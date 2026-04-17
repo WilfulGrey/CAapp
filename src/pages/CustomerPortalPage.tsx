@@ -1454,17 +1454,18 @@ const MatchCard: FC<{
   onNurseClick: () => void;
   onInvite?: () => void;
 }> = ({ nurse, status, onNurseClick, onInvite }) => {
-  const [confirming, setConfirming] = useState(false);
+  const [invitePhase, setInvitePhase] = useState<'idle'|'sending'|'done'>('idle');
   const inits = initials(nurse.name);
   const name = displayName(nurse.name);
   const bars = Array.from({ length: 5 }, (_, i) => i < nurse.language.bars);
 
   const handleInvite = () => {
-    setConfirming(true);
+    setInvitePhase('sending');
     setTimeout(() => {
+      setInvitePhase('done');
       onInvite?.();
-      setConfirming(false);
-    }, 900);
+      setTimeout(() => setInvitePhase('idle'), 1200);
+    }, 1400);
   };
 
   return (
@@ -1544,13 +1545,17 @@ const MatchCard: FC<{
           <span className="flex items-center gap-1.5 text-xs font-bold text-[#9B1FA1] bg-[#F5EDF6] border border-[#D8A9DC] px-3 py-1.5 rounded-full">
             <Check className="w-3 h-3" /> Eingeladen
           </span>
-        ) : confirming ? (
+        ) : invitePhase === 'sending' ? (
           <span className="flex items-center gap-1.5 text-xs font-bold text-[#9B1FA1] bg-[#F5EDF6] border border-[#D8A9DC] px-4 py-1.5 rounded-full">
-            <svg className="w-3 h-3 animate-spin" viewBox="0 0 24 24" fill="none">
+            <svg className="w-3 h-3 animate-spin flex-shrink-0" viewBox="0 0 24 24" fill="none">
               <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3"/>
               <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"/>
             </svg>
-            Pflegekraft wird eingeladen…
+            wird eingeladen…
+          </span>
+        ) : invitePhase === 'done' ? (
+          <span className="flex items-center gap-1.5 text-xs font-bold text-[#22A06B] bg-[#E3F7EF] border border-[#B8E8D4] px-4 py-1.5 rounded-full">
+            <Check className="w-3 h-3 flex-shrink-0" /> wurde eingeladen!
           </span>
         ) : (
           <button
@@ -2252,6 +2257,17 @@ const CustomerNurseModal: FC<{
   isInvited?: boolean;
 }> = ({ nurse, onClose, app, onReview, onDecline, onUndo, onInvite, onDeclineMatch, isInvited = false }) => {
   const [invited, setInvited] = useState(isInvited);
+  const [invitePhaseModal, setInvitePhaseModal] = useState<'idle'|'sending'|'done'>('idle');
+
+  const handleModalInvite = () => {
+    setInvitePhaseModal('sending');
+    setTimeout(() => {
+      setInvitePhaseModal('done');
+      setInvited(true);
+      onInvite?.();
+      setTimeout(() => { setInvitePhaseModal('idle'); }, 1200);
+    }, 1400);
+  };
   const inits = initials(nurse.name);
   const name = displayName(nurse.name);
   const bars = Array.from({ length: 5 }, (_, i) => i < nurse.language.bars);
@@ -2467,12 +2483,26 @@ const CustomerNurseModal: FC<{
                     >
                       Nein danke
                     </button>
-                    <button
-                      onClick={() => { setInvited(true); onInvite?.(); }}
-                      className="flex-[2] bg-[#9B1FA1] text-white rounded-xl py-3 font-bold text-sm hover:bg-[#7B1A85] transition-colors flex items-center justify-center gap-2"
-                    >
-                      <UserPlus className="w-4 h-4" /> Einladen
-                    </button>
+                    {invitePhaseModal === 'sending' ? (
+                      <div className="flex-[2] bg-[#F5EDF6] text-[#9B1FA1] rounded-xl py-3 font-bold text-sm border border-[#D8A9DC] flex items-center justify-center gap-2">
+                        <svg className="w-4 h-4 animate-spin flex-shrink-0" viewBox="0 0 24 24" fill="none">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3"/>
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"/>
+                        </svg>
+                        Pflegekraft wird eingeladen…
+                      </div>
+                    ) : invitePhaseModal === 'done' ? (
+                      <div className="flex-[2] bg-[#E3F7EF] text-[#22A06B] rounded-xl py-3 font-bold text-sm border border-[#B8E8D4] flex items-center justify-center gap-2">
+                        <Check className="w-4 h-4" /> Pflegekraft wurde eingeladen!
+                      </div>
+                    ) : (
+                      <button
+                        onClick={handleModalInvite}
+                        className="flex-[2] bg-[#9B1FA1] text-white rounded-xl py-3 font-bold text-sm hover:bg-[#7B1A85] transition-colors flex items-center justify-center gap-2"
+                      >
+                        <UserPlus className="w-4 h-4" /> Einladen
+                      </button>
+                    )}
                   </>
                 ) : (
                   <div className="flex-1 bg-[#F5EDF6] text-[#9B1FA1] rounded-xl py-3 font-bold text-sm border border-[#D8A9DC] flex items-center justify-center gap-2">
