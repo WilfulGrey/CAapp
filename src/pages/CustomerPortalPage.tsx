@@ -250,7 +250,7 @@ const CustomerPortalPage: FC = () => {
           <h1 className="text-xl font-bold text-gray-900 leading-snug mb-1">
             Unser Kundenportal.<br />Transparent. In Ihren Händen.
           </h1>
-          <p className="text-sm text-gray-400">
+          <p className="text-sm text-gray-600">
             Kein Rätselraten — Angebot ansehen, passende Betreuungskräfte einladen und Bewerbungen direkt annehmen.
           </p>
         </div>
@@ -267,7 +267,7 @@ const CustomerPortalPage: FC = () => {
               </div>
               <div>
                 <p className="text-base font-bold text-gray-900">Bewerbungen werden für Sie vorbereitet</p>
-                <p className="text-xs text-gray-400 mt-0.5">Wir benachrichtigen Sie sobald neue eingehen.</p>
+                <p className="text-xs text-gray-600 mt-0.5">Wir benachrichtigen Sie sobald neue eingehen.</p>
               </div>
             </div>
             <div className="border-t border-gray-100 pt-3 flex items-start gap-2.5">
@@ -470,7 +470,7 @@ const BookedScreen: FC<{ app: Application; onNurseClick: (n: Nurse) => void }> =
       <div className="text-center py-4">
         <div className="text-5xl mb-3">🎊</div>
         <h1 className="text-xl font-bold text-gray-900 mb-1">Pflegekraft gebucht!</h1>
-        <p className="text-sm text-gray-400">Alles ist bestätigt. Die Agentur wurde benachrichtigt.</p>
+        <p className="text-sm text-gray-600">Alles ist bestätigt. Die Agentur wurde benachrichtigt.</p>
       </div>
 
       {/* Nurse + offer card */}
@@ -503,9 +503,9 @@ const BookedScreen: FC<{ app: Application; onNurseClick: (n: Nurse) => void }> =
               <span className="text-gray-300 text-xs">·</span>
               <span className="text-xs font-bold text-[#9B1FA1]">{nurse.experience}</span>
             </div>
-            <p className="text-xs text-gray-400 mt-0.5">{agencyName}</p>
+            <p className="text-xs text-gray-500 mt-0.5">{agencyName}</p>
           </div>
-          <span className="text-xs text-gray-400 flex-shrink-0">Profil →</span>
+          <span className="text-xs text-gray-500 flex-shrink-0">Profil →</span>
         </div>
 
         {/* Offer details */}
@@ -527,7 +527,7 @@ const BookedScreen: FC<{ app: Application; onNurseClick: (n: Nurse) => void }> =
 
       {/* Milestones */}
       <div className="space-y-2.5">
-        <p className="text-xs font-bold text-gray-400 uppercase tracking-wider px-1">Als nächstes</p>
+        <p className="text-xs font-bold text-gray-600 uppercase tracking-wider px-1">Als nächstes</p>
         {milestones.map((m) => (
           <div key={m.title} className="bg-white border border-gray-200 rounded-2xl px-4 py-3.5 flex items-start gap-3.5 shadow-sm">
             <div className="w-9 h-9 rounded-xl bg-gray-100 flex items-center justify-center flex-shrink-0 text-lg">
@@ -664,8 +664,8 @@ const AngebotCard: FC = () => {
             <Check className="w-4 h-4 text-[#22A06B]" strokeWidth={3} />
           </div>
           <div className="flex-1 min-w-0">
-            <p className="text-[11px] text-gray-400 mb-0.5">Ihr Angebot</p>
-            <p className="text-sm font-bold text-gray-900 truncate">
+            <p className="text-[11px] text-gray-500 mb-0.5">Ihr Angebot</p>
+            <p className="text-sm font-bold text-gray-900">
               Von Norman · ab 01.05.2026 · 3.050 €/Mo.
             </p>
           </div>
@@ -680,11 +680,11 @@ const AngebotCard: FC = () => {
               <div className="flex items-start justify-between gap-2">
                 <div>
                   <p className="text-xs font-bold text-gray-800">Frau Von Norman</p>
-                  <p className="text-[11px] text-gray-400">graefinnorman@gmx.de</p>
+                  <p className="text-[11px] text-gray-500">graefinnorman@gmx.de</p>
                 </div>
                 <div className="text-right flex-shrink-0">
-                  <p className="text-[11px] text-gray-400">Angebotsdatum: 15.04.2026</p>
-                  <p className="text-[11px] text-gray-400">Gültig bis: 15.05.2026</p>
+                  <p className="text-[11px] text-gray-500">Angebotsdatum: 15.04.2026</p>
+                  <p className="text-[11px] text-gray-500">Gültig bis: 15.05.2026</p>
                 </div>
               </div>
               <div>
@@ -710,8 +710,8 @@ const AngebotCard: FC = () => {
                 ].map(r => (
                   <div key={r.label} className="flex items-center justify-between px-4 py-2 bg-white gap-4">
                     <div>
-                      <span className="text-xs text-gray-500">{r.label}</span>
-                      {r.sub && <p className="text-[10px] text-gray-400 mt-0.5">{r.sub}</p>}
+                      <span className="text-xs text-gray-700">{r.label}</span>
+                      {r.sub && <p className="text-[10px] text-gray-500 mt-0.5">{r.sub}</p>}
                     </div>
                     <span className={`text-xs text-right flex-shrink-0 ${r.bold ? 'font-bold text-gray-900' : 'text-gray-600'}`}>{r.value}</span>
                   </div>
@@ -811,7 +811,7 @@ const AngebotCard: FC = () => {
                   <div className="w-6 h-6 rounded-full bg-[#9B1FA1] text-white text-xs font-bold flex items-center justify-center flex-shrink-0">1</div>
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-semibold text-[#9B1FA1]">Profildaten vervollständigen</p>
-                    <p className="text-[11px] text-gray-400">Angaben zum Patienten & Haushalt</p>
+                    <p className="text-[11px] text-gray-500">Angaben zum Patienten & Haushalt</p>
                   </div>
                   <ChevronDown className="w-4 h-4 text-[#9B1FA1] -rotate-90 flex-shrink-0" />
                 </button>
@@ -820,7 +820,7 @@ const AngebotCard: FC = () => {
                   <div className="w-6 h-6 rounded-full bg-gray-200 text-gray-500 text-xs font-bold flex items-center justify-center flex-shrink-0">2</div>
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-semibold text-gray-700">Auswahl Ihrer Pflegekraft</p>
-                    <p className="text-[11px] text-gray-400">Passende Betreuerin kennenlernen</p>
+                    <p className="text-[11px] text-gray-500">Passende Betreuerin kennenlernen</p>
                   </div>
                 </div>
                 {/* Step 3 */}
@@ -828,7 +828,7 @@ const AngebotCard: FC = () => {
                   <div className="w-6 h-6 rounded-full bg-gray-200 text-gray-500 text-xs font-bold flex items-center justify-center flex-shrink-0">3</div>
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-semibold text-gray-700">Anreise & Betreuungsbeginn</p>
-                    <p className="text-[11px] text-gray-400">Pflegekraft kommt zu Ihnen nach Hause</p>
+                    <p className="text-[11px] text-gray-500">Pflegekraft kommt zu Ihnen nach Hause</p>
                   </div>
                 </div>
                 {/* Step 4 */}
@@ -836,7 +836,7 @@ const AngebotCard: FC = () => {
                   <div className="w-6 h-6 rounded-full bg-gray-200 text-gray-500 text-xs font-bold flex items-center justify-center flex-shrink-0">4</div>
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-semibold text-gray-700">Laufende Betreuung</p>
-                    <p className="text-[11px] text-gray-400">Ihr persönlicher Ansprechpartner begleitet Sie</p>
+                    <p className="text-[11px] text-gray-500">Ihr persönlicher Ansprechpartner begleitet Sie</p>
                   </div>
                 </div>
               </div>
@@ -859,7 +859,7 @@ const AngebotCard: FC = () => {
             }
           </div>
           <div className="flex-1 min-w-0">
-            <p className="text-[11px] text-gray-400 mb-0.5">Patientendaten</p>
+            <p className="text-[11px] text-gray-500 mb-0.5">Patientendaten</p>
             {allComplete && saved ? (
               <p className="text-sm font-bold text-gray-900">Vollständig ausgefüllt</p>
             ) : (
@@ -888,7 +888,7 @@ const AngebotCard: FC = () => {
                   />
                 ))}
               </div>
-              <span className="text-[10px] text-gray-400 flex-shrink-0">
+              <span className="text-xs text-gray-600 flex-shrink-0 font-medium">
                 {STEP_LABELS[step]} ({step + 1}/{STEP_LABELS.length})
               </span>
             </div>
@@ -1231,7 +1231,7 @@ const NurseRow: FC<{ nurse: Nurse }> = ({ nurse }) => {
             <span className="text-[15px] font-bold text-gray-900 leading-tight truncate">
               {name}
             </span>
-            <span className="text-xs text-gray-400 whitespace-nowrap flex-shrink-0">
+            <span className="text-xs text-gray-500 whitespace-nowrap flex-shrink-0">
               {nurse.age} J.
             </span>
           </div>
@@ -1248,7 +1248,7 @@ const NurseRow: FC<{ nurse: Nurse }> = ({ nurse }) => {
 
         {/* Row 2: Language bars + level */}
         <div className="flex items-center gap-1.5 mb-1.5">
-          <span className="text-xs text-gray-400 whitespace-nowrap">Deutsch</span>
+          <span className="text-xs text-gray-500 whitespace-nowrap">Deutsch</span>
           <div className="flex gap-0.5 flex-shrink-0">
             {bars.map((f, i) => (
               <div
@@ -1270,7 +1270,7 @@ const NurseRow: FC<{ nurse: Nurse }> = ({ nurse }) => {
           {nurse.history && (
             <>
               <span className="text-gray-300">·</span>
-              <span className="text-[11px] text-gray-400 whitespace-nowrap">
+              <span className="text-[11px] text-gray-500 whitespace-nowrap">
                 {nurse.history.assignments} Einsätze · Ø {avgDur.toFixed(1).replace('.', ',')} Mon.
               </span>
             </>
@@ -1321,7 +1321,7 @@ const AppCard: FC<{
             <div className="flex items-center justify-between gap-2 mb-1">
               <div className="flex items-baseline gap-1.5 min-w-0">
                 <span className="font-bold text-gray-900 leading-tight">{name}</span>
-                <span className="text-xs text-gray-400 flex-shrink-0">{nurse.age} J.</span>
+                <span className="text-xs text-gray-500 flex-shrink-0">{nurse.age} J.</span>
               </div>
               {(() => { const lvl = nurseLevel(nurse.history?.assignments ?? 0); return (
                 <span className={`flex items-center gap-1 text-[10px] font-bold pl-1.5 pr-2.5 py-0.5 rounded-full border flex-shrink-0 ${lvl.cls}`}>
@@ -1333,7 +1333,7 @@ const AppCard: FC<{
 
             {/* Row 2: Language */}
             <div className="flex items-center gap-1.5 mb-1">
-              <span className="text-xs text-gray-400">Deutsch</span>
+              <span className="text-xs text-gray-500">Deutsch</span>
               <div className="flex gap-0.5">
                 {bars.map((f, i) => (
                   <div key={i} className={`w-2.5 h-[5px] rounded-full ${f ? 'bg-[#9B1FA1]' : 'bg-gray-200'}`} />
@@ -1366,10 +1366,10 @@ const AppCard: FC<{
             <p className="font-semibold text-gray-800 truncate">
               {app.offer.anreisedatum} – {app.offer.abreisedatum}
             </p>
-            <p className="text-[11px] text-gray-400 mt-0.5">
+            <p className="text-[11px] text-gray-500 mt-0.5">
               Reisekosten: {app.offer.anreisekosten} € pro Fahrt
             </p>
-            <p className="text-[11px] text-gray-400 mt-0">
+            <p className="text-[11px] text-gray-500 mt-0">
               {app.offer.kuendigungsfrist} Kündigungsfrist
             </p>
           </div>
@@ -1489,7 +1489,7 @@ const MatchCard: FC<{
             <div className="flex items-center justify-between gap-2 mb-1">
               <div className="flex items-baseline gap-1.5 min-w-0">
                 <span className="font-bold text-gray-900 leading-tight">{name}</span>
-                <span className="text-xs text-gray-400 flex-shrink-0">{nurse.age} J.</span>
+                <span className="text-xs text-gray-500 flex-shrink-0">{nurse.age} J.</span>
               </div>
               {(() => { const lvl = nurseLevel(nurse.history?.assignments ?? 0); return (
                 <span className={`flex items-center gap-1 text-[10px] font-bold pl-1.5 pr-2.5 py-0.5 rounded-full border flex-shrink-0 ${lvl.cls}`}>
@@ -1501,7 +1501,7 @@ const MatchCard: FC<{
 
             {/* Row 2: Language */}
             <div className="flex items-center gap-1.5 mb-1">
-              <span className="text-xs text-gray-400">Deutsch</span>
+              <span className="text-xs text-gray-500">Deutsch</span>
               <div className="flex gap-0.5">
                 {bars.map((f, i) => (
                   <div key={i} className={`w-2.5 h-[5px] rounded-full ${f ? 'bg-[#9B1FA1]' : 'bg-gray-200'}`} />
@@ -1557,7 +1557,7 @@ const InfoPopup: FC<{ onClose: () => void }> = ({ onClose }) => (
           <div className="flex items-start justify-between">
             <div>
               <h2 className="text-base font-bold text-gray-900">Wie funktioniert das Einladen?</h2>
-              <p className="text-xs text-gray-400 mt-0.5">Alles Wichtige auf einen Blick</p>
+              <p className="text-xs text-gray-600 mt-0.5">Alles Wichtige auf einen Blick</p>
             </div>
             <button onClick={onClose} className="w-8 h-8 rounded-full hover:bg-gray-100 flex items-center justify-center transition-colors flex-shrink-0">
               <X className="w-4 h-4 text-gray-500" />
@@ -1636,7 +1636,7 @@ const ContactPopup: FC<{ onClose: () => void }> = ({ onClose }) => (
 
           {/* Header row */}
           <div className="flex items-center justify-between">
-            <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider">Ihre Beraterin</p>
+            <p className="text-[11px] font-semibold text-gray-600 uppercase tracking-wider">Ihre Beraterin</p>
             <button
               onClick={onClose}
               className="w-7 h-7 rounded-full hover:bg-gray-100 flex items-center justify-center transition-colors"
@@ -1663,7 +1663,7 @@ const ContactPopup: FC<{ onClose: () => void }> = ({ onClose }) => (
             </div>
             <div className="flex-1 min-w-0">
               <p className="font-bold text-gray-900 text-base leading-tight">Ilka Wysocki</p>
-              <p className="text-xs text-gray-400 mb-2.5">Pflegeberaterin · Primundus</p>
+              <p className="text-xs text-gray-500 mb-2.5">Pflegeberaterin · Primundus</p>
               <a
                 href="tel:089200000830"
                 className="inline-flex items-center gap-1.5 text-[#9B1FA1] font-bold text-sm hover:opacity-80 transition-opacity"
@@ -1671,7 +1671,7 @@ const ContactPopup: FC<{ onClose: () => void }> = ({ onClose }) => (
                 <Phone className="w-3.5 h-3.5 flex-shrink-0" />
                 089 200 000 830
               </a>
-              <p className="text-[11px] text-gray-400 mt-0.5">Mo–So, 8:00–18:00 Uhr</p>
+              <p className="text-[11px] text-gray-500 mt-0.5">Mo–So, 8:00–18:00 Uhr</p>
             </div>
           </div>
 
@@ -1754,7 +1754,7 @@ const DeclineConfirmModal: FC<{
             {/* Header */}
             <div>
               <h2 className="text-base font-bold text-gray-900">Bewerbung ablehnen</h2>
-              <p className="text-xs text-gray-400 mt-0.5">Die Agentur wird über die Absage informiert.</p>
+              <p className="text-xs text-gray-600 mt-0.5">Die Agentur wird über die Absage informiert.</p>
             </div>
 
             {/* Nurse card */}
@@ -1930,7 +1930,7 @@ const AngebotPruefenModal: FC<{
                 {/* Details zur Bewerbung */}
                 <div>
                   <p className="text-xs font-bold text-gray-700 mb-1">Details zur Bewerbung</p>
-                  <p className="text-[11px] text-gray-400 mb-2">{offer.submittedAt}</p>
+                  <p className="text-[11px] text-gray-500 mb-2">{offer.submittedAt}</p>
                   <div className="rounded-xl border border-gray-100 overflow-hidden divide-y divide-gray-100">
                     {[
                       { label: 'Mtl. Betreuungskosten', value: `${offer.monatlicheKosten.toLocaleString('de-DE')} €`, bold: true },
@@ -2030,12 +2030,12 @@ const AngebotPruefenModal: FC<{
                     </div>
                     <div>
                       <p className="font-bold text-sm text-gray-900">{name}</p>
-                      <p className="text-xs text-gray-400">{agencyName}</p>
+                      <p className="text-xs text-gray-500">{agencyName}</p>
                     </div>
                   </div>
                   <div className="flex justify-between text-xs pb-3 border-b border-gray-200">
-                    <div><p className="text-gray-400 mb-0.5">Anreise</p><p className="font-semibold">{offer.anreisedatum}</p></div>
-                    <div className="text-right"><p className="text-gray-400 mb-0.5">Abreise</p><p className="font-semibold">{offer.abreisedatum}</p></div>
+                    <div><p className="text-gray-600 mb-0.5">Anreise</p><p className="font-semibold">{offer.anreisedatum}</p></div>
+                    <div className="text-right"><p className="text-gray-600 mb-0.5">Abreise</p><p className="font-semibold">{offer.abreisedatum}</p></div>
                   </div>
                   <div className="space-y-2">
                     {summary.map(m => (
@@ -2126,7 +2126,7 @@ const OfferModal: FC<{ onClose: () => void }> = ({ onClose }) => (
               { label: 'Sprachkenntnisse', value: 'mind. B1' },
             ].map((item, i) => (
               <div key={i} className="bg-gray-50 rounded-xl p-3.5">
-                <div className="text-xs text-gray-400 mb-0.5">{item.label}</div>
+                <div className="text-xs text-gray-600 mb-0.5">{item.label}</div>
                 <div className="font-semibold text-gray-900 text-sm">{item.value}</div>
               </div>
             ))}
@@ -2234,7 +2234,7 @@ const CustomerNurseModal: FC<{
     <div className="flex gap-3.5 py-3 border-b border-gray-100 last:border-0">
       <span className="text-xl w-7 flex-shrink-0 text-center leading-none mt-0.5">{emoji}</span>
       <div className="min-w-0">
-        <p className="text-xs text-gray-400 mb-0.5">{label}</p>
+        <p className="text-xs text-gray-500 mb-0.5">{label}</p>
         {value && <p className="text-sm font-bold text-gray-800">{value}</p>}
         {chips && (
           <div className="flex flex-wrap gap-1.5 mt-1">
@@ -2299,11 +2299,11 @@ const CustomerNurseModal: FC<{
             {/* 2 stat boxes: Erfahrung + Deutschkenntnisse */}
             <div className="grid grid-cols-2 gap-2 mt-4">
               <div className="bg-white rounded-xl px-3 py-2.5 shadow-sm">
-                <p className="text-xs text-gray-400 mb-1">Erfahrung</p>
+                <p className="text-xs text-gray-600 mb-1">Erfahrung</p>
                 <p className="text-sm font-bold text-[#9B1FA1]">{nurse.experience}</p>
               </div>
               <div className="bg-white rounded-xl px-3 py-2.5 shadow-sm">
-                <p className="text-xs text-gray-400 mb-1">Deutschkenntnisse</p>
+                <p className="text-xs text-gray-600 mb-1">Deutschkenntnisse</p>
                 <div className="flex items-center gap-1.5">
                   <div className="flex gap-0.5">
                     {bars.map((f, i) => <div key={i} className={`w-3 h-1.5 rounded-full ${f ? 'bg-[#9B1FA1]' : 'bg-gray-200'}`} />)}
