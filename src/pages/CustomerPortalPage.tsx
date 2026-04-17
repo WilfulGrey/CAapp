@@ -171,7 +171,7 @@ const CustomerPortalPage: FC = () => {
 
   const showToast = (msg: string) => {
     setToast(msg);
-    setTimeout(() => setToast(null), 3000);
+    setTimeout(() => setToast(null), 4000);
   };
 
   const acceptApp = (id: string) => {
@@ -1454,9 +1454,18 @@ const MatchCard: FC<{
   onNurseClick: () => void;
   onInvite?: () => void;
 }> = ({ nurse, status, onNurseClick, onInvite }) => {
+  const [confirming, setConfirming] = useState(false);
   const inits = initials(nurse.name);
   const name = displayName(nurse.name);
   const bars = Array.from({ length: 5 }, (_, i) => i < nurse.language.bars);
+
+  const handleInvite = () => {
+    setConfirming(true);
+    setTimeout(() => {
+      onInvite?.();
+      setConfirming(false);
+    }, 900);
+  };
 
   return (
     <div
@@ -1535,10 +1544,14 @@ const MatchCard: FC<{
           <span className="flex items-center gap-1.5 text-xs font-bold text-[#9B1FA1] bg-[#F5EDF6] border border-[#D8A9DC] px-3 py-1.5 rounded-full">
             <Check className="w-3 h-3" /> Eingeladen
           </span>
+        ) : confirming ? (
+          <span className="flex items-center gap-1.5 text-xs font-bold text-[#22A06B] bg-[#E3F7EF] border border-[#B8E8D4] px-4 py-1.5 rounded-full">
+            <Check className="w-3 h-3" /> Eingeladen!
+          </span>
         ) : (
           <button
-            onClick={e => { e.stopPropagation(); onInvite?.(); }}
-            className="text-xs font-bold bg-[#9B1FA1] text-white px-4 py-1.5 rounded-full hover:bg-[#7B1A85] transition-colors"
+            onClick={e => { e.stopPropagation(); handleInvite(); }}
+            className="text-xs font-bold bg-[#9B1FA1] text-white px-4 py-1.5 rounded-full hover:bg-[#7B1A85] transition-colors active:scale-95"
           >
             Einladen
           </button>
