@@ -206,7 +206,9 @@ const CustomerPortalPage: FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gray-200 md:flex md:items-start md:justify-center md:py-10">
+    <div className="min-h-screen md:min-h-0 bg-gray-50 w-full md:w-[390px] md:min-h-[844px] md:rounded-[48px] md:shadow-2xl md:overflow-hidden md:border-[8px] md:border-gray-800 md:ring-4 md:ring-gray-900/10 relative" style={{fontFamily: 'inherit'}}>
+    <div className="md:h-[844px] md:overflow-y-auto md:overflow-x-hidden">
       {/* Toast */}
       {toast && (
         <div
@@ -425,6 +427,8 @@ const CustomerPortalPage: FC = () => {
         @keyframes slideSheet { from { opacity: 0; transform: translateY(24px) } to { opacity: 1; transform: translateY(0) } }
         @keyframes exitCard { 0% { opacity: 1; transform: translateY(0) } 100% { opacity: 0; transform: translateY(16px) } }
       `}</style>
+    </div>
+    </div>
     </div>
   );
 };
