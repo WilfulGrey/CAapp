@@ -1463,9 +1463,11 @@ const MatchCard: FC<{
     setInvitePhase('sending');
     setTimeout(() => {
       setInvitePhase('done');
-      onInvite?.();
-      setTimeout(() => setInvitePhase('idle'), 1200);
-    }, 1400);
+      setTimeout(() => {
+        onInvite?.();
+        setInvitePhase('idle');
+      }, 2000);
+    }, 2000);
   };
 
   return (
@@ -2263,10 +2265,12 @@ const CustomerNurseModal: FC<{
     setInvitePhaseModal('sending');
     setTimeout(() => {
       setInvitePhaseModal('done');
-      setInvited(true);
-      onInvite?.();
-      setTimeout(() => { setInvitePhaseModal('idle'); }, 1200);
-    }, 1400);
+      setTimeout(() => {
+        setInvited(true);
+        onInvite?.();
+        setInvitePhaseModal('idle');
+      }, 2000);
+    }, 2000);
   };
   const inits = initials(nurse.name);
   const name = displayName(nurse.name);
