@@ -665,9 +665,8 @@ const AngebotCard: FC = () => {
           </div>
           <div className="flex-1 min-w-0">
             <p className="text-[11px] text-gray-500 mb-0.5">Ihr Angebot</p>
-            <p className="text-sm font-bold text-gray-900">
-              Von Norman · ab 01.05.2026 · 3.050 €/Mo.
-            </p>
+            <p className="text-sm font-bold text-gray-900">Von Norman · 3.050 €/Mo.</p>
+            <p className="text-xs text-gray-500 mt-0.5">ab 01.05.2026</p>
           </div>
           <ChevronDown className={`w-4 h-4 text-gray-400 flex-shrink-0 transition-transform ${angebotOpen ? 'rotate-180' : ''}`} />
         </button>
