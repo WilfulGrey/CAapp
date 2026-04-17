@@ -1522,14 +1522,27 @@ const MatchCard: FC<{
         </div>
       </div>
 
-      {/* Invited status indicator */}
-      {status === 'invited' && (
-        <div className="px-4 pb-3 -mt-1">
-          <div className="flex items-center gap-1.5 text-xs font-bold text-[#9B1FA1] bg-[#F5EDF6] border border-[#D8A9DC] rounded-xl px-3 py-2">
-            <Check className="w-3.5 h-3.5" /> Eingeladen — warten auf Bewerbung
-          </div>
-        </div>
-      )}
+      {/* Footer */}
+      <div className="border-t border-gray-100 px-4 py-2.5 flex items-center justify-between">
+        <button
+          onClick={onNurseClick}
+          className="text-sm font-semibold text-[#9B1FA1] flex items-center gap-1 hover:underline"
+        >
+          Details <ChevronDown className="w-3.5 h-3.5 -rotate-90" />
+        </button>
+        {status === 'invited' ? (
+          <span className="flex items-center gap-1.5 text-xs font-bold text-[#9B1FA1] bg-[#F5EDF6] border border-[#D8A9DC] px-3 py-1.5 rounded-full">
+            <Check className="w-3 h-3" /> Eingeladen
+          </span>
+        ) : (
+          <button
+            onClick={onNurseClick}
+            className="text-xs font-bold bg-[#9B1FA1] text-white px-4 py-1.5 rounded-full hover:bg-[#7B1A85] transition-colors"
+          >
+            Einladen
+          </button>
+        )}
+      </div>
     </div>
   );
 };
