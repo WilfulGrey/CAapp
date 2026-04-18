@@ -2135,6 +2135,25 @@ const AngebotPruefenModal: FC<{
   const [telefon, setTelefon] = useState('');
   const [email, setEmail] = useState('');
 
+  // Kontaktperson
+  const [kpAnrede, setKpAnrede] = useState('');
+  const [kpVorname, setKpVorname] = useState('');
+  const [kpNachname, setKpNachname] = useState('');
+  const [kpTelefon, setKpTelefon] = useState('');
+  const [kpEmail, setKpEmail] = useState('');
+
+  // AGB checkbox
+  const [agbChecked, setAgbChecked] = useState(false);
+
+  const canAccept =
+    vorname.trim() !== '' &&
+    nachname.trim() !== '' &&
+    einsatzort.trim() !== '' &&
+    kpVorname.trim() !== '' &&
+    kpNachname.trim() !== '' &&
+    kpTelefon.trim() !== '' &&
+    agbChecked;
+
   // Monthly summary data (mock, based on offer)
   const tagessatz = Math.round(offer.monatlicheKosten / 30);
   const summary = [
@@ -2313,6 +2332,43 @@ const AngebotPruefenModal: FC<{
                   </div>
                 </div>
 
+                {/* Kontaktperson */}
+                <div>
+                  <p className="text-sm font-bold text-gray-900 mb-1">Kontaktperson <span className="text-gray-400 font-normal">(in Notfällen)</span></p>
+                  <p className="text-xs text-gray-400 mb-4">Wen sollen wir bei Notfällen kontaktieren?</p>
+                  <div className="space-y-4">
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <label className={labelCls}>Anrede</label>
+                        <select value={kpAnrede} onChange={e => setKpAnrede(e.target.value)} className={inputCls}>
+                          <option value="">Bitte wählen</option>
+                          <option>Frau</option><option>Herr</option><option>Divers</option>
+                        </select>
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <label className={labelCls}>Vorname *</label>
+                        <input value={kpVorname} onChange={e => setKpVorname(e.target.value)} placeholder="Vorname" className={inputCls} />
+                      </div>
+                      <div>
+                        <label className={labelCls}>Nachname *</label>
+                        <input value={kpNachname} onChange={e => setKpNachname(e.target.value)} placeholder="Nachname" className={inputCls} />
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <label className={labelCls}>Telefon *</label>
+                        <input value={kpTelefon} onChange={e => setKpTelefon(e.target.value)} placeholder="Bitte eingeben" className={inputCls} />
+                      </div>
+                      <div>
+                        <label className={labelCls}>E-Mail</label>
+                        <input value={kpEmail} onChange={e => setKpEmail(e.target.value)} placeholder="Bitte eingeben" className={inputCls} />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
                 {/* Summary box */}
                 <div className="bg-gray-50 rounded-xl border border-gray-100 p-4 space-y-3">
                   <p className="text-xs font-bold text-gray-700 mb-1">Zusammenfassung</p>
@@ -2347,6 +2403,16 @@ const AngebotPruefenModal: FC<{
                   </div>
                   <p className="text-xs text-gray-400">Reisekosten werden nach <em>halben Tag</em> berechnet. Provision ist im Monatspreis enthalten.</p>
                 </div>
+
+                {/* AGB Checkbox */}
+                <label className="flex items-start gap-3 cursor-pointer p-4 bg-gray-50 border border-gray-200 rounded-xl" onClick={() => setAgbChecked(v => !v)}>
+                  <div className={`w-5 h-5 rounded flex items-center justify-center flex-shrink-0 mt-0.5 border-2 transition-all ${agbChecked ? 'bg-[#9B1FA1] border-[#9B1FA1]' : 'border-gray-300 bg-white'}`}>
+                    {agbChecked && <Check className="w-3 h-3 text-white" strokeWidth={3} />}
+                  </div>
+                  <span className="text-sm text-gray-600 leading-relaxed">
+                    Ich akzeptiere das Angebot verbindlich und bestätige, dass alle Angaben korrekt sind. Der Vertrag wird direkt mit der Agentur geschlossen.
+                  </span>
+                </label>
               </div>
             )}
           </div>
@@ -2369,8 +2435,9 @@ const AngebotPruefenModal: FC<{
                   ← Zurück
                 </button>
                 <button
-                  onClick={() => onAccept(app.id)}
-                  className="flex-1 bg-[#9B1FA1] hover:bg-[#7B1A85] text-white rounded-xl py-3 text-sm font-bold transition-all"
+                  onClick={() => canAccept && onAccept(app.id)}
+                  disabled={!canAccept}
+                  className={`flex-1 rounded-xl py-3 text-sm font-bold transition-all ${canAccept ? 'bg-[#9B1FA1] hover:bg-[#7B1A85] text-white' : 'bg-gray-100 text-gray-400 cursor-not-allowed'}`}
                 >
                   Betreuungskraft akzeptieren
                 </button>
