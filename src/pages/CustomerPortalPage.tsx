@@ -789,9 +789,9 @@ const AngebotCard: FC<{
             <Check className="w-4 h-4 text-[#22A06B]" strokeWidth={3} />
           </div>
           <div className="flex-1 min-w-0">
-            <p className="text-xs text-gray-500 mb-0.5">Ihr Angebot</p>
+            <p className="text-sm text-gray-500 mb-0.5">Ihr Angebot</p>
             <p className="text-sm font-bold text-gray-900">Von Norman · 3.050 €/Mo.</p>
-            <p className="text-xs text-gray-500 mt-0.5">ab 01.05.2026</p>
+            <p className="text-sm text-gray-500 mt-0.5">ab 01.05.2026</p>
           </div>
           <ChevronDown className={`w-4 h-4 text-gray-400 flex-shrink-0 transition-transform ${angebotOpen ? 'rotate-180' : ''}`} />
         </button>
@@ -803,19 +803,20 @@ const AngebotCard: FC<{
             <div className="space-y-3">
               <div className="flex items-start justify-between gap-2">
                 <div>
-                  <p className="text-xs font-bold text-gray-800">Frau Von Norman</p>
-                  <p className="text-xs text-gray-500">graefinnorman@gmx.de</p>
+                  <p className="text-sm font-bold text-gray-800">Frau Von Norman</p>
+                  <p className="text-sm text-gray-500">graefinnorman@gmx.de</p>
                 </div>
                 <div className="text-right flex-shrink-0">
-                  <p className="text-xs text-gray-500">Angebotsdatum: 15.04.2026</p>
-                  <p className="text-xs text-gray-500">Gültig bis: 15.05.2026</p>
+                  <p className="text-sm text-gray-500">Angebotsdatum: 15.04.2026</p>
+                  <p className="text-sm text-gray-500">Gültig bis: 15.05.2026</p>
                 </div>
               </div>
               <div>
-                <p className="text-sm font-bold text-gray-900 mb-2">Ihr persönliches Angebot –<br />24-Stunden-Betreuung zu Hause</p>
-                <p className="text-xs text-gray-600 mb-2">Sehr geehrte Frau Von Norman,</p>
-                <p className="text-xs text-gray-600 leading-relaxed">vielen Dank für Ihre Anfrage. Gerne können wir die Betreuung übernehmen. Da unsere Betreuungskräfte direkt angestellt sind, kann die Betreuung bereits <span className="font-semibold">innerhalb von 4–7 Werktagen</span> beginnen.</p>
-                <p className="text-xs text-gray-400 mt-3">Ihre Ilka Wysocki</p>
+                <p className="text-sm font-bold text-gray-900 mb-2 mt-6">Ihr persönliches Angebot –<br />24-Stunden-Betreuung zu Hause</p>
+                <p className="text-sm text-gray-600 mb-2">Sehr geehrte Frau Von Norman,</p>
+                <p className="text-sm text-gray-600 leading-relaxed">vielen Dank für Ihre Anfrage. Gerne können wir die Betreuung übernehmen. Da unsere Betreuungskräfte direkt angestellt sind, kann die Betreuung bereits <span className="font-semibold">innerhalb von 4–7 Werktagen</span> beginnen.</p>
+                <p className="text-sm text-gray-600 leading-relaxed mt-2">Nachfolgend finden Sie die Konditionen sowie bereits vorausgewählte Pflegekräfte. Melden Sie sich jederzeit bei Fragen.</p>
+                <p className="text-sm text-gray-400 mt-3">Ihre Ilka Wysocki</p>
               </div>
             </div>
 
@@ -835,14 +836,14 @@ const AngebotCard: FC<{
                   <div key={r.label} className="flex items-center justify-between px-4 py-2 bg-white gap-4">
                     <div>
                       <span className="text-sm text-gray-700">{r.label}</span>
-                      {r.sub && <p className="text-xs text-gray-500 mt-0.5">{r.sub}</p>}
+                      {r.sub && <p className="text-sm text-gray-500 mt-0.5">{r.sub}</p>}
                     </div>
-                    <span className={`text-xs text-right flex-shrink-0 ${r.bold ? 'font-bold text-gray-900' : 'text-gray-600'}`}>{r.value}</span>
+                    <span className={`text-sm text-right flex-shrink-0 ${r.bold ? 'font-bold text-gray-900' : 'text-gray-600'}`}>{r.value}</span>
                   </div>
                 ))}
                 {/* Vertragskonditionen */}
                 <div className="flex items-center justify-between px-4 py-2 bg-gray-50">
-                  <span className="text-xs font-semibold text-gray-500">Vertragskonditionen</span>
+                  <span className="text-sm font-semibold text-gray-500">Vertragskonditionen</span>
                   <span className="text-xs font-semibold text-[#1a7a4f] bg-[#E3F7EF] border border-[#B8E8D4] px-2 py-0.5 rounded-full">100% Sorglos</span>
                 </div>
                 {[
@@ -860,7 +861,7 @@ const AngebotCard: FC<{
               {/* Warum Primundus */}
               <div className="rounded-xl border border-gray-100 overflow-hidden divide-y divide-gray-100">
                 <div className="px-4 py-2.5 bg-white">
-                  <p className="text-xs font-bold text-gray-900">Warum Primundus…</p>
+                  <p className="text-sm font-bold text-gray-900">Warum Primundus…</p>
                 </div>
                 {[
                   { icon: '🏅', label: 'Über 20 Jahre Erfahrung' },
@@ -875,8 +876,8 @@ const AngebotCard: FC<{
                 <div className="flex items-center gap-3 px-4 py-2.5 bg-white">
                   <img src="/badge-testsieger.webp" alt="Testsieger" className="w-8 flex-shrink-0 rounded" />
                   <div>
-                    <p className="text-xs font-semibold text-gray-800">Testsieger bei DIE WELT</p>
-                    <p className="text-xs text-gray-400 italic">„Beste Kombination aus Preis, Qualität und Kundenservice."</p>
+                    <p className="text-sm font-semibold text-gray-800">Testsieger bei DIE WELT</p>
+                    <p className="text-sm text-gray-400 italic">„Beste Kombination aus Preis, Qualität und Kundenservice."</p>
                   </div>
                 </div>
                 <div className="px-4 py-3 bg-white">
