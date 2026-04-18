@@ -1588,13 +1588,13 @@ const AppCard: FC<{
       {/* Cost + Message — Teil der Bewerbung, zusammen */}
       <div className="border-t border-gray-100 px-5 py-4">
         <div className="flex items-center justify-between gap-3 mb-3">
-          <div>
-            <p className="text-xs text-gray-400 mb-0.5">Mtl. Betreuungskosten</p>
-            <p className="text-xl font-bold text-[#9B1FA1]">{app.offer.monatlicheKosten.toLocaleString('de-DE')} €</p>
-          </div>
-          <div className="text-right min-w-0">
+          <div className="min-w-0">
             <p className="text-xs text-gray-500 truncate">{app.offer.anreisedatum} – {app.offer.abreisedatum}</p>
             <p className="text-xs text-gray-400 mt-0.5 truncate">Reisekosten á {app.offer.anreisekosten} € · {app.offer.kuendigungsfrist}</p>
+          </div>
+          <div className="text-right flex-shrink-0">
+            <p className="text-xs text-gray-400 mb-0.5">Mtl. Betreuungskosten</p>
+            <p className="text-xl font-bold text-[#9B1FA1]">{app.offer.monatlicheKosten.toLocaleString('de-DE')} €</p>
           </div>
         </div>
         {message && (
