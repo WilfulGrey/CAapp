@@ -715,7 +715,7 @@ const AngebotCard: FC<{
   const labelCls = 'block text-xs font-semibold text-gray-500 mb-1.5';
 
   return (
-    <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden shadow-sm divide-y divide-gray-100">
+    <div className={`bg-white rounded-2xl overflow-hidden shadow-sm divide-y divide-gray-100 transition-all duration-200 ${patientOpen ? 'border-2 border-[#9B1FA1] shadow-[0_0_0_4px_rgba(155,31,161,0.08)]' : 'border border-gray-200'}`}>
 
       {/* ── Row 1: Ihr Angebot ── */}
       <div>
@@ -935,7 +935,18 @@ const AngebotCard: FC<{
         </button>
 
         {patientOpen && (
-          <div className="border-t border-gray-100 bg-gray-50">
+          <div className="border-t-2 border-[#9B1FA1] bg-white">
+
+            {/* Colored header banner */}
+            <div className="bg-[#F5EDF6] px-4 py-3 flex items-center gap-2.5">
+              <div className="w-7 h-7 rounded-lg bg-[#9B1FA1] flex items-center justify-center flex-shrink-0">
+                <FileText className="w-3.5 h-3.5 text-white" />
+              </div>
+              <div>
+                <p className="text-sm font-bold text-[#9B1FA1]">Patientendaten ausfüllen</p>
+                <p className="text-[11px] text-[#9B1FA1]/70">Damit Pflegekräfte sich optimal vorbereiten können</p>
+              </div>
+            </div>
 
             {/* Progress bar */}
             <div className="px-4 pt-3 pb-2 flex items-center gap-3">
