@@ -145,6 +145,7 @@ const CustomerPortalPage: FC = () => {
   const [patientSaved, setPatientSaved] = useState(false);
   const [showPatientReminder, setShowPatientReminder] = useState(false);
   const [triggerOpenPatient, setTriggerOpenPatient] = useState(false);
+  const [firstInviteDone, setFirstInviteDone] = useState(false);
 
   const animateThenProcess = (id: string, fn: () => void) => {
     setExitingIds(prev => new Set([...prev, id]));
@@ -199,13 +200,27 @@ const CustomerPortalPage: FC = () => {
     );
   };
 
-  const inviteNurse = (idx: number, name: string): boolean => {
-    if (!patientSaved) {
+  const canInviteNurse = (idx: number): boolean => {
+    if (!patientSaved && firstInviteDone) {
       setShowPatientReminder(true);
       return false;
     }
+    return true;
+  };
+
+  const confirmInviteNurse = (idx: number, name: string) => {
     setNurseStatuses((prev) => ({ ...prev, [idx]: 'invited' }));
     showToast(`✓ ${name} wurde eingeladen!`);
+    if (!patientSaved && !firstInviteDone) {
+      setFirstInviteDone(true);
+      setShowPatientReminder(true);
+    }
+  };
+
+  // Used by modal (calls after own animation)
+  const inviteNurse = (idx: number, name: string): boolean => {
+    if (!canInviteNurse(idx)) return false;
+    confirmInviteNurse(idx, name);
     return true;
   };
 
@@ -342,7 +357,7 @@ const CustomerPortalPage: FC = () => {
                   </div>
                   <div className="space-y-3">
                     {visibleNurses.map(({ nurse, i, status }) => (
-                      <MatchCard key={i} nurse={nurse} status={status} onNurseClick={() => openNurseFromMatch(nurse, i)} onInvite={() => inviteNurse(i, displayName(nurse.name))} />
+                      <MatchCard key={i} nurse={nurse} status={status} onNurseClick={() => openNurseFromMatch(nurse, i)} onInvite={() => canInviteNurse(i)} onInviteConfirm={() => confirmInviteNurse(i, displayName(nurse.name))} />
                     ))}
                   </div>
                 </div>
@@ -554,7 +569,6 @@ const BookedScreen: FC<{ app: Application; onNurseClick: (n: Nurse) => void }> =
               <span className="text-gray-300 text-xs">·</span>
               <span className="text-xs font-bold text-[#9B1FA1]">{nurse.experience}</span>
             </div>
-            <p className="text-xs text-gray-500 mt-0.5">{agencyName}</p>
           </div>
           <span className="text-xs text-gray-500 flex-shrink-0">Profil →</span>
         </div>
@@ -683,16 +697,20 @@ interface PatientForm {
   anzahl: '1' | '2' | '';
   // Patient 1
   geschlecht: string; geburtsjahr: string; pflegegrad: string; gewicht: string; groesse: string;
-  mobilitaet: string; hilfsmittel: string; heben: string; demenz: string; inkontinenz: string; nacht: string;
+  mobilitaet: string; heben: string; demenz: string; inkontinenz: string; nacht: string;
   // Patient 2
   p2_geschlecht: string; p2_geburtsjahr: string; p2_pflegegrad: string; p2_gewicht: string; p2_groesse: string;
-  p2_mobilitaet: string; p2_hilfsmittel: string; p2_heben: string; p2_demenz: string; p2_inkontinenz: string; p2_nacht: string;
+  p2_mobilitaet: string; p2_heben: string; p2_demenz: string; p2_inkontinenz: string; p2_nacht: string;
   // Shared
   diagnosen: string;
-  plz: string; ort: string; haushalt: string; tiere: string; rauchen: string; unterbringung: string; aufgaben: string;
+  plz: string; ort: string; haushalt: string; wohnungstyp: string; urbanisierung: string;
+  familieNahe: string; pflegedienst: string; internet: string;
+  tiere: string; unterbringung: string; aufgaben: string;
+  // PK-Wünsche
+  wunschGeschlecht: string; rauchen: string; sonstigeWuensche: string;
 }
 
-const STEP_LABELS = ['Zur Person', 'Pflegebedarf', 'Wohnsituation'];
+const STEP_LABELS = ['Zur Person', 'Pflegebedarf', 'Wohnsituation', 'Wünsche zur PK'];
 
 const AngebotCard: FC<{
   onPatientSaved?: (saved: boolean) => void;
@@ -703,6 +721,7 @@ const AngebotCard: FC<{
   const [patientOpen, setPatientOpen] = useState(false);
   const [step, setStep] = useState(0);
   const [saved, setSaved] = useState(false);
+  const [priceInfo, setPriceInfo] = useState<string|null>(null);
 
   useEffect(() => {
     if (triggerOpenPatient) {
@@ -713,13 +732,15 @@ const AngebotCard: FC<{
     }
   }, [triggerOpenPatient]);
   const [patient, setPatient] = useState<PatientForm>({
-    anzahl: '',
+    anzahl: '1',
     geschlecht:'', geburtsjahr:'', pflegegrad:'', gewicht:'', groesse:'',
-    mobilitaet:'', hilfsmittel:'', heben:'', demenz:'', inkontinenz:'', nacht:'',
+    mobilitaet:'Rollstuhlfähig', heben:'', demenz:'', inkontinenz:'', nacht:'Nein',
     p2_geschlecht:'', p2_geburtsjahr:'', p2_pflegegrad:'', p2_gewicht:'', p2_groesse:'',
-    p2_mobilitaet:'', p2_hilfsmittel:'', p2_heben:'', p2_demenz:'', p2_inkontinenz:'', p2_nacht:'',
+    p2_mobilitaet:'', p2_heben:'', p2_demenz:'', p2_inkontinenz:'', p2_nacht:'',
     diagnosen:'',
-    plz:'', ort:'', haushalt:'', tiere:'', rauchen:'', unterbringung:'', aufgaben:'',
+    plz:'', ort:'', haushalt:'Ehepartner/in', wohnungstyp:'', urbanisierung:'', familieNahe:'', pflegedienst:'', internet:'',
+    tiere:'', unterbringung:'', aufgaben:'',
+    wunschGeschlecht:'', rauchen:'', sonstigeWuensche:'',
   });
 
   const zwei = patient.anzahl === '2';
@@ -741,7 +762,12 @@ const AngebotCard: FC<{
       return p1ok && p2ok;
     }
     if (s === 2) {
-      return patient.plz !== '' && patient.ort !== '' && patient.haushalt !== '';
+      return patient.plz !== '' && patient.ort !== '' && patient.haushalt !== ''
+        && patient.wohnungstyp !== '' && patient.urbanisierung !== '' && patient.familieNahe !== ''
+        && patient.pflegedienst !== '' && patient.internet !== '';
+    }
+    if (s === 3) {
+      return patient.wunschGeschlecht !== '' && patient.rauchen !== '';
     }
     return false;
   };
@@ -1019,23 +1045,19 @@ const AngebotCard: FC<{
                 <>
                   {/* Anzahl Patienten toggle */}
                   <div>
-                    <label className={labelCls}>Anzahl zu betreuender Personen <span className="text-red-400">*</span></label>
-                    <div className="flex gap-2">
-                      {(['1', '2'] as const).map(n => (
-                        <button
-                          key={n}
-                          type="button"
-                          onClick={() => setPatient(p => ({ ...p, anzahl: n }))}
-                          className={`flex-1 py-2.5 text-sm font-semibold rounded-xl border transition-all ${
-                            patient.anzahl === n
-                              ? 'bg-[#F5EDF6] text-[#9B1FA1] border-[#D8A9DC] font-bold'
-                              : 'bg-white text-gray-600 border-gray-200 hover:border-gray-300'
-                          }`}
-                        >
-                          {n === '1' ? '1 Person' : '2 Personen'}
-                        </button>
-                      ))}
-                    </div>
+                    <label className={`${labelCls} flex items-center gap-1.5`}>
+                      Anzahl zu betreuender Personen
+                      <button type="button" onClick={() => setPriceInfo(priceInfo === 'anzahl' ? null : 'anzahl')} className="flex-shrink-0 text-gray-400 hover:text-[#9B1FA1] transition-colors">
+                        <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><circle cx="12" cy="12" r="10"/><path strokeLinecap="round" strokeLinejoin="round" d="M12 16v-4m0-4h.01"/></svg>
+                      </button>
+                    </label>
+                    {priceInfo === 'anzahl' && (
+                      <div className="text-xs text-gray-500 bg-gray-50 border border-gray-200 rounded-xl px-3 py-2.5 leading-relaxed flex items-start gap-2 mb-1">
+                        <span>Dieser Wert basiert auf Ihrem Angebot und beeinflusst den Preis. Für Änderungen wenden Sie sich bitte an Ihren Berater.</span>
+                        <button type="button" onClick={() => setPriceInfo(null)} className="text-gray-400 flex-shrink-0 font-bold">✕</button>
+                      </div>
+                    )}
+                    <div className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm text-gray-700 bg-gray-50 cursor-not-allowed">1 Person</div>
                   </div>
 
                   {/* Patient 1 */}
@@ -1123,14 +1145,19 @@ const AngebotCard: FC<{
                     <p className="text-xs font-bold text-gray-400 uppercase tracking-wider">Person 1</p>
                   )}
                   <div>
-                    <label className={labelCls}>Mobilität <span className="text-red-400">*</span></label>
-                    <CustomSelect value={patient.mobilitaet} onChange={v => setPatient(p=>({...p,mobilitaet:v}))}
-                      options={['Vollständig mobil','Am Gehstock','Rollatorfähig','Rollstuhlfähig','Bettlägerig']} />
-                  </div>
-                  <div>
-                    <label className={labelCls}>Hilfsmittel <span className="font-normal text-gray-400">(optional)</span></label>
-                    <CustomSelect value={patient.hilfsmittel} onChange={v => setPatient(p=>({...p,hilfsmittel:v}))}
-                      options={['Keine','Rollator','Rollstuhl','Pflegebett','Rollator + Pflegebett','Lifter']} />
+                    <label className={`${labelCls} flex items-center gap-1.5`}>
+                      Mobilität
+                      <button type="button" onClick={() => setPriceInfo(priceInfo === 'mobilitaet' ? null : 'mobilitaet')} className="flex-shrink-0 text-gray-400 hover:text-[#9B1FA1] transition-colors">
+                        <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><circle cx="12" cy="12" r="10"/><path strokeLinecap="round" strokeLinejoin="round" d="M12 16v-4m0-4h.01"/></svg>
+                      </button>
+                    </label>
+                    {priceInfo === 'mobilitaet' && (
+                      <div className="text-xs text-gray-500 bg-gray-50 border border-gray-200 rounded-xl px-3 py-2.5 leading-relaxed flex items-start gap-2 mb-1">
+                        <span>Dieser Wert basiert auf Ihrem Angebot und beeinflusst den Preis. Für Änderungen wenden Sie sich bitte an Ihren Berater.</span>
+                        <button type="button" onClick={() => setPriceInfo(null)} className="text-gray-400 flex-shrink-0 font-bold">✕</button>
+                      </div>
+                    )}
+                    <div className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm text-gray-700 bg-gray-50 cursor-not-allowed">{patient.mobilitaet}</div>
                   </div>
                   <div className="grid grid-cols-2 gap-2">
                     <div>
@@ -1151,9 +1178,19 @@ const AngebotCard: FC<{
                         options={['Nein','Harninkontinenz','Stuhlinkontinenz','Beides']} />
                     </div>
                     <div>
-                      <label className={labelCls}>Nachteinsätze <span className="text-red-400">*</span></label>
-                      <CustomSelect value={patient.nacht} onChange={v => setPatient(p=>({...p,nacht:v}))}
-                        options={['Nein','Bis zu 1 Mal','1–2 Mal','Mehr als 2']} />
+                      <label className={`${labelCls} flex items-center gap-1.5`}>
+                        Nachteinsätze
+                        <button type="button" onClick={() => setPriceInfo(priceInfo === 'nacht' ? null : 'nacht')} className="flex-shrink-0 text-gray-400 hover:text-[#9B1FA1] transition-colors">
+                          <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><circle cx="12" cy="12" r="10"/><path strokeLinecap="round" strokeLinejoin="round" d="M12 16v-4m0-4h.01"/></svg>
+                        </button>
+                      </label>
+                      {priceInfo === 'nacht' && (
+                        <div className="text-xs text-gray-500 bg-gray-50 border border-gray-200 rounded-xl px-3 py-2.5 leading-relaxed flex items-start gap-2 mb-1">
+                          <span>Dieser Wert basiert auf Ihrem Angebot und beeinflusst den Preis. Für Änderungen wenden Sie sich bitte an Ihren Berater.</span>
+                          <button type="button" onClick={() => setPriceInfo(null)} className="text-gray-400 flex-shrink-0 font-bold">✕</button>
+                        </div>
+                      )}
+                      <div className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm text-gray-700 bg-gray-50 cursor-not-allowed">{patient.nacht}</div>
                     </div>
                   </div>
 
@@ -1163,14 +1200,9 @@ const AngebotCard: FC<{
                       <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-3">Person 2</p>
                       <div className="space-y-3">
                         <div>
-                          <label className={labelCls}>Mobilität <span className="text-red-400">*</span></label>
+                          <label className={`${labelCls} flex items-center gap-1.5`}>Mobilität <span className="text-red-400">*</span><svg className="w-3.5 h-3.5 text-gray-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><circle cx="12" cy="12" r="10"/><path strokeLinecap="round" strokeLinejoin="round" d="M12 16v-4m0-4h.01"/></svg></label>
                           <CustomSelect value={patient.p2_mobilitaet} onChange={v => setPatient(p=>({...p,p2_mobilitaet:v}))}
                             options={['Vollständig mobil','Am Gehstock','Rollatorfähig','Rollstuhlfähig','Bettlägerig']} />
-                        </div>
-                        <div>
-                          <label className={labelCls}>Hilfsmittel <span className="font-normal text-gray-400">(optional)</span></label>
-                          <CustomSelect value={patient.p2_hilfsmittel} onChange={v => setPatient(p=>({...p,p2_hilfsmittel:v}))}
-                            options={['Keine','Rollator','Rollstuhl','Pflegebett','Rollator + Pflegebett','Lifter']} />
                         </div>
                         <div className="grid grid-cols-2 gap-2">
                           <div>
@@ -1191,7 +1223,7 @@ const AngebotCard: FC<{
                               options={['Nein','Harninkontinenz','Stuhlinkontinenz','Beides']} />
                           </div>
                           <div>
-                            <label className={labelCls}>Nachteinsätze <span className="text-red-400">*</span></label>
+                            <label className={`${labelCls} flex items-center gap-1.5`}>Nachteinsätze <span className="text-red-400">*</span><svg className="w-3.5 h-3.5 text-gray-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><circle cx="12" cy="12" r="10"/><path strokeLinecap="round" strokeLinejoin="round" d="M12 16v-4m0-4h.01"/></svg></label>
                             <CustomSelect value={patient.p2_nacht} onChange={v => setPatient(p=>({...p,p2_nacht:v}))}
                               options={['Nein','Bis zu 1 Mal','1–2 Mal','Mehr als 2']} />
                           </div>
@@ -1223,31 +1255,120 @@ const AngebotCard: FC<{
                     </div>
                   </div>
                   <div>
-                    <label className={labelCls}>Weitere Personen im Haushalt <span className="text-red-400">*</span></label>
-                    <CustomSelect value={patient.haushalt} onChange={v => setPatient(p=>({...p,haushalt:v}))}
-                      options={['Nein, allein','Ehepartner/in','Kinder','Sonstige']} />
+                    <label className={`${labelCls} flex items-center gap-1.5`}>
+                      Weitere Personen im Haushalt
+                      <button type="button" onClick={() => setPriceInfo(priceInfo === 'haushalt' ? null : 'haushalt')} className="flex-shrink-0 text-gray-400 hover:text-[#9B1FA1] transition-colors">
+                        <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><circle cx="12" cy="12" r="10"/><path strokeLinecap="round" strokeLinejoin="round" d="M12 16v-4m0-4h.01"/></svg>
+                      </button>
+                    </label>
+                    {priceInfo === 'haushalt' && (
+                      <div className="text-xs text-gray-500 bg-gray-50 border border-gray-200 rounded-xl px-3 py-2.5 leading-relaxed flex items-start gap-2 mb-1">
+                        <span>Dieser Wert basiert auf Ihrem Angebot und beeinflusst den Preis. Für Änderungen wenden Sie sich bitte an Ihren Berater.</span>
+                        <button type="button" onClick={() => setPriceInfo(null)} className="text-gray-400 flex-shrink-0 font-bold">✕</button>
+                      </div>
+                    )}
+                    <div className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm text-gray-700 bg-gray-50 cursor-not-allowed">{patient.haushalt}</div>
+                  </div>
+                  <div>
+                    <label className={labelCls}>Familie in der Nähe (bis 20 km) <span className="text-red-400">*</span></label>
+                    <CustomSelect value={patient.familieNahe} onChange={v => setPatient(p=>({...p,familieNahe:v}))}
+                      options={['Ja','Nein']} />
                   </div>
                   <div className="grid grid-cols-2 gap-2">
                     <div>
-                      <label className={labelCls}>Tiere</label>
-                      <CustomSelect value={patient.tiere} onChange={v => setPatient(p=>({...p,tiere:v}))}
-                        options={['Keine','Hund','Katze','Sonstige']} placeholder="Keine" />
+                      <label className={labelCls}>Urbanisation <span className="text-red-400">*</span></label>
+                      <CustomSelect value={patient.urbanisierung} onChange={v => setPatient(p=>({...p,urbanisierung:v}))}
+                        options={['Großstadt','Kleinstadt','Dorf/Land']} />
                     </div>
                     <div>
-                      <label className={labelCls}>Rauchen erlaubt?</label>
-                      <CustomSelect value={patient.rauchen} onChange={v => setPatient(p=>({...p,rauchen:v}))}
-                        options={['Nein','Ja']} placeholder="Nein" />
+                      <label className={labelCls}>Wohnungstyp <span className="text-red-400">*</span></label>
+                      <CustomSelect value={patient.wohnungstyp} onChange={v => setPatient(p=>({...p,wohnungstyp:v}))}
+                        options={['Einfamilienhaus','Wohnung in Mehrfamilienhaus','Andere']} />
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <label className={labelCls}>Unterbringung der PK</label>
+                      <CustomSelect value={patient.unterbringung} onChange={v => setPatient(p=>({...p,unterbringung:v}))}
+                        options={['Zimmer in den Räumlichkeiten','Gesamter Bereich','Zimmer extern','Bereich extern']} />
+                    </div>
+                    <div>
+                      <label className={labelCls}>Internet vorhanden? <span className="text-red-400">*</span></label>
+                      <CustomSelect value={patient.internet} onChange={v => setPatient(p=>({...p,internet:v}))}
+                        options={['Ja','Nein']} />
                     </div>
                   </div>
                   <div>
-                    <label className={labelCls}>Unterbringung PK</label>
-                    <CustomSelect value={patient.unterbringung} onChange={v => setPatient(p=>({...p,unterbringung:v}))}
-                      options={['Eigenes Zimmer','Eigener Bereich','Extern']} />
+                    <label className={labelCls}>Haustiere <span className="font-normal text-gray-400">(opt.)</span></label>
+                    <CustomSelect value={patient.tiere} onChange={v => setPatient(p=>({...p,tiere:v}))}
+                      options={['Keine','Hund','Katze','Andere']} placeholder="Keine" />
                   </div>
                   <div>
-                    <label className={labelCls}>Aufgaben Familie / Haushaltshilfe <span className="font-normal text-gray-400">(optional)</span></label>
+                    <label className={labelCls}>Pflegedienst kommt? <span className="text-red-400">*</span></label>
+                    <CustomSelect value={patient.pflegedienst} onChange={v => setPatient(p=>({...p,pflegedienst:v}))}
+                      options={['Ja','Nein','Geplant']} />
+                  </div>
+                </>
+              )}
+
+              {/* ── Step 4: Wünsche zur PK ── */}
+              {step === 3 && (
+                <>
+                  <div>
+                    <label className={labelCls}>Gewünschtes Geschlecht der PK <span className="text-red-400">*</span></label>
+                    <CustomSelect value={patient.wunschGeschlecht} onChange={v => setPatient(p=>({...p,wunschGeschlecht:v}))}
+                      options={['Egal','Weiblich','Männlich']} />
+                  </div>
+
+                  {/* Preisrelevante Felder – read-only */}
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <label className="block text-sm font-semibold text-gray-600 mb-1.5 flex items-center gap-1.5">
+                        Sprachniveau
+                        <button type="button" onClick={() => setPriceInfo(priceInfo === 'sprache' ? null : 'sprache')} className="flex-shrink-0 text-gray-400 hover:text-[#9B1FA1] transition-colors">
+                          <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><circle cx="12" cy="12" r="10"/><path strokeLinecap="round" strokeLinejoin="round" d="M12 16v-4m0-4h.01"/></svg>
+                        </button>
+                      </label>
+                      {priceInfo === 'sprache' && (
+                        <div className="text-xs text-gray-500 bg-gray-50 border border-gray-200 rounded-xl px-3 py-2.5 leading-relaxed flex items-start gap-2 mb-1">
+                          <span>Dieser Wert basiert auf Ihrem Angebot und beeinflusst den Preis. Für Änderungen wenden Sie sich bitte an Ihren Berater.</span>
+                          <button type="button" onClick={() => setPriceInfo(null)} className="text-gray-400 flex-shrink-0 font-bold">✕</button>
+                        </div>
+                      )}
+                      <div className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm text-gray-700 bg-gray-50 cursor-not-allowed">mind. B1</div>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-semibold text-gray-600 mb-1.5 flex items-center gap-1.5">
+                        Führerschein
+                        <button type="button" onClick={() => setPriceInfo(priceInfo === 'fuehrerschein' ? null : 'fuehrerschein')} className="flex-shrink-0 text-gray-400 hover:text-[#9B1FA1] transition-colors">
+                          <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><circle cx="12" cy="12" r="10"/><path strokeLinecap="round" strokeLinejoin="round" d="M12 16v-4m0-4h.01"/></svg>
+                        </button>
+                      </label>
+                      {priceInfo === 'fuehrerschein' && (
+                        <div className="text-xs text-gray-500 bg-gray-50 border border-gray-200 rounded-xl px-3 py-2.5 leading-relaxed flex items-start gap-2 mb-1">
+                          <span>Dieser Wert basiert auf Ihrem Angebot und beeinflusst den Preis. Für Änderungen wenden Sie sich bitte an Ihren Berater.</span>
+                          <button type="button" onClick={() => setPriceInfo(null)} className="text-gray-400 flex-shrink-0 font-bold">✕</button>
+                        </div>
+                      )}
+                      <div className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm text-gray-700 bg-gray-50 cursor-not-allowed">Nicht erforderlich</div>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className={labelCls}>Darf die Betreuungsperson rauchen? <span className="text-red-400">*</span></label>
+                    <CustomSelect value={patient.rauchen} onChange={v => setPatient(p=>({...p,rauchen:v}))}
+                      options={['Ja','Nein']} />
+                  </div>
+                  <div>
+                    <label className={labelCls}>Aufgaben der Pflegekraft <span className="font-normal text-gray-400">(optional)</span></label>
                     <textarea value={patient.aufgaben} onChange={set('aufgaben')}
-                      placeholder="z.B. Einkaufen wird von Tochter übernommen…"
+                      placeholder="z.B. Körperpflege, Mahlzeiten, Arztbegleitung, Einkäufe…"
+                      rows={3} className={`${inputCls} resize-none`} />
+                  </div>
+                  <div>
+                    <label className={labelCls}>Sonstige Wünsche <span className="font-normal text-gray-400">(optional)</span></label>
+                    <textarea value={patient.sonstigeWuensche} onChange={set('sonstigeWuensche')}
+                      placeholder="z.B. Erfahrung mit Demenz, ruhige Person, tierlieb…"
                       rows={2} className={`${inputCls} resize-none`} />
                   </div>
                 </>
@@ -1473,17 +1594,13 @@ const AppCard: FC<{
 
         {/* Cost strip */}
         <div className="mt-3 bg-[#F5EDF6] rounded-xl px-3.5 py-2.5 border border-[#E8D0EA]">
-          <div className="text-xs text-gray-600">
-            <p className="font-semibold text-gray-800 truncate">
-              {app.offer.anreisedatum} – {app.offer.abreisedatum}
-            </p>
-            <p className="text-xs text-gray-500 mt-0.5">
-              Reisekosten: {app.offer.anreisekosten} € pro Fahrt
-            </p>
-            <p className="text-xs text-gray-500 mt-0">
-              {app.offer.kuendigungsfrist} Kündigungsfrist
-            </p>
+          <div className="flex items-center justify-between mb-1.5">
+            <span className="text-xs text-gray-500">Mtl. Betreuungskosten</span>
+            <span className="text-base font-bold text-[#9B1FA1]">{app.offer.monatlicheKosten.toLocaleString('de-DE')} €</span>
           </div>
+          <div className="h-px bg-[#E8D0EA] mb-1.5" />
+          <p className="text-xs text-gray-600 truncate">{app.offer.anreisedatum} – {app.offer.abreisedatum}</p>
+          <p className="text-xs text-gray-500 mt-0.5">Reisekosten: {app.offer.anreisekosten} € · {app.offer.kuendigungsfrist} Kündigungsfrist</p>
         </div>
       </div>
 
@@ -1565,7 +1682,8 @@ const MatchCard: FC<{
   status: NurseStatus;
   onNurseClick: () => void;
   onInvite?: () => boolean;
-}> = ({ nurse, status, onNurseClick, onInvite }) => {
+  onInviteConfirm?: () => void;
+}> = ({ nurse, status, onNurseClick, onInvite, onInviteConfirm }) => {
   const [invitePhase, setInvitePhase] = useState<'idle'|'sending'|'done'>('idle');
   const inits = initials(nurse.name);
   const name = displayName(nurse.name);
@@ -1578,6 +1696,7 @@ const MatchCard: FC<{
     setTimeout(() => {
       setInvitePhase('done');
       setTimeout(() => {
+        onInviteConfirm?.();
         setInvitePhase('idle');
       }, 2000);
     }, 2000);
@@ -1903,37 +2022,37 @@ const DeclineConfirmModal: FC<{
           <div className="px-5 pt-4 pb-5 space-y-4">
             {/* Header */}
             <div>
-              <h2 className="text-base font-bold text-gray-900">Bewerbung ablehnen</h2>
-              <p className="text-xs text-gray-600 mt-0.5">Die Agentur wird über die Absage informiert.</p>
+              <h2 className="text-lg font-bold text-gray-900">Bewerbung ablehnen</h2>
+              <p className="text-sm text-gray-600 mt-0.5">Die Agentur wird über die Absage informiert.</p>
             </div>
 
             {/* Nurse card */}
-            <div className="flex items-center gap-3 bg-gray-50 rounded-2xl px-4 py-3 border border-gray-100">
+            <div className="flex items-center gap-3.5 bg-gray-50 rounded-2xl px-4 py-3.5 border border-gray-200">
               <div className="flex-shrink-0">
                 {nurse.image ? (
-                  <img src={nurse.image} alt={nurse.name} className="w-12 h-12 rounded-xl object-cover" />
+                  <img src={nurse.image} alt={nurse.name} className="w-16 h-16 rounded-2xl object-cover" />
                 ) : (
-                  <div className="w-12 h-12 rounded-xl flex items-center justify-center text-base font-bold text-white"
+                  <div className="w-16 h-16 rounded-2xl flex items-center justify-center text-lg font-bold text-white"
                     style={{ backgroundColor: nurse.color }}>
                     {inits}
                   </div>
                 )}
               </div>
               <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2 mb-0.5">
-                  <span className="font-bold text-sm text-gray-900">{name}</span>
-                  <span className="text-xs text-gray-400">{nurse.age} J.</span>
-                  <span className={`flex items-center gap-0.5 text-xs font-bold pl-1 pr-2 py-0.5 rounded-full border flex-shrink-0 ${lvl.cls}`}>
+                <div className="flex items-center gap-2 flex-wrap mb-1">
+                  <span className="font-bold text-base text-gray-900">{name}</span>
+                  <span className="text-sm text-gray-500">{nurse.age} J.</span>
+                  <span className={`flex items-center gap-0.5 text-xs font-bold pl-1.5 pr-2 py-0.5 rounded-full border flex-shrink-0 ${lvl.cls}`}>
                     <span className="text-xs leading-none">{lvl.emoji}</span>{lvl.label}
                   </span>
                 </div>
-                <p className="text-xs text-gray-400">{app.agencyName} · {nurse.experience}</p>
+                <p className="text-sm font-medium text-gray-700 mt-0.5">{nurse.experience}</p>
               </div>
             </div>
 
             {/* Optional message */}
             <div>
-              <label className="block text-sm font-semibold text-gray-600 mb-1.5">
+              <label className="block text-sm font-semibold text-gray-700 mb-1.5">
                 Nachricht an die Agentur <span className="font-normal text-gray-400">(optional)</span>
               </label>
               <textarea
@@ -1949,13 +2068,13 @@ const DeclineConfirmModal: FC<{
             <div className="flex gap-2.5">
               <button
                 onClick={onCancel}
-                className="flex-1 border-2 border-gray-200 text-gray-600 rounded-xl py-3 text-sm font-semibold hover:bg-gray-50 transition-colors"
+                className="flex-1 border-2 border-gray-200 text-gray-700 rounded-xl py-3 text-base font-semibold hover:bg-gray-50 transition-colors"
               >
                 Abbrechen
               </button>
               <button
                 onClick={() => onConfirm(message)}
-                className="flex-1 bg-red-500 hover:bg-red-600 text-white rounded-xl py-3 text-sm font-bold transition-colors"
+                className="flex-1 bg-red-500 hover:bg-red-600 text-white rounded-xl py-3 text-base font-bold transition-colors"
               >
                 Ablehnen
               </button>
@@ -2180,7 +2299,6 @@ const AngebotPruefenModal: FC<{
                     </div>
                     <div>
                       <p className="font-bold text-sm text-gray-900">{name}</p>
-                      <p className="text-xs text-gray-500">{agencyName}</p>
                     </div>
                   </div>
                   <div className="flex justify-between text-xs pb-3 border-b border-gray-200">
