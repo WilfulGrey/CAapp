@@ -627,11 +627,17 @@ const CustomSelect: FC<{
   useEffect(() => {
     if (!open) return;
     const close = () => setOpen(false);
+    const updatePos = () => {
+      if (btnRef.current) {
+        const r = btnRef.current.getBoundingClientRect();
+        setDropdownStyle({ position: 'fixed', top: r.bottom + 4, left: r.left, width: r.width, zIndex: 9999 });
+      }
+    };
     document.addEventListener('click', close);
-    window.addEventListener('scroll', close, true);
+    window.addEventListener('scroll', updatePos, true);
     return () => {
       document.removeEventListener('click', close);
-      window.removeEventListener('scroll', close, true);
+      window.removeEventListener('scroll', updatePos, true);
     };
   }, [open]);
 
