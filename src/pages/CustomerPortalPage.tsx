@@ -2216,10 +2216,10 @@ const AngebotPruefenModal: FC<{
 
             {/* ── STEP 1 ── */}
             {step === 1 && (
-              <div className="p-5 space-y-4">
-                {/* Nurse mini-card with Profil link */}
+              <div className="p-5 space-y-5">
+                {/* Nurse mini-card */}
                 <div className="flex items-center gap-3 bg-gray-50 rounded-xl px-4 py-3 border border-gray-100">
-                  <div className="w-10 h-10 rounded-xl flex-shrink-0 overflow-hidden">
+                  <div className="w-12 h-12 rounded-xl flex-shrink-0 overflow-hidden">
                     {nurse.image ? (
                       <img src={nurse.image} alt={nurse.name} className="w-full h-full object-cover" />
                     ) : (
@@ -2230,52 +2230,53 @@ const AngebotPruefenModal: FC<{
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className="font-bold text-sm text-gray-900">{name}</p>
-                    <p className="text-xs text-gray-500">
-                      {nurse.age} J. · {nurse.experience} · Deutsch {nurse.language.level} · {nurse.history?.assignments} Einsätze
+                    <p className="text-sm text-gray-500">
+                      {nurse.age} J. · {nurse.experience} · Deutsch {nurse.language.level}
                     </p>
                   </div>
                   <button
                     onClick={() => onNurseClick(nurse)}
-                    className="text-xs font-semibold text-[#9B1FA1] hover:underline flex-shrink-0 flex items-center gap-0.5"
+                    className="text-sm font-semibold text-[#9B1FA1] hover:underline flex-shrink-0"
                   >
                     Profil →
                   </button>
                 </div>
 
-                {/* Details zur Bewerbung */}
+                {/* Bewerbungstext — prominent */}
+                {app.message && (
+                  <div>
+                    <p className="text-sm font-bold text-gray-700 mb-2">Nachricht der Agentur</p>
+                    <div className="border-l-4 border-[#9B1FA1] pl-4 py-1">
+                      <p className="text-sm text-gray-600 leading-relaxed">„{app.message}"</p>
+                    </div>
+                  </div>
+                )}
+
+                {/* Konditionen */}
                 <div>
-                  <p className="text-xs font-bold text-gray-700 mb-1">Details zur Bewerbung</p>
-                  <p className="text-xs text-gray-500 mb-2">{offer.submittedAt}</p>
+                  <div className="flex items-center justify-between mb-2">
+                    <p className="text-sm font-bold text-gray-700">Konditionen</p>
+                    <p className="text-xs text-gray-400">{offer.submittedAt}</p>
+                  </div>
                   <div className="rounded-xl border border-gray-100 overflow-hidden divide-y divide-gray-100">
                     {[
                       { label: 'Mtl. Betreuungskosten', value: `${offer.monatlicheKosten.toLocaleString('de-DE')} €`, bold: true },
-                      { label: 'Anreisedatum', value: offer.anreisedatum, bold: false },
-                      { label: 'Abreisedatum', value: `Vorauss. ${offer.abreisedatum}`, bold: false },
+                      { label: 'Anreisedatum', value: offer.anreisedatum },
+                      { label: 'Abreisedatum', value: `Vorauss. ${offer.abreisedatum}` },
+                      { label: 'Anreisekosten', value: `${offer.anreisekosten} €` },
+                      { label: 'Abreisekosten', value: `${offer.abreisekosten} €` },
+                      { label: 'Reisetage', value: offer.reisetage },
+                      { label: 'Feiertagszuschlag', value: offer.feiertagszuschlag === 0 ? '0 €' : `${offer.feiertagszuschlag} €/Tag` },
+                      { label: 'Kündigungsfrist', value: offer.kuendigungsfrist },
                     ].map(row => (
-                      <div key={row.label} className="flex items-center justify-between px-4 py-2 bg-white">
-                        <span className="text-xs text-gray-500">{row.label}</span>
-                        <span className={`text-xs ${row.bold ? 'font-bold text-gray-900' : 'font-semibold text-gray-700'}`}>
+                      <div key={row.label} className="flex items-center justify-between px-4 py-2.5 bg-white">
+                        <span className="text-sm text-gray-500">{row.label}</span>
+                        <span className={`text-sm ${(row as any).bold ? 'font-bold text-gray-900' : 'font-semibold text-gray-700'}`}>
                           {row.value}
                         </span>
                       </div>
                     ))}
                   </div>
-                </div>
-
-                {/* Reisekosten & Konditionen */}
-                <div className="rounded-xl border border-gray-100 overflow-hidden divide-y divide-gray-100">
-                  {[
-                    { label: 'Anreisekosten', value: `${offer.anreisekosten} €` },
-                    { label: 'Abreisekosten', value: `${offer.abreisekosten} €` },
-                    { label: 'Berechnung der Reisetage', value: offer.reisetage },
-                    { label: 'Feiertagszuschlag', value: offer.feiertagszuschlag === 0 ? '0 €' : `${offer.feiertagszuschlag} €/Tag` },
-                    { label: 'Kündigungsfrist', value: offer.kuendigungsfrist },
-                  ].map(row => (
-                    <div key={row.label} className="flex items-center justify-between px-4 py-2 bg-white">
-                      <span className="text-xs text-gray-500">{row.label}</span>
-                      <span className="text-xs font-semibold text-gray-700">{row.value}</span>
-                    </div>
-                  ))}
                 </div>
               </div>
             )}
@@ -2283,10 +2284,10 @@ const AngebotPruefenModal: FC<{
             {/* ── STEP 2 ── */}
             {step === 2 && (
               <div className="p-5 space-y-5">
-                {/* Form */}
+                {/* Hauptpatient */}
                 <div>
-                  <p className="text-sm font-bold text-gray-900 mb-4">Hauptpatient (Vertragspartner)</p>
-                  <div className="space-y-4">
+                  <p className="text-sm font-bold text-gray-700 mb-3">Hauptpatient (Vertragspartner)</p>
+                  <div className="space-y-3">
                     <div className="grid grid-cols-2 gap-2">
                       <div>
                         <label className={labelCls}>Anrede</label>
@@ -2332,11 +2333,13 @@ const AngebotPruefenModal: FC<{
                   </div>
                 </div>
 
+                <div className="h-px bg-gray-100" />
+
                 {/* Kontaktperson */}
                 <div>
-                  <p className="text-sm font-bold text-gray-900 mb-1">Kontaktperson <span className="text-gray-400 font-normal">(in Notfällen)</span></p>
-                  <p className="text-xs text-gray-400 mb-4">Wen sollen wir bei Notfällen kontaktieren?</p>
-                  <div className="space-y-4">
+                  <p className="text-sm font-bold text-gray-700 mb-0.5">Kontaktperson <span className="text-gray-400 font-normal">(in Notfällen)</span></p>
+                  <p className="text-sm text-gray-400 mb-3">Wen sollen wir bei Notfällen kontaktieren?</p>
+                  <div className="space-y-3">
                     <div className="grid grid-cols-2 gap-2">
                       <div>
                         <label className={labelCls}>Anrede</label>
@@ -2368,6 +2371,8 @@ const AngebotPruefenModal: FC<{
                     </div>
                   </div>
                 </div>
+
+                <div className="h-px bg-gray-100" />
 
                 {/* Summary box */}
                 <div className="bg-gray-50 rounded-xl border border-gray-100 p-4 space-y-3">
