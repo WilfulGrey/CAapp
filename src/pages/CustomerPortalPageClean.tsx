@@ -1554,8 +1554,12 @@ const AppCard: FC<{
 
           {/* Name + details */}
           <div className="flex-1 min-w-0">
+            {/* Zeile 1: Name + Alter | Level-Badge */}
             <div className="flex items-start justify-between gap-2 mb-1">
-              <p className="text-base font-bold text-gray-900 leading-tight">{name}</p>
+              <div className="flex items-baseline gap-1.5 min-w-0">
+                <p className="text-base font-bold text-gray-900 leading-tight">{name}</p>
+                <span className="text-sm text-gray-400 flex-shrink-0">{nurse.age} J.</span>
+              </div>
               {(() => { const lvl = nurseLevel(nurse.history?.assignments ?? 0); return (
                 <span className={`flex items-center gap-1 text-xs font-bold pl-1.5 pr-2.5 py-0.5 rounded-full border flex-shrink-0 ${lvl.cls}`}>
                   <span className="text-sm leading-none">{lvl.emoji}</span>
@@ -1563,16 +1567,20 @@ const AppCard: FC<{
                 </span>
               ); })()}
             </div>
-            <p className="text-sm text-gray-500">{nurse.age} Jahre · {nurse.experience}</p>
-            <div className="flex items-center gap-2 mt-2">
+            {/* Zeile 2: Sprache */}
+            <div className="flex items-center gap-2 mb-1">
               <div className="flex gap-0.5">
                 {bars.map((f, i) => (
                   <div key={i} className={`w-3 h-1.5 rounded-full ${f ? 'bg-[#9B1FA1]' : 'bg-gray-200'}`} />
                 ))}
               </div>
               <span className="text-sm text-gray-500">Deutsch {nurse.language.level}</span>
+            </div>
+            {/* Zeile 3: Erfahrung + Einsätze */}
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="text-sm font-semibold text-[#9B1FA1]">{nurse.experience}</span>
               {nurse.history && (
-                <span className="text-sm text-gray-400">· {nurse.history.assignments} Einsätze</span>
+                <span className="text-sm text-gray-400">· {nurse.history.assignments} Einsätze · Ø {Math.round(nurse.history.avgDurationMonths * 4.3)} Wo.</span>
               )}
             </div>
           </div>
@@ -1714,14 +1722,14 @@ const MatchCard: FC<{
       }`}
     >
       {/* Clickable nurse info */}
-      <div className="p-4 cursor-pointer active:bg-gray-50" onClick={onNurseClick}>
-        <div className="flex items-start gap-3">
+      <div className="px-4 pt-4 pb-3 cursor-pointer active:bg-gray-50" onClick={onNurseClick}>
+        <div className="flex items-center gap-3">
           {/* Photo */}
           <div className="flex-shrink-0">
             {nurse.image ? (
-              <img src={nurse.image} alt={nurse.name} className="w-14 h-14 rounded-xl object-cover" />
+              <img src={nurse.image} alt={nurse.name} className="w-14 h-14 rounded-2xl object-cover" />
             ) : (
-              <div className="w-14 h-14 rounded-xl flex items-center justify-center text-lg font-bold text-white"
+              <div className="w-14 h-14 rounded-2xl flex items-center justify-center text-lg font-bold text-white"
                 style={{ backgroundColor: nurse.color }}>
                 {inits}
               </div>
@@ -1730,11 +1738,11 @@ const MatchCard: FC<{
 
           {/* Info */}
           <div className="flex-1 min-w-0">
-            {/* Row 1: Name + Age | Level badge */}
-            <div className="flex items-center justify-between gap-2 mb-1">
+            {/* Zeile 1: Name + Alter | Level-Badge */}
+            <div className="flex items-start justify-between gap-2 mb-1">
               <div className="flex items-baseline gap-1.5 min-w-0">
                 <span className="font-bold text-gray-900 leading-tight">{name}</span>
-                <span className="text-xs text-gray-500 flex-shrink-0">{nurse.age} J.</span>
+                <span className="text-sm text-gray-400 flex-shrink-0">{nurse.age} J.</span>
               </div>
               {(() => { const lvl = nurseLevel(nurse.history?.assignments ?? 0); return (
                 <span className={`flex items-center gap-1 text-xs font-bold pl-1.5 pr-2.5 py-0.5 rounded-full border flex-shrink-0 ${lvl.cls}`}>
@@ -1743,25 +1751,20 @@ const MatchCard: FC<{
                 </span>
               ); })()}
             </div>
-
-            {/* Row 2: Language */}
-            <div className="flex items-center gap-1.5 mb-1">
-              <span className="text-xs text-gray-500">Deutsch</span>
+            {/* Zeile 2: Sprache */}
+            <div className="flex items-center gap-2 mb-1">
               <div className="flex gap-0.5">
                 {bars.map((f, i) => (
-                  <div key={i} className={`w-2.5 h-[5px] rounded-full ${f ? 'bg-[#9B1FA1]' : 'bg-gray-200'}`} />
+                  <div key={i} className={`w-3 h-1.5 rounded-full ${f ? 'bg-[#9B1FA1]' : 'bg-gray-200'}`} />
                 ))}
               </div>
-              <span className="text-xs font-semibold text-gray-500">{nurse.language.level}</span>
+              <span className="text-sm text-gray-500">Deutsch {nurse.language.level}</span>
             </div>
-
-            {/* Row 3: Experience + assignments badge */}
+            {/* Zeile 3: Erfahrung + Einsätze */}
             <div className="flex items-center gap-2 flex-wrap">
-              <span className="text-xs font-bold text-[#9B1FA1]">{nurse.experience}</span>
+              <span className="text-sm font-semibold text-[#9B1FA1]">{nurse.experience}</span>
               {nurse.history && (
-                <span className="text-xs font-semibold text-gray-500 bg-gray-100 border border-gray-200 px-2.5 py-0.5 rounded-full">
-                  {nurse.history.assignments} Einsätze · Ø {Math.round(nurse.history.avgDurationMonths * 4.3)} Wo.
-                </span>
+                <span className="text-sm text-gray-400">· {nurse.history.assignments} Einsätze · Ø {Math.round(nurse.history.avgDurationMonths * 4.3)} Wo.</span>
               )}
             </div>
           </div>
