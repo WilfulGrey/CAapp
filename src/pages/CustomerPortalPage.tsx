@@ -199,13 +199,14 @@ const CustomerPortalPage: FC = () => {
     );
   };
 
-  const inviteNurse = (idx: number, name: string) => {
-    const wasFirst = Object.values(nurseStatuses).filter(s => s === 'invited').length === 0;
+  const inviteNurse = (idx: number, name: string): boolean => {
+    if (!patientSaved) {
+      setShowPatientReminder(true);
+      return false;
+    }
     setNurseStatuses((prev) => ({ ...prev, [idx]: 'invited' }));
     showToast(`✓ ${name} wurde eingeladen!`);
-    if (wasFirst && !patientSaved) {
-      setTimeout(() => setShowPatientReminder(true), 400);
-    }
+    return true;
   };
 
   const declineNurse = (idx: number) => {
@@ -424,7 +425,7 @@ const CustomerPortalPage: FC = () => {
                 <div>
                   <p className="text-base font-bold text-gray-900">Patientendaten fehlen noch</p>
                   <p className="text-sm text-gray-600 mt-1 leading-relaxed">
-                    Super, die erste Pflegekraft wurde eingeladen! Damit sie sich optimal vorbereiten kann, brauchen wir noch Angaben zum Patienten und Haushalt.
+                    Bevor Pflegekräfte eingeladen werden können, benötigen wir noch Angaben zum Patienten und Haushalt — damit sich alle Bewerberinnen optimal vorbereiten können.
                   </p>
                 </div>
               </div>
@@ -1563,7 +1564,7 @@ const MatchCard: FC<{
   nurse: Nurse;
   status: NurseStatus;
   onNurseClick: () => void;
-  onInvite?: () => void;
+  onInvite?: () => boolean;
 }> = ({ nurse, status, onNurseClick, onInvite }) => {
   const [invitePhase, setInvitePhase] = useState<'idle'|'sending'|'done'>('idle');
   const inits = initials(nurse.name);
@@ -1571,11 +1572,12 @@ const MatchCard: FC<{
   const bars = Array.from({ length: 5 }, (_, i) => i < nurse.language.bars);
 
   const handleInvite = () => {
+    const allowed = onInvite ? onInvite() : true;
+    if (!allowed) return;
     setInvitePhase('sending');
     setTimeout(() => {
       setInvitePhase('done');
       setTimeout(() => {
-        onInvite?.();
         setInvitePhase('idle');
       }, 2000);
     }, 2000);
