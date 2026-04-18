@@ -715,7 +715,7 @@ const AngebotCard: FC<{
   const labelCls = 'block text-xs font-semibold text-gray-500 mb-1.5';
 
   return (
-    <div className={`bg-white rounded-2xl overflow-hidden shadow-sm divide-y divide-gray-100 transition-all duration-200 ${patientOpen ? 'border-2 border-[#9B1FA1] shadow-[0_0_0_4px_rgba(155,31,161,0.08)]' : 'border border-gray-200'}`}>
+    <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden shadow-sm divide-y divide-gray-100">
 
       {/* ── Row 1: Ihr Angebot ── */}
       <div>
@@ -935,7 +935,8 @@ const AngebotCard: FC<{
         </button>
 
         {patientOpen && (
-          <div className="border-t-2 border-[#9B1FA1] bg-white">
+          <div className="border-t border-gray-100 p-3 bg-gray-50">
+          <div className="rounded-2xl border-2 border-[#9B1FA1] overflow-hidden shadow-[0_0_0_4px_rgba(155,31,161,0.07)] bg-white">
 
             {/* Colored header banner */}
             <div className="bg-[#F5EDF6] px-4 py-3 flex items-center gap-2.5">
@@ -1251,6 +1252,7 @@ const AngebotCard: FC<{
                 )}
               </div>
             </div>
+          </div>
           </div>
         )}
       </div>
