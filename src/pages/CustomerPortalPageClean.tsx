@@ -1576,13 +1576,11 @@ const AppCard: FC<{
               </div>
               <span className="text-sm text-gray-500">Deutsch {nurse.language.level}</span>
             </div>
-            {/* Zeile 3: Erfahrung + Einsätze */}
-            <div className="flex items-center gap-2 flex-wrap">
-              <span className="text-sm font-semibold text-[#9B1FA1]">{nurse.experience}</span>
-              {nurse.history && (
-                <span className="text-sm text-gray-400">· {nurse.history.assignments} Einsätze · Ø {Math.round(nurse.history.avgDurationMonths * 4.3)} Wo.</span>
-              )}
-            </div>
+            {/* Zeile 3: Erfahrung + Einsätze in einer Zeile */}
+            <p className="text-sm text-gray-500">
+              <span className="font-semibold text-[#9B1FA1]">{nurse.experience}</span>
+              {nurse.history && <span> · {nurse.history.assignments} Einsätze · Ø {Math.round(nurse.history.avgDurationMonths * 4.3)} Wo.</span>}
+            </p>
           </div>
         </div>
 
@@ -1760,13 +1758,11 @@ const MatchCard: FC<{
               </div>
               <span className="text-sm text-gray-500">Deutsch {nurse.language.level}</span>
             </div>
-            {/* Zeile 3: Erfahrung + Einsätze */}
-            <div className="flex items-center gap-2 flex-wrap">
-              <span className="text-sm font-semibold text-[#9B1FA1]">{nurse.experience}</span>
-              {nurse.history && (
-                <span className="text-sm text-gray-400">· {nurse.history.assignments} Einsätze · Ø {Math.round(nurse.history.avgDurationMonths * 4.3)} Wo.</span>
-              )}
-            </div>
+            {/* Zeile 3: Erfahrung + Einsätze in einer Zeile */}
+            <p className="text-sm text-gray-500">
+              <span className="font-semibold text-[#9B1FA1]">{nurse.experience}</span>
+              {nurse.history && <span> · {nurse.history.assignments} Einsätze · Ø {Math.round(nurse.history.avgDurationMonths * 4.3)} Wo.</span>}
+            </p>
           </div>
         </div>
       </div>
