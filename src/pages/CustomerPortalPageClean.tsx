@@ -283,7 +283,7 @@ const CustomerPortalPageClean: FC = () => {
             Unser Kundenportal.<br />Transparent. In Ihren Händen.
           </h1>
           <p className="text-sm text-gray-500 leading-relaxed">
-            Angebot ansehen, passende Betreuungskräfte einladen und Bewerbungen direkt annehmen.
+            Kein Rätselraten — Angebot ansehen, passende Betreuungskräfte einladen und Bewerbungen direkt annehmen.
           </p>
         </div>
 
@@ -297,8 +297,8 @@ const CustomerPortalPageClean: FC = () => {
               <Bell className="w-4 h-4 text-gray-400" />
             </div>
             <div className="flex-1 min-w-0">
-              <p className="text-sm font-semibold text-gray-800">Bewerbungen werden vorbereitet</p>
-              <p className="text-sm text-gray-400 mt-0.5">Wir melden uns sobald neue eingehen.</p>
+              <p className="text-sm font-semibold text-gray-800">Bewerbungen werden für Sie vorbereitet</p>
+              <p className="text-sm text-gray-400 mt-0.5">Wir benachrichtigen Sie sobald neue eingehen.</p>
             </div>
           </div>
         ) : (
@@ -308,9 +308,11 @@ const CustomerPortalPageClean: FC = () => {
             </div>
             <div className="flex-1 min-w-0">
               <p className="text-sm font-semibold text-gray-900">
-                {pendingApps.length === 1 ? 'Eine neue Bewerbung!' : `${pendingApps.length} neue Bewerbungen!`}
+                {pendingApps.length === 1 ? 'Eine Bewerbung aktiv!' : `${pendingApps.length} Bewerbungen aktiv!`}
               </p>
-              <p className="text-sm text-[#1a7a4f] mt-0.5">Schauen Sie sich die Angebote in Ruhe an.</p>
+              <p className="text-sm text-[#1a7a4f] mt-0.5">
+                Schauen Sie sich {pendingApps.length === 1 ? 'die Pflegekraft' : 'die Pflegekräfte'} in Ruhe an und entscheiden Sie, welches Angebot am besten passt.
+              </p>
             </div>
           </div>
         )}
@@ -1535,7 +1537,8 @@ const AppCard: FC<{
       )}
 
       {/* Clickable nurse row → opens profile */}
-      <div className="px-5 pt-5 pb-4 cursor-pointer active:bg-gray-50" onClick={() => onNurseClick(nurse)}>
+      {/* Nurse info — clickable */}
+      <div className="px-5 pt-5 pb-5 cursor-pointer active:bg-gray-50" onClick={() => onNurseClick(nurse)}>
         <div className="flex items-center gap-4">
           {/* Photo */}
           <div className="flex-shrink-0">
@@ -1549,13 +1552,10 @@ const AppCard: FC<{
             )}
           </div>
 
-          {/* Info */}
+          {/* Name + details */}
           <div className="flex-1 min-w-0">
-            <div className="flex items-start justify-between gap-2">
-              <div>
-                <p className="text-base font-bold text-gray-900 leading-tight">{name}</p>
-                <p className="text-sm text-gray-400 mt-0.5">{nurse.age} Jahre · {nurse.experience}</p>
-              </div>
+            <div className="flex items-start justify-between gap-2 mb-1">
+              <p className="text-base font-bold text-gray-900 leading-tight">{name}</p>
               {(() => { const lvl = nurseLevel(nurse.history?.assignments ?? 0); return (
                 <span className={`flex items-center gap-1 text-xs font-bold pl-1.5 pr-2.5 py-0.5 rounded-full border flex-shrink-0 ${lvl.cls}`}>
                   <span className="text-sm leading-none">{lvl.emoji}</span>
@@ -1563,47 +1563,51 @@ const AppCard: FC<{
                 </span>
               ); })()}
             </div>
+            <p className="text-sm text-gray-500">{nurse.age} Jahre · {nurse.experience}</p>
             <div className="flex items-center gap-2 mt-2">
               <div className="flex gap-0.5">
                 {bars.map((f, i) => (
                   <div key={i} className={`w-3 h-1.5 rounded-full ${f ? 'bg-[#9B1FA1]' : 'bg-gray-200'}`} />
                 ))}
               </div>
-              <span className="text-xs text-gray-400">Deutsch {nurse.language.level}</span>
+              <span className="text-sm text-gray-500">Deutsch {nurse.language.level}</span>
               {nurse.history && (
-                <span className="text-xs text-gray-400">· {nurse.history.assignments} Einsätze</span>
+                <span className="text-sm text-gray-400">· {nurse.history.assignments} Einsätze</span>
               )}
             </div>
           </div>
         </div>
 
+        {/* Message */}
         {message && (
-          <p className="mt-4 text-sm text-gray-500 leading-relaxed">„{message}"</p>
+          <p className="mt-4 text-sm text-gray-500 leading-relaxed border-l-2 border-gray-200 pl-3">„{message}"</p>
         )}
+      </div>
 
-        {/* Cost row — no nested box */}
-        <div className="mt-4 pt-4 border-t border-gray-100 flex items-center justify-between">
-          <div>
-            <p className="text-xs text-gray-400 mb-0.5">Monatliche Kosten</p>
-            <p className="text-lg font-bold text-gray-900">{app.offer.monatlicheKosten.toLocaleString('de-DE')} €</p>
-          </div>
-          <div className="text-right">
-            <p className="text-xs text-gray-400 mb-0.5">{app.offer.anreisedatum} – {app.offer.abreisedatum}</p>
-            <p className="text-xs text-gray-400">Reise: {app.offer.anreisekosten} €</p>
-          </div>
+      {/* Cost section — klar abgetrennt */}
+      <div className="border-t border-gray-100 px-5 py-4 flex items-center justify-between">
+        <div>
+          <p className="text-xs text-gray-400 mb-0.5">Mtl. Betreuungskosten</p>
+          <p className="text-xl font-bold text-[#9B1FA1]">{app.offer.monatlicheKosten.toLocaleString('de-DE')} €</p>
+        </div>
+        <div className="text-right">
+          <p className="text-sm text-gray-500">{app.offer.anreisedatum} – {app.offer.abreisedatum}</p>
+          <p className="text-xs text-gray-400 mt-0.5">Reise: {app.offer.anreisekosten} € · {app.offer.kuendigungsfrist} Kündigungsfrist</p>
         </div>
       </div>
 
-      <div className="flex gap-3 px-5 pb-5">
+      {/* Actions */}
+      <div className="border-t border-gray-100 flex">
         <button
           onClick={onReview}
-          className="flex-1 bg-[#9B1FA1] hover:bg-[#7B1A85] text-white rounded-2xl py-3.5 text-sm font-semibold transition-all"
+          className="flex-1 bg-[#9B1FA1] hover:bg-[#7B1A85] text-white py-4 text-sm font-semibold transition-all"
         >
           Angebot prüfen
         </button>
+        <div className="w-px bg-white/20" />
         <button
           onClick={() => onDecline(app.id)}
-          className="px-5 bg-gray-100 hover:bg-gray-200 text-gray-500 rounded-2xl py-3.5 text-sm font-semibold transition-all"
+          className="px-6 bg-gray-100 hover:bg-gray-200 text-gray-500 py-4 text-sm font-semibold transition-all"
         >
           Ablehnen
         </button>
