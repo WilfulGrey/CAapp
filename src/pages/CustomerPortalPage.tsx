@@ -936,10 +936,10 @@ const AngebotCard: FC<{
 
         {patientOpen && (
           <div className="border-t border-gray-100 p-3 bg-gray-50">
-          <div className="rounded-2xl border-2 border-[#9B1FA1] overflow-hidden shadow-[0_0_0_4px_rgba(155,31,161,0.07)] bg-gray-50">
+          <div className="rounded-2xl border-2 border-[#9B1FA1] shadow-[0_0_0_4px_rgba(155,31,161,0.07)] bg-gray-50">
 
             {/* Colored header banner */}
-            <div className="bg-[#F5EDF6] px-4 py-3 flex items-center gap-2.5">
+            <div className="bg-[#F5EDF6] px-4 py-3 flex items-center gap-2.5 rounded-t-2xl">
               <div className="w-7 h-7 rounded-lg bg-[#9B1FA1] flex items-center justify-center flex-shrink-0">
                 <FileText className="w-3.5 h-3.5 text-white" />
               </div>
