@@ -13,6 +13,8 @@ import {
   leadGreeting,
   careStartLabel,
   formatEuro,
+  cap,
+  prefillPatientFromLead,
 } from '../lib/supabase';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -840,7 +842,7 @@ const AngebotCard: FC<{
   const kalk = lead?.kalkulation;
   const bruttopreis = kalk ? formatEuro(kalk.bruttopreis) : '3.050 €';
   const eigenanteil = kalk ? formatEuro(kalk.eigenanteil) : '2.075 €';
-  const nachname = lead?.nachname || 'Von Norman';
+  const nachname = cap(lead?.nachname) || 'Von Norman';
   const displayAngebot = `${nachname} · ${bruttopreis}/Mo.`;
   const careStart = careStartLabel(lead?.care_start_timing ?? null);
   const angebotDatum = lead ? formatDate(lead.created_at) : '15.04.2026';
@@ -867,16 +869,17 @@ const AngebotCard: FC<{
       onTriggerHandled?.();
     }
   }, [triggerOpenPatient]);
+  const prefill = lead ? prefillPatientFromLead(lead) : {};
   const [patient, setPatient] = useState<PatientForm>({
-    anzahl: '1',
-    geschlecht:'', geburtsjahr:'', pflegegrad:'', gewicht:'', groesse:'',
-    mobilitaet:'Rollstuhlfähig', heben:'', demenz:'', inkontinenz:'', nacht:'Nein',
+    anzahl: prefill.anzahl ?? '1',
+    geschlecht:'', geburtsjahr:'', pflegegrad: prefill.pflegegrad ?? '', gewicht:'', groesse:'',
+    mobilitaet: prefill.mobilitaet ?? 'Rollstuhlfähig', heben:'', demenz:'', inkontinenz:'', nacht: prefill.nacht ?? 'Nein',
     p2_geschlecht:'', p2_geburtsjahr:'', p2_pflegegrad:'', p2_gewicht:'', p2_groesse:'',
     p2_mobilitaet:'', p2_heben:'', p2_demenz:'', p2_inkontinenz:'', p2_nacht:'',
     diagnosen:'',
     plz:'', ort:'', haushalt:'Ehepartner/in', wohnungstyp:'', urbanisierung:'', familieNahe:'', pflegedienst:'', internet:'',
     tiere:'', unterbringung:'', aufgaben:'',
-    wunschGeschlecht:'', rauchen:'', sonstigeWuensche:'',
+    wunschGeschlecht: prefill.wunschGeschlecht ?? '', rauchen:'', sonstigeWuensche:'',
   });
 
   const zwei = patient.anzahl === '2';

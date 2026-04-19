@@ -89,9 +89,15 @@ export function addDays(iso: string, days: number): string {
   return d.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' });
 }
 
+/** Capitalize first letter of each word */
+export function cap(s: string | null | undefined): string {
+  if (!s) return '';
+  return s.replace(/\b\w/g, c => c.toUpperCase());
+}
+
 /** Build display name from lead */
 export function leadDisplayName(lead: Lead): string {
-  const parts = [lead.vorname, lead.nachname].filter(Boolean);
+  const parts = [cap(lead.vorname), cap(lead.nachname)].filter(Boolean);
   return parts.join(' ') || lead.email;
 }
 
@@ -122,4 +128,54 @@ export function careStartLabel(timing: string | null): string {
 /** Format euro amount */
 export function formatEuro(amount: number): string {
   return amount.toLocaleString('de-DE', { minimumFractionDigits: 0, maximumFractionDigits: 0 }) + ' €';
+}
+
+// ─── Map formularDaten → PatientForm prefill ──────────────────────────────────
+
+export interface PatientPrefill {
+  anzahl?: '1' | '2';
+  pflegegrad?: string;
+  mobilitaet?: string;
+  nacht?: string;
+  wunschGeschlecht?: string;
+}
+
+export function prefillPatientFromLead(lead: Lead): PatientPrefill {
+  const fd = lead.kalkulation?.formularDaten;
+  if (!fd) return {};
+
+  // Mobilitaet mapping
+  const mobMap: Record<string, string> = {
+    rollstuhl:     'Rollstuhlfähig',
+    gehfaehig:     'Gehfähig mit Hilfe',
+    bettlaegerig:  'Bettlägerig',
+    mobil:         'Selbstständig mobil',
+  };
+
+  // Nachteinsätze mapping
+  const nachtMap: Record<string, string> = {
+    nein:          'Nein',
+    gelegentlich:  'Gelegentlich',
+    regelmaessig:  'Regelmäßig',
+  };
+
+  // Wunschgeschlecht mapping
+  const geschlechtMap: Record<string, string> = {
+    weiblich: 'Weiblich',
+    maennlich: 'Männlich',
+    egal:     'Egal',
+  };
+
+  const mob = String(fd.mobilitaet ?? '');
+  const nacht = String(fd.nachteinsaetze ?? '');
+  const geschl = String(fd.geschlecht ?? '');
+  const weitere = String(fd.weitere_personen ?? '');
+
+  return {
+    anzahl:           weitere === 'ja' ? '2' : '1',
+    pflegegrad:       fd.pflegegrad ? String(fd.pflegegrad) : undefined,
+    mobilitaet:       mob ? (mobMap[mob] ?? '') : undefined,
+    nacht:            nacht ? (nachtMap[nacht] ?? 'Nein') : undefined,
+    wunschGeschlecht: geschl ? (geschlechtMap[geschl] ?? '') : undefined,
+  };
 }
