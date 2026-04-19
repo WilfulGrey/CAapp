@@ -4,6 +4,16 @@ import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
 import { Nurse } from '../types';
 import { NURSES } from '../data/nurses';
+import {
+  fetchLeadByToken,
+  Lead,
+  formatDate,
+  addDays,
+  leadDisplayName,
+  leadGreeting,
+  careStartLabel,
+  formatEuro,
+} from '../lib/supabase';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -135,6 +145,29 @@ function initials(fullName: string) {
 // ─── Main Page ────────────────────────────────────────────────────────────────
 
 const CustomerPortalPage: FC = () => {
+  // ─── Lead loading via token ──────────────────────────────────────────────────
+  const [lead, setLead] = useState<Lead | null>(null);
+  const [leadLoading, setLeadLoading] = useState(true);
+  const [leadError, setLeadError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const token = params.get('token');
+    if (!token) {
+      // No token → demo mode with hardcoded data
+      setLeadLoading(false);
+      return;
+    }
+    fetchLeadByToken(token).then(({ lead: l, error }) => {
+      if (error || !l) {
+        setLeadError('Ihr Angebot konnte nicht geladen werden. Bitte öffnen Sie den Link aus Ihrer E-Mail erneut.');
+      } else {
+        setLead(l);
+      }
+      setLeadLoading(false);
+    });
+  }, []);
+
   const [applications, setApplications] = useState<Application[]>(MOCK_APPLICATIONS);
   const [nurseStatuses, setNurseStatuses] = useState<NurseStatuses>({});
   const [selectedNurse, setSelectedNurse] = useState<Nurse | null>(null);
@@ -240,6 +273,35 @@ const CustomerPortalPage: FC = () => {
     setNurseStatuses((prev) => ({ ...prev, [idx]: 'declined' }));
   };
 
+  // ─── Loading / Error states ──────────────────────────────────────────────────
+  if (leadLoading) {
+    return (
+      <div className="min-h-screen bg-white flex items-center justify-center">
+        <div className="text-center space-y-3">
+          <div className="w-10 h-10 border-2 border-[#9B1FA1] border-t-transparent rounded-full animate-spin mx-auto" />
+          <p className="text-sm text-gray-400">Ihr Angebot wird geladen…</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (leadError) {
+    return (
+      <div className="min-h-screen bg-white flex items-center justify-center px-6">
+        <div className="text-center space-y-4 max-w-sm">
+          <div className="w-14 h-14 rounded-full bg-red-50 flex items-center justify-center mx-auto">
+            <AlertCircle className="w-7 h-7 text-red-400" />
+          </div>
+          <p className="text-sm font-semibold text-gray-800">Link nicht mehr gültig</p>
+          <p className="text-sm text-gray-500 leading-relaxed">{leadError}</p>
+          <a href="tel:+4989200000830" className="inline-flex items-center gap-2 text-sm font-semibold text-[#9B1FA1] border border-[#D8A9DC] bg-[#F5EDF6] rounded-xl px-4 py-2.5">
+            <Phone className="w-4 h-4" /> 089 200 000 830
+          </a>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-gray-100 md:flex md:items-start md:justify-center md:py-10">
     <div className="min-h-screen md:min-h-0 bg-white w-full md:w-[390px] md:min-h-[844px] md:rounded-[48px] md:shadow-2xl md:overflow-hidden md:border-[8px] md:border-gray-800 md:ring-4 md:ring-gray-900/10 relative" style={{fontFamily: 'inherit'}}>
@@ -291,7 +353,7 @@ const CustomerPortalPage: FC = () => {
         </div>
 
         {/* ── Kombinierte Karte: Identität + Anfrage + Stepper ── */}
-        <AngebotCard onPatientSaved={setPatientSaved} triggerOpenPatient={triggerOpenPatient} onTriggerHandled={() => setTriggerOpenPatient(false)} />
+        <AngebotCard lead={lead} onPatientSaved={setPatientSaved} triggerOpenPatient={triggerOpenPatient} onTriggerHandled={() => setTriggerOpenPatient(false)} />
 
         {/* ── Bewerbungsstatus ── */}
         {!hasPending ? (
@@ -769,10 +831,28 @@ interface PatientForm {
 const STEP_LABELS = ['Zur Person', 'Pflegebedarf', 'Wohnsituation', 'Wünsche zur PK'];
 
 const AngebotCard: FC<{
+  lead?: Lead | null;
   onPatientSaved?: (saved: boolean) => void;
   triggerOpenPatient?: boolean;
   onTriggerHandled?: () => void;
-}> = ({ onPatientSaved, triggerOpenPatient, onTriggerHandled }) => {
+}> = ({ lead, onPatientSaved, triggerOpenPatient, onTriggerHandled }) => {
+  // ─── Derive display values from lead (or fallback to demo data) ──────────────
+  const kalk = lead?.kalkulation;
+  const bruttopreis = kalk ? formatEuro(kalk.bruttopreis) : '3.050 €';
+  const eigenanteil = kalk ? formatEuro(kalk.eigenanteil) : '2.075 €';
+  const nachname = lead?.nachname || 'Von Norman';
+  const displayAngebot = `${nachname} · ${bruttopreis}/Mo.`;
+  const careStart = careStartLabel(lead?.care_start_timing ?? null);
+  const angebotDatum = lead ? formatDate(lead.created_at) : '15.04.2026';
+  const gueltigBis = lead ? addDays(lead.created_at, 30) : '15.05.2026';
+  const kundenEmail = lead?.email ?? 'graefinnorman@gmx.de';
+  const kundenName = lead ? leadDisplayName(lead) : 'Frau Von Norman';
+  const greeting = lead ? leadGreeting(lead) : 'Sehr geehrte Frau Von Norman';
+  const zuschüsse = kalk?.['zuschüsse']?.items?.filter(z => z.in_kalkulation) ?? [
+    { label: 'Pflegegeld (Pflegegrad 2)', betrag_monatlich: 347 },
+    { label: 'Entlastungsbudget (anteilig mt.)', betrag_monatlich: 295 },
+    { label: 'Steuervorteile § 35a EStG', betrag_monatlich: 333 },
+  ];
   const [angebotOpen, setAngebotOpen] = useState(false);
   const [patientOpen, setPatientOpen] = useState(false);
   const [step, setStep] = useState(0);
@@ -857,13 +937,13 @@ const AngebotCard: FC<{
   <div style="padding:24px 52px 20px;border-bottom:1px solid #f0f0f0;">
     <table style="width:100%;border-collapse:collapse;"><tr>
       <td style="vertical-align:top;">
-        <div style="font-size:13px;font-weight:600;color:#1a1a1a;">Frau Von Norman</div>
-        <div style="font-size:12px;color:#888;margin-top:2px;">graefinnorman@gmx.de</div>
+        <div style="font-size:13px;font-weight:600;color:#1a1a1a;">${kundenName}</div>
+        <div style="font-size:12px;color:#888;margin-top:2px;">${kundenEmail}</div>
       </td>
       <td style="vertical-align:top;text-align:right;">
         <div style="font-size:12px;color:#888;line-height:2.0;">
-          <div>Angebotsdatum: <span style="color:#333;">15.04.2026</span></div>
-          <div>Gültig bis: <span style="color:#333;">15.05.2026</span></div>
+          <div>Angebotsdatum: <span style="color:#333;">${angebotDatum}</span></div>
+          <div>Gültig bis: <span style="color:#333;">${gueltigBis}</span></div>
         </div>
       </td>
     </tr></table>
@@ -872,7 +952,7 @@ const AngebotCard: FC<{
   <!-- TITLE + BRIEF -->
   <div style="padding:32px 52px 28px;">
     <div style="font-size:19px;font-weight:700;color:#1a1a1a;margin-bottom:20px;line-height:1.35;">Ihr persönliches Angebot –<br/>24-Stunden-Betreuung zu Hause</div>
-    <p style="font-size:13.5px;color:#333;margin:0 0 10px;">Sehr geehrte Frau Von Norman,</p>
+    <p style="font-size:13.5px;color:#333;margin:0 0 10px;">${greeting},</p>
     <p style="font-size:13.5px;color:#555;line-height:1.7;margin:0 0 10px;">vielen Dank für Ihre Anfrage. Gerne können wir die Betreuung übernehmen. Da unsere Betreuungskräfte direkt angestellt sind, kann die Betreuung bereits <strong style="color:#1a1a1a;">innerhalb von 4–7 Werktagen</strong> beginnen.</p>
     <p style="font-size:13.5px;color:#555;line-height:1.7;margin:0 0 18px;">Unser nachfolgendes Angebot ist auf Ihre individuelle Situation zugeschnitten.</p>
     <div style="font-size:13px;color:#888;">Ihre Ilka Wysocki</div>
@@ -898,7 +978,7 @@ const AngebotCard: FC<{
         <div style="font-size:10px;font-weight:700;color:#aaa;letter-spacing:1.2px;text-transform:uppercase;">Monatssatz für die 24h-Betreuung</div>
       </div>
       <div style="padding:20px 22px 16px;">
-        <div style="font-size:38px;font-weight:700;color:#1a1a1a;line-height:1;">3.050 €</div>
+        <div style="font-size:38px;font-weight:700;color:#1a1a1a;line-height:1;">${bruttopreis}</div>
         <div style="font-size:12px;color:#aaa;margin-top:6px;">Inkl. aller Steuern, Gebühren und Sozialabgaben</div>
       </div>
       <div style="border-top:1px solid #f0f0f0;">
@@ -924,10 +1004,8 @@ const AngebotCard: FC<{
     <div style="font-size:10px;font-weight:700;color:#aaa;letter-spacing:1.5px;text-transform:uppercase;margin-bottom:14px;">Mögliche Zuschüsse der Pflegekasse</div>
     <div style="border:1px solid #e8e8e8;border-radius:6px;overflow:hidden;">
       <table style="width:100%;border-collapse:collapse;">
-        <tr><td style="padding:11px 22px;font-size:13px;color:#555;border-bottom:1px solid #f0f0f0;background:#fafafa;">Pflegegeld (Pflegegrad 2)</td><td style="padding:11px 22px;text-align:right;font-size:13px;color:#555;border-bottom:1px solid #f0f0f0;background:#fafafa;white-space:nowrap;">−347 €</td></tr>
-        <tr><td style="padding:11px 22px;font-size:13px;color:#555;border-bottom:1px solid #f0f0f0;background:#fafafa;">Entlastungsbudget (anteilig mt.)</td><td style="padding:11px 22px;text-align:right;font-size:13px;color:#555;border-bottom:1px solid #f0f0f0;background:#fafafa;white-space:nowrap;">−295 €</td></tr>
-        <tr><td style="padding:11px 22px;font-size:13px;color:#555;border-bottom:1px solid #f0f0f0;background:#fafafa;">Steuervorteile § 35a EStG</td><td style="padding:11px 22px;text-align:right;font-size:13px;color:#555;border-bottom:1px solid #f0f0f0;background:#fafafa;white-space:nowrap;">−333 €</td></tr>
-        <tr><td style="padding:14px 22px;font-size:14px;font-weight:700;color:#1a1a1a;background:#fff;">Möglicher Eigenanteil</td><td style="padding:14px 22px;text-align:right;font-size:16px;font-weight:700;color:#1a1a1a;background:#fff;white-space:nowrap;">ab 2.075 €/Monat</td></tr>
+        ${zuschüsse.map((z: any) => `<tr><td style="padding:11px 22px;font-size:13px;color:#555;border-bottom:1px solid #f0f0f0;background:#fafafa;">${z.label}</td><td style="padding:11px 22px;text-align:right;font-size:13px;color:#555;border-bottom:1px solid #f0f0f0;background:#fafafa;white-space:nowrap;">−${formatEuro(z.betrag_monatlich)}</td></tr>`).join('')}
+        <tr><td style="padding:14px 22px;font-size:14px;font-weight:700;color:#1a1a1a;background:#fff;">Möglicher Eigenanteil</td><td style="padding:14px 22px;text-align:right;font-size:16px;font-weight:700;color:#1a1a1a;background:#fff;white-space:nowrap;">ab ${eigenanteil}/Monat</td></tr>
       </table>
     </div>
     <div style="font-size:11px;color:#ccc;margin-top:8px;font-style:italic;">Zuschüsse sind individuell und abhängig von Ihrer persönlichen Situation. Kein Vertragsbestandteil.</div>
@@ -957,7 +1035,7 @@ const AngebotCard: FC<{
   <div style="padding:16px 52px;border-top:1px solid #f0f0f0;background:#f9f9f9;">
     <table style="width:100%;border-collapse:collapse;"><tr>
       <td style="font-size:11px;color:#bbb;">Primundus GmbH · primundus.de · info@primundus.de</td>
-      <td style="text-align:right;font-size:11px;color:#bbb;">Vertrauliches Angebot · Nur für Frau Von Norman</td>
+      <td style="text-align:right;font-size:11px;color:#bbb;">Vertrauliches Angebot · Nur für ${kundenName}</td>
     </tr></table>
   </div>
 
@@ -1027,8 +1105,8 @@ const AngebotCard: FC<{
           </div>
           <div className="flex-1 min-w-0">
             <p className="text-sm text-gray-500 mb-0.5">Ihr Angebot</p>
-            <p className="text-sm font-bold text-gray-900">Von Norman · 3.050 €/Mo.</p>
-            <p className="text-sm text-gray-500 mt-0.5">ab 01.05.2026</p>
+            <p className="text-sm font-bold text-gray-900">{displayAngebot}</p>
+            <p className="text-sm text-gray-500 mt-0.5">{careStart}</p>
           </div>
           <div className="w-7 h-7 rounded-full bg-[#F5EDF6] flex items-center justify-center flex-shrink-0">
             <ChevronDown className={`w-4 h-4 text-[#9B1FA1] transition-transform ${angebotOpen ? 'rotate-180' : ''}`} />
@@ -1042,17 +1120,17 @@ const AngebotCard: FC<{
             <div className="space-y-3">
               <div className="flex items-start justify-between gap-2">
                 <div>
-                  <p className="text-sm font-bold text-gray-800">Frau Von Norman</p>
-                  <p className="text-sm text-gray-500">graefinnorman@gmx.de</p>
+                  <p className="text-sm font-bold text-gray-800">{kundenName}</p>
+                  <p className="text-sm text-gray-500">{kundenEmail}</p>
                 </div>
                 <div className="text-right flex-shrink-0">
-                  <p className="text-xs text-gray-500">Angebotsdatum: 15.04.2026</p>
-                  <p className="text-xs text-gray-500">Gültig bis: 15.05.2026</p>
+                  <p className="text-xs text-gray-500">Angebotsdatum: {angebotDatum}</p>
+                  <p className="text-xs text-gray-500">Gültig bis: {gueltigBis}</p>
                 </div>
               </div>
               <div>
                 <p className="text-sm font-bold text-gray-900 mb-2 mt-6">Ihr persönliches Angebot –<br />24-Stunden-Betreuung zu Hause</p>
-                <p className="text-sm text-gray-600 mb-2">Sehr geehrte Frau Von Norman,</p>
+                <p className="text-sm text-gray-600 mb-2">{greeting},</p>
                 <p className="text-sm text-gray-600 leading-relaxed">vielen Dank für Ihre Anfrage. Gerne können wir die Betreuung übernehmen. Da unsere Betreuungskräfte direkt angestellt sind, kann die Betreuung bereits <span className="font-semibold">innerhalb von 4–7 Werktagen</span> beginnen.</p>
                 <p className="text-sm text-gray-600 leading-relaxed mt-2">Nachfolgend finden Sie die Konditionen sowie bereits vorausgewählte Pflegekräfte. Melden Sie sich jederzeit bei Fragen.</p>
                 <p className="text-sm text-gray-400 mt-3">Ihre Ilka Wysocki</p>
@@ -1068,7 +1146,7 @@ const AngebotCard: FC<{
                 </div>
                 {/* Kosten */}
                 {[
-                  { label: 'Mtl. Betreuungskosten', value: '3.050 €', bold: true, sub: 'Inkl. Steuern, Gebühren & Sozialabgaben' },
+                  { label: 'Mtl. Betreuungskosten', value: bruttopreis, bold: true, sub: 'Inkl. Steuern, Gebühren & Sozialabgaben' },
                   { label: 'Anreise', value: 'Zzgl. 125 € / Strecke', bold: false },
                   { label: 'Unterkunft', value: 'Zzgl. Kost & Logis', bold: false },
                 ].map(r => (
@@ -1141,19 +1219,15 @@ const AngebotCard: FC<{
                   <p className="text-xs font-bold text-[#1a7a4f]">Mögliche Zuschüsse der Pflegekasse</p>
                   <p className="text-xs text-[#2a9a6f] mt-0.5">Hinweis – kein Vertragsbestandteil</p>
                 </div>
-                {[
-                  { label: 'Pflegegeld (Pflegegrad 2)', value: '−347 €' },
-                  { label: 'Entlastungsbudget (anteilig mt.)', value: '−295 €' },
-                  { label: 'Steuervorteile § 35a EStG', value: '−333 €' },
-                ].map(r => (
-                  <div key={r.label} className="flex items-center justify-between px-4 py-2 bg-[#E3F7EF] gap-4">
-                    <span className="text-xs text-[#1a7a4f]">{r.label}</span>
-                    <span className="text-xs font-semibold text-[#1a7a4f] text-right">{r.value}</span>
+                {zuschüsse.map((z: any) => (
+                  <div key={z.label || z.name} className="flex items-center justify-between px-4 py-2 bg-[#E3F7EF] gap-4">
+                    <span className="text-xs text-[#1a7a4f]">{z.label}</span>
+                    <span className="text-xs font-semibold text-[#1a7a4f] text-right">−{formatEuro(z.betrag_monatlich)}</span>
                   </div>
                 ))}
                 <div className="flex items-center justify-between px-4 py-2.5 bg-[#d0f2e4] border-t border-[#a3d9c4] gap-4">
                   <span className="text-sm font-bold text-[#1a7a4f]">Möglicher Eigenanteil</span>
-                  <span className="text-sm font-bold text-[#1a7a4f] text-right">ab 2.075 €/Monat</span>
+                  <span className="text-sm font-bold text-[#1a7a4f] text-right">ab {eigenanteil}/Monat</span>
                 </div>
               </div>
               <p className="text-xs text-gray-400 leading-relaxed">
