@@ -832,181 +832,131 @@ const AngebotCard: FC<{
   const labelCls = 'block text-sm font-medium text-gray-500 mb-1.5';
 
   const downloadPdf = () => {
-    const doc = new jsPDF({ unit: 'mm', format: 'a4' });
-    const lila = [155, 31, 161] as const;
-    const gruen = [26, 122, 79] as const;
-    const grau = [100, 100, 100] as const;
-    const schwarz = [30, 30, 30] as const;
-    const pageW = doc.internal.pageSize.getWidth();
-    const margin = 18;
-    const colRight = pageW - margin;
-    let y = 0;
+    const logoUrl = `${window.location.origin}/LOGO-PRIMUNDUS.png`;
 
-    // ── Header band ──────────────────────────────────────────────────
-    doc.setFillColor(245, 237, 246);
-    doc.rect(0, 0, pageW, 28, 'F');
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(16);
-    doc.setTextColor(...lila);
-    doc.text('primundus', margin, 17);
-    doc.setFont('helvetica', 'normal');
-    doc.setFontSize(9);
-    doc.setTextColor(...grau);
-    doc.text('24-Stunden-Betreuung zu Hause', margin, 23);
-    // Datum rechts
-    doc.text('Angebotsdatum: 15.04.2026', colRight, 17, { align: 'right' });
-    doc.text('Gültig bis: 15.05.2026', colRight, 23, { align: 'right' });
-    y = 38;
+    const html = `
+      <div style="width:794px;font-family:Arial,Helvetica,sans-serif;color:#1a1a1a;background:#fff;margin:0;padding:0;">
 
-    // ── Empfänger ────────────────────────────────────────────────────
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(11);
-    doc.setTextColor(...schwarz);
-    doc.text('Frau Von Norman', margin, y);
-    doc.setFont('helvetica', 'normal');
-    doc.setFontSize(9);
-    doc.setTextColor(...grau);
-    doc.text('graefinnorman@gmx.de', margin, y + 5);
-    y += 16;
+        <!-- Header -->
+        <div style="background:#F5EDF6;padding:24px 40px;display:flex;justify-content:space-between;align-items:center;">
+          <img src="${logoUrl}" style="height:38px;display:block;" crossorigin="anonymous" />
+          <div style="text-align:right;font-size:12px;color:#888;line-height:1.8;">
+            <div>Angebotsdatum: 15.04.2026</div>
+            <div>Gültig bis: 15.05.2026</div>
+          </div>
+        </div>
 
-    // ── Anschreiben ──────────────────────────────────────────────────
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(13);
-    doc.setTextColor(...schwarz);
-    doc.text('Ihr persönliches Angebot –', margin, y);
-    doc.text('24-Stunden-Betreuung zu Hause', margin, y + 7);
-    y += 18;
-    doc.setFont('helvetica', 'normal');
-    doc.setFontSize(9.5);
-    doc.setTextColor(60, 60, 60);
-    doc.text('Sehr geehrte Frau Von Norman,', margin, y);
-    y += 6;
-    const intro = doc.splitTextToSize(
-      'vielen Dank für Ihre Anfrage. Gerne können wir die Betreuung übernehmen. Da unsere Betreuungskräfte direkt angestellt sind, kann die Betreuung bereits innerhalb von 4–7 Werktagen beginnen.',
-      pageW - margin * 2
-    );
-    doc.text(intro, margin, y);
-    y += intro.length * 5 + 2;
-    const intro2 = doc.splitTextToSize(
-      'Nachfolgend finden Sie die Konditionen sowie bereits vorausgewählte Pflegekräfte. Melden Sie sich jederzeit bei Fragen.',
-      pageW - margin * 2
-    );
-    doc.text(intro2, margin, y);
-    y += intro2.length * 5 + 3;
-    doc.setTextColor(...grau);
-    doc.text('Ihre Ilka Wysocki', margin, y);
-    y += 12;
+        <!-- Body -->
+        <div style="padding:36px 40px;">
 
-    // ── Trennlinie ───────────────────────────────────────────────────
-    doc.setDrawColor(220, 220, 220);
-    doc.line(margin, y, colRight, y);
-    y += 8;
+          <!-- Empfänger -->
+          <div style="margin-bottom:28px;">
+            <div style="font-size:16px;font-weight:700;color:#1a1a1a;margin-bottom:3px;">Frau Von Norman</div>
+            <div style="font-size:13px;color:#888;">graefinnorman@gmx.de</div>
+          </div>
 
-    // ── Konditionen Tabelle ──────────────────────────────────────────
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(11);
-    doc.setTextColor(...lila);
-    doc.text('Ihre Konditionen', margin, y);
-    y += 6;
+          <!-- Brieftext -->
+          <div style="margin-bottom:28px;">
+            <div style="font-size:18px;font-weight:700;color:#1a1a1a;line-height:1.4;margin-bottom:14px;">
+              Ihr persönliches Angebot –<br/>24-Stunden-Betreuung zu Hause
+            </div>
+            <p style="font-size:13px;color:#3c3c3c;margin:0 0 10px 0;">Sehr geehrte Frau Von Norman,</p>
+            <p style="font-size:13px;color:#3c3c3c;line-height:1.65;margin:0 0 10px 0;">vielen Dank für Ihre Anfrage. Gerne können wir die Betreuung übernehmen. Da unsere Betreuungskräfte direkt angestellt sind, kann die Betreuung bereits <strong>innerhalb von 4–7 Werktagen</strong> beginnen.</p>
+            <p style="font-size:13px;color:#3c3c3c;line-height:1.65;margin:0 0 14px 0;">Nachfolgend finden Sie die Konditionen sowie bereits vorausgewählte Pflegekräfte. Melden Sie sich jederzeit bei Fragen.</p>
+            <p style="font-size:13px;color:#888;margin:0;">Ihre Ilka Wysocki</p>
+          </div>
 
-    const rows: [string, string, boolean][] = [
-      ['Mtl. Betreuungskosten', '3.050 €', true],
-      ['(inkl. Steuern, Gebühren & Sozialabgaben)', '', false],
-      ['Anreise', 'Zzgl. 125 € / Strecke', false],
-      ['Unterkunft', 'Zzgl. Kost & Logis', false],
-    ];
-    rows.forEach(([label, value, bold]) => {
-      doc.setFont('helvetica', bold ? 'bold' : 'normal');
-      doc.setFontSize(9.5);
-      const [r, g, b] = bold ? schwarz : grau;
-      doc.setTextColor(r, g, b);
-      if (value) {
-        doc.text(label, margin + 2, y);
-        doc.setFont('helvetica', bold ? 'bold' : 'normal');
-        doc.text(value, colRight, y, { align: 'right' });
-      } else {
-        doc.setFontSize(8);
-        doc.text(label, margin + 2, y);
-      }
-      y += bold ? 6 : 5;
+          <!-- Trennlinie -->
+          <hr style="border:none;border-top:1px solid #e5e5e5;margin:0 0 28px 0;" />
+
+          <!-- Konditionen -->
+          <div style="margin-bottom:28px;">
+            <div style="background:#F5EDF6;border-radius:10px 10px 0 0;padding:12px 16px;">
+              <span style="font-size:14px;font-weight:700;color:#9B1FA1;">Ihre Konditionen</span>
+            </div>
+            <div style="border:1px solid #e5e5e5;border-top:none;border-radius:0 0 10px 10px;overflow:hidden;">
+              <!-- Hauptkosten -->
+              <div style="display:flex;justify-content:space-between;align-items:flex-start;padding:12px 16px;background:#fff;border-bottom:1px solid #f0f0f0;">
+                <div>
+                  <div style="font-size:13px;color:#3c3c3c;">Mtl. Betreuungskosten</div>
+                  <div style="font-size:11px;color:#999;margin-top:2px;">Inkl. Steuern, Gebühren &amp; Sozialabgaben</div>
+                </div>
+                <div style="font-size:16px;font-weight:700;color:#1a1a1a;white-space:nowrap;">3.050 €</div>
+              </div>
+              <div style="display:flex;justify-content:space-between;padding:10px 16px;background:#fff;border-bottom:1px solid #f0f0f0;">
+                <div style="font-size:13px;color:#3c3c3c;">Anreise</div>
+                <div style="font-size:13px;color:#555;white-space:nowrap;">Zzgl. 125 € / Strecke</div>
+              </div>
+              <div style="display:flex;justify-content:space-between;padding:10px 16px;background:#fff;border-bottom:1px solid #f0f0f0;">
+                <div style="font-size:13px;color:#3c3c3c;">Unterkunft</div>
+                <div style="font-size:13px;color:#555;white-space:nowrap;">Zzgl. Kost &amp; Logis</div>
+              </div>
+              <!-- Vertragskonditionen Header -->
+              <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 16px;background:#fafafa;border-bottom:1px solid #f0f0f0;">
+                <span style="font-size:12px;font-weight:600;color:#666;">Vertragskonditionen</span>
+                <span style="font-size:11px;font-weight:600;color:#1a7a4f;background:#E3F7EF;border:1px solid #B8E8D4;border-radius:20px;padding:2px 10px;">100% Sorglos</span>
+              </div>
+              ${['Täglich kündbar','Tagesgenaue Abrechnung','Kosten entstehen nur wenn Pflegekraft vor Ort ist'].map(t => `
+              <div style="display:flex;align-items:center;gap:10px;padding:9px 16px;background:#fafafa;border-bottom:1px solid #f0f0f0;">
+                <span style="color:#22A06B;font-size:14px;font-weight:700;flex-shrink:0;">✓</span>
+                <span style="font-size:13px;color:#3c3c3c;">${t}</span>
+              </div>`).join('')}
+            </div>
+          </div>
+
+          <!-- Zuschüsse -->
+          <div style="margin-bottom:16px;">
+            <div style="background:#E3F7EF;border:1px solid #B8E8D4;border-radius:10px 10px 0 0;padding:12px 16px;display:flex;justify-content:space-between;align-items:center;">
+              <div>
+                <div style="font-size:13px;font-weight:700;color:#1a7a4f;">Mögliche Zuschüsse der Pflegekasse</div>
+                <div style="font-size:11px;color:#2a9a6f;margin-top:2px;">Hinweis – kein Vertragsbestandteil</div>
+              </div>
+            </div>
+            <div style="border:1px solid #B8E8D4;border-top:none;border-radius:0 0 10px 10px;overflow:hidden;">
+              ${[
+                ['Pflegegeld (Pflegegrad 2)', '−347 €'],
+                ['Entlastungsbudget (anteilig mt.)', '−295 €'],
+                ['Steuervorteile § 35a EStG', '−333 €'],
+              ].map(([l,v]) => `
+              <div style="display:flex;justify-content:space-between;padding:9px 16px;background:#E3F7EF;border-bottom:1px solid #c8edd8;">
+                <span style="font-size:12px;color:#1a7a4f;">${l}</span>
+                <span style="font-size:12px;font-weight:600;color:#1a7a4f;">${v}</span>
+              </div>`).join('')}
+              <div style="display:flex;justify-content:space-between;padding:12px 16px;background:#d0f2e4;">
+                <span style="font-size:14px;font-weight:700;color:#1a7a4f;">Möglicher Eigenanteil</span>
+                <span style="font-size:14px;font-weight:700;color:#1a7a4f;">ab 2.075 €/Monat</span>
+              </div>
+            </div>
+          </div>
+          <p style="font-size:11px;color:#aaa;font-style:italic;margin:0 0 0 0;line-height:1.5;">Zuschüsse sind individuell nutzbar und abhängig von Ihrer persönlichen Situation.</p>
+        </div>
+
+        <!-- Footer -->
+        <div style="border-top:1px solid #e5e5e5;margin:0 40px;padding:14px 0;display:flex;justify-content:space-between;">
+          <span style="font-size:11px;color:#bbb;">Primundus GmbH · primundus.de · info@primundus.de</span>
+          <span style="font-size:11px;color:#bbb;">Seite 1 / 1</span>
+        </div>
+
+      </div>`;
+
+    const el = document.createElement('div');
+    el.style.cssText = 'position:fixed;left:-9999px;top:0;z-index:-1;';
+    el.innerHTML = html;
+    document.body.appendChild(el);
+
+    const doc = new jsPDF({ unit: 'mm', format: 'a4', orientation: 'portrait' });
+    doc.html(el, {
+      callback: (pdf) => {
+        pdf.save('Primundus-Angebot.pdf');
+        document.body.removeChild(el);
+      },
+      x: 0,
+      y: 0,
+      width: 210,
+      windowWidth: 794,
+      margin: [0, 0, 0, 0],
+      autoPaging: 'text',
     });
-    y += 4;
-
-    // Vertragskonditionen
-    doc.setFillColor(245, 237, 246);
-    doc.roundedRect(margin, y, pageW - margin * 2, 6, 2, 2, 'F');
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(9);
-    doc.setTextColor(...lila);
-    doc.text('Vertragskonditionen', margin + 3, y + 4);
-    y += 9;
-    ['Täglich kündbar', 'Tagesgenaue Abrechnung', 'Kosten entstehen nur wenn Pflegekraft vor Ort ist'].forEach(item => {
-      doc.setFont('helvetica', 'normal');
-      doc.setFontSize(9);
-      doc.setTextColor(...grau);
-      doc.text('✓  ' + item, margin + 2, y);
-      y += 5.5;
-    });
-    y += 6;
-
-    // ── Trennlinie ───────────────────────────────────────────────────
-    doc.setDrawColor(220, 220, 220);
-    doc.line(margin, y, colRight, y);
-    y += 8;
-
-    // ── Zuschüsse ────────────────────────────────────────────────────
-    doc.setFillColor(227, 247, 239);
-    doc.roundedRect(margin, y, pageW - margin * 2, 6, 2, 2, 'F');
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(10);
-    doc.setTextColor(...gruen);
-    doc.text('Mögliche Zuschüsse der Pflegekasse', margin + 3, y + 4);
-    doc.setFont('helvetica', 'italic');
-    doc.setFontSize(7.5);
-    doc.text('Hinweis – kein Vertragsbestandteil', colRight, y + 4, { align: 'right' });
-    y += 9;
-
-    const zuschuss: [string, string][] = [
-      ['Pflegegeld (Pflegegrad 2)', '−347 €'],
-      ['Entlastungsbudget (anteilig mt.)', '−295 €'],
-      ['Steuervorteile § 35a EStG', '−333 €'],
-    ];
-    zuschuss.forEach(([label, value]) => {
-      doc.setFont('helvetica', 'normal');
-      doc.setFontSize(9);
-      doc.setTextColor(...gruen);
-      doc.text(label, margin + 2, y);
-      doc.text(value, colRight, y, { align: 'right' });
-      y += 5.5;
-    });
-    // Eigenanteil row
-    doc.setFillColor(208, 242, 228);
-    doc.roundedRect(margin, y + 1, pageW - margin * 2, 7, 2, 2, 'F');
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(10);
-    doc.setTextColor(...gruen);
-    doc.text('Möglicher Eigenanteil', margin + 3, y + 5.5);
-    doc.text('ab 2.075 €/Monat', colRight, y + 5.5, { align: 'right' });
-    y += 13;
-
-    doc.setFont('helvetica', 'italic');
-    doc.setFontSize(7.5);
-    doc.setTextColor(160, 160, 160);
-    const hinweis = doc.splitTextToSize('Zuschüsse sind individuell nutzbar und abhängig von Ihrer persönlichen Situation.', pageW - margin * 2);
-    doc.text(hinweis, margin, y);
-    y += 12;
-
-    // ── Footer ───────────────────────────────────────────────────────
-    const footerY = doc.internal.pageSize.getHeight() - 12;
-    doc.setDrawColor(220, 220, 220);
-    doc.line(margin, footerY - 3, colRight, footerY - 3);
-    doc.setFont('helvetica', 'normal');
-    doc.setFontSize(7.5);
-    doc.setTextColor(180, 180, 180);
-    doc.text('Primundus GmbH · primundus.de · info@primundus.de', margin, footerY);
-    doc.text('Seite 1 / 1', colRight, footerY, { align: 'right' });
-
-    doc.save('Primundus-Angebot.pdf');
   };
 
   return (
