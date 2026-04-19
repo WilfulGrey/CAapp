@@ -941,7 +941,7 @@ const AngebotCard: FC<{
       </div>`;
 
     const el = document.createElement('div');
-    el.style.cssText = 'position:absolute;top:0;left:0;width:794px;z-index:-9999;opacity:0;pointer-events:none;';
+    el.style.cssText = 'position:fixed;left:-10000px;top:0;width:794px;pointer-events:none;';
     el.innerHTML = html;
     document.body.appendChild(el);
 
