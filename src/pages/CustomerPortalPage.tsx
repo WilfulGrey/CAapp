@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, FC } from 'react';
 import { Check, X, Bell, MapPin, Calendar, User, UserPlus, FileText, Euro, Clock, Plane, ChevronDown, Phone, AlertCircle, Shield, Users } from 'lucide-react';
+import jsPDF from 'jspdf';
 import { Nurse } from '../types';
 import { NURSES } from '../data/nurses';
 
@@ -830,6 +831,184 @@ const AngebotCard: FC<{
   const inputCls = 'w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm text-gray-800 placeholder-gray-300 focus:outline-none focus:border-[#9B1FA1] focus:ring-2 focus:ring-[#9B1FA1]/10 transition-all bg-white';
   const labelCls = 'block text-sm font-medium text-gray-500 mb-1.5';
 
+  const downloadPdf = () => {
+    const doc = new jsPDF({ unit: 'mm', format: 'a4' });
+    const lila = [155, 31, 161] as const;
+    const gruen = [26, 122, 79] as const;
+    const grau = [100, 100, 100] as const;
+    const schwarz = [30, 30, 30] as const;
+    const pageW = doc.internal.pageSize.getWidth();
+    const margin = 18;
+    const colRight = pageW - margin;
+    let y = 0;
+
+    // ── Header band ──────────────────────────────────────────────────
+    doc.setFillColor(245, 237, 246);
+    doc.rect(0, 0, pageW, 28, 'F');
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(16);
+    doc.setTextColor(...lila);
+    doc.text('primundus', margin, 17);
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(9);
+    doc.setTextColor(...grau);
+    doc.text('24-Stunden-Betreuung zu Hause', margin, 23);
+    // Datum rechts
+    doc.text('Angebotsdatum: 15.04.2026', colRight, 17, { align: 'right' });
+    doc.text('Gültig bis: 15.05.2026', colRight, 23, { align: 'right' });
+    y = 38;
+
+    // ── Empfänger ────────────────────────────────────────────────────
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(11);
+    doc.setTextColor(...schwarz);
+    doc.text('Frau Von Norman', margin, y);
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(9);
+    doc.setTextColor(...grau);
+    doc.text('graefinnorman@gmx.de', margin, y + 5);
+    y += 16;
+
+    // ── Anschreiben ──────────────────────────────────────────────────
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(13);
+    doc.setTextColor(...schwarz);
+    doc.text('Ihr persönliches Angebot –', margin, y);
+    doc.text('24-Stunden-Betreuung zu Hause', margin, y + 7);
+    y += 18;
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(9.5);
+    doc.setTextColor(60, 60, 60);
+    doc.text('Sehr geehrte Frau Von Norman,', margin, y);
+    y += 6;
+    const intro = doc.splitTextToSize(
+      'vielen Dank für Ihre Anfrage. Gerne können wir die Betreuung übernehmen. Da unsere Betreuungskräfte direkt angestellt sind, kann die Betreuung bereits innerhalb von 4–7 Werktagen beginnen.',
+      pageW - margin * 2
+    );
+    doc.text(intro, margin, y);
+    y += intro.length * 5 + 2;
+    const intro2 = doc.splitTextToSize(
+      'Nachfolgend finden Sie die Konditionen sowie bereits vorausgewählte Pflegekräfte. Melden Sie sich jederzeit bei Fragen.',
+      pageW - margin * 2
+    );
+    doc.text(intro2, margin, y);
+    y += intro2.length * 5 + 3;
+    doc.setTextColor(...grau);
+    doc.text('Ihre Ilka Wysocki', margin, y);
+    y += 12;
+
+    // ── Trennlinie ───────────────────────────────────────────────────
+    doc.setDrawColor(220, 220, 220);
+    doc.line(margin, y, colRight, y);
+    y += 8;
+
+    // ── Konditionen Tabelle ──────────────────────────────────────────
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(11);
+    doc.setTextColor(...lila);
+    doc.text('Ihre Konditionen', margin, y);
+    y += 6;
+
+    const rows: [string, string, boolean][] = [
+      ['Mtl. Betreuungskosten', '3.050 €', true],
+      ['(inkl. Steuern, Gebühren & Sozialabgaben)', '', false],
+      ['Anreise', 'Zzgl. 125 € / Strecke', false],
+      ['Unterkunft', 'Zzgl. Kost & Logis', false],
+    ];
+    rows.forEach(([label, value, bold]) => {
+      doc.setFont('helvetica', bold ? 'bold' : 'normal');
+      doc.setFontSize(9.5);
+      const [r, g, b] = bold ? schwarz : grau;
+      doc.setTextColor(r, g, b);
+      if (value) {
+        doc.text(label, margin + 2, y);
+        doc.setFont('helvetica', bold ? 'bold' : 'normal');
+        doc.text(value, colRight, y, { align: 'right' });
+      } else {
+        doc.setFontSize(8);
+        doc.text(label, margin + 2, y);
+      }
+      y += bold ? 6 : 5;
+    });
+    y += 4;
+
+    // Vertragskonditionen
+    doc.setFillColor(245, 237, 246);
+    doc.roundedRect(margin, y, pageW - margin * 2, 6, 2, 2, 'F');
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(9);
+    doc.setTextColor(...lila);
+    doc.text('Vertragskonditionen', margin + 3, y + 4);
+    y += 9;
+    ['Täglich kündbar', 'Tagesgenaue Abrechnung', 'Kosten entstehen nur wenn Pflegekraft vor Ort ist'].forEach(item => {
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(9);
+      doc.setTextColor(...grau);
+      doc.text('✓  ' + item, margin + 2, y);
+      y += 5.5;
+    });
+    y += 6;
+
+    // ── Trennlinie ───────────────────────────────────────────────────
+    doc.setDrawColor(220, 220, 220);
+    doc.line(margin, y, colRight, y);
+    y += 8;
+
+    // ── Zuschüsse ────────────────────────────────────────────────────
+    doc.setFillColor(227, 247, 239);
+    doc.roundedRect(margin, y, pageW - margin * 2, 6, 2, 2, 'F');
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(10);
+    doc.setTextColor(...gruen);
+    doc.text('Mögliche Zuschüsse der Pflegekasse', margin + 3, y + 4);
+    doc.setFont('helvetica', 'italic');
+    doc.setFontSize(7.5);
+    doc.text('Hinweis – kein Vertragsbestandteil', colRight, y + 4, { align: 'right' });
+    y += 9;
+
+    const zuschuss: [string, string][] = [
+      ['Pflegegeld (Pflegegrad 2)', '−347 €'],
+      ['Entlastungsbudget (anteilig mt.)', '−295 €'],
+      ['Steuervorteile § 35a EStG', '−333 €'],
+    ];
+    zuschuss.forEach(([label, value]) => {
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(9);
+      doc.setTextColor(...gruen);
+      doc.text(label, margin + 2, y);
+      doc.text(value, colRight, y, { align: 'right' });
+      y += 5.5;
+    });
+    // Eigenanteil row
+    doc.setFillColor(208, 242, 228);
+    doc.roundedRect(margin, y + 1, pageW - margin * 2, 7, 2, 2, 'F');
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(10);
+    doc.setTextColor(...gruen);
+    doc.text('Möglicher Eigenanteil', margin + 3, y + 5.5);
+    doc.text('ab 2.075 €/Monat', colRight, y + 5.5, { align: 'right' });
+    y += 13;
+
+    doc.setFont('helvetica', 'italic');
+    doc.setFontSize(7.5);
+    doc.setTextColor(160, 160, 160);
+    const hinweis = doc.splitTextToSize('Zuschüsse sind individuell nutzbar und abhängig von Ihrer persönlichen Situation.', pageW - margin * 2);
+    doc.text(hinweis, margin, y);
+    y += 12;
+
+    // ── Footer ───────────────────────────────────────────────────────
+    const footerY = doc.internal.pageSize.getHeight() - 12;
+    doc.setDrawColor(220, 220, 220);
+    doc.line(margin, footerY - 3, colRight, footerY - 3);
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(7.5);
+    doc.setTextColor(180, 180, 180);
+    doc.text('Primundus GmbH · primundus.de · info@primundus.de', margin, footerY);
+    doc.text('Seite 1 / 1', colRight, footerY, { align: 'right' });
+
+    doc.save('Primundus-Angebot.pdf');
+  };
+
   return (
     <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden shadow-sm divide-y divide-gray-100">
 
@@ -872,10 +1051,6 @@ const AngebotCard: FC<{
                 <p className="text-sm text-gray-600 leading-relaxed mt-2">Nachfolgend finden Sie die Konditionen sowie bereits vorausgewählte Pflegekräfte. Melden Sie sich jederzeit bei Fragen.</p>
                 <p className="text-sm text-gray-400 mt-3">Ihre Ilka Wysocki</p>
               </div>
-              <button className="flex items-center gap-2 text-xs font-semibold text-[#9B1FA1] border border-[#D8A9DC] bg-[#F5EDF6] rounded-lg px-3 py-2 hover:bg-[#EDD9EF] transition-colors w-full justify-center">
-                <svg className="w-3.5 h-3.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
-                Angebot als PDF herunterladen
-              </button>
             </div>
 
             {/* ── Konditionen & Kosten ── */}
@@ -979,6 +1154,12 @@ const AngebotCard: FC<{
                 Zuschüsse sind individuell nutzbar und abhängig von Ihrer persönlichen Situation.
               </p>
             </div>
+
+            {/* ── PDF Download ── */}
+            <button onClick={downloadPdf} className="flex items-center gap-2 text-xs font-semibold text-[#9B1FA1] border border-[#D8A9DC] bg-[#F5EDF6] rounded-lg px-3 py-2 hover:bg-[#EDD9EF] transition-colors w-full justify-center">
+              <svg className="w-3.5 h-3.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
+              Angebot als PDF herunterladen
+            </button>
 
             {/* ── Wie geht es weiter? ── */}
             <div className="rounded-xl border border-gray-200 overflow-hidden">
