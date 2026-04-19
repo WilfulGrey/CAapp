@@ -833,120 +833,152 @@ const AngebotCard: FC<{
   const labelCls = 'block text-sm font-medium text-gray-500 mb-1.5';
 
   const downloadPdf = async () => {
-    const logoUrl = `${window.location.origin}/LOGO-PRIMUNDUS.png`;
+    // Pre-load logo as base64 so html2canvas doesn't miss it
+    const logoB64 = await fetch('/LOGO-PRIMUNDUS.png')
+      .then(r => r.blob())
+      .then(b => new Promise<string>(res => { const fr = new FileReader(); fr.onload = () => res(fr.result as string); fr.readAsDataURL(b); }));
 
-    const html = `
-      <div style="width:794px;font-family:Arial,Helvetica,sans-serif;color:#1a1a1a;background:#fff;margin:0;padding:0;">
+    const row = (label: string, value: string, bold = false) =>
+      `<tr style="background:#fff;">
+        <td style="padding:11px 20px;font-size:13px;color:#444;border-bottom:1px solid #f0f0f0;">${label}</td>
+        <td style="padding:11px 20px;text-align:right;font-size:${bold ? '18' : '13'}px;font-weight:${bold ? '700' : '400'};color:${bold ? '#9B1FA1' : '#555'};border-bottom:1px solid #f0f0f0;white-space:nowrap;">${value}</td>
+      </tr>`;
 
-        <!-- Header -->
-        <div style="background:#F5EDF6;padding:24px 40px;display:flex;justify-content:space-between;align-items:center;">
-          <img src="${logoUrl}" style="height:38px;display:block;" crossorigin="anonymous" />
-          <div style="text-align:right;font-size:12px;color:#888;line-height:1.8;">
-            <div>Angebotsdatum: 15.04.2026</div>
-            <div>Gültig bis: 15.05.2026</div>
-          </div>
+    const greenRow = (label: string, value: string) =>
+      `<tr style="background:#E3F7EF;">
+        <td style="padding:9px 20px;font-size:13px;color:#1a7a4f;border-bottom:1px solid #c8edd8;">${label}</td>
+        <td style="padding:9px 20px;text-align:right;font-size:13px;font-weight:600;color:#1a7a4f;border-bottom:1px solid #c8edd8;white-space:nowrap;">${value}</td>
+      </tr>`;
+
+    const step = (n: string, title: string, desc: string) =>
+      `<tr style="background:#fff;">
+        <td style="padding:12px 20px;vertical-align:top;width:36px;">
+          <div style="width:26px;height:26px;background:#F5EDF6;border-radius:50%;text-align:center;line-height:26px;font-size:11px;font-weight:700;color:#9B1FA1;">${n}</div>
+        </td>
+        <td style="padding:12px 20px 12px 0;border-bottom:1px solid #f5f5f5;vertical-align:top;">
+          <div style="font-size:13px;font-weight:700;color:#1a1a1a;">${title}</div>
+          <div style="font-size:12px;color:#777;margin-top:3px;line-height:1.5;">${desc}</div>
+        </td>
+      </tr>`;
+
+    const html = `<div style="width:794px;font-family:Arial,Helvetica,sans-serif;color:#1a1a1a;background:#fff;">
+
+  <!-- HEADER: white bg so logo renders cleanly -->
+  <div style="background:#fff;padding:28px 48px 24px;border-bottom:1px solid #EDD9EF;">
+    <table style="width:100%;border-collapse:collapse;"><tr>
+      <td style="vertical-align:middle;"><img src="${logoB64}" style="height:120px;display:block;" /></td>
+      <td style="vertical-align:middle;text-align:right;">
+        <div style="font-size:10px;font-weight:700;color:#9B1FA1;letter-spacing:2px;text-transform:uppercase;margin-bottom:8px;">Persönliches Angebot</div>
+        <div style="font-size:12px;color:#666;line-height:2.1;">
+          <div>Angebotsdatum: <strong style="color:#333;">15.04.2026</strong></div>
+          <div>Gültig bis: <strong style="color:#333;">15.05.2026</strong></div>
         </div>
+      </td>
+    </tr></table>
+  </div>
 
-        <!-- Body -->
-        <div style="padding:36px 40px;">
+  <!-- HERO BAND: lila -->
+  <div style="background:#9B1FA1;padding:26px 48px;">
+    <div style="font-size:22px;font-weight:700;color:#fff;line-height:1.3;">24-Stunden-Betreuung zu Hause</div>
+    <div style="font-size:14px;color:rgba(255,255,255,0.8);margin-top:6px;">Persönliches Angebot für Frau Von Norman</div>
+  </div>
 
-          <!-- Empfänger -->
-          <div style="margin-bottom:28px;">
-            <div style="font-size:16px;font-weight:700;color:#1a1a1a;margin-bottom:3px;">Frau Von Norman</div>
-            <div style="font-size:13px;color:#888;">graefinnorman@gmx.de</div>
-          </div>
+  <!-- BODY -->
+  <div style="padding:36px 48px 28px;">
 
-          <!-- Brieftext -->
-          <div style="margin-bottom:28px;">
-            <div style="font-size:18px;font-weight:700;color:#1a1a1a;line-height:1.4;margin-bottom:14px;">
-              Ihr persönliches Angebot –<br/>24-Stunden-Betreuung zu Hause
-            </div>
-            <p style="font-size:13px;color:#3c3c3c;margin:0 0 10px 0;">Sehr geehrte Frau Von Norman,</p>
-            <p style="font-size:13px;color:#3c3c3c;line-height:1.65;margin:0 0 10px 0;">vielen Dank für Ihre Anfrage. Gerne können wir die Betreuung übernehmen. Da unsere Betreuungskräfte direkt angestellt sind, kann die Betreuung bereits <strong>innerhalb von 4–7 Werktagen</strong> beginnen.</p>
-            <p style="font-size:13px;color:#3c3c3c;line-height:1.65;margin:0 0 14px 0;">Nachfolgend finden Sie die Konditionen sowie bereits vorausgewählte Pflegekräfte. Melden Sie sich jederzeit bei Fragen.</p>
-            <p style="font-size:13px;color:#888;margin:0;">Ihre Ilka Wysocki</p>
-          </div>
+    <!-- Anschreiben -->
+    <p style="font-size:14px;color:#333;margin:0 0 8px;">Sehr geehrte Frau Von Norman,</p>
+    <p style="font-size:13.5px;color:#555;line-height:1.7;margin:0 0 8px;">vielen Dank für Ihre Anfrage. Gerne können wir die Betreuung übernehmen. Da unsere Betreuungskräfte direkt angestellt sind, kann die Betreuung bereits <strong style="color:#1a1a1a;">innerhalb von 4–7 Werktagen</strong> beginnen.</p>
+    <p style="font-size:13.5px;color:#555;line-height:1.7;margin:0 0 6px;">Nachfolgend finden Sie die Konditionen sowie bereits vorausgewählte Pflegekräfte. Melden Sie sich jederzeit bei Fragen.</p>
+    <p style="font-size:13px;color:#aaa;margin:0 0 32px;">Ihre Ilka Wysocki · Primundus GmbH</p>
 
-          <!-- Trennlinie -->
-          <hr style="border:none;border-top:1px solid #e5e5e5;margin:0 0 28px 0;" />
+    <!-- KONDITIONEN -->
+    <div style="margin-bottom:28px;">
+      <div style="background:#9B1FA1;padding:13px 20px;border-radius:8px 8px 0 0;">
+        <span style="font-size:13px;font-weight:700;color:#fff;letter-spacing:0.3px;">Ihre Konditionen</span>
+      </div>
+      <table style="width:100%;border-collapse:collapse;border:1px solid #e5e5e5;border-top:none;border-radius:0 0 8px 8px;">
+        ${row('Mtl. Betreuungskosten<div style="font-size:11px;color:#aaa;margin-top:2px;">Inkl. Steuern, Gebühren &amp; Sozialabgaben</div>', '3.050 €', true)}
+        ${row('Anreise', 'Zzgl. 125 € / Strecke')}
+        ${row('Unterkunft', 'Zzgl. Kost &amp; Logis')}
+        <tr style="background:#fafafa;">
+          <td colspan="2" style="padding:10px 20px;font-size:11px;font-weight:700;color:#9B1FA1;letter-spacing:1px;border-bottom:1px solid #f0f0f0;">VERTRAGSKONDITIONEN</td>
+        </tr>
+        ${['Täglich kündbar', 'Tagesgenaue Abrechnung', 'Kosten entstehen nur wenn Pflegekraft vor Ort ist'].map(t =>
+          `<tr style="background:#fafafa;"><td colspan="2" style="padding:9px 20px;font-size:13px;color:#444;border-bottom:1px solid #f0f0f0;"><span style="color:#22A06B;font-weight:700;margin-right:8px;">&#10003;</span>${t}</td></tr>`
+        ).join('')}
+      </table>
+    </div>
 
-          <!-- Konditionen -->
-          <div style="margin-bottom:28px;">
-            <div style="background:#F5EDF6;border-radius:10px 10px 0 0;padding:12px 16px;">
-              <span style="font-size:14px;font-weight:700;color:#9B1FA1;">Ihre Konditionen</span>
-            </div>
-            <div style="border:1px solid #e5e5e5;border-top:none;border-radius:0 0 10px 10px;overflow:hidden;">
-              <!-- Hauptkosten -->
-              <div style="display:flex;justify-content:space-between;align-items:flex-start;padding:12px 16px;background:#fff;border-bottom:1px solid #f0f0f0;">
-                <div>
-                  <div style="font-size:13px;color:#3c3c3c;">Mtl. Betreuungskosten</div>
-                  <div style="font-size:11px;color:#999;margin-top:2px;">Inkl. Steuern, Gebühren &amp; Sozialabgaben</div>
-                </div>
-                <div style="font-size:16px;font-weight:700;color:#1a1a1a;white-space:nowrap;">3.050 €</div>
-              </div>
-              <div style="display:flex;justify-content:space-between;padding:10px 16px;background:#fff;border-bottom:1px solid #f0f0f0;">
-                <div style="font-size:13px;color:#3c3c3c;">Anreise</div>
-                <div style="font-size:13px;color:#555;white-space:nowrap;">Zzgl. 125 € / Strecke</div>
-              </div>
-              <div style="display:flex;justify-content:space-between;padding:10px 16px;background:#fff;border-bottom:1px solid #f0f0f0;">
-                <div style="font-size:13px;color:#3c3c3c;">Unterkunft</div>
-                <div style="font-size:13px;color:#555;white-space:nowrap;">Zzgl. Kost &amp; Logis</div>
-              </div>
-              <!-- Vertragskonditionen Header -->
-              <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 16px;background:#fafafa;border-bottom:1px solid #f0f0f0;">
-                <span style="font-size:12px;font-weight:600;color:#666;">Vertragskonditionen</span>
-                <span style="font-size:11px;font-weight:600;color:#1a7a4f;background:#E3F7EF;border:1px solid #B8E8D4;border-radius:20px;padding:2px 10px;">100% Sorglos</span>
-              </div>
-              ${['Täglich kündbar','Tagesgenaue Abrechnung','Kosten entstehen nur wenn Pflegekraft vor Ort ist'].map(t => `
-              <div style="display:flex;align-items:center;gap:10px;padding:9px 16px;background:#fafafa;border-bottom:1px solid #f0f0f0;">
-                <span style="color:#22A06B;font-size:14px;font-weight:700;flex-shrink:0;">✓</span>
-                <span style="font-size:13px;color:#3c3c3c;">${t}</span>
-              </div>`).join('')}
-            </div>
-          </div>
+    <!-- ZUSCHÜSSE -->
+    <div style="margin-bottom:28px;">
+      <div style="background:#22A06B;padding:13px 20px;border-radius:8px 8px 0 0;">
+        <span style="font-size:13px;font-weight:700;color:#fff;">Mögliche Zuschüsse der Pflegekasse</span>
+        <span style="font-size:11px;color:rgba(255,255,255,0.75);margin-left:8px;">— kein Vertragsbestandteil</span>
+      </div>
+      <table style="width:100%;border-collapse:collapse;border:1px solid #B8E8D4;border-top:none;">
+        ${greenRow('Pflegegeld (Pflegegrad 2)', '−347 €')}
+        ${greenRow('Entlastungsbudget (anteilig mt.)', '−295 €')}
+        ${greenRow('Steuervorteile § 35a EStG', '−333 €')}
+        <tr style="background:#d0f2e4;">
+          <td style="padding:14px 20px;font-size:14px;font-weight:700;color:#1a7a4f;">Möglicher Eigenanteil</td>
+          <td style="padding:14px 20px;text-align:right;font-size:16px;font-weight:700;color:#1a7a4f;white-space:nowrap;">ab 2.075 €/Monat</td>
+        </tr>
+      </table>
+      <p style="font-size:11px;color:#bbb;font-style:italic;margin:7px 0 0;">Zuschüsse sind individuell nutzbar und abhängig von Ihrer persönlichen Situation.</p>
+    </div>
 
-          <!-- Zuschüsse -->
-          <div style="margin-bottom:16px;">
-            <div style="background:#E3F7EF;border:1px solid #B8E8D4;border-radius:10px 10px 0 0;padding:12px 16px;display:flex;justify-content:space-between;align-items:center;">
-              <div>
-                <div style="font-size:13px;font-weight:700;color:#1a7a4f;">Mögliche Zuschüsse der Pflegekasse</div>
-                <div style="font-size:11px;color:#2a9a6f;margin-top:2px;">Hinweis – kein Vertragsbestandteil</div>
-              </div>
-            </div>
-            <div style="border:1px solid #B8E8D4;border-top:none;border-radius:0 0 10px 10px;overflow:hidden;">
-              ${[
-                ['Pflegegeld (Pflegegrad 2)', '−347 €'],
-                ['Entlastungsbudget (anteilig mt.)', '−295 €'],
-                ['Steuervorteile § 35a EStG', '−333 €'],
-              ].map(([l,v]) => `
-              <div style="display:flex;justify-content:space-between;padding:9px 16px;background:#E3F7EF;border-bottom:1px solid #c8edd8;">
-                <span style="font-size:12px;color:#1a7a4f;">${l}</span>
-                <span style="font-size:12px;font-weight:600;color:#1a7a4f;">${v}</span>
-              </div>`).join('')}
-              <div style="display:flex;justify-content:space-between;padding:12px 16px;background:#d0f2e4;">
-                <span style="font-size:14px;font-weight:700;color:#1a7a4f;">Möglicher Eigenanteil</span>
-                <span style="font-size:14px;font-weight:700;color:#1a7a4f;">ab 2.075 €/Monat</span>
-              </div>
-            </div>
-          </div>
-          <p style="font-size:11px;color:#aaa;font-style:italic;margin:0 0 0 0;line-height:1.5;">Zuschüsse sind individuell nutzbar und abhängig von Ihrer persönlichen Situation.</p>
-        </div>
+    <!-- WARUM PRIMUNDUS -->
+    <div style="margin-bottom:28px;">
+      <div style="background:#9B1FA1;padding:13px 20px;border-radius:8px 8px 0 0;">
+        <span style="font-size:13px;font-weight:700;color:#fff;">Warum Primundus?</span>
+      </div>
+      <table style="width:100%;border-collapse:collapse;border:1px solid #e5e5e5;border-top:none;">
+        ${[
+          ['20+ Jahre Erfahrung', 'Seit über zwei Jahrzehnten vermitteln wir zuverlässige Betreuungskräfte.'],
+          ['60.000+ Einsätze', 'Erfahrung aus tausenden erfolgreichen Betreuungsverhältnissen.'],
+          ['Persönlicher Ansprechpartner', 'Ihre Beraterin ist 7 Tage die Woche für Sie erreichbar.'],
+          ['Testsieger bei DIE WELT', 'Beste Kombination aus Preis, Qualität und Kundenservice.'],
+        ].map(([t, d]) =>
+          `<tr style="background:#fff;"><td style="padding:11px 20px;border-bottom:1px solid #f5f5f5;vertical-align:top;">
+            <div style="font-size:13px;font-weight:700;color:#1a1a1a;">${t}</div>
+            <div style="font-size:12px;color:#777;margin-top:2px;line-height:1.5;">${d}</div>
+          </td></tr>`
+        ).join('')}
+      </table>
+    </div>
 
-        <!-- Footer -->
-        <div style="border-top:1px solid #e5e5e5;margin:0 40px;padding:14px 0;display:flex;justify-content:space-between;">
-          <span style="font-size:11px;color:#bbb;">Primundus GmbH · primundus.de · info@primundus.de</span>
-          <span style="font-size:11px;color:#bbb;">Seite 1 / 1</span>
-        </div>
+    <!-- WIE GEHT ES WEITER -->
+    <div style="margin-bottom:12px;">
+      <div style="background:#9B1FA1;padding:13px 20px;border-radius:8px 8px 0 0;">
+        <span style="font-size:13px;font-weight:700;color:#fff;">Was passiert nach der Annahme?</span>
+      </div>
+      <table style="width:100%;border-collapse:collapse;border:1px solid #EDD9EF;border-top:none;">
+        ${step('1', 'Vertragsbestätigung per E-Mail', 'Sie erhalten sofort eine Bestätigung mit allen Details.')}
+        ${step('2', 'Anreise &amp; Betreuungsbeginn', 'Die Pflegekraft reist zum vereinbarten Startdatum an und beginnt die Betreuung.')}
+        ${step('3', 'Laufende Begleitung', 'Ihr persönlicher Ansprechpartner ist jederzeit für Sie da — auch während des Einsatzes.')}
+        ${step('4', 'Nächsten Einsatz planen', 'Zur Mitte des Einsatzes starten wir die Planung der Nachfolge. Neue Pflegekräfte erscheinen direkt im Portal.')}
+      </table>
+    </div>
 
-      </div>`;
+  </div>
+
+  <!-- FOOTER -->
+  <div style="border-top:2px solid #F5EDF6;padding:16px 48px;background:#fafafa;">
+    <table style="width:100%;border-collapse:collapse;"><tr>
+      <td style="font-size:11px;color:#bbb;">Primundus GmbH · primundus.de · info@primundus.de</td>
+      <td style="text-align:right;font-size:11px;color:#bbb;">Vertrauliches Angebot · Nur für Frau Von Norman</td>
+    </tr></table>
+  </div>
+
+</div>`;
 
     const el = document.createElement('div');
     el.style.cssText = 'position:fixed;left:-10000px;top:0;width:794px;pointer-events:none;';
     el.innerHTML = html;
     document.body.appendChild(el);
 
-    // Wait one frame so the browser renders the element (images etc.)
-    await new Promise(r => setTimeout(r, 200));
+    await new Promise(r => setTimeout(r, 300));
 
     try {
       const canvas = await html2canvas(el, {
@@ -960,15 +992,13 @@ const AngebotCard: FC<{
 
       const imgData = canvas.toDataURL('image/png');
       const doc = new jsPDF({ unit: 'mm', format: 'a4', orientation: 'portrait' });
-      const pageW = doc.internal.pageSize.getWidth();   // 210 mm
-      const pageH = doc.internal.pageSize.getHeight();  // 297 mm
+      const pageW = doc.internal.pageSize.getWidth();
+      const pageH = doc.internal.pageSize.getHeight();
       const canvasH = (canvas.height / canvas.width) * pageW;
 
       if (canvasH <= pageH) {
-        // Fits on one page
         doc.addImage(imgData, 'PNG', 0, 0, pageW, canvasH);
       } else {
-        // Multi-page: slice canvas per page
         const pxPerPage = (pageH / pageW) * canvas.width;
         let remainingH = canvas.height;
         let srcY = 0;
@@ -978,11 +1008,9 @@ const AngebotCard: FC<{
           const sliceCanvas = document.createElement('canvas');
           sliceCanvas.width = canvas.width;
           sliceCanvas.height = sliceH;
-          const ctx = sliceCanvas.getContext('2d')!;
-          ctx.drawImage(canvas, 0, srcY, canvas.width, sliceH, 0, 0, canvas.width, sliceH);
-          const sliceImg = sliceCanvas.toDataURL('image/png');
+          sliceCanvas.getContext('2d')!.drawImage(canvas, 0, srcY, canvas.width, sliceH, 0, 0, canvas.width, sliceH);
           if (!firstPage) doc.addPage();
-          doc.addImage(sliceImg, 'PNG', 0, 0, pageW, (sliceH / canvas.width) * pageW);
+          doc.addImage(sliceCanvas.toDataURL('image/png'), 'PNG', 0, 0, pageW, (sliceH / canvas.width) * pageW);
           srcY += sliceH;
           remainingH -= sliceH;
           firstPage = false;
