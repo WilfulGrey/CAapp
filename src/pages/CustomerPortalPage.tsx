@@ -148,6 +148,7 @@ const CustomerPortalPage: FC = () => {
   const [showPatientReminder, setShowPatientReminder] = useState(false);
   const [triggerOpenPatient, setTriggerOpenPatient] = useState(false);
   const [firstInviteDone, setFirstInviteDone] = useState(false);
+  const [openFaq, setOpenFaq] = useState<number | null>(null);
 
   const animateThenProcess = (id: string, fn: () => void) => {
     setExitingIds(prev => new Set([...prev, id]));
@@ -298,7 +299,11 @@ const CustomerPortalPage: FC = () => {
             </div>
             <div className="flex-1 min-w-0">
               <p className="text-sm font-semibold text-gray-800">Bewerbungen werden für Sie vorbereitet</p>
-              <p className="text-sm text-gray-400 mt-0.5">Wir benachrichtigen Sie sobald neue eingehen.</p>
+              <p className="text-xs text-gray-400 mt-0.5">Sie erhalten eine E-Mail sobald eine Pflegekraft sich bewirbt.</p>
+              <div className="flex items-center gap-1.5 mt-1.5">
+                <svg className="w-3 h-3 text-[#22A06B] flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>
+                <span className="text-xs font-medium text-[#22A06B]">graefinnorman@gmx.de</span>
+              </div>
             </div>
           </div>
         ) : (
@@ -378,6 +383,62 @@ const CustomerPortalPage: FC = () => {
             ))}
           </div>
         )}
+
+        {/* ── SECTION: Was passiert nach der Annahme? ── */}
+        <div className="rounded-xl border border-gray-100 overflow-hidden">
+          <div className="px-4 py-3 bg-gray-50 border-b border-gray-100">
+            <p className="text-xs font-bold text-gray-400 uppercase tracking-wider">Was passiert nach der Annahme?</p>
+          </div>
+          <div className="divide-y divide-gray-100 bg-white">
+            {[
+              { n: '1', title: 'Vertragsbestätigung per E-Mail', desc: 'Sie erhalten sofort eine Bestätigung mit allen Details.' },
+              { n: '2', title: 'Anreise & Betreuungsbeginn', desc: 'Die Pflegekraft reist zum vereinbarten Startdatum an und beginnt die Betreuung.' },
+              { n: '3', title: 'Laufende Begleitung', desc: 'Ihr persönlicher Ansprechpartner ist jederzeit für Sie da — auch während des Einsatzes.' },
+              { n: '4', title: 'Nächsten Einsatz planen', desc: 'Zur Mitte des laufenden Einsatzes starten wir die Planung der Nachfolge. Neue Pflegekräfte und alle Infos erscheinen direkt hier im Portal.' },
+            ].map((s) => (
+              <div key={s.n} className="flex items-start gap-3 px-4 py-3">
+                <div className="w-5 h-5 rounded-full bg-[#F5EDF6] text-[#9B1FA1] text-[10px] font-bold flex items-center justify-center flex-shrink-0 mt-0.5">{s.n}</div>
+                <div>
+                  <p className="text-sm font-semibold text-gray-800">{s.title}</p>
+                  <p className="text-xs text-gray-500 mt-0.5">{s.desc}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* ── SECTION: FAQ ── */}
+        <div className="rounded-xl border border-gray-100 overflow-hidden">
+          <div className="px-4 py-3 bg-gray-50 border-b border-gray-100">
+            <p className="text-xs font-bold text-gray-400 uppercase tracking-wider">Häufige Fragen</p>
+          </div>
+          <div className="divide-y divide-gray-100 bg-white">
+            {[
+              { q: 'Was bedeutet "Einladen"?', a: 'Wenn Sie eine Pflegekraft einladen, erhält sie eine direkte Anfrage und kann sich offiziell bei Ihnen bewerben. Erst nach einer Bewerbung sehen Sie das konkrete Angebot und können annehmen oder ablehnen.' },
+              { q: 'Kann ich kündigen, wenn es nicht passt?', a: 'Ja — Sie können täglich kündigen, sofern in Ihrem Angebot so vereinbart. Es entstehen keine weiteren Kosten nach Abreise der Pflegekraft.' },
+              { q: 'Wie läuft die Zahlung ab?', a: 'Die Abrechnung erfolgt monatsgenau. Sie erhalten am Monatsende eine Rechnung für die tatsächlichen Betreuungstage.' },
+              { q: 'Was passiert, wenn die Pflegekraft ausfällt?', a: 'Primundus organisiert schnellstmöglich eine Vertretung. Ihr Ansprechpartner informiert Sie proaktiv.' },
+              { q: 'Kann ich eine andere Pflegekraft wählen?', a: 'Ja — Sie können Bewerbungen ablehnen und weitere Pflegekräfte einladen. Wir helfen Ihnen, die beste Lösung zu finden.' },
+              { q: 'Wie werden Reisekosten abgerechnet?', a: 'Reisekosten fallen einmalig bei An- und Abreise an und sind im Angebot als Pauschale ausgewiesen.' },
+            ].map((item, i) => (
+              <div key={i}>
+                <button
+                  onClick={() => setOpenFaq(openFaq === i ? null : i)}
+                  className="w-full flex items-center justify-between px-4 py-3 text-left hover:bg-gray-50 transition-colors"
+                >
+                  <span className="text-sm font-medium text-gray-800 pr-4">{item.q}</span>
+                  <ChevronDown className={`w-4 h-4 text-gray-400 flex-shrink-0 transition-transform ${openFaq === i ? 'rotate-180' : ''}`} />
+                </button>
+                {openFaq === i && (
+                  <div className="px-4 pb-3">
+                    <p className="text-sm text-gray-500 leading-relaxed">{item.a}</p>
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+
       </div>
       )}
 
@@ -767,7 +828,7 @@ const AngebotCard: FC<{
   const allComplete = STEP_LABELS.every((_, i) => stepComplete(i));
 
   const inputCls = 'w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm text-gray-800 placeholder-gray-300 focus:outline-none focus:border-[#9B1FA1] focus:ring-2 focus:ring-[#9B1FA1]/10 transition-all bg-white';
-  const labelCls = 'block text-sm font-semibold text-gray-600 mb-1.5';
+  const labelCls = 'block text-sm font-medium text-gray-500 mb-1.5';
 
   return (
     <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden shadow-sm divide-y divide-gray-100">
@@ -800,8 +861,8 @@ const AngebotCard: FC<{
                   <p className="text-sm text-gray-500">graefinnorman@gmx.de</p>
                 </div>
                 <div className="text-right flex-shrink-0">
-                  <p className="text-sm text-gray-500">Angebotsdatum: 15.04.2026</p>
-                  <p className="text-sm text-gray-500">Gültig bis: 15.05.2026</p>
+                  <p className="text-xs text-gray-500">Angebotsdatum: 15.04.2026</p>
+                  <p className="text-xs text-gray-500">Gültig bis: 15.05.2026</p>
                 </div>
               </div>
               <div>
@@ -811,6 +872,10 @@ const AngebotCard: FC<{
                 <p className="text-sm text-gray-600 leading-relaxed mt-2">Nachfolgend finden Sie die Konditionen sowie bereits vorausgewählte Pflegekräfte. Melden Sie sich jederzeit bei Fragen.</p>
                 <p className="text-sm text-gray-400 mt-3">Ihre Ilka Wysocki</p>
               </div>
+              <button className="flex items-center gap-2 text-xs font-semibold text-[#9B1FA1] border border-[#D8A9DC] bg-[#F5EDF6] rounded-lg px-3 py-2 hover:bg-[#EDD9EF] transition-colors w-full justify-center">
+                <svg className="w-3.5 h-3.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
+                Angebot als PDF herunterladen
+              </button>
             </div>
 
             {/* ── Konditionen & Kosten ── */}
@@ -857,12 +922,12 @@ const AngebotCard: FC<{
                   <p className="text-sm font-bold text-gray-900">Warum Primundus…</p>
                 </div>
                 {[
-                  { icon: '🏅', label: 'Über 20 Jahre Erfahrung' },
-                  { icon: '📋', label: 'Über 60.000+ Einsätze' },
-                  { icon: '👤', label: 'Persönlicher Ansprechpartner 7 Tage die Woche' },
-                ].map(r => (
-                  <div key={r.label} className="flex items-center gap-3 px-4 py-2 bg-white">
-                    <span className="text-sm flex-shrink-0">{r.icon}</span>
+                  { icon: <svg className="w-4 h-4 text-[#9B1FA1]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z" /></svg>, label: 'Über 20 Jahre Erfahrung' },
+                  { icon: <svg className="w-4 h-4 text-[#9B1FA1]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" /></svg>, label: 'Über 60.000+ Einsätze' },
+                  { icon: <svg className="w-4 h-4 text-[#9B1FA1]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg>, label: 'Persönlicher Ansprechpartner 7 Tage die Woche' },
+                ].map((r, i) => (
+                  <div key={i} className="flex items-center gap-3 px-4 py-2 bg-white">
+                    <span className="flex-shrink-0">{r.icon}</span>
                     <span className="text-sm text-gray-700">{r.label}</span>
                   </div>
                 ))}
@@ -905,9 +970,9 @@ const AngebotCard: FC<{
                     <span className="text-xs font-semibold text-[#1a7a4f] text-right">{r.value}</span>
                   </div>
                 ))}
-                <div className="flex items-center justify-between px-4 py-2.5 bg-[#d0f2e4] gap-4">
-                  <span className="text-xs font-bold text-[#1a7a4f]">Möglicher Eigenanteil</span>
-                  <span className="text-xs font-bold text-[#1a7a4f] text-right">ab 2.075 €/Monat</span>
+                <div className="flex items-center justify-between px-4 py-2.5 bg-[#d0f2e4] border-t border-[#a3d9c4] gap-4">
+                  <span className="text-sm font-bold text-[#1a7a4f]">Möglicher Eigenanteil</span>
+                  <span className="text-sm font-bold text-[#1a7a4f] text-right">ab 2.075 €/Monat</span>
                 </div>
               </div>
               <p className="text-xs text-gray-400 leading-relaxed">
@@ -1027,7 +1092,7 @@ const AngebotCard: FC<{
 
               {/* Step heading */}
               <div className="pt-1 pb-1 border-b border-gray-100">
-                <p className="text-sm font-bold text-gray-800">
+                <p className="text-xs font-bold text-gray-400 uppercase tracking-wider">
                   {step === 0 && 'Angaben zur betreuten Person'}
                   {step === 1 && 'Pflegebedarf'}
                   {step === 2 && 'Wohnsituation'}
@@ -1527,18 +1592,22 @@ const AppCard: FC<{
       style={exiting ? { animation: 'exitCard 0.32s ease-in forwards' } : undefined}
     >
       {/* Header band — always visible */}
-      <div className="flex items-center justify-between px-5 py-2.5 bg-[#F5EDF6] border-b border-[#EDD9EF]">
-        {app.isInvited ? (
-          <div className="flex items-center gap-1.5">
-            <svg className="w-3.5 h-3.5 text-[#9B1FA1] flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-            </svg>
-            <span className="text-xs font-semibold text-[#9B1FA1]">Von Ihnen eingeladen</span>
-          </div>
-        ) : (
-          <span className="text-xs font-semibold text-[#9B1FA1]">Neue Bewerbung</span>
-        )}
-        <span className="text-xs text-[#9B1FA1]">Eingegangen: {app.appliedAt}</span>
+      <div className="flex items-center justify-between px-5 py-2 bg-[#F5EDF6] border-b border-[#EDD9EF]">
+        <div className="flex items-center gap-2">
+          <span className="text-xs font-semibold text-[#9B1FA1]">Bewerbung</span>
+          {app.status === 'new' && (
+            <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-[#E3F7EF] text-[#22A06B] border border-[#B8E8D4]">Neu</span>
+          )}
+          {app.isInvited && (
+            <span className="flex items-center gap-1 text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-[#EDD9EF] text-[#9B1FA1] border border-[#D8A9DC]">
+              <svg className="w-3 h-3 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+              </svg>
+              Eingeladen
+            </span>
+          )}
+        </div>
+        <span className="text-[10px] text-[#9B1FA1]">{app.appliedAt}</span>
       </div>
 
       {/* Clickable nurse row → opens profile */}
@@ -1582,9 +1651,9 @@ const AppCard: FC<{
               <span className="text-sm text-gray-500">Deutsch {nurse.language.level}</span>
             </div>
             {/* Zeile 3: Erfahrung + Einsätze in einer Zeile */}
-            <p className="text-sm text-gray-500">
+            <p className="text-sm text-gray-500 truncate">
               <span className="font-semibold text-[#9B1FA1]">{nurse.experience}</span>
-              {nurse.history && <span> · {nurse.history.assignments} Einsätze · Ø {Math.round(nurse.history.avgDurationMonths * 4.3)} Wo.</span>}
+              {nurse.history && <span> · {nurse.history.assignments} Eins. · Ø {Math.round(nurse.history.avgDurationMonths * 4.3)} Wo.</span>}
             </p>
           </div>
         </div>
@@ -1592,14 +1661,17 @@ const AppCard: FC<{
 
       {/* Cost + Message — Teil der Bewerbung, zusammen */}
       <div className="border-t border-gray-100 px-5 py-4">
-        <div className="flex items-center justify-between gap-3 mb-3">
-          <div className="min-w-0">
-            <p className="text-sm font-medium text-gray-700 truncate">{app.offer.anreisedatum} – {app.offer.abreisedatum}</p>
-            <p className="text-xs text-gray-500 mt-0.5 truncate">Reisekosten á {app.offer.anreisekosten} € · {app.offer.kuendigungsfrist}</p>
-          </div>
-          <div className="text-right flex-shrink-0">
-            <p className="text-xs text-gray-500 mb-0.5">Mtl. Betreuungskosten</p>
-            <p className="text-xl font-bold text-[#9B1FA1]">{app.offer.monatlicheKosten.toLocaleString('de-DE')} €</p>
+        <div className="bg-[#F5EDF6] rounded-xl px-4 py-3 mb-3">
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0">
+              <p className="text-xs text-gray-500">{app.offer.anreisedatum} – {app.offer.abreisedatum}</p>
+              <p className="text-xs text-gray-500">Reisekosten á {app.offer.anreisekosten} €</p>
+              <p className="text-xs text-gray-500">{app.offer.kuendigungsfrist}</p>
+            </div>
+            <div className="text-right flex-shrink-0">
+              <p className="text-[10px] text-gray-500 mb-0.5">Mtl. Betreuungskosten</p>
+              <p className="text-xl font-bold text-[#9B1FA1]">{app.offer.monatlicheKosten.toLocaleString('de-DE')} €</p>
+            </div>
           </div>
         </div>
         {message && (
@@ -1720,7 +1792,7 @@ const MatchCard: FC<{
         status === 'declined'
           ? 'opacity-40 border-gray-200'
           : status === 'invited'
-          ? 'border-[#9B1FA1] shadow-[0_0_0_3px_rgba(155,31,161,0.08)]'
+          ? 'border-gray-200'
           : 'border-gray-200 hover:border-[#9B1FA1] hover:shadow-[0_4px_16px_rgba(155,31,161,0.12)]'
       }`}
     >
@@ -1764,9 +1836,9 @@ const MatchCard: FC<{
               <span className="text-sm text-gray-500">Deutsch {nurse.language.level}</span>
             </div>
             {/* Zeile 3: Erfahrung + Einsätze in einer Zeile */}
-            <p className="text-sm text-gray-500">
+            <p className="text-sm text-gray-500 truncate">
               <span className="font-semibold text-[#9B1FA1]">{nurse.experience}</span>
-              {nurse.history && <span> · {nurse.history.assignments} Einsätze · Ø {Math.round(nurse.history.avgDurationMonths * 4.3)} Wo.</span>}
+              {nurse.history && <span> · {nurse.history.assignments} Eins. · Ø {Math.round(nurse.history.avgDurationMonths * 4.3)} Wo.</span>}
             </p>
           </div>
         </div>
@@ -1781,8 +1853,8 @@ const MatchCard: FC<{
           Details <ChevronDown className="w-3.5 h-3.5 -rotate-90" />
         </button>
         {status === 'invited' ? (
-          <span className="flex items-center gap-1.5 text-xs font-bold text-[#9B1FA1] bg-[#F5EDF6] border border-[#D8A9DC] px-3 py-1.5 rounded-full">
-            <Check className="w-3 h-3" /> Eingeladen
+          <span className="flex items-center gap-1.5 text-xs text-gray-400">
+            <Check className="w-3.5 h-3.5 text-[#22A06B]" /> Einladung gesendet
           </span>
         ) : invitePhase === 'sending' ? (
           <span className="flex items-center gap-1.5 text-xs font-bold text-[#9B1FA1] bg-[#F5EDF6] border border-[#D8A9DC] px-4 py-1.5 rounded-full">
@@ -1956,11 +2028,19 @@ const ContactPopup: FC<{ onClose: () => void }> = ({ onClose }) => (
               <p className="text-xs font-semibold text-gray-500 leading-tight">Testsieger<br/>Die Welt</p>
             </div>
             <div className="text-center bg-gray-50 rounded-xl py-3 px-1 border border-gray-100">
-              <p className="text-2xl leading-none mb-1">📅</p>
+              <div className="flex justify-center mb-1.5">
+                <svg className="w-6 h-6 text-[#9B1FA1]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+              </div>
               <p className="text-xs font-semibold text-gray-500 leading-tight">20+ Jahre<br/>Erfahrung</p>
             </div>
             <div className="text-center bg-gray-50 rounded-xl py-3 px-1 border border-gray-100">
-              <p className="text-2xl leading-none mb-1">❤️</p>
+              <div className="flex justify-center mb-1.5">
+                <svg className="w-6 h-6 text-[#9B1FA1]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
+                </svg>
+              </div>
               <p className="text-xs font-semibold text-gray-500 leading-tight">60.000+<br/>Einsätze</p>
             </div>
           </div>
