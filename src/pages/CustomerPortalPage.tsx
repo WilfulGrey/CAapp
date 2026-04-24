@@ -18,7 +18,17 @@ import {
 } from '../lib/supabase';
 import { useMamamiaSession } from '../hooks/useMamamiaSession';
 import { useCustomer, useJobOffer, useApplications, useMatchings } from '../lib/mamamia/hooks';
-import { customerDisplayName, jobOfferArrivalDisplay } from '../lib/mamamia/mappers';
+import {
+  useRejectApplication,
+  useStoreConfirmation,
+  useInviteCaregiver,
+} from '../lib/mamamia/mutations';
+import {
+  customerDisplayName,
+  jobOfferArrivalDisplay,
+  mapApplicationToUI,
+  mapMatchingToNurse,
+} from '../lib/mamamia/mappers';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -194,8 +204,46 @@ const CustomerPortalPage: FC = () => {
   const { session, ready: mmReady, error: mmError } = useMamamiaSession(lead?.token ?? null);
   const { data: mmCustomer } = useCustomer(mmReady);
   const { data: mmJobOffer } = useJobOffer(mmReady);
-  const { data: mmApplications } = useApplications({ limit: 20 }, mmReady);
+  const { data: mmApplications, refetch: refetchApplications } = useApplications({ limit: 20 }, mmReady);
   const { data: mmMatchings } = useMatchings({ limit: 20 }, mmReady);
+
+  // K5 mutations
+  const rejectAppMutation = useRejectApplication();
+  const confirmMutation = useStoreConfirmation();
+  const inviteMutation = useInviteCaregiver();
+
+  // Caregiver id mapping per match index (for invite flow).
+  // effectiveMatched[idx].caregiverId resolves to Mamamia id when session ready,
+  // null when in demo mode (NURSES fallback — invite becomes local-only animation).
+  const effectiveMatched = (() => {
+    if (mmReady && mmMatchings?.data && mmMatchings.data.length > 0) {
+      const nowIso = new Date().toISOString();
+      const nowYear = new Date().getFullYear();
+      return mmMatchings.data
+        .filter(m => m.is_show !== false)
+        .map(m => ({
+          nurse: mapMatchingToNurse(m, { nowIso, nowYear }),
+          caregiverId: m.caregiver.id,
+        }));
+    }
+    // Demo mode fallback — reuse existing MATCHED_NURSES
+    return MATCHED_NURSES.map(n => ({ nurse: n, caregiverId: null as number | null }));
+  })();
+
+  // Sync real applications from Mamamia → local state (keeps existing mutation flow).
+  useEffect(() => {
+    if (!mmReady || !mmApplications) return;
+    const nowIso = new Date().toISOString();
+    const nowYear = new Date().getFullYear();
+    setApplications(prev => {
+      // Preserve local status overlays (accepted/declined) on top of fresh Mamamia data
+      const statusById = new Map(prev.map(p => [p.id, p.status]));
+      return mmApplications.data.map(a => {
+        const mapped = mapApplicationToUI(a, null, { nowIso, nowYear });
+        return { ...mapped, status: statusById.get(mapped.id) ?? 'new' };
+      });
+    });
+  }, [mmReady, mmApplications]);
 
   const animateThenProcess = (id: string, fn: () => void) => {
     setExitingIds(prev => new Set([...prev, id]));
@@ -231,17 +279,53 @@ const CustomerPortalPage: FC = () => {
   const acceptApp = (id: string) => {
     setSelectedApp(null);
     animateThenProcess(id, () => {
+      // Optimistic update
       setApplications((prev) =>
         prev.map((a) => (a.id === id ? { ...a, status: 'accepted' } : a))
       );
       showToast('✓ Betreuungskraft akzeptiert — die Agentur wird benachrichtigt.');
+
+      // Persist to Mamamia when session is live (minimal StoreConfirmation —
+      // full contract_patient/contract_contact fill-out happens in K5 refactor
+      // of AngebotPruefenModal step 2).
+      if (mmReady && Number.isFinite(Number(id))) {
+        confirmMutation.mutate({
+          application_id: Number(id),
+          is_confirm_binding: true,
+          update_customer: false,
+          message: 'Angenommen via Portal',
+        }).then(() => refetchApplications())
+          .catch(err => {
+            console.error('storeConfirmation failed:', err);
+            setApplications((prev) =>
+              prev.map((a) => (a.id === id ? { ...a, status: 'new' } : a))
+            );
+            showToast('Fehler beim Akzeptieren — bitte erneut versuchen.');
+          });
+      }
     });
   };
 
-  const declineApp = (id: string) => {
+  const declineApp = (id: string, message?: string) => {
+    // Optimistic update
     setApplications((prev) =>
       prev.map((a) => (a.id === id ? { ...a, status: 'declined' } : a))
     );
+
+    // Persist to Mamamia
+    if (mmReady && Number.isFinite(Number(id))) {
+      rejectAppMutation.mutate({
+        application_id: Number(id),
+        reject_message: message,
+      }).then(() => refetchApplications())
+        .catch(err => {
+          console.error('rejectApplication failed:', err);
+          setApplications((prev) =>
+            prev.map((a) => (a.id === id ? { ...a, status: 'new' } : a))
+          );
+          showToast('Fehler beim Ablehnen — bitte erneut versuchen.');
+        });
+    }
   };
 
   const undoApp = (id: string) => {
@@ -259,7 +343,8 @@ const CustomerPortalPage: FC = () => {
   };
 
   const confirmInviteNurse = (idx: number, name: string) => {
-    const nurseName = MATCHED_NURSES[idx]?.name ?? '';
+    const match = effectiveMatched[idx];
+    const nurseName = match?.nurse.name ?? '';
     setNurseStatuses((prev) => ({ ...prev, [idx]: 'invited' }));
     // Mark matching application as invited (nurse applied after being invited)
     if (nurseName) {
@@ -271,6 +356,18 @@ const CustomerPortalPage: FC = () => {
     if (!patientSaved && !firstInviteDone) {
       setFirstInviteDone(true);
       setShowPatientReminder(true);
+    }
+
+    // Persist to Mamamia.
+    // TODO(K6): invite requires customer-scoped JWT (via RegisterCustomer +
+    // email verify flow, or ImpersonateCustomer with admin token).
+    // Current Primundus agency token gets Unauthorized from Mamamia.
+    // We keep the optimistic UI even on failure — user will see "invited" locally;
+    // real caregiver notification waits on customer auth flow in K6.
+    if (mmReady && typeof match?.caregiverId === 'number') {
+      inviteMutation.mutate({ caregiver_id: match.caregiverId }).catch(err => {
+        console.warn('inviteCaregiver not persisted (K6 customer-auth pending):', err.message);
+      });
     }
   };
 
@@ -417,7 +514,7 @@ const CustomerPortalPage: FC = () => {
 
         {/* ── SECTION: Matched Nurses — pending + invited, nur wenn keine offenen Bewerbungen ── */}
         {!hasPending && (() => {
-          const visibleNurses = MATCHED_NURSES.map((n, i) => ({ nurse: n, i, status: nurseStatuses[i] ?? 'pending' as NurseStatus }))
+          const visibleNurses = effectiveMatched.map((m, i) => ({ nurse: m.nurse, i, status: nurseStatuses[i] ?? 'pending' as NurseStatus }))
             .filter(({ status }) => status === 'pending' || status === 'invited')
             .sort((a, b) => (a.status === 'invited' ? 1 : 0) - (b.status === 'invited' ? 1 : 0));
           return (
@@ -608,7 +705,7 @@ const CustomerPortalPage: FC = () => {
             const id = declineConfirmApp.id;
             setDeclineConfirmApp(null);
             animateThenProcess(id, () => {
-              declineApp(id);
+              declineApp(id, msg);
               showToast('Bewerbung abgelehnt' + (msg ? ' — Nachricht wurde gesendet.' : '.'));
             });
           }}

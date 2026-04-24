@@ -178,6 +178,73 @@ export const SEARCH_LOCATIONS = /* GraphQL */ `
   }
 `;
 
+// K5 — customer rejects a caregiver application.
+export const REJECT_APPLICATION = /* GraphQL */ `
+  mutation RejectApplication($id: Int, $reject_message: String) {
+    RejectApplication(id: $id, reject_message: $reject_message) {
+      id
+      rejected_at
+      reject_message
+    }
+  }
+`;
+
+// K5 — customer accepts application (creates binding Confirmation).
+// contract_patient / contract_contact map 1:1 from AngebotPruefenModal step 2.
+export const STORE_CONFIRMATION = /* GraphQL */ `
+  mutation StoreConfirmation(
+    $application_id: Int
+    $message: String
+    $is_confirm_binding: Boolean
+    $contract_patient: ContractPatientInputType
+    $contract_contact: ContractContactInputType
+    $patient_contracts: [ContractPatientInputType]
+    $contract_contacts: [ContractContactInputType]
+    $update_customer: Boolean
+    $file_tokens: [String]
+  ) {
+    StoreConfirmation(
+      application_id: $application_id
+      message: $message
+      is_confirm_binding: $is_confirm_binding
+      contract_patient: $contract_patient
+      contract_contact: $contract_contact
+      patient_contracts: $patient_contracts
+      contract_contacts: $contract_contacts
+      update_customer: $update_customer
+      file_tokens: $file_tokens
+    ) {
+      id
+      application_id
+      is_confirm_binding
+    }
+  }
+`;
+
+// K5 — customer invites a caregiver to apply. Primary flow: SendInvitationCaregiver.
+// (Fallback StoreRequest available if customer needs to pass a message.)
+export const SEND_INVITATION_CAREGIVER = /* GraphQL */ `
+  mutation SendInvitationCaregiver($caregiver_id: Int) {
+    SendInvitationCaregiver(caregiver_id: $caregiver_id)
+  }
+`;
+
+export const STORE_REQUEST = /* GraphQL */ `
+  mutation StoreRequest($caregiver_id: Int, $job_offer_id: Int, $message: String) {
+    StoreRequest(
+      caregiver_id: $caregiver_id
+      job_offer_id: $job_offer_id
+      message: $message
+    ) {
+      id
+      caregiver_id
+      job_offer_id
+      message
+      created_at
+    }
+  }
+`;
+
 // K4 — patient form persistence. id from session (not variables) — ownership.
 export const UPDATE_CUSTOMER = /* GraphQL */ `
   mutation UpdateCustomer(

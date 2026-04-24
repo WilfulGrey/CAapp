@@ -148,6 +148,80 @@ export function mapCaregiverToNurse(
   };
 }
 
+// ─── MamamiaApplication / MamamiaMatching → UI Application/Nurse ─────────
+
+import type { MamamiaApplication, MamamiaMatching } from './types';
+
+// UI's Application type (duplicated here for decoupling from CustomerPortalPage).
+// NOTE: must match shape expected by AppCard / AngebotPruefenModal.
+export interface UIApplication {
+  id: string;
+  nurse: Nurse;
+  agencyName: string;
+  appliedAt: string;
+  status: 'new' | 'accepted' | 'declined';
+  message: string;
+  offer: {
+    monatlicheKosten: number;
+    anreisedatum: string;
+    abreisedatum: string;
+    anreisekosten: number;
+    abreisekosten: number;
+    reisetage: string;
+    feiertagszuschlag: number;
+    kuendigungsfrist: string;
+    submittedAt: string;
+  };
+  isInvited?: boolean;
+}
+
+function fmtRelativeTime(iso: string | null, nowIso: string): string {
+  if (!iso) return 'kürzlich';
+  const diff = new Date(nowIso).getTime() - new Date(iso).getTime();
+  const mins = diff / 60000;
+  const hrs = mins / 60;
+  if (mins < 60) return `vor ${Math.max(1, Math.floor(mins))} Min.`;
+  if (hrs < 24) return `vor ${Math.floor(hrs)} Std.`;
+  const days = Math.floor(hrs / 24);
+  if (days === 1) return 'gestern';
+  return `vor ${days} Tagen`;
+}
+
+export function mapApplicationToUI(
+  app: MamamiaApplication,
+  nurseOverride: Nurse | null,
+  opts: { nowIso: string; nowYear: number },
+): UIApplication {
+  const nurse = nurseOverride ?? mapCaregiverToNurse(app.caregiver, opts);
+  return {
+    id: String(app.id),
+    nurse,
+    // AnonymousApplication strips agency identity — show generic label.
+    agencyName: 'Pflegeagentur',
+    appliedAt: fmtRelativeTime(app.active_until_at, opts.nowIso),
+    status: 'new',
+    message: app.message ?? '',
+    offer: {
+      monatlicheKosten: app.salary ?? 0,
+      anreisedatum: formatMamamiaDate(app.arrival_at) ?? '—',
+      abreisedatum: formatMamamiaDate(app.departure_at) ?? '—',
+      anreisekosten: app.arrival_fee ?? 0,
+      abreisekosten: app.departure_fee ?? 0,
+      reisetage: app.holiday_surcharge ? 'Halb' : 'Halb',
+      feiertagszuschlag: app.holiday_surcharge ?? 0,
+      kuendigungsfrist: 'Täglich kündbar',
+      submittedAt: formatMamamiaDate(app.active_until_at) ?? '—',
+    },
+  };
+}
+
+export function mapMatchingToNurse(
+  m: MamamiaMatching,
+  opts: { nowIso: string; nowYear: number },
+): Nurse {
+  return mapCaregiverToNurse(m.caregiver, opts);
+}
+
 // ─── Presentational helpers for JobOffer/Customer display ────────────────
 
 export function formatMamamiaDate(iso: string | null): string | null {

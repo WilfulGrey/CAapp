@@ -47,13 +47,18 @@ export async function onboardWithLeadToken(leadToken: string): Promise<OnboardRe
 // ─── Proxy actions ────────────────────────────────────────────────────────
 
 export type ProxyAction =
+  // reads
   | 'getJobOffer'
   | 'getCustomer'
   | 'listApplications'
   | 'listMatchings'
   | 'getCaregiver'
   | 'searchLocations'
-  | 'updateCustomer';
+  // writes
+  | 'updateCustomer'
+  | 'rejectApplication'
+  | 'storeConfirmation'
+  | 'inviteCaregiver';
 
 export async function callMamamia<T>(
   action: ProxyAction,

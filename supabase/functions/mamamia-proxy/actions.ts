@@ -6,7 +6,10 @@ import {
   GET_JOB_OFFER,
   LIST_APPLICATIONS,
   LIST_MATCHINGS,
+  REJECT_APPLICATION,
   SEARCH_LOCATIONS,
+  SEND_INVITATION_CAREGIVER,
+  STORE_CONFIRMATION,
   UPDATE_CUSTOMER,
 } from "./operations.ts";
 
@@ -82,6 +85,141 @@ const searchLocations: ActionHandler = (_session, variables, deps) => {
   });
 };
 
+// ─── Ownership check for application-bound mutations ───────────────────────
+// Any mutation that targets an Application must first verify the application
+// belongs to session.job_offer_id — otherwise a malicious client could reject
+// arbitrary applications across tenants.
+
+const ASSERT_APP_BELONGS = /* GraphQL */ `
+  query AssertAppBelongs($job_offer_id: Int!) {
+    JobOfferApplicationsWithPagination(job_offer_id: $job_offer_id, limit: 100, page: 1) {
+      data { id }
+    }
+  }
+`;
+
+async function assertApplicationBelongsToSession(
+  deps: ActionDeps,
+  session: SessionPayload,
+  applicationId: number,
+): Promise<void> {
+  const res = await mamamiaRequest<{
+    JobOfferApplicationsWithPagination: { data: Array<{ id: number }> };
+  }>({
+    endpoint: deps.endpoint,
+    token: await deps.getAgencyToken(),
+    query: ASSERT_APP_BELONGS,
+    variables: { job_offer_id: session.job_offer_id },
+    fetchFn: deps.fetchFn,
+  });
+  const ids = new Set(res.JobOfferApplicationsWithPagination.data.map((a) => a.id));
+  if (!ids.has(applicationId)) {
+    throw new Error("forbidden: application not owned by session");
+  }
+}
+
+const rejectApplication: ActionHandler = async (session, variables, deps) => {
+  const v = variables as { application_id?: unknown; reject_message?: unknown };
+  const appId = v.application_id;
+  if (typeof appId !== "number") throw new Error("application_id required");
+  await assertApplicationBelongsToSession(deps, session, appId);
+  return await runGraphQL(deps, REJECT_APPLICATION, {
+    id: appId,
+    reject_message: typeof v.reject_message === "string" ? v.reject_message : null,
+  });
+};
+
+// ─── Accept: StoreConfirmation ─────────────────────────────────────────────
+// Creates binding Confirmation with contract_patient/contract_contact taken
+// 1:1 from AngebotPruefenModal step-2 form. Ownership via prefetch of
+// JobOfferApplicationsWithPagination(session.job_offer_id) — we verify
+// application belongs before we call StoreConfirmation.
+
+const CONTRACT_PATIENT_ALLOWED = new Set([
+  "contact_type",
+  "is_same_as_first_patient",
+  "is_same_as_contact",
+  "location_id",
+  "location_custom_text",
+  "salutation",
+  "title",
+  "first_name",
+  "last_name",
+  "phone",
+  "email",
+  "street_number",
+  "zip_code",
+  "city",
+]);
+
+const CONTRACT_CONTACT_ALLOWED = new Set([
+  "is_same_as_first_patient",
+  "location_id",
+  "location_custom_text",
+  "salutation",
+  "title",
+  "first_name",
+  "last_name",
+  "phone",
+  "email",
+  "street_number",
+  "zip_code",
+  "city",
+]);
+
+function pickAllowed(input: unknown, allowed: Set<string>): Record<string, unknown> | null {
+  if (!input || typeof input !== "object") return null;
+  const out: Record<string, unknown> = {};
+  for (const [k, v] of Object.entries(input as Record<string, unknown>)) {
+    if (allowed.has(k)) out[k] = v;
+  }
+  return out;
+}
+
+const storeConfirmation: ActionHandler = async (session, variables, deps) => {
+  const v = variables as {
+    application_id?: unknown;
+    message?: unknown;
+    is_confirm_binding?: unknown;
+    contract_patient?: unknown;
+    contract_contact?: unknown;
+    patient_contracts?: unknown;
+    contract_contacts?: unknown;
+    update_customer?: unknown;
+    file_tokens?: unknown;
+  };
+  const appId = v.application_id;
+  if (typeof appId !== "number") throw new Error("application_id required");
+  await assertApplicationBelongsToSession(deps, session, appId);
+
+  const payload: Record<string, unknown> = {
+    application_id: appId,
+    message: typeof v.message === "string" ? v.message : null,
+    is_confirm_binding: v.is_confirm_binding === true,
+    update_customer: v.update_customer === true,
+    contract_patient: pickAllowed(v.contract_patient, CONTRACT_PATIENT_ALLOWED),
+    contract_contact: pickAllowed(v.contract_contact, CONTRACT_CONTACT_ALLOWED),
+    patient_contracts: Array.isArray(v.patient_contracts)
+      ? v.patient_contracts.map((p) => pickAllowed(p, CONTRACT_PATIENT_ALLOWED)).filter(Boolean)
+      : null,
+    contract_contacts: Array.isArray(v.contract_contacts)
+      ? v.contract_contacts.map((c) => pickAllowed(c, CONTRACT_CONTACT_ALLOWED)).filter(Boolean)
+      : null,
+    file_tokens: Array.isArray(v.file_tokens) ? v.file_tokens.filter((t) => typeof t === "string") : null,
+  };
+
+  return await runGraphQL(deps, STORE_CONFIRMATION, payload);
+};
+
+// ─── Invite caregiver ──────────────────────────────────────────────────────
+// Primary: SendInvitationCaregiver (caregiver_id only; context from session).
+
+const inviteCaregiver: ActionHandler = async (_session, variables, deps) => {
+  const id = (variables as { caregiver_id?: unknown }).caregiver_id;
+  if (typeof id !== "number") throw new Error("caregiver_id required");
+  return await runGraphQL(deps, SEND_INVITATION_CAREGIVER, { caregiver_id: id });
+};
+
 // ─── Mutations — strict allowlist + ownership ───────────────────────────────
 
 const UPDATE_CUSTOMER_ALLOWED = new Set([
@@ -121,6 +259,9 @@ export const ACTIONS: Record<ProxyAction, ActionHandler> = {
   getCaregiver,
   searchLocations,
   updateCustomer,
+  rejectApplication,
+  storeConfirmation,
+  inviteCaregiver,
 };
 
 export function isKnownAction(name: string): name is ProxyAction {

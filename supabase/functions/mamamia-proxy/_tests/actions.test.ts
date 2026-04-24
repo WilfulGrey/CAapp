@@ -206,3 +206,151 @@ Deno.test("updateCustomer: strips unexpected fields (allowlist)", async () => {
   assertEquals(sent.variables.role, undefined);
   assertEquals(sent.variables.service_agency_id, undefined);
 });
+
+// ─── rejectApplication (K5) ─────────────────────────────────────────────
+
+// Multi-response fetch helper for actions that prefetch + mutate.
+function multiFetch(...responses: Array<{ body: object; status?: number }>): {
+  state: { bodies: unknown[]; urls: string[] };
+  fetchFn: typeof fetch;
+} {
+  const state = { bodies: [] as unknown[], urls: [] as string[] };
+  let idx = 0;
+  const fetchFn: typeof fetch = async (input, init) => {
+    state.urls.push(input.toString());
+    state.bodies.push(JSON.parse((init as RequestInit | undefined)?.body as string));
+    const r = responses[idx++];
+    if (!r) throw new Error(`unexpected fetch call #${idx}`);
+    return new Response(JSON.stringify(r.body), { status: r.status ?? 200 });
+  };
+  return { state, fetchFn };
+}
+
+Deno.test("rejectApplication: prefetch ownership check + reject with reject_message", async () => {
+  const { state, fetchFn } = multiFetch(
+    // 1. ownership prefetch — app 555 belongs to our job offer
+    { body: { data: { JobOfferApplicationsWithPagination: { data: [{ id: 555 }, { id: 999 }] } } } },
+    // 2. RejectApplication
+    { body: { data: { RejectApplication: { id: 555, rejected_at: "2026-04-24T13:00:00Z", reject_message: "nope" } } } },
+  );
+
+  const result = await ACTIONS.rejectApplication(SESSION, {
+    application_id: 555,
+    reject_message: "nope",
+  }, makeDeps(fetchFn));
+
+  // 2 calls: prefetch + reject
+  assertEquals(state.bodies.length, 2);
+  const rejectCall = state.bodies[1] as { variables: { id: number; reject_message: string } };
+  assertEquals(rejectCall.variables.id, 555);
+  assertEquals(rejectCall.variables.reject_message, "nope");
+  assertEquals((result as { RejectApplication: { id: number } }).RejectApplication.id, 555);
+});
+
+Deno.test("rejectApplication: forbids cross-tenant application", async () => {
+  const { fetchFn } = multiFetch(
+    // prefetch returns only id=111, but client tries to reject 9999
+    { body: { data: { JobOfferApplicationsWithPagination: { data: [{ id: 111 }] } } } },
+  );
+
+  await assertRejects(
+    () => ACTIONS.rejectApplication(SESSION, { application_id: 9999 }, makeDeps(fetchFn)),
+    Error,
+    "forbidden",
+  );
+});
+
+Deno.test("rejectApplication: application_id required", async () => {
+  const { fetchFn } = captureFetch({ data: {} });
+  await assertRejects(
+    () => ACTIONS.rejectApplication(SESSION, {}, makeDeps(fetchFn)),
+    Error,
+    "application_id required",
+  );
+});
+
+// ─── storeConfirmation (K5) ─────────────────────────────────────────────
+
+Deno.test("storeConfirmation: ownership check + allowlisted contract fields", async () => {
+  const { state, fetchFn } = multiFetch(
+    { body: { data: { JobOfferApplicationsWithPagination: { data: [{ id: 555 }] } } } },
+    { body: { data: { StoreConfirmation: { id: 42, application_id: 555, is_confirm_binding: true } } } },
+  );
+
+  await ACTIONS.storeConfirmation(SESSION, {
+    application_id: 555,
+    is_confirm_binding: true,
+    update_customer: true,
+    contract_patient: {
+      salutation: "Frau",
+      first_name: "Hildegard",
+      last_name: "Müller",
+      email: "h@m.de",
+      phone: "+49 89 1",
+      street_number: "Rosenstraße 12",
+      zip_code: "80331",
+      city: "München",
+      location_id: 1148,
+      // non-allowed fields should be stripped:
+      service_agency_id: 999,
+      customer_id: 888,
+    },
+    contract_contact: {
+      salutation: "Herr",
+      first_name: "Michael",
+      last_name: "Müller",
+      phone: "+49 89 2",
+      email: "m@m.de",
+      role: "admin", // stripped
+    },
+  }, makeDeps(fetchFn));
+
+  const confirmCall = state.bodies[1] as {
+    variables: {
+      application_id: number;
+      contract_patient: Record<string, unknown>;
+      contract_contact: Record<string, unknown>;
+      is_confirm_binding: boolean;
+      update_customer: boolean;
+    };
+  };
+  assertEquals(confirmCall.variables.application_id, 555);
+  assertEquals(confirmCall.variables.is_confirm_binding, true);
+  assertEquals(confirmCall.variables.update_customer, true);
+  assertEquals(confirmCall.variables.contract_patient.first_name, "Hildegard");
+  assertEquals(confirmCall.variables.contract_patient.service_agency_id, undefined);
+  assertEquals(confirmCall.variables.contract_patient.customer_id, undefined);
+  assertEquals(confirmCall.variables.contract_contact.first_name, "Michael");
+  assertEquals(confirmCall.variables.contract_contact.role, undefined);
+});
+
+Deno.test("storeConfirmation: forbids cross-tenant", async () => {
+  const { fetchFn } = multiFetch(
+    { body: { data: { JobOfferApplicationsWithPagination: { data: [{ id: 1 }] } } } },
+  );
+  await assertRejects(
+    () => ACTIONS.storeConfirmation(SESSION, { application_id: 9999 }, makeDeps(fetchFn)),
+    Error,
+    "forbidden",
+  );
+});
+
+// ─── inviteCaregiver (K5) ──────────────────────────────────────────────
+
+Deno.test("inviteCaregiver: calls SendInvitationCaregiver with caregiver_id", async () => {
+  const { state, fetchFn } = captureFetch({
+    data: { SendInvitationCaregiver: true },
+  });
+  await ACTIONS.inviteCaregiver(SESSION, { caregiver_id: 10053 }, makeDeps(fetchFn));
+  const sent = state.body as { variables: { caregiver_id: number } };
+  assertEquals(sent.variables.caregiver_id, 10053);
+});
+
+Deno.test("inviteCaregiver: caregiver_id required", async () => {
+  const { fetchFn } = captureFetch({ data: {} });
+  await assertRejects(
+    () => ACTIONS.inviteCaregiver(SESSION, {}, makeDeps(fetchFn)),
+    Error,
+    "caregiver_id required",
+  );
+});

@@ -197,6 +197,75 @@ describe('jobOfferArrivalDisplay', () => {
   });
 });
 
+describe('mapApplicationToUI', () => {
+  const baseApp = {
+    id: 333,
+    caregiver_id: 10053,
+    job_offer_id: 16226,
+    parent_id: null,
+    is_counter_offer: false,
+    salary: 2250,
+    message: 'Bewerbung text',
+    arrival_at: '2026-05-01 00:00:00',
+    departure_at: '2026-07-12 00:00:00',
+    arrival_fee: 120,
+    departure_fee: 120,
+    holiday_surcharge: 0,
+    active_until_at: '2026-04-24T11:00:00.000Z',
+    caregiver: makeCg(),
+  };
+
+  it('maps core offer fields: monatlicheKosten, anreise/abreisedatum (DE format), fees', async () => {
+    const { mapApplicationToUI } = await import('../../lib/mamamia/mappers');
+    const ui = mapApplicationToUI(baseApp, null, { nowIso: NOW_ISO, nowYear: NOW_YEAR });
+    expect(ui.offer.monatlicheKosten).toBe(2250);
+    expect(ui.offer.anreisedatum).toBe('01.05.2026');
+    expect(ui.offer.abreisedatum).toBe('12.07.2026');
+    expect(ui.offer.anreisekosten).toBe(120);
+    expect(ui.offer.abreisekosten).toBe(120);
+    expect(ui.message).toBe('Bewerbung text');
+    expect(ui.id).toBe('333');
+    expect(ui.status).toBe('new');
+    expect(ui.nurse.name).toBe('Anna K.');
+  });
+
+  it('defaults to 0 when salary/fees missing', async () => {
+    const { mapApplicationToUI } = await import('../../lib/mamamia/mappers');
+    const ui = mapApplicationToUI(
+      { ...baseApp, salary: null, arrival_fee: null, departure_fee: null },
+      null,
+      { nowIso: NOW_ISO, nowYear: NOW_YEAR },
+    );
+    expect(ui.offer.monatlicheKosten).toBe(0);
+    expect(ui.offer.anreisekosten).toBe(0);
+    expect(ui.offer.abreisekosten).toBe(0);
+  });
+
+  it('appliedAt: "vor X Std." for recent active_until_at', async () => {
+    const { mapApplicationToUI } = await import('../../lib/mamamia/mappers');
+    const ui = mapApplicationToUI(
+      { ...baseApp, active_until_at: '2026-04-24T10:00:00.000Z' },
+      null,
+      { nowIso: NOW_ISO, nowYear: NOW_YEAR },
+    );
+    expect(ui.appliedAt).toBe('vor 2 Std.');
+  });
+});
+
+describe('mapMatchingToNurse', () => {
+  it('delegates to mapCaregiverToNurse', async () => {
+    const { mapMatchingToNurse } = await import('../../lib/mamamia/mappers');
+    const nurse = mapMatchingToNurse({
+      id: 10,
+      percentage_match: 100,
+      is_show: true,
+      is_best_matching: true,
+      caregiver: makeCg({ id: 10, first_name: 'Marta', last_name: 'Wisniewski' }),
+    }, { nowIso: NOW_ISO, nowYear: NOW_YEAR });
+    expect(nurse.name).toBe('Marta W.');
+  });
+});
+
 describe('customerDisplayName', () => {
   it('"first last" when both present', () => {
     expect(customerDisplayName({

@@ -4,13 +4,18 @@ export type { SessionPayload };
 
 // Whitelisted actions — handler rejects unknown values.
 export type ProxyAction =
+  // reads
   | "getJobOffer"
   | "getCustomer"
   | "listApplications"
   | "listMatchings"
   | "getCaregiver"
   | "searchLocations"
-  | "updateCustomer";
+  // writes
+  | "updateCustomer"
+  | "rejectApplication"
+  | "storeConfirmation"
+  | "inviteCaregiver";
 
 export interface ActionDeps {
   endpoint: string;
