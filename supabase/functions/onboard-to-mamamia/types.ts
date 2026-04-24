@@ -58,9 +58,5 @@ export interface OnboardResult {
   job_offer_id: number;
 }
 
-export interface SessionPayload {
-  customer_id: number;
-  job_offer_id: number;
-  lead_id: string;          // lead.id UUID — for re-validation against Supabase
-  // iat/exp dodane przez JWT library
-}
+// Re-export SessionPayload from _shared to keep onboard consumers stable
+export type { SessionPayload } from "../_shared/sessionTypes.ts";

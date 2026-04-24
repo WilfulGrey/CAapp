@@ -5,7 +5,7 @@ import {
   sessionCookieHeader,
   parseCookie,
   clearSessionCookieHeader,
-} from "../session.ts";
+} from "../../_shared/session.ts";
 
 const SECRET = "test-secret-must-be-at-least-32-bytes-long-okay";
 

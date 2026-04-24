@@ -1,6 +1,7 @@
-import type { Lead, OnboardResult, SessionPayload } from "./types.ts";
+import type { Lead, OnboardResult } from "./types.ts";
+import type { SessionPayload } from "../_shared/sessionTypes.ts";
 import { buildJobOfferTitle, buildPatients, computeArrivalDate } from "./mappers.ts";
-import { getOrRefreshAgencyToken, mamamiaRequest } from "./mamamiaClient.ts";
+import { getOrRefreshAgencyToken, mamamiaRequest } from "../_shared/mamamiaClient.ts";
 
 // ─── Supabase-like interface (dependency injection for testability) ────────
 

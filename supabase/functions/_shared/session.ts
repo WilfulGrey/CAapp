@@ -1,5 +1,6 @@
 import { SignJWT, jwtVerify } from "jose";
-import type { SessionPayload } from "./types.ts";
+import type { SessionPayload } from "./sessionTypes.ts";
+export type { SessionPayload };
 
 const DEFAULT_TTL_SEC = 60 * 60 * 24; // 24h
 const COOKIE_NAME = "session";

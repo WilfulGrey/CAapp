@@ -1,7 +1,7 @@
 import { assertEquals, assertStringIncludes } from "@std/assert";
 import { handleRequest } from "../index.ts";
-import { _resetRateLimit } from "../rateLimit.ts";
-import { _resetAgencyTokenCache } from "../mamamiaClient.ts";
+import { _resetRateLimit } from "../../_shared/rateLimit.ts";
+import { _resetAgencyTokenCache } from "../../_shared/mamamiaClient.ts";
 import type { Lead } from "../types.ts";
 
 // ─── Fakes ─────────────────────────────────────────────────────────────────

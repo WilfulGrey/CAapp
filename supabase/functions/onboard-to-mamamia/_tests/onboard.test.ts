@@ -1,6 +1,6 @@
 import { assertEquals, assertRejects } from "@std/assert";
 import { onboardLead } from "../onboard.ts";
-import { _resetAgencyTokenCache } from "../mamamiaClient.ts";
+import { _resetAgencyTokenCache } from "../../_shared/mamamiaClient.ts";
 import type { Lead } from "../types.ts";
 
 // ─── Fakes ───────────────────────────────────────────────────────────────────

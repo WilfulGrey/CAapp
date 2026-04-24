@@ -1,5 +1,5 @@
 import { assertEquals, assertRejects } from "@std/assert";
-import { loginAgency, mamamiaRequest } from "../mamamiaClient.ts";
+import { loginAgency, mamamiaRequest } from "../../_shared/mamamiaClient.ts";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────
 

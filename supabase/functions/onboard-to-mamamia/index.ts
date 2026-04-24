@@ -4,9 +4,9 @@
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.4";
 import { onboardLead, sessionPayloadFromResult, type OnboardSecrets, type SupabaseLike } from "./onboard.ts";
-import { createSessionToken, sessionCookieHeader } from "./session.ts";
-import { corsHeaders } from "./cors.ts";
-import { isRateLimited } from "./rateLimit.ts";
+import { createSessionToken, sessionCookieHeader } from "../_shared/session.ts";
+import { corsHeaders } from "../_shared/cors.ts";
+import { isRateLimited } from "../_shared/rateLimit.ts";
 
 // ─── Handler dependencies (for DI in tests) ────────────────────────────────
 
@@ -31,9 +31,9 @@ export async function handleRequest(req: Request, deps: HandlerDeps): Promise<Re
     return jsonError(405, "method not allowed", baseHeaders);
   }
 
-  // Rate limit
+  // Rate limit — onboard is rare (per-lead first visit), 5/min enough
   const ip = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "unknown";
-  if (isRateLimited(ip)) {
+  if (isRateLimited(ip, { bucketKey: "onboard", max: 5 })) {
     return jsonError(429, "too many requests", baseHeaders);
   }
 
