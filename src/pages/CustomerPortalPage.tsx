@@ -16,6 +16,9 @@ import {
   cap,
   prefillPatientFromLead,
 } from '../lib/supabase';
+import { useMamamiaSession } from '../hooks/useMamamiaSession';
+import { useCustomer, useJobOffer, useApplications, useMatchings } from '../lib/mamamia/hooks';
+import { customerDisplayName, jobOfferArrivalDisplay } from '../lib/mamamia/mappers';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -187,6 +190,13 @@ const CustomerPortalPage: FC = () => {
   const [firstInviteDone, setFirstInviteDone] = useState(false);
   const [openFaq, setOpenFaq] = useState<number | null>(null);
 
+  // ─── Mamamia session + queries (K2-K4 integration) ───────────────────────
+  const { session, ready: mmReady, error: mmError } = useMamamiaSession(lead?.token ?? null);
+  const { data: mmCustomer } = useCustomer(mmReady);
+  const { data: mmJobOffer } = useJobOffer(mmReady);
+  const { data: mmApplications } = useApplications({ limit: 20 }, mmReady);
+  const { data: mmMatchings } = useMatchings({ limit: 20 }, mmReady);
+
   const animateThenProcess = (id: string, fn: () => void) => {
     setExitingIds(prev => new Set([...prev, id]));
     setTimeout(() => {
@@ -305,6 +315,7 @@ const CustomerPortalPage: FC = () => {
   }
 
   return (
+    <>
     <div className="min-h-screen bg-gray-100 md:flex md:items-start md:justify-center md:py-10">
     <div className="min-h-screen md:min-h-0 bg-white w-full md:w-[390px] md:min-h-[844px] md:rounded-[48px] md:shadow-2xl md:overflow-hidden md:border-[8px] md:border-gray-800 md:ring-4 md:ring-gray-900/10 relative" style={{fontFamily: 'inherit'}}>
     <div className="md:h-[844px] md:overflow-y-auto md:overflow-x-hidden">
@@ -616,6 +627,25 @@ const CustomerPortalPage: FC = () => {
     </div>
     </div>
     </div>
+
+    {import.meta.env.VITE_DEBUG === '1' && (
+      <div className="fixed bottom-0 inset-x-0 bg-black/85 text-white text-[11px] font-mono px-3 py-2 z-[100] overflow-x-auto whitespace-nowrap">
+        <span className="text-emerald-400">Mamamia</span>
+        {' '}ready={String(mmReady)}
+        {mmError && <span className="text-red-400"> · err={mmError.message}</span>}
+        {session && (
+          <>
+            {' · '}cust={session.customer_id}
+            {' · '}job={session.job_offer_id}
+            {' · '}apps={mmApplications?.total ?? '…'}
+            {' · '}matches={mmMatchings?.total ?? '…'}
+            {' · '}name={customerDisplayName(mmCustomer) ?? '…'}
+            {' · '}arrival={jobOfferArrivalDisplay(mmJobOffer) ?? '…'}
+          </>
+        )}
+      </div>
+    )}
+    </>
   );
 };
 

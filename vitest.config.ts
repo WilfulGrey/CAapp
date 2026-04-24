@@ -8,6 +8,8 @@ export default defineConfig({
     globals: true,
     setupFiles: ['./test/setup.ts'],
     css: false,
+    // Edge Functions run under Deno (deno test). Keep Vitest focused on src/.
+    exclude: ['supabase/**', 'node_modules/**', 'dist/**'],
     coverage: {
       provider: 'v8',
       reporter: ['text', 'html'],
