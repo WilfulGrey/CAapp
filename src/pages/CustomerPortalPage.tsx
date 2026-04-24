@@ -331,10 +331,12 @@ const CustomerPortalPage: FC = () => {
     }
   };
 
-  const undoApp = (id: string) => {
-    setApplications((prev) =>
-      prev.map((a) => (a.id === id ? { ...a, status: 'new' } : a))
-    );
+  // Mamamia currently has no RestoreApplication mutation (verified 2026-04-24
+  // via schema introspection — zero hits for restore/unreject/undo/revert/cancel).
+  // Backend will add the mutation later; for now we show a support-contact dialog.
+  const [undoErrorOpen, setUndoErrorOpen] = useState(false);
+  const undoApp = (_id: string) => {
+    setUndoErrorOpen(true);
   };
 
   const canInviteNurse = (idx: number): boolean => {
@@ -663,6 +665,47 @@ const CustomerPortalPage: FC = () => {
 
       {/* Info Popup */}
       {showInfoPopup && <InfoPopup onClose={() => setShowInfoPopup(false)} />}
+
+      {undoErrorOpen && (
+        <>
+          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[60]" onClick={() => setUndoErrorOpen(false)}
+            style={{ animation: 'fadeIn 0.15s ease-out' }} />
+          <div className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center sm:p-4 pointer-events-none"
+            style={{ animation: 'fadeIn 0.15s ease-out' }}>
+            <div className="bg-white w-full sm:max-w-md rounded-t-3xl sm:rounded-2xl pointer-events-auto shadow-2xl"
+              style={{ animation: 'slideSheet 0.25s cubic-bezier(0.32,0.72,0,1)' }}
+              onClick={e => e.stopPropagation()}>
+              <div className="flex justify-center pt-3 pb-1 sm:hidden"><div className="w-10 h-1 rounded-full bg-gray-300" /></div>
+              <div className="px-5 pt-4 pb-6 space-y-4">
+                <div className="flex items-start gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-amber-50 flex items-center justify-center flex-shrink-0 text-xl">⚠️</div>
+                  <div>
+                    <h2 className="text-base font-bold text-gray-900">Rückgängig machen derzeit nicht möglich</h2>
+                    <p className="text-sm text-gray-600 mt-1 leading-relaxed">
+                      Eine abgelehnte Bewerbung kann aktuell nicht automatisch wiederhergestellt werden.
+                      Bitte kontaktieren Sie Ihre Ansprechpartnerin — sie kann die Bewerbung manuell
+                      reaktivieren.
+                    </p>
+                  </div>
+                </div>
+                <a
+                  href="tel:089200000830"
+                  className="flex items-center justify-center gap-2 w-full bg-[#9B1FA1] hover:bg-[#7B1A85] text-white rounded-xl py-3 text-sm font-bold transition-colors"
+                >
+                  <Phone className="w-4 h-4" />
+                  Beraterin anrufen: 089 200 000 830
+                </a>
+                <button
+                  onClick={() => setUndoErrorOpen(false)}
+                  className="w-full text-gray-500 font-semibold py-2 text-sm"
+                >
+                  Schließen
+                </button>
+              </div>
+            </div>
+          </div>
+        </>
+      )}
 
       {/* Contact Popup */}
       {showContactPopup && <ContactPopup onClose={() => setShowContactPopup(false)} />}

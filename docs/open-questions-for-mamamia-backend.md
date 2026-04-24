@@ -28,24 +28,26 @@ Laravel validator odrzuca `validation` error bez podania dozwolonych wartości d
 
 ## Q2. Customer-scope authentication dla invite flow
 
-Customer portalu nie loguje się w Mamamii — korzystamy z Primundus agency token (LoginAgency) dla wszystkich operacji. Działa dla read (JobOffer, Customer, Applications, Matchings) i większości write (UpdateCustomer, StoreConfirmation, RejectApplication).
+**Zgodnie z `primundus_developer_doku.pdf` §6**, nowy portal klienta ma po prostu „wyświetlać dopasowane oferty opiekunek" i pozwalać klientowi na invite (= customer inicjuje kontakt z opiekunką). PDF nie specyfikuje technicznie jak to się ma odbyć — po prostu zakłada że działa.
 
-**Ale** `SendInvitationCaregiver(caregiver_id)` i `StoreRequest(caregiver_id, job_offer_id, message)` zwracają **`Unauthorized`** dla agency token.
+**Problem techniczny**: portal używa Primundus agency token (LoginAgency). Działa dla:
+- Read: JobOffer, Customer, Applications, Matchings ✅
+- Write: UpdateCustomer, StoreConfirmation, RejectApplication ✅
 
-**Live test**:
-- `SendInvitationCaregiver` z agency bearer → Unauthorized
-- `StoreRequest` z agency bearer → Unauthorized
-- `ImpersonateCustomer(customer_id)` z agency bearer → Unauthorized (wymaga admin?)
-- `CustomerVerifyEmail(token=<supabase_lead_token>)` → Unauthorized
-- `CustomerLandingpage(uuid=<supabase_lead_id>)` → Internal server error
+**Ale NIE działa dla invite**:
+- `SendInvitationCaregiver(caregiver_id)` z agency bearer → **Unauthorized**
+- `StoreRequest(caregiver_id, job_offer_id, message)` z agency bearer → **Unauthorized**
+- `ImpersonateCustomer(customer_id)` z agency bearer → **Unauthorized** (wymaga admin scope)
+- `CustomerVerifyEmail(token=<supabase_lead_token>)` → **Unauthorized** (Mamamia ma własny token system)
+- `CustomerLandingpage(uuid=<supabase_lead_id>)` → **Internal server error**
 
-**Pytanie:** Jak portal klienta (który nie ma customer password) powinien wykonywać `SendInvitationCaregiver` po stronie Mamamii? Opcje które rozpatrujemy:
+**Request do Mamamia backend team**: zgodnie z zamysłem PDF portal klienta powinien po prostu móc invite'ować opiekunki. Proszę rozwiązać po stronie Mamamii — np.:
 
-- **(a)** Klient ustawia password przy pierwszym wejściu na link: `RegisterCustomer(email, first_name, password)` → customer JWT trzymany w session. **Minus**: force password setup w UX pre-sales.
-- **(b)** Dedykowany admin scope token dla agency Primundus że może wywołać `SendInvitationCaregiver` w imieniu customera z tej agency. Wymagałby zmiany permission rules po stronie Mamamii.
-- **(c)** Nowy endpoint `InviteCaregiverAsAgencyCustomer(caregiver_id, customer_id)` który bierze agency token + customer_id jako explicit argument. Wymaga dev work po stronie Mamamii.
+- **(a)** Automatyczne stworzenie customer-session podczas pierwszego onboardingu przez agency (żeby portal miał customer JWT bez password flow). Wtedy subsekwentne `SendInvitationCaregiver` działają.
+- **(b)** Nowy dedykowany endpoint typu `InviteCaregiverAsAgencyForCustomer(customer_id, caregiver_id)` który bierze agency bearer + explicit customer_id, autoryzuje że agency jest właścicielem tego customera.
+- **(c)** Inna architektura którą macie na uwadze — chętnie dostosujemy portal.
 
-Która z tych ścieżek najlepiej pasuje do istniejącej architektury Mamamii, lub jest inna opcja którą przeoczyliśmy?
+Workaround czasowy w portalu: invite działa tylko optimistic UI (klient widzi „eingeladen" lokalnie, ale caregiver notification nie idzie). Do czasu rozwiązania po stronie Mamamii.
 
 ---
 
