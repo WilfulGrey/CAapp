@@ -22,8 +22,6 @@ import {
 } from '../lib/mamamia/mappers';
 import { mapPatientFormToUpdateCustomerInput } from '../lib/mamamia/patientFormMapper';
 import {
-  MOCK_APPLICATIONS,
-  MATCHED_NURSES,
   type Application,
   type NurseStatus,
   type NurseStatuses,
@@ -50,7 +48,8 @@ const CustomerPortalPage: FC = () => {
     const params = new URLSearchParams(window.location.search);
     const token = params.get('token');
     if (!token) {
-      // No token → demo mode with hardcoded data
+      // No token → nothing to show. No demo fallback (CLAUDE.md §1).
+      setLeadError('Ihr persönlicher Link fehlt. Bitte öffnen Sie die E-Mail erneut und klicken Sie auf den Angebots-Link.');
       setLeadLoading(false);
       return;
     }
@@ -64,7 +63,9 @@ const CustomerPortalPage: FC = () => {
     });
   }, []);
 
-  const [applications, setApplications] = useState<Application[]>(MOCK_APPLICATIONS);
+  // Applications state. Empty by default — populated once Mamamia session
+  // is ready and `listApplications` returns. No mock seeds (CLAUDE.md §1).
+  const [applications, setApplications] = useState<Application[]>([]);
   const [nurseStatuses, setNurseStatuses] = useState<NurseStatuses>({});
   const [selectedNurse, setSelectedNurse] = useState<Nurse | null>(null);
   const [selectedApp, setSelectedApp] = useState<Application | null>(null);
@@ -95,21 +96,18 @@ const CustomerPortalPage: FC = () => {
   const updateCustomerMutation = useUpdateCustomer();
 
   // Caregiver id mapping per match index (for invite flow).
-  // effectiveMatched[idx].caregiverId resolves to Mamamia id when session ready,
-  // null when in demo mode (NURSES fallback — invite becomes local-only animation).
+  // effectiveMatched[idx].caregiverId resolves to real Mamamia id. Empty
+  // array until session ready — NO mock/demo fallback (CLAUDE.md §1).
   const effectiveMatched = (() => {
-    if (mmReady && mmMatchings?.data && mmMatchings.data.length > 0) {
-      const nowIso = new Date().toISOString();
-      const nowYear = new Date().getFullYear();
-      return mmMatchings.data
-        .filter(m => m.is_show !== false)
-        .map(m => ({
-          nurse: mapMatchingToNurse(m, { nowIso, nowYear }),
-          caregiverId: m.caregiver.id,
-        }));
-    }
-    // Demo mode fallback — reuse existing MATCHED_NURSES
-    return MATCHED_NURSES.map(n => ({ nurse: n, caregiverId: null as number | null }));
+    if (!mmReady || !mmMatchings?.data) return [];
+    const nowIso = new Date().toISOString();
+    const nowYear = new Date().getFullYear();
+    return mmMatchings.data
+      .filter(m => m.is_show !== false)
+      .map(m => ({
+        nurse: mapMatchingToNurse(m, { nowIso, nowYear }),
+        caregiverId: m.caregiver.id,
+      }));
   })();
 
   // Sync real applications from Mamamia → local state (keeps existing mutation flow).
@@ -290,6 +288,41 @@ const CustomerPortalPage: FC = () => {
           <a href="tel:+4989200000830" className="inline-flex items-center gap-2 text-sm font-semibold text-[#9B1FA1] border border-[#D8A9DC] bg-[#F5EDF6] rounded-xl px-4 py-2.5">
             <Phone className="w-4 h-4" /> 089 200 000 830
           </a>
+        </div>
+      </div>
+    );
+  }
+
+  // Mamamia session failure — surface it rather than silently falling back.
+  if (lead && mmError) {
+    return (
+      <div className="min-h-screen bg-white flex items-center justify-center px-6">
+        <div className="text-center space-y-4 max-w-sm">
+          <div className="w-14 h-14 rounded-full bg-red-50 flex items-center justify-center mx-auto">
+            <AlertCircle className="w-7 h-7 text-red-400" />
+          </div>
+          <p className="text-sm font-semibold text-gray-800">Verbindung zum Betreuungs-System fehlgeschlagen</p>
+          <p className="text-sm text-gray-500 leading-relaxed">{mmError.message || 'Bitte versuchen Sie es in wenigen Augenblicken erneut.'}</p>
+          <div className="flex gap-2 justify-center">
+            <button onClick={() => window.location.reload()} className="text-sm font-semibold text-[#9B1FA1] border border-[#D8A9DC] bg-[#F5EDF6] rounded-xl px-4 py-2.5">
+              Erneut versuchen
+            </button>
+            <a href="tel:+4989200000830" className="inline-flex items-center gap-2 text-sm font-semibold text-white bg-[#9B1FA1] rounded-xl px-4 py-2.5">
+              <Phone className="w-4 h-4" /> Kontakt
+            </a>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Lead loaded but Mamamia session still bootstrapping.
+  if (lead && !mmReady) {
+    return (
+      <div className="min-h-screen bg-white flex items-center justify-center">
+        <div className="text-center space-y-3">
+          <div className="w-10 h-10 border-2 border-[#9B1FA1] border-t-transparent rounded-full animate-spin mx-auto" />
+          <p className="text-sm text-gray-400">Betreuungskräfte werden geladen…</p>
         </div>
       </div>
     );

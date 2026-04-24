@@ -47,12 +47,14 @@ Deno.test("verifySessionToken: expired token returns null", async () => {
   assertEquals(payload, null);
 });
 
-Deno.test("sessionCookieHeader: has HttpOnly, Secure, SameSite=Lax, Path=/", () => {
+Deno.test("sessionCookieHeader: has HttpOnly, Secure, SameSite=None, Path=/", () => {
   const header = sessionCookieHeader("abc.def.ghi", 86400);
   assertStringIncludes(header, "session=abc.def.ghi");
   assertStringIncludes(header, "HttpOnly");
   assertStringIncludes(header, "Secure");
-  assertStringIncludes(header, "SameSite=Lax");
+  // SameSite=None required for cross-site fetch from portal (localhost:5173
+  // or portal.primundus.de) to Edge Function on *.supabase.co.
+  assertStringIncludes(header, "SameSite=None");
   assertStringIncludes(header, "Path=/");
   assertStringIncludes(header, "Max-Age=86400");
 });

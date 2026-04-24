@@ -1,8 +1,11 @@
 // Shared types + pure helpers for portal components.
 // Extracted from pages/CustomerPortalPage.tsx monolith.
+//
+// NOTE: No mock/fallback data lives here. See CLAUDE.md §1 — application
+// data (nurses, bewerbungen, matchings) must come from Mamamia backend,
+// never from inline seeds.
 
 import type { Nurse } from '../../types';
-import { NURSES } from '../../data/nurses';
 
 // ─── Types ────────────────────────────────────────────────────────────────
 
@@ -35,76 +38,6 @@ export interface Application {
 export interface NurseStatuses {
   [index: number]: NurseStatus;
 }
-
-// ─── Mock data (used when demo-mode, no token) ────────────────────────────
-
-export const MOCK_APPLICATIONS: Application[] = [
-  {
-    id: '1',
-    nurse: NURSES[0],
-    agencyName: 'CarePartner GmbH',
-    appliedAt: 'vor 23 Min.',
-    status: 'new',
-    isInvited: true,
-    message:
-      'Anna hat 6 Jahre Erfahrung in der 24h-Betreuung und ist sofort einsatzbereit. Ihre Sprachkenntnisse auf B2-Niveau ermöglichen eine reibungslose Kommunikation.',
-    offer: {
-      monatlicheKosten: 2250,
-      anreisedatum: '01.05.2026',
-      abreisedatum: '12.07.2026',
-      anreisekosten: 120,
-      abreisekosten: 120,
-      reisetage: 'Halb',
-      feiertagszuschlag: 0,
-      kuendigungsfrist: 'Täglich kündbar',
-      submittedAt: '16.04.2026, 09:14',
-    },
-  },
-  {
-    id: '2',
-    nurse: NURSES[1],
-    agencyName: 'CareConnect Vermittlung',
-    appliedAt: 'vor 1 Std.',
-    status: 'new',
-    message:
-      'Marta bringt 8 Jahre Berufserfahrung mit und hat bereits ähnliche Patienten erfolgreich betreut. Sie kann flexibel und kurzfristig beginnen.',
-    offer: {
-      monatlicheKosten: 2150,
-      anreisedatum: '01.05.2026',
-      abreisedatum: '30.06.2026',
-      anreisekosten: 140,
-      abreisekosten: 140,
-      reisetage: 'Halb',
-      feiertagszuschlag: 75,
-      kuendigungsfrist: 'Täglich kündbar',
-      submittedAt: '16.04.2026, 08:31',
-    },
-  },
-  {
-    id: '3',
-    nurse: NURSES[4],
-    agencyName: 'Herz & Hand Pflegedienst',
-    appliedAt: 'vor 2 Std.',
-    status: 'new',
-    message:
-      'Katarzyna ist eine sehr erfahrene Pflegekraft mit 12 Jahren im Bereich 24h-Betreuung. Sie ist bei Patienten sehr beliebt.',
-    offer: {
-      monatlicheKosten: 2350,
-      anreisedatum: '01.05.2026',
-      abreisedatum: '30.06.2026',
-      anreisekosten: 130,
-      abreisekosten: 130,
-      reisetage: 'Halb',
-      feiertagszuschlag: 0,
-      kuendigungsfrist: 'Täglich kündbar',
-      submittedAt: '16.04.2026, 07:55',
-    },
-  },
-];
-
-export const MATCHED_NURSES: Nurse[] = NURSES.slice(2, 14).filter(
-  (n) => !MOCK_APPLICATIONS.some((a) => a.nurse.name === n.name),
-);
 
 // ─── Helpers ──────────────────────────────────────────────────────────────
 
