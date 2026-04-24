@@ -33,6 +33,9 @@ export const GET_CUSTOMER = /* GraphQL */ `
       arrival_at
       departure_at
       care_budget
+      patients {
+        id
+      }
     }
   }
 `;

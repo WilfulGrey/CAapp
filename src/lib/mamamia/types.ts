@@ -31,6 +31,8 @@ export interface MamamiaCustomer {
   arrival_at: string | null;
   departure_at: string | null;
   care_budget: number | null;
+  /** Existing patients — used to thread patient.id when UpdateCustomer mutates them. */
+  patients?: Array<{ id: number }>;
 }
 
 export interface MamamiaCaregiverRef {

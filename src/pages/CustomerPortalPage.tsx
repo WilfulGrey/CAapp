@@ -22,6 +22,7 @@ import {
   useRejectApplication,
   useStoreConfirmation,
   useInviteCaregiver,
+  useUpdateCustomer,
 } from '../lib/mamamia/mutations';
 import {
   customerDisplayName,
@@ -29,6 +30,7 @@ import {
   mapApplicationToUI,
   mapMatchingToNurse,
 } from '../lib/mamamia/mappers';
+import { mapPatientFormToUpdateCustomerInput } from '../lib/mamamia/patientFormMapper';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -211,6 +213,7 @@ const CustomerPortalPage: FC = () => {
   const rejectAppMutation = useRejectApplication();
   const confirmMutation = useStoreConfirmation();
   const inviteMutation = useInviteCaregiver();
+  const updateCustomerMutation = useUpdateCustomer();
 
   // Caregiver id mapping per match index (for invite flow).
   // effectiveMatched[idx].caregiverId resolves to Mamamia id when session ready,
@@ -463,7 +466,18 @@ const CustomerPortalPage: FC = () => {
         </div>
 
         {/* ── Kombinierte Karte: Identität + Anfrage + Stepper ── */}
-        <AngebotCard lead={lead} onPatientSaved={setPatientSaved} triggerOpenPatient={triggerOpenPatient} onTriggerHandled={() => setTriggerOpenPatient(false)} />
+        <AngebotCard
+          lead={lead}
+          onPatientSaved={setPatientSaved}
+          triggerOpenPatient={triggerOpenPatient}
+          onTriggerHandled={() => setTriggerOpenPatient(false)}
+          mamamiaEnabled={mmReady}
+          onSaveToMamamia={async (form) => {
+            const existingPatientIds = mmCustomer?.patients?.map(p => p.id) ?? [];
+            const patch = mapPatientFormToUpdateCustomerInput(form, { existingPatientIds });
+            await updateCustomerMutation.mutate(patch as Record<string, unknown>);
+          }}
+        />
 
         {/* ── Bewerbungsstatus ── */}
         {!hasPending ? (
@@ -968,7 +982,9 @@ const AngebotCard: FC<{
   onPatientSaved?: (saved: boolean) => void;
   triggerOpenPatient?: boolean;
   onTriggerHandled?: () => void;
-}> = ({ lead, onPatientSaved, triggerOpenPatient, onTriggerHandled }) => {
+  mamamiaEnabled?: boolean;
+  onSaveToMamamia?: (form: PatientForm) => Promise<void>;
+}> = ({ lead, onPatientSaved, triggerOpenPatient, onTriggerHandled, mamamiaEnabled, onSaveToMamamia }) => {
   // ─── Derive display values from lead (or fallback to demo data) ──────────────
   const kalk = lead?.kalkulation;
   const bruttopreis = kalk ? formatEuro(kalk.bruttopreis) : '3.050 €';
@@ -1854,7 +1870,23 @@ const AngebotCard: FC<{
                   </button>
                 ) : (
                   <button
-                    onClick={() => { if (allComplete) { if (storageKey) localStorage.setItem(storageKey, JSON.stringify(patient)); setSaved(true); setPatientOpen(false); onPatientSaved?.(true); }}}
+                    onClick={async () => {
+                      if (!allComplete) return;
+                      // Always persist locally as draft first (instant UX on F5).
+                      if (storageKey) localStorage.setItem(storageKey, JSON.stringify(patient));
+                      // Persist to Mamamia when session is live.
+                      if (mamamiaEnabled && onSaveToMamamia) {
+                        try {
+                          await onSaveToMamamia(patient);
+                        } catch (err) {
+                          console.error('UpdateCustomer failed:', err);
+                          // Still let user proceed (local draft saved). Revisit when mutation settles.
+                        }
+                      }
+                      setSaved(true);
+                      setPatientOpen(false);
+                      onPatientSaved?.(true);
+                    }}
                     className={`flex-1 py-2.5 text-sm font-bold rounded-xl transition-all ${
                       allComplete
                         ? 'bg-[#9B1FA1] hover:bg-[#7B1A85] text-white'
