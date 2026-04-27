@@ -18,6 +18,10 @@ async function postJson<T>(path: string, body: object): Promise<T> {
     headers: {
       'Content-Type': 'application/json',
       apikey: SUPABASE_ANON_KEY,
+      // Supabase Gateway requires both `apikey` and `Authorization: Bearer`
+      // — without Authorization the gateway returns 401 UNAUTHORIZED_NO_AUTH_HEADER
+      // before the request reaches the Edge Function.
+      Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
     },
     body: JSON.stringify(body),
   });
