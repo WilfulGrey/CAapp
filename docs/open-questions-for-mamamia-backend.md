@@ -137,7 +137,62 @@ Content-Type: application/json
 
 ---
 
-## Q5. Customer / JobOffer deploy na prod — czy agency Primundus będzie replikowana?
+## Q5. SendInvitationCaregiver — konkretna policy
+
+`canImpersonateCustomer` zaimplementowaliście, panel-style flow przeszedł u nas live (csrf-cookie → LoginAgency → ImpersonateCustomer → User.id zwrócony, sesja w customer-mode). Wpięte w nasz Edge Function `mamamia-proxy` przez nowy `mamamiaPanelClient` helper.
+
+**Następny gate to `SendInvitationCaregiver` jako impersonowany customer — który dalej rzuca `Unauthorized` mimo że customer wygląda na complete.**
+
+Konkretny test (beta, `primundus+portal@mamamia.app` SA admin):
+
+Customer 7577 — utworzony świeżo + uzupełniony przez nas:
+```json
+{
+  "id": 7577,
+  "service_agency_id": 18,
+  "is_user": true,                  // SendInvitationCustomer side-effect
+  "can_request_caregiver": true,    // UpdateCustomer + flag
+  "customer_contract": { "id": 5717 },  // StoreCustomerContract done
+  "first_patient_contract": { "id": 5717, "city": "München" },
+  "current_job_offer": {
+    "id": 16233,
+    "status": "search",
+    "visibility": "hide"
+  },
+  "patients": [{ "id": 12828, "care_level": 3, "mobility_id": 1 }]
+}
+```
+
+Caregiver 10061 jest w `JobOfferMatchingsWithPagination(job_offer_id: 16233)` z `is_show=true` (pole #3 z 130 matchingów).
+
+Pełen panel-flow:
+```
+1. GET  /backend/sanctum/csrf-cookie                   204 OK
+2. POST /backend/graphql/auth   LoginAgency           200 OK (id=8190)
+3. POST /backend/graphql/auth   ImpersonateCustomer    200 OK (User.id=8205)
+4. POST /backend/graphql        SendInvitationCaregiver  errors[Unauthorized]
+                                                       category: authorization
+                                                       file: …/Field.php:227
+```
+
+Identycznie jak ImpersonateCustomer wcześniej — `Unauthorized` na `Field.php:227` (resolver-level), trace nie odsłania konkretnego warunku.
+
+**Pytanie:** czy moglibyście pokazać `canSendInvitationCaregiver` policy / gate (analogicznie do `canImpersonateCustomer` którą pokazaliście)?
+
+Coś jeszcze jest sprawdzane czego nie odgadujemy — porównanie z customer 7576 (gdzie wasz panel UI "Logowanie" działa dla Primundus admin) pokazuje że TEN customer ma **mniej** uzupełnione pola (nie ma żadnego customer_contract, can_request_caregiver=null) ale **panel pozwala go impersonować i wejść w jego widok**. Widać że gate `SendInvitationCaregiver` jest oddzielną regułą od panel-impersonate.
+
+Hipotezy — który warunek nas blokuje:
+- a) `customer.location_id` musi być not null (mamy null — żaden location_id z PLZ lookup; może wymaga osobnej mutacji `Locations(search)` + UpdateCustomer)?
+- b) `current_job_offer.visibility != 'hide'`? UpdateJobOffer crashuje na `JobOfferArrivalAtExistsRule::__construct(): null given` — chyba bug niezwiązany, ale flip visibility nam nie wyszedł.
+- c) `customer.status != 'draft'` — ale schemat nie eksponuje argumentu `status` na UpdateCustomer; jak go flippnąć?
+- d) `customer.invoice_contract` musi istnieć (StoreCustomerContract daje tylko `patient_contact` typ; jak utworzyć `invoice_contract` typ?)
+- e) `customer_contacts` musi mieć ≥1 wpis (brak osobnej mutacji `StoreCustomerContact` w schemacie)?
+
+Konkretnie najbardziej zaintrygowała mnie (d): `StoreCustomerContract` zwraca zawsze `contact_type=patient_contact`, a w schemacie jest też `invoice_contract` (`Customer.invoice_contract: CustomerContract`) i `customer_contacts: [CustomerContact]`. Jak agency-side stworzyć te dwa pozostałe?
+
+---
+
+## Q6. Customer / JobOffer deploy na prod — czy agency Primundus będzie replikowana?
 
 Obecnie zarejestrowaliśmy ServiceAgency „Primundus" (id=18, code=ts-18) na **beta** przez SADASH-grade admin token. Nasz Edge Function Supabase loguje się jako `primundus+portal@mamamia.app` → agency JWT.
 
