@@ -37,6 +37,12 @@ export const GET_CUSTOMER = /* GraphQL */ `
       care_budget
       gender
       year_of_birth
+      accommodation
+      other_people_in_house
+      has_family_near_by
+      smoking_household
+      internet
+      urbanization_id
       patients {
         id
         gender
@@ -44,9 +50,12 @@ export const GET_CUSTOMER = /* GraphQL */ `
         care_level
         mobility_id
         weight
+        height
         night_operations
         dementia
         incontinence
+        incontinence_feces
+        incontinence_urine
         smoking
         lift_id
       }
@@ -151,6 +160,8 @@ export const LIST_MATCHINGS = /* GraphQL */ `
 `;
 
 // K3 — full caregiver profile (when user opens modal).
+// Pulls every Mamamia-provided field the modal renders, replacing the
+// previous mockProfile() fake-data path (CLAUDE.md §1).
 export const GET_CAREGIVER = /* GraphQL */ `
   query GetCaregiver($id: Int!) {
     Caregiver(id: $id) {
@@ -169,6 +180,22 @@ export const GET_CAREGIVER = /* GraphQL */ `
       hp_total_jobs
       hp_total_days
       hp_avg_mission_days
+      weight
+      height
+      marital_status
+      smoking
+      driving_license
+      is_nurse
+      education
+      qualifications
+      further_hobbies
+      motivation
+      about_de
+      nationality { nationality }
+      hobbies { hobby }
+      personalities { personality }
+      mobilities { mobility }
+      languagables { level language { name } }
       avatar_retouched { aws_url }
       hp_recent_assignments(limit: 5) {
         arrival_date

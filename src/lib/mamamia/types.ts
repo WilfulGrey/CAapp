@@ -55,6 +55,23 @@ export interface MamamiaCaregiverRef {
 }
 
 export interface MamamiaCaregiverFull extends MamamiaCaregiverRef {
+  // Extra profile fields fetched by GET_CAREGIVER (used by CustomerNurseModal).
+  weight?: string | null;
+  height?: string | null;
+  marital_status?: string | null;
+  smoking?: 'no' | 'yes' | 'yes_outside' | null;
+  driving_license?: string | null;
+  is_nurse?: boolean | null;
+  education?: string | null;
+  qualifications?: string | null;
+  further_hobbies?: string | null;
+  motivation?: string | null;
+  about_de?: string | null;
+  nationality?: { nationality: string | null } | null;
+  hobbies?: Array<{ hobby: string | null }>;
+  personalities?: Array<{ personality: string | null }>;
+  mobilities?: Array<{ mobility: string | null }>;
+  languagables?: Array<{ level: string | null; language: { name: string | null } | null }>;
   hp_recent_assignments?: Array<{
     arrival_date: string | null;
     departure_date: string | null;

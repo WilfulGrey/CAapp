@@ -38,6 +38,24 @@ export const CustomerNurseModal: FC<{
   const bars = Array.from({ length: 5 }, (_, i) => i < nurse.language.bars);
   const avgWo = nurse.history ? Math.round(nurse.history.avgDurationMonths * 4.3) : 0;
   const lvl = nurseLevel(nurse.history?.assignments ?? 0);
+  const p = nurse.profile;
+  const dash = '—';
+  const yesNo = (v: boolean | undefined): string => v == null ? dash : v ? 'Ja' : 'Nein';
+  const smokingLabel: Record<string, string> = {
+    no: 'Nein',
+    yes: 'Ja',
+    yes_outside: 'Ja, draußen',
+  };
+  // "Über die Pflegekraft" prose — built from real fields only. If the
+  // backend hasn't filled them in we show a neutral placeholder rather
+  // than fabricating personality traits (CLAUDE.md §1).
+  const aboutSentence = p?.aboutDe
+    ? p.aboutDe
+    : p?.motivation
+    ? p.motivation
+    : `${name} verfügt über ${nurse.experience} in der 24h-Betreuung und spricht Deutsch auf ${nurse.language.level}-Niveau.${
+        nurse.history ? ` Mit ${nurse.history.assignments} erfolgreich abgeschlossenen Einsätzen bringt sie bewährte Praxiserfahrung mit.` : ''
+      }`;
 
   const InfoRow = ({ emoji, label, value, chips }: { emoji: string; label: string; value?: string; chips?: string[] }) => (
     <div className="flex gap-3.5 py-3 border-b border-gray-100 last:border-0">
@@ -122,12 +140,7 @@ export const CustomerNurseModal: FC<{
             <div className="px-5 pt-4 pb-5">
               <h3 className="text-sm font-bold text-gray-900 mb-2">Über die Pflegekraft</h3>
               <div className="bg-[#F5EDF6] rounded-xl p-4">
-                <p className="text-sm text-gray-700 leading-relaxed">
-                  {name} verfügt über {nurse.experience} in der 24h-Betreuung älterer Menschen
-                  und spricht Deutsch auf {nurse.language.level}-Niveau.
-                  {nurse.history && ` Mit ${nurse.history.assignments} erfolgreich abgeschlossenen Einsätzen bringt sie bewährte Praxiserfahrung mit.`}
-                  {' '}Sie ist {p.persoenlichkeit.slice(0, 2).join(' und ')} und legt großen Wert auf eine vertrauensvolle Beziehung zu Patient und Familie.
-                </p>
+                <p className="text-sm text-gray-700 leading-relaxed whitespace-pre-line">{aboutSentence}</p>
               </div>
             </div>
 
@@ -160,39 +173,49 @@ export const CustomerNurseModal: FC<{
               <h3 className="text-sm font-bold text-gray-900 mb-3">Über mich</h3>
               <div className="divide-y divide-gray-100">
                 <InfoRow emoji="👤" label="Geschlecht" value={nurse.gender === 'female' ? 'Weiblich' : 'Männlich'} />
-                <InfoRow emoji="🌍" label="Nationalität" value={p.nationalitaet} />
-                <InfoRow emoji="🎂" label="Geburtsjahr" value={p.geburtsjahr} />
-                <InfoRow emoji="⚖️" label="Gewicht" value={p.gewicht} />
-                <InfoRow emoji="📏" label="Größe" value={p.groesse} />
-                <InfoRow emoji="🧠" label="Persönlichkeit" chips={p.persoenlichkeit} />
-                <InfoRow emoji="🎯" label="Hobbys" chips={p.hobbys} />
+                <InfoRow emoji="🌍" label="Nationalität" value={p?.nationality ?? dash} />
+                <InfoRow emoji="🎂" label="Geburtsjahr" value={p?.yearOfBirth ? String(p.yearOfBirth) : dash} />
+                <InfoRow emoji="⚖️" label="Gewicht" value={p?.weight ?? dash} />
+                <InfoRow emoji="📏" label="Größe" value={p?.height ?? dash} />
+                {p && p.personalities.length > 0 && (
+                  <InfoRow emoji="🧠" label="Persönlichkeit" chips={p.personalities} />
+                )}
+                {p && p.hobbies.length > 0 && (
+                  <InfoRow emoji="🎯" label="Hobbys" chips={p.hobbies} />
+                )}
               </div>
             </div>
 
             <div className="px-5 pb-5">
               <h3 className="text-sm font-bold text-gray-900 mb-3">Besondere Merkmale</h3>
               <div className="divide-y divide-gray-100">
-                <InfoRow emoji="🚗" label="Führerschein" value={p.fuehrerschein ? 'Ja' : 'Nein'} />
-                <InfoRow emoji="🚬" label="Raucher" value={p.raucher} />
-                <InfoRow emoji="🎓" label="Pflegeberuf erlernt" value={p.pflegeberuf ? 'Ja' : 'Nein'} />
-                <InfoRow emoji="🏥" label="Erfahrung Krankenpflege" value={p.krankenpflegeJahre} />
-                <InfoRow emoji="🌐" label="Andere Sprachkenntnisse" chips={p.andereSpachen} />
+                <InfoRow emoji="🚗" label="Führerschein" value={yesNo(p?.drivingLicense)} />
+                <InfoRow emoji="🚬" label="Raucher" value={p?.smoking ? smokingLabel[p.smoking] ?? dash : dash} />
+                <InfoRow emoji="🎓" label="Pflegeberuf erlernt" value={yesNo(p?.isNurse)} />
+                {p?.qualifications && (
+                  <InfoRow emoji="🏥" label="Qualifikationen" value={p.qualifications} />
+                )}
+                {p?.education && (
+                  <InfoRow emoji="📚" label="Ausbildung" value={p.education} />
+                )}
+                {p && p.otherLanguages.length > 0 && (
+                  <InfoRow
+                    emoji="🌐"
+                    label="Andere Sprachkenntnisse"
+                    chips={p.otherLanguages.map(l => `${l.name} (${l.level})`)}
+                  />
+                )}
               </div>
             </div>
 
-            <div className="px-5 pb-6">
-              <h3 className="text-sm font-bold text-gray-900 mb-3">Berufliche Anforderungen</h3>
-              <div className="divide-y divide-gray-100">
-                <InfoRow emoji="👥" label="Anzahl Patienten" value={p.patienten} />
-                <InfoRow emoji="🦽" label="Akzeptierte Mobilität" chips={p.mobilitaet} />
-                <InfoRow emoji="💪" label="Heben & Lagern" value={p.heben ? 'Ja' : 'Nein'} />
-                <InfoRow emoji="🧩" label="Demenzausprägung" value={p.demenz} />
-                <InfoRow emoji="🌙" label="Nachteinsätze" value={p.nacht} />
-                <InfoRow emoji="🐾" label="Tiere im Haushalt" value={p.tiere} />
-                <InfoRow emoji="🏠" label="Unterbringung" value={p.unterbringung} />
-                <InfoRow emoji="🏙️" label="Urbanisierung" value={p.urbanisierung} />
+            {p && p.acceptedMobilities.length > 0 && (
+              <div className="px-5 pb-6">
+                <h3 className="text-sm font-bold text-gray-900 mb-3">Berufliche Anforderungen</h3>
+                <div className="divide-y divide-gray-100">
+                  <InfoRow emoji="🦽" label="Akzeptierte Mobilität" chips={p.acceptedMobilities} />
+                </div>
               </div>
-            </div>
+            )}
           </div>
 
           <div className="px-5 py-4 border-t border-gray-100 flex gap-3 flex-shrink-0">

@@ -79,15 +79,37 @@ function incontinenceToApi(v: string): {
   return {};
 }
 
-// Night operations enum — LIVE-DISCOVERED 2026-04-24 via UpdateCustomer with
-// patient.id threading (Mamamia silently drops the field when id is missing).
-// Valid values confirmed: "no", "occasionally", "more_than_2".
-// Rejected: yes/never/sometimes/regularly/always/often/1x/2x/multiple/heavy/etc.
+// Night operations enum — verified vs Mamamia prod DB (2026-04-27):
+//   "no" | "up_to_1_time" | "1_2_times" | "more_than_2" | "occasionally"
+// PatientForm dropdown options ['Nein','Bis zu 1 Mal','1–2 Mal','Mehr als 2']
+// map 1:1; older 'Gelegentlich'/'Regelmäßig' values kept for legacy drafts.
 function nachtToApi(v: string): string | null {
   if (!v) return null;
   if (v === 'Nein') return 'no';
+  if (v === 'Bis zu 1 Mal') return 'up_to_1_time';
+  if (v === '1–2 Mal' || v === '1-2 Mal') return '1_2_times';
+  if (v === 'Mehr als 2') return 'more_than_2';
+  // Legacy values from older drafts (still valid prod enum).
   if (v === 'Gelegentlich') return 'occasionally';
-  if (v === 'Regelmäßig') return 'more_than_2';
+  if (v === 'Regelmäßig') return 'up_to_1_time';
+  return null;
+}
+
+// accommodation (wohnungstyp) enum — verified prod 2026-04-27.
+function accommodationToApi(v: string): string | null {
+  if (!v) return null;
+  if (v === 'Einfamilienhaus') return 'single_family_house';
+  if (v === 'Wohnung in Mehrfamilienhaus' || v === 'Wohnung') return 'apartment';
+  if (v === 'Andere' || v === 'Sonstiges') return 'other';
+  return null;
+}
+
+// smoking_household — verified prod enum: yes / no / yes_outside.
+// Form question: "Darf die Betreuungsperson rauchen?" — yes/no only.
+function smokingHouseholdToApi(v: string): 'yes' | 'no' | null {
+  if (v === 'Ja') return 'yes';
+  if (v === 'Nein') return 'no';
+  // (yes_outside not exposed in form yet — future option.)
   return null;
 }
 
@@ -220,11 +242,17 @@ export function mapPatientFormToUpdateCustomerInput(
     patch.location_custom_text = `${form.plz} ${form.ort}`.trim();
   }
 
-  // NOTE: other_people_in_house / accommodation / smoking_household have strict
-  // Mamamia enums (not yes/no) — exact values unknown. Skipping them here
-  // prevents UpdateCustomer from crashing with validation error; they stay
-  // in localStorage draft until enum list is confirmed with backend team.
-  // Live-verified working: has_family_near_by, internet (both yes/no).
+  // Customer-level enums (verified vs prod DB 2026-04-27).
+  const acc = accommodationToApi(form.wohnungstyp);
+  if (acc) patch.accommodation = acc;
+
+  // other_people_in_house — derive from anzahl: 2 patients = yes, 1 = no.
+  // (Form's `haushalt` field is read-only prefill from formularDaten.)
+  if (form.anzahl === '2') patch.other_people_in_house = 'yes';
+  else if (form.anzahl === '1') patch.other_people_in_house = 'no';
+
+  const smoke = smokingHouseholdToApi(form.rauchen);
+  if (smoke) patch.smoking_household = smoke;
 
   const fam = yesNoToApi(form.familieNahe);
   if (fam) patch.has_family_near_by = fam;

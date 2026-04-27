@@ -7,7 +7,7 @@ import {
   Lead,
 } from '../lib/supabase';
 import { useMamamiaSession } from '../hooks/useMamamiaSession';
-import { useCustomer, useJobOffer, useApplications, useMatchings } from '../lib/mamamia/hooks';
+import { useCustomer, useJobOffer, useApplications, useMatchings, useCaregiver } from '../lib/mamamia/hooks';
 import {
   useRejectApplication,
   useStoreConfirmation,
@@ -19,6 +19,7 @@ import {
   jobOfferArrivalDisplay,
   mapApplicationToUI,
   mapMatchingToNurse,
+  mapCaregiverToNurse,
 } from '../lib/mamamia/mappers';
 import { mapPatientFormToUpdateCustomerInput } from '../lib/mamamia/patientFormMapper';
 import {
@@ -94,6 +95,19 @@ const CustomerPortalPage: FC = () => {
   const confirmMutation = useStoreConfirmation();
   const inviteMutation = useInviteCaregiver();
   const updateCustomerMutation = useUpdateCustomer();
+
+  // Lazy-load full caregiver profile when modal opens — replaces mockProfile().
+  const { data: fullCaregiver } = useCaregiver(selectedNurse?.caregiverId ?? null);
+  const enrichedSelectedNurse = (() => {
+    if (!selectedNurse) return null;
+    if (!fullCaregiver) return selectedNurse;
+    const enriched = mapCaregiverToNurse(fullCaregiver, {
+      nowIso: new Date().toISOString(),
+      nowYear: new Date().getFullYear(),
+    });
+    // Preserve color (deterministic by id, identical anyway) + caregiverId.
+    return { ...selectedNurse, ...enriched };
+  })();
 
   // Caregiver id mapping per match index (for invite flow).
   // effectiveMatched[idx].caregiverId resolves to real Mamamia id. Empty
@@ -561,18 +575,26 @@ const CustomerPortalPage: FC = () => {
       )}
 
       {/* Nurse Detail Modal */}
-      {selectedNurse && (
+      {selectedNurse && enrichedSelectedNurse && (
         <CustomerNurseModal
-          nurse={selectedNurse}
+          nurse={enrichedSelectedNurse}
           onClose={() => { setSelectedNurse(null); setNurseModalApp(null); setNurseMatchIdx(null); }}
           app={nurseModalApp ?? undefined}
           onReview={() => { setSelectedNurse(null); setSelectedApp(nurseModalApp); setNurseModalApp(null); }}
           onDecline={() => { setDeclineConfirmApp(nurseModalApp); setSelectedNurse(null); setNurseModalApp(null); }}
           onUndo={() => { if (nurseModalApp) undoApp(nurseModalApp.id); setNurseModalApp(null); }}
           isInvited={nurseMatchIdx !== null && nurseStatuses[nurseMatchIdx] === 'invited'}
-          onInvite={nurseMatchIdx !== null ? () => {
-            inviteNurse(nurseMatchIdx, displayName(selectedNurse.name));
-            setSelectedNurse(null); setNurseMatchIdx(null);
+          onInvite={nurseMatchIdx !== null ? async () => {
+            const idx = nurseMatchIdx;
+            // Modal animation is driven by the returned Promise — surfaces
+            // failure to the user instead of fake success (CLAUDE.md §1).
+            try {
+              if (canInviteNurse(idx)) {
+                await confirmInviteNurse(idx, displayName(selectedNurse.name));
+              }
+            } finally {
+              setSelectedNurse(null); setNurseMatchIdx(null);
+            }
           } : undefined}
           onDeclineMatch={nurseMatchIdx !== null ? () => {
             declineNurse(nurseMatchIdx);

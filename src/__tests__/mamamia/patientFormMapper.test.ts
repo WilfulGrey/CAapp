@@ -124,10 +124,16 @@ describe('mapPatientFormToUpdateCustomerInput', () => {
     });
   });
 
-  it('night operations Nein/Gelegentlich/Regelmäßig → no/occasionally/more_than_2 (live-verified)', () => {
+  it('night operations: 4-option dropdown maps 1:1 to prod enum (verified vs DB 2026-04-27)', () => {
     expect(mapPatientFormToUpdateCustomerInput(makeForm({ nacht: 'Nein' })).patients?.[0].night_operations).toBe('no');
+    expect(mapPatientFormToUpdateCustomerInput(makeForm({ nacht: 'Bis zu 1 Mal' })).patients?.[0].night_operations).toBe('up_to_1_time');
+    expect(mapPatientFormToUpdateCustomerInput(makeForm({ nacht: '1–2 Mal' })).patients?.[0].night_operations).toBe('1_2_times');
+    expect(mapPatientFormToUpdateCustomerInput(makeForm({ nacht: 'Mehr als 2' })).patients?.[0].night_operations).toBe('more_than_2');
+  });
+
+  it('night operations: legacy "Gelegentlich"/"Regelmäßig" still work for old drafts', () => {
     expect(mapPatientFormToUpdateCustomerInput(makeForm({ nacht: 'Gelegentlich' })).patients?.[0].night_operations).toBe('occasionally');
-    expect(mapPatientFormToUpdateCustomerInput(makeForm({ nacht: 'Regelmäßig' })).patients?.[0].night_operations).toBe('more_than_2');
+    expect(mapPatientFormToUpdateCustomerInput(makeForm({ nacht: 'Regelmäßig' })).patients?.[0].night_operations).toBe('up_to_1_time');
   });
 
   it('threads existingPatientIds into patient objects (required for persistence)', () => {
@@ -177,15 +183,20 @@ describe('mapPatientFormToUpdateCustomerInput', () => {
     expect(r.internet).toBe('yes');
   });
 
-  it('skips other_people_in_house / accommodation / smoking_household (unknown enums, would crash Mamamia)', () => {
-    const r = mapPatientFormToUpdateCustomerInput(makeForm({
-      haushalt: 'Ehepartner/in',
-      wohnungstyp: 'Einfamilienhaus',
-      rauchen: 'Ja',
-    }));
-    expect(r.other_people_in_house).toBeUndefined();
-    expect(r.accommodation).toBeUndefined();
-    expect(r.smoking_household).toBeUndefined();
+  it('maps accommodation (verified prod enum 2026-04-27)', () => {
+    expect(mapPatientFormToUpdateCustomerInput(makeForm({ wohnungstyp: 'Einfamilienhaus' })).accommodation).toBe('single_family_house');
+    expect(mapPatientFormToUpdateCustomerInput(makeForm({ wohnungstyp: 'Wohnung in Mehrfamilienhaus' })).accommodation).toBe('apartment');
+    expect(mapPatientFormToUpdateCustomerInput(makeForm({ wohnungstyp: 'Andere' })).accommodation).toBe('other');
+  });
+
+  it('derives other_people_in_house from anzahl (yes/no enum)', () => {
+    expect(mapPatientFormToUpdateCustomerInput(makeForm({ anzahl: '2' })).other_people_in_house).toBe('yes');
+    expect(mapPatientFormToUpdateCustomerInput(makeForm({ anzahl: '1' })).other_people_in_house).toBe('no');
+  });
+
+  it('maps rauchen → smoking_household yes/no', () => {
+    expect(mapPatientFormToUpdateCustomerInput(makeForm({ rauchen: 'Ja' })).smoking_household).toBe('yes');
+    expect(mapPatientFormToUpdateCustomerInput(makeForm({ rauchen: 'Nein' })).smoking_household).toBe('no');
   });
 
   it('combines diagnosen/aufgaben/sonstigeWuensche into job_description', () => {

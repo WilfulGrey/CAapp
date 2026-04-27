@@ -122,7 +122,43 @@ export function mapCaregiverToNurse(
     }
   }
 
+  // Real Caregiver profile fields — only present when GET_CAREGIVER ran
+  // (i.e. cg has the full type, not the matching ref). Anything missing
+  // stays undefined; the modal renders "—" for absent fields rather than
+  // making something up (CLAUDE.md §1).
+  let profile: Nurse['profile'];
+  if ('hobbies' in cg || 'personalities' in cg || 'nationality' in cg) {
+    const full = cg as MamamiaCaregiverFull;
+    profile = {
+      nationality: full.nationality?.nationality ?? undefined,
+      yearOfBirth: full.year_of_birth ?? undefined,
+      weight: full.weight ?? undefined,
+      height: full.height ?? undefined,
+      maritalStatus: full.marital_status ?? undefined,
+      drivingLicense: full.driving_license != null
+        ? full.driving_license !== 'no'
+        : undefined,
+      isNurse: full.is_nurse ?? undefined,
+      smoking: full.smoking ?? undefined,
+      education: full.education ?? undefined,
+      qualifications: full.qualifications ?? undefined,
+      motivation: full.motivation ?? undefined,
+      aboutDe: full.about_de ?? undefined,
+      furtherHobbies: full.further_hobbies ?? undefined,
+      hobbies: (full.hobbies ?? [])
+        .map(h => h.hobby).filter((x): x is string => Boolean(x)),
+      personalities: (full.personalities ?? [])
+        .map(p => p.personality).filter((x): x is string => Boolean(x)),
+      acceptedMobilities: (full.mobilities ?? [])
+        .map(m => m.mobility).filter((x): x is string => Boolean(x)),
+      otherLanguages: (full.languagables ?? [])
+        .filter(l => l.language?.name && l.language.name.toLowerCase() !== 'german')
+        .map(l => ({ name: l.language!.name!, level: l.level ?? '—' })),
+    };
+  }
+
   return {
+    caregiverId: cg.id,
     name: formatDisplayName(cg.first_name, cg.last_name),
     age,
     experience,
@@ -145,6 +181,7 @@ export function mapCaregiverToNurse(
       }
       : undefined,
     detailedAssignments: detailedAssignments.length > 0 ? detailedAssignments : undefined,
+    profile,
   };
 }
 

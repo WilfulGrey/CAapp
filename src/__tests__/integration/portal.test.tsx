@@ -178,27 +178,17 @@ describe('Portal integration: golden paths', () => {
     const user = userEvent.setup();
     render(<CustomerPortalPage />);
 
-    // Match section title (only visible when there are no pending apps)
-    await screen.findByText(/Für Sie vorausgewählte Pflegekräfte/i, undefined, { timeout: 5000 });
+    // findByRole polls until the element appears — handles the async
+    // session bootstrap (mmReady flips from false to true).
+    const inviteBtn = await screen.findByRole(
+      'button', { name: /^Einladen$/i }, { timeout: 5000 },
+    );
+    await user.click(inviteBtn);
 
-    // Click first "Einladen" button (on the MatchCard)
-    const inviteBtns = screen.getAllByRole('button', { name: /^Einladen$/i });
-    await user.click(inviteBtns[0]);
-
-    // First invite without saved patient data triggers the reminder popup.
-    // Dismiss via "Später erledigen" and click Einladen again.
-    const reminder = screen.queryByText(/Patientendaten fehlen noch/i);
-    if (reminder) {
-      await user.click(screen.getByRole('button', { name: /Später erledigen/i }));
-      const inviteBtns2 = screen.getAllByRole('button', { name: /^Einladen$/i });
-      await user.click(inviteBtns2[0]);
-    }
-
-    // The MatchCard goes through invitePhase animations:
-    // idle → sending (2s) → done (2s) → onInviteConfirm fires.
-    // We assert the caregiver_id landed in inviteCaregiver mutation.
+    // After click: MatchCard awaits the real mutation (no fake setTimeout).
+    // The mutation hits MSW which records caregiver_id immediately.
     await waitFor(() => expect(inviteCaregiverId).toBe(sampleMatching.caregiver.id), {
-      timeout: 10_000,
+      timeout: 5000,
     });
-  }, 20_000);
+  }, 15_000);
 });
