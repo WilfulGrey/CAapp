@@ -9,6 +9,7 @@ import {
   REJECT_APPLICATION,
   SEARCH_LOCATIONS,
   SEND_INVITATION_CAREGIVER,
+  SEND_INVITATION_CUSTOMER,
   STORE_CONFIRMATION,
   UPDATE_CUSTOMER,
 } from "./operations.ts";
@@ -23,6 +24,28 @@ async function runGraphQL<T>(
   return await mamamiaRequest<T>({
     endpoint: deps.endpoint,
     token: await deps.getAgencyToken(),
+    query,
+    variables,
+    fetchFn: deps.fetchFn,
+  });
+}
+
+// K6 — run GraphQL with the customer-scope JWT obtained via
+// CustomerVerifyEmail. Used for mutations Mamamia gates to the customer
+// (e.g. SendInvitationCaregiver). Throws if the session never went through
+// /functions/v1/customer-verify, surfacing the gap to the UI.
+async function runGraphQLAsCustomer<T>(
+  customerToken: string | undefined,
+  deps: ActionDeps,
+  query: string,
+  variables: Record<string, unknown>,
+): Promise<T> {
+  if (!customerToken) {
+    throw new Error("customer email not verified");
+  }
+  return await mamamiaRequest<T>({
+    endpoint: deps.endpoint,
+    token: customerToken,
     query,
     variables,
     fetchFn: deps.fetchFn,
@@ -214,11 +237,31 @@ const storeConfirmation: ActionHandler = async (session, variables, deps) => {
 // ─── Invite caregiver ──────────────────────────────────────────────────────
 // Primary: SendInvitationCaregiver (caregiver_id only; context from session).
 
-const inviteCaregiver: ActionHandler = async (_session, variables, deps) => {
+const inviteCaregiver: ActionHandler = async (session, variables, deps) => {
   const id = (variables as { caregiver_id?: unknown }).caregiver_id;
   if (typeof id !== "number") throw new Error("caregiver_id required");
-  return await runGraphQL(deps, SEND_INVITATION_CAREGIVER, { caregiver_id: id });
+  // Mamamia gates SendInvitationCaregiver behind customer auth — agency
+  // token returns Unauthorized. Use the customer-scope JWT from session
+  // (set by /functions/v1/customer-verify after the magic-link click).
+  return await runGraphQLAsCustomer(
+    session.customer_token,
+    deps,
+    SEND_INVITATION_CAREGIVER,
+    { caregiver_id: id },
+  );
 };
+
+// ─── K6: customer-scope auth bootstrap ──────────────────────────────────────
+// Email verify mail to the customer's address. The email is read from the
+// signed session JWT (originally from Supabase lead.email) — never from
+// client variables, so the user can't redirect the verify mail elsewhere.
+// Once the customer clicks the link, /functions/v1/customer-verify
+// exchanges the magic-link token for a customer-scope JWT (User.token).
+const sendCustomerInvitation: ActionHandler = (session, _variables, deps) =>
+  runGraphQL(deps, SEND_INVITATION_CUSTOMER, {
+    customer_id: session.customer_id,
+    email: session.email,
+  });
 
 // ─── Mutations — strict allowlist + ownership ───────────────────────────────
 
@@ -262,6 +305,7 @@ export const ACTIONS: Record<ProxyAction, ActionHandler> = {
   rejectApplication,
   storeConfirmation,
   inviteCaregiver,
+  sendCustomerInvitation,
 };
 
 export function isKnownAction(name: string): name is ProxyAction {

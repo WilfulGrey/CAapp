@@ -15,7 +15,9 @@ export type ProxyAction =
   | "updateCustomer"
   | "rejectApplication"
   | "storeConfirmation"
-  | "inviteCaregiver";
+  | "inviteCaregiver"
+  // K6 — customer-scope auth bootstrap
+  | "sendCustomerInvitation";
 
 export interface ActionDeps {
   endpoint: string;

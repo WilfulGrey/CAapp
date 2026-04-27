@@ -273,6 +273,19 @@ export const SEND_INVITATION_CAREGIVER = /* GraphQL */ `
   }
 `;
 
+// K6 — Triggers Mamamia to email the customer a verify link. The customer
+// then clicks it, the portal calls /functions/v1/customer-verify which
+// exchanges the magic-link token for a User.token (customer-scope JWT).
+// That JWT is what authorises SendInvitationCaregiver.
+//
+// Both args required by Laravel validator — email is mandatory ("Pole email
+// jest wymagane") even though the schema says nullable.
+export const SEND_INVITATION_CUSTOMER = /* GraphQL */ `
+  mutation SendInvitationCustomer($customer_id: Int, $email: String) {
+    SendInvitationCustomer(customer_id: $customer_id, email: $email)
+  }
+`;
+
 export const STORE_REQUEST = /* GraphQL */ `
   mutation StoreRequest($caregiver_id: Int, $job_offer_id: Int, $message: String) {
     StoreRequest(

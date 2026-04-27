@@ -6,6 +6,7 @@ const SESSION: SessionPayload = {
   customer_id: 7570,
   job_offer_id: 16226,
   lead_id: "c4286032-9e06-453d-93f2-52779127c8e5",
+  email: "test@example.com",
 };
 
 function captureFetch(response: object, status = 200) {
@@ -335,22 +336,68 @@ Deno.test("storeConfirmation: forbids cross-tenant", async () => {
   );
 });
 
-// ─── inviteCaregiver (K5) ──────────────────────────────────────────────
+// ─── inviteCaregiver (K5/K6) ───────────────────────────────────────────
 
-Deno.test("inviteCaregiver: calls SendInvitationCaregiver with caregiver_id", async () => {
-  const { state, fetchFn } = captureFetch({
-    data: { SendInvitationCaregiver: true },
-  });
-  await ACTIONS.inviteCaregiver(SESSION, { caregiver_id: 10053 }, makeDeps(fetchFn));
-  const sent = state.body as { variables: { caregiver_id: number } };
-  assertEquals(sent.variables.caregiver_id, 10053);
+Deno.test("inviteCaregiver: requires customer_token in session (K6 — agency token gets Unauthorized)", async () => {
+  const { fetchFn } = captureFetch({ data: { SendInvitationCaregiver: true } });
+  await assertRejects(
+    () => ACTIONS.inviteCaregiver(SESSION, { caregiver_id: 10053 }, makeDeps(fetchFn)),
+    Error,
+    "customer email not verified",
+  );
 });
 
-Deno.test("inviteCaregiver: caregiver_id required", async () => {
+Deno.test("inviteCaregiver: uses session.customer_token as Bearer (NOT agency token)", async () => {
+  const sessionWithCustomerToken = { ...SESSION, customer_token: "31|customer-jwt-xyz" };
+  let capturedAuth = "";
+  const fetchFn: typeof fetch = async (_input, init) => {
+    const headers = (init as RequestInit | undefined)?.headers as Record<string, string> | undefined;
+    capturedAuth = String(headers?.["Authorization"] ?? "");
+    return new Response(JSON.stringify({ data: { SendInvitationCaregiver: true } }), { status: 200 });
+  };
+  await ACTIONS.inviteCaregiver(
+    sessionWithCustomerToken,
+    { caregiver_id: 10053 },
+    makeDeps(fetchFn),
+  );
+  assertEquals(capturedAuth, "Bearer 31|customer-jwt-xyz");
+});
+
+Deno.test("inviteCaregiver: caregiver_id required (still validated when verified)", async () => {
+  const sessionWithCustomerToken = { ...SESSION, customer_token: "31|x" };
   const { fetchFn } = captureFetch({ data: {} });
   await assertRejects(
-    () => ACTIONS.inviteCaregiver(SESSION, {}, makeDeps(fetchFn)),
+    () => ACTIONS.inviteCaregiver(sessionWithCustomerToken, {}, makeDeps(fetchFn)),
     Error,
     "caregiver_id required",
   );
+});
+
+// ─── sendCustomerInvitation (K6) ────────────────────────────────────────
+// Triggers Mamamia to email the customer a verify link. Once the customer
+// clicks it, we exchange the magic-link token for a customer-scope JWT
+// (CustomerVerifyEmail) — that JWT is what authorises SendInvitationCaregiver.
+
+Deno.test("sendCustomerInvitation: uses session.customer_id + session.email", async () => {
+  const { state, fetchFn } = captureFetch({
+    data: { SendInvitationCustomer: true },
+  });
+  await ACTIONS.sendCustomerInvitation(SESSION, {}, makeDeps(fetchFn));
+  const sent = state.body as { variables: { customer_id: number; email: string } };
+  assertEquals(sent.variables.customer_id, SESSION.customer_id);
+  assertEquals(sent.variables.email, SESSION.email);
+});
+
+Deno.test("sendCustomerInvitation: ignores user-supplied email/customer_id (ownership)", async () => {
+  const { state, fetchFn } = captureFetch({
+    data: { SendInvitationCustomer: true },
+  });
+  await ACTIONS.sendCustomerInvitation(
+    SESSION,
+    { customer_id: 9999, email: "evil@attacker.com" },
+    makeDeps(fetchFn),
+  );
+  const sent = state.body as { variables: { customer_id: number; email: string } };
+  assertEquals(sent.variables.customer_id, SESSION.customer_id);
+  assertEquals(sent.variables.email, SESSION.email);
 });

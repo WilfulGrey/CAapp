@@ -67,7 +67,7 @@ const PRIMUNDUS_AGENCY_ID = 18;
 
 // ─── Main flow ─────────────────────────────────────────────────────────────
 
-export async function onboardLead(opts: OnboardOptions): Promise<OnboardResult & { lead_id: string }> {
+export async function onboardLead(opts: OnboardOptions): Promise<OnboardResult & { lead_id: string; email: string }> {
   const { leadToken, secrets, supabase, fetchFn = globalThis.fetch, now = () => new Date() } = opts;
 
   // 1. Lookup lead
@@ -90,6 +90,7 @@ export async function onboardLead(opts: OnboardOptions): Promise<OnboardResult &
       customer_id: lead.mamamia_customer_id,
       job_offer_id: lead.mamamia_job_offer_id,
       lead_id: lead.id,
+      email: lead.email,
     };
   }
 
@@ -161,14 +162,18 @@ export async function onboardLead(opts: OnboardOptions): Promise<OnboardResult &
     customer_id: mamamiaCustomerId,
     job_offer_id: mamamiaJobOfferId,
     lead_id: lead.id,
+    email: lead.email,
   };
 }
 
 // Build session payload ready for JWT signing (used by handler after onboarding)
-export function sessionPayloadFromResult(result: OnboardResult & { lead_id: string }): SessionPayload {
+export function sessionPayloadFromResult(
+  result: OnboardResult & { lead_id: string; email: string },
+): SessionPayload {
   return {
     customer_id: result.customer_id,
     job_offer_id: result.job_offer_id,
     lead_id: result.lead_id,
+    email: result.email,
   };
 }

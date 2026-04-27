@@ -13,7 +13,9 @@ import {
   useStoreConfirmation,
   useInviteCaregiver,
   useUpdateCustomer,
+  useSendCustomerInvitation,
 } from '../lib/mamamia/mutations';
+import { verifyCustomerEmail } from '../lib/mamamia/client';
 import {
   customerDisplayName,
   jobOfferArrivalDisplay,
@@ -95,6 +97,36 @@ const CustomerPortalPage: FC = () => {
   const confirmMutation = useStoreConfirmation();
   const inviteMutation = useInviteCaregiver();
   const updateCustomerMutation = useUpdateCustomer();
+  const sendCustomerInvitationMutation = useSendCustomerInvitation();
+
+  // K6 — customer-scope auth state.
+  // `customerVerified=true` once the customer clicked the magic-link in the
+  // verify mail and we exchanged the token via /functions/v1/customer-verify.
+  // Until then, SendInvitationCaregiver returns 502 (agency token rejected by
+  // Mamamia), so the UI gates the Einladen buttons behind a verify banner.
+  const [customerVerified, setCustomerVerified] = useState(false);
+  const [verifyMailStatus, setVerifyMailStatus] = useState<'idle' | 'sending' | 'sent' | 'failed'>('idle');
+
+  // Magic-link landing — when the user clicks the verify mail, Mamamia
+  // redirects them to portal URL with `?verify_token=xxx`. We exchange it
+  // for a customer-scope JWT and clean the URL so refresh stays signed in.
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const verifyToken = params.get('verify_token');
+    if (!verifyToken) return;
+    verifyCustomerEmail(verifyToken)
+      .then(() => {
+        setCustomerVerified(true);
+        // Strip the param so reload doesn't re-trigger.
+        params.delete('verify_token');
+        const qs = params.toString();
+        const cleaned = `${window.location.pathname}${qs ? `?${qs}` : ''}`;
+        window.history.replaceState({}, '', cleaned);
+      })
+      .catch(err => {
+        console.error('customer-verify failed:', err.message);
+      });
+  }, []);
 
   // Lazy-load full caregiver profile when modal opens — replaces mockProfile().
   const { data: fullCaregiver } = useCaregiver(selectedNurse?.caregiverId ?? null);
@@ -245,6 +277,14 @@ const CustomerPortalPage: FC = () => {
       throw new Error('not-ready');
     }
 
+    // K6 gate — Mamamia requires customer-scope JWT for SendInvitationCaregiver.
+    // We surface this clearly instead of letting the request fail with a
+    // generic upstream error (CLAUDE.md §1).
+    if (!customerVerified) {
+      showToast('Bitte bestätigen Sie zuerst Ihre E-Mail, um Pflegekräfte einzuladen.');
+      throw new Error('email-not-verified');
+    }
+
     const nurseName = match.nurse.name ?? '';
 
     if (!patientSaved && !firstInviteDone) {
@@ -263,12 +303,21 @@ const CustomerPortalPage: FC = () => {
       }
       showToast(`✓ ${name} wurde eingeladen!`);
     } catch (err) {
-      // Surface the failure — no silent fallback (CLAUDE.md §1).
-      // Known limitation: SendInvitationCaregiver requires customer-scoped
-      // JWT (K6). Until that lands, this path fires and the user sees it.
       console.error('inviteCaregiver failed:', (err as Error).message);
       showToast('Einladung konnte nicht gesendet werden. Bitte kontaktieren Sie uns.');
       throw err;
+    }
+  };
+
+  const sendVerifyMail = async () => {
+    setVerifyMailStatus('sending');
+    try {
+      await sendCustomerInvitationMutation.mutate({});
+      setVerifyMailStatus('sent');
+    } catch (err) {
+      console.error('sendCustomerInvitation failed:', (err as Error).message);
+      setVerifyMailStatus('failed');
+      showToast('Verify-E-Mail konnte nicht gesendet werden. Bitte später erneut versuchen.');
     }
   };
 
@@ -475,6 +524,36 @@ const CustomerPortalPage: FC = () => {
                       <span className="text-sm font-normal text-gray-400 ml-2">({visibleNurses.length})</span>
                     </h2>
                   </div>
+
+                  {/* K6 — Verify-mail banner. Shown until the customer has clicked
+                      the magic link from the verify mail. Without that, Mamamia
+                      rejects SendInvitationCaregiver with 502, so we gate the UI. */}
+                  {!customerVerified && (
+                    <div className="mb-3 bg-[#FFF7E6] border border-[#F5C97D] rounded-2xl px-4 py-3.5 flex items-start gap-3">
+                      <span className="text-xl flex-shrink-0">✉️</span>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-bold text-gray-900 mb-0.5">E-Mail bestätigen</p>
+                        <p className="text-xs text-gray-600 leading-relaxed mb-2">
+                          {verifyMailStatus === 'sent'
+                            ? `Wir haben eine Bestätigungs-Mail an ${lead?.email ?? 'Ihre Adresse'} gesendet. Bitte klicken Sie auf den Link, um Pflegekräfte einladen zu können.`
+                            : 'Damit Sie Pflegekräfte einladen können, müssen Sie zuerst Ihre E-Mail bestätigen.'}
+                        </p>
+                        {verifyMailStatus !== 'sent' && (
+                          <button
+                            onClick={sendVerifyMail}
+                            disabled={verifyMailStatus === 'sending'}
+                            className="text-xs font-bold bg-[#9B1FA1] text-white rounded-full px-4 py-1.5 disabled:opacity-50 hover:bg-[#7B1A85] transition-colors"
+                          >
+                            {verifyMailStatus === 'sending' ? 'wird gesendet…' : 'Bestätigungs-Mail senden'}
+                          </button>
+                        )}
+                        {verifyMailStatus === 'failed' && (
+                          <p className="text-xs text-red-500 mt-1">Versand fehlgeschlagen — bitte später erneut versuchen.</p>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
                   <div className="space-y-3">
                     {visibleNurses.map(({ nurse, i, status }) => (
                       <MatchCard key={i} nurse={nurse} status={status} onNurseClick={() => openNurseFromMatch(nurse, i)} onInvite={() => canInviteNurse(i)} onInviteConfirm={() => confirmInviteNurse(i, displayName(nurse.name))} />

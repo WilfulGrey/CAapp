@@ -16,6 +16,7 @@ const SESSION_PAYLOAD = {
   customer_id: 7570,
   job_offer_id: 16226,
   lead_id: "c4286032-9e06-453d-93f2-52779127c8e5",
+  email: "test@example.com",
 };
 
 function okFetch(response: object): typeof fetch {

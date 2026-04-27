@@ -61,7 +61,39 @@ Nasze UI patient form ma tylko boolean: `heben: "Ja"/"Nein"`. Jeśli Mamamia lif
 
 ---
 
-## Q4. Customer / JobOffer deploy na prod — czy agency Primundus będzie replikowana?
+## Q4. SendInvitationCustomer redirect → Primundus portal (BLOCKER for K6)
+
+**Stan:** zaimplementowaliśmy customer-scope JWT flow. Edge Function `customer-verify` woła `CustomerVerifyEmail(token)`, dostaje `User.token`, embed-uje go jako `customer_token` w naszej HttpOnly session JWT — następne `SendInvitationCaregiver` używa tego customer JWT (zamiast agency, który zwraca Unauthorized). Pełna implementacja gotowa, integration testy zielone, K6 banner UI też.
+
+End-to-end live test: `SendInvitationCustomer(customer_id: 7576, email: "m.kepinski@mamamia.app")` zwraca `true`, email się wysyła. Kod w `supabase/functions/customer-verify/`, `supabase/functions/mamamia-proxy/actions.ts:sendCustomerInvitation`.
+
+**Problem:** w schemacie `SendInvitationCustomer(customer_id, email): Boolean` — **brak parametru `redirect`**. Read-only sweep prod DB pokazuje że `magic_links.redirect` używa relatywnych ścieżek (`/job-offers`, `/caregiver/jobs/...`) — czyli Mamamia kieruje customera po klik magic-link **na swój własny portal** (mamamia.app), nie na nasz Primundus portal.
+
+Bez tego customer nie wraca do naszego portalu z `?verify_token=xxx`, więc nie ma jak exchangować magic-link na customer-scope JWT — użytkownik utknie w Mamamia.app i nigdy nie wróci do flow Primundus.
+
+**Pytanie:** trzy potencjalne podejścia, każdy wymaga backend support — który jest realistyczny:
+
+**Wariant A — `redirect` param na SendInvitationCustomer:**
+```graphql
+SendInvitationCustomer(
+  customer_id: Int,
+  email: String,
+  redirect: String  # NEW — np. "https://portal.primundus.de/?verify_token={TOKEN}"
+): Boolean
+```
+Dokładnie jak `StoreMagicLink` ma `redirect` (caregiver flow już to ma). Pozwoliłoby Primundus stamp custom URL na link w mailu.
+
+**Wariant B — service_agency-bound default redirect:**
+Mamamia trzyma per-ServiceAgency custom portal URL (kolumna `service_agencies.customer_portal_url`?) i używa go zamiast generic redirect kiedy `Customer.service_agency_id` pasuje. Service Agency Primundus (id=18) byłaby skonfigurowana do kierowania na `portal.primundus.de`.
+
+**Wariant C — exchange via UUID, nie magic link:**
+W schemacie jest `CustomerSetPassword(uuid: String, password: String)` — sugeruje że istnieje UUID identyfikator który możemy z naszego portalu wymienić na User.token bez chodzenia przez email. Czy istnieje analogiczna `CustomerVerifyEmailByUuid(uuid)` lub podobny direct-exchange który bypass-uje email-redirect (gdy mamy już agency-scope auth + customer ownership)?
+
+Bez któregoś z tych — nie da się wyzwolić customer-scope JWT z poziomu Primundus portal, więc invite caregiver pozostaje pod K6 gate.
+
+---
+
+## Q5. Customer / JobOffer deploy na prod — czy agency Primundus będzie replikowana?
 
 Obecnie zarejestrowaliśmy ServiceAgency „Primundus" (id=18, code=ts-18) na **beta** przez SADASH-grade admin token. Nasz Edge Function Supabase loguje się jako `primundus+portal@mamamia.app` → agency JWT.
 

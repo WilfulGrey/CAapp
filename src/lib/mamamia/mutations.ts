@@ -99,3 +99,13 @@ export function useUpdateCustomer() {
     { UpdateCustomer: { id: number; customer_id: string } }
   >('updateCustomer');
 }
+
+// K6 — Triggers Mamamia to email the customer a verify link. After the
+// customer clicks it, the portal calls verifyCustomerEmail which embeds the
+// resulting customer-scope JWT in the session cookie.
+export function useSendCustomerInvitation() {
+  return useMamamiaMutation<
+    Record<string, never>,
+    { SendInvitationCustomer: boolean }
+  >('sendCustomerInvitation');
+}

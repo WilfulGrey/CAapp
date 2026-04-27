@@ -214,6 +214,21 @@ export function onboardHandler(body = { customer_id: TEST_CUSTOMER_ID, job_offer
   });
 }
 
+// K6 — magic-link landing. Portal posts the token from `?verify_token=`,
+// proxy exchanges it for a customer-scope JWT and embeds it in session.
+export function customerVerifyHandler(opts: { ok?: boolean } = {}) {
+  const { ok = true } = opts;
+  return http.post(`${SUPABASE_URL}/functions/v1/customer-verify`, () => {
+    if (!ok) {
+      return HttpResponse.json({ error: 'magic link invalid' }, { status: 401 });
+    }
+    return HttpResponse.json(
+      { verified: true, customer_id: TEST_CUSTOMER_ID },
+      { headers: { 'Set-Cookie': 'session=mock-customer-jwt; HttpOnly; Path=/' } },
+    );
+  });
+}
+
 // ─── Bundle: default handlers for a "happy" integration test ─────────────
 
 export function defaultHandlers(
@@ -222,6 +237,7 @@ export function defaultHandlers(
   return [
     leadHandler(overrides.lead),
     onboardHandler(),
+    customerVerifyHandler(),
     proxyHandler(overrides.proxy),
   ];
 }

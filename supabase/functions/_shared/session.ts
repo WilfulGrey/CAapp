@@ -29,11 +29,19 @@ export async function verifySessionToken(
   if (!jwt || typeof jwt !== "string") return null;
   try {
     const { payload } = await jwtVerify(jwt, secretKey(secret));
-    const { customer_id, job_offer_id, lead_id } = payload as Record<string, unknown>;
+    const { customer_id, job_offer_id, lead_id, email, customer_token } = payload as Record<string, unknown>;
     if (typeof customer_id !== "number" || typeof job_offer_id !== "number" || typeof lead_id !== "string") {
       return null;
     }
-    return { customer_id, job_offer_id, lead_id };
+    // `email` is required since K6 (sendCustomerInvitation needs it). Older
+    // sessions without `email` are treated as expired so the user is
+    // re-onboarded with the new payload shape.
+    if (typeof email !== "string" || email.length === 0) return null;
+    const session: SessionPayload = { customer_id, job_offer_id, lead_id, email };
+    if (typeof customer_token === "string" && customer_token.length > 0) {
+      session.customer_token = customer_token;
+    }
+    return session;
   } catch {
     return null;
   }

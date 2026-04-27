@@ -100,8 +100,13 @@ export async function handleRequest(req: Request, deps: ProxyDeps): Promise<Resp
       },
     );
   } catch (e) {
-    console.error(`proxy[${action}] error:`, (e as Error).message, (e as Error).stack);
-    // Generic — no internals leak to response body
+    const errMsg = (e as Error).message;
+    console.error(`proxy[${action}] error:`, errMsg, (e as Error).stack);
+    // DEBUG_PROXY=1 — leak the underlying message to ease diagnostics on
+    // beta. Remove before going to prod (or guard on a non-prod project ref).
+    if (Deno.env.get("DEBUG_PROXY") === "1") {
+      return jsonError(502, `upstream failed: ${errMsg}`, baseHeaders);
+    }
     return jsonError(502, "upstream failed", baseHeaders);
   }
 }
