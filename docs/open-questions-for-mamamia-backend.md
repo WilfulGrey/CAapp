@@ -61,35 +61,79 @@ Nasze UI patient form ma tylko boolean: `heben: "Ja"/"Nein"`. Jeśli Mamamia lif
 
 ---
 
-## Q4. SendInvitationCustomer redirect → Primundus portal (BLOCKER for K6)
+## Q4. ImpersonateCustomer zwraca `Unauthorized` mimo że spełniamy warunki, które podaliście
 
-**Stan:** zaimplementowaliśmy customer-scope JWT flow. Edge Function `customer-verify` woła `CustomerVerifyEmail(token)`, dostaje `User.token`, embed-uje go jako `customer_token` w naszej HttpOnly session JWT — następne `SendInvitationCaregiver` używa tego customer JWT (zamiast agency, który zwraca Unauthorized). Pełna implementacja gotowa, integration testy zielone, K6 banner UI też.
+**Wasza informacja (2026-04-27):** *„rola musi być SA + CA musi należeć do tego SA, więcej warunków nie ma, poza tym że CA musi istnieć i musi mieć powiązanego usera, na którego można się zalogować"*.
 
-End-to-end live test: `SendInvitationCustomer(customer_id: 7576, email: "m.kepinski@mamamia.app")` zwraca `true`, email się wysyła. Kod w `supabase/functions/customer-verify/`, `supabase/functions/mamamia-proxy/actions.ts:sendCustomerInvitation`.
+**Po naszej stronie wszystko jest spełnione**, ale `ImpersonateCustomer` dalej rzuca `Unauthorized`. Konkretne dane:
 
-**Problem:** w schemacie `SendInvitationCustomer(customer_id, email): Boolean` — **brak parametru `redirect`**. Read-only sweep prod DB pokazuje że `magic_links.redirect` używa relatywnych ścieżek (`/job-offers`, `/caregiver/jobs/...`) — czyli Mamamia kieruje customera po klik magic-link **na swój własny portal** (mamamia.app), nie na nasz Primundus portal.
-
-Bez tego customer nie wraca do naszego portalu z `?verify_token=xxx`, więc nie ma jak exchangować magic-link na customer-scope JWT — użytkownik utknie w Mamamia.app i nigdy nie wróci do flow Primundus.
-
-**Pytanie:** trzy potencjalne podejścia, każdy wymaga backend support — który jest realistyczny:
-
-**Wariant A — `redirect` param na SendInvitationCustomer:**
-```graphql
-SendInvitationCustomer(
-  customer_id: Int,
-  email: String,
-  redirect: String  # NEW — np. "https://portal.primundus.de/?verify_token={TOKEN}"
-): Boolean
+**(1) User wykonujący — `primundus+portal@mamamia.app` (id=8190).** `LoginAgency` na `https://backend.beta.mamamia.app/graphql/auth` zwraca:
+```json
+{
+  "id": 8190,
+  "current_roleable_id": 8134,
+  "roleables": [{
+    "id": 8134,
+    "role_id": 6,
+    "roleable_type": "serviceAgency",
+    "roleable_id": 18,
+    "role": { "id": 6, "name": "admin", "slug": "admin", "morph_name": "caregiverAgency" },
+    "roleable": { "__typename": "ServiceAgency" }
+  }]
+}
 ```
-Dokładnie jak `StoreMagicLink` ma `redirect` (caregiver flow już to ma). Pozwoliłoby Primundus stamp custom URL na link w mailu.
+- `roleable_type=serviceAgency` ✓
+- `roleable.__typename = ServiceAgency` ✓
+- `role.slug = admin` ✓
 
-**Wariant B — service_agency-bound default redirect:**
-Mamamia trzyma per-ServiceAgency custom portal URL (kolumna `service_agencies.customer_portal_url`?) i używa go zamiast generic redirect kiedy `Customer.service_agency_id` pasuje. Service Agency Primundus (id=18) byłaby skonfigurowana do kierowania na `portal.primundus.de`.
+**(2) Customer 7576** (`Customer(id: 7576)`):
+```json
+{
+  "id": 7576,
+  "service_agency_id": 18,
+  "is_user": true,
+  "email": "m.kepinski@mamamia.app",
+  "first_name": "Michał"
+}
+```
+- `service_agency_id == user.current_roleable.id` (18 == 18) ✓
+- `is_user: true` ✓ (User account istnieje)
 
-**Wariant C — exchange via UUID, nie magic link:**
-W schemacie jest `CustomerSetPassword(uuid: String, password: String)` — sugeruje że istnieje UUID identyfikator który możemy z naszego portalu wymienić na User.token bez chodzenia przez email. Czy istnieje analogiczna `CustomerVerifyEmailByUuid(uuid)` lub podobny direct-exchange który bypass-uje email-redirect (gdy mamy już agency-scope auth + customer ownership)?
+**(3) Wywołanie:**
+```bash
+POST https://backend.beta.mamamia.app/graphql/auth
+Authorization: Bearer <agency JWT z LoginAgency, len=54>
+Content-Type: application/json
 
-Bez któregoś z tych — nie da się wyzwolić customer-scope JWT z poziomu Primundus portal, więc invite caregiver pozostaje pod K6 gate.
+{"query":"mutation Imp($cid: Int) { ImpersonateCustomer(customer_id: $cid) { id email token } }",
+ "variables":{"cid":7576}}
+```
+
+**Odpowiedź:**
+```json
+{
+  "errors": [{
+    "message": "Unauthorized",
+    "locations": [{"line": 1, "column": 27}],
+    "path": ["ImpersonateCustomer"],
+    "extensions": {
+      "file": "/var/www/laravel/vendor/rebing/graphql-laravel/src/Support/Field.php",
+      "line": 227
+    }
+  }]
+}
+```
+
+**Pytanie:** czy możecie sprawdzić co dokładnie sprawdza middleware/policy na `ImpersonateCustomer` resolver? Hipotezy które przychodzą do głowy:
+
+- **a)** Może liczy się `role.morph_name` zamiast `roleable_type`. Nasz role 6 ma `morph_name = "caregiverAgency"` — może gating chce `morph_name = "serviceAgency"` (czyli rolę z `roles` table id=8 `admin-sa-test` zamiast 6)? Read-only sweep prod DB pokazuje że role_id=8 ma 0 użytkowników, więc nikt jej nie używa — ale może to ona jest właściwa?
+- **b)** Może wymaga personal_access_token z `name='impersonate'` (tak jak ma Admin MM, user 1, mm@vitanas.pl), a nie standardowego JWT z `name='API Token'` z `LoginAgency`?
+- **c)** Może w `Customer.user_id` jest dodatkowa walidacja (np. user nie może być deleted, email_verified_at musi być nie-null)?
+- **d)** Może wszystkim agency-admin-om mimo wszystko jest to wyłączone i jest hard-coded ABAC tylko dla user.id == 1?
+
+**Co próbujemy osiągnąć:** zero-touch customer-scope JWT podczas onboardingu Primundus, żeby `SendInvitationCaregiver` działał bez czekania aż klient kliknie verify-mail. ImpersonateCustomer to idealny tool do tego (agency to my, ownership na Customer.service_agency_id). Magic-link flow też mamy zaimplementowany jako fallback (Edge Function `customer-verify` exchanguje token na User.token), ale `SendInvitationCustomer` nie ma `redirect` parametru więc magic-link kieruje na mamamia.app, nie na nasz portal — to drugi blocker.
+
+**Stan po naszej stronie:** całe BFF + frontend gotowe, akceptują customer-token z dowolnego źródła (Impersonate albo magic-link). Czeka na wyjaśnienie middleware'u Impersonate.
 
 ---
 
