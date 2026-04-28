@@ -490,29 +490,90 @@ export function extractPlzFromFormularDaten(fd: FormularDaten): string | null {
   return null;
 }
 
-// ─── Customer-level contract & contacts (invoice + main) ────────────────────
-// For a Primundus lead the lead's contact data IS the patient-payer-contact
-// triple — use is_same_as_first_patient on contacts to express that we've
-// merged the roles. Patient form will split them later if needed.
+// ─── Patient identity helpers ──────────────────────────────────────────────
+// Primundus stage-B form (Betreuung beauftragen) collects the PATIENT's
+// own name + salutation in `patient_anrede / patient_vorname /
+// patient_nachname` — distinct from `lead.vorname / nachname / anrede`,
+// which describe the CONTRACT-CONTACT (the person who orders + pays,
+// e.g. an adult child of the patient).
+//
+// These two often differ (Michał Test orders care for Zenon Test) and
+// Mamamia tracks them on separate rows:
+//   - customer_contract  (contact_type='patient_contact')   ← patient
+//   - invoice_contract / customer_contracts[contact_contact] ← orderer
+//
+// When stage-B has not run yet (status='angebot_requested'), both
+// identities collapse to lead.* — falling back keeps the helpers safe
+// for stage-A re-onboards.
+export function resolvePatientFirstName(lead: Lead): string | undefined {
+  return lead.patient_vorname ?? lead.vorname ?? undefined;
+}
+export function resolvePatientLastName(lead: Lead): string | undefined {
+  return lead.patient_nachname ?? lead.nachname ?? undefined;
+}
+export function resolvePatientSalutation(lead: Lead): "Mr." | "Mrs." {
+  return mapSalutation(lead.patient_anrede ?? lead.anrede);
+}
+
+// ─── Customer-level contract & contacts ─────────────────────────────────────
 //
 // `location_id` is required for the panel form's "Lokalizacja opieki"
 // dropdown. We resolve it via Locations(search: PLZ) BEFORE building the
 // contract; if the lead carries no PLZ, we set location_custom_text as
 // the manual-entry fallback (mirrors the panel checkbox "Lokalizacja
 // poza Niemcami / Wprowadź ręcznie").
+//
+// `kind` decides which Primundus identity feeds the row:
+//   - "patient": the actual care recipient (Zenon Test). Goes into
+//     customer.customer_contract (Mamamia contact_type='patient_contact').
+//   - "contact": the contract/billing contact (Michał Test = lead.*). Goes
+//     into customer.invoice_contract (Mamamia contact_type='contract_contact').
+//   - "invoice": legacy alias of "contact" — Mamamia field is invoice_contract.
+//
+// is_same_as_first_patient — true only when contact identity collapses to
+// patient identity (e.g. stage-A leads with no patient_* yet).
 export function buildContractFromLead(
   lead: Lead,
   locationId: number | null = null,
+  kind: "patient" | "contact" = "patient",
 ): CustomerContractInput {
+  const usePatient = kind === "patient";
+  const firstName = usePatient
+    ? resolvePatientFirstName(lead)
+    : lead.vorname ?? undefined;
+  const lastName = usePatient
+    ? resolvePatientLastName(lead)
+    : lead.nachname ?? undefined;
+  const salutation = usePatient
+    ? resolvePatientSalutation(lead)
+    : mapSalutation(lead.anrede);
+
+  // patient identity == contact identity? Then 2nd contract is just a
+  // mirror — flag is_same_as_first_patient so Mamamia panel UI can
+  // collapse the row. Detect by comparing resolved patient names against
+  // lead.* (the contact source).
+  const patientFirst = resolvePatientFirstName(lead);
+  const patientLast = resolvePatientLastName(lead);
+  const sameIdentity =
+    patientFirst === (lead.vorname ?? undefined) &&
+    patientLast === (lead.nachname ?? undefined);
+
   const base: CustomerContractInput = {
-    contact_type: "patient",
-    is_same_as_first_patient: true,
-    salutation: mapSalutation(lead.anrede),
-    first_name: lead.vorname ?? undefined,
-    last_name: lead.nachname ?? undefined,
+    contact_type: usePatient ? "patient" : "invoice",
+    is_same_as_first_patient: usePatient ? true : sameIdentity,
+    salutation,
+    first_name: firstName,
+    last_name: lastName,
     phone: lead.telefon ?? undefined,
     email: lead.email,
   };
+  // Use patient_street fields for both contracts when present — care
+  // location is shared between patient + invoice contact in the
+  // Primundus billing model.
+  if (lead.patient_street) base.street_number = lead.patient_street;
+  if (lead.patient_zip) base.zip_code = lead.patient_zip;
+  if (lead.patient_city) base.city = lead.patient_city;
+
   if (locationId !== null) {
     base.location_id = locationId;
   } else {
@@ -523,10 +584,20 @@ export function buildContractFromLead(
   return base;
 }
 
+// customer_contacts holds the contract-contact identity (the orderer/
+// payer — `lead.*`). When Primundus stage-B has not run, patient and
+// contact share the same identity, so is_same_as_first_patient=true
+// signals to the panel that the row mirrors the patient.
 export function buildContactsFromLead(lead: Lead): CustomerContactInput[] {
+  const patientFirst = resolvePatientFirstName(lead);
+  const patientLast = resolvePatientLastName(lead);
+  const sameIdentity =
+    patientFirst === (lead.vorname ?? undefined) &&
+    patientLast === (lead.nachname ?? undefined);
+
   return [
     {
-      is_same_as_first_patient: true,
+      is_same_as_first_patient: sameIdentity,
       salutation: mapSalutation(lead.anrede),
       first_name: lead.vorname ?? undefined,
       last_name: lead.nachname ?? undefined,
@@ -582,8 +653,13 @@ export function buildCustomerInput(
   const arrivalAt = computeArrivalDate(lead.care_start_timing, nowISO);
 
   return {
-    first_name: lead.vorname,
-    last_name: lead.nachname,
+    // Customer top-level identity = the PATIENT (care recipient).
+    // Mamamia models customer.first_name/last_name as the patient's name
+    // for matching/UI display (76% fill in active prod customers).
+    // For stage-A leads where patient_* haven't been collected yet, the
+    // helper falls back to lead.* (Primundus orderer).
+    first_name: resolvePatientFirstName(lead) ?? null,
+    last_name: resolvePatientLastName(lead) ?? null,
     email: lead.email,
     phone: lead.telefon,
     // Customer-level location — same as contract (resolved by caller via
@@ -625,8 +701,12 @@ export function buildCustomerInput(
     gender: mapGender(fd) ?? "not_important",
     patients: buildPatients(fd, { primaryGender: resolvePatientGender(lead) }),
     customer_caregiver_wish: buildCaregiverWish(fd),
-    customer_contract: buildContractFromLead(lead, locationId),
-    invoice_contract: buildContractFromLead(lead, locationId),
+    // customer_contract = PATIENT identity (Zenon)
+    // invoice_contract = ORDERER/PAYER identity (Michał = lead.*)
+    // customer_contacts = orderer in customer-contacts list (mirrors invoice
+    // role — what the panel UI shows as the contract-contact block).
+    customer_contract: buildContractFromLead(lead, locationId, "patient"),
+    invoice_contract: buildContractFromLead(lead, locationId, "contact"),
     customer_contacts: buildContactsFromLead(lead),
   };
 }

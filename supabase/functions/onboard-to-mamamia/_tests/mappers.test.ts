@@ -21,6 +21,9 @@ import {
   mapOtherPeopleInHouse,
   mapSalutation,
   mapToolIds,
+  resolvePatientFirstName,
+  resolvePatientLastName,
+  resolvePatientSalutation,
 } from "../mappers.ts";
 import type { FormularDaten, Lead } from "../types.ts";
 
@@ -586,6 +589,105 @@ Deno.test("buildContractFromLead: with locationId → uses dropdown id, no custo
   assertEquals(contract.location_custom_text, undefined);
 });
 
+// ─── Patient identity vs contract contact ────────────────────────────────
+//
+// Primundus stage-B form puts the actual care recipient in patient_*
+// fields (e.g. Zenon Test) and keeps the orderer/payer in lead.*
+// (e.g. Michał Test = the person who filled the calculator).
+// Mamamia tracks both as distinct rows; we must not collapse them.
+
+Deno.test("resolvePatientFirstName: prefers patient_vorname (stage-B)", () => {
+  assertEquals(
+    resolvePatientFirstName(makeLead({ patient_vorname: "Zenon" })),
+    "Zenon",
+  );
+});
+
+Deno.test("resolvePatientFirstName: falls back to lead.vorname (stage-A only)", () => {
+  assertEquals(
+    resolvePatientFirstName(makeLead({ patient_vorname: null })),
+    "hildegard",
+  );
+});
+
+Deno.test("resolvePatientSalutation: prefers patient_anrede over lead.anrede", () => {
+  assertEquals(
+    resolvePatientSalutation(makeLead({ patient_anrede: "Herr" })),
+    "Mr.",
+  );
+  // Fallback to lead.anrede when patient_anrede missing.
+  assertEquals(
+    resolvePatientSalutation(makeLead({ patient_anrede: null, anrede: "Frau" })),
+    "Mrs.",
+  );
+});
+
+Deno.test("buildContractFromLead kind='patient' uses patient_* identity", () => {
+  const lead = makeLead({
+    vorname: "Michał",
+    nachname: "Test",
+    anrede: "Herr",
+    patient_anrede: "Herr",
+    patient_vorname: "Zenon",
+    patient_nachname: "Test",
+  });
+  const contract = buildContractFromLead(lead, 1148, "patient");
+  assertEquals(contract.first_name, "Zenon");
+  assertEquals(contract.last_name, "Test");
+  assertEquals(contract.salutation, "Mr.");
+  assertEquals(contract.contact_type, "patient");
+});
+
+Deno.test("buildContractFromLead kind='contact' uses lead.* identity (orderer/payer)", () => {
+  const lead = makeLead({
+    vorname: "Michał",
+    nachname: "Test",
+    anrede: "Herr",
+    patient_anrede: "Herr",
+    patient_vorname: "Zenon",
+    patient_nachname: "Test",
+  });
+  const contract = buildContractFromLead(lead, 1148, "contact");
+  assertEquals(contract.first_name, "Michał");
+  assertEquals(contract.last_name, "Test");
+  assertEquals(contract.contact_type, "invoice");
+  // Patient ≠ contact identity → not mirrored
+  assertEquals(contract.is_same_as_first_patient, false);
+});
+
+Deno.test("buildContractFromLead patient address fields propagate from patient_*", () => {
+  const lead = makeLead({
+    patient_street: "Hans Kloss Strasse",
+    patient_zip: "10176",
+    patient_city: "Berlin",
+  });
+  const contract = buildContractFromLead(lead, 1148, "patient");
+  assertEquals(contract.street_number, "Hans Kloss Strasse");
+  assertEquals(contract.zip_code, "10176");
+  assertEquals(contract.city, "Berlin");
+});
+
+Deno.test("buildContactsFromLead: patient ≠ contact → is_same_as_first_patient=false", () => {
+  const lead = makeLead({
+    vorname: "Michał",
+    nachname: "Test",
+    patient_vorname: "Zenon",
+    patient_nachname: "Test",
+  });
+  const contacts = buildContactsFromLead(lead);
+  assertEquals(contacts[0].first_name, "Michał");
+  assertEquals(contacts[0].is_same_as_first_patient, false);
+});
+
+Deno.test("buildContactsFromLead: stage-A only (patient missing) → is_same_as_first_patient=true", () => {
+  const lead = makeLead({
+    patient_vorname: null,
+    patient_nachname: null,
+  });
+  const contacts = buildContactsFromLead(lead);
+  assertEquals(contacts[0].is_same_as_first_patient, true);
+});
+
 Deno.test("buildContactsFromLead: returns single contact mirroring lead", () => {
   const lead = makeLead({ anrede: "Herr", vorname: "klaus" });
   const contacts = buildContactsFromLead(lead);
@@ -621,7 +723,8 @@ Deno.test("buildCustomerInput: every must-fill field is set for active-state cus
   const lead = makeLead();
   const input = buildCustomerInput(lead);
 
-  // Identity
+  // Identity — when stage-B hasn't run, the patient identity falls
+  // back to lead.* so first_name == lead.vorname.
   assertEquals(input.first_name, "hildegard");
   assertEquals(input.email, "frau@example.de");
   assertEquals(input.phone, "+49 89 1234567");
@@ -686,6 +789,39 @@ Deno.test("buildCustomerInput: weitere_personen=ja propagates only to other_peop
   // Single patient — weitere_personen is "others IN house", not "2 patients
   // under care". Couple-under-care needs betreuung_fuer='ehepaar'.
   assertEquals(input.patients.length, 1);
+});
+
+Deno.test("buildCustomerInput: stage-B lead → top-level uses patient_*, contracts split correctly", () => {
+  const lead = makeLead({
+    vorname: "Michał",
+    nachname: "Test",
+    anrede: "Herr",
+    patient_anrede: "Herr",
+    patient_vorname: "Zenon",
+    patient_nachname: "Test",
+    patient_street: "Hans Kloss Strasse",
+    patient_zip: "10115",
+    patient_city: "Berlin",
+  });
+  const input = buildCustomerInput(lead, 1148);
+
+  // Customer top-level identity = patient (Zenon)
+  assertEquals(input.first_name, "Zenon");
+  assertEquals(input.last_name, "Test");
+
+  // customer_contract = patient (Zenon) — contact_type 'patient'
+  assertEquals(input.customer_contract?.first_name, "Zenon");
+  assertEquals(input.customer_contract?.contact_type, "patient");
+  assertEquals(input.customer_contract?.zip_code, "10115");
+
+  // invoice_contract = orderer/payer (Michał) — contact_type 'invoice'
+  assertEquals(input.invoice_contract?.first_name, "Michał");
+  assertEquals(input.invoice_contract?.contact_type, "invoice");
+  assertEquals(input.invoice_contract?.is_same_as_first_patient, false);
+
+  // customer_contacts mirrors invoice (orderer)
+  assertEquals(input.customer_contacts?.[0].first_name, "Michał");
+  assertEquals(input.customer_contacts?.[0].is_same_as_first_patient, false);
 });
 
 Deno.test("buildCustomerInput: betreuung_fuer='ehepaar' yields 2 patients (couple-under-care)", () => {
