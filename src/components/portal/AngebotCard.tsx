@@ -102,6 +102,11 @@ export const AngebotCard: FC<{
 
   const inputCls = 'w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm text-gray-800 placeholder-gray-300 focus:outline-none focus:border-[#9B1FA1] focus:ring-2 focus:ring-[#9B1FA1]/10 transition-all bg-white';
   const labelCls = 'block text-sm font-medium text-gray-500 mb-1.5';
+  // 2-column grid rows: align label boxes so a wrapped label (e.g.
+  // "Heben erforderlich? *" vs single-line "Demenz *") doesn't shift its
+  // select down relative to the neighbour. Apply via grid items-end on
+  // the row and flex flex-col on each cell.
+  const gridRow2 = 'grid grid-cols-2 gap-2 items-end';
 
   const downloadPdf = async () => {
     // Pre-load logo as base64 so html2canvas doesn't miss it
@@ -581,7 +586,7 @@ export const AngebotCard: FC<{
                       {zwei && (
                         <p className="text-xs font-bold text-gray-400 uppercase tracking-wider pt-1">Person 1</p>
                       )}
-                      <div className="grid grid-cols-2 gap-2">
+                      <div className={gridRow2}>
                         <div>
                           <label className={labelCls}>Geschlecht <span className="text-red-400">*</span></label>
                           <CustomSelect value={patient.geschlecht} onChange={v => setPatient(p=>({...p,geschlecht:v}))}
@@ -598,7 +603,7 @@ export const AngebotCard: FC<{
                         <CustomSelect value={patient.pflegegrad} onChange={v => setPatient(p=>({...p,pflegegrad:v}))}
                           options={['Kein/e','Pflegegrad 1','Pflegegrad 2','Pflegegrad 3','Pflegegrad 4','Pflegegrad 5']} />
                       </div>
-                      <div className="grid grid-cols-2 gap-2">
+                      <div className={gridRow2}>
                         <div>
                           <label className={labelCls}>Gewicht <span className="font-normal text-gray-400">(optional)</span></label>
                           <CustomSelect value={patient.gewicht} onChange={v => setPatient(p=>({...p,gewicht:v}))}
@@ -618,7 +623,7 @@ export const AngebotCard: FC<{
                     <>
                       <div className="border-t border-gray-100 pt-3">
                         <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-3">Person 2</p>
-                        <div className="grid grid-cols-2 gap-2">
+                        <div className={gridRow2}>
                           <div>
                             <label className={labelCls}>Geschlecht <span className="text-red-400">*</span></label>
                             <CustomSelect value={patient.p2_geschlecht} onChange={v => setPatient(p=>({...p,p2_geschlecht:v}))}
@@ -674,7 +679,7 @@ export const AngebotCard: FC<{
                     )}
                     <div className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm text-gray-700 bg-gray-50 cursor-not-allowed">{patient.mobilitaet}</div>
                   </div>
-                  <div className="grid grid-cols-2 gap-2">
+                  <div className={gridRow2}>
                     <div>
                       <label className={labelCls}>Heben erforderlich? <span className="text-red-400">*</span></label>
                       <CustomSelect value={patient.heben} onChange={v => setPatient(p=>({...p,heben:v}))}
@@ -686,7 +691,7 @@ export const AngebotCard: FC<{
                         options={['Nein','Leichtgradig','Mittelgradig','Schwer']} />
                     </div>
                   </div>
-                  <div className="grid grid-cols-2 gap-2">
+                  <div className={gridRow2}>
                     <div>
                       <label className={labelCls}>Inkontinenz <span className="text-red-400">*</span></label>
                       <CustomSelect value={patient.inkontinenz} onChange={v => setPatient(p=>({...p,inkontinenz:v}))}
@@ -719,7 +724,7 @@ export const AngebotCard: FC<{
                           <CustomSelect value={patient.p2_mobilitaet} onChange={v => setPatient(p=>({...p,p2_mobilitaet:v}))}
                             options={['Vollständig mobil','Am Gehstock','Rollatorfähig','Rollstuhlfähig','Bettlägerig']} />
                         </div>
-                        <div className="grid grid-cols-2 gap-2">
+                        <div className={gridRow2}>
                           <div>
                             <label className={labelCls}>Heben erforderlich? <span className="text-red-400">*</span></label>
                             <CustomSelect value={patient.p2_heben} onChange={v => setPatient(p=>({...p,p2_heben:v}))}
@@ -731,7 +736,7 @@ export const AngebotCard: FC<{
                               options={['Nein','Leichtgradig','Mittelgradig','Schwer']} />
                           </div>
                         </div>
-                        <div className="grid grid-cols-2 gap-2">
+                        <div className={gridRow2}>
                           <div>
                             <label className={labelCls}>Inkontinenz <span className="text-red-400">*</span></label>
                             <CustomSelect value={patient.p2_inkontinenz} onChange={v => setPatient(p=>({...p,p2_inkontinenz:v}))}
@@ -789,7 +794,7 @@ export const AngebotCard: FC<{
                     <CustomSelect value={patient.familieNahe} onChange={v => setPatient(p=>({...p,familieNahe:v}))}
                       options={['Ja','Nein']} />
                   </div>
-                  <div className="grid grid-cols-2 gap-2">
+                  <div className={gridRow2}>
                     <div>
                       <label className={labelCls}>Urbanisation <span className="text-red-400">*</span></label>
                       <CustomSelect value={patient.urbanisierung} onChange={v => setPatient(p=>({...p,urbanisierung:v}))}
@@ -801,7 +806,7 @@ export const AngebotCard: FC<{
                         options={['Einfamilienhaus','Wohnung in Mehrfamilienhaus','Andere']} />
                     </div>
                   </div>
-                  <div className="grid grid-cols-2 gap-2">
+                  <div className={gridRow2}>
                     <div>
                       <label className={labelCls}>Unterbringung der PK</label>
                       <CustomSelect value={patient.unterbringung} onChange={v => setPatient(p=>({...p,unterbringung:v}))}
@@ -836,7 +841,7 @@ export const AngebotCard: FC<{
                   </div>
 
                   {/* Preisrelevante Felder – read-only */}
-                  <div className="grid grid-cols-2 gap-2">
+                  <div className={gridRow2}>
                     <div>
                       <label className="block text-sm font-semibold text-gray-600 mb-1.5 flex items-center gap-1.5">
                         Sprachniveau
