@@ -137,7 +137,7 @@ Content-Type: application/json
 
 ---
 
-## Q5. SendInvitationCaregiver — konkretna policy
+## Q5. SendInvitationCaregiver — konkretna policy (UPDATE — wszystkie warunki spełnione, dalej Unauthorized)
 
 `canImpersonateCustomer` zaimplementowaliście, panel-style flow przeszedł u nas live (csrf-cookie → LoginAgency → ImpersonateCustomer → User.id zwrócony, sesja w customer-mode). Wpięte w nasz Edge Function `mamamia-proxy` przez nowy `mamamiaPanelClient` helper.
 
@@ -189,6 +189,67 @@ Hipotezy — który warunek nas blokuje:
 - e) `customer_contacts` musi mieć ≥1 wpis (brak osobnej mutacji `StoreCustomerContact` w schemacie)?
 
 Konkretnie najbardziej zaintrygowała mnie (d): `StoreCustomerContract` zwraca zawsze `contact_type=patient_contact`, a w schemacie jest też `invoice_contract` (`Customer.invoice_contract: CustomerContract`) i `customer_contacts: [CustomerContact]`. Jak agency-side stworzyć te dwa pozostałe?
+
+---
+
+### UPDATE 2026-04-28 — uzupełniliśmy customer 7577 do stanu `status="active"`. Dalej `Unauthorized`.
+
+Po analizie 200 losowych aktywnych customerów w prod (`SELECT … WHERE status='active' ORDER BY RAND()`) wybraliśmy fill-rate 100% pola jako wymagane i wypełniliśmy je dla 7577:
+
+```sql
+-- 100% fill-rate w prod (must-have):
+service_agency_id, location_id, urbanization_id, arrival_at, care_budget,
+other_people_in_house, has_family_near_by, accommodation, caregiver_accommodated,
+visibility, pets
+
+-- 99% (job_description), 90+% (internet, day_care_facility, caregiver_time_off, last_name)
+```
+
+Dodatkowe `UpdateCustomerOnboarding(step_finished: 3)` **(jako impersonowany customer)** flippuje `customer.status` z `draft` na **`active`**. Confirmed live. Pełny stan customer 7577 teraz:
+
+```json
+{
+  "id": 7577, "status": "active", "is_user": true,
+  "can_request_caregiver": true,
+  "service_agency_id": 18, "location_id": 14380, "urbanization_id": 1,
+  "accommodation": "single_family_house", "caregiver_accommodated": "room_premises",
+  "internet": "yes", "smoking_household": "no", "has_family_near_by": "yes",
+  "other_people_in_house": "no", "pets": "no_information",
+  "job_description": "…",
+  "customer_contract": { "id": 5717, "contact_type": "patient_contact" },
+  "customer_caregiver_wish": {
+    "gender": "female", "germany_skill": "level_3",
+    "smoking": "no", "driving_license": "not_important"
+  },
+  "customer_contacts": [{ "id": 1216 }],
+  "current_job_offer": {
+    "id": 16233, "status": "search",
+    "visibility": "public_limited",   // flipped via UpdateJobOffer
+    "arrival_at": "2026-06-15"
+  },
+  "patients": [{
+    "id": 12828, "gender": "male", "year_of_birth": 1945,
+    "care_level": 3, "mobility_id": 3, "weight": "70-90 kg",
+    "night_operations": "1_2_times", "night_operations_description": "…",
+    "dementia": "yes", "dementia_description": "…",
+    "incontinence": true, "incontinence_urine": true
+  }]
+}
+```
+
+Caregiver 10061 jest w `JobOfferMatchingsWithPagination(16233)` z `is_show=true` (3-cie miejsce z 130 matchings).
+
+**Mimo wszystkiego — `SendInvitationCaregiver(caregiver_id: 10061)` jako impersonowany customer dalej rzuca `Unauthorized` na `Field.php:227`.**
+
+Jedyna hipoteza która pozostaje:
+
+**(f) — gating odróżnia "real customer login" od "agency-impersonate session".** Mamamia wykrywa że auth.user.impersonate_user_id != null (impersonowani przez agency) i blokuje sensitive actions takie jak SendInvitationCaregiver, akceptuje tylko gdy customer zalogował się sam (przez `Login(email,password)` lub `CustomerVerifyEmail` magic-link).
+
+Jeśli to (f), to `canImpersonateCustomer` którą pokazałeś jest dla "agent może zalogować się jako klient żeby zobaczyć co widzi", ale write-actions od strony klienta nie przechodzą. To byłby projektowany feature.
+
+Czy możecie wprost potwierdzić: **czy SA-admin po `ImpersonateCustomer` ma uprawnienia do `SendInvitationCaregiver` w imieniu klienta, czy tylko do read-only debug-mode?**
+
+Jeśli tylko read-only — flow Primundus musi przejść przez `CustomerVerifyEmail` magic-link (klient sam loguje się przez mail), a wtedy wracamy do Q4 wariant A — potrzebujemy `redirect: String` parametru na `SendInvitationCustomer` żeby magic-link prowadził do `portal.primundus.de`, nie `mamamia.app`.
 
 ---
 
