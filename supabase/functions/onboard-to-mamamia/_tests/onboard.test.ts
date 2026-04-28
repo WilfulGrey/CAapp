@@ -187,9 +187,10 @@ Deno.test("onboardLead: StoreCustomer payload carries every must-fill field", as
   assertEquals(v.equipment_ids, [1, 2]);
   assertEquals(v.day_care_facility, "no");
 
-  // Care budget mirrored
+  // Care budget mirrored + commission default
   assertEquals(v.care_budget, 3200);
   assertEquals(v.monthly_salary, 3200);
+  assertEquals(v.commission_agent_salary, 300);
 
   // Job description i18n — non-empty in all 4 locales
   for (const k of ["job_description", "job_description_de", "job_description_en", "job_description_pl"]) {
@@ -226,6 +227,12 @@ Deno.test("onboardLead: StoreCustomer payload carries every must-fill field", as
   assertEquals(patients[0].tool_ids, [3]);       // wheelchair only — Others triggers required free-text
   assertEquals(patients[0].weight, "61-70");
   assertEquals(patients[0].height, "161-170");
+
+  // StoreJobOffer (third request — after LoginAgency + StoreCustomer) must
+  // also carry commission + visibility (panel rejects 0/missing).
+  const sjoReq = mm.requests[2];
+  assertEquals(sjoReq.variables.salary_commission, 300);
+  assertEquals(sjoReq.variables.visibility, "public");
 });
 
 Deno.test("onboardLead: cache hit — returns cached IDs without Mamamia calls", async () => {

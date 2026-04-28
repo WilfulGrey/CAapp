@@ -195,6 +195,9 @@ export interface CustomerInput {
   // Care budget — both fields are kept in sync per prod (100% fill)
   care_budget?: number | null;
   monthly_salary?: number | null;
+  // Agent commission — panel form rejects 0. 365 is the prod-most-common
+  // value for low-bracket customers; we set 300 as the Primundus default.
+  commission_agent_salary?: number;
   // Visibility / publication state
   visibility?: "public" | "public_limited" | "hide";
   // Living conditions (3-5 enum values — prod-most-common as defaults)

@@ -476,6 +476,10 @@ export function buildCustomerInput(
     day_care_facility: "no",
     care_budget: careBudget,
     monthly_salary: careBudget,
+    // Primundus default commission. Prod active distribution: 365 (3120),
+    // 780 (1890), 790 (1140), 730 (507), 0 (15). Panel form rejects 0,
+    // so set 300 as the Primundus baseline (per K7 product decision).
+    commission_agent_salary: 300,
     visibility: "public",
     accommodation: "single_family_house",
     caregiver_accommodated: "room_premises",

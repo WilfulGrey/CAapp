@@ -523,6 +523,8 @@ Deno.test("buildCustomerInput: every must-fill field is set for active-state cus
   // Care budget = bruttopreis (mirrored to monthly_salary)
   assertEquals(input.care_budget, 3200);
   assertEquals(input.monthly_salary, 3200);
+  // Primundus default commission — panel rejects 0
+  assertEquals(input.commission_agent_salary, 300);
 
   // Job description set in all 4 locales
   if (!input.job_description || input.job_description.length === 0) {

@@ -51,7 +51,7 @@ const STORE_CUSTOMER = /* GraphQL */ `
     $first_name: String, $last_name: String, $email: String, $phone: String,
     $location_id: Int, $urbanization_id: Int, $language_id: Int,
     $equipment_ids: [Int], $day_care_facility: String,
-    $care_budget: Float, $monthly_salary: Float,
+    $care_budget: Float, $monthly_salary: Float, $commission_agent_salary: Float,
     $visibility: String,
     $accommodation: String, $caregiver_accommodated: String,
     $has_family_near_by: String, $internet: String, $pets: String,
@@ -71,6 +71,7 @@ const STORE_CUSTOMER = /* GraphQL */ `
       location_id: $location_id, urbanization_id: $urbanization_id, language_id: $language_id,
       equipment_ids: $equipment_ids, day_care_facility: $day_care_facility,
       care_budget: $care_budget, monthly_salary: $monthly_salary,
+      commission_agent_salary: $commission_agent_salary,
       visibility: $visibility,
       accommodation: $accommodation, caregiver_accommodated: $caregiver_accommodated,
       has_family_near_by: $has_family_near_by, internet: $internet, pets: $pets,
@@ -126,12 +127,16 @@ const STORE_JOB_OFFER = /* GraphQL */ `
   mutation StoreJobOffer(
     $customer_id: Int, $service_agency_id: Int,
     $title: String, $description: String,
-    $salary_offered: Float, $arrival_at: String
+    $salary_offered: Float, $salary_commission: Float,
+    $visibility: String,
+    $arrival_at: String
   ) {
     StoreJobOffer(
       customer_id: $customer_id, service_agency_id: $service_agency_id,
       title: $title, description: $description,
-      salary_offered: $salary_offered, arrival_at: $arrival_at
+      salary_offered: $salary_offered, salary_commission: $salary_commission,
+      visibility: $visibility,
+      arrival_at: $arrival_at
     ) { id job_offer_id title status }
   }
 `;
@@ -217,6 +222,8 @@ export async function onboardLead(opts: OnboardOptions): Promise<OnboardResult &
       title,
       description: "Auto-created from Primundus kostenrechner",
       salary_offered: careBudget,
+      salary_commission: 300,   // Primundus default commission, panel rejects 0
+      visibility: "public",
       arrival_at: arrivalAt,
     },
     fetchFn,
