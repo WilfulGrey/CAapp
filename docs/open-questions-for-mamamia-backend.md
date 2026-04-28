@@ -161,7 +161,12 @@ Co zmieniliśmy w naszym kodzie:
 Pozostałe pytania (per Q5 archeology) — nadal otwarte ale o niższym priorytecie:
 - `customer.is_user=true` — co dokładnie flippuje (poza CustomerSetPassword)? nie jest gating
   dla StoreRequest, więc czysto info.
-- JobOffer.visibility — wysyłamy "public", DB pokazuje "hide". Pewnie HP-side gate.
+- ~~JobOffer.visibility — wysyłamy "public", DB pokazuje "hide".~~ **RESOLVED 2026-04-28:**
+  Mamamia coerce'uje JobOffer.visibility na 'hide' gdy customer.status='draft' niezależnie
+  od tego co StoreJobOffer dostaje w argumentach. Verified beta: 4 customers, jedyny 'hide'
+  to ten utworzony przed naszym Customer.arrival_at fix (175468f) — cała reszta z
+  status='active' ma visibility='public' zgodnie z payloadem. Side-effect customer.status,
+  nic do naprawiania po naszej stronie.
 
 ---
 
