@@ -1,5 +1,5 @@
 import { mamamiaRequest } from "../_shared/mamamiaClient.ts";
-import { loginAndImpersonate, panelMutateAsCustomer } from "../_shared/mamamiaPanelClient.ts";
+import { loginAsAgency, panelMutateAsCustomer } from "../_shared/mamamiaPanelClient.ts";
 import type { ActionDeps, ActionHandler, ProxyAction, SessionPayload } from "./types.ts";
 import {
   GET_CAREGIVER,
@@ -9,8 +9,8 @@ import {
   LIST_MATCHINGS,
   REJECT_APPLICATION,
   SEARCH_LOCATIONS,
-  SEND_INVITATION_CAREGIVER,
   STORE_CONFIRMATION,
+  STORE_REQUEST,
   UPDATE_CUSTOMER,
 } from "./operations.ts";
 
@@ -214,31 +214,44 @@ const storeConfirmation: ActionHandler = async (session, variables, deps) => {
 };
 
 // ─── Invite caregiver ──────────────────────────────────────────────────────
-// Primary: SendInvitationCaregiver (caregiver_id only; context from session).
-
+// Mutation: StoreRequest(caregiver_id, job_offer_id, message).
+//
+// This is the mutation Mamamia's own panel UI fires when an agency admin
+// clicks "wyślij zaproszenie" on a customer's matching list. Verified live
+// on beta 2026-04-28 by inspecting DevTools network log on a real panel
+// session — operationName="StoreRequest", returns Request{id, ...}.
+//
+// Auth model: panel /backend/graphql + agency-only session cookie. NO
+// ImpersonateCustomer needed despite earlier hypothesis — Mamamia's
+// panel-side policy accepts a service-agency admin owning the customer
+// directly, provided customer.status='active' (which our onboard payload
+// achieves by setting Customer.arrival_at — see onboard-to-mamamia/mappers.ts).
+//
+// Why not SendInvitationCaregiver: that mutation is customer-side
+// (auth.user must be the customer), used by Mamamia's customer portal.
+// It is unrelated to the agency-side invite flow we need.
 const inviteCaregiver: ActionHandler = async (session, variables, deps) => {
   const id = (variables as { caregiver_id?: unknown }).caregiver_id;
   if (typeof id !== "number") throw new Error("caregiver_id required");
-  // Mamamia gates SendInvitationCaregiver behind a session that has been
-  // flipped to customer-mode via ImpersonateCustomer (verified live on beta
-  // 2026-04-27 — public /graphql/auth refuses our agency Bearer token, but
-  // the panel /backend/graphql + cookie session works for service-agency
-  // admins owning the customer).
+  const message = (variables as { message?: unknown }).message;
   if (!deps.panelBaseUrl || !deps.agencyEmail || !deps.agencyPassword) {
     throw new Error("panel auth not configured");
   }
-  const panelSession = await loginAndImpersonate(
+  const panelSession = await loginAsAgency(
     { baseUrl: deps.panelBaseUrl, fetchFn: deps.fetchFn },
     deps.agencyEmail,
     deps.agencyPassword,
-    session.customer_id,
   );
   return await panelMutateAsCustomer(
     { baseUrl: deps.panelBaseUrl, fetchFn: deps.fetchFn },
     panelSession,
-    SEND_INVITATION_CAREGIVER,
-    { caregiver_id: id },
-    "SendInvitationCaregiver",
+    STORE_REQUEST,
+    {
+      caregiver_id: id,
+      job_offer_id: session.job_offer_id,
+      message: typeof message === "string" ? message : null,
+    },
+    "StoreRequest",
   );
 };
 

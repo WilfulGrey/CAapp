@@ -3,10 +3,9 @@
 
 import { assertEquals, assertRejects, assertStringIncludes } from "@std/assert";
 import {
-  loginAndImpersonate,
+  loginAsAgency,
   panelMutateAsCustomer,
   __testing,
-  type PanelClientOptions,
 } from "../../_shared/mamamiaPanelClient.ts";
 
 const BASE = "https://beta.example/backend";
@@ -74,9 +73,9 @@ Deno.test("decodeXsrf: URL-decodes the XSRF-TOKEN cookie", () => {
   assertEquals(__testing.decodeXsrf(jar), "abc==");
 });
 
-// ─── loginAndImpersonate ──────────────────────────────────────────────────
+// ─── loginAsAgency ────────────────────────────────────────────────────────
 
-Deno.test("loginAndImpersonate: full flow — csrf-cookie → LoginAgency → ImpersonateCustomer", async () => {
+Deno.test("loginAsAgency: csrf-cookie → LoginAgency, returns logged-in panel session", async () => {
   const { fetchFn, calls } = recordingFetch([
     // 1. csrf-cookie response
     {
@@ -86,7 +85,7 @@ Deno.test("loginAndImpersonate: full flow — csrf-cookie → LoginAgency → Im
         "mamamia_beta_session=sess-1; httponly; path=/",
       ],
     },
-    // 2. LoginAgency response — Laravel rotates session
+    // 2. LoginAgency response — Laravel rotates session+xsrf
     {
       status: 200,
       bodyJson: { data: { LoginAgency: { id: 8190, email: "primundus+portal@mamamia.app" } } },
@@ -95,67 +94,50 @@ Deno.test("loginAndImpersonate: full flow — csrf-cookie → LoginAgency → Im
         "mamamia_beta_session=sess-2-logged-in; httponly; path=/",
       ],
     },
-    // 3. ImpersonateCustomer response — flips to customer-mode
-    {
-      status: 200,
-      bodyJson: { data: { ImpersonateCustomer: { id: 8204, email: "m.kepinski@mamamia.app" } } },
-      setCookies: [
-        "XSRF-TOKEN=token-3%3D%3D; path=/",
-        "mamamia_beta_session=sess-3-as-customer; httponly; path=/",
-      ],
-    },
   ]);
 
-  const session = await loginAndImpersonate(
+  const session = await loginAsAgency(
     { baseUrl: BASE, fetchFn },
     "primundus+portal@mamamia.app",
     "secret-pass",
-    7576,
   );
 
-  // Final jar should reflect impersonate-state cookies (3rd response).
-  assertStringIncludes(session.cookies, "mamamia_beta_session=sess-3-as-customer");
-  assertEquals(session.xsrf, "token-3==");
+  // Final jar should reflect logged-in cookies (2nd response).
+  assertStringIncludes(session.cookies, "mamamia_beta_session=sess-2-logged-in");
+  assertEquals(session.xsrf, "token-2==");
 
-  // 3 sequential calls
-  assertEquals(calls.length, 3);
+  // 2 sequential calls — no ImpersonateCustomer (StoreRequest works under
+  // agency-only session when customer.status='active').
+  assertEquals(calls.length, 2);
   assertEquals(calls[0].url, `${BASE}/sanctum/csrf-cookie`);
   assertEquals(calls[1].url, `${BASE}/graphql/auth`);
-  assertEquals(calls[2].url, `${BASE}/graphql/auth`);
 
-  // LoginAgency request should carry XSRF from csrf-cookie + jar cookies.
+  // LoginAgency request carries XSRF from csrf-cookie + jar cookies.
   assertEquals(calls[1].headers["X-XSRF-TOKEN"], "token-1==");
   assertStringIncludes(calls[1].headers["Cookie"] ?? "", "mamamia_beta_session=sess-1");
   const loginBody = JSON.parse(calls[1].body!);
   assertEquals(loginBody.operationName, "LoginAgency");
   assertEquals(loginBody.variables.email, "primundus+portal@mamamia.app");
-
-  // Impersonate request should carry the rotated XSRF + logged-in session.
-  assertEquals(calls[2].headers["X-XSRF-TOKEN"], "token-2==");
-  assertStringIncludes(calls[2].headers["Cookie"] ?? "", "mamamia_beta_session=sess-2-logged-in");
-  const impBody = JSON.parse(calls[2].body!);
-  assertEquals(impBody.operationName, "ImpersonateCustomer");
-  assertEquals(impBody.variables.customer_id, 7576);
 });
 
-Deno.test("loginAndImpersonate: propagates GraphQL errors", async () => {
+Deno.test("loginAsAgency: propagates GraphQL errors", async () => {
   const { fetchFn } = recordingFetch([
     { status: 204, setCookies: ["XSRF-TOKEN=t1; path=/"] },
     { status: 200, bodyJson: { errors: [{ message: "Niepoprawne dane logowania." }] } },
   ]);
   await assertRejects(
-    () => loginAndImpersonate({ baseUrl: BASE, fetchFn }, "x", "wrong-pass", 1),
+    () => loginAsAgency({ baseUrl: BASE, fetchFn }, "x", "wrong-pass"),
     Error,
     "Niepoprawne dane logowania",
   );
 });
 
-Deno.test("loginAndImpersonate: csrf-cookie HTTP failure aborts", async () => {
+Deno.test("loginAsAgency: csrf-cookie HTTP failure aborts", async () => {
   const { fetchFn } = recordingFetch([
     { status: 503 },
   ]);
   await assertRejects(
-    () => loginAndImpersonate({ baseUrl: BASE, fetchFn }, "x", "y", 1),
+    () => loginAsAgency({ baseUrl: BASE, fetchFn }, "x", "y"),
     Error,
     "csrf-cookie failed: HTTP 503",
   );
@@ -167,27 +149,27 @@ Deno.test("panelMutateAsCustomer: posts to /graphql with cookie + xsrf header", 
   const { fetchFn, calls } = recordingFetch([
     {
       status: 200,
-      bodyJson: { data: { SendInvitationCaregiver: true } },
+      bodyJson: { data: { StoreRequest: { id: 893, caregiver_id: 10061 } } },
     },
   ]);
-  const result = await panelMutateAsCustomer<{ SendInvitationCaregiver: boolean }>(
+  const result = await panelMutateAsCustomer<{ StoreRequest: { id: number; caregiver_id: number } }>(
     { baseUrl: BASE, fetchFn },
     {
-      cookies: "XSRF-TOKEN=%24abc; mamamia_beta_session=sess-as-customer",
+      cookies: "XSRF-TOKEN=%24abc; mamamia_beta_session=sess-agency",
       xsrf: "$abc",
     },
-    "mutation Inv($id: Int) { SendInvitationCaregiver(caregiver_id: $id) }",
-    { id: 10061 },
-    "SendInvitationCaregiver",
+    "mutation StoreRequest($caregiver_id: Int, $job_offer_id: Int) { StoreRequest(caregiver_id: $caregiver_id, job_offer_id: $job_offer_id) { id caregiver_id } }",
+    { caregiver_id: 10061, job_offer_id: 16235 },
+    "StoreRequest",
   );
-  assertEquals(result.SendInvitationCaregiver, true);
+  assertEquals(result.StoreRequest.id, 893);
 
   assertEquals(calls[0].url, `${BASE}/graphql`);
   assertEquals(calls[0].headers["X-XSRF-TOKEN"], "$abc");
-  assertStringIncludes(calls[0].headers["Cookie"] ?? "", "mamamia_beta_session=sess-as-customer");
+  assertStringIncludes(calls[0].headers["Cookie"] ?? "", "mamamia_beta_session=sess-agency");
   const body = JSON.parse(calls[0].body!);
-  assertEquals(body.operationName, "SendInvitationCaregiver");
-  assertEquals(body.variables.id, 10061);
+  assertEquals(body.operationName, "StoreRequest");
+  assertEquals(body.variables.caregiver_id, 10061);
 });
 
 Deno.test("panelMutateAsCustomer: throws on backend error message", async () => {

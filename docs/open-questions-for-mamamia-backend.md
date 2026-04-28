@@ -137,7 +137,37 @@ Content-Type: application/json
 
 ---
 
-## Q5. SendInvitationCaregiver — konkretna policy (UPDATE — wszystkie warunki spełnione, dalej Unauthorized)
+## Q5. SendInvitationCaregiver — RESOLVED 2026-04-28
+
+**TL;DR:** Polowaliśmy na złe drzewo. `SendInvitationCaregiver` to mutacja **customer-side**
+(auth.user musi być customerem) — nieużywana w naszym agency-side flow. Mutacja, którą
+panel UI Mamamii faktycznie wywołuje przy kliknięciu „wyślij zaproszenie" to
+**`StoreRequest(caregiver_id, job_offer_id, message)`** na `/backend/graphql` pod
+**agency-only session** (LoginAgency, BEZ ImpersonateCustomer).
+
+Kluczem nie jest impersonate ani `is_user=true`. Wystarczy `customer.status='active'`,
+co osiągamy ustawiając `Customer.arrival_at` w StoreCustomer (Mamamia auto-flippuje status
+gdy spełniony cały if-block w controllerze). Verified live na becie 2026-04-28: customer 7585
+status=active po samym StoreCustomer, StoreRequest pod agency-only panel zwraca Request.id=893.
+
+Co zmieniliśmy w naszym kodzie:
+- `inviteCaregiver` (mamamia-proxy/actions.ts) używa StoreRequest pod `loginAsAgency`,
+  bez ImpersonateCustomer.
+- `loginAndImpersonate` + `IMPERSONATE_CUSTOMER` + `SEND_INVITATION_CAREGIVER` usunięte
+  jako dead code.
+- Customer.arrival_at dodany do StoreCustomer payload (`onboard-to-mamamia/mappers.ts`)
+  tak żeby customer od razu lądował z status=active.
+
+Pozostałe pytania (per Q5 archeology) — nadal otwarte ale o niższym priorytecie:
+- `customer.is_user=true` — co dokładnie flippuje (poza CustomerSetPassword)? nie jest gating
+  dla StoreRequest, więc czysto info.
+- JobOffer.visibility — wysyłamy "public", DB pokazuje "hide". Pewnie HP-side gate.
+
+---
+
+## Q5. (HISTORICAL — kept for context only)
+
+SendInvitationCaregiver — konkretna policy (UPDATE — wszystkie warunki spełnione, dalej Unauthorized)
 
 `canImpersonateCustomer` zaimplementowaliście, panel-style flow przeszedł u nas live (csrf-cookie → LoginAgency → ImpersonateCustomer → User.id zwrócony, sesja w customer-mode). Wpięte w nasz Edge Function `mamamia-proxy` przez nowy `mamamiaPanelClient` helper.
 

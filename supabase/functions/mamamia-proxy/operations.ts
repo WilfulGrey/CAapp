@@ -265,19 +265,19 @@ export const STORE_CONFIRMATION = /* GraphQL */ `
   }
 `;
 
-// K5 — customer invites a caregiver to apply. Primary flow: SendInvitationCaregiver.
-// (Fallback StoreRequest available if customer needs to pass a message.)
-export const SEND_INVITATION_CAREGIVER = /* GraphQL */ `
-  mutation SendInvitationCaregiver($caregiver_id: Int) {
-    SendInvitationCaregiver(caregiver_id: $caregiver_id)
-  }
-`;
-
-// SendInvitationCustomer (magic-link verify mail) was wired during the K6
-// magic-link approach but is no longer used — the panel-style flow
-// (mamamiaPanelClient.loginAndImpersonate) replaces it. Kept out of the
-// codebase entirely so dead operations don't drift out of sync with prod.
-
+// K7 — agency-side caregiver invite. This is the mutation the Mamamia panel
+// UI fires when an agency admin clicks "wyślij zaproszenie" on a customer's
+// matching list (verified live on beta 2026-04-28 by inspecting DevTools).
+// Auth context: panel /backend/graphql + agency-only session cookie.
+//
+// Earlier hypotheses (now resolved/discarded):
+//   - SendInvitationCaregiver — that's the customer-side mutation; auth.user
+//     must be the customer. Useless under agency-mode. Removed.
+//   - SendInvitationCustomer + magic-link — was the K6 approach;
+//     superseded by direct panel-mode invite once Customer.arrival_at flipped
+//     status to 'active' so panel-side policy permits StoreRequest.
+//   - ImpersonateCustomer + customer-mode panel — was the K7 hypothesis;
+//     turned out unnecessary, agency-only panel session works.
 export const STORE_REQUEST = /* GraphQL */ `
   mutation StoreRequest($caregiver_id: Int, $job_offer_id: Int, $message: String) {
     StoreRequest(

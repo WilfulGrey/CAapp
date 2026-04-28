@@ -161,29 +161,21 @@ const LOGIN_AGENCY = /* GraphQL */ `
   }
 `;
 
-const IMPERSONATE_CUSTOMER = /* GraphQL */ `
-  mutation ImpersonateCustomer($customer_id: Int!) {
-    ImpersonateCustomer(customer_id: $customer_id) {
-      id
-      email
-    }
-  }
-`;
-
 /**
- * Full flow that ends with the cookie jar in customer-impersonated state.
- * Use the returned PanelSession to call any subsequent panel mutations
- * (SendInvitationCaregiver, etc.) as if we were the customer.
+ * Login as service-agency admin and return the panel session.
+ *
+ * Used by mamamia-proxy actions that fire panel-side mutations the public
+ * /graphql endpoint refuses under agency Bearer auth (e.g. StoreRequest).
+ * Verified live on beta 2026-04-28: this agency-only session is enough,
+ * ImpersonateCustomer is NOT required when customer.status='active'.
  */
-export async function loginAndImpersonate(
+export async function loginAsAgency(
   opts: PanelClientOptions,
   email: string,
   password: string,
-  customerId: number,
 ): Promise<PanelSession> {
   let jar = await fetchCsrfCookie(opts);
 
-  // Login as service-agency admin.
   const login = await panelGraphQL<{ LoginAgency: { id: number } }>(
     opts,
     jar,
@@ -194,24 +186,19 @@ export async function loginAndImpersonate(
   );
   jar = login.jar;
 
-  // Flip session to customer-mode.
-  const imp = await panelGraphQL<{ ImpersonateCustomer: { id: number } }>(
-    opts,
-    jar,
-    "/graphql/auth",
-    "ImpersonateCustomer",
-    IMPERSONATE_CUSTOMER,
-    { customer_id: customerId },
-  );
-  jar = imp.jar;
-
   return { cookies: jarToCookieHeader(jar), xsrf: decodeXsrf(jar) };
 }
 
 /**
- * Calls a panel mutation in an existing customer-impersonated session.
- * Used by mamamia-proxy actions that the public /graphql/auth endpoint
- * rejects (e.g. SendInvitationCaregiver).
+ * Posts a GraphQL mutation/query to the panel /graphql endpoint using a
+ * persisted session cookie jar. The jar may carry an agency-only session
+ * (loginAsAgency) OR a customer-impersonated one (loginAndImpersonate) —
+ * the function does not care; the caller picks whichever auth context
+ * the target mutation requires.
+ *
+ * The "AsCustomer" suffix in the function name is historical (the first
+ * action that landed used impersonate). Kept as the export name to avoid
+ * a churn-only rename across tests.
  */
 export async function panelMutateAsCustomer<T>(
   opts: PanelClientOptions,

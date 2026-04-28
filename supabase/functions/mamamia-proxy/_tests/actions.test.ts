@@ -339,10 +339,12 @@ Deno.test("storeConfirmation: forbids cross-tenant", async () => {
   );
 });
 
-// ─── inviteCaregiver (K5/K6) ───────────────────────────────────────────
+// ─── inviteCaregiver (K7) ──────────────────────────────────────────────
 
-Deno.test("inviteCaregiver: panel-style flow — csrf → LoginAgency → ImpersonateCustomer → SendInvitationCaregiver", async () => {
-  // 4 sequential calls into the panel API.
+Deno.test("inviteCaregiver: agency-only panel flow — csrf → LoginAgency → StoreRequest", async () => {
+  // 3 sequential calls into the panel API. NO ImpersonateCustomer —
+  // verified live on beta 2026-04-28: StoreRequest works under
+  // agency-only session when customer.status='active'.
   const calls: { url: string; body?: string }[] = [];
   let i = 0;
   const responses: Array<{ status: number; json?: unknown; setCookie?: string[] }> = [
@@ -354,14 +356,21 @@ Deno.test("inviteCaregiver: panel-style flow — csrf → LoginAgency → Impers
       json: { data: { LoginAgency: { id: 8190, email: "primundus+portal@example.com" } } },
       setCookie: ["XSRF-TOKEN=t2; path=/", "mamamia_beta_session=s2; httponly"],
     },
-    // 3. ImpersonateCustomer
+    // 3. StoreRequest — final, on /graphql (not /graphql/auth)
     {
       status: 200,
-      json: { data: { ImpersonateCustomer: { id: 8204, email: "customer@example.com" } } },
-      setCookie: ["XSRF-TOKEN=t3; path=/", "mamamia_beta_session=s3-customer; httponly"],
+      json: {
+        data: {
+          StoreRequest: {
+            id: 893,
+            caregiver_id: 10061,
+            job_offer_id: 16235,
+            message: null,
+            created_at: "2026-04-28T09:43:44.000000Z",
+          },
+        },
+      },
     },
-    // 4. SendInvitationCaregiver — final
-    { status: 200, json: { data: { SendInvitationCaregiver: true } } },
   ];
   const fetchFn: typeof fetch = async (input, init) => {
     const url = typeof input === "string" ? input : (input as Request).url;
@@ -380,28 +389,58 @@ Deno.test("inviteCaregiver: panel-style flow — csrf → LoginAgency → Impers
   };
 
   const result = await ACTIONS.inviteCaregiver(
-    SESSION,
+    { ...SESSION, job_offer_id: 16235 },
     { caregiver_id: 10061 },
     makeDeps(fetchFn),
   );
-  assertEquals((result as { SendInvitationCaregiver: boolean }).SendInvitationCaregiver, true);
+  const sr = (result as { StoreRequest: { id: number; caregiver_id: number } }).StoreRequest;
+  assertEquals(sr.id, 893);
+  assertEquals(sr.caregiver_id, 10061);
 
-  // Verify the call chain
-  assertEquals(calls.length, 4);
+  // Call chain: csrf → LoginAgency → StoreRequest. NO ImpersonateCustomer.
+  assertEquals(calls.length, 3);
   assertEquals(calls[0].url, "https://beta.example/backend/sanctum/csrf-cookie");
   assertEquals(calls[1].url, "https://beta.example/backend/graphql/auth");
-  assertEquals(calls[2].url, "https://beta.example/backend/graphql/auth");
-  assertEquals(calls[3].url, "https://beta.example/backend/graphql");
+  assertEquals(calls[2].url, "https://beta.example/backend/graphql");
 
-  // ImpersonateCustomer should have used SESSION.customer_id (ownership)
-  const impBody = JSON.parse(calls[2].body!);
-  assertEquals(impBody.operationName, "ImpersonateCustomer");
-  assertEquals(impBody.variables.customer_id, SESSION.customer_id);
+  // LoginAgency carries credentials
+  const loginBody = JSON.parse(calls[1].body!);
+  assertEquals(loginBody.operationName, "LoginAgency");
 
-  // SendInvitationCaregiver carries caregiver_id from variables
-  const inviteBody = JSON.parse(calls[3].body!);
-  assertEquals(inviteBody.operationName, "SendInvitationCaregiver");
+  // StoreRequest carries caregiver_id + job_offer_id from session, plus null message
+  const inviteBody = JSON.parse(calls[2].body!);
+  assertEquals(inviteBody.operationName, "StoreRequest");
   assertEquals(inviteBody.variables.caregiver_id, 10061);
+  assertEquals(inviteBody.variables.job_offer_id, 16235);
+  assertEquals(inviteBody.variables.message, null);
+});
+
+Deno.test("inviteCaregiver: optional message string passes through to StoreRequest", async () => {
+  const calls: { body?: string }[] = [];
+  let i = 0;
+  const responses = [
+    { status: 204, setCookie: ["XSRF-TOKEN=t; path=/"] },
+    { status: 200, json: { data: { LoginAgency: { id: 1, email: "x" } } }, setCookie: ["XSRF-TOKEN=t; path=/"] },
+    { status: 200, json: { data: { StoreRequest: { id: 1, caregiver_id: 1, job_offer_id: 1, message: "hi", created_at: "x" } } } },
+  ];
+  const fetchFn: typeof fetch = async (_input, init) => {
+    const body = typeof (init as RequestInit | undefined)?.body === "string"
+      ? (init as RequestInit).body as string : undefined;
+    calls.push({ body });
+    const r = responses[i++] as { status: number; json?: unknown; setCookie?: string[] };
+    const headers = new Headers();
+    for (const sc of r.setCookie ?? []) headers.append("set-cookie", sc);
+    const bodyAllowed = r.status !== 204 && r.status !== 304;
+    return new Response(bodyAllowed && r.json !== undefined ? JSON.stringify(r.json) : null, { status: r.status, headers });
+  };
+
+  await ACTIONS.inviteCaregiver(
+    SESSION,
+    { caregiver_id: 10, message: "Bitte melden" },
+    makeDeps(fetchFn),
+  );
+  const inviteBody = JSON.parse(calls[2].body!);
+  assertEquals(inviteBody.variables.message, "Bitte melden");
 });
 
 Deno.test("inviteCaregiver: caregiver_id required", async () => {
