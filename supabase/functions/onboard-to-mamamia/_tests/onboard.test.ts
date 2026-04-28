@@ -30,6 +30,14 @@ function makeLead(overrides: Partial<Lead> = {}): Lead {
         weitere_personen: "nein",
       },
     },
+    patient_anrede: null,
+    patient_vorname: null,
+    patient_nachname: null,
+    patient_street: null,
+    patient_zip: null,
+    patient_city: null,
+    special_requirements: null,
+    order_confirmed_at: null,
     created_at: "2026-04-23T09:00:00.000Z",
     updated_at: "2026-04-23T09:00:00.000Z",
     mamamia_customer_id: null,
@@ -332,22 +340,12 @@ Deno.test("onboardLead: Mamamia StoreCustomer error propagates", async () => {
   assertEquals(supa.updated.length, 0);
 });
 
-Deno.test("onboardLead: lead with PLZ in formularDaten → Locations(search) → location_id on contract", async () => {
+Deno.test("onboardLead: lead with patient_zip → Locations(search) → location_id on contract", async () => {
   _resetAgencyTokenCache();
-  const lead = makeLead({
-    kalkulation: {
-      bruttopreis: 3200,
-      eigenanteil: 1700,
-      formularDaten: {
-        pflegegrad: 3,
-        mobilitaet: "rollstuhl",
-        nachteinsaetze: "gelegentlich",
-        geschlecht: "weiblich",
-        weitere_personen: "nein",
-        plz: "10115",
-      },
-    },
-  });
+  // patient_zip is the Primundus stage-B field — populated after the
+  // customer fills the Betreuung-beauftragen form. Our onboard prefers
+  // it over any formularDaten fallback.
+  const lead = makeLead({ patient_zip: "10115" });
   const supa = makeFakeSupabase([lead]);
 
   const mm = fakeMamamia([

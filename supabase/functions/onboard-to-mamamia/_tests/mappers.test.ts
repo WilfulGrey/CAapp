@@ -9,9 +9,12 @@ import {
   buildPatients,
   computeArrivalDate,
   extractPlzFromFormularDaten,
+  extractPlzFromLead,
   mapCareLevel,
   mapDementia,
+  mapDrivingLicense,
   mapGender,
+  mapGermanySkill,
   mapLiftId,
   mapMobilityToId,
   mapNightOperations,
@@ -53,6 +56,16 @@ function makeLead(overrides: Partial<Lead> = {}): Lead {
       eigenanteil: 1700,
       formularDaten: makeFormularDaten(),
     },
+    // Stage-B Primundus fields — null by default (only set in tests
+    // that explicitly exercise the post-betreuung-beauftragen state).
+    patient_anrede: null,
+    patient_vorname: null,
+    patient_nachname: null,
+    patient_street: null,
+    patient_zip: null,
+    patient_city: null,
+    special_requirements: null,
+    order_confirmed_at: null,
     created_at: "2026-04-23T09:00:00.000Z",
     updated_at: "2026-04-23T09:00:00.000Z",
     mamamia_customer_id: null,
@@ -146,22 +159,60 @@ Deno.test("mapNightOperations: gelegentlich → 'occasionally'", () => {
   );
 });
 
-Deno.test("mapNightOperations: regelmaessig → 'up_to_1_time'", () => {
+Deno.test("mapNightOperations: legacy 'regelmaessig' → 'up_to_1_time'", () => {
+  // Pre-2026-04-28 calculator label, kept for back-compat with old leads.
   assertEquals(
     mapNightOperations(makeFormularDaten({ nachteinsaetze: "regelmaessig" })),
     "up_to_1_time",
   );
 });
 
-Deno.test("mapNightOperations: taeglich → '1_2_times'", () => {
+Deno.test("mapNightOperations: taeglich (Primundus '1×') → 'up_to_1_time'", () => {
   assertEquals(
     mapNightOperations(makeFormularDaten({ nachteinsaetze: "taeglich" })),
+    "up_to_1_time",
+  );
+});
+
+Deno.test("mapNightOperations: mehrmals (Primundus 'multiple times') → '1_2_times'", () => {
+  assertEquals(
+    mapNightOperations(makeFormularDaten({ nachteinsaetze: "mehrmals" })),
     "1_2_times",
   );
 });
 
 Deno.test("mapNightOperations: missing → 'no'", () => {
   assertEquals(mapNightOperations({} as FormularDaten), "no");
+});
+
+// ─── mapGermanySkill ────────────────────────────────────────────────────────
+
+Deno.test("mapGermanySkill: grundlegend → level_2", () => {
+  assertEquals(mapGermanySkill(makeFormularDaten({ deutschkenntnisse: "grundlegend" })), "level_2");
+});
+
+Deno.test("mapGermanySkill: kommunikativ → level_3", () => {
+  assertEquals(mapGermanySkill(makeFormularDaten({ deutschkenntnisse: "kommunikativ" })), "level_3");
+});
+
+Deno.test("mapGermanySkill: sehr-gut → level_4", () => {
+  assertEquals(mapGermanySkill(makeFormularDaten({ deutschkenntnisse: "sehr-gut" })), "level_4");
+});
+
+Deno.test("mapGermanySkill: missing → level_3 (prod-most-common default)", () => {
+  assertEquals(mapGermanySkill({} as FormularDaten), "level_3");
+});
+
+// ─── mapDrivingLicense ──────────────────────────────────────────────────────
+
+Deno.test("mapDrivingLicense: ja → yes", () => {
+  assertEquals(mapDrivingLicense(makeFormularDaten({ fuehrerschein: "ja" })), "yes");
+});
+
+Deno.test("mapDrivingLicense: nein / egal / missing → not_important", () => {
+  assertEquals(mapDrivingLicense(makeFormularDaten({ fuehrerschein: "nein" })), "not_important");
+  assertEquals(mapDrivingLicense(makeFormularDaten({ fuehrerschein: "egal" })), "not_important");
+  assertEquals(mapDrivingLicense({} as FormularDaten), "not_important");
 });
 
 // ─── mapGender ───────────────────────────────────────────────────────────────
@@ -279,13 +330,16 @@ Deno.test("buildPatients: weitere_personen=nein → single patient with all 100%
   }
 });
 
-Deno.test("buildPatients: rollator + taeglich (live formularDaten regression)", () => {
+Deno.test("buildPatients: rollator + taeglich (Primundus '1×' bucket)", () => {
+  // taeglich in Primundus calculator = "once a night" → maps to
+  // Mamamia 'up_to_1_time'. Pre-2026-04-28 we incorrectly mapped this
+  // to '1_2_times'.
   const patients = buildPatients(makeFormularDaten({
     mobilitaet: "rollator",
     nachteinsaetze: "taeglich",
   }));
   assertEquals(patients[0].mobility_id, 3);
-  assertEquals(patients[0].night_operations, "1_2_times");
+  assertEquals(patients[0].night_operations, "up_to_1_time");
 });
 
 Deno.test("buildPatients: dementia=ja propagates to patient[0]", () => {
@@ -293,8 +347,11 @@ Deno.test("buildPatients: dementia=ja propagates to patient[0]", () => {
   assertEquals(patients[0].dementia, "yes");
 });
 
-Deno.test("buildPatients: weitere_personen=ja → 2 patients (second is fully-padded placeholder)", () => {
-  const patients = buildPatients(makeFormularDaten({ weitere_personen: "ja" }));
+Deno.test("buildPatients: betreuung_fuer='ehepaar' → 2 patients (couple under care)", () => {
+  // Primundus stage-A field that signals "two people need care". This is
+  // the correct trigger — pre-2026-04-28 we incorrectly used
+  // weitere_personen which is a different question (others IN house).
+  const patients = buildPatients(makeFormularDaten({ betreuung_fuer: "ehepaar" }));
   assertEquals(patients.length, 2);
   // first patient filled from formular
   assertEquals(patients[0].mobility_id, 4);
@@ -305,7 +362,29 @@ Deno.test("buildPatients: weitere_personen=ja → 2 patients (second is fully-pa
   assertEquals(patients[1].lift_id, 2);  // mobile → no lift
   assertEquals(patients[1].tool_ids, [1]); // mobile → Walking stick only (never Others)
   assertEquals(patients[1].weight, "61-70");
-  assertEquals(patients[1].gender, "not_important");
+  // 2nd patient is the spouse — opposite gender as a best-guess heuristic.
+  // Default primaryGender is "female" (when no opts.primaryGender given),
+  // so secondGender flips to "male".
+  assertEquals(patients[1].gender, "male");
+});
+
+Deno.test("buildPatients: opts.primaryGender drives both rows (couple swap)", () => {
+  const patients = buildPatients(
+    makeFormularDaten({ betreuung_fuer: "ehepaar" }),
+    { primaryGender: "male" },
+  );
+  assertEquals(patients[0].gender, "male");
+  assertEquals(patients[1].gender, "female"); // flipped
+});
+
+Deno.test("buildPatients: betreuung_fuer='1-person' → single patient even with weitere_personen=ja", () => {
+  // Regression guard: weitere_personen='ja' must NOT add a 2nd patient.
+  // It only feeds customer.other_people_in_house.
+  const patients = buildPatients(makeFormularDaten({
+    betreuung_fuer: "1-person",
+    weitere_personen: "ja",
+  }));
+  assertEquals(patients.length, 1);
 });
 
 Deno.test("buildPatients: empty formularDaten → single default patient (no crash)", () => {
@@ -313,9 +392,11 @@ Deno.test("buildPatients: empty formularDaten → single default patient (no cra
   assertEquals(patients.length, 1);
   assertEquals(patients[0].mobility_id, 1);
   assertEquals(patients[0].care_level, 2);
-  // gender defaults to not_important when formularDaten doesn't carry it,
-  // because PatientInputType.gender is 100% in active prod customers.
-  assertEquals(patients[0].gender, "not_important");
+  // patient.gender defaults to "female" (prod-most-common, 61% of active
+  // patients) when no primaryGender is provided. Mamamia rejects
+  // "not_important" on patient.gender — separate concept from caregiver
+  // preference (customer_caregiver_wish.gender).
+  assertEquals(patients[0].gender, "female");
 });
 
 Deno.test("buildPatients: geburtsjahr in formularDaten → year_of_birth on patient[0]", () => {
@@ -419,7 +500,50 @@ Deno.test("buildCaregiverWish: missing gender → 'not_important' (prod-safe def
   assertEquals(wish.gender, "not_important");
 });
 
-// ─── extractPlzFromFormularDaten ───────────────────────────────────────────
+Deno.test("buildCaregiverWish: real Primundus stage-A fields override defaults", () => {
+  // Verify deutschkenntnisse + fuehrerschein from formularDaten flow
+  // through to germany_skill / driving_license rather than being shadowed
+  // by the prod-default fallbacks.
+  const wish = buildCaregiverWish(makeFormularDaten({
+    deutschkenntnisse: "sehr-gut",
+    fuehrerschein: "ja",
+    geschlecht: "maennlich",
+  }));
+  assertEquals(wish.germany_skill, "level_4");
+  assertEquals(wish.driving_license, "yes");
+  assertEquals(wish.gender, "male");
+});
+
+// ─── extractPlzFromLead (primary path) ─────────────────────────────────────
+
+Deno.test("extractPlzFromLead: lead.patient_zip is preferred (Primundus stage-B field)", () => {
+  const lead = makeLead({ patient_zip: "10115" });
+  assertEquals(extractPlzFromLead(lead), "10115");
+});
+
+Deno.test("extractPlzFromLead: 4-digit zip on patient_zip is padded", () => {
+  const lead = makeLead({ patient_zip: "1067" });
+  assertEquals(extractPlzFromLead(lead), "01067");
+});
+
+Deno.test("extractPlzFromLead: missing patient_zip falls back to formularDaten.plz", () => {
+  const lead = makeLead({
+    patient_zip: null,
+    kalkulation: {
+      bruttopreis: 0,
+      eigenanteil: 0,
+      formularDaten: { ...makeFormularDaten(), plz: "80331" },
+    },
+  });
+  assertEquals(extractPlzFromLead(lead), "80331");
+});
+
+Deno.test("extractPlzFromLead: no PLZ anywhere → null", () => {
+  const lead = makeLead({ patient_zip: null });
+  assertEquals(extractPlzFromLead(lead), null);
+});
+
+// ─── extractPlzFromFormularDaten (legacy / fallback helper) ────────────────
 
 Deno.test("extractPlzFromFormularDaten: plz key (string)", () => {
   assertEquals(extractPlzFromFormularDaten({ plz: "10115" } as FormularDaten), "10115");
@@ -549,7 +673,7 @@ Deno.test("buildCustomerInput: every must-fill field is set for active-state cus
   }
 });
 
-Deno.test("buildCustomerInput: weitere_personen=ja propagates to other_people_in_house + 2 patients", () => {
+Deno.test("buildCustomerInput: weitere_personen=ja propagates only to other_people_in_house (not 2 patients)", () => {
   const lead = makeLead({
     kalkulation: {
       bruttopreis: 3000,
@@ -559,6 +683,20 @@ Deno.test("buildCustomerInput: weitere_personen=ja propagates to other_people_in
   });
   const input = buildCustomerInput(lead);
   assertEquals(input.other_people_in_house, "yes");
+  // Single patient — weitere_personen is "others IN house", not "2 patients
+  // under care". Couple-under-care needs betreuung_fuer='ehepaar'.
+  assertEquals(input.patients.length, 1);
+});
+
+Deno.test("buildCustomerInput: betreuung_fuer='ehepaar' yields 2 patients (couple-under-care)", () => {
+  const lead = makeLead({
+    kalkulation: {
+      bruttopreis: 3000,
+      eigenanteil: 1500,
+      formularDaten: { ...makeFormularDaten(), betreuung_fuer: "ehepaar" },
+    },
+  });
+  const input = buildCustomerInput(lead);
   assertEquals(input.patients.length, 2);
 });
 

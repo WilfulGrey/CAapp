@@ -4,7 +4,7 @@ import {
   buildCustomerInput,
   buildJobOfferTitle,
   computeArrivalDate,
-  extractPlzFromFormularDaten,
+  extractPlzFromLead,
 } from "./mappers.ts";
 import { getOrRefreshAgencyToken, mamamiaRequest } from "../_shared/mamamiaClient.ts";
 
@@ -183,8 +183,11 @@ export async function onboardLead(opts: OnboardOptions): Promise<OnboardResult &
     fetchFn,
   });
 
-  // 5. Resolve location_id from formularDaten.plz (best-effort).
-  const plz = extractPlzFromFormularDaten(lead.kalkulation?.formularDaten ?? {});
+  // 5. Resolve location_id — primarily from lead.patient_zip (set during
+  //    Primundus stage-B "Betreuung beauftragen" form), with formularDaten
+  //    fallback. Lookup is best-effort: failure → null → contracts use
+  //    location_custom_text fallback in buildContractFromLead.
+  const plz = extractPlzFromLead(lead);
   const locationId = await lookupLocationId({
     endpoint: secrets.mamamiaEndpoint,
     token: agencyToken,

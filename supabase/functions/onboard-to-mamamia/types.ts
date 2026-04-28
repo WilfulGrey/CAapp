@@ -1,13 +1,31 @@
-// Supabase `leads` row shape (matches CAapp src/lib/supabase.ts)
+// Supabase `leads` row shape — matches Primundus landing-page schema
+// (project 3/supabase/migrations + the MultiStepForm submission contract).
+//
+// Two-stage life-cycle relevant here:
+//   A) `angebot_requested` (after kalkulator) — formularDaten populated,
+//      address fields (patient_*) NOT YET captured.
+//   B) `vertrag_abgeschlossen` (after Betreuung-beauftragen form) —
+//      patient_zip / patient_street / patient_city / patient_anrede /
+//      patient_nachname now present. THIS is the safe trigger for our
+//      onboard-to-mamamia, because location_id needs PLZ to resolve.
 
 export interface FormularDaten {
-  pflegegrad?: number;
-  mobilitaet?: string;
-  nachteinsaetze?: string;
-  weitere_personen?: string;
-  geschlecht?: string;
+  // ─── Stage-A fields populated by MultiStepForm ───────────────────────
+  // Source of truth: project 3/components/calculator/MultiStepForm.tsx:154
+  pflegegrad?: number;                                    // 0..5 (int)
+  mobilitaet?: "mobil" | "rollator" | "rollstuhl" | "bettlaegerig" | string;
+  nachteinsaetze?: "nein" | "gelegentlich" | "taeglich" | "mehrmals" | string;
+  weitere_personen?: "ja" | "nein" | string;              // others in household, NOT 2nd patient
+  betreuung_fuer?: "1-person" | "ehepaar" | string;       // 1 vs 2 patients under care
+  geschlecht?: "weiblich" | "maennlich" | "egal" | string; // preferred caregiver gender
+  // Caregiver-wish fields (mapped to customer_caregiver_wish in Mamamia)
+  deutschkenntnisse?: "grundlegend" | "kommunikativ" | "sehr-gut" | string;
+  fuehrerschein?: "ja" | "nein" | "egal" | string;
+  erfahrung?: "einsteiger" | "erfahren" | "sehr-erfahren" | string;
+  // Optional / legacy
   demenz?: string;
-  betreuung_fuer?: string;
+  // PLZ does NOT live in formularDaten — Primundus calculator never
+  // collects it. It surfaces on lead.patient_zip after stage B.
   [key: string]: unknown;
 }
 
@@ -32,6 +50,17 @@ export interface Lead {
   token_used: boolean;
   care_start_timing: string | null;
   kalkulation: LeadKalkulation | null;
+  // ─── Stage-B fields (populated by /api/betreuung-beauftragen) ─────────
+  // The customer types these in manually after clicking through the
+  // calculator email. Until stage B runs they're null.
+  patient_anrede?: string | null;
+  patient_vorname?: string | null;
+  patient_nachname?: string | null;
+  patient_street?: string | null;
+  patient_zip?: string | null;
+  patient_city?: string | null;
+  special_requirements?: string | null;
+  order_confirmed_at?: string | null;
   created_at: string;
   updated_at: string;
   // Rev2 Mamamia cache columns (migration 20260423)

@@ -48,14 +48,18 @@ export function mapDementia(fd: FormularDaten): "yes" | "no" {
 
 // ─── Night operations ───────────────────────────────────────────────────────
 // Mamamia enum (verified via prod DB read-only on 2026-04-27):
-//   "no"           — 65% of records
-//   "up_to_1_time" — 22% (≤1× per night)
-//   "1_2_times"    —  5% (1–2× per night)
-//   "more_than_2"  —  1% (>2× per night)
-//   "occasionally" —  0.2% (legacy / rare)
+//   "no"           — 65%
+//   "up_to_1_time" — 22% (≤1×)
+//   "1_2_times"    —  5%
+//   "more_than_2"  —  1% (>2×)
+//   "occasionally" —  0.2%
 //
-// formularDaten only offers 4 levels (nein/gelegentlich/regelmaessig/taeglich),
-// so we map onto the production-supported 4-bucket scale.
+// Primundus calculator (project 3 MultiStepForm) emits 4 distinct values:
+//   "nein", "gelegentlich", "taeglich" (=1×), "mehrmals" (multiple times).
+// Map them onto Mamamia's 4-bucket scale by frequency.
+//
+// Note: legacy "regelmaessig" kept for back-compat with leads created
+// before the calculator UX update.
 export type NightOperations =
   | "no"
   | "up_to_1_time"
@@ -66,15 +70,27 @@ export type NightOperations =
 export function mapNightOperations(fd: FormularDaten): NightOperations {
   const v = (fd?.nachteinsaetze ?? "").toString().toLowerCase();
   if (v === "gelegentlich") return "occasionally";
-  if (v === "regelmaessig") return "up_to_1_time";
-  if (v === "taeglich") return "1_2_times";
+  if (v === "taeglich") return "up_to_1_time";   // Primundus "1×" → Mamamia "≤1×"
+  if (v === "mehrmals") return "1_2_times";       // Primundus "multiple" → Mamamia 1-2×
+  if (v === "regelmaessig") return "up_to_1_time"; // legacy alias
   return "no";
 }
 
-// ─── Gender ─────────────────────────────────────────────────────────────────
-// Mamamia enum (verified prod DB 2026-04-27):
-//   "female" (61%), "male" (38%), "not_important" (rare), null
-// formularDaten "egal" → "not_important" so the matcher knows it's intentional.
+// ─── Gender — TWO distinct dimensions in Mamamia ────────────────────────────
+//
+//   1. customer_caregiver_wish.gender  → preferred CAREGIVER gender
+//      Accepts "female" / "male" / "not_important". Source: Primundus
+//      formularDaten.geschlecht ("weiblich" / "maennlich" / "egal").
+//
+//   2. patient.gender → PATIENT's actual gender
+//      Validator rejects "not_important" (verified beta 2026-04-28).
+//      Source: lead salutation (anrede) — Frau→female, Herr→male.
+//      Primundus does NOT capture patient gender separately.
+//
+// Pre-2026-04-28 we used mapGender for both, which broke when the
+// customer answered "egal" on the caregiver-preference question.
+
+// Caregiver-preference gender (used in customer_caregiver_wish.gender).
 export function mapGender(
   fd: FormularDaten,
 ): "male" | "female" | "not_important" | null {
@@ -83,6 +99,25 @@ export function mapGender(
   if (v === "maennlich") return "male";
   if (v === "egal") return "not_important";
   return null;
+}
+
+// Patient's actual gender (used in patients[].gender). Reads anrede
+// fields with stage-B priority. Defaults to "female" — the prod-most-
+// common patient gender (61%), and a safe assumption that lets the
+// matcher run; the customer can update later via UpdateCustomer/patient
+// form once they know the real recipient.
+export function resolvePatientGender(lead: Lead): "male" | "female" {
+  const candidates = [
+    lead.patient_anrede,
+    lead.anrede,
+    lead.anrede_text,
+  ];
+  for (const c of candidates) {
+    const v = (c ?? "").toString().trim().toLowerCase();
+    if (v === "frau" || v === "mrs." || v === "mrs") return "female";
+    if (v === "herr" || v === "mr." || v === "mr") return "male";
+  }
+  return "female";
 }
 
 // ─── Arrival date from care_start_timing ────────────────────────────────────
@@ -230,7 +265,10 @@ function dementiaDescriptionFor(d: string): { de: string; en: string; pl: string
   };
 }
 
-export function buildPatients(fd: FormularDaten): PatientInput[] {
+export function buildPatients(
+  fd: FormularDaten,
+  opts: { primaryGender?: "male" | "female" } = {},
+): PatientInput[] {
   const mobility = mapMobilityToId(fd);
   const liftId = mapLiftId(mobility);
   const dementia = mapDementia(fd);
@@ -239,8 +277,14 @@ export function buildPatients(fd: FormularDaten): PatientInput[] {
   const nightDesc = nightOperationsDescriptionFor(nightOps);
   const demDesc = dementiaDescriptionFor(dementia);
 
+  // patient.gender: real patient gender (NOT caregiver preference).
+  // Mamamia validator rejects "not_important" on patients; default to
+  // the prod-most-common "female" if the caller didn't resolve it from
+  // the lead's salutation.
+  const primaryGender = opts.primaryGender ?? "female";
+
   const first: PatientInput = {
-    gender: mapGender(fd) ?? "not_important",
+    gender: primaryGender,
     care_level: mapCareLevel(fd),
     mobility_id: mobility,
     lift_id: liftId,
@@ -273,18 +317,30 @@ export function buildPatients(fd: FormularDaten): PatientInput[] {
 
   // Second-patient placeholder uses mobile/no-lift defaults; same
   // description scaffold so panel form passes for both rows.
+  // ⚠ CORRECTNESS: a 2nd patient is added when Primundus reports
+  // `betreuung_fuer === 'ehepaar'` (couple under care). The
+  // `weitere_personen` flag is a different question — "are there
+  // OTHER people in the household who do NOT need care" — and maps to
+  // customer.other_people_in_house, NOT to a second patient row.
+  // Pre-2026-04-28 we used the wrong key here; legacy leads with only
+  // weitere_personen='ja' set are now treated as single-patient.
+  const isCouple = fd?.betreuung_fuer === "ehepaar";
   const secondMob = 1;
   const secondLiftDesc = liftDescriptionFor(secondMob);
   const secondNightDesc = nightOperationsDescriptionFor("no");
   const secondDemDesc = dementiaDescriptionFor("no");
 
-  const second: PatientInput | null = fd?.weitere_personen === "ja"
+  // For "ehepaar" the 2nd patient is the spouse — opposite gender as a
+  // best-guess heuristic. Customer corrects via patient form when
+  // editing the second-patient row.
+  const secondGender: "male" | "female" = primaryGender === "female" ? "male" : "female";
+  const second: PatientInput | null = isCouple
     ? {
       care_level: 2,
       mobility_id: secondMob,
       lift_id: mapLiftId(secondMob),
       tool_ids: mapToolIds(secondMob),
-      gender: "not_important",
+      gender: secondGender,
       weight: DEFAULT_WEIGHT,
       height: DEFAULT_HEIGHT,
       night_operations: "no",
@@ -326,15 +382,51 @@ export function mapOtherPeopleInHouse(fd: FormularDaten): "yes" | "no" {
   return fd?.weitere_personen === "ja" ? "yes" : "no";
 }
 
+// ─── German skill (caregiver-wish) ──────────────────────────────────────────
+// Primundus calculator collects 3 levels:
+//   "grundlegend"  → A1-A2 territory  → Mamamia "level_2"
+//   "kommunikativ" → B1-B2            → Mamamia "level_3"
+//   "sehr-gut"     → C1+              → Mamamia "level_4"
+// Mamamia enum 0..4 + "not_important" — verified prod sweep 2026-04-28.
+// Default level_3 (50% of active customers) when formularDaten missing.
+export function mapGermanySkill(
+  fd: FormularDaten,
+):
+  | "level_0"
+  | "level_1"
+  | "level_2"
+  | "level_3"
+  | "level_4"
+  | "not_important" {
+  const v = (fd?.deutschkenntnisse ?? "").toString().toLowerCase();
+  if (v === "grundlegend") return "level_2";
+  if (v === "kommunikativ") return "level_3";
+  if (v === "sehr-gut" || v === "sehr_gut") return "level_4";
+  return "level_3"; // default — most-common in prod active customers
+}
+
+// ─── Driving license (caregiver-wish) ───────────────────────────────────────
+// Primundus calculator: "egal" / "ja" / "nein". Mamamia enum: "yes" /
+// "not_important" (no "no" — semantics are "must have license" vs "any").
+// "nein" → not_important: we don't reject licensed cgs, just don't require.
+export function mapDrivingLicense(
+  fd: FormularDaten,
+): "yes" | "not_important" {
+  const v = (fd?.fuehrerschein ?? "").toString().toLowerCase();
+  if (v === "ja") return "yes";
+  return "not_important"; // egal / nein / missing
+}
+
 // ─── Build the CustomerCaregiverWish from formularDaten + defaults ──────────
-// 100% of active customers have one. Prod-most-common defaults are picked
-// where formularDaten doesn't carry the answer.
+// 100% of active customers have one. Real lead data (deutschkenntnisse,
+// fuehrerschein, geschlecht) is preferred; prod-most-common defaults
+// only when calculator didn't capture it.
 export function buildCaregiverWish(fd: FormularDaten): CaregiverWishInput {
   return {
     is_open_for_all: false,
     gender: mapGender(fd) ?? "not_important",
-    germany_skill: "level_3",
-    driving_license: "not_important",
+    germany_skill: mapGermanySkill(fd),
+    driving_license: mapDrivingLicense(fd),
     smoking: "yes_outside",
     shopping: "no",
     // Free-text fields — ship a sensible auto-string so customer.tasks
@@ -351,19 +443,49 @@ export function buildCaregiverWish(fd: FormularDaten): CaregiverWishInput {
   };
 }
 
-// ─── Extract PLZ from formularDaten ────────────────────────────────────────
-// Primundus calculator stores the customer's German postal code under
-// various keys (the schema is loose). Try the most common ones.
+// ─── Extract PLZ from a lead ────────────────────────────────────────────────
+// Source-of-truth (verified vs project 3 schema 2026-04-28):
+//   - Primary: lead.patient_zip — populated by /api/betreuung-beauftragen
+//     (stage B). This is the form where the customer types their actual
+//     PLZ for the care location.
+//   - Fallback: formularDaten.{plz, postleitzahl, postal_code, zip,
+//     zip_code} — none of these are written by the current Primundus
+//     calculator, but keep the look-ups defensively in case a future
+//     UX iteration adds PLZ to stage A or a manually-edited lead
+//     surfaces it through admin.
+//
+// Returns 5-digit PLZ string or null when no PLZ is available — caller
+// falls back to location_custom_text.
+function isPlzString(v: unknown): v is string {
+  return typeof v === "string" && /^\d{4,5}$/.test(v.trim());
+}
+function isPlzNumber(v: unknown): v is number {
+  return typeof v === "number" && v >= 1000 && v <= 99999;
+}
+
+export function extractPlzFromLead(lead: Lead): string | null {
+  // Stage-B field — preferred and verified-by-customer source.
+  if (isPlzString(lead.patient_zip)) {
+    return (lead.patient_zip as string).trim().padStart(5, "0");
+  }
+  // Fallbacks inside formularDaten (defensive — none currently written
+  // by Primundus calculator, but cheap to check).
+  const fd = lead.kalkulation?.formularDaten ?? {};
+  for (const k of ["plz", "postleitzahl", "postal_code", "zip", "zip_code"]) {
+    const v = fd[k];
+    if (isPlzString(v)) return v.trim().padStart(5, "0");
+    if (isPlzNumber(v)) return String(v).padStart(5, "0");
+  }
+  return null;
+}
+
+// Back-compat alias — kept so old call sites don't break, but new code
+// should use extractPlzFromLead which sees the stage-B patient_zip.
 export function extractPlzFromFormularDaten(fd: FormularDaten): string | null {
-  const candidates = ["plz", "postleitzahl", "postal_code", "zip", "zip_code"];
-  for (const k of candidates) {
+  for (const k of ["plz", "postleitzahl", "postal_code", "zip", "zip_code"]) {
     const v = fd?.[k];
-    if (typeof v === "string" && /^\d{4,5}$/.test(v.trim())) {
-      return v.trim().padStart(5, "0");
-    }
-    if (typeof v === "number" && v >= 1000 && v <= 99999) {
-      return String(v).padStart(5, "0");
-    }
+    if (isPlzString(v)) return v.trim().padStart(5, "0");
+    if (isPlzNumber(v)) return String(v).padStart(5, "0");
   }
   return null;
 }
@@ -501,7 +623,7 @@ export function buildCustomerInput(
     job_description_en: desc.en,
     job_description_pl: desc.pl,
     gender: mapGender(fd) ?? "not_important",
-    patients: buildPatients(fd),
+    patients: buildPatients(fd, { primaryGender: resolvePatientGender(lead) }),
     customer_caregiver_wish: buildCaregiverWish(fd),
     customer_contract: buildContractFromLead(lead, locationId),
     invoice_contract: buildContractFromLead(lead, locationId),
