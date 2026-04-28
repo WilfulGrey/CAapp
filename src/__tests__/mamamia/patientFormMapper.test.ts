@@ -194,24 +194,31 @@ describe('mapPatientFormToUpdateCustomerInput', () => {
     expect(mapPatientFormToUpdateCustomerInput(makeForm({ anzahl: '1' })).other_people_in_house).toBe('no');
   });
 
-  it('maps rauchen → smoking_household yes/no', () => {
-    expect(mapPatientFormToUpdateCustomerInput(makeForm({ rauchen: 'Ja' })).smoking_household).toBe('yes');
-    expect(mapPatientFormToUpdateCustomerInput(makeForm({ rauchen: 'Nein' })).smoking_household).toBe('no');
+  it('maps rauchen → customer_caregiver_wish.smoking (yes_outside / no)', () => {
+    // Post-2026-04-28 audit: rauchen is a CAREGIVER preference, not a
+    // customer attribute. It moved from smoking_household to wish.smoking.
+    expect(mapPatientFormToUpdateCustomerInput(makeForm({ rauchen: 'Ja' })).customer_caregiver_wish?.smoking).toBe('yes_outside');
+    expect(mapPatientFormToUpdateCustomerInput(makeForm({ rauchen: 'Nein' })).customer_caregiver_wish?.smoking).toBe('no');
   });
 
-  it('combines diagnosen/aufgaben/sonstigeWuensche into job_description', () => {
+  it('only diagnosen lands in job_description; aufgaben/sonstigeWuensche go to wish', () => {
     const r = mapPatientFormToUpdateCustomerInput(makeForm({
       diagnosen: 'Parkinson',
       aufgaben: 'Körperpflege',
       sonstigeWuensche: 'Tierlieb',
     }));
+    // Medical diagnoses stay on customer.job_description (this is what
+    // caregivers read to prepare).
     expect(r.job_description).toContain('Diagnosen: Parkinson');
-    expect(r.job_description).toContain('Aufgaben: Körperpflege');
-    expect(r.job_description).toContain('Sonstige Wünsche: Tierlieb');
+    // Caregiver-side fields land on the wish row, not job_description.
+    expect(r.job_description).not.toContain('Körperpflege');
+    expect(r.job_description).not.toContain('Tierlieb');
+    expect(r.customer_caregiver_wish?.tasks).toBe('Körperpflege');
+    expect(r.customer_caregiver_wish?.other_wishes).toBe('Tierlieb');
   });
 
-  it('no job_description key when all textareas empty', () => {
-    const r = mapPatientFormToUpdateCustomerInput(makeForm());
+  it('no job_description key when no diagnoses', () => {
+    const r = mapPatientFormToUpdateCustomerInput(makeForm({ aufgaben: 'X' }));
     expect(r.job_description).toBeUndefined();
   });
 

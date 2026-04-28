@@ -268,19 +268,53 @@ const UPDATE_CUSTOMER_ALLOWED = new Set([
   "urbanization_id",
   "job_description",
   "accommodation",
+  "caregiver_accommodated",
   "other_people_in_house",
   "has_family_near_by",
   "smoking_household",
   "internet",
   "day_care_facility",
   "caregiver_time_off",
+  "pets",
+  "is_pet_dog",
+  "is_pet_cat",
+  "is_pet_other",
   "patients",
+  "customer_caregiver_wish",
 ]);
+
+// Whitelist for the nested customer_caregiver_wish object — keep tight
+// so we never leak unintended wish fields from a malicious client body.
+const WISH_ALLOWED = new Set([
+  "gender",
+  "germany_skill",
+  "driving_license",
+  "smoking",
+  "shopping",
+  "tasks",
+  "tasks_de",
+  "other_wishes",
+  "other_wishes_de",
+]);
+
+function pickAllowedWish(input: unknown): Record<string, unknown> | null {
+  if (!input || typeof input !== "object") return null;
+  const out: Record<string, unknown> = {};
+  for (const [k, v] of Object.entries(input as Record<string, unknown>)) {
+    if (WISH_ALLOWED.has(k)) out[k] = v;
+  }
+  return Object.keys(out).length > 0 ? out : null;
+}
 
 const updateCustomer: ActionHandler = (session, variables, deps) => {
   const patch: Record<string, unknown> = { id: session.customer_id };
   for (const [k, v] of Object.entries(variables)) {
-    if (UPDATE_CUSTOMER_ALLOWED.has(k)) patch[k] = v;
+    if (k === "customer_caregiver_wish") {
+      const wish = pickAllowedWish(v);
+      if (wish) patch.customer_caregiver_wish = wish;
+    } else if (UPDATE_CUSTOMER_ALLOWED.has(k)) {
+      patch[k] = v;
+    }
   }
   return runGraphQL(deps, UPDATE_CUSTOMER, patch);
 };

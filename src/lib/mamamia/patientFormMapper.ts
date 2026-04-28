@@ -104,28 +104,103 @@ function accommodationToApi(v: string): string | null {
   return null;
 }
 
-// smoking_household — verified prod enum: yes / no / yes_outside.
-// Form question: "Darf die Betreuungsperson rauchen?" — yes/no only.
-function smokingHouseholdToApi(v: string): 'yes' | 'no' | null {
-  if (v === 'Ja') return 'yes';
+// urbanization_id (urbanisierung) — Mamamia lookup verified 2026-04-28:
+//   1 = Village, 2 = City, 3 = Big city
+function urbanizationIdToApi(v: string): number | null {
+  if (v === 'Großstadt') return 3;
+  if (v === 'Kleinstadt') return 2;
+  if (v === 'Dorf/Land' || v === 'Dorf') return 1;
+  return null;
+}
+
+// day_care_facility (pflegedienst) — boolean enum on Mamamia.
+//   "Geplant" treated as "yes" because Mamamia has no third option.
+function dayCareFacilityToApi(v: string): 'yes' | 'no' | null {
+  if (v === 'Ja' || v === 'Geplant') return 'yes';
   if (v === 'Nein') return 'no';
-  // (yes_outside not exposed in form yet — future option.)
   return null;
 }
 
-// Lift / heben: Mamamia has `lift_id: Int` — unknown enum.
-// Safe default: skip unless we know mapping. Include `features_condition` text later.
-function hebenToApi(v: string): number | null {
-  // TODO live-discover valid lift_id values. For now omit.
-  if (v === 'Ja') return null;
+// pets (tiere) — pets enum + 3 boolean flags. Form distinguishes pet
+// type while Mamamia tracks them separately.
+function petsToApi(v: string): {
+  pets?: string;
+  is_pet_dog?: boolean;
+  is_pet_cat?: boolean;
+  is_pet_other?: boolean;
+} {
+  if (!v || v === 'Keine') return { pets: 'no', is_pet_dog: false, is_pet_cat: false, is_pet_other: false };
+  if (v === 'Hund') return { pets: 'yes', is_pet_dog: true, is_pet_cat: false, is_pet_other: false };
+  if (v === 'Katze') return { pets: 'yes', is_pet_dog: false, is_pet_cat: true, is_pet_other: false };
+  if (v === 'Andere') return { pets: 'yes', is_pet_dog: false, is_pet_cat: false, is_pet_other: true };
+  return {};
+}
+
+// caregiver_accommodated (unterbringung) — verified prod 2026-04-28.
+function caregiverAccommodatedToApi(v: string): string | null {
+  if (v === 'Zimmer in den Räumlichkeiten') return 'room_premises';
+  if (v === 'Gesamter Bereich') return 'area_premises';
+  if (v === 'Zimmer extern') return 'room_other_premises';
+  if (v === 'Bereich extern') return 'area_other_premises';
   return null;
 }
 
-// Smoking household: form has "Ja"/"Nein" for caregiver smoking preference.
-// NOTE: rauchen form field = "Darf die Betreuungsperson rauchen?" (is caregiver ALLOWED to smoke),
-// which semantically maps better to `smoking_household` (yes = household accepts smoker).
-function rauchenToApi(v: string): 'yes' | 'no' | null {
-  return yesNoToApi(v);
+// Lift / heben: Mamamia lifts lookup: 1=Yes, 2=No, 3=legacy.
+// "Heben erforderlich?" Ja → patient needs hoist → lift_id=1.
+// Nein → no hoist needed → lift_id=2.
+function liftIdToApi(v: string): number | null {
+  if (v === 'Ja') return 1;
+  if (v === 'Nein') return 2;
+  return null;
+}
+
+// Dementia gradation (Leichtgradig/Mittelgradig/Schwer) is lost on
+// Mamamia.dementia (yes/no enum). Capture it in dementia_description
+// instead, so the agency sees the severity. 4-locale set.
+function dementiaDescriptionFromForm(v: string): {
+  de: string;
+  en: string;
+  pl: string;
+} | null {
+  if (!v) return null;
+  if (v === 'Nein') {
+    return {
+      de: 'Keine Demenzdiagnose.',
+      en: 'No dementia diagnosis.',
+      pl: 'Brak rozpoznania demencji.',
+    };
+  }
+  const grad: Record<string, { de: string; en: string; pl: string }> = {
+    Leichtgradig: { de: 'leichtgradig', en: 'mild', pl: 'łagodna' },
+    Mittelgradig: { de: 'mittelgradig', en: 'moderate', pl: 'umiarkowana' },
+    Schwer: { de: 'schwer', en: 'severe', pl: 'ciężka' },
+  };
+  const g = grad[v];
+  if (!g) return null;
+  return {
+    de: `Demenzdiagnose: ${g.de}.`,
+    en: `Dementia diagnosis: ${g.en}.`,
+    pl: `Rozpoznana demencja: ${g.pl}.`,
+  };
+}
+
+// customer_caregiver_wish.gender (wunschGeschlecht) — preferred caregiver
+// gender. NOT the patient gender (that comes from anrede).
+function wishGenderToApi(v: string): 'female' | 'male' | 'not_important' | null {
+  if (v === 'Weiblich') return 'female';
+  if (v === 'Männlich') return 'male';
+  if (v === 'Egal') return 'not_important';
+  return null;
+}
+
+// customer_caregiver_wish.smoking — caregiver smoking preference (yes
+// means "smoking caregiver is OK"). Form question is "Darf die
+// Betreuungsperson rauchen?". Default to "yes_outside" for Ja since
+// that's the prod-most-common positive answer (5169 vs 142 plain "yes").
+function wishSmokingToApi(v: string): 'yes_outside' | 'no' | null {
+  if (v === 'Ja') return 'yes_outside';
+  if (v === 'Nein') return 'no';
+  return null;
 }
 
 // Build a single patient object for UpdateCustomer.patients[].
@@ -172,10 +247,30 @@ function buildPatient(
   if (gewicht) p.weight = gewicht;
   if (groesse) p.height = groesse;
 
-  const lift = hebenToApi(heben);
+  const lift = liftIdToApi(heben);
   if (lift !== null) p.lift_id = lift;
 
+  // Dementia gradation lives in dementia_description (4 locales).
+  // Mamamia.dementia is just yes/no — without this, "Mittelgradig" vs
+  // "Schwer" looks identical to the agency.
+  const demDesc = dementiaDescriptionFromForm(demenz);
+  if (demDesc) {
+    p.dementia_description = demDesc.de;
+    p.dementia_description_de = demDesc.de;
+    p.dementia_description_en = demDesc.en;
+    p.dementia_description_pl = demDesc.pl;
+  }
+
   return p;
+}
+
+export interface CaregiverWishPatch {
+  gender?: 'female' | 'male' | 'not_important';
+  smoking?: 'yes_outside' | 'no';
+  tasks?: string;
+  tasks_de?: string;
+  other_wishes?: string;
+  other_wishes_de?: string;
 }
 
 export interface MappedCustomerPatch {
@@ -184,10 +279,18 @@ export interface MappedCustomerPatch {
   other_people_in_house?: string;
   has_family_near_by?: 'yes' | 'no';
   internet?: 'yes' | 'no';
-  smoking_household?: 'yes' | 'no';
   accommodation?: string;
   location_id?: number;
   location_custom_text?: string;
+  // ── Newly mapped (post-2026-04-28 audit) ──
+  urbanization_id?: number;
+  day_care_facility?: 'yes' | 'no';
+  pets?: string;
+  is_pet_dog?: boolean;
+  is_pet_cat?: boolean;
+  is_pet_other?: boolean;
+  caregiver_accommodated?: string;
+  customer_caregiver_wish?: CaregiverWishPatch;
   // Patient array.
   patients?: Array<Record<string, unknown>>;
 }
@@ -242,17 +345,31 @@ export function mapPatientFormToUpdateCustomerInput(
     patch.location_custom_text = `${form.plz} ${form.ort}`.trim();
   }
 
-  // Customer-level enums (verified vs prod DB 2026-04-27).
+  // ── Customer-level fields ────────────────────────────────────────────
   const acc = accommodationToApi(form.wohnungstyp);
   if (acc) patch.accommodation = acc;
+
+  const urb = urbanizationIdToApi(form.urbanisierung);
+  if (urb !== null) patch.urbanization_id = urb;
+
+  const dcf = dayCareFacilityToApi(form.pflegedienst);
+  if (dcf) patch.day_care_facility = dcf;
+
+  const petsObj = petsToApi(form.tiere);
+  if (petsObj.pets) {
+    patch.pets = petsObj.pets;
+    patch.is_pet_dog = petsObj.is_pet_dog;
+    patch.is_pet_cat = petsObj.is_pet_cat;
+    patch.is_pet_other = petsObj.is_pet_other;
+  }
+
+  const cga = caregiverAccommodatedToApi(form.unterbringung);
+  if (cga) patch.caregiver_accommodated = cga;
 
   // other_people_in_house — derive from anzahl: 2 patients = yes, 1 = no.
   // (Form's `haushalt` field is read-only prefill from formularDaten.)
   if (form.anzahl === '2') patch.other_people_in_house = 'yes';
   else if (form.anzahl === '1') patch.other_people_in_house = 'no';
-
-  const smoke = smokingHouseholdToApi(form.rauchen);
-  if (smoke) patch.smoking_household = smoke;
 
   const fam = yesNoToApi(form.familieNahe);
   if (fam) patch.has_family_near_by = fam;
@@ -260,13 +377,31 @@ export function mapPatientFormToUpdateCustomerInput(
   const net = yesNoToApi(form.internet);
   if (net) patch.internet = net;
 
-  // Combine free-text fields into job_description (best-fit placeholder).
-  const jobDescriptionParts: string[] = [];
-  if (form.diagnosen) jobDescriptionParts.push(`Diagnosen: ${form.diagnosen}`);
-  if (form.aufgaben) jobDescriptionParts.push(`Aufgaben: ${form.aufgaben}`);
-  if (form.sonstigeWuensche) jobDescriptionParts.push(`Sonstige Wünsche: ${form.sonstigeWuensche}`);
-  if (jobDescriptionParts.length > 0) {
-    patch.job_description = jobDescriptionParts.join('\n\n');
+  // ── customer_caregiver_wish nested ───────────────────────────────────
+  // wunschGeschlecht / rauchen / aufgaben / sonstigeWuensche all live
+  // here — they are caregiver preferences, NOT customer attributes.
+  // Pre-2026-04-28 audit they leaked into smoking_household + job_description.
+  const wish: CaregiverWishPatch = {};
+  const wg = wishGenderToApi(form.wunschGeschlecht);
+  if (wg) wish.gender = wg;
+  const ws = wishSmokingToApi(form.rauchen);
+  if (ws) wish.smoking = ws;
+  if (form.aufgaben) {
+    wish.tasks = form.aufgaben;
+    wish.tasks_de = form.aufgaben;
+  }
+  if (form.sonstigeWuensche) {
+    wish.other_wishes = form.sonstigeWuensche;
+    wish.other_wishes_de = form.sonstigeWuensche;
+  }
+  if (Object.keys(wish).length > 0) {
+    patch.customer_caregiver_wish = wish;
+  }
+
+  // ── job_description: ONLY medical diagnoses now ─────────────────────
+  // aufgaben/sonstigeWuensche moved out (they belong on the wish row).
+  if (form.diagnosen) {
+    patch.job_description = `Diagnosen: ${form.diagnosen}`;
   }
 
   return patch;

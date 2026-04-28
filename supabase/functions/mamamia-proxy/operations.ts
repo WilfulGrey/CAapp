@@ -295,6 +295,11 @@ export const STORE_REQUEST = /* GraphQL */ `
 `;
 
 // K4 — patient form persistence. id from session (not variables) — ownership.
+// Field set extended after 2026-04-28 mapping audit: pets/urbanization_id/
+// caregiver_accommodated/day_care_facility now propagate from the form,
+// and customer_caregiver_wish carries the caregiver-side prefs (gender,
+// smoking, tasks, other_wishes) instead of leaking into smoking_household
+// and job_description.
 export const UPDATE_CUSTOMER = /* GraphQL */ `
   mutation UpdateCustomer(
     $id: Int
@@ -307,13 +312,19 @@ export const UPDATE_CUSTOMER = /* GraphQL */ `
     $urbanization_id: Int
     $job_description: String
     $accommodation: String
+    $caregiver_accommodated: String
     $other_people_in_house: String
     $has_family_near_by: String
     $smoking_household: String
     $internet: String
     $day_care_facility: String
     $caregiver_time_off: String
+    $pets: String
+    $is_pet_dog: Boolean
+    $is_pet_cat: Boolean
+    $is_pet_other: Boolean
     $patients: [PatientInputType]
+    $customer_caregiver_wish: CustomerCaregiverWishInputType
   ) {
     UpdateCustomer(
       id: $id
@@ -326,13 +337,19 @@ export const UPDATE_CUSTOMER = /* GraphQL */ `
       urbanization_id: $urbanization_id
       job_description: $job_description
       accommodation: $accommodation
+      caregiver_accommodated: $caregiver_accommodated
       other_people_in_house: $other_people_in_house
       has_family_near_by: $has_family_near_by
       smoking_household: $smoking_household
       internet: $internet
       day_care_facility: $day_care_facility
       caregiver_time_off: $caregiver_time_off
+      pets: $pets
+      is_pet_dog: $is_pet_dog
+      is_pet_cat: $is_pet_cat
+      is_pet_other: $is_pet_other
       patients: $patients
+      customer_caregiver_wish: $customer_caregiver_wish
     ) {
       id
       customer_id
