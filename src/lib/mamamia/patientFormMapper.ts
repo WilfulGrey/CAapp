@@ -203,6 +203,11 @@ function wishSmokingToApi(v: string): 'yes_outside' | 'no' | null {
   return null;
 }
 
+// driving_license is NOT in the in-portal patient form (that's a stage-A
+// formularDaten question — handled by backend onboard mapper). So this
+// frontend mapper has nothing to send here, and consequently no need to
+// supply driving_license_gearbox either.
+
 // Build a single patient object for UpdateCustomer.patients[].
 // Threading existing `patientId` is critical — Mamamia SILENTLY DROPS fields
 // like night_operations and incontinence when patient is new (no id) inside

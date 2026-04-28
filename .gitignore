@@ -7,3 +7,4 @@ supabase/.temp/
 .env.*.local
 .claude/
 coverage/
+project 3/

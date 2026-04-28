@@ -422,11 +422,17 @@ export function mapDrivingLicense(
 // fuehrerschein, geschlecht) is preferred; prod-most-common defaults
 // only when calculator didn't capture it.
 export function buildCaregiverWish(fd: FormularDaten): CaregiverWishInput {
-  return {
+  // When driving_license=yes the panel form requires
+  // driving_license_gearbox (automatic / manual). Default 'automatic' —
+  // prod-most-common (712 vs 547) and the more permissive choice (any
+  // licensed caregiver can drive it). Skip when driving_license is
+  // not_important (no follow-up question shown).
+  const drivingLicense = mapDrivingLicense(fd);
+  const wish: CaregiverWishInput = {
     is_open_for_all: false,
     gender: mapGender(fd) ?? "not_important",
     germany_skill: mapGermanySkill(fd),
-    driving_license: mapDrivingLicense(fd),
+    driving_license: drivingLicense,
     smoking: "yes_outside",
     shopping: "no",
     // Free-text fields — ship a sensible auto-string so customer.tasks
@@ -441,6 +447,10 @@ export function buildCaregiverWish(fd: FormularDaten): CaregiverWishInput {
     shopping_be_done_en: "By arrangement",
     shopping_be_done_pl: "Wedle uzgodnienia",
   };
+  if (drivingLicense === "yes") {
+    wish.driving_license_gearbox = "automatic";
+  }
+  return wish;
 }
 
 // ─── Extract PLZ from a lead ────────────────────────────────────────────────
