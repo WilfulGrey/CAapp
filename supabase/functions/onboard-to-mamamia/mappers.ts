@@ -452,10 +452,12 @@ export function buildJobDescription(fd: FormularDaten): {
 export function buildCustomerInput(
   lead: Lead,
   locationId: number | null = null,
+  nowISO: string = new Date().toISOString(),
 ): CustomerInput {
   const fd = lead.kalkulation?.formularDaten ?? {};
   const careBudget = lead.kalkulation?.bruttopreis ?? null;
   const desc = buildJobDescription(fd);
+  const arrivalAt = computeArrivalDate(lead.care_start_timing, nowISO);
 
   return {
     first_name: lead.vorname,
@@ -480,6 +482,9 @@ export function buildCustomerInput(
     // 780 (1890), 790 (1140), 730 (507), 0 (15). Panel form rejects 0,
     // so set 300 as the Primundus baseline (per K7 product decision).
     commission_agent_salary: 300,
+    // arrival_at — same value as JobOffer.arrival_at; Customer-active
+    // gate requires it (Mamamia Laravel: $customer->arrival_at && ...).
+    arrival_at: arrivalAt,
     visibility: "public",
     accommodation: "single_family_house",
     caregiver_accommodated: "room_premises",

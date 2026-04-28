@@ -191,6 +191,9 @@ Deno.test("onboardLead: StoreCustomer payload carries every must-fill field", as
   assertEquals(v.care_budget, 3200);
   assertEquals(v.monthly_salary, 3200);
   assertEquals(v.commission_agent_salary, 300);
+  // arrival_at on Customer (separate gate from JobOffer)
+  // NOW=2026-04-23 + 7 days (sofort) → 2026-04-30
+  assertEquals(v.arrival_at, "2026-04-30");
 
   // Job description i18n — non-empty in all 4 locales
   for (const k of ["job_description", "job_description_de", "job_description_en", "job_description_pl"]) {

@@ -52,6 +52,7 @@ const STORE_CUSTOMER = /* GraphQL */ `
     $location_id: Int, $urbanization_id: Int, $language_id: Int,
     $equipment_ids: [Int], $day_care_facility: String,
     $care_budget: Float, $monthly_salary: Float, $commission_agent_salary: Float,
+    $arrival_at: String,
     $visibility: String,
     $accommodation: String, $caregiver_accommodated: String,
     $has_family_near_by: String, $internet: String, $pets: String,
@@ -72,6 +73,7 @@ const STORE_CUSTOMER = /* GraphQL */ `
       equipment_ids: $equipment_ids, day_care_facility: $day_care_facility,
       care_budget: $care_budget, monthly_salary: $monthly_salary,
       commission_agent_salary: $commission_agent_salary,
+      arrival_at: $arrival_at,
       visibility: $visibility,
       accommodation: $accommodation, caregiver_accommodated: $caregiver_accommodated,
       has_family_near_by: $has_family_near_by, internet: $internet, pets: $pets,
@@ -191,7 +193,8 @@ export async function onboardLead(opts: OnboardOptions): Promise<OnboardResult &
   });
 
   // 6. StoreCustomer — full payload (customer + wish + patients + contracts + contacts)
-  const customerInput = buildCustomerInput(lead, locationId);
+  const nowISO = now().toISOString();
+  const customerInput = buildCustomerInput(lead, locationId, nowISO);
 
   const customerResp = await mamamiaRequest<{
     StoreCustomer: { id: number; customer_id: string; status: string };
@@ -206,8 +209,8 @@ export async function onboardLead(opts: OnboardOptions): Promise<OnboardResult &
   const mamamiaCustomerId = customerResp.StoreCustomer.id;
   const careBudget = lead.kalkulation?.bruttopreis ?? null;
 
-  // 6. StoreJobOffer
-  const arrivalAt = computeArrivalDate(lead.care_start_timing, now().toISOString());
+  // 7. StoreJobOffer — arrival_at must match Customer.arrival_at (set above)
+  const arrivalAt = computeArrivalDate(lead.care_start_timing, nowISO);
   const title = buildJobOfferTitle(lead);
 
   const joResp = await mamamiaRequest<{

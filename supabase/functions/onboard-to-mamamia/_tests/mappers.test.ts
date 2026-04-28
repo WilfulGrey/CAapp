@@ -525,6 +525,11 @@ Deno.test("buildCustomerInput: every must-fill field is set for active-state cus
   assertEquals(input.monthly_salary, 3200);
   // Primundus default commission — panel rejects 0
   assertEquals(input.commission_agent_salary, 300);
+  // arrival_at on Customer (separate from JobOffer) — Mamamia
+  // active-state gate requires it. computeArrivalDate("sofort") = +7d.
+  if (typeof input.arrival_at !== "string" || input.arrival_at.length === 0) {
+    throw new Error("expected input.arrival_at to be non-empty YYYY-MM-DD");
+  }
 
   // Job description set in all 4 locales
   if (!input.job_description || input.job_description.length === 0) {

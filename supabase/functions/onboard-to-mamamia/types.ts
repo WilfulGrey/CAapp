@@ -198,6 +198,11 @@ export interface CustomerInput {
   // Agent commission — panel form rejects 0. 365 is the prod-most-common
   // value for low-bracket customers; we set 300 as the Primundus default.
   commission_agent_salary?: number;
+  // arrival_at — Customer-level, separate from JobOffer.arrival_at.
+  // Required by the "complete state" gate in Mamamia's customer-active
+  // check (Laravel: $customer->arrival_at && ...).
+  arrival_at?: string;
+  departure_at?: string;
   // Visibility / publication state
   visibility?: "public" | "public_limited" | "hide";
   // Living conditions (3-5 enum values — prod-most-common as defaults)
