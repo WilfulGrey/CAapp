@@ -429,7 +429,7 @@ const CustomerPortalPage: FC = () => {
               <p className="text-xs text-gray-400 mt-0.5">Sie erhalten eine E-Mail sobald eine Pflegekraft sich bewirbt.</p>
               <div className="flex items-center gap-1.5 mt-1.5">
                 <svg className="w-3 h-3 text-[#22A06B] flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>
-                <span className="text-xs font-medium text-[#22A06B]">graefinnorman@gmx.de</span>
+                <span className="text-xs font-medium text-[#22A06B]">{lead?.email ?? mmCustomer?.email ?? ''}</span>
               </div>
             </div>
           </div>

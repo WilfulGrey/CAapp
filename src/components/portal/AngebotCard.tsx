@@ -27,22 +27,21 @@ export const AngebotCard: FC<{
   onSaveToMamamia?: (form: PatientForm) => Promise<void>;
 }> = ({ lead, onPatientSaved, triggerOpenPatient, onTriggerHandled, mamamiaEnabled, onSaveToMamamia }) => {
   // ─── Derive display values from lead (or fallback to demo data) ──────────────
+  // No demo-mode hardcodes (CLAUDE.md §1: real backend or visible failure).
+  // When lead is missing, fields render empty — parent decides whether to
+  // gate the card behind a loading/error state.
   const kalk = lead?.kalkulation;
-  const bruttopreis = kalk ? formatEuro(kalk.bruttopreis) : '3.050 €';
-  const eigenanteil = kalk ? formatEuro(kalk.eigenanteil) : '2.075 €';
-  const nachname = cap(lead?.nachname) || 'Von Norman';
-  const displayAngebot = `${nachname} · ${bruttopreis}/Mo.`;
+  const bruttopreis = kalk ? formatEuro(kalk.bruttopreis) : '';
+  const eigenanteil = kalk ? formatEuro(kalk.eigenanteil) : '';
+  const nachname = cap(lead?.nachname) || '';
+  const displayAngebot = nachname ? `${nachname} · ${bruttopreis}/Mo.` : bruttopreis;
   const careStart = careStartLabel(lead?.care_start_timing ?? null);
-  const angebotDatum = lead ? formatDate(lead.created_at) : '15.04.2026';
-  const gueltigBis = lead ? addDays(lead.created_at, 30) : '15.05.2026';
-  const kundenEmail = lead?.email ?? 'graefinnorman@gmx.de';
-  const kundenName = lead ? leadDisplayName(lead) : 'Frau Von Norman';
-  const greeting = lead ? leadGreeting(lead) : 'Sehr geehrte Frau Von Norman';
-  const zuschüsse = kalk?.['zuschüsse']?.items?.filter(z => z.in_kalkulation) ?? [
-    { label: 'Pflegegeld (Pflegegrad 2)', betrag_monatlich: 347 },
-    { label: 'Entlastungsbudget (anteilig mt.)', betrag_monatlich: 295 },
-    { label: 'Steuervorteile § 35a EStG', betrag_monatlich: 333 },
-  ];
+  const angebotDatum = lead ? formatDate(lead.created_at) : '';
+  const gueltigBis = lead ? addDays(lead.created_at, 30) : '';
+  const kundenEmail = lead?.email ?? '';
+  const kundenName = lead ? leadDisplayName(lead) : '';
+  const greeting = lead ? leadGreeting(lead) : '';
+  const zuschüsse = kalk?.['zuschüsse']?.items?.filter(z => z.in_kalkulation) ?? [];
   const [angebotOpen, setAngebotOpen] = useState(false);
   const [patientOpen, setPatientOpen] = useState(false);
   const [step, setStep] = useState(0);
