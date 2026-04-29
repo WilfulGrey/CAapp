@@ -115,6 +115,20 @@ export function useMatchings(
   };
 }
 
+// Set of caregiver IDs that already have an invite Request. Backend
+// derives via JobOfferMatchingsWithPagination(filters:{is_request:true}) —
+// the only working signal, since Matching.is_request field is null even
+// when the row is request-flagged. Used to render persistent
+// "Eingeladen" status across page refreshes.
+export function useInvitedCaregivers(enabled = true) {
+  const state = useMamamiaQuery<{ caregiver_ids: number[] }>(
+    'listInvitedCaregiverIds',
+    {},
+    enabled,
+  );
+  return { ...state, data: state.data?.caregiver_ids ?? null };
+}
+
 export function useCaregiver(id: number | null) {
   const state = useMamamiaQuery<{ Caregiver: MamamiaCaregiverFull | null }>(
     id ? 'getCaregiver' : null,

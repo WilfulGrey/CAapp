@@ -7,7 +7,7 @@ import {
   Lead,
 } from '../lib/supabase';
 import { useMamamiaSession } from '../hooks/useMamamiaSession';
-import { useCustomer, useJobOffer, useApplications, useMatchings, useCaregiver } from '../lib/mamamia/hooks';
+import { useCustomer, useJobOffer, useApplications, useMatchings, useCaregiver, useInvitedCaregivers } from '../lib/mamamia/hooks';
 import {
   useRejectApplication,
   useStoreConfirmation,
@@ -89,6 +89,9 @@ const CustomerPortalPage: FC = () => {
   const { data: mmJobOffer } = useJobOffer(mmReady);
   const { data: mmApplications, refetch: refetchApplications } = useApplications({ limit: 20 }, mmReady);
   const { data: mmMatchings } = useMatchings({ limit: 20 }, mmReady);
+  // Set of caregiver IDs already invited (Request rows in Mamamia). Used
+  // below to seed nurseStatuses with 'invited' so the badge survives F5.
+  const { data: invitedCaregiverIds, refetch: refetchInvited } = useInvitedCaregivers(mmReady);
 
   // K5 mutations
   const rejectAppMutation = useRejectApplication();
@@ -143,6 +146,25 @@ const CustomerPortalPage: FC = () => {
       });
     });
   }, [mmReady, mmApplications]);
+
+  // Seed nurseStatuses with 'invited' for caregivers that already have a
+  // Request in Mamamia. Without this the badge state lives only in
+  // memory — F5 wipes it and the user re-sees "Einladen" on already-
+  // invited cgs (UX bug; could even double-invite). We merge instead of
+  // replace so locally-set 'declined' overlays survive a refetch.
+  useEffect(() => {
+    if (!mmReady || !invitedCaregiverIds || effectiveMatched.length === 0) return;
+    const invitedSet = new Set(invitedCaregiverIds);
+    setNurseStatuses(prev => {
+      const next: NurseStatuses = { ...prev };
+      effectiveMatched.forEach((m, idx) => {
+        if (invitedSet.has(m.caregiverId) && next[idx] !== 'declined') {
+          next[idx] = 'invited';
+        }
+      });
+      return next;
+    });
+  }, [mmReady, invitedCaregiverIds, effectiveMatched]);
 
   const animateThenProcess = (id: string, fn: () => void) => {
     setExitingIds(prev => new Set([...prev, id]));
@@ -261,6 +283,9 @@ const CustomerPortalPage: FC = () => {
       await inviteMutation.mutate({ caregiver_id: match.caregiverId });
       // Persist invited state ONLY after backend confirmed.
       setNurseStatuses((prev) => ({ ...prev, [idx]: 'invited' }));
+      // Refetch the invited-IDs set so a subsequent F5 already sees this
+      // caregiver as invited (without depending on local state survival).
+      refetchInvited();
       if (nurseName) {
         setApplications((prev) =>
           prev.map((a) => a.nurse.name === nurseName ? { ...a, isInvited: true } : a)

@@ -6,6 +6,7 @@ import {
   GET_CUSTOMER,
   GET_JOB_OFFER,
   LIST_APPLICATIONS,
+  LIST_INVITED_CAREGIVER_IDS,
   LIST_MATCHINGS,
   REJECT_APPLICATION,
   SEARCH_LOCATIONS,
@@ -64,6 +65,24 @@ const listMatchings: ActionHandler = (session, variables, deps) => {
   if (filters && Object.keys(filters).length > 0) payload.filters = filters;
   if (typeof order_by === "string" && order_by.length > 0) payload.order_by = order_by;
   return runGraphQL(deps, LIST_MATCHINGS, payload);
+};
+
+// Returns the set of caregiver IDs that already have an invite Request
+// against this customer's job offer. Frontend uses it to render
+// status='invited' on first load — without this the portal can't tell
+// invited cgs apart from un-invited ones across page refreshes.
+//
+// We unwrap the GraphQL pagination shape into a flat { caregiver_ids }
+// payload so the client doesn't have to relearn it.
+const listInvitedCaregiverIds: ActionHandler = async (session, _variables, deps) => {
+  const r = await runGraphQL<{
+    JobOfferMatchingsWithPagination: {
+      total: number;
+      data: Array<{ caregiver: { id: number } }>;
+    };
+  }>(deps, LIST_INVITED_CAREGIVER_IDS, { job_offer_id: session.job_offer_id });
+  const ids = r.JobOfferMatchingsWithPagination.data.map(m => m.caregiver.id);
+  return { caregiver_ids: ids };
 };
 
 // ─── Public/open actions (id from variables) ────────────────────────────────
@@ -326,6 +345,7 @@ export const ACTIONS: Record<ProxyAction, ActionHandler> = {
   getCustomer,
   listApplications,
   listMatchings,
+  listInvitedCaregiverIds,
   getCaregiver,
   searchLocations,
   updateCustomer,

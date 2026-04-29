@@ -265,6 +265,28 @@ export const STORE_CONFIRMATION = /* GraphQL */ `
   }
 `;
 
+// Invited caregivers — lightweight Set source-of-truth. Mamamia exposes
+// Matching.is_request as null in the default field selection, but the
+// `filters: {is_request: true}` server-side filter on
+// JobOfferMatchingsWithPagination correctly returns only matchings that
+// have a Request row backing them. We use that filter to derive the set
+// of caregiver IDs the portal should render with status='invited'.
+export const LIST_INVITED_CAREGIVER_IDS = /* GraphQL */ `
+  query ListInvitedCaregiverIds($job_offer_id: Int!) {
+    JobOfferMatchingsWithPagination(
+      job_offer_id: $job_offer_id
+      filters: { is_request: true }
+      limit: 100
+      page: 1
+    ) {
+      total
+      data {
+        caregiver { id }
+      }
+    }
+  }
+`;
+
 // K7 — agency-side caregiver invite. This is the mutation the Mamamia panel
 // UI fires when an agency admin clicks "wyślij zaproszenie" on a customer's
 // matching list (verified live on beta 2026-04-28 by inspecting DevTools).

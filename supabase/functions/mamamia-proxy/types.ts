@@ -9,6 +9,7 @@ export type ProxyAction =
   | "getCustomer"
   | "listApplications"
   | "listMatchings"
+  | "listInvitedCaregiverIds"
   | "getCaregiver"
   | "searchLocations"
   // writes
