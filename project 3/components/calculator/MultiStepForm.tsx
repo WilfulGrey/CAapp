@@ -26,6 +26,10 @@ export function MultiStepForm() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showResults, setShowResults] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
+  // Captured from /api/angebot-anfordern response — drives the auto-
+  // redirect into the CA app (kundenportal) on the success screen.
+  const [portalUrl, setPortalUrl] = useState<string | null>(null);
+  const [redirectCountdown, setRedirectCountdown] = useState<number | null>(null);
 
   const totalSteps = 11; // 10 Fragen + Kontaktformular
   const stepStartRef = useRef<number>(Date.now());
@@ -220,6 +224,12 @@ export function MultiStepForm() {
             conversion_value: kalkulation.bruttopreis,
           });
         }
+        // Capture handoff URL so the success screen can auto-redirect into
+        // the CA app. Falls back to the old static success UI when the
+        // server didn't ship NEXT_PUBLIC_PORTAL_URL (dev safety net).
+        if (typeof data.portalUrl === 'string' && data.portalUrl.length > 0) {
+          setPortalUrl(data.portalUrl);
+        }
         setShowSuccess(true);
       } else {
         throw new Error('Fehler beim Anfordern des Angebots');
@@ -268,6 +278,27 @@ export function MultiStepForm() {
     }
   };
 
+  // Auto-redirect into the CA app once the success screen has rendered.
+  // Visible 3-2-1 countdown so the page jump doesn't surprise the user;
+  // manual click on the button (rendered below) skips the wait. Effect
+  // is no-op when portalUrl is null (dev / NEXT_PUBLIC_PORTAL_URL unset).
+  useEffect(() => {
+    if (!showSuccess || !portalUrl) return;
+    setRedirectCountdown(3);
+    const interval = setInterval(() => {
+      setRedirectCountdown((prev) => {
+        if (prev == null) return null;
+        if (prev <= 1) {
+          clearInterval(interval);
+          window.location.assign(portalUrl);
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [showSuccess, portalUrl]);
+
   // Success-Ansicht nach erfolgreichem Submit
   if (showSuccess) {
     return (
@@ -281,11 +312,29 @@ export function MultiStepForm() {
               Vielen Dank!
             </h2>
             <p className="text-sm text-[#5A5A5A]">
-              Ihre Anfrage wurde erfolgreich übermittelt
+              {portalUrl
+                ? <>Sie werden gleich zu Ihrer persönlichen Pflegekraft-Auswahl weitergeleitet
+                  {redirectCountdown != null && redirectCountdown > 0 && (
+                    <> in <span className="font-bold text-[#2D5C2F]">{redirectCountdown}</span>…</>
+                  )}</>
+                : "Ihre Anfrage wurde erfolgreich übermittelt"}
             </p>
           </div>
 
           <div className="px-4 sm:px-8 py-8">
+            {portalUrl && (
+              <div className="mb-6 text-center">
+                <a
+                  href={portalUrl}
+                  className="inline-block w-full sm:w-auto px-8 py-3.5 bg-gradient-to-r from-[#2D5C2F] to-[#1F4421] text-white rounded-xl text-base font-bold hover:shadow-lg transition-all"
+                >
+                  Pflegekraft jetzt finden →
+                </a>
+                <p className="text-xs text-[#8B8B8B] mt-3">
+                  Eine Bestätigungs-E-Mail mit Ihrem persönlichen Portal-Link ist unterwegs — der Link bleibt 14 Tage aktiv.
+                </p>
+              </div>
+            )}
             <div className="bg-[#F8F7F5] rounded-xl p-6 mb-6">
               <div className="flex items-start gap-3 mb-4">
                 <CheckCircle2 className="w-5 h-5 text-[#4CAF50] mt-0.5 flex-shrink-0" />
