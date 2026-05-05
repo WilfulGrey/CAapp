@@ -48,12 +48,12 @@ export function getEmailLayout({ content, preheader, siteUrl }: EmailLayoutProps
 
     .email-header {
       background: #ffffff;
-      padding: 30px 30px 20px 30px;
-      border-bottom: 4px solid #B5A184;
+      padding: 24px 40px 20px 40px;
+      border-bottom: 1px solid #f0ebe4;
     }
 
     .email-header img {
-      max-width: 180px;
+      max-width: 160px;
       height: auto;
       display: block;
     }
@@ -66,7 +66,8 @@ export function getEmailLayout({ content, preheader, siteUrl }: EmailLayoutProps
     }
 
     .email-content {
-      padding: 40px 30px;
+      padding: 40px 40px 32px;
+      text-align: left;
     }
 
     .email-content p {
@@ -74,6 +75,7 @@ export function getEmailLayout({ content, preheader, siteUrl }: EmailLayoutProps
       font-size: 16px;
       line-height: 1.6;
       color: #333333;
+      text-align: left;
     }
 
     .email-content ul, .email-content ol {
@@ -259,9 +261,29 @@ export function getEmailLayout({ content, preheader, siteUrl }: EmailLayoutProps
         <td align="center">
           <div class="email-container">
             <div class="email-header">
-              <img src="${baseUrl}/images/Primundus-Logo_V6.png" alt="Primundus Logo" style="max-width: 180px; height: auto; display: block;" />
+              <table width="100%" cellpadding="0" cellspacing="0" role="presentation">
+                <tr>
+                  <td style="vertical-align: middle;">
+                    <img src="${baseUrl}/images/Primundus-Logo_V6.png" alt="Primundus Logo" style="max-width: 160px; height: auto; display: block;" />
+                  </td>
+                  <td style="vertical-align: middle; text-align: right;">
+                    <table cellpadding="0" cellspacing="0" role="presentation" style="margin-left: auto;">
+                      <tr>
+                        <td style="text-align: center; vertical-align: middle; padding-right: 8px; border-right: 1px solid #f0ebe4;">
+                          <img src="${baseUrl}/images/primundus_testsieger-2021.webp" alt="Testsieger DIE WELT" width="36" style="display: block; width: 36px; height: auto;" />
+                        </td>
+                        <td style="text-align: left; padding-left: 8px;">
+                          <p style="margin: 0 0 1px 0; font-size: 10px; font-weight: 700; color: #3D2B1F; white-space: nowrap;">Testsieger</p>
+                          <p style="margin: 0 0 1px 0; font-size: 10px; color: #B5A184; white-space: nowrap; font-weight: 600;">DIE WELT</p>
+                          <p style="margin: 0; font-size: 9px; color: #aaa; white-space: nowrap;">Preis &amp; Qualität</p>
+                        </td>
+                      </tr>
+                    </table>
+                  </td>
+                </tr>
+              </table>
             </div>
-            <div class="email-content">
+            <div class="email-content" style="text-align:left;">
               ${content}
             </div>
             <div class="email-footer">

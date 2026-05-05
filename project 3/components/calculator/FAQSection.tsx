@@ -13,7 +13,7 @@ export function FAQSection() {
   const faqs: FAQItem[] = [
     {
       question: "Was kostet eine 24-Stunden-Pflege ungefähr?",
-      answer: "Die Kosten variieren je nach Pflegebedarf und Qualifikation der Betreuungskraft. Mit unserem Online-Rechner erhalten Sie in 2 Minuten Ihren individuellen Preis – inklusive möglicher Zuschüsse durch die Pflegekasse, die den Eigenanteil erheblich senken können."
+      answer: "Die Kosten variieren je nach Pflegebedarf und Qualifikation der Betreuungskraft. In 2 Minuten sehen Sie sofort Ihr persönliches Angebot & passende Pflegekräfte – inklusive möglicher Zuschüsse durch die Pflegekasse, die den Eigenanteil erheblich senken können."
     },
     {
       question: "Wie schnell kann eine Betreuungskraft starten?",
@@ -29,7 +29,7 @@ export function FAQSection() {
     },
     {
       question: "Welche Zuschüsse kann ich von der Pflegekasse erhalten?",
-      answer: "Je nach Pflegegrad können Sie Verhinderungspflege, Pflegegeld und weitere Leistungen nutzen. In unserer Kalkulation zeigen wir Ihnen genau, welche Zuschüsse Ihnen zustehen und wie sich der Eigenanteil reduziert."
+      answer: "Je nach Pflegegrad können Sie Verhinderungspflege, Pflegegeld und weitere Leistungen nutzen. In Ihrem Angebot zeigen wir Ihnen genau, welche Zuschüsse Ihnen zustehen und wie sich der Eigenanteil reduziert."
     },
     {
       question: "Sind die Betreuungskräfte qualifiziert?",

@@ -4,11 +4,7 @@ import { Clock, Mail, Check } from 'lucide-react';
 
 export function HowItWorks() {
   const scrollToCalculator = () => {
-    // Scroll to top of page where the wizard/form is located
-    window.scrollTo({
-      top: 0,
-      behavior: 'smooth'
-    });
+    const el = document.getElementById('calculator-form'); if (el) { window.scrollTo({ top: el.getBoundingClientRect().top + window.pageYOffset - 90, behavior: 'smooth' }); }
   };
 
   return (
@@ -34,7 +30,7 @@ export function HowItWorks() {
                 Angebot online einholen
               </h3>
               <p className="text-[14px] md:text-[15px] lg:text-[16px] leading-[1.55] text-[#5A5A5A] mb-2.5 md:text-center">
-                Beantworten Sie wenige kurze Fragen zu Ihrer Pflegesituation. Sie erhalten einen individuellen Preis – inklusive möglicher Zuschüsse und Steuervorteile.
+                Beantworten Sie wenige kurze Fragen zu Ihrer Pflegesituation. Sie sehen sofort Ihr Angebot & passende Pflegekräfte – inklusive möglicher Zuschüsse und Steuervorteile.
               </p>
               <span className="inline-flex items-center gap-1.5 bg-[#E8F5E9] text-[#2E7D32] px-3 py-1.5 rounded-lg text-xs font-semibold md:mx-auto">
                 <Clock className="w-3.5 h-3.5" strokeWidth={2} />
@@ -91,7 +87,7 @@ export function HowItWorks() {
             onClick={scrollToCalculator}
             className="inline-flex items-center gap-2 px-8 py-4 bg-[#E76F63] hover:bg-[#D65E52] text-white font-bold text-base md:text-lg rounded-full transition-all duration-200 shadow-lg hover:shadow-xl"
           >
-            Betreuung anfragen
+            Kosten & Pflegekräfte ansehen
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
             </svg>

@@ -97,66 +97,159 @@ function buildHalloAnrede(anrede: string | null, nachname: string, vorname: stri
 }
  
 function buildEmailWrapper(lead: Lead, siteUrl: string, content: string): string {
-  const logoUrl = `${siteUrl}/images/primundus_logo_header.webp`;
+  const logoUrl = `${siteUrl}/images/Primundus-Logo_V6.png`;
+  const testUrl = `${siteUrl}/images/primundus_testsieger-2021.webp`;
   return `<!DOCTYPE html>
 <html lang="de">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
   <title>Primundus 24h-Pflege</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; line-height: 1.6; color: #333333; background-color: #f4f4f4; }
+    .email-wrapper { width: 100%; background-color: #f4f4f4; padding: 20px 0; }
+    .email-container { max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+    .email-header { background: #ffffff; padding: 24px 40px 20px 40px; border-bottom: 1px solid #f0ebe4; }
+    .email-content { padding: 40px 40px 32px; text-align: left; }
+    .email-footer { background-color: #f8f9fa; padding: 30px; text-align: center; border-top: 1px solid #e0e0e0; }
+    @media only screen and (max-width: 600px) {
+      .email-content { padding: 30px 20px; }
+    }
+  </style>
 </head>
-<body style="margin:0;padding:0;background-color:#f0ede6;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;">
-  <table width="100%" cellpadding="0" cellspacing="0" role="presentation">
-    <tr><td align="center" style="padding:20px 16px;">
-      <div style="max-width:580px;margin:0 auto;background:#fff;border-radius:10px;overflow:hidden;box-shadow:0 2px 10px rgba(0,0,0,0.08);">
-        <div style="background:#fff;padding:14px 20px 12px;border-bottom:3px solid #B5A184;">
-          <table width="100%" cellpadding="0" cellspacing="0" role="presentation">
-            <tr>
-              <td style="vertical-align:middle;"><img src="${logoUrl}" alt="Primundus" style="height:24px;width:auto;display:block;" /></td>
-              <td style="vertical-align:middle;text-align:right;"><span style="display:inline-block;background:#2D6A4F;color:#fff;font-size:10px;font-weight:700;padding:4px 10px;border-radius:20px;white-space:nowrap;">✓ 100% sorgenfrei und ohne Risiko</span></td>
-            </tr>
-          </table>
-        </div>
-        <div style="padding:28px 28px;text-align:left;">
-          ${content}
-        </div>
-        <div style="background:#f8f9fa;padding:18px 24px;text-align:center;border-top:1px solid #e0e0e0;">
-          <div style="font-weight:600;font-size:13px;color:#3D2B1F;margin-bottom:4px;">Primundus Deutschland</div>
-          <div style="font-size:12px;color:#888;line-height:1.7;">
-            <a href="tel:+4989200000830" style="color:#B5A184;text-decoration:none;">+49 89 200 000 830</a> &middot;
-            <a href="mailto:info@primundus.de" style="color:#B5A184;text-decoration:none;">info@primundus.de</a> &middot;
-            <a href="https://primundus.de" style="color:#B5A184;text-decoration:none;">www.primundus.de</a>
+<body>
+  <div class="email-wrapper">
+    <table width="100%" cellpadding="0" cellspacing="0" role="presentation">
+      <tr><td align="center">
+        <div class="email-container">
+          <div class="email-header">
+            <table width="100%" cellpadding="0" cellspacing="0" role="presentation">
+              <tr>
+                <td style="vertical-align:middle;">
+                  <img src="${logoUrl}" alt="Primundus Logo" style="max-width:160px;height:auto;display:block;" />
+                </td>
+                <td style="vertical-align:middle;text-align:right;">
+                  <table cellpadding="0" cellspacing="0" role="presentation" style="margin-left:auto;">
+                    <tr>
+                      <td style="text-align:center;vertical-align:middle;padding-right:8px;border-right:1px solid #f0ebe4;">
+                        <img src="${testUrl}" alt="Testsieger DIE WELT" width="36" style="display:block;width:36px;height:auto;" />
+                      </td>
+                      <td style="text-align:left;padding-left:8px;">
+                        <p style="margin:0 0 1px 0;font-size:10px;font-weight:700;color:#3D2B1F;white-space:nowrap;">Testsieger</p>
+                        <p style="margin:0 0 1px 0;font-size:10px;color:#B5A184;white-space:nowrap;font-weight:600;">DIE WELT</p>
+                        <p style="margin:0;font-size:9px;color:#aaa;white-space:nowrap;">Preis &amp; Qualit&auml;t</p>
+                      </td>
+                    </tr>
+                  </table>
+                </td>
+              </tr>
+            </table>
           </div>
-          <div style="font-size:11px;color:#bbb;margin-top:10px;line-height:1.5;">
-            Diese E-Mail wurde versendet an: ${lead.email}<br>
-            Primundus Deutschland | Vitanas Group
+          <div class="email-content">
+            ${content}
+          </div>
+          <div class="email-footer">
+            <div style="font-weight:600;font-size:15px;color:#3D2B1F;margin-bottom:6px;">Primundus Deutschland</div>
+            <div style="font-size:13px;color:#666;line-height:1.8;">
+              24h-Pflege und Betreuung zu Hause<br>
+              <a href="tel:+4989200000830" style="color:#0066CC;text-decoration:none;">+49 89 200 000 830</a> |
+              <a href="mailto:info@primundus.de" style="color:#0066CC;text-decoration:none;">info@primundus.de</a><br>
+              <a href="https://primundus.de" style="color:#0066CC;text-decoration:none;">www.primundus.de</a>
+            </div>
+            <div style="font-size:12px;color:#999;margin-top:16px;line-height:1.5;">
+              Diese E-Mail wurde versendet an: ${lead.email}<br>
+              Primundus Deutschland | Vitanas Group<br><br>
+              Sie erhalten diese E-Mail, weil Sie eine Kalkulation auf primundus.de angefordert haben.
+            </div>
           </div>
         </div>
-      </div>
-    </td></tr>
-  </table>
+      </td></tr>
+    </table>
+  </div>
 </body>
 </html>`;
 }
  
 function buildIlkaSig(siteUrl: string): string {
   const ilkaUrl = `${siteUrl}/images/ilka-wysocki_pm-mallorca.webp`;
+  const testUrl = `${siteUrl}/images/primundus_testsieger-2021.webp`;
+  const mediaBase = `${siteUrl}/images/media`;
   return `
-    <div style="margin-top:20px;padding-top:16px;border-top:1px solid #eee;">
-      <div style="display:flex;align-items:center;gap:12px;margin-bottom:12px;">
-        <img src="${ilkaUrl}" alt="Ilka Wysocki" style="width:42px;height:42px;border-radius:50%;object-fit:cover;object-position:top;border:1.5px solid #F0997B;flex-shrink:0;" />
-        <div>
-          <div style="font-size:14px;font-weight:600;color:#2D1F0F;">Ilka Wysocki</div>
-          <div style="font-size:12px;color:#aaa;">Ihre persönliche Beraterin &middot; Mo&ndash;So 8&ndash;18 Uhr</div>
-          <div style="font-size:13px;font-weight:600;color:#E76F63;margin-top:2px;">089 200 000 830</div>
-        </div>
-      </div>
-      <div style="border-top:1px solid #f0ece5;padding-top:10px;text-align:center;">
-        <div style="font-size:11px;color:#aaa;line-height:1.8;">
-          20+ Jahre Erfahrung &nbsp;&middot;&nbsp; 60.000+ Einsätze &nbsp;&middot;&nbsp; Bestpreis-Garantie &nbsp;&middot;&nbsp; Testsieger DIE WELT
-        </div>
-      </div>
-    </div>`;
+    <p style="font-size:16px;line-height:1.7;color:#555;margin-top:24px;margin-bottom:16px;">Mit freundlichen Grüßen<br><strong style="color:#3D2B1F;">Ilka Wysocki</strong></p>
+    <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="margin:0 0 24px 0;border:1px solid #e8ddd0;border-radius:12px;overflow:hidden;">
+      <tr>
+        <td style="padding:18px 20px 16px;background:#ffffff;">
+          <table width="100%" cellpadding="0" cellspacing="0" role="presentation">
+            <tr>
+              <td style="vertical-align:top;">
+                <table cellpadding="0" cellspacing="0" role="presentation">
+                  <tr>
+                    <td style="padding-right:12px;vertical-align:top;">
+                      <img src="${ilkaUrl}" alt="Ilka Wysocki" width="60" style="display:block;width:60px;height:auto;border-radius:8px;" />
+                    </td>
+                    <td style="vertical-align:middle;">
+                      <p style="margin:0 0 2px;font-size:15px;font-weight:700;color:#3D2B1F;white-space:nowrap;">Ilka Wysocki</p>
+                      <p style="margin:0 0 2px;font-size:13px;color:#555;white-space:nowrap;">Pflegeberaterin</p>
+                      <p style="margin:0;font-size:12px;color:#9a8a73;white-space:nowrap;">Mo – So, 8 – 20 Uhr</p>
+                    </td>
+                  </tr>
+                </table>
+                <table cellpadding="0" cellspacing="0" role="presentation" style="margin-top:12px;">
+                  <tr><td style="padding-bottom:6px;">
+                    <a href="tel:+4989200000830" style="display:inline-block;background-color:#f0ebe4;border-radius:20px;padding:8px 16px;text-decoration:none;font-size:13px;font-weight:500;color:#3D2B1F;white-space:nowrap;">&#9990; 089 200 000 830</a>
+                  </td></tr>
+                  <tr><td>
+                    <a href="https://wa.me/4989200000830" style="display:inline-block;background-color:#25D366;border-radius:20px;padding:8px 16px;text-decoration:none;font-size:13px;font-weight:600;color:#ffffff;white-space:nowrap;">WhatsApp schreiben</a>
+                  </td></tr>
+                </table>
+              </td>
+              <td style="vertical-align:top;text-align:right;">
+                <table cellpadding="0" cellspacing="0" role="presentation" style="border:1px solid #e8ddd0;border-radius:8px;overflow:hidden;margin-left:auto;">
+                  <tr>
+                    <td style="padding:8px 10px;background:#ffffff;text-align:center;vertical-align:top;">
+                      <img src="${testUrl}" alt="Testsieger DIE WELT" width="64" style="display:block;width:64px;height:auto;margin:0 auto 5px;" />
+                      <p style="margin:0 0 1px;font-size:11px;font-weight:700;color:#3D2B1F;white-space:nowrap;">Testsieger <span style="color:#B5A184;">DIE WELT</span></p>
+                      <p style="margin:0;font-size:10px;color:#888;line-height:1.4;">Preis, Qualität &amp;<br>Kundenservice</p>
+                    </td>
+                  </tr>
+                </table>
+              </td>
+            </tr>
+          </table>
+        </td>
+      </tr>
+      <tr>
+        <td style="background:#f9f6f2;border-top:1px solid #e8ddd0;">
+          <table width="100%" cellpadding="0" cellspacing="0" role="presentation">
+            <tr>
+              <td style="padding:12px 0;text-align:center;width:33%;border-right:1px solid #e8ddd0;">
+                <p style="margin:0;font-size:12px;color:#555;line-height:1.4;">Über 20 Jahre<br>Erfahrung</p>
+              </td>
+              <td style="padding:12px 0;text-align:center;width:33%;border-right:1px solid #e8ddd0;">
+                <p style="margin:0;font-size:12px;color:#555;line-height:1.4;">60.000+<br>betreute Einsätze</p>
+              </td>
+              <td style="padding:12px 0;text-align:center;width:33%;">
+                <p style="margin:0;font-size:12px;color:#555;line-height:1.4;">Persönlicher<br>Ansprechpartner,<br>7&nbsp;Tage/Woche</p>
+              </td>
+            </tr>
+          </table>
+        </td>
+      </tr>
+      <tr>
+        <td style="background:#ffffff;border-top:1px solid #e8ddd0;padding:12px 16px;">
+          <table width="100%" cellpadding="0" cellspacing="0" role="presentation"><tr>
+            <td style="text-align:center;vertical-align:middle;padding:0 4px;"><img src="${mediaBase}/die-welt.webp" alt="DIE WELT" height="14" style="display:inline-block;height:14px;width:auto;opacity:0.4;filter:grayscale(100%);" /></td>
+            <td style="text-align:center;vertical-align:middle;padding:0 4px;"><img src="${mediaBase}/frankfurter-allgemeine.webp" alt="FAZ" height="14" style="display:inline-block;height:14px;width:auto;opacity:0.4;filter:grayscale(100%);" /></td>
+            <td style="text-align:center;vertical-align:middle;padding:0 4px;"><img src="${mediaBase}/ard.webp" alt="ARD" height="14" style="display:inline-block;height:14px;width:auto;opacity:0.4;filter:grayscale(100%);" /></td>
+            <td style="text-align:center;vertical-align:middle;padding:0 4px;"><img src="${mediaBase}/ndr.webp" alt="NDR" height="14" style="display:inline-block;height:14px;width:auto;opacity:0.4;filter:grayscale(100%);" /></td>
+            <td style="text-align:center;vertical-align:middle;padding:0 4px;"><img src="${mediaBase}/sat1.webp" alt="SAT.1" height="14" style="display:inline-block;height:14px;width:auto;opacity:0.4;filter:grayscale(100%);" /></td>
+            <td style="text-align:center;vertical-align:middle;padding:0 4px;"><img src="${mediaBase}/bild-der-frau.webp" alt="Bild der Frau" height="14" style="display:inline-block;height:14px;width:auto;opacity:0.4;filter:grayscale(100%);" /></td>
+          </tr></table>
+        </td>
+      </tr>
+    </table>`;
 }
  
 function buildAngebotsEmailHtml(lead: Lead, siteUrl: string): string {
@@ -242,8 +335,8 @@ function buildNachfass1Html(lead: Lead, siteUrl: string): string {
  
     ${buildIlkaSig(siteUrl)}
  
-    <div style="margin-top:16px;padding-top:14px;border-top:1px solid #eee;">
-      <p style="font-size:13px;color:#888;">PS: Hier finden Sie Ihr Angebot: <a href="${kalkulationUrl}" style="color:#B5A184;font-weight:600;text-decoration:none;">Angebot ansehen →</a></p>
+    <div style="text-align:center;margin:8px 0 4px;">
+      <a href="${kalkulationUrl}" style="display:inline-block;background:linear-gradient(135deg,#B5A184 0%,#9A8A73 100%);color:#ffffff;text-decoration:none;padding:14px 32px;border-radius:6px;font-weight:600;font-size:15px;box-shadow:0 2px 4px rgba(181,161,132,0.35);">Angebot jetzt einsehen →</a>
     </div>`;
  
   return buildEmailWrapper(lead, siteUrl, content);
@@ -294,8 +387,8 @@ function buildNachfass2Html(lead: Lead, siteUrl: string): string {
  
     ${buildIlkaSig(siteUrl)}
  
-    <div style="margin-top:16px;padding-top:14px;border-top:1px solid #eee;">
-      <p style="font-size:13px;color:#888;">PS: Hier finden Sie Ihr Angebot: <a href="${kalkulationUrl}" style="color:#B5A184;font-weight:600;text-decoration:none;">Angebot ansehen →</a></p>
+    <div style="text-align:center;margin:8px 0 4px;">
+      <a href="${kalkulationUrl}" style="display:inline-block;background:linear-gradient(135deg,#B5A184 0%,#9A8A73 100%);color:#ffffff;text-decoration:none;padding:14px 32px;border-radius:6px;font-weight:600;font-size:15px;box-shadow:0 2px 4px rgba(181,161,132,0.35);">Angebot jetzt einsehen →</a>
     </div>`;
  
   return buildEmailWrapper(lead, siteUrl, content);
@@ -333,7 +426,8 @@ async function sendEmailSmtp(
   to: string,
   subject: string,
   html: string,
-  text: string
+  text: string,
+  attachments?: { filename: string; content: Uint8Array; contentType: string }[]
 ): Promise<{ success: boolean; error?: string }> {
   try {
     const transport = nodemailer.createTransport({
@@ -345,27 +439,60 @@ async function sendEmailSmtp(
         pass: smtpConfig.pass,
       },
     });
- 
+
+    const mailOptions: any = {
+      from: `"${smtpConfig.fromName}" <${smtpConfig.from}>`,
+      to,
+      subject,
+      text,
+      html,
+    };
+
+    if (attachments && attachments.length > 0) {
+      mailOptions.attachments = attachments.map((att) => ({
+        filename: att.filename,
+        content: Buffer.from(att.content),
+        contentType: att.contentType,
+      }));
+    }
+
     await new Promise<void>((resolve, reject) => {
-      transport.sendMail(
-        {
-          from: `"${smtpConfig.fromName}" <${smtpConfig.from}>`,
-          to,
-          subject,
-          text,
-          html,
-        },
-        (error: any) => {
-          if (error) return reject(error);
-          resolve();
-        }
-      );
+      transport.sendMail(mailOptions, (error: any) => {
+        if (error) return reject(error);
+        resolve();
+      });
     });
- 
+
     return { success: true };
   } catch (error) {
     const msg = error instanceof Error ? error.message : String(error);
     return { success: false, error: msg };
+  }
+}
+
+async function fetchPDFAttachment(
+  siteUrl: string,
+  leadId: string,
+  vorname?: string
+): Promise<{ filename: string; content: Uint8Array; contentType: string } | null> {
+  try {
+    const pdfUrl = `${siteUrl}/api/pdf/kalkulation/${leadId}`;
+    const response = await fetch(pdfUrl, { signal: AbortSignal.timeout(15000) });
+    if (!response.ok) {
+      console.warn(`PDF-Abruf fehlgeschlagen: ${response.status}`);
+      return null;
+    }
+    const arrayBuffer = await response.arrayBuffer();
+    const name = vorname ? `_${vorname}` : '';
+    // Note: full name passed as `vorname` param from caller (Vorname_Nachname)
+    return {
+      filename: `Primundus_Angebot${name}.pdf`,
+      content: new Uint8Array(arrayBuffer),
+      contentType: 'application/pdf',
+    };
+  } catch (err) {
+    console.warn('PDF fetch error (Mail wird trotzdem gesendet):', err);
+    return null;
   }
 }
  
@@ -524,7 +651,15 @@ Deno.serve(async (req: Request) => {
           continue;
         }
  
-        const emailResult = await sendEmailSmtp(smtpConfig, scheduledEmail.recipient_email, subject, html, text);
+        // For Angebotsmail, attach the PDF
+        let attachments: { filename: string; content: Uint8Array; contentType: string }[] | undefined;
+        if (scheduledEmail.email_type === "angebot") {
+          const fullName = [(lead as Lead).vorname, (lead as any).nachname].filter(Boolean).join('_');
+          const pdfAttachment = await fetchPDFAttachment(smtpConfig.siteUrl, lead.id, fullName || undefined);
+          if (pdfAttachment) attachments = [pdfAttachment];
+        }
+
+        const emailResult = await sendEmailSmtp(smtpConfig, scheduledEmail.recipient_email, subject, html, text, attachments);
  
         if (emailResult.success) {
           await supabase

@@ -5,7 +5,7 @@ export function ReviewsSection() {
       location: "Berlin",
       initials: "HM",
       stars: 5,
-      text: "Dank der schnellen Kalkulation hatten wir endlich eine klare Übersicht über die Kosten meiner Mutter. Die Betreuerin ist seit 8 Monaten bei uns – wir sind sehr zufrieden."
+      text: "Dank der schnellen Online-Anfrage hatten wir endlich eine klare Übersicht über die Kosten meiner Mutter. Die Betreuerin ist seit 8 Monaten bei uns – wir sind sehr zufrieden."
     },
     {
       name: "Stefan K.",

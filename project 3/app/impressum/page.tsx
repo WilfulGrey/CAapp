@@ -70,7 +70,7 @@ export default function ImpressumPage() {
                 </div>
               </div>
               <p className="text-gray-600 mt-4">
-                Erreichbarkeit: Montag bis Freitag, 9:00 - 18:00 Uhr
+                Erreichbarkeit: Montag bis Sonntag, 8:00 - 20:00 Uhr
               </p>
             </div>
           </section>

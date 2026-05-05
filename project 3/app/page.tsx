@@ -14,6 +14,7 @@ import { MultiStepForm } from "@/components/calculator/MultiStepForm";
 import { WhatIs24hCare } from "@/components/calculator/WhatIs24hCare";
 import { RequirementsSection } from "@/components/calculator/RequirementsSection";
 import { KeyBenefitsBar } from "@/components/calculator/KeyBenefitsBar";
+import { WhatsAppFloat } from "@/components/calculator/WhatsAppFloat";
 
 export default function HomePage() {
   return (
@@ -37,7 +38,7 @@ export default function HomePage() {
               24-Stunden-Pflege im eigenen Zuhause
             </h1>
             <p className="text-[18px] md:text-[19px] leading-[1.5] text-[#5A5A5A] mb-8">
-              Bezahlbare Alternative zum Pflegeheim – Betreuung in 4–7 Tagen organisiert.
+              Bezahlbare Alternative zum Pflegeheim – <strong>Angebot & Pflegekräfte sofort einsehen,</strong> Betreuung in 4–7 Werktagen organisiert.
             </p>
 
             {/* Direct Form Integration */}
@@ -96,7 +97,7 @@ export default function HomePage() {
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
                       </svg>
                     </div>
-                    <p className="text-[15px] text-[#3D3D3D] font-semibold text-left">Betreuung startklar in 4–7 Tagen</p>
+                    <p className="text-[15px] text-[#3D3D3D] font-semibold text-left">Betreuung startklar in 4–7 Werktagen</p>
                   </div>
                   <div className="flex items-center gap-3">
                     <div className="flex-shrink-0 w-9 h-9 rounded-full bg-[#8B7355]/10 flex items-center justify-center">
@@ -119,7 +120,7 @@ export default function HomePage() {
               24-Stunden-Pflege im eigenen Zuhause
             </h1>
             <p className="text-[18px] xl:text-[18px] leading-[1.5] text-[#5A5A5A] mb-8">
-              Bezahlbare Alternative zum Pflegeheim – Betreuung in 4–7 Tagen organisiert.
+              Bezahlbare Alternative zum Pflegeheim – <strong>Angebot & Pflegekräfte sofort einsehen,</strong> Betreuung in 4–7 Werktagen organisiert.
             </p>
 
             {/* USP Section Desktop */}
@@ -172,7 +173,7 @@ export default function HomePage() {
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
                     </svg>
                   </div>
-                  <p className="text-[16px] text-[#3D3D3D] font-semibold text-left">Betreuung startklar in 4–7 Tagen</p>
+                  <p className="text-[16px] text-[#3D3D3D] font-semibold text-left">Betreuung startklar in 4–7 Werktagen</p>
                 </div>
                 <div className="flex items-center gap-3">
                   <div className="flex-shrink-0 w-8 h-8 rounded-full bg-[#8B7355]/10 flex items-center justify-center">
@@ -283,6 +284,7 @@ export default function HomePage() {
       <FAQSection />
       <FinalCTA />
       <Footer />
+      <WhatsAppFloat />
     </div>
   );
 }

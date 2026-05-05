@@ -53,10 +53,16 @@ export default function KalkulationPrintPage() {
   const cap = (s: string) => s ? s.charAt(0).toUpperCase() + s.slice(1) : s;
   const anredeText = lead.anrede_text || lead.anrede || '';
   const nachname = lead.nachname || '';
+  const vorname = lead.vorname || '';
   let greeting = 'Sehr geehrte Damen und Herren';
   if (anredeText === 'Frau' && nachname) greeting = `Sehr geehrte Frau ${cap(nachname)}`;
+  else if (anredeText === 'Frau' && vorname) greeting = `Sehr geehrte Frau ${cap(vorname)}`;
   else if (anredeText === 'Herr' && nachname) greeting = `Sehr geehrter Herr ${cap(nachname)}`;
+  else if (anredeText === 'Herr' && vorname) greeting = `Sehr geehrter Herr ${cap(vorname)}`;
   else if (anredeText === 'Familie' && nachname) greeting = `Sehr geehrte Familie ${cap(nachname)}`;
+  else if (anredeText === 'Familie' && vorname) greeting = `Sehr geehrte Familie ${cap(vorname)}`;
+  else if (vorname && nachname) greeting = `Guten Tag ${cap(vorname)} ${cap(nachname)}`;
+  else if (vorname) greeting = `Guten Tag ${cap(vorname)}`;
 
   const mobilityText = formData.mobilitaet === 'mobil' ? 'Mobil' : formData.mobilitaet === 'eingeschraenkt' ? 'Eingeschränkt mobil' : formData.mobilitaet === 'bettlaegerig' ? 'Bettlägerig' : '–';
   const nachteinsaetzeText = formData.nachteinsaetze === 'nie' ? 'Nein' : formData.nachteinsaetze === 'gelegentlich' ? 'Gelegentlich' : formData.nachteinsaetze === 'regelmaessig' ? 'Regelmäßig' : '–';
@@ -65,7 +71,7 @@ export default function KalkulationPrintPage() {
   const geschlechtText = formData.geschlecht === 'weiblich' ? 'Weiblich' : formData.geschlecht === 'maennlich' ? 'Männlich' : 'Egal';
 
   const s: any = {
-    page: { fontFamily: '-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif', maxWidth: '170mm', margin: '0 auto', padding: '20mm 0 15mm', background: '#fff', fontSize: '10pt', color: '#1a1a1a', lineHeight: 1.5 },
+    page: { fontFamily: '-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif', maxWidth: '170mm', margin: '0 auto', padding: '0', background: '#fff', fontSize: '10pt', color: '#1a1a1a', lineHeight: 1.5 },
     lh: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingBottom: '8pt', borderBottom: '2pt solid #B5A184', marginBottom: '14pt' },
     addrRow: { display: 'flex', justifyContent: 'space-between', marginBottom: '12pt', fontSize: '9pt' },
     h1: { fontSize: '13pt', fontWeight: 700, color: '#2D1F0F', borderBottom: '1pt solid #eee', paddingBottom: '8pt', marginBottom: '10pt' },
@@ -114,6 +120,8 @@ export default function KalkulationPrintPage() {
         * { print-color-adjust: exact; -webkit-print-color-adjust: exact; box-sizing: border-box; }
         body { margin: 0; background: white; }
         @media print { body { background: white !important; } }
+        /* Hide cookie banner in print/PDF */
+        .fixed.bottom-0, [class*="CookieConsent"], [id*="cookie"] { display: none !important; }
       `}</style>
 
       <div style={s.page}>
@@ -121,16 +129,27 @@ export default function KalkulationPrintPage() {
         {/* LETTERHEAD */}
         <div style={s.lh}>
           <Image src="/images/primundus_logo_header.webp" alt="Primundus" width={140} height={40} style={{ height: '22pt', width: 'auto' }} />
-          <div style={{ textAlign: 'right', fontSize: '8pt', color: '#888', lineHeight: 1.6 }}>
-            <div style={{ color: '#8B6914', fontWeight: 700, fontSize: '9pt' }}>089 200 000 830</div>
-            <div>Ilka Wysocki · Mo–So 8–18 Uhr</div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10pt' }}>
+            {/* Testsieger Seal */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '5pt', paddingRight: '10pt', borderRight: '1pt solid #f0ebe4' }}>
+              <Image src="/images/primundus_testsieger-2021.webp" alt="Testsieger" width={28} height={28} style={{ height: '22pt', width: 'auto' }} />
+              <div style={{ fontSize: '7pt', lineHeight: 1.4 }}>
+                <div style={{ fontWeight: 700, color: '#3D2B1F' }}>Testsieger</div>
+                <div style={{ color: '#B5A184', fontWeight: 600 }}>DIE WELT</div>
+                <div style={{ color: '#aaa' }}>Preis &amp; Qualität</div>
+              </div>
+            </div>
+            <div style={{ textAlign: 'right', fontSize: '8pt', color: '#888', lineHeight: 1.6 }}>
+              <div style={{ color: '#8B6914', fontWeight: 700, fontSize: '9pt' }}>089 200 000 830</div>
+              <div>Ilka Wysocki · Mo–So 8–18 Uhr</div>
+            </div>
           </div>
         </div>
 
         {/* ADRESSE */}
         <div style={s.addrRow}>
           <div style={{ color: '#444', lineHeight: 1.7 }}>
-            <div style={{ fontWeight: 700, color: '#222' }}>{anredeText} {cap(nachname)}</div>
+            <div style={{ fontWeight: 700, color: '#222' }}>{[anredeText, cap(vorname), cap(nachname)].filter(Boolean).join(' ')}</div>
             {lead.email && <div>{lead.email}</div>}
           </div>
           <div style={{ textAlign: 'right', color: '#888', lineHeight: 1.8 }}>
@@ -139,7 +158,7 @@ export default function KalkulationPrintPage() {
           </div>
         </div>
 
-        <div style={s.h1}>Ihr persönliches Angebot – 24-Stunden-Betreuung zu Hause</div>
+        <div style={{ ...s.h1, marginTop: '32pt' }}>Ihr persönliches Angebot – 24-Stunden-Betreuung zu Hause</div>
 
         <div style={s.letter}>
           <p style={{ marginBottom: '6pt' }}>{greeting},</p>
@@ -162,9 +181,10 @@ export default function KalkulationPrintPage() {
         <div style={s.section}>
           <div style={s.secHd}><div style={s.secNum}>1</div><div style={s.secTitle}>Kosten</div></div>
           <div style={s.body}>
-            <div style={{ fontSize: '8pt', textTransform: 'uppercase' as const, letterSpacing: '0.04em', color: '#999', marginBottom: '3pt' }}>Monatssatz für die 24-Stunden-Betreuung</div>
-            <div style={{ fontSize: '20pt', fontWeight: 700, color: '#2D1F0F', marginBottom: '2pt' }}>{formatEuro(bruttopreis)}</div>
-            <div style={{ fontSize: '8.5pt', color: '#888', marginBottom: '10pt' }}>Inkl. aller Steuern, Gebühren und Sozialabgaben</div>
+            <div style={{ fontSize: '8pt', textTransform: 'uppercase' as const, letterSpacing: '0.04em', color: '#999', marginBottom: '3pt' }}>Tagessatz für die 24-Stunden-Betreuung</div>
+            <div style={{ fontSize: '20pt', fontWeight: 700, color: '#2D1F0F', marginBottom: '2pt' }}>{formatEuro(Math.round(bruttopreis / 30))}<span style={{ fontSize: '11pt', fontWeight: 400, color: '#888' }}>/Tag</span></div>
+            <div style={{ fontSize: '8.5pt', color: '#888', marginBottom: '4pt' }}>Inkl. aller Steuern, Gebühren und Sozialabgaben</div>
+            <div style={{ fontSize: '8.5pt', color: '#666', marginBottom: '10pt' }}>Monatssatz gesamt: <strong>{formatEuro(bruttopreis)}</strong></div>
             <div style={s.kGrid}>
               <div style={s.kItem}>
                 <div style={{ fontSize: '7.5pt', textTransform: 'uppercase' as const, color: '#999', marginBottom: '2pt' }}>Zzgl. Anreisepauschale</div>
@@ -188,7 +208,7 @@ export default function KalkulationPrintPage() {
             <div style={{ fontSize: '8pt', color: '#aaa', lineHeight: 1.5 }}>Der Bruttopreis ist die vertraglich maßgebliche Vergütung. Zuschüsse sind individuell nutzbar und abhängig von Ihrer persönlichen Situation.</div>
           </div>
           <div style={s.statsRow}>
-            {[['M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2M13 7a4 4 0 11-8 0 4 4 0 018 0z', '20+ Jahre Erfahrung'], ['M12 2a6 6 0 100 12A6 6 0 0012 2zM15.477 12.89L17 22l-5-3-5 3 1.523-9.11', '60.000+ Einsätze'], ['M20 6L9 17l-5-5', 'Bestpreis-Garantie']].map(([path, label], i) => (
+            {[['M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2M13 7a4 4 0 11-8 0 4 4 0 018 0z', '20+ Jahre Erfahrung'], ['M12 2a6 6 0 100 12A6 6 0 0012 2zM15.477 12.89L17 22l-5-3-5 3 1.523-9.11', '60.000+ Einsätze'], ['M20 6L9 17l-5-5', 'Täglich kündbar']].map(([path, label], i) => (
               <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '4pt', fontSize: '8pt', color: '#7A5C2E', fontWeight: 600 }}>
                 <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#B5A184" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d={path} /></svg>
                 {label}
@@ -258,7 +278,7 @@ export default function KalkulationPrintPage() {
             <Image src="/images/ilka-wysocki_pm-mallorca.webp" alt="Ilka Wysocki" width={44} height={44} style={{ width: '34pt', height: '34pt', borderRadius: '50%', objectFit: 'cover', objectPosition: 'top', border: '1.5pt solid #F0997B', flexShrink: 0 }} />
             <div>
               <div style={{ fontSize: '10pt', fontWeight: 700, color: '#2D1F0F', marginBottom: '1pt' }}>Ilka Wysocki</div>
-              <div style={{ fontSize: '8pt', color: '#aaa', marginBottom: '5pt' }}>Ihre persönliche Beraterin · Mo–So, 8:00–18:00 Uhr</div>
+              <div style={{ fontSize: '8pt', color: '#aaa', marginBottom: '5pt' }}>Ihre persönliche Beraterin · Mo–So, 8:00–20:00 Uhr</div>
               <div style={{ fontSize: '9pt', fontWeight: 600, color: '#2D1F0F', marginBottom: '3pt' }}>Noch offene Fragen?</div>
               <div style={{ fontSize: '8.5pt', color: '#666', lineHeight: 1.5, marginBottom: '5pt' }}>Ich begleite Sie persönlich durch den gesamten Prozess – von der Auswahl der passenden Pflegekraft bis zum Start der Betreuung.</div>
               <div style={{ fontSize: '10pt', fontWeight: 700, color: '#E76F63' }}>089 200 000 830</div>
@@ -267,7 +287,7 @@ export default function KalkulationPrintPage() {
           <div style={s.ilkaFooter}>
             <Image src="/images/primundus_testsieger-2021.webp" alt="Testsieger" width={28} height={28} style={{ height: '22pt', width: 'auto' }} />
             <span style={{ width: '1pt', height: '14pt', background: '#F0C4B4', display: 'inline-block' }} />
-            {[['M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2M9 7a4 4 0 100 8 4 4 0 000-8z', '20+ Jahre Erfahrung'], ['M12 2a6 6 0 100 12A6 6 0 0012 2z', '60.000+ Einsätze'], ['M20 6L9 17l-5-5', 'Bestpreis-Garantie']].map(([path, label], i) => (
+            {[['M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2M9 7a4 4 0 100 8 4 4 0 000-8z', '20+ Jahre Erfahrung'], ['M12 2a6 6 0 100 12A6 6 0 0012 2z', '60.000+ Einsätze'], ['M20 6L9 17l-5-5', 'Täglich kündbar']].map(([path, label], i) => (
               <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '10pt' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '3pt', fontSize: '8pt', color: '#7A4030', fontWeight: 600 }}>
                   <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#E76F63" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d={path} /></svg>
@@ -288,16 +308,6 @@ export default function KalkulationPrintPage() {
                 <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#B5A184" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d={path} /></svg>
                 {label}
               </div>
-            ))}
-          </div>
-        </div>
-
-        {/* TAGS */}
-        <div style={s.tagsBox}>
-          <div style={{ fontSize: '7.5pt', textTransform: 'uppercase' as const, letterSpacing: '0.06em', color: '#bbb', marginBottom: '5pt' }}>Angebot basiert auf Ihren Angaben</div>
-          <div>
-            {[`Pflegegrad ${formData.pflegegrad || '–'}`, formData.anzahlPersonen === '2' ? '2 Personen' : '1 Person + Haushalt', mobilityText, nachteinsaetzeText === 'Nein' ? 'Keine Nachteinsätze' : nachteinsaetzeText, deutschText + ' Deutsch', fuehrerscheinText === 'Nein' ? 'Kein Führerschein' : 'Führerschein', geschlechtText].map((t, i) => (
-              <span key={i} style={s.tag}>{t}</span>
             ))}
           </div>
         </div>

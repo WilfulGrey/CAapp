@@ -780,7 +780,7 @@ function addPage4(doc: jsPDF, leadData?: LeadData, vertragsToken?: string) {
 
   doc.setFontSize(8);
   doc.setFont('helvetica', 'normal');
-  doc.text('Oder rufen Sie uns an: Tel. 0800 123 456 78 (Mo-Fr 8-18 Uhr)', 110, y + 37, { align: 'center' });
+  doc.text('Oder rufen Sie uns an: Tel. 0800 123 456 78 (Mo-So 8-20 Uhr)', 110, y + 37, { align: 'center' });
 
   doc.setFontSize(7);
   doc.text('✓ Sie zahlen erst, wenn die Pflegekraft arbeitet', 110, y + 43, { align: 'center' });

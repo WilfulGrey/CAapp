@@ -48,7 +48,7 @@ export function Footer() {
               </a>
             </li>
             <li className="text-[14px] text-gray-400 pt-2">
-              Mo-Fr 9:00-18:00 Uhr
+              Mo-So: 8-20 Uhr
             </li>
           </ul>
         </div>

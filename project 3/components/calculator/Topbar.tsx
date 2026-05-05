@@ -41,7 +41,7 @@ export function Topbar({ onBack, onClose, title = "IHRE KALKULATION", showComple
       {showCompleteBadge ? (
         <div className="inline-flex items-center gap-2 bg-green-50 text-green-700 px-4 py-2 rounded-full text-xs md:text-sm font-semibold">
           <CheckCircle2 className="w-4 h-4 md:w-5 md:h-5" />
-          Kalkulation abgeschlossen
+          Anfrage abgeschlossen
         </div>
       ) : (
         <div className="text-xs font-semibold text-[#8B8B8B] tracking-wider uppercase">

@@ -2,11 +2,7 @@
 
 export function ComparisonSection() {
   const scrollToCalculator = () => {
-    // Scroll to top of page where the wizard/form is located
-    window.scrollTo({
-      top: 0,
-      behavior: 'smooth'
-    });
+    const el = document.getElementById('calculator-form'); if (el) { window.scrollTo({ top: el.getBoundingClientRect().top + window.pageYOffset - 90, behavior: 'smooth' }); }
   };
 
   return (
@@ -135,7 +131,7 @@ export function ComparisonSection() {
             onClick={scrollToCalculator}
             className="inline-flex items-center gap-2 px-8 py-4 bg-[#E76F63] hover:bg-[#D65E52] text-white font-bold text-base md:text-lg rounded-full transition-all duration-200 shadow-lg hover:shadow-xl"
           >
-            Betreuung anfragen
+            Kosten & Pflegekräfte ansehen
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
             </svg>

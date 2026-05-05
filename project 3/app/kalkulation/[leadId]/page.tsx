@@ -68,9 +68,13 @@ export default function KalkulationPage() {
 
   let greeting = 'Sehr geehrte Damen und Herren';
   if (anredeText === 'Frau' && nachname) greeting = `Sehr geehrte Frau ${cap(nachname)}`;
+  else if (anredeText === 'Frau' && vorname) greeting = `Sehr geehrte Frau ${cap(vorname)}`;
   else if (anredeText === 'Herr' && nachname) greeting = `Sehr geehrter Herr ${cap(nachname)}`;
+  else if (anredeText === 'Herr' && vorname) greeting = `Sehr geehrter Herr ${cap(vorname)}`;
   else if (anredeText === 'Familie' && nachname) greeting = `Sehr geehrte Familie ${cap(nachname)}`;
-  else if (vorname && nachname) greeting = `Sehr geehrte/r ${cap(vorname)} ${cap(nachname)}`;
+  else if (anredeText === 'Familie' && vorname) greeting = `Sehr geehrte Familie ${cap(vorname)}`;
+  else if (vorname && nachname) greeting = `Guten Tag ${cap(vorname)} ${cap(nachname)}`;
+  else if (vorname) greeting = `Guten Tag ${cap(vorname)}`;
 
   const mobilityText = formData.mobilitaet === 'mobil' ? 'Mobil' : formData.mobilitaet === 'eingeschraenkt' ? 'Eingeschränkt mobil' : formData.mobilitaet === 'bettlaegerig' ? 'Bettlägerig' : '–';
   const nachteinsaetzeText = formData.nachteinsaetze === 'regelmaessig' ? 'Regelmäßig' : formData.nachteinsaetze === 'gelegentlich' ? 'Gelegentlich' : formData.nachteinsaetze === 'mehrmals' ? 'Mehrmals wöchentlich' : formData.nachteinsaetze === 'nie' ? 'Nein' : '–';
@@ -123,7 +127,7 @@ export default function KalkulationPage() {
           <div className="px-6 py-5">
             <div className="flex justify-between items-start mb-5">
               <div className="text-sm text-gray-600 leading-relaxed">
-                <div className="font-semibold text-gray-900">{anredeText} {cap(nachname)}</div>
+                <div className="font-semibold text-gray-900">{[anredeText, cap(vorname), cap(nachname)].filter(Boolean).join(' ')}</div>
                 {lead.email && <div>{lead.email}</div>}
               </div>
               <div className="text-right text-xs text-gray-500">
@@ -296,12 +300,14 @@ export default function KalkulationPage() {
             <Image src="/images/ilka-wysocki_pm-mallorca.webp" alt="Ilka Wysocki" width={56} height={56} className="w-14 h-14 rounded-full object-cover object-top border-2 border-[#F0997B] flex-shrink-0" />
             <div>
               <div className="text-sm font-bold text-[#2D1F0F]">Ilka Wysocki</div>
-              <div className="text-xs text-gray-400 mb-2">Ihre persönliche Beraterin · Mo–So, 8:00–18:00 Uhr</div>
+              <div className="text-xs text-gray-400 mb-2">Ihre persönliche Beraterin · Mo–So, 8:00–20:00 Uhr</div>
               <div className="text-sm font-semibold text-[#2D1F0F] mb-1">Noch offene Fragen?</div>
               <div className="text-xs text-gray-600 leading-relaxed mb-3">Ich begleite Sie persönlich durch den gesamten Prozess – von der Auswahl der passenden Pflegekraft bis zum Start der Betreuung.</div>
               <div className="flex gap-2 flex-wrap">
                 <a href="tel:08920000830" className="inline-flex items-center gap-1.5 h-10 px-4 bg-white text-[#2D1F0F] border border-gray-200 rounded-lg text-sm font-semibold transition-all hover:-translate-y-0.5 hover:shadow-md active:scale-[.97]">
-                  <Phone className="w-3.5 h-3.5" /> Jetzt anrufen
+                  <Phone className="w-3.5 h-3.5" />
+                  <span className="sm:hidden">Jetzt anrufen</span>
+                  <span className="hidden sm:inline">089 200 000 830</span>
                 </a>
                 <Button onClick={handleStartBetreuung} className="h-10 px-4 bg-[#2A9D5C] hover:bg-[#239050] text-white text-sm font-semibold transition-all hover:-translate-y-0.5 hover:shadow-md active:scale-[.97]">
                   Zum Portal <ArrowRight className="w-4 h-4 ml-1" />
