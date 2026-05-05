@@ -530,12 +530,34 @@ function mamamiaPetsToForm(
 
 // weight/height in Mamamia store as bare buckets ("61-70" / "161-170").
 // Form expects suffix ("61-70 kg" / "161-170 cm").
-function mamamiaWeightToForm(w: string | null | undefined): string {
+//
+// Suppression of onboard-injected defaults:
+//   onboard-to-mamamia/mappers.ts writes DEFAULT_WEIGHT="61-70" and
+//   DEFAULT_HEIGHT="161-170" so Mamamia matching can run before the
+//   patient form is saved. Surfacing those back in the form misleads
+//   the customer into thinking we know their weight/height. We detect
+//   the exact default pair on the SAME patient row and return ''
+//   instead — the form treats the field as empty (it's labeled optional
+//   anyway). Tradeoff: a user who genuinely is 61-70 kg AND 161-170 cm
+//   will see empty fields on reload (~6% of patients statistically) —
+//   acceptable since they can retype.
+const DEFAULT_WEIGHT_SENTINEL = '61-70';
+const DEFAULT_HEIGHT_SENTINEL = '161-170';
+
+function mamamiaWeightToForm(
+  w: string | null | undefined,
+  h?: string | null | undefined,
+): string {
   if (!w) return '';
+  if (w === DEFAULT_WEIGHT_SENTINEL && h === DEFAULT_HEIGHT_SENTINEL) return '';
   return w.endsWith('kg') ? w : `${w} kg`;
 }
-function mamamiaHeightToForm(h: string | null | undefined): string {
+function mamamiaHeightToForm(
+  h: string | null | undefined,
+  w?: string | null | undefined,
+): string {
   if (!h) return '';
+  if (h === DEFAULT_HEIGHT_SENTINEL && w === DEFAULT_WEIGHT_SENTINEL) return '';
   return h.endsWith('cm') ? h : `${h} cm`;
 }
 
@@ -590,8 +612,8 @@ function mamamiaPatientToForm(
     geschlecht: p.gender ? (MAMAMIA_GENDER_TO_FORM[p.gender] ?? '') : '',
     geburtsjahr: p.year_of_birth ? String(p.year_of_birth) : '',
     pflegegrad: p.care_level ? `Pflegegrad ${p.care_level}` : '',
-    gewicht: mamamiaWeightToForm(p.weight),
-    groesse: mamamiaHeightToForm(p.height),
+    gewicht: mamamiaWeightToForm(p.weight, p.height),
+    groesse: mamamiaHeightToForm(p.height, p.weight),
     mobilitaet: p.mobility_id ? (MAMAMIA_MOBILITY_TO_FORM[p.mobility_id] ?? '') : '',
     heben: p.lift_id === 1 ? 'Ja' : p.lift_id === 2 ? 'Nein' : '',
     demenz: mamamiaDementiaToForm(p.dementia, p.dementia_description),

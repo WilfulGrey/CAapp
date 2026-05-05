@@ -557,3 +557,64 @@ describe('mapMamamiaCustomerToPatientForm — pflegedienst from job_description'
     expect(r.pflegedienstAufgaben).toBeUndefined();
   });
 });
+
+// ─── Onboard-default suppression for weight/height ─────────────────────
+// onboard-to-mamamia writes DEFAULT_WEIGHT="61-70" + DEFAULT_HEIGHT="161-170"
+// so Mamamia matching (checkSuperJob3) can run before the patient form is
+// saved. Reverse mapper detects the exact pair and returns '' so the form
+// renders empty (optional fields). User-typed values that differ from
+// either DEFAULT propagate normally.
+
+describe('mapMamamiaCustomerToPatientForm — onboard-default weight/height suppression', () => {
+  function makeCustWithPatient(
+    weight: string | null,
+    height: string | null,
+  ): MamamiaCustomer {
+    return {
+      id: 1, customer_id: 'x-1', status: 'active',
+      first_name: null, last_name: null, email: null, phone: null,
+      language_id: null, location_id: null, location_custom_text: null,
+      job_description: null, arrival_at: null, departure_at: null,
+      care_budget: null, gender: null, year_of_birth: null,
+      accommodation: null, caregiver_accommodated: null,
+      other_people_in_house: null, has_family_near_by: null,
+      smoking_household: null, internet: null, urbanization_id: null,
+      pets: null, is_pet_dog: null, is_pet_cat: null, is_pet_other: null,
+      day_care_facility: null,
+      patients: [{
+        id: 11, gender: null, year_of_birth: null, care_level: 3,
+        mobility_id: null, weight, height, night_operations: null,
+        dementia: null, dementia_description: null, incontinence: null,
+        incontinence_feces: null, incontinence_urine: null, smoking: null,
+        lift_id: null,
+      }],
+      customer_caregiver_wish: null, customer_contracts: [],
+    } as unknown as MamamiaCustomer;
+  }
+
+  it('onboard-default pair (61-70 + 161-170) → both fields empty', () => {
+    const r = mapMamamiaCustomerToPatientForm(makeCustWithPatient('61-70', '161-170'));
+    expect(r.gewicht).toBe('');
+    expect(r.groesse).toBe('');
+  });
+
+  it('user-typed weight (different from default) → keep both visible', () => {
+    // weight=81-90 means user filled it. Even if height stayed at default
+    // (legacy edge case), surface what we have so user can correct.
+    const r = mapMamamiaCustomerToPatientForm(makeCustWithPatient('81-90', '161-170'));
+    expect(r.gewicht).toBe('81-90 kg');
+    expect(r.groesse).toBe('161-170 cm');
+  });
+
+  it('user-typed height (different from default) → keep both visible', () => {
+    const r = mapMamamiaCustomerToPatientForm(makeCustWithPatient('61-70', '171-180'));
+    expect(r.gewicht).toBe('61-70 kg');
+    expect(r.groesse).toBe('171-180 cm');
+  });
+
+  it('null weight/height → empty (no spurious "kg"/"cm" suffix)', () => {
+    const r = mapMamamiaCustomerToPatientForm(makeCustWithPatient(null, null));
+    expect(r.gewicht).toBe('');
+    expect(r.groesse).toBe('');
+  });
+});

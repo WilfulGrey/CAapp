@@ -183,7 +183,11 @@ export const AngebotCard: FC<{
           || (k === 'haushalt' && cur === 'Ehepartner/in')
           // calculator prefill stores raw digit "3"; Mamamia "Pflegegrad 3"
           // is the proper UI label — let it win over the bare digit.
-          || (k === 'pflegegrad' && /^\d$/.test(cur ?? ''));
+          // Both Person 1 and Person 2 (couple flow) get the digit-only
+          // prefill from the calculator — pre-2026-05-05 we only handled
+          // pflegegrad and Person 2 stayed at raw "4" while Person 1 was
+          // upgraded to "Pflegegrad 4".
+          || ((k === 'pflegegrad' || k === 'p2_pflegegrad') && /^\d$/.test(cur ?? ''));
         if (isDefault) {
           (next as unknown as Record<string, string>)[k] = v as string;
           changed = true;
