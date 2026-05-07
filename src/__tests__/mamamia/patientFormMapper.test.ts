@@ -160,10 +160,13 @@ describe('mapPatientFormToUpdateCustomerInput', () => {
     expect(r.patients?.[0].id).toBeUndefined();
   });
 
-  it('passes weight/height strings through', () => {
+  it('weight/height: en-dash normalized to ASCII hyphen (Mamamia panel format)', () => {
+    // Pre-Bug-#13a Customer 7653 stored "70–90 kg" (en-dash) — Mamamia
+    // panel rendered the field empty because its dropdown enum uses
+    // hyphen-formatted buckets. Fix: normalize en-dash on the way out.
     const r = mapPatientFormToUpdateCustomerInput(makeForm());
-    expect(r.patients?.[0].weight).toBe('70–90 kg');
-    expect(r.patients?.[0].height).toBe('155–165 cm');
+    expect(r.patients?.[0].weight).toBe('70-90 kg');
+    expect(r.patients?.[0].height).toBe('155-165 cm');
   });
 
   it('location_id preferred over plz/ort custom_text', () => {
@@ -219,14 +222,13 @@ describe('mapPatientFormToUpdateCustomerInput', () => {
     expect(mapPatientFormToUpdateCustomerInput(makeForm({ rauchen: 'Nein' })).customer_caregiver_wish?.smoking).toBe('no');
   });
 
-  it('only diagnosen lands in job_description; aufgaben/sonstigeWuensche go to wish', () => {
+  it('diagnosen + aufgaben + sonstigeWuensche split between job_description and wish row', () => {
     const r = mapPatientFormToUpdateCustomerInput(makeForm({
       diagnosen: 'Parkinson',
       aufgaben: 'Körperpflege',
       sonstigeWuensche: 'Tierlieb',
     }));
-    // Medical diagnoses stay on customer.job_description (this is what
-    // caregivers read to prepare).
+    // Medical diagnoses stay on customer.job_description.
     expect(r.job_description).toContain('Diagnosen: Parkinson');
     // Caregiver-side fields land on the wish row, not job_description.
     expect(r.job_description).not.toContain('Körperpflege');
@@ -235,9 +237,83 @@ describe('mapPatientFormToUpdateCustomerInput', () => {
     expect(r.customer_caregiver_wish?.other_wishes).toBe('Tierlieb');
   });
 
-  it('no job_description key when no diagnoses', () => {
-    const r = mapPatientFormToUpdateCustomerInput(makeForm({ aufgaben: 'X' }));
-    expect(r.job_description).toBeUndefined();
+  it('Bug #13a: job_description always carries auto-summary even without diagnoses', () => {
+    // Patient form has no "krótki opis sytuacji" free-text, but Mamamia
+    // panel + caregiver listings render this prominently. Auto-summary
+    // (DE) gives the agency a quick picture from the form data.
+    const r = mapPatientFormToUpdateCustomerInput(makeForm({
+      pflegegrad: 'Pflegegrad 4',
+      mobilitaet: 'Rollstuhlfähig',
+      demenz: 'Mittelgradig',
+      inkontinenz: 'Harninkontinenz',
+      nacht: '1–2 Mal',
+    }));
+    expect(r.job_description).toContain('24-Stunden-Betreuung gesucht');
+    expect(r.job_description).toContain('Pflegegrad 4');
+    expect(r.job_description).toContain('rollstuhlfähig');
+    expect(r.job_description).toContain('Demenzdiagnose: mittelgradig');
+    expect(r.job_description).toContain('Inkontinenz: harninkontinenz');
+    expect(r.job_description).toContain('Nächtliche Unterstützung: 1–2 mal');
+  });
+
+  it('Bug #13a: wish.shopping defaults to "no" so panel field is non-empty', () => {
+    // Patient form doesn't ask "Czy opiekun musi robić zakupy?"; without
+    // a default Mamamia panel shows the dropdown empty. Default 'no' is
+    // prod-most-common (43% of active customers).
+    const r = mapPatientFormToUpdateCustomerInput(makeForm());
+    expect(r.customer_caregiver_wish?.shopping).toBe('no');
+  });
+
+  it('Bug #13a: equipment_ids defaults to [1, 2] (TV + Bathroom)', () => {
+    // Patient form doesn't ask; panel "Wyposażenie zakwaterowania" is
+    // multi-select required. [1, 2] is the single most-common pair in
+    // active prod customers.
+    const r = mapPatientFormToUpdateCustomerInput(makeForm());
+    expect(r.equipment_ids).toEqual([1, 2]);
+  });
+
+  it('Bug #13a: night_operations_description placeholder when nacht != Nein', () => {
+    // Patient form doesn't have a free-text for night-time tasks, but
+    // Mamamia panel renders the description field as empty without it.
+    // Standard placeholder (3 locales) covers the gap.
+    const r = mapPatientFormToUpdateCustomerInput(makeForm({ nacht: 'Bis zu 1 Mal' }));
+    expect(r.patients?.[0].night_operations_description).toBeTruthy();
+    expect(r.patients?.[0].night_operations_description_de).toBeTruthy();
+    expect(r.patients?.[0].night_operations_description_en).toBeTruthy();
+    expect(r.patients?.[0].night_operations_description_pl).toBeTruthy();
+  });
+
+  it('Bug #13a: nacht=Nein → no night_operations_description (placeholder skipped)', () => {
+    const r = mapPatientFormToUpdateCustomerInput(makeForm({ nacht: 'Nein' }));
+    expect(r.patients?.[0].night_operations).toBe('no');
+    expect(r.patients?.[0].night_operations_description).toBeUndefined();
+  });
+
+  it('Bug #13b: tool_ids re-derive from mobility on every save (proxy PRESERVE_QUERY otherwise sticks stale)', () => {
+    // Without this: Customer 7655 patient[1] had mobility_id=1 (mobile) +
+    // tools=[4,6] (hoist+care-bed) — tools were inherited from couple
+    // onboard (Person 1 bedridden) and proxy PRESERVE_QUERY re-injected
+    // them every save because patientFormMapper didn't ship tool_ids.
+    for (const [label, mobId, expectedTools] of [
+      ['Bettlägerig', 5, [4, 6]],
+      ['Rollstuhlfähig', 4, [3]],
+      ['Rollatorfähig', 3, [2]],
+      ['Am Gehstock', 2, [1]],
+      ['Selbstständig mobil', 1, [1]],
+    ] as const) {
+      const r = mapPatientFormToUpdateCustomerInput(makeForm({ mobilitaet: label }));
+      expect(r.patients?.[0].mobility_id).toBe(mobId);
+      expect(r.patients?.[0].tool_ids).toEqual(expectedTools);
+    }
+  });
+
+  it('Bug #13b: tool_ids omitted when mobility itself is empty (no overwrite)', () => {
+    // Defensive — if user clears mobility (which shouldn't happen via UI
+    // since it's required), don't blow away tool_ids by deriving from
+    // unknown. Mapper already skips mobility_id in that case.
+    const r = mapPatientFormToUpdateCustomerInput(makeForm({ mobilitaet: '' }));
+    expect(r.patients?.[0].mobility_id).toBeUndefined();
+    expect(r.patients?.[0].tool_ids).toBeUndefined();
   });
 
   it('omits fields when source is empty (no stale null overwrite)', () => {
@@ -259,6 +335,7 @@ describe('mapPatientFormToUpdateCustomerInput', () => {
 
   describe('pflegedienst description on job_description', () => {
     it('pflegedienst=Ja with frequency + tasks → job_description has Pflegedienst segment (DE)', () => {
+      // job_description carries: auto-summary | Diagnosen (if set) | Pflegedienst (if set)
       // pflegedienstAufgaben uses '; ' as the internal separator so the
       // task labels (which contain commas inside parens like
       // "Grundpflege (Körperpflege, Anziehen)") can be split back
@@ -269,9 +346,10 @@ describe('mapPatientFormToUpdateCustomerInput', () => {
         pflegedienstAufgaben: 'Grundpflege (Körperpflege, Anziehen); Wundversorgung',
       }));
       expect(r.day_care_facility).toBe('yes');
-      expect(r.job_description).toBe(
+      expect(r.job_description).toContain(
         'Pflegedienst: 2× pro Woche: Grundpflege (Körperpflege, Anziehen), Wundversorgung',
       );
+      expect(r.job_description).toContain('24-Stunden-Betreuung gesucht');
       // No dedicated description fields — they aren't writable on Mamamia.
       expect((r as Record<string, unknown>).day_care_facility_description).toBeUndefined();
     });
@@ -283,7 +361,7 @@ describe('mapPatientFormToUpdateCustomerInput', () => {
         pflegedienstAufgaben: 'Medikamentengabe',
       }));
       expect(r.day_care_facility).toBe('yes');
-      expect(r.job_description).toBe('Pflegedienst: Täglich: Medikamentengabe');
+      expect(r.job_description).toContain('Pflegedienst: Täglich: Medikamentengabe');
     });
 
     it('diagnoses + pflegedienst combine in one job_description (separator " | ")', () => {
@@ -293,12 +371,13 @@ describe('mapPatientFormToUpdateCustomerInput', () => {
         pflegedienstHaeufigkeit: '1× pro Woche',
         pflegedienstAufgaben: 'Wundversorgung',
       }));
-      expect(r.job_description).toBe(
-        'Diagnosen: Diabetes Typ 2 | Pflegedienst: 1× pro Woche: Wundversorgung',
+      // Order: summary | Diagnosen | Pflegedienst
+      expect(r.job_description).toMatch(
+        /^24-Stunden-Betreuung gesucht\..* \| Diagnosen: Diabetes Typ 2 \| Pflegedienst: 1× pro Woche: Wundversorgung$/,
       );
     });
 
-    it('pflegedienst=Nein → no Pflegedienst segment in job_description', () => {
+    it('pflegedienst=Nein → no Pflegedienst segment in job_description (summary still present)', () => {
       // Stale frequency/tasks must not leak through when customer says No.
       const r = mapPatientFormToUpdateCustomerInput(makeForm({
         pflegedienst: 'Nein',
@@ -306,10 +385,11 @@ describe('mapPatientFormToUpdateCustomerInput', () => {
         pflegedienstAufgaben: 'Medikamentengabe',
       }));
       expect(r.day_care_facility).toBe('no');
-      expect(r.job_description).toBeUndefined();
+      expect(r.job_description).toContain('24-Stunden-Betreuung gesucht');
+      expect(r.job_description).not.toContain('Pflegedienst:');
     });
 
-    it('pflegedienst=Ja with empty follow-ups → no description block (mapper tolerates partial)', () => {
+    it('pflegedienst=Ja with empty follow-ups → no Pflegedienst segment (only summary)', () => {
       // Validation in AngebotCard prevents save when follow-ups are blank,
       // but this is a defense-in-depth: don't ship a literal `Pflegedienst: `
       // segment with empty body if a malformed body slips through.
@@ -319,7 +399,8 @@ describe('mapPatientFormToUpdateCustomerInput', () => {
         pflegedienstAufgaben: '',
       }));
       expect(r.day_care_facility).toBe('yes');
-      expect(r.job_description).toBeUndefined();
+      expect(r.job_description).toContain('24-Stunden-Betreuung gesucht');
+      expect(r.job_description).not.toContain('Pflegedienst:');
     });
   });
 });

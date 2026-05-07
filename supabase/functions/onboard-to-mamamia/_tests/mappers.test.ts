@@ -1,10 +1,7 @@
 import { assertEquals } from "@std/assert";
 import {
   buildCaregiverWish,
-  buildContactsFromLead,
-  buildContractFromLead,
   buildCustomerInput,
-  buildJobDescription,
   buildJobOfferTitle,
   buildPatients,
   computeArrivalDate,
@@ -133,6 +130,8 @@ Deno.test("mapCareLevel: 0 or out-of-range → 2 (default)", () => {
 });
 
 // ─── mapDementia ─────────────────────────────────────────────────────────────
+// Helper used by patient form save (patientFormMapper) — onboard does NOT
+// set patient.dementia anymore (Bug #13: kalkulator nigdy nie pyta).
 
 Deno.test("mapDementia: absent in formularDaten → 'no' (default)", () => {
   assertEquals(mapDementia(makeFormularDaten()), "no");
@@ -180,7 +179,6 @@ Deno.test("mapNightOperations: taeglich (Primundus '1×') → 'up_to_1_time'", (
 Deno.test("mapNightOperations: mehrmals (Primundus 'Mehrmals nachts') → 'more_than_2'", () => {
   // Pre-2026-05-01 we mapped this to "1_2_times" — but "Mehrmals nachts"
   // in Marcin's NEW calculator means MORE than 2× per night, not 1-2.
-  // Customer answering this honestly was being silently downgraded.
   assertEquals(
     mapNightOperations(makeFormularDaten({ nachteinsaetze: "mehrmals" })),
     "more_than_2",
@@ -290,56 +288,45 @@ Deno.test("buildJobOfferTitle: missing nachname falls back to 'Primundus' + lead
   assertEquals(buildJobOfferTitle(l), "Primundus — aaaaaaaa");
 });
 
-// ─── buildPatients ──────────────────────────────────────────────────────────
+// ─── buildPatients (post-Bug-#13 minimal payload) ───────────────────────────
+// Onboard ships ONLY fields the calculator collects (or derivable from
+// those — lift_id / tool_ids from mobility_id). All previously-injected
+// defaults (gender, weight, height, dementia, incontinence_*, smoking,
+// *_description{,_de,_en,_pl}) are deferred to patient form save.
 
-Deno.test("buildPatients: weitere_personen=nein → single patient with all 100%-fill fields set", () => {
+Deno.test("buildPatients: single patient carries only real care attrs + derivations", () => {
   const patients = buildPatients(makeFormularDaten({ weitere_personen: "nein" }));
   assertEquals(patients.length, 1);
-  assertEquals(patients[0].mobility_id, 4);
-  assertEquals(patients[0].care_level, 3);
-  assertEquals(patients[0].gender, "female");
-  // Default fixture: nachteinsaetze="gelegentlich" → "occasionally".
-  assertEquals(patients[0].night_operations, "occasionally");
-  // dementia: default fixture has no demenz key → mapDementia returns "no".
-  assertEquals(patients[0].dementia, "no");
-  // Defaults verified vs prod patients-active sweep + customer panel form:
-  // - lift_id depends on mobility (rollstuhl=4 → lift_id=1 "Yes")
-  // - panel form requires *_description fields, auto-text fills them
-  assertEquals(patients[0].lift_id, 1);          // rollstuhl → lift required
-  assertEquals(patients[0].tool_ids, [3]);       // wheelchair only — never Others
-  assertEquals(patients[0].weight, "61-70");
-  assertEquals(patients[0].height, "161-170");
-  assertEquals(patients[0].incontinence, false);
-  assertEquals(patients[0].incontinence_feces, false);
-  assertEquals(patients[0].incontinence_urine, false);
-  assertEquals(patients[0].smoking, false);
-  // Auto-text descriptions in 4 locales — panel form requires non-empty
-  for (
-    const k of [
-      "lift_description",
-      "lift_description_de",
-      "lift_description_en",
-      "lift_description_pl",
-      "night_operations_description",
-      "night_operations_description_de",
-      "night_operations_description_en",
-      "night_operations_description_pl",
-      "dementia_description",
-      "dementia_description_de",
-      "dementia_description_en",
-      "dementia_description_pl",
-    ] as const
-  ) {
-    if (!patients[0][k] || patients[0][k]?.length === 0) {
-      throw new Error(`expected patients[0].${k} to be non-empty`);
-    }
-  }
+  // Real / derived from real
+  assertEquals(patients[0].mobility_id, 4);                  // rollstuhl
+  assertEquals(patients[0].care_level, 3);                   // pflegegrad
+  assertEquals(patients[0].night_operations, "occasionally"); // gelegentlich
+  assertEquals(patients[0].lift_id, 1);                      // derived (mobility>=4 → Yes)
+  assertEquals(patients[0].tool_ids, [3]);                   // derived (wheelchair only)
+});
+
+Deno.test("buildPatients: cut fields are NOT set on patient row (Bug #13)", () => {
+  const patients = buildPatients(makeFormularDaten());
+  const p = patients[0];
+  // Mamamia accepts these as null/omitted at StoreCustomer time — verified
+  // 2026-05-07 via /tmp/test-minimal-storecustomer.mjs (Customer 7651).
+  assertEquals(p.gender, undefined);
+  assertEquals(p.weight, undefined);
+  assertEquals(p.height, undefined);
+  assertEquals(p.dementia, undefined);
+  assertEquals(p.incontinence, undefined);
+  assertEquals(p.incontinence_feces, undefined);
+  assertEquals(p.incontinence_urine, undefined);
+  assertEquals(p.smoking, undefined);
+  assertEquals(p.lift_description, undefined);
+  assertEquals(p.lift_description_de, undefined);
+  assertEquals(p.lift_description_en, undefined);
+  assertEquals(p.lift_description_pl, undefined);
+  assertEquals(p.night_operations_description, undefined);
+  assertEquals(p.dementia_description, undefined);
 });
 
 Deno.test("buildPatients: rollator + taeglich (Primundus '1×' bucket)", () => {
-  // taeglich in Primundus calculator = "once a night" → maps to
-  // Mamamia 'up_to_1_time'. Pre-2026-04-28 we incorrectly mapped this
-  // to '1_2_times'.
   const patients = buildPatients(makeFormularDaten({
     mobilitaet: "rollator",
     nachteinsaetze: "taeglich",
@@ -348,45 +335,22 @@ Deno.test("buildPatients: rollator + taeglich (Primundus '1×' bucket)", () => {
   assertEquals(patients[0].night_operations, "up_to_1_time");
 });
 
-Deno.test("buildPatients: dementia=ja propagates to patient[0]", () => {
-  const patients = buildPatients(makeFormularDaten({ demenz: "ja" }));
-  assertEquals(patients[0].dementia, "yes");
-});
-
 Deno.test("buildPatients: betreuung_fuer='ehepaar' → 2 patients (couple under care)", () => {
-  // Primundus stage-A field that signals "two people need care". This is
-  // the correct trigger — pre-2026-04-28 we incorrectly used
-  // weitere_personen which is a different question (others IN house).
+  // Pre-2026-04-28 we incorrectly used weitere_personen as the trigger;
+  // the correct field is betreuung_fuer.
   const patients = buildPatients(makeFormularDaten({ betreuung_fuer: "ehepaar" }));
   assertEquals(patients.length, 2);
-  // first patient filled from formular (rollstuhl in fixture)
+  // 1st patient filled from formular (rollstuhl in fixture)
   assertEquals(patients[0].mobility_id, 4);
-  // 2nd patient inherits Person 1's care attributes (Pflegegrad,
-  // mobility, lift, night_ops). Pre-2026-05-01 we hardcoded these to
-  // {care_level:2, mobility:1, lift:2, night:"no"} — silent overwrite of
-  // user input. Couple gets ONE set of answers from the calculator and
-  // both rows should reflect them by default; user edits Person 2 in
-  // the patient form when reality differs.
+  // 2nd patient inherits Person 1's care attrs (the calculator collects
+  // ONE set of answers for the couple as a unit).
   assertEquals(patients[1].mobility_id, 4);
   assertEquals(patients[1].care_level, patients[0].care_level);
   assertEquals(patients[1].lift_id, patients[0].lift_id);
   assertEquals(patients[1].tool_ids, patients[0].tool_ids);
   assertEquals(patients[1].night_operations, patients[0].night_operations);
-  assertEquals(patients[1].dementia, patients[0].dementia);
-  assertEquals(patients[1].weight, "61-70");
-  // 2nd patient is the spouse — opposite gender as a best-guess heuristic.
-  // Default primaryGender is "female" (when no opts.primaryGender given),
-  // so secondGender flips to "male".
-  assertEquals(patients[1].gender, "male");
-});
-
-Deno.test("buildPatients: opts.primaryGender drives both rows (couple swap)", () => {
-  const patients = buildPatients(
-    makeFormularDaten({ betreuung_fuer: "ehepaar" }),
-    { primaryGender: "male" },
-  );
-  assertEquals(patients[0].gender, "male");
-  assertEquals(patients[1].gender, "female"); // flipped
+  // Bug #13: NO gender heuristic (we don't know couple composition).
+  assertEquals(patients[1].gender, undefined);
 });
 
 Deno.test("buildPatients: betreuung_fuer='1-person' → single patient even with weitere_personen=ja", () => {
@@ -404,11 +368,9 @@ Deno.test("buildPatients: empty formularDaten → single default patient (no cra
   assertEquals(patients.length, 1);
   assertEquals(patients[0].mobility_id, 1);
   assertEquals(patients[0].care_level, 2);
-  // patient.gender defaults to "female" (prod-most-common, 61% of active
-  // patients) when no primaryGender is provided. Mamamia rejects
-  // "not_important" on patient.gender — separate concept from caregiver
-  // preference (customer_caregiver_wish.gender).
-  assertEquals(patients[0].gender, "female");
+  // Bug #13: patient.gender NOT set when formularDaten missing — patient
+  // form will collect it from the user's explicit pick.
+  assertEquals(patients[0].gender, undefined);
 });
 
 Deno.test("buildPatients: geburtsjahr in formularDaten → year_of_birth on patient[0]", () => {
@@ -449,6 +411,8 @@ Deno.test("mapToolIds: walking-stick / mobile → [Walking stick] only", () => {
 });
 
 // ─── mapSalutation ─────────────────────────────────────────────────────────
+// Helper used by acceptance flow (StoreConfirmation contracts) and
+// patient identity helpers — NOT by onboard since contracts moved out.
 
 Deno.test("mapSalutation: Frau → 'Mrs.' (prod enum, NOT 'Frau')", () => {
   assertEquals(mapSalutation("Frau"), "Mrs.");
@@ -476,35 +440,33 @@ Deno.test("mapOtherPeopleInHouse: nein/missing → 'no'", () => {
   assertEquals(mapOtherPeopleInHouse({} as FormularDaten), "no");
 });
 
-// ─── buildCaregiverWish ────────────────────────────────────────────────────
+// ─── buildCaregiverWish (post-Bug-#13: only real preference enums) ─────────
 
-Deno.test("buildCaregiverWish: prod-most-common defaults + gender from formularDaten", () => {
-  const wish = buildCaregiverWish(makeFormularDaten({ geschlecht: "weiblich" }));
+Deno.test("buildCaregiverWish: carries only real preference enums", () => {
+  const wish = buildCaregiverWish(makeFormularDaten({
+    geschlecht: "weiblich",
+    deutschkenntnisse: "kommunikativ",
+    fuehrerschein: "ja",
+  }));
   assertEquals(wish.gender, "female");
   assertEquals(wish.germany_skill, "level_3");
-  assertEquals(wish.driving_license, "not_important");
-  assertEquals(wish.smoking, "yes_outside");
-  assertEquals(wish.shopping, "no");
-  assertEquals(wish.is_open_for_all, false);
-  // Free-text fields must be non-null (99-100% in active customers).
-  // We don't assert the exact wording — just that all 4 locales carry
-  // a non-empty string for tasks + shopping_be_done.
-  for (
-    const k of [
-      "tasks",
-      "tasks_de",
-      "tasks_en",
-      "tasks_pl",
-      "shopping_be_done",
-      "shopping_be_done_de",
-      "shopping_be_done_en",
-      "shopping_be_done_pl",
-    ] as const
-  ) {
-    if (!wish[k] || wish[k]?.length === 0) {
-      throw new Error(`expected wish.${k} to be non-empty`);
-    }
-  }
+  assertEquals(wish.driving_license, "yes");
+  assertEquals(wish.is_open_for_all, false);   // Primundus business default
+});
+
+Deno.test("buildCaregiverWish: cut fields are NOT set (Bug #13)", () => {
+  const wish = buildCaregiverWish(makeFormularDaten({ fuehrerschein: "ja" }));
+  // Bug #13: smoking/shopping/tasks*/shopping_be_done*/driving_license_gearbox
+  // are deferred to patient form save (real user choice, not auto-string).
+  assertEquals(wish.smoking, undefined);
+  assertEquals(wish.shopping, undefined);
+  assertEquals(wish.tasks, undefined);
+  assertEquals(wish.tasks_de, undefined);
+  assertEquals(wish.tasks_en, undefined);
+  assertEquals(wish.tasks_pl, undefined);
+  assertEquals(wish.shopping_be_done, undefined);
+  // Even when driving_license=yes — gearbox lives on patient form.
+  assertEquals(wish.driving_license_gearbox, undefined);
 });
 
 Deno.test("buildCaregiverWish: missing gender → 'not_important' (prod-safe default)", () => {
@@ -513,9 +475,6 @@ Deno.test("buildCaregiverWish: missing gender → 'not_important' (prod-safe def
 });
 
 Deno.test("buildCaregiverWish: real Primundus stage-A fields override defaults", () => {
-  // Verify deutschkenntnisse + fuehrerschein from formularDaten flow
-  // through to germany_skill / driving_license rather than being shadowed
-  // by the prod-default fallbacks.
   const wish = buildCaregiverWish(makeFormularDaten({
     deutschkenntnisse: "sehr-gut",
     fuehrerschein: "ja",
@@ -524,23 +483,6 @@ Deno.test("buildCaregiverWish: real Primundus stage-A fields override defaults",
   assertEquals(wish.germany_skill, "level_4");
   assertEquals(wish.driving_license, "yes");
   assertEquals(wish.gender, "male");
-});
-
-Deno.test("buildCaregiverWish: fuehrerschein=ja → driving_license_gearbox='automatic' default", () => {
-  // Calculator no longer asks for gearbox — that lives on the CA-app
-  // patient form. Onboard sets a permissive 'automatic' default so the
-  // Mamamia matcher can run before the patient form is saved; the user's
-  // actual choice (Automatik / Schaltung / Egal) overwrites it on save.
-  const wish = buildCaregiverWish(makeFormularDaten({ fuehrerschein: "ja" }));
-  assertEquals(wish.driving_license, "yes");
-  assertEquals(wish.driving_license_gearbox, "automatic");
-});
-
-Deno.test("buildCaregiverWish: fuehrerschein=nein → driving_license_gearbox unset", () => {
-  // No gearbox needed when no car driving required.
-  const wish = buildCaregiverWish(makeFormularDaten({ fuehrerschein: "nein" }));
-  assertEquals(wish.driving_license, "not_important");
-  assertEquals(wish.driving_license_gearbox, undefined);
 });
 
 // ─── extractPlzFromLead (primary path) ─────────────────────────────────────
@@ -591,36 +533,9 @@ Deno.test("extractPlzFromFormularDaten: no PLZ → null", () => {
   assertEquals(extractPlzFromFormularDaten({ plz: "abc" } as FormularDaten), null);
 });
 
-// ─── buildContractFromLead / buildContactsFromLead ─────────────────────────
-
-Deno.test("buildContractFromLead: lead → invoice/main contract with patient role", () => {
-  const lead = makeLead();
-  const contract = buildContractFromLead(lead);
-  assertEquals(contract.contact_type, "patient");
-  assertEquals(contract.is_same_as_first_patient, true);
-  assertEquals(contract.salutation, "Mrs.");      // Frau → Mrs.
-  assertEquals(contract.first_name, "hildegard");
-  assertEquals(contract.last_name, "von norman");
-  assertEquals(contract.email, "frau@example.de");
-  assertEquals(contract.phone, "+49 89 1234567");
-  // Without locationId → manual-entry fallback (mirrors panel checkbox)
-  assertEquals(contract.location_id, undefined);
-  assertEquals(contract.location_custom_text, "Wird vom Kunden ergänzt");
-});
-
-Deno.test("buildContractFromLead: with locationId → uses dropdown id, no custom_text", () => {
-  const lead = makeLead();
-  const contract = buildContractFromLead(lead, 1148);
-  assertEquals(contract.location_id, 1148);
-  assertEquals(contract.location_custom_text, undefined);
-});
-
-// ─── Patient identity vs contract contact ────────────────────────────────
-//
-// Primundus stage-B form puts the actual care recipient in patient_*
-// fields (e.g. Zenon Test) and keeps the orderer/payer in lead.*
-// (e.g. Michał Test = the person who filled the calculator).
-// Mamamia tracks both as distinct rows; we must not collapse them.
+// ─── Patient identity helpers ──────────────────────────────────────────────
+// Used by buildCustomerInput to set Customer.first_name/last_name.
+// Stage-B `patient_*` fields take priority; MVP fallback is lead.* (orderer).
 
 Deno.test("resolvePatientFirstName: prefers patient_vorname (stage-B)", () => {
   assertEquals(
@@ -636,181 +551,88 @@ Deno.test("resolvePatientFirstName: falls back to lead.vorname (stage-A only)", 
   );
 });
 
+Deno.test("resolvePatientLastName: prefers patient_nachname (stage-B)", () => {
+  assertEquals(
+    resolvePatientLastName(makeLead({ patient_nachname: "Test" })),
+    "Test",
+  );
+});
+
 Deno.test("resolvePatientSalutation: prefers patient_anrede over lead.anrede", () => {
   assertEquals(
     resolvePatientSalutation(makeLead({ patient_anrede: "Herr" })),
     "Mr.",
   );
-  // Fallback to lead.anrede when patient_anrede missing.
   assertEquals(
     resolvePatientSalutation(makeLead({ patient_anrede: null, anrede: "Frau" })),
     "Mrs.",
   );
 });
 
-Deno.test("buildContractFromLead kind='patient' uses patient_* identity", () => {
-  const lead = makeLead({
-    vorname: "Michał",
-    nachname: "Test",
-    anrede: "Herr",
-    patient_anrede: "Herr",
-    patient_vorname: "Zenon",
-    patient_nachname: "Test",
-  });
-  const contract = buildContractFromLead(lead, 1148, "patient");
-  assertEquals(contract.first_name, "Zenon");
-  assertEquals(contract.last_name, "Test");
-  assertEquals(contract.salutation, "Mr.");
-  assertEquals(contract.contact_type, "patient");
-});
+// ─── buildCustomerInput (post-Bug-#13: minimal payload) ────────────────────
 
-Deno.test("buildContractFromLead kind='contact' uses lead.* identity (orderer/payer)", () => {
-  const lead = makeLead({
-    vorname: "Michał",
-    nachname: "Test",
-    anrede: "Herr",
-    patient_anrede: "Herr",
-    patient_vorname: "Zenon",
-    patient_nachname: "Test",
-  });
-  const contract = buildContractFromLead(lead, 1148, "contact");
-  assertEquals(contract.first_name, "Michał");
-  assertEquals(contract.last_name, "Test");
-  assertEquals(contract.contact_type, "invoice");
-  // Patient ≠ contact identity → not mirrored
-  assertEquals(contract.is_same_as_first_patient, false);
-});
-
-Deno.test("buildContractFromLead patient address fields propagate from patient_*", () => {
-  const lead = makeLead({
-    patient_street: "Hans Kloss Strasse",
-    patient_zip: "10176",
-    patient_city: "Berlin",
-  });
-  const contract = buildContractFromLead(lead, 1148, "patient");
-  assertEquals(contract.street_number, "Hans Kloss Strasse");
-  assertEquals(contract.zip_code, "10176");
-  assertEquals(contract.city, "Berlin");
-});
-
-Deno.test("buildContractFromLead drops street_number when shorter than 3 chars (Mamamia min-len)", () => {
-  // Mamamia rejects street_number with <3 chars. Skip the field rather
-  // than letting the whole UpdateCustomer/StoreCustomer call fail.
-  const c1 = buildContractFromLead(makeLead({ patient_street: "X" }), 1148, "patient");
-  assertEquals(c1.street_number, undefined);
-  const c2 = buildContractFromLead(makeLead({ patient_street: "  AB " }), 1148, "patient");
-  assertEquals(c2.street_number, undefined);
-  const c3 = buildContractFromLead(makeLead({ patient_street: "ABC" }), 1148, "patient");
-  assertEquals(c3.street_number, "ABC");
-});
-
-Deno.test("buildContactsFromLead: patient ≠ contact → is_same_as_first_patient=false", () => {
-  const lead = makeLead({
-    vorname: "Michał",
-    nachname: "Test",
-    patient_vorname: "Zenon",
-    patient_nachname: "Test",
-  });
-  const contacts = buildContactsFromLead(lead);
-  assertEquals(contacts[0].first_name, "Michał");
-  assertEquals(contacts[0].is_same_as_first_patient, false);
-});
-
-Deno.test("buildContactsFromLead: stage-A only (patient missing) → is_same_as_first_patient=true", () => {
-  const lead = makeLead({
-    patient_vorname: null,
-    patient_nachname: null,
-  });
-  const contacts = buildContactsFromLead(lead);
-  assertEquals(contacts[0].is_same_as_first_patient, true);
-});
-
-Deno.test("buildContactsFromLead: returns single contact mirroring lead", () => {
-  const lead = makeLead({ anrede: "Herr", vorname: "klaus" });
-  const contacts = buildContactsFromLead(lead);
-  assertEquals(contacts.length, 1);
-  assertEquals(contacts[0].salutation, "Mr.");
-  assertEquals(contacts[0].first_name, "klaus");
-  assertEquals(contacts[0].is_same_as_first_patient, true);
-});
-
-// ─── buildJobDescription ───────────────────────────────────────────────────
-
-Deno.test("buildJobDescription: includes care_level + mobility label in 3 locales", () => {
-  const desc = buildJobDescription(makeFormularDaten({
-    pflegegrad: 4,
-    mobilitaet: "rollstuhl",
-  }));
-  // sanity checks — actual wording is implementation detail, but must
-  // include the care level number and reference the mobility category
-  if (!desc.de.includes("4") || !desc.de.toLowerCase().includes("rollstuhl")) {
-    throw new Error(`unexpected DE: ${desc.de}`);
-  }
-  if (!desc.en.includes("4") || !desc.en.toLowerCase().includes("wheelchair")) {
-    throw new Error(`unexpected EN: ${desc.en}`);
-  }
-  if (!desc.pl.includes("4") || !desc.pl.toLowerCase().includes("wózk")) {
-    throw new Error(`unexpected PL: ${desc.pl}`);
-  }
-});
-
-// ─── buildCustomerInput (top-level) ────────────────────────────────────────
-
-Deno.test("buildCustomerInput: every must-fill field is set for active-state customer", () => {
+Deno.test("buildCustomerInput: identity + business defaults + real formularDaten", () => {
   const lead = makeLead();
   const input = buildCustomerInput(lead);
 
-  // Identity — when stage-B hasn't run, the patient identity falls
-  // back to lead.* so first_name == lead.vorname.
+  // Identity (real from lead.*; patient_* are null in MVP)
   assertEquals(input.first_name, "hildegard");
+  assertEquals(input.last_name, "von norman");
   assertEquals(input.email, "frau@example.de");
   assertEquals(input.phone, "+49 89 1234567");
 
-  // 100% fill in active prod (must-set)
-  assertEquals(input.urbanization_id, 2);
+  // Business defaults — NOT pytania do klienta
   assertEquals(input.language_id, 1);
   assertEquals(input.visibility, "public");
-  assertEquals(input.accommodation, "single_family_house");
-  assertEquals(input.caregiver_accommodated, "room_premises");
-  assertEquals(input.has_family_near_by, "not_important");
-  assertEquals(input.internet, "yes");
-  assertEquals(input.pets, "no_information");
-  assertEquals(input.other_people_in_house, "no");   // weitere_personen=nein
-  assertEquals(input.smoking_household, "no");
-  assertEquals(input.gender, "female");              // from formularDaten
+  assertEquals(input.commission_agent_salary, 300);
 
-  // Panel form requires these — verified vs screenshots from customer 7579/7580
-  // (NEVER pick "Others" id 8 — triggers required "Inne urządzenia" text)
-  assertEquals(input.equipment_ids, [1, 2]);        // Own TV, Own Bathroom
-  assertEquals(input.day_care_facility, "no");
-
-  // Care budget = bruttopreis (mirrored to monthly_salary)
+  // Real from kalkulation
   assertEquals(input.care_budget, 3200);
   assertEquals(input.monthly_salary, 3200);
-  // Primundus default commission — panel rejects 0
-  assertEquals(input.commission_agent_salary, 300);
-  // arrival_at on Customer (separate from JobOffer) — Mamamia
-  // active-state gate requires it. computeArrivalDate("sofort") = +7d.
+
+  // Derived from real care_start_timing
   if (typeof input.arrival_at !== "string" || input.arrival_at.length === 0) {
     throw new Error("expected input.arrival_at to be non-empty YYYY-MM-DD");
   }
 
-  // Job description set in all 4 locales
-  if (!input.job_description || input.job_description.length === 0) {
-    throw new Error("job_description must be non-empty");
-  }
-  if (!input.job_description_de || !input.job_description_en || !input.job_description_pl) {
-    throw new Error("job_description_{de,en,pl} must all be non-empty");
-  }
+  // Real from formularDaten
+  assertEquals(input.other_people_in_house, "no");   // weitere_personen=nein
+  assertEquals(input.gender, "female");              // geschlecht=weiblich
 
   // Nested
   assertEquals(input.patients.length, 1);
   if (!input.customer_caregiver_wish) throw new Error("wish must be set");
-  if (!input.customer_contract) throw new Error("contract must be set");
-  if (!input.invoice_contract) throw new Error("invoice contract must be set");
-  if (!input.customer_contacts || input.customer_contacts.length === 0) {
-    throw new Error("contacts must be set");
-  }
+});
+
+Deno.test("buildCustomerInput: cut fields are NOT in payload (Bug #13)", () => {
+  const lead = makeLead();
+  // deno-lint-ignore no-explicit-any
+  const input = buildCustomerInput(lead) as any;
+
+  // Customer-level fields cut from onboard — Mamamia accepts as
+  // null/omitted (verified 2026-05-07). Patient form save populates
+  // them via UpdateCustomer (real user choice, not phantom default).
+  assertEquals(input.urbanization_id, undefined);
+  assertEquals(input.equipment_ids, undefined);
+  assertEquals(input.day_care_facility, undefined);
+  assertEquals(input.accommodation, undefined);
+  assertEquals(input.caregiver_accommodated, undefined);  // Mamamia auto-defaults to "room_premises"
+  assertEquals(input.has_family_near_by, undefined);
+  assertEquals(input.internet, undefined);
+  assertEquals(input.pets, undefined);                    // Mamamia auto-defaults to "no_information"
+  assertEquals(input.is_pet_dog, undefined);
+  assertEquals(input.is_pet_cat, undefined);
+  assertEquals(input.is_pet_other, undefined);
+  assertEquals(input.smoking_household, undefined);
+  assertEquals(input.job_description, undefined);
+  assertEquals(input.job_description_de, undefined);
+  assertEquals(input.job_description_en, undefined);
+  assertEquals(input.job_description_pl, undefined);
+
+  // Contracts moved to acceptance flow (StoreConfirmation).
+  assertEquals(input.customer_contract, undefined);
+  assertEquals(input.invoice_contract, undefined);
+  assertEquals(input.customer_contacts, undefined);
 });
 
 Deno.test("buildCustomerInput: weitere_personen=ja propagates only to other_people_in_house (not 2 patients)", () => {
@@ -823,12 +645,10 @@ Deno.test("buildCustomerInput: weitere_personen=ja propagates only to other_peop
   });
   const input = buildCustomerInput(lead);
   assertEquals(input.other_people_in_house, "yes");
-  // Single patient — weitere_personen is "others IN house", not "2 patients
-  // under care". Couple-under-care needs betreuung_fuer='ehepaar'.
   assertEquals(input.patients.length, 1);
 });
 
-Deno.test("buildCustomerInput: stage-B lead → top-level uses patient_*, contracts split correctly", () => {
+Deno.test("buildCustomerInput: stage-B patient_* override lead.* for top-level identity", () => {
   const lead = makeLead({
     vorname: "Michał",
     nachname: "Test",
@@ -836,32 +656,14 @@ Deno.test("buildCustomerInput: stage-B lead → top-level uses patient_*, contra
     patient_anrede: "Herr",
     patient_vorname: "Zenon",
     patient_nachname: "Test",
-    patient_street: "Hans Kloss Strasse",
-    patient_zip: "10115",
-    patient_city: "Berlin",
   });
   const input = buildCustomerInput(lead, 1148);
-
-  // Customer top-level identity = patient (Zenon)
+  // Customer top-level identity = patient (Zenon), since stage-B has run.
   assertEquals(input.first_name, "Zenon");
   assertEquals(input.last_name, "Test");
-
-  // customer_contract = patient (Zenon) — contact_type 'patient'
-  assertEquals(input.customer_contract?.first_name, "Zenon");
-  assertEquals(input.customer_contract?.contact_type, "patient");
-  assertEquals(input.customer_contract?.zip_code, "10115");
-
-  // invoice_contract = orderer/payer (Michał) — contact_type 'invoice'
-  assertEquals(input.invoice_contract?.first_name, "Michał");
-  assertEquals(input.invoice_contract?.contact_type, "invoice");
-  assertEquals(input.invoice_contract?.is_same_as_first_patient, false);
-
-  // customer_contacts mirrors invoice (orderer)
-  assertEquals(input.customer_contacts?.[0].first_name, "Michał");
-  assertEquals(input.customer_contacts?.[0].is_same_as_first_patient, false);
 });
 
-Deno.test("buildCustomerInput: betreuung_fuer='ehepaar' yields 2 patients (couple-under-care)", () => {
+Deno.test("buildCustomerInput: betreuung_fuer='ehepaar' yields 2 patients", () => {
   const lead = makeLead({
     kalkulation: {
       bruttopreis: 3000,
@@ -878,25 +680,21 @@ Deno.test("buildCustomerInput: null kalkulation → defaults preserved (no crash
   const input = buildCustomerInput(lead);
   assertEquals(input.care_budget, null);
   assertEquals(input.monthly_salary, null);
-  assertEquals(input.urbanization_id, 2);
   assertEquals(input.patients.length, 1);
   assertEquals(input.other_people_in_house, "no");
+  assertEquals(input.language_id, 1);
 });
 
-Deno.test("buildCustomerInput: locationId arg propagates to customer + both contracts", () => {
+Deno.test("buildCustomerInput: locationId arg propagates to customer top-level", () => {
   const lead = makeLead();
   const input = buildCustomerInput(lead, 1148);
   assertEquals(input.location_id, 1148);
-  assertEquals(input.customer_contract?.location_id, 1148);
-  assertEquals(input.invoice_contract?.location_id, 1148);
-  // No custom_text fallback when location_id is supplied
-  assertEquals(input.customer_contract?.location_custom_text, undefined);
 });
 
-Deno.test("buildCustomerInput: no locationId → contracts carry custom_text fallback", () => {
+Deno.test("buildCustomerInput: no locationId → location_id stays null (patient form fills)", () => {
   const lead = makeLead();
   const input = buildCustomerInput(lead);
   assertEquals(input.location_id, null);
-  assertEquals(input.customer_contract?.location_custom_text, "Wird vom Kunden ergänzt");
-  assertEquals(input.invoice_contract?.location_custom_text, "Wird vom Kunden ergänzt");
+  // No location_custom_text on customer top-level — patient form's PLZ+Ort
+  // propagate via UpdateCustomer.
 });

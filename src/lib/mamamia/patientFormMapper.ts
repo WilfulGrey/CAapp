@@ -300,6 +300,59 @@ function wishDrivingGearboxToApi(v: string): 'automatic' | 'manual' | null {
   return null;
 }
 
+// Bucket strings (e.g. "70–90 kg" / "175–185 cm") use en-dash in form
+// options, but Mamamia panel dropdown values use ASCII hyphen. Without
+// normalization the panel UI shows the field as empty even though the
+// raw value is in the DB. Verified 2026-05-07: Customer 7653 stored
+// "70–90 kg" (en-dash) → panel rendered weight as unselected.
+function normalizeBucket(s: string): string {
+  return s.replace(/–/g, '-');
+}
+
+// Tool ids derived from mobility — mirrors
+// supabase/functions/onboard-to-mamamia/mappers.ts:mapToolIds. Patient
+// form has no "Pomoce" multi-select; tool_ids derive from mobility_id
+// every save so they stay in sync when user changes mobility (otherwise
+// proxy.PRESERVE_QUERY re-injects stale tools — verified 2026-05-07
+// on Customer 7655 patient[1]: mobility_id=1 mobile + tools=[4,6]
+// hoist+bed because couple-onboard set [4,6] for both, then patient
+// form changed mobility but tools weren't refreshed).
+//   bedridden (5)  → [4 Patient hoist, 6 Care bed]
+//   wheelchair (4) → [3 Wheelchair]
+//   walker (3)     → [2 Rollator]
+//   walking-stick (2) / mobile (1) / unknown → [1 Walking stick]
+// NEVER include id 7 (Others) — selecting it triggers a required
+// "Jakie inne narzędzia są używane?" free-text we cannot fill.
+function deriveToolIds(mobilityId: number): number[] {
+  switch (mobilityId) {
+    case 5: return [4, 6];
+    case 4: return [3];
+    case 3: return [2];
+    default: return [1];
+  }
+}
+
+// Standard placeholder for `night_operations_description` when the
+// patient form reports any night work (calculator-side question doesn't
+// surface details, but Mamamia panel UI shows the description field as
+// empty if not populated). Generic enough to be true regardless of the
+// actual mix of overnight tasks.
+function standardNightOpsDescription(no: string): {
+  de: string;
+  en: string;
+  pl: string;
+} | null {
+  if (no === 'no') return null;
+  return {
+    de:
+      'Konkrete nächtliche Aufgaben werden direkt mit der Pflegekraft abgestimmt — typischerweise Toilettenbegleitung, Lagerung oder Beruhigung.',
+    en:
+      'Specific night-time tasks will be coordinated directly with the caregiver — typically toilet assistance, repositioning, or reassurance.',
+    pl:
+      'Konkretne zadania nocne będą uzgadniane bezpośrednio z opiekunką — zazwyczaj towarzyszenie do toalety, zmiana pozycji lub uspokojenie.',
+  };
+}
+
 // Build a single patient object for UpdateCustomer.patients[].
 // Threading existing `patientId` is critical — Mamamia SILENTLY DROPS fields
 // like night_operations and incontinence when patient is new (no id) inside
@@ -330,7 +383,13 @@ function buildPatient(
   if (pg) p.care_level = pg;
 
   const mob = MOBILITY_BY_LABEL[mobility];
-  if (mob !== undefined) p.mobility_id = mob;
+  if (mob !== undefined) {
+    p.mobility_id = mob;
+    // Derive tool_ids every save so they stay in sync when mobility
+    // changes (proxy PRESERVE_QUERY would otherwise re-inject stale tools
+    // from a previous mobility — Bug #13b on Customer 7655 patient[1]).
+    p.tool_ids = deriveToolIds(mob);
+  }
 
   const na = nachtToApi(nacht);
   if (na) p.night_operations = na;
@@ -341,8 +400,10 @@ function buildPatient(
   const inc = incontinenceToApi(inkontinenz);
   Object.assign(p, inc);
 
-  if (gewicht) p.weight = gewicht;
-  if (groesse) p.height = groesse;
+  // weight/height bucket — normalize en-dash to ASCII hyphen so Mamamia
+  // panel dropdown matches its enum (verified 2026-05-07 on Customer 7653).
+  if (gewicht) p.weight = normalizeBucket(gewicht);
+  if (groesse) p.height = normalizeBucket(groesse);
 
   const lift = liftIdToApi(heben);
   if (lift !== null) p.lift_id = lift;
@@ -358,17 +419,82 @@ function buildPatient(
     p.dementia_description_pl = demDesc.pl;
   }
 
+  // night_operations_description (4 locales) — auto-filled when
+  // night_operations != 'no'. Form does not collect details; panel UI
+  // requires non-empty text. Standard placeholder unless customer
+  // overrides via free-text field (none today, but preserved for future).
+  if (na) {
+    const ndesc = standardNightOpsDescription(na);
+    if (ndesc) {
+      p.night_operations_description = ndesc.de;
+      p.night_operations_description_de = ndesc.de;
+      p.night_operations_description_en = ndesc.en;
+      p.night_operations_description_pl = ndesc.pl;
+    }
+  }
+
   return p;
 }
 
 export interface CaregiverWishPatch {
   gender?: 'female' | 'male' | 'not_important';
   smoking?: 'yes_outside' | 'no';
+  shopping?: 'yes' | 'no' | 'occasionally';
   driving_license_gearbox?: 'automatic' | 'manual';
   tasks?: string;
   tasks_de?: string;
   other_wishes?: string;
   other_wishes_de?: string;
+}
+
+// MAMAMIA_WISH_ALLOWED in mamamia-proxy/actions.ts must include 'shopping'
+// for this to actually reach Mamamia. Update there in tandem.
+
+// Auto-summary for `Customer.job_description`. Patient form doesn't have
+// a "krótki opis sytuacji" free-text — but Mamamia panel + caregiver
+// listings render this prominently. Generate a one-liner from the form
+// data so the agency / caregivers get a quick picture.
+//
+// Mamamia UpdateCustomer mutation only exposes `$job_description` (single
+// string, no locale variants — verified 2026-05-05 via Bug #9 attempt
+// that broke all updateCustomer calls). Stick to DE.
+function buildJobDescriptionSummary(form: PatientFormShape): string {
+  const parts: string[] = [];
+
+  // Headline: 24h-Betreuung + Pflegegrad
+  const pg = parsePflegegrad(form.pflegegrad);
+  if (pg) {
+    parts.push(`24-Stunden-Betreuung gesucht. Pflegegrad ${pg}.`);
+  } else {
+    parts.push('24-Stunden-Betreuung gesucht.');
+  }
+
+  // Anzahl + Mobilität
+  const couple = form.anzahl === '2';
+  const mobLabel = form.mobilitaet ? form.mobilitaet.toLowerCase() : null;
+  if (couple) {
+    parts.push('Ehepaar — beide Personen benötigen Betreuung.');
+  }
+  if (mobLabel) {
+    parts.push(`Mobilität: ${mobLabel}.`);
+  }
+
+  // Demenz (gradation if available)
+  if (form.demenz && form.demenz !== 'Nein') {
+    parts.push(`Demenzdiagnose: ${form.demenz.toLowerCase()}.`);
+  }
+
+  // Inkontinenz
+  if (form.inkontinenz && form.inkontinenz !== 'Nein') {
+    parts.push(`Inkontinenz: ${form.inkontinenz.toLowerCase()}.`);
+  }
+
+  // Nachteinsätze
+  if (form.nacht && form.nacht !== 'Nein') {
+    parts.push(`Nächtliche Unterstützung: ${form.nacht.toLowerCase()}.`);
+  }
+
+  return parts.join(' ');
 }
 
 export interface MappedCustomerPatch {
@@ -395,6 +521,11 @@ export interface MappedCustomerPatch {
   is_pet_cat?: boolean;
   is_pet_other?: boolean;
   caregiver_accommodated?: string;
+  // Equipment ids ([Int]) — populated with sensible default (TV + Bathroom)
+  // since the patient form doesn't ask. Mamamia panel "Wyposażenie
+  // zakwaterowania" is a required-looking multi-select; an empty list
+  // surfaces as missing config to the agency.
+  equipment_ids?: number[];
   customer_caregiver_wish?: CaregiverWishPatch;
   // Patient array.
   patients?: Array<Record<string, unknown>>;
@@ -505,16 +636,29 @@ export function mapPatientFormToUpdateCustomerInput(
     wish.other_wishes = form.sonstigeWuensche;
     wish.other_wishes_de = form.sonstigeWuensche;
   }
+  // Mamamia panel "Czy opiekun musi robić zakupy?" is a mandatory-looking
+  // dropdown but the patient form doesn't ask. Default 'no' (prod-most-
+  // common at 43%) so the agency doesn't see an empty field. Customer
+  // can update via panel if needed.
+  wish.shopping = 'no';
   if (Object.keys(wish).length > 0) {
     patch.customer_caregiver_wish = wish;
   }
 
-  // ── job_description: medical diagnoses + pflegedienst description ───
-  // aufgaben/sonstigeWuensche moved out (they belong on the wish row).
-  // Pflegedienst frequency+tasks land here too because the dedicated
+  // ── equipment_ids: default selection so panel "Wyposażenie zakwaterowania"
+  // isn't empty. Patient form doesn't ask; [1, 2] = Own TV + Own Bathroom
+  // is the single most common pair in active prod customers.
+  patch.equipment_ids = [1, 2];
+
+  // ── job_description: auto-summary + medical diagnoses + pflegedienst ───
+  // Auto-summary gives caregivers / agency a quick picture of the
+  // situation since the form doesn't have a "krótki opis sytuacji"
+  // free-text. Users diagnoses and pflegedienst details append.
+  // Pflegedienst frequency+tasks land here because the dedicated
   // day_care_facility_description column isn't writable via GraphQL
   // UpdateCustomer (Mamamia mutation input doesn't expose it).
   const jobParts: string[] = [];
+  jobParts.push(buildJobDescriptionSummary(form));
   if (form.diagnosen) {
     jobParts.push(`Diagnosen: ${form.diagnosen}`);
   }
@@ -527,9 +671,7 @@ export function mapPatientFormToUpdateCustomerInput(
       jobParts.push(`Pflegedienst: ${desc.de}`);
     }
   }
-  if (jobParts.length > 0) {
-    patch.job_description = jobParts.join(' | ');
-  }
+  patch.job_description = jobParts.join(' | ');
 
   return patch;
 }

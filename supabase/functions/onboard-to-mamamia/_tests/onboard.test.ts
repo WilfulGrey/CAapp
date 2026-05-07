@@ -147,7 +147,7 @@ Deno.test("onboardLead: happy path — registers customer + joboffer, caches IDs
   assertEquals(supa.updated[0].patch.mamamia_user_token, "agency-jwt-xyz");
 });
 
-Deno.test("onboardLead: StoreCustomer payload carries every must-fill field", async () => {
+Deno.test("onboardLead: StoreCustomer payload (Bug #13: minimal — only real data + business defaults)", async () => {
   _resetAgencyTokenCache();
   const lead = makeLead();
   const supa = makeFakeSupabase([lead]);
@@ -171,76 +171,77 @@ Deno.test("onboardLead: StoreCustomer payload carries every must-fill field", as
   if (!storeCustomerReq) throw new Error("StoreCustomer request not captured");
   const v = storeCustomerReq.variables;
 
-  // Identity
+  // ── REAL DATA — what user actually provided ──
+  // Identity (lead.* — orderer from kostenrechner, MVP fallback)
   assertEquals(v.first_name, "hildegard");
   assertEquals(v.last_name, "schmidt");
   assertEquals(v.email, "frau@example.de");
   assertEquals(v.phone, "+49 89 1234567");
 
-  // Customer-level enums (every 100%-fill column from active customers)
-  assertEquals(v.urbanization_id, 2);
-  assertEquals(v.language_id, 1);
-  assertEquals(v.visibility, "public");
-  assertEquals(v.accommodation, "single_family_house");
-  assertEquals(v.caregiver_accommodated, "room_premises");
-  assertEquals(v.has_family_near_by, "not_important");
-  assertEquals(v.internet, "yes");
-  assertEquals(v.pets, "no_information");
-  assertEquals(v.other_people_in_house, "no");
-  assertEquals(v.smoking_household, "no");
-  assertEquals(v.gender, "female"); // formularDaten.geschlecht=weiblich
+  // Real from formularDaten
+  assertEquals(v.other_people_in_house, "no");      // weitere_personen=nein
+  assertEquals(v.gender, "female");                 // geschlecht=weiblich
 
-  // Panel form must-fill (verified vs customer 7580 screenshots) — never
-  // include Others (id 8) which triggers a required free-text field.
-  assertEquals(v.equipment_ids, [1, 2]);
-  assertEquals(v.day_care_facility, "no");
-
-  // Care budget mirrored + commission default
+  // Real from kalkulation
   assertEquals(v.care_budget, 3200);
   assertEquals(v.monthly_salary, 3200);
-  assertEquals(v.commission_agent_salary, 300);
-  // arrival_at on Customer (separate gate from JobOffer)
-  // NOW=2026-04-23 + 7 days (sofort) → 2026-04-30
+
+  // Derived from real care_start_timing (sofort = +7 days from NOW=2026-04-23)
   assertEquals(v.arrival_at, "2026-04-30");
 
-  // Job description i18n — non-empty in all 4 locales
-  for (const k of ["job_description", "job_description_de", "job_description_en", "job_description_pl"]) {
-    const s = v[k];
-    if (typeof s !== "string" || s.length === 0) {
-      throw new Error(`expected ${k} to be non-empty string`);
-    }
-  }
+  // ── BUSINESS DEFAULTS — NOT pytania do klienta ──
+  assertEquals(v.language_id, 1);                   // Primundus = German market
+  assertEquals(v.visibility, "public");
+  assertEquals(v.commission_agent_salary, 300);     // Primundus baseline (panel rejects 0)
 
-  // Nested input objects — each is sent as a real object, not a string.
+  // ── NESTED — real care attrs only ──
   const wish = v.customer_caregiver_wish as Record<string, unknown>;
   if (!wish || typeof wish !== "object") throw new Error("wish must be an object");
   assertEquals(wish.gender, "female");
   assertEquals(wish.germany_skill, "level_3");
+  assertEquals(wish.driving_license, "not_important");
+  // No auto-strings or enum defaults for fields kalkulator nie pyta
+  assertEquals(wish.smoking, undefined);
+  assertEquals(wish.shopping, undefined);
+  assertEquals(wish.tasks, undefined);
 
-  const contract = v.customer_contract as Record<string, unknown>;
-  assertEquals(contract.salutation, "Mrs.");
-  assertEquals(contract.first_name, "hildegard");
-  assertEquals(contract.is_same_as_first_patient, true);
-
-  const invoice = v.invoice_contract as Record<string, unknown>;
-  assertEquals(invoice.email, "frau@example.de");
-
-  const contacts = v.customer_contacts as Array<Record<string, unknown>>;
-  assertEquals(contacts.length, 1);
-  assertEquals(contacts[0].is_same_as_first_patient, true);
-
-  // Patients — first patient has all 100%-fill fields set
   const patients = v.patients as Array<Record<string, unknown>>;
   assertEquals(patients.length, 1);
-  assertEquals(patients[0].mobility_id, 4);   // rollstuhl
-  assertEquals(patients[0].care_level, 3);    // pflegegrad
-  assertEquals(patients[0].lift_id, 1);          // wheelchair → lift required
-  assertEquals(patients[0].tool_ids, [3]);       // wheelchair only — Others triggers required free-text
-  assertEquals(patients[0].weight, "61-70");
-  assertEquals(patients[0].height, "161-170");
+  assertEquals(patients[0].mobility_id, 4);    // rollstuhl
+  assertEquals(patients[0].care_level, 3);     // pflegegrad
+  assertEquals(patients[0].lift_id, 1);        // derived (mobility>=4 → Yes)
+  assertEquals(patients[0].tool_ids, [3]);     // derived (wheelchair only)
+  assertEquals(patients[0].night_operations, "occasionally");
+  // No injected defaults for fields kalkulator nie pyta — patient form fills.
+  assertEquals(patients[0].weight, undefined);
+  assertEquals(patients[0].height, undefined);
+  assertEquals(patients[0].gender, undefined);
+  assertEquals(patients[0].dementia, undefined);
+  assertEquals(patients[0].incontinence, undefined);
+  assertEquals(patients[0].smoking, undefined);
 
-  // StoreJobOffer (third request — after LoginAgency + StoreCustomer) must
-  // also carry commission + visibility (panel rejects 0/missing).
+  // ── CUT FROM PAYLOAD (Bug #13) ──
+  // Customer-level — Mamamia accepts as null/omitted (verified
+  // 2026-05-07 via /tmp/test-minimal-storecustomer.mjs, Customer 7651).
+  assertEquals(v.urbanization_id, undefined);
+  assertEquals(v.equipment_ids, undefined);
+  assertEquals(v.day_care_facility, undefined);
+  assertEquals(v.accommodation, undefined);
+  assertEquals(v.caregiver_accommodated, undefined);
+  assertEquals(v.has_family_near_by, undefined);
+  assertEquals(v.internet, undefined);
+  assertEquals(v.pets, undefined);
+  assertEquals(v.is_pet_dog, undefined);
+  assertEquals(v.smoking_household, undefined);
+  assertEquals(v.job_description, undefined);
+  assertEquals(v.job_description_de, undefined);
+
+  // Contracts — moved to acceptance flow (StoreConfirmation).
+  assertEquals(v.customer_contract, undefined);
+  assertEquals(v.invoice_contract, undefined);
+  assertEquals(v.customer_contacts, undefined);
+
+  // ── StoreJobOffer (third request after LoginAgency + StoreCustomer) ──
   const sjoReq = mm.requests[2];
   assertEquals(sjoReq.variables.salary_commission, 300);
   assertEquals(sjoReq.variables.visibility, "public");
@@ -369,11 +370,13 @@ Deno.test("onboardLead: lead with patient_zip → Locations(search) → location
   if (!locReq) throw new Error("Locations request not captured");
   assertEquals(locReq.variables.search, "10115");
 
-  // Third was StoreCustomer with location_id resolved on contract
+  // Third was StoreCustomer with location_id at top-level (Bug #13:
+  // contracts no longer in onboard payload — they're set at acceptance
+  // time via StoreConfirmation; location lives only on Customer top-level
+  // and gets re-set by patient form save once user types PLZ + Ort).
   const sc = mm.requests[2];
-  const contract = sc.variables.customer_contract as Record<string, unknown>;
-  assertEquals(contract.location_id, 1148);
-  assertEquals(contract.location_custom_text, undefined);
+  assertEquals(sc.variables.location_id, 1148);
+  assertEquals(sc.variables.customer_contract, undefined);
 });
 
 Deno.test("onboardLead: null kalkulation lead still works (default patient)", async () => {

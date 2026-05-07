@@ -442,37 +442,31 @@ describe('mapMamamiaCustomerToPatientForm — patientGenderKnown', () => {
     } as unknown as MamamiaCustomer;
   }
 
-  it('default (no opts) → emits geschlecht for backwards compat', () => {
+  // Bug #13 (2026-05-07): patientGenderKnown opt deleted. Onboard no
+  // longer injects patient.gender default 'female' (calculator nie pyta);
+  // Mamamia returns null until patient form save → reverse mapper outputs
+  // '' for null gender naturally. Real user-saved gender propagates.
+
+  it('null gender (pre-patient-form-save) → empty string', () => {
+    const cust = makeCustWithGender(null as unknown as 'female');
+    const r = mapMamamiaCustomerToPatientForm(cust);
+    expect(r.geschlecht).toBe('');
+  });
+
+  it('user-saved gender from patient form → real value surfaces', () => {
     const r = mapMamamiaCustomerToPatientForm(makeCustWithGender('female'));
     expect(r.geschlecht).toBe('Weiblich');
   });
 
-  it('patientGenderKnown=true → emits geschlecht', () => {
-    const r = mapMamamiaCustomerToPatientForm(
-      makeCustWithGender('female'),
-      { patientGenderKnown: true },
-    );
-    expect(r.geschlecht).toBe('Weiblich');
-  });
-
-  it('patientGenderKnown=false → omits geschlecht (empty string)', () => {
-    const r = mapMamamiaCustomerToPatientForm(
-      makeCustWithGender('female'),
-      { patientGenderKnown: false },
-    );
-    expect(r.geschlecht).toBe('');
-  });
-
-  it('patientGenderKnown=false also clears p2_geschlecht', () => {
+  it('p2_geschlecht propagates from real patient[1].gender', () => {
     const cust = makeCustWithGender('female');
     cust.patients = [
       cust.patients![0],
       { ...cust.patients![0], id: 12, gender: 'male' },
     ];
-    const r = mapMamamiaCustomerToPatientForm(cust, { patientGenderKnown: false });
-    expect(r.geschlecht).toBe('');
-    expect(r.p2_geschlecht).toBe('');
-    // Other p2_* fields still propagate (Pflegegrad, mobility, etc.).
+    const r = mapMamamiaCustomerToPatientForm(cust);
+    expect(r.geschlecht).toBe('Weiblich');
+    expect(r.p2_geschlecht).toBe('Männlich');
     expect(r.p2_pflegegrad).toBe('Pflegegrad 3');
   });
 });
@@ -558,14 +552,14 @@ describe('mapMamamiaCustomerToPatientForm — pflegedienst from job_description'
   });
 });
 
-// ─── Onboard-default suppression for weight/height ─────────────────────
-// onboard-to-mamamia writes DEFAULT_WEIGHT="61-70" + DEFAULT_HEIGHT="161-170"
-// so Mamamia matching (checkSuperJob3) can run before the patient form is
-// saved. Reverse mapper detects the exact pair and returns '' so the form
-// renders empty (optional fields). User-typed values that differ from
-// either DEFAULT propagate normally.
+// ─── Weight/height — straight passthrough (Bug #13 refactor) ──────────
+// Pre-Bug-#13 onboard injected DEFAULT_WEIGHT="61-70" + DEFAULT_HEIGHT="161-170"
+// for Mamamia matching, and reverse mapper detected the exact pair to suppress.
+// After Bug #13 onboard ships nothing for weight/height; Mamamia returns null
+// until patient form save. Reverse mapper passes any non-null bucket through
+// with the kg/cm suffix and emits '' for null.
 
-describe('mapMamamiaCustomerToPatientForm — onboard-default weight/height suppression', () => {
+describe('mapMamamiaCustomerToPatientForm — weight/height passthrough', () => {
   function makeCustWithPatient(
     weight: string | null,
     height: string | null,
@@ -592,29 +586,26 @@ describe('mapMamamiaCustomerToPatientForm — onboard-default weight/height supp
     } as unknown as MamamiaCustomer;
   }
 
-  it('onboard-default pair (61-70 + 161-170) → both fields empty', () => {
-    const r = mapMamamiaCustomerToPatientForm(makeCustWithPatient('61-70', '161-170'));
-    expect(r.gewicht).toBe('');
-    expect(r.groesse).toBe('');
-  });
-
-  it('user-typed weight (different from default) → keep both visible', () => {
-    // weight=81-90 means user filled it. Even if height stayed at default
-    // (legacy edge case), surface what we have so user can correct.
-    const r = mapMamamiaCustomerToPatientForm(makeCustWithPatient('81-90', '161-170'));
-    expect(r.gewicht).toBe('81-90 kg');
-    expect(r.groesse).toBe('161-170 cm');
-  });
-
-  it('user-typed height (different from default) → keep both visible', () => {
-    const r = mapMamamiaCustomerToPatientForm(makeCustWithPatient('61-70', '171-180'));
-    expect(r.gewicht).toBe('61-70 kg');
-    expect(r.groesse).toBe('171-180 cm');
-  });
-
-  it('null weight/height → empty (no spurious "kg"/"cm" suffix)', () => {
+  it('null weight/height (pre-patient-form-save) → empty', () => {
     const r = mapMamamiaCustomerToPatientForm(makeCustWithPatient(null, null));
     expect(r.gewicht).toBe('');
     expect(r.groesse).toBe('');
+  });
+
+  it('user-saved bucket → kg/cm suffix added', () => {
+    const r = mapMamamiaCustomerToPatientForm(makeCustWithPatient('81-90', '171-180'));
+    expect(r.gewicht).toBe('81-90 kg');
+    expect(r.groesse).toBe('171-180 cm');
+  });
+
+  it('Bug #13: user who genuinely picked 61-70 + 161-170 sees real values (no spurious suppression)', () => {
+    // Pre-Bug-#13 reverse mapper suppressed this exact pair as the onboard
+    // default sentinel — surfaced as empty even when the user explicitly
+    // saved 61-70 / 161-170. Bug #13 removes onboard injection of those
+    // defaults entirely, so this pair is now always real user input and
+    // surfaces as-is.
+    const r = mapMamamiaCustomerToPatientForm(makeCustWithPatient('61-70', '161-170'));
+    expect(r.gewicht).toBe('61-70 kg');
+    expect(r.groesse).toBe('161-170 cm');
   });
 });

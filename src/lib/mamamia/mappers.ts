@@ -531,33 +531,16 @@ function mamamiaPetsToForm(
 // weight/height in Mamamia store as bare buckets ("61-70" / "161-170").
 // Form expects suffix ("61-70 kg" / "161-170 cm").
 //
-// Suppression of onboard-injected defaults:
-//   onboard-to-mamamia/mappers.ts writes DEFAULT_WEIGHT="61-70" and
-//   DEFAULT_HEIGHT="161-170" so Mamamia matching can run before the
-//   patient form is saved. Surfacing those back in the form misleads
-//   the customer into thinking we know their weight/height. We detect
-//   the exact default pair on the SAME patient row and return ''
-//   instead — the form treats the field as empty (it's labeled optional
-//   anyway). Tradeoff: a user who genuinely is 61-70 kg AND 161-170 cm
-//   will see empty fields on reload (~6% of patients statistically) —
-//   acceptable since they can retype.
-const DEFAULT_WEIGHT_SENTINEL = '61-70';
-const DEFAULT_HEIGHT_SENTINEL = '161-170';
-
-function mamamiaWeightToForm(
-  w: string | null | undefined,
-  h?: string | null | undefined,
-): string {
+// Bug #13 (2026-05-07): pre-refactor the onboard injected DEFAULT_WEIGHT /
+// DEFAULT_HEIGHT and we used pair-detection sentinel suppression to hide
+// them. After Bug #13 onboard ships nothing for weight/height — Mamamia
+// returns null until patient form save. No sentinel needed: null → ''.
+function mamamiaWeightToForm(w: string | null | undefined): string {
   if (!w) return '';
-  if (w === DEFAULT_WEIGHT_SENTINEL && h === DEFAULT_HEIGHT_SENTINEL) return '';
   return w.endsWith('kg') ? w : `${w} kg`;
 }
-function mamamiaHeightToForm(
-  h: string | null | undefined,
-  w?: string | null | undefined,
-): string {
+function mamamiaHeightToForm(h: string | null | undefined): string {
   if (!h) return '';
-  if (h === DEFAULT_HEIGHT_SENTINEL && w === DEFAULT_WEIGHT_SENTINEL) return '';
   return h.endsWith('cm') ? h : `${h} cm`;
 }
 
@@ -616,8 +599,8 @@ function mamamiaPatientToForm(
     geschlecht: p.gender ? (MAMAMIA_GENDER_TO_FORM[p.gender] ?? '') : '',
     geburtsjahr: p.year_of_birth ? String(p.year_of_birth) : '',
     pflegegrad: p.care_level ? `Pflegegrad ${p.care_level}` : '',
-    gewicht: mamamiaWeightToForm(p.weight, p.height),
-    groesse: mamamiaHeightToForm(p.height, p.weight),
+    gewicht: mamamiaWeightToForm(p.weight),
+    groesse: mamamiaHeightToForm(p.height),
     mobilitaet: p.mobility_id ? (MAMAMIA_MOBILITY_TO_FORM[p.mobility_id] ?? '') : '',
     heben: p.lift_id === 1 ? 'Ja' : p.lift_id === 2 ? 'Nein' : '',
     demenz: mamamiaDementiaToForm(p.dementia, p.dementia_description),
@@ -632,20 +615,24 @@ function mamamiaPatientToForm(
 
 export function mapMamamiaCustomerToPatientForm(
   cust: MamamiaCustomer | null,
-  opts: {
-    /** When false, omit `geschlecht` / `p2_geschlecht` from the output —
-     *  the onboard mapper defaults patient.gender to "female" when the
-     *  lead has no salutation (Marcin's NEW calculator never asks for
-     *  `anrede` of the patient), and that default is meaningless to the
-     *  customer. AngebotCard then leaves the dropdown empty so the user
-     *  consciously picks a value. Defaults to `true` for backwards
-     *  compat. */
-    patientGenderKnown?: boolean;
-  } = {},
 ): PatientFormPrefill {
   if (!cust) return {};
   const out: PatientFormPrefill = {};
-  const genderKnown = opts.patientGenderKnown !== false;
+
+  // Bug #13: onboard ships nothing for patient.gender / weight / height /
+  // dementia / incontinence_* / smoking / wish.smoking / wish.tasks /
+  // wish.shopping / wish.driving_license_gearbox. Mamamia returns null
+  // for these until patient form save (UpdateCustomer); reverse mapper
+  // emits '' naturally. Pre-Bug-#13 we needed sentinel-suppression for
+  // weight/height pair, patientGenderKnown opt, and gearbox-automatic —
+  // all gone now (see git history of this file ca. 2026-05-07).
+  //
+  // Schema-level Mamamia defaults (NOT from us, but UI-visible if surfaced):
+  //   - pets="no_information" → already mapped to '' by mamamiaPetsToForm
+  //   - caregiver_accommodated="room_premises" → suppressed below when
+  //     Customer.status='draft' (= patient form not saved yet).
+
+  const isDraft = cust.status === 'draft';
 
   // anzahl from patients.length (1 or 2). 0/missing → leave undefined so
   // the formularDaten prefill or default '1' wins.
@@ -656,12 +643,11 @@ export function mapMamamiaCustomerToPatientForm(
   if (patients[0]) {
     const p1 = mamamiaPatientToForm(patients[0]);
     Object.assign(out, p1);
-    if (!genderKnown) out.geschlecht = '';
   }
   // Patient 2 — same fields, p2_* keys.
   if (patients[1]) {
     const p2 = mamamiaPatientToForm(patients[1]);
-    out.p2_geschlecht = genderKnown ? p2.geschlecht : '';
+    out.p2_geschlecht = p2.geschlecht;
     out.p2_geburtsjahr = p2.geburtsjahr;
     out.p2_pflegegrad = p2.pflegegrad;
     out.p2_gewicht = p2.gewicht;
@@ -681,8 +667,18 @@ export function mapMamamiaCustomerToPatientForm(
     out.urbanisierung = MAMAMIA_URBANIZATION_TO_FORM[cust.urbanization_id] ?? '';
   }
   if (cust.caregiver_accommodated) {
-    out.unterbringung =
-      MAMAMIA_CAREGIVER_ACCOMMODATED_TO_FORM[cust.caregiver_accommodated] ?? '';
+    // Mamamia auto-defaults to "room_premises" at schema level when
+    // StoreCustomer ships without caregiver_accommodated (Bug #13:
+    // we now ship without it). Suppress when Customer is still 'draft'
+    // (= patient form not saved yet) so the user picks consciously.
+    // Same trade-off as Bug #11 weight/height: a user who genuinely picks
+    // "Zimmer in den Räumlichkeiten" sees empty on first reload — but
+    // post-save Customer flips to 'active' and the value surfaces.
+    const isSchemaDefault = isDraft && cust.caregiver_accommodated === 'room_premises';
+    if (!isSchemaDefault) {
+      out.unterbringung =
+        MAMAMIA_CAREGIVER_ACCOMMODATED_TO_FORM[cust.caregiver_accommodated] ?? '';
+    }
   }
   if (cust.has_family_near_by === 'yes') out.familieNahe = 'Ja';
   else if (cust.has_family_near_by === 'no') out.familieNahe = 'Nein';
@@ -735,15 +731,15 @@ export function mapMamamiaCustomerToPatientForm(
     out.rauchen = mamamiaWishSmokingToForm(wish.smoking);
     out.aufgaben = wish.tasks ?? '';
     out.sonstigeWuensche = wish.other_wishes ?? '';
-    // Gearbox: 'manual' → Schaltung, 'automatic' → empty (the onboard
-    // default — leave blank so the user explicitly picks instead of
-    // seeing "Automatik" preselected). When the user saves a deliberate
-    // 'automatic' from the form, on reload they'll still see blank — same
-    // tradeoff as Bug #11 weight/height suppression. They can repick.
+    // Bug #13: onboard ships nothing for driving_license_gearbox; Mamamia
+    // returns null until patient form save explicitly writes 'automatic'
+    // / 'manual'. Reverse mapper emits the user's saved pick — no
+    // suppression needed (pre-Bug-#13 we suppressed 'automatic' as the
+    // onboard default, that's gone now).
     if (wish.driving_license_gearbox === 'manual') {
       out.wunschGetriebe = 'Schaltung';
-    } else {
-      out.wunschGetriebe = '';
+    } else if (wish.driving_license_gearbox === 'automatic') {
+      out.wunschGetriebe = 'Automatik';
     }
   }
 

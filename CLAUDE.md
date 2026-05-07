@@ -42,6 +42,61 @@ Naruszenie tej zasady = regression. Review + rewrite.
 
 ---
 
+## 🩸 Święta zasada nr 2: DOKUMENTACJA ŻYJE Z KODEM
+
+**Każda zmiana dotykająca data flow / integracji / mappingu / schemy ZOBOWIĄZUJE
+do aktualizacji dokumentacji w tym samym PR-ze.** Nie ma „zaktualizuję jutro".
+Nie ma „dopiszę po review". Doc-drift jest gorszy niż brak dokumentacji — bo
+ludzie ufają temu co przeczytają, a stare dokumenty kłamią z autorytetem.
+
+### Pliki które MUSZĄ być w sync z kodem
+
+| Co zmieniłeś | Plik(i) do aktualizacji |
+|---|---|
+| Nowy step w `MultiStepForm.tsx` lub zmiana wartości pola | [docs/customer-portal-flow.md](docs/customer-portal-flow.md) §2 (Stage A) + §5 ⑤ (jeśli mapping do mamamii się zmienia) |
+| Zmiana w `findOrCreateLead` lub schema `leads` | [docs/customer-portal-flow.md](docs/customer-portal-flow.md) §3 |
+| Nowy default lub zmiana mapowania w `onboard-to-mamamia/mappers.ts` | [docs/customer-portal-flow.md](docs/customer-portal-flow.md) §5 ⑤ + Recent bug fixes registry (poniżej) |
+| Nowa akcja w `mamamia-proxy/actions.ts` lub zmiana allowlisty | [docs/customer-portal-flow.md](docs/customer-portal-flow.md) §6 + tabela podsumowująca |
+| Zmiana `SESSION_JWT_SECRET` payload shape | [docs/customer-portal-flow.md](docs/customer-portal-flow.md) §5 ⑧ |
+| Nowy mamamia gotcha (np. nowy enum, validation, hidden requirement) | CLAUDE.md sekcja „Mamamia integration — gotchas i lekcje" + jeśli ma to wpływ na flow → [docs/customer-portal-flow.md](docs/customer-portal-flow.md) |
+| Nowy anti-pattern (coś co nie zadziałało i nie chcemy żeby ktoś znów próbował) | CLAUDE.md sekcja „Anti-patterns" |
+| Nowe pole w `PatientForm` interface lub `mapMamamiaCustomerToPatientForm` | CLAUDE.md sekcja „Field mapping reference" + [docs/customer-portal-flow.md](docs/customer-portal-flow.md) §6 (`getCustomer` / `updateCustomer`) |
+| Bugfix (każdy) | CLAUDE.md sekcja „Recent bug fixes — registry" — kolejny numer, plik(i), one-line fix highlight |
+| Nowa edge function lub usunięcie istniejącej | CLAUDE.md sekcja „Kluczowe pliki" + [docs/customer-portal-flow.md](docs/customer-portal-flow.md) (jeśli wpływa na browser↔mamamia path) |
+
+### Sekcje samo-aktualizujące się
+
+`docs/customer-portal-flow.md` ma dedykowaną sekcję „Maintenance — kiedy
+aktualizować ten dokument" — przeczytaj ją zanim zaczniesz tam pisać; nie
+duplikuj reguł.
+
+### PR checklist (rozszerzenie istniejącej)
+
+Każdy PR dotykający kodu w `src/` lub `supabase/functions/` lub `project 3/`
+musi zawierać:
+
+- [ ] zaktualizowano `docs/customer-portal-flow.md` (jeśli punkt z tabeli powyżej dotyczy)
+- [ ] zaktualizowano CLAUDE.md (gotchas / anti-patterns / bug fixes registry)
+- [ ] vitest + deno tests pass
+- [ ] e2e curl recipe przeszedł na becie (gdy zmiana dotyka mamamii)
+
+PR bez tych aktualizacji = block. Review pyta o nie pierwszym komentarzem.
+
+### Co to znaczy w praktyce dla Claude
+
+Gdy user prosi o zmianę kodu:
+1. Implementacja
+2. Testy
+3. **Aktualizacja dokumentacji** — zawsze w tym samym turnie, nie „później"
+4. Verification
+
+Gdy user prosi o samą dokumentację (audit / opis / „co tu się dzieje") —
+sprawdzaj `docs/customer-portal-flow.md` PIERWSZY zanim zaczniesz czytać kod.
+To źródło prawdy. Jeśli dokument się nie zgadza z kodem, dokument jest stary —
+zaktualizuj go w tym samym turnie.
+
+---
+
 ## Architektura — co gdzie żyje
 
 Repo to **monorepo z dwoma aplikacjami** + Supabase Edge Functions. Każda
@@ -355,7 +410,26 @@ CAapp to `caapp-beta.onrender.com`, Edge Functions to
 `SameSite=Lax` (browser default) cichaczem zignoruje cookie. Frontend
 fetch używa `credentials: 'include'`.
 
-### 8. Bot detection / rate limit
+### 8. Mamamia schema-level defaults (NOT from us)
+
+Mamamia auto-fills 2 fields with schema defaults when `StoreCustomer` ships
+without them — even after Bug #13 minimal-payload refactor. Verified live
+2026-05-07 via `/tmp/test-minimal-storecustomer.mjs` (Customer 7651):
+
+- `pets = "no_information"` → reverse mapper `mamamiaPetsToForm` already
+  emits `''` for this value (clean separation: user-pick "Keine" maps to
+  `pets="no"`, distinct from schema-default).
+- `caregiver_accommodated = "room_premises"` → SAME enum value as user
+  picking "Zimmer in den Räumlichkeiten" (no clean separation). Reverse
+  mapper suppresses ONLY when `Customer.status='draft'` (= patient form
+  not saved yet); after save, status flips to 'active' and the value
+  surfaces normally.
+
+If Mamamia schema adds another auto-default to a field whose user-pick
+range overlaps (no separable enum like `no_information`), apply the same
+status-gated suppression pattern in `src/lib/mamamia/mappers.ts`.
+
+### 9. Bot detection / rate limit
 
 Mamamia panel rate-limit'uje agency calls (~60 req/min/account po naszym
 shared agency). Heavy bursty operations (np. invite 50 caregivers w pętli)
@@ -474,6 +548,9 @@ Wszystkie z 2026-04 → 2026-05. Lista ma być wyczerpana — jak coś znów
 | 10 | Person 2 pokazywał "4" zamiast "Pflegegrad 4" | AngebotCard.tsx mm-rehydrate | Extended digit-default regex check do `p2_pflegegrad` |
 | 11 | Gewicht/Größe auto-prefilled DEFAULT_WEIGHT/HEIGHT z onboard | src/lib/mamamia/mappers.ts | Detect pair-exact `('61-70', '161-170')` → emit `''` |
 | 12 | Gearbox question + Success screen z calculator-a | project 3/components/calculator/MultiStepForm + AngebotCard | Gearbox → CAapp patient form (`wunschGetriebe`); Success screen wycięty (direct redirect) |
+| 13 | **Phantom data w patient form** — onboard wstrzykiwał ~25 hardkodowanych defaultów (`weight=61-70`, `height=161-170`, `accommodation=single_family_house`, `urbanization_id=2`, `internet=yes`, `caregiver_accommodated=room_premises`, `equipment_ids=[1,2]`, `day_care_facility=no`, `has_family_near_by=not_important`, `pets=no_information`, `smoking_household=no`, patient `gender=female`/`dementia=no`/`incontinence=false`/`smoking=false`, wish `smoking=yes_outside`/`shopping=no`/`tasks="Grundpflege..."`/`shopping_be_done="Nach Absprache"`/`driving_license_gearbox=automatic`, plus 4-locale auto-strings dla lift/night/dementia descriptions, plus `customer_contract`/`invoice_contract`/`customer_contacts`). Klient widział je jako preselect w formularzu jakby je sam wybrał — narusza świętą zasadę nr 1 | onboard-to-mamamia/mappers.ts + onboard.ts (mutation `$variables`), src/lib/mamamia/mappers.ts (drop weight/height pair sentinel + patientGenderKnown opt + gearbox-automatic suppression; add status-gated `caregiver_accommodated="room_premises"` schema-default suppression), AngebotCard.tsx (drop `patientGenderKnown` arg), tests | Wszystkie defaulty wycięte z onboardu — Customer ląduje jako `status='draft'`, patient form save flippa go na `'active'` przez `UpdateCustomer` z prawdziwymi danymi. Contracts (customer_contract / invoice_contract / customer_contacts) deferred do `StoreConfirmation` (acceptance time). Verified live: `/tmp/test-minimal-storecustomer.mjs` (Customer 7651). Bonus: 1 round-trip mniej w onboard (StoreCustomer payload znacznie mniejszy). |
+| 13a | **Patient form save — pola które Mamamia panel pokazywał jako puste** (follow-up do #13). Po wycięciu phantom-defaults z onboardu, panel UI Customer 7653 pokazywał: (1) waga/wzrost niewyrenderowane mimo że stored (form używał en-dash `–`, panel dropdown enum używa ASCII hyphen `-`); (2) `night_operations_description` puste (form nie ma free-text dla nocnych zadań); (3) `job_description` puste (form nie ma "krótki opis sytuacji"); (4) `wish.shopping` puste (form nie pyta); (5) `equipments` puste (form nie pyta) | src/lib/mamamia/patientFormMapper.ts | (1) `normalizeBucket(s)` zamienia `–` → `-` w weight/height przed wysłaniem; (2) `standardNightOpsDescription(no)` generuje 3-locale placeholder gdy `night_operations !== 'no'`; (3) `buildJobDescriptionSummary(form)` generuje DE auto-summary z Pflegegrad/mobility/demenz/inkontinenz/nacht — prepended do existing diagnoses+pflegedienst segments; (4) `wish.shopping = 'no'` ustawiany zawsze (prod-most-common 43%); (5) `patch.equipment_ids = [1, 2]` ustawiany zawsze (TV + Bathroom). Verified live: `/tmp/test6-resave-bug13a.mjs` na Customer 7653. |
+| 13b | **Patient form save — `tool_ids` rozjeżdża się z `mobility_id` po edycji**. Na Customer 7655 patient[1]: couple-onboard ustawił obu pacjentom `mobility_id=5 (bedridden) + tools=[4,6] (hoist+bed)`. User w patient form zmienił Person 2 na `mobility_id=1 (mobile)`, ale `tools=[4,6]` zostały — niemożliwa kombinacja na panelu Mamamii. Przyczyna: `patientFormMapper.buildPatient` aktualizował tylko `mobility_id`, NIE wysyłał `tool_ids` → proxy `PRESERVE_QUERY` re-fetcha aktualne tools z bazy i je re-injectuje | src/lib/mamamia/patientFormMapper.ts (`deriveToolIds(mobility_id)` mirror onboard `mapToolIds`) | `buildPatient` zawsze wysyła `tool_ids = deriveToolIds(mobility_id)` gdy mobility jest ustawiana — nadpisuje stale tools fresh derivation. NEVER include id 7 (Others) — triggeruje required free-text "Jakie inne narzędzia są używane?". |
 
 ---
 

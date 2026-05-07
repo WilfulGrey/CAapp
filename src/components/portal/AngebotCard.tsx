@@ -72,19 +72,10 @@ export const AngebotCard: FC<{
   // it's identical to Mamamia state by construction (the save is what
   // wrote both) so its position relative to (2) doesn't matter.
   const prefill = lead ? prefillPatientFromLead(lead) : {};
-  // Patient gender is "known" when the lead carries a salutation we can
-  // derive female/male from. Marcin's NEW calculator never collects it,
-  // so all stage-A leads land here with patientGenderKnown=false →
-  // mmPrefill omits geschlecht/p2_geschlecht and the dropdowns stay
-  // empty until the customer picks consciously. Fixes default "Weiblich"
-  // bleed-through from the backend's resolvePatientGender fallback.
-  const patientGenderKnown = !!(
-    lead?.patient_anrede || lead?.anrede || lead?.anrede_text
-  );
-  const mmPrefill = mapMamamiaCustomerToPatientForm(
-    mmCustomer ?? null,
-    { patientGenderKnown },
-  );
+  // Bug #13: onboard no longer ships patient.gender (kalkulator nie pyta);
+  // Mamamia returns null until patient form save → reverse mapper outputs
+  // '' for gender so dropdown stays empty. No more patientGenderKnown opt.
+  const mmPrefill = mapMamamiaCustomerToPatientForm(mmCustomer ?? null);
   const savedData: Partial<PatientForm> & { _isDraft?: boolean } = storageKey
     ? (() => { try { return JSON.parse(localStorage.getItem(storageKey) || '{}'); } catch { return {}; } })()
     : {};
@@ -170,7 +161,7 @@ export const AngebotCard: FC<{
       mmMergedFor.current = mmCustomer.id;
       return;
     }
-    const fresh = mapMamamiaCustomerToPatientForm(mmCustomer, { patientGenderKnown });
+    const fresh = mapMamamiaCustomerToPatientForm(mmCustomer);
     mmMergedFor.current = mmCustomer.id;
     setPatient(prev => {
       const next = { ...prev };

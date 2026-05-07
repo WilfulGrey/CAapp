@@ -38,55 +38,36 @@ export interface OnboardOptions {
 }
 
 // ─── GraphQL mutations ─────────────────────────────────────────────────────
-// Full StoreCustomer payload — every must-fill field plus the three
-// nested input types (CustomerCaregiverWishInputType,
-// CustomerContractInputType, CustomerContactInputType) so the customer
-// lands in a state that matches the prod active distribution.
-//
-// Field selection driven by docs/mamamia-customer-fields-map.md fill-rate
-// diff: every column at >=99% in active customers is set here.
+// Bug #13 refactor (2026-05-07): minimal StoreCustomer payload — only fields
+// the calculator actually collects (or business defaults that aren't pytania
+// do klienta). Customer lands as status='draft'; patient form save flips it
+// to 'active' via UpdateCustomer. Contracts (customer_contract /
+// invoice_contract / customer_contacts) populated at acceptance time via
+// StoreConfirmation. See docs/customer-portal-flow.md §5 ⑤.
 
 const STORE_CUSTOMER = /* GraphQL */ `
   mutation StoreCustomer(
     $first_name: String, $last_name: String, $email: String, $phone: String,
-    $location_id: Int, $urbanization_id: Int, $language_id: Int,
-    $equipment_ids: [Int], $day_care_facility: String,
+    $location_id: Int, $language_id: Int,
     $care_budget: Float, $monthly_salary: Float, $commission_agent_salary: Float,
     $arrival_at: String,
     $visibility: String,
-    $accommodation: String, $caregiver_accommodated: String,
-    $has_family_near_by: String, $internet: String, $pets: String,
-    $is_pet_dog: Boolean, $is_pet_cat: Boolean, $is_pet_other: Boolean,
-    $other_people_in_house: String, $smoking_household: String,
-    $job_description: String, $job_description_de: String,
-    $job_description_en: String, $job_description_pl: String,
+    $other_people_in_house: String,
     $gender: String,
     $patients: [PatientInputType],
-    $customer_caregiver_wish: CustomerCaregiverWishInputType,
-    $customer_contract: CustomerContractInputType,
-    $invoice_contract: CustomerContractInputType,
-    $customer_contacts: [CustomerContactInputType]
+    $customer_caregiver_wish: CustomerCaregiverWishInputType
   ) {
     StoreCustomer(
       first_name: $first_name, last_name: $last_name, email: $email, phone: $phone,
-      location_id: $location_id, urbanization_id: $urbanization_id, language_id: $language_id,
-      equipment_ids: $equipment_ids, day_care_facility: $day_care_facility,
+      location_id: $location_id, language_id: $language_id,
       care_budget: $care_budget, monthly_salary: $monthly_salary,
       commission_agent_salary: $commission_agent_salary,
       arrival_at: $arrival_at,
       visibility: $visibility,
-      accommodation: $accommodation, caregiver_accommodated: $caregiver_accommodated,
-      has_family_near_by: $has_family_near_by, internet: $internet, pets: $pets,
-      is_pet_dog: $is_pet_dog, is_pet_cat: $is_pet_cat, is_pet_other: $is_pet_other,
-      other_people_in_house: $other_people_in_house, smoking_household: $smoking_household,
-      job_description: $job_description, job_description_de: $job_description_de,
-      job_description_en: $job_description_en, job_description_pl: $job_description_pl,
+      other_people_in_house: $other_people_in_house,
       gender: $gender,
       patients: $patients,
-      customer_caregiver_wish: $customer_caregiver_wish,
-      customer_contract: $customer_contract,
-      invoice_contract: $invoice_contract,
-      customer_contacts: $customer_contacts
+      customer_caregiver_wish: $customer_caregiver_wish
     ) { id customer_id status }
   }
 `;
@@ -185,8 +166,9 @@ export async function onboardLead(opts: OnboardOptions): Promise<OnboardResult &
 
   // 5. Resolve location_id — primarily from lead.patient_zip (set during
   //    Primundus stage-B "Betreuung beauftragen" form), with formularDaten
-  //    fallback. Lookup is best-effort: failure → null → contracts use
-  //    location_custom_text fallback in buildContractFromLead.
+  //    fallback. Lookup is best-effort: in MVP stage B never runs, so PLZ is
+  //    null and we ship StoreCustomer without location_id; patient form save
+  //    propagates location via UpdateCustomer (Bug #13 refactor).
   const plz = extractPlzFromLead(lead);
   const locationId = await lookupLocationId({
     endpoint: secrets.mamamiaEndpoint,
@@ -195,7 +177,7 @@ export async function onboardLead(opts: OnboardOptions): Promise<OnboardResult &
     fetchFn,
   });
 
-  // 6. StoreCustomer — full payload (customer + wish + patients + contracts + contacts)
+  // 6. StoreCustomer — minimal payload (Bug #13: no UX-fake defaults)
   const nowISO = now().toISOString();
   const customerInput = buildCustomerInput(lead, locationId, nowISO);
 

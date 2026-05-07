@@ -1,7 +1,5 @@
 import type {
   CaregiverWishInput,
-  CustomerContactInput,
-  CustomerContractInput,
   CustomerInput,
   FormularDaten,
   Lead,
@@ -40,6 +38,9 @@ export function mapCareLevel(fd: FormularDaten): number {
 }
 
 // ─── Dementia ───────────────────────────────────────────────────────────────
+// Helper kept for patient form save flow (patientFormMapper) — onboard does
+// NOT set patient.dementia anymore (calculator never asks; surfaces as
+// fake "Nein" preselect in UI per Bug #13).
 export function mapDementia(fd: FormularDaten): "yes" | "no" {
   const v = (fd?.demenz ?? "").toString().toLowerCase();
   if (v === "ja" || v === "yes") return "yes";
@@ -82,15 +83,13 @@ export function mapNightOperations(fd: FormularDaten): NightOperations {
 //      Accepts "female" / "male" / "not_important". Source: Primundus
 //      formularDaten.geschlecht ("weiblich" / "maennlich" / "egal").
 //
-//   2. patient.gender → PATIENT's actual gender
-//      Validator rejects "not_important" (verified beta 2026-04-28).
-//      Source: lead salutation (anrede) — Frau→female, Herr→male.
-//      Primundus does NOT capture patient gender separately.
-//
-// Pre-2026-04-28 we used mapGender for both, which broke when the
-// customer answered "egal" on the caregiver-preference question.
+//   2. patient.gender → real PATIENT's gender. Mamamia validator rejects
+//      "not_important" here BUT accepts null/omitted. Bug #13 refactor:
+//      we no longer set patient.gender at onboard time (Marcin's calculator
+//      does not collect anrede; the previous "female" fallback surfaced in
+//      the UI as a phantom preselect). Patient form sets it from the user's
+//      explicit pick.
 
-// Caregiver-preference gender (used in customer_caregiver_wish.gender).
 export function mapGender(
   fd: FormularDaten,
 ): "male" | "female" | "not_important" | null {
@@ -99,25 +98,6 @@ export function mapGender(
   if (v === "maennlich") return "male";
   if (v === "egal") return "not_important";
   return null;
-}
-
-// Patient's actual gender (used in patients[].gender). Reads anrede
-// fields with stage-B priority. Defaults to "female" — the prod-most-
-// common patient gender (61%), and a safe assumption that lets the
-// matcher run; the customer can update later via UpdateCustomer/patient
-// form once they know the real recipient.
-export function resolvePatientGender(lead: Lead): "male" | "female" {
-  const candidates = [
-    lead.patient_anrede,
-    lead.anrede,
-    lead.anrede_text,
-  ];
-  for (const c of candidates) {
-    const v = (c ?? "").toString().trim().toLowerCase();
-    if (v === "frau" || v === "mrs." || v === "mrs") return "female";
-    if (v === "herr" || v === "mr." || v === "mr") return "male";
-  }
-  return "female";
 }
 
 // ─── Arrival date from care_start_timing ────────────────────────────────────
@@ -160,25 +140,19 @@ export function buildJobOfferTitle(lead: Lead): string {
 }
 
 // ─── Build patients[] from formularDaten ────────────────────────────────────
-// We map every formularDaten field for which Mamamia exposes a known-valid
-// patient enum (verified vs prod DB read-only).
+// Bug #13 refactor (2026-05-07): patient row carries ONLY fields the
+// calculator actually collects (or fields derivable from those — lift_id /
+// tool_ids from mobility_id). All previously-injected defaults
+// (weight, height, gender, dementia, incontinence_*, smoking,
+// *_description{,_de,_en,_pl}) are deferred to patient form save via
+// UpdateCustomer; Mamamia accepts them as null/omitted at StoreCustomer time
+// (Customer lands as status='draft', flips to 'active' once patient form
+// completes the picture). See docs/customer-portal-flow.md §5 ⑤.
 //
-// dementia: prod uses "yes"/"no" cleanly (51%/48%) — re-included after
-// the discovery sweep on 2026-04-27. Earlier suspicion that Laravel rejected
-// "yes"/"no" turned out to come from another field's validator, not dementia.
-//
-// weitere_personen=ja → 2 patients; second carries minimum required fields
-// (mobility_id + care_level) to prevent StoreJobOffer checkSuperJob3 crash;
-// patient form fills the second's details later via UpdateCustomer.
-// Default weight/height buckets — prod-most-common values from the
-// patients table sweep on 2026-04-28:
-//   weight: "61-70" (29%), "71-80" (27%), "51-60" (23%) ...
-//   height: "161-170" (44%), "171-180" (26%) ...
-// "Default" here means "we don't know, fill with statistically-likely
-// value so checkSuperJob3 / matching can run". Patient form will
-// override via UpdateCustomer once the user actually fills it in.
-const DEFAULT_WEIGHT = "61-70";
-const DEFAULT_HEIGHT = "161-170";
+// weitere_personen=ja → 2 patients flag (couple-under-care): the
+// `betreuung_fuer === 'ehepaar'` field gates a 2nd patient row that
+// inherits Person 1's care attrs (Pflegegrad, mobility, lift, night-ops);
+// the calculator collects ONE set of answers for the couple as a unit.
 
 // lift_id: pick based on mobility — 4 ("not_important") is allowed by
 // the schema but doesn't appear in any active customer's patient row,
@@ -211,108 +185,21 @@ export function mapToolIds(mobilityId: number): number[] {
   }
 }
 
-// Auto-text generators for the 3 description fields the panel form
-// requires (lift_description, night_operations_description,
-// dementia_description). The lead's calculator never collects these —
-// we fill with "to be specified" placeholders that match the live-data
-// patterns and that the customer can refine later via UpdateCustomer.
-function liftDescriptionFor(mobilityId: number): {
-  de: string;
-  en: string;
-  pl: string;
-} {
-  if (mobilityId >= 4) {
-    return {
-      de: "Transfer mit Unterstützung — Details werden in der Patientenform ergänzt.",
-      en: "Transfer with assistance — details to be added via the patient form.",
-      pl: "Transfer z pomocą — szczegóły zostaną podane w formularzu pacjenta.",
-    };
-  }
-  return {
-    de: "Patient transferiert sich selbstständig.",
-    en: "Patient transfers independently.",
-    pl: "Pacjent przemieszcza się samodzielnie.",
-  };
-}
-
-function nightOperationsDescriptionFor(no: string): { de: string; en: string; pl: string } {
-  if (no === "no") {
-    return {
-      de: "Keine nächtlichen Einsätze erforderlich.",
-      en: "No night-time operations required.",
-      pl: "Brak konieczności nocnych operacji.",
-    };
-  }
-  return {
-    de: "Gelegentliche nächtliche Unterstützung — Details folgen.",
-    en: "Occasional night-time assistance — details to follow.",
-    pl: "Sporadyczna pomoc nocna — szczegóły zostaną podane.",
-  };
-}
-
-function dementiaDescriptionFor(d: string): { de: string; en: string; pl: string } {
-  if (d === "yes") {
-    return {
-      de: "Demenzdiagnose vorhanden — Stadium und Verhalten werden in der Patientenform präzisiert.",
-      en: "Dementia diagnosis present — stage and behaviour to be detailed via the patient form.",
-      pl: "Rozpoznana demencja — stopień i zachowanie zostaną dopowiedziane w formularzu pacjenta.",
-    };
-  }
-  return {
-    de: "Keine Demenzdiagnose.",
-    en: "No dementia diagnosis.",
-    pl: "Brak rozpoznania demencji.",
-  };
-}
-
-export function buildPatients(
-  fd: FormularDaten,
-  opts: { primaryGender?: "male" | "female" } = {},
-): PatientInput[] {
+export function buildPatients(fd: FormularDaten): PatientInput[] {
   const mobility = mapMobilityToId(fd);
   const liftId = mapLiftId(mobility);
-  const dementia = mapDementia(fd);
   const nightOps = mapNightOperations(fd);
-  const liftDesc = liftDescriptionFor(mobility);
-  const nightDesc = nightOperationsDescriptionFor(nightOps);
-  const demDesc = dementiaDescriptionFor(dementia);
-
-  // patient.gender: real patient gender (NOT caregiver preference).
-  // Mamamia validator rejects "not_important" on patients; default to
-  // the prod-most-common "female" if the caller didn't resolve it from
-  // the lead's salutation.
-  const primaryGender = opts.primaryGender ?? "female";
 
   const first: PatientInput = {
-    gender: primaryGender,
     care_level: mapCareLevel(fd),
     mobility_id: mobility,
     lift_id: liftId,
     tool_ids: mapToolIds(mobility),
     night_operations: nightOps,
-    dementia,
-    weight: DEFAULT_WEIGHT,
-    height: DEFAULT_HEIGHT,
-    incontinence: false,
-    incontinence_feces: false,
-    incontinence_urine: false,
-    smoking: false,
-    lift_description: liftDesc.de,
-    lift_description_de: liftDesc.de,
-    lift_description_en: liftDesc.en,
-    lift_description_pl: liftDesc.pl,
-    night_operations_description: nightDesc.de,
-    night_operations_description_de: nightDesc.de,
-    night_operations_description_en: nightDesc.en,
-    night_operations_description_pl: nightDesc.pl,
-    dementia_description: demDesc.de,
-    dementia_description_de: demDesc.de,
-    dementia_description_en: demDesc.en,
-    dementia_description_pl: demDesc.pl,
   };
 
-  // year_of_birth — only set when formularDaten provides it (or we add
-  // a prefill source later). Don't fabricate; the form will fill it.
+  // year_of_birth — only set when formularDaten provides it. Don't
+  // fabricate; the form will fill it.
   if (typeof fd?.geburtsjahr === "number") first.year_of_birth = fd.geburtsjahr;
 
   // ⚠ CORRECTNESS: a 2nd patient is added when Primundus reports
@@ -320,47 +207,14 @@ export function buildPatients(
   // `weitere_personen` flag is a different question — "are there
   // OTHER people in the household who do NOT need care" — and maps to
   // customer.other_people_in_house, NOT to a second patient row.
-  // Pre-2026-04-28 we used the wrong key here; legacy leads with only
-  // weitere_personen='ja' set are now treated as single-patient.
   const isCouple = fd?.betreuung_fuer === "ehepaar";
-
-  // For "ehepaar" the 2nd patient inherits the SAME care attributes as
-  // the first (Pflegegrad / mobility / night ops / dementia) — the
-  // calculator collects ONE set of answers for the couple as a unit.
-  // Pre-2026-05-01 we hardcoded second to {care_level:2, mobility:1,
-  // night_ops:"no", dementia:"no"} which silently overrode the user's
-  // input (e.g. user picked Pg4+Rollstuhl, Person 2 row in the patient
-  // form showed Pg2+"Selbstständig mobil"). Only `gender` stays a
-  // best-guess heuristic (opposite of primary) — the customer corrects
-  // both genders in the patient form anyway.
-  const secondGender: "male" | "female" = primaryGender === "female" ? "male" : "female";
   const second: PatientInput | null = isCouple
     ? {
       care_level: mapCareLevel(fd),
       mobility_id: mobility,
       lift_id: liftId,
       tool_ids: mapToolIds(mobility),
-      gender: secondGender,
-      weight: DEFAULT_WEIGHT,
-      height: DEFAULT_HEIGHT,
       night_operations: nightOps,
-      dementia,
-      incontinence: false,
-      incontinence_feces: false,
-      incontinence_urine: false,
-      smoking: false,
-      lift_description: liftDesc.de,
-      lift_description_de: liftDesc.de,
-      lift_description_en: liftDesc.en,
-      lift_description_pl: liftDesc.pl,
-      night_operations_description: nightDesc.de,
-      night_operations_description_de: nightDesc.de,
-      night_operations_description_en: nightDesc.en,
-      night_operations_description_pl: nightDesc.pl,
-      dementia_description: demDesc.de,
-      dementia_description_de: demDesc.de,
-      dementia_description_en: demDesc.en,
-      dementia_description_pl: demDesc.pl,
     }
     : null;
 
@@ -370,7 +224,9 @@ export function buildPatients(
 // ─── Salutation ─────────────────────────────────────────────────────────────
 // Prod customer_contracts.salutation enum is "Mr." / "Mrs." (NOT German
 // "Herr"/"Frau"). lead.anrede comes from the calculator which uses the
-// German labels — translate explicitly.
+// German labels — translate explicitly. Helper kept for use by patient
+// form save / acceptance flow (Bug #13 refactor: onboard no longer sets
+// contracts; they are populated at StoreConfirmation accept time).
 export function mapSalutation(anrede: string | null | undefined): "Mr." | "Mrs." {
   const v = (anrede ?? "").toString().trim().toLowerCase();
   if (v === "frau" || v === "mrs." || v === "mrs") return "Mrs.";
@@ -418,56 +274,35 @@ export function mapDrivingLicense(
 }
 
 
-// ─── Build the CustomerCaregiverWish from formularDaten + defaults ──────────
-// 100% of active customers have one. Real lead data (deutschkenntnisse,
-// fuehrerschein, geschlecht) is preferred; prod-most-common defaults
-// only when calculator didn't capture it.
+// ─── Build the CustomerCaregiverWish from formularDaten ─────────────────────
+// Bug #13 refactor (2026-05-07): wish carries ONLY fields the calculator
+// collects (gender / germany_skill / driving_license). Free-text auto-strings
+// (tasks*, shopping_be_done*) and enum defaults (smoking, shopping,
+// driving_license_gearbox) are deferred to patient form save: the user picks
+// real values via patientFormMapper → UpdateCustomer.customer_caregiver_wish.
+// `is_open_for_all: false` is a Primundus business default, not pytanie do
+// klienta — keeps Mamamia matcher in "filter by wish" mode rather than
+// "match anyone".
 export function buildCaregiverWish(fd: FormularDaten): CaregiverWishInput {
-  // When driving_license=yes the panel form requires
-  // driving_license_gearbox (automatic / manual). The customer picks
-  // Automatik / Schaltung / Egal in the CA-app patient form (step 3 /
-  // Wünsche zur PK); this onboard pass writes a permissive 'automatic'
-  // default so Mamamia matching can run before the patient form save.
-  // Skip the field entirely when driving_license is not_important.
-  const drivingLicense = mapDrivingLicense(fd);
-  const wish: CaregiverWishInput = {
+  return {
     is_open_for_all: false,
     gender: mapGender(fd) ?? "not_important",
     germany_skill: mapGermanySkill(fd),
-    driving_license: drivingLicense,
-    smoking: "yes_outside",
-    shopping: "no",
-    // Free-text fields — ship a sensible auto-string so customer.tasks
-    // and customer.shopping_be_done are non-null (they're 99-100% in active
-    // and the matcher uses them as filter input).
-    tasks: "Grundpflege, Hauswirtschaft, Gesellschaft",
-    tasks_de: "Grundpflege, Hauswirtschaft, Gesellschaft",
-    tasks_en: "Basic care, housekeeping, companionship",
-    tasks_pl: "Opieka podstawowa, prowadzenie domu, towarzystwo",
-    shopping_be_done: "Nach Absprache",
-    shopping_be_done_de: "Nach Absprache",
-    shopping_be_done_en: "By arrangement",
-    shopping_be_done_pl: "Wedle uzgodnienia",
+    driving_license: mapDrivingLicense(fd),
   };
-  if (drivingLicense === "yes") {
-    wish.driving_license_gearbox = "automatic";
-  }
-  return wish;
 }
 
 // ─── Extract PLZ from a lead ────────────────────────────────────────────────
 // Source-of-truth (verified vs project 3 schema 2026-04-28):
 //   - Primary: lead.patient_zip — populated by /api/betreuung-beauftragen
-//     (stage B). This is the form where the customer types their actual
-//     PLZ for the care location.
+//     (stage B). MVP: stage B never runs, so this is null.
 //   - Fallback: formularDaten.{plz, postleitzahl, postal_code, zip,
 //     zip_code} — none of these are written by the current Primundus
-//     calculator, but keep the look-ups defensively in case a future
-//     UX iteration adds PLZ to stage A or a manually-edited lead
-//     surfaces it through admin.
+//     calculator. Defensive look-up retained in case a future UX iteration
+//     adds PLZ to stage A.
 //
 // Returns 5-digit PLZ string or null when no PLZ is available — caller
-// falls back to location_custom_text.
+// passes null to StoreCustomer (location_id stays null too).
 function isPlzString(v: unknown): v is string {
   return typeof v === "string" && /^\d{4,5}$/.test(v.trim());
 }
@@ -476,12 +311,9 @@ function isPlzNumber(v: unknown): v is number {
 }
 
 export function extractPlzFromLead(lead: Lead): string | null {
-  // Stage-B field — preferred and verified-by-customer source.
   if (isPlzString(lead.patient_zip)) {
     return (lead.patient_zip as string).trim().padStart(5, "0");
   }
-  // Fallbacks inside formularDaten (defensive — none currently written
-  // by Primundus calculator, but cheap to check).
   const fd = lead.kalkulation?.formularDaten ?? {};
   for (const k of ["plz", "postleitzahl", "postal_code", "zip", "zip_code"]) {
     const v = fd[k];
@@ -509,14 +341,11 @@ export function extractPlzFromFormularDaten(fd: FormularDaten): string | null {
 // which describe the CONTRACT-CONTACT (the person who orders + pays,
 // e.g. an adult child of the patient).
 //
-// These two often differ (Michał Test orders care for Zenon Test) and
-// Mamamia tracks them on separate rows:
-//   - customer_contract  (contact_type='patient_contact')   ← patient
-//   - invoice_contract / customer_contracts[contact_contact] ← orderer
-//
-// When stage-B has not run yet (status='angebot_requested'), both
-// identities collapse to lead.* — falling back keeps the helpers safe
-// for stage-A re-onboards.
+// MVP: stage B never runs → patient_* are null → these helpers fall back
+// to lead.* (the orderer-from-calculator). Onboard uses them to populate
+// Customer.first_name/last_name (the panel-display identity); the legal
+// PATIENT vs ORDERER split is recorded later via StoreConfirmation at
+// acceptance time (Bug #13 refactor).
 export function resolvePatientFirstName(lead: Lead): string | undefined {
   return lead.patient_vorname ?? lead.vorname ?? undefined;
 }
@@ -527,139 +356,29 @@ export function resolvePatientSalutation(lead: Lead): "Mr." | "Mrs." {
   return mapSalutation(lead.patient_anrede ?? lead.anrede);
 }
 
-// ─── Customer-level contract & contacts ─────────────────────────────────────
-//
-// `location_id` is required for the panel form's "Lokalizacja opieki"
-// dropdown. We resolve it via Locations(search: PLZ) BEFORE building the
-// contract; if the lead carries no PLZ, we set location_custom_text as
-// the manual-entry fallback (mirrors the panel checkbox "Lokalizacja
-// poza Niemcami / Wprowadź ręcznie").
-//
-// `kind` decides which Primundus identity feeds the row:
-//   - "patient": the actual care recipient (Zenon Test). Goes into
-//     customer.customer_contract (Mamamia contact_type='patient_contact').
-//   - "contact": the contract/billing contact (Michał Test = lead.*). Goes
-//     into customer.invoice_contract (Mamamia contact_type='contract_contact').
-//   - "invoice": legacy alias of "contact" — Mamamia field is invoice_contract.
-//
-// is_same_as_first_patient — true only when contact identity collapses to
-// patient identity (e.g. stage-A leads with no patient_* yet).
-export function buildContractFromLead(
-  lead: Lead,
-  locationId: number | null = null,
-  kind: "patient" | "contact" = "patient",
-): CustomerContractInput {
-  const usePatient = kind === "patient";
-  const firstName = usePatient
-    ? resolvePatientFirstName(lead)
-    : lead.vorname ?? undefined;
-  const lastName = usePatient
-    ? resolvePatientLastName(lead)
-    : lead.nachname ?? undefined;
-  const salutation = usePatient
-    ? resolvePatientSalutation(lead)
-    : mapSalutation(lead.anrede);
-
-  // patient identity == contact identity? Then 2nd contract is just a
-  // mirror — flag is_same_as_first_patient so Mamamia panel UI can
-  // collapse the row. Detect by comparing resolved patient names against
-  // lead.* (the contact source).
-  const patientFirst = resolvePatientFirstName(lead);
-  const patientLast = resolvePatientLastName(lead);
-  const sameIdentity =
-    patientFirst === (lead.vorname ?? undefined) &&
-    patientLast === (lead.nachname ?? undefined);
-
-  const base: CustomerContractInput = {
-    contact_type: usePatient ? "patient" : "invoice",
-    is_same_as_first_patient: usePatient ? true : sameIdentity,
-    salutation,
-    first_name: firstName,
-    last_name: lastName,
-    phone: lead.telefon ?? undefined,
-    email: lead.email,
-  };
-  // Use patient_street fields for both contracts when present — care
-  // location is shared between patient + invoice contact in the
-  // Primundus billing model.
-  // Mamamia rejects street_number with fewer than 3 characters
-  // ("X" fails validation). Skip the field when too short instead of
-  // letting the whole StoreCustomer/UpdateCustomer call fail — the
-  // panel will show the row as missing and SA can correct it. Trim
-  // whitespace before counting.
-  const street = (lead.patient_street ?? "").trim();
-  if (street.length >= 3) base.street_number = street;
-  if (lead.patient_zip) base.zip_code = lead.patient_zip;
-  if (lead.patient_city) base.city = lead.patient_city;
-
-  if (locationId !== null) {
-    base.location_id = locationId;
-  } else {
-    // Manual-entry fallback. Panel form accepts non-empty string here
-    // and skips the dropdown validation.
-    base.location_custom_text = "Wird vom Kunden ergänzt";
-  }
-  return base;
-}
-
-// customer_contacts holds the contract-contact identity (the orderer/
-// payer — `lead.*`). When Primundus stage-B has not run, patient and
-// contact share the same identity, so is_same_as_first_patient=true
-// signals to the panel that the row mirrors the patient.
-export function buildContactsFromLead(lead: Lead): CustomerContactInput[] {
-  const patientFirst = resolvePatientFirstName(lead);
-  const patientLast = resolvePatientLastName(lead);
-  const sameIdentity =
-    patientFirst === (lead.vorname ?? undefined) &&
-    patientLast === (lead.nachname ?? undefined);
-
-  return [
-    {
-      is_same_as_first_patient: sameIdentity,
-      salutation: mapSalutation(lead.anrede),
-      first_name: lead.vorname ?? undefined,
-      last_name: lead.nachname ?? undefined,
-      phone: lead.telefon ?? undefined,
-      email: lead.email,
-    },
-  ];
-}
-
-// ─── Job description (auto-generated, multi-language) ───────────────────────
-// 100% in active customers — must be non-empty. Auto-generate from
-// formularDaten so caregivers can read what's expected before applying.
-export function buildJobDescription(fd: FormularDaten): {
-  de: string;
-  en: string;
-  pl: string;
-} {
-  const careLevel = mapCareLevel(fd);
-  const mobilityId = mapMobilityToId(fd);
-  // ID → human label for the auto-text. Match mobilities lookup (prod).
-  const mobilityLabel: Record<number, { de: string; en: string; pl: string }> = {
-    1: { de: "selbstständig mobil", en: "fully mobile", pl: "samodzielnie mobilna" },
-    2: { de: "mit Gehstock", en: "walking stick", pl: "o lasce" },
-    3: { de: "mit Rollator", en: "walker / rollator", pl: "z chodzikiem" },
-    4: { de: "im Rollstuhl", en: "wheelchair-bound", pl: "na wózku" },
-    5: { de: "bettlägerig", en: "bedridden", pl: "leżąca" },
-  };
-  const m = mobilityLabel[mobilityId] ?? mobilityLabel[1];
-  return {
-    de: `24-Stunden-Betreuung gesucht. Pflegegrad ${careLevel}, ${m.de}.`,
-    en: `24h care needed. Care level ${careLevel}, ${m.en}.`,
-    pl: `Poszukiwana całodobowa opieka. Poziom opieki ${careLevel}, ${m.pl}.`,
-  };
-}
-
 // ─── Top-level CustomerInput builder ────────────────────────────────────────
-// Single function: takes a Lead, returns the full StoreCustomer payload
-// with every must-fill field populated and sensible defaults where the
-// lead doesn't carry the answer. Goal: customer ends up in a state that
-// matches the prod active distribution as closely as possible.
+// Bug #13 refactor (2026-05-07): minimal payload — ONLY fields the
+// calculator collects (or business defaults that aren't pytania do
+// klienta). Goal: Mamamia Customer lands as status='draft' carrying
+// truth-only data; everything else is deferred to:
+//   - patient form save  → UpdateCustomer (accommodation, urbanization_id,
+//     equipment_ids, day_care_facility, has_family_near_by, internet,
+//     pets, is_pet_*, smoking_household, weight/height/dementia/
+//     incontinence_*/smoking on patients, wish.smoking/shopping/tasks*/
+//     shopping_be_done*/driving_license_gearbox, job_description).
+//   - acceptance         → StoreConfirmation (customer_contract,
+//     invoice_contract, customer_contacts — real identity collected at
+//     AngebotPruefenModal step 2).
 //
-// urbanization_id default = 2 ("City") — most-common in lookup/usage.
-// language_id = 1 — German (default for Primundus market).
-// visibility = "public" — most-common in prod.
+// Business defaults that DO ship in onboard (NOT pytania do klienta):
+//   - language_id = 1   → Primundus is German market
+//   - visibility = "public"
+//   - commission_agent_salary = 300  → Primundus baseline (panel rejects 0)
+//   - is_open_for_all = false (in wish) → matcher should respect filters
+//
+// caller passes locationId from Locations(plz) lookup; null when PLZ
+// unknown (MVP norm). location_custom_text fallback NOT shipped — the
+// patient form sets PLZ + Ort which propagate via UpdateCustomer.
 export function buildCustomerInput(
   lead: Lead,
   locationId: number | null = null,
@@ -667,64 +386,33 @@ export function buildCustomerInput(
 ): CustomerInput {
   const fd = lead.kalkulation?.formularDaten ?? {};
   const careBudget = lead.kalkulation?.bruttopreis ?? null;
-  const desc = buildJobDescription(fd);
   const arrivalAt = computeArrivalDate(lead.care_start_timing, nowISO);
 
   return {
-    // Customer top-level identity = the PATIENT (care recipient).
-    // Mamamia models customer.first_name/last_name as the patient's name
-    // for matching/UI display (76% fill in active prod customers).
-    // For stage-A leads where patient_* haven't been collected yet, the
-    // helper falls back to lead.* (Primundus orderer).
+    // Identity — patient_* (stage-B) → fallback to lead.* (orderer).
+    // Customer.first_name/last_name is the panel-display identity.
     first_name: resolvePatientFirstName(lead) ?? null,
     last_name: resolvePatientLastName(lead) ?? null,
     email: lead.email,
     phone: lead.telefon,
-    // Customer-level location — same as contract (resolved by caller via
-    // Locations(search: PLZ)). When PLZ unknown we leave it null and let
-    // the contract carry location_custom_text fallback.
+    // Location — best-effort. Null when PLZ unknown; patient form fills
+    // via UpdateCustomer (location_id or location_custom_text).
     location_id: locationId,
-    urbanization_id: 2,
+    // Business defaults
     language_id: 1,
-    // [1 Own TV, 2 Own Bathroom] — clean default without "Others"
-    // (id 8 triggers a required "Inne urządzenia" free-text field
-    // we have no answer for). 345 active customers in prod use
-    // exactly this pair; another 552 use [1] or [2] alone.
-    equipment_ids: [1, 2],
-    day_care_facility: "no",
+    visibility: "public",
+    commission_agent_salary: 300,
+    // Pricing (real, from kalkulation)
     care_budget: careBudget,
     monthly_salary: careBudget,
-    // Primundus default commission. Prod active distribution: 365 (3120),
-    // 780 (1890), 790 (1140), 730 (507), 0 (15). Panel form rejects 0,
-    // so set 300 as the Primundus baseline (per K7 product decision).
-    commission_agent_salary: 300,
-    // arrival_at — same value as JobOffer.arrival_at; Customer-active
-    // gate requires it (Mamamia Laravel: $customer->arrival_at && ...).
+    // Time (derived from real care_start_timing)
     arrival_at: arrivalAt,
-    visibility: "public",
-    accommodation: "single_family_house",
-    caregiver_accommodated: "room_premises",
-    has_family_near_by: "not_important",
-    internet: "yes",
-    pets: "no_information",
-    is_pet_dog: false,
-    is_pet_cat: false,
-    is_pet_other: false,
+    // Real formularDaten
     other_people_in_house: mapOtherPeopleInHouse(fd),
-    smoking_household: "no",
-    job_description: desc.de,
-    job_description_de: desc.de,
-    job_description_en: desc.en,
-    job_description_pl: desc.pl,
     gender: mapGender(fd) ?? "not_important",
-    patients: buildPatients(fd, { primaryGender: resolvePatientGender(lead) }),
+    // Nested — patients carry only real care attrs; wish carries only
+    // real preference enums (no auto-strings).
+    patients: buildPatients(fd),
     customer_caregiver_wish: buildCaregiverWish(fd),
-    // customer_contract = PATIENT identity (Zenon)
-    // invoice_contract = ORDERER/PAYER identity (Michał = lead.*)
-    // customer_contacts = orderer in customer-contacts list (mirrors invoice
-    // role — what the panel UI shows as the contract-contact block).
-    customer_contract: buildContractFromLead(lead, locationId, "patient"),
-    invoice_contract: buildContractFromLead(lead, locationId, "contact"),
-    customer_contacts: buildContactsFromLead(lead),
   };
 }
