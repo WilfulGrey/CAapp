@@ -4,7 +4,6 @@ import { findOrCreateLead, logEvent } from '@/lib/lead-management';
 import { Kalkulation } from '@/lib/calculation';
 import {
   sendEmail,
-  getEingangsbestaetigungEmailTemplate,
   getTeamNotificationTemplate,
   getAngebotsEmailTemplate,
 } from '@/lib/email';
@@ -26,7 +25,12 @@ function getSupabaseClient() {
 
 const supabase = getSupabaseClient();
 
-async function scheduleAngebotsEmail(leadId: string, email: string): Promise<{ success: boolean; error?: string }> {
+async function scheduleEmail(
+  leadId: string,
+  email: string,
+  emailType: 'angebot' | 'eingangsbestaetigung',
+  delayMinutes: number,
+): Promise<{ success: boolean; error?: string }> {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
   const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
   const edgeFunctionUrl = `${supabaseUrl}/functions/v1/schedule-email`;
@@ -41,9 +45,9 @@ async function scheduleAngebotsEmail(leadId: string, email: string): Promise<{ s
       },
       body: JSON.stringify({
         lead_id: leadId,
-        email_type: 'angebot',
+        email_type: emailType,
         recipient_email: email,
-        delay_minutes: 15,
+        delay_minutes: delayMinutes,
       }),
     });
 
@@ -56,6 +60,30 @@ async function scheduleAngebotsEmail(leadId: string, email: string): Promise<{ s
     return { success: result.success === true };
   } catch (err) {
     return { success: false, error: err instanceof Error ? err.message : String(err) };
+  }
+}
+
+async function flushScheduledEmails(): Promise<void> {
+  // Fire-and-forget — when we schedule an Eingangsbestätigung with delay=0,
+  // we want it dispatched right away rather than waiting up to 5 min for
+  // the next pg_cron tick. Errors are non-fatal: cron will pick it up on
+  // the next tick anyway.
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+  const key = (serviceKey && serviceKey.length > 10) ? serviceKey : anonKey;
+  try {
+    await fetch(`${supabaseUrl}/functions/v1/send-scheduled-emails`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${key}`,
+        'Apikey': key,
+      },
+      body: '{}',
+    });
+  } catch (err) {
+    console.warn('flushScheduledEmails failed:', err instanceof Error ? err.message : String(err));
   }
 }
 
@@ -115,25 +143,27 @@ export async function POST(request: NextRequest) {
     );
 
     // Fire-and-forget all email/scheduling side-effects — the customer's
-    // hand-off into CA app should NOT wait on Ionos SMTP (Render → Ionos
-    // can stall up to a minute when the relay rate-limits or blocks an
-    // unfamiliar source IP). Each promise still logs success/failure to
-    // lead_events so we can audit later. Render Web Services don't tear
-    // down on response, so the orphan promises continue running until
-    // the runtime decides they're done.
-    const eingangsEmail = getEingangsbestaetigungEmailTemplate(lead, kalkulation);
-    sendEmail(email, eingangsEmail)
+    // hand-off into CA app should NOT wait on Ionos SMTP. The Eingangs-
+    // bestätigung used to be a direct sendEmail() call here, but Render →
+    // Ionos was timing out, so it's now scheduled via the same edge-
+    // function pipeline that handles Angebot/Nachfass (delay=0 + an
+    // immediate flushScheduledEmails so we don't wait for the next 5-min
+    // pg_cron tick). Render Web Services don't tear down on response, so
+    // the orphan promises continue running until the runtime decides
+    // they're done.
+    scheduleEmail(lead.id, email, 'eingangsbestaetigung', 0)
       .then(async (r) => {
         if (r.success) {
-          await logEvent(lead.id, 'email_eingangsbestaetigung_sent', { to: email, token: lead.token });
+          await logEvent(lead.id, 'email_eingangsbestaetigung_scheduled', { to: email, token: lead.token });
+          flushScheduledEmails();
         } else {
-          console.error('Eingangsbestaetigungs-Email fehlgeschlagen:', r.error);
-          await logEvent(lead.id, 'email_eingangsbestaetigung_failed', { to: email, error: r.error });
+          console.error('Eingangsbestaetigung schedule fehlgeschlagen:', r.error);
+          await logEvent(lead.id, 'email_eingangsbestaetigung_schedule_failed', { to: email, error: r.error });
         }
       })
-      .catch((e) => console.error('eingangs send threw:', e instanceof Error ? e.message : String(e)));
+      .catch((e) => console.error('schedule eingangs threw:', e instanceof Error ? e.message : String(e)));
 
-    scheduleAngebotsEmail(lead.id, email)
+    scheduleEmail(lead.id, email, 'angebot', 15)
       .then(async (r) => {
         if (r.success) {
           await logEvent(lead.id, 'email_angebot_scheduled', { to: email });

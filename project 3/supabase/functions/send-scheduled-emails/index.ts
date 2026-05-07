@@ -398,29 +398,198 @@ function buildNachfass2Text(lead: Lead, siteUrl: string): string {
   const kalkulationUrl = `${siteUrl}/kalkulation/${lead.id}`;
   const halloAnrede = buildHalloAnrede(lead.anrede_text || null, lead.nachname || "", lead.vorname || "");
   return `${halloAnrede},
- 
+
 ich melde mich noch einmal kurz – vielleicht war einfach noch nicht der richtige Moment.
- 
+
 Wenn Sie möchten, schaue ich gerne schon mal nach passenden Betreuungskräften für Ihre Situation. Das ist völlig unverbindlich.
- 
+
 Zur Erinnerung:
 ✓ Keine Vorauszahlung – Kosten entstehen erst wenn die Betreuungskraft vor Ort ist
 ✓ Täglich kündbar – keinerlei Vertragsbindung
 ✓ Start in 4–7 Tagen – wenn Sie möchten
- 
+
 Melden Sie sich einfach, wenn Sie Fragen haben oder wenn wir loslegen sollen.
- 
+
 Mit freundlichen Grüßen
 Ilka Wysocki
- 
+
 PS: Hier finden Sie Ihr Angebot: ${kalkulationUrl}
- 
+
 ---
 ✓ Keine Vertragsbindung · ✓ Tagesgenaue Abrechnung · ✓ Kosten erst bei Anreise
 Primundus Deutschland | +49 89 200 000 830 | www.primundus.de`;
 }
- 
- 
+
+const EINGANGS_LABELS: Record<string, Record<string, string>> = {
+  betreuung_fuer: { "1-person": "1 Person", "ehepaar": "2 Personen" },
+  mobilitaet: { "mobil": "Mobil", "rollator": "Eingeschränkt – Rollator", "rollstuhl": "Rollstuhl", "bettlaegerig": "Bettlägerig" },
+  nachteinsaetze: { "nein": "Nein", "gelegentlich": "Gelegentlich", "taeglich": "Täglich (1×)", "mehrmals": "Mehrmals nachts" },
+  deutschkenntnisse: { "grundlegend": "Grundlegend", "kommunikativ": "Kommunikativ", "sehr-gut": "Gut" },
+  fuehrerschein: { "ja": "Ja", "nein": "Nein / nicht unbedingt" },
+  geschlecht: { "egal": "Egal", "weiblich": "Weiblich", "maennlich": "Männlich" },
+  erfahrung: { "keine": "Keine Anforderung", "wuenschenswert": "Wünschenswert", "zwingend": "Zwingend erforderlich" },
+  weitere_personen: { "ja": "Ja", "nein": "Nein" },
+  care_start_timing: { "sofort": "Sofort (4–7 Tage)", "2-4-wochen": "In 2–4 Wochen", "1-2-monate": "In 1–2 Monaten", "unklar": "Noch unklar" },
+};
+
+function eingangsLabel(key: string, val: string | undefined): string {
+  if (!val) return "Nicht angegeben";
+  return EINGANGS_LABELS[key]?.[val] || val;
+}
+
+function buildEingangsGreeting(lead: Lead): string {
+  const detectedAnrede = lead.anrede_text || detectGenderFromName(lead.vorname || "");
+  const n = lead.nachname || "";
+  if (detectedAnrede === "Frau" && n) return `Guten Tag Frau ${n}`;
+  if (detectedAnrede === "Herr" && n) return `Guten Tag Herr ${n}`;
+  if (detectedAnrede === "Familie" && n) return `Guten Tag Familie ${n}`;
+  if (lead.vorname) return `Guten Tag ${lead.vorname}`;
+  return "Guten Tag";
+}
+
+function buildEingangsbestaetigungHtml(lead: Lead, siteUrl: string, portalBase: string): string {
+  const greeting = buildEingangsGreeting(lead);
+  const fd = (lead.kalkulation as any)?.formularDaten || {};
+  const careStartTiming = (lead as any).care_start_timing || "";
+
+  const betreuungFuer = eingangsLabel("betreuung_fuer", fd.betreuung_fuer);
+  const pflegegrad = fd.pflegegrad ? `Pflegegrad ${fd.pflegegrad}` : "Nicht angegeben";
+  const weiterePersonen = eingangsLabel("weitere_personen", fd.weitere_personen);
+  const mobilitaet = eingangsLabel("mobilitaet", fd.mobilitaet);
+  const nachteinsaetze = eingangsLabel("nachteinsaetze", fd.nachteinsaetze);
+  const deutschkenntnisse = eingangsLabel("deutschkenntnisse", fd.deutschkenntnisse);
+  const fuehrerschein = eingangsLabel("fuehrerschein", fd.fuehrerschein);
+  const geschlecht = eingangsLabel("geschlecht", fd.geschlecht);
+  const careStart = eingangsLabel("care_start_timing", careStartTiming);
+
+  type Row = [string, string];
+  const rows: Row[] = [
+    ["Name", [lead.anrede_text, lead.vorname, lead.nachname].filter(Boolean).join(" ") || "Nicht angegeben"],
+    ["E-Mail", lead.email],
+  ];
+  if ((lead as any).telefon) rows.push(["Telefon", (lead as any).telefon]);
+  rows.push(
+    ["Betreuung für", betreuungFuer],
+    ["Weitere Person im Haushalt", weiterePersonen],
+    ["Pflegegrad", pflegegrad],
+    ["Mobilität", mobilitaet],
+    ["Nachteinsätze", nachteinsaetze],
+    ["Deutschkenntnisse BK", deutschkenntnisse],
+  );
+  if (fd.fuehrerschein) rows.push(["Führerschein BK", fuehrerschein]);
+  if (fd.geschlecht) rows.push(["Geschlecht BK", geschlecht]);
+  rows.push(["Betreuungsstart", careStart]);
+
+  const rowsHtml = rows.map(([label, value], i) => {
+    const isLast = i === rows.length - 1;
+    const border = isLast ? "" : "border-bottom:1px solid #f0ebe4;";
+    return `<tr>
+      <td style="padding:8px 0;${border}color:#888;font-size:13px;width:44%;">${label}</td>
+      <td style="padding:8px 0;${border}color:#333;font-size:13px;font-weight:600;">${value}</td>
+    </tr>`;
+  }).join("");
+
+  const portalBlock = (portalBase && lead.token) ? (() => {
+    const portalUrl = `${portalBase.replace(/\/$/, "")}/?token=${encodeURIComponent(lead.token)}`;
+    return `
+    <div style="background:linear-gradient(135deg,#2D5C2F 0%,#1F4421 100%);border-radius:10px;padding:28px;margin:0 0 28px 0;text-align:center;color:#ffffff;">
+      <h3 style="color:#ffffff;font-size:18px;font-weight:700;margin:0 0 8px 0;">Ihr persönlicher Portal-Link</h3>
+      <p style="color:#E8F5E9;font-size:14px;line-height:1.6;margin:0 0 18px 0;">In Ihrem Kundenportal finden Sie passende Pflegekräfte und können direkt Kontakt aufnehmen. Der Link bleibt 14 Tage aktiv und kann jederzeit erneut verwendet werden.</p>
+      <a href="${portalUrl}" style="display:inline-block;background:#ffffff;color:#2D5C2F;padding:14px 28px;border-radius:8px;text-decoration:none;font-weight:700;font-size:15px;">Pflegekraft jetzt finden →</a>
+    </div>`;
+  })() : "";
+
+  const content = `
+    <p style="font-size:16px;line-height:1.6;color:#333;margin-bottom:20px;">${greeting},</p>
+
+    <p style="font-size:16px;line-height:1.7;color:#555;margin-bottom:24px;">vielen Dank für Ihre Anfrage zur 24h-Pflege. Wir haben Ihre Angaben erhalten und werden Ihnen <strong>schnellstmöglich ein persönliches Angebot</strong> zusenden.</p>
+
+    <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="margin:0 0 24px 0;border:1px solid #e8ddd0;border-radius:8px;overflow:hidden;">
+      <tr>
+        <td style="background:#f9f6f2;padding:6px 20px;border-bottom:1px solid #e8ddd0;">
+          <p style="margin:0;font-size:11px;font-weight:700;letter-spacing:0.08em;color:#9a8a73;text-transform:uppercase;">Ihre Angaben im Überblick</p>
+        </td>
+      </tr>
+      <tr>
+        <td style="padding:4px 20px 8px;">
+          <table width="100%" cellpadding="0" cellspacing="0">${rowsHtml}</table>
+        </td>
+      </tr>
+    </table>
+
+    <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="margin:0 0 28px 0;border:1px solid #e8ddd0;border-radius:8px;overflow:hidden;">
+      <tr>
+        <td style="background:#f9f6f2;padding:6px 20px;border-bottom:1px solid #e8ddd0;">
+          <p style="margin:0;font-size:11px;font-weight:700;letter-spacing:0.08em;color:#9a8a73;text-transform:uppercase;">Nächster Schritt</p>
+        </td>
+      </tr>
+      <tr>
+        <td style="padding:18px 20px;text-align:left;">
+          <p style="margin:0 0 8px 0;font-size:18px;font-weight:700;color:#3D2B1F;line-height:1.3;">Wir senden Ihnen Ihr persönliches Angebot</p>
+          <p style="margin:0;font-size:14px;color:#666;line-height:1.6;">Unser Team prüft Ihre Angaben und meldet sich in Kürze – in der Regel noch am selben Werktag.</p>
+        </td>
+      </tr>
+    </table>
+
+    ${portalBlock}
+
+    ${buildIlkaSig(siteUrl)}`;
+
+  return buildEmailWrapper(lead, siteUrl, content);
+}
+
+function buildEingangsbestaetigungText(lead: Lead, portalBase: string): string {
+  const greeting = buildEingangsGreeting(lead);
+  const fd = (lead.kalkulation as any)?.formularDaten || {};
+  const careStartTiming = (lead as any).care_start_timing || "";
+
+  const portalUrl = (portalBase && lead.token)
+    ? `${portalBase.replace(/\/$/, "")}/?token=${encodeURIComponent(lead.token)}`
+    : "";
+
+  const portalBlock = portalUrl ? `
+IHR PERSÖNLICHER PORTAL-LINK
+
+In Ihrem Kundenportal finden Sie passende Pflegekräfte und können direkt Kontakt aufnehmen. Der Link bleibt 14 Tage aktiv und kann jederzeit erneut verwendet werden.
+
+${portalUrl}
+` : "";
+
+  return `Ihre Anfrage ist eingegangen – Primundus 24h-Pflege
+
+${greeting},
+
+vielen Dank für Ihre Anfrage zur 24h-Pflege. Wir haben Ihre Angaben erhalten und werden Ihnen schnellstmöglich ein persönliches Angebot zusenden.
+
+IHRE ANGABEN IM ÜBERBLICK
+
+Name: ${[lead.anrede_text, lead.vorname, lead.nachname].filter(Boolean).join(" ") || "Nicht angegeben"}
+E-Mail: ${lead.email}
+${(lead as any).telefon ? `Telefon: ${(lead as any).telefon}` : ""}
+Betreuung für: ${eingangsLabel("betreuung_fuer", fd.betreuung_fuer)}
+Weitere Personen: ${eingangsLabel("weitere_personen", fd.weitere_personen)}
+Pflegegrad: ${fd.pflegegrad ? `Pflegegrad ${fd.pflegegrad}` : "Nicht angegeben"}
+Mobilität: ${eingangsLabel("mobilitaet", fd.mobilitaet)}
+Nachteinsätze: ${eingangsLabel("nachteinsaetze", fd.nachteinsaetze)}
+Deutschkenntnisse: ${eingangsLabel("deutschkenntnisse", fd.deutschkenntnisse)}
+Wann soll die Betreuung starten?: ${eingangsLabel("care_start_timing", careStartTiming)}
+
+WIE GEHT ES WEITER?
+
+Unser Team prüft Ihre Anfrage und meldet sich in Kürze mit einem passenden Angebot bei Ihnen.
+${portalBlock}
+Bei Fragen stehen wir Ihnen gerne telefonisch zur Verfügung: +49 89 200 000 830
+
+Herzliche Grüße
+Ihr Primundus-Team
+
+---
+Primundus Deutschland | 24h-Pflege und Betreuung
+Telefon: +49 89 200 000 830 | E-Mail: info@primundus.de
+www.primundus.de`;
+}
+
+
 async function sendEmailSmtp(
   smtpConfig: SmtpConfig,
   to: string,
@@ -625,6 +794,13 @@ Deno.serve(async (req: Request) => {
           text = buildAngebotsEmailText(lead as Lead, smtpConfig.siteUrl);
           eventTypeSent = "email_angebot_sent";
           eventTypeFailed = "email_angebot_failed";
+        } else if (scheduledEmail.email_type === "eingangsbestaetigung") {
+          subject = "Ihre Anfrage ist eingegangen \u2013 Primundus 24h-Pflege";
+          const portalBase = Deno.env.get("PORTAL_URL") || "https://kundenportal.primundus.de";
+          html = buildEingangsbestaetigungHtml(lead as Lead, smtpConfig.siteUrl, portalBase);
+          text = buildEingangsbestaetigungText(lead as Lead, portalBase);
+          eventTypeSent = "email_eingangsbestaetigung_sent";
+          eventTypeFailed = "email_eingangsbestaetigung_failed";
         } else if (scheduledEmail.email_type === "nachfass_1") {
           subject = "AW: Kurze R\u00fcckfrage zu Ihrem Angebot";
           html = buildNachfass1Html(lead as Lead, smtpConfig.siteUrl);
