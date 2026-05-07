@@ -87,16 +87,16 @@ const CustomerPortalPage: FC = () => {
 
   // ─── Mamamia session + queries (K2-K4 integration) ───────────────────────
   const { session, ready: mmReady, error: mmError } = useMamamiaSession(lead?.token ?? null);
-  const { data: mmCustomer } = useCustomer(mmReady);
-  const { data: mmJobOffer } = useJobOffer(mmReady);
-  const { data: mmApplications, refetch: refetchApplications } = useApplications({ limit: 20 }, mmReady);
+  const { data: mmCustomer, loading: mmCustomerLoading, error: mmCustomerError } = useCustomer(mmReady);
+  const { data: mmJobOffer, loading: mmJobOfferLoading, error: mmJobOfferError } = useJobOffer(mmReady);
+  const { data: mmApplications, loading: mmApplicationsLoading, error: mmApplicationsError, refetch: refetchApplications } = useApplications({ limit: 20 }, mmReady);
   // limit=20 is intentional — client-side ranking (see `effectiveMatched`)
   // re-orders the page-1 batch by our own criteria (availability, freshness,
   // experience) rather than relying on Mamamia's server-side `order_by`.
-  const { data: mmMatchings } = useMatchings({ limit: 20 }, mmReady);
+  const { data: mmMatchings, loading: mmMatchingsLoading, error: mmMatchingsError } = useMatchings({ limit: 20 }, mmReady);
   // Set of caregiver IDs already invited (Request rows in Mamamia). Used
   // below to seed nurseStatuses with 'invited' so the badge survives F5.
-  const { data: invitedCaregiverIds, refetch: refetchInvited } = useInvitedCaregivers(mmReady);
+  const { data: invitedCaregiverIds, loading: invitedLoading, error: invitedError, refetch: refetchInvited } = useInvitedCaregivers(mmReady);
 
   // K5 mutations
   const rejectAppMutation = useRejectApplication();
@@ -380,20 +380,51 @@ const CustomerPortalPage: FC = () => {
     setNurseStatuses((prev) => ({ ...prev, [idx]: 'declined' }));
   };
 
+  // ─── Debug overlay (?debug=1) ────────────────────────────────────────────
+  // Renders fixed-bottom black panel with key state — token presence,
+  // session/onboard error, every Mamamia hook's loading/error/data summary.
+  // Only active when URL has `?debug=1` so production traffic doesn't see
+  // it. Designed for iPhone-side diagnosis where remote DevTools isn't
+  // always available — user opens with ?debug=1, screenshots panel, sends.
+  const debugOn = typeof window !== 'undefined' &&
+    new URLSearchParams(window.location.search).has('debug');
+  const fmtErr = (e: Error | null) => e ? `${e.name}: ${e.message.slice(0, 80)}` : 'null';
+  const fmtVal = (v: unknown) => v == null ? 'null' : typeof v === 'object' ? JSON.stringify(v).slice(0, 60) : String(v);
+  const debugOverlay = debugOn ? (
+    <div style={{position:'fixed',bottom:0,left:0,right:0,zIndex:9999,background:'rgba(0,0,0,0.92)',color:'#0f0',fontFamily:'ui-monospace,Menlo,monospace',fontSize:10,lineHeight:1.4,padding:'8px 10px',maxHeight:'40vh',overflowY:'auto',borderTop:'2px solid #0f0'}}>
+      <div style={{color:'#ff0',fontWeight:'bold',marginBottom:4}}>🔧 DEBUG (?debug=1) — UA: {typeof navigator !== 'undefined' ? navigator.userAgent.slice(0, 80) : '?'}</div>
+      <div>token: {new URLSearchParams(window.location.search).get('token')?.slice(0, 12) ?? 'MISSING'}…</div>
+      <div>cookie.session visible: {typeof document !== 'undefined' && document.cookie.includes('session=') ? 'YES' : 'NO (HttpOnly hides — could mean cookie present but JS-invisible, OR really absent)'}</div>
+      <div>cookie raw: {typeof document !== 'undefined' ? (document.cookie || '(empty)').slice(0, 120) : '?'}</div>
+      <hr style={{borderColor:'#0f04',margin:'4px 0'}}/>
+      <div>lead: loading={String(leadLoading)} err={leadError ?? 'null'} loaded={lead ? 'yes id='+lead.id.slice(0,8) : 'null'}</div>
+      <div>mmSession: ready={String(mmReady)} err={fmtErr(mmError)} session={fmtVal(session)}</div>
+      <div>mmCustomer: loading={String(mmCustomerLoading)} err={fmtErr(mmCustomerError)} id={fmtVal(mmCustomer?.id)} status={fmtVal(mmCustomer?.status)}</div>
+      <div>mmJobOffer: loading={String(mmJobOfferLoading)} err={fmtErr(mmJobOfferError)} id={fmtVal(mmJobOffer?.id)} status={fmtVal(mmJobOffer?.status)}</div>
+      <div>mmApplications: loading={String(mmApplicationsLoading)} err={fmtErr(mmApplicationsError)} total={fmtVal(mmApplications?.total)} count={fmtVal(mmApplications?.data.length)}</div>
+      <div>mmMatchings: loading={String(mmMatchingsLoading)} err={fmtErr(mmMatchingsError)} total={fmtVal(mmMatchings?.total)} count={fmtVal(mmMatchings?.data.length)}</div>
+      <div>invitedCaregiverIds: loading={String(invitedLoading)} err={fmtErr(invitedError)} count={fmtVal(invitedCaregiverIds?.length)}</div>
+    </div>
+  ) : null;
+
   // ─── Loading / Error states ──────────────────────────────────────────────────
   if (leadLoading) {
     return (
+      <>
       <div className="min-h-screen bg-white flex items-center justify-center">
         <div className="text-center space-y-3">
           <div className="w-10 h-10 border-2 border-[#9B1FA1] border-t-transparent rounded-full animate-spin mx-auto" />
           <p className="text-sm text-gray-400">Ihr Angebot wird geladen…</p>
         </div>
       </div>
+      {debugOverlay}
+      </>
     );
   }
 
   if (leadError) {
     return (
+      <>
       <div className="min-h-screen bg-white flex items-center justify-center px-6">
         <div className="text-center space-y-4 max-w-sm">
           <div className="w-14 h-14 rounded-full bg-red-50 flex items-center justify-center mx-auto">
@@ -406,12 +437,15 @@ const CustomerPortalPage: FC = () => {
           </a>
         </div>
       </div>
+      {debugOverlay}
+      </>
     );
   }
 
   // Mamamia session failure — surface it rather than silently falling back.
   if (lead && mmError) {
     return (
+      <>
       <div className="min-h-screen bg-white flex items-center justify-center px-6">
         <div className="text-center space-y-4 max-w-sm">
           <div className="w-14 h-14 rounded-full bg-red-50 flex items-center justify-center mx-auto">
@@ -429,18 +463,23 @@ const CustomerPortalPage: FC = () => {
           </div>
         </div>
       </div>
+      {debugOverlay}
+      </>
     );
   }
 
   // Lead loaded but Mamamia session still bootstrapping.
   if (lead && !mmReady) {
     return (
+      <>
       <div className="min-h-screen bg-white flex items-center justify-center">
         <div className="text-center space-y-3">
           <div className="w-10 h-10 border-2 border-[#9B1FA1] border-t-transparent rounded-full animate-spin mx-auto" />
           <p className="text-sm text-gray-400">Betreuungskräfte werden geladen…</p>
         </div>
       </div>
+      {debugOverlay}
+      </>
     );
   }
 
@@ -864,6 +903,7 @@ const CustomerPortalPage: FC = () => {
         )}
       </div>
     )}
+    {debugOverlay}
     </>
   );
 };
