@@ -49,9 +49,16 @@ export async function handleRequest(req: Request, deps: ProxyDeps): Promise<Resp
     return jsonError(429, "too many requests", baseHeaders);
   }
 
-  // Verify session cookie
+  // Verify session token — header preferred, cookie fallback.
+  // Header path (X-Session-Token) added 2026-05-07 after Bug #13j: iOS
+  // Chrome/Safari incognito drops the cross-site session cookie even with
+  // Partitioned attribute. Frontend stores onboard's session_token in
+  // sessionStorage and re-sends here. Cookie path retained as transparent
+  // fallback for desktop / non-incognito flows.
+  const headerToken = req.headers.get("x-session-token");
   const cookieHeader = req.headers.get("cookie");
-  const jwt = parseCookie(cookieHeader, "session");
+  const cookieToken = parseCookie(cookieHeader, "session");
+  const jwt = headerToken || cookieToken;
   if (!jwt) {
     return jsonError(401, "no session", baseHeaders);
   }

@@ -73,11 +73,20 @@ export async function handleRequest(req: Request, deps: HandlerDeps): Promise<Re
     deps.secrets.sessionJwtSecret,
   );
 
-  // Response — body contains ONLY non-sensitive IDs. Agency token stays in cookie/server.
+  // Response carries:
+  //   - customer_id / job_offer_id (non-sensitive identifiers)
+  //   - session_token: signed session JWT (NOT the agency token — only
+  //     authenticates this browser to mamamia-proxy ownership scope).
+  //     Body return added 2026-05-07 after Bug #13j: iOS Chrome/Safari
+  //     incognito drops cross-site session cookie even with Partitioned;
+  //     frontend stores token in sessionStorage and sends as
+  //     `X-Session-Token` header on subsequent proxy calls. Cookie still
+  //     emitted for desktop / non-incognito flows (transparent fallback).
   return new Response(
     JSON.stringify({
       customer_id: result.customer_id,
       job_offer_id: result.job_offer_id,
+      session_token: jwt,
     }),
     {
       status: 200,

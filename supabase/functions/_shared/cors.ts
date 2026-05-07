@@ -16,7 +16,11 @@ export function corsHeaders(origin: string | null): Record<string, string> {
   return {
     "Access-Control-Allow-Origin": allow,
     "Access-Control-Allow-Credentials": "true",
-    "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+    // x-session-token added 2026-05-07 (Bug #13j) — frontend re-sends the
+    // session JWT as a header for browsers that drop the cross-site cookie
+    // (iOS WebKit incognito). Without this in the allow-list, preflight
+    // rejects the actual request.
+    "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-session-token",
     "Access-Control-Allow-Methods": "POST, OPTIONS",
     "Vary": "Origin",
   };
