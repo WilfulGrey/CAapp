@@ -12,7 +12,10 @@ function makeLead(overrides: Partial<Lead> = {}): Lead {
     email: "x@e.de",
     vorname: "a", nachname: "b", anrede: "Frau", anrede_text: "Frau", telefon: null,
     status: "angebot_requested",
-    token: "valid", token_expires_at: "2026-05-07T12:00:00.000Z", token_used: false,
+    // Far-future expiry — CI runs at any wall clock, so a hardcoded
+    // "today + N hours" string flakes once the runner clock moves past it.
+    // 2099 is unambiguously in the future for the lifetime of this repo.
+    token: "valid", token_expires_at: "2099-01-01T00:00:00.000Z", token_used: false,
     care_start_timing: "sofort",
     kalkulation: { bruttopreis: 3000, eigenanteil: 1500, formularDaten: { pflegegrad: 3, mobilitaet: "rollstuhl" } },
     created_at: "2026-04-23T09:00:00.000Z", updated_at: "2026-04-23T09:00:00.000Z",

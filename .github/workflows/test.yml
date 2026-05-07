@@ -22,8 +22,13 @@ jobs:
       - name: Install deps
         run: npm ci
 
+      # Pin timezone to Europe/Berlin — `formatDate('YYYY-12-31T23:59:59Z')`
+      # rolls into next year only when local TZ is UTC+. Beta + prod serve
+      # German customers, so pinning Berlin matches actual user behaviour.
       - name: Run vitest
         run: npx vitest run
+        env:
+          TZ: Europe/Berlin
 
       # TypeScript check (build config skips test files)
       - name: Typecheck (src/)

@@ -16,7 +16,8 @@ function makeLead(overrides: Partial<Lead> = {}): Lead {
     telefon: "+49 89 1234567",
     status: "angebot_requested",
     token: "valid-token",
-    token_expires_at: "2026-05-07T12:00:00.000Z",
+    // Far-future expiry — see comment in handler.test.ts:15.
+    token_expires_at: "2099-01-01T00:00:00.000Z",
     token_used: false,
     care_start_timing: "sofort",
     kalkulation: {
