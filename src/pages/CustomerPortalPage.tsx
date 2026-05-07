@@ -23,6 +23,7 @@ import {
   mapCaregiverToNurse,
 } from '../lib/mamamia/mappers';
 import { mapPatientFormToUpdateCustomerInput } from '../lib/mamamia/patientFormMapper';
+import { callMamamia } from '../lib/mamamia/client';
 import {
   type Application,
   type NurseStatus,
@@ -504,7 +505,33 @@ const CustomerPortalPage: FC = () => {
           mamamiaEnabled={mmReady}
           onSaveToMamamia={async (form) => {
             const existingPatientIds = mmCustomer?.patients?.map(p => p.id) ?? [];
-            const patch = mapPatientFormToUpdateCustomerInput(form, { existingPatientIds });
+            // Resolve Mamamia location_id from PLZ via Locations(search).
+            // Without a canonical id, panel "Lokalizacja opieki" stays empty
+            // even if location_custom_text is set — verified 2026-05-07 on
+            // Customer 7655 (location_custom_text="80332 Munchen", panel
+            // location dropdown empty). Best-effort: errors fall back to
+            // the location_custom_text path inside the mapper.
+            let locationId: number | undefined;
+            const plz = form.plz?.trim();
+            if (plz && /^\d{4,5}$/.test(plz)) {
+              try {
+                const r = await callMamamia<{
+                  LocationsWithPagination: {
+                    data: Array<{ id: number; zip_code: string; country_code: string }>;
+                  };
+                }>('searchLocations', { search: plz, limit: 10, page: 1 });
+                const rows = r.LocationsWithPagination.data;
+                const de = rows.find(l => l.country_code === 'DE');
+                const match = de ?? rows[0];
+                if (match) locationId = match.id;
+              } catch {
+                // swallow — fall back to location_custom_text in mapper
+              }
+            }
+            const patch = mapPatientFormToUpdateCustomerInput(form, {
+              existingPatientIds,
+              locationId,
+            });
             await updateCustomerMutation.mutate(patch as Record<string, unknown>);
           }}
         />
