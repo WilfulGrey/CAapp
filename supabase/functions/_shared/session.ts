@@ -48,12 +48,23 @@ export async function verifySessionToken(
 // fetch() calls, breaking every mamamia-proxy request after onboarding.
 // Secure flag is still enforced; Chrome treats localhost as a secure
 // context so this works in dev over HTTP too.
+//
+// `Partitioned` (CHIPS — Cookies Having Independent Partitioned State)
+// added 2026-05-07 after Bug #13i: iOS WebKit (Safari + Chrome) ITP
+// silently dropped the cross-site session cookie even with SameSite=None
+// + Secure, so onboard set the cookie but mamamia-proxy never received
+// it on subsequent calls → matchings/applications never loaded on
+// iPhone. With `Partitioned`, the cookie is scoped to the top-level
+// site partition (caapp-beta.onrender.com), bypassing third-party
+// cookie restrictions. Supported in Safari 16.4+ / Chrome 118+ /
+// Firefox 124+ (Mar 2024). For older browsers, ignored gracefully —
+// falls back to plain SameSite=None behavior.
 export function sessionCookieHeader(jwt: string, maxAgeSec: number = DEFAULT_TTL_SEC): string {
-  return `${COOKIE_NAME}=${jwt}; HttpOnly; Secure; SameSite=None; Path=/; Max-Age=${maxAgeSec}`;
+  return `${COOKIE_NAME}=${jwt}; HttpOnly; Secure; SameSite=None; Partitioned; Path=/; Max-Age=${maxAgeSec}`;
 }
 
 export function clearSessionCookieHeader(): string {
-  return `${COOKIE_NAME}=; HttpOnly; Secure; SameSite=None; Path=/; Max-Age=0`;
+  return `${COOKIE_NAME}=; HttpOnly; Secure; SameSite=None; Partitioned; Path=/; Max-Age=0`;
 }
 
 export function parseCookie(header: string | null | undefined, name: string): string | null {

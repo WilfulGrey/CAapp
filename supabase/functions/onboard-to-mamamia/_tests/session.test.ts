@@ -64,7 +64,7 @@ Deno.test("verifySessionToken: expired token returns null", async () => {
   assertEquals(payload, null);
 });
 
-Deno.test("sessionCookieHeader: has HttpOnly, Secure, SameSite=None, Path=/", () => {
+Deno.test("sessionCookieHeader: has HttpOnly, Secure, SameSite=None, Partitioned, Path=/", () => {
   const header = sessionCookieHeader("abc.def.ghi", 86400);
   assertStringIncludes(header, "session=abc.def.ghi");
   assertStringIncludes(header, "HttpOnly");
@@ -72,6 +72,10 @@ Deno.test("sessionCookieHeader: has HttpOnly, Secure, SameSite=None, Path=/", ()
   // SameSite=None required for cross-site fetch from portal (localhost:5173
   // or portal.primundus.de) to Edge Function on *.supabase.co.
   assertStringIncludes(header, "SameSite=None");
+  // Partitioned (CHIPS) added 2026-05-07 — iOS WebKit (Safari + Chrome)
+  // ITP silently dropped cross-site session cookie even with SameSite=None
+  // + Secure (Bug #13i, Test iPhone Customer 7659).
+  assertStringIncludes(header, "Partitioned");
   assertStringIncludes(header, "Path=/");
   assertStringIncludes(header, "Max-Age=86400");
 });
