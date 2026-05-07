@@ -398,6 +398,8 @@ export const UPDATE_CUSTOMER = /* GraphQL */ `
     $equipment_ids: [Int]
     $patients: [PatientInputType]
     $customer_caregiver_wish: CustomerCaregiverWishInputType
+    $patient_contracts: [CustomerContractInputType]
+    $invoice_contract: CustomerContractInputType
   ) {
     UpdateCustomer(
       id: $id
@@ -428,6 +430,8 @@ export const UPDATE_CUSTOMER = /* GraphQL */ `
       equipment_ids: $equipment_ids
       patients: $patients
       customer_caregiver_wish: $customer_caregiver_wish
+      patient_contracts: $patient_contracts
+      invoice_contract: $invoice_contract
     ) {
       id
       customer_id

@@ -579,6 +579,14 @@ export interface MappedCustomerPatch {
   // zakwaterowania" is a required-looking multi-select; an empty list
   // surfaces as missing config to the agency.
   equipment_ids?: number[];
+  // Bug #13l (2026-05-07): Mamamia panel "Lokalizacja opieki" reads from
+  // customer_contracts[].location_id, not Customer.location_id top-level.
+  // patientFormMapper sends both contracts (patient + invoice) with the
+  // resolved location_id so panel renders. Other contract fields (name,
+  // street, salutation) are NOT sent — patient form doesn't collect them
+  // and they get filled at acceptance via StoreConfirmation.
+  patient_contracts?: Array<{ contact_type: string; location_id?: number }>;
+  invoice_contract?: { contact_type: string; location_id?: number };
   customer_caregiver_wish?: CaregiverWishPatch;
   // Patient array.
   patients?: Array<Record<string, unknown>>;
@@ -628,8 +636,19 @@ export function mapPatientFormToUpdateCustomerInput(
   patch.patients = patients;
 
   // Location — prefer explicit id from autocomplete; else custom text "PLZ Ort".
+  // Bug #13l: Mamamia panel "Lokalizacja opieki" reads from
+  // customer_contracts[].location_id, not Customer.location_id top-level.
+  // When we have resolved locationId, also set both contract rows
+  // (patient_contact + contract_contact) so panel renders.
   if (opts.locationId) {
     patch.location_id = opts.locationId;
+    patch.patient_contracts = [
+      { contact_type: 'patient_contact', location_id: opts.locationId },
+    ];
+    patch.invoice_contract = {
+      contact_type: 'contract_contact',
+      location_id: opts.locationId,
+    };
   } else if (form.plz || form.ort) {
     patch.location_custom_text = `${form.plz} ${form.ort}`.trim();
   }
