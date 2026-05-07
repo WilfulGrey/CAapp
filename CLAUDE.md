@@ -893,12 +893,17 @@ Skonfigurowane via `gh api repos/WilfulGrey/CAapp/branches/.../protection`
 
 | Reguła | Wartość | Co znaczy |
 |---|---|---|
-| `required_pull_request_reviews.required_approving_review_count` | 1 | Każdy PR wymaga 1 approve. Marcin nie może mergować własnego PR-a. |
-| `required_pull_request_reviews.dismiss_stale_reviews` | true | Push po review unieważnia approve — reviewer musi zatwierdzić ponownie. |
+| `required_pull_request_reviews.required_approving_review_count` | **0** | PR wymagany ALE **bez approve** — autor sam mergeuje gdy CI green. Decyzja 2026-05-08: Michał nie chce być review-bottleneckiem; CI + PR-only path uznane za wystarczający quality gate. |
+| `required_pull_request_reviews.dismiss_stale_reviews` | false | (irrelevant przy 0 approvals) |
 | `required_status_checks.strict` | true | Branch musi być up-to-date z target zanim merge. |
-| `required_status_checks.contexts` | `vitest (frontend)`, `deno tests (onboard-to-mamamia)`, `deno tests (mamamia-proxy)` | 3 jobs musi być green. |
+| `required_status_checks.contexts` | `vitest (frontend)`, `deno tests (onboard-to-mamamia)`, `deno tests (mamamia-proxy)` | 3 jobs musi być green. **To jedyna realna brama.** |
 | `enforce_admins` | false | Michał (admin) może obejść w hot-fix. **Używaj świadomie.** |
 | `allow_force_pushes` / `allow_deletions` | false | Nie da się zniszczyć historii brancha. |
+
+**Implikacja:** każdy dev z `write` permission może self-merge swój PR po
+zielonym CI. Code review jest opcjonalny (post-merge, on-demand). Jeśli
+wynik okaże się problematyczny — zmień `required_approving_review_count`
+na 1 przez `gh api -X PUT .../protection`.
 
 ### CI workflow (`.github/workflows/test.yml`)
 
@@ -953,8 +958,10 @@ git push -u origin fix/<scope>-<short-desc>
 gh pr create --base integration/mamamia-onboarding --title "..." --body "..."
 # albo via UI — template auto-load
 
-# 6. CI runuje (~60s). Czekamy na green + review.
-# 7. Po merge — Render auto-deploy beta (~2-3 min).
+# 6. CI runuje (~60s). Czekamy na green.
+# 7. Self-merge (CI green = wystarcza, approve nie jest wymagany).
+#    GitHub UI → "Squash and merge" preferowane (clean history).
+# 8. Po merge — Render auto-deploy beta (~2-3 min).
 ```
 
 ### Hot-fix path (admin override)

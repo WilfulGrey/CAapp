@@ -196,8 +196,19 @@ git push -u origin fix/portal-pflegegrad-display
 #    Tytuł = commit message
 #    Opis = co + dlaczego + jak testowałeś (patrz template poniżej)
 
-# 8. Czekaj na review Michała. Po merge — Render auto-deploy'uje na beta.
+# 8. Czekaj na CI green (~60s, 3 status checks).
+#    Approve od Michała NIE jest wymagany — możesz self-merge.
+
+# 9. Self-merge: GitHub UI → "Squash and merge" (preferowane dla
+#    czystej historii). Branch protection przepuści gdy CI zielony.
+
+# 10. Po merge — Render auto-deploy'uje na beta (~2-3 min).
 ```
+
+**Code review jest opcjonalny.** Jeśli zmiana jest nieoczywista
+(refactor, nowy module, decyzja architektoniczna) — pinguj Michała
+w PR comments + zaczekaj. CI łapie regresje techniczne; nie łapie
+"czy to dobry pomysł". Self-merge gdy pewny; reviews on-demand.
 
 ### Commit convention (z CLAUDE.md)
 
@@ -255,9 +266,17 @@ twój PR mergowany → Render dostaje webhook → build → live na beta
 | `caapp-beta` | https://caapp-beta.onrender.com | root (Vite static build) |
 | `kostenrechner-beta` | https://kostenrechner-beta.onrender.com | `project 3/` (Next.js SSR) |
 
+### Render team access
+
+Michał dodaje Cię do Render team (Settings → Members → Invite). Po
+akceptacji email-a zobaczysz w https://dashboard.render.com/ oba serwisy
+beta. Możesz oglądać build logs / runtime logs / triggerować manual
+redeploy. **NIE możesz** kasować serwisów ani zmieniać `render.yaml`
+blueprint — to zarezerwowane dla Admin role.
+
 ### Co robisz po merge
 
-1. Patrz logi build (Render dashboard → Service → Events lub Logs). Michał dodaje cię do Render team gdyby było potrzeba — pisz.
+1. Patrz logi build (Render dashboard → Service → Events lub Logs).
 2. Smoke test live: skopiuj URL z PR → otwórz → przelataj wizard / portal → upewnij się że nic nie zepsute.
 3. Jeśli zepsute — natychmiast otwórz PR z fix'em / rollback'iem (`git revert <merge-commit>` na nowym branchu, PR, merge).
 
