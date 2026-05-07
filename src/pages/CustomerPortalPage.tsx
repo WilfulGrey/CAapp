@@ -381,21 +381,58 @@ const CustomerPortalPage: FC = () => {
   };
 
   // ─── Debug overlay (?debug=1) ────────────────────────────────────────────
-  // Renders fixed-bottom black panel with key state — token presence,
-  // session/onboard error, every Mamamia hook's loading/error/data summary.
-  // Only active when URL has `?debug=1` so production traffic doesn't see
-  // it. Designed for iPhone-side diagnosis where remote DevTools isn't
-  // always available — user opens with ?debug=1, screenshots panel, sends.
+  // Renders fixed-bottom black panel with key state. Only active when URL
+  // has `?debug=1` so production traffic doesn't see it. Designed for
+  // iPhone-side diagnosis where remote DevTools isn't always available —
+  // user opens with ?debug=1, screenshots panel, sends.
+  //
+  // Auth section reflects the dual mechanism added in Bug #13j: cookie
+  // (cross-site, often dropped on iOS) AND X-Session-Token header
+  // (sessionStorage-backed, bulletproof). The header path is what works
+  // on iOS WebKit incognito; cookie is transparent fallback for desktop.
   const debugOn = typeof window !== 'undefined' &&
     new URLSearchParams(window.location.search).has('debug');
   const fmtErr = (e: Error | null) => e ? `${e.name}: ${e.message.slice(0, 80)}` : 'null';
   const fmtVal = (v: unknown) => v == null ? 'null' : typeof v === 'object' ? JSON.stringify(v).slice(0, 60) : String(v);
+
+  // Read auth artifacts safely (guard SSR / private mode throws).
+  let sessionTokenInStorage: string | null = null;
+  try { sessionTokenInStorage = typeof sessionStorage !== 'undefined' ? sessionStorage.getItem('mamamia_session_token') : null; } catch { /* private mode */ }
+  const cookieDoc = typeof document !== 'undefined' ? (document.cookie || '') : '';
+  const sessionCookieVisible = cookieDoc.includes('session=');
+  const hasAnyCookie = cookieDoc.length > 0;
+
+  // Infer which auth method is actively carrying proxy calls. The
+  // frontend prefers header when sessionStorage has a token (Bug #13j);
+  // otherwise it falls back to credentials: include cookie path. We can
+  // verify the cookie path is *probably* live by checking mmReady but
+  // not seeing the token in storage — meaning cookie HttpOnly carried it.
+  let authMethod: string;
+  if (sessionTokenInStorage) {
+    authMethod = 'X-Session-Token header (sessionStorage)';
+  } else if (sessionCookieVisible) {
+    authMethod = 'session cookie (visible — non-HttpOnly?)';
+  } else if (mmReady && hasAnyCookie) {
+    authMethod = 'session cookie (HttpOnly — JS-invisible)';
+  } else if (mmReady) {
+    authMethod = 'unknown — mmReady=true but no token visible (proxy calls likely failing)';
+  } else {
+    authMethod = 'none yet (mmSession not ready)';
+  }
+
+  const tokenPreview = (t: string | null) => t ? `${t.slice(0, 12)}…(${t.length} chars)` : '(absent)';
+
   const debugOverlay = debugOn ? (
-    <div style={{position:'fixed',bottom:0,left:0,right:0,zIndex:9999,background:'rgba(0,0,0,0.92)',color:'#0f0',fontFamily:'ui-monospace,Menlo,monospace',fontSize:10,lineHeight:1.4,padding:'8px 10px',maxHeight:'40vh',overflowY:'auto',borderTop:'2px solid #0f0'}}>
-      <div style={{color:'#ff0',fontWeight:'bold',marginBottom:4}}>🔧 DEBUG (?debug=1) — UA: {typeof navigator !== 'undefined' ? navigator.userAgent.slice(0, 80) : '?'}</div>
-      <div>token: {new URLSearchParams(window.location.search).get('token')?.slice(0, 12) ?? 'MISSING'}…</div>
-      <div>cookie.session visible: {typeof document !== 'undefined' && document.cookie.includes('session=') ? 'YES' : 'NO (HttpOnly hides — could mean cookie present but JS-invisible, OR really absent)'}</div>
-      <div>cookie raw: {typeof document !== 'undefined' ? (document.cookie || '(empty)').slice(0, 120) : '?'}</div>
+    <div style={{position:'fixed',bottom:0,left:0,right:0,zIndex:9999,background:'rgba(0,0,0,0.92)',color:'#0f0',fontFamily:'ui-monospace,Menlo,monospace',fontSize:10,lineHeight:1.4,padding:'8px 10px',maxHeight:'45vh',overflowY:'auto',borderTop:'2px solid #0f0'}}>
+      <div style={{color:'#ff0',fontWeight:'bold',marginBottom:4}}>🔧 DEBUG (?debug=1)</div>
+      <div>UA: {typeof navigator !== 'undefined' ? navigator.userAgent.slice(0, 100) : '?'}</div>
+      <div>online: {typeof navigator !== 'undefined' ? String(navigator.onLine) : '?'} · cookieEnabled: {typeof navigator !== 'undefined' ? String(navigator.cookieEnabled) : '?'}</div>
+      <div>lead.token URL: {new URLSearchParams(window.location.search).get('token')?.slice(0, 12) ?? 'MISSING'}…</div>
+      <hr style={{borderColor:'#0f04',margin:'4px 0'}}/>
+      <div style={{color:'#ff0'}}>auth via: {authMethod}</div>
+      <div>sessionStorage.mamamia_session_token: {tokenPreview(sessionTokenInStorage)}</div>
+      <div>document.cookie has any: {String(hasAnyCookie)} · session= visible: {String(sessionCookieVisible)}</div>
+      <div>cookie raw (truncated): {cookieDoc.slice(0, 120) || '(empty — iOS WebKit incognito normalny stan)'}</div>
       <hr style={{borderColor:'#0f04',margin:'4px 0'}}/>
       <div>lead: loading={String(leadLoading)} err={leadError ?? 'null'} loaded={lead ? 'yes id='+lead.id.slice(0,8) : 'null'}</div>
       <div>mmSession: ready={String(mmReady)} err={fmtErr(mmError)} session={fmtVal(session)}</div>
