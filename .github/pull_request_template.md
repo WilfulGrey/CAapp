@@ -17,8 +17,8 @@
 
 ## Test plan
 
-- [ ] `npx vitest run` — frontend tests pass (146+ baseline)
-- [ ] (jeśli dotyczy) `cd supabase/functions/onboard-to-mamamia && deno task test` — onboard tests pass (133+)
+- [ ] `npx vitest run` — frontend tests pass (163+ baseline)
+- [ ] (jeśli dotyczy) `cd supabase/functions/onboard-to-mamamia && deno task test` — onboard tests pass (124+)
 - [ ] (jeśli dotyczy) `cd supabase/functions/mamamia-proxy && deno task test` — proxy tests pass (31+)
 - [ ] (jeśli dotyczy) `npx tsc --noEmit -p tsconfig.build.json` — clean build
 - [ ] (jeśli dotyczy Mamamia integration) e2e curl recipe na becie przeszedł — patrz CLAUDE.md sekcja "E2e verification recipe"

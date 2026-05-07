@@ -7,6 +7,10 @@ supabase/.temp/
 .env.*.local
 .claude/
 coverage/
+# Onboarding paczki dla nowych devów — mogą zawierać klucze .env w plain text.
+# Trzymaj poza repo, przekaż osobnym kanałem (Signal / 1Password / GPG).
+*-env-package.zip
+*-env-package/
 # project 3 (Primundus calculator, Next.js) co-locates here so we can ship
 # it alongside the CA app from a single Render Blueprint. Its own
 # project 3/.gitignore keeps node_modules / .env / .next out of the repo.

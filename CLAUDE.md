@@ -105,6 +105,8 @@ ludzie ufają temu co przeczytają, a stare dokumenty kłamią z autorytetem.
 | Nowe pole w `PatientForm` interface lub `mapMamamiaCustomerToPatientForm` | CLAUDE.md sekcja „Field mapping reference" + [docs/customer-portal-flow.md](docs/customer-portal-flow.md) §6 (`getCustomer` / `updateCustomer`) |
 | Bugfix (każdy) | CLAUDE.md sekcja „Recent bug fixes — registry" — kolejny numer, plik(i), one-line fix highlight |
 | Nowa edge function lub usunięcie istniejącej | CLAUDE.md sekcja „Kluczowe pliki" + [docs/customer-portal-flow.md](docs/customer-portal-flow.md) (jeśli wpływa na browser↔mamamia path) |
+| Zmiana w `.github/workflows/*` lub wymaganiach branch protection | CLAUDE.md sekcja „GitHub workflow (PR / CI / branch protection)" — tabela reguł + status check names |
+| Nowe wymagania środowiskowe (env var / `.env*` / Render secret) | ONBOARDING.md (§2 / §3) + jeśli runtime → CLAUDE.md sekcja „Deploy workflow" → „Supabase secrets" |
 
 ### Sekcje samo-aktualizujące się
 
@@ -211,6 +213,9 @@ CA app → Mamamia:
   `deno task test` dla Edge Functions
 - **Deploy:** Render Blueprint (`render.yaml`), branch
   `integration/mamamia-onboarding`, auto-deploy po push
+- **CI:** GitHub Actions (`.github/workflows/test.yml`) — vitest +
+  2× deno na każdy PR. Branch protection wymaga 3 status checks
+  green + 1 approving review przed merge.
 
 ---
 
@@ -264,8 +269,8 @@ CA app → Mamamia:
 
 | Folder | Suite |
 |---|---|
-| `src/__tests__/` | Vitest (frontend) — `mamamia/`, `integration/`, `supabase.test.ts`. **146 cases** (stan na 2026-05-07) |
-| `supabase/functions/onboard-to-mamamia/_tests/` | Deno (Edge Function) — `mappers.test.ts`, `onboard.test.ts`, `session.test.ts`. **133 cases** |
+| `src/__tests__/` | Vitest (frontend) — `mamamia/`, `integration/`, `supabase.test.ts`. **163 cases** (stan na 2026-05-08, CI commit d17ac93) |
+| `supabase/functions/onboard-to-mamamia/_tests/` | Deno (Edge Function) — `mappers.test.ts`, `onboard.test.ts`, `session.test.ts`, `handler.test.ts`. **124 cases** |
 | `supabase/functions/mamamia-proxy/_tests/` | Deno — `actions.test.ts`, `handler.test.ts`. **31 cases** |
 
 ### Deploy / Infra
@@ -274,7 +279,12 @@ CA app → Mamamia:
 |---|---|
 | `render.yaml` | Blueprint dla obu serwisów (caapp-beta + kostenrechner-beta) |
 | `.env.local` | Local dev — VITE_SUPABASE_URL/ANON_KEY (NIE commit) |
+| `.env.example` | Template dla CAapp `.env.local` — bezpieczne klucze + komentarze |
+| `project 3/.env.example` | Template dla calculator `.env` — j.w. |
 | `tsconfig.json` / `tsconfig.build.json` | Production build pomija test files |
+| `.github/workflows/test.yml` | CI — vitest + 2× deno tests na PR/push do `integration/mamamia-onboarding` |
+| `.github/pull_request_template.md` | Auto-load template przy każdym PR (Summary / Why / Test plan / Documentation updates) |
+| `ONBOARDING.md` | Operations manual dla nowego dev'a — clone do PR w 30-60 min |
 
 ### Docs
 
@@ -604,6 +614,7 @@ Wszystkie z 2026-04 → 2026-05. Lista ma być wyczerpana — jak coś znów
 | 13j-debug | **Mechanizm debug dla iOS issues bez DevTools dostępu**. Bez Mac Safari → iPhone remote debug, ślepe spekulacje (Bug #13i Partitioned cookie nie pomogło) | src/pages/CustomerPortalPage.tsx (debug overlay) | URL z `?debug=1` aktywuje fixed-bottom panel z czarnym tłem + zielonym monospace text. Pokazuje: token, document.cookie raw, userAgent, lead/mmSession state, każdy hook (mmCustomer/JobOffer/Apps/Matchings/invitedCaregivers) loading/error/data. User screenshotuje, sysłalem fixy oparte o konkrety. Production bez `?debug=1` nie widzi. |
 | 13l | **Mamamia panel "Lokalizacja opieki" nie zaciągało się mimo Customer.location_id ustawionego**. Bug #13d ustawia top-level `Customer.location_id` przez searchLocations lookup, ALE panel "Lokalizacja opieki" reads z `customer_contracts[].location_id` (osobny wiersz). Bug #13 wyciął contracts z onboardu (delegated to acceptance) → patient form save tworzy customer.location_id, ale customer_contracts stays []. Empirical verification 2026-05-07 na Customer 7661 (testiphone2): user wpisał ręcznie "01108 Marsdorf" w panel → Mamamia auto-stworzyła 2 contracts (patient_contact + contract_contact) z location_id. Diff potwierdził że panel reads from contracts | supabase/functions/mamamia-proxy/operations.ts (UPDATE_CUSTOMER args), supabase/functions/mamamia-proxy/actions.ts (UPDATE_CUSTOMER_ALLOWED), src/lib/mamamia/patientFormMapper.ts (MappedCustomerPatch + emit contracts) | UPDATE_CUSTOMER mutation: dodać `$patient_contracts: [CustomerContractInputType]` + `$invoice_contract: CustomerContractInputType`. UPDATE_CUSTOMER_ALLOWED: dodać te pola do whitelisty. patientFormMapper: gdy `opts.locationId` resolved, emit `patient_contracts: [{contact_type:"patient_contact", location_id}]` + `invoice_contract: {contact_type:"contract_contact", location_id}`. Sanity test 2026-05-07 na Customer 7659: HTTP 200, contracts utworzone z `location_id=14380`. NIE wysyłamy innych pól contractu (name, street, salutation) — patient form ich nie zbiera, ustaje przy acceptance via StoreConfirmation. Edge: jeśli user manualnie wpisał inne pola contractu w panelu między Save calls, nasz Save je nadpisuje (Mamamia replaces contract list). Akceptowalne dla MVP. |
 | 13k | **Pflegedienst description nie zaciągało się w Mamamia panel "Jak często i jakie zadania wykonuje Pflegedienst?"** — patientFormMapper pakował frequency+tasks w `job_description` jako `Pflegedienst: <freq>: <tasks>` segment, bo gotcha #2 (2026-05-05) mówiło że dedicated args ŁAMIĄ mutation. **Schema się zmieniło od 2026-05-05** — zweryfikowane live 2026-05-07: introspection pokazała 4 dedicated args na `UpdateCustomer`, sanity test na Customer 7659 wpisał wartości i mutation HTTP 200. ŚWIĘTA ZASADA NR 1.5: gotchas też podlegają empirycznej weryfikacji okresowo | supabase/functions/mamamia-proxy/operations.ts (UPDATE_CUSTOMER + GET_CUSTOMER), supabase/functions/mamamia-proxy/actions.ts (UPDATE_CUSTOMER_ALLOWED), src/lib/mamamia/patientFormMapper.ts, src/lib/mamamia/mappers.ts (reverse), src/lib/mamamia/types.ts | (1) UPDATE_CUSTOMER mutation: dodać 4 args `day_care_facility_description{,_de,_en,_pl}`. (2) GET_CUSTOMER select: dodać te same. (3) UPDATE_CUSTOMER_ALLOWED whitelist: dodać. (4) patientFormMapper: gdy pflegedienst=Ja, wysyłać do dedykowanych pól (3 lokale + no-locale variant mirror DE), drop `Pflegedienst:` segment z job_description. (5) Reverse mapper: czytać z `day_care_facility_description_de` (lub no-locale fallback) pierwsze; legacy `job_description` segment parser jako fallback dla customers utworzonych pre-Bug-#13k. |
+| 14 | **CI flakes ujawnione w pierwszym GitHub Actions run** (2026-05-07) — testy przechodzące lokalnie u Michała padały na ubuntu-latest UTC runner. Dwa różne wzory: (1) `formatDate('2025-12-31T23:59:59Z') === '01.01.2026'` w supabase.test.ts działało tylko w UTC+ TZ (CEST u Michała, UTC na CI → '31.12.2025'); (2) 3 pliki testów onboard hardcodowały `token_expires_at: "2026-05-07T12:00:00Z"` — passed lokalnie (Michał uruchamiał rano), padało na CI od ~14 UTC tego dnia z "lead token expired or invalid". Pre-existing flakes maskowane lokalnym setupem | .github/workflows/test.yml (TZ pin), supabase/functions/onboard-to-mamamia/_tests/{handler,onboard,mappers}.test.ts | (1) Pin `TZ=Europe/Berlin` w vitest job env — pasuje do produkcji (niemieccy klienci) i naprawia tym samym wszystkie przyszłe TZ-dependent testy. (2) Bump `token_expires_at` do `"2099-01-01T00:00:00.000Z"` we wszystkich 3 fixture'ach — nigdy nie wygaśnie podczas runa. **Reguła:** każda data w testach która ma być "w przyszłości" → bump do 2099 lub `new Date(Date.now() + N).toISOString()`. NIE używaj dat względem dzisiejszej, bo CI runuje 24/7. |
 
 ---
 
@@ -851,19 +862,124 @@ przez curl/fetch.
 - Service-role keys, agency credentials
 - Pliki `*.tsx.bak` / `*.tsx.broken` (cleanup before commit)
 
-### PR template (gdy będzie używany)
+### PR template
 
-```markdown
-## Summary
-- 2-3 bullets co zmieniło
+Plik `.github/pull_request_template.md` auto-loaduje się przy każdym
+otwartym PR. Sekcje: Summary / Why / Test plan (4 testy + e2e + smoke)
+/ Documentation updates (mapowanie 1:1 na tabelę "Pliki które MUSZĄ być
+w sync z kodem" z §"Święta zasada nr 2"). Nie usuwaj checklist'y —
+wymuszenie spójności jest celem.
 
-## Test plan
-- [ ] vitest passes (146+ tests)
-- [ ] deno onboard tests pass (133+)
-- [ ] deno proxy tests pass (31+)
-- [ ] e2e curl recipe na beta przeszedł
-- [ ] manual smoke przez UI (gdy zmiana dotyka form)
+---
+
+## GitHub workflow (PR / CI / branch protection)
+
+Setup post-2026-05-07 (commit dodający Marcin'a jako collaboratora).
+Przed tym commit'em workflow był "Michał pcha do `integration/...`
+i Render auto-deploy'uje". Teraz wymuszamy PR-flow dla każdego — w tym
+Michał (z `enforce_admins: false` może obejść w emergency, ale to
+zarezerwowane do hot-fix'ów prod, nie codzienna ścieżka).
+
+### Default branch dla pracy
+
+`integration/mamamia-onboarding` jest "main" zespołu. Render auto-deploy
+beta na każdy push do tego brancha. `main` istnieje historycznie ale
+jest stary — **nie ruszamy**.
+
+### Branch protection na `integration/mamamia-onboarding`
+
+Skonfigurowane via `gh api repos/WilfulGrey/CAapp/branches/.../protection`
+(commit `c277035`):
+
+| Reguła | Wartość | Co znaczy |
+|---|---|---|
+| `required_pull_request_reviews.required_approving_review_count` | 1 | Każdy PR wymaga 1 approve. Marcin nie może mergować własnego PR-a. |
+| `required_pull_request_reviews.dismiss_stale_reviews` | true | Push po review unieważnia approve — reviewer musi zatwierdzić ponownie. |
+| `required_status_checks.strict` | true | Branch musi być up-to-date z target zanim merge. |
+| `required_status_checks.contexts` | `vitest (frontend)`, `deno tests (onboard-to-mamamia)`, `deno tests (mamamia-proxy)` | 3 jobs musi być green. |
+| `enforce_admins` | false | Michał (admin) może obejść w hot-fix. **Używaj świadomie.** |
+| `allow_force_pushes` / `allow_deletions` | false | Nie da się zniszczyć historii brancha. |
+
+### CI workflow (`.github/workflows/test.yml`)
+
+3 jobs runują na każdy PR + push do `integration/mamamia-onboarding`:
+
+1. **`vitest (frontend)`** — `npm ci` + `npx vitest run` + `tsc --noEmit`.
+   Pin `TZ=Europe/Berlin` w env (patrz Bug #14 dla rationale).
+2. **`deno tests (onboard-to-mamamia)`** — Deno setup + `deno task test`.
+3. **`deno tests (mamamia-proxy)`** — Deno setup + `deno task test`.
+
+Jobs runują równolegle (≈40-60s każdy). Cache: npm cache action automatic;
+Deno nie ma persistent cache w tym workflow (dla deps reload at start —
+remote modules, nie mamy lockfile cross-platformowy żeby cache walidować).
+
+### Co aktywnie robi CI
+
+- Sygnalizuje czerwonym `failed` na PR-e zanim merge — Michał widzi przed approve
+- Re-runuje na każdy push do PR (force-push też triggeruje)
+- Status checks pojawiają się jako wymagane w "Merge" button — branch
+  protection blokuje przycisk gdy któryś job czerwony
+
+### Co NIE robi CI (gotchas)
+
+- **Nie deploy'uje Edge Functions** — Supabase Edge Functions lecą
+  manualnie (`npx supabase functions deploy <name> --project-ref ...`).
+  CI tylko testuje logikę.
+- **Nie sprawdza tsc w `project 3/`** — pre-existing TS errors w
+  Next.js typings (lucide CircleCheck, next/navigation). Skupiamy się
+  na `src/` clean. Jeśli CI zacznie pinwheelować na `project 3/`,
+  dodaj exclude w workflow.
+- **Nie testuje przeciw beta backend** — wszystkie testy używają
+  fixture'ów / mocks / `fetchFn` injected. Real e2e przez curl recipe
+  z §"E2e verification recipe" — manual.
+
+### Workflow per task (każdy dev)
+
+```bash
+# 1. Pull latest
+git checkout integration/mamamia-onboarding && git pull
+
+# 2. Branch off
+git checkout -b fix/<scope>-<short-desc>
+
+# 3. Pracuj. Commit (multi-commit OK — squash przy merge).
+
+# 4. Test lokalnie ZANIM push
+npx vitest run
+# (deno tests jeśli ruszałeś Edge Functions)
+
+# 5. Push + open PR
+git push -u origin fix/<scope>-<short-desc>
+gh pr create --base integration/mamamia-onboarding --title "..." --body "..."
+# albo via UI — template auto-load
+
+# 6. CI runuje (~60s). Czekamy na green + review.
+# 7. Po merge — Render auto-deploy beta (~2-3 min).
 ```
+
+### Hot-fix path (admin override)
+
+Gdy beta się pali i czekanie na CI/review = ryzyko biznesowe:
+
+```bash
+git checkout integration/mamamia-onboarding
+# fix
+git commit -m "hotfix(...): ..."
+git push origin integration/mamamia-onboarding
+# Branch protection przepuści (enforce_admins=false). Render zacznie
+# build natychmiast. Zrób PR retro do code review history.
+```
+
+**Używaj świadomie** — to obejście wszystkich review'ów. Lepiej tracić
+5 minut na PR niż 5 godzin na nieoczekiwany rollback.
+
+### ONBOARDING.md — manual operations dla nowych devów
+
+Plik `ONBOARDING.md` w repo root — od-zera-do-PR dla nowego
+współpracownika. Zawiera: clone setup, .env handling (paczka osobnym
+kanałem), install + dev, testy, branch/PR workflow, Render deploys,
+troubleshooting. **Linkowany z każdej onboarding wiadomości do nowego
+devа** — nie powtarzaj treści w Slacku, link do plik'a.
 
 ---
 
@@ -902,11 +1018,22 @@ Jeśli widzisz nowy phantom field — dodaj sentinel detection w
 
 ### "Test pada lokalnie ale nie na CI / vice versa"
 
+- **TZ-dependent test pada na CI** (UTC) ale przechodzi lokalnie (CEST/CET):
+  data parsing który rolluje się na granicy dnia (`23:59:59Z` → next day
+  w UTC+1, same day w UTC). Nasz CI pinuje `TZ=Europe/Berlin` w env
+  vitest job — jeśli twój nowy test pada tylko na CI bez pina, sprawdź
+  czy nie zakładasz lokalnej TZ. Patrz Bug #14.
+- **Date hardcoded "dzisiaj N:NN UTC"** — token expiry / arrival_at /
+  podobne. Pada w CI run po tej godzinie tego dnia. Fix: bump na
+  `2099-01-01` lub użyj `new Date(Date.now() + N).toISOString()`. Bug #14.
 - Frontend Vitest jest jsdom-based, nie real browser. Niektóre ipv6
   / network features nie działają.
 - MSW mocks żyją w `test/setup.ts`. Sprawdź czy nie kolidują z fetch'em.
 - Edge Function tests używają fake `fetchFn` injected — jeśli kod woła
   `fetch` bezpośrednio zamiast `deps.fetchFn`, test pominie network mock.
+- **CI green ale lokalnie red** — najczęściej brakuje `npm install`
+  po pull (lockfile się zmienił) lub stale `node_modules/`. `rm -rf
+  node_modules && npm ci` rozwiązuje 90% przypadków.
 
 ### "Jak uruchomić nową Edge Function locally?"
 
@@ -958,6 +1085,15 @@ FROM leads WHERE token = '...';
   silently — patch wygląda OK ale field nie dochodzi do Mamamia.
 - ❌ Branch operacje na `main` lub `master` — pracujemy na
   `integration/mamamia-onboarding`. Production nie istnieje jeszcze.
+- ❌ Direct push do `integration/mamamia-onboarding` (admin override mimo
+  branch protection). Każda zmiana = feature branch + PR + CI green +
+  1 review. Wyjątek: hot-fix prod fire — patrz §"Hot-fix path". Bug #14
+  pokazał że nawet "pewne lokalnie" testy padają na CI runner.
+- ❌ Hardcoded daty w testach (`token_expires_at: "2026-05-07..."`).
+  Bump na `2099-01-01` lub relative `Date.now() + N`. CI runuje 24/7,
+  twoja "jutrzejsza" data wygaśnie nim się zorientujesz.
+- ❌ Założenia o lokalnej TZ w testach formatowania dat. CI runuje UTC.
+  Pin `TZ` w workflow albo użyj UTC-relative assertions.
 
 ---
 

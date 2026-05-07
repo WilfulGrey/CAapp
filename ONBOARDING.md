@@ -136,13 +136,13 @@ npx vitest                # watch mode podczas dev
 npm run test:coverage     # coverage report
 ```
 
-Powinno przejść **146 testów** (stan na 2026-05-08). Jeśli twoja zmiana je psuje — albo aktualizuj test, albo cofnij zmianę.
+Powinno przejść **163 testów** (stan na 2026-05-08, CI baseline). Jeśli twoja zmiana je psuje — albo aktualizuj test, albo cofnij zmianę.
 
 ### Edge Functions (Deno) — opcjonalnie
 
 ```bash
 cd supabase/functions/onboard-to-mamamia
-deno task test            # ~133 testów
+deno task test            # ~124 testów
 
 cd ../mamamia-proxy
 deno task test            # ~31 testów
@@ -218,7 +218,7 @@ git push -u origin fix/portal-pflegegrad-display
 - Krótkie wyjaśnienie kontekstu / numer bug-a / link do issue
 
 ## Test plan
-- [ ] vitest run (146+ tests passing)
+- [ ] vitest run (163+ tests passing)
 - [ ] (jeśli dotyczy) deno onboard tests pass
 - [ ] (jeśli dotyczy) deno proxy tests pass
 - [ ] (jeśli dotyczy) e2e curl recipe na becie przeszedł — patrz CLAUDE.md
