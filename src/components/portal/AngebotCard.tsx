@@ -18,7 +18,7 @@ import { CustomSelect } from './CustomSelect';
 import type { PatientForm } from './shared';
 import { STEP_LABELS } from './shared';
 import type { MamamiaCustomer } from '../../lib/mamamia/types';
-import { mapMamamiaCustomerToPatientForm } from '../../lib/mamamia/mappers';
+import { mapMamamiaCustomerToPatientForm, germanySkillLabel } from '../../lib/mamamia/mappers';
 
 export const AngebotCard: FC<{
   lead?: Lead | null;
@@ -1079,7 +1079,9 @@ export const AngebotCard: FC<{
                           <button type="button" onClick={() => setPriceInfo(null)} className="text-gray-400 flex-shrink-0 font-bold">✕</button>
                         </div>
                       )}
-                      <div className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm text-gray-700 bg-gray-50 cursor-not-allowed">mind. B1</div>
+                      <div className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm text-gray-700 bg-gray-50 cursor-not-allowed">
+                        {germanySkillLabel(mmCustomer?.customer_caregiver_wish?.germany_skill) || '—'}
+                      </div>
                     </div>
                     <div>
                       <label className={labelCls}>

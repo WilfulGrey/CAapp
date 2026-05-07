@@ -544,6 +544,26 @@ function mamamiaHeightToForm(h: string | null | undefined): string {
   return h.endsWith('cm') ? h : `${h} cm`;
 }
 
+// Mamamia customer_caregiver_wish.germany_skill enum (verified prod 2026-04-28):
+//   level_0  → "A1"  (1% active)
+//   level_1  → "A2"  (1% — manual panel pick)
+//   level_2  → "A1-A2" (22% — calculator "grundlegend")
+//   level_3  → "B1-B2" (50% — calculator "kommunikativ")
+//   level_4  → "C1+"  (8% — calculator "sehr-gut")
+//   not_important → "Egal"
+// Bug #13g: AngebotCard step 4 displayed hardcoded "mind. B1" — replace
+// with this helper to read real value from mmCustomer.
+export function germanySkillLabel(level: string | null | undefined): string {
+  if (!level) return '';
+  if (level === 'level_0') return 'A1';
+  if (level === 'level_1') return 'A2';
+  if (level === 'level_2') return 'mind. A2';
+  if (level === 'level_3') return 'mind. B1';
+  if (level === 'level_4') return 'mind. C1';
+  if (level === 'not_important') return 'Egal';
+  return '';
+}
+
 function mamamiaWishGenderToForm(g: string | null | undefined): string {
   if (g === 'male') return 'Männlich';
   if (g === 'female') return 'Weiblich';
