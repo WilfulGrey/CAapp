@@ -132,6 +132,58 @@ export function formatEuro(amount: number): string {
 
 // ─── Map formularDaten → PatientForm prefill ──────────────────────────────────
 
+type FormularDatenField =
+  | 'mobilitaet'
+  | 'nachteinsaetze'
+  | 'geschlecht'
+  | 'deutschkenntnisse'
+  | 'fuehrerschein';
+
+const FORMULAR_DATEN_LABELS: Record<FormularDatenField, Record<string, string>> = {
+  mobilitaet: {
+    rollstuhl:    'Rollstuhlfähig',
+    gehfaehig:    'Gehfähig mit Hilfe',
+    bettlaegerig: 'Bettlägerig',
+    mobil:        'Selbstständig mobil',
+  },
+  nachteinsaetze: {
+    nein:         'Nein',
+    gelegentlich: 'Gelegentlich',
+    regelmaessig: 'Regelmäßig',
+  },
+  geschlecht: {
+    weiblich:  'Weiblich',
+    maennlich: 'Männlich',
+    egal:      'Egal',
+  },
+  deutschkenntnisse: {
+    grundlegend:  'Grundlegend',
+    kommunikativ: 'Kommunikativ',
+    'sehr-gut':   'Gut',
+  },
+  fuehrerschein: {
+    ja:   'Ja',
+    nein: 'Nein',
+    egal: 'Egal',
+  },
+};
+
+/**
+ * Format an enum value coming from formularDaten as a German display label.
+ * - Empty / nullish input → `fallback`
+ * - Known enum value → mapped label
+ * - Unknown enum value → raw value (so issues surface in QA instead of being silently swallowed)
+ */
+export function formatFormularDaten(
+  field: FormularDatenField,
+  raw: unknown,
+  fallback = '',
+): string {
+  if (raw == null || raw === '') return fallback;
+  const s = String(raw);
+  return FORMULAR_DATEN_LABELS[field][s] ?? s;
+}
+
 export interface PatientPrefill {
   anzahl?: '1' | '2';
   pflegegrad?: string;
@@ -144,38 +196,16 @@ export function prefillPatientFromLead(lead: Lead): PatientPrefill {
   const fd = lead.kalkulation?.formularDaten;
   if (!fd) return {};
 
-  // Mobilitaet mapping
-  const mobMap: Record<string, string> = {
-    rollstuhl:     'Rollstuhlfähig',
-    gehfaehig:     'Gehfähig mit Hilfe',
-    bettlaegerig:  'Bettlägerig',
-    mobil:         'Selbstständig mobil',
-  };
-
-  // Nachteinsätze mapping
-  const nachtMap: Record<string, string> = {
-    nein:          'Nein',
-    gelegentlich:  'Gelegentlich',
-    regelmaessig:  'Regelmäßig',
-  };
-
-  // Wunschgeschlecht mapping
-  const geschlechtMap: Record<string, string> = {
-    weiblich: 'Weiblich',
-    maennlich: 'Männlich',
-    egal:     'Egal',
-  };
-
-  const mob = String(fd.mobilitaet ?? '');
-  const nacht = String(fd.nachteinsaetze ?? '');
-  const geschl = String(fd.geschlecht ?? '');
+  const mob     = String(fd.mobilitaet       ?? '');
+  const nacht   = String(fd.nachteinsaetze   ?? '');
+  const geschl  = String(fd.geschlecht       ?? '');
   const weitere = String(fd.weitere_personen ?? '');
 
   return {
     anzahl:           weitere === 'ja' ? '2' : '1',
     pflegegrad:       fd.pflegegrad ? String(fd.pflegegrad) : undefined,
-    mobilitaet:       mob ? (mobMap[mob] ?? '') : undefined,
-    nacht:            nacht ? (nachtMap[nacht] ?? 'Nein') : undefined,
-    wunschGeschlecht: geschl ? (geschlechtMap[geschl] ?? '') : undefined,
+    mobilitaet:       mob    ? (FORMULAR_DATEN_LABELS.mobilitaet[mob]        ?? '')     : undefined,
+    nacht:            nacht  ? (FORMULAR_DATEN_LABELS.nachteinsaetze[nacht]  ?? 'Nein') : undefined,
+    wunschGeschlecht: geschl ? (FORMULAR_DATEN_LABELS.geschlecht[geschl]     ?? '')     : undefined,
   };
 }

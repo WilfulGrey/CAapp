@@ -15,6 +15,7 @@ import {
   formatEuro,
   cap,
   prefillPatientFromLead,
+  formatFormularDaten,
 } from '../lib/supabase';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -854,6 +855,9 @@ const AngebotCard: FC<{
   const kundenEmail = lead?.email ?? 'graefinnorman@gmx.de';
   const kundenName = lead ? leadDisplayName(lead) : 'Frau Von Norman';
   const greeting = lead ? leadGreeting(lead) : 'Sehr geehrte Frau Von Norman';
+  const fd = kalk?.formularDaten;
+  const sprachniveauDisplay  = formatFormularDaten('deutschkenntnisse', fd?.deutschkenntnisse, 'mind. B1');
+  const fuehrerscheinDisplay = formatFormularDaten('fuehrerschein',     fd?.fuehrerschein,     'Nicht erforderlich');
   const zuschüsse = kalk?.['zuschüsse']?.items?.filter(z => z.in_kalkulation) ?? [
     { label: 'Pflegegeld (Pflegegrad 2)', betrag_monatlich: 347 },
     { label: 'Entlastungsbudget (anteilig mt.)', betrag_monatlich: 295 },
@@ -1655,7 +1659,7 @@ const AngebotCard: FC<{
                           <button type="button" onClick={() => setPriceInfo(null)} className="text-gray-400 flex-shrink-0 font-bold">✕</button>
                         </div>
                       )}
-                      <div className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm text-gray-700 bg-gray-50 cursor-not-allowed">mind. B1</div>
+                      <div className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm text-gray-700 bg-gray-50 cursor-not-allowed">{sprachniveauDisplay}</div>
                     </div>
                     <div>
                       <label className="block text-sm font-semibold text-gray-600 mb-1.5 flex items-center gap-1.5">
@@ -1670,7 +1674,7 @@ const AngebotCard: FC<{
                           <button type="button" onClick={() => setPriceInfo(null)} className="text-gray-400 flex-shrink-0 font-bold">✕</button>
                         </div>
                       )}
-                      <div className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm text-gray-700 bg-gray-50 cursor-not-allowed">Nicht erforderlich</div>
+                      <div className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm text-gray-700 bg-gray-50 cursor-not-allowed">{fuehrerscheinDisplay}</div>
                     </div>
                   </div>
 
