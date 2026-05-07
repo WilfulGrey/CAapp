@@ -94,6 +94,14 @@ const CustomerPortalPage: FC = () => {
   // re-orders the page-1 batch by our own criteria (availability, freshness,
   // experience) rather than relying on Mamamia's server-side `order_by`.
   const { data: mmMatchings, loading: mmMatchingsLoading, error: mmMatchingsError } = useMatchings({ limit: 20 }, mmReady);
+  // Mamamia's default listMatchings excludes matchings where is_request=true
+  // (already-invited caregivers), so without this second call the invited
+  // ones simply vanish from the list after F5 — only their ids would survive
+  // via useInvitedCaregivers, but the seed-effect below can only flip the
+  // status of caregivers that are still in `effectiveMatched`. Fetching the
+  // invited matchings explicitly puts them back into the list with full
+  // caregiver data so the modal click and badge both work.
+  const { data: mmInvitedMatchings } = useMatchings({ limit: 100, filters: { is_request: true } }, mmReady);
   // Set of caregiver IDs already invited (Request rows in Mamamia). Used
   // below to seed nurseStatuses with 'invited' so the badge survives F5.
   const { data: invitedCaregiverIds, loading: invitedLoading, error: invitedError, refetch: refetchInvited } = useInvitedCaregivers(mmReady);
@@ -144,6 +152,24 @@ const CustomerPortalPage: FC = () => {
     const nowYear = new Date().getFullYear();
     const nowMs = new Date(nowIso).getTime();
 
+    // Merge open matchings (default listMatchings) + already-invited matchings
+    // (filters: is_request:true). Dedup by caregiver.id — a row should never
+    // appear in both lists, but be defensive against backend overlap.
+    const seen = new Set<number>();
+    const merged: typeof mmMatchings.data = [];
+    for (const m of mmMatchings.data) {
+      if (seen.has(m.caregiver.id)) continue;
+      seen.add(m.caregiver.id);
+      merged.push(m);
+    }
+    if (mmInvitedMatchings?.data) {
+      for (const m of mmInvitedMatchings.data) {
+        if (seen.has(m.caregiver.id)) continue;
+        seen.add(m.caregiver.id);
+        merged.push(m);
+      }
+    }
+
     // Numeric sort keys built from raw Mamamia fields. NaN guard: missing
     // values rank "best" — null available_from = "Sofort" should be top,
     // missing last_contact = treat as long ago (rank lower).
@@ -159,9 +185,8 @@ const CustomerPortalPage: FC = () => {
       return Number.isFinite(t) ? t : -Infinity;
     };
 
-    return mmMatchings.data
+    return merged
       .filter(m => m.is_show !== false)
-      .slice() // don't mutate the SWR cache array
       .sort((a, b) => {
         const av = availMs(a.caregiver.available_from);
         const bv = availMs(b.caregiver.available_from);
