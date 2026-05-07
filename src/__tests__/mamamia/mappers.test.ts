@@ -610,6 +610,75 @@ describe('mapMamamiaCustomerToPatientForm — weight/height passthrough', () => 
   });
 });
 
+// ─── Bug #13k — Pflegedienst description via dedicated fields ───────────
+// Mamamia mutation now accepts day_care_facility_description{,_de,_en,_pl}
+// (verified live 2026-05-07 — Customer 7659 sanity). Reverse mapper czyta
+// te pola pierwsze; legacy job_description segment jako fallback dla
+// customers utworzonych pre-Bug-#13k.
+
+describe('mapMamamiaCustomerToPatientForm — Bug #13k pflegedienst dedicated fields', () => {
+  function makeCustWithDedicatedDesc(
+    facility: 'yes' | 'no' | null,
+    descDe: string | null,
+    jobDescription: string | null = null,
+  ): MamamiaCustomer {
+    return {
+      id: 1, customer_id: 'x-1', status: 'active',
+      first_name: null, last_name: null, email: null, phone: null,
+      language_id: null, location_id: null, location_custom_text: null,
+      job_description: jobDescription, arrival_at: null, departure_at: null,
+      care_budget: null, gender: null, year_of_birth: null,
+      accommodation: null, caregiver_accommodated: null,
+      other_people_in_house: null, has_family_near_by: null,
+      smoking_household: null, internet: null, urbanization_id: null,
+      pets: null, is_pet_dog: null, is_pet_cat: null, is_pet_other: null,
+      day_care_facility: facility,
+      day_care_facility_description: descDe,
+      day_care_facility_description_de: descDe,
+      day_care_facility_description_en: null,
+      day_care_facility_description_pl: null,
+      patients: [], customer_caregiver_wish: null, customer_contracts: [],
+    } as unknown as MamamiaCustomer;
+  }
+
+  it('day_care_facility_description_de "freq: tasks" → split into haeufigkeit + aufgaben', () => {
+    const r = mapMamamiaCustomerToPatientForm(
+      makeCustWithDedicatedDesc('yes', '2× pro Woche: Wundversorgung, Injektionen'),
+    );
+    expect(r.pflegedienstHaeufigkeit).toBe('2× pro Woche');
+    expect(r.pflegedienstAufgaben).toBe('Wundversorgung, Injektionen');
+  });
+
+  it('dedicated field preferred over legacy job_description segment', () => {
+    const r = mapMamamiaCustomerToPatientForm(
+      makeCustWithDedicatedDesc(
+        'yes',
+        '3× pro Woche: NEW',
+        'Pflegedienst: 1× pro Woche: OLD',
+      ),
+    );
+    expect(r.pflegedienstHaeufigkeit).toBe('3× pro Woche');
+    expect(r.pflegedienstAufgaben).toBe('NEW');
+  });
+
+  it('day_care_facility_description without colon → all on Häufigkeit (free-text fallback)', () => {
+    const r = mapMamamiaCustomerToPatientForm(
+      makeCustWithDedicatedDesc('yes', 'Mehrmals pro Woche'),
+    );
+    expect(r.pflegedienstHaeufigkeit).toBe('Mehrmals pro Woche');
+    expect(r.pflegedienstAufgaben).toBeUndefined();
+  });
+
+  it('day_care_facility=no → ignores dedicated description (UX consistency)', () => {
+    const r = mapMamamiaCustomerToPatientForm(
+      makeCustWithDedicatedDesc('no', 'stale: data'),
+    );
+    expect(r.pflegedienst).toBe('Nein');
+    expect(r.pflegedienstHaeufigkeit).toBeUndefined();
+    expect(r.pflegedienstAufgaben).toBeUndefined();
+  });
+});
+
 // ─── Bug #13e — Pflegegrad "Kein/e" via natywne care_level=null ──────────
 // Mamamia panel oferuje "Keine" — w bazie `care_level: null`. Zweryfikowane
 // live 2026-05-07 na Customer 7658 (po ręcznym ustawieniu "brak" w panelu,

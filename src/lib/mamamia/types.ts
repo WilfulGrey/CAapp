@@ -96,9 +96,15 @@ export interface MamamiaCustomer {
   is_pet_cat?: boolean | null;
   is_pet_other?: boolean | null;
   day_care_facility?: string | null;
-  // Note: day_care_facility_description{,_de,_en,_pl} columns exist in
-  // Mamamia DB but are NOT exposed via UpdateCustomer GraphQL mutation
-  // input. Pflegedienst frequency+tasks ride on `job_description` instead.
+  // Bug #13k (2026-05-07): mutation now accepts these args (verified live
+  // via introspection + Customer 7659 sanity). Frontend reads from these
+  // dedicated fields instead of parsing `Pflegedienst:` segment from
+  // job_description. Legacy customers with the segment still parse via
+  // reverse mapper fallback for backward compat.
+  day_care_facility_description?: string | null;
+  day_care_facility_description_de?: string | null;
+  day_care_facility_description_en?: string | null;
+  day_care_facility_description_pl?: string | null;
   /** Patients — full shape for prefill, not just { id }. */
   patients?: MamamiaPatient[];
   customer_caregiver_wish?: MamamiaCaregiverWish | null;

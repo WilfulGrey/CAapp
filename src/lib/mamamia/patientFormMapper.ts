@@ -559,13 +559,16 @@ export interface MappedCustomerPatch {
   // ── Newly mapped (post-2026-04-28 audit) ──
   urbanization_id?: number;
   day_care_facility?: 'yes' | 'no';
-  // Note: Mamamia GraphQL UpdateCustomer mutation does NOT accept
-  // day_care_facility_description{,_de,_en,_pl} as input arguments
-  // (verified 2026-05-05 via beta — adding them to the mutation triggered
-  // GraphQL parse failure, breaking ALL updateCustomer calls). The DB
-  // columns exist but the mutation input type doesn't expose them.
-  // Workaround: append the pflegedienst description to job_description
-  // — that field IS settable and carries free-text agency-readable info.
+  // Bug #13k (2026-05-07): mutation now accepts dedicated description
+  // fields (verified live via introspection + Customer 7659 sanity).
+  // Pre-Bug-#13k workaround stuffed the pflegedienst description into
+  // job_description as `Pflegedienst: <freq>: <tasks>` — gone, dedicated
+  // fields used directly. Older customers that have legacy segment in
+  // job_description still parse cleanly via reverse mapper.
+  day_care_facility_description?: string;
+  day_care_facility_description_de?: string;
+  day_care_facility_description_en?: string;
+  day_care_facility_description_pl?: string;
   pets?: string;
   is_pet_dog?: boolean;
   is_pet_cat?: boolean;
@@ -700,26 +703,35 @@ export function mapPatientFormToUpdateCustomerInput(
   // is the single most common pair in active prod customers.
   patch.equipment_ids = [1, 2];
 
-  // ── job_description: auto-summary + medical diagnoses + pflegedienst ───
-  // Auto-summary gives caregivers / agency a quick picture of the
-  // situation since the form doesn't have a "krótki opis sytuacji"
-  // free-text. Users diagnoses and pflegedienst details append.
-  // Pflegedienst frequency+tasks land here because the dedicated
-  // day_care_facility_description column isn't writable via GraphQL
-  // UpdateCustomer (Mamamia mutation input doesn't expose it).
-  const jobParts: string[] = [];
-  jobParts.push(buildJobDescriptionSummary(form));
-  if (form.diagnosen) {
-    jobParts.push(`Diagnosen: ${form.diagnosen}`);
-  }
+  // ── Pflegedienst description — dedicated fields (Bug #13k) ────────────
+  // Mamamia panel "Jak często i jakie zadania wykonuje Pflegedienst?" is
+  // backed by `day_care_facility_description{,_de,_en,_pl}`. Schema
+  // accepts these args on UpdateCustomer (verified live 2026-05-07 on
+  // Customer 7659). Send 3 locales — Mamamia stores them independently.
+  // The no-locale `day_care_facility_description` mirrors `_de` so panel
+  // language fallback works.
   if (dcf === 'yes') {
     const desc = buildDayCareFacilityDescription(
       form.pflegedienstHaeufigkeit ?? '',
       form.pflegedienstAufgaben ?? '',
     );
     if (desc) {
-      jobParts.push(`Pflegedienst: ${desc.de}`);
+      patch.day_care_facility_description = desc.de;
+      patch.day_care_facility_description_de = desc.de;
+      patch.day_care_facility_description_en = desc.en;
+      patch.day_care_facility_description_pl = desc.pl;
     }
+  }
+
+  // ── job_description: auto-summary + medical diagnoses ─────────────────
+  // Auto-summary gives caregivers / agency a quick picture of the
+  // situation since the form doesn't have a "krótki opis sytuacji"
+  // free-text. Diagnosen append. Pflegedienst details NO longer pakowane
+  // tutaj — siedzą na dedykowanych polach (Bug #13k).
+  const jobParts: string[] = [];
+  jobParts.push(buildJobDescriptionSummary(form));
+  if (form.diagnosen) {
+    jobParts.push(`Diagnosen: ${form.diagnosen}`);
   }
   patch.job_description = jobParts.join(' | ');
 

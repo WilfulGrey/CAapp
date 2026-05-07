@@ -386,25 +386,28 @@ describe('mapPatientFormToUpdateCustomerInput', () => {
   // to job_description as `Pflegedienst: {frequency}: {tasks}`, separated
   // from other segments (Diagnosen, etc.) by ` | `.
 
-  describe('pflegedienst description on job_description', () => {
-    it('pflegedienst=Ja with frequency + tasks → job_description has Pflegedienst segment (DE)', () => {
-      // job_description carries: auto-summary | Diagnosen (if set) | Pflegedienst (if set)
-      // pflegedienstAufgaben uses '; ' as the internal separator so the
-      // task labels (which contain commas inside parens like
-      // "Grundpflege (Körperpflege, Anziehen)") can be split back
-      // unambiguously.
+  // Bug #13k (2026-05-07): Mamamia UpdateCustomer mutation now accepts
+  // dedicated `day_care_facility_description{,_de,_en,_pl}` args (verified
+  // live via introspection + Customer 7659 sanity). Pre-Bug-#13k workaround
+  // pakowało Pflegedienst frequency+tasks w job_description segment —
+  // gone, dedicated fields used instead.
+  describe('pflegedienst description on dedicated day_care_facility_description fields', () => {
+    it('pflegedienst=Ja → dedicated fields populated in 3 lokal, NIE w job_description', () => {
       const r = mapPatientFormToUpdateCustomerInput(makeForm({
         pflegedienst: 'Ja',
         pflegedienstHaeufigkeit: '2× pro Woche',
         pflegedienstAufgaben: 'Grundpflege (Körperpflege, Anziehen); Wundversorgung',
       }));
       expect(r.day_care_facility).toBe('yes');
-      expect(r.job_description).toContain(
-        'Pflegedienst: 2× pro Woche: Grundpflege (Körperpflege, Anziehen), Wundversorgung',
+      expect(r.day_care_facility_description).toBe(
+        '2× pro Woche: Grundpflege (Körperpflege, Anziehen), Wundversorgung',
       );
+      expect(r.day_care_facility_description_de).toBe(r.day_care_facility_description);
+      expect(r.day_care_facility_description_en).toBeTruthy();
+      expect(r.day_care_facility_description_pl).toBeTruthy();
+      // Bug #13k: job_description NIE zawiera już "Pflegedienst:" segment.
+      expect(r.job_description).not.toContain('Pflegedienst:');
       expect(r.job_description).toContain('24-Stunden-Betreuung gesucht');
-      // No dedicated description fields — they aren't writable on Mamamia.
-      expect((r as Record<string, unknown>).day_care_facility_description).toBeUndefined();
     });
 
     it('pflegedienst=Geplant treated like Ja (Mamamia has no third option)', () => {
@@ -414,45 +417,44 @@ describe('mapPatientFormToUpdateCustomerInput', () => {
         pflegedienstAufgaben: 'Medikamentengabe',
       }));
       expect(r.day_care_facility).toBe('yes');
-      expect(r.job_description).toContain('Pflegedienst: Täglich: Medikamentengabe');
+      expect(r.day_care_facility_description).toBe('Täglich: Medikamentengabe');
     });
 
-    it('diagnoses + pflegedienst combine in one job_description (separator " | ")', () => {
+    it('diagnoses + pflegedienst — diagnoses w job_description, pflegedienst w dedykowanych polach', () => {
       const r = mapPatientFormToUpdateCustomerInput(makeForm({
         diagnosen: 'Diabetes Typ 2',
         pflegedienst: 'Ja',
         pflegedienstHaeufigkeit: '1× pro Woche',
         pflegedienstAufgaben: 'Wundversorgung',
       }));
-      // Order: summary | Diagnosen | Pflegedienst
+      // job_description: summary + Diagnosen (no Pflegedienst segment)
       expect(r.job_description).toMatch(
-        /^24-Stunden-Betreuung gesucht\..* \| Diagnosen: Diabetes Typ 2 \| Pflegedienst: 1× pro Woche: Wundversorgung$/,
+        /^24-Stunden-Betreuung gesucht\..* \| Diagnosen: Diabetes Typ 2$/,
       );
+      // pflegedienst osobno
+      expect(r.day_care_facility_description).toBe('1× pro Woche: Wundversorgung');
     });
 
-    it('pflegedienst=Nein → no Pflegedienst segment in job_description (summary still present)', () => {
-      // Stale frequency/tasks must not leak through when customer says No.
+    it('pflegedienst=Nein → dedicated fields NIE wysyłane (no overwrite of stale)', () => {
       const r = mapPatientFormToUpdateCustomerInput(makeForm({
         pflegedienst: 'Nein',
         pflegedienstHaeufigkeit: 'Täglich', // stale leftover
         pflegedienstAufgaben: 'Medikamentengabe',
       }));
       expect(r.day_care_facility).toBe('no');
-      expect(r.job_description).toContain('24-Stunden-Betreuung gesucht');
+      expect(r.day_care_facility_description).toBeUndefined();
+      expect(r.day_care_facility_description_de).toBeUndefined();
       expect(r.job_description).not.toContain('Pflegedienst:');
     });
 
-    it('pflegedienst=Ja with empty follow-ups → no Pflegedienst segment (only summary)', () => {
-      // Validation in AngebotCard prevents save when follow-ups are blank,
-      // but this is a defense-in-depth: don't ship a literal `Pflegedienst: `
-      // segment with empty body if a malformed body slips through.
+    it('pflegedienst=Ja with empty follow-ups → no description (defense in depth)', () => {
       const r = mapPatientFormToUpdateCustomerInput(makeForm({
         pflegedienst: 'Ja',
         pflegedienstHaeufigkeit: '',
         pflegedienstAufgaben: '',
       }));
       expect(r.day_care_facility).toBe('yes');
-      expect(r.job_description).toContain('24-Stunden-Betreuung gesucht');
+      expect(r.day_care_facility_description).toBeUndefined();
       expect(r.job_description).not.toContain('Pflegedienst:');
     });
   });

@@ -720,24 +720,41 @@ export function mapMamamiaCustomerToPatientForm(
   if (cust.day_care_facility === 'yes') out.pflegedienst = 'Ja';
   else if (cust.day_care_facility === 'no') out.pflegedienst = 'Nein';
 
-  // Pflegedienst frequency+tasks live on `job_description` (the writable
-  // free-text field), formatted as `Pflegedienst: {frequency}: {tasks}`.
-  // Other parts of job_description ("Diagnosen: …") are separated by ` | `.
-  // Pull out just the Pflegedienst segment and split on the first colon
-  // to restore frequency + tasks selectors.
-  if (cust.day_care_facility === 'yes' && cust.job_description) {
-    const segments = cust.job_description.split(' | ');
-    const pflegedienstSeg = segments.find(s => s.startsWith('Pflegedienst: '));
-    if (pflegedienstSeg) {
-      const inner = pflegedienstSeg.slice('Pflegedienst: '.length);
-      const colonIdx = inner.indexOf(':');
+  // Pflegedienst frequency+tasks — Bug #13k (2026-05-07): czytane z
+  // dedykowanych pól `day_care_facility_description{,_de}` zamiast
+  // parsowania `Pflegedienst:` segment z job_description.
+  // Format pisany przez patientFormMapper: `{frequency}: {tasks}` lub
+  // sam `{frequency}` / `{tasks}` (bez colonu) gdy tylko jedno wpisane.
+  // Fallback do legacy job_description segment dla customers utworzonych
+  // pre-Bug-#13k (workaround #2 sprzed schematu update).
+  if (cust.day_care_facility === 'yes') {
+    const desc = cust.day_care_facility_description_de
+      ?? cust.day_care_facility_description
+      ?? null;
+    if (desc) {
+      const colonIdx = desc.indexOf(':');
       if (colonIdx >= 0) {
-        out.pflegedienstHaeufigkeit = inner.slice(0, colonIdx).trim();
-        out.pflegedienstAufgaben = inner.slice(colonIdx + 1).trim();
+        out.pflegedienstHaeufigkeit = desc.slice(0, colonIdx).trim();
+        out.pflegedienstAufgaben = desc.slice(colonIdx + 1).trim();
       } else {
-        // No inner colon — frequency-only or tasks-only legacy entry. Surface
-        // on Häufigkeit so user data isn't lost.
-        out.pflegedienstHaeufigkeit = inner.trim();
+        out.pflegedienstHaeufigkeit = desc.trim();
+      }
+    } else if (cust.job_description) {
+      // Legacy fallback: parse `Pflegedienst: …` segment from
+      // job_description (pre-Bug-#13k workaround). Customers saved
+      // their pflegedienst this way before schema changed; reading them
+      // back keeps the form populated.
+      const segments = cust.job_description.split(' | ');
+      const pflegedienstSeg = segments.find(s => s.startsWith('Pflegedienst: '));
+      if (pflegedienstSeg) {
+        const inner = pflegedienstSeg.slice('Pflegedienst: '.length);
+        const colonIdx = inner.indexOf(':');
+        if (colonIdx >= 0) {
+          out.pflegedienstHaeufigkeit = inner.slice(0, colonIdx).trim();
+          out.pflegedienstAufgaben = inner.slice(colonIdx + 1).trim();
+        } else {
+          out.pflegedienstHaeufigkeit = inner.trim();
+        }
       }
     }
   }

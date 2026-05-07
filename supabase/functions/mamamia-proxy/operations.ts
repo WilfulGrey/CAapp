@@ -54,6 +54,10 @@ export const GET_CUSTOMER = /* GraphQL */ `
       is_pet_cat
       is_pet_other
       day_care_facility
+      day_care_facility_description
+      day_care_facility_description_de
+      day_care_facility_description_en
+      day_care_facility_description_pl
       patients {
         id
         gender
@@ -357,11 +361,13 @@ export const STORE_REQUEST = /* GraphQL */ `
 `;
 
 // K4 — patient form persistence. id from session (not variables) — ownership.
-// Field set extended after 2026-04-28 mapping audit: pets/urbanization_id/
-// caregiver_accommodated/day_care_facility now propagate from the form,
-// and customer_caregiver_wish carries the caregiver-side prefs (gender,
-// smoking, tasks, other_wishes) instead of leaking into smoking_household
-// and job_description.
+//
+// 2026-05-07 (Bug #13k): added day_care_facility_description{,_de,_en,_pl}.
+// Verified live (introspection + sanity Customer 7659): schema accepts.
+// Pre-Bug-#13k pflegedienst frequency+tasks were stuffed into
+// job_description as `Pflegedienst: <freq>: <tasks>` segment because
+// gotcha #2 (2026-05-05) said the dedicated args broke the mutation.
+// Schema changed since — empirical verification supersedes the gotcha.
 export const UPDATE_CUSTOMER = /* GraphQL */ `
   mutation UpdateCustomer(
     $id: Int
@@ -380,6 +386,10 @@ export const UPDATE_CUSTOMER = /* GraphQL */ `
     $smoking_household: String
     $internet: String
     $day_care_facility: String
+    $day_care_facility_description: String
+    $day_care_facility_description_de: String
+    $day_care_facility_description_en: String
+    $day_care_facility_description_pl: String
     $caregiver_time_off: String
     $pets: String
     $is_pet_dog: Boolean
@@ -406,6 +416,10 @@ export const UPDATE_CUSTOMER = /* GraphQL */ `
       smoking_household: $smoking_household
       internet: $internet
       day_care_facility: $day_care_facility
+      day_care_facility_description: $day_care_facility_description
+      day_care_facility_description_de: $day_care_facility_description_de
+      day_care_facility_description_en: $day_care_facility_description_en
+      day_care_facility_description_pl: $day_care_facility_description_pl
       caregiver_time_off: $caregiver_time_off
       pets: $pets
       is_pet_dog: $is_pet_dog
