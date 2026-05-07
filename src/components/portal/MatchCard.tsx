@@ -96,8 +96,8 @@ export const MatchCard: FC<{
           Details <ChevronDown className="w-3.5 h-3.5 -rotate-90" />
         </button>
         {status === 'invited' ? (
-          <span className="flex items-center gap-1.5 text-xs text-gray-400">
-            <Check className="w-3.5 h-3.5 text-[#22A06B]" /> Einladung gesendet
+          <span className="flex items-center gap-1.5 text-xs font-bold text-[#22A06B] bg-[#E3F7EF] border border-[#B8E8D4] px-4 py-1.5 rounded-full">
+            <Check className="w-3 h-3 flex-shrink-0" /> Einladung gesendet
           </span>
         ) : invitePhase === 'sending' ? (
           <span className="flex items-center gap-1.5 text-xs font-bold text-[#9B1FA1] bg-[#F5EDF6] border border-[#D8A9DC] px-4 py-1.5 rounded-full">
