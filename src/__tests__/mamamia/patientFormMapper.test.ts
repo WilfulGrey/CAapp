@@ -307,6 +307,25 @@ describe('mapPatientFormToUpdateCustomerInput', () => {
     }
   });
 
+  it('Bug #13c: lift_description placeholder when heben=Ja (lift_id=1)', () => {
+    // Form has only Ja/Nein for "Heben erforderlich?" but Mamamia panel
+    // "Kiedy potrzebne jest podnoszenie?" requires non-empty description.
+    // Standard placeholder (3 locales) covers the gap — same pattern as
+    // night_operations_description (Bug #13a #2).
+    const r = mapPatientFormToUpdateCustomerInput(makeForm({ heben: 'Ja' }));
+    expect(r.patients?.[0].lift_id).toBe(1);
+    expect(r.patients?.[0].lift_description).toBeTruthy();
+    expect(r.patients?.[0].lift_description_de).toBeTruthy();
+    expect(r.patients?.[0].lift_description_en).toBeTruthy();
+    expect(r.patients?.[0].lift_description_pl).toBeTruthy();
+  });
+
+  it('Bug #13c: heben=Nein → no lift_description (placeholder skipped)', () => {
+    const r = mapPatientFormToUpdateCustomerInput(makeForm({ heben: 'Nein' }));
+    expect(r.patients?.[0].lift_id).toBe(2);
+    expect(r.patients?.[0].lift_description).toBeUndefined();
+  });
+
   it('Bug #13b: tool_ids omitted when mobility itself is empty (no overwrite)', () => {
     // Defensive — if user clears mobility (which shouldn't happen via UI
     // since it's required), don't blow away tool_ids by deriving from

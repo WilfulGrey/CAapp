@@ -353,6 +353,26 @@ function standardNightOpsDescription(no: string): {
   };
 }
 
+// Standard placeholder for `lift_description` when the patient form
+// reports lifting is required (Heben erforderlich = Ja → lift_id=1).
+// Mamamia panel "Kiedy potrzebne jest podnoszenie?" shows empty without
+// it. Skipped for lift_id=2 (No — no lift needed).
+function standardLiftDescription(liftId: number): {
+  de: string;
+  en: string;
+  pl: string;
+} | null {
+  if (liftId !== 1) return null;
+  return {
+    de:
+      'Konkrete Hilfe beim Transfer (z.B. Aufstehen, Umsetzen, Bett↔Rollstuhl) wird direkt mit der Pflegekraft abgestimmt.',
+    en:
+      'Specific transfer assistance (e.g. standing up, repositioning, bed↔wheelchair) will be coordinated with the caregiver.',
+    pl:
+      'Konkretna pomoc przy transferze (np. wstawanie, zmiana pozycji, łóżko↔wózek) będzie uzgadniana z opiekunką.',
+  };
+}
+
 // Build a single patient object for UpdateCustomer.patients[].
 // Threading existing `patientId` is critical — Mamamia SILENTLY DROPS fields
 // like night_operations and incontinence when patient is new (no id) inside
@@ -406,7 +426,19 @@ function buildPatient(
   if (groesse) p.height = normalizeBucket(groesse);
 
   const lift = liftIdToApi(heben);
-  if (lift !== null) p.lift_id = lift;
+  if (lift !== null) {
+    p.lift_id = lift;
+    // lift_description (4 locales) — auto-filled when lift required
+    // (lift_id=1 = Yes). Form does not collect transfer details; panel
+    // UI "Kiedy potrzebne jest podnoszenie?" requires non-empty text.
+    const ldesc = standardLiftDescription(lift);
+    if (ldesc) {
+      p.lift_description = ldesc.de;
+      p.lift_description_de = ldesc.de;
+      p.lift_description_en = ldesc.en;
+      p.lift_description_pl = ldesc.pl;
+    }
+  }
 
   // Dementia gradation lives in dementia_description (4 locales).
   // Mamamia.dementia is just yes/no — without this, "Mittelgradig" vs
