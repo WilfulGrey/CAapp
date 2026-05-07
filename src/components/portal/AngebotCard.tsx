@@ -138,8 +138,14 @@ export const AngebotCard: FC<{
 
   // updatePatient — wrap setPatient for user actions. Never call this
   // from programmatic effects.
+  // Bug #13h: any user-driven edit reverts saved → false so the form
+  // again shows "Unvollständig / Bitte ergänzen" until next Save click.
+  // Pre-Bug-#13h the chevron click handler stomped saved=false unconditionally
+  // — peeking the form (without editing) reset state and triggered autosave
+  // with `_isDraft: true`, breaking refresh persistence.
   const updatePatient = (updater: (prev: PatientForm) => PatientForm) => {
     userDirty.current = true;
+    setSaved(false);
     setPatient(updater);
   };
 
@@ -639,7 +645,7 @@ export const AngebotCard: FC<{
       {/* ── Row 2: Patientendaten ── */}
       <div>
         <button
-          onClick={() => { setPatientOpen(o => !o); setSaved(false); }}
+          onClick={() => setPatientOpen(o => !o)}
           className="w-full flex items-center gap-3 px-4 py-3.5 hover:bg-gray-50 transition-colors text-left"
         >
           <div className={`w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 ${allComplete && saved ? 'bg-[#E3F7EF]' : 'bg-amber-50'}`}>
