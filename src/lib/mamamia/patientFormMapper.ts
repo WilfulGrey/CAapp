@@ -36,10 +36,21 @@ const MOBILITY_BY_LABEL: Record<string, number> = {
   'Bettlägerig': 5,
 };
 
-function parsePflegegrad(label: string): number | null {
-  if (!label) return null;
+// Mamamia panel oferuje "Keine" jako natywną opcję — w bazie zapisana
+// jako `care_level: null` (zweryfikowane live na Customer 7658 po
+// ręcznym ustawieniu "brak" w panelu, 2026-05-07). Form label "Kein/e"
+// → null verbatim. NIE wymyślamy mapowania na 1/0 + sentinel tagi —
+// patrz CLAUDE.md "ŚWIĘTA ZASADA NR 1.5".
+//
+// Sygnatura zwraca:
+//   - number 1-5: explicit Pflegegrad
+//   - null: "Kein/e" (explicit no Pflegegrad — Mamamia "Keine")
+//   - undefined: empty / unparseable label (don't touch field)
+function parsePflegegrad(label: string): number | null | undefined {
+  if (!label) return undefined;
+  if (label === 'Kein/e') return null;
   const m = label.match(/\d/);
-  return m ? Number(m[0]) : null;
+  return m ? Number(m[0]) : undefined;
 }
 
 function parseYear(year: string): number | null {
@@ -399,8 +410,10 @@ function buildPatient(
   const y = parseYear(year);
   if (y) p.year_of_birth = y;
 
+  // care_level: 1-5 = Pflegegrad N; null = "Keine" (explicit no PG);
+  // undefined = field untouched. Mamamia akceptuje null natywnie.
   const pg = parsePflegegrad(pflegegrad);
-  if (pg) p.care_level = pg;
+  if (pg !== undefined) p.care_level = pg;
 
   const mob = MOBILITY_BY_LABEL[mobility];
   if (mob !== undefined) {
@@ -495,7 +508,9 @@ function buildJobDescriptionSummary(form: PatientFormShape): string {
 
   // Headline: 24h-Betreuung + Pflegegrad
   const pg = parsePflegegrad(form.pflegegrad);
-  if (pg) {
+  if (pg === null) {
+    parts.push('24-Stunden-Betreuung gesucht. Kein offizieller Pflegegrad.');
+  } else if (pg) {
     parts.push(`24-Stunden-Betreuung gesucht. Pflegegrad ${pg}.`);
   } else {
     parts.push('24-Stunden-Betreuung gesucht.');

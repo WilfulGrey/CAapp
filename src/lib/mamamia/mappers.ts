@@ -595,10 +595,20 @@ function mamamiaPatientToForm(
   mobilitaet?: string; heben?: string; demenz?: string;
   inkontinenz?: string; nacht?: string;
 } {
+  // Pflegegrad: Mamamia natywnie wspiera "Keine" jako `care_level: null`
+  // (zweryfikowane live na Customer 7658 po ręcznym ustawieniu "brak"
+  // w panelu, 2026-05-07). Mapowanie 1:1 — null → "Kein/e",
+  // 1-5 → "Pflegegrad N", undefined/0 → "" (no prefill).
+  let pflegegrad = '';
+  if (p.care_level === null) pflegegrad = 'Kein/e';
+  else if (typeof p.care_level === 'number' && p.care_level >= 1 && p.care_level <= 5) {
+    pflegegrad = `Pflegegrad ${p.care_level}`;
+  }
+
   return {
     geschlecht: p.gender ? (MAMAMIA_GENDER_TO_FORM[p.gender] ?? '') : '',
     geburtsjahr: p.year_of_birth ? String(p.year_of_birth) : '',
-    pflegegrad: p.care_level ? `Pflegegrad ${p.care_level}` : '',
+    pflegegrad,
     gewicht: mamamiaWeightToForm(p.weight),
     groesse: mamamiaHeightToForm(p.height),
     mobilitaet: p.mobility_id ? (MAMAMIA_MOBILITY_TO_FORM[p.mobility_id] ?? '') : '',

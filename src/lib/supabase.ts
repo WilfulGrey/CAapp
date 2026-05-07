@@ -211,7 +211,15 @@ export function prefillPatientFromLead(lead: Lead): PatientPrefill {
   const isCouple = betreuungFuer === 'ehepaar';
 
   // Resolved labels — computed once, reused for Person 1 + 2.
-  const pflegegradLabel = fd.pflegegrad ? String(fd.pflegegrad) : undefined;
+  // Pflegegrad: kalkulator allows 0 ("Kein/e" — keine offizielle Einstufung).
+  // Map to the form's "Kein/e" label so the customer sees their actual
+  // calculator pick instead of empty / mm-rehydrate "Pflegegrad 2"
+  // (which used to be the onboard fallback for 0).
+  const rawPg = fd.pflegegrad;
+  const pflegegradLabel: string | undefined =
+    rawPg === 0 ? 'Kein/e'
+    : (typeof rawPg === 'number' && rawPg >= 1 && rawPg <= 5) ? String(rawPg)
+    : undefined;
   const mobilitaetLabel = mob ? (mobMap[mob] ?? '') : undefined;
   const nachtLabel = nacht ? (nachtMap[nacht] ?? 'Nein') : undefined;
 

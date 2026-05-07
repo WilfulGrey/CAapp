@@ -307,6 +307,30 @@ describe('mapPatientFormToUpdateCustomerInput', () => {
     }
   });
 
+  it('Bug #13e: pflegegrad="Kein/e" → care_level=null (Mamamia natywne "Keine")', () => {
+    // Mamamia panel ma natywną opcję "Keine" zapisaną jako care_level=null.
+    // Zweryfikowane live 2026-05-07 na Customer 7658. NIE wymyślamy
+    // mapowania 1 + sentinel tag — care_level=null jest forwardowane verbatim.
+    const r = mapPatientFormToUpdateCustomerInput(makeForm({ pflegegrad: 'Kein/e' }));
+    expect(r.patients?.[0].care_level).toBeNull();
+    // job_description summary nadal wspomina "Kein offizieller Pflegegrad"
+    // jako opisowy text dla agency (NIE jako round-trip sentinel).
+    expect(r.job_description).toContain('Kein offizieller Pflegegrad');
+  });
+
+  it('Bug #13f: weight/height ASCII-hyphen passthrough (form options now use ASCII)', () => {
+    // Form options changed from en-dash "70–90 kg" to ASCII "70-90 kg"
+    // 2026-05-07 to match Mamamia panel dropdown enum. Mapper still
+    // normalizes any stale en-dash drafts as defense-in-depth.
+    const r1 = mapPatientFormToUpdateCustomerInput(makeForm({ gewicht: '70-90 kg', groesse: '165-175 cm' }));
+    expect(r1.patients?.[0].weight).toBe('70-90 kg');
+    expect(r1.patients?.[0].height).toBe('165-175 cm');
+    // Defense in depth: en-dash from old localStorage drafts still normalized
+    const r2 = mapPatientFormToUpdateCustomerInput(makeForm({ gewicht: '70–90 kg', groesse: '165–175 cm' }));
+    expect(r2.patients?.[0].weight).toBe('70-90 kg');
+    expect(r2.patients?.[0].height).toBe('165-175 cm');
+  });
+
   it('Bug #13c: lift_description placeholder when heben=Ja (lift_id=1)', () => {
     // Form has only Ja/Nein for "Heben erforderlich?" but Mamamia panel
     // "Kiedy potrzebne jest podnoszenie?" requires non-empty description.

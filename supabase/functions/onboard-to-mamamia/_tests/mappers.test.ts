@@ -123,8 +123,15 @@ Deno.test("mapCareLevel: valid 1-5 passes through", () => {
   }
 });
 
-Deno.test("mapCareLevel: 0 or out-of-range → 2 (default)", () => {
-  assertEquals(mapCareLevel(makeFormularDaten({ pflegegrad: 0 })), 2);
+Deno.test("mapCareLevel: 0 (kalkulator 'Kein/e') → null (Mamamia natywne 'Keine')", () => {
+  // Mamamia panel oferuje "Keine" zapisane jako care_level=null.
+  // Zweryfikowane live 2026-05-07 na Customer 7658 po ręcznym
+  // ustawieniu "brak" w panelu (query zwróciło null).
+  // Forward verbatim: pflegegrad=0 → null. Bug #13e.
+  assertEquals(mapCareLevel(makeFormularDaten({ pflegegrad: 0 })), null);
+});
+
+Deno.test("mapCareLevel: out-of-range / missing → 2 (most-common active default)", () => {
   assertEquals(mapCareLevel(makeFormularDaten({ pflegegrad: 99 })), 2);
   assertEquals(mapCareLevel({} as FormularDaten), 2);
 });

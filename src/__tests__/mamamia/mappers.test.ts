@@ -609,3 +609,48 @@ describe('mapMamamiaCustomerToPatientForm — weight/height passthrough', () => 
     expect(r.groesse).toBe('161-170 cm');
   });
 });
+
+// ─── Bug #13e — Pflegegrad "Kein/e" via natywne care_level=null ──────────
+// Mamamia panel oferuje "Keine" — w bazie `care_level: null`. Zweryfikowane
+// live 2026-05-07 na Customer 7658 (po ręcznym ustawieniu "brak" w panelu,
+// query zwróciło null). NIE wymyślamy mapowania na 1 + sentinel tag.
+
+describe('mapMamamiaCustomerToPatientForm — Bug #13e Kein/e via care_level=null', () => {
+  function makeCustWithPg(careLevel: number | null): MamamiaCustomer {
+    return {
+      id: 1, customer_id: 'x-1', status: 'active',
+      first_name: null, last_name: null, email: null, phone: null,
+      language_id: null, location_id: null, location_custom_text: null,
+      job_description: null, arrival_at: null, departure_at: null,
+      care_budget: null, gender: null, year_of_birth: null,
+      accommodation: null, caregiver_accommodated: null,
+      other_people_in_house: null, has_family_near_by: null,
+      smoking_household: null, internet: null, urbanization_id: null,
+      pets: null, is_pet_dog: null, is_pet_cat: null, is_pet_other: null,
+      day_care_facility: null,
+      patients: [{
+        id: 11, gender: null, year_of_birth: null, care_level: careLevel,
+        mobility_id: null, weight: null, height: null, night_operations: null,
+        dementia: null, dementia_description: null, incontinence: null,
+        incontinence_feces: null, incontinence_urine: null, smoking: null,
+        lift_id: null,
+      }],
+      customer_caregiver_wish: null, customer_contracts: [],
+    } as unknown as MamamiaCustomer;
+  }
+
+  it('care_level=null → "Kein/e" (natywna opcja Mamamia "Keine")', () => {
+    const r = mapMamamiaCustomerToPatientForm(makeCustWithPg(null));
+    expect(r.pflegegrad).toBe('Kein/e');
+  });
+
+  it('care_level=1 → "Pflegegrad 1" (real PG1)', () => {
+    const r = mapMamamiaCustomerToPatientForm(makeCustWithPg(1));
+    expect(r.pflegegrad).toBe('Pflegegrad 1');
+  });
+
+  it('care_level=3 → "Pflegegrad 3"', () => {
+    const r = mapMamamiaCustomerToPatientForm(makeCustWithPg(3));
+    expect(r.pflegegrad).toBe('Pflegegrad 3');
+  });
+});

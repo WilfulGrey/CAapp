@@ -30,10 +30,18 @@ export function mapMobilityToId(fd: FormularDaten): number {
 }
 
 // ─── Care level (Pflegegrad) ────────────────────────────────────────────────
-// Valid 1-5. Mamamia required. Default 2 if missing/invalid.
-export function mapCareLevel(fd: FormularDaten): number {
+// Mamamia panel "Keine" = `care_level: null` (zweryfikowane live na
+// Customer 7658, 2026-05-07). Calculator allows pflegegrad=0 → null
+// verbatim. NIE wymyślamy mapowania (patrz CLAUDE.md "ŚWIĘTA ZASADA NR 1.5").
+//
+// Sygnatura:
+//   - number 1-5: explicit Pflegegrad
+//   - null: "Keine" (explicit no PG — Mamamia native option)
+//   - missing/invalid: default 2 (most-common active value, defensive)
+export function mapCareLevel(fd: FormularDaten): number | null {
   const v = fd?.pflegegrad;
   if (typeof v === "number" && v >= 1 && v <= 5) return v;
+  if (v === 0) return null;
   return 2;
 }
 

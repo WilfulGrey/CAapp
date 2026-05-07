@@ -42,6 +42,48 @@ Naruszenie tej zasady = regression. Review + rewrite.
 
 ---
 
+## 🩸 ŚWIĘTA ZASADA NR 1.5: NIGDY NIE WYMYŚLAJ MAPOWAŃ ENUM ZA BACKEND
+
+**ZAKAZANE — KONKRETNE PRZYKŁADY:**
+
+- `kalkulator pflegegrad=0` → `mapuję na care_level=1` "bo Mamamia enum to
+  pewnie 1-5" — **NIE!** Sprawdź pierwszy czy Mamamia ma natywne `0` /
+  `null` / `"none"` / "Keine" w panelu/enum.
+- `form picked "Kein/e"` → `wysyłam care_level=1 + tag w job_description`
+  jako round-trip workaround — **NIE!** To fałszuje dane: agency widzi
+  "Pflegegrad 1" zamiast "Kein". To bezpośrednie naruszenie ŚWIĘTEJ
+  ZASADY NR 1 (NO DUMB DATA, NO SOFT FALLBACKS).
+- `Mamamia odrzuca moje założone X` → `mapuję na "closest valid Y"` —
+  **NIE!** Albo Y jest semantycznie tym samym co X (= legalne mapowanie),
+  albo nie i wtedy zmieniamy UX (wycinamy opcję z form), nie fałszujemy
+  wartości.
+
+**OBOWIĄZKOWA WERYFIKACJA przed jakimkolwiek "default fallback" /
+"workaround mapping":**
+
+1. **Otwórz panel Mamamia** (browser MCP, screenshot od user-a) i zobacz
+   jakie opcje dropdown faktycznie ma. "Keine" / "0" / "Brak" widoczne?
+   To jest natywna wartość enum, użyj jej.
+2. **GraphQL introspection** — sprawdź `__type(name: "PatientInputType")
+   { inputFields { name type { ... } } }` żeby zobaczyć czy field jest
+   nullable / jaki ma enum values.
+3. **Live test na becie** — wyślij raw value (0, null, omitted) i zobacz
+   czy mutation zwraca error vs success. Sandbox safe.
+4. **Zapytaj user-a** — "Czy panel Mamamia ma opcję X?" — jedno pytanie
+   < długi commit message tłumaczący hack.
+
+**Anti-pattern z incydentu 2026-05-07** (Bug #13e — Test77): wymyśliłem
+że "Kein/e" → `care_level=1` + sentinel tag w `job_description`. User:
+"w mamamia mam opcje keine!!!!!" — Mamamia panel od początku miał
+natywną opcję dla "no Pflegegrad". Hack stał się ślepym mappingiem
+fałszującym dane. Round-tripping przez sentinel tag w innym polu to
+**szczególnie obrzydliwy anti-pattern** — buduje kruchy ad-hoc protokół
+ponad źle zaprojektowanym mapperem.
+
+**Naruszenie tej zasady = block + rewrite + szczerze przeprosić user-a.**
+
+---
+
 ## 🩸 Święta zasada nr 2: DOKUMENTACJA ŻYJE Z KODEM
 
 **Każda zmiana dotykająca data flow / integracji / mappingu / schemy ZOBOWIĄZUJE
@@ -553,6 +595,8 @@ Wszystkie z 2026-04 → 2026-05. Lista ma być wyczerpana — jak coś znów
 | 13b | **Patient form save — `tool_ids` rozjeżdża się z `mobility_id` po edycji**. Na Customer 7655 patient[1]: couple-onboard ustawił obu pacjentom `mobility_id=5 (bedridden) + tools=[4,6] (hoist+bed)`. User w patient form zmienił Person 2 na `mobility_id=1 (mobile)`, ale `tools=[4,6]` zostały — niemożliwa kombinacja na panelu Mamamii. Przyczyna: `patientFormMapper.buildPatient` aktualizował tylko `mobility_id`, NIE wysyłał `tool_ids` → proxy `PRESERVE_QUERY` re-fetcha aktualne tools z bazy i je re-injectuje | src/lib/mamamia/patientFormMapper.ts (`deriveToolIds(mobility_id)` mirror onboard `mapToolIds`) | `buildPatient` zawsze wysyła `tool_ids = deriveToolIds(mobility_id)` gdy mobility jest ustawiana — nadpisuje stale tools fresh derivation. NEVER include id 7 (Others) — triggeruje required free-text "Jakie inne narzędzia są używane?". |
 | 13c | **Patient form save — `lift_description` puste mimo `Heben erforderlich = Ja`**. Panel Mamamii "Kiedy potrzebne jest podnoszenie?" wymaga niepustego opisu, ale form ma tylko Ja/Nein bez free-text dla szczegółów transferu. Symptom: na Customer 7656 (Test7) pole `lift_description` zostawało null mimo `lift_id=1` | src/lib/mamamia/patientFormMapper.ts (`standardLiftDescription(liftId)`) | `buildPatient` ustawia 3-locale placeholder `lift_description{,_de,_en,_pl}` gdy `lift_id === 1` (Yes — lift required). Skipped dla `lift_id === 2` (No). Analogicznie do `night_operations_description` z #13a. |
 | 13d | **Patient form save — panel "Lokalizacja opieki" puste mimo wpisanego PLZ+Ort**. patientFormMapper wysyłał tylko `location_custom_text` (np. `"80332 Munchen"`) bo `mapPatientFormToUpdateCustomerInput` nie resolwowało PLZ → location_id. Mamamia panel dropdown wymaga canonicznego `location_id` z tabeli Locations — `location_custom_text` jest fallbackiem manual-entry. Symptom: Customer 7655 (Test66) miał `location_id=null + location_custom_text="80332 Munchen"`, panel pokazywał lokalizację jako pustą | src/pages/CustomerPortalPage.tsx (onSaveToMamamia) | Przed `mapPatientFormToUpdateCustomerInput`, gdy `form.plz` matchuje `/^\d{4,5}$/`, callMamamia('searchLocations', {search: plz}) → wybierz pierwszy match z `country_code='DE'` → przekaż jego `id` jako `locationId` opt do mappera. Mapper preferuje `locationId` → `location_id`; lookup failure swallow → fallback do `location_custom_text` (defense in depth). |
+| 13e | **Pflegegrad 0 ("Kein/e") nie round-trippuje**. Kalkulator pozwala wybrać `pflegegrad: 0` (klient bez oficjalnej einstufung), ale: (1) prefill ignorował 0 (`fd.pflegegrad ? ... : undefined` — falsy check); (2) form save z "Kein/e" → `parsePflegegrad` zwracał `null` → patientFormMapper omittował `care_level` → Mamamia trzymała stare 2. Symptom: Customer 7658 (Test77) wybrał Kein/e w formularzu, panel pokazywał care_level=2 | src/lib/supabase.ts (`prefillPatientFromLead`), src/lib/mamamia/patientFormMapper.ts (`parsePflegegrad`, `buildJobDescriptionSummary`, `buildPatient`), src/lib/mamamia/mappers.ts (`mamamiaPatientToForm`), supabase/functions/onboard-to-mamamia/{mappers,types}.ts | **Mamamia natywnie wspiera "Keine" jako `care_level: null`** (zweryfikowane live 2026-05-07 na Customer 7658 po ręcznym ustawieniu "brak" w panelu). Forward 1:1: kostenrechner `pflegegrad=0` → onboard `care_level: null` → Mamamia "Keine". Form "Kein/e" → patientFormMapper `care_level: null` → Mamamia "Keine". Reverse mapper: `care_level === null` → `"Kein/e"`. Sygnatury zwracają `number \| null`; `PatientInput.care_level: number \| null`. **Pierwsza wersja tego fixa wymyśliła hack `care_level=1 + sentinel tag w job_description`** — fałszowała dane (agency widział "Pflegegrad 1" zamiast "Keine"). User scolded; reguła zapisana drukowanymi w "ŚWIĘTA ZASADA NR 1.5". |
+| 13f | **Weight/height en-dash w form options** — Mamamia panel dropdown enum używa ASCII hyphen, jakikolwiek customer-side wybór (np. `"50–70 kg"` z form options) nie matchował dropdownu i panel pokazywał pole jako puste. Jednocześnie reverse mapper zwracał ASCII (Mamamia stored ASCII) → `<CustomSelect value="50-70 kg" options=["50–70 kg", ...]>` nie pasowało → form dropdown TEŻ pokazywał empty na reload | src/components/portal/AngebotCard.tsx (form options) | Wymiana en-dash `–` na ASCII hyphen `-` we wszystkich weight/height options — `"50–70 kg"` → `"50-70 kg"`, etc. patientFormMapper `normalizeBucket` zostaje jako defensive backstop dla starych localStorage drafts. |
 
 ---
 

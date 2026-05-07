@@ -85,7 +85,10 @@ export interface Lead {
 export interface PatientInput {
   gender?: "male" | "female" | "not_important" | null;
   year_of_birth?: number;
-  care_level: number;       // required by Mamamia (1-5)
+  // Mamamia care_level: 1-5 lub null ("Keine" — natywna opcja panelu).
+  // Zweryfikowane live 2026-05-07 na Customer 7658 (po ręcznym ustawieniu
+  // "brak" w panelu, query zwróciło care_level: null).
+  care_level: number | null;
   mobility_id: number;      // required by Mamamia to prevent checkSuperJob3 crash
   // lift_id active-customers distribution (verified prod sweep 2026-04-28):
   //   2 (No)  = 53%, 1 (Yes) = 42%, 3 = 7%. **lift_id=4 (not_important)
