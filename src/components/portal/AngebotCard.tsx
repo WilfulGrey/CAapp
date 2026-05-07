@@ -757,12 +757,12 @@ export const AngebotCard: FC<{
                         <div>
                           <label className={labelCls}>Gewicht <span className="font-normal text-gray-400">(optional)</span></label>
                           <CustomSelect value={patient.gewicht} onChange={v => updatePatient(p=>({...p,gewicht:v}))}
-                            options={['Unter 50 kg','50-70 kg','70-90 kg','90-110 kg','Über 110 kg']} />
+                            options={['Unter 50 kg','51-60 kg','61-70 kg','71-80 kg','81-90 kg','91-100 kg','101-110 kg','Über 110 kg']} />
                         </div>
                         <div>
                           <label className={labelCls}>Größe <span className="font-normal text-gray-400">(optional)</span></label>
                           <CustomSelect value={patient.groesse} onChange={v => updatePatient(p=>({...p,groesse:v}))}
-                            options={['Unter 155 cm','155-165 cm','165-175 cm','175-185 cm','Über 185 cm']} />
+                            options={['Unter 151 cm','151-160 cm','161-170 cm','171-180 cm','181-190 cm','Über 190 cm']} />
                         </div>
                       </div>
                     </>
@@ -794,12 +794,12 @@ export const AngebotCard: FC<{
                           <div>
                             <label className={labelCls}>Gewicht <span className="font-normal text-gray-400">(optional)</span></label>
                             <CustomSelect value={patient.p2_gewicht} onChange={v => updatePatient(p=>({...p,p2_gewicht:v}))}
-                              options={['Unter 50 kg','50-70 kg','70-90 kg','90-110 kg','Über 110 kg']} />
+                              options={['Unter 50 kg','51-60 kg','61-70 kg','71-80 kg','81-90 kg','91-100 kg','101-110 kg','Über 110 kg']} />
                           </div>
                           <div>
                             <label className={labelCls}>Größe <span className="font-normal text-gray-400">(optional)</span></label>
                             <CustomSelect value={patient.p2_groesse} onChange={v => updatePatient(p=>({...p,p2_groesse:v}))}
-                              options={['Unter 155 cm','155-165 cm','165-175 cm','175-185 cm','Über 185 cm']} />
+                              options={['Unter 151 cm','151-160 cm','161-170 cm','171-180 cm','181-190 cm','Über 190 cm']} />
                           </div>
                         </div>
                       </div>

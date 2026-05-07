@@ -160,13 +160,13 @@ describe('mapPatientFormToUpdateCustomerInput', () => {
     expect(r.patients?.[0].id).toBeUndefined();
   });
 
-  it('weight/height: en-dash normalized to ASCII hyphen (Mamamia panel format)', () => {
-    // Pre-Bug-#13a Customer 7653 stored "70–90 kg" (en-dash) — Mamamia
-    // panel rendered the field empty because its dropdown enum uses
-    // hyphen-formatted buckets. Fix: normalize en-dash on the way out.
+  it('weight/height: normalized (en-dash → ASCII, suffix stripped)', () => {
+    // Bug #13a (en-dash → ASCII) + Bug #13f (strip " kg"/" cm"): Mamamia
+    // stores raw bucket "70-90", "155-165" — no unit. Form labels keep
+    // suffix for UX clarity; mapper strips on send.
     const r = mapPatientFormToUpdateCustomerInput(makeForm());
-    expect(r.patients?.[0].weight).toBe('70-90 kg');
-    expect(r.patients?.[0].height).toBe('155-165 cm');
+    expect(r.patients?.[0].weight).toBe('70-90');
+    expect(r.patients?.[0].height).toBe('155-165');
   });
 
   it('location_id preferred over plz/ort custom_text', () => {
@@ -318,17 +318,27 @@ describe('mapPatientFormToUpdateCustomerInput', () => {
     expect(r.job_description).toContain('Kein offizieller Pflegegrad');
   });
 
-  it('Bug #13f: weight/height ASCII-hyphen passthrough (form options now use ASCII)', () => {
-    // Form options changed from en-dash "70–90 kg" to ASCII "70-90 kg"
-    // 2026-05-07 to match Mamamia panel dropdown enum. Mapper still
-    // normalizes any stale en-dash drafts as defense-in-depth.
-    const r1 = mapPatientFormToUpdateCustomerInput(makeForm({ gewicht: '70-90 kg', groesse: '165-175 cm' }));
-    expect(r1.patients?.[0].weight).toBe('70-90 kg');
-    expect(r1.patients?.[0].height).toBe('165-175 cm');
-    // Defense in depth: en-dash from old localStorage drafts still normalized
-    const r2 = mapPatientFormToUpdateCustomerInput(makeForm({ gewicht: '70–90 kg', groesse: '165–175 cm' }));
-    expect(r2.patients?.[0].weight).toBe('70-90 kg');
-    expect(r2.patients?.[0].height).toBe('165-175 cm');
+  it('Bug #13f: weight/height — strip " kg"/" cm" suffix before send (Mamamia stores raw bucket)', () => {
+    // Verified live 2026-05-07 on Customer 7658 after manual panel pick:
+    // weight="71-80" / height="171-180" (no suffix). Form labels keep
+    // the unit suffix for UX clarity; mapper strips it on outbound.
+    const r = mapPatientFormToUpdateCustomerInput(makeForm({ gewicht: '71-80 kg', groesse: '171-180 cm' }));
+    expect(r.patients?.[0].weight).toBe('71-80');
+    expect(r.patients?.[0].height).toBe('171-180');
+  });
+
+  it('Bug #13f: "Unter X" / "Über X" labels also lose suffix on send', () => {
+    // Boundary buckets — same suffix-strip rule applies.
+    const r = mapPatientFormToUpdateCustomerInput(makeForm({ gewicht: 'Unter 50 kg', groesse: 'Über 190 cm' }));
+    expect(r.patients?.[0].weight).toBe('Unter 50');
+    expect(r.patients?.[0].height).toBe('Über 190');
+  });
+
+  it('Bug #13f: legacy en-dash drafts still normalize to ASCII + suffix-strip', () => {
+    // Old localStorage drafts saved with en-dash form options pre-2026-05-07.
+    const r = mapPatientFormToUpdateCustomerInput(makeForm({ gewicht: '70–90 kg', groesse: '165–175 cm' }));
+    expect(r.patients?.[0].weight).toBe('70-90');
+    expect(r.patients?.[0].height).toBe('165-175');
   });
 
   it('Bug #13c: lift_description placeholder when heben=Ja (lift_id=1)', () => {

@@ -311,13 +311,16 @@ function wishDrivingGearboxToApi(v: string): 'automatic' | 'manual' | null {
   return null;
 }
 
-// Bucket strings (e.g. "70–90 kg" / "175–185 cm") use en-dash in form
-// options, but Mamamia panel dropdown values use ASCII hyphen. Without
-// normalization the panel UI shows the field as empty even though the
-// raw value is in the DB. Verified 2026-05-07: Customer 7653 stored
-// "70–90 kg" (en-dash) → panel rendered weight as unselected.
+// Bucket strings (e.g. "71-80 kg" / "171-180 cm") get two transforms
+// before reaching Mamamia:
+//   1. en-dash "–" → ASCII hyphen "-" (defense for legacy localStorage
+//      drafts saved with en-dash form options pre-2026-05-07).
+//   2. strip " kg" / " cm" suffix — Mamamia panel stores raw bucket
+//      ("71-80", "171-180") without unit. Verified live 2026-05-07 on
+//      Customer 7658 after manual panel pick: weight="71-80",
+//      height="171-180". Reverse mapper re-adds suffix for form display.
 function normalizeBucket(s: string): string {
-  return s.replace(/–/g, '-');
+  return s.replace(/–/g, '-').replace(/\s*(?:kg|cm)$/, '');
 }
 
 // Tool ids derived from mobility — mirrors
