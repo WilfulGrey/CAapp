@@ -5,6 +5,8 @@ import { displayName } from '../components/portal/shared';
 import {
   fetchLeadByToken,
   Lead,
+  cap,
+  formatEuro,
 } from '../lib/supabase';
 import { useMamamiaSession } from '../hooks/useMamamiaSession';
 import { useCustomer, useJobOffer, useApplications, useMatchings, useCaregiver, useInvitedCaregivers } from '../lib/mamamia/hooks';
@@ -564,7 +566,7 @@ const CustomerPortalPage: FC = () => {
       )}
 
       {/* Navbar */}
-      <nav className="sticky top-0 z-40 bg-white border-b border-gray-100">
+      <nav className="sticky top-0 z-40" style={{background:'white', boxShadow:'0 1px 0 #E5E3DF, 0 2px 8px rgba(0,0,0,0.06)'}}>
         <div className="max-w-3xl mx-auto px-4 py-3 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <img src="/LOGO-PRIMUNDUS.webp" alt="Primundus" className="h-6" />
@@ -572,7 +574,7 @@ const CustomerPortalPage: FC = () => {
           <div className="flex items-center gap-2">
             <button
               onClick={() => setShowContactPopup(true)}
-              className="flex items-center gap-1.5 bg-[#F5EDF6] hover:bg-[#EDD9EF] text-[#9B1FA1] border border-[#D8A9DC] rounded-full px-3 py-1.5 text-xs font-semibold transition-colors"
+              className="flex items-center gap-1.5 bg-white hover:bg-[#F8F7F5] text-[#8B7355] border border-[#E5E3DF] rounded-full px-3 py-1.5 text-xs font-semibold transition-colors"
             >
               <Phone className="w-3.5 h-3.5" />
               Hilfe
@@ -584,17 +586,127 @@ const CustomerPortalPage: FC = () => {
       {acceptedApp ? (
         <BookedScreen app={acceptedApp} onNurseClick={setSelectedNurse} />
       ) : (
-      <div className="max-w-3xl mx-auto px-4 py-6 space-y-4">
+      <>
+      {/* ── Hero (full-width gradient) ── */}
+      {(() => {
+        const kalk = lead?.kalkulation;
+        const anrede = lead?.anrede_text ?? lead?.anrede;
+        const nachname = cap(lead?.nachname);
+        const vorname = cap(lead?.vorname);
+        const heroNameLine = lead
+          ? (anrede && nachname
+              ? `${anrede} ${nachname}`
+              : nachname || vorname || '')
+          : 'Herr Mustermann';
+        const heroBrutto = kalk ? formatEuro(kalk.bruttopreis) : null;
+        const heroEigen = kalk ? formatEuro(kalk.eigenanteil) : null;
+        const heroZuschuss = kalk ? formatEuro(kalk['zuschüsse']?.gesamt ?? 0) : null;
+        return (
+          <div className="relative overflow-hidden" style={{background:'linear-gradient(135deg, #6B5444 0%, #8B7355 55%, #A18973 100%)'}}>
+            <div className="absolute -top-12 -right-12 w-52 h-52 rounded-full" style={{background:'rgba(255,255,255,0.06)'}} />
+            <div className="absolute -bottom-10 -left-10 w-40 h-40 rounded-full" style={{background:'rgba(255,255,255,0.06)'}} />
+            <div className="relative max-w-3xl mx-auto px-5 pt-8 pb-3">
+              <p className="text-[15px] font-medium mb-3" style={{color:'rgba(255,255,255,0.8)'}}>
+                Guten Tag{heroNameLine ? `, ${heroNameLine}` : ''}.
+              </p>
+              <h1 className="text-[1.65rem] font-bold text-white leading-tight mb-2">
+                Ihr Angebot ist fertig. 🎉
+              </h1>
+              <p className="text-[14px] leading-relaxed mb-5" style={{color:'rgba(255,255,255,0.8)'}}>
+                Prüfen Sie Ihr persönliches Angebot, ergänzen Sie die Patientendaten und laden Sie Ihre Wunsch-Pflegekraft direkt ein.
+              </p>
+              <div className="inline-flex items-center gap-2 rounded-full px-4 py-2" style={{background:'rgba(255,255,255,0.15)', border:'1px solid rgba(255,255,255,0.3)'}}>
+                <Check className="w-3.5 h-3.5 flex-shrink-0" strokeWidth={3} style={{color:'rgba(255,255,255,0.9)'}} />
+                <span className="text-[14px] font-medium" style={{color:'rgba(255,255,255,0.95)'}}>Angebot kostenlos &amp; unverbindlich</span>
+              </div>
 
-        {/* ── Intro ── */}
-        <div className="px-1 pt-2">
-          <h1 className="text-2xl font-bold text-gray-900 leading-snug mb-2">
-            Unser Kundenportal.<br />Transparent. In Ihren Händen.
-          </h1>
-          <p className="text-sm text-gray-500 leading-relaxed">
-            Kein Rätselraten — Angebot ansehen, passende Betreuungskräfte einladen und Bewerbungen direkt annehmen.
-          </p>
+              {heroBrutto && (
+                <div className="grid grid-cols-3 gap-2.5 mt-5 mb-2">
+                  {[
+                    { label: 'Gesamtkosten', value: heroBrutto, sub: 'pro Monat' },
+                    { label: 'Ihr Anteil', value: heroEigen, sub: 'nach Zuschüssen' },
+                    { label: 'Zuschüsse', value: heroZuschuss, sub: 'monatlich' },
+                  ].map(c => (
+                    <div key={c.label} className="rounded-2xl px-2 py-3.5 text-center" style={{background:'rgba(255,255,255,0.15)'}}>
+                      <div className="text-[10px] uppercase tracking-wide mb-1" style={{color:'rgba(255,255,255,0.65)'}}>{c.label}</div>
+                      <div className="text-[1.1rem] font-bold text-white">{c.value}</div>
+                      <div className="text-[10px] mt-0.5" style={{color:'rgba(255,255,255,0.55)'}}>{c.sub}</div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+            <svg viewBox="0 0 390 28" className="w-full block" style={{marginBottom:'-1px'}} preserveAspectRatio="none">
+              <path d="M0,14 C100,28 290,0 390,14 L390,28 L0,28 Z" fill="#F8F7F5"/>
+            </svg>
+          </div>
+        );
+      })()}
+
+      {/* ── SECTION: Ihr Angebot (header + price card + conditions card + PDF) ── */}
+      <div style={{background:'#F8F7F5'}}>
+        <div className="max-w-3xl mx-auto">
+          <div className="px-5 pt-6 pb-4 flex items-center justify-between">
+            <div>
+              <h2 className="text-[1.1rem] font-bold" style={{color:'#3D3D3D'}}>Ihr Angebot</h2>
+              <div className="mt-1.5 h-[2px] w-10 rounded-full" style={{background:'#8B7355'}} />
+            </div>
+            <span className="text-[12px] font-semibold px-3 py-1 rounded-full" style={{background:'#E3F7EF', color:'#2a9a6f'}}>
+              100 % risikofrei
+            </span>
+          </div>
+
+          {(() => {
+            const brutto = lead?.kalkulation?.bruttopreis ?? 3050;
+            const tagessatz = Math.round(brutto / 30);
+            const items = [
+              { text: 'Täglich kündbar' },
+              { text: 'Tagesgenaue Abrechnung' },
+              { text: 'Kosten entstehen immer erst, wenn Pflegekraft vor Ort ist' },
+            ];
+            return (
+              <div className="px-4 pb-4">
+                <div className="rounded-2xl border px-5 pt-5 pb-4" style={{background:'white', borderColor:'#E5E3DF'}}>
+                  <p className="text-[12px] font-semibold uppercase tracking-widest mb-2" style={{color:'#8B7355'}}>Betreuungskosten</p>
+                  <div className="flex items-center gap-4">
+                    <div className="flex items-baseline gap-1 flex-shrink-0" style={{minWidth:'55%'}}>
+                      <span className="text-[2.2rem] font-bold leading-none" style={{color:'#3D3D3D'}}>{formatEuro(tagessatz)}</span>
+                      <span className="text-[15px]" style={{color:'#8B8B8B'}}>/&nbsp;Tag</span>
+                    </div>
+                    <p className="text-[13px] leading-snug flex-1" style={{color:'#ABABAB'}}>inkl. Steuern, Gebühren &amp; Sozialabgaben</p>
+                  </div>
+                  <p className="text-[15px] mt-3 leading-snug" style={{color:'#3D3D3D'}}>zzgl. 125 € Anreisekosten pro Strecke sowie Kost &amp; Logis</p>
+                </div>
+
+                <div className="rounded-2xl overflow-hidden border mt-3" style={{background:'white', borderColor:'#E5E3DF'}}>
+                  <div className="px-5 pt-4 pb-1">
+                    <p className="text-[12px] font-semibold uppercase tracking-widest" style={{color:'#8B7355'}}>Unsere fairen Konditionen</p>
+                  </div>
+                  {items.map((item, i, arr) => (
+                    <div key={i} className={`flex items-start gap-3 px-5 py-3.5 ${i < arr.length - 1 ? 'border-b' : ''}`} style={{borderColor:'#E5E3DF'}}>
+                      <div className="w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5" style={{background:'#E3F7EF'}}>
+                        <Check className="w-3 h-3" strokeWidth={3} style={{color:'#2a9a6f'}} />
+                      </div>
+                      <span className="text-[15px] leading-snug" style={{color:'#3D3D3D'}}>{item.text}</span>
+                    </div>
+                  ))}
+                </div>
+
+                <div className="mt-2 flex justify-center">
+                  <button onClick={() => {}} className="flex items-center gap-1.5 transition-opacity hover:opacity-70">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" style={{width:14,height:14,color:'#3D3D3D'}}>
+                      <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="12" x2="12" y2="18"/><polyline points="9 15 12 18 15 15"/>
+                    </svg>
+                    <span className="text-[13px] underline" style={{color:'#3D3D3D'}}>Angebot als PDF herunterladen</span>
+                  </button>
+                </div>
+              </div>
+            );
+          })()}
         </div>
+      </div>
+
+      <div className="max-w-3xl mx-auto px-4 py-6 space-y-4">
 
         {/* ── Kombinierte Karte: Identität + Anfrage + Stepper ── */}
         <AngebotCard
@@ -787,6 +899,7 @@ const CustomerPortalPage: FC = () => {
         </div>
 
       </div>
+      </>
       )}
 
       {/* Angebot prüfen Modal */}
