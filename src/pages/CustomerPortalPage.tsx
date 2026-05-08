@@ -1,5 +1,5 @@
 import { useState, useEffect, FC } from 'react';
-import { Check, Bell, Phone, AlertCircle, ChevronDown } from 'lucide-react';
+import { Check, Bell, Phone, AlertCircle, AlertTriangle, ChevronDown } from 'lucide-react';
 import { Nurse } from '../types';
 import { displayName } from '../components/portal/shared';
 import {
@@ -708,6 +708,25 @@ const CustomerPortalPage: FC = () => {
 
       <div className="max-w-3xl mx-auto px-4 py-6 space-y-4">
 
+        {/* ── SECTION HEADER: Passende Pflegekräfte ── */}
+        <div className="px-1">
+          <h2 className="text-[1.1rem] font-bold" style={{color:'#3D3D3D'}}>Passende Pflegekräfte</h2>
+          <div className="mt-1.5 h-[2px] w-10 rounded-full" style={{background:'#8B7355'}} />
+        </div>
+
+        {/* ── INFO-Box: Profil unvollständig ── */}
+        {!patientSaved && (
+          <div className="rounded-2xl border px-5 py-4 flex gap-3" style={{background:'#FFFBF5', borderColor:'#E8D9C0'}}>
+            <AlertTriangle className="w-5 h-5 flex-shrink-0 mt-0.5" style={{color:'#D97706'}} />
+            <div>
+              <p className="text-[15px] font-semibold" style={{color:'#3D3D3D'}}>Achtung: Profil unvollständig</p>
+              <p className="text-[15px] mt-1 leading-relaxed" style={{color:'#8B8B8B'}}>
+                Damit Sie Bewerbungen erhalten und Pflegekräfte einladen können, vervollständigen Sie bitte das Patientenprofil hier.
+              </p>
+            </div>
+          </div>
+        )}
+
         {/* ── Kombinierte Karte: Identität + Anfrage + Stepper ── */}
         <AngebotCard
           lead={lead}
@@ -805,13 +824,11 @@ const CustomerPortalPage: FC = () => {
             <>
               {visibleNurses.length > 0 && (
                 <div>
-                  <div className="flex items-center justify-between mb-3 px-1">
-                    <h2 className="text-base font-bold text-gray-900">
-                      Für Sie vorausgewählte Pflegekräfte
-                      <span className="text-sm font-normal text-gray-400 ml-2">({visibleNurses.length})</span>
-                    </h2>
-                  </div>
-
+                  {!patientSaved && (
+                    <p className="text-[14px] leading-relaxed pb-2 px-1" style={{color:'#3D3D3D'}}>
+                      Damit sich Pflegekräfte bewerben bzw. Sie diese einladen können, vervollständigen Sie bitte die Patienteninformationen.
+                    </p>
+                  )}
                   <div className="space-y-3">
                     {visibleNurses.map(({ nurse, i, status }) => (
                       <MatchCard key={i} nurse={nurse} status={status} onNurseClick={() => openNurseFromMatch(nurse, i)} onInvite={() => canInviteNurse(i)} onInviteConfirm={() => confirmInviteNurse(i, displayName(nurse.name))} />
