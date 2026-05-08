@@ -589,7 +589,6 @@ const CustomerPortalPage: FC = () => {
       <>
       {/* ── Hero (full-width gradient) ── */}
       {(() => {
-        const kalk = lead?.kalkulation;
         const anrede = lead?.anrede_text ?? lead?.anrede;
         const nachname = cap(lead?.nachname);
         const vorname = cap(lead?.vorname);
@@ -598,9 +597,6 @@ const CustomerPortalPage: FC = () => {
               ? `${anrede} ${nachname}`
               : nachname || vorname || '')
           : 'Herr Mustermann';
-        const heroBrutto = kalk ? formatEuro(kalk.bruttopreis) : null;
-        const heroEigen = kalk ? formatEuro(kalk.eigenanteil) : null;
-        const heroZuschuss = kalk ? formatEuro(kalk['zuschüsse']?.gesamt ?? 0) : null;
         return (
           <div className="relative overflow-hidden" style={{background:'linear-gradient(135deg, #6B5444 0%, #8B7355 55%, #A18973 100%)'}}>
             <div className="absolute -top-12 -right-12 w-52 h-52 rounded-full" style={{background:'rgba(255,255,255,0.06)'}} />
@@ -619,22 +615,6 @@ const CustomerPortalPage: FC = () => {
                 <Check className="w-3.5 h-3.5 flex-shrink-0" strokeWidth={3} style={{color:'rgba(255,255,255,0.9)'}} />
                 <span className="text-[14px] font-medium" style={{color:'rgba(255,255,255,0.95)'}}>Angebot kostenlos &amp; unverbindlich</span>
               </div>
-
-              {heroBrutto && (
-                <div className="grid grid-cols-3 gap-2.5 mt-5 mb-2">
-                  {[
-                    { label: 'Gesamtkosten', value: heroBrutto, sub: 'pro Monat' },
-                    { label: 'Ihr Anteil', value: heroEigen, sub: 'nach Zuschüssen' },
-                    { label: 'Zuschüsse', value: heroZuschuss, sub: 'monatlich' },
-                  ].map(c => (
-                    <div key={c.label} className="rounded-2xl px-2 py-3.5 text-center" style={{background:'rgba(255,255,255,0.15)'}}>
-                      <div className="text-[10px] uppercase tracking-wide mb-1" style={{color:'rgba(255,255,255,0.65)'}}>{c.label}</div>
-                      <div className="text-[1.1rem] font-bold text-white">{c.value}</div>
-                      <div className="text-[10px] mt-0.5" style={{color:'rgba(255,255,255,0.55)'}}>{c.sub}</div>
-                    </div>
-                  ))}
-                </div>
-              )}
             </div>
             <svg viewBox="0 0 390 28" className="w-full block" style={{marginBottom:'-1px'}} preserveAspectRatio="none">
               <path d="M0,14 C100,28 290,0 390,14 L390,28 L0,28 Z" fill="#F8F7F5"/>
@@ -873,7 +853,7 @@ const CustomerPortalPage: FC = () => {
               { n: '4', title: 'Nächsten Einsatz planen', desc: 'Zur Mitte des laufenden Einsatzes starten wir die Planung der Nachfolge. Neue Pflegekräfte und alle Infos erscheinen direkt hier im Portal.' },
             ].map((s) => (
               <div key={s.n} className="flex items-start gap-3 px-4 py-3">
-                <div className="w-5 h-5 rounded-full bg-[#F5EDF6] text-[#9B1FA1] text-[10px] font-bold flex items-center justify-center flex-shrink-0 mt-0.5">{s.n}</div>
+                <div className="w-5 h-5 rounded-full bg-[#F8F7F5] text-[#8B7355] text-[10px] font-bold flex items-center justify-center flex-shrink-0 mt-0.5">{s.n}</div>
                 <div>
                   <p className="text-sm font-semibold text-gray-800">{s.title}</p>
                   <p className="text-xs text-gray-500 mt-0.5">{s.desc}</p>
