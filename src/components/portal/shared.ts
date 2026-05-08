@@ -46,7 +46,7 @@ export function nurseLevel(assignments: number): {
   emoji: string;
   cls: string;
 } {
-  if (assignments >= 36) return { label: 'Platin',  emoji: '🏆', cls: 'bg-violet-50 text-violet-600 border-violet-200' };
+  if (assignments >= 36) return { label: 'Platin',  emoji: '🏆', cls: 'bg-amber-50 text-amber-700 border-amber-200' };
   if (assignments >= 25) return { label: 'Gold',    emoji: '🥇', cls: 'bg-yellow-50 text-yellow-600 border-yellow-300' };
   if (assignments >= 15) return { label: 'Silber',  emoji: '🥈', cls: 'bg-slate-100 text-slate-500 border-slate-300' };
   if (assignments >= 8)  return { label: 'Bronze',  emoji: '🥉', cls: 'bg-amber-50 text-amber-700 border-amber-200' };
