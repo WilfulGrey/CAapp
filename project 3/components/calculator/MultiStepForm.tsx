@@ -35,19 +35,6 @@ export function MultiStepForm() {
 
   const displayCountRef = useRef(dailyBase);
   const [displayCount, setDisplayCount] = useState(dailyBase);
-  const [liveVariation, setLiveVariation] = useState(0);
-
-  useEffect(() => {
-    const tick = () => {
-      const delta = Math.random() < 0.5 ? -1 : 1;
-      setLiveVariation(prev => {
-        const next = prev + delta;
-        return Math.max(-2, Math.min(2, next));
-      });
-    };
-    const id = setInterval(tick, 4000 + Math.random() * 3000);
-    return () => clearInterval(id);
-  }, []);
 
   useEffect(() => {
     const target = getMatchingCount();
@@ -441,7 +428,7 @@ export function MultiStepForm() {
             <div className="inline-flex items-center gap-1.5 bg-[#F0F7F1] border border-[#A8D5B0] rounded-full px-3 py-1">
               <span className="w-1.5 h-1.5 rounded-full bg-[#4CAF50] animate-pulse flex-shrink-0"></span>
               <span className="text-[12px] text-[#3A6B42]">
-                <span className="font-bold tabular-nums">{displayCount + liveVariation}</span>
+                <span className="font-bold tabular-nums">{displayCount}</span>
                 {currentStep === 1 ? ' direkt verfügbare Pflegekräfte' : ' Pflegekräfte passen zu Ihrer Suche'}
               </span>
             </div>
