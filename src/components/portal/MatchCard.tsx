@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import type { FC } from 'react';
-import { Check, ChevronDown } from 'lucide-react';
+import { Check, ChevronDown, UserPlus } from 'lucide-react';
 import type { Nurse } from '../../types';
 import type { NurseStatus } from './shared';
 import { nurseLevel, displayName, initials } from './shared';
@@ -43,7 +43,7 @@ export const MatchCard: FC<{
           ? 'opacity-40 border-gray-200'
           : status === 'invited'
           ? 'border-gray-200'
-          : 'border-gray-200 hover:border-[#9B1FA1] hover:shadow-[0_4px_16px_rgba(155,31,161,0.12)]'
+          : 'border-gray-200 hover:border-[#8B7355] hover:shadow-[0_4px_16px_rgba(139,115,85,0.12)]'
       }`}
     >
       <div className="px-4 pt-4 pb-3 cursor-pointer active:bg-gray-50" onClick={onNurseClick}>
@@ -75,13 +75,13 @@ export const MatchCard: FC<{
             <div className="flex items-center gap-2 mb-1">
               <div className="flex gap-0.5">
                 {bars.map((f, i) => (
-                  <div key={i} className={`w-3 h-1.5 rounded-full ${f ? 'bg-[#9B1FA1]' : 'bg-gray-200'}`} />
+                  <div key={i} className={`w-3 h-1.5 rounded-full ${f ? 'bg-[#8B7355]' : 'bg-gray-200'}`} />
                 ))}
               </div>
               <span className="text-sm text-gray-500">Deutsch {nurse.language.level}</span>
             </div>
             <p className="text-sm text-gray-500 truncate">
-              <span className="font-semibold text-[#9B1FA1]">{nurse.experience}</span>
+              <span className="font-semibold text-[#8B7355]">{nurse.experience}</span>
               {nurse.history && <span> · {nurse.history.assignments} Eins. · Ø {Math.round(nurse.history.avgDurationMonths * 4.3)} Wo.</span>}
             </p>
           </div>
@@ -91,7 +91,7 @@ export const MatchCard: FC<{
       <div className="border-t border-gray-100 px-4 py-2.5 flex items-center justify-between">
         <button
           onClick={onNurseClick}
-          className="text-sm font-semibold text-[#9B1FA1] flex items-center gap-1 hover:underline"
+          className="text-sm font-semibold text-[#8B7355] flex items-center gap-1 hover:underline"
         >
           Details <ChevronDown className="w-3.5 h-3.5 -rotate-90" />
         </button>
@@ -100,7 +100,7 @@ export const MatchCard: FC<{
             <Check className="w-3 h-3 flex-shrink-0" /> Einladung gesendet
           </span>
         ) : invitePhase === 'sending' ? (
-          <span className="flex items-center gap-1.5 text-xs font-bold text-[#9B1FA1] bg-[#F5EDF6] border border-[#D8A9DC] px-4 py-1.5 rounded-full">
+          <span className="flex items-center gap-1.5 text-xs font-bold text-[#8B7355] bg-[#F8F7F5] border border-[#E5E3DF] px-4 py-1.5 rounded-full">
             <svg className="w-3 h-3 animate-spin flex-shrink-0" viewBox="0 0 24 24" fill="none">
               <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3"/>
               <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"/>
@@ -114,8 +114,9 @@ export const MatchCard: FC<{
         ) : (
           <button
             onClick={e => { e.stopPropagation(); handleInvite(); }}
-            className="text-xs font-bold bg-[#F5EDF6] text-[#9B1FA1] border border-[#D8A9DC] px-4 py-1.5 rounded-full hover:bg-[#EDD9EF] transition-colors active:scale-95"
+            className="flex items-center gap-1.5 text-xs font-bold bg-[#E76F63] text-white px-4 py-1.5 rounded-full hover:bg-[#D65E52] transition-colors active:scale-95 shadow-sm"
           >
+            <UserPlus className="w-3.5 h-3.5" />
             Einladen
           </button>
         )}
