@@ -256,7 +256,7 @@ export const AngebotCard: FC<{
   };
   const allComplete = STEP_LABELS.every((_, i) => stepComplete(i));
 
-  const inputCls = 'w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm text-gray-800 placeholder-gray-300 focus:outline-none focus:border-[#9B1FA1] focus:ring-2 focus:ring-[#9B1FA1]/10 transition-all bg-white';
+  const inputCls = 'w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm text-gray-800 placeholder-gray-300 focus:outline-none focus:border-[#8B7355] focus:ring-2 focus:ring-[#8B7355]/10 transition-all bg-white';
   const labelCls = 'block text-sm font-medium text-gray-500 mb-1.5';
   // 2-column grid rows: align label boxes so a wrapped label (e.g.
   // "Heben erforderlich? *" vs single-line "Demenz *") doesn't shift its
@@ -460,8 +460,8 @@ export const AngebotCard: FC<{
             <p className="text-sm font-bold text-gray-900">{displayAngebot}</p>
             <p className="text-sm text-gray-500 mt-0.5">{careStart}</p>
           </div>
-          <div className="w-7 h-7 rounded-full bg-[#F5EDF6] flex items-center justify-center flex-shrink-0">
-            <ChevronDown className={`w-4 h-4 text-[#9B1FA1] transition-transform ${angebotOpen ? 'rotate-180' : ''}`} />
+          <div className="w-7 h-7 rounded-full bg-[#F8F7F5] flex items-center justify-center flex-shrink-0">
+            <ChevronDown className={`w-4 h-4 text-[#8B7355] transition-transform ${angebotOpen ? 'rotate-180' : ''}`} />
           </div>
         </button>
 
@@ -493,8 +493,8 @@ export const AngebotCard: FC<{
             <div className="space-y-4">
               <div className="rounded-xl border border-gray-200 overflow-hidden divide-y divide-gray-100 shadow-sm">
                 {/* Header */}
-                <div className="flex items-center justify-between px-4 py-3 bg-[#F5EDF6]">
-                  <span className="text-sm font-bold text-[#9B1FA1]">Ihre Konditionen</span>
+                <div className="flex items-center justify-between px-4 py-3 bg-[#F8F7F5]">
+                  <span className="text-sm font-bold text-[#8B7355]">Ihre Konditionen</span>
                 </div>
                 {/* Kosten */}
                 {[
@@ -533,9 +533,9 @@ export const AngebotCard: FC<{
                   <p className="text-sm font-bold text-gray-900">Warum Primundus…</p>
                 </div>
                 {[
-                  { icon: <svg className="w-4 h-4 text-[#9B1FA1]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z" /></svg>, label: 'Über 20 Jahre Erfahrung' },
-                  { icon: <svg className="w-4 h-4 text-[#9B1FA1]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" /></svg>, label: 'Über 60.000+ Einsätze' },
-                  { icon: <svg className="w-4 h-4 text-[#9B1FA1]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg>, label: 'Persönlicher Ansprechpartner 7 Tage die Woche' },
+                  { icon: <svg className="w-4 h-4 text-[#8B7355]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z" /></svg>, label: 'Über 20 Jahre Erfahrung' },
+                  { icon: <svg className="w-4 h-4 text-[#8B7355]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" /></svg>, label: 'Über 60.000+ Einsätze' },
+                  { icon: <svg className="w-4 h-4 text-[#8B7355]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg>, label: 'Persönlicher Ansprechpartner 7 Tage die Woche' },
                 ].map((r, i) => (
                   <div key={i} className="flex items-center gap-3 px-4 py-2 bg-white">
                     <span className="flex-shrink-0">{r.icon}</span>
@@ -588,7 +588,7 @@ export const AngebotCard: FC<{
             </div>
 
             {/* ── PDF Download ── */}
-            <button onClick={downloadPdf} className="flex items-center gap-2 text-xs font-semibold text-[#9B1FA1] border border-[#D8A9DC] bg-[#F5EDF6] rounded-lg px-3 py-2 hover:bg-[#EDD9EF] transition-colors w-full justify-center">
+            <button onClick={downloadPdf} className="flex items-center gap-2 text-xs font-semibold text-[#8B7355] border border-[#C5B49A] bg-[#F8F7F5] rounded-lg px-3 py-2 hover:bg-[#EBE2D5] transition-colors w-full justify-center">
               <svg className="w-3.5 h-3.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
               Angebot als PDF herunterladen
             </button>
@@ -602,14 +602,14 @@ export const AngebotCard: FC<{
                 {/* Step 1 */}
                 <button
                   onClick={() => { setAngebotOpen(false); setPatientOpen(true); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
-                  className="w-full flex items-center gap-3 px-4 py-3 hover:bg-[#F5EDF6] transition-colors text-left group"
+                  className="w-full flex items-center gap-3 px-4 py-3 hover:bg-[#F8F7F5] transition-colors text-left group"
                 >
-                  <div className="w-6 h-6 rounded-full bg-[#9B1FA1] text-white text-xs font-bold flex items-center justify-center flex-shrink-0">1</div>
+                  <div className="w-6 h-6 rounded-full bg-[#8B7355] text-white text-xs font-bold flex items-center justify-center flex-shrink-0">1</div>
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-semibold text-[#9B1FA1]">Profildaten vervollständigen</p>
+                    <p className="text-sm font-semibold text-[#8B7355]">Profildaten vervollständigen</p>
                     <p className="text-xs text-gray-500">Angaben zum Patienten & Haushalt</p>
                   </div>
-                  <ChevronDown className="w-4 h-4 text-[#9B1FA1] -rotate-90 flex-shrink-0" />
+                  <ChevronDown className="w-4 h-4 text-[#8B7355] -rotate-90 flex-shrink-0" />
                 </button>
                 {/* Step 2 */}
                 <div className="flex items-center gap-3 px-4 py-3">
@@ -665,23 +665,23 @@ export const AngebotCard: FC<{
               </div>
             )}
           </div>
-          <div className="w-7 h-7 rounded-full bg-[#F5EDF6] flex items-center justify-center flex-shrink-0">
-            <ChevronDown className={`w-4 h-4 text-[#9B1FA1] transition-transform ${patientOpen ? 'rotate-180' : ''}`} />
+          <div className="w-7 h-7 rounded-full bg-[#F8F7F5] flex items-center justify-center flex-shrink-0">
+            <ChevronDown className={`w-4 h-4 text-[#8B7355] transition-transform ${patientOpen ? 'rotate-180' : ''}`} />
           </div>
         </button>
 
         {patientOpen && (
           <div className="border-t border-gray-100 p-3 bg-gray-50">
-          <div className="rounded-2xl border-2 border-[#9B1FA1] overflow-hidden shadow-[0_0_0_4px_rgba(155,31,161,0.07)] bg-gray-50">
+          <div className="rounded-2xl border-2 border-[#E76F63] overflow-hidden shadow-[0_0_0_4px_rgba(231,111,99,0.07)] bg-gray-50">
 
             {/* Colored header banner */}
-            <div className="bg-[#F5EDF6] px-4 py-3 flex items-center gap-2.5 rounded-t-2xl">
-              <div className="w-7 h-7 rounded-lg bg-[#9B1FA1] flex items-center justify-center flex-shrink-0">
+            <div className="bg-[#E76F63] px-4 py-3 flex items-center gap-2.5 rounded-t-2xl">
+              <div className="w-7 h-7 rounded-lg bg-white/20 flex items-center justify-center flex-shrink-0">
                 <FileText className="w-3.5 h-3.5 text-white" />
               </div>
               <div>
-                <p className="text-sm font-bold text-[#9B1FA1]">Patientendaten ausfüllen</p>
-                <p className="text-xs text-[#9B1FA1]/70">Damit Pflegekräfte sich optimal vorbereiten können</p>
+                <p className="text-[15px] font-bold text-white">Patientendaten ausfüllen</p>
+                <p className="text-[13px] text-white/75">Damit Pflegekräfte sich optimal vorbereiten können</p>
               </div>
             </div>
 
@@ -693,7 +693,7 @@ export const AngebotCard: FC<{
                     key={i}
                     onClick={() => setStep(i)}
                     className={`h-1 flex-1 rounded-full transition-all ${
-                      i < step ? 'bg-[#9B1FA1]' : i === step ? 'bg-[#9B1FA1]/30' : 'bg-gray-200'
+                      i < step ? 'bg-[#8B7355]' : i === step ? 'bg-[#8B7355]/20' : 'bg-gray-200'
                     }`}
                   />
                 ))}
@@ -721,7 +721,7 @@ export const AngebotCard: FC<{
                   <div>
                     <label className={`${labelCls} flex items-center gap-1.5`}>
                       Anzahl zu betreuender Personen
-                      <button type="button" onClick={() => setPriceInfo(priceInfo === 'anzahl' ? null : 'anzahl')} className="flex-shrink-0 text-gray-400 hover:text-[#9B1FA1] transition-colors">
+                      <button type="button" onClick={() => setPriceInfo(priceInfo === 'anzahl' ? null : 'anzahl')} className="flex-shrink-0 text-gray-400 hover:text-[#8B7355] transition-colors">
                         <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><circle cx="12" cy="12" r="10"/><path strokeLinecap="round" strokeLinejoin="round" d="M12 16v-4m0-4h.01"/></svg>
                       </button>
                     </label>
@@ -823,7 +823,7 @@ export const AngebotCard: FC<{
                   <div>
                     <label className={`${labelCls} flex items-center gap-1.5`}>
                       Mobilität
-                      <button type="button" onClick={() => setPriceInfo(priceInfo === 'mobilitaet' ? null : 'mobilitaet')} className="flex-shrink-0 text-gray-400 hover:text-[#9B1FA1] transition-colors">
+                      <button type="button" onClick={() => setPriceInfo(priceInfo === 'mobilitaet' ? null : 'mobilitaet')} className="flex-shrink-0 text-gray-400 hover:text-[#8B7355] transition-colors">
                         <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><circle cx="12" cy="12" r="10"/><path strokeLinecap="round" strokeLinejoin="round" d="M12 16v-4m0-4h.01"/></svg>
                       </button>
                     </label>
@@ -856,7 +856,7 @@ export const AngebotCard: FC<{
                     <div>
                       <label className={`${labelCls} flex items-center gap-1.5`}>
                         Nachteinsätze
-                        <button type="button" onClick={() => setPriceInfo(priceInfo === 'nacht' ? null : 'nacht')} className="flex-shrink-0 text-gray-400 hover:text-[#9B1FA1] transition-colors">
+                        <button type="button" onClick={() => setPriceInfo(priceInfo === 'nacht' ? null : 'nacht')} className="flex-shrink-0 text-gray-400 hover:text-[#8B7355] transition-colors">
                           <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><circle cx="12" cy="12" r="10"/><path strokeLinecap="round" strokeLinejoin="round" d="M12 16v-4m0-4h.01"/></svg>
                         </button>
                       </label>
@@ -933,7 +933,7 @@ export const AngebotCard: FC<{
                   <div>
                     <label className={`${labelCls} flex items-center gap-1.5`}>
                       Weitere Personen im Haushalt
-                      <button type="button" onClick={() => setPriceInfo(priceInfo === 'haushalt' ? null : 'haushalt')} className="flex-shrink-0 text-gray-400 hover:text-[#9B1FA1] transition-colors">
+                      <button type="button" onClick={() => setPriceInfo(priceInfo === 'haushalt' ? null : 'haushalt')} className="flex-shrink-0 text-gray-400 hover:text-[#8B7355] transition-colors">
                         <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><circle cx="12" cy="12" r="10"/><path strokeLinecap="round" strokeLinejoin="round" d="M12 16v-4m0-4h.01"/></svg>
                       </button>
                     </label>
@@ -1002,7 +1002,7 @@ export const AngebotCard: FC<{
                       "Wie oft und welche Aufgaben übernimmt der Pflegedienst?"
                       validation error. */}
                   {(patient.pflegedienst === 'Ja' || patient.pflegedienst === 'Geplant') && (
-                    <div className="space-y-3 pl-3 border-l-2 border-[#9B1FA1]/20">
+                    <div className="space-y-3 pl-3 border-l-2 border-[#8B7355]/20">
                       <div>
                         <label className={labelCls}>Wie oft kommt der Pflegedienst? <span className="text-red-400">*</span></label>
                         <CustomSelect value={patient.pflegedienstHaeufigkeit}
@@ -1032,7 +1032,7 @@ export const AngebotCard: FC<{
                               <label key={task}
                                 className={`flex items-center gap-2.5 px-3 py-2 rounded-xl border cursor-pointer transition-colors ${
                                   checked
-                                    ? 'bg-[#9B1FA1]/5 border-[#9B1FA1]/40'
+                                    ? 'bg-[#8B7355]/5 border-[#8B7355]/40'
                                     : 'bg-white border-gray-200 hover:bg-gray-50'
                                 }`}>
                                 <input
@@ -1048,7 +1048,7 @@ export const AngebotCard: FC<{
                                       : [...cur, task];
                                     return { ...p, pflegedienstAufgaben: next.join('; ') };
                                   })}
-                                  className="w-4 h-4 rounded border-gray-300 text-[#9B1FA1] focus:ring-[#9B1FA1]/30"
+                                  className="w-4 h-4 rounded border-gray-300 text-[#8B7355] focus:ring-[#8B7355]/30"
                                 />
                                 <span className="text-sm text-gray-700">{task}</span>
                               </label>
@@ -1075,7 +1075,7 @@ export const AngebotCard: FC<{
                     <div>
                       <label className="block text-sm font-semibold text-gray-600 mb-1.5 flex items-center gap-1.5">
                         Sprachniveau
-                        <button type="button" onClick={() => setPriceInfo(priceInfo === 'sprache' ? null : 'sprache')} className="flex-shrink-0 text-gray-400 hover:text-[#9B1FA1] transition-colors">
+                        <button type="button" onClick={() => setPriceInfo(priceInfo === 'sprache' ? null : 'sprache')} className="flex-shrink-0 text-gray-400 hover:text-[#8B7355] transition-colors">
                           <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><circle cx="12" cy="12" r="10"/><path strokeLinecap="round" strokeLinejoin="round" d="M12 16v-4m0-4h.01"/></svg>
                         </button>
                       </label>
@@ -1147,7 +1147,7 @@ export const AngebotCard: FC<{
                     onClick={() => stepComplete(step) && setStep(s => s + 1)}
                     className={`flex-1 py-2.5 text-sm font-bold rounded-xl transition-all ${
                       stepComplete(step)
-                        ? 'bg-[#9B1FA1] hover:bg-[#7B1A85] text-white'
+                        ? 'bg-[#8B7355] hover:bg-[#7B1A85] text-white'
                         : 'bg-gray-100 text-gray-400 cursor-not-allowed'
                     }`}
                   >
@@ -1180,7 +1180,7 @@ export const AngebotCard: FC<{
                     }}
                     className={`flex-1 py-2.5 text-sm font-bold rounded-xl transition-all ${
                       allComplete
-                        ? 'bg-[#9B1FA1] hover:bg-[#7B1A85] text-white'
+                        ? 'bg-[#8B7355] hover:bg-[#7B1A85] text-white'
                         : 'bg-gray-100 text-gray-400 cursor-not-allowed'
                     }`}
                   >
