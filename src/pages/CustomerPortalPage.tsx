@@ -1095,10 +1095,10 @@ const CustomerPortalPage: FC = () => {
       {showPatientReminder && (
         <>
           <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[70]" onClick={() => setShowPatientReminder(false)} style={{ animation: 'fadeIn 0.2s ease-out' }} />
-          <div className="fixed inset-0 z-[70] flex items-end justify-center pointer-events-none" style={{ animation: 'fadeIn 0.2s ease-out' }}>
-            <div className="bg-white w-full rounded-t-3xl pointer-events-auto shadow-2xl px-5 pt-5 pb-8 space-y-4" style={{ animation: 'slideSheet 0.3s cubic-bezier(0.32,0.72,0,1)' }}
+          <div className="fixed inset-0 z-[70] flex items-end sm:items-center justify-center sm:p-4 pointer-events-none" style={{ animation: 'fadeIn 0.2s ease-out' }}>
+            <div className="bg-white w-full sm:max-w-md rounded-t-3xl sm:rounded-2xl pointer-events-auto shadow-2xl px-5 pt-5 pb-8 sm:pb-6 space-y-4" style={{ animation: 'slideSheet 0.3s cubic-bezier(0.32,0.72,0,1)' }}
               onClick={e => e.stopPropagation()}>
-              <div className="flex justify-center mb-1">
+              <div className="flex justify-center mb-1 sm:hidden">
                 <div className="w-10 h-1 rounded-full bg-gray-200" />
               </div>
               <div className="flex items-start gap-3">
