@@ -187,6 +187,13 @@ describe('Portal integration: golden paths', () => {
 
     // Panel-style flow lives in the Edge Function — browser doesn't need
     // to verify anything before clicking Einladen.
+    // Strict invite-gate (since 2026-05-09) blocks Einladen until
+    // patient profile is saved. AngebotCard hydrates `saved` from this
+    // localStorage entry on mount → patientSaved=true → gate opens.
+    localStorage.setItem(
+      `patient_${TEST_LEAD_TOKEN}`,
+      JSON.stringify({ _isDraft: false }),
+    );
     setLocation(`?token=${TEST_LEAD_TOKEN}`);
     const user = userEvent.setup();
     render(<CustomerPortalPage />);

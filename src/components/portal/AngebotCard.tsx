@@ -98,6 +98,29 @@ export const AngebotCard: FC<{
   };
 
   const [saved, setSaved] = useState(hasFinalSave);
+
+  // Propagate saved → parent. The hasFinalSave hydration above flips
+  // `saved=true` on mount when the customer revisits with a previously
+  // submitted patient form, but without this useEffect the parent's
+  // patientSaved would stay false (onPatientSaved is only called from
+  // the explicit "Daten speichern" click handler) — meaning the strict
+  // invite-gate would block invitations for a returning customer who
+  // already has a complete profile.
+  useEffect(() => {
+    onPatientSaved?.(saved);
+  }, [saved]);
+
+  // Open the Patientendaten row when the parent flips `triggerOpenPatient`
+  // (e.g. customer clicks "Jetzt Patientendaten ausfüllen" in the
+  // invite-gate popup or in the So-funktioniert's stepper). The prop was
+  // declared but never wired up, so the click was a no-op apart from the
+  // scrollIntoView — the row stayed collapsed.
+  useEffect(() => {
+    if (triggerOpenPatient) {
+      setPatientOpen(true);
+      onTriggerHandled?.();
+    }
+  }, [triggerOpenPatient]);
   const [patient, setPatient] = useState<PatientForm>({
     anzahl: (pick('anzahl') as '1' | '2' | '') || '1',
     geschlecht: pick('geschlecht'), geburtsjahr: pick('geburtsjahr'),

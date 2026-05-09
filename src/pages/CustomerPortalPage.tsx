@@ -85,7 +85,6 @@ const CustomerPortalPage: FC = () => {
   const [patientSaved, setPatientSaved] = useState(false);
   const [showPatientReminder, setShowPatientReminder] = useState(false);
   const [triggerOpenPatient, setTriggerOpenPatient] = useState(false);
-  const [firstInviteDone, setFirstInviteDone] = useState(false);
   const [openFaq, setOpenFaq] = useState<number | null>(null);
 
   // ─── Mamamia session + queries (K2-K4 integration) ───────────────────────
@@ -356,8 +355,11 @@ const CustomerPortalPage: FC = () => {
     setUndoErrorOpen(true);
   };
 
-  const canInviteNurse = (idx: number): boolean => {
-    if (!patientSaved && firstInviteDone) {
+  const canInviteNurse = (_idx: number): boolean => {
+    // Strict gate: no invitations until patient profile is complete.
+    // Without it, the caregiver can't prepare a meaningful application
+    // and we get back-and-forth queries that frustrate both sides.
+    if (!patientSaved) {
       setShowPatientReminder(true);
       return false;
     }
@@ -372,11 +374,6 @@ const CustomerPortalPage: FC = () => {
     }
 
     const nurseName = match.nurse.name ?? '';
-
-    if (!patientSaved && !firstInviteDone) {
-      setFirstInviteDone(true);
-      setShowPatientReminder(true);
-    }
 
     try {
       await inviteMutation.mutate({ caregiver_id: match.caregiverId });
@@ -1105,23 +1102,24 @@ const CustomerPortalPage: FC = () => {
                 <div className="w-10 h-1 rounded-full bg-gray-200" />
               </div>
               <div className="flex items-start gap-3">
-                <div className="w-10 h-10 rounded-xl bg-amber-50 flex items-center justify-center flex-shrink-0 text-xl">⚠️</div>
+                <div className="w-10 h-10 rounded-xl bg-amber-50 flex items-center justify-center flex-shrink-0">
+                  <AlertTriangle className="w-5 h-5" style={{color:'#D97706'}} />
+                </div>
                 <div>
-                  <p className="text-base font-bold text-gray-900">Patientendaten fehlen noch</p>
+                  <p className="text-base font-bold text-gray-900">Noch ein Schritt — die Patientendaten</p>
                   <p className="text-sm text-gray-600 mt-1 leading-relaxed">
-                    Bevor Pflegekräfte eingeladen werden können, benötigen wir noch Angaben zum Patienten und Haushalt — damit sich alle Bewerberinnen optimal vorbereiten können.
+                    Damit sich Pflegekräfte gut auf Ihre Situation vorbereiten können, fehlen uns noch ein paar Angaben zum Patienten. Sobald das ausgefüllt ist, können Sie Pflegekräfte einladen und Bewerbungen erhalten.
                   </p>
                 </div>
               </div>
-              <div className="bg-[#FFF8E7] border border-amber-200 rounded-xl px-4 py-3">
-                <p className="text-xs text-amber-800 leading-relaxed">
-                  Ohne vollständige Patientendaten können Pflegekräfte keine fundierte Bewerbung einreichen.
-                </p>
-              </div>
               <div className="flex flex-col gap-2 pt-1">
                 <button
-                  onClick={() => { setShowPatientReminder(false); setTriggerOpenPatient(true); }}
-                  className="w-full bg-[#9B1FA1] text-white font-bold py-3.5 rounded-2xl text-sm hover:bg-[#7B1A85] transition-colors"
+                  onClick={() => {
+                    setShowPatientReminder(false);
+                    setTriggerOpenPatient(true);
+                    document.getElementById('patientendaten')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                  }}
+                  className="w-full bg-[#E76F63] text-white font-bold py-3.5 rounded-2xl text-sm hover:bg-[#D65E52] shadow-sm transition-colors"
                 >
                   Jetzt Patientendaten ausfüllen
                 </button>
@@ -1129,7 +1127,7 @@ const CustomerPortalPage: FC = () => {
                   onClick={() => setShowPatientReminder(false)}
                   className="w-full text-gray-500 font-semibold py-2.5 text-sm"
                 >
-                  Später erledigen
+                  Später
                 </button>
               </div>
             </div>
