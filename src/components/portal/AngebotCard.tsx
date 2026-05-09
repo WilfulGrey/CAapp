@@ -1147,7 +1147,7 @@ export const AngebotCard: FC<{
                     onClick={() => stepComplete(step) && setStep(s => s + 1)}
                     className={`flex-1 py-2.5 text-sm font-bold rounded-xl transition-all ${
                       stepComplete(step)
-                        ? 'bg-[#8B7355] hover:bg-[#7B1A85] text-white'
+                        ? 'bg-[#E76F63] hover:bg-[#D65E52] text-white shadow-sm'
                         : 'bg-gray-100 text-gray-400 cursor-not-allowed'
                     }`}
                   >
@@ -1180,7 +1180,7 @@ export const AngebotCard: FC<{
                     }}
                     className={`flex-1 py-2.5 text-sm font-bold rounded-xl transition-all ${
                       allComplete
-                        ? 'bg-[#8B7355] hover:bg-[#7B1A85] text-white'
+                        ? 'bg-[#E76F63] hover:bg-[#D65E52] text-white shadow-sm'
                         : 'bg-gray-100 text-gray-400 cursor-not-allowed'
                     }`}
                   >
