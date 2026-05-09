@@ -753,13 +753,11 @@ const CustomerPortalPage: FC = () => {
 
         {/* ── INFO: Bewerbungen werden vorbereitet (state B only) ── */}
         {patientSaved && !hasPending && (
-          <div className="rounded-2xl border px-4 py-3 flex items-center gap-3" style={{background:'#F8F7F5', borderColor:'#E5E3DF'}}>
-            <div className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 border" style={{background:'white', borderColor:'#E5E3DF'}}>
-              <Bell className="w-4 h-4" style={{color:'#8B7355'}} />
-            </div>
+          <div className="rounded-2xl border px-5 py-4 flex gap-3" style={{background:'#F8F7F5', borderColor:'#E5E3DF'}}>
+            <Bell className="w-5 h-5 flex-shrink-0 mt-0.5" style={{color:'#8B7355'}} />
             <div className="flex-1 min-w-0">
-              <p className="text-[14px] font-semibold" style={{color:'#3D3D3D'}}>Bewerbungen werden für Sie vorbereitet</p>
-              <p className="text-[13px] mt-0.5 leading-snug" style={{color:'#8B8B8B'}}>Sobald sich Pflegekräfte bewerben, erscheinen die Angebote hier.</p>
+              <p className="text-[15px] font-semibold" style={{color:'#3D3D3D'}}>Bewerbungen werden für Sie vorbereitet</p>
+              <p className="text-[15px] mt-1 leading-relaxed" style={{color:'#8B8B8B'}}>Sobald sich Pflegekräfte bewerben, erscheinen die Angebote hier.</p>
             </div>
           </div>
         )}
