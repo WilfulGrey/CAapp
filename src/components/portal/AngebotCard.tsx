@@ -98,6 +98,17 @@ export const AngebotCard: FC<{
   };
 
   const [saved, setSaved] = useState(hasFinalSave);
+
+  // Propagate saved → parent. The hasFinalSave hydration above flips
+  // `saved=true` on mount when the customer revisits with a previously
+  // submitted patient form, but without this useEffect the parent's
+  // patientSaved would stay false (onPatientSaved is only called from
+  // the explicit "Daten speichern" click handler) — meaning the strict
+  // invite-gate would block invitations for a returning customer who
+  // already has a complete profile.
+  useEffect(() => {
+    onPatientSaved?.(saved);
+  }, [saved]);
   const [patient, setPatient] = useState<PatientForm>({
     anzahl: (pick('anzahl') as '1' | '2' | '') || '1',
     geschlecht: pick('geschlecht'), geburtsjahr: pick('geburtsjahr'),
