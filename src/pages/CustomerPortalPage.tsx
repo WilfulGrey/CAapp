@@ -35,6 +35,7 @@ import { BookedScreen } from '../components/portal/BookedScreen';
 import { AngebotCard } from '../components/portal/AngebotCard';
 import { AppCard } from '../components/portal/AppCard';
 import { AppCardDone } from '../components/portal/AppCardDone';
+import { MatchCardDone } from '../components/portal/MatchCardDone';
 import { MatchCard } from '../components/portal/MatchCard';
 import { InfoPopup } from '../components/portal/InfoPopup';
 import { ContactPopup } from '../components/portal/ContactPopup';
@@ -281,6 +282,11 @@ const CustomerPortalPage: FC = () => {
 
   const pendingApps = applications.filter((a) => a.status === 'new');
   const doneApps = applications.filter((a) => a.status !== 'new');
+  // Locally-declined matches (decline-match has no backend mutation, lives only in nurseStatuses).
+  // Surface them in "Bereits bearbeitet" alongside processed applications.
+  const declinedMatches = effectiveMatched
+    .map((m, idx) => ({ nurse: m.nurse, idx }))
+    .filter(({ idx }) => nurseStatuses[idx] === 'declined');
   const acceptedApp = applications.find((a) => a.status === 'accepted') ?? null;
   const hasPending = pendingApps.length > 0;
   const matchesUnlocked = !hasPending;
@@ -405,6 +411,17 @@ const CustomerPortalPage: FC = () => {
 
   const declineNurse = (idx: number) => {
     setNurseStatuses((prev) => ({ ...prev, [idx]: 'declined' }));
+  };
+
+  // Reset a locally-declined match back to 'pending' so the caregiver
+  // reappears in the matched-nurses list. Decline-match has no backend
+  // mutation (it's a local-only filter), so undo is just state.
+  const undoDeclinedMatch = (idx: number) => {
+    setNurseStatuses((prev) => {
+      const next = { ...prev };
+      delete next[idx];
+      return next;
+    });
   };
 
   // ─── Debug overlay (?debug=1) ────────────────────────────────────────────
@@ -788,12 +805,15 @@ const CustomerPortalPage: FC = () => {
                 </div>
               )}
 
-              {/* ── SECTION: Processed applications ── */}
-              {doneApps.length > 0 && (
+              {/* ── SECTION: Processed applications + declined matches ── */}
+              {(doneApps.length > 0 || declinedMatches.length > 0) && (
                 <div className="space-y-2">
                   <p className="text-xs font-semibold uppercase tracking-wider text-gray-400 px-1">Bereits bearbeitet</p>
                   {doneApps.map((app) => (
                     <AppCardDone key={app.id} app={app} onNurseClick={(n, a) => { setNurseModalApp(a); setSelectedNurse(n); }} onUndo={undoApp} />
+                  ))}
+                  {declinedMatches.map(({ nurse, idx }) => (
+                    <MatchCardDone key={`m-${idx}`} nurse={nurse} onNurseClick={() => openNurseFromMatch(nurse, idx)} onUndo={() => undoDeclinedMatch(idx)} />
                   ))}
                 </div>
               )}
@@ -801,12 +821,15 @@ const CustomerPortalPage: FC = () => {
           );
         })()}
 
-        {/* ── SECTION: Processed applications (mit pending) ── */}
-        {hasPending && doneApps.length > 0 && (
+        {/* ── SECTION: Processed applications + declined matches (mit pending) ── */}
+        {hasPending && (doneApps.length > 0 || declinedMatches.length > 0) && (
           <div className="space-y-2">
             <p className="text-xs font-semibold uppercase tracking-wider text-gray-400 px-1">Bereits bearbeitet</p>
             {doneApps.map((app) => (
               <AppCardDone key={app.id} app={app} onNurseClick={(n, a) => { setNurseModalApp(a); setSelectedNurse(n); }} onUndo={undoApp} />
+            ))}
+            {declinedMatches.map(({ nurse, idx }) => (
+              <MatchCardDone key={`m-${idx}`} nurse={nurse} onNurseClick={() => openNurseFromMatch(nurse, idx)} onUndo={() => undoDeclinedMatch(idx)} />
             ))}
           </div>
         )}
