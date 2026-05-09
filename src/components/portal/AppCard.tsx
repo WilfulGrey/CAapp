@@ -17,7 +17,7 @@ export const AppCard: FC<{
 
   return (
     <div
-      className="bg-white rounded-2xl border border-gray-200 overflow-hidden"
+      className="bg-white rounded-2xl border-2 border-[#E76F63] overflow-hidden shadow-[0_4px_16px_rgba(231,111,99,0.15)]"
       style={exiting ? { animation: 'exitCard 0.32s ease-in forwards' } : undefined}
     >
       <div className="flex items-center justify-between px-5 py-2 bg-[#F8F7F5] border-b border-[#E5E3DF]">
