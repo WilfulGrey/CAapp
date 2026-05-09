@@ -147,13 +147,13 @@ export const CustomerNurseModal: FC<{
             <div className="grid grid-cols-2 gap-2 mt-4">
               <div className="bg-white rounded-xl px-3 py-2.5 shadow-sm">
                 <p className="text-xs text-gray-600 mb-1">Erfahrung</p>
-                <p className="text-sm font-bold text-[#9B1FA1]">{nurse.experience}</p>
+                <p className="text-sm font-bold text-[#8B7355]">{nurse.experience}</p>
               </div>
               <div className="bg-white rounded-xl px-3 py-2.5 shadow-sm">
                 <p className="text-xs text-gray-600 mb-1">Deutschkenntnisse</p>
                 <div className="flex items-center gap-1.5">
                   <div className="flex gap-0.5">
-                    {bars.map((f, i) => <div key={i} className={`w-3 h-1.5 rounded-full ${f ? 'bg-[#9B1FA1]' : 'bg-gray-200'}`} />)}
+                    {bars.map((f, i) => <div key={i} className={`w-3 h-1.5 rounded-full ${f ? 'bg-[#8B7355]' : 'bg-gray-200'}`} />)}
                   </div>
                   <span className="text-xs font-bold text-gray-700">{nurse.language.level}</span>
                 </div>
@@ -165,19 +165,19 @@ export const CustomerNurseModal: FC<{
             <div className="px-5 pt-4 pb-5">
               <h3 className="text-sm font-bold text-gray-900 mb-2">Über die Pflegekraft</h3>
               {profileLoading && !p ? (
-                <div className="bg-[#F5EDF6] rounded-xl p-4 animate-pulse">
-                  <div className="h-3 w-full bg-purple-200/60 rounded mb-2" />
-                  <div className="h-3 w-11/12 bg-purple-200/60 rounded mb-2" />
-                  <div className="h-3 w-9/12 bg-purple-200/60 rounded" />
+                <div className="bg-[#F8F7F5] rounded-xl p-4 animate-pulse">
+                  <div className="h-3 w-full bg-gray-200 rounded mb-2" />
+                  <div className="h-3 w-11/12 bg-gray-200 rounded mb-2" />
+                  <div className="h-3 w-9/12 bg-gray-200 rounded" />
                 </div>
               ) : (
-                <div className="bg-[#F5EDF6] rounded-xl p-4">
+                <div className="bg-[#F8F7F5] rounded-xl p-4">
                   <p className="text-sm text-gray-700 leading-relaxed whitespace-pre-line">{aboutSentence}</p>
                 </div>
               )}
             </div>
 
-            {nurse.detailedAssignments && nurse.detailedAssignments.length > 0 && (
+            {nurse.detailedAssignments && nurse.detailedAssignments.length > 0 && (nurse.history?.assignments ?? 0) > 0 && (
               <div className="px-5 pb-5">
                 <div className="flex items-center justify-between mb-2">
                   <h3 className="text-sm font-bold text-gray-900">Letzte Einsätze</h3>
@@ -289,7 +289,7 @@ export const CustomerNurseModal: FC<{
               app.status === 'declined' ? (
                 <button
                   onClick={() => { onUndo?.(); onClose(); }}
-                  className="flex-1 bg-[#F5EDF6] text-[#9B1FA1] border border-[#D8A9DC] rounded-xl py-3 font-bold text-sm hover:bg-[#EDD9EF] transition-colors flex items-center justify-center gap-2"
+                  className="flex-1 bg-[#F8F7F5] text-[#8B7355] border border-[#E5E3DF] rounded-xl py-3 font-bold text-sm hover:bg-[#EBE2D5] transition-colors flex items-center justify-center gap-2"
                 >
                   ↩ Ablehnung rückgängig machen
                 </button>
@@ -303,7 +303,7 @@ export const CustomerNurseModal: FC<{
                   </button>
                   <button
                     onClick={onReview}
-                    className="flex-[2] bg-[#9B1FA1] text-white rounded-xl py-3 font-bold text-sm hover:bg-[#7B1A85] transition-colors"
+                    className="flex-[2] bg-[#E76F63] text-white rounded-xl py-3 font-bold text-sm hover:bg-[#D65E52] shadow-sm transition-colors"
                   >
                     Angebot prüfen
                   </button>
@@ -320,7 +320,7 @@ export const CustomerNurseModal: FC<{
                       Nein danke
                     </button>
                     {invitePhaseModal === 'sending' ? (
-                      <div className="flex-[2] bg-[#F5EDF6] text-[#9B1FA1] rounded-xl py-3 font-bold text-sm border border-[#D8A9DC] flex items-center justify-center gap-2">
+                      <div className="flex-[2] bg-[#F8F7F5] text-[#8B7355] rounded-xl py-3 font-bold text-sm border border-[#E5E3DF] flex items-center justify-center gap-2">
                         <svg className="w-4 h-4 animate-spin flex-shrink-0" viewBox="0 0 24 24" fill="none">
                           <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3"/>
                           <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"/>
@@ -334,14 +334,14 @@ export const CustomerNurseModal: FC<{
                     ) : (
                       <button
                         onClick={handleModalInvite}
-                        className="flex-[2] bg-[#9B1FA1] text-white rounded-xl py-3 font-bold text-sm hover:bg-[#7B1A85] transition-colors flex items-center justify-center gap-2"
+                        className="flex-[2] bg-[#E76F63] text-white rounded-xl py-3 font-bold text-sm hover:bg-[#D65E52] shadow-sm transition-colors flex items-center justify-center gap-2"
                       >
                         <UserPlus className="w-4 h-4" /> Einladen
                       </button>
                     )}
                   </>
                 ) : (
-                  <div className="flex-1 bg-[#F5EDF6] text-[#9B1FA1] rounded-xl py-3 font-bold text-sm border border-[#D8A9DC] flex items-center justify-center gap-2">
+                  <div className="flex-1 bg-[#F8F7F5] text-[#8B7355] rounded-xl py-3 font-bold text-sm border border-[#E5E3DF] flex items-center justify-center gap-2">
                     <Check className="w-4 h-4" /> Eingeladen — warten auf Bewerbung
                   </div>
                 )}
