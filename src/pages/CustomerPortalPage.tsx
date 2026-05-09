@@ -86,6 +86,10 @@ const CustomerPortalPage: FC = () => {
   const [showPatientReminder, setShowPatientReminder] = useState(false);
   const [triggerOpenPatient, setTriggerOpenPatient] = useState(false);
   const [openFaq, setOpenFaq] = useState<number | null>(null);
+  // Manual override for the "Ihr Angebot" expand/collapse. null = follow
+  // the auto rule below (expanded only in initial state). Toggling sets
+  // an explicit value that wins over the auto rule.
+  const [offerExpandedManual, setOfferExpandedManual] = useState<boolean | null>(null);
 
   // ─── Mamamia session + queries (K2-K4 integration) ───────────────────────
   const { session, ready: mmReady, error: mmError } = useMamamiaSession(lead?.token ?? null);
@@ -668,29 +672,42 @@ const CustomerPortalPage: FC = () => {
         );
       })()}
 
-      {/* ── SECTION: Ihr Angebot (header + price card + conditions card + PDF) ── */}
-      <div style={{background:'#F8F7F5'}}>
+      {/* ── SECTION: Ihr Angebot (collapsible) ── */}
+      {(() => {
+        // Default: expanded only in initial state. Once the customer has
+        // saved their profile or has applications waiting, the offer is
+        // reference material — collapse to free up screen space. Manual
+        // toggle (offerExpandedManual) overrides the auto rule.
+        const autoExpanded = !patientSaved && !hasPending;
+        const offerExpanded = offerExpandedManual ?? autoExpanded;
+        const brutto = lead?.kalkulation?.bruttopreis ?? 3050;
+        const tagessatz = Math.round(brutto / 30);
+        const items = [
+          { text: 'Täglich kündbar' },
+          { text: 'Tagesgenaue Abrechnung' },
+          { text: 'Kosten entstehen immer erst, wenn Pflegekraft vor Ort ist' },
+        ];
+        return (
+        <div style={{background:'#F8F7F5'}}>
         <div className="max-w-3xl mx-auto">
-          <div className="px-5 pt-6 pb-4 flex items-center justify-between">
+          <button
+            onClick={() => setOfferExpandedManual(!offerExpanded)}
+            className="w-full px-5 pt-6 pb-4 flex items-center justify-between text-left transition-colors hover:bg-black/[0.02]"
+          >
             <div>
               <h2 className="text-[1.1rem] font-bold" style={{color:'#3D3D3D'}}>Ihr Angebot</h2>
               <div className="mt-1.5 h-[2px] w-10 rounded-full" style={{background:'#8B7355'}} />
             </div>
-            <span className="text-[12px] font-semibold px-3 py-1 rounded-full" style={{background:'#E3F7EF', color:'#2a9a6f'}}>
-              100 % risikofrei
-            </span>
-          </div>
+            <div className="flex items-center gap-2 flex-shrink-0">
+              <span className="text-[12px] font-semibold px-3 py-1 rounded-full" style={{background:'#E3F7EF', color:'#2a9a6f'}}>
+                100 % risikofrei
+              </span>
+              <ChevronDown className={`w-5 h-5 text-[#8B7355] transition-transform duration-200 ${offerExpanded ? 'rotate-180' : ''}`} />
+            </div>
+          </button>
 
-          {(() => {
-            const brutto = lead?.kalkulation?.bruttopreis ?? 3050;
-            const tagessatz = Math.round(brutto / 30);
-            const items = [
-              { text: 'Täglich kündbar' },
-              { text: 'Tagesgenaue Abrechnung' },
-              { text: 'Kosten entstehen immer erst, wenn Pflegekraft vor Ort ist' },
-            ];
-            return (
-              <div className="px-4 pb-4">
+          {offerExpanded && (
+            <div className="px-4 pb-4">
                 <div className="rounded-2xl border px-5 pt-5 pb-4" style={{background:'white', borderColor:'#E5E3DF'}}>
                   <p className="text-[12px] font-semibold uppercase tracking-widest mb-2" style={{color:'#8B7355'}}>Betreuungskosten</p>
                   <div className="flex items-center gap-4">
@@ -725,11 +742,12 @@ const CustomerPortalPage: FC = () => {
                     <span className="text-[13px] underline" style={{color:'#3D3D3D'}}>Angebot als PDF herunterladen</span>
                   </button>
                 </div>
-              </div>
-            );
-          })()}
+            </div>
+          )}
         </div>
-      </div>
+        </div>
+        );
+      })()}
 
       <div className="max-w-3xl mx-auto px-4 py-6 space-y-4">
 
