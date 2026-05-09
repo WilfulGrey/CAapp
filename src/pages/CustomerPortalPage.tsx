@@ -816,6 +816,9 @@ const CustomerPortalPage: FC = () => {
         {/* ── SECTION: Pending Applications ── */}
         {hasPending && (
           <div className="space-y-3">
+            <p className="text-[14px] leading-relaxed px-1" style={{color:'#3D3D3D'}}>
+              Tippen Sie auf <span className="font-semibold">"Angebot prüfen"</span>, um die Details der Pflegekraft zu sehen und über das Angebot zu entscheiden.
+            </p>
             {pendingApps.map((app) => (
               <AppCard
                 key={app.id}
@@ -838,11 +841,11 @@ const CustomerPortalPage: FC = () => {
             <>
               {visibleNurses.length > 0 && (
                 <div>
-                  {!patientSaved && (
-                    <p className="text-[14px] leading-relaxed pb-2 px-1" style={{color:'#3D3D3D'}}>
-                      Damit sich Pflegekräfte bewerben bzw. Sie diese einladen können, vervollständigen Sie bitte die Patienteninformationen.
-                    </p>
-                  )}
+                  <p className="text-[14px] leading-relaxed pb-2 px-1" style={{color:'#3D3D3D'}}>
+                    {!patientSaved
+                      ? 'Damit sich Pflegekräfte bewerben bzw. Sie diese einladen können, vervollständigen Sie bitte die Patienteninformationen.'
+                      : 'Tippen Sie auf „Einladen", wenn Ihnen eine Pflegekraft gefällt — sie bewirbt sich dann bei Ihnen.'}
+                  </p>
                   <div className="space-y-3">
                     {visibleNurses.map(({ nurse, i, status }) => (
                       <MatchCard key={i} nurse={nurse} status={status} onNurseClick={() => openNurseFromMatch(nurse, i)} onInvite={() => canInviteNurse(i)} onInviteConfirm={() => confirmInviteNurse(i, displayName(nurse.name))} />
@@ -888,16 +891,22 @@ const CustomerPortalPage: FC = () => {
         </div>
         <div className="rounded-2xl overflow-hidden border" style={{background:'white', borderColor:'#E5E3DF'}}>
           {[
-            { n: 1, title: 'Patientendaten vervollständigen', desc: 'Das Angebot sagt Ihnen zu? Ergänzen Sie jetzt die Angaben zum Patienten — so können sich Pflegekräfte optimal vorbereiten.', cta: !patientSaved },
-            { n: 2, title: 'Bewerbungen erhalten & Pflegekräfte einladen', desc: 'Geeignete Pflegekräfte bewerben sich bei Ihnen. In der Zwischenzeit können Sie Wunschkandidatinnen gezielt einladen.', cta: false },
-            { n: 3, title: 'Vertrag abschließen', desc: 'Sie wählen Ihre Favoritin aus und bestätigen das Angebot — den Rest übernehmen wir.', cta: false },
-            { n: 4, title: 'Laufende Betreuung', desc: 'Die Pflegekraft ist da. Ihr persönlicher Ansprechpartner begleitet Sie während des gesamten Einsatzes.', cta: false },
+            { n: 1, title: 'Patientendaten vervollständigen', desc: 'Das Angebot sagt Ihnen zu? Ergänzen Sie jetzt die Angaben zum Patienten — so können sich Pflegekräfte optimal vorbereiten.', cta: !patientSaved, done: patientSaved },
+            { n: 2, title: 'Bewerbungen erhalten & Pflegekräfte einladen', desc: 'Geeignete Pflegekräfte bewerben sich bei Ihnen. In der Zwischenzeit können Sie Wunschkandidatinnen gezielt einladen.', cta: false, done: hasPending },
+            { n: 3, title: 'Vertrag abschließen', desc: 'Sie wählen Ihre Favoritin aus und bestätigen das Angebot — den Rest übernehmen wir.', cta: false, done: false },
+            { n: 4, title: 'Laufende Betreuung', desc: 'Die Pflegekraft ist da. Ihr persönlicher Ansprechpartner begleitet Sie während des gesamten Einsatzes.', cta: false, done: false },
           ].map((s, i, arr) => (
             <div key={s.n} className={`flex items-start gap-4 px-5 py-4 ${i < arr.length - 1 ? 'border-b' : ''}`} style={{borderColor:'#E5E3DF'}}>
-              <div className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 font-bold text-white mt-0.5" style={{background:'#8B7355', fontSize:'15px'}}>{s.n}</div>
+              {s.done ? (
+                <div className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5" style={{background:'#E3F7EF'}}>
+                  <Check className="w-4 h-4" strokeWidth={3} style={{color:'#22A06B'}} />
+                </div>
+              ) : (
+                <div className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 font-bold text-white mt-0.5" style={{background:'#8B7355', fontSize:'15px'}}>{s.n}</div>
+              )}
               <div>
-                <p className="text-[15px] font-semibold" style={{color:'#3D3D3D'}}>{s.title}</p>
-                <p className="text-[15px] mt-0.5 leading-relaxed" style={{color:'#8B8B8B'}}>{s.desc}</p>
+                <p className="text-[15px] font-semibold" style={{color: s.done ? '#9CA3AF' : '#3D3D3D'}}>{s.title}</p>
+                <p className="text-[15px] mt-0.5 leading-relaxed" style={{color: s.done ? '#B5B5B5' : '#8B8B8B'}}>{s.desc}</p>
                 {s.cta && (
                   <button
                     onClick={() => { setTriggerOpenPatient(true); document.getElementById('patientendaten')?.scrollIntoView({ behavior: 'smooth', block: 'start' }); }}

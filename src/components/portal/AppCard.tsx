@@ -20,14 +20,14 @@ export const AppCard: FC<{
       className="bg-white rounded-2xl border border-gray-200 overflow-hidden"
       style={exiting ? { animation: 'exitCard 0.32s ease-in forwards' } : undefined}
     >
-      <div className="flex items-center justify-between px-5 py-2 bg-[#F5EDF6] border-b border-[#EDD9EF]">
+      <div className="flex items-center justify-between px-5 py-2 bg-[#F8F7F5] border-b border-[#E5E3DF]">
         <div className="flex items-center gap-2">
-          <span className="text-xs font-semibold text-[#9B1FA1]">Bewerbung</span>
+          <span className="text-xs font-semibold text-[#8B7355]">Bewerbung</span>
           {app.status === 'new' && (
             <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-[#E3F7EF] text-[#22A06B] border border-[#B8E8D4]">Neu</span>
           )}
           {app.isInvited && (
-            <span className="flex items-center gap-1 text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-[#EDD9EF] text-[#9B1FA1] border border-[#D8A9DC]">
+            <span className="flex items-center gap-1 text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-[#EBE2D5] text-[#8B7355] border border-[#E5E3DF]">
               <svg className="w-3 h-3 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
               </svg>
@@ -35,7 +35,7 @@ export const AppCard: FC<{
             </span>
           )}
         </div>
-        <span className="text-[10px] text-[#9B1FA1]">{app.appliedAt}</span>
+        <span className="text-[10px] text-[#8B7355]">{app.appliedAt}</span>
       </div>
 
       <div className="px-5 pt-5 pb-5 cursor-pointer active:bg-gray-50" onClick={() => onNurseClick(nurse)}>
@@ -67,13 +67,13 @@ export const AppCard: FC<{
             <div className="flex items-center gap-2 mb-1">
               <div className="flex gap-0.5">
                 {bars.map((f, i) => (
-                  <div key={i} className={`w-3 h-1.5 rounded-full ${f ? 'bg-[#9B1FA1]' : 'bg-gray-200'}`} />
+                  <div key={i} className={`w-3 h-1.5 rounded-full ${f ? 'bg-[#8B7355]' : 'bg-gray-200'}`} />
                 ))}
               </div>
               <span className="text-sm text-gray-500">Deutsch {nurse.language.level}</span>
             </div>
             <p className="text-sm text-gray-500 truncate">
-              <span className="font-semibold text-[#9B1FA1]">{nurse.experience}</span>
+              <span className="font-semibold text-[#8B7355]">{nurse.experience}</span>
               {nurse.history && <span> · {nurse.history.assignments} Eins. · Ø {Math.round(nurse.history.avgDurationMonths * 4.3)} Wo.</span>}
             </p>
           </div>
@@ -81,7 +81,7 @@ export const AppCard: FC<{
       </div>
 
       <div className="border-t border-gray-100 px-5 py-4">
-        <div className="bg-[#F5EDF6] rounded-xl px-4 py-3 mb-3">
+        <div className="bg-[#F8F7F5] rounded-xl px-4 py-3 mb-3">
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
               <p className="text-xs text-gray-500">{app.offer.anreisedatum} – {app.offer.abreisedatum}</p>
@@ -90,12 +90,12 @@ export const AppCard: FC<{
             </div>
             <div className="text-right flex-shrink-0">
               <p className="text-[10px] text-gray-500 mb-0.5">Mtl. Betreuungskosten</p>
-              <p className="text-xl font-bold text-[#9B1FA1]">{app.offer.monatlicheKosten.toLocaleString('de-DE')} €</p>
+              <p className="text-xl font-bold text-[#8B7355]">{app.offer.monatlicheKosten.toLocaleString('de-DE')} €</p>
             </div>
           </div>
         </div>
         {message && (
-          <p className="text-sm text-gray-600 leading-relaxed line-clamp-2 border-l-2 border-[#D8A9DC] pl-3">„{message}"</p>
+          <p className="text-sm text-gray-600 leading-relaxed line-clamp-2 border-l-2 border-[#E5E3DF] pl-3">„{message}"</p>
         )}
       </div>
 
@@ -108,7 +108,7 @@ export const AppCard: FC<{
         </button>
         <button
           onClick={onReview}
-          className="bg-[#9B1FA1] hover:bg-[#7B1A85] text-white rounded-2xl px-6 py-3 text-sm font-semibold transition-all"
+          className="bg-[#E76F63] hover:bg-[#D65E52] text-white rounded-2xl px-6 py-3 text-sm font-semibold transition-all"
         >
           Angebot prüfen →
         </button>
