@@ -89,8 +89,8 @@ export const AppCard: FC<{
               <p className="text-xs text-gray-500">{app.offer.kuendigungsfrist}</p>
             </div>
             <div className="text-right flex-shrink-0">
-              <p className="text-[10px] text-gray-500 mb-0.5">Mtl. Betreuungskosten</p>
-              <p className="text-xl font-bold text-[#8B7355]">{app.offer.monatlicheKosten.toLocaleString('de-DE')} €</p>
+              <p className="text-[10px] text-gray-500 mb-0.5">Tagessatz</p>
+              <p className="text-xl font-bold text-[#8B7355]">{Math.round(app.offer.monatlicheKosten / 30)} €<span className="text-sm font-normal text-gray-500">/Tag</span></p>
             </div>
           </div>
         </div>

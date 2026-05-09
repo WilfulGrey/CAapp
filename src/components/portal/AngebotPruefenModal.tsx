@@ -40,7 +40,9 @@ export const AngebotPruefenModal: FC<{
   ];
 
   const inputCls = 'w-full border border-gray-200 rounded-xl px-3.5 py-3 text-sm text-gray-800 focus:outline-none focus:border-[#8B7355] focus:ring-2 focus:ring-[#8B7355]/10 transition-all bg-white';
-  const labelCls = 'block text-sm font-semibold text-gray-700 mb-1.5';
+  const labelCls = 'block text-[13px] font-semibold text-gray-700 mb-1.5';
+  const sectionCls = 'rounded-2xl border border-gray-100 bg-white p-5 shadow-sm';
+  const sectionTitleCls = 'text-[15px] font-bold text-gray-900 mb-3 pb-2 border-b border-gray-100';
 
   return (
     <>
@@ -122,7 +124,7 @@ export const AngebotPruefenModal: FC<{
                   </div>
                   <div className="rounded-xl border border-gray-100 overflow-hidden divide-y divide-gray-100">
                     {[
-                      { label: 'Mtl. Betreuungskosten', value: `${offer.monatlicheKosten.toLocaleString('de-DE')} €`, bold: true },
+                      { label: 'Tagessatz', value: `${tagessatz} €/Tag`, bold: true },
                       { label: 'Anreisedatum', value: offer.anreisedatum },
                       { label: 'Abreisedatum', value: `Vorauss. ${offer.abreisedatum}` },
                       { label: 'Anreisekosten', value: `${offer.anreisekosten} €` },
@@ -142,11 +144,11 @@ export const AngebotPruefenModal: FC<{
             )}
 
             {step === 2 && (
-              <div className="p-5 space-y-5">
-                <div>
-                  <p className="text-sm font-bold text-gray-700 mb-3">Hauptpatient (Vertragspartner)</p>
+              <div className="p-5 space-y-4" style={{background:'#FAFAF9'}}>
+                <div className={sectionCls}>
+                  <p className={sectionTitleCls}>Hauptpatient <span className="font-normal text-gray-400">(Vertragspartner)</span></p>
                   <div className="space-y-3">
-                    <div className="grid grid-cols-2 gap-2">
+                    <div className="grid grid-cols-2 gap-3">
                       <div>
                         <label className={labelCls}>Anrede</label>
                         <select value={anrede} onChange={e => setAnrede(e.target.value)} className={inputCls}>
@@ -160,7 +162,7 @@ export const AngebotPruefenModal: FC<{
                         </select>
                       </div>
                     </div>
-                    <div className="grid grid-cols-2 gap-2">
+                    <div className="grid grid-cols-2 gap-3">
                       <div>
                         <label className={labelCls}>Vorname *</label>
                         <input value={vorname} onChange={e => setVorname(e.target.value)} className={inputCls} />
@@ -178,7 +180,7 @@ export const AngebotPruefenModal: FC<{
                       <label className={labelCls}>Einsatzort *</label>
                       <input value={einsatzort} onChange={e => setEinsatzort(e.target.value)} className={inputCls} />
                     </div>
-                    <div className="grid grid-cols-2 gap-2">
+                    <div className="grid grid-cols-2 gap-3">
                       <div>
                         <label className={labelCls}>Telefon</label>
                         <input value={telefon} onChange={e => setTelefon(e.target.value)} placeholder="Bitte eingeben" className={inputCls} />
@@ -191,22 +193,18 @@ export const AngebotPruefenModal: FC<{
                   </div>
                 </div>
 
-                <div className="h-px bg-gray-100" />
-
-                <div>
-                  <p className="text-sm font-bold text-gray-700 mb-0.5">Kontaktperson <span className="text-gray-400 font-normal">(in Notfällen)</span></p>
-                  <p className="text-sm text-gray-400 mb-3">Wen sollen wir bei Notfällen kontaktieren?</p>
+                <div className={sectionCls}>
+                  <p className={sectionTitleCls}>Kontaktperson <span className="font-normal text-gray-400">(in Notfällen)</span></p>
+                  <p className="text-[13px] text-gray-500 -mt-2 mb-3">Wen sollen wir im Notfall kontaktieren?</p>
                   <div className="space-y-3">
-                    <div className="grid grid-cols-2 gap-2">
-                      <div>
-                        <label className={labelCls}>Anrede</label>
-                        <select value={kpAnrede} onChange={e => setKpAnrede(e.target.value)} className={inputCls}>
-                          <option value="">Bitte wählen</option>
-                          <option>Frau</option><option>Herr</option><option>Divers</option>
-                        </select>
-                      </div>
+                    <div>
+                      <label className={labelCls}>Anrede</label>
+                      <select value={kpAnrede} onChange={e => setKpAnrede(e.target.value)} className={inputCls}>
+                        <option value="">Bitte wählen</option>
+                        <option>Frau</option><option>Herr</option><option>Divers</option>
+                      </select>
                     </div>
-                    <div className="grid grid-cols-2 gap-2">
+                    <div className="grid grid-cols-2 gap-3">
                       <div>
                         <label className={labelCls}>Vorname *</label>
                         <input value={kpVorname} onChange={e => setKpVorname(e.target.value)} placeholder="Vorname" className={inputCls} />
@@ -216,7 +214,7 @@ export const AngebotPruefenModal: FC<{
                         <input value={kpNachname} onChange={e => setKpNachname(e.target.value)} placeholder="Nachname" className={inputCls} />
                       </div>
                     </div>
-                    <div className="grid grid-cols-2 gap-2">
+                    <div className="grid grid-cols-2 gap-3">
                       <div>
                         <label className={labelCls}>Telefon *</label>
                         <input value={kpTelefon} onChange={e => setKpTelefon(e.target.value)} placeholder="Bitte eingeben" className={inputCls} />
@@ -229,9 +227,8 @@ export const AngebotPruefenModal: FC<{
                   </div>
                 </div>
 
-                <div className="h-px bg-gray-100" />
-
-                <div>
+                <div className={sectionCls}>
+                  <p className={sectionTitleCls}>Zusammenfassung</p>
                   <div className="flex items-center gap-3 mb-3">
                     <div className="w-10 h-10 rounded-xl flex-shrink-0 overflow-hidden">
                       {nurse.image ? (
@@ -240,9 +237,9 @@ export const AngebotPruefenModal: FC<{
                         <div className="w-full h-full flex items-center justify-center text-sm font-bold text-white" style={{ backgroundColor: nurse.color }}>{inits}</div>
                       )}
                     </div>
-                    <div>
-                      <p className="text-sm font-bold text-gray-700">Zusammenfassung</p>
-                      <p className="text-sm text-gray-500">{name}</p>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-semibold text-gray-900 truncate">{name}</p>
+                      <p className="text-[12px] text-gray-500">Tagessatz {tagessatz} €/Tag</p>
                     </div>
                   </div>
                   <div className="rounded-xl border border-gray-100 overflow-hidden divide-y divide-gray-100">
@@ -266,10 +263,10 @@ export const AngebotPruefenModal: FC<{
                       </div>
                     ))}
                   </div>
-                  <p className="text-xs text-gray-400 mt-2 px-1">Reisekosten werden nach <em>halben Tag</em> berechnet. Provision ist im Monatspreis enthalten.</p>
+                  <p className="text-[12px] text-gray-400 mt-2.5 leading-relaxed">Reisekosten werden nach <em>halben Tag</em> berechnet. Provision ist im Monatspreis enthalten.</p>
                 </div>
 
-                <label className="flex items-start gap-3 cursor-pointer p-4 bg-gray-50 border border-gray-200 rounded-xl" onClick={() => setAgbChecked(v => !v)}>
+                <label className="flex items-start gap-3 cursor-pointer p-4 bg-white border border-gray-200 rounded-2xl hover:bg-gray-50 transition-colors" onClick={() => setAgbChecked(v => !v)}>
                   <div className={`w-5 h-5 rounded flex items-center justify-center flex-shrink-0 mt-0.5 border-2 transition-all ${agbChecked ? 'bg-[#8B7355] border-[#8B7355]' : 'border-gray-300 bg-white'}`}>
                     {agbChecked && <Check className="w-3 h-3 text-white" strokeWidth={3} />}
                   </div>
