@@ -601,7 +601,7 @@ const CustomerPortalPage: FC = () => {
         <BookedScreen app={acceptedApp} onNurseClick={setSelectedNurse} />
       ) : (
       <>
-      {/* ── Hero (full-width gradient) ── */}
+      {/* ── Hero (full-width gradient) — state-aware copy ── */}
       {(() => {
         const anrede = lead?.anrede_text ?? lead?.anrede;
         const nachname = cap(lead?.nachname);
@@ -611,6 +611,37 @@ const CustomerPortalPage: FC = () => {
               ? `${anrede} ${nachname}`
               : nachname || vorname || '')
           : 'Herr Mustermann';
+
+        // Hero copy adapts to where the customer is in the flow:
+        //   pending  — at least one application waiting on a decision
+        //              → focus the customer on reviewing it now
+        //   ready    — patient profile saved, no applications yet
+        //              → encourage them to invite a Wunschkraft
+        //   initial  — fresh portal, profile not filled
+        //              → explain what the portal does next
+        const n = pendingApps.length;
+        const heroCopy = hasPending
+          ? {
+              title: n > 1
+                ? `Sie haben ${n} neue Bewerbungen. 📨`
+                : 'Sie haben eine neue Bewerbung. 📨',
+              subtitle: n > 1
+                ? 'Schauen Sie sich die Pflegekräfte in Ruhe an und entscheiden Sie, welche am besten passt.'
+                : 'Schauen Sie sich die Bewerbung in Ruhe an und entscheiden Sie, ob die Pflegekraft passt.',
+              pill: n > 1 ? `${n} Bewerbungen aktiv` : '1 Bewerbung aktiv',
+            }
+          : patientSaved
+          ? {
+              title: 'Sie sind startklar. ✨',
+              subtitle: 'Laden Sie jetzt Ihre Wunsch-Pflegekräfte ein — sobald sich jemand bewirbt, sehen Sie das Angebot direkt hier.',
+              pill: 'Profil vollständig',
+            }
+          : {
+              title: 'Ihr Angebot ist fertig. 🎉',
+              subtitle: 'Prüfen Sie Ihr persönliches Angebot, ergänzen Sie die Patientendaten und laden Sie Ihre Wunsch-Pflegekraft direkt ein.',
+              pill: 'Angebot kostenlos & unverbindlich',
+            };
+
         return (
           <div className="relative overflow-hidden" style={{background:'linear-gradient(135deg, #6B5444 0%, #8B7355 55%, #A18973 100%)'}}>
             <div className="absolute -top-12 -right-12 w-52 h-52 rounded-full" style={{background:'rgba(255,255,255,0.06)'}} />
@@ -620,14 +651,14 @@ const CustomerPortalPage: FC = () => {
                 Guten Tag{heroNameLine ? `, ${heroNameLine}` : ''}.
               </p>
               <h1 className="text-[1.65rem] font-bold text-white leading-tight mb-2">
-                Ihr Angebot ist fertig. 🎉
+                {heroCopy.title}
               </h1>
               <p className="text-[14px] leading-relaxed mb-5" style={{color:'rgba(255,255,255,0.8)'}}>
-                Prüfen Sie Ihr persönliches Angebot, ergänzen Sie die Patientendaten und laden Sie Ihre Wunsch-Pflegekraft direkt ein.
+                {heroCopy.subtitle}
               </p>
               <div className="inline-flex items-center gap-2 rounded-full px-4 py-2" style={{background:'rgba(255,255,255,0.15)', border:'1px solid rgba(255,255,255,0.3)'}}>
                 <Check className="w-3.5 h-3.5 flex-shrink-0" strokeWidth={3} style={{color:'rgba(255,255,255,0.9)'}} />
-                <span className="text-[14px] font-medium" style={{color:'rgba(255,255,255,0.95)'}}>Angebot kostenlos &amp; unverbindlich</span>
+                <span className="text-[14px] font-medium" style={{color:'rgba(255,255,255,0.95)'}}>{heroCopy.pill}</span>
               </div>
             </div>
             <svg viewBox="0 0 390 28" className="w-full block" style={{marginBottom:'-1px'}} preserveAspectRatio="none">
