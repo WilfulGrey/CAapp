@@ -446,8 +446,8 @@ export const AngebotCard: FC<{
   return (
     <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden shadow-sm divide-y divide-gray-100">
 
-      {/* ── Row 1: Ihr Angebot ── */}
-      <div>
+      {/* ── Row 1: Ihr Angebot — hidden, offer is now shown inline above the AngebotCard ── */}
+      <div style={{display:'none'}}>
         <button
           onClick={() => setAngebotOpen(o => !o)}
           className="w-full flex items-center gap-3 px-4 py-3.5 hover:bg-gray-50 transition-colors text-left"

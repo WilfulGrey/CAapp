@@ -748,37 +748,6 @@ const CustomerPortalPage: FC = () => {
           }}
         />
 
-        {/* ── Bewerbungsstatus ── */}
-        {!hasPending ? (
-          <div className="bg-gray-50 rounded-2xl px-5 py-4 flex items-center gap-4">
-            <div className="w-9 h-9 rounded-full bg-white border border-gray-200 flex items-center justify-center flex-shrink-0">
-              <Bell className="w-4 h-4 text-gray-400" />
-            </div>
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-semibold text-gray-800">Bewerbungen werden für Sie vorbereitet</p>
-              <p className="text-xs text-gray-400 mt-0.5">Sie erhalten eine E-Mail sobald eine Pflegekraft sich bewirbt.</p>
-              <div className="flex items-center gap-1.5 mt-1.5">
-                <svg className="w-3 h-3 text-[#22A06B] flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>
-                <span className="text-xs font-medium text-[#22A06B]">{lead?.email ?? mmCustomer?.email ?? ''}</span>
-              </div>
-            </div>
-          </div>
-        ) : (
-          <div className="bg-[#F0FAF5] rounded-2xl px-5 py-4 flex items-center gap-4">
-            <div className="w-9 h-9 rounded-full bg-white border border-[#B8E8D4] flex items-center justify-center flex-shrink-0 text-lg">
-              🎉
-            </div>
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-semibold text-gray-900">
-                {pendingApps.length === 1 ? 'Eine Bewerbung aktiv!' : `${pendingApps.length} Bewerbungen aktiv!`}
-              </p>
-              <p className="text-sm text-[#1a7a4f] mt-0.5">
-                Schauen Sie sich {pendingApps.length === 1 ? 'die Pflegekraft' : 'die Pflegekräfte'} in Ruhe an und entscheiden Sie, welches Angebot am besten passt.
-              </p>
-            </div>
-          </div>
-        )}
-
         {/* ── SECTION: Pending Applications ── */}
         {hasPending && (
           <div className="space-y-3">
