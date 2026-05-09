@@ -1106,9 +1106,9 @@ const CustomerPortalPage: FC = () => {
                   <AlertTriangle className="w-5 h-5" style={{color:'#D97706'}} />
                 </div>
                 <div>
-                  <p className="text-base font-bold text-gray-900">Patientendaten fehlen</p>
+                  <p className="text-base font-bold text-gray-900">Noch ein Schritt — die Patientendaten</p>
                   <p className="text-sm text-gray-600 mt-1 leading-relaxed">
-                    Ohne diese Angaben können Sie keine Pflegekräfte einladen — und auch keine Bewerbungen erhalten. Die Pflegekräfte brauchen die Infos, um den Auftrag richtig einzuschätzen.
+                    Damit sich Pflegekräfte gut auf Ihre Situation vorbereiten können, fehlen uns noch ein paar Angaben zum Patienten. Sobald das ausgefüllt ist, können Sie Pflegekräfte einladen und Bewerbungen erhalten.
                   </p>
                 </div>
               </div>

@@ -109,6 +109,18 @@ export const AngebotCard: FC<{
   useEffect(() => {
     onPatientSaved?.(saved);
   }, [saved]);
+
+  // Open the Patientendaten row when the parent flips `triggerOpenPatient`
+  // (e.g. customer clicks "Jetzt Patientendaten ausfüllen" in the
+  // invite-gate popup or in the So-funktioniert's stepper). The prop was
+  // declared but never wired up, so the click was a no-op apart from the
+  // scrollIntoView — the row stayed collapsed.
+  useEffect(() => {
+    if (triggerOpenPatient) {
+      setPatientOpen(true);
+      onTriggerHandled?.();
+    }
+  }, [triggerOpenPatient]);
   const [patient, setPatient] = useState<PatientForm>({
     anzahl: (pick('anzahl') as '1' | '2' | '') || '1',
     geschlecht: pick('geschlecht'), geburtsjahr: pick('geburtsjahr'),
