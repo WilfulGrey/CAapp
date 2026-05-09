@@ -39,7 +39,7 @@ export const AngebotPruefenModal: FC<{
     { monat: 'Juli 2026', betrag: Math.round(tagessatz * 12 + offer.abreisekosten), details: [`${tagessatz} €/Tag × 12 Tage`, `+ ${offer.abreisekosten} € Abreise`] },
   ];
 
-  const inputCls = 'w-full border border-gray-200 rounded-xl px-3.5 py-3 text-sm text-gray-800 focus:outline-none focus:border-[#9B1FA1] focus:ring-2 focus:ring-[#9B1FA1]/10 transition-all bg-white';
+  const inputCls = 'w-full border border-gray-200 rounded-xl px-3.5 py-3 text-sm text-gray-800 focus:outline-none focus:border-[#8B7355] focus:ring-2 focus:ring-[#8B7355]/10 transition-all bg-white';
   const labelCls = 'block text-sm font-semibold text-gray-700 mb-1.5';
 
   return (
@@ -71,13 +71,13 @@ export const AngebotPruefenModal: FC<{
             <div className="flex border-b border-gray-100 mt-1">
               <button
                 onClick={() => setStep(1)}
-                className={`flex items-center gap-1.5 px-1 pb-2.5 text-xs font-semibold mr-5 border-b-2 transition-colors ${step === 1 ? 'border-[#9B1FA1] text-[#9B1FA1]' : 'border-transparent text-gray-400'}`}
+                className={`flex items-center gap-1.5 px-1 pb-2.5 text-xs font-semibold mr-5 border-b-2 transition-colors ${step === 1 ? 'border-[#8B7355] text-[#8B7355]' : 'border-transparent text-gray-400'}`}
               >
                 {step === 2 && <Check className="w-3 h-3 text-[#22A06B]" />}
                 1 · Angebot
               </button>
               <button
-                className={`flex items-center gap-1.5 px-1 pb-2.5 text-xs font-semibold border-b-2 transition-colors ${step === 2 ? 'border-[#9B1FA1] text-[#9B1FA1]' : 'border-transparent text-gray-400'}`}
+                className={`flex items-center gap-1.5 px-1 pb-2.5 text-xs font-semibold border-b-2 transition-colors ${step === 2 ? 'border-[#8B7355] text-[#8B7355]' : 'border-transparent text-gray-400'}`}
               >
                 2 · Vertrag &amp; Bestätigung
               </button>
@@ -101,7 +101,7 @@ export const AngebotPruefenModal: FC<{
                     <p className="font-bold text-sm text-gray-900">{name}</p>
                     <p className="text-sm text-gray-500">{nurse.age} J. · {nurse.experience} · Deutsch {nurse.language.level}</p>
                   </div>
-                  <button onClick={() => onNurseClick(nurse)} className="text-sm font-semibold text-[#9B1FA1] hover:underline flex-shrink-0">
+                  <button onClick={() => onNurseClick(nurse)} className="text-sm font-semibold text-[#8B7355] hover:underline flex-shrink-0">
                     Profil →
                   </button>
                 </div>
@@ -109,7 +109,7 @@ export const AngebotPruefenModal: FC<{
                 {app.message && (
                   <div>
                     <p className="text-sm font-bold text-gray-700 mb-2">Nachricht der Agentur</p>
-                    <div className="border-l-4 border-[#9B1FA1] pl-4 py-1">
+                    <div className="border-l-4 border-[#8B7355] pl-4 py-1">
                       <p className="text-sm text-gray-600 leading-relaxed">„{app.message}"</p>
                     </div>
                   </div>
@@ -270,7 +270,7 @@ export const AngebotPruefenModal: FC<{
                 </div>
 
                 <label className="flex items-start gap-3 cursor-pointer p-4 bg-gray-50 border border-gray-200 rounded-xl" onClick={() => setAgbChecked(v => !v)}>
-                  <div className={`w-5 h-5 rounded flex items-center justify-center flex-shrink-0 mt-0.5 border-2 transition-all ${agbChecked ? 'bg-[#9B1FA1] border-[#9B1FA1]' : 'border-gray-300 bg-white'}`}>
+                  <div className={`w-5 h-5 rounded flex items-center justify-center flex-shrink-0 mt-0.5 border-2 transition-all ${agbChecked ? 'bg-[#8B7355] border-[#8B7355]' : 'border-gray-300 bg-white'}`}>
                     {agbChecked && <Check className="w-3 h-3 text-white" strokeWidth={3} />}
                   </div>
                   <span className="text-sm text-gray-600 leading-relaxed">
@@ -285,7 +285,7 @@ export const AngebotPruefenModal: FC<{
             {step === 1 ? (
               <button
                 onClick={() => setStep(2)}
-                className="w-full bg-[#9B1FA1] hover:bg-[#7B1A85] text-white rounded-xl py-3.5 text-sm font-bold transition-all"
+                className="w-full bg-[#E76F63] hover:bg-[#D65E52] text-white rounded-xl py-3.5 text-sm font-bold transition-all"
               >
                 Weiter →
               </button>
@@ -300,7 +300,7 @@ export const AngebotPruefenModal: FC<{
                 <button
                   onClick={() => canAccept && onAccept(app.id)}
                   disabled={!canAccept}
-                  className={`flex-1 rounded-xl py-3 text-sm font-bold transition-all ${canAccept ? 'bg-[#9B1FA1] hover:bg-[#7B1A85] text-white' : 'bg-gray-100 text-gray-400 cursor-not-allowed'}`}
+                  className={`flex-1 rounded-xl py-3 text-sm font-bold transition-all ${canAccept ? 'bg-[#E76F63] hover:bg-[#D65E52] text-white' : 'bg-gray-100 text-gray-400 cursor-not-allowed'}`}
                 >
                   Betreuungskraft akzeptieren
                 </button>
