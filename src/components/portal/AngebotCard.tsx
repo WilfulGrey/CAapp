@@ -31,7 +31,14 @@ export const AngebotCard: FC<{
   onTriggerHandled?: () => void;
   mamamiaEnabled?: boolean;
   onSaveToMamamia?: (form: PatientForm) => Promise<void>;
-}> = ({ lead, mmCustomer, onPatientSaved, triggerOpenPatient, onTriggerHandled, mamamiaEnabled, onSaveToMamamia }) => {
+  /** External "patient is saved" signal from the parent (e.g. demo
+   *  override or a future API-driven source of truth). Treated as an
+   *  upper bound: when true, the row reads as "Vollständig" even if the
+   *  AngebotCard's own `saved` state hasn't flipped from a draft. Avoids
+   *  the parent claiming patientSaved=true while this card still shows
+   *  "Unvollständig" — they should agree. */
+  forceSaved?: boolean;
+}> = ({ lead, mmCustomer, onPatientSaved, triggerOpenPatient, onTriggerHandled, mamamiaEnabled, onSaveToMamamia, forceSaved }) => {
   // ─── Derive display values from lead (or fallback to demo data) ──────────────
   // No demo-mode hardcodes (CLAUDE.md §1: real backend or visible failure).
   // When lead is missing, fields render empty — parent decides whether to
@@ -278,6 +285,12 @@ export const AngebotCard: FC<{
     return false;
   };
   const allComplete = STEP_LABELS.every((_, i) => stepComplete(i));
+
+  // `effectiveSaved` lets the parent's patientSaved signal flip the row
+  // to "Vollständig" even when the AngebotCard's own `saved` state hasn't
+  // moved (e.g. demo override, hydration race). The parent has its own
+  // truth — if it says saved, we should agree.
+  const effectiveSaved = saved || !!forceSaved;
 
   const inputCls = 'w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm text-gray-800 placeholder-gray-300 focus:outline-none focus:border-[#8B7355] focus:ring-2 focus:ring-[#8B7355]/10 transition-all bg-white';
   const labelCls = 'block text-sm font-medium text-gray-500 mb-1.5';
@@ -671,15 +684,15 @@ export const AngebotCard: FC<{
           onClick={() => setPatientOpen(o => !o)}
           className="w-full flex items-center gap-3 px-4 py-3.5 hover:bg-gray-50 transition-colors text-left"
         >
-          <div className={`w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 ${allComplete && saved ? 'bg-[#E3F7EF]' : 'bg-amber-50'}`}>
-            {allComplete && saved
+          <div className={`w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 ${effectiveSaved ? 'bg-[#E3F7EF]' : 'bg-amber-50'}`}>
+            {effectiveSaved
               ? <Check className="w-4 h-4 text-[#22A06B]" strokeWidth={3} />
               : <AlertCircle className="w-4 h-4 text-amber-500" />
             }
           </div>
           <div className="flex-1 min-w-0">
             <p className="text-xs text-gray-500 mb-0.5">Patientendaten</p>
-            {allComplete && saved ? (
+            {effectiveSaved ? (
               <p className="text-sm font-bold text-gray-900">Vollständig ausgefüllt</p>
             ) : (
               <div className="flex items-center gap-2">
