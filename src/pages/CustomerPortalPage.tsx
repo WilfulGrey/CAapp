@@ -708,6 +708,7 @@ const CustomerPortalPage: FC = () => {
         )}
 
         {/* ── Kombinierte Karte: Identität + Anfrage + Stepper ── */}
+        <div id="patientendaten">
         <AngebotCard
           lead={lead}
           mmCustomer={mmCustomer}
@@ -747,6 +748,7 @@ const CustomerPortalPage: FC = () => {
             await updateCustomerMutation.mutate(patch as Record<string, unknown>);
           }}
         />
+        </div>
 
         {/* ── SECTION: Pending Applications ── */}
         {hasPending && (
@@ -809,58 +811,172 @@ const CustomerPortalPage: FC = () => {
           </div>
         )}
 
-        {/* ── SECTION: Was passiert nach der Annahme? ── */}
-        <div className="rounded-xl border border-gray-100 overflow-hidden">
-          <div className="px-4 py-3 bg-gray-50 border-b border-gray-100">
-            <p className="text-xs font-bold text-gray-400 uppercase tracking-wider">Was passiert nach der Annahme?</p>
-          </div>
-          <div className="divide-y divide-gray-100 bg-white">
-            {[
-              { n: '1', title: 'Vertragsbestätigung per E-Mail', desc: 'Sie erhalten sofort eine Bestätigung mit allen Details.' },
-              { n: '2', title: 'Anreise & Betreuungsbeginn', desc: 'Die Pflegekraft reist zum vereinbarten Startdatum an und beginnt die Betreuung.' },
-              { n: '3', title: 'Laufende Begleitung', desc: 'Ihr persönlicher Ansprechpartner ist jederzeit für Sie da — auch während des Einsatzes.' },
-              { n: '4', title: 'Nächsten Einsatz planen', desc: 'Zur Mitte des laufenden Einsatzes starten wir die Planung der Nachfolge. Neue Pflegekräfte und alle Infos erscheinen direkt hier im Portal.' },
-            ].map((s) => (
-              <div key={s.n} className="flex items-start gap-3 px-4 py-3">
-                <div className="w-5 h-5 rounded-full bg-[#F8F7F5] text-[#8B7355] text-[10px] font-bold flex items-center justify-center flex-shrink-0 mt-0.5">{s.n}</div>
-                <div>
-                  <p className="text-sm font-semibold text-gray-800">{s.title}</p>
-                  <p className="text-xs text-gray-500 mt-0.5">{s.desc}</p>
-                </div>
-              </div>
-            ))}
-          </div>
+        {/* ── SECTION HEADER: So funktioniert's ── */}
+        <div className="px-1 pt-3">
+          <h2 className="text-[1.1rem] font-bold" style={{color:'#3D3D3D'}}>So funktioniert's</h2>
+          <div className="mt-1.5 h-[2px] w-10 rounded-full" style={{background:'#8B7355'}} />
+          <p className="text-[15px] mt-2" style={{color:'#8B8B8B'}}>Von der ersten Anfrage bis zur laufenden Betreuung.</p>
         </div>
-
-        {/* ── SECTION: FAQ ── */}
-        <div className="rounded-xl border border-gray-100 overflow-hidden">
-          <div className="px-4 py-3 bg-gray-50 border-b border-gray-100">
-            <p className="text-xs font-bold text-gray-400 uppercase tracking-wider">Häufige Fragen</p>
-          </div>
-          <div className="divide-y divide-gray-100 bg-white">
-            {[
-              { q: 'Was bedeutet "Einladen"?', a: 'Wenn Sie eine Pflegekraft einladen, erhält sie eine direkte Anfrage und kann sich offiziell bei Ihnen bewerben. Erst nach einer Bewerbung sehen Sie das konkrete Angebot und können annehmen oder ablehnen.' },
-              { q: 'Kann ich kündigen, wenn es nicht passt?', a: 'Ja — Sie können täglich kündigen, sofern in Ihrem Angebot so vereinbart. Es entstehen keine weiteren Kosten nach Abreise der Pflegekraft.' },
-              { q: 'Wie läuft die Zahlung ab?', a: 'Die Abrechnung erfolgt monatsgenau. Sie erhalten am Monatsende eine Rechnung für die tatsächlichen Betreuungstage.' },
-              { q: 'Was passiert, wenn die Pflegekraft ausfällt?', a: 'Primundus organisiert schnellstmöglich eine Vertretung. Ihr Ansprechpartner informiert Sie proaktiv.' },
-              { q: 'Kann ich eine andere Pflegekraft wählen?', a: 'Ja — Sie können Bewerbungen ablehnen und weitere Pflegekräfte einladen. Wir helfen Ihnen, die beste Lösung zu finden.' },
-              { q: 'Wie werden Reisekosten abgerechnet?', a: 'Reisekosten fallen einmalig bei An- und Abreise an und sind im Angebot als Pauschale ausgewiesen.' },
-            ].map((item, i) => (
-              <div key={i}>
-                <button
-                  onClick={() => setOpenFaq(openFaq === i ? null : i)}
-                  className="w-full flex items-center justify-between px-4 py-3 text-left hover:bg-gray-50 transition-colors"
-                >
-                  <span className="text-sm font-medium text-gray-800 pr-4">{item.q}</span>
-                  <ChevronDown className={`w-4 h-4 text-gray-400 flex-shrink-0 transition-transform ${openFaq === i ? 'rotate-180' : ''}`} />
-                </button>
-                {openFaq === i && (
-                  <div className="px-4 pb-3">
-                    <p className="text-sm text-gray-500 leading-relaxed">{item.a}</p>
-                  </div>
+        <div className="rounded-2xl overflow-hidden border" style={{background:'white', borderColor:'#E5E3DF'}}>
+          {[
+            { n: 1, title: 'Patientendaten vervollständigen', desc: 'Das Angebot sagt Ihnen zu? Ergänzen Sie jetzt die Angaben zum Patienten — so können sich Pflegekräfte optimal vorbereiten.', cta: !patientSaved },
+            { n: 2, title: 'Bewerbungen erhalten & Pflegekräfte einladen', desc: 'Geeignete Pflegekräfte bewerben sich bei Ihnen. In der Zwischenzeit können Sie Wunschkandidatinnen gezielt einladen.', cta: false },
+            { n: 3, title: 'Vertrag abschließen', desc: 'Sie wählen Ihre Favoritin aus und bestätigen das Angebot — den Rest übernehmen wir.', cta: false },
+            { n: 4, title: 'Laufende Betreuung', desc: 'Die Pflegekraft ist da. Ihr persönlicher Ansprechpartner begleitet Sie während des gesamten Einsatzes.', cta: false },
+          ].map((s, i, arr) => (
+            <div key={s.n} className={`flex items-start gap-4 px-5 py-4 ${i < arr.length - 1 ? 'border-b' : ''}`} style={{borderColor:'#E5E3DF'}}>
+              <div className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 font-bold text-white mt-0.5" style={{background:'#8B7355', fontSize:'15px'}}>{s.n}</div>
+              <div>
+                <p className="text-[15px] font-semibold" style={{color:'#3D3D3D'}}>{s.title}</p>
+                <p className="text-[15px] mt-0.5 leading-relaxed" style={{color:'#8B8B8B'}}>{s.desc}</p>
+                {s.cta && (
+                  <button
+                    onClick={() => { setTriggerOpenPatient(true); document.getElementById('patientendaten')?.scrollIntoView({ behavior: 'smooth', block: 'start' }); }}
+                    className="mt-1.5 text-[13px] font-semibold flex items-center gap-1 transition-colors"
+                    style={{color:'#8B7355'}}
+                  >
+                    Jetzt ausfüllen ↑
+                  </button>
                 )}
               </div>
-            ))}
+            </div>
+          ))}
+        </div>
+
+        {/* ── SECTION HEADER: Häufige Fragen ── */}
+        <div className="px-1 pt-3">
+          <h2 className="text-[1.1rem] font-bold" style={{color:'#3D3D3D'}}>Häufige Fragen</h2>
+          <div className="mt-1.5 h-[2px] w-10 rounded-full" style={{background:'#8B7355'}} />
+        </div>
+        <div className="rounded-2xl overflow-hidden border" style={{background:'white', borderColor:'#E5E3DF'}}>
+          {[
+            { q: 'Was bedeutet „Einladen"?', a: 'Wenn Ihnen eine Pflegekraft gefällt, können Sie sie einladen, sich bei Ihnen zu bewerben. Voraussetzung ist, dass das Patientenprofil vollständig ausgefüllt ist — damit sich die Pflegekraft optimal vorbereiten kann. Erst wenn Sie ein konkretes Angebot annehmen, kommt ein Vertrag zustande.' },
+            { q: 'Gehe ich mit dem Einladen einen Vertrag ein?', a: 'Nein — das Einladen und Anschauen von Profilen ist vollständig unverbindlich. Ein Vertrag kommt erst zustande, wenn Sie ein konkretes Angebot ausdrücklich annehmen.' },
+            { q: 'Kann ich jederzeit kündigen?', a: 'Ja, täglich kündbar — ohne Mindestlaufzeit und ohne Angabe von Gründen. Kosten entstehen ausschließlich für Tage, an denen die Pflegekraft tatsächlich vor Ort ist.' },
+            { q: 'Wie funktioniert die Abrechnung?', a: 'Tagesgenau: Sie zahlen nur für geleistete Betreuungstage. Die Rechnung für den laufenden Monat wird jeweils zur Monatsmitte erstellt — transparent, nachvollziehbar, ohne versteckte Posten.' },
+            { q: 'Wie lange bleibt die Pflegekraft — und wie läuft der Wechsel?', a: 'Pflegekräfte bleiben im Durchschnitt 6 bis 8 Wochen. Zur Mitte des Einsatzes beginnen wir bereits mit der Planung der Nachfolge, damit der Übergang nahtlos klappt. Sie müssen sich um nichts kümmern — Primundus organisiert den gesamten Wechsel.' },
+            { q: 'Was passiert, wenn die Pflegekraft ausfällt?', a: 'Primundus kümmert sich umgehend um eine qualifizierte Vertretung. Ihr persönlicher Ansprechpartner informiert Sie proaktiv und begleitet die Übergabe.' },
+            { q: 'Wie werden Reisekosten abgerechnet?', a: 'Die Reisekosten betragen pauschal 125 € pro Strecke — also je einmal bei der Anreise und bei der Abreise. Weitere versteckte Reisekosten gibt es nicht.' },
+            { q: 'Ist das legal?', a: 'Ja, vollständig. Die Pflegekräfte sind sozialversicherungspflichtig bei uns angestellt und werden von uns nach Deutschland entsandt. Für jeden Einsatz liegt eine offizielle A1-Bescheinigung vor — der Nachweis der Sozialversicherungspflicht im Herkunftsland.' },
+            { q: 'Mit wem wird der Vertrag geschlossen?', a: 'Der Betreuungsvertrag wird mit unserer Muttergesellschaft, der Vitanas Group, geschlossen — einem der größten und erfahrensten Pflegeunternehmen Deutschlands.' },
+            { q: 'Welche Kosten entstehen insgesamt?', a: 'Es gibt vier Kostenpunkte: Die monatlichen Betreuungskosten laut Ihrem Angebot. Anreise und Abreise pauschal je 125 €. Kost und Logis, die Sie der Pflegekraft frei zur Verfügung stellen. Fällt der Einsatz in einen Sommermonat (Juli oder August), kommen einmalig 200 € Urlaubszuschlag hinzu. Gesetzliche Feiertage werden mit dem doppelten Tagessatz berechnet. Darüber hinaus gibt es keinerlei versteckte Kosten.' },
+          ].map((item, i, arr) => (
+            <div key={i} className={i < arr.length - 1 ? 'border-b' : ''} style={{borderColor:'#E5E3DF'}}>
+              <button
+                onClick={() => setOpenFaq(openFaq === i ? null : i)}
+                className="w-full flex items-center justify-between px-5 py-5 text-left transition-colors duration-150"
+                style={{background: openFaq === i ? '#FAFAF9' : 'transparent'}}
+              >
+                <span className="text-[15px] font-semibold pr-4 leading-snug transition-colors duration-150"
+                  style={{color: openFaq === i ? '#6B5444' : '#3D3D3D'}}>
+                  {item.q}
+                </span>
+                <div className={`w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0 transition-all duration-200 ${
+                  openFaq === i ? 'bg-[#8B7355]' : 'bg-[#F0EDE8]'
+                }`}>
+                  <ChevronDown className={`w-4 h-4 transition-transform duration-200 ${
+                    openFaq === i ? 'rotate-180 text-white' : 'text-[#8B7355]'
+                  }`} />
+                </div>
+              </button>
+              {openFaq === i && (
+                <div className="px-5 pb-6 pt-1" style={{background:'#FAFAF9'}}>
+                  <p className="text-[15px] leading-[1.75] text-gray-600">{item.a}</p>
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+
+        {/* ── Ilka-Box (Beraterin / Trust / CTA) ── */}
+        <div className="rounded-2xl overflow-hidden border bg-white" style={{borderColor:'#E5E3DF'}}>
+          <div className="px-5 pt-5 pb-5 space-y-5">
+            <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Noch Fragen? Ihre Beraterin</p>
+            <div className="flex items-center gap-4">
+              <div className="relative flex-shrink-0">
+                <img
+                  src="/ilka.webp"
+                  alt="Ilka Wysocki"
+                  className="w-[72px] h-[72px] rounded-2xl object-cover object-top"
+                  style={{border:'1.5px solid #F0C4B4'}}
+                />
+                <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-[#22A06B] rounded-full border-2 border-white">
+                  <span className="relative flex h-full w-full items-center justify-center">
+                    <span className="animate-ping absolute inline-flex h-2 w-2 rounded-full bg-white opacity-60" />
+                    <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-white" />
+                  </span>
+                </div>
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="font-bold text-gray-900 text-base leading-tight">Ilka Wysocki</p>
+                <p className="text-xs text-gray-500 mb-2">Pflegeberaterin · Primundus</p>
+                <a href="tel:089200000830" className="inline-flex items-center gap-1.5 text-[#8B7355] font-bold text-sm hover:opacity-80 transition-opacity">
+                  <Phone className="w-3.5 h-3.5 flex-shrink-0" />
+                  089 200 000 830
+                </a>
+                <p className="text-xs text-gray-500 mt-0.5">Mo–So, 8:00–18:00 Uhr</p>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-3 gap-2">
+              <div className="text-center bg-gray-50 rounded-xl py-3 px-1 border border-gray-100">
+                <img src="/badge-testsieger.webp" alt="Testsieger" className="h-8 w-auto mx-auto mb-1.5 object-contain" />
+                <p className="text-xs font-semibold text-gray-500 leading-tight">Testsieger<br/>Die Welt</p>
+              </div>
+              <div className="text-center bg-gray-50 rounded-xl py-3 px-1 border border-gray-100">
+                <div className="flex justify-center mb-1.5">
+                  <svg className="w-6 h-6 text-[#8B7355]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                </div>
+                <p className="text-xs font-semibold text-gray-500 leading-tight">20+ Jahre<br/>Erfahrung</p>
+              </div>
+              <div className="text-center bg-gray-50 rounded-xl py-3 px-1 border border-gray-100">
+                <div className="flex justify-center mb-1.5">
+                  <svg className="w-6 h-6 text-[#8B7355]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
+                  </svg>
+                </div>
+                <p className="text-xs font-semibold text-gray-500 leading-tight">60.000+<br/>Einsätze</p>
+              </div>
+            </div>
+
+            <div>
+              <p className="text-xs font-semibold text-gray-300 uppercase tracking-wider text-center mb-2.5">Bekannt aus</p>
+              <div className="flex items-center justify-center gap-4 flex-wrap">
+                {[
+                  { src: '/media-welt.webp', alt: 'Die Welt' },
+                  { src: '/media-bildderfau.webp', alt: 'Bild der Frau' },
+                  { src: '/media-faz.webp', alt: 'FAZ' },
+                  { src: '/media-ard.webp', alt: 'ARD' },
+                  { src: '/media-ndr.webp', alt: 'NDR' },
+                  { src: '/media-sat1.webp', alt: 'SAT.1' },
+                ].map(logo => (
+                  <img key={logo.alt} src={logo.src} alt={logo.alt} className="h-4 w-auto object-contain opacity-50 grayscale" />
+                ))}
+              </div>
+            </div>
+
+            <div className="flex gap-3">
+              <a
+                href="tel:089200000830"
+                className="flex-1 flex items-center justify-center gap-2 bg-[#E76F63] hover:bg-[#D65E52] text-white rounded-xl py-3 text-sm font-bold transition-colors"
+              >
+                <Phone className="w-4 h-4" />
+                Anrufen
+              </a>
+              <a
+                href="https://wa.me/4989200000830"
+                target="_blank"
+                rel="noreferrer"
+                className="flex-1 flex items-center justify-center gap-2 bg-[#25D366] hover:bg-[#20BA5A] text-white rounded-xl py-3 text-sm font-bold transition-colors"
+              >
+                <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
+                  <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/><path d="M12 0C5.373 0 0 5.373 0 12c0 2.123.555 4.116 1.529 5.845L.057 23.571l5.865-1.539A11.94 11.94 0 0012 24c6.627 0 12-5.373 12-12S18.627 0 12 0zm0 21.894a9.86 9.86 0 01-5.031-1.378l-.361-.214-3.741.981.999-3.648-.235-.374A9.86 9.86 0 012.106 12C2.106 6.58 6.58 2.106 12 2.106S21.894 6.58 21.894 12 17.42 21.894 12 21.894z"/>
+                </svg>
+                WhatsApp
+              </a>
+            </div>
           </div>
         </div>
 
