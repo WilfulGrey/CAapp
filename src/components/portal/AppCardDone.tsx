@@ -16,11 +16,11 @@ export const AppCardDone: FC<{
   return (
     <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
       {app.isInvited && (
-        <div className="flex items-center gap-1.5 px-3 py-1.5 bg-[#F5EDF6] border-b border-[#E8D0EA]">
-          <svg className="w-3 h-3 text-[#9B1FA1] flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+        <div className="flex items-center gap-1.5 px-3 py-1.5 bg-[#F8F7F5] border-b border-[#E5E3DF]">
+          <svg className="w-3 h-3 text-[#8B7355] flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
           </svg>
-          <span className="text-xs font-semibold text-[#9B1FA1]">Von Ihnen eingeladen</span>
+          <span className="text-xs font-semibold text-[#8B7355]">Von Ihnen eingeladen</span>
         </div>
       )}
       <div
@@ -53,7 +53,7 @@ export const AppCardDone: FC<{
         <div className="border-t border-gray-100 px-4 py-2 flex justify-end">
           <button
             onClick={() => onUndo(app.id)}
-            className="text-xs font-semibold text-[#9B1FA1] hover:underline"
+            className="text-xs font-semibold text-[#8B7355] hover:underline"
           >
             ↩ Ablehnung rückgängig machen
           </button>
