@@ -751,9 +751,9 @@ const CustomerPortalPage: FC = () => {
 
       <div className="max-w-3xl mx-auto px-4 py-6 space-y-4">
 
-        {/* ── SECTION HEADER: Passende Pflegekräfte ── */}
+        {/* ── SECTION HEADER: Passende Pflegekräfte / Ihre Bewerbungen (state-aware) ── */}
         <div className="px-1">
-          <h2 className="text-[1.1rem] font-bold" style={{color:'#3D3D3D'}}>Passende Pflegekräfte</h2>
+          <h2 className="text-[1.1rem] font-bold" style={{color:'#3D3D3D'}}>{hasPending ? 'Ihre Bewerbungen' : 'Passende Pflegekräfte'}</h2>
           <div className="mt-1.5 h-[2px] w-10 rounded-full" style={{background:'#8B7355'}} />
         </div>
 
@@ -770,7 +770,10 @@ const CustomerPortalPage: FC = () => {
           </div>
         )}
 
-        {/* ── Kombinierte Karte: Identität + Anfrage + Stepper ── */}
+        {/* ── Kombinierte Karte: Identität + Anfrage + Stepper ──
+             Hidden once a Bewerbung is in: customer should focus on the
+             pending application, not on revisiting saved patient data. */}
+        {!hasPending && (
         <div id="patientendaten">
         <AngebotCard
           lead={lead}
@@ -812,6 +815,7 @@ const CustomerPortalPage: FC = () => {
           }}
         />
         </div>
+        )}
 
         {/* ── SECTION: Pending Applications ── */}
         {hasPending && (
@@ -841,10 +845,21 @@ const CustomerPortalPage: FC = () => {
             <>
               {visibleNurses.length > 0 && (
                 <div>
+                  {patientSaved && (
+                    <div className="rounded-2xl border px-4 py-3 mb-3 flex items-center gap-3" style={{background:'#F8F7F5', borderColor:'#E5E3DF'}}>
+                      <div className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0" style={{background:'white', borderColor:'#E5E3DF', borderWidth:1}}>
+                        <Bell className="w-4 h-4" style={{color:'#8B7355'}} />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-[14px] font-semibold" style={{color:'#3D3D3D'}}>Bewerbungen werden für Sie vorbereitet</p>
+                        <p className="text-[13px] mt-0.5 leading-snug" style={{color:'#8B8B8B'}}>Sobald sich Pflegekräfte bewerben, erscheinen die Angebote hier oben.</p>
+                      </div>
+                    </div>
+                  )}
                   <p className="text-[14px] leading-relaxed pb-2 px-1" style={{color:'#3D3D3D'}}>
                     {!patientSaved
                       ? 'Damit sich Pflegekräfte bewerben bzw. Sie diese einladen können, vervollständigen Sie bitte die Patienteninformationen.'
-                      : 'Tippen Sie auf „Einladen", wenn Ihnen eine Pflegekraft gefällt — sie bewirbt sich dann bei Ihnen.'}
+                      : 'Tippen Sie auf „Einladen", wenn Ihnen eine Pflegekraft gefällt — die Anfrage geht direkt an die Pflegekraft.'}
                   </p>
                   <div className="space-y-3">
                     {visibleNurses.map(({ nurse, i, status }) => (
