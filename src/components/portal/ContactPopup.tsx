@@ -117,7 +117,7 @@ export const ContactPopup: FC<{ onClose: () => void }> = ({ onClose }) => (
               Anrufen
             </a>
             <a
-              href="https://wa.me/4989200000830"
+              href={`https://wa.me/4989200000830?text=${encodeURIComponent('Hallo Frau Wysocki, ich habe folgendes Anliegen:')}`}
               target="_blank"
               rel="noreferrer"
               className="flex-1 flex items-center justify-center gap-2 bg-[#25D366] hover:bg-[#20BA5A] text-white rounded-xl py-3 text-sm font-bold transition-colors"
