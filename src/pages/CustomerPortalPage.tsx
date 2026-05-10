@@ -735,12 +735,17 @@ const CustomerPortalPage: FC = () => {
                 </div>
 
                 <div className="mt-2 flex justify-center">
-                  <button onClick={() => {}} className="flex items-center gap-1.5 transition-opacity hover:opacity-70">
+                  <a
+                    href="/primundus-mustervertrag.pdf"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center gap-1.5 transition-opacity hover:opacity-70"
+                  >
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" style={{width:14,height:14,color:'#3D3D3D'}}>
                       <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="12" x2="12" y2="18"/><polyline points="9 15 12 18 15 15"/>
                     </svg>
-                    <span className="text-[13px] underline" style={{color:'#3D3D3D'}}>Angebot als PDF herunterladen</span>
-                  </button>
+                    <span className="text-[13px] underline" style={{color:'#3D3D3D'}}>Mustervertrag als PDF herunterladen</span>
+                  </a>
                 </div>
             </div>
           )}
@@ -1060,7 +1065,7 @@ const CustomerPortalPage: FC = () => {
                 Anrufen
               </a>
               <a
-                href="https://wa.me/4989200000830"
+                href={`https://wa.me/4989200000830?text=${encodeURIComponent('Hallo Frau Wysocki, ich habe folgendes Anliegen:')}`}
                 target="_blank"
                 rel="noreferrer"
                 className="flex-1 flex items-center justify-center gap-2 bg-[#25D366] hover:bg-[#20BA5A] text-white rounded-xl py-3 text-sm font-bold transition-colors"
