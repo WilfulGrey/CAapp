@@ -793,15 +793,11 @@ const CustomerPortalPage: FC = () => {
 
       <div className="max-w-3xl mx-auto px-4 py-6 space-y-4">
 
-        {/* ── INFO: Bewerbungen werden vorbereitet (state B only) ── */}
+        {/* ── CTA: Jetzt Pflegekräfte einladen (state B only) ── */}
         {patientSaved && !hasPending && (
-          <div className="rounded-2xl border px-5 py-4 flex gap-3" style={{background:'#F8F7F5', borderColor:'#E5E3DF'}}>
-            <Bell className="w-5 h-5 flex-shrink-0 mt-1" style={{color:'#8B7355'}} />
-            <div className="flex-1 min-w-0">
-              <p className="text-base font-semibold leading-snug" style={{color:'#3D3D3D'}}>Bewerbungen werden für Sie vorbereitet</p>
-              <p className="text-sm mt-1.5 leading-relaxed" style={{color:'#6B6B6B'}}>Sobald sich Pflegekräfte bewerben, erscheinen die Angebote hier. Laden Sie in der Zwischenzeit weitere Pflegekräfte ein, sich bei Ihnen zu bewerben.</p>
-            </div>
-          </div>
+          <p className="text-sm leading-relaxed px-1" style={{color:'#6B6B6B'}}>
+            Jetzt Pflegekräfte einladen
+          </p>
         )}
 
         {/* ── SECTION HEADER: Passende Pflegekräfte / Ihre Bewerbungen (state-aware) ── */}
