@@ -42,8 +42,8 @@ export const MatchCard: FC<{
         status === 'declined'
           ? 'opacity-40 border-gray-200'
           : status === 'invited'
-          ? 'border-gray-200'
-          : 'border-gray-200 hover:border-[#8B7355] hover:shadow-[0_4px_16px_rgba(139,115,85,0.12)]'
+          ? 'border-[#C4B49A]'
+          : 'border-[#C4B49A] hover:border-[#8B7355] hover:shadow-[0_4px_16px_rgba(139,115,85,0.12)]'
       }`}
     >
       <div className="px-4 pt-4 pb-3 cursor-pointer active:bg-gray-50" onClick={onNurseClick}>
