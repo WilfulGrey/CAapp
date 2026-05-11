@@ -216,7 +216,7 @@ export async function onboardLead(opts: OnboardOptions): Promise<OnboardResult &
       title,
       description: "Auto-created from Primundus kostenrechner",
       salary_offered: careBudget,
-      salary_commission: 300,   // Primundus default commission, panel rejects 0
+      salary_commission: 10,    // Primundus default commission, panel rejects 0 (300 → 10 wg decyzji 2026-05-11)
       visibility: "public",
       arrival_at: arrivalAt,
     },

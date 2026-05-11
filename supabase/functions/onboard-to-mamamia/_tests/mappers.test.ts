@@ -593,7 +593,7 @@ Deno.test("buildCustomerInput: identity + business defaults + real formularDaten
   // Business defaults — NOT pytania do klienta
   assertEquals(input.language_id, 1);
   assertEquals(input.visibility, "public");
-  assertEquals(input.commission_agent_salary, 300);
+  assertEquals(input.commission_agent_salary, 10);
 
   // Real from kalkulation
   assertEquals(input.care_budget, 3200);
