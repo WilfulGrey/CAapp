@@ -796,7 +796,7 @@ const CustomerPortalPage: FC = () => {
         {/* ── CTA: Jetzt Pflegekräfte einladen (state B only) ── */}
         {patientSaved && !hasPending && (
           <p className="text-sm leading-relaxed px-1" style={{color:'#6B6B6B'}}>
-            Jetzt Pflegekräfte einladen
+            Wir haben passende Pflegekräfte für Sie vorbereitet – laden Sie jetzt Ihre Wunschpflegekräfte ein, sich bei Ihnen zu bewerben. Für Sie völlig unverbindlich.
           </p>
         )}
 
