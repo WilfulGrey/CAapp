@@ -615,6 +615,7 @@ Wszystkie z 2026-04 → 2026-05. Lista ma być wyczerpana — jak coś znów
 | 13l | **Mamamia panel "Lokalizacja opieki" nie zaciągało się mimo Customer.location_id ustawionego**. Bug #13d ustawia top-level `Customer.location_id` przez searchLocations lookup, ALE panel "Lokalizacja opieki" reads z `customer_contracts[].location_id` (osobny wiersz). Bug #13 wyciął contracts z onboardu (delegated to acceptance) → patient form save tworzy customer.location_id, ale customer_contracts stays []. Empirical verification 2026-05-07 na Customer 7661 (testiphone2): user wpisał ręcznie "01108 Marsdorf" w panel → Mamamia auto-stworzyła 2 contracts (patient_contact + contract_contact) z location_id. Diff potwierdził że panel reads from contracts | supabase/functions/mamamia-proxy/operations.ts (UPDATE_CUSTOMER args), supabase/functions/mamamia-proxy/actions.ts (UPDATE_CUSTOMER_ALLOWED), src/lib/mamamia/patientFormMapper.ts (MappedCustomerPatch + emit contracts) | UPDATE_CUSTOMER mutation: dodać `$patient_contracts: [CustomerContractInputType]` + `$invoice_contract: CustomerContractInputType`. UPDATE_CUSTOMER_ALLOWED: dodać te pola do whitelisty. patientFormMapper: gdy `opts.locationId` resolved, emit `patient_contracts: [{contact_type:"patient_contact", location_id}]` + `invoice_contract: {contact_type:"contract_contact", location_id}`. Sanity test 2026-05-07 na Customer 7659: HTTP 200, contracts utworzone z `location_id=14380`. NIE wysyłamy innych pól contractu (name, street, salutation) — patient form ich nie zbiera, ustaje przy acceptance via StoreConfirmation. Edge: jeśli user manualnie wpisał inne pola contractu w panelu między Save calls, nasz Save je nadpisuje (Mamamia replaces contract list). Akceptowalne dla MVP. |
 | 13k | **Pflegedienst description nie zaciągało się w Mamamia panel "Jak często i jakie zadania wykonuje Pflegedienst?"** — patientFormMapper pakował frequency+tasks w `job_description` jako `Pflegedienst: <freq>: <tasks>` segment, bo gotcha #2 (2026-05-05) mówiło że dedicated args ŁAMIĄ mutation. **Schema się zmieniło od 2026-05-05** — zweryfikowane live 2026-05-07: introspection pokazała 4 dedicated args na `UpdateCustomer`, sanity test na Customer 7659 wpisał wartości i mutation HTTP 200. ŚWIĘTA ZASADA NR 1.5: gotchas też podlegają empirycznej weryfikacji okresowo | supabase/functions/mamamia-proxy/operations.ts (UPDATE_CUSTOMER + GET_CUSTOMER), supabase/functions/mamamia-proxy/actions.ts (UPDATE_CUSTOMER_ALLOWED), src/lib/mamamia/patientFormMapper.ts, src/lib/mamamia/mappers.ts (reverse), src/lib/mamamia/types.ts | (1) UPDATE_CUSTOMER mutation: dodać 4 args `day_care_facility_description{,_de,_en,_pl}`. (2) GET_CUSTOMER select: dodać te same. (3) UPDATE_CUSTOMER_ALLOWED whitelist: dodać. (4) patientFormMapper: gdy pflegedienst=Ja, wysyłać do dedykowanych pól (3 lokale + no-locale variant mirror DE), drop `Pflegedienst:` segment z job_description. (5) Reverse mapper: czytać z `day_care_facility_description_de` (lub no-locale fallback) pierwsze; legacy `job_description` segment parser jako fallback dla customers utworzonych pre-Bug-#13k. |
 | 14 | **CI flakes ujawnione w pierwszym GitHub Actions run** (2026-05-07) — testy przechodzące lokalnie u Michała padały na ubuntu-latest UTC runner. Dwa różne wzory: (1) `formatDate('2025-12-31T23:59:59Z') === '01.01.2026'` w supabase.test.ts działało tylko w UTC+ TZ (CEST u Michała, UTC na CI → '31.12.2025'); (2) 3 pliki testów onboard hardcodowały `token_expires_at: "2026-05-07T12:00:00Z"` — passed lokalnie (Michał uruchamiał rano), padało na CI od ~14 UTC tego dnia z "lead token expired or invalid". Pre-existing flakes maskowane lokalnym setupem | .github/workflows/test.yml (TZ pin), supabase/functions/onboard-to-mamamia/_tests/{handler,onboard,mappers}.test.ts | (1) Pin `TZ=Europe/Berlin` w vitest job env — pasuje do produkcji (niemieccy klienci) i naprawia tym samym wszystkie przyszłe TZ-dependent testy. (2) Bump `token_expires_at` do `"2099-01-01T00:00:00.000Z"` we wszystkich 3 fixture'ach — nigdy nie wygaśnie podczas runa. **Reguła:** każda data w testach która ma być "w przyszłości" → bump do 2099 lub `new Date(Date.now() + N).toISOString()`. NIE używaj dat względem dzisiejszej, bo CI runuje 24/7. |
+| 15 | **Switch beta → preprod Mamamia padał z `validation [{"service_agency_id":["...ist ungültig."]}]`** (2026-05-11). Po set'cie nowych secrets MAMAMIA_ENDPOINT + AUTH + AGENCY_EMAIL + AGENCY_PASSWORD w Supabase + redeploy Edge Functions, pierwszy onboard zwracał generic "onboarding failed". `DEBUG_ONBOARD=1` ujawnił że Mamamia odrzuca StoreJobOffer.service_agency_id=18 — to był id Primundus w beta.mamamia.app, prod ma id=3. Każdy tenant Mamamia ma osobny auto-increment, IDs się nie zgadzają między beta/prod | supabase/functions/onboard-to-mamamia/onboard.ts (`PRIMUNDUS_AGENCY_ID`), supabase/functions/onboard-to-mamamia/index.ts (DEBUG_ONBOARD gate) | (1) `PRIMUNDUS_AGENCY_ID = 3` dla prod (było 18 dla beta). Komentarz w kodzie listuje IDs per env. (2) Discovery: `{ ServiceAgency { id name } }` na live endpoint — query bez arg zwraca singleton dla zalogowanego agency user'a (Primundus = ten user). (3) Dodany `DEBUG_ONBOARD=1` env-gate analog do `DEBUG_PROXY` — gdy ustawiony, onboard zwraca underlying Mamamia error w body zamiast generic "onboarding failed". Default off; włącz tylko podczas diagnozy. **Reguła:** każdy hardcoded ID z Mamamia jest per-tenant. Przy następnym env switch'u (preprod → real prod, czy fresh tenant) — zrób query żeby zweryfikować że IDs są aktualne, NIE zakładaj że beta→prod ma identyczny seed data. Long-term TODO: fetch raz przy cold-start Edge Fn i cache w module singleton (eliminacja hardcode). |
 
 ---
 
@@ -1101,6 +1102,126 @@ FROM leads WHERE token = '...';
   twoja "jutrzejsza" data wygaśnie nim się zorientujesz.
 - ❌ Założenia o lokalnej TZ w testach formatowania dat. CI runuje UTC.
   Pin `TZ` w workflow albo użyj UTC-relative assertions.
+- ❌ Hardcoded Mamamia IDs (`PRIMUNDUS_AGENCY_ID`, `location_id`-y,
+  etc.) bez znacznika środowiska. IDs są **per-tenant** — beta i prod
+  to oddzielne bazy z osobnymi auto-increment'ami. Przy switch'u env
+  zweryfikuj IDs live query'em (`{ ServiceAgency { id name } }` itp.),
+  nie zakładaj że seed jest spójny. Patrz Bug #15.
+
+---
+
+## Environment switch checklist
+
+Switching Supabase Edge Function secrets między środowiskami Mamamia
+(np. beta → preprod → prod) jest niskim-kontaktowym kodzie ale wymaga
+weryfikacji per-tenant invariants. Sekwencja:
+
+### 1. Backup current secrets digests
+
+```bash
+npx supabase secrets list --project-ref <SUPA_REF>
+# Zapisz digesty 4 MAMAMIA_* — przyda się gdyby trzeba rollback.
+```
+
+### 2. Set new secrets
+
+```bash
+npx supabase secrets set \
+  MAMAMIA_ENDPOINT="https://<new-endpoint>/graphql" \
+  MAMAMIA_AUTH_ENDPOINT="https://<new-endpoint>/graphql/auth" \
+  MAMAMIA_AGENCY_EMAIL="..." \
+  MAMAMIA_AGENCY_PASSWORD="..." \
+  --project-ref <SUPA_REF>
+```
+
+Verify że digesty się zmieniły.
+
+### 3. Redeploy both Edge Functions (cold-start = fresh secrets)
+
+```bash
+npx supabase functions deploy onboard-to-mamamia --project-ref <SUPA_REF>
+npx supabase functions deploy mamamia-proxy --project-ref <SUPA_REF>
+```
+
+In-memory cache agency-token reset'uje się na cold-start (mamamiaClient.ts
+`cachedToken`).
+
+### 4. Reset legacy lead cache w Supabase
+
+Stare `leads.mamamia_customer_id` wskazują na customers w **poprzednim**
+tenant'cie — niedziałające w nowym. Jeśli chcesz żeby otwarcie portala
+re-onboardowało:
+
+```bash
+supabase db query --linked "
+  UPDATE leads
+  SET mamamia_customer_id = NULL,
+      mamamia_job_offer_id = NULL,
+      mamamia_user_token = NULL,
+      mamamia_onboarded_at = NULL
+  WHERE mamamia_customer_id IS NOT NULL;
+"
+```
+
+Albo skasuj testowe leady (`DELETE FROM leads WHERE email LIKE
+'%mailinator.com'`). Decyzja zależy od tego czy leady mają wartość.
+
+### 5. Verify hardcoded IDs
+
+Najważniejszy step — **hardcoded Mamamia IDs są per-tenant**. Sprawdź:
+
+```bash
+# Agency ID
+curl -sS -X POST "$NEW_AUTH_ENDPOINT" -d '{"query":"mutation { LoginAgency(email: \"...\", password: \"...\") { token } }"}'
+TOKEN="<extracted>"
+
+curl -sS -X POST "$NEW_GRAPHQL_ENDPOINT" \
+  -H "Authorization: Bearer $TOKEN" \
+  -d '{"query":"{ ServiceAgency { id name } }"}'
+# → porównaj z PRIMUNDUS_AGENCY_ID w supabase/functions/onboard-to-mamamia/onboard.ts
+```
+
+Jeśli ID się różni — update kodu + redeploy. Patrz Bug #15.
+
+Inne potencjalne per-tenant IDs do sprawdzenia w przyszłości:
+- `mobility_id` set (1..5) — system enum, zazwyczaj stabilne
+- `lift_id` (1, 2) — system enum
+- `tool_ids` ([1..6]) — pivot table content
+- `urbanization_id` (1, 2, 3) — system enum
+- `equipment_ids` ([1, 2, 6, 8]) — pivot
+- `language_id` (1) — system enum
+- `caregiver_id`-y matching'u — runtime, nie hardcoded
+
+Te są **system-level enums w Mamamia** — gdyby zostały zmienione w
+prod relative do beta, lots-of-things by się zepsuło. Spróbuj jeden
+e2e test po switch'u (onboard + getCustomer + listMatchings) — błąd
+typu "invalid enum" wskaże który ID jest zły.
+
+### 6. E2e sanity (bez tworzenia śmieci)
+
+- **Submit fresh test lead** — calculator API tworzy lead w Supabase.
+  Onboard tworzy customer w Mamamia ze `status='draft'` (matcher
+  publicznie ich nie pali, dopóki patient form save nie flippa na
+  `'active'`).
+- **Verify onboard zwraca customer_id + job_offer_id** — to dowodzi
+  że StoreCustomer + StoreJobOffer przeszły walidację Mamamia.
+- **NIE wypełniaj patient form do końca** — to UpdateCustomer +
+  StoreJobOfferMatch które flippuje status. Druk w prod = potencjalny
+  shadow ban Twojego agency account za spam draftami.
+
+Jeśli onboard fail'uje z "onboarding failed" — włącz
+`DEBUG_ONBOARD=1` (analog `DEBUG_PROXY`):
+
+```bash
+npx supabase secrets set DEBUG_ONBOARD=1 --project-ref <SUPA_REF>
+npx supabase functions deploy onboard-to-mamamia --project-ref <SUPA_REF>
+# Retry — response zwraca underlying Mamamia error
+npx supabase secrets unset DEBUG_ONBOARD --project-ref <SUPA_REF>
+npx supabase functions deploy onboard-to-mamamia --project-ref <SUPA_REF>
+```
+
+NIE zostaw DEBUG_ONBOARD włączonego na prod — wycieka details błędów
+to potencjalny attack vector.
 
 ---
 
