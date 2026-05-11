@@ -344,7 +344,9 @@ function pickAllowedWish(input: unknown): Record<string, unknown> | null {
 // patient form save (proxy.updateCustomer) silently zeroed out:
 //   • Customer.equipments  (TV / bathroom / kitchen / others)
 //   • Patient.tools        (rollator / walking stick / hoist)
-// — both populated by the onboard mapper, both wiped on first
+//   • customer_caregiver_wish.germany_skill  (desired language level)
+//   • customer_caregiver_wish.driving_license (license requirement)
+// — all populated by the onboard mapper, all wiped on first
 // UpdateCustomer call because the client doesn't carry them in its
 // patch. Fix: re-fetch current values and re-pass them whenever the
 // caller didn't explicitly provide their own.
@@ -353,6 +355,10 @@ const PRESERVE_QUERY = /* GraphQL */ `
     Customer(id: $id) {
       equipments { id }
       patients { id tools { id } }
+      customer_caregiver_wish {
+        germany_skill
+        driving_license
+      }
     }
   }
 `;
@@ -361,6 +367,10 @@ interface PreserveData {
   Customer: {
     equipments: Array<{ id: number }>;
     patients: Array<{ id: number; tools: Array<{ id: number }> }>;
+    customer_caregiver_wish: {
+      germany_skill: string | null;
+      driving_license: string | null;
+    } | null;
   };
 }
 
@@ -375,16 +385,21 @@ const updateCustomer: ActionHandler = async (session, variables, deps) => {
     }
   }
 
-  // ── Preserve associations the caller didn't touch ──
-  // Always re-fetch current Customer.equipments and per-patient tools
-  // and pass them back unless the caller explicitly supplied their own.
+  // ── Preserve associations + wish scalars the caller didn't touch ──
+  // Always re-fetch current Customer.equipments, per-patient tools, and
+  // customer_caregiver_wish scalars (germany_skill, driving_license) and
+  // pass them back unless the caller explicitly supplied their own.
   const needsEquipmentPreserve = !("equipment_ids" in patch);
   const patientPatches = Array.isArray(patch.patients) ? patch.patients : null;
   const needsToolPreserve = !!patientPatches && patientPatches.some((p) =>
     p && typeof p === "object" && !("tool_ids" in (p as Record<string, unknown>))
   );
+  const wishPatch = patch.customer_caregiver_wish as Record<string, unknown> | undefined;
+  const needsWishPreserve = !!wishPatch && (
+    !("germany_skill" in wishPatch) || !("driving_license" in wishPatch)
+  );
 
-  if (needsEquipmentPreserve || needsToolPreserve) {
+  if (needsEquipmentPreserve || needsToolPreserve || needsWishPreserve) {
     try {
       const current = await runGraphQL<PreserveData>(deps, PRESERVE_QUERY, {
         id: session.customer_id,
@@ -409,6 +424,18 @@ const updateCustomer: ActionHandler = async (session, variables, deps) => {
           if (!existing) return pp;
           return { ...pp, tool_ids: existing };
         });
+      }
+
+      if (needsWishPreserve && wishPatch) {
+        const cw = current.Customer.customer_caregiver_wish;
+        if (cw) {
+          if (!("germany_skill" in wishPatch) && cw.germany_skill) {
+            wishPatch.germany_skill = cw.germany_skill;
+          }
+          if (!("driving_license" in wishPatch) && cw.driving_license) {
+            wishPatch.driving_license = cw.driving_license;
+          }
+        }
       }
     } catch (e) {
       // Preserve fetch failed — log but proceed; better to apply the
