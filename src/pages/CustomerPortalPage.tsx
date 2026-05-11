@@ -7,6 +7,7 @@ import {
   Lead,
   cap,
   formatEuro,
+  setDeclinedCaregiver,
 } from '../lib/supabase';
 import { useMamamiaSession } from '../hooks/useMamamiaSession';
 import { useCustomer, useJobOffer, useApplications, useMatchings, useCaregiver, useInvitedCaregivers } from '../lib/mamamia/hooks';
@@ -263,6 +264,26 @@ const CustomerPortalPage: FC = () => {
     });
   }, [mmReady, invitedCaregiverIds, effectiveMatched]);
 
+  // Seed nurseStatuses with 'declined' for caregivers the customer rejected
+  // via "Nein danke" in a previous session. Persisted in
+  // leads.declined_caregiver_ids by setDeclinedCaregiver RPC, hydrated here
+  // on mount so the rejection survives F5 + cross-device. Declined wins
+  // over 'invited' (someone declined → we don't restore an invitation).
+  useEffect(() => {
+    const declinedIds = lead?.declined_caregiver_ids;
+    if (!declinedIds || declinedIds.length === 0 || effectiveMatched.length === 0) return;
+    const declinedSet = new Set(declinedIds);
+    setNurseStatuses(prev => {
+      const next: NurseStatuses = { ...prev };
+      effectiveMatched.forEach((m, idx) => {
+        if (declinedSet.has(m.caregiverId)) {
+          next[idx] = 'declined';
+        }
+      });
+      return next;
+    });
+  }, [lead, effectiveMatched]);
+
   const animateThenProcess = (id: string, fn: () => void) => {
     setExitingIds(prev => new Set([...prev, id]));
     setTimeout(() => {
@@ -411,18 +432,34 @@ const CustomerPortalPage: FC = () => {
   };
 
   const declineNurse = (idx: number) => {
+    // Optimistic local update — UI flips immediately, customer doesn't wait
+    // on the round-trip. Persist to Supabase so the rejection survives F5
+    // + cross-device. RPC errors stay silent in the UI; the next mount
+    // simply won't seed this id, and the customer can re-decline.
     setNurseStatuses((prev) => ({ ...prev, [idx]: 'declined' }));
+    const caregiverId = effectiveMatched[idx]?.caregiverId;
+    if (lead?.token && caregiverId != null) {
+      setDeclinedCaregiver(lead.token, caregiverId, true).catch(err => {
+        console.error('setDeclinedCaregiver failed:', err);
+      });
+    }
   };
 
   // Reset a locally-declined match back to 'pending' so the caregiver
-  // reappears in the matched-nurses list. Decline-match has no backend
-  // mutation (it's a local-only filter), so undo is just state.
+  // reappears in the matched-nurses list. Mirrors declineNurse — optimistic
+  // local clear, then RPC removes the id from leads.declined_caregiver_ids.
   const undoDeclinedMatch = (idx: number) => {
     setNurseStatuses((prev) => {
       const next = { ...prev };
       delete next[idx];
       return next;
     });
+    const caregiverId = effectiveMatched[idx]?.caregiverId;
+    if (lead?.token && caregiverId != null) {
+      setDeclinedCaregiver(lead.token, caregiverId, false).catch(err => {
+        console.error('setDeclinedCaregiver(undo) failed:', err);
+      });
+    }
   };
 
   // ─── Debug overlay (?debug=1) ────────────────────────────────────────────

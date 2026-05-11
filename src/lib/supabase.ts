@@ -58,6 +58,11 @@ export interface Lead {
   patient_street?: string | null;
   patient_zip?: string | null;
   patient_city?: string | null;
+  /** Mamamia caregiver_ids the customer has rejected via "Nein danke".
+   *  Seeded into nurseStatuses on portal mount so a decline survives F5 +
+   *  cross-device sessions. Updated via the set_declined_caregiver RPC
+   *  (token-authenticated, SECURITY DEFINER). */
+  declined_caregiver_ids?: number[] | null;
   created_at: string;
   updated_at: string;
 }
@@ -78,6 +83,26 @@ export async function fetchLeadByToken(token: string): Promise<{
   if (!data) return { lead: null, error: 'Token nicht gefunden' };
 
   return { lead: data as Lead, error: null };
+}
+
+// ─── Persist a decline (or undo) for a caregiver via the
+//     set_declined_caregiver RPC (token-authenticated, SECURITY DEFINER).
+//     Returns null on success, error message on failure. Caller is
+//     responsible for optimistic local-state updates — RPC just handles
+//     the durable side. ────────────────────────────────────────────────────────
+
+export async function setDeclinedCaregiver(
+  token: string,
+  caregiverId: number,
+  declined: boolean,
+): Promise<{ error: string | null }> {
+  const { error } = await supabase.rpc('set_declined_caregiver', {
+    p_token: token,
+    p_caregiver_id: caregiverId,
+    p_declined: declined,
+  });
+  if (error) return { error: error.message };
+  return { error: null };
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
