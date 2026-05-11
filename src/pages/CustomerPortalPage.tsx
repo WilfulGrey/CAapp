@@ -673,8 +673,8 @@ const CustomerPortalPage: FC = () => {
             }
           : patientSaved
           ? {
-              title: 'Sie sind startklar. ✨',
-              subtitle: 'Laden Sie jetzt Ihre Wunsch-Pflegekräfte ein — sobald sich jemand bewirbt, sehen Sie das Angebot direkt hier.',
+              title: 'Profil vollständig. Bewerbungen werden für Sie vorbereitet. ✨',
+              subtitle: 'Sobald sich Pflegekräfte bewerben, erscheinen die Angebote hier. Laden Sie in der Zwischenzeit weitere Pflegekräfte ein, sich bei Ihnen zu bewerben.',
               pill: 'Profil vollständig',
             }
           : {
@@ -796,17 +796,17 @@ const CustomerPortalPage: FC = () => {
         {/* ── INFO: Bewerbungen werden vorbereitet (state B only) ── */}
         {patientSaved && !hasPending && (
           <div className="rounded-2xl border px-5 py-4 flex gap-3" style={{background:'#F8F7F5', borderColor:'#E5E3DF'}}>
-            <Bell className="w-5 h-5 flex-shrink-0 mt-0.5" style={{color:'#8B7355'}} />
+            <Bell className="w-5 h-5 flex-shrink-0 mt-1" style={{color:'#8B7355'}} />
             <div className="flex-1 min-w-0">
-              <p className="text-[15px] font-semibold" style={{color:'#3D3D3D'}}>Bewerbungen werden für Sie vorbereitet</p>
-              <p className="text-[15px] mt-1 leading-relaxed" style={{color:'#8B8B8B'}}>Sobald sich Pflegekräfte bewerben, erscheinen die Angebote hier.</p>
+              <p className="text-base font-semibold leading-snug" style={{color:'#3D3D3D'}}>Bewerbungen werden für Sie vorbereitet</p>
+              <p className="text-sm mt-1.5 leading-relaxed" style={{color:'#6B6B6B'}}>Sobald sich Pflegekräfte bewerben, erscheinen die Angebote hier. Laden Sie in der Zwischenzeit weitere Pflegekräfte ein, sich bei Ihnen zu bewerben.</p>
             </div>
           </div>
         )}
 
         {/* ── SECTION HEADER: Passende Pflegekräfte / Ihre Bewerbungen (state-aware) ── */}
         <div className="px-1">
-          <h2 className="text-[1.1rem] font-bold" style={{color:'#3D3D3D'}}>{hasPending ? 'Ihre Bewerbungen' : 'Passende Pflegekräfte'}</h2>
+          <h2 className="text-[1.1rem] font-bold" style={{color:'#3D3D3D'}}>{hasPending ? 'Ihre Bewerbungen' : 'Passende Pflegekräfte einladen'}</h2>
           <div className="mt-1.5 h-[2px] w-10 rounded-full" style={{background:'#8B7355'}} />
         </div>
 
