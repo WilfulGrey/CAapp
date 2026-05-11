@@ -892,9 +892,14 @@ const CustomerPortalPage: FC = () => {
 
         {/* ── SECTION: Matched Nurses — pending + invited, nur wenn keine offenen Bewerbungen ── */}
         {!hasPending && (() => {
-          const visibleNurses = effectiveMatched.map((m, i) => ({ nurse: m.nurse, i, status: nurseStatuses[i] ?? 'pending' as NurseStatus }))
-            .filter(({ status }) => status === 'pending' || status === 'invited')
-            .sort((a, b) => (a.status === 'invited' ? 1 : 0) - (b.status === 'invited' ? 1 : 0));
+          const allVisible = effectiveMatched.map((m, i) => ({ nurse: m.nurse, i, status: nurseStatuses[i] ?? 'pending' as NurseStatus }))
+            .filter(({ status }) => status === 'pending' || status === 'invited');
+          // Cap pending at 5 so customers aren't overwhelmed; always show all
+          // invited ones (user already took action on those).
+          const visibleNurses = [
+            ...allVisible.filter(({ status }) => status === 'pending').slice(0, 5),
+            ...allVisible.filter(({ status }) => status === 'invited'),
+          ];
           return (
             <>
               {visibleNurses.length > 0 && (
