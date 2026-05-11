@@ -124,8 +124,14 @@ const STORE_JOB_OFFER = /* GraphQL */ `
   }
 `;
 
-// Primundus agency id (ServiceAgency w Mamamia beta — zarejestrowany 2026-04-23)
-const PRIMUNDUS_AGENCY_ID = 18;
+// Primundus ServiceAgency id w Mamamia.
+//   beta.mamamia.app:           id = 18 (zarejestrowane 2026-04-23)
+//   backend.prod.mamamia.app:   id = 3  (verified live 2026-05-11)
+// IDs są per-tenant — beta i prod to oddzielne bazy. Dla switch'a
+// środowiska: query `{ ServiceAgency { id name } }` żeby potwierdzić
+// aktualny id (singleton — zwraca rekord przypisany do zalogowanego
+// agency user'a).
+const PRIMUNDUS_AGENCY_ID = 3;
 
 // ─── Main flow ─────────────────────────────────────────────────────────────
 

@@ -64,6 +64,13 @@ export async function handleRequest(req: Request, deps: HandlerDeps): Promise<Re
     // Expected: token errors → 401; everything else → 500
     const isTokenErr = /expired|invalid|nonexistent/i.test(msg);
     console.error("onboard error:", msg, (e as Error).stack); // Edge Function logs
+    // DEBUG_ONBOARD=1 — leak underlying error to ease diagnosis during
+    // env switches. Analog do DEBUG_PROXY w mamamia-proxy. Unset secret
+    // (`npx supabase secrets unset DEBUG_ONBOARD --project-ref ...`)
+    // gdy nie potrzebujesz; prod nie powinien tego mieć włączonego.
+    if (Deno.env.get("DEBUG_ONBOARD") === "1" && !isTokenErr) {
+      return jsonError(500, `onboarding failed: ${msg}`, baseHeaders);
+    }
     return jsonError(isTokenErr ? 401 : 500, isTokenErr ? "invalid-token" : "onboarding failed", baseHeaders);
   }
 
