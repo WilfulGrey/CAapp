@@ -686,11 +686,16 @@ export function mapMamamiaCustomerToPatientForm(
   // Patient 1
   if (patients[0]) {
     const p1 = mamamiaPatientToForm(patients[0]);
+    // In draft state, Mamamia sets lift_id=2 ("Nein") as a schema default
+    // during onboarding — the customer never chose this. Suppress it so the
+    // portal shows a blank "Heben erforderlich?" instead of a misleading "Nein".
+    if (isDraft) p1.heben = '';
     Object.assign(out, p1);
   }
   // Patient 2 — same fields, p2_* keys.
   if (patients[1]) {
     const p2 = mamamiaPatientToForm(patients[1]);
+    if (isDraft) p2.heben = '';
     out.p2_geschlecht = p2.geschlecht;
     out.p2_geburtsjahr = p2.geburtsjahr;
     out.p2_pflegegrad = p2.pflegegrad;
