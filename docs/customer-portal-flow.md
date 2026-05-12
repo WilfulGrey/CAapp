@@ -687,15 +687,18 @@ mutation StoreRequest($caregiver_id: Int, $job_offer_id: Int, $message: String) 
 }
 ```
 
-Endpoint: `https://beta.mamamia.app/backend/graphql` (panel base URL,
-**NIE** `backend.beta.mamamia.app/graphql`), z agency-only session cookie
-z osobnego loginu (Sanctum CSRF + `XSRF-TOKEN`).
+Endpoint: panel `/graphql` z secret `MAMAMIA_PANEL_URL` (np.
+`https://beta.mamamia.app/backend` na beta, `https://portal.mamamia.app/backend`
+na preprod). Panel SPA Mamamii żyje na **osobnym subdomain'ie per tenant**,
+nie da się derive'ować z `MAMAMIA_ENDPOINT` host'a. Wartość ustalana per-tenant
+przez inspekcję DevTools Network w żywym panelu (Bug #17). Auth: agency-only
+session cookie z osobnego loginu (Sanctum CSRF + `XSRF-TOKEN`).
 
 Tło: K5/K6 historia. `SendInvitationCaregiver` jest customer-side mutacją
 (wymaga customer JWT — niedostępny). `StoreRequest` na zwykłym `/graphql`
 zwraca `Unauthorized` dla agency tokena. Panel-mode session pozwala — pod
-warunkiem że Customer ma `status='active'` (co osiągamy przez setting
-`Customer.arrival_at` w onboard).
+warunkiem że Customer ma `status='active'` ORAZ JobOffer też jest active
+(co osiągamy przez setting `Customer.arrival_at` w onboard).
 
 ### Tabela podsumowująca
 

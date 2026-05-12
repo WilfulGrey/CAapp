@@ -143,7 +143,10 @@ async function panelGraphQL<T>(
 
   if (json.errors && json.errors.length > 0) {
     const msg = json.errors[0]?.message ?? "unknown";
-    throw new Error(`panel ${operationName}: ${msg}`);
+    // Include HTTP status + cookie names sent + first error category for diagnosis.
+    const cookieNames = [...jar.keys()].join(",");
+    const cat = (json.errors[0] as { extensions?: { category?: string } })?.extensions?.category ?? "?";
+    throw new Error(`panel ${operationName}: ${msg} [http=${res.status} cat=${cat} cookies=${cookieNames}]`);
   }
   if (!json.data) {
     throw new Error(`panel ${operationName}: empty data field (${res.status})`);

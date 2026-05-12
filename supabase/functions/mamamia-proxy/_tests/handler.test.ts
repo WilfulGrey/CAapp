@@ -10,6 +10,7 @@ const SECRETS = {
   mamamiaAgencyEmail: "p@e",
   mamamiaAgencyPassword: "pw",
   sessionJwtSecret: "x".repeat(40),
+  mamamiaPanelUrl: "https://beta.example/backend",
 };
 
 const SESSION_PAYLOAD = {

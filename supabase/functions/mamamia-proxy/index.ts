@@ -22,6 +22,19 @@ export interface ProxySecrets {
   mamamiaAgencyEmail: string;
   mamamiaAgencyPassword: string;
   sessionJwtSecret: string;
+  // Panel SPA base URL — different host than GraphQL API. Mamamia
+  // hostuje panel UI na osobnym subdomain z `/backend` path:
+  //   - beta tenant:    https://beta.mamamia.app/backend
+  //   - preprod tenant: https://portal.mamamia.app/backend
+  // GraphQL API (MAMAMIA_ENDPOINT) jest na innym hoście
+  // (`backend.{env}.mamamia.app`). Panel = miejsce gdzie csrf-cookie +
+  // LoginAgency + StoreRequest faktycznie żyją. Bez panel URL panel-side
+  // mutations (inviteCaregiver) wpadają w niewłaściwy endpoint i policy
+  // je rejectuje pomimo ustawionych cookies.
+  // REQUIRED secret. Bootstrap throws gdy brak — no soft fallback
+  // (Święta zasada nr 1). Wartość ustalana per-tenant przez inspekcję
+  // DevTools Network w żywym panelu Mamamii.
+  mamamiaPanelUrl: string;
 }
 
 export interface ProxyDeps {
@@ -87,13 +100,7 @@ export async function handleRequest(req: Request, deps: ProxyDeps): Promise<Resp
 
   // Dispatch action
   try {
-    // Panel base URL = same host as Mamamia GraphQL but rooted at /backend.
-    // E.g. https://backend.<env>.mamamia.app/graphql → derive panel as
-    // https://<env>.mamamia.app/backend (the SPA's actual API origin).
-    // Działa dla beta (backend.beta.mamamia.app) i preprod
-    // (backend.prod.mamamia.app) — w obu wzór "strip `backend.` prefix
-    // + dodaj /backend path" daje SPA host.
-    const panelBaseUrl = derivePanelBaseUrl(deps.secrets.mamamiaEndpoint);
+    const panelBaseUrl = deps.secrets.mamamiaPanelUrl;
     const data = await ACTIONS[action](session, variables, {
       endpoint: deps.secrets.mamamiaEndpoint,
       getAgencyToken: () =>
@@ -135,29 +142,20 @@ function jsonError(status: number, message: string, extraHeaders: Record<string,
   });
 }
 
-// Backend GraphQL → SPA panel base URL. Mamamia hosts the panel at the
-// non-subdomain (beta.mamamia.app) under /backend, but its public GraphQL
-// API at backend.beta.mamamia.app. We strip the leading "backend." host
-// part and append /backend to the path.
-function derivePanelBaseUrl(graphqlEndpoint: string): string {
-  try {
-    const u = new URL(graphqlEndpoint);
-    const host = u.host.replace(/^backend\./, "");
-    return `${u.protocol}//${host}/backend`;
-  } catch {
-    return graphqlEndpoint;
-  }
-}
-
 // ─── Bootstrap (prod only) ─────────────────────────────────────────────────
 
 if (import.meta.main) {
+  const panelUrl = Deno.env.get("MAMAMIA_PANEL_URL");
+  if (!panelUrl) {
+    throw new Error("MAMAMIA_PANEL_URL secret missing — required for panel-side actions (inviteCaregiver). Set to panel SPA base, e.g. https://portal.mamamia.app/backend");
+  }
   const secrets: ProxySecrets = {
     mamamiaEndpoint: Deno.env.get("MAMAMIA_ENDPOINT")!,
     mamamiaAuthEndpoint: Deno.env.get("MAMAMIA_AUTH_ENDPOINT")!,
     mamamiaAgencyEmail: Deno.env.get("MAMAMIA_AGENCY_EMAIL")!,
     mamamiaAgencyPassword: Deno.env.get("MAMAMIA_AGENCY_PASSWORD")!,
     sessionJwtSecret: Deno.env.get("SESSION_JWT_SECRET")!,
+    mamamiaPanelUrl: panelUrl,
   };
 
   Deno.serve((req) => handleRequest(req, { secrets }));

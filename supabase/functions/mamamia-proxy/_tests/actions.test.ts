@@ -348,7 +348,7 @@ Deno.test("inviteCaregiver: agency-only panel flow — csrf → LoginAgency → 
   const calls: { url: string; body?: string }[] = [];
   let i = 0;
   const responses: Array<{ status: number; json?: unknown; setCookie?: string[] }> = [
-    // 1. /backend/sanctum/csrf-cookie
+    // 1. /sanctum/csrf-cookie
     { status: 204, setCookie: ["XSRF-TOKEN=t1; path=/", "mamamia_beta_session=s1; httponly"] },
     // 2. LoginAgency
     {

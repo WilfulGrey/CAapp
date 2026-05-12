@@ -240,11 +240,20 @@ const storeConfirmation: ActionHandler = async (session, variables, deps) => {
 // on beta 2026-04-28 by inspecting DevTools network log on a real panel
 // session — operationName="StoreRequest", returns Request{id, ...}.
 //
-// Auth model: panel /backend/graphql + agency-only session cookie. NO
-// ImpersonateCustomer needed despite earlier hypothesis — Mamamia's
+// Auth model: panel /graphql + agency-only session cookie. Mamamia's
 // panel-side policy accepts a service-agency admin owning the customer
 // directly, provided customer.status='active' (which our onboard payload
 // achieves by setting Customer.arrival_at — see onboard-to-mamamia/mappers.ts).
+//
+// **Known limitation on preprod (Bug #17, 2026-05-12)**: the agency-admin
+// account hardcoded behind MAMAMIA_AGENCY_EMAIL/PASSWORD on preprod tenant
+// does NOT have permission to invoke StoreRequest. Live diagnosis showed
+// Mamamia returns HTTP 200 + GraphQL `Unauthorized` (extensions.category=
+// "authorization") for both `StoreRequest` (Bearer + panel-session) and
+// `ImpersonateCustomer(customer_id)` — same policy gate. The same
+// credentials work on beta. Resolution requires Mamamia ops to grant the
+// preprod agency user matching permissions, OR a different agency cred
+// with elevated role.
 //
 // Why not SendInvitationCaregiver: that mutation is customer-side
 // (auth.user must be the customer), used by Mamamia's customer portal.
