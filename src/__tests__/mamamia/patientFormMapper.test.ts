@@ -204,9 +204,13 @@ describe('mapPatientFormToUpdateCustomerInput', () => {
     expect(mapPatientFormToUpdateCustomerInput(makeForm({ wohnungstyp: 'Andere' })).accommodation).toBe('other');
   });
 
-  it('derives other_people_in_house from anzahl (yes/no enum)', () => {
-    expect(mapPatientFormToUpdateCustomerInput(makeForm({ anzahl: '2' })).other_people_in_house).toBe('yes');
-    expect(mapPatientFormToUpdateCustomerInput(makeForm({ anzahl: '1' })).other_people_in_house).toBe('no');
+  it('derives other_people_in_house from haushalt (Ja/Nein), not from anzahl', () => {
+    // haushalt='Ja' → yes (other non-care people in house)
+    expect(mapPatientFormToUpdateCustomerInput(makeForm({ haushalt: 'Ja' })).other_people_in_house).toBe('yes');
+    // haushalt='Nein' → no
+    expect(mapPatientFormToUpdateCustomerInput(makeForm({ haushalt: 'Nein' })).other_people_in_house).toBe('no');
+    // anzahl=2 (couple under care) does NOT imply other_people_in_house
+    expect(mapPatientFormToUpdateCustomerInput(makeForm({ anzahl: '2', haushalt: 'Nein' })).other_people_in_house).toBe('no');
   });
 
   it('maps wunschGetriebe → customer_caregiver_wish.driving_license_gearbox', () => {

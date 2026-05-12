@@ -612,6 +612,7 @@ export interface PatientFormPrefill {
   // user's previously-saved frequency + tasks.
   pflegedienstHaeufigkeit?: string;
   pflegedienstAufgaben?: string;
+  haushalt?: string;
   tiere?: string;
   wunschGeschlecht?: string; rauchen?: string;
   // Customer-side gearbox preference, restored from
@@ -729,6 +730,10 @@ export function mapMamamiaCustomerToPatientForm(
         MAMAMIA_CAREGIVER_ACCOMMODATED_TO_FORM[cust.caregiver_accommodated] ?? '';
     }
   }
+  // other_people_in_house → haushalt: 'Ja'/'Nein' (price-relevant)
+  if (cust.other_people_in_house === 'yes') out.haushalt = 'Ja';
+  else if (cust.other_people_in_house === 'no') out.haushalt = 'Nein';
+
   if (cust.has_family_near_by === 'yes') out.familieNahe = 'Ja';
   else if (cust.has_family_near_by === 'no') out.familieNahe = 'Nein';
   // 'not_important' has no form equivalent → leave empty.

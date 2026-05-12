@@ -157,6 +157,7 @@ describe('prefillPatientFromLead', () => {
       pflegegrad: '4',
       mobilitaet: 'Rollstuhlfähig',
       nacht: 'Gelegentlich',
+      haushalt: 'Nein',         // baseLead.formularDaten.weitere_personen='nein'
       wunschGeschlecht: 'Weiblich',
     });
   });
@@ -217,9 +218,9 @@ describe('prefillPatientFromLead', () => {
     expect(r.p2_nacht).toBeUndefined();
   });
 
-  it("ignores weitere_personen='ja' for anzahl (different semantic)", () => {
-    // weitere_personen = "are there OTHER people in the household".
-    // Only betreuung_fuer drives patient count.
+  it("ignores weitere_personen='ja' for anzahl but maps it to haushalt", () => {
+    // weitere_personen = "are there OTHER people in the household" — price-relevant.
+    // Only betreuung_fuer drives patient count (anzahl).
     const lead = {
       ...baseLead,
       kalkulation: {
@@ -231,7 +232,9 @@ describe('prefillPatientFromLead', () => {
         },
       },
     };
-    expect(prefillPatientFromLead(lead).anzahl).toBe('1');
+    const r = prefillPatientFromLead(lead);
+    expect(r.anzahl).toBe('1');           // anzahl unaffected
+    expect(r.haushalt).toBe('Ja');        // weitere_personen maps to haushalt
   });
 
   it.each([
