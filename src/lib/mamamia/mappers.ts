@@ -613,6 +613,7 @@ export interface PatientFormPrefill {
   pflegedienstHaeufigkeit?: string;
   pflegedienstAufgaben?: string;
   haushalt?: string;
+  badezimmer?: string;
   tiere?: string;
   wunschGeschlecht?: string; rauchen?: string;
   // Customer-side gearbox preference, restored from
@@ -733,6 +734,12 @@ export function mapMamamiaCustomerToPatientForm(
   // other_people_in_house → haushalt: 'Ja'/'Nein' (price-relevant)
   if (cust.other_people_in_house === 'yes') out.haushalt = 'Ja';
   else if (cust.other_people_in_house === 'no') out.haushalt = 'Nein';
+
+  // equipments → badezimmer: id=2 = Own Bathroom.
+  // GET_CUSTOMER fetches equipments { id equipment }; id=1 = TV, id=2 = Bathroom.
+  if (Array.isArray(cust.equipments)) {
+    out.badezimmer = cust.equipments.some(e => e.id === 2) ? 'Ja' : 'Nein';
+  }
 
   if (cust.has_family_near_by === 'yes') out.familieNahe = 'Ja';
   else if (cust.has_family_near_by === 'no') out.familieNahe = 'Nein';

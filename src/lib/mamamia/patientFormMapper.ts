@@ -18,7 +18,7 @@ export interface PatientFormShape {
   // pflegedienst='Ja'/'Geplant'. See buildDayCareFacilityDescription.
   pflegedienstHaeufigkeit: string;
   pflegedienstAufgaben: string;
-  tiere: string; unterbringung: string; aufgaben: string;
+  tiere: string; unterbringung: string; badezimmer: string; aufgaben: string;
   wunschGeschlecht: string; rauchen: string; sonstigeWuensche: string;
   // Getriebe — only populated when the customer answered fuehrerschein=Ja
   // in the calculator. Empty = field hidden / not applicable.
@@ -728,10 +728,14 @@ export function mapPatientFormToUpdateCustomerInput(
     patch.customer_caregiver_wish = wish;
   }
 
-  // ── equipment_ids: default selection so panel "Wyposażenie zakwaterowania"
-  // isn't empty. Patient form doesn't ask; [1, 2] = Own TV + Own Bathroom
-  // is the single most common pair in active prod customers.
-  patch.equipment_ids = [1, 2];
+  // ── equipment_ids: derived from form.badezimmer (Eigenes Badezimmer).
+  // id=1 = Own TV (always included — assumed standard).
+  // id=2 = Own Bathroom — included only when customer answers 'Ja'.
+  // Mamamia panel "Wyposażenie zakwaterowania" shows "Bitte wählen" when
+  // equipment_ids is empty; TV ensures the field is never blank.
+  const equipIds = [1]; // own TV always
+  if (form.badezimmer === 'Ja') equipIds.push(2);
+  patch.equipment_ids = equipIds;
 
   // ── Pflegedienst description — dedicated fields (Bug #13k) ────────────
   // Mamamia panel "Jak często i jakie zadania wykonuje Pflegedienst?" is

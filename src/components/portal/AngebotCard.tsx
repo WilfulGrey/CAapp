@@ -146,7 +146,7 @@ export const AngebotCard: FC<{
     familieNahe: pick('familieNahe'), pflegedienst: pick('pflegedienst'), internet: pick('internet'),
     pflegedienstHaeufigkeit: pick('pflegedienstHaeufigkeit'),
     pflegedienstAufgaben: pick('pflegedienstAufgaben'),
-    tiere: pick('tiere'), unterbringung: pick('unterbringung'), aufgaben: pick('aufgaben'),
+    tiere: pick('tiere'), unterbringung: pick('unterbringung'), badezimmer: pick('badezimmer'), aufgaben: pick('aufgaben'),
     wunschGeschlecht: pick('wunschGeschlecht'),
     rauchen: pick('rauchen'), sonstigeWuensche: pick('sonstigeWuensche'),
     wunschGetriebe: pick('wunschGetriebe'),
@@ -262,7 +262,7 @@ export const AngebotCard: FC<{
     if (s === 2) {
       const baseOk = patient.plz !== '' && patient.ort !== '' && patient.haushalt !== ''
         && patient.wohnungstyp !== '' && patient.urbanisierung !== '' && patient.familieNahe !== ''
-        && patient.pflegedienst !== '' && patient.internet !== '';
+        && patient.pflegedienst !== '' && patient.internet !== '' && patient.badezimmer !== '';
       // When Pflegedienst='Ja' or 'Geplant', Mamamia requires a description
       // of frequency + tasks (panel form gates customer completion on it).
       // 'Nein' skips both follow-ups.
@@ -985,10 +985,15 @@ export const AngebotCard: FC<{
                         options={['Zimmer in den Räumlichkeiten','Gesamter Bereich','Zimmer extern','Bereich extern']} />
                     </div>
                     <div>
-                      <label className={labelCls}>Internet vorhanden? <span className="text-red-400">*</span></label>
-                      <CustomSelect value={patient.internet} onChange={v => updatePatient(p=>({...p,internet:v}))}
+                      <label className={labelCls}>Eigenes Badezimmer <span className="text-red-400">*</span></label>
+                      <CustomSelect value={patient.badezimmer} onChange={v => updatePatient(p=>({...p,badezimmer:v}))}
                         options={['Ja','Nein']} />
                     </div>
+                  </div>
+                  <div>
+                    <label className={labelCls}>Internet vorhanden? <span className="text-red-400">*</span></label>
+                    <CustomSelect value={patient.internet} onChange={v => updatePatient(p=>({...p,internet:v}))}
+                      options={['Ja','Nein']} />
                   </div>
                   <div>
                     <label className={labelCls}>Haustiere <span className="font-normal text-gray-400">(opt.)</span></label>
