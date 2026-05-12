@@ -88,8 +88,11 @@ export async function handleRequest(req: Request, deps: ProxyDeps): Promise<Resp
   // Dispatch action
   try {
     // Panel base URL = same host as Mamamia GraphQL but rooted at /backend.
-    // E.g. https://backend.beta.mamamia.app/graphql → derive panel as
-    // https://beta.mamamia.app/backend (the SPA's actual API origin).
+    // E.g. https://backend.<env>.mamamia.app/graphql → derive panel as
+    // https://<env>.mamamia.app/backend (the SPA's actual API origin).
+    // Działa dla beta (backend.beta.mamamia.app) i preprod
+    // (backend.prod.mamamia.app) — w obu wzór "strip `backend.` prefix
+    // + dodaj /backend path" daje SPA host.
     const panelBaseUrl = derivePanelBaseUrl(deps.secrets.mamamiaEndpoint);
     const data = await ACTIONS[action](session, variables, {
       endpoint: deps.secrets.mamamiaEndpoint,

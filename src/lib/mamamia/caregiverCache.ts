@@ -1,8 +1,10 @@
 // Module-level cache for full Caregiver profiles.
 //
-// Why this exists: GET_CAREGIVER takes 1.7-3.1s on Mamamia beta. Without
-// caching every modal-open re-fires the request. Without prefetching, the
-// user always pays full latency on first click. This module solves both:
+// Why this exists: GET_CAREGIVER takes 1.7-3.1s on Mamamia (measured
+// on beta tenant 2026-04; preprod tenant nie sprawdzony empirycznie ale
+// rząd wielkości ten sam — full caregiver profile = duże response).
+// Bez cachowania każde modal-open re-fires request. Bez prefetchu user
+// zawsze płaci pełne latency na first click. Ten moduł rozwiązuje oba:
 //
 // - `getCached(id)`           → resolved Caregiver or null (sync read)
 // - `fetch(id)`               → returns Promise; dedupes in-flight requests

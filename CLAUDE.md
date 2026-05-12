@@ -147,6 +147,28 @@ Repo to **monorepo z dwoma aplikacjami** + Supabase Edge Functions. Każda
 zmiana z reguły dotyka kilku warstw — wiedz która jest jaka, żeby nie
 duplikować logiki.
 
+### 🏷️ Naming convention — "beta" to NIE jedno
+
+W projekcie słowo "beta" oznacza **dwie różne rzeczy** zależnie od kontekstu.
+Zawsze rozróżniaj zanim coś zmienisz / zdiagnozujesz:
+
+| Termin | Co to | Gdzie żyje | Aktualny stan |
+|---|---|---|---|
+| **Nasz beta Render slot** | Środowisko staging dla *naszego* deploy'u — `caapp-beta` + `kostenrechner-beta` na Render free-tier | `render.yaml`, `caapp-beta.onrender.com`, `kostenrechner-beta.onrender.com`, branch `integration/mamamia-onboarding` | Live, nasz preprod |
+| **Mamamia beta tenant** | Mamamia development environment — separate DB, separate user accounts, separate schema seed | `https://backend.beta.mamamia.app/graphql` (URL hostuje Mamamia) | Forward-going (newer schema features, np. plural `customer_contracts`) |
+| **Mamamia preprod tenant** | Mamamia "real prod" environment — legacy schema, separate DB | `https://backend.prod.mamamia.app/graphql` (URL hostuje Mamamia, ale nazwa myli — to ich production-grade tenant, my używamy jako preprod) | **Aktualnie podpięte** (od 2026-05-11), Bug #15 + #16 fixe tu zlokalizowane |
+| **Mamamia prod** | Mamamia true-production (real customers) — kiedyś będziemy chcieli się tam podpiąć | TBD, prawdopodobnie ten sam endpoint co preprod ale inny agency account z prawdziwymi danymi | Jeszcze nie używamy |
+
+**Konwencja w kodzie/komentarzach:**
+- "beta" bez kwantyfikatora = **nasz Render slot** (default w tym repo)
+- "Mamamia beta" / "beta tenant" / "beta.mamamia.app" = **Mamamia dev environment**
+- "Mamamia preprod" / "prod Mamamia" / "backend.prod.mamamia.app" = **nasz aktualny target** (Mamamia production-grade tenant używany przez nasz beta slot)
+
+**Implikacja:**
+- Mamamia beta i preprod **MAJĄ różne schema** (Bug #16). Nie zakładaj że są spójne.
+- Nasze Render slot nazewnictwo (`caapp-beta`, `kostenrechner-beta`) odzwierciedla **nasze** dev/staging stage, niezależnie od tego pod jakim Mamamia tenantem aktualnie hostujemy.
+- Aktualnie: nasz `caapp-beta` (Render) → Supabase Edge Functions → Mamamia **preprod** (NIE Mamamia beta).
+
 ### Dwie aplikacje
 
 | App | Stack | Rola | Branch deploy |
@@ -193,13 +215,27 @@ CA app → Mamamia:
 
 ### Mamamia (external panel)
 
-- **GraphQL:** `https://beta.mamamia.app/...` (URL w secret `MAMAMIA_ENDPOINT`)
-- **Panel UI (agency):** `https://beta.mamamia.app/backend`
+- **GraphQL (aktualnie używany, "Mamamia preprod"):**
+  `https://backend.prod.mamamia.app/graphql` (URL w secret `MAMAMIA_ENDPOINT`).
+  Nazwa myli — to nie *nasza* produkcja, to Mamamia production-grade
+  tenant którego używamy jako preprod. Switch z beta tenanta wykonany
+  2026-05-11 (patrz Bug #15 + #16).
+- **GraphQL (Mamamia beta tenant, NIE aktualnie używany):**
+  `https://backend.beta.mamamia.app/graphql` — forward-going dev env
+  z newer schema. Dostępny dla porównań schema (jak Bug #16) jeśli
+  potrzeba zdebugować rozjazdy.
+- **Panel UI (agency):** `https://backend.prod.mamamia.app/...` (preprod
+  panel). Beta panel pod `https://backend.beta.mamamia.app/...`.
 - **Auth:** agency token refreshed via `MAMAMIA_AGENCY_EMAIL` /
   `MAMAMIA_AGENCY_PASSWORD` — ZAWSZE server-side. Nigdy nie wystawiać
-  agency credentials do browsera.
+  agency credentials do browsera. Każdy tenant (beta vs preprod) ma
+  **osobne credentials** — agency w beta to inny user niż w preprod.
 - **Customer ID space:** numeric `Customer.id` + readable `customer_id`
-  string (`ts-18-7641` for Primundus).
+  string. Per-tenant osobne auto-incrementy — `Customer.id=8420` w
+  preprod to inny customer niż `Customer.id=8420` w beta. Patrz §"Naming
+  convention" wyżej + Bug #15 (ServiceAgency ID per-tenant).
+- **ServiceAgency ID (Primundus):** preprod=`3`, beta=`18`. Hardcoded
+  per env w `supabase/functions/onboard-to-mamamia/onboard.ts:PRIMUNDUS_AGENCY_ID`.
 
 ---
 
