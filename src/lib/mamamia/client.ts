@@ -104,7 +104,8 @@ export type ProxyAction =
   | 'storeConfirmation'
   | 'inviteCaregiver'
   // AI
-  | 'generateJobDescription';
+  | 'generateJobDescription'
+  | 'generateCaregiverAbout';
 
 export async function callMamamia<T>(
   action: ProxyAction,

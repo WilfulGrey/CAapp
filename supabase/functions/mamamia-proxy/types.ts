@@ -18,7 +18,8 @@ export type ProxyAction =
   | "storeConfirmation"
   | "inviteCaregiver"
   // AI
-  | "generateJobDescription";
+  | "generateJobDescription"
+  | "generateCaregiverAbout";
 
 export interface ActionDeps {
   endpoint: string;

@@ -131,6 +131,49 @@ const CustomerPortalPage: FC = () => {
   const { data: fullCaregiver, loading: caregiverLoading } = useCaregiver(
     selectedNurse?.caregiverId ?? null,
   );
+
+  // AI-generated "Über die Pflegekraft" intro — fires once fullCaregiver
+  // arrives. Keyed by caregiverId so switching nurses resets it. Falls back
+  // to the modal's existing mechanical text when the call fails or key missing.
+  const [aiAbout, setAiAbout] = useState<string | null>(null);
+  const [aiAboutForId, setAiAboutForId] = useState<number | null>(null);
+  useEffect(() => {
+    if (!fullCaregiver) return;
+    const id = fullCaregiver.id;
+    // Already generated for this caregiver — skip.
+    if (aiAboutForId === id) return;
+    setAiAbout(null);
+    setAiAboutForId(id);
+
+    const germanLevel = (() => {
+      const levels: Record<string, string> = {
+        level_0: 'A1', level_1: 'A2', level_2: 'B1', level_3: 'B2', level_4: 'C1+',
+      };
+      return levels[fullCaregiver.germany_skill ?? ''] ?? fullCaregiver.germany_skill ?? undefined;
+    })();
+
+    const expYears = fullCaregiver.care_experience
+      ? `${fullCaregiver.care_experience} Jahre`
+      : fullCaregiver.hp_total_days
+      ? `${Math.round(fullCaregiver.hp_total_days / 365)} Jahre`
+      : undefined;
+
+    callMamamia<{ about: string | null }>('generateCaregiverAbout', {
+      firstName: fullCaregiver.first_name ?? undefined,
+      experienceYears: expYears,
+      assignments: fullCaregiver.hp_total_jobs ?? undefined,
+      languageLevel: germanLevel,
+      nationality: fullCaregiver.nationality?.nationality ?? undefined,
+      personalities: (fullCaregiver.personalities ?? [])
+        .map(p => p.personality).filter(Boolean) as string[],
+      hobbies: (fullCaregiver.hobbies ?? [])
+        .map(h => h.hobby).filter(Boolean) as string[],
+      isNurse: fullCaregiver.is_nurse ?? undefined,
+      qualifications: fullCaregiver.qualifications ?? undefined,
+      education: fullCaregiver.education ?? undefined,
+    }).then(r => { if (r.about) setAiAbout(r.about); }).catch(() => {/* keep fallback */});
+  }, [fullCaregiver?.id]);
+
   const enrichedSelectedNurse = (() => {
     if (!selectedNurse) return null;
     if (!fullCaregiver) return selectedNurse;
@@ -138,8 +181,14 @@ const CustomerPortalPage: FC = () => {
       nowIso: new Date().toISOString(),
       nowYear: new Date().getFullYear(),
     });
+    const base = { ...selectedNurse, ...enriched };
+    // Inject AI-generated about text once available — overrides Mamamia's
+    // about_de / motivation fields which are often empty or low quality.
+    if (aiAbout && aiAboutForId === fullCaregiver.id && base.profile) {
+      base.profile = { ...base.profile, aboutDe: aiAbout };
+    }
     // Preserve color (deterministic by id, identical anyway) + caregiverId.
-    return { ...selectedNurse, ...enriched };
+    return base;
   })();
 
   // Caregiver id mapping per match index (for invite flow).
