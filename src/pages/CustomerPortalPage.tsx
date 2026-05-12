@@ -532,7 +532,7 @@ const CustomerPortalPage: FC = () => {
       <>
       <div className="min-h-screen bg-white flex items-center justify-center">
         <div className="text-center space-y-3">
-          <div className="w-10 h-10 border-2 border-[#9B1FA1] border-t-transparent rounded-full animate-spin mx-auto" />
+          <div className="w-10 h-10 border-2 border-[#8B7355] border-t-transparent rounded-full animate-spin mx-auto" />
           <p className="text-sm text-gray-400">Ihr Angebot wird geladen…</p>
         </div>
       </div>
@@ -544,16 +544,21 @@ const CustomerPortalPage: FC = () => {
   if (leadError) {
     return (
       <>
-      <div className="min-h-screen bg-white flex items-center justify-center px-6">
-        <div className="text-center space-y-4 max-w-sm">
-          <div className="w-14 h-14 rounded-full bg-red-50 flex items-center justify-center mx-auto">
-            <AlertCircle className="w-7 h-7 text-red-400" />
+      <div className="min-h-screen flex flex-col items-center justify-center px-6" style={{background:'linear-gradient(160deg,#F8F5F1 0%,#EFE8DE 100%)'}}>
+        <div className="text-center space-y-5 max-w-xs">
+          <div className="w-16 h-16 rounded-2xl flex items-center justify-center mx-auto" style={{background:'#E76F6320'}}>
+            <AlertCircle className="w-8 h-8" style={{color:'#E76F63'}} />
           </div>
-          <p className="text-sm font-semibold text-gray-800">Link nicht mehr gültig</p>
-          <p className="text-sm text-gray-500 leading-relaxed">{leadError}</p>
-          <a href="tel:+4989200000830" className="inline-flex items-center gap-2 text-sm font-semibold text-[#9B1FA1] border border-[#D8A9DC] bg-[#F5EDF6] rounded-xl px-4 py-2.5">
+          <div>
+            <p className="text-lg font-bold text-gray-900 mb-2">Link nicht mehr gültig</p>
+            <p className="text-sm text-gray-500 leading-relaxed">{leadError}</p>
+          </div>
+          <a href="tel:+4989200000830"
+             className="inline-flex items-center gap-2 text-sm font-bold text-white rounded-2xl px-6 py-3 shadow-sm"
+             style={{background:'#8B7355'}}>
             <Phone className="w-4 h-4" /> 089 200 000 830
           </a>
+          <p className="text-xs text-gray-400">Mo–So, 8:00–18:00 Uhr</p>
         </div>
       </div>
       {debugOverlay}
@@ -565,18 +570,24 @@ const CustomerPortalPage: FC = () => {
   if (lead && mmError) {
     return (
       <>
-      <div className="min-h-screen bg-white flex items-center justify-center px-6">
-        <div className="text-center space-y-4 max-w-sm">
-          <div className="w-14 h-14 rounded-full bg-red-50 flex items-center justify-center mx-auto">
-            <AlertCircle className="w-7 h-7 text-red-400" />
+      <div className="min-h-screen flex flex-col items-center justify-center px-6" style={{background:'linear-gradient(160deg,#F8F5F1 0%,#EFE8DE 100%)'}}>
+        <div className="text-center space-y-5 max-w-xs">
+          <div className="w-16 h-16 rounded-2xl flex items-center justify-center mx-auto" style={{background:'#E76F6320'}}>
+            <AlertCircle className="w-8 h-8" style={{color:'#E76F63'}} />
           </div>
-          <p className="text-sm font-semibold text-gray-800">Verbindung zum Betreuungs-System fehlgeschlagen</p>
-          <p className="text-sm text-gray-500 leading-relaxed">{mmError.message || 'Bitte versuchen Sie es in wenigen Augenblicken erneut.'}</p>
+          <div>
+            <p className="text-lg font-bold text-gray-900 mb-2">Verbindung fehlgeschlagen</p>
+            <p className="text-sm text-gray-500 leading-relaxed">{mmError.message || 'Bitte versuchen Sie es in wenigen Augenblicken erneut.'}</p>
+          </div>
           <div className="flex gap-2 justify-center">
-            <button onClick={() => window.location.reload()} className="text-sm font-semibold text-[#9B1FA1] border border-[#D8A9DC] bg-[#F5EDF6] rounded-xl px-4 py-2.5">
+            <button onClick={() => window.location.reload()}
+                    className="text-sm font-bold rounded-2xl px-5 py-3 border"
+                    style={{color:'#8B7355', borderColor:'#C4B49A', background:'white'}}>
               Erneut versuchen
             </button>
-            <a href="tel:+4989200000830" className="inline-flex items-center gap-2 text-sm font-semibold text-white bg-[#9B1FA1] rounded-xl px-4 py-2.5">
+            <a href="tel:+4989200000830"
+               className="inline-flex items-center gap-2 text-sm font-bold text-white rounded-2xl px-5 py-3"
+               style={{background:'#8B7355'}}>
               <Phone className="w-4 h-4" /> Kontakt
             </a>
           </div>
