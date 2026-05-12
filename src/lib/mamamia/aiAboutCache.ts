@@ -4,6 +4,10 @@
 // the AI call fires automatically (no waiting for the modal to open).
 // By the time the user clicks on a nurse card the text is often ready.
 //
+// Persistence: generated texts are stored in localStorage under
+// "ai_about_<caregiverId>". On subsequent visits the text is loaded
+// instantly — no AI call needed, text stays consistent for that caregiver.
+//
 // Pattern mirrors caregiverCache:
 //   getAiAbout(id)            → cached text or undefined (sync read)
 //   scheduleAiAbouts(ids)     → register ids; fires when profile lands
@@ -19,6 +23,20 @@ type AiEntry =
 
 const cache = new Map<number, AiEntry>();
 const listenerMap = new Map<number, Set<() => void>>();
+
+// ─── localStorage helpers ────────────────────────────────────────────────────
+
+const LS_PREFIX = 'ai_about_';
+
+function lsRead(id: number): string | null {
+  try { return localStorage.getItem(`${LS_PREFIX}${id}`); } catch { return null; }
+}
+
+function lsWrite(id: number, text: string): void {
+  try { localStorage.setItem(`${LS_PREFIX}${id}`, text); } catch { /* quota / private mode */ }
+}
+
+// ────────────────────────────────────────────────────────────────────────────
 
 function notify(id: number): void {
   listenerMap.get(id)?.forEach(fn => fn());
@@ -61,10 +79,21 @@ function buildInput(cg: MamamiaCaregiverFull): Record<string, unknown> {
 
 function generateForCaregiver(id: number, cg: MamamiaCaregiverFull): void {
   if (cache.has(id)) return; // already pending or resolved
+
+  // localStorage hit — use persisted text, skip AI call entirely.
+  const stored = lsRead(id);
+  if (stored) {
+    cache.set(id, { state: 'resolved', text: stored });
+    notify(id);
+    return;
+  }
+
   cache.set(id, { state: 'pending' });
   callMamamia<{ about: string | null }>('generateCaregiverAbout', buildInput(cg))
     .then(r => {
-      cache.set(id, { state: 'resolved', text: r.about ?? null });
+      const text = r.about ?? null;
+      cache.set(id, { state: 'resolved', text });
+      if (text) lsWrite(id, text); // persist so next visit skips AI call
       notify(id);
     })
     .catch(() => {
@@ -74,12 +103,21 @@ function generateForCaregiver(id: number, cg: MamamiaCaregiverFull): void {
 }
 
 // Schedule AI about generation for a list of caregiver IDs.
-// - If the full profile is already in caregiverCache → fire immediately.
+// - If text is already in localStorage → resolve instantly, no API call.
+// - If the full profile is already in caregiverCache → fire AI immediately.
 // - Otherwise subscribe to caregiverCache and fire when profile lands.
 // Safe to call multiple times with the same ids (idempotent via cache.has).
 export function scheduleAiAbouts(ids: number[]): void {
   for (const id of ids) {
     if (cache.has(id)) continue; // already scheduled or done
+
+    // Fast path: text already persisted from a previous visit.
+    const stored = lsRead(id);
+    if (stored) {
+      cache.set(id, { state: 'resolved', text: stored });
+      notify(id);
+      continue;
+    }
 
     const cg = getCached(id);
     if (cg !== undefined) {
