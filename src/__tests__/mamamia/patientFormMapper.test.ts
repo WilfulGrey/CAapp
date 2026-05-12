@@ -169,30 +169,25 @@ describe('mapPatientFormToUpdateCustomerInput', () => {
     expect(r.patients?.[0].height).toBe('155-165');
   });
 
-  it('location_id preferred over plz/ort custom_text + contracts ride along', () => {
-    // Bug #13l: locationId triggers patient_contracts + invoice_contract
-    // emission so Mamamia panel "Lokalizacja opieki" renders. Verified
-    // live 2026-05-07 on Customer 7659.
+  it('location_id preferred over plz/ort custom_text + customer_contract rides along', () => {
+    // Bug #13l + Bug #16: locationId triggers customer_contract (singular)
+    // emission so Mamamia panel "Lokalizacja opieki" renders. Beta miała
+    // plural `patient_contracts` + `invoice_contract` (zweryfikowane live
+    // 2026-05-07 na Customer 7659) — prod ma legacy singular schema.
+    // Refactor 2026-05-12 na singular który działa na obu środowiskach.
     const r = mapPatientFormToUpdateCustomerInput(makeForm(), { locationId: 1148 });
     expect(r.location_id).toBe(1148);
     expect(r.location_custom_text).toBeUndefined();
-    expect(r.patient_contracts).toEqual([
-      { contact_type: 'patient_contact', location_id: 1148 },
-    ]);
-    expect(r.invoice_contract).toEqual({
-      contact_type: 'contract_contact',
-      location_id: 1148,
-    });
+    expect(r.customer_contract).toEqual({ location_id: 1148 });
   });
 
-  it('location_custom_text fallback when no id (no contracts emitted)', () => {
+  it('location_custom_text fallback when no id (no customer_contract emitted)', () => {
     const r = mapPatientFormToUpdateCustomerInput(makeForm());
     expect(r.location_custom_text).toBe('10115 Berlin');
     expect(r.location_id).toBeUndefined();
-    // Without resolved id we cannot write to contracts (Mamamia panel
+    // Without resolved id nie zapisujemy customer_contract (Mamamia panel
     // dropdown wymaga canonical location_id, nie custom text).
-    expect(r.patient_contracts).toBeUndefined();
-    expect(r.invoice_contract).toBeUndefined();
+    expect(r.customer_contract).toBeUndefined();
   });
 
   it('maps familieNahe + internet yes/no (live-verified working enums)', () => {

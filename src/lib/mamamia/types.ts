@@ -54,6 +54,9 @@ export interface MamamiaCaregiverWish {
 
 export interface MamamiaCustomerContract {
   id?: number;
+  // contact_type — beta-only field, prod nie zwraca (singular customer_contract
+  // jest 1:1 więc discriminator zbędny). Pole zostawione dla backward compat
+  // gdyby kod gdziekolwiek go odczytywał.
   contact_type?: string | null;
   salutation?: string | null;
   first_name?: string | null;
@@ -108,7 +111,12 @@ export interface MamamiaCustomer {
   /** Patients — full shape for prefill, not just { id }. */
   patients?: MamamiaPatient[];
   customer_caregiver_wish?: MamamiaCaregiverWish | null;
-  customer_contracts?: MamamiaCustomerContract[];
+  // Beta Mamamia ma plural `customer_contracts` (1:n contracts z contact_type
+  // discriminator) — prod Mamamia ma legacy singular `customer_contract`
+  // (1:1 z customer). Refactor 2026-05-12 (Bug #16) na singular — działa
+  // na obu środowiskach. Beta zwraca tu pierwszy contract z plural array,
+  // prod jedyny dostępny.
+  customer_contract?: MamamiaCustomerContract | null;
 }
 
 export interface MamamiaCaregiverRef {

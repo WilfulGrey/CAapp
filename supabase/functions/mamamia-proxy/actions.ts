@@ -305,14 +305,17 @@ const UPDATE_CUSTOMER_ALLOWED = new Set([
   "equipment_ids",
   "patients",
   "customer_caregiver_wish",
-  // Bug #13l (2026-05-07): Mamamia panel "Lokalizacja opieki" reads from
-  // customer_contracts[].location_id (not just Customer.location_id top
-  // level). Bug #13 cut contracts from onboard → panel field empty even
-  // after Bug #13d set Customer.location_id. Now patient form save also
-  // sends contracts with the resolved location_id so panel renders.
-  // Verified live 2026-05-07 on Customer 7659 (testiphone).
-  "patient_contracts",
-  "invoice_contract",
+  // Bug #13l (2026-05-07, beta Mamamia): mamamia panel "Lokalizacja opieki"
+  // reads from customer_contract.location_id (NOT just Customer.location_id
+  // top level). Patient form save propaguje resolved location_id na
+  // customer_contract żeby panel renderował.
+  //
+  // Bug #16 (2026-05-12, prod Mamamia switch): pierwotnie pisaliśmy
+  // `patient_contracts: [...]` + `invoice_contract: {...}` (beta-only
+  // schema extension z N contracts per customer + contact_type discriminator).
+  // Prod ma legacy singular schema: `customer_contract` 1:1 z customer.
+  // Refactor na singular — universal, działa na obu środowiskach.
+  "customer_contract",
 ]);
 
 // Whitelist for the nested customer_caregiver_wish object — keep tight

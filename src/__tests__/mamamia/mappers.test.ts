@@ -438,7 +438,7 @@ describe('mapMamamiaCustomerToPatientForm — patientGenderKnown', () => {
         dementia: null, dementia_description: null, incontinence: null,
         incontinence_feces: null, incontinence_urine: null, smoking: null,
         lift_id: null }],
-      customer_caregiver_wish: null, customer_contracts: [],
+      customer_caregiver_wish: null, customer_contract: null,
     } as unknown as MamamiaCustomer;
   }
 
@@ -494,7 +494,7 @@ describe('mapMamamiaCustomerToPatientForm — pflegedienst from job_description'
       smoking_household: null, internet: null, urbanization_id: null,
       pets: null, is_pet_dog: null, is_pet_cat: null, is_pet_other: null,
       day_care_facility: facility,
-      patients: [], customer_caregiver_wish: null, customer_contracts: [],
+      patients: [], customer_caregiver_wish: null, customer_contract: null,
     } as unknown as MamamiaCustomer;
   }
 
@@ -582,7 +582,7 @@ describe('mapMamamiaCustomerToPatientForm — weight/height passthrough', () => 
         incontinence_feces: null, incontinence_urine: null, smoking: null,
         lift_id: null,
       }],
-      customer_caregiver_wish: null, customer_contracts: [],
+      customer_caregiver_wish: null, customer_contract: null,
     } as unknown as MamamiaCustomer;
   }
 
@@ -637,7 +637,7 @@ describe('mapMamamiaCustomerToPatientForm — Bug #13k pflegedienst dedicated fi
       day_care_facility_description_de: descDe,
       day_care_facility_description_en: null,
       day_care_facility_description_pl: null,
-      patients: [], customer_caregiver_wish: null, customer_contracts: [],
+      patients: [], customer_caregiver_wish: null, customer_contract: null,
     } as unknown as MamamiaCustomer;
   }
 
@@ -704,7 +704,7 @@ describe('mapMamamiaCustomerToPatientForm — Bug #13e Kein/e via care_level=nul
         incontinence_feces: null, incontinence_urine: null, smoking: null,
         lift_id: null,
       }],
-      customer_caregiver_wish: null, customer_contracts: [],
+      customer_caregiver_wish: null, customer_contract: null,
     } as unknown as MamamiaCustomer;
   }
 

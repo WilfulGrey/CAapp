@@ -763,13 +763,13 @@ export function mapMamamiaCustomerToPatientForm(
     cust.pets, cust.is_pet_dog, cust.is_pet_cat, cust.is_pet_other,
   );
 
-  // Address from the patient_contact contract row (street_number /
-  // zip_code / city are filled by Primundus stage-B form).
-  const patientContract = cust.customer_contracts?.find(
-    c => c.contact_type === 'patient_contact',
-  );
-  if (patientContract?.zip_code) out.plz = patientContract.zip_code;
-  if (patientContract?.city) out.ort = patientContract.city;
+  // Address z customer_contract (singular, 1:1). Bug #16 (2026-05-12) refactor
+  // — beta miała plural customer_contracts[] z contact_type='patient_contact'
+  // discriminator. Prod ma singular. Singular field istnieje w obu środowiskach
+  // (na becie zwraca pierwszy z plural).
+  const contract = cust.customer_contract;
+  if (contract?.zip_code) out.plz = contract.zip_code;
+  if (contract?.city) out.ort = contract.city;
 
   // Caregiver-wish (preferences).
   const wish = cust.customer_caregiver_wish;
