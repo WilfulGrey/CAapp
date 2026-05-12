@@ -100,7 +100,7 @@ const CustomerPortalPage: FC = () => {
   // limit=20 is intentional — client-side ranking (see `effectiveMatched`)
   // re-orders the page-1 batch by our own criteria (availability, freshness,
   // experience) rather than relying on Mamamia's server-side `order_by`.
-  const { data: mmMatchings, loading: mmMatchingsLoading, error: mmMatchingsError } = useMatchings({ limit: 20 }, mmReady);
+  const { data: mmMatchings, loading: mmMatchingsLoading, error: mmMatchingsError, refetch: refetchMatchings } = useMatchings({ limit: 20 }, mmReady);
   // Mamamia's default listMatchings excludes matchings where is_request=true
   // (already-invited caregivers), so without this second call the invited
   // ones simply vanish from the list after F5 — only their ids would survive
@@ -935,6 +935,13 @@ const CustomerPortalPage: FC = () => {
               locationId,
             });
             await updateCustomerMutation.mutate(patch as Record<string, unknown>);
+            // Patient form save flippa customer na active + dorzuca pełne
+            // patient/wish dane. Mamamia matching engine re-scoreuje całą
+            // listę z nowymi inputami — początkowo zwrócone caregivers
+            // (na bazie minimal onboard payload) mogą już nie pasować lub
+            // mogą się pojawić nowi. Refetch listę żeby user widział
+            // aktualny scoring, nie stale wynik z czasu onboardu.
+            refetchMatchings();
           }}
         />
         </div>
