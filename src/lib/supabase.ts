@@ -184,6 +184,9 @@ export interface PatientPrefill {
   p2_mobilitaet?: string;
   p2_nacht?: string;
   wunschGeschlecht?: string;
+  /** Whether other (non-care) people live in the household. Mapped from
+   *  calculator's `weitere_personen` (ja/nein) to 'Ja'/'Nein'. */
+  haushalt?: string;
 }
 
 export function prefillPatientFromLead(lead: Lead): PatientPrefill {
@@ -248,11 +251,18 @@ export function prefillPatientFromLead(lead: Lead): PatientPrefill {
   const mobilitaetLabel = mob ? (mobMap[mob] ?? '') : undefined;
   const nachtLabel = nacht ? (nachtMap[nacht] ?? 'Nein') : undefined;
 
+  // weitere_personen: 'ja'/'nein' → 'Ja'/'Nein' for the haushalt field.
+  // This is price-relevant and must not be left blank.
+  const wpRaw = String(fd.weitere_personen ?? '').toLowerCase();
+  const haushaltLabel: string | undefined =
+    wpRaw === 'ja' ? 'Ja' : wpRaw === 'nein' ? 'Nein' : undefined;
+
   return {
     anzahl:           isCouple ? '2' : '1',
     pflegegrad:       pflegegradLabel,
     mobilitaet:       mobilitaetLabel,
     nacht:            nachtLabel,
+    haushalt:         haushaltLabel,
     // Person 2 inherits Person 1's calculator answers — the calculator
     // doesn't collect them separately, and "couple, both have same
     // Pflegegrad" is a much better default than blank/Pflegegrad 2.

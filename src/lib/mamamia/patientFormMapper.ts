@@ -688,10 +688,11 @@ export function mapPatientFormToUpdateCustomerInput(
   const cga = caregiverAccommodatedToApi(form.unterbringung);
   if (cga) patch.caregiver_accommodated = cga;
 
-  // other_people_in_house — derive from anzahl: 2 patients = yes, 1 = no.
-  // (Form's `haushalt` field is read-only prefill from formularDaten.)
-  if (form.anzahl === '2') patch.other_people_in_house = 'yes';
-  else if (form.anzahl === '1') patch.other_people_in_house = 'no';
+  // other_people_in_house — from form.haushalt ('Ja'/'Nein'), NOT from anzahl.
+  // anzahl = how many people need care; haushalt = are there OTHER non-care
+  // people in the household (maps from calculator's weitere_personen: ja/nein).
+  if (form.haushalt === 'Ja') patch.other_people_in_house = 'yes';
+  else if (form.haushalt === 'Nein') patch.other_people_in_house = 'no';
 
   const fam = yesNoToApi(form.familieNahe);
   if (fam) patch.has_family_near_by = fam;
