@@ -1191,7 +1191,7 @@ export const AngebotCard: FC<{
                   </button>
                 ) : (
                   <button
-                    onClick={async () => {
+                    onClick={() => {
                       if (!allComplete) return;
                       // Mark as final submission (not a draft) so reload
                       // shows the green-checked "Vollständig" state.
@@ -1201,18 +1201,17 @@ export const AngebotCard: FC<{
                           JSON.stringify({ ...patient, _isDraft: false }),
                         );
                       }
-                      // Persist to Mamamia when session is live.
-                      if (mamamiaEnabled && onSaveToMamamia) {
-                        try {
-                          await onSaveToMamamia(patient);
-                        } catch (err) {
-                          console.error('UpdateCustomer failed:', err);
-                          // Still let user proceed (local draft saved). Revisit when mutation settles.
-                        }
-                      }
+                      // Close the form immediately — branded loading screen
+                      // in the parent takes over while Mamamia saves in bg.
                       setSaved(true);
                       setPatientOpen(false);
                       onPatientSaved?.(true);
+                      // Fire-and-forget: Mamamia save runs after UI transition.
+                      if (mamamiaEnabled && onSaveToMamamia) {
+                        onSaveToMamamia(patient).catch(err =>
+                          console.error('UpdateCustomer failed:', err),
+                        );
+                      }
                     }}
                     className={`flex-1 py-2.5 text-sm font-bold rounded-xl transition-all ${
                       allComplete
