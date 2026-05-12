@@ -165,6 +165,10 @@ export interface MamamiaCaregiverFull extends MamamiaCaregiverRef {
     postal_code: string | null;
     city: string | null;
     status: string | null;
+    /** Number of patients in this assignment (1 = single, 2 = couple care). */
+    patients_count?: number | null;
+    /** Patient's primary mobility level (1=Mobile…5=Bedridden), same scale as patient.mobility_id. */
+    patient_mobility_id?: number | null;
   }>;
 }
 

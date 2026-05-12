@@ -90,6 +90,17 @@ const MOBILITY_DE: Record<string, string> = {
   Bedridden: 'Bettlägerig',
 };
 
+// Patient mobility_id → German display label.
+// Used for hp_recent_assignments.patient_mobility_id (same scale as Patient.mobility_id).
+// id=2 (Walking stick) is rare in care assignments; all others are common.
+const PATIENT_MOBILITY_BY_ID: Record<number, string> = {
+  1: 'Mobil',
+  2: 'Am Gehstock',
+  3: 'Rollator',
+  4: 'Rollstuhl',
+  5: 'Bettlägerig',
+};
+
 // Caregiver.personalities[].personality — values from beta sample.
 // Mapping covers the prod-most-common; unknown values pass through.
 const PERSONALITY_DE: Record<string, string> = {
@@ -244,8 +255,10 @@ export function mapCaregiverToNurse(
         endDate: a.departure_date,
         postalCode: a.postal_code ?? '—',
         city: a.city ?? '—',
-        patientCount: 1,
-        mobility: '—',
+        patientCount: a.patients_count ?? 1,
+        mobility: a.patient_mobility_id != null
+          ? (PATIENT_MOBILITY_BY_ID[a.patient_mobility_id] ?? '—')
+          : '—',
       });
       if (detailedAssignments.length >= 3) break;
     }
