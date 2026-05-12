@@ -22,6 +22,9 @@ export interface ProxySecrets {
   mamamiaAgencyEmail: string;
   mamamiaAgencyPassword: string;
   sessionJwtSecret: string;
+  /** Anthropic API key — optional. When missing, generateJobDescription
+   *  returns null and the frontend falls back to the mechanical summary. */
+  anthropicApiKey?: string;
   // Panel SPA base URL — different host than GraphQL API. Mamamia
   // hostuje panel UI na osobnym subdomain z `/backend` path:
   //   - beta tenant:    https://beta.mamamia.app/backend
@@ -114,6 +117,7 @@ export async function handleRequest(req: Request, deps: ProxyDeps): Promise<Resp
       agencyEmail: deps.secrets.mamamiaAgencyEmail,
       agencyPassword: deps.secrets.mamamiaAgencyPassword,
       fetchFn: deps.fetchFn,
+      anthropicApiKey: deps.secrets.anthropicApiKey,
     });
 
     return new Response(
@@ -156,6 +160,7 @@ if (import.meta.main) {
     mamamiaAgencyPassword: Deno.env.get("MAMAMIA_AGENCY_PASSWORD")!,
     sessionJwtSecret: Deno.env.get("SESSION_JWT_SECRET")!,
     mamamiaPanelUrl: panelUrl,
+    anthropicApiKey: Deno.env.get("ANTHROPIC_API_KEY"),
   };
 
   Deno.serve((req) => handleRequest(req, { secrets }));

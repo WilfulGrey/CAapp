@@ -907,33 +907,68 @@ const CustomerPortalPage: FC = () => {
           mamamiaEnabled={mmReady}
           onSaveToMamamia={async (form) => {
             const existingPatientIds = mmCustomer?.patients?.map(p => p.id) ?? [];
-            // Resolve Mamamia location_id from PLZ via Locations(search).
-            // Without a canonical id, panel "Lokalizacja opieki" stays empty
-            // even if location_custom_text is set — verified 2026-05-07 on
-            // Customer 7655 (location_custom_text="80332 Munchen", panel
-            // location dropdown empty). Best-effort: errors fall back to
-            // the location_custom_text path inside the mapper.
-            let locationId: number | undefined;
-            const plz = form.plz?.trim();
-            if (plz && /^\d{4,5}$/.test(plz)) {
-              try {
-                const r = await callMamamia<{
-                  LocationsWithPagination: {
-                    data: Array<{ id: number; zip_code: string; country_code: string }>;
-                  };
-                }>('searchLocations', { search: plz, limit: 10, page: 1 });
-                const rows = r.LocationsWithPagination.data;
-                const de = rows.find(l => l.country_code === 'DE');
-                const match = de ?? rows[0];
-                if (match) locationId = match.id;
-              } catch {
-                // swallow — fall back to location_custom_text in mapper
-              }
-            }
+
+            // ── Run AI description + location lookup in parallel ──────────
+            // generateJobDescription: Anthropic (via proxy) produces a 2–3
+            // sentence natural summary. Falls back to mechanical summary if
+            // the API key is missing or the call fails — never blocks save.
+            const [aiResult, locationId] = await Promise.all([
+              callMamamia<{ description: string | null }>('generateJobDescription', {
+                anzahl: form.anzahl,
+                geschlecht: form.geschlecht, geburtsjahr: form.geburtsjahr,
+                pflegegrad: form.pflegegrad, mobilitaet: form.mobilitaet,
+                heben: form.heben, demenz: form.demenz,
+                inkontinenz: form.inkontinenz, nacht: form.nacht,
+                diagnosen: form.diagnosen,
+                p2_geschlecht: form.p2_geschlecht, p2_geburtsjahr: form.p2_geburtsjahr,
+                p2_pflegegrad: form.p2_pflegegrad, p2_mobilitaet: form.p2_mobilitaet,
+                p2_demenz: form.p2_demenz,
+                ort: form.ort, wohnungstyp: form.wohnungstyp,
+                urbanisierung: form.urbanisierung, familieNahe: form.familieNahe,
+                haushalt: form.haushalt, pflegedienst: form.pflegedienst,
+                aufgaben: form.aufgaben, sonstigeWuensche: form.sonstigeWuensche,
+              }).catch(() => ({ description: null })),
+
+              // Resolve Mamamia location_id from PLZ via Locations(search).
+              // Without a canonical id, panel "Lokalizacja opieki" stays empty
+              // even if location_custom_text is set — verified 2026-05-07 on
+              // Customer 7655 (location_custom_text="80332 Munchen", panel
+              // location dropdown empty). Best-effort: errors fall back to
+              // the location_custom_text path inside the mapper.
+              (async () => {
+                const plz = form.plz?.trim();
+                if (plz && /^\d{4,5}$/.test(plz)) {
+                  try {
+                    const r = await callMamamia<{
+                      LocationsWithPagination: {
+                        data: Array<{ id: number; zip_code: string; country_code: string }>;
+                      };
+                    }>('searchLocations', { search: plz, limit: 10, page: 1 });
+                    const rows = r.LocationsWithPagination.data;
+                    const de = rows.find(l => l.country_code === 'DE');
+                    const match = de ?? rows[0];
+                    return match?.id as number | undefined;
+                  } catch {
+                    // swallow — fall back to location_custom_text in mapper
+                  }
+                }
+                return undefined;
+              })(),
+            ]);
+
             const patch = mapPatientFormToUpdateCustomerInput(form, {
               existingPatientIds,
               locationId,
             });
+
+            // Override job_description with AI result when available.
+            // The AI already incorporates diagnosen naturally — no suffix needed.
+            // Mechanical summary from mapPatientFormToUpdateCustomerInput
+            // stays as fallback when Anthropic call failed or key is missing.
+            if (aiResult.description) {
+              patch.job_description = aiResult.description;
+            }
+
             await updateCustomerMutation.mutate(patch as Record<string, unknown>);
             // Patient form save flippa customer na active + dorzuca pełne
             // patient/wish dane. Mamamia matching engine re-scoreuje całą
