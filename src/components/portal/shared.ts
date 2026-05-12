@@ -142,7 +142,7 @@ export interface PatientForm {
   // task labels (e.g. "Grundpflege, Wundversorgung").
   pflegedienstHaeufigkeit: string;
   pflegedienstAufgaben: string;
-  tiere: string; unterbringung: string; aufgaben: string;
+  tiere: string; unterbringung: string; badezimmer: string; aufgaben: string;
   // PK-Wünsche
   wunschGeschlecht: string; rauchen: string; sonstigeWuensche: string;
   // Getriebe (gearbox) — only shown/required when the customer answered

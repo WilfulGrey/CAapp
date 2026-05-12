@@ -40,6 +40,7 @@ function makeForm(overrides: Partial<PatientFormShape> = {}): PatientFormShape {
     internet: 'Ja',
     tiere: 'Keine',
     unterbringung: 'Zimmer in den Räumlichkeiten',
+    badezimmer: 'Ja',
     aufgaben: '',
     wunschGeschlecht: 'Egal',
     rauchen: 'Nein',
@@ -277,12 +278,16 @@ describe('mapPatientFormToUpdateCustomerInput', () => {
     expect(r.customer_caregiver_wish?.shopping).toBe('no');
   });
 
-  it('Bug #13a: equipment_ids defaults to [1, 2] (TV + Bathroom)', () => {
-    // Patient form doesn't ask; panel "Wyposażenie zakwaterowania" is
-    // multi-select required. [1, 2] is the single most-common pair in
-    // active prod customers.
-    const r = mapPatientFormToUpdateCustomerInput(makeForm());
+  it('Bug #13a: equipment_ids = [1, 2] when badezimmer=Ja (TV always + Bathroom)', () => {
+    // Panel "Ausstattung der Unterkunft" is required; TV (id=1) is always
+    // included, Bathroom (id=2) added only when badezimmer=Ja.
+    const r = mapPatientFormToUpdateCustomerInput(makeForm({ badezimmer: 'Ja' }));
     expect(r.equipment_ids).toEqual([1, 2]);
+  });
+
+  it('equipment_ids = [1] when badezimmer=Nein (TV only, no Bathroom)', () => {
+    const r = mapPatientFormToUpdateCustomerInput(makeForm({ badezimmer: 'Nein' }));
+    expect(r.equipment_ids).toEqual([1]);
   });
 
   it('Bug #13a: night_operations_description placeholder when nacht != Nein', () => {

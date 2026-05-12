@@ -117,6 +117,9 @@ export interface MamamiaCustomer {
   // na obu środowiskach. Beta zwraca tu pierwszy contract z plural array,
   // prod jedyny dostępny.
   customer_contract?: MamamiaCustomerContract | null;
+  /** Accommodation equipment — fetched by GET_CUSTOMER as `equipments { id equipment }`.
+   *  id=1 = Own TV, id=2 = Own Bathroom. Used to prefill the `badezimmer` field. */
+  equipments?: Array<{ id: number; equipment?: string | null }> | null;
 }
 
 export interface MamamiaCaregiverRef {
