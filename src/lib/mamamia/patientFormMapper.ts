@@ -311,16 +311,32 @@ function wishDrivingGearboxToApi(v: string): 'automatic' | 'manual' | null {
   return null;
 }
 
-// Bucket strings (e.g. "71-80 kg" / "171-180 cm") get two transforms
-// before reaching Mamamia:
-//   1. en-dash "–" → ASCII hyphen "-" (defense for legacy localStorage
-//      drafts saved with en-dash form options pre-2026-05-07).
-//   2. strip " kg" / " cm" suffix — Mamamia panel stores raw bucket
-//      ("71-80", "171-180") without unit. Verified live 2026-05-07 on
-//      Customer 7658 after manual panel pick: weight="71-80",
-//      height="171-180". Reverse mapper re-adds suffix for form display.
+// Bucket strings (e.g. "71-80 kg" / "171-180 cm") map to Mamamia panel's
+// internal bucket strings. For middle ranges Mamamia stores the bare
+// bucket without unit ("71-80", "171-180"). For edge buckets Mamamia
+// uses non-uniform conventions (verified live 2026-05-12 on Customer
+// 8454 via DevTools after manual panel picks):
+//   weight  "Unter 50 kg"  → "40-50"   (closed range, not "<50" / "less_50")
+//   weight  "Über 100 kg"  → "> 100"   (with space, NOT "100+" / ">100")
+//   height  "Unter 151 cm" → "140-150" (closed range, not "<151" / "less_151")
+//   height  "Über 190 cm"  → "190+"    (NO space, plus suffix, NOT "> 190")
+// Sending the wrong edge string makes Mamamia silently store nothing —
+// patient form save appears to succeed but weight/height stay blank in
+// the panel.
+//
+// Defense: en-dash "–" → ASCII hyphen "-" for legacy localStorage drafts
+// saved with en-dash form options pre-2026-05-07.
+const WEIGHT_EDGE: Record<string, string> = {
+  'Unter 50': '40-50',
+  'Über 100': '> 100',
+};
+const HEIGHT_EDGE: Record<string, string> = {
+  'Unter 151': '140-150',
+  'Über 190': '190+',
+};
 function normalizeBucket(s: string): string {
-  return s.replace(/–/g, '-').replace(/\s*(?:kg|cm)$/, '');
+  const stripped = s.replace(/–/g, '-').replace(/\s*(?:kg|cm)$/, '');
+  return WEIGHT_EDGE[stripped] ?? HEIGHT_EDGE[stripped] ?? stripped;
 }
 
 // Tool ids derived from mobility — mirrors

@@ -469,6 +469,23 @@ describe('mapMamamiaCustomerToPatientForm — patientGenderKnown', () => {
     expect(r.p2_geschlecht).toBe('Männlich');
     expect(r.p2_pflegegrad).toBe('Pflegegrad 3');
   });
+
+  it('Bug #17b: weight/height edge buckets reverse-map to form labels', () => {
+    // Mamamia stores edges as "40-50"/"> 100" (weight), "140-150"/"190+"
+    // (height). Reverse mapper must re-emit the form's Unter/Über labels
+    // so AngebotCard prefill picks the correct dropdown option.
+    // Verified live 2026-05-12 on Customer 8454.
+    const cust = makeCustWithGender('female');
+    cust.patients = [{ ...cust.patients![0], weight: '40-50', height: '140-150' }];
+    const lo = mapMamamiaCustomerToPatientForm(cust);
+    expect(lo.gewicht).toBe('Unter 50 kg');
+    expect(lo.groesse).toBe('Unter 151 cm');
+
+    cust.patients = [{ ...cust.patients![0], weight: '> 100', height: '190+' }];
+    const hi = mapMamamiaCustomerToPatientForm(cust);
+    expect(hi.gewicht).toBe('Über 100 kg');
+    expect(hi.groesse).toBe('Über 190 cm');
+  });
 });
 
 // ─── Bug #9 round-trip: pflegedienst from job_description → form ─────────

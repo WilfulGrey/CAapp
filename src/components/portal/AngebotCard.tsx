@@ -799,7 +799,7 @@ export const AngebotCard: FC<{
                         <div>
                           <label className={labelCls}>Gewicht <span className="font-normal text-gray-400">(optional)</span></label>
                           <CustomSelect value={patient.gewicht} onChange={v => updatePatient(p=>({...p,gewicht:v}))}
-                            options={['Unter 50 kg','51-60 kg','61-70 kg','71-80 kg','81-90 kg','91-100 kg','101-110 kg','Über 110 kg']} />
+                            options={['Unter 50 kg','51-60 kg','61-70 kg','71-80 kg','81-90 kg','91-100 kg','Über 100 kg']} />
                         </div>
                         <div>
                           <label className={labelCls}>Größe <span className="font-normal text-gray-400">(optional)</span></label>
@@ -836,7 +836,7 @@ export const AngebotCard: FC<{
                           <div>
                             <label className={labelCls}>Gewicht <span className="font-normal text-gray-400">(optional)</span></label>
                             <CustomSelect value={patient.p2_gewicht} onChange={v => updatePatient(p=>({...p,p2_gewicht:v}))}
-                              options={['Unter 50 kg','51-60 kg','61-70 kg','71-80 kg','81-90 kg','91-100 kg','101-110 kg','Über 110 kg']} />
+                              options={['Unter 50 kg','51-60 kg','61-70 kg','71-80 kg','81-90 kg','91-100 kg','Über 100 kg']} />
                           </div>
                           <div>
                             <label className={labelCls}>Größe <span className="font-normal text-gray-400">(optional)</span></label>

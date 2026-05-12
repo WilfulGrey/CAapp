@@ -339,11 +339,18 @@ describe('mapPatientFormToUpdateCustomerInput', () => {
     expect(r.patients?.[0].height).toBe('171-180');
   });
 
-  it('Bug #13f: "Unter X" / "Über X" labels also lose suffix on send', () => {
-    // Boundary buckets — same suffix-strip rule applies.
-    const r = mapPatientFormToUpdateCustomerInput(makeForm({ gewicht: 'Unter 50 kg', groesse: 'Über 190 cm' }));
-    expect(r.patients?.[0].weight).toBe('Unter 50');
-    expect(r.patients?.[0].height).toBe('Über 190');
+  it('Bug #17b: edge buckets map to Mamamia-specific values (verified 8454 2026-05-12)', () => {
+    // Mamamia panel stores edges with non-uniform conventions — sending
+    // the raw form label silently drops the value (Mamamia stores nothing,
+    // panel weight/height stays empty). Verified live on Customer 8454
+    // via DevTools after manual panel picks.
+    const lo = mapPatientFormToUpdateCustomerInput(makeForm({ gewicht: 'Unter 50 kg', groesse: 'Unter 151 cm' }));
+    expect(lo.patients?.[0].weight).toBe('40-50');
+    expect(lo.patients?.[0].height).toBe('140-150');
+
+    const hi = mapPatientFormToUpdateCustomerInput(makeForm({ gewicht: 'Über 100 kg', groesse: 'Über 190 cm' }));
+    expect(hi.patients?.[0].weight).toBe('> 100');
+    expect(hi.patients?.[0].height).toBe('190+');
   });
 
   it('Bug #13f: legacy en-dash drafts still normalize to ASCII + suffix-strip', () => {

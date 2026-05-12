@@ -528,8 +528,15 @@ function mamamiaPetsToForm(
   return '';
 }
 
-// weight/height in Mamamia store as bare buckets ("61-70" / "161-170").
-// Form expects suffix ("61-70 kg" / "161-170 cm").
+// weight/height in Mamamia store as bare buckets for middle ranges
+// ("61-70" / "161-170") and non-uniform edges for the extremes
+// (weight: "40-50" / "> 100"; height: "140-150" / "190+"). Form expects
+// suffix-annotated labels ("Unter 50 kg" / "Über 100 kg" / "61-70 kg",
+// "Unter 151 cm" / "Über 190 cm" / "161-170 cm").
+//
+// Edge mapping verified live 2026-05-12 on Customer 8454 via DevTools
+// after manual panel picks (see patientFormMapper.ts WEIGHT_EDGE / HEIGHT_EDGE
+// for the forward direction).
 //
 // Bug #13 (2026-05-07): pre-refactor the onboard injected DEFAULT_WEIGHT /
 // DEFAULT_HEIGHT and we used pair-detection sentinel suppression to hide
@@ -537,10 +544,14 @@ function mamamiaPetsToForm(
 // returns null until patient form save. No sentinel needed: null → ''.
 function mamamiaWeightToForm(w: string | null | undefined): string {
   if (!w) return '';
+  if (w === '40-50') return 'Unter 50 kg';
+  if (w === '> 100') return 'Über 100 kg';
   return w.endsWith('kg') ? w : `${w} kg`;
 }
 function mamamiaHeightToForm(h: string | null | undefined): string {
   if (!h) return '';
+  if (h === '140-150') return 'Unter 151 cm';
+  if (h === '190+') return 'Über 190 cm';
   return h.endsWith('cm') ? h : `${h} cm`;
 }
 
