@@ -212,9 +212,16 @@ export function prefillPatientFromLead(lead: Lead): PatientPrefill {
   // Pre-2026-05-01 this map only had {nein, gelegentlich, regelmaessig},
   // so a customer answering "Mehrmals nachts" silently fell through to
   // 'Nein' in the patient-form prefill — confusing handoff.
+  //
+  // NOTE: 'gelegentlich' maps to 'Bis zu 1 Mal' (NOT 'Gelegentlich').
+  // 'Gelegentlich' was the old label but it is NOT a valid AngebotCard
+  // CustomSelect option. More importantly, it mapped to 'occasionally'
+  // in patientFormMapper — a Mamamia DB enum that the panel dropdown
+  // does NOT render (shows "Bitte wählen" even though data is stored).
+  // Closest valid panel option is 'Bis zu 1 Mal' → 'up_to_1_time'.
   const nachtMap: Record<string, string> = {
     nein:          'Nein',
-    gelegentlich:  'Gelegentlich',
+    gelegentlich:  'Bis zu 1 Mal', // was 'Gelegentlich' — not a valid form option; maps to unusable 'occasionally'
     taeglich:      'Bis zu 1 Mal',
     mehrmals:      'Mehr als 2',
     regelmaessig:  'Bis zu 1 Mal', // legacy alias
