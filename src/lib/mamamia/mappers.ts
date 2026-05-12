@@ -80,11 +80,13 @@ const DRIVING_GEARBOX_DE: Record<string, string> = {
 
 // Caregiver.mobilities[].mobility — English labels on Mamamia.
 // "Akzeptierte Mobilität" chips show what mobility levels CG accepts.
+// Labels intentionally aligned with patient-form vocabulary so CG profile
+// and patient requirement read the same terms (verified Mamamia enum values).
 const MOBILITY_DE: Record<string, string> = {
-  Mobile: 'Mobil',
-  'Walking stick': 'Gehstock',
-  Walker: 'Rollator',
-  Wheelchair: 'Rollstuhl',
+  Mobile: 'Selbstständig mobil',
+  'Walking stick': 'Am Gehstock',
+  Walker: 'Rollatorfähig',
+  Wheelchair: 'Rollstuhlfähig',
   Bedridden: 'Bettlägerig',
 };
 
@@ -289,10 +291,12 @@ export function mapCaregiverToNurse(
         .map(p => p.personality)
         .filter((x): x is string => Boolean(x))
         .map(p => translate(PERSONALITY_DE, p) ?? p),
-      acceptedMobilities: (full.mobilities ?? [])
-        .map(m => m.mobility)
-        .filter((x): x is string => Boolean(x))
-        .map(m => translate(MOBILITY_DE, m) ?? m),
+      acceptedMobilities: [...new Set(
+        (full.mobilities ?? [])
+          .map(m => m.mobility)
+          .filter((x): x is string => Boolean(x))
+          .map(m => translate(MOBILITY_DE, m) ?? m),
+      )],
       otherLanguages: (full.languagables ?? [])
         .filter(l => l.language?.name && l.language.name.toLowerCase() !== 'german')
         .map(l => ({ name: l.language!.name!, level: l.level ?? '—' })),

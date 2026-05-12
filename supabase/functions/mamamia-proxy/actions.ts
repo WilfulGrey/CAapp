@@ -459,6 +459,148 @@ const updateCustomer: ActionHandler = async (session, variables, deps) => {
   return runGraphQL(deps, UPDATE_CUSTOMER, patch);
 };
 
+// ─── generateJobDescription — AI-generated care situation summary ──────────
+//
+// Calls Anthropic Messages API (claude-haiku-3-5) to produce a 2–3 sentence
+// human-readable summary of the care situation. Used as `job_description` on
+// the Mamamia customer record, replacing the mechanical auto-summary.
+//
+// Requires ANTHROPIC_API_KEY secret. When missing, returns { description: null }
+// so the frontend falls back to the mechanical summary without breaking the
+// save flow. Errors are swallowed for the same reason.
+
+interface JobDescriptionInput {
+  // Patient 1
+  geschlecht?: string;
+  geburtsjahr?: string;
+  pflegegrad?: string;
+  mobilitaet?: string;
+  heben?: string;
+  demenz?: string;
+  inkontinenz?: string;
+  nacht?: string;
+  diagnosen?: string;
+  // Patient 2 (couple flow)
+  anzahl?: string;
+  p2_geschlecht?: string;
+  p2_geburtsjahr?: string;
+  p2_pflegegrad?: string;
+  p2_mobilitaet?: string;
+  p2_demenz?: string;
+  // Situation
+  ort?: string;
+  wohnungstyp?: string;
+  urbanisierung?: string;
+  familieNahe?: string;
+  pflegedienst?: string;
+  haushalt?: string;
+  aufgaben?: string;
+  sonstigeWuensche?: string;
+}
+
+function buildPatientDataText(v: JobDescriptionInput): string {
+  const lines: string[] = [];
+  const couple = v.anzahl === '2';
+
+  // --- Person 1 ---
+  const label1 = couple ? 'Person 1' : 'Patient/in';
+  if (v.geschlecht) lines.push(`${label1} – Geschlecht: ${v.geschlecht}`);
+  if (v.geburtsjahr) {
+    const alter = new Date().getFullYear() - Number(v.geburtsjahr);
+    if (alter > 0 && alter < 120) lines.push(`${label1} – Alter: ca. ${alter} Jahre`);
+  }
+  if (v.pflegegrad) lines.push(`${label1} – Pflegegrad: ${v.pflegegrad}`);
+  if (v.mobilitaet) lines.push(`${label1} – Mobilität: ${v.mobilitaet}`);
+  if (v.heben && v.heben !== 'Nein') lines.push(`${label1} – Heben/Transfer erforderlich`);
+  if (v.demenz && v.demenz !== 'Nein') lines.push(`${label1} – Demenz: ${v.demenz}`);
+  if (v.inkontinenz && v.inkontinenz !== 'Nein') lines.push(`${label1} – Inkontinenz: ${v.inkontinenz}`);
+  if (v.nacht && v.nacht !== 'Nein') lines.push(`${label1} – Nachteinsätze: ${v.nacht}`);
+  if (v.diagnosen) lines.push(`${label1} – Diagnosen: ${v.diagnosen}`);
+
+  // --- Person 2 ---
+  if (couple) {
+    if (v.p2_geschlecht) lines.push(`Person 2 – Geschlecht: ${v.p2_geschlecht}`);
+    if (v.p2_geburtsjahr) {
+      const alter2 = new Date().getFullYear() - Number(v.p2_geburtsjahr);
+      if (alter2 > 0 && alter2 < 120) lines.push(`Person 2 – Alter: ca. ${alter2} Jahre`);
+    }
+    if (v.p2_pflegegrad) lines.push(`Person 2 – Pflegegrad: ${v.p2_pflegegrad}`);
+    if (v.p2_mobilitaet) lines.push(`Person 2 – Mobilität: ${v.p2_mobilitaet}`);
+    if (v.p2_demenz && v.p2_demenz !== 'Nein') lines.push(`Person 2 – Demenz: ${v.p2_demenz}`);
+  }
+
+  // --- Wohnsituation ---
+  if (v.ort) lines.push(`Wohnort: ${v.ort}${v.urbanisierung ? ` (${v.urbanisierung})` : ''}`);
+  if (v.wohnungstyp) lines.push(`Wohnsituation: ${v.wohnungstyp}`);
+  if (v.familieNahe === 'Ja') lines.push(`Familie in der Nähe: Ja`);
+  if (v.haushalt === 'Ja') lines.push(`Weitere Personen im Haushalt: Ja`);
+  if (v.pflegedienst && v.pflegedienst !== 'Nein') lines.push(`Pflegedienst: ${v.pflegedienst}`);
+
+  // --- Aufgaben / Wünsche ---
+  if (v.aufgaben) lines.push(`Gewünschte Aufgaben: ${v.aufgaben}`);
+  if (v.sonstigeWuensche) lines.push(`Sonstige Wünsche: ${v.sonstigeWuensche}`);
+
+  return lines.join('\n');
+}
+
+const SYSTEM_PROMPT = `Du fasst Pflegesituationen für Pflegekräfte zusammen.
+Schreibe 2–3 natürliche Sätze – klar, menschlich, ehrlich, keine Floskeln.
+Die Pflegekraft soll wissen: wen sie betreut, was die Hauptaufgaben sind und wie der Alltag aussieht.
+Besonderheiten (Demenz, Nachteinsätze, Pflegedienst) nur erwähnen wenn relevant.
+Keine Aufzählungen. Keine Überschriften. Nur Fließtext.
+Gib ausschließlich den Beschreibungstext aus — keine Einleitung, keine Erläuterung.`;
+
+const generateJobDescription: ActionHandler = async (_session, variables, deps) => {
+  if (!deps.anthropicApiKey) {
+    return { description: null };
+  }
+
+  const input = variables as JobDescriptionInput;
+  const dataText = buildPatientDataText(input);
+
+  if (!dataText.trim()) {
+    return { description: null };
+  }
+
+  const fetchFn = deps.fetchFn ?? fetch;
+  try {
+    const res = await fetchFn('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'x-api-key': deps.anthropicApiKey,
+        'anthropic-version': '2023-06-01',
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: 'claude-haiku-4-5',
+        max_tokens: 512,
+        system: SYSTEM_PROMPT,
+        messages: [
+          {
+            role: 'user',
+            content: `Pflegesituation:\n${dataText}`,
+          },
+        ],
+      }),
+    });
+
+    if (!res.ok) {
+      const errText = await res.text();
+      console.error('Anthropic API error:', res.status, errText.slice(0, 200));
+      return { description: null };
+    }
+
+    const body = await res.json() as {
+      content?: Array<{ type: string; text: string }>;
+    };
+    const text = body.content?.find(b => b.type === 'text')?.text?.trim() ?? null;
+    return { description: text };
+  } catch (e) {
+    console.error('generateJobDescription failed:', (e as Error).message);
+    return { description: null };
+  }
+};
+
 // ─── Dispatcher ────────────────────────────────────────────────────────────
 
 export const ACTIONS: Record<ProxyAction, ActionHandler> = {
@@ -473,6 +615,7 @@ export const ACTIONS: Record<ProxyAction, ActionHandler> = {
   rejectApplication,
   storeConfirmation,
   inviteCaregiver,
+  generateJobDescription,
 };
 
 export function isKnownAction(name: string): name is ProxyAction {

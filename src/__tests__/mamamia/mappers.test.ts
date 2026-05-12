@@ -260,7 +260,7 @@ describe('mapCaregiverToNurse — full profile (translations + units)', () => {
       }) as any,
       { nowIso: NOW_ISO, nowYear: NOW_YEAR },
     );
-    expect(n.profile?.acceptedMobilities).toEqual(['Mobil', 'Rollstuhl', 'Bettlägerig']);
+    expect(n.profile?.acceptedMobilities).toEqual(['Selbstständig mobil', 'Rollstuhlfähig', 'Bettlägerig']);
   });
 
   it('drivingLicense: parses gearbox label from enum', () => {

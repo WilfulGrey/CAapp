@@ -16,7 +16,9 @@ export type ProxyAction =
   | "updateCustomer"
   | "rejectApplication"
   | "storeConfirmation"
-  | "inviteCaregiver";
+  | "inviteCaregiver"
+  // AI
+  | "generateJobDescription";
 
 export interface ActionDeps {
   endpoint: string;
@@ -28,6 +30,8 @@ export interface ActionDeps {
   agencyEmail?: string;
   agencyPassword?: string;
   fetchFn?: typeof fetch;
+  /** Anthropic API key — used by generateJobDescription action. */
+  anthropicApiKey?: string;
 }
 
 export type ActionHandler = (
