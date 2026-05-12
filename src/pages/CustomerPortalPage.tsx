@@ -589,13 +589,72 @@ const CustomerPortalPage: FC = () => {
 
   // Lead loaded but Mamamia session still bootstrapping.
   if (lead && !mmReady) {
+    const firstName = lead.vorname ?? null;
     return (
       <>
-      <div className="min-h-screen bg-white flex items-center justify-center">
-        <div className="text-center space-y-3">
-          <div className="w-10 h-10 border-2 border-[#9B1FA1] border-t-transparent rounded-full animate-spin mx-auto" />
-          <p className="text-sm text-gray-400">Betreuungskräfte werden geladen…</p>
+      <div className="min-h-screen flex flex-col items-center justify-center relative overflow-hidden px-8"
+           style={{background: 'linear-gradient(135deg, #6B5444 0%, #8B7355 55%, #A18973 100%)'}}>
+
+        {/* Decorative blobs */}
+        <div className="absolute -top-24 -right-24 w-80 h-80 rounded-full pointer-events-none" style={{background:'rgba(255,255,255,0.07)'}} />
+        <div className="absolute -bottom-20 -left-20 w-64 h-64 rounded-full pointer-events-none" style={{background:'rgba(255,255,255,0.07)'}} />
+        <div className="absolute top-1/3 -left-12 w-32 h-32 rounded-full pointer-events-none" style={{background:'rgba(255,255,255,0.04)'}} />
+
+        {/* Wordmark */}
+        <p className="absolute top-10 text-white/50 text-xs font-semibold tracking-[0.25em] uppercase">Primundus</p>
+
+        {/* Animated card stack */}
+        <div className="relative mb-10" style={{animation:'float 3.5s ease-in-out infinite'}}>
+          {/* Back card */}
+          <div className="absolute w-56 h-[76px] rounded-2xl"
+               style={{background:'rgba(255,255,255,0.12)', transform:'rotate(-7deg) translateY(14px) translateX(-10px)'}} />
+          {/* Mid card */}
+          <div className="absolute w-56 h-[76px] rounded-2xl"
+               style={{background:'rgba(255,255,255,0.20)', transform:'rotate(-3.5deg) translateY(7px) translateX(-5px)'}} />
+          {/* Front card */}
+          <div className="relative w-56 h-[76px] bg-white rounded-2xl shadow-2xl flex items-center gap-3 px-4">
+            <div className="w-11 h-11 rounded-xl flex-shrink-0 flex items-center justify-center text-white font-bold text-base"
+                 style={{background:'linear-gradient(135deg,#8B7355,#A18973)'}}>A</div>
+            <div className="flex-1 min-w-0">
+              <div className="h-2.5 rounded-full mb-2" style={{background:'#F0EBE3', width:'72%', animation:'shimmer 1.8s ease-in-out infinite'}} />
+              <div className="h-2 rounded-full mb-2.5" style={{background:'#F0EBE3', width:'52%'}} />
+              <div className="flex gap-1">
+                {[...Array(5)].map((_, i) => (
+                  <div key={i} className="w-4 h-1.5 rounded-full" style={{background: i < 4 ? '#C4B49A' : '#F0EBE3'}} />
+                ))}
+              </div>
+            </div>
+          </div>
         </div>
+
+        {/* Headline */}
+        <div className="text-center mb-8">
+          <h2 className="text-[1.7rem] font-bold text-white leading-tight mb-3">
+            {firstName ? `${firstName}, wir` : 'Wir'} bereiten<br/>Ihre Pflegekräfte vor
+          </h2>
+          <p className="text-sm leading-relaxed" style={{color:'rgba(255,255,255,0.72)'}}>
+            Gleich sehen Sie Ihr persönliches Angebot<br/>und passende Betreuungspersonen.
+          </p>
+        </div>
+
+        {/* Bouncing dots */}
+        <div className="flex gap-2.5">
+          {[0, 160, 320].map(d => (
+            <div key={d} className="w-2.5 h-2.5 rounded-full animate-bounce"
+                 style={{background:'rgba(255,255,255,0.75)', animationDelay:`${d}ms`}} />
+          ))}
+        </div>
+
+        <style>{`
+          @keyframes float {
+            0%, 100% { transform: translateY(0px) rotate(0deg); }
+            50% { transform: translateY(-10px) rotate(0.5deg); }
+          }
+          @keyframes shimmer {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.4; }
+          }
+        `}</style>
       </div>
       {debugOverlay}
       </>
