@@ -12,6 +12,7 @@ import {
 import { useMamamiaSession } from '../hooks/useMamamiaSession';
 import { useCustomer, useJobOffer, useApplications, useMatchings, useCaregiver, useInvitedCaregivers } from '../lib/mamamia/hooks';
 import { prefetchCaregivers } from '../lib/mamamia/caregiverCache';
+import { scheduleAiAbouts, getAiAbout, subscribeAiAbout } from '../lib/mamamia/aiAboutCache';
 import {
   useRejectApplication,
   useStoreConfirmation,
@@ -132,46 +133,30 @@ const CustomerPortalPage: FC = () => {
     selectedNurse?.caregiverId ?? null,
   );
 
-  // AI-generated "Über die Pflegekraft" intro — fires once fullCaregiver
-  // arrives. Keyed by caregiverId so switching nurses resets it. Falls back
-  // to the modal's existing mechanical text when the call fails or key missing.
+  // AI "Über die Pflegekraft" — reads from aiAboutCache (pre-baked during
+  // prefetch). If already resolved: instant. If still pending: subscribe
+  // and update when it arrives. Falls back to modal's mechanical text.
   const [aiAbout, setAiAbout] = useState<string | null>(null);
   const [aiAboutForId, setAiAboutForId] = useState<number | null>(null);
   useEffect(() => {
     if (!fullCaregiver) return;
     const id = fullCaregiver.id;
-    // Already generated for this caregiver — skip.
-    if (aiAboutForId === id) return;
-    setAiAbout(null);
+    if (aiAboutForId === id) return; // already wired for this nurse
     setAiAboutForId(id);
 
-    const germanLevel = (() => {
-      const levels: Record<string, string> = {
-        level_0: 'A1', level_1: 'A2', level_2: 'B1', level_3: 'B2', level_4: 'C1+',
-      };
-      return levels[fullCaregiver.germany_skill ?? ''] ?? fullCaregiver.germany_skill ?? undefined;
-    })();
-
-    const expYears = fullCaregiver.care_experience
-      ? `${fullCaregiver.care_experience} Jahre`
-      : fullCaregiver.hp_total_days
-      ? `${Math.round(fullCaregiver.hp_total_days / 365)} Jahre`
-      : undefined;
-
-    callMamamia<{ about: string | null }>('generateCaregiverAbout', {
-      firstName: fullCaregiver.first_name ?? undefined,
-      experienceYears: expYears,
-      assignments: fullCaregiver.hp_total_jobs ?? undefined,
-      languageLevel: germanLevel,
-      nationality: fullCaregiver.nationality?.nationality ?? undefined,
-      personalities: (fullCaregiver.personalities ?? [])
-        .map(p => p.personality).filter(Boolean) as string[],
-      hobbies: (fullCaregiver.hobbies ?? [])
-        .map(h => h.hobby).filter(Boolean) as string[],
-      isNurse: fullCaregiver.is_nurse ?? undefined,
-      qualifications: fullCaregiver.qualifications ?? undefined,
-      education: fullCaregiver.education ?? undefined,
-    }).then(r => { if (r.about) setAiAbout(r.about); }).catch(() => {/* keep fallback */});
+    const cached = getAiAbout(id);
+    if (cached !== undefined) {
+      // Cache hit — instant (pre-baked during prefetch).
+      setAiAbout(cached);
+      return;
+    }
+    // Still pending — subscribe; scheduleAiAbouts already fired the call.
+    setAiAbout(null);
+    const unsub = subscribeAiAbout(id, () => {
+      const text = getAiAbout(id);
+      if (text !== undefined) setAiAbout(text);
+    });
+    return unsub;
   }, [fullCaregiver?.id]);
 
   const enrichedSelectedNurse = (() => {
@@ -289,7 +274,13 @@ const CustomerPortalPage: FC = () => {
     if (mmApplications?.data) {
       for (const a of mmApplications.data) ids.add(a.caregiver.id);
     }
-    if (ids.size > 0) prefetchCaregivers([...ids]);
+    if (ids.size > 0) {
+      prefetchCaregivers([...ids]);
+      // Once each full profile lands in caregiverCache, scheduleAiAbouts
+      // fires the AI generation immediately — so "Über die Pflegekraft" text
+      // is often pre-baked by the time the user opens a modal.
+      scheduleAiAbouts([...ids]);
+    }
     // intentionally not depending on `effectiveMatched` reference identity —
     // its caregiverIds is what we care about, derived from mmMatchings.
   }, [mmReady, mmMatchings, mmApplications]);
