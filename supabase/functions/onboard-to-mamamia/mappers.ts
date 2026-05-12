@@ -78,7 +78,10 @@ export type NightOperations =
 
 export function mapNightOperations(fd: FormularDaten): NightOperations {
   const v = (fd?.nachteinsaetze ?? "").toString().toLowerCase();
-  if (v === "gelegentlich") return "occasionally";
+  // NOTE: 'gelegentlich' used to map to 'occasionally' — a valid Mamamia DB enum
+  // but NOT rendered in the Mamamia panel dropdown (shows "Bitte wählen" even when
+  // stored). Closest renderable option is 'up_to_1_time' ("Bis zu 1 Mal"). 2026-05-12.
+  if (v === "gelegentlich") return "up_to_1_time";
   if (v === "taeglich") return "up_to_1_time";       // Primundus "Täglich (1×)" → Mamamia "≤1×"
   if (v === "mehrmals") return "more_than_2";        // Primundus "Mehrmals nachts" → Mamamia ">2×"
   if (v === "regelmaessig") return "up_to_1_time";   // legacy alias

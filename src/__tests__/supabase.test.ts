@@ -152,11 +152,14 @@ describe('careStartLabel', () => {
 
 describe('prefillPatientFromLead', () => {
   it('maps baseLead formularDaten to PatientPrefill', () => {
+    // baseLead has nachteinsaetze='gelegentlich' → 'Bis zu 1 Mal'
+    // ('Gelegentlich' was the old label but maps to 'occasionally' which
+    // Mamamia panel renders as "Bitte wählen" — fixed 2026-05-12).
     expect(prefillPatientFromLead(baseLead)).toEqual({
       anzahl: '1',
       pflegegrad: '4',
       mobilitaet: 'Rollstuhlfähig',
-      nacht: 'Gelegentlich',
+      nacht: 'Bis zu 1 Mal',
       haushalt: 'Nein',         // baseLead.formularDaten.weitere_personen='nein'
       wunschGeschlecht: 'Weiblich',
     });
@@ -257,7 +260,11 @@ describe('prefillPatientFromLead', () => {
 
   it.each([
     ['nein', 'Nein'],
-    ['gelegentlich', 'Gelegentlich'],
+    // 'gelegentlich' maps to 'Bis zu 1 Mal' (NOT 'Gelegentlich'):
+    // 'Gelegentlich' is not a valid AngebotCard option and maps to
+    // 'occasionally' which the Mamamia panel dropdown cannot render
+    // (shows "Bitte wählen"). Closest panel-renderable option = 'Bis zu 1 Mal'.
+    ['gelegentlich', 'Bis zu 1 Mal'],
     // NEW calculator (Marcin) emits taeglich + mehrmals — pre-2026-05-01
     // both fell through to default 'Nein'. Now map to the patient-form
     // labels the AngebotCard <CustomSelect> options expect.

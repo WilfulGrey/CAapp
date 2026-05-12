@@ -215,7 +215,7 @@ Deno.test("onboardLead: StoreCustomer payload (Bug #13: minimal — only real da
   assertEquals(patients[0].care_level, 3);     // pflegegrad
   assertEquals(patients[0].lift_id, 1);        // derived (mobility>=4 → Yes)
   assertEquals(patients[0].tool_ids, [3]);     // derived (wheelchair only)
-  assertEquals(patients[0].night_operations, "occasionally");
+  assertEquals(patients[0].night_operations, "up_to_1_time"); // gelegentlich → up_to_1_time (not occasionally — Mamamia panel can't render it)
   // No injected defaults for fields kalkulator nie pyta — patient form fills.
   assertEquals(patients[0].weight, undefined);
   assertEquals(patients[0].height, undefined);
