@@ -612,6 +612,7 @@ export interface PatientFormPrefill {
   // user's previously-saved frequency + tasks.
   pflegedienstHaeufigkeit?: string;
   pflegedienstAufgaben?: string;
+  haushalt?: string;
   tiere?: string;
   wunschGeschlecht?: string; rauchen?: string;
   // Customer-side gearbox preference, restored from
