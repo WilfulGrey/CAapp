@@ -167,10 +167,13 @@ Deno.test("mapNightOperations: nein → 'no'", () => {
   assertEquals(mapNightOperations(makeFormularDaten({ nachteinsaetze: "nein" })), "no");
 });
 
-Deno.test("mapNightOperations: gelegentlich → 'occasionally'", () => {
+Deno.test("mapNightOperations: gelegentlich → 'up_to_1_time'", () => {
+  // 'occasionally' is a valid Mamamia DB enum but NOT rendered in the panel
+  // dropdown — it shows "Bitte wählen" even when stored. Closest renderable
+  // option is 'up_to_1_time' ("Bis zu 1 Mal"). Changed 2026-05-12.
   assertEquals(
     mapNightOperations(makeFormularDaten({ nachteinsaetze: "gelegentlich" })),
-    "occasionally",
+    "up_to_1_time",
   );
 });
 
@@ -342,7 +345,7 @@ Deno.test("buildPatients: single patient carries only real care attrs + derivati
   // Real / derived from real
   assertEquals(patients[0].mobility_id, 4);                  // rollstuhl
   assertEquals(patients[0].care_level, 3);                   // pflegegrad
-  assertEquals(patients[0].night_operations, "occasionally"); // gelegentlich
+  assertEquals(patients[0].night_operations, "up_to_1_time"); // gelegentlich → up_to_1_time (not occasionally — panel can't render it)
   assertEquals(patients[0].lift_id, 1);                      // derived (mobility>=4 → Yes)
   assertEquals(patients[0].tool_ids, [3]);                   // derived (wheelchair only)
 });
