@@ -544,12 +544,15 @@ function mamamiaHeightToForm(h: string | null | undefined): string {
   return h.endsWith('cm') ? h : `${h} cm`;
 }
 
-// Mamamia customer_caregiver_wish.germany_skill enum (verified prod 2026-04-28):
-//   level_0  → "A1"  (1% active)
-//   level_1  → "A2"  (1% — manual panel pick)
-//   level_2  → "A1-A2" (22% — calculator "grundlegend")
-//   level_3  → "B1-B2" (50% — calculator "kommunikativ")
-//   level_4  → "C1+"  (8% — calculator "sehr-gut")
+// Mamamia customer_caregiver_wish.germany_skill enum (verified prod 2026-04-28).
+// Reverse mapping na label do display w AngebotCard step 4 (read-only field).
+// % distribution z prod sweep:
+//   level_0  → "A1"          (1% active)
+//   level_1  → "A2"          (1% — calculator "grundlegend" od 2026-05-12)
+//   level_2  → "mind. A2"    (22% — calculator "kommunikativ" od 2026-05-12)
+//   level_3  → "mind. B1"    (50% — calculator NIE używa od 2026-05-12,
+//                             tylko manual panel pick przez agency)
+//   level_4  → "mind. C1"    (8% — calculator "sehr-gut")
 //   not_important → "Egal"
 // Bug #13g: AngebotCard step 4 displayed hardcoded "mind. B1" — replace
 // with this helper to read real value from mmCustomer.

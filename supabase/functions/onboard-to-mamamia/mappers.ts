@@ -247,26 +247,33 @@ export function mapOtherPeopleInHouse(fd: FormularDaten): "yes" | "no" {
 }
 
 // ─── German skill (caregiver-wish) ──────────────────────────────────────────
-// Primundus calculator collects 3 levels:
-//   "grundlegend"  → A1-A2 territory  → Mamamia "level_2"
-//   "kommunikativ" → B1-B2            → Mamamia "level_3"
-//   "sehr-gut"     → C1+              → Mamamia "level_4"
-// Mamamia enum 0..4 + "not_important" — verified prod sweep 2026-04-28.
-// Default level_3 (50% of active customers) when formularDaten missing.
+// Primundus calculator collects 3 levels (step 7 wymagany, canProceed blokuje
+// dalej bez wyboru). Mapowanie zaktualizowane 2026-05-12 wg decyzji
+// biznesowej Michała:
+//   "grundlegend"  → Mamamia "level_1"   (było level_2)
+//   "kommunikativ" → Mamamia "level_2"   (było level_3)
+//   "sehr-gut"     → Mamamia "level_4"   (unchanged)
+// `level_3` świadomie pomijany — calculator nie ma odpowiadającego pytania,
+// agency może je samodzielnie pickować w panelu Mamamia jeśli chce.
+// Mamamia enum 0..4 + "not_important" verified prod sweep 2026-04-28.
+//
+// NO SOFT DEFAULT (Święta zasada nr 1) — gdy formularDaten missing albo
+// unknown value, THROW. Lead onboard pada wyraźnie zamiast wstawiać dumb
+// wartość typu level_3 udając "we got something". Caller (onboardLead)
+// catchuje, surface'uje błąd jako "onboarding failed" (lub real message
+// gdy DEBUG_ONBOARD=1).
 export function mapGermanySkill(
   fd: FormularDaten,
-):
-  | "level_0"
-  | "level_1"
-  | "level_2"
-  | "level_3"
-  | "level_4"
-  | "not_important" {
+): "level_1" | "level_2" | "level_4" {
   const v = (fd?.deutschkenntnisse ?? "").toString().toLowerCase();
-  if (v === "grundlegend") return "level_2";
-  if (v === "kommunikativ") return "level_3";
+  if (v === "grundlegend") return "level_1";
+  if (v === "kommunikativ") return "level_2";
   if (v === "sehr-gut" || v === "sehr_gut") return "level_4";
-  return "level_3"; // default — most-common in prod active customers
+  throw new Error(
+    `mapGermanySkill: unknown deutschkenntnisse value ${JSON.stringify(v)} — ` +
+      `calculator should emit one of "grundlegend" / "kommunikativ" / "sehr-gut". ` +
+      `Brak default'u celowo (Święta zasada nr 1).`,
+  );
 }
 
 // ─── Driving license (caregiver-wish) ───────────────────────────────────────

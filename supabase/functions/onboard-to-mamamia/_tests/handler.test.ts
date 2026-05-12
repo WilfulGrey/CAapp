@@ -17,7 +17,7 @@ function makeLead(overrides: Partial<Lead> = {}): Lead {
     // 2099 is unambiguously in the future for the lifetime of this repo.
     token: "valid", token_expires_at: "2099-01-01T00:00:00.000Z", token_used: false,
     care_start_timing: "sofort",
-    kalkulation: { bruttopreis: 3000, eigenanteil: 1500, formularDaten: { pflegegrad: 3, mobilitaet: "rollstuhl" } },
+    kalkulation: { bruttopreis: 3000, eigenanteil: 1500, formularDaten: { pflegegrad: 3, mobilitaet: "rollstuhl", deutschkenntnisse: "kommunikativ" } },
     created_at: "2026-04-23T09:00:00.000Z", updated_at: "2026-04-23T09:00:00.000Z",
     mamamia_customer_id: null, mamamia_job_offer_id: null, mamamia_user_token: null, mamamia_onboarded_at: null,
     ...overrides,

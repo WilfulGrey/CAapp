@@ -29,6 +29,9 @@ function makeLead(overrides: Partial<Lead> = {}): Lead {
         nachteinsaetze: "gelegentlich",
         geschlecht: "weiblich",
         weitere_personen: "nein",
+        // mapGermanySkill throws na missing/unknown (Święta zasada nr 1) —
+        // fixture musi mieć valid enum żeby happy-path testy przeszły.
+        deutschkenntnisse: "kommunikativ",
       },
     },
     patient_anrede: null,
@@ -199,7 +202,7 @@ Deno.test("onboardLead: StoreCustomer payload (Bug #13: minimal — only real da
   const wish = v.customer_caregiver_wish as Record<string, unknown>;
   if (!wish || typeof wish !== "object") throw new Error("wish must be an object");
   assertEquals(wish.gender, "female");
-  assertEquals(wish.germany_skill, "level_3");
+  assertEquals(wish.germany_skill, "level_2");  // kommunikativ → level_2 (refactor 2026-05-12)
   assertEquals(wish.driving_license, "not_important");
   // No auto-strings or enum defaults for fields kalkulator nie pyta
   assertEquals(wish.smoking, undefined);
@@ -380,25 +383,35 @@ Deno.test("onboardLead: lead with patient_zip → Locations(search) → location
   assertEquals(sc.variables.customer_contract, undefined);
 });
 
-Deno.test("onboardLead: null kalkulation lead still works (default patient)", async () => {
+Deno.test("onboardLead: null kalkulation lead throws (no soft default — Święta zasada nr 1)", async () => {
+  // Pre-2026-05-12: ten test asser'ował że onboard "still works" z
+  // null kalkulation, używając defaultów (germany_skill=level_3 etc.).
+  // Po refactor mapGermanySkill (2026-05-12, decyzja biznesowa Michała):
+  // brak deutschkenntnisse w formularDaten → throw. Onboard fail loud
+  // zamiast wstawiać dumb wartość udając "wybór klienta". Legacy data
+  // (lead bez kalkulacji = anomalia) wymaga manual fix w Supabase.
   _resetAgencyTokenCache();
   const lead = makeLead({ kalkulation: null });
   const supa = makeFakeSupabase([lead]);
 
   const mm = fakeMamamia([
     { data: { LoginAgency: { id: 1, name: "P", email: "x", token: "t" } } },
-    { data: { StoreCustomer: { id: 1, customer_id: "ts-18-1", status: "draft" } } },
-    { data: { StoreJobOffer: { id: 2, job_offer_id: "ts-18-1-1", title: "t", status: "search" } } },
   ]);
 
-  const result = await onboardLead({
-    leadToken: "valid-token",
-    secrets: SECRETS,
-    supabase: supa,
-    fetchFn: mm.fetch,
-    now: NOW,
-  });
-
-  assertEquals(result.customer_id, 1);
-  assertEquals(result.job_offer_id, 2);
+  let threw = false;
+  try {
+    await onboardLead({
+      leadToken: "valid-token",
+      secrets: SECRETS,
+      supabase: supa,
+      fetchFn: mm.fetch,
+      now: NOW,
+    });
+  } catch (e) {
+    threw = true;
+    if (!(e as Error).message.includes("unknown deutschkenntnisse value")) {
+      throw new Error(`unexpected error: ${(e as Error).message}`);
+    }
+  }
+  if (!threw) throw new Error("expected throw on null kalkulation");
 });

@@ -33,6 +33,10 @@ function makeFormularDaten(overrides: Partial<FormularDaten> = {}): FormularDate
     nachteinsaetze: "gelegentlich",
     weitere_personen: "nein",
     geschlecht: "weiblich",
+    // mapGermanySkill throws na missing/unknown — fixture defaultuje na
+    // valid enum żeby happy-path testy przeszły. Tests które weryfikują
+    // throw na missing override'ują na {} przez `{} as FormularDaten`.
+    deutschkenntnisse: "kommunikativ",
     ...overrides,
   };
 }
@@ -199,21 +203,50 @@ Deno.test("mapNightOperations: missing → 'no'", () => {
 });
 
 // ─── mapGermanySkill ────────────────────────────────────────────────────────
+// Mapping updated 2026-05-12 (decyzja biznesowa Michała):
+//   grundlegend → level_1 (było level_2)
+//   kommunikativ → level_2 (było level_3)
+//   sehr-gut    → level_4 (unchanged)
+//   level_3 świadomie pomijany — agency picks manually w Mamamia panel.
+// NO soft default — unknown/missing value triggers throw (Święta zasada nr 1).
 
-Deno.test("mapGermanySkill: grundlegend → level_2", () => {
-  assertEquals(mapGermanySkill(makeFormularDaten({ deutschkenntnisse: "grundlegend" })), "level_2");
+Deno.test("mapGermanySkill: grundlegend → level_1", () => {
+  assertEquals(mapGermanySkill(makeFormularDaten({ deutschkenntnisse: "grundlegend" })), "level_1");
 });
 
-Deno.test("mapGermanySkill: kommunikativ → level_3", () => {
-  assertEquals(mapGermanySkill(makeFormularDaten({ deutschkenntnisse: "kommunikativ" })), "level_3");
+Deno.test("mapGermanySkill: kommunikativ → level_2", () => {
+  assertEquals(mapGermanySkill(makeFormularDaten({ deutschkenntnisse: "kommunikativ" })), "level_2");
 });
 
 Deno.test("mapGermanySkill: sehr-gut → level_4", () => {
   assertEquals(mapGermanySkill(makeFormularDaten({ deutschkenntnisse: "sehr-gut" })), "level_4");
 });
 
-Deno.test("mapGermanySkill: missing → level_3 (prod-most-common default)", () => {
-  assertEquals(mapGermanySkill({} as FormularDaten), "level_3");
+Deno.test("mapGermanySkill: sehr_gut underscore alias → level_4", () => {
+  assertEquals(mapGermanySkill(makeFormularDaten({ deutschkenntnisse: "sehr_gut" })), "level_4");
+});
+
+Deno.test("mapGermanySkill: missing throws (no soft default)", () => {
+  let threw = false;
+  try {
+    mapGermanySkill({} as FormularDaten);
+  } catch (e) {
+    threw = true;
+    if (!(e as Error).message.includes("unknown deutschkenntnisse value")) {
+      throw new Error(`unexpected error message: ${(e as Error).message}`);
+    }
+  }
+  if (!threw) throw new Error("expected throw on missing deutschkenntnisse");
+});
+
+Deno.test("mapGermanySkill: unknown value throws (no enum guessing)", () => {
+  let threw = false;
+  try {
+    mapGermanySkill(makeFormularDaten({ deutschkenntnisse: "fluent" }));
+  } catch (_e) {
+    threw = true;
+  }
+  if (!threw) throw new Error("expected throw on unknown deutschkenntnisse value");
 });
 
 // ─── mapDrivingLicense ──────────────────────────────────────────────────────
@@ -458,7 +491,7 @@ Deno.test("buildCaregiverWish: carries only real preference enums", () => {
     fuehrerschein: "ja",
   }));
   assertEquals(wish.gender, "female");
-  assertEquals(wish.germany_skill, "level_3");
+  assertEquals(wish.germany_skill, "level_2");   // kommunikativ → level_2 (refactor 2026-05-12)
   assertEquals(wish.driving_license, "yes");
   assertEquals(wish.is_open_for_all, false);   // Primundus business default
 });
@@ -479,7 +512,10 @@ Deno.test("buildCaregiverWish: cut fields are NOT set (Bug #13)", () => {
 });
 
 Deno.test("buildCaregiverWish: missing gender → 'not_important' (prod-safe default)", () => {
-  const wish = buildCaregiverWish({} as FormularDaten);
+  // deutschkenntnisse jest required przez mapGermanySkill (throw na missing) —
+  // ten test sprawdza tylko gender fallback, dorzucamy valid deutschkenntnisse
+  // żeby wish nie wybuchł na innej missing field.
+  const wish = buildCaregiverWish({ deutschkenntnisse: "kommunikativ" } as FormularDaten);
   assertEquals(wish.gender, "not_important");
 });
 
@@ -684,14 +720,22 @@ Deno.test("buildCustomerInput: betreuung_fuer='ehepaar' yields 2 patients", () =
   assertEquals(input.patients.length, 2);
 });
 
-Deno.test("buildCustomerInput: null kalkulation → defaults preserved (no crash)", () => {
+Deno.test("buildCustomerInput: null kalkulation throws (no soft default — Święta zasada nr 1)", () => {
+  // Pre-2026-05-12: ten test asser'ował że null kalkulation "no crash" —
+  // defaultami wszystkich enum field'ów. Post-refactor mapGermanySkill:
+  // missing deutschkenntnisse → throw. Onboard fail loud zamiast soft
+  // default'u. Legacy lead bez kalkulacji = anomalia wymagająca manual fix.
   const lead = makeLead({ kalkulation: null });
-  const input = buildCustomerInput(lead);
-  assertEquals(input.care_budget, null);
-  assertEquals(input.monthly_salary, null);
-  assertEquals(input.patients.length, 1);
-  assertEquals(input.other_people_in_house, "no");
-  assertEquals(input.language_id, 1);
+  let threw = false;
+  try {
+    buildCustomerInput(lead);
+  } catch (e) {
+    threw = true;
+    if (!(e as Error).message.includes("unknown deutschkenntnisse value")) {
+      throw new Error(`unexpected error: ${(e as Error).message}`);
+    }
+  }
+  if (!threw) throw new Error("expected throw on null kalkulation");
 });
 
 Deno.test("buildCustomerInput: locationId arg propagates to customer top-level", () => {

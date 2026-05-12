@@ -541,7 +541,7 @@ warstwy. Mapping audit w `docs/patient-form-mapping-audit-2026-04-28.md`
 | pflegegrad | pflegegrad (int) | patient.care_level | direct passthrough |
 | mobility | mobilitaet | patient.mobility_id (1..5) | mobil=1, rollator=3, rollstuhl=4, bettlaegerig=5 |
 | nightCare | nachteinsaetze | patient.night_operations | nein=no, gelegentlich=occasionally, taeglich=`up_to_1_time`, **mehrmals=more_than_2** (Bug #1) |
-| germanLevel | deutschkenntnisse | wish.germany_skill | grundlegend=level_2, kommunikativ=level_3, sehr-gut=level_4 |
+| germanLevel | deutschkenntnisse | wish.germany_skill | grundlegend=**level_1**, kommunikativ=**level_2**, sehr-gut=level_4 (updated 2026-05-12, level_3 świadomie pomijany — agency picks manually). **No soft default** — mapper throws na unknown/missing value (Święta zasada nr 1). |
 | driving | fuehrerschein | wish.driving_license | ja=yes, nein/egal=not_important |
 | (gearbox — NOT in calc) | — | wish.driving_license_gearbox | onboard defaultuje "automatic"; user nadpisuje przez patient form (`wunschGetriebe`) |
 | gender | geschlecht | wish.gender | weiblich=female, maennlich=male, egal=not_important |
