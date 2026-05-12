@@ -334,7 +334,9 @@ function normalizeBucket(s: string): string {
 //   bedridden (5)  → [4 Patient hoist, 6 Care bed]
 //   wheelchair (4) → [3 Wheelchair]
 //   walker (3)     → [2 Rollator]
-//   walking-stick (2) / mobile (1) / unknown → [1 Walking stick]
+//   walking-stick (2) → [1 Walking stick]
+//   mobile (1) → [] (independent — no mobility aid; auto-adding
+//                Gehstock falsifies the customer's choice)
 // NEVER include id 7 (Others) — selecting it triggers a required
 // "Jakie inne narzędzia są używane?" free-text we cannot fill.
 function deriveToolIds(mobilityId: number): number[] {
@@ -342,7 +344,8 @@ function deriveToolIds(mobilityId: number): number[] {
     case 5: return [4, 6];
     case 4: return [3];
     case 3: return [2];
-    default: return [1];
+    case 2: return [1];
+    default: return [];
   }
 }
 

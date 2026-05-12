@@ -554,7 +554,7 @@ warstwy. Mapping audit w `docs/patient-form-mapping-audit-2026-04-28.md`
   pair-exact i zwraca `''` → form pokazuje empty (są optional).
 - `lift_id` derived z mobility — wheelchair/bedridden=1 (lift required),
   else=2.
-- `tool_ids` — minimum 1 z mobility-derived set, NIGDY id=7 (Inne).
+- `tool_ids` — mobility-derived. `mobility=1 (mobil)` → `[]` (pacjent samodzielny, brak Hilfsmittel). `mobility=2 (Gehstock)` → `[1 walking stick]`. `mobility=3 (rollator)` → `[2 rollator]`. `mobility=4 (wheelchair)` → `[3 wheelchair]`. `mobility=5 (bedridden)` → `[4 hoist, 6 care bed]`. NIGDY id=7 (Inne) — triggeruje required free-text "Jakie inne narzędzia są używane?".
 - `gender` patient — fallback "female" gdy lead.anrede missing
   (Marcin's calc nie zbiera).
 

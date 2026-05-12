@@ -308,7 +308,10 @@ describe('mapPatientFormToUpdateCustomerInput', () => {
       ['Rollstuhlfähig', 4, [3]],
       ['Rollatorfähig', 3, [2]],
       ['Am Gehstock', 2, [1]],
-      ['Selbstständig mobil', 1, [1]],
+      // mobility=1 (Selbstständig mobil) → [] (no aid). User feedback
+      // 2026-05-12: auto-adding Gehstock falsifies customer's "walks
+      // independently" choice in Mamamia panel "Welche Hilfsmittel".
+      ['Selbstständig mobil', 1, []],
     ] as const) {
       const r = mapPatientFormToUpdateCustomerInput(makeForm({ mobilitaet: label }));
       expect(r.patients?.[0].mobility_id).toBe(mobId);

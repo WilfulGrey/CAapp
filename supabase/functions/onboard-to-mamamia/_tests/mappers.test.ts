@@ -447,9 +447,15 @@ Deno.test("mapToolIds: walker → [Rollator] only", () => {
   assertEquals(mapToolIds(3), [2]);
 });
 
-Deno.test("mapToolIds: walking-stick / mobile → [Walking stick] only", () => {
+Deno.test("mapToolIds: walking-stick → [Walking stick] only", () => {
   assertEquals(mapToolIds(2), [1]);
-  assertEquals(mapToolIds(1), [1]);
+});
+
+Deno.test("mapToolIds: mobile (independent) → [] (no mobility aid)", () => {
+  // User feedback 2026-05-12: auto-adding Gehstock dla mobility=1 falszuje
+  // wybor "Mobil – geht selbstandig" w panelu Mamamii. Pacjent samodzielny
+  // nie potrzebuje walking stick.
+  assertEquals(mapToolIds(1), []);
 });
 
 // ─── mapSalutation ─────────────────────────────────────────────────────────

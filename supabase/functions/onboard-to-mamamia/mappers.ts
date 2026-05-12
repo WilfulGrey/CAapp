@@ -172,14 +172,16 @@ export function mapLiftId(mobilityId: number): number {
   return mobilityId >= 4 ? 1 : 2;
 }
 
-// tool_ids: panel form "Jakie pomoce są dostępne?" is required, ship at
-// least one. NEVER include id 7 (Others) — selecting "Inne" triggers a
-// required free-text field "Jakie inne narzędzia są używane?" which we
-// have no answer for. Use mobility-specific concrete tools only.
+// tool_ids: mobility-specific concrete tools. NEVER include id 7
+// (Others) — selecting "Inne" triggers a required free-text field
+// "Jakie inne narzędzia są używane?" which we have no answer for.
 //   bedridden (5)  → [4 Patient hoist, 6 Care bed]
 //   wheelchair (4) → [3 Wheelchair]
 //   walker (3)     → [2 Rollator]
-//   walking-stick (2) / mobile (1) → [1 Walking stick]
+//   walking-stick (2) → [1 Walking stick]
+//   mobile (1) → [] (independent — no mobility aid; auto-adding
+//                Gehstock falsifies customer's "Mobil – geht selbständig"
+//                pick. User feedback 2026-05-12.)
 export function mapToolIds(mobilityId: number): number[] {
   switch (mobilityId) {
     case 5:
@@ -188,8 +190,10 @@ export function mapToolIds(mobilityId: number): number[] {
       return [3];
     case 3:
       return [2];
-    default:
+    case 2:
       return [1];
+    default:
+      return [];
   }
 }
 
