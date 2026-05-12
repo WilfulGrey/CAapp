@@ -1220,7 +1220,7 @@ export const AngebotCard: FC<{
                         : 'bg-gray-100 text-gray-400 cursor-not-allowed'
                     }`}
                   >
-                    {allComplete ? '✓ Daten speichern' : 'Bitte alle Pflichtfelder ausfüllen'}
+                    {allComplete ? 'Angebot & Pflegekräfte anzeigen →' : 'Bitte alle Pflichtfelder ausfüllen'}
                   </button>
                 )}
               </div>
