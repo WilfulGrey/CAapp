@@ -27,7 +27,7 @@ const listenerMap = new Map<number, Set<() => void>>();
 // ─── localStorage helpers ────────────────────────────────────────────────────
 
 // Bump this when the AI prompt changes so stale cached texts are discarded.
-const LS_PREFIX = 'ai_about_v3_';
+const LS_PREFIX = 'ai_about_v4_';
 
 function lsRead(id: number): string | null {
   try { return localStorage.getItem(`${LS_PREFIX}${id}`); } catch { return null; }
@@ -70,9 +70,31 @@ function buildInput(cg: MamamiaCaregiverFull): Record<string, unknown> {
     ? (gearboxDE[dl] ? `Ja (${gearboxDE[dl]})` : 'Ja')
     : undefined;
 
-  const otherLanguages = (cg.languagables ?? [])
-    .map(l => l.language?.name)
-    .filter((n): n is string => Boolean(n));
+  // Summarise recent assignments for the AI prompt.
+  // Each entry: city + duration in months + patient type (single/couple, mobility).
+  const mobilityLabel: Record<number, string> = {
+    1: 'mobil', 2: 'Gehhilfe', 3: 'Rollstuhl', 4: 'bettlägerig', 5: 'bettlägerig',
+  };
+  const recentAssignments = (cg.hp_recent_assignments ?? [])
+    .filter(a => a.status === 'finished' || a.status === 'completed' || !a.status)
+    .slice(0, 3)
+    .map(a => {
+      const parts: string[] = [];
+      if (a.city) parts.push(a.city);
+      if (a.arrival_date && a.departure_date) {
+        const months = Math.max(1, Math.round(
+          (new Date(a.departure_date).getTime() - new Date(a.arrival_date).getTime())
+          / (1000 * 60 * 60 * 24 * 30)
+        ));
+        parts.push(`${months} Mon.`);
+      }
+      if (a.patients_count === 2) parts.push('Paar');
+      if (a.patient_mobility_id && mobilityLabel[a.patient_mobility_id]) {
+        parts.push(mobilityLabel[a.patient_mobility_id]);
+      }
+      return parts.join(', ');
+    })
+    .filter(Boolean);
 
   return {
     firstName: cg.first_name ?? undefined,
@@ -91,7 +113,7 @@ function buildInput(cg: MamamiaCaregiverFull): Record<string, unknown> {
     qualifications: cg.qualifications ?? undefined,
     education: cg.education ?? undefined,
     drivingLicense,
-    otherLanguages: otherLanguages.length ? otherLanguages : undefined,
+    recentAssignments: recentAssignments.length ? recentAssignments : undefined,
     motivation: cg.motivation ?? undefined,
   };
 }
