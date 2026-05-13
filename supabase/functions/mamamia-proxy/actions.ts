@@ -625,7 +625,7 @@ interface CaregiverAboutInput {
   qualifications?: string;
   education?: string;
   drivingLicense?: string;
-  otherLanguages?: string[];
+  recentAssignments?: string[];  // e.g. ["München, 3 Mon., Rollstuhl"]
   motivation?: string;
 }
 
@@ -636,8 +636,8 @@ Verwende nur den Vornamen. Länge: 4–5 Sätze. Ton: menschlich, konkret, vertr
 
 Aufbau:
 1. Wer sie ist: Name, Herkunft, Jahre Erfahrung in der 24h-Seniorenpflege.
-2. Praktische Fähigkeiten: Deutschkenntnisse, Führerschein mit Getriebetyp, weitere Sprachen.
-3. Pflegerische Stärken: Ausbildung, Qualifikationen, besondere Kompetenzen oder Pflegeerfahrung.
+2. Praktische Fähigkeiten: Deutschkenntnisse, Führerschein mit Getriebetyp.
+3. Pflegerische Stärken: Ausbildung, Qualifikationen, besondere Kompetenzen — ggf. letzte Einsätze einweben (Orte, Patientenart).
 4. Als Mensch: Persönlichkeit, Charakter, Hobbys und Interessen — was die Familie an ihr schätzen wird.
 5. Motivation (nur wenn vorhanden): warum sie diese Arbeit liebt.
 
@@ -658,8 +658,8 @@ const generateCaregiverAbout: ActionHandler = async (_session, variables, deps) 
     lines.push(`Abgeschlossene Einsätze in Deutschland: ${v.assignments}`);
   }
   if (v.languageLevel) lines.push(`Deutschkenntnisse: ${v.languageLevel}`);
-  if (v.otherLanguages?.length) lines.push(`Weitere Sprachen: ${v.otherLanguages.join(', ')}`);
   if (v.drivingLicense) lines.push(`Führerschein: ${v.drivingLicense}`);
+  if (v.recentAssignments?.length) lines.push(`Letzte Einsätze: ${v.recentAssignments.join(' | ')}`);
   if (v.isNurse) lines.push(`Ausbildung: Ausgebildete Pflegefachkraft`);
   if (v.education) lines.push(`Bildung: ${v.education}`);
   if (v.qualifications) lines.push(`Qualifikationen / Pflegeschwerpunkte: ${v.qualifications}`);
