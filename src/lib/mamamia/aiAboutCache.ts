@@ -26,7 +26,8 @@ const listenerMap = new Map<number, Set<() => void>>();
 
 // ─── localStorage helpers ────────────────────────────────────────────────────
 
-const LS_PREFIX = 'ai_about_';
+// Bump this when the AI prompt changes so stale cached texts are discarded.
+const LS_PREFIX = 'ai_about_v2_';
 
 function lsRead(id: number): string | null {
   try { return localStorage.getItem(`${LS_PREFIX}${id}`); } catch { return null; }
