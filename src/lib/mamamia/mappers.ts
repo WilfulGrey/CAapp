@@ -607,7 +607,7 @@ function mamamiaWishGenderToForm(g: string | null | undefined): string {
 // allowed to smoke), 'no' to 'Nein'.
 function mamamiaWishSmokingToForm(s: string | null | undefined): string {
   if (s === 'no') return 'Nein';
-  if (s === 'yes' || s === 'yes_outside' || s === 'not_important') return 'Ja';
+  if (s === 'yes' || s === 'yes_outside' || s === 'not_important') return 'Ja (nur Draußen)';
   return '';
 }
 
@@ -632,7 +632,7 @@ export interface PatientFormPrefill {
   haushalt?: string;
   badezimmer?: string;
   tiere?: string;
-  wunschGeschlecht?: string; rauchen?: string;
+  wunschGeschlecht?: string; rauchen?: string; fuehrerschein?: string;
   // Customer-side gearbox preference, restored from
   // customer_caregiver_wish.driving_license_gearbox so the form re-opens
   // with the user's previously-saved Automatik / Schaltung pick.
@@ -754,7 +754,9 @@ export function mapMamamiaCustomerToPatientForm(
 
   // equipments → badezimmer: id=2 = Own Bathroom.
   // GET_CUSTOMER fetches equipments { id equipment }; id=1 = TV, id=2 = Bathroom.
-  if (Array.isArray(cust.equipments)) {
+  // Only pre-fill 'Ja' when bathroom equipment is explicitly present.
+  // An absent/empty list is treated as unknown → '' → "Bitte wählen" in the form.
+  if (Array.isArray(cust.equipments) && cust.equipments.length > 0) {
     out.badezimmer = cust.equipments.some(e => e.id === 2) ? 'Ja' : 'Nein';
   }
 
@@ -831,6 +833,9 @@ export function mapMamamiaCustomerToPatientForm(
     // / 'manual'. Reverse mapper emits the user's saved pick — no
     // suppression needed (pre-Bug-#13 we suppressed 'automatic' as the
     // onboard default, that's gone now).
+    if (wish.driving_license) {
+      out.fuehrerschein = wish.driving_license === 'no' ? 'Nein' : 'Ja';
+    }
     if (wish.driving_license_gearbox === 'manual') {
       out.wunschGetriebe = 'Schaltung';
     } else if (wish.driving_license_gearbox === 'automatic') {

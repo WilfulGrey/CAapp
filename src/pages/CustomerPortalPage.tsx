@@ -716,7 +716,7 @@ const CustomerPortalPage: FC = () => {
     <>
     <div className="min-h-screen bg-gray-100 md:flex md:items-start md:justify-center md:py-10">
     <div className="min-h-screen md:min-h-0 bg-white w-full md:w-[390px] md:min-h-[844px] md:rounded-[48px] md:shadow-2xl md:overflow-hidden md:border-[8px] md:border-gray-800 md:ring-4 md:ring-gray-900/10 relative" style={{fontFamily: 'inherit'}}>
-    <div className="md:h-[844px] md:overflow-y-auto md:overflow-x-hidden">
+    <div id="portal-scroll-container" className="md:h-[844px] md:overflow-y-auto md:overflow-x-hidden">
       {/* Toast */}
       {toast && (
         <div

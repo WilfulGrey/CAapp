@@ -145,10 +145,9 @@ export interface PatientForm {
   tiere: string; unterbringung: string; badezimmer: string; aufgaben: string;
   // PK-Wünsche
   wunschGeschlecht: string; rauchen: string; sonstigeWuensche: string;
-  // Getriebe (gearbox) — only shown/required when the customer answered
-  // fuehrerschein=Ja in the calculator (driving_license=yes on Mamamia).
-  // Maps to customer_caregiver_wish.driving_license_gearbox. Empty when
-  // not applicable.
+  // Führerschein Ja/Nein — editable, writes customer_caregiver_wish.driving_license.
+  fuehrerschein: string;
+  // Getriebe — only shown when fuehrerschein='Ja'. Maps to driving_license_gearbox.
   wunschGetriebe: string;
 }
 

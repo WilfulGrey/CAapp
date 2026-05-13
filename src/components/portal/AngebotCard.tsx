@@ -147,6 +147,7 @@ export const AngebotCard: FC<{
     pflegedienstHaeufigkeit: pick('pflegedienstHaeufigkeit'),
     pflegedienstAufgaben: pick('pflegedienstAufgaben'),
     tiere: pick('tiere'), unterbringung: pick('unterbringung'), badezimmer: pick('badezimmer'), aufgaben: pick('aufgaben'),
+    fuehrerschein: pick('fuehrerschein'),
     wunschGeschlecht: pick('wunschGeschlecht'),
     rauchen: pick('rauchen'), sonstigeWuensche: pick('sonstigeWuensche'),
     wunschGetriebe: pick('wunschGetriebe'),
@@ -273,11 +274,8 @@ export const AngebotCard: FC<{
       return baseOk;
     }
     if (s === 3) {
-      const baseOk = patient.wunschGeschlecht !== '' && patient.rauchen !== '';
-      // Gearbox is required only when the customer's calculator answer
-      // said they need a driving caregiver — surfaced via Mamamia state.
-      const needsGearbox = mmCustomer?.customer_caregiver_wish?.driving_license === 'yes';
-      if (needsGearbox) {
+      const baseOk = patient.wunschGeschlecht !== '' && patient.rauchen !== '' && patient.fuehrerschein !== '';
+      if (patient.fuehrerschein === 'Ja') {
         return baseOk && patient.wunschGetriebe !== '';
       }
       return baseOk;
@@ -637,7 +635,7 @@ export const AngebotCard: FC<{
               <div className="divide-y divide-gray-100">
                 {/* Step 1 */}
                 <button
-                  onClick={() => { setAngebotOpen(false); setPatientOpen(true); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
+                  onClick={() => { setAngebotOpen(false); setPatientOpen(true); (document.getElementById('portal-scroll-container') ?? window).scrollTo({ top: 0, behavior: 'smooth' }); }}
                   className="w-full flex items-center gap-3 px-4 py-3 hover:bg-[#F8F7F5] transition-colors text-left group"
                 >
                   <div className="w-6 h-6 rounded-full bg-[#8B7355] text-white text-xs font-bold flex items-center justify-center flex-shrink-0">1</div>
@@ -890,9 +888,19 @@ export const AngebotCard: FC<{
                         options={['Nein','Harninkontinenz','Stuhlinkontinenz','Beides']} />
                     </div>
                     <div>
-                      <label className={labelCls}>Nachteinsätze <span className="text-red-400">*</span></label>
-                      <CustomSelect value={patient.nacht} onChange={v => updatePatient(p=>({...p,nacht:v}))}
-                        options={['Nein','Bis zu 1 Mal','1–2 Mal','Mehr als 2']} />
+                      <label className={`${labelCls} flex items-center gap-1.5`}>
+                        Nachteinsätze
+                        <button type="button" onClick={() => setPriceInfo(priceInfo === 'nacht' ? null : 'nacht')} className="flex-shrink-0 text-gray-400 hover:text-[#8B7355] transition-colors">
+                          <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><circle cx="12" cy="12" r="10"/><path strokeLinecap="round" strokeLinejoin="round" d="M12 16v-4m0-4h.01"/></svg>
+                        </button>
+                      </label>
+                      {priceInfo === 'nacht' && (
+                        <div className="text-xs text-gray-500 bg-gray-50 border border-gray-200 rounded-xl px-3 py-2.5 leading-relaxed flex items-start gap-2 mb-1">
+                          <span>Dieser Wert basiert auf Ihrem Angebot und beeinflusst den Preis. Für Änderungen wenden Sie sich bitte an Ihren Berater.</span>
+                          <button type="button" onClick={() => setPriceInfo(null)} className="text-gray-400 flex-shrink-0 font-bold">✕</button>
+                        </div>
+                      )}
+                      <div className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm text-gray-700 bg-gray-50 cursor-not-allowed">{patient.nacht}</div>
                     </div>
                   </div>
 
@@ -957,9 +965,19 @@ export const AngebotCard: FC<{
                     </div>
                   </div>
                   <div>
-                    <label className={labelCls}>Weitere Personen im Haushalt <span className="text-red-400">*</span></label>
-                    <CustomSelect value={patient.haushalt} onChange={v => updatePatient(p => ({ ...p, haushalt: v }))}
-                      options={['Ja', 'Nein']} />
+                    <label className={`${labelCls} flex items-center gap-1.5`}>
+                      Weitere Personen im Haushalt
+                      <button type="button" onClick={() => setPriceInfo(priceInfo === 'haushalt' ? null : 'haushalt')} className="flex-shrink-0 text-gray-400 hover:text-[#8B7355] transition-colors">
+                        <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><circle cx="12" cy="12" r="10"/><path strokeLinecap="round" strokeLinejoin="round" d="M12 16v-4m0-4h.01"/></svg>
+                      </button>
+                    </label>
+                    {priceInfo === 'haushalt' && (
+                      <div className="text-xs text-gray-500 bg-gray-50 border border-gray-200 rounded-xl px-3 py-2.5 leading-relaxed flex items-start gap-2 mb-1">
+                        <span>Dieser Wert basiert auf Ihrem Angebot und beeinflusst den Preis. Für Änderungen wenden Sie sich bitte an Ihren Berater.</span>
+                        <button type="button" onClick={() => setPriceInfo(null)} className="text-gray-400 flex-shrink-0 font-bold">✕</button>
+                      </div>
+                    )}
+                    <div className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm text-gray-700 bg-gray-50 cursor-not-allowed">{patient.haushalt}</div>
                   </div>
                   <div>
                     <label className={labelCls}>Familie in der Nähe (bis 20 km) <span className="text-red-400">*</span></label>
@@ -1110,25 +1128,22 @@ export const AngebotCard: FC<{
                         {germanySkillLabel(mmCustomer?.customer_caregiver_wish?.germany_skill) || '—'}
                       </div>
                     </div>
-                    <div>
-                      <label className={labelCls}>
-                        Führerschein
-                        {mmCustomer?.customer_caregiver_wish?.driving_license === 'yes' && (
-                          <span className="text-red-400"> *</span>
-                        )}
-                      </label>
-                      {/* When the calculator answered fuehrerschein=Ja
-                          (mirror via Mamamia.customer_caregiver_wish.driving_license=yes),
-                          let the user pick the gearbox they need. Otherwise
-                          show the static "Nicht erforderlich" — license isn't
-                          required for matching, so gearbox is moot. */}
-                      {mmCustomer?.customer_caregiver_wish?.driving_license === 'yes' ? (
-                        <CustomSelect value={patient.wunschGetriebe}
-                          onChange={v => updatePatient(p=>({...p,wunschGetriebe:v}))}
-                          options={['Automatik','Schaltung','Egal']}
+                    <div className="space-y-3">
+                      <div>
+                        <label className={labelCls}>Führerschein erforderlich? <span className="text-red-400">*</span></label>
+                        <CustomSelect value={patient.fuehrerschein}
+                          onChange={v => updatePatient(p => ({ ...p, fuehrerschein: v, wunschGetriebe: v === 'Nein' ? '' : p.wunschGetriebe }))}
+                          options={['Ja', 'Nein']}
                           placeholder="Bitte wählen" />
-                      ) : (
-                        <div className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm text-gray-700 bg-gray-50 cursor-not-allowed">Nicht erforderlich</div>
+                      </div>
+                      {patient.fuehrerschein === 'Ja' && (
+                        <div>
+                          <label className={labelCls}>Getriebe <span className="text-red-400">*</span></label>
+                          <CustomSelect value={patient.wunschGetriebe}
+                            onChange={v => updatePatient(p => ({ ...p, wunschGetriebe: v }))}
+                            options={['Automatik', 'Schaltung', 'Egal']}
+                            placeholder="Bitte wählen" />
+                        </div>
                       )}
                     </div>
                   </div>
@@ -1136,7 +1151,7 @@ export const AngebotCard: FC<{
                   <div>
                     <label className={labelCls}>Darf die Betreuungsperson rauchen? <span className="text-red-400">*</span></label>
                     <CustomSelect value={patient.rauchen} onChange={v => updatePatient(p=>({...p,rauchen:v}))}
-                      options={['Ja','Nein']} />
+                      options={['Ja (nur Draußen)','Nein']} />
                   </div>
                   <div>
                     <label className={labelCls}>Aufgaben der Pflegekraft <span className="font-normal text-gray-400">(optional)</span></label>
@@ -1157,7 +1172,7 @@ export const AngebotCard: FC<{
               <div className={`flex gap-2 pt-1 ${step > 0 ? 'justify-between' : 'justify-end'}`}>
                 {step > 0 && (
                   <button
-                    onClick={() => { setStep(s => s - 1); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
+                    onClick={() => { setStep(s => s - 1); (document.getElementById('portal-scroll-container') ?? window).scrollTo({ top: 0, behavior: 'smooth' }); }}
                     className="px-4 py-2.5 text-sm font-semibold text-gray-500 border border-gray-200 rounded-xl hover:bg-gray-50 transition-colors"
                   >
                     ← Zurück
@@ -1165,7 +1180,7 @@ export const AngebotCard: FC<{
                 )}
                 {step < STEP_LABELS.length - 1 ? (
                   <button
-                    onClick={() => { if (stepComplete(step)) { setStep(s => s + 1); window.scrollTo({ top: 0, behavior: 'smooth' }); } }}
+                    onClick={() => { if (stepComplete(step)) { setStep(s => s + 1); (document.getElementById('portal-scroll-container') ?? window).scrollTo({ top: 0, behavior: 'smooth' }); } }}
                     className={`flex-1 py-2.5 text-sm font-bold rounded-xl transition-all ${
                       stepComplete(step)
                         ? 'bg-[#E76F63] hover:bg-[#D65E52] text-white shadow-sm'
@@ -1191,7 +1206,7 @@ export const AngebotCard: FC<{
                       setSaved(true);
                       setPatientOpen(false);
                       onPatientSaved?.(true);
-                      window.scrollTo({ top: 0, behavior: 'smooth' });
+                      (document.getElementById('portal-scroll-container') ?? window).scrollTo({ top: 0, behavior: 'smooth' });
                       // Fire-and-forget: Mamamia save runs after UI transition.
                       if (mamamiaEnabled && onSaveToMamamia) {
                         onSaveToMamamia(patient).catch(err =>
@@ -1206,7 +1221,7 @@ export const AngebotCard: FC<{
                     }`}
                   >
                     {allComplete
-                      ? (hasFinalSave || !!forceSaved ? 'Speichern' : 'Angebot & Pflegekräfte anzeigen →')
+                      ? 'Speichern'
                       : 'Bitte alle Pflichtfelder ausfüllen'}
                   </button>
                 )}
