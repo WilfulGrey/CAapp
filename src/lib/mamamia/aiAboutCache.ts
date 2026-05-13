@@ -27,7 +27,7 @@ const listenerMap = new Map<number, Set<() => void>>();
 // ─── localStorage helpers ────────────────────────────────────────────────────
 
 // Bump this when the AI prompt changes so stale cached texts are discarded.
-const LS_PREFIX = 'ai_about_v2_';
+const LS_PREFIX = 'ai_about_v3_';
 
 function lsRead(id: number): string | null {
   try { return localStorage.getItem(`${LS_PREFIX}${id}`); } catch { return null; }
@@ -70,6 +70,10 @@ function buildInput(cg: MamamiaCaregiverFull): Record<string, unknown> {
     ? (gearboxDE[dl] ? `Ja (${gearboxDE[dl]})` : 'Ja')
     : undefined;
 
+  const otherLanguages = (cg.languagables ?? [])
+    .map(l => l.language?.name)
+    .filter((n): n is string => Boolean(n));
+
   return {
     firstName: cg.first_name ?? undefined,
     experienceYears: cg.care_experience
@@ -82,10 +86,13 @@ function buildInput(cg: MamamiaCaregiverFull): Record<string, unknown> {
     nationality: cg.nationality?.nationality ?? undefined,
     personalities: (cg.personalities ?? []).map(p => p.personality).filter(Boolean),
     hobbies: (cg.hobbies ?? []).map(h => h.hobby).filter(Boolean),
+    furtherHobbies: cg.further_hobbies ?? undefined,
     isNurse: cg.is_nurse ?? undefined,
     qualifications: cg.qualifications ?? undefined,
     education: cg.education ?? undefined,
     drivingLicense,
+    otherLanguages: otherLanguages.length ? otherLanguages : undefined,
+    motivation: cg.motivation ?? undefined,
   };
 }
 
