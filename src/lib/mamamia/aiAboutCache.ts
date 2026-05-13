@@ -26,7 +26,8 @@ const listenerMap = new Map<number, Set<() => void>>();
 
 // ─── localStorage helpers ────────────────────────────────────────────────────
 
-const LS_PREFIX = 'ai_about_';
+// Bump this when the AI prompt changes so stale cached texts are discarded.
+const LS_PREFIX = 'ai_about_v2_';
 
 function lsRead(id: number): string | null {
   try { return localStorage.getItem(`${LS_PREFIX}${id}`); } catch { return null; }
@@ -59,6 +60,16 @@ function buildInput(cg: MamamiaCaregiverFull): Record<string, unknown> {
   const levels: Record<string, string> = {
     level_0: 'A1', level_1: 'A2', level_2: 'B1', level_3: 'B2', level_4: 'C1+',
   };
+  const gearboxDE: Record<string, string> = {
+    yes_automatic: 'Automatik',
+    yes_manual: 'Schaltung',
+    yes_automatic_manual: 'Automatik & Schaltung',
+  };
+  const dl = cg.driving_license;
+  const drivingLicense = dl && dl !== 'no'
+    ? (gearboxDE[dl] ? `Ja (${gearboxDE[dl]})` : 'Ja')
+    : undefined;
+
   return {
     firstName: cg.first_name ?? undefined,
     experienceYears: cg.care_experience
@@ -74,6 +85,7 @@ function buildInput(cg: MamamiaCaregiverFull): Record<string, unknown> {
     isNurse: cg.is_nurse ?? undefined,
     qualifications: cg.qualifications ?? undefined,
     education: cg.education ?? undefined,
+    drivingLicense,
   };
 }
 

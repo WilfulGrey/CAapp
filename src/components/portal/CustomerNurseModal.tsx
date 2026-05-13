@@ -114,12 +114,12 @@ export const CustomerNurseModal: FC<{
           </div>
 
           <div className="px-5 pb-4 flex-shrink-0" style={{ backgroundColor: `${nurse.color}12` }}>
-            <div className="flex items-start justify-between gap-3 pt-2">
+            <div className="flex items-start justify-between gap-3 pt-5">
               <div className="relative flex-shrink-0">
                 {nurse.image ? (
-                  <img src={nurse.image} alt={nurse.name} className="w-16 h-16 rounded-2xl object-cover border-2 border-white shadow" />
+                  <img src={nurse.image} alt={nurse.name} className="w-20 h-20 rounded-2xl object-cover border-2 border-white shadow" />
                 ) : (
-                  <div className="w-16 h-16 rounded-2xl flex items-center justify-center text-2xl font-bold text-white border-2 border-white shadow"
+                  <div className="w-20 h-20 rounded-2xl flex items-center justify-center text-2xl font-bold text-white border-2 border-white shadow"
                     style={{ backgroundColor: nurse.color }}>
                     {inits}
                   </div>
@@ -163,7 +163,7 @@ export const CustomerNurseModal: FC<{
 
           <div className="flex-1 overflow-y-auto">
             <div className="px-5 pt-4 pb-5">
-              <h3 className="text-sm font-bold text-gray-900 mb-2">Über die Pflegekraft</h3>
+              <h3 className="text-sm font-bold text-gray-900 mb-2">Über {nurse.name.split(' ')[0]}</h3>
               {profileLoading && !p ? (
                 <div className="bg-[#F8F7F5] rounded-xl p-4 animate-pulse">
                   <div className="h-3 w-full bg-gray-200 rounded mb-2" />
