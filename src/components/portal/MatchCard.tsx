@@ -65,7 +65,7 @@ export const MatchCard: FC<{
                 <span className="font-bold text-gray-900 leading-tight">{name}</span>
                 <span className="text-sm text-gray-400 flex-shrink-0">{nurse.age} J.</span>
               </div>
-              {(() => { const lvl = nurseLevel(nurse.history?.assignments ?? 0); return (
+              {(() => { const lvl = nurseLevel(nurse.experienceYears ?? 0, nurse.history?.assignments ?? 0); return (
                 <span className={`flex items-center gap-1 text-xs font-bold pl-1.5 pr-2.5 py-0.5 rounded-full border flex-shrink-0 ${lvl.cls}`}>
                   <span className="text-sm leading-none">{lvl.emoji}</span>
                   {lvl.label}

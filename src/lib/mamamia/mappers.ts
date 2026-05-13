@@ -319,11 +319,16 @@ export function mapCaregiverToNurse(
     };
   }
 
+  // Numeric years (Math.floor of parsed care_experience or hp_total_days/365).
+  // Used by nurseLevel badge formula. 0 when unknown.
+  const experienceYearsNum = experienceYears ? Math.max(0, parseInt(experienceYears, 10) || 0) : 0;
+
   return {
     caregiverId: cg.id,
     name: formatDisplayName(cg.first_name, cg.last_name),
     age,
     experience,
+    experienceYears: experienceYearsNum,
     availability: formatAvailability(cg.available_from, opts.nowIso),
     availableSoon: (() => {
       if (!cg.available_from) return true;

@@ -51,7 +51,7 @@ export const CustomerNurseModal: FC<{
   const name = displayName(nurse.name);
   const bars = Array.from({ length: 5 }, (_, i) => i < nurse.language.bars);
   const avgWo = nurse.history ? Math.round(nurse.history.avgDurationMonths * 4.3) : 0;
-  const lvl = nurseLevel(nurse.history?.assignments ?? 0);
+  const lvl = nurseLevel(nurse.experienceYears ?? 0, nurse.history?.assignments ?? 0);
   const p = nurse.profile;
   const dash = '—';
   const yesNo = (v: boolean | undefined): string => v == null ? dash : v ? 'Ja' : 'Nein';

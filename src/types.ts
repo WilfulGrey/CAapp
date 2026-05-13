@@ -13,6 +13,10 @@ export interface Nurse {
   name: string;
   age: number;
   experience: string;
+  /** Numeric years of care experience, parsed from `care_experience` or
+   *  derived from `hp_total_days`. Used by nurseLevel badge formula
+   *  (score = experienceYears + history.assignments). */
+  experienceYears: number;
   availability: string;
   availableSoon: boolean;
   language: {
