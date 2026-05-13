@@ -1221,7 +1221,7 @@ export const AngebotCard: FC<{
                     }`}
                   >
                     {allComplete
-                      ? (hasFinalSave || !!forceSaved ? 'Speichern' : 'Angebot & Pflegekräfte anzeigen →')
+                      ? 'Speichern'
                       : 'Bitte alle Pflichtfelder ausfüllen'}
                   </button>
                 )}
