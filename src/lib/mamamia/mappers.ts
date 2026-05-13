@@ -246,9 +246,13 @@ export function mapCaregiverToNurse(
   const detailedAssignments: Assignment[] = [];
   if ('hp_recent_assignments' in cg && cg.hp_recent_assignments) {
     const todayIso = opts.nowIso.slice(0, 10);
+    // Status filter: beta uses 'finish', preprod/prod may use 'finished',
+    // 'completed', etc. We accept anything finish-like or null — the
+    // departure_date < today check below excludes future/in-progress ones.
+    const completedStatuses = new Set(['finish', 'finished', 'completed', 'done', 'success']);
     for (const a of cg.hp_recent_assignments) {
       if (!a.arrival_date || !a.departure_date) continue;
-      if (a.status !== 'finish') continue;
+      if (a.status && !completedStatuses.has(a.status)) continue;
       if (a.departure_date.slice(0, 10) >= todayIso) continue;
       detailedAssignments.push({
         startDate: a.arrival_date,
