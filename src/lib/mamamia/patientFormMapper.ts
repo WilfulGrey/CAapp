@@ -20,8 +20,9 @@ export interface PatientFormShape {
   pflegedienstAufgaben: string;
   tiere: string; unterbringung: string; badezimmer: string; aufgaben: string;
   wunschGeschlecht: string; rauchen: string; sonstigeWuensche: string;
-  // Getriebe — only populated when the customer answered fuehrerschein=Ja
-  // in the calculator. Empty = field hidden / not applicable.
+  // Führerschein: 'Ja'/'Nein'/'' — editable in the form, writes driving_license.
+  fuehrerschein: string;
+  // Getriebe — only shown when fuehrerschein='Ja'. Empty = no preference.
   wunschGetriebe: string;
 }
 
@@ -507,6 +508,7 @@ export interface CaregiverWishPatch {
   gender?: 'female' | 'male' | 'not_important';
   smoking?: 'yes_outside' | 'no';
   shopping?: 'yes' | 'no' | 'occasionally';
+  driving_license?: 'yes' | 'no';
   driving_license_gearbox?: 'automatic' | 'manual';
   tasks?: string;
   tasks_de?: string;
@@ -709,7 +711,9 @@ export function mapPatientFormToUpdateCustomerInput(
   if (wg) wish.gender = wg;
   const ws = wishSmokingToApi(form.rauchen);
   if (ws) wish.smoking = ws;
-  const wgear = wishDrivingGearboxToApi(form.wunschGetriebe);
+  if (form.fuehrerschein === 'Ja') wish.driving_license = 'yes';
+  else if (form.fuehrerschein === 'Nein') wish.driving_license = 'no';
+  const wgear = form.fuehrerschein === 'Ja' ? wishDrivingGearboxToApi(form.wunschGetriebe) : undefined;
   if (wgear) wish.driving_license_gearbox = wgear;
   if (form.aufgaben) {
     wish.tasks = form.aufgaben;

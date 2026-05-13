@@ -833,6 +833,9 @@ export function mapMamamiaCustomerToPatientForm(
     // / 'manual'. Reverse mapper emits the user's saved pick — no
     // suppression needed (pre-Bug-#13 we suppressed 'automatic' as the
     // onboard default, that's gone now).
+    if (wish.driving_license) {
+      out.fuehrerschein = wish.driving_license === 'no' ? 'Nein' : 'Ja';
+    }
     if (wish.driving_license_gearbox === 'manual') {
       out.wunschGetriebe = 'Schaltung';
     } else if (wish.driving_license_gearbox === 'automatic') {

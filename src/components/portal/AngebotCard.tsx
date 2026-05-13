@@ -147,6 +147,7 @@ export const AngebotCard: FC<{
     pflegedienstHaeufigkeit: pick('pflegedienstHaeufigkeit'),
     pflegedienstAufgaben: pick('pflegedienstAufgaben'),
     tiere: pick('tiere'), unterbringung: pick('unterbringung'), badezimmer: pick('badezimmer'), aufgaben: pick('aufgaben'),
+    fuehrerschein: pick('fuehrerschein'),
     wunschGeschlecht: pick('wunschGeschlecht'),
     rauchen: pick('rauchen'), sonstigeWuensche: pick('sonstigeWuensche'),
     wunschGetriebe: pick('wunschGetriebe'),
@@ -273,11 +274,8 @@ export const AngebotCard: FC<{
       return baseOk;
     }
     if (s === 3) {
-      const baseOk = patient.wunschGeschlecht !== '' && patient.rauchen !== '';
-      // Gearbox is required only when the customer's calculator answer
-      // said they need a driving caregiver — surfaced via Mamamia state.
-      const needsGearbox = mmCustomer?.customer_caregiver_wish?.driving_license === 'yes';
-      if (needsGearbox) {
+      const baseOk = patient.wunschGeschlecht !== '' && patient.rauchen !== '' && patient.fuehrerschein !== '';
+      if (patient.fuehrerschein === 'Ja') {
         return baseOk && patient.wunschGetriebe !== '';
       }
       return baseOk;
@@ -1130,25 +1128,22 @@ export const AngebotCard: FC<{
                         {germanySkillLabel(mmCustomer?.customer_caregiver_wish?.germany_skill) || '—'}
                       </div>
                     </div>
-                    <div>
-                      <label className={labelCls}>
-                        Führerschein
-                        {mmCustomer?.customer_caregiver_wish?.driving_license === 'yes' && (
-                          <span className="text-red-400"> *</span>
-                        )}
-                      </label>
-                      {/* When the calculator answered fuehrerschein=Ja
-                          (mirror via Mamamia.customer_caregiver_wish.driving_license=yes),
-                          let the user pick the gearbox they need. Otherwise
-                          show the static "Nicht erforderlich" — license isn't
-                          required for matching, so gearbox is moot. */}
-                      {mmCustomer?.customer_caregiver_wish?.driving_license === 'yes' ? (
-                        <CustomSelect value={patient.wunschGetriebe}
-                          onChange={v => updatePatient(p=>({...p,wunschGetriebe:v}))}
-                          options={['Automatik','Schaltung','Egal']}
+                    <div className="space-y-3">
+                      <div>
+                        <label className={labelCls}>Führerschein erforderlich? <span className="text-red-400">*</span></label>
+                        <CustomSelect value={patient.fuehrerschein}
+                          onChange={v => updatePatient(p => ({ ...p, fuehrerschein: v, wunschGetriebe: v === 'Nein' ? '' : p.wunschGetriebe }))}
+                          options={['Ja', 'Nein']}
                           placeholder="Bitte wählen" />
-                      ) : (
-                        <div className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm text-gray-700 bg-gray-50 cursor-not-allowed">Nicht erforderlich</div>
+                      </div>
+                      {patient.fuehrerschein === 'Ja' && (
+                        <div>
+                          <label className={labelCls}>Getriebe <span className="text-red-400">*</span></label>
+                          <CustomSelect value={patient.wunschGetriebe}
+                            onChange={v => updatePatient(p => ({ ...p, wunschGetriebe: v }))}
+                            options={['Automatik', 'Schaltung', 'Egal']}
+                            placeholder="Bitte wählen" />
+                        </div>
                       )}
                     </div>
                   </div>
