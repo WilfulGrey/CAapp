@@ -12,6 +12,7 @@ import {
 import { useMamamiaSession } from '../hooks/useMamamiaSession';
 import { useCustomer, useJobOffer, useApplications, useMatchings, useCaregiver, useInvitedCaregivers } from '../lib/mamamia/hooks';
 import { prefetchCaregivers } from '../lib/mamamia/caregiverCache';
+import { scheduleAiAbouts, getAiAbout, subscribeAiAbout } from '../lib/mamamia/aiAboutCache';
 import {
   useRejectApplication,
   useStoreConfirmation,
@@ -131,6 +132,33 @@ const CustomerPortalPage: FC = () => {
   const { data: fullCaregiver, loading: caregiverLoading } = useCaregiver(
     selectedNurse?.caregiverId ?? null,
   );
+
+  // AI "Über die Pflegekraft" — reads from aiAboutCache (pre-baked during
+  // prefetch). If already resolved: instant. If still pending: subscribe
+  // and update when it arrives. Falls back to modal's mechanical text.
+  const [aiAbout, setAiAbout] = useState<string | null>(null);
+  const [aiAboutForId, setAiAboutForId] = useState<number | null>(null);
+  useEffect(() => {
+    if (!fullCaregiver) return;
+    const id = fullCaregiver.id;
+    if (aiAboutForId === id) return; // already wired for this nurse
+    setAiAboutForId(id);
+
+    const cached = getAiAbout(id);
+    if (cached !== undefined) {
+      // Cache hit — instant (pre-baked during prefetch).
+      setAiAbout(cached);
+      return;
+    }
+    // Still pending — subscribe; scheduleAiAbouts already fired the call.
+    setAiAbout(null);
+    const unsub = subscribeAiAbout(id, () => {
+      const text = getAiAbout(id);
+      if (text !== undefined) setAiAbout(text);
+    });
+    return unsub;
+  }, [fullCaregiver?.id]);
+
   const enrichedSelectedNurse = (() => {
     if (!selectedNurse) return null;
     if (!fullCaregiver) return selectedNurse;
@@ -138,8 +166,14 @@ const CustomerPortalPage: FC = () => {
       nowIso: new Date().toISOString(),
       nowYear: new Date().getFullYear(),
     });
+    const base = { ...selectedNurse, ...enriched };
+    // Inject AI-generated about text once available — overrides Mamamia's
+    // about_de / motivation fields which are often empty or low quality.
+    if (aiAbout && aiAboutForId === fullCaregiver.id && base.profile) {
+      base.profile = { ...base.profile, aboutDe: aiAbout };
+    }
     // Preserve color (deterministic by id, identical anyway) + caregiverId.
-    return { ...selectedNurse, ...enriched };
+    return base;
   })();
 
   // Caregiver id mapping per match index (for invite flow).
@@ -240,7 +274,13 @@ const CustomerPortalPage: FC = () => {
     if (mmApplications?.data) {
       for (const a of mmApplications.data) ids.add(a.caregiver.id);
     }
-    if (ids.size > 0) prefetchCaregivers([...ids]);
+    if (ids.size > 0) {
+      prefetchCaregivers([...ids]);
+      // Once each full profile lands in caregiverCache, scheduleAiAbouts
+      // fires the AI generation immediately — so "Über die Pflegekraft" text
+      // is often pre-baked by the time the user opens a modal.
+      scheduleAiAbouts([...ids]);
+    }
     // intentionally not depending on `effectiveMatched` reference identity —
     // its caregiverIds is what we care about, derived from mmMatchings.
   }, [mmReady, mmMatchings, mmApplications]);

@@ -562,42 +562,106 @@ const generateJobDescription: ActionHandler = async (_session, variables, deps) 
     return { description: null };
   }
 
-  const fetchFn = deps.fetchFn ?? fetch;
   try {
-    const res = await fetchFn('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: {
-        'x-api-key': deps.anthropicApiKey,
-        'anthropic-version': '2023-06-01',
-        'content-type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: 'claude-haiku-4-5',
-        max_tokens: 512,
-        system: SYSTEM_PROMPT,
-        messages: [
-          {
-            role: 'user',
-            content: `Pflegesituation:\n${dataText}`,
-          },
-        ],
-      }),
-    });
-
-    if (!res.ok) {
-      const errText = await res.text();
-      console.error('Anthropic API error:', res.status, errText.slice(0, 200));
-      return { description: null };
-    }
-
-    const body = await res.json() as {
-      content?: Array<{ type: string; text: string }>;
-    };
-    const text = body.content?.find(b => b.type === 'text')?.text?.trim() ?? null;
+    const text = await callAnthropicForText(
+      deps.anthropicApiKey,
+      SYSTEM_PROMPT,
+      `Pflegesituation:\n${dataText}`,
+      deps.fetchFn,
+    );
     return { description: text };
   } catch (e) {
     console.error('generateJobDescription failed:', (e as Error).message);
     return { description: null };
+  }
+};
+
+// ─── generateCaregiverAbout — AI-generated caregiver introduction ───────────
+//
+// Produces a 3–4 sentence professional German introduction for the caregiver
+// profile modal ("Über die Pflegekraft"). Built from real Mamamia fields:
+// first name, experience, language level, nationality, personality traits,
+// assignments count, nurse qualification. Falls back to null on failure so
+// the modal shows its existing mechanical fallback text.
+
+async function callAnthropicForText(
+  apiKey: string,
+  system: string,
+  userContent: string,
+  fetchFn: typeof fetch = fetch,
+): Promise<string | null> {
+  const res = await fetchFn('https://api.anthropic.com/v1/messages', {
+    method: 'POST',
+    headers: {
+      'x-api-key': apiKey,
+      'anthropic-version': '2023-06-01',
+      'content-type': 'application/json',
+    },
+    body: JSON.stringify({
+      model: 'claude-haiku-4-5',
+      max_tokens: 512,
+      system,
+      messages: [{ role: 'user', content: userContent }],
+    }),
+  });
+  if (!res.ok) {
+    console.error('Anthropic error:', res.status, (await res.text()).slice(0, 200));
+    return null;
+  }
+  const body = await res.json() as { content?: Array<{ type: string; text: string }> };
+  return body.content?.find(b => b.type === 'text')?.text?.trim() ?? null;
+}
+
+interface CaregiverAboutInput {
+  firstName?: string;
+  experienceYears?: string;     // e.g. "5 J."
+  assignments?: number;
+  languageLevel?: string;       // e.g. "B2"
+  nationality?: string;         // e.g. "Polnisch"
+  personalities?: string[];     // e.g. ["humorvoll", "strukturiert"]
+  hobbies?: string[];
+  isNurse?: boolean;
+  qualifications?: string;
+  education?: string;
+}
+
+const CAREGIVER_ABOUT_SYSTEM = `Verfasse 3–4 professionelle Sätze auf Deutsch, die die Pflegekraft vorstellen.
+Nutze dafür Erfahrung, Persönlichkeit, Sprachkenntnisse, Nationalität und besondere Fähigkeiten.
+Nur Vorname verwenden. Schreibe in der dritten Person, warmherzig aber professionell.
+Kein Marketingsprech. Direkt und ehrlich. Niemals leer lassen.
+Gib ausschließlich die fertige Vorstellung aus — keine Einleitung, kein Kommentar.`;
+
+const generateCaregiverAbout: ActionHandler = async (_session, variables, deps) => {
+  if (!deps.anthropicApiKey) return { about: null };
+
+  const v = variables as CaregiverAboutInput;
+  if (!v.firstName) return { about: null };
+
+  const lines: string[] = [];
+  lines.push(`Vorname: ${v.firstName}`);
+  if (v.nationality) lines.push(`Nationalität: ${v.nationality}`);
+  if (v.experienceYears) lines.push(`Erfahrung: ${v.experienceYears} in der 24h-Betreuung`);
+  if (typeof v.assignments === 'number' && v.assignments > 0) {
+    lines.push(`Abgeschlossene Einsätze: ${v.assignments}`);
+  }
+  if (v.languageLevel) lines.push(`Deutschkenntnisse: ${v.languageLevel}`);
+  if (v.isNurse) lines.push(`Ausbildung: Ausgebildete Pflegefachkraft`);
+  if (v.education) lines.push(`Bildung: ${v.education}`);
+  if (v.qualifications) lines.push(`Qualifikationen: ${v.qualifications}`);
+  if (v.personalities?.length) lines.push(`Persönlichkeit: ${v.personalities.join(', ')}`);
+  if (v.hobbies?.length) lines.push(`Hobbys: ${v.hobbies.join(', ')}`);
+
+  try {
+    const about = await callAnthropicForText(
+      deps.anthropicApiKey,
+      CAREGIVER_ABOUT_SYSTEM,
+      lines.join('\n'),
+      deps.fetchFn,
+    );
+    return { about };
+  } catch (e) {
+    console.error('generateCaregiverAbout failed:', (e as Error).message);
+    return { about: null };
   }
 };
 
@@ -616,6 +680,7 @@ export const ACTIONS: Record<ProxyAction, ActionHandler> = {
   storeConfirmation,
   inviteCaregiver,
   generateJobDescription,
+  generateCaregiverAbout,
 };
 
 export function isKnownAction(name: string): name is ProxyAction {
