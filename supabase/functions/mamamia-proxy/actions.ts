@@ -598,8 +598,8 @@ async function callAnthropicForText(
       'content-type': 'application/json',
     },
     body: JSON.stringify({
-      model: 'claude-haiku-4-5',
-      max_tokens: 512,
+      model: 'claude-sonnet-4-6',
+      max_tokens: 700,
       system,
       messages: [{ role: 'user', content: userContent }],
     }),
@@ -614,23 +614,35 @@ async function callAnthropicForText(
 
 interface CaregiverAboutInput {
   firstName?: string;
-  experienceYears?: string;     // e.g. "5 Jahre"
+  experienceYears?: string;
   assignments?: number;
-  languageLevel?: string;       // e.g. "B2"
-  nationality?: string;         // e.g. "Polnisch"
-  personalities?: string[];     // e.g. ["humorvoll", "strukturiert"]
+  languageLevel?: string;
+  nationality?: string;
+  personalities?: string[];
   hobbies?: string[];
+  furtherHobbies?: string;
   isNurse?: boolean;
   qualifications?: string;
   education?: string;
-  drivingLicense?: string;      // e.g. "Ja (Automatik)" or "Ja"
+  drivingLicense?: string;
+  otherLanguages?: string[];
+  motivation?: string;
 }
 
-const CAREGIVER_ABOUT_SYSTEM = `Verfasse 3–4 professionelle Sätze auf Deutsch, die die Pflegekraft vorstellen.
-Struktur: (1) Vorname, Herkunft, Erfahrung in der Seniorenpflege. (2) Sprachkenntnisse und Mobilität (Führerschein). (3) Pflegekompetenzen oder Qualifikationen. (4) Persönlichkeit und Hobbys.
-Nur Vorname verwenden. Schreibe in der dritten Person, warmherzig aber professionell.
-Kein Marketingsprech. Direkt und ehrlich. Niemals leer lassen. Nicht alle Sätze sind Pflicht wenn Daten fehlen.
-Gib ausschließlich die fertige Vorstellung aus — keine Einleitung, kein Kommentar.`;
+const CAREGIVER_ABOUT_SYSTEM = `Du schreibst eine warmherzige, persönliche Vorstellung einer Pflegekraft für eine pflegesuchende Familie in Deutschland.
+
+PFLICHT: Schreibe IMMER in der dritten Person. Niemals "Ich" verwenden. Beispiel: "Klaudia ist..." oder "Sie bringt..." — nie "Ich bin...".
+Verwende nur den Vornamen. Länge: 4–5 Sätze. Ton: menschlich, konkret, vertrauensbildend.
+
+Aufbau:
+1. Wer sie ist: Name, Herkunft, Jahre Erfahrung in der 24h-Seniorenpflege.
+2. Praktische Fähigkeiten: Deutschkenntnisse, Führerschein mit Getriebetyp, weitere Sprachen.
+3. Pflegerische Stärken: Ausbildung, Qualifikationen, besondere Kompetenzen oder Pflegeerfahrung.
+4. Als Mensch: Persönlichkeit, Charakter, Hobbys und Interessen — was die Familie an ihr schätzen wird.
+5. Motivation (nur wenn vorhanden): warum sie diese Arbeit liebt.
+
+Kein Marketingsprech. Keine leeren Phrasen. Nur Infos nutzen die tatsächlich vorliegen.
+Ausgabe: ausschließlich der fertige Fließtext — keine Überschrift, keine Liste, kein Kommentar.`;
 
 const generateCaregiverAbout: ActionHandler = async (_session, variables, deps) => {
   if (!deps.anthropicApiKey) return { about: null };
@@ -641,17 +653,20 @@ const generateCaregiverAbout: ActionHandler = async (_session, variables, deps) 
   const lines: string[] = [];
   lines.push(`Vorname: ${v.firstName}`);
   if (v.nationality) lines.push(`Nationalität: ${v.nationality}`);
-  if (v.experienceYears) lines.push(`Erfahrung: ${v.experienceYears} in der 24h-Betreuung`);
+  if (v.experienceYears) lines.push(`Erfahrung: ${v.experienceYears} in der 24h-Seniorenpflege`);
   if (typeof v.assignments === 'number' && v.assignments > 0) {
-    lines.push(`Abgeschlossene Einsätze: ${v.assignments}`);
+    lines.push(`Abgeschlossene Einsätze in Deutschland: ${v.assignments}`);
   }
   if (v.languageLevel) lines.push(`Deutschkenntnisse: ${v.languageLevel}`);
+  if (v.otherLanguages?.length) lines.push(`Weitere Sprachen: ${v.otherLanguages.join(', ')}`);
+  if (v.drivingLicense) lines.push(`Führerschein: ${v.drivingLicense}`);
   if (v.isNurse) lines.push(`Ausbildung: Ausgebildete Pflegefachkraft`);
   if (v.education) lines.push(`Bildung: ${v.education}`);
-  if (v.qualifications) lines.push(`Qualifikationen: ${v.qualifications}`);
-  if (v.drivingLicense) lines.push(`Führerschein: ${v.drivingLicense}`);
+  if (v.qualifications) lines.push(`Qualifikationen / Pflegeschwerpunkte: ${v.qualifications}`);
   if (v.personalities?.length) lines.push(`Persönlichkeit: ${v.personalities.join(', ')}`);
   if (v.hobbies?.length) lines.push(`Hobbys: ${v.hobbies.join(', ')}`);
+  if (v.furtherHobbies) lines.push(`Weitere Interessen: ${v.furtherHobbies}`);
+  if (v.motivation) lines.push(`Eigene Worte / Motivation: ${v.motivation}`);
 
   try {
     const about = await callAnthropicForText(
