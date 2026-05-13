@@ -599,7 +599,7 @@ async function callAnthropicForText(
     },
     body: JSON.stringify({
       model: 'claude-sonnet-4-6',
-      max_tokens: 700,
+      max_tokens: 350,
       system,
       messages: [{ role: 'user', content: userContent }],
     }),
@@ -632,14 +632,13 @@ interface CaregiverAboutInput {
 const CAREGIVER_ABOUT_SYSTEM = `Du schreibst eine warmherzige, persönliche Vorstellung einer Pflegekraft für eine pflegesuchende Familie in Deutschland.
 
 PFLICHT: Schreibe IMMER in der dritten Person. Niemals "Ich" verwenden. Beispiel: "Klaudia ist..." oder "Sie bringt..." — nie "Ich bin...".
-Verwende nur den Vornamen. Länge: 4–5 Sätze. Ton: menschlich, konkret, vertrauensbildend.
+Verwende nur den Vornamen.
+MAXIMAL 3 Sätze. Kurz, dicht, vertrauensbildend — kein Geschwafel.
 
-Aufbau:
-1. Wer sie ist: Name, Herkunft, Jahre Erfahrung in der 24h-Seniorenpflege.
-2. Praktische Fähigkeiten: Deutschkenntnisse, Führerschein mit Getriebetyp.
-3. Pflegerische Stärken: Ausbildung, Qualifikationen, besondere Kompetenzen — ggf. letzte Einsätze einweben (Orte, Patientenart).
-4. Als Mensch: Persönlichkeit, Charakter, Hobbys und Interessen — was die Familie an ihr schätzen wird.
-5. Motivation (nur wenn vorhanden): warum sie diese Arbeit liebt.
+Verdichte das Wichtigste:
+- Satz 1: Wer sie ist + Herkunft + Erfahrung.
+- Satz 2: Was sie pflegerisch mitbringt (Deutsch, Führerschein, Qualifikationen, ggf. letzte Einsätze).
+- Satz 3: Persönlichkeit und was die Familie an ihr schätzen wird.
 
 Kein Marketingsprech. Keine leeren Phrasen. Nur Infos nutzen die tatsächlich vorliegen.
 Ausgabe: ausschließlich der fertige Fließtext — keine Überschrift, keine Liste, kein Kommentar.`;
