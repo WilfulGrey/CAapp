@@ -215,17 +215,17 @@ describe('mapPatientFormToUpdateCustomerInput', () => {
   });
 
   it('maps wunschGetriebe → customer_caregiver_wish.driving_license_gearbox', () => {
-    // Customer picks the gearbox in the CA-app patient form (step 3).
+    // Gearbox is only mapped when fuehrerschein='Ja' (license required).
     // Schaltung → manual; Automatik → automatic; Egal → automatic
     // (permissive — any licensed cg can drive auto). Empty omits the
     // field so the onboard default ('automatic') sticks.
-    expect(mapPatientFormToUpdateCustomerInput(makeForm({ wunschGetriebe: 'Schaltung' }))
+    expect(mapPatientFormToUpdateCustomerInput(makeForm({ fuehrerschein: 'Ja', wunschGetriebe: 'Schaltung' }))
       .customer_caregiver_wish?.driving_license_gearbox).toBe('manual');
-    expect(mapPatientFormToUpdateCustomerInput(makeForm({ wunschGetriebe: 'Automatik' }))
+    expect(mapPatientFormToUpdateCustomerInput(makeForm({ fuehrerschein: 'Ja', wunschGetriebe: 'Automatik' }))
       .customer_caregiver_wish?.driving_license_gearbox).toBe('automatic');
-    expect(mapPatientFormToUpdateCustomerInput(makeForm({ wunschGetriebe: 'Egal' }))
+    expect(mapPatientFormToUpdateCustomerInput(makeForm({ fuehrerschein: 'Ja', wunschGetriebe: 'Egal' }))
       .customer_caregiver_wish?.driving_license_gearbox).toBe('automatic');
-    expect(mapPatientFormToUpdateCustomerInput(makeForm({ wunschGetriebe: '' }))
+    expect(mapPatientFormToUpdateCustomerInput(makeForm({ fuehrerschein: 'Ja', wunschGetriebe: '' }))
       .customer_caregiver_wish?.driving_license_gearbox).toBeUndefined();
   });
 
