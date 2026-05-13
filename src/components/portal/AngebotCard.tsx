@@ -890,9 +890,19 @@ export const AngebotCard: FC<{
                         options={['Nein','Harninkontinenz','Stuhlinkontinenz','Beides']} />
                     </div>
                     <div>
-                      <label className={labelCls}>Nachteinsätze <span className="text-red-400">*</span></label>
-                      <CustomSelect value={patient.nacht} onChange={v => updatePatient(p=>({...p,nacht:v}))}
-                        options={['Nein','Bis zu 1 Mal','1–2 Mal','Mehr als 2']} />
+                      <label className={`${labelCls} flex items-center gap-1.5`}>
+                        Nachteinsätze
+                        <button type="button" onClick={() => setPriceInfo(priceInfo === 'nacht' ? null : 'nacht')} className="flex-shrink-0 text-gray-400 hover:text-[#8B7355] transition-colors">
+                          <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><circle cx="12" cy="12" r="10"/><path strokeLinecap="round" strokeLinejoin="round" d="M12 16v-4m0-4h.01"/></svg>
+                        </button>
+                      </label>
+                      {priceInfo === 'nacht' && (
+                        <div className="text-xs text-gray-500 bg-gray-50 border border-gray-200 rounded-xl px-3 py-2.5 leading-relaxed flex items-start gap-2 mb-1">
+                          <span>Dieser Wert basiert auf Ihrem Angebot und beeinflusst den Preis. Für Änderungen wenden Sie sich bitte an Ihren Berater.</span>
+                          <button type="button" onClick={() => setPriceInfo(null)} className="text-gray-400 flex-shrink-0 font-bold">✕</button>
+                        </div>
+                      )}
+                      <div className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm text-gray-700 bg-gray-50 cursor-not-allowed">{patient.nacht}</div>
                     </div>
                   </div>
 
