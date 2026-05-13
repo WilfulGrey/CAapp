@@ -723,14 +723,35 @@ to nie nasze — projekt 3 ma inną tsconfig. Skupić się na `src/` clean.
 Render dashboard: pokazuje build logs. Jeśli build padnie, Render trzyma
 poprzednią wersję live.
 
-### Edge Functions (manual)
+### Edge Functions (auto, via CI)
 
+**Zmiany w `supabase/functions/*` ZAWSZE przez PR.** Po merge do
+`integration/mamamia-onboarding` GitHub Actions (`deploy-edge-functions`
+job w `.github/workflows/test.yml`) automatycznie deployuje funkcje do
+prod Supabase. To jest single source of truth — gita.
+
+**NIGDY** `supabase functions deploy` lokalnie ani direct push na
+`integration/mamamia-onboarding`. Każdy lokalny deploy to race condition:
+wgrywa stan TWOJEGO dysku, nie git HEAD, więc cudze zmiany w chmurze
+mogą wyparować (incydent 2026-05-13 z `hp_caregiver_id` był dokładnie tym).
+
+**Emergency hotfix** (tylko gdy CI padło i klient krwawi):
 ```bash
+# 1. Confirm jesteś na czystym integration/mamamia-onboarding zsync z origin
+git fetch origin && git diff HEAD origin/integration/mamamia-onboarding -- supabase/functions/
+# Diff musi być pusty. Jeśli nie — pull/merge najpierw.
+
+# 2. Deploy
 npx supabase functions deploy <name> --project-ref ycdwtrklpoqprabtwahi
 ```
 
 Często musisz zdeployować **OBA** (`onboard-to-mamamia` + `mamamia-proxy`)
-gdy zmiany dotyczą shared modules w `_shared/`.
+gdy zmiany dotyczą shared modules w `_shared/`. CI deploy robi to za
+Ciebie (wszystkie funkcje po kolei).
+
+**Branch protection** na `integration/mamamia-onboarding` wymaga PR + passing
+CI checks (`vitest`, `deno-onboard`, `deno-proxy`) przed merge. To
+strukturalnie blokuje direct push.
 
 ### Supabase secrets
 
