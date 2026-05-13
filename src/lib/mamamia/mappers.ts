@@ -632,7 +632,7 @@ export interface PatientFormPrefill {
   haushalt?: string;
   badezimmer?: string;
   tiere?: string;
-  wunschGeschlecht?: string; rauchen?: string;
+  wunschGeschlecht?: string; rauchen?: string; fuehrerschein?: string;
   // Customer-side gearbox preference, restored from
   // customer_caregiver_wish.driving_license_gearbox so the form re-opens
   // with the user's previously-saved Automatik / Schaltung pick.
