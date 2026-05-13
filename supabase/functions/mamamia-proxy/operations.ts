@@ -220,6 +220,7 @@ export const GET_CAREGIVER = /* GraphQL */ `
       last_contact_at
       last_login_at
       is_active_user
+      hp_caregiver_id
       hp_total_jobs
       hp_total_days
       hp_avg_mission_days
