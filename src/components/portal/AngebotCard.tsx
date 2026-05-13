@@ -1151,7 +1151,7 @@ export const AngebotCard: FC<{
                   <div>
                     <label className={labelCls}>Darf die Betreuungsperson rauchen? <span className="text-red-400">*</span></label>
                     <CustomSelect value={patient.rauchen} onChange={v => updatePatient(p=>({...p,rauchen:v}))}
-                      options={['Ja','Nein']} />
+                      options={['Ja (nur Draußen)','Nein']} />
                   </div>
                   <div>
                     <label className={labelCls}>Aufgaben der Pflegekraft <span className="font-normal text-gray-400">(optional)</span></label>

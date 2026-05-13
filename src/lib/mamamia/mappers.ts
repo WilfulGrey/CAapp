@@ -607,7 +607,7 @@ function mamamiaWishGenderToForm(g: string | null | undefined): string {
 // allowed to smoke), 'no' to 'Nein'.
 function mamamiaWishSmokingToForm(s: string | null | undefined): string {
   if (s === 'no') return 'Nein';
-  if (s === 'yes' || s === 'yes_outside' || s === 'not_important') return 'Ja';
+  if (s === 'yes' || s === 'yes_outside' || s === 'not_important') return 'Ja (nur Draußen)';
   return '';
 }
 

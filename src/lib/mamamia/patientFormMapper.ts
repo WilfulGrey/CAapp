@@ -294,7 +294,7 @@ function wishGenderToApi(v: string): 'female' | 'male' | 'not_important' | null 
 // Betreuungsperson rauchen?". Default to "yes_outside" for Ja since
 // that's the prod-most-common positive answer (5169 vs 142 plain "yes").
 function wishSmokingToApi(v: string): 'yes_outside' | 'no' | null {
-  if (v === 'Ja') return 'yes_outside';
+  if (v === 'Ja' || v === 'Ja (nur Draußen)') return 'yes_outside';
   if (v === 'Nein') return 'no';
   return null;
 }
