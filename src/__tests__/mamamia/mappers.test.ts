@@ -740,3 +740,114 @@ describe('mapMamamiaCustomerToPatientForm — Bug #13e Kein/e via care_level=nul
     expect(r.pflegegrad).toBe('Pflegegrad 3');
   });
 });
+
+// ─── hp_recent_assignments — patients_count + patient_mobility_id ────────────
+
+describe('mapCaregiverToNurse — hp_recent_assignments detail fields', () => {
+  const NOW = '2026-05-12T12:00:00.000Z';
+
+  function makeCgWithAssignments(
+    assignments: Array<{
+      arrival_date: string;
+      departure_date: string;
+      postal_code?: string;
+      city?: string;
+      status: string;
+      patients_count?: number | null;
+      patient_mobility_id?: number | null;
+    }>,
+  ) {
+    return {
+      ...makeCg({ hp_total_jobs: assignments.length }),
+      hobbies: [],
+      personalities: [],
+      mobilities: [],
+      languagables: [],
+      nationality: null,
+      hp_recent_assignments: assignments.map(a => ({
+        postal_code: '10115',
+        city: 'Berlin',
+        patients_count: null,
+        patient_mobility_id: null,
+        ...a,
+      })),
+    } as any; // eslint-disable-line @typescript-eslint/no-explicit-any
+  }
+
+  it('uses patients_count from API (2 patients)', () => {
+    const cg = makeCgWithAssignments([{
+      arrival_date: '2025-01-01',
+      departure_date: '2025-02-01',
+      status: 'finish',
+      patients_count: 2,
+      patient_mobility_id: null,
+    }]);
+    const n = mapCaregiverToNurse(cg, { nowIso: NOW, nowYear: 2026 });
+    expect(n.detailedAssignments?.[0]?.patientCount).toBe(2);
+  });
+
+  it('falls back to patientCount=1 when patients_count is null', () => {
+    const cg = makeCgWithAssignments([{
+      arrival_date: '2025-01-01',
+      departure_date: '2025-02-01',
+      status: 'finish',
+      patients_count: null,
+    }]);
+    const n = mapCaregiverToNurse(cg, { nowIso: NOW, nowYear: 2026 });
+    expect(n.detailedAssignments?.[0]?.patientCount).toBe(1);
+  });
+
+  it('maps patient_mobility_id=4 → "Rollstuhl"', () => {
+    const cg = makeCgWithAssignments([{
+      arrival_date: '2025-01-01',
+      departure_date: '2025-02-01',
+      status: 'finish',
+      patient_mobility_id: 4,
+    }]);
+    const n = mapCaregiverToNurse(cg, { nowIso: NOW, nowYear: 2026 });
+    expect(n.detailedAssignments?.[0]?.mobility).toBe('Rollstuhl');
+  });
+
+  it('maps patient_mobility_id=5 → "Bettlägerig"', () => {
+    const cg = makeCgWithAssignments([{
+      arrival_date: '2025-01-01',
+      departure_date: '2025-02-01',
+      status: 'finish',
+      patient_mobility_id: 5,
+    }]);
+    const n = mapCaregiverToNurse(cg, { nowIso: NOW, nowYear: 2026 });
+    expect(n.detailedAssignments?.[0]?.mobility).toBe('Bettlägerig');
+  });
+
+  it('maps patient_mobility_id=1 → "Mobil"', () => {
+    const cg = makeCgWithAssignments([{
+      arrival_date: '2025-01-01',
+      departure_date: '2025-02-01',
+      status: 'finish',
+      patient_mobility_id: 1,
+    }]);
+    const n = mapCaregiverToNurse(cg, { nowIso: NOW, nowYear: 2026 });
+    expect(n.detailedAssignments?.[0]?.mobility).toBe('Mobil');
+  });
+
+  it('falls back to "—" when patient_mobility_id is null', () => {
+    const cg = makeCgWithAssignments([{
+      arrival_date: '2025-01-01',
+      departure_date: '2025-02-01',
+      status: 'finish',
+      patient_mobility_id: null,
+    }]);
+    const n = mapCaregiverToNurse(cg, { nowIso: NOW, nowYear: 2026 });
+    expect(n.detailedAssignments?.[0]?.mobility).toBe('—');
+  });
+
+  it('filters out non-finish assignments', () => {
+    const cg = makeCgWithAssignments([
+      { arrival_date: '2025-01-01', departure_date: '2025-02-01', status: 'rejected', patients_count: 1 },
+      { arrival_date: '2025-03-01', departure_date: '2025-04-01', status: 'finish', patients_count: 2 },
+    ]);
+    const n = mapCaregiverToNurse(cg, { nowIso: NOW, nowYear: 2026 });
+    expect(n.detailedAssignments?.length).toBe(1);
+    expect(n.detailedAssignments?.[0]?.patientCount).toBe(2);
+  });
+});
