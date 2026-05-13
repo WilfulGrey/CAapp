@@ -754,7 +754,9 @@ export function mapMamamiaCustomerToPatientForm(
 
   // equipments → badezimmer: id=2 = Own Bathroom.
   // GET_CUSTOMER fetches equipments { id equipment }; id=1 = TV, id=2 = Bathroom.
-  if (Array.isArray(cust.equipments)) {
+  // Only pre-fill 'Ja' when bathroom equipment is explicitly present.
+  // An absent/empty list is treated as unknown → '' → "Bitte wählen" in the form.
+  if (Array.isArray(cust.equipments) && cust.equipments.length > 0) {
     out.badezimmer = cust.equipments.some(e => e.id === 2) ? 'Ja' : 'Nein';
   }
 
