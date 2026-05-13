@@ -216,10 +216,18 @@ export const CustomerNurseModal: FC<{
               ) : (
                 <div className="divide-y divide-gray-100">
                   <InfoRow emoji="👤" label="Geschlecht" value={nurse.gender === 'female' ? 'Weiblich' : 'Männlich'} />
-                  <InfoRow emoji="🌍" label="Nationalität" value={p?.nationality ?? dash} />
-                  <InfoRow emoji="🎂" label="Geburtsjahr" value={p?.yearOfBirth ? String(p.yearOfBirth) : dash} />
-                  <InfoRow emoji="⚖️" label="Gewicht" value={p?.weight ?? dash} />
-                  <InfoRow emoji="📏" label="Größe" value={p?.height ?? dash} />
+                  {p?.nationality && (
+                    <InfoRow emoji="🌍" label="Nationalität" value={p.nationality} />
+                  )}
+                  {p?.yearOfBirth && (
+                    <InfoRow emoji="🎂" label="Geburtsjahr" value={String(p.yearOfBirth)} />
+                  )}
+                  {p?.weight && (
+                    <InfoRow emoji="⚖️" label="Gewicht" value={p.weight} />
+                  )}
+                  {p?.height && (
+                    <InfoRow emoji="📏" label="Größe" value={p.height} />
+                  )}
                   {p?.maritalStatus && (
                     <InfoRow emoji="💍" label="Familienstand" value={p.maritalStatus} />
                   )}
@@ -236,36 +244,64 @@ export const CustomerNurseModal: FC<{
               )}
             </div>
 
-            <div className="px-5 pb-5">
-              <h3 className="text-sm font-bold text-gray-900 mb-3">Besondere Merkmale</h3>
-              {profileLoading ? (
-                <div className="divide-y divide-gray-100">
-                  <SkeletonRow />
-                  <SkeletonRow />
-                  <SkeletonRow />
-                  <SkeletonRow chips />
+            {(() => {
+              // Hide whole "Besondere Merkmale" section when post-load every
+              // row would be empty. During loading we show skeletons —
+              // can't know yet which rows have data.
+              const smokingValue = p?.smoking ? smokingLabel[p.smoking] : '';
+              const hasDrivingLicense = p?.drivingLicense != null;
+              const hasSmoking = !!smokingValue;
+              const hasIsNurse = p?.isNurse != null;
+              const hasQualifications = !!p?.qualifications;
+              const hasEducation = !!p?.education;
+              const hasOtherLanguages = !!(p && p.otherLanguages.length > 0);
+              const showSpecial = profileLoading
+                || hasDrivingLicense || hasSmoking || hasIsNurse
+                || hasQualifications || hasEducation || hasOtherLanguages;
+              if (!showSpecial) return null;
+              return (
+                <div className="px-5 pb-5">
+                  <h3 className="text-sm font-bold text-gray-900 mb-3">Besondere Merkmale</h3>
+                  {profileLoading ? (
+                    <div className="divide-y divide-gray-100">
+                      <SkeletonRow />
+                      <SkeletonRow />
+                      <SkeletonRow />
+                      <SkeletonRow chips />
+                    </div>
+                  ) : (
+                    <div className="divide-y divide-gray-100">
+                      {hasDrivingLicense && (
+                        <InfoRow
+                          emoji="🚗"
+                          label="Führerschein"
+                          value={`${yesNo(p!.drivingLicense)}${p!.drivingLicenseGearbox ? ` (${p!.drivingLicenseGearbox})` : ''}`}
+                        />
+                      )}
+                      {hasSmoking && (
+                        <InfoRow emoji="🚬" label="Raucher" value={smokingValue} />
+                      )}
+                      {hasIsNurse && (
+                        <InfoRow emoji="🎓" label="Pflegeberuf erlernt" value={yesNo(p!.isNurse)} />
+                      )}
+                      {hasQualifications && (
+                        <InfoRow emoji="🏥" label="Qualifikationen" value={p!.qualifications} />
+                      )}
+                      {hasEducation && (
+                        <InfoRow emoji="📚" label="Ausbildung" value={p!.education} />
+                      )}
+                      {hasOtherLanguages && (
+                        <InfoRow
+                          emoji="🌐"
+                          label="Andere Sprachkenntnisse"
+                          chips={p!.otherLanguages.map(l => `${l.name} (${l.level})`)}
+                        />
+                      )}
+                    </div>
+                  )}
                 </div>
-              ) : (
-                <div className="divide-y divide-gray-100">
-                  <InfoRow emoji="🚗" label="Führerschein" value={p?.drivingLicense != null ? `${yesNo(p.drivingLicense)}${p.drivingLicenseGearbox ? ` (${p.drivingLicenseGearbox})` : ''}` : dash} />
-                  <InfoRow emoji="🚬" label="Raucher" value={p?.smoking ? smokingLabel[p.smoking] ?? dash : dash} />
-                  <InfoRow emoji="🎓" label="Pflegeberuf erlernt" value={yesNo(p?.isNurse)} />
-                  {p?.qualifications && (
-                    <InfoRow emoji="🏥" label="Qualifikationen" value={p.qualifications} />
-                  )}
-                  {p?.education && (
-                    <InfoRow emoji="📚" label="Ausbildung" value={p.education} />
-                  )}
-                  {p && p.otherLanguages.length > 0 && (
-                    <InfoRow
-                      emoji="🌐"
-                      label="Andere Sprachkenntnisse"
-                      chips={p.otherLanguages.map(l => `${l.name} (${l.level})`)}
-                    />
-                  )}
-                </div>
-              )}
-            </div>
+              );
+            })()}
 
             {profileLoading ? (
               <div className="px-5 pb-6">
