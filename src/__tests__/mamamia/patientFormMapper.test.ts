@@ -45,6 +45,7 @@ function makeForm(overrides: Partial<PatientFormShape> = {}): PatientFormShape {
     wunschGeschlecht: 'Egal',
     rauchen: 'Nein',
     sonstigeWuensche: '',
+    fuehrerschein: '',
     wunschGetriebe: '',
     ...overrides,
   };

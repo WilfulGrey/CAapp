@@ -614,7 +614,7 @@ async function callAnthropicForText(
 
 interface CaregiverAboutInput {
   firstName?: string;
-  experienceYears?: string;     // e.g. "5 J."
+  experienceYears?: string;     // e.g. "5 Jahre"
   assignments?: number;
   languageLevel?: string;       // e.g. "B2"
   nationality?: string;         // e.g. "Polnisch"
@@ -623,12 +623,13 @@ interface CaregiverAboutInput {
   isNurse?: boolean;
   qualifications?: string;
   education?: string;
+  drivingLicense?: string;      // e.g. "Ja (Automatik)" or "Ja"
 }
 
 const CAREGIVER_ABOUT_SYSTEM = `Verfasse 3–4 professionelle Sätze auf Deutsch, die die Pflegekraft vorstellen.
-Nutze dafür Erfahrung, Persönlichkeit, Sprachkenntnisse, Nationalität und besondere Fähigkeiten.
+Struktur: (1) Vorname, Herkunft, Erfahrung in der Seniorenpflege. (2) Sprachkenntnisse und Mobilität (Führerschein). (3) Pflegekompetenzen oder Qualifikationen. (4) Persönlichkeit und Hobbys.
 Nur Vorname verwenden. Schreibe in der dritten Person, warmherzig aber professionell.
-Kein Marketingsprech. Direkt und ehrlich. Niemals leer lassen.
+Kein Marketingsprech. Direkt und ehrlich. Niemals leer lassen. Nicht alle Sätze sind Pflicht wenn Daten fehlen.
 Gib ausschließlich die fertige Vorstellung aus — keine Einleitung, kein Kommentar.`;
 
 const generateCaregiverAbout: ActionHandler = async (_session, variables, deps) => {
@@ -648,6 +649,7 @@ const generateCaregiverAbout: ActionHandler = async (_session, variables, deps) 
   if (v.isNurse) lines.push(`Ausbildung: Ausgebildete Pflegefachkraft`);
   if (v.education) lines.push(`Bildung: ${v.education}`);
   if (v.qualifications) lines.push(`Qualifikationen: ${v.qualifications}`);
+  if (v.drivingLicense) lines.push(`Führerschein: ${v.drivingLicense}`);
   if (v.personalities?.length) lines.push(`Persönlichkeit: ${v.personalities.join(', ')}`);
   if (v.hobbies?.length) lines.push(`Hobbys: ${v.hobbies.join(', ')}`);
 

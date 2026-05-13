@@ -163,7 +163,7 @@ export const CustomerNurseModal: FC<{
 
           <div className="flex-1 overflow-y-auto">
             <div className="px-5 pt-4 pb-5">
-              <h3 className="text-sm font-bold text-gray-900 mb-2">Über die Pflegekraft</h3>
+              <h3 className="text-sm font-bold text-gray-900 mb-2">Über {nurse.name.split(' ')[0]}</h3>
               {profileLoading && !p ? (
                 <div className="bg-[#F8F7F5] rounded-xl p-4 animate-pulse">
                   <div className="h-3 w-full bg-gray-200 rounded mb-2" />
