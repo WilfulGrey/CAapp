@@ -44,20 +44,21 @@ export interface NurseStatuses {
 // Badge tier from a combined score: years of experience + number of
 // completed assignments (equal weighting — 1 Einsatz counts as 1 Jahr).
 // Examples:
-//   2 Jahre + 0 Einsätze → score 2 → Bronze
-//   1 Jahr + 4 Einsätze → score 5 → Gold
-//   3 Jahre + 5 Einsätze → score 8 → Platin
+//   1 J. + 4 Eins. = 5 → Bronze
+//   3 J. + 8 Eins. = 11 → Silber
+//   6 J. + 10 Eins. = 16 → Gold
+//   10 J. + 16 Eins. = 26 → Platin
 export function nurseLevel(experienceYears: number, assignments: number): {
   label: string;
   emoji: string;
   cls: string;
 } {
   const score = (experienceYears || 0) + (assignments || 0);
-  if (score >= 8) return { label: 'Platin',  emoji: '🏆', cls: 'bg-amber-50 text-amber-700 border-amber-200' };
-  if (score >= 5) return { label: 'Gold',    emoji: '🥇', cls: 'bg-yellow-50 text-yellow-600 border-yellow-300' };
-  if (score >= 3) return { label: 'Silber',  emoji: '🥈', cls: 'bg-slate-100 text-slate-500 border-slate-300' };
-  if (score >= 1) return { label: 'Bronze',  emoji: '🥉', cls: 'bg-amber-50 text-amber-700 border-amber-200' };
-  return                 { label: 'Starter', emoji: '⭐', cls: 'bg-gray-100 text-gray-500 border-gray-200' };
+  if (score >= 26) return { label: 'Platin',  emoji: '🏆', cls: 'bg-amber-50 text-amber-700 border-amber-200' };
+  if (score >= 13) return { label: 'Gold',    emoji: '🥇', cls: 'bg-yellow-50 text-yellow-600 border-yellow-300' };
+  if (score >= 5)  return { label: 'Silber',  emoji: '🥈', cls: 'bg-slate-100 text-slate-500 border-slate-300' };
+  if (score >= 1)  return { label: 'Bronze',  emoji: '🥉', cls: 'bg-amber-50 text-amber-700 border-amber-200' };
+  return                  { label: 'Starter', emoji: '⭐', cls: 'bg-gray-100 text-gray-500 border-gray-200' };
 }
 
 export function displayName(fullName: string): string {

@@ -82,7 +82,7 @@ export const MatchCard: FC<{
             </div>
             <p className="text-sm text-gray-500 truncate">
               <span className="font-semibold text-[#8B7355]">{nurse.experience}</span>
-              {nurse.history && <span> · {nurse.history.assignments} Eins. · Ø {Math.round(nurse.history.avgDurationMonths * 4.3)} Wo.</span>}
+              {nurse.history && <span> · {nurse.history.assignments} Einsätze · Ø {Math.round(nurse.history.avgDurationMonths * 4.3)} Wo.</span>}
             </p>
           </div>
         </div>
