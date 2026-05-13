@@ -637,7 +637,7 @@ export const AngebotCard: FC<{
               <div className="divide-y divide-gray-100">
                 {/* Step 1 */}
                 <button
-                  onClick={() => { setAngebotOpen(false); setPatientOpen(true); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
+                  onClick={() => { setAngebotOpen(false); setPatientOpen(true); (document.getElementById('portal-scroll-container') ?? window).scrollTo({ top: 0, behavior: 'smooth' }); }}
                   className="w-full flex items-center gap-3 px-4 py-3 hover:bg-[#F8F7F5] transition-colors text-left group"
                 >
                   <div className="w-6 h-6 rounded-full bg-[#8B7355] text-white text-xs font-bold flex items-center justify-center flex-shrink-0">1</div>
@@ -1177,7 +1177,7 @@ export const AngebotCard: FC<{
               <div className={`flex gap-2 pt-1 ${step > 0 ? 'justify-between' : 'justify-end'}`}>
                 {step > 0 && (
                   <button
-                    onClick={() => { setStep(s => s - 1); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
+                    onClick={() => { setStep(s => s - 1); (document.getElementById('portal-scroll-container') ?? window).scrollTo({ top: 0, behavior: 'smooth' }); }}
                     className="px-4 py-2.5 text-sm font-semibold text-gray-500 border border-gray-200 rounded-xl hover:bg-gray-50 transition-colors"
                   >
                     ← Zurück
@@ -1185,7 +1185,7 @@ export const AngebotCard: FC<{
                 )}
                 {step < STEP_LABELS.length - 1 ? (
                   <button
-                    onClick={() => { if (stepComplete(step)) { setStep(s => s + 1); window.scrollTo({ top: 0, behavior: 'smooth' }); } }}
+                    onClick={() => { if (stepComplete(step)) { setStep(s => s + 1); (document.getElementById('portal-scroll-container') ?? window).scrollTo({ top: 0, behavior: 'smooth' }); } }}
                     className={`flex-1 py-2.5 text-sm font-bold rounded-xl transition-all ${
                       stepComplete(step)
                         ? 'bg-[#E76F63] hover:bg-[#D65E52] text-white shadow-sm'
@@ -1211,7 +1211,7 @@ export const AngebotCard: FC<{
                       setSaved(true);
                       setPatientOpen(false);
                       onPatientSaved?.(true);
-                      window.scrollTo({ top: 0, behavior: 'smooth' });
+                      (document.getElementById('portal-scroll-container') ?? window).scrollTo({ top: 0, behavior: 'smooth' });
                       // Fire-and-forget: Mamamia save runs after UI transition.
                       if (mamamiaEnabled && onSaveToMamamia) {
                         onSaveToMamamia(patient).catch(err =>
