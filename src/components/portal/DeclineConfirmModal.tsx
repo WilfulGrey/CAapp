@@ -12,7 +12,7 @@ export const DeclineConfirmModal: FC<{
   const { nurse } = app;
   const name = displayName(nurse.name);
   const inits = initials(nurse.name);
-  const lvl = nurseLevel(nurse.history?.assignments ?? 0);
+  const lvl = nurseLevel(nurse.experienceYears ?? 0, nurse.history?.assignments ?? 0);
 
   return (
     <>
