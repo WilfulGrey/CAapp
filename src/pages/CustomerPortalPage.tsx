@@ -1,4 +1,4 @@
-import { useState, useEffect, FC } from 'react';
+import { useState, useEffect, useMemo, FC } from 'react';
 import { Check, Bell, Phone, AlertCircle, AlertTriangle, ChevronDown } from 'lucide-react';
 import { Nurse } from '../types';
 import { displayName } from '../components/portal/shared';
@@ -31,7 +31,6 @@ import { callMamamia } from '../lib/mamamia/client';
 import {
   type Application,
   type NurseStatus,
-  type NurseStatuses,
 } from '../components/portal/shared';
 import { BookedScreen } from '../components/portal/BookedScreen';
 import { AngebotCard } from '../components/portal/AngebotCard';
@@ -74,7 +73,15 @@ const CustomerPortalPage: FC = () => {
   // Applications state. Empty by default — populated once Mamamia session
   // is ready and `listApplications` returns. No mock seeds (CLAUDE.md §1).
   const [applications, setApplications] = useState<Application[]>([]);
-  const [nurseStatuses, setNurseStatuses] = useState<NurseStatuses>({});
+  // Per-session local overrides keyed by caregiverId. Server is source of truth
+  // for persistence (invitedCaregiverIds via listInvitedCaregiverIds RPC,
+  // lead.declined_caregiver_ids via Supabase column). This map only carries
+  // optimistic updates between the user's click and the server-side refetch.
+  //   - id → 'invited':  user just clicked Einladen (before refetchInvited)
+  //   - id → 'declined': user just clicked Nein danke (before lead refresh)
+  //   - id → 'pending':  user just undid a declined match (mask server side)
+  // Resolved status per caregiver is derived in `nurseStatusById` (useMemo).
+  const [statusOverrides, setStatusOverrides] = useState<Map<number, NurseStatus>>(new Map());
   const [selectedNurse, setSelectedNurse] = useState<Nurse | null>(null);
   const [selectedApp, setSelectedApp] = useState<Application | null>(null);
   const [nurseModalApp, setNurseModalApp] = useState<Application | null>(null);
@@ -285,44 +292,34 @@ const CustomerPortalPage: FC = () => {
     // its caregiverIds is what we care about, derived from mmMatchings.
   }, [mmReady, mmMatchings, mmApplications]);
 
-  // Seed nurseStatuses with 'invited' for caregivers that already have a
-  // Request in Mamamia. Without this the badge state lives only in
-  // memory — F5 wipes it and the user re-sees "Einladen" on already-
-  // invited cgs (UX bug; could even double-invite). We merge instead of
-  // replace so locally-set 'declined' overlays survive a refetch.
-  useEffect(() => {
-    if (!mmReady || !invitedCaregiverIds || effectiveMatched.length === 0) return;
-    const invitedSet = new Set(invitedCaregiverIds);
-    setNurseStatuses(prev => {
-      const next: NurseStatuses = { ...prev };
-      effectiveMatched.forEach((m, idx) => {
-        if (invitedSet.has(m.caregiverId) && next[idx] !== 'declined') {
-          next[idx] = 'invited';
-        }
-      });
-      return next;
-    });
-  }, [mmReady, invitedCaregiverIds, effectiveMatched]);
-
-  // Seed nurseStatuses with 'declined' for caregivers the customer rejected
-  // via "Nein danke" in a previous session. Persisted in
-  // leads.declined_caregiver_ids by setDeclinedCaregiver RPC, hydrated here
-  // on mount so the rejection survives F5 + cross-device. Declined wins
-  // over 'invited' (someone declined → we don't restore an invitation).
-  useEffect(() => {
-    const declinedIds = lead?.declined_caregiver_ids;
-    if (!declinedIds || declinedIds.length === 0 || effectiveMatched.length === 0) return;
-    const declinedSet = new Set(declinedIds);
-    setNurseStatuses(prev => {
-      const next: NurseStatuses = { ...prev };
-      effectiveMatched.forEach((m, idx) => {
-        if (declinedSet.has(m.caregiverId)) {
-          next[idx] = 'declined';
-        }
-      });
-      return next;
-    });
-  }, [lead, effectiveMatched]);
+  // Resolved nurse status per caregiver — DERIVED from server data + local
+  // overrides every render. Replaces the previous synced-state pattern
+  // (multi-effect setNurseStatuses({...prev})) which caused an infinite
+  // render loop because `effectiveMatched` is recomputed each render
+  // (new array ref) and the dep would refire the effect → setState → repeat.
+  //
+  // Precedence: localOverride (this-session click) > server declined >
+  // server invited > 'pending'. An override of 'pending' explicitly
+  // unwinds the server declined (used by undo).
+  const nurseStatusById = useMemo(() => {
+    const out = new Map<number, NurseStatus>();
+    const invitedServer = new Set(invitedCaregiverIds ?? []);
+    const declinedServer = new Set(lead?.declined_caregiver_ids ?? []);
+    for (const m of effectiveMatched) {
+      const id = m.caregiverId;
+      const override = statusOverrides.get(id);
+      if (override !== undefined) {
+        out.set(id, override);
+      } else if (declinedServer.has(id)) {
+        out.set(id, 'declined');
+      } else if (invitedServer.has(id)) {
+        out.set(id, 'invited');
+      } else {
+        out.set(id, 'pending');
+      }
+    }
+    return out;
+  }, [effectiveMatched, invitedCaregiverIds, lead?.declined_caregiver_ids, statusOverrides]);
 
   const animateThenProcess = (id: string, fn: () => void) => {
     setExitingIds(prev => new Set([...prev, id]));
@@ -346,11 +343,12 @@ const CustomerPortalPage: FC = () => {
 
   const pendingApps = applications.filter((a) => a.status === 'new');
   const doneApps = applications.filter((a) => a.status !== 'new');
-  // Locally-declined matches (decline-match has no backend mutation, lives only in nurseStatuses).
-  // Surface them in "Bereits bearbeitet" alongside processed applications.
+  // Locally-declined matches — surface in "Bereits bearbeitet" alongside
+  // processed applications. Status comes from the derived `nurseStatusById`
+  // (server lead.declined_caregiver_ids + this-session statusOverrides).
   const declinedMatches = effectiveMatched
-    .map((m, idx) => ({ nurse: m.nurse, idx }))
-    .filter(({ idx }) => nurseStatuses[idx] === 'declined');
+    .map((m, idx) => ({ nurse: m.nurse, idx, caregiverId: m.caregiverId }))
+    .filter(({ caregiverId }) => nurseStatusById.get(caregiverId) === 'declined');
   const acceptedApp = applications.find((a) => a.status === 'accepted') ?? null;
   const hasPending = pendingApps.length > 0;
   const matchesUnlocked = !hasPending;
@@ -442,10 +440,14 @@ const CustomerPortalPage: FC = () => {
 
     try {
       await inviteMutation.mutate({ caregiver_id: match.caregiverId });
-      // Persist invited state ONLY after backend confirmed.
-      setNurseStatuses((prev) => ({ ...prev, [idx]: 'invited' }));
-      // Refetch the invited-IDs set so a subsequent F5 already sees this
-      // caregiver as invited (without depending on local state survival).
+      // Optimistic local override — server source of truth (invitedCaregiverIds)
+      // catches up via refetchInvited(). Override survives until then.
+      const id = match.caregiverId;
+      setStatusOverrides((prev) => {
+        const next = new Map(prev);
+        next.set(id, 'invited');
+        return next;
+      });
       refetchInvited();
       if (nurseName) {
         setApplications((prev) =>
@@ -472,13 +474,19 @@ const CustomerPortalPage: FC = () => {
   };
 
   const declineNurse = (idx: number) => {
-    // Optimistic local update — UI flips immediately, customer doesn't wait
+    // Optimistic local override — UI flips immediately, customer doesn't wait
     // on the round-trip. Persist to Supabase so the rejection survives F5
-    // + cross-device. RPC errors stay silent in the UI; the next mount
-    // simply won't seed this id, and the customer can re-decline.
-    setNurseStatuses((prev) => ({ ...prev, [idx]: 'declined' }));
+    // + cross-device. RPC errors stay silent in the UI; on next mount the
+    // server-side lead.declined_caregiver_ids reflects truth and the override
+    // collapses naturally.
     const caregiverId = effectiveMatched[idx]?.caregiverId;
-    if (lead?.token && caregiverId != null) {
+    if (caregiverId == null) return;
+    setStatusOverrides((prev) => {
+      const next = new Map(prev);
+      next.set(caregiverId, 'declined');
+      return next;
+    });
+    if (lead?.token) {
       setDeclinedCaregiver(lead.token, caregiverId, true).catch(err => {
         console.error('setDeclinedCaregiver failed:', err);
       });
@@ -486,16 +494,18 @@ const CustomerPortalPage: FC = () => {
   };
 
   // Reset a locally-declined match back to 'pending' so the caregiver
-  // reappears in the matched-nurses list. Mirrors declineNurse — optimistic
-  // local clear, then RPC removes the id from leads.declined_caregiver_ids.
+  // reappears in the matched-nurses list. Override to 'pending' masks the
+  // server lead.declined_caregiver_ids until the RPC completes + lead
+  // re-fetches; from then on the override is harmless (server agrees).
   const undoDeclinedMatch = (idx: number) => {
-    setNurseStatuses((prev) => {
-      const next = { ...prev };
-      delete next[idx];
+    const caregiverId = effectiveMatched[idx]?.caregiverId;
+    if (caregiverId == null) return;
+    setStatusOverrides((prev) => {
+      const next = new Map(prev);
+      next.set(caregiverId, 'pending');
       return next;
     });
-    const caregiverId = effectiveMatched[idx]?.caregiverId;
-    if (lead?.token && caregiverId != null) {
+    if (lead?.token) {
       setDeclinedCaregiver(lead.token, caregiverId, false).catch(err => {
         console.error('setDeclinedCaregiver(undo) failed:', err);
       });
@@ -1043,7 +1053,8 @@ const CustomerPortalPage: FC = () => {
 
         {/* ── SECTION: Matched Nurses — pending + invited, nur wenn keine offenen Bewerbungen ── */}
         {!hasPending && (() => {
-          const allVisible = effectiveMatched.map((m, i) => ({ nurse: m.nurse, i, status: nurseStatuses[i] ?? 'pending' as NurseStatus }))
+          const allVisible = effectiveMatched
+            .map((m, i) => ({ nurse: m.nurse, i, status: nurseStatusById.get(m.caregiverId) ?? 'pending' as NurseStatus }))
             .filter(({ status }) => status === 'pending' || status === 'invited');
           // Cap pending at 5 so customers aren't overwhelmed; always show all
           // invited ones (user already took action on those).
@@ -1296,7 +1307,11 @@ const CustomerPortalPage: FC = () => {
           onReview={() => { setSelectedNurse(null); setSelectedApp(nurseModalApp); setNurseModalApp(null); }}
           onDecline={() => { setDeclineConfirmApp(nurseModalApp); setSelectedNurse(null); setNurseModalApp(null); }}
           onUndo={() => { if (nurseModalApp) undoApp(nurseModalApp.id); setNurseModalApp(null); }}
-          isInvited={nurseMatchIdx !== null && nurseStatuses[nurseMatchIdx] === 'invited'}
+          isInvited={
+            nurseMatchIdx !== null
+            && effectiveMatched[nurseMatchIdx] !== undefined
+            && nurseStatusById.get(effectiveMatched[nurseMatchIdx].caregiverId) === 'invited'
+          }
           onInvite={nurseMatchIdx !== null ? async () => {
             const idx = nurseMatchIdx;
             // Modal animation is driven by the returned Promise — surfaces

@@ -246,8 +246,6 @@ export const GET_CAREGIVER = /* GraphQL */ `
         postal_code
         city
         status
-        patients_count
-        patient_mobility_id
       }
     }
   }
