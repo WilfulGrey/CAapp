@@ -13,6 +13,14 @@ export const CustomerNurseModal: FC<{
    *  GET_CAREGIVER (~1.7-3.1s on beta). When this is true we render a
    *  shimmer skeleton for those sections instead of empty rows. */
   profileLoading?: boolean;
+  /** True while the AI-generated "Über die Pflegekraft" introduction is in
+   *  flight. Decoupled from profileLoading because the basic profile lands
+   *  fast (often cached) but the AI text takes ~3-5s. Without this prop
+   *  the about-section briefly flashes Mamamia's raw motivation text, then
+   *  swaps to AI — ugly. With it: we show a friendly loader until AI
+   *  resolves, then either the AI text (success) or the Mamamia fallback
+   *  (failure / null). */
+  aboutLoading?: boolean;
   onClose: () => void;
   app?: Application;
   onReview?: () => void;
@@ -24,7 +32,7 @@ export const CustomerNurseModal: FC<{
   onInvite?: () => Promise<void>;
   onDeclineMatch?: () => void;
   isInvited?: boolean;
-}> = ({ nurse, profileLoading = false, onClose, app, onReview, onDecline, onUndo, onInvite, onDeclineMatch, isInvited = false }) => {
+}> = ({ nurse, profileLoading = false, aboutLoading = false, onClose, app, onReview, onDecline, onUndo, onInvite, onDeclineMatch, isInvited = false }) => {
   const [invited, setInvited] = useState(isInvited);
   const [invitePhaseModal, setInvitePhaseModal] = useState<'idle' | 'sending' | 'done'>('idle');
 
@@ -169,6 +177,21 @@ export const CustomerNurseModal: FC<{
                   <div className="h-3 w-full bg-gray-200 rounded mb-2" />
                   <div className="h-3 w-11/12 bg-gray-200 rounded mb-2" />
                   <div className="h-3 w-9/12 bg-gray-200 rounded" />
+                </div>
+              ) : aboutLoading ? (
+                <div className="bg-[#F8F7F5] rounded-xl p-4 flex items-start gap-3">
+                  <svg
+                    className="w-5 h-5 animate-spin text-[#8B7355] flex-shrink-0 mt-0.5"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    aria-hidden="true"
+                  >
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" />
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
+                  </svg>
+                  <p className="text-sm text-gray-600 italic leading-relaxed">
+                    Wir bereiten Ihnen gerade eine persönliche Vorstellung von {nurse.name.split(' ')[0]} vor…
+                  </p>
                 </div>
               ) : (
                 <div className="bg-[#F8F7F5] rounded-xl p-4">

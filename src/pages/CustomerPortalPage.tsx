@@ -141,9 +141,15 @@ const CustomerPortalPage: FC = () => {
   );
 
   // AI "Über die Pflegekraft" — reads from aiAboutCache (pre-baked during
-  // prefetch). If already resolved: instant. If still pending: subscribe
-  // and update when it arrives. Falls back to modal's mechanical text.
-  const [aiAbout, setAiAbout] = useState<string | null>(null);
+  // prefetch). 3-state to distinguish "in flight" from "resolved-but-null":
+  //   kind='loading'                  → modal shows a friendly "we're
+  //                                       preparing the introduction" loader
+  //                                       (no Mamamia-text flash, then swap)
+  //   kind='resolved', text=string    → modal shows AI text
+  //   kind='resolved', text=null      → modal falls back to Mamamia motivation
+  //                                       / synthesized sentence
+  type AiAboutState = { kind: 'loading' } | { kind: 'resolved'; text: string | null };
+  const [aiAboutState, setAiAboutState] = useState<AiAboutState>({ kind: 'loading' });
   const [aiAboutForId, setAiAboutForId] = useState<number | null>(null);
   useEffect(() => {
     if (!fullCaregiver) return;
@@ -154,14 +160,14 @@ const CustomerPortalPage: FC = () => {
     const cached = getAiAbout(id);
     if (cached !== undefined) {
       // Cache hit — instant (pre-baked during prefetch).
-      setAiAbout(cached);
+      setAiAboutState({ kind: 'resolved', text: cached });
       return;
     }
     // Still pending — subscribe; scheduleAiAbouts already fired the call.
-    setAiAbout(null);
+    setAiAboutState({ kind: 'loading' });
     const unsub = subscribeAiAbout(id, () => {
       const text = getAiAbout(id);
-      if (text !== undefined) setAiAbout(text);
+      if (text !== undefined) setAiAboutState({ kind: 'resolved', text });
     });
     return unsub;
   }, [fullCaregiver?.id]);
@@ -176,8 +182,13 @@ const CustomerPortalPage: FC = () => {
     const base = { ...selectedNurse, ...enriched };
     // Inject AI-generated about text once available — overrides Mamamia's
     // about_de / motivation fields which are often empty or low quality.
-    if (aiAbout && aiAboutForId === fullCaregiver.id && base.profile) {
-      base.profile = { ...base.profile, aboutDe: aiAbout };
+    if (
+      aiAboutState.kind === 'resolved'
+      && aiAboutState.text
+      && aiAboutForId === fullCaregiver.id
+      && base.profile
+    ) {
+      base.profile = { ...base.profile, aboutDe: aiAboutState.text };
     }
     // Preserve color (deterministic by id, identical anyway) + caregiverId.
     return base;
@@ -1302,6 +1313,15 @@ const CustomerPortalPage: FC = () => {
         <CustomerNurseModal
           nurse={enrichedSelectedNurse}
           profileLoading={caregiverLoading && !fullCaregiver}
+          aboutLoading={
+            // Show "we're preparing the intro" loader instead of the Mamamia
+            // motivation text while AI is in flight. Once AI resolves
+            // (success OR null-failure) the loader collapses and the modal
+            // shows whichever text the fallback chain ends on.
+            !!fullCaregiver
+            && aiAboutForId === fullCaregiver.id
+            && aiAboutState.kind === 'loading'
+          }
           onClose={() => { setSelectedNurse(null); setNurseModalApp(null); setNurseMatchIdx(null); }}
           app={nurseModalApp ?? undefined}
           onReview={() => { setSelectedNurse(null); setSelectedApp(nurseModalApp); setNurseModalApp(null); }}
