@@ -405,6 +405,29 @@ const updateCustomer: ActionHandler = async (session, variables, deps) => {
     patch.patients = [];
   }
 
+  // Mamamia preprod backend regression (verified 2026-05-14 via Tragefwkdf
+  // repro): customer_caregiver_wish.driving_license = "no" triggers the
+  // same generic "Internal server error" NPE in UpdateCustomer resolver.
+  // Every other value ("yes", "not_important", omitted) works, regardless
+  // of whether driving_license_gearbox is set. Drop the "no" value so the
+  // rest of the save (patient data, wish.germany_skill etc.) goes through.
+  // The customer's "no driver needed" preference is lost — Mamamia keeps
+  // the previous wish.driving_license. Remove this when Mamamia patches
+  // their resolver.
+  const wishPatchEarly = patch.customer_caregiver_wish as
+    | Record<string, unknown>
+    | undefined;
+  if (wishPatchEarly && wishPatchEarly.driving_license === "no") {
+    delete wishPatchEarly.driving_license;
+    // Gearbox is irrelevant when license requirement is dropped — wipe too
+    // so we don't end up with `gearbox: 'manual', driving_license: omitted`.
+    delete wishPatchEarly.driving_license_gearbox;
+    // If wish became empty after removing the only field, drop entirely.
+    if (Object.keys(wishPatchEarly).length === 0) {
+      delete patch.customer_caregiver_wish;
+    }
+  }
+
   // ── Preserve associations + wish scalars the caller didn't touch ──
   // Always re-fetch current Customer.equipments, per-patient tools, and
   // customer_caregiver_wish scalars (germany_skill, driving_license) and
