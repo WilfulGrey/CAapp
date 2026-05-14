@@ -62,7 +62,7 @@ export const CustomSelect: FC<{
         ref={btnRef}
         type="button"
         onClick={e => { e.stopPropagation(); handleOpen(); }}
-        className={`w-full border rounded-xl px-3 py-2.5 text-sm text-left flex items-center justify-between gap-2 transition-all bg-white ${
+        className={`w-full border rounded-xl px-3 py-2.5 text-base text-left flex items-center justify-between gap-2 transition-all bg-white ${
           open ? 'border-[#8B7355] ring-2 ring-[#8B7355]/10' : 'border-gray-300'
         } ${value ? 'text-gray-800' : 'text-gray-400'}`}
       >
@@ -76,7 +76,7 @@ export const CustomSelect: FC<{
               key={opt}
               type="button"
               onClick={e => { e.stopPropagation(); onChange(opt); setOpen(false); }}
-              className={`w-full text-left px-4 py-2.5 text-sm transition-colors ${
+              className={`w-full text-left px-4 py-2.5 text-base transition-colors ${
                 opt === value
                   ? 'bg-[#F5F1EA] text-[#8B7355] font-semibold'
                   : 'text-gray-700 hover:bg-gray-50'

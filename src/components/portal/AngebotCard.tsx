@@ -290,8 +290,8 @@ export const AngebotCard: FC<{
   // truth — if it says saved, we should agree.
   const effectiveSaved = saved || !!forceSaved;
 
-  const inputCls = 'w-full border border-gray-300 rounded-xl px-3 py-2.5 text-sm text-gray-800 placeholder-gray-400 focus:outline-none focus:border-[#8B7355] focus:ring-2 focus:ring-[#8B7355]/10 transition-all bg-white';
-  const labelCls = 'block text-sm font-medium text-gray-700 mb-1.5';
+  const inputCls = 'w-full border border-gray-300 rounded-xl px-3 py-2.5 text-base text-gray-800 placeholder-gray-400 focus:outline-none focus:border-[#8B7355] focus:ring-2 focus:ring-[#8B7355]/10 transition-all bg-white';
+  const labelCls = 'block text-[15px] font-medium text-gray-700 mb-1.5';
 
   // Desktop: the phone-frame div (#portal-scroll-container) is the scroller.
   // Mobile: that div has no overflow, so `window` is the actual scroller.
