@@ -163,16 +163,10 @@ export async function POST(request: NextRequest) {
       })
       .catch((e) => console.error('schedule eingangs threw:', e instanceof Error ? e.message : String(e)));
 
-    scheduleEmail(lead.id, email, 'angebot', 15)
-      .then(async (r) => {
-        if (r.success) {
-          await logEvent(lead.id, 'email_angebot_scheduled', { to: email });
-        } else {
-          console.error('Fehler beim Schedulen der Angebotsmail:', r.error);
-          await logEvent(lead.id, 'email_angebot_schedule_failed', { error: r.error });
-        }
-      })
-      .catch((e) => console.error('scheduleAngebot threw:', e instanceof Error ? e.message : String(e)));
+    // Separate Angebots-Mail (delay 15) entfällt — Eingangsbestätigung ist
+    // jetzt die gemergte Mail 1 (Empfangsbestätigung + Angebot + Preis +
+    // Portal-CTA, delay 0). Die Nachfass-Kette wird in der Edge Function
+    // nach Versand der Eingangsbestätigung gestartet.
 
     const teamEmail = getTeamNotificationTemplate(lead, 'angebot_requested');
     sendEmail('info@primundus.de', teamEmail)

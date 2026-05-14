@@ -252,6 +252,29 @@ function buildIlkaSig(siteUrl: string): string {
     </table>`;
 }
  
+// ── Portal-Link + Lead-Meilenstein ────────────────────────────────────────
+// Der kostenrechner-Lead erfährt vom CA-App-Portal über `lead_events`, die
+// per /api/lead-event reingeschrieben werden (token-authentifiziert).
+function buildPortalUrl(portalBase: string, token: string): string {
+  return `${portalBase.replace(/\/$/, "")}/?token=${encodeURIComponent(token)}`;
+}
+
+type LeadMilestone = "none" | "portal_opened" | "patient_data_saved" | "caregiver_invited";
+
+async function getLeadMilestone(supabase: any, leadId: string): Promise<LeadMilestone> {
+  const { data } = await supabase
+    .from("lead_events")
+    .select("event_type")
+    .eq("lead_id", leadId)
+    .in("event_type", ["portal_opened", "patient_data_saved", "caregiver_invited"]);
+  if (!data || data.length === 0) return "none";
+  const types = new Set(data.map((e: { event_type: string }) => e.event_type));
+  if (types.has("caregiver_invited")) return "caregiver_invited";
+  if (types.has("patient_data_saved")) return "patient_data_saved";
+  if (types.has("portal_opened")) return "portal_opened";
+  return "none";
+}
+
 function buildAngebotsEmailHtml(lead: Lead, siteUrl: string): string {
   const kalkulationUrl = `${siteUrl}/kalkulation/${lead.id}`;
   const anredeText = buildAnredeText(lead.anrede_text || null, lead.nachname || "", lead.vorname || "");
@@ -324,53 +347,91 @@ Primundus Deutschland | 24h-Pflege und Betreuung
 Telefon: +49 89 200 000 830 | info@primundus.de | www.primundus.de`;
 }
  
-function buildNachfass1Html(lead: Lead, siteUrl: string): string {
-  const kalkulationUrl = `${siteUrl}/kalkulation/${lead.id}`;
+// Nachfass-Inhalt je nach Lead-Meilenstein:
+//   none             → war noch nicht im Portal
+//   portal_opened    → war im Portal, aber Patientendaten fehlen (Hauptfall)
+//   patient_data_saved → Daten vollständig, aber noch keine Einladung
+// (caregiver_invited wird vorher abgebrochen, erreicht den Builder nicht.)
+function nachfassContent(milestone: LeadMilestone): { intro: string; body: string; cta: string } {
+  if (milestone === "patient_data_saved") {
+    return {
+      intro: "Ihre Patientendaten sind vollständig – perfekt.",
+      body: "Jetzt fehlt nur noch der letzte Schritt: Laden Sie Ihre <strong>Wunsch-Pflegekräfte ein</strong>. Die Anfrage geht direkt an die Betreuungskraft, und Sie erhalten zeitnah eine Rückmeldung.",
+      cta: "Pflegekräfte einladen →",
+    };
+  }
+  if (milestone === "portal_opened") {
+    return {
+      intro: "wir haben gesehen, dass Sie schon in Ihrem Kundenportal waren – schön!",
+      body: "Damit es weitergeht, fehlt nur noch <strong>ein Schritt: die Patientendaten vervollständigen</strong>. Erst damit kennen die Pflegekräfte den konkreten Pflegebedarf – und Sie können Ihre Wunsch-Pflegekräfte einladen und Bewerbungen erhalten. Es dauert nur 2 Minuten.",
+      cta: "Patientendaten vervollständigen →",
+    };
+  }
+  return {
+    intro: "ich wollte kurz nachfragen, ob bei Ihnen alles angekommen ist.",
+    body: "In Ihrem Kundenportal liegen bereits <strong>passende Betreuungskräfte</strong> für Sie bereit – mit Profil, Erfahrung und Verfügbarkeit. Schauen Sie gern unverbindlich rein.",
+    cta: "Zum Kundenportal →",
+  };
+}
+
+function nachfassCtaButton(url: string, label: string): string {
+  return `
+    <div style="text-align:center;margin:8px 0 4px;">
+      <a href="${url}" style="display:inline-block;background:linear-gradient(135deg,#B5A184 0%,#9A8A73 100%);color:#ffffff;text-decoration:none;padding:14px 32px;border-radius:6px;font-weight:600;font-size:15px;box-shadow:0 2px 4px rgba(181,161,132,0.35);">${label}</a>
+    </div>`;
+}
+
+function buildNachfass1Html(lead: Lead, siteUrl: string, portalBase: string, milestone: LeadMilestone): string {
+  const portalUrl = (portalBase && lead.token) ? buildPortalUrl(portalBase, lead.token) : siteUrl;
   const halloAnrede = buildHalloAnrede(lead.anrede_text || null, lead.nachname || "", lead.vorname || "");
- 
+  const v = nachfassContent(milestone);
+
   const content = `
     <p style="font-size:15px;line-height:1.75;color:#444;margin-bottom:14px;">${halloAnrede},</p>
-    <p style="font-size:15px;line-height:1.75;color:#444;margin-bottom:14px;">ich wollte kurz nachfragen, ob Sie unser Angebot schon anschauen konnten.</p>
-    <p style="font-size:15px;line-height:1.75;color:#444;margin-bottom:14px;">Wir sind bereits dabei, nach passenden Betreuungskräften für Ihre Situation zu schauen. Passt das für Sie grundsätzlich so – oder gibt es noch etwas, das wir berücksichtigen sollten?</p>
- 
+    <p style="font-size:15px;line-height:1.75;color:#444;margin-bottom:14px;">${v.intro}</p>
+    <p style="font-size:15px;line-height:1.75;color:#444;margin-bottom:14px;">${v.body}</p>
+
     ${buildIlkaSig(siteUrl)}
- 
-    <div style="text-align:center;margin:8px 0 4px;">
-      <a href="${kalkulationUrl}" style="display:inline-block;background:linear-gradient(135deg,#B5A184 0%,#9A8A73 100%);color:#ffffff;text-decoration:none;padding:14px 32px;border-radius:6px;font-weight:600;font-size:15px;box-shadow:0 2px 4px rgba(181,161,132,0.35);">Angebot jetzt einsehen →</a>
-    </div>`;
- 
+    ${nachfassCtaButton(portalUrl, v.cta)}`;
+
   return buildEmailWrapper(lead, siteUrl, content);
 }
- 
-function buildNachfass1Text(lead: Lead, siteUrl: string): string {
-  const kalkulationUrl = `${siteUrl}/kalkulation/${lead.id}`;
+
+function buildNachfass1Text(lead: Lead, siteUrl: string, portalBase: string, milestone: LeadMilestone): string {
+  const portalUrl = (portalBase && lead.token) ? buildPortalUrl(portalBase, lead.token) : siteUrl;
   const halloAnrede = buildHalloAnrede(lead.anrede_text || null, lead.nachname || "", lead.vorname || "");
+  const v = nachfassContent(milestone);
+  const plain = (s: string) => s.replace(/<\/?strong>/g, "");
   return `${halloAnrede},
- 
-ich wollte kurz nachfragen, ob Sie unser Angebot schon anschauen konnten.
- 
-Wir sind bereits dabei, nach passenden Betreuungskräften für Ihre Situation zu schauen.
-Passt das für Sie grundsätzlich so – oder gibt es noch etwas, das wir berücksichtigen sollten?
- 
+
+${plain(v.intro)}
+
+${plain(v.body)}
+
 Mit freundlichen Grüßen
 Ilka Wysocki
- 
-PS: Hier finden Sie Ihr Angebot: ${kalkulationUrl}
- 
+
+${v.cta.replace(/ →$/, "")}: ${portalUrl}
+
 ---
 ✓ Keine Vertragsbindung · ✓ Tagesgenaue Abrechnung · ✓ Kosten erst bei Anreise
 Primundus Deutschland | +49 89 200 000 830 | www.primundus.de`;
 }
- 
-function buildNachfass2Html(lead: Lead, siteUrl: string): string {
-  const kalkulationUrl = `${siteUrl}/kalkulation/${lead.id}`;
+
+function buildNachfass2Html(lead: Lead, siteUrl: string, portalBase: string, milestone: LeadMilestone): string {
+  const portalUrl = (portalBase && lead.token) ? buildPortalUrl(portalBase, lead.token) : siteUrl;
   const halloAnrede = buildHalloAnrede(lead.anrede_text || null, lead.nachname || "", lead.vorname || "");
- 
+  const v = nachfassContent(milestone);
+  // Nachfass 2 = dringlicher Ton im Intro für den "noch nicht im Portal"-Fall.
+  const intro = milestone === "none"
+    ? "ich melde mich noch einmal kurz – vielleicht war einfach noch nicht der richtige Moment."
+    : v.intro;
+
   const content = `
     <p style="font-size:15px;line-height:1.75;color:#444;margin-bottom:14px;">${halloAnrede},</p>
-    <p style="font-size:15px;line-height:1.75;color:#444;margin-bottom:14px;">ich melde mich noch einmal kurz – vielleicht war einfach noch nicht der richtige Moment.</p>
-    <p style="font-size:15px;line-height:1.75;color:#444;margin-bottom:14px;">Wenn Sie möchten, schaue ich gerne schon mal nach passenden Betreuungskräften für Ihre Situation. Das ist völlig unverbindlich und gibt Ihnen einen ersten Eindruck, was möglich ist.</p>
- 
+    <p style="font-size:15px;line-height:1.75;color:#444;margin-bottom:14px;">${intro}</p>
+    <p style="font-size:15px;line-height:1.75;color:#444;margin-bottom:14px;">${v.body}</p>
+
     <div style="background:#F7F5F0;border:1px solid #e5e0d8;border-radius:8px;padding:12px 16px;margin:16px 0;display:flex;align-items:center;justify-content:space-between;gap:12px;">
       <div>
         <div style="font-size:10px;font-weight:700;color:#999;text-transform:uppercase;letter-spacing:.06em;margin-bottom:7px;">100% Sorglos – unsere Konditionen</div>
@@ -382,41 +443,42 @@ function buildNachfass2Html(lead: Lead, siteUrl: string): string {
       </div>
       <img src="${siteUrl}/images/primundus_testsieger-2021.webp" alt="Testsieger" style="height:64px;width:auto;border:1px solid #e8d9a0;border-radius:4px;flex-shrink:0;opacity:.9;" />
     </div>
- 
+
     <p style="font-size:15px;line-height:1.75;color:#444;margin-bottom:14px;">Melden Sie sich einfach, wenn Sie Fragen haben oder wenn wir loslegen sollen.</p>
- 
+
     ${buildIlkaSig(siteUrl)}
- 
-    <div style="text-align:center;margin:8px 0 4px;">
-      <a href="${kalkulationUrl}" style="display:inline-block;background:linear-gradient(135deg,#B5A184 0%,#9A8A73 100%);color:#ffffff;text-decoration:none;padding:14px 32px;border-radius:6px;font-weight:600;font-size:15px;box-shadow:0 2px 4px rgba(181,161,132,0.35);">Angebot jetzt einsehen →</a>
-    </div>`;
- 
+    ${nachfassCtaButton(portalUrl, v.cta)}`;
+
   return buildEmailWrapper(lead, siteUrl, content);
 }
- 
-function buildNachfass2Text(lead: Lead, siteUrl: string): string {
-  const kalkulationUrl = `${siteUrl}/kalkulation/${lead.id}`;
+
+function buildNachfass2Text(lead: Lead, siteUrl: string, portalBase: string, milestone: LeadMilestone): string {
+  const portalUrl = (portalBase && lead.token) ? buildPortalUrl(portalBase, lead.token) : siteUrl;
   const halloAnrede = buildHalloAnrede(lead.anrede_text || null, lead.nachname || "", lead.vorname || "");
+  const v = nachfassContent(milestone);
+  const plain = (s: string) => s.replace(/<\/?strong>/g, "");
+  const intro = milestone === "none"
+    ? "ich melde mich noch einmal kurz – vielleicht war einfach noch nicht der richtige Moment."
+    : plain(v.intro);
   return `${halloAnrede},
 
-ich melde mich noch einmal kurz – vielleicht war einfach noch nicht der richtige Moment.
+${intro}
 
-Wenn Sie möchten, schaue ich gerne schon mal nach passenden Betreuungskräften für Ihre Situation. Das ist völlig unverbindlich.
+${plain(v.body)}
 
-Zur Erinnerung:
-✓ Keine Vorauszahlung – Kosten entstehen erst wenn die Betreuungskraft vor Ort ist
-✓ Täglich kündbar – keinerlei Vertragsbindung
-✓ Start in 4–7 Tagen – wenn Sie möchten
+100% Sorglos – unsere Konditionen:
+✓ Keine Vertragsbindung
+✓ Tagesgenaue Abrechnung
+✓ Kosten erst bei Anreise
 
 Melden Sie sich einfach, wenn Sie Fragen haben oder wenn wir loslegen sollen.
 
 Mit freundlichen Grüßen
 Ilka Wysocki
 
-PS: Hier finden Sie Ihr Angebot: ${kalkulationUrl}
+${v.cta.replace(/ →$/, "")}: ${portalUrl}
 
 ---
-✓ Keine Vertragsbindung · ✓ Tagesgenaue Abrechnung · ✓ Kosten erst bei Anreise
 Primundus Deutschland | +49 89 200 000 830 | www.primundus.de`;
 }
 
@@ -489,22 +551,63 @@ function buildEingangsbestaetigungHtml(lead: Lead, siteUrl: string, portalBase: 
     </tr>`;
   }).join("");
 
-  const portalBlock = (portalBase && lead.token) ? (() => {
-    const portalUrl = `${portalBase.replace(/\/$/, "")}/?token=${encodeURIComponent(lead.token)}`;
-    return `
-    <div style="background:linear-gradient(135deg,#2D5C2F 0%,#1F4421 100%);border-radius:10px;padding:28px;margin:0 0 28px 0;text-align:center;color:#ffffff;">
-      <h3 style="color:#ffffff;font-size:18px;font-weight:700;margin:0 0 8px 0;">Ihr persönlicher Portal-Link</h3>
-      <p style="color:#E8F5E9;font-size:14px;line-height:1.6;margin:0 0 18px 0;">In Ihrem Kundenportal finden Sie passende Pflegekräfte und können direkt Kontakt aufnehmen. Der Link bleibt 14 Tage aktiv und kann jederzeit erneut verwendet werden.</p>
-      <a href="${portalUrl}" style="display:inline-block;background:#ffffff;color:#2D5C2F;padding:14px 28px;border-radius:8px;text-decoration:none;font-weight:700;font-size:15px;">Pflegekraft jetzt finden →</a>
-    </div>`;
-  })() : "";
+  // Preis aus der Kalkulation (gleiche Box wie früher die separate Angebots-Mail).
+  const kalk = lead.kalkulation || {};
+  const bruttopreis = kalk.bruttopreis || 0;
+  const gesamteZuschuesse = kalk.zuschüsse?.gesamt || 0;
+  const eigenanteil = kalk.eigenanteil || (bruttopreis - gesamteZuschuesse);
+  const formatEuro = (n: number) => n.toLocaleString("de-DE", { minimumFractionDigits: 0, maximumFractionDigits: 0 }) + " €";
+
+  const priceBox = bruttopreis > 0 ? `
+    <div style="background:#FAF7F0;border:1.5px solid #B5A184;border-radius:8px;padding:12px 14px;margin:18px 0;">
+      <table width="100%" cellpadding="0" cellspacing="0" role="presentation">
+        <tr>
+          <td style="vertical-align:top;padding-right:8px;">
+            <div style="font-size:9px;text-transform:uppercase;letter-spacing:.07em;color:#8B6914;margin-bottom:2px;">Monatssatz</div>
+            <div style="font-size:17px;font-weight:700;color:#2D1F0F;">${formatEuro(bruttopreis)}</div>
+            <div style="font-size:10px;color:#aaa;">inkl. Steuern &amp; Sozialabgaben</div>
+          </td>
+          <td style="vertical-align:top;text-align:right;border-left:1px solid #e8d9a0;padding-left:12px;">
+            <div style="font-size:9px;text-transform:uppercase;letter-spacing:.07em;color:#8B6914;margin-bottom:2px;">Eigenanteil möglich</div>
+            <div style="font-size:16px;font-weight:700;color:#1E5C3A;">${formatEuro(eigenanteil)}</div>
+            <div style="font-size:10px;color:#aaa;">nach Pflegekasse</div>
+          </td>
+        </tr>
+      </table>
+    </div>` : "";
+
+  const portalUrl = (portalBase && lead.token) ? buildPortalUrl(portalBase, lead.token) : "";
+  const portalBlock = portalUrl ? `
+    <div style="background:#FAF8F4;border:1px solid #e8ddd0;border-radius:8px;padding:18px 20px;margin:0 0 22px 0;">
+      <p style="margin:0 0 12px 0;font-size:14px;color:#555;line-height:1.6;">In Ihrem <strong style="color:#2D1F0F;">Kundenportal</strong> sehen Sie die vorgeschlagenen Pflegekräfte mit Profil und Erfahrung. So geht es weiter:</p>
+      <table width="100%" cellpadding="0" cellspacing="0" role="presentation">
+        <tr><td style="padding:5px 0;vertical-align:top;width:26px;"><span style="display:inline-block;width:20px;height:20px;background:#B5A184;color:#fff;border-radius:50%;text-align:center;font-size:12px;font-weight:700;line-height:20px;">1</span></td>
+          <td style="padding:5px 0;font-size:14px;color:#444;line-height:1.55;"><strong>Pflegekräfte ansehen</strong> – jederzeit möglich</td></tr>
+        <tr><td style="padding:5px 0;vertical-align:top;"><span style="display:inline-block;width:20px;height:20px;background:#B5A184;color:#fff;border-radius:50%;text-align:center;font-size:12px;font-weight:700;line-height:20px;">2</span></td>
+          <td style="padding:5px 0;font-size:14px;color:#444;line-height:1.55;"><strong>Patientendaten vervollständigen</strong> – damit die Pflegekräfte den konkreten Pflegebedarf kennen. Voraussetzung für den nächsten Schritt.</td></tr>
+        <tr><td style="padding:5px 0;vertical-align:top;"><span style="display:inline-block;width:20px;height:20px;background:#B5A184;color:#fff;border-radius:50%;text-align:center;font-size:12px;font-weight:700;line-height:20px;">3</span></td>
+          <td style="padding:5px 0;font-size:14px;color:#444;line-height:1.55;"><strong>Wunsch-Pflegekräfte einladen &amp; Bewerbungen erhalten</strong> – sobald die Patientendaten vollständig sind</td></tr>
+      </table>
+      <div style="text-align:center;margin:18px 0 4px;">
+        <a href="${portalUrl}" style="display:inline-block;background:#2A9D5C;color:#fff;text-decoration:none;padding:13px 34px;border-radius:8px;font-weight:600;font-size:15px;">Zum Kundenportal →</a>
+      </div>
+    </div>` : "";
 
   const content = `
-    <p style="font-size:16px;line-height:1.6;color:#333;margin-bottom:20px;">${greeting},</p>
+    <p style="font-size:15px;line-height:1.75;color:#444;margin-bottom:14px;">${greeting},</p>
+    <p style="font-size:15px;line-height:1.75;color:#444;margin-bottom:14px;">vielen Dank für Ihre Anfrage. Auf Grundlage Ihrer Angaben haben wir Ihr <strong style="color:#2D1F0F;">persönliches Angebot</strong> für die 24-Stunden-Betreuung zu Hause erstellt – inklusive passender Pflegekräfte, die wir bereits für Sie ausgewählt haben.</p>
 
-    <p style="font-size:16px;line-height:1.7;color:#555;margin-bottom:24px;">vielen Dank für Ihre Anfrage zur 24h-Pflege. Wir haben Ihre Angaben erhalten und werden Ihnen <strong>schnellstmöglich ein persönliches Angebot</strong> zusenden.</p>
+    ${priceBox}
 
-    <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="margin:0 0 24px 0;border:1px solid #e8ddd0;border-radius:8px;overflow:hidden;">
+    <div style="font-size:12px;color:#888;line-height:1.8;margin:0 0 18px;text-align:center;">
+      <span style="color:#2D6A4F;font-weight:600;">✓ Keine Vertragsbindung</span>&ensp;&middot;&ensp;
+      <span style="color:#2D6A4F;font-weight:600;">✓ Tagesgenaue Abrechnung</span>&ensp;&middot;&ensp;
+      <span style="color:#2D6A4F;font-weight:600;">✓ Kosten erst bei Anreise</span>
+    </div>
+
+    ${portalBlock}
+
+    <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="margin:0 0 22px 0;border:1px solid #e8ddd0;border-radius:8px;overflow:hidden;">
       <tr>
         <td style="background:#f9f6f2;padding:6px 20px;border-bottom:1px solid #e8ddd0;">
           <p style="margin:0;font-size:11px;font-weight:700;letter-spacing:0.08em;color:#9a8a73;text-transform:uppercase;">Ihre Angaben im Überblick</p>
@@ -517,21 +620,9 @@ function buildEingangsbestaetigungHtml(lead: Lead, siteUrl: string, portalBase: 
       </tr>
     </table>
 
-    <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="margin:0 0 28px 0;border:1px solid #e8ddd0;border-radius:8px;overflow:hidden;">
-      <tr>
-        <td style="background:#f9f6f2;padding:6px 20px;border-bottom:1px solid #e8ddd0;">
-          <p style="margin:0;font-size:11px;font-weight:700;letter-spacing:0.08em;color:#9a8a73;text-transform:uppercase;">Nächster Schritt</p>
-        </td>
-      </tr>
-      <tr>
-        <td style="padding:18px 20px;text-align:left;">
-          <p style="margin:0 0 8px 0;font-size:18px;font-weight:700;color:#3D2B1F;line-height:1.3;">Wir senden Ihnen Ihr persönliches Angebot</p>
-          <p style="margin:0;font-size:14px;color:#666;line-height:1.6;">Unser Team prüft Ihre Angaben und meldet sich in Kürze – in der Regel noch am selben Werktag.</p>
-        </td>
-      </tr>
-    </table>
-
-    ${portalBlock}
+    <div style="background:#EEF6F0;border-left:3px solid #4CAF50;padding:12px 14px;border-radius:0 6px 6px 0;font-size:14px;color:#555;line-height:1.6;">
+      Für Sie bleibt alles <strong>unverbindlich</strong>, bis Sie sich für eine passende Betreuungskraft entscheiden und diese anreist.
+    </div>
 
     ${buildIlkaSig(siteUrl)}`;
 
@@ -543,25 +634,38 @@ function buildEingangsbestaetigungText(lead: Lead, portalBase: string): string {
   const fd = (lead.kalkulation as any)?.formularDaten || {};
   const careStartTiming = (lead as any).care_start_timing || "";
 
-  const portalUrl = (portalBase && lead.token)
-    ? `${portalBase.replace(/\/$/, "")}/?token=${encodeURIComponent(lead.token)}`
+  const portalUrl = (portalBase && lead.token) ? buildPortalUrl(portalBase, lead.token) : "";
+
+  const kalk = lead.kalkulation || {};
+  const bruttopreis = kalk.bruttopreis || 0;
+  const gesamteZuschuesse = kalk.zuschüsse?.gesamt || 0;
+  const eigenanteil = kalk.eigenanteil || (bruttopreis - gesamteZuschuesse);
+  const formatEuro = (n: number) => n.toLocaleString("de-DE", { minimumFractionDigits: 0, maximumFractionDigits: 0 }) + " €";
+  const priceLine = bruttopreis > 0
+    ? `Monatssatz: ${formatEuro(bruttopreis)} (inkl. Steuern & Sozialabgaben) | Eigenanteil möglich: ${formatEuro(eigenanteil)} (nach Pflegekasse)\n\n`
     : "";
 
-  const portalBlock = portalUrl ? `
-IHR PERSÖNLICHER PORTAL-LINK
+  const portalBlock = portalUrl ? `SO GEHT ES WEITER
 
-In Ihrem Kundenportal finden Sie passende Pflegekräfte und können direkt Kontakt aufnehmen. Der Link bleibt 14 Tage aktiv und kann jederzeit erneut verwendet werden.
+In Ihrem Kundenportal sehen Sie die vorgeschlagenen Pflegekräfte mit Profil und Erfahrung.
 
-${portalUrl}
+1. Pflegekräfte ansehen – jederzeit möglich
+2. Patientendaten vervollständigen – damit die Pflegekräfte den konkreten Pflegebedarf kennen. Voraussetzung für den nächsten Schritt.
+3. Wunsch-Pflegekräfte einladen & Bewerbungen erhalten – sobald die Patientendaten vollständig sind
+
+Zum Kundenportal: ${portalUrl}
+
 ` : "";
 
-  return `Ihre Anfrage ist eingegangen – Primundus 24h-Pflege
+  return `Ihr persönliches Angebot zur 24-Stunden-Betreuung – Primundus
 
 ${greeting},
 
-vielen Dank für Ihre Anfrage zur 24h-Pflege. Wir haben Ihre Angaben erhalten und werden Ihnen schnellstmöglich ein persönliches Angebot zusenden.
+vielen Dank für Ihre Anfrage. Auf Grundlage Ihrer Angaben haben wir Ihr persönliches Angebot für die 24-Stunden-Betreuung zu Hause erstellt – inklusive passender Pflegekräfte, die wir bereits für Sie ausgewählt haben.
 
-IHRE ANGABEN IM ÜBERBLICK
+${priceLine}✓ Keine Vertragsbindung · ✓ Tagesgenaue Abrechnung · ✓ Kosten erst bei Anreise
+
+${portalBlock}IHRE ANGABEN IM ÜBERBLICK
 
 Name: ${[lead.anrede_text, lead.vorname, lead.nachname].filter(Boolean).join(" ") || "Nicht angegeben"}
 E-Mail: ${lead.email}
@@ -574,14 +678,12 @@ Nachteinsätze: ${eingangsLabel("nachteinsaetze", fd.nachteinsaetze)}
 Deutschkenntnisse: ${eingangsLabel("deutschkenntnisse", fd.deutschkenntnisse)}
 Wann soll die Betreuung starten?: ${eingangsLabel("care_start_timing", careStartTiming)}
 
-WIE GEHT ES WEITER?
+Für Sie bleibt alles unverbindlich, bis Sie sich für eine passende Betreuungskraft entscheiden und diese anreist.
 
-Unser Team prüft Ihre Anfrage und meldet sich in Kürze mit einem passenden Angebot bei Ihnen.
-${portalBlock}
 Bei Fragen stehen wir Ihnen gerne telefonisch zur Verfügung: +49 89 200 000 830
 
-Herzliche Grüße
-Ihr Primundus-Team
+Mit freundlichen Grüßen
+Ilka Wysocki
 
 ---
 Primundus Deutschland | 24h-Pflege und Betreuung
@@ -762,55 +864,70 @@ Deno.serve(async (req: Request) => {
  
         const isBeauftragt = lead.status === "vertrag_abgeschlossen" || lead.status === "betreuung_beauftragt" || lead.order_confirmed === true;
         const isNichtInteressiert = lead.status === "nicht_interessiert";
- 
-        if (
-          (scheduledEmail.email_type === "nachfass_1" || scheduledEmail.email_type === "nachfass_2") &&
-          (isBeauftragt || isNichtInteressiert)
-        ) {
+
+        const isNachfass = scheduledEmail.email_type === "nachfass_1" || scheduledEmail.email_type === "nachfass_2";
+
+        // Lead-Meilenstein aus den CA-App-Events (portal_opened, patient_data_saved,
+        // caregiver_invited) \u2014 steuert die Nachfass-Variante + den Abbruch.
+        const milestone = isNachfass
+          ? await getLeadMilestone(supabase, scheduledEmail.lead_id)
+          : "none" as LeadMilestone;
+
+        // Abbruch: Lead ist beauftragt / nicht interessiert ODER hat bereits
+        // eine Pflegekraft eingeladen (Ziel erreicht \u2014 kein Nachfass mehr n\u00f6tig).
+        if (isNachfass && (isBeauftragt || isNichtInteressiert || milestone === "caregiver_invited")) {
           await supabase
             .from("scheduled_emails")
             .update({ status: "cancelled", updated_at: new Date().toISOString() })
             .eq("id", scheduledEmail.id);
- 
+
           await supabase.from("lead_events").insert({
             lead_id: scheduledEmail.lead_id,
             event_type: `email_${scheduledEmail.email_type}_cancelled`,
-            data: { reason: isNichtInteressiert ? "nicht_interessiert" : "betreuung_beauftragt" },
+            data: {
+              reason: milestone === "caregiver_invited"
+                ? "caregiver_invited"
+                : isNichtInteressiert ? "nicht_interessiert" : "betreuung_beauftragt",
+            },
           });
- 
+
           results.push({ id: scheduledEmail.id, success: true });
           continue;
         }
- 
+
         let subject = "";
         let html = "";
         let text = "";
         let eventTypeSent = "";
         let eventTypeFailed = "";
- 
+
+        const portalBase = Deno.env.get("PORTAL_URL") || "https://kundenportal.primundus.de";
+
         if (scheduledEmail.email_type === "angebot") {
+          // Legacy: wird seit dem neuen Flow nicht mehr neu eingeplant, der
+          // Handler bleibt nur f\u00fcr evtl. noch eingeplante Alt-Rows.
           subject = "Ihr pers\u00f6nliches Angebot zur 24-Stunden-Betreuung";
           html = buildAngebotsEmailHtml(lead as Lead, smtpConfig.siteUrl);
           text = buildAngebotsEmailText(lead as Lead, smtpConfig.siteUrl);
           eventTypeSent = "email_angebot_sent";
           eventTypeFailed = "email_angebot_failed";
         } else if (scheduledEmail.email_type === "eingangsbestaetigung") {
-          subject = "Ihre Anfrage ist eingegangen \u2013 Primundus 24h-Pflege";
-          const portalBase = Deno.env.get("PORTAL_URL") || "https://kundenportal.primundus.de";
+          // Gemergte Mail 1: Empfangsbest\u00e4tigung + Angebot in einem.
+          subject = "Ihr pers\u00f6nliches Angebot zur 24-Stunden-Betreuung";
           html = buildEingangsbestaetigungHtml(lead as Lead, smtpConfig.siteUrl, portalBase);
           text = buildEingangsbestaetigungText(lead as Lead, portalBase);
           eventTypeSent = "email_eingangsbestaetigung_sent";
           eventTypeFailed = "email_eingangsbestaetigung_failed";
         } else if (scheduledEmail.email_type === "nachfass_1") {
           subject = "AW: Kurze R\u00fcckfrage zu Ihrem Angebot";
-          html = buildNachfass1Html(lead as Lead, smtpConfig.siteUrl);
-          text = buildNachfass1Text(lead as Lead, smtpConfig.siteUrl);
+          html = buildNachfass1Html(lead as Lead, smtpConfig.siteUrl, portalBase, milestone);
+          text = buildNachfass1Text(lead as Lead, smtpConfig.siteUrl, portalBase, milestone);
           eventTypeSent = "email_nachfass_1_sent";
           eventTypeFailed = "email_nachfass_1_failed";
         } else if (scheduledEmail.email_type === "nachfass_2") {
           subject = "Noch offen: Ihr Angebot zur 24h-Betreuung – ich helfe gerne weiter";
-          html = buildNachfass2Html(lead as Lead, smtpConfig.siteUrl);
-          text = buildNachfass2Text(lead as Lead, smtpConfig.siteUrl);
+          html = buildNachfass2Html(lead as Lead, smtpConfig.siteUrl, portalBase, milestone);
+          text = buildNachfass2Text(lead as Lead, smtpConfig.siteUrl, portalBase, milestone);
           eventTypeSent = "email_nachfass_2_sent";
           eventTypeFailed = "email_nachfass_2_failed";
         } else {
@@ -853,7 +970,9 @@ Deno.serve(async (req: Request) => {
             data: { to: scheduledEmail.recipient_email, triggered_by: "scheduled_email" },
           });
  
-          if (scheduledEmail.email_type === "angebot") {
+          // Nachfass-Kette: startet jetzt nach der (gemergten) Eingangsbestätigung.
+          // `angebot` bleibt für evtl. eingeplante Alt-Rows ebenfalls als Anker.
+          if (scheduledEmail.email_type === "eingangsbestaetigung" || scheduledEmail.email_type === "angebot") {
             await scheduleFollowUp(supabase, lead as Lead, "nachfass_1", 24 * 60);
           } else if (scheduledEmail.email_type === "nachfass_1") {
             await scheduleFollowUp(supabase, lead as Lead, "nachfass_2", 48 * 60);

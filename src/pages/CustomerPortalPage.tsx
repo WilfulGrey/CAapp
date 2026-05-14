@@ -13,6 +13,7 @@ import { useMamamiaSession } from '../hooks/useMamamiaSession';
 import { useCustomer, useJobOffer, useApplications, useMatchings, useCaregiver, useInvitedCaregivers } from '../lib/mamamia/hooks';
 import { prefetchCaregivers } from '../lib/mamamia/caregiverCache';
 import { scheduleAiAbouts, getAiAbout, subscribeAiAbout } from '../lib/mamamia/aiAboutCache';
+import { reportLeadEvent } from '../lib/leadEvents';
 import {
   useRejectApplication,
   useStoreConfirmation,
@@ -65,6 +66,9 @@ const CustomerPortalPage: FC = () => {
         setLeadError('Ihr Angebot konnte nicht geladen werden. Bitte öffnen Sie den Link aus Ihrer E-Mail erneut.');
       } else {
         setLead(l);
+        // Report back to the kostenrechner lead so the Nachfass emails know
+        // the customer reached the portal. Fire-and-forget.
+        reportLeadEvent(l.token, 'portal_opened');
       }
       setLeadLoading(false);
     });
@@ -451,6 +455,9 @@ const CustomerPortalPage: FC = () => {
 
     try {
       await inviteMutation.mutate({ caregiver_id: match.caregiverId });
+      // Report back to the kostenrechner lead — invite = goal reached, the
+      // Nachfass chain gets cancelled server-side. Fire-and-forget.
+      reportLeadEvent(lead?.token, 'caregiver_invited');
       // Optimistic local override — server source of truth (invitedCaregiverIds)
       // catches up via refetchInvited(). Override survives until then.
       const id = match.caregiverId;
@@ -1031,6 +1038,10 @@ const CustomerPortalPage: FC = () => {
             }
 
             await updateCustomerMutation.mutate(patch as Record<string, unknown>);
+            // Report back to the kostenrechner lead — patient data complete
+            // unlocks invites/applications, so the Nachfass switches to the
+            // "last step: invite" variant. Fire-and-forget.
+            reportLeadEvent(lead?.token, 'patient_data_saved');
             // Patient form save flippa customer na active + dorzuca pełne
             // patient/wish dane. Mamamia matching engine re-scoreuje całą
             // listę z nowymi inputami — początkowo zwrócone caregivers
