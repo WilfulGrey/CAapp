@@ -296,9 +296,21 @@ export const AngebotCard: FC<{
   // Desktop: the phone-frame div (#portal-scroll-container) is the scroller.
   // Mobile: that div has no overflow, so `window` is the actual scroller.
   // Scroll both — each is a harmless no-op where it doesn't apply.
+  // Used for the final save: jump to the very top of the page.
   const scrollPortalToTop = () => {
     document.getElementById('portal-scroll-container')?.scrollTo({ top: 0, behavior: 'smooth' });
     window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  // Step changes (open form / Weiter / Zurück) scroll to the top of the
+  // patient form, not the page top. scrollIntoView picks the right scroller
+  // (phone-frame on desktop, window on mobile); `scroll-mt-16` on the form
+  // wrapper keeps it clear of the sticky portal nav.
+  const patientFormRef = useRef<HTMLDivElement>(null);
+  const scrollToFormTop = () => {
+    setTimeout(() => {
+      patientFormRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 50);
   };
   // 2-column grid rows: align label boxes so a wrapped label (e.g.
   // "Heben erforderlich? *" vs single-line "Demenz *") doesn't shift its
@@ -643,7 +655,7 @@ export const AngebotCard: FC<{
               <div className="divide-y divide-gray-100">
                 {/* Step 1 */}
                 <button
-                  onClick={() => { setAngebotOpen(false); setPatientOpen(true); scrollPortalToTop(); }}
+                  onClick={() => { setAngebotOpen(false); setPatientOpen(true); scrollToFormTop(); }}
                   className="w-full flex items-center gap-3 px-4 py-3 hover:bg-[#F8F7F5] transition-colors text-left group"
                 >
                   <div className="w-6 h-6 rounded-full bg-[#8B7355] text-white text-xs font-bold flex items-center justify-center flex-shrink-0">1</div>
@@ -713,7 +725,7 @@ export const AngebotCard: FC<{
         </button>
 
         {patientOpen && (
-          <div className="border-t border-gray-100 p-3 bg-gray-100">
+          <div ref={patientFormRef} className="border-t border-gray-100 p-3 bg-gray-100 scroll-mt-16">
           <div className="rounded-2xl border-2 border-[#E76F63] overflow-hidden shadow-[0_0_0_4px_rgba(231,111,99,0.07)] bg-white">
 
             {/* Colored header banner */}
@@ -1180,7 +1192,7 @@ export const AngebotCard: FC<{
               <div className={`flex gap-2 pt-1 ${step > 0 ? 'justify-between' : 'justify-end'}`}>
                 {step > 0 && (
                   <button
-                    onClick={() => { setStep(s => s - 1); scrollPortalToTop(); }}
+                    onClick={() => { setStep(s => s - 1); scrollToFormTop(); }}
                     className="px-4 py-2.5 text-sm font-semibold text-gray-500 border border-gray-200 rounded-xl hover:bg-gray-50 transition-colors"
                   >
                     ← Zurück
@@ -1188,7 +1200,7 @@ export const AngebotCard: FC<{
                 )}
                 {step < STEP_LABELS.length - 1 ? (
                   <button
-                    onClick={() => { if (stepComplete(step)) { setStep(s => s + 1); scrollPortalToTop(); } }}
+                    onClick={() => { if (stepComplete(step)) { setStep(s => s + 1); scrollToFormTop(); } }}
                     className={`flex-1 py-2.5 text-sm font-bold rounded-xl transition-all ${
                       stepComplete(step)
                         ? 'bg-[#E76F63] hover:bg-[#D65E52] text-white shadow-sm'
