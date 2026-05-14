@@ -372,7 +372,7 @@ function nachfassContent(milestone: LeadMilestone): { intro: string; body: strin
   return {
     intro: "ich wollte kurz nachfragen, ob bei Ihnen alles angekommen ist.",
     body: "In Ihrem Kundenportal liegen bereits <strong>passende Betreuungskräfte</strong> für Sie bereit – mit Profil, Erfahrung und Verfügbarkeit. Schauen Sie gern unverbindlich rein.",
-    cta: "Zum Kundenportal →",
+    cta: "Angebot und Pflegekräfte anzeigen →",
   };
 }
 
@@ -591,7 +591,7 @@ function buildEingangsbestaetigungHtml(lead: Lead, siteUrl: string, portalBase: 
           <td style="padding:5px 0;font-size:14px;color:#444;line-height:1.55;"><strong>Wunsch-Pflegekräfte einladen &amp; Bewerbungen erhalten</strong> – sobald die Patientendaten vollständig sind</td></tr>
       </table>
       <div style="text-align:center;margin:18px 0 4px;">
-        <a href="${portalUrl}" style="display:inline-block;background:#2A9D5C;color:#fff;text-decoration:none;padding:13px 34px;border-radius:8px;font-weight:600;font-size:15px;">Zum Kundenportal →</a>
+        <a href="${portalUrl}" style="display:inline-block;background:#2A9D5C;color:#fff;text-decoration:none;padding:13px 34px;border-radius:8px;font-weight:600;font-size:15px;">Angebot und Pflegekräfte anzeigen →</a>
       </div>
     </div>` : "";
 
@@ -655,7 +655,7 @@ In Ihrem Kundenportal sehen Sie die vorgeschlagenen Pflegekräfte mit Profil und
 2. Patientendaten vervollständigen – damit die Pflegekräfte den konkreten Pflegebedarf kennen. Voraussetzung für den nächsten Schritt.
 3. Wunsch-Pflegekräfte einladen & Bewerbungen erhalten – sobald die Patientendaten vollständig sind
 
-Zum Kundenportal: ${portalUrl}
+Angebot und Pflegekräfte anzeigen: ${portalUrl}
 
 ` : "";
 
