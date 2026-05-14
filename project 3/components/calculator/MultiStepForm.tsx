@@ -132,7 +132,14 @@ export function MultiStepForm() {
     if (currentStep < totalSteps) {
       setCurrentStep(currentStep + 1);
       setTimeout(() => {
-        formRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        const el = formRef.current;
+        if (!el) return;
+        // Land the form just below the sticky header — scrollIntoView +
+        // scroll-mt-24 (96px) overshot the 64px mobile header, leaving a
+        // strip of hero visible above the form. Measure the real header.
+        const headerH = document.querySelector('header')?.getBoundingClientRect().height ?? 0;
+        const top = el.getBoundingClientRect().top + window.scrollY - headerH;
+        window.scrollTo({ top, behavior: 'smooth' });
       }, 50);
     } else if (currentStep === totalSteps) {
       await handleSubmit();
