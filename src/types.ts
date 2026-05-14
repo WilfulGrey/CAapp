@@ -4,7 +4,9 @@ export interface Assignment {
   postalCode: string;
   city: string;
   patientCount: number;
-  mobility: string;
+  /** Human-readable assignment length, derived from start/end dates
+   *  (e.g. "3 Monate", "6 Wochen"). */
+  duration: string;
 }
 
 export interface Nurse {
