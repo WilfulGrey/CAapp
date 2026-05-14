@@ -624,6 +624,7 @@ interface CaregiverAboutInput {
   firstName?: string;
   experienceYears?: string;
   assignments?: number;
+  experienceLevel?: string;      // badge label: Starter / Bronze / Silber / Gold / Platin
   languageLevel?: string;
   nationality?: string;
   personalities?: string[];
@@ -633,7 +634,7 @@ interface CaregiverAboutInput {
   qualifications?: string;
   education?: string;
   drivingLicense?: string;
-  recentAssignments?: string[];  // e.g. ["München, 3 Mon., Rollstuhl"]
+  recentAssignments?: string[];  // e.g. ["München, 3 Monate"]
   motivation?: string;
 }
 
@@ -644,8 +645,8 @@ Verwende nur den Vornamen.
 MAXIMAL 3 Sätze. Kurz, dicht, vertrauensbildend — kein Geschwafel.
 
 Verdichte das Wichtigste:
-- Satz 1: Wer sie ist + Herkunft + Erfahrung.
-- Satz 2: Was sie pflegerisch mitbringt (Deutsch, Führerschein, Qualifikationen, ggf. letzte Einsätze).
+- Satz 1: Wer sie ist + Herkunft + Erfahrung — Jahre, Anzahl Einsätze und (wenn angegeben) das Erfahrungs-Level einweben, damit der Bezug zum Level-Badge im Profil da ist. Natürlich formulieren, nicht aufgesetzt.
+- Satz 2: Pflegerische Stärken (Deutsch, Führerschein, Qualifikationen) und — wenn vorhanden — konkrete letzte Einsätze mit Ort und Dauer.
 - Satz 3: Persönlichkeit und was die Familie an ihr schätzen wird.
 
 Kein Marketingsprech. Keine leeren Phrasen. Nur Infos nutzen die tatsächlich vorliegen.
@@ -664,6 +665,7 @@ const generateCaregiverAbout: ActionHandler = async (_session, variables, deps) 
   if (typeof v.assignments === 'number' && v.assignments > 0) {
     lines.push(`Abgeschlossene Einsätze in Deutschland: ${v.assignments}`);
   }
+  if (v.experienceLevel) lines.push(`Erfahrungs-Level (Badge im Profil): ${v.experienceLevel}`);
   if (v.languageLevel) lines.push(`Deutschkenntnisse: ${v.languageLevel}`);
   if (v.drivingLicense) lines.push(`Führerschein: ${v.drivingLicense}`);
   if (v.recentAssignments?.length) lines.push(`Letzte Einsätze: ${v.recentAssignments.join(' | ')}`);

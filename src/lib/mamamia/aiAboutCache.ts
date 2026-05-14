@@ -16,6 +16,8 @@
 import { callMamamia } from './client';
 import type { MamamiaCaregiverFull } from './types';
 import { getCached, subscribe } from './caregiverCache';
+import { formatAssignmentDuration } from './mappers';
+import { nurseLevel } from '../../components/portal/shared';
 
 type AiEntry =
   | { state: 'pending' }
@@ -27,7 +29,7 @@ const listenerMap = new Map<number, Set<() => void>>();
 // ─── localStorage helpers ────────────────────────────────────────────────────
 
 // Bump this when the AI prompt changes so stale cached texts are discarded.
-const LS_PREFIX = 'ai_about_v5_';
+const LS_PREFIX = 'ai_about_v6_';
 
 function lsRead(id: number): string | null {
   try { return localStorage.getItem(`${LS_PREFIX}${id}`); } catch { return null; }
@@ -70,31 +72,32 @@ function buildInput(cg: MamamiaCaregiverFull): Record<string, unknown> {
     ? (gearboxDE[dl] ? `Ja (${gearboxDE[dl]})` : 'Ja')
     : undefined;
 
-  // Summarise recent assignments for the AI prompt.
-  // Each entry: city + duration in months + patient type (single/couple, mobility).
-  const mobilityLabel: Record<number, string> = {
-    1: 'mobil', 2: 'Gehhilfe', 3: 'Rollstuhl', 4: 'bettlägerig', 5: 'bettlägerig',
-  };
+  // Summarise recent assignments for the AI prompt (city + duration).
+  // Same filter logic as the modal's detailedAssignments (mappers.ts):
+  // finish-like or null status, completed (past) only.
+  const completedStatuses = new Set(['finish', 'finished', 'completed', 'done', 'success']);
+  const todayIso = new Date().toISOString().slice(0, 10);
   const recentAssignments = (cg.hp_recent_assignments ?? [])
-    .filter(a => a.status === 'finished' || a.status === 'completed' || !a.status)
+    .filter(a =>
+      !!a.arrival_date && !!a.departure_date &&
+      (!a.status || completedStatuses.has(a.status)) &&
+      a.departure_date.slice(0, 10) < todayIso,
+    )
     .slice(0, 3)
     .map(a => {
-      const parts: string[] = [];
-      if (a.city) parts.push(a.city);
-      if (a.arrival_date && a.departure_date) {
-        const months = Math.max(1, Math.round(
-          (new Date(a.departure_date).getTime() - new Date(a.arrival_date).getTime())
-          / (1000 * 60 * 60 * 24 * 30)
-        ));
-        parts.push(`${months} Mon.`);
-      }
-      if (a.patients_count === 2) parts.push('Paar');
-      if (a.patient_mobility_id && mobilityLabel[a.patient_mobility_id]) {
-        parts.push(mobilityLabel[a.patient_mobility_id]);
-      }
-      return parts.join(', ');
+      const dur = formatAssignmentDuration(a.arrival_date as string, a.departure_date as string);
+      return [a.city ?? '', dur].filter(Boolean).join(', ');
     })
     .filter(Boolean);
+
+  // Experience-level badge (same formula as the profile modal) — passed to
+  // the prompt so the description ties back to the badge the customer sees.
+  const yearsNum = cg.care_experience
+    ? Math.max(0, parseInt(cg.care_experience, 10) || 0)
+    : cg.hp_total_days
+    ? Math.max(0, Math.floor(cg.hp_total_days / 365))
+    : 0;
+  const experienceLevel = nurseLevel(yearsNum, cg.hp_total_jobs ?? 0).label;
 
   return {
     firstName: cg.first_name ?? undefined,
@@ -104,6 +107,7 @@ function buildInput(cg: MamamiaCaregiverFull): Record<string, unknown> {
       ? `${Math.round(cg.hp_total_days / 365)} Jahre`
       : undefined,
     assignments: cg.hp_total_jobs ?? undefined,
+    experienceLevel,
     languageLevel: levels[cg.germany_skill ?? ''] ?? cg.germany_skill ?? undefined,
     nationality: cg.nationality?.nationality ?? undefined,
     personalities: (cg.personalities ?? []).map(p => p.personality).filter(Boolean),

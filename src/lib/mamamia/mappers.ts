@@ -91,7 +91,7 @@ const MOBILITY_DE: Record<string, string> = {
 };
 
 // Assignment length from start/end dates → human-readable German label.
-function formatAssignmentDuration(arrival: string, departure: string): string {
+export function formatAssignmentDuration(arrival: string, departure: string): string {
   const days = Math.max(
     1,
     Math.round((new Date(departure).getTime() - new Date(arrival).getTime()) / 86_400_000),
