@@ -22,8 +22,11 @@ export function WhatsAppFloat() {
   }, []);
 
   useEffect(() => {
-    const forms = document.querySelectorAll('#calculator-form');
-    if (forms.length === 0) return;
+    // Observe the form card itself (not the whole #calculator-form wrapper —
+    // that also contains the badges + Ilka contact block, which kept the
+    // float hidden far too long after scrolling past the form).
+    const cards = document.querySelectorAll('[data-calculator-card]');
+    if (cards.length === 0) return;
     const visible = new Set<Element>();
     const observer = new IntersectionObserver((entries) => {
       for (const e of entries) {
@@ -32,7 +35,7 @@ export function WhatsAppFloat() {
       }
       setFormVisible(visible.size > 0);
     }, { threshold: 0 });
-    forms.forEach((f) => observer.observe(f));
+    cards.forEach((c) => observer.observe(c));
     return () => observer.disconnect();
   }, []);
 
