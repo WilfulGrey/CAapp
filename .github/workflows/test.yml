@@ -63,16 +63,20 @@ jobs:
         working-directory: supabase/functions/mamamia-proxy
         run: deno task test
 
-  # ─── Deploy Edge Functions (after merge to integration/mamamia-onboarding) ─
+  # ─── Deploy CA-App Edge Functions (after merge to integration/mamamia-onboarding) ─
   # Strukturalnie eliminuje race condition gdzie ktoś deployuje ze swojego
   # lokalnego stanu i nadpisuje cudze zmiany w chmurze. Po merge PR-a CI
   # robi single source of truth deploy z git HEAD.
+  #
+  # Deployuje TYLKO funkcje z repo-root supabase/functions/ na projekt
+  # CA-App (ycdwtrklpoqprabtwahi). Funkcje kostenrechnera (project 3/...)
+  # idą osobnym jobem niżej — inny projekt Supabase, inne konto.
   #
   # Wymaga GitHub Secret: SUPABASE_ACCESS_TOKEN
   #   gh secret set SUPABASE_ACCESS_TOKEN
   #   (wygeneruj na https://supabase.com/dashboard/account/tokens)
   deploy-edge-functions:
-    name: Deploy Edge Functions to Supabase
+    name: Deploy CA-App Edge Functions to Supabase
     needs: [vitest, deno-onboard, deno-proxy]
     if: github.event_name == 'push' && github.ref == 'refs/heads/integration/mamamia-onboarding'
     runs-on: ubuntu-latest
@@ -82,14 +86,14 @@ jobs:
           # need previous commit for diff check below
           fetch-depth: 2
 
-      - name: Check if Edge Functions changed
+      - name: Check if CA-App Edge Functions changed
         id: changed
         run: |
           if git diff --quiet ${{ github.event.before }} ${{ github.sha }} -- supabase/functions/; then
-            echo "Edge Functions unchanged in this push — skipping deploy."
+            echo "CA-App Edge Functions unchanged in this push — skipping deploy."
             echo "skip=true" >> $GITHUB_OUTPUT
           else
-            echo "Edge Functions changed — proceeding with deploy."
+            echo "CA-App Edge Functions changed — proceeding with deploy."
             echo "skip=false" >> $GITHUB_OUTPUT
           fi
 
@@ -98,15 +102,56 @@ jobs:
         with:
           version: latest
 
-      # Deployujemy wszystkie funkcje po kolei. Każda to ~5s — fail-fast, jeśli
-      # jedna padnie reszta się nie deployuje (lepiej zauważyć regresję
-      # natychmiast niż mieć rozjazd między funkcjami).
+      # Tylko funkcje istniejące w repo-root supabase/functions/.
       - name: Deploy functions
         if: steps.changed.outputs.skip != 'true'
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
         run: |
-          for fn in mamamia-proxy onboard-to-mamamia chat-ai schedule-email send-scheduled-emails betreuung-beauftragen; do
+          for fn in mamamia-proxy onboard-to-mamamia; do
+            echo "::group::Deploying $fn"
+            supabase functions deploy "$fn" --project-ref ycdwtrklpoqprabtwahi
+            echo "::endgroup::"
+          done
+
+  # ─── Deploy kostenrechner Edge Functions (project 3/) ─────────────────────
+  # Funkcje kostenrechnera leżą w `project 3/supabase/functions/` — ten sam
+  # projekt Supabase co CA-App (monorepo, wspólny ycdwtrklpoqprabtwahi), ale
+  # `supabase functions deploy` szuka funkcji względem cwd. Dlatego osobny
+  # job z working-directory "project 3" + własny diff-trigger.
+  deploy-kostenrechner-edge-functions:
+    name: Deploy kostenrechner Edge Functions to Supabase
+    needs: [vitest, deno-onboard, deno-proxy]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/integration/mamamia-onboarding'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      - name: Check if kostenrechner Edge Functions changed
+        id: changed
+        run: |
+          if git diff --quiet ${{ github.event.before }} ${{ github.sha }} -- 'project 3/supabase/functions/'; then
+            echo "kostenrechner Edge Functions unchanged — skipping deploy."
+            echo "skip=true" >> $GITHUB_OUTPUT
+          else
+            echo "kostenrechner Edge Functions changed — proceeding with deploy."
+            echo "skip=false" >> $GITHUB_OUTPUT
+          fi
+
+      - uses: supabase/setup-cli@v1
+        if: steps.changed.outputs.skip != 'true'
+        with:
+          version: latest
+
+      - name: Deploy kostenrechner functions
+        if: steps.changed.outputs.skip != 'true'
+        working-directory: "project 3"
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+        run: |
+          for fn in chat-ai schedule-email send-scheduled-emails; do
             echo "::group::Deploying $fn"
             supabase functions deploy "$fn" --project-ref ycdwtrklpoqprabtwahi
             echo "::endgroup::"
