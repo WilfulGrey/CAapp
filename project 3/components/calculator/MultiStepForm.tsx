@@ -418,7 +418,7 @@ export function MultiStepForm() {
             100% sorgenfrei
           </div>
         </div>
-      <div className="bg-white rounded-2xl border-[1.5px] border-[#C0C0C0] overflow-hidden shadow-md">
+      <div data-calculator-card className="bg-white rounded-2xl border-[1.5px] border-[#C0C0C0] overflow-hidden shadow-md">
         <div className="px-4 sm:px-8 py-5 border-b-2 border-[#E5E3DF]/50 bg-[#E76F63]">
           <p className="text-base font-bold uppercase tracking-wide text-white/95 mb-1.5">
             Angebot & Pflegekräfte sofort erhalten
