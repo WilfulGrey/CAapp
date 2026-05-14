@@ -35,6 +35,7 @@ export const CustomerNurseModal: FC<{
 }> = ({ nurse, profileLoading = false, aboutLoading = false, onClose, app, onReview, onDecline, onUndo, onInvite, onDeclineMatch, isInvited = false }) => {
   const [invited, setInvited] = useState(isInvited);
   const [invitePhaseModal, setInvitePhaseModal] = useState<'idle' | 'sending' | 'done'>('idle');
+  const [showLevelInfo, setShowLevelInfo] = useState(false);
 
   const handleModalInvite = async () => {
     setInvitePhaseModal('sending');
@@ -139,6 +140,16 @@ export const CustomerNurseModal: FC<{
                   <span className={`flex items-center gap-1 text-xs font-bold pl-1.5 pr-2 py-0.5 rounded-full border flex-shrink-0 ${lvl.cls}`}>
                     <span className="text-sm leading-none">{lvl.emoji}</span>{lvl.label}
                   </span>
+                  <button
+                    type="button"
+                    onClick={() => setShowLevelInfo(v => !v)}
+                    className="flex-shrink-0 text-gray-400 hover:text-[#8B7355] transition-colors"
+                    aria-label="Was bedeutet das Erfahrungs-Level?"
+                  >
+                    <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                      <circle cx="12" cy="12" r="10" /><path strokeLinecap="round" strokeLinejoin="round" d="M12 16v-4m0-4h.01" />
+                    </svg>
+                  </button>
                 </div>
                 <p className="text-xs text-gray-500 mt-0.5">{nurse.age} Jahre</p>
                 <span className={`inline-block mt-1.5 text-xs font-bold px-2.5 py-1 rounded-full border ${
@@ -151,6 +162,19 @@ export const CustomerNurseModal: FC<{
                 <X className="w-4 h-4 text-gray-500" />
               </button>
             </div>
+
+            {showLevelInfo && (
+              <div className="mt-3 bg-white/85 rounded-xl px-3.5 py-3 text-xs text-gray-600 leading-relaxed">
+                Das <strong className="text-gray-800">Erfahrungs-Level</strong> zeigt auf einen Blick,
+                wie viel Praxis {nurse.name.split(' ')[0]} mitbringt — aus Jahren in der Betreuung und
+                bereits abgeschlossenen Einsätzen. Je höher das Level, desto erfahrener:
+                <span className="whitespace-nowrap"> ⭐ Starter</span> →
+                <span className="whitespace-nowrap"> 🥉 Bronze</span> →
+                <span className="whitespace-nowrap"> 🥈 Silber</span> →
+                <span className="whitespace-nowrap"> 🥇 Gold</span> →
+                <span className="whitespace-nowrap"> 🏆 Platin</span>.
+              </div>
+            )}
 
             <div className="grid grid-cols-2 gap-2 mt-4">
               <div className="bg-white rounded-xl px-3 py-2.5 shadow-sm">
@@ -217,7 +241,7 @@ export const CustomerNurseModal: FC<{
                         <div><p className="text-xs text-gray-400 uppercase tracking-wide mb-0.5">Zeitraum</p><p className="text-xs font-semibold text-gray-800">{a.startDate} – {a.endDate}</p></div>
                         <div><p className="text-xs text-gray-400 uppercase tracking-wide mb-0.5">Ort</p><p className="text-xs font-semibold text-gray-800">{a.postalCode} {a.city}</p></div>
                         <div><p className="text-xs text-gray-400 uppercase tracking-wide mb-0.5">Patienten</p><p className="text-xs font-semibold text-gray-800">{a.patientCount} {a.patientCount === 1 ? 'Patient' : 'Patienten'}</p></div>
-                        <div><p className="text-xs text-gray-400 uppercase tracking-wide mb-0.5">Mobilität</p><p className="text-xs font-semibold text-gray-800">{a.mobility}</p></div>
+                        <div><p className="text-xs text-gray-400 uppercase tracking-wide mb-0.5">Dauer</p><p className="text-xs font-semibold text-gray-800">{a.duration}</p></div>
                       </div>
                     </div>
                   ))}

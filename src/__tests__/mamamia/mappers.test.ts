@@ -797,48 +797,44 @@ describe('mapCaregiverToNurse — hp_recent_assignments detail fields', () => {
     expect(n.detailedAssignments?.[0]?.patientCount).toBe(1);
   });
 
-  it('maps patient_mobility_id=4 → "Rollstuhl"', () => {
+  it('computes duration in Tagen for a short assignment', () => {
     const cg = makeCgWithAssignments([{
       arrival_date: '2025-01-01',
-      departure_date: '2025-02-01',
+      departure_date: '2025-01-10',
       status: 'finish',
-      patient_mobility_id: 4,
     }]);
     const n = mapCaregiverToNurse(cg, { nowIso: NOW, nowYear: 2026 });
-    expect(n.detailedAssignments?.[0]?.mobility).toBe('Rollstuhl');
+    expect(n.detailedAssignments?.[0]?.duration).toBe('9 Tage');
   });
 
-  it('maps patient_mobility_id=5 → "Bettlägerig"', () => {
+  it('uses singular "Tag" for a 1-day assignment', () => {
     const cg = makeCgWithAssignments([{
       arrival_date: '2025-01-01',
-      departure_date: '2025-02-01',
+      departure_date: '2025-01-02',
       status: 'finish',
-      patient_mobility_id: 5,
     }]);
     const n = mapCaregiverToNurse(cg, { nowIso: NOW, nowYear: 2026 });
-    expect(n.detailedAssignments?.[0]?.mobility).toBe('Bettlägerig');
+    expect(n.detailedAssignments?.[0]?.duration).toBe('1 Tag');
   });
 
-  it('maps patient_mobility_id=1 → "Mobil"', () => {
+  it('computes duration in Wochen for a mid-length assignment', () => {
     const cg = makeCgWithAssignments([{
       arrival_date: '2025-01-01',
       departure_date: '2025-02-01',
       status: 'finish',
-      patient_mobility_id: 1,
     }]);
     const n = mapCaregiverToNurse(cg, { nowIso: NOW, nowYear: 2026 });
-    expect(n.detailedAssignments?.[0]?.mobility).toBe('Mobil');
+    expect(n.detailedAssignments?.[0]?.duration).toBe('4 Wochen');
   });
 
-  it('falls back to "—" when patient_mobility_id is null', () => {
+  it('computes duration in Monaten for a long assignment', () => {
     const cg = makeCgWithAssignments([{
       arrival_date: '2025-01-01',
-      departure_date: '2025-02-01',
+      departure_date: '2025-04-01',
       status: 'finish',
-      patient_mobility_id: null,
     }]);
     const n = mapCaregiverToNurse(cg, { nowIso: NOW, nowYear: 2026 });
-    expect(n.detailedAssignments?.[0]?.mobility).toBe('—');
+    expect(n.detailedAssignments?.[0]?.duration).toBe('3 Monate');
   });
 
   it('filters out non-finish assignments', () => {
