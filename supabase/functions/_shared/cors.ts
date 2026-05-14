@@ -9,17 +9,15 @@ const ALLOWED_ORIGINS = new Set([
   // Production custom domains
   "https://kundenportal.primundus.de",
   "https://kostenrechner.primundus.de",
-  // Render slot URLs (auto-assigned <service-name>.onrender.com) —
-  // kept for cutover testing and as a fallback if primundus.de DNS
-  // has issues. Can be removed once primundus.de is stable (1-2 weeks).
-  "https://caapp.onrender.com",
-  "https://kostenrechner.onrender.com",
-  // Legacy aliases — services were renamed from caapp-beta /
-  // kostenrechner-beta on 2026-05-14. Drop after a few weeks once
-  // any cached references or external bookmarks have migrated.
-  "https://portal.primundus.de",
+  // Render slot URLs (auto-assigned <slug>.onrender.com). Slug is
+  // immutable on Render even though display names were renamed
+  // from caapp-beta/kostenrechner-beta to caapp/kostenrechner on
+  // 2026-05-14 — these *-beta URLs stay live until services are
+  // recreated. Kept as fallback during primundus.de cutover.
   "https://caapp-beta.onrender.com",
   "https://kostenrechner-beta.onrender.com",
+  // Legacy
+  "https://portal.primundus.de",
 ]);
 
 export function corsHeaders(origin: string | null): Record<string, string> {
