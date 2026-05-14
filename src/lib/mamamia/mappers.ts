@@ -841,8 +841,12 @@ export function mapMamamiaCustomerToPatientForm(
     // / 'manual'. Reverse mapper emits the user's saved pick — no
     // suppression needed (pre-Bug-#13 we suppressed 'automatic' as the
     // onboard default, that's gone now).
+    // Wish enum reverse: "yes" → "Ja" (customer requires license), anything
+    // else ("not_important" is what onboard + the form's "Nein" pick both
+    // map to; "no" was a historic mis-mapping that crashed the Mamamia
+    // resolver — see patientFormMapper) → "Nein" in the UI.
     if (wish.driving_license) {
-      out.fuehrerschein = wish.driving_license === 'no' ? 'Nein' : 'Ja';
+      out.fuehrerschein = wish.driving_license === 'yes' ? 'Ja' : 'Nein';
     }
     if (wish.driving_license_gearbox === 'manual') {
       out.wunschGetriebe = 'Schaltung';

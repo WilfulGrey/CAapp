@@ -508,7 +508,11 @@ export interface CaregiverWishPatch {
   gender?: 'female' | 'male' | 'not_important';
   smoking?: 'yes_outside' | 'no';
   shopping?: 'yes' | 'no' | 'occasionally';
-  driving_license?: 'yes' | 'no';
+  // Wish enum: "yes" = customer requires license, "not_important" = doesn't
+  // care. Literal "no" is not a valid Mamamia value (would mean "I require
+  // a caregiver WITHOUT a license") and crashes the resolver — see
+  // mapper comment near where this is written.
+  driving_license?: 'yes' | 'not_important';
   driving_license_gearbox?: 'automatic' | 'manual';
   tasks?: string;
   tasks_de?: string;
@@ -711,8 +715,17 @@ export function mapPatientFormToUpdateCustomerInput(
   if (wg) wish.gender = wg;
   const ws = wishSmokingToApi(form.rauchen);
   if (ws) wish.smoking = ws;
+  // Mamamia `customer_caregiver_wish.driving_license` is the CUSTOMER'S
+  // REQUIREMENT toward the caregiver:
+  //   "yes"           = customer requires a caregiver with a license
+  //   "not_important" = customer doesn't care either way
+  //   ("no" would mean "I require a caregiver WITHOUT a license" — nonsense;
+  //    not a real enum value, Mamamia resolver NPE's on it.)
+  // UI label "Nein" means "I don't need a driver", which semantically maps
+  // to "not_important", not to a literal "no" requirement. This matches the
+  // onboard mapper (mapDrivingLicense in onboard-to-mamamia/mappers.ts).
   if (form.fuehrerschein === 'Ja') wish.driving_license = 'yes';
-  else if (form.fuehrerschein === 'Nein') wish.driving_license = 'no';
+  else if (form.fuehrerschein === 'Nein') wish.driving_license = 'not_important';
   const wgear = form.fuehrerschein === 'Ja' ? wishDrivingGearboxToApi(form.wunschGetriebe) : undefined;
   if (wgear) wish.driving_license_gearbox = wgear;
   if (form.aufgaben) {
