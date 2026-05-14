@@ -75,6 +75,11 @@ export function MultiStepForm() {
 
   const totalSteps = 10; // 9 Fragen + Kontaktformular (Getriebe lebt im CA-app patient form, nicht hier)
   const stepStartRef = useRef<number>(Date.now());
+  // Scroll target for step changes. page.tsx renders TWO MultiStepForm
+  // instances (mobile + desktop layout), both with id="calculator-form" —
+  // getElementById would return the first (often the hidden one) and scroll
+  // nowhere. A per-instance ref always targets the visible form.
+  const formRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     analytics.trackEvent('wizard', 'step_view', {
@@ -127,7 +132,7 @@ export function MultiStepForm() {
     if (currentStep < totalSteps) {
       setCurrentStep(currentStep + 1);
       setTimeout(() => {
-        document.getElementById('calculator-form')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        formRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
       }, 50);
     } else if (currentStep === totalSteps) {
       await handleSubmit();
@@ -403,7 +408,7 @@ export function MultiStepForm() {
     }`;
 
   return (
-    <div id="calculator-form" className="pt-6 pb-6 scroll-mt-24 lg:scroll-mt-32 lg:pt-4 max-w-md sm:max-w-[95%] xl:max-w-[1800px] 2xl:max-w-[2000px] mx-auto px-0 sm:px-4">
+    <div ref={formRef} id="calculator-form" className="pt-6 pb-6 scroll-mt-24 lg:scroll-mt-32 lg:pt-4 max-w-md sm:max-w-[95%] xl:max-w-[1800px] 2xl:max-w-[2000px] mx-auto px-0 sm:px-4">
       <div className="relative">
         <div className="absolute -top-3.5 left-1/2 -translate-x-1/2 z-10 whitespace-nowrap">
           <div className="inline-flex items-center gap-1.5 bg-white border border-[#D4C4B0] text-[#8B7355] text-[11px] font-semibold uppercase tracking-wide px-4 py-1.5 rounded-full shadow-sm">
