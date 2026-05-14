@@ -24,6 +24,16 @@ export async function GET(request: NextRequest) {
 
     console.log('[Analytics API] Sessions fetched:', sessions?.length || 0, 'Error:', sessionsError);
 
+    // Surface query failures instead of silently returning all-zero stats.
+    // A wrong/expired SUPABASE_SERVICE_ROLE_KEY makes every query 401 — the
+    // dashboard then showed plausible-looking zeros instead of an error.
+    if (sessionsError) {
+      return NextResponse.json(
+        { error: `analytics_sessions query failed: ${sessionsError.message}` },
+        { status: 500 }
+      );
+    }
+
     const sessionIds = sessions?.map(s => s.id) || [];
     console.log('[Analytics API] Session IDs:', sessionIds.length);
 
@@ -71,6 +81,14 @@ export async function GET(request: NextRequest) {
     console.log('[Analytics API] Conversions:', conversions.length, 'Error:', conversionsError);
     console.log('[Analytics API] Form interactions:', formInteractions.length, 'Error:', formInteractionsError);
     console.log('[Analytics API] Wizard events:', events.length, 'Error:', eventsError);
+
+    const detailError = pageViewsError || conversionsError || formInteractionsError || eventsError;
+    if (detailError) {
+      return NextResponse.json(
+        { error: `analytics detail query failed: ${detailError.message}` },
+        { status: 500 }
+      );
+    }
 
     const uniqueVisitors = new Set(sessions?.map(s => s.fingerprint)).size;
     const totalSessions = sessions?.length || 0;
