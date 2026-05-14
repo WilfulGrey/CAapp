@@ -1,3 +1,5 @@
+// Deployed by CI — .github/workflows/test.yml → deploy-kostenrechner-edge-functions
+// (on push to integration/mamamia-onboarding). Do not deploy manually.
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
 import nodemailer from "npm:nodemailer@6.9.10";
