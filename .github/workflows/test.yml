@@ -5,6 +5,9 @@ on:
     branches: [integration/mamamia-onboarding, main]
   push:
     branches: [integration/mamamia-onboarding]
+  # Manual trigger — deploys Edge Functions regardless of diff. Useful to
+  # ship a function whose code is already merged but not yet deployed.
+  workflow_dispatch:
 
 jobs:
   # ─── Frontend (CAapp Vite) ─────────────────────────────────────────────
@@ -78,7 +81,7 @@ jobs:
   deploy-edge-functions:
     name: Deploy CA-App Edge Functions to Supabase
     needs: [vitest, deno-onboard, deno-proxy]
-    if: github.event_name == 'push' && github.ref == 'refs/heads/integration/mamamia-onboarding'
+    if: (github.event_name == 'push' && github.ref == 'refs/heads/integration/mamamia-onboarding') || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -89,7 +92,10 @@ jobs:
       - name: Check if CA-App Edge Functions changed
         id: changed
         run: |
-          if git diff --quiet ${{ github.event.before }} ${{ github.sha }} -- supabase/functions/; then
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "Manual dispatch — deploying regardless of diff."
+            echo "skip=false" >> $GITHUB_OUTPUT
+          elif git diff --quiet ${{ github.event.before }} ${{ github.sha }} -- supabase/functions/; then
             echo "CA-App Edge Functions unchanged in this push — skipping deploy."
             echo "skip=true" >> $GITHUB_OUTPUT
           else
@@ -122,7 +128,7 @@ jobs:
   deploy-kostenrechner-edge-functions:
     name: Deploy kostenrechner Edge Functions to Supabase
     needs: [vitest, deno-onboard, deno-proxy]
-    if: github.event_name == 'push' && github.ref == 'refs/heads/integration/mamamia-onboarding'
+    if: (github.event_name == 'push' && github.ref == 'refs/heads/integration/mamamia-onboarding') || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -132,7 +138,10 @@ jobs:
       - name: Check if kostenrechner Edge Functions changed
         id: changed
         run: |
-          if git diff --quiet ${{ github.event.before }} ${{ github.sha }} -- 'project 3/supabase/functions/'; then
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "Manual dispatch — deploying regardless of diff."
+            echo "skip=false" >> $GITHUB_OUTPUT
+          elif git diff --quiet ${{ github.event.before }} ${{ github.sha }} -- 'project 3/supabase/functions/'; then
             echo "kostenrechner Edge Functions unchanged — skipping deploy."
             echo "skip=true" >> $GITHUB_OUTPUT
           else
@@ -147,10 +156,17 @@ jobs:
 
       - name: Deploy kostenrechner functions
         if: steps.changed.outputs.skip != 'true'
-        working-directory: "project 3"
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
         run: |
+          # Katalog "project 3" ma spację w nazwie — psuje to docker volume
+          # mount w supabase CLI ("entrypoint path does not exist"). Kopiujemy
+          # funkcje do ścieżki bez spacji i deployujemy stamtąd. Funkcje
+          # kostenrechnera są samodzielne (brak _shared), więc kopia wystarcza.
+          rm -rf /tmp/kr-deploy
+          mkdir -p /tmp/kr-deploy/supabase
+          cp -r "project 3/supabase/functions" /tmp/kr-deploy/supabase/
+          cd /tmp/kr-deploy
           for fn in chat-ai schedule-email send-scheduled-emails; do
             echo "::group::Deploying $fn"
             supabase functions deploy "$fn" --project-ref ycdwtrklpoqprabtwahi
