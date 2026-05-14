@@ -397,6 +397,14 @@ const updateCustomer: ActionHandler = async (session, variables, deps) => {
     }
   }
 
+  // Mamamia preprod backend regression (verified 2026-05-14 via bisection):
+  // UpdateCustomer resolver NPE's when `patients` is null or omitted. An
+  // empty array passes through fine. Always default to [] so partial saves
+  // that don't touch patients (e.g. customer-only changes) still go through.
+  if (!("patients" in patch)) {
+    patch.patients = [];
+  }
+
   // ── Preserve associations + wish scalars the caller didn't touch ──
   // Always re-fetch current Customer.equipments, per-patient tools, and
   // customer_caregiver_wish scalars (germany_skill, driving_license) and
