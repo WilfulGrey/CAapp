@@ -134,12 +134,14 @@ export function MultiStepForm() {
       setTimeout(() => {
         const el = formRef.current;
         if (!el) return;
-        // Land the form just below the sticky header — scrollIntoView +
-        // scroll-mt-24 (96px) overshot the 64px mobile header, leaving a
-        // strip of hero visible above the form. Measure the real header.
-        const headerH = document.querySelector('header')?.getBoundingClientRect().height ?? 0;
-        const top = el.getBoundingClientRect().top + window.scrollY - headerH;
-        window.scrollTo({ top, behavior: 'smooth' });
+        // Same jump target as the CTA buttons (HowItWorks / FinalCTA /
+        // RequirementsSection) — `-90` lands the form cleanly below the
+        // sticky header. formRef instead of getElementById so the desktop
+        // layout's instance is targeted too (both share id="calculator-form").
+        window.scrollTo({
+          top: el.getBoundingClientRect().top + window.pageYOffset - 90,
+          behavior: 'smooth',
+        });
       }, 50);
     } else if (currentStep === totalSteps) {
       await handleSubmit();
