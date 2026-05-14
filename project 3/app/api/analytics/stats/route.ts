@@ -30,9 +30,11 @@ export async function GET(request: NextRequest) {
     let pageViews: any[] = [];
     let conversions: any[] = [];
     let formInteractions: any[] = [];
+    let events: any[] = [];
     let pageViewsError = null;
     let conversionsError = null;
     let formInteractionsError = null;
+    let eventsError = null;
 
     if (sessionIds.length > 0) {
       const results = await Promise.all([
@@ -47,6 +49,11 @@ export async function GET(request: NextRequest) {
         supabase
           .from('analytics_form_interactions')
           .select('*')
+          .in('session_id', sessionIds),
+        supabase
+          .from('analytics_events')
+          .select('session_id, event_type, event_name, event_data')
+          .eq('event_type', 'wizard')
           .in('session_id', sessionIds)
       ]);
 
@@ -56,11 +63,14 @@ export async function GET(request: NextRequest) {
       conversionsError = results[1].error;
       formInteractions = results[2].data || [];
       formInteractionsError = results[2].error;
+      events = results[3].data || [];
+      eventsError = results[3].error;
     }
 
     console.log('[Analytics API] Page views:', pageViews.length, 'Error:', pageViewsError);
     console.log('[Analytics API] Conversions:', conversions.length, 'Error:', conversionsError);
     console.log('[Analytics API] Form interactions:', formInteractions.length, 'Error:', formInteractionsError);
+    console.log('[Analytics API] Wizard events:', events.length, 'Error:', eventsError);
 
     const uniqueVisitors = new Set(sessions?.map(s => s.fingerprint)).size;
     const totalSessions = sessions?.length || 0;
@@ -68,9 +78,45 @@ export async function GET(request: NextRequest) {
     const totalConversions = conversions.length;
 
     const kalkulationConversions = conversions.filter(c => c.conversion_type === 'kalkulation_requested').length;
-    const angebotConversions = conversions.filter(c => c.conversion_type === 'angebot_requested').length;
+    // The wizard tracks 'angebot_angefordert'; older/result-page code used
+    // 'angebot_requested'. Count both so the dashboard reflects reality.
+    const angebotConversions = conversions.filter(
+      c => c.conversion_type === 'angebot_angefordert' || c.conversion_type === 'angebot_requested'
+    ).length;
 
     const conversionRate = totalSessions > 0 ? ((totalConversions / totalSessions) * 100).toFixed(2) : '0.00';
+
+    // ── Wizard step funnel — unique sessions per step, from analytics_events ──
+    // step_view / step_complete are emitted by MultiStepForm. This is the
+    // real "where do users drop off, at which step" answer.
+    const STEP_NAMES: Record<number, string> = {
+      1: 'Betreuungsbeginn', 2: 'Anzahl Patienten', 3: 'Weitere Person im Haushalt',
+      4: 'Pflegegrad', 5: 'Mobilität', 6: 'Nachteinsätze', 7: 'Deutschkenntnisse',
+      8: 'Führerschein', 9: 'Geschlecht', 10: 'Kontaktformular',
+    };
+    const viewedSessions: Record<number, Set<string>> = {};
+    const completedSessions: Record<number, Set<string>> = {};
+    for (const e of events) {
+      const step = e.event_data?.step;
+      if (typeof step !== 'number') continue;
+      if (e.event_name === 'step_view') (viewedSessions[step] ??= new Set()).add(e.session_id);
+      if (e.event_name === 'step_complete') (completedSessions[step] ??= new Set()).add(e.session_id);
+    }
+    const wizardFunnel = Array.from({ length: 10 }, (_, i) => {
+      const step = i + 1;
+      const viewed = viewedSessions[step]?.size || 0;
+      const completed = completedSessions[step]?.size || 0;
+      const dropoff = Math.max(0, viewed - completed);
+      return {
+        step,
+        stepName: STEP_NAMES[step],
+        viewed,
+        completed,
+        dropoff,
+        dropoffRate: viewed > 0 ? Number(((dropoff / viewed) * 100).toFixed(1)) : 0,
+      };
+    });
+    const formStarted = wizardFunnel[0]?.viewed || 0;
 
     const pageViewsByPath = pageViews.reduce((acc: any, pv: any) => {
       acc[pv.page_path] = (acc[pv.page_path] || 0) + 1;
@@ -116,6 +162,7 @@ export async function GET(request: NextRequest) {
         totalConversions,
         kalkulationConversions,
         angebotConversions,
+        formStarted,
         conversionRate: parseFloat(conversionRate),
         avgPagesPerSession: totalSessions > 0 ? (totalPageViews / totalSessions).toFixed(2) : '0.00',
       },
@@ -123,30 +170,14 @@ export async function GET(request: NextRequest) {
       deviceTypes,
       trafficSources,
       formDropoffs,
+      wizardFunnel,
       sessionsOverTime,
       conversionsOverTime,
     };
 
     console.log('[Analytics API] Result summary:', result.summary);
 
-    return NextResponse.json({
-      summary: {
-        uniqueVisitors,
-        totalSessions,
-        totalPageViews,
-        totalConversions,
-        kalkulationConversions,
-        angebotConversions,
-        conversionRate: parseFloat(conversionRate),
-        avgPagesPerSession: totalSessions > 0 ? (totalPageViews / totalSessions).toFixed(2) : '0.00',
-      },
-      pageViewsByPath,
-      deviceTypes,
-      trafficSources,
-      formDropoffs,
-      sessionsOverTime,
-      conversionsOverTime,
-    });
+    return NextResponse.json(result);
   } catch (error) {
     console.error('Analytics stats error:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
