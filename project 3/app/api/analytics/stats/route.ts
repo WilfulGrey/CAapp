@@ -1,6 +1,73 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 
+// ── Why this file is structured around helpers ───────────────────────────
+// The naive `select('*')` / `.in('session_id', sessionIds)` shape fails the
+// moment the calculator collects nontrivial traffic:
+//
+//   1. Supabase REST caps a single response at 1000 rows by default. With
+//      ~1.2k sessions/30d the dashboard silently lost the tail — totals,
+//      funnel and over-time charts were all under-counted.
+//
+//   2. `.in('session_id', <N uuids>)` encodes every id into the URL. ~1.2k
+//      uuids ≈ 50 KB of querystring, which the upstream (PostgREST behind
+//      Cloudflare) rejects with `Bad Request` long before it reaches PG.
+//
+// Fix: paginate every list query with `.range()` until we see a short page,
+// and chunk every `.in()` filter so each request stays well under the URL
+// limit. Chunk size 200 → ~7.4 KB of UUIDs, comfortably inside common
+// 8/16 KB caps.
+const PAGE_SIZE = 1000;
+const IN_CHUNK = 200;
+
+type QueryResult<T> = { data: T[]; error: any };
+
+// Supabase's PostgrestFilterBuilder is thenable but doesn't satisfy
+// TS's strict PromiseLike shape, so callbacks return `any` — we only
+// care about the awaited `{ data, error }` payload.
+type SupabaseQuery<T> = { data: T[] | null; error: any } | PromiseLike<{ data: T[] | null; error: any }> | any;
+
+// Pull every row out of a paginated query. The caller supplies a builder
+// because the Supabase JS query builder isn't reusable across pages — each
+// page needs a freshly-composed query with its own `.range()`.
+async function fetchAllPages<T>(
+  buildQuery: (from: number, to: number) => SupabaseQuery<T>
+): Promise<QueryResult<T>> {
+  const all: T[] = [];
+  let from = 0;
+  // Hard ceiling so a runaway query can't loop forever (e.g. 1M rows).
+  // Bumping this is fine if real traffic ever needs more.
+  const MAX_ROWS = 200_000;
+  while (from < MAX_ROWS) {
+    const to = from + PAGE_SIZE - 1;
+    const { data, error } = (await buildQuery(from, to)) as { data: T[] | null; error: any };
+    if (error) return { data: all, error };
+    if (!data || data.length === 0) break;
+    all.push(...data);
+    if (data.length < PAGE_SIZE) break;
+    from += PAGE_SIZE;
+  }
+  return { data: all, error: null };
+}
+
+// Run the same query for many session ids without blowing the URL limit.
+// Chunks are awaited sequentially per table to keep the connection pool
+// honest (free-tier Supabase = 60 conns); the four tables themselves still
+// run in parallel via Promise.all at the call site.
+async function fetchByIdsInChunks<T>(
+  ids: string[],
+  buildQuery: (chunk: string[], from: number, to: number) => SupabaseQuery<T>
+): Promise<QueryResult<T>> {
+  const all: T[] = [];
+  for (let i = 0; i < ids.length; i += IN_CHUNK) {
+    const chunk = ids.slice(i, i + IN_CHUNK);
+    const res = await fetchAllPages<T>((from, to) => buildQuery(chunk, from, to));
+    if (res.error) return { data: all, error: res.error };
+    all.push(...res.data);
+  }
+  return { data: all, error: null };
+}
+
 export async function GET(request: NextRequest) {
   try {
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -17,12 +84,15 @@ export async function GET(request: NextRequest) {
     const startDate = new Date();
     startDate.setDate(startDate.getDate() - days);
 
-    const { data: sessions, error: sessionsError } = await supabase
-      .from('analytics_sessions')
-      .select('*')
-      .gte('created_at', startDate.toISOString());
+    const { data: sessions, error: sessionsError } = await fetchAllPages<any>(
+      (from, to) => supabase
+        .from('analytics_sessions')
+        .select('*')
+        .gte('created_at', startDate.toISOString())
+        .range(from, to)
+    );
 
-    console.log('[Analytics API] Sessions fetched:', sessions?.length || 0, 'Error:', sessionsError);
+    console.log('[Analytics API] Sessions fetched:', sessions.length, 'Error:', sessionsError);
 
     // Surface query failures instead of silently returning all-zero stats.
     // A wrong/expired SUPABASE_SERVICE_ROLE_KEY makes every query 401 — the
@@ -34,7 +104,7 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const sessionIds = sessions?.map(s => s.id) || [];
+    const sessionIds = sessions.map(s => s.id);
     console.log('[Analytics API] Session IDs:', sessionIds.length);
 
     let pageViews: any[] = [];
@@ -47,34 +117,46 @@ export async function GET(request: NextRequest) {
     let eventsError = null;
 
     if (sessionIds.length > 0) {
-      const results = await Promise.all([
-        supabase
-          .from('analytics_page_views')
-          .select('*')
-          .in('session_id', sessionIds),
-        supabase
-          .from('analytics_conversions')
-          .select('*')
-          .in('session_id', sessionIds),
-        supabase
-          .from('analytics_form_interactions')
-          .select('*')
-          .in('session_id', sessionIds),
-        supabase
-          .from('analytics_events')
-          .select('session_id, event_type, event_name, event_data')
-          .eq('event_type', 'wizard')
-          .in('session_id', sessionIds)
+      const [pvRes, convRes, fiRes, evRes] = await Promise.all([
+        fetchByIdsInChunks<any>(sessionIds, (chunk, from, to) =>
+          supabase
+            .from('analytics_page_views')
+            .select('*')
+            .in('session_id', chunk)
+            .range(from, to)
+        ),
+        fetchByIdsInChunks<any>(sessionIds, (chunk, from, to) =>
+          supabase
+            .from('analytics_conversions')
+            .select('*')
+            .in('session_id', chunk)
+            .range(from, to)
+        ),
+        fetchByIdsInChunks<any>(sessionIds, (chunk, from, to) =>
+          supabase
+            .from('analytics_form_interactions')
+            .select('*')
+            .in('session_id', chunk)
+            .range(from, to)
+        ),
+        fetchByIdsInChunks<any>(sessionIds, (chunk, from, to) =>
+          supabase
+            .from('analytics_events')
+            .select('session_id, event_type, event_name, event_data')
+            .eq('event_type', 'wizard')
+            .in('session_id', chunk)
+            .range(from, to)
+        ),
       ]);
 
-      pageViews = results[0].data || [];
-      pageViewsError = results[0].error;
-      conversions = results[1].data || [];
-      conversionsError = results[1].error;
-      formInteractions = results[2].data || [];
-      formInteractionsError = results[2].error;
-      events = results[3].data || [];
-      eventsError = results[3].error;
+      pageViews = pvRes.data;
+      pageViewsError = pvRes.error;
+      conversions = convRes.data;
+      conversionsError = convRes.error;
+      formInteractions = fiRes.data;
+      formInteractionsError = fiRes.error;
+      events = evRes.data;
+      eventsError = evRes.error;
     }
 
     console.log('[Analytics API] Page views:', pageViews.length, 'Error:', pageViewsError);
@@ -90,8 +172,8 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const uniqueVisitors = new Set(sessions?.map(s => s.fingerprint)).size;
-    const totalSessions = sessions?.length || 0;
+    const uniqueVisitors = new Set(sessions.map(s => s.fingerprint)).size;
+    const totalSessions = sessions.length;
     const totalPageViews = pageViews.length;
     const totalConversions = conversions.length;
 
@@ -141,16 +223,16 @@ export async function GET(request: NextRequest) {
       return acc;
     }, {});
 
-    const deviceTypes = sessions?.reduce((acc: any, s: any) => {
+    const deviceTypes = sessions.reduce((acc: any, s: any) => {
       acc[s.device_type] = (acc[s.device_type] || 0) + 1;
       return acc;
-    }, {}) || {};
+    }, {});
 
-    const trafficSources = sessions?.reduce((acc: any, s: any) => {
+    const trafficSources = sessions.reduce((acc: any, s: any) => {
       const source = s.utm_source || (s.referrer === 'direct' ? 'direct' : 'referral');
       acc[source] = (acc[source] || 0) + 1;
       return acc;
-    }, {}) || {};
+    }, {});
 
     const formDropoffs = formInteractions.reduce((acc: any, fi: any) => {
       if (fi.interaction_type === 'abandon') {
@@ -160,11 +242,11 @@ export async function GET(request: NextRequest) {
       return acc;
     }, {});
 
-    const sessionsOverTime = sessions?.reduce((acc: any, s: any) => {
+    const sessionsOverTime = sessions.reduce((acc: any, s: any) => {
       const date = new Date(s.created_at).toISOString().split('T')[0];
       acc[date] = (acc[date] || 0) + 1;
       return acc;
-    }, {}) || {};
+    }, {});
 
     const conversionsOverTime = conversions.reduce((acc: any, c: any) => {
       const date = new Date(c.created_at).toISOString().split('T')[0];
