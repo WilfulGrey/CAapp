@@ -9,8 +9,14 @@ const ALLOWED_ORIGINS = new Set([
   // Production custom domains
   "https://kundenportal.primundus.de",
   "https://kostenrechner.primundus.de",
-  // Legacy / cutover fallbacks — drop once primundus.de domains are
-  // stable in production (target: 1-2 weeks after DNS switch).
+  // Render slot URLs (auto-assigned <service-name>.onrender.com) —
+  // kept for cutover testing and as a fallback if primundus.de DNS
+  // has issues. Can be removed once primundus.de is stable (1-2 weeks).
+  "https://caapp.onrender.com",
+  "https://kostenrechner.onrender.com",
+  // Legacy aliases — services were renamed from caapp-beta /
+  // kostenrechner-beta on 2026-05-14. Drop after a few weeks once
+  // any cached references or external bookmarks have migrated.
   "https://portal.primundus.de",
   "https://caapp-beta.onrender.com",
   "https://kostenrechner-beta.onrender.com",
