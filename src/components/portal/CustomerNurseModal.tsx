@@ -5,6 +5,16 @@ import type { Nurse } from '../../types';
 import type { Application } from './shared';
 import { nurseLevel, displayName, initials } from './shared';
 
+// Customer-facing explanation of the experience-level badge. No exact
+// score thresholds — just the progression and a one-line descriptor.
+const EXPERIENCE_LEVELS = [
+  { emoji: '⭐', label: 'Starter', desc: 'Am Anfang der Laufbahn' },
+  { emoji: '🥉', label: 'Bronze', desc: 'Erste solide Praxiserfahrung' },
+  { emoji: '🥈', label: 'Silber', desc: 'Mehrjährige Erfahrung' },
+  { emoji: '🥇', label: 'Gold', desc: 'Sehr erfahren' },
+  { emoji: '🏆', label: 'Platin', desc: 'Höchste Erfahrungsstufe' },
+];
+
 export const CustomerNurseModal: FC<{
   nurse: Nurse;
   /** True while the full Caregiver profile is in flight. The header and
@@ -137,18 +147,13 @@ export const CustomerNurseModal: FC<{
               <div className="flex-1 min-w-0 pt-1">
                 <div className="flex items-center gap-2 flex-wrap">
                   <h2 className="text-xl font-bold text-gray-900 leading-tight">{name}</h2>
-                  <span className={`flex items-center gap-1 text-xs font-bold pl-1.5 pr-2 py-0.5 rounded-full border flex-shrink-0 ${lvl.cls}`}>
-                    <span className="text-sm leading-none">{lvl.emoji}</span>{lvl.label}
-                  </span>
                   <button
                     type="button"
-                    onClick={() => setShowLevelInfo(v => !v)}
-                    className="flex-shrink-0 text-gray-400 hover:text-[#8B7355] transition-colors"
-                    aria-label="Was bedeutet das Erfahrungs-Level?"
+                    onClick={() => setShowLevelInfo(true)}
+                    className={`flex items-center gap-1 text-xs font-bold pl-1.5 pr-2 py-0.5 rounded-full border flex-shrink-0 cursor-pointer transition-transform active:scale-95 hover:brightness-95 ${lvl.cls}`}
+                    aria-label="Erfahrungs-Level erklären"
                   >
-                    <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                      <circle cx="12" cy="12" r="10" /><path strokeLinecap="round" strokeLinejoin="round" d="M12 16v-4m0-4h.01" />
-                    </svg>
+                    <span className="text-sm leading-none">{lvl.emoji}</span>{lvl.label}
                   </button>
                 </div>
                 <p className="text-xs text-gray-500 mt-0.5">{nurse.age} Jahre</p>
@@ -162,19 +167,6 @@ export const CustomerNurseModal: FC<{
                 <X className="w-4 h-4 text-gray-500" />
               </button>
             </div>
-
-            {showLevelInfo && (
-              <div className="mt-3 bg-white/85 rounded-xl px-3.5 py-3 text-xs text-gray-600 leading-relaxed">
-                Das <strong className="text-gray-800">Erfahrungs-Level</strong> zeigt auf einen Blick,
-                wie viel Praxis {nurse.name.split(' ')[0]} mitbringt — aus Jahren in der Betreuung und
-                bereits abgeschlossenen Einsätzen. Je höher das Level, desto erfahrener:
-                <span className="whitespace-nowrap"> ⭐ Starter</span> →
-                <span className="whitespace-nowrap"> 🥉 Bronze</span> →
-                <span className="whitespace-nowrap"> 🥈 Silber</span> →
-                <span className="whitespace-nowrap"> 🥇 Gold</span> →
-                <span className="whitespace-nowrap"> 🏆 Platin</span>.
-              </div>
-            )}
 
             <div className="grid grid-cols-2 gap-2 mt-4">
               <div className="bg-white rounded-xl px-3 py-2.5 shadow-sm">
@@ -433,6 +425,68 @@ export const CustomerNurseModal: FC<{
           </div>
         </div>
       </div>
+
+      {/* Experience-level explanation — opened by tapping the badge */}
+      {showLevelInfo && (
+        <>
+          <div
+            className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[70]"
+            onClick={() => setShowLevelInfo(false)}
+            style={{ animation: 'fadeIn 0.2s ease-out' }}
+          />
+          <div
+            className="fixed z-[70] inset-x-0 bottom-0 sm:inset-0 sm:flex sm:items-center sm:justify-center sm:p-4 pointer-events-none"
+            style={{ animation: 'fadeIn 0.2s ease-out' }}
+          >
+            <div
+              className="bg-white w-full sm:max-w-sm sm:rounded-2xl rounded-t-3xl pointer-events-auto shadow-2xl"
+              style={{ animation: 'slideSheet 0.3s cubic-bezier(0.32,0.72,0,1)' }}
+              onClick={e => e.stopPropagation()}
+            >
+              <div className="flex justify-center pt-3 pb-1 sm:hidden">
+                <div className="w-10 h-1 rounded-full bg-gray-300" />
+              </div>
+              <div className="px-5 pt-3 pb-5">
+                <div className="flex items-start justify-between gap-3 mb-1.5">
+                  <h3 className="text-base font-bold text-gray-900">Erfahrungs-Level</h3>
+                  <button
+                    onClick={() => setShowLevelInfo(false)}
+                    className="w-7 h-7 rounded-full bg-gray-100 flex items-center justify-center flex-shrink-0"
+                    aria-label="Schließen"
+                  >
+                    <X className="w-4 h-4 text-gray-500" />
+                  </button>
+                </div>
+                <p className="text-sm text-gray-600 leading-relaxed mb-4">
+                  Das Level zeigt auf einen Blick, wie viel Praxis eine Pflegekraft
+                  mitbringt — aus Jahren in der Betreuung und bereits abgeschlossenen
+                  Einsätzen.
+                </p>
+                <div className="space-y-1.5">
+                  {EXPERIENCE_LEVELS.map(level => {
+                    const isCurrent = level.label === lvl.label;
+                    return (
+                      <div
+                        key={level.label}
+                        className={`flex items-center gap-3 rounded-xl px-3 py-2.5 border ${
+                          isCurrent ? lvl.cls : 'bg-gray-50 border-gray-100'
+                        }`}
+                      >
+                        <span className="text-xl leading-none flex-shrink-0">{level.emoji}</span>
+                        <div className="min-w-0 flex-1">
+                          <p className={`text-sm font-bold ${isCurrent ? '' : 'text-gray-800'}`}>{level.label}</p>
+                          <p className={`text-xs ${isCurrent ? 'opacity-80' : 'text-gray-500'}`}>{level.desc}</p>
+                        </div>
+                        {isCurrent && <span className="text-xs font-bold flex-shrink-0">Aktuell</span>}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+          </div>
+        </>
+      )}
     </>
   );
 };
