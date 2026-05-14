@@ -291,7 +291,15 @@ export const AngebotCard: FC<{
   const effectiveSaved = saved || !!forceSaved;
 
   const inputCls = 'w-full border border-gray-300 rounded-xl px-3 py-2.5 text-sm text-gray-800 placeholder-gray-400 focus:outline-none focus:border-[#8B7355] focus:ring-2 focus:ring-[#8B7355]/10 transition-all bg-white';
-  const labelCls = 'block text-sm font-medium text-gray-500 mb-1.5';
+  const labelCls = 'block text-sm font-medium text-gray-700 mb-1.5';
+
+  // Desktop: the phone-frame div (#portal-scroll-container) is the scroller.
+  // Mobile: that div has no overflow, so `window` is the actual scroller.
+  // Scroll both — each is a harmless no-op where it doesn't apply.
+  const scrollPortalToTop = () => {
+    document.getElementById('portal-scroll-container')?.scrollTo({ top: 0, behavior: 'smooth' });
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
   // 2-column grid rows: align label boxes so a wrapped label (e.g.
   // "Heben erforderlich? *" vs single-line "Demenz *") doesn't shift its
   // select down relative to the neighbour. Apply via grid items-end on
@@ -635,7 +643,7 @@ export const AngebotCard: FC<{
               <div className="divide-y divide-gray-100">
                 {/* Step 1 */}
                 <button
-                  onClick={() => { setAngebotOpen(false); setPatientOpen(true); (document.getElementById('portal-scroll-container') ?? window).scrollTo({ top: 0, behavior: 'smooth' }); }}
+                  onClick={() => { setAngebotOpen(false); setPatientOpen(true); scrollPortalToTop(); }}
                   className="w-full flex items-center gap-3 px-4 py-3 hover:bg-[#F8F7F5] transition-colors text-left group"
                 >
                   <div className="w-6 h-6 rounded-full bg-[#8B7355] text-white text-xs font-bold flex items-center justify-center flex-shrink-0">1</div>
@@ -705,8 +713,8 @@ export const AngebotCard: FC<{
         </button>
 
         {patientOpen && (
-          <div className="border-t border-gray-100 p-3 bg-gray-50">
-          <div className="rounded-2xl border-2 border-[#E76F63] overflow-hidden shadow-[0_0_0_4px_rgba(231,111,99,0.07)] bg-gray-50">
+          <div className="border-t border-gray-100 p-3 bg-gray-100">
+          <div className="rounded-2xl border-2 border-[#E76F63] overflow-hidden shadow-[0_0_0_4px_rgba(231,111,99,0.07)] bg-white">
 
             {/* Colored header banner */}
             <div className="bg-[#E76F63] px-4 py-3 flex items-center gap-2.5 rounded-t-2xl">
@@ -737,11 +745,11 @@ export const AngebotCard: FC<{
               </span>
             </div>
 
-            <div className="px-4 pb-5 space-y-3 bg-gray-50">
+            <div className="px-4 pb-5 space-y-3 bg-white">
 
               {/* Step heading */}
               <div className="pt-1 pb-1 border-b border-gray-100">
-                <p className="text-xs font-bold text-gray-400 uppercase tracking-wider">
+                <p className="text-xs font-bold text-gray-500 uppercase tracking-wider">
                   {step === 0 && 'Angaben zur betreuten Person'}
                   {step === 1 && 'Pflegebedarf'}
                   {step === 2 && 'Wohnsituation'}
@@ -1172,7 +1180,7 @@ export const AngebotCard: FC<{
               <div className={`flex gap-2 pt-1 ${step > 0 ? 'justify-between' : 'justify-end'}`}>
                 {step > 0 && (
                   <button
-                    onClick={() => { setStep(s => s - 1); (document.getElementById('portal-scroll-container') ?? window).scrollTo({ top: 0, behavior: 'smooth' }); }}
+                    onClick={() => { setStep(s => s - 1); scrollPortalToTop(); }}
                     className="px-4 py-2.5 text-sm font-semibold text-gray-500 border border-gray-200 rounded-xl hover:bg-gray-50 transition-colors"
                   >
                     ← Zurück
@@ -1180,7 +1188,7 @@ export const AngebotCard: FC<{
                 )}
                 {step < STEP_LABELS.length - 1 ? (
                   <button
-                    onClick={() => { if (stepComplete(step)) { setStep(s => s + 1); (document.getElementById('portal-scroll-container') ?? window).scrollTo({ top: 0, behavior: 'smooth' }); } }}
+                    onClick={() => { if (stepComplete(step)) { setStep(s => s + 1); scrollPortalToTop(); } }}
                     className={`flex-1 py-2.5 text-sm font-bold rounded-xl transition-all ${
                       stepComplete(step)
                         ? 'bg-[#E76F63] hover:bg-[#D65E52] text-white shadow-sm'
@@ -1206,7 +1214,7 @@ export const AngebotCard: FC<{
                       setSaved(true);
                       setPatientOpen(false);
                       onPatientSaved?.(true);
-                      (document.getElementById('portal-scroll-container') ?? window).scrollTo({ top: 0, behavior: 'smooth' });
+                      scrollPortalToTop();
                       // Fire-and-forget: Mamamia save runs after UI transition.
                       if (mamamiaEnabled && onSaveToMamamia) {
                         onSaveToMamamia(patient).catch(err =>

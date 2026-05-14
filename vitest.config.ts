@@ -15,8 +15,10 @@ export default defineConfig({
       VITE_SUPABASE_ANON_KEY: 'test-anon-key',
     },
     // Edge Functions run under Deno (deno test). Playwright E2E under playwright test.
-    // Vitest owns src/** only.
-    exclude: ['supabase/**', 'e2e/**', 'node_modules/**', 'dist/**'],
+    // Vitest owns src/** only. `**/node_modules/**` (not `node_modules/**`)
+    // so nested node_modules — e.g. `project 3/node_modules` — are excluded too.
+    // `project 3/**` is the kostenrechner (separate Next.js app, own tooling).
+    exclude: ['supabase/**', 'e2e/**', '**/node_modules/**', 'dist/**', 'project 3/**'],
     coverage: {
       provider: 'v8',
       reporter: ['text', 'html'],
