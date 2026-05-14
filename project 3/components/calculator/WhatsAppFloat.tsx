@@ -9,6 +9,9 @@ const WA_URL = `https://wa.me/${WA_NUMBER}?text=${WA_TEXT}`;
 export function WhatsAppFloat() {
   const [tooltipPhase, setTooltipPhase] = useState<0 | 1 | 2>(0);
   const [fadingOut, setFadingOut] = useState(false);
+  // Hide the float while the calculator form is on screen — it sits over
+  // the "Weiter" button otherwise.
+  const [formVisible, setFormVisible] = useState(false);
 
   useEffect(() => {
     const t1 = setTimeout(() => { setFadingOut(false); setTooltipPhase(1); }, 10000);
@@ -17,6 +20,23 @@ export function WhatsAppFloat() {
     const t4 = setTimeout(() => setTooltipPhase(0), 17200);
     return () => { clearTimeout(t1); clearTimeout(t2); clearTimeout(t3); clearTimeout(t4); };
   }, []);
+
+  useEffect(() => {
+    const forms = document.querySelectorAll('#calculator-form');
+    if (forms.length === 0) return;
+    const visible = new Set<Element>();
+    const observer = new IntersectionObserver((entries) => {
+      for (const e of entries) {
+        if (e.isIntersecting) visible.add(e.target);
+        else visible.delete(e.target);
+      }
+      setFormVisible(visible.size > 0);
+    }, { threshold: 0 });
+    forms.forEach((f) => observer.observe(f));
+    return () => observer.disconnect();
+  }, []);
+
+  if (formVisible) return null;
 
   return (
     <div className="md:hidden fixed bottom-5 right-4 z-50 flex flex-col items-end gap-2">
