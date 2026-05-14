@@ -64,14 +64,15 @@ services:
     pullRequestPreviewsEnabled: false
     envVars:
       # Public — baked into the client bundle; safe to commit-or-prompt.
-      # NEXT_PUBLIC_SITE_URL: once the service has its assigned URL, swap
-      # this to the actual https://kostenrechner-beta.onrender.com or a
-      # custom domain.
+      # NEXT_PUBLIC_SITE_URL: production custom domain for the calculator.
+      # Production value: https://kostenrechner.primundus.de
+      # (legacy: https://kostenrechner-beta.onrender.com during cutover).
       - key: NEXT_PUBLIC_SITE_URL
         sync: false
-      # NEXT_PUBLIC_PORTAL_URL: caapp-beta service URL. After first deploy
-      # set to e.g. https://caapp-beta.onrender.com — drives the handoff
-      # CTA in result page + Eingangsbestätigung email + PDF.
+      # NEXT_PUBLIC_PORTAL_URL: caapp service URL. Drives the handoff CTA
+      # in result page + Eingangsbestätigung email + PDF.
+      # Production value: https://kundenportal.primundus.de
+      # (legacy: https://caapp-beta.onrender.com during cutover).
       - key: NEXT_PUBLIC_PORTAL_URL
         sync: false
       - key: NEXT_PUBLIC_SUPABASE_URL

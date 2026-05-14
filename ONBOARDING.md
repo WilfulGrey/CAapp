@@ -263,10 +263,10 @@ twój PR mergowany → Render dostaje webhook → build → live na beta
 
 ### Dwa serwisy
 
-| Service | URL | Z jakiej części repo |
-|---|---|---|
-| `caapp-beta` | https://caapp-beta.onrender.com | root (Vite static build) |
-| `kostenrechner-beta` | https://kostenrechner-beta.onrender.com | `project 3/` (Next.js SSR) |
+| Service | Production URL | Legacy URL (fallback) | Z jakiej części repo |
+|---|---|---|---|
+| `caapp-beta` | https://kundenportal.primundus.de | https://caapp-beta.onrender.com | root (Vite static build) |
+| `kostenrechner-beta` | https://kostenrechner.primundus.de | https://kostenrechner-beta.onrender.com | `project 3/` (Next.js SSR) |
 
 ### Render team access
 

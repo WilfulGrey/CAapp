@@ -154,7 +154,7 @@ Zawsze rozróżniaj zanim coś zmienisz / zdiagnozujesz:
 
 | Termin | Co to | Gdzie żyje | Aktualny stan |
 |---|---|---|---|
-| **Nasz beta Render slot** | Środowisko staging dla *naszego* deploy'u — `caapp-beta` + `kostenrechner-beta` na Render free-tier | `render.yaml`, `caapp-beta.onrender.com`, `kostenrechner-beta.onrender.com`, branch `integration/mamamia-onboarding` | Live, nasz preprod |
+| **Nasz beta Render slot** | Środowisko staging dla *naszego* deploy'u — `caapp-beta` + `kostenrechner-beta` na Render free-tier. Produkcyjne custom domains: `kundenportal.primundus.de` (CAapp) + `kostenrechner.primundus.de` (calculator). Legacy `*.onrender.com` URL-e nadal działają jako fallback. | `render.yaml`, `kundenportal.primundus.de` / `kostenrechner.primundus.de`, branch `integration/mamamia-onboarding` | Live, nasz preprod |
 | **Mamamia beta tenant** | Mamamia development environment — separate DB, separate user accounts, separate schema seed | `https://backend.beta.mamamia.app/graphql` (URL hostuje Mamamia) | Forward-going (newer schema features, np. plural `customer_contracts`) |
 | **Mamamia preprod tenant** | Mamamia "real prod" environment — legacy schema, separate DB | `https://backend.prod.mamamia.app/graphql` (URL hostuje Mamamia, ale nazwa myli — to ich production-grade tenant, my używamy jako preprod) | **Aktualnie podpięte** (od 2026-05-11), Bug #15 + #16 fixe tu zlokalizowane |
 | **Mamamia prod** | Mamamia true-production (real customers) — kiedyś będziemy chcieli się tam podpiąć | TBD, prawdopodobnie ten sam endpoint co preprod ale inny agency account z prawdziwymi danymi | Jeszcze nie używamy |
@@ -171,10 +171,10 @@ Zawsze rozróżniaj zanim coś zmienisz / zdiagnozujesz:
 
 ### Dwie aplikacje
 
-| App | Stack | Rola | Branch deploy |
-|---|---|---|---|
-| **`project 3/`** | Next.js 13, React, Tailwind | Calculator (Primundus 24h-Pflege Kostenrechner) — public landing, lead-capture wizard, pricing config, magic-link email | `kostenrechner-beta` |
-| **`/` (root)** | Vite + React 18 + TS, Tailwind | CA app (Kundenportal) — token-gated portal gdzie customer wypełnia patient form, ogląda zaproponowane PK, akceptuje/odrzuca aplikacje | `caapp-beta` |
+| App | Stack | Rola | Render service | Production URL |
+|---|---|---|---|---|
+| **`project 3/`** | Next.js 13, React, Tailwind | Calculator (Primundus 24h-Pflege Kostenrechner) — public landing, lead-capture wizard, pricing config, magic-link email | `kostenrechner-beta` | `kostenrechner.primundus.de` |
+| **`/` (root)** | Vite + React 18 + TS, Tailwind | CA app (Kundenportal) — token-gated portal gdzie customer wypełnia patient form, ogląda zaproponowane PK, akceptuje/odrzuca aplikacje | `caapp-beta` | `kundenportal.primundus.de` |
 
 Oba na Render free-tier (`render.yaml`), branch `integration/mamamia-onboarding`,
 auto-deploy po push.
@@ -717,8 +717,12 @@ to nie nasze — projekt 3 ma inną tsconfig. Skupić się na `src/` clean.
 ### Frontend (auto)
 
 `git push origin integration/mamamia-onboarding` → Render auto-builds:
-- `caapp-beta` (Vite static) — ~1.5min
-- `kostenrechner-beta` (Next.js SSR) — ~2-3min
+- `caapp-beta` (Vite static) — ~1.5min — serwowany na `https://kundenportal.primundus.de`
+- `kostenrechner-beta` (Next.js SSR) — ~2-3min — serwowany na `https://kostenrechner.primundus.de`
+
+Legacy URL-e `caapp-beta.onrender.com` + `kostenrechner-beta.onrender.com`
+nadal działają jako fallback (CORS + Render aliases) — można je wyciąć
+osobnym PR-em po 1-2 tygodniach stabilności na primundus.de.
 
 Render dashboard: pokazuje build logs. Jeśli build padnie, Render trzyma
 poprzednią wersję live.
