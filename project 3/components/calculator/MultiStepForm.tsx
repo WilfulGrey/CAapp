@@ -5,10 +5,15 @@ import { useCalculator, formatEuro } from "@/lib/calculator-context";
 import { CircleCheck as CheckCircle2, Phone } from "lucide-react";
 import Image from "next/image";
 import { analytics } from "@/lib/analytics";
+import { useFormTracking } from "@/hooks/use-form-tracking";
 
 export function MultiStepForm() {
   const { state, updateState, calculate } = useCalculator();
   const [currentStep, setCurrentStep] = useState(1);
+  // Field-level tracking for the contact step (step 10) — populates
+  // analytics_form_interactions so the dashboard can show where in the
+  // contact form users engage / drop off.
+  const { trackFieldFocus, trackFieldBlur, trackFormSubmit } = useFormTracking('kontaktformular');
 
   const dailyBase = useMemo(() => 71 + (new Date().getDate() % 8), []);
 
@@ -251,6 +256,7 @@ export function MultiStepForm() {
       const data = await response.json();
 
       if (data.success && data.leadId) {
+        trackFormSubmit();
         analytics.trackConversion('angebot_angefordert', data.leadId, kalkulation.bruttopreis, {
           pflegegrad: state.pflegegrad,
           care_start_timing: state.careStartTiming,
@@ -762,6 +768,8 @@ export function MultiStepForm() {
                           setFormData({ ...formData, name: e.target.value });
                           setErrors({ ...errors, name: '' });
                         }}
+                        onFocus={() => trackFieldFocus('name')}
+                        onBlur={(e) => trackFieldBlur('name', e.target.value)}
                         className={`w-full px-4 py-2.5 text-base border-2 rounded-full focus:outline-none focus:ring-1 focus:ring-[#8B7355]/40 focus:border-[#8B7355] ${
                           errors.name ? 'border-red-500' : 'border-[#B8B0A6]'
                         }`}
@@ -778,6 +786,8 @@ export function MultiStepForm() {
                           setFormData({ ...formData, email: e.target.value });
                           setErrors({ ...errors, email: '' });
                         }}
+                        onFocus={() => trackFieldFocus('email')}
+                        onBlur={(e) => trackFieldBlur('email', e.target.value)}
                         className={`w-full px-4 py-2.5 text-base border-2 rounded-full focus:outline-none focus:ring-1 focus:ring-[#8B7355]/40 focus:border-[#8B7355] ${
                           errors.email ? 'border-red-500' : 'border-[#B8B0A6]'
                         }`}
@@ -793,6 +803,8 @@ export function MultiStepForm() {
                         type="tel"
                         value={formData.phone}
                         onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                        onFocus={() => trackFieldFocus('telefon')}
+                        onBlur={(e) => trackFieldBlur('telefon', e.target.value)}
                         className="w-full px-4 py-2.5 text-base border-2 border-[#B8B0A6] rounded-full focus:outline-none focus:ring-1 focus:ring-[#8B7355]/40 focus:border-[#8B7355]"
                         placeholder="Telefonnummer (optional)"
                       />

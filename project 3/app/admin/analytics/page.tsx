@@ -16,6 +16,15 @@ import {
   ArrowDownRight,
 } from 'lucide-react';
 
+interface WizardStep {
+  step: number;
+  stepName: string;
+  viewed: number;
+  completed: number;
+  dropoff: number;
+  dropoffRate: number;
+}
+
 interface AnalyticsStats {
   summary: {
     uniqueVisitors: number;
@@ -24,6 +33,7 @@ interface AnalyticsStats {
     totalConversions: number;
     kalkulationConversions: number;
     angebotConversions: number;
+    formStarted: number;
     conversionRate: number;
     avgPagesPerSession: string;
   };
@@ -31,6 +41,7 @@ interface AnalyticsStats {
   deviceTypes: Record<string, number>;
   trafficSources: Record<string, number>;
   formDropoffs: Record<string, number>;
+  wizardFunnel: WizardStep[];
   sessionsOverTime: Record<string, number>;
   conversionsOverTime: Record<string, number>;
 }
@@ -107,11 +118,12 @@ export default function AnalyticsPage() {
     uniqueVisitors: 0,
     totalSessions: 0,
     totalPageViews: 0,
-    avgPagesPerSession: 0,
+    avgPagesPerSession: '0.00',
     totalConversions: 0,
+    kalkulationConversions: 0,
+    angebotConversions: 0,
+    formStarted: 0,
     conversionRate: 0,
-    totalFormStarts: 0,
-    avgTimeOnSite: 0,
   };
 
   return (
@@ -186,7 +198,7 @@ export default function AnalyticsPage() {
                 {summary.angebotConversions}
               </div>
               <p className="text-xs text-gray-600 mt-1">
-                {summary.kalkulationConversions} Kalkulationen
+                {summary.formStarted} Formular gestartet
               </p>
             </CardContent>
           </Card>
@@ -320,13 +332,15 @@ export default function AnalyticsPage() {
                       <ArrowDownRight className="w-6 h-6 text-gray-400" />
                     </div>
                     <div className="flex items-center justify-between p-4 bg-green-50 rounded-lg">
-                      <span className="font-medium">Kalkulation</span>
+                      <span className="font-medium">Formular gestartet</span>
                       <div className="text-right">
                         <div className="font-bold text-lg text-green-600">
-                          {summary.kalkulationConversions}
+                          {summary.formStarted}
                         </div>
                         <div className="text-sm text-gray-600">
-                          {((summary.kalkulationConversions / summary.totalSessions) * 100).toFixed(1)}%
+                          {summary.totalSessions > 0
+                            ? ((summary.formStarted / summary.totalSessions) * 100).toFixed(1)
+                            : '0.0'}%
                         </div>
                       </div>
                     </div>
@@ -334,14 +348,14 @@ export default function AnalyticsPage() {
                       <ArrowDownRight className="w-6 h-6 text-gray-400" />
                     </div>
                     <div className="flex items-center justify-between p-4 bg-purple-50 rounded-lg">
-                      <span className="font-medium">Angebot</span>
+                      <span className="font-medium">Angebot angefordert</span>
                       <div className="text-right">
                         <div className="font-bold text-lg text-purple-600">
                           {summary.angebotConversions}
                         </div>
                         <div className="text-sm text-gray-600">
-                          {summary.kalkulationConversions > 0
-                            ? ((summary.angebotConversions / summary.kalkulationConversions) * 100).toFixed(1)
+                          {summary.formStarted > 0
+                            ? ((summary.angebotConversions / summary.formStarted) * 100).toFixed(1)
                             : '0.0'}%
                         </div>
                       </div>
@@ -359,16 +373,20 @@ export default function AnalyticsPage() {
                   <div className="space-y-6">
                     <div>
                       <div className="flex justify-between mb-2">
-                        <span className="text-sm font-medium">Besucher → Kalkulation</span>
+                        <span className="text-sm font-medium">Besucher → Formular gestartet</span>
                         <span className="text-sm font-bold">
-                          {((summary.kalkulationConversions / summary.totalSessions) * 100).toFixed(1)}%
+                          {summary.totalSessions > 0
+                            ? ((summary.formStarted / summary.totalSessions) * 100).toFixed(1)
+                            : '0.0'}%
                         </span>
                       </div>
                       <div className="w-full bg-gray-200 rounded-full h-3">
                         <div
                           className="bg-green-500 h-3 rounded-full"
                           style={{
-                            width: `${(summary.kalkulationConversions / summary.totalSessions) * 100}%`
+                            width: summary.totalSessions > 0
+                              ? `${(summary.formStarted / summary.totalSessions) * 100}%`
+                              : '0%'
                           }}
                         />
                       </div>
@@ -376,10 +394,10 @@ export default function AnalyticsPage() {
 
                     <div>
                       <div className="flex justify-between mb-2">
-                        <span className="text-sm font-medium">Kalkulation → Angebot</span>
+                        <span className="text-sm font-medium">Formular gestartet → Angebot</span>
                         <span className="text-sm font-bold">
-                          {summary.kalkulationConversions > 0
-                            ? ((summary.angebotConversions / summary.kalkulationConversions) * 100).toFixed(1)
+                          {summary.formStarted > 0
+                            ? ((summary.angebotConversions / summary.formStarted) * 100).toFixed(1)
                             : '0.0'}%
                         </span>
                       </div>
@@ -387,8 +405,8 @@ export default function AnalyticsPage() {
                         <div
                           className="bg-purple-500 h-3 rounded-full"
                           style={{
-                            width: summary.kalkulationConversions > 0
-                              ? `${(summary.angebotConversions / summary.kalkulationConversions) * 100}%`
+                            width: summary.formStarted > 0
+                              ? `${(summary.angebotConversions / summary.formStarted) * 100}%`
                               : '0%'
                           }}
                         />
@@ -418,9 +436,56 @@ export default function AnalyticsPage() {
           <TabsContent value="forms" className="space-y-6">
             <Card>
               <CardHeader>
-                <CardTitle>Formular Drop-offs</CardTitle>
+                <CardTitle>Formular-Funnel — Schritt für Schritt</CardTitle>
                 <CardDescription>
-                  Wo steigen Nutzer aus dem Formular aus?
+                  Wie viele Nutzer sehen jeden Schritt, und wo steigen sie aus?
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                {(stats.wizardFunnel || []).some((s) => s.viewed > 0) ? (
+                  <div className="space-y-3">
+                    {(stats.wizardFunnel || []).map((s) => {
+                      const completedPct = s.viewed > 0 ? (s.completed / s.viewed) * 100 : 0;
+                      const highDropoff = s.dropoffRate >= 25 && s.viewed >= 10;
+                      return (
+                        <div key={s.step} className="space-y-1.5">
+                          <div className="flex items-center justify-between text-sm">
+                            <span className="font-medium text-gray-900">
+                              <span className="text-gray-400 mr-1.5">{s.step}.</span>
+                              {s.stepName}
+                            </span>
+                            <span className="text-gray-600">
+                              {s.viewed} gesehen → <span className="font-semibold text-gray-900">{s.completed}</span> weiter
+                              {s.dropoff > 0 && (
+                                <span className={highDropoff ? 'text-red-600 font-semibold ml-2' : 'text-gray-500 ml-2'}>
+                                  −{s.dropoff} ({s.dropoffRate}%)
+                                </span>
+                              )}
+                            </span>
+                          </div>
+                          <div className="w-full bg-red-100 rounded-full h-2.5 overflow-hidden">
+                            <div
+                              className={`h-2.5 rounded-full ${highDropoff ? 'bg-amber-500' : 'bg-green-500'}`}
+                              style={{ width: `${completedPct}%` }}
+                            />
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <div className="text-center py-8 text-gray-500">
+                    Keine Funnel-Daten verfügbar
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>Kontaktformular — Feld-Abbrüche</CardTitle>
+                <CardDescription>
+                  Wo im Kontaktformular (Schritt 10) steigen Nutzer aus?
                 </CardDescription>
               </CardHeader>
               <CardContent>
@@ -450,7 +515,7 @@ export default function AnalyticsPage() {
                   </div>
                 ) : (
                   <div className="text-center py-8 text-gray-500">
-                    Keine Drop-off-Daten verfügbar
+                    Keine Feld-Abbruch-Daten im gewählten Zeitraum
                   </div>
                 )}
               </CardContent>
