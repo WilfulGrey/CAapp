@@ -83,12 +83,19 @@ export async function GET(request: NextRequest) {
     const days = parseInt(searchParams.get('days') || '30');
     const startDate = new Date();
     startDate.setDate(startDate.getDate() - days);
+    // Analytics reset (2026-05-15): the pre-#85 data was inconsistent
+    // (step-1 step_view dropped, label confusion). Floor every query at
+    // this cutoff so the dashboard shows a clean slate from the relaunch.
+    // Old rows stay in the DB — just hidden. Bumping or removing this
+    // constant brings them back.
+    const ANALYTICS_CUTOFF = new Date('2026-05-15T00:00:00Z');
+    const effectiveStart = startDate > ANALYTICS_CUTOFF ? startDate : ANALYTICS_CUTOFF;
 
     const { data: sessions, error: sessionsError } = await fetchAllPages<any>(
       (from, to) => supabase
         .from('analytics_sessions')
         .select('*')
-        .gte('created_at', startDate.toISOString())
+        .gte('created_at', effectiveStart.toISOString())
         .range(from, to)
     );
 
