@@ -263,10 +263,12 @@ twój PR mergowany → Render dostaje webhook → build → live na beta
 
 ### Dwa serwisy
 
-| Service | URL | Z jakiej części repo |
-|---|---|---|
-| `caapp-beta` | https://caapp-beta.onrender.com | root (Vite static build) |
-| `kostenrechner-beta` | https://kostenrechner-beta.onrender.com | `project 3/` (Next.js SSR) |
+| Service | Production URL | Render slot URL (fallback) | Z jakiej części repo |
+|---|---|---|---|
+| `caapp` | https://kundenportal.primundus.de | https://caapp-beta.onrender.com | root (Vite static build) |
+| `kostenrechner` | https://kostenrechner.primundus.de | https://kostenrechner-beta.onrender.com | `project 3/` (Next.js SSR) |
+
+Display names były zrename'owane z `caapp-beta` / `kostenrechner-beta` w 2026-05-14 wraz z cutoverem na domeny primundus.de. **Slug (`<slug>.onrender.com` URL) jest immutable na Render — pozostał `-beta`.** Jedyna ścieżka żeby usunąć `-beta` z URL-a to delete + recreate service (osobny task, nieuwzględniony tutaj).
 
 ### Render team access
 

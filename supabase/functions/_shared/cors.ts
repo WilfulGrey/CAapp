@@ -1,14 +1,23 @@
 // Origin allow-list for the CA app + the calculator that triggers
-// /onboard-to-mamamia from the magic-link redirect. Both Render beta
-// hosts get an entry plus the production portal domain. Localhost is
-// kept for dev. Unknown origins are rejected (fall through to localhost
-// so cookies/credentials are never sent to a hostile origin).
+// /onboard-to-mamamia from the magic-link redirect. Production custom
+// domains (kundenportal.primundus.de + kostenrechner.primundus.de) plus
+// the Render beta hosts as fallback during cutover. Localhost is kept
+// for dev. Unknown origins are rejected (fall through to localhost so
+// cookies/credentials are never sent to a hostile origin).
 const ALLOWED_ORIGINS = new Set([
   "http://localhost:5173",
-  "https://portal.primundus.de",
+  // Production custom domains
   "https://kundenportal.primundus.de",
+  "https://kostenrechner.primundus.de",
+  // Render slot URLs (auto-assigned <slug>.onrender.com). Slug is
+  // immutable on Render even though display names were renamed
+  // from caapp-beta/kostenrechner-beta to caapp/kostenrechner on
+  // 2026-05-14 — these *-beta URLs stay live until services are
+  // recreated. Kept as fallback during primundus.de cutover.
   "https://caapp-beta.onrender.com",
   "https://kostenrechner-beta.onrender.com",
+  // Legacy
+  "https://portal.primundus.de",
 ]);
 
 export function corsHeaders(origin: string | null): Record<string, string> {

@@ -4,21 +4,29 @@
 #
 # Two services share this monorepo:
 #
-#   1. caapp-beta            — Static Site (Vite + React)
+#   1. caapp                 — Static Site (Vite + React)
 #                              built from repo root, serves the CA app
 #                              kundenportal at /. Public envs prefixed
 #                              VITE_* are baked at build time.
+#                              Production URL: kundenportal.primundus.de
+#                              Render slot URL: caapp-beta.onrender.com
+#                              (slug remained -beta because Render slugs
+#                              are immutable; display name renamed 2026-05-14)
 #
-#   2. kostenrechner-beta    — Web Service (Next.js 13)
+#   2. kostenrechner         — Web Service (Next.js 13)
 #                              built from "project 3/" subdirectory.
 #                              SSR pages, magic-link mail, SMTP, calls
 #                              into Supabase Edge Functions.
 #                              Server-only secrets (SMTP_PASS, Supabase
 #                              service-role key) live as Render env-vars,
 #                              NOT in repo.
+#                              Production URL: kostenrechner.primundus.de
+#                              Render slot URL: kostenrechner-beta.onrender.com
+#                              (slug remained -beta because Render slugs
+#                              are immutable; display name renamed 2026-05-14)
 #
-# Cross-link contract: kostenrechner-beta's NEXT_PUBLIC_PORTAL_URL points
-# at caapp-beta's URL, so the result-page handoff redirects there.
+# Cross-link contract: kostenrechner's NEXT_PUBLIC_PORTAL_URL points
+# at caapp's URL, so the result-page handoff redirects there.
 #
 # After first deploy set the per-service secrets in the Render dashboard
 # (see docs/render-beta-deployment.md) — they're declared with sync:false
@@ -27,7 +35,7 @@
 services:
   # ── 1. CA app (kundenportal) — Static Site ─────────────────────────────
   - type: web
-    name: caapp-beta
+    name: caapp
     runtime: static
     plan: free
     branch: integration/mamamia-onboarding
@@ -53,7 +61,7 @@ services:
 
   # ── 2. Primundus calculator (project 3) — Next.js Web Service ──────────
   - type: web
-    name: kostenrechner-beta
+    name: kostenrechner
     runtime: node
     plan: free
     branch: integration/mamamia-onboarding
@@ -64,14 +72,15 @@ services:
     pullRequestPreviewsEnabled: false
     envVars:
       # Public — baked into the client bundle; safe to commit-or-prompt.
-      # NEXT_PUBLIC_SITE_URL: once the service has its assigned URL, swap
-      # this to the actual https://kostenrechner-beta.onrender.com or a
-      # custom domain.
+      # NEXT_PUBLIC_SITE_URL: production custom domain for the calculator.
+      # Production value: https://kostenrechner.primundus.de
+      # (legacy: https://kostenrechner-beta.onrender.com during cutover).
       - key: NEXT_PUBLIC_SITE_URL
         sync: false
-      # NEXT_PUBLIC_PORTAL_URL: caapp-beta service URL. After first deploy
-      # set to e.g. https://caapp-beta.onrender.com — drives the handoff
-      # CTA in result page + Eingangsbestätigung email + PDF.
+      # NEXT_PUBLIC_PORTAL_URL: caapp service URL. Drives the handoff CTA
+      # in result page + Eingangsbestätigung email + PDF.
+      # Production value: https://kundenportal.primundus.de
+      # (legacy: https://caapp-beta.onrender.com during cutover).
       - key: NEXT_PUBLIC_PORTAL_URL
         sync: false
       - key: NEXT_PUBLIC_SUPABASE_URL
