@@ -976,88 +976,64 @@ const CustomerPortalPage: FC = () => {
           onSaveToMamamia={async (form) => {
             const existingPatientIds = mmCustomer?.patients?.map(p => p.id) ?? [];
 
-            // ── Save flow: single updateCustomer, AI inline (PR #47 shape) ─
+            // ── Save flow: gating 1st mutation + AI overlay 2nd ────────────
             //
-            // AI Sonnet generates a polished 2–3 sentence German summary
-            // for customer.job_description ("Kurze Zusammenfassung der
-            // Tätigkeit"). Mamamia panel REQUIRES this field non-empty
-            // before SendInvitationCaregiver / StoreRequest will fire.
+            // Mamamia preprod has a regression: the 1st UpdateCustomer that
+            // creates/updates patients SILENTLY DROPS per-patient
+            // description fields (lift_description, dementia_description,
+            // night_operations_description) even when the nested patient
+            // carries a valid `id`. A SECOND UpdateCustomer with the same
+            // patients (now confirmed present by id) re-applies and
+            // persists those fields. Verified live on customer 8517 with
+            // PR #92 single-mutation — descriptions stayed empty until a
+            // follow-up write.
             //
-            // Mapper builds a mechanical fallback in patch.job_description
-            // from form fields — so even when the AI call fails, the
-            // saved customer still has a usable description.
+            // So we run two writes:
             //
-            // Why single-mutation + await: a previous two-phase variant
-            // (#87 + #88) had the AI overlay fire-and-forget after the
-            // gating mutation, but Mamamia's "omitted associations = wipe"
-            // rule combined with the proxy's defensive `patches=[]`
-            // workaround corrupted patient/wish state on the second write.
-            // Sticking to one mutation is simpler and matches the working
-            // PR #47 shape. The caller (AngebotCard) still awaits this
-            // promise before flipping patientSaved, so the invite gate
-            // can't open until Mamamia has the full payload.
-            const [aiResult, locationId] = await Promise.all([
-              // generateJobDescription: Anthropic (Sonnet via proxy)
-              // returns { description: string | null }. Falls back to
-              // null on missing API key / API failure — patch.job_description
-              // then keeps the mechanical text from the mapper.
-              callMamamia<{ description: string | null }>('generateJobDescription', {
-                anzahl: form.anzahl,
-                geschlecht: form.geschlecht, geburtsjahr: form.geburtsjahr,
-                pflegegrad: form.pflegegrad, mobilitaet: form.mobilitaet,
-                heben: form.heben, demenz: form.demenz,
-                inkontinenz: form.inkontinenz, nacht: form.nacht,
-                diagnosen: form.diagnosen,
-                p2_geschlecht: form.p2_geschlecht, p2_geburtsjahr: form.p2_geburtsjahr,
-                p2_pflegegrad: form.p2_pflegegrad, p2_mobilitaet: form.p2_mobilitaet,
-                p2_demenz: form.p2_demenz,
-                ort: form.ort, wohnungstyp: form.wohnungstyp,
-                urbanisierung: form.urbanisierung, familieNahe: form.familieNahe,
-                haushalt: form.haushalt, pflegedienst: form.pflegedienst,
-                aufgaben: form.aufgaben, sonstigeWuensche: form.sonstigeWuensche,
-              }).catch(() => ({ description: null })),
+            //   1. Gating mutation (awaited): mechanical patch from the
+            //      mapper. Caller (AngebotCard) doesn't flip patientSaved
+            //      until this succeeds, so the invite gate stays closed
+            //      until Mamamia at minimum has the base customer state.
+            //
+            //   2. AI overlay (fire-and-forget): re-sends the FULL patch
+            //      with the AI-generated job_description spread on top.
+            //      Spread (not `{ job_description }` alone) because the
+            //      proxy's defensive `patches=[]` workaround for a
+            //      different Mamamia NPE would otherwise wipe patients,
+            //      and Mamamia's "omitted associations = wipe" rule would
+            //      nuke wish.tasks / other_wishes / etc. Sending the full
+            //      patch a second time is idempotent for everything else
+            //      and turns the description re-write into a no-op when
+            //      AI fails (mechanical text already on the wire).
 
-              // Resolve Mamamia location_id from PLZ via Locations(search).
-              // Without a canonical id, panel "Lokalizacja opieki" stays
-              // empty even when location_custom_text is set — verified
-              // 2026-05-07 on Customer 7655. Best-effort: errors fall back
-              // to the location_custom_text path inside the mapper.
-              (async (): Promise<number | undefined> => {
-                const plz = form.plz?.trim();
-                if (plz && /^\d{4,5}$/.test(plz)) {
-                  try {
-                    const r = await callMamamia<{
-                      LocationsWithPagination: {
-                        data: Array<{ id: number; zip_code: string; country_code: string }>;
-                      };
-                    }>('searchLocations', { search: plz, limit: 10, page: 1 });
-                    const rows = r.LocationsWithPagination.data;
-                    const de = rows.find(l => l.country_code === 'DE');
-                    return (de ?? rows[0])?.id as number | undefined;
-                  } catch {
-                    // swallow — fall back to location_custom_text in mapper
-                  }
-                }
-                return undefined;
-              })(),
-            ]);
+            // ── Location lookup (~500 ms typical). Synchronous, before
+            // we build the patch so the customer_contract carries the id.
+            let locationId: number | undefined;
+            const plz = form.plz?.trim();
+            if (plz && /^\d{4,5}$/.test(plz)) {
+              try {
+                const r = await callMamamia<{
+                  LocationsWithPagination: {
+                    data: Array<{ id: number; zip_code: string; country_code: string }>;
+                  };
+                }>('searchLocations', { search: plz, limit: 10, page: 1 });
+                const rows = r.LocationsWithPagination.data;
+                locationId = (rows.find(l => l.country_code === 'DE') ?? rows[0])?.id as number | undefined;
+              } catch {
+                // swallow — mapper falls back to location_custom_text
+              }
+            }
 
             const patch = mapPatientFormToUpdateCustomerInput(form, {
               existingPatientIds,
               locationId,
             });
+            const mechanicalJobDescription = patch.job_description;
 
-            // Override job_description with the AI summary when available.
-            // Mechanical text from the mapper stays as fallback otherwise.
-            if (aiResult.description) {
-              patch.job_description = aiResult.description;
-            }
-
+            // ── 1. Gating mutation: mechanical patch, awaited. ────────────
             try {
               await updateCustomerMutation.mutate(patch as Record<string, unknown>);
             } catch (err) {
-              // Surface the failure to the caller (AngebotCard re-opens the
-              // form and keeps patientSaved=false so invite stays blocked).
               showToast('Speichern fehlgeschlagen. Bitte erneut versuchen.');
               throw err;
             }
@@ -1073,6 +1049,54 @@ const CustomerPortalPage: FC = () => {
             // mogą się pojawić nowi. Refetch listę żeby user widział
             // aktualny scoring, nie stale wynik z czasu onboardu.
             refetchMatchings();
+
+            // ── 2. AI overlay + description re-write (fire-and-forget). ──
+            // See top-of-handler comment: the 1st mutation creates the
+            // patients but Mamamia silently drops per-patient descriptions
+            // on creation. A 2nd UpdateCustomer with the same patients
+            // (now persisted by id) DOES retain those fields. We piggyback
+            // on this with the AI-generated job_description so the panel's
+            // "Kurze Zusammenfassung der Tätigkeit" lands as the polished
+            // Sonnet text instead of the mechanical fallback.
+            //
+            // Spread the FULL patch (not `{ job_description }` alone):
+            //   - proxy defensive `patches=[]` would otherwise wipe patients
+            //   - Mamamia "omitted = wipe" would nuke wish.tasks, etc.
+            // The second write is idempotent for every other field.
+            void (async () => {
+              try {
+                const aiResult = await callMamamia<{ description: string | null }>(
+                  'generateJobDescription',
+                  {
+                    anzahl: form.anzahl,
+                    geschlecht: form.geschlecht, geburtsjahr: form.geburtsjahr,
+                    pflegegrad: form.pflegegrad, mobilitaet: form.mobilitaet,
+                    heben: form.heben, demenz: form.demenz,
+                    inkontinenz: form.inkontinenz, nacht: form.nacht,
+                    diagnosen: form.diagnosen,
+                    p2_geschlecht: form.p2_geschlecht, p2_geburtsjahr: form.p2_geburtsjahr,
+                    p2_pflegegrad: form.p2_pflegegrad, p2_mobilitaet: form.p2_mobilitaet,
+                    p2_demenz: form.p2_demenz,
+                    ort: form.ort, wohnungstyp: form.wohnungstyp,
+                    urbanisierung: form.urbanisierung, familieNahe: form.familieNahe,
+                    haushalt: form.haushalt, pflegedienst: form.pflegedienst,
+                    aufgaben: form.aufgaben, sonstigeWuensche: form.sonstigeWuensche,
+                  },
+                );
+                const finalDescription =
+                  aiResult.description ?? mechanicalJobDescription;
+                await updateCustomerMutation.mutate({
+                  ...(patch as Record<string, unknown>),
+                  job_description: finalDescription,
+                });
+              } catch (err) {
+                // 2nd-write is best-effort. Mechanical job_description
+                // already persisted by the gating call; per-patient
+                // descriptions stay empty if this fails — agency can
+                // populate via panel.
+                console.warn('AI description re-write failed:', err);
+              }
+            })();
           }}
         />
         </div>
