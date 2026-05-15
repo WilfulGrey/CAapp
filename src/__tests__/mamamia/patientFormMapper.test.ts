@@ -298,8 +298,10 @@ describe('mapPatientFormToUpdateCustomerInput', () => {
     const r = mapPatientFormToUpdateCustomerInput(makeForm({ nacht: 'Bis zu 1 Mal' }));
     expect(r.patients?.[0].night_operations_description).toBeTruthy();
     expect(r.patients?.[0].night_operations_description_de).toBeTruthy();
-    expect(r.patients?.[0].night_operations_description_en).toBeTruthy();
-    expect(r.patients?.[0].night_operations_description_pl).toBeTruthy();
+    // _en/_pl no longer mapped from the client — Mamamia backend AI
+    // translator auto-fills them from the German source.
+    expect(r.patients?.[0].night_operations_description_en).toBeUndefined();
+    expect(r.patients?.[0].night_operations_description_pl).toBeUndefined();
   });
 
   it('Bug #13a: nacht=Nein → no night_operations_description (placeholder skipped)', () => {
@@ -379,8 +381,9 @@ describe('mapPatientFormToUpdateCustomerInput', () => {
     expect(r.patients?.[0].lift_id).toBe(1);
     expect(r.patients?.[0].lift_description).toBeTruthy();
     expect(r.patients?.[0].lift_description_de).toBeTruthy();
-    expect(r.patients?.[0].lift_description_en).toBeTruthy();
-    expect(r.patients?.[0].lift_description_pl).toBeTruthy();
+    // _en/_pl no longer mapped — Mamamia backend AI translator auto-fills.
+    expect(r.patients?.[0].lift_description_en).toBeUndefined();
+    expect(r.patients?.[0].lift_description_pl).toBeUndefined();
   });
 
   it('Bug #13c: heben=Nein → no lift_description (placeholder skipped)', () => {
@@ -432,8 +435,9 @@ describe('mapPatientFormToUpdateCustomerInput', () => {
         '2× pro Woche: Grundpflege (Körperpflege, Anziehen), Wundversorgung',
       );
       expect(r.day_care_facility_description_de).toBe(r.day_care_facility_description);
-      expect(r.day_care_facility_description_en).toBeTruthy();
-      expect(r.day_care_facility_description_pl).toBeTruthy();
+      // _en/_pl no longer mapped — Mamamia backend AI translator auto-fills.
+      expect((r as Record<string, unknown>).day_care_facility_description_en).toBeUndefined();
+      expect((r as Record<string, unknown>).day_care_facility_description_pl).toBeUndefined();
       // Bug #13k: job_description NIE zawiera już "Pflegedienst:" segment.
       expect(r.job_description).not.toContain('Pflegedienst:');
       expect(r.job_description).toContain('24-Stunden-Betreuung gesucht');
