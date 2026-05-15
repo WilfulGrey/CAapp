@@ -390,10 +390,6 @@ interface PreserveData {
 }
 
 const updateCustomer: ActionHandler = async (session, variables, deps) => {
-  // ───── DEBUG TRACE — TEMP, revert via PR after diagnosis ─────
-  console.log(`[DBG][updateCustomer][1-IN] cid=${session.customer_id} keys=${JSON.stringify(Object.keys(variables as Record<string, unknown>).sort())}`);
-  console.log(`[DBG][updateCustomer][1-IN-FULL] cid=${session.customer_id} ${JSON.stringify(variables).slice(0, 12000)}`);
-  // ─────────────────────────────────────────────────────────────
   const patch: Record<string, unknown> = { id: session.customer_id };
   for (const [k, v] of Object.entries(variables)) {
     if (k === "customer_caregiver_wish") {
@@ -403,7 +399,6 @@ const updateCustomer: ActionHandler = async (session, variables, deps) => {
       patch[k] = v;
     }
   }
-  console.log(`[DBG][updateCustomer][2-POSTFILTER] cid=${session.customer_id} ${JSON.stringify(patch).slice(0, 12000)}`);
 
   // Mamamia preprod backend regression (verified 2026-05-14 via bisection):
   // UpdateCustomer resolver NPE's when `patients` is null or omitted. An
@@ -472,7 +467,6 @@ const updateCustomer: ActionHandler = async (session, variables, deps) => {
     }
   }
 
-  console.log(`[DBG][updateCustomer][3-BEFORE-GQL] cid=${session.customer_id} ${JSON.stringify(patch).slice(0, 12000)}`);
   return runGraphQL(deps, UPDATE_CUSTOMER, patch);
 };
 
@@ -502,7 +496,6 @@ const updateCustomer: ActionHandler = async (session, variables, deps) => {
 // associations follow the "omitted = wipe" rule.
 const updateJobDescription: ActionHandler = async (session, variables, deps) => {
   const text = (variables as { text?: unknown }).text;
-  console.log(`[DBG][updateJobDescription][1-IN] cid=${session.customer_id} text=${JSON.stringify(text).slice(0, 2000)}`);
   if (typeof text !== "string" || text.length === 0) {
     throw new Error("text required (non-empty string)");
   }
@@ -521,7 +514,7 @@ const updateJobDescription: ActionHandler = async (session, variables, deps) => 
     }
   `, { id: session.customer_id });
 
-  const payload = {
+  return runGraphQL(deps, UPDATE_CUSTOMER, {
     id: session.customer_id,
     // base + _de mirror Mamamia panel manual-save (verified live
     // customer 8528, 2026-05-15). Backend AI translator handles
@@ -530,9 +523,7 @@ const updateJobDescription: ActionHandler = async (session, variables, deps) => 
     job_description_de: text,
     patients: current.Customer.patients.map((p) => ({ id: p.id })),
     equipment_ids: current.Customer.equipments.map((e) => e.id),
-  };
-  console.log(`[DBG][updateJobDescription][2-BEFORE-GQL] ${JSON.stringify(payload).slice(0, 4000)}`);
-  return runGraphQL(deps, UPDATE_CUSTOMER, payload);
+  });
 };
 
 // ─── generateJobDescription — AI-generated care situation summary ──────────
@@ -627,18 +618,14 @@ Keine Aufzählungen. Keine Überschriften. Nur Fließtext.
 Gib ausschließlich den Beschreibungstext aus — keine Einleitung, keine Erläuterung.`;
 
 const generateJobDescription: ActionHandler = async (_session, variables, deps) => {
-  console.log(`[DBG][generateJobDescription][1-IN] hasKey=${!!deps.anthropicApiKey} vars=${JSON.stringify(variables).slice(0, 3000)}`);
   if (!deps.anthropicApiKey) {
-    console.log(`[DBG][generateJobDescription][1b-NO-KEY] returning null`);
     return { description: null };
   }
 
   const input = variables as JobDescriptionInput;
   const dataText = buildPatientDataText(input);
-  console.log(`[DBG][generateJobDescription][2-DATATEXT] ${JSON.stringify(dataText).slice(0, 2000)}`);
 
   if (!dataText.trim()) {
-    console.log(`[DBG][generateJobDescription][2b-EMPTY-DATATEXT] returning null`);
     return { description: null };
   }
 
@@ -649,7 +636,6 @@ const generateJobDescription: ActionHandler = async (_session, variables, deps) 
       `Pflegesituation:\n${dataText}`,
       deps.fetchFn,
     );
-    console.log(`[DBG][generateJobDescription][3-RESULT] text=${JSON.stringify(text).slice(0, 2000)}`);
     return { description: text };
   } catch (e) {
     console.error('generateJobDescription failed:', (e as Error).message);
