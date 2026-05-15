@@ -91,7 +91,7 @@ export async function GET(request: NextRequest) {
     const ANALYTICS_CUTOFF = new Date('2026-05-15T00:00:00Z');
     const effectiveStart = startDate > ANALYTICS_CUTOFF ? startDate : ANALYTICS_CUTOFF;
 
-    const { data: sessions, error: sessionsError } = await fetchAllPages<any>(
+    let { data: sessions, error: sessionsError } = await fetchAllPages<any>(
       (from, to) => supabase
         .from('analytics_sessions')
         .select('*')
@@ -177,6 +177,43 @@ export async function GET(request: NextRequest) {
         { error: `analytics detail query failed: ${detailError.message}` },
         { status: 500 }
       );
+    }
+
+    // Exclude test traffic. Lead with "test" in vorname/nachname/email →
+    // drop the entire session footprint (sessions, page_views, conversions,
+    // wizard events, form interactions). Test leads are unavoidable on a
+    // public form (team QA + curious users); without this they inflate the
+    // funnel.
+    let testSessionIds = new Set<string>();
+    const conversionLeadIds = Array.from(new Set(
+      conversions.map(c => c.lead_id).filter((id: any): id is string => Boolean(id))
+    ));
+    if (conversionLeadIds.length > 0) {
+      const { data: testLeadRows } = await fetchByIdsInChunks<{ id: string }>(
+        conversionLeadIds,
+        (chunk, from, to) => supabase
+          .from('leads')
+          .select('id')
+          .in('id', chunk)
+          .or('vorname.ilike.%test%,nachname.ilike.%test%,email.ilike.%test%')
+          .range(from, to),
+      );
+      const testLeadIdSet = new Set((testLeadRows ?? []).map(l => l.id));
+      if (testLeadIdSet.size > 0) {
+        testSessionIds = new Set(
+          conversions
+            .filter(c => c.lead_id && testLeadIdSet.has(c.lead_id))
+            .map(c => c.session_id),
+        );
+      }
+    }
+    if (testSessionIds.size > 0) {
+      console.log('[Analytics API] Excluding', testSessionIds.size, 'test sessions');
+      sessions = sessions.filter((s: any) => !testSessionIds.has(s.id));
+      pageViews = pageViews.filter(pv => !testSessionIds.has(pv.session_id));
+      conversions = conversions.filter(c => !testSessionIds.has(c.session_id));
+      events = events.filter(e => !testSessionIds.has(e.session_id));
+      formInteractions = formInteractions.filter(fi => !testSessionIds.has(fi.session_id));
     }
 
     const uniqueVisitors = new Set(sessions.map(s => s.fingerprint)).size;
