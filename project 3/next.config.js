@@ -6,7 +6,10 @@ const nextConfig = {
   eslint: {
     ignoreDuringBuilds: true,
   },
-  images: { unoptimized: true },
+  // Image optimization stays on (was disabled when this app shipped on
+  // Cloudflare Pages — Render runs Next as a real Node server, so the
+  // built-in optimizer works and serves responsive WebP/AVIF at the right
+  // size per breakpoint). Drops the hero from 348 KB on mobile.
   generateBuildId: async () => {
     return BUILD_ID;
   },

@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { Header } from "@/components/calculator/Header";
 import { TestimonialCard } from "@/components/calculator/TestimonialCard";
 import { HowItWorks } from "@/components/calculator/HowItWorks";
@@ -26,10 +27,16 @@ export default function HomePage() {
         {/* Mobile/Tablet: Stacked Layout */}
         <div className="lg:hidden">
           <div className="relative w-full h-[240px] md:h-[280px] overflow-hidden mb-8 bg-[#F8F7F5]">
-            <img
+            {/* LCP element — explicit priority + sizes so the optimizer
+                generates a mobile-sized WebP/AVIF and the browser fetches
+                it eagerly with fetchpriority="high". */}
+            <Image
               src="/images/PM-Betreuung_frontal_desktop.webp"
               alt="Professionelle 24-Stunden-Betreuung"
-              className="w-full h-full object-contain scale-110"
+              fill
+              priority
+              sizes="(max-width: 1024px) 100vw, 0px"
+              className="object-contain scale-110"
             />
             <div className="absolute inset-0 bg-gradient-to-b from-black/15 via-transparent to-transparent pointer-events-none"></div>
           </div>
@@ -55,20 +62,20 @@ export default function HomePage() {
                   <div className="relative overflow-hidden">
                     <div className="flex animate-scroll">
                       <div className="flex items-center gap-8 shrink-0">
-                        <img src="/images/media/ard.webp" alt="ARD" className="h-[20px] object-contain opacity-70 hover:opacity-100 transition-opacity duration-300" />
-                        <img src="/images/media/ndr.webp" alt="NDR" className="h-[20px] object-contain opacity-70 hover:opacity-100 transition-opacity duration-300" />
-                        <img src="/images/media/sat1.webp" alt="SAT.1" className="h-[20px] object-contain opacity-70 hover:opacity-100 transition-opacity duration-300" />
-                        <img src="/images/media/die-welt.webp" alt="Die Welt" className="h-[20px] object-contain opacity-70 hover:opacity-100 transition-opacity duration-300" />
-                        <img src="/images/media/bild-der-frau.webp" alt="Bild der Frau" className="h-[20px] object-contain opacity-70 hover:opacity-100 transition-opacity duration-300" />
-                        <img src="/images/media/frankfurter-allgemeine.webp" alt="Frankfurter Allgemeine" className="h-[20px] object-contain opacity-70 hover:opacity-100 transition-opacity duration-300" />
+                        <img src="/images/media/ard.webp" alt="ARD" loading="lazy" decoding="async" className="h-[20px] object-contain opacity-70 hover:opacity-100 transition-opacity duration-300" />
+                        <img src="/images/media/ndr.webp" alt="NDR" loading="lazy" decoding="async" className="h-[20px] object-contain opacity-70 hover:opacity-100 transition-opacity duration-300" />
+                        <img src="/images/media/sat1.webp" alt="SAT.1" loading="lazy" decoding="async" className="h-[20px] object-contain opacity-70 hover:opacity-100 transition-opacity duration-300" />
+                        <img src="/images/media/die-welt.webp" alt="Die Welt" loading="lazy" decoding="async" className="h-[20px] object-contain opacity-70 hover:opacity-100 transition-opacity duration-300" />
+                        <img src="/images/media/bild-der-frau.webp" alt="Bild der Frau" loading="lazy" decoding="async" className="h-[20px] object-contain opacity-70 hover:opacity-100 transition-opacity duration-300" />
+                        <img src="/images/media/frankfurter-allgemeine.webp" alt="Frankfurter Allgemeine" loading="lazy" decoding="async" className="h-[20px] object-contain opacity-70 hover:opacity-100 transition-opacity duration-300" />
                       </div>
                       <div className="flex items-center gap-8 shrink-0 ml-8">
-                        <img src="/images/media/ard.webp" alt="ARD" className="h-[20px] object-contain opacity-70 hover:opacity-100 transition-opacity duration-300" />
-                        <img src="/images/media/ndr.webp" alt="NDR" className="h-[20px] object-contain opacity-70 hover:opacity-100 transition-opacity duration-300" />
-                        <img src="/images/media/sat1.webp" alt="SAT.1" className="h-[20px] object-contain opacity-70 hover:opacity-100 transition-opacity duration-300" />
-                        <img src="/images/media/die-welt.webp" alt="Die Welt" className="h-[20px] object-contain opacity-70 hover:opacity-100 transition-opacity duration-300" />
-                        <img src="/images/media/bild-der-frau.webp" alt="Bild der Frau" className="h-[20px] object-contain opacity-70 hover:opacity-100 transition-opacity duration-300" />
-                        <img src="/images/media/frankfurter-allgemeine.webp" alt="Frankfurter Allgemeine" className="h-[20px] object-contain opacity-70 hover:opacity-100 transition-opacity duration-300" />
+                        <img src="/images/media/ard.webp" alt="ARD" loading="lazy" decoding="async" className="h-[20px] object-contain opacity-70 hover:opacity-100 transition-opacity duration-300" />
+                        <img src="/images/media/ndr.webp" alt="NDR" loading="lazy" decoding="async" className="h-[20px] object-contain opacity-70 hover:opacity-100 transition-opacity duration-300" />
+                        <img src="/images/media/sat1.webp" alt="SAT.1" loading="lazy" decoding="async" className="h-[20px] object-contain opacity-70 hover:opacity-100 transition-opacity duration-300" />
+                        <img src="/images/media/die-welt.webp" alt="Die Welt" loading="lazy" decoding="async" className="h-[20px] object-contain opacity-70 hover:opacity-100 transition-opacity duration-300" />
+                        <img src="/images/media/bild-der-frau.webp" alt="Bild der Frau" loading="lazy" decoding="async" className="h-[20px] object-contain opacity-70 hover:opacity-100 transition-opacity duration-300" />
+                        <img src="/images/media/frankfurter-allgemeine.webp" alt="Frankfurter Allgemeine" loading="lazy" decoding="async" className="h-[20px] object-contain opacity-70 hover:opacity-100 transition-opacity duration-300" />
                       </div>
                     </div>
                   </div>
@@ -131,20 +138,20 @@ export default function HomePage() {
                 <div className="relative overflow-hidden">
                   <div className="flex animate-scroll">
                     <div className="flex items-center gap-7 shrink-0">
-                      <img src="/images/media/ard.webp" alt="ARD" className="h-[20px] object-contain opacity-70 hover:opacity-100 transition-opacity duration-300" />
-                      <img src="/images/media/ndr.webp" alt="NDR" className="h-[20px] object-contain opacity-70 hover:opacity-100 transition-opacity duration-300" />
-                      <img src="/images/media/sat1.webp" alt="SAT.1" className="h-[20px] object-contain opacity-70 hover:opacity-100 transition-opacity duration-300" />
-                      <img src="/images/media/die-welt.webp" alt="Die Welt" className="h-[20px] object-contain opacity-70 hover:opacity-100 transition-opacity duration-300" />
-                      <img src="/images/media/bild-der-frau.webp" alt="Bild der Frau" className="h-[20px] object-contain opacity-70 hover:opacity-100 transition-opacity duration-300" />
-                      <img src="/images/media/frankfurter-allgemeine.webp" alt="Frankfurter Allgemeine" className="h-[20px] object-contain opacity-70 hover:opacity-100 transition-opacity duration-300" />
+                      <img src="/images/media/ard.webp" alt="ARD" loading="lazy" decoding="async" className="h-[20px] object-contain opacity-70 hover:opacity-100 transition-opacity duration-300" />
+                      <img src="/images/media/ndr.webp" alt="NDR" loading="lazy" decoding="async" className="h-[20px] object-contain opacity-70 hover:opacity-100 transition-opacity duration-300" />
+                      <img src="/images/media/sat1.webp" alt="SAT.1" loading="lazy" decoding="async" className="h-[20px] object-contain opacity-70 hover:opacity-100 transition-opacity duration-300" />
+                      <img src="/images/media/die-welt.webp" alt="Die Welt" loading="lazy" decoding="async" className="h-[20px] object-contain opacity-70 hover:opacity-100 transition-opacity duration-300" />
+                      <img src="/images/media/bild-der-frau.webp" alt="Bild der Frau" loading="lazy" decoding="async" className="h-[20px] object-contain opacity-70 hover:opacity-100 transition-opacity duration-300" />
+                      <img src="/images/media/frankfurter-allgemeine.webp" alt="Frankfurter Allgemeine" loading="lazy" decoding="async" className="h-[20px] object-contain opacity-70 hover:opacity-100 transition-opacity duration-300" />
                     </div>
                     <div className="flex items-center gap-7 shrink-0 ml-7">
-                      <img src="/images/media/ard.webp" alt="ARD" className="h-[20px] object-contain opacity-70 hover:opacity-100 transition-opacity duration-300" />
-                      <img src="/images/media/ndr.webp" alt="NDR" className="h-[20px] object-contain opacity-70 hover:opacity-100 transition-opacity duration-300" />
-                      <img src="/images/media/sat1.webp" alt="SAT.1" className="h-[20px] object-contain opacity-70 hover:opacity-100 transition-opacity duration-300" />
-                      <img src="/images/media/die-welt.webp" alt="Die Welt" className="h-[20px] object-contain opacity-70 hover:opacity-100 transition-opacity duration-300" />
-                      <img src="/images/media/bild-der-frau.webp" alt="Bild der Frau" className="h-[20px] object-contain opacity-70 hover:opacity-100 transition-opacity duration-300" />
-                      <img src="/images/media/frankfurter-allgemeine.webp" alt="Frankfurter Allgemeine" className="h-[20px] object-contain opacity-70 hover:opacity-100 transition-opacity duration-300" />
+                      <img src="/images/media/ard.webp" alt="ARD" loading="lazy" decoding="async" className="h-[20px] object-contain opacity-70 hover:opacity-100 transition-opacity duration-300" />
+                      <img src="/images/media/ndr.webp" alt="NDR" loading="lazy" decoding="async" className="h-[20px] object-contain opacity-70 hover:opacity-100 transition-opacity duration-300" />
+                      <img src="/images/media/sat1.webp" alt="SAT.1" loading="lazy" decoding="async" className="h-[20px] object-contain opacity-70 hover:opacity-100 transition-opacity duration-300" />
+                      <img src="/images/media/die-welt.webp" alt="Die Welt" loading="lazy" decoding="async" className="h-[20px] object-contain opacity-70 hover:opacity-100 transition-opacity duration-300" />
+                      <img src="/images/media/bild-der-frau.webp" alt="Bild der Frau" loading="lazy" decoding="async" className="h-[20px] object-contain opacity-70 hover:opacity-100 transition-opacity duration-300" />
+                      <img src="/images/media/frankfurter-allgemeine.webp" alt="Frankfurter Allgemeine" loading="lazy" decoding="async" className="h-[20px] object-contain opacity-70 hover:opacity-100 transition-opacity duration-300" />
                     </div>
                   </div>
                 </div>
