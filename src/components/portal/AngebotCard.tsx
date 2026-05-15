@@ -105,6 +105,11 @@ export const AngebotCard: FC<{
   };
 
   const [saved, setSaved] = useState(hasFinalSave);
+  // Tracks the Mamamia updateCustomer round-trip kicked off from "Speichern".
+  // While true: button stays disabled with "Speichern…" label, form stays
+  // visible (no premature collapse), invite gate stays closed. Flips back
+  // to false in both success and failure paths inside the click handler.
+  const [isSaving, setIsSaving] = useState(false);
 
   // Propagate saved → parent. The hasFinalSave hydration above flips
   // `saved=true` on mount when the customer revisits with a previously
@@ -1211,8 +1216,8 @@ export const AngebotCard: FC<{
                   </button>
                 ) : (
                   <button
-                    onClick={() => {
-                      if (!allComplete) return;
+                    onClick={async () => {
+                      if (!allComplete || isSaving) return;
                       // Mark as final submission (not a draft) so reload
                       // shows the green-checked "Vollständig" state.
                       if (storageKey) {
@@ -1221,28 +1226,53 @@ export const AngebotCard: FC<{
                           JSON.stringify({ ...patient, _isDraft: false }),
                         );
                       }
-                      // Close the form immediately — branded loading screen
-                      // in the parent takes over while Mamamia saves in bg.
-                      setSaved(true);
-                      setPatientOpen(false);
-                      onPatientSaved?.(true);
-                      scrollPortalToTop();
-                      // Fire-and-forget: Mamamia save runs after UI transition.
+                      // ── Save flow ─────────────────────────────────────
+                      // Previously we collapsed the form and flipped
+                      // patientSaved BEFORE the Mamamia round-trip — the
+                      // customer could then click "Einladen" while Mamamia
+                      // still had a half-populated profile (job_description
+                      // missing), which made StoreRequest reject the
+                      // invite. Now: button stays disabled, form stays
+                      // visible, gate stays closed until updateCustomer
+                      // resolves. On error: form re-opens, gate stays
+                      // closed, parent shows a toast.
                       if (mamamiaEnabled && onSaveToMamamia) {
-                        onSaveToMamamia(patient).catch(err =>
-                          console.error('UpdateCustomer failed:', err),
-                        );
+                        setIsSaving(true);
+                        try {
+                          await onSaveToMamamia(patient);
+                          setSaved(true);
+                          setPatientOpen(false);
+                          onPatientSaved?.(true);
+                          scrollPortalToTop();
+                        } catch (err) {
+                          console.error('UpdateCustomer failed:', err);
+                          // Parent already toasted; keep form open so the
+                          // customer can retry without re-entering data.
+                          setPatientOpen(true);
+                        } finally {
+                          setIsSaving(false);
+                        }
+                      } else {
+                        // Mamamia disabled (e.g. local dev) — fall back to
+                        // the old immediate-collapse path.
+                        setSaved(true);
+                        setPatientOpen(false);
+                        onPatientSaved?.(true);
+                        scrollPortalToTop();
                       }
                     }}
+                    disabled={!allComplete || isSaving}
                     className={`flex-1 py-2.5 text-sm font-bold rounded-xl transition-all ${
-                      allComplete
+                      allComplete && !isSaving
                         ? 'bg-[#E76F63] hover:bg-[#D65E52] text-white shadow-sm'
                         : 'bg-gray-100 text-gray-400 cursor-not-allowed'
                     }`}
                   >
-                    {allComplete
-                      ? 'Speichern'
-                      : 'Bitte alle Pflichtfelder ausfüllen'}
+                    {!allComplete
+                      ? 'Bitte alle Pflichtfelder ausfüllen'
+                      : isSaving
+                        ? 'Speichern…'
+                        : 'Speichern'}
                   </button>
                 )}
               </div>

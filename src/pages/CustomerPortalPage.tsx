@@ -976,68 +976,69 @@ const CustomerPortalPage: FC = () => {
           onSaveToMamamia={async (form) => {
             const existingPatientIds = mmCustomer?.patients?.map(p => p.id) ?? [];
 
-            // ── Run AI description + location lookup in parallel ──────────
-            // generateJobDescription: Anthropic (via proxy) produces a 2–3
-            // sentence natural summary. Falls back to mechanical summary if
-            // the API key is missing or the call fails — never blocks save.
-            const [aiResult, locationId] = await Promise.all([
-              callMamamia<{ description: string | null }>('generateJobDescription', {
-                anzahl: form.anzahl,
-                geschlecht: form.geschlecht, geburtsjahr: form.geburtsjahr,
-                pflegegrad: form.pflegegrad, mobilitaet: form.mobilitaet,
-                heben: form.heben, demenz: form.demenz,
-                inkontinenz: form.inkontinenz, nacht: form.nacht,
-                diagnosen: form.diagnosen,
-                p2_geschlecht: form.p2_geschlecht, p2_geburtsjahr: form.p2_geburtsjahr,
-                p2_pflegegrad: form.p2_pflegegrad, p2_mobilitaet: form.p2_mobilitaet,
-                p2_demenz: form.p2_demenz,
-                ort: form.ort, wohnungstyp: form.wohnungstyp,
-                urbanisierung: form.urbanisierung, familieNahe: form.familieNahe,
-                haushalt: form.haushalt, pflegedienst: form.pflegedienst,
-                aufgaben: form.aufgaben, sonstigeWuensche: form.sonstigeWuensche,
-              }).catch(() => ({ description: null })),
+            // ── Save flow: two-phase, basic-first then AI overlay ─────────
+            //
+            // The invite-caregiver gate downstream (canInviteNurse →
+            // patientSaved=true) MUST open only after Mamamia has a full
+            // customer profile, otherwise StoreRequest fails server-side
+            // with a panel error ("zlecenie nie jest otwarte poprawnie").
+            // Previously we ran AI + location in Promise.all and fired a
+            // single updateCustomer — the AI call could take 1–5 s, during
+            // which the form was already collapsed and the customer could
+            // (and did) click "Einladen" against a half-empty profile.
+            //
+            // New shape:
+            //   1. Location lookup (~500 ms typical) — synchronous, fast.
+            //   2. First updateCustomer with the MECHANICAL job_description
+            //      built by the mapper. This is the gating call: caller
+            //      awaits it before flipping patientSaved.
+            //   3. Fire-and-forget AI overlay — Sonnet returns a polished
+            //      2–3 sentence summary that overwrites the mechanical one.
+            //      If the AI call fails or never resolves, the mechanical
+            //      version is already persisted — invite stays unblocked.
 
-              // Resolve Mamamia location_id from PLZ via Locations(search).
-              // Without a canonical id, panel "Lokalizacja opieki" stays empty
-              // even if location_custom_text is set — verified 2026-05-07 on
-              // Customer 7655 (location_custom_text="80332 Munchen", panel
-              // location dropdown empty). Best-effort: errors fall back to
-              // the location_custom_text path inside the mapper.
-              (async () => {
-                const plz = form.plz?.trim();
-                if (plz && /^\d{4,5}$/.test(plz)) {
-                  try {
-                    const r = await callMamamia<{
-                      LocationsWithPagination: {
-                        data: Array<{ id: number; zip_code: string; country_code: string }>;
-                      };
-                    }>('searchLocations', { search: plz, limit: 10, page: 1 });
-                    const rows = r.LocationsWithPagination.data;
-                    const de = rows.find(l => l.country_code === 'DE');
-                    const match = de ?? rows[0];
-                    return match?.id as number | undefined;
-                  } catch {
-                    // swallow — fall back to location_custom_text in mapper
-                  }
-                }
-                return undefined;
-              })(),
-            ]);
+            // ── 1. Location lookup. Resolve Mamamia location_id from PLZ ─
+            // via Locations(search). Without a canonical id, panel
+            // "Lokalizacja opieki" stays empty even if location_custom_text
+            // is set — verified 2026-05-07 on Customer 7655. Best-effort:
+            // errors fall back to the location_custom_text path inside the
+            // mapper.
+            let locationId: number | undefined;
+            const plz = form.plz?.trim();
+            if (plz && /^\d{4,5}$/.test(plz)) {
+              try {
+                const r = await callMamamia<{
+                  LocationsWithPagination: {
+                    data: Array<{ id: number; zip_code: string; country_code: string }>;
+                  };
+                }>('searchLocations', { search: plz, limit: 10, page: 1 });
+                const rows = r.LocationsWithPagination.data;
+                const de = rows.find(l => l.country_code === 'DE');
+                locationId = (de ?? rows[0])?.id as number | undefined;
+              } catch {
+                // swallow — mapper falls back to location_custom_text
+              }
+            }
 
+            // ── 2. Mechanical patch + first updateCustomer (gating). ─────
+            // mapper always produces a non-empty job_description from form
+            // fields, so Mamamia panel now has enough state to validate an
+            // inviteCaregiver immediately after this returns.
             const patch = mapPatientFormToUpdateCustomerInput(form, {
               existingPatientIds,
               locationId,
             });
+            const mechanicalJobDescription = patch.job_description;
 
-            // Override job_description with AI result when available.
-            // The AI already incorporates diagnosen naturally — no suffix needed.
-            // Mechanical summary from mapPatientFormToUpdateCustomerInput
-            // stays as fallback when Anthropic call failed or key is missing.
-            if (aiResult.description) {
-              patch.job_description = aiResult.description;
+            try {
+              await updateCustomerMutation.mutate(patch as Record<string, unknown>);
+            } catch (err) {
+              // Surface the failure to the caller (AngebotCard re-opens the
+              // form and keeps patientSaved=false so invite stays blocked).
+              showToast('Speichern fehlgeschlagen. Bitte erneut versuchen.');
+              throw err;
             }
 
-            await updateCustomerMutation.mutate(patch as Record<string, unknown>);
             // Report back to the kostenrechner lead — patient data complete
             // unlocks invites/applications, so the Nachfass switches to the
             // "last step: invite" variant. Fire-and-forget.
@@ -1049,6 +1050,46 @@ const CustomerPortalPage: FC = () => {
             // mogą się pojawić nowi. Refetch listę żeby user widział
             // aktualny scoring, nie stale wynik z czasu onboardu.
             refetchMatchings();
+
+            // ── 3. AI overlay (fire-and-forget). ─────────────────────────
+            // Sonnet polishes job_description into a natural 2–3 sentence
+            // German summary. We deliberately do NOT await this — the
+            // caller has already moved on to the matchings UI. If it
+            // succeeds, the second updateCustomer overwrites the mechanical
+            // text. If it fails (API down, missing key, timeout), the
+            // mechanical version remains — invite & matching keep working.
+            void (async () => {
+              try {
+                const aiResult = await callMamamia<{ description: string | null }>(
+                  'generateJobDescription',
+                  {
+                    anzahl: form.anzahl,
+                    geschlecht: form.geschlecht, geburtsjahr: form.geburtsjahr,
+                    pflegegrad: form.pflegegrad, mobilitaet: form.mobilitaet,
+                    heben: form.heben, demenz: form.demenz,
+                    inkontinenz: form.inkontinenz, nacht: form.nacht,
+                    diagnosen: form.diagnosen,
+                    p2_geschlecht: form.p2_geschlecht, p2_geburtsjahr: form.p2_geburtsjahr,
+                    p2_pflegegrad: form.p2_pflegegrad, p2_mobilitaet: form.p2_mobilitaet,
+                    p2_demenz: form.p2_demenz,
+                    ort: form.ort, wohnungstyp: form.wohnungstyp,
+                    urbanisierung: form.urbanisierung, familieNahe: form.familieNahe,
+                    haushalt: form.haushalt, pflegedienst: form.pflegedienst,
+                    aufgaben: form.aufgaben, sonstigeWuensche: form.sonstigeWuensche,
+                  },
+                );
+                if (aiResult.description && aiResult.description !== mechanicalJobDescription) {
+                  await updateCustomerMutation.mutate({
+                    job_description: aiResult.description,
+                  });
+                }
+              } catch (err) {
+                // AI overlay is best-effort; mechanical summary already
+                // persisted by the gating call above. Log for diagnostics
+                // but do not toast — the customer's flow is unaffected.
+                console.warn('AI job_description overlay failed (mechanical retained):', err);
+              }
+            })();
           }}
         />
         </div>
