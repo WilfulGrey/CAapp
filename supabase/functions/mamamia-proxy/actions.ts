@@ -467,6 +467,58 @@ const updateCustomer: ActionHandler = async (session, variables, deps) => {
   return runGraphQL(deps, UPDATE_CUSTOMER, patch);
 };
 
+// ─── updateJobDescription — narrow write for the AI overlay ────────────────
+//
+// Writes ONLY customer.job_description. The patient-form save flow on the
+// portal first lands a complete mechanical patch via `updateCustomer`
+// (above) — every association reaches Mamamia in that single write, and the
+// invite gate opens as soon as it succeeds. AI Sonnet then runs in the
+// background and the polished summary lands via this action, without
+// touching any other field.
+//
+// Why a dedicated action instead of reusing `updateCustomer` with a thin
+// `{ job_description }` payload:
+//   • Mamamia treats omitted associations as "wipe to empty" — a thin
+//     payload would null out patients, equipments, wish scalars.
+//   • `updateCustomer`'s defensive `patches = []` default (workaround for a
+//     Mamamia preprod NPE on null patients) means a thin payload would even
+//     ACTIVELY wipe patients. Verified live on customer 8506.
+//
+// Fix: re-fetch current patients[].id and equipments[].id and re-pass them
+// as bare-id stubs. Mamamia merges by id on the patients relation, so a
+// stub `{ id: X }` is a no-op for that patient's scalar fields. Same for
+// equipment_ids — re-passing the current ids is idempotent. The rest of
+// the customer state (wish, contract, location, accommodation, ...) stays
+// untouched because Mamamia merges the customer scalar fields, only
+// associations follow the "omitted = wipe" rule.
+const updateJobDescription: ActionHandler = async (session, variables, deps) => {
+  const text = (variables as { text?: unknown }).text;
+  if (typeof text !== "string" || text.length === 0) {
+    throw new Error("text required (non-empty string)");
+  }
+
+  const current = await runGraphQL<{
+    Customer: {
+      patients: Array<{ id: number }>;
+      equipments: Array<{ id: number }>;
+    };
+  }>(deps, /* GraphQL */ `
+    query PreservePatientsAndEquipments($id: Int!) {
+      Customer(id: $id) {
+        patients { id }
+        equipments { id }
+      }
+    }
+  `, { id: session.customer_id });
+
+  return runGraphQL(deps, UPDATE_CUSTOMER, {
+    id: session.customer_id,
+    job_description: text,
+    patients: current.Customer.patients.map((p) => ({ id: p.id })),
+    equipment_ids: current.Customer.equipments.map((e) => e.id),
+  });
+};
+
 // ─── generateJobDescription — AI-generated care situation summary ──────────
 //
 // Calls Anthropic Messages API (claude-haiku-3-5) to produce a 2–3 sentence
@@ -702,6 +754,7 @@ export const ACTIONS: Record<ProxyAction, ActionHandler> = {
   getCaregiver,
   searchLocations,
   updateCustomer,
+  updateJobDescription,
   rejectApplication,
   storeConfirmation,
   inviteCaregiver,
