@@ -387,15 +387,6 @@ interface PreserveData {
 }
 
 const updateCustomer: ActionHandler = async (session, variables, deps) => {
-  // TEMP DEBUG (revert via PR): log what the portal actually ships in 1st
-  // mutation. Specifically: does `job_description` arrive non-empty, and
-  // does it survive the whitelist? Remove once root cause identified.
-  const _vars = variables as Record<string, unknown>;
-  console.log(
-    `[DBG updateCustomer] cid=${session.customer_id}`,
-    `incoming.job_description=${JSON.stringify(_vars.job_description ?? null)}`,
-    `incoming.keys=${JSON.stringify(Object.keys(_vars).sort())}`,
-  );
   const patch: Record<string, unknown> = { id: session.customer_id };
   for (const [k, v] of Object.entries(variables)) {
     if (k === "customer_caregiver_wish") {
@@ -405,10 +396,6 @@ const updateCustomer: ActionHandler = async (session, variables, deps) => {
       patch[k] = v;
     }
   }
-  console.log(
-    `[DBG updateCustomer] cid=${session.customer_id}`,
-    `post-filter.job_description=${JSON.stringify(patch.job_description ?? null)}`,
-  );
 
   // Mamamia preprod backend regression (verified 2026-05-14 via bisection):
   // UpdateCustomer resolver NPE's when `patients` is null or omitted. An
