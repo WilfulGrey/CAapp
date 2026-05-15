@@ -67,13 +67,36 @@ export const GET_CUSTOMER = /* GraphQL */ `
         weight
         height
         night_operations
+        night_operations_description
+        night_operations_description_de
+        night_operations_description_en
+        night_operations_description_pl
         dementia
         dementia_description
+        dementia_description_de
+        dementia_description_en
+        dementia_description_pl
         incontinence
         incontinence_feces
         incontinence_urine
         smoking
         lift_id
+        lift_description
+        lift_description_de
+        lift_description_en
+        lift_description_pl
+        features_condition
+        features_condition_de
+        features_condition_en
+        features_condition_pl
+        other_tools
+        other_tools_de
+        other_tools_en
+        other_tools_pl
+        lift_mobility_description
+        lift_mobility_description_de
+        lift_mobility_description_en
+        lift_mobility_description_pl
       }
       customer_caregiver_wish {
         id
