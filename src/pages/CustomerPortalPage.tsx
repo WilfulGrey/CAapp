@@ -1079,7 +1079,20 @@ const CustomerPortalPage: FC = () => {
                   },
                 );
                 if (aiResult.description && aiResult.description !== mechanicalJobDescription) {
+                  // Re-send the FULL patch with the AI description over
+                  // the top. Sending only `{ job_description }` would
+                  // trigger Mamamia's "omitted = wipe to empty" behaviour
+                  // on associations the proxy can't preserve from a thin
+                  // payload — patients (proxy defaults to `[]` to dodge a
+                  // resolver NPE, which Mamamia then reads as "delete all
+                  // patients" — verified live on customer 8506 leaving
+                  // "Anzahl der Patienten" blank), plus the wish scalars
+                  // outside the proxy's preserve list (smoking, gender,
+                  // tasks, other_wishes). The patch we built in phase 2
+                  // already carries the full intended state; just override
+                  // the description.
                   await updateCustomerMutation.mutate({
+                    ...(patch as Record<string, unknown>),
                     job_description: aiResult.description,
                   });
                 }
