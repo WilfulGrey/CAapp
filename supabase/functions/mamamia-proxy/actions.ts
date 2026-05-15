@@ -294,7 +294,11 @@ const UPDATE_CUSTOMER_ALLOWED = new Set([
   "location_id",
   "location_custom_text",
   "urbanization_id",
+  // job_description: base + _de mirror the Mamamia panel's manual-save
+  // payload (verified live on customer 8528, 2026-05-15). Backend AI
+  // translator handles _en/_pl from the German source automatically.
   "job_description",
+  "job_description_de",
   "accommodation",
   "caregiver_accommodated",
   "other_people_in_house",
@@ -302,10 +306,9 @@ const UPDATE_CUSTOMER_ALLOWED = new Set([
   "smoking_household",
   "internet",
   "day_care_facility",
+  // day_care_facility_description: base + _de only.
   "day_care_facility_description",
   "day_care_facility_description_de",
-  "day_care_facility_description_en",
-  "day_care_facility_description_pl",
   "caregiver_time_off",
   "pets",
   "is_pet_dog",
@@ -520,7 +523,11 @@ const updateJobDescription: ActionHandler = async (session, variables, deps) => 
 
   const payload = {
     id: session.customer_id,
+    // base + _de mirror Mamamia panel manual-save (verified live
+    // customer 8528, 2026-05-15). Backend AI translator handles
+    // _en/_pl from the German source automatically.
     job_description: text,
+    job_description_de: text,
     patients: current.Customer.patients.map((p) => ({ id: p.id })),
     equipment_ids: current.Customer.equipments.map((e) => e.id),
   };

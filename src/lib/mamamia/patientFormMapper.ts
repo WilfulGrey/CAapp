@@ -464,40 +464,32 @@ function buildPatient(
   const lift = liftIdToApi(heben);
   if (lift !== null) {
     p.lift_id = lift;
-    // lift_description (4 locales) — auto-filled when lift required
-    // (lift_id=1 = Yes). Form does not collect transfer details; panel
-    // UI "Kiedy potrzebne jest podnoszenie?" requires non-empty text.
+    // lift_description: base + _de only. Mamamia backend AI translator
+    // auto-fills _en/_pl from the German source — sending them ourselves
+    // causes inconsistent state (verified live on customer 8528, 2026-05-15).
+    // Base + _de matches what the Mamamia panel sends on manual agent save.
     const ldesc = standardLiftDescription(lift);
     if (ldesc) {
       p.lift_description = ldesc.de;
       p.lift_description_de = ldesc.de;
-      p.lift_description_en = ldesc.en;
-      p.lift_description_pl = ldesc.pl;
     }
   }
 
-  // Dementia gradation lives in dementia_description (4 locales).
-  // Mamamia.dementia is just yes/no — without this, "Mittelgradig" vs
-  // "Schwer" looks identical to the agency.
+  // dementia_description: base + _de only. Captures gradation
+  // (leichtgradig/mittelgradig/schwer) that Mamamia.dementia (yes/no)
+  // doesn't carry on its own. See lift_description comment.
   const demDesc = dementiaDescriptionFromForm(demenz);
   if (demDesc) {
     p.dementia_description = demDesc.de;
     p.dementia_description_de = demDesc.de;
-    p.dementia_description_en = demDesc.en;
-    p.dementia_description_pl = demDesc.pl;
   }
 
-  // night_operations_description (4 locales) — auto-filled when
-  // night_operations != 'no'. Form does not collect details; panel UI
-  // requires non-empty text. Standard placeholder unless customer
-  // overrides via free-text field (none today, but preserved for future).
+  // night_operations_description: base + _de only.
   if (na) {
     const ndesc = standardNightOpsDescription(na);
     if (ndesc) {
       p.night_operations_description = ndesc.de;
       p.night_operations_description_de = ndesc.de;
-      p.night_operations_description_en = ndesc.en;
-      p.night_operations_description_pl = ndesc.pl;
     }
   }
 
@@ -574,7 +566,11 @@ function buildJobDescriptionSummary(form: PatientFormShape): string {
 
 export interface MappedCustomerPatch {
   // Fields that land on Customer root.
+  // job_description: base + _de mirror what the Mamamia panel sends on
+  // manual agent save. Mamamia backend AI translator handles _en/_pl
+  // from the German source automatically.
   job_description?: string;
+  job_description_de?: string;
   other_people_in_house?: string;
   has_family_near_by?: 'yes' | 'no';
   internet?: 'yes' | 'no';
@@ -584,16 +580,11 @@ export interface MappedCustomerPatch {
   // ── Newly mapped (post-2026-04-28 audit) ──
   urbanization_id?: number;
   day_care_facility?: 'yes' | 'no';
-  // Bug #13k (2026-05-07): mutation now accepts dedicated description
-  // fields (verified live via introspection + Customer 7659 sanity).
-  // Pre-Bug-#13k workaround stuffed the pflegedienst description into
-  // job_description as `Pflegedienst: <freq>: <tasks>` — gone, dedicated
-  // fields used directly. Older customers that have legacy segment in
-  // job_description still parse cleanly via reverse mapper.
+  // Bug #13k (2026-05-07): mutation accepts dedicated description fields
+  // (verified live via introspection + Customer 7659 sanity).
+  // Base + _de only — _en/_pl auto-filled by Mamamia AI translator.
   day_care_facility_description?: string;
   day_care_facility_description_de?: string;
-  day_care_facility_description_en?: string;
-  day_care_facility_description_pl?: string;
   pets?: string;
   is_pet_dog?: boolean;
   is_pet_cat?: boolean;
@@ -767,10 +758,9 @@ export function mapPatientFormToUpdateCustomerInput(
       form.pflegedienstAufgaben ?? '',
     );
     if (desc) {
+      // base + _de only; _en/_pl auto-filled by Mamamia AI translator.
       patch.day_care_facility_description = desc.de;
       patch.day_care_facility_description_de = desc.de;
-      patch.day_care_facility_description_en = desc.en;
-      patch.day_care_facility_description_pl = desc.pl;
     }
   }
 
@@ -784,7 +774,12 @@ export function mapPatientFormToUpdateCustomerInput(
   if (form.diagnosen) {
     jobParts.push(`Diagnosen: ${form.diagnosen}`);
   }
-  patch.job_description = jobParts.join(' | ');
+  // Send to both base and _de — matches what the Mamamia panel sends
+  // on a manual agent save (verified live on customer 8528, 2026-05-15).
+  // Mamamia backend AI translator fills _en/_pl from the German source.
+  const jobDescription = jobParts.join(' | ');
+  patch.job_description = jobDescription;
+  patch.job_description_de = jobDescription;
 
   return patch;
 }

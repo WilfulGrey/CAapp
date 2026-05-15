@@ -405,6 +405,7 @@ export const UPDATE_CUSTOMER = /* GraphQL */ `
     $location_custom_text: String
     $urbanization_id: Int
     $job_description: String
+    $job_description_de: String
     $accommodation: String
     $caregiver_accommodated: String
     $other_people_in_house: String
@@ -414,8 +415,6 @@ export const UPDATE_CUSTOMER = /* GraphQL */ `
     $day_care_facility: String
     $day_care_facility_description: String
     $day_care_facility_description_de: String
-    $day_care_facility_description_en: String
-    $day_care_facility_description_pl: String
     $caregiver_time_off: String
     $pets: String
     $is_pet_dog: Boolean
@@ -436,6 +435,7 @@ export const UPDATE_CUSTOMER = /* GraphQL */ `
       location_custom_text: $location_custom_text
       urbanization_id: $urbanization_id
       job_description: $job_description
+      job_description_de: $job_description_de
       accommodation: $accommodation
       caregiver_accommodated: $caregiver_accommodated
       other_people_in_house: $other_people_in_house
@@ -445,8 +445,6 @@ export const UPDATE_CUSTOMER = /* GraphQL */ `
       day_care_facility: $day_care_facility
       day_care_facility_description: $day_care_facility_description
       day_care_facility_description_de: $day_care_facility_description_de
-      day_care_facility_description_en: $day_care_facility_description_en
-      day_care_facility_description_pl: $day_care_facility_description_pl
       caregiver_time_off: $caregiver_time_off
       pets: $pets
       is_pet_dog: $is_pet_dog
