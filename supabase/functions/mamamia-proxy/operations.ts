@@ -37,6 +37,9 @@ export const GET_CUSTOMER = /* GraphQL */ `
       location_id
       location_custom_text
       job_description
+      job_description_de
+      job_description_en
+      job_description_pl
       arrival_at
       departure_at
       care_budget
