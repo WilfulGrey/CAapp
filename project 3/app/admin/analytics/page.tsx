@@ -318,12 +318,12 @@ export default function AnalyticsPage() {
               <Card>
                 <CardHeader>
                   <CardTitle>Conversion-Funnel</CardTitle>
-                  <CardDescription>Von Besucher bis Angebot</CardDescription>
+                  <CardDescription>Von Session bis Angebot</CardDescription>
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-4">
                     <div className="flex items-center justify-between p-4 bg-blue-50 rounded-lg">
-                      <span className="font-medium">Besucher</span>
+                      <span className="font-medium">Sessions</span>
                       <span className="font-bold text-lg">
                         {summary.totalSessions}
                       </span>
@@ -373,7 +373,7 @@ export default function AnalyticsPage() {
                   <div className="space-y-6">
                     <div>
                       <div className="flex justify-between mb-2">
-                        <span className="text-sm font-medium">Besucher → Formular gestartet</span>
+                        <span className="text-sm font-medium">Sessions → Formular gestartet</span>
                         <span className="text-sm font-bold">
                           {summary.totalSessions > 0
                             ? ((summary.formStarted / summary.totalSessions) * 100).toFixed(1)

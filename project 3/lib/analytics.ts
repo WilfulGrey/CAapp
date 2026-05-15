@@ -28,6 +28,16 @@ class Analytics {
   private lastPageView: string | null = null;
   private pageViewStartTime: number = Date.now();
   private formFieldTimes: Map<string, number> = new Map();
+  // Events fired before createOrUpdateSession() set sessionDbId — e.g. the
+  // wizard's step-1 step_view on mount. Replayed by flushPendingEvents().
+  private pendingEvents: Array<() => void> = [];
+
+  private flushPendingEvents() {
+    if (this.pendingEvents.length === 0) return;
+    const queued = this.pendingEvents;
+    this.pendingEvents = [];
+    queued.forEach(fn => fn());
+  }
 
   async init() {
     if (typeof window === 'undefined') return;
@@ -170,6 +180,8 @@ class Analytics {
           this.sessionDbId = newSession.id;
         }
       }
+      // Session id is ready — replay anything queued before now.
+      if (this.sessionDbId) this.flushPendingEvents();
     } catch (error) {
       console.error('Analytics session error:', error);
     }
@@ -233,7 +245,13 @@ class Analytics {
   }
 
   async trackEvent(eventType: string, eventName: string, eventData?: any) {
-    if (!this.sessionDbId) return;
+    if (!this.sessionDbId) {
+      // Fired before the analytics session finished initialising (e.g. the
+      // wizard's step-1 step_view on mount). Queue it — flushPendingEvents()
+      // replays it once the session id is available, instead of dropping it.
+      this.pendingEvents.push(() => this.trackEvent(eventType, eventName, eventData));
+      return;
+    }
     if (!this.hasAnalyticsConsent()) {
       console.log('[Analytics] Skipping event tracking - no consent');
       return;

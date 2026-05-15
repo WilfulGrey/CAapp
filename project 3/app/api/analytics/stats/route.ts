@@ -196,7 +196,14 @@ export async function GET(request: NextRequest) {
     };
     const viewedSessions: Record<number, Set<string>> = {};
     const completedSessions: Record<number, Set<string>> = {};
+    // "Formular gestartet" = any wizard step was viewed. We can't key this on
+    // step 1 alone: the step-1 step_view fires on mount, often before the
+    // analytics session is initialised, so it's dropped. Step 2+ (fired after
+    // user interaction) land fine — so a union over all step_view events is
+    // the robust signal that a session entered the wizard.
+    const startedSessions = new Set<string>();
     for (const e of events) {
+      if (e.event_name === 'step_view') startedSessions.add(e.session_id);
       const step = e.event_data?.step;
       if (typeof step !== 'number') continue;
       if (e.event_name === 'step_view') (viewedSessions[step] ??= new Set()).add(e.session_id);
@@ -216,7 +223,7 @@ export async function GET(request: NextRequest) {
         dropoffRate: viewed > 0 ? Number(((dropoff / viewed) * 100).toFixed(1)) : 0,
       };
     });
-    const formStarted = wizardFunnel[0]?.viewed || 0;
+    const formStarted = startedSessions.size;
 
     const pageViewsByPath = pageViews.reduce((acc: any, pv: any) => {
       acc[pv.page_path] = (acc[pv.page_path] || 0) + 1;
