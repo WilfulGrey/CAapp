@@ -100,6 +100,7 @@ export type ProxyAction =
   | 'searchLocations'
   // writes
   | 'updateCustomer'
+  | 'updateJobDescription'
   | 'rejectApplication'
   | 'storeConfirmation'
   | 'inviteCaregiver'

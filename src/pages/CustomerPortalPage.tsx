@@ -19,6 +19,7 @@ import {
   useStoreConfirmation,
   useInviteCaregiver,
   useUpdateCustomer,
+  useUpdateJobDescription,
 } from '../lib/mamamia/mutations';
 import {
   customerDisplayName,
@@ -130,6 +131,7 @@ const CustomerPortalPage: FC = () => {
   const confirmMutation = useStoreConfirmation();
   const inviteMutation = useInviteCaregiver();
   const updateCustomerMutation = useUpdateCustomer();
+  const updateJobDescriptionMutation = useUpdateJobDescription();
   // K6 (replaced) — customer-scope auth used to require a verify-mail
   // round-trip. As of the panel-style flow (mamamia-proxy → Sanctum SPA
   // login + ImpersonateCustomer), the Edge Function impersonates the
@@ -976,38 +978,33 @@ const CustomerPortalPage: FC = () => {
           onSaveToMamamia={async (form) => {
             const existingPatientIds = mmCustomer?.patients?.map(p => p.id) ?? [];
 
-            // ── Save flow: gating 1st mutation + AI overlay 2nd ────────────
+            // ── Save flow ──────────────────────────────────────────────────
             //
-            // Mamamia preprod has a regression: the 1st UpdateCustomer that
-            // creates/updates patients SILENTLY DROPS per-patient
-            // description fields (lift_description, dementia_description,
-            // night_operations_description) even when the nested patient
-            // carries a valid `id`. A SECOND UpdateCustomer with the same
-            // patients (now confirmed present by id) re-applies and
-            // persists those fields. Verified live on customer 8517 with
-            // PR #92 single-mutation — descriptions stayed empty until a
-            // follow-up write.
+            // One write to land the full patient profile, then a separate
+            // narrow write to overlay the AI-generated job_description.
             //
-            // So we run two writes:
+            // Why narrow overlay (proxy action `updateJobDescription`)
+            // instead of re-sending the whole patch with AI text spread:
+            //   - re-sending the full patch a second time bounces every
+            //     association through Mamamia's resolver again — the
+            //     resolver takes ~10-15 s to fully validate, during which
+            //     panel-side StoreRequest (invite) returns Unauthorized.
+            //   - a thin `{ job_description }` payload would trip Mamamia's
+            //     "omitted associations = wipe" rule AND the proxy's
+            //     defensive `patches=[]` workaround → wipes patients.
+            //   - the dedicated proxy action re-fetches current patient
+            //     and equipment ids and re-passes them as bare-id stubs,
+            //     which Mamamia merges into the existing rows. Nothing
+            //     else is touched, no wipe, no 10s lag.
             //
-            //   1. Gating mutation (awaited): mechanical patch from the
-            //      mapper. Caller (AngebotCard) doesn't flip patientSaved
-            //      until this succeeds, so the invite gate stays closed
-            //      until Mamamia at minimum has the base customer state.
-            //
-            //   2. AI overlay (fire-and-forget): re-sends the FULL patch
-            //      with the AI-generated job_description spread on top.
-            //      Spread (not `{ job_description }` alone) because the
-            //      proxy's defensive `patches=[]` workaround for a
-            //      different Mamamia NPE would otherwise wipe patients,
-            //      and Mamamia's "omitted associations = wipe" rule would
-            //      nuke wish.tasks / other_wishes / etc. Sending the full
-            //      patch a second time is idempotent for everything else
-            //      and turns the description re-write into a no-op when
-            //      AI fails (mechanical text already on the wire).
+            // Sonnet (generateJobDescription) is fire-and-forget after the
+            // gating write so the invite gate opens in ~1 s instead of
+            // ~5 s. Mechanical job_description from the mapper is already
+            // persisted by the gating write — if AI fails or never lands,
+            // the customer profile still has a usable summary.
 
-            // ── Location lookup (~500 ms typical). Synchronous, before
-            // we build the patch so the customer_contract carries the id.
+            // Location lookup synchronous, ~500 ms typical. Required before
+            // building the patch so customer_contract carries the id.
             let locationId: number | undefined;
             const plz = form.plz?.trim();
             if (plz && /^\d{4,5}$/.test(plz)) {
@@ -1028,9 +1025,10 @@ const CustomerPortalPage: FC = () => {
               existingPatientIds,
               locationId,
             });
-            const mechanicalJobDescription = patch.job_description;
 
-            // ── 1. Gating mutation: mechanical patch, awaited. ────────────
+            // ── Gating write: full mechanical patch. Awaited so the caller
+            // (AngebotCard) keeps patientSaved=false until Mamamia has the
+            // complete profile — invite gate opens only on success.
             try {
               await updateCustomerMutation.mutate(patch as Record<string, unknown>);
             } catch (err) {
@@ -1050,19 +1048,11 @@ const CustomerPortalPage: FC = () => {
             // aktualny scoring, nie stale wynik z czasu onboardu.
             refetchMatchings();
 
-            // ── 2. AI overlay + description re-write (fire-and-forget). ──
-            // See top-of-handler comment: the 1st mutation creates the
-            // patients but Mamamia silently drops per-patient descriptions
-            // on creation. A 2nd UpdateCustomer with the same patients
-            // (now persisted by id) DOES retain those fields. We piggyback
-            // on this with the AI-generated job_description so the panel's
-            // "Kurze Zusammenfassung der Tätigkeit" lands as the polished
-            // Sonnet text instead of the mechanical fallback.
-            //
-            // Spread the FULL patch (not `{ job_description }` alone):
-            //   - proxy defensive `patches=[]` would otherwise wipe patients
-            //   - Mamamia "omitted = wipe" would nuke wish.tasks, etc.
-            // The second write is idempotent for every other field.
+            // ── AI overlay (fire-and-forget). Only writes job_description.
+            // Sonnet polishes the mechanical summary into a 2-3 sentence
+            // German text. The proxy's `updateJobDescription` action
+            // preserves patients + equipments by re-fetching their ids,
+            // so nothing else in the customer state is touched.
             void (async () => {
               try {
                 const aiResult = await callMamamia<{ description: string | null }>(
@@ -1083,18 +1073,13 @@ const CustomerPortalPage: FC = () => {
                     aufgaben: form.aufgaben, sonstigeWuensche: form.sonstigeWuensche,
                   },
                 );
-                const finalDescription =
-                  aiResult.description ?? mechanicalJobDescription;
-                await updateCustomerMutation.mutate({
-                  ...(patch as Record<string, unknown>),
-                  job_description: finalDescription,
-                });
+                if (aiResult.description) {
+                  await updateJobDescriptionMutation.mutate({ text: aiResult.description });
+                }
               } catch (err) {
-                // 2nd-write is best-effort. Mechanical job_description
-                // already persisted by the gating call; per-patient
-                // descriptions stay empty if this fails — agency can
-                // populate via panel.
-                console.warn('AI description re-write failed:', err);
+                // AI overlay is best-effort. Mechanical job_description
+                // from the mapper is already persisted by the gating write.
+                console.warn('AI job_description overlay failed (mechanical retained):', err);
               }
             })();
           }}

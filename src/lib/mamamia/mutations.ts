@@ -111,3 +111,15 @@ export function useUpdateCustomer() {
     { UpdateCustomer: { id: number; customer_id: string } }
   >('updateCustomer');
 }
+
+// Narrow write — replaces only customer.job_description, never touching
+// patients / wish / equipments / contract. The proxy action `updateJobDescription`
+// re-fetches current associations as id-stubs before the write, so Mamamia's
+// "omitted = wipe" rule can't damage them. Used for the AI overlay that fires
+// after the main patient-form save in CustomerPortalPage.onSaveToMamamia.
+export function useUpdateJobDescription() {
+  return useMamamiaMutation<
+    { text: string },
+    { UpdateCustomer: { id: number; customer_id: string } }
+  >('updateJobDescription');
+}
