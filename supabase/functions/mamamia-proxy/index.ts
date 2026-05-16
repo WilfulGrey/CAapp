@@ -130,17 +130,29 @@ export async function handleRequest(req: Request, deps: ProxyDeps): Promise<Resp
   } catch (e) {
     const errMsg = (e as Error).message;
     console.error(`proxy[${action}] error:`, errMsg, (e as Error).stack);
+    // Surface the GraphQL error category to the client so it can make retry
+    // decisions without depending on DEBUG_PROXY leakage. Panel-client errors
+    // carry `cat=<category>` per mamamiaPanelClient.ts (e.g. cat=validation
+    // when Mamamia's translator transiently wipes patient description fields
+    // mid-invite — frontend retries those for ~30s).
+    const catMatch = errMsg.match(/\bcat=([a-z?]+)/);
+    const category = catMatch ? catMatch[1] : null;
     // DEBUG_PROXY=1 — leak the underlying message to ease diagnostics on
     // beta. Remove before going to prod (or guard on a non-prod project ref).
     if (Deno.env.get("DEBUG_PROXY") === "1") {
-      return jsonError(502, `upstream failed: ${errMsg}`, baseHeaders);
+      return jsonError(502, `upstream failed: ${errMsg}`, baseHeaders, { category });
     }
-    return jsonError(502, "upstream failed", baseHeaders);
+    return jsonError(502, "upstream failed", baseHeaders, { category });
   }
 }
 
-function jsonError(status: number, message: string, extraHeaders: Record<string, string>): Response {
-  return new Response(JSON.stringify({ error: message }), {
+function jsonError(
+  status: number,
+  message: string,
+  extraHeaders: Record<string, string>,
+  extra: Record<string, unknown> = {},
+): Response {
+  return new Response(JSON.stringify({ error: message, ...extra }), {
     status,
     headers: { ...extraHeaders, "Content-Type": "application/json" },
   });
