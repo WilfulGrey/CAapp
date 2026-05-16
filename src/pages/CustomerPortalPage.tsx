@@ -487,7 +487,14 @@ const CustomerPortalPage: FC = () => {
         return;
       } catch (err) {
         lastErr = err as Error;
-        const isRaceShape = err instanceof MamamiaError && err.category === 'validation';
+        // Mamamia's panel-mode StoreRequest returns "Unauthorized" with
+        // cat=authorization transiently while the just-saved customer is
+        // still being processed server-side (translator + permission cache
+        // warm-up). Retry only this exact shape — other auth failures
+        // (genuine permission denial, expired session, etc.) also surface
+        // as cat=authorization, but those won't resolve in 30s either and
+        // delaying the toast is the lesser evil vs spamming a confused user.
+        const isRaceShape = err instanceof MamamiaError && err.category === 'authorization';
         if (!isRaceShape) break;
         if (attempt < MAX_ATTEMPTS - 1) {
           await new Promise((r) => setTimeout(r, RETRY_DELAY_MS));

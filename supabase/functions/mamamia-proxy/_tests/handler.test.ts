@@ -167,11 +167,12 @@ Deno.test("POST with Mamamia error returns 502 (action failed, generic)", async 
   assertEquals(body.category, null);
 });
 
-Deno.test("POST inviteCaregiver with cat=validation surfaces category in 502 body", async () => {
-  // Frontend uses body.category === 'validation' to silently retry around
-  // Mamamia's translator race (transient field wipes during invite). This
-  // test pins the wire-shape contract: a panel-client error containing
-  // cat=validation must produce {error, category: "validation"} in the body.
+Deno.test("POST inviteCaregiver with cat=authorization surfaces category in 502 body", async () => {
+  // Frontend uses body.category === 'authorization' to silently retry around
+  // Mamamia's transient "Unauthorized" on StoreRequest right after customer
+  // save (server-side state warm-up). This test pins the wire-shape contract:
+  // a panel-client error containing cat=authorization must produce
+  // {error, category: "authorization"} in the body.
   _resetRateLimit(); _resetAgencyTokenCache();
 
   let i = 0;
@@ -184,14 +185,14 @@ Deno.test("POST inviteCaregiver with cat=validation surfaces category in 502 bod
       json: { data: { LoginAgency: { id: 1, email: "x" } } },
       setCookie: ["XSRF-TOKEN=t2; path=/", "mamamia_beta_session=s2; httponly"],
     },
-    // 3. StoreRequest — fails with validation error (the race-condition shape)
+    // 3. StoreRequest — fails with Unauthorized (transient race shape)
     {
       status: 200,
       json: {
         errors: [
           {
-            message: "patient.lift_description: required",
-            extensions: { category: "validation" },
+            message: "Unauthorized",
+            extensions: { category: "authorization" },
           },
         ],
       },
@@ -216,7 +217,7 @@ Deno.test("POST inviteCaregiver with cat=validation surfaces category in 502 bod
   assertEquals(res.status, 502);
   const body = await res.json();
   assertEquals(body.error, "upstream failed");
-  assertEquals(body.category, "validation");
+  assertEquals(body.category, "authorization");
 });
 
 Deno.test("GET method returns 405", async () => {
