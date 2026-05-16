@@ -162,6 +162,62 @@ Deno.test("POST with Mamamia error returns 502 (action failed, generic)", async 
   const body = await res.json();
   // Generic — no internals leak
   assertEquals(body.error, "upstream failed");
+  // No `cat=` in the agency-flow error message, so category is null. Body still
+  // exposes the field for client-side consistency.
+  assertEquals(body.category, null);
+});
+
+Deno.test("POST inviteCaregiver with cat=authorization surfaces category in 502 body", async () => {
+  // Frontend uses body.category === 'authorization' to silently retry around
+  // Mamamia's transient "Unauthorized" on StoreRequest right after customer
+  // save (server-side state warm-up). This test pins the wire-shape contract:
+  // a panel-client error containing cat=authorization must produce
+  // {error, category: "authorization"} in the body.
+  _resetRateLimit(); _resetAgencyTokenCache();
+
+  let i = 0;
+  const responses: Array<{ status: number; json?: unknown; setCookie?: string[] }> = [
+    // 1. /sanctum/csrf-cookie
+    { status: 204, setCookie: ["XSRF-TOKEN=t1; path=/", "mamamia_beta_session=s1; httponly"] },
+    // 2. LoginAgency
+    {
+      status: 200,
+      json: { data: { LoginAgency: { id: 1, email: "x" } } },
+      setCookie: ["XSRF-TOKEN=t2; path=/", "mamamia_beta_session=s2; httponly"],
+    },
+    // 3. StoreRequest — fails with Unauthorized (transient race shape)
+    {
+      status: 200,
+      json: {
+        errors: [
+          {
+            message: "Unauthorized",
+            extensions: { category: "authorization" },
+          },
+        ],
+      },
+    },
+  ];
+  const fetchFn: typeof fetch = async () => {
+    const r = responses[i++];
+    const headers = new Headers();
+    for (const sc of r.setCookie ?? []) headers.append("set-cookie", sc);
+    const bodyAllowed = r.status !== 204 && r.status !== 304;
+    return new Response(
+      bodyAllowed && r.json !== undefined ? JSON.stringify(r.json) : null,
+      { status: r.status, headers },
+    );
+  };
+
+  const cookie = await makeCookie();
+  const res = await handleRequest(
+    baseReq({ action: "inviteCaregiver", variables: { caregiver_id: 10061 } }, cookie),
+    { secrets: SECRETS, fetchFn },
+  );
+  assertEquals(res.status, 502);
+  const body = await res.json();
+  assertEquals(body.error, "upstream failed");
+  assertEquals(body.category, "authorization");
 });
 
 Deno.test("GET method returns 405", async () => {

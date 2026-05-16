@@ -29,7 +29,7 @@ import {
   mapCaregiverToNurse,
 } from '../lib/mamamia/mappers';
 import { mapPatientFormToUpdateCustomerInput } from '../lib/mamamia/patientFormMapper';
-import { callMamamia } from '../lib/mamamia/client';
+import { callMamamia, MamamiaError } from '../lib/mamamia/client';
 import {
   type Application,
   type NurseStatus,
@@ -453,36 +453,69 @@ const CustomerPortalPage: FC = () => {
       throw new Error('not-ready');
     }
 
+    const id = match.caregiverId;
     const nurseName = match.nurse.name ?? '';
 
-    try {
-      await inviteMutation.mutate({ caregiver_id: match.caregiverId });
-      // Report back to the kostenrechner lead — invite = goal reached, the
-      // Nachfass chain gets cancelled server-side. Fire-and-forget.
-      reportLeadEvent(lead?.token, 'caregiver_invited');
-      // Optimistic local override — server source of truth (invitedCaregiverIds)
-      // catches up via refetchInvited(). Override survives until then.
-      const id = match.caregiverId;
-      setStatusOverrides((prev) => {
-        const next = new Map(prev);
-        next.set(id, 'invited');
-        return next;
-      });
-      refetchInvited();
-      if (nurseName) {
-        setApplications((prev) =>
-          prev.map((a) => a.nurse.name === nurseName ? { ...a, isInvited: true } : a)
-        );
-      }
-      showToast(`✓ ${name} wurde eingeladen!`);
-    } catch (err) {
-      console.error('inviteCaregiver failed:', (err as Error).message);
-      // Onboard now lands the customer at status='active' (Customer.arrival_at
-      // wired in 175468f), so the previous Unauthorized-for-draft branch is
-      // obsolete. Any error here is an upstream outage; show generic message.
-      showToast('Einladung konnte nicht gesendet werden. Bitte kontaktieren Sie uns.');
-      throw err;
+    // Mamamia's backend translator runs async after patient-form save and
+    // transiently wipes patient description fields for ~5-7s. During that
+    // window StoreRequest fails with cat=validation. We hide this from the
+    // user: flip optimistic state immediately, retry silently for up to
+    // 30s (6 attempts × 5s), only surface the toast if every retry fails.
+    setStatusOverrides((prev) => {
+      const next = new Map(prev);
+      next.set(id, 'invited');
+      return next;
+    });
+    if (nurseName) {
+      setApplications((prev) =>
+        prev.map((a) => a.nurse.name === nurseName ? { ...a, isInvited: true } : a)
+      );
     }
+
+    const RETRY_DELAY_MS = 5000;
+    const MAX_ATTEMPTS = 6;
+    let lastErr: Error | null = null;
+
+    for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
+      try {
+        await inviteMutation.mutate({ caregiver_id: id });
+        // Report back to the kostenrechner lead — invite = goal reached, the
+        // Nachfass chain gets cancelled server-side. Fire-and-forget.
+        reportLeadEvent(lead?.token, 'caregiver_invited');
+        refetchInvited();
+        showToast(`✓ ${name} wurde eingeladen!`);
+        return;
+      } catch (err) {
+        lastErr = err as Error;
+        // Mamamia's panel-mode StoreRequest returns "Unauthorized" with
+        // cat=authorization transiently while the just-saved customer is
+        // still being processed server-side (translator + permission cache
+        // warm-up). Retry only this exact shape — other auth failures
+        // (genuine permission denial, expired session, etc.) also surface
+        // as cat=authorization, but those won't resolve in 30s either and
+        // delaying the toast is the lesser evil vs spamming a confused user.
+        const isRaceShape = err instanceof MamamiaError && err.category === 'authorization';
+        if (!isRaceShape) break;
+        if (attempt < MAX_ATTEMPTS - 1) {
+          await new Promise((r) => setTimeout(r, RETRY_DELAY_MS));
+        }
+      }
+    }
+
+    // Exhausted retries or hit a non-race error — revert optimistic state.
+    console.error('inviteCaregiver failed after retries:', lastErr?.message);
+    setStatusOverrides((prev) => {
+      const next = new Map(prev);
+      next.delete(id);
+      return next;
+    });
+    if (nurseName) {
+      setApplications((prev) =>
+        prev.map((a) => a.nurse.name === nurseName ? { ...a, isInvited: false } : a)
+      );
+    }
+    showToast('Einladung konnte nicht gesendet werden. Bitte kontaktieren Sie uns.');
+    throw lastErr ?? new Error('invite-failed');
   };
 
   // Used by modal (calls after own animation). Modal doesn't await — it just

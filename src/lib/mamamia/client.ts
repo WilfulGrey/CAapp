@@ -36,6 +36,19 @@ export class MamamiaError extends Error {
   constructor(public status: number, public body: string) {
     super(`MamamiaError ${status}: ${body.slice(0, 200)}`);
   }
+
+  // mamamia-proxy includes `category` in the error body for GraphQL panel-flow
+  // errors (e.g. "validation" / "authorization"). Returns null when body isn't
+  // JSON or carries no category — graceful for HTTP-only errors (network,
+  // gateway, non-proxy sources).
+  get category(): string | null {
+    try {
+      const parsed = JSON.parse(this.body) as { category?: unknown };
+      return typeof parsed.category === 'string' ? parsed.category : null;
+    } catch {
+      return null;
+    }
+  }
 }
 
 async function postJson<T>(path: string, body: object): Promise<T> {
