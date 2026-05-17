@@ -493,7 +493,7 @@ const EINGANGS_LABELS: Record<string, Record<string, string>> = {
   geschlecht: { "egal": "Egal", "weiblich": "Weiblich", "maennlich": "Männlich" },
   erfahrung: { "keine": "Keine Anforderung", "wuenschenswert": "Wünschenswert", "zwingend": "Zwingend erforderlich" },
   weitere_personen: { "ja": "Ja", "nein": "Nein" },
-  care_start_timing: { "sofort": "Sofort (4–7 Tage)", "2-4-wochen": "In 2–4 Wochen", "1-2-monate": "In 1–2 Monaten", "unklar": "Noch unklar" },
+  care_start_timing: { "sofort": "Sofort (4–7 Tage)", "2-4-wochen": "In 2–4 Wochen", "1-2-monate": "In 1–2 Monaten", "unklar": "Ich informiere mich nur" },
 };
 
 function eingangsLabel(key: string, val: string | undefined): string {

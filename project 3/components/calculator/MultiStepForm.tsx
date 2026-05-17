@@ -93,17 +93,23 @@ export function MultiStepForm() {
     stepStartRef.current = Date.now();
   }, [currentStep]);
 
+  // Step-Reihenfolge (PR #108): die Timing-Frage wurde aus Step 1 entfernt
+  // und ans Ende des Funnels (vor das Kontaktformular) verschoben — Step 1
+  // ist jetzt die konkrete Sachfrage "Wie viele Personen benötigen Pflege?",
+  // damit der Einstieg ohne planerisches Commitment funktioniert. Daten-Feld
+  // care_start_timing bleibt erhalten (Lead-Pipeline + Mamamia-Mapping
+  // unverändert).
   function getStepId(step: number): string {
     switch (step) {
-      case 1: return 'care_start_timing';
-      case 2: return 'patient_count';
-      case 3: return 'household_others';
-      case 4: return 'pflegegrad';
-      case 5: return 'mobility';
-      case 6: return 'night_care';
-      case 7: return 'german_level';
-      case 8: return 'driving';
-      case 9: return 'gender';
+      case 1: return 'patient_count';
+      case 2: return 'household_others';
+      case 3: return 'pflegegrad';
+      case 4: return 'mobility';
+      case 5: return 'night_care';
+      case 6: return 'german_level';
+      case 7: return 'driving';
+      case 8: return 'gender';
+      case 9: return 'care_start_timing';
       case 10: return 'contact_form';
       default: return `step_${step}`;
     }
@@ -111,25 +117,42 @@ export function MultiStepForm() {
 
   function getCurrentAnswer(step: number): string | null {
     switch (step) {
-      case 1: return state.careStartTiming;
-      case 2: return state.patientCount;
-      case 3: return state.householdOthers;
-      case 4: return state.pflegegrad;
-      case 5: return state.mobility;
-      case 6: return state.nightCare;
-      case 7: return state.germanLevel;
-      case 8: return state.driving;
-      case 9: return state.gender;
+      case 1: return state.patientCount;
+      case 2: return state.householdOthers;
+      case 3: return state.pflegegrad;
+      case 4: return state.mobility;
+      case 5: return state.nightCare;
+      case 6: return state.germanLevel;
+      case 7: return state.driving;
+      case 8: return state.gender;
+      case 9: return state.careStartTiming;
       default: return null;
     }
   }
 
-  const handleNext = async () => {
+  // Pending Auto-Advance Timer (PR #108). selectAndAdvance schedules
+  // handleNext nach 300ms; klickt der User vor Ablauf eine andere Option,
+  // wird der alte Timer gecleart, der neue startet. handleBack räumt
+  // einen pendierenden Advance auf, damit ein "Zurück"-Klick nie durch
+  // einen verspäteten Vorwärts-Sprung überschrieben wird.
+  const advanceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => {
+    return () => {
+      if (advanceTimer.current) clearTimeout(advanceTimer.current);
+    };
+  }, []);
+
+  const handleNext = async (overrideAnswer?: string | null) => {
     const timeOnStep = Math.round((Date.now() - stepStartRef.current) / 1000);
+    // overrideAnswer wird bei Auto-Advance gesetzt (selectAndAdvance), weil
+    // getCurrentAnswer in dem Render-Zyklus eine stale closure-Version von
+    // state sieht (setState wurde gerade erst geschedulet). Beim Klick auf
+    // den manuellen "Weiter"-Button bleibt overrideAnswer undefined und wir
+    // fallen auf den getCurrentAnswer-Lookup zurück.
     analytics.trackEvent('wizard', 'step_complete', {
       step: currentStep,
       step_name: getStepId(currentStep),
-      answer: getCurrentAnswer(currentStep),
+      answer: overrideAnswer !== undefined ? overrideAnswer : getCurrentAnswer(currentStep),
       time_on_step_seconds: timeOnStep,
     });
 
@@ -152,7 +175,24 @@ export function MultiStepForm() {
     }
   };
 
+  // Auto-Advance Helper für Single-Choice-Steps 1-9: aktualisiert den State
+  // und triggert handleNext nach 300ms (kurze Pause, damit die Auswahl-
+  // Animation gesehen wird). Der "Weiter"-Button wurde auf diesen Steps
+  // entfernt — die Pause entlastet User, die ihre Wahl noch ändern wollen
+  // (eine andere Option zu klicken startet den Timer neu).
+  const selectAndAdvance = (answerValue: string, update: () => void) => {
+    update();
+    if (advanceTimer.current) clearTimeout(advanceTimer.current);
+    advanceTimer.current = setTimeout(() => {
+      handleNext(answerValue);
+    }, 300);
+  };
+
   const handleBack = () => {
+    if (advanceTimer.current) {
+      clearTimeout(advanceTimer.current);
+      advanceTimer.current = null;
+    }
     if (currentStep > 1) {
       analytics.trackEvent('wizard', 'step_back', {
         from_step: currentStep,
@@ -167,15 +207,15 @@ export function MultiStepForm() {
 
   const canProceed = () => {
     switch (currentStep) {
-      case 1: return Boolean(state.careStartTiming);
-      case 2: return Boolean(state.patientCount);
-      case 3: return Boolean(state.householdOthers);
-      case 4: return Boolean(state.pflegegrad !== null);
-      case 5: return Boolean(state.mobility);
-      case 6: return Boolean(state.nightCare);
-      case 7: return Boolean(state.germanLevel);
-      case 8: return Boolean(state.driving);
-      case 9: return Boolean(state.gender);
+      case 1: return Boolean(state.patientCount);
+      case 2: return Boolean(state.householdOthers);
+      case 3: return Boolean(state.pflegegrad !== null);
+      case 4: return Boolean(state.mobility);
+      case 5: return Boolean(state.nightCare);
+      case 6: return Boolean(state.germanLevel);
+      case 7: return Boolean(state.driving);
+      case 8: return Boolean(state.gender);
+      case 9: return Boolean(state.careStartTiming);
       case 10: return Boolean(formData.name && formData.email);
       default: return false;
     }
@@ -315,15 +355,15 @@ export function MultiStepForm() {
   const getStepTitle = () => {
     if (showResults) return "Ihr persönliches Angebot";
     switch (currentStep) {
-      case 1: return "Ab wann wird Betreuung benötigt?";
-      case 2: return "Wie viele Personen benötigen Pflege?";
-      case 3: return "Weitere Personen im Haushalt?";
-      case 4: return "Vorhandener Pflegegrad?";
-      case 5: return "Mobilität der zu betreuenden Person";
-      case 6: return "Nachteinsätze erforderlich?";
-      case 7: return "Deutschkenntnisse der Pflegekraft";
-      case 8: return "Führerschein gewünscht?";
-      case 9: return "Geschlecht der Pflegekraft";
+      case 1: return "Wie viele Personen benötigen Pflege?";
+      case 2: return "Weitere Personen im Haushalt?";
+      case 3: return "Vorhandener Pflegegrad?";
+      case 4: return "Mobilität der zu betreuenden Person";
+      case 5: return "Nachteinsätze erforderlich?";
+      case 6: return "Deutschkenntnisse der Pflegekraft";
+      case 7: return "Führerschein gewünscht?";
+      case 8: return "Geschlecht der Pflegekraft";
+      case 9: return "Wann soll die Betreuung starten?";
       case 10: return "Fast geschafft — Ihr Angebot wartet schon";
       default: return "";
     }
@@ -332,15 +372,15 @@ export function MultiStepForm() {
   const getStepSubtext = () => {
     if (showResults) return "";
     switch (currentStep) {
-      case 1: return "Damit wir Ihre Anfrage optimal einordnen können";
-      case 2: return "Andere im Haushalt erfassen wir im nächsten Schritt.";
-      case 3: return "Personen im Haushalt, die nicht pflegebedürftig sind";
-      case 4: return "Falls unbekannt, bitte schätzen";
-      case 5: return "Wie mobil ist die zu betreuende Person?";
-      case 6: return "Wird nachts Unterstützung benötigt?";
-      case 7: return "Welches Sprachniveau sollte die Betreuungskraft haben?";
-      case 8: return "Sind Autofahren notwendig und nicht anders zu organisieren?";
-      case 9: return "Haben Sie eine Präferenz bezüglich des Geschlechts?";
+      case 1: return "Andere im Haushalt erfassen wir im nächsten Schritt.";
+      case 2: return "Personen im Haushalt, die nicht pflegebedürftig sind";
+      case 3: return "Falls unbekannt, bitte schätzen";
+      case 4: return "Wie mobil ist die zu betreuende Person?";
+      case 5: return "Wird nachts Unterstützung benötigt?";
+      case 6: return "Welches Sprachniveau sollte die Betreuungskraft haben?";
+      case 7: return "Sind Autofahren notwendig und nicht anders zu organisieren?";
+      case 8: return "Haben Sie eine Präferenz bezüglich des Geschlechts?";
+      case 9: return "Egal ob konkret geplant oder noch in der Recherche — wir richten alles danach aus.";
       case 10: return "Sie sehen es gleich am Bildschirm. Eine Kopie kommt zusätzlich per E-Mail — damit Sie es jederzeit nachlesen können.";
       default: return "";
     }
@@ -437,7 +477,7 @@ export function MultiStepForm() {
             Angebot & Pflegekräfte sofort erhalten
           </p>
           <p className="text-sm text-white/90">
-            Kostenlos & unverbindlich · in <span className="font-bold">2 Minuten</span>
+            Ihr persönlicher Preis + passende Pflegekräfte in <span className="font-bold">2 Minuten</span>
           </p>
         </div>
 
@@ -483,18 +523,18 @@ export function MultiStepForm() {
             )}
 
             <div className="space-y-3">
-              {/* Step 1 */}
-              {currentStep === 1 && (
+              {/* Step 9 (was 1) — Timing nach hinten verschoben (PR #108) */}
+              {currentStep === 9 && (
                 <div className="grid grid-cols-1 gap-3">
                   {[
                     { value: 'sofort', label: 'Sofort (4-7 Tage)' },
                     { value: '2-4-wochen', label: 'In 2-4 Wochen' },
                     { value: '1-2-monate', label: 'In 1-2 Monaten' },
-                    { value: 'unklar', label: 'Noch unklar' }
+                    { value: 'unklar', label: 'Ich informiere mich nur' }
                   ].map(({ value, label }) => (
                     <button
                       key={value}
-                      onClick={() => updateState({ careStartTiming: value as any })}
+                      onClick={() => selectAndAdvance(value, () => updateState({ careStartTiming: value as any }))}
                       className={btnClass(state.careStartTiming === value)}
                     >
                       <div className="flex items-center justify-start gap-3.5">
@@ -516,13 +556,13 @@ export function MultiStepForm() {
                 </div>
               )}
 
-              {/* Step 2 */}
-              {currentStep === 2 && (
+              {/* Step 1 (was 2) — Patientenzahl ist jetzt die Einstiegsfrage */}
+              {currentStep === 1 && (
                 <div className="grid grid-cols-1 gap-3">
                   {[{ value: '1-person', label: '1 Pflegebedürftige/r' }, { value: 'ehepaar', label: '2 Pflegebedürftige (Ehepaar)' }].map(({ value, label }) => (
                     <button
                       key={value}
-                      onClick={() => updateState({ patientCount: value as any })}
+                      onClick={() => selectAndAdvance(value, () => updateState({ patientCount: value as any }))}
                       className={btnClass(state.patientCount === value)}
                     >
                       <div className="flex items-center justify-start gap-3.5">
@@ -544,13 +584,13 @@ export function MultiStepForm() {
                 </div>
               )}
 
-              {/* Step 3 */}
-              {currentStep === 3 && (
+              {/* Step 2 (was 3) — Haushalt */}
+              {currentStep === 2 && (
                 <div className="grid grid-cols-1 gap-3">
                   {[{ value: 'ja', label: 'Ja' }, { value: 'nein', label: 'Nein' }].map(({ value, label }) => (
                     <button
                       key={value}
-                      onClick={() => updateState({ householdOthers: value as any })}
+                      onClick={() => selectAndAdvance(value, () => updateState({ householdOthers: value as any }))}
                       className={btnClass(state.householdOthers === value)}
                     >
                       <div className="flex items-center justify-start gap-3.5">
@@ -572,13 +612,13 @@ export function MultiStepForm() {
                 </div>
               )}
 
-              {/* Step 4 */}
-              {currentStep === 4 && (
+              {/* Step 3 (was 4) — Pflegegrad */}
+              {currentStep === 3 && (
                 <div className="grid grid-cols-3 md:grid-cols-6 gap-3">
                   {['0', '1', '2', '3', '4', '5'].map((grad) => (
                     <button
                       key={grad}
-                      onClick={() => updateState({ pflegegrad: grad as any })}
+                      onClick={() => selectAndAdvance(grad, () => updateState({ pflegegrad: grad as any }))}
                       className={`px-4 py-3 border rounded-lg transition-all duration-300 shadow-sm hover:shadow-md ${
                         state.pflegegrad === grad
                           ? 'border-[#8B7355] bg-[#8B7355]/5 ring-1 ring-[#8B7355]/20 shadow-md'
@@ -593,8 +633,8 @@ export function MultiStepForm() {
                 </div>
               )}
 
-              {/* Step 5 */}
-              {currentStep === 5 && (
+              {/* Step 4 (was 5) — Mobilität */}
+              {currentStep === 4 && (
                 <div className="grid grid-cols-1 gap-3">
                   {[
                     { value: 'mobil', label: 'Mobil – geht selbstständig' },
@@ -604,7 +644,7 @@ export function MultiStepForm() {
                   ].map(({ value, label }) => (
                     <button
                       key={value}
-                      onClick={() => updateState({ mobility: value as any, lifting: 'nein' })}
+                      onClick={() => selectAndAdvance(value, () => updateState({ mobility: value as any, lifting: 'nein' }))}
                       className={btnClass(state.mobility === value)}
                     >
                       <div className="flex items-center justify-start gap-3.5">
@@ -626,8 +666,8 @@ export function MultiStepForm() {
                 </div>
               )}
 
-              {/* Step 6 */}
-              {currentStep === 6 && (
+              {/* Step 5 (was 6) — Nachteinsätze */}
+              {currentStep === 5 && (
                 <div className="grid grid-cols-1 gap-3">
                   {[
                     { value: 'nein', label: 'Nein' },
@@ -637,7 +677,7 @@ export function MultiStepForm() {
                   ].map(({ value, label }) => (
                     <button
                       key={value}
-                      onClick={() => updateState({ nightCare: value as any })}
+                      onClick={() => selectAndAdvance(value, () => updateState({ nightCare: value as any }))}
                       className={btnClass(state.nightCare === value)}
                     >
                       <div className="flex items-center justify-start gap-3.5">
@@ -659,8 +699,8 @@ export function MultiStepForm() {
                 </div>
               )}
 
-              {/* Step 7 */}
-              {currentStep === 7 && (
+              {/* Step 6 (was 7) — Deutschkenntnisse */}
+              {currentStep === 6 && (
                 <div className="grid grid-cols-1 gap-3">
                   {[
                     { value: 'grundlegend', label: 'Grundlegend', description: 'Versteht und spricht nur wenige deutsche Wörter' },
@@ -669,7 +709,7 @@ export function MultiStepForm() {
                   ].map(({ value, label, description }) => (
                     <div key={value} className="relative flex items-center gap-2">
                       <button
-                        onClick={() => updateState({ germanLevel: value as any })}
+                        onClick={() => selectAndAdvance(value, () => updateState({ germanLevel: value as any }))}
                         className={`flex-1 ${btnClass(state.germanLevel === value)}`}
                       >
                         <div className="flex items-center justify-start gap-3.5">
@@ -701,8 +741,8 @@ export function MultiStepForm() {
                 </div>
               )}
 
-              {/* Step 8 */}
-              {currentStep === 8 && (
+              {/* Step 7 (was 8) — Führerschein */}
+              {currentStep === 7 && (
                 <div className="grid grid-cols-1 gap-3">
                   {[
                     { value: 'ja', label: 'Ja, unbedingt', description: 'Weniger Auswahl & etwas höhere Kosten. Lässt sich manchmal auch anders lösen (z.B. Taxi, Fahrdienst).' },
@@ -710,7 +750,7 @@ export function MultiStepForm() {
                   ].map(({ value, label, description }) => (
                     <div key={value} className="relative flex items-center gap-2">
                       <button
-                        onClick={() => updateState({ driving: value as any })}
+                        onClick={() => selectAndAdvance(value, () => updateState({ driving: value as any }))}
                         className={`flex-1 ${btnClass(state.driving === value)}`}
                       >
                         <div className="flex items-center justify-start gap-3.5">
@@ -742,8 +782,8 @@ export function MultiStepForm() {
                 </div>
               )}
 
-              {/* Step 9 */}
-              {currentStep === 9 && (
+              {/* Step 8 (was 9) — Geschlecht */}
+              {currentStep === 8 && (
                 <div className="grid grid-cols-1 gap-3">
                   {[
                     { value: 'egal', label: 'Egal' },
@@ -752,7 +792,7 @@ export function MultiStepForm() {
                   ].map(({ value, label }) => (
                     <button
                       key={value}
-                      onClick={() => updateState({ gender: value as any })}
+                      onClick={() => selectAndAdvance(value, () => updateState({ gender: value as any }))}
                       className={btnClass(state.gender === value)}
                     >
                       <div className="flex items-center justify-start gap-3.5">
@@ -846,58 +886,50 @@ export function MultiStepForm() {
           </div>
         </div>
 
-        <div className="px-3 sm:px-6 lg:px-8 pt-4 pb-5 bg-white">
-          {currentStep === totalSteps ? (
-            <div className="flex flex-col gap-2.5">
-              <button
-                onClick={handleNext}
-                disabled={!canProceed() || isSubmitting}
-                className={`w-full py-4 font-bold text-base rounded-full transition-all duration-200 ${
-                  canProceed() && !isSubmitting
-                    ? 'bg-[#E76F63] hover:bg-[#D65E52] text-white shadow-lg hover:shadow-xl cursor-pointer'
-                    : 'bg-[#E5E3DF] text-[#8B8B8B] cursor-not-allowed opacity-60'
-                }`}
-              >
-                {isSubmitting ? (
-                  <div className="flex items-center justify-center gap-2">
-                    <span>Wird gesendet...</span>
-                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                  </div>
-                ) : (
-                  <span>Angebot & Pflegekräfte jetzt sehen →</span>
-                )}
-              </button>
-              <p className="text-center text-xs text-[#8B8B8B] leading-snug">
-                100% kostenfrei &amp; unverbindlich · Mit dem Absenden stimmen Sie unserer{' '}
-                <a href="/datenschutz" target="_blank" className="text-[#8B7355] underline hover:text-[#A68968]">
-                  Datenschutzerklärung
-                </a>{' '}zu.
-              </p>
-            </div>
-          ) : (
-            <div className="flex items-center justify-between gap-5">
-              {currentStep > 1 && (
+        {/* Bottom-Button-Block: auf Step 1 komplett ausgeblendet (kein
+            Zurück, Auto-Advance kümmert sich um Weiter), Steps 2-9 zeigen
+            nur Zurück, Step 10 zeigt den Submit-Button mit Hinweis. */}
+        {(currentStep === totalSteps || currentStep > 1) && (
+          <div className="px-3 sm:px-6 lg:px-8 pt-4 pb-5 bg-white">
+            {currentStep === totalSteps ? (
+              <div className="flex flex-col gap-2.5">
+                <button
+                  onClick={() => handleNext()}
+                  disabled={!canProceed() || isSubmitting}
+                  className={`w-full py-4 font-bold text-base rounded-full transition-all duration-200 ${
+                    canProceed() && !isSubmitting
+                      ? 'bg-[#E76F63] hover:bg-[#D65E52] text-white shadow-lg hover:shadow-xl cursor-pointer'
+                      : 'bg-[#E5E3DF] text-[#8B8B8B] cursor-not-allowed opacity-60'
+                  }`}
+                >
+                  {isSubmitting ? (
+                    <div className="flex items-center justify-center gap-2">
+                      <span>Wird gesendet...</span>
+                      <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                    </div>
+                  ) : (
+                    <span>Angebot & Pflegekräfte jetzt sehen →</span>
+                  )}
+                </button>
+                <p className="text-center text-xs text-[#8B8B8B] leading-snug">
+                  100% kostenfrei &amp; unverbindlich · Mit dem Absenden stimmen Sie unserer{' '}
+                  <a href="/datenschutz" target="_blank" className="text-[#8B7355] underline hover:text-[#A68968]">
+                    Datenschutzerklärung
+                  </a>{' '}zu.
+                </p>
+              </div>
+            ) : (
+              <div className="flex items-center">
                 <button
                   onClick={handleBack}
                   className="px-7 py-3.5 font-semibold text-base rounded-full transition-all duration-200 border-2 border-[#E5E3DF] text-[#708A95] hover:bg-gray-50"
                 >
                   Zurück
                 </button>
-              )}
-              <button
-                onClick={handleNext}
-                disabled={!canProceed() || isSubmitting}
-                className={`${currentStep === 1 ? 'w-full' : ''} px-9 py-3.5 font-bold text-base rounded-full transition-all duration-200 ${
-                  canProceed() && !isSubmitting
-                    ? 'bg-[#E76F63] hover:bg-[#D65E52] text-white shadow-lg hover:shadow-xl cursor-pointer'
-                    : 'bg-[#E5E3DF] text-[#8B8B8B] cursor-not-allowed opacity-60'
-                }`}
-              >
-                Weiter
-              </button>
-            </div>
-          )}
-        </div>
+              </div>
+            )}
+          </div>
+        )}
       </div>
       </div>
 

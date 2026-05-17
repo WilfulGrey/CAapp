@@ -233,10 +233,17 @@ export async function GET(request: NextRequest) {
     // ── Wizard step funnel — unique sessions per step, from analytics_events ──
     // step_view / step_complete are emitted by MultiStepForm. This is the
     // real "where do users drop off, at which step" answer.
+    // Step-Reihenfolge geändert in PR #108: Timing-Frage vom Anfang ans Ende
+    // verschoben, weil Step 1 (Timing) mit 73 % Drop der größte Conversion-
+    // Verlust im Funnel war. Alte step_view/step_complete-Events vor dem
+    // Cutover (#108) sind mit der alten Nummerierung in der DB und werden
+    // hier mit den NEUEN Labels gezeigt — der Funnel-Vergleich über das
+    // Deploy-Datum hinweg ist daher kurz unsauber. Dauer ~2-3 Tage bis neue
+    // Daten dominieren.
     const STEP_NAMES: Record<number, string> = {
-      1: 'Betreuungsbeginn', 2: 'Anzahl Patienten', 3: 'Weitere Person im Haushalt',
-      4: 'Pflegegrad', 5: 'Mobilität', 6: 'Nachteinsätze', 7: 'Deutschkenntnisse',
-      8: 'Führerschein', 9: 'Geschlecht', 10: 'Kontaktformular',
+      1: 'Anzahl Patienten', 2: 'Weitere Person im Haushalt', 3: 'Pflegegrad',
+      4: 'Mobilität', 5: 'Nachteinsätze', 6: 'Deutschkenntnisse',
+      7: 'Führerschein', 8: 'Geschlecht', 9: 'Betreuungsbeginn', 10: 'Kontaktformular',
     };
     const viewedSessions: Record<number, Set<string>> = {};
     const completedSessions: Record<number, Set<string>> = {};
