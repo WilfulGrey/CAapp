@@ -312,7 +312,7 @@ export function MultiStepForm() {
     if (showResults) return "Ihr persönliches Angebot";
     switch (currentStep) {
       case 1: return "Ab wann wird Betreuung benötigt?";
-      case 2: return "Anzahl Patienten?";
+      case 2: return "Wie viele Personen benötigen Pflege?";
       case 3: return "Weitere Person im Haushalt?";
       case 4: return "Vorhandener Pflegegrad?";
       case 5: return "Mobilität der zu betreuenden Person";
@@ -329,7 +329,7 @@ export function MultiStepForm() {
     if (showResults) return "";
     switch (currentStep) {
       case 1: return "Damit wir Ihre Anfrage optimal einordnen können";
-      case 2: return "Wie viele Personen werden gleichzeitig betreut?";
+      case 2: return "Andere im Haushalt erfassen wir im nächsten Schritt.";
       case 3: return "Person im Haushalt, die nicht betreut werden muss";
       case 4: return "Falls unbekannt, bitte schätzen";
       case 5: return "Wie mobil ist die zu betreuende Person?";
@@ -515,7 +515,7 @@ export function MultiStepForm() {
               {/* Step 2 */}
               {currentStep === 2 && (
                 <div className="grid grid-cols-1 gap-3">
-                  {[{ value: '1-person', label: '1 Person' }, { value: 'ehepaar', label: '2 Personen' }].map(({ value, label }) => (
+                  {[{ value: '1-person', label: '1 Pflegebedürftige/r' }, { value: 'ehepaar', label: '2 Pflegebedürftige (Ehepaar)' }].map(({ value, label }) => (
                     <button
                       key={value}
                       onClick={() => updateState({ patientCount: value as any })}
