@@ -63,7 +63,11 @@ export function MultiStepForm() {
     email: '',
     phone: '',
     postalCode: '',
-    acceptPrivacy: false,
+    // Soft-Consent (PR #107): die explizite Pflicht-Checkbox wurde entfernt,
+    // Einwilligung ergibt sich aus dem Absenden + Hinweistext unter dem CTA.
+    // Wert bleibt als `true` initialisiert, damit downstream Code (lead-record,
+    // analytics) ohne Änderung weiterläuft.
+    acceptPrivacy: true,
   });
   const [errors, setErrors] = useState({
     name: '',
@@ -172,7 +176,7 @@ export function MultiStepForm() {
       case 7: return Boolean(state.germanLevel);
       case 8: return Boolean(state.driving);
       case 9: return Boolean(state.gender);
-      case 10: return Boolean(formData.name && formData.email && formData.acceptPrivacy);
+      case 10: return Boolean(formData.name && formData.email);
       default: return false;
     }
   };
@@ -194,12 +198,12 @@ export function MultiStepForm() {
       newErrors.email = 'Bitte geben Sie eine gültige E-Mail-Adresse ein';
     }
 
-    if (!formData.acceptPrivacy) {
-      newErrors.acceptPrivacy = 'Bitte akzeptieren Sie die Datenschutzerklärung';
-    }
+    // Datenschutz-Einwilligung wurde durch Soft-Consent ersetzt (Hinweistext
+    // unter dem CTA, das Absenden gilt als Zustimmung) — kein explizites
+    // Checkbox-Validation mehr nötig.
 
     setErrors(newErrors);
-    return !newErrors.name && !newErrors.email && !newErrors.acceptPrivacy;
+    return !newErrors.name && !newErrors.email;
   };
 
   const handleSubmit = async () => {
@@ -320,7 +324,7 @@ export function MultiStepForm() {
       case 7: return "Deutschkenntnisse der Pflegekraft";
       case 8: return "Führerschein gewünscht?";
       case 9: return "Geschlecht der Pflegekraft";
-      case 10: return "Jetzt Angebot & Pflegekräfte anzeigen";
+      case 10: return "Fast geschafft — Ihr Angebot wartet schon";
       default: return "";
     }
   };
@@ -337,7 +341,7 @@ export function MultiStepForm() {
       case 7: return "Welches Sprachniveau sollte die Betreuungskraft haben?";
       case 8: return "Sind Autofahren notwendig und nicht anders zu organisieren?";
       case 9: return "Haben Sie eine Präferenz bezüglich des Geschlechts?";
-      case 10: return "Letzter Schritt – Sie sehen sofort Ihr Angebot & passende Pflegekräfte und erhalten alles per Mail";
+      case 10: return "Sie sehen es gleich am Bildschirm. Eine Kopie kommt zusätzlich per E-Mail — damit Sie es jederzeit nachlesen können.";
       default: return "";
     }
   };
@@ -787,7 +791,7 @@ export function MultiStepForm() {
                         className={`w-full px-4 py-2.5 text-base border-2 rounded-full focus:outline-none focus:ring-1 focus:ring-[#8B7355]/40 focus:border-[#8B7355] ${
                           errors.name ? 'border-red-500' : 'border-[#B8B0A6]'
                         }`}
-                        placeholder="Vollständiger Name"
+                        placeholder="Ihr Name"
                       />
                       {errors.name && <p className="text-[11px] text-red-500 mt-1 px-3">{errors.name}</p>}
                     </div>
@@ -805,7 +809,7 @@ export function MultiStepForm() {
                         className={`w-full px-4 py-2.5 text-base border-2 rounded-full focus:outline-none focus:ring-1 focus:ring-[#8B7355]/40 focus:border-[#8B7355] ${
                           errors.email ? 'border-red-500' : 'border-[#B8B0A6]'
                         }`}
-                        placeholder="E-Mail-Adresse"
+                        placeholder="Ihre E-Mail-Adresse"
                       />
                       {errors.email && <p className="text-[11px] text-red-500 mt-1 px-3">{errors.email}</p>}
                     </div>
@@ -820,30 +824,21 @@ export function MultiStepForm() {
                         onFocus={() => trackFieldFocus('telefon')}
                         onBlur={(e) => trackFieldBlur('telefon', e.target.value)}
                         className="w-full px-4 py-2.5 text-base border-2 border-[#B8B0A6] rounded-full focus:outline-none focus:ring-1 focus:ring-[#8B7355]/40 focus:border-[#8B7355]"
-                        placeholder="Telefonnummer (optional)"
+                        placeholder="Telefon (optional) — nur falls Sie eine persönliche Rückfrage möchten"
                       />
                     </div>
                   </div>
 
+                  {/* Trust-Bar direkt am Entscheidungspunkt — adressiert die 3
+                      häufigsten Spam-Ängste in einer Zeile (PR #107). */}
                   <div className="pt-1">
-                    <label className="flex items-start gap-2.5 cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={formData.acceptPrivacy}
-                        onChange={(e) => {
-                          setFormData({ ...formData, acceptPrivacy: e.target.checked });
-                          setErrors({ ...errors, acceptPrivacy: '' });
-                        }}
-                        className="mt-0.5 w-4 h-4 text-[#8B7355] border-2 border-[#B8B0A6] rounded focus:ring-2 focus:ring-[#8B7355]/30"
-                      />
-                      <span className="text-[13px] text-[#3D3D3D] leading-snug">
-                        Ich akzeptiere die{' '}
-                        <a href="/datenschutz" target="_blank" className="text-[#8B7355] underline hover:text-[#A68968]">
-                          Datenschutzerklärung
-                        </a>
-                      </span>
-                    </label>
-                    {errors.acceptPrivacy && <p className="text-[11px] text-red-500 mt-1 px-3">{errors.acceptPrivacy}</p>}
+                    <div className="flex flex-wrap items-center justify-center gap-x-3 gap-y-1 text-[11px] text-[#6B6B6B]">
+                      <span className="inline-flex items-center gap-1">🔒 DSGVO</span>
+                      <span className="text-[#D0CCC4]">·</span>
+                      <span className="inline-flex items-center gap-1">✉️ Kein Newsletter</span>
+                      <span className="text-[#D0CCC4]">·</span>
+                      <span className="inline-flex items-center gap-1">📞 Nur auf Wunsch</span>
+                    </div>
                   </div>
                 </div>
               )}
@@ -869,10 +864,15 @@ export function MultiStepForm() {
                     <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
                   </div>
                 ) : (
-                  <span>Angebot & Pflegekräfte anzeigen →</span>
+                  <span>Angebot & Pflegekräfte jetzt sehen →</span>
                 )}
               </button>
-              <p className="text-center text-xs text-[#8B8B8B]">100% kostenfrei &amp; unverbindlich</p>
+              <p className="text-center text-xs text-[#8B8B8B] leading-snug">
+                100% kostenfrei &amp; unverbindlich · Mit dem Absenden stimmen Sie unserer{' '}
+                <a href="/datenschutz" target="_blank" className="text-[#8B7355] underline hover:text-[#A68968]">
+                  Datenschutzerklärung
+                </a>{' '}zu.
+              </p>
             </div>
           ) : (
             <div className="flex items-center justify-between gap-5">
