@@ -871,12 +871,16 @@ export function getTeamNotificationTemplate(
   const statusEmojis = {
     info_requested: '🔵',
     angebot_requested: '🟡',
+    patient_data_saved: '🔵',
+    caregiver_invited: '🟢',
     vertrag_abgeschlossen: '🟢',
   };
 
   const statusText = {
     info_requested: 'Neuer Lead – Kalkulation angefordert',
     angebot_requested: 'Neuer Lead – Angebot angefordert',
+    patient_data_saved: 'Patientenprofil ausgefüllt',
+    caregiver_invited: 'Pflegekraft angefordert',
     vertrag_abgeschlossen: 'Neuer Vertrag abgeschlossen!',
   };
 
@@ -911,6 +915,29 @@ export function getTeamNotificationTemplate(
   const geschlecht = getLabel('geschlecht');
   const careStartTiming = lead.care_start_timing || 'Nicht angegeben';
 
+  // Portal-Deeplink für Status, bei denen das Team direkt ins Kundenportal
+  // einsteigen soll (Patientenprofil ansehen, Pflegekraft-Vorschau, etc.).
+  const portalBase = process.env.NEXT_PUBLIC_PORTAL_URL ?? '';
+  const portalUrl = portalBase && lead.token ? `${portalBase}/?token=${lead.token}` : '';
+  const showPortalCta = (status === 'patient_data_saved' || status === 'caregiver_invited') && Boolean(portalUrl);
+
+  // Pflegekraft-Name aus additionalData für caregiver_invited.
+  const caregiverName = (status === 'caregiver_invited' && additionalData?.caregiverName)
+    ? String(additionalData.caregiverName)
+    : '';
+
+  // Aktionshinweis unten — bei Pflegekraft-Einladung Erstkontakt anstoßen.
+  const actionHighlightHtml = status === 'caregiver_invited'
+    ? '<strong>📞 Bitte Erstkontakt mit der Pflegekraft anstoßen.</strong>'
+    : status === 'patient_data_saved'
+    ? '<strong>👀 Patientenprofil ist gefüllt — Lead ist warm.</strong>'
+    : '<strong>⏰ Keine Aktion erforderlich - Lead wurde automatisch im System erfasst</strong>';
+  const actionHighlightText = status === 'caregiver_invited'
+    ? '📞 Bitte Erstkontakt mit der Pflegekraft anstoßen.'
+    : status === 'patient_data_saved'
+    ? '👀 Patientenprofil ist gefüllt — Lead ist warm.'
+    : '⏰ Keine Aktion erforderlich - Lead wurde automatisch im System erfasst';
+
   return {
     subject: `${emoji} ${text}`,
     html: `
@@ -931,6 +958,16 @@ export function getTeamNotificationTemplate(
       <body>
         <div class="container">
           <h2>${emoji} ${text}</h2>
+
+          ${caregiverName ? `
+            <div class="highlight">
+              <strong>Eingeladene Pflegekraft:</strong> ${caregiverName}
+            </div>
+          ` : ''}
+
+          ${showPortalCta ? `
+            <p><a href="${portalUrl}" style="display:inline-block; background:#5C4A32; color:#fff; padding:10px 18px; text-decoration:none; border-radius:6px; font-weight:bold;">➜ Im Kundenportal ansehen</a></p>
+          ` : ''}
 
           <div class="section-title">Kontaktdaten</div>
           <table>
@@ -979,7 +1016,7 @@ export function getTeamNotificationTemplate(
           ` : ''}
 
           <div class="highlight">
-            <strong>⏰ Keine Aktion erforderlich - Lead wurde automatisch im System erfasst</strong>
+            ${actionHighlightHtml}
           </div>
           <p><a href="${process.env.NEXT_PUBLIC_SITE_URL}/admin/leads/${lead.id}" style="color: #0066CC; font-weight: bold;">➜ Lead im Admin-Panel öffnen</a></p>
         </div>
@@ -988,7 +1025,11 @@ export function getTeamNotificationTemplate(
     `,
     text: `
 ${emoji} ${text}
-
+${caregiverName ? `
+Eingeladene Pflegekraft: ${caregiverName}
+` : ''}${showPortalCta ? `
+➜ Im Kundenportal ansehen: ${portalUrl}
+` : ''}
 === KONTAKTDATEN ===
 Name: ${[lead.anrede_text, lead.vorname, lead.nachname].filter(Boolean).join(' ') || 'N/A'}
 E-Mail: ${lead.email}
@@ -1019,7 +1060,7 @@ ${additionalData ? `
 ${Object.entries(additionalData).map(([key, value]) => `${key}: ${value}`).join('\n')}
 ` : ''}
 
-⏰ Keine Aktion erforderlich - Lead wurde automatisch im System erfasst
+${actionHighlightText}
 
 Lead im Admin-Panel: ${process.env.NEXT_PUBLIC_SITE_URL}/admin/leads/${lead.id}
     `,

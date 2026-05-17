@@ -480,8 +480,13 @@ const CustomerPortalPage: FC = () => {
       try {
         await inviteMutation.mutate({ caregiver_id: id });
         // Report back to the kostenrechner lead — invite = goal reached, the
-        // Nachfass chain gets cancelled server-side. Fire-and-forget.
-        reportLeadEvent(lead?.token, 'caregiver_invited');
+        // Nachfass chain gets cancelled server-side, and the team gets a
+        // notification mail with the caregiver name. Per-caregiver dedupe in
+        // reportLeadEvent so each different invite in the same session fires.
+        reportLeadEvent(lead?.token, 'caregiver_invited', {
+          caregiver_id: id,
+          caregiver_name: nurseName,
+        });
         refetchInvited();
         showToast(`✓ ${name} wurde eingeladen!`);
         return;
