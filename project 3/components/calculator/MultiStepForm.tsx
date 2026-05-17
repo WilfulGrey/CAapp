@@ -330,7 +330,7 @@ export function MultiStepForm() {
     switch (currentStep) {
       case 1: return "Damit wir Ihre Anfrage optimal einordnen können";
       case 2: return "Andere im Haushalt erfassen wir im nächsten Schritt.";
-      case 3: return "Person im Haushalt, die nicht betreut werden muss";
+      case 3: return "Personen im Haushalt, die nicht pflegebedürftig sind";
       case 4: return "Falls unbekannt, bitte schätzen";
       case 5: return "Wie mobil ist die zu betreuende Person?";
       case 6: return "Wird nachts Unterstützung benötigt?";
