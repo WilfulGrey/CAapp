@@ -313,7 +313,7 @@ export function MultiStepForm() {
     switch (currentStep) {
       case 1: return "Ab wann wird Betreuung benötigt?";
       case 2: return "Wie viele Personen benötigen Pflege?";
-      case 3: return "Weitere Person im Haushalt?";
+      case 3: return "Weitere Personen im Haushalt?";
       case 4: return "Vorhandener Pflegegrad?";
       case 5: return "Mobilität der zu betreuenden Person";
       case 6: return "Nachteinsätze erforderlich?";
