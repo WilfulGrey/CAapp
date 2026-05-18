@@ -55,6 +55,33 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'lead not found' }, { status: 404, headers: corsHeaders });
     }
 
+    // Phone sync: when the portal saves the patient form, it ships the
+    // current phone in metadata.phone. We mirror it to leads.telefon so
+    // the team-notification template + any later admin lookup see the
+    // value the customer most recently entered (Mamamia Customer.phone is
+    // the source of truth but leads.telefon is what kostenrechner-side
+    // code reads). Runs even on dedupe-suppressed events so a re-save
+    // with an edited number still propagates.
+    if (
+      event === 'patient_data_saved' &&
+      metadata &&
+      typeof metadata === 'object' &&
+      typeof metadata.phone === 'string'
+    ) {
+      const newPhone = metadata.phone.trim();
+      if (newPhone && newPhone !== lead.telefon) {
+        const { error: updateErr } = await supabase
+          .from('leads')
+          .update({ telefon: newPhone })
+          .eq('id', lead.id);
+        if (updateErr) {
+          console.error('leads.telefon update failed:', updateErr.message);
+        } else {
+          lead.telefon = newPhone;
+        }
+      }
+    }
+
     // Dedupe rule per event:
     // - portal_opened / patient_data_saved → milestone (only first matters
     //   for Nachfass branching). Skip if already recorded.

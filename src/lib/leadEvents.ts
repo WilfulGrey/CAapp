@@ -17,16 +17,25 @@ export interface LeadEventMetadata {
   // team mail). Optional — older callers without these fields still work.
   caregiver_id?: number | string;
   caregiver_name?: string;
+  // patient_data_saved: customer's current phone number from the form so
+  // the kostenrechner endpoint can refresh leads.telefon (kept in sync with
+  // Mamamia Customer.phone after a step-4 edit). Optional.
+  phone?: string;
 }
 
 // Session-level dedupe so a re-render or repeated save doesn't spam the
 // endpoint. For caregiver_invited we include the caregiver id in the key so
 // inviting different caregivers in the same session each produces an event.
+// For patient_data_saved we include phone so a re-save with an edited
+// number actually reaches the server (where leads.telefon gets refreshed).
 const sent = new Set<string>();
 
 function dedupeKey(token: string, event: LeadEvent, metadata?: LeadEventMetadata): string {
   if (event === 'caregiver_invited' && metadata?.caregiver_id != null) {
     return `${token}:${event}:${String(metadata.caregiver_id)}`;
+  }
+  if (event === 'patient_data_saved' && metadata?.phone) {
+    return `${token}:${event}:${metadata.phone}`;
   }
   return `${token}:${event}`;
 }

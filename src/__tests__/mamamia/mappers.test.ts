@@ -849,7 +849,10 @@ describe('mapCaregiverToNurse — hp_recent_assignments detail fields', () => {
 });
 
 describe('mapMamamiaCustomerToPatientForm — phone', () => {
-  function makeCustWithPhone(phone: string | null): MamamiaCustomer {
+  function makeCust(
+    phone: string | null,
+    contractPhone: string | null = null,
+  ): MamamiaCustomer {
     return {
       id: 1, customer_id: 'x-1', status: 'active',
       first_name: null, last_name: null, email: null, phone,
@@ -862,17 +865,28 @@ describe('mapMamamiaCustomerToPatientForm — phone', () => {
       pets: null, is_pet_dog: null, is_pet_cat: null, is_pet_other: null,
       day_care_facility: null,
       patients: null,
-      customer_caregiver_wish: null, customer_contract: null,
+      customer_caregiver_wish: null,
+      customer_contract: contractPhone == null ? null : { id: 1, phone: contractPhone },
     } as unknown as MamamiaCustomer;
   }
 
-  it('surfaces non-empty phone to form', () => {
-    const r = mapMamamiaCustomerToPatientForm(makeCustWithPhone('+49 89 200 000 830'));
+  it('surfaces non-empty Customer.phone to form', () => {
+    const r = mapMamamiaCustomerToPatientForm(makeCust('+49 89 200 000 830'));
     expect(r.phone).toBe('+49 89 200 000 830');
   });
 
-  it('omits phone when null (returning customer prefill loses no leads.telefon fallback)', () => {
-    const r = mapMamamiaCustomerToPatientForm(makeCustWithPhone(null));
+  it('omits phone when both Customer.phone and contract.phone are null', () => {
+    const r = mapMamamiaCustomerToPatientForm(makeCust(null, null));
     expect(r.phone).toBeUndefined();
+  });
+
+  it('falls back to customer_contract.phone when Customer.phone is null (manual panel edit case)', () => {
+    const r = mapMamamiaCustomerToPatientForm(makeCust(null, '+49 30 123 456'));
+    expect(r.phone).toBe('+49 30 123 456');
+  });
+
+  it('prefers Customer.phone over customer_contract.phone when both set', () => {
+    const r = mapMamamiaCustomerToPatientForm(makeCust('+49 89 TOP', '+49 30 CONTRACT'));
+    expect(r.phone).toBe('+49 89 TOP');
   });
 });

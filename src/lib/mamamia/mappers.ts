@@ -778,7 +778,12 @@ export function mapMamamiaCustomerToPatientForm(
   if (cust.internet === 'yes') out.internet = 'Ja';
   else if (cust.internet === 'no') out.internet = 'Nein';
 
-  if (cust.phone) out.phone = cust.phone;
+  // Prefer Customer.phone but fall back to customer_contract.phone — the
+  // panel writes only to contract when an agent edits, so a customer who
+  // has only contract.phone (manual panel edit) still round-trips into
+  // the form cleanly.
+  const phoneValue = cust.phone || cust.customer_contract?.phone;
+  if (phoneValue) out.phone = phoneValue;
 
   if (cust.day_care_facility === 'yes') out.pflegedienst = 'Ja';
   else if (cust.day_care_facility === 'no') out.pflegedienst = 'Nein';
