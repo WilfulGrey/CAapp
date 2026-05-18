@@ -141,6 +141,10 @@ export interface PatientForm {
   diagnosen: string;
   plz: string; ort: string; haushalt: string; wohnungstyp: string; urbanisierung: string;
   familieNahe: string; pflegedienst: string; internet: string;
+  // Contact: required on step 4, prefilled from leads.telefon when the
+  // calculator collected it. Editable. Mapped to Customer.phone via
+  // patientFormMapper → mamamia-proxy.updateCustomer.
+  phone: string;
   // Pflegedienst follow-up: required by Mamamia panel form when
   // pflegedienst='Ja'/'Geplant' (otherwise the customer is incomplete and
   // can't be matched). Frequency = how often, tasks = which tasks the

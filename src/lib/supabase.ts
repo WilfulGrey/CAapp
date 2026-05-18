@@ -187,11 +187,17 @@ export interface PatientPrefill {
   /** Whether other (non-care) people live in the household. Mapped from
    *  calculator's `weitere_personen` (ja/nein) to 'Ja'/'Nein'. */
   haushalt?: string;
+  /** Phone — read directly from leads.telefon (not formularDaten).
+   *  Calculator collects it as optional; portal step 4 requires it. */
+  phone?: string;
 }
 
 export function prefillPatientFromLead(lead: Lead): PatientPrefill {
+  // Phone lives on the lead row directly (not in formularDaten), so it
+  // survives even when the calculator didn't collect anything else.
+  const phone = lead.telefon ?? undefined;
   const fd = lead.kalkulation?.formularDaten;
-  if (!fd) return {};
+  if (!fd) return phone ? { phone } : {};
 
   // Mobilitaet mapping. Marcin's NEW calculator emits one of:
   //   mobil | rollator | rollstuhl | bettlaegerig
@@ -278,5 +284,6 @@ export function prefillPatientFromLead(lead: Lead): PatientPrefill {
     p2_mobilitaet:    isCouple ? mobilitaetLabel : undefined,
     p2_nacht:         isCouple ? nachtLabel : undefined,
     wunschGeschlecht: geschl ? (geschlechtMap[geschl] ?? '') : undefined,
+    phone,
   };
 }

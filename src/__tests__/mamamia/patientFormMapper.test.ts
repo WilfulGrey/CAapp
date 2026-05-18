@@ -47,6 +47,7 @@ function makeForm(overrides: Partial<PatientFormShape> = {}): PatientFormShape {
     sonstigeWuensche: '',
     fuehrerschein: '',
     wunschGetriebe: '',
+    phone: '',
     ...overrides,
   };
 }
@@ -489,6 +490,25 @@ describe('mapPatientFormToUpdateCustomerInput', () => {
       expect(r.day_care_facility).toBe('yes');
       expect(r.day_care_facility_description).toBeUndefined();
       expect(r.job_description).not.toContain('Pflegedienst:');
+    });
+  });
+
+  describe('phone', () => {
+    it('maps form.phone → patch.phone', () => {
+      const r = mapPatientFormToUpdateCustomerInput(makeForm({ phone: '+49 89 200 000 830' }));
+      expect(r.phone).toBe('+49 89 200 000 830');
+    });
+
+    it('trims whitespace', () => {
+      const r = mapPatientFormToUpdateCustomerInput(makeForm({ phone: '   +49 89 123   ' }));
+      expect(r.phone).toBe('+49 89 123');
+    });
+
+    it('empty / whitespace-only → patch.phone omitted (no overwrite with "")', () => {
+      const empty = mapPatientFormToUpdateCustomerInput(makeForm({ phone: '' }));
+      expect(empty.phone).toBeUndefined();
+      const spaces = mapPatientFormToUpdateCustomerInput(makeForm({ phone: '   ' }));
+      expect(spaces.phone).toBeUndefined();
     });
   });
 });

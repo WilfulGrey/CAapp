@@ -14,6 +14,7 @@ export interface PatientFormShape {
   diagnosen: string;
   plz: string; ort: string; haushalt: string; wohnungstyp: string; urbanisierung: string;
   familieNahe: string; pflegedienst: string; internet: string;
+  phone: string;
   // Pflegedienst follow-up — populated by AngebotCard step 2 when
   // pflegedienst='Ja'/'Geplant'. See buildDayCareFacilityDescription.
   pflegedienstHaeufigkeit: string;
@@ -577,6 +578,7 @@ export interface MappedCustomerPatch {
   accommodation?: string;
   location_id?: number;
   location_custom_text?: string;
+  phone?: string;
   // ── Newly mapped (post-2026-04-28 audit) ──
   urbanization_id?: number;
   day_care_facility?: 'yes' | 'no';
@@ -696,6 +698,11 @@ export function mapPatientFormToUpdateCustomerInput(
 
   const net = yesNoToApi(form.internet);
   if (net) patch.internet = net;
+
+  // Phone — trim + skip empty so a bypassed-validation empty form doesn't
+  // overwrite an existing Customer.phone with ''.
+  const phoneTrimmed = form.phone?.trim();
+  if (phoneTrimmed) patch.phone = phoneTrimmed;
 
   // ── customer_caregiver_wish nested ───────────────────────────────────
   // wunschGeschlecht / rauchen / aufgaben / sonstigeWuensche all live
