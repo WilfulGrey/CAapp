@@ -156,6 +156,7 @@ export const AngebotCard: FC<{
     wunschGeschlecht: pick('wunschGeschlecht'),
     rauchen: pick('rauchen'), sonstigeWuensche: pick('sonstigeWuensche'),
     wunschGetriebe: pick('wunschGetriebe'),
+    phone: pick('phone'),
   });
 
   const zwei = patient.anzahl === '2';
@@ -279,7 +280,7 @@ export const AngebotCard: FC<{
       return baseOk;
     }
     if (s === 3) {
-      const baseOk = patient.wunschGeschlecht !== '' && patient.rauchen !== '' && patient.fuehrerschein !== '';
+      const baseOk = patient.wunschGeschlecht !== '' && patient.rauchen !== '' && patient.fuehrerschein !== '' && patient.phone.trim() !== '';
       if (patient.fuehrerschein === 'Ja') {
         return baseOk && patient.wunschGetriebe !== '';
       }
@@ -1128,6 +1129,18 @@ export const AngebotCard: FC<{
               {/* ── Step 4: Wünsche zur PK ── */}
               {step === 3 && (
                 <>
+                  <div>
+                    <label className={labelCls}>Telefonnummer <span className="text-red-400">*</span></label>
+                    <input
+                      type="tel"
+                      value={patient.phone}
+                      onChange={set('phone')}
+                      placeholder="z.B. +49 89 200 000 830"
+                      autoComplete="tel"
+                      inputMode="tel"
+                      className={inputCls}
+                    />
+                  </div>
                   <div>
                     <label className={labelCls}>Gewünschtes Geschlecht der PK <span className="text-red-400">*</span></label>
                     <CustomSelect value={patient.wunschGeschlecht} onChange={v => updatePatient(p=>({...p,wunschGeschlecht:v}))}

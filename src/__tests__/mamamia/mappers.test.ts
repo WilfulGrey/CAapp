@@ -847,3 +847,32 @@ describe('mapCaregiverToNurse — hp_recent_assignments detail fields', () => {
     expect(n.detailedAssignments?.[0]?.patientCount).toBe(2);
   });
 });
+
+describe('mapMamamiaCustomerToPatientForm — phone', () => {
+  function makeCustWithPhone(phone: string | null): MamamiaCustomer {
+    return {
+      id: 1, customer_id: 'x-1', status: 'active',
+      first_name: null, last_name: null, email: null, phone,
+      language_id: null, location_id: null, location_custom_text: null,
+      job_description: null, arrival_at: null, departure_at: null,
+      care_budget: null, gender: null, year_of_birth: null,
+      accommodation: null, caregiver_accommodated: null,
+      other_people_in_house: null, has_family_near_by: null,
+      smoking_household: null, internet: null, urbanization_id: null,
+      pets: null, is_pet_dog: null, is_pet_cat: null, is_pet_other: null,
+      day_care_facility: null,
+      patients: null,
+      customer_caregiver_wish: null, customer_contract: null,
+    } as unknown as MamamiaCustomer;
+  }
+
+  it('surfaces non-empty phone to form', () => {
+    const r = mapMamamiaCustomerToPatientForm(makeCustWithPhone('+49 89 200 000 830'));
+    expect(r.phone).toBe('+49 89 200 000 830');
+  });
+
+  it('omits phone when null (returning customer prefill loses no leads.telefon fallback)', () => {
+    const r = mapMamamiaCustomerToPatientForm(makeCustWithPhone(null));
+    expect(r.phone).toBeUndefined();
+  });
+});

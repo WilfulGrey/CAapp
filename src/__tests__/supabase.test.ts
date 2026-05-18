@@ -162,11 +162,23 @@ describe('prefillPatientFromLead', () => {
       nacht: 'Bis zu 1 Mal',
       haushalt: 'Nein',         // baseLead.formularDaten.weitere_personen='nein'
       wunschGeschlecht: 'Weiblich',
+      phone: '+49 89 1234567',
     });
   });
 
   it('returns empty object when kalkulation is null', () => {
     expect(prefillPatientFromLead(bareLead)).toEqual({});
+  });
+
+  it('surfaces lead.telefon as phone even when kalkulation is null', () => {
+    expect(prefillPatientFromLead({ ...bareLead, telefon: '+49 30 555' })).toEqual({
+      phone: '+49 30 555',
+    });
+  });
+
+  it('phone undefined when lead.telefon is null', () => {
+    expect(prefillPatientFromLead(baseLead).phone).toBe('+49 89 1234567');
+    expect(prefillPatientFromLead({ ...baseLead, telefon: null }).phone).toBeUndefined();
   });
 
   it("maps betreuung_fuer='ehepaar' to anzahl=2 (couple under care)", () => {

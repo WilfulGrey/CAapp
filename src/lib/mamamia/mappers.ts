@@ -648,6 +648,7 @@ export interface PatientFormPrefill {
   // with the user's previously-saved Automatik / Schaltung pick.
   wunschGetriebe?: string;
   aufgaben?: string; sonstigeWuensche?: string;
+  phone?: string;
 }
 
 function mamamiaPatientToForm(
@@ -776,6 +777,8 @@ export function mapMamamiaCustomerToPatientForm(
 
   if (cust.internet === 'yes') out.internet = 'Ja';
   else if (cust.internet === 'no') out.internet = 'Nein';
+
+  if (cust.phone) out.phone = cust.phone;
 
   if (cust.day_care_facility === 'yes') out.pflegedienst = 'Ja';
   else if (cust.day_care_facility === 'no') out.pflegedienst = 'Nein';
