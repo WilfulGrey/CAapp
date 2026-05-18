@@ -1077,7 +1077,17 @@ const CustomerPortalPage: FC = () => {
             // Report back to the kostenrechner lead — patient data complete
             // unlocks invites/applications, so the Nachfass switches to the
             // "last step: invite" variant. Fire-and-forget.
-            reportLeadEvent(lead?.token, 'patient_data_saved');
+            //
+            // Pass phone so the kostenrechner endpoint can refresh
+            // leads.telefon (kept in sync with Mamamia Customer.phone after
+            // a step-4 edit). Dedupe key includes phone, so a follow-up
+            // save with an edited number re-fires.
+            const phoneForLead = form.phone?.trim();
+            reportLeadEvent(
+              lead?.token,
+              'patient_data_saved',
+              phoneForLead ? { phone: phoneForLead } : undefined,
+            );
             // Patient form save flippa customer na active + dorzuca pełne
             // patient/wish dane. Mamamia matching engine re-scoreuje całą
             // listę z nowymi inputami — początkowo zwrócone caregivers

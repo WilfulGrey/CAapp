@@ -602,7 +602,11 @@ export interface MappedCustomerPatch {
   // Beta miała plural patient_contracts + invoice_contract — prod ma
   // singular customer_contract (1:1). Refactor 2026-05-12 na singular
   // który działa na obu środowiskach.
-  customer_contract?: { location_id?: number };
+  // phone: Mamamia panel "Dane kontaktowe" reads from customer_contract.phone,
+  // NOT Customer.phone top-level (same trap as Bug #13l with location_id).
+  // We write to both so panel renders + agency tooling that queries the
+  // top-level field also sees the value.
+  customer_contract?: { location_id?: number; phone?: string };
   customer_caregiver_wish?: CaregiverWishPatch;
   // Patient array.
   patients?: Array<Record<string, unknown>>;
@@ -701,8 +705,17 @@ export function mapPatientFormToUpdateCustomerInput(
 
   // Phone — trim + skip empty so a bypassed-validation empty form doesn't
   // overwrite an existing Customer.phone with ''.
+  //
+  // Write to both Customer.phone (top-level) AND customer_contract.phone.
+  // The Mamamia panel's contact section renders contract.phone — top-level
+  // alone leaves the panel blank (verified live 2026-05-18 on Customer
+  // 8569: Customer.phone set, contract.phone null, panel showed empty).
+  // Same pattern as Bug #13l for location_id.
   const phoneTrimmed = form.phone?.trim();
-  if (phoneTrimmed) patch.phone = phoneTrimmed;
+  if (phoneTrimmed) {
+    patch.phone = phoneTrimmed;
+    patch.customer_contract = { ...(patch.customer_contract ?? {}), phone: phoneTrimmed };
+  }
 
   // ── customer_caregiver_wish nested ───────────────────────────────────
   // wunschGeschlecht / rauchen / aufgaben / sonstigeWuensche all live

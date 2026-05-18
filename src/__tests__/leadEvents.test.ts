@@ -73,4 +73,13 @@ describe('reportLeadEvent', () => {
     reportLeadEvent('tok-1', 'patient_data_saved');
     expect(calls()).toHaveLength(2);
   });
+
+  it('re-fires patient_data_saved when phone changes (so leads.telefon sync runs)', () => {
+    reportLeadEvent('tok-1', 'patient_data_saved', { phone: '+49 89 111' });
+    reportLeadEvent('tok-1', 'patient_data_saved', { phone: '+49 89 111' }); // dedupe
+    reportLeadEvent('tok-1', 'patient_data_saved', { phone: '+49 89 222' }); // new value
+    expect(calls()).toHaveLength(2);
+    expect(bodyOf(0).metadata).toEqual({ phone: '+49 89 111' });
+    expect(bodyOf(1).metadata).toEqual({ phone: '+49 89 222' });
+  });
 });

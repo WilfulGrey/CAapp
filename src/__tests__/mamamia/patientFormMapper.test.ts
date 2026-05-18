@@ -494,21 +494,34 @@ describe('mapPatientFormToUpdateCustomerInput', () => {
   });
 
   describe('phone', () => {
-    it('maps form.phone → patch.phone', () => {
+    it('maps form.phone → patch.phone AND customer_contract.phone', () => {
       const r = mapPatientFormToUpdateCustomerInput(makeForm({ phone: '+49 89 200 000 830' }));
       expect(r.phone).toBe('+49 89 200 000 830');
+      // Mamamia panel reads from customer_contract.phone, not top-level.
+      expect(r.customer_contract?.phone).toBe('+49 89 200 000 830');
     });
 
-    it('trims whitespace', () => {
+    it('phone + locationId share the same customer_contract object', () => {
+      const r = mapPatientFormToUpdateCustomerInput(
+        makeForm({ phone: '+49 89 123' }),
+        { locationId: 13035 },
+      );
+      expect(r.customer_contract).toEqual({ location_id: 13035, phone: '+49 89 123' });
+    });
+
+    it('trims whitespace on both fields', () => {
       const r = mapPatientFormToUpdateCustomerInput(makeForm({ phone: '   +49 89 123   ' }));
       expect(r.phone).toBe('+49 89 123');
+      expect(r.customer_contract?.phone).toBe('+49 89 123');
     });
 
-    it('empty / whitespace-only → patch.phone omitted (no overwrite with "")', () => {
+    it('empty / whitespace-only → patch.phone + customer_contract.phone both omitted', () => {
       const empty = mapPatientFormToUpdateCustomerInput(makeForm({ phone: '' }));
       expect(empty.phone).toBeUndefined();
+      expect(empty.customer_contract).toBeUndefined();
       const spaces = mapPatientFormToUpdateCustomerInput(makeForm({ phone: '   ' }));
       expect(spaces.phone).toBeUndefined();
+      expect(spaces.customer_contract).toBeUndefined();
     });
   });
 });
