@@ -7,7 +7,7 @@
 // portal_opened / patient_data_saved; caregiver_invited is intentionally NOT
 // deduped on the server so each invite produces one team mail.
 
-const KOSTENRECHNER_URL =
+export const KOSTENRECHNER_URL =
   import.meta.env.VITE_KOSTENRECHNER_URL || 'https://kostenrechner.primundus.de';
 
 export type LeadEvent = 'portal_opened' | 'patient_data_saved' | 'caregiver_invited';

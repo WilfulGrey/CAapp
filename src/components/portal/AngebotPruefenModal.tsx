@@ -5,29 +5,52 @@ import type { Nurse } from '../../types';
 import type { Application } from './shared';
 import { displayName, initials } from './shared';
 
+// Contract form data captured in step 2. Returned to parent via onAccept
+// so it can be POSTed to the kostenrechner bridge (which fires the team
+// mail + persists in lead_application_acceptances). MVP: this data does
+// NOT go to Mamamia.
+export interface ContractFormData {
+  anrede: string;
+  vorname: string;
+  nachname: string;
+  strasse: string;
+  einsatzort: string;
+  telefon: string;
+  email: string;
+  kpAnrede: string;
+  kpVorname: string;
+  kpNachname: string;
+  kpTelefon: string;
+  kpEmail: string;
+}
+
 export const AngebotPruefenModal: FC<{
   app: Application;
+  /** Parent-supplied defaults derived from lead + mmCustomer. Empty values
+   *  render empty fields (NOT hardcoded fixture data). Step 2 lets the
+   *  customer correct/fill before accepting. */
+  prefill?: Partial<ContractFormData>;
   onClose: () => void;
-  onAccept: (id: string) => void;
+  onAccept: (id: string, data: ContractFormData) => void | Promise<void>;
   onNurseClick: (n: Nurse) => void;
-}> = ({ app, onClose, onAccept, onNurseClick }) => {
+}> = ({ app, prefill, onClose, onAccept, onNurseClick }) => {
   const [step, setStep] = useState<1 | 2>(1);
   const { nurse, offer } = app;
   const inits = initials(nurse.name);
   const name = displayName(nurse.name);
 
-  const [anrede, setAnrede] = useState('Frau');
-  const [vorname, setVorname] = useState('Hildegard');
-  const [nachname, setNachname] = useState('Müller');
-  const [strasse, setStrasse] = useState('Rosenstraße 12');
-  const [einsatzort, setEinsatzort] = useState('80331, München');
-  const [telefon, setTelefon] = useState('');
-  const [email, setEmail] = useState('');
-  const [kpAnrede, setKpAnrede] = useState('');
-  const [kpVorname, setKpVorname] = useState('');
-  const [kpNachname, setKpNachname] = useState('');
-  const [kpTelefon, setKpTelefon] = useState('');
-  const [kpEmail, setKpEmail] = useState('');
+  const [anrede, setAnrede] = useState(prefill?.anrede ?? 'Frau');
+  const [vorname, setVorname] = useState(prefill?.vorname ?? '');
+  const [nachname, setNachname] = useState(prefill?.nachname ?? '');
+  const [strasse, setStrasse] = useState(prefill?.strasse ?? '');
+  const [einsatzort, setEinsatzort] = useState(prefill?.einsatzort ?? '');
+  const [telefon, setTelefon] = useState(prefill?.telefon ?? '');
+  const [email, setEmail] = useState(prefill?.email ?? '');
+  const [kpAnrede, setKpAnrede] = useState(prefill?.kpAnrede ?? '');
+  const [kpVorname, setKpVorname] = useState(prefill?.kpVorname ?? '');
+  const [kpNachname, setKpNachname] = useState(prefill?.kpNachname ?? '');
+  const [kpTelefon, setKpTelefon] = useState(prefill?.kpTelefon ?? '');
+  const [kpEmail, setKpEmail] = useState(prefill?.kpEmail ?? '');
   const [agbChecked, setAgbChecked] = useState(false);
   const canAccept = vorname.trim() !== '' && nachname.trim() !== '' && einsatzort.trim() !== ''
     && kpVorname.trim() !== '' && kpNachname.trim() !== '' && kpTelefon.trim() !== '' && agbChecked;
@@ -297,7 +320,10 @@ export const AngebotPruefenModal: FC<{
                   ← Zurück
                 </button>
                 <button
-                  onClick={() => canAccept && onAccept(app.id)}
+                  onClick={() => canAccept && onAccept(app.id, {
+                    anrede, vorname, nachname, strasse, einsatzort, telefon, email,
+                    kpAnrede, kpVorname, kpNachname, kpTelefon, kpEmail,
+                  })}
                   disabled={!canAccept}
                   className={`flex-1 rounded-xl py-3 text-sm font-bold transition-all ${canAccept ? 'bg-[#E76F63] hover:bg-[#D65E52] text-white' : 'bg-gray-100 text-gray-400 cursor-not-allowed'}`}
                 >

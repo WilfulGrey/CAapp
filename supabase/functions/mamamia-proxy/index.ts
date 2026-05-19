@@ -195,6 +195,18 @@ function makeRealSupabase(url: string, serviceKey: string): ProxySupabase {
         );
       if (error) throw new Error(`supabase upsertDismissedCaregiver: ${error.message}`);
     },
+    async selectAcceptedApplications(leadId) {
+      const { data, error } = await client
+        .from("lead_application_acceptances")
+        .select("application_id, caregiver_id, accepted_at")
+        .eq("lead_id", leadId);
+      if (error) throw new Error(`supabase selectAcceptedApplications: ${error.message}`);
+      return (data ?? []) as Array<{
+        application_id: number;
+        caregiver_id: number | null;
+        accepted_at: string;
+      }>;
+    },
   };
 }
 

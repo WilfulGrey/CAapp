@@ -15,6 +15,7 @@ import type {
   MamamiaInterest,
   MamamiaJobOfferInterestsResponse,
   MamamiaDismissedCaregivers,
+  MamamiaAcceptedApplications,
   MamamiaCaregiverFull,
   MamamiaLocation,
   PaginatedResponse,
@@ -138,6 +139,20 @@ export function useInterests(enabled = true) {
   );
   const interests: MamamiaInterest[] = state.data?.JobOffer?.interests ?? [];
   return { ...state, data: interests };
+}
+
+// Set of Mamamia application_ids the customer has confirmed via
+// AngebotPruefenModal step 2 (lead_application_acceptances). On portal
+// load this flips the matching Application's local status to 'accepted'
+// so the existing BookedScreen surfaces and persists across reload.
+// Mamamia is NOT involved — pure local MVP state.
+export function useAcceptedApplications(enabled = true) {
+  const state = useMamamiaQuery<MamamiaAcceptedApplications>(
+    'listAcceptedApplications',
+    {},
+    enabled,
+  );
+  return { ...state, data: state.data ?? null };
 }
 
 // Local UI dismiss-set per lead (lead_dismissed_caregivers). Frontend

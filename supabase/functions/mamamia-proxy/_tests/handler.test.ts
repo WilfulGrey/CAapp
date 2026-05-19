@@ -317,6 +317,7 @@ Deno.test("dismissCaregiver: writes via Supabase adapter, idempotent", async () 
     upsertDismissedCaregiver: async (leadId: string, caregiverId: number, kind: "interest" | "application") => {
       upsertCalls.push({ leadId, caregiverId, kind });
     },
+    selectAcceptedApplications: async () => [],
   };
 
   const res = await handleRequest(
@@ -336,6 +337,7 @@ Deno.test("dismissCaregiver: rejects missing caregiver_id", async () => {
   const supabase = {
     selectDismissedCaregivers: async () => [],
     upsertDismissedCaregiver: async () => {},
+    selectAcceptedApplications: async () => [],
   };
   const res = await handleRequest(
     baseReq({ action: "dismissCaregiver", variables: { kind: "interest" } }, cookie),
@@ -350,6 +352,7 @@ Deno.test("dismissCaregiver: rejects bad kind", async () => {
   const supabase = {
     selectDismissedCaregivers: async () => [],
     upsertDismissedCaregiver: async () => {},
+    selectAcceptedApplications: async () => [],
   };
   const res = await handleRequest(
     baseReq({ action: "dismissCaregiver", variables: { caregiver_id: 50001, kind: "garbage" } }, cookie),
@@ -371,6 +374,7 @@ Deno.test("listDismissedCaregivers: reads via session.lead_id, returns caregiver
       ];
     },
     upsertDismissedCaregiver: async () => {},
+    selectAcceptedApplications: async () => [],
   };
 
   const res = await handleRequest(
@@ -381,4 +385,53 @@ Deno.test("listDismissedCaregivers: reads via session.lead_id, returns caregiver
   assertEquals(selectArg, SESSION_PAYLOAD.lead_id);
   const body = await res.json();
   assertEquals(body.data.caregiver_ids, [50001, 50002]);
+});
+
+// ─── Acceptance actions ────────────────────────────────────────────────────
+
+Deno.test("listAcceptedApplications: reads via session.lead_id, returns application_ids[]", async () => {
+  _resetRateLimit(); _resetAgencyTokenCache();
+  const cookie = await makeCookie();
+  let selectArg: string | null = null;
+  const supabase = {
+    selectDismissedCaregivers: async () => [],
+    upsertDismissedCaregiver: async () => {},
+    selectAcceptedApplications: async (leadId: string) => {
+      selectArg = leadId;
+      return [
+        { application_id: 7997, caregiver_id: 26960, accepted_at: "2026-05-19T12:00:00Z" },
+        { application_id: 8001, caregiver_id: 27001, accepted_at: "2026-05-19T13:00:00Z" },
+      ];
+    },
+  };
+
+  const res = await handleRequest(
+    baseReq({ action: "listAcceptedApplications" }, cookie),
+    { secrets: SECRETS, supabase, fetchFn: okFetch({}) },
+  );
+  assertEquals(res.status, 200);
+  assertEquals(selectArg, SESSION_PAYLOAD.lead_id);
+  const body = await res.json();
+  assertEquals(body.data.application_ids, [7997, 8001]);
+  assertEquals(body.data.rows.length, 2);
+  assertEquals(body.data.rows[0].application_id, 7997);
+  assertEquals(body.data.rows[0].caregiver_id, 26960);
+});
+
+Deno.test("listAcceptedApplications: empty returns application_ids=[]", async () => {
+  _resetRateLimit(); _resetAgencyTokenCache();
+  const cookie = await makeCookie();
+  const supabase = {
+    selectDismissedCaregivers: async () => [],
+    upsertDismissedCaregiver: async () => {},
+    selectAcceptedApplications: async () => [],
+  };
+
+  const res = await handleRequest(
+    baseReq({ action: "listAcceptedApplications" }, cookie),
+    { secrets: SECRETS, supabase, fetchFn: okFetch({}) },
+  );
+  assertEquals(res.status, 200);
+  const body = await res.json();
+  assertEquals(body.data.application_ids, []);
 });
