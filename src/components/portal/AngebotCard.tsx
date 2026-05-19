@@ -1201,9 +1201,9 @@ export const AngebotCard: FC<{
               {step === 4 && (
                 <>
                   <div className="rounded-2xl bg-[#FBF6EE] border border-[#E8D9BC] px-4 py-3.5 space-y-1.5">
-                    <p className="text-sm font-bold text-[#5C4422]">Letzter Schritt — fast geschafft!</p>
+                    <p className="text-sm font-bold text-[#5C4422]">Telefonnummer für Rückfragen</p>
                     <p className="text-sm text-gray-700 leading-relaxed">
-                      Damit wir die passende Pflegekraft sorgfältig für Sie auswählen können, möchten wir uns kurz telefonisch mit Ihnen abstimmen. Bitte hinterlassen Sie uns Ihre Telefonnummer.
+                      Falls bei der Auswahl Ihrer Pflegekraft etwas zu klären ist, möchten wir Sie schnell erreichen.
                     </p>
                   </div>
                   <div>
