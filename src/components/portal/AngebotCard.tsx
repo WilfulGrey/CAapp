@@ -280,11 +280,14 @@ export const AngebotCard: FC<{
       return baseOk;
     }
     if (s === 3) {
-      const baseOk = patient.wunschGeschlecht !== '' && patient.rauchen !== '' && patient.fuehrerschein !== '' && patient.phone.trim() !== '';
+      const baseOk = patient.wunschGeschlecht !== '' && patient.rauchen !== '' && patient.fuehrerschein !== '';
       if (patient.fuehrerschein === 'Ja') {
         return baseOk && patient.wunschGetriebe !== '';
       }
       return baseOk;
+    }
+    if (s === 4) {
+      return patient.phone.trim() !== '';
     }
     return false;
   };
@@ -1130,18 +1133,6 @@ export const AngebotCard: FC<{
               {step === 3 && (
                 <>
                   <div>
-                    <label className={labelCls}>Telefonnummer <span className="text-red-400">*</span></label>
-                    <input
-                      type="tel"
-                      value={patient.phone}
-                      onChange={set('phone')}
-                      placeholder="z.B. +49 89 200 000 830"
-                      autoComplete="tel"
-                      inputMode="tel"
-                      className={inputCls}
-                    />
-                  </div>
-                  <div>
                     <label className={labelCls}>Gewünschtes Geschlecht der PK <span className="text-red-400">*</span></label>
                     <CustomSelect value={patient.wunschGeschlecht} onChange={v => updatePatient(p=>({...p,wunschGeschlecht:v}))}
                       options={['Egal','Weiblich','Männlich']} />
@@ -1202,6 +1193,30 @@ export const AngebotCard: FC<{
                     <textarea value={patient.sonstigeWuensche} onChange={set('sonstigeWuensche')}
                       placeholder="z.B. Erfahrung mit Demenz, ruhige Person, tierlieb…"
                       rows={2} className={`${inputCls} resize-none`} />
+                  </div>
+                </>
+              )}
+
+              {/* ── Step 5: Kontakt (Telefonnummer) ── */}
+              {step === 4 && (
+                <>
+                  <div className="rounded-2xl bg-[#FBF6EE] border border-[#E8D9BC] px-4 py-3.5 space-y-1.5">
+                    <p className="text-sm font-bold text-[#5C4422]">Letzter Schritt — fast geschafft!</p>
+                    <p className="text-sm text-gray-700 leading-relaxed">
+                      Damit wir die passende Pflegekraft sorgfältig für Sie auswählen können, möchten wir uns kurz telefonisch mit Ihnen abstimmen. Bitte hinterlassen Sie uns Ihre Telefonnummer.
+                    </p>
+                  </div>
+                  <div>
+                    <label className={labelCls}>Telefonnummer <span className="text-red-400">*</span></label>
+                    <input
+                      type="tel"
+                      value={patient.phone}
+                      onChange={set('phone')}
+                      placeholder="z.B. +49 89 200 000 830"
+                      autoComplete="tel"
+                      inputMode="tel"
+                      className={inputCls}
+                    />
                   </div>
                 </>
               )}

@@ -141,7 +141,7 @@ export interface PatientForm {
   diagnosen: string;
   plz: string; ort: string; haushalt: string; wohnungstyp: string; urbanisierung: string;
   familieNahe: string; pflegedienst: string; internet: string;
-  // Contact: required on step 4, prefilled from leads.telefon when the
+  // Contact: required on step 5, prefilled from leads.telefon when the
   // calculator collected it. Editable. Mapped to Customer.phone via
   // patientFormMapper → mamamia-proxy.updateCustomer.
   phone: string;
@@ -163,4 +163,4 @@ export interface PatientForm {
   wunschGetriebe: string;
 }
 
-export const STEP_LABELS = ['Zur Person', 'Pflegebedarf', 'Wohnsituation', 'Wünsche zur PK'];
+export const STEP_LABELS = ['Zur Person', 'Pflegebedarf', 'Wohnsituation', 'Wünsche zur PK', 'Kontakt'];
