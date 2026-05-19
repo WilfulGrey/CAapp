@@ -873,6 +873,8 @@ export function getTeamNotificationTemplate(
     angebot_requested: '🟡',
     patient_data_saved: '🔵',
     caregiver_invited: '🟢',
+    caregiver_interest_shown: '💚',
+    application_received: '📨',
     vertrag_abgeschlossen: '🟢',
   };
 
@@ -881,6 +883,8 @@ export function getTeamNotificationTemplate(
     angebot_requested: 'Neuer Lead – Angebot angefordert',
     patient_data_saved: 'Patientenprofil ausgefüllt',
     caregiver_invited: 'Pflegekraft angefordert',
+    caregiver_interest_shown: 'Pflegekraft hat Interesse gezeigt',
+    application_received: 'Bewerbung an Kunden gesendet',
     vertrag_abgeschlossen: 'Neuer Vertrag abgeschlossen!',
   };
 
@@ -919,24 +923,33 @@ export function getTeamNotificationTemplate(
   // einsteigen soll (Patientenprofil ansehen, Pflegekraft-Vorschau, etc.).
   const portalBase = process.env.NEXT_PUBLIC_PORTAL_URL ?? '';
   const portalUrl = portalBase && lead.token ? `${portalBase}/?token=${lead.token}` : '';
-  const showPortalCta = (status === 'patient_data_saved' || status === 'caregiver_invited') && Boolean(portalUrl);
+  const CAREGIVER_NAME_STATUSES = ['caregiver_invited', 'caregiver_interest_shown', 'application_received'];
+  const PORTAL_CTA_STATUSES = [
+    'patient_data_saved',
+    'caregiver_invited',
+    'caregiver_interest_shown',
+    'application_received',
+  ];
+  const showPortalCta = PORTAL_CTA_STATUSES.includes(status) && Boolean(portalUrl);
 
-  // Pflegekraft-Name aus additionalData für caregiver_invited.
-  const caregiverName = (status === 'caregiver_invited' && additionalData?.caregiverName)
+  // Pflegekraft-Name aus additionalData (nur bei Caregiver-Events).
+  const caregiverName = (CAREGIVER_NAME_STATUSES.includes(status) && additionalData?.caregiverName)
     ? String(additionalData.caregiverName)
     : '';
 
-  // Aktionshinweis unten — bei Pflegekraft-Einladung Erstkontakt anstoßen.
-  const actionHighlightHtml = status === 'caregiver_invited'
-    ? '<strong>📞 Bitte Erstkontakt mit der Pflegekraft anstoßen.</strong>'
-    : status === 'patient_data_saved'
-    ? '<strong>👀 Patientenprofil ist gefüllt — Lead ist warm.</strong>'
-    : '<strong>⏰ Keine Aktion erforderlich - Lead wurde automatisch im System erfasst</strong>';
-  const actionHighlightText = status === 'caregiver_invited'
-    ? '📞 Bitte Erstkontakt mit der Pflegekraft anstoßen.'
-    : status === 'patient_data_saved'
-    ? '👀 Patientenprofil ist gefüllt — Lead ist warm.'
-    : '⏰ Keine Aktion erforderlich - Lead wurde automatisch im System erfasst';
+  // Aktionshinweis unten — Status-spezifisch.
+  const actionHighlightHtml =
+    status === 'caregiver_invited'         ? '<strong>📞 Bitte Erstkontakt mit der Pflegekraft anstoßen.</strong>'
+  : status === 'caregiver_interest_shown'  ? '<strong>👀 Pflegekraft zeigt Interesse — Kunde hat Hinweis per E-Mail erhalten.</strong>'
+  : status === 'application_received'      ? '<strong>📨 Bewerbung wurde an den Kunden gesendet — wartet auf Buchungsbestätigung.</strong>'
+  : status === 'patient_data_saved'        ? '<strong>👀 Patientenprofil ist gefüllt — Lead ist warm.</strong>'
+  : '<strong>⏰ Keine Aktion erforderlich - Lead wurde automatisch im System erfasst</strong>';
+  const actionHighlightText =
+    status === 'caregiver_invited'         ? '📞 Bitte Erstkontakt mit der Pflegekraft anstoßen.'
+  : status === 'caregiver_interest_shown'  ? '👀 Pflegekraft zeigt Interesse — Kunde hat Hinweis per E-Mail erhalten.'
+  : status === 'application_received'      ? '📨 Bewerbung wurde an den Kunden gesendet — wartet auf Buchungsbestätigung.'
+  : status === 'patient_data_saved'        ? '👀 Patientenprofil ist gefüllt — Lead ist warm.'
+  : '⏰ Keine Aktion erforderlich - Lead wurde automatisch im System erfasst';
 
   return {
     subject: `${emoji} ${text}`,
