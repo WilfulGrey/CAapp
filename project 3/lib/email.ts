@@ -875,6 +875,7 @@ export function getTeamNotificationTemplate(
     caregiver_invited: '🟢',
     caregiver_interest_shown: '💚',
     application_received: '📨',
+    application_accepted_internal: '🎉',
     vertrag_abgeschlossen: '🟢',
   };
 
@@ -885,6 +886,7 @@ export function getTeamNotificationTemplate(
     caregiver_invited: 'Pflegekraft angefordert',
     caregiver_interest_shown: 'Pflegekraft hat Interesse gezeigt',
     application_received: 'Bewerbung an Kunden gesendet',
+    application_accepted_internal: 'Neue Buchung – Kunde hat akzeptiert',
     vertrag_abgeschlossen: 'Neuer Vertrag abgeschlossen!',
   };
 
@@ -923,12 +925,13 @@ export function getTeamNotificationTemplate(
   // einsteigen soll (Patientenprofil ansehen, Pflegekraft-Vorschau, etc.).
   const portalBase = process.env.NEXT_PUBLIC_PORTAL_URL ?? '';
   const portalUrl = portalBase && lead.token ? `${portalBase}/?token=${lead.token}` : '';
-  const CAREGIVER_NAME_STATUSES = ['caregiver_invited', 'caregiver_interest_shown', 'application_received'];
+  const CAREGIVER_NAME_STATUSES = ['caregiver_invited', 'caregiver_interest_shown', 'application_received', 'application_accepted_internal'];
   const PORTAL_CTA_STATUSES = [
     'patient_data_saved',
     'caregiver_invited',
     'caregiver_interest_shown',
     'application_received',
+    'application_accepted_internal',
   ];
   const showPortalCta = PORTAL_CTA_STATUSES.includes(status) && Boolean(portalUrl);
 
@@ -937,15 +940,99 @@ export function getTeamNotificationTemplate(
     ? String(additionalData.caregiverName)
     : '';
 
+  // Acceptance-specific data — contract_patient + contract_contact from the
+  // modal's step 2 form, rendered as two tables in the team mail body.
+  const contractPatient = (status === 'application_accepted_internal' && additionalData?.contractPatient && typeof additionalData.contractPatient === 'object')
+    ? additionalData.contractPatient as Record<string, unknown>
+    : null;
+  const contractContact = (status === 'application_accepted_internal' && additionalData?.contractContact && typeof additionalData.contractContact === 'object')
+    ? additionalData.contractContact as Record<string, unknown>
+    : null;
+  const acceptanceApplicationId = status === 'application_accepted_internal'
+    ? (typeof additionalData?.applicationId === 'number' || typeof additionalData?.applicationId === 'string'
+        ? String(additionalData.applicationId)
+        : '')
+    : '';
+  const acceptanceCaregiverId = status === 'application_accepted_internal'
+    ? (typeof additionalData?.caregiverId === 'number' || typeof additionalData?.caregiverId === 'string'
+        ? String(additionalData.caregiverId)
+        : '')
+    : '';
+  const renderContractTable = (title: string, data: Record<string, unknown> | null, labels: Array<[string, string]>): string => {
+    if (!data) return '';
+    const rows = labels
+      .map(([key, label]) => {
+        const v = data[key];
+        if (v == null || v === '') return '';
+        return `<tr><td style="padding:6px 12px 6px 0;color:#666;font-size:13px;">${label}</td><td style="padding:6px 0;font-size:14px;font-weight:600;color:#000;">${String(v)}</td></tr>`;
+      })
+      .join('');
+    if (!rows) return '';
+    return `
+      <div style="background:#f9f9f9;border-radius:8px;padding:14px 16px;margin:12px 0;">
+        <div style="font-weight:700;font-size:14px;color:#000;margin-bottom:8px;">${title}</div>
+        <table style="border-collapse:collapse;width:100%;">${rows}</table>
+      </div>`;
+  };
+  const contractTablesHtml = status === 'application_accepted_internal'
+    ? renderContractTable('Hauptpatient (vom Kunden im Portal bestätigt)', contractPatient, [
+        ['anrede', 'Anrede'],
+        ['vorname', 'Vorname'],
+        ['nachname', 'Nachname'],
+        ['strasse', 'Straße + Nr.'],
+        ['einsatzort', 'Einsatzort (PLZ, Ort)'],
+        ['telefon', 'Telefon'],
+        ['email', 'E-Mail'],
+      ]) + renderContractTable('Kontaktperson', contractContact, [
+        ['anrede', 'Anrede'],
+        ['vorname', 'Vorname'],
+        ['nachname', 'Nachname'],
+        ['telefon', 'Telefon'],
+        ['email', 'E-Mail'],
+      ])
+    : '';
+  const renderContractText = (title: string, data: Record<string, unknown> | null, labels: Array<[string, string]>): string => {
+    if (!data) return '';
+    const lines = labels
+      .map(([key, label]) => {
+        const v = data[key];
+        if (v == null || v === '') return '';
+        return `${label}: ${String(v)}`;
+      })
+      .filter(Boolean)
+      .join('\n');
+    if (!lines) return '';
+    return `\n${title}:\n${lines}\n`;
+  };
+  const contractTablesText = status === 'application_accepted_internal'
+    ? renderContractText('Hauptpatient', contractPatient, [
+        ['anrede', 'Anrede'],
+        ['vorname', 'Vorname'],
+        ['nachname', 'Nachname'],
+        ['strasse', 'Straße + Nr.'],
+        ['einsatzort', 'Einsatzort'],
+        ['telefon', 'Telefon'],
+        ['email', 'E-Mail'],
+      ]) + renderContractText('Kontaktperson', contractContact, [
+        ['anrede', 'Anrede'],
+        ['vorname', 'Vorname'],
+        ['nachname', 'Nachname'],
+        ['telefon', 'Telefon'],
+        ['email', 'E-Mail'],
+      ])
+    : '';
+
   // Aktionshinweis unten — Status-spezifisch.
   const actionHighlightHtml =
-    status === 'caregiver_invited'         ? '<strong>📞 Bitte Erstkontakt mit der Pflegekraft anstoßen.</strong>'
+    status === 'application_accepted_internal' ? '<strong>🎉 Kunde hat akzeptiert — Vertragsdokumente vorbereiten und Kunden anrufen.</strong>'
+  : status === 'caregiver_invited'         ? '<strong>📞 Bitte Erstkontakt mit der Pflegekraft anstoßen.</strong>'
   : status === 'caregiver_interest_shown'  ? '<strong>👀 Pflegekraft zeigt Interesse — Kunde hat Hinweis per E-Mail erhalten.</strong>'
   : status === 'application_received'      ? '<strong>📨 Bewerbung wurde an den Kunden gesendet — wartet auf Buchungsbestätigung.</strong>'
   : status === 'patient_data_saved'        ? '<strong>👀 Patientenprofil ist gefüllt — Lead ist warm.</strong>'
   : '<strong>⏰ Keine Aktion erforderlich - Lead wurde automatisch im System erfasst</strong>';
   const actionHighlightText =
-    status === 'caregiver_invited'         ? '📞 Bitte Erstkontakt mit der Pflegekraft anstoßen.'
+    status === 'application_accepted_internal' ? '🎉 Kunde hat akzeptiert — Vertragsdokumente vorbereiten und Kunden anrufen.'
+  : status === 'caregiver_invited'         ? '📞 Bitte Erstkontakt mit der Pflegekraft anstoßen.'
   : status === 'caregiver_interest_shown'  ? '👀 Pflegekraft zeigt Interesse — Kunde hat Hinweis per E-Mail erhalten.'
   : status === 'application_received'      ? '📨 Bewerbung wurde an den Kunden gesendet — wartet auf Buchungsbestätigung.'
   : status === 'patient_data_saved'        ? '👀 Patientenprofil ist gefüllt — Lead ist warm.'
@@ -974,9 +1061,11 @@ export function getTeamNotificationTemplate(
 
           ${caregiverName ? `
             <div class="highlight">
-              <strong>Eingeladene Pflegekraft:</strong> ${caregiverName}
+              <strong>${status === 'application_accepted_internal' ? 'Akzeptierte Pflegekraft' : 'Eingeladene Pflegekraft'}:</strong> ${caregiverName}${status === 'application_accepted_internal' && acceptanceCaregiverId ? ` (caregiver_id ${acceptanceCaregiverId})` : ''}${status === 'application_accepted_internal' && acceptanceApplicationId ? ` · Application ${acceptanceApplicationId}` : ''}
             </div>
           ` : ''}
+
+          ${contractTablesHtml}
 
           ${showPortalCta ? `
             <p><a href="${portalUrl}" style="display:inline-block; background:#5C4A32; color:#fff; padding:10px 18px; text-decoration:none; border-radius:6px; font-weight:bold;">➜ Im Kundenportal ansehen</a></p>
@@ -1019,11 +1108,11 @@ export function getTeamNotificationTemplate(
             <tr><td><strong>Zuschüsse gesamt</strong></td><td>${kalkulation?.zuschüsse?.gesamt ? kalkulation.zuschüsse.gesamt.toFixed(2).replace('.', ',') : 'N/A'} €</td></tr>
           </table>
 
-          ${additionalData ? `
+          ${additionalData && status !== 'application_accepted_internal' ? `
             <div class="section-title">Zusätzliche Daten</div>
             <table>
               ${Object.entries(additionalData).map(([key, value]) => `
-                <tr><td><strong>${key}</strong></td><td>${value}</td></tr>
+                <tr><td><strong>${key}</strong></td><td>${typeof value === 'object' ? JSON.stringify(value) : value}</td></tr>
               `).join('')}
             </table>
           ` : ''}
@@ -1039,8 +1128,8 @@ export function getTeamNotificationTemplate(
     text: `
 ${emoji} ${text}
 ${caregiverName ? `
-Eingeladene Pflegekraft: ${caregiverName}
-` : ''}${showPortalCta ? `
+${status === 'application_accepted_internal' ? 'Akzeptierte Pflegekraft' : 'Eingeladene Pflegekraft'}: ${caregiverName}${status === 'application_accepted_internal' && acceptanceCaregiverId ? ` (caregiver_id ${acceptanceCaregiverId})` : ''}${status === 'application_accepted_internal' && acceptanceApplicationId ? ` · Application ${acceptanceApplicationId}` : ''}
+` : ''}${contractTablesText}${showPortalCta ? `
 ➜ Im Kundenportal ansehen: ${portalUrl}
 ` : ''}
 === KONTAKTDATEN ===
@@ -1068,9 +1157,9 @@ Eigenanteil (monatlich): ${eigenanteil} €
 Bruttopreis: ${kalkulation?.bruttopreis ? kalkulation.bruttopreis.toFixed(2).replace('.', ',') : 'N/A'} €
 Zuschüsse gesamt: ${kalkulation?.zuschüsse?.gesamt ? kalkulation.zuschüsse.gesamt.toFixed(2).replace('.', ',') : 'N/A'} €
 
-${additionalData ? `
+${additionalData && status !== 'application_accepted_internal' ? `
 === ZUSÄTZLICHE DATEN ===
-${Object.entries(additionalData).map(([key, value]) => `${key}: ${value}`).join('\n')}
+${Object.entries(additionalData).map(([key, value]) => `${key}: ${typeof value === 'object' ? JSON.stringify(value) : value}`).join('\n')}
 ` : ''}
 
 ${actionHighlightText}

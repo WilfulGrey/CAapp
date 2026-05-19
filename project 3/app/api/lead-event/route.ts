@@ -30,12 +30,18 @@ const ALLOWED_EVENTS = [
   'caregiver_invited',
   'caregiver_interest_shown',
   'application_received',
+  // PR #123: customer confirmed acceptance via AngebotPruefenModal step 2.
+  // MVP path — Mamamia NOT notified, Primundus team gets a notification
+  // email with the contract form data and handles contract paperwork
+  // manually. Acceptance row persisted in lead_application_acceptances.
+  'application_accepted_internal',
 ];
 const TEAM_NOTIFY_EVENTS = [
   'patient_data_saved',
   'caregiver_invited',
   'caregiver_interest_shown',
   'application_received',
+  'application_accepted_internal',
 ];
 // Events, die in der Team-Mail einen Pflegekraft-Namen anzeigen sollen.
 // Liest caregiver_name aus dem Event-Metadata und steckt ihn als
@@ -147,6 +153,40 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    // Acceptance persistence (application_accepted_internal): UPSERT a
+    // dedicated row in lead_application_acceptances with the full contract
+    // form data. Idempotent on (lead_id, application_id) — re-clicking
+    // "Akzeptieren" doesn't duplicate. Frontend queries this table via
+    // mamamia-proxy.listAcceptedApplications on portal load to flip the
+    // matching app's status to 'accepted' → BookedScreen renders.
+    if (event === 'application_accepted_internal' && metadata && typeof metadata === 'object') {
+      const m = metadata as Record<string, unknown>;
+      const rawAppId = m.application_id;
+      const appId = typeof rawAppId === 'number' ? rawAppId : Number(rawAppId);
+      if (Number.isFinite(appId)) {
+        const rawCaregiverId = m.caregiver_id;
+        const caregiverId = typeof rawCaregiverId === 'number'
+          ? rawCaregiverId
+          : (typeof rawCaregiverId === 'string' && rawCaregiverId
+              ? Number(rawCaregiverId)
+              : null);
+        const { error: accErr } = await supabase
+          .from('lead_application_acceptances')
+          .upsert({
+            lead_id: lead.id,
+            application_id: appId,
+            caregiver_id: typeof caregiverId === 'number' && Number.isFinite(caregiverId) ? caregiverId : null,
+            contract_patient: m.contract_patient ?? {},
+            contract_contact: m.contract_contact ?? {},
+          }, { onConflict: 'lead_id,application_id' });
+        if (accErr) {
+          console.error('lead_application_acceptances upsert failed:', accErr.message);
+        }
+      } else {
+        console.warn('application_accepted_internal: missing/invalid application_id in metadata');
+      }
+    }
+
     // Dedupe rule per event:
     // - portal_opened / patient_data_saved → milestone (only first matters
     //   for Nachfass branching). Skip if already recorded.
@@ -184,11 +224,19 @@ export async function POST(request: NextRequest) {
       (!isDeduped || isFirstOccurrence);
 
     if (shouldNotifyTeam) {
-      const additionalData =
+      const additionalData: Record<string, unknown> | undefined =
         TEAM_NOTIFY_CAREGIVER_EVENTS.has(event) && metadata && typeof metadata === 'object'
           ? { caregiverName: metadata.caregiver_name ?? metadata.caregiverName ?? '' }
-          : undefined;
-      const teamTemplate = getTeamNotificationTemplate(lead as any, event, additionalData);
+          : (event === 'application_accepted_internal' && metadata && typeof metadata === 'object'
+              ? {
+                  caregiverName: metadata.caregiver_name ?? metadata.caregiverName ?? '',
+                  caregiverId: metadata.caregiver_id ?? null,
+                  applicationId: metadata.application_id ?? null,
+                  contractPatient: metadata.contract_patient ?? null,
+                  contractContact: metadata.contract_contact ?? null,
+                }
+              : undefined);
+      const teamTemplate = getTeamNotificationTemplate(lead as any, event, additionalData as any);
       sendEmail(TEAM_NOTIFY_RECIPIENT, teamTemplate).catch((e) =>
         console.error('team notify send threw:', e instanceof Error ? e.message : String(e)),
       );

@@ -8,6 +8,7 @@ import {
   defaultLead,
   sampleMatching,
   TEST_LEAD_TOKEN,
+  bridgeHandler,
 } from '../../../test/fixtures/mamamia-mocks';
 
 // Mock Supabase helpers — Supabase-js uses a fetch impl that doesn't route
@@ -51,18 +52,19 @@ function setLocation(search: string) {
 describe('Portal integration: golden paths', () => {
   // ─── Path 1: Happy (accept application) ─────────────────────────────────
 
-  it('happy path: token → review → accept → Confirmation', async () => {
-    let confirmationCalled = false;
+  it('happy path: token → review → accept → bridge POST + BookedScreen', async () => {
+    // MVP flow: acceptance does NOT call Mamamia STORE_CONFIRMATION; it
+    // POSTs to the kostenrechner bridge with event=application_accepted_internal.
+    // Bridge writes lead_application_acceptances + fires team mail.
+    let bridgePayload: { token?: string; event?: string; metadata?: unknown } | null = null;
 
+    // bridgeHandler with capture FIRST so it takes priority over the
+    // default no-op bridge handler bundled in defaultHandlers().
     server.use(
-      ...defaultHandlers({
-        proxy: {
-          storeConfirmation: () => {
-            confirmationCalled = true;
-            return { StoreConfirmation: { id: 77, application_id: 333, is_confirm_binding: true } };
-          },
-        },
+      bridgeHandler((body) => {
+        bridgePayload = body;
       }),
+      ...defaultHandlers({}),
     );
 
     setLocation(`?token=${TEST_LEAD_TOKEN}`);
@@ -102,12 +104,17 @@ describe('Portal integration: golden paths', () => {
     const acceptBtn = screen.getByRole('button', { name: /Betreuungskraft akzeptieren/i });
     await user.click(acceptBtn);
 
-    // BookedScreen rendered
+    // BookedScreen rendered (copy includes "Pflegekraft gebucht!" substring)
     await waitFor(
       () => expect(screen.getByText(/Pflegekraft gebucht!/i)).toBeInTheDocument(),
       { timeout: 3000 },
     );
-    expect(confirmationCalled).toBe(true);
+    // Bridge called with event=application_accepted_internal + contract data
+    await waitFor(() => expect(bridgePayload).not.toBeNull(), { timeout: 1000 });
+    expect(bridgePayload!.event).toBe('application_accepted_internal');
+    const meta = bridgePayload!.metadata as Record<string, unknown>;
+    expect((meta.contract_contact as Record<string, unknown>).vorname).toBe('Max');
+    expect((meta.contract_contact as Record<string, unknown>).nachname).toBe('Kontakt');
   }, 15000);
 
   // ─── Path 2: Decline (reject application) ───────────────────────────────

@@ -35,8 +35,10 @@ export const BookedScreen: FC<{ app: Application; onNurseClick: (n: Nurse) => vo
     <div className="max-w-3xl mx-auto px-4 py-6 space-y-5" style={{ animation: 'fadeIn 0.4s ease-out' }}>
       <div className="text-center py-4">
         <div className="text-5xl mb-3">🎊</div>
-        <h1 className="text-xl font-bold text-gray-900 mb-1">Pflegekraft gebucht!</h1>
-        <p className="text-sm text-gray-600">Alles ist bestätigt. Die Agentur wurde benachrichtigt.</p>
+        <h1 className="text-xl font-bold text-gray-900 mb-1">Vielen Dank — Pflegekraft gebucht!</h1>
+        <p className="text-sm text-gray-600 leading-relaxed">
+          Wir bereiten Ihre Vertragsdokumente vor. Jemand aus dem Primundus-Team meldet sich in Kürze persönlich bei Ihnen.
+        </p>
       </div>
 
       <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">

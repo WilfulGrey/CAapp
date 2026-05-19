@@ -10,10 +10,10 @@ import {
   setDeclinedCaregiver,
 } from '../lib/supabase';
 import { useMamamiaSession } from '../hooks/useMamamiaSession';
-import { useCustomer, useJobOffer, useApplications, useInterests, useDismissedCaregivers, useMatchings, useCaregiver, useInvitedCaregivers } from '../lib/mamamia/hooks';
+import { useCustomer, useJobOffer, useApplications, useInterests, useDismissedCaregivers, useAcceptedApplications, useMatchings, useCaregiver, useInvitedCaregivers } from '../lib/mamamia/hooks';
 import { prefetchCaregivers } from '../lib/mamamia/caregiverCache';
 import { scheduleAiAbouts, getAiAbout, subscribeAiAbout } from '../lib/mamamia/aiAboutCache';
-import { reportLeadEvent } from '../lib/leadEvents';
+import { reportLeadEvent, KOSTENRECHNER_URL } from '../lib/leadEvents';
 import {
   useRejectApplication,
   useStoreConfirmation,
@@ -42,6 +42,7 @@ import { AppCardDone } from '../components/portal/AppCardDone';
 import { MatchCardDone } from '../components/portal/MatchCardDone';
 import { MatchCard } from '../components/portal/MatchCard';
 import { InterestCard, type InterestActionStatus } from '../components/portal/InterestCard';
+import type { ContractFormData } from '../components/portal/AngebotPruefenModal';
 import { InfoPopup } from '../components/portal/InfoPopup';
 import { ContactPopup } from '../components/portal/ContactPopup';
 import { DeclineConfirmModal } from '../components/portal/DeclineConfirmModal';
@@ -136,6 +137,13 @@ const CustomerPortalPage: FC = () => {
   const { data: mmInterests, refetch: refetchInterests } = useInterests(mmReady);
   const { data: dismissedCaregivers, refetch: refetchDismissed } = useDismissedCaregivers(mmReady);
   const [interestStatusOverrides, setInterestStatusOverrides] = useState<Map<number, InterestActionStatus>>(new Map());
+
+  // Accepted applications (lead_application_acceptances). Written by the
+  // kostenrechner bridge after AngebotPruefenModal step 2 → bridge fires
+  // info@primundus.de team mail with contract data, no Mamamia call.
+  // On portal load we flip the matching app's status to 'accepted' →
+  // existing BookedScreen renders. Persists across reload.
+  const { data: acceptedApplications, refetch: refetchAcceptedApplications } = useAcceptedApplications(mmReady);
 
   // K5 mutations
   const rejectAppMutation = useRejectApplication();
@@ -315,6 +323,20 @@ const CustomerPortalPage: FC = () => {
     });
   }, [mmReady, mmApplications]);
 
+  // Persistence merge — flip status to 'accepted' for applications that
+  // the customer confirmed via AngebotPruefenModal step 2 (recorded in
+  // lead_application_acceptances). Runs both on initial mount (after
+  // mmReady + acceptedApplications fetched) and after each refetch.
+  // → BookedScreen renders on reload because acceptedApp is truthy.
+  useEffect(() => {
+    if (!mmReady || !acceptedApplications) return;
+    const acceptedIds = new Set(acceptedApplications.application_ids);
+    if (acceptedIds.size === 0) return;
+    setApplications(prev => prev.map(a =>
+      acceptedIds.has(Number(a.id)) ? { ...a, status: 'accepted' } : a
+    ));
+  }, [mmReady, acceptedApplications]);
+
   // Background prefetch full caregiver profiles for visible matchings +
   // applications. GET_CAREGIVER takes 1.7-3.1s on Mamamia beta — without
   // prefetch, every modal open pays full latency. With prefetch, by the
@@ -399,6 +421,33 @@ const CustomerPortalPage: FC = () => {
   const hasPending = pendingApps.length > 0;
   const matchesUnlocked = !hasPending;
 
+  // Prefill for AngebotPruefenModal step 2 — replaces the previous
+  // hardcoded fixture (Hildegard/Müller/Rosenstraße/München) that bled
+  // through to every customer regardless of their actual data.
+  // Priority: stage-B patient_* fields → stage-A lead.* → mmCustomer →
+  // empty string. KP (Kontaktperson) fields stay fresh — first time we
+  // ask for them.
+  const pruefenPrefill: Partial<ContractFormData> = (() => {
+    const stageBStreet = lead?.patient_street ?? '';
+    const stageBZip = lead?.patient_zip ?? mmCustomer?.customer_contract?.zip_code ?? '';
+    const stageBCity = lead?.patient_city ?? mmCustomer?.customer_contract?.city ?? '';
+    const ortLine = [stageBZip, stageBCity].filter(Boolean).join(', ');
+    return {
+      anrede: lead?.patient_anrede || lead?.anrede_text || 'Frau',
+      vorname: lead?.patient_vorname || lead?.vorname || '',
+      nachname: lead?.patient_nachname || lead?.nachname || '',
+      strasse: stageBStreet || mmCustomer?.customer_contract?.street_number || '',
+      einsatzort: ortLine,
+      telefon: lead?.telefon || mmCustomer?.phone || mmCustomer?.customer_contract?.phone || '',
+      email: lead?.email || mmCustomer?.email || '',
+      kpAnrede: '',
+      kpVorname: '',
+      kpNachname: '',
+      kpTelefon: '',
+      kpEmail: '',
+    };
+  })();
+
   // Compute visible interests — drop rejected-by-caregiver and locally-
   // dismissed-by-customer entries. Also drop interests whose caregiver
   // has already become a pending Application (stronger signal already
@@ -424,32 +473,68 @@ const CustomerPortalPage: FC = () => {
     setTimeout(() => setToast(null), 4000);
   };
 
-  const acceptApp = (id: string) => {
+  // MVP path — acceptance does NOT call Mamamia (no STORE_CONFIRMATION).
+  // Instead we POST to the kostenrechner bridge, which:
+  //   1. fires the team mail to info@primundus.de with the full contract
+  //      form data (step 2 of the modal)
+  //   2. UPSERTs into lead_application_acceptances so portal reload still
+  //      shows the BookedScreen
+  // Mamamia learns about the booking only when a Primundus team member
+  // manually processes it. This is intentional for MVP — confirmation
+  // logic + downstream Mamamia state is too complex for first launch.
+  const acceptApp = (id: string, formData: ContractFormData) => {
     setSelectedApp(null);
-    animateThenProcess(id, () => {
-      // Optimistic update
+    animateThenProcess(id, async () => {
+      // Optimistic — flips status to 'accepted' → existing acceptedApp
+      // derivation truthy → BookedScreen takes over the layout.
+      const targetApp = applications.find((a) => a.id === id);
       setApplications((prev) =>
         prev.map((a) => (a.id === id ? { ...a, status: 'accepted' } : a))
       );
-      showToast('✓ Betreuungskraft akzeptiert — die Agentur wird benachrichtigt.');
+      showToast('✓ Vielen Dank — wir bereiten alles vor.');
 
-      // Persist to Mamamia when session is live (minimal StoreConfirmation —
-      // full contract_patient/contract_contact fill-out happens in K5 refactor
-      // of AngebotPruefenModal step 2).
-      if (mmReady && Number.isFinite(Number(id))) {
-        confirmMutation.mutate({
-          application_id: Number(id),
-          is_confirm_binding: true,
-          update_customer: false,
-          message: 'Angenommen via Portal',
-        }).then(() => refetchApplications())
-          .catch(err => {
-            console.error('storeConfirmation failed:', err);
-            setApplications((prev) =>
-              prev.map((a) => (a.id === id ? { ...a, status: 'new' } : a))
-            );
-            showToast('Fehler beim Akzeptieren — bitte erneut versuchen.');
-          });
+      if (!lead?.token) return;
+
+      try {
+        const res = await fetch(`${KOSTENRECHNER_URL}/api/lead-event`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            token: lead.token,
+            event: 'application_accepted_internal',
+            metadata: {
+              application_id: Number(id),
+              caregiver_id: targetApp?.nurse?.caregiverId,
+              caregiver_name: targetApp?.nurse?.name,
+              contract_patient: {
+                anrede: formData.anrede,
+                vorname: formData.vorname,
+                nachname: formData.nachname,
+                strasse: formData.strasse,
+                einsatzort: formData.einsatzort,
+                telefon: formData.telefon,
+                email: formData.email,
+              },
+              contract_contact: {
+                anrede: formData.kpAnrede,
+                vorname: formData.kpVorname,
+                nachname: formData.kpNachname,
+                telefon: formData.kpTelefon,
+                email: formData.kpEmail,
+              },
+            },
+          }),
+        });
+        if (!res.ok) throw new Error(`bridge HTTP ${res.status}`);
+        // Refetch so the persistence merge useEffect re-flips status on
+        // next render even if optimistic state somehow drops.
+        refetchAcceptedApplications();
+      } catch (err) {
+        console.error('application_accepted_internal failed:', (err as Error).message);
+        setApplications((prev) =>
+          prev.map((a) => (a.id === id ? { ...a, status: 'new' } : a))
+        );
+        showToast('Etwas ist schiefgelaufen. Bitte erneut versuchen oder uns anrufen.');
       }
     });
   };
@@ -1553,6 +1638,7 @@ const CustomerPortalPage: FC = () => {
       {selectedApp && (
         <AngebotPruefenModal
           app={selectedApp}
+          prefill={pruefenPrefill}
           onClose={() => setSelectedApp(null)}
           onAccept={acceptApp}
           onNurseClick={(n) => openNurseFromApp(n, selectedApp)}

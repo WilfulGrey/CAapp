@@ -111,6 +111,7 @@ export type ProxyAction =
   | 'listMatchings'
   | 'listInvitedCaregiverIds'
   | 'listDismissedCaregivers'
+  | 'listAcceptedApplications'
   | 'getCaregiver'
   | 'searchLocations'
   // writes

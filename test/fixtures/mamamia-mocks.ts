@@ -30,6 +30,16 @@ export const defaultLead = {
   token_expires_at: '2099-01-01T00:00:00.000Z',
   token_used: false,
   care_start_timing: 'sofort',
+  // Stage-B identity (post /betreuung-beauftragen). Filled here so
+  // AngebotPruefenModal step 2 prefill has data to render (vorname,
+  // einsatzort, etc.) — otherwise canAccept stays false and integration
+  // tests can't reach the accept button.
+  patient_anrede: 'Frau',
+  patient_vorname: 'Anna',
+  patient_nachname: 'Testerin',
+  patient_street: 'Teststr. 1',
+  patient_zip: '80331',
+  patient_city: 'München',
   kalkulation: {
     bruttopreis: 2800,
     eigenanteil: 1800,
@@ -206,6 +216,24 @@ export function leadHandler(lead = defaultLead) {
   });
 }
 
+// Kostenrechner bridge endpoint (POST /api/lead-event). Used by the
+// portal for events that bypass Mamamia (e.g. application_accepted_internal
+// in the MVP flow — see acceptApp in CustomerPortalPage). Default mock
+// just acknowledges. Tests can override to assert payload or simulate errors.
+export function bridgeHandler(
+  onCall?: (body: { token?: string; event?: string; metadata?: unknown }) => void,
+) {
+  return http.post('https://kostenrechner.primundus.de/api/lead-event', async ({ request }) => {
+    try {
+      const body = (await request.json()) as { token?: string; event?: string; metadata?: unknown };
+      onCall?.(body);
+    } catch {
+      // ignore — body may be empty or non-JSON in some tests
+    }
+    return HttpResponse.json({ ok: true });
+  });
+}
+
 export function onboardHandler(body = { customer_id: TEST_CUSTOMER_ID, job_offer_id: TEST_JOB_OFFER_ID }) {
   return http.post(`${SUPABASE_URL}/functions/v1/onboard-to-mamamia`, () => {
     return HttpResponse.json(body, {
@@ -223,5 +251,6 @@ export function defaultHandlers(
     leadHandler(overrides.lead),
     onboardHandler(),
     proxyHandler(overrides.proxy),
+    bridgeHandler(),
   ];
 }

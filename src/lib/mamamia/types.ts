@@ -222,6 +222,16 @@ export interface MamamiaDismissedCaregivers {
   rows: Array<{ caregiver_id: number; kind: 'interest' | 'application' }>;
 }
 
+// Customer-portal acceptances (lead_application_acceptances). Written
+// by the kostenrechner bridge endpoint when the customer confirms an
+// application via AngebotPruefenModal step 2. Frontend reads on portal
+// load to flip the matching Application's status to 'accepted' → existing
+// BookedScreen surfaces, persists across reload.
+export interface MamamiaAcceptedApplications {
+  application_ids: number[];
+  rows: Array<{ application_id: number; caregiver_id: number | null; accepted_at: string }>;
+}
+
 export interface MamamiaLocation {
   id: number;
   location: string;

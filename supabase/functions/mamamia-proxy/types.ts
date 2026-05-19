@@ -12,6 +12,7 @@ export type ProxyAction =
   | "listMatchings"
   | "listInvitedCaregiverIds"
   | "listDismissedCaregivers"
+  | "listAcceptedApplications"
   | "getCaregiver"
   | "searchLocations"
   // writes
@@ -38,6 +39,13 @@ export interface ProxySupabase {
     caregiverId: number,
     kind: "interest" | "application",
   ): Promise<void>;
+  // Used by listAcceptedApplications — frontend reads this set on portal
+  // load to flip the matching Application's local status to 'accepted'
+  // (which triggers BookedScreen). Source of truth lives in
+  // lead_application_acceptances, written by bridge endpoint.
+  selectAcceptedApplications(
+    leadId: string,
+  ): Promise<Array<{ application_id: number; caregiver_id: number | null; accepted_at: string }>>;
 }
 
 export interface ActionDeps {

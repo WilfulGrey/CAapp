@@ -786,6 +786,19 @@ const listDismissedCaregivers: ActionHandler = async (session, _variables, deps)
   };
 };
 
+// Returns the customer's accepted applications (from lead_application_acceptances,
+// written by the kostenrechner bridge endpoint after AngebotPruefenModal step 2).
+// Frontend reads on portal load → flips matching app status to 'accepted' →
+// existing BookedScreen renders. Persists across reload.
+const listAcceptedApplications: ActionHandler = async (session, _variables, deps) => {
+  if (!deps.supabase) throw new Error("supabase adapter not configured");
+  const rows = await deps.supabase.selectAcceptedApplications(session.lead_id);
+  return {
+    application_ids: rows.map((r) => r.application_id),
+    rows,
+  };
+};
+
 // UPSERT a dismiss row. Idempotent — clicking dismiss twice doesn't
 // error. Bridge/detect-caregiver-events does NOT read this table, so
 // dismiss is UI-only (customer mail keeps flowing when caregiver later
@@ -811,6 +824,7 @@ export const ACTIONS: Record<ProxyAction, ActionHandler> = {
   listMatchings,
   listInvitedCaregiverIds,
   listDismissedCaregivers,
+  listAcceptedApplications,
   getCaregiver,
   searchLocations,
   updateCustomer,
