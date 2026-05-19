@@ -108,14 +108,16 @@ export const AngebotPruefenModal: FC<{
                   </button>
                 </div>
 
-                {app.message && (
-                  <div>
-                    <p className="text-sm font-bold text-gray-700 mb-2">Nachricht der Agentur</p>
-                    <div className="border-l-4 border-[#8B7355] pl-4 py-1">
-                      <p className="text-sm text-gray-600 leading-relaxed">„{app.message}"</p>
-                    </div>
-                  </div>
-                )}
+                {/*
+                  'Nachricht der Agentur' (app.message) intentionally NOT
+                  rendered. Same redaction as AppCard.tsx — the Mamamia
+                  application.message field carries agency-internal back-
+                  office notes (caregiver full name, phone, salary
+                  breakdown DLV/PK Netto/RK, ID stubs). Verified live
+                  2026-05-19 on Customer 8546 (Wendt) application 7997.
+                  Defense in depth: LIST_APPLICATIONS GraphQL also drops
+                  the field.
+                */}
 
                 <div>
                   <div className="flex items-center justify-between mb-2">
