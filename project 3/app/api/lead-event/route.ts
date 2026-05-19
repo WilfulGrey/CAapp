@@ -1,24 +1,76 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
-import { sendEmail, getTeamNotificationTemplate } from '@/lib/email';
+import {
+  sendEmail,
+  getTeamNotificationTemplate,
+  getCaregiverInterestEmailTemplate,
+  getApplicationReceivedEmailTemplate,
+  type CaregiverDisplay,
+} from '@/lib/email';
 
 // Bridge endpoint: the CA-App portal reports customer milestones back to the
 // kostenrechner lead so the Nachfass emails can branch. Token-authenticated —
 // the magic-link token (leads.token) is the shared identifier between the
 // kostenrechner and the portal.
 //
-// Side effect (added 2026-05): also triggers internal team notification mails
-// for `patient_data_saved` (once per lead) and `caregiver_invited` (every
-// invitation). Existing milestone semantics for the Nachfass-Kette are kept
-// — patient_data_saved is still deduped in lead_events; caregiver_invited is
-// inserted every time so a team mail goes out per invite.
+// Side effects:
+// - Internal team notification mails for `patient_data_saved` (once per lead)
+//   and `caregiver_invited` (every invitation) — PR #106.
+// - Customer mails for `caregiver_interest_shown` (Mail A: a caregiver liked
+//   the lead in Mamamia) and `application_received` (Mail B: staff sent the
+//   formal application document to the customer) — PR #109. Caregiver display
+//   info travels in the event `metadata`; no DB dedupe, one mail per event.
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
 
-const ALLOWED_EVENTS = ['portal_opened', 'patient_data_saved', 'caregiver_invited'];
+const ALLOWED_EVENTS = [
+  'portal_opened',
+  'patient_data_saved',
+  'caregiver_invited',
+  'caregiver_interest_shown',
+  'application_received',
+];
 const TEAM_NOTIFY_EVENTS = ['patient_data_saved', 'caregiver_invited'];
 const TEAM_NOTIFY_RECIPIENT = 'info@primundus.de';
+// Events, die KEINEN DB-Dedupe verwenden — pro Auftreten ein Eintrag und
+// (falls eine Mail dranhängt) eine Mail. Mehrere Pflegekräfte können Interesse
+// zeigen, mehrere Bewerbungen können auf einen Lead landen.
+const NON_DEDUPED_EVENTS = new Set([
+  'caregiver_invited',
+  'caregiver_interest_shown',
+  'application_received',
+]);
+// Customer-facing Mails (an die Lead-Email) je Event. Trigger sind die neuen
+// Caregiver-Lifecycle-Events; das eigentliche Hooking aus Mamamia kommt
+// separat — der Endpoint nimmt die Events bereits entgegen.
+const CUSTOMER_MAIL_EVENTS = new Set([
+  'caregiver_interest_shown',
+  'application_received',
+]);
+
+function extractCaregiverDisplay(metadata: any): CaregiverDisplay | null {
+  if (!metadata || typeof metadata !== 'object') return null;
+  // Accept both snake_case (matches CA-app `reportLeadEvent` payload) and
+  // camelCase keys (matches existing CaregiverDisplay type) — defensive
+  // because the caller (Mamamia hook, CA-app, manual test) might vary.
+  const name = metadata.caregiver_name ?? metadata.caregiverName;
+  if (!name || typeof name !== 'string' || !name.trim()) return null;
+  return {
+    name: name.trim(),
+    badgeLevel: metadata.caregiver_badge_level ?? metadata.badgeLevel,
+    yearsExperience: metadata.caregiver_years_experience ?? metadata.yearsExperience,
+    einsatzCount: metadata.caregiver_einsatz_count ?? metadata.einsatzCount,
+    photoUrl: metadata.caregiver_photo_url ?? metadata.photoUrl,
+    aboutText: metadata.caregiver_about_text ?? metadata.aboutText,
+  };
+}
+
+function buildPortalUrl(lead: { token?: string | null }): string {
+  const portalBase = process.env.NEXT_PUBLIC_PORTAL_URL || '';
+  if (!portalBase || !lead.token) return '';
+  return `${portalBase.replace(/\/$/, '')}/?token=${encodeURIComponent(lead.token)}`;
+}
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -85,10 +137,12 @@ export async function POST(request: NextRequest) {
     // Dedupe rule per event:
     // - portal_opened / patient_data_saved → milestone (only first matters
     //   for Nachfass branching). Skip if already recorded.
-    // - caregiver_invited → multiple invites per lead are expected; insert
-    //   every time so we can fire one team mail per invite.
+    // - caregiver_invited / caregiver_interest_shown / application_received →
+    //   multiple events per lead expected (different caregivers, mehrere
+    //   Bewerbungen); insert every time so one mail goes per event.
+    const isDeduped = !NON_DEDUPED_EVENTS.has(event);
     let isFirstOccurrence = true;
-    if (event !== 'caregiver_invited') {
+    if (isDeduped) {
       const { data: existing } = await supabase
         .from('lead_events')
         .select('id')
@@ -98,7 +152,7 @@ export async function POST(request: NextRequest) {
       isFirstOccurrence = !existing || existing.length === 0;
     }
 
-    if (event === 'caregiver_invited' || isFirstOccurrence) {
+    if (!isDeduped || isFirstOccurrence) {
       await supabase.from('lead_events').insert({
         lead_id: lead.id,
         event_type: event,
@@ -113,7 +167,7 @@ export async function POST(request: NextRequest) {
     // caregiver_invited fires on every invite.
     const shouldNotifyTeam =
       TEAM_NOTIFY_EVENTS.includes(event) &&
-      (event === 'caregiver_invited' || isFirstOccurrence);
+      (!isDeduped || isFirstOccurrence);
 
     if (shouldNotifyTeam) {
       const additionalData =
@@ -124,6 +178,27 @@ export async function POST(request: NextRequest) {
       sendEmail(TEAM_NOTIFY_RECIPIENT, teamTemplate).catch((e) =>
         console.error('team notify send threw:', e instanceof Error ? e.message : String(e)),
       );
+    }
+
+    // Customer-facing mail (Mail A / Mail B). Fire-and-forget — Mamamia-Hooks
+    // (oder spätere Trigger) sollen niemals durch eine Mail-Latenz blockiert
+    // werden. Bei fehlenden Pflegekraft-Daten loggen wir und überspringen die
+    // Mail — der lead_event wird trotzdem aufgezeichnet.
+    if (CUSTOMER_MAIL_EVENTS.has(event)) {
+      const caregiver = extractCaregiverDisplay(metadata);
+      if (!caregiver) {
+        console.warn(`lead-event ${event}: caregiver display data missing in metadata — mail skipped (lead ${lead.id})`);
+      } else if (!lead.email) {
+        console.warn(`lead-event ${event}: lead has no email — mail skipped (lead ${lead.id})`);
+      } else {
+        const portalUrl = buildPortalUrl(lead as any);
+        const customerTemplate = event === 'caregiver_interest_shown'
+          ? getCaregiverInterestEmailTemplate(lead as any, caregiver, portalUrl)
+          : getApplicationReceivedEmailTemplate(lead as any, caregiver, portalUrl);
+        sendEmail((lead as any).email, customerTemplate).catch((e) =>
+          console.error('customer mail send threw:', e instanceof Error ? e.message : String(e)),
+        );
+      }
     }
 
     return NextResponse.json({ ok: true }, { headers: corsHeaders });
