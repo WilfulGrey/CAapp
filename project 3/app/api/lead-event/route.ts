@@ -31,7 +31,20 @@ const ALLOWED_EVENTS = [
   'caregiver_interest_shown',
   'application_received',
 ];
-const TEAM_NOTIFY_EVENTS = ['patient_data_saved', 'caregiver_invited'];
+const TEAM_NOTIFY_EVENTS = [
+  'patient_data_saved',
+  'caregiver_invited',
+  'caregiver_interest_shown',
+  'application_received',
+];
+// Events, die in der Team-Mail einen Pflegekraft-Namen anzeigen sollen.
+// Liest caregiver_name aus dem Event-Metadata und steckt ihn als
+// additionalData in getTeamNotificationTemplate.
+const TEAM_NOTIFY_CAREGIVER_EVENTS = new Set([
+  'caregiver_invited',
+  'caregiver_interest_shown',
+  'application_received',
+]);
 const TEAM_NOTIFY_RECIPIENT = 'info@primundus.de';
 // Events, die KEINEN DB-Dedupe verwenden — pro Auftreten ein Eintrag und
 // (falls eine Mail dranhängt) eine Mail. Mehrere Pflegekräfte können Interesse
@@ -163,15 +176,16 @@ export async function POST(request: NextRequest) {
     }
 
     // Team notification (fire-and-forget — never blocks the response).
-    // patient_data_saved fires only on the first occurrence (milestone),
-    // caregiver_invited fires on every invite.
+    // - patient_data_saved → einmal pro Lead (Milestone, deduped)
+    // - caregiver_invited / caregiver_interest_shown / application_received →
+    //   pro Event eine Mail (kein DB-Dedupe), jede mit Pflegekraft-Name.
     const shouldNotifyTeam =
       TEAM_NOTIFY_EVENTS.includes(event) &&
       (!isDeduped || isFirstOccurrence);
 
     if (shouldNotifyTeam) {
       const additionalData =
-        event === 'caregiver_invited' && metadata && typeof metadata === 'object'
+        TEAM_NOTIFY_CAREGIVER_EVENTS.has(event) && metadata && typeof metadata === 'object'
           ? { caregiverName: metadata.caregiver_name ?? metadata.caregiverName ?? '' }
           : undefined;
       const teamTemplate = getTeamNotificationTemplate(lead as any, event, additionalData);
