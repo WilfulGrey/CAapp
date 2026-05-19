@@ -11,6 +11,8 @@ const SECRETS = {
   mamamiaAgencyPassword: "pw",
   sessionJwtSecret: "x".repeat(40),
   mamamiaPanelUrl: "https://beta.example/backend",
+  supabaseUrl: "https://supabase.test",
+  supabaseServiceKey: "test-service-key",
 };
 
 const SESSION_PAYLOAD = {
@@ -266,4 +268,117 @@ Deno.test("Rate limit: 61st request from same IP returns 429", async () => {
 
   const res61 = await handleRequest(makeReq(), { secrets: SECRETS, fetchFn });
   assertEquals(res61.status, 429);
+});
+
+// ─── Interest actions ─────────────────────────────────────────────────────
+
+Deno.test("listInterests returns JobOffer.interests scoped to session.job_offer_id", async () => {
+  _resetRateLimit(); _resetAgencyTokenCache();
+  const cookie = await makeCookie();
+  let capturedVars: Record<string, unknown> | null = null;
+  let loginDone = false;
+  const fetchFn: typeof fetch = async (input, init) => {
+    const url = typeof input === "string" ? input : (input as Request).url;
+    if (!loginDone && url.includes("/graphql/auth")) {
+      loginDone = true;
+      return new Response(
+        JSON.stringify({ data: { LoginAgency: { id: 1, name: "P", email: "x", token: "t" } } }),
+        { status: 200 },
+      );
+    }
+    const raw = (init as { body?: BodyInit } | undefined)?.body;
+    const body = typeof raw === "string" ? JSON.parse(raw) : {};
+    capturedVars = body.variables ?? null;
+    return new Response(
+      JSON.stringify({
+        data: { JobOffer: { id: 16226, interests: [{ id: 99, caregiver_id: 50001, rejected_at: null }] } },
+      }),
+      { status: 200 },
+    );
+  };
+
+  const res = await handleRequest(
+    baseReq({ action: "listInterests" }, cookie),
+    { secrets: SECRETS, fetchFn },
+  );
+  assertEquals(res.status, 200);
+  // Variable comes from session, not client — session.job_offer_id = 16226.
+  assertEquals(capturedVars, { id: 16226 });
+  const body = await res.json();
+  assertEquals(body.data.JobOffer.interests.length, 1);
+});
+
+Deno.test("dismissCaregiver: writes via Supabase adapter, idempotent", async () => {
+  _resetRateLimit(); _resetAgencyTokenCache();
+  const cookie = await makeCookie();
+  const upsertCalls: Array<{ leadId: string; caregiverId: number; kind: string }> = [];
+  const supabase = {
+    selectDismissedCaregivers: async () => [],
+    upsertDismissedCaregiver: async (leadId: string, caregiverId: number, kind: "interest" | "application") => {
+      upsertCalls.push({ leadId, caregiverId, kind });
+    },
+  };
+
+  const res = await handleRequest(
+    baseReq({ action: "dismissCaregiver", variables: { caregiver_id: 50001, kind: "interest" } }, cookie),
+    { secrets: SECRETS, supabase, fetchFn: okFetch({}) },
+  );
+  assertEquals(res.status, 200);
+  assertEquals(upsertCalls.length, 1);
+  assertEquals(upsertCalls[0].leadId, SESSION_PAYLOAD.lead_id);
+  assertEquals(upsertCalls[0].caregiverId, 50001);
+  assertEquals(upsertCalls[0].kind, "interest");
+});
+
+Deno.test("dismissCaregiver: rejects missing caregiver_id", async () => {
+  _resetRateLimit(); _resetAgencyTokenCache();
+  const cookie = await makeCookie();
+  const supabase = {
+    selectDismissedCaregivers: async () => [],
+    upsertDismissedCaregiver: async () => {},
+  };
+  const res = await handleRequest(
+    baseReq({ action: "dismissCaregiver", variables: { kind: "interest" } }, cookie),
+    { secrets: SECRETS, supabase, fetchFn: okFetch({}) },
+  );
+  assertEquals(res.status, 502); // proxy maps action errors to 502
+});
+
+Deno.test("dismissCaregiver: rejects bad kind", async () => {
+  _resetRateLimit(); _resetAgencyTokenCache();
+  const cookie = await makeCookie();
+  const supabase = {
+    selectDismissedCaregivers: async () => [],
+    upsertDismissedCaregiver: async () => {},
+  };
+  const res = await handleRequest(
+    baseReq({ action: "dismissCaregiver", variables: { caregiver_id: 50001, kind: "garbage" } }, cookie),
+    { secrets: SECRETS, supabase, fetchFn: okFetch({}) },
+  );
+  assertEquals(res.status, 502);
+});
+
+Deno.test("listDismissedCaregivers: reads via session.lead_id, returns caregiver_ids[]", async () => {
+  _resetRateLimit(); _resetAgencyTokenCache();
+  const cookie = await makeCookie();
+  let selectArg: string | null = null;
+  const supabase = {
+    selectDismissedCaregivers: async (leadId: string) => {
+      selectArg = leadId;
+      return [
+        { caregiver_id: 50001, kind: "interest" },
+        { caregiver_id: 50002, kind: "interest" },
+      ];
+    },
+    upsertDismissedCaregiver: async () => {},
+  };
+
+  const res = await handleRequest(
+    baseReq({ action: "listDismissedCaregivers" }, cookie),
+    { secrets: SECRETS, supabase, fetchFn: okFetch({}) },
+  );
+  assertEquals(res.status, 200);
+  assertEquals(selectArg, SESSION_PAYLOAD.lead_id);
+  const body = await res.json();
+  assertEquals(body.data.caregiver_ids, [50001, 50002]);
 });

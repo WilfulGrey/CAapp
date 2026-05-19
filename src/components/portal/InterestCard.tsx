@@ -1,0 +1,169 @@
+import { useState } from 'react';
+import type { FC } from 'react';
+import { Check, ChevronDown, Heart, UserPlus, X } from 'lucide-react';
+import type { Nurse } from '../../types';
+import { nurseLevel, displayName, initials } from './shared';
+
+export type InterestActionStatus = 'idle' | 'invited' | 'dismissed';
+
+// Mirror of MatchCard layout with two differences:
+// 1. Purple "Hat Interesse" badge in the top-right of the tile (signals
+//    proactive caregiver-side interest, distinct from system matchings).
+// 2. Footer carries TWO buttons: Einladen (primary, mirrors MatchCard's
+//    invite) + Ablehnen (subdued, fires a local-only dismiss that hides
+//    the card from this customer's view via lead_dismissed_caregivers).
+//
+// Once status flips to 'invited' or 'dismissed' the card collapses its
+// action area to a confirmation pill — the parent typically removes the
+// card from the list right after via state update, the pill is the
+// transitional state during the optimistic update.
+export const InterestCard: FC<{
+  nurse: Nurse;
+  status: InterestActionStatus;
+  onNurseClick: () => void;
+  onInvite?: () => boolean;
+  onInviteConfirm?: () => Promise<void>;
+  onDismiss?: () => Promise<void>;
+  exiting?: boolean;
+}> = ({ nurse, status, onNurseClick, onInvite, onInviteConfirm, onDismiss, exiting }) => {
+  const [invitePhase, setInvitePhase] = useState<'idle' | 'sending' | 'done'>('idle');
+  const [dismissPhase, setDismissPhase] = useState<'idle' | 'sending'>('idle');
+  const inits = initials(nurse.name);
+  const name = displayName(nurse.name);
+  const bars = Array.from({ length: 5 }, (_, i) => i < nurse.language.bars);
+
+  const handleInvite = async () => {
+    const allowed = onInvite ? onInvite() : true;
+    if (!allowed) return;
+    setInvitePhase('sending');
+    try {
+      await onInviteConfirm?.();
+      setInvitePhase('done');
+      // Parent typically removes the card on next render. The brief
+      // 'done' flash is a UX fallback in case parent doesn't.
+      setTimeout(() => setInvitePhase('idle'), 1500);
+    } catch {
+      setInvitePhase('idle');
+    }
+  };
+
+  const handleDismiss = async () => {
+    if (dismissPhase === 'sending') return;
+    setDismissPhase('sending');
+    try {
+      await onDismiss?.();
+      // Optimistic — parent removes the card from the list, no need to
+      // toggle local state back. If the server rejects, parent surfaces
+      // the error and we reset.
+    } catch {
+      setDismissPhase('idle');
+    }
+  };
+
+  return (
+    <div
+      className={`bg-white rounded-2xl border overflow-hidden transition-all relative ${
+        exiting ? 'opacity-0 -translate-x-2 pointer-events-none' : ''
+      } ${
+        status === 'dismissed'
+          ? 'opacity-40 border-gray-200'
+          : status === 'invited'
+          ? 'border-[#C4B49A]'
+          : 'border-[#C4B49A] hover:border-[#8B7355] hover:shadow-[0_4px_16px_rgba(139,115,85,0.12)]'
+      }`}
+    >
+      <div className="px-4 pt-4 pb-3 cursor-pointer active:bg-gray-50" onClick={onNurseClick}>
+        <div className="flex items-center gap-3">
+          <div className="flex-shrink-0">
+            {nurse.image ? (
+              <img src={nurse.image} alt={nurse.name} className="w-14 h-14 rounded-2xl object-cover" />
+            ) : (
+              <div
+                className="w-14 h-14 rounded-2xl flex items-center justify-center text-lg font-bold text-white"
+                style={{ backgroundColor: nurse.color }}
+              >
+                {inits}
+              </div>
+            )}
+          </div>
+
+          <div className="flex-1 min-w-0">
+            <div className="flex items-start justify-between gap-2 mb-1">
+              <div className="flex items-baseline gap-1.5 min-w-0">
+                <span className="font-bold text-gray-900 leading-tight">{name}</span>
+                <span className="text-sm text-gray-400 flex-shrink-0">{nurse.age} J.</span>
+              </div>
+              <span className="flex items-center gap-1 text-[10px] font-bold pl-1.5 pr-2 py-0.5 rounded-full text-white shadow-sm flex-shrink-0"
+                style={{ background: 'linear-gradient(135deg, #E879F9 0%, #9B1FA1 100%)' }}>
+                <Heart className="w-3 h-3" fill="currentColor" />
+                Hat Interesse
+              </span>
+            </div>
+            <div className="flex items-center gap-2 mb-1">
+              <div className="flex gap-0.5">
+                {bars.map((f, i) => (
+                  <div key={i} className={`w-3 h-1.5 rounded-full ${f ? 'bg-[#8B7355]' : 'bg-gray-200'}`} />
+                ))}
+              </div>
+              <span className="text-sm text-gray-500">Deutsch {nurse.language.level}</span>
+            </div>
+            <p className="text-sm text-gray-500 truncate">
+              <span className="font-semibold text-[#8B7355]">{nurse.experience}</span>
+              {nurse.history && (
+                <span>
+                  {' '}· {nurse.history.assignments} Einsätze · Ø {Math.round(nurse.history.avgDurationMonths * 4.3)} Wo.
+                </span>
+              )}
+              {(() => {
+                const lvl = nurseLevel(nurse.experienceYears ?? 0, nurse.history?.assignments ?? 0);
+                return <span className={`ml-1 inline-flex items-center gap-0.5 text-[10px] font-bold px-1.5 py-0.5 rounded-full border ${lvl.cls}`}><span className="leading-none">{lvl.emoji}</span>{lvl.label}</span>;
+              })()}
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <div className="border-t border-gray-100 px-4 py-2.5 flex items-center justify-between gap-2">
+        <button
+          onClick={onNurseClick}
+          className="text-sm font-semibold text-[#8B7355] flex items-center gap-1 hover:underline shrink-0"
+        >
+          Details <ChevronDown className="w-3.5 h-3.5 -rotate-90" />
+        </button>
+        <div className="flex items-center gap-2">
+          {status === 'invited' || invitePhase === 'done' ? (
+            <span className="flex items-center gap-1.5 text-xs font-bold text-[#22A06B] bg-[#E3F7EF] border border-[#B8E8D4] px-4 py-1.5 rounded-full">
+              <Check className="w-3 h-3 flex-shrink-0" /> Einladung gesendet
+            </span>
+          ) : invitePhase === 'sending' ? (
+            <span className="flex items-center gap-1.5 text-xs font-bold text-[#8B7355] bg-[#F8F7F5] border border-[#E5E3DF] px-4 py-1.5 rounded-full">
+              <svg className="w-3 h-3 animate-spin flex-shrink-0" viewBox="0 0 24 24" fill="none">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3"/>
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"/>
+              </svg>
+              wird eingeladen…
+            </span>
+          ) : (
+            <>
+              <button
+                onClick={e => { e.stopPropagation(); handleDismiss(); }}
+                disabled={dismissPhase === 'sending'}
+                className="flex items-center gap-1 text-xs font-semibold text-gray-500 hover:text-gray-700 px-3 py-1.5 rounded-full hover:bg-gray-100 transition-colors disabled:opacity-50"
+              >
+                <X className="w-3.5 h-3.5" />
+                Ablehnen
+              </button>
+              <button
+                onClick={e => { e.stopPropagation(); handleInvite(); }}
+                className="flex items-center gap-1.5 text-xs font-bold bg-[#E76F63] text-white px-4 py-1.5 rounded-full hover:bg-[#D65E52] transition-colors active:scale-95 shadow-sm"
+              >
+                <UserPlus className="w-3.5 h-3.5" />
+                Einladen
+              </button>
+            </>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+};

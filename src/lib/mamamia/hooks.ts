@@ -12,6 +12,9 @@ import type {
   MamamiaJobOffer,
   MamamiaApplication,
   MamamiaMatching,
+  MamamiaInterest,
+  MamamiaJobOfferInterestsResponse,
+  MamamiaDismissedCaregivers,
   MamamiaCaregiverFull,
   MamamiaLocation,
   PaginatedResponse,
@@ -120,6 +123,33 @@ export function useMatchings(
     ...state,
     data: state.data?.JobOfferMatchingsWithPagination ?? null,
   };
+}
+
+// Caregivers who signalled soft interest in this customer's JobOffer.
+// Surface non-rejected entries in a dedicated portal section between
+// "Ihre Bewerbungen" and matchings. Customer can invite (StoreRequest)
+// or dismiss locally (writes to lead_dismissed_caregivers — UI-only,
+// does NOT suppress detect-caregiver-events emails).
+export function useInterests(enabled = true) {
+  const state = useMamamiaQuery<MamamiaJobOfferInterestsResponse>(
+    'listInterests',
+    {},
+    enabled,
+  );
+  const interests: MamamiaInterest[] = state.data?.JobOffer?.interests ?? [];
+  return { ...state, data: interests };
+}
+
+// Local UI dismiss-set per lead (lead_dismissed_caregivers). Frontend
+// filters out these caregivers from the Interest list. Refetched after
+// each successful dismiss to keep the set fresh across renders.
+export function useDismissedCaregivers(enabled = true) {
+  const state = useMamamiaQuery<MamamiaDismissedCaregivers>(
+    'listDismissedCaregivers',
+    {},
+    enabled,
+  );
+  return { ...state, data: state.data ?? null };
 }
 
 // Set of caregiver IDs that already have an invite Request. Backend

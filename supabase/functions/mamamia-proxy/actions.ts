@@ -6,6 +6,7 @@ import {
   GET_CUSTOMER,
   GET_JOB_OFFER,
   LIST_APPLICATIONS,
+  LIST_INTERESTS,
   LIST_INVITED_CAREGIVER_IDS,
   LIST_MATCHINGS,
   REJECT_APPLICATION,
@@ -764,14 +765,52 @@ const generateCaregiverAbout: ActionHandler = async (_session, variables, deps) 
   }
 };
 
+// ─── Interest actions (new — list + dismiss locally) ───────────────────────
+
+// Surface JobOffer.interests for the portal. Same ownership model as
+// listApplications: query bound to session.job_offer_id, customer can
+// never read interests for somebody else's offer.
+const listInterests: ActionHandler = async (session, _variables, deps) => {
+  return await runGraphQL(deps, LIST_INTERESTS, { id: session.job_offer_id });
+};
+
+// Returns local dismiss-set for THIS lead. Frontend uses it to filter
+// the InterestCard list ("klient powiedział nie, nie pokazuj więcej").
+// Service-role bypasses RLS — ownership comes from session.lead_id.
+const listDismissedCaregivers: ActionHandler = async (session, _variables, deps) => {
+  if (!deps.supabase) throw new Error("supabase adapter not configured");
+  const rows = await deps.supabase.selectDismissedCaregivers(session.lead_id);
+  return {
+    caregiver_ids: rows.map((r) => r.caregiver_id),
+    rows,
+  };
+};
+
+// UPSERT a dismiss row. Idempotent — clicking dismiss twice doesn't
+// error. Bridge/detect-caregiver-events does NOT read this table, so
+// dismiss is UI-only (customer mail keeps flowing when caregiver later
+// applies — by design, per user decision).
+const dismissCaregiver: ActionHandler = async (session, variables, deps) => {
+  if (!deps.supabase) throw new Error("supabase adapter not configured");
+  const v = variables as { caregiver_id?: unknown; kind?: unknown };
+  if (typeof v.caregiver_id !== "number") throw new Error("caregiver_id required (number)");
+  if (v.kind !== "interest" && v.kind !== "application") {
+    throw new Error("kind must be 'interest' or 'application'");
+  }
+  await deps.supabase.upsertDismissedCaregiver(session.lead_id, v.caregiver_id, v.kind);
+  return { dismissed: true };
+};
+
 // ─── Dispatcher ────────────────────────────────────────────────────────────
 
 export const ACTIONS: Record<ProxyAction, ActionHandler> = {
   getJobOffer,
   getCustomer,
   listApplications,
+  listInterests,
   listMatchings,
   listInvitedCaregiverIds,
+  listDismissedCaregivers,
   getCaregiver,
   searchLocations,
   updateCustomer,
@@ -779,6 +818,7 @@ export const ACTIONS: Record<ProxyAction, ActionHandler> = {
   rejectApplication,
   storeConfirmation,
   inviteCaregiver,
+  dismissCaregiver,
   generateJobDescription,
   generateCaregiverAbout,
 };

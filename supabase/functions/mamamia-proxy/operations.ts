@@ -180,6 +180,45 @@ export const LIST_APPLICATIONS = /* GraphQL */ `
   }
 `;
 
+// K3b — interests on a JobOffer. Mamamia "Interest" = caregiver expressed
+// soft interest via panel (precursor to formal application). Schema:
+//   JobOffer { interests: [Interest] }; Interest { id, caregiver_id,
+//   rejected_at, caregiver, ... }. We surface non-rejected interests in
+//   the portal so customers can invite (StoreRequest) or dismiss locally.
+// Nested caregiver mirrors LIST_APPLICATIONS shape so mapCaregiverToNurse
+// works without a separate fetch. about_de omitted — portal uses AI overlay.
+export const LIST_INTERESTS = /* GraphQL */ `
+  query ListInterests($id: Int!) {
+    JobOffer(id: $id) {
+      id
+      interests {
+        id
+        caregiver_id
+        rejected_at
+        caregiver {
+          id
+          first_name
+          last_name
+          gender
+          year_of_birth
+          birth_date
+          germany_skill
+          care_experience
+          available_from
+          last_contact_at
+          last_login_at
+          is_active_user
+          hp_caregiver_id
+          hp_total_jobs
+          hp_total_days
+          hp_avg_mission_days
+          avatar_retouched { aws_url }
+        }
+      }
+    }
+  }
+`;
+
 // K3 — matchings (personalised by JobOffer).
 // JobOfferMatchingFiltersInputType only has boolean status flags
 // (is_request, is_like, is_match, is_rejected etc.) — NO gender/language filter.

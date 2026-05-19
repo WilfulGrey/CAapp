@@ -107,8 +107,10 @@ export type ProxyAction =
   | 'getJobOffer'
   | 'getCustomer'
   | 'listApplications'
+  | 'listInterests'
   | 'listMatchings'
   | 'listInvitedCaregiverIds'
+  | 'listDismissedCaregivers'
   | 'getCaregiver'
   | 'searchLocations'
   // writes
@@ -117,6 +119,7 @@ export type ProxyAction =
   | 'rejectApplication'
   | 'storeConfirmation'
   | 'inviteCaregiver'
+  | 'dismissCaregiver'
   // AI
   | 'generateJobDescription'
   | 'generateCaregiverAbout';

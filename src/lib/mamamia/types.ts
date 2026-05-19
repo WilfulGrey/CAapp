@@ -197,6 +197,31 @@ export interface MamamiaMatching {
   caregiver: MamamiaCaregiverRef;
 }
 
+// Caregiver-side soft interest in a JobOffer (precursor to a formal
+// Application). LIST_INTERESTS surfaces non-rejected interests to the
+// portal so customers can invite (StoreRequest) or dismiss locally.
+export interface MamamiaInterest {
+  id: number;
+  caregiver_id: number;
+  rejected_at: string | null;
+  caregiver: MamamiaCaregiverRef;
+}
+
+export interface MamamiaJobOfferInterestsResponse {
+  JobOffer: {
+    id: number;
+    interests: MamamiaInterest[] | null;
+  } | null;
+}
+
+// Customer-portal local dismiss-set returned by listDismissedCaregivers.
+// Surface as a typed shape — frontend uses caregiver_ids for the Set
+// filter, rows are kept around in case downstream wants the kind too.
+export interface MamamiaDismissedCaregivers {
+  caregiver_ids: number[];
+  rows: Array<{ caregiver_id: number; kind: 'interest' | 'application' }>;
+}
+
 export interface MamamiaLocation {
   id: number;
   location: string;
