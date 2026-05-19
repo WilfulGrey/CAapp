@@ -53,6 +53,7 @@ export interface EventRow {
 
 export interface DetectSupabase {
   fetchLead(id: string): Promise<LeadRow | null>;
+  fetchActiveLeads(): Promise<LeadRow[]>;
   fetchPastEvents(leadId: string): Promise<EventRow[]>;
 }
 
@@ -62,6 +63,16 @@ export interface DetectResult {
   new_interests: number;
   skipped_no_caregiver_data: number;
   bridge_errors: number;
+}
+
+export interface BatchResult {
+  mode: "batch";
+  leads_processed: number;
+  total_new_applications: number;
+  total_new_interests: number;
+  total_skipped_no_caregiver_data: number;
+  total_bridge_errors: number;
+  per_lead_errors: number;
 }
 
 export interface HandlerDeps {
@@ -76,17 +87,27 @@ export async function handleRequest(req: Request, deps: HandlerDeps): Promise<Re
   if (req.method === "OPTIONS") return new Response(null, { status: 204 });
   if (req.method !== "POST") return jsonError(405, "method not allowed");
 
-  let leadId: string | undefined;
+  // Empty/{} body = batch mode (cron path). { lead_id } = single-lead path
+  // (manual curl, useful for testing or one-off triggers).
+  let body: { lead_id?: unknown } = {};
   try {
-    const body = await req.json();
-    leadId = body?.lead_id;
+    const raw = await req.text();
+    if (raw.trim()) body = JSON.parse(raw);
   } catch {
     return jsonError(400, "invalid json body");
   }
-  if (!leadId || typeof leadId !== "string") {
-    return jsonError(400, "missing lead_id field");
+
+  if (body.lead_id != null) {
+    if (typeof body.lead_id !== "string") {
+      return jsonError(400, "lead_id must be a string");
+    }
+    return await handleSingle(body.lead_id, deps);
   }
 
+  return await handleBatch(deps);
+}
+
+async function handleSingle(leadId: string, deps: HandlerDeps): Promise<Response> {
   const lead = await deps.supabase.fetchLead(leadId);
   if (!lead) return jsonError(404, "lead not found");
   if (!lead.mamamia_job_offer_id) {
@@ -99,6 +120,41 @@ export async function handleRequest(req: Request, deps: HandlerDeps): Promise<Re
   const result = await detect(lead as LeadRow & { token: string; mamamia_job_offer_id: number }, deps);
 
   return new Response(JSON.stringify(result), {
+    status: 200,
+    headers: { "Content-Type": "application/json" },
+  });
+}
+
+async function handleBatch(deps: HandlerDeps): Promise<Response> {
+  const leads = await deps.supabase.fetchActiveLeads();
+  const batch: BatchResult = {
+    mode: "batch",
+    leads_processed: 0,
+    total_new_applications: 0,
+    total_new_interests: 0,
+    total_skipped_no_caregiver_data: 0,
+    total_bridge_errors: 0,
+    per_lead_errors: 0,
+  };
+
+  for (const lead of leads) {
+    // fetchActiveLeads filter already enforces token + mamamia_job_offer_id non-null,
+    // so the type cast is safe.
+    if (!lead.token || !lead.mamamia_job_offer_id) continue;
+    try {
+      const r = await detect(lead as LeadRow & { token: string; mamamia_job_offer_id: number }, deps);
+      batch.leads_processed += 1;
+      batch.total_new_applications += r.new_applications;
+      batch.total_new_interests += r.new_interests;
+      batch.total_skipped_no_caregiver_data += r.skipped_no_caregiver_data;
+      batch.total_bridge_errors += r.bridge_errors;
+    } catch (e) {
+      console.error(`detect lead ${lead.id} threw:`, (e as Error).message);
+      batch.per_lead_errors += 1;
+    }
+  }
+
+  return new Response(JSON.stringify(batch), {
     status: 200,
     headers: { "Content-Type": "application/json" },
   });
@@ -303,6 +359,20 @@ function makeRealSupabase(url: string, serviceKey: string): DetectSupabase {
         .maybeSingle();
       if (error) throw new Error(`supabase fetchLead: ${error.message}`);
       return (data ?? null) as LeadRow | null;
+    },
+    async fetchActiveLeads() {
+      // Active = onboarded to Mamamia (has job_offer_id + token) AND token still
+      // valid AND status not in terminal-converted/declined states. Same set of
+      // exclusions as `send-scheduled-emails` uses for Nachfass cancellation.
+      const { data, error } = await client
+        .from("leads")
+        .select("id, token, email, mamamia_customer_id, mamamia_job_offer_id")
+        .not("mamamia_job_offer_id", "is", null)
+        .not("token", "is", null)
+        .gt("token_expires_at", new Date().toISOString())
+        .not("status", "in", "(vertrag_abgeschlossen,betreuung_beauftragt,nicht_interessiert)");
+      if (error) throw new Error(`supabase fetchActiveLeads: ${error.message}`);
+      return (data ?? []) as LeadRow[];
     },
     async fetchPastEvents(leadId: string) {
       const { data, error } = await client

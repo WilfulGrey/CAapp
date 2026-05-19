@@ -121,8 +121,29 @@ function makeSupabase(lead: LeadRow | null, events: EventRow[] = []): DetectSupa
     fetchLead(_id) {
       return Promise.resolve(lead);
     },
+    fetchActiveLeads() {
+      return Promise.resolve(lead ? [lead] : []);
+    },
     fetchPastEvents(_leadId) {
       return Promise.resolve(events);
+    },
+  };
+}
+
+// Multi-lead supabase fake for batch mode tests.
+function makeBatchSupabase(
+  leads: LeadRow[],
+  eventsByLead: Record<string, EventRow[]> = {},
+): DetectSupabase {
+  return {
+    fetchLead(id) {
+      return Promise.resolve(leads.find((l) => l.id === id) ?? null);
+    },
+    fetchActiveLeads() {
+      return Promise.resolve(leads);
+    },
+    fetchPastEvents(leadId) {
+      return Promise.resolve(eventsByLead[leadId] ?? []);
     },
   };
 }
@@ -141,14 +162,32 @@ function resetCaches() {
 
 // ─── Tests ─────────────────────────────────────────────────────────────────
 
-Deno.test("missing lead_id → 400", async () => {
+Deno.test("non-string lead_id → 400", async () => {
   resetCaches();
-  const res = await handleRequest(makeReq({}), {
+  const res = await handleRequest(makeReq({ lead_id: 123 }), {
     secrets: SECRETS,
     supabase: makeSupabase(VALID_LEAD),
     fetchFn: makeFetch({}),
   });
   assertEquals(res.status, 400);
+});
+
+Deno.test("empty body → batch mode (cron path)", async () => {
+  resetCaches();
+  const res = await handleRequest(
+    new Request("https://x/functions/v1/detect-caregiver-events", {
+      method: "POST",
+    }),
+    {
+      secrets: SECRETS,
+      supabase: makeBatchSupabase([]),
+      fetchFn: makeFetch({}),
+    },
+  );
+  assertEquals(res.status, 200);
+  const body = await res.json();
+  assertEquals(body.mode, "batch");
+  assertEquals(body.leads_processed, 0);
 });
 
 Deno.test("lead not found → 404", async () => {
@@ -357,6 +396,81 @@ Deno.test("mixed batch: 1 new app + 1 new interest + 1 dedupe → counts split c
 });
 
 // ─── Helper unit tests ─────────────────────────────────────────────────────
+
+Deno.test("batch mode: 2 active leads with apps → aggregate counts + per-lead bridge calls", async () => {
+  resetCaches();
+  const recorder: BridgeOptions["recorder"] = [];
+  const leadA: LeadRow = { ...VALID_LEAD, id: "lead-a", token: "tok-a", mamamia_job_offer_id: 1001 };
+  const leadB: LeadRow = { ...VALID_LEAD, id: "lead-b", token: "tok-b", mamamia_job_offer_id: 1002 };
+  const res = await handleRequest(
+    new Request("https://x/functions/v1/detect-caregiver-events", { method: "POST" }),
+    {
+      secrets: SECRETS,
+      supabase: makeBatchSupabase([leadA, leadB]),
+      // Both leads see the same fake Mamamia state (1 app each).
+      fetchFn: makeFetch(
+        { apps: [{ id: 1, caregiver_id: 50001, caregiver: makeCaregiver({ id: 50001 }) }] },
+        { recorder },
+      ),
+    },
+  );
+  assertEquals(res.status, 200);
+  const body = await res.json();
+  assertEquals(body.mode, "batch");
+  assertEquals(body.leads_processed, 2);
+  assertEquals(body.total_new_applications, 2);
+  assertEquals(body.per_lead_errors, 0);
+  // Each lead → 1 bridge POST, each with its own token.
+  assertEquals(recorder.length, 2);
+});
+
+Deno.test("batch mode: one lead's Mamamia call throws → per_lead_errors increments, sweep continues", async () => {
+  resetCaches();
+  const recorder: BridgeOptions["recorder"] = [];
+  const leadA: LeadRow = { ...VALID_LEAD, id: "lead-a", token: "tok-a", mamamia_job_offer_id: 1001 };
+  const leadB: LeadRow = { ...VALID_LEAD, id: "lead-b", token: "tok-b", mamamia_job_offer_id: 9999 };
+
+  // Custom fetchFn — lead B's job_offer_id triggers a GraphQL error.
+  const fetchFn: typeof fetch = async (input, init) => {
+    const url = typeof input === "string" ? input : (input as Request).url;
+    const rawBody = (init as { body?: BodyInit } | undefined)?.body;
+    const reqBody = typeof rawBody === "string" ? JSON.parse(rawBody) : {};
+    if (url.includes("/graphql/auth")) {
+      return new Response(JSON.stringify({ data: { LoginAgency: { id: 1, name: "A", email: "a", token: "t" } } }), { status: 200 });
+    }
+    if (url.includes("mamamia.test/graphql")) {
+      const opName = (reqBody.query.match(/(?:query|mutation)\s+(\w+)/) || [, ""])[1];
+      const jobOfferId = reqBody.variables?.job_offer_id ?? reqBody.variables?.id;
+      if (jobOfferId === 9999) {
+        return new Response(JSON.stringify({ errors: [{ message: "boom" }] }), { status: 200 });
+      }
+      if (opName === "DetectListApplications") {
+        return new Response(JSON.stringify({ data: { JobOfferApplicationsWithPagination: { total: 1, data: [{ id: 1, caregiver_id: 50001, caregiver: makeCaregiver({ id: 50001 }) }] } } }), { status: 200 });
+      }
+      if (opName === "DetectListInterests") {
+        return new Response(JSON.stringify({ data: { JobOffer: { id: jobOfferId, interests: [] } } }), { status: 200 });
+      }
+    }
+    if (url.includes("/api/lead-event")) {
+      recorder.push({ event: reqBody.event, metadata: reqBody.metadata });
+      return new Response(JSON.stringify({ ok: true }), { status: 200 });
+    }
+    return new Response("unexpected", { status: 500 });
+  };
+
+  const res = await handleRequest(
+    new Request("https://x/functions/v1/detect-caregiver-events", { method: "POST" }),
+    {
+      secrets: SECRETS,
+      supabase: makeBatchSupabase([leadA, leadB]),
+      fetchFn,
+    },
+  );
+  const body = await res.json();
+  assertEquals(body.leads_processed, 1); // only lead A succeeded
+  assertEquals(body.per_lead_errors, 1);
+  assertEquals(body.total_new_applications, 1);
+});
 
 Deno.test("mapHpToBadge thresholds", () => {
   assertEquals(mapHpToBadge(null), null);
