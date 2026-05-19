@@ -283,6 +283,23 @@ const CustomerPortalPage: FC = () => {
       }));
   })();
 
+  // Server-authoritative override for `patientSaved`. Mamamia flips
+  // Customer.status from 'draft' → 'active' on the first patient-form
+  // save (StoreCustomer → UpdateCustomer transition). Local state defaults
+  // to false and only the AngebotCard's localStorage-hydrate flips it on
+  // mount — but that misses (a) customers visiting from a new device /
+  // incognito, and (b) customers whose Mamamia profile was completed via
+  // a different path (e.g. agency-driven). Any of these would otherwise
+  // see the misleading "Achtung: Profil unvollständig" banner despite
+  // having a job offer with real applications. We trust Mamamia status as
+  // the source of truth and only ever flip TO true, never back to false
+  // (so an in-progress mid-edit doesn't accidentally clear the badge).
+  useEffect(() => {
+    if (mmCustomer?.status && mmCustomer.status !== 'draft' && !patientSaved) {
+      setPatientSaved(true);
+    }
+  }, [mmCustomer?.status, patientSaved]);
+
   // Sync real applications from Mamamia → local state (keeps existing mutation flow).
   useEffect(() => {
     if (!mmReady || !mmApplications) return;
