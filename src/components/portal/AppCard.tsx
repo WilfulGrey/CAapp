@@ -10,7 +10,7 @@ export const AppCard: FC<{
   onDecline: (id: string) => void;
   onNurseClick: (n: Nurse) => void;
 }> = ({ app, exiting, onReview, onDecline, onNurseClick }) => {
-  const { nurse, message } = app;
+  const { nurse } = app;
   const inits = initials(nurse.name);
   const name = displayName(nurse.name);
   const bars = Array.from({ length: 5 }, (_, i) => i < nurse.language.bars);
@@ -94,9 +94,15 @@ export const AppCard: FC<{
             </div>
           </div>
         </div>
-        {message && (
-          <p className="text-sm text-gray-600 leading-relaxed line-clamp-2 border-l-2 border-[#E5E3DF] pl-3">„{message}"</p>
-        )}
+        {/*
+          'Nachricht der Agentur' (application.message) intentionally NOT
+          rendered. The Mamamia field carries agency-internal back-office
+          notes — verified live 2026-05-19 on Customer 8546 (Wendt)
+          application 7997: caregiver full name (Monika Jaremowicz), phone
+          number, salary breakdown (DLV/PK Netto/RK), ID stubs
+          (pr-8546-1). Defense in depth: also dropped from the
+          LIST_APPLICATIONS GraphQL query so it never reaches the proxy.
+        */}
       </div>
 
       <div className="flex items-center justify-between px-5 pb-5 pt-1">

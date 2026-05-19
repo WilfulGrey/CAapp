@@ -150,7 +150,13 @@ export const LIST_APPLICATIONS = /* GraphQL */ `
         parent_id
         is_counter_offer
         salary
-        message
+        # 'message' intentionally NOT fetched. Defense in depth for the
+        # AppCard / AngebotPruefenModal redaction — Mamamia's application
+        # message field carries agency-internal back-office notes (caregiver
+        # full name, phone, salary breakdown DLV/PK Netto/RK, ID stubs like
+        # pr-XXXX-N). Verified live 2026-05-19 on Customer 8546 application
+        # 7997. By dropping the field at the GraphQL boundary the data
+        # never crosses the proxy, even if the frontend regresses.
         arrival_at
         departure_at
         arrival_fee
