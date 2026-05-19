@@ -1594,6 +1594,12 @@ export async function sendEmail(
 
     const toAddr = Array.isArray(to) ? to.join(', ') : to;
 
+    // Optional BCC for ops visibility — every outgoing customer mail
+    // copies to info@mamamia.app by default. Disable by setting
+    // SMTP_BCC=  (empty) on the deploy. Comma-separated for multiple.
+    const bccRaw = process.env.SMTP_BCC ?? 'info@mamamia.app';
+    const bccAddr = bccRaw.trim();
+
     const mailOptions: any = {
       from: `"${process.env.SMTP_FROM_NAME || 'Primundus 24h-Pflege'}" <${process.env.SMTP_FROM || process.env.SMTP_USER}>`,
       to: toAddr,
@@ -1601,6 +1607,10 @@ export async function sendEmail(
       text: template.text,
       html: template.html,
     };
+
+    if (bccAddr) {
+      mailOptions.bcc = bccAddr;
+    }
 
     if (attachments && attachments.length > 0) {
       mailOptions.attachments = attachments.map((att: any) => ({
@@ -1611,7 +1621,7 @@ export async function sendEmail(
     }
 
     await transporter.sendMail(mailOptions);
-    console.log(`Email sent via SMTP to: ${toAddr}`);
+    console.log(`Email sent via SMTP to: ${toAddr}${bccAddr ? ` (bcc: ${bccAddr})` : ''}`);
     return { success: true };
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);

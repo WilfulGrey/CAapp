@@ -713,12 +713,18 @@ async function sendEmailSmtp(
       },
     });
 
+    // Optional BCC for ops visibility — mirrors project 3/lib/email.ts.
+    // Default info@mamamia.app; disable by setting SMTP_BCC= (empty).
+    const bccRaw = Deno.env.get("SMTP_BCC") ?? "info@mamamia.app";
+    const bccAddr = bccRaw.trim();
+
     const mailOptions: any = {
       from: `"${smtpConfig.fromName}" <${smtpConfig.from}>`,
       to,
       subject,
       text,
       html,
+      ...(bccAddr ? { bcc: bccAddr } : {}),
     };
 
     if (attachments && attachments.length > 0) {
