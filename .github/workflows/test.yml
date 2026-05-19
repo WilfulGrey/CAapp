@@ -66,6 +66,20 @@ jobs:
         working-directory: supabase/functions/mamamia-proxy
         run: deno task test
 
+  deno-detect:
+    name: deno tests (detect-caregiver-events)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: "v2.x"
+
+      - name: Run detect tests
+        working-directory: supabase/functions/detect-caregiver-events
+        run: deno task test
+
   # ─── Deploy CA-App Edge Functions (after merge to integration/mamamia-onboarding) ─
   # Strukturalnie eliminuje race condition gdzie ktoś deployuje ze swojego
   # lokalnego stanu i nadpisuje cudze zmiany w chmurze. Po merge PR-a CI
@@ -80,7 +94,7 @@ jobs:
   #   (wygeneruj na https://supabase.com/dashboard/account/tokens)
   deploy-edge-functions:
     name: Deploy CA-App Edge Functions to Supabase
-    needs: [vitest, deno-onboard, deno-proxy]
+    needs: [vitest, deno-onboard, deno-proxy, deno-detect]
     if: (github.event_name == 'push' && github.ref == 'refs/heads/integration/mamamia-onboarding') || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     steps:
@@ -114,7 +128,7 @@ jobs:
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
         run: |
-          for fn in mamamia-proxy onboard-to-mamamia; do
+          for fn in mamamia-proxy onboard-to-mamamia detect-caregiver-events; do
             echo "::group::Deploying $fn"
             supabase functions deploy "$fn" --project-ref ycdwtrklpoqprabtwahi
             echo "::endgroup::"
@@ -127,7 +141,7 @@ jobs:
   # job z working-directory "project 3" + własny diff-trigger.
   deploy-kostenrechner-edge-functions:
     name: Deploy kostenrechner Edge Functions to Supabase
-    needs: [vitest, deno-onboard, deno-proxy]
+    needs: [vitest, deno-onboard, deno-proxy, deno-detect]
     if: (github.event_name == 'push' && github.ref == 'refs/heads/integration/mamamia-onboarding') || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     steps:
