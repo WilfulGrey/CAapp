@@ -123,3 +123,15 @@ export function useUpdateJobDescription() {
     { UpdateCustomer: { id: number; customer_id: string } }
   >('updateJobDescription');
 }
+
+// Local UI dismiss — writes a row into lead_dismissed_caregivers so the
+// portal stops surfacing this caregiver in the Interest section. Does
+// NOT call Mamamia. Backend detect-caregiver-events also doesn't read
+// the dismiss table, so the customer mail keeps flowing if Mamamia
+// re-surfaces this caregiver later (by design, user decision).
+export function useDismissCaregiver() {
+  return useMamamiaMutation<
+    { caregiver_id: number; kind: 'interest' | 'application' },
+    { dismissed: boolean }
+  >('dismissCaregiver');
+}

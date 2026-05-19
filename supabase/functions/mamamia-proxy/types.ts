@@ -8,8 +8,10 @@ export type ProxyAction =
   | "getJobOffer"
   | "getCustomer"
   | "listApplications"
+  | "listInterests"
   | "listMatchings"
   | "listInvitedCaregiverIds"
+  | "listDismissedCaregivers"
   | "getCaregiver"
   | "searchLocations"
   // writes
@@ -18,9 +20,25 @@ export type ProxyAction =
   | "rejectApplication"
   | "storeConfirmation"
   | "inviteCaregiver"
+  | "dismissCaregiver"
   // AI
   | "generateJobDescription"
   | "generateCaregiverAbout";
+
+// Minimal Supabase client interface used by dismissCaregiver /
+// listDismissedCaregivers. Real impl in proxy index.ts; tests inject
+// a fake. Kept narrow so tests don't have to satisfy the full @supabase
+// surface.
+export interface ProxySupabase {
+  selectDismissedCaregivers(
+    leadId: string,
+  ): Promise<Array<{ caregiver_id: number; kind: string }>>;
+  upsertDismissedCaregiver(
+    leadId: string,
+    caregiverId: number,
+    kind: "interest" | "application",
+  ): Promise<void>;
+}
 
 export interface ActionDeps {
   endpoint: string;
@@ -34,6 +52,10 @@ export interface ActionDeps {
   fetchFn?: typeof fetch;
   /** Anthropic API key — used by generateJobDescription action. */
   anthropicApiKey?: string;
+  /** Supabase service-role adapter — used by dismiss-caregiver actions
+   *  that read/write `lead_dismissed_caregivers`. Optional so tests
+   *  that don't exercise dismiss can skip wiring it. */
+  supabase?: ProxySupabase;
 }
 
 export type ActionHandler = (

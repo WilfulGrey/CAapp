@@ -8,11 +8,13 @@
 // Each action validates ownership (queries constrained by session.customer_id
 // or session.job_offer_id; mutations same + allowlist of mutable fields).
 
+import { createClient, type SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2.57.4";
 import { corsHeaders } from "../_shared/cors.ts";
 import { isRateLimited } from "../_shared/rateLimit.ts";
 import { parseCookie, verifySessionToken } from "../_shared/session.ts";
 import { getOrRefreshAgencyToken } from "../_shared/mamamiaClient.ts";
 import { ACTIONS, isKnownAction } from "./actions.ts";
+import type { ProxySupabase } from "./types.ts";
 
 // ─── Secrets + DI ──────────────────────────────────────────────────────────
 
@@ -38,11 +40,19 @@ export interface ProxySecrets {
   // (Święta zasada nr 1). Wartość ustalana per-tenant przez inspekcję
   // DevTools Network w żywym panelu Mamamii.
   mamamiaPanelUrl: string;
+  /** Used by dismissCaregiver / listDismissedCaregivers actions which
+   *  write to `lead_dismissed_caregivers`. Service-role bypasses RLS;
+   *  ownership is enforced at the proxy layer via session.lead_id. */
+  supabaseUrl: string;
+  supabaseServiceKey: string;
 }
 
 export interface ProxyDeps {
   secrets: ProxySecrets;
   fetchFn?: typeof fetch;
+  /** Optional override for tests. Real impl built from secrets in
+   *  bootstrap below. */
+  supabase?: ProxySupabase;
 }
 
 // ─── Core handler (testable) ───────────────────────────────────────────────
@@ -118,6 +128,11 @@ export async function handleRequest(req: Request, deps: ProxyDeps): Promise<Resp
       agencyPassword: deps.secrets.mamamiaAgencyPassword,
       fetchFn: deps.fetchFn,
       anthropicApiKey: deps.secrets.anthropicApiKey,
+      // Bootstrap constructs the real Supabase adapter once (module-level
+      // singleton) and passes it through `deps.supabase`. We do NOT
+      // auto-construct here because `createClient` schedules a token
+      // auto-refresh timer that Deno test runner flags as a leak.
+      supabase: deps.supabase,
     });
 
     return new Response(
@@ -158,6 +173,31 @@ function jsonError(
   });
 }
 
+// ─── Real Supabase adapter ─────────────────────────────────────────────────
+
+function makeRealSupabase(url: string, serviceKey: string): ProxySupabase {
+  const client: SupabaseClient = createClient(url, serviceKey);
+  return {
+    async selectDismissedCaregivers(leadId: string) {
+      const { data, error } = await client
+        .from("lead_dismissed_caregivers")
+        .select("caregiver_id, kind")
+        .eq("lead_id", leadId);
+      if (error) throw new Error(`supabase selectDismissedCaregivers: ${error.message}`);
+      return (data ?? []) as Array<{ caregiver_id: number; kind: string }>;
+    },
+    async upsertDismissedCaregiver(leadId, caregiverId, kind) {
+      const { error } = await client
+        .from("lead_dismissed_caregivers")
+        .upsert(
+          { lead_id: leadId, caregiver_id: caregiverId, kind },
+          { onConflict: "lead_id,caregiver_id,kind" },
+        );
+      if (error) throw new Error(`supabase upsertDismissedCaregiver: ${error.message}`);
+    },
+  };
+}
+
 // ─── Bootstrap (prod only) ─────────────────────────────────────────────────
 
 if (import.meta.main) {
@@ -173,7 +213,10 @@ if (import.meta.main) {
     sessionJwtSecret: Deno.env.get("SESSION_JWT_SECRET")!,
     mamamiaPanelUrl: panelUrl,
     anthropicApiKey: Deno.env.get("ANTHROPIC_API_KEY"),
+    supabaseUrl: Deno.env.get("SUPABASE_URL")!,
+    supabaseServiceKey: Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
   };
 
-  Deno.serve((req) => handleRequest(req, { secrets }));
+  const supabase = makeRealSupabase(secrets.supabaseUrl, secrets.supabaseServiceKey);
+  Deno.serve((req) => handleRequest(req, { secrets, supabase }));
 }

@@ -10,7 +10,7 @@ import {
   setDeclinedCaregiver,
 } from '../lib/supabase';
 import { useMamamiaSession } from '../hooks/useMamamiaSession';
-import { useCustomer, useJobOffer, useApplications, useMatchings, useCaregiver, useInvitedCaregivers } from '../lib/mamamia/hooks';
+import { useCustomer, useJobOffer, useApplications, useInterests, useDismissedCaregivers, useMatchings, useCaregiver, useInvitedCaregivers } from '../lib/mamamia/hooks';
 import { prefetchCaregivers } from '../lib/mamamia/caregiverCache';
 import { scheduleAiAbouts, getAiAbout, subscribeAiAbout } from '../lib/mamamia/aiAboutCache';
 import { reportLeadEvent } from '../lib/leadEvents';
@@ -18,6 +18,7 @@ import {
   useRejectApplication,
   useStoreConfirmation,
   useInviteCaregiver,
+  useDismissCaregiver,
   useUpdateCustomer,
   useUpdateJobDescription,
 } from '../lib/mamamia/mutations';
@@ -40,6 +41,7 @@ import { AppCard } from '../components/portal/AppCard';
 import { AppCardDone } from '../components/portal/AppCardDone';
 import { MatchCardDone } from '../components/portal/MatchCardDone';
 import { MatchCard } from '../components/portal/MatchCard';
+import { InterestCard, type InterestActionStatus } from '../components/portal/InterestCard';
 import { InfoPopup } from '../components/portal/InfoPopup';
 import { ContactPopup } from '../components/portal/ContactPopup';
 import { DeclineConfirmModal } from '../components/portal/DeclineConfirmModal';
@@ -126,10 +128,20 @@ const CustomerPortalPage: FC = () => {
   // below to seed nurseStatuses with 'invited' so the badge survives F5.
   const { data: invitedCaregiverIds, loading: invitedLoading, error: invitedError, refetch: refetchInvited } = useInvitedCaregivers(mmReady);
 
+  // Interests (Pflegekraft signalisiert proaktiv Interesse — precursor
+  // to a formal Bewerbung). Surface in a dedicated section between
+  // "Ihre Bewerbungen" and matchings. Filter by dismissed_set so
+  // caregivers the customer already said "no thanks" to don't reappear
+  // after refetch.
+  const { data: mmInterests, refetch: refetchInterests } = useInterests(mmReady);
+  const { data: dismissedCaregivers, refetch: refetchDismissed } = useDismissedCaregivers(mmReady);
+  const [interestStatusOverrides, setInterestStatusOverrides] = useState<Map<number, InterestActionStatus>>(new Map());
+
   // K5 mutations
   const rejectAppMutation = useRejectApplication();
   const confirmMutation = useStoreConfirmation();
   const inviteMutation = useInviteCaregiver();
+  const dismissCaregiverMutation = useDismissCaregiver();
   const updateCustomerMutation = useUpdateCustomer();
   const updateJobDescriptionMutation = useUpdateJobDescription();
   // K6 (replaced) — customer-scope auth used to require a verify-mail
@@ -370,6 +382,26 @@ const CustomerPortalPage: FC = () => {
   const hasPending = pendingApps.length > 0;
   const matchesUnlocked = !hasPending;
 
+  // Compute visible interests — drop rejected-by-caregiver and locally-
+  // dismissed-by-customer entries. Also drop interests whose caregiver
+  // has already become a pending Application (stronger signal already
+  // surfaced) or already been invited (we sent StoreRequest, waiting on
+  // their formal application).
+  const dismissedSet = new Set(dismissedCaregivers?.caregiver_ids ?? []);
+  const applicationCaregiverIds = new Set(
+    applications.map((a) => a.nurse?.caregiverId).filter((id): id is number => typeof id === 'number'),
+  );
+  const invitedSet = new Set(invitedCaregiverIds ?? []);
+  const visibleInterests = (mmInterests ?? []).filter((i) => {
+    if (i.rejected_at) return false;
+    if (dismissedSet.has(i.caregiver_id)) return false;
+    if (applicationCaregiverIds.has(i.caregiver_id)) return false;
+    if (invitedSet.has(i.caregiver_id)) return false;
+    const override = interestStatusOverrides.get(i.caregiver_id);
+    if (override === 'dismissed') return false;
+    return true;
+  });
+
   const showToast = (msg: string) => {
     setToast(msg);
     setTimeout(() => setToast(null), 4000);
@@ -521,6 +553,83 @@ const CustomerPortalPage: FC = () => {
     }
     showToast('Einladung konnte nicht gesendet werden. Bitte kontaktieren Sie uns.');
     throw lastErr ?? new Error('invite-failed');
+  };
+
+  // Interest-side invite handler. Same retry-on-cat=authorization shape as
+  // confirmInviteNurse but keyed by caregiver_id (no matching-array index
+  // available for interests). Updates interestStatusOverrides + refetches
+  // both interests + invited so the next render moves the caregiver out
+  // of the Interest section into the invited matchings.
+  const confirmInviteInterest = async (caregiverId: number, displayLabel: string): Promise<void> => {
+    if (!mmReady) {
+      showToast('Einladung derzeit nicht möglich. Bitte später erneut versuchen.');
+      throw new Error('not-ready');
+    }
+    setInterestStatusOverrides((prev) => {
+      const next = new Map(prev);
+      next.set(caregiverId, 'invited');
+      return next;
+    });
+
+    const RETRY_DELAY_MS = 5000;
+    const MAX_ATTEMPTS = 6;
+    let lastErr: Error | null = null;
+
+    for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
+      try {
+        await inviteMutation.mutate({ caregiver_id: caregiverId });
+        reportLeadEvent(lead?.token, 'caregiver_invited', {
+          caregiver_id: caregiverId,
+          caregiver_name: displayLabel,
+        });
+        refetchInvited();
+        refetchInterests();
+        showToast(`✓ ${displayLabel} wurde eingeladen!`);
+        return;
+      } catch (err) {
+        lastErr = err as Error;
+        const isRaceShape = err instanceof MamamiaError && err.category === 'authorization';
+        if (!isRaceShape) break;
+        if (attempt < MAX_ATTEMPTS - 1) {
+          await new Promise((r) => setTimeout(r, RETRY_DELAY_MS));
+        }
+      }
+    }
+
+    console.error('inviteCaregiver (interest) failed after retries:', lastErr?.message);
+    setInterestStatusOverrides((prev) => {
+      const next = new Map(prev);
+      next.delete(caregiverId);
+      return next;
+    });
+    showToast('Einladung konnte nicht gesendet werden. Bitte kontaktieren Sie uns.');
+    throw lastErr ?? new Error('invite-failed');
+  };
+
+  // Interest-side dismiss handler. Local-only — writes a row to
+  // lead_dismissed_caregivers so the next portal refresh / refetch
+  // filters this caregiver out. Mamamia is NOT informed; detect-
+  // caregiver-events still emails when the caregiver re-appears as a
+  // formal application (by design).
+  const confirmDismissInterest = async (caregiverId: number): Promise<void> => {
+    setInterestStatusOverrides((prev) => {
+      const next = new Map(prev);
+      next.set(caregiverId, 'dismissed');
+      return next;
+    });
+    try {
+      await dismissCaregiverMutation.mutate({ caregiver_id: caregiverId, kind: 'interest' });
+      refetchDismissed();
+    } catch (err) {
+      console.error('dismissCaregiver failed:', (err as Error).message);
+      setInterestStatusOverrides((prev) => {
+        const next = new Map(prev);
+        next.delete(caregiverId);
+        return next;
+      });
+      showToast('Konnte nicht ablehnen. Bitte erneut versuchen.');
+      throw err;
+    }
   };
 
   // Used by modal (calls after own animation). Modal doesn't await — it just
@@ -1151,6 +1260,39 @@ const CustomerPortalPage: FC = () => {
                 onNurseClick={(n) => openNurseFromApp(n, app)}
               />
             ))}
+          </div>
+        )}
+
+        {/* ── SECTION: Pflegekräfte mit Interesse — between Bewerbungen and Matchings ── */}
+        {visibleInterests.length > 0 && (
+          <div className="space-y-3">
+            <h3 className="text-[15px] font-bold px-1" style={{color:'#3D3D3D'}}>
+              Pflegekräfte mit Interesse {visibleInterests.length > 1 ? `(${visibleInterests.length})` : ''}
+            </h3>
+            <p className="text-[13px] leading-relaxed px-1 text-gray-600">
+              Diese Pflegekräfte haben Interesse an Ihrer Anfrage signalisiert. Tippen Sie auf
+              <span className="font-semibold"> „Einladen"</span>, damit wir die formale Bewerbung anstoßen — oder
+              auf <span className="font-semibold">„Ablehnen"</span>, um die Karte zu entfernen.
+            </p>
+            {visibleInterests.map((i) => {
+              const nurse = mapCaregiverToNurse(i.caregiver, {
+                nowIso: new Date().toISOString(),
+                nowYear: new Date().getFullYear(),
+              });
+              const status: InterestActionStatus =
+                interestStatusOverrides.get(i.caregiver_id) ?? 'idle';
+              const label = displayName(nurse.name);
+              return (
+                <InterestCard
+                  key={i.id}
+                  nurse={nurse}
+                  status={status}
+                  onNurseClick={() => setSelectedNurse(nurse)}
+                  onInviteConfirm={() => confirmInviteInterest(i.caregiver_id, label)}
+                  onDismiss={() => confirmDismissInterest(i.caregiver_id)}
+                />
+              );
+            })}
           </div>
         )}
 
