@@ -5,7 +5,7 @@ import { useParams, useRouter } from 'next/navigation';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { createClient } from '@supabase/supabase-js';
-import { Loader as Loader2, ArrowLeft, Mail, Phone, Calendar, MapPin, FileText, Clock, Download, CreditCard as Edit, Save, X, RefreshCw, User, BellOff, CircleCheck as CheckCircle, MessageSquare } from 'lucide-react';
+import { Loader as Loader2, ArrowLeft, Mail, Phone, Calendar, MapPin, FileText, Clock, Download, CreditCard as Edit, Save, X, RefreshCw, User, BellOff, CircleCheck as CheckCircle, MessageSquare, Copy, Check } from 'lucide-react';
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -31,6 +31,10 @@ export default function LeadDetailPage() {
   const [adminNotes, setAdminNotes] = useState('');
   const [isEditingNotes, setIsEditingNotes] = useState(false);
   const [isSavingStatus, setIsSavingStatus] = useState(false);
+  // Token recovery UI: feedback flags for the two Copy buttons. Each
+  // flips to true for 2s then back so the icon/label shows "Kopiert".
+  const [tokenCopied, setTokenCopied] = useState(false);
+  const [urlCopied, setUrlCopied] = useState(false);
 
   useEffect(() => {
     loadLeadDetails();
@@ -1165,23 +1169,86 @@ export default function LeadDetailPage() {
                   Lead reaktivieren
                 </Button>
               )}
-              {lead.token && (
-                <div>
-                  <p className="text-sm text-gray-600 mb-1">Vertrags-Token</p>
-                  <p className="text-xs font-mono bg-gray-100 p-2 rounded break-all">
-                    {lead.token}
-                  </p>
-                  {lead.token_used && (
-                    <p className="text-xs text-green-600 mt-1">✓ Verwendet</p>
-                  )}
-                  {lead.token_expires_at && (
-                    <p className="text-xs text-gray-500 mt-1">
-                      Gültig bis:{' '}
-                      {new Date(lead.token_expires_at).toLocaleDateString('de-DE')}
-                    </p>
-                  )}
-                </div>
-              )}
+              {lead.token && (() => {
+                const portalBase =
+                  process.env.NEXT_PUBLIC_PORTAL_URL ?? 'https://kundenportal.primundus.de';
+                const portalUrl = `${portalBase}/?token=${encodeURIComponent(lead.token)}`;
+                const copy = async (
+                  text: string,
+                  setFlag: (v: boolean) => void,
+                ): Promise<void> => {
+                  try {
+                    await navigator.clipboard.writeText(text);
+                    setFlag(true);
+                    setTimeout(() => setFlag(false), 2000);
+                  } catch (err) {
+                    console.error('clipboard write failed:', err);
+                  }
+                };
+                const isExpired =
+                  lead.token_expires_at &&
+                  new Date(lead.token_expires_at) < new Date();
+                return (
+                  <div className="space-y-3">
+                    <p className="text-sm text-gray-600">Vertrags-Token</p>
+                    {/* Token + Copy */}
+                    <div className="flex items-start gap-2">
+                      <p className="flex-1 text-xs font-mono bg-gray-100 p-2 rounded break-all">
+                        {lead.token}
+                      </p>
+                      <button
+                        type="button"
+                        onClick={() => copy(lead.token, setTokenCopied)}
+                        title="Token kopieren"
+                        className="px-3 py-2 text-xs font-semibold text-gray-700 hover:text-gray-900 hover:bg-gray-100 rounded border border-gray-200 flex items-center gap-1.5 transition-colors flex-shrink-0"
+                      >
+                        {tokenCopied ? (
+                          <Check className="w-3.5 h-3.5 text-green-600" />
+                        ) : (
+                          <Copy className="w-3.5 h-3.5" />
+                        )}
+                        {tokenCopied ? 'Kopiert' : 'Token'}
+                      </button>
+                    </div>
+                    {/* Portal URL + Copy */}
+                    <div>
+                      <p className="text-xs text-gray-500 mb-1">Portal-Link für den Kunden</p>
+                      <div className="flex items-start gap-2">
+                        <p className="flex-1 text-xs font-mono bg-gray-50 p-2 rounded break-all text-gray-600">
+                          {portalUrl}
+                        </p>
+                        <button
+                          type="button"
+                          onClick={() => copy(portalUrl, setUrlCopied)}
+                          title="Portal-Link kopieren"
+                          className="px-3 py-2 text-xs font-semibold text-white bg-[#5C4A32] hover:bg-[#4A3B26] rounded flex items-center gap-1.5 transition-colors flex-shrink-0"
+                        >
+                          {urlCopied ? (
+                            <Check className="w-3.5 h-3.5" />
+                          ) : (
+                            <Copy className="w-3.5 h-3.5" />
+                          )}
+                          {urlCopied ? 'Kopiert' : 'Link'}
+                        </button>
+                      </div>
+                    </div>
+                    {lead.token_used && (
+                      <p className="text-xs text-green-600">✓ Verwendet</p>
+                    )}
+                    {lead.token_expires_at && !isExpired && (
+                      <p className="text-xs text-gray-500">
+                        Gültig bis:{' '}
+                        {new Date(lead.token_expires_at).toLocaleDateString('de-DE')}
+                      </p>
+                    )}
+                    {isExpired && (
+                      <p className="text-xs text-red-600 font-semibold">
+                        ⚠ Token abgelaufen ({new Date(lead.token_expires_at).toLocaleDateString('de-DE')}) — der Kunde kann den Link nicht mehr nutzen.
+                      </p>
+                    )}
+                  </div>
+                );
+              })()}
             </div>
           </Card>
 
