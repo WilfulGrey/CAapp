@@ -364,7 +364,7 @@ export function MultiStepForm() {
       case 7: return "Führerschein gewünscht?";
       case 8: return "Geschlecht der Pflegekraft";
       case 9: return "Wann soll die Betreuung starten?";
-      case 10: return "Fast geschafft — Ihr Angebot wartet schon";
+      case 10: return "Jetzt Angebot & Pflegekräfte anzeigen";
       default: return "";
     }
   };
@@ -381,7 +381,7 @@ export function MultiStepForm() {
       case 7: return "Sind Autofahren notwendig und nicht anders zu organisieren?";
       case 8: return "Haben Sie eine Präferenz bezüglich des Geschlechts?";
       case 9: return "Egal ob konkret geplant oder noch in der Recherche — wir richten alles danach aus.";
-      case 10: return "Sie sehen es gleich am Bildschirm. Eine Kopie kommt zusätzlich per E-Mail — damit Sie es jederzeit nachlesen können.";
+      case 10: return "Letzter Schritt – Sie sehen sofort Ihr Angebot & passende Pflegekräfte und erhalten alles per Mail";
       default: return "";
     }
   };
@@ -477,7 +477,7 @@ export function MultiStepForm() {
             Angebot & Pflegekräfte sofort erhalten
           </p>
           <p className="text-sm text-white/90">
-            Ihr persönlicher Preis + passende Pflegekräfte in <span className="font-bold">2 Minuten</span>
+            Kostenlos & unverbindlich · in <span className="font-bold">2 Minuten</span>
           </p>
         </div>
 
@@ -831,7 +831,7 @@ export function MultiStepForm() {
                         className={`w-full px-4 py-2.5 text-base border-2 rounded-full focus:outline-none focus:ring-1 focus:ring-[#8B7355]/40 focus:border-[#8B7355] ${
                           errors.name ? 'border-red-500' : 'border-[#B8B0A6]'
                         }`}
-                        placeholder="Ihr Name"
+                        placeholder="Vollständiger Name"
                       />
                       {errors.name && <p className="text-[11px] text-red-500 mt-1 px-3">{errors.name}</p>}
                     </div>
@@ -849,7 +849,7 @@ export function MultiStepForm() {
                         className={`w-full px-4 py-2.5 text-base border-2 rounded-full focus:outline-none focus:ring-1 focus:ring-[#8B7355]/40 focus:border-[#8B7355] ${
                           errors.email ? 'border-red-500' : 'border-[#B8B0A6]'
                         }`}
-                        placeholder="Ihre E-Mail-Adresse"
+                        placeholder="E-Mail-Adresse"
                       />
                       {errors.email && <p className="text-[11px] text-red-500 mt-1 px-3">{errors.email}</p>}
                     </div>
@@ -864,22 +864,11 @@ export function MultiStepForm() {
                         onFocus={() => trackFieldFocus('telefon')}
                         onBlur={(e) => trackFieldBlur('telefon', e.target.value)}
                         className="w-full px-4 py-2.5 text-base border-2 border-[#B8B0A6] rounded-full focus:outline-none focus:ring-1 focus:ring-[#8B7355]/40 focus:border-[#8B7355]"
-                        placeholder="Telefon (optional) — nur falls Sie eine persönliche Rückfrage möchten"
+                        placeholder="Telefonnummer (optional)"
                       />
                     </div>
                   </div>
 
-                  {/* Trust-Bar direkt am Entscheidungspunkt — adressiert die 3
-                      häufigsten Spam-Ängste in einer Zeile (PR #107). */}
-                  <div className="pt-1">
-                    <div className="flex flex-wrap items-center justify-center gap-x-3 gap-y-1 text-[11px] text-[#6B6B6B]">
-                      <span className="inline-flex items-center gap-1">🔒 DSGVO</span>
-                      <span className="text-[#D0CCC4]">·</span>
-                      <span className="inline-flex items-center gap-1">✉️ Kein Newsletter</span>
-                      <span className="text-[#D0CCC4]">·</span>
-                      <span className="inline-flex items-center gap-1">📞 Nur auf Wunsch</span>
-                    </div>
-                  </div>
                 </div>
               )}
             </div>
@@ -908,7 +897,7 @@ export function MultiStepForm() {
                       <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
                     </div>
                   ) : (
-                    <span>Angebot & Pflegekräfte jetzt sehen →</span>
+                    <span>Angebot & Pflegekräfte anzeigen →</span>
                   )}
                 </button>
                 <p className="text-center text-xs text-[#8B8B8B] leading-snug">
