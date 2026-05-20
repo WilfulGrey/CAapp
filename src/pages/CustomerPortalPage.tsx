@@ -49,15 +49,146 @@ import { ContactPopup } from '../components/portal/ContactPopup';
 import { DeclineConfirmModal } from '../components/portal/DeclineConfirmModal';
 import { AngebotPruefenModal } from '../components/portal/AngebotPruefenModal';
 import { CustomerNurseModal } from '../components/portal/CustomerNurseModal';
+
+// ─── Dev-Only Preview-Mode (NICHT für Production) ──────────────────────────
+// Aktiviert via ?preview=bewerbung oder ?preview=interesse. Skipped den
+// Token-Lookup + Mamamia und rendert die Portal-Seite mit hardcoded Dummy-
+// Daten, damit UI-Iterationen ohne echte Test-Leads getestet werden können.
+const PREVIEW_PARAM =
+  typeof window !== 'undefined'
+    ? new URLSearchParams(window.location.search).get('preview')
+    : null;
+const IS_PREVIEW_BEWERBUNG = PREVIEW_PARAM === 'bewerbung';
+const IS_PREVIEW_INTERESSE = PREVIEW_PARAM === 'interesse';
+const IS_PREVIEW_ANY = IS_PREVIEW_BEWERBUNG || IS_PREVIEW_INTERESSE;
+
+const PREVIEW_LEAD: Lead = {
+  id: 'preview-lead-1',
+  email: 'mueller@example.com',
+  vorname: 'Anna',
+  nachname: 'Müller',
+  anrede: 'Frau',
+  anrede_text: 'Frau',
+  telefon: '+49 89 1234567',
+  status: 'angebot_angefordert',
+  token: 'preview-token',
+  token_expires_at: null,
+  token_used: true,
+  care_start_timing: 'sofort',
+  kalkulation: {
+    bruttopreis: 3050,
+    eigenanteil: 2150,
+    zuschüsse: { gesamt: 900 },
+    formularDaten: {},
+    aufschluesselung: [],
+  } as any,
+  created_at: new Date().toISOString(),
+  updated_at: new Date().toISOString(),
+} as Lead;
+
+const PREVIEW_INTEREST_PROFILE = {
+  nationality: 'Polnisch',
+  yearOfBirth: 1964,
+  weight: '51–60 kg',
+  height: '151–160 cm',
+  maritalStatus: 'Verwitwet',
+  drivingLicense: false,
+  isNurse: false,
+  smoking: 'no' as const,
+  qualifications: 'Demenzbetreuung, Mobilisierung, Wundversorgung',
+  motivation: 'Ich freue mich, älteren Menschen ein liebevolles Zuhause zu erhalten.',
+  aboutDe: 'Maria ist eine ruhige, einfühlsame Frau, die gerne backt und sich für klassische Musik begeistert. Sie ist seit 6 Jahren in der 24h-Pflege tätig und hat in dieser Zeit 14 Familien begleitet — zuletzt zehn Wochen lang eine Familie in München. Was sie besonders auszeichnet: ihre Geduld und ihr feines Gespür für die Tagesform der Patienten — das schenkt Sicherheit und Ruhe in den Alltag.',
+  furtherHobbies: 'Sie hört gerne klassische Musik und backt traditionelle polnische Kuchen.',
+  hobbies: ['Backen', 'Musik', 'Gartenarbeit'],
+  personalities: ['einfühlsam', 'ruhig', 'zuverlässig', 'herzlich'],
+  acceptedMobilities: ['Mobil', 'Rollator', 'Bettlägerig'],
+  otherLanguages: [{ name: 'Englisch', level: 'A2' }],
+};
+
+const PREVIEW_INTEREST_ASSIGNMENTS = [
+  { startDate: '10.01.2026', endDate: '20.03.2026', postalCode: '80331', city: 'München', patientCount: 1, duration: '10 Wochen' },
+  { startDate: '01.09.2025', endDate: '15.11.2025', postalCode: '50667', city: 'Köln', patientCount: 1, duration: '10 Wochen' },
+];
+
+const PREVIEW_INTEREST = {
+  id: 999001,
+  caregiver_id: 999001,
+  rejected_at: null,
+  caregiver: {
+    id: 999001,
+    first_name: 'Maria',
+    last_name: 'Kowalska',
+    gender: 'female' as const,
+    year_of_birth: 1964,
+    birth_date: '1964-03-15',
+    germany_skill: 'level_3',
+    care_experience: '6',
+    available_from: new Date().toISOString(),
+    last_contact_at: new Date().toISOString(),
+    last_login_at: new Date().toISOString(),
+    is_active_user: true,
+    hp_total_jobs: 14,
+    hp_total_days: 1200,
+    hp_avg_mission_days: 84,
+    avatar_retouched: { aws_url: 'https://i.pravatar.cc/200?img=47' },
+  },
+};
+
+const PREVIEW_APPLICATION: Application = {
+  id: 'preview-app-1',
+  nurse: {
+    caregiverId: 999001,
+    name: 'Maria Kowalska',
+    age: 62,
+    experience: '6 Jahre Erfahrung',
+    experienceYears: 6,
+    availability: 'sofort verfügbar',
+    availableSoon: true,
+    language: { level: 'Gut', bars: 4 },
+    color: '#8B7355',
+    addedTime: 'vor 12 Min.',
+    isLive: true,
+    gender: 'female',
+    image: 'https://i.pravatar.cc/200?img=47',
+    history: { assignments: 14, avgDurationMonths: 2.8 },
+  },
+  agencyName: 'Mamamia',
+  appliedAt: 'vor 12 Min.',
+  status: 'new',
+  isInvited: true,
+  message:
+    'Ich freue mich auf den Einsatz bei Ihnen. Ich bin seit vielen Jahren in der 24h-Betreuung tätig und habe besondere Erfahrung mit demenziell veränderten Patienten.',
+  offer: {
+    monatlicheKosten: 2850,
+    anreisedatum: '19.05.2026',
+    abreisedatum: '19.07.2026',
+    anreisekosten: 125,
+    abreisekosten: 125,
+    reisetage: 'Mo + Mi',
+    feiertagszuschlag: 100,
+    kuendigungsfrist: '4 Wochen Kündigungsfrist',
+    submittedAt: 'vor 12 Min.',
+  },
+};
+
+const PREVIEW_MATCHINGS: Array<{ nurse: Nurse; caregiverId: number }> = [
+  { caregiverId: 999010, nurse: { caregiverId: 999010, name: 'Anna Nowak', age: 58, experience: '8 J. Erfahrung', experienceYears: 8, availability: 'sofort verfügbar', availableSoon: true, language: { level: 'Sehr gut', bars: 5 }, color: '#8B7355', addedTime: 'heute', isLive: true, gender: 'female', image: 'https://i.pravatar.cc/200?img=44', history: { assignments: 22, avgDurationMonths: 3.1 } } },
+  { caregiverId: 999011, nurse: { caregiverId: 999011, name: 'Ewa Lewandowski', age: 65, experience: '12 J. Erfahrung', experienceYears: 12, availability: 'verfügbar ab 02.06.', availableSoon: true, language: { level: 'Gut', bars: 4 }, color: '#A18973', addedTime: 'gestern', isLive: true, gender: 'female', image: 'https://i.pravatar.cc/200?img=49', history: { assignments: 35, avgDurationMonths: 3.6 } } },
+  { caregiverId: 999012, nurse: { caregiverId: 999012, name: 'Helena Wiśniewska', age: 54, experience: '4 J. Erfahrung', experienceYears: 4, availability: 'sofort verfügbar', availableSoon: true, language: { level: 'Kommunikativ', bars: 3 }, color: '#B5A184', addedTime: 'vor 2 Tagen', isLive: true, gender: 'female', image: 'https://i.pravatar.cc/200?img=45', history: { assignments: 9, avgDurationMonths: 2.4 } } },
+  { caregiverId: 999013, nurse: { caregiverId: 999013, name: 'Pavel Kowalski', age: 61, experience: '7 J. Erfahrung', experienceYears: 7, availability: 'verfügbar ab 26.05.', availableSoon: true, language: { level: 'Gut', bars: 4 }, color: '#6B5444', addedTime: 'heute', isLive: true, gender: 'male', image: 'https://i.pravatar.cc/200?img=12', history: { assignments: 18, avgDurationMonths: 2.9 } } },
+];
+
 // ─── Main Page ────────────────────────────────────────────────────────────────
 
 const CustomerPortalPage: FC = () => {
   // ─── Lead loading via token ──────────────────────────────────────────────────
-  const [lead, setLead] = useState<Lead | null>(null);
-  const [leadLoading, setLeadLoading] = useState(true);
+  // Preview-Mode: hardcoded Lead + skip Supabase fetch.
+  const [lead, setLead] = useState<Lead | null>(IS_PREVIEW_ANY ? PREVIEW_LEAD : null);
+  const [leadLoading, setLeadLoading] = useState(!IS_PREVIEW_ANY);
   const [leadError, setLeadError] = useState<string | null>(null);
 
   useEffect(() => {
+    if (IS_PREVIEW_ANY) return;
     const params = new URLSearchParams(window.location.search);
     const token = params.get('token');
     if (!token) {
@@ -81,7 +212,7 @@ const CustomerPortalPage: FC = () => {
 
   // Applications state. Empty by default — populated once Mamamia session
   // is ready and `listApplications` returns. No mock seeds (CLAUDE.md §1).
-  const [applications, setApplications] = useState<Application[]>([]);
+  const [applications, setApplications] = useState<Application[]>(IS_PREVIEW_BEWERBUNG ? [PREVIEW_APPLICATION] : []);
   // Per-session local overrides keyed by caregiverId. Server is source of truth
   // for persistence (invitedCaregiverIds via listInvitedCaregiverIds RPC,
   // lead.declined_caregiver_ids via Supabase column). This map only carries
@@ -92,6 +223,10 @@ const CustomerPortalPage: FC = () => {
   // Resolved status per caregiver is derived in `nurseStatusById` (useMemo).
   const [statusOverrides, setStatusOverrides] = useState<Map<number, NurseStatus>>(new Map());
   const [selectedNurse, setSelectedNurse] = useState<Nurse | null>(null);
+  // Tracking: kam der gerade geöffnete Profil-Modal aus einer Interest-Card?
+  // Wenn ja, zeigt das Modal oben den "Hat Interesse signalisiert"-Hinweis-
+  // Block. State wird beim Modal-Close zurückgesetzt.
+  const [selectedFromInterestId, setSelectedFromInterestId] = useState<number | null>(null);
   const [selectedApp, setSelectedApp] = useState<Application | null>(null);
   const [nurseModalApp, setNurseModalApp] = useState<Application | null>(null);
   const [nurseMatchIdx, setNurseMatchIdx] = useState<number | null>(null);
@@ -100,7 +235,7 @@ const CustomerPortalPage: FC = () => {
   const [showContactPopup, setShowContactPopup] = useState(false);
   const [exitingIds, setExitingIds] = useState<Set<string>>(new Set());
   const [toast, setToast] = useState<string | null>(null);
-  const [patientSaved, setPatientSaved] = useState(false);
+  const [patientSaved, setPatientSaved] = useState(IS_PREVIEW_ANY);
   const [showPatientReminder, setShowPatientReminder] = useState(false);
   const [triggerOpenPatient, setTriggerOpenPatient] = useState(false);
   const [openFaq, setOpenFaq] = useState<number | null>(null);
@@ -138,6 +273,16 @@ const CustomerPortalPage: FC = () => {
   const { data: mmInterests, refetch: refetchInterests } = useInterests(mmReady);
   const { data: dismissedCaregivers, refetch: refetchDismissed } = useDismissedCaregivers(mmReady);
   const [interestStatusOverrides, setInterestStatusOverrides] = useState<Map<number, InterestActionStatus>>(new Map());
+  // Preview-Mode-Helper: nach erfolgreicher Einladung wird die Pflegekraft
+  // hier abgelegt. In Production passiert das durch Mamamia-Refetch
+  // (`mmInvitedMatchings` enthält den frisch invitierten Caregiver mit
+  // is_request=true), in Preview simulieren wir das.
+  // - Key: caregiverId
+  // - Value: Nurse (damit wir sie als invited match in effectiveMatched
+  //   einhängen können)
+  // Effekt: visibleInterests filtert die Karte aus (über invitedSet) UND
+  // sie taucht in effectiveMatched mit Status='invited' wieder auf.
+  const [previewInvitedFromInterest, setPreviewInvitedFromInterest] = useState<Map<number, Nurse>>(new Map());
 
   // Accepted applications (lead_application_acceptances). Written by the
   // kostenrechner bridge after AngebotPruefenModal step 2 → bridge fires
@@ -233,6 +378,14 @@ const CustomerPortalPage: FC = () => {
   //   secondary: last_contact_at DESC (recently-active CGs respond faster)
   //   tertiary : hp_total_jobs   DESC (more experience first)
   const effectiveMatched = (() => {
+    if (IS_PREVIEW_ANY) {
+      // Base matchings + post-invite-from-interest (so Maria erscheint nach
+      // Einladung in der gleichen Liste mit Status 'invited').
+      const fromInterest = [...previewInvitedFromInterest.entries()].map(
+        ([caregiverId, nurse]) => ({ caregiverId, nurse }),
+      );
+      return [...PREVIEW_MATCHINGS, ...fromInterest];
+    }
     if (!mmReady || !mmMatchings?.data) return [];
     const now = new Date();
     const nowIso = now.toISOString();
@@ -356,12 +509,15 @@ const CustomerPortalPage: FC = () => {
         out.set(id, 'declined');
       } else if (invitedServer.has(id)) {
         out.set(id, 'invited');
+      } else if (IS_PREVIEW_ANY && previewInvitedFromInterest.has(id)) {
+        // Preview: invitierte Interest-Caregiver erscheinen mit 'invited'.
+        out.set(id, 'invited');
       } else {
         out.set(id, 'pending');
       }
     }
     return out;
-  }, [effectiveMatched, invitedCaregiverIds, lead?.declined_caregiver_ids, statusOverrides]);
+  }, [effectiveMatched, invitedCaregiverIds, lead?.declined_caregiver_ids, statusOverrides, previewInvitedFromInterest]);
 
   const animateThenProcess = (id: string, fn: () => void) => {
     setExitingIds(prev => new Set([...prev, id]));
@@ -432,7 +588,13 @@ const CustomerPortalPage: FC = () => {
     applications.map((a) => a.nurse?.caregiverId).filter((id): id is number => typeof id === 'number'),
   );
   const invitedSet = new Set(invitedCaregiverIds ?? []);
-  const visibleInterests = (mmInterests ?? []).filter((i) => {
+  // Preview: gemerge invitierte Caregiver in den Filter-Set, damit der
+  // InterestCard nach Klick verschwindet (statt auf Mamamia-Refetch zu warten,
+  // den es im Preview nicht gibt). Die Pflegekraft taucht stattdessen in
+  // effectiveMatched mit Status='invited' wieder auf.
+  if (IS_PREVIEW_ANY) previewInvitedFromInterest.forEach((_n, id) => invitedSet.add(id));
+  const sourceInterests = IS_PREVIEW_INTERESSE ? [PREVIEW_INTEREST as any] : (mmInterests ?? []);
+  const visibleInterests = sourceInterests.filter((i) => {
     if (i.rejected_at) return false;
     if (dismissedSet.has(i.caregiver_id)) return false;
     if (applicationCaregiverIds.has(i.caregiver_id)) return false;
@@ -637,6 +799,39 @@ const CustomerPortalPage: FC = () => {
   // both interests + invited so the next render moves the caregiver out
   // of the Interest section into the invited matchings.
   const confirmInviteInterest = async (caregiverId: number, displayLabel: string): Promise<void> => {
+    // Preview-Mode: simuliere erfolgreiche Einladung lokal (kein Mamamia-Call).
+    // Override auf 'invited' → InterestCard zeigt "Einladung gesendet"-Pill;
+    // nach 1.5s wird die Pflegekraft in previewInvitedFromInterest abgelegt
+    // → Filter entfernt sie aus visibleInterests, effectiveMatched hängt sie
+    // mit Status='invited' wieder ein, genau wie der Mamamia-Refetch in
+    // Production.
+    if (IS_PREVIEW_ANY) {
+      // Pflegekraft aus visibleInterests holen, damit wir die Nurse-Daten
+      // an previewInvitedFromInterest weiterreichen können.
+      const interest = sourceInterests.find((i: any) => i.caregiver_id === caregiverId);
+      const interestNurse = interest
+        ? mapCaregiverToNurse(interest.caregiver, {
+            nowIso: new Date().toISOString(),
+            nowYear: new Date().getFullYear(),
+          })
+        : null;
+      setInterestStatusOverrides((prev) => {
+        const next = new Map(prev);
+        next.set(caregiverId, 'invited');
+        return next;
+      });
+      setTimeout(() => {
+        if (interestNurse) {
+          setPreviewInvitedFromInterest((prev) => {
+            const next = new Map(prev);
+            next.set(caregiverId, interestNurse);
+            return next;
+          });
+        }
+        showToast(`✓ ${displayLabel} wurde eingeladen!`);
+      }, 1500);
+      return;
+    }
     if (!mmReady) {
       showToast('Einladung derzeit nicht möglich. Bitte später erneut versuchen.');
       throw new Error('not-ready');
@@ -860,7 +1055,7 @@ const CustomerPortalPage: FC = () => {
   }
 
   // Mamamia session failure — surface it rather than silently falling back.
-  if (lead && mmError) {
+  if (lead && mmError && !IS_PREVIEW_ANY) {
     return (
       <>
       <div className="min-h-screen flex flex-col items-center justify-center px-6" style={{background:'linear-gradient(160deg,#F8F5F1 0%,#EFE8DE 100%)'}}>
@@ -892,7 +1087,7 @@ const CustomerPortalPage: FC = () => {
   }
 
   // Lead loaded but Mamamia session still bootstrapping.
-  if (lead && !mmReady) {
+  if (lead && !mmReady && !IS_PREVIEW_ANY) {
     const firstName = lead.vorname ?? null;
     return (
       <>
@@ -1339,40 +1534,11 @@ const CustomerPortalPage: FC = () => {
           </div>
         )}
 
-        {/* ── SECTION: Pflegekräfte mit Interesse — between Bewerbungen and Matchings ── */}
-        {visibleInterests.length > 0 && (
-          <div className="space-y-3">
-            <h3 className="text-[15px] font-bold px-1" style={{color:'#3D3D3D'}}>
-              Pflegekräfte mit Interesse {visibleInterests.length > 1 ? `(${visibleInterests.length})` : ''}
-            </h3>
-            <p className="text-[13px] leading-relaxed px-1 text-gray-600">
-              Diese Pflegekräfte haben Interesse an Ihrer Anfrage signalisiert. Tippen Sie auf
-              <span className="font-semibold"> „Einladen"</span>, damit wir die formale Bewerbung anstoßen — oder
-              auf <span className="font-semibold">„Ablehnen"</span>, um die Karte zu entfernen.
-            </p>
-            {visibleInterests.map((i) => {
-              const nurse = mapCaregiverToNurse(i.caregiver, {
-                nowIso: new Date().toISOString(),
-                nowYear: new Date().getFullYear(),
-              });
-              const status: InterestActionStatus =
-                interestStatusOverrides.get(i.caregiver_id) ?? 'idle';
-              const label = displayName(nurse.name);
-              return (
-                <InterestCard
-                  key={i.id}
-                  nurse={nurse}
-                  status={status}
-                  onNurseClick={() => setSelectedNurse(nurse)}
-                  onInviteConfirm={() => confirmInviteInterest(i.caregiver_id, label)}
-                  onDismiss={() => confirmDismissInterest(i.caregiver_id)}
-                />
-              );
-            })}
-          </div>
-        )}
-
-        {/* ── SECTION: Matched Nurses — pending + invited, nur wenn keine offenen Bewerbungen ── */}
+        {/* ── SECTION: Matched Nurses — pending + invited + Interests, nur
+             wenn keine offenen Bewerbungen. Interest-Karten (Pflegekräfte,
+             die proaktiv Interesse signalisiert haben) werden ganz oben in
+             die gleiche Liste eingehängt — keine eigene Section, kein
+             Erklär-Text. ── */}
         {!hasPending && (() => {
           const allVisible = effectiveMatched
             .map((m, i) => ({ nurse: m.nurse, i, status: nurseStatusById.get(m.caregiverId) ?? 'pending' as NurseStatus }))
@@ -1383,9 +1549,10 @@ const CustomerPortalPage: FC = () => {
             ...allVisible.filter(({ status }) => status === 'pending').slice(0, 5),
             ...allVisible.filter(({ status }) => status === 'invited'),
           ];
+          const hasAnyCard = visibleNurses.length > 0 || visibleInterests.length > 0;
           return (
             <>
-              {visibleNurses.length > 0 && (
+              {hasAnyCard && (
                 <div>
                   <p className="text-[14px] leading-relaxed pb-2 px-1" style={{color:'#3D3D3D'}}>
                     {!patientSaved
@@ -1393,6 +1560,37 @@ const CustomerPortalPage: FC = () => {
                       : 'Tippen Sie auf „Einladen", wenn Ihnen eine Pflegekraft gefällt — die Anfrage geht direkt an die Pflegekraft.'}
                   </p>
                   <div className="space-y-3">
+                    {/* Interest-Karten zuerst — Pflegekräfte mit
+                        signalisiertem Interesse sind die "wärmsten"
+                        Kandidatinnen und gehören oben. Sind durch den
+                        lila/coral "Hat Interesse"-Pill klar erkennbar. */}
+                    {visibleInterests.map((i) => {
+                      const baseNurse = mapCaregiverToNurse(i.caregiver, {
+                        nowIso: new Date().toISOString(),
+                        nowYear: new Date().getFullYear(),
+                      });
+                      // Preview-Mode: Profile + Einsatz-Historie merge,
+                      // damit das Modal scrollbaren Inhalt zeigt.
+                      const nurse = IS_PREVIEW_INTERESSE
+                        ? { ...baseNurse, profile: PREVIEW_INTEREST_PROFILE, detailedAssignments: PREVIEW_INTEREST_ASSIGNMENTS }
+                        : baseNurse;
+                      const status: InterestActionStatus =
+                        interestStatusOverrides.get(i.caregiver_id) ?? 'idle';
+                      const label = displayName(nurse.name);
+                      return (
+                        <InterestCard
+                          key={`interest-${i.id}`}
+                          nurse={nurse}
+                          status={status}
+                          onNurseClick={() => {
+                            setSelectedNurse(nurse);
+                            setSelectedFromInterestId(i.caregiver_id);
+                          }}
+                          onInviteConfirm={() => confirmInviteInterest(i.caregiver_id, label)}
+                          onDismiss={() => confirmDismissInterest(i.caregiver_id)}
+                        />
+                      );
+                    })}
                     {visibleNurses.map(({ nurse, i, status }) => (
                       <MatchCard key={i} nurse={nurse} status={status} onNurseClick={() => openNurseFromMatch(nurse, i)} onInvite={() => canInviteNurse(i)} onInviteConfirm={() => confirmInviteNurse(i, displayName(nurse.name))} />
                     ))}
@@ -1633,10 +1831,11 @@ const CustomerPortalPage: FC = () => {
             && aiAboutForId === fullCaregiver.id
             && aiAboutState.kind === 'loading'
           }
-          onClose={() => { setSelectedNurse(null); setNurseModalApp(null); setNurseMatchIdx(null); }}
+          onClose={() => { setSelectedNurse(null); setNurseModalApp(null); setNurseMatchIdx(null); setSelectedFromInterestId(null); }}
           app={nurseModalApp ?? undefined}
-          onReview={() => { setSelectedNurse(null); setSelectedApp(nurseModalApp); setNurseModalApp(null); }}
-          onDecline={() => { setDeclineConfirmApp(nurseModalApp); setSelectedNurse(null); setNurseModalApp(null); }}
+          onReview={() => { setSelectedNurse(null); setSelectedApp(nurseModalApp); setNurseModalApp(null); setSelectedFromInterestId(null); }}
+          onDecline={() => { setDeclineConfirmApp(nurseModalApp); setSelectedNurse(null); setNurseModalApp(null); setSelectedFromInterestId(null); }}
+          hasInterest={selectedFromInterestId !== null && enrichedSelectedNurse.caregiverId === selectedFromInterestId}
           onUndo={() => { if (nurseModalApp) undoApp(nurseModalApp.id); setNurseModalApp(null); }}
           isInvited={
             nurseMatchIdx !== null
