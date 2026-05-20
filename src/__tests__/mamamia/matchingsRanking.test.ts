@@ -1,13 +1,16 @@
 // Client-side ranking of Mamamia matchings — verifies the ordering
-// rules used by CustomerPortalPage's `effectiveMatched`:
-//   primary  : available_from ASC  (closest to "now" first; null = Sofort = top)
-//   secondary: last_contact_at DESC (recently-active CGs respond faster)
-//   tertiary : hp_total_jobs   DESC (more experienced first)
+// rules used by CustomerPortalPage's `effectiveMatched`. Hierarchy:
+//   1. hp_total_jobs > 0  DESC  (any prior assignment first)
+//   2. avatar_retouched.aws_url truthy  DESC  (photo first)
+//   3. available_from ASC  (closest to "now" first; null = Sofort = top)
+//   4. last_contact_at DESC (recently-active CGs respond faster)
+//   5. hp_total_jobs   DESC numeric (tie-breaker inside "had jobs" bucket)
 //
-// We test the ranking algorithm in isolation by replicating the comparator
-// from the page. The test catches regressions if the comparator drifts.
+// The comparator lives in src/lib/mamamia/matchingsRanking.ts — shared
+// between this test and the page so the two can't drift apart.
 
 import { describe, it, expect } from 'vitest';
+import { rankComparator } from '../../lib/mamamia/matchingsRanking';
 import type { MamamiaMatching, MamamiaCaregiverRef } from '../../lib/mamamia/types';
 
 function makeRef(o: Partial<MamamiaCaregiverRef>): MamamiaCaregiverRef {
@@ -31,33 +34,6 @@ function makeMatch(o: Partial<MamamiaCaregiverRef> & { id?: number }): MamamiaMa
     is_show: true,
     is_best_matching: true,
     caregiver: makeRef({ id: o.id ?? 1, ...o }),
-  };
-}
-
-// Import-free comparator extracted from CustomerPortalPage so the test can
-// verify it without rendering the full React tree.
-function rankComparator(now: Date) {
-  const nowMs = now.getTime();
-  const availMs = (iso: string | null): number => {
-    if (!iso) return 0;
-    const t = new Date(iso).getTime();
-    return Number.isFinite(t) ? Math.max(0, t - nowMs) : Infinity;
-  };
-  const contactMs = (iso: string | null): number => {
-    if (!iso) return -Infinity;
-    const t = new Date(iso).getTime();
-    return Number.isFinite(t) ? t : -Infinity;
-  };
-  return (a: MamamiaMatching, b: MamamiaMatching) => {
-    const av = availMs(a.caregiver.available_from);
-    const bv = availMs(b.caregiver.available_from);
-    if (av !== bv) return av - bv;
-    const ac = contactMs(a.caregiver.last_contact_at);
-    const bc = contactMs(b.caregiver.last_contact_at);
-    if (ac !== bc) return bc - ac;
-    const aj = a.caregiver.hp_total_jobs ?? 0;
-    const bj = b.caregiver.hp_total_jobs ?? 0;
-    return bj - aj;
   };
 }
 
@@ -126,5 +102,69 @@ describe('matchings ranking', () => {
     const sorted = items.slice().sort(rankComparator(NOW));
     // V8 / modern engines guarantee stable sort. Assert original order preserved.
     expect(sorted.map(m => m.id)).toEqual([1, 2, 3]);
+  });
+});
+
+// ─── New prior-jobs + photo priority rules ───────────────────────────────
+
+describe('matchings ranking — prior-jobs + photo priority', () => {
+  it('caregiver with hp_total_jobs > 0 ranks above zero-jobs even if available_from worse', () => {
+    const sorted = [
+      makeMatch({ id: 1, hp_total_jobs: 0, available_from: null }),            // Sofort, rookie
+      makeMatch({ id: 2, hp_total_jobs: 5, available_from: '2026-06-01T00:00:00Z' }), // future, experienced
+    ].sort(rankComparator(NOW));
+    expect(sorted.map(m => m.id)).toEqual([2, 1]);
+  });
+
+  it('within jobs-bucket: photo ranks above no-photo', () => {
+    const sorted = [
+      makeMatch({ id: 1, hp_total_jobs: 3, avatar_retouched: null }),
+      makeMatch({ id: 2, hp_total_jobs: 3, avatar_retouched: { aws_url: 'https://x/p.jpg' } }),
+    ].sort(rankComparator(NOW));
+    expect(sorted.map(m => m.id)).toEqual([2, 1]);
+  });
+
+  it('within zero-jobs bucket: photo still ranks above no-photo', () => {
+    const sorted = [
+      makeMatch({ id: 1, hp_total_jobs: 0, avatar_retouched: null }),
+      makeMatch({ id: 2, hp_total_jobs: 0, avatar_retouched: { aws_url: 'https://x/p.jpg' } }),
+    ].sort(rankComparator(NOW));
+    expect(sorted.map(m => m.id)).toEqual([2, 1]);
+  });
+
+  it('within jobs+photo bucket: existing available_from rule applies', () => {
+    const sorted = [
+      makeMatch({ id: 1, hp_total_jobs: 3, avatar_retouched: { aws_url: 'p' }, available_from: '2026-06-01T00:00:00Z' }),
+      makeMatch({ id: 2, hp_total_jobs: 3, avatar_retouched: { aws_url: 'p' }, available_from: null }),
+    ].sort(rankComparator(NOW));
+    expect(sorted.map(m => m.id)).toEqual([2, 1]);
+  });
+
+  it('full 4-bucket sort: jobs+photo > jobs only > photo only > neither', () => {
+    const sorted = [
+      makeMatch({ id: 1, hp_total_jobs: 0, avatar_retouched: null }),                              // neither
+      makeMatch({ id: 2, hp_total_jobs: 5, avatar_retouched: null }),                              // jobs only
+      makeMatch({ id: 3, hp_total_jobs: 0, avatar_retouched: { aws_url: 'p' } }),                  // photo only
+      makeMatch({ id: 4, hp_total_jobs: 5, avatar_retouched: { aws_url: 'p' } }),                  // jobs+photo
+    ].sort(rankComparator(NOW));
+    expect(sorted.map(m => m.id)).toEqual([4, 2, 3, 1]);
+  });
+
+  it('avatar_retouched with null aws_url is treated as no-photo', () => {
+    const sorted = [
+      makeMatch({ id: 1, hp_total_jobs: 3, avatar_retouched: { aws_url: null } }),
+      makeMatch({ id: 2, hp_total_jobs: 3, avatar_retouched: { aws_url: 'https://x/p.jpg' } }),
+    ].sort(rankComparator(NOW));
+    expect(sorted.map(m => m.id)).toEqual([2, 1]);
+  });
+
+  it('hp_total_jobs null is treated as no-jobs (jobs beats photo)', () => {
+    const sorted = [
+      // photo but null jobs → second bucket (photo only)
+      makeMatch({ id: 1, hp_total_jobs: null as unknown as number, avatar_retouched: { aws_url: 'p' } }),
+      // jobs but no photo → first bucket (jobs)
+      makeMatch({ id: 2, hp_total_jobs: 1, avatar_retouched: null }),
+    ].sort(rankComparator(NOW));
+    expect(sorted.map(m => m.id)).toEqual([2, 1]);
   });
 });

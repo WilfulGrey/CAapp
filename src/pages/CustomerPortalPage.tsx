@@ -11,6 +11,7 @@ import {
 } from '../lib/supabase';
 import { useMamamiaSession } from '../hooks/useMamamiaSession';
 import { useCustomer, useJobOffer, useApplications, useInterests, useDismissedCaregivers, useAcceptedApplications, useMatchings, useCaregiver, useInvitedCaregivers } from '../lib/mamamia/hooks';
+import { rankComparator } from '../lib/mamamia/matchingsRanking';
 import { prefetchCaregivers } from '../lib/mamamia/caregiverCache';
 import { scheduleAiAbouts, getAiAbout, subscribeAiAbout } from '../lib/mamamia/aiAboutCache';
 import { reportLeadEvent, KOSTENRECHNER_URL } from '../lib/leadEvents';
@@ -233,9 +234,9 @@ const CustomerPortalPage: FC = () => {
   //   tertiary : hp_total_jobs   DESC (more experience first)
   const effectiveMatched = (() => {
     if (!mmReady || !mmMatchings?.data) return [];
-    const nowIso = new Date().toISOString();
-    const nowYear = new Date().getFullYear();
-    const nowMs = new Date(nowIso).getTime();
+    const now = new Date();
+    const nowIso = now.toISOString();
+    const nowYear = now.getFullYear();
 
     // Merge open matchings (default listMatchings) + already-invited matchings
     // (filters: is_request:true). Dedup by caregiver.id — a row should never
@@ -255,36 +256,9 @@ const CustomerPortalPage: FC = () => {
       }
     }
 
-    // Numeric sort keys built from raw Mamamia fields. NaN guard: missing
-    // values rank "best" — null available_from = "Sofort" should be top,
-    // missing last_contact = treat as long ago (rank lower).
-    const availMs = (iso: string | null): number => {
-      if (!iso) return 0; // "Sofort" → top
-      const t = new Date(iso).getTime();
-      // CGs already past their availability date are equally "available now".
-      return Number.isFinite(t) ? Math.max(0, t - nowMs) : Infinity;
-    };
-    const contactMs = (iso: string | null): number => {
-      if (!iso) return -Infinity;
-      const t = new Date(iso).getTime();
-      return Number.isFinite(t) ? t : -Infinity;
-    };
-
     return merged
       .filter(m => m.is_show !== false)
-      .sort((a, b) => {
-        const av = availMs(a.caregiver.available_from);
-        const bv = availMs(b.caregiver.available_from);
-        if (av !== bv) return av - bv;
-
-        const ac = contactMs(a.caregiver.last_contact_at);
-        const bc = contactMs(b.caregiver.last_contact_at);
-        if (ac !== bc) return bc - ac;
-
-        const aj = a.caregiver.hp_total_jobs ?? 0;
-        const bj = b.caregiver.hp_total_jobs ?? 0;
-        return bj - aj;
-      })
+      .sort(rankComparator(now))
       .map(m => ({
         nurse: mapMatchingToNurse(m, { nowIso, nowYear }),
         caregiverId: m.caregiver.id,
