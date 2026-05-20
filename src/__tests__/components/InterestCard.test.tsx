@@ -20,7 +20,7 @@ function makeNurse(overrides: Partial<Nurse> = {}): Nurse {
 }
 
 describe('InterestCard', () => {
-  it('renders Einladen + Ablehnen buttons when status is idle', () => {
+  it('renders Einladen button when status is idle (no Ablehnen — removed)', () => {
     render(
       <InterestCard
         nurse={makeNurse()}
@@ -29,7 +29,7 @@ describe('InterestCard', () => {
       />,
     );
     expect(screen.getByText(/Einladen/)).toBeTruthy();
-    expect(screen.getByText(/Ablehnen/)).toBeTruthy();
+    expect(screen.queryByText(/Ablehnen/)).toBeNull();
   });
 
   it('shows "Hat Interesse" badge', () => {
@@ -61,21 +61,6 @@ describe('InterestCard', () => {
     expect(screen.getByText(/wird eingeladen/)).toBeTruthy();
     resolve();
     await waitFor(() => expect(screen.queryByText(/wird eingeladen/)).toBeNull());
-  });
-
-  it('Ablehnen click → onDismiss called', async () => {
-    const onDismiss = vi.fn().mockResolvedValue(undefined);
-    const user = userEvent.setup();
-    render(
-      <InterestCard
-        nurse={makeNurse()}
-        status="idle"
-        onNurseClick={() => {}}
-        onDismiss={onDismiss}
-      />,
-    );
-    await user.click(screen.getByText(/Ablehnen/));
-    expect(onDismiss).toHaveBeenCalledTimes(1);
   });
 
   it('status=invited renders confirmation pill, no Einladen button', () => {

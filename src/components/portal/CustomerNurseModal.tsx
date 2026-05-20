@@ -1,6 +1,6 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import type { FC } from 'react';
-import { Check, X, UserPlus } from 'lucide-react';
+import { Check, X, UserPlus, Heart } from 'lucide-react';
 import type { Nurse } from '../../types';
 import type { Application } from './shared';
 import { nurseLevel, displayName, initials } from './shared';
@@ -42,10 +42,28 @@ export const CustomerNurseModal: FC<{
   onInvite?: () => Promise<void>;
   onDeclineMatch?: () => void;
   isInvited?: boolean;
-}> = ({ nurse, profileLoading = false, aboutLoading = false, onClose, app, onReview, onDecline, onUndo, onInvite, onDeclineMatch, isInvited = false }) => {
+  /** Wenn true, hat die Pflegekraft in Mamamia Interesse signalisiert.
+   *  Modal zeigt dann oben einen Hinweis-Block (warmer Coral-Ton mit
+   *  Heart-Icon), der erklärt, dass eine Einladung ihre offizielle
+   *  Bewerbung ermöglicht. */
+  hasInterest?: boolean;
+}> = ({ nurse, profileLoading = false, aboutLoading = false, onClose, app, onReview, onDecline, onUndo, onInvite, onDeclineMatch, isInvited = false, hasInterest = false }) => {
   const [invited, setInvited] = useState(isInvited);
   const [invitePhaseModal, setInvitePhaseModal] = useState<'idle' | 'sending' | 'done'>('idle');
   const [showLevelInfo, setShowLevelInfo] = useState(false);
+
+  // Body-Scroll-Lock solange das Modal offen ist. Ohne diesen Lock
+  // propagiert ein Scroll-Versuch im Modal-Body auf das darunter liegende
+  // <body> und scrollt die Portal-Seite statt das Profil. Stellt den
+  // ursprünglichen overflow-Wert beim Unmount wieder her, damit andere
+  // Seiten / Routen nicht in einem gelockten State landen.
+  useEffect(() => {
+    const previous = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = previous;
+    };
+  }, []);
 
   const handleModalInvite = async () => {
     setInvitePhaseModal('sending');
@@ -186,6 +204,27 @@ export const CustomerNurseModal: FC<{
           </div>
 
           <div className="flex-1 overflow-y-auto">
+            {/* "Hat Interesse"-Hinweis — nur wenn die Pflegekraft in Mamamia
+                proaktiv Interesse signalisiert hat (z.B. via Like). Erklärt
+                kurz, dass eine Einladung die offizielle Bewerbung ermöglicht. */}
+            {hasInterest && (
+              <div className="mx-5 mt-4 rounded-xl border px-4 py-3"
+                   style={{ background: 'linear-gradient(135deg, #FFF1EC 0%, #FFE5DE 100%)', borderColor: '#F0B0A4' }}>
+                <div className="flex items-start gap-2.5">
+                  <div className="flex-shrink-0 w-7 h-7 rounded-full flex items-center justify-center" style={{ background: '#FFCFC4' }}>
+                    <Heart className="w-3.5 h-3.5" fill="currentColor" style={{ color: '#C04A40' }} />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-bold" style={{ color: '#C04A40' }}>
+                      {nurse.name.split(' ')[0]} hat Interesse signalisiert
+                    </p>
+                    <p className="text-[13px] text-gray-700 mt-0.5 leading-relaxed">
+                      Sie hat Ihre Anfrage gesehen und würde sich gerne bei Ihnen bewerben. Laden Sie {nurse.name.split(' ')[0]} ein, damit wir ihre offizielle Bewerbung anstoßen können.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
             <div className="px-5 pt-4 pb-5">
               <h3 className="text-sm font-bold text-gray-900 mb-2">Über {nurse.name.split(' ')[0]}</h3>
               {profileLoading && !p ? (

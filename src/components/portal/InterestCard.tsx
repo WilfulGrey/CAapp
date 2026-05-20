@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import type { FC } from 'react';
-import { Check, ChevronDown, Heart, UserPlus, X } from 'lucide-react';
+import { Check, ChevronDown, Heart, UserPlus } from 'lucide-react';
 import type { Nurse } from '../../types';
 import { nurseLevel, displayName, initials } from './shared';
 
@@ -25,9 +25,8 @@ export const InterestCard: FC<{
   onInviteConfirm?: () => Promise<void>;
   onDismiss?: () => Promise<void>;
   exiting?: boolean;
-}> = ({ nurse, status, onNurseClick, onInvite, onInviteConfirm, onDismiss, exiting }) => {
+}> = ({ nurse, status, onNurseClick, onInvite, onInviteConfirm, exiting }) => {
   const [invitePhase, setInvitePhase] = useState<'idle' | 'sending' | 'done'>('idle');
-  const [dismissPhase, setDismissPhase] = useState<'idle' | 'sending'>('idle');
   const inits = initials(nurse.name);
   const name = displayName(nurse.name);
   const bars = Array.from({ length: 5 }, (_, i) => i < nurse.language.bars);
@@ -47,31 +46,36 @@ export const InterestCard: FC<{
     }
   };
 
-  const handleDismiss = async () => {
-    if (dismissPhase === 'sending') return;
-    setDismissPhase('sending');
-    try {
-      await onDismiss?.();
-      // Optimistic — parent removes the card from the list, no need to
-      // toggle local state back. If the server rejects, parent surfaces
-      // the error and we reset.
-    } catch {
-      setDismissPhase('idle');
-    }
-  };
-
   return (
-    <div
-      className={`bg-white rounded-2xl border overflow-hidden transition-all relative ${
-        exiting ? 'opacity-0 -translate-x-2 pointer-events-none' : ''
-      } ${
-        status === 'dismissed'
-          ? 'opacity-40 border-gray-200'
-          : status === 'invited'
-          ? 'border-[#C4B49A]'
-          : 'border-[#C4B49A] hover:border-[#8B7355] hover:shadow-[0_4px_16px_rgba(139,115,85,0.12)]'
-      }`}
-    >
+    <div className="relative">
+      {/* "Hat Interesse" Top-Edge Badge — sitzt mittig auf der Card-Oberkante,
+          warmer Coral-Ton in der Marken-Palette. Außerhalb des overflow-hidden
+          Containers, damit der Pin über den Card-Rand ragen kann. */}
+      <div className="absolute -top-2.5 left-1/2 -translate-x-1/2 z-10 whitespace-nowrap">
+        <span
+          className="inline-flex items-center gap-1.5 text-[11px] font-bold tracking-wide px-3 py-1 rounded-full shadow-sm border"
+          style={{
+            background: 'linear-gradient(135deg, #FFE5DE 0%, #FFCFC4 100%)',
+            color: '#C04A40',
+            borderColor: '#F0B0A4',
+          }}
+        >
+          <Heart className="w-3 h-3" fill="currentColor" />
+          Hat Interesse
+        </span>
+      </div>
+
+      <div
+        className={`bg-white rounded-2xl border overflow-hidden transition-all ${
+          exiting ? 'opacity-0 -translate-x-2 pointer-events-none' : ''
+        } ${
+          status === 'dismissed'
+            ? 'opacity-40 border-gray-200'
+            : status === 'invited'
+            ? 'border-[#C4B49A]'
+            : 'border-[#C4B49A] hover:border-[#8B7355] hover:shadow-[0_4px_16px_rgba(139,115,85,0.12)]'
+        }`}
+      >
       <div className="px-4 pt-4 pb-3 cursor-pointer active:bg-gray-50" onClick={onNurseClick}>
         <div className="flex items-center gap-3">
           <div className="flex-shrink-0">
@@ -88,16 +92,9 @@ export const InterestCard: FC<{
           </div>
 
           <div className="flex-1 min-w-0">
-            <div className="flex items-start justify-between gap-2 mb-1">
-              <div className="flex items-baseline gap-1.5 min-w-0">
-                <span className="font-bold text-gray-900 leading-tight">{name}</span>
-                <span className="text-sm text-gray-400 flex-shrink-0">{nurse.age} J.</span>
-              </div>
-              <span className="flex items-center gap-1 text-[10px] font-bold pl-1.5 pr-2 py-0.5 rounded-full text-white shadow-sm flex-shrink-0"
-                style={{ background: 'linear-gradient(135deg, #E879F9 0%, #9B1FA1 100%)' }}>
-                <Heart className="w-3 h-3" fill="currentColor" />
-                Hat Interesse
-              </span>
+            <div className="flex items-baseline gap-1.5 min-w-0 mb-1">
+              <span className="font-bold text-gray-900 leading-tight">{name}</span>
+              <span className="text-sm text-gray-400 flex-shrink-0">{nurse.age} J.</span>
             </div>
             <div className="flex items-center gap-2 mb-1">
               <div className="flex gap-0.5">
@@ -144,25 +141,16 @@ export const InterestCard: FC<{
               wird eingeladen…
             </span>
           ) : (
-            <>
-              <button
-                onClick={e => { e.stopPropagation(); handleDismiss(); }}
-                disabled={dismissPhase === 'sending'}
-                className="flex items-center gap-1 text-xs font-semibold text-gray-500 hover:text-gray-700 px-3 py-1.5 rounded-full hover:bg-gray-100 transition-colors disabled:opacity-50"
-              >
-                <X className="w-3.5 h-3.5" />
-                Ablehnen
-              </button>
-              <button
-                onClick={e => { e.stopPropagation(); handleInvite(); }}
-                className="flex items-center gap-1.5 text-xs font-bold bg-[#E76F63] text-white px-4 py-1.5 rounded-full hover:bg-[#D65E52] transition-colors active:scale-95 shadow-sm"
-              >
-                <UserPlus className="w-3.5 h-3.5" />
-                Einladen
-              </button>
-            </>
+            <button
+              onClick={e => { e.stopPropagation(); handleInvite(); }}
+              className="flex items-center gap-1.5 text-xs font-bold bg-[#E76F63] text-white px-4 py-1.5 rounded-full hover:bg-[#D65E52] transition-colors active:scale-95 shadow-sm"
+            >
+              <UserPlus className="w-3.5 h-3.5" />
+              Einladen
+            </button>
           )}
         </div>
+      </div>
       </div>
     </div>
   );

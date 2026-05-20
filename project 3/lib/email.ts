@@ -1672,6 +1672,30 @@ export function getApplicationReceivedEmailTemplate(
   });
 }
 
+// Customer-Mail bei Buchungsbestätigung (Mail C). Wird ausgelöst, wenn der
+// Kunde im Portal eine Bewerbung akzeptiert (Event
+// `application_accepted_internal` an /api/lead-event). Team-Mail mit
+// Vertragsdaten wird parallel über getTeamNotificationTemplate verschickt.
+export function getBookingConfirmedEmailTemplate(
+  lead: Lead,
+  caregiver: CaregiverDisplay,
+  portalUrl: string,
+): EmailTemplate {
+  const firstName = caregiver.name.split(' ')[0];
+  const introHtml = `<p style="font-size:15px;line-height:1.75;color:#444;margin-bottom:18px;">schön, dass Sie sich für <strong style="color:#2D1F0F;">${caregiver.name}</strong> entschieden haben. <strong style="color:#2D1F0F;">Ihre Buchung ist bei uns eingegangen</strong> — wir kümmern uns jetzt um alle weiteren Schritte.</p>`;
+  const middleHtml = `<p style="font-size:15px;line-height:1.75;color:#444;margin-bottom:20px;">Wir stoßen die Vertragsunterlagen an und stimmen den Anreisetermin mit ${firstName} ab. Innerhalb der nächsten Werktage meldet sich Ihr persönlicher Ansprechpartner bei Ihnen, um die letzten Details zu klären — zum Beispiel den genauen Tag der Anreise, Zimmer und Schlüsselübergabe.</p>`;
+  return buildCaregiverEventEmail({
+    lead,
+    caregiver,
+    subject: 'Buchung bestätigt — wir kümmern uns um alle weiteren Schritte',
+    introHtml,
+    middleHtml,
+    ctaText: 'Status im Portal ansehen →',
+    portalUrl,
+    plainSummary: `schön, dass Sie sich für ${caregiver.name} entschieden haben. Ihre Buchung ist bei uns eingegangen — wir kümmern uns jetzt um alle weiteren Schritte. Wir stoßen die Vertragsunterlagen an und stimmen den Anreisetermin mit ${firstName} ab. Innerhalb der nächsten Werktage meldet sich Ihr persönlicher Ansprechpartner bei Ihnen, um die letzten Details zu klären — zum Beispiel den genauen Tag der Anreise, Zimmer und Schlüsselübergabe.`,
+  });
+}
+
 // Email transport — kept on nodemailer/Ionos SMTP per user decision.
 // Signature accepts string | string[] so multi-recipient callers from
 // the cherry-picked content layer (e.g. Vertrag template) keep working;

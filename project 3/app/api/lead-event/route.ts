@@ -5,6 +5,7 @@ import {
   getTeamNotificationTemplate,
   getCaregiverInterestEmailTemplate,
   getApplicationReceivedEmailTemplate,
+  getBookingConfirmedEmailTemplate,
   type CaregiverDisplay,
 } from '@/lib/email';
 
@@ -66,6 +67,7 @@ const NON_DEDUPED_EVENTS = new Set([
 const CUSTOMER_MAIL_EVENTS = new Set([
   'caregiver_interest_shown',
   'application_received',
+  'application_accepted_internal',
 ]);
 
 function extractCaregiverDisplay(metadata: any): CaregiverDisplay | null {
@@ -242,10 +244,11 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Customer-facing mail (Mail A / Mail B). Fire-and-forget — Mamamia-Hooks
-    // (oder spätere Trigger) sollen niemals durch eine Mail-Latenz blockiert
-    // werden. Bei fehlenden Pflegekraft-Daten loggen wir und überspringen die
-    // Mail — der lead_event wird trotzdem aufgezeichnet.
+    // Customer-facing mail (Mail A / Mail B / Mail C — Buchung bestätigt).
+    // Fire-and-forget — Mamamia-Hooks / Portal-Trigger dürfen niemals durch
+    // eine Mail-Latenz blockiert werden. Bei fehlenden Pflegekraft-Daten
+    // loggen wir und überspringen die Mail — der lead_event wird trotzdem
+    // aufgezeichnet.
     if (CUSTOMER_MAIL_EVENTS.has(event)) {
       const caregiver = extractCaregiverDisplay(metadata);
       if (!caregiver) {
@@ -254,9 +257,10 @@ export async function POST(request: NextRequest) {
         console.warn(`lead-event ${event}: lead has no email — mail skipped (lead ${lead.id})`);
       } else {
         const portalUrl = buildPortalUrl(lead as any);
-        const customerTemplate = event === 'caregiver_interest_shown'
-          ? getCaregiverInterestEmailTemplate(lead as any, caregiver, portalUrl)
-          : getApplicationReceivedEmailTemplate(lead as any, caregiver, portalUrl);
+        const customerTemplate =
+          event === 'caregiver_interest_shown'      ? getCaregiverInterestEmailTemplate(lead as any, caregiver, portalUrl)
+        : event === 'application_accepted_internal' ? getBookingConfirmedEmailTemplate(lead as any, caregiver, portalUrl)
+        :                                             getApplicationReceivedEmailTemplate(lead as any, caregiver, portalUrl);
         sendEmail((lead as any).email, customerTemplate).catch((e) =>
           console.error('customer mail send threw:', e instanceof Error ? e.message : String(e)),
         );

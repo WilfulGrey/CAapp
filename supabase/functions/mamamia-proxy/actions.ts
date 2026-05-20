@@ -712,18 +712,19 @@ interface CaregiverAboutInput {
   motivation?: string;
 }
 
-const CAREGIVER_ABOUT_SYSTEM = `Du schreibst eine warmherzige, persönliche Vorstellung einer Pflegekraft für eine pflegesuchende Familie in Deutschland.
+const CAREGIVER_ABOUT_SYSTEM = `Du schreibst eine warme, sehr persönliche Vorstellung einer Pflegekraft für eine Familie, die einen Angehörigen betreuen lassen möchte. Die Familie soll ein Gefühl für den Menschen hinter dem Profil bekommen — nicht eine Bewerbung lesen.
 
-PFLICHT: Schreibe IMMER in der dritten Person. Niemals "Ich" verwenden. Beispiel: "Klaudia ist..." oder "Sie bringt..." — nie "Ich bin...".
-Verwende nur den Vornamen.
-MAXIMAL 3 Sätze. Kurz, dicht, vertrauensbildend — kein Geschwafel.
+PFLICHT:
+- IMMER dritte Person, nur Vorname (z.B. "Maria ist..."). Niemals "Ich" verwenden.
+- MAXIMAL 3 Sätze. Warm, menschlich, ehrlich. Keine Werbephrasen, keine leeren Floskeln.
+- Jede Aussage muss durch die übergebenen Daten gedeckt sein — nichts erfinden.
+- Nationalität NICHT erwähnen, wenn sie polnisch ist (das ist der Standard im 24h-Pflege-Kontext, füllt nur Worte). Nur wenn die Nationalität abweicht (z.B. Ukrainisch, Rumänisch), darf sie kurz vorkommen.
 
-Verdichte das Wichtigste:
-- Satz 1: Wer sie ist + Herkunft + Erfahrung — Jahre, Anzahl Einsätze und (wenn angegeben) das Erfahrungs-Level einweben, damit der Bezug zum Level-Badge im Profil da ist. Natürlich formulieren, nicht aufgesetzt.
-- Satz 2: Pflegerische Stärken (Deutsch, Führerschein, Qualifikationen) und — wenn vorhanden — konkrete letzte Einsätze mit Ort und Dauer.
-- Satz 3: Persönlichkeit und was die Familie an ihr schätzen wird.
+Aufbau:
+- Satz 1: Wer sie als Mensch ist — Persönlichkeit + ein greifbares Detail (Hobby, Lebenssituation, persönliches Interesse). Macht sie greifbar, nicht generisch.
+- Satz 2: Ihre Erfahrung in der 24h-Pflege — IMMER die Anzahl Jahre UND die Anzahl Einsätze nennen, als natürliche Erzählung statt trockener Aufzählung. Wenn ein konkreter letzter Einsatz mit Ort und Dauer vorliegt, als Beispiel einweben. Pflegerische Stärken (Deutsch, Führerschein, Qualifikationen) hier nur einbauen, wenn sie sich natürlich anfügen.
+- Satz 3: Was die Familie an ihr besonders schätzen wird — eine empathische Aussage, die das Mensch-zu-Mensch-Match betont (Geduld, Ruhe, Verlässlichkeit etc., abgeleitet aus den Persönlichkeits-Daten).
 
-Kein Marketingsprech. Keine leeren Phrasen. Nur Infos nutzen die tatsächlich vorliegen.
 Ausgabe: ausschließlich der fertige Fließtext — keine Überschrift, keine Liste, kein Kommentar.`;
 
 const generateCaregiverAbout: ActionHandler = async (_session, variables, deps) => {
