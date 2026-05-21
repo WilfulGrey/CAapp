@@ -943,8 +943,8 @@ function buildReminderHtml(
     : "Bewerbung ansehen und buchen →";
 
   const softOut = variant === "interest"
-    ? `<p style="font-size:13px;line-height:1.6;color:#888;margin:18px 0 0;font-style:italic;">Falls ${firstName} nicht passt, ignorieren Sie diese E-Mail einfach — wir suchen für Sie weiter.</p>`
-    : `<p style="font-size:13px;line-height:1.6;color:#888;margin:18px 0 0;font-style:italic;">Falls ${firstName} doch nicht passt, melden Sie sich kurz bei uns — wir suchen weiter.</p>`;
+    ? `<p style="font-size:13px;line-height:1.6;color:#888;margin:18px 0 0;font-style:italic;">Falls ${firstName} nicht zu Ihnen passt, lehnen Sie sie im Portal kurz ab — so weiß sie Bescheid und kann sich auf andere Familien konzentrieren.</p>`
+    : `<p style="font-size:13px;line-height:1.6;color:#888;margin:18px 0 0;font-style:italic;">Falls die Bewerbung nicht passt, lehnen Sie sie im Portal kurz ab — so weiß ${firstName} Bescheid und kann sich auf andere Familien konzentrieren.</p>`;
 
   const content = `
     <p style="font-size:15px;line-height:1.75;color:#444;margin-bottom:14px;">${greeting},</p>
@@ -979,7 +979,7 @@ Pflegekräfte mit guten Profilen werden häufig schnell von anderen Familien ang
 
 Profil ansehen und einladen: ${portalUrl}
 
-Falls ${firstName} nicht passt, ignorieren Sie diese E-Mail einfach — wir suchen für Sie weiter.
+Falls ${firstName} nicht zu Ihnen passt, lehnen Sie sie im Portal kurz ab — so weiß sie Bescheid und kann sich auf andere Familien konzentrieren.
 
 Mit freundlichen Grüßen
 Ilka Wysocki — Pflegeberaterin
@@ -996,7 +996,7 @@ Pflegekräfte halten ihre Bewerbung bei uns offen, solange sie keine andere Fami
 
 Bewerbung ansehen und buchen: ${portalUrl}
 
-Falls ${firstName} doch nicht passt, melden Sie sich kurz bei uns — wir suchen weiter.
+Falls die Bewerbung nicht passt, lehnen Sie sie im Portal kurz ab — so weiß ${firstName} Bescheid und kann sich auf andere Familien konzentrieren.
 
 Mit freundlichen Grüßen
 Ilka Wysocki — Pflegeberaterin
