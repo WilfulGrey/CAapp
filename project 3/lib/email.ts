@@ -1634,6 +1634,176 @@ www.primundus.de
   return { subject: opts.subject, html, text };
 }
 
+// Customer-Mail bei `patient_data_saved` (Mail D). Wird einmal pro Lead
+// ausgelöst (DB-Dedupe), sobald der Kunde im Portal die Pflegesituation
+// vollständig erfasst hat. Nutzt denselben Visual-Frame wie die Caregiver-
+// Event-Mails — bewusst KEINE Pflegekraft-Kachel, weil zu diesem Zeitpunkt
+// noch keine spezifische Pflegekraft im Spiel ist. Stattdessen schiebt die
+// Mail den Kunden in den nächsten Action-Schritt: selbst Pflegekräfte
+// anschauen + einladen, statt passiv zu warten.
+export function getPatientDataSavedEmailTemplate(
+  lead: Lead,
+  portalUrl: string,
+): EmailTemplate {
+  const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://primundus.de';
+  const greeting = customerGreeting(lead);
+  const subject = 'Ihre Pflegedaten sind bei uns eingegangen';
+
+  const introHtml = `<p style="font-size:15px;line-height:1.75;color:#444;margin-bottom:18px;">vielen Dank — Ihre Pflegesituation ist nun vollständig erfasst. Passende Pflegekräfte können sich jetzt ein Bild machen und sich bei Ihnen bewerben oder ihr Interesse bekunden.</p>`;
+
+  const actionHtml = `<p style="font-size:15px;line-height:1.75;color:#444;margin-bottom:20px;">In der Zwischenzeit müssen Sie nicht warten: Im Kundenportal sehen Sie sofort <strong style="color:#2D1F0F;">verfügbare Pflegekräfte</strong>, die zu Ihrem Bedarf passen, und können sie persönlich einladen, sich bei Ihnen zu bewerben.</p>`;
+
+  const ctaText = 'Jetzt Pflegekräfte ansehen und einladen →';
+
+  const outroHtml = `<p style="font-size:14px;line-height:1.65;color:#555;margin:18px 0 0;">Bei Fragen erreichen Sie uns telefonisch unter <a href="tel:+4989200000830" style="color:#0066CC;text-decoration:none;">+49 89 200 000 830</a> oder per E-Mail an <a href="mailto:info@primundus.de" style="color:#0066CC;text-decoration:none;">info@primundus.de</a>.</p>`;
+
+  // Ilka-Sig — identisch zu buildCaregiverEventEmail, damit die Mail-Reihe
+  // optisch konsistent bleibt.
+  const ilkaSig = `
+    <p style="font-size:16px;line-height:1.7;color:#555;margin-top:24px;margin-bottom:16px;">Mit freundlichen Grüßen<br><strong style="color:#3D2B1F;">Ilka Wysocki</strong></p>
+    <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="margin:0 0 24px 0;border:1px solid #e8ddd0;border-radius:12px;overflow:hidden;">
+      <tr>
+        <td style="padding:18px 20px 16px;background:#ffffff;">
+          <table width="100%" cellpadding="0" cellspacing="0" role="presentation">
+            <tr>
+              <td style="vertical-align:top;">
+                <table cellpadding="0" cellspacing="0" role="presentation">
+                  <tr>
+                    <td style="padding-right:12px;vertical-align:top;">
+                      <img src="${baseUrl}/images/ilka-wysocki_pm-mallorca.webp" alt="Ilka Wysocki" width="60" style="display:block;width:60px;height:auto;border-radius:8px;" />
+                    </td>
+                    <td style="vertical-align:middle;">
+                      <p style="margin:0 0 2px;font-size:15px;font-weight:700;color:#3D2B1F;white-space:nowrap;">Ilka Wysocki</p>
+                      <p style="margin:0 0 2px;font-size:13px;color:#555;white-space:nowrap;">Pflegeberaterin</p>
+                      <p style="margin:0;font-size:12px;color:#9a8a73;white-space:nowrap;">Mo – So, 8 – 20 Uhr</p>
+                    </td>
+                  </tr>
+                </table>
+                <table cellpadding="0" cellspacing="0" role="presentation" style="margin-top:12px;">
+                  <tr><td style="padding-bottom:6px;">
+                    <a href="tel:+4989200000830" style="display:inline-block;background-color:#f0ebe4;border-radius:20px;padding:8px 16px;text-decoration:none;font-size:13px;font-weight:500;color:#3D2B1F;white-space:nowrap;">&#9990; 089 200 000 830</a>
+                  </td></tr>
+                  <tr><td>
+                    <a href="https://wa.me/4989200000830" style="display:inline-block;background-color:#25D366;border-radius:20px;padding:8px 16px;text-decoration:none;font-size:13px;font-weight:600;color:#ffffff;white-space:nowrap;">WhatsApp schreiben</a>
+                  </td></tr>
+                </table>
+              </td>
+              <td style="vertical-align:top;text-align:right;">
+                <table cellpadding="0" cellspacing="0" role="presentation" style="border:1px solid #e8ddd0;border-radius:8px;overflow:hidden;margin-left:auto;">
+                  <tr><td style="padding:8px 10px;background:#ffffff;text-align:center;vertical-align:top;">
+                    <img src="${baseUrl}/images/primundus_testsieger-2021.webp" alt="Testsieger DIE WELT" width="64" style="display:block;width:64px;height:auto;margin:0 auto 5px;" />
+                    <p style="margin:0 0 1px;font-size:11px;font-weight:700;color:#3D2B1F;white-space:nowrap;">Testsieger <span style="color:#B5A184;">DIE WELT</span></p>
+                    <p style="margin:0;font-size:10px;color:#888;line-height:1.4;">Preis, Qualität &amp;<br>Kundenservice</p>
+                  </td></tr>
+                </table>
+              </td>
+            </tr>
+          </table>
+        </td>
+      </tr>
+      <tr><td style="background:#f9f6f2;border-top:1px solid #e8ddd0;">
+        <table width="100%" cellpadding="0" cellspacing="0" role="presentation"><tr>
+          <td style="padding:12px 0;text-align:center;width:33%;border-right:1px solid #e8ddd0;"><p style="margin:0;font-size:12px;color:#555;line-height:1.4;">Über 20 Jahre<br>Erfahrung</p></td>
+          <td style="padding:12px 0;text-align:center;width:33%;border-right:1px solid #e8ddd0;"><p style="margin:0;font-size:12px;color:#555;line-height:1.4;">60.000+<br>betreute Einsätze</p></td>
+          <td style="padding:12px 0;text-align:center;width:33%;"><p style="margin:0;font-size:12px;color:#555;line-height:1.4;">Persönlicher<br>Ansprechpartner,<br>7&nbsp;Tage/Woche</p></td>
+        </tr></table>
+      </td></tr>
+    </table>`;
+
+  const content = `
+    <p style="font-size:15px;line-height:1.75;color:#444;margin-bottom:14px;">${greeting},</p>
+    ${introHtml}
+    ${actionHtml}
+    <div style="text-align:center;margin:0 0 24px;">
+      <a href="${portalUrl}" style="display:inline-block;background:#2A9D5C;color:#fff;text-decoration:none;padding:13px 34px;border-radius:8px;font-weight:600;font-size:15px;">${ctaText}</a>
+    </div>
+    <div style="font-size:12px;color:#888;line-height:1.8;margin:0 0 18px;text-align:center;">
+      <span style="color:#2D6A4F;font-weight:600;">✓ Keine Vertragsbindung</span>&ensp;&middot;&ensp;
+      <span style="color:#2D6A4F;font-weight:600;">✓ Tagesgenaue Abrechnung</span>&ensp;&middot;&ensp;
+      <span style="color:#2D6A4F;font-weight:600;">✓ Kosten erst bei Anreise</span>
+    </div>
+    ${outroHtml}
+    ${ilkaSig}`;
+
+  const html = `<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Primundus 24h-Pflege</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; line-height: 1.6; color: #333; background-color: #f4f4f4; }
+    @media only screen and (max-width: 600px) { .email-content { padding: 30px 20px !important; } }
+  </style>
+</head>
+<body>
+  <div style="width:100%;background-color:#f4f4f4;padding:20px 0;">
+    <table width="100%" cellpadding="0" cellspacing="0" role="presentation"><tr><td align="center">
+      <div style="max-width:600px;margin:0 auto;background-color:#ffffff;border-radius:8px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.1);">
+        <div style="background:#ffffff;padding:24px 40px 20px 40px;border-bottom:1px solid #f0ebe4;">
+          <table width="100%" cellpadding="0" cellspacing="0" role="presentation"><tr>
+            <td style="vertical-align:middle;">
+              <img src="${baseUrl}/images/Primundus-Logo_V6.png" alt="Primundus Logo" style="max-width:160px;height:auto;display:block;" />
+            </td>
+            <td style="vertical-align:middle;text-align:right;">
+              <table cellpadding="0" cellspacing="0" role="presentation" style="margin-left:auto;"><tr>
+                <td style="text-align:center;vertical-align:middle;padding-right:8px;border-right:1px solid #f0ebe4;">
+                  <img src="${baseUrl}/images/primundus_testsieger-2021.webp" alt="Testsieger DIE WELT" width="36" style="display:block;width:36px;height:auto;" />
+                </td>
+                <td style="text-align:left;padding-left:8px;">
+                  <p style="margin:0 0 1px;font-size:10px;font-weight:700;color:#3D2B1F;white-space:nowrap;">Testsieger</p>
+                  <p style="margin:0 0 1px;font-size:10px;color:#B5A184;white-space:nowrap;font-weight:600;">DIE WELT</p>
+                  <p style="margin:0;font-size:9px;color:#aaa;white-space:nowrap;">Preis &amp; Qualit&auml;t</p>
+                </td>
+              </tr></table>
+            </td>
+          </tr></table>
+        </div>
+        <div class="email-content" style="padding:40px 40px 32px;text-align:left;">${content}</div>
+        <div style="background-color:#f8f9fa;padding:30px;text-align:center;border-top:1px solid #e0e0e0;">
+          <div style="font-weight:600;font-size:15px;color:#3D2B1F;margin-bottom:6px;">Primundus Deutschland</div>
+          <div style="font-size:13px;color:#666;line-height:1.8;">
+            24h-Pflege und Betreuung zu Hause<br>
+            <a href="tel:+4989200000830" style="color:#0066CC;text-decoration:none;">+49 89 200 000 830</a> |
+            <a href="mailto:info@primundus.de" style="color:#0066CC;text-decoration:none;">info@primundus.de</a><br>
+            <a href="https://primundus.de" style="color:#0066CC;text-decoration:none;">www.primundus.de</a>
+          </div>
+          <div style="font-size:12px;color:#999;margin-top:16px;line-height:1.5;">
+            Diese E-Mail wurde versendet an: ${lead.email}<br>
+            Primundus Deutschland | Vitanas Group<br><br>
+            Sie erhalten diese E-Mail, weil Sie eine Kalkulation auf primundus.de angefordert haben.
+          </div>
+        </div>
+      </div>
+    </td></tr></table>
+  </div>
+</body>
+</html>`;
+
+  const text = `${greeting},
+
+vielen Dank — Ihre Pflegesituation ist nun vollständig erfasst. Passende Pflegekräfte können sich jetzt ein Bild machen und sich bei Ihnen bewerben oder ihr Interesse bekunden.
+
+In der Zwischenzeit müssen Sie nicht warten: Im Kundenportal sehen Sie sofort verfügbare Pflegekräfte, die zu Ihrem Bedarf passen, und können sie persönlich einladen, sich bei Ihnen zu bewerben.
+
+Jetzt Pflegekräfte ansehen und einladen: ${portalUrl}
+
+✓ Keine Vertragsbindung  ·  ✓ Tagesgenaue Abrechnung  ·  ✓ Kosten erst bei Anreise
+
+Bei Fragen erreichen Sie uns telefonisch unter +49 89 200 000 830 oder per E-Mail an info@primundus.de.
+
+Mit freundlichen Grüßen
+Ilka Wysocki — Pflegeberaterin
+Tel: 089 200 000 830  ·  WhatsApp: https://wa.me/4989200000830
+
+Primundus Deutschland
+www.primundus.de
+`;
+
+  return { subject, html, text };
+}
+
 export function getCaregiverInterestEmailTemplate(
   lead: Lead,
   caregiver: CaregiverDisplay,
