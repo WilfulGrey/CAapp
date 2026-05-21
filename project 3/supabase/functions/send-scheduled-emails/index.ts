@@ -714,8 +714,9 @@ async function sendEmailSmtp(
     });
 
     // Optional BCC for ops visibility — mirrors project 3/lib/email.ts.
-    // Default info@mamamia.app; disable by setting SMTP_BCC= (empty).
-    const bccRaw = Deno.env.get("SMTP_BCC") ?? "info@mamamia.app";
+    // Default info@primundus.de + info@mamamia.app; disable by setting
+    // SMTP_BCC= (empty). Comma-separated for multiple.
+    const bccRaw = Deno.env.get("SMTP_BCC") ?? "info@primundus.de,info@mamamia.app";
     const bccAddr = bccRaw.trim();
 
     const mailOptions: any = {

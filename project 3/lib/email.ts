@@ -1721,9 +1721,9 @@ export async function sendEmail(
     const toAddr = Array.isArray(to) ? to.join(', ') : to;
 
     // Optional BCC for ops visibility — every outgoing customer mail
-    // copies to info@mamamia.app by default. Disable by setting
-    // SMTP_BCC=  (empty) on the deploy. Comma-separated for multiple.
-    const bccRaw = process.env.SMTP_BCC ?? 'info@mamamia.app';
+    // copies to info@primundus.de + info@mamamia.app by default. Disable by
+    // setting SMTP_BCC=  (empty) on the deploy. Comma-separated for multiple.
+    const bccRaw = process.env.SMTP_BCC ?? 'info@primundus.de,info@mamamia.app';
     const bccAddr = bccRaw.trim();
 
     const mailOptions: any = {
