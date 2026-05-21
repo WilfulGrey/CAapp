@@ -4,6 +4,7 @@ import {
   sendEmail,
   getTeamNotificationTemplate,
   buildCustomerCaregiverMailWithInlinePhoto,
+  getPatientDataSavedEmailTemplate,
   type CaregiverDisplay,
   type CaregiverMailEvent,
 } from '@/lib/email';
@@ -64,9 +65,10 @@ const NON_DEDUPED_EVENTS = new Set([
 // Caregiver-Lifecycle-Events; das eigentliche Hooking aus Mamamia kommt
 // separat — der Endpoint nimmt die Events bereits entgegen.
 const CUSTOMER_MAIL_EVENTS = new Set([
-  'caregiver_interest_shown',
-  'application_received',
-  'application_accepted_internal',
+  'patient_data_saved',          // Mail D — Pflegedaten erfasst, Action-CTA "Pflegekräfte einladen"
+  'caregiver_interest_shown',    // Mail A
+  'application_received',        // Mail B
+  'application_accepted_internal', // Mail C
 ]);
 
 function extractCaregiverDisplay(metadata: any): CaregiverDisplay | null {
@@ -249,27 +251,45 @@ export async function POST(request: NextRequest) {
     // loggen wir und überspringen die Mail — der lead_event wird trotzdem
     // aufgezeichnet.
     if (CUSTOMER_MAIL_EVENTS.has(event)) {
-      const caregiver = extractCaregiverDisplay(metadata);
-      if (!caregiver) {
-        console.warn(`lead-event ${event}: caregiver display data missing in metadata — mail skipped (lead ${lead.id})`);
+      // patient_data_saved ist deduped (NON_DEDUPED_EVENTS enthält nur die
+      // Caregiver-Events) — Mail nur beim ersten Speichern verschicken,
+      // sonst spammen wir den Kunden bei jedem Patientendaten-Update.
+      const shouldSendCustomerMail = !isDeduped || isFirstOccurrence;
+
+      if (!shouldSendCustomerMail) {
+        console.log(`lead-event ${event}: dedupe — Customer-Mail skipped (lead ${lead.id})`);
       } else if (!lead.email) {
         console.warn(`lead-event ${event}: lead has no email — mail skipped (lead ${lead.id})`);
-      } else {
+      } else if (event === 'patient_data_saved') {
+        // Mail D — kein Caregiver involviert, einfacher Action-CTA in
+        // Richtung "Pflegekräfte ansehen + einladen".
         const portalUrl = buildPortalUrl(lead as any);
-        // Foto inline einbetten (CID) — presigned S3-URLs laufen nach 30 Min
-        // ab, daher nicht zuverlässig direkt im HTML referenzierbar.
-        buildCustomerCaregiverMailWithInlinePhoto(
-          event as CaregiverMailEvent,
-          lead as any,
-          caregiver,
-          portalUrl,
-        )
-          .then(({ template, attachments }) =>
-            sendEmail((lead as any).email, template, attachments),
+        const template = getPatientDataSavedEmailTemplate(lead as any, portalUrl);
+        sendEmail((lead as any).email, template).catch((e) =>
+          console.error('customer mail send threw:', e instanceof Error ? e.message : String(e)),
+        );
+      } else {
+        // Caregiver-Event-Mails (A/B/C) — Foto inline einbetten (CID) —
+        // presigned S3-URLs laufen nach 30 Min ab, daher nicht zuverlässig
+        // direkt im HTML referenzierbar.
+        const caregiver = extractCaregiverDisplay(metadata);
+        if (!caregiver) {
+          console.warn(`lead-event ${event}: caregiver display data missing in metadata — mail skipped (lead ${lead.id})`);
+        } else {
+          const portalUrl = buildPortalUrl(lead as any);
+          buildCustomerCaregiverMailWithInlinePhoto(
+            event as CaregiverMailEvent,
+            lead as any,
+            caregiver,
+            portalUrl,
           )
-          .catch((e) =>
-            console.error('customer mail send threw:', e instanceof Error ? e.message : String(e)),
-          );
+            .then(({ template, attachments }) =>
+              sendEmail((lead as any).email, template, attachments),
+            )
+            .catch((e) =>
+              console.error('customer mail send threw:', e instanceof Error ? e.message : String(e)),
+            );
+        }
       }
     }
 
