@@ -942,8 +942,8 @@ const CustomerPortalPage: FC = () => {
     // + cross-device. RPC errors stay silent in the UI; on next mount the
     // server-side lead.declined_caregiver_ids reflects truth and the override
     // collapses naturally.
-    const nurse = effectiveMatched[idx];
-    const caregiverId = nurse?.caregiverId;
+    const match = effectiveMatched[idx];
+    const caregiverId = match?.caregiverId;
     if (caregiverId == null) return;
     setStatusOverrides((prev) => {
       const next = new Map(prev);
@@ -961,7 +961,7 @@ const CustomerPortalPage: FC = () => {
       // rausgehen.
       reportLeadEvent(lead.token, 'caregiver_declined', {
         caregiver_id: caregiverId,
-        caregiver_name: nurse?.name ? displayName(nurse.name) : undefined,
+        caregiver_name: match?.nurse?.name ? displayName(match.nurse.name) : undefined,
       });
     }
   };

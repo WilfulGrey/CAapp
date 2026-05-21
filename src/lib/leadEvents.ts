@@ -10,7 +10,12 @@
 export const KOSTENRECHNER_URL =
   import.meta.env.VITE_KOSTENRECHNER_URL || 'https://kostenrechner.primundus.de';
 
-export type LeadEvent = 'portal_opened' | 'patient_data_saved' | 'caregiver_invited';
+export type LeadEvent =
+  | 'portal_opened'
+  | 'patient_data_saved'
+  | 'caregiver_invited'
+  | 'caregiver_declined'     // customer wegklicken einer Matching-Pflegekraft
+  | 'application_rejected';  // customer Bewerbung abgelehnt
 
 export interface LeadEventMetadata {
   // caregiver_invited: which caregiver was invited (id + name shown in the
