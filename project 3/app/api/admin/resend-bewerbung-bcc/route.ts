@@ -85,9 +85,10 @@ export async function POST(request: NextRequest) {
   const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
   // Letzte N application_received-Events, neueste zuerst.
+  // Spalte heißt `metadata` (siehe lead-event route insert).
   const { data: events, error: eErr } = await supabase
     .from('lead_events')
-    .select('id, lead_id, event_type, data, created_at')
+    .select('id, lead_id, event_type, metadata, created_at')
     .eq('event_type', 'application_received')
     .order('created_at', { ascending: false })
     .limit(limit);
@@ -124,10 +125,7 @@ export async function POST(request: NextRequest) {
       continue;
     }
 
-    const metadata = (event.data && typeof event.data === 'object' && 'metadata' in event.data)
-      ? (event.data as any).metadata
-      : event.data;
-    const caregiver = extractCaregiverDisplay(metadata);
+    const caregiver = extractCaregiverDisplay(event.metadata);
     if (!caregiver) {
       results.push({ event_id: event.id, lead_email: lead.email, created_at: event.created_at, sent: false, skipped: 'caregiver metadata missing' });
       continue;
