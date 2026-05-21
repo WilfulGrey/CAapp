@@ -35,9 +35,11 @@ export function buildReportEmail(opts: {
   yesterdayLabel: string;
   dayBeforeLabel: string;
   totalLeads: number;
+  bookedCustomers: number;   // distinct lead_ids mit ≥1 Buchung (lifetime)
+  totalBookings: number;     // Buchungs-Vorgänge insgesamt (lifetime)
   siteUrl: string;
 }): { subject: string; html: string; text: string } {
-  const { yesterday, dayBefore, yesterdayLabel, dayBeforeLabel, totalLeads, siteUrl } = opts;
+  const { yesterday, dayBefore, yesterdayLabel, dayBeforeLabel, totalLeads, bookedCustomers, totalBookings, siteUrl } = opts;
 
   const subject = `📊 Primundus Daily — ${yesterdayLabel} · ${yesterday.wizardCompleted} neue Leads`;
 
@@ -148,8 +150,9 @@ export function buildReportEmail(opts: {
           </tr>
         </table>
 
-        <div style="margin-top:24px;padding:14px 16px;background:#FAF7F0;border-left:3px solid #B5A184;border-radius:0 6px 6px 0;font-size:13px;color:#5C4A32;">
-          <strong>📊 Gesamtzahl Leads im System (lifetime):</strong> ${totalLeads}
+        <div style="margin-top:24px;padding:14px 16px;background:#FAF7F0;border-left:3px solid #B5A184;border-radius:0 6px 6px 0;font-size:13px;color:#5C4A32;line-height:1.8;">
+          <strong>📊 Gesamtzahl Leads im System (lifetime):</strong> ${totalLeads}<br>
+          <strong>🎉 Gebuchte Kunden (lifetime, distinct):</strong> ${bookedCustomers} <span style="color:#9a8a73;font-weight:400;">(${totalBookings} Buchungs-Vorgänge total)</span>
         </div>
       </div>
 
@@ -187,7 +190,8 @@ QUELLEN
   Direct:           ${yesterday.sourceDirect}
   Referral/Suche:   ${yesterday.sourceReferral}
 
-Gesamt Leads im System: ${totalLeads}
+Gesamt Leads im System:    ${totalLeads}
+Gebuchte Kunden (lifetime): ${bookedCustomers} (${totalBookings} Buchungs-Vorgänge)
 `;
 
   return { subject, html, text };

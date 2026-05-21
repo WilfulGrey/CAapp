@@ -187,3 +187,40 @@ export async function fetchTotalLeads(supabase: SupabaseClient): Promise<number>
   if (error) throw new Error(`leads (total): ${error.message}`);
   return count ?? 0;
 }
+
+/**
+ * Kunden mit mindestens einer bestätigten Buchung (lifetime).
+ * Primärquelle: lead_application_acceptances (PR #125).
+ * Fallback: distinct lead_id in lead_events mit
+ *   event_type='application_accepted_internal' — für ältere DB-Stände
+ *   in denen die Tabelle nicht existiert.
+ *
+ * Liefert:
+ *   uniqueCustomers — Anzahl distinct Kunden, die mindestens 1× gebucht haben
+ *   totalBookings    — Anzahl Buchungs-Vorgänge insgesamt (Re-Buchungen
+ *                       desselben Kunden zählen mit)
+ */
+export async function fetchBookedCustomers(supabase: SupabaseClient): Promise<{
+  uniqueCustomers: number;
+  totalBookings: number;
+}> {
+  const { data: accRows, error: accErr } = await supabase
+    .from("lead_application_acceptances")
+    .select("lead_id");
+  if (!accErr && Array.isArray(accRows)) {
+    const unique = new Set(accRows.map((r: any) => r.lead_id));
+    return { uniqueCustomers: unique.size, totalBookings: accRows.length };
+  }
+
+  // Fallback — Tabelle existiert nicht oder Query failed.
+  const { data: evRows, error: evErr } = await supabase
+    .from("lead_events")
+    .select("lead_id")
+    .eq("event_type", "application_accepted_internal");
+  if (evErr) {
+    console.error("fetchBookedCustomers fallback failed:", evErr.message);
+    return { uniqueCustomers: 0, totalBookings: 0 };
+  }
+  const unique = new Set((evRows ?? []).map((r: any) => r.lead_id));
+  return { uniqueCustomers: unique.size, totalBookings: (evRows ?? []).length };
+}
