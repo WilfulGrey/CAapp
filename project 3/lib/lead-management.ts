@@ -24,6 +24,24 @@ export interface Lead {
   updated_at: string;
 }
 
+// Vergleicht User-Inputs (formularDaten) zweier Kalkulationen. Used für
+// Re-Submit-Erkennung: wenn der Kunde das Wizard erneut abschickt, ohne
+// irgendwas zu ändern, sollen wir die Eingangsbestätigung nicht nochmal
+// schicken (siehe angebot-anfordern). Vergleicht bewusst nur formularDaten,
+// nicht das gesamte kalkulation-JSON — da können computed-Felder
+// (bruttopreis, Rundungen) sich theoretisch verschieben ohne dass der
+// Kunde was geändert hat.
+function isSameFormularInput(prev: Kalkulation | undefined | null, next: Kalkulation | undefined | null): boolean {
+  if (!prev || !next) return false;
+  try {
+    const a = JSON.stringify((prev as any).formularDaten ?? {});
+    const b = JSON.stringify((next as any).formularDaten ?? {});
+    return a === b;
+  } catch {
+    return false;
+  }
+}
+
 export async function findOrCreateLead(
   email: string,
   targetStatus: 'info_requested' | 'angebot_requested' | 'vertrag_abgeschlossen',
@@ -35,7 +53,7 @@ export async function findOrCreateLead(
     care_start_timing?: string;
     kalkulation?: Kalkulation;
   }
-): Promise<{ lead: Lead; isNew: boolean; isUpgrade: boolean }> {
+): Promise<{ lead: Lead; isNew: boolean; isUpgrade: boolean; kalkulationChanged: boolean }> {
   const { data: existingLeads } = await supabase
     .from('leads')
     .select('*')
@@ -54,6 +72,11 @@ export async function findOrCreateLead(
     const targetStatusLevel = statusOrder[targetStatus];
 
     if (currentStatusLevel >= targetStatusLevel && latestLead.status !== 'vertrag_abgeschlossen') {
+      // Vergleiche vor dem Update — sonst überschreiben wir die Referenz.
+      const kalkulationChanged = data?.kalkulation
+        ? !isSameFormularInput(latestLead.kalkulation as Kalkulation | null, data.kalkulation)
+        : false;
+
       const updates: any = { updated_at: new Date().toISOString() };
       if (data?.kalkulation) updates.kalkulation = data.kalkulation;
       if (data?.vorname) updates.vorname = data.vorname;
@@ -71,8 +94,9 @@ export async function findOrCreateLead(
 
       await logEvent(latestLead.id, `${targetStatus}_duplicate`, {
         message: 'Lead bereits vorhanden, Kalkulation aktualisiert',
+        kalkulation_changed: kalkulationChanged,
       });
-      return { lead: updatedLead || latestLead, isNew: false, isUpgrade: false };
+      return { lead: updatedLead || latestLead, isNew: false, isUpgrade: false, kalkulationChanged };
     }
 
     if (currentStatusLevel < targetStatusLevel) {
@@ -116,7 +140,7 @@ export async function findOrCreateLead(
         to: targetStatus,
       });
 
-      return { lead: updatedLead, isNew: false, isUpgrade: true };
+      return { lead: updatedLead, isNew: false, isUpgrade: true, kalkulationChanged: false };
     }
 
     if (latestLead.status === 'vertrag_abgeschlossen') {
@@ -159,7 +183,7 @@ export async function findOrCreateLead(
         message: 'Neuer Lead nach abgeschlossenem Vertrag',
       });
 
-      return { lead: newLead, isNew: true, isUpgrade: false };
+      return { lead: newLead, isNew: true, isUpgrade: false, kalkulationChanged: false };
     }
   }
 
@@ -200,7 +224,7 @@ export async function findOrCreateLead(
 
   await logEvent(newLead.id, targetStatus, { message: 'Neuer Lead erstellt' });
 
-  return { lead: newLead, isNew: true, isUpgrade: false };
+  return { lead: newLead, isNew: true, isUpgrade: false, kalkulationChanged: false };
 }
 
 export async function logEvent(
