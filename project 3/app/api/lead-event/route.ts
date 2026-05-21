@@ -30,12 +30,14 @@ const ALLOWED_EVENTS = [
   'patient_data_saved',
   'caregiver_invited',
   'caregiver_interest_shown',
+  'caregiver_declined',         // Kunde hat eine Matching-Pflegekraft abgelehnt
   'application_received',
   // PR #123: customer confirmed acceptance via AngebotPruefenModal step 2.
   // MVP path — Mamamia NOT notified, Primundus team gets a notification
   // email with the contract form data and handles contract paperwork
   // manually. Acceptance row persisted in lead_application_acceptances.
   'application_accepted_internal',
+  'application_rejected',       // Kunde hat eine Bewerbung abgelehnt
 ];
 const TEAM_NOTIFY_EVENTS = [
   'patient_data_saved',
@@ -59,7 +61,9 @@ const TEAM_NOTIFY_RECIPIENT = 'info@primundus.de';
 const NON_DEDUPED_EVENTS = new Set([
   'caregiver_invited',
   'caregiver_interest_shown',
+  'caregiver_declined',
   'application_received',
+  'application_rejected',
 ]);
 // Customer-facing Mails (an die Lead-Email) je Event. Trigger sind die neuen
 // Caregiver-Lifecycle-Events; das eigentliche Hooking aus Mamamia kommt
@@ -92,6 +96,52 @@ function buildPortalUrl(lead: { token?: string | null }): string {
   const portalBase = process.env.NEXT_PUBLIC_PORTAL_URL || '';
   if (!portalBase || !lead.token) return '';
   return `${portalBase.replace(/\/$/, '')}/?token=${encodeURIComponent(lead.token)}`;
+}
+
+// Plant einen Reaktions-Reminder (interest_reminder / application_reminder)
+// für ~30 Min nach dem ursprünglichen caregiver_interest_shown bzw.
+// application_received-Event. Pflegekraft-Metadata wird mitgespeichert,
+// damit die Edge Function beim Versand die richtige Mail bauen kann.
+const REMINDER_DELAY_MIN = 30;
+async function scheduleReactionReminder(
+  supabaseAdmin: any,
+  leadId: string,
+  recipientEmail: string,
+  triggerEvent: 'caregiver_interest_shown' | 'application_received',
+  caregiver: CaregiverDisplay,
+  caregiverId: number | string | undefined,
+): Promise<void> {
+  const emailType = triggerEvent === 'caregiver_interest_shown'
+    ? 'interest_reminder'
+    : 'application_reminder';
+  const scheduledFor = new Date(Date.now() + REMINDER_DELAY_MIN * 60 * 1000).toISOString();
+  try {
+    await supabaseAdmin.from('scheduled_emails').insert({
+      lead_id: leadId,
+      email_type: emailType,
+      recipient_email: recipientEmail,
+      scheduled_for: scheduledFor,
+      status: 'pending',
+      // Pflegekraft-Snapshot für den Mail-Build beim Versand. Photo-URL
+      // ist eine presigned S3-URL die in ~30 Min abläuft — die Edge
+      // Function fetched das Bild aber direkt beim Versand und inlined
+      // es per CID (PR #142), passt also zeitlich.
+      metadata: {
+        caregiver_id: caregiverId,
+        caregiver_name: caregiver.name,
+        caregiver_badge_level: caregiver.badgeLevel ?? null,
+        caregiver_years_experience: caregiver.yearsExperience ?? null,
+        caregiver_einsatz_count: caregiver.einsatzCount ?? null,
+        caregiver_photo_url: caregiver.photoUrl ?? null,
+        caregiver_about_text: caregiver.aboutText ?? null,
+        trigger_event: triggerEvent,
+      },
+    });
+  } catch (e) {
+    // Fire-and-forget — falls das Scheduling fehlschlägt, soll die
+    // ursprüngliche Mail (A/B) trotzdem als Erfolg gelten.
+    console.error(`scheduleReactionReminder ${emailType} failed:`, e instanceof Error ? e.message : String(e));
+  }
 }
 
 const corsHeaders = {
@@ -277,6 +327,7 @@ export async function POST(request: NextRequest) {
           console.warn(`lead-event ${event}: caregiver display data missing in metadata — mail skipped (lead ${lead.id})`);
         } else {
           const portalUrl = buildPortalUrl(lead as any);
+          const caregiverIdRaw = metadata?.caregiver_id ?? metadata?.caregiverId;
           buildCustomerCaregiverMailWithInlinePhoto(
             event as CaregiverMailEvent,
             lead as any,
@@ -286,6 +337,25 @@ export async function POST(request: NextRequest) {
             .then(({ template, attachments }) =>
               sendEmail((lead as any).email, template, attachments),
             )
+            .then((result) => {
+              // Reaktions-Reminder schedulen — 30 Min nach Mail A/B, falls
+              // der Kunde bis dahin keine Reaktion (positiv ODER negativ)
+              // gezeigt hat. Nur für die zwei zeitkritischen Events, nicht
+              // für application_accepted_internal (= Endpunkt der Kette).
+              if (
+                result?.success &&
+                (event === 'caregiver_interest_shown' || event === 'application_received')
+              ) {
+                scheduleReactionReminder(
+                  supabase,
+                  lead.id,
+                  (lead as any).email,
+                  event,
+                  caregiver,
+                  caregiverIdRaw,
+                );
+              }
+            })
             .catch((e) =>
               console.error('customer mail send threw:', e instanceof Error ? e.message : String(e)),
             );

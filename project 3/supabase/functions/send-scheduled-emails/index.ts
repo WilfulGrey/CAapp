@@ -728,7 +728,7 @@ async function sendEmailSmtp(
   subject: string,
   html: string,
   text: string,
-  attachments?: { filename: string; content: Uint8Array; contentType: string }[]
+  attachments?: { filename: string; content: Uint8Array; contentType: string; cid?: string }[]
 ): Promise<{ success: boolean; error?: string }> {
   try {
     const transport = nodemailer.createTransport({
@@ -757,10 +757,13 @@ async function sendEmailSmtp(
     };
 
     if (attachments && attachments.length > 0) {
+      // `cid` mitschicken — nodemailer rendert das Attachment dann als
+      // Inline-Bild für <img src="cid:xxx"> im HTML (siehe Reminder-Foto).
       mailOptions.attachments = attachments.map((att) => ({
         filename: att.filename,
         content: Buffer.from(att.content),
         contentType: att.contentType,
+        ...(att.cid ? { cid: att.cid } : {}),
       }));
     }
 
@@ -776,6 +779,231 @@ async function sendEmailSmtp(
     const msg = error instanceof Error ? error.message : String(error);
     return { success: false, error: msg };
   }
+}
+
+// Reaktions-Reminder-Helpers (für interest_reminder / application_reminder).
+// Logik: nach 30 Min kontrollieren ob der Kunde auf den ursprünglichen
+// caregiver_interest_shown / application_received reagiert hat (Reaktion =
+// invite/decline für Interesse, accept/reject für Bewerbung). Wenn ja →
+// Reminder cancelt sich selbst. Wenn nein → Mail raus.
+
+async function hasReactionForCaregiver(
+  supabase: any,
+  leadId: string,
+  reminderType: "interest_reminder" | "application_reminder",
+  caregiverId: number | string,
+): Promise<boolean> {
+  const positiveEvent = reminderType === "interest_reminder"
+    ? "caregiver_invited"
+    : "application_accepted_internal";
+  const negativeEvent = reminderType === "interest_reminder"
+    ? "caregiver_declined"
+    : "application_rejected";
+  // PostgREST kann jsonb-Felder mit ->> filtern. caregiver_id ist als Number
+  // im Metadata gespeichert; Vergleich als String passt.
+  const cgIdStr = String(caregiverId);
+  const { data, error } = await supabase
+    .from("lead_events")
+    .select("id, event_type")
+    .eq("lead_id", leadId)
+    .in("event_type", [positiveEvent, negativeEvent])
+    .filter("metadata->>caregiver_id", "eq", cgIdStr)
+    .limit(1);
+  if (error) {
+    console.error(`hasReactionForCaregiver query failed (${reminderType}, lead ${leadId}, cg ${cgIdStr}):`, error.message);
+    // Im Zweifel skip senden — Reminder nicht doppelt rauspusten.
+    return true;
+  }
+  return Array.isArray(data) && data.length > 0;
+}
+
+async function fetchInlinePhotoDeno(
+  url: string | null | undefined,
+): Promise<{ filename: string; content: Uint8Array; contentType: string; cid: string } | null> {
+  if (!url) return null;
+  try {
+    const res = await fetch(url, { signal: AbortSignal.timeout(10000) });
+    if (!res.ok) {
+      console.warn(`fetchInlinePhotoDeno: HTTP ${res.status} for ${url.slice(0, 80)}…`);
+      return null;
+    }
+    const ct = (res.headers.get("content-type") || "").toLowerCase();
+    if (!ct.startsWith("image/")) return null;
+    const buf = new Uint8Array(await res.arrayBuffer());
+    if (buf.length === 0 || buf.length > 5 * 1024 * 1024) return null;
+    const ext = ct.includes("png") ? "png" : ct.includes("webp") ? "webp" : "jpg";
+    const cid = `caregiver-photo-${Math.random().toString(36).slice(2, 10)}@primundus.de`;
+    return { filename: `caregiver.${ext}`, content: buf, contentType: ct, cid };
+  } catch (e) {
+    console.warn("fetchInlinePhotoDeno error:", e instanceof Error ? e.message : String(e));
+    return null;
+  }
+}
+
+interface ReminderMeta {
+  caregiver_id?: number | string;
+  caregiver_name?: string;
+  caregiver_badge_level?: string | null;
+  caregiver_years_experience?: number | null;
+  caregiver_einsatz_count?: number | null;
+  caregiver_photo_url?: string | null;
+  caregiver_about_text?: string | null;
+}
+
+function reminderCaregiverInitials(name: string): string {
+  const parts = (name || "?").trim().split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return "?";
+  if (parts.length === 1) return parts[0].charAt(0).toUpperCase();
+  return (parts[0].charAt(0) + parts[parts.length - 1].charAt(0)).toUpperCase();
+}
+
+function reminderBadgeStyle(level?: string | null): { label: string; gradient: string } | null {
+  if (!level) return null;
+  const key = level.trim().toLowerCase();
+  const map: Record<string, { label: string; gradient: string }> = {
+    starter: { label: "🌱 STARTER-PFLEGEKRAFT", gradient: "linear-gradient(135deg,#8AB47C 0%,#5E8C50 100%)" },
+    bronze:  { label: "🥉 BRONZE-PFLEGEKRAFT",  gradient: "linear-gradient(135deg,#C68850 0%,#8B5A2B 100%)" },
+    silber:  { label: "🥈 SILBER-PFLEGEKRAFT",  gradient: "linear-gradient(135deg,#B8B8B8 0%,#7E7E7E 100%)" },
+    gold:    { label: "🏅 GOLD-PFLEGEKRAFT",    gradient: "linear-gradient(135deg,#E0AC32 0%,#B8860B 100%)" },
+    platin:  { label: "💎 PLATIN-PFLEGEKRAFT",  gradient: "linear-gradient(135deg,#D4DCE0 0%,#7E8E96 100%)" },
+  };
+  return map[key] || null;
+}
+
+// Reminder-Mail-HTML. Beide Varianten (interest / application) teilen sich
+// dasselbe Layout — nur Subject, Intro, Action-Satz + CTA-Text unterscheiden
+// sich. Visual matched mit Mail A/B (buildCaregiverEventEmail), damit die
+// Reihe optisch zusammengehört.
+function buildReminderHtml(
+  lead: Lead,
+  meta: ReminderMeta,
+  portalUrl: string,
+  siteUrl: string,
+  variant: "interest" | "application",
+  photoCid: string | null,
+): string {
+  const greeting = buildHalloAnrede(lead.anrede_text || null, lead.nachname || "", lead.vorname || "");
+  const cgName = meta.caregiver_name || "Ihre Pflegekraft";
+  const firstName = cgName.split(/\s+/)[0] || cgName;
+
+  const badge = reminderBadgeStyle(meta.caregiver_badge_level || null);
+  const badgeHtml = badge
+    ? `<span style="display:inline-block;background:${badge.gradient};color:#fff;padding:4px 11px;border-radius:14px;font-size:11px;font-weight:700;letter-spacing:.04em;">${badge.label}</span>`
+    : "";
+
+  const metaParts: string[] = [];
+  if (meta.caregiver_years_experience && meta.caregiver_years_experience > 0) {
+    metaParts.push(`${meta.caregiver_years_experience} ${meta.caregiver_years_experience === 1 ? "Jahr" : "Jahre"} Erfahrung`);
+  }
+  if (meta.caregiver_einsatz_count && meta.caregiver_einsatz_count > 0) {
+    metaParts.push(`${meta.caregiver_einsatz_count} ${meta.caregiver_einsatz_count === 1 ? "Einsatz" : "Einsätze"}`);
+  }
+  const metaLine = metaParts.length > 0
+    ? `<p style="margin:0 0 6px;font-size:13px;color:#666;">${metaParts.join(" &middot; ")}</p>`
+    : "";
+
+  // Nur Inline-CID nutzen — der presigned S3-URL ist nach 30 Min meist tot,
+  // daher bei fehlgeschlagenem Inline-Fetch direkt auf Initialen-Avatar
+  // ausweichen statt eine kaputte Bild-Ref im HTML zu lassen.
+  const photoHtml = photoCid
+    ? `<img src="cid:${photoCid}" alt="${cgName}" width="80" style="display:block;width:80px;height:80px;border-radius:50%;object-fit:cover;border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.08);" />`
+    : `<div style="width:80px;height:80px;border-radius:50%;background:#B5A184;color:#fff;font-size:28px;font-weight:700;display:flex;align-items:center;justify-content:center;border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.08);">${reminderCaregiverInitials(cgName)}</div>`;
+
+  const aboutHtml = meta.caregiver_about_text
+    ? `<p style="margin:14px 0 0;font-size:14px;line-height:1.65;color:#555;font-style:italic;">„${meta.caregiver_about_text}"</p>`
+    : "";
+
+  const kachel = `
+    <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="margin:0 0 22px 0;border:1px solid #e8ddd0;border-radius:12px;overflow:hidden;">
+      <tr><td style="padding:18px 20px;background:#FAF8F4;">
+        <table width="100%" cellpadding="0" cellspacing="0" role="presentation">
+          <tr>
+            <td style="vertical-align:middle;width:96px;padding-right:16px;">${photoHtml}</td>
+            <td style="vertical-align:middle;">
+              <p style="margin:0 0 4px;font-size:18px;font-weight:700;color:#2D1F0F;">${cgName}</p>
+              ${metaLine}
+              ${badgeHtml}
+            </td>
+          </tr>
+        </table>
+        ${aboutHtml}
+      </td></tr>
+    </table>`;
+
+  const introHtml = variant === "interest"
+    ? `<p style="font-size:15px;line-height:1.75;color:#444;margin-bottom:18px;">vor einer halben Stunde haben wir Ihnen geschrieben, dass <strong style="color:#2D1F0F;">${cgName}</strong> Interesse an Ihrer Anfrage hat. Eine kurze Erinnerung — die nächsten Stunden zählen:</p>`
+    : `<p style="font-size:15px;line-height:1.75;color:#444;margin-bottom:18px;">vor einer halben Stunde haben wir Ihnen <strong style="color:#2D1F0F;">${firstName}s Bewerbung</strong> weitergeleitet. Eine kurze Erinnerung — diese Phase ist zeitkritisch:</p>`;
+
+  const middleHtml = variant === "interest"
+    ? `<p style="font-size:15px;line-height:1.75;color:#444;margin-bottom:20px;">Pflegekräfte mit guten Profilen werden häufig schnell von anderen Familien angefragt. <strong style="color:#2D1F0F;">Damit ${firstName} für Sie verfügbar bleibt</strong>, schauen Sie sich ihr Profil jetzt an und laden Sie sie ein, sich bei Ihnen zu bewerben.</p>`
+    : `<p style="font-size:15px;line-height:1.75;color:#444;margin-bottom:20px;">Pflegekräfte halten ihre Bewerbung bei uns offen, solange sie keine andere Familie verbindlich gebucht hat. <strong style="color:#2D1F0F;">Damit Sie ${firstName} nicht verlieren</strong>, schauen Sie sich ihre Bewerbung jetzt an und bestätigen Sie die Buchung, wenn alles passt.</p>`;
+
+  const ctaText = variant === "interest"
+    ? "Profil ansehen und einladen →"
+    : "Bewerbung ansehen und buchen →";
+
+  const softOut = variant === "interest"
+    ? `<p style="font-size:13px;line-height:1.6;color:#888;margin:18px 0 0;font-style:italic;">Falls ${firstName} nicht passt, ignorieren Sie diese E-Mail einfach — wir suchen für Sie weiter.</p>`
+    : `<p style="font-size:13px;line-height:1.6;color:#888;margin:18px 0 0;font-style:italic;">Falls ${firstName} doch nicht passt, melden Sie sich kurz bei uns — wir suchen weiter.</p>`;
+
+  const content = `
+    <p style="font-size:15px;line-height:1.75;color:#444;margin-bottom:14px;">${greeting},</p>
+    ${introHtml}
+    ${kachel}
+    ${middleHtml}
+    <div style="text-align:center;margin:0 0 24px;">
+      <a href="${portalUrl}" style="display:inline-block;background:#2A9D5C;color:#fff;text-decoration:none;padding:13px 34px;border-radius:8px;font-weight:600;font-size:15px;">${ctaText}</a>
+    </div>
+    ${softOut}
+    ${buildIlkaSig(siteUrl)}`;
+
+  return buildEmailWrapper(lead, siteUrl, content);
+}
+
+function buildReminderText(
+  lead: Lead,
+  meta: ReminderMeta,
+  portalUrl: string,
+  variant: "interest" | "application",
+): string {
+  const halloAnrede = buildHalloAnrede(lead.anrede_text || null, lead.nachname || "", lead.vorname || "");
+  const cgName = meta.caregiver_name || "Ihre Pflegekraft";
+  const firstName = cgName.split(/\s+/)[0] || cgName;
+
+  if (variant === "interest") {
+    return `${halloAnrede},
+
+vor einer halben Stunde haben wir Ihnen geschrieben, dass ${cgName} Interesse an Ihrer Anfrage hat. Eine kurze Erinnerung — die nächsten Stunden zählen:
+
+Pflegekräfte mit guten Profilen werden häufig schnell von anderen Familien angefragt. Damit ${firstName} für Sie verfügbar bleibt, schauen Sie sich ihr Profil jetzt an und laden Sie sie ein, sich bei Ihnen zu bewerben.
+
+Profil ansehen und einladen: ${portalUrl}
+
+Falls ${firstName} nicht passt, ignorieren Sie diese E-Mail einfach — wir suchen für Sie weiter.
+
+Mit freundlichen Grüßen
+Ilka Wysocki — Pflegeberaterin
+Tel: 089 200 000 830  ·  WhatsApp: https://wa.me/4989200000830
+
+Primundus Deutschland | www.primundus.de
+`;
+  }
+  return `${halloAnrede},
+
+vor einer halben Stunde haben wir Ihnen ${firstName}s Bewerbung weitergeleitet. Eine kurze Erinnerung — diese Phase ist zeitkritisch:
+
+Pflegekräfte halten ihre Bewerbung bei uns offen, solange sie keine andere Familie verbindlich gebucht hat. Damit Sie ${firstName} nicht verlieren, schauen Sie sich ihre Bewerbung jetzt an und bestätigen Sie die Buchung, wenn alles passt.
+
+Bewerbung ansehen und buchen: ${portalUrl}
+
+Falls ${firstName} doch nicht passt, melden Sie sich kurz bei uns — wir suchen weiter.
+
+Mit freundlichen Grüßen
+Ilka Wysocki — Pflegeberaterin
+Tel: 089 200 000 830  ·  WhatsApp: https://wa.me/4989200000830
+
+Primundus Deutschland | www.primundus.de
+`;
 }
 
 async function fetchPDFAttachment(
@@ -972,6 +1200,84 @@ Deno.serve(async (req: Request) => {
           text = buildNachfass2Text(lead as Lead, smtpConfig.siteUrl, portalBase, milestone);
           eventTypeSent = "email_nachfass_2_sent";
           eventTypeFailed = "email_nachfass_2_failed";
+        } else if (
+          scheduledEmail.email_type === "interest_reminder" ||
+          scheduledEmail.email_type === "application_reminder"
+        ) {
+          // Reaktions-Reminder. 30 Min nach dem ursprünglichen
+          // caregiver_interest_shown / application_received-Event. Vor Versand:
+          // checken ob der Kunde inzwischen reagiert hat (positiv ODER negativ
+          // für diese Pflegekraft). Wenn ja, cancelt sich der Reminder selbst.
+          const meta = ((scheduledEmail as any).metadata ?? {}) as ReminderMeta;
+          const cgId = meta.caregiver_id;
+          if (cgId == null) {
+            await supabase
+              .from("scheduled_emails")
+              .update({ status: "failed", error_message: "reminder missing caregiver_id in metadata", updated_at: new Date().toISOString() })
+              .eq("id", scheduledEmail.id);
+            results.push({ id: scheduledEmail.id, success: false, error: "no caregiver_id" });
+            continue;
+          }
+
+          // Lead schon "fertig"? Status-Abbruch greift wie bei Nachfass.
+          if (isBeauftragt || isNichtInteressiert) {
+            await supabase
+              .from("scheduled_emails")
+              .update({ status: "cancelled", updated_at: new Date().toISOString() })
+              .eq("id", scheduledEmail.id);
+            await supabase.from("lead_events").insert({
+              lead_id: scheduledEmail.lead_id,
+              event_type: `email_${scheduledEmail.email_type}_cancelled`,
+              metadata: { caregiver_id: cgId, reason: isNichtInteressiert ? "nicht_interessiert" : "betreuung_beauftragt" },
+            });
+            results.push({ id: scheduledEmail.id, success: true });
+            continue;
+          }
+
+          // Hat der Kunde reagiert (invite/decline bzw. accept/reject)?
+          const reacted = await hasReactionForCaregiver(
+            supabase,
+            scheduledEmail.lead_id,
+            scheduledEmail.email_type as "interest_reminder" | "application_reminder",
+            cgId,
+          );
+          if (reacted) {
+            await supabase
+              .from("scheduled_emails")
+              .update({ status: "cancelled", updated_at: new Date().toISOString() })
+              .eq("id", scheduledEmail.id);
+            await supabase.from("lead_events").insert({
+              lead_id: scheduledEmail.lead_id,
+              event_type: `email_${scheduledEmail.email_type}_cancelled`,
+              metadata: { caregiver_id: cgId, reason: "customer_reacted" },
+            });
+            results.push({ id: scheduledEmail.id, success: true });
+            continue;
+          }
+
+          // Reaktion fehlt → Reminder bauen + senden. Foto inline einbetten
+          // (CID), die S3-URL ist nach 30 Min eh meist abgelaufen.
+          const variant = scheduledEmail.email_type === "interest_reminder" ? "interest" : "application";
+          const cgName = meta.caregiver_name || "Ihre Pflegekraft";
+          const firstName = cgName.split(/\s+/)[0] || cgName;
+          subject = variant === "interest"
+            ? `${firstName} wartet auf Ihre Rückmeldung`
+            : `${firstName} wartet auf Ihre Entscheidung`;
+
+          // Portal-URL mit Token bauen
+          const portalUrl = (portalBase && (lead as Lead).token)
+            ? buildPortalUrl(portalBase, (lead as Lead).token)
+            : smtpConfig.siteUrl;
+
+          const inline = await fetchInlinePhotoDeno(meta.caregiver_photo_url);
+          html = buildReminderHtml(lead as Lead, meta, portalUrl, smtpConfig.siteUrl, variant, inline?.cid ?? null);
+          text = buildReminderText(lead as Lead, meta, portalUrl, variant);
+          eventTypeSent = `email_${scheduledEmail.email_type}_sent`;
+          eventTypeFailed = `email_${scheduledEmail.email_type}_failed`;
+
+          // Inline-Photo wird unten beim Send-Block aufgenommen (siehe
+          // reminderInline-Variable).
+          (scheduledEmail as any).__reminderInline = inline;
         } else {
           await supabase
             .from("scheduled_emails")
@@ -986,12 +1292,20 @@ Deno.serve(async (req: Request) => {
           continue;
         }
  
-        // For Angebotsmail, attach the PDF
-        let attachments: { filename: string; content: Uint8Array; contentType: string }[] | undefined;
+        // Attachments — je nach email_type unterschiedlich:
+        // - "angebot" (legacy): PDF
+        // - "interest_reminder"/"application_reminder": Inline-Foto via CID
+        let attachments: { filename: string; content: Uint8Array; contentType: string; cid?: string }[] | undefined;
         if (scheduledEmail.email_type === "angebot") {
           const fullName = [(lead as Lead).vorname, (lead as any).nachname].filter(Boolean).join('_');
           const pdfAttachment = await fetchPDFAttachment(smtpConfig.siteUrl, lead.id, fullName || undefined);
           if (pdfAttachment) attachments = [pdfAttachment];
+        } else {
+          const reminderInline = (scheduledEmail as any).__reminderInline as
+            | { filename: string; content: Uint8Array; contentType: string; cid: string }
+            | null
+            | undefined;
+          if (reminderInline) attachments = [reminderInline];
         }
 
         const emailResult = await sendEmailSmtp(smtpConfig, scheduledEmail.recipient_email, subject, html, text, attachments);

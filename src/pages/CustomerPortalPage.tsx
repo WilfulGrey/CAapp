@@ -693,6 +693,19 @@ const CustomerPortalPage: FC = () => {
       prev.map((a) => (a.id === id ? { ...a, status: 'declined' } : a))
     );
 
+    // Bridge-Event: Kunde hat eine Bewerbung abgelehnt. Wichtig für den
+    // Application-Reminder-Flow (send-scheduled-emails liest dieses Event
+    // als "Reaktion erfolgt", auch wenn negativ) — ohne das würden wir
+    // 30 Min später eine "Bitte entscheiden Sie"-Mail schicken, obwohl
+    // der Kunde längst entschieden hat.
+    const app = applications.find((a) => a.id === id);
+    reportLeadEvent(lead?.token, 'application_rejected', {
+      application_id: id,
+      caregiver_id: app?.nurse?.caregiverId,
+      caregiver_name: app?.nurse?.name ? displayName(app.nurse.name) : undefined,
+      reject_message: message,
+    });
+
     // Persist to Mamamia
     if (mmReady && Number.isFinite(Number(id))) {
       rejectAppMutation.mutate({
@@ -929,7 +942,8 @@ const CustomerPortalPage: FC = () => {
     // + cross-device. RPC errors stay silent in the UI; on next mount the
     // server-side lead.declined_caregiver_ids reflects truth and the override
     // collapses naturally.
-    const caregiverId = effectiveMatched[idx]?.caregiverId;
+    const nurse = effectiveMatched[idx];
+    const caregiverId = nurse?.caregiverId;
     if (caregiverId == null) return;
     setStatusOverrides((prev) => {
       const next = new Map(prev);
@@ -939,6 +953,15 @@ const CustomerPortalPage: FC = () => {
     if (lead?.token) {
       setDeclinedCaregiver(lead.token, caregiverId, true).catch(err => {
         console.error('setDeclinedCaregiver failed:', err);
+      });
+      // Bridge-Event: Kunde hat eine Pflegekraft abgelehnt (vor Bewerbung).
+      // Wichtig für den Interest-Reminder-Flow — wenn die Pflegekraft schon
+      // Interesse gezeigt hat (caregiver_interest_shown) und der Kunde sie
+      // 30 Min später abgelehnt hat, soll keine "Bitte reagieren"-Mail mehr
+      // rausgehen.
+      reportLeadEvent(lead.token, 'caregiver_declined', {
+        caregiver_id: caregiverId,
+        caregiver_name: nurse?.name ? displayName(nurse.name) : undefined,
       });
     }
   };
