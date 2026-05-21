@@ -1742,10 +1742,15 @@ export async function sendEmail(
     }
 
     if (attachments && attachments.length > 0) {
+      // Pass `cid` through so callers can inline images (CID-embed) — the
+      // caregiver-photo flow relies on this: nodemailer renders the image
+      // inline when an <img src="cid:xxx"> in the HTML matches an
+      // attachment with `cid: 'xxx'`.
       mailOptions.attachments = attachments.map((att: any) => ({
         filename: att.filename,
         content: att.content,
         contentType: att.contentType || 'application/octet-stream',
+        ...(att.cid ? { cid: att.cid } : {}),
       }));
     }
 
@@ -1757,4 +1762,86 @@ export async function sendEmail(
     console.error('SMTP send error:', errorMessage);
     return { success: false, error: errorMessage };
   }
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// Caregiver-Foto als Inline-Attachment (CID-Embed)
+// ─────────────────────────────────────────────────────────────────────────
+// Hintergrund: Mamamia liefert das Caregiver-Foto als presigned S3-URL mit
+// 30 Min Gültigkeit. Beim Live-Versand reicht das meistens (Gmail/Outlook
+// cachen das Bild beim ersten Öffnen), aber: wenn der Empfänger die Mail
+// >30 Min ungeöffnet liegen lässt UND sein Mailclient kein Image-Proxy hat,
+// fehlt das Foto. Außerdem komplett kaputt im BCC-Resend-Flow.
+//
+// Fix: vor dem Versand das Bild von S3 fetchen, als nodemailer-Attachment
+// mit `cid:` einbetten, im HTML auf `cid:xxx` referenzieren. Bild liegt
+// dann physikalisch in der Mail — kein S3-Refresh mehr nötig.
+
+export async function fetchInlineCaregiverPhoto(
+  url: string | undefined | null,
+): Promise<{ filename: string; content: Buffer; contentType: string; cid: string } | null> {
+  if (!url) return null;
+  try {
+    const res = await fetch(url, { signal: AbortSignal.timeout(10000) });
+    if (!res.ok) {
+      console.warn(`fetchInlineCaregiverPhoto: HTTP ${res.status} for ${url.slice(0, 80)}…`);
+      return null;
+    }
+    const ct = (res.headers.get('content-type') || '').toLowerCase();
+    if (!ct.startsWith('image/')) {
+      console.warn(`fetchInlineCaregiverPhoto: non-image content-type "${ct}" for ${url.slice(0, 80)}…`);
+      return null;
+    }
+    const buf = Buffer.from(await res.arrayBuffer());
+    if (buf.length === 0 || buf.length > 5 * 1024 * 1024) {
+      // Schutz gegen 0-Byte oder absurd große Bilder.
+      console.warn(`fetchInlineCaregiverPhoto: skip — size ${buf.length}`);
+      return null;
+    }
+    const ext = ct.includes('png') ? 'png' : ct.includes('webp') ? 'webp' : 'jpg';
+    const cid = `caregiver-photo-${Math.random().toString(36).slice(2, 10)}@primundus.de`;
+    return {
+      filename: `caregiver.${ext}`,
+      content: buf,
+      contentType: ct,
+      cid,
+    };
+  } catch (e) {
+    console.warn('fetchInlineCaregiverPhoto error:', e instanceof Error ? e.message : String(e));
+    return null;
+  }
+}
+
+// High-Level-Wrapper für die drei Customer-Caregiver-Mails. Versucht, das
+// Foto inline einzubetten — fallback ohne Foto-Override (Template rendert
+// dann die alte S3-URL, was im Live-Flow <30 Min immer noch funktioniert).
+//
+// Trick: wir geben den Template-Buildern ein Caregiver-Objekt mit
+// photoUrl="cid:..." — die rendern dann <img src="cid:..."> ohne dass die
+// Builder selbst geändert werden müssen.
+export type CaregiverMailEvent =
+  | 'caregiver_interest_shown'
+  | 'application_received'
+  | 'application_accepted_internal';
+
+export async function buildCustomerCaregiverMailWithInlinePhoto(
+  event: CaregiverMailEvent,
+  lead: Lead,
+  caregiver: CaregiverDisplay,
+  portalUrl: string,
+): Promise<{ template: EmailTemplate; attachments?: any[] }> {
+  const inline = await fetchInlineCaregiverPhoto(caregiver.photoUrl);
+
+  const caregiverForTemplate: CaregiverDisplay = inline
+    ? { ...caregiver, photoUrl: `cid:${inline.cid}` }
+    : caregiver;
+
+  const template =
+    event === 'caregiver_interest_shown'      ? getCaregiverInterestEmailTemplate(lead, caregiverForTemplate, portalUrl)
+  : event === 'application_accepted_internal' ? getBookingConfirmedEmailTemplate(lead, caregiverForTemplate, portalUrl)
+  :                                             getApplicationReceivedEmailTemplate(lead, caregiverForTemplate, portalUrl);
+
+  return inline
+    ? { template, attachments: [inline] }
+    : { template };
 }

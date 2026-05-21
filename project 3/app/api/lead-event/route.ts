@@ -3,10 +3,9 @@ import { createClient } from '@supabase/supabase-js';
 import {
   sendEmail,
   getTeamNotificationTemplate,
-  getCaregiverInterestEmailTemplate,
-  getApplicationReceivedEmailTemplate,
-  getBookingConfirmedEmailTemplate,
+  buildCustomerCaregiverMailWithInlinePhoto,
   type CaregiverDisplay,
+  type CaregiverMailEvent,
 } from '@/lib/email';
 
 // Bridge endpoint: the CA-App portal reports customer milestones back to the
@@ -257,13 +256,20 @@ export async function POST(request: NextRequest) {
         console.warn(`lead-event ${event}: lead has no email — mail skipped (lead ${lead.id})`);
       } else {
         const portalUrl = buildPortalUrl(lead as any);
-        const customerTemplate =
-          event === 'caregiver_interest_shown'      ? getCaregiverInterestEmailTemplate(lead as any, caregiver, portalUrl)
-        : event === 'application_accepted_internal' ? getBookingConfirmedEmailTemplate(lead as any, caregiver, portalUrl)
-        :                                             getApplicationReceivedEmailTemplate(lead as any, caregiver, portalUrl);
-        sendEmail((lead as any).email, customerTemplate).catch((e) =>
-          console.error('customer mail send threw:', e instanceof Error ? e.message : String(e)),
-        );
+        // Foto inline einbetten (CID) — presigned S3-URLs laufen nach 30 Min
+        // ab, daher nicht zuverlässig direkt im HTML referenzierbar.
+        buildCustomerCaregiverMailWithInlinePhoto(
+          event as CaregiverMailEvent,
+          lead as any,
+          caregiver,
+          portalUrl,
+        )
+          .then(({ template, attachments }) =>
+            sendEmail((lead as any).email, template, attachments),
+          )
+          .catch((e) =>
+            console.error('customer mail send threw:', e instanceof Error ? e.message : String(e)),
+          );
       }
     }
 

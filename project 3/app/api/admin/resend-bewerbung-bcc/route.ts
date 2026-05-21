@@ -17,7 +17,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import {
   sendEmail,
-  getApplicationReceivedEmailTemplate,
+  buildCustomerCaregiverMailWithInlinePhoto,
   type CaregiverDisplay,
 } from '@/lib/email';
 
@@ -132,9 +132,16 @@ export async function POST(request: NextRequest) {
     }
 
     const portalUrl = buildPortalUrl(lead);
-    const template = getApplicationReceivedEmailTemplate(lead as any, caregiver, portalUrl);
+    // Foto inline (CID) — presigned S3-URLs sind beim Resend in der Regel
+    // schon abgelaufen, also IMMER inlinen.
+    const { template, attachments } = await buildCustomerCaregiverMailWithInlinePhoto(
+      'application_received',
+      lead as any,
+      caregiver,
+      portalUrl,
+    );
 
-    const r = await sendEmail(BCC_RECIPIENTS, template, undefined, { skipBcc: true });
+    const r = await sendEmail(BCC_RECIPIENTS, template, attachments, { skipBcc: true });
     results.push({
       event_id: event.id,
       lead_email: lead.email,
