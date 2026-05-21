@@ -16,6 +16,10 @@ on:
         description: "Edge function name to invoke (leer = skip)"
         type: string
         default: ""
+      run_query:
+        description: "Arbitrary SQL query to run via Management API (leer = skip)"
+        type: string
+        default: ""
 
 jobs:
   ops:
@@ -68,6 +72,25 @@ jobs:
 
           if [ "$HTTP_CODE" -ge 400 ]; then
             echo "::error::Migration failed with HTTP $HTTP_CODE"
+            exit 1
+          fi
+
+      - name: Run arbitrary SQL query
+        if: github.event.inputs.run_query != ''
+        run: |
+          echo "::group::Running query via Management API"
+          PAYLOAD=$(jq -n --arg q "${{ github.event.inputs.run_query }}" '{query: $q}')
+          HTTP_CODE=$(curl -sS -o /tmp/query-response.json -w "%{http_code}" \
+            -H "Authorization: Bearer $SUPABASE_ACCESS_TOKEN" \
+            -H "Content-Type: application/json" \
+            -X POST \
+            "https://api.supabase.com/v1/projects/$PROJECT_REF/database/query" \
+            -d "$PAYLOAD")
+          echo "HTTP $HTTP_CODE"
+          cat /tmp/query-response.json | jq . 2>/dev/null || cat /tmp/query-response.json
+          echo "::endgroup::"
+          if [ "$HTTP_CODE" -ge 400 ]; then
+            echo "::error::Query failed with HTTP $HTTP_CODE"
             exit 1
           fi
 
