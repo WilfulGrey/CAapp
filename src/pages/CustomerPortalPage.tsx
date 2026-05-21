@@ -44,6 +44,7 @@ import { AppCardDone } from '../components/portal/AppCardDone';
 import { MatchCardDone } from '../components/portal/MatchCardDone';
 import { MatchCard } from '../components/portal/MatchCard';
 import { InterestCard, type InterestActionStatus } from '../components/portal/InterestCard';
+import { ExpiredLinkScreen } from '../components/portal/ExpiredLinkScreen';
 import type { ContractFormData } from '../components/portal/AngebotPruefenModal';
 import { InfoPopup } from '../components/portal/InfoPopup';
 import { ContactPopup } from '../components/portal/ContactPopup';
@@ -187,11 +188,16 @@ const CustomerPortalPage: FC = () => {
   const [lead, setLead] = useState<Lead | null>(IS_PREVIEW_ANY ? PREVIEW_LEAD : null);
   const [leadLoading, setLeadLoading] = useState(!IS_PREVIEW_ANY);
   const [leadError, setLeadError] = useState<string | null>(null);
+  // Token the customer arrived with — exposed to ExpiredLinkScreen so its
+  // "Neuen Link senden" button can identify the lead. null when no ?token
+  // in the URL (different UX branch: no regen offered, just contact CTA).
+  const [tokenFromUrl, setTokenFromUrl] = useState<string | null>(null);
 
   useEffect(() => {
     if (IS_PREVIEW_ANY) return;
     const params = new URLSearchParams(window.location.search);
     const token = params.get('token');
+    setTokenFromUrl(token);
     if (!token) {
       // No token → nothing to show. No demo fallback (CLAUDE.md §1).
       setLeadError('Ihr persönlicher Link fehlt. Bitte öffnen Sie die E-Mail erneut und klicken Sie auf den Angebots-Link.');
@@ -1038,24 +1044,8 @@ const CustomerPortalPage: FC = () => {
   if (leadError) {
     return (
       <>
-      <div className="min-h-screen flex flex-col items-center justify-center px-6" style={{background:'linear-gradient(160deg,#F8F5F1 0%,#EFE8DE 100%)'}}>
-        <div className="text-center space-y-5 max-w-xs">
-          <div className="w-16 h-16 rounded-2xl flex items-center justify-center mx-auto" style={{background:'#E76F6320'}}>
-            <AlertCircle className="w-8 h-8" style={{color:'#E76F63'}} />
-          </div>
-          <div>
-            <p className="text-lg font-bold text-gray-900 mb-2">Link nicht mehr gültig</p>
-            <p className="text-sm text-gray-500 leading-relaxed">{leadError}</p>
-          </div>
-          <a href="tel:+4989200000830"
-             className="inline-flex items-center gap-2 text-sm font-bold text-white rounded-2xl px-6 py-3 shadow-sm"
-             style={{background:'#8B7355'}}>
-            <Phone className="w-4 h-4" /> 089 200 000 830
-          </a>
-          <p className="text-xs text-gray-400">Mo–So, 8:00–18:00 Uhr</p>
-        </div>
-      </div>
-      {debugOverlay}
+        <ExpiredLinkScreen token={tokenFromUrl} message={leadError} />
+        {debugOverlay}
       </>
     );
   }
