@@ -18,6 +18,7 @@ import nodemailer from "npm:nodemailer@6.9.10";
 import { Buffer } from "node:buffer";
 import {
   berlinDayRange,
+  fetchBookedCustomers,
   fetchDailyStats,
   fetchTotalLeads,
 } from "./queries.ts";
@@ -117,10 +118,11 @@ Deno.serve(async (req: Request) => {
     const yesterday = berlinDayRange(daysAgo);
     const dayBefore = berlinDayRange(daysAgo + 1);
 
-    const [yesterdayStats, dayBeforeStats, totalLeads] = await Promise.all([
+    const [yesterdayStats, dayBeforeStats, totalLeads, booked] = await Promise.all([
       fetchDailyStats(supabase, yesterday.start, yesterday.end),
       fetchDailyStats(supabase, dayBefore.start, dayBefore.end),
       fetchTotalLeads(supabase),
+      fetchBookedCustomers(supabase),
     ]);
 
     const smtp = await getSmtpConfig(supabase);
@@ -132,6 +134,8 @@ Deno.serve(async (req: Request) => {
       yesterdayLabel: yesterday.label,
       dayBeforeLabel: dayBefore.label,
       totalLeads,
+      bookedCustomers: booked.uniqueCustomers,
+      totalBookings: booked.totalBookings,
       siteUrl: smtp.siteUrl,
     });
 
@@ -150,6 +154,9 @@ Deno.serve(async (req: Request) => {
         date: yesterday.iso,
         recipients,
         stats: yesterdayStats,
+        totalLeads,
+        bookedCustomers: booked.uniqueCustomers,
+        totalBookings: booked.totalBookings,
       }),
       { status: 200, headers: { "Content-Type": "application/json" } },
     );
