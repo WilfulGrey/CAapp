@@ -4,6 +4,25 @@
 
 import { type SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2.57.4";
 
+// Test-Lead-Filter: gleicher Set wie das Live-Dashboard (/api/analytics/stats).
+// Wendet sich auf vorname / nachname / email an, damit interne QA-Submits
+// (z.B. m.kepinski+test...@mamamia.app, *example.com, *mailinator.com) nicht
+// die echten Conversion-Zahlen verfälschen.
+export function isRealLead(lead: { vorname?: string | null; nachname?: string | null; email?: string | null } | null | undefined): boolean {
+  if (!lead) return false;
+  const v = (lead.vorname ?? "").toLowerCase();
+  const n = (lead.nachname ?? "").toLowerCase();
+  const e = (lead.email ?? "").toLowerCase();
+  if (v.includes("test")) return false;
+  if (n.includes("test")) return false;
+  if (e.includes("test")) return false;
+  if (e.includes("mailinator")) return false;
+  if (e.includes("example.com")) return false;
+  if (e.includes("wyzzi")) return false;
+  if (e.includes("mamamia")) return false;
+  return true;
+}
+
 export interface DailyStats {
   visitors: number;            // Unique analytics_sessions
   wizardStarted: number;       // Sessions mit mind. einem step_view-Event
@@ -127,14 +146,17 @@ export async function fetchDailyStats(
   }
   const wizardStarted = startedSessions.size;
 
-  // 3) Wizard abgeschlossen = Leads angelegt im Zeitraum
-  const { count: leadsCount, error: lErr } = await supabase
+  // 3) Wizard abgeschlossen = Leads angelegt im Zeitraum.
+  // Test-Leads (m.kepinski+test*@mamamia.app, *example.com, etc.)
+  // werden über isRealLead() rausgefiltert, damit interne QA die
+  // echten Conversion-Zahlen nicht verfälscht.
+  const { data: leadsInPeriod, error: lErr } = await supabase
     .from("leads")
-    .select("id", { count: "exact", head: true })
+    .select("id, email, vorname, nachname")
     .gte("created_at", start)
     .lt("created_at", end);
   if (lErr) throw new Error(`leads: ${lErr.message}`);
-  const wizardCompleted = leadsCount ?? 0;
+  const wizardCompleted = (leadsInPeriod ?? []).filter(isRealLead).length;
 
   // 4) Lead-Events pro Typ
   const { data: leadEvents, error: leErr } = await supabase
@@ -177,15 +199,15 @@ export async function fetchDailyStats(
 }
 
 /**
- * Gesamtzahl Leads im System (lifetime). Konstante Referenz für Watershed-
- * Zahl im Report-Footer.
+ * Echte Leads im System (lifetime, ohne Test-Submits). Konstante Referenz
+ * für Watershed-Zahl im Report-Footer.
  */
 export async function fetchTotalLeads(supabase: SupabaseClient): Promise<number> {
-  const { count, error } = await supabase
+  const { data, error } = await supabase
     .from("leads")
-    .select("id", { count: "exact", head: true });
+    .select("email, vorname, nachname");
   if (error) throw new Error(`leads (total): ${error.message}`);
-  return count ?? 0;
+  return (data ?? []).filter(isRealLead).length;
 }
 
 /**
@@ -204,23 +226,43 @@ export async function fetchBookedCustomers(supabase: SupabaseClient): Promise<{
   uniqueCustomers: number;
   totalBookings: number;
 }> {
+  // Erst: alle Booking-Rows holen (lead_id)
+  let bookingLeadIds: string[] = [];
   const { data: accRows, error: accErr } = await supabase
     .from("lead_application_acceptances")
     .select("lead_id");
   if (!accErr && Array.isArray(accRows)) {
-    const unique = new Set(accRows.map((r: any) => r.lead_id));
-    return { uniqueCustomers: unique.size, totalBookings: accRows.length };
+    bookingLeadIds = accRows.map((r: any) => r.lead_id);
+  } else {
+    const { data: evRows, error: evErr } = await supabase
+      .from("lead_events")
+      .select("lead_id")
+      .eq("event_type", "application_accepted_internal");
+    if (evErr) {
+      console.error("fetchBookedCustomers fallback failed:", evErr.message);
+      return { uniqueCustomers: 0, totalBookings: 0 };
+    }
+    bookingLeadIds = (evRows ?? []).map((r: any) => r.lead_id);
   }
 
-  // Fallback — Tabelle existiert nicht oder Query failed.
-  const { data: evRows, error: evErr } = await supabase
-    .from("lead_events")
-    .select("lead_id")
-    .eq("event_type", "application_accepted_internal");
-  if (evErr) {
-    console.error("fetchBookedCustomers fallback failed:", evErr.message);
+  if (bookingLeadIds.length === 0) {
     return { uniqueCustomers: 0, totalBookings: 0 };
   }
-  const unique = new Set((evRows ?? []).map((r: any) => r.lead_id));
-  return { uniqueCustomers: unique.size, totalBookings: (evRows ?? []).length };
+
+  // Test-Leads ausfiltern: hole zugehörige Lead-Daten + isRealLead-Check.
+  const uniqueIds = [...new Set(bookingLeadIds)];
+  const { data: leadRows, error: lErr } = await supabase
+    .from("leads")
+    .select("id, email, vorname, nachname")
+    .in("id", uniqueIds);
+  if (lErr) {
+    console.error("fetchBookedCustomers leads fetch failed:", lErr.message);
+    // Fallback: ungefiltert zählen
+    return { uniqueCustomers: uniqueIds.length, totalBookings: bookingLeadIds.length };
+  }
+  const realLeadIds = new Set(
+    (leadRows ?? []).filter(isRealLead).map((l: any) => l.id),
+  );
+  const realBookings = bookingLeadIds.filter((id) => realLeadIds.has(id));
+  return { uniqueCustomers: realLeadIds.size, totalBookings: realBookings.length };
 }
