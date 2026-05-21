@@ -129,7 +129,7 @@ export async function POST(request: NextRequest) {
     const parsedNachname = nameParts.length > 1 ? nameParts[nameParts.length - 1] : '';
     const detectedAnrede = detectGenderFromName(parsedVorname) || undefined;
 
-    const { lead, isNew, isUpgrade } = await findOrCreateLead(
+    const { lead, isNew, isUpgrade, kalkulationChanged } = await findOrCreateLead(
       email,
       'angebot_requested',
       {
@@ -142,6 +142,32 @@ export async function POST(request: NextRequest) {
       }
     );
 
+    // Re-Submit-Dedupe: wenn der Kunde dasselbe Formular nochmal schickt UND
+    // die letzte Eingangsbestätigung <24h alt ist, schlucken wir die zweite
+    // Mail komplett (kein Customer-Mail, kein Team-Mail). Bei Änderungen am
+    // Formular ODER >24h Abstand geht die Mail raus — send-scheduled-emails
+    // erkennt dann anhand der lead_events, dass es ein Re-Submit ist, und
+    // wählt automatisch den "Ihr aktualisiertes Angebot"-Wording-Zweig.
+    let shouldSendMails = true;
+    if (!isNew && !isUpgrade && !kalkulationChanged) {
+      const cutoff = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+      const { data: recentSent } = await supabase
+        .from('lead_events')
+        .select('id')
+        .eq('lead_id', lead.id)
+        .eq('event_type', 'email_eingangsbestaetigung_sent')
+        .gte('created_at', cutoff)
+        .limit(1);
+      if (Array.isArray(recentSent) && recentSent.length > 0) {
+        shouldSendMails = false;
+        await logEvent(lead.id, 'eingangsbestaetigung_skipped_identical_resubmit', {
+          to: email,
+          reason: 'identical formularDaten + last sent <24h ago',
+        });
+        console.log(`angebot-anfordern: identischer Re-Submit innerhalb 24h für ${email} — Mails geskipped.`);
+      }
+    }
+
     // Fire-and-forget all email/scheduling side-effects — the customer's
     // hand-off into CA app should NOT wait on Ionos SMTP. The Eingangs-
     // bestätigung used to be a direct sendEmail() call here, but Render →
@@ -151,33 +177,37 @@ export async function POST(request: NextRequest) {
     // pg_cron tick). Render Web Services don't tear down on response, so
     // the orphan promises continue running until the runtime decides
     // they're done.
-    scheduleEmail(lead.id, email, 'eingangsbestaetigung', 0)
-      .then(async (r) => {
-        if (r.success) {
-          await logEvent(lead.id, 'email_eingangsbestaetigung_scheduled', { to: email, token: lead.token });
-          flushScheduledEmails();
-        } else {
-          console.error('Eingangsbestaetigung schedule fehlgeschlagen:', r.error);
-          await logEvent(lead.id, 'email_eingangsbestaetigung_schedule_failed', { to: email, error: r.error });
-        }
-      })
-      .catch((e) => console.error('schedule eingangs threw:', e instanceof Error ? e.message : String(e)));
+    if (shouldSendMails) {
+      scheduleEmail(lead.id, email, 'eingangsbestaetigung', 0)
+        .then(async (r) => {
+          if (r.success) {
+            await logEvent(lead.id, 'email_eingangsbestaetigung_scheduled', { to: email, token: lead.token });
+            flushScheduledEmails();
+          } else {
+            console.error('Eingangsbestaetigung schedule fehlgeschlagen:', r.error);
+            await logEvent(lead.id, 'email_eingangsbestaetigung_schedule_failed', { to: email, error: r.error });
+          }
+        })
+        .catch((e) => console.error('schedule eingangs threw:', e instanceof Error ? e.message : String(e)));
+    }
 
     // Separate Angebots-Mail (delay 15) entfällt — Eingangsbestätigung ist
     // jetzt die gemergte Mail 1 (Empfangsbestätigung + Angebot + Preis +
     // Portal-CTA, delay 0). Die Nachfass-Kette wird in der Edge Function
     // nach Versand der Eingangsbestätigung gestartet.
 
-    const teamEmail = getTeamNotificationTemplate(lead, 'angebot_requested');
-    sendEmail('info@primundus.de', teamEmail)
-      .then(async (r) => {
-        if (r.success) {
-          await logEvent(lead.id, 'team_notified', { status: 'angebot_requested' });
-        } else {
-          console.error('Team-Benachrichtigung fehlgeschlagen:', r.error);
-        }
-      })
-      .catch((e) => console.error('team send threw:', e instanceof Error ? e.message : String(e)));
+    if (shouldSendMails) {
+      const teamEmail = getTeamNotificationTemplate(lead, 'angebot_requested');
+      sendEmail('info@primundus.de', teamEmail)
+        .then(async (r) => {
+          if (r.success) {
+            await logEvent(lead.id, 'team_notified', { status: 'angebot_requested' });
+          } else {
+            console.error('Team-Benachrichtigung fehlgeschlagen:', r.error);
+          }
+        })
+        .catch((e) => console.error('team send threw:', e instanceof Error ? e.message : String(e)));
+    }
 
     // Response contract — used by the result page to drive the seamless
     // hand-off into the CA app (kundenportal). `token` is the persistent
