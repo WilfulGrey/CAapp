@@ -46,7 +46,7 @@ export function buildReportEmail(opts: {
   const rows: Array<{ label: string; today: number | string; yest: number | string; deltaStr?: string }> = [
     { label: "Besucher (unique Sessions)",      today: yesterday.visitors,           yest: dayBefore.visitors,           deltaStr: delta(yesterday.visitors, dayBefore.visitors) },
     { label: "Wizard gestartet",                 today: yesterday.wizardStarted,      yest: dayBefore.wizardStarted,      deltaStr: delta(yesterday.wizardStarted, dayBefore.wizardStarted) },
-    { label: "Wizard abgeschlossen (neue Leads)",today: yesterday.wizardCompleted,    yest: dayBefore.wizardCompleted,    deltaStr: delta(yesterday.wizardCompleted, dayBefore.wizardCompleted) },
+    { label: "Wizard abgeschlossen (echte Leads, ohne Tests)",today: yesterday.wizardCompleted,    yest: dayBefore.wizardCompleted,    deltaStr: delta(yesterday.wizardCompleted, dayBefore.wizardCompleted) },
     { label: "Conversion-Rate (Lead/Besucher)", today: pct(yesterday.wizardCompleted, yesterday.visitors), yest: pct(dayBefore.wizardCompleted, dayBefore.visitors) },
     { label: "Patientenprofil ausgefüllt",       today: yesterday.patientDataSaved,   yest: dayBefore.patientDataSaved,   deltaStr: delta(yesterday.patientDataSaved, dayBefore.patientDataSaved) },
     { label: "Pflegekräfte eingeladen",          today: yesterday.caregiverInvited,   yest: dayBefore.caregiverInvited,   deltaStr: delta(yesterday.caregiverInvited, dayBefore.caregiverInvited) },
@@ -151,7 +151,7 @@ export function buildReportEmail(opts: {
         </table>
 
         <div style="margin-top:24px;padding:14px 16px;background:#FAF7F0;border-left:3px solid #B5A184;border-radius:0 6px 6px 0;font-size:13px;color:#5C4A32;line-height:1.8;">
-          <strong>📊 Gesamtzahl Leads im System (lifetime):</strong> ${totalLeads}<br>
+          <strong>📊 Echte Leads im System (lifetime, ohne Tests):</strong> ${totalLeads}<br>
           <strong>🎉 Gebuchte Kunden (lifetime, distinct):</strong> ${bookedCustomers} <span style="color:#9a8a73;font-weight:400;">(${totalBookings} Buchungs-Vorgänge total)</span>
         </div>
       </div>
