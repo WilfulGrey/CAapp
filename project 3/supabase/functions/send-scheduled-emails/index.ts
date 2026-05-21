@@ -511,7 +511,23 @@ function buildEingangsGreeting(lead: Lead): string {
   return "Guten Tag";
 }
 
-function buildEingangsbestaetigungHtml(lead: Lead, siteUrl: string, portalBase: string): string {
+// Re-Submit-Erkennung: wenn der Kunde das Wizard-Formular ein zweites Mal
+// abschickt, bekommt er die "Eingangsbestätigung" nochmal — angebot-anfordern
+// hat keinen Dedupe-Check und schedult immer. Statt die zweite Mail zu
+// unterdrücken (würde Kunden verwirren falls sie wirklich was geändert haben),
+// passen wir Subject + Intro an, damit er versteht: "Sie haben uns das nochmal
+// geschickt, hier Ihre aktualisierten Angaben".
+async function hasPreviousEingangsbestaetigungSent(supabase: any, leadId: string): Promise<boolean> {
+  const { data } = await supabase
+    .from("lead_events")
+    .select("event_type")
+    .eq("lead_id", leadId)
+    .eq("event_type", "email_eingangsbestaetigung_sent")
+    .limit(1);
+  return Array.isArray(data) && data.length > 0;
+}
+
+function buildEingangsbestaetigungHtml(lead: Lead, siteUrl: string, portalBase: string, isResubmit: boolean = false): string {
   const greeting = buildEingangsGreeting(lead);
   const fd = (lead.kalkulation as any)?.formularDaten || {};
   const careStartTiming = (lead as any).care_start_timing || "";
@@ -595,9 +611,13 @@ function buildEingangsbestaetigungHtml(lead: Lead, siteUrl: string, portalBase: 
       </div>
     </div>` : "";
 
+  const introParagraph = isResubmit
+    ? `vielen Dank für Ihre erneute Anfrage. Wir haben Ihre aktualisierten Angaben übernommen und Ihr <strong style="color:#2D1F0F;">persönliches Angebot</strong> entsprechend angepasst – inklusive passender Pflegekräfte, die wir für Sie ausgewählt haben.`
+    : `vielen Dank für Ihre Anfrage. Auf Grundlage Ihrer Angaben haben wir Ihr <strong style="color:#2D1F0F;">persönliches Angebot</strong> für die 24-Stunden-Betreuung zu Hause erstellt – inklusive passender Pflegekräfte, die wir bereits für Sie ausgewählt haben.`;
+
   const content = `
     <p style="font-size:15px;line-height:1.75;color:#444;margin-bottom:14px;">${greeting},</p>
-    <p style="font-size:15px;line-height:1.75;color:#444;margin-bottom:14px;">vielen Dank für Ihre Anfrage. Auf Grundlage Ihrer Angaben haben wir Ihr <strong style="color:#2D1F0F;">persönliches Angebot</strong> für die 24-Stunden-Betreuung zu Hause erstellt – inklusive passender Pflegekräfte, die wir bereits für Sie ausgewählt haben.</p>
+    <p style="font-size:15px;line-height:1.75;color:#444;margin-bottom:14px;">${introParagraph}</p>
 
     ${priceBox}
 
@@ -631,7 +651,7 @@ function buildEingangsbestaetigungHtml(lead: Lead, siteUrl: string, portalBase: 
   return buildEmailWrapper(lead, siteUrl, content);
 }
 
-function buildEingangsbestaetigungText(lead: Lead, portalBase: string): string {
+function buildEingangsbestaetigungText(lead: Lead, portalBase: string, isResubmit: boolean = false): string {
   const greeting = buildEingangsGreeting(lead);
   const fd = (lead.kalkulation as any)?.formularDaten || {};
   const careStartTiming = (lead as any).care_start_timing || "";
@@ -659,11 +679,19 @@ Angebot und Pflegekräfte anzeigen: ${portalUrl}
 
 ` : "";
 
-  return `Ihr persönliches Angebot zur 24-Stunden-Betreuung – Primundus
+  const headerLine = isResubmit
+    ? "Ihr aktualisiertes Angebot zur 24-Stunden-Betreuung – Primundus"
+    : "Ihr persönliches Angebot zur 24-Stunden-Betreuung – Primundus";
+
+  const introPlain = isResubmit
+    ? "vielen Dank für Ihre erneute Anfrage. Wir haben Ihre aktualisierten Angaben übernommen und Ihr persönliches Angebot entsprechend angepasst – inklusive passender Pflegekräfte, die wir für Sie ausgewählt haben."
+    : "vielen Dank für Ihre Anfrage. Auf Grundlage Ihrer Angaben haben wir Ihr persönliches Angebot für die 24-Stunden-Betreuung zu Hause erstellt – inklusive passender Pflegekräfte, die wir bereits für Sie ausgewählt haben.";
+
+  return `${headerLine}
 
 ${greeting},
 
-vielen Dank für Ihre Anfrage. Auf Grundlage Ihrer Angaben haben wir Ihr persönliches Angebot für die 24-Stunden-Betreuung zu Hause erstellt – inklusive passender Pflegekräfte, die wir bereits für Sie ausgewählt haben.
+${introPlain}
 
 ${priceLine}✓ Keine Vertragsbindung · ✓ Tagesgenaue Abrechnung · ✓ Kosten erst bei Anreise
 
@@ -922,9 +950,14 @@ Deno.serve(async (req: Request) => {
           eventTypeFailed = "email_angebot_failed";
         } else if (scheduledEmail.email_type === "eingangsbestaetigung") {
           // Gemergte Mail 1: Empfangsbest\u00e4tigung + Angebot in einem.
-          subject = "Ihr pers\u00f6nliches Angebot zur 24-Stunden-Betreuung";
-          html = buildEingangsbestaetigungHtml(lead as Lead, smtpConfig.siteUrl, portalBase);
-          text = buildEingangsbestaetigungText(lead as Lead, portalBase);
+          // Re-Submit-Check: hat der Kunde schon mal eine Eingangsbest\u00e4tigung
+          // bekommen? Falls ja \u2192 angepasste Wording-Variante.
+          const isResubmit = await hasPreviousEingangsbestaetigungSent(supabase, scheduledEmail.lead_id);
+          subject = isResubmit
+            ? "Ihr aktualisiertes Angebot zur 24-Stunden-Betreuung"
+            : "Ihr pers\u00f6nliches Angebot zur 24-Stunden-Betreuung";
+          html = buildEingangsbestaetigungHtml(lead as Lead, smtpConfig.siteUrl, portalBase, isResubmit);
+          text = buildEingangsbestaetigungText(lead as Lead, portalBase, isResubmit);
           eventTypeSent = "email_eingangsbestaetigung_sent";
           eventTypeFailed = "email_eingangsbestaetigung_failed";
         } else if (scheduledEmail.email_type === "nachfass_1") {
