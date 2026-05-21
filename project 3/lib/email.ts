@@ -1703,7 +1703,8 @@ export function getBookingConfirmedEmailTemplate(
 export async function sendEmail(
   to: string | string[],
   template: EmailTemplate,
-  attachments?: any[]
+  attachments?: any[],
+  options?: { skipBcc?: boolean }
 ): Promise<{ success: boolean; error?: string }> {
   try {
     const nodemailer = await import('nodemailer');
@@ -1723,8 +1724,10 @@ export async function sendEmail(
     // Optional BCC for ops visibility — every outgoing customer mail
     // copies to info@primundus.de + info@mamamia.app by default. Disable by
     // setting SMTP_BCC=  (empty) on the deploy. Comma-separated for multiple.
+    // Callers can opt out per-call via options.skipBcc (e.g. when the `to`
+    // already IS the ops audience, like the admin resend-to-BCC endpoint).
     const bccRaw = process.env.SMTP_BCC ?? 'info@primundus.de,info@mamamia.app';
-    const bccAddr = bccRaw.trim();
+    const bccAddr = options?.skipBcc ? '' : bccRaw.trim();
 
     const mailOptions: any = {
       from: `"${process.env.SMTP_FROM_NAME || 'Primundus 24h-Pflege'}" <${process.env.SMTP_FROM || process.env.SMTP_USER}>`,
