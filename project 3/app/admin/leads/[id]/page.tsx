@@ -35,6 +35,15 @@ export default function LeadDetailPage() {
   // flips to true for 2s then back so the icon/label shows "Kopiert".
   const [tokenCopied, setTokenCopied] = useState(false);
   const [urlCopied, setUrlCopied] = useState(false);
+  // Token rotation UI state. After a successful POST we surface a small
+  // confirmation chip + refetch the lead so the rotated token, expiry, and
+  // token_used flag all reflect the new state.
+  const [isRotating, setIsRotating] = useState(false);
+  const [rotateStatus, setRotateStatus] = useState<
+    | { kind: 'idle' }
+    | { kind: 'success'; sentEmail: boolean }
+    | { kind: 'error'; message: string }
+  >({ kind: 'idle' });
 
   useEffect(() => {
     loadLeadDetails();
@@ -270,6 +279,41 @@ export default function LeadDetailPage() {
       alert(`Fehler: ${error instanceof Error ? error.message : 'Unbekannter Fehler'}`);
     } finally {
       setIsSaving(false);
+    }
+  };
+
+  // Token rotation. 'admin-silent' rotates without sending an email — admin
+  // hands off the new URL via their own channel (DM, phone call). 'admin-
+  // with-email' rotates AND sends the standard regen email to lead.email.
+  // After success we refetch the lead so the rotated token/expiry/used flag
+  // render immediately in the Vertrags-Token section.
+  const handleRotateToken = async (source: 'admin-silent' | 'admin-with-email') => {
+    if (!lead?.id || isRotating) return;
+    setIsRotating(true);
+    setRotateStatus({ kind: 'idle' });
+    try {
+      const res = await fetch('/api/lead-regenerate-token', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ lead_id: lead.id, source }),
+      });
+      if (!res.ok) {
+        const errBody = await res.json().catch(() => ({}));
+        setRotateStatus({
+          kind: 'error',
+          message: (errBody as { error?: string })?.error ?? `HTTP ${res.status}`,
+        });
+        return;
+      }
+      setRotateStatus({ kind: 'success', sentEmail: source === 'admin-with-email' });
+      await loadLeadDetails();
+    } catch (err) {
+      setRotateStatus({
+        kind: 'error',
+        message: err instanceof Error ? err.message : 'unknown',
+      });
+    } finally {
+      setIsRotating(false);
     }
   };
 
@@ -1246,6 +1290,43 @@ export default function LeadDetailPage() {
                         ⚠ Token abgelaufen ({new Date(lead.token_expires_at).toLocaleDateString('de-DE')}) — der Kunde kann den Link nicht mehr nutzen.
                       </p>
                     )}
+                    {/* Token rotation buttons — admin can force a fresh
+                        token (extends expiry +14 days, marks token_used=false).
+                        Silent variant skips the customer e-mail. */}
+                    <div className="flex flex-col gap-2 pt-2 border-t border-gray-100">
+                      <p className="text-xs text-gray-500">Token erneuern</p>
+                      <div className="flex flex-col sm:flex-row gap-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          disabled={isRotating}
+                          onClick={() => handleRotateToken('admin-silent')}
+                          className="flex items-center gap-1.5"
+                        >
+                          <RefreshCw className={`w-3.5 h-3.5 ${isRotating ? 'animate-spin' : ''}`} />
+                          Nur rotieren (ohne Mail)
+                        </Button>
+                        <Button
+                          size="sm"
+                          disabled={isRotating}
+                          onClick={() => handleRotateToken('admin-with-email')}
+                          className="flex items-center gap-1.5 bg-[#5C4A32] hover:bg-[#4A3B26]"
+                        >
+                          <Mail className="w-3.5 h-3.5" />
+                          Rotieren + Mail an Kunden
+                        </Button>
+                      </div>
+                      {rotateStatus.kind === 'success' && (
+                        <p className="text-xs text-green-600 font-semibold">
+                          ✓ Neuer Token aktiv{rotateStatus.sentEmail && ' — E-Mail an Kunden versendet'}
+                        </p>
+                      )}
+                      {rotateStatus.kind === 'error' && (
+                        <p className="text-xs text-red-600 font-semibold">
+                          ✗ Rotation fehlgeschlagen ({rotateStatus.message})
+                        </p>
+                      )}
+                    </div>
                   </div>
                 );
               })()}
