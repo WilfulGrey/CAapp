@@ -1696,6 +1696,110 @@ export function getBookingConfirmedEmailTemplate(
   });
 }
 
+// ─── Token regeneration — magic-link expired → send a new one ─────────────
+// Triggered by /api/lead-regenerate-token when the customer clicks
+// "Neuen Link senden" in the portal, or when admin uses the
+// "Token rotieren + Mail an Kunden" button. Same look-and-feel as the
+// Eingangsbestätigung but stripped down to a single CTA — the customer
+// just needs the new link.
+export function getTokenRegenerationEmailTemplate(
+  lead: Lead,
+  portalUrl: string,
+): EmailTemplate {
+  const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://primundus.de';
+  const greeting = customerGreeting(lead);
+
+  const ilkaSignatur = `
+    <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="margin: 0 0 32px 0; border: 1px solid #e8ddd0; border-radius: 12px; overflow: hidden;">
+      <tr>
+        <td style="padding: 18px 20px 16px; background: #ffffff;">
+          <table width="100%" cellpadding="0" cellspacing="0" role="presentation">
+            <tr>
+              <td style="vertical-align: top;">
+                <table cellpadding="0" cellspacing="0" role="presentation">
+                  <tr>
+                    <td style="padding-right: 12px; vertical-align: top;">
+                      <img src="${baseUrl}/images/ilka-wysocki_pm-mallorca.webp" alt="Ilka Wysocki" width="60" style="display: block; width: 60px; height: auto; border-radius: 8px;" />
+                    </td>
+                    <td style="vertical-align: middle;">
+                      <p style="margin: 0 0 2px 0; font-size: 15px; font-weight: 700; color: #3D2B1F; white-space: nowrap; text-align: left;">Ilka Wysocki</p>
+                      <p style="margin: 0 0 2px 0; font-size: 13px; color: #555; white-space: nowrap; text-align: left;">Pflegeberaterin</p>
+                      <p style="margin: 0; font-size: 12px; color: #9a8a73; white-space: nowrap; text-align: left;">Mo – So, 8 – 20 Uhr</p>
+                    </td>
+                  </tr>
+                </table>
+                <table cellpadding="0" cellspacing="0" role="presentation" style="margin-top: 12px;">
+                  <tr>
+                    <td style="padding-bottom: 6px;">
+                      <a href="tel:+4989200000830" style="display: inline-block; background-color: #f0ebe4; border-radius: 20px; padding: 8px 16px; text-decoration: none; font-size: 13px; font-weight: 500; color: #3D2B1F; white-space: nowrap;">&#9990; 089 200 000 830</a>
+                    </td>
+                  </tr>
+                  <tr>
+                    <td>
+                      <a href="https://wa.me/4989200000830" style="display: inline-block; background-color: #25D366; border-radius: 20px; padding: 8px 16px; text-decoration: none; font-size: 13px; font-weight: 600; color: #ffffff; white-space: nowrap;">WhatsApp schreiben</a>
+                    </td>
+                  </tr>
+                </table>
+              </td>
+            </tr>
+          </table>
+        </td>
+      </tr>
+    </table>`;
+
+  const content = `
+    <p style="font-size: 17px; font-weight: 700; color: #3D2B1F; margin: 0 0 16px 0; line-height: 1.5;">${greeting},</p>
+    <p style="font-size: 16px; line-height: 1.7; color: #555; margin: 0 0 20px 0;">Ihr vorheriger Zugangslink zum Kundenportal ist abgelaufen oder wurde ungültig. Wir haben Ihnen einen neuen, frischen Link erstellt — Sie können einfach hier weitermachen, wo Sie aufgehört haben.</p>
+
+    <div style="background: linear-gradient(135deg, #2D5C2F 0%, #1F4421 100%); border-radius: 10px; padding: 28px; margin: 0 0 28px 0; text-align: center; color: #ffffff;">
+      <h3 style="color: #ffffff; font-size: 18px; font-weight: 700; margin: 0 0 8px 0;">Ihr neuer Portal-Link</h3>
+      <p style="color: #E8F5E9; font-size: 14px; line-height: 1.6; margin: 0 0 18px 0;">Im Portal sehen Sie passende Pflegekräfte, eingegangene Bewerbungen und können Ihre Patientenangaben jederzeit aktualisieren.</p>
+      <a href="${portalUrl}" style="display: inline-block; background: #ffffff; color: #2D5C2F; padding: 14px 28px; border-radius: 8px; text-decoration: none; font-weight: 700; font-size: 15px;">Zum Kundenportal →</a>
+    </div>
+
+    <p style="font-size: 13px; color: #888; line-height: 1.7; margin: 0 0 24px 0;">Aus Sicherheitsgründen ist auch dieser Link 14 Tage gültig. Falls Sie diese E-Mail nicht angefordert haben, können Sie sie ignorieren — der alte Link bleibt deaktiviert.</p>
+
+    <p style="font-size: 16px; line-height: 1.7; color: #555; margin: 0 0 20px 0;">Bei Fragen melden Sie sich gerne — wir sind 7 Tage die Woche für Sie da.</p>
+
+    <p style="font-size: 16px; line-height: 1.7; color: #555; margin-bottom: 20px; text-align: left;">Mit freundlichen Grüßen<br><strong style="color: #3D2B1F;">Ilka Wysocki</strong></p>
+
+    ${ilkaSignatur}
+  `;
+
+  const preheader = 'Ihr neuer Zugangslink zum Primundus-Kundenportal';
+  const html = getEmailLayout({ content, preheader, siteUrl: baseUrl }).replace('{{EMAIL}}', lead.email);
+
+  return {
+    subject: 'Ihr neuer Zugangslink zum Kundenportal – Primundus',
+    html,
+    text: `
+Ihr neuer Zugangslink zum Kundenportal – Primundus
+
+${greeting},
+
+Ihr vorheriger Zugangslink ist abgelaufen oder wurde ungültig. Wir haben Ihnen einen neuen, frischen Link erstellt — Sie können einfach hier weitermachen, wo Sie aufgehört haben.
+
+IHR NEUER PORTAL-LINK
+${portalUrl}
+
+Aus Sicherheitsgründen ist auch dieser Link 14 Tage gültig. Falls Sie diese E-Mail nicht angefordert haben, können Sie sie ignorieren — der alte Link bleibt deaktiviert.
+
+Bei Fragen melden Sie sich gerne — wir sind 7 Tage die Woche für Sie da.
+
+Mit freundlichen Grüßen
+Ilka Wysocki
+Pflegeberaterin · Mo – So, 8 – 20 Uhr
++49 89 200 000 830
+WhatsApp: https://wa.me/4989200000830
+
+---
+Primundus Deutschland | 24h-Pflege und Betreuung
+Telefon: +49 89 200 000 830 | E-Mail: info@primundus.de
+www.primundus.de
+    `,
+  };
+}
+
 // Email transport — kept on nodemailer/Ionos SMTP per user decision.
 // Signature accepts string | string[] so multi-recipient callers from
 // the cherry-picked content layer (e.g. Vertrag template) keep working;
