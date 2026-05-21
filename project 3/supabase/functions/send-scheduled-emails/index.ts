@@ -1149,7 +1149,7 @@ Deno.serve(async (req: Request) => {
           await supabase.from("lead_events").insert({
             lead_id: scheduledEmail.lead_id,
             event_type: `email_${scheduledEmail.email_type}_cancelled`,
-            data: {
+            metadata: {
               reason: milestone === "caregiver_invited"
                 ? "caregiver_invited"
                 : isNichtInteressiert ? "nicht_interessiert" : "betreuung_beauftragt",
@@ -1323,7 +1323,7 @@ Deno.serve(async (req: Request) => {
           await supabase.from("lead_events").insert({
             lead_id: scheduledEmail.lead_id,
             event_type: eventTypeSent,
-            data: { to: scheduledEmail.recipient_email, triggered_by: "scheduled_email" },
+            metadata: { to: scheduledEmail.recipient_email, triggered_by: "scheduled_email" },
           });
  
           // Nachfass-Kette: startet jetzt nach der (gemergten) Eingangsbestätigung.
@@ -1348,7 +1348,7 @@ Deno.serve(async (req: Request) => {
           await supabase.from("lead_events").insert({
             lead_id: scheduledEmail.lead_id,
             event_type: eventTypeFailed,
-            data: { to: scheduledEmail.recipient_email, error: emailResult.error, triggered_by: "scheduled_email" },
+            metadata: { to: scheduledEmail.recipient_email, error: emailResult.error, triggered_by: "scheduled_email" },
           });
  
           results.push({ id: scheduledEmail.id, success: false, error: emailResult.error });
