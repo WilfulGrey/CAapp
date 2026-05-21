@@ -393,8 +393,8 @@ function buildNachfass1Html(lead: Lead, siteUrl: string, portalBase: string, mil
     <p style="font-size:15px;line-height:1.75;color:#444;margin-bottom:14px;">${v.intro}</p>
     <p style="font-size:15px;line-height:1.75;color:#444;margin-bottom:14px;">${v.body}</p>
 
-    ${buildIlkaSig(siteUrl)}
-    ${nachfassCtaButton(portalUrl, v.cta)}`;
+    ${nachfassCtaButton(portalUrl, v.cta)}
+    ${buildIlkaSig(siteUrl)}`;
 
   return buildEmailWrapper(lead, siteUrl, content);
 }
@@ -410,10 +410,10 @@ ${plain(v.intro)}
 
 ${plain(v.body)}
 
+${v.cta.replace(/ →$/, "")}: ${portalUrl}
+
 Mit freundlichen Grüßen
 Ilka Wysocki
-
-${v.cta.replace(/ →$/, "")}: ${portalUrl}
 
 ---
 ✓ Keine Vertragsbindung · ✓ Tagesgenaue Abrechnung · ✓ Kosten erst bei Anreise
@@ -448,8 +448,8 @@ function buildNachfass2Html(lead: Lead, siteUrl: string, portalBase: string, mil
 
     <p style="font-size:15px;line-height:1.75;color:#444;margin-bottom:14px;">Melden Sie sich einfach, wenn Sie Fragen haben oder wenn wir loslegen sollen.</p>
 
-    ${buildIlkaSig(siteUrl)}
-    ${nachfassCtaButton(portalUrl, v.cta)}`;
+    ${nachfassCtaButton(portalUrl, v.cta)}
+    ${buildIlkaSig(siteUrl)}`;
 
   return buildEmailWrapper(lead, siteUrl, content);
 }
@@ -475,10 +475,10 @@ ${plain(v.body)}
 
 Melden Sie sich einfach, wenn Sie Fragen haben oder wenn wir loslegen sollen.
 
+${v.cta.replace(/ →$/, "")}: ${portalUrl}
+
 Mit freundlichen Grüßen
 Ilka Wysocki
-
-${v.cta.replace(/ →$/, "")}: ${portalUrl}
 
 ---
 Primundus Deutschland | +49 89 200 000 830 | www.primundus.de`;
