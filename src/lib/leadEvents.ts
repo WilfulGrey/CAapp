@@ -18,10 +18,15 @@ export type LeadEvent =
   | 'application_rejected';  // customer Bewerbung abgelehnt
 
 export interface LeadEventMetadata {
-  // caregiver_invited: which caregiver was invited (id + name shown in the
-  // team mail). Optional — older callers without these fields still work.
+  // caregiver_invited / caregiver_declined / application_rejected:
+  // which caregiver (id + display name). Optional — older callers without
+  // these fields still work.
   caregiver_id?: number | string;
   caregiver_name?: string;
+  // application_rejected: Mamamia-Application-ID + optional Begründung des
+  // Kunden — landet im lead_event-metadata für Audit.
+  application_id?: string | number;
+  reject_message?: string;
   // patient_data_saved: customer's current phone number from the form so
   // the kostenrechner endpoint can refresh leads.telefon (kept in sync with
   // Mamamia Customer.phone after a step-4 edit). Optional.
