@@ -7,6 +7,7 @@ import { format, addDays } from 'date-fns';
 import { Download, Loader as Loader2, Phone, ArrowRight, Shield, Clock, FileText, CircleCheck as CheckCircle2, Bed, Utensils, Chrome as Home, Handshake, Users, Award } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import Image from 'next/image';
+import { identifyClarity } from '@/lib/clarity';
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -31,6 +32,15 @@ export default function KalkulationPage() {
     }
     loadData();
   }, [params.leadId]);
+
+  // Stitch this kostenrechner session to the upcoming kundenportal session
+  // in Clarity. Lead token is the shared identifier between both sites
+  // (already used for the magic-link portal handoff). Idempotent — fires
+  // once per token, retries until the GTM-loaded Clarity tag is ready.
+  useEffect(() => {
+    const t = (lead as { token?: string | null } | null)?.token;
+    if (t) identifyClarity(t);
+  }, [lead]);
 
   if (loading) {
     return (
@@ -97,6 +107,11 @@ export default function KalkulationPage() {
       alert('Der Portal-Link ist gerade nicht verfügbar. Bitte kontaktieren Sie uns telefonisch unter +49 89 200 000 830.');
       return;
     }
+    // Defensive: identifyClarity is already fired in useEffect above, but
+    // on cold mounts or fast clicks the tag might not have been ready yet.
+    // Re-firing right before navigation gives us a second window to land
+    // the userId on this session before it ends.
+    identifyClarity(token);
     const portalUrl = `${portalBase.replace(/\/$/, '')}/?token=${encodeURIComponent(token)}`;
     window.location.assign(portalUrl);
   };

@@ -15,6 +15,7 @@ import { rankComparator } from '../lib/mamamia/matchingsRanking';
 import { prefetchCaregivers } from '../lib/mamamia/caregiverCache';
 import { scheduleAiAbouts, getAiAbout, subscribeAiAbout } from '../lib/mamamia/aiAboutCache';
 import { reportLeadEvent, KOSTENRECHNER_URL } from '../lib/leadEvents';
+import { identifyClarity } from '../lib/clarity';
 import {
   useRejectApplication,
   useStoreConfirmation,
@@ -205,6 +206,11 @@ const CustomerPortalPage: FC = () => {
         // Report back to the kostenrechner lead so the Nachfass emails know
         // the customer reached the portal. Fire-and-forget.
         reportLeadEvent(l.token, 'portal_opened');
+        // Stitch this portal session to the customer's earlier
+        // kostenrechner session in Clarity. The kalkulation page does the
+        // matching identify on its side. Idempotent + retries until the
+        // GTM-loaded Clarity tag is ready.
+        identifyClarity(l.token);
       }
       setLeadLoading(false);
     });
