@@ -1387,6 +1387,21 @@ export async function sendConfirmationEmail(data: {
 // `application_received` (siehe app/api/lead-event/route.ts).
 // ─────────────────────────────────────────────────────────────────────────
 
+// Bulletproof CTA-Button — Outlook-Safe (Word-Renderer). Schlüssel-Tricks:
+//   - <table align="center"> statt <div text-align:center>
+//   - bgcolor-HTML-Attribut + CSS-Fallback auf <td>
+//   - Padding auf <td>, NICHT auf <a> (Outlook ignoriert Padding auf inline-Elementen)
+function bulletproofButton(url: string, label: string, bgColor: string = '#2A9D5C'): string {
+  return `
+    <table role="presentation" cellpadding="0" cellspacing="0" border="0" align="center" style="margin:8px auto;border-collapse:separate;">
+      <tr>
+        <td align="center" bgcolor="${bgColor}" style="background-color:${bgColor};border-radius:8px;padding:13px 34px;">
+          <a href="${url}" target="_blank" style="color:#ffffff;text-decoration:none;font-weight:600;font-size:15px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;line-height:1.4;">${label}</a>
+        </td>
+      </tr>
+    </table>`;
+}
+
 export interface CaregiverDisplay {
   name: string;                  // "Maria K." — caller liefert schon gekürzt
   badgeLevel?: string;           // "Starter" | "Bronze" | "Silber" | "Gold" | "Platin"
@@ -1403,15 +1418,18 @@ function caregiverInitials(name: string): string {
   return (parts[0].charAt(0) + parts[parts.length - 1].charAt(0)).toUpperCase();
 }
 
-function caregiverBadgeStyle(level?: string): { label: string; gradient: string } | null {
+function caregiverBadgeStyle(level?: string): { label: string; gradient: string; solid: string } | null {
   if (!level) return null;
   const key = level.trim().toLowerCase();
-  const map: Record<string, { label: string; gradient: string }> = {
-    starter:  { label: '🌱 STARTER-PFLEGEKRAFT', gradient: 'linear-gradient(135deg,#8AB47C 0%,#5E8C50 100%)' },
-    bronze:   { label: '🥉 BRONZE-PFLEGEKRAFT',  gradient: 'linear-gradient(135deg,#C68850 0%,#8B5A2B 100%)' },
-    silber:   { label: '🥈 SILBER-PFLEGEKRAFT',  gradient: 'linear-gradient(135deg,#B8B8B8 0%,#7E7E7E 100%)' },
-    gold:     { label: '🏅 GOLD-PFLEGEKRAFT',    gradient: 'linear-gradient(135deg,#E0AC32 0%,#B8860B 100%)' },
-    platin:   { label: '💎 PLATIN-PFLEGEKRAFT',  gradient: 'linear-gradient(135deg,#D4DCE0 0%,#7E8E96 100%)' },
+  // `solid` ist der Start-Farbton des Gradient — Outlook (Word-Renderer) kann
+  // `linear-gradient` nicht und ignoriert das Background → braucht solide
+  // Farbe als Fallback (sonst weißer Text auf weiß).
+  const map: Record<string, { label: string; gradient: string; solid: string }> = {
+    starter:  { label: 'STARTER-PFLEGEKRAFT', gradient: 'linear-gradient(135deg,#8AB47C 0%,#5E8C50 100%)', solid: '#5E8C50' },
+    bronze:   { label: 'BRONZE-PFLEGEKRAFT',  gradient: 'linear-gradient(135deg,#C68850 0%,#8B5A2B 100%)', solid: '#8B5A2B' },
+    silber:   { label: 'SILBER-PFLEGEKRAFT',  gradient: 'linear-gradient(135deg,#B8B8B8 0%,#7E7E7E 100%)', solid: '#7E7E7E' },
+    gold:     { label: 'GOLD-PFLEGEKRAFT',    gradient: 'linear-gradient(135deg,#E0AC32 0%,#B8860B 100%)', solid: '#B8860B' },
+    platin:   { label: 'PLATIN-PFLEGEKRAFT',  gradient: 'linear-gradient(135deg,#D4DCE0 0%,#7E8E96 100%)', solid: '#7E8E96' },
   };
   return map[key] || null;
 }
@@ -1443,8 +1461,11 @@ function buildCaregiverEventEmail(opts: {
   const cg = opts.caregiver;
 
   const badge = caregiverBadgeStyle(cg.badgeLevel);
+  // Background: solid color first (Outlook reads this), then linear-gradient
+  // (modern clients override the solid). So fällt die Pille in Outlook nicht
+  // ins Weiße sondern bleibt sichtbar.
   const badgeHtml = badge
-    ? `<span style="display:inline-block;background:${badge.gradient};color:#fff;padding:4px 11px;border-radius:14px;font-size:11px;font-weight:700;letter-spacing:.04em;">${badge.label}</span>`
+    ? `<span style="display:inline-block;background-color:${badge.solid};background:${badge.gradient};color:#fff;padding:4px 11px;border-radius:14px;font-size:11px;font-weight:700;letter-spacing:.04em;">${badge.label}</span>`
     : '';
 
   const metaParts: string[] = [];
@@ -1456,7 +1477,7 @@ function buildCaregiverEventEmail(opts: {
 
   const photoHtml = cg.photoUrl
     ? `<img src="${cg.photoUrl}" alt="${cg.name}" width="80" style="display:block;width:80px;height:80px;border-radius:50%;object-fit:cover;border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.08);" />`
-    : `<div style="width:80px;height:80px;border-radius:50%;background:#B5A184;color:#fff;font-size:28px;font-weight:700;display:flex;align-items:center;justify-content:center;border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.08);">${caregiverInitials(cg.name)}</div>`;
+    : `<div style="width:80px;height:80px;border-radius:50%;background-color:#B5A184;color:#fff;font-size:28px;font-weight:700;line-height:80px;text-align:center;border:2px solid #fff;">${caregiverInitials(cg.name)}</div>`;
 
   const aboutHtml = cg.aboutText
     ? `<p style="margin:14px 0 0;font-size:14px;line-height:1.65;color:#555;font-style:italic;">„${cg.aboutText}"</p>`
@@ -1538,9 +1559,7 @@ function buildCaregiverEventEmail(opts: {
     ${kachel}
     <p style="font-size:15px;line-height:1.75;color:#444;margin-bottom:12px;"><strong style="color:#2D1F0F;">So geht es weiter:</strong></p>
     ${opts.middleHtml}
-    <div style="text-align:center;margin:0 0 24px;">
-      <a href="${opts.portalUrl}" style="display:inline-block;background:#2A9D5C;color:#fff;text-decoration:none;padding:13px 34px;border-radius:8px;font-weight:600;font-size:15px;">${opts.ctaText}</a>
-    </div>
+    ${bulletproofButton(opts.portalUrl, opts.ctaText)}
     <div style="font-size:12px;color:#888;line-height:1.8;margin:0 0 18px;text-align:center;">
       <span style="color:#2D6A4F;font-weight:600;">✓ Keine Vertragsbindung</span>&ensp;&middot;&ensp;
       <span style="color:#2D6A4F;font-weight:600;">✓ Tagesgenaue Abrechnung</span>&ensp;&middot;&ensp;
@@ -1570,7 +1589,7 @@ function buildCaregiverEventEmail(opts: {
         <div style="background:#ffffff;padding:24px 40px 20px 40px;border-bottom:1px solid #f0ebe4;">
           <table width="100%" cellpadding="0" cellspacing="0" role="presentation"><tr>
             <td style="vertical-align:middle;">
-              <img src="${baseUrl}/images/Primundus-Logo_V6.png" alt="Primundus Logo" style="max-width:160px;height:auto;display:block;" />
+              <img src="${baseUrl}/images/Primundus-Logo_V6.png" alt="Primundus Logo" width="160" style="display:block;width:160px;max-width:160px;height:auto;" />
             </td>
             <td style="vertical-align:middle;text-align:right;">
               <table cellpadding="0" cellspacing="0" role="presentation" style="margin-left:auto;"><tr>
@@ -1714,9 +1733,7 @@ export function getPatientDataSavedEmailTemplate(
     <p style="font-size:15px;line-height:1.75;color:#444;margin-bottom:14px;">${greeting},</p>
     ${introHtml}
     ${actionHtml}
-    <div style="text-align:center;margin:0 0 24px;">
-      <a href="${portalUrl}" style="display:inline-block;background:#2A9D5C;color:#fff;text-decoration:none;padding:13px 34px;border-radius:8px;font-weight:600;font-size:15px;">${ctaText}</a>
-    </div>
+    ${bulletproofButton(portalUrl, ctaText)}
     <div style="font-size:12px;color:#888;line-height:1.8;margin:0 0 18px;text-align:center;">
       <span style="color:#2D6A4F;font-weight:600;">✓ Keine Vertragsbindung</span>&ensp;&middot;&ensp;
       <span style="color:#2D6A4F;font-weight:600;">✓ Tagesgenaue Abrechnung</span>&ensp;&middot;&ensp;
@@ -1744,7 +1761,7 @@ export function getPatientDataSavedEmailTemplate(
         <div style="background:#ffffff;padding:24px 40px 20px 40px;border-bottom:1px solid #f0ebe4;">
           <table width="100%" cellpadding="0" cellspacing="0" role="presentation"><tr>
             <td style="vertical-align:middle;">
-              <img src="${baseUrl}/images/Primundus-Logo_V6.png" alt="Primundus Logo" style="max-width:160px;height:auto;display:block;" />
+              <img src="${baseUrl}/images/Primundus-Logo_V6.png" alt="Primundus Logo" width="160" style="display:block;width:160px;max-width:160px;height:auto;" />
             </td>
             <td style="vertical-align:middle;text-align:right;">
               <table cellpadding="0" cellspacing="0" role="presentation" style="margin-left:auto;"><tr>
