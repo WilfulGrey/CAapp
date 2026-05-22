@@ -169,6 +169,30 @@ Zawsze rozróżniaj zanim coś zmienisz / zdiagnozujesz:
 - Nasze Render slot nazewnictwo (`caapp-beta`, `kostenrechner-beta`) odzwierciedla **nasze** dev/staging stage, niezależnie od tego pod jakim Mamamia tenantem aktualnie hostujemy.
 - Aktualnie: nasz `caapp-beta` (Render) → Supabase Edge Functions → Mamamia **preprod** (NIE Mamamia beta).
 
+### 🚨 URL convention — primundus.de w komunikacji, *.onrender.com tylko w infra
+
+Render slot names (`caapp-beta`, `kostenrechner-beta`) i ich domyślne URL-e
+(`*.onrender.com`) to **wewnętrzne identyfikatory infrastruktury**. Klienci
+NIGDY nie widzą `onrender.com` — wchodzą na branded domains:
+
+| User-facing URL (ZAWSZE w komunikacji do usera) | Internal Render slot |
+|---|---|
+| `https://kundenportal.primundus.de` | `caapp-beta` (`srv-d7phc0rrjlhs73dtismg`) |
+| `https://kostenrechner.primundus.de` | `kostenrechner-beta` |
+
+**W wiadomościach do usera** (verify steps, deploy status, "otwórz portal i...")
+— **ZAWSZE** `kundenportal.primundus.de` / `kostenrechner.primundus.de`. Pisanie
+`caapp-beta.onrender.com` zostało explicite zareportowane jako "nie jest właściwy
+adres" (user feedback 2026-05-22) — myli kontekst, bo to nie jest URL pod którym
+user testuje.
+
+**W infra / curl recipe / debug logs / kodzie** `*.onrender.com` jest OK
+(np. portalUrl assertion w testach, Render dashboard linki, e2e curl snippet
+w §"E2e verification recipe"). Tam to wskazuje na konkretny build target.
+
+**Regex check:** jeśli piszesz wiadomość do usera i widzisz `onrender.com` →
+swap na primundus.de.
+
 ### Dwie aplikacje
 
 | App | Stack | Rola | Branch deploy |
