@@ -24,6 +24,88 @@ export interface ContractFormData {
   kpEmail: string;
 }
 
+// Parse DE-Datum "12.06.2026" → Date. Tag/Monat/Jahr-Format, falls Format
+// abweicht oder ungültig → null.
+function parseDeDate(s: string | undefined | null): Date | null {
+  if (!s) return null;
+  const m = s.trim().match(/^(\d{1,2})\.(\d{1,2})\.(\d{4})$/);
+  if (!m) return null;
+  const [, day, month, year] = m;
+  const d = new Date(parseInt(year, 10), parseInt(month, 10) - 1, parseInt(day, 10));
+  return Number.isFinite(d.getTime()) ? d : null;
+}
+
+const MONAT_NAMES_DE = [
+  'Januar', 'Februar', 'März', 'April', 'Mai', 'Juni',
+  'Juli', 'August', 'September', 'Oktober', 'November', 'Dezember',
+];
+
+interface SummaryRow {
+  monat: string;
+  betrag: number;
+  details: string[];
+}
+
+// Berechnet die monatliche Aufstellung von Anreisedatum bis Abreisedatum.
+// - Erster Monat: Tage ab Anreise bis Monatsende + Anreisekosten
+// - Mittlere Monate: volle Tage
+// - Letzter Monat: Tage bis Abreise + Abreisekosten
+// Wenn ein Datum nicht parsbar → leeres Array (UI rendert dann nichts statt
+// hardcoded Mock-Daten zu zeigen).
+function buildMonthlyBreakdown(
+  anreiseStr: string,
+  abreiseStr: string,
+  tagessatz: number,
+  anreisekosten: number,
+  abreisekosten: number,
+): SummaryRow[] {
+  const start = parseDeDate(anreiseStr);
+  const end = parseDeDate(abreiseStr);
+  if (!start || !end || end < start) return [];
+
+  const rows: SummaryRow[] = [];
+  let cursorYear = start.getFullYear();
+  let cursorMonth = start.getMonth();
+  const endYear = end.getFullYear();
+  const endMonth = end.getMonth();
+
+  // Safety-Bound: max 24 Monate (gegen Endlosschleifen bei pathologischen Inputs).
+  for (let i = 0; i < 24; i++) {
+    const daysInMonth = new Date(cursorYear, cursorMonth + 1, 0).getDate();
+    const isFirstMonth = i === 0;
+    const isLastMonth = cursorYear === endYear && cursorMonth === endMonth;
+
+    const dayFrom = isFirstMonth ? start.getDate() : 1;
+    const dayTo = isLastMonth ? end.getDate() : daysInMonth;
+    const tage = dayTo - dayFrom + 1;
+
+    const details: string[] = [`${tagessatz} €/Tag × ${tage} ${tage === 1 ? 'Tag' : 'Tage'}`];
+    let betrag = tagessatz * tage;
+    if (isFirstMonth && anreisekosten > 0) {
+      details.push(`+ ${anreisekosten} € Anreise`);
+      betrag += anreisekosten;
+    }
+    if (isLastMonth && abreisekosten > 0) {
+      details.push(`+ ${abreisekosten} € Abreise`);
+      betrag += abreisekosten;
+    }
+
+    rows.push({
+      monat: `${MONAT_NAMES_DE[cursorMonth]} ${cursorYear}`,
+      betrag: Math.round(betrag),
+      details,
+    });
+
+    if (isLastMonth) break;
+    cursorMonth += 1;
+    if (cursorMonth > 11) {
+      cursorMonth = 0;
+      cursorYear += 1;
+    }
+  }
+  return rows;
+}
+
 export const AngebotPruefenModal: FC<{
   app: Application;
   /** Parent-supplied defaults derived from lead + mmCustomer. Empty values
@@ -56,11 +138,16 @@ export const AngebotPruefenModal: FC<{
     && kpVorname.trim() !== '' && kpNachname.trim() !== '' && kpTelefon.trim() !== '' && agbChecked;
 
   const tagessatz = Math.round(offer.monatlicheKosten / 30);
-  const summary = [
-    { monat: 'Mai 2026', betrag: offer.monatlicheKosten, details: [`${tagessatz} €/Tag × 31 Tage`, `+ ${offer.anreisekosten} € Anreise`] },
-    { monat: 'Juni 2026', betrag: offer.monatlicheKosten, details: [`${tagessatz} €/Tag × 30 Tage`] },
-    { monat: 'Juli 2026', betrag: Math.round(tagessatz * 12 + offer.abreisekosten), details: [`${tagessatz} €/Tag × 12 Tage`, `+ ${offer.abreisekosten} € Abreise`] },
-  ];
+  // Monatliche Aufstellung dynamisch aus Anreise-/Abreisedatum berechnen.
+  // Davor: hardcoded Mai/Juni/Juli 2026 (Bug — wenn z.B. Anreise 12.06.
+  // dann zeigte die Zusammenfassung trotzdem Mai an).
+  const summary = buildMonthlyBreakdown(
+    offer.anreisedatum,
+    offer.abreisedatum,
+    tagessatz,
+    offer.anreisekosten,
+    offer.abreisekosten,
+  );
 
   const inputCls = 'w-full border border-gray-200 rounded-xl px-3.5 py-3 text-sm text-gray-800 focus:outline-none focus:border-[#8B7355] focus:ring-2 focus:ring-[#8B7355]/10 transition-all bg-white';
   const labelCls = 'block text-[13px] font-semibold text-gray-700 mb-1.5';
