@@ -130,7 +130,7 @@ function buildEmailWrapper(lead: Lead, siteUrl: string, content: string): string
             <table width="100%" cellpadding="0" cellspacing="0" role="presentation">
               <tr>
                 <td style="vertical-align:middle;">
-                  <img src="${logoUrl}" alt="Primundus Logo" style="max-width:160px;height:auto;display:block;" />
+                  <img src="${logoUrl}" alt="Primundus Logo" width="160" style="display:block;width:160px;max-width:160px;height:auto;" />
                 </td>
                 <td style="vertical-align:middle;text-align:right;">
                   <table cellpadding="0" cellspacing="0" role="presentation" style="margin-left:auto;">
@@ -315,9 +315,7 @@ function buildAngebotsEmailHtml(lead: Lead, siteUrl: string): string {
     </div>
     <p style="font-size:15px;line-height:1.75;color:#444;margin-bottom:14px;">Im Angebot finden Sie alle Details zu Kosten, Konditionen und dem weiteren Ablauf.</p>
  
-    <div style="text-align:center;margin:22px 0;">
-      <a href="${kalkulationUrl}" style="display:inline-block;background:#2A9D5C;color:#fff;text-decoration:none;padding:13px 34px;border-radius:8px;font-weight:600;font-size:15px;">Angebot jetzt ansehen →</a>
-    </div>
+    ${bulletproofButton(kalkulationUrl, "Angebot jetzt ansehen →")}
  
     <div style="background:#EEF6F0;border-left:3px solid #4CAF50;padding:12px 14px;border-radius:0 6px 6px 0;font-size:14px;color:#555;line-height:1.6;">
       Für Sie bleibt alles <strong>unverbindlich</strong>, bis Sie sich für eine passende Betreuungskraft entscheiden und diese anreist.
@@ -376,11 +374,27 @@ function nachfassContent(milestone: LeadMilestone): { intro: string; body: strin
   };
 }
 
-function nachfassCtaButton(url: string, label: string): string {
+// Bulletproof CTA-Button. Funktioniert in Outlook (Word-Renderer), Gmail,
+// Apple Mail, Thunderbird, Yahoo, Web-Clients. Schlüssel-Tricks:
+//   - <table align="center"> statt <div text-align:center> — Outlook respektiert
+//     die `align`-HTML-Attribute zuverlässig
+//   - bgcolor-HTML-Attribut + CSS-Fallback auf <td> — Outlook nimmt das HTML-Attr
+//   - Padding auf <td>, NICHT auf <a> — Outlook ignoriert Padding auf inline-Elementen
+//   - Anker ohne display:inline-block (das hat Outlook unzuverlässig gerendert)
+function bulletproofButton(url: string, label: string, bgColor: string = "#2A9D5C"): string {
   return `
-    <div style="text-align:center;margin:8px 0 4px;">
-      <a href="${url}" style="display:inline-block;background:linear-gradient(135deg,#B5A184 0%,#9A8A73 100%);color:#ffffff;text-decoration:none;padding:14px 32px;border-radius:6px;font-weight:600;font-size:15px;box-shadow:0 2px 4px rgba(181,161,132,0.35);">${label}</a>
-    </div>`;
+    <table role="presentation" cellpadding="0" cellspacing="0" border="0" align="center" style="margin:8px auto;border-collapse:separate;">
+      <tr>
+        <td align="center" bgcolor="${bgColor}" style="background-color:${bgColor};border-radius:8px;padding:13px 34px;">
+          <a href="${url}" target="_blank" style="color:#ffffff;text-decoration:none;font-weight:600;font-size:15px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;line-height:1.4;">${label}</a>
+        </td>
+      </tr>
+    </table>`;
+}
+
+function nachfassCtaButton(url: string, label: string): string {
+  // Sand-Braun für Nachfass (passt zum Primundus-Farbschema)
+  return bulletproofButton(url, label, "#9A8A73");
 }
 
 function buildNachfass1Html(lead: Lead, siteUrl: string, portalBase: string, milestone: LeadMilestone): string {
@@ -434,17 +448,21 @@ function buildNachfass2Html(lead: Lead, siteUrl: string, portalBase: string, mil
     <p style="font-size:15px;line-height:1.75;color:#444;margin-bottom:14px;">${intro}</p>
     <p style="font-size:15px;line-height:1.75;color:#444;margin-bottom:14px;">${v.body}</p>
 
-    <div style="background:#F7F5F0;border:1px solid #e5e0d8;border-radius:8px;padding:12px 16px;margin:16px 0;display:flex;align-items:center;justify-content:space-between;gap:12px;">
-      <div>
-        <div style="font-size:10px;font-weight:700;color:#999;text-transform:uppercase;letter-spacing:.06em;margin-bottom:7px;">100% Sorglos – unsere Konditionen</div>
-        <div style="font-size:13px;color:#555;line-height:1.9;">
-          <div><span style="color:#2D6A4F;font-weight:600;">✓</span> Keine Vertragsbindung</div>
-          <div><span style="color:#2D6A4F;font-weight:600;">✓</span> Tagesgenaue Abrechnung</div>
-          <div><span style="color:#2D6A4F;font-weight:600;">✓</span> Kosten erst bei Anreise</div>
-        </div>
-      </div>
-      <img src="${siteUrl}/images/primundus_testsieger-2021.webp" alt="Testsieger" style="height:64px;width:auto;border:1px solid #e8d9a0;border-radius:4px;flex-shrink:0;opacity:.9;" />
-    </div>
+    <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="background-color:#F7F5F0;border:1px solid #e5e0d8;border-radius:8px;margin:16px 0;">
+      <tr>
+        <td style="padding:12px 16px;vertical-align:middle;">
+          <div style="font-size:10px;font-weight:700;color:#999;text-transform:uppercase;letter-spacing:.06em;margin-bottom:7px;">100% Sorglos – unsere Konditionen</div>
+          <div style="font-size:13px;color:#555;line-height:1.9;">
+            <div><span style="color:#2D6A4F;font-weight:600;">✓</span> Keine Vertragsbindung</div>
+            <div><span style="color:#2D6A4F;font-weight:600;">✓</span> Tagesgenaue Abrechnung</div>
+            <div><span style="color:#2D6A4F;font-weight:600;">✓</span> Kosten erst bei Anreise</div>
+          </div>
+        </td>
+        <td style="padding:12px 16px;vertical-align:middle;text-align:right;width:80px;">
+          <img src="${siteUrl}/images/primundus_testsieger-2021.webp" alt="Testsieger" width="64" style="display:block;width:64px;height:auto;border:1px solid #e8d9a0;border-radius:4px;opacity:.9;" />
+        </td>
+      </tr>
+    </table>
 
     <p style="font-size:15px;line-height:1.75;color:#444;margin-bottom:14px;">Melden Sie sich einfach, wenn Sie Fragen haben oder wenn wir loslegen sollen.</p>
 
@@ -606,9 +624,7 @@ function buildEingangsbestaetigungHtml(lead: Lead, siteUrl: string, portalBase: 
         <tr><td style="padding:5px 0;vertical-align:top;"><span style="display:inline-block;width:20px;height:20px;background:#B5A184;color:#fff;border-radius:50%;text-align:center;font-size:12px;font-weight:700;line-height:20px;">3</span></td>
           <td style="padding:5px 0;font-size:14px;color:#444;line-height:1.55;"><strong>Wunsch-Pflegekräfte einladen &amp; Bewerbungen erhalten</strong> – sobald die Patientendaten vollständig sind</td></tr>
       </table>
-      <div style="text-align:center;margin:18px 0 4px;">
-        <a href="${portalUrl}" style="display:inline-block;background:#2A9D5C;color:#fff;text-decoration:none;padding:13px 34px;border-radius:8px;font-weight:600;font-size:15px;">Angebot und Pflegekräfte anzeigen →</a>
-      </div>
+      ${bulletproofButton(portalUrl, "Angebot und Pflegekräfte anzeigen →")}
     </div>` : "";
 
   const introParagraph = isResubmit
@@ -857,15 +873,17 @@ function reminderCaregiverInitials(name: string): string {
   return (parts[0].charAt(0) + parts[parts.length - 1].charAt(0)).toUpperCase();
 }
 
-function reminderBadgeStyle(level?: string | null): { label: string; gradient: string } | null {
+function reminderBadgeStyle(level?: string | null): { label: string; gradient: string; solid: string } | null {
   if (!level) return null;
   const key = level.trim().toLowerCase();
-  const map: Record<string, { label: string; gradient: string }> = {
-    starter: { label: "🌱 STARTER-PFLEGEKRAFT", gradient: "linear-gradient(135deg,#8AB47C 0%,#5E8C50 100%)" },
-    bronze:  { label: "🥉 BRONZE-PFLEGEKRAFT",  gradient: "linear-gradient(135deg,#C68850 0%,#8B5A2B 100%)" },
-    silber:  { label: "🥈 SILBER-PFLEGEKRAFT",  gradient: "linear-gradient(135deg,#B8B8B8 0%,#7E7E7E 100%)" },
-    gold:    { label: "🏅 GOLD-PFLEGEKRAFT",    gradient: "linear-gradient(135deg,#E0AC32 0%,#B8860B 100%)" },
-    platin:  { label: "💎 PLATIN-PFLEGEKRAFT",  gradient: "linear-gradient(135deg,#D4DCE0 0%,#7E8E96 100%)" },
+  // `solid` ist der Start-Farbton — Outlook (Word-Renderer) kann
+  // linear-gradient nicht, braucht solide Farbe als Background-Fallback.
+  const map: Record<string, { label: string; gradient: string; solid: string }> = {
+    starter: { label: "STARTER-PFLEGEKRAFT", gradient: "linear-gradient(135deg,#8AB47C 0%,#5E8C50 100%)", solid: "#5E8C50" },
+    bronze:  { label: "BRONZE-PFLEGEKRAFT",  gradient: "linear-gradient(135deg,#C68850 0%,#8B5A2B 100%)", solid: "#8B5A2B" },
+    silber:  { label: "SILBER-PFLEGEKRAFT",  gradient: "linear-gradient(135deg,#B8B8B8 0%,#7E7E7E 100%)", solid: "#7E7E7E" },
+    gold:    { label: "GOLD-PFLEGEKRAFT",    gradient: "linear-gradient(135deg,#E0AC32 0%,#B8860B 100%)", solid: "#B8860B" },
+    platin:  { label: "PLATIN-PFLEGEKRAFT",  gradient: "linear-gradient(135deg,#D4DCE0 0%,#7E8E96 100%)", solid: "#7E8E96" },
   };
   return map[key] || null;
 }
@@ -888,7 +906,7 @@ function buildReminderHtml(
 
   const badge = reminderBadgeStyle(meta.caregiver_badge_level || null);
   const badgeHtml = badge
-    ? `<span style="display:inline-block;background:${badge.gradient};color:#fff;padding:4px 11px;border-radius:14px;font-size:11px;font-weight:700;letter-spacing:.04em;">${badge.label}</span>`
+    ? `<span style="display:inline-block;background-color:${badge.solid};background:${badge.gradient};color:#fff;padding:4px 11px;border-radius:14px;font-size:11px;font-weight:700;letter-spacing:.04em;">${badge.label}</span>`
     : "";
 
   const metaParts: string[] = [];
@@ -907,7 +925,7 @@ function buildReminderHtml(
   // ausweichen statt eine kaputte Bild-Ref im HTML zu lassen.
   const photoHtml = photoCid
     ? `<img src="cid:${photoCid}" alt="${cgName}" width="80" style="display:block;width:80px;height:80px;border-radius:50%;object-fit:cover;border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.08);" />`
-    : `<div style="width:80px;height:80px;border-radius:50%;background:#B5A184;color:#fff;font-size:28px;font-weight:700;display:flex;align-items:center;justify-content:center;border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.08);">${reminderCaregiverInitials(cgName)}</div>`;
+    : `<div style="width:80px;height:80px;border-radius:50%;background-color:#B5A184;color:#fff;font-size:28px;font-weight:700;line-height:80px;text-align:center;border:2px solid #fff;">${reminderCaregiverInitials(cgName)}</div>`;
 
   const aboutHtml = meta.caregiver_about_text
     ? `<p style="margin:14px 0 0;font-size:14px;line-height:1.65;color:#555;font-style:italic;">„${meta.caregiver_about_text}"</p>`
@@ -951,9 +969,7 @@ function buildReminderHtml(
     ${introHtml}
     ${kachel}
     ${middleHtml}
-    <div style="text-align:center;margin:0 0 24px;">
-      <a href="${portalUrl}" style="display:inline-block;background:#2A9D5C;color:#fff;text-decoration:none;padding:13px 34px;border-radius:8px;font-weight:600;font-size:15px;">${ctaText}</a>
-    </div>
+    ${bulletproofButton(portalUrl, ctaText)}
     ${softOut}
     ${buildIlkaSig(siteUrl)}`;
 
