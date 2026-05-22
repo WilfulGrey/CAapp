@@ -1531,19 +1531,12 @@ const CustomerPortalPage: FC = () => {
         </div>
         )}
 
-        {/* ── SECTION: Bewerbungen — pending + bereits bearbeitet ──
-             Pending oben (mit Action-Buttons), bearbeitete unten (greyed out
-             mit "Bereits bearbeitet"-Pill + Undo). Sektion ist IMMER sichtbar
-             wenn überhaupt Bewerbungen existieren — User-Wunsch: bearbeitete
-             Bewerbungen sollen nicht in einer halb-versteckten "Bereits
-             bearbeitet"-Sub-Section unter dem Matching ver-schwinden. */}
-        {applications.length > 0 && (
+        {/* ── SECTION: Pending Applications ── */}
+        {hasPending && (
           <div className="space-y-3">
-            {hasPending && (
-              <p className="text-[14px] leading-relaxed px-1" style={{color:'#3D3D3D'}}>
-                Tippen Sie auf <span className="font-semibold">"Angebot prüfen"</span>, um die Details der Pflegekraft zu sehen und über das Angebot zu entscheiden.
-              </p>
-            )}
+            <p className="text-[14px] leading-relaxed px-1" style={{color:'#3D3D3D'}}>
+              Tippen Sie auf <span className="font-semibold">"Angebot prüfen"</span>, um die Details der Pflegekraft zu sehen und über das Angebot zu entscheiden.
+            </p>
             {pendingApps.map((app) => (
               <AppCard
                 key={app.id}
@@ -1554,16 +1547,6 @@ const CustomerPortalPage: FC = () => {
                 onNurseClick={(n) => openNurseFromApp(n, app)}
               />
             ))}
-            {doneApps.length > 0 && (
-              <>
-                {hasPending && (
-                  <p className="text-xs font-semibold uppercase tracking-wider text-gray-400 px-1 pt-2">Bereits bearbeitet</p>
-                )}
-                {doneApps.map((app) => (
-                  <AppCardDone key={app.id} app={app} onNurseClick={(n, a) => { setNurseModalApp(a); setSelectedNurse(n); }} onUndo={undoApp} />
-                ))}
-              </>
-            )}
           </div>
         )}
 
@@ -1642,16 +1625,26 @@ const CustomerPortalPage: FC = () => {
                 </div>
               )}
 
-              {/* Bereits-bearbeitete Bewerbungen werden jetzt OBEN in der
-                  Bewerbungen-Sektion (über dem Matching) gerendert — siehe
-                  applications.length > 0-Block. */}
+              {/* "Bereits bearbeitet" wird einheitlich unten gerendert
+                  (außerhalb dieser IIFE) — beide Branches (hasPending /
+                  !hasPending) sehen dieselbe Sektion am Ende. */}
             </>
           );
         })()}
 
-        {/* Bereits-bearbeitete Bewerbungen sind jetzt in der oberen
-             Bewerbungen-Sektion (applications.length > 0-Block) — kein
-             separater Rendering-Pfad mehr für hasPending. */}
+        {/* ── SECTION: Bereits bearbeitete Bewerbungen ──
+             Immer unten sichtbar wenn done apps existieren, egal ob es
+             gerade pending Apps gibt oder die Matching-Liste angezeigt
+             wird. Declined Matches sind hier RAUS — die leben jetzt am
+             Ende der Matching-Liste mit ihrer eigenen "Abgelehnt"-Pill. */}
+        {doneApps.length > 0 && (
+          <div className="space-y-2">
+            <p className="text-xs font-semibold uppercase tracking-wider text-gray-400 px-1">Bereits bearbeitet</p>
+            {doneApps.map((app) => (
+              <AppCardDone key={app.id} app={app} onNurseClick={(n, a) => { setNurseModalApp(a); setSelectedNurse(n); }} onUndo={undoApp} />
+            ))}
+          </div>
+        )}
 
         {/* ── SECTION HEADER: So funktioniert's ── */}
         <div className="px-1 pt-3">
