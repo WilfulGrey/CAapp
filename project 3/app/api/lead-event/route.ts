@@ -99,10 +99,10 @@ function buildPortalUrl(lead: { token?: string | null }): string {
 }
 
 // Plant einen Reaktions-Reminder (interest_reminder / application_reminder)
-// für ~30 Min nach dem ursprünglichen caregiver_interest_shown bzw.
+// für ~1h nach dem ursprünglichen caregiver_interest_shown bzw.
 // application_received-Event. Pflegekraft-Metadata wird mitgespeichert,
 // damit die Edge Function beim Versand die richtige Mail bauen kann.
-const REMINDER_DELAY_MIN = 30;
+const REMINDER_DELAY_MIN = 60;
 async function scheduleReactionReminder(
   supabaseAdmin: any,
   leadId: string,
@@ -123,9 +123,10 @@ async function scheduleReactionReminder(
       scheduled_for: scheduledFor,
       status: 'pending',
       // Pflegekraft-Snapshot für den Mail-Build beim Versand. Photo-URL
-      // ist eine presigned S3-URL die in ~30 Min abläuft — die Edge
-      // Function fetched das Bild aber direkt beim Versand und inlined
-      // es per CID (PR #142), passt also zeitlich.
+      // ist eine presigned S3-URL mit 30 Min Gültigkeit — beim 1h-
+      // Reminder also bereits abgelaufen. Edge Function versucht trotzdem
+      // einen Inline-Fetch und fällt sauber auf Initialen-Avatar zurück
+      // wenn S3 mit 403 antwortet (PR #142/#148-Pattern).
       metadata: {
         caregiver_id: caregiverId,
         caregiver_name: caregiver.name,
@@ -338,7 +339,7 @@ export async function POST(request: NextRequest) {
               sendEmail((lead as any).email, template, attachments),
             )
             .then((result) => {
-              // Reaktions-Reminder schedulen — 30 Min nach Mail A/B, falls
+              // Reaktions-Reminder schedulen — 1h nach Mail A/B, falls
               // der Kunde bis dahin keine Reaktion (positiv ODER negativ)
               // gezeigt hat. Nur für die zwei zeitkritischen Events, nicht
               // für application_accepted_internal (= Endpunkt der Kette).
