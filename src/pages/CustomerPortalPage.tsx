@@ -1531,12 +1531,19 @@ const CustomerPortalPage: FC = () => {
         </div>
         )}
 
-        {/* ── SECTION: Pending Applications ── */}
-        {hasPending && (
+        {/* ── SECTION: Bewerbungen — pending + bereits bearbeitet ──
+             Pending oben (mit Action-Buttons), bearbeitete unten (greyed out
+             mit "Bereits bearbeitet"-Pill + Undo). Sektion ist IMMER sichtbar
+             wenn überhaupt Bewerbungen existieren — User-Wunsch: bearbeitete
+             Bewerbungen sollen nicht in einer halb-versteckten "Bereits
+             bearbeitet"-Sub-Section unter dem Matching ver-schwinden. */}
+        {applications.length > 0 && (
           <div className="space-y-3">
-            <p className="text-[14px] leading-relaxed px-1" style={{color:'#3D3D3D'}}>
-              Tippen Sie auf <span className="font-semibold">"Angebot prüfen"</span>, um die Details der Pflegekraft zu sehen und über das Angebot zu entscheiden.
-            </p>
+            {hasPending && (
+              <p className="text-[14px] leading-relaxed px-1" style={{color:'#3D3D3D'}}>
+                Tippen Sie auf <span className="font-semibold">"Angebot prüfen"</span>, um die Details der Pflegekraft zu sehen und über das Angebot zu entscheiden.
+              </p>
+            )}
             {pendingApps.map((app) => (
               <AppCard
                 key={app.id}
@@ -1547,6 +1554,16 @@ const CustomerPortalPage: FC = () => {
                 onNurseClick={(n) => openNurseFromApp(n, app)}
               />
             ))}
+            {doneApps.length > 0 && (
+              <>
+                {hasPending && (
+                  <p className="text-xs font-semibold uppercase tracking-wider text-gray-400 px-1 pt-2">Bereits bearbeitet</p>
+                )}
+                {doneApps.map((app) => (
+                  <AppCardDone key={app.id} app={app} onNurseClick={(n, a) => { setNurseModalApp(a); setSelectedNurse(n); }} onUndo={undoApp} />
+                ))}
+              </>
+            )}
           </div>
         )}
 
@@ -1625,35 +1642,16 @@ const CustomerPortalPage: FC = () => {
                 </div>
               )}
 
-              {/* ── SECTION: Processed applications ── (declined matches
-                  bleiben jetzt in der Haupt-Matching-Liste ganz unten mit
-                  "Abgelehnt"-Pill + Undo, statt hier nochmal aufzutauchen) */}
-              {doneApps.length > 0 && (
-                <div className="space-y-2">
-                  <p className="text-xs font-semibold uppercase tracking-wider text-gray-400 px-1">Bereits bearbeitet</p>
-                  {doneApps.map((app) => (
-                    <AppCardDone key={app.id} app={app} onNurseClick={(n, a) => { setNurseModalApp(a); setSelectedNurse(n); }} onUndo={undoApp} />
-                  ))}
-                </div>
-              )}
+              {/* Bereits-bearbeitete Bewerbungen werden jetzt OBEN in der
+                  Bewerbungen-Sektion (über dem Matching) gerendert — siehe
+                  applications.length > 0-Block. */}
             </>
           );
         })()}
 
-        {/* ── SECTION: Processed applications (mit pending) ──
-             Hinweis: declined matches sind hier rausgenommen, sie leben jetzt
-             ausschließlich in der Haupt-Matching-Liste. Falls hasPending=true
-             ist die Matching-Liste aber ausgeblendet → declined matches sind
-             dann unsichtbar (bewusst — bei offener Bewerbung hat die History
-             keine Priorität). */}
-        {hasPending && doneApps.length > 0 && (
-          <div className="space-y-2">
-            <p className="text-xs font-semibold uppercase tracking-wider text-gray-400 px-1">Bereits bearbeitet</p>
-            {doneApps.map((app) => (
-              <AppCardDone key={app.id} app={app} onNurseClick={(n, a) => { setNurseModalApp(a); setSelectedNurse(n); }} onUndo={undoApp} />
-            ))}
-          </div>
-        )}
+        {/* Bereits-bearbeitete Bewerbungen sind jetzt in der oberen
+             Bewerbungen-Sektion (applications.length > 0-Block) — kein
+             separater Rendering-Pfad mehr für hasPending. */}
 
         {/* ── SECTION HEADER: So funktioniert's ── */}
         <div className="px-1 pt-3">
