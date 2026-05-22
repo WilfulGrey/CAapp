@@ -798,7 +798,7 @@ async function sendEmailSmtp(
 }
 
 // Reaktions-Reminder-Helpers (für interest_reminder / application_reminder).
-// Logik: nach 30 Min kontrollieren ob der Kunde auf den ursprünglichen
+// Logik: nach 1h kontrollieren ob der Kunde auf den ursprünglichen
 // caregiver_interest_shown / application_received reagiert hat (Reaktion =
 // invite/decline für Interesse, accept/reject für Bewerbung). Wenn ja →
 // Reminder cancelt sich selbst. Wenn nein → Mail raus.
@@ -949,8 +949,8 @@ function buildReminderHtml(
     </table>`;
 
   const introHtml = variant === "interest"
-    ? `<p style="font-size:15px;line-height:1.75;color:#444;margin-bottom:18px;">vor einer halben Stunde haben wir Ihnen geschrieben, dass <strong style="color:#2D1F0F;">${cgName}</strong> Interesse an Ihrer Anfrage hat. Eine kurze Erinnerung — die nächsten Stunden zählen:</p>`
-    : `<p style="font-size:15px;line-height:1.75;color:#444;margin-bottom:18px;">vor einer halben Stunde haben wir Ihnen <strong style="color:#2D1F0F;">${firstName}s Bewerbung</strong> weitergeleitet. Eine kurze Erinnerung — diese Phase ist zeitkritisch:</p>`;
+    ? `<p style="font-size:15px;line-height:1.75;color:#444;margin-bottom:18px;">vor einer Stunde haben wir Ihnen geschrieben, dass <strong style="color:#2D1F0F;">${cgName}</strong> Interesse an Ihrer Anfrage hat. Eine kurze Erinnerung — die nächsten Stunden zählen:</p>`
+    : `<p style="font-size:15px;line-height:1.75;color:#444;margin-bottom:18px;">vor einer Stunde haben wir Ihnen <strong style="color:#2D1F0F;">${firstName}s Bewerbung</strong> weitergeleitet. Eine kurze Erinnerung — diese Phase ist zeitkritisch:</p>`;
 
   const middleHtml = variant === "interest"
     ? `<p style="font-size:15px;line-height:1.75;color:#444;margin-bottom:20px;">Pflegekräfte mit guten Profilen werden häufig schnell von anderen Familien angefragt. <strong style="color:#2D1F0F;">Damit ${firstName} für Sie verfügbar bleibt</strong>, schauen Sie sich ihr Profil jetzt an und laden Sie sie ein, sich bei Ihnen zu bewerben.</p>`
@@ -989,7 +989,7 @@ function buildReminderText(
   if (variant === "interest") {
     return `${halloAnrede},
 
-vor einer halben Stunde haben wir Ihnen geschrieben, dass ${cgName} Interesse an Ihrer Anfrage hat. Eine kurze Erinnerung — die nächsten Stunden zählen:
+vor einer Stunde haben wir Ihnen geschrieben, dass ${cgName} Interesse an Ihrer Anfrage hat. Eine kurze Erinnerung — die nächsten Stunden zählen:
 
 Pflegekräfte mit guten Profilen werden häufig schnell von anderen Familien angefragt. Damit ${firstName} für Sie verfügbar bleibt, schauen Sie sich ihr Profil jetzt an und laden Sie sie ein, sich bei Ihnen zu bewerben.
 
@@ -1006,7 +1006,7 @@ Primundus Deutschland | www.primundus.de
   }
   return `${halloAnrede},
 
-vor einer halben Stunde haben wir Ihnen ${firstName}s Bewerbung weitergeleitet. Eine kurze Erinnerung — diese Phase ist zeitkritisch:
+vor einer Stunde haben wir Ihnen ${firstName}s Bewerbung weitergeleitet. Eine kurze Erinnerung — diese Phase ist zeitkritisch:
 
 Pflegekräfte halten ihre Bewerbung bei uns offen, solange sie keine andere Familie verbindlich gebucht hat. Damit Sie ${firstName} nicht verlieren, schauen Sie sich ihre Bewerbung jetzt an und bestätigen Sie die Buchung, wenn alles passt.
 
@@ -1220,7 +1220,7 @@ Deno.serve(async (req: Request) => {
           scheduledEmail.email_type === "interest_reminder" ||
           scheduledEmail.email_type === "application_reminder"
         ) {
-          // Reaktions-Reminder. 30 Min nach dem ursprünglichen
+          // Reaktions-Reminder. 1h nach dem ursprünglichen
           // caregiver_interest_shown / application_received-Event. Vor Versand:
           // checken ob der Kunde inzwischen reagiert hat (positiv ODER negativ
           // für diese Pflegekraft). Wenn ja, cancelt sich der Reminder selbst.
