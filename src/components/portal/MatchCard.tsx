@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import type { FC } from 'react';
-import { Check, ChevronDown, UserPlus } from 'lucide-react';
+import { Check, ChevronDown, UserPlus, X } from 'lucide-react';
 import type { Nurse } from '../../types';
 import type { NurseStatus } from './shared';
 import { nurseLevel, displayName, initials } from './shared';
@@ -14,7 +14,10 @@ export const MatchCard: FC<{
    *  promise resolves; on rejection MatchCard rolls back to idle and the
    *  parent surfaces the error (CLAUDE.md §1 — no fake "done" animation). */
   onInviteConfirm?: () => Promise<void>;
-}> = ({ nurse, status, onNurseClick, onInvite, onInviteConfirm }) => {
+  /** When status='declined', clicking the Undo-Link calls this to restore
+   *  the card to pending (UI override + Mamamia mutation handled by parent). */
+  onUndoDecline?: () => void;
+}> = ({ nurse, status, onNurseClick, onInvite, onInviteConfirm, onUndoDecline }) => {
   const [invitePhase, setInvitePhase] = useState<'idle' | 'sending' | 'done'>('idle');
   const inits = initials(nurse.name);
   const name = displayName(nurse.name);
@@ -95,7 +98,21 @@ export const MatchCard: FC<{
         >
           Details <ChevronDown className="w-3.5 h-3.5 -rotate-90" />
         </button>
-        {status === 'invited' ? (
+        {status === 'declined' ? (
+          <div className="flex items-center gap-3">
+            {onUndoDecline && (
+              <button
+                onClick={(e) => { e.stopPropagation(); onUndoDecline(); }}
+                className="text-xs font-semibold text-[#8B7355] hover:underline"
+              >
+                ↩ Rückgängig
+              </button>
+            )}
+            <span className="flex items-center gap-1.5 text-xs font-medium text-gray-500 bg-gray-100 border border-gray-200 px-4 py-1.5 rounded-full">
+              <X className="w-3 h-3 flex-shrink-0" /> Abgelehnt
+            </span>
+          </div>
+        ) : status === 'invited' ? (
           <span className="flex items-center gap-1.5 text-xs font-bold text-[#22A06B] bg-[#E3F7EF] border border-[#B8E8D4] px-4 py-1.5 rounded-full">
             <Check className="w-3 h-3 flex-shrink-0" /> Einladung gesendet
           </span>

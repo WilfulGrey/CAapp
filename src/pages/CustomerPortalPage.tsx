@@ -41,7 +41,6 @@ import { BookedScreen } from '../components/portal/BookedScreen';
 import { AngebotCard } from '../components/portal/AngebotCard';
 import { AppCard } from '../components/portal/AppCard';
 import { AppCardDone } from '../components/portal/AppCardDone';
-import { MatchCardDone } from '../components/portal/MatchCardDone';
 import { MatchCard } from '../components/portal/MatchCard';
 import { InterestCard, type InterestActionStatus } from '../components/portal/InterestCard';
 import { ExpiredLinkScreen } from '../components/portal/ExpiredLinkScreen';
@@ -553,12 +552,10 @@ const CustomerPortalPage: FC = () => {
 
   const pendingApps = applications.filter((a) => a.status === 'new');
   const doneApps = applications.filter((a) => a.status !== 'new');
-  // Locally-declined matches — surface in "Bereits bearbeitet" alongside
-  // processed applications. Status comes from the derived `nurseStatusById`
-  // (server lead.declined_caregiver_ids + this-session statusOverrides).
-  const declinedMatches = effectiveMatched
-    .map((m, idx) => ({ nurse: m.nurse, idx, caregiverId: m.caregiverId }))
-    .filter(({ caregiverId }) => nurseStatusById.get(caregiverId) === 'declined');
+  // Declined matches sind jetzt direkt in der Haupt-Matching-Liste am
+  // Ende einsortiert (Status='declined', "Abgelehnt"-Pill + Undo im
+  // Button). Frühere `declinedMatches`-Liste + MatchCardDone-Pfad
+  // entfallen — Status kommt aus dem derived `nurseStatusById`.
   const acceptedApp = applications.find((a) => a.status === 'accepted') ?? null;
   const hasPending = pendingApps.length > 0;
   const matchesUnlocked = !hasPending;
@@ -1561,12 +1558,15 @@ const CustomerPortalPage: FC = () => {
         {!hasPending && (() => {
           const allVisible = effectiveMatched
             .map((m, i) => ({ nurse: m.nurse, i, status: nurseStatusById.get(m.caregiverId) ?? 'pending' as NurseStatus }))
-            .filter(({ status }) => status === 'pending' || status === 'invited');
-          // Cap pending at 5 so customers aren't overwhelmed; always show all
-          // invited ones (user already took action on those).
+            .filter(({ status }) => status === 'pending' || status === 'invited' || status === 'declined');
+          // Order: pending (cap 5, oben) → invited → declined (ganz unten,
+          // ausgegraut mit "Abgelehnt"-Pill + Undo-Link). User-Wunsch:
+          // bearbeitete Pflegekräfte rutschen nach unten statt in eine
+          // separate "Bereits bearbeitet"-Sektion.
           const visibleNurses = [
             ...allVisible.filter(({ status }) => status === 'pending').slice(0, 5),
             ...allVisible.filter(({ status }) => status === 'invited'),
+            ...allVisible.filter(({ status }) => status === 'declined'),
           ];
           const hasAnyCard = visibleNurses.length > 0 || visibleInterests.length > 0;
           return (
@@ -1611,21 +1611,28 @@ const CustomerPortalPage: FC = () => {
                       );
                     })}
                     {visibleNurses.map(({ nurse, i, status }) => (
-                      <MatchCard key={i} nurse={nurse} status={status} onNurseClick={() => openNurseFromMatch(nurse, i)} onInvite={() => canInviteNurse(i)} onInviteConfirm={() => confirmInviteNurse(i, displayName(nurse.name))} />
+                      <MatchCard
+                        key={i}
+                        nurse={nurse}
+                        status={status}
+                        onNurseClick={() => openNurseFromMatch(nurse, i)}
+                        onInvite={() => canInviteNurse(i)}
+                        onInviteConfirm={() => confirmInviteNurse(i, displayName(nurse.name))}
+                        onUndoDecline={status === 'declined' ? () => undoDeclinedMatch(i) : undefined}
+                      />
                     ))}
                   </div>
                 </div>
               )}
 
-              {/* ── SECTION: Processed applications + declined matches ── */}
-              {(doneApps.length > 0 || declinedMatches.length > 0) && (
+              {/* ── SECTION: Processed applications ── (declined matches
+                  bleiben jetzt in der Haupt-Matching-Liste ganz unten mit
+                  "Abgelehnt"-Pill + Undo, statt hier nochmal aufzutauchen) */}
+              {doneApps.length > 0 && (
                 <div className="space-y-2">
                   <p className="text-xs font-semibold uppercase tracking-wider text-gray-400 px-1">Bereits bearbeitet</p>
                   {doneApps.map((app) => (
                     <AppCardDone key={app.id} app={app} onNurseClick={(n, a) => { setNurseModalApp(a); setSelectedNurse(n); }} onUndo={undoApp} />
-                  ))}
-                  {declinedMatches.map(({ nurse, idx }) => (
-                    <MatchCardDone key={`m-${idx}`} nurse={nurse} onNurseClick={() => openNurseFromMatch(nurse, idx)} onUndo={() => undoDeclinedMatch(idx)} />
                   ))}
                 </div>
               )}
@@ -1633,15 +1640,17 @@ const CustomerPortalPage: FC = () => {
           );
         })()}
 
-        {/* ── SECTION: Processed applications + declined matches (mit pending) ── */}
-        {hasPending && (doneApps.length > 0 || declinedMatches.length > 0) && (
+        {/* ── SECTION: Processed applications (mit pending) ──
+             Hinweis: declined matches sind hier rausgenommen, sie leben jetzt
+             ausschließlich in der Haupt-Matching-Liste. Falls hasPending=true
+             ist die Matching-Liste aber ausgeblendet → declined matches sind
+             dann unsichtbar (bewusst — bei offener Bewerbung hat die History
+             keine Priorität). */}
+        {hasPending && doneApps.length > 0 && (
           <div className="space-y-2">
             <p className="text-xs font-semibold uppercase tracking-wider text-gray-400 px-1">Bereits bearbeitet</p>
             {doneApps.map((app) => (
               <AppCardDone key={app.id} app={app} onNurseClick={(n, a) => { setNurseModalApp(a); setSelectedNurse(n); }} onUndo={undoApp} />
-            ))}
-            {declinedMatches.map(({ nurse, idx }) => (
-              <MatchCardDone key={`m-${idx}`} nurse={nurse} onNurseClick={() => openNurseFromMatch(nurse, idx)} onUndo={() => undoDeclinedMatch(idx)} />
             ))}
           </div>
         )}
