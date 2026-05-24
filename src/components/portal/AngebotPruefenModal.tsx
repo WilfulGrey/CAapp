@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import type { FC } from 'react';
-import { Check, Info, X } from 'lucide-react';
+import { Award, Check, Info, ShieldCheck, Users, X } from 'lucide-react';
 
 // Liste aller Feiertage mit doppeltem Tagessatz — wird im Konditionen-
 // Modal als Popover hinter dem Info-Icon angezeigt + von der Berechnungs-
@@ -323,7 +323,7 @@ export const AngebotPruefenModal: FC<{
               <button
                 className={`flex items-center gap-1.5 px-1 pb-2.5 text-xs font-semibold border-b-2 transition-colors ${step === 2 ? 'border-[#8B7355] text-[#8B7355]' : 'border-transparent text-gray-400'}`}
               >
-                2 · Vertrag &amp; Bestätigung
+                2 · Buchung bestätigen
               </button>
             </div>
           </div>
@@ -422,7 +422,7 @@ export const AngebotPruefenModal: FC<{
             {step === 2 && (
               <div className="p-5 space-y-4" style={{background:'#FAFAF9'}}>
                 <div className={sectionCls}>
-                  <p className={sectionTitleCls}>Hauptpatient <span className="font-normal text-gray-400">(Vertragspartner)</span></p>
+                  <p className={sectionTitleCls}>Hauptpatient <span className="font-normal text-gray-400">(zu betreuende Person)</span></p>
                   <div className="space-y-3">
                     <div className="grid grid-cols-2 gap-3">
                       <div>
@@ -555,11 +555,30 @@ export const AngebotPruefenModal: FC<{
                     {agbChecked && <Check className="w-3 h-3 text-white" strokeWidth={3} />}
                   </div>
                   <span className="text-sm text-gray-600 leading-relaxed">
-                    Ich akzeptiere das Angebot verbindlich und bestätige, dass alle Angaben korrekt sind. Der Vertrag wird direkt mit der Agentur geschlossen.
+                    Ich beauftrage die Pflegekraft verbindlich und bestätige, dass alle Angaben korrekt sind.
                   </span>
                 </label>
               </div>
             )}
+          </div>
+
+          {/* Trust-Strip — direkt über dem CTA an dem Punkt wo der Kunde
+              die Entscheidung trifft. 3 prägnante Signale: Marktposition,
+              Erfahrung, Risikofreiheit. Beide Steps damit das Angebot von
+              Anfang an Vertrauen ausstrahlt. */}
+          <div className="px-5 py-3 border-t border-gray-100 bg-[#FAF8F4] flex items-center justify-between gap-2">
+            <div className="flex items-center gap-1.5 min-w-0">
+              <Award className="w-4 h-4 text-[#8B7355] flex-shrink-0" />
+              <span className="text-[11px] font-semibold text-[#3D2B1F] leading-tight">Testsieger 2024</span>
+            </div>
+            <div className="flex items-center gap-1.5 min-w-0">
+              <Users className="w-4 h-4 text-[#8B7355] flex-shrink-0" />
+              <span className="text-[11px] font-semibold text-[#3D2B1F] leading-tight">60.000+ Einsätze</span>
+            </div>
+            <div className="flex items-center gap-1.5 min-w-0">
+              <ShieldCheck className="w-4 h-4 text-[#8B7355] flex-shrink-0" />
+              <span className="text-[11px] font-semibold text-[#3D2B1F] leading-tight">Täglich kündbar</span>
+            </div>
           </div>
 
           <div className={`flex gap-2.5 px-5 py-4 border-t border-gray-100 flex-shrink-0 ${step === 2 ? 'flex-row' : 'flex-col'}`}>
@@ -568,7 +587,7 @@ export const AngebotPruefenModal: FC<{
                 onClick={() => setStep(2)}
                 className="w-full bg-[#E76F63] hover:bg-[#D65E52] text-white rounded-xl py-3.5 text-sm font-bold transition-all"
               >
-                Weiter →
+                Pflegekraft sichern →
               </button>
             ) : (
               <>
@@ -586,7 +605,7 @@ export const AngebotPruefenModal: FC<{
                   disabled={!canAccept}
                   className={`flex-1 rounded-xl py-3 text-sm font-bold transition-all ${canAccept ? 'bg-[#E76F63] hover:bg-[#D65E52] text-white' : 'bg-gray-100 text-gray-400 cursor-not-allowed'}`}
                 >
-                  Betreuungskraft akzeptieren
+                  Pflegekraft beauftragen
                 </button>
               </>
             )}

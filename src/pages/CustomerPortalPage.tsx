@@ -42,6 +42,7 @@ import { BookedScreen } from '../components/portal/BookedScreen';
 import { AngebotCard } from '../components/portal/AngebotCard';
 import { AppCard } from '../components/portal/AppCard';
 import { AppCardDone } from '../components/portal/AppCardDone';
+import { BeratungCTA } from '../components/portal/BeratungCTA';
 import { MatchCard } from '../components/portal/MatchCard';
 import { MatchCardDone } from '../components/portal/MatchCardDone';
 import { InterestCard, type InterestActionStatus } from '../components/portal/InterestCard';
@@ -1763,6 +1764,13 @@ const CustomerPortalPage: FC = () => {
                 onNurseClick={(n) => openNurseFromApp(n, app)}
               />
             ))}
+            {/* Beratungs-CTA direkt unter den Bewerbungen — Bewerbungen sind
+                der entscheidungsstärkste Moment, hier sind Kunden besonders
+                empfänglich für persönliche Hilfe. */}
+            <BeratungCTA
+              headline="Fragen zur Bewerbung?"
+              body="Ich gehe das Angebot gerne mit Ihnen durch und beantworte alle offenen Fragen."
+            />
           </div>
         )}
 
@@ -1887,40 +1895,13 @@ const CustomerPortalPage: FC = () => {
 
                   {/* Beratungs-CTA — direkt unter den 3 Match-Karten.
                        Fängt Kunden ab die überfordert oder unsicher sind
-                       und sonst still abspringen würden. WhatsApp als
-                       niederschwelliger Kanal + Telefon. */}
+                       und sonst still abspringen würden. */}
                   {patientSaved && (
-                    <div className="mt-4 rounded-2xl border border-[#E5E3DF] bg-[#FAF8F4] p-4">
-                      <div className="flex items-start gap-3">
-                        <img
-                          src="/images/ilka-wysocki_pm-mallorca.webp"
-                          alt="Ilka Wysocki"
-                          className="w-12 h-12 rounded-xl object-cover flex-shrink-0"
-                          onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }}
-                        />
-                        <div className="flex-1 min-w-0">
-                          <p className="text-[14px] font-semibold text-[#3D2B1F] mb-0.5">Unsicher bei der Auswahl?</p>
-                          <p className="text-[13px] text-[#666] leading-relaxed mb-2.5">
-                            Ich helfe Ihnen gerne, die passende Pflegekraft für Ihre Situation zu finden — schnell und unverbindlich.
-                          </p>
-                          <div className="flex flex-wrap items-center gap-2">
-                            <a
-                              href="https://wa.me/4989200000830"
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="inline-flex items-center gap-1.5 text-xs font-semibold bg-[#25D366] text-white px-3.5 py-2 rounded-full hover:bg-[#1FB854] transition-colors"
-                            >
-                              WhatsApp schreiben
-                            </a>
-                            <a
-                              href="tel:+4989200000830"
-                              className="inline-flex items-center gap-1.5 text-xs font-semibold bg-white text-[#3D2B1F] border border-[#E5E3DF] px-3.5 py-2 rounded-full hover:bg-gray-50 transition-colors"
-                            >
-                              ☎ 089 200 000 830
-                            </a>
-                          </div>
-                        </div>
-                      </div>
+                    <div className="mt-4">
+                      <BeratungCTA
+                        headline="Unsicher bei der Auswahl?"
+                        body="Ich helfe Ihnen gerne, die passende Pflegekraft für Ihre Situation zu finden — schnell und unverbindlich."
+                      />
                     </div>
                   )}
                 </div>
