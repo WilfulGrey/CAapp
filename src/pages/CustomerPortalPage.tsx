@@ -43,6 +43,7 @@ import { AngebotCard } from '../components/portal/AngebotCard';
 import { AppCard } from '../components/portal/AppCard';
 import { AppCardDone } from '../components/portal/AppCardDone';
 import { MatchCard } from '../components/portal/MatchCard';
+import { MatchCardDone } from '../components/portal/MatchCardDone';
 import { InterestCard, type InterestActionStatus } from '../components/portal/InterestCard';
 import { ExpiredLinkScreen } from '../components/portal/ExpiredLinkScreen';
 import type { ContractFormData } from '../components/portal/AngebotPruefenModal';
@@ -1763,23 +1764,23 @@ const CustomerPortalPage: FC = () => {
              die gleiche Liste eingehängt — keine eigene Section, kein
              Erklär-Text. ── */}
         {!hasPending && (() => {
-          // Welche caregiver_ids sind schon als effectiveMatched-Eintrag
-          // drin? Damit wir die virtuellen declined-from-Interest-Karten
-          // (aus declinedFromInterest-Map) nicht doppelt rendern falls
-          // Mamamia sie ausnahmsweise doch noch im Matching listet.
-          const effectiveMatchedIds = new Set(effectiveMatched.map((m) => m.caregiverId));
-          const declinedInterestVirtual = Array.from(declinedFromInterest.entries())
-            .filter(([cgId]) => !effectiveMatchedIds.has(cgId))
-            .map(([cgId, nurse]) => ({ nurse, caregiverId: cgId, virtualDeclinedFromInterest: true as const }));
-
+          // Interest-Pflegekräfte (sowohl invited als auch declined)
+          // werden NICHT in der Matching-Liste gerendert sondern unten
+          // in der "Bereits bearbeitet"-Sektion (User-Wunsch: gleiche
+          // Behandlung wie bei Bewerbungen). Filter: caregiverId raus
+          // wenn interestOriginIds das hat UND Status invited/declined.
           const allVisible = effectiveMatched
             .map((m, i) => ({ nurse: m.nurse, i, caregiverId: m.caregiverId, status: nurseStatusById.get(m.caregiverId) ?? 'pending' as NurseStatus, virtualDeclinedFromInterest: false as const }))
-            .filter(({ status }) => status === 'pending' || status === 'invited' || status === 'declined');
+            .filter(({ status, caregiverId }) => {
+              if (status === 'pending') return true;
+              // invited/declined ausschließen wenn aus Interest stammt
+              return !interestOriginIds.has(caregiverId);
+            });
           // Order: pending (cap 5, oben) → invited → declined (ganz unten,
           // ausgegraut mit "Abgelehnt"-Pill + Undo-Link). User-Wunsch:
-          // bearbeitete Pflegekräfte rutschen nach unten statt in eine
-          // separate "Bereits bearbeitet"-Sektion. Virtuelle declined-from-
-          // Interest-Karten kommen ganz ans Ende.
+          // bearbeitete (normale) Pflegekräfte rutschen nach unten in der
+          // Matching-Liste. Interest-Aktionen leben in "Bereits bearbeitet"
+          // (siehe unten — InterestActionCards in der doneApps-Sektion).
           const visibleNurses: Array<{
             nurse: Nurse;
             i: number;
@@ -1790,13 +1791,6 @@ const CustomerPortalPage: FC = () => {
             ...allVisible.filter(({ status }) => status === 'pending').slice(0, 5),
             ...allVisible.filter(({ status }) => status === 'invited'),
             ...allVisible.filter(({ status }) => status === 'declined'),
-            ...declinedInterestVirtual.map((v, idx) => ({
-              nurse: v.nurse,
-              i: -1 - idx,                       // negativ damit kollisionsfrei zu effectiveMatched-Indices
-              caregiverId: v.caregiverId,
-              status: 'declined' as NurseStatus,
-              virtualDeclinedFromInterest: true,
-            })),
           ];
           const hasAnyCard = visibleNurses.length > 0 || visibleInterests.length > 0;
           return (
@@ -1840,34 +1834,19 @@ const CustomerPortalPage: FC = () => {
                         />
                       );
                     })}
-                    {visibleNurses.map(({ nurse, i, status, caregiverId, virtualDeclinedFromInterest }) => {
-                      const onUndo = status === 'declined'
-                        ? (virtualDeclinedFromInterest
-                            ? () => undoDismissInterest(caregiverId)   // Interest-Restore
-                            : () => undoDeclinedMatch(i))               // Matching-Restore
-                        : undefined;
-                      return (
-                        <MatchCard
-                          key={virtualDeclinedFromInterest ? `vd-${caregiverId}` : `m-${i}`}
-                          nurse={nurse}
-                          status={status}
-                          onNurseClick={
-                            virtualDeclinedFromInterest
-                              // Virtuelle Karten haben keinen Matching-Index → Modal
-                              // direkt mit nurse-Daten öffnen (Profil nur statisch aus
-                              // Snapshot, kein Mamamia-Refetch nötig).
-                              ? () => setSelectedNurse(nurse)
-                              : () => openNurseFromMatch(nurse, i)
-                          }
-                          onInvite={virtualDeclinedFromInterest ? undefined : () => canInviteNurse(i)}
-                          onInviteConfirm={virtualDeclinedFromInterest ? undefined : () => confirmInviteNurse(i, displayName(nurse.name))}
-                          onUndoDecline={onUndo}
-                          // Hat Interesse: bei virtuellen immer true, sonst über
-                          // interestOriginIds-Set.
-                          hasInterestOrigin={virtualDeclinedFromInterest || interestOriginIds.has(caregiverId)}
-                        />
-                      );
-                    })}
+                    {visibleNurses.map(({ nurse, i, status }) => (
+                      <MatchCard
+                        key={`m-${i}`}
+                        nurse={nurse}
+                        status={status}
+                        onNurseClick={() => openNurseFromMatch(nurse, i)}
+                        onInvite={() => canInviteNurse(i)}
+                        onInviteConfirm={() => confirmInviteNurse(i, displayName(nurse.name))}
+                        onUndoDecline={status === 'declined' ? () => undoDeclinedMatch(i) : undefined}
+                        // Interest-Origin landet jetzt in "Bereits bearbeitet" —
+                        // hier in der Matching-Liste sind nur normale Matchings.
+                      />
+                    ))}
                   </div>
                 </div>
               )}
@@ -1879,19 +1858,47 @@ const CustomerPortalPage: FC = () => {
           );
         })()}
 
-        {/* ── SECTION: Bereits bearbeitete Bewerbungen ──
-             Immer unten sichtbar wenn done apps existieren, egal ob es
-             gerade pending Apps gibt oder die Matching-Liste angezeigt
-             wird. Declined Matches sind hier RAUS — die leben jetzt am
-             Ende der Matching-Liste mit ihrer eigenen "Abgelehnt"-Pill. */}
-        {doneApps.length > 0 && (
-          <div className="space-y-2">
-            <p className="text-xs font-semibold uppercase tracking-wider text-gray-400 px-1">Bereits bearbeitet</p>
-            {doneApps.map((app) => (
-              <AppCardDone key={app.id} app={app} onNurseClick={(n, a) => { setNurseModalApp(a); setSelectedNurse(n); }} onUndo={undoApp} />
-            ))}
-          </div>
-        )}
+        {/* ── SECTION: Bereits bearbeitet ──
+             Immer unten sichtbar wenn doneApps ODER Interest-Aktionen
+             existieren. Sammelt:
+             - bearbeitete Bewerbungen (AppCardDone)
+             - eingeladene Interest-Pflegekräfte (MatchCardDone, kein Undo
+               weil Mamamia keine uninvite-Mutation kennt)
+             - abgelehnte Interest-Pflegekräfte (MatchCardDone, mit Undo)
+             Normale Matchings (invited/declined) bleiben im Matching-
+             List-Bearbeitet-Bereich oben, nicht hier. */}
+        {(() => {
+          // Interest-Aktionen aus den verfügbaren Quellen sammeln:
+          // - declinedFromInterest-Map (lokal + lead_events)
+          // - invited Interests aus effectiveMatched gefiltert auf
+          //   interestOriginIds-Mitgliedschaft
+          const interestInvited = effectiveMatched
+            .filter((m) => nurseStatusById.get(m.caregiverId) === 'invited' && interestOriginIds.has(m.caregiverId))
+            .map((m) => ({ nurse: m.nurse, caregiverId: m.caregiverId, status: 'invited' as const, key: `ii-${m.caregiverId}` }));
+          const interestDeclined = Array.from(declinedFromInterest.entries())
+            .map(([cgId, nurse]) => ({ nurse, caregiverId: cgId, status: 'declined' as const, key: `id-${cgId}` }));
+          const interestActions = [...interestInvited, ...interestDeclined];
+          const hasAny = doneApps.length > 0 || interestActions.length > 0;
+          if (!hasAny) return null;
+          return (
+            <div className="space-y-2">
+              <p className="text-xs font-semibold uppercase tracking-wider text-gray-400 px-1">Bereits bearbeitet</p>
+              {doneApps.map((app) => (
+                <AppCardDone key={app.id} app={app} onNurseClick={(n, a) => { setNurseModalApp(a); setSelectedNurse(n); }} onUndo={undoApp} />
+              ))}
+              {interestActions.map(({ nurse, caregiverId, status, key }) => (
+                <MatchCardDone
+                  key={key}
+                  nurse={nurse}
+                  status={status}
+                  hasInterestOrigin
+                  onNurseClick={() => setSelectedNurse(nurse)}
+                  onUndo={status === 'declined' ? () => undoDismissInterest(caregiverId) : undefined}
+                />
+              ))}
+            </div>
+          );
+        })()}
 
         {/* ── SECTION HEADER: So funktioniert's ── */}
         <div className="px-1 pt-3">
