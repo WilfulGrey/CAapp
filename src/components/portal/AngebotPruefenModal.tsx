@@ -1,6 +1,11 @@
 import { useState } from 'react';
 import type { FC } from 'react';
-import { Check, X } from 'lucide-react';
+import { Check, Info, X } from 'lucide-react';
+
+// Liste aller Feiertage mit doppeltem Tagessatz — wird im Konditionen-
+// Modal als Popover hinter dem Info-Icon angezeigt + von der Berechnungs-
+// Logik (holidaysForYear) als Quelle der Wahrheit verwendet.
+const FEIERTAGE_LIST = 'Karfreitag, Ostersonntag, Ostermontag, 1. Mai, Heiligabend, 1. + 2. Weihnachtstag, Silvester, Neujahr';
 import type { Nurse } from '../../types';
 import type { Application } from './shared';
 import { displayName, initials } from './shared';
@@ -238,6 +243,7 @@ export const AngebotPruefenModal: FC<{
   onNurseClick: (n: Nurse) => void;
 }> = ({ app, prefill, onClose, onAccept, onNurseClick }) => {
   const [step, setStep] = useState<1 | 2>(1);
+  const [feiertagInfoOpen, setFeiertagInfoOpen] = useState(false);
   const { nurse, offer } = app;
   const inits = initials(nurse.name);
   const name = displayName(nurse.name);
@@ -361,33 +367,51 @@ export const AngebotPruefenModal: FC<{
                     <p className="text-xs text-gray-400">{offer.submittedAt}</p>
                   </div>
                   <div className="rounded-xl border border-gray-100 overflow-hidden divide-y divide-gray-100">
-                    {[
+                    {([
                       { label: 'Tagessatz', value: `${tagessatz} €/Tag`, bold: true },
                       { label: 'Anreisedatum', value: offer.anreisedatum },
                       { label: 'Abreisedatum', value: `Vorauss. ${offer.abreisedatum}` },
                       { label: 'Anreisekosten', value: `${offer.anreisekosten} €` },
                       { label: 'Abreisekosten', value: `${offer.abreisekosten} €` },
-                      // Reisetage = volle Tagessätze (Anreise- + Abreisetage
-                      // werden mit dem normalen Tagessatz berechnet).
                       { label: 'Reisetage', value: 'Voller Tagessatz' },
-                      // Sommerzuschlag-Row nur wenn Einsatz Juli oder August
-                      // berührt — sonst irrelevant und nur visuelles Rauschen.
-                      ...(zuschlagRelevance.hasSummer
-                        ? [{ label: 'Sommerzuschlag', value: '200 €/Monat (Juli + August)' }]
-                        : []),
-                      // Feiertagszuschlag-Row nur wenn mindestens ein Policy-
-                      // Feiertag im Einsatz-Zeitraum liegt. Listet die konkret
-                      // betroffenen Feiertage damit der Kunde sofort sieht
-                      // wofür der doppelte Tagessatz anfällt.
-                      ...(zuschlagRelevance.relevantHolidayNames.length > 0
-                        ? [{ label: 'Feiertagszuschlag', value: `${tagessatz} €/Tag · ${zuschlagRelevance.relevantHolidayNames.join(', ')}` }]
-                        : []),
-                      // Kündigungsfrist: täglich (Policy).
+                      { label: 'Sommerzuschlag', value: '200 €/Monat (Juli + August)' },
+                      // Feiertagszuschlag wird separat unten gerendert (mit
+                      // Info-Icon zum Aufklappen der Feiertagsliste).
                       { label: 'Kündigungsfrist', value: 'Täglich' },
-                    ].map(row => (
-                      <div key={row.label} className="flex items-center justify-between px-4 py-2.5 bg-white">
-                        <span className="text-sm text-gray-500">{row.label}</span>
-                        <span className={`text-sm ${(row as { bold?: boolean }).bold ? 'font-bold text-gray-900' : 'font-semibold text-gray-700'}`}>{row.value}</span>
+                    ] as { label: string; value: string; bold?: boolean }[]).map((row, idx, arr) => (
+                      <div key={row.label}>
+                        <div className="flex items-center justify-between px-4 py-2.5 bg-white">
+                          <span className="text-sm text-gray-500">{row.label}</span>
+                          <span className={`text-sm ${row.bold ? 'font-bold text-gray-900' : 'font-semibold text-gray-700'}`}>{row.value}</span>
+                        </div>
+                        {/* Feiertagszuschlag-Block direkt nach Sommerzuschlag
+                            einhängen, damit die Vertragskonditionen-Tabelle
+                            in der natürlichen Reihenfolge bleibt. */}
+                        {row.label === 'Sommerzuschlag' && (
+                          <>
+                            <div className="flex items-center justify-between px-4 py-2.5 bg-white border-t border-gray-100">
+                              <span className="text-sm text-gray-500">Feiertagszuschlag</span>
+                              <span className="text-sm font-semibold text-gray-700 inline-flex items-center gap-1.5">
+                                Doppelter Tagessatz
+                                <button
+                                  type="button"
+                                  onClick={() => setFeiertagInfoOpen(v => !v)}
+                                  aria-label="Welche Feiertage?"
+                                  className="text-gray-400 hover:text-gray-700 transition-colors"
+                                >
+                                  <Info className="w-3.5 h-3.5" />
+                                </button>
+                              </span>
+                            </div>
+                            {feiertagInfoOpen && (
+                              <div className="px-4 py-2.5 bg-gray-50 border-t border-gray-100">
+                                <p className="text-[12px] text-gray-600 leading-relaxed">
+                                  <span className="font-semibold">Feiertage mit doppeltem Tagessatz:</span> {FEIERTAGE_LIST}
+                                </p>
+                              </div>
+                            )}
+                          </>
+                        )}
                       </div>
                     ))}
                   </div>
