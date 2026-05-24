@@ -25,8 +25,9 @@ export const InterestCard: FC<{
   onInviteConfirm?: () => Promise<void>;
   onDismiss?: () => Promise<void>;
   exiting?: boolean;
-}> = ({ nurse, status, onNurseClick, onInvite, onInviteConfirm, exiting }) => {
+}> = ({ nurse, status, onNurseClick, onInvite, onInviteConfirm, onDismiss, exiting }) => {
   const [invitePhase, setInvitePhase] = useState<'idle' | 'sending' | 'done'>('idle');
+  const [dismissPhase, setDismissPhase] = useState<'idle' | 'sending'>('idle');
   const inits = initials(nurse.name);
   const name = displayName(nurse.name);
   const bars = Array.from({ length: 5 }, (_, i) => i < nurse.language.bars);
@@ -43,6 +44,18 @@ export const InterestCard: FC<{
       setTimeout(() => setInvitePhase('idle'), 1500);
     } catch {
       setInvitePhase('idle');
+    }
+  };
+
+  const handleDismiss = async () => {
+    if (!onDismiss) return;
+    setDismissPhase('sending');
+    try {
+      await onDismiss();
+      // Parent moves the card aus visibleInterests → erscheint nach kurzem
+      // Render-Tick als virtuelle declined MatchCard im bearbeitet-Bereich.
+    } catch {
+      setDismissPhase('idle');
     }
   };
 
@@ -141,13 +154,24 @@ export const InterestCard: FC<{
               wird eingeladen…
             </span>
           ) : (
-            <button
-              onClick={e => { e.stopPropagation(); handleInvite(); }}
-              className="flex items-center gap-1.5 text-xs font-bold bg-[#E76F63] text-white px-4 py-1.5 rounded-full hover:bg-[#D65E52] transition-colors active:scale-95 shadow-sm"
-            >
-              <UserPlus className="w-3.5 h-3.5" />
-              Einladen
-            </button>
+            <>
+              {onDismiss && (
+                <button
+                  onClick={(e) => { e.stopPropagation(); handleDismiss(); }}
+                  disabled={dismissPhase === 'sending'}
+                  className="text-xs font-medium text-gray-500 hover:text-gray-700 px-3 py-1.5 rounded-full hover:bg-gray-50 transition-colors disabled:opacity-50"
+                >
+                  {dismissPhase === 'sending' ? 'lehnt ab…' : 'Ablehnen'}
+                </button>
+              )}
+              <button
+                onClick={(e) => { e.stopPropagation(); handleInvite(); }}
+                className="flex items-center gap-1.5 text-xs font-bold bg-[#E76F63] text-white px-4 py-1.5 rounded-full hover:bg-[#D65E52] transition-colors active:scale-95 shadow-sm"
+              >
+                <UserPlus className="w-3.5 h-3.5" />
+                Einladen
+              </button>
+            </>
           )}
         </div>
       </div>
