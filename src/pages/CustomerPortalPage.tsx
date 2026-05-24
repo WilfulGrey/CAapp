@@ -14,7 +14,7 @@ import { useCustomer, useJobOffer, useApplications, useInterests, useDismissedCa
 import { rankComparator } from '../lib/mamamia/matchingsRanking';
 import { prefetchCaregivers } from '../lib/mamamia/caregiverCache';
 import { scheduleAiAbouts, getAiAbout, subscribeAiAbout } from '../lib/mamamia/aiAboutCache';
-import { reportLeadEvent, KOSTENRECHNER_URL } from '../lib/leadEvents';
+import { reportLeadEvent, fetchLeadEvents, KOSTENRECHNER_URL } from '../lib/leadEvents';
 import { identifyClarity } from '../lib/clarity';
 import {
   useRejectApplication,
@@ -631,6 +631,29 @@ const CustomerPortalPage: FC = () => {
       return changed ? next : prev;
     });
   }, [sourceInterests, previewInvitedFromInterest]);
+
+  // Persistenz: auf Mount lead_events laden und Interest-Origin-IDs
+  // rehydraten. Damit überlebt der "Hat Interesse"-Badge auch F5 +
+  // cross-device, selbst wenn Mamamia die Pflegekraft inzwischen aus
+  // mmInterests gedroppt hat.
+  useEffect(() => {
+    if (!lead?.token) return;
+    let cancelled = false;
+    fetchLeadEvents(lead.token, ['caregiver_interest_shown']).then((events) => {
+      if (cancelled || !events.length) return;
+      const ids = events
+        .map((e) => Number(e.metadata?.caregiver_id))
+        .filter((id) => Number.isFinite(id) && id > 0);
+      if (ids.length === 0) return;
+      setInterestOriginIds((prev) => {
+        const next = new Set(prev);
+        let changed = false;
+        for (const id of ids) { if (!next.has(id)) { next.add(id); changed = true; } }
+        return changed ? next : prev;
+      });
+    });
+    return () => { cancelled = true; };
+  }, [lead?.token]);
 
   const visibleInterests = sourceInterests.filter((i) => {
     if (i.rejected_at) return false;

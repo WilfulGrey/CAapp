@@ -75,3 +75,34 @@ export function reportLeadEvent(
     sent.delete(key);
   });
 }
+
+// Fetch persistent lead_events for the given token. Used by the portal
+// on mount to rehydrate Interest-Origin tracking + dismissed-Interest
+// reconstruction (überlebt F5, cross-device). Best-effort — failures
+// loggen + leeres Array zurückgeben damit das Portal-UI weiterläuft.
+export interface FetchedLeadEvent {
+  id: string;
+  event_type: string;
+  metadata: any;
+  created_at: string;
+}
+
+export async function fetchLeadEvents(
+  token: string | null | undefined,
+  eventTypes?: LeadEvent[] | string[],
+): Promise<FetchedLeadEvent[]> {
+  if (!token) return [];
+  const params = new URLSearchParams({ token });
+  if (eventTypes && eventTypes.length > 0) params.set('types', eventTypes.join(','));
+  try {
+    const res = await fetch(`${KOSTENRECHNER_URL}/api/lead-event?${params}`, {
+      method: 'GET',
+      headers: { 'Content-Type': 'application/json' },
+    });
+    if (!res.ok) return [];
+    const json = await res.json().catch(() => ({ events: [] }));
+    return Array.isArray(json?.events) ? (json.events as FetchedLeadEvent[]) : [];
+  } catch {
+    return [];
+  }
+}

@@ -155,6 +155,66 @@ export async function OPTIONS() {
   return new NextResponse(null, { status: 204, headers: corsHeaders });
 }
 
+// GET /api/lead-event?token=<magic-link-token>&types=caregiver_interest_shown,caregiver_declined
+//
+// Liefert lead_events für einen token-authenticated Lead. Wird vom Portal
+// auf Mount aufgerufen um Interest-Origin + bearbeitete Interests aus
+// der Historie zu rehydraten (überlebt F5, cross-device).
+//
+// Erlaubte Event-Typen werden auf die "öffentlichen" beschränkt — keine
+// internen Tracking-Events (email_*_sent etc.) ausgeben.
+const GET_PUBLIC_EVENT_TYPES = new Set([
+  'caregiver_interest_shown',
+  'caregiver_invited',
+  'caregiver_declined',
+  'application_received',
+  'application_accepted_internal',
+  'application_rejected',
+]);
+
+export async function GET(request: NextRequest) {
+  try {
+    const token = request.nextUrl.searchParams.get('token');
+    const typesParam = request.nextUrl.searchParams.get('types') ?? '';
+    if (!token || typeof token !== 'string') {
+      return NextResponse.json({ error: 'token required' }, { status: 400, headers: corsHeaders });
+    }
+
+    const supabase = createClient(supabaseUrl, supabaseServiceKey);
+    const { data: lead } = await supabase
+      .from('leads')
+      .select('id')
+      .eq('token', token)
+      .maybeSingle();
+
+    if (!lead) {
+      return NextResponse.json({ error: 'lead not found' }, { status: 404, headers: corsHeaders });
+    }
+
+    const requestedTypes = typesParam
+      .split(',')
+      .map((s) => s.trim())
+      .filter((s) => GET_PUBLIC_EVENT_TYPES.has(s));
+    const types = requestedTypes.length > 0 ? requestedTypes : Array.from(GET_PUBLIC_EVENT_TYPES);
+
+    const { data: events, error } = await supabase
+      .from('lead_events')
+      .select('id, event_type, metadata, created_at')
+      .eq('lead_id', lead.id)
+      .in('event_type', types)
+      .order('created_at', { ascending: false })
+      .limit(500);
+
+    if (error) {
+      return NextResponse.json({ error: error.message }, { status: 500, headers: corsHeaders });
+    }
+    return NextResponse.json({ events: events ?? [] }, { headers: corsHeaders });
+  } catch (e) {
+    console.error('lead-event GET error:', e instanceof Error ? e.message : String(e));
+    return NextResponse.json({ error: 'failed' }, { status: 500, headers: corsHeaders });
+  }
+}
+
 export async function POST(request: NextRequest) {
   try {
     const { token, event, metadata } = await request.json();
