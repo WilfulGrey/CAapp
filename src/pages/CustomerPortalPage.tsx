@@ -42,6 +42,7 @@ import { BookedScreen } from '../components/portal/BookedScreen';
 import { AngebotCard } from '../components/portal/AngebotCard';
 import { AppCard } from '../components/portal/AppCard';
 import { AppCardDone } from '../components/portal/AppCardDone';
+import { BeratungCTA } from '../components/portal/BeratungCTA';
 import { MatchCard } from '../components/portal/MatchCard';
 import { MatchCardDone } from '../components/portal/MatchCardDone';
 import { InterestCard, type InterestActionStatus } from '../components/portal/InterestCard';
@@ -1763,6 +1764,13 @@ const CustomerPortalPage: FC = () => {
                 onNurseClick={(n) => openNurseFromApp(n, app)}
               />
             ))}
+            {/* Beratungs-CTA direkt unter den Bewerbungen — Bewerbungen sind
+                der entscheidungsstärkste Moment, hier sind Kunden besonders
+                empfänglich für persönliche Hilfe. */}
+            <BeratungCTA
+              headline="Fragen zur Bewerbung?"
+              body="Ich gehe das Angebot gerne mit Ihnen durch und beantworte alle offenen Fragen."
+            />
           </div>
         )}
 
@@ -1837,7 +1845,12 @@ const CustomerPortalPage: FC = () => {
             status: NurseStatus;
             virtualDeclinedFromInterest: boolean;
           }> = [
-            ...allVisible.filter(({ status }) => status === 'pending').slice(0, 5),
+            // Top 3 Pending (vorher 5) — bewusst kürzer damit der Kunde
+            // nicht überfordert wird; höhere Conversion erwartet vom
+            // "patient_data_saved → caregiver_invited"-Schritt. Kein
+            // "Mehr anzeigen"-Button, plus Interest-Karten stehen weiter
+            // oben in eigener Sektion.
+            ...allVisible.filter(({ status }) => status === 'pending').slice(0, 3),
             ...allVisible.filter(({ status }) => status === 'invited'),
             ...allVisible.filter(({ status }) => status === 'declined'),
           ];
@@ -1856,20 +1869,41 @@ const CustomerPortalPage: FC = () => {
                         always-visible Section gerendert (siehe oben), nicht
                         mehr hier — damit sie auch bei hasPending sichtbar
                         bleiben. */}
-                    {visibleNurses.map(({ nurse, i, status }) => (
-                      <MatchCard
-                        key={`m-${i}`}
-                        nurse={nurse}
-                        status={status}
-                        onNurseClick={() => openNurseFromMatch(nurse, i)}
-                        onInvite={() => canInviteNurse(i)}
-                        onInviteConfirm={() => confirmInviteNurse(i, displayName(nurse.name))}
-                        onUndoDecline={status === 'declined' ? () => undoDeclinedMatch(i) : undefined}
-                        // Interest-Origin landet jetzt in "Bereits bearbeitet" —
-                        // hier in der Matching-Liste sind nur normale Matchings.
-                      />
-                    ))}
+                    {(() => {
+                      // Top-2 pending Pflegekräfte kriegen den "Empfehlung des
+                      // Beraters"-Badge — Entscheidungshilfe damit der Kunde
+                      // bei 3 Vorschlägen nicht überfordert ist.
+                      let recommendedCount = 0;
+                      return visibleNurses.map(({ nurse, i, status }) => {
+                        const isRecommended = status === 'pending' && recommendedCount < 2;
+                        if (isRecommended) recommendedCount += 1;
+                        return (
+                          <MatchCard
+                            key={`m-${i}`}
+                            nurse={nurse}
+                            status={status}
+                            isRecommended={isRecommended}
+                            onNurseClick={() => openNurseFromMatch(nurse, i)}
+                            onInvite={() => canInviteNurse(i)}
+                            onInviteConfirm={() => confirmInviteNurse(i, displayName(nurse.name))}
+                            onUndoDecline={status === 'declined' ? () => undoDeclinedMatch(i) : undefined}
+                          />
+                        );
+                      });
+                    })()}
                   </div>
+
+                  {/* Beratungs-CTA — direkt unter den 3 Match-Karten.
+                       Fängt Kunden ab die überfordert oder unsicher sind
+                       und sonst still abspringen würden. */}
+                  {patientSaved && (
+                    <div className="mt-4">
+                      <BeratungCTA
+                        headline="Unsicher bei der Auswahl?"
+                        body="Ich helfe Ihnen gerne, die passende Pflegekraft für Ihre Situation zu finden — schnell und unverbindlich."
+                      />
+                    </div>
+                  )}
                 </div>
               )}
 
