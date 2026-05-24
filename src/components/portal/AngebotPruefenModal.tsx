@@ -367,17 +367,22 @@ export const AngebotPruefenModal: FC<{
                       { label: 'Abreisedatum', value: `Vorauss. ${offer.abreisedatum}` },
                       { label: 'Anreisekosten', value: `${offer.anreisekosten} €` },
                       { label: 'Abreisekosten', value: `${offer.abreisekosten} €` },
-                      // Reisetage = volle Tagessätze (Anreise- + Abreisetage werden
-                      // mit dem normalen Tagessatz berechnet, kein Reduktion).
+                      // Reisetage = volle Tagessätze (Anreise- + Abreisetage
+                      // werden mit dem normalen Tagessatz berechnet).
                       { label: 'Reisetage', value: 'Voller Tagessatz' },
-                      // Feiertagszuschlag = doppelter Tagessatz, also +tagessatz
-                      // on top des regulären Tagessatzes (Policy, nicht offer.
-                      // feiertagszuschlag aus Mamamia das oft mit anderen Werten
-                      // bestückt wird).
-                      { label: 'Feiertagszuschlag', value: `${tagessatz} €/Tag (doppelter Tagessatz)` },
-                      // Kündigungsfrist: täglich, nicht offer.kuendigungsfrist
-                      // (User-Policy: keine Mindestlaufzeit, tagesgenaue
-                      // Kündigung möglich).
+                      // Sommerzuschlag-Row nur wenn Einsatz Juli oder August
+                      // berührt — sonst irrelevant und nur visuelles Rauschen.
+                      ...(zuschlagRelevance.hasSummer
+                        ? [{ label: 'Sommerzuschlag', value: '200 €/Monat (Juli + August)' }]
+                        : []),
+                      // Feiertagszuschlag-Row nur wenn mindestens ein Policy-
+                      // Feiertag im Einsatz-Zeitraum liegt. Listet die konkret
+                      // betroffenen Feiertage damit der Kunde sofort sieht
+                      // wofür der doppelte Tagessatz anfällt.
+                      ...(zuschlagRelevance.relevantHolidayNames.length > 0
+                        ? [{ label: 'Feiertagszuschlag', value: `${tagessatz} €/Tag · ${zuschlagRelevance.relevantHolidayNames.join(', ')}` }]
+                        : []),
+                      // Kündigungsfrist: täglich (Policy).
                       { label: 'Kündigungsfrist', value: 'Täglich' },
                     ].map(row => (
                       <div key={row.label} className="flex items-center justify-between px-4 py-2.5 bg-white">
