@@ -1080,6 +1080,13 @@ const CustomerPortalPage: FC = () => {
       caregiver_snapshot: snapshot,
       decline_origin: 'interest',
     });
+    // Preview-Mode: Mamamia-Mutation skippen, optimistischer Lokal-State
+    // reicht für UI-Test. Sonst würde der Mock-Caregiver-ID Mamamia mit
+    // 404 oder 401 antworten und den optimistischen State zurückrollen.
+    if (IS_PREVIEW_ANY) {
+      showToast('✓ Pflegekraft abgelehnt');
+      return;
+    }
     try {
       await dismissCaregiverMutation.mutate({ caregiver_id: caregiverId, kind: 'interest' });
       refetchDismissed();
