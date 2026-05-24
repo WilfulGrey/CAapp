@@ -100,11 +100,25 @@ function buildPortalUrl(lead: { token?: string | null }): string {
   return `${portalBase.replace(/\/$/, '')}/?token=${encodeURIComponent(lead.token)}`;
 }
 
-// Plant einen Reaktions-Reminder (interest_reminder / application_reminder)
-// für ~1h nach dem ursprünglichen caregiver_interest_shown bzw.
-// application_received-Event. Pflegekraft-Metadata wird mitgespeichert,
+// Plant Reaktions-Reminder nach dem ursprünglichen caregiver_interest_shown
+// bzw. application_received-Event. Pflegekraft-Metadata wird mitgespeichert,
 // damit die Edge Function beim Versand die richtige Mail bauen kann.
-const REMINDER_DELAY_MIN = 60;
+//
+// caregiver_interest_shown → 1 Reminder nach 1h (interest_reminder).
+// application_received → 3 Reminder im Crescendo:
+//   1h  (application_reminder)        sanft, "schon einen Blick werfen können?"
+//   4h  (application_reminder_4h)     dringender, "Pflegekraft prüft andere Anfragen"
+//   12h (application_reminder_12h)    dringendster, "wahrscheinlich nicht mehr verfügbar"
+// Alle 3 tragen identische Cancel-Logik (siehe Edge Function): sobald der
+// Kunde reagiert hat (accept/reject) ODER der Lead beauftragt/nicht
+// interessiert ist, cancelt sich der jeweilige Reminder beim nächsten Tick.
+const REMINDER_DELAY_INTEREST_MIN = 60;
+const REMINDER_DELAYS_APPLICATION_MIN: { emailType: string; delay: number }[] = [
+  { emailType: 'application_reminder',     delay: 60 },
+  { emailType: 'application_reminder_4h',  delay: 4 * 60 },
+  { emailType: 'application_reminder_12h', delay: 12 * 60 },
+];
+
 async function scheduleReactionReminder(
   supabaseAdmin: any,
   leadId: string,
@@ -113,37 +127,42 @@ async function scheduleReactionReminder(
   caregiver: CaregiverDisplay,
   caregiverId: number | string | undefined,
 ): Promise<void> {
-  const emailType = triggerEvent === 'caregiver_interest_shown'
-    ? 'interest_reminder'
-    : 'application_reminder';
-  const scheduledFor = new Date(Date.now() + REMINDER_DELAY_MIN * 60 * 1000).toISOString();
-  try {
-    await supabaseAdmin.from('scheduled_emails').insert({
-      lead_id: leadId,
-      email_type: emailType,
-      recipient_email: recipientEmail,
-      scheduled_for: scheduledFor,
-      status: 'pending',
-      // Pflegekraft-Snapshot für den Mail-Build beim Versand. Photo-URL
-      // ist eine presigned S3-URL mit 30 Min Gültigkeit — beim 1h-
-      // Reminder also bereits abgelaufen. Edge Function versucht trotzdem
-      // einen Inline-Fetch und fällt sauber auf Initialen-Avatar zurück
-      // wenn S3 mit 403 antwortet (PR #142/#148-Pattern).
-      metadata: {
-        caregiver_id: caregiverId,
-        caregiver_name: caregiver.name,
-        caregiver_badge_level: caregiver.badgeLevel ?? null,
-        caregiver_years_experience: caregiver.yearsExperience ?? null,
-        caregiver_einsatz_count: caregiver.einsatzCount ?? null,
-        caregiver_photo_url: caregiver.photoUrl ?? null,
-        caregiver_about_text: caregiver.aboutText ?? null,
-        trigger_event: triggerEvent,
-      },
-    });
-  } catch (e) {
-    // Fire-and-forget — falls das Scheduling fehlschlägt, soll die
-    // ursprüngliche Mail (A/B) trotzdem als Erfolg gelten.
-    console.error(`scheduleReactionReminder ${emailType} failed:`, e instanceof Error ? e.message : String(e));
+  // Pflegekraft-Snapshot für den Mail-Build beim Versand. Photo-URL ist
+  // eine presigned S3-URL mit 30 Min Gültigkeit — beim 1h/4h/12h-Reminder
+  // also bereits abgelaufen. Edge Function versucht trotzdem einen Inline-
+  // Fetch und fällt sauber auf Initialen-Avatar zurück wenn S3 mit 403
+  // antwortet (PR #142/#148-Pattern).
+  const metadata = {
+    caregiver_id: caregiverId,
+    caregiver_name: caregiver.name,
+    caregiver_badge_level: caregiver.badgeLevel ?? null,
+    caregiver_years_experience: caregiver.yearsExperience ?? null,
+    caregiver_einsatz_count: caregiver.einsatzCount ?? null,
+    caregiver_photo_url: caregiver.photoUrl ?? null,
+    caregiver_about_text: caregiver.aboutText ?? null,
+    trigger_event: triggerEvent,
+  };
+
+  const tiers = triggerEvent === 'caregiver_interest_shown'
+    ? [{ emailType: 'interest_reminder', delay: REMINDER_DELAY_INTEREST_MIN }]
+    : REMINDER_DELAYS_APPLICATION_MIN;
+
+  for (const { emailType, delay } of tiers) {
+    const scheduledFor = new Date(Date.now() + delay * 60 * 1000).toISOString();
+    try {
+      await supabaseAdmin.from('scheduled_emails').insert({
+        lead_id: leadId,
+        email_type: emailType,
+        recipient_email: recipientEmail,
+        scheduled_for: scheduledFor,
+        status: 'pending',
+        metadata,
+      });
+    } catch (e) {
+      // Fire-and-forget — falls das Scheduling fehlschlägt, sollen weder
+      // die ursprüngliche Mail (A/B) noch die anderen Tiers blockiert sein.
+      console.error(`scheduleReactionReminder ${emailType} failed:`, e instanceof Error ? e.message : String(e));
+    }
   }
 }
 
