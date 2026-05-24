@@ -947,10 +947,19 @@ function reminderBadgeStyle(level?: string | null): { label: string; gradient: s
   return map[key] || null;
 }
 
+// Reminder-Tier — application-Reminder eskalieren in 3 Stufen (1h/4h/12h),
+// interest bleibt 1-stufig. Tier steuert Intro-Wording, CTA-Text und ob
+// ein prominenter "Schnell Bescheid geben"-Block (WhatsApp + Phone)
+// eingeblendet wird.
+type ReminderTier = "1h" | "4h" | "12h";
+
 // Reminder-Mail-HTML. Beide Varianten (interest / application) teilen sich
 // dasselbe Layout — nur Subject, Intro, Action-Satz + CTA-Text unterscheiden
-// sich. Visual matched mit Mail A/B (buildCaregiverEventEmail), damit die
-// Reihe optisch zusammengehört.
+// sich. Ab Tier "4h" kommt ein prominenter Quick-Action-Block oben drauf
+// damit der Kunde auch ohne Portal-Besuch per WhatsApp/Anruf "passt nicht"
+// signalisieren kann (reduziert Entscheidungs-Paralyse).
+// Visual matched mit Mail A/B (buildCaregiverEventEmail), damit die Reihe
+// optisch zusammengehört.
 function buildReminderHtml(
   lead: Lead,
   meta: ReminderMeta,
@@ -958,6 +967,7 @@ function buildReminderHtml(
   siteUrl: string,
   variant: "interest" | "application",
   photoCid: string | null,
+  tier: ReminderTier = "1h",
 ): string {
   const greeting = buildHalloAnrede(lead.anrede_text || null, lead.nachname || "", lead.vorname || "");
   const cgName = meta.caregiver_name || "Ihre Pflegekraft";
@@ -1007,17 +1017,60 @@ function buildReminderHtml(
       </td></tr>
     </table>`;
 
-  const introHtml = variant === "interest"
-    ? `<p style="font-size:15px;line-height:1.75;color:#444;margin-bottom:18px;">vor einer Stunde haben wir Ihnen geschrieben, dass <strong style="color:#2D1F0F;">${cgName}</strong> Interesse an Ihrer Anfrage hat. Eine kurze Erinnerung — die nächsten Stunden zählen:</p>`
-    : `<p style="font-size:15px;line-height:1.75;color:#444;margin-bottom:18px;">vor einer Stunde haben wir Ihnen <strong style="color:#2D1F0F;">${firstName}s Bewerbung</strong> weitergeleitet. Eine kurze Erinnerung — diese Phase ist zeitkritisch:</p>`;
+  // Tier-spezifisches Intro/Middle/CTA. Crescendo bei application:
+  // 1h sanft → 4h dringender ("prüft andere Anfragen") → 12h dringendster
+  // ("verfügbar nicht mehr garantiert"). Interest bleibt einstufig.
+  let introHtml: string;
+  let middleHtml: string;
+  let ctaText: string;
+  if (variant === "interest") {
+    introHtml = `<p style="font-size:15px;line-height:1.75;color:#444;margin-bottom:18px;">vor einer Stunde haben wir Ihnen geschrieben, dass <strong style="color:#2D1F0F;">${cgName}</strong> Interesse an Ihrer Anfrage hat. Eine kurze Erinnerung — die nächsten Stunden zählen:</p>`;
+    middleHtml = `<p style="font-size:15px;line-height:1.75;color:#444;margin-bottom:20px;">Pflegekräfte mit guten Profilen werden häufig schnell von anderen Familien angefragt. <strong style="color:#2D1F0F;">Damit ${firstName} für Sie verfügbar bleibt</strong>, schauen Sie sich ihr Profil jetzt an und laden Sie sie ein, sich bei Ihnen zu bewerben.</p>`;
+    ctaText = "Profil ansehen und einladen →";
+  } else if (tier === "1h") {
+    introHtml = `<p style="font-size:15px;line-height:1.75;color:#444;margin-bottom:18px;">vor einer Stunde haben wir Ihnen <strong style="color:#2D1F0F;">${firstName}s Bewerbung</strong> weitergeleitet. Eine kurze Erinnerung — diese Phase ist zeitkritisch:</p>`;
+    middleHtml = `<p style="font-size:15px;line-height:1.75;color:#444;margin-bottom:20px;">Pflegekräfte halten ihre Bewerbung bei uns offen, solange sie keine andere Familie verbindlich gebucht hat. <strong style="color:#2D1F0F;">Damit Sie ${firstName} nicht verlieren</strong>, schauen Sie sich ihre Bewerbung jetzt an und bestätigen Sie die Buchung, wenn alles passt.</p>`;
+    ctaText = "Bewerbung ansehen und buchen →";
+  } else if (tier === "4h") {
+    introHtml = `<p style="font-size:15px;line-height:1.75;color:#444;margin-bottom:18px;">${firstName}s Bewerbung liegt nun seit <strong style="color:#2D1F0F;">über 4 Stunden</strong> bei Ihnen — und wir möchten Sie kurz informieren:</p>`;
+    middleHtml = `<p style="font-size:15px;line-height:1.75;color:#444;margin-bottom:20px;">Pflegekräfte werden oft <strong style="color:#2D1F0F;">innerhalb weniger Stunden</strong> für andere Einsätze angefragt. Damit wir ${firstName} für Sie reservieren können, brauchen wir ein kurzes Signal von Ihnen — entweder die Bewerbung annehmen oder kurz Bescheid geben, dass es nicht passt.</p>`;
+    ctaText = "Jetzt entscheiden →";
+  } else {
+    introHtml = `<p style="font-size:15px;line-height:1.75;color:#444;margin-bottom:18px;">${firstName}s Bewerbung wartet nun seit <strong style="color:#C4543D;">über 12 Stunden</strong> auf Ihre Rückmeldung.</p>`;
+    middleHtml = `<p style="font-size:15px;line-height:1.75;color:#444;margin-bottom:20px;">Wir können <strong style="color:#2D1F0F;">nicht mehr garantieren</strong> dass ${firstName} noch verfügbar ist — viele Pflegekräfte sagen nach so langer Zeit anderen Familien zu. Bitte geben Sie uns kurz Bescheid, dann wissen wir woran wir sind und können ggf. eine andere Pflegekraft für Sie suchen.</p>`;
+    ctaText = "Jetzt entscheiden →";
+  }
 
-  const middleHtml = variant === "interest"
-    ? `<p style="font-size:15px;line-height:1.75;color:#444;margin-bottom:20px;">Pflegekräfte mit guten Profilen werden häufig schnell von anderen Familien angefragt. <strong style="color:#2D1F0F;">Damit ${firstName} für Sie verfügbar bleibt</strong>, schauen Sie sich ihr Profil jetzt an und laden Sie sie ein, sich bei Ihnen zu bewerben.</p>`
-    : `<p style="font-size:15px;line-height:1.75;color:#444;margin-bottom:20px;">Pflegekräfte halten ihre Bewerbung bei uns offen, solange sie keine andere Familie verbindlich gebucht hat. <strong style="color:#2D1F0F;">Damit Sie ${firstName} nicht verlieren</strong>, schauen Sie sich ihre Bewerbung jetzt an und bestätigen Sie die Buchung, wenn alles passt.</p>`;
-
-  const ctaText = variant === "interest"
-    ? "Profil ansehen und einladen →"
-    : "Bewerbung ansehen und buchen →";
+  // Quick-Action-Block ab Tier "4h": prominent oben unter dem Intro,
+  // damit der Kunde auch ohne Portal-Besuch antworten kann. Häufigste
+  // Hemmschwelle: "ich weiß nicht ob es passt, also schiebe ich es auf" —
+  // mit "kurz Bescheid geben"-Button reduziert das die Paralyse.
+  const showQuickActions = variant === "application" && (tier === "4h" || tier === "12h");
+  const quickActionTitle = tier === "12h"
+    ? "Bitte kurz Bescheid geben"
+    : "Schnell antworten?";
+  const quickActionSub = tier === "12h"
+    ? "Auch ein kurzes „passt nicht“ hilft uns weiter — dann können wir freigeben und ${firstName} findet schneller einen anderen Einsatz."
+    : "Falls Sie keine Zeit für das Portal haben, reicht eine kurze Nachricht — wir kümmern uns dann um den Rest.";
+  const quickActionHtml = showQuickActions
+    ? `
+    <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="margin:0 0 22px 0;border:1px solid #EFD9CC;border-radius:12px;overflow:hidden;background-color:#FDF6F1;">
+      <tr><td style="padding:18px 20px;">
+        <p style="margin:0 0 6px;font-size:15px;font-weight:700;color:#2D1F0F;">${quickActionTitle}</p>
+        <p style="margin:0 0 14px;font-size:14px;line-height:1.6;color:#555;">${quickActionSub.replace("${firstName}", firstName)}</p>
+        <table cellpadding="0" cellspacing="0" role="presentation">
+          <tr>
+            <td style="padding-right:8px;">
+              <a href="https://wa.me/4989200000830" style="display:inline-block;background-color:#25D366;border-radius:22px;padding:11px 20px;text-decoration:none;font-size:14px;font-weight:700;color:#ffffff;white-space:nowrap;">WhatsApp schreiben</a>
+            </td>
+            <td>
+              <a href="tel:+4989200000830" style="display:inline-block;background-color:#ffffff;border:1px solid #E5E3DF;border-radius:22px;padding:11px 20px;text-decoration:none;font-size:14px;font-weight:700;color:#3D2B1F;white-space:nowrap;">&#9990; 089 200 000 830</a>
+            </td>
+          </tr>
+        </table>
+      </td></tr>
+    </table>`
+    : "";
 
   const softOut = variant === "interest"
     ? `<p style="font-size:13px;line-height:1.6;color:#888;margin:18px 0 0;font-style:italic;">Falls ${firstName} nicht zu Ihnen passt, lehnen Sie sie im Portal kurz ab — so weiß sie Bescheid und kann sich auf andere Familien konzentrieren.</p>`
@@ -1026,6 +1079,7 @@ function buildReminderHtml(
   const content = `
     <p style="font-size:15px;line-height:1.75;color:#444;margin-bottom:14px;">${greeting},</p>
     ${introHtml}
+    ${quickActionHtml}
     ${kachel}
     ${middleHtml}
     ${bulletproofButton(portalUrl, ctaText)}
@@ -1040,6 +1094,7 @@ function buildReminderText(
   meta: ReminderMeta,
   portalUrl: string,
   variant: "interest" | "application",
+  tier: ReminderTier = "1h",
 ): string {
   const halloAnrede = buildHalloAnrede(lead.anrede_text || null, lead.nachname || "", lead.vorname || "");
   const cgName = meta.caregiver_name || "Ihre Pflegekraft";
@@ -1063,13 +1118,35 @@ Tel: 089 200 000 830  ·  WhatsApp: https://wa.me/4989200000830
 Primundus Deutschland | www.primundus.de
 `;
   }
+
+  // Application-Variante in 3 Tiers — Text-Body schrittweise dringender.
+  let intro: string;
+  let body: string;
+  let cta: string;
+  let quickAction = "";
+  if (tier === "1h") {
+    intro = `vor einer Stunde haben wir Ihnen ${firstName}s Bewerbung weitergeleitet. Eine kurze Erinnerung — diese Phase ist zeitkritisch:`;
+    body = `Pflegekräfte halten ihre Bewerbung bei uns offen, solange sie keine andere Familie verbindlich gebucht hat. Damit Sie ${firstName} nicht verlieren, schauen Sie sich ihre Bewerbung jetzt an und bestätigen Sie die Buchung, wenn alles passt.`;
+    cta = `Bewerbung ansehen und buchen: ${portalUrl}`;
+  } else if (tier === "4h") {
+    intro = `${firstName}s Bewerbung liegt nun seit über 4 Stunden bei Ihnen — und wir möchten Sie kurz informieren:`;
+    body = `Pflegekräfte werden oft innerhalb weniger Stunden für andere Einsätze angefragt. Damit wir ${firstName} für Sie reservieren können, brauchen wir ein kurzes Signal von Ihnen — entweder die Bewerbung annehmen oder kurz Bescheid geben, dass es nicht passt.`;
+    cta = `Jetzt entscheiden: ${portalUrl}`;
+    quickAction = `\nSchnell antworten?\nFalls Sie keine Zeit für das Portal haben, reicht eine kurze Nachricht:\n  WhatsApp: https://wa.me/4989200000830\n  Telefon:  089 200 000 830\n`;
+  } else {
+    intro = `${firstName}s Bewerbung wartet nun seit über 12 Stunden auf Ihre Rückmeldung.`;
+    body = `Wir können nicht mehr garantieren dass ${firstName} noch verfügbar ist — viele Pflegekräfte sagen nach so langer Zeit anderen Familien zu. Bitte geben Sie uns kurz Bescheid, dann wissen wir woran wir sind und können ggf. eine andere Pflegekraft für Sie suchen.`;
+    cta = `Jetzt entscheiden: ${portalUrl}`;
+    quickAction = `\nBitte kurz Bescheid geben\nAuch ein kurzes „passt nicht“ hilft uns weiter — dann können wir freigeben und ${firstName} findet schneller einen anderen Einsatz:\n  WhatsApp: https://wa.me/4989200000830\n  Telefon:  089 200 000 830\n`;
+  }
+
   return `${halloAnrede},
 
-vor einer Stunde haben wir Ihnen ${firstName}s Bewerbung weitergeleitet. Eine kurze Erinnerung — diese Phase ist zeitkritisch:
+${intro}
+${quickAction}
+${body}
 
-Pflegekräfte halten ihre Bewerbung bei uns offen, solange sie keine andere Familie verbindlich gebucht hat. Damit Sie ${firstName} nicht verlieren, schauen Sie sich ihre Bewerbung jetzt an und bestätigen Sie die Buchung, wenn alles passt.
-
-Bewerbung ansehen und buchen: ${portalUrl}
+${cta}
 
 Falls die Bewerbung nicht passt, lehnen Sie sie im Portal kurz ab — so weiß ${firstName} Bescheid und kann sich auf andere Familien konzentrieren.
 
@@ -1286,12 +1363,15 @@ Deno.serve(async (req: Request) => {
           eventTypeFailed = "email_nachfass_3_failed";
         } else if (
           scheduledEmail.email_type === "interest_reminder" ||
-          scheduledEmail.email_type === "application_reminder"
+          scheduledEmail.email_type === "application_reminder" ||
+          scheduledEmail.email_type === "application_reminder_4h" ||
+          scheduledEmail.email_type === "application_reminder_12h"
         ) {
-          // Reaktions-Reminder. 1h nach dem ursprünglichen
-          // caregiver_interest_shown / application_received-Event. Vor Versand:
-          // checken ob der Kunde inzwischen reagiert hat (positiv ODER negativ
-          // für diese Pflegekraft). Wenn ja, cancelt sich der Reminder selbst.
+          // Reaktions-Reminder. 1h / 4h / 12h nach dem ursprünglichen
+          // caregiver_interest_shown / application_received-Event. Vor
+          // Versand: checken ob der Kunde inzwischen reagiert hat (positiv
+          // ODER negativ für diese Pflegekraft). Wenn ja, cancelt sich der
+          // Reminder selbst — gilt für alle 3 application-Tiers gleich.
           const meta = ((scheduledEmail as any).metadata ?? {}) as ReminderMeta;
           const cgId = meta.caregiver_id;
           if (cgId == null) {
@@ -1318,11 +1398,19 @@ Deno.serve(async (req: Request) => {
             continue;
           }
 
+          // Reminder-Variant (interest / application) für Reaktions-Check
+          // und Mail-Build. Alle 3 application-Tiers teilen sich die
+          // Reaktions-Definition (accept/reject).
+          const reminderVariant: "interest_reminder" | "application_reminder" =
+            scheduledEmail.email_type === "interest_reminder"
+              ? "interest_reminder"
+              : "application_reminder";
+
           // Hat der Kunde reagiert (invite/decline bzw. accept/reject)?
           const reacted = await hasReactionForCaregiver(
             supabase,
             scheduledEmail.lead_id,
-            scheduledEmail.email_type as "interest_reminder" | "application_reminder",
+            reminderVariant,
             cgId,
           );
           if (reacted) {
@@ -1341,12 +1429,23 @@ Deno.serve(async (req: Request) => {
 
           // Reaktion fehlt → Reminder bauen + senden. Foto inline einbetten
           // (CID), die S3-URL ist nach 30 Min eh meist abgelaufen.
-          const variant = scheduledEmail.email_type === "interest_reminder" ? "interest" : "application";
+          const variant: "interest" | "application" =
+            reminderVariant === "interest_reminder" ? "interest" : "application";
+          const tier: ReminderTier =
+            scheduledEmail.email_type === "application_reminder_4h" ? "4h"
+            : scheduledEmail.email_type === "application_reminder_12h" ? "12h"
+            : "1h";
           const cgName = meta.caregiver_name || "Ihre Pflegekraft";
           const firstName = cgName.split(/\s+/)[0] || cgName;
-          subject = variant === "interest"
-            ? `${firstName} wartet auf Ihre Rückmeldung`
-            : `${firstName} wartet auf Ihre Entscheidung`;
+          if (variant === "interest") {
+            subject = `${firstName} wartet auf Ihre Rückmeldung`;
+          } else if (tier === "1h") {
+            subject = `${firstName} wartet auf Ihre Entscheidung`;
+          } else if (tier === "4h") {
+            subject = `${firstName}: bitte kurz Bescheid geben`;
+          } else {
+            subject = `${firstName}: ist die Bewerbung noch aktuell?`;
+          }
 
           // Portal-URL mit Token bauen
           const portalUrl = (portalBase && (lead as Lead).token)
@@ -1354,8 +1453,8 @@ Deno.serve(async (req: Request) => {
             : smtpConfig.siteUrl;
 
           const inline = await fetchInlinePhotoDeno(meta.caregiver_photo_url);
-          html = buildReminderHtml(lead as Lead, meta, portalUrl, smtpConfig.siteUrl, variant, inline?.cid ?? null);
-          text = buildReminderText(lead as Lead, meta, portalUrl, variant);
+          html = buildReminderHtml(lead as Lead, meta, portalUrl, smtpConfig.siteUrl, variant, inline?.cid ?? null, tier);
+          text = buildReminderText(lead as Lead, meta, portalUrl, variant, tier);
           eventTypeSent = `email_${scheduledEmail.email_type}_sent`;
           eventTypeFailed = `email_${scheduledEmail.email_type}_failed`;
 
