@@ -370,18 +370,14 @@ export const AngebotPruefenModal: FC<{
                       // Reisetage = volle Tagessätze (Anreise- + Abreisetage
                       // werden mit dem normalen Tagessatz berechnet).
                       { label: 'Reisetage', value: 'Voller Tagessatz' },
-                      // Sommerzuschlag-Row nur wenn Einsatz Juli oder August
-                      // berührt — sonst irrelevant und nur visuelles Rauschen.
-                      ...(zuschlagRelevance.hasSummer
-                        ? [{ label: 'Sommerzuschlag', value: '200 €/Monat (Juli + August)' }]
-                        : []),
-                      // Feiertagszuschlag-Row nur wenn mindestens ein Policy-
-                      // Feiertag im Einsatz-Zeitraum liegt. Listet die konkret
-                      // betroffenen Feiertage damit der Kunde sofort sieht
-                      // wofür der doppelte Tagessatz anfällt.
-                      ...(zuschlagRelevance.relevantHolidayNames.length > 0
-                        ? [{ label: 'Feiertagszuschlag', value: `${tagessatz} €/Tag · ${zuschlagRelevance.relevantHolidayNames.join(', ')}` }]
-                        : []),
+                      // Sommerzuschlag- + Feiertagszuschlag-Rows IMMER zeigen
+                      // (= allgemeine Vertragskonditionen, keine Einsatz-
+                      // spezifischen Werte). Ob die Zuschläge für DIESEN
+                      // konkreten Einsatz tatsächlich anfallen, steht in der
+                      // Footnote unter dem Breakdown weiter unten + ergibt
+                      // sich aus der monatlichen Aufstellung.
+                      { label: 'Sommerzuschlag', value: '200 €/Monat (Juli + August)' },
+                      { label: 'Feiertagszuschlag', value: `${tagessatz} €/Tag · Karfreitag, Ostersonntag, Ostermontag, 1. Mai, Heiligabend, 1. + 2. Weihnachtstag, Silvester, Neujahr` },
                       // Kündigungsfrist: täglich (Policy).
                       { label: 'Kündigungsfrist', value: 'Täglich' },
                     ].map(row => (
