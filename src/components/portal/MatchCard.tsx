@@ -45,28 +45,24 @@ export const MatchCard: FC<{
     }
   };
 
-  // "Hat Interesse"-Badge nur im bearbeitet-Bereich (invited/declined) —
-  // pending Interests werden ohnehin als InterestCard mit eigenem Top-Edge-
-  // Badge gerendert.
-  const showInterestOriginBadge = hasInterestOrigin && status !== 'pending';
+  // "Hat Interesse"-Indikator nur im bearbeitet-Bereich (invited/declined).
+  // Pending Interests werden ohnehin als InterestCard mit eigenem
+  // prominenten Top-Edge-Badge gerendert. Bei MatchCard zeigen wir ihn
+  // INLINE im Footer (klein, kein floating Pill auf der Card-Oberkante)
+  // damit er nicht mit den aktiven Interest-Karten konkurriert.
+  const showInterestOriginInline = hasInterestOrigin && status !== 'pending';
+  const interestOriginInline = showInterestOriginInline ? (
+    <span
+      className="inline-flex items-center gap-1 text-[11px] font-medium"
+      style={{ color: status === 'declined' ? '#9CA3AF' : '#C04A40' }}
+      title="Pflegekraft hat ursprünglich Interesse signalisiert"
+    >
+      <Heart className="w-3 h-3" fill="currentColor" />
+      Interesse
+    </span>
+  ) : null;
 
   return (
-    <div className="relative">
-      {showInterestOriginBadge && (
-        <div className="absolute -top-2.5 left-1/2 -translate-x-1/2 z-10 whitespace-nowrap">
-          <span
-            className="inline-flex items-center gap-1.5 text-[11px] font-bold tracking-wide px-3 py-1 rounded-full shadow-sm border"
-            style={{
-              background: 'linear-gradient(135deg, #FFE5DE 0%, #FFCFC4 100%)',
-              color: '#C04A40',
-              borderColor: '#F0B0A4',
-            }}
-          >
-            <Heart className="w-3 h-3" fill="currentColor" />
-            Hat Interesse
-          </span>
-        </div>
-      )}
     <div
       className={`bg-white rounded-2xl border overflow-hidden transition-all ${
         status === 'declined'
@@ -127,6 +123,7 @@ export const MatchCard: FC<{
         </button>
         {status === 'declined' ? (
           <div className="flex items-center gap-3">
+            {interestOriginInline}
             {onUndoDecline && (
               <button
                 onClick={(e) => { e.stopPropagation(); onUndoDecline(); }}
@@ -140,9 +137,12 @@ export const MatchCard: FC<{
             </span>
           </div>
         ) : status === 'invited' ? (
-          <span className="flex items-center gap-1.5 text-xs font-bold text-[#22A06B] bg-[#E3F7EF] border border-[#B8E8D4] px-4 py-1.5 rounded-full">
-            <Check className="w-3 h-3 flex-shrink-0" /> Einladung gesendet
-          </span>
+          <div className="flex items-center gap-3">
+            {interestOriginInline}
+            <span className="flex items-center gap-1.5 text-xs font-bold text-[#22A06B] bg-[#E3F7EF] border border-[#B8E8D4] px-4 py-1.5 rounded-full">
+              <Check className="w-3 h-3 flex-shrink-0" /> Einladung gesendet
+            </span>
+          </div>
         ) : invitePhase === 'sending' ? (
           <span className="flex items-center gap-1.5 text-xs font-bold text-[#8B7355] bg-[#F8F7F5] border border-[#E5E3DF] px-4 py-1.5 rounded-full">
             <svg className="w-3 h-3 animate-spin flex-shrink-0" viewBox="0 0 24 24" fill="none">
@@ -165,7 +165,6 @@ export const MatchCard: FC<{
           </button>
         )}
       </div>
-    </div>
     </div>
   );
 };
