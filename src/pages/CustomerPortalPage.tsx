@@ -114,13 +114,16 @@ const PREVIEW_INTEREST_ASSIGNMENTS = [
 ];
 
 const PREVIEW_INTEREST = {
-  id: 999001,
-  caregiver_id: 999001,
+  // Unique caregiver_id (≠ PREVIEW_APPLICATION 999001) damit das Szenario
+  // "pending Bewerbung von Maria UND offenes Interesse von Krystyna" im
+  // preview=bewerbung Modus getestet werden kann.
+  id: 999020,
+  caregiver_id: 999020,
   rejected_at: null,
   caregiver: {
-    id: 999001,
-    first_name: 'Maria',
-    last_name: 'Kowalska',
+    id: 999020,
+    first_name: 'Krystyna',
+    last_name: 'Nowicka',
     gender: 'female' as const,
     year_of_birth: 1964,
     birth_date: '1964-03-15',
@@ -624,7 +627,10 @@ const CustomerPortalPage: FC = () => {
   // den es im Preview nicht gibt). Die Pflegekraft taucht stattdessen in
   // effectiveMatched mit Status='invited' wieder auf.
   if (IS_PREVIEW_ANY) previewInvitedFromInterest.forEach((_n, id) => invitedSet.add(id));
-  const sourceInterests = IS_PREVIEW_INTERESSE ? [PREVIEW_INTEREST as any] : (mmInterests ?? []);
+  // Preview-Modi: beide (bewerbung + interesse) bekommen die Interest-Dummy
+  // damit das Szenario "pending Bewerbung UND offenes Interesse" getestet
+  // werden kann.
+  const sourceInterests = IS_PREVIEW_ANY ? [PREVIEW_INTEREST as any] : (mmInterests ?? []);
   // Akkumuliere Interest-Origin-IDs aus sourceInterests + Preview-State.
   // Wird in einem Effect synchronisiert (statt direkt in setState im
   // Render) damit React nicht über setState-in-render schreit.
@@ -1739,11 +1745,33 @@ const CustomerPortalPage: FC = () => {
         </div>
         )}
 
+        {/* ── SECTION: Pending Applications ──
+             Höchste Priorität: pending Bewerbungen wollen eine Entscheidung
+             vom Kunden — die kommen ZUERST, vor allem anderen. */}
+        {hasPending && (
+          <div className="space-y-3">
+            <p className="text-[14px] leading-relaxed px-1" style={{color:'#3D3D3D'}}>
+              Tippen Sie auf <span className="font-semibold">"Angebot prüfen"</span>, um die Details der Pflegekraft zu sehen und über das Angebot zu entscheiden.
+            </p>
+            {pendingApps.map((app) => (
+              <AppCard
+                key={app.id}
+                app={app}
+                exiting={exitingIds.has(app.id)}
+                onReview={() => setSelectedApp(app)}
+                onDecline={() => setDeclineConfirmApp(app)}
+                onNurseClick={(n) => openNurseFromApp(n, app)}
+              />
+            ))}
+          </div>
+        )}
+
         {/* ── SECTION: Interest-Karten ──
              IMMER sichtbar wenn proaktiv interessierte Pflegekräfte da sind,
-             egal ob hasPending oder nicht. Neue Interest-Signale sind hot
-             leads die unmittelbar Action wert sind — auch wenn der Kunde
-             grade eine Bewerbung am bearbeiten ist. */}
+             egal ob hasPending oder nicht. Steht UNTER pending Bewerbungen
+             (Bewerbung hat Priorität: schnelle Entscheidung nötig), aber
+             ÜBER der Matching-Liste (Interest ist heißer als ein normales
+             Matching). */}
         {visibleInterests.length > 0 && (
           <div className="space-y-3">
             <p className="text-[14px] leading-relaxed px-1" style={{color:'#3D3D3D'}}>
@@ -1756,7 +1784,7 @@ const CustomerPortalPage: FC = () => {
                 nowIso: new Date().toISOString(),
                 nowYear: new Date().getFullYear(),
               });
-              const nurse = IS_PREVIEW_INTERESSE
+              const nurse = IS_PREVIEW_ANY
                 ? { ...baseNurse, profile: PREVIEW_INTEREST_PROFILE, detailedAssignments: PREVIEW_INTEREST_ASSIGNMENTS }
                 : baseNurse;
               const status: InterestActionStatus =
@@ -1776,25 +1804,6 @@ const CustomerPortalPage: FC = () => {
                 />
               );
             })}
-          </div>
-        )}
-
-        {/* ── SECTION: Pending Applications ── */}
-        {hasPending && (
-          <div className="space-y-3">
-            <p className="text-[14px] leading-relaxed px-1" style={{color:'#3D3D3D'}}>
-              Tippen Sie auf <span className="font-semibold">"Angebot prüfen"</span>, um die Details der Pflegekraft zu sehen und über das Angebot zu entscheiden.
-            </p>
-            {pendingApps.map((app) => (
-              <AppCard
-                key={app.id}
-                app={app}
-                exiting={exitingIds.has(app.id)}
-                onReview={() => setSelectedApp(app)}
-                onDecline={() => setDeclineConfirmApp(app)}
-                onNurseClick={(n) => openNurseFromApp(n, app)}
-              />
-            ))}
           </div>
         )}
 
