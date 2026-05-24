@@ -1543,6 +1543,7 @@ const CustomerPortalPage: FC = () => {
                     <p className="text-[13px] leading-snug flex-1" style={{color:'#ABABAB'}}>inkl. Steuern, Gebühren &amp; Sozialabgaben</p>
                   </div>
                   <p className="text-[15px] mt-3 leading-snug" style={{color:'#3D3D3D'}}>zzgl. 125 € Anreisekosten pro Strecke sowie Kost &amp; Logis</p>
+                  <p className="text-[13px] mt-1.5 leading-snug" style={{color:'#8B8B8B'}}>Falls relevant: Sommerzuschlag im Juli &amp; August (200 €/Monat bzw. 6,67 €/Tag), an deutschen Feiertagen doppelter Tagessatz.</p>
                 </div>
 
                 <div className="rounded-2xl overflow-hidden border mt-3" style={{background:'white', borderColor:'#E5E3DF'}}>
