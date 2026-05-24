@@ -1739,6 +1739,46 @@ const CustomerPortalPage: FC = () => {
         </div>
         )}
 
+        {/* ── SECTION: Interest-Karten ──
+             IMMER sichtbar wenn proaktiv interessierte Pflegekräfte da sind,
+             egal ob hasPending oder nicht. Neue Interest-Signale sind hot
+             leads die unmittelbar Action wert sind — auch wenn der Kunde
+             grade eine Bewerbung am bearbeiten ist. */}
+        {visibleInterests.length > 0 && (
+          <div className="space-y-3">
+            <p className="text-[14px] leading-relaxed px-1" style={{color:'#3D3D3D'}}>
+              {visibleInterests.length === 1
+                ? 'Eine Pflegekraft hat proaktiv Interesse an Ihnen signalisiert.'
+                : `${visibleInterests.length} Pflegekräfte haben proaktiv Interesse an Ihnen signalisiert.`}
+            </p>
+            {visibleInterests.map((i) => {
+              const baseNurse = mapCaregiverToNurse(i.caregiver, {
+                nowIso: new Date().toISOString(),
+                nowYear: new Date().getFullYear(),
+              });
+              const nurse = IS_PREVIEW_INTERESSE
+                ? { ...baseNurse, profile: PREVIEW_INTEREST_PROFILE, detailedAssignments: PREVIEW_INTEREST_ASSIGNMENTS }
+                : baseNurse;
+              const status: InterestActionStatus =
+                interestStatusOverrides.get(i.caregiver_id) ?? 'idle';
+              const label = displayName(nurse.name);
+              return (
+                <InterestCard
+                  key={`interest-${i.id}`}
+                  nurse={nurse}
+                  status={status}
+                  onNurseClick={() => {
+                    setSelectedNurse(nurse);
+                    setSelectedFromInterestId(i.caregiver_id);
+                  }}
+                  onInviteConfirm={() => confirmInviteInterest(i.caregiver_id, label)}
+                  onDismiss={() => confirmDismissInterest(i.caregiver_id)}
+                />
+              );
+            })}
+          </div>
+        )}
+
         {/* ── SECTION: Pending Applications ── */}
         {hasPending && (
           <div className="space-y-3">
@@ -1792,7 +1832,7 @@ const CustomerPortalPage: FC = () => {
             ...allVisible.filter(({ status }) => status === 'invited'),
             ...allVisible.filter(({ status }) => status === 'declined'),
           ];
-          const hasAnyCard = visibleNurses.length > 0 || visibleInterests.length > 0;
+          const hasAnyCard = visibleNurses.length > 0;
           return (
             <>
               {hasAnyCard && (
@@ -1803,37 +1843,10 @@ const CustomerPortalPage: FC = () => {
                       : 'Tippen Sie auf „Einladen", wenn Ihnen eine Pflegekraft gefällt — die Anfrage geht direkt an die Pflegekraft.'}
                   </p>
                   <div className="space-y-3">
-                    {/* Interest-Karten zuerst — Pflegekräfte mit
-                        signalisiertem Interesse sind die "wärmsten"
-                        Kandidatinnen und gehören oben. Sind durch den
-                        lila/coral "Hat Interesse"-Pill klar erkennbar. */}
-                    {visibleInterests.map((i) => {
-                      const baseNurse = mapCaregiverToNurse(i.caregiver, {
-                        nowIso: new Date().toISOString(),
-                        nowYear: new Date().getFullYear(),
-                      });
-                      // Preview-Mode: Profile + Einsatz-Historie merge,
-                      // damit das Modal scrollbaren Inhalt zeigt.
-                      const nurse = IS_PREVIEW_INTERESSE
-                        ? { ...baseNurse, profile: PREVIEW_INTEREST_PROFILE, detailedAssignments: PREVIEW_INTEREST_ASSIGNMENTS }
-                        : baseNurse;
-                      const status: InterestActionStatus =
-                        interestStatusOverrides.get(i.caregiver_id) ?? 'idle';
-                      const label = displayName(nurse.name);
-                      return (
-                        <InterestCard
-                          key={`interest-${i.id}`}
-                          nurse={nurse}
-                          status={status}
-                          onNurseClick={() => {
-                            setSelectedNurse(nurse);
-                            setSelectedFromInterestId(i.caregiver_id);
-                          }}
-                          onInviteConfirm={() => confirmInviteInterest(i.caregiver_id, label)}
-                          onDismiss={() => confirmDismissInterest(i.caregiver_id)}
-                        />
-                      );
-                    })}
+                    {/* Interest-Karten werden jetzt OBEN in einer eigenen
+                        always-visible Section gerendert (siehe oben), nicht
+                        mehr hier — damit sie auch bei hasPending sichtbar
+                        bleiben. */}
                     {visibleNurses.map(({ nurse, i, status }) => (
                       <MatchCard
                         key={`m-${i}`}
