@@ -20,9 +20,16 @@ import {
   berlinDayRange,
   fetchBookedCustomers,
   fetchDailyStats,
+  fetchPeriodStats,
   fetchTotalLeads,
 } from "./queries.ts";
 import { buildReportEmail } from "./template.ts";
+
+// Vergleichs-Periode für den Daily Report. 7 Tage liefert einen stabilen
+// Schnitt, der Wochenend-Effekt rausgemittelt + die Top-Tag-Spalte zeigt
+// das aktuelle Plateau. Falls eines Tages eine andere Periode getestet
+// werden soll, ist das die zentrale Stelle.
+const PERIOD_DAYS_BACK = 7;
 
 interface SmtpConfig {
   host: string;
@@ -116,11 +123,10 @@ Deno.serve(async (req: Request) => {
 
   try {
     const yesterday = berlinDayRange(daysAgo);
-    const dayBefore = berlinDayRange(daysAgo + 1);
 
-    const [yesterdayStats, dayBeforeStats, totalLeads, booked] = await Promise.all([
+    const [yesterdayStats, periodStats, totalLeads, booked] = await Promise.all([
       fetchDailyStats(supabase, yesterday.start, yesterday.end),
-      fetchDailyStats(supabase, dayBefore.start, dayBefore.end),
+      fetchPeriodStats(supabase, PERIOD_DAYS_BACK),
       fetchTotalLeads(supabase),
       fetchBookedCustomers(supabase),
     ]);
@@ -130,9 +136,9 @@ Deno.serve(async (req: Request) => {
 
     const { subject, html, text } = buildReportEmail({
       yesterday: yesterdayStats,
-      dayBefore: dayBeforeStats,
+      period: periodStats,
       yesterdayLabel: yesterday.label,
-      dayBeforeLabel: dayBefore.label,
+      periodLabel: `letzte ${PERIOD_DAYS_BACK} Tage`,
       totalLeads,
       bookedCustomers: booked.uniqueCustomers,
       totalBookings: booked.totalBookings,
