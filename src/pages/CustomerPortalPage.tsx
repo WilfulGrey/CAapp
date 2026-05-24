@@ -2108,22 +2108,53 @@ const CustomerPortalPage: FC = () => {
             && effectiveMatched[nurseMatchIdx] !== undefined
             && nurseStatusById.get(effectiveMatched[nurseMatchIdx].caregiverId) === 'invited'
           }
-          onInvite={nurseMatchIdx !== null ? async () => {
-            const idx = nurseMatchIdx;
-            // Modal animation is driven by the returned Promise — surfaces
-            // failure to the user instead of fake success (CLAUDE.md §1).
-            try {
-              if (canInviteNurse(idx)) {
-                await confirmInviteNurse(idx, displayName(selectedNurse.name));
-              }
-            } finally {
-              setSelectedNurse(null); setNurseMatchIdx(null);
-            }
-          } : undefined}
-          onDeclineMatch={nurseMatchIdx !== null ? () => {
-            declineNurse(nurseMatchIdx);
-            setSelectedNurse(null); setNurseMatchIdx(null);
-          } : undefined}
+          onInvite={
+            nurseMatchIdx !== null
+              ? async () => {
+                  const idx = nurseMatchIdx;
+                  // Modal animation is driven by the returned Promise — surfaces
+                  // failure to the user instead of fake success (CLAUDE.md §1).
+                  try {
+                    if (canInviteNurse(idx)) {
+                      await confirmInviteNurse(idx, displayName(selectedNurse.name));
+                    }
+                  } finally {
+                    setSelectedNurse(null); setNurseMatchIdx(null);
+                  }
+                }
+              : selectedFromInterestId !== null
+              ? async () => {
+                  // Modal wurde aus einer Interest-Karte geöffnet —
+                  // Einladen ruft denselben Interest-Invite-Pfad wie der
+                  // Card-Footer-Button.
+                  const cgId = selectedFromInterestId;
+                  try {
+                    await confirmInviteInterest(cgId, displayName(selectedNurse.name));
+                  } finally {
+                    setSelectedNurse(null); setSelectedFromInterestId(null);
+                  }
+                }
+              : undefined
+          }
+          onDeclineMatch={
+            nurseMatchIdx !== null
+              ? () => {
+                  declineNurse(nurseMatchIdx);
+                  setSelectedNurse(null); setNurseMatchIdx(null);
+                }
+              : selectedFromInterestId !== null
+              ? () => {
+                  // Modal wurde aus einer Interest-Karte geöffnet —
+                  // "Nein danke" feuert den Dismiss-Flow analog zum
+                  // Ablehnen-Button auf der Card. Optimistic: die Karte
+                  // rutscht via declinedFromInterest in den bearbeitet-
+                  // Bereich.
+                  const cgId = selectedFromInterestId;
+                  confirmDismissInterest(cgId).catch(() => { /* parent zeigt Toast */ });
+                  setSelectedNurse(null); setSelectedFromInterestId(null);
+                }
+              : undefined
+          }
         />
       )}
 
