@@ -60,7 +60,7 @@ export const DeclineConfirmModal: FC<{
 
             <div>
               <label className="block text-sm font-semibold text-gray-700 mb-1.5">
-                Nachricht an die Agentur <span className="font-normal text-gray-400">(optional)</span>
+                Grund der Ablehnung <span className="text-red-500">*</span>
               </label>
               <textarea
                 value={message}
@@ -79,8 +79,9 @@ export const DeclineConfirmModal: FC<{
                 Abbrechen
               </button>
               <button
-                onClick={() => onConfirm(message)}
-                className="flex-1 bg-red-500 hover:bg-red-600 text-white rounded-xl py-3 text-base font-bold transition-colors"
+                onClick={() => onConfirm(message.trim())}
+                disabled={message.trim() === ''}
+                className="flex-1 bg-red-500 text-white rounded-xl py-3 text-base font-bold transition-colors hover:bg-red-600 disabled:bg-red-200 disabled:cursor-not-allowed"
               >
                 Ablehnen
               </button>
