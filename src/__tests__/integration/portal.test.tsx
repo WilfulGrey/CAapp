@@ -75,8 +75,10 @@ describe('Portal integration: golden paths', () => {
     const reviewBtn = await screen.findByRole('button', { name: /Angebot prüfen/i }, { timeout: 5000 });
     await user.click(reviewBtn);
 
-    // Modal step 1 → click Weiter
-    const weiter = await screen.findByRole('button', { name: /^Weiter/i });
+    // Modal step 1 → click "Pflegekraft sichern" (PR #166 — renamed from
+    // generic "Weiter" damit das CTA-Wording dem Entscheidungsmoment
+    // entspricht).
+    const weiter = await screen.findByRole('button', { name: /Pflegekraft sichern/i });
     await user.click(weiter);
 
     // Step 2 — fill required Kontaktperson fields.
@@ -97,11 +99,14 @@ describe('Portal integration: golden paths', () => {
     if (!kpTelefonInput) throw new Error('KP Telefon input not found');
     await user.type(kpTelefonInput, '+49 89 12345');
 
-    // AGB checkbox — click label
-    await user.click(screen.getByText(/Ich akzeptiere das Angebot verbindlich/));
+    // AGB checkbox — click label (PR #166 — wording entfernt
+    // "Vertrag mit der Agentur"-Bezug; jetzt "Ich beauftrage die
+    // Pflegekraft verbindlich").
+    await user.click(screen.getByText(/Ich beauftrage die Pflegekraft verbindlich/));
 
-    // Accept
-    const acceptBtn = screen.getByRole('button', { name: /Betreuungskraft akzeptieren/i });
+    // Accept (PR #166 — CTA "Betreuungskraft akzeptieren" → "Pflegekraft
+    // beauftragen", aktiver formuliert am Entscheidungspunkt).
+    const acceptBtn = screen.getByRole('button', { name: /Pflegekraft beauftragen/i });
     await user.click(acceptBtn);
 
     // BookedScreen rendered (copy includes "Pflegekraft gebucht!" substring)
