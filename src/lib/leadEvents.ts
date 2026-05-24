@@ -14,8 +14,28 @@ export type LeadEvent =
   | 'portal_opened'
   | 'patient_data_saved'
   | 'caregiver_invited'
-  | 'caregiver_declined'     // customer wegklicken einer Matching-Pflegekraft
-  | 'application_rejected';  // customer Bewerbung abgelehnt
+  | 'caregiver_declined'           // customer hat eine Pflegekraft abgelehnt (matching ODER interest)
+  | 'caregiver_declined_undone'    // customer hat die Ablehnung rückgängig gemacht (Undo)
+  | 'application_rejected';        // customer Bewerbung abgelehnt
+
+// Mini-Snapshot der Nurse-Daten, die wir brauchen um eine declined-from-
+// Interest Pflegekraft im bearbeitet-Bereich als virtuelle MatchCard zu
+// rendern. Wird beim Dismissen einer Interest-Karte in lead_events
+// gespeichert, weil Mamamia die Pflegekraft danach permanent aus den
+// Interest-/Matching-Listen entfernt und wir sonst keine Daten mehr für
+// Name/Foto/Erfahrung hätten.
+export interface CaregiverSnapshot {
+  name?: string;
+  age?: number;
+  image?: string;
+  color?: string;
+  experience?: string;
+  experienceYears?: number;
+  languageLevel?: string;
+  languageBars?: number;
+  historyAssignments?: number;
+  historyAvgDurationMonths?: number;
+}
 
 export interface LeadEventMetadata {
   // caregiver_invited / caregiver_declined / application_rejected:
@@ -31,6 +51,14 @@ export interface LeadEventMetadata {
   // the kostenrechner endpoint can refresh leads.telefon (kept in sync with
   // Mamamia Customer.phone after a step-4 edit). Optional.
   phone?: string;
+  // caregiver_declined (Interest-Dismiss-Pfad): Nurse-Snapshot damit die
+  // declined Pflegekraft im bearbeitet-Bereich als virtual MatchCard
+  // rekonstruiert werden kann nach Reload / cross-device.
+  caregiver_snapshot?: CaregiverSnapshot;
+  // caregiver_declined: Origin-Marker — 'interest' wenn aus Interest-
+  // Dismiss-Pfad gekommen (= virtual declined MatchCard rendern),
+  // 'matching' (oder undefined) wenn normal aus declineNurse.
+  decline_origin?: 'interest' | 'matching';
 }
 
 // Session-level dedupe so a re-render or repeated save doesn't spam the
@@ -74,4 +102,35 @@ export function reportLeadEvent(
     // can retry (e.g. patient_data_saved fires again on the next save).
     sent.delete(key);
   });
+}
+
+// Fetch persistent lead_events for the given token. Used by the portal
+// on mount to rehydrate Interest-Origin tracking + dismissed-Interest
+// reconstruction (überlebt F5, cross-device). Best-effort — failures
+// loggen + leeres Array zurückgeben damit das Portal-UI weiterläuft.
+export interface FetchedLeadEvent {
+  id: string;
+  event_type: string;
+  metadata: any;
+  created_at: string;
+}
+
+export async function fetchLeadEvents(
+  token: string | null | undefined,
+  eventTypes?: LeadEvent[] | string[],
+): Promise<FetchedLeadEvent[]> {
+  if (!token) return [];
+  const params = new URLSearchParams({ token });
+  if (eventTypes && eventTypes.length > 0) params.set('types', eventTypes.join(','));
+  try {
+    const res = await fetch(`${KOSTENRECHNER_URL}/api/lead-event?${params}`, {
+      method: 'GET',
+      headers: { 'Content-Type': 'application/json' },
+    });
+    if (!res.ok) return [];
+    const json = await res.json().catch(() => ({ events: [] }));
+    return Array.isArray(json?.events) ? (json.events as FetchedLeadEvent[]) : [];
+  } catch {
+    return [];
+  }
 }

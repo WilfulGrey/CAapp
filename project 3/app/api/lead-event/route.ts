@@ -30,14 +30,15 @@ const ALLOWED_EVENTS = [
   'patient_data_saved',
   'caregiver_invited',
   'caregiver_interest_shown',
-  'caregiver_declined',         // Kunde hat eine Matching-Pflegekraft abgelehnt
+  'caregiver_declined',          // Kunde hat eine Pflegekraft abgelehnt (matching ODER interest)
+  'caregiver_declined_undone',   // Kunde hat die Ablehnung rückgängig gemacht
   'application_received',
   // PR #123: customer confirmed acceptance via AngebotPruefenModal step 2.
   // MVP path — Mamamia NOT notified, Primundus team gets a notification
   // email with the contract form data and handles contract paperwork
   // manually. Acceptance row persisted in lead_application_acceptances.
   'application_accepted_internal',
-  'application_rejected',       // Kunde hat eine Bewerbung abgelehnt
+  'application_rejected',        // Kunde hat eine Bewerbung abgelehnt
 ];
 const TEAM_NOTIFY_EVENTS = [
   'patient_data_saved',
@@ -62,6 +63,7 @@ const NON_DEDUPED_EVENTS = new Set([
   'caregiver_invited',
   'caregiver_interest_shown',
   'caregiver_declined',
+  'caregiver_declined_undone',
   'application_received',
   'application_rejected',
 ]);
@@ -153,6 +155,67 @@ const corsHeaders = {
 
 export async function OPTIONS() {
   return new NextResponse(null, { status: 204, headers: corsHeaders });
+}
+
+// GET /api/lead-event?token=<magic-link-token>&types=caregiver_interest_shown,caregiver_declined
+//
+// Liefert lead_events für einen token-authenticated Lead. Wird vom Portal
+// auf Mount aufgerufen um Interest-Origin + bearbeitete Interests aus
+// der Historie zu rehydraten (überlebt F5, cross-device).
+//
+// Erlaubte Event-Typen werden auf die "öffentlichen" beschränkt — keine
+// internen Tracking-Events (email_*_sent etc.) ausgeben.
+const GET_PUBLIC_EVENT_TYPES = new Set([
+  'caregiver_interest_shown',
+  'caregiver_invited',
+  'caregiver_declined',
+  'caregiver_declined_undone',
+  'application_received',
+  'application_accepted_internal',
+  'application_rejected',
+]);
+
+export async function GET(request: NextRequest) {
+  try {
+    const token = request.nextUrl.searchParams.get('token');
+    const typesParam = request.nextUrl.searchParams.get('types') ?? '';
+    if (!token || typeof token !== 'string') {
+      return NextResponse.json({ error: 'token required' }, { status: 400, headers: corsHeaders });
+    }
+
+    const supabase = createClient(supabaseUrl, supabaseServiceKey);
+    const { data: lead } = await supabase
+      .from('leads')
+      .select('id')
+      .eq('token', token)
+      .maybeSingle();
+
+    if (!lead) {
+      return NextResponse.json({ error: 'lead not found' }, { status: 404, headers: corsHeaders });
+    }
+
+    const requestedTypes = typesParam
+      .split(',')
+      .map((s) => s.trim())
+      .filter((s) => GET_PUBLIC_EVENT_TYPES.has(s));
+    const types = requestedTypes.length > 0 ? requestedTypes : Array.from(GET_PUBLIC_EVENT_TYPES);
+
+    const { data: events, error } = await supabase
+      .from('lead_events')
+      .select('id, event_type, metadata, created_at')
+      .eq('lead_id', lead.id)
+      .in('event_type', types)
+      .order('created_at', { ascending: false })
+      .limit(500);
+
+    if (error) {
+      return NextResponse.json({ error: error.message }, { status: 500, headers: corsHeaders });
+    }
+    return NextResponse.json({ events: events ?? [] }, { headers: corsHeaders });
+  } catch (e) {
+    console.error('lead-event GET error:', e instanceof Error ? e.message : String(e));
+    return NextResponse.json({ error: 'failed' }, { status: 500, headers: corsHeaders });
+  }
 }
 
 export async function POST(request: NextRequest) {
