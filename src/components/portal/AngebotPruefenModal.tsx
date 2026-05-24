@@ -187,6 +187,46 @@ function buildMonthlyBreakdown(
   return rows;
 }
 
+// Prüft ob ein Einsatz-Zeitraum tatsächlich Sommer-Monate (Juli/August)
+// berührt und welche Feiertage aus unserer Policy-Liste reinfallen.
+// Wird für die konditionale Footnote unter der Zusammenfassung verwendet —
+// damit der Sommer-/Feiertag-Hinweis nur dann erscheint, wenn er für
+// diesen konkreten Einsatz relevant ist.
+function computeZuschlagRelevance(anreiseStr: string, abreiseStr: string): {
+  hasSummer: boolean;
+  relevantHolidayNames: string[];
+} {
+  const start = parseDeDate(anreiseStr);
+  const end = parseDeDate(abreiseStr);
+  if (!start || !end || end < start) return { hasSummer: false, relevantHolidayNames: [] };
+
+  let hasSummer = false;
+  let y = start.getFullYear();
+  let m = start.getMonth();
+  for (let i = 0; i < 24; i++) {
+    if (SOMMER_MONTHS.has(m)) hasSummer = true;
+    if (y === end.getFullYear() && m === end.getMonth()) break;
+    m += 1;
+    if (m > 11) { m = 0; y += 1; }
+  }
+
+  const all: { name: string; date: Date }[] = [];
+  for (let yr = start.getFullYear(); yr <= end.getFullYear(); yr++) {
+    all.push(...holidaysForYear(yr));
+  }
+  // Dedupe Namen (Karfreitag könnte bei Mehrjahres-Range doppelt vorkommen)
+  // und in Datums-Reihenfolge sortieren.
+  const seen = new Set<string>();
+  const relevantHolidayNames: string[] = [];
+  for (const h of all.filter(h => h.date >= start && h.date <= end).sort((a, b) => a.date.getTime() - b.date.getTime())) {
+    if (!seen.has(h.name)) {
+      seen.add(h.name);
+      relevantHolidayNames.push(h.name);
+    }
+  }
+  return { hasSummer, relevantHolidayNames };
+}
+
 export const AngebotPruefenModal: FC<{
   app: Application;
   /** Parent-supplied defaults derived from lead + mmCustomer. Empty values
@@ -231,6 +271,7 @@ export const AngebotPruefenModal: FC<{
     offer.abreisekosten,
     offer.feiertagszuschlag ?? 0,
   );
+  const zuschlagRelevance = computeZuschlagRelevance(offer.anreisedatum, offer.abreisedatum);
 
   const inputCls = 'w-full border border-gray-200 rounded-xl px-3.5 py-3 text-sm text-gray-800 focus:outline-none focus:border-[#8B7355] focus:ring-2 focus:ring-[#8B7355]/10 transition-all bg-white';
   const labelCls = 'block text-[13px] font-semibold text-gray-700 mb-1.5';
@@ -458,7 +499,15 @@ export const AngebotPruefenModal: FC<{
                       </div>
                     ))}
                   </div>
-                  <p className="text-[12px] text-gray-400 mt-2.5 leading-relaxed">An- und Abreisetage werden mit vollem Tagessatz berechnet. Falls relevant: Sommerzuschlag im Juli &amp; August (200 €/Monat bzw. 6,67 €/Tag), an deutschen Feiertagen doppelter Tagessatz.</p>
+                  <p className="text-[12px] text-gray-400 mt-2.5 leading-relaxed">
+                    An- und Abreisetage werden mit vollem Tagessatz berechnet.
+                    {zuschlagRelevance.hasSummer && (
+                      <> Im Juli und August fällt ein Sommerzuschlag von 200 €/Monat (bzw. 6,67 €/Tag) an.</>
+                    )}
+                    {zuschlagRelevance.relevantHolidayNames.length > 0 && (
+                      <> An {zuschlagRelevance.relevantHolidayNames.join(', ')} wird der doppelte Tagessatz berechnet.</>
+                    )}
+                  </p>
                 </div>
 
                 <label className="flex items-start gap-3 cursor-pointer p-4 bg-white border border-gray-200 rounded-2xl hover:bg-gray-50 transition-colors" onClick={() => setAgbChecked(v => !v)}>
