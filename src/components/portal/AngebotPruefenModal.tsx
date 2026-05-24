@@ -262,14 +262,16 @@ export const AngebotPruefenModal: FC<{
   // Monatliche Aufstellung dynamisch aus Anreise-/Abreisedatum berechnen.
   // Inklusive Sommerzuschlag (Juli/August) + Feiertagszuschläge (Karfreitag,
   // Ostersonntag, Ostermontag, 1. Mai, Heiligabend, 1./2. Weihnachtstag,
-  // Silvester, Neujahr).
+  // Silvester, Neujahr). Feiertagszuschlag = tagessatz (doppelter
+  // Tagessatz an Feiertagen — Policy, nicht offer.feiertagszuschlag aus
+  // Mamamia).
   const summary = buildMonthlyBreakdown(
     offer.anreisedatum,
     offer.abreisedatum,
     tagessatz,
     offer.anreisekosten,
     offer.abreisekosten,
-    offer.feiertagszuschlag ?? 0,
+    tagessatz,
   );
   const zuschlagRelevance = computeZuschlagRelevance(offer.anreisedatum, offer.abreisedatum);
 
@@ -365,9 +367,18 @@ export const AngebotPruefenModal: FC<{
                       { label: 'Abreisedatum', value: `Vorauss. ${offer.abreisedatum}` },
                       { label: 'Anreisekosten', value: `${offer.anreisekosten} €` },
                       { label: 'Abreisekosten', value: `${offer.abreisekosten} €` },
-                      { label: 'Reisetage', value: offer.reisetage },
-                      { label: 'Feiertagszuschlag', value: offer.feiertagszuschlag === 0 ? '0 €' : `${offer.feiertagszuschlag} €/Tag` },
-                      { label: 'Kündigungsfrist', value: offer.kuendigungsfrist },
+                      // Reisetage = volle Tagessätze (Anreise- + Abreisetage werden
+                      // mit dem normalen Tagessatz berechnet, kein Reduktion).
+                      { label: 'Reisetage', value: 'Voller Tagessatz' },
+                      // Feiertagszuschlag = doppelter Tagessatz, also +tagessatz
+                      // on top des regulären Tagessatzes (Policy, nicht offer.
+                      // feiertagszuschlag aus Mamamia das oft mit anderen Werten
+                      // bestückt wird).
+                      { label: 'Feiertagszuschlag', value: `${tagessatz} €/Tag (doppelter Tagessatz)` },
+                      // Kündigungsfrist: täglich, nicht offer.kuendigungsfrist
+                      // (User-Policy: keine Mindestlaufzeit, tagesgenaue
+                      // Kündigung möglich).
+                      { label: 'Kündigungsfrist', value: 'Täglich' },
                     ].map(row => (
                       <div key={row.label} className="flex items-center justify-between px-4 py-2.5 bg-white">
                         <span className="text-sm text-gray-500">{row.label}</span>

@@ -86,7 +86,7 @@ export const AppCard: FC<{
             <div className="min-w-0">
               <p className="text-xs text-gray-500">{app.offer.anreisedatum} – {app.offer.abreisedatum}</p>
               <p className="text-xs text-gray-500">Reisekosten á {app.offer.anreisekosten} €</p>
-              <p className="text-xs text-gray-500">{app.offer.kuendigungsfrist}</p>
+              <p className="text-xs text-gray-500">Täglich kündbar</p>
             </div>
             <div className="text-right flex-shrink-0">
               <p className="text-[10px] text-gray-500 mb-0.5">Tagessatz</p>
