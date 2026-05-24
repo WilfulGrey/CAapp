@@ -198,6 +198,89 @@ export async function fetchDailyStats(
   };
 }
 
+// Aggregations-Result für die letzten N Tage. Pro Metrik:
+//   avg — arithmetisches Mittel über die N Tage
+//   top — höchster Tageswert
+//   topDate — Label-Datum (TT.MM.JJJJ) des Top-Tages
+// Conversion-Rates werden aus den aufsummierten Zahlen über den ganzen
+// Zeitraum gebaut (nicht avg der Tages-Rates), damit kleine Tage mit
+// wenig Traffic die Rate nicht verzerren.
+export interface PeriodStat { avg: number; top: number; topDate: string }
+export interface PeriodStats {
+  visitors: PeriodStat;
+  wizardStarted: PeriodStat;
+  wizardCompleted: PeriodStat;
+  patientDataSaved: PeriodStat;
+  caregiverInvited: PeriodStat;
+  interestShown: PeriodStat;
+  applicationReceived: PeriodStat;
+  bookings: PeriodStat;
+  // Conversion-Raten als Prozentzahlen über die Periode (0..100).
+  // Berechnet aus den jeweiligen Summen, nicht aus den Tages-Avg.
+  convLeadVisitor: number;        // wizardCompleted / visitors
+  convProfilLead: number;         // patientDataSaved / wizardCompleted
+  convInviteProfil: number;       // caregiverInvited / patientDataSaved
+  convAppInvite: number;          // applicationReceived / caregiverInvited
+  convBookingApp: number;         // bookings / applicationReceived
+  // Tageskennzahl der einzelnen 7 Tage — für Mini-Sparkline/Debug.
+  days: { label: string; stats: DailyStats }[];
+}
+
+/**
+ * Holt N Tageskennzahlen (Tag −1 bis Tag −N) und aggregiert sie zu avg+top.
+ * Lädt sequenziell um Supabase-Connection-Pool nicht zu sprengen.
+ */
+export async function fetchPeriodStats(
+  supabase: SupabaseClient,
+  daysBack: number,
+): Promise<PeriodStats> {
+  const perDay: { label: string; stats: DailyStats }[] = [];
+  for (let i = 1; i <= daysBack; i++) {
+    const r = berlinDayRange(i);
+    const stats = await fetchDailyStats(supabase, r.start, r.end);
+    perDay.push({ label: r.label, stats });
+  }
+
+  const aggregate = (pick: (s: DailyStats) => number): PeriodStat => {
+    let sum = 0; let top = -1; let topDate = perDay[0]?.label ?? "";
+    for (const d of perDay) {
+      const v = pick(d.stats);
+      sum += v;
+      if (v > top) { top = v; topDate = d.label; }
+    }
+    return { avg: perDay.length > 0 ? sum / perDay.length : 0, top: top < 0 ? 0 : top, topDate };
+  };
+
+  const sumOf = (pick: (s: DailyStats) => number): number =>
+    perDay.reduce((acc, d) => acc + pick(d.stats), 0);
+  const rate = (num: number, den: number): number =>
+    den > 0 ? (num / den) * 100 : 0;
+
+  const visitorsSum = sumOf((s) => s.visitors);
+  const wizardCompletedSum = sumOf((s) => s.wizardCompleted);
+  const patientDataSavedSum = sumOf((s) => s.patientDataSaved);
+  const caregiverInvitedSum = sumOf((s) => s.caregiverInvited);
+  const applicationReceivedSum = sumOf((s) => s.applicationReceived);
+  const bookingsSum = sumOf((s) => s.bookings);
+
+  return {
+    visitors: aggregate((s) => s.visitors),
+    wizardStarted: aggregate((s) => s.wizardStarted),
+    wizardCompleted: aggregate((s) => s.wizardCompleted),
+    patientDataSaved: aggregate((s) => s.patientDataSaved),
+    caregiverInvited: aggregate((s) => s.caregiverInvited),
+    interestShown: aggregate((s) => s.interestShown),
+    applicationReceived: aggregate((s) => s.applicationReceived),
+    bookings: aggregate((s) => s.bookings),
+    convLeadVisitor: rate(wizardCompletedSum, visitorsSum),
+    convProfilLead: rate(patientDataSavedSum, wizardCompletedSum),
+    convInviteProfil: rate(caregiverInvitedSum, patientDataSavedSum),
+    convAppInvite: rate(applicationReceivedSum, caregiverInvitedSum),
+    convBookingApp: rate(bookingsSum, applicationReceivedSum),
+    days: perDay,
+  };
+}
+
 /**
  * Echte Leads im System (lifetime, ohne Test-Submits). Konstante Referenz
  * für Watershed-Zahl im Report-Footer.

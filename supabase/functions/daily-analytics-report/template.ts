@@ -1,8 +1,15 @@
 // HTML/Text-Template für den Daily-Analytics-Report.
-// Stil: kompakte Tabelle mit gestern vs vorgestern, plus Funnel-Liste,
-// im gewohnten Primundus-Mail-Look (Logo-Header, Footer).
+// Stil: kompakte Tabelle mit "Gestern · 7-Tage-Ø · Top-Tag" Spalten,
+// plus separate Conversion-Rate-Tabelle und Funnel-Liste, im gewohnten
+// Primundus-Mail-Look (Logo-Header, Footer).
+//
+// Begründung 7-Tage-Ø statt Vorgestern (PR #168):
+// Tag-zu-Tag-Vergleiche schwanken stark (Wochenend-Effekt, Kampagnen-
+// Spitzen). Ø über 7 Tage gibt einen stabilen Vergleichspunkt, "Top-Tag"
+// zeigt das aktuelle Plateau. Conversion-% als Tabelle, weil absolute
+// Zahlen wenig aussagen wenn Traffic schwankt.
 
-import type { DailyStats } from "./queries.ts";
+import type { DailyStats, PeriodStats } from "./queries.ts";
 
 const STEP_NAMES: Record<number, string> = {
   1: "Anzahl Patienten",
@@ -17,54 +24,85 @@ const STEP_NAMES: Record<number, string> = {
   10: "Kontaktformular",
 };
 
-function delta(today: number, yesterday: number): string {
-  const diff = today - yesterday;
-  if (diff === 0) return "→ 0";
-  const sign = diff > 0 ? "↑" : "↓";
-  return `${sign} ${Math.abs(diff)}`;
+function fmtInt(n: number): string {
+  return Math.round(n).toLocaleString("de-DE");
 }
 
-function pct(numerator: number, denominator: number): string {
+function fmtAvg(n: number): string {
+  // Avg darf Nachkommastelle haben damit "1.3" nicht als "1" verschwindet.
+  return n.toLocaleString("de-DE", { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+}
+
+function fmtPct(p: number): string {
+  return `${p.toFixed(1)}%`;
+}
+
+function pctRaw(numerator: number, denominator: number): string {
   if (!denominator) return "—";
   return `${((numerator / denominator) * 100).toFixed(1)}%`;
 }
 
 export function buildReportEmail(opts: {
   yesterday: DailyStats;
-  dayBefore: DailyStats;
+  period: PeriodStats;     // 7-Tage-Aggregat (avg + top + conv-rates)
   yesterdayLabel: string;
-  dayBeforeLabel: string;
+  periodLabel: string;     // z.B. "letzte 7 Tage"
   totalLeads: number;
   bookedCustomers: number;   // distinct lead_ids mit ≥1 Buchung (lifetime)
   totalBookings: number;     // Buchungs-Vorgänge insgesamt (lifetime)
   siteUrl: string;
 }): { subject: string; html: string; text: string } {
-  const { yesterday, dayBefore, yesterdayLabel, dayBeforeLabel, totalLeads, bookedCustomers, totalBookings, siteUrl } = opts;
+  const { yesterday, period, yesterdayLabel, periodLabel, totalLeads, bookedCustomers, totalBookings, siteUrl } = opts;
 
   const subject = `📊 Primundus Daily — ${yesterdayLabel} · ${yesterday.wizardCompleted} neue Leads`;
 
-  const rows: Array<{ label: string; today: number | string; yest: number | string; deltaStr?: string }> = [
-    { label: "Besucher (unique Sessions)",      today: yesterday.visitors,           yest: dayBefore.visitors,           deltaStr: delta(yesterday.visitors, dayBefore.visitors) },
-    { label: "Wizard gestartet",                 today: yesterday.wizardStarted,      yest: dayBefore.wizardStarted,      deltaStr: delta(yesterday.wizardStarted, dayBefore.wizardStarted) },
-    { label: "Wizard abgeschlossen (echte Leads, ohne Tests)",today: yesterday.wizardCompleted,    yest: dayBefore.wizardCompleted,    deltaStr: delta(yesterday.wizardCompleted, dayBefore.wizardCompleted) },
-    { label: "Conversion-Rate (Lead/Besucher)", today: pct(yesterday.wizardCompleted, yesterday.visitors), yest: pct(dayBefore.wizardCompleted, dayBefore.visitors) },
-    { label: "Patientenprofil ausgefüllt",       today: yesterday.patientDataSaved,   yest: dayBefore.patientDataSaved,   deltaStr: delta(yesterday.patientDataSaved, dayBefore.patientDataSaved) },
-    { label: "Pflegekräfte eingeladen",          today: yesterday.caregiverInvited,   yest: dayBefore.caregiverInvited,   deltaStr: delta(yesterday.caregiverInvited, dayBefore.caregiverInvited) },
-    { label: "Pflegekräfte mit Interesse",       today: yesterday.interestShown,      yest: dayBefore.interestShown,      deltaStr: delta(yesterday.interestShown, dayBefore.interestShown) },
-    { label: "Bewerbungen erhalten",             today: yesterday.applicationReceived,yest: dayBefore.applicationReceived,deltaStr: delta(yesterday.applicationReceived, dayBefore.applicationReceived) },
-    { label: "Buchungen",                        today: yesterday.bookings,           yest: dayBefore.bookings,           deltaStr: delta(yesterday.bookings, dayBefore.bookings) },
+  // Absolutwerte-Tabelle: Gestern · 7-T-Ø · Top (Datum)
+  const rows: Array<{ label: string; today: number; avg: number; top: number; topDate: string }> = [
+    { label: "Besucher (unique Sessions)",                     today: yesterday.visitors,            avg: period.visitors.avg,            top: period.visitors.top,            topDate: period.visitors.topDate },
+    { label: "Wizard gestartet",                               today: yesterday.wizardStarted,       avg: period.wizardStarted.avg,       top: period.wizardStarted.top,       topDate: period.wizardStarted.topDate },
+    { label: "Wizard abgeschlossen (echte Leads, ohne Tests)", today: yesterday.wizardCompleted,     avg: period.wizardCompleted.avg,     top: period.wizardCompleted.top,     topDate: period.wizardCompleted.topDate },
+    { label: "Patientenprofil ausgefüllt",                     today: yesterday.patientDataSaved,    avg: period.patientDataSaved.avg,    top: period.patientDataSaved.top,    topDate: period.patientDataSaved.topDate },
+    { label: "Pflegekräfte eingeladen",                        today: yesterday.caregiverInvited,    avg: period.caregiverInvited.avg,    top: period.caregiverInvited.top,    topDate: period.caregiverInvited.topDate },
+    { label: "Pflegekräfte mit Interesse",                     today: yesterday.interestShown,       avg: period.interestShown.avg,       top: period.interestShown.top,       topDate: period.interestShown.topDate },
+    { label: "Bewerbungen erhalten",                           today: yesterday.applicationReceived, avg: period.applicationReceived.avg, top: period.applicationReceived.top, topDate: period.applicationReceived.topDate },
+    { label: "Buchungen",                                      today: yesterday.bookings,            avg: period.bookings.avg,            top: period.bookings.top,            topDate: period.bookings.topDate },
   ];
 
   const rowsHtml = rows.map((r, i) => {
     const isLast = i === rows.length - 1;
     const border = isLast ? "" : "border-bottom:1px solid #f0ebe4;";
-    const deltaHtml = r.deltaStr
-      ? `<span style="font-size:11px;color:${r.deltaStr.startsWith("↑") ? "#2D6A4F" : r.deltaStr.startsWith("↓") ? "#B71C1C" : "#9CA3AF"};margin-left:8px;">${r.deltaStr}</span>`
-      : "";
+    // Gestern-vs-Avg Indikator: ↑ über dem Ø, ↓ darunter, → ähnlich (±10%).
+    let arrow = "";
+    if (r.avg > 0) {
+      const ratio = r.today / r.avg;
+      if (ratio >= 1.1) arrow = `<span style="font-size:11px;color:#2D6A4F;margin-left:6px;">↑</span>`;
+      else if (ratio <= 0.9) arrow = `<span style="font-size:11px;color:#B71C1C;margin-left:6px;">↓</span>`;
+      else arrow = `<span style="font-size:11px;color:#9CA3AF;margin-left:6px;">→</span>`;
+    }
     return `<tr>
-      <td style="padding:10px 12px;${border}color:#3D3D3D;font-size:13px;width:60%;">${r.label}</td>
-      <td style="padding:10px 12px;${border}color:#3D3D3D;font-size:14px;font-weight:700;text-align:right;width:25%;">${r.today}${deltaHtml}</td>
-      <td style="padding:10px 12px;${border}color:#9CA3AF;font-size:12px;text-align:right;width:15%;">${r.yest}</td>
+      <td style="padding:10px 12px;${border}color:#3D3D3D;font-size:13px;width:48%;">${r.label}</td>
+      <td style="padding:10px 12px;${border}color:#3D3D3D;font-size:14px;font-weight:700;text-align:right;width:18%;">${fmtInt(r.today)}${arrow}</td>
+      <td style="padding:10px 12px;${border}color:#666;font-size:13px;text-align:right;width:14%;">${fmtAvg(r.avg)}</td>
+      <td style="padding:10px 12px;${border}color:#666;font-size:13px;text-align:right;width:20%;"><strong style="color:#3D2B1F;">${fmtInt(r.top)}</strong> <span style="color:#9CA3AF;font-size:11px;">${r.topDate.slice(0, 5)}</span></td>
+    </tr>`;
+  }).join("");
+
+  // Conversion-Raten-Tabelle: Gestern (Tages-Rate) vs 7-T-Ø (Periode-Rate)
+  const convRows: Array<{ label: string; today: string; avg: number }> = [
+    { label: "Lead-Conv  (Wizard abgeschl. / Besucher)",         today: pctRaw(yesterday.wizardCompleted, yesterday.visitors),               avg: period.convLeadVisitor },
+    { label: "Profil-Conv  (Profil / Lead)",                     today: pctRaw(yesterday.patientDataSaved, yesterday.wizardCompleted),       avg: period.convProfilLead },
+    { label: "Invite-Conv  (Eingeladen / Profil)",               today: pctRaw(yesterday.caregiverInvited, yesterday.patientDataSaved),      avg: period.convInviteProfil },
+    { label: "Bewerbungs-Conv  (Bewerbung / Eingeladen)",        today: pctRaw(yesterday.applicationReceived, yesterday.caregiverInvited),   avg: period.convAppInvite },
+    { label: "Buchungs-Conv  (Buchung / Bewerbung)",             today: pctRaw(yesterday.bookings, yesterday.applicationReceived),           avg: period.convBookingApp },
+  ];
+
+  const convRowsHtml = convRows.map((r, i) => {
+    const isLast = i === convRows.length - 1;
+    const border = isLast ? "" : "border-bottom:1px solid #f0ebe4;";
+    return `<tr>
+      <td style="padding:10px 12px;${border}color:#3D3D3D;font-size:13px;width:62%;">${r.label}</td>
+      <td style="padding:10px 12px;${border}color:#3D3D3D;font-size:14px;font-weight:700;text-align:right;width:18%;">${r.today}</td>
+      <td style="padding:10px 12px;${border}color:#666;font-size:13px;text-align:right;width:20%;">${fmtPct(r.avg)}</td>
     </tr>`;
   }).join("");
 
@@ -114,18 +152,29 @@ export function buildReportEmail(opts: {
 
       <div style="padding:24px 32px;">
         <p style="margin:0 0 4px;font-size:15px;color:#555;">📊 Übersicht für <strong style="color:#2D1F0F;">${yesterdayLabel}</strong></p>
-        <p style="margin:0 0 18px;font-size:12px;color:#9a8a73;">Vergleich rechts: ${dayBeforeLabel}</p>
+        <p style="margin:0 0 18px;font-size:12px;color:#9a8a73;">Vergleich: ${periodLabel} (Ø + Top-Tag)</p>
 
         <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="border:1px solid #e8ddd0;border-radius:8px;overflow:hidden;background:#fff;">
           <thead><tr>
             <th style="padding:8px 12px;background:#5C4A32;color:#fff;text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:0.04em;">Metrik</th>
             <th style="padding:8px 12px;background:#5C4A32;color:#fff;text-align:right;font-size:11px;text-transform:uppercase;letter-spacing:0.04em;">Gestern</th>
-            <th style="padding:8px 12px;background:#5C4A32;color:#fff;text-align:right;font-size:11px;text-transform:uppercase;letter-spacing:0.04em;">Vorgestern</th>
+            <th style="padding:8px 12px;background:#5C4A32;color:#fff;text-align:right;font-size:11px;text-transform:uppercase;letter-spacing:0.04em;">7-T-Ø</th>
+            <th style="padding:8px 12px;background:#5C4A32;color:#fff;text-align:right;font-size:11px;text-transform:uppercase;letter-spacing:0.04em;">Top (Tag)</th>
           </tr></thead>
           <tbody>${rowsHtml}</tbody>
         </table>
 
-        <p style="margin:24px 0 8px;font-size:14px;font-weight:700;color:#3D2B1F;">Wizard-Funnel (Sessions pro Step)</p>
+        <p style="margin:24px 0 8px;font-size:14px;font-weight:700;color:#3D2B1F;">Conversion-Raten</p>
+        <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="border:1px solid #e8ddd0;border-radius:8px;overflow:hidden;background:#fff;">
+          <thead><tr>
+            <th style="padding:8px 12px;background:#5C4A32;color:#fff;text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:0.04em;">Stufe</th>
+            <th style="padding:8px 12px;background:#5C4A32;color:#fff;text-align:right;font-size:11px;text-transform:uppercase;letter-spacing:0.04em;">Gestern</th>
+            <th style="padding:8px 12px;background:#5C4A32;color:#fff;text-align:right;font-size:11px;text-transform:uppercase;letter-spacing:0.04em;">7-T-Ø</th>
+          </tr></thead>
+          <tbody>${convRowsHtml}</tbody>
+        </table>
+
+        <p style="margin:24px 0 8px;font-size:14px;font-weight:700;color:#3D2B1F;">Wizard-Funnel (Sessions pro Step, Gestern)</p>
         <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="border:1px solid #e8ddd0;border-radius:8px;overflow:hidden;background:#fff;">
           <tbody>${funnelHtml}</tbody>
         </table>
@@ -133,7 +182,7 @@ export function buildReportEmail(opts: {
         <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="margin-top:24px;">
           <tr>
             <td style="width:50%;padding-right:8px;vertical-align:top;">
-              <p style="margin:0 0 6px;font-size:13px;font-weight:700;color:#3D2B1F;">Geräte</p>
+              <p style="margin:0 0 6px;font-size:13px;font-weight:700;color:#3D2B1F;">Geräte (Gestern)</p>
               <p style="margin:0;font-size:12px;color:#555;line-height:1.8;">
                 📱 Mobile: <strong>${yesterday.deviceMobile}</strong> (${Math.round(yesterday.deviceMobile/devTotal*100)}%)<br>
                 🖥️ Desktop: <strong>${yesterday.deviceDesktop}</strong> (${Math.round(yesterday.deviceDesktop/devTotal*100)}%)<br>
@@ -141,7 +190,7 @@ export function buildReportEmail(opts: {
               </p>
             </td>
             <td style="width:50%;padding-left:8px;vertical-align:top;">
-              <p style="margin:0 0 6px;font-size:13px;font-weight:700;color:#3D2B1F;">Quellen</p>
+              <p style="margin:0 0 6px;font-size:13px;font-weight:700;color:#3D2B1F;">Quellen (Gestern)</p>
               <p style="margin:0;font-size:12px;color:#555;line-height:1.8;">
                 ↪️ Direct: <strong>${yesterday.sourceDirect}</strong> (${Math.round(yesterday.sourceDirect/srcTotal*100)}%)<br>
                 🔗 Referral/Suche: <strong>${yesterday.sourceReferral}</strong> (${Math.round(yesterday.sourceReferral/srcTotal*100)}%)
@@ -169,11 +218,14 @@ export function buildReportEmail(opts: {
 </html>`;
 
   const text = `Primundus Daily Report — ${yesterdayLabel}
-(Vergleich: ${dayBeforeLabel})
+(Vergleich: ${periodLabel} Ø + Top-Tag)
 
-${rows.map((r) => `${r.label.padEnd(36)} ${String(r.today).padStart(6)}  (${r.yest})${r.deltaStr ? "  " + r.deltaStr : ""}`).join("\n")}
+${rows.map((r) => `${r.label.padEnd(50)} ${String(fmtInt(r.today)).padStart(6)}   Ø ${fmtAvg(r.avg).padStart(5)}   Top ${fmtInt(r.top).padStart(4)} (${r.topDate.slice(0, 5)})`).join("\n")}
 
-WIZARD-FUNNEL
+CONVERSION-RATEN
+${convRows.map((r) => `  ${r.label.padEnd(50)} ${r.today.padStart(6)}   Ø ${fmtPct(r.avg).padStart(6)}`).join("\n")}
+
+WIZARD-FUNNEL (Gestern)
 ${Array.from({ length: 10 }, (_, i) => i + 1).map((s) => {
   const v = yesterday.funnelStepViewed[s] ?? 0;
   const next = yesterday.funnelStepViewed[s + 1] ?? 0;
@@ -181,12 +233,12 @@ ${Array.from({ length: 10 }, (_, i) => i + 1).map((s) => {
   return `  ${s}. ${STEP_NAMES[s].padEnd(34)} ${String(v).padStart(4)}${drop}`;
 }).join("\n")}
 
-GERÄTE
+GERÄTE (Gestern)
   Mobile:  ${yesterday.deviceMobile}
   Desktop: ${yesterday.deviceDesktop}
   Tablet:  ${yesterday.deviceTablet}
 
-QUELLEN
+QUELLEN (Gestern)
   Direct:           ${yesterday.sourceDirect}
   Referral/Suche:   ${yesterday.sourceReferral}
 
