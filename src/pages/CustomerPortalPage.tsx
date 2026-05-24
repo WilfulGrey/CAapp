@@ -1837,7 +1837,12 @@ const CustomerPortalPage: FC = () => {
             status: NurseStatus;
             virtualDeclinedFromInterest: boolean;
           }> = [
-            ...allVisible.filter(({ status }) => status === 'pending').slice(0, 5),
+            // Top 3 Pending (vorher 5) — bewusst kürzer damit der Kunde
+            // nicht überfordert wird; höhere Conversion erwartet vom
+            // "patient_data_saved → caregiver_invited"-Schritt. Kein
+            // "Mehr anzeigen"-Button, plus Interest-Karten stehen weiter
+            // oben in eigener Sektion.
+            ...allVisible.filter(({ status }) => status === 'pending').slice(0, 3),
             ...allVisible.filter(({ status }) => status === 'invited'),
             ...allVisible.filter(({ status }) => status === 'declined'),
           ];
@@ -1856,20 +1861,68 @@ const CustomerPortalPage: FC = () => {
                         always-visible Section gerendert (siehe oben), nicht
                         mehr hier — damit sie auch bei hasPending sichtbar
                         bleiben. */}
-                    {visibleNurses.map(({ nurse, i, status }) => (
-                      <MatchCard
-                        key={`m-${i}`}
-                        nurse={nurse}
-                        status={status}
-                        onNurseClick={() => openNurseFromMatch(nurse, i)}
-                        onInvite={() => canInviteNurse(i)}
-                        onInviteConfirm={() => confirmInviteNurse(i, displayName(nurse.name))}
-                        onUndoDecline={status === 'declined' ? () => undoDeclinedMatch(i) : undefined}
-                        // Interest-Origin landet jetzt in "Bereits bearbeitet" —
-                        // hier in der Matching-Liste sind nur normale Matchings.
-                      />
-                    ))}
+                    {(() => {
+                      // Top-2 pending Pflegekräfte kriegen den "Empfehlung des
+                      // Beraters"-Badge — Entscheidungshilfe damit der Kunde
+                      // bei 3 Vorschlägen nicht überfordert ist.
+                      let recommendedCount = 0;
+                      return visibleNurses.map(({ nurse, i, status }) => {
+                        const isRecommended = status === 'pending' && recommendedCount < 2;
+                        if (isRecommended) recommendedCount += 1;
+                        return (
+                          <MatchCard
+                            key={`m-${i}`}
+                            nurse={nurse}
+                            status={status}
+                            isRecommended={isRecommended}
+                            onNurseClick={() => openNurseFromMatch(nurse, i)}
+                            onInvite={() => canInviteNurse(i)}
+                            onInviteConfirm={() => confirmInviteNurse(i, displayName(nurse.name))}
+                            onUndoDecline={status === 'declined' ? () => undoDeclinedMatch(i) : undefined}
+                          />
+                        );
+                      });
+                    })()}
                   </div>
+
+                  {/* Beratungs-CTA — direkt unter den 3 Match-Karten.
+                       Fängt Kunden ab die überfordert oder unsicher sind
+                       und sonst still abspringen würden. WhatsApp als
+                       niederschwelliger Kanal + Telefon. */}
+                  {patientSaved && (
+                    <div className="mt-4 rounded-2xl border border-[#E5E3DF] bg-[#FAF8F4] p-4">
+                      <div className="flex items-start gap-3">
+                        <img
+                          src="/images/ilka-wysocki_pm-mallorca.webp"
+                          alt="Ilka Wysocki"
+                          className="w-12 h-12 rounded-xl object-cover flex-shrink-0"
+                          onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }}
+                        />
+                        <div className="flex-1 min-w-0">
+                          <p className="text-[14px] font-semibold text-[#3D2B1F] mb-0.5">Unsicher bei der Auswahl?</p>
+                          <p className="text-[13px] text-[#666] leading-relaxed mb-2.5">
+                            Ich helfe Ihnen gerne, die passende Pflegekraft für Ihre Situation zu finden — schnell und unverbindlich.
+                          </p>
+                          <div className="flex flex-wrap items-center gap-2">
+                            <a
+                              href="https://wa.me/4989200000830"
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-flex items-center gap-1.5 text-xs font-semibold bg-[#25D366] text-white px-3.5 py-2 rounded-full hover:bg-[#1FB854] transition-colors"
+                            >
+                              WhatsApp schreiben
+                            </a>
+                            <a
+                              href="tel:+4989200000830"
+                              className="inline-flex items-center gap-1.5 text-xs font-semibold bg-white text-[#3D2B1F] border border-[#E5E3DF] px-3.5 py-2 rounded-full hover:bg-gray-50 transition-colors"
+                            >
+                              ☎ 089 200 000 830
+                            </a>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
 
