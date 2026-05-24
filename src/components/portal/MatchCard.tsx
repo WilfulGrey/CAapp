@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import type { FC } from 'react';
-import { Check, ChevronDown, UserPlus, X } from 'lucide-react';
+import { Check, ChevronDown, Heart, UserPlus, X } from 'lucide-react';
 import type { Nurse } from '../../types';
 import type { NurseStatus } from './shared';
 import { nurseLevel, displayName, initials } from './shared';
@@ -17,7 +17,13 @@ export const MatchCard: FC<{
   /** When status='declined', clicking the Undo-Link calls this to restore
    *  the card to pending (UI override + Mamamia mutation handled by parent). */
   onUndoDecline?: () => void;
-}> = ({ nurse, status, onNurseClick, onInvite, onInviteConfirm, onUndoDecline }) => {
+  /** Pflegekraft hat ursprünglich proaktiv Interesse signalisiert
+   *  (caregiver_interest_shown). Wenn true UND status invited/declined,
+   *  rendert die Card ein zusätzliches "Hat Interesse"-Badge damit der
+   *  Kunde die Pflegekraft im bearbeitet-Bereich klar von normalen
+   *  Matchings differenzieren kann. */
+  hasInterestOrigin?: boolean;
+}> = ({ nurse, status, onNurseClick, onInvite, onInviteConfirm, onUndoDecline, hasInterestOrigin }) => {
   const [invitePhase, setInvitePhase] = useState<'idle' | 'sending' | 'done'>('idle');
   const inits = initials(nurse.name);
   const name = displayName(nurse.name);
@@ -39,7 +45,28 @@ export const MatchCard: FC<{
     }
   };
 
+  // "Hat Interesse"-Badge nur im bearbeitet-Bereich (invited/declined) —
+  // pending Interests werden ohnehin als InterestCard mit eigenem Top-Edge-
+  // Badge gerendert.
+  const showInterestOriginBadge = hasInterestOrigin && status !== 'pending';
+
   return (
+    <div className="relative">
+      {showInterestOriginBadge && (
+        <div className="absolute -top-2.5 left-1/2 -translate-x-1/2 z-10 whitespace-nowrap">
+          <span
+            className="inline-flex items-center gap-1.5 text-[11px] font-bold tracking-wide px-3 py-1 rounded-full shadow-sm border"
+            style={{
+              background: 'linear-gradient(135deg, #FFE5DE 0%, #FFCFC4 100%)',
+              color: '#C04A40',
+              borderColor: '#F0B0A4',
+            }}
+          >
+            <Heart className="w-3 h-3" fill="currentColor" />
+            Hat Interesse
+          </span>
+        </div>
+      )}
     <div
       className={`bg-white rounded-2xl border overflow-hidden transition-all ${
         status === 'declined'
@@ -138,6 +165,7 @@ export const MatchCard: FC<{
           </button>
         )}
       </div>
+    </div>
     </div>
   );
 };

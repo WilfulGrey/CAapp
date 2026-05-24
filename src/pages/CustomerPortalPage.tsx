@@ -295,6 +295,19 @@ const CustomerPortalPage: FC = () => {
   // sie taucht in effectiveMatched mit Status='invited' wieder auf.
   const [previewInvitedFromInterest, setPreviewInvitedFromInterest] = useState<Map<number, Nurse>>(new Map());
 
+  // Caregiver-IDs die irgendwann mal als Interest aufgetaucht sind. Wird
+  // gebraucht damit eine bereits-eingeladene oder bereits-abgelehnte
+  // Pflegekraft, die ursprünglich proaktiv Interesse gezeigt hat, im
+  // unteren bearbeitet-Bereich der Matching-Liste ein "Hat Interesse"-
+  // Badge zusätzlich zum Status-Pill bekommt — der Kunde kann so
+  // differenzieren ob die Einladung/Ablehnung aus einem Interest oder
+  // einem normalen Matching kam.
+  //
+  // Akkumulierend über die Session: sourceInterests kann nach Mamamia-
+  // Refetch eine Pflegekraft verlieren (z.B. nach Invite/Dismiss), aber
+  // wir wollen die Origin-Info trotzdem behalten.
+  const [interestOriginIds, setInterestOriginIds] = useState<Set<number>>(new Set());
+
   // Accepted applications (lead_application_acceptances). Written by the
   // kostenrechner bridge after AngebotPruefenModal step 2 → bridge fires
   // info@primundus.de team mail with contract data, no Mamamia call.
@@ -603,6 +616,22 @@ const CustomerPortalPage: FC = () => {
   // effectiveMatched mit Status='invited' wieder auf.
   if (IS_PREVIEW_ANY) previewInvitedFromInterest.forEach((_n, id) => invitedSet.add(id));
   const sourceInterests = IS_PREVIEW_INTERESSE ? [PREVIEW_INTEREST as any] : (mmInterests ?? []);
+  // Akkumuliere Interest-Origin-IDs aus sourceInterests + Preview-State.
+  // Wird in einem Effect synchronisiert (statt direkt in setState im
+  // Render) damit React nicht über setState-in-render schreit.
+  useEffect(() => {
+    const fromSource = (sourceInterests ?? []).map((i: any) => i.caregiver_id).filter((id: any) => typeof id === 'number');
+    const fromPreview = Array.from(previewInvitedFromInterest.keys());
+    if (fromSource.length === 0 && fromPreview.length === 0) return;
+    setInterestOriginIds((prev) => {
+      const next = new Set(prev);
+      let changed = false;
+      for (const id of fromSource) { if (!next.has(id)) { next.add(id); changed = true; } }
+      for (const id of fromPreview) { if (!next.has(id)) { next.add(id); changed = true; } }
+      return changed ? next : prev;
+    });
+  }, [sourceInterests, previewInvitedFromInterest]);
+
   const visibleInterests = sourceInterests.filter((i) => {
     if (i.rejected_at) return false;
     if (dismissedSet.has(i.caregiver_id)) return false;
@@ -1610,17 +1639,21 @@ const CustomerPortalPage: FC = () => {
                         />
                       );
                     })}
-                    {visibleNurses.map(({ nurse, i, status }) => (
-                      <MatchCard
-                        key={i}
-                        nurse={nurse}
-                        status={status}
-                        onNurseClick={() => openNurseFromMatch(nurse, i)}
-                        onInvite={() => canInviteNurse(i)}
-                        onInviteConfirm={() => confirmInviteNurse(i, displayName(nurse.name))}
-                        onUndoDecline={status === 'declined' ? () => undoDeclinedMatch(i) : undefined}
-                      />
-                    ))}
+                    {visibleNurses.map(({ nurse, i, status }) => {
+                      const cgId = effectiveMatched[i]?.caregiverId;
+                      return (
+                        <MatchCard
+                          key={i}
+                          nurse={nurse}
+                          status={status}
+                          onNurseClick={() => openNurseFromMatch(nurse, i)}
+                          onInvite={() => canInviteNurse(i)}
+                          onInviteConfirm={() => confirmInviteNurse(i, displayName(nurse.name))}
+                          onUndoDecline={status === 'declined' ? () => undoDeclinedMatch(i) : undefined}
+                          hasInterestOrigin={cgId != null && interestOriginIds.has(cgId)}
+                        />
+                      );
+                    })}
                   </div>
                 </div>
               )}
