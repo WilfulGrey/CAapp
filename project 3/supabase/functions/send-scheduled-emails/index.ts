@@ -472,7 +472,7 @@ function buildNachfass2Html(lead: Lead, siteUrl: string, portalBase: string, mil
     ${nachfassCtaButton(portalUrl, v.cta)}
 
     <p style="font-size:14px;line-height:1.65;color:#666;margin:20px 0 0;text-align:center;">
-      Oder einfach kurz anrufen: <a href="tel:+4989200000830" style="color:#3D2B1F;text-decoration:none;font-weight:600;white-space:nowrap;">+49 89 200 000 830</a>
+      Schreiben Sie kurz per <a href="https://wa.me/4989200000830" style="color:#25D366;text-decoration:none;font-weight:600;white-space:nowrap;">WhatsApp</a> oder rufen Sie an: <a href="tel:+4989200000830" style="color:#3D2B1F;text-decoration:none;font-weight:600;white-space:nowrap;">+49 89 200 000 830</a>
     </p>
 
     ${buildIlkaSig(siteUrl)}`;
@@ -490,7 +490,8 @@ ${v.intro}
 
 ${v.cta.replace(/ →$/, "")}: ${portalUrl}
 
-Oder einfach kurz anrufen: +49 89 200 000 830
+Schreiben Sie kurz per WhatsApp: https://wa.me/4989200000830
+Oder rufen Sie an: +49 89 200 000 830
 
 Mit freundlichen Grüßen
 Ilka Wysocki
@@ -519,7 +520,7 @@ function buildNachfass3Html(lead: Lead, siteUrl: string): string {
     ${bulletproofButton(mailtoNo, "Doch nicht relevant", "#9CA3AF")}
 
     <p style="font-size:14px;line-height:1.65;color:#666;margin:22px 0 0;text-align:center;">
-      Oder einfach kurz anrufen: <a href="tel:+4989200000830" style="color:#3D2B1F;text-decoration:none;font-weight:600;white-space:nowrap;">+49 89 200 000 830</a>
+      Schreiben Sie kurz per <a href="https://wa.me/4989200000830" style="color:#25D366;text-decoration:none;font-weight:600;white-space:nowrap;">WhatsApp</a> oder rufen Sie an: <a href="tel:+4989200000830" style="color:#3D2B1F;text-decoration:none;font-weight:600;white-space:nowrap;">+49 89 200 000 830</a>
     </p>
 
     <p style="font-size:13px;line-height:1.6;color:#888;margin:22px 0 0;font-style:italic;">Falls wir nichts hören, melden wir uns nicht mehr — wir wollen Sie nicht stören.</p>
@@ -547,7 +548,8 @@ mailto:info@primundus.de?subject=Aktuell nicht — ${leadRef}
 Doch nicht relevant:
 mailto:info@primundus.de?subject=Doch nicht relevant — ${leadRef}
 
-Oder einfach kurz anrufen: +49 89 200 000 830
+Schreiben Sie kurz per WhatsApp: https://wa.me/4989200000830
+Oder rufen Sie an: +49 89 200 000 830
 
 Falls wir nichts hören, melden wir uns nicht mehr — wir wollen Sie nicht stören.
 
