@@ -458,7 +458,7 @@ export const AngebotPruefenModal: FC<{
                       </div>
                     ))}
                   </div>
-                  <p className="text-[12px] text-gray-400 mt-2.5 leading-relaxed">Reisekosten werden nach <em>halben Tag</em> berechnet. Provision ist im Monatspreis enthalten.</p>
+                  <p className="text-[12px] text-gray-400 mt-2.5 leading-relaxed">An- und Abreisetage werden mit vollem Tagessatz berechnet. Falls relevant: Sommerzuschlag im Juli &amp; August (200 €/Monat bzw. 6,67 €/Tag), an deutschen Feiertagen doppelter Tagessatz.</p>
                 </div>
 
                 <label className="flex items-start gap-3 cursor-pointer p-4 bg-white border border-gray-200 rounded-2xl hover:bg-gray-50 transition-colors" onClick={() => setAgbChecked(v => !v)}>
