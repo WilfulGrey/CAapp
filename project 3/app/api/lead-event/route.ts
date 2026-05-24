@@ -30,14 +30,15 @@ const ALLOWED_EVENTS = [
   'patient_data_saved',
   'caregiver_invited',
   'caregiver_interest_shown',
-  'caregiver_declined',         // Kunde hat eine Matching-Pflegekraft abgelehnt
+  'caregiver_declined',          // Kunde hat eine Pflegekraft abgelehnt (matching ODER interest)
+  'caregiver_declined_undone',   // Kunde hat die Ablehnung rückgängig gemacht
   'application_received',
   // PR #123: customer confirmed acceptance via AngebotPruefenModal step 2.
   // MVP path — Mamamia NOT notified, Primundus team gets a notification
   // email with the contract form data and handles contract paperwork
   // manually. Acceptance row persisted in lead_application_acceptances.
   'application_accepted_internal',
-  'application_rejected',       // Kunde hat eine Bewerbung abgelehnt
+  'application_rejected',        // Kunde hat eine Bewerbung abgelehnt
 ];
 const TEAM_NOTIFY_EVENTS = [
   'patient_data_saved',
@@ -62,6 +63,7 @@ const NON_DEDUPED_EVENTS = new Set([
   'caregiver_invited',
   'caregiver_interest_shown',
   'caregiver_declined',
+  'caregiver_declined_undone',
   'application_received',
   'application_rejected',
 ]);
@@ -167,6 +169,7 @@ const GET_PUBLIC_EVENT_TYPES = new Set([
   'caregiver_interest_shown',
   'caregiver_invited',
   'caregiver_declined',
+  'caregiver_declined_undone',
   'application_received',
   'application_accepted_internal',
   'application_rejected',
