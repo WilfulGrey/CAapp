@@ -374,6 +374,28 @@ function nachfassContent(milestone: LeadMilestone): { intro: string; body: strin
   };
 }
 
+// Nachfass-2: kürzer + persönlicher als Nachfass-1. Statt Re-Marketing
+// ("hier sind unsere Konditionen") direkt fragen "brauchen Sie noch
+// Hilfe?". Je nach Milestone leichte Variation in der Hilfe-Frage.
+function nachfass2Content(milestone: LeadMilestone): { intro: string; cta: string } {
+  if (milestone === "patient_data_saved") {
+    return {
+      intro: "kommen Sie mit der Auswahl der Pflegekräfte zurecht? Ich gehe gern mit Ihnen durch die Profile — antworten Sie kurz oder rufen Sie mich an.",
+      cta: "Pflegekräfte einladen →",
+    };
+  }
+  if (milestone === "portal_opened") {
+    return {
+      intro: "brauchen Sie Hilfe beim Ausfüllen der Patientendaten? Antworten Sie einfach kurz oder rufen Sie mich an — ich helfe Ihnen gern.",
+      cta: "Patientendaten vervollständigen →",
+    };
+  }
+  return {
+    intro: "brauchen Sie noch Hilfe? Falls Ihnen etwas unklar war oder Sie nicht weiterkommen, melden Sie sich einfach bei mir — ich rufe Sie gern an.",
+    cta: "Im Portal weitersehen →",
+  };
+}
+
 // Bulletproof CTA-Button. Funktioniert in Outlook (Word-Renderer), Gmail,
 // Apple Mail, Thunderbird, Yahoo, Web-Clients. Schlüssel-Tricks:
 //   - <table align="center"> statt <div text-align:center> — Outlook respektiert
@@ -437,36 +459,22 @@ Primundus Deutschland | +49 89 200 000 830 | www.primundus.de`;
 function buildNachfass2Html(lead: Lead, siteUrl: string, portalBase: string, milestone: LeadMilestone): string {
   const portalUrl = (portalBase && lead.token) ? buildPortalUrl(portalBase, lead.token) : siteUrl;
   const halloAnrede = buildHalloAnrede(lead.anrede_text || null, lead.nachname || "", lead.vorname || "");
-  const v = nachfassContent(milestone);
-  // Nachfass 2 = dringlicher Ton im Intro für den "noch nicht im Portal"-Fall.
-  const intro = milestone === "none"
-    ? "ich melde mich noch einmal kurz – vielleicht war einfach noch nicht der richtige Moment."
-    : v.intro;
+  const v = nachfass2Content(milestone);
 
+  // Bewusst minimaler Aufbau: kurze persönliche Frage + ein CTA + Telefon-
+  // Direktdraht. Kein Re-Marketing-Block, kein Testsieger-Strip, keine
+  // Konditionen-Auflistung — die Mail soll wie eine Nachfrage vom Berater
+  // klingen, nicht wie eine zweite Verkaufsmail.
   const content = `
     <p style="font-size:15px;line-height:1.75;color:#444;margin-bottom:14px;">${halloAnrede},</p>
-    <p style="font-size:15px;line-height:1.75;color:#444;margin-bottom:14px;">${intro}</p>
-    <p style="font-size:15px;line-height:1.75;color:#444;margin-bottom:14px;">${v.body}</p>
-
-    <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="background-color:#F7F5F0;border:1px solid #e5e0d8;border-radius:8px;margin:16px 0;">
-      <tr>
-        <td style="padding:12px 16px;vertical-align:middle;">
-          <div style="font-size:10px;font-weight:700;color:#999;text-transform:uppercase;letter-spacing:.06em;margin-bottom:7px;">100% Sorglos – unsere Konditionen</div>
-          <div style="font-size:13px;color:#555;line-height:1.9;">
-            <div><span style="color:#2D6A4F;font-weight:600;">✓</span> Keine Vertragsbindung</div>
-            <div><span style="color:#2D6A4F;font-weight:600;">✓</span> Tagesgenaue Abrechnung</div>
-            <div><span style="color:#2D6A4F;font-weight:600;">✓</span> Kosten erst bei Anreise</div>
-          </div>
-        </td>
-        <td style="padding:12px 16px;vertical-align:middle;text-align:right;width:80px;">
-          <img src="${siteUrl}/images/primundus_testsieger-2021.webp" alt="Testsieger" width="64" style="display:block;width:64px;height:auto;border:1px solid #e8d9a0;border-radius:4px;opacity:.9;" />
-        </td>
-      </tr>
-    </table>
-
-    <p style="font-size:15px;line-height:1.75;color:#444;margin-bottom:14px;">Melden Sie sich einfach, wenn Sie Fragen haben oder wenn wir loslegen sollen.</p>
+    <p style="font-size:15px;line-height:1.75;color:#444;margin-bottom:18px;">${v.intro}</p>
 
     ${nachfassCtaButton(portalUrl, v.cta)}
+
+    <p style="font-size:14px;line-height:1.65;color:#666;margin:20px 0 0;text-align:center;">
+      Schreiben Sie kurz per <a href="https://wa.me/4989200000830" style="color:#25D366;text-decoration:none;font-weight:600;white-space:nowrap;">WhatsApp</a> oder rufen Sie an: <a href="tel:+4989200000830" style="color:#3D2B1F;text-decoration:none;font-weight:600;white-space:nowrap;">+49 89 200 000 830</a>
+    </p>
+
     ${buildIlkaSig(siteUrl)}`;
 
   return buildEmailWrapper(lead, siteUrl, content);
@@ -475,25 +483,15 @@ function buildNachfass2Html(lead: Lead, siteUrl: string, portalBase: string, mil
 function buildNachfass2Text(lead: Lead, siteUrl: string, portalBase: string, milestone: LeadMilestone): string {
   const portalUrl = (portalBase && lead.token) ? buildPortalUrl(portalBase, lead.token) : siteUrl;
   const halloAnrede = buildHalloAnrede(lead.anrede_text || null, lead.nachname || "", lead.vorname || "");
-  const v = nachfassContent(milestone);
-  const plain = (s: string) => s.replace(/<\/?strong>/g, "");
-  const intro = milestone === "none"
-    ? "ich melde mich noch einmal kurz – vielleicht war einfach noch nicht der richtige Moment."
-    : plain(v.intro);
+  const v = nachfass2Content(milestone);
   return `${halloAnrede},
 
-${intro}
-
-${plain(v.body)}
-
-100% Sorglos – unsere Konditionen:
-✓ Keine Vertragsbindung
-✓ Tagesgenaue Abrechnung
-✓ Kosten erst bei Anreise
-
-Melden Sie sich einfach, wenn Sie Fragen haben oder wenn wir loslegen sollen.
+${v.intro}
 
 ${v.cta.replace(/ →$/, "")}: ${portalUrl}
+
+Schreiben Sie kurz per WhatsApp: https://wa.me/4989200000830
+Oder rufen Sie an: +49 89 200 000 830
 
 Mit freundlichen Grüßen
 Ilka Wysocki
@@ -501,6 +499,67 @@ Ilka Wysocki
 ---
 Primundus Deutschland | +49 89 200 000 830 | www.primundus.de`;
 }
+
+// Nachfass-3: "letzter Versuch" — Quick-Reaktion mit drei mailto-Buttons.
+// Antworten kommen als normale Mail an info@primundus.de mit
+// vordefiniertem Subject (inkl. Lead-ID damit das Team direkt zuordnen
+// kann). Bewusst SEHR kurz — nicht überreden, nur Status abklopfen.
+function buildNachfass3Html(lead: Lead, siteUrl: string): string {
+  const halloAnrede = buildHalloAnrede(lead.anrede_text || null, lead.nachname || "", lead.vorname || "");
+  const leadRef = lead.email || lead.id;
+  const mailtoYes = `mailto:info@primundus.de?subject=${encodeURIComponent(`Habe noch Interesse — ${leadRef}`)}&body=${encodeURIComponent(`Hallo Ilka,\n\nich habe noch Interesse, bitte melden Sie sich bei mir.\n\n${halloAnrede.replace(/^Hallo /, '')}`)}`;
+  const mailtoLater = `mailto:info@primundus.de?subject=${encodeURIComponent(`Aktuell nicht — vielleicht später — ${leadRef}`)}&body=${encodeURIComponent(`Hallo Ilka,\n\naktuell brauche ich noch keine Pflegekraft, vielleicht später.\n\n${halloAnrede.replace(/^Hallo /, '')}`)}`;
+  const mailtoNo = `mailto:info@primundus.de?subject=${encodeURIComponent(`Doch nicht relevant — ${leadRef}`)}&body=${encodeURIComponent(`Hallo Ilka,\n\nes hat sich erledigt, das Thema ist für mich nicht mehr relevant.\n\n${halloAnrede.replace(/^Hallo /, '')}`)}`;
+
+  const content = `
+    <p style="font-size:15px;line-height:1.75;color:#444;margin-bottom:14px;">${halloAnrede},</p>
+    <p style="font-size:15px;line-height:1.75;color:#444;margin-bottom:18px;">ein letzter Versuch von meiner Seite — wie schaut's bei Ihnen aus? Klicken Sie kurz auf eines der Felder, damit ich weiß, woran ich bin:</p>
+
+    ${bulletproofButton(mailtoYes, "Ja, habe Interesse — bitte melden", "#2A9D5C")}
+    ${bulletproofButton(mailtoLater, "Aktuell nicht — vielleicht später", "#8B7355")}
+    ${bulletproofButton(mailtoNo, "Doch nicht relevant", "#9CA3AF")}
+
+    <p style="font-size:14px;line-height:1.65;color:#666;margin:22px 0 0;text-align:center;">
+      Schreiben Sie kurz per <a href="https://wa.me/4989200000830" style="color:#25D366;text-decoration:none;font-weight:600;white-space:nowrap;">WhatsApp</a> oder rufen Sie an: <a href="tel:+4989200000830" style="color:#3D2B1F;text-decoration:none;font-weight:600;white-space:nowrap;">+49 89 200 000 830</a>
+    </p>
+
+    <p style="font-size:13px;line-height:1.6;color:#888;margin:22px 0 0;font-style:italic;">Falls wir nichts hören, melden wir uns nicht mehr — wir wollen Sie nicht stören.</p>
+
+    ${buildIlkaSig(siteUrl)}`;
+
+  return buildEmailWrapper(lead, siteUrl, content);
+}
+
+function buildNachfass3Text(lead: Lead, _siteUrl: string): string {
+  const halloAnrede = buildHalloAnrede(lead.anrede_text || null, lead.nachname || "", lead.vorname || "");
+  const leadRef = lead.email || lead.id;
+  return `${halloAnrede},
+
+ein letzter Versuch von meiner Seite — wie schaut's bei Ihnen aus?
+
+Antworten Sie kurz mit einer der drei Optionen:
+
+Ja, habe Interesse — bitte melden:
+mailto:info@primundus.de?subject=Habe noch Interesse — ${leadRef}
+
+Aktuell nicht — vielleicht später:
+mailto:info@primundus.de?subject=Aktuell nicht — ${leadRef}
+
+Doch nicht relevant:
+mailto:info@primundus.de?subject=Doch nicht relevant — ${leadRef}
+
+Schreiben Sie kurz per WhatsApp: https://wa.me/4989200000830
+Oder rufen Sie an: +49 89 200 000 830
+
+Falls wir nichts hören, melden wir uns nicht mehr — wir wollen Sie nicht stören.
+
+Mit freundlichen Grüßen
+Ilka Wysocki
+
+---
+Primundus Deutschland | +49 89 200 000 830 | www.primundus.de`;
+}
+
 
 const EINGANGS_LABELS: Record<string, Record<string, string>> = {
   betreuung_fuer: { "1-person": "1 Person", "ehepaar": "2 Personen" },
@@ -1146,7 +1205,10 @@ Deno.serve(async (req: Request) => {
         const isBeauftragt = lead.status === "vertrag_abgeschlossen" || lead.status === "betreuung_beauftragt" || lead.order_confirmed === true;
         const isNichtInteressiert = lead.status === "nicht_interessiert";
 
-        const isNachfass = scheduledEmail.email_type === "nachfass_1" || scheduledEmail.email_type === "nachfass_2";
+        const isNachfass =
+          scheduledEmail.email_type === "nachfass_1" ||
+          scheduledEmail.email_type === "nachfass_2" ||
+          scheduledEmail.email_type === "nachfass_3";
 
         // Lead-Meilenstein aus den CA-App-Events (portal_opened, patient_data_saved,
         // caregiver_invited) \u2014 steuert die Nachfass-Variante + den Abbruch.
@@ -1211,11 +1273,17 @@ Deno.serve(async (req: Request) => {
           eventTypeSent = "email_nachfass_1_sent";
           eventTypeFailed = "email_nachfass_1_failed";
         } else if (scheduledEmail.email_type === "nachfass_2") {
-          subject = "Noch offen: Ihr Angebot zur 24h-Betreuung – ich helfe gerne weiter";
+          subject = "Brauchen Sie noch Hilfe?";
           html = buildNachfass2Html(lead as Lead, smtpConfig.siteUrl, portalBase, milestone);
           text = buildNachfass2Text(lead as Lead, smtpConfig.siteUrl, portalBase, milestone);
           eventTypeSent = "email_nachfass_2_sent";
           eventTypeFailed = "email_nachfass_2_failed";
+        } else if (scheduledEmail.email_type === "nachfass_3") {
+          subject = "Eine letzte Frage — wie schaut's bei Ihnen aus?";
+          html = buildNachfass3Html(lead as Lead, smtpConfig.siteUrl);
+          text = buildNachfass3Text(lead as Lead, smtpConfig.siteUrl);
+          eventTypeSent = "email_nachfass_3_sent";
+          eventTypeFailed = "email_nachfass_3_failed";
         } else if (
           scheduledEmail.email_type === "interest_reminder" ||
           scheduledEmail.email_type === "application_reminder"
@@ -1344,10 +1412,14 @@ Deno.serve(async (req: Request) => {
  
           // Nachfass-Kette: startet jetzt nach der (gemergten) Eingangsbestätigung.
           // `angebot` bleibt für evtl. eingeplante Alt-Rows ebenfalls als Anker.
+          // Sequenz: Eingangsbest +24h → Nachfass_1 +48h → Nachfass_2 +48h →
+          // Nachfass_3 (Quick-Reaktion mit mailto-Buttons, "letzter Versuch").
           if (scheduledEmail.email_type === "eingangsbestaetigung" || scheduledEmail.email_type === "angebot") {
             await scheduleFollowUp(supabase, lead as Lead, "nachfass_1", 24 * 60);
           } else if (scheduledEmail.email_type === "nachfass_1") {
             await scheduleFollowUp(supabase, lead as Lead, "nachfass_2", 48 * 60);
+          } else if (scheduledEmail.email_type === "nachfass_2") {
+            await scheduleFollowUp(supabase, lead as Lead, "nachfass_3", 48 * 60);
           }
  
           results.push({ id: scheduledEmail.id, success: true });
