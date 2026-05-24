@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import type { FC } from 'react';
-import { Check, ChevronDown, Heart, UserPlus, X } from 'lucide-react';
+import { Check, ChevronDown, Heart, Sparkles, UserPlus, X } from 'lucide-react';
 import type { Nurse } from '../../types';
 import type { NurseStatus } from './shared';
 import { nurseLevel, displayName, initials } from './shared';
@@ -23,7 +23,12 @@ export const MatchCard: FC<{
    *  Kunde die Pflegekraft im bearbeitet-Bereich klar von normalen
    *  Matchings differenzieren kann. */
   hasInterestOrigin?: boolean;
-}> = ({ nurse, status, onNurseClick, onInvite, onInviteConfirm, onUndoDecline, hasInterestOrigin }) => {
+  /** Setzt einen prominenten "✨ Empfehlung"-Top-Badge mittig auf der
+   *  Card. Wird nur für die Top 1-2 pending Matchings vergeben — soll
+   *  dem Kunden die Entscheidung erleichtern wenn er sonst überwältigt
+   *  von der Auswahl ist. */
+  isRecommended?: boolean;
+}> = ({ nurse, status, onNurseClick, onInvite, onInviteConfirm, onUndoDecline, hasInterestOrigin, isRecommended }) => {
   const [invitePhase, setInvitePhase] = useState<'idle' | 'sending' | 'done'>('idle');
   const inits = initials(nurse.name);
   const name = displayName(nurse.name);
@@ -67,12 +72,30 @@ export const MatchCard: FC<{
           </span>
         </div>
       )}
+      {isRecommended && status === 'pending' && (
+        <div className="absolute -top-2.5 left-1/2 -translate-x-1/2 z-10 whitespace-nowrap">
+          <span
+            className="inline-flex items-center gap-1 text-[11px] font-bold tracking-wide px-3 py-1 rounded-full shadow-sm border"
+            style={{
+              background: 'linear-gradient(135deg, #FFF4D6 0%, #FFE3A1 100%)',
+              backgroundColor: '#FFE3A1',
+              color: '#7A5410',
+              borderColor: '#E0AC32',
+            }}
+          >
+            <Sparkles className="w-3 h-3" />
+            Empfehlung des Beraters
+          </span>
+        </div>
+      )}
     <div
       className={`bg-white rounded-2xl border overflow-hidden transition-all ${
         status === 'declined'
           ? 'opacity-40 border-gray-200'
           : status === 'invited'
           ? 'border-[#C4B49A]'
+          : isRecommended
+          ? 'border-[#E0AC32] shadow-[0_2px_12px_rgba(224,172,50,0.18)]'
           : 'border-[#C4B49A] hover:border-[#8B7355] hover:shadow-[0_4px_16px_rgba(139,115,85,0.12)]'
       }`}
     >
