@@ -22,6 +22,8 @@ import {
   LIST_INTERESTS_FOR_OFFER,
   type ListApplicationsResponse,
   type ListInterestsResponse,
+  REJECT_APPLICATION,
+  type RejectApplicationResponse,
 } from "./queries.ts";
 
 // ─── Types ─────────────────────────────────────────────────────────────────
@@ -51,10 +53,24 @@ export interface EventRow {
   caregiver_id: number | null;
 }
 
+// Für den 48h-Auto-Reject: application_received (mit created_at als
+// Alters-Anker) + Reaktions-Events (accept/reject) pro Pflegekraft.
+export type AppStatusEventType =
+  | "application_received"
+  | "application_accepted_internal"
+  | "application_rejected";
+
+export interface AppStatusEventRow {
+  event_type: AppStatusEventType;
+  caregiver_id: number | null;
+  created_at: string;
+}
+
 export interface DetectSupabase {
   fetchLead(id: string): Promise<LeadRow | null>;
   fetchActiveLeads(): Promise<LeadRow[]>;
   fetchPastEvents(leadId: string): Promise<EventRow[]>;
+  fetchAppStatusEvents(leadId: string): Promise<AppStatusEventRow[]>;
 }
 
 export interface DetectResult {
@@ -63,6 +79,9 @@ export interface DetectResult {
   new_interests: number;
   skipped_no_caregiver_data: number;
   bridge_errors: number;
+  // 48h-Auto-Reject (PR: feat/auto-reject-48h-dryrun). auto_rejected zählt
+  // tatsächlich (oder im Dry-Run: hypothetisch) abgelehnte Bewerbungen.
+  auto_rejected: number;
 }
 
 export interface BatchResult {
@@ -72,6 +91,7 @@ export interface BatchResult {
   total_new_interests: number;
   total_skipped_no_caregiver_data: number;
   total_bridge_errors: number;
+  total_auto_rejected: number;
   per_lead_errors: number;
 }
 
@@ -134,6 +154,7 @@ async function handleBatch(deps: HandlerDeps): Promise<Response> {
     total_new_interests: 0,
     total_skipped_no_caregiver_data: 0,
     total_bridge_errors: 0,
+    total_auto_rejected: 0,
     per_lead_errors: 0,
   };
 
@@ -148,6 +169,7 @@ async function handleBatch(deps: HandlerDeps): Promise<Response> {
       batch.total_new_interests += r.new_interests;
       batch.total_skipped_no_caregiver_data += r.skipped_no_caregiver_data;
       batch.total_bridge_errors += r.bridge_errors;
+      batch.total_auto_rejected += r.auto_rejected;
     } catch (e) {
       console.error(`detect lead ${lead.id} threw:`, (e as Error).message);
       batch.per_lead_errors += 1;
@@ -207,7 +229,7 @@ export async function detect(
     else if (e.event_type === "caregiver_interest_shown") seenInterests.add(e.caregiver_id);
   }
 
-  const counts = { new_applications: 0, new_interests: 0, skipped_no_caregiver_data: 0, bridge_errors: 0 };
+  const counts = { new_applications: 0, new_interests: 0, skipped_no_caregiver_data: 0, bridge_errors: 0, auto_rejected: 0 };
 
   for (const app of apps) {
     if (app.caregiver_id == null) continue;
@@ -251,7 +273,136 @@ export async function detect(
     }
   }
 
+  // 48h-Auto-Reject: unbeantwortete Bewerbungen (≥48h seit der
+  // application_received-Mail, keine Reaktion) automatisch ablehnen.
+  // apps + agencyToken sind hier bereits geladen — wiederverwenden.
+  counts.auto_rejected += await autoRejectStaleApplications(lead, apps, agencyToken, deps, fetcher);
+
   return { lead_id: lead.id, ...counts };
+}
+
+// ─── 48h Auto-Reject ───────────────────────────────────────────────────────
+// Lehnt Bewerbungen automatisch ab, auf die der Kunde 48h nach der
+// Bewerbungs-Mail (application_received) nicht reagiert hat. Die 46h-
+// "Letzte Chance"-Mail (send-scheduled-emails) warnt ~2h vorher.
+//
+// Sicherheits-Guards:
+//   1. Nur Bewerbungen mit bestätigtem application_received-Event ablehnen
+//      (kein created_at ⇒ kein Reject) — wir lehnen nie etwas ab, worüber
+//      der Kunde nie informiert wurde.
+//   2. Nie ablehnen, wenn der Kunde für diese Pflegekraft bereits reagiert
+//      hat (application_accepted_internal ODER application_rejected).
+//   3. Erst ab Alter ≥ AUTO_REJECT_AFTER_HOURS.
+//
+// Dry-Run (Default): loggt nur "would reject", schreibt NICHTS. Scharf-
+// schalten über Env AUTO_REJECT_ENABLED="true"|"1".
+const AUTO_REJECT_AFTER_HOURS = 48;
+const AUTO_REJECT_MESSAGE =
+  "Automatische Absage — keine Rückmeldung des Kunden innerhalb 48 Stunden.";
+
+function autoRejectIsLive(): boolean {
+  const v = (Deno.env.get("AUTO_REJECT_ENABLED") ?? "").trim().toLowerCase();
+  return v === "true" || v === "1";
+}
+
+async function autoRejectStaleApplications(
+  lead: LeadRow & { token: string; mamamia_job_offer_id: number },
+  apps: ApplicationNode[],
+  agencyToken: string,
+  deps: HandlerDeps,
+  fetcher: typeof fetch,
+): Promise<number> {
+  const { secrets, supabase } = deps;
+  const live = autoRejectIsLive();
+
+  let statusEvents: AppStatusEventRow[];
+  try {
+    statusEvents = await supabase.fetchAppStatusEvents(lead.id);
+  } catch (e) {
+    console.error(`auto-reject: fetchAppStatusEvents failed (lead ${lead.id}):`, e instanceof Error ? e.message : String(e));
+    return 0;
+  }
+
+  // Frühestes application_received pro Pflegekraft (Alters-Anker) +
+  // Reaktions-Set (accept/reject).
+  const receivedAt = new Map<number, number>(); // caregiver_id → ms timestamp
+  const reacted = new Set<number>();
+  for (const ev of statusEvents) {
+    if (ev.caregiver_id == null) continue;
+    if (ev.event_type === "application_received") {
+      const ms = Date.parse(ev.created_at);
+      if (!Number.isFinite(ms)) continue;
+      const prev = receivedAt.get(ev.caregiver_id);
+      if (prev == null || ms < prev) receivedAt.set(ev.caregiver_id, ms);
+    } else {
+      // application_accepted_internal | application_rejected
+      reacted.add(ev.caregiver_id);
+    }
+  }
+
+  const cutoffMs = AUTO_REJECT_AFTER_HOURS * 60 * 60 * 1000;
+  const now = Date.now();
+  let rejected = 0;
+
+  for (const app of apps) {
+    if (app.caregiver_id == null) continue;
+    if (reacted.has(app.caregiver_id)) continue;        // Guard 2
+    const received = receivedAt.get(app.caregiver_id);
+    if (received == null) continue;                      // Guard 1
+    const ageMs = now - received;
+    if (ageMs < cutoffMs) continue;                      // Guard 3
+
+    const ageH = Math.round(ageMs / 3_600_000);
+    if (!live) {
+      console.log(`auto-reject [DRY-RUN] would reject application ${app.id} (caregiver ${app.caregiver_id}, lead ${lead.id}, age ${ageH}h)`);
+      rejected += 1;
+      continue;
+    }
+
+    // Scharf: Mamamia RejectApplication + Bridge-Event application_rejected
+    // (Letzteres lässt kostenrechner das Event aufzeichnen und cancelt die
+    // noch offenen Reminder).
+    try {
+      await mamamiaRequest<RejectApplicationResponse>({
+        endpoint: secrets.mamamiaEndpoint,
+        token: agencyToken,
+        query: REJECT_APPLICATION,
+        variables: { id: app.id, reject_message: AUTO_REJECT_MESSAGE },
+        fetchFn: fetcher,
+      });
+    } catch (e) {
+      console.error(`auto-reject: RejectApplication failed (app ${app.id}, lead ${lead.id}):`, e instanceof Error ? e.message : String(e));
+      continue;
+    }
+
+    try {
+      await fetcher(`${secrets.kostenrechnerUrl.replace(/\/$/, "")}/api/lead-event`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          token: lead.token,
+          event: "application_rejected",
+          metadata: {
+            application_id: app.id,
+            caregiver_id: app.caregiver_id,
+            reject_message: AUTO_REJECT_MESSAGE,
+            reason: "auto_timeout_48h",
+            source: "detect-caregiver-events",
+          },
+        }),
+      });
+    } catch (e) {
+      // Mamamia-Reject ist schon durch — Bridge-Event-Fehler nur loggen.
+      // Beim nächsten Sweep verhindert die Mamamia-Seite (Bewerbung ist
+      // rejected) bzw. das fehlende Event ein Doppel-Reject ist unkritisch
+      // (RejectApplication auf bereits abgelehnte App ist idempotent/no-op).
+      console.error(`auto-reject: bridge event failed (app ${app.id}, lead ${lead.id}):`, e instanceof Error ? e.message : String(e));
+    }
+    console.log(`auto-reject [LIVE] rejected application ${app.id} (caregiver ${app.caregiver_id}, lead ${lead.id}, age ${ageH}h)`);
+    rejected += 1;
+  }
+
+  return rejected;
 }
 
 // ─── Bridge POST + metadata mapper ─────────────────────────────────────────
@@ -384,6 +535,23 @@ function makeRealSupabase(url: string, serviceKey: string): DetectSupabase {
       return (data ?? []).map((row: { event_type: string; metadata: unknown }) => ({
         event_type: row.event_type as EventType,
         caregiver_id: extractCaregiverId(row.metadata),
+      }));
+    },
+    async fetchAppStatusEvents(leadId: string) {
+      const { data, error } = await client
+        .from("lead_events")
+        .select("event_type, metadata, created_at")
+        .eq("lead_id", leadId)
+        .in("event_type", [
+          "application_received",
+          "application_accepted_internal",
+          "application_rejected",
+        ]);
+      if (error) throw new Error(`supabase fetchAppStatusEvents: ${error.message}`);
+      return (data ?? []).map((row: { event_type: string; metadata: unknown; created_at: string }) => ({
+        event_type: row.event_type as AppStatusEventType,
+        caregiver_id: extractCaregiverId(row.metadata),
+        created_at: row.created_at,
       }));
     },
   };
