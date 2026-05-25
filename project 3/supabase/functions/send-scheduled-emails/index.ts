@@ -966,7 +966,7 @@ function reminderBadgeStyle(level?: string | null): { label: string; gradient: s
 // interest bleibt 1-stufig. Tier steuert Intro-Wording, CTA-Text und ob
 // ein prominenter "Schnell Bescheid geben"-Block (WhatsApp + Phone)
 // eingeblendet wird.
-type ReminderTier = "1h" | "4h" | "12h";
+type ReminderTier = "1h" | "4h" | "12h" | "46h";
 
 // Reminder-Mail-HTML. Beide Varianten (interest / application) teilen sich
 // dasselbe Layout — nur Subject, Intro, Action-Satz + CTA-Text unterscheiden
@@ -1050,9 +1050,16 @@ function buildReminderHtml(
     introHtml = `<p style="font-size:15px;line-height:1.75;color:#444;margin-bottom:18px;">${firstName}s Bewerbung liegt nun seit <strong style="color:#2D1F0F;">über 4 Stunden</strong> bei Ihnen — und wir möchten Sie kurz informieren:</p>`;
     middleHtml = `<p style="font-size:15px;line-height:1.75;color:#444;margin-bottom:20px;">Pflegekräfte werden oft <strong style="color:#2D1F0F;">innerhalb weniger Stunden</strong> für andere Einsätze angefragt. Damit wir ${firstName} für Sie reservieren können, brauchen wir ein kurzes Signal von Ihnen — entweder die Bewerbung annehmen oder kurz Bescheid geben, dass es nicht passt.</p>`;
     ctaText = "Jetzt entscheiden →";
-  } else {
+  } else if (tier === "12h") {
     introHtml = `<p style="font-size:15px;line-height:1.75;color:#444;margin-bottom:18px;">${firstName}s Bewerbung wartet nun seit <strong style="color:#C4543D;">über 12 Stunden</strong> auf Ihre Rückmeldung.</p>`;
     middleHtml = `<p style="font-size:15px;line-height:1.75;color:#444;margin-bottom:20px;">Wir können <strong style="color:#2D1F0F;">nicht mehr garantieren</strong> dass ${firstName} noch verfügbar ist — viele Pflegekräfte sagen nach so langer Zeit anderen Familien zu. Bitte geben Sie uns kurz Bescheid, dann wissen wir woran wir sind und können ggf. eine andere Pflegekraft für Sie suchen.</p>`;
+    ctaText = "Jetzt entscheiden →";
+  } else {
+    // tier === "46h" — letzte Erinnerung vor dem automatischen Schließen
+    // der Bewerbung (~2h später durch den Auto-Reject). Klare Ansage +
+    // alle Reaktionswege (Portal annehmen/ablehnen, Berater, sonst auto).
+    introHtml = `<p style="font-size:15px;line-height:1.75;color:#444;margin-bottom:18px;">${firstName}s Bewerbung liegt jetzt seit fast <strong style="color:#C4543D;">48 Stunden</strong> bei Ihnen — eine letzte Erinnerung, bevor wir sie schließen.</p>`;
+    middleHtml = `<p style="font-size:15px;line-height:1.75;color:#444;margin-bottom:20px;">Wir können <strong style="color:#2D1F0F;">${firstName} nicht länger für Sie reservieren</strong>. Bitte entscheiden Sie jetzt — die Bewerbung im Portal <strong>annehmen</strong> oder <strong>ablehnen</strong>, oder sprechen Sie kurz mit uns. Ohne Rückmeldung schließen wir die Bewerbung in etwa 2 Stunden automatisch. Bei Interesse schlagen wir Ihnen dann gerne weitere passende Pflegekräfte vor.</p>`;
     ctaText = "Jetzt entscheiden →";
   }
 
@@ -1060,11 +1067,15 @@ function buildReminderHtml(
   // damit der Kunde auch ohne Portal-Besuch antworten kann. Häufigste
   // Hemmschwelle: "ich weiß nicht ob es passt, also schiebe ich es auf" —
   // mit "kurz Bescheid geben"-Button reduziert das die Paralyse.
-  const showQuickActions = variant === "application" && (tier === "4h" || tier === "12h");
-  const quickActionTitle = tier === "12h"
+  const showQuickActions = variant === "application" && (tier === "4h" || tier === "12h" || tier === "46h");
+  const quickActionTitle = tier === "46h"
+    ? "Jetzt entscheiden — oder kurz mit uns sprechen"
+    : tier === "12h"
     ? "Bitte kurz Bescheid geben"
     : "Schnell antworten?";
-  const quickActionSub = tier === "12h"
+  const quickActionSub = tier === "46h"
+    ? "Annehmen, ablehnen oder eine kurze Rückfrage — am schnellsten per WhatsApp oder Anruf. Ohne Rückmeldung schließen wir die Bewerbung in ca. 2 Stunden automatisch."
+    : tier === "12h"
     ? "Auch ein kurzes „passt nicht“ hilft uns weiter — dann können wir freigeben und ${firstName} findet schneller einen anderen Einsatz."
     : "Falls Sie keine Zeit für das Portal haben, reicht eine kurze Nachricht — wir kümmern uns dann um den Rest.";
   const quickActionHtml = showQuickActions
@@ -1159,11 +1170,17 @@ Primundus Deutschland | www.primundus.de
     body = `Pflegekräfte werden oft innerhalb weniger Stunden für andere Einsätze angefragt. Damit wir ${firstName} für Sie reservieren können, brauchen wir ein kurzes Signal von Ihnen — entweder die Bewerbung annehmen oder kurz Bescheid geben, dass es nicht passt.`;
     cta = `Jetzt entscheiden: ${portalUrl}`;
     quickAction = `\nSchnell antworten?\nFalls Sie keine Zeit für das Portal haben, reicht eine kurze Nachricht:\n  WhatsApp: https://wa.me/4989200000830\n  Telefon:  089 200 000 830\n`;
-  } else {
+  } else if (tier === "12h") {
     intro = `${firstName}s Bewerbung wartet nun seit über 12 Stunden auf Ihre Rückmeldung.`;
     body = `Wir können nicht mehr garantieren dass ${firstName} noch verfügbar ist — viele Pflegekräfte sagen nach so langer Zeit anderen Familien zu. Bitte geben Sie uns kurz Bescheid, dann wissen wir woran wir sind und können ggf. eine andere Pflegekraft für Sie suchen.`;
     cta = `Jetzt entscheiden: ${portalUrl}`;
     quickAction = `\nBitte kurz Bescheid geben\nAuch ein kurzes „passt nicht“ hilft uns weiter — dann können wir freigeben und ${firstName} findet schneller einen anderen Einsatz:\n  WhatsApp: https://wa.me/4989200000830\n  Telefon:  089 200 000 830\n`;
+  } else {
+    // tier === "46h" — letzte Erinnerung vor dem automatischen Schließen.
+    intro = `${firstName}s Bewerbung liegt jetzt seit fast 48 Stunden bei Ihnen — eine letzte Erinnerung, bevor wir sie schließen.`;
+    body = `Wir können ${firstName} nicht länger für Sie reservieren. Bitte entscheiden Sie jetzt — die Bewerbung im Portal annehmen oder ablehnen, oder sprechen Sie kurz mit uns. Ohne Rückmeldung schließen wir die Bewerbung in etwa 2 Stunden automatisch. Bei Interesse schlagen wir Ihnen dann gerne weitere passende Pflegekräfte vor.`;
+    cta = `Jetzt entscheiden: ${portalUrl}`;
+    quickAction = `\nJetzt entscheiden — oder kurz mit uns sprechen\nAnnehmen, ablehnen oder eine kurze Rückfrage — am schnellsten per WhatsApp oder Anruf:\n  WhatsApp: https://wa.me/4989200000830\n  Telefon:  089 200 000 830\n`;
   }
 
   // Bestpreis-Anker nur im 12h-Tier (siehe HTML-Builder).
@@ -1472,7 +1489,8 @@ Deno.serve(async (req: Request) => {
           scheduledEmail.email_type === "interest_reminder" ||
           scheduledEmail.email_type === "application_reminder" ||
           scheduledEmail.email_type === "application_reminder_4h" ||
-          scheduledEmail.email_type === "application_reminder_12h"
+          scheduledEmail.email_type === "application_reminder_12h" ||
+          scheduledEmail.email_type === "application_last_chance"
         ) {
           // Reaktions-Reminder. 1h / 4h / 12h nach dem ursprünglichen
           // caregiver_interest_shown / application_received-Event. Vor
@@ -1541,6 +1559,7 @@ Deno.serve(async (req: Request) => {
           const tier: ReminderTier =
             scheduledEmail.email_type === "application_reminder_4h" ? "4h"
             : scheduledEmail.email_type === "application_reminder_12h" ? "12h"
+            : scheduledEmail.email_type === "application_last_chance" ? "46h"
             : "1h";
           const cgName = meta.caregiver_name || "Ihre Pflegekraft";
           const firstName = cgName.split(/\s+/)[0] || cgName;
@@ -1550,8 +1569,10 @@ Deno.serve(async (req: Request) => {
             subject = `${firstName} wartet auf Ihre Entscheidung`;
           } else if (tier === "4h") {
             subject = `${firstName}: bitte kurz Bescheid geben`;
-          } else {
+          } else if (tier === "12h") {
             subject = `${firstName}: ist die Bewerbung noch aktuell?`;
+          } else {
+            subject = `${firstName}: letzte Erinnerung — wir schließen die Bewerbung bald`;
           }
 
           // Portal-URL mit Token bauen
