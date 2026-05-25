@@ -1457,6 +1457,17 @@ function caregiverInitials(name: string): string {
   return (parts[0].charAt(0) + parts[parts.length - 1].charAt(0)).toUpperCase();
 }
 
+// Mamamia liefert teils unübersetzte Platzhalter in about_de (z.B. "Bitte
+// geben Sie den Text an, den Sie ins Deutsche übersetzen möchten.") statt
+// einer echten Beschreibung — nie als Pflegekraft-Zitat rendern.
+function cleanCaregiverAbout(raw: string | null | undefined): string | null {
+  const t = (raw ?? '').trim();
+  if (!t) return null;
+  const lower = t.toLowerCase();
+  const markers = ['übersetzen möchten', 'bitte geben sie den text', 'ins deutsche übersetzen', 'lorem ipsum'];
+  return markers.some((m) => lower.includes(m)) ? null : t;
+}
+
 function caregiverBadgeStyle(level?: string): { label: string; gradient: string; solid: string } | null {
   if (!level) return null;
   const key = level.trim().toLowerCase();
@@ -1520,8 +1531,12 @@ function buildCaregiverEventEmail(opts: {
     ? `<img src="${cg.photoUrl}" alt="${cg.name}" width="80" style="display:block;width:80px;height:80px;border-radius:50%;object-fit:cover;border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.08);" />`
     : `<div style="width:80px;height:80px;border-radius:50%;background-color:#B5A184;color:#fff;font-size:28px;font-weight:700;line-height:80px;text-align:center;border:2px solid #fff;">${caregiverInitials(cg.name)}</div>`;
 
-  const aboutHtml = cg.aboutText
-    ? `<p style="margin:14px 0 0;font-size:14px;line-height:1.65;color:#555;font-style:italic;">„${cg.aboutText}"</p>`
+  // Mamamia liefert teils unübersetzte Platzhalter in about_de (z.B. "Bitte
+  // geben Sie den Text an, den Sie ins Deutsche übersetzen möchten.") — nie
+  // als Zitat rendern.
+  const aboutClean = cleanCaregiverAbout(cg.aboutText);
+  const aboutHtml = aboutClean
+    ? `<p style="margin:14px 0 0;font-size:14px;line-height:1.65;color:#555;font-style:italic;">„${aboutClean}"</p>`
     : '';
 
   const kachel = `
@@ -1676,7 +1691,7 @@ ${opts.plainSummary}
 
 PFLEGEKRAFT
 ${cg.name}${cg.badgeLevel ? ` · ${cg.badgeLevel}-Pflegekraft` : ''}
-${metaParts.length > 0 ? metaParts.join(' · ') + '\n' : ''}${cg.aboutText ? `„${cg.aboutText}"\n` : ''}
+${metaParts.length > 0 ? metaParts.join(' · ') + '\n' : ''}${aboutClean ? `„${aboutClean}"\n` : ''}
 ${opts.ctaText.replace(/\s*→\s*$/, '')}: ${opts.portalUrl}
 
 ✓ Keine Vertragsbindung  ·  ✓ Tagesgenaue Abrechnung  ·  ✓ Kosten erst bei Anreise

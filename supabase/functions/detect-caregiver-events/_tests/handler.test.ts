@@ -3,6 +3,7 @@ import {
   type AppStatusEventRow,
   buildCaregiverMetadata,
   type CaregiverNode,
+  cleanAboutText,
   type DetectSecrets,
   type DetectSupabase,
   type EventRow,
@@ -526,6 +527,18 @@ Deno.test("buildCaregiverMetadata initials + optional fields", () => {
 Deno.test("buildCaregiverMetadata missing first_name → no name field", () => {
   const meta = buildCaregiverMetadata(50001, makeCaregiver({ first_name: null }));
   assertEquals(meta.caregiver_name, undefined);
+});
+
+Deno.test("cleanAboutText filtert Mamamia-Platzhalter raus", () => {
+  assertEquals(cleanAboutText("Bitte geben Sie den Text an, den Sie ins Deutsche übersetzen möchten."), null);
+  assertEquals(cleanAboutText("  "), null);
+  assertEquals(cleanAboutText(null), null);
+  assertEquals(cleanAboutText("Ich betreue mit Herz und Geduld."), "Ich betreue mit Herz und Geduld.");
+});
+
+Deno.test("buildCaregiverMetadata: Platzhalter-about_de wird nicht übernommen", () => {
+  const meta = buildCaregiverMetadata(50001, makeCaregiver({ about_de: "Bitte geben Sie den Text an, den Sie ins Deutsche übersetzen möchten." }));
+  assertEquals(meta.caregiver_about_text, undefined);
 });
 
 // ─── 48h Auto-Reject ─────────────────────────────────────────────────────────

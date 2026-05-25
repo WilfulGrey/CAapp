@@ -947,6 +947,17 @@ function reminderCaregiverInitials(name: string): string {
   return (parts[0].charAt(0) + parts[parts.length - 1].charAt(0)).toUpperCase();
 }
 
+// Filtert unübersetzte Mamamia-Platzhalter aus about_de — die dürfen nie als
+// Pflegekraft-Zitat in der Mail landen. Spiegelt cleanAboutText() aus
+// detect-caregiver-events (dort an der Quelle, hier defensiv beim Render).
+function cleanReminderAbout(raw: string | null | undefined): string | null {
+  const t = (raw ?? "").trim();
+  if (!t) return null;
+  const lower = t.toLowerCase();
+  const markers = ["übersetzen möchten", "bitte geben sie den text", "ins deutsche übersetzen", "lorem ipsum"];
+  return markers.some((m) => lower.includes(m)) ? null : t;
+}
+
 function reminderBadgeStyle(level?: string | null): { label: string; gradient: string; solid: string } | null {
   if (!level) return null;
   const key = level.trim().toLowerCase();
@@ -1011,8 +1022,13 @@ function buildReminderHtml(
     ? `<img src="cid:${photoCid}" alt="${cgName}" width="80" style="display:block;width:80px;height:80px;border-radius:50%;object-fit:cover;border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.08);" />`
     : `<div style="width:80px;height:80px;border-radius:50%;background-color:#B5A184;color:#fff;font-size:28px;font-weight:700;line-height:80px;text-align:center;border:2px solid #fff;">${reminderCaregiverInitials(cgName)}</div>`;
 
-  const aboutHtml = meta.caregiver_about_text
-    ? `<p style="margin:14px 0 0;font-size:14px;line-height:1.65;color:#555;font-style:italic;">„${meta.caregiver_about_text}"</p>`
+  // Mamamia liefert teils unübersetzte Platzhalter in about_de (z.B. "Bitte
+  // geben Sie den Text an, den Sie ins Deutsche übersetzen möchten.") — die
+  // dürfen nie als Zitat erscheinen. Defensive auch hier (alte scheduled_
+  // emails-Rows tragen evtl. noch ungefilterte Werte).
+  const aboutClean = cleanReminderAbout(meta.caregiver_about_text);
+  const aboutHtml = aboutClean
+    ? `<p style="margin:14px 0 0;font-size:14px;line-height:1.65;color:#555;font-style:italic;">„${aboutClean}"</p>`
     : "";
 
   const kachel = `
@@ -1043,11 +1059,11 @@ function buildReminderHtml(
     middleHtml = `<p style="font-size:15px;line-height:1.75;color:#444;margin-bottom:20px;">Pflegekräfte mit guten Profilen werden häufig schnell von anderen Familien angefragt. <strong style="color:#2D1F0F;">Damit ${firstName} für Sie verfügbar bleibt</strong>, schauen Sie sich ihr Profil jetzt an und laden Sie sie ein, sich bei Ihnen zu bewerben.</p>`;
     ctaText = "Profil ansehen und einladen →";
   } else if (tier === "1h") {
-    introHtml = `<p style="font-size:15px;line-height:1.75;color:#444;margin-bottom:18px;">vor einer Stunde haben wir Ihnen <strong style="color:#2D1F0F;">${firstName}s Bewerbung</strong> weitergeleitet. Eine kurze Erinnerung — diese Phase ist zeitkritisch:</p>`;
+    introHtml = `<p style="font-size:15px;line-height:1.75;color:#444;margin-bottom:18px;">vor einer Stunde haben wir Ihnen <strong style="color:#2D1F0F;">${firstName}s Bewerbung</strong> weitergeleitet — eine kurze Erinnerung, denn diese Phase ist zeitkritisch.</p>`;
     middleHtml = `<p style="font-size:15px;line-height:1.75;color:#444;margin-bottom:20px;">Pflegekräfte halten ihre Bewerbung bei uns offen, solange sie keine andere Familie verbindlich gebucht hat. <strong style="color:#2D1F0F;">Damit Sie ${firstName} nicht verlieren</strong>, schauen Sie sich ihre Bewerbung jetzt an und bestätigen Sie die Buchung, wenn alles passt.</p>`;
     ctaText = "Bewerbung ansehen und buchen →";
   } else if (tier === "4h") {
-    introHtml = `<p style="font-size:15px;line-height:1.75;color:#444;margin-bottom:18px;">${firstName}s Bewerbung liegt nun seit <strong style="color:#2D1F0F;">über 4 Stunden</strong> bei Ihnen — und wir möchten Sie kurz informieren:</p>`;
+    introHtml = `<p style="font-size:15px;line-height:1.75;color:#444;margin-bottom:18px;">${firstName}s Bewerbung liegt nun seit <strong style="color:#2D1F0F;">über 4 Stunden</strong> bei Ihnen — und wir möchten kurz nachfassen.</p>`;
     middleHtml = `<p style="font-size:15px;line-height:1.75;color:#444;margin-bottom:20px;">Pflegekräfte werden oft <strong style="color:#2D1F0F;">innerhalb weniger Stunden</strong> für andere Einsätze angefragt. Damit wir ${firstName} für Sie reservieren können, brauchen wir ein kurzes Signal von Ihnen — entweder die Bewerbung annehmen oder kurz Bescheid geben, dass es nicht passt.</p>`;
     ctaText = "Jetzt entscheiden →";
   } else if (tier === "12h") {
@@ -1167,11 +1183,11 @@ Primundus Deutschland | www.primundus.de
   let cta: string;
   let quickAction = "";
   if (tier === "1h") {
-    intro = `vor einer Stunde haben wir Ihnen ${firstName}s Bewerbung weitergeleitet. Eine kurze Erinnerung — diese Phase ist zeitkritisch:`;
+    intro = `vor einer Stunde haben wir Ihnen ${firstName}s Bewerbung weitergeleitet — eine kurze Erinnerung, denn diese Phase ist zeitkritisch.`;
     body = `Pflegekräfte halten ihre Bewerbung bei uns offen, solange sie keine andere Familie verbindlich gebucht hat. Damit Sie ${firstName} nicht verlieren, schauen Sie sich ihre Bewerbung jetzt an und bestätigen Sie die Buchung, wenn alles passt.`;
     cta = `Bewerbung ansehen und buchen: ${portalUrl}`;
   } else if (tier === "4h") {
-    intro = `${firstName}s Bewerbung liegt nun seit über 4 Stunden bei Ihnen — und wir möchten Sie kurz informieren:`;
+    intro = `${firstName}s Bewerbung liegt nun seit über 4 Stunden bei Ihnen — und wir möchten kurz nachfassen.`;
     body = `Pflegekräfte werden oft innerhalb weniger Stunden für andere Einsätze angefragt. Damit wir ${firstName} für Sie reservieren können, brauchen wir ein kurzes Signal von Ihnen — entweder die Bewerbung annehmen oder kurz Bescheid geben, dass es nicht passt.`;
     cta = `Jetzt entscheiden: ${portalUrl}`;
     quickAction = `\nSchnell antworten?\nFalls Sie keine Zeit für das Portal haben, reicht eine kurze Nachricht:\n  WhatsApp: https://wa.me/4989200000830\n  Telefon:  089 200 000 830\n`;
