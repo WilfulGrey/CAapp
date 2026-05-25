@@ -535,8 +535,33 @@ const hoursAgo = (h: number) => new Date(Date.now() - h * 3_600_000).toISOString
 // damit der Test nur den Auto-Reject isoliert.
 const SEEN_50001: EventRow[] = [{ event_type: "application_received", caregiver_id: 50001 }];
 
-Deno.test("auto-reject DRY-RUN: stale app (≥48h, no reaction) → counted, KEIN Mamamia-Reject, KEIN bridge event", async () => {
+Deno.test("auto-reject DRY-RUN (Kill-Switch AUTO_REJECT_ENABLED=false): stale app → gezählt, KEIN Mamamia-Reject, KEIN bridge event", async () => {
   resetCaches();
+  Deno.env.set("AUTO_REJECT_ENABLED", "false"); // Kill-Switch — Default ist sonst scharf
+  try {
+    const recorder: BridgeOptions["recorder"] = [];
+    const rejectRecorder: number[] = [];
+    const appStatus: AppStatusEventRow[] = [
+      { event_type: "application_received", caregiver_id: 50001, created_at: hoursAgo(49) },
+    ];
+    const res = await handleRequest(makeReq({ lead_id: VALID_LEAD.id }), {
+      secrets: SECRETS,
+      supabase: makeSupabase(VALID_LEAD, SEEN_50001, appStatus),
+      fetchFn: makeFetch({ apps: [{ id: 777, caregiver_id: 50001, caregiver: makeCaregiver() }], rejectRecorder }, { recorder }),
+    });
+    assertEquals(res.status, 200);
+    const body = await res.json();
+    assertEquals(body.auto_rejected, 1);
+    assertEquals(rejectRecorder.length, 0); // Dry-Run: kein echter Reject
+    assertEquals(recorder.filter((r) => r.event === "application_rejected").length, 0);
+  } finally {
+    Deno.env.delete("AUTO_REJECT_ENABLED");
+  }
+});
+
+Deno.test("auto-reject DEFAULT (kein Env): stale app → SCHARF, Mamamia-Reject + bridge event", async () => {
+  resetCaches();
+  Deno.env.delete("AUTO_REJECT_ENABLED"); // Default = live
   const recorder: BridgeOptions["recorder"] = [];
   const rejectRecorder: number[] = [];
   const appStatus: AppStatusEventRow[] = [
@@ -547,11 +572,10 @@ Deno.test("auto-reject DRY-RUN: stale app (≥48h, no reaction) → counted, KEI
     supabase: makeSupabase(VALID_LEAD, SEEN_50001, appStatus),
     fetchFn: makeFetch({ apps: [{ id: 777, caregiver_id: 50001, caregiver: makeCaregiver() }], rejectRecorder }, { recorder }),
   });
-  assertEquals(res.status, 200);
   const body = await res.json();
   assertEquals(body.auto_rejected, 1);
-  assertEquals(rejectRecorder.length, 0); // Dry-Run: kein echter Reject
-  assertEquals(recorder.filter((r) => r.event === "application_rejected").length, 0);
+  assertEquals(rejectRecorder, [777]); // Default scharf → echter Reject
+  assertEquals(recorder.filter((r) => r.event === "application_rejected").length, 1);
 });
 
 Deno.test("auto-reject: app jünger als 48h → nicht abgelehnt", async () => {

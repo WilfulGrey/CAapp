@@ -294,15 +294,21 @@ export async function detect(
 //      hat (application_accepted_internal ODER application_rejected).
 //   3. Erst ab Alter ≥ AUTO_REJECT_AFTER_HOURS.
 //
-// Dry-Run (Default): loggt nur "would reject", schreibt NICHTS. Scharf-
-// schalten über Env AUTO_REJECT_ENABLED="true"|"1".
+// SCHARF per Default (Default-Live). Kill-Switch: Edge-Function-Secret
+// AUTO_REJECT_ENABLED="false"|"0" → zurück in den Dry-Run (loggt nur
+// "would reject", schreibt NICHTS). Alternativ AUTO_REJECT_DEFAULT_LIVE
+// hier auf false + Deploy. Explizites Env überschreibt den Default in
+// beide Richtungen.
 const AUTO_REJECT_AFTER_HOURS = 48;
 const AUTO_REJECT_MESSAGE =
   "Automatische Absage — keine Rückmeldung des Kunden innerhalb 48 Stunden.";
+const AUTO_REJECT_DEFAULT_LIVE = true;
 
 function autoRejectIsLive(): boolean {
   const v = (Deno.env.get("AUTO_REJECT_ENABLED") ?? "").trim().toLowerCase();
-  return v === "true" || v === "1";
+  if (v === "true" || v === "1") return true;
+  if (v === "false" || v === "0") return false;
+  return AUTO_REJECT_DEFAULT_LIVE;
 }
 
 async function autoRejectStaleApplications(
