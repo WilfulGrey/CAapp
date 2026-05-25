@@ -1422,6 +1422,15 @@ function buildStepsList(steps: { title: string; desc: string }[]): string {
   return `<table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="margin:0 0 14px;">${rows}</table>`;
 }
 
+// "Lieber persönlich?"-Hinweis — senkt die Portal-Hürde: der Kunde kann
+// jeden Schritt auch ohne Portal per Telefon / WhatsApp / Mail-Antwort
+// erledigen. Wird in Mail A + Mail B unter die Schritt-Liste gehängt.
+const PERSOENLICH_HINWEIS_TEXT =
+  'Lieber persönlich? Rufen Sie uns gerne direkt an (089 200 000 830) oder schreiben Sie per WhatsApp (wa.me/4989200000830) — oder antworten Sie einfach auf diese E-Mail. Ganz wie es für Sie am bequemsten ist.';
+function persoenlichHinweisHtml(): string {
+  return `<p style="font-size:14px;line-height:1.65;color:#555;margin:4px 0 16px;">Lieber persönlich? Rufen Sie uns gerne <a href="tel:+4989200000830" style="color:#0066CC;text-decoration:none;white-space:nowrap;">direkt an</a> oder schreiben Sie per <a href="https://wa.me/4989200000830" style="color:#25D366;text-decoration:none;font-weight:600;white-space:nowrap;">WhatsApp</a> — oder antworten Sie einfach auf diese E-Mail. Ganz wie es für Sie am bequemsten ist.</p>`;
+}
+
 export interface CaregiverDisplay {
   name: string;                  // "Maria K." — caller liefert schon gekürzt
   badgeLevel?: string;           // "Starter" | "Bronze" | "Silber" | "Gold" | "Platin"
@@ -1852,7 +1861,7 @@ export function getCaregiverInterestEmailTemplate(
     { title: 'Profil ansehen', desc: `${firstName}s Erfahrung, Qualifikation und bisherige Einsätze in Ruhe im Portal anschauen.` },
     { title: 'Einladen', desc: `Gefällt Ihnen das Profil, laden Sie ${firstName} mit einem Klick ein, sich bei Ihnen zu bewerben.` },
     { title: 'Bewerbung erhalten', desc: `Wenn ${firstName} sich daraufhin bewirbt, bekommen Sie das konkrete Angebot per E-Mail und entscheiden dann in Ruhe.` },
-  ]);
+  ]) + persoenlichHinweisHtml();
   return buildCaregiverEventEmail({
     lead,
     caregiver,
@@ -1866,7 +1875,9 @@ export function getCaregiverInterestEmailTemplate(
 So geht es weiter:
 1. Profil ansehen — ${firstName}s Erfahrung, Qualifikation und bisherige Einsätze in Ruhe im Portal anschauen.
 2. Einladen — gefällt Ihnen das Profil, laden Sie ${firstName} mit einem Klick ein, sich bei Ihnen zu bewerben.
-3. Bewerbung erhalten — wenn ${firstName} sich daraufhin bewirbt, bekommen Sie das konkrete Angebot per E-Mail und entscheiden dann in Ruhe.`,
+3. Bewerbung erhalten — wenn ${firstName} sich daraufhin bewirbt, bekommen Sie das konkrete Angebot per E-Mail und entscheiden dann in Ruhe.
+
+${PERSOENLICH_HINWEIS_TEXT}`,
   });
 }
 
@@ -1881,7 +1892,7 @@ export function getApplicationReceivedEmailTemplate(
     { title: 'Bewerbung ansehen', desc: `${firstName}s Profil, Erfahrung und bisherige Einsätze in Ruhe im Portal prüfen.` },
     { title: 'Angebot & Kosten prüfen', desc: `Tagessatz, An- und Abreise sowie eine vollständige Kostenzusammenfassung sind transparent aufgelistet — keine versteckten Kosten.` },
     { title: 'Pflegekraft beauftragen', desc: `Passt alles? Mit Eingabe Ihrer Kontaktdaten beauftragen Sie ${firstName}. Den Vertrag senden wir Ihnen anschließend separat per E-Mail zu — um Anreise und alle weiteren Schritte kümmern wir uns.` },
-  ]);
+  ]) + persoenlichHinweisHtml();
   const softOutHtml = `<p style="font-size:14px;line-height:1.65;color:#888;margin:4px 0 20px;font-style:italic;">Passt es nicht? Lehnen Sie die Bewerbung im Portal kurz ab oder schreiben Sie uns — dann suchen wir gerne weiter.</p>`;
   return buildCaregiverEventEmail({
     lead,
@@ -1897,6 +1908,8 @@ So geht es weiter:
 1. Bewerbung ansehen — ${firstName}s Profil, Erfahrung und bisherige Einsätze in Ruhe im Portal prüfen.
 2. Angebot & Kosten prüfen — Tagessatz, An- und Abreise sowie eine vollständige Kostenzusammenfassung sind transparent aufgelistet — keine versteckten Kosten.
 3. Pflegekraft beauftragen — passt alles? Mit Eingabe Ihrer Kontaktdaten beauftragen Sie ${firstName}. Den Vertrag senden wir Ihnen anschließend separat per E-Mail zu — um Anreise und alle weiteren Schritte kümmern wir uns.
+
+${PERSOENLICH_HINWEIS_TEXT}
 
 Passt es nicht? Lehnen Sie die Bewerbung im Portal kurz ab oder schreiben Sie uns — dann suchen wir gerne weiter.`,
   });
