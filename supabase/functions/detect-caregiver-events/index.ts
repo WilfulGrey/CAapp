@@ -473,11 +473,30 @@ export function buildCaregiverMetadata(
   if (caregiver.avatar_retouched?.aws_url) {
     meta.caregiver_photo_url = caregiver.avatar_retouched.aws_url;
   }
-  if (caregiver.about_de) {
-    meta.caregiver_about_text = caregiver.about_de;
+  const about = cleanAboutText(caregiver.about_de);
+  if (about) {
+    meta.caregiver_about_text = about;
   }
 
   return meta;
+}
+
+// Mamamia liefert in about_de teils unübersetzte Platzhalter / Übersetzungs-
+// Prompts statt einer echten Beschreibung (z.B. "Bitte geben Sie den Text an,
+// den Sie ins Deutsche übersetzen möchten."). Solche Werte dürfen NIE als
+// Pflegekraft-Zitat in einer Kundenmail landen → rausfiltern.
+export function cleanAboutText(raw: string | null | undefined): string | null {
+  const t = (raw ?? "").trim();
+  if (!t) return null;
+  const lower = t.toLowerCase();
+  const placeholderMarkers = [
+    "übersetzen möchten",
+    "bitte geben sie den text",
+    "ins deutsche übersetzen",
+    "lorem ipsum",
+  ];
+  if (placeholderMarkers.some((m) => lower.includes(m))) return null;
+  return t;
 }
 
 // Mirror of frontend src/lib/mamamia/mappers.ts badge thresholds. Mamamia
