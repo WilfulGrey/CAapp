@@ -328,7 +328,12 @@ export const AngebotPruefenModal: FC<{
             </div>
           </div>
 
-          <div className="overflow-y-auto flex-1">
+          {/* Scroll-Bereich mit Bottom-Fade: signalisiert dass unterhalb des
+              sichtbaren Rands noch Inhalt kommt (Hinweistext + Pflicht-
+              Checkbox in Step 1). Ohne den Fade wirkt die Liste am
+              Kündigungsfrist-Row "fertig" und die Checkbox wird übersehen. */}
+          <div className="relative flex-1 min-h-0">
+          <div className="overflow-y-auto h-full">
             {step === 1 && (
               <div className="p-5 space-y-5">
                 <div className="flex items-center gap-3 bg-gray-50 rounded-xl px-4 py-3 border border-gray-100">
@@ -561,6 +566,10 @@ export const AngebotPruefenModal: FC<{
               </div>
             )}
           </div>
+            {/* Bottom-Fade — Scroll-Affordance, zeigt dass unten noch
+                Inhalt kommt. pointer-events-none, damit Klicks durchgehen. */}
+            <div className="pointer-events-none absolute bottom-0 inset-x-0 h-6 bg-gradient-to-t from-white to-transparent" />
+          </div>
 
           {/* Trust-Strip — direkt über dem CTA an dem Punkt wo der Kunde
               die Entscheidung trifft. 3 prägnante Signale: Marktposition,
@@ -569,7 +578,7 @@ export const AngebotPruefenModal: FC<{
           <div className="px-5 py-3 border-t border-gray-100 bg-[#FAF8F4] flex items-center justify-between gap-2">
             <div className="flex items-center gap-1.5 min-w-0">
               <Award className="w-4 h-4 text-[#8B7355] flex-shrink-0" />
-              <span className="text-[11px] font-semibold text-[#3D2B1F] leading-tight">Testsieger 2024</span>
+              <span className="text-[11px] font-semibold text-[#3D2B1F] leading-tight">Testsieger DIE WELT</span>
             </div>
             <div className="flex items-center gap-1.5 min-w-0">
               <Users className="w-4 h-4 text-[#8B7355] flex-shrink-0" />
