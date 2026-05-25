@@ -1431,6 +1431,16 @@ function persoenlichHinweisHtml(): string {
   return `<p style="font-size:14px;line-height:1.65;color:#555;margin:4px 0 16px;">Lieber persönlich? Rufen Sie uns gerne <a href="tel:+4989200000830" style="color:#0066CC;text-decoration:none;white-space:nowrap;">direkt an</a> oder schreiben Sie per <a href="https://wa.me/4989200000830" style="color:#25D366;text-decoration:none;font-weight:600;white-space:nowrap;">WhatsApp</a> — oder antworten Sie einfach auf diese E-Mail. Ganz wie es für Sie am bequemsten ist.</p>`;
 }
 
+// Bestpreis-PS — kurzer, unaufdringlicher Reinforcer für alle Nurture-Mails
+// (NICHT Buchungsbestätigung — da schon gebucht). Direktanbieter-Argument
+// + abgesicherter Garantie-Claim. Bewusst als P.S., damit es den Haupt-
+// inhalt nicht überlagert aber an jedem Touchpoint präsent ist.
+const BESTPREIS_PS_TEXT =
+  'P.S. Kennen Sie schon die Primundus-Bestpreis-Garantie? Als Direktanbieter ohne Vermittler-Provision bieten wir faire Preise — finden Sie bei vergleichbarer Leistung ein günstigeres Angebot, unterbieten wir es.';
+function bestpreisPsHtml(): string {
+  return `<p style="font-size:13px;line-height:1.65;color:#777;margin:18px 0 0;border-top:1px solid #f0ebe4;padding-top:14px;"><strong style="color:#5C4A32;">P.S.</strong> Kennen Sie schon die <strong style="color:#2D1F0F;">Primundus-Bestpreis-Garantie?</strong> Als Direktanbieter ohne Vermittler-Provision bieten wir faire Preise — finden Sie bei vergleichbarer Leistung ein günstigeres Angebot, unterbieten wir es.</p>`;
+}
+
 export interface CaregiverDisplay {
   name: string;                  // "Maria K." — caller liefert schon gekürzt
   badgeLevel?: string;           // "Starter" | "Bronze" | "Silber" | "Gold" | "Platin"
@@ -1484,6 +1494,8 @@ function buildCaregiverEventEmail(opts: {
   ctaText: string;         // Button-Text
   portalUrl: string;       // URL hinter dem Button
   plainSummary: string;    // Plaintext-Fallback (intro + middle, ohne HTML)
+  psHtml?: string;         // optionales P.S. (z.B. Bestpreis) — vor der Sig
+  psText?: string;         // Plaintext-Pendant des P.S.
 }): EmailTemplate {
   const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://primundus.de';
   const greeting = customerGreeting(opts.lead);
@@ -1597,6 +1609,7 @@ function buildCaregiverEventEmail(opts: {
     <div style="background:#EEF6F0;border-left:3px solid #4CAF50;padding:12px 14px;border-radius:0 6px 6px 0;font-size:14px;color:#555;line-height:1.6;">
       Für Sie bleibt alles <strong>unverbindlich</strong>, bis Sie sich für eine passende Betreuungskraft entscheiden und diese anreist.
     </div>
+    ${opts.psHtml ?? ''}
     ${ilkaSig}`;
 
   const html = `<!DOCTYPE html>
@@ -1670,7 +1683,7 @@ ${opts.ctaText.replace(/\s*→\s*$/, '')}: ${opts.portalUrl}
 
 Für Sie bleibt alles unverbindlich, bis Sie sich für eine passende
 Betreuungskraft entscheiden und diese anreist.
-
+${opts.psText ? '\n' + opts.psText + '\n' : ''}
 Mit freundlichen Grüßen
 Ilka Wysocki — Pflegeberaterin
 Tel: 089 200 000 830  ·  WhatsApp: https://wa.me/4989200000830
@@ -1870,6 +1883,8 @@ export function getCaregiverInterestEmailTemplate(
     middleHtml,
     ctaText: 'Pflegekraft im Portal ansehen →',
     portalUrl,
+    psHtml: bestpreisPsHtml(),
+    psText: BESTPREIS_PS_TEXT,
     plainSummary: `eine erfreuliche Nachricht — eine Pflegekraft hat sich Ihr Angebot angesehen und ist interessiert, die Betreuung zu übernehmen.
 
 So geht es weiter:
@@ -1902,6 +1917,8 @@ export function getApplicationReceivedEmailTemplate(
     middleHtml: middleHtml + softOutHtml,
     ctaText: 'Bewerbung im Portal ansehen →',
     portalUrl,
+    psHtml: bestpreisPsHtml(),
+    psText: BESTPREIS_PS_TEXT,
     plainSummary: `eine schöne Nachricht — Sie haben eine neue Bewerbung erhalten. ${caregiver.name} möchte die Betreuung gerne übernehmen.
 
 So geht es weiter:

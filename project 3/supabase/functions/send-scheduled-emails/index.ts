@@ -419,6 +419,15 @@ function nachfassCtaButton(url: string, label: string): string {
   return bulletproofButton(url, label, "#9A8A73");
 }
 
+// Bestpreis-PS — kurzer Reinforcer für Nurture-Mails (Eingangsbestätigung,
+// Nachfass_1). Bewusst NICHT in Nachfass_2/_3, die als minimale persönliche
+// Nachfrage gestaltet sind. Claim abgesichert ("vergleichbare Leistung").
+const BESTPREIS_PS_TEXT =
+  "P.S. Kennen Sie schon die Primundus-Bestpreis-Garantie? Als Direktanbieter ohne Vermittler-Provision bieten wir faire Preise — finden Sie bei vergleichbarer Leistung ein günstigeres Angebot, unterbieten wir es.";
+function bestpreisPsHtml(): string {
+  return `<p style="font-size:13px;line-height:1.65;color:#777;margin:18px 0 0;border-top:1px solid #f0ebe4;padding-top:14px;"><strong style="color:#5C4A32;">P.S.</strong> Kennen Sie schon die <strong style="color:#2D1F0F;">Primundus-Bestpreis-Garantie?</strong> Als Direktanbieter ohne Vermittler-Provision bieten wir faire Preise — finden Sie bei vergleichbarer Leistung ein günstigeres Angebot, unterbieten wir es.</p>`;
+}
+
 function buildNachfass1Html(lead: Lead, siteUrl: string, portalBase: string, milestone: LeadMilestone): string {
   const portalUrl = (portalBase && lead.token) ? buildPortalUrl(portalBase, lead.token) : siteUrl;
   const halloAnrede = buildHalloAnrede(lead.anrede_text || null, lead.nachname || "", lead.vorname || "");
@@ -430,6 +439,7 @@ function buildNachfass1Html(lead: Lead, siteUrl: string, portalBase: string, mil
     <p style="font-size:15px;line-height:1.75;color:#444;margin-bottom:14px;">${v.body}</p>
 
     ${nachfassCtaButton(portalUrl, v.cta)}
+    ${bestpreisPsHtml()}
     ${buildIlkaSig(siteUrl)}`;
 
   return buildEmailWrapper(lead, siteUrl, content);
@@ -447,6 +457,8 @@ ${plain(v.intro)}
 ${plain(v.body)}
 
 ${v.cta.replace(/ →$/, "")}: ${portalUrl}
+
+${BESTPREIS_PS_TEXT}
 
 Mit freundlichen Grüßen
 Ilka Wysocki
@@ -721,6 +733,7 @@ function buildEingangsbestaetigungHtml(lead: Lead, siteUrl: string, portalBase: 
       Für Sie bleibt alles <strong>unverbindlich</strong>, bis Sie sich für eine passende Betreuungskraft entscheiden und diese anreist.
     </div>
 
+    ${bestpreisPsHtml()}
     ${buildIlkaSig(siteUrl)}`;
 
   return buildEmailWrapper(lead, siteUrl, content);
@@ -784,6 +797,8 @@ Deutschkenntnisse: ${eingangsLabel("deutschkenntnisse", fd.deutschkenntnisse)}
 Wann soll die Betreuung starten?: ${eingangsLabel("care_start_timing", careStartTiming)}
 
 Für Sie bleibt alles unverbindlich, bis Sie sich für eine passende Betreuungskraft entscheiden und diese anreist.
+
+${BESTPREIS_PS_TEXT}
 
 Bei Fragen stehen wir Ihnen gerne telefonisch zur Verfügung: +49 89 200 000 830
 
@@ -1574,7 +1589,7 @@ Deno.serve(async (req: Request) => {
           const portalUrl = (portalBase && (lead as Lead).token)
             ? buildPortalUrl(portalBase, (lead as Lead).token)
             : smtpConfig.siteUrl;
-          subject = "Warum Primundus? Ihre Bestpreis-Garantie als Direktanbieter";
+          subject = "Kennen Sie die Primundus-Bestpreis-Garantie?";
           html = buildWarumPrimundusHtml(lead as Lead, portalUrl, smtpConfig.siteUrl);
           text = buildWarumPrimundusText(lead as Lead, portalUrl);
           eventTypeSent = "email_warum_primundus_sent";
