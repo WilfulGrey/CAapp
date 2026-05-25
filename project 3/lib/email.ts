@@ -1402,6 +1402,26 @@ function bulletproofButton(url: string, label: string, bgColor: string = '#2A9D5
     </table>`;
 }
 
+// Email-sichere nummerierte Schritt-Liste. Statt <ol> (inkonsistentes
+// Spacing über Clients) eine Tabelle mit Nummern-Badge + Titel + Beschreibung
+// pro Zeile. Wird in Mail A / Mail B als "So geht es weiter"-Block genutzt
+// damit der nächste Schritt unübersehbar ist (Funnel stockte hier).
+function buildStepsList(steps: { title: string; desc: string }[]): string {
+  const rows = steps.map((s, i) => `
+    <tr>
+      <td style="vertical-align:top;width:34px;padding:0 12px 14px 0;">
+        <table cellpadding="0" cellspacing="0" role="presentation"><tr>
+          <td width="26" height="26" align="center" valign="middle" bgcolor="#8B7355" style="background-color:#8B7355;border-radius:50%;color:#ffffff;font-size:13px;font-weight:700;line-height:26px;text-align:center;">${i + 1}</td>
+        </tr></table>
+      </td>
+      <td style="vertical-align:top;padding:0 0 14px 0;">
+        <p style="margin:0 0 2px;font-size:15px;font-weight:700;color:#2D1F0F;line-height:1.4;">${s.title}</p>
+        <p style="margin:0;font-size:14px;line-height:1.6;color:#555;">${s.desc}</p>
+      </td>
+    </tr>`).join("");
+  return `<table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="margin:0 0 14px;">${rows}</table>`;
+}
+
 export interface CaregiverDisplay {
   name: string;                  // "Maria K." — caller liefert schon gekürzt
   badgeLevel?: string;           // "Starter" | "Bronze" | "Silber" | "Gold" | "Platin"
@@ -1826,8 +1846,13 @@ export function getCaregiverInterestEmailTemplate(
   caregiver: CaregiverDisplay,
   portalUrl: string,
 ): EmailTemplate {
+  const firstName = caregiver.name.split(' ')[0];
   const introHtml = `<p style="font-size:15px;line-height:1.75;color:#444;margin-bottom:18px;">eine erfreuliche Nachricht — eine Pflegekraft hat sich Ihr Angebot angesehen und ist interessiert, die Betreuung zu übernehmen.</p>`;
-  const middleHtml = `<p style="font-size:15px;line-height:1.75;color:#444;margin-bottom:20px;">Sehen Sie sich ${caregiver.name.split(' ')[0]}s Profil im Portal an. Wenn Ihnen das Profil zusagt, laden Sie sie ein, sich bei Ihnen zu bewerben. Sobald ihre Bewerbung eingeht, erhalten Sie eine E-Mail von uns.</p>`;
+  const middleHtml = buildStepsList([
+    { title: 'Profil ansehen', desc: `${firstName}s Erfahrung, Qualifikation und bisherige Einsätze in Ruhe im Portal anschauen.` },
+    { title: 'Einladen', desc: `Gefällt Ihnen das Profil, laden Sie ${firstName} mit einem Klick ein, sich bei Ihnen zu bewerben.` },
+    { title: 'Bewerbung erhalten', desc: `Wenn ${firstName} sich daraufhin bewirbt, bekommen Sie das konkrete Angebot per E-Mail und entscheiden dann in Ruhe.` },
+  ]);
   return buildCaregiverEventEmail({
     lead,
     caregiver,
@@ -1836,7 +1861,12 @@ export function getCaregiverInterestEmailTemplate(
     middleHtml,
     ctaText: 'Pflegekraft im Portal ansehen →',
     portalUrl,
-    plainSummary: `eine erfreuliche Nachricht — eine Pflegekraft hat sich Ihr Angebot angesehen und ist interessiert, die Betreuung zu übernehmen. Sehen Sie sich ${caregiver.name.split(' ')[0]}s Profil im Portal an. Wenn Ihnen das Profil zusagt, laden Sie sie ein, sich bei Ihnen zu bewerben. Sobald ihre Bewerbung eingeht, erhalten Sie eine E-Mail von uns.`,
+    plainSummary: `eine erfreuliche Nachricht — eine Pflegekraft hat sich Ihr Angebot angesehen und ist interessiert, die Betreuung zu übernehmen.
+
+So geht es weiter:
+1. Profil ansehen — ${firstName}s Erfahrung, Qualifikation und bisherige Einsätze in Ruhe im Portal anschauen.
+2. Einladen — gefällt Ihnen das Profil, laden Sie ${firstName} mit einem Klick ein, sich bei Ihnen zu bewerben.
+3. Bewerbung erhalten — wenn ${firstName} sich daraufhin bewirbt, bekommen Sie das konkrete Angebot per E-Mail und entscheiden dann in Ruhe.`,
   });
 }
 
@@ -1845,17 +1875,30 @@ export function getApplicationReceivedEmailTemplate(
   caregiver: CaregiverDisplay,
   portalUrl: string,
 ): EmailTemplate {
+  const firstName = caregiver.name.split(' ')[0];
   const introHtml = `<p style="font-size:15px;line-height:1.75;color:#444;margin-bottom:18px;">eine schöne Nachricht — <strong style="color:#2D1F0F;">Sie haben eine neue Bewerbung erhalten</strong>. ${caregiver.name} möchte die Betreuung gerne übernehmen.</p>`;
-  const middleHtml = `<p style="font-size:15px;line-height:1.75;color:#444;margin-bottom:20px;">Sehen Sie sich ${caregiver.name.split(' ')[0]}s Bewerbung im Portal an. Wenn Ihnen die Bewerbung zusagt, bestätigen Sie die Buchung — wir kümmern uns dann um Anreise und alle weiteren Schritte.</p>`;
+  const middleHtml = buildStepsList([
+    { title: 'Bewerbung ansehen', desc: `${firstName}s Profil, Erfahrung und bisherige Einsätze in Ruhe im Portal prüfen.` },
+    { title: 'Angebot & Kosten prüfen', desc: `Tagessatz, An- und Abreise sowie eine vollständige Kostenzusammenfassung sind transparent aufgelistet — keine versteckten Kosten.` },
+    { title: 'Pflegekraft beauftragen', desc: `Passt alles? Mit Eingabe Ihrer Kontaktdaten beauftragen Sie ${firstName}. Den Vertrag senden wir Ihnen anschließend separat per E-Mail zu — um Anreise und alle weiteren Schritte kümmern wir uns.` },
+  ]);
+  const softOutHtml = `<p style="font-size:14px;line-height:1.65;color:#888;margin:4px 0 20px;font-style:italic;">Passt es nicht? Lehnen Sie die Bewerbung im Portal kurz ab oder schreiben Sie uns — dann suchen wir gerne weiter.</p>`;
   return buildCaregiverEventEmail({
     lead,
     caregiver,
     subject: 'Sie haben eine neue Bewerbung erhalten',
     introHtml,
-    middleHtml,
+    middleHtml: middleHtml + softOutHtml,
     ctaText: 'Bewerbung im Portal ansehen →',
     portalUrl,
-    plainSummary: `eine schöne Nachricht — Sie haben eine neue Bewerbung erhalten. ${caregiver.name} möchte die Betreuung gerne übernehmen. Sehen Sie sich ${caregiver.name.split(' ')[0]}s Bewerbung im Portal an. Wenn Ihnen die Bewerbung zusagt, bestätigen Sie die Buchung — wir kümmern uns dann um Anreise und alle weiteren Schritte.`,
+    plainSummary: `eine schöne Nachricht — Sie haben eine neue Bewerbung erhalten. ${caregiver.name} möchte die Betreuung gerne übernehmen.
+
+So geht es weiter:
+1. Bewerbung ansehen — ${firstName}s Profil, Erfahrung und bisherige Einsätze in Ruhe im Portal prüfen.
+2. Angebot & Kosten prüfen — Tagessatz, An- und Abreise sowie eine vollständige Kostenzusammenfassung sind transparent aufgelistet — keine versteckten Kosten.
+3. Pflegekraft beauftragen — passt alles? Mit Eingabe Ihrer Kontaktdaten beauftragen Sie ${firstName}. Den Vertrag senden wir Ihnen anschließend separat per E-Mail zu — um Anreise und alle weiteren Schritte kümmern wir uns.
+
+Passt es nicht? Lehnen Sie die Bewerbung im Portal kurz ab oder schreiben Sie uns — dann suchen wir gerne weiter.`,
   });
 }
 
