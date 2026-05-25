@@ -148,6 +148,9 @@ function makeSupabase(
     fetchAppStatusEvents(_leadId) {
       return Promise.resolve(appStatusEvents);
     },
+    refreshReminderPhotos(_leadId, _photoByCaregiver) {
+      return Promise.resolve(0);
+    },
   };
 }
 
@@ -168,6 +171,9 @@ function makeBatchSupabase(
     },
     fetchAppStatusEvents(_leadId) {
       return Promise.resolve([]);
+    },
+    refreshReminderPhotos(_leadId, _photoByCaregiver) {
+      return Promise.resolve(0);
     },
   };
 }
@@ -527,6 +533,30 @@ Deno.test("buildCaregiverMetadata initials + optional fields", () => {
 Deno.test("buildCaregiverMetadata missing first_name → no name field", () => {
   const meta = buildCaregiverMetadata(50001, makeCaregiver({ first_name: null }));
   assertEquals(meta.caregiver_name, undefined);
+});
+
+Deno.test("refreshReminderPhotos: detect übergibt frische Foto-URLs aus apps", async () => {
+  resetCaches();
+  let captured: Map<number, string> | null = null;
+  const supa: DetectSupabase = {
+    fetchLead: (_id) => Promise.resolve(VALID_LEAD),
+    fetchActiveLeads: () => Promise.resolve([VALID_LEAD]),
+    fetchPastEvents: (_l) => Promise.resolve(SEEN_50001), // app schon gesehen → kein neuer Event
+    fetchAppStatusEvents: (_l) => Promise.resolve([]),
+    refreshReminderPhotos: (_l, m) => {
+      captured = m;
+      return Promise.resolve(m.size);
+    },
+  };
+  const caregiver = makeCaregiver({ id: 50001, avatar_retouched: { aws_url: "https://cdn.test/fresh-50001.jpg" } });
+  const res = await handleRequest(makeReq({ lead_id: VALID_LEAD.id }), {
+    secrets: SECRETS,
+    supabase: supa,
+    fetchFn: makeFetch({ apps: [{ id: 1, caregiver_id: 50001, caregiver }] }),
+  });
+  assertEquals(res.status, 200);
+  assertEquals(captured !== null, true);
+  assertEquals(captured!.get(50001), "https://cdn.test/fresh-50001.jpg");
 });
 
 Deno.test("cleanAboutText filtert Mamamia-Platzhalter raus", () => {
