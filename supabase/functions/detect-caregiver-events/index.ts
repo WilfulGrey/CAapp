@@ -71,6 +71,14 @@ export interface DetectSupabase {
   fetchActiveLeads(): Promise<LeadRow[]>;
   fetchPastEvents(leadId: string): Promise<EventRow[]>;
   fetchAppStatusEvents(leadId: string): Promise<AppStatusEventRow[]>;
+  // Aktualisiert caregiver_photo_url in den noch offenen Reminder-Rows
+  // (scheduled_emails) mit frischen presigned URLs. Mamamia-Foto-URLs
+  // laufen nach ~30 Min ab; da der Reminder erst 1h+ später feuert wäre
+  // die beim Bewerbungseingang gespeicherte URL tot → Initialen-Fallback.
+  // detect läuft alle 15 Min, der Versand-Cron alle 5 Min — refreshte URL
+  // ist beim Versand also ≤15 Min alt und damit gültig. Liefert Anzahl
+  // aktualisierter Rows.
+  refreshReminderPhotos(leadId: string, photoByCaregiver: Map<number, string>): Promise<number>;
 }
 
 export interface DetectResult {
@@ -277,6 +285,27 @@ export async function detect(
   // application_received-Mail, keine Reaktion) automatisch ablehnen.
   // apps + agencyToken sind hier bereits geladen — wiederverwenden.
   counts.auto_rejected += await autoRejectStaleApplications(lead, apps, agencyToken, deps, fetcher);
+
+  // Reminder-Foto-Refresh: frische presigned URLs aus apps + interests in
+  // die offenen Reminder-Rows schreiben, damit das Foto beim (späteren)
+  // Versand nicht abgelaufen ist (siehe refreshReminderPhotos-Doc).
+  const photoByCaregiver = new Map<number, string>();
+  for (const a of apps) {
+    const url = a.caregiver?.avatar_retouched?.aws_url;
+    if (a.caregiver_id != null && url) photoByCaregiver.set(a.caregiver_id, url);
+  }
+  for (const i of interests) {
+    const url = i.caregiver?.avatar_retouched?.aws_url;
+    if (i.caregiver_id != null && url && !photoByCaregiver.has(i.caregiver_id)) {
+      photoByCaregiver.set(i.caregiver_id, url);
+    }
+  }
+  try {
+    await supabase.refreshReminderPhotos(lead.id, photoByCaregiver);
+  } catch (e) {
+    // Best-effort — Foto-Refresh darf den Sweep nicht scheitern lassen.
+    console.error(`refreshReminderPhotos failed (lead ${lead.id}):`, e instanceof Error ? e.message : String(e));
+  }
 
   return { lead_id: lead.id, ...counts };
 }
@@ -578,6 +607,41 @@ function makeRealSupabase(url: string, serviceKey: string): DetectSupabase {
         caregiver_id: extractCaregiverId(row.metadata),
         created_at: row.created_at,
       }));
+    },
+    async refreshReminderPhotos(leadId: string, photoByCaregiver: Map<number, string>) {
+      if (photoByCaregiver.size === 0) return 0;
+      const REMINDER_TYPES = [
+        "interest_reminder",
+        "application_reminder",
+        "application_reminder_4h",
+        "application_reminder_12h",
+        "application_last_chance",
+      ];
+      const { data, error } = await client
+        .from("scheduled_emails")
+        .select("id, metadata")
+        .eq("lead_id", leadId)
+        .eq("status", "pending")
+        .in("email_type", REMINDER_TYPES);
+      if (error) throw new Error(`supabase refreshReminderPhotos select: ${error.message}`);
+      let updated = 0;
+      for (const row of (data ?? []) as { id: string; metadata: unknown }[]) {
+        const md = (row.metadata ?? {}) as Record<string, unknown>;
+        const cgId = extractCaregiverId(md);
+        if (cgId == null) continue;
+        const fresh = photoByCaregiver.get(cgId);
+        if (!fresh || md.caregiver_photo_url === fresh) continue;
+        const { error: uErr } = await client
+          .from("scheduled_emails")
+          .update({ metadata: { ...md, caregiver_photo_url: fresh } })
+          .eq("id", row.id);
+        if (uErr) {
+          console.error(`refreshReminderPhotos update row ${row.id} failed:`, uErr.message);
+          continue;
+        }
+        updated += 1;
+      }
+      return updated;
     },
   };
 }
