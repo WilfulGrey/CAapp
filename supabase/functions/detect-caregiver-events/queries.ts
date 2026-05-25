@@ -91,3 +91,24 @@ export interface ListInterestsResponse {
     interests: InterestNode[] | null;
   } | null;
 }
+
+// K5 — Bewerbung ablehnen (gleiche Mutation wie im mamamia-proxy, hier
+// server-side mit Agency-Token für das automatische Ablehnen nach 48h
+// ohne Kundenreaktion). Lokale Kopie bewusst (kein cross-folder import).
+export const REJECT_APPLICATION = /* GraphQL */ `
+  mutation RejectApplication($id: Int, $reject_message: String) {
+    RejectApplication(id: $id, reject_message: $reject_message) {
+      id
+      rejected_at
+      reject_message
+    }
+  }
+`;
+
+export interface RejectApplicationResponse {
+  RejectApplication: {
+    id: number;
+    rejected_at: string | null;
+    reject_message: string | null;
+  } | null;
+}
