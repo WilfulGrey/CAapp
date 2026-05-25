@@ -1112,13 +1112,18 @@ function buildReminderHtml(
       </div>`
     : "";
 
+  // Logische Reihenfolge: Begrüßung → Situation (Intro) → um wen geht's
+  // (Kachel) → warum + was tun (middleHtml) → Haupt-CTA (Portal) → erst
+  // DANN die schnelle WhatsApp/Anruf-Alternative (quickActionHtml). Der
+  // Quick-Action-Block stand vorher direkt unter dem Intro, also bevor der
+  // Leser überhaupt wusste worum es geht — das wirkte unlogisch.
   const content = `
     <p style="font-size:15px;line-height:1.75;color:#444;margin-bottom:14px;">${greeting},</p>
     ${introHtml}
-    ${quickActionHtml}
     ${kachel}
     ${middleHtml}
     ${bulletproofButton(portalUrl, ctaText)}
+    ${quickActionHtml}
     ${bestpreisAnchor}
     ${softOut}
     ${buildIlkaSig(siteUrl)}`;
@@ -1191,11 +1196,11 @@ Primundus Deutschland | www.primundus.de
   return `${halloAnrede},
 
 ${intro}
-${quickAction}
+
 ${body}
 
 ${cta}
-${bestpreis}
+${quickAction}${bestpreis}
 Falls die Bewerbung nicht passt, lehnen Sie sie im Portal kurz ab — so weiß ${firstName} Bescheid und kann sich auf andere Familien konzentrieren.
 
 Mit freundlichen Grüßen
