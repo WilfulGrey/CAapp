@@ -1076,6 +1076,16 @@ function buildReminderHtml(
     ? `<p style="font-size:13px;line-height:1.6;color:#888;margin:18px 0 0;font-style:italic;">Falls ${firstName} nicht zu Ihnen passt, lehnen Sie sie im Portal kurz ab — so weiß sie Bescheid und kann sich auf andere Familien konzentrieren.</p>`
     : `<p style="font-size:13px;line-height:1.6;color:#888;margin:18px 0 0;font-style:italic;">Falls die Bewerbung nicht passt, lehnen Sie sie im Portal kurz ab — so weiß ${firstName} Bescheid und kann sich auf andere Familien konzentrieren.</p>`;
 
+  // Bestpreis-Anker — nur im 12h-Reminder (letzte Stufe). Wenn der Kunde
+  // bis hier nicht gebucht hat, ist der Preis ein häufiger Blocker. Als
+  // Direktanbieter ohne Vermittler-Provision können wir das Argument
+  // glaubwürdig setzen. Claim abgesichert ("vergleichbare Leistung").
+  const bestpreisAnchor = (variant === "application" && tier === "12h")
+    ? `<div style="margin:18px 0 0;padding:14px 16px;background:#FAF8F4;border-left:3px solid #B5A184;border-radius:0 8px 8px 0;">
+        <p style="margin:0;font-size:13px;line-height:1.7;color:#5C4A32;"><strong style="color:#2D1F0F;">💡 Bestpreis-Garantie:</strong> Als Direktanbieter ohne Vermittler-Provision bieten wir faire Preise — finden Sie bei vergleichbarer Leistung ein günstigeres Angebot, unterbieten wir es.</p>
+      </div>`
+    : "";
+
   const content = `
     <p style="font-size:15px;line-height:1.75;color:#444;margin-bottom:14px;">${greeting},</p>
     ${introHtml}
@@ -1083,6 +1093,7 @@ function buildReminderHtml(
     ${kachel}
     ${middleHtml}
     ${bulletproofButton(portalUrl, ctaText)}
+    ${bestpreisAnchor}
     ${softOut}
     ${buildIlkaSig(siteUrl)}`;
 
@@ -1140,6 +1151,11 @@ Primundus Deutschland | www.primundus.de
     quickAction = `\nBitte kurz Bescheid geben\nAuch ein kurzes „passt nicht“ hilft uns weiter — dann können wir freigeben und ${firstName} findet schneller einen anderen Einsatz:\n  WhatsApp: https://wa.me/4989200000830\n  Telefon:  089 200 000 830\n`;
   }
 
+  // Bestpreis-Anker nur im 12h-Tier (siehe HTML-Builder).
+  const bestpreis = (tier === "12h")
+    ? `\nBestpreis-Garantie: Als Direktanbieter ohne Vermittler-Provision bieten wir faire Preise — finden Sie bei vergleichbarer Leistung ein günstigeres Angebot, unterbieten wir es.\n`
+    : "";
+
   return `${halloAnrede},
 
 ${intro}
@@ -1147,8 +1163,84 @@ ${quickAction}
 ${body}
 
 ${cta}
-
+${bestpreis}
 Falls die Bewerbung nicht passt, lehnen Sie sie im Portal kurz ab — so weiß ${firstName} Bescheid und kann sich auf andere Familien konzentrieren.
+
+Mit freundlichen Grüßen
+Ilka Wysocki — Pflegeberaterin
+Tel: 089 200 000 830  ·  WhatsApp: https://wa.me/4989200000830
+
+Primundus Deutschland | www.primundus.de
+`;
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// "Warum Primundus?" — Trust- + Bestpreis-Mail. Eigenständige Nurture-Mail,
+// ~48h nach der Eingangsbestätigung (Vergleichsphase: der Kunde checkt
+// gerade andere Anbieter). Cancelt sich, sobald der Lead beauftragt oder
+// nicht interessiert ist. Argument: Direktanbieter ohne Vermittler-
+// Provision → Bestpreis-Garantie. Claim bewusst abgesichert ("bei
+// vergleichbarer Qualifikation und Leistung").
+// ─────────────────────────────────────────────────────────────────────────
+function buildWarumPrimundusHtml(lead: Lead, portalUrl: string, siteUrl: string): string {
+  const greeting = buildHalloAnrede(lead.anrede_text || null, lead.nachname || "", lead.vorname || "");
+
+  const usp = (title: string, desc: string) => `
+    <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="margin:0 0 12px;">
+      <tr>
+        <td style="vertical-align:top;width:30px;padding:2px 12px 0 0;">
+          <table cellpadding="0" cellspacing="0" role="presentation"><tr>
+            <td width="22" height="22" align="center" valign="middle" bgcolor="#2A9D5C" style="background-color:#2A9D5C;border-radius:50%;color:#ffffff;font-size:13px;font-weight:700;line-height:22px;text-align:center;">&#10003;</td>
+          </tr></table>
+        </td>
+        <td style="vertical-align:top;">
+          <p style="margin:0 0 2px;font-size:15px;font-weight:700;color:#2D1F0F;line-height:1.4;">${title}</p>
+          <p style="margin:0;font-size:14px;line-height:1.6;color:#555;">${desc}</p>
+        </td>
+      </tr>
+    </table>`;
+
+  const uspBlock =
+    usp("Testsieger DIE WELT", "Ausgezeichnet für Preis, Qualität &amp; Kundenservice.") +
+    usp("Direktanbieter mit über 60.000 erfolgreichen Einsätzen", "Wir vermitteln nicht — wir sind der Anbieter. Ohne Zwischenhändler-Kette.") +
+    usp("Bestpreis-Garantie", "Erhalten Sie bei vergleichbarer Qualifikation und Leistung ein günstigeres Angebot, unterbieten wir es.");
+
+  const content = `
+    <p style="font-size:15px;line-height:1.75;color:#444;margin-bottom:14px;">${greeting},</p>
+    <p style="font-size:15px;line-height:1.75;color:#444;margin-bottom:18px;">Sie vergleichen gerade verschiedene Anbieter für die 24-Stunden-Betreuung? Dann lohnt sich ein kurzer Blick darauf, was Primundus auszeichnet:</p>
+    ${uspBlock}
+    <div style="margin:18px 0;padding:16px 18px;background:#FAF8F4;border:1px solid #e8ddd0;border-radius:12px;">
+      <p style="margin:0;font-size:14px;line-height:1.7;color:#444;"><strong style="color:#2D1F0F;">Warum wir günstiger sein können:</strong> Als Direktanbieter sparen wir die Vermittler-Provisionen, die in Deutschland sonst üblich sind. Das Ergebnis: Die Pflegekraft verdient <strong style="color:#2D1F0F;">mehr</strong> — und Sie zahlen <strong style="color:#2D1F0F;">weniger</strong>.</p>
+    </div>
+    ${bulletproofButton(portalUrl, "Pflegekräfte im Portal ansehen →")}
+    <div style="font-size:12px;color:#888;line-height:1.8;margin:0 0 18px;text-align:center;">
+      <span style="color:#2D6A4F;font-weight:600;">✓ Keine Vertragsbindung</span>&ensp;&middot;&ensp;
+      <span style="color:#2D6A4F;font-weight:600;">✓ Tagesgenaue Abrechnung</span>&ensp;&middot;&ensp;
+      <span style="color:#2D6A4F;font-weight:600;">✓ Kosten erst bei Anreise</span>
+    </div>
+    <p style="font-size:14px;line-height:1.65;color:#555;margin:0 0 4px;">Fragen zum Preis oder zur Bestpreis-Garantie? Rufen Sie uns gerne <a href="tel:+4989200000830" style="color:#0066CC;text-decoration:none;white-space:nowrap;">direkt an</a> oder schreiben Sie per <a href="https://wa.me/4989200000830" style="color:#25D366;text-decoration:none;font-weight:600;white-space:nowrap;">WhatsApp</a> — oder antworten Sie einfach auf diese E-Mail.</p>
+    ${buildIlkaSig(siteUrl)}`;
+
+  return buildEmailWrapper(lead, siteUrl, content);
+}
+
+function buildWarumPrimundusText(lead: Lead, portalUrl: string): string {
+  const greeting = buildHalloAnrede(lead.anrede_text || null, lead.nachname || "", lead.vorname || "");
+  return `${greeting},
+
+Sie vergleichen gerade verschiedene Anbieter für die 24-Stunden-Betreuung? Dann lohnt sich ein kurzer Blick darauf, was Primundus auszeichnet:
+
+✓ Testsieger DIE WELT — ausgezeichnet für Preis, Qualität & Kundenservice.
+✓ Direktanbieter mit über 60.000 erfolgreichen Einsätzen — wir vermitteln nicht, wir sind der Anbieter. Ohne Zwischenhändler-Kette.
+✓ Bestpreis-Garantie — erhalten Sie bei vergleichbarer Qualifikation und Leistung ein günstigeres Angebot, unterbieten wir es.
+
+Warum wir günstiger sein können: Als Direktanbieter sparen wir die Vermittler-Provisionen, die in Deutschland sonst üblich sind. Das Ergebnis: Die Pflegekraft verdient mehr — und Sie zahlen weniger.
+
+Pflegekräfte im Portal ansehen: ${portalUrl}
+
+✓ Keine Vertragsbindung  ·  ✓ Tagesgenaue Abrechnung  ·  ✓ Kosten erst bei Anreise
+
+Fragen zum Preis oder zur Bestpreis-Garantie? Rufen Sie uns gerne direkt an (089 200 000 830) oder schreiben Sie per WhatsApp (wa.me/4989200000830) — oder antworten Sie einfach auf diese E-Mail.
 
 Mit freundlichen Grüßen
 Ilka Wysocki — Pflegeberaterin
@@ -1461,6 +1553,32 @@ Deno.serve(async (req: Request) => {
           // Inline-Photo wird unten beim Send-Block aufgenommen (siehe
           // reminderInline-Variable).
           (scheduledEmail as any).__reminderInline = inline;
+        } else if (scheduledEmail.email_type === "warum_primundus") {
+          // Trust- + Bestpreis-Mail (~48h nach Eingangsbestätigung).
+          // Abbruch wenn Lead beauftragt/nicht interessiert — sonst raus.
+          // Bewusst KEIN Abbruch bei caregiver_invited: solange noch nicht
+          // gebucht ist, hilft das Preis-Argument weiterhin.
+          if (isBeauftragt || isNichtInteressiert) {
+            await supabase
+              .from("scheduled_emails")
+              .update({ status: "cancelled", updated_at: new Date().toISOString() })
+              .eq("id", scheduledEmail.id);
+            await supabase.from("lead_events").insert({
+              lead_id: scheduledEmail.lead_id,
+              event_type: "email_warum_primundus_cancelled",
+              metadata: { reason: isNichtInteressiert ? "nicht_interessiert" : "betreuung_beauftragt" },
+            });
+            results.push({ id: scheduledEmail.id, success: true });
+            continue;
+          }
+          const portalUrl = (portalBase && (lead as Lead).token)
+            ? buildPortalUrl(portalBase, (lead as Lead).token)
+            : smtpConfig.siteUrl;
+          subject = "Warum Primundus? Ihre Bestpreis-Garantie als Direktanbieter";
+          html = buildWarumPrimundusHtml(lead as Lead, portalUrl, smtpConfig.siteUrl);
+          text = buildWarumPrimundusText(lead as Lead, portalUrl);
+          eventTypeSent = "email_warum_primundus_sent";
+          eventTypeFailed = "email_warum_primundus_failed";
         } else {
           await supabase
             .from("scheduled_emails")
@@ -1470,7 +1588,7 @@ Deno.serve(async (req: Request) => {
               updated_at: new Date().toISOString(),
             })
             .eq("id", scheduledEmail.id);
- 
+
           results.push({ id: scheduledEmail.id, success: false, error: `Unknown email type: ${scheduledEmail.email_type}` });
           continue;
         }
@@ -1515,6 +1633,9 @@ Deno.serve(async (req: Request) => {
           // Nachfass_3 (Quick-Reaktion mit mailto-Buttons, "letzter Versuch").
           if (scheduledEmail.email_type === "eingangsbestaetigung" || scheduledEmail.email_type === "angebot") {
             await scheduleFollowUp(supabase, lead as Lead, "nachfass_1", 24 * 60);
+            // Trust-/Bestpreis-Mail in der Vergleichsphase — +48h, also im
+            // sauberen Slot zwischen Nachfass_1 (+24h) und Nachfass_2 (+72h).
+            await scheduleFollowUp(supabase, lead as Lead, "warum_primundus", 48 * 60);
           } else if (scheduledEmail.email_type === "nachfass_1") {
             await scheduleFollowUp(supabase, lead as Lead, "nachfass_2", 48 * 60);
           } else if (scheduledEmail.email_type === "nachfass_2") {
