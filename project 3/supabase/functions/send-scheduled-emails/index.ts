@@ -1041,12 +1041,7 @@ function buildReminderHtml(
     ? `<p style="margin:0;font-size:14px;color:#555;">${infoBits.join(" &middot; ")}</p>`
     : "";
 
-  const profilButton = `
-    <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:14px 0 0;border-collapse:separate;">
-      <tr><td align="center" bgcolor="#8B7355" style="background-color:#8B7355;border-radius:8px;padding:10px 22px;">
-        <a href="${portalUrl}" target="_blank" style="color:#ffffff;text-decoration:none;font-weight:700;font-size:14px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">${firstName}s Profil ansehen &rarr;</a>
-      </td></tr>
-    </table>`;
+  const profilButton = `<p style="margin:12px 0 0;"><a href="${portalUrl}" target="_blank" style="color:#8B7355;text-decoration:none;font-weight:700;font-size:14px;">${firstName}s Profil ansehen &rarr;</a></p>`;
 
   const kachelBody = variant === "application"
     ? `<p style="margin:0 0 3px;font-size:18px;font-weight:700;color:#2D1F0F;">${cgName}</p>${infoLine}`
