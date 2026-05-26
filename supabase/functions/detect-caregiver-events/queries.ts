@@ -10,6 +10,7 @@ export interface CaregiverNode {
   last_name: string | null;
   year_of_birth: number | null;
   care_experience: number | null;
+  germany_skill: string | null;   // level_0..level_4 → Deutsch-Level (CEFR)
   hp_caregiver_id: number | null;
   hp_total_jobs: number | null;
   hp_total_days: number | null;
@@ -39,6 +40,7 @@ const CAREGIVER_FRAGMENT = /* GraphQL */ `
   last_name
   year_of_birth
   care_experience
+  germany_skill
   hp_caregiver_id
   hp_total_jobs
   hp_total_days

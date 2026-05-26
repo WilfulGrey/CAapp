@@ -89,6 +89,8 @@ function extractCaregiverDisplay(metadata: any): CaregiverDisplay | null {
     badgeLevel: metadata.caregiver_badge_level ?? metadata.badgeLevel,
     yearsExperience: metadata.caregiver_years_experience ?? metadata.yearsExperience,
     einsatzCount: metadata.caregiver_einsatz_count ?? metadata.einsatzCount,
+    age: metadata.caregiver_age ?? metadata.age,
+    germanLevel: metadata.caregiver_german_level ?? metadata.germanLevel,
     photoUrl: metadata.caregiver_photo_url ?? metadata.photoUrl,
     aboutText: metadata.caregiver_about_text ?? metadata.aboutText,
   };
@@ -143,6 +145,8 @@ async function scheduleReactionReminder(
     caregiver_badge_level: caregiver.badgeLevel ?? null,
     caregiver_years_experience: caregiver.yearsExperience ?? null,
     caregiver_einsatz_count: caregiver.einsatzCount ?? null,
+    caregiver_age: caregiver.age ?? null,
+    caregiver_german_level: caregiver.germanLevel ?? null,
     caregiver_photo_url: caregiver.photoUrl ?? null,
     caregiver_about_text: caregiver.aboutText ?? null,
     trigger_event: triggerEvent,

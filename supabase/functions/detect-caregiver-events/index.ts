@@ -499,6 +499,14 @@ export function buildCaregiverMetadata(
   if (typeof caregiver.hp_total_jobs === "number" && caregiver.hp_total_jobs > 0) {
     meta.caregiver_einsatz_count = caregiver.hp_total_jobs;
   }
+  // Alter (aus year_of_birth) + Deutsch-Level (aus germany_skill) für die
+  // einheitliche Pflegekraft-Box in den Kundenmails.
+  if (typeof caregiver.year_of_birth === "number" && caregiver.year_of_birth > 1900) {
+    const age = new Date().getFullYear() - caregiver.year_of_birth;
+    if (age > 0 && age < 120) meta.caregiver_age = age;
+  }
+  const germanLevel = germanLevelLabel(caregiver.germany_skill);
+  if (germanLevel) meta.caregiver_german_level = germanLevel;
   if (caregiver.avatar_retouched?.aws_url) {
     meta.caregiver_photo_url = caregiver.avatar_retouched.aws_url;
   }
@@ -514,6 +522,20 @@ export function buildCaregiverMetadata(
 // Prompts statt einer echten Beschreibung (z.B. "Bitte geben Sie den Text an,
 // den Sie ins Deutsche übersetzen möchten."). Solche Werte dürfen NIE als
 // Pflegekraft-Zitat in einer Kundenmail landen → rausfiltern.
+// Caregiver-Deutsch-Level aus germany_skill (level_0..level_4) → CEFR-Label,
+// identisch zur Portal-Anzeige (src/lib/mamamia/mappers.ts GERMANY_SKILL_LEVELS).
+// So steht in der Mail dasselbe wie im Pflegekraft-Profil.
+export function germanLevelLabel(skill: string | null | undefined): string | null {
+  const map: Record<string, string> = {
+    level_0: "A1",
+    level_1: "A1-A2",
+    level_2: "A2-B1",
+    level_3: "B1-B2",
+    level_4: "B2-C1",
+  };
+  return (skill && map[skill]) || null;
+}
+
 export function cleanAboutText(raw: string | null | undefined): string | null {
   const t = (raw ?? "").trim();
   if (!t) return null;

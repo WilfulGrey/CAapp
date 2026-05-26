@@ -1446,6 +1446,8 @@ export interface CaregiverDisplay {
   badgeLevel?: string;           // "Starter" | "Bronze" | "Silber" | "Gold" | "Platin"
   yearsExperience?: number;
   einsatzCount?: number;
+  age?: number;                  // Alter in Jahren (aus year_of_birth)
+  germanLevel?: string;          // CEFR-Level, z.B. "B1-B2" (aus germany_skill)
   photoUrl?: string;             // vollständige URL — leer = Initialen-Avatar
   aboutText?: string;            // 2-3 Satz AI-Beschreibung
 }

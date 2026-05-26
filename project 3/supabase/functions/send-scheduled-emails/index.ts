@@ -940,6 +940,8 @@ interface ReminderMeta {
   caregiver_badge_level?: string | null;
   caregiver_years_experience?: number | null;
   caregiver_einsatz_count?: number | null;
+  caregiver_age?: number | null;
+  caregiver_german_level?: string | null;
   caregiver_photo_url?: string | null;
   caregiver_about_text?: string | null;
 }
@@ -1026,13 +1028,33 @@ function buildReminderHtml(
     ? `<img src="cid:${photoCid}" alt="${cgName}" width="80" style="display:block;width:80px;height:80px;border-radius:50%;object-fit:cover;border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.08);" />`
     : `<div style="width:80px;height:80px;border-radius:50%;background-color:#B5A184;color:#fff;font-size:28px;font-weight:700;line-height:80px;text-align:center;border:2px solid #fff;">${reminderCaregiverInitials(cgName)}</div>`;
 
-  // Kachel-Footer: interest behält das Bio-Zitat (Platzhalter gefiltert).
-  // application braucht keinen extra Link — der persönliche CTA-Button
-  // "{Vorname}s Bewerbung ansehen" führt direkt hin.
+  // Einheitliche Pflegekraft-Box.
+  // - application: Foto + Name + "Alter · Deutsch-Level" + Button
+  //   "{Vorname}s Profil ansehen". Kein Badge/Einsätze/Bio — kompakt.
+  // - interest: Foto + Name + Erfahrung/Einsätze + Badge + Bio (wie gehabt).
   const aboutClean = cleanReminderAbout(meta.caregiver_about_text);
-  const kachelFooter = variant === "interest" && aboutClean
-    ? `<p style="margin:14px 0 0;font-size:14px;line-height:1.65;color:#555;font-style:italic;">„${aboutClean}"</p>`
+
+  const infoBits: string[] = [];
+  if (meta.caregiver_age && meta.caregiver_age > 0) infoBits.push(`${meta.caregiver_age} J.`);
+  if (meta.caregiver_german_level) infoBits.push(`Deutsch ${meta.caregiver_german_level}`);
+  const infoLine = infoBits.length > 0
+    ? `<p style="margin:0;font-size:14px;color:#555;">${infoBits.join(" &middot; ")}</p>`
     : "";
+
+  const profilButton = `
+    <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:14px 0 0;border-collapse:separate;">
+      <tr><td align="center" bgcolor="#8B7355" style="background-color:#8B7355;border-radius:8px;padding:10px 22px;">
+        <a href="${portalUrl}" target="_blank" style="color:#ffffff;text-decoration:none;font-weight:700;font-size:14px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">${firstName}s Profil ansehen &rarr;</a>
+      </td></tr>
+    </table>`;
+
+  const kachelBody = variant === "application"
+    ? `<p style="margin:0 0 3px;font-size:18px;font-weight:700;color:#2D1F0F;">${cgName}</p>${infoLine}`
+    : `<p style="margin:0 0 4px;font-size:18px;font-weight:700;color:#2D1F0F;">${cgName}</p>${metaLine}${badgeHtml}`;
+
+  const kachelFooter = variant === "application"
+    ? profilButton
+    : (aboutClean ? `<p style="margin:14px 0 0;font-size:14px;line-height:1.65;color:#555;font-style:italic;">„${aboutClean}"</p>` : "");
 
   const kachel = `
     <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="margin:0 0 22px 0;border:1px solid #e8ddd0;border-radius:12px;overflow:hidden;">
@@ -1041,9 +1063,7 @@ function buildReminderHtml(
           <tr>
             <td style="vertical-align:middle;width:96px;padding-right:16px;">${photoHtml}</td>
             <td style="vertical-align:middle;">
-              <p style="margin:0 0 4px;font-size:18px;font-weight:700;color:#2D1F0F;">${cgName}</p>
-              ${metaLine}
-              ${badgeHtml}
+              ${kachelBody}
             </td>
           </tr>
         </table>
@@ -1091,15 +1111,17 @@ function buildReminderHtml(
     : "";
 
   // Aufbau wie eine persönliche Nachricht: Begrüßung → kurze Situation →
-  // kompakte Pflegekraft-Kachel (mit "Zum Profil"-Link) → eine klare,
-  // freundliche Bitte → Portal-Button → Ilka-Signatur (enthält bereits
-  // WhatsApp + Telefon, daher KEINE extra Kontakt-Buttons im Body).
+  // kompakte Pflegekraft-Box (mit "Profil ansehen"-Button) → freundliche
+  // Bitte → Ilka-Signatur (enthält WhatsApp + Telefon).
+  // application: kein extra CTA-Button (der Button steckt in der Box).
+  // interest: behält seinen CTA-Button + Soft-Out.
+  const ctaButton = variant === "application" ? "" : bulletproofButton(portalUrl, ctaText);
   const content = `
     <p style="font-size:15px;line-height:1.75;color:#444;margin-bottom:14px;">${greeting},</p>
     ${introHtml}
     ${kachel}
     ${middleHtml}
-    ${bulletproofButton(portalUrl, ctaText)}
+    ${ctaButton}
     ${softOut}
     ${buildIlkaSig(siteUrl)}`;
 
@@ -1156,13 +1178,19 @@ Primundus Deutschland | www.primundus.de
     body = `Teilen Sie mir gern kurz mit, ob ja oder nein. Wenn ich nichts von Ihnen höre, gebe ich ${firstName} in den nächsten Stunden wieder frei, damit sie nicht unnötig wartet. Möchten Sie weitere Pflegekräfte sehen? Dann melden Sie sich einfach kurz bei uns.`;
   }
 
+  const infoBits: string[] = [];
+  if (meta.caregiver_age && meta.caregiver_age > 0) infoBits.push(`${meta.caregiver_age} J.`);
+  if (meta.caregiver_german_level) infoBits.push(`Deutsch ${meta.caregiver_german_level}`);
+  const infoLine = infoBits.length > 0 ? ` (${infoBits.join(" · ")})` : "";
+
   return `${halloAnrede},
 
 ${intro}
 
 ${body}
 
-${firstName}s Bewerbung ansehen: ${portalUrl}
+${cgName}${infoLine}
+${firstName}s Profil ansehen: ${portalUrl}
 
 Mit freundlichen Grüßen
 Ilka Wysocki — Pflegeberaterin
