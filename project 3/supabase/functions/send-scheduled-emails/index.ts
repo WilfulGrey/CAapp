@@ -746,9 +746,9 @@ function buildEingangsbestaetigungHtml(lead: Lead, siteUrl: string, portalBase: 
 
     ${priceStage}
 
-    ${stepsTable}
-
     ${cta}
+
+    ${stepsTable}
 
     ${angabenTable}
 
@@ -805,13 +805,13 @@ ${greeting},
 
 ${introPlain}
 
-${priceLine}SO GEHT ES WEITER
+${priceLine}Angebot & Pflegekräfte ansehen: ${ctaUrl}
+
+SO GEHT ES WEITER
 
 1. Angebot und erste Pflegekräfte ansehen — im Portal finden Sie Ihr Angebot im Detail sowie erste passende Pflegekräfte mit Profil, Erfahrung und Sprachkenntnissen.
 2. Patientendaten ergänzen — damit Pflegekräfte den konkreten Bedarf einschätzen können. Dauert wenige Minuten.
 3. Wunsch-Pflegekräfte einladen — sobald Sie eingeladen haben, erhalten Sie konkrete Bewerbungen, mit Anreisedatum und Reisekosten.
-
-Angebot & Pflegekräfte ansehen: ${ctaUrl}
 
 PFLEGESITUATION & ANFORDERUNGEN
 
