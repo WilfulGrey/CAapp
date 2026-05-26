@@ -250,6 +250,13 @@ export async function detect(
       secrets.kostenrechnerUrl,
       counts,
       fetcher,
+      {
+        salary: app.salary,
+        arrival_at: app.arrival_at,
+        departure_at: app.departure_at,
+        arrival_fee: app.arrival_fee,
+        departure_fee: app.departure_fee,
+      },
     );
     if (ok) {
       counts.new_applications += 1;
@@ -450,11 +457,22 @@ async function fireBridgeEvent(
   kostenrechnerUrl: string,
   counts: { skipped_no_caregiver_data: number; bridge_errors: number },
   fetchFn: typeof fetch,
+  offer?: Pick<ApplicationNode, "salary" | "arrival_at" | "departure_at" | "arrival_fee" | "departure_fee">,
 ): Promise<boolean> {
   const metadata = buildCaregiverMetadata(caregiverId, caregiver);
   if (!metadata.caregiver_name) {
     counts.skipped_no_caregiver_data += 1;
     return false;
+  }
+
+  // Konditionen der Bewerbung mitschicken (nur application_received) — Mail B
+  // rendert daraus die Konditionen-Bühne (Tagessatz/Datum/Reisekosten).
+  if (offer) {
+    if (offer.salary != null) metadata.offer_salary = offer.salary;
+    if (offer.arrival_at != null) metadata.offer_arrival_at = offer.arrival_at;
+    if (offer.departure_at != null) metadata.offer_departure_at = offer.departure_at;
+    if (offer.arrival_fee != null) metadata.offer_arrival_fee = offer.arrival_fee;
+    if (offer.departure_fee != null) metadata.offer_departure_fee = offer.departure_fee;
   }
 
   try {

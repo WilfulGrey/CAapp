@@ -22,6 +22,12 @@ export interface CaregiverNode {
 export interface ApplicationNode {
   id: number;
   caregiver_id: number | null;
+  // Konditionen der Bewerbung — für Mail B (Bewerbung) ans Kunden-Postfach.
+  salary: number | null;          // Monatssatz €/Monat
+  arrival_at: string | null;      // Anreisedatum (ISO)
+  departure_at: string | null;    // vorauss. Abreisedatum (ISO)
+  arrival_fee: number | null;     // Anreisekosten €
+  departure_fee: number | null;   // Abreisekosten €
   caregiver: CaregiverNode | null;
 }
 
@@ -56,6 +62,11 @@ export const LIST_APPLICATIONS = /* GraphQL */ `
       data {
         id
         caregiver_id
+        salary
+        arrival_at
+        departure_at
+        arrival_fee
+        departure_fee
         caregiver {
           ${CAREGIVER_FRAGMENT}
         }

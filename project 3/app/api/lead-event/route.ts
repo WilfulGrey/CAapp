@@ -7,6 +7,7 @@ import {
   getPatientDataSavedEmailTemplate,
   type CaregiverDisplay,
   type CaregiverMailEvent,
+  type OfferInfo,
 } from '@/lib/email';
 
 // Bridge endpoint: the CA-App portal reports customer milestones back to the
@@ -93,6 +94,28 @@ function extractCaregiverDisplay(metadata: any): CaregiverDisplay | null {
     germanLevel: metadata.caregiver_german_level ?? metadata.germanLevel,
     photoUrl: metadata.caregiver_photo_url ?? metadata.photoUrl,
     aboutText: metadata.caregiver_about_text ?? metadata.aboutText,
+  };
+}
+
+// Konditionen einer Bewerbung aus der Event-Metadata (von
+// detect-caregiver-events gesetzt). Nur für application_received relevant —
+// fehlt bei Interesse/Buchung, dann undefined.
+function extractOffer(metadata: any): OfferInfo | undefined {
+  if (!metadata || typeof metadata !== 'object') return undefined;
+  const salary = metadata.offer_salary ?? metadata.offerSalary;
+  const arrivalAt = metadata.offer_arrival_at ?? metadata.offerArrivalAt;
+  const departureAt = metadata.offer_departure_at ?? metadata.offerDepartureAt;
+  const arrivalFee = metadata.offer_arrival_fee ?? metadata.offerArrivalFee;
+  const departureFee = metadata.offer_departure_fee ?? metadata.offerDepartureFee;
+  if (salary == null && arrivalAt == null && departureAt == null && arrivalFee == null && departureFee == null) {
+    return undefined;
+  }
+  return {
+    salary: salary ?? null,
+    arrivalAt: arrivalAt ?? null,
+    departureAt: departureAt ?? null,
+    arrivalFee: arrivalFee ?? null,
+    departureFee: departureFee ?? null,
   };
 }
 
@@ -420,11 +443,13 @@ export async function POST(request: NextRequest) {
         } else {
           const portalUrl = buildPortalUrl(lead as any);
           const caregiverIdRaw = metadata?.caregiver_id ?? metadata?.caregiverId;
+          const offer = extractOffer(metadata);
           buildCustomerCaregiverMailWithInlinePhoto(
             event as CaregiverMailEvent,
             lead as any,
             caregiver,
             portalUrl,
+            offer,
           )
             .then(({ template, attachments }) =>
               sendEmail((lead as any).email, template, attachments),
