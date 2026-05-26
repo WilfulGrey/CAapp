@@ -1,3 +1,7 @@
+// Required by `loadPrimundusAgencyId()` in onboard.ts (throws if unset).
+// Prod value used for parity; routing-only, doesn't affect assertions.
+Deno.env.set("MAMAMIA_AGENCY_ID", "3");
+
 import { assertEquals, assertRejects } from "@std/assert";
 import { onboardLead } from "../onboard.ts";
 import { _resetAgencyTokenCache } from "../../_shared/mamamiaClient.ts";

@@ -1,3 +1,10 @@
+// Set env vars BEFORE importing handler — `loadPrimundusAgencyId()` in
+// onboard.ts reads MAMAMIA_AGENCY_ID lazily but still throws if unset
+// when called. Use prod value (3) in tests for parity with what onboard
+// previously hardcoded; semantically the constant only changes routing,
+// not test assertions.
+Deno.env.set("MAMAMIA_AGENCY_ID", "3");
+
 import { assertEquals, assertStringIncludes } from "@std/assert";
 import { handleRequest } from "../index.ts";
 import { _resetRateLimit } from "../../_shared/rateLimit.ts";
