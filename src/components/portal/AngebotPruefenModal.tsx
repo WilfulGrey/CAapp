@@ -377,15 +377,15 @@ export const AngebotPruefenModal: FC<{
                       { label: 'Anreisekosten', value: `${offer.anreisekosten} €` },
                       { label: 'Abreisekosten', value: `${offer.abreisekosten} €` },
                       { label: 'Reisetage', value: 'Voller Tagessatz' },
-                      { label: 'Sommerzuschlag', value: '200 €/Monat (Juli + August)' },
+                      { label: 'Sommerzuschlag', value: '6,67 €/Tag (Juli + Aug.)' },
                       // Feiertagszuschlag wird separat unten gerendert (mit
                       // Info-Icon zum Aufklappen der Feiertagsliste).
                       { label: 'Kündigungsfrist', value: 'Täglich' },
                     ] as { label: string; value: string; bold?: boolean }[]).map((row, idx, arr) => (
                       <div key={row.label}>
                         <div className="flex items-center justify-between px-4 py-2.5 bg-white">
-                          <span className="text-sm text-gray-500">{row.label}</span>
-                          <span className={`text-sm ${row.bold ? 'font-bold text-gray-900' : 'font-semibold text-gray-700'}`}>{row.value}</span>
+                          <span className="text-sm text-gray-500 flex-shrink-0">{row.label}</span>
+                          <span className={`text-sm text-right ${row.bold ? 'font-bold text-gray-900' : 'font-semibold text-gray-700'}`}>{row.value}</span>
                         </div>
                         {/* Feiertagszuschlag-Block direkt nach Sommerzuschlag
                             einhängen, damit die Vertragskonditionen-Tabelle
@@ -545,7 +545,7 @@ export const AngebotPruefenModal: FC<{
                   <p className="text-[12px] text-gray-400 mt-2.5 leading-relaxed">
                     An- und Abreisetage werden mit vollem Tagessatz berechnet.
                     {zuschlagRelevance.hasSummer && (
-                      <> Im Juli und August fällt ein Sommerzuschlag von 200 €/Monat (bzw. 6,67 €/Tag) an.</>
+                      <> Im Juli und August fällt ein Sommerzuschlag von 6,67 €/Tag (200 €/Monat) an.</>
                     )}
                     {zuschlagRelevance.relevantHolidayNames.length > 0 && (
                       <> An {zuschlagRelevance.relevantHolidayNames.join(', ')} wird der doppelte Tagessatz berechnet.</>
