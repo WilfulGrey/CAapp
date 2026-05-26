@@ -1462,6 +1462,16 @@ export interface CaregiverDisplay {
   aboutText?: string;            // 2-3 Satz AI-Beschreibung
 }
 
+// Konditionen einer konkreten Bewerbung (aus der Mamamia-Application, via
+// detect-caregiver-events → lead-event-metadata). Nur für Mail 12 (Bewerbung).
+export interface OfferInfo {
+  salary?: number | null;        // Monatssatz €/Monat (Mamamia application.salary)
+  arrivalAt?: string | null;     // Anreisedatum (ISO, application.arrival_at)
+  departureAt?: string | null;   // vorauss. Abreisedatum (ISO, application.departure_at)
+  arrivalFee?: number | null;    // Anreisekosten € (application.arrival_fee)
+  departureFee?: number | null;  // Abreisekosten € (application.departure_fee)
+}
+
 function caregiverInitials(name: string): string {
   const parts = name.trim().split(/\s+/).filter(Boolean);
   if (parts.length === 0) return '?';
@@ -1574,7 +1584,11 @@ function caregiverMailShell(baseUrl: string, leadEmail: string, content: string)
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; line-height: 1.6; color: #333; background-color: #f4f4f4; }
-    @media only screen and (max-width: 600px) { .email-content { padding: 30px 20px !important; } }
+    @media only screen and (max-width: 600px) {
+      .email-content { padding: 30px 20px !important; }
+      .cond-top-cell { display: block !important; width: 100% !important; padding: 18px 22px 16px !important; border-right: none !important; border-bottom: 1px solid #ebe2d2 !important; }
+      .cond-top-cell:last-child { border-bottom: none !important; }
+    }
   </style>
 </head>
 <body>
@@ -1620,6 +1634,54 @@ function caregiverMailShell(baseUrl: string, leadEmail: string, content: string)
   </div>
 </body>
 </html>`;
+}
+
+// Kompakte Pflegekraft-Kachel (Foto/Initialen · Name · Alter · Badge ·
+// Erfahrung·Einsätze · Deutsch + "Profil ansehen"-Link). Gemeinsam für
+// Mail 11 (Interesse) und Mail 12 (Bewerbung), damit beide identisch wirken.
+// Kein grüner Button, keine Bio. Badge bewusst als Emoji-Medaille (📅 SVG
+// rendert in Gmail/Outlook nicht).
+function caregiverKachelHtml(cg: CaregiverDisplay, portalUrl: string): string {
+  const firstName = cg.name.split(' ')[0];
+  const photoHtml = cg.photoUrl
+    ? `<img src="${cg.photoUrl}" alt="${cg.name}" width="80" style="display:block;width:80px;height:80px;border-radius:50%;object-fit:cover;border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.08);" />`
+    : `<div style="width:80px;height:80px;border-radius:50%;background-color:#B5A184;color:#fff;font-size:28px;font-weight:700;line-height:80px;text-align:center;border:2px solid #fff;">${caregiverInitials(cg.name)}</div>`;
+
+  const badge = caregiverBadgeStyle(cg.badgeLevel);
+  const badgeHtml = badge
+    ? `<span style="display:inline-block;background-color:${badge.solid};background:${badge.gradient};color:#fff;padding:5px 12px;border-radius:14px;font-size:12px;font-weight:700;letter-spacing:.04em;white-space:nowrap;">&#127941; ${(cg.badgeLevel || '').toUpperCase()}</span>`
+    : '';
+
+  const metaParts: string[] = [];
+  if (cg.yearsExperience && cg.yearsExperience > 0) metaParts.push(`${cg.yearsExperience} ${cg.yearsExperience === 1 ? 'Jahr' : 'Jahre'} Erfahrung`);
+  if (cg.einsatzCount && cg.einsatzCount > 0)       metaParts.push(`${cg.einsatzCount} ${cg.einsatzCount === 1 ? 'Einsatz' : 'Einsätze'}`);
+  const metaLine = metaParts.length > 0
+    ? `<p style="margin:0 0 3px;font-size:14px;color:#666;">${metaParts.join(' &middot; ')}</p>`
+    : '';
+  const deutschLine = cg.germanLevel
+    ? `<p style="margin:0;font-size:14px;color:#666;">Deutsch ${cg.germanLevel}</p>`
+    : '';
+  const ageSuffix = cg.age ? ` <span style="font-size:15px;font-weight:400;color:#9a8a73;">&middot; ${cg.age} J.</span>` : '';
+
+  return `
+    <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="margin:0 0 26px;border-radius:12px;background:#FAF8F4;overflow:hidden;">
+      <tr><td style="padding:20px 22px;">
+        <table width="100%" cellpadding="0" cellspacing="0" role="presentation">
+          <tr>
+            <td style="vertical-align:middle;width:96px;padding-right:16px;">${photoHtml}</td>
+            <td style="vertical-align:middle;">
+              <p style="margin:0 0 4px;font-size:18px;font-weight:700;color:#2D1F0F;">${cg.name}${ageSuffix}</p>
+              ${metaLine}
+              ${deutschLine}
+            </td>
+            ${badgeHtml ? `<td style="vertical-align:top;text-align:right;padding-left:10px;">${badgeHtml}</td>` : ''}
+          </tr>
+        </table>
+        <div style="border-top:1px solid #ebe2d2;margin:16px 0 0;padding-top:14px;">
+          <a href="${portalUrl}" style="color:#8B7355;text-decoration:none;font-weight:700;font-size:15px;">${firstName}s Profil ansehen &rarr;</a>
+        </div>
+      </td></tr>
+    </table>`;
 }
 
 // Gemeinsamer Frame für beide Caregiver-Event-Mails. Nur Subject, Intro-HTML,
@@ -1831,7 +1893,11 @@ export function getPatientDataSavedEmailTemplate(
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; line-height: 1.6; color: #333; background-color: #f4f4f4; }
-    @media only screen and (max-width: 600px) { .email-content { padding: 30px 20px !important; } }
+    @media only screen and (max-width: 600px) {
+      .email-content { padding: 30px 20px !important; }
+      .cond-top-cell { display: block !important; width: 100% !important; padding: 18px 22px 16px !important; border-right: none !important; border-bottom: 1px solid #ebe2d2 !important; }
+      .cond-top-cell:last-child { border-bottom: none !important; }
+    }
   </style>
 </head>
 <body>
@@ -1919,45 +1985,12 @@ export function getCaregiverInterestEmailTemplate(
   const firstName = cg.name.split(' ')[0];
   const psLabel = 'font-size:11px;font-weight:700;color:#9a8a73;letter-spacing:.08em;text-transform:uppercase;';
 
-  const photoHtml = cg.photoUrl
-    ? `<img src="${cg.photoUrl}" alt="${cg.name}" width="80" style="display:block;width:80px;height:80px;border-radius:50%;object-fit:cover;border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.08);" />`
-    : `<div style="width:80px;height:80px;border-radius:50%;background-color:#B5A184;color:#fff;font-size:28px;font-weight:700;line-height:80px;text-align:center;border:2px solid #fff;">${caregiverInitials(cg.name)}</div>`;
+  const kachel = caregiverKachelHtml(cg, portalUrl);
 
-  const badge = caregiverBadgeStyle(cg.badgeLevel);
-  const badgeHtml = badge
-    ? `<span style="display:inline-block;background-color:${badge.solid};background:${badge.gradient};color:#fff;padding:5px 12px;border-radius:14px;font-size:12px;font-weight:700;letter-spacing:.04em;white-space:nowrap;">&#127941; ${(cg.badgeLevel || '').toUpperCase()}</span>`
-    : '';
-
+  // Nur für den Plaintext-Reflex der Kachel.
   const metaParts: string[] = [];
   if (cg.yearsExperience && cg.yearsExperience > 0) metaParts.push(`${cg.yearsExperience} ${cg.yearsExperience === 1 ? 'Jahr' : 'Jahre'} Erfahrung`);
   if (cg.einsatzCount && cg.einsatzCount > 0)       metaParts.push(`${cg.einsatzCount} ${cg.einsatzCount === 1 ? 'Einsatz' : 'Einsätze'}`);
-  const metaLine = metaParts.length > 0
-    ? `<p style="margin:0 0 3px;font-size:14px;color:#666;">${metaParts.join(' &middot; ')}</p>`
-    : '';
-  const deutschLine = cg.germanLevel
-    ? `<p style="margin:0;font-size:14px;color:#666;">Deutsch ${cg.germanLevel}</p>`
-    : '';
-  const ageSuffix = cg.age ? ` <span style="font-size:15px;font-weight:400;color:#9a8a73;">&middot; ${cg.age} J.</span>` : '';
-
-  const kachel = `
-    <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="margin:0 0 26px;border-radius:12px;background:#FAF8F4;overflow:hidden;">
-      <tr><td style="padding:20px 22px;">
-        <table width="100%" cellpadding="0" cellspacing="0" role="presentation">
-          <tr>
-            <td style="vertical-align:middle;width:96px;padding-right:16px;">${photoHtml}</td>
-            <td style="vertical-align:middle;">
-              <p style="margin:0 0 4px;font-size:18px;font-weight:700;color:#2D1F0F;">${cg.name}${ageSuffix}</p>
-              ${metaLine}
-              ${deutschLine}
-            </td>
-            ${badgeHtml ? `<td style="vertical-align:top;text-align:right;padding-left:10px;">${badgeHtml}</td>` : ''}
-          </tr>
-        </table>
-        <div style="border-top:1px solid #ebe2d2;margin:16px 0 0;padding-top:14px;">
-          <a href="${portalUrl}" style="color:#8B7355;text-decoration:none;font-weight:700;font-size:15px;">${firstName}s Profil ansehen &rarr;</a>
-        </div>
-      </td></tr>
-    </table>`;
 
   const stepRow = (n: string, title: string, desc: string, last = false) => `
       <tr>
@@ -2029,40 +2062,189 @@ www.primundus.de
   return { subject: 'Eine Pflegekraft interessiert sich für Ihre Anfrage', html, text };
 }
 
+// Deutsche Datumsausgabe aus ISO (tz-sicher — nur der YYYY-MM-DD-Teil zählt).
+const MONTHS_DE = ['Januar', 'Februar', 'März', 'April', 'Mai', 'Juni', 'Juli', 'August', 'September', 'Oktober', 'November', 'Dezember'];
+function formatGermanDate(iso?: string | null): string | null {
+  if (!iso) return null;
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(iso);
+  if (!m) return null;
+  return `${Number(m[3])}. ${MONTHS_DE[Number(m[2]) - 1]} ${m[1]}`;
+}
+// Berührt der Einsatzzeitraum die Sommermonate Juli/August? (Monatsweise von
+// Anreise bis Abreise prüfen.) Nur wenn beide Daten vorliegen.
+function rangeTouchesSummer(arr?: string | null, dep?: string | null): boolean {
+  const a = /^(\d{4})-(\d{2})/.exec(arr ?? '');
+  const b = /^(\d{4})-(\d{2})/.exec(dep ?? '');
+  if (!a || !b) return false;
+  let y = Number(a[1]); let mo = Number(a[2]);
+  const ey = Number(b[1]); const em = Number(b[2]);
+  while (y < ey || (y === ey && mo <= em)) {
+    if (mo === 7 || mo === 8) return true;
+    mo += 1; if (mo > 12) { mo = 1; y += 1; }
+  }
+  return false;
+}
+
+// Mail 12 (Mail B — Bewerbung). Eigenständiges Layout mit Konditionen-Bühne
+// (Tagessatz/Monatssatz + Detail-Tabelle aus der konkreten Mamamia-Bewerbung).
+// Mail A/C bleiben unberührt. `offer` ist optional — fehlt es (Alt-Events,
+// fehlende Daten), wird die Konditionen-Bühne weggelassen.
 export function getApplicationReceivedEmailTemplate(
   lead: Lead,
   caregiver: CaregiverDisplay,
   portalUrl: string,
+  offer?: OfferInfo,
 ): EmailTemplate {
-  const firstName = caregiver.name.split(' ')[0];
-  const introHtml = `<p style="font-size:15px;line-height:1.75;color:#444;margin-bottom:18px;">eine schöne Nachricht — <strong style="color:#2D1F0F;">Sie haben eine neue Bewerbung erhalten</strong>. ${caregiver.name} möchte die Betreuung gerne übernehmen.</p>`;
-  const middleHtml = buildStepsList([
-    { title: 'Bewerbung ansehen', desc: `${firstName}s Profil, Erfahrung und bisherige Einsätze in Ruhe im Portal prüfen.` },
-    { title: 'Angebot & Kosten prüfen', desc: `Tagessatz, An- und Abreise sowie eine vollständige Kostenzusammenfassung sind transparent aufgelistet — keine versteckten Kosten.` },
-    { title: 'Pflegekraft beauftragen', desc: `Passt alles? Mit Eingabe Ihrer Kontaktdaten beauftragen Sie ${firstName}. Den Vertrag senden wir Ihnen anschließend separat per E-Mail zu — um Anreise und alle weiteren Schritte kümmern wir uns.` },
-  ]) + persoenlichHinweisHtml();
-  const softOutHtml = `<p style="font-size:14px;line-height:1.65;color:#888;margin:4px 0 20px;font-style:italic;">Passt es nicht? Lehnen Sie die Bewerbung im Portal kurz ab oder schreiben Sie uns — dann suchen wir gerne weiter.</p>`;
-  return buildCaregiverEventEmail({
-    lead,
-    caregiver,
-    subject: 'Sie haben eine neue Bewerbung erhalten',
-    introHtml,
-    middleHtml: middleHtml + softOutHtml,
-    ctaText: 'Bewerbung im Portal ansehen →',
-    portalUrl,
-    psHtml: bestpreisPsHtml(),
-    psText: BESTPREIS_PS_TEXT,
-    plainSummary: `eine schöne Nachricht — Sie haben eine neue Bewerbung erhalten. ${caregiver.name} möchte die Betreuung gerne übernehmen.
+  const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://primundus.de';
+  const greeting = customerGreeting(lead);
+  const cg = caregiver;
+  const firstName = cg.name.split(' ')[0];
+  const psLabel = 'font-size:11px;font-weight:700;color:#9a8a73;letter-spacing:.08em;text-transform:uppercase;';
+  const fmtEuro = (n: number) => n.toLocaleString('de-DE', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
 
-So geht es weiter:
-1. Bewerbung ansehen — ${firstName}s Profil, Erfahrung und bisherige Einsätze in Ruhe im Portal prüfen.
-2. Angebot & Kosten prüfen — Tagessatz, An- und Abreise sowie eine vollständige Kostenzusammenfassung sind transparent aufgelistet — keine versteckten Kosten.
-3. Pflegekraft beauftragen — passt alles? Mit Eingabe Ihrer Kontaktdaten beauftragen Sie ${firstName}. Den Vertrag senden wir Ihnen anschließend separat per E-Mail zu — um Anreise und alle weiteren Schritte kümmern wir uns.
+  const applicationViewUrl = portalUrl + (portalUrl.includes('?') ? '&' : '?') + 'view=application';
 
-${PERSOENLICH_HINWEIS_TEXT}
+  // ── Konditionen aus der Bewerbung ─────────────────────────────────────────
+  const salary = offer?.salary && offer.salary > 0 ? offer.salary : 0;
+  const tagessatz = salary > 0 ? Math.round(salary / 30) : 0;
+  const zuschuesse = (lead as any).kalkulation?.zuschüsse?.gesamt ?? 0;
+  const eigenanteil = salary > 0 ? Math.max(0, salary - zuschuesse) : 0;
+  const anreiseDatum = formatGermanDate(offer?.arrivalAt);
+  const abreiseDatum = formatGermanDate(offer?.departureAt);
+  const showSummer = rangeTouchesSummer(offer?.arrivalAt, offer?.departureAt);
+  const hasConditions = salary > 0 || !!anreiseDatum || !!abreiseDatum;
 
-Passt es nicht? Lehnen Sie die Bewerbung im Portal kurz ab oder schreiben Sie uns — dann suchen wir gerne weiter.`,
-  });
+  // Detail-Zeilen (nur befüllte zeigen).
+  const detailRow = (label: string, sub: string, value: string) =>
+    `<tr>
+      <td style="padding:5px 0;color:#888;">${label}${sub ? `<br><span style="font-size:12px;color:#aaa;">${sub}</span>` : ''}</td>
+      <td style="padding:5px 0;color:#2D1F0F;font-weight:600;text-align:right;">${value}</td>
+    </tr>`;
+  const detailRows: string[] = [];
+  if (anreiseDatum) detailRows.push(detailRow('Anreisedatum', '', anreiseDatum));
+  if (abreiseDatum) detailRows.push(detailRow('Abreisedatum (voraussichtlich)', '', abreiseDatum));
+  if (offer?.arrivalFee != null) detailRows.push(detailRow('Anreisekosten', '', `${fmtEuro(offer.arrivalFee)}&nbsp;€`));
+  if (offer?.departureFee != null) detailRows.push(detailRow('Abreisekosten', '', `${fmtEuro(offer.departureFee)}&nbsp;€`));
+  if (showSummer) detailRows.push(detailRow('Sommerzuschlag', 'Juli &amp; August', '6,67&nbsp;€&nbsp;/&nbsp;Tag'));
+  detailRows.push(detailRow('Feiertagszuschlag', 'an gesetzlichen Feiertagen', 'doppelter Tagessatz'));
+  detailRows.push(detailRow('Kündigungsfrist', '', 'täglich'));
+
+  const konditionen = hasConditions ? `
+    <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="margin:0 0 28px;background:#FAF8F4;border-radius:10px;overflow:hidden;">
+      ${salary > 0 ? `
+      <tr>
+        <td class="cond-top-cell" style="width:50%;padding:22px 24px 18px;border-right:1px solid #ebe2d2;vertical-align:top;">
+          <p style="margin:0 0 8px;${psLabel}">Tagessatz</p>
+          <p style="margin:0 0 4px;font-size:26px;font-weight:700;color:#2D1F0F;line-height:1.15;">${fmtEuro(tagessatz)}&nbsp;€<span style="font-size:14px;font-weight:500;color:#9a8a73;"> / Tag</span></p>
+          <p style="margin:0;font-size:12px;color:#9a8a73;line-height:1.5;">inkl. Steuern &amp; Sozialabgaben</p>
+        </td>
+        <td class="cond-top-cell" style="width:50%;padding:22px 24px 18px;vertical-align:top;">
+          <p style="margin:0 0 8px;${psLabel}">Monatssatz</p>
+          <p style="margin:0 0 4px;font-size:26px;font-weight:700;color:#2D1F0F;line-height:1.15;">${fmtEuro(salary)}&nbsp;€<span style="font-size:14px;font-weight:500;color:#9a8a73;"> / Monat</span></p>
+          <p style="margin:0;font-size:12px;color:#9a8a73;line-height:1.5;">${zuschuesse > 0 ? `rechn. Eigenanteil ca. ${fmtEuro(eigenanteil)}&nbsp;€` : 'inkl. Steuern &amp; Sozialabgaben'}</p>
+        </td>
+      </tr>` : ''}
+      <tr>
+        <td colspan="2" style="padding:16px 24px 16px;${salary > 0 ? 'border-top:1px solid #ebe2d2;' : ''}">
+          <p style="margin:0 0 12px;${psLabel}">Konditionen im Detail</p>
+          <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="font-size:14px;color:#555;line-height:1.7;">
+            ${detailRows.join('')}
+          </table>
+        </td>
+      </tr>
+      <tr>
+        <td colspan="2" style="padding:14px 24px 18px;border-top:1px solid #ebe2d2;">
+          <p style="margin:0;font-size:13px;line-height:1.6;color:#666;"><a href="https://primundus.de/primundus-mustervertrag.pdf" target="_blank" style="color:#8B7355;text-decoration:none;font-weight:600;">Mustervertrag vorab einsehen &rarr;</a></p>
+        </td>
+      </tr>
+    </table>` : '';
+
+  const cta = `
+    <!--[if mso]><table role="presentation" cellpadding="0" cellspacing="0" border="0" align="center"><tr><td><![endif]-->
+    <table role="presentation" cellpadding="0" cellspacing="0" border="0" align="center" style="margin:8px auto 30px;border-collapse:separate;">
+      <tr>
+        <td align="center" bgcolor="#2A9D5C" style="background-color:#2A9D5C;background-image:linear-gradient(180deg,#34B36C 0%,#2A9D5C 100%);border-radius:10px;padding:17px 44px;box-shadow:0 2px 6px rgba(42,157,92,0.25);">
+          <a href="${applicationViewUrl}" target="_blank" style="color:#ffffff;text-decoration:none;font-weight:600;font-size:16px;letter-spacing:0.01em;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;line-height:1.4;">Bewerbung prüfen&nbsp;&nbsp;&rarr;</a>
+        </td>
+      </tr>
+    </table>
+    <!--[if mso]></td></tr></table><![endif]-->`;
+
+  const stepRow = (n: string, title: string, desc: string, last = false) => `
+      <tr>
+        <td style="vertical-align:top;width:34px;padding:0 12px ${last ? '0' : '14px'} 0;">
+          <table cellpadding="0" cellspacing="0" role="presentation"><tr>
+            <td width="26" height="26" align="center" valign="middle" bgcolor="#8B7355" style="background-color:#8B7355;border-radius:50%;color:#ffffff;font-size:13px;font-weight:700;line-height:26px;text-align:center;">${n}</td>
+          </tr></table>
+        </td>
+        <td style="vertical-align:top;padding:0 0 ${last ? '0' : '14px'} 0;">
+          <p style="margin:0 0 2px;font-size:15px;font-weight:700;color:#2D1F0F;line-height:1.4;">${title}</p>
+          <p style="margin:0;font-size:14px;line-height:1.6;color:#555;">${desc}</p>
+        </td>
+      </tr>`;
+
+  const stepsTable = `
+    <p style="font-size:15px;line-height:1.75;color:#2D1F0F;margin:8px 0 16px;"><strong>So geht es weiter:</strong></p>
+    <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="margin:0 0 28px;">
+      ${stepRow('1', `${firstName}s Profil in Ruhe ansehen`, `Im Portal finden Sie ${firstName}s vollständige Erfahrung, bisherige Einsätze und Sprachkenntnisse.`)}
+      ${stepRow('2', 'Konditionen prüfen', 'Tagessatz, Anreise- und Abreisedatum, Reisekosten und etwaige Zuschläge im Detail durchgehen.')}
+      ${stepRow('3', 'Annehmen oder ablehnen', `Wenn ${firstName} passt: Kontaktdaten ergänzen und Pflegekraft beauftragen. Andernfalls die Bewerbung mit einem Klick ablehnen.`, true)}
+    </table>`;
+
+  const bestpreisBox = `
+    <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="margin:0 0 8px;background:#FAF8F4;border-radius:10px;overflow:hidden;">
+      <tr><td style="padding:16px 24px 20px;">
+        <p style="margin:0 0 6px;${psLabel}color:#B8860B;">Bestpreis-Garantie</p>
+        <p style="margin:0 0 6px;font-size:14px;line-height:1.65;color:#2D1F0F;">Als <strong>Direktanbieter ohne Vermittler</strong> sparen wir die Provision — und geben diesen Vorteil direkt an Sie weiter.</p>
+        <p style="margin:0;font-size:14px;line-height:1.65;color:#2D1F0F;">Sollten Sie bei vergleichbarer Leistung ein günstigeres Angebot finden, <strong>unterbieten wir es.</strong></p>
+      </td></tr>
+    </table>`;
+
+  const content = `
+    <p style="font-size:15px;line-height:1.75;color:#444;margin-bottom:14px;">${greeting},</p>
+    <p style="font-size:15px;line-height:1.75;color:#444;margin-bottom:14px;"><strong style="color:#2D1F0F;">${cg.name}</strong> hat sich auf Ihre Betreuungsstelle beworben. Hier sind die Konditionen ihrer Bewerbung im Überblick.</p>
+    ${caregiverKachelHtml(cg, portalUrl)}
+    ${konditionen}
+    ${cta}
+    ${stepsTable}
+    ${bestpreisBox}
+    <p style="font-size:15px;line-height:1.75;color:#444;margin:28px 0 18px;">Wenn Sie Fragen zu ${firstName}s Bewerbung haben oder Unterstützung bei der Entscheidung möchten — rufen Sie mich an, schreiben Sie mir per WhatsApp oder antworten Sie einfach auf diese E-Mail. Ich bin gerne für Sie da.</p>
+    ${caregiverIlkaSig(baseUrl)}`;
+
+  const html = caregiverMailShell(baseUrl, lead.email, content);
+
+  // ── Plaintext ─────────────────────────────────────────────────────────────
+  const condPlain = hasConditions ? `KONDITIONEN
+${salary > 0 ? `Tagessatz: ${fmtEuro(tagessatz)} € / Tag (inkl. Steuern & Sozialabgaben)\nMonatssatz: ${fmtEuro(salary)} € / Monat${zuschuesse > 0 ? ` — rechn. Eigenanteil ca. ${fmtEuro(eigenanteil)} €` : ''}\n` : ''}${anreiseDatum ? `Anreisedatum: ${anreiseDatum}\n` : ''}${abreiseDatum ? `Abreisedatum (voraussichtlich): ${abreiseDatum}\n` : ''}${offer?.arrivalFee != null ? `Anreisekosten: ${fmtEuro(offer.arrivalFee)} €\n` : ''}${offer?.departureFee != null ? `Abreisekosten: ${fmtEuro(offer.departureFee)} €\n` : ''}${showSummer ? 'Sommerzuschlag (Juli & August): 6,67 € / Tag\n' : ''}Feiertagszuschlag (an gesetzlichen Feiertagen): doppelter Tagessatz
+Kündigungsfrist: täglich
+Mustervertrag: https://primundus.de/primundus-mustervertrag.pdf
+
+` : '';
+
+  const text = `${greeting},
+
+${cg.name} hat sich auf Ihre Betreuungsstelle beworben. Hier sind die Konditionen ihrer Bewerbung im Überblick.
+
+${condPlain}Bewerbung prüfen: ${applicationViewUrl}
+
+SO GEHT ES WEITER
+1. ${firstName}s Profil in Ruhe ansehen — im Portal finden Sie ${firstName}s vollständige Erfahrung, bisherige Einsätze und Sprachkenntnisse.
+2. Konditionen prüfen — Tagessatz, Anreise- und Abreisedatum, Reisekosten und etwaige Zuschläge im Detail durchgehen.
+3. Annehmen oder ablehnen — wenn ${firstName} passt: Kontaktdaten ergänzen und Pflegekraft beauftragen. Andernfalls die Bewerbung mit einem Klick ablehnen.
+
+Bestpreis-Garantie: Als Direktanbieter ohne Vermittler sparen wir die Provision — und geben diesen Vorteil direkt an Sie weiter. Sollten Sie bei vergleichbarer Leistung ein günstigeres Angebot finden, unterbieten wir es.
+
+Wenn Sie Fragen zu ${firstName}s Bewerbung haben oder Unterstützung bei der Entscheidung möchten — rufen Sie mich an, schreiben Sie mir per WhatsApp oder antworten Sie einfach auf diese E-Mail. Ich bin gerne für Sie da.
+
+Mit freundlichen Grüßen
+Ilka Wysocki — Pflegeberaterin
+Tel: 089 200 000 830  ·  WhatsApp: https://wa.me/4989200000830
+
+Primundus Deutschland
+www.primundus.de
+`;
+
+  return { subject: 'Sie haben eine neue Bewerbung erhalten', html, text };
 }
 
 // Customer-Mail bei Buchungsbestätigung (Mail C). Wird ausgelöst, wenn der
@@ -2326,6 +2508,7 @@ export async function buildCustomerCaregiverMailWithInlinePhoto(
   lead: Lead,
   caregiver: CaregiverDisplay,
   portalUrl: string,
+  offer?: OfferInfo,
 ): Promise<{ template: EmailTemplate; attachments?: any[] }> {
   const inline = await fetchInlineCaregiverPhoto(caregiver.photoUrl);
 
@@ -2336,7 +2519,7 @@ export async function buildCustomerCaregiverMailWithInlinePhoto(
   const template =
     event === 'caregiver_interest_shown'      ? getCaregiverInterestEmailTemplate(lead, caregiverForTemplate, portalUrl)
   : event === 'application_accepted_internal' ? getBookingConfirmedEmailTemplate(lead, caregiverForTemplate, portalUrl)
-  :                                             getApplicationReceivedEmailTemplate(lead, caregiverForTemplate, portalUrl);
+  :                                             getApplicationReceivedEmailTemplate(lead, caregiverForTemplate, portalUrl, offer);
 
   return inline
     ? { template, attachments: [inline] }
