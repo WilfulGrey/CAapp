@@ -1026,20 +1026,13 @@ function buildReminderHtml(
     ? `<img src="cid:${photoCid}" alt="${cgName}" width="80" style="display:block;width:80px;height:80px;border-radius:50%;object-fit:cover;border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.08);" />`
     : `<div style="width:80px;height:80px;border-radius:50%;background-color:#B5A184;color:#fff;font-size:28px;font-weight:700;line-height:80px;text-align:center;border:2px solid #fff;">${reminderCaregiverInitials(cgName)}</div>`;
 
-  // Mamamia liefert teils unübersetzte Platzhalter in about_de (z.B. "Bitte
-  // geben Sie den Text an, den Sie ins Deutsche übersetzen möchten.") — die
-  // dürfen nie als Zitat erscheinen. Defensive auch hier (alte scheduled_
-  // emails-Rows tragen evtl. noch ungefilterte Werte).
-  // Kachel-Footer je Variante:
-  // - application: schlanker "Zum Profil"-Link (kein Bio-Zitat — wirkte
-  //   generisch/Platzhalter-anfällig; das volle Profil steht im Portal).
-  // - interest: weiterhin das Bio-Zitat (Platzhalter gefiltert).
+  // Kachel-Footer: interest behält das Bio-Zitat (Platzhalter gefiltert).
+  // application braucht keinen extra Link — der persönliche CTA-Button
+  // "{Vorname}s Bewerbung ansehen" führt direkt hin.
   const aboutClean = cleanReminderAbout(meta.caregiver_about_text);
-  const kachelFooter = variant === "application"
-    ? `<p style="margin:12px 0 0;"><a href="${portalUrl}" style="color:#8B7355;text-decoration:none;font-weight:600;font-size:14px;">Zum Profil &rarr;</a></p>`
-    : (aboutClean
-        ? `<p style="margin:14px 0 0;font-size:14px;line-height:1.65;color:#555;font-style:italic;">„${aboutClean}"</p>`
-        : "");
+  const kachelFooter = variant === "interest" && aboutClean
+    ? `<p style="margin:14px 0 0;font-size:14px;line-height:1.65;color:#555;font-style:italic;">„${aboutClean}"</p>`
+    : "";
 
   const kachel = `
     <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="margin:0 0 22px 0;border:1px solid #e8ddd0;border-radius:12px;overflow:hidden;">
@@ -1058,34 +1051,36 @@ function buildReminderHtml(
       </td></tr>
     </table>`;
 
-  // Tier-spezifisches Intro/Middle/CTA. Crescendo bei application:
-  // 1h sanft → 4h dringender ("prüft andere Anfragen") → 12h dringendster
-  // ("verfügbar nicht mehr garantiert"). Interest bleibt einstufig.
+  // Persönlicher, positiver Ton — eine echte Frage statt Füllsatz, kein
+  // "Kundenportal"-Wording (der CTA-Button führt direkt hin), keine
+  // Drohkulisse. Application eskaliert sanft über die Stufen.
   let introHtml: string;
   let middleHtml: string;
   let ctaText: string;
+  const PpassT = `So weiß ${firstName}, woran sie ist, und Sie erhalten bei Bedarf gerne weitere Bewerbungen.`;
   if (variant === "interest") {
     introHtml = `<p style="font-size:15px;line-height:1.75;color:#444;margin-bottom:18px;">vor einer Stunde haben wir Ihnen geschrieben, dass <strong style="color:#2D1F0F;">${cgName}</strong> Interesse an Ihrer Anfrage hat. Eine kurze Erinnerung — die nächsten Stunden zählen:</p>`;
     middleHtml = `<p style="font-size:15px;line-height:1.75;color:#444;margin-bottom:20px;">Pflegekräfte mit guten Profilen werden häufig schnell von anderen Familien angefragt. <strong style="color:#2D1F0F;">Damit ${firstName} für Sie verfügbar bleibt</strong>, schauen Sie sich ihr Profil jetzt an und laden Sie sie ein, sich bei Ihnen zu bewerben.</p>`;
     ctaText = "Profil ansehen und einladen →";
   } else if (tier === "1h") {
-    introHtml = `<p style="font-size:15px;line-height:1.75;color:#444;margin-bottom:18px;">vor einer Stunde haben wir Ihnen <strong style="color:#2D1F0F;">${firstName}s Bewerbung</strong> weitergeleitet — eine kurze Erinnerung von mir.</p>`;
-    middleHtml = `<p style="font-size:15px;line-height:1.75;color:#444;margin-bottom:20px;">Schauen Sie sich ${firstName} in Ruhe an. Passt sie? Dann bestätigen Sie die Buchung im Portal — oder antworten Sie einfach auf diese E-Mail, wenn Sie Fragen haben. Um alles Weitere kümmere ich mich.</p>`;
-    ctaText = "Im Portal ansehen →";
+    introHtml = `<p style="font-size:15px;line-height:1.75;color:#444;margin-bottom:18px;">konnten Sie sich schon mit <strong style="color:#2D1F0F;">${firstName}s Bewerbung</strong> beschäftigen?</p>`;
+    middleHtml = `<p style="font-size:15px;line-height:1.75;color:#444;margin-bottom:20px;">Teilen Sie mir gern kurz mit, ob ${firstName} zu Ihnen passt oder nicht. ${PpassT}</p>`;
+    ctaText = `${firstName}s Bewerbung ansehen →`;
   } else if (tier === "4h") {
-    introHtml = `<p style="font-size:15px;line-height:1.75;color:#444;margin-bottom:18px;">${firstName}s Bewerbung liegt nun seit <strong style="color:#2D1F0F;">über 4 Stunden</strong> bei Ihnen — ich wollte kurz nachfassen.</p>`;
-    middleHtml = `<p style="font-size:15px;line-height:1.75;color:#444;margin-bottom:20px;">Pflegekräfte werden oft innerhalb weniger Stunden für andere Einsätze angefragt. Damit ich ${firstName} für Sie reservieren kann, geben Sie mir bitte kurz Bescheid — im Portal entscheiden oder einfach auf diese E-Mail antworten.</p>`;
-    ctaText = "Im Portal entscheiden →";
+    introHtml = `<p style="font-size:15px;line-height:1.75;color:#444;margin-bottom:18px;">konnten Sie schon einen Blick auf <strong style="color:#2D1F0F;">${firstName}s Bewerbung</strong> werfen?</p>`;
+    middleHtml = `<p style="font-size:15px;line-height:1.75;color:#444;margin-bottom:20px;">Teilen Sie mir gern kurz mit, ob sie zu Ihnen passt oder nicht. ${PpassT}</p>`;
+    ctaText = `${firstName}s Bewerbung ansehen →`;
   } else if (tier === "12h") {
-    introHtml = `<p style="font-size:15px;line-height:1.75;color:#444;margin-bottom:18px;">${firstName}s Bewerbung wartet nun seit <strong style="color:#C4543D;">über 12 Stunden</strong> auf Ihre Rückmeldung.</p>`;
-    middleHtml = `<p style="font-size:15px;line-height:1.75;color:#444;margin-bottom:20px;">Ich kann leider <strong style="color:#2D1F0F;">nicht mehr garantieren</strong>, dass ${firstName} noch verfügbar ist. Eine kurze Rückmeldung genügt — im Portal entscheiden oder einfach auf diese E-Mail antworten. Um alles Weitere kümmere ich mich.</p>`;
-    ctaText = "Im Portal entscheiden →";
+    introHtml = `<p style="font-size:15px;line-height:1.75;color:#444;margin-bottom:18px;"><strong style="color:#2D1F0F;">${firstName}s Bewerbung</strong> wartet noch auf Ihre Rückmeldung.</p>`;
+    middleHtml = `<p style="font-size:15px;line-height:1.75;color:#444;margin-bottom:20px;">Teilen Sie mir gern kurz mit, ob ${firstName} zu Ihnen passt oder nicht. So weiß ${firstName}, woran sie ist. Und wenn Sie unsicher sind, berate ich Sie natürlich gerne persönlich.</p>`;
+    ctaText = `${firstName}s Bewerbung ansehen →`;
   } else {
-    // tier === "46h" — letzte Erinnerung vor dem automatischen Schließen
-    // der Bewerbung (~2h später durch den Auto-Reject).
-    introHtml = `<p style="font-size:15px;line-height:1.75;color:#444;margin-bottom:18px;">${firstName}s Bewerbung liegt jetzt seit fast <strong style="color:#C4543D;">48 Stunden</strong> bei Ihnen — eine letzte Erinnerung, bevor ich sie schließe.</p>`;
-    middleHtml = `<p style="font-size:15px;line-height:1.75;color:#444;margin-bottom:20px;">Bitte geben Sie mir kurz Bescheid — im Portal <strong>an- oder ablehnen</strong> oder einfach auf diese E-Mail antworten. Ohne Rückmeldung schließe ich die Bewerbung in etwa 2 Stunden automatisch; bei Interesse schlage ich Ihnen gerne weitere passende Pflegekräfte vor.</p>`;
-    ctaText = "Im Portal entscheiden →";
+    // tier === "46h" — letzte Erinnerung vor dem automatischen Freigeben
+    // (~2h später durch den Auto-Reject). Positiv gerahmt: Barbara nicht
+    // unnötig warten lassen; weitere Vorschläge nur auf Wunsch.
+    introHtml = `<p style="font-size:15px;line-height:1.75;color:#444;margin-bottom:18px;">passt <strong style="color:#2D1F0F;">${firstName}</strong> zu Ihnen?</p>`;
+    middleHtml = `<p style="font-size:15px;line-height:1.75;color:#444;margin-bottom:20px;">Teilen Sie mir gern kurz mit, ob ja oder nein. Wenn ich nichts von Ihnen höre, gebe ich ${firstName} in den nächsten Stunden wieder frei, damit sie nicht unnötig wartet. Möchten Sie weitere Pflegekräfte sehen? Dann melden Sie sich einfach kurz bei uns.</p>`;
+    ctaText = `${firstName}s Bewerbung ansehen →`;
   }
 
   // Interest behält den dezenten Soft-Out unter dem CTA. Application
@@ -1141,29 +1136,24 @@ Primundus Deutschland | www.primundus.de
 `;
   }
 
-  // Application-Variante in 4 Tiers — persönlicher Ton, kein WhatsApp/Tel-
-  // Block im Body (steht in der Signatur). "im Portal entscheiden oder
-  // einfach auf diese E-Mail antworten" als niederschwellige Reaktion.
+  // Application-Variante in 4 Tiers — persönlicher, positiver Ton, kein
+  // "Kundenportal"-Wording (der Link führt direkt hin), keine Drohkulisse.
   let intro: string;
   let body: string;
-  let cta: string;
+  const passT = `So weiß ${firstName}, woran sie ist, und Sie erhalten bei Bedarf gerne weitere Bewerbungen.`;
   if (tier === "1h") {
-    intro = `vor einer Stunde haben wir Ihnen ${firstName}s Bewerbung weitergeleitet — eine kurze Erinnerung von mir.`;
-    body = `Schauen Sie sich ${firstName} in Ruhe an. Passt sie? Dann bestätigen Sie die Buchung im Portal — oder antworten Sie einfach auf diese E-Mail, wenn Sie Fragen haben. Um alles Weitere kümmere ich mich.`;
-    cta = `Im Portal ansehen: ${portalUrl}`;
+    intro = `konnten Sie sich schon mit ${firstName}s Bewerbung beschäftigen?`;
+    body = `Teilen Sie mir gern kurz mit, ob ${firstName} zu Ihnen passt oder nicht. ${passT}`;
   } else if (tier === "4h") {
-    intro = `${firstName}s Bewerbung liegt nun seit über 4 Stunden bei Ihnen — ich wollte kurz nachfassen.`;
-    body = `Pflegekräfte werden oft innerhalb weniger Stunden für andere Einsätze angefragt. Damit ich ${firstName} für Sie reservieren kann, geben Sie mir bitte kurz Bescheid — im Portal entscheiden oder einfach auf diese E-Mail antworten.`;
-    cta = `Im Portal entscheiden: ${portalUrl}`;
+    intro = `konnten Sie schon einen Blick auf ${firstName}s Bewerbung werfen?`;
+    body = `Teilen Sie mir gern kurz mit, ob sie zu Ihnen passt oder nicht. ${passT}`;
   } else if (tier === "12h") {
-    intro = `${firstName}s Bewerbung wartet nun seit über 12 Stunden auf Ihre Rückmeldung.`;
-    body = `Ich kann leider nicht mehr garantieren, dass ${firstName} noch verfügbar ist. Eine kurze Rückmeldung genügt — im Portal entscheiden oder einfach auf diese E-Mail antworten. Um alles Weitere kümmere ich mich.`;
-    cta = `Im Portal entscheiden: ${portalUrl}`;
+    intro = `${firstName}s Bewerbung wartet noch auf Ihre Rückmeldung.`;
+    body = `Teilen Sie mir gern kurz mit, ob ${firstName} zu Ihnen passt oder nicht. So weiß ${firstName}, woran sie ist. Und wenn Sie unsicher sind, berate ich Sie natürlich gerne persönlich.`;
   } else {
-    // tier === "46h" — letzte Erinnerung vor dem automatischen Schließen.
-    intro = `${firstName}s Bewerbung liegt jetzt seit fast 48 Stunden bei Ihnen — eine letzte Erinnerung, bevor ich sie schließe.`;
-    body = `Bitte geben Sie mir kurz Bescheid — im Portal an- oder ablehnen oder einfach auf diese E-Mail antworten. Ohne Rückmeldung schließe ich die Bewerbung in etwa 2 Stunden automatisch; bei Interesse schlage ich Ihnen gerne weitere passende Pflegekräfte vor.`;
-    cta = `Im Portal entscheiden: ${portalUrl}`;
+    // tier === "46h" — letzte Erinnerung; weitere Vorschläge nur auf Wunsch.
+    intro = `passt ${firstName} zu Ihnen?`;
+    body = `Teilen Sie mir gern kurz mit, ob ja oder nein. Wenn ich nichts von Ihnen höre, gebe ich ${firstName} in den nächsten Stunden wieder frei, damit sie nicht unnötig wartet. Möchten Sie weitere Pflegekräfte sehen? Dann melden Sie sich einfach kurz bei uns.`;
   }
 
   return `${halloAnrede},
@@ -1172,7 +1162,7 @@ ${intro}
 
 ${body}
 
-${cta}
+${firstName}s Bewerbung ansehen: ${portalUrl}
 
 Mit freundlichen Grüßen
 Ilka Wysocki — Pflegeberaterin
