@@ -11,148 +11,237 @@
     .email-wrapper { width: 100%; background-color: #f4f4f4; padding: 20px 0; }
     .email-container { max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
     .email-header { background: #ffffff; padding: 24px 40px 20px 40px; border-bottom: 1px solid #f0ebe4; }
-    .email-content { padding: 40px 40px 32px; text-align: left; }
+    .email-content { padding: 36px 40px 32px; text-align: left; }
     .email-footer { background-color: #f8f9fa; padding: 30px; text-align: center; border-top: 1px solid #e0e0e0; }
     @media only screen and (max-width: 600px) {
-      .email-content { padding: 30px 20px; }
+      .email-content { padding: 28px 20px; }
+      .price-stage-cell { display: block !important; width: 100% !important; padding: 18px 22px 16px !important; border-right: none !important; border-bottom: 1px solid #ebe2d2 !important; }
+      .price-stage-cell:last-child { border-bottom: none !important; }
     }
+    .label { font-size: 11px; font-weight: 700; color: #9a8a73; letter-spacing: .08em; text-transform: uppercase; }
   </style>
 </head>
 <body>
-  <div class="email-wrapper">
+<div class="email-wrapper">
+<table width="100%" cellpadding="0" cellspacing="0" role="presentation">
+<tr><td align="center">
+<div class="email-container">
+
+  <!-- HEADER -->
+  <div class="email-header">
     <table width="100%" cellpadding="0" cellspacing="0" role="presentation">
-      <tr><td align="center">
-        <div class="email-container">
-          <div class="email-header">
-            <table width="100%" cellpadding="0" cellspacing="0" role="presentation">
-              <tr>
-                <td style="vertical-align:middle;">
-                  <img src="https://kostenrechner.primundus.de/images/Primundus-Logo_V6.png" alt="Primundus Logo" width="160" style="display:block;width:160px;max-width:160px;height:auto;" />
-                </td>
-                <td style="vertical-align:middle;text-align:right;">
-                  <table cellpadding="0" cellspacing="0" role="presentation" style="margin-left:auto;">
-                    <tr>
-                      <td style="text-align:center;vertical-align:middle;padding-right:8px;border-right:1px solid #f0ebe4;">
-                        <img src="https://kostenrechner.primundus.de/images/primundus_testsieger-2021.webp" alt="Testsieger DIE WELT" width="36" style="display:block;width:36px;height:auto;" />
-                      </td>
-                      <td style="text-align:left;padding-left:8px;">
-                        <p style="margin:0 0 1px 0;font-size:10px;font-weight:700;color:#3D2B1F;white-space:nowrap;">Testsieger</p>
-                        <p style="margin:0 0 1px 0;font-size:10px;color:#B5A184;white-space:nowrap;font-weight:600;">DIE WELT</p>
-                        <p style="margin:0;font-size:9px;color:#aaa;white-space:nowrap;">Preis &amp; Qualit&auml;t</p>
-                      </td>
-                    </tr>
-                  </table>
-                </td>
-              </tr>
-            </table>
-          </div>
-          <div class="email-content">
-            
+      <tr>
+        <td style="vertical-align:middle;">
+          <img src="https://kostenrechner.primundus.de/images/Primundus-Logo_V6.png" alt="Primundus Logo" width="160" style="display:block;width:160px;max-width:160px;height:auto;" />
+        </td>
+        <td style="vertical-align:middle;text-align:right;">
+          <table cellpadding="0" cellspacing="0" role="presentation" style="margin-left:auto;">
+            <tr>
+              <td style="text-align:center;vertical-align:middle;padding-right:8px;border-right:1px solid #f0ebe4;">
+                <img src="https://kostenrechner.primundus.de/images/primundus_testsieger-2021.webp" alt="Testsieger DIE WELT" width="36" style="display:block;width:36px;height:auto;" />
+              </td>
+              <td style="text-align:left;padding-left:8px;">
+                <p style="margin:0 0 1px;font-size:10px;font-weight:700;color:#3D2B1F;white-space:nowrap;">Testsieger</p>
+                <p style="margin:0 0 1px;font-size:10px;color:#B5A184;white-space:nowrap;font-weight:600;">DIE WELT</p>
+                <p style="margin:0;font-size:9px;color:#aaa;white-space:nowrap;">Preis &amp; Qualit&auml;t</p>
+              </td>
+            </tr>
+          </table>
+        </td>
+      </tr>
+    </table>
+  </div>
+
+  <!-- CONTENT -->
+  <div class="email-content">
+
+    <!-- Anrede -->
     <p style="font-size:15px;line-height:1.75;color:#444;margin-bottom:14px;">Guten Tag Frau Wendt,</p>
-    <p style="font-size:15px;line-height:1.75;color:#444;margin-bottom:14px;">vielen Dank für Ihre Anfrage. Auf Grundlage Ihrer Angaben haben wir Ihr <strong style="color:#2D1F0F;">persönliches Angebot</strong> für die 24-Stunden-Betreuung zu Hause erstellt – inklusive passender Pflegekräfte, die wir bereits für Sie ausgewählt haben.</p>
 
-    
-    <div style="background:#FAF7F0;border:1.5px solid #B5A184;border-radius:8px;padding:12px 14px;margin:18px 0;">
-      <table width="100%" cellpadding="0" cellspacing="0" role="presentation">
-        <tr>
-          <td style="vertical-align:top;padding-right:8px;">
-            <div style="font-size:9px;text-transform:uppercase;letter-spacing:.07em;color:#8B6914;margin-bottom:2px;">Monatssatz</div>
-            <div style="font-size:17px;font-weight:700;color:#2D1F0F;">3.200 €</div>
-            <div style="font-size:10px;color:#aaa;">inkl. Steuern &amp; Sozialabgaben</div>
-          </td>
-          <td style="vertical-align:top;text-align:right;border-left:1px solid #e8d9a0;padding-left:12px;">
-            <div style="font-size:9px;text-transform:uppercase;letter-spacing:.07em;color:#8B6914;margin-bottom:2px;">Eigenanteil möglich</div>
-            <div style="font-size:16px;font-weight:700;color:#1E5C3A;">2.400 €</div>
-            <div style="font-size:10px;color:#aaa;">nach Pflegekasse</div>
-          </td>
-        </tr>
-      </table>
-    </div>
+    <p style="font-size:15px;line-height:1.75;color:#444;margin-bottom:24px;">vielen Dank f&uuml;r Ihre Anfrage. Auf Basis Ihrer Angaben haben wir Ihr <strong style="color:#2D1F0F;">Angebot f&uuml;r die 24-Stunden-Betreuung zu Hause</strong> erstellt. Im Kundenportal warten bereits Pflegekr&auml;fte, die zu Ihrem Bedarf passen.</p>
 
-    <div style="font-size:12px;color:#888;line-height:1.8;margin:0 0 18px;text-align:center;">
-      <span style="color:#2D6A4F;font-weight:600;">✓ Keine Vertragsbindung</span>&ensp;&middot;&ensp;
-      <span style="color:#2D6A4F;font-weight:600;">✓ Tagesgenaue Abrechnung</span>&ensp;&middot;&ensp;
-      <span style="color:#2D6A4F;font-weight:600;">✓ Kosten erst bei Anreise</span>
-    </div>
+    <!-- ═══════════════════════════════════════════ -->
+    <!-- DIE PREIS-BÜHNE: Preise + Trust + Bestpreis -->
+    <!-- in einer einzigen visuellen Klammer        -->
+    <!-- ═══════════════════════════════════════════ -->
+    <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="margin:0 0 28px;background:#FAF8F4;border-radius:10px;overflow:hidden;">
 
-    
-    <div style="background:#FAF8F4;border:1px solid #e8ddd0;border-radius:8px;padding:18px 20px;margin:0 0 22px 0;">
-      <p style="margin:0 0 12px 0;font-size:14px;color:#555;line-height:1.6;">In Ihrem <strong style="color:#2D1F0F;">Kundenportal</strong> sehen Sie die vorgeschlagenen Pflegekräfte mit Profil und Erfahrung. So geht es weiter:</p>
-      <table width="100%" cellpadding="0" cellspacing="0" role="presentation">
-        <tr><td style="padding:5px 0;vertical-align:top;width:26px;"><span style="display:inline-block;width:20px;height:20px;background:#B5A184;color:#fff;border-radius:50%;text-align:center;font-size:12px;font-weight:700;line-height:20px;">1</span></td>
-          <td style="padding:5px 0;font-size:14px;color:#444;line-height:1.55;"><strong>Pflegekräfte ansehen</strong> – jederzeit möglich</td></tr>
-        <tr><td style="padding:5px 0;vertical-align:top;"><span style="display:inline-block;width:20px;height:20px;background:#B5A184;color:#fff;border-radius:50%;text-align:center;font-size:12px;font-weight:700;line-height:20px;">2</span></td>
-          <td style="padding:5px 0;font-size:14px;color:#444;line-height:1.55;"><strong>Patientendaten vervollständigen</strong> – damit die Pflegekräfte den konkreten Pflegebedarf kennen. Voraussetzung für den nächsten Schritt.</td></tr>
-        <tr><td style="padding:5px 0;vertical-align:top;"><span style="display:inline-block;width:20px;height:20px;background:#B5A184;color:#fff;border-radius:50%;text-align:center;font-size:12px;font-weight:700;line-height:20px;">3</span></td>
-          <td style="padding:5px 0;font-size:14px;color:#444;line-height:1.55;"><strong>Wunsch-Pflegekräfte einladen &amp; Bewerbungen erhalten</strong> – sobald die Patientendaten vollständig sind</td></tr>
-      </table>
-      
-    <table role="presentation" cellpadding="0" cellspacing="0" border="0" align="center" style="margin:8px auto;border-collapse:separate;">
+      <!-- Reihe 1: Tagessatz | Monatssatz -->
       <tr>
-        <td align="center" bgcolor="#2A9D5C" style="background-color:#2A9D5C;border-radius:8px;padding:13px 34px;">
-          <a href="https://kundenportal.primundus.de/?token=demo" target="_blank" style="color:#ffffff;text-decoration:none;font-weight:600;font-size:15px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;line-height:1.4;">Angebot und Pflegekräfte anzeigen →</a>
+        <td class="price-stage-cell" style="width:50%;padding:22px 24px 18px;border-right:1px solid #ebe2d2;vertical-align:top;">
+          <p class="label" style="margin:0 0 8px;">Tagessatz</p>
+          <p style="margin:0 0 4px;font-size:26px;font-weight:700;color:#2D1F0F;line-height:1.15;">95&nbsp;&euro;<span style="font-size:14px;font-weight:500;color:#9a8a73;"> / Tag</span></p>
+          <p style="margin:0;font-size:12px;color:#9a8a73;line-height:1.5;">inkl. Steuern &amp; Sozialabgaben</p>
+        </td>
+        <td class="price-stage-cell" style="width:50%;padding:22px 24px 18px;vertical-align:top;">
+          <p class="label" style="margin:0 0 8px;">Monatssatz</p>
+          <p style="margin:0 0 4px;font-size:26px;font-weight:700;color:#2D1F0F;line-height:1.15;">2.850&nbsp;&euro;<span style="font-size:14px;font-weight:500;color:#9a8a73;"> / Monat</span></p>
+          <p style="margin:0;font-size:12px;color:#9a8a73;line-height:1.5;">rechn. Eigenanteil ca. 1.623&nbsp;&euro;</p>
+        </td>
+      </tr>
+
+      <!-- Reihe 2: Zusatzkosten-Hinweise -->
+      <tr>
+        <td colspan="2" style="padding:14px 24px 16px;border-top:1px solid #ebe2d2;">
+          <p style="margin:0;font-size:13px;line-height:1.7;color:#666;">
+            zzgl. ca. 125&nbsp;&euro; Anreise- und Abreisekosten je Strecke sowie Kost und Logis.
+          </p>
+        </td>
+      </tr>
+
+      <!-- Reihe 3: Trust-Statement -->
+      <tr>
+        <td colspan="2" style="padding:16px 24px 16px;border-top:1px solid #ebe2d2;">
+          <p class="label" style="margin:0 0 6px;color:#2A9D5C;">100&thinsp;% risikofrei</p>
+          <p style="margin:0;font-size:14px;line-height:1.65;color:#2D1F0F;">
+            Bei Primundus zahlen Sie <strong>tagesgenau</strong>, ohne Vertragsbindung. Kosten entstehen erst, wenn Ihre Pflegekraft vor Ort ist &mdash; bis dahin bleibt alles f&uuml;r Sie unverbindlich.
+          </p>
+        </td>
+      </tr>
+
+      <!-- Reihe 4: Bestpreis-Garantie -->
+      <tr>
+        <td colspan="2" style="padding:16px 24px 20px;border-top:1px solid #ebe2d2;">
+          <p class="label" style="margin:0 0 6px;color:#B8860B;">Bestpreis-Garantie</p>
+          <p style="margin:0 0 6px;font-size:14px;line-height:1.65;color:#2D1F0F;">
+            Finden Sie bei vergleichbarer Leistung ein g&uuml;nstigeres Angebot? <strong>Wir unterbieten es.</strong>
+          </p>
+          <p style="margin:0;font-size:14px;line-height:1.65;color:#2D1F0F;">
+            Als <strong>Direktanbieter ohne Vermittler</strong> sparen wir Provisionen &mdash; und reichen das an Sie weiter.
+          </p>
+        </td>
+      </tr>
+
+    </table>
+
+    <!-- CTA — direkt unter dem Angebot, wo der Kunde entscheidet -->
+    <!--[if mso]>
+    <table role="presentation" cellpadding="0" cellspacing="0" border="0" align="center"><tr><td>
+    <![endif]-->
+    <table role="presentation" cellpadding="0" cellspacing="0" border="0" align="center" style="margin:8px auto 30px;border-collapse:separate;">
+      <tr>
+        <td align="center" bgcolor="#2A9D5C" style="background-color:#2A9D5C;background-image:linear-gradient(180deg,#34B36C 0%,#2A9D5C 100%);border-radius:10px;padding:17px 44px;box-shadow:0 2px 6px rgba(42,157,92,0.25);">
+          <a href="https://kundenportal.primundus.de/?token=demo" target="_blank" style="color:#ffffff;text-decoration:none;font-weight:600;font-size:16px;letter-spacing:0.01em;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;line-height:1.4;">Angebot &amp; Pflegekr&auml;fte ansehen&nbsp;&nbsp;&rarr;</a>
         </td>
       </tr>
     </table>
-    </div>
+    <!--[if mso]>
+    </td></tr></table>
+    <![endif]-->
 
-    <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="margin:0 0 22px 0;border:1px solid #e8ddd0;border-radius:8px;overflow:hidden;">
+    <!-- So geht es weiter — reiner Fließtext, keine Box -->
+    <p style="font-size:15px;line-height:1.75;color:#2D1F0F;margin:0 0 16px;"><strong>So geht es weiter:</strong></p>
+
+    <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="margin:0 0 26px;">
       <tr>
-        <td style="background:#f9f6f2;padding:6px 20px;border-bottom:1px solid #e8ddd0;">
-          <p style="margin:0;font-size:11px;font-weight:700;letter-spacing:0.08em;color:#9a8a73;text-transform:uppercase;">Ihre Angaben im Überblick</p>
+        <td style="vertical-align:top;width:34px;padding:0 12px 14px 0;">
+          <table cellpadding="0" cellspacing="0" role="presentation"><tr>
+            <td width="26" height="26" align="center" valign="middle" bgcolor="#8B7355" style="background-color:#8B7355;border-radius:50%;color:#ffffff;font-size:13px;font-weight:700;line-height:26px;text-align:center;">1</td>
+          </tr></table>
+        </td>
+        <td style="vertical-align:top;padding:0 0 14px 0;">
+          <p style="margin:0 0 2px;font-size:15px;font-weight:700;color:#2D1F0F;line-height:1.4;">Angebot und erste Pflegekr&auml;fte ansehen</p>
+          <p style="margin:0;font-size:14px;line-height:1.6;color:#555;">Im Portal finden Sie Ihr Angebot im Detail sowie erste passende Pflegekr&auml;fte mit Profil, Erfahrung und Sprachkenntnissen.</p>
         </td>
       </tr>
       <tr>
-        <td style="padding:4px 20px 8px;">
-          <table width="100%" cellpadding="0" cellspacing="0"><tr>
-      <td style="padding:8px 0;border-bottom:1px solid #f0ebe4;color:#888;font-size:13px;width:44%;">Name</td>
-      <td style="padding:8px 0;border-bottom:1px solid #f0ebe4;color:#333;font-size:13px;font-weight:600;">Frau Petra Wendt</td>
-    </tr><tr>
-      <td style="padding:8px 0;border-bottom:1px solid #f0ebe4;color:#888;font-size:13px;width:44%;">E-Mail</td>
-      <td style="padding:8px 0;border-bottom:1px solid #f0ebe4;color:#333;font-size:13px;font-weight:600;">kunde@example.com</td>
-    </tr><tr>
-      <td style="padding:8px 0;border-bottom:1px solid #f0ebe4;color:#888;font-size:13px;width:44%;">Telefon</td>
-      <td style="padding:8px 0;border-bottom:1px solid #f0ebe4;color:#333;font-size:13px;font-weight:600;">089 12345678</td>
-    </tr><tr>
-      <td style="padding:8px 0;border-bottom:1px solid #f0ebe4;color:#888;font-size:13px;width:44%;">Betreuung für</td>
-      <td style="padding:8px 0;border-bottom:1px solid #f0ebe4;color:#333;font-size:13px;font-weight:600;">1 Person</td>
-    </tr><tr>
-      <td style="padding:8px 0;border-bottom:1px solid #f0ebe4;color:#888;font-size:13px;width:44%;">Weitere Person im Haushalt</td>
-      <td style="padding:8px 0;border-bottom:1px solid #f0ebe4;color:#333;font-size:13px;font-weight:600;">Nein</td>
-    </tr><tr>
-      <td style="padding:8px 0;border-bottom:1px solid #f0ebe4;color:#888;font-size:13px;width:44%;">Pflegegrad</td>
-      <td style="padding:8px 0;border-bottom:1px solid #f0ebe4;color:#333;font-size:13px;font-weight:600;">Pflegegrad 3</td>
-    </tr><tr>
-      <td style="padding:8px 0;border-bottom:1px solid #f0ebe4;color:#888;font-size:13px;width:44%;">Mobilität</td>
-      <td style="padding:8px 0;border-bottom:1px solid #f0ebe4;color:#333;font-size:13px;font-weight:600;">Eingeschränkt – Rollator</td>
-    </tr><tr>
-      <td style="padding:8px 0;border-bottom:1px solid #f0ebe4;color:#888;font-size:13px;width:44%;">Nachteinsätze</td>
-      <td style="padding:8px 0;border-bottom:1px solid #f0ebe4;color:#333;font-size:13px;font-weight:600;">Nein</td>
-    </tr><tr>
-      <td style="padding:8px 0;border-bottom:1px solid #f0ebe4;color:#888;font-size:13px;width:44%;">Deutschkenntnisse BK</td>
-      <td style="padding:8px 0;border-bottom:1px solid #f0ebe4;color:#333;font-size:13px;font-weight:600;">Gut</td>
-    </tr><tr>
-      <td style="padding:8px 0;border-bottom:1px solid #f0ebe4;color:#888;font-size:13px;width:44%;">Führerschein BK</td>
-      <td style="padding:8px 0;border-bottom:1px solid #f0ebe4;color:#333;font-size:13px;font-weight:600;">Ja</td>
-    </tr><tr>
-      <td style="padding:8px 0;border-bottom:1px solid #f0ebe4;color:#888;font-size:13px;width:44%;">Geschlecht BK</td>
-      <td style="padding:8px 0;border-bottom:1px solid #f0ebe4;color:#333;font-size:13px;font-weight:600;">Weiblich</td>
-    </tr><tr>
-      <td style="padding:8px 0;color:#888;font-size:13px;width:44%;">Betreuungsstart</td>
-      <td style="padding:8px 0;color:#333;font-size:13px;font-weight:600;">Sofort (4–7 Tage)</td>
-    </tr></table>
+        <td style="vertical-align:top;width:34px;padding:0 12px 14px 0;">
+          <table cellpadding="0" cellspacing="0" role="presentation"><tr>
+            <td width="26" height="26" align="center" valign="middle" bgcolor="#8B7355" style="background-color:#8B7355;border-radius:50%;color:#ffffff;font-size:13px;font-weight:700;line-height:26px;text-align:center;">2</td>
+          </tr></table>
+        </td>
+        <td style="vertical-align:top;padding:0 0 14px 0;">
+          <p style="margin:0 0 2px;font-size:15px;font-weight:700;color:#2D1F0F;line-height:1.4;">Patientendaten erg&auml;nzen</p>
+          <p style="margin:0;font-size:14px;line-height:1.6;color:#555;">Damit Pflegekr&auml;fte den konkreten Bedarf einsch&auml;tzen k&ouml;nnen. Dauert wenige Minuten.</p>
+        </td>
+      </tr>
+      <tr>
+        <td style="vertical-align:top;width:34px;padding:0 12px 14px 0;">
+          <table cellpadding="0" cellspacing="0" role="presentation"><tr>
+            <td width="26" height="26" align="center" valign="middle" bgcolor="#8B7355" style="background-color:#8B7355;border-radius:50%;color:#ffffff;font-size:13px;font-weight:700;line-height:26px;text-align:center;">3</td>
+          </tr></table>
+        </td>
+        <td style="vertical-align:top;padding:0 0 14px 0;">
+          <p style="margin:0 0 2px;font-size:15px;font-weight:700;color:#2D1F0F;line-height:1.4;">Wunsch-Pflegekr&auml;fte einladen</p>
+          <p style="margin:0;font-size:14px;line-height:1.6;color:#555;">Sobald Sie eingeladen haben, erhalten Sie konkrete Bewerbungen &mdash; mit Anreisedatum und Reisekosten.</p>
         </td>
       </tr>
     </table>
 
-    <div style="background:#EEF6F0;border-left:3px solid #4CAF50;padding:12px 14px;border-radius:0 6px 6px 0;font-size:14px;color:#555;line-height:1.6;">
-      Für Sie bleibt alles <strong>unverbindlich</strong>, bis Sie sich für eine passende Betreuungskraft entscheiden und diese anreist.
-    </div>
+    <!-- Ihre Angaben im Überblick -->
+    <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="margin:0 0 8px;border:1px solid #ebe2d2;border-radius:10px;overflow:hidden;">
 
-    <p style="font-size:13px;line-height:1.65;color:#777;margin:18px 0 0;border-top:1px solid #f0ebe4;padding-top:14px;"><strong style="color:#5C4A32;">P.S.</strong> Kennen Sie schon die <strong style="color:#2D1F0F;">Primundus-Bestpreis-Garantie?</strong> Als Direktanbieter ohne Vermittler-Provision bieten wir faire Preise — finden Sie bei vergleichbarer Leistung ein günstigeres Angebot, unterbieten wir es.</p>
-    
-    <p style="font-size:16px;line-height:1.7;color:#555;margin-top:24px;margin-bottom:16px;">Mit freundlichen Grüßen<br><strong style="color:#3D2B1F;">Ilka Wysocki</strong></p>
-    <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="margin:0 0 24px 0;border:1px solid #e8ddd0;border-radius:12px;overflow:hidden;">
+      <!-- Sektion: Pflegesituation & Anforderungen -->
+      <tr>
+        <td style="padding:12px 20px;background:#FAF8F4;border-bottom:1px solid #ebe2d2;">
+          <p class="label" style="margin:0;">Pflegesituation &amp; Anforderungen</p>
+        </td>
+      </tr>
+      <tr><td style="padding:14px 20px 16px;border-bottom:1px solid #ebe2d2;">
+        <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="font-size:14px;color:#555;line-height:1.7;">
+          <tr>
+            <td style="padding:4px 0;color:#888;width:55%;">Betreuung f&uuml;r</td>
+            <td style="padding:4px 0;color:#2D1F0F;font-weight:600;">1 Person</td>
+          </tr>
+          <tr>
+            <td style="padding:4px 0;color:#888;">Pflegegrad</td>
+            <td style="padding:4px 0;color:#2D1F0F;font-weight:600;">Pflegegrad 3</td>
+          </tr>
+          <tr>
+            <td style="padding:4px 0;color:#888;">Weitere Personen im Haushalt</td>
+            <td style="padding:4px 0;color:#2D1F0F;font-weight:600;">Ja</td>
+          </tr>
+          <tr>
+            <td style="padding:4px 0;color:#888;">Mobilit&auml;t</td>
+            <td style="padding:4px 0;color:#2D1F0F;font-weight:600;">Auf Rollstuhl angewiesen</td>
+          </tr>
+          <tr>
+            <td style="padding:4px 0;color:#888;">Nachteins&auml;tze erforderlich</td>
+            <td style="padding:4px 0;color:#2D1F0F;font-weight:600;">Mehrmals nachts</td>
+          </tr>
+          <tr>
+            <td style="padding:4px 0;color:#888;">Gew&uuml;nschter Start</td>
+            <td style="padding:4px 0;color:#2D1F0F;font-weight:600;">In 2&ndash;4 Wochen</td>
+          </tr>
+        </table>
+      </td></tr>
+
+      <!-- Sektion: Anforderungen an die Pflegekraft -->
+      <tr>
+        <td style="padding:12px 20px;background:#FAF8F4;border-bottom:1px solid #ebe2d2;">
+          <p class="label" style="margin:0;">Anforderungen an die Pflegekraft</p>
+        </td>
+      </tr>
+      <tr><td style="padding:14px 20px 16px;">
+        <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="font-size:14px;color:#555;line-height:1.7;">
+          <tr>
+            <td style="padding:4px 0;color:#888;width:55%;">Deutschkenntnisse</td>
+            <td style="padding:4px 0;color:#2D1F0F;font-weight:600;">Grundlegend</td>
+          </tr>
+          <tr>
+            <td style="padding:4px 0;color:#888;">Erfahrung</td>
+            <td style="padding:4px 0;color:#aaa;">nicht angegeben</td>
+          </tr>
+          <tr>
+            <td style="padding:4px 0;color:#888;">F&uuml;hrerschein</td>
+            <td style="padding:4px 0;color:#2D1F0F;font-weight:600;">Ja</td>
+          </tr>
+          <tr>
+            <td style="padding:4px 0;color:#888;">Geschlecht der Pflegekraft</td>
+            <td style="padding:4px 0;color:#2D1F0F;font-weight:600;">Egal</td>
+          </tr>
+        </table>
+      </td></tr>
+
+    </table>
+
+    <!-- Persönlicher Schlusssatz von Ilka -->
+    <p style="font-size:15px;line-height:1.75;color:#444;margin:30px 0 18px;">Wenn Sie Fragen haben oder Unterst&uuml;tzung m&ouml;chten &mdash; rufen Sie mich an, schreiben Sie mir per WhatsApp oder antworten Sie einfach auf diese E-Mail. Ich bin gerne f&uuml;r Sie da.</p>
+
+    <!-- Grüße + Signatur-Karte -->
+    <p style="font-size:16px;line-height:1.7;color:#555;margin:0 0 16px;">Mit freundlichen Gr&uuml;&szlig;en<br><strong style="color:#3D2B1F;">Ilka Wysocki</strong></p>
+
+    <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="margin:0 0 24px 0;border:1px solid #ebe2d2;border-radius:10px;overflow:hidden;">
       <tr>
         <td style="padding:18px 20px 16px;background:#ffffff;">
           <table width="100%" cellpadding="0" cellspacing="0" role="presentation">
@@ -166,7 +255,7 @@
                     <td style="vertical-align:middle;">
                       <p style="margin:0 0 2px;font-size:15px;font-weight:700;color:#3D2B1F;white-space:nowrap;">Ilka Wysocki</p>
                       <p style="margin:0 0 2px;font-size:13px;color:#555;white-space:nowrap;">Pflegeberaterin</p>
-                      <p style="margin:0;font-size:12px;color:#9a8a73;white-space:nowrap;">Mo – So, 8 – 20 Uhr</p>
+                      <p style="margin:0;font-size:12px;color:#9a8a73;white-space:nowrap;">Mo &ndash; So, 8 &ndash; 20 Uhr</p>
                     </td>
                   </tr>
                 </table>
@@ -180,12 +269,12 @@
                 </table>
               </td>
               <td style="vertical-align:top;text-align:right;">
-                <table cellpadding="0" cellspacing="0" role="presentation" style="border:1px solid #e8ddd0;border-radius:8px;overflow:hidden;margin-left:auto;">
+                <table cellpadding="0" cellspacing="0" role="presentation" style="border:1px solid #ebe2d2;border-radius:8px;overflow:hidden;margin-left:auto;">
                   <tr>
                     <td style="padding:8px 10px;background:#ffffff;text-align:center;vertical-align:top;">
                       <img src="https://kostenrechner.primundus.de/images/primundus_testsieger-2021.webp" alt="Testsieger DIE WELT" width="64" style="display:block;width:64px;height:auto;margin:0 auto 5px;" />
                       <p style="margin:0 0 1px;font-size:11px;font-weight:700;color:#3D2B1F;white-space:nowrap;">Testsieger <span style="color:#B5A184;">DIE WELT</span></p>
-                      <p style="margin:0;font-size:10px;color:#888;line-height:1.4;">Preis, Qualität &amp;<br>Kundenservice</p>
+                      <p style="margin:0;font-size:10px;color:#888;line-height:1.4;">Preis, Qualit&auml;t &amp;<br>Kundenservice</p>
                     </td>
                   </tr>
                 </table>
@@ -195,24 +284,24 @@
         </td>
       </tr>
       <tr>
-        <td style="background:#f9f6f2;border-top:1px solid #e8ddd0;">
+        <td style="background:#f9f6f2;border-top:1px solid #ebe2d2;">
           <table width="100%" cellpadding="0" cellspacing="0" role="presentation">
             <tr>
-              <td style="padding:12px 0;text-align:center;width:33%;border-right:1px solid #e8ddd0;">
-                <p style="margin:0;font-size:12px;color:#555;line-height:1.4;">Über 20 Jahre<br>Erfahrung</p>
+              <td style="padding:12px 0;text-align:center;width:33%;border-right:1px solid #ebe2d2;">
+                <p style="margin:0;font-size:12px;color:#555;line-height:1.4;">&Uuml;ber 20 Jahre<br>Erfahrung</p>
               </td>
-              <td style="padding:12px 0;text-align:center;width:33%;border-right:1px solid #e8ddd0;">
-                <p style="margin:0;font-size:12px;color:#555;line-height:1.4;">60.000+<br>betreute Einsätze</p>
+              <td style="padding:12px 0;text-align:center;width:33%;border-right:1px solid #ebe2d2;">
+                <p style="margin:0;font-size:12px;color:#555;line-height:1.4;">60.000&#43;<br>betreute Eins&auml;tze</p>
               </td>
               <td style="padding:12px 0;text-align:center;width:33%;">
-                <p style="margin:0;font-size:12px;color:#555;line-height:1.4;">Persönlicher<br>Ansprechpartner,<br>7&nbsp;Tage/Woche</p>
+                <p style="margin:0;font-size:12px;color:#555;line-height:1.4;">Pers&ouml;nlicher<br>Ansprechpartner,<br>7&nbsp;Tage/Woche</p>
               </td>
             </tr>
           </table>
         </td>
       </tr>
       <tr>
-        <td style="background:#ffffff;border-top:1px solid #e8ddd0;padding:12px 16px;">
+        <td style="background:#ffffff;border-top:1px solid #ebe2d2;padding:12px 16px;">
           <table width="100%" cellpadding="0" cellspacing="0" role="presentation"><tr>
             <td style="text-align:center;vertical-align:middle;padding:0 4px;"><img src="https://kostenrechner.primundus.de/images/media/die-welt.webp" alt="DIE WELT" height="14" style="display:inline-block;height:14px;width:auto;opacity:0.4;filter:grayscale(100%);" /></td>
             <td style="text-align:center;vertical-align:middle;padding:0 4px;"><img src="https://kostenrechner.primundus.de/images/media/frankfurter-allgemeine.webp" alt="FAZ" height="14" style="display:inline-block;height:14px;width:auto;opacity:0.4;filter:grayscale(100%);" /></td>
@@ -224,24 +313,28 @@
         </td>
       </tr>
     </table>
-          </div>
-          <div class="email-footer">
-            <div style="font-weight:600;font-size:15px;color:#3D2B1F;margin-bottom:6px;">Primundus Deutschland</div>
-            <div style="font-size:13px;color:#666;line-height:1.8;">
-              24h-Pflege und Betreuung zu Hause<br>
-              <a href="tel:+4989200000830" style="color:#0066CC;text-decoration:none;">+49 89 200 000 830</a> |
-              <a href="mailto:info@primundus.de" style="color:#0066CC;text-decoration:none;">info@primundus.de</a><br>
-              <a href="https://primundus.de" style="color:#0066CC;text-decoration:none;">www.primundus.de</a>
-            </div>
-            <div style="font-size:12px;color:#999;margin-top:16px;line-height:1.5;">
-              Diese E-Mail wurde versendet an: kunde@example.com<br>
-              Primundus Deutschland | Vitanas Group<br><br>
-              Sie erhalten diese E-Mail, weil Sie eine Kalkulation auf primundus.de angefordert haben.
-            </div>
-          </div>
-        </div>
-      </td></tr>
-    </table>
+
   </div>
+
+  <!-- FOOTER -->
+  <div class="email-footer">
+    <div style="font-weight:600;font-size:15px;color:#3D2B1F;margin-bottom:6px;">Primundus Deutschland</div>
+    <div style="font-size:13px;color:#666;line-height:1.8;">
+      24h-Pflege und Betreuung zu Hause<br>
+      <a href="tel:+4989200000830" style="color:#0066CC;text-decoration:none;">+49 89 200 000 830</a> |
+      <a href="mailto:info@primundus.de" style="color:#0066CC;text-decoration:none;">info@primundus.de</a><br>
+      <a href="https://primundus.de" style="color:#0066CC;text-decoration:none;">www.primundus.de</a>
+    </div>
+    <div style="font-size:12px;color:#999;margin-top:16px;line-height:1.5;">
+      Diese E-Mail wurde versendet an: kunde@example.com<br>
+      Primundus Deutschland | Vitanas Group<br><br>
+      Sie erhalten diese E-Mail, weil Sie eine Kalkulation auf primundus.de angefordert haben.
+    </div>
+  </div>
+
+</div>
+</td></tr>
+</table>
+</div>
 </body>
 </html>

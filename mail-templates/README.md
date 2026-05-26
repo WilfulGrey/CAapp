@@ -69,7 +69,7 @@ Die Betreff-Zeilen werden im Code gesetzt, nicht im HTML — hier zum Mitbearbei
 
 | Datei | Subject |
 |-------|---------|
-| 01 Eingangsbestätigung | Ihr persönliches Angebot zur 24-Stunden-Betreuung – Primundus *(Resubmit: „Ihr aktualisiertes Angebot zur 24-Stunden-Betreuung – Primundus")* |
+| 01 Eingangsbestätigung | Ihr Angebot zur 24-Stunden-Betreuung – Primundus *(Resubmit: „Ihr aktualisiertes Angebot zur 24-Stunden-Betreuung – Primundus")* |
 | 02 Nachfass 1 | AW: Kurze Rückfrage zu Ihrem Angebot |
 | 03 Nachfass 2 | Brauchen Sie noch Hilfe? |
 | 04 Nachfass 3 | Eine letzte Frage — wie schaut's bei Ihnen aus? |

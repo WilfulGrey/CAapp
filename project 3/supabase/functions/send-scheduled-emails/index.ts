@@ -118,6 +118,8 @@ function buildEmailWrapper(lead: Lead, siteUrl: string, content: string): string
     .email-footer { background-color: #f8f9fa; padding: 30px; text-align: center; border-top: 1px solid #e0e0e0; }
     @media only screen and (max-width: 600px) {
       .email-content { padding: 30px 20px; }
+      .price-stage-cell { display: block !important; width: 100% !important; padding: 18px 22px 16px !important; border-right: none !important; border-bottom: 1px solid #ebe2d2 !important; }
+      .price-stage-cell:last-child { border-bottom: none !important; }
     }
   </style>
 </head>
@@ -621,119 +623,137 @@ function buildEingangsbestaetigungHtml(lead: Lead, siteUrl: string, portalBase: 
   const fd = (lead.kalkulation as any)?.formularDaten || {};
   const careStartTiming = (lead as any).care_start_timing || "";
 
-  const betreuungFuer = eingangsLabel("betreuung_fuer", fd.betreuung_fuer);
-  const pflegegrad = fd.pflegegrad ? `Pflegegrad ${fd.pflegegrad}` : "Nicht angegeben";
-  const weiterePersonen = eingangsLabel("weitere_personen", fd.weitere_personen);
-  const mobilitaet = eingangsLabel("mobilitaet", fd.mobilitaet);
-  const nachteinsaetze = eingangsLabel("nachteinsaetze", fd.nachteinsaetze);
-  const deutschkenntnisse = eingangsLabel("deutschkenntnisse", fd.deutschkenntnisse);
-  const fuehrerschein = eingangsLabel("fuehrerschein", fd.fuehrerschein);
-  const geschlecht = eingangsLabel("geschlecht", fd.geschlecht);
-  const careStart = eingangsLabel("care_start_timing", careStartTiming);
-
-  type Row = [string, string];
-  const rows: Row[] = [
-    ["Name", [lead.anrede_text, lead.vorname, lead.nachname].filter(Boolean).join(" ") || "Nicht angegeben"],
-    ["E-Mail", lead.email],
-  ];
-  if ((lead as any).telefon) rows.push(["Telefon", (lead as any).telefon]);
-  rows.push(
-    ["Betreuung für", betreuungFuer],
-    ["Weitere Person im Haushalt", weiterePersonen],
-    ["Pflegegrad", pflegegrad],
-    ["Mobilität", mobilitaet],
-    ["Nachteinsätze", nachteinsaetze],
-    ["Deutschkenntnisse BK", deutschkenntnisse],
-  );
-  if (fd.fuehrerschein) rows.push(["Führerschein BK", fuehrerschein]);
-  if (fd.geschlecht) rows.push(["Geschlecht BK", geschlecht]);
-  rows.push(["Betreuungsstart", careStart]);
-
-  const rowsHtml = rows.map(([label, value], i) => {
-    const isLast = i === rows.length - 1;
-    const border = isLast ? "" : "border-bottom:1px solid #f0ebe4;";
-    return `<tr>
-      <td style="padding:8px 0;${border}color:#888;font-size:13px;width:44%;">${label}</td>
-      <td style="padding:8px 0;${border}color:#333;font-size:13px;font-weight:600;">${value}</td>
-    </tr>`;
-  }).join("");
-
-  // Preis aus der Kalkulation (gleiche Box wie früher die separate Angebots-Mail).
+  // Preis aus der Kalkulation (eigene DB). Tagessatz = Monatssatz / 30.
   const kalk = lead.kalkulation || {};
   const bruttopreis = kalk.bruttopreis || 0;
   const gesamteZuschuesse = kalk.zuschüsse?.gesamt || 0;
   const eigenanteil = kalk.eigenanteil || (bruttopreis - gesamteZuschuesse);
-  const formatEuro = (n: number) => n.toLocaleString("de-DE", { minimumFractionDigits: 0, maximumFractionDigits: 0 }) + " €";
-
-  const priceBox = bruttopreis > 0 ? `
-    <div style="background:#FAF7F0;border:1.5px solid #B5A184;border-radius:8px;padding:12px 14px;margin:18px 0;">
-      <table width="100%" cellpadding="0" cellspacing="0" role="presentation">
-        <tr>
-          <td style="vertical-align:top;padding-right:8px;">
-            <div style="font-size:9px;text-transform:uppercase;letter-spacing:.07em;color:#8B6914;margin-bottom:2px;">Monatssatz</div>
-            <div style="font-size:17px;font-weight:700;color:#2D1F0F;">${formatEuro(bruttopreis)}</div>
-            <div style="font-size:10px;color:#aaa;">inkl. Steuern &amp; Sozialabgaben</div>
-          </td>
-          <td style="vertical-align:top;text-align:right;border-left:1px solid #e8d9a0;padding-left:12px;">
-            <div style="font-size:9px;text-transform:uppercase;letter-spacing:.07em;color:#8B6914;margin-bottom:2px;">Eigenanteil möglich</div>
-            <div style="font-size:16px;font-weight:700;color:#1E5C3A;">${formatEuro(eigenanteil)}</div>
-            <div style="font-size:10px;color:#aaa;">nach Pflegekasse</div>
-          </td>
-        </tr>
-      </table>
-    </div>` : "";
+  const tagessatz = bruttopreis > 0 ? Math.round(bruttopreis / 30) : 0;
+  const fmt = (n: number) => n.toLocaleString("de-DE", { minimumFractionDigits: 0, maximumFractionDigits: 0 });
 
   const portalUrl = (portalBase && lead.token) ? buildPortalUrl(portalBase, lead.token) : "";
-  const portalBlock = portalUrl ? `
-    <div style="background:#FAF8F4;border:1px solid #e8ddd0;border-radius:8px;padding:18px 20px;margin:0 0 22px 0;">
-      <p style="margin:0 0 12px 0;font-size:14px;color:#555;line-height:1.6;">In Ihrem <strong style="color:#2D1F0F;">Kundenportal</strong> sehen Sie die vorgeschlagenen Pflegekräfte mit Profil und Erfahrung. So geht es weiter:</p>
-      <table width="100%" cellpadding="0" cellspacing="0" role="presentation">
-        <tr><td style="padding:5px 0;vertical-align:top;width:26px;"><span style="display:inline-block;width:20px;height:20px;background:#B5A184;color:#fff;border-radius:50%;text-align:center;font-size:12px;font-weight:700;line-height:20px;">1</span></td>
-          <td style="padding:5px 0;font-size:14px;color:#444;line-height:1.55;"><strong>Pflegekräfte ansehen</strong> – jederzeit möglich</td></tr>
-        <tr><td style="padding:5px 0;vertical-align:top;"><span style="display:inline-block;width:20px;height:20px;background:#B5A184;color:#fff;border-radius:50%;text-align:center;font-size:12px;font-weight:700;line-height:20px;">2</span></td>
-          <td style="padding:5px 0;font-size:14px;color:#444;line-height:1.55;"><strong>Patientendaten vervollständigen</strong> – damit die Pflegekräfte den konkreten Pflegebedarf kennen. Voraussetzung für den nächsten Schritt.</td></tr>
-        <tr><td style="padding:5px 0;vertical-align:top;"><span style="display:inline-block;width:20px;height:20px;background:#B5A184;color:#fff;border-radius:50%;text-align:center;font-size:12px;font-weight:700;line-height:20px;">3</span></td>
-          <td style="padding:5px 0;font-size:14px;color:#444;line-height:1.55;"><strong>Wunsch-Pflegekräfte einladen &amp; Bewerbungen erhalten</strong> – sobald die Patientendaten vollständig sind</td></tr>
-      </table>
-      ${bulletproofButton(portalUrl, "Angebot und Pflegekräfte anzeigen →")}
-    </div>` : "";
+  const ctaUrl = portalUrl || siteUrl;
 
-  const introParagraph = isResubmit
-    ? `vielen Dank für Ihre erneute Anfrage. Wir haben Ihre aktualisierten Angaben übernommen und Ihr <strong style="color:#2D1F0F;">persönliches Angebot</strong> entsprechend angepasst – inklusive passender Pflegekräfte, die wir für Sie ausgewählt haben.`
-    : `vielen Dank für Ihre Anfrage. Auf Grundlage Ihrer Angaben haben wir Ihr <strong style="color:#2D1F0F;">persönliches Angebot</strong> für die 24-Stunden-Betreuung zu Hause erstellt – inklusive passender Pflegekräfte, die wir bereits für Sie ausgewählt haben.`;
+  // Wiederverwendbares Label-Styling (Preis-Bühne + Angaben-Sektionen).
+  const psLabel = "font-size:11px;font-weight:700;color:#9a8a73;letter-spacing:.08em;text-transform:uppercase;";
 
-  const content = `
-    <p style="font-size:15px;line-height:1.75;color:#444;margin-bottom:14px;">${greeting},</p>
-    <p style="font-size:15px;line-height:1.75;color:#444;margin-bottom:14px;">${introParagraph}</p>
-
-    ${priceBox}
-
-    <div style="font-size:12px;color:#888;line-height:1.8;margin:0 0 18px;text-align:center;">
-      <span style="color:#2D6A4F;font-weight:600;">✓ Keine Vertragsbindung</span>&ensp;&middot;&ensp;
-      <span style="color:#2D6A4F;font-weight:600;">✓ Tagesgenaue Abrechnung</span>&ensp;&middot;&ensp;
-      <span style="color:#2D6A4F;font-weight:600;">✓ Kosten erst bei Anreise</span>
-    </div>
-
-    ${portalBlock}
-
-    <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="margin:0 0 22px 0;border:1px solid #e8ddd0;border-radius:8px;overflow:hidden;">
+  // ── Preis-Bühne: Preise + Trust + Bestpreis in einer Klammer ──────────────
+  const priceRows = bruttopreis > 0 ? `
       <tr>
-        <td style="background:#f9f6f2;padding:6px 20px;border-bottom:1px solid #e8ddd0;">
-          <p style="margin:0;font-size:11px;font-weight:700;letter-spacing:0.08em;color:#9a8a73;text-transform:uppercase;">Ihre Angaben im Überblick</p>
+        <td class="price-stage-cell" style="width:50%;padding:22px 24px 18px;border-right:1px solid #ebe2d2;vertical-align:top;">
+          <p style="margin:0 0 8px;${psLabel}">Tagessatz</p>
+          <p style="margin:0 0 4px;font-size:26px;font-weight:700;color:#2D1F0F;line-height:1.15;">${fmt(tagessatz)}&nbsp;€<span style="font-size:14px;font-weight:500;color:#9a8a73;"> / Tag</span></p>
+          <p style="margin:0;font-size:12px;color:#9a8a73;line-height:1.5;">inkl. Steuern &amp; Sozialabgaben</p>
+        </td>
+        <td class="price-stage-cell" style="width:50%;padding:22px 24px 18px;vertical-align:top;">
+          <p style="margin:0 0 8px;${psLabel}">Monatssatz</p>
+          <p style="margin:0 0 4px;font-size:26px;font-weight:700;color:#2D1F0F;line-height:1.15;">${fmt(bruttopreis)}&nbsp;€<span style="font-size:14px;font-weight:500;color:#9a8a73;"> / Monat</span></p>
+          <p style="margin:0;font-size:12px;color:#9a8a73;line-height:1.5;">rechn. Eigenanteil ca. ${fmt(eigenanteil)}&nbsp;€</p>
         </td>
       </tr>
       <tr>
-        <td style="padding:4px 20px 8px;">
-          <table width="100%" cellpadding="0" cellspacing="0">${rowsHtml}</table>
+        <td colspan="2" style="padding:14px 24px 16px;border-top:1px solid #ebe2d2;">
+          <p style="margin:0;font-size:13px;line-height:1.7;color:#666;">zzgl. ca. 125&nbsp;€ Anreise- und Abreisekosten je Strecke sowie Kost und Logis.</p>
+        </td>
+      </tr>` : "";
+
+  const priceStage = `
+    <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="margin:0 0 28px;background:#FAF8F4;border-radius:10px;overflow:hidden;">
+      ${priceRows}
+      <tr>
+        <td colspan="2" style="padding:16px 24px 16px;${bruttopreis > 0 ? "border-top:1px solid #ebe2d2;" : ""}">
+          <p style="margin:0 0 6px;${psLabel}color:#2A9D5C;">100&thinsp;% risikofrei</p>
+          <p style="margin:0;font-size:14px;line-height:1.65;color:#2D1F0F;">Bei Primundus zahlen Sie <strong>tagesgenau</strong>, ohne Vertragsbindung. Kosten entstehen erst, wenn Ihre Pflegekraft vor Ort ist — bis dahin bleibt alles für Sie unverbindlich.</p>
+        </td>
+      </tr>
+      <tr>
+        <td colspan="2" style="padding:16px 24px 20px;border-top:1px solid #ebe2d2;">
+          <p style="margin:0 0 6px;${psLabel}color:#B8860B;">Bestpreis-Garantie</p>
+          <p style="margin:0 0 6px;font-size:14px;line-height:1.65;color:#2D1F0F;">Finden Sie bei vergleichbarer Leistung ein günstigeres Angebot? <strong>Wir unterbieten es.</strong></p>
+          <p style="margin:0;font-size:14px;line-height:1.65;color:#2D1F0F;">Als <strong>Direktanbieter ohne Vermittler</strong> sparen wir Provisionen — und reichen das an Sie weiter.</p>
+        </td>
+      </tr>
+    </table>`;
+
+  // ── "So geht es weiter" — 3 Schritte ──────────────────────────────────────
+  const stepRow = (n: string, title: string, desc: string, last = false) => `
+      <tr>
+        <td style="vertical-align:top;width:34px;padding:0 12px ${last ? "0" : "14px"} 0;">
+          <table cellpadding="0" cellspacing="0" role="presentation"><tr>
+            <td width="26" height="26" align="center" valign="middle" bgcolor="#8B7355" style="background-color:#8B7355;border-radius:50%;color:#ffffff;font-size:13px;font-weight:700;line-height:26px;text-align:center;">${n}</td>
+          </tr></table>
+        </td>
+        <td style="vertical-align:top;padding:0 0 ${last ? "0" : "14px"} 0;">
+          <p style="margin:0 0 2px;font-size:15px;font-weight:700;color:#2D1F0F;line-height:1.4;">${title}</p>
+          <p style="margin:0;font-size:14px;line-height:1.6;color:#555;">${desc}</p>
+        </td>
+      </tr>`;
+
+  const stepsTable = `
+    <p style="font-size:15px;line-height:1.75;color:#2D1F0F;margin:0 0 16px;"><strong>So geht es weiter:</strong></p>
+    <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="margin:0 0 26px;">
+      ${stepRow("1", "Angebot und erste Pflegekräfte ansehen", "Im Portal finden Sie Ihr Angebot im Detail sowie erste passende Pflegekräfte mit Profil, Erfahrung und Sprachkenntnissen.")}
+      ${stepRow("2", "Patientendaten ergänzen", "Damit Pflegekräfte den konkreten Bedarf einschätzen können. Dauert wenige Minuten.")}
+      ${stepRow("3", "Wunsch-Pflegekräfte einladen", "Sobald Sie eingeladen haben, erhalten Sie konkrete Bewerbungen — mit Anreisedatum und Reisekosten.", true)}
+    </table>`;
+
+  // ── CTA-Button (Gradient + Schatten, mit Outlook-Fallback) ────────────────
+  const cta = `
+    <!--[if mso]><table role="presentation" cellpadding="0" cellspacing="0" border="0" align="center"><tr><td><![endif]-->
+    <table role="presentation" cellpadding="0" cellspacing="0" border="0" align="center" style="margin:8px auto 30px;border-collapse:separate;">
+      <tr>
+        <td align="center" bgcolor="#2A9D5C" style="background-color:#2A9D5C;background-image:linear-gradient(180deg,#34B36C 0%,#2A9D5C 100%);border-radius:10px;padding:17px 44px;box-shadow:0 2px 6px rgba(42,157,92,0.25);">
+          <a href="${ctaUrl}" target="_blank" style="color:#ffffff;text-decoration:none;font-weight:600;font-size:16px;letter-spacing:0.01em;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;line-height:1.4;">Angebot &amp; Pflegekräfte ansehen&nbsp;&nbsp;→</a>
         </td>
       </tr>
     </table>
+    <!--[if mso]></td></tr></table><![endif]-->`;
 
-    <div style="background:#EEF6F0;border-left:3px solid #4CAF50;padding:12px 14px;border-radius:0 6px 6px 0;font-size:14px;color:#555;line-height:1.6;">
-      Für Sie bleibt alles <strong>unverbindlich</strong>, bis Sie sich für eine passende Betreuungskraft entscheiden und diese anreist.
-    </div>
+  // ── Angaben im Überblick — zwei Sektionen, null-Werte ausgeblendet ────────
+  const kvRow = (label: string, value: string) =>
+    `<tr><td style="padding:4px 0;color:#888;width:55%;">${label}</td><td style="padding:4px 0;color:#2D1F0F;font-weight:600;">${value}</td></tr>`;
 
-    ${bestpreisPsHtml()}
+  const section1 = [
+    kvRow("Betreuung für", eingangsLabel("betreuung_fuer", fd.betreuung_fuer)),
+    kvRow("Pflegegrad", fd.pflegegrad ? `Pflegegrad ${fd.pflegegrad}` : "Nicht angegeben"),
+    kvRow("Weitere Personen im Haushalt", eingangsLabel("weitere_personen", fd.weitere_personen)),
+    kvRow("Mobilität", eingangsLabel("mobilitaet", fd.mobilitaet)),
+    kvRow("Nachteinsätze erforderlich", eingangsLabel("nachteinsaetze", fd.nachteinsaetze)),
+    kvRow("Gewünschter Start", eingangsLabel("care_start_timing", careStartTiming)),
+  ].join("");
+
+  const section2Parts = [kvRow("Deutschkenntnisse", eingangsLabel("deutschkenntnisse", fd.deutschkenntnisse))];
+  if (fd.erfahrung) section2Parts.push(kvRow("Erfahrung", eingangsLabel("erfahrung", fd.erfahrung)));
+  if (fd.fuehrerschein) section2Parts.push(kvRow("Führerschein", eingangsLabel("fuehrerschein", fd.fuehrerschein)));
+  section2Parts.push(kvRow("Geschlecht der Pflegekraft", fd.geschlecht ? eingangsLabel("geschlecht", fd.geschlecht) : "Egal"));
+  const section2 = section2Parts.join("");
+
+  const angabenTable = `
+    <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="margin:0 0 8px;border:1px solid #ebe2d2;border-radius:10px;overflow:hidden;">
+      <tr><td style="padding:12px 20px;background:#FAF8F4;border-bottom:1px solid #ebe2d2;"><p style="margin:0;${psLabel}">Pflegesituation &amp; Anforderungen</p></td></tr>
+      <tr><td style="padding:14px 20px 16px;border-bottom:1px solid #ebe2d2;"><table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="font-size:14px;color:#555;line-height:1.7;">${section1}</table></td></tr>
+      <tr><td style="padding:12px 20px;background:#FAF8F4;border-bottom:1px solid #ebe2d2;"><p style="margin:0;${psLabel}">Anforderungen an die Pflegekraft</p></td></tr>
+      <tr><td style="padding:14px 20px 16px;"><table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="font-size:14px;color:#555;line-height:1.7;">${section2}</table></td></tr>
+    </table>`;
+
+  const introParagraph = isResubmit
+    ? `vielen Dank für Ihre erneute Anfrage. Wir haben Ihre aktualisierten Angaben übernommen und Ihr <strong style="color:#2D1F0F;">Angebot für die 24-Stunden-Betreuung zu Hause</strong> entsprechend angepasst. Im Kundenportal warten bereits Pflegekräfte, die zu Ihrem Bedarf passen.`
+    : `vielen Dank für Ihre Anfrage. Auf Basis Ihrer Angaben haben wir Ihr <strong style="color:#2D1F0F;">Angebot für die 24-Stunden-Betreuung zu Hause</strong> erstellt. Im Kundenportal warten bereits Pflegekräfte, die zu Ihrem Bedarf passen.`;
+
+  const content = `
+    <p style="font-size:15px;line-height:1.75;color:#444;margin-bottom:14px;">${greeting},</p>
+    <p style="font-size:15px;line-height:1.75;color:#444;margin-bottom:24px;">${introParagraph}</p>
+
+    ${priceStage}
+
+    ${cta}
+
+    ${stepsTable}
+
+    ${angabenTable}
+
+    <p style="font-size:15px;line-height:1.75;color:#444;margin:30px 0 18px;">Wenn Sie Fragen haben oder Unterstützung möchten — rufen Sie mich an, schreiben Sie mir per WhatsApp oder antworten Sie einfach auf diese E-Mail. Ich bin gerne für Sie da.</p>
+
     ${buildIlkaSig(siteUrl)}`;
 
   return buildEmailWrapper(lead, siteUrl, content);
@@ -745,35 +765,39 @@ function buildEingangsbestaetigungText(lead: Lead, portalBase: string, isResubmi
   const careStartTiming = (lead as any).care_start_timing || "";
 
   const portalUrl = (portalBase && lead.token) ? buildPortalUrl(portalBase, lead.token) : "";
+  const ctaUrl = portalUrl || "https://primundus.de";
 
   const kalk = lead.kalkulation || {};
   const bruttopreis = kalk.bruttopreis || 0;
   const gesamteZuschuesse = kalk.zuschüsse?.gesamt || 0;
   const eigenanteil = kalk.eigenanteil || (bruttopreis - gesamteZuschuesse);
-  const formatEuro = (n: number) => n.toLocaleString("de-DE", { minimumFractionDigits: 0, maximumFractionDigits: 0 }) + " €";
+  const tagessatz = bruttopreis > 0 ? Math.round(bruttopreis / 30) : 0;
+  const fmt = (n: number) => n.toLocaleString("de-DE", { minimumFractionDigits: 0, maximumFractionDigits: 0 }) + " €";
   const priceLine = bruttopreis > 0
-    ? `Monatssatz: ${formatEuro(bruttopreis)} (inkl. Steuern & Sozialabgaben) | Eigenanteil möglich: ${formatEuro(eigenanteil)} (nach Pflegekasse)\n\n`
+    ? `Tagessatz: ${fmt(tagessatz)} / Tag (inkl. Steuern & Sozialabgaben)
+Monatssatz: ${fmt(bruttopreis)} / Monat — rechn. Eigenanteil ca. ${fmt(eigenanteil)}
+zzgl. ca. 125 € Anreise- und Abreisekosten je Strecke sowie Kost und Logis.
+
+100 % risikofrei: Bei Primundus zahlen Sie tagesgenau, ohne Vertragsbindung. Kosten entstehen erst, wenn Ihre Pflegekraft vor Ort ist.
+
+Bestpreis-Garantie: Finden Sie bei vergleichbarer Leistung ein günstigeres Angebot? Wir unterbieten es. Als Direktanbieter ohne Vermittler sparen wir Provisionen — und reichen das an Sie weiter.
+
+`
     : "";
-
-  const portalBlock = portalUrl ? `SO GEHT ES WEITER
-
-In Ihrem Kundenportal sehen Sie die vorgeschlagenen Pflegekräfte mit Profil und Erfahrung.
-
-1. Pflegekräfte ansehen – jederzeit möglich
-2. Patientendaten vervollständigen – damit die Pflegekräfte den konkreten Pflegebedarf kennen. Voraussetzung für den nächsten Schritt.
-3. Wunsch-Pflegekräfte einladen & Bewerbungen erhalten – sobald die Patientendaten vollständig sind
-
-Angebot und Pflegekräfte anzeigen: ${portalUrl}
-
-` : "";
 
   const headerLine = isResubmit
     ? "Ihr aktualisiertes Angebot zur 24-Stunden-Betreuung – Primundus"
-    : "Ihr persönliches Angebot zur 24-Stunden-Betreuung – Primundus";
+    : "Ihr Angebot zur 24-Stunden-Betreuung – Primundus";
 
   const introPlain = isResubmit
-    ? "vielen Dank für Ihre erneute Anfrage. Wir haben Ihre aktualisierten Angaben übernommen und Ihr persönliches Angebot entsprechend angepasst – inklusive passender Pflegekräfte, die wir für Sie ausgewählt haben."
-    : "vielen Dank für Ihre Anfrage. Auf Grundlage Ihrer Angaben haben wir Ihr persönliches Angebot für die 24-Stunden-Betreuung zu Hause erstellt – inklusive passender Pflegekräfte, die wir bereits für Sie ausgewählt haben.";
+    ? "vielen Dank für Ihre erneute Anfrage. Wir haben Ihre aktualisierten Angaben übernommen und Ihr Angebot für die 24-Stunden-Betreuung zu Hause entsprechend angepasst. Im Kundenportal warten bereits Pflegekräfte, die zu Ihrem Bedarf passen."
+    : "vielen Dank für Ihre Anfrage. Auf Basis Ihrer Angaben haben wir Ihr Angebot für die 24-Stunden-Betreuung zu Hause erstellt. Im Kundenportal warten bereits Pflegekräfte, die zu Ihrem Bedarf passen.";
+
+  // Sektion 2 (Anforderungen an die Pflegekraft) — null-Werte ausblenden.
+  const anf: string[] = [`Deutschkenntnisse: ${eingangsLabel("deutschkenntnisse", fd.deutschkenntnisse)}`];
+  if (fd.erfahrung) anf.push(`Erfahrung: ${eingangsLabel("erfahrung", fd.erfahrung)}`);
+  if (fd.fuehrerschein) anf.push(`Führerschein: ${eingangsLabel("fuehrerschein", fd.fuehrerschein)}`);
+  anf.push(`Geschlecht der Pflegekraft: ${fd.geschlecht ? eingangsLabel("geschlecht", fd.geschlecht) : "Egal"}`);
 
   return `${headerLine}
 
@@ -781,26 +805,28 @@ ${greeting},
 
 ${introPlain}
 
-${priceLine}✓ Keine Vertragsbindung · ✓ Tagesgenaue Abrechnung · ✓ Kosten erst bei Anreise
+${priceLine}Angebot & Pflegekräfte ansehen: ${ctaUrl}
 
-${portalBlock}IHRE ANGABEN IM ÜBERBLICK
+SO GEHT ES WEITER
 
-Name: ${[lead.anrede_text, lead.vorname, lead.nachname].filter(Boolean).join(" ") || "Nicht angegeben"}
-E-Mail: ${lead.email}
-${(lead as any).telefon ? `Telefon: ${(lead as any).telefon}` : ""}
+1. Angebot und erste Pflegekräfte ansehen — im Portal finden Sie Ihr Angebot im Detail sowie erste passende Pflegekräfte mit Profil, Erfahrung und Sprachkenntnissen.
+2. Patientendaten ergänzen — damit Pflegekräfte den konkreten Bedarf einschätzen können. Dauert wenige Minuten.
+3. Wunsch-Pflegekräfte einladen — sobald Sie eingeladen haben, erhalten Sie konkrete Bewerbungen, mit Anreisedatum und Reisekosten.
+
+PFLEGESITUATION & ANFORDERUNGEN
+
 Betreuung für: ${eingangsLabel("betreuung_fuer", fd.betreuung_fuer)}
-Weitere Personen: ${eingangsLabel("weitere_personen", fd.weitere_personen)}
 Pflegegrad: ${fd.pflegegrad ? `Pflegegrad ${fd.pflegegrad}` : "Nicht angegeben"}
+Weitere Personen im Haushalt: ${eingangsLabel("weitere_personen", fd.weitere_personen)}
 Mobilität: ${eingangsLabel("mobilitaet", fd.mobilitaet)}
-Nachteinsätze: ${eingangsLabel("nachteinsaetze", fd.nachteinsaetze)}
-Deutschkenntnisse: ${eingangsLabel("deutschkenntnisse", fd.deutschkenntnisse)}
-Wann soll die Betreuung starten?: ${eingangsLabel("care_start_timing", careStartTiming)}
+Nachteinsätze erforderlich: ${eingangsLabel("nachteinsaetze", fd.nachteinsaetze)}
+Gewünschter Start: ${eingangsLabel("care_start_timing", careStartTiming)}
 
-Für Sie bleibt alles unverbindlich, bis Sie sich für eine passende Betreuungskraft entscheiden und diese anreist.
+ANFORDERUNGEN AN DIE PFLEGEKRAFT
 
-${BESTPREIS_PS_TEXT}
+${anf.join("\n")}
 
-Bei Fragen stehen wir Ihnen gerne telefonisch zur Verfügung: +49 89 200 000 830
+Wenn Sie Fragen haben oder Unterstützung möchten — rufen Sie mich an, schreiben Sie mir per WhatsApp oder antworten Sie einfach auf diese E-Mail. Ich bin gerne für Sie da.
 
 Mit freundlichen Grüßen
 Ilka Wysocki
@@ -1450,8 +1476,8 @@ Deno.serve(async (req: Request) => {
           // bekommen? Falls ja \u2192 angepasste Wording-Variante.
           const isResubmit = await hasPreviousEingangsbestaetigungSent(supabase, scheduledEmail.lead_id);
           subject = isResubmit
-            ? "Ihr aktualisiertes Angebot zur 24-Stunden-Betreuung"
-            : "Ihr pers\u00f6nliches Angebot zur 24-Stunden-Betreuung";
+            ? "Ihr aktualisiertes Angebot zur 24-Stunden-Betreuung \u2013 Primundus"
+            : "Ihr Angebot zur 24-Stunden-Betreuung \u2013 Primundus";
           html = buildEingangsbestaetigungHtml(lead as Lead, smtpConfig.siteUrl, portalBase, isResubmit);
           text = buildEingangsbestaetigungText(lead as Lead, portalBase, isResubmit);
           eventTypeSent = "email_eingangsbestaetigung_sent";
