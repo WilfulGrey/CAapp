@@ -5,12 +5,12 @@ description: Promote the current trunk commit from STAGING to PROD — applies m
 
 # Promote staging → prod
 
-> **🚧 STATUS (2026-05-22): not yet active.** Pending user-side
-> infrastructure setup — staging Supabase project + Render staging
-> services + branch rename. Until staging exists, "promotion" is a
-> no-op (there's nothing to promote from). See `docs/staging-environment-plan.md`.
-> The interim manual promotion path is described in CLAUDE.md §"Deploy
-> workflow" → "Emergency hotfix".
+> **Status:** ACTIVE since 2026-05-26. Staging exists
+> (`caapp-staging.onrender.com` + `taggpiwpwthgpcmaiqjw` Supabase). PROD =
+> `kundenportal.primundus.de` (Render slot `caapp-beta`, real slug
+> historical artifact, see CLAUDE.md URL convention) + `ycdwtrklpoqprabtwahi`
+> Supabase. Branch rename `integration/mamamia-onboarding` → `main` still
+> deferred — skill works with current branch name.
 
 ## What this skill does
 
@@ -179,14 +179,14 @@ Each /deploy_prod between steps is a full promotion cycle. NEVER bundle.
 
 ## Env vars expected
 
-| Var | Source | Notes |
+| Var | Value | Source |
 |---|---|---|
-| `SUPABASE_PROD_REF` | hardcoded = `ycdwtrklpoqprabtwahi` | Current prod project |
-| `SUPABASE_PROD_ANON_KEY` | Supabase Dashboard | Public, safe in env |
-| `RENDER_API_KEY` | Render Dashboard → Account → API Keys | Same key as staging |
-| `PROD_CAAPP_SERVICE_ID` | `srv-d7phc0rrjlhs73dtismg` (caapp-beta slot) | Memory: `reference_deploy-branches.md` |
-| `PROD_KOSTENRECHNER_SERVICE_ID` | Render Dashboard → kostenrechner-beta | TODO: document once verified |
-| `MAMAMIA_PROD_ENDPOINT`, `MAMAMIA_PROD_AUTH_ENDPOINT`, `MAMAMIA_PROD_AGENCY_EMAIL`, `MAMAMIA_PROD_AGENCY_PASSWORD` | User's `~/.primundus-mamamia-prod.env` (per CLAUDE.md "Naming convention") | Only needed for pre-flight schema introspection |
+| `SUPABASE_PROD_REF` | `ycdwtrklpoqprabtwahi` | Hardcoded — current prod Supabase |
+| `SUPABASE_PROD_ANON_KEY` | `eyJhbGc...` | Supabase Dashboard → caapp (prod) → Settings → API |
+| `RENDER_API_KEY` | `rnd_...` | Render Dashboard → Account → API Keys |
+| `PROD_CAAPP_SERVICE_ID` | `srv-d7phc0rrjlhs73dtismg` | caapp-beta Render slot (= prod kundenportal) |
+| `PROD_KOSTENRECHNER_SERVICE_ID` | `srv-d7phc1n7f7vs739kaa5g` | kostenrechner-beta Render slot (= prod kostenrechner) |
+| `MAMAMIA_PROD_ENDPOINT`, `MAMAMIA_PROD_AUTH_ENDPOINT`, `MAMAMIA_PROD_AGENCY_EMAIL`, `MAMAMIA_PROD_AGENCY_PASSWORD` | env file | User's `~/.primundus-mamamia-prod.env` (per CLAUDE.md "Naming convention") — only needed for pre-flight schema introspection |
 
 ## Related
 

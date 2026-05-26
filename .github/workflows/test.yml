@@ -80,20 +80,21 @@ jobs:
         working-directory: supabase/functions/detect-caregiver-events
         run: deno task test
 
-  # ─── Deploy CA-App Edge Functions (after merge to integration/mamamia-onboarding) ─
+  # ─── Deploy CA-App Edge Functions to STAGING Supabase ─────────────────
+  # Push to integration/mamamia-onboarding (= trunk) → deploys edge fns to
+  # STAGING Supabase project (taggpiwpwthgpcmaiqjw via SUPABASE_STAGING_REF).
+  # PROD edge fn deploy is gated — only via `/deploy_prod` Claude skill
+  # (manual promotion after staging verification).
+  #
   # Strukturalnie eliminuje race condition gdzie ktoś deployuje ze swojego
   # lokalnego stanu i nadpisuje cudze zmiany w chmurze. Po merge PR-a CI
-  # robi single source of truth deploy z git HEAD.
+  # robi single source of truth deploy z git HEAD na staging.
   #
-  # Deployuje TYLKO funkcje z repo-root supabase/functions/ na projekt
-  # CA-App (ycdwtrklpoqprabtwahi). Funkcje kostenrechnera (project 3/...)
-  # idą osobnym jobem niżej — inny projekt Supabase, inne konto.
-  #
-  # Wymaga GitHub Secret: SUPABASE_ACCESS_TOKEN
-  #   gh secret set SUPABASE_ACCESS_TOKEN
-  #   (wygeneruj na https://supabase.com/dashboard/account/tokens)
+  # Wymaga GitHub Secrets:
+  #   SUPABASE_ACCESS_TOKEN  — user-scoped token, works for both staging+prod
+  #   SUPABASE_STAGING_REF   — staging project ref (taggpiwpwthgpcmaiqjw)
   deploy-edge-functions:
-    name: Deploy CA-App Edge Functions to Supabase
+    name: Deploy CA-App Edge Functions to Supabase (staging)
     needs: [vitest, deno-onboard, deno-proxy, deno-detect]
     if: (github.event_name == 'push' && github.ref == 'refs/heads/integration/mamamia-onboarding') || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
@@ -123,24 +124,29 @@ jobs:
           version: latest
 
       # Tylko funkcje istniejące w repo-root supabase/functions/.
-      - name: Deploy functions
+      - name: Deploy functions to STAGING
         if: steps.changed.outputs.skip != 'true'
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          STAGING_REF: ${{ secrets.SUPABASE_STAGING_REF }}
         run: |
+          if [ -z "$STAGING_REF" ]; then
+            echo "::error::SUPABASE_STAGING_REF secret not set — cannot deploy edge fns to staging."
+            exit 1
+          fi
           for fn in mamamia-proxy onboard-to-mamamia detect-caregiver-events daily-analytics-report; do
-            echo "::group::Deploying $fn"
-            supabase functions deploy "$fn" --project-ref ycdwtrklpoqprabtwahi
+            echo "::group::Deploying $fn → staging ($STAGING_REF)"
+            supabase functions deploy "$fn" --project-ref "$STAGING_REF"
             echo "::endgroup::"
           done
 
-  # ─── Deploy kostenrechner Edge Functions (project 3/) ─────────────────────
+  # ─── Deploy kostenrechner Edge Functions to STAGING (project 3/) ────────
   # Funkcje kostenrechnera leżą w `project 3/supabase/functions/` — ten sam
-  # projekt Supabase co CA-App (monorepo, wspólny ycdwtrklpoqprabtwahi), ale
-  # `supabase functions deploy` szuka funkcji względem cwd. Dlatego osobny
-  # job z working-directory "project 3" + własny diff-trigger.
+  # Supabase project co CA-App (monorepo, w staging = taggpiwpwthgpcmaiqjw),
+  # ale `supabase functions deploy` szuka funkcji względem cwd. Dlatego
+  # osobny job z working-directory "project 3" + własny diff-trigger.
   deploy-kostenrechner-edge-functions:
-    name: Deploy kostenrechner Edge Functions to Supabase
+    name: Deploy kostenrechner Edge Functions to Supabase (staging)
     needs: [vitest, deno-onboard, deno-proxy, deno-detect]
     if: (github.event_name == 'push' && github.ref == 'refs/heads/integration/mamamia-onboarding') || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
@@ -168,11 +174,16 @@ jobs:
         with:
           version: latest
 
-      - name: Deploy kostenrechner functions
+      - name: Deploy kostenrechner functions to STAGING
         if: steps.changed.outputs.skip != 'true'
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          STAGING_REF: ${{ secrets.SUPABASE_STAGING_REF }}
         run: |
+          if [ -z "$STAGING_REF" ]; then
+            echo "::error::SUPABASE_STAGING_REF secret not set — cannot deploy edge fns to staging."
+            exit 1
+          fi
           # Katalog "project 3" ma spację w nazwie — psuje to docker volume
           # mount w supabase CLI ("entrypoint path does not exist"). Kopiujemy
           # funkcje do ścieżki bez spacji i deployujemy stamtąd. Funkcje
@@ -182,7 +193,7 @@ jobs:
           cp -r "project 3/supabase/functions" /tmp/kr-deploy/supabase/
           cd /tmp/kr-deploy
           for fn in chat-ai schedule-email send-scheduled-emails; do
-            echo "::group::Deploying $fn"
-            supabase functions deploy "$fn" --project-ref ycdwtrklpoqprabtwahi
+            echo "::group::Deploying $fn → staging ($STAGING_REF)"
+            supabase functions deploy "$fn" --project-ref "$STAGING_REF"
             echo "::endgroup::"
           done

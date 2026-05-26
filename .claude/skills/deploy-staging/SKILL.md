@@ -5,13 +5,11 @@ description: Deploy current trunk to STAGING — runs Supabase migrations + edge
 
 # Deploy to staging
 
-> **🚧 STATUS (2026-05-22): not yet active.** Pending user-side infrastructure
-> setup — staging Supabase project, Render staging services, and the
-> branch rename `integration/mamamia-onboarding` → `main`. See
-> `docs/staging-environment-plan.md`. Until those are in place, this skill
-> aborts at the Preconditions step. Do NOT remove this callout until
-> `STAGING_CAAPP_SERVICE_ID` is set in user env and a successful staging
-> deploy has been logged.
+> **Status:** ACTIVE since 2026-05-26. Staging Supabase = `taggpiwpwthgpcmaiqjw`,
+> Render slots = `caapp-staging` (`srv-d8anbsfavr4c73do33mg`) +
+> `kostenrechner-staging` (`srv-d8anc9b7uimc73ajhdm0`). Branch rename
+> `integration/mamamia-onboarding` → `main` deferred — skill works with
+> current branch name. See `docs/staging-environment-plan.md`.
 
 ## What this skill does
 
@@ -137,15 +135,17 @@ Tell user:
 
 ## Env vars expected
 
-| Var | Source | Example |
+| Var | Value | Source |
 |---|---|---|
-| `SUPABASE_STAGING_REF` | Supabase Dashboard → new staging project → Settings → API | `abcdefghijklm` |
-| `SUPABASE_STAGING_ANON_KEY` | same | `eyJhbGc...` |
-| `RENDER_API_KEY` | Render Dashboard → Account → API Keys | `rnd_...` |
-| `STAGING_CAAPP_SERVICE_ID` | Render Dashboard → caapp-staging → service ID in URL | `srv-xxx...` |
-| `STAGING_KOSTENRECHNER_SERVICE_ID` | same for kostenrechner-staging | `srv-xxx...` |
+| `SUPABASE_STAGING_REF` | `taggpiwpwthgpcmaiqjw` | Hardcoded — staging Supabase project ref |
+| `SUPABASE_STAGING_ANON_KEY` | `eyJhbGc...` | Supabase Dashboard → caapp-staging → Settings → API |
+| `RENDER_API_KEY` | `rnd_...` | Render Dashboard → Account → API Keys |
+| `STAGING_CAAPP_SERVICE_ID` | `srv-d8anbsfavr4c73do33mg` | Hardcoded — caapp-staging Render slot |
+| `STAGING_KOSTENRECHNER_SERVICE_ID` | `srv-d8anc9b7uimc73ajhdm0` | Hardcoded — kostenrechner-staging Render slot |
 
-User keeps these in `~/.zshrc` or `direnv` `.envrc`. Never commit to repo.
+User keeps these in `~/.zshrc` or `direnv` `.envrc`. Never commit to repo
+(refs + service IDs are arguably non-secret but treat as project metadata
+that lives outside source control).
 
 ## Related
 

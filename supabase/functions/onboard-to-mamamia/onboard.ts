@@ -124,14 +124,34 @@ const STORE_JOB_OFFER = /* GraphQL */ `
   }
 `;
 
-// Primundus ServiceAgency id w Mamamia.
-//   beta.mamamia.app:           id = 18 (zarejestrowane 2026-04-23)
-//   backend.prod.mamamia.app:   id = 3  (verified live 2026-05-11)
+// Primundus ServiceAgency id w Mamamia — per-tenant, zawsze z env.
+//   beta.mamamia.app:           id = 18 (Primundus beta, used by STAGING)
+//   backend.prod.mamamia.app:   id = 3  (Primundus prod, used by PROD)
 // IDs są per-tenant — beta i prod to oddzielne bazy. Dla switch'a
 // środowiska: query `{ ServiceAgency { id name } }` żeby potwierdzić
 // aktualny id (singleton — zwraca rekord przypisany do zalogowanego
 // agency user'a).
-const PRIMUNDUS_AGENCY_ID = 3;
+//
+// MUST be set as Supabase secret per environment:
+//   prod:    MAMAMIA_AGENCY_ID=3
+//   staging: MAMAMIA_AGENCY_ID=18
+// Throw on missing per Święta zasada nr 1 (NO SOFT FALLBACKS) — wrong
+// agency_id silently routes new customers to wrong tenant.
+//
+// Read lazily (NOT at module load) so test files can import this module
+// without needing the env var, and so cold-start errors surface in the
+// onboard request handler (visible to the caller) rather than blowing
+// up the function before any traffic arrives.
+export function loadPrimundusAgencyId(): number {
+  const raw = Deno.env.get("MAMAMIA_AGENCY_ID");
+  const parsed = raw ? parseInt(raw, 10) : NaN;
+  if (!Number.isFinite(parsed)) {
+    throw new Error(
+      "MAMAMIA_AGENCY_ID env var required (3 for prod Mamamia tenant, 18 for staging/beta tenant)",
+    );
+  }
+  return parsed;
+}
 
 // ─── Main flow ─────────────────────────────────────────────────────────────
 
@@ -212,7 +232,7 @@ export async function onboardLead(opts: OnboardOptions): Promise<OnboardResult &
     query: STORE_JOB_OFFER,
     variables: {
       customer_id: mamamiaCustomerId,
-      service_agency_id: PRIMUNDUS_AGENCY_ID,
+      service_agency_id: loadPrimundusAgencyId(),
       title,
       description: "Auto-created from Primundus kostenrechner",
       salary_offered: careBudget,
