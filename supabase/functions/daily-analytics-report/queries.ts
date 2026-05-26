@@ -2,7 +2,7 @@
 // Tabellen analytics_sessions / analytics_events / leads / lead_events.
 // Zeitraum wird via Berlin-Tagesgrenzen berechnet (Helper unten).
 
-import { type SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2.57.4";
+import { type SupabaseClient } from "npm:@supabase/supabase-js@2.57.4";
 
 // Test-Lead-Filter: gleicher Set wie das Live-Dashboard (/api/analytics/stats).
 // Wendet sich auf vorname / nachname / email an, damit interne QA-Submits
