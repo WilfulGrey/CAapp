@@ -669,8 +669,8 @@ function buildEingangsbestaetigungHtml(lead: Lead, siteUrl: string, portalBase: 
       <tr>
         <td colspan="2" style="padding:16px 24px 20px;border-top:1px solid #ebe2d2;">
           <p style="margin:0 0 6px;${psLabel}color:#B8860B;">Bestpreis-Garantie</p>
-          <p style="margin:0 0 6px;font-size:14px;line-height:1.65;color:#2D1F0F;">Finden Sie bei vergleichbarer Leistung ein günstigeres Angebot? <strong>Wir unterbieten es.</strong></p>
-          <p style="margin:0;font-size:14px;line-height:1.65;color:#2D1F0F;">Als <strong>Direktanbieter ohne Vermittler</strong> sparen wir Provisionen — und reichen das an Sie weiter.</p>
+          <p style="margin:0 0 6px;font-size:14px;line-height:1.65;color:#2D1F0F;">Als <strong>Direktanbieter ohne Vermittler</strong> sparen wir die Provision — und geben diesen Vorteil direkt an Sie weiter.</p>
+          <p style="margin:0;font-size:14px;line-height:1.65;color:#2D1F0F;">Sollten Sie bei vergleichbarer Leistung ein günstigeres Angebot finden, <strong>unterbieten wir es.</strong></p>
         </td>
       </tr>
     </table>`;
@@ -780,7 +780,7 @@ zzgl. ca. 125 € Anreise- und Abreisekosten je Strecke sowie Kost und Logis.
 
 100 % risikofrei: Bei Primundus zahlen Sie tagesgenau, ohne Vertragsbindung. Kosten entstehen erst, wenn Ihre Pflegekraft vor Ort ist.
 
-Bestpreis-Garantie: Finden Sie bei vergleichbarer Leistung ein günstigeres Angebot? Wir unterbieten es. Als Direktanbieter ohne Vermittler sparen wir Provisionen — und reichen das an Sie weiter.
+Bestpreis-Garantie: Als Direktanbieter ohne Vermittler sparen wir die Provision — und geben diesen Vorteil direkt an Sie weiter. Sollten Sie bei vergleichbarer Leistung ein günstigeres Angebot finden, unterbieten wir es.
 
 `
     : "";
