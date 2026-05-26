@@ -841,6 +841,10 @@ async function sendEmailSmtp(
       from: `"${smtpConfig.fromName}" <${smtpConfig.from}>`,
       to,
       subject,
+      // Reply-To auf ein überwachtes Team-Postfach — die Reminder bitten den
+      // Kunden ausdrücklich, "einfach auf diese E-Mail zu antworten". Ohne
+      // Reply-To gingen Antworten an die (ggf. unüberwachte) Absenderadresse.
+      replyTo: "info@primundus.de",
       text,
       html,
       ...(bccAddr ? { bcc: bccAddr } : {}),
@@ -936,6 +940,8 @@ interface ReminderMeta {
   caregiver_badge_level?: string | null;
   caregiver_years_experience?: number | null;
   caregiver_einsatz_count?: number | null;
+  caregiver_age?: number | null;
+  caregiver_german_level?: string | null;
   caregiver_photo_url?: string | null;
   caregiver_about_text?: string | null;
 }
@@ -1022,14 +1028,28 @@ function buildReminderHtml(
     ? `<img src="cid:${photoCid}" alt="${cgName}" width="80" style="display:block;width:80px;height:80px;border-radius:50%;object-fit:cover;border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.08);" />`
     : `<div style="width:80px;height:80px;border-radius:50%;background-color:#B5A184;color:#fff;font-size:28px;font-weight:700;line-height:80px;text-align:center;border:2px solid #fff;">${reminderCaregiverInitials(cgName)}</div>`;
 
-  // Mamamia liefert teils unübersetzte Platzhalter in about_de (z.B. "Bitte
-  // geben Sie den Text an, den Sie ins Deutsche übersetzen möchten.") — die
-  // dürfen nie als Zitat erscheinen. Defensive auch hier (alte scheduled_
-  // emails-Rows tragen evtl. noch ungefilterte Werte).
+  // Einheitliche Pflegekraft-Box.
+  // - application: Foto + Name + "Alter · Deutsch-Level" + Button
+  //   "{Vorname}s Profil ansehen". Kein Badge/Einsätze/Bio — kompakt.
+  // - interest: Foto + Name + Erfahrung/Einsätze + Badge + Bio (wie gehabt).
   const aboutClean = cleanReminderAbout(meta.caregiver_about_text);
-  const aboutHtml = aboutClean
-    ? `<p style="margin:14px 0 0;font-size:14px;line-height:1.65;color:#555;font-style:italic;">„${aboutClean}"</p>`
+
+  const infoBits: string[] = [];
+  if (meta.caregiver_age && meta.caregiver_age > 0) infoBits.push(`${meta.caregiver_age} J.`);
+  if (meta.caregiver_german_level) infoBits.push(`Deutsch ${meta.caregiver_german_level}`);
+  const infoLine = infoBits.length > 0
+    ? `<p style="margin:0;font-size:14px;color:#555;">${infoBits.join(" &middot; ")}</p>`
     : "";
+
+  const profilButton = `<p style="margin:12px 0 0;"><a href="${portalUrl}" target="_blank" style="color:#8B7355;text-decoration:none;font-weight:700;font-size:14px;">${firstName}s Profil ansehen &rarr;</a></p>`;
+
+  const kachelBody = variant === "application"
+    ? `<p style="margin:0 0 3px;font-size:18px;font-weight:700;color:#2D1F0F;">${cgName}</p>${infoLine}`
+    : `<p style="margin:0 0 4px;font-size:18px;font-weight:700;color:#2D1F0F;">${cgName}</p>${metaLine}${badgeHtml}`;
+
+  const kachelFooter = variant === "application"
+    ? profilButton
+    : (aboutClean ? `<p style="margin:14px 0 0;font-size:14px;line-height:1.65;color:#555;font-style:italic;">„${aboutClean}"</p>` : "");
 
   const kachel = `
     <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="margin:0 0 22px 0;border:1px solid #e8ddd0;border-radius:12px;overflow:hidden;">
@@ -1038,109 +1058,65 @@ function buildReminderHtml(
           <tr>
             <td style="vertical-align:middle;width:96px;padding-right:16px;">${photoHtml}</td>
             <td style="vertical-align:middle;">
-              <p style="margin:0 0 4px;font-size:18px;font-weight:700;color:#2D1F0F;">${cgName}</p>
-              ${metaLine}
-              ${badgeHtml}
+              ${kachelBody}
             </td>
           </tr>
         </table>
-        ${aboutHtml}
+        ${kachelFooter}
       </td></tr>
     </table>`;
 
-  // Tier-spezifisches Intro/Middle/CTA. Crescendo bei application:
-  // 1h sanft → 4h dringender ("prüft andere Anfragen") → 12h dringendster
-  // ("verfügbar nicht mehr garantiert"). Interest bleibt einstufig.
+  // Persönlicher, positiver Ton — eine echte Frage statt Füllsatz, kein
+  // "Kundenportal"-Wording (der CTA-Button führt direkt hin), keine
+  // Drohkulisse. Application eskaliert sanft über die Stufen.
   let introHtml: string;
   let middleHtml: string;
   let ctaText: string;
+  const PpassT = `So weiß ${firstName}, woran sie ist, und Sie erhalten bei Bedarf gerne weitere Bewerbungen.`;
   if (variant === "interest") {
     introHtml = `<p style="font-size:15px;line-height:1.75;color:#444;margin-bottom:18px;">vor einer Stunde haben wir Ihnen geschrieben, dass <strong style="color:#2D1F0F;">${cgName}</strong> Interesse an Ihrer Anfrage hat. Eine kurze Erinnerung — die nächsten Stunden zählen:</p>`;
     middleHtml = `<p style="font-size:15px;line-height:1.75;color:#444;margin-bottom:20px;">Pflegekräfte mit guten Profilen werden häufig schnell von anderen Familien angefragt. <strong style="color:#2D1F0F;">Damit ${firstName} für Sie verfügbar bleibt</strong>, schauen Sie sich ihr Profil jetzt an und laden Sie sie ein, sich bei Ihnen zu bewerben.</p>`;
     ctaText = "Profil ansehen und einladen →";
   } else if (tier === "1h") {
-    introHtml = `<p style="font-size:15px;line-height:1.75;color:#444;margin-bottom:18px;">vor einer Stunde haben wir Ihnen <strong style="color:#2D1F0F;">${firstName}s Bewerbung</strong> weitergeleitet — eine kurze Erinnerung, denn diese Phase ist zeitkritisch.</p>`;
-    middleHtml = `<p style="font-size:15px;line-height:1.75;color:#444;margin-bottom:20px;">Pflegekräfte halten ihre Bewerbung bei uns offen, solange sie keine andere Familie verbindlich gebucht hat. <strong style="color:#2D1F0F;">Damit Sie ${firstName} nicht verlieren</strong>, schauen Sie sich ihre Bewerbung jetzt an und bestätigen Sie die Buchung, wenn alles passt.</p>`;
-    ctaText = "Bewerbung ansehen und buchen →";
+    introHtml = `<p style="font-size:15px;line-height:1.75;color:#444;margin-bottom:18px;">konnten Sie sich schon mit <strong style="color:#2D1F0F;">${firstName}s Bewerbung</strong> beschäftigen?</p>`;
+    middleHtml = `<p style="font-size:15px;line-height:1.75;color:#444;margin-bottom:20px;">Teilen Sie mir gern kurz mit, ob ${firstName} zu Ihnen passt oder nicht. ${PpassT}</p>`;
+    ctaText = `${firstName}s Bewerbung ansehen →`;
   } else if (tier === "4h") {
-    introHtml = `<p style="font-size:15px;line-height:1.75;color:#444;margin-bottom:18px;">${firstName}s Bewerbung liegt nun seit <strong style="color:#2D1F0F;">über 4 Stunden</strong> bei Ihnen — und wir möchten kurz nachfassen.</p>`;
-    middleHtml = `<p style="font-size:15px;line-height:1.75;color:#444;margin-bottom:20px;">Pflegekräfte werden oft <strong style="color:#2D1F0F;">innerhalb weniger Stunden</strong> für andere Einsätze angefragt. Damit wir ${firstName} für Sie reservieren können, brauchen wir ein kurzes Signal von Ihnen — entweder die Bewerbung annehmen oder kurz Bescheid geben, dass es nicht passt.</p>`;
-    ctaText = "Jetzt entscheiden →";
+    introHtml = `<p style="font-size:15px;line-height:1.75;color:#444;margin-bottom:18px;">konnten Sie schon einen Blick auf <strong style="color:#2D1F0F;">${firstName}s Bewerbung</strong> werfen?</p>`;
+    middleHtml = `<p style="font-size:15px;line-height:1.75;color:#444;margin-bottom:20px;">Teilen Sie mir gern kurz mit, ob sie zu Ihnen passt oder nicht. ${PpassT}</p>`;
+    ctaText = `${firstName}s Bewerbung ansehen →`;
   } else if (tier === "12h") {
-    introHtml = `<p style="font-size:15px;line-height:1.75;color:#444;margin-bottom:18px;">${firstName}s Bewerbung wartet nun seit <strong style="color:#C4543D;">über 12 Stunden</strong> auf Ihre Rückmeldung.</p>`;
-    middleHtml = `<p style="font-size:15px;line-height:1.75;color:#444;margin-bottom:20px;">Wir können <strong style="color:#2D1F0F;">nicht mehr garantieren</strong> dass ${firstName} noch verfügbar ist — viele Pflegekräfte sagen nach so langer Zeit anderen Familien zu. Bitte geben Sie uns kurz Bescheid, dann wissen wir woran wir sind und können ggf. eine andere Pflegekraft für Sie suchen.</p>`;
-    ctaText = "Jetzt entscheiden →";
+    introHtml = `<p style="font-size:15px;line-height:1.75;color:#444;margin-bottom:18px;"><strong style="color:#2D1F0F;">${firstName}s Bewerbung</strong> wartet noch auf Ihre Rückmeldung.</p>`;
+    middleHtml = `<p style="font-size:15px;line-height:1.75;color:#444;margin-bottom:20px;">Teilen Sie mir gern kurz mit, ob ${firstName} zu Ihnen passt oder nicht. So weiß ${firstName}, woran sie ist. Und wenn Sie unsicher sind, berate ich Sie natürlich gerne persönlich.</p>`;
+    ctaText = `${firstName}s Bewerbung ansehen →`;
   } else {
-    // tier === "46h" — letzte Erinnerung vor dem automatischen Schließen
-    // der Bewerbung (~2h später durch den Auto-Reject). Klare Ansage +
-    // alle Reaktionswege (Portal annehmen/ablehnen, Berater, sonst auto).
-    introHtml = `<p style="font-size:15px;line-height:1.75;color:#444;margin-bottom:18px;">${firstName}s Bewerbung liegt jetzt seit fast <strong style="color:#C4543D;">48 Stunden</strong> bei Ihnen — eine letzte Erinnerung, bevor wir sie schließen.</p>`;
-    middleHtml = `<p style="font-size:15px;line-height:1.75;color:#444;margin-bottom:20px;">Wir können <strong style="color:#2D1F0F;">${firstName} nicht länger für Sie reservieren</strong>. Bitte entscheiden Sie jetzt — die Bewerbung im Portal <strong>annehmen</strong> oder <strong>ablehnen</strong>, oder sprechen Sie kurz mit uns. Ohne Rückmeldung schließen wir die Bewerbung in etwa 2 Stunden automatisch. Bei Interesse schlagen wir Ihnen dann gerne weitere passende Pflegekräfte vor.</p>`;
-    ctaText = "Jetzt entscheiden →";
+    // tier === "46h" — letzte Erinnerung vor dem automatischen Freigeben
+    // (~2h später durch den Auto-Reject). Positiv gerahmt: Barbara nicht
+    // unnötig warten lassen; weitere Vorschläge nur auf Wunsch.
+    introHtml = `<p style="font-size:15px;line-height:1.75;color:#444;margin-bottom:18px;">passt <strong style="color:#2D1F0F;">${firstName}</strong> zu Ihnen?</p>`;
+    middleHtml = `<p style="font-size:15px;line-height:1.75;color:#444;margin-bottom:20px;">Teilen Sie mir gern kurz mit, ob ja oder nein. Wenn ich nichts von Ihnen höre, gebe ich ${firstName} in den nächsten Stunden wieder frei, damit sie nicht unnötig wartet. Möchten Sie weitere Pflegekräfte sehen? Dann melden Sie sich einfach kurz bei uns.</p>`;
+    ctaText = `${firstName}s Bewerbung ansehen →`;
   }
 
-  // Quick-Action-Block ab Tier "4h": prominent oben unter dem Intro,
-  // damit der Kunde auch ohne Portal-Besuch antworten kann. Häufigste
-  // Hemmschwelle: "ich weiß nicht ob es passt, also schiebe ich es auf" —
-  // mit "kurz Bescheid geben"-Button reduziert das die Paralyse.
-  const showQuickActions = variant === "application" && (tier === "4h" || tier === "12h" || tier === "46h");
-  const quickActionTitle = tier === "46h"
-    ? "Jetzt entscheiden — oder kurz mit uns sprechen"
-    : tier === "12h"
-    ? "Bitte kurz Bescheid geben"
-    : "Schnell antworten?";
-  const quickActionSub = tier === "46h"
-    ? "Annehmen, ablehnen oder eine kurze Rückfrage — am schnellsten per WhatsApp oder Anruf. Ohne Rückmeldung schließen wir die Bewerbung in ca. 2 Stunden automatisch."
-    : tier === "12h"
-    ? "Auch ein kurzes „passt nicht“ hilft uns weiter — dann können wir freigeben und ${firstName} findet schneller einen anderen Einsatz."
-    : "Falls Sie keine Zeit für das Portal haben, reicht eine kurze Nachricht — wir kümmern uns dann um den Rest.";
-  const quickActionHtml = showQuickActions
-    ? `
-    <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="margin:0 0 22px 0;border:1px solid #EFD9CC;border-radius:12px;overflow:hidden;background-color:#FDF6F1;">
-      <tr><td style="padding:18px 20px;">
-        <p style="margin:0 0 6px;font-size:15px;font-weight:700;color:#2D1F0F;">${quickActionTitle}</p>
-        <p style="margin:0 0 14px;font-size:14px;line-height:1.6;color:#555;">${quickActionSub.replace("${firstName}", firstName)}</p>
-        <table cellpadding="0" cellspacing="0" role="presentation">
-          <tr>
-            <td style="padding-right:8px;">
-              <a href="https://wa.me/4989200000830" style="display:inline-block;background-color:#25D366;border-radius:22px;padding:11px 20px;text-decoration:none;font-size:14px;font-weight:700;color:#ffffff;white-space:nowrap;">WhatsApp schreiben</a>
-            </td>
-            <td>
-              <a href="tel:+4989200000830" style="display:inline-block;background-color:#ffffff;border:1px solid #E5E3DF;border-radius:22px;padding:11px 20px;text-decoration:none;font-size:14px;font-weight:700;color:#3D2B1F;white-space:nowrap;">&#9990; 089 200 000 830</a>
-            </td>
-          </tr>
-        </table>
-      </td></tr>
-    </table>`
-    : "";
-
+  // Interest behält den dezenten Soft-Out unter dem CTA. Application
+  // braucht ihn nicht mehr — der "passt nicht?"-Hinweis steckt jetzt
+  // direkt in middleHtml ("an- oder ablehnen / auf diese Mail antworten").
   const softOut = variant === "interest"
     ? `<p style="font-size:13px;line-height:1.6;color:#888;margin:18px 0 0;font-style:italic;">Falls ${firstName} nicht zu Ihnen passt, lehnen Sie sie im Portal kurz ab — so weiß sie Bescheid und kann sich auf andere Familien konzentrieren.</p>`
-    : `<p style="font-size:13px;line-height:1.6;color:#888;margin:18px 0 0;font-style:italic;">Falls die Bewerbung nicht passt, lehnen Sie sie im Portal kurz ab — so weiß ${firstName} Bescheid und kann sich auf andere Familien konzentrieren.</p>`;
-
-  // Bestpreis-Anker — nur im 12h-Reminder (letzte Stufe). Wenn der Kunde
-  // bis hier nicht gebucht hat, ist der Preis ein häufiger Blocker. Als
-  // Direktanbieter ohne Vermittler-Provision können wir das Argument
-  // glaubwürdig setzen. Claim abgesichert ("vergleichbare Leistung").
-  const bestpreisAnchor = (variant === "application" && tier === "12h")
-    ? `<div style="margin:18px 0 0;padding:14px 16px;background:#FAF8F4;border-left:3px solid #B5A184;border-radius:0 8px 8px 0;">
-        <p style="margin:0;font-size:13px;line-height:1.7;color:#5C4A32;"><strong style="color:#2D1F0F;">💡 Bestpreis-Garantie:</strong> Als Direktanbieter ohne Vermittler-Provision bieten wir faire Preise — finden Sie bei vergleichbarer Leistung ein günstigeres Angebot, unterbieten wir es.</p>
-      </div>`
     : "";
 
-  // Logische Reihenfolge: Begrüßung → Situation (Intro) → um wen geht's
-  // (Kachel) → warum + was tun (middleHtml) → Haupt-CTA (Portal) → erst
-  // DANN die schnelle WhatsApp/Anruf-Alternative (quickActionHtml). Der
-  // Quick-Action-Block stand vorher direkt unter dem Intro, also bevor der
-  // Leser überhaupt wusste worum es geht — das wirkte unlogisch.
+  // Aufbau wie eine persönliche Nachricht: Begrüßung → kurze Situation →
+  // kompakte Pflegekraft-Box (mit "Profil ansehen"-Button) → freundliche
+  // Bitte → Ilka-Signatur (enthält WhatsApp + Telefon).
+  // application: kein extra CTA-Button (der Button steckt in der Box).
+  // interest: behält seinen CTA-Button + Soft-Out.
+  const ctaButton = variant === "application" ? "" : bulletproofButton(portalUrl, ctaText);
   const content = `
     <p style="font-size:15px;line-height:1.75;color:#444;margin-bottom:14px;">${greeting},</p>
     ${introHtml}
     ${kachel}
     ${middleHtml}
-    ${bulletproofButton(portalUrl, ctaText)}
-    ${quickActionHtml}
-    ${bestpreisAnchor}
+    ${ctaButton}
     ${softOut}
     ${buildIlkaSig(siteUrl)}`;
 
@@ -1177,37 +1153,30 @@ Primundus Deutschland | www.primundus.de
 `;
   }
 
-  // Application-Variante in 3 Tiers — Text-Body schrittweise dringender.
+  // Application-Variante in 4 Tiers — persönlicher, positiver Ton, kein
+  // "Kundenportal"-Wording (der Link führt direkt hin), keine Drohkulisse.
   let intro: string;
   let body: string;
-  let cta: string;
-  let quickAction = "";
+  const passT = `So weiß ${firstName}, woran sie ist, und Sie erhalten bei Bedarf gerne weitere Bewerbungen.`;
   if (tier === "1h") {
-    intro = `vor einer Stunde haben wir Ihnen ${firstName}s Bewerbung weitergeleitet — eine kurze Erinnerung, denn diese Phase ist zeitkritisch.`;
-    body = `Pflegekräfte halten ihre Bewerbung bei uns offen, solange sie keine andere Familie verbindlich gebucht hat. Damit Sie ${firstName} nicht verlieren, schauen Sie sich ihre Bewerbung jetzt an und bestätigen Sie die Buchung, wenn alles passt.`;
-    cta = `Bewerbung ansehen und buchen: ${portalUrl}`;
+    intro = `konnten Sie sich schon mit ${firstName}s Bewerbung beschäftigen?`;
+    body = `Teilen Sie mir gern kurz mit, ob ${firstName} zu Ihnen passt oder nicht. ${passT}`;
   } else if (tier === "4h") {
-    intro = `${firstName}s Bewerbung liegt nun seit über 4 Stunden bei Ihnen — und wir möchten kurz nachfassen.`;
-    body = `Pflegekräfte werden oft innerhalb weniger Stunden für andere Einsätze angefragt. Damit wir ${firstName} für Sie reservieren können, brauchen wir ein kurzes Signal von Ihnen — entweder die Bewerbung annehmen oder kurz Bescheid geben, dass es nicht passt.`;
-    cta = `Jetzt entscheiden: ${portalUrl}`;
-    quickAction = `\nSchnell antworten?\nFalls Sie keine Zeit für das Portal haben, reicht eine kurze Nachricht:\n  WhatsApp: https://wa.me/4989200000830\n  Telefon:  089 200 000 830\n`;
+    intro = `konnten Sie schon einen Blick auf ${firstName}s Bewerbung werfen?`;
+    body = `Teilen Sie mir gern kurz mit, ob sie zu Ihnen passt oder nicht. ${passT}`;
   } else if (tier === "12h") {
-    intro = `${firstName}s Bewerbung wartet nun seit über 12 Stunden auf Ihre Rückmeldung.`;
-    body = `Wir können nicht mehr garantieren dass ${firstName} noch verfügbar ist — viele Pflegekräfte sagen nach so langer Zeit anderen Familien zu. Bitte geben Sie uns kurz Bescheid, dann wissen wir woran wir sind und können ggf. eine andere Pflegekraft für Sie suchen.`;
-    cta = `Jetzt entscheiden: ${portalUrl}`;
-    quickAction = `\nBitte kurz Bescheid geben\nAuch ein kurzes „passt nicht“ hilft uns weiter — dann können wir freigeben und ${firstName} findet schneller einen anderen Einsatz:\n  WhatsApp: https://wa.me/4989200000830\n  Telefon:  089 200 000 830\n`;
+    intro = `${firstName}s Bewerbung wartet noch auf Ihre Rückmeldung.`;
+    body = `Teilen Sie mir gern kurz mit, ob ${firstName} zu Ihnen passt oder nicht. So weiß ${firstName}, woran sie ist. Und wenn Sie unsicher sind, berate ich Sie natürlich gerne persönlich.`;
   } else {
-    // tier === "46h" — letzte Erinnerung vor dem automatischen Schließen.
-    intro = `${firstName}s Bewerbung liegt jetzt seit fast 48 Stunden bei Ihnen — eine letzte Erinnerung, bevor wir sie schließen.`;
-    body = `Wir können ${firstName} nicht länger für Sie reservieren. Bitte entscheiden Sie jetzt — die Bewerbung im Portal annehmen oder ablehnen, oder sprechen Sie kurz mit uns. Ohne Rückmeldung schließen wir die Bewerbung in etwa 2 Stunden automatisch. Bei Interesse schlagen wir Ihnen dann gerne weitere passende Pflegekräfte vor.`;
-    cta = `Jetzt entscheiden: ${portalUrl}`;
-    quickAction = `\nJetzt entscheiden — oder kurz mit uns sprechen\nAnnehmen, ablehnen oder eine kurze Rückfrage — am schnellsten per WhatsApp oder Anruf:\n  WhatsApp: https://wa.me/4989200000830\n  Telefon:  089 200 000 830\n`;
+    // tier === "46h" — letzte Erinnerung; weitere Vorschläge nur auf Wunsch.
+    intro = `passt ${firstName} zu Ihnen?`;
+    body = `Teilen Sie mir gern kurz mit, ob ja oder nein. Wenn ich nichts von Ihnen höre, gebe ich ${firstName} in den nächsten Stunden wieder frei, damit sie nicht unnötig wartet. Möchten Sie weitere Pflegekräfte sehen? Dann melden Sie sich einfach kurz bei uns.`;
   }
 
-  // Bestpreis-Anker nur im 12h-Tier (siehe HTML-Builder).
-  const bestpreis = (tier === "12h")
-    ? `\nBestpreis-Garantie: Als Direktanbieter ohne Vermittler-Provision bieten wir faire Preise — finden Sie bei vergleichbarer Leistung ein günstigeres Angebot, unterbieten wir es.\n`
-    : "";
+  const infoBits: string[] = [];
+  if (meta.caregiver_age && meta.caregiver_age > 0) infoBits.push(`${meta.caregiver_age} J.`);
+  if (meta.caregiver_german_level) infoBits.push(`Deutsch ${meta.caregiver_german_level}`);
+  const infoLine = infoBits.length > 0 ? ` (${infoBits.join(" · ")})` : "";
 
   return `${halloAnrede},
 
@@ -1215,9 +1184,8 @@ ${intro}
 
 ${body}
 
-${cta}
-${quickAction}${bestpreis}
-Falls die Bewerbung nicht passt, lehnen Sie sie im Portal kurz ab — so weiß ${firstName} Bescheid und kann sich auf andere Familien konzentrieren.
+${cgName}${infoLine}
+${firstName}s Profil ansehen: ${portalUrl}
 
 Mit freundlichen Grüßen
 Ilka Wysocki — Pflegeberaterin
