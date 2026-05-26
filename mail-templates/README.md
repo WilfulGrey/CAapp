@@ -5,6 +5,49 @@ laden aus der Prod-Seite, also siehst du die echte Optik). Dieser Ordner ist
 ein **Design-Workspace** — er wird **nicht** deployed und beeinflusst keinen
 Build. Die echten Mails werden im Code generiert (siehe „Wo es im Code lebt").
 
+## Flow — wann läuft welche Mail (und warum sie stoppt)
+
+Es gibt **zwei parallele Stränge**:
+
+### A) Zeit-getriggert — „Kunde tut nichts" (Nurture)
+Startet automatisch nach der Anfrage, **fixe Zeitabstände**:
+
+```
+0h     [01] Eingangsbestätigung + Angebot   (sofort bei Anfrage)
++24h   [02] Nachfass 1
++48h   [05] Warum Primundus                 ← VOR Nachfass 2
++72h   [03] Nachfass 2
++120h  [04] Nachfass 3   (Break-up, 3 mailto-Buttons)
+```
+
+**Abbruch der Kette:**
+- Nachfass 1–3 stoppen, sobald der Kunde **bucht**, **„nicht interessiert"** ist
+  **oder eine Pflegekraft einlädt**.
+- „Warum Primundus" stoppt nur bei **gebucht / nicht interessiert** (läuft also
+  weiter, auch wenn schon eingeladen — Preis-Argument hilft bis zur Buchung).
+- Nachfass-Texte passen sich dem Fortschritt an (Portal geöffnet / Daten
+  erfasst / eingeladen) — sind **nicht** fix „Patientendaten unvollständig".
+
+### B) Event-getriggert — vom System / Mamamia
+Laufen unabhängig vom Timer, sobald das Event passiert:
+
+```
+patient_data_saved        → [14] Mail D — Profil erfasst
+caregiver_interest_shown  → [11] Mail A + [06] Interesse-Reminder (+1h)
+application_received       → [12] Mail B + [07/08/09/10] Reminder 1h/4h/12h/46h
+application_accepted        → [13] Mail C — Buchung
+```
+
+**Abbruch / Konsequenz:**
+- [06] und [07–10] stoppen, sobald der Kunde für **diese** Pflegekraft reagiert
+  (annimmt ODER ablehnt).
+- Nach [10] (46h-Reminder): ~2h später lehnt das System die Bewerbung
+  **automatisch ab** (48h ohne Reaktion). Keine Mail, sondern die Konsequenz.
+
+> A und B laufen gleichzeitig: Ein Kunde kann z.B. mitten in der Nurture-Kette
+> eine Bewerbung erhalten (B) — die Nurture-Kette bricht dann ab, sobald er
+> reagiert/einlädt/bucht.
+
 ## So arbeiten wir (kein Chaos)
 
 1. **Du** editierst die HTML hier (direkt im Repo via GitHub-Editor, lokal,
