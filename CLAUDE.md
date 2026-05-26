@@ -1,5 +1,37 @@
 # CAapp — Project rules for Claude
 
+> ## 🆕 PROJECT CHANGE (2026-05-26): STAGING ENVIRONMENT JEST LIVE
+>
+> **Critical zmiana którą musisz znać zanim cokolwiek zrobisz.** Do 2026-05-25
+> projekt miał jeden tryb: `git push` do trunk = deploy do prod. Klient widział
+> twoje zmiany natychmiast. Od **2026-05-26** mamy dwa równoległe targets:
+>
+> | | STAGING (default) | PROD (gated) |
+> |---|---|---|
+> | URL CAapp | `caapp-staging.onrender.com` | `kundenportal.primundus.de` |
+> | URL Kostenrechner | `kostenrechner-staging.onrender.com` | `kostenrechner.primundus.de` |
+> | Supabase | `taggpiwpwthgpcmaiqjw` | `ycdwtrklpoqprabtwahi` |
+> | Mamamia | `backend.beta.mamamia.app` (agency_id=18) | `backend.prod.mamamia.app` (agency_id=3) |
+> | Trigger | Push do `integration/mamamia-onboarding` → Render auto-build + CI deploy edge fns automatycznie | **TYLKO** `/deploy_prod` skill |
+>
+> **Co to oznacza dla twojego workflow:**
+>
+> 1. **Merge PR jak zwykle** → automatycznie ląduje na STAGING (frontend Render + edge fns przez CI). Klient NIC nie widzi.
+> 2. **Otwórz `caapp-staging.onrender.com`**, przetestuj swoją zmianę, kliknij się przez flow.
+> 3. **Wszystko OK?** → poproś Claude'a o `/deploy_prod`. Claude zrobi sekwencję: migracje → edge fns → Render API → smoke tests → raport. Pyta o potwierdzenie przed dotknięciem prod.
+>
+> **Edge functions:** PR merge NIE deploy'uje już edge fns na prod automatycznie. Tylko na staging. Żeby zaaktualizować prod edge fns — `/deploy_prod`.
+>
+> **Migracje DB:** ZAWSZE backward-compatible z poprzednią wersją kodu (patrz Święta zasada nr 3 niżej). Nowa NOT NULL bez DEFAULT = zepsujesz prod między momentem zaaplikowania migracji a deploy'em kodu.
+>
+> **Skille dostępne:** `/deploy_staging` (manual refresh stagingu — rzadko potrzebny, CI to robi) + `/deploy_prod` (jedyny sposób na klient-facing change). Definicje w `.claude/skills/`. Wymagają env vars: `SUPABASE_STAGING_REF`, `SUPABASE_PROD_REF`, `RENDER_API_KEY`, `STAGING_CAAPP_SERVICE_ID`, `STAGING_KOSTENRECHNER_SERVICE_ID`, `PROD_CAAPP_SERVICE_ID`, `PROD_KOSTENRECHNER_SERVICE_ID`. Michał wkleja ci to w pierwszej wiadomości albo masz w shell rc.
+>
+> **Pełna dokumentacja:** `docs/staging-environment-plan.md`. Sekcja "Deploy workflow" w tym pliku niżej + URL convention (kostenrechner-beta slot = prod, mental-model "slot z custom domain = prod, slot bez = staging").
+>
+> **Kiedy w wątpliwości — ZAPYTAJ Michała.** Lepiej pause niż zdeployować nie tam.
+
+---
+
 ## 🩸 Święta zasada nr 1: NO DUMB DATA, NO SOFT FALLBACKS
 
 **Albo coś działa, albo nie.** Nie oszukujemy się sami hardkodowanymi
