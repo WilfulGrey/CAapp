@@ -252,46 +252,65 @@ w PR comments + zaczekaj. CI łapie regresje techniczne; nie łapie
 
 ## 6. Render deploys — jak to działa dla ciebie
 
-### Trigger jest automatyczny
+### Staging vs prod — kluczowy mental model
 
-Render auto-deploy'uje na każdy push do `integration/mamamia-onboarding`. Nie potrzebujesz Render dashboard access żeby "wywołać deploy" — wystarczy że twój PR zostanie zmergowany.
+Mamy **dwa środowiska**:
 
-```
-twój PR mergowany → Render dostaje webhook → build → live na beta
-                    (~1.5min CAapp, ~2-3min calculator)
-```
-
-### Dwa serwisy
-
-| Service | URL | Z jakiej części repo |
+| | STAGING (auto) | PROD (gated) |
 |---|---|---|
-| `caapp-beta` | https://caapp-beta.onrender.com | root (Vite static build) |
-| `kostenrechner-beta` | https://kostenrechner-beta.onrender.com | `project 3/` (Next.js SSR) |
+| Komu służy | Zespołowi do verify przed wypuszczeniem | Żywym klientom |
+| Trigger | Każdy push do `main` (= merge twojego PR) | `/deploy_prod` w Claude Code |
+| URL CAapp | https://caapp-staging.onrender.com | https://kundenportal.primundus.de |
+| URL Kostenrechner | https://kostenrechner-staging.onrender.com | https://kostenrechner.primundus.de |
+| Supabase | Osobny staging project (niech inni) | `ycdwtrklpoqprabtwahi` |
+| Mamamia tenant | `backend.beta.mamamia.app` | `backend.prod.mamamia.app` |
+| Render slot slug | `caapp-staging` / `kostenrechner-staging` | `caapp-beta` / `kostenrechner-beta` (historic naming) |
+
+> **🚧 STATUS (2026-05-22):** staging infra w trakcie setup'u. Do czasu
+> aż user-side ops podniesie staging Supabase + Render staging services,
+> faktyczny flow to nadal "trunk → prod" (per `docs/staging-environment-plan.md`).
+> Cala docs poniżej opisuje target state. Treść której jeszcze nie ma — oznaczona.
+
+### Twój dev cycle (target state)
+
+```
+feature/xyz branch → PR → CI green → self-merge to main
+                                       ↓
+                                    Render auto-build STAGING (~3 min)
+                                       ↓
+                                    Manual verify staging URL
+                                       ↓
+                                    "Działa" → poproś Claude: /deploy_prod
+                                       ↓
+                                    Claude robi sekwencję + raportuje
+                                       ↓
+                                    PROD live
+```
+
+`/deploy_prod` jest **jedyną** ścieżką żeby klienci coś zobaczyli. Merge do `main` daje ci tylko staging.
 
 ### Render team access
 
 Michał dodaje Cię do Render team (Settings → Members → Invite). Po
-akceptacji email-a zobaczysz w https://dashboard.render.com/ oba serwisy
-beta. Możesz oglądać build logs / runtime logs / triggerować manual
-redeploy. **NIE możesz** kasować serwisów ani zmieniać `render.yaml`
+akceptacji email-a zobaczysz w https://dashboard.render.com/ wszystkie 4 serwisy
+(2 staging + 2 prod). Możesz oglądać build logs / runtime logs / triggerować
+manual redeploy. **NIE możesz** kasować serwisów ani zmieniać `render.yaml`
 blueprint — to zarezerwowane dla Admin role.
 
-### Co robisz po merge
+### Edge Functions deploy
 
-1. Patrz logi build (Render dashboard → Service → Events lub Logs).
-2. Smoke test live: skopiuj URL z PR → otwórz → przelataj wizard / portal → upewnij się że nic nie zepsute.
-3. Jeśli zepsute — natychmiast otwórz PR z fix'em / rollback'iem (`git revert <merge-commit>` na nowym branchu, PR, merge).
+**Staging:** automatyczny via GitHub Actions (`test.yml` job `deploy-edge-functions`) po merge do `main`. Działa też dla `project 3/supabase/functions/` (kostenrechner edge fns).
 
-### Edge Functions (manual)
+**Prod:** wyłącznie via `/deploy_prod` skill — żaden push do `main` nie ruszy prod Supabase.
 
-Edge Functions Supabase **NIE są deploy'owane przez Render**. Push do brancha ich nie ruszy. Deploy ręczny:
+**Local manual deploy** (NIE rób tego dla prod — patrz CLAUDE.md §"Emergency hotfix"):
 
 ```bash
-npx supabase functions deploy onboard-to-mamamia --project-ref ycdwtrklpoqprabtwahi
-npx supabase functions deploy mamamia-proxy --project-ref ycdwtrklpoqprabtwahi
+npx supabase functions deploy onboard-to-mamamia --project-ref <STAGING_REF>
+# Tylko w razie potrzeby manual re-trigger stagingu po CI flake
 ```
 
-Wymaga `npx supabase login` (Michał da ci dostęp do Supabase project'u jeśli musisz dotykać Edge Functions). W praktyce większość zmian dzieje się w `src/` (CAapp) i `project 3/` — Edge Functions są stabilne, dotyka ich Michał.
+W praktyce większość zmian dzieje się w `src/` (CAapp) i `project 3/` — Edge Functions są stabilne, dotyka ich Michał. Jeśli zmieniasz Edge Function, koniecznie przeczytaj **CLAUDE.md §"Święta zasada nr 3"** (migracje backward-compatible) zanim mergeujesz.
 
 ---
 

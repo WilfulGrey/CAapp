@@ -5,7 +5,13 @@ supabase/.temp/
 .env
 .env.local
 .env.*.local
-.claude/
+# Ignore per-user Claude Code state but commit shared skills.
+# Pattern uses wildcard + negation: gitignore can't un-ignore inside a
+# fully-ignored directory, so we ignore CONTENTS of .claude (with /*)
+# then re-include the skills subtree.
+.claude/*
+!.claude/skills/
+!.claude/skills/**
 coverage/
 # Onboarding paczki dla nowych devów — mogą zawierać klucze .env w plain text.
 # Trzymaj poza repo, przekaż osobnym kanałem (Signal / 1Password / GPG).
