@@ -20,6 +20,32 @@ lassen oder umbauen — ich erkenne sie beim Zurückbauen an dieser Spec. Wenn d
 einen dynamischen Wert **verschiebst**, bleibt er dynamisch; wenn du ihn
 **löschst**, fällt das Feld weg.
 
+## Subject-Zeilen (stehen nicht im HTML)
+
+Die Betreff-Zeilen werden im Code gesetzt, nicht im HTML — hier zum Mitbearbeiten:
+
+| Datei | Subject |
+|-------|---------|
+| 01 Eingangsbestätigung | Ihr persönliches Angebot zur 24-Stunden-Betreuung – Primundus *(Resubmit: „Ihr aktualisiertes Angebot zur 24-Stunden-Betreuung – Primundus")* |
+| 02 Nachfass 1 | AW: Kurze Rückfrage zu Ihrem Angebot |
+| 03 Nachfass 2 | Brauchen Sie noch Hilfe? |
+| 04 Nachfass 3 | Eine letzte Frage — wie schaut's bei Ihnen aus? |
+| 05 Warum Primundus | Kennen Sie die Primundus-Bestpreis-Garantie? |
+| 06 Interesse-Reminder | `{VORNAME}` wartet auf Ihre Rückmeldung |
+| 07 Bewerbung 1h | `{VORNAME}` wartet auf Ihre Entscheidung |
+| 08 Bewerbung 4h | `{VORNAME}`: bitte kurz Bescheid geben |
+| 09 Bewerbung 12h | `{VORNAME}`: ist die Bewerbung noch aktuell? |
+| 10 Bewerbung 46h | `{VORNAME}`: letzte Erinnerung — wir schließen die Bewerbung bald |
+| 11 Mail A — Interesse | Eine Pflegekraft interessiert sich für Ihre Anfrage |
+| 12 Mail B — Bewerbung | Sie haben eine neue Bewerbung erhalten |
+| 13 Mail C — Buchung | Buchung bestätigt — wir kümmern uns um alle weiteren Schritte |
+| 14 Mail D — Profil | Ihre Pflegedaten sind bei uns eingegangen |
+
+> Hinweis: Die Reminder-Subjects 07–10 stammen noch aus der alten Tonalität
+> (v.a. 10 „… wir schließen die Bewerbung bald" ist negativer als der neue
+> Mailtext). Wenn du die Subjects mit anpassen willst, schreib die Wunsch-
+> Betreffs einfach in diese Tabelle — ich ziehe sie nach.
+
 ## Feste Bausteine (überall gleich, am besten nicht pro Mail einzeln ändern)
 
 Wenn du diese änderst, sag es dazu — ich ziehe die Änderung dann **zentral**
