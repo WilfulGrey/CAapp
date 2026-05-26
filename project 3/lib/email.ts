@@ -940,6 +940,16 @@ export function getTeamNotificationTemplate(
     ? String(additionalData.caregiverName)
     : '';
 
+  // Label je Event — NICHT pauschal "Eingeladene Pflegekraft". Eingeladen ist
+  // sie nur bei caregiver_invited (Kunde lädt ein); Interesse / Bewerbung /
+  // Buchung sind eigene Zustände.
+  const caregiverLabel =
+    status === 'caregiver_invited'            ? 'Eingeladene Pflegekraft'
+  : status === 'caregiver_interest_shown'     ? 'Pflegekraft mit Interesse'
+  : status === 'application_received'         ? 'Beworbene Pflegekraft'
+  : status === 'application_accepted_internal' ? 'Akzeptierte Pflegekraft'
+  :                                              'Pflegekraft';
+
   // Acceptance-specific data — contract_patient + contract_contact from the
   // modal's step 2 form, rendered as two tables in the team mail body.
   const contractPatient = (status === 'application_accepted_internal' && additionalData?.contractPatient && typeof additionalData.contractPatient === 'object')
@@ -1061,7 +1071,7 @@ export function getTeamNotificationTemplate(
 
           ${caregiverName ? `
             <div class="highlight">
-              <strong>${status === 'application_accepted_internal' ? 'Akzeptierte Pflegekraft' : 'Eingeladene Pflegekraft'}:</strong> ${caregiverName}${status === 'application_accepted_internal' && acceptanceCaregiverId ? ` (caregiver_id ${acceptanceCaregiverId})` : ''}${status === 'application_accepted_internal' && acceptanceApplicationId ? ` · Application ${acceptanceApplicationId}` : ''}
+              <strong>${caregiverLabel}:</strong> ${caregiverName}${status === 'application_accepted_internal' && acceptanceCaregiverId ? ` (caregiver_id ${acceptanceCaregiverId})` : ''}${status === 'application_accepted_internal' && acceptanceApplicationId ? ` · Application ${acceptanceApplicationId}` : ''}
             </div>
           ` : ''}
 
@@ -1128,7 +1138,7 @@ export function getTeamNotificationTemplate(
     text: `
 ${emoji} ${text}
 ${caregiverName ? `
-${status === 'application_accepted_internal' ? 'Akzeptierte Pflegekraft' : 'Eingeladene Pflegekraft'}: ${caregiverName}${status === 'application_accepted_internal' && acceptanceCaregiverId ? ` (caregiver_id ${acceptanceCaregiverId})` : ''}${status === 'application_accepted_internal' && acceptanceApplicationId ? ` · Application ${acceptanceApplicationId}` : ''}
+${caregiverLabel}: ${caregiverName}${status === 'application_accepted_internal' && acceptanceCaregiverId ? ` (caregiver_id ${acceptanceCaregiverId})` : ''}${status === 'application_accepted_internal' && acceptanceApplicationId ? ` · Application ${acceptanceApplicationId}` : ''}
 ` : ''}${contractTablesText}${showPortalCta ? `
 ➜ Im Kundenportal ansehen: ${portalUrl}
 ` : ''}
