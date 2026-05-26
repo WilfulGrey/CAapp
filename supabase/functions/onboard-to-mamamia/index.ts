@@ -2,7 +2,7 @@
 // POST /functions/v1/onboard-to-mamamia  body: { token: string }
 // → 200 + Set-Cookie: session=... (HttpOnly) + body: { customer_id, job_offer_id }
 
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.4";
+import { createClient } from "npm:@supabase/supabase-js@2.57.4";
 import { onboardLead, sessionPayloadFromResult, type OnboardSecrets, type SupabaseLike } from "./onboard.ts";
 import { createSessionToken, sessionCookieHeader } from "../_shared/session.ts";
 import { corsHeaders } from "../_shared/cors.ts";

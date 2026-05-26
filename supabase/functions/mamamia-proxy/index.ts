@@ -8,7 +8,7 @@
 // Each action validates ownership (queries constrained by session.customer_id
 // or session.job_offer_id; mutations same + allowlist of mutable fields).
 
-import { createClient, type SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2.57.4";
+import { createClient, type SupabaseClient } from "npm:@supabase/supabase-js@2.57.4";
 import { corsHeaders } from "../_shared/cors.ts";
 import { isRateLimited } from "../_shared/rateLimit.ts";
 import { parseCookie, verifySessionToken } from "../_shared/session.ts";
