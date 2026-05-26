@@ -1,14 +1,23 @@
 // Origin allow-list for the CA app + the calculator that triggers
-// /onboard-to-mamamia from the magic-link redirect. Both Render beta
-// hosts get an entry plus the production portal domain. Localhost is
-// kept for dev. Unknown origins are rejected (fall through to localhost
-// so cookies/credentials are never sent to a hostile origin).
+// /onboard-to-mamamia from the magic-link redirect. Both Render hosts
+// (prod slot + staging slot) get an entry plus the production portal
+// domain. Localhost is kept for dev. Unknown origins are rejected (fall
+// through to localhost so cookies/credentials are never sent to a
+// hostile origin).
+//
+// Slot naming (per CLAUDE.md §"URL convention"):
+//   caapp-beta.onrender.com           = PROD slot (custom domain: kundenportal.primundus.de)
+//   kostenrechner-beta.onrender.com   = PROD slot (custom domain: kostenrechner.primundus.de)
+//   caapp-staging.onrender.com        = STAGING slot (no custom domain)
+//   kostenrechner-staging.onrender.com= STAGING slot (no custom domain)
 const ALLOWED_ORIGINS = new Set([
   "http://localhost:5173",
   "https://portal.primundus.de",
   "https://kundenportal.primundus.de",
   "https://caapp-beta.onrender.com",
   "https://kostenrechner-beta.onrender.com",
+  "https://caapp-staging.onrender.com",
+  "https://kostenrechner-staging.onrender.com",
 ]);
 
 export function corsHeaders(origin: string | null): Record<string, string> {

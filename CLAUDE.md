@@ -141,6 +141,59 @@ zaktualizuj go w tym samym turnie.
 
 ---
 
+## 🩸 Święta zasada nr 3: MIGRACJE BACKWARD-COMPATIBLE Z POPRZEDNIĄ WERSJĄ KODU
+
+**Każda migracja DB którą puszczasz na PROD MUSI być działająca z aktualnie
+running kodem (= wersją przed twoim deploy'em).** Inaczej między momentem
+zaaplikowania migracji a deploy'em nowego kodu masz okno gdzie żywy ruch
+hituje błąd. Klient widzi 500. Lead się gubi.
+
+To wynika z faktu że `/deploy_prod` (patrz §"Deploy workflow") robi migracje
+**pierwsze**, potem deploy edge fns + Render. Sekwencja celowa — schema musi
+być gotowa zanim nowy kod jej zacznie używać. Ale to znaczy że stary kod
+przez ~30-60 sekund działa na nowej schemie.
+
+### Konkretne reguły
+
+| Zmiana | OK? | Dlaczego |
+|---|---|---|
+| Dodać NULLABLE kolumnę | ✅ | Stary kod ją ignoruje. |
+| Dodać kolumnę z DEFAULT | ✅ | Inserts z starego kodu (bez tego pola) dostają default. |
+| Dodać tabelę | ✅ | Stary kod nie pisze do niej, nowy zaczyna. |
+| Dodać index | ✅ | Czysto perf, neutralne. |
+| Dodać CHECK constraint na istniejącej kolumnie | ⚠️ | OK gdy data już compliant. Inaczej migracja fail. Najpierw backfill. |
+| Dodać NOT NULL bez DEFAULT na istniejącej kolumnie | ❌ | Stary kod może INSERTOWAĆ bez tego pola → constraint violation → 500. |
+| Drop kolumny | ❌ | Stary kod ją SELECT-uje → undefined column → 500. Multi-step: code stops reading → deploy → migracja drop'ująca. |
+| Rename kolumny | ❌ | Stary kod używa starej nazwy → undefined. Expand-contract: add new + dual-write + deploy code reading new + drop old. 4 deploy cycles. |
+| Drop tabeli | ❌ | Patrz drop kolumny — najpierw stop-reading w kodzie. |
+| Zmiana typu kolumny | ❌ | Cast może rzucić. Add nową column z nowym type → backfill → switch kod → drop starą. |
+
+### Expand-contract pattern dla breaking changes
+
+Gdy MUSISZ zrobić destruktywną zmianę (np. rename `lead.email` → `lead.contact_email`):
+
+1. **PR 1 (expand)**: dodaj `contact_email` (nullable). Code: dual-read (`row.contact_email ?? row.email`), dual-write (zapisz w oba pola na każdy save). `/deploy_prod`.
+2. **PR 2 (backfill)**: skrypt SQL kopiuje istniejące wartości `email` → `contact_email`. Run manually w Supabase Studio lub jako migration. `/deploy_prod`.
+3. **PR 3 (switch)**: code czyta tylko `contact_email`. Pisze tylko `contact_email`. `email` nieużywane ale jeszcze w DB. `/deploy_prod`.
+4. **PR 4 (contract)**: migration drop'ująca kolumnę `email`. `/deploy_prod`.
+
+Cztery deploy cycles, ale ZERO downtime + zero customer-visible error.
+
+### Kiedy można obejść (rzadko)
+
+- **Maintenance window** ogłoszony klientom (np. niedziela 2:00-4:00 AM CET, banner w portalu wcześniej) — wtedy "stop-the-world" rebuild OK. Ale do tego potrzebujesz dummy-mode lub przekierowania na statyczną stronę "Wir machen ein Update". Obecnie nie mamy.
+- **Migracja na pustej tabeli** (np. nowo dodana w poprzednim PR, jeszcze brak rows) — NOT NULL bez DEFAULT OK bo nie ma row'a do złamania.
+
+### Co `/deploy_prod` robi z tą zasadą
+
+Skill `/deploy_prod` ma sekcję "Migration safety reminder" która listuje warunki. Jeśli ostatni diff zawiera zmianę w `supabase/migrations/` która łamie te reguły, skill **OSTRZEGA** user'a w confirmation modal'u zanim wystrzeli. User świadomie potwierdza lub anuluje. Skill nie blokuje silnie — ale zostawia ślad w raporcie.
+
+### Anti-pattern
+
+Najczęstsza pokusa: "dodam NOT NULL z DEFAULT, ale chcę żeby kolumna była strict bez default na future inserts → zaraz po deploy zrobię ALTER TABLE DROP DEFAULT". To dwie migracje. Pierwsza puszcza się z DEFAULT (compat z starym kodem). Druga (DROP DEFAULT) puszcza się w następnym `/deploy_prod` JUŻ z nowym kodem który ZAWSZE wpisuje wartość. To jest zgodne z regułą.
+
+---
+
 ## Architektura — co gdzie żyje
 
 Repo to **monorepo z dwoma aplikacjami** + Supabase Edge Functions. Każda
@@ -171,27 +224,40 @@ Zawsze rozróżniaj zanim coś zmienisz / zdiagnozujesz:
 
 ### 🚨 URL convention — primundus.de w komunikacji, *.onrender.com tylko w infra
 
-Render slot names (`caapp-beta`, `kostenrechner-beta`) i ich domyślne URL-e
-(`*.onrender.com`) to **wewnętrzne identyfikatory infrastruktury**. Klienci
-NIGDY nie widzą `onrender.com` — wchodzą na branded domains:
+Render slot names i ich domyślne URL-e (`*.onrender.com`) to **wewnętrzne
+identyfikatory infrastruktury**. Klienci NIGDY nie widzą `onrender.com`
+— wchodzą na branded domains:
 
-| User-facing URL (ZAWSZE w komunikacji do usera) | Internal Render slot |
-|---|---|
-| `https://kundenportal.primundus.de` | `caapp-beta` (`srv-d7phc0rrjlhs73dtismg`) |
-| `https://kostenrechner.primundus.de` | `kostenrechner-beta` |
+| Env | User-facing URL | Internal Render slot |
+|---|---|---|
+| **PROD** | `https://kundenportal.primundus.de` | `caapp-beta` (`srv-d7phc0rrjlhs73dtismg`) |
+| **PROD** | `https://kostenrechner.primundus.de` | `kostenrechner-beta` |
+| **STAGING** | `https://caapp-staging.onrender.com` (no custom domain) | `caapp-staging` |
+| **STAGING** | `https://kostenrechner-staging.onrender.com` (no custom domain) | `kostenrechner-staging` |
 
-**W wiadomościach do usera** (verify steps, deploy status, "otwórz portal i...")
-— **ZAWSZE** `kundenportal.primundus.de` / `kostenrechner.primundus.de`. Pisanie
-`caapp-beta.onrender.com` zostało explicite zareportowane jako "nie jest właściwy
-adres" (user feedback 2026-05-22) — myli kontekst, bo to nie jest URL pod którym
-user testuje.
+**Gotcha:** prod slot ma "beta" w slug'u (historyczny artefakt — pierwsze
+deploy'e były beta, potem dostały custom domain i awansowały na prod, ale
+slug został). Staging slot ma "staging" w slug'u (nowy, naming pasuje).
+Mental-model: **"slot z custom domain = prod, slot bez = staging".**
+
+**W wiadomościach do usera o PROD** (verify steps, deploy status,
+"otwórz portal i...") — **ZAWSZE** `kundenportal.primundus.de` /
+`kostenrechner.primundus.de`. Pisanie `caapp-beta.onrender.com` zostało
+explicite zareportowane jako "nie jest właściwy adres" (user feedback
+2026-05-22) — myli kontekst, bo to nie jest URL pod którym user testuje
+prod.
+
+**W wiadomościach o STAGING** — OK pisać `caapp-staging.onrender.com`,
+bo staging NIE ma custom domain'a (zero DNS ceremonii, świadoma decyzja
+per `docs/staging-environment-plan.md`). Customer nigdy nie widzi staging
+URL-a, więc to jest "infra address" widoczne tylko zespołowi.
 
 **W infra / curl recipe / debug logs / kodzie** `*.onrender.com` jest OK
 (np. portalUrl assertion w testach, Render dashboard linki, e2e curl snippet
 w §"E2e verification recipe"). Tam to wskazuje na konkretny build target.
 
-**Regex check:** jeśli piszesz wiadomość do usera i widzisz `onrender.com` →
-swap na primundus.de.
+**Regex check:** jeśli piszesz user-message O PROD i widzisz `onrender.com` →
+swap na primundus.de. Jeśli O STAGING — zostaw, to legalny URL.
 
 ### Dwie aplikacje
 
@@ -739,44 +805,95 @@ to nie nasze — projekt 3 ma inną tsconfig. Skupić się na `src/` clean.
 
 ## Deploy workflow
 
-### Frontend (auto)
+> **🚧 TRANSITION STATE (2026-05-22):** plan przejścia na dual-env (staging
+> + prod) opisany w `docs/staging-environment-plan.md`. **Faza 1** (foundation
+> docs + skills + CORS prep) — merged. **Faza 2** (staging Supabase + Render
+> services + branch rename + agency_id env refactor) — pending user-side
+> infra setup. Sekcja poniżej opisuje TARGET state. Do czasu zakończenia
+> Fazy 2, faktyczny workflow = "trunk = prod" (= obecne `integration/mamamia-onboarding` → Render auto-deploy + CI deploy edge fns do prod Supabase). Patrz §"Emergency hotfix" niżej.
 
-`git push origin integration/mamamia-onboarding` → Render auto-builds:
-- `caapp-beta` (Vite static) — ~1.5min
-- `kostenrechner-beta` (Next.js SSR) — ~2-3min
+### Dwa środowiska
 
-Render dashboard: pokazuje build logs. Jeśli build padnie, Render trzyma
-poprzednią wersję live.
+| | STAGING | PROD |
+|---|---|---|
+| Render slot CAapp | `caapp-staging` | `caapp-beta` |
+| Render slot Kostenrechner | `kostenrechner-staging` | `kostenrechner-beta` |
+| URL CAapp | `caapp-staging.onrender.com` | `kundenportal.primundus.de` |
+| URL Kostenrechner | `kostenrechner-staging.onrender.com` | `kostenrechner.primundus.de` |
+| Supabase project ref | `<staging-ref>` | `ycdwtrklpoqprabtwahi` |
+| Mamamia tenant | `backend.beta.mamamia.app` | `backend.prod.mamamia.app` |
+| Mamamia agency_id | `18` (Primundus beta) | `3` (Primundus prod) |
+| Deploy mechanism | Render auto on push do `main` | Manual via `/deploy_prod` skill |
+| Edge fn deploy | CI auto via `test.yml` on push do `main` | `/deploy_prod` skill |
+| Migration deploy | CI auto + `/deploy_staging` skill | `/deploy_prod` skill |
 
-### Edge Functions (auto, via CI)
+### Promotion workflow — `/deploy_staging` i `/deploy_prod`
 
-**Zmiany w `supabase/functions/*` ZAWSZE przez PR.** Po merge do
-`integration/mamamia-onboarding` GitHub Actions (`deploy-edge-functions`
-job w `.github/workflows/test.yml`) automatycznie deployuje funkcje do
-prod Supabase. To jest single source of truth — gita.
+Skills żyją w `.claude/skills/deploy-staging/SKILL.md` + `.claude/skills/deploy-prod/SKILL.md` (commited do repo, więc każdy dev po `git pull` ma dostęp w swoim Claude Code).
 
-**NIGDY** `supabase functions deploy` lokalnie ani direct push na
-`integration/mamamia-onboarding`. Każdy lokalny deploy to race condition:
-wgrywa stan TWOJEGO dysku, nie git HEAD, więc cudze zmiany w chmurze
-mogą wyparować (incydent 2026-05-13 z `hp_caregiver_id` był dokładnie tym).
+**Typowy dev cycle:**
 
-**Emergency hotfix** (tylko gdy CI padło i klient krwawi):
+```
+feature/xyz branch → PR → CI green → self-merge to main
+                                       ↓ (Render auto-deploy)
+                                    STAGING live (~3 min)
+                                       ↓
+                                    Manual verify: open
+                                    caapp-staging.onrender.com
+                                       ↓
+                                    "Looks good" → /deploy_prod
+                                       ↓
+                                    Claude: pre-flight + confirm + migrate +
+                                            edge fns + Render API call +
+                                            poll + smoke + report
+                                       ↓
+                                    PROD live (kundenportal.primundus.de)
+```
+
+**Czego `/deploy_staging` użyć (rzadkie):** ręczny refresh stagingu po
+transient CI flake (esm.sh 522, Render build timeout), albo gdy chcesz
+przepuścić tę samą wersję jeszcze raz po zmianie staging secrets.
+
+**Czego `/deploy_prod` użyć (zawsze):** każda zmiana która ma trafić
+do klienta. Skill enforce'uje:
+- local SHA == staging SHA (nie skipujemy stagingu)
+- interactive confirmation z listą migracji + funkcji do deploy
+- migracje **pierwsze**, kod **drugi** (kolejność krytyczna — patrz Święta zasada nr 3)
+- smoke test po deploy
+- raport z URLs + czasem trwania
+
+### Emergency hotfix (tylko gdy klient krwawi)
+
+Gdy staging jest broken lub czekanie na full cycle = ryzyko biznesowe:
+
 ```bash
-# 1. Confirm jesteś na czystym integration/mamamia-onboarding zsync z origin
-git fetch origin && git diff HEAD origin/integration/mamamia-onboarding -- supabase/functions/
+# 1. Confirm jesteś na czystym main zsync z origin
+git fetch origin && git diff HEAD origin/main -- supabase/functions/
 # Diff musi być pusty. Jeśli nie — pull/merge najpierw.
 
-# 2. Deploy
+# 2. Bezpośredni deploy na prod (skipuje staging)
 npx supabase functions deploy <name> --project-ref ycdwtrklpoqprabtwahi
 ```
 
-Często musisz zdeployować **OBA** (`onboard-to-mamamia` + `mamamia-proxy`)
-gdy zmiany dotyczą shared modules w `_shared/`. CI deploy robi to za
-Ciebie (wszystkie funkcje po kolei).
+**Używaj świadomie.** Skipowanie stagingu znaczy że nie ma weryfikacji że
+zmiana działa z prod Mamamia tenant (Bug #15, #16 by się wykryły na
+stagingu). Po hotfix'ie zrób retro PR żeby commit znalazł się w git history,
+oraz `/deploy_staging` żeby staging i prod znów były synchronized.
 
-**Branch protection** na `integration/mamamia-onboarding` wymaga PR + passing
-CI checks (`vitest`, `deno-onboard`, `deno-proxy`) przed merge. To
-strukturalnie blokuje direct push.
+Często musisz zdeployować **OBA** (`onboard-to-mamamia` + `mamamia-proxy`)
+gdy zmiany dotyczą shared modules w `_shared/`.
+
+**Branch protection** na `main` wymaga PR + passing CI checks (`vitest`,
+`deno-onboard`, `deno-proxy`, `deno-detect`) przed merge. To strukturalnie
+blokuje direct push.
+
+### NEVER `supabase functions deploy` na prod bez gita
+
+Każdy lokalny deploy bez wcześniejszego commit + push to race condition:
+wgrywa stan TWOJEGO dysku, nie git HEAD, więc cudze zmiany w chmurze
+mogą wyparować (incydent 2026-05-13 z `hp_caregiver_id` był dokładnie tym).
+Hotfix sequence powyżej zaczyna od `git fetch + diff` żeby ten case
+wykryć przed deploy'em.
 
 ### Supabase secrets
 
