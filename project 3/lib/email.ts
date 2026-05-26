@@ -1506,6 +1506,122 @@ function customerGreeting(lead: Lead): string {
   return 'Guten Tag';
 }
 
+// Ilka-Signatur-Karte — zentral für alle Caregiver-Event-Mails (A/B/C) und
+// das neue Mail-11-Layout. Identisch zur Eingangsbestätigung, damit die
+// gesamte Mail-Reihe optisch zusammenpasst.
+function caregiverIlkaSig(baseUrl: string): string {
+  return `
+    <p style="font-size:16px;line-height:1.7;color:#555;margin-top:24px;margin-bottom:16px;">Mit freundlichen Grüßen<br><strong style="color:#3D2B1F;">Ilka Wysocki</strong></p>
+    <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="margin:0 0 24px 0;border:1px solid #e8ddd0;border-radius:12px;overflow:hidden;">
+      <tr>
+        <td style="padding:18px 20px 16px;background:#ffffff;">
+          <table width="100%" cellpadding="0" cellspacing="0" role="presentation">
+            <tr>
+              <td style="vertical-align:top;">
+                <table cellpadding="0" cellspacing="0" role="presentation">
+                  <tr>
+                    <td style="padding-right:12px;vertical-align:top;">
+                      <img src="${baseUrl}/images/ilka-wysocki_pm-mallorca.webp" alt="Ilka Wysocki" width="60" style="display:block;width:60px;height:auto;border-radius:8px;" />
+                    </td>
+                    <td style="vertical-align:middle;">
+                      <p style="margin:0 0 2px;font-size:15px;font-weight:700;color:#3D2B1F;white-space:nowrap;">Ilka Wysocki</p>
+                      <p style="margin:0 0 2px;font-size:13px;color:#555;white-space:nowrap;">Pflegeberaterin</p>
+                      <p style="margin:0;font-size:12px;color:#9a8a73;white-space:nowrap;">Mo – So, 8 – 20 Uhr</p>
+                    </td>
+                  </tr>
+                </table>
+                <table cellpadding="0" cellspacing="0" role="presentation" style="margin-top:12px;">
+                  <tr><td style="padding-bottom:6px;">
+                    <a href="tel:+4989200000830" style="display:inline-block;background-color:#f0ebe4;border-radius:20px;padding:8px 16px;text-decoration:none;font-size:13px;font-weight:500;color:#3D2B1F;white-space:nowrap;">&#9990; 089 200 000 830</a>
+                  </td></tr>
+                  <tr><td>
+                    <a href="https://wa.me/4989200000830" style="display:inline-block;background-color:#25D366;border-radius:20px;padding:8px 16px;text-decoration:none;font-size:13px;font-weight:600;color:#ffffff;white-space:nowrap;">WhatsApp schreiben</a>
+                  </td></tr>
+                </table>
+              </td>
+              <td style="vertical-align:top;text-align:right;">
+                <table cellpadding="0" cellspacing="0" role="presentation" style="border:1px solid #e8ddd0;border-radius:8px;overflow:hidden;margin-left:auto;">
+                  <tr><td style="padding:8px 10px;background:#ffffff;text-align:center;vertical-align:top;">
+                    <img src="${baseUrl}/images/primundus_testsieger-2021.webp" alt="Testsieger DIE WELT" width="64" style="display:block;width:64px;height:auto;margin:0 auto 5px;" />
+                    <p style="margin:0 0 1px;font-size:11px;font-weight:700;color:#3D2B1F;white-space:nowrap;">Testsieger <span style="color:#B5A184;">DIE WELT</span></p>
+                    <p style="margin:0;font-size:10px;color:#888;line-height:1.4;">Preis, Qualität &amp;<br>Kundenservice</p>
+                  </td></tr>
+                </table>
+              </td>
+            </tr>
+          </table>
+        </td>
+      </tr>
+      <tr><td style="background:#f9f6f2;border-top:1px solid #e8ddd0;">
+        <table width="100%" cellpadding="0" cellspacing="0" role="presentation"><tr>
+          <td style="padding:12px 0;text-align:center;width:33%;border-right:1px solid #e8ddd0;"><p style="margin:0;font-size:12px;color:#555;line-height:1.4;">Über 20 Jahre<br>Erfahrung</p></td>
+          <td style="padding:12px 0;text-align:center;width:33%;border-right:1px solid #e8ddd0;"><p style="margin:0;font-size:12px;color:#555;line-height:1.4;">60.000+<br>betreute Einsätze</p></td>
+          <td style="padding:12px 0;text-align:center;width:33%;"><p style="margin:0;font-size:12px;color:#555;line-height:1.4;">Persönlicher<br>Ansprechpartner,<br>7&nbsp;Tage/Woche</p></td>
+        </tr></table>
+      </td></tr>
+    </table>`;
+}
+
+// Gemeinsame HTML-Shell (Header + Content + Footer) für alle Caregiver-
+// Event-Mails und Mail 11. Nur `content` unterscheidet sich.
+function caregiverMailShell(baseUrl: string, leadEmail: string, content: string): string {
+  return `<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Primundus 24h-Pflege</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; line-height: 1.6; color: #333; background-color: #f4f4f4; }
+    @media only screen and (max-width: 600px) { .email-content { padding: 30px 20px !important; } }
+  </style>
+</head>
+<body>
+  <div style="width:100%;background-color:#f4f4f4;padding:20px 0;">
+    <table width="100%" cellpadding="0" cellspacing="0" role="presentation"><tr><td align="center">
+      <div style="max-width:600px;margin:0 auto;background-color:#ffffff;border-radius:8px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.1);">
+        <div style="background:#ffffff;padding:24px 40px 20px 40px;border-bottom:1px solid #f0ebe4;">
+          <table width="100%" cellpadding="0" cellspacing="0" role="presentation"><tr>
+            <td style="vertical-align:middle;">
+              <img src="${baseUrl}/images/Primundus-Logo_V6.png" alt="Primundus Logo" width="160" style="display:block;width:160px;max-width:160px;height:auto;" />
+            </td>
+            <td style="vertical-align:middle;text-align:right;">
+              <table cellpadding="0" cellspacing="0" role="presentation" style="margin-left:auto;"><tr>
+                <td style="text-align:center;vertical-align:middle;padding-right:8px;border-right:1px solid #f0ebe4;">
+                  <img src="${baseUrl}/images/primundus_testsieger-2021.webp" alt="Testsieger DIE WELT" width="36" style="display:block;width:36px;height:auto;" />
+                </td>
+                <td style="text-align:left;padding-left:8px;">
+                  <p style="margin:0 0 1px;font-size:10px;font-weight:700;color:#3D2B1F;white-space:nowrap;">Testsieger</p>
+                  <p style="margin:0 0 1px;font-size:10px;color:#B5A184;white-space:nowrap;font-weight:600;">DIE WELT</p>
+                  <p style="margin:0;font-size:9px;color:#aaa;white-space:nowrap;">Preis &amp; Qualit&auml;t</p>
+                </td>
+              </tr></table>
+            </td>
+          </tr></table>
+        </div>
+        <div class="email-content" style="padding:40px 40px 32px;text-align:left;">${content}</div>
+        <div style="background-color:#f8f9fa;padding:30px;text-align:center;border-top:1px solid #e0e0e0;">
+          <div style="font-weight:600;font-size:15px;color:#3D2B1F;margin-bottom:6px;">Primundus Deutschland</div>
+          <div style="font-size:13px;color:#666;line-height:1.8;">
+            24h-Pflege und Betreuung zu Hause<br>
+            <a href="tel:+4989200000830" style="color:#0066CC;text-decoration:none;">+49 89 200 000 830</a> |
+            <a href="mailto:info@primundus.de" style="color:#0066CC;text-decoration:none;">info@primundus.de</a><br>
+            <a href="https://primundus.de" style="color:#0066CC;text-decoration:none;">www.primundus.de</a>
+          </div>
+          <div style="font-size:12px;color:#999;margin-top:16px;line-height:1.5;">
+            Diese E-Mail wurde versendet an: ${leadEmail}<br>
+            Primundus Deutschland | Vitanas Group<br><br>
+            Sie erhalten diese E-Mail, weil Sie eine Kalkulation auf primundus.de angefordert haben.
+          </div>
+        </div>
+      </div>
+    </td></tr></table>
+  </div>
+</body>
+</html>`;
+}
+
 // Gemeinsamer Frame für beide Caregiver-Event-Mails. Nur Subject, Intro-HTML,
 // "So geht es weiter"-HTML und CTA-Text sind je Mail unterschiedlich.
 function buildCaregiverEventEmail(opts: {
@@ -1568,58 +1684,7 @@ function buildCaregiverEventEmail(opts: {
       </td></tr>
     </table>`;
 
-  // Ilka-Sig — inline, gleicher Aufbau wie in der Eingangsbestätigung oben
-  // damit beide Mails optisch zur Mail-1 passen.
-  const ilkaSig = `
-    <p style="font-size:16px;line-height:1.7;color:#555;margin-top:24px;margin-bottom:16px;">Mit freundlichen Grüßen<br><strong style="color:#3D2B1F;">Ilka Wysocki</strong></p>
-    <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="margin:0 0 24px 0;border:1px solid #e8ddd0;border-radius:12px;overflow:hidden;">
-      <tr>
-        <td style="padding:18px 20px 16px;background:#ffffff;">
-          <table width="100%" cellpadding="0" cellspacing="0" role="presentation">
-            <tr>
-              <td style="vertical-align:top;">
-                <table cellpadding="0" cellspacing="0" role="presentation">
-                  <tr>
-                    <td style="padding-right:12px;vertical-align:top;">
-                      <img src="${baseUrl}/images/ilka-wysocki_pm-mallorca.webp" alt="Ilka Wysocki" width="60" style="display:block;width:60px;height:auto;border-radius:8px;" />
-                    </td>
-                    <td style="vertical-align:middle;">
-                      <p style="margin:0 0 2px;font-size:15px;font-weight:700;color:#3D2B1F;white-space:nowrap;">Ilka Wysocki</p>
-                      <p style="margin:0 0 2px;font-size:13px;color:#555;white-space:nowrap;">Pflegeberaterin</p>
-                      <p style="margin:0;font-size:12px;color:#9a8a73;white-space:nowrap;">Mo – So, 8 – 20 Uhr</p>
-                    </td>
-                  </tr>
-                </table>
-                <table cellpadding="0" cellspacing="0" role="presentation" style="margin-top:12px;">
-                  <tr><td style="padding-bottom:6px;">
-                    <a href="tel:+4989200000830" style="display:inline-block;background-color:#f0ebe4;border-radius:20px;padding:8px 16px;text-decoration:none;font-size:13px;font-weight:500;color:#3D2B1F;white-space:nowrap;">&#9990; 089 200 000 830</a>
-                  </td></tr>
-                  <tr><td>
-                    <a href="https://wa.me/4989200000830" style="display:inline-block;background-color:#25D366;border-radius:20px;padding:8px 16px;text-decoration:none;font-size:13px;font-weight:600;color:#ffffff;white-space:nowrap;">WhatsApp schreiben</a>
-                  </td></tr>
-                </table>
-              </td>
-              <td style="vertical-align:top;text-align:right;">
-                <table cellpadding="0" cellspacing="0" role="presentation" style="border:1px solid #e8ddd0;border-radius:8px;overflow:hidden;margin-left:auto;">
-                  <tr><td style="padding:8px 10px;background:#ffffff;text-align:center;vertical-align:top;">
-                    <img src="${baseUrl}/images/primundus_testsieger-2021.webp" alt="Testsieger DIE WELT" width="64" style="display:block;width:64px;height:auto;margin:0 auto 5px;" />
-                    <p style="margin:0 0 1px;font-size:11px;font-weight:700;color:#3D2B1F;white-space:nowrap;">Testsieger <span style="color:#B5A184;">DIE WELT</span></p>
-                    <p style="margin:0;font-size:10px;color:#888;line-height:1.4;">Preis, Qualität &amp;<br>Kundenservice</p>
-                  </td></tr>
-                </table>
-              </td>
-            </tr>
-          </table>
-        </td>
-      </tr>
-      <tr><td style="background:#f9f6f2;border-top:1px solid #e8ddd0;">
-        <table width="100%" cellpadding="0" cellspacing="0" role="presentation"><tr>
-          <td style="padding:12px 0;text-align:center;width:33%;border-right:1px solid #e8ddd0;"><p style="margin:0;font-size:12px;color:#555;line-height:1.4;">Über 20 Jahre<br>Erfahrung</p></td>
-          <td style="padding:12px 0;text-align:center;width:33%;border-right:1px solid #e8ddd0;"><p style="margin:0;font-size:12px;color:#555;line-height:1.4;">60.000+<br>betreute Einsätze</p></td>
-          <td style="padding:12px 0;text-align:center;width:33%;"><p style="margin:0;font-size:12px;color:#555;line-height:1.4;">Persönlicher<br>Ansprechpartner,<br>7&nbsp;Tage/Woche</p></td>
-        </tr></table>
-      </td></tr>
-    </table>`;
+  const ilkaSig = caregiverIlkaSig(baseUrl);
 
   const content = `
     <p style="font-size:15px;line-height:1.75;color:#444;margin-bottom:14px;">${greeting},</p>
@@ -1639,61 +1704,7 @@ function buildCaregiverEventEmail(opts: {
     ${opts.psHtml ?? ''}
     ${ilkaSig}`;
 
-  const html = `<!DOCTYPE html>
-<html lang="de">
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Primundus 24h-Pflege</title>
-  <style>
-    * { margin: 0; padding: 0; box-sizing: border-box; }
-    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; line-height: 1.6; color: #333; background-color: #f4f4f4; }
-    @media only screen and (max-width: 600px) { .email-content { padding: 30px 20px !important; } }
-  </style>
-</head>
-<body>
-  <div style="width:100%;background-color:#f4f4f4;padding:20px 0;">
-    <table width="100%" cellpadding="0" cellspacing="0" role="presentation"><tr><td align="center">
-      <div style="max-width:600px;margin:0 auto;background-color:#ffffff;border-radius:8px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.1);">
-        <div style="background:#ffffff;padding:24px 40px 20px 40px;border-bottom:1px solid #f0ebe4;">
-          <table width="100%" cellpadding="0" cellspacing="0" role="presentation"><tr>
-            <td style="vertical-align:middle;">
-              <img src="${baseUrl}/images/Primundus-Logo_V6.png" alt="Primundus Logo" width="160" style="display:block;width:160px;max-width:160px;height:auto;" />
-            </td>
-            <td style="vertical-align:middle;text-align:right;">
-              <table cellpadding="0" cellspacing="0" role="presentation" style="margin-left:auto;"><tr>
-                <td style="text-align:center;vertical-align:middle;padding-right:8px;border-right:1px solid #f0ebe4;">
-                  <img src="${baseUrl}/images/primundus_testsieger-2021.webp" alt="Testsieger DIE WELT" width="36" style="display:block;width:36px;height:auto;" />
-                </td>
-                <td style="text-align:left;padding-left:8px;">
-                  <p style="margin:0 0 1px;font-size:10px;font-weight:700;color:#3D2B1F;white-space:nowrap;">Testsieger</p>
-                  <p style="margin:0 0 1px;font-size:10px;color:#B5A184;white-space:nowrap;font-weight:600;">DIE WELT</p>
-                  <p style="margin:0;font-size:9px;color:#aaa;white-space:nowrap;">Preis &amp; Qualit&auml;t</p>
-                </td>
-              </tr></table>
-            </td>
-          </tr></table>
-        </div>
-        <div class="email-content" style="padding:40px 40px 32px;text-align:left;">${content}</div>
-        <div style="background-color:#f8f9fa;padding:30px;text-align:center;border-top:1px solid #e0e0e0;">
-          <div style="font-weight:600;font-size:15px;color:#3D2B1F;margin-bottom:6px;">Primundus Deutschland</div>
-          <div style="font-size:13px;color:#666;line-height:1.8;">
-            24h-Pflege und Betreuung zu Hause<br>
-            <a href="tel:+4989200000830" style="color:#0066CC;text-decoration:none;">+49 89 200 000 830</a> |
-            <a href="mailto:info@primundus.de" style="color:#0066CC;text-decoration:none;">info@primundus.de</a><br>
-            <a href="https://primundus.de" style="color:#0066CC;text-decoration:none;">www.primundus.de</a>
-          </div>
-          <div style="font-size:12px;color:#999;margin-top:16px;line-height:1.5;">
-            Diese E-Mail wurde versendet an: ${opts.lead.email}<br>
-            Primundus Deutschland | Vitanas Group<br><br>
-            Sie erhalten diese E-Mail, weil Sie eine Kalkulation auf primundus.de angefordert haben.
-          </div>
-        </div>
-      </div>
-    </td></tr></table>
-  </div>
-</body>
-</html>`;
+  const html = caregiverMailShell(baseUrl, opts.lead.email, content);
 
   // Plaintext-Fallback. Knapper als HTML — Mail-Clients ohne HTML-Rendering
   // sehen einen lesbaren Reflex von Intro + Pflegekraft + nächster Schritt.
@@ -1890,37 +1901,132 @@ www.primundus.de
   return { subject, html, text };
 }
 
+// Mail 11 (Mail A — Interesse). Eigenständiges Layout (NICHT
+// buildCaregiverEventEmail), damit Mail B/C unberührt bleiben:
+// kompakte Pflegekraft-Kachel (Foto · Name·Alter · Badge · Erfahrung ·
+// Deutsch · „Profil ansehen"-Link, kein grüner Button, keine Bio),
+// „Was Sie als Nächstes tun können"-Schritte und Bestpreis-Box mit der
+// abgestimmten Formulierung. Header/Footer/Signatur über die geteilten
+// Helper (caregiverMailShell / caregiverIlkaSig).
 export function getCaregiverInterestEmailTemplate(
   lead: Lead,
   caregiver: CaregiverDisplay,
   portalUrl: string,
 ): EmailTemplate {
-  const firstName = caregiver.name.split(' ')[0];
-  const introHtml = `<p style="font-size:15px;line-height:1.75;color:#444;margin-bottom:18px;">eine erfreuliche Nachricht — eine Pflegekraft hat sich Ihr Angebot angesehen und ist interessiert, die Betreuung zu übernehmen.</p>`;
-  const middleHtml = buildStepsList([
-    { title: 'Profil ansehen', desc: `${firstName}s Erfahrung, Qualifikation und bisherige Einsätze in Ruhe im Portal anschauen.` },
-    { title: 'Einladen', desc: `Gefällt Ihnen das Profil, laden Sie ${firstName} mit einem Klick ein, sich bei Ihnen zu bewerben.` },
-    { title: 'Bewerbung erhalten', desc: `Wenn ${firstName} sich daraufhin bewirbt, bekommen Sie das konkrete Angebot per E-Mail und entscheiden dann in Ruhe.` },
-  ]) + persoenlichHinweisHtml();
-  return buildCaregiverEventEmail({
-    lead,
-    caregiver,
-    subject: 'Eine Pflegekraft interessiert sich für Ihre Anfrage',
-    introHtml,
-    middleHtml,
-    ctaText: 'Pflegekraft im Portal ansehen →',
-    portalUrl,
-    psHtml: bestpreisPsHtml(),
-    psText: BESTPREIS_PS_TEXT,
-    plainSummary: `eine erfreuliche Nachricht — eine Pflegekraft hat sich Ihr Angebot angesehen und ist interessiert, die Betreuung zu übernehmen.
+  const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://primundus.de';
+  const greeting = customerGreeting(lead);
+  const cg = caregiver;
+  const firstName = cg.name.split(' ')[0];
+  const psLabel = 'font-size:11px;font-weight:700;color:#9a8a73;letter-spacing:.08em;text-transform:uppercase;';
 
-So geht es weiter:
-1. Profil ansehen — ${firstName}s Erfahrung, Qualifikation und bisherige Einsätze in Ruhe im Portal anschauen.
-2. Einladen — gefällt Ihnen das Profil, laden Sie ${firstName} mit einem Klick ein, sich bei Ihnen zu bewerben.
-3. Bewerbung erhalten — wenn ${firstName} sich daraufhin bewirbt, bekommen Sie das konkrete Angebot per E-Mail und entscheiden dann in Ruhe.
+  const photoHtml = cg.photoUrl
+    ? `<img src="${cg.photoUrl}" alt="${cg.name}" width="80" style="display:block;width:80px;height:80px;border-radius:50%;object-fit:cover;border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.08);" />`
+    : `<div style="width:80px;height:80px;border-radius:50%;background-color:#B5A184;color:#fff;font-size:28px;font-weight:700;line-height:80px;text-align:center;border:2px solid #fff;">${caregiverInitials(cg.name)}</div>`;
 
-${PERSOENLICH_HINWEIS_TEXT}`,
-  });
+  const badge = caregiverBadgeStyle(cg.badgeLevel);
+  const badgeHtml = badge
+    ? `<span style="display:inline-block;background-color:${badge.solid};background:${badge.gradient};color:#fff;padding:5px 12px;border-radius:14px;font-size:12px;font-weight:700;letter-spacing:.04em;white-space:nowrap;">&#127941; ${(cg.badgeLevel || '').toUpperCase()}</span>`
+    : '';
+
+  const metaParts: string[] = [];
+  if (cg.yearsExperience && cg.yearsExperience > 0) metaParts.push(`${cg.yearsExperience} ${cg.yearsExperience === 1 ? 'Jahr' : 'Jahre'} Erfahrung`);
+  if (cg.einsatzCount && cg.einsatzCount > 0)       metaParts.push(`${cg.einsatzCount} ${cg.einsatzCount === 1 ? 'Einsatz' : 'Einsätze'}`);
+  const metaLine = metaParts.length > 0
+    ? `<p style="margin:0 0 3px;font-size:14px;color:#666;">${metaParts.join(' &middot; ')}</p>`
+    : '';
+  const deutschLine = cg.germanLevel
+    ? `<p style="margin:0;font-size:14px;color:#666;">Deutsch ${cg.germanLevel}</p>`
+    : '';
+  const ageSuffix = cg.age ? ` <span style="font-size:15px;font-weight:400;color:#9a8a73;">&middot; ${cg.age} J.</span>` : '';
+
+  const kachel = `
+    <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="margin:0 0 26px;border-radius:12px;background:#FAF8F4;overflow:hidden;">
+      <tr><td style="padding:20px 22px;">
+        <table width="100%" cellpadding="0" cellspacing="0" role="presentation">
+          <tr>
+            <td style="vertical-align:middle;width:96px;padding-right:16px;">${photoHtml}</td>
+            <td style="vertical-align:middle;">
+              <p style="margin:0 0 4px;font-size:18px;font-weight:700;color:#2D1F0F;">${cg.name}${ageSuffix}</p>
+              ${metaLine}
+              ${deutschLine}
+            </td>
+            ${badgeHtml ? `<td style="vertical-align:top;text-align:right;padding-left:10px;">${badgeHtml}</td>` : ''}
+          </tr>
+        </table>
+        <div style="border-top:1px solid #ebe2d2;margin:16px 0 0;padding-top:14px;">
+          <a href="${portalUrl}" style="color:#8B7355;text-decoration:none;font-weight:700;font-size:15px;">${firstName}s Profil ansehen &rarr;</a>
+        </div>
+      </td></tr>
+    </table>`;
+
+  const stepRow = (n: string, title: string, desc: string, last = false) => `
+      <tr>
+        <td style="vertical-align:top;width:34px;padding:0 12px ${last ? '0' : '14px'} 0;">
+          <table cellpadding="0" cellspacing="0" role="presentation"><tr>
+            <td width="26" height="26" align="center" valign="middle" bgcolor="#8B7355" style="background-color:#8B7355;border-radius:50%;color:#ffffff;font-size:13px;font-weight:700;line-height:26px;text-align:center;">${n}</td>
+          </tr></table>
+        </td>
+        <td style="vertical-align:top;padding:0 0 ${last ? '0' : '14px'} 0;">
+          <p style="margin:0 0 2px;font-size:15px;font-weight:700;color:#2D1F0F;line-height:1.4;">${title}</p>
+          <p style="margin:0;font-size:14px;line-height:1.6;color:#555;">${desc}</p>
+        </td>
+      </tr>`;
+
+  const stepsTable = `
+    <p style="font-size:15px;line-height:1.75;color:#2D1F0F;margin:0 0 16px;"><strong>Was Sie als Nächstes tun können:</strong></p>
+    <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="margin:0 0 26px;">
+      ${stepRow('1', 'Profil in Ruhe ansehen', `Im Portal finden Sie ${firstName}s vollständige Erfahrung, bisherige Einsätze und Sprachkenntnisse.`)}
+      ${stepRow('2', 'Einladen, sich zu bewerben', `Wenn Sie ebenfalls den Eindruck haben, dass ${firstName} passt, laden Sie sie mit einem Klick ein, sich bei Ihnen formal zu bewerben.`)}
+      ${stepRow('3', 'Konkrete Bewerbung erhalten', `Die formale Bewerbung erhalten Sie per E-Mail und sehen sie auch im Portal — mit Anreisedatum, Reisekosten und allen Konditionen. Erst dann entscheiden Sie verbindlich.`, true)}
+    </table>`;
+
+  const bestpreisBox = `
+    <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="margin:0 0 8px;background:#FAF8F4;border-radius:10px;overflow:hidden;">
+      <tr><td style="padding:16px 24px 20px;">
+        <p style="margin:0 0 6px;${psLabel}color:#B8860B;">Bestpreis-Garantie</p>
+        <p style="margin:0 0 6px;font-size:14px;line-height:1.65;color:#2D1F0F;">Als <strong>Direktanbieter ohne Vermittler</strong> sparen wir die Provision — und geben diesen Vorteil direkt an Sie weiter.</p>
+        <p style="margin:0;font-size:14px;line-height:1.65;color:#2D1F0F;">Sollten Sie bei vergleichbarer Leistung ein günstigeres Angebot finden, <strong>unterbieten wir es.</strong></p>
+      </td></tr>
+    </table>`;
+
+  const content = `
+    <p style="font-size:15px;line-height:1.75;color:#444;margin-bottom:14px;">${greeting},</p>
+    <p style="font-size:15px;line-height:1.75;color:#444;margin-bottom:24px;">eine Pflegekraft hat Interesse an Ihrer Betreuungsstelle. Schauen Sie sich ihr Profil in Ruhe an — und laden Sie sie ein, sich zu bewerben, oder lehnen Sie ab.</p>
+    ${kachel}
+    ${stepsTable}
+    ${bestpreisBox}
+    <p style="font-size:15px;line-height:1.75;color:#444;margin:30px 0 18px;">Wenn Sie Fragen zu ${firstName}s Profil haben oder Unterstützung bei der Einschätzung möchten — rufen Sie mich an, schreiben Sie mir per WhatsApp oder antworten Sie einfach auf diese E-Mail. Ich bin gerne für Sie da.</p>
+    ${caregiverIlkaSig(baseUrl)}`;
+
+  const html = caregiverMailShell(baseUrl, lead.email, content);
+
+  const metaPlain = metaParts.length > 0 ? metaParts.join(' · ') : '';
+  const text = `${greeting},
+
+eine Pflegekraft hat Interesse an Ihrer Betreuungsstelle. Schauen Sie sich ihr Profil in Ruhe an — und laden Sie sie ein, sich zu bewerben, oder lehnen Sie ab.
+
+PFLEGEKRAFT
+${cg.name}${cg.age ? ` · ${cg.age} J.` : ''}${cg.badgeLevel ? ` · ${cg.badgeLevel}-Pflegekraft` : ''}
+${metaPlain ? metaPlain + '\n' : ''}${cg.germanLevel ? `Deutsch ${cg.germanLevel}\n` : ''}${firstName}s Profil ansehen: ${portalUrl}
+
+WAS SIE ALS NÄCHSTES TUN KÖNNEN
+1. Profil in Ruhe ansehen — im Portal finden Sie ${firstName}s vollständige Erfahrung, bisherige Einsätze und Sprachkenntnisse.
+2. Einladen, sich zu bewerben — wenn Sie ebenfalls den Eindruck haben, dass ${firstName} passt, laden Sie sie mit einem Klick ein, sich bei Ihnen formal zu bewerben.
+3. Konkrete Bewerbung erhalten — die formale Bewerbung erhalten Sie per E-Mail und sehen sie auch im Portal, mit Anreisedatum, Reisekosten und allen Konditionen. Erst dann entscheiden Sie verbindlich.
+
+Bestpreis-Garantie: Als Direktanbieter ohne Vermittler sparen wir die Provision — und geben diesen Vorteil direkt an Sie weiter. Sollten Sie bei vergleichbarer Leistung ein günstigeres Angebot finden, unterbieten wir es.
+
+Wenn Sie Fragen zu ${firstName}s Profil haben oder Unterstützung bei der Einschätzung möchten — rufen Sie mich an, schreiben Sie mir per WhatsApp oder antworten Sie einfach auf diese E-Mail. Ich bin gerne für Sie da.
+
+Mit freundlichen Grüßen
+Ilka Wysocki — Pflegeberaterin
+Tel: 089 200 000 830  ·  WhatsApp: https://wa.me/4989200000830
+
+Primundus Deutschland
+www.primundus.de
+`;
+
+  return { subject: 'Eine Pflegekraft interessiert sich für Ihre Anfrage', html, text };
 }
 
 export function getApplicationReceivedEmailTemplate(
