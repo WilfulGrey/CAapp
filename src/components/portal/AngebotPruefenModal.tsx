@@ -328,12 +328,10 @@ export const AngebotPruefenModal: FC<{
             </div>
           </div>
 
-          {/* Scroll-Bereich mit Bottom-Fade: signalisiert dass unterhalb des
-              sichtbaren Rands noch Inhalt kommt (Hinweistext + Pflicht-
-              Checkbox in Step 1). Ohne den Fade wirkt die Liste am
-              Kündigungsfrist-Row "fertig" und die Checkbox wird übersehen. */}
-          <div className="relative flex-1 min-h-0">
-          <div className="overflow-y-auto h-full">
+          {/* Scrollbarer Body — robustes Flex-Muster: flex-1 (füllt den Platz
+              zwischen Header und fixem Footer) + min-h-0 (erlaubt Schrumpfen
+              unter Content-Höhe → echtes Scrollen) + overflow-y-auto. */}
+          <div className="flex-1 min-h-0 overflow-y-auto">
             {step === 1 && (
               <div className="p-5 space-y-5">
                 <div className="flex items-center gap-3 bg-gray-50 rounded-xl px-4 py-3 border border-gray-100">
@@ -565,10 +563,6 @@ export const AngebotPruefenModal: FC<{
                 </label>
               </div>
             )}
-          </div>
-            {/* Bottom-Fade — Scroll-Affordance, zeigt dass unten noch
-                Inhalt kommt. pointer-events-none, damit Klicks durchgehen. */}
-            <div className="pointer-events-none absolute bottom-0 inset-x-0 h-6 bg-gradient-to-t from-white to-transparent" />
           </div>
 
           {/* Trust-Strip — direkt über dem CTA an dem Punkt wo der Kunde
