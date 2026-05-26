@@ -805,27 +805,51 @@ to nie nasze — projekt 3 ma inną tsconfig. Skupić się na `src/` clean.
 
 ## Deploy workflow
 
-> **🚧 TRANSITION STATE (2026-05-22):** plan przejścia na dual-env (staging
-> + prod) opisany w `docs/staging-environment-plan.md`. **Faza 1** (foundation
-> docs + skills + CORS prep) — merged. **Faza 2** (staging Supabase + Render
-> services + branch rename + agency_id env refactor) — pending user-side
-> infra setup. Sekcja poniżej opisuje TARGET state. Do czasu zakończenia
-> Fazy 2, faktyczny workflow = "trunk = prod" (= obecne `integration/mamamia-onboarding` → Render auto-deploy + CI deploy edge fns do prod Supabase). Patrz §"Emergency hotfix" niżej.
+> **🟢 STAGING LIVE (od 2026-05-26).** PR #189 + #190 wprowadziły dual-env.
+> Staging = osobny Supabase project (`taggpiwpwthgpcmaiqjw`) + osobne Render
+> slots (`caapp-staging` + `kostenrechner-staging`) + Mamamia beta tenant
+> (`backend.beta.mamamia.app`, agency 18). Prod **niezmieniony** (slot
+> `caapp` + `kostenrechner`, Supabase `ycdwtrklpoqprabtwahi`, Mamamia
+> preprod `backend.prod.mamamia.app`, agency 3). Patrz
+> `docs/staging-environment-plan.md` dla pełnego rationale.
+>
+> **Branch rename** `integration/mamamia-onboarding` → `main` — świadomie
+> defer'owany. Trunk to nadal `integration/mamamia-onboarding`. Skills +
+> workflows referują tę gałąź; rename gdy będzie pretekst.
+
+### ⚠️ CO SIĘ ZMIENIŁO 2026-05-26 — KAŻDY DEV / CLAUDE MUSI WIEDZIEĆ
+
+**Przed:** `git push origin integration/mamamia-onboarding` → wszystko auto-deployowało się na prod (Render + edge fns + migracje).
+
+**Po:**
+- **Frontend (Render):** push → BOTH prod + staging Render slots auto-build z tego samego commit'a. Bez zmian dla frontu.
+- **Edge functions:** CI deployuje **tylko na STAGING** Supabase (`taggpiwpwthgpcmaiqjw`). PROD Supabase (`ycdwtrklpoqprabtwahi`) **NIE dostaje auto-deploy**. Musisz albo `/deploy_prod` (skill w Claude Code), albo manual `supabase functions deploy --project-ref ycdwtrklpoqprabtwahi`.
+- **Migracje SQL:** brak auto-deploy w żadnym kierunku — zawsze manual przez `supabase db push --linked` lub `/deploy_prod`.
+
+**Implikacja:** jeśli zmieniasz cokolwiek w `supabase/functions/*` lub `project 3/supabase/functions/*` lub `supabase/migrations/*` → po merge frontend dotrze na prod automatycznie, **edge functions + migracje NIE**. Klient zobaczy nowy UI ale rozmawiający z nim Supabase ma stary kod → kruche.
+
+**Co robić:**
+1. **Zwykła sytuacja:** merge PR → automatycznie staging dostaje wszystko (front + edge + bez migracji). Otwórz `caapp-staging.onrender.com/?token=<test>`, sprawdź. Jeśli OK → `/deploy_prod` w Claude Code. Skill przepyta + zrobi sekwencję.
+2. **Hot-fix bez stagingu:** patrz §"Emergency hotfix" niżej — manualny deploy z explicit `--project-ref ycdwtrklpoqprabtwahi`.
+3. **Tylko-frontend change** (np. tylko `src/` lub `project 3/components/`): Render auto-deploy załatwia obie strony. Nie wymaga `/deploy_prod`.
 
 ### Dwa środowiska
 
 | | STAGING | PROD |
 |---|---|---|
-| Render slot CAapp | `caapp-staging` | `caapp-beta` |
-| Render slot Kostenrechner | `kostenrechner-staging` | `kostenrechner-beta` |
+| Render slot CAapp | `caapp-staging` (`srv-d8anbsfavr4c73do33mg`) | `caapp` (`srv-d7phc0rrjlhs73dtismg`) |
+| Render slot Kostenrechner | `kostenrechner-staging` (`srv-d8anc9b7uimc73ajhdm0`) | `kostenrechner` (`srv-d7phc1n7f7vs739kaa5g`) |
 | URL CAapp | `caapp-staging.onrender.com` | `kundenportal.primundus.de` |
 | URL Kostenrechner | `kostenrechner-staging.onrender.com` | `kostenrechner.primundus.de` |
-| Supabase project ref | `<staging-ref>` | `ycdwtrklpoqprabtwahi` |
+| Supabase project ref | `taggpiwpwthgpcmaiqjw` | `ycdwtrklpoqprabtwahi` |
+| Supabase region | eu-central-1 (Frankfurt) | eu-west-1 (Ireland) |
 | Mamamia tenant | `backend.beta.mamamia.app` | `backend.prod.mamamia.app` |
 | Mamamia agency_id | `18` (Primundus beta) | `3` (Primundus prod) |
-| Deploy mechanism | Render auto on push do `main` | Manual via `/deploy_prod` skill |
-| Edge fn deploy | CI auto via `test.yml` on push do `main` | `/deploy_prod` skill |
-| Migration deploy | CI auto + `/deploy_staging` skill | `/deploy_prod` skill |
+| Frontend deploy | Render auto on push do trunk | Render auto on push do trunk |
+| Edge fn deploy | CI auto via `test.yml` (po merge) | **Manual via `/deploy_prod` skill** lub `supabase functions deploy --project-ref ycdwtrklpoqprabtwahi` |
+| Migration deploy | Manual via `/deploy_staging` skill lub `supabase db push --linked --project-ref taggpiwpwthgpcmaiqjw` | **Manual via `/deploy_prod` skill** |
+
+(Slot slug `caapp-beta` istniał historycznie i został przemianowany na `caapp` — w starszych docsach możesz zobaczyć obie nazwy. To ten sam serwis.)
 
 ### Promotion workflow — `/deploy_staging` i `/deploy_prod`
 
@@ -867,8 +891,8 @@ do klienta. Skill enforce'uje:
 Gdy staging jest broken lub czekanie na full cycle = ryzyko biznesowe:
 
 ```bash
-# 1. Confirm jesteś na czystym main zsync z origin
-git fetch origin && git diff HEAD origin/main -- supabase/functions/
+# 1. Confirm jesteś na czystym integration/mamamia-onboarding zsync z origin
+git fetch origin && git diff HEAD origin/integration/mamamia-onboarding -- supabase/functions/
 # Diff musi być pusty. Jeśli nie — pull/merge najpierw.
 
 # 2. Bezpośredni deploy na prod (skipuje staging)
@@ -883,9 +907,9 @@ oraz `/deploy_staging` żeby staging i prod znów były synchronized.
 Często musisz zdeployować **OBA** (`onboard-to-mamamia` + `mamamia-proxy`)
 gdy zmiany dotyczą shared modules w `_shared/`.
 
-**Branch protection** na `main` wymaga PR + passing CI checks (`vitest`,
-`deno-onboard`, `deno-proxy`, `deno-detect`) przed merge. To strukturalnie
-blokuje direct push.
+**Branch protection** na `integration/mamamia-onboarding` wymaga PR + passing
+CI checks (`vitest`, `deno-onboard`, `deno-proxy`, `deno-detect`) przed merge.
+To strukturalnie blokuje direct push.
 
 ### NEVER `supabase functions deploy` na prod bez gita
 
