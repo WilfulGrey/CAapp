@@ -145,6 +145,7 @@ export default function ResultPage() {
             email: formData.email,
             telefon: formData.phone,
             kalkulation: kalkulationMitFormular,
+            acceptPrivacy: formData.acceptPrivacy,
           }),
         });
 
