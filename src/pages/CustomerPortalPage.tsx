@@ -1838,22 +1838,17 @@ const CustomerPortalPage: FC = () => {
           // bearbeitete (normale) Pflegekräfte rutschen nach unten in der
           // Matching-Liste. Interest-Aktionen leben in "Bereits bearbeitet"
           // (siehe unten — InterestActionCards in der doneApps-Sektion).
+          // Oben NUR die frischen Vorschläge (max 3). Bereits bearbeitete
+          // Matchings (invited/declined) wandern in die gedämpfte
+          // "Bereits bearbeitet"-Sektion unten (MatchCardDone) — sonst
+          // wirken sie zu prominent / zu ähnlich wie die offenen Vorschläge.
           const visibleNurses: Array<{
             nurse: Nurse;
             i: number;
             caregiverId: number;
             status: NurseStatus;
             virtualDeclinedFromInterest: boolean;
-          }> = [
-            // Top 3 Pending (vorher 5) — bewusst kürzer damit der Kunde
-            // nicht überfordert wird; höhere Conversion erwartet vom
-            // "patient_data_saved → caregiver_invited"-Schritt. Kein
-            // "Mehr anzeigen"-Button, plus Interest-Karten stehen weiter
-            // oben in eigener Sektion.
-            ...allVisible.filter(({ status }) => status === 'pending').slice(0, 3),
-            ...allVisible.filter(({ status }) => status === 'invited'),
-            ...allVisible.filter(({ status }) => status === 'declined'),
-          ];
+          }> = allVisible.filter(({ status }) => status === 'pending').slice(0, 3);
           const hasAnyCard = visibleNurses.length > 0;
           return (
             <>
@@ -1915,26 +1910,35 @@ const CustomerPortalPage: FC = () => {
         })()}
 
         {/* ── SECTION: Bereits bearbeitet ──
-             Immer unten sichtbar wenn doneApps ODER Interest-Aktionen
-             existieren. Sammelt:
+             Immer unten sichtbar wenn doneApps ODER bearbeitete Matchings
+             existieren. Bewusst gedämpft (MatchCardDone: kompakt, grau) +
+             klar getrennt unter den frischen Vorschlägen — sonst wirken die
+             bearbeiteten Karten zu ähnlich wie die offenen. Sammelt:
              - bearbeitete Bewerbungen (AppCardDone)
-             - eingeladene Interest-Pflegekräfte (MatchCardDone, kein Undo
-               weil Mamamia keine uninvite-Mutation kennt)
-             - abgelehnte Interest-Pflegekräfte (MatchCardDone, mit Undo)
-             Normale Matchings (invited/declined) bleiben im Matching-
-             List-Bearbeitet-Bereich oben, nicht hier. */}
+             - eingeladene Pflegekräfte (normal + aus Interesse) — kein Undo
+               (Mamamia kennt keine uninvite-Mutation)
+             - abgelehnte Pflegekräfte (normal + aus Interesse) — mit Undo
+             Reihenfolge: eingeladen zuerst, abgelehnt (ausgegraut) zuletzt. */}
         {(() => {
-          // Interest-Aktionen aus den verfügbaren Quellen sammeln:
-          // - declinedFromInterest-Map (lokal + lead_events)
-          // - invited Interests aus effectiveMatched gefiltert auf
-          //   interestOriginIds-Mitgliedschaft
+          // Normale Matchings (NICHT aus Interesse) nach Status, mit
+          // effectiveMatched-Index für die Undo-/Detail-Handler.
+          const matchInvited = effectiveMatched
+            .map((m, i) => ({ m, i }))
+            .filter(({ m }) => nurseStatusById.get(m.caregiverId) === 'invited' && !interestOriginIds.has(m.caregiverId))
+            .map(({ m, i }) => ({ nurse: m.nurse, caregiverId: m.caregiverId, status: 'invited' as const, key: `mi-${m.caregiverId}`, matchIdx: i, interest: false }));
+          const matchDeclined = effectiveMatched
+            .map((m, i) => ({ m, i }))
+            .filter(({ m }) => nurseStatusById.get(m.caregiverId) === 'declined' && !interestOriginIds.has(m.caregiverId))
+            .map(({ m, i }) => ({ nurse: m.nurse, caregiverId: m.caregiverId, status: 'declined' as const, key: `md-${m.caregiverId}`, matchIdx: i, interest: false }));
+          // Aktionen die aus einer Interest-Karte stammen (♥ Interesse-Label).
           const interestInvited = effectiveMatched
             .filter((m) => nurseStatusById.get(m.caregiverId) === 'invited' && interestOriginIds.has(m.caregiverId))
-            .map((m) => ({ nurse: m.nurse, caregiverId: m.caregiverId, status: 'invited' as const, key: `ii-${m.caregiverId}` }));
+            .map((m) => ({ nurse: m.nurse, caregiverId: m.caregiverId, status: 'invited' as const, key: `ii-${m.caregiverId}`, matchIdx: -1, interest: true }));
           const interestDeclined = Array.from(declinedFromInterest.entries())
-            .map(([cgId, nurse]) => ({ nurse, caregiverId: cgId, status: 'declined' as const, key: `id-${cgId}` }));
-          const interestActions = [...interestInvited, ...interestDeclined];
-          const hasAny = doneApps.length > 0 || interestActions.length > 0;
+            .map(([cgId, nurse]) => ({ nurse, caregiverId: cgId, status: 'declined' as const, key: `id-${cgId}`, matchIdx: -1, interest: true }));
+          // Eingeladen zuerst, abgelehnt zuletzt.
+          const doneMatches = [...matchInvited, ...interestInvited, ...matchDeclined, ...interestDeclined];
+          const hasAny = doneApps.length > 0 || doneMatches.length > 0;
           if (!hasAny) return null;
           return (
             <div className="space-y-2">
@@ -1942,14 +1946,14 @@ const CustomerPortalPage: FC = () => {
               {doneApps.map((app) => (
                 <AppCardDone key={app.id} app={app} onNurseClick={(n, a) => { setNurseModalApp(a); setSelectedNurse(n); }} onUndo={undoApp} />
               ))}
-              {interestActions.map(({ nurse, caregiverId, status, key }) => (
+              {doneMatches.map(({ nurse, caregiverId, status, key, matchIdx, interest }) => (
                 <MatchCardDone
                   key={key}
                   nurse={nurse}
                   status={status}
-                  hasInterestOrigin
-                  onNurseClick={() => setSelectedNurse(nurse)}
-                  onUndo={status === 'declined' ? () => undoDismissInterest(caregiverId) : undefined}
+                  hasInterestOrigin={interest}
+                  onNurseClick={() => interest ? setSelectedNurse(nurse) : openNurseFromMatch(nurse, matchIdx)}
+                  onUndo={status === 'declined' ? (interest ? () => undoDismissInterest(caregiverId) : () => undoDeclinedMatch(matchIdx)) : undefined}
                 />
               ))}
             </div>
