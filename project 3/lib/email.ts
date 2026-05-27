@@ -1574,7 +1574,20 @@ function caregiverIlkaSig(baseUrl: string): string {
 
 // Gemeinsame HTML-Shell (Header + Content + Footer) für alle Caregiver-
 // Event-Mails und Mail 11. Nur `content` unterscheidet sich.
-function caregiverMailShell(baseUrl: string, leadEmail: string, content: string): string {
+// Ein-Klick-Abmelde-URL (token-basiert). Seite /abmelden liegt in der
+// kostenrechner-Next.js-App (gleiche Domain wie baseUrl). Leerer String,
+// wenn kein Token vorhanden → Link wird dann weggelassen.
+function customerUnsubscribeUrl(lead: Lead): string {
+  const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://primundus.de';
+  return lead.token
+    ? `${baseUrl.replace(/\/$/, '')}/abmelden?token=${encodeURIComponent(lead.token)}`
+    : '';
+}
+
+function caregiverMailShell(baseUrl: string, leadEmail: string, content: string, unsubscribeUrl?: string): string {
+  const unsubLink = unsubscribeUrl
+    ? `<br><a href="${unsubscribeUrl}" style="color:#999;text-decoration:underline;">Keine E-Mails mehr erhalten</a>`
+    : '';
   return `<!DOCTYPE html>
 <html lang="de">
 <head>
@@ -1626,7 +1639,7 @@ function caregiverMailShell(baseUrl: string, leadEmail: string, content: string)
           <div style="font-size:12px;color:#999;margin-top:16px;line-height:1.5;">
             Diese E-Mail wurde versendet an: ${leadEmail}<br>
             Primundus Deutschland | Vitanas Group<br><br>
-            Sie erhalten diese E-Mail, weil Sie eine Kalkulation auf primundus.de angefordert haben.
+            Sie erhalten diese E-Mail, weil Sie eine Kalkulation auf primundus.de angefordert haben.${unsubLink}
           </div>
         </div>
       </div>
@@ -1766,7 +1779,7 @@ function buildCaregiverEventEmail(opts: {
     ${opts.psHtml ?? ''}
     ${ilkaSig}`;
 
-  const html = caregiverMailShell(baseUrl, opts.lead.email, content);
+  const html = caregiverMailShell(baseUrl, opts.lead.email, content, customerUnsubscribeUrl(opts.lead));
 
   // Plaintext-Fallback. Knapper als HTML — Mail-Clients ohne HTML-Rendering
   // sehen einen lesbaren Reflex von Intro + Pflegekraft + nächster Schritt.
@@ -1935,7 +1948,7 @@ export function getPatientDataSavedEmailTemplate(
           <div style="font-size:12px;color:#999;margin-top:16px;line-height:1.5;">
             Diese E-Mail wurde versendet an: ${lead.email}<br>
             Primundus Deutschland | Vitanas Group<br><br>
-            Sie erhalten diese E-Mail, weil Sie eine Kalkulation auf primundus.de angefordert haben.
+            Sie erhalten diese E-Mail, weil Sie eine Kalkulation auf primundus.de angefordert haben.${customerUnsubscribeUrl(lead) ? `<br><a href="${customerUnsubscribeUrl(lead)}" style="color:#999;text-decoration:underline;">Keine E-Mails mehr erhalten</a>` : ''}
           </div>
         </div>
       </div>
@@ -2031,7 +2044,7 @@ export function getCaregiverInterestEmailTemplate(
     <p style="font-size:15px;line-height:1.75;color:#444;margin:30px 0 18px;">Wenn Sie Fragen zu ${firstName}s Profil haben oder Unterstützung bei der Einschätzung möchten — rufen Sie mich an, schreiben Sie mir per WhatsApp oder antworten Sie einfach auf diese E-Mail. Ich bin gerne für Sie da.</p>
     ${caregiverIlkaSig(baseUrl)}`;
 
-  const html = caregiverMailShell(baseUrl, lead.email, content);
+  const html = caregiverMailShell(baseUrl, lead.email, content, customerUnsubscribeUrl(lead));
 
   const metaPlain = metaParts.length > 0 ? metaParts.join(' · ') : '';
   const text = `${greeting},
@@ -2211,7 +2224,7 @@ export function getApplicationReceivedEmailTemplate(
     <p style="font-size:15px;line-height:1.75;color:#444;margin:28px 0 18px;">Wenn Sie Fragen zu ${firstName}s Bewerbung haben oder Unterstützung bei der Entscheidung möchten — rufen Sie mich an, schreiben Sie mir per WhatsApp oder antworten Sie einfach auf diese E-Mail. Ich bin gerne für Sie da.</p>
     ${caregiverIlkaSig(baseUrl)}`;
 
-  const html = caregiverMailShell(baseUrl, lead.email, content);
+  const html = caregiverMailShell(baseUrl, lead.email, content, customerUnsubscribeUrl(lead));
 
   // ── Plaintext ─────────────────────────────────────────────────────────────
   const condPlain = hasConditions ? `KONDITIONEN
