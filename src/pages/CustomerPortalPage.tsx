@@ -1842,13 +1842,27 @@ const CustomerPortalPage: FC = () => {
           // Matchings (invited/declined) wandern in die gedämpfte
           // "Bereits bearbeitet"-Sektion unten (MatchCardDone) — sonst
           // wirken sie zu prominent / zu ähnlich wie die offenen Vorschläge.
-          const visibleNurses: Array<{
+          type VisibleNurse = {
             nurse: Nurse;
             i: number;
             caregiverId: number;
             status: NurseStatus;
             virtualDeclinedFromInterest: boolean;
-          }> = allVisible.filter(({ status }) => status === 'pending').slice(0, 3);
+          };
+          const pendingNurses: VisibleNurse[] = allVisible.filter(({ status }) => status === 'pending').slice(0, 3);
+          // Die Empfehlung (höchste Badge-Bewertung, Score = Erfahrungsjahre +
+          // Einsätze) nach ganz oben ziehen — die anderen behalten ihre
+          // Reihenfolge. So steht "Empfehlung des Beraters" immer zuoberst.
+          const badgeScore = (n: Nurse) => (n.experienceYears ?? 0) + (n.history?.assignments ?? 0);
+          let bestIdx = -1;
+          let bestScore = -Infinity;
+          pendingNurses.forEach((p, idx) => {
+            const s = badgeScore(p.nurse);
+            if (s > bestScore) { bestScore = s; bestIdx = idx; }
+          });
+          const visibleNurses: VisibleNurse[] = bestIdx > 0
+            ? [pendingNurses[bestIdx], ...pendingNurses.filter((_, idx) => idx !== bestIdx)]
+            : pendingNurses;
           const hasAnyCard = visibleNurses.length > 0;
           return (
             <>
