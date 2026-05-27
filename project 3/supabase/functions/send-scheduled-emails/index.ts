@@ -165,7 +165,7 @@ function buildEmailWrapper(lead: Lead, siteUrl: string, content: string): string
             <div style="font-size:12px;color:#999;margin-top:16px;line-height:1.5;">
               Diese E-Mail wurde versendet an: ${lead.email}<br>
               Primundus Deutschland | Vitanas Group<br><br>
-              Sie erhalten diese E-Mail, weil Sie eine Kalkulation auf primundus.de angefordert haben.
+              Sie erhalten diese E-Mail, weil Sie eine Kalkulation auf primundus.de angefordert haben.${lead.token ? `<br><a href="${siteUrl.replace(/\/$/, "")}/abmelden?token=${encodeURIComponent(lead.token)}" style="color:#999;text-decoration:underline;">Keine E-Mails mehr erhalten</a>` : ""}
             </div>
           </div>
         </div>
@@ -1418,6 +1418,29 @@ Deno.serve(async (req: Request) => {
           continue;
         }
  
+        // Abmeldung (Abmelde-Link): gilt für ALLE Mail-Typen — der Kunde hat
+        // dem weiteren E-Mail-Versand widersprochen (Art. 21 DSGVO). Mail
+        // canceln, NICHT senden.
+        const { data: unsubEvt } = await supabase
+          .from("lead_events")
+          .select("id")
+          .eq("lead_id", scheduledEmail.lead_id)
+          .eq("event_type", "email_unsubscribed")
+          .limit(1);
+        if (Array.isArray(unsubEvt) && unsubEvt.length > 0) {
+          await supabase
+            .from("scheduled_emails")
+            .update({ status: "cancelled", updated_at: new Date().toISOString() })
+            .eq("id", scheduledEmail.id);
+          await supabase.from("lead_events").insert({
+            lead_id: scheduledEmail.lead_id,
+            event_type: `email_${scheduledEmail.email_type}_cancelled`,
+            metadata: { reason: "unsubscribed" },
+          });
+          results.push({ id: scheduledEmail.id, success: true });
+          continue;
+        }
+
         const isBeauftragt = lead.status === "vertrag_abgeschlossen" || lead.status === "betreuung_beauftragt" || lead.order_confirmed === true;
         const isNichtInteressiert = lead.status === "nicht_interessiert";
 

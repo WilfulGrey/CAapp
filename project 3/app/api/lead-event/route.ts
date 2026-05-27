@@ -421,8 +421,25 @@ export async function POST(request: NextRequest) {
       // sonst spammen wir den Kunden bei jedem Patientendaten-Update.
       const shouldSendCustomerMail = !isDeduped || isFirstOccurrence;
 
+      // Abmeldung (Abmelde-Link, Art. 21 DSGVO): keine automatisierten
+      // Kundenmails mehr. Ausnahme: Mail C (application_accepted_internal /
+      // Buchungsbestätigung) — der Kunde hat die Buchung gerade aktiv im
+      // Portal ausgelöst, die Bestätigung ist transaktional.
+      let unsubscribed = false;
+      if (event !== 'application_accepted_internal') {
+        const { data: unsubEvt } = await supabase
+          .from('lead_events')
+          .select('id')
+          .eq('lead_id', lead.id)
+          .eq('event_type', 'email_unsubscribed')
+          .limit(1);
+        unsubscribed = Array.isArray(unsubEvt) && unsubEvt.length > 0;
+      }
+
       if (!shouldSendCustomerMail) {
         console.log(`lead-event ${event}: dedupe — Customer-Mail skipped (lead ${lead.id})`);
+      } else if (unsubscribed) {
+        console.log(`lead-event ${event}: lead unsubscribed — Customer-Mail skipped (lead ${lead.id})`);
       } else if (!lead.email) {
         console.warn(`lead-event ${event}: lead has no email — mail skipped (lead ${lead.id})`);
       } else if (event === 'patient_data_saved') {
