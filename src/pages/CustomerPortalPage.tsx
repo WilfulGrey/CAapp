@@ -1865,13 +1865,21 @@ const CustomerPortalPage: FC = () => {
                         mehr hier — damit sie auch bei hasPending sichtbar
                         bleiben. */}
                     {(() => {
-                      // Top-2 pending Pflegekräfte kriegen den "Empfehlung des
-                      // Beraters"-Badge — Entscheidungshilfe damit der Kunde
-                      // bei 3 Vorschlägen nicht überfordert ist.
-                      let recommendedCount = 0;
-                      return visibleNurses.map(({ nurse, i, status }) => {
-                        const isRecommended = status === 'pending' && recommendedCount < 2;
-                        if (isRecommended) recommendedCount += 1;
+                      // Genau EINE "Empfehlung des Beraters": die pending
+                      // Pflegekraft mit der höchsten Badge-Bewertung. Score =
+                      // Erfahrungsjahre + Einsätze (gleiche Formel wie
+                      // nurseLevel → höchster Score = bestes Tier). Eine klare
+                      // Empfehlung wirkt stärker als zwei.
+                      const badgeScore = (n: Nurse) => (n.experienceYears ?? 0) + (n.history?.assignments ?? 0);
+                      let recIdx = -1;
+                      let recBest = -Infinity;
+                      visibleNurses.forEach(({ nurse, status }, idx) => {
+                        if (status !== 'pending') return;
+                        const s = badgeScore(nurse);
+                        if (s > recBest) { recBest = s; recIdx = idx; }
+                      });
+                      return visibleNurses.map(({ nurse, i, status }, idx) => {
+                        const isRecommended = idx === recIdx;
                         return (
                           <MatchCard
                             key={`m-${i}`}
