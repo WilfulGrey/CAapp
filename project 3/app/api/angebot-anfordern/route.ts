@@ -25,6 +25,13 @@ function getSupabaseClient() {
 
 const supabase = getSupabaseClient();
 
+// DSGVO-Einwilligung — exakter Checkbox-Text + Version, die der Kunde im
+// Result-Formular akzeptiert (result/page.tsx). Bei Textänderung Version
+// hochzählen, damit der Nachweis sagt, WELCHEM Text zugestimmt wurde.
+const PRIVACY_CONSENT_VERSION = '2026-02';
+const PRIVACY_CONSENT_TEXT =
+  'Ich akzeptiere die Datenschutzerklärung und bin damit einverstanden, dass Primundus meine Daten zur Bearbeitung meiner Anfrage verarbeitet.';
+
 async function scheduleEmail(
   leadId: string,
   email: string,
@@ -101,12 +108,14 @@ export async function POST(request: NextRequest) {
       telefon,
       careStartTiming,
       kalkulation,
+      acceptPrivacy,
     }: {
       vorname: string;
       email: string;
       telefon?: string;
       careStartTiming?: string;
       kalkulation: Kalkulation;
+      acceptPrivacy?: boolean;
     } = body;
 
     if (!vorname || !email || !kalkulation) {
@@ -141,6 +150,27 @@ export async function POST(request: NextRequest) {
         kalkulation,
       }
     );
+
+    // DSGVO Art. 7 Abs. 1 — Einwilligung nachweisbar protokollieren. Als
+    // append-only lead_event (Zeitpunkt = created_at, Text + Version + Quelle
+    // in den Metadaten). Best-effort: ein Fehler hier darf die Lead-Erstellung
+    // NIE blockieren. Die Checkbox ist im Formular Pflicht (Submit sonst
+    // gesperrt), daher ist acceptPrivacy beim regulären Flow immer true.
+    if (acceptPrivacy) {
+      try {
+        await logEvent(lead.id, 'privacy_consent', {
+          accepted: true,
+          version: PRIVACY_CONSENT_VERSION,
+          text: PRIVACY_CONSENT_TEXT,
+          source: 'kostenrechner-result',
+          at: new Date().toISOString(),
+        });
+      } catch (e) {
+        console.error('privacy_consent log failed (lead created anyway):', e instanceof Error ? e.message : String(e));
+      }
+    } else {
+      console.warn(`angebot-anfordern: Lead ${lead.id} ohne acceptPrivacy=true angelegt (sollte durch Formular-Pflichtfeld nicht vorkommen).`);
+    }
 
     // Re-Submit-Dedupe: wenn der Kunde dasselbe Formular nochmal schickt UND
     // die letzte Eingangsbestätigung <24h alt ist, schlucken wir die zweite
