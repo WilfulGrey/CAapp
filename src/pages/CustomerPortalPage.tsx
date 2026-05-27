@@ -260,6 +260,24 @@ const CustomerPortalPage: FC = () => {
   // the auto rule below (expanded only in initial state). Toggling sets
   // an explicit value that wins over the auto rule.
   const [offerExpandedManual, setOfferExpandedManual] = useState<boolean | null>(null);
+  // Erstbesuch pro Lead (localStorage): beim ERSTEN Reingehen ins Portal soll
+  // "Ihr Angebot" aufgeklappt sein — danach folgt es der Fortschritts-Regel
+  // (collapsed sobald Patientendaten erfasst sind). In Preview immer true,
+  // damit der Erstbesuch-Zustand sichtbar ist. iOS-WebKit-localStorage kann
+  // fehlschlagen → Fallback "kein Erstbesuch" (greift dann nur die Auto-Regel).
+  const [offerFirstVisit] = useState<boolean>(() => {
+    if (IS_PREVIEW_ANY) return true;
+    try {
+      const token = new URLSearchParams(window.location.search).get('token');
+      if (!token) return false;
+      const key = `pm_portal_offer_seen_${token}`;
+      const seen = localStorage.getItem(key) === '1';
+      if (!seen) localStorage.setItem(key, '1');
+      return !seen;
+    } catch {
+      return false;
+    }
+  });
 
   // ─── Mamamia session + queries (K2-K4 integration) ───────────────────────
   const { session, ready: mmReady, error: mmError } = useMamamiaSession(lead?.token ?? null);
@@ -1500,11 +1518,12 @@ const CustomerPortalPage: FC = () => {
 
       {/* ── SECTION: Ihr Angebot (collapsible) ── */}
       {(() => {
-        // Default: expanded only in initial state. Once the customer has
-        // saved their profile or has applications waiting, the offer is
-        // reference material — collapse to free up screen space. Manual
-        // toggle (offerExpandedManual) overrides the auto rule.
-        const autoExpanded = !patientSaved && !hasPending;
+        // Beim Erstbesuch immer aufgeklappt (offerFirstVisit). Sonst: nur im
+        // initialen Zustand — sobald Patientendaten erfasst sind, ist das
+        // Angebot Referenzmaterial und wird eingeklappt. Bei offener Bewerbung
+        // (hasPending) hat die Bewerbung Priorität → immer eingeklappt.
+        // Manueller Toggle (offerExpandedManual) überschreibt die Auto-Regel.
+        const autoExpanded = !hasPending && (offerFirstVisit || !patientSaved);
         const offerExpanded = offerExpandedManual ?? autoExpanded;
         const brutto = lead?.kalkulation?.bruttopreis ?? 3050;
         const tagessatz = Math.round(brutto / 30);
