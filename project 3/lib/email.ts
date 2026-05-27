@@ -2411,6 +2411,11 @@ export async function sendEmail(
     const mailOptions: any = {
       from: `"${process.env.SMTP_FROM_NAME || 'Primundus 24h-Pflege'}" <${process.env.SMTP_FROM || process.env.SMTP_USER}>`,
       to: toAddr,
+      // Reply-To auf das überwachte Team-Postfach (nicht die Absender-/
+      // SMTP_FROM-Adresse kostenrechner@primundus.de). Die Mails bitten den
+      // Kunden ausdrücklich, "einfach auf diese E-Mail zu antworten" — die
+      // Antwort soll bei info@primundus.de landen. Spiegelt send-scheduled-emails.
+      replyTo: 'info@primundus.de',
       subject: template.subject,
       text: template.text,
       html: template.html,
