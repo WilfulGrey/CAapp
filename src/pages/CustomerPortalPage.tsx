@@ -1718,10 +1718,14 @@ const CustomerPortalPage: FC = () => {
             // a step-4 edit). Dedupe key includes phone, so a follow-up
             // save with an edited number re-fires.
             const phoneForLead = form.phone?.trim();
+            const startDateForLead = form.startDate?.trim();
+            const leadEventMeta: Record<string, string> = {};
+            if (phoneForLead) leadEventMeta.phone = phoneForLead;
+            if (startDateForLead) leadEventMeta.startDate = startDateForLead;
             reportLeadEvent(
               lead?.token,
               'patient_data_saved',
-              phoneForLead ? { phone: phoneForLead } : undefined,
+              Object.keys(leadEventMeta).length > 0 ? leadEventMeta : undefined,
             );
             // Patient form save flippa customer na active + dorzuca pełne
             // patient/wish dane. Mamamia matching engine re-scoreuje całą
