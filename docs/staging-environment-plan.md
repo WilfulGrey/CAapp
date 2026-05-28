@@ -13,11 +13,11 @@ Obecnie pracujemy w trybie "trunk = prod". Każdy merge do `integration/mamamia-
 
 To zostawia zero przestrzeni na "skomplikowany test" — każdy taki test jest na żywym kliencie. Bug #15 (Primundus agency_id się rozjechał beta→prod, 2026-05-11) + Bug #16 (schema drift contracts plural vs singular, 2026-05-12) pokazały że potrzebujemy realnego środowiska do prelaunch verify, nie tylko vitest mock'ów.
 
-**Cel:** dwa równoległe deploy targets — STAGING (Mamamia beta tenant + osobny Supabase + Render slot URLs) jako "trunk auto-deploy" i PROD (obecny stan) jako "Claude-orchestrated promotion". Workflow developera nie zmienia się dla 90% zadań (PR → merge → staging deploy automatycznie). Dla 10% "kompletny feature gotowy → ship" — `/deploy_prod` w Claude Code.
+**Cel:** dwa równoległe deploy targets — STAGING (Mamamia beta tenant + osobny Supabase + Render slot URLs) jako "trunk auto-deploy" i PROD (obecny stan) jako "Claude-orchestrated promotion". Workflow developera nie zmienia się dla 90% zadań (PR → merge → staging deploy automatycznie). Dla 10% "kompletny feature gotowy → ship" — `/deploy-prod` w Claude Code.
 
 User decyzje (zatwierdzone w plan-mode):
 - **Mamamia tenant dla staging:** `backend.beta.mamamia.app` (osobne agency, czyste IDs, akceptujemy ryzyko schema drift względem preprod).
-- **Promotion mechanism:** Claude Code skills (`/deploy_staging`, `/deploy_prod`) — user pisze command, Claude wykonuje sekwencję + raportuje. Skills definiowane w repo (`.claude/skills/`).
+- **Promotion mechanism:** Claude Code skills (`/deploy-staging`, `/deploy-prod`) — user pisze command, Claude wykonuje sekwencję + raportuje. Skills definiowane w repo (`.claude/skills/`).
 - **Staging URL:** Render slot URL (`caapp-staging.onrender.com`, `kostenrechner-staging.onrender.com`) — zero DNS ceremony.
 - **Branch rename:** `integration/mamamia-onboarding` → `main`; obecny mockup `main` → `main-mockup-legacy` (zarchiwizowany, nie usuwany).
 
@@ -43,7 +43,7 @@ User decyzje (zatwierdzone w plan-mode):
         │  • Edge fns + migracje auto via CI (push to main) │
         └──────────────────────────────────────────────────┘
                                    │
-                                   │ /deploy_prod  (Claude orchestrates)
+                                   │ /deploy-prod  (Claude orchestrates)
                                    │ ── user-confirmed promotion
                                    ▼
         ┌──────────────────────────────────────────────────┐
@@ -60,7 +60,7 @@ Render slot nazewnictwo zostaje (`caapp-beta` / `kostenrechner-beta` = prod) —
 
 ## Migration / deploy ordering rule
 
-W `/deploy_prod` zawsze: **migracje pierwsze, kod drugi**. Migracje MUSZĄ być backward-compatible z poprzednią wersją kodu (= expand/contract pattern):
+W `/deploy-prod` zawsze: **migracje pierwsze, kod drugi**. Migracje MUSZĄ być backward-compatible z poprzednią wersją kodu (= expand/contract pattern):
 
 - Nowa kolumna → ZAWSZE nullable albo z DEFAULT
 - Usuwana kolumna → najpierw stop-reading w kodzie (deploy), potem migracja drop'ująca
@@ -198,7 +198,7 @@ Dodać `workflow_dispatch.inputs.target_env` ∈ {staging, prod}, switchować PR
 ```markdown
 ---
 name: deploy-staging
-description: Deploy current main branch to STAGING (Render auto-deploy + edge fns + migrations to staging Supabase). Use when user types /deploy_staging or asks "deploy to staging".
+description: Deploy current main branch to STAGING (Render auto-deploy + edge fns + migrations to staging Supabase). Use when user types /deploy-staging or asks "deploy to staging".
 ---
 
 # Deploy to staging
@@ -239,7 +239,7 @@ description: Deploy current main branch to STAGING (Render auto-deploy + edge fn
 ```markdown
 ---
 name: deploy-prod
-description: Promote current main commit from STAGING to PROD (manual gated). User types /deploy_prod after they've verified staging.
+description: Promote current main commit from STAGING to PROD (manual gated). User types /deploy-prod after they've verified staging.
 ---
 
 # Promote staging → prod
@@ -252,7 +252,7 @@ description: Promote current main commit from STAGING to PROD (manual gated). Us
 ## Steps
 
 1. Determine current SHA: `git rev-parse HEAD`
-2. Check Render API: is `caapp-staging` last deploy of this SHA live? If not, abort and tell user "Staging is on <other SHA>, deploy that first via /deploy_staging".
+2. Check Render API: is `caapp-staging` last deploy of this SHA live? If not, abort and tell user "Staging is on <other SHA>, deploy that first via /deploy-staging".
 3. **Interactive confirm**: AskUserQuestion: "Promote commit <SHA> (\"<commit msg>\") from staging to PROD?
    - Migrations will be applied to PROD Supabase (ycdwtrklpoqprabtwahi)
    - Edge functions deployed to PROD Supabase
@@ -273,7 +273,7 @@ description: Promote current main commit from STAGING to PROD (manual gated). Us
 - Document failure in plain Polish for the user, include the last error message verbatim.
 
 ## Migration rule reminder
-- Code in this commit MUST be backward-compatible with PREVIOUS prod schema (expand-contract). If you added a NOT NULL column without default, /deploy_prod will succeed but live traffic mid-deploy will hit errors. Per Święta zasada nr 3 in CLAUDE.md.
+- Code in this commit MUST be backward-compatible with PREVIOUS prod schema (expand-contract). If you added a NOT NULL column without default, /deploy-prod will succeed but live traffic mid-deploy will hit errors. Per Święta zasada nr 3 in CLAUDE.md.
 
 ## Env vars expected
 - `SUPABASE_PROD_REF=ycdwtrklpoqprabtwahi`
@@ -288,8 +288,8 @@ Sekcja "Deploy workflow" do przepisania:
 
 - Stara sekcja "Frontend (auto)" + "Edge Functions (auto, via CI)" → opis dual-env (staging auto, prod gated).
 - Nowa sekcja **"Święta zasada nr 3: BACKWARD-COMPATIBLE MIGRATIONS"** z expand-contract patternem.
-- Nowa sekcja **"Promotion workflow — /deploy_staging i /deploy_prod"** wyjaśniająca skills.
-- "Branch model" — `main` = staging trunk, deploy do prod = `/deploy_prod`.
+- Nowa sekcja **"Promotion workflow — /deploy-staging i /deploy-prod"** wyjaśniająca skills.
+- "Branch model" — `main` = staging trunk, deploy do prod = `/deploy-prod`.
 - "Mamamia integration" — staging używa beta tenant + agency 18, prod używa preprod + agency 3.
 
 Update sekcji "🚨 URL convention" — dodać staging URLs do tabeli.
@@ -301,7 +301,7 @@ Bug registry — nie dodawać (to nie bugfix). Dodać do nowej "Recent infra cha
 Dodać sekcję "Staging vs prod" wyjaśniającą nowemu devowi:
 - Trunk = staging
 - Customer-facing URLs = prod (kundenportal.primundus.de)
-- Twoja `/deploy_staging` po merge to nice-to-have (CI też deployuje), ale `/deploy_prod` jest jedynym sposobem na klienta-widoczną zmianę.
+- Twoja `/deploy-staging` po merge to nice-to-have (CI też deployuje), ale `/deploy-prod` jest jedynym sposobem na klienta-widoczną zmianę.
 
 ## Critical files — final list
 
@@ -333,7 +333,7 @@ End-to-end po wszystkim:
 2. **Staging Render**: open `https://caapp-staging.onrender.com/` → renders portal (token gate).
 3. **Staging Mamamia**: token z testowego lead → onboard działa, panel beta.mamamia.app pokazuje customer z agency_id=18.
 4. **Push to main → CI auto-deploy**: commit no-op zmianę, push, watch Actions → edge fns deploy na staging Supabase, Render auto-builds staging slots.
-5. **`/deploy_prod` skill**: w nowym chat'cie type `/deploy_prod` → Claude pyta o confirm, robi sekwencję, raportuje.
+5. **`/deploy-prod` skill**: w nowym chat'cie type `/deploy-prod` → Claude pyta o confirm, robi sekwencję, raportuje.
 6. **Smoke test po deploy_prod**: `kundenportal.primundus.de/?token=<known>` ładuje portal, mamamia-proxy zwraca dane (sprawdza że secrets w prod się nie rozjechały).
 7. **Migration rule sanity**: stwórz testową migrację z NOT NULL + DEFAULT, deploy na staging, verify że stara wersja kodu (przed merge) nadal czyta DB bez błędu.
 
@@ -342,14 +342,14 @@ End-to-end po wszystkim:
 - **Anonymized prod data dump → staging** — fajny do mieć dla repro klientów-specific bugów, ale wymaga RGPD/GDPR review (PII). Defer do osobnego planu jeśli będzie taka potrzeba.
 - **PR preview environments** (per-PR ephemeral URL) — wymaga paid Render plan + Supabase branching ($25/mo). Wartość vs koszt nie uzasadnia teraz.
 - **Auto-rollback przy failed smoke test** — wymaga "previous deploy SHA" tracking + Render API rollback. Defer; manual rollback przez Render Dashboard "Rollback" button wystarczy na MVP.
-- **Slack/Telegram notification po deploy_prod** — fajne, ale `/deploy_prod` zwraca raport bezpośrednio Claude'owi który forwarduje user'owi w chat. Wystarczy.
+- **Slack/Telegram notification po deploy_prod** — fajne, ale `/deploy-prod` zwraca raport bezpośrednio Claude'owi który forwarduje user'owi w chat. Wystarczy.
 - **Telemetry split staging vs prod** (Clarity, analytics) — staging nie powinien tracked'ować do prod Clarity workspace. Trzeba osobny Clarity project ID per env (env-driven w `VITE_CLARITY_ID`). Trywialna zmiana, można dorzucić w tym PR jeśli czas pozwala.
 
 ## Open questions / risks
 
-- **Mamamia beta schema drift** — staging passe może maskować prod-only bug (Bug #16 reverse: feature works on beta plural contracts, fails on prod singular). Mitigation: dla każdej zmiany dotykającej Mamamia GraphQL, w `/deploy_prod` Claude robi proactive schema introspection na prod (`__type(name: "...")`) i porównuje z założeniami feature'a. Dodać do skill steps.
+- **Mamamia beta schema drift** — staging passe może maskować prod-only bug (Bug #16 reverse: feature works on beta plural contracts, fails on prod singular). Mitigation: dla każdej zmiany dotykającej Mamamia GraphQL, w `/deploy-prod` Claude robi proactive schema introspection na prod (`__type(name: "...")`) i porównuje z założeniami feature'a. Dodać do skill steps.
 - **pg_cron cycle na staging Supabase** — codzienny analytics report + 15min detect-caregiver-events wystartują też na staging, więc bedą generować emails. Mitigation: ustawić `DAILY_REPORT_RECIPIENTS=null` (lub na test inbox) na staging Supabase secrets, żeby zespół nie był spammed dwa razy dziennie.
 - **Cross-env Mamamia customer ID collision** — gdyby ktoś przez pomyłkę odpalił staging-token na prod portal (token to losowy 32-char string, więc szansa kolizji ≈ 0 ale UI rendering może się rozjechać), proxy reject nie znajdzie customera w prod Mamamia. Akceptowalne — fail closed.
 - **Render slot rename ceremonii** — pomijamy. `caapp-beta` slug w Render = prod, `caapp-staging` = staging. Dokumentujemy w CLAUDE.md że to historyczne. Rename slot'a teoretycznie możliwy ale niewart ryzyka (DNS może się przerwać, GitHub Actions deploys mogą się zbluffować).
-- **Migration concurrency** — gdyby `/deploy_staging` i `/deploy_prod` poszły blisko siebie z różnymi migracjami w drodze, mogą się ścigać o lock. Mitigation: `/deploy_prod` zawsze najpierw sprawdza że staging SHA = local SHA, więc nie ma "wyprzedzenia". Skill enforce'uje.
+- **Migration concurrency** — gdyby `/deploy-staging` i `/deploy-prod` poszły blisko siebie z różnymi migracjami w drodze, mogą się ścigać o lock. Mitigation: `/deploy-prod` zawsze najpierw sprawdza że staging SHA = local SHA, więc nie ma "wyprzedzenia". Skill enforce'uje.
 - **Hardcoded sekrety BCC email** (`info@primundus.de`, `info@mamamia.app`) — na staging team nie chce dostawać emaili klienta. Konkretna decyzja: na staging Supabase ustawić `SMTP_BCC=` (puste) i `DAILY_REPORT_RECIPIENTS=` (puste lub test inbox). Code już env-driven, więc zero refactor.

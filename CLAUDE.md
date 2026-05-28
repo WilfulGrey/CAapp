@@ -12,19 +12,19 @@
 > | URL Kostenrechner | `kostenrechner-staging.onrender.com` | `kostenrechner.primundus.de` |
 > | Supabase | `taggpiwpwthgpcmaiqjw` | `ycdwtrklpoqprabtwahi` |
 > | Mamamia | `backend.beta.mamamia.app` (agency_id=18) | `backend.prod.mamamia.app` (agency_id=3) |
-> | Trigger | Push do `integration/mamamia-onboarding` → Render auto-build + CI deploy edge fns automatycznie | **TYLKO** `/deploy_prod` skill |
+> | Trigger | Push do `integration/mamamia-onboarding` → Render auto-build + CI deploy edge fns automatycznie | **TYLKO** `/deploy-prod` skill |
 >
 > **Co to oznacza dla twojego workflow:**
 >
 > 1. **Merge PR jak zwykle** → automatycznie ląduje na STAGING (frontend Render + edge fns przez CI). Klient NIC nie widzi.
 > 2. **Otwórz `caapp-staging.onrender.com`**, przetestuj swoją zmianę, kliknij się przez flow.
-> 3. **Wszystko OK?** → poproś Claude'a o `/deploy_prod`. Claude zrobi sekwencję: migracje → edge fns → Render API → smoke tests → raport. Pyta o potwierdzenie przed dotknięciem prod.
+> 3. **Wszystko OK?** → poproś Claude'a o `/deploy-prod`. Claude zrobi sekwencję: migracje → edge fns → Render API → smoke tests → raport. Pyta o potwierdzenie przed dotknięciem prod.
 >
-> **Edge functions:** PR merge NIE deploy'uje już edge fns na prod automatycznie. Tylko na staging. Żeby zaaktualizować prod edge fns — `/deploy_prod`.
+> **Edge functions:** PR merge NIE deploy'uje już edge fns na prod automatycznie. Tylko na staging. Żeby zaaktualizować prod edge fns — `/deploy-prod`.
 >
 > **Migracje DB:** ZAWSZE backward-compatible z poprzednią wersją kodu (patrz Święta zasada nr 3 niżej). Nowa NOT NULL bez DEFAULT = zepsujesz prod między momentem zaaplikowania migracji a deploy'em kodu.
 >
-> **Skille dostępne:** `/deploy_staging` (manual refresh stagingu — rzadko potrzebny, CI to robi) + `/deploy_prod` (jedyny sposób na klient-facing change). Definicje w `.claude/skills/`. Wymagają env vars: `SUPABASE_STAGING_REF`, `SUPABASE_PROD_REF`, `RENDER_API_KEY`, `STAGING_CAAPP_SERVICE_ID`, `STAGING_KOSTENRECHNER_SERVICE_ID`, `PROD_CAAPP_SERVICE_ID`, `PROD_KOSTENRECHNER_SERVICE_ID`. Michał wkleja ci to w pierwszej wiadomości albo masz w shell rc.
+> **Skille dostępne:** `/deploy-staging` (manual refresh stagingu — rzadko potrzebny, CI to robi) + `/deploy-prod` (jedyny sposób na klient-facing change). Definicje w `.claude/skills/`. Wymagają env vars: `SUPABASE_STAGING_REF`, `SUPABASE_PROD_REF`, `RENDER_API_KEY`, `STAGING_CAAPP_SERVICE_ID`, `STAGING_KOSTENRECHNER_SERVICE_ID`, `PROD_CAAPP_SERVICE_ID`, `PROD_KOSTENRECHNER_SERVICE_ID`. Michał wkleja ci to w pierwszej wiadomości albo masz w shell rc.
 >
 > **Pełna dokumentacja:** `docs/staging-environment-plan.md`. Sekcja "Deploy workflow" w tym pliku niżej + URL convention (kostenrechner-beta slot = prod, mental-model "slot z custom domain = prod, slot bez = staging").
 >
@@ -180,7 +180,7 @@ running kodem (= wersją przed twoim deploy'em).** Inaczej między momentem
 zaaplikowania migracji a deploy'em nowego kodu masz okno gdzie żywy ruch
 hituje błąd. Klient widzi 500. Lead się gubi.
 
-To wynika z faktu że `/deploy_prod` (patrz §"Deploy workflow") robi migracje
+To wynika z faktu że `/deploy-prod` (patrz §"Deploy workflow") robi migracje
 **pierwsze**, potem deploy edge fns + Render. Sekwencja celowa — schema musi
 być gotowa zanim nowy kod jej zacznie używać. Ale to znaczy że stary kod
 przez ~30-60 sekund działa na nowej schemie.
@@ -204,10 +204,10 @@ przez ~30-60 sekund działa na nowej schemie.
 
 Gdy MUSISZ zrobić destruktywną zmianę (np. rename `lead.email` → `lead.contact_email`):
 
-1. **PR 1 (expand)**: dodaj `contact_email` (nullable). Code: dual-read (`row.contact_email ?? row.email`), dual-write (zapisz w oba pola na każdy save). `/deploy_prod`.
-2. **PR 2 (backfill)**: skrypt SQL kopiuje istniejące wartości `email` → `contact_email`. Run manually w Supabase Studio lub jako migration. `/deploy_prod`.
-3. **PR 3 (switch)**: code czyta tylko `contact_email`. Pisze tylko `contact_email`. `email` nieużywane ale jeszcze w DB. `/deploy_prod`.
-4. **PR 4 (contract)**: migration drop'ująca kolumnę `email`. `/deploy_prod`.
+1. **PR 1 (expand)**: dodaj `contact_email` (nullable). Code: dual-read (`row.contact_email ?? row.email`), dual-write (zapisz w oba pola na każdy save). `/deploy-prod`.
+2. **PR 2 (backfill)**: skrypt SQL kopiuje istniejące wartości `email` → `contact_email`. Run manually w Supabase Studio lub jako migration. `/deploy-prod`.
+3. **PR 3 (switch)**: code czyta tylko `contact_email`. Pisze tylko `contact_email`. `email` nieużywane ale jeszcze w DB. `/deploy-prod`.
+4. **PR 4 (contract)**: migration drop'ująca kolumnę `email`. `/deploy-prod`.
 
 Cztery deploy cycles, ale ZERO downtime + zero customer-visible error.
 
@@ -216,13 +216,13 @@ Cztery deploy cycles, ale ZERO downtime + zero customer-visible error.
 - **Maintenance window** ogłoszony klientom (np. niedziela 2:00-4:00 AM CET, banner w portalu wcześniej) — wtedy "stop-the-world" rebuild OK. Ale do tego potrzebujesz dummy-mode lub przekierowania na statyczną stronę "Wir machen ein Update". Obecnie nie mamy.
 - **Migracja na pustej tabeli** (np. nowo dodana w poprzednim PR, jeszcze brak rows) — NOT NULL bez DEFAULT OK bo nie ma row'a do złamania.
 
-### Co `/deploy_prod` robi z tą zasadą
+### Co `/deploy-prod` robi z tą zasadą
 
-Skill `/deploy_prod` ma sekcję "Migration safety reminder" która listuje warunki. Jeśli ostatni diff zawiera zmianę w `supabase/migrations/` która łamie te reguły, skill **OSTRZEGA** user'a w confirmation modal'u zanim wystrzeli. User świadomie potwierdza lub anuluje. Skill nie blokuje silnie — ale zostawia ślad w raporcie.
+Skill `/deploy-prod` ma sekcję "Migration safety reminder" która listuje warunki. Jeśli ostatni diff zawiera zmianę w `supabase/migrations/` która łamie te reguły, skill **OSTRZEGA** user'a w confirmation modal'u zanim wystrzeli. User świadomie potwierdza lub anuluje. Skill nie blokuje silnie — ale zostawia ślad w raporcie.
 
 ### Anti-pattern
 
-Najczęstsza pokusa: "dodam NOT NULL z DEFAULT, ale chcę żeby kolumna była strict bez default na future inserts → zaraz po deploy zrobię ALTER TABLE DROP DEFAULT". To dwie migracje. Pierwsza puszcza się z DEFAULT (compat z starym kodem). Druga (DROP DEFAULT) puszcza się w następnym `/deploy_prod` JUŻ z nowym kodem który ZAWSZE wpisuje wartość. To jest zgodne z regułą.
+Najczęstsza pokusa: "dodam NOT NULL z DEFAULT, ale chcę żeby kolumna była strict bez default na future inserts → zaraz po deploy zrobię ALTER TABLE DROP DEFAULT". To dwie migracje. Pierwsza puszcza się z DEFAULT (compat z starym kodem). Druga (DROP DEFAULT) puszcza się w następnym `/deploy-prod` JUŻ z nowym kodem który ZAWSZE wpisuje wartość. To jest zgodne z regułą.
 
 ---
 
@@ -855,15 +855,15 @@ to nie nasze — projekt 3 ma inną tsconfig. Skupić się na `src/` clean.
 
 **Po:**
 - **Frontend (Render):** push → BOTH prod + staging Render slots auto-build z tego samego commit'a. Bez zmian dla frontu.
-- **Edge functions:** CI deployuje **tylko na STAGING** Supabase (`taggpiwpwthgpcmaiqjw`). PROD Supabase (`ycdwtrklpoqprabtwahi`) **NIE dostaje auto-deploy**. Musisz albo `/deploy_prod` (skill w Claude Code), albo manual `supabase functions deploy --project-ref ycdwtrklpoqprabtwahi`.
-- **Migracje SQL:** brak auto-deploy w żadnym kierunku — zawsze manual przez `supabase db push --linked` lub `/deploy_prod`.
+- **Edge functions:** CI deployuje **tylko na STAGING** Supabase (`taggpiwpwthgpcmaiqjw`). PROD Supabase (`ycdwtrklpoqprabtwahi`) **NIE dostaje auto-deploy**. Musisz albo `/deploy-prod` (skill w Claude Code), albo manual `supabase functions deploy --project-ref ycdwtrklpoqprabtwahi`.
+- **Migracje SQL:** brak auto-deploy w żadnym kierunku — zawsze manual przez `supabase db push --linked` lub `/deploy-prod`.
 
 **Implikacja:** jeśli zmieniasz cokolwiek w `supabase/functions/*` lub `project 3/supabase/functions/*` lub `supabase/migrations/*` → po merge frontend dotrze na prod automatycznie, **edge functions + migracje NIE**. Klient zobaczy nowy UI ale rozmawiający z nim Supabase ma stary kod → kruche.
 
 **Co robić:**
-1. **Zwykła sytuacja:** merge PR → automatycznie staging dostaje wszystko (front + edge + bez migracji). Otwórz `caapp-staging.onrender.com/?token=<test>`, sprawdź. Jeśli OK → `/deploy_prod` w Claude Code. Skill przepyta + zrobi sekwencję.
+1. **Zwykła sytuacja:** merge PR → automatycznie staging dostaje wszystko (front + edge + bez migracji). Otwórz `caapp-staging.onrender.com/?token=<test>`, sprawdź. Jeśli OK → `/deploy-prod` w Claude Code. Skill przepyta + zrobi sekwencję.
 2. **Hot-fix bez stagingu:** patrz §"Emergency hotfix" niżej — manualny deploy z explicit `--project-ref ycdwtrklpoqprabtwahi`.
-3. **Tylko-frontend change** (np. tylko `src/` lub `project 3/components/`): Render auto-deploy załatwia obie strony. Nie wymaga `/deploy_prod`.
+3. **Tylko-frontend change** (np. tylko `src/` lub `project 3/components/`): Render auto-deploy załatwia obie strony. Nie wymaga `/deploy-prod`.
 
 ### Dwa środowiska
 
@@ -878,12 +878,12 @@ to nie nasze — projekt 3 ma inną tsconfig. Skupić się na `src/` clean.
 | Mamamia tenant | `backend.beta.mamamia.app` | `backend.prod.mamamia.app` |
 | Mamamia agency_id | `18` (Primundus beta) | `3` (Primundus prod) |
 | Frontend deploy | Render auto on push do trunk | Render auto on push do trunk |
-| Edge fn deploy | CI auto via `test.yml` (po merge) | **Manual via `/deploy_prod` skill** lub `supabase functions deploy --project-ref ycdwtrklpoqprabtwahi` |
-| Migration deploy | Manual via `/deploy_staging` skill lub `supabase db push --linked --project-ref taggpiwpwthgpcmaiqjw` | **Manual via `/deploy_prod` skill** |
+| Edge fn deploy | CI auto via `test.yml` (po merge) | **Manual via `/deploy-prod` skill** lub `supabase functions deploy --project-ref ycdwtrklpoqprabtwahi` |
+| Migration deploy | Manual via `/deploy-staging` skill lub `supabase db push --linked --project-ref taggpiwpwthgpcmaiqjw` | **Manual via `/deploy-prod` skill** |
 
 (Slot slug `caapp-beta` istniał historycznie i został przemianowany na `caapp` — w starszych docsach możesz zobaczyć obie nazwy. To ten sam serwis.)
 
-### Promotion workflow — `/deploy_staging` i `/deploy_prod`
+### Promotion workflow — `/deploy-staging` i `/deploy-prod`
 
 Skills żyją w `.claude/skills/deploy-staging/SKILL.md` + `.claude/skills/deploy-prod/SKILL.md` (commited do repo, więc każdy dev po `git pull` ma dostęp w swoim Claude Code).
 
@@ -897,7 +897,7 @@ feature/xyz branch → PR → CI green → self-merge to main
                                     Manual verify: open
                                     caapp-staging.onrender.com
                                        ↓
-                                    "Looks good" → /deploy_prod
+                                    "Looks good" → /deploy-prod
                                        ↓
                                     Claude: pre-flight + confirm + migrate +
                                             edge fns + Render API call +
@@ -906,11 +906,11 @@ feature/xyz branch → PR → CI green → self-merge to main
                                     PROD live (kundenportal.primundus.de)
 ```
 
-**Czego `/deploy_staging` użyć (rzadkie):** ręczny refresh stagingu po
+**Czego `/deploy-staging` użyć (rzadkie):** ręczny refresh stagingu po
 transient CI flake (esm.sh 522, Render build timeout), albo gdy chcesz
 przepuścić tę samą wersję jeszcze raz po zmianie staging secrets.
 
-**Czego `/deploy_prod` użyć (zawsze):** każda zmiana która ma trafić
+**Czego `/deploy-prod` użyć (zawsze):** każda zmiana która ma trafić
 do klienta. Skill enforce'uje:
 - local SHA == staging SHA (nie skipujemy stagingu)
 - interactive confirmation z listą migracji + funkcji do deploy
@@ -934,7 +934,7 @@ npx supabase functions deploy <name> --project-ref ycdwtrklpoqprabtwahi
 **Używaj świadomie.** Skipowanie stagingu znaczy że nie ma weryfikacji że
 zmiana działa z prod Mamamia tenant (Bug #15, #16 by się wykryły na
 stagingu). Po hotfix'ie zrób retro PR żeby commit znalazł się w git history,
-oraz `/deploy_staging` żeby staging i prod znów były synchronized.
+oraz `/deploy-staging` żeby staging i prod znów były synchronized.
 
 Często musisz zdeployować **OBA** (`onboard-to-mamamia` + `mamamia-proxy`)
 gdy zmiany dotyczą shared modules w `_shared/`.

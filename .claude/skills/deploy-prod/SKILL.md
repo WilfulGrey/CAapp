@@ -1,6 +1,6 @@
 ---
 name: deploy-prod
-description: Promote the current trunk commit from STAGING to PROD — applies migrations to prod Supabase, deploys edge functions to prod Supabase, triggers Render redeploy of caapp-beta + kostenrechner-beta (= prod slots), and smoke-tests kundenportal.primundus.de. Always asks for explicit user confirmation before touching prod. Use when the user types /deploy_prod or asks "wypuść to na prod".
+description: Promote the current trunk commit from STAGING to PROD — applies migrations to prod Supabase, deploys edge functions to prod Supabase, triggers Render redeploy of caapp-beta + kostenrechner-beta (= prod slots), and smoke-tests kundenportal.primundus.de. Always asks for explicit user confirmation before touching prod. Use when the user types /deploy-prod or asks "wypuść to na prod".
 ---
 
 # Promote staging → prod
@@ -27,7 +27,7 @@ Takes the commit currently live on STAGING and ships it to PROD. The user has al
 ## Preconditions
 
 1. **Branch & tree:** `main` (or `integration/mamamia-onboarding` pre-rename), clean, up-to-date.
-2. **Local SHA == staging SHA:** Query Render API for `caapp-staging` last successful deploy. If its commit ≠ `git rev-parse HEAD`, abort: *"Staging is on `<other SHA>`. Either pull/checkout that commit, or run /deploy_staging first."*
+2. **Local SHA == staging SHA:** Query Render API for `caapp-staging` last successful deploy. If its commit ≠ `git rev-parse HEAD`, abort: *"Staging is on `<other SHA>`. Either pull/checkout that commit, or run /deploy-staging first."*
 3. **Env vars present:** `SUPABASE_PROD_REF=ycdwtrklpoqprabtwahi`, `RENDER_API_KEY`, `PROD_CAAPP_SERVICE_ID=srv-d7phc0rrjlhs73dtismg`, `PROD_KOSTENRECHNER_SERVICE_ID` (lookup needed).
 
 ## Steps
@@ -83,7 +83,7 @@ Failure → STOP, surface error. Do NOT deploy functions if migration failed.
 
 ### 4. Deploy edge functions to PROD
 
-Same loop as `/deploy_staging` but with `$SUPABASE_PROD_REF`:
+Same loop as `/deploy-staging` but with `$SUPABASE_PROD_REF`:
 
 CA-App functions: `onboard-to-mamamia`, `mamamia-proxy`, `detect-caregiver-events`, `daily-analytics-report`.
 
@@ -170,12 +170,12 @@ Every commit promoted via this skill MUST satisfy **Święta zasada nr 3** (CLAU
 
 If you ARE doing a breaking schema change, it's a multi-step ship:
 
-1. PR 1: expand migration (add new) + dual-read code → /deploy_prod
-2. PR 2: backfill data (if needed) → /deploy_prod
-3. PR 3: switch to read-new only → /deploy_prod
-4. PR 4: contract migration (drop old) → /deploy_prod
+1. PR 1: expand migration (add new) + dual-read code → /deploy-prod
+2. PR 2: backfill data (if needed) → /deploy-prod
+3. PR 3: switch to read-new only → /deploy-prod
+4. PR 4: contract migration (drop old) → /deploy-prod
 
-Each /deploy_prod between steps is a full promotion cycle. NEVER bundle.
+Each /deploy-prod between steps is a full promotion cycle. NEVER bundle.
 
 ## Env vars expected
 
@@ -190,7 +190,7 @@ Each /deploy_prod between steps is a full promotion cycle. NEVER bundle.
 
 ## Related
 
-- **/deploy_staging** — what you run before this skill. Verify staging there first.
+- **/deploy-staging** — what you run before this skill. Verify staging there first.
 - `docs/staging-environment-plan.md` — full architecture rationale.
 - CLAUDE.md §"Promotion workflow" — narrative summary.
 - CLAUDE.md Bug #15, #16, #17 — examples of what staging would have caught.

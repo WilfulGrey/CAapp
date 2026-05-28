@@ -259,7 +259,7 @@ Mamy **dwa środowiska**:
 | | STAGING (auto) | PROD (gated) |
 |---|---|---|
 | Komu służy | Zespołowi do verify przed wypuszczeniem | Żywym klientom |
-| Trigger | Każdy push do `main` (= merge twojego PR) | `/deploy_prod` w Claude Code |
+| Trigger | Każdy push do `main` (= merge twojego PR) | `/deploy-prod` w Claude Code |
 | URL CAapp | https://caapp-staging.onrender.com | https://kundenportal.primundus.de |
 | URL Kostenrechner | https://kostenrechner-staging.onrender.com | https://kostenrechner.primundus.de |
 | Supabase | Osobny staging project (niech inni) | `ycdwtrklpoqprabtwahi` |
@@ -280,14 +280,14 @@ feature/xyz branch → PR → CI green → self-merge to main
                                        ↓
                                     Manual verify staging URL
                                        ↓
-                                    "Działa" → poproś Claude: /deploy_prod
+                                    "Działa" → poproś Claude: /deploy-prod
                                        ↓
                                     Claude robi sekwencję + raportuje
                                        ↓
                                     PROD live
 ```
 
-`/deploy_prod` jest **jedyną** ścieżką żeby klienci coś zobaczyli. Merge do `main` daje ci tylko staging.
+`/deploy-prod` jest **jedyną** ścieżką żeby klienci coś zobaczyli. Merge do `main` daje ci tylko staging.
 
 ### Render team access
 
@@ -301,7 +301,7 @@ blueprint — to zarezerwowane dla Admin role.
 
 **Staging:** automatyczny via GitHub Actions (`test.yml` job `deploy-edge-functions`) po merge do `main`. Działa też dla `project 3/supabase/functions/` (kostenrechner edge fns).
 
-**Prod:** wyłącznie via `/deploy_prod` skill — żaden push do `main` nie ruszy prod Supabase.
+**Prod:** wyłącznie via `/deploy-prod` skill — żaden push do `main` nie ruszy prod Supabase.
 
 **Local manual deploy** (NIE rób tego dla prod — patrz CLAUDE.md §"Emergency hotfix"):
 

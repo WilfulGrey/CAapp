@@ -1,6 +1,6 @@
 ---
 name: deploy-staging
-description: Deploy current trunk to STAGING — runs Supabase migrations + edge function deploy + waits for Render auto-build of caapp-staging + kostenrechner-staging, then smoke-tests both. Use when the user types /deploy_staging, asks "deploy do staging", or wants to manually trigger a staging refresh after merge.
+description: Deploy current trunk to STAGING — runs Supabase migrations + edge function deploy + waits for Render auto-build of caapp-staging + kostenrechner-staging, then smoke-tests both. Use when the user types /deploy-staging, asks "deploy do staging", or wants to manually trigger a staging refresh after merge.
 ---
 
 # Deploy to staging
@@ -149,6 +149,6 @@ that lives outside source control).
 
 ## Related
 
-- **/deploy_prod** — promotes staging → prod. Use after staging passes manual verification.
+- **/deploy-prod** — promotes staging → prod. Use after staging passes manual verification.
 - `docs/staging-environment-plan.md` — full architecture rationale.
 - CLAUDE.md §"Promotion workflow" — narrative summary.
