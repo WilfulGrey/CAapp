@@ -77,7 +77,10 @@ export function MultiStepForm() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showResults, setShowResults] = useState(false);
 
-  const totalSteps = 10; // 9 Fragen + Kontaktformular (Getriebe lebt im CA-app patient form, nicht hier)
+  const totalSteps = 9; // 8 Fragen + Kontaktformular. care_start_timing wurde
+                        // entfernt — das konkrete Startdatum wird jetzt im
+                        // CA-App-Patientenformular abgefragt (PatientForm.startDate).
+                        // Getriebe lebt auch im CA-app patient form, nicht hier.
   const stepStartRef = useRef<number>(Date.now());
   // Scroll target for step changes. page.tsx renders TWO MultiStepForm
   // instances (mobile + desktop layout), both with id="calculator-form" —
@@ -93,12 +96,13 @@ export function MultiStepForm() {
     stepStartRef.current = Date.now();
   }, [currentStep]);
 
-  // Step-Reihenfolge (PR #108): die Timing-Frage wurde aus Step 1 entfernt
-  // und ans Ende des Funnels (vor das Kontaktformular) verschoben — Step 1
-  // ist jetzt die konkrete Sachfrage "Wie viele Personen benötigen Pflege?",
-  // damit der Einstieg ohne planerisches Commitment funktioniert. Daten-Feld
-  // care_start_timing bleibt erhalten (Lead-Pipeline + Mamamia-Mapping
-  // unverändert).
+  // Step-Reihenfolge: Step 1 ist die konkrete Sachfrage "Wie viele Personen
+  // benötigen Pflege?", damit der Einstieg ohne planerisches Commitment
+  // funktioniert. Die Timing-Frage (care_start_timing) wurde komplett aus dem
+  // Funnel entfernt — das konkrete Startdatum holt jetzt das CA-App-
+  // Patientenformular (PatientForm.startDate) ab. State-Feld + API-Payload
+  // bleiben erhalten (Lead-Pipeline + Mamamia-Mapping unverändert), wird
+  // jetzt aber durchgängig als null gesendet.
   function getStepId(step: number): string {
     switch (step) {
       case 1: return 'patient_count';
@@ -109,8 +113,7 @@ export function MultiStepForm() {
       case 6: return 'german_level';
       case 7: return 'driving';
       case 8: return 'gender';
-      case 9: return 'care_start_timing';
-      case 10: return 'contact_form';
+      case 9: return 'contact_form';
       default: return `step_${step}`;
     }
   }
@@ -125,7 +128,6 @@ export function MultiStepForm() {
       case 6: return state.germanLevel;
       case 7: return state.driving;
       case 8: return state.gender;
-      case 9: return state.careStartTiming;
       default: return null;
     }
   }
@@ -215,8 +217,7 @@ export function MultiStepForm() {
       case 6: return Boolean(state.germanLevel);
       case 7: return Boolean(state.driving);
       case 8: return Boolean(state.gender);
-      case 9: return Boolean(state.careStartTiming);
-      case 10: return Boolean(formData.name && formData.email);
+      case 9: return Boolean(formData.name && formData.email);
       default: return false;
     }
   };
@@ -363,8 +364,7 @@ export function MultiStepForm() {
       case 6: return "Deutschkenntnisse der Pflegekraft";
       case 7: return "Führerschein gewünscht?";
       case 8: return "Geschlecht der Pflegekraft";
-      case 9: return "Wann soll die Betreuung starten?";
-      case 10: return "Jetzt Angebot & Pflegekräfte anzeigen";
+      case 9: return "Jetzt Angebot & Pflegekräfte anzeigen";
       default: return "";
     }
   };
@@ -380,8 +380,7 @@ export function MultiStepForm() {
       case 6: return "Welches Sprachniveau sollte die Betreuungskraft haben?";
       case 7: return "Sind Autofahren notwendig und nicht anders zu organisieren?";
       case 8: return "Haben Sie eine Präferenz bezüglich des Geschlechts?";
-      case 9: return "Egal ob konkret geplant oder noch in der Recherche — wir richten alles danach aus.";
-      case 10: return "Letzter Schritt – Sie sehen sofort Ihr Angebot & passende Pflegekräfte und erhalten alles per Mail";
+      case 9: return "Letzter Schritt – Sie sehen sofort Ihr Angebot & passende Pflegekräfte und erhalten alles per Mail";
       default: return "";
     }
   };
@@ -490,7 +489,7 @@ export function MultiStepForm() {
           </div>
         </div>
 
-        {currentStep >= 1 && currentStep <= 9 && (
+        {currentStep >= 1 && currentStep <= 8 && (
           <div className="flex justify-center pt-3 pb-0">
             <div className="inline-flex items-center gap-1.5 bg-[#F0F7F1] border border-[#A8D5B0] rounded-full px-3 py-1">
               <span className="w-1.5 h-1.5 rounded-full bg-[#4CAF50] animate-pulse flex-shrink-0"></span>
@@ -502,7 +501,7 @@ export function MultiStepForm() {
           </div>
         )}
 
-        {currentStep === 10 && (
+        {currentStep === 9 && (
           <div className="flex justify-center pt-3 pb-0">
             <div className="inline-flex items-center gap-2 bg-green-50 border border-green-200 rounded-full px-4 py-1.5 shadow-sm">
               <svg className="w-3.5 h-3.5 text-green-600 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -523,40 +522,10 @@ export function MultiStepForm() {
             )}
 
             <div className="space-y-3">
-              {/* Step 9 (was 1) — Timing nach hinten verschoben (PR #108) */}
-              {currentStep === 9 && (
-                <div className="grid grid-cols-1 gap-3">
-                  {[
-                    { value: 'sofort', label: 'Sofort (4-7 Tage)' },
-                    { value: '2-4-wochen', label: 'In 2-4 Wochen' },
-                    { value: '1-2-monate', label: 'In 1-2 Monaten' },
-                    { value: 'unklar', label: 'Ich informiere mich nur' }
-                  ].map(({ value, label }) => (
-                    <button
-                      key={value}
-                      onClick={() => selectAndAdvance(value, () => updateState({ careStartTiming: value as any }))}
-                      className={btnClass(state.careStartTiming === value)}
-                    >
-                      <div className="flex items-center justify-start gap-3.5">
-                        <div className={`w-5 h-5 rounded-full border flex-shrink-0 transition-all duration-200 ${
-                          state.careStartTiming === value
-                            ? 'border-[#8B7355] bg-[#8B7355] border-[3px]'
-                            : 'border-gray-300 bg-white border-2'
-                        }`}>
-                          {state.careStartTiming === value && (
-                            <div className="w-full h-full flex items-center justify-center">
-                              <div className="w-2 h-2 bg-white rounded-full"></div>
-                            </div>
-                          )}
-                        </div>
-                        <span className="text-base font-medium text-[#3D3D3D]">{label}</span>
-                      </div>
-                    </button>
-                  ))}
-                </div>
-              )}
-
-              {/* Step 1 (was 2) — Patientenzahl ist jetzt die Einstiegsfrage */}
+              {/* Step 1 (was 2) — Patientenzahl ist jetzt die Einstiegsfrage.
+                  Timing-Frage (alter Step 9) wurde komplett entfernt — das
+                  konkrete Startdatum wird jetzt im CA-App-Patientenformular
+                  abgefragt (PatientForm.startDate). */}
               {currentStep === 1 && (
                 <div className="grid grid-cols-1 gap-3">
                   {[{ value: '1-person', label: '1 Pflegebedürftige/r' }, { value: 'ehepaar', label: '2 Pflegebedürftige (Ehepaar)' }].map(({ value, label }) => (
@@ -814,8 +783,8 @@ export function MultiStepForm() {
                 </div>
               )}
 
-              {/* Step 10 - Kontaktformular */}
-              {currentStep === 10 && (
+              {/* Step 9 - Kontaktformular (vorher Step 10, Timing-Frage wurde entfernt) */}
+              {currentStep === 9 && (
                 <div className="space-y-3">
                   <div className="grid grid-cols-1 gap-3">
                     <div>
