@@ -267,7 +267,10 @@ export const AngebotCard: FC<{
       return p1ok && p2ok;
     }
     if (s === 2) {
-      const baseOk = patient.plz !== '' && patient.ort !== '' && patient.haushalt !== ''
+      // haushalt ist read-only (kommt aus dem Angebot/Mamamia) — NIE in die
+      // Validation aufnehmen, sonst kann ein Kunde mit fehlendem Wert nicht
+      // weiter, ohne die Möglichkeit, das Feld selbst zu füllen (Deadlock).
+      const baseOk = patient.plz !== '' && patient.ort !== ''
         && patient.wohnungstyp !== '' && patient.urbanisierung !== '' && patient.familieNahe !== ''
         && patient.pflegedienst !== '' && patient.internet !== '' && patient.badezimmer !== '';
       // When Pflegedienst='Ja' or 'Geplant', Mamamia requires a description
