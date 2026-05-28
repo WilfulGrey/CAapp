@@ -2,7 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useCalculator, formatEuro } from "@/lib/calculator-context";
-import { CircleCheck as CheckCircle2, ArrowRight, Info, Phone, ArrowLeft, X, Lightbulb, User, Mail, Calendar } from "lucide-react";
+import { CircleCheck as CheckCircle2, ArrowRight, Info, Phone, ArrowLeft, X, Lightbulb, User, Mail } from "lucide-react";
 import { useEffect, useState, useRef } from "react";
 import Image from "next/image";
 import { berechnePreis } from "@/lib/calculation";
@@ -18,15 +18,8 @@ export default function ResultPage() {
     name: '',
     email: '',
     phone: '',
-    startDate: '',
     acceptPrivacy: false,
   });
-
-  // Heutiges Datum als min-Wert für das Date-Input (kein Versand in die
-  // Vergangenheit). SSR-sicher: input rendert client-seitig.
-  const todayIso = typeof window !== 'undefined'
-    ? new Date().toISOString().slice(0, 10)
-    : '';
   const [errors, setErrors] = useState({
     name: '',
     email: '',
@@ -126,7 +119,7 @@ export default function ResultPage() {
       setIsSubmitting(true);
 
       try {
-        const mappedFormularDaten: Record<string, any> = {
+        const mappedFormularDaten = {
           betreuung_fuer: state.patientCount || '1-person',
           pflegegrad: parseInt(state.pflegegrad || '0'),
           weitere_personen: state.householdOthers || 'nein',
@@ -137,28 +130,8 @@ export default function ResultPage() {
           fuehrerschein: state.driving || 'egal',
           geschlecht: state.gender || 'egal',
         };
-        // Voraussichtliches Startdatum (optional) — in der Kalkulation als
-        // YYYY-MM-DD ablegen + daraus einen Bucket für care_start_timing
-        // ableiten (≤7d sofort, ≤28d 2-4-wochen, ≤60d 1-2-monate, sonst
-        // unklar). So zeigt die Eingangsbestätigung sofort einen sinnvollen
-        // Wert, auch bevor wir das echte Datum dort darstellen.
-        let careStartTiming: string | undefined;
-        if (formData.startDate) {
-          mappedFormularDaten.care_start_date = formData.startDate;
-          const d = new Date(formData.startDate + 'T00:00:00');
-          if (!isNaN(d.getTime())) {
-            const today = new Date(); today.setHours(0, 0, 0, 0);
-            const diffDays = Math.round((d.getTime() - today.getTime()) / 86400000);
-            if (diffDays >= 0) {
-              careStartTiming = diffDays <= 7 ? 'sofort'
-                : diffDays <= 28 ? '2-4-wochen'
-                : diffDays <= 60 ? '1-2-monate'
-                : 'unklar';
-            }
-          }
-        }
 
-        const vollstaendigeKalkulation = await berechnePreis(mappedFormularDaten as any);
+        const vollstaendigeKalkulation = await berechnePreis(mappedFormularDaten);
         const kalkulationMitFormular = {
           ...vollstaendigeKalkulation,
           formularDaten: mappedFormularDaten
@@ -172,7 +145,6 @@ export default function ResultPage() {
             email: formData.email,
             telefon: formData.phone,
             kalkulation: kalkulationMitFormular,
-            careStartTiming,
             acceptPrivacy: formData.acceptPrivacy,
           }),
         });
@@ -433,25 +405,6 @@ export default function ResultPage() {
                   className="w-full border-2 border-[#E5E3DF] rounded-xl px-4 py-3 text-base text-[#3D3D3D] outline-none focus:border-[#8B7355] transition-colors"
                   placeholder="+49 123 456789"
                 />
-              </div>
-
-              <div>
-                <div className="flex justify-between mb-2">
-                  <label htmlFor="startDate" className="text-sm font-semibold text-[#3D3D3D] flex items-center gap-2">
-                    <Calendar className="w-4 h-4 text-[#8B7355]" />
-                    Voraussichtliches Startdatum
-                  </label>
-                  <span className="text-xs text-[#8B8B8B]">optional</span>
-                </div>
-                <input
-                  type="date"
-                  id="startDate"
-                  value={formData.startDate}
-                  min={todayIso}
-                  onChange={(e) => setFormData({ ...formData, startDate: e.target.value })}
-                  className="w-full border-2 border-[#E5E3DF] rounded-xl px-4 py-3 text-base text-[#3D3D3D] outline-none focus:border-[#8B7355] transition-colors"
-                />
-                <p className="text-xs text-[#8B8B8B] mt-1.5">Falls bekannt — hilft uns, passende Pflegekräfte vorzuschlagen.</p>
               </div>
 
               <div className="flex gap-3 items-start pt-2">
