@@ -143,8 +143,30 @@ export async function handleRequest(req: Request, deps: ProxyDeps): Promise<Resp
       },
     );
   } catch (e) {
-    const errMsg = (e as Error).message;
-    console.error(`proxy[${action}] error:`, errMsg, (e as Error).stack);
+    const err = e as Error & {
+      rateLimited?: boolean;
+      retry_after_seconds?: number;
+      limit?: number;
+      window_minutes?: number;
+      used?: number;
+    };
+    const errMsg = err.message;
+    console.error(`proxy[${action}] error:`, errMsg, err.stack);
+
+    // Rate-limit errors thrown by inviteCaregiver carry structured data
+    // (retry_after_seconds, limit, used). Surface as HTTP 429 with the
+    // metadata so the frontend modal can show "Bitte warten Sie noch X
+    // Min." without depending on DEBUG_PROXY leakage. Distinct from a
+    // 502 upstream failure — retry vs wait have different UX.
+    if (err.rateLimited) {
+      return jsonError(429, "rate-limited", baseHeaders, {
+        retry_after_seconds: err.retry_after_seconds,
+        limit: err.limit,
+        window_minutes: err.window_minutes,
+        used: err.used,
+      });
+    }
+
     // Surface the GraphQL error category to the client so it can make retry
     // decisions without depending on DEBUG_PROXY leakage. Panel-client errors
     // carry `cat=<category>` per mamamiaPanelClient.ts (e.g. cat=validation
@@ -206,6 +228,35 @@ function makeRealSupabase(url: string, serviceKey: string): ProxySupabase {
         caregiver_id: number | null;
         accepted_at: string;
       }>;
+    },
+    async countRecentInviteAttempts(leadId, windowMinutes) {
+      const cutoff = new Date(Date.now() - windowMinutes * 60_000).toISOString();
+      const { count, error } = await client
+        .from("caregiver_invite_attempts")
+        .select("id", { count: "exact", head: true })
+        .eq("lead_id", leadId)
+        .gte("attempted_at", cutoff);
+      if (error) throw new Error(`supabase countRecentInviteAttempts: ${error.message}`);
+      return count ?? 0;
+    },
+    async oldestInviteAttemptWithin(leadId, windowMinutes) {
+      const cutoff = new Date(Date.now() - windowMinutes * 60_000).toISOString();
+      const { data, error } = await client
+        .from("caregiver_invite_attempts")
+        .select("attempted_at")
+        .eq("lead_id", leadId)
+        .gte("attempted_at", cutoff)
+        .order("attempted_at", { ascending: true })
+        .limit(1);
+      if (error) throw new Error(`supabase oldestInviteAttemptWithin: ${error.message}`);
+      const row = (data ?? [])[0] as { attempted_at: string } | undefined;
+      return row ? new Date(row.attempted_at) : null;
+    },
+    async recordInviteAttempt(leadId, caregiverId) {
+      const { error } = await client
+        .from("caregiver_invite_attempts")
+        .insert({ lead_id: leadId, caregiver_id: caregiverId });
+      if (error) throw new Error(`supabase recordInviteAttempt: ${error.message}`);
     },
   };
 }

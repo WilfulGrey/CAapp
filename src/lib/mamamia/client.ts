@@ -49,6 +49,40 @@ export class MamamiaError extends Error {
       return null;
     }
   }
+
+  // Rate-limit payload from inviteCaregiver gate. Proxy returns HTTP 429
+  // with body `{ error: 'rate-limited', retry_after_seconds, limit,
+  // window_minutes, used }`. Frontend reads these to show the wait modal
+  // without depending on additional state lookups. Returns null for any
+  // non-429 / unparseable body.
+  get rateLimitPayload(): {
+    retry_after_seconds: number;
+    limit: number;
+    window_minutes: number;
+    used: number;
+  } | null {
+    if (this.status !== 429) return null;
+    try {
+      const parsed = JSON.parse(this.body) as {
+        error?: unknown;
+        retry_after_seconds?: unknown;
+        limit?: unknown;
+        window_minutes?: unknown;
+        used?: unknown;
+      };
+      if (parsed.error !== 'rate-limited') return null;
+      const num = (x: unknown, fallback: number): number =>
+        typeof x === 'number' && Number.isFinite(x) ? x : fallback;
+      return {
+        retry_after_seconds: num(parsed.retry_after_seconds, 60),
+        limit: num(parsed.limit, 5),
+        window_minutes: num(parsed.window_minutes, 60),
+        used: num(parsed.used, 0),
+      };
+    } catch {
+      return null;
+    }
+  }
 }
 
 async function postJson<T>(path: string, body: object): Promise<T> {
@@ -114,6 +148,7 @@ export type ProxyAction =
   | 'listAcceptedApplications'
   | 'getCaregiver'
   | 'searchLocations'
+  | 'getInviteRateState'
   // writes
   | 'updateCustomer'
   | 'updateJobDescription'

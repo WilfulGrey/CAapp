@@ -19,7 +19,44 @@ function captureFetch(response: object, status = 200) {
   return { state, fetchFn };
 }
 
-function makeDeps(fetchFn: typeof fetch): ActionDeps {
+// Bare fake of ProxySupabase — covers all 6 methods, in-memory, mutable.
+// Each test that needs to assert / preload state grabs this and tweaks
+// the maps. Functions that don't touch supabase get an inert instance.
+type FakeSupa = {
+  invites: Array<{ leadId: string; caregiverId: number; attemptedAt: Date }>;
+  failOnRecord?: boolean;
+};
+function makeFakeSupabase(state: FakeSupa = { invites: [] }) {
+  return {
+    state,
+    adapter: {
+      // dismiss / accept fakes not used by invite tests but required by
+      // the interface — keep them inert.
+      async selectDismissedCaregivers() { return []; },
+      async upsertDismissedCaregiver() { /* no-op */ },
+      async selectAcceptedApplications() { return []; },
+      async countRecentInviteAttempts(leadId: string, windowMinutes: number) {
+        const cutoff = Date.now() - windowMinutes * 60_000;
+        return state.invites.filter(
+          (r) => r.leadId === leadId && r.attemptedAt.getTime() >= cutoff,
+        ).length;
+      },
+      async oldestInviteAttemptWithin(leadId: string, windowMinutes: number) {
+        const cutoff = Date.now() - windowMinutes * 60_000;
+        const within = state.invites
+          .filter((r) => r.leadId === leadId && r.attemptedAt.getTime() >= cutoff)
+          .sort((a, b) => a.attemptedAt.getTime() - b.attemptedAt.getTime());
+        return within[0]?.attemptedAt ?? null;
+      },
+      async recordInviteAttempt(leadId: string, caregiverId: number) {
+        if (state.failOnRecord) throw new Error("simulated record failure");
+        state.invites.push({ leadId, caregiverId, attemptedAt: new Date() });
+      },
+    },
+  };
+}
+
+function makeDeps(fetchFn: typeof fetch, supabase?: ActionDeps["supabase"]): ActionDeps {
   return {
     endpoint: "https://beta.example/graphql",
     getAgencyToken: async () => "agency-token",
@@ -27,6 +64,7 @@ function makeDeps(fetchFn: typeof fetch): ActionDeps {
     agencyEmail: "primundus+portal@example.com",
     agencyPassword: "secret-pass",
     fetchFn,
+    supabase: supabase ?? makeFakeSupabase().adapter,
   };
 }
 
@@ -528,5 +566,221 @@ Deno.test("inviteCaregiver: missing panel config aborts before panel calls", asy
     Error,
     "panel auth not configured",
   );
+});
+
+// ─── inviteCaregiver: rate limit gate ──────────────────────────────────
+
+// Helper: mock panel flow (csrf → LoginAgency → StoreRequest) so we can
+// focus rate-limit tests on the gate logic without re-asserting Mamamia
+// shape per case.
+function panelFlowFetchFn(state: { calls: number; lastBody?: string }, opts: {
+  storeRequestId?: number;
+  failAt?: "store-request";
+} = {}): typeof fetch {
+  return async (_input, init) => {
+    state.calls++;
+    const body = typeof (init as RequestInit | undefined)?.body === "string"
+      ? (init as RequestInit).body as string : undefined;
+    state.lastBody = body;
+    // calls 1 (csrf), 2 (LoginAgency), 3 (StoreRequest)
+    if (state.calls === 1) {
+      const h = new Headers(); h.append("set-cookie", "XSRF-TOKEN=t; path=/");
+      return new Response(null, { status: 204, headers: h });
+    }
+    if (state.calls === 2) {
+      const h = new Headers(); h.append("set-cookie", "XSRF-TOKEN=t; path=/");
+      return new Response(JSON.stringify({ data: { LoginAgency: { id: 1, email: "x" } } }), { status: 200, headers: h });
+    }
+    if (state.calls === 3) {
+      if (opts.failAt === "store-request") {
+        return new Response(
+          JSON.stringify({ errors: [{ message: "Panel rejected", extensions: { category: "authorization" } }] }),
+          { status: 200 },
+        );
+      }
+      return new Response(
+        JSON.stringify({ data: { StoreRequest: {
+          id: opts.storeRequestId ?? 100,
+          caregiver_id: 10061,
+          job_offer_id: 16235,
+          message: null,
+          created_at: "2026-04-28T09:43:44.000000Z",
+        } } }),
+        { status: 200 },
+      );
+    }
+    throw new Error(`unexpected fetch call #${state.calls}`);
+  };
+}
+
+Deno.test("inviteCaregiver[rate-limit]: 1st invite passes through + records attempt", async () => {
+  const supa = makeFakeSupabase();
+  const callState = { calls: 0 };
+  const fetchFn = panelFlowFetchFn(callState);
+
+  await ACTIONS.inviteCaregiver(
+    SESSION,
+    { caregiver_id: 10061 },
+    makeDeps(fetchFn, supa.adapter),
+  );
+
+  assertEquals(callState.calls, 3); // csrf + LoginAgency + StoreRequest
+  assertEquals(supa.state.invites.length, 1);
+  assertEquals(supa.state.invites[0].leadId, SESSION.lead_id);
+  assertEquals(supa.state.invites[0].caregiverId, 10061);
+});
+
+Deno.test("inviteCaregiver[rate-limit]: 6th invite within 60min → rate-limited error, NO Mamamia call", async () => {
+  // Pre-load 5 attempts within last 30 min — oldest 30 min ago means
+  // retry_after ≈ 30 min remaining in the rolling hour window.
+  const now = Date.now();
+  const supa = makeFakeSupabase({
+    invites: [
+      { leadId: SESSION.lead_id, caregiverId: 1, attemptedAt: new Date(now - 30 * 60_000) }, // 30min ago (oldest)
+      { leadId: SESSION.lead_id, caregiverId: 2, attemptedAt: new Date(now - 20 * 60_000) },
+      { leadId: SESSION.lead_id, caregiverId: 3, attemptedAt: new Date(now - 10 * 60_000) },
+      { leadId: SESSION.lead_id, caregiverId: 4, attemptedAt: new Date(now - 5 * 60_000) },
+      { leadId: SESSION.lead_id, caregiverId: 5, attemptedAt: new Date(now - 1 * 60_000) },
+    ],
+  });
+  const callState = { calls: 0 };
+  const fetchFn = panelFlowFetchFn(callState);
+
+  const err = await assertRejects(
+    () => ACTIONS.inviteCaregiver(
+      SESSION,
+      { caregiver_id: 10061 },
+      makeDeps(fetchFn, supa.adapter),
+    ),
+    Error,
+    "rate-limited",
+  ) as Error & { rateLimited?: boolean; retry_after_seconds?: number; limit?: number; used?: number };
+
+  // NO Mamamia call — gate fired before panel flow
+  assertEquals(callState.calls, 0);
+  // No 6th attempt recorded
+  assertEquals(supa.state.invites.length, 5);
+  // Structured rate-limit payload
+  assertEquals(err.rateLimited, true);
+  assertEquals(err.limit, 5);
+  assertEquals(err.used, 5);
+  // Retry ≈ 60 - 30 = 30 min ≈ 1800s (allow some scheduling slop)
+  if (err.retry_after_seconds! < 1700 || err.retry_after_seconds! > 1900) {
+    throw new Error(`retry_after_seconds expected ~1800, got ${err.retry_after_seconds}`);
+  }
+});
+
+Deno.test("inviteCaregiver[rate-limit]: Mamamia StoreRequest failure does NOT consume quota", async () => {
+  const supa = makeFakeSupabase();
+  const callState = { calls: 0 };
+  const fetchFn = panelFlowFetchFn(callState, { failAt: "store-request" });
+
+  await assertRejects(
+    () => ACTIONS.inviteCaregiver(
+      SESSION,
+      { caregiver_id: 10061 },
+      makeDeps(fetchFn, supa.adapter),
+    ),
+    Error,
+  );
+
+  // No row recorded — user can retry without penalty
+  assertEquals(supa.state.invites.length, 0);
+});
+
+Deno.test("inviteCaregiver[rate-limit]: recordInviteAttempt failure still returns success (best-effort ledger)", async () => {
+  const supa = makeFakeSupabase({ invites: [], failOnRecord: true });
+  const callState = { calls: 0 };
+  const fetchFn = panelFlowFetchFn(callState);
+
+  // Mamamia call succeeds, ledger write fails → returns OK (don't punish
+  // user for a ledger blip; worst case next quota check sees old count)
+  const result = await ACTIONS.inviteCaregiver(
+    SESSION,
+    { caregiver_id: 10061 },
+    makeDeps(fetchFn, supa.adapter),
+  );
+  const sr = (result as { StoreRequest: { id: number } }).StoreRequest;
+  assertEquals(sr.id, 100);
+  // No row landed
+  assertEquals(supa.state.invites.length, 0);
+});
+
+Deno.test("inviteCaregiver[rate-limit]: aborts with structured error if supabase adapter missing", async () => {
+  const { fetchFn } = captureFetch({ data: {} });
+  // Strip supabase from deps explicitly
+  const deps = { ...makeDeps(fetchFn), supabase: undefined };
+  await assertRejects(
+    () => ACTIONS.inviteCaregiver(SESSION, { caregiver_id: 10053 }, deps),
+    Error,
+    "supabase adapter required",
+  );
+});
+
+// ─── getInviteRateState ───────────────────────────────────────────────
+
+Deno.test("getInviteRateState: empty ledger → used=0, blocked=false, retry_after=0", async () => {
+  const supa = makeFakeSupabase();
+  const { fetchFn } = captureFetch({ data: {} });
+
+  const result = await ACTIONS.getInviteRateState(
+    SESSION, {}, makeDeps(fetchFn, supa.adapter),
+  ) as {
+    used: number; limit: number; window_minutes: number;
+    oldest_at: string | null; retry_after_seconds: number; blocked: boolean;
+  };
+
+  assertEquals(result.used, 0);
+  assertEquals(result.limit, 5);
+  assertEquals(result.window_minutes, 60);
+  assertEquals(result.oldest_at, null);
+  assertEquals(result.retry_after_seconds, 0);
+  assertEquals(result.blocked, false);
+});
+
+Deno.test("getInviteRateState: at limit → blocked=true, retry_after derived from oldest attempt", async () => {
+  const now = Date.now();
+  const supa = makeFakeSupabase({
+    invites: [
+      { leadId: SESSION.lead_id, caregiverId: 1, attemptedAt: new Date(now - 45 * 60_000) }, // oldest, 45min ago
+      { leadId: SESSION.lead_id, caregiverId: 2, attemptedAt: new Date(now - 30 * 60_000) },
+      { leadId: SESSION.lead_id, caregiverId: 3, attemptedAt: new Date(now - 20 * 60_000) },
+      { leadId: SESSION.lead_id, caregiverId: 4, attemptedAt: new Date(now - 10 * 60_000) },
+      { leadId: SESSION.lead_id, caregiverId: 5, attemptedAt: new Date(now - 5 * 60_000) },
+    ],
+  });
+  const { fetchFn } = captureFetch({ data: {} });
+
+  const result = await ACTIONS.getInviteRateState(
+    SESSION, {}, makeDeps(fetchFn, supa.adapter),
+  ) as { used: number; blocked: boolean; retry_after_seconds: number };
+
+  assertEquals(result.used, 5);
+  assertEquals(result.blocked, true);
+  // Retry ≈ 60 - 45 = 15 min ≈ 900s
+  if (result.retry_after_seconds < 800 || result.retry_after_seconds > 1000) {
+    throw new Error(`retry_after_seconds expected ~900, got ${result.retry_after_seconds}`);
+  }
+});
+
+Deno.test("getInviteRateState: scoped to session.lead_id (ignores other leads)", async () => {
+  const supa = makeFakeSupabase({
+    invites: [
+      // Same caregiver but a different lead's invites — must NOT count
+      { leadId: "other-lead-uuid", caregiverId: 1, attemptedAt: new Date() },
+      { leadId: "other-lead-uuid", caregiverId: 2, attemptedAt: new Date() },
+      { leadId: "other-lead-uuid", caregiverId: 3, attemptedAt: new Date() },
+      { leadId: "other-lead-uuid", caregiverId: 4, attemptedAt: new Date() },
+      { leadId: "other-lead-uuid", caregiverId: 5, attemptedAt: new Date() },
+    ],
+  });
+  const { fetchFn } = captureFetch({ data: {} });
+
+  const result = await ACTIONS.getInviteRateState(
+    SESSION, {}, makeDeps(fetchFn, supa.adapter),
+  ) as { used: number; blocked: boolean };
+
+  assertEquals(result.used, 0);
+  assertEquals(result.blocked, false);
 });
 

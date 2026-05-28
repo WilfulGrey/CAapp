@@ -281,4 +281,25 @@ export function useSearchLocations(
   };
 }
 
+// Invite rate-limit snapshot. Backend reads OUR Supabase ledger
+// (caregiver_invite_attempts, written by inviteCaregiver after Mamamia
+// StoreRequest succeeds). Frontend uses this for:
+//   - disabling the "Einladen" button + showing a wait modal when blocked
+//   - showing "X von 5 in letzter Stunde" indicator (optional UX hint)
+//   - countdown without re-fetch (use retry_after_seconds locally)
+// Refetch after every successful invite (manual via .refetch()) to keep
+// the count in sync without polling.
+export interface InviteRateState {
+  used: number;
+  limit: number;
+  window_minutes: number;
+  oldest_at: string | null;
+  retry_after_seconds: number;
+  blocked: boolean;
+}
+
+export function useInviteRateState(enabled = true) {
+  return useMamamiaQuery<InviteRateState>('getInviteRateState', {}, enabled);
+}
+
 export { MamamiaError };
