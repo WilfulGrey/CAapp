@@ -105,9 +105,23 @@ export const InterestCard: FC<{
           </div>
 
           <div className="flex-1 min-w-0">
-            <div className="flex items-baseline gap-1.5 min-w-0 mb-1">
-              <span className="font-bold text-gray-900 leading-tight">{name}</span>
-              <span className="text-sm text-gray-400 flex-shrink-0">{nurse.age} J.</span>
+            <div className="flex items-start justify-between gap-2 mb-1">
+              <div className="flex items-baseline gap-1.5 min-w-0">
+                <span className="font-bold text-gray-900 leading-tight">{name}</span>
+                <span className="text-sm text-gray-400 flex-shrink-0">{nurse.age} J.</span>
+              </div>
+              {/* Badge identisch zur MatchCard (top-right neben Name) —
+                  damit Interesse- und Matching-Karten visuell konsistent
+                  sind. */}
+              {(() => {
+                const lvl = nurseLevel(nurse.experienceYears ?? 0, nurse.history?.assignments ?? 0);
+                return (
+                  <span className={`flex items-center gap-1 text-xs font-bold pl-1.5 pr-2.5 py-0.5 rounded-full border flex-shrink-0 ${lvl.cls}`}>
+                    <span className="text-sm leading-none">{lvl.emoji}</span>
+                    {lvl.label}
+                  </span>
+                );
+              })()}
             </div>
             <div className="flex items-center gap-2 mb-1">
               <div className="flex gap-0.5">
@@ -124,10 +138,6 @@ export const InterestCard: FC<{
                   {' '}· {nurse.history.assignments} Einsätze · Ø {Math.round(nurse.history.avgDurationMonths * 4.3)} Wo.
                 </span>
               )}
-              {(() => {
-                const lvl = nurseLevel(nurse.experienceYears ?? 0, nurse.history?.assignments ?? 0);
-                return <span className={`ml-1 inline-flex items-center gap-0.5 text-[10px] font-bold px-1.5 py-0.5 rounded-full border ${lvl.cls}`}><span className="leading-none">{lvl.emoji}</span>{lvl.label}</span>;
-              })()}
             </p>
           </div>
         </div>
