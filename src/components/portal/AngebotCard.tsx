@@ -267,7 +267,10 @@ export const AngebotCard: FC<{
       return p1ok && p2ok;
     }
     if (s === 2) {
-      const baseOk = patient.plz !== '' && patient.ort !== '' && patient.haushalt !== ''
+      // haushalt ist read-only (kommt aus dem Angebot/Mamamia) — NIE in die
+      // Validation aufnehmen, sonst kann ein Kunde mit fehlendem Wert nicht
+      // weiter, ohne die Möglichkeit, das Feld selbst zu füllen (Deadlock).
+      const baseOk = patient.plz !== '' && patient.ort !== ''
         && patient.wohnungstyp !== '' && patient.urbanisierung !== '' && patient.familieNahe !== ''
         && patient.pflegedienst !== '' && patient.internet !== '' && patient.badezimmer !== '';
       // When Pflegedienst='Ja' or 'Geplant', Mamamia requires a description
@@ -1006,7 +1009,11 @@ export const AngebotCard: FC<{
                         <button type="button" onClick={() => setPriceInfo(null)} className="text-gray-400 flex-shrink-0 font-bold">✕</button>
                       </div>
                     )}
-                    <div className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm text-gray-700 bg-gray-50 cursor-not-allowed">{patient.haushalt}</div>
+                    <div className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm bg-gray-50 cursor-not-allowed">
+                      {patient.haushalt
+                        ? <span className="text-gray-700">{patient.haushalt}</span>
+                        : <span className="text-gray-400">Nicht angegeben</span>}
+                    </div>
                   </div>
                   <div>
                     <label className={labelCls}>Familie in der Nähe (bis 20 km) <span className="text-red-400">*</span></label>
@@ -1138,8 +1145,12 @@ export const AngebotCard: FC<{
                       options={['Egal','Weiblich','Männlich']} />
                   </div>
 
-                  {/* Preisrelevante Felder – read-only */}
-                  <div className={gridRow2}>
+                  {/* Preisrelevante Felder – read-only.
+                      items-start (statt items-end aus gridRow2), damit
+                      Sprachniveau (links, alleine) nicht nach unten rutscht,
+                      wenn rechts unter Führerschein das Getriebe-Feld
+                      eingeblendet wird. */}
+                  <div className="grid grid-cols-2 gap-2 items-start">
                     <div>
                       <label className="block text-sm font-semibold text-gray-600 mb-1.5 flex items-center gap-1.5">
                         Sprachniveau
