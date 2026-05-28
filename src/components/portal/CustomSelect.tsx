@@ -13,16 +13,23 @@ export const CustomSelect: FC<{
   const btnRef = useRef<HTMLButtonElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
+  // Dropdown-Breite: mindestens Button-Breite (visuelle Verbindung), aber
+  // bei langen Options darf das Menü bis zum Viewport-Rand wachsen — sonst
+  // werden Optionen wie "Harninkontinenz" / "Stuhlinkontinenz" abgeschnitten,
+  // weil die Felder in einer 2-Spalten-Grid sitzen.
+  const buildDropdownStyle = (r: DOMRect): React.CSSProperties => ({
+    position: 'fixed',
+    top: r.bottom + 4,
+    left: r.left,
+    minWidth: r.width,
+    maxWidth: Math.max(r.width, window.innerWidth - r.left - 8),
+    width: 'max-content',
+    zIndex: 9999,
+  });
+
   const handleOpen = () => {
     if (!open && btnRef.current) {
-      const r = btnRef.current.getBoundingClientRect();
-      setDropdownStyle({
-        position: 'fixed',
-        top: r.bottom + 4,
-        left: r.left,
-        width: r.width,
-        zIndex: 9999,
-      });
+      setDropdownStyle(buildDropdownStyle(btnRef.current.getBoundingClientRect()));
     }
     setOpen(o => !o);
   };
@@ -44,8 +51,7 @@ export const CustomSelect: FC<{
     };
     const updatePos = () => {
       if (btnRef.current) {
-        const r = btnRef.current.getBoundingClientRect();
-        setDropdownStyle({ position: 'fixed', top: r.bottom + 4, left: r.left, width: r.width, zIndex: 9999 });
+        setDropdownStyle(buildDropdownStyle(btnRef.current.getBoundingClientRect()));
       }
     };
     document.addEventListener('mousedown', close);
@@ -76,7 +82,7 @@ export const CustomSelect: FC<{
               key={opt}
               type="button"
               onClick={e => { e.stopPropagation(); onChange(opt); setOpen(false); }}
-              className={`w-full text-left px-4 py-2.5 text-base transition-colors ${
+              className={`w-full text-left whitespace-normal break-words px-4 py-2.5 text-base transition-colors ${
                 opt === value
                   ? 'bg-[#F5F1EA] text-[#8B7355] font-semibold'
                   : 'text-gray-700 hover:bg-gray-50'
