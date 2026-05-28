@@ -293,6 +293,11 @@ export const AngebotCard: FC<{
     return false;
   };
   const allComplete = STEP_LABELS.every((_, i) => stepComplete(i));
+  // Erster unvollständiger Step — für den "Speichern"-Button-Label auf Step 5.
+  // Wenn der Kunde auf Step 5 ist und ein anderer Step noch Lücken hat, soll
+  // der Button NICHT nur "Bitte alle Pflichtfelder ausfüllen" sagen, sondern
+  // konkret den Step nennen + dorthin springen.
+  const firstIncompleteStep = allComplete ? -1 : STEP_LABELS.findIndex((_, i) => !stepComplete(i));
 
   // `effectiveSaved` lets the parent's patientSaved signal flip the row
   // to "Vollständig" even when the AngebotCard's own `saved` state hasn't
@@ -1268,7 +1273,16 @@ export const AngebotCard: FC<{
                 ) : (
                   <button
                     onClick={async () => {
-                      if (!allComplete || isSaving) return;
+                      if (isSaving) return;
+                      // Statt stumm zu blockieren: zum ersten unvollständigen
+                      // Step springen, damit der Kunde sieht, was fehlt.
+                      if (!allComplete) {
+                        if (firstIncompleteStep >= 0) {
+                          setStep(firstIncompleteStep);
+                          scrollToFormTop();
+                        }
+                        return;
+                      }
                       // Mark as final submission (not a draft) so reload
                       // shows the green-checked "Vollständig" state.
                       if (storageKey) {
@@ -1312,15 +1326,15 @@ export const AngebotCard: FC<{
                         scrollPortalToTop();
                       }
                     }}
-                    disabled={!allComplete || isSaving}
+                    disabled={isSaving}
                     className={`flex-1 py-2.5 text-sm font-bold rounded-xl transition-all ${
                       allComplete && !isSaving
                         ? 'bg-[#E76F63] hover:bg-[#D65E52] text-white shadow-sm'
-                        : 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                        : 'bg-amber-50 border border-amber-200 text-amber-800 hover:bg-amber-100'
                     }`}
                   >
-                    {!allComplete
-                      ? 'Bitte alle Pflichtfelder ausfüllen'
+                    {!allComplete && firstIncompleteStep >= 0
+                      ? `Schritt ${firstIncompleteStep + 1}: ${STEP_LABELS[firstIncompleteStep]} ausfüllen →`
                       : isSaving
                         ? 'Speichern…'
                         : 'Speichern'}
