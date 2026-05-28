@@ -124,6 +124,19 @@ export function useUpdateJobDescription() {
   >('updateJobDescription');
 }
 
+// Sets JobOffer.arrival_at / departure_at via UpdateJobOfferDates mutation.
+// Used after the patient form save to push the customer's explicit
+// "Voraussichtliches Startdatum" pick (form.startDate) into Mamamia,
+// overriding the fuzzy onboard-computed arrival_at (offset from
+// lead.care_start_timing). JobOffer.id + customer_id are forced from
+// session JWT in the proxy — passing them here is harmless.
+export function useUpdateJobOfferDates() {
+  return useMamamiaMutation<
+    { arrival_at?: string | null; departure_at?: string | null },
+    { UpdateJobOfferDates: { id: number; job_offer_id: string; arrival_at: string | null; departure_at: string | null } }
+  >('updateJobOfferDates');
+}
+
 // Local UI dismiss — writes a row into lead_dismissed_caregivers so the
 // portal stops surfacing this caregiver in the Interest section. Does
 // NOT call Mamamia. Backend detect-caregiver-events also doesn't read

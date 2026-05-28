@@ -211,6 +211,74 @@ Deno.test("updateCustomer: strips unexpected fields (allowlist)", async () => {
   assertEquals(sent.variables.service_agency_id, undefined);
 });
 
+// ─── updateJobOfferDates ────────────────────────────────────────────────
+
+Deno.test("updateJobOfferDates: forces session.job_offer_id + session.customer_id, ignores user override", async () => {
+  const { state, fetchFn } = captureFetch({
+    data: { UpdateJobOfferDates: { id: 16226, job_offer_id: "ts-18-16226", arrival_at: "2026-06-10", departure_at: null } },
+  });
+
+  await ACTIONS.updateJobOfferDates(SESSION, {
+    arrival_at: "2026-06-10",
+    // malicious attempts — must be ignored
+    id: 99999,
+    customer_id: 88888,
+  }, makeDeps(fetchFn));
+
+  const sent = state.body as { variables: Record<string, unknown> };
+  assertEquals(sent.variables.id, 16226);         // session.job_offer_id, not 99999
+  assertEquals(sent.variables.customer_id, 7570); // session.customer_id, not 88888
+  assertEquals(sent.variables.arrival_at, "2026-06-10");
+});
+
+Deno.test("updateJobOfferDates: empty string arrival_at → null (Mamamia clear semantics)", async () => {
+  const { state, fetchFn } = captureFetch({
+    data: { UpdateJobOfferDates: { id: 16226, arrival_at: null } },
+  });
+
+  await ACTIONS.updateJobOfferDates(SESSION, { arrival_at: "   " }, makeDeps(fetchFn));
+
+  const sent = state.body as { variables: Record<string, unknown> };
+  assertEquals(sent.variables.arrival_at, null);
+});
+
+Deno.test("updateJobOfferDates: omitted arrival_at → field not sent (preserve current Mamamia value)", async () => {
+  const { state, fetchFn } = captureFetch({
+    data: { UpdateJobOfferDates: { id: 16226, arrival_at: "2026-06-01" } },
+  });
+
+  // Caller wants to update ONLY departure_at — arrival_at must NOT be
+  // overwritten with null.
+  await ACTIONS.updateJobOfferDates(SESSION, { departure_at: "2026-12-15" }, makeDeps(fetchFn));
+
+  const sent = state.body as { variables: Record<string, unknown> };
+  assertEquals(sent.variables.departure_at, "2026-12-15");
+  assertEquals("arrival_at" in sent.variables, false);
+});
+
+Deno.test("updateJobOfferDates: no date fields supplied → no-op (does not call Mamamia)", async () => {
+  let called = false;
+  const fetchFn: typeof fetch = async () => {
+    called = true;
+    return new Response("{}", { status: 200 });
+  };
+
+  const result = await ACTIONS.updateJobOfferDates(SESSION, {}, makeDeps(fetchFn));
+
+  assertEquals(called, false);
+  assertEquals((result as { skipped: string }).skipped, "no date fields supplied");
+});
+
+Deno.test("updateJobOfferDates: non-string arrival_at throws", async () => {
+  const { fetchFn } = captureFetch({ data: {} });
+
+  await assertRejects(
+    () => ACTIONS.updateJobOfferDates(SESSION, { arrival_at: 12345 }, makeDeps(fetchFn)),
+    Error,
+    "must be string",
+  );
+});
+
 // ─── rejectApplication (K5) ─────────────────────────────────────────────
 
 // Multi-response fetch helper for actions that prefetch + mutate.

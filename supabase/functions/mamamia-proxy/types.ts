@@ -18,6 +18,7 @@ export type ProxyAction =
   // writes
   | "updateCustomer"
   | "updateJobDescription"
+  | "updateJobOfferDates"
   | "rejectApplication"
   | "storeConfirmation"
   | "inviteCaregiver"
