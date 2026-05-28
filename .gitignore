@@ -5,13 +5,21 @@ supabase/.temp/
 .env
 .env.local
 .env.*.local
-# Ignore per-user Claude Code state but commit shared skills.
+# Ignore per-user Claude Code state but commit shared skills + commands.
 # Pattern uses wildcard + negation: gitignore can't un-ignore inside a
 # fully-ignored directory, so we ignore CONTENTS of .claude (with /*)
-# then re-include the skills subtree.
+# then re-include the skills + commands subtrees.
+#   skills/   = .claude/skills/<name>/SKILL.md  (model-invocable + slash command)
+#   commands/ = .claude/commands/<name>.md      (slash command, simpler form)
+# Both register as `/name` slash commands in Claude Code. Two entry
+# points → resilience: if Claude Code's skill-discovery misses a project
+# subdir (per-version regressions seen 2026-05-28), the explicit
+# commands/ file still surfaces the slash command.
 .claude/*
 !.claude/skills/
 !.claude/skills/**
+!.claude/commands/
+!.claude/commands/**
 coverage/
 # Onboarding paczki dla nowych devów — mogą zawierać klucze .env w plain text.
 # Trzymaj poza repo, przekaż osobnym kanałem (Signal / 1Password / GPG).
