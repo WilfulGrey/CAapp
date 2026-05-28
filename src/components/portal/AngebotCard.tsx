@@ -1145,8 +1145,12 @@ export const AngebotCard: FC<{
                       options={['Egal','Weiblich','Männlich']} />
                   </div>
 
-                  {/* Preisrelevante Felder – read-only */}
-                  <div className={gridRow2}>
+                  {/* Preisrelevante Felder – read-only.
+                      items-start (statt items-end aus gridRow2), damit
+                      Sprachniveau (links, alleine) nicht nach unten rutscht,
+                      wenn rechts unter Führerschein das Getriebe-Feld
+                      eingeblendet wird. */}
+                  <div className="grid grid-cols-2 gap-2 items-start">
                     <div>
                       <label className="block text-sm font-semibold text-gray-600 mb-1.5 flex items-center gap-1.5">
                         Sprachniveau
