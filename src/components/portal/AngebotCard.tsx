@@ -157,6 +157,7 @@ export const AngebotCard: FC<{
     rauchen: pick('rauchen'), sonstigeWuensche: pick('sonstigeWuensche'),
     wunschGetriebe: pick('wunschGetriebe'),
     phone: pick('phone'),
+    startDate: pick('startDate'),
   });
 
   const zwei = patient.anzahl === '2';
@@ -1203,7 +1204,7 @@ export const AngebotCard: FC<{
                   <div className="rounded-2xl bg-[#FBF6EE] border border-[#E8D9BC] px-4 py-3.5 space-y-1.5">
                     <p className="text-sm font-bold text-[#5C4422]">Fast geschafft</p>
                     <p className="text-sm text-gray-700 leading-relaxed">
-                      Für eventuelle Rückfragen zur Betreuung benötigen wir noch Ihre Telefonnummer.
+                      Für eventuelle Rückfragen zur Betreuung benötigen wir noch Ihre Telefonnummer und ein gewünschtes Startdatum (voraussichtlich, falls noch unklar).
                     </p>
                   </div>
                   <div>
@@ -1217,6 +1218,17 @@ export const AngebotCard: FC<{
                       inputMode="tel"
                       className={inputCls}
                     />
+                  </div>
+                  <div>
+                    <label className={labelCls}>Voraussichtliches Startdatum <span className="font-normal text-gray-400">(optional)</span></label>
+                    <input
+                      type="date"
+                      value={patient.startDate}
+                      min={new Date().toISOString().slice(0, 10)}
+                      onChange={set('startDate')}
+                      className={inputCls}
+                    />
+                    <p className="text-xs text-gray-500 mt-1.5">Falls noch unklar — einfach leer lassen.</p>
                   </div>
                 </>
               )}
