@@ -260,6 +260,40 @@ const storeConfirmation: ActionHandler = async (session, variables, deps) => {
 // Why not SendInvitationCaregiver: that mutation is customer-side
 // (auth.user must be the customer), used by Mamamia's customer portal.
 // It is unrelated to the agency-side invite flow we need.
+// ─── Rate limit constants ───────────────────────────────────────────────────
+//
+// Cap how many caregivers a customer can invite per rolling time window.
+// Goal: prevent buyer's-remorse spam — customer invites 20 caregivers in
+// 30 seconds because the UI lets them, then complains about getting 20
+// uncoordinated replies. The wait forces deliberation + gives the first
+// invitees a chance to respond before the customer adds more.
+//
+// Ledger lives in `caregiver_invite_attempts` (Supabase). Source of truth
+// is OUR table, not Mamamia.Request entity — because the portal renders
+// invite as "wysłano" optimistically and a 6-click burst would race
+// Mamamia's persistence (~1-2s). Our row is written server-side INSIDE
+// the proxy after StoreRequest succeeds, so the count is authoritative.
+const INVITE_LIMIT = 5;
+const INVITE_WINDOW_MINUTES = 60;
+
+type RateLimitError = Error & {
+  rateLimited: true;
+  retry_after_seconds: number;
+  limit: number;
+  window_minutes: number;
+  used: number;
+};
+
+function makeRateLimitError(retryAfterSeconds: number, used: number): RateLimitError {
+  const err = new Error("rate-limited") as RateLimitError;
+  err.rateLimited = true;
+  err.retry_after_seconds = retryAfterSeconds;
+  err.limit = INVITE_LIMIT;
+  err.window_minutes = INVITE_WINDOW_MINUTES;
+  err.used = used;
+  return err;
+}
+
 const inviteCaregiver: ActionHandler = async (session, variables, deps) => {
   const id = (variables as { caregiver_id?: unknown }).caregiver_id;
   if (typeof id !== "number") throw new Error("caregiver_id required");
@@ -267,12 +301,43 @@ const inviteCaregiver: ActionHandler = async (session, variables, deps) => {
   if (!deps.panelBaseUrl || !deps.agencyEmail || !deps.agencyPassword) {
     throw new Error("panel auth not configured");
   }
+  if (!deps.supabase) {
+    throw new Error("supabase adapter required for invite rate limiting");
+  }
+
+  // ── Rate-limit gate ──────────────────────────────────────────────────
+  // Check BEFORE Mamamia call so 6th attempt is rejected without polluting
+  // Mamamia (no orphan StoreRequest that we'd never count). Concurrency
+  // race: two near-simultaneous 5th-and-6th can both pass the count==4
+  // check and both proceed. Acceptable — drift of 1 invite over rolling
+  // hour is harmless vs the engineering cost of distributed lock.
+  const used = await deps.supabase.countRecentInviteAttempts(
+    session.lead_id,
+    INVITE_WINDOW_MINUTES,
+  );
+  if (used >= INVITE_LIMIT) {
+    const oldest = await deps.supabase.oldestInviteAttemptWithin(
+      session.lead_id,
+      INVITE_WINDOW_MINUTES,
+    );
+    // oldest + window = the moment the oldest row "ages out" of the
+    // window, freeing one slot. Anything sooner is undefined-precision.
+    const retryAt = oldest
+      ? oldest.getTime() + INVITE_WINDOW_MINUTES * 60_000
+      : Date.now() + INVITE_WINDOW_MINUTES * 60_000;
+    const retryAfterSeconds = Math.max(1, Math.ceil((retryAt - Date.now()) / 1000));
+    console.log(
+      `[inviteCaregiver][rate-limited] lead=${session.lead_id} used=${used}/${INVITE_LIMIT} retry_after=${retryAfterSeconds}s`,
+    );
+    throw makeRateLimitError(retryAfterSeconds, used);
+  }
+
   const panelSession = await loginAsAgency(
     { baseUrl: deps.panelBaseUrl, fetchFn: deps.fetchFn },
     deps.agencyEmail,
     deps.agencyPassword,
   );
-  return await panelMutateAsCustomer(
+  const result = await panelMutateAsCustomer(
     { baseUrl: deps.panelBaseUrl, fetchFn: deps.fetchFn },
     panelSession,
     STORE_REQUEST,
@@ -283,6 +348,59 @@ const inviteCaregiver: ActionHandler = async (session, variables, deps) => {
     },
     "StoreRequest",
   );
+
+  // Record AFTER Mamamia success — failed panel calls (Bug #17 race,
+  // network glitch) must NOT consume the user's quota. Best-effort: if
+  // the ledger write itself fails, log and surface the Mamamia result
+  // anyway. Worst case the next attempt re-counts and gets a free slot
+  // we already used — drift of 1, same magnitude as the race above.
+  try {
+    await deps.supabase.recordInviteAttempt(session.lead_id, id);
+  } catch (e) {
+    console.warn(
+      `[inviteCaregiver][record-failed] lead=${session.lead_id} cg=${id} err=${(e as Error).message}`,
+    );
+  }
+
+  return result;
+};
+
+// ─── getInviteRateState — read-only quota snapshot for the UI ──────────────
+//
+// Lets the portal pre-emptively decide: "this is the user's 5th click,
+// I should warn them next click won't go through" or "they're at 5 of 5
+// already, disable the button + show a modal with the wait time".
+//
+// Distinct from inviteCaregiver: this NEVER calls Mamamia, never records
+// anything — just reads the ledger. Cheap to refetch after any action
+// the UI takes (after a successful invite, periodically as countdown).
+const getInviteRateState: ActionHandler = async (session, _variables, deps) => {
+  if (!deps.supabase) {
+    throw new Error("supabase adapter required for getInviteRateState");
+  }
+  const used = await deps.supabase.countRecentInviteAttempts(
+    session.lead_id,
+    INVITE_WINDOW_MINUTES,
+  );
+  const oldest = used > 0
+    ? await deps.supabase.oldestInviteAttemptWithin(session.lead_id, INVITE_WINDOW_MINUTES)
+    : null;
+  const retryAfterSeconds = used >= INVITE_LIMIT && oldest
+    ? Math.max(
+      1,
+      Math.ceil(
+        (oldest.getTime() + INVITE_WINDOW_MINUTES * 60_000 - Date.now()) / 1000,
+      ),
+    )
+    : 0;
+  return {
+    used,
+    limit: INVITE_LIMIT,
+    window_minutes: INVITE_WINDOW_MINUTES,
+    oldest_at: oldest ? oldest.toISOString() : null,
+    retry_after_seconds: retryAfterSeconds,
+    blocked: used >= INVITE_LIMIT,
+  };
 };
 
 
@@ -886,6 +1004,7 @@ export const ACTIONS: Record<ProxyAction, ActionHandler> = {
   listAcceptedApplications,
   getCaregiver,
   searchLocations,
+  getInviteRateState,
   updateCustomer,
   updateJobDescription,
   updateJobOfferDates,

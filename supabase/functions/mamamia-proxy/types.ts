@@ -15,6 +15,7 @@ export type ProxyAction =
   | "listAcceptedApplications"
   | "getCaregiver"
   | "searchLocations"
+  | "getInviteRateState"
   // writes
   | "updateCustomer"
   | "updateJobDescription"
@@ -47,6 +48,27 @@ export interface ProxySupabase {
   selectAcceptedApplications(
     leadId: string,
   ): Promise<Array<{ application_id: number; caregiver_id: number | null; accepted_at: string }>>;
+  // Used by inviteCaregiver + getInviteRateState. Counts attempts in
+  // rolling time window (most callers: 60 min). Source-of-truth row is
+  // written by inviteCaregiver AFTER Mamamia StoreRequest succeeds.
+  countRecentInviteAttempts(
+    leadId: string,
+    windowMinutes: number,
+  ): Promise<number>;
+  // Returns the timestamp of the oldest attempt within the window, or
+  // null if window is empty. Used to compute retry_after_seconds for
+  // rate-limited responses (= oldest + window - now).
+  oldestInviteAttemptWithin(
+    leadId: string,
+    windowMinutes: number,
+  ): Promise<Date | null>;
+  // Writes a single attempt row. ONLY called after the upstream
+  // Mamamia StoreRequest call succeeds — failed calls do NOT consume
+  // the user's rate quota.
+  recordInviteAttempt(
+    leadId: string,
+    caregiverId: number,
+  ): Promise<void>;
 }
 
 export interface ActionDeps {

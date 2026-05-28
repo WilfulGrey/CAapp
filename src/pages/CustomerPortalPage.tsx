@@ -10,7 +10,7 @@ import {
   setDeclinedCaregiver,
 } from '../lib/supabase';
 import { useMamamiaSession } from '../hooks/useMamamiaSession';
-import { useCustomer, useJobOffer, useApplications, useInterests, useDismissedCaregivers, useAcceptedApplications, useMatchings, useCaregiver, useInvitedCaregivers } from '../lib/mamamia/hooks';
+import { useCustomer, useJobOffer, useApplications, useInterests, useDismissedCaregivers, useAcceptedApplications, useMatchings, useCaregiver, useInvitedCaregivers, useInviteRateState } from '../lib/mamamia/hooks';
 import { rankComparator } from '../lib/mamamia/matchingsRanking';
 import { prefetchCaregivers } from '../lib/mamamia/caregiverCache';
 import { scheduleAiAbouts, getAiAbout, subscribeAiAbout } from '../lib/mamamia/aiAboutCache';
@@ -52,6 +52,7 @@ import type { ContractFormData } from '../components/portal/AngebotPruefenModal'
 import { InfoPopup } from '../components/portal/InfoPopup';
 import { ContactPopup } from '../components/portal/ContactPopup';
 import { DeclineConfirmModal } from '../components/portal/DeclineConfirmModal';
+import { InviteRateLimitModal } from '../components/portal/InviteRateLimitModal';
 import { AngebotPruefenModal } from '../components/portal/AngebotPruefenModal';
 import { CustomerNurseModal } from '../components/portal/CustomerNurseModal';
 
@@ -355,6 +356,16 @@ const CustomerPortalPage: FC = () => {
   const updateCustomerMutation = useUpdateCustomer();
   const updateJobDescriptionMutation = useUpdateJobDescription();
   const updateJobOfferDatesMutation = useUpdateJobOfferDates();
+  // Invite rate-limit snapshot from our Supabase ledger
+  // (caregiver_invite_attempts). Read on portal load, refetched after
+  // every successful invite. Backend hard-gate in mamamia-proxy.inviteCaregiver
+  // is the security boundary; this hook drives UX (disable button + modal).
+  const { data: inviteRate, refetch: refetchInviteRate } = useInviteRateState(mmReady);
+  const [inviteRateModalState, setInviteRateModalState] = useState<{
+    retryAfterSeconds: number;
+    limit: number;
+    windowMinutes: number;
+  } | null>(null);
   // K6 (replaced) — customer-scope auth used to require a verify-mail
   // round-trip. As of the panel-style flow (mamamia-proxy → Sanctum SPA
   // login + ImpersonateCustomer), the Edge Function impersonates the
@@ -890,6 +901,19 @@ const CustomerPortalPage: FC = () => {
       setShowPatientReminder(true);
       return false;
     }
+    // Pre-emptive rate-limit gate. Backend enforces hard limit (5 per 60min),
+    // this just spares the user a wasted round-trip + opens the wait modal
+    // with the retry_after value the server returned last sync. Race-safe:
+    // if our cached count is stale, backend rejects with 429 and the
+    // confirmInviteNurse catch block opens the same modal with fresh data.
+    if (inviteRate?.blocked) {
+      setInviteRateModalState({
+        retryAfterSeconds: inviteRate.retry_after_seconds,
+        limit: inviteRate.limit,
+        windowMinutes: inviteRate.window_minutes,
+      });
+      return false;
+    }
     return true;
   };
 
@@ -935,10 +959,28 @@ const CustomerPortalPage: FC = () => {
           caregiver_name: nurseName,
         });
         refetchInvited();
+        refetchInviteRate();
         showToast(`✓ ${name} wurde eingeladen!`);
         return;
       } catch (err) {
         lastErr = err as Error;
+        // Rate-limited (HTTP 429): backend says client is over quota.
+        // Open the modal with the fresh retry_after, revert optimistic
+        // state, and STOP retrying — waiting doesn't change the gate.
+        if (err instanceof MamamiaError) {
+          const rate = err.rateLimitPayload;
+          if (rate) {
+            setInviteRateModalState({
+              retryAfterSeconds: rate.retry_after_seconds,
+              limit: rate.limit,
+              windowMinutes: rate.window_minutes,
+            });
+            // Revert immediately — the rest of the optimistic-revert path
+            // below handles UI cleanup uniformly. Skip the retry loop.
+            lastErr = err;
+            break;
+          }
+        }
         // Mamamia's panel-mode StoreRequest returns "Unauthorized" with
         // cat=authorization transiently while the just-saved customer is
         // still being processed server-side (translator + permission cache
@@ -1032,10 +1074,24 @@ const CustomerPortalPage: FC = () => {
         });
         refetchInvited();
         refetchInterests();
+        refetchInviteRate();
         showToast(`✓ ${displayLabel} wurde eingeladen!`);
         return;
       } catch (err) {
         lastErr = err as Error;
+        // Rate-limited path — same handling as confirmInviteNurse.
+        if (err instanceof MamamiaError) {
+          const rate = err.rateLimitPayload;
+          if (rate) {
+            setInviteRateModalState({
+              retryAfterSeconds: rate.retry_after_seconds,
+              limit: rate.limit,
+              windowMinutes: rate.window_minutes,
+            });
+            lastErr = err;
+            break;
+          }
+        }
         const isRaceShape = err instanceof MamamiaError && err.category === 'authorization';
         if (!isRaceShape) break;
         if (attempt < MAX_ATTEMPTS - 1) {
@@ -2407,6 +2463,24 @@ const CustomerPortalPage: FC = () => {
               declineApp(id, msg);
               showToast('Bewerbung abgelehnt' + (msg ? ' — Nachricht wurde gesendet.' : '.'));
             });
+          }}
+        />
+      )}
+
+      {/* Invite Rate-Limit Modal — fires when canInviteNurse pre-emptively
+          detects the customer is over their 5/hr quota OR when the
+          backend returns HTTP 429 mid-invite (race / DevTools bypass). */}
+      {inviteRateModalState && (
+        <InviteRateLimitModal
+          retryAfterSeconds={inviteRateModalState.retryAfterSeconds}
+          limit={inviteRateModalState.limit}
+          windowMinutes={inviteRateModalState.windowMinutes}
+          onClose={() => {
+            setInviteRateModalState(null);
+            // Re-query the ledger after close — countdown may have
+            // expired in the modal, oldest attempt may have aged out,
+            // and the gate may now be open.
+            refetchInviteRate();
           }}
         />
       )}
