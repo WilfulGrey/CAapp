@@ -288,7 +288,7 @@ export const AngebotCard: FC<{
       return baseOk;
     }
     if (s === 4) {
-      return patient.phone.trim() !== '';
+      return patient.phone.trim() !== '' && patient.startDate !== '';
     }
     return false;
   };
@@ -1139,44 +1139,46 @@ export const AngebotCard: FC<{
                       options={['Egal','Weiblich','Männlich']} />
                   </div>
 
-                  {/* Preisrelevante Felder – read-only */}
-                  <div className={gridRow2}>
-                    <div>
-                      <label className="block text-sm font-semibold text-gray-600 mb-1.5 flex items-center gap-1.5">
-                        Sprachniveau
-                        <button type="button" onClick={() => setPriceInfo(priceInfo === 'sprache' ? null : 'sprache')} className="flex-shrink-0 text-gray-400 hover:text-[#8B7355] transition-colors">
-                          <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><circle cx="12" cy="12" r="10"/><path strokeLinecap="round" strokeLinejoin="round" d="M12 16v-4m0-4h.01"/></svg>
-                        </button>
-                      </label>
-                      {priceInfo === 'sprache' && (
-                        <div className="text-xs text-gray-500 bg-gray-50 border border-gray-200 rounded-xl px-3 py-2.5 leading-relaxed flex items-start gap-2 mb-1">
-                          <span>Dieser Wert basiert auf Ihrem Angebot und beeinflusst den Preis. Für Änderungen wenden Sie sich bitte an Ihren Berater.</span>
-                          <button type="button" onClick={() => setPriceInfo(null)} className="text-gray-400 flex-shrink-0 font-bold">✕</button>
-                        </div>
-                      )}
-                      <div className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm text-gray-700 bg-gray-50 cursor-not-allowed">
-                        {germanySkillLabel(mmCustomer?.customer_caregiver_wish?.germany_skill) || '—'}
+                  {/* Sprachniveau (read-only, preisrelevant) — eigene volle Zeile.
+                      Höhe matched die anderen Felder (text-base + px-3 py-2.5)
+                      damit es nicht "verkleinert" wirkt. */}
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-600 mb-1.5 flex items-center gap-1.5">
+                      Sprachniveau
+                      <button type="button" onClick={() => setPriceInfo(priceInfo === 'sprache' ? null : 'sprache')} className="flex-shrink-0 text-gray-400 hover:text-[#8B7355] transition-colors">
+                        <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><circle cx="12" cy="12" r="10"/><path strokeLinecap="round" strokeLinejoin="round" d="M12 16v-4m0-4h.01"/></svg>
+                      </button>
+                    </label>
+                    {priceInfo === 'sprache' && (
+                      <div className="text-xs text-gray-500 bg-gray-50 border border-gray-200 rounded-xl px-3 py-2.5 leading-relaxed flex items-start gap-2 mb-1">
+                        <span>Dieser Wert basiert auf Ihrem Angebot und beeinflusst den Preis. Für Änderungen wenden Sie sich bitte an Ihren Berater.</span>
+                        <button type="button" onClick={() => setPriceInfo(null)} className="text-gray-400 flex-shrink-0 font-bold">✕</button>
                       </div>
-                    </div>
-                    <div className="space-y-3">
-                      <div>
-                        <label className={labelCls}>Führerschein erforderlich? <span className="text-red-400">*</span></label>
-                        <CustomSelect value={patient.fuehrerschein}
-                          onChange={v => updatePatient(p => ({ ...p, fuehrerschein: v, wunschGetriebe: v === 'Nein' ? '' : p.wunschGetriebe }))}
-                          options={['Ja', 'Nein']}
-                          placeholder="Bitte wählen" />
-                      </div>
-                      {patient.fuehrerschein === 'Ja' && (
-                        <div>
-                          <label className={labelCls}>Getriebe <span className="text-red-400">*</span></label>
-                          <CustomSelect value={patient.wunschGetriebe}
-                            onChange={v => updatePatient(p => ({ ...p, wunschGetriebe: v }))}
-                            options={['Automatik', 'Schaltung', 'Egal']}
-                            placeholder="Bitte wählen" />
-                        </div>
-                      )}
+                    )}
+                    <div className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-base text-gray-700 bg-gray-50 cursor-not-allowed">
+                      {germanySkillLabel(mmCustomer?.customer_caregiver_wish?.germany_skill) || '—'}
                     </div>
                   </div>
+
+                  {/* Führerschein — eigene volle Zeile, damit das Label nicht wrappt */}
+                  <div>
+                    <label className={labelCls}>Führerschein erforderlich? <span className="text-red-400">*</span></label>
+                    <CustomSelect value={patient.fuehrerschein}
+                      onChange={v => updatePatient(p => ({ ...p, fuehrerschein: v, wunschGetriebe: v === 'Nein' ? '' : p.wunschGetriebe }))}
+                      options={['Ja', 'Nein']}
+                      placeholder="Bitte wählen" />
+                  </div>
+
+                  {/* Getriebe — eigene volle Zeile, nur wenn Führerschein='Ja' */}
+                  {patient.fuehrerschein === 'Ja' && (
+                    <div>
+                      <label className={labelCls}>Getriebe <span className="text-red-400">*</span></label>
+                      <CustomSelect value={patient.wunschGetriebe}
+                        onChange={v => updatePatient(p => ({ ...p, wunschGetriebe: v }))}
+                        options={['Automatik', 'Schaltung', 'Egal']}
+                        placeholder="Bitte wählen" />
+                    </div>
+                  )}
 
                   <div>
                     <label className={labelCls}>Darf die Betreuungsperson rauchen? <span className="text-red-400">*</span></label>
@@ -1204,7 +1206,7 @@ export const AngebotCard: FC<{
                   <div className="rounded-2xl bg-[#FBF6EE] border border-[#E8D9BC] px-4 py-3.5 space-y-1.5">
                     <p className="text-sm font-bold text-[#5C4422]">Fast geschafft</p>
                     <p className="text-sm text-gray-700 leading-relaxed">
-                      Für eventuelle Rückfragen zur Betreuung benötigen wir noch Ihre Telefonnummer und ein gewünschtes Startdatum (voraussichtlich, falls noch unklar).
+                      Für eventuelle Rückfragen zur Betreuung benötigen wir noch Ihre Telefonnummer und ein voraussichtliches Startdatum (gerne grob geschätzt, falls noch unklar).
                     </p>
                   </div>
                   <div>
@@ -1220,15 +1222,24 @@ export const AngebotCard: FC<{
                     />
                   </div>
                   <div>
-                    <label className={labelCls}>Voraussichtliches Startdatum <span className="font-normal text-gray-400">(optional)</span></label>
+                    <label className={labelCls}>Voraussichtliches Startdatum <span className="text-red-400">*</span></label>
                     <input
                       type="date"
                       value={patient.startDate}
                       min={new Date().toISOString().slice(0, 10)}
                       onChange={set('startDate')}
-                      className={inputCls}
+                      onClick={(e) => {
+                        // showPicker() öffnet den nativen Date-Picker direkt
+                        // (modern browsers: Safari 16.4+, Chrome 99+, Firefox 101+).
+                        // Bei älteren Browsern fällt es auf das Standard-Klick-Verhalten zurück.
+                        const el = e.currentTarget as HTMLInputElement & { showPicker?: () => void };
+                        if (typeof el.showPicker === 'function') {
+                          try { el.showPicker(); } catch { /* user gesture missing — kein Problem */ }
+                        }
+                      }}
+                      className={`${inputCls} cursor-pointer`}
                     />
-                    <p className="text-xs text-gray-500 mt-1.5">Falls noch unklar — einfach leer lassen.</p>
+                    <p className="text-xs text-gray-500 mt-1.5">Wenn noch unklar — eine grobe Schätzung reicht.</p>
                   </div>
                 </>
               )}
