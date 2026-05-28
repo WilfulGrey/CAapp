@@ -24,6 +24,7 @@ import {
   useDismissCaregiver,
   useUpdateCustomer,
   useUpdateJobDescription,
+  useUpdateJobOfferDates,
 } from '../lib/mamamia/mutations';
 import {
   customerDisplayName,
@@ -282,7 +283,7 @@ const CustomerPortalPage: FC = () => {
   // ─── Mamamia session + queries (K2-K4 integration) ───────────────────────
   const { session, ready: mmReady, error: mmError } = useMamamiaSession(lead?.token ?? null);
   const { data: mmCustomer, loading: mmCustomerLoading, error: mmCustomerError } = useCustomer(mmReady);
-  const { data: mmJobOffer, loading: mmJobOfferLoading, error: mmJobOfferError } = useJobOffer(mmReady);
+  const { data: mmJobOffer, loading: mmJobOfferLoading, error: mmJobOfferError, refetch: refetchJobOffer } = useJobOffer(mmReady);
   const { data: mmApplications, loading: mmApplicationsLoading, error: mmApplicationsError, refetch: refetchApplications } = useApplications({ limit: 20 }, mmReady);
   // limit=20 is intentional — client-side ranking (see `effectiveMatched`)
   // re-orders the page-1 batch by our own criteria (availability, freshness,
@@ -353,6 +354,7 @@ const CustomerPortalPage: FC = () => {
   const dismissCaregiverMutation = useDismissCaregiver();
   const updateCustomerMutation = useUpdateCustomer();
   const updateJobDescriptionMutation = useUpdateJobDescription();
+  const updateJobOfferDatesMutation = useUpdateJobOfferDates();
   // K6 (replaced) — customer-scope auth used to require a verify-mail
   // round-trip. As of the panel-style flow (mamamia-proxy → Sanctum SPA
   // login + ImpersonateCustomer), the Edge Function impersonates the
@@ -1734,6 +1736,33 @@ const CustomerPortalPage: FC = () => {
             // mogą się pojawić nowi. Refetch listę żeby user widział
             // aktualny scoring, nie stale wynik z czasu onboardu.
             refetchMatchings();
+
+            // ── JobOffer.arrival_at sync (fire-and-forget).
+            // Form Step 5 collects "Voraussichtliches Startdatum" — push it
+            // to Mamamia's JobOffer.arrival_at via UpdateJobOfferDates.
+            // Onboard set arrival_at as a fuzzy offset from care_start_timing
+            // (e.g. "sofort" → +7d); the customer's explicit pick wins.
+            //
+            // Only fire when the user's pick actually differs from what
+            // Mamamia currently holds — avoid no-op writes that would log
+            // noise + reload the JobOffer.
+            const pickedStartDate = form.startDate?.trim();
+            const currentArrival = mmJobOffer?.arrival_at ?? null;
+            if (pickedStartDate && pickedStartDate !== currentArrival) {
+              void (async () => {
+                try {
+                  await updateJobOfferDatesMutation.mutate({ arrival_at: pickedStartDate });
+                  refetchJobOffer();
+                } catch (err) {
+                  // Best-effort. Customer profile is saved; only the
+                  // arrival_at didn't update. Surface a soft toast so the
+                  // user knows to retry the form Save if the date was
+                  // critical, but don't block the flow.
+                  console.warn('updateJobOfferDates failed:', err);
+                  showToast('Startdatum konnte nicht aktualisiert werden. Patientendaten wurden gespeichert.');
+                }
+              })();
+            }
 
             // ── AI overlay (fire-and-forget). Only writes job_description.
             // Sonnet polishes the mechanical summary into a 2-3 sentence

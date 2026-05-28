@@ -505,3 +505,38 @@ export const UPDATE_CUSTOMER = /* GraphQL */ `
     }
   }
 `;
+
+// UpdateJobOfferDates — dedykowana Mamamia mutation do edycji
+// JobOffer.arrival_at + JobOffer.departure_at po onboard. Initial
+// arrival_at jest computed w onboard (`computeArrivalDate(care_start_timing)`)
+// jako fuzzy offset. Dodane 2026-05-26: po PR #207 Marcin dodał pole
+// "Voraussichtliches Startdatum" w step 5 patient formularza — wartość
+// usera (konkretna data) wygrywa nad onboard-computed fuzzy.
+//
+// Schema (verified live via Mamamia GraphQL introspection 2026-05-26):
+//   mutation UpdateJobOfferDates(
+//     id: Int!            (= JobOffer.id)
+//     customer_id: Int!   (= Customer.id)
+//     arrival_at: String  (ISO YYYY-MM-DD lub null)
+//     departure_at: String
+//   ): JobOffer
+export const UPDATE_JOB_OFFER_DATES = /* GraphQL */ `
+  mutation UpdateJobOfferDates(
+    $id: Int!
+    $customer_id: Int!
+    $arrival_at: String
+    $departure_at: String
+  ) {
+    UpdateJobOfferDates(
+      id: $id
+      customer_id: $customer_id
+      arrival_at: $arrival_at
+      departure_at: $departure_at
+    ) {
+      id
+      job_offer_id
+      arrival_at
+      departure_at
+    }
+  }
+`;

@@ -14,6 +14,7 @@ import {
   STORE_CONFIRMATION,
   STORE_REQUEST,
   UPDATE_CUSTOMER,
+  UPDATE_JOB_OFFER_DATES,
 } from "./operations.ts";
 
 // ─── Helper — run GraphQL with agency token ─────────────────────────────────
@@ -536,6 +537,63 @@ const updateJobDescription: ActionHandler = async (session, variables, deps) => 
   return runGraphQL(deps, UPDATE_CUSTOMER, payload);
 };
 
+// ─── updateJobOfferDates — set JobOffer.arrival_at + .departure_at ─────────
+//
+// Initial arrival_at is computed at onboard time as a fuzzy offset from
+// lead.care_start_timing (`computeArrivalDate` in onboard.ts). After PR
+// #207 (2026-05-26) the patient form Step 5 has a concrete "Voraussichtliches
+// Startdatum" picker — the customer's explicit pick wins over the onboard
+// heuristic. Frontend fires this action right after `updateCustomer`
+// succeeds when the picked date differs from the JobOffer's current
+// arrival_at.
+//
+// Ownership: `id` (JobOffer id) and `customer_id` are forced from the
+// session JWT, NOT from the request body. Caller cannot alter another
+// customer's JobOffer even if they swap IDs in the payload.
+//
+// Inputs (from request body):
+//   arrival_at?:  string ISO YYYY-MM-DD or null  — only field the portal currently writes
+//   departure_at?: string                         — schema-supported, not yet surfaced in UI
+//
+// Both args are optional from the API's perspective; in practice the
+// frontend always sends arrival_at when the user picked a date. Empty
+// strings are coerced to null (Mamamia distinguishes "" from null — null
+// means "clear", "" can be rejected as invalid format).
+const updateJobOfferDates: ActionHandler = async (session, variables, deps) => {
+  const v = variables as { arrival_at?: unknown; departure_at?: unknown };
+
+  const sanitize = (x: unknown): string | null | undefined => {
+    if (x === undefined) return undefined;
+    if (x === null) return null;
+    if (typeof x !== "string") {
+      throw new Error("arrival_at / departure_at must be string (ISO YYYY-MM-DD) or null");
+    }
+    const trimmed = x.trim();
+    return trimmed === "" ? null : trimmed;
+  };
+
+  const payload: Record<string, unknown> = {
+    id: session.job_offer_id,
+    customer_id: session.customer_id,
+  };
+
+  const arrival = sanitize(v.arrival_at);
+  if (arrival !== undefined) payload.arrival_at = arrival;
+
+  const departure = sanitize(v.departure_at);
+  if (departure !== undefined) payload.departure_at = departure;
+
+  // Nothing to update → no-op. (Frontend shouldn't call us with empty
+  // payload, but be defensive.)
+  if (!("arrival_at" in payload) && !("departure_at" in payload)) {
+    return { id: session.job_offer_id, skipped: "no date fields supplied" };
+  }
+
+  console.log(`[DBG][updateJobOfferDates] cid=${session.customer_id} jid=${session.job_offer_id} arrival_at=${payload.arrival_at ?? "(unchanged)"} departure_at=${payload.departure_at ?? "(unchanged)"}`);
+
+  return runGraphQL(deps, UPDATE_JOB_OFFER_DATES, payload);
+};
+
 // ─── generateJobDescription — AI-generated care situation summary ──────────
 //
 // Calls Anthropic Messages API (claude-haiku-3-5) to produce a 2–3 sentence
@@ -830,6 +888,7 @@ export const ACTIONS: Record<ProxyAction, ActionHandler> = {
   searchLocations,
   updateCustomer,
   updateJobDescription,
+  updateJobOfferDates,
   rejectApplication,
   storeConfirmation,
   inviteCaregiver,
