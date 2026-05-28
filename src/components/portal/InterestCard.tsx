@@ -25,7 +25,11 @@ export const InterestCard: FC<{
   onInviteConfirm?: () => Promise<void>;
   onDismiss?: () => Promise<void>;
   exiting?: boolean;
-}> = ({ nurse, status, onNurseClick, onInvite, onInviteConfirm, onDismiss, exiting }) => {
+  /** Global "another card has an invite in flight" lock. When true we
+   *  render Einladen disabled so concurrent clicks can't race the
+   *  rate-limit gate (the active card still shows its own spinner). */
+  globalInviteLocked?: boolean;
+}> = ({ nurse, status, onNurseClick, onInvite, onInviteConfirm, onDismiss, exiting, globalInviteLocked }) => {
   const [invitePhase, setInvitePhase] = useState<'idle' | 'sending' | 'done'>('idle');
   const [dismissPhase, setDismissPhase] = useState<'idle' | 'sending'>('idle');
   const inits = initials(nurse.name);
@@ -176,7 +180,13 @@ export const InterestCard: FC<{
               )}
               <button
                 onClick={(e) => { e.stopPropagation(); handleInvite(); }}
-                className="flex items-center gap-1.5 text-xs font-bold bg-[#E76F63] text-white px-4 py-1.5 rounded-full hover:bg-[#D65E52] transition-colors active:scale-95 shadow-sm"
+                disabled={globalInviteLocked}
+                aria-disabled={globalInviteLocked || undefined}
+                className={
+                  globalInviteLocked
+                    ? "flex items-center gap-1.5 text-xs font-bold bg-[#E76F63]/40 text-white px-4 py-1.5 rounded-full cursor-not-allowed shadow-sm"
+                    : "flex items-center gap-1.5 text-xs font-bold bg-[#E76F63] text-white px-4 py-1.5 rounded-full hover:bg-[#D65E52] transition-colors active:scale-95 shadow-sm"
+                }
               >
                 <UserPlus className="w-3.5 h-3.5" />
                 Einladen
