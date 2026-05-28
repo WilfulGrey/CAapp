@@ -20,6 +20,22 @@ import { STEP_LABELS } from './shared';
 import type { MamamiaCustomer } from '../../lib/mamamia/types';
 import { mapMamamiaCustomerToPatientForm, germanySkillLabel } from '../../lib/mamamia/mappers';
 
+// Plausibilitäts-Check für deutsche Telefonnummern — bewusst lax: erlaubt
+// +49, 0049 oder führende 0, mit/ohne Leerzeichen/Bindestrich/Klammer.
+// Prüft nur, dass die Ziffern-Länge im realistischen Bereich liegt
+// (Festnetz + Mobil). Soll Tippfehler / Unsinn abfangen, NICHT als strenge
+// Format-Pflicht wirken (sonst frustrierte Kunden mit gültigen aber
+// ungewohnt formatierten Nummern).
+function isPlausibleGermanPhone(raw: string): boolean {
+  if (!raw) return false;
+  const cleaned = raw.replace(/[\s\-/().]/g, '');
+  // +49…, 0049… oder 0… — nach dem Prefix muss eine Ziffer 1-9 folgen
+  // (keine 0 als Vorwahl-Start), dann nur Ziffern. Plausible Rest-Länge
+  // 6–13 deckt deutsche Festnetz- und Mobilnummern ab.
+  const m = /^(?:\+49|0049|0)([1-9]\d{5,12})$/.exec(cleaned);
+  return m !== null;
+}
+
 export const AngebotCard: FC<{
   lead?: Lead | null;
   /** Snapshot of the customer's Mamamia state — used to seed the
@@ -291,7 +307,7 @@ export const AngebotCard: FC<{
       return baseOk;
     }
     if (s === 4) {
-      return patient.phone.trim() !== '' && patient.startDate !== '';
+      return isPlausibleGermanPhone(patient.phone) && patient.startDate !== '';
     }
     return false;
   };
@@ -1236,6 +1252,11 @@ export const AngebotCard: FC<{
                       inputMode="tel"
                       className={inputCls}
                     />
+                    {patient.phone.trim() !== '' && !isPlausibleGermanPhone(patient.phone) && (
+                      <p className="text-xs text-red-500 mt-1.5">
+                        Bitte eine gültige deutsche Telefonnummer eingeben — z.&nbsp;B. <span className="font-mono">+49&nbsp;89&nbsp;200&nbsp;000&nbsp;830</span> oder <span className="font-mono">089&nbsp;200&nbsp;000&nbsp;830</span>.
+                      </p>
+                    )}
                   </div>
                   <div>
                     <label className={labelCls}>Voraussichtliches Startdatum <span className="text-red-400">*</span></label>
