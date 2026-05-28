@@ -366,6 +366,17 @@ const CustomerPortalPage: FC = () => {
     limit: number;
     windowMinutes: number;
   } | null>(null);
+  // Global "an invite is in flight on this page" lock. The race that
+  // motivated this: customer rapid-clicks 5+ Einladen buttons before the
+  // first backend response returns; each parallel call to mamamia-proxy
+  // reads `used < 5` from the ledger and all pass the gate, blowing the
+  // 5/hr cap. We serialize at the UI: while one invite is in flight,
+  // ALL other Einladen buttons (MatchCard + InterestCard) render
+  // disabled via the `globalInviteLocked` prop. The active card carries
+  // its own 'sending' spinner; the rest dim. canInviteNurse also rejects
+  // pre-emptive clicks while this is true so even a stale (= not yet
+  // re-rendered) button still can't fire a parallel mutation.
+  const [inviteInFlight, setInviteInFlight] = useState(false);
   // K6 (replaced) — customer-scope auth used to require a verify-mail
   // round-trip. As of the panel-style flow (mamamia-proxy → Sanctum SPA
   // login + ImpersonateCustomer), the Edge Function impersonates the
@@ -901,6 +912,15 @@ const CustomerPortalPage: FC = () => {
       setShowPatientReminder(true);
       return false;
     }
+    // Serialize concurrent invite clicks. Backend gate is per-request
+    // and the rate-limit count read can race with a sibling click that
+    // hasn't recorded yet. Reject any click while another invite is
+    // still in flight (button is also disabled visually, but stale
+    // renders could still let a click through). User waits ~1 s; the
+    // active card carries the spinner so they know what's happening.
+    if (inviteInFlight) {
+      return false;
+    }
     // Pre-emptive rate-limit gate. Backend enforces hard limit (5 per 60min),
     // this just spares the user a wasted round-trip + opens the wait modal
     // with the retry_after value the server returned last sync. Race-safe:
@@ -926,6 +946,14 @@ const CustomerPortalPage: FC = () => {
 
     const id = match.caregiverId;
     const nurseName = match.nurse.name ?? '';
+
+    // Hold the global lock for the full duration of the mutation (incl.
+    // any cat=authorization retries below). All OTHER Einladen buttons
+    // render disabled via the `globalInviteLocked` prop while this is
+    // true — that's what prevents the 5+ concurrent clicks from racing
+    // past the rate-limit gate.
+    setInviteInFlight(true);
+    try {
 
     // Mamamia's backend translator runs async after patient-form save and
     // transiently wipes patient description fields for ~5-7s. During that
@@ -1010,6 +1038,9 @@ const CustomerPortalPage: FC = () => {
     }
     showToast('Einladung konnte nicht gesendet werden. Bitte kontaktieren Sie uns.');
     throw lastErr ?? new Error('invite-failed');
+    } finally {
+      setInviteInFlight(false);
+    }
   };
 
   // Interest-side invite handler. Same retry-on-cat=authorization shape as
@@ -1018,6 +1049,11 @@ const CustomerPortalPage: FC = () => {
   // both interests + invited so the next render moves the caregiver out
   // of the Interest section into the invited matchings.
   const confirmInviteInterest = async (caregiverId: number, displayLabel: string): Promise<void> => {
+    // Hold the global lock — same rationale as confirmInviteNurse above.
+    // Disables other Einladen buttons (MatchCard + InterestCard) until
+    // this mutation settles (success / failure / preview-timeout).
+    setInviteInFlight(true);
+    try {
     // Preview-Mode: simuliere erfolgreiche Einladung lokal (kein Mamamia-Call).
     // Override auf 'invited' → InterestCard zeigt "Einladung gesendet"-Pill;
     // nach 1.5s wird die Pflegekraft in previewInvitedFromInterest abgelegt
@@ -1108,6 +1144,9 @@ const CustomerPortalPage: FC = () => {
     });
     showToast('Einladung konnte nicht gesendet werden. Bitte kontaktieren Sie uns.');
     throw lastErr ?? new Error('invite-failed');
+    } finally {
+      setInviteInFlight(false);
+    }
   };
 
   // Interest-side dismiss handler. Local-only — writes a row to
@@ -1920,8 +1959,10 @@ const CustomerPortalPage: FC = () => {
                     setSelectedNurse(nurse);
                     setSelectedFromInterestId(i.caregiver_id);
                   }}
+                  onInvite={() => canInviteNurse(0)}
                   onInviteConfirm={() => confirmInviteInterest(i.caregiver_id, label)}
                   onDismiss={() => confirmDismissInterest(i.caregiver_id)}
+                  globalInviteLocked={inviteInFlight}
                 />
               );
             })}
@@ -2017,6 +2058,7 @@ const CustomerPortalPage: FC = () => {
                             onInvite={() => canInviteNurse(i)}
                             onInviteConfirm={() => confirmInviteNurse(i, displayName(nurse.name))}
                             onUndoDecline={status === 'declined' ? () => undoDeclinedMatch(i) : undefined}
+                            globalInviteLocked={inviteInFlight}
                           />
                         );
                       });

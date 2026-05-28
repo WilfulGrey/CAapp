@@ -28,7 +28,15 @@ export const MatchCard: FC<{
    *  dem Kunden die Entscheidung erleichtern wenn er sonst überwältigt
    *  von der Auswahl ist. */
   isRecommended?: boolean;
-}> = ({ nurse, status, onNurseClick, onInvite, onInviteConfirm, onUndoDecline, hasInterestOrigin, isRecommended }) => {
+  /** Global "an invite is in flight on this page" lock. When true and
+   *  THIS card is still in pending/idle state, render the Einladen button
+   *  disabled so the customer cannot fire a parallel invite before the
+   *  rate-limit gate finishes processing the in-flight one. Prevents
+   *  the race where multiple concurrent clicks all see `used < 5` and
+   *  all pass the gate. Local invitePhase='sending' on this card already
+   *  hides the button — this prop covers the OTHER cards. */
+  globalInviteLocked?: boolean;
+}> = ({ nurse, status, onNurseClick, onInvite, onInviteConfirm, onUndoDecline, hasInterestOrigin, isRecommended, globalInviteLocked }) => {
   const [invitePhase, setInvitePhase] = useState<'idle' | 'sending' | 'done'>('idle');
   const inits = initials(nurse.name);
   const name = displayName(nurse.name);
@@ -178,6 +186,17 @@ export const MatchCard: FC<{
           <span className="flex items-center gap-1.5 text-xs font-bold text-[#22A06B] bg-[#E3F7EF] border border-[#B8E8D4] px-4 py-1.5 rounded-full">
             <Check className="w-3 h-3 flex-shrink-0" /> wurde eingeladen!
           </span>
+        ) : globalInviteLocked ? (
+          // Another card is currently sending an invite — dim our button
+          // and block clicks. The active card carries the visible spinner.
+          <button
+            disabled
+            aria-disabled="true"
+            className="flex items-center gap-1.5 text-xs font-bold bg-[#E76F63]/40 text-white px-4 py-1.5 rounded-full cursor-not-allowed shadow-sm"
+          >
+            <UserPlus className="w-3.5 h-3.5" />
+            Einladen
+          </button>
         ) : (
           <button
             onClick={e => { e.stopPropagation(); handleInvite(); }}
