@@ -145,6 +145,11 @@ export interface PatientForm {
   // calculator collected it. Editable. Mapped to Customer.phone via
   // patientFormMapper → mamamia-proxy.updateCustomer.
   phone: string;
+  // Voraussichtliches Startdatum — optional, ISO YYYY-MM-DD. Wird auf
+  // Step 5 (Kontakt) abgefragt. Kann ans Mamamia Customer.arrival_at
+  // weitergegeben werden (Matching-relevant); wenn der Mapper das Feld
+  // nicht setzt, bleibt es im PatientForm-State (localStorage) erhalten.
+  startDate: string;
   // Pflegedienst follow-up: required by Mamamia panel form when
   // pflegedienst='Ja'/'Geplant' (otherwise the customer is incomplete and
   // can't be matched). Frequency = how often, tasks = which tasks the

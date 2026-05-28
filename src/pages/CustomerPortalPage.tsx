@@ -766,9 +766,9 @@ const CustomerPortalPage: FC = () => {
     return true;
   });
 
-  const showToast = (msg: string) => {
+  const showToast = (msg: string, durationMs = 4000) => {
     setToast(msg);
-    setTimeout(() => setToast(null), 4000);
+    setTimeout(() => setToast(null), durationMs);
   };
 
   // MVP path — acceptance does NOT call Mamamia (no STORE_CONFIRMATION).
@@ -1638,7 +1638,12 @@ const CustomerPortalPage: FC = () => {
         <AngebotCard
           lead={lead}
           mmCustomer={mmCustomer}
-          onPatientSaved={setPatientSaved}
+          onPatientSaved={(saved) => {
+            setPatientSaved(saved);
+            if (saved) {
+              showToast('✓ Vielen Dank! Ihre Daten sind gespeichert. Sie können jetzt Pflegekräfte einladen und Bewerbungen erhalten.', 7000);
+            }
+          }}
           forceSaved={patientSaved}
           triggerOpenPatient={triggerOpenPatient}
           onTriggerHandled={() => setTriggerOpenPatient(false)}
@@ -1713,10 +1718,14 @@ const CustomerPortalPage: FC = () => {
             // a step-4 edit). Dedupe key includes phone, so a follow-up
             // save with an edited number re-fires.
             const phoneForLead = form.phone?.trim();
+            const startDateForLead = form.startDate?.trim();
+            const leadEventMeta: Record<string, string> = {};
+            if (phoneForLead) leadEventMeta.phone = phoneForLead;
+            if (startDateForLead) leadEventMeta.startDate = startDateForLead;
             reportLeadEvent(
               lead?.token,
               'patient_data_saved',
-              phoneForLead ? { phone: phoneForLead } : undefined,
+              Object.keys(leadEventMeta).length > 0 ? leadEventMeta : undefined,
             );
             // Patient form save flippa customer na active + dorzuca pełne
             // patient/wish dane. Mamamia matching engine re-scoreuje całą
