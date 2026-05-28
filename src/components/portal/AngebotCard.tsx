@@ -1015,7 +1015,11 @@ export const AngebotCard: FC<{
                         <button type="button" onClick={() => setPriceInfo(null)} className="text-gray-400 flex-shrink-0 font-bold">✕</button>
                       </div>
                     )}
-                    <div className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm text-gray-700 bg-gray-50 cursor-not-allowed">{patient.haushalt}</div>
+                    <div className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-base bg-gray-50 cursor-not-allowed">
+                      {patient.haushalt
+                        ? <span className="text-gray-700">{patient.haushalt}</span>
+                        : <span className="text-gray-400">Nicht angegeben</span>}
+                    </div>
                   </div>
                   <div>
                     <label className={labelCls}>Familie in der Nähe (bis 20 km) <span className="text-red-400">*</span></label>
