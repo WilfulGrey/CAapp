@@ -766,9 +766,9 @@ const CustomerPortalPage: FC = () => {
     return true;
   });
 
-  const showToast = (msg: string) => {
+  const showToast = (msg: string, durationMs = 4000) => {
     setToast(msg);
-    setTimeout(() => setToast(null), 4000);
+    setTimeout(() => setToast(null), durationMs);
   };
 
   // MVP path — acceptance does NOT call Mamamia (no STORE_CONFIRMATION).
@@ -1638,7 +1638,12 @@ const CustomerPortalPage: FC = () => {
         <AngebotCard
           lead={lead}
           mmCustomer={mmCustomer}
-          onPatientSaved={setPatientSaved}
+          onPatientSaved={(saved) => {
+            setPatientSaved(saved);
+            if (saved) {
+              showToast('✓ Vielen Dank! Ihre Daten sind gespeichert. Sie können jetzt Pflegekräfte einladen und Bewerbungen erhalten.', 7000);
+            }
+          }}
           forceSaved={patientSaved}
           triggerOpenPatient={triggerOpenPatient}
           onTriggerHandled={() => setTriggerOpenPatient(false)}

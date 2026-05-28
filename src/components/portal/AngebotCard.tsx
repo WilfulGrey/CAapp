@@ -296,11 +296,6 @@ export const AngebotCard: FC<{
     return false;
   };
   const allComplete = STEP_LABELS.every((_, i) => stepComplete(i));
-  // Erster unvollständiger Step — für den "Speichern"-Button-Label auf Step 5.
-  // Wenn der Kunde auf Step 5 ist und ein anderer Step noch Lücken hat, soll
-  // der Button NICHT nur "Bitte alle Pflichtfelder ausfüllen" sagen, sondern
-  // konkret den Step nennen + dorthin springen.
-  const firstIncompleteStep = allComplete ? -1 : STEP_LABELS.findIndex((_, i) => !stepComplete(i));
 
   // `effectiveSaved` lets the parent's patientSaved signal flip the row
   // to "Vollständig" even when the AngebotCard's own `saved` state hasn't
@@ -760,15 +755,24 @@ export const AngebotCard: FC<{
             {/* Progress bar */}
             <div className="px-4 pt-3 pb-2 flex items-center gap-3">
               <div className="flex gap-1 flex-1">
-                {STEP_LABELS.map((_, i) => (
-                  <button
-                    key={i}
-                    onClick={() => setStep(i)}
-                    className={`h-1 flex-1 rounded-full transition-all ${
-                      i < step ? 'bg-[#8B7355]' : i === step ? 'bg-[#8B7355]/20' : 'bg-gray-200'
-                    }`}
-                  />
-                ))}
+                {STEP_LABELS.map((_, i) => {
+                  // Erreichte Steps (inkl. aktueller) sind braun ausgefüllt;
+                  // noch nicht erreichte bleiben grau. Klick nur RÜCKWÄRTS zu
+                  // schon erreichten Steps erlaubt — vorwärts muss man durch
+                  // "Weiter" (mit Validation). Verhindert das Springen auf
+                  // Step 5 mit unvollständigen vorderen Steps.
+                  const reached = i <= step;
+                  return (
+                    <button
+                      key={i}
+                      onClick={() => { if (reached) setStep(i); }}
+                      disabled={!reached}
+                      className={`h-1 flex-1 rounded-full transition-all ${
+                        reached ? 'bg-[#8B7355]' : 'bg-gray-200 cursor-not-allowed'
+                      }`}
+                    />
+                  );
+                })}
               </div>
               <span className="text-xs text-gray-600 flex-shrink-0 font-medium">
                 {STEP_LABELS[step]} ({step + 1}/{STEP_LABELS.length})
@@ -1280,16 +1284,7 @@ export const AngebotCard: FC<{
                 ) : (
                   <button
                     onClick={async () => {
-                      if (isSaving) return;
-                      // Statt stumm zu blockieren: zum ersten unvollständigen
-                      // Step springen, damit der Kunde sieht, was fehlt.
-                      if (!allComplete) {
-                        if (firstIncompleteStep >= 0) {
-                          setStep(firstIncompleteStep);
-                          scrollToFormTop();
-                        }
-                        return;
-                      }
+                      if (!allComplete || isSaving) return;
                       // Mark as final submission (not a draft) so reload
                       // shows the green-checked "Vollständig" state.
                       if (storageKey) {
@@ -1333,18 +1328,14 @@ export const AngebotCard: FC<{
                         scrollPortalToTop();
                       }
                     }}
-                    disabled={isSaving}
+                    disabled={!allComplete || isSaving}
                     className={`flex-1 py-2.5 text-sm font-bold rounded-xl transition-all ${
                       allComplete && !isSaving
                         ? 'bg-[#E76F63] hover:bg-[#D65E52] text-white shadow-sm'
-                        : 'bg-amber-50 border border-amber-200 text-amber-800 hover:bg-amber-100'
+                        : 'bg-gray-100 text-gray-400 cursor-not-allowed'
                     }`}
                   >
-                    {!allComplete && firstIncompleteStep >= 0
-                      ? `Schritt ${firstIncompleteStep + 1}: ${STEP_LABELS[firstIncompleteStep]} ausfüllen →`
-                      : isSaving
-                        ? 'Speichern…'
-                        : 'Speichern'}
+                    {isSaving ? 'Speichern…' : 'Speichern'}
                   </button>
                 )}
               </div>
