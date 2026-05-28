@@ -187,15 +187,22 @@ export const MatchCard: FC<{
             <Check className="w-3 h-3 flex-shrink-0" /> wurde eingeladen!
           </span>
         ) : globalInviteLocked ? (
-          // Another card is currently sending an invite — dim our button
-          // and block clicks. The active card carries the visible spinner.
+          // Another card is currently sending an invite. The active card
+          // often disappears off-screen (status flips to 'invited' → moved
+          // to "Bereits bearbeitet" section), so the only visual signal
+          // the customer has is THESE inactive cards. Show a spinner +
+          // "Bitte warten…" instead of a dim grey button — makes it
+          // obvious the system is working, not stuck.
           <button
             disabled
             aria-disabled="true"
-            className="flex items-center gap-1.5 text-xs font-bold bg-[#E76F63]/40 text-white px-4 py-1.5 rounded-full cursor-not-allowed shadow-sm"
+            className="flex items-center gap-1.5 text-xs font-bold text-[#8B7355] bg-[#F8F7F5] border border-[#E5E3DF] px-4 py-1.5 rounded-full cursor-not-allowed shadow-sm"
           >
-            <UserPlus className="w-3.5 h-3.5" />
-            Einladen
+            <svg className="w-3 h-3 animate-spin flex-shrink-0" viewBox="0 0 24 24" fill="none">
+              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3"/>
+              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"/>
+            </svg>
+            Bitte warten…
           </button>
         ) : (
           <button
