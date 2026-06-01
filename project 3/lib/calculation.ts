@@ -1,8 +1,15 @@
 import { createClient } from '@supabase/supabase-js';
 
+// auth.{persistSession,autoRefreshToken}=false is MANDATORY for every
+// server-side Supabase client. With the defaults (autoRefreshToken=true),
+// supabase-js v2 starts a 30s setInterval token-refresh ticker on Node.
+// Route handlers that build a client per request leaked one ticker + the
+// client it references on every call → ~50MB/day RSS creep → daily OOM on
+// the 512Mi Render container (kostenrechner). Do NOT remove these options.
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+  { auth: { persistSession: false, autoRefreshToken: false } }
 );
 
 export interface FormularDaten {

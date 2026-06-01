@@ -82,7 +82,7 @@ export async function POST(request: NextRequest) {
     // Body parse fail → default 2.
   }
 
-  const supabase = createClient(supabaseUrl, supabaseServiceKey);
+  const supabase = createClient(supabaseUrl, supabaseServiceKey, { auth: { persistSession: false, autoRefreshToken: false } });
 
   // Letzte N application_received-Events, neueste zuerst.
   // Spalte heißt `metadata` (siehe lead-event route insert).
