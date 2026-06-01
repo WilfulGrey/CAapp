@@ -14,7 +14,7 @@ function getSupabaseClient() {
   const key = (serviceKey && serviceKey.length > 10 ? serviceKey : null)
     || (anonKey && anonKey.length > 10 ? anonKey : null);
   if (!url || !key) throw new Error('Missing Supabase configuration');
-  return createClient(url, key);
+  return createClient(url, key, { auth: { persistSession: false, autoRefreshToken: false } });
 }
 
 async function unsubscribeByToken(token: unknown): Promise<{ ok: boolean; status: number }> {

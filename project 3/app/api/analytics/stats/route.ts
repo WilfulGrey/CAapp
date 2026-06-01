@@ -77,7 +77,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Server configuration error' }, { status: 500 });
     }
 
-    const supabase = createClient(supabaseUrl, supabaseServiceKey);
+    const supabase = createClient(supabaseUrl, supabaseServiceKey, { auth: { persistSession: false, autoRefreshToken: false } });
 
     const { searchParams } = new URL(request.url);
     const days = parseInt(searchParams.get('days') || '30');

@@ -21,7 +21,7 @@ export async function POST(request: NextRequest) {
     const kalkulation = await berechnePreis(formularDaten);
 
     if (sessionId) {
-      const supabase = createClient(supabaseUrl, supabaseAnonKey);
+      const supabase = createClient(supabaseUrl, supabaseAnonKey, { auth: { persistSession: false, autoRefreshToken: false } });
       await supabase.from('analytics_conversions').insert({
         session_id: sessionId,
         conversion_type: 'kalkulation_requested',

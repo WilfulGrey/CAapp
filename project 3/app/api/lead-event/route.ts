@@ -234,7 +234,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'token required' }, { status: 400, headers: corsHeaders });
     }
 
-    const supabase = createClient(supabaseUrl, supabaseServiceKey);
+    const supabase = createClient(supabaseUrl, supabaseServiceKey, { auth: { persistSession: false, autoRefreshToken: false } });
     const { data: lead } = await supabase
       .from('leads')
       .select('id')
@@ -280,7 +280,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'invalid event' }, { status: 400, headers: corsHeaders });
     }
 
-    const supabase = createClient(supabaseUrl, supabaseServiceKey);
+    const supabase = createClient(supabaseUrl, supabaseServiceKey, { auth: { persistSession: false, autoRefreshToken: false } });
 
     // Load the full lead row — needed for the team notification template (was
     // just `id` before, but the team mail uses kalkulation, contact data, etc.).
