@@ -40,6 +40,9 @@ import {
   type NurseStatus,
 } from '../components/portal/shared';
 import { BookedScreen } from '../components/portal/BookedScreen';
+import { VertragSignieren } from '../components/portal/VertragSignieren';
+import { BuchungsFlow } from '../components/portal/BuchungsFlow';
+import { AnnahmeFlow } from '../components/portal/AnnahmeFlow';
 import { AngebotCard } from '../components/portal/AngebotCard';
 import { AppCard } from '../components/portal/AppCard';
 import { AppCardDone } from '../components/portal/AppCardDone';
@@ -66,7 +69,18 @@ const PREVIEW_PARAM =
     : null;
 const IS_PREVIEW_BEWERBUNG = PREVIEW_PARAM === 'bewerbung';
 const IS_PREVIEW_INTERESSE = PREVIEW_PARAM === 'interesse';
-const IS_PREVIEW_ANY = IS_PREVIEW_BEWERBUNG || IS_PREVIEW_INTERESSE;
+// Dev-only preview of the post-acceptance "gebucht" screen (BookedScreen).
+// Seeds a dummy accepted application so the booked layout renders with
+// dummy data — real Mamamia wiring (JobOffer.status==='accepted' + the
+// confirmation read) is hooked up later.
+const IS_PREVIEW_GEBUCHT = PREVIEW_PARAM === 'gebucht';
+// Dev-only prototype of the online-signable Dienstleistungsvertrag (Stufe A).
+const IS_PREVIEW_VERTRAG = PREVIEW_PARAM === 'vertrag';
+// Dev-only prototype of the full booking flow (mail → portal → contract → done).
+const IS_PREVIEW_FLOW = PREVIEW_PARAM === 'flow';
+// Dev-only prototype of the application-acceptance flow (step 3 = contract).
+const IS_PREVIEW_ANNAHME = PREVIEW_PARAM === 'annahme';
+const IS_PREVIEW_ANY = IS_PREVIEW_BEWERBUNG || IS_PREVIEW_INTERESSE || IS_PREVIEW_GEBUCHT;
 
 const PREVIEW_LEAD: Lead = {
   id: 'preview-lead-1',
@@ -190,6 +204,13 @@ const PREVIEW_MATCHINGS: Array<{ nurse: Nurse; caregiverId: number }> = [
 // ─── Main Page ────────────────────────────────────────────────────────────────
 
 const CustomerPortalPage: FC = () => {
+  // Prototyp-Takeover: online-signierbarer Vertrag (?preview=vertrag).
+  // IS_PREVIEW_VERTRAG ist eine Modul-Konstante → konsistent über alle Renders
+  // (Rules-of-Hooks-safe, da der Early-Return-Pfad sich nie ändert).
+  if (IS_PREVIEW_VERTRAG) return <VertragSignieren />;
+  if (IS_PREVIEW_FLOW) return <BuchungsFlow app={{ ...PREVIEW_APPLICATION, status: 'accepted' }} />;
+  if (IS_PREVIEW_ANNAHME) return <AnnahmeFlow app={PREVIEW_APPLICATION} />;
+
   // ─── Lead loading via token ──────────────────────────────────────────────────
   // Preview-Mode: hardcoded Lead + skip Supabase fetch.
   const [lead, setLead] = useState<Lead | null>(IS_PREVIEW_ANY ? PREVIEW_LEAD : null);
@@ -231,7 +252,13 @@ const CustomerPortalPage: FC = () => {
 
   // Applications state. Empty by default — populated once Mamamia session
   // is ready and `listApplications` returns. No mock seeds (CLAUDE.md §1).
-  const [applications, setApplications] = useState<Application[]>(IS_PREVIEW_BEWERBUNG ? [PREVIEW_APPLICATION] : []);
+  const [applications, setApplications] = useState<Application[]>(
+    IS_PREVIEW_GEBUCHT
+      ? [{ ...PREVIEW_APPLICATION, status: 'accepted' }]
+      : IS_PREVIEW_BEWERBUNG
+      ? [PREVIEW_APPLICATION]
+      : [],
+  );
   // Per-session local overrides keyed by caregiverId. Server is source of truth
   // for persistence (invitedCaregiverIds via listInvitedCaregiverIds RPC,
   // lead.declined_caregiver_ids via Supabase column). This map only carries
