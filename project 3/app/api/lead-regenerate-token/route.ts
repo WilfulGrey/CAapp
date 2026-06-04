@@ -72,7 +72,7 @@ export async function POST(request: NextRequest) {
     if (!leadId) return jsonError(400, 'lead_id_required');
   }
 
-  const supabase = createClient(supabaseUrl, supabaseServiceKey);
+  const supabase = createClient(supabaseUrl, supabaseServiceKey, { auth: { persistSession: false, autoRefreshToken: false } });
 
   // Lookup lead. NB: NOT filtering by token_expires_at — expired tokens are
   // exactly the case we want to handle here.

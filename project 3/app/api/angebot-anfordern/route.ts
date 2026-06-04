@@ -7,7 +7,7 @@ import {
   getTeamNotificationTemplate,
   getAngebotsEmailTemplate,
 } from '@/lib/email';
-import { detectGenderFromName } from '@/lib/calculation';
+import { parseCustomerName } from '@/lib/calculation';
 
 function getSupabaseClient() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -20,7 +20,7 @@ function getSupabaseClient() {
     throw new Error('Missing Supabase configuration');
   }
 
-  return createClient(url, key);
+  return createClient(url, key, { auth: { persistSession: false, autoRefreshToken: false } });
 }
 
 const supabase = getSupabaseClient();
@@ -133,18 +133,22 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const nameParts = vorname.trim().split(/\s+/);
-    const parsedVorname = nameParts.length > 1 ? nameParts.slice(0, -1).join(' ') : nameParts[0];
-    const parsedNachname = nameParts.length > 1 ? nameParts[nameParts.length - 1] : '';
-    const detectedAnrede = detectGenderFromName(parsedVorname) || undefined;
+    // The "vorname" field is a single free-text input — customers often type
+    // a full name incl. title and notes ("Herr Steffen Krumbholz (Sohn)").
+    // Parse it robustly into vorname / nachname / anrede.
+    const { vorname: parsedVorname, nachname: parsedNachname, anrede: detectedAnrede } =
+      parseCustomerName(vorname);
 
     const { lead, isNew, isUpgrade, kalkulationChanged } = await findOrCreateLead(
       email,
       'angebot_requested',
       {
-        vorname: parsedVorname,
+        // Keep parsed vorname (may be empty for "Familie Müller", where the
+        // name lives in nachname). Only fall back to the raw input when the
+        // parse produced no name at all.
+        vorname: parsedVorname || (parsedNachname ? '' : vorname.trim()),
         nachname: parsedNachname || undefined,
-        anrede: detectedAnrede,
+        anrede: detectedAnrede || undefined,
         telefon,
         care_start_timing: careStartTiming,
         kalkulation,

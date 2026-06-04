@@ -1,8 +1,15 @@
 import { createClient } from '@supabase/supabase-js';
 
+// auth.{persistSession,autoRefreshToken}=false is MANDATORY for every
+// server-side Supabase client. With the defaults (autoRefreshToken=true),
+// supabase-js v2 starts a 30s setInterval token-refresh ticker on Node.
+// Route handlers that build a client per request leaked one ticker + the
+// client it references on every call → ~50MB/day RSS creep → daily OOM on
+// the 512Mi Render container (kostenrechner). Do NOT remove these options.
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+  { auth: { persistSession: false, autoRefreshToken: false } }
 );
 
 export interface FormularDaten {
@@ -263,4 +270,100 @@ export function detectGenderFromName(vorname: string): 'Frau' | 'Herr' | 'Famili
  */
 export function generateAnrede(vorname: string, nachname: string): string | null {
   return detectGenderFromName(vorname);
+}
+
+// Leading salutation/title tokens that map to an explicit Anrede.
+const SALUTATION_TITLES: Record<string, 'Frau' | 'Herr' | 'Familie'> = {
+  herr: 'Herr', herrn: 'Herr', hr: 'Herr',
+  frau: 'Frau', fr: 'Frau',
+  familie: 'Familie', fam: 'Familie',
+};
+
+// Academic / professional titles to strip from a name without affecting Anrede.
+const ACADEMIC_TITLES = new Set([
+  'dr', 'prof', 'dipl', 'mag', 'ing', 'med', 'phil', 'rer', 'nat', 'jur', 'habil',
+]);
+
+export interface ParsedName {
+  vorname: string;
+  nachname: string;
+  anrede: 'Frau' | 'Herr' | 'Familie' | null;
+}
+
+/**
+ * Returns a name part only if it actually looks like a usable name: at least
+ * two letters, no leftover bracketed notes like "(Sohn)", not a bare initial
+ * ("M" / "M."). Otherwise returns '' so callers fall back to a neutral
+ * greeting instead of printing garbage ("Guten Tag (Sohn)," / "Guten Tag M,").
+ */
+export function usableNamePart(part?: string | null): string {
+  if (!part) return '';
+  const trimmed = part.trim();
+  if (/[([{)\]}]/.test(trimmed)) return '';            // bracketed note, e.g. "(Sohn)"
+  if (!/[A-Za-zÀ-ÿ]/.test(trimmed)) return '';          // no letters at all
+  if (trimmed.replace(/\.$/, '').length < 2) return ''; // bare initial, e.g. "M" / "M."
+  return trimmed;
+}
+
+/**
+ * Parse a single free-text name field into vorname / nachname / anrede.
+ *
+ * Customers type all sorts of things into one field:
+ *   "Herr Steffen Krumbholz (Sohn)"  → Herr · Steffen · Krumbholz
+ *   "Frau Dr. Anna Müller"           → Frau · Anna · Müller
+ *   "M Mazura"                       → null · M · Mazura  (greeting falls back to "Guten Tag,")
+ *   "Familie Müller"                 → Familie · "" · Müller
+ *
+ * Steps: strip bracketed notes like "(Sohn)" → strip leading titles (and
+ * capture the salutation) → split the rest into vorname (all but last token)
+ * and nachname (last token) → detect gender from the first name if no explicit
+ * title was given.
+ */
+export function parseCustomerName(raw: string | null | undefined): ParsedName {
+  const empty: ParsedName = { vorname: '', nachname: '', anrede: null };
+  if (!raw?.trim()) return empty;
+
+  // 1. Remove bracketed relationship notes: (Sohn), [Tochter], {Ehemann} …
+  const cleaned = raw.replace(/[([{][^)\]}]*[)\]}]/g, ' ');
+
+  let tokens = cleaned.trim().split(/\s+/).filter(Boolean);
+
+  // 2. Strip leading title tokens; first salutation title wins as Anrede.
+  let anrede: 'Frau' | 'Herr' | 'Familie' | null = null;
+  while (tokens.length > 0) {
+    const key = tokens[0].toLowerCase().replace(/\.$/, '');
+    if (key in SALUTATION_TITLES) {
+      if (!anrede) anrede = SALUTATION_TITLES[key];
+      tokens = tokens.slice(1);
+    } else if (ACADEMIC_TITLES.has(key)) {
+      tokens = tokens.slice(1);
+    } else {
+      break;
+    }
+  }
+
+  // 3. Split remainder into vorname (all but last) + nachname (last).
+  let vorname = '';
+  let nachname = '';
+  if (tokens.length === 1) {
+    vorname = tokens[0];
+  } else if (tokens.length > 1) {
+    vorname = tokens.slice(0, -1).join(' ');
+    nachname = tokens[tokens.length - 1];
+  }
+
+  // 4. If no explicit salutation, detect from the whole remaining name
+  //    (so couples like "Anna und Peter Schmidt" are recognised as Familie).
+  if (!anrede && tokens.length > 0) {
+    anrede = detectGenderFromName(tokens.join(' '));
+  }
+
+  // 5. For a family salutation the (single) remaining name is the family
+  //    name → keep it as nachname, not vorname ("Familie Müller").
+  if (anrede === 'Familie' && !nachname && vorname) {
+    nachname = vorname;
+    vorname = '';
+  }
+
+  return { vorname, nachname, anrede };
 }
