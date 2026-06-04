@@ -69,7 +69,19 @@ function capitalize(name: string): string {
   if (!name) return name;
   return name.charAt(0).toUpperCase() + name.slice(1);
 }
- 
+
+// A name part is only usable in a greeting if it looks like a real name:
+// at least one letter and no leftover bracketed notes like "(Sohn)". Guards
+// against legacy/garbage data so we never greet "Hallo Herr (Sohn),".
+function cleanNamePart(part?: string | null): string {
+  if (!part) return "";
+  const trimmed = part.trim();
+  if (/[([{)\]}]/.test(trimmed)) return "";            // bracketed note, e.g. "(Sohn)"
+  if (!/[A-Za-zÀ-ÿ]/.test(trimmed)) return "";          // no letters at all
+  if (trimmed.replace(/\.$/, "").length < 2) return ""; // bare initial, e.g. "M" / "M."
+  return trimmed;
+}
+
 function detectGenderFromName(vorname: string): "Frau" | "Herr" | "Familie" | null {
   if (!vorname?.trim()) return null;
   const v = vorname.trim();
@@ -82,20 +94,23 @@ function detectGenderFromName(vorname: string): "Frau" | "Herr" | "Familie" | nu
  
 function buildAnredeText(anrede: string | null, nachname: string, vorname: string): string {
   const effectiveAnrede = anrede || detectGenderFromName(vorname);
-  const n = capitalize(nachname);
+  const n = capitalize(cleanNamePart(nachname));
   if (effectiveAnrede === "Frau" && n) return `Sehr geehrte Frau ${n}`;
   if (effectiveAnrede === "Herr" && n) return `Sehr geehrter Herr ${n}`;
   if (effectiveAnrede === "Familie" && n) return `Sehr geehrte Familie ${n}`;
   return "Sehr geehrte Damen und Herren";
 }
- 
+
 function buildHalloAnrede(anrede: string | null, nachname: string, vorname: string): string {
   const effectiveAnrede = anrede || detectGenderFromName(vorname);
-  const n = capitalize(nachname);
+  const n = capitalize(cleanNamePart(nachname));
+  const v = capitalize(cleanNamePart(vorname));
   if (effectiveAnrede === "Frau" && n) return `Hallo Frau ${n}`;
   if (effectiveAnrede === "Herr" && n) return `Hallo Herr ${n}`;
   if (effectiveAnrede === "Familie" && n) return `Hallo Familie ${n}`;
-  return "Sehr geehrte Damen und Herren";
+  if (effectiveAnrede && v) return `Hallo ${v}`;
+  // Salutation unknown → neutral, warm fallback (no name).
+  return "Guten Tag";
 }
  
 function buildEmailWrapper(lead: Lead, siteUrl: string, content: string): string {
@@ -594,11 +609,13 @@ function eingangsLabel(key: string, val: string | undefined): string {
 
 function buildEingangsGreeting(lead: Lead): string {
   const detectedAnrede = lead.anrede_text || detectGenderFromName(lead.vorname || "");
-  const n = lead.nachname || "";
+  const n = capitalize(cleanNamePart(lead.nachname));
+  const v = capitalize(cleanNamePart(lead.vorname));
   if (detectedAnrede === "Frau" && n) return `Guten Tag Frau ${n}`;
   if (detectedAnrede === "Herr" && n) return `Guten Tag Herr ${n}`;
   if (detectedAnrede === "Familie" && n) return `Guten Tag Familie ${n}`;
-  if (lead.vorname) return `Guten Tag ${lead.vorname}`;
+  if (detectedAnrede && v) return `Guten Tag ${v}`;
+  // Salutation unknown → neutral fallback (no name).
   return "Guten Tag";
 }
 

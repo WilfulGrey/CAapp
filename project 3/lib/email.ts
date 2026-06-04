@@ -1,5 +1,5 @@
 import { Lead } from './lead-management';
-import { Kalkulation, detectGenderFromName } from './calculation';
+import { Kalkulation, detectGenderFromName, usableNamePart as cleanNamePart } from './calculation';
 import { getEmailLayout } from './email-template';
 
 function capitalize(name: string): string {
@@ -87,20 +87,18 @@ export function getKalkulationEmailTemplate(
 
   // Generate greeting – use explicit anrede if given, otherwise auto-detect from first name
   const effectiveAnrede = anrede || (vorname ? detectGenderFromName(vorname) : null);
+  const safeVorname = cleanNamePart(vorname);
+  const safeNachname = cleanNamePart(nachname);
   let greeting = 'Guten Tag';
-  if (effectiveAnrede && (vorname || nachname)) {
-    if (effectiveAnrede === 'Familie') {
-      greeting = `Guten Tag Familie ${capitalize(nachname || vorname || '')}`.trim();
-    } else if (nachname) {
-      greeting = `Guten Tag ${effectiveAnrede} ${capitalize(nachname)}`.trim();
-    } else if (vorname) {
-      greeting = `Guten Tag ${capitalize(vorname)}`;
-    } else {
-      greeting = `Guten Tag ${effectiveAnrede}`;
-    }
-  } else if (vorname) {
-    greeting = `Guten Tag ${capitalize(vorname)}`;
+  if (effectiveAnrede === 'Familie' && (safeNachname || safeVorname)) {
+    greeting = `Guten Tag Familie ${capitalize(safeNachname || safeVorname)}`;
+  } else if ((effectiveAnrede === 'Frau' || effectiveAnrede === 'Herr') && safeNachname) {
+    greeting = `Guten Tag ${effectiveAnrede} ${capitalize(safeNachname)}`;
+  } else if (effectiveAnrede && safeVorname) {
+    // Gender known but no usable last name → first name only.
+    greeting = `Guten Tag ${capitalize(safeVorname)}`;
   }
+  // else: salutation unknown → neutral "Guten Tag," (no name).
 
   const content = `
     <p style="font-size: 14px; line-height: 1.4; color: #8B7355; margin: 0 0 25px 0; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;">Ihre persönliche Kalkulation</p>
@@ -285,16 +283,17 @@ export function getEingangsbestaetigungEmailTemplate(
   const careStartTiming = lbl('care_start_timing', lead.care_start_timing || '');
 
   const detectedAnrede = lead.anrede_text || detectGenderFromName(lead.vorname || '');
-  const eingangsNachname = lead.nachname || '';
+  const eingangsNachname = cleanNamePart(lead.nachname);
+  const eingangsVorname = cleanNamePart(lead.vorname);
   let eingangsGreeting: string;
   if (detectedAnrede === 'Frau' && eingangsNachname) {
-    eingangsGreeting = `Guten Tag Frau ${eingangsNachname}`;
+    eingangsGreeting = `Guten Tag Frau ${capitalize(eingangsNachname)}`;
   } else if (detectedAnrede === 'Herr' && eingangsNachname) {
-    eingangsGreeting = `Guten Tag Herr ${eingangsNachname}`;
+    eingangsGreeting = `Guten Tag Herr ${capitalize(eingangsNachname)}`;
   } else if (detectedAnrede === 'Familie' && eingangsNachname) {
-    eingangsGreeting = `Guten Tag Familie ${eingangsNachname}`;
-  } else if (lead.vorname) {
-    eingangsGreeting = `Guten Tag ${lead.vorname}`;
+    eingangsGreeting = `Guten Tag Familie ${capitalize(eingangsNachname)}`;
+  } else if (detectedAnrede && eingangsVorname) {
+    eingangsGreeting = `Guten Tag ${capitalize(eingangsVorname)}`;
   } else {
     eingangsGreeting = 'Guten Tag';
   }
@@ -527,8 +526,8 @@ export function getAngebotsEmailTemplate(
   const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://primundus.de';
 
   const anrede = lead.anrede_text || detectGenderFromName(lead.vorname || '') || '';
-  const nachname = lead.nachname || '';
-  const vorname = lead.vorname || '';
+  const nachname = cleanNamePart(lead.nachname);
+  const vorname = cleanNamePart(lead.vorname);
 
   let anredeText: string;
   if (anrede === 'Frau' && nachname) {
@@ -537,12 +536,8 @@ export function getAngebotsEmailTemplate(
     anredeText = `Sehr geehrter Herr ${capitalize(nachname)}`;
   } else if (anrede === 'Familie' && nachname) {
     anredeText = `Sehr geehrte Familie ${capitalize(nachname)}`;
-  } else if (vorname && nachname) {
-    anredeText = `Guten Tag ${capitalize(vorname)} ${capitalize(nachname)}`;
-  } else if (vorname) {
+  } else if (anrede && vorname) {
     anredeText = `Guten Tag ${capitalize(vorname)}`;
-  } else if (nachname) {
-    anredeText = `Guten Tag ${capitalize(nachname)}`;
   } else {
     anredeText = 'Guten Tag';
   }
@@ -774,16 +769,17 @@ export function getVertragsbestaetigungTemplate(
   vertragId: string
 ): EmailTemplate {
   const vertragDetectedAnrede = lead.anrede_text || detectGenderFromName(lead.vorname || '');
-  const vertragNachname = lead.nachname || '';
+  const vertragNachname = cleanNamePart(lead.nachname);
+  const vertragVorname = cleanNamePart(lead.vorname);
   let vertragGreeting: string;
   if (vertragDetectedAnrede === 'Frau' && vertragNachname) {
-    vertragGreeting = `Guten Tag Frau ${vertragNachname}`;
+    vertragGreeting = `Guten Tag Frau ${capitalize(vertragNachname)}`;
   } else if (vertragDetectedAnrede === 'Herr' && vertragNachname) {
-    vertragGreeting = `Guten Tag Herr ${vertragNachname}`;
+    vertragGreeting = `Guten Tag Herr ${capitalize(vertragNachname)}`;
   } else if (vertragDetectedAnrede === 'Familie' && vertragNachname) {
-    vertragGreeting = `Guten Tag Familie ${vertragNachname}`;
-  } else if (lead.vorname) {
-    vertragGreeting = `Guten Tag ${lead.vorname}`;
+    vertragGreeting = `Guten Tag Familie ${capitalize(vertragNachname)}`;
+  } else if (vertragDetectedAnrede && vertragVorname) {
+    vertragGreeting = `Guten Tag ${capitalize(vertragVorname)}`;
   } else {
     vertragGreeting = 'Guten Tag';
   }
@@ -1193,15 +1189,14 @@ export function getVertragEmailTemplate(
 ): EmailTemplate {
   const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://primundus.de';
   const anrede = lead.anrede_text || detectGenderFromName(lead.vorname || '');
-  const nachname = lead.nachname || '';
-  const vorname = lead.vorname || '';
+  const nachname = cleanNamePart(lead.nachname);
+  const vorname = cleanNamePart(lead.vorname);
 
   let anredeText: string;
   if (anrede === 'Frau' && nachname) anredeText = `Sehr geehrte Frau ${capitalize(nachname)}`;
   else if (anrede === 'Herr' && nachname) anredeText = `Sehr geehrter Herr ${capitalize(nachname)}`;
   else if (anrede === 'Familie' && nachname) anredeText = `Sehr geehrte Familie ${capitalize(nachname)}`;
-  else if (vorname && nachname) anredeText = `Guten Tag ${capitalize(vorname)} ${capitalize(nachname)}`;
-  else if (vorname) anredeText = `Guten Tag ${capitalize(vorname)}`;
+  else if (anrede && vorname) anredeText = `Guten Tag ${capitalize(vorname)}`;
   else anredeText = 'Guten Tag';
 
   const subject = options.subject || `Ihr Dienstleistungsvertrag – PRIMUNDUS Deutschland`;
