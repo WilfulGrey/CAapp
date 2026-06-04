@@ -8,6 +8,7 @@ import { Download, Loader as Loader2, Phone, ArrowRight, Shield, Clock, FileText
 import { Button } from '@/components/ui/button';
 import Image from 'next/image';
 import { identifyClarity } from '@/lib/clarity';
+import { usableNamePart } from '@/lib/calculation';
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -73,8 +74,8 @@ export default function KalkulationPage() {
 
   const cap = (s: string) => s ? s.charAt(0).toUpperCase() + s.slice(1) : s;
   const anredeText = (lead as any).anrede_text || lead.anrede || '';
-  const nachname = lead.nachname || '';
-  const vorname = lead.vorname || '';
+  const nachname = usableNamePart(lead.nachname);
+  const vorname = usableNamePart(lead.vorname);
 
   let greeting = 'Sehr geehrte Damen und Herren';
   if (anredeText === 'Frau' && nachname) greeting = `Sehr geehrte Frau ${cap(nachname)}`;
