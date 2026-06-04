@@ -5,6 +5,32 @@ laden aus der Prod-Seite, also siehst du die echte Optik). Dieser Ordner ist
 ein **Design-Workspace** — er wird **nicht** deployed und beeinflusst keinen
 Build. Die echten Mails werden im Code generiert (siehe „Wo es im Code lebt").
 
+## Regeln (gelten für ALLE Mails)
+
+Diese Regeln gelten mailübergreifend. Beim Bauen/Zurückbauen jeder Mail prüfen.
+
+1. **CTA-Buttons benennen den konkreten Nutzen — niemals „Zum Portal".**
+   Ein generischer Portal-Link ist verboten. Der Button-Text sagt, was der Kunde
+   dort tut/sieht. Standard für Angebots-Mails:
+   **„Angebot & passende Pflegekräfte ansehen →"**.
+   Kontext-Varianten: Pflegekraft-Profil → „Profil von {VORNAME} ansehen →",
+   Bewerbung → „Bewerbung von {VORNAME} ansehen →", Buchung → „Vertrag & nächste
+   Schritte ansehen →". Faustregel: **Verb + konkretes Objekt**, kein Ort.
+2. **Anrede:** „Guten Tag {Anrede} {Nachname}," bei Haupt-Mails (01, 11, 12, 13,
+   14); „Hallo {Anrede} {Nachname}," bei Remindern (02–10, 15).
+3. **Tonalität:** Ilka spricht in **Ich-Form**. Kein „wir", das eigentlich Ilka
+   meint („Rufen Sie **uns** an" → „Rufen Sie **mich** an").
+4. **Schlusssatz** (Ich-Form): „Wenn Sie Fragen [zum X] haben — rufen Sie mich
+   an, schreiben Sie mir per WhatsApp oder antworten Sie einfach auf diese
+   E-Mail. Ich bin gerne für Sie da." ({X}: 01–05 „zum Angebot", 11/06 „zu Marias
+   Profil", 12/07–10 „zu Marias Bewerbung", 13 „zur Buchung oder zum Vertrag",
+   14 „zu den Pflegekraft-Vorschlägen").
+5. **Header / Footer / Signatur** identisch zu Mail 01 (zentral, nicht pro Mail).
+6. **Bestpreis-Garantie:** Ein *eigener, separater* beiger Block existiert **nur in
+   Mail 02 und Mail 04**. Sonst ist Bestpreis entweder **integriert** (01, 05, 11, 12,
+   15 — in 05 als Baustein 2 der Vertrauens-Box, Titel golden #B8860B) oder **gar nicht**
+   vorhanden (03, 06–10, 13, 14).
+
 ## Flow — wann läuft welche Mail (und warum sie stoppt)
 
 Es gibt **zwei parallele Stränge**:
