@@ -47,8 +47,8 @@ function checkBlocked(text: string): 'kontakt' | 'geld' | null {
   // Telefon: 7+ Ziffern am Stück (nach Entfernen von Leerzeichen). Datums-
   // angaben wie "19.05.2026" bleiben unberührt (Punkte werden NICHT entfernt).
   if (/\d{7,}/.test(text.replace(/\s/g, ''))) return 'kontakt';
-  // Geldbetrag mit Währung
-  if (/\d[\d.,]*\s*(€|eur|euro)\b/i.test(text)) return 'geld';
+  // Geldbetrag mit Währung (kein \b nach €, da € kein Wortzeichen ist)
+  if (/\d[\d.,]*\s*(?:€|eur|euro)/i.test(text)) return 'geld';
   // Gehalts-/Bezahl-Schlagworte (auch ohne Zahl)
   if (/(gehalt|lohn|bezahl|verdien|netto|brutto|schwarz|cash|bar\s*(zahl|geld))/i.test(text)) return 'geld';
   return null;
