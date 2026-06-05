@@ -157,9 +157,6 @@ function renderParagraphen(liste: { titel: string; punkte: string[] }[]): string
     .join('');
 }
 
-// Faksimile-Unterschrift Primundus (gleiche SVG-Linie wie im Portal).
-const PRIMUNDUS_FAKSIMILE = `<svg viewBox="0 0 210 56" height="40" xmlns="http://www.w3.org/2000/svg" aria-label="Unterschrift Primundus"><path d="M8,40 C18,8 26,8 30,28 C33,42 40,44 46,30 C50,20 56,18 60,30 C64,42 72,44 80,30 C86,20 94,18 100,32 C104,42 112,42 120,28 C128,16 138,18 146,32 C152,42 162,40 172,26 C180,16 190,22 202,30" fill="none" stroke="#1f3a8a" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/><path d="M14,47 C66,53 142,53 200,44" fill="none" stroke="#1f3a8a" stroke-width="1.6" stroke-linecap="round" opacity="0.7"/></svg>`;
-
 export interface VertragHtmlOptions {
   signaturName: string;
   signedAt?: string; // menschenlesbarer Zeitstempel, z.B. "05.06.2026 um 14:30 Uhr"
@@ -173,8 +170,8 @@ export function buildVertragHtml(daten: VertragInput, opts: VertragHtmlOptions):
   const beginn = esc(daten.vertragsbeginn || '—');
   const abreise = esc(daten.voraussAbreise || '—');
   const tagessatz = esc(daten.tagessatz || '—');
-  const dlName = esc(daten.dl?.name || 'Ilka Wysocki');
-  const dlRolle = esc(daten.dl?.rolle || 'Bevollmächtigte');
+  const dlName = esc(daten.dl?.name || 'Kamila Bilska-Wabik');
+  const dlRolle = esc(daten.dl?.rolle || 'Vitanas Group');
   const ort = esc(ag.ort || '');
   const signaturName = esc(opts.signaturName);
   const signedAt = esc(opts.signedAt || '');
@@ -220,7 +217,8 @@ export function buildVertragHtml(daten: VertragInput, opts: VertragHtmlOptions):
   li { font-size: 13px; margin-bottom: 6px; text-align: justify; }
   .sign { display:flex; gap:40px; margin-top: 14px; }
   .sign .col { flex:1; }
-  .sign .name { font-family: "Snell Roundhand", "Segoe Script", cursive; font-size: 22px; height: 40px; display:flex; align-items:flex-end; }
+  .sign .name { font-family: "Snell Roundhand", "Segoe Script", "Brush Script MT", cursive; font-size: 24px; height: 40px; display:flex; align-items:flex-end; }
+  .sign .name.dl { color:#1f3a8a; }
   .sign .cap { border-top:1px solid #9ca3af; padding-top:4px; font-size: 11px; color:#6b7280; }
   .signed { border:1px solid #bbf7d0; background:#f0fdf4; border-radius:10px; padding:14px 16px; margin-top:16px; }
   .signed .h { font-weight:700; color:#166534; margin-bottom:4px; }
@@ -277,7 +275,7 @@ export function buildVertragHtml(daten: VertragInput, opts: VertragHtmlOptions):
         <div class="cap">${ort}${ort ? ', ' : ''}${signDatum} · Unterschrift Auftraggeber</div>
       </div>
       <div class="col">
-        <div class="name">${PRIMUNDUS_FAKSIMILE}</div>
+        <div class="name dl">${dlName}</div>
         <div class="cap">i. A. ${dlName}, ${dlRolle} · Warszawa, ${datum}</div>
       </div>
     </div>
