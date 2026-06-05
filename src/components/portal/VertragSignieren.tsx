@@ -31,7 +31,7 @@ const DUMMY: VertragsDaten = {
   vertragsbeginn: '19.05.2026',
   voraussAbreise: '19.07.2026',
   tagessatz: 'EUR 95,00',
-  dl: { name: 'Ilka Wysocki', rolle: 'Bevollmächtigte' }, // signaturImg → echter Scan später
+  dl: { name: 'Kamila Bilska-Wabik', rolle: 'Vitanas Group' }, // signaturImg → echter Scan später
 };
 
 // Statische §§ aus dem Mustervertrag. §3.1 und §4.1 werden separat (mit
@@ -307,13 +307,10 @@ export const VertragSignieren: FC<{
             <div>
               <div className="h-12 flex items-end">
                 {daten.dl.signaturImg ? (
-                  <img src={daten.dl.signaturImg} alt="Unterschrift Primundus" className="h-11 w-auto" />
+                  <img src={daten.dl.signaturImg} alt={`Unterschrift ${daten.dl.name}`} className="h-11 w-auto" />
                 ) : (
-                  /* Platzhalter-Faksimile — wird durch den hinterlegten Scan ersetzt. */
-                  <svg viewBox="0 0 210 56" className="h-11 w-auto" aria-label="Unterschrift Primundus (Faksimile)">
-                    <path d="M8,40 C18,8 26,8 30,28 C33,42 40,44 46,30 C50,20 56,18 60,30 C64,42 72,44 80,30 C86,20 94,18 100,32 C104,42 112,42 120,28 C128,16 138,18 146,32 C152,42 162,40 172,26 C180,16 190,22 202,30" fill="none" stroke="#1f3a8a" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" />
-                    <path d="M14,47 C66,53 142,53 200,44" fill="none" stroke="#1f3a8a" strokeWidth="1.6" strokeLinecap="round" opacity="0.7" />
-                  </svg>
+                  /* Standard: schöne Schreibschrift-Unterschrift (kein Bild). */
+                  <span className="text-2xl text-[#1f3a8a]" style={{ fontFamily: '"Snell Roundhand","Segoe Script","Brush Script MT",cursive' }}>{daten.dl.name}</span>
                 )}
               </div>
               <div className="border-t border-gray-400 pt-1 text-[11px] text-gray-500">i. A. {daten.dl.name}, {daten.dl.rolle} · Warszawa, {daten.datum}</div>
