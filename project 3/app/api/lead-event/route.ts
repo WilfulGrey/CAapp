@@ -41,6 +41,9 @@ const ALLOWED_EVENTS = [
   // manually. Acceptance row persisted in lead_application_acceptances.
   'application_accepted_internal',
   'application_rejected',        // Kunde hat eine Bewerbung abgelehnt
+  // Kunde hat der beworbenen Pflegekraft eine Chat-Nachricht geschickt
+  // (caregiver-chat Edge-Function notify). Team-Mail je Nachricht.
+  'caregiver_chat_message',
 ];
 const TEAM_NOTIFY_EVENTS = [
   'patient_data_saved',
@@ -48,6 +51,7 @@ const TEAM_NOTIFY_EVENTS = [
   'caregiver_interest_shown',
   'application_received',
   'application_accepted_internal',
+  'caregiver_chat_message',
 ];
 // Events, die in der Team-Mail einen Pflegekraft-Namen anzeigen sollen.
 // Liest caregiver_name aus dem Event-Metadata und steckt ihn als
@@ -68,6 +72,7 @@ const NON_DEDUPED_EVENTS = new Set([
   'caregiver_declined_undone',
   'application_received',
   'application_rejected',
+  'caregiver_chat_message',
 ]);
 // Customer-facing Mails (an die Lead-Email) je Event. Trigger sind die neuen
 // Caregiver-Lifecycle-Events; das eigentliche Hooking aus Mamamia kommt
@@ -444,7 +449,12 @@ export async function POST(request: NextRequest) {
                   contractPatient: metadata.contract_patient ?? null,
                   contractContact: metadata.contract_contact ?? null,
                 }
-              : undefined);
+              : (event === 'caregiver_chat_message' && metadata && typeof metadata === 'object'
+                  ? {
+                      caregiverName: metadata.caregiver_name ?? metadata.caregiverName ?? '',
+                      chatPreview: metadata.preview ?? '',
+                    }
+                  : undefined));
       const teamTemplate = getTeamNotificationTemplate(lead as any, event, additionalData as any);
       sendEmail(TEAM_NOTIFY_RECIPIENT, teamTemplate, contractAttachment ? [contractAttachment] : undefined).catch((e) =>
         console.error('team notify send threw:', e instanceof Error ? e.message : String(e)),

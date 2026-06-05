@@ -293,9 +293,10 @@ const CustomerPortalPage: FC = () => {
     IS_PREVIEW_GEBUCHT ? PREVIEW_SIGNED_FORM : null,
   );
   const [showSignedContract, setShowSignedContract] = useState(false);
-  // Prototyp: Chat mit der beworbenen Pflegekraft (übersetzt, mit Leitplanken).
-  const [chatNurse, setChatNurse] = useState<Nurse | null>(
-    IS_PREVIEW_CHAT ? PREVIEW_APPLICATION.nurse : null,
+  // Chat mit der beworbenen Pflegekraft (übersetzt, mit Leitplanken). Echt-
+  // Modus (Lead-Token) → caregiver-chat Edge-Function; Preview → Dummy-Chat.
+  const [chatTarget, setChatTarget] = useState<{ nurse: Nurse; applicationId?: number; caregiverId?: number } | null>(
+    IS_PREVIEW_CHAT ? { nurse: PREVIEW_APPLICATION.nurse, caregiverId: PREVIEW_APPLICATION.nurse.caregiverId } : null,
   );
   const [showInfoPopup, setShowInfoPopup] = useState(false);
   const [showContactPopup, setShowContactPopup] = useState(false);
@@ -1992,7 +1993,7 @@ const CustomerPortalPage: FC = () => {
                 onReview={() => setSelectedApp(app)}
                 onDecline={() => setDeclineConfirmApp(app)}
                 onNurseClick={(n) => openNurseFromApp(n, app)}
-                onChat={(n) => setChatNurse(n)}
+                onChat={() => setChatTarget({ nurse: app.nurse, applicationId: Number(app.id) || undefined, caregiverId: app.nurse.caregiverId })}
               />
             ))}
             {/* Beratungs-CTA direkt unter den Bewerbungen — Bewerbungen sind
@@ -2425,8 +2426,14 @@ const CustomerPortalPage: FC = () => {
       )}
 
       {/* Chat mit der beworbenen Pflegekraft (Prototyp) */}
-      {chatNurse && (
-        <PflegekraftChat nurse={chatNurse} onClose={() => setChatNurse(null)} />
+      {chatTarget && (
+        <PflegekraftChat
+          nurse={chatTarget.nurse}
+          token={IS_PREVIEW_ANY ? undefined : (lead?.token ?? undefined)}
+          applicationId={chatTarget.applicationId}
+          caregiverId={chatTarget.caregiverId}
+          onClose={() => setChatTarget(null)}
+        />
       )}
 
       {/* Angebot prüfen Modal */}
@@ -2458,7 +2465,7 @@ const CustomerPortalPage: FC = () => {
           app={nurseModalApp ?? undefined}
           onReview={() => { setSelectedNurse(null); setSelectedApp(nurseModalApp); setNurseModalApp(null); setSelectedFromInterestId(null); }}
           onDecline={() => { setDeclineConfirmApp(nurseModalApp); setSelectedNurse(null); setNurseModalApp(null); setSelectedFromInterestId(null); }}
-          onChat={nurseModalApp ? () => { const n = enrichedSelectedNurse; setSelectedNurse(null); setNurseModalApp(null); setNurseMatchIdx(null); setSelectedFromInterestId(null); setChatNurse(n); } : undefined}
+          onChat={nurseModalApp ? () => { const n = enrichedSelectedNurse; const appId = Number(nurseModalApp.id) || undefined; setSelectedNurse(null); setNurseModalApp(null); setNurseMatchIdx(null); setSelectedFromInterestId(null); setChatTarget({ nurse: n, applicationId: appId, caregiverId: n.caregiverId }); } : undefined}
           hasInterest={selectedFromInterestId !== null && enrichedSelectedNurse.caregiverId === selectedFromInterestId}
           onUndo={() => { if (nurseModalApp) undoApp(nurseModalApp.id); setNurseModalApp(null); }}
           isInvited={

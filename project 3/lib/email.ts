@@ -873,6 +873,7 @@ export function getTeamNotificationTemplate(
     application_received: '📨',
     application_accepted_internal: '🎉',
     vertrag_abgeschlossen: '🟢',
+    caregiver_chat_message: '💬',
   };
 
   const statusText = {
@@ -884,6 +885,7 @@ export function getTeamNotificationTemplate(
     application_received: 'Bewerbung an Kunden gesendet',
     application_accepted_internal: 'Neue Buchung – Kunde hat akzeptiert',
     vertrag_abgeschlossen: 'Neuer Vertrag abgeschlossen!',
+    caregiver_chat_message: 'Neue Chat-Nachricht vom Kunden an die Pflegekraft',
   };
 
   const emoji = statusEmojis[status as keyof typeof statusEmojis] || '📋';
@@ -921,13 +923,14 @@ export function getTeamNotificationTemplate(
   // einsteigen soll (Patientenprofil ansehen, Pflegekraft-Vorschau, etc.).
   const portalBase = process.env.NEXT_PUBLIC_PORTAL_URL ?? '';
   const portalUrl = portalBase && lead.token ? `${portalBase}/?token=${lead.token}` : '';
-  const CAREGIVER_NAME_STATUSES = ['caregiver_invited', 'caregiver_interest_shown', 'application_received', 'application_accepted_internal'];
+  const CAREGIVER_NAME_STATUSES = ['caregiver_invited', 'caregiver_interest_shown', 'application_received', 'application_accepted_internal', 'caregiver_chat_message'];
   const PORTAL_CTA_STATUSES = [
     'patient_data_saved',
     'caregiver_invited',
     'caregiver_interest_shown',
     'application_received',
     'application_accepted_internal',
+    'caregiver_chat_message',
   ];
   const showPortalCta = PORTAL_CTA_STATUSES.includes(status) && Boolean(portalUrl);
 
@@ -1028,9 +1031,22 @@ export function getTeamNotificationTemplate(
       ])
     : '';
 
+  // Chat-Nachricht (Vorschau) — Kunde hat der Pflegekraft geschrieben.
+  const chatPreview = (status === 'caregiver_chat_message' && additionalData?.chatPreview)
+    ? String(additionalData.chatPreview)
+    : '';
+  const chatPreviewHtml = chatPreview
+    ? `<div style="background:#f9f9f9;border-left:3px solid #8B7355;border-radius:6px;padding:14px 16px;margin:12px 0;">
+        <div style="font-weight:700;font-size:13px;color:#000;margin-bottom:6px;">Nachricht des Kunden</div>
+        <div style="font-size:14px;color:#333;white-space:pre-line;">${chatPreview}</div>
+      </div>`
+    : '';
+  const chatPreviewText = chatPreview ? `\nNachricht des Kunden:\n${chatPreview}\n` : '';
+
   // Aktionshinweis unten — Status-spezifisch.
   const actionHighlightHtml =
     status === 'application_accepted_internal' ? '<strong>🎉 Kunde hat akzeptiert — Vertragsdokumente vorbereiten und Kunden anrufen.</strong>'
+  : status === 'caregiver_chat_message'    ? '<strong>💬 Kunde hat der Pflegekraft eine Frage gestellt — bitte übersetzen und an die Pflegekraft weiterleiten.</strong>'
   : status === 'caregiver_invited'         ? '<strong>📞 Bitte Erstkontakt mit der Pflegekraft anstoßen.</strong>'
   : status === 'caregiver_interest_shown'  ? '<strong>👀 Pflegekraft zeigt Interesse — Kunde hat Hinweis per E-Mail erhalten.</strong>'
   : status === 'application_received'      ? '<strong>📨 Bewerbung wurde an den Kunden gesendet — wartet auf Buchungsbestätigung.</strong>'
@@ -1072,6 +1088,7 @@ export function getTeamNotificationTemplate(
           ` : ''}
 
           ${contractTablesHtml}
+          ${chatPreviewHtml}
 
           ${showPortalCta ? `
             <p><a href="${portalUrl}" style="display:inline-block; background:#5C4A32; color:#fff; padding:10px 18px; text-decoration:none; border-radius:6px; font-weight:bold;">➜ Im Kundenportal ansehen</a></p>
@@ -1135,7 +1152,7 @@ export function getTeamNotificationTemplate(
 ${emoji} ${text}
 ${caregiverName ? `
 ${caregiverLabel}: ${caregiverName}${status === 'application_accepted_internal' && acceptanceCaregiverId ? ` (caregiver_id ${acceptanceCaregiverId})` : ''}${status === 'application_accepted_internal' && acceptanceApplicationId ? ` · Application ${acceptanceApplicationId}` : ''}
-` : ''}${contractTablesText}${showPortalCta ? `
+` : ''}${contractTablesText}${chatPreviewText}${showPortalCta ? `
 ➜ Im Kundenportal ansehen: ${portalUrl}
 ` : ''}
 === KONTAKTDATEN ===
