@@ -144,7 +144,10 @@ export const VertragSignieren: FC<{
   // embedded = ohne eigenen Seiten-Rahmen (z.B. in einem Modal-Schritt);
   // die Unterschrift schließt dann direkt ab (kein Zwischen-„Weiter").
   embedded?: boolean;
-}> = ({ daten = DUMMY, onSigned, embedded }) => {
+  // signDisabled = Unterschrift-Button sperren (z.B. solange übergeordnete
+  // Pflichtfelder im Modal noch nicht vollständig sind).
+  signDisabled?: boolean;
+}> = ({ daten = DUMMY, onSigned, embedded, signDisabled }) => {
   const [name, setName] = useState('');
   const [ort, setOrt] = useState(daten.ag.ort);
   const [bestaetigt, setBestaetigt] = useState(false);
@@ -349,8 +352,11 @@ export const VertragSignieren: FC<{
                 <input type="checkbox" checked={widerruf} onChange={(e) => setWiderruf(e.target.checked)} className="mt-0.5 accent-[#8B7355] w-4 h-4" />
                 <span className="text-[12px] text-gray-600 leading-relaxed">Ich verlange ausdrücklich, dass die Betreuung bereits vor Ablauf der 14-tägigen Widerrufsfrist beginnt (§ 8). Die Widerrufsbelehrung habe ich erhalten.</span>
               </label>
-              <button onClick={sign} disabled={!canSign}
-                className={`w-full rounded-xl py-3.5 text-sm font-bold text-white transition-colors ${canSign ? 'bg-[#2A9D5C] hover:bg-[#248a50]' : 'bg-gray-300 cursor-not-allowed'}`}>
+              {signDisabled && (
+                <p className="text-[12px] text-amber-600 mb-2 text-center">Bitte oben zuerst die Kundendaten vollständig ausfüllen.</p>
+              )}
+              <button onClick={sign} disabled={!canSign || signDisabled}
+                className={`w-full rounded-xl py-3.5 text-sm font-bold text-white transition-colors ${(canSign && !signDisabled) ? 'bg-[#2A9D5C] hover:bg-[#248a50]' : 'bg-gray-300 cursor-not-allowed'}`}>
                 Rechtsverbindlich &amp; kostenpflichtig unterschreiben
               </button>
             </div>

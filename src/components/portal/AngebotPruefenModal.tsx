@@ -322,7 +322,7 @@ export const AngebotPruefenModal: FC<{
             <div className="flex items-start justify-between mb-3">
               <div>
                 <h2 className="text-lg font-bold text-gray-900">
-                  {step === 1 ? 'Ihre Daten' : 'Vertrag & Unterschrift'}
+                  {step === 1 ? 'Angebot prüfen' : 'Daten & Vertrag'}
                 </h2>
               </div>
               <button onClick={onClose} className="w-8 h-8 rounded-full hover:bg-gray-100 flex items-center justify-center transition-colors flex-shrink-0 mt-0.5">
@@ -336,12 +336,12 @@ export const AngebotPruefenModal: FC<{
                 className={`flex items-center gap-1.5 px-1 pb-2.5 text-xs font-semibold mr-5 border-b-2 transition-colors ${step === 1 ? 'border-[#8B7355] text-[#8B7355]' : 'border-transparent text-gray-400'}`}
               >
                 {step === 2 && <Check className="w-3 h-3 text-[#22A06B]" />}
-                1 · Ihre Daten
+                1 · Angebot
               </button>
               <button
                 className={`flex items-center gap-1.5 px-1 pb-2.5 text-xs font-semibold border-b-2 transition-colors ${step === 2 ? 'border-[#8B7355] text-[#8B7355]' : 'border-transparent text-gray-400'}`}
               >
-                2 · Vertrag & Unterschrift
+                2 · Daten & Vertrag
               </button>
             </div>
           </div>
@@ -450,7 +450,7 @@ export const AngebotPruefenModal: FC<{
               </div>
             )}
 
-            {step === 1 && (
+            {step === 2 && (
               <div className="p-5 space-y-4" style={{background:'#FAFAF9'}}>
                 <div className={sectionCls}>
                   <p className={sectionTitleCls}>Hauptpatient <span className="font-normal text-gray-400">(zu betreuende Person)</span></p>
@@ -541,6 +541,7 @@ export const AngebotPruefenModal: FC<{
                 <VertragSignieren
                   embedded
                   daten={vertragsDaten}
+                  signDisabled={!canProceed}
                   onSigned={(sig) => onAccept(app.id, {
                     anrede, vorname, nachname, strasse, einsatzort, telefon, email,
                     kpAnrede, kpVorname, kpNachname, kpTelefon, kpEmail, signatur: sig,
@@ -553,18 +554,17 @@ export const AngebotPruefenModal: FC<{
           <div className="flex gap-2.5 px-5 py-4 border-t border-gray-100 flex-shrink-0">
             {step === 1 ? (
               <button
-                onClick={() => canProceed && setStep(2)}
-                disabled={!canProceed}
-                className={`w-full rounded-xl py-3.5 text-sm font-bold transition-all ${canProceed ? 'bg-[#E76F63] hover:bg-[#D65E52] text-white' : 'bg-gray-100 text-gray-400 cursor-not-allowed'}`}
+                onClick={() => setStep(2)}
+                className="w-full rounded-xl py-3.5 text-sm font-bold bg-[#E76F63] hover:bg-[#D65E52] text-white transition-all"
               >
-                Weiter zum Vertrag →
+                Weiter →
               </button>
             ) : (
               <button
                 onClick={() => setStep(1)}
                 className="w-full flex items-center justify-center gap-1.5 px-4 py-3 border border-gray-200 rounded-xl text-sm font-semibold text-gray-600 hover:bg-gray-50 transition-all"
               >
-                ← Zurück zu Ihren Daten
+                ← Zurück zum Angebot
               </button>
             )}
           </div>

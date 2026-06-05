@@ -75,7 +75,10 @@ describe('Portal integration: golden paths', () => {
     const reviewBtn = await screen.findByRole('button', { name: /Angebot prüfen/i }, { timeout: 5000 });
     await user.click(reviewBtn);
 
-    // Modal: Seite 1 = Ihre Daten. Kontaktperson-Pflichtfelder ausfüllen.
+    // Seite 1 = Angebot/Konditionen → weiter zu Daten & Vertrag (Seite 2).
+    await user.click(await screen.findByRole('button', { name: /Weiter →/ }));
+
+    // Seite 2 = Kundendaten + Vertrag. Kontaktperson-Pflichtfelder ausfüllen.
     // Placeholders "Vorname" / "Nachname" appear ONLY in Kontaktperson
     // (Hauptpatient fields are prefilled <input value={}>, no placeholder).
     await user.type(await screen.findByPlaceholderText('Vorname'), 'Max');
@@ -94,10 +97,7 @@ describe('Portal integration: golden paths', () => {
     await user.clear(kpEmailInput);
     await user.type(kpEmailInput, 'max@kontakt.de');
 
-    // Weiter zur Vertrags-Seite (Schritt 2).
-    await user.click(screen.getByRole('button', { name: /Weiter zum Vertrag/i }));
-
-    // Schritt 2 (Vertrag & Unterschrift): Name tippen = Unterschrift,
+    // Vertrag-Unterschrift: Name tippen = Unterschrift,
     // beide Pflicht-Häkchen, dann rechtsverbindlich unterschreiben.
     await user.type(await screen.findByPlaceholderText('Vor- und Nachname'), 'Max Kontakt');
     await user.click(screen.getByText(/Ich habe den gesamten Vertragsinhalt gelesen/));
