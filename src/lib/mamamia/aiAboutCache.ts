@@ -59,8 +59,11 @@ export function subscribeAiAbout(id: number, listener: () => void): () => void {
 }
 
 function buildInput(cg: MamamiaCaregiverFull): Record<string, unknown> {
+  // Konsistent zu mappers.ts → Portal nutzt 3 Stufen (Grund/Mittel/Gut).
+  // Die KI bekommt dieselbe Skala, damit ihre Beschreibung nicht „A2" sagt,
+  // während der Badge auf der Karte „Grund" zeigt.
   const levels: Record<string, string> = {
-    level_0: 'A1', level_1: 'A2', level_2: 'B1', level_3: 'B2', level_4: 'C1+',
+    level_0: 'Grund', level_1: 'Grund', level_2: 'Mittel', level_3: 'Gut', level_4: 'Gut',
   };
   const gearboxDE: Record<string, string> = {
     yes_automatic: 'Automatik',

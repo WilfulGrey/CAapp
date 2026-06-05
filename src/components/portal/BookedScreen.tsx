@@ -17,7 +17,7 @@ export const BookedScreen: FC<{
   const name = displayName(nurse.name);
   const inits = initials(nurse.name);
   const lvl = nurseLevel(nurse.experienceYears ?? 0, nurse.history?.assignments ?? 0);
-  const bars = Array.from({ length: 5 }, (_, i) => i < nurse.language.bars);
+  const bars = Array.from({ length: 3 }, (_, i) => i < nurse.language.bars);
 
   const milestones = [
     {

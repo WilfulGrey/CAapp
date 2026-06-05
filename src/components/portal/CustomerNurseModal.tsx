@@ -80,7 +80,7 @@ export const CustomerNurseModal: FC<{
   };
   const inits = initials(nurse.name);
   const name = displayName(nurse.name);
-  const bars = Array.from({ length: 5 }, (_, i) => i < nurse.language.bars);
+  const bars = Array.from({ length: 3 }, (_, i) => i < nurse.language.bars);
   const avgWo = nurse.history ? Math.round(nurse.history.avgDurationMonths * 4.3) : 0;
   const lvl = nurseLevel(nurse.experienceYears ?? 0, nurse.history?.assignments ?? 0);
   const p = nurse.profile;
@@ -98,7 +98,12 @@ export const CustomerNurseModal: FC<{
     ? p.aboutDe
     : p?.motivation
     ? p.motivation
-    : `${name} verfügt über ${nurse.experience} in der 24h-Betreuung und spricht Deutsch auf ${nurse.language.level}-Niveau.${
+    : `${name} verfügt über ${nurse.experience} in der 24h-Betreuung und spricht Deutsch auf ${
+        nurse.language.level === 'Grund' ? 'Grundniveau'
+        : nurse.language.level === 'Mittel' ? 'mittlerem Niveau'
+        : nurse.language.level === 'Gut' ? 'gutem Niveau'
+        : `${nurse.language.level}-Niveau`
+      }.${
         nurse.history ? ` Mit ${nurse.history.assignments} erfolgreich abgeschlossenen Einsätzen bringt sie bewährte Praxiserfahrung mit.` : ''
       }`;
 

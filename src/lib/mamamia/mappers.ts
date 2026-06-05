@@ -17,12 +17,18 @@ const COLORS = [
   '#1F5FAB', '#8B7D5B', '#AB1F4A', '#4FA5A1', '#D48B1F',
 ];
 
+// Primundus nutzt im Portal eine vereinfachte 3-Stufen-Skala (Grund / Mittel /
+// Gut) statt der 5 GER-Niveaus, weil das für Kunden besser einzuordnen ist.
+// Mamamias 5 germany_skill-Stufen werden hier zusammengeführt:
+//   A1 / A1-A2          → Grund     (1 Punkt)
+//   A2-B1               → Mittel    (2 Punkte)
+//   B1-B2 / B2-C1       → Gut       (3 Punkte)
 const GERMANY_SKILL_LEVELS: Record<string, { level: string; bars: number }> = {
-  level_0: { level: 'A1', bars: 1 },
-  level_1: { level: 'A1-A2', bars: 2 },
-  level_2: { level: 'A2-B1', bars: 3 },
-  level_3: { level: 'B1-B2', bars: 4 },
-  level_4: { level: 'B2-C1', bars: 5 },
+  level_0: { level: 'Grund',  bars: 1 },
+  level_1: { level: 'Grund',  bars: 1 },
+  level_2: { level: 'Mittel', bars: 2 },
+  level_3: { level: 'Gut',    bars: 3 },
+  level_4: { level: 'Gut',    bars: 3 },
 };
 
 // ─── Mamamia → German translation maps ───────────────────────────────────
@@ -596,11 +602,12 @@ function mamamiaHeightToForm(h: string | null | undefined): string {
 // with this helper to read real value from mmCustomer.
 export function germanySkillLabel(level: string | null | undefined): string {
   if (!level) return '';
-  if (level === 'level_0') return 'A1';
-  if (level === 'level_1') return 'A2';
-  if (level === 'level_2') return 'mind. A2';
-  if (level === 'level_3') return 'mind. B1';
-  if (level === 'level_4') return 'mind. C1';
+  // Portal nutzt die 3 Stufen Grund / Mittel / Gut. Mamamias level_0/1 fallen
+  // in „Grund", level_2 in „Mittel", level_3/4 in „Gut" (siehe mappers.ts
+  // GERMANY_SKILL_LEVELS). Hier als Mindestwunsch ausgedrückt.
+  if (level === 'level_0' || level === 'level_1') return 'ab Grund';
+  if (level === 'level_2') return 'ab Mittel';
+  if (level === 'level_3' || level === 'level_4') return 'ab Gut';
   if (level === 'not_important') return 'Egal';
   return '';
 }
