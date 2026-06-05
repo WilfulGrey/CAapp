@@ -342,6 +342,7 @@ export async function POST(request: NextRequest) {
         const clientIp = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim()
           || request.headers.get('x-real-ip')
           || null;
+        // Kern-Upsert (kritisch für die Buchungs-Persistenz / BookedScreen).
         const { error: accErr } = await supabase
           .from('lead_application_acceptances')
           .upsert({
@@ -350,14 +351,25 @@ export async function POST(request: NextRequest) {
             caregiver_id: typeof caregiverId === 'number' && Number.isFinite(caregiverId) ? caregiverId : null,
             contract_patient: m.contract_patient ?? {},
             contract_contact: m.contract_contact ?? {},
-            // Stufe B: elektronische Signatur + Audit + Vertrags-Snapshot.
+          }, { onConflict: 'lead_id,application_id' });
+        if (accErr) {
+          console.error('lead_application_acceptances upsert failed:', accErr.message);
+        }
+        // Stufe B: Signatur-Audit + Vertrags-Snapshot SEPARAT + best-effort.
+        // Entkoppelt von der Kern-Persistenz, damit eine noch nicht angewendete
+        // Migration (Signatur-Spalten fehlen) die Buchung nicht bricht.
+        const { error: sigErr } = await supabase
+          .from('lead_application_acceptances')
+          .update({
             signatur: typeof m.signatur === 'string' ? m.signatur : null,
             signed_at: new Date().toISOString(),
             signed_ip: clientIp,
             contract_snapshot: m.contract ?? null,
-          }, { onConflict: 'lead_id,application_id' });
-        if (accErr) {
-          console.error('lead_application_acceptances upsert failed:', accErr.message);
+          })
+          .eq('lead_id', lead.id)
+          .eq('application_id', appId);
+        if (sigErr) {
+          console.warn('signature audit update skipped (Migration noch nicht angewendet?):', sigErr.message);
         }
       } else {
         console.warn('application_accepted_internal: missing/invalid application_id in metadata');
