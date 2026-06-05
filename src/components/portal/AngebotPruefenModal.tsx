@@ -9,6 +9,7 @@ const FEIERTAGE_LIST = 'Karfreitag, Ostersonntag, Ostermontag, 1. Mai, Heiligabe
 import type { Nurse } from '../../types';
 import type { Application } from './shared';
 import { displayName, initials } from './shared';
+import { VertragSignieren } from './VertragSignieren';
 
 // Contract form data captured in step 2. Returned to parent via onAccept
 // so it can be POSTed to the kostenrechner bridge (which fires the team
@@ -264,12 +265,24 @@ export const AngebotPruefenModal: FC<{
   const [kpNachname, setKpNachname] = useState(prefill?.kpNachname ?? '');
   const [kpTelefon, setKpTelefon] = useState(prefill?.kpTelefon ?? '');
   const [kpEmail, setKpEmail] = useState(prefill?.kpEmail ?? '');
-  const [signatur, setSignatur] = useState('');
-  const canAccept = vorname.trim() !== '' && nachname.trim() !== '' && einsatzort.trim() !== ''
-    && kpVorname.trim() !== '' && kpNachname.trim() !== '' && kpTelefon.trim() !== '' && kpEmail.trim() !== ''
-    && signatur.trim().length >= 3;
+  // Seite 1 (Daten) ist vollständig → weiter zum Vertrag erlaubt.
+  const canProceed = vorname.trim() !== '' && nachname.trim() !== '' && einsatzort.trim() !== ''
+    && kpVorname.trim() !== '' && kpNachname.trim() !== '' && kpTelefon.trim() !== '' && kpEmail.trim() !== '';
 
   const tagessatz = Math.round(offer.monatlicheKosten / 30);
+
+  // Vertrag-Dokument für Seite 2 — aus den eingegebenen Daten gemappt.
+  // Auftraggeber = Kontaktperson, Leistungsempfänger = Patient.
+  const heute = new Date();
+  const vertragsDaten = {
+    datum: `${String(heute.getDate()).padStart(2, '0')}.${String(heute.getMonth() + 1).padStart(2, '0')}.${heute.getFullYear()}`,
+    ag: { name: `${kpVorname} ${kpNachname}`.trim() || 'Auftraggeber', strasse, plz: '', ort: einsatzort, email: kpEmail, telefon: kpTelefon },
+    le: { name: `${vorname} ${nachname}`.trim() || 'Leistungsempfänger', strasse, plz: '', ort: einsatzort },
+    vertragsbeginn: offer.anreisedatum,
+    voraussAbreise: offer.abreisedatum,
+    tagessatz: `EUR ${tagessatz},00`,
+    dl: { name: 'Ilka Wysocki', rolle: 'Bevollmächtigte' },
+  };
   // Monatliche Aufstellung dynamisch aus Anreise-/Abreisedatum berechnen.
   // Inklusive Sommerzuschlag (Juli/August) + Feiertagszuschläge (Karfreitag,
   // Ostersonntag, Ostermontag, 1. Mai, Heiligabend, 1./2. Weihnachtstag,
@@ -309,7 +322,7 @@ export const AngebotPruefenModal: FC<{
             <div className="flex items-start justify-between mb-3">
               <div>
                 <h2 className="text-lg font-bold text-gray-900">
-                  {step === 1 ? 'Angebot prüfen' : 'Betreuungskraft auswählen'}
+                  {step === 1 ? 'Ihre Daten' : 'Vertrag & Unterschrift'}
                 </h2>
               </div>
               <button onClick={onClose} className="w-8 h-8 rounded-full hover:bg-gray-100 flex items-center justify-center transition-colors flex-shrink-0 mt-0.5">
@@ -323,12 +336,12 @@ export const AngebotPruefenModal: FC<{
                 className={`flex items-center gap-1.5 px-1 pb-2.5 text-xs font-semibold mr-5 border-b-2 transition-colors ${step === 1 ? 'border-[#8B7355] text-[#8B7355]' : 'border-transparent text-gray-400'}`}
               >
                 {step === 2 && <Check className="w-3 h-3 text-[#22A06B]" />}
-                1 · Angebot
+                1 · Ihre Daten
               </button>
               <button
                 className={`flex items-center gap-1.5 px-1 pb-2.5 text-xs font-semibold border-b-2 transition-colors ${step === 2 ? 'border-[#8B7355] text-[#8B7355]' : 'border-transparent text-gray-400'}`}
               >
-                2 · Buchung bestätigen
+                2 · Vertrag & Unterschrift
               </button>
             </div>
           </div>
@@ -337,7 +350,7 @@ export const AngebotPruefenModal: FC<{
               zwischen Header und fixem Footer) + min-h-0 (erlaubt Schrumpfen
               unter Content-Höhe → echtes Scrollen) + overflow-y-auto. */}
           <div className="flex-1 min-h-0 overflow-y-auto">
-            {step === 1 && (
+            {false && (/* Angebot/Konditionen-Seite entfernt — Konditionen stehen jetzt im Vertrag (Seite 2) */
               <div className="p-5 space-y-5">
                 <div className="flex items-center gap-3 bg-gray-50 rounded-xl px-4 py-3 border border-gray-100">
                   <div className="w-12 h-12 rounded-xl flex-shrink-0 overflow-hidden">
@@ -437,7 +450,7 @@ export const AngebotPruefenModal: FC<{
               </div>
             )}
 
-            {step === 2 && (
+            {step === 1 && (
               <div className="p-5 space-y-4" style={{background:'#FAFAF9'}}>
                 <div className={sectionCls}>
                   <p className={sectionTitleCls}>Hauptpatient <span className="font-normal text-gray-400">(zu betreuende Person)</span></p>
@@ -520,48 +533,39 @@ export const AngebotPruefenModal: FC<{
                   </div>
                 </div>
 
-                <div className={sectionCls}>
-                  <p className={sectionTitleCls}>Vertrag &amp; Unterschrift</p>
-                  <a href="/?preview=vertrag" target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 text-sm font-semibold text-[#8B7355] hover:underline mb-4">
-                    Vollständigen Vertrag ansehen →
-                  </a>
-                  <label className={labelCls}>Ihre Unterschrift — vollständiger Name *</label>
-                  <input value={signatur} onChange={e => setSignatur(e.target.value)} placeholder="Vor- und Nachname" className={inputCls} />
-                  <p className="text-[12px] text-gray-500 leading-relaxed mt-2.5">
-                    Mit dem Tippen Ihres Namens unterschreiben Sie den Dienstleistungsvertrag rechtsverbindlich elektronisch und beauftragen die Pflegekraft. Eine Kopie geht an Ihre E-Mail.
-                  </p>
-                </div>
+              </div>
+            )}
+
+            {step === 2 && (
+              <div className="p-5">
+                <VertragSignieren
+                  embedded
+                  daten={vertragsDaten}
+                  onSigned={(sig) => onAccept(app.id, {
+                    anrede, vorname, nachname, strasse, einsatzort, telefon, email,
+                    kpAnrede, kpVorname, kpNachname, kpTelefon, kpEmail, signatur: sig,
+                  })}
+                />
               </div>
             )}
           </div>
 
-          <div className={`flex gap-2.5 px-5 py-4 border-t border-gray-100 flex-shrink-0 ${step === 2 ? 'flex-row' : 'flex-col'}`}>
+          <div className="flex gap-2.5 px-5 py-4 border-t border-gray-100 flex-shrink-0">
             {step === 1 ? (
               <button
-                onClick={() => setStep(2)}
-                className="w-full bg-[#E76F63] hover:bg-[#D65E52] text-white rounded-xl py-3.5 text-sm font-bold transition-all"
+                onClick={() => canProceed && setStep(2)}
+                disabled={!canProceed}
+                className={`w-full rounded-xl py-3.5 text-sm font-bold transition-all ${canProceed ? 'bg-[#E76F63] hover:bg-[#D65E52] text-white' : 'bg-gray-100 text-gray-400 cursor-not-allowed'}`}
               >
-                Pflegekraft sichern →
+                Weiter zum Vertrag →
               </button>
             ) : (
-              <>
-                <button
-                  onClick={() => setStep(1)}
-                  className="flex items-center gap-1.5 px-4 py-3 border border-gray-200 rounded-xl text-sm font-semibold text-gray-600 hover:bg-gray-50 transition-all flex-shrink-0"
-                >
-                  ← Zurück
-                </button>
-                <button
-                  onClick={() => canAccept && onAccept(app.id, {
-                    anrede, vorname, nachname, strasse, einsatzort, telefon, email,
-                    kpAnrede, kpVorname, kpNachname, kpTelefon, kpEmail, signatur,
-                  })}
-                  disabled={!canAccept}
-                  className={`flex-1 rounded-xl py-3 text-sm font-bold transition-all ${canAccept ? 'bg-[#E76F63] hover:bg-[#D65E52] text-white' : 'bg-gray-100 text-gray-400 cursor-not-allowed'}`}
-                >
-                  Unterschreiben &amp; beauftragen
-                </button>
-              </>
+              <button
+                onClick={() => setStep(1)}
+                className="w-full flex items-center justify-center gap-1.5 px-4 py-3 border border-gray-200 rounded-xl text-sm font-semibold text-gray-600 hover:bg-gray-50 transition-all"
+              >
+                ← Zurück zu Ihren Daten
+              </button>
             )}
           </div>
         </div>

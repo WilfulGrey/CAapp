@@ -75,48 +75,34 @@ describe('Portal integration: golden paths', () => {
     const reviewBtn = await screen.findByRole('button', { name: /Angebot prüfen/i }, { timeout: 5000 });
     await user.click(reviewBtn);
 
-    // Modal step 1 → click "Pflegekraft sichern" (PR #166 — renamed from
-    // generic "Weiter" damit das CTA-Wording dem Entscheidungsmoment
-    // entspricht).
-    const weiter = await screen.findByRole('button', { name: /Pflegekraft sichern/i });
-    await user.click(weiter);
-
-    // Step 2 — fill required Kontaktperson fields.
-    // Placeholders "Vorname" / "Nachname" appear ONLY in Kontaktperson (Hauptpatient
-    // fields are prefilled <input value={}>, no placeholder).
+    // Modal: Seite 1 = Ihre Daten. Kontaktperson-Pflichtfelder ausfüllen.
+    // Placeholders "Vorname" / "Nachname" appear ONLY in Kontaktperson
+    // (Hauptpatient fields are prefilled <input value={}>, no placeholder).
     await user.type(await screen.findByPlaceholderText('Vorname'), 'Max');
     await user.type(screen.getByPlaceholderText('Nachname'), 'Kontakt');
 
-    // KP Telefon is the only "Telefon *" (asterisk = required) label. Find via
-    // the label element, then its sibling input.
     const kpSection = screen.getByText(/Kontaktperson/).closest('div')!;
-    const kpTelefonInput = within(kpSection.parentElement!)
-      .getAllByPlaceholderText('Bitte eingeben')
-      .find(el => {
-        const label = el.closest('div')?.querySelector('label')?.textContent ?? '';
-        return label.includes('Telefon') && label.includes('*');
-      });
-    if (!kpTelefonInput) throw new Error('KP Telefon input not found');
+    const kpInputs = within(kpSection.parentElement!).getAllByPlaceholderText('Bitte eingeben');
+    const byLabel = (needle: string) => kpInputs.find(el => {
+      const label = el.closest('div')?.querySelector('label')?.textContent ?? '';
+      return label.includes(needle) && label.includes('*');
+    });
+    const kpTelefonInput = byLabel('Telefon');
+    const kpEmailInput = byLabel('E-Mail');
+    if (!kpTelefonInput || !kpEmailInput) throw new Error('KP Telefon/E-Mail input not found');
     await user.type(kpTelefonInput, '+49 89 12345');
-
-    // KP E-Mail ist jetzt Pflichtfeld.
-    const kpEmailInput = within(kpSection.parentElement!)
-      .getAllByPlaceholderText('Bitte eingeben')
-      .find(el => {
-        const label = el.closest('div')?.querySelector('label')?.textContent ?? '';
-        return label.includes('E-Mail') && label.includes('*');
-      });
-    if (!kpEmailInput) throw new Error('KP E-Mail input not found');
     await user.clear(kpEmailInput);
     await user.type(kpEmailInput, 'max@kontakt.de');
 
-    // Online-Unterschrift (Name tippen) ersetzt das frühere "verbindlich"-
-    // Häkchen — die Unterschrift IST die Beauftragung.
-    await user.type(screen.getByPlaceholderText('Vor- und Nachname'), 'Max Kontakt');
+    // Weiter zur Vertrags-Seite (Schritt 2).
+    await user.click(screen.getByRole('button', { name: /Weiter zum Vertrag/i }));
 
-    // Accept → "Unterschreiben & beauftragen".
-    const acceptBtn = screen.getByRole('button', { name: /Unterschreiben & beauftragen/i });
-    await user.click(acceptBtn);
+    // Schritt 2 (Vertrag & Unterschrift): Name tippen = Unterschrift,
+    // beide Pflicht-Häkchen, dann rechtsverbindlich unterschreiben.
+    await user.type(await screen.findByPlaceholderText('Vor- und Nachname'), 'Max Kontakt');
+    await user.click(screen.getByText(/Ich habe den gesamten Vertragsinhalt gelesen/));
+    await user.click(screen.getByText(/Ich verlange ausdrücklich/));
+    await user.click(screen.getByRole('button', { name: /Rechtsverbindlich & kostenpflichtig unterschreiben/i }));
 
     // BookedScreen rendered (copy includes "Pflegekraft gebucht!" substring)
     await waitFor(
