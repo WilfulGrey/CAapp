@@ -138,7 +138,13 @@ const ParteiZeile: FC<{ label: string; value?: string }> = ({ label, value }) =>
   </div>
 );
 
-export const VertragSignieren: FC<{ daten?: VertragsDaten; onSigned?: () => void }> = ({ daten = DUMMY, onSigned }) => {
+export const VertragSignieren: FC<{
+  daten?: VertragsDaten;
+  onSigned?: (name: string) => void;
+  // embedded = ohne eigenen Seiten-Rahmen (z.B. in einem Modal-Schritt);
+  // die Unterschrift schließt dann direkt ab (kein Zwischen-„Weiter").
+  embedded?: boolean;
+}> = ({ daten = DUMMY, onSigned, embedded }) => {
   const [name, setName] = useState('');
   const [ort, setOrt] = useState(daten.ag.ort);
   const [bestaetigt, setBestaetigt] = useState(false);
@@ -154,11 +160,12 @@ export const VertragSignieren: FC<{ daten?: VertragsDaten; onSigned?: () => void
     const hh = String(now.getHours()).padStart(2, '0');
     const mi = String(now.getMinutes()).padStart(2, '0');
     setSignedAt(`${dd}.${mm}.${now.getFullYear()} um ${hh}:${mi} Uhr`);
+    // Eingebettet (Modal): Unterschrift schließt direkt ab.
+    if (embedded && onSigned) onSigned(name);
   };
 
-  return (
-    <div className="min-h-screen bg-gray-100 py-6 px-3">
-      <div className="max-w-2xl mx-auto bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
+  const inner = (
+      <div className={embedded ? 'bg-white' : 'max-w-2xl mx-auto bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden'}>
         {/* Dokument-Kopf */}
         <div className="px-6 sm:px-10 pt-8 pb-6">
           <div className="flex items-start justify-between mb-6">
@@ -311,8 +318,8 @@ export const VertragSignieren: FC<{ daten?: VertragsDaten; onSigned?: () => void
               <p className="text-[11px] text-green-600/80 mt-2">
                 Audit: einfache elektronische Signatur · Zeitstempel + IP protokolliert · Vertragsversion v1.0
               </p>
-              {onSigned && (
-                <button onClick={onSigned}
+              {onSigned && !embedded && (
+                <button onClick={() => onSigned(name)}
                   className="mt-3 w-full rounded-xl bg-[#8B7355] hover:bg-[#766145] text-white text-sm font-bold py-3 transition-colors">
                   Weiter zum Portal →
                 </button>
@@ -334,12 +341,12 @@ export const VertragSignieren: FC<{ daten?: VertragsDaten; onSigned?: () => void
                     className="w-full border border-gray-200 rounded-xl px-3.5 py-3 text-sm focus:outline-none focus:border-[#8B7355] focus:ring-2 focus:ring-[#8B7355]/10" />
                 </div>
               </div>
-              <label className="flex items-start gap-2.5 mb-2.5 cursor-pointer" onClick={() => setBestaetigt((v) => !v)}>
-                <input type="checkbox" checked={bestaetigt} readOnly className="mt-0.5 accent-[#8B7355] w-4 h-4" />
+              <label className="flex items-start gap-2.5 mb-2.5 cursor-pointer">
+                <input type="checkbox" checked={bestaetigt} onChange={(e) => setBestaetigt(e.target.checked)} className="mt-0.5 accent-[#8B7355] w-4 h-4" />
                 <span className="text-[12px] text-gray-600 leading-relaxed">Ich habe den gesamten Vertragsinhalt gelesen und unterschreibe diesen Dienstleistungsvertrag hiermit rechtsverbindlich elektronisch.</span>
               </label>
-              <label className="flex items-start gap-2.5 mb-4 cursor-pointer" onClick={() => setWiderruf((v) => !v)}>
-                <input type="checkbox" checked={widerruf} readOnly className="mt-0.5 accent-[#8B7355] w-4 h-4" />
+              <label className="flex items-start gap-2.5 mb-4 cursor-pointer">
+                <input type="checkbox" checked={widerruf} onChange={(e) => setWiderruf(e.target.checked)} className="mt-0.5 accent-[#8B7355] w-4 h-4" />
                 <span className="text-[12px] text-gray-600 leading-relaxed">Ich verlange ausdrücklich, dass die Betreuung bereits vor Ablauf der 14-tägigen Widerrufsfrist beginnt (§ 8). Die Widerrufsbelehrung habe ich erhalten.</span>
               </label>
               <button onClick={sign} disabled={!canSign}
@@ -350,6 +357,9 @@ export const VertragSignieren: FC<{ daten?: VertragsDaten; onSigned?: () => void
           )}
         </div>
       </div>
-    </div>
+  );
+
+  return embedded ? inner : (
+    <div className="min-h-screen bg-gray-100 py-6 px-3">{inner}</div>
   );
 };
