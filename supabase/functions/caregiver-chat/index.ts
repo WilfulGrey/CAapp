@@ -46,6 +46,7 @@ export interface NewMessage {
 // Chain-Mocking nötig).
 export interface ChatStore {
   findLeadIdByToken(token: string): Promise<string | null>;
+  findTokenByLeadId(leadId: string): Promise<string | null>;
   insertMessage(row: NewMessage): Promise<MessageRow>;
   listMessages(leadId: string, applicationId: number | null): Promise<MessageRow[]>;
 }
@@ -138,7 +139,7 @@ export async function handleRequest(req: Request, deps: ChatDeps): Promise<Respo
     });
 
     // Team-Benachrichtigung — best effort, blockiert die Antwort nicht.
-    notifyTeam(fetchFn, secrets.kostenrechnerUrl, {
+    notifyBridge(fetchFn, secrets.kostenrechnerUrl, {
       token,
       event: "caregiver_chat_message",
       metadata: {
@@ -191,6 +192,22 @@ export async function handleRequest(req: Request, deps: ChatDeps): Promise<Respo
       text_de: de ?? text,
       text_pl: text,
     });
+
+    // Kunden per Mail benachrichtigen („… hat Ihnen geantwortet") — über die
+    // bestehende Bridge (token-auth). Token aus Payload oder via lead_id.
+    const notifyToken = (typeof body.token === "string" && body.token)
+      ? body.token
+      : await store.findTokenByLeadId(leadId);
+    if (notifyToken) {
+      notifyBridge(fetchFn, secrets.kostenrechnerUrl, {
+        token: notifyToken,
+        event: "caregiver_chat_reply",
+        metadata: {
+          caregiver_name: typeof body.caregiver_name === "string" ? body.caregiver_name : "",
+          preview: de ?? text,
+        },
+      });
+    }
     return json({ message: mapRow(row) }, 200, origin);
   }
 
@@ -202,8 +219,9 @@ function toIntOrNull(v: unknown): number | null {
   return Number.isFinite(n) && v !== null && v !== "" && v !== undefined ? Math.trunc(n) : null;
 }
 
-// Team-Mail über die bestehende kostenrechner-Bridge — fire & forget.
-function notifyTeam(
+// Event an die bestehende kostenrechner-Bridge schicken (Team-Mail bzw.
+// Kundenmail) — fire & forget.
+function notifyBridge(
   fetchFn: typeof fetch,
   kostenrechnerUrl: string,
   payload: { token: string; event: string; metadata: Record<string, unknown> },
@@ -213,9 +231,9 @@ function notifyTeam(
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
-    }).catch((e) => console.error("notifyTeam failed:", (e as Error).message));
+    }).catch((e) => console.error("notifyBridge failed:", (e as Error).message));
   } catch (e) {
-    console.error("notifyTeam threw:", (e as Error).message);
+    console.error("notifyBridge threw:", (e as Error).message);
   }
 }
 
@@ -234,6 +252,18 @@ function makeStore(supabase: SupabaseClient): ChatStore {
         return null;
       }
       return (data?.id as string) ?? null;
+    },
+    async findTokenByLeadId(leadId) {
+      const { data, error } = await supabase
+        .from("leads")
+        .select("token")
+        .eq("id", leadId)
+        .maybeSingle();
+      if (error) {
+        console.error("findTokenByLeadId error:", error.message);
+        return null;
+      }
+      return (data?.token as string) ?? null;
     },
     async insertMessage(row) {
       const { data, error } = await supabase

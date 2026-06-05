@@ -37,6 +37,39 @@ export async function listChat(token: string, applicationId?: number): Promise<C
   return json.messages ?? [];
 }
 
+// ─── Ungelesen-Tracking (In-App Badge) ──────────────────────────────────────
+// Pro (Token, Bewerbung) wird die höchste gesehene Nachrichten-ID in
+// localStorage gemerkt. „Ungelesen" = es gibt eine Pflegekraft-Antwort mit
+// höherer ID als zuletzt gesehen.
+
+function seenKey(token: string, applicationId?: number): string {
+  return `chat_seen_${token}_${applicationId ?? 'all'}`;
+}
+
+export function getChatSeenId(token: string, applicationId?: number): number {
+  try {
+    return Number(localStorage.getItem(seenKey(token, applicationId))) || 0;
+  } catch {
+    return 0;
+  }
+}
+
+export function markChatSeen(token: string, applicationId: number | undefined, maxId: number): void {
+  try {
+    if (maxId > getChatSeenId(token, applicationId)) {
+      localStorage.setItem(seenKey(token, applicationId), String(maxId));
+    }
+  } catch {
+    /* ignore quota / private mode */
+  }
+}
+
+// True, wenn es eine Pflegekraft-Antwort gibt, die neuer ist als zuletzt gesehen.
+export function hasUnreadCaregiverReply(token: string, applicationId: number | undefined, msgs: ChatMessageDTO[]): boolean {
+  const seen = getChatSeenId(token, applicationId);
+  return msgs.some((m) => m.from === 'caregiver' && m.id > seen);
+}
+
 export async function sendChat(
   token: string,
   text: string,

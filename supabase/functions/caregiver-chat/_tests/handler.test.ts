@@ -19,6 +19,9 @@ function makeFakeStore(opts: { leadId?: string | null } = {}): ChatStore & { row
       if ("leadId" in opts) return Promise.resolve(opts.leadId ?? null);
       return Promise.resolve(token === "good-token" ? "lead-uuid-1" : null);
     },
+    findTokenByLeadId(leadId: string) {
+      return Promise.resolve(leadId === "lead-uuid-1" ? "good-token" : null);
+    },
     insertMessage(row: NewMessage) {
       const full: MessageRow = { id: id++, created_at: "2026-06-05T12:00:00Z", ...row };
       rows.push(full);
@@ -43,11 +46,11 @@ const fakeTranslate = (
 const fakeFetch: typeof fetch = () =>
   Promise.resolve(new Response("{}", { status: 200 }));
 
-function deps(store: ChatStore): ChatDeps {
+function deps(store: ChatStore, fetchFn: typeof fetch = fakeFetch): ChatDeps {
   return {
     secrets: { anthropicApiKey: "k", kostenrechnerUrl: "https://kr.test", replySecret: "s3cret" },
     store,
-    fetchFn: fakeFetch,
+    fetchFn,
     translateFn: fakeTranslate as unknown as ChatDeps["translateFn"],
   };
 }
@@ -134,11 +137,17 @@ Deno.test("reply: wrong secret → 401", async () => {
   assertEquals(res.status, 401);
 });
 
-Deno.test("reply: correct secret stores caregiver msg, PL input + DE translation", async () => {
+Deno.test("reply: correct secret stores caregiver msg, PL input + DE translation, notifies customer", async () => {
   const store = makeFakeStore();
+  // Bridge-Aufrufe aufzeichnen, um die Kundenmail-Benachrichtigung zu prüfen.
+  const bridgeCalls: Array<Record<string, unknown>> = [];
+  const recordingFetch: typeof fetch = (_url, init) => {
+    try { bridgeCalls.push(JSON.parse(String(init?.body ?? "{}"))); } catch { /* ignore */ }
+    return Promise.resolve(new Response("{}", { status: 200 }));
+  };
   const res = await handleRequest(
-    post({ action: "reply", lead_id: "lead-uuid-1", application_id: 1, text: "Dzień dobry" }, { "x-reply-secret": "s3cret" }),
-    deps(store),
+    post({ action: "reply", lead_id: "lead-uuid-1", application_id: 1, caregiver_name: "Maria K.", text: "Dzień dobry" }, { "x-reply-secret": "s3cret" }),
+    deps(store, recordingFetch),
   );
   assertEquals(res.status, 200);
   const out = await res.json();
@@ -147,6 +156,10 @@ Deno.test("reply: correct secret stores caregiver msg, PL input + DE translation
   assertEquals(out.message.text, "[de] Dzień dobry"); // Kunde sieht DE-Übersetzung
   assertEquals(store.rows[0].text_pl, "Dzień dobry");
   assertEquals(store.rows[0].text_de, "[de] Dzień dobry");
+  // Kundenmail-Event an die Bridge ausgelöst.
+  const replyEvt = bridgeCalls.find((c) => c.event === "caregiver_chat_reply");
+  assert(replyEvt, "expected caregiver_chat_reply bridge call");
+  assertEquals((replyEvt!.metadata as Record<string, unknown>).preview, "[de] Dzień dobry");
 });
 
 // ─── misc ─────────────────────────────────────────────────────────────────────

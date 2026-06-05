@@ -11,7 +11,9 @@ export const AppCard: FC<{
   onNurseClick: (n: Nurse) => void;
   // Öffnet den (übersetzten) Chat mit der beworbenen Pflegekraft.
   onChat?: (n: Nurse) => void;
-}> = ({ app, exiting, onReview, onDecline, onNurseClick, onChat }) => {
+  // True = ungelesene Antwort der Pflegekraft → Badge am Chat-Button.
+  chatUnread?: boolean;
+}> = ({ app, exiting, onReview, onDecline, onNurseClick, onChat, chatUnread }) => {
   const { nurse } = app;
   const inits = initials(nurse.name);
   const name = displayName(nurse.name);
@@ -109,12 +111,22 @@ export const AppCard: FC<{
         {onChat && (
           <button
             onClick={() => onChat(nurse)}
-            className="w-full flex items-center justify-center gap-2 rounded-xl border border-[#8B7355]/30 bg-white hover:bg-[#F8F7F5] text-[#6B5444] text-sm font-semibold py-2.5 transition-colors"
+            className={`relative w-full flex items-center justify-center gap-2 rounded-xl border text-sm font-semibold py-2.5 transition-colors ${
+              chatUnread
+                ? 'border-[#2A9D5C]/50 bg-[#2A9D5C]/8 text-[#1f7a45] hover:bg-[#2A9D5C]/15'
+                : 'border-[#8B7355]/30 bg-white text-[#6B5444] hover:bg-[#F8F7F5]'
+            }`}
           >
             <svg className="w-4 h-4 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.86 9.86 0 01-4-.8L3 20l.8-3.2A7.9 7.9 0 013 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
             </svg>
-            Frage an {vorname} stellen
+            {chatUnread ? `${vorname} hat geantwortet` : `Frage an ${vorname} stellen`}
+            {chatUnread && (
+              <span className="absolute top-2 right-3 flex h-2.5 w-2.5">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#2A9D5C] opacity-60" />
+                <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-[#2A9D5C]" />
+              </span>
+            )}
           </button>
         )}
       </div>

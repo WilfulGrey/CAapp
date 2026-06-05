@@ -3,7 +3,7 @@ import type { FC } from 'react';
 import { X, Send, ShieldCheck, Globe } from 'lucide-react';
 import type { Nurse } from '../../types';
 import { displayName, initials } from './shared';
-import { listChat, sendChat, type ChatMessageDTO } from '../../lib/caregiverChat';
+import { listChat, sendChat, markChatSeen, type ChatMessageDTO } from '../../lib/caregiverChat';
 
 // ─── Prototyp: Chat mit der beworbenen Pflegekraft ───────────────────────────
 // Freier Chat, ABER mit zwei Leitplanken (vom Kunden gefordert):
@@ -128,6 +128,9 @@ export const PflegekraftChat: FC<{
     try {
       const dtos = await listChat(token, applicationId);
       setMessages(dtos.map(fromDTO));
+      // Alles aktuell Geladene gilt als gesehen → In-App Badge zurücksetzen.
+      const maxId = dtos.reduce((mx, d) => Math.max(mx, d.id), 0);
+      markChatSeen(token, applicationId, maxId);
     } catch (e) {
       console.error('listChat failed:', (e as Error).message);
     } finally {
