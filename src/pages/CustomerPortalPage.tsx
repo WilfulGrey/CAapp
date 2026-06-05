@@ -41,8 +41,6 @@ import {
 } from '../components/portal/shared';
 import { BookedScreen } from '../components/portal/BookedScreen';
 import { VertragSignieren } from '../components/portal/VertragSignieren';
-import { BuchungsFlow } from '../components/portal/BuchungsFlow';
-import { AnnahmeFlow } from '../components/portal/AnnahmeFlow';
 import { AngebotCard } from '../components/portal/AngebotCard';
 import { AppCard } from '../components/portal/AppCard';
 import { AppCardDone } from '../components/portal/AppCardDone';
@@ -76,10 +74,6 @@ const IS_PREVIEW_INTERESSE = PREVIEW_PARAM === 'interesse';
 const IS_PREVIEW_GEBUCHT = PREVIEW_PARAM === 'gebucht';
 // Dev-only prototype of the online-signable Dienstleistungsvertrag (Stufe A).
 const IS_PREVIEW_VERTRAG = PREVIEW_PARAM === 'vertrag';
-// Dev-only prototype of the full booking flow (mail → portal → contract → done).
-const IS_PREVIEW_FLOW = PREVIEW_PARAM === 'flow';
-// Dev-only prototype of the application-acceptance flow (step 3 = contract).
-const IS_PREVIEW_ANNAHME = PREVIEW_PARAM === 'annahme';
 const IS_PREVIEW_ANY = IS_PREVIEW_BEWERBUNG || IS_PREVIEW_INTERESSE || IS_PREVIEW_GEBUCHT;
 
 const PREVIEW_LEAD: Lead = {
@@ -208,8 +202,6 @@ const CustomerPortalPage: FC = () => {
   // IS_PREVIEW_VERTRAG ist eine Modul-Konstante → konsistent über alle Renders
   // (Rules-of-Hooks-safe, da der Early-Return-Pfad sich nie ändert).
   if (IS_PREVIEW_VERTRAG) return <VertragSignieren />;
-  if (IS_PREVIEW_FLOW) return <BuchungsFlow app={{ ...PREVIEW_APPLICATION, status: 'accepted' }} />;
-  if (IS_PREVIEW_ANNAHME) return <AnnahmeFlow app={PREVIEW_APPLICATION} />;
 
   // ─── Lead loading via token ──────────────────────────────────────────────────
   // Preview-Mode: hardcoded Lead + skip Supabase fetch.
@@ -672,13 +664,15 @@ const CustomerPortalPage: FC = () => {
       nachname: lead?.patient_nachname || lead?.nachname || '',
       strasse: stageBStreet || mmCustomer?.customer_contract?.street_number || '',
       einsatzort: ortLine,
-      telefon: lead?.telefon || mmCustomer?.phone || mmCustomer?.customer_contract?.phone || '',
-      email: lead?.email || mmCustomer?.email || '',
+      // Patient hat meist KEINE eigene Telefon/E-Mail — die vorhandenen
+      // Kontaktdaten gehören i.d.R. der Kontaktperson, daher dort vorausfüllen.
+      telefon: '',
+      email: '',
       kpAnrede: '',
       kpVorname: '',
       kpNachname: '',
-      kpTelefon: '',
-      kpEmail: '',
+      kpTelefon: lead?.telefon || mmCustomer?.phone || mmCustomer?.customer_contract?.phone || '',
+      kpEmail: lead?.email || mmCustomer?.email || '',
     };
   })();
 
@@ -841,6 +835,10 @@ const CustomerPortalPage: FC = () => {
         prev.map((a) => (a.id === id ? { ...a, status: 'accepted' } : a))
       );
       showToast('✓ Vielen Dank — wir bereiten alles vor.');
+
+      // Preview: keine echte Bridge — optimistischen 'accepted'-Status halten,
+      // damit der gebucht-Screen (BookedScreen) zuverlässig erscheint.
+      if (IS_PREVIEW_ANY) return;
 
       if (!lead?.token) return;
 
