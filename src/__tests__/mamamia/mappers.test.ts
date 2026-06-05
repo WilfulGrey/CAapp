@@ -57,13 +57,13 @@ describe('mapCaregiverToNurse', () => {
     expect(n.age).toBe(2026 - 1985);
   });
 
-  it('maps germany_skill level_0..level_4 → A1..B2-C1 + bars 1..5', () => {
+  it('maps germany_skill level_0..level_4 → 3 Stufen Grund/Mittel/Gut (bars 1..3)', () => {
     for (const [skill, expected] of [
-      ['level_0', { level: 'A1', bars: 1 }],
-      ['level_1', { level: 'A1-A2', bars: 2 }],
-      ['level_2', { level: 'A2-B1', bars: 3 }],
-      ['level_3', { level: 'B1-B2', bars: 4 }],
-      ['level_4', { level: 'B2-C1', bars: 5 }],
+      ['level_0', { level: 'Grund',  bars: 1 }],
+      ['level_1', { level: 'Grund',  bars: 1 }],
+      ['level_2', { level: 'Mittel', bars: 2 }],
+      ['level_3', { level: 'Gut',    bars: 3 }],
+      ['level_4', { level: 'Gut',    bars: 3 }],
     ] as const) {
       const n = mapCaregiverToNurse(makeCg({ germany_skill: skill }), { nowIso: NOW_ISO, nowYear: NOW_YEAR });
       expect(n.language.level).toBe(expected.level);

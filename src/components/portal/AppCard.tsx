@@ -16,7 +16,7 @@ export const AppCard: FC<{
   const inits = initials(nurse.name);
   const name = displayName(nurse.name);
   const vorname = nurse.name.split(' ')[0];
-  const bars = Array.from({ length: 5 }, (_, i) => i < nurse.language.bars);
+  const bars = Array.from({ length: 3 }, (_, i) => i < nurse.language.bars);
 
   return (
     <div

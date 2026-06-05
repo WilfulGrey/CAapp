@@ -40,7 +40,7 @@ export const MatchCard: FC<{
   const [invitePhase, setInvitePhase] = useState<'idle' | 'sending' | 'done'>('idle');
   const inits = initials(nurse.name);
   const name = displayName(nurse.name);
-  const bars = Array.from({ length: 5 }, (_, i) => i < nurse.language.bars);
+  const bars = Array.from({ length: 3 }, (_, i) => i < nurse.language.bars);
 
   const handleInvite = async () => {
     const allowed = onInvite ? onInvite() : true;

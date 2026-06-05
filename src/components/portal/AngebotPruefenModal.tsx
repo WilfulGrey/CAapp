@@ -296,7 +296,7 @@ export const AngebotPruefenModal: FC<{
   const name = displayName(nurse.name);
   // Deutsch-Punktebalken — identisch zur geteilten PK-Karte (AppCard),
   // damit die Sprach-Optik im Modal konsistent zum restlichen Portal ist.
-  const germanBars = Array.from({ length: 5 }, (_, i) => i < nurse.language.bars);
+  const germanBars = Array.from({ length: 3 }, (_, i) => i < nurse.language.bars);
 
   const [anrede, setAnrede] = useState(prefill?.anrede ?? 'Frau');
   const [vorname, setVorname] = useState(prefill?.vorname ?? '');

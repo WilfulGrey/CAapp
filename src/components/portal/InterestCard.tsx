@@ -34,7 +34,7 @@ export const InterestCard: FC<{
   const [dismissPhase, setDismissPhase] = useState<'idle' | 'sending'>('idle');
   const inits = initials(nurse.name);
   const name = displayName(nurse.name);
-  const bars = Array.from({ length: 5 }, (_, i) => i < nurse.language.bars);
+  const bars = Array.from({ length: 3 }, (_, i) => i < nurse.language.bars);
 
   const handleInvite = async () => {
     const allowed = onInvite ? onInvite() : true;
