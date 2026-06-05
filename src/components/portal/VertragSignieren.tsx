@@ -368,7 +368,7 @@ export const VertragSignieren: FC<{
               )}
               <button onClick={sign} disabled={!canSign || signDisabled}
                 className={`w-full rounded-xl py-3.5 text-sm font-bold text-white transition-colors ${(canSign && !signDisabled) ? 'bg-[#2A9D5C] hover:bg-[#248a50]' : 'bg-gray-300 cursor-not-allowed'}`}>
-                Rechtsverbindlich &amp; kostenpflichtig unterschreiben
+                Kostenpflichtig unterschreiben
               </button>
             </div>
           )}

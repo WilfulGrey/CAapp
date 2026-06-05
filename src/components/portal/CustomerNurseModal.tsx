@@ -205,7 +205,7 @@ export const CustomerNurseModal: FC<{
             </div>
           </div>
 
-          <div className="flex-1 overflow-y-auto">
+          <div className="flex-1 min-h-0 overflow-y-auto">
             {/* "Hat Interesse"-Hinweis — nur wenn die Pflegekraft in Mamamia
                 proaktiv Interesse signalisiert hat (z.B. via Like). Erklärt
                 kurz, dass eine Einladung die offizielle Bewerbung ermöglicht. */}

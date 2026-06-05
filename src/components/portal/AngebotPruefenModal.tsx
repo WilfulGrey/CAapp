@@ -331,7 +331,7 @@ export const AngebotPruefenModal: FC<{
   // Seite 1 (Daten) ist vollständig → weiter zum Vertrag erlaubt. Auftraggeber-
   // Name nur dann Pflicht, wenn er abweichend vom Leistungsempfänger ist.
   const agComplete = agGleich || (agVorname.trim() !== '' && agNachname.trim() !== '');
-  const canProceed = vorname.trim() !== '' && nachname.trim() !== '' && einsatzort.trim() !== ''
+  const canProceed = vorname.trim() !== '' && nachname.trim() !== '' && strasse.trim() !== '' && einsatzort.trim() !== ''
     && agComplete
     && kpVorname.trim() !== '' && kpNachname.trim() !== '' && kpTelefon.trim() !== '' && kpEmail.trim() !== '';
 
@@ -537,7 +537,7 @@ export const AngebotPruefenModal: FC<{
                       </div>
                     </div>
                     <div>
-                      <label className={labelCls}>Straße und Hausnummer</label>
+                      <label className={labelCls}>Straße und Hausnummer *</label>
                       <input value={strasse} onChange={e => setStrasse(e.target.value)} className={inputCls} />
                     </div>
                     <div>
