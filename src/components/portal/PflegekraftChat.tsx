@@ -72,18 +72,33 @@ export const PflegekraftChat: FC<{
   const name = displayName(nurse.name);
   const inits = initials(nurse.name);
 
+  // Preview-Seed: realistische Konversation inkl. Pflegekraft-Antwort, damit
+  // sichtbar wird, wie eine eingegangene (übersetzte) Antwort aussieht.
   const [messages, setMessages] = useState<ChatMessage[]>([
     {
       id: 1,
       from: 'nurse',
       text: `Guten Tag! Ich freue mich sehr über Ihr Interesse. Wenn Sie Fragen an mich haben, schreiben Sie mir gerne. 🙂`,
-      time: nowHHMM(),
+      time: '09:12',
+      translated: true,
+    },
+    {
+      id: 2,
+      from: 'customer',
+      text: 'Ab wann können Sie anreisen?',
+      time: '09:18',
+    },
+    {
+      id: 3,
+      from: 'nurse',
+      text: 'Sehr gerne — ich kann ab dem 19.05. anreisen und freue mich auf Sie. Ich habe viel Erfahrung mit Demenz und gehe sehr geduldig vor. 🙂',
+      time: '09:23',
       translated: true,
     },
   ]);
   const [draft, setDraft] = useState('');
   const [typing, setTyping] = useState(false);
-  const idRef = useRef(2);
+  const idRef = useRef(4);
   const replyRef = useRef(0);
   const endRef = useRef<HTMLDivElement | null>(null);
 
