@@ -10,7 +10,9 @@ export const BookedScreen: FC<{
   // Optional: macht den "Vertrag"-Schritt aktiv (öffnet die Signatur-Ansicht).
   onSignContract?: () => void;
   vertragSigned?: boolean;
-}> = ({ app, onNurseClick, onSignContract, vertragSigned }) => {
+  // Optional: öffnet den bereits unterschriebenen Vertrag zur Ansicht (read-only).
+  onShowContract?: () => void;
+}> = ({ app, onNurseClick, onSignContract, vertragSigned, onShowContract }) => {
   const { nurse, offer } = app;
   const name = displayName(nurse.name);
   const inits = initials(nurse.name);
@@ -44,7 +46,9 @@ export const BookedScreen: FC<{
         <div className="text-5xl mb-3">🎊</div>
         <h1 className="text-2xl font-bold text-gray-900 mb-1.5">Vielen Dank — Pflegekraft gebucht!</h1>
         <p className="text-sm text-gray-600 leading-relaxed">
-          Wir bereiten Ihre Vertragsdokumente vor. Jemand aus dem Primundus-Team meldet sich in Kürze persönlich bei Ihnen.
+          {vertragSigned
+            ? 'Ihr Vertrag ist unterschrieben. Jemand aus dem Primundus-Team meldet sich in Kürze persönlich bei Ihnen, um die Anreise zu organisieren.'
+            : 'Wir bereiten Ihre Vertragsdokumente vor. Jemand aus dem Primundus-Team meldet sich in Kürze persönlich bei Ihnen.'}
         </p>
       </div>
 
@@ -107,7 +111,7 @@ export const BookedScreen: FC<{
                   )}
                 </div>
                 <p className="text-sm text-gray-500 leading-relaxed">
-                  {vertragDone ? 'Ihr Vertrag ist unterschrieben. Eine Kopie wurde Ihnen per E-Mail gesendet.'
+                  {vertragDone ? 'Ihr Vertrag ist online unterschrieben. Eine Kopie wurde Ihnen per E-Mail gesendet — Sie können ihn jederzeit hier ansehen.'
                     : vertragActionable ? 'Ihr Betreuungsvertrag liegt zur Unterschrift bereit.'
                     : m.desc}
                 </p>
@@ -115,6 +119,12 @@ export const BookedScreen: FC<{
                   <button onClick={onSignContract}
                     className="mt-2.5 inline-flex items-center gap-1.5 rounded-xl bg-[#2A9D5C] hover:bg-[#248a50] text-white text-sm font-bold px-4 py-2.5 transition-colors">
                     Vertrag ansehen &amp; unterschreiben →
+                  </button>
+                )}
+                {vertragDone && onShowContract && (
+                  <button onClick={onShowContract}
+                    className="mt-2.5 inline-flex items-center gap-1.5 rounded-xl border border-[#2A9D5C]/40 bg-white hover:bg-green-50 text-[#1f7a45] text-sm font-bold px-4 py-2.5 transition-colors">
+                    📄 Unterschriebenen Vertrag ansehen →
                   </button>
                 )}
               </div>

@@ -12,7 +12,7 @@ import type { FC, ReactNode } from 'react';
 // normaler Vertragstext). Nur Durchreichen.
 const Fill: FC<{ children: ReactNode }> = ({ children }) => <>{children}</>;
 
-interface VertragsDaten {
+export interface VertragsDaten {
   datum: string;
   ag: { name: string; strasse: string; plz: string; ort: string; email: string; telefon: string };
   le: { name: string; strasse: string; plz: string; ort: string } | null; // null = identisch mit AG
@@ -146,13 +146,23 @@ export const VertragSignieren: FC<{
   // signDisabled = Unterschrift-Button sperren (z.B. solange übergeordnete
   // Pflichtfelder im Modal noch nicht vollständig sind).
   signDisabled?: boolean;
-}> = ({ daten = DUMMY, onSigned, embedded, signDisabled }) => {
-  const [name, setName] = useState('');
+  // Bereits unterschriebener Vertrag — read-only Präsentation im gebuchten
+  // Portal. initialSignedName setzt die Unterschrift, readOnly blendet das
+  // Signatur-Panel aus (nur noch die „unterschrieben"-Bestätigung sichtbar).
+  initialSignedName?: string;
+  initialSignedAt?: string;
+  readOnly?: boolean;
+}> = ({ daten = DUMMY, onSigned, embedded, signDisabled, initialSignedName, initialSignedAt, readOnly }) => {
+  const [name, setName] = useState(initialSignedName ?? '');
   const [ort, setOrt] = useState(daten.ag.ort);
   const [bestaetigt, setBestaetigt] = useState(false);
   const [widerruf, setWiderruf] = useState(false);
-  const [signedAt, setSignedAt] = useState<string | null>(null);
-  const [vollOffen, setVollOffen] = useState(false);
+  const [signedAt, setSignedAt] = useState<string | null>(
+    initialSignedName ? (initialSignedAt ?? 'bereits unterschrieben') : null,
+  );
+  // Read-only Ansicht: vollständigen Vertrag direkt aufgeklappt zeigen, damit
+  // der Kunde den unterschriebenen Vertrag komplett einsehen kann.
+  const [vollOffen, setVollOffen] = useState(!!readOnly);
 
   const canSign = name.trim().length >= 3 && bestaetigt && widerruf;
   const sign = () => {
@@ -182,7 +192,7 @@ export const VertragSignieren: FC<{
 
         {/* Eckdaten — immer sichtbar (kompakt) */}
         <div className="px-6 sm:px-10 py-5 border-t border-gray-100">
-          <p className="text-[13px] text-gray-600 mb-4">Ihr Betreuungsvertrag ist bereit. Prüfen Sie die Eckdaten und unterschreiben Sie unten online.</p>
+          <p className="text-[13px] text-gray-600 mb-4">{readOnly ? 'Ihr unterschriebener Betreuungsvertrag — hier sehen Sie alle Eckdaten und den vollständigen Vertragstext.' : 'Ihr Betreuungsvertrag ist bereit. Prüfen Sie die Eckdaten und unterschreiben Sie unten online.'}</p>
           <div className="rounded-xl border border-gray-100 overflow-hidden divide-y divide-gray-100 mb-3">
             <div className="flex items-center justify-between px-4 py-2.5"><span className="text-sm text-gray-500">Auftraggeber</span><span className="text-sm font-semibold text-gray-700 text-right">{daten.ag.name}</span></div>
             <div className="flex items-center justify-between px-4 py-2.5"><span className="text-sm text-gray-500">Leistungsempfänger</span><span className="text-sm font-semibold text-gray-700 text-right">{daten.le ? daten.le.name : daten.ag.name}</span></div>
@@ -291,7 +301,7 @@ export const VertragSignieren: FC<{
                   : <span className="text-gray-300 text-sm italic">noch nicht unterschrieben</span>}
               </div>
               <div className="border-t border-gray-400 pt-1 text-[11px] text-gray-500">
-                <Fill>{ort}</Fill>, {signedAt ? <Fill>{signedAt.split(' um ')[0]}</Fill> : daten.datum} · Unterschrift Auftraggeber
+                <Fill>{ort}</Fill>, <Fill>{signedAt && signedAt !== 'bereits unterschrieben' ? signedAt.split(' um ')[0] : daten.datum}</Fill> · Unterschrift Auftraggeber
               </div>
             </div>
             <div>
@@ -314,13 +324,15 @@ export const VertragSignieren: FC<{
             <div className="rounded-xl border border-green-200 bg-green-50 px-4 py-4">
               <p className="text-sm font-bold text-green-800 mb-1">✓ Vertrag rechtsverbindlich unterschrieben</p>
               <p className="text-[12px] text-green-700 leading-relaxed">
-                Elektronisch signiert von <strong>{name}</strong> am <strong>{signedAt}</strong>.
-                Sie erhalten umgehend eine Kopie des unterschriebenen Vertrags per E-Mail an {daten.ag.email}.
+                Elektronisch signiert von <strong>{name}</strong>{signedAt && signedAt !== 'bereits unterschrieben' ? <> am <strong>{signedAt}</strong></> : ''}.
+                {readOnly
+                  ? ` Eine Kopie des unterschriebenen Vertrags wurde an ${daten.ag.email} gesendet.`
+                  : ` Sie erhalten umgehend eine Kopie des unterschriebenen Vertrags per E-Mail an ${daten.ag.email}.`}
               </p>
               <p className="text-[11px] text-green-600/80 mt-2">
                 Audit: einfache elektronische Signatur · Zeitstempel + IP protokolliert · Vertragsversion v1.0
               </p>
-              {onSigned && !embedded && (
+              {onSigned && !embedded && !readOnly && (
                 <button onClick={() => onSigned(name)}
                   className="mt-3 w-full rounded-xl bg-[#8B7355] hover:bg-[#766145] text-white text-sm font-bold py-3 transition-colors">
                   Weiter zum Portal →

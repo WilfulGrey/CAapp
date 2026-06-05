@@ -9,13 +9,14 @@ const FEIERTAGE_LIST = 'Karfreitag, Ostersonntag, Ostermontag, 1. Mai, Heiligabe
 import type { Nurse } from '../../types';
 import type { Application } from './shared';
 import { displayName, initials } from './shared';
-import { VertragSignieren } from './VertragSignieren';
+import { VertragSignieren, type VertragsDaten } from './VertragSignieren';
 
 // Contract form data captured in step 2. Returned to parent via onAccept
 // so it can be POSTed to the kostenrechner bridge (which fires the team
 // mail + persists in lead_application_acceptances). MVP: this data does
 // NOT go to Mamamia.
 export interface ContractFormData {
+  // Leistungsempfänger (zu betreuende Person) = LE im Vertrag
   anrede: string;
   vorname: string;
   nachname: string;
@@ -23,12 +24,56 @@ export interface ContractFormData {
   einsatzort: string;
   telefon: string;
   email: string;
+  // Auftraggeber (Vertragspartner) = AG im Vertrag. agGleich=true → identisch
+  // mit dem Leistungsempfänger (Patient unterschreibt für sich selbst).
+  agGleich: boolean;
+  agAnrede: string;
+  agVorname: string;
+  agNachname: string;
+  agStrasse: string;
+  agOrt: string;
+  agTelefon: string;
+  agEmail: string;
+  // Kontaktperson (Ansprechpartner)
   kpAnrede: string;
   kpVorname: string;
   kpNachname: string;
   kpTelefon: string;
   kpEmail: string;
   signatur?: string; // getippter Name = elektronische Unterschrift (= Beauftragung)
+}
+
+// Baut das Vertrag-Dokument (VertragsDaten) aus den erfassten Formulardaten.
+// Einzige Quelle der Wahrheit — genutzt vom Modal (Live-Vorschau + Signatur)
+// und vom gebuchten Portal (read-only Präsentation des unterschriebenen
+// Vertrags). Auftraggeber = LE wenn agGleich; sonst separat erfasst.
+export function buildVertragsDaten(
+  form: ContractFormData,
+  offer: { anreisedatum: string; abreisedatum: string; monatlicheKosten: number },
+  heute: Date = new Date(),
+): VertragsDaten {
+  const tagessatz = Math.round(offer.monatlicheKosten / 30);
+  const datum = `${String(heute.getDate()).padStart(2, '0')}.${String(heute.getMonth() + 1).padStart(2, '0')}.${heute.getFullYear()}`;
+  const leName = `${form.vorname} ${form.nachname}`.trim();
+  const agName = form.agGleich ? leName : `${form.agVorname} ${form.agNachname}`.trim();
+  const agStrasse = form.agGleich ? form.strasse : form.agStrasse;
+  const agOrt = form.agGleich ? form.einsatzort : form.agOrt;
+  // E-Mail/Telefon des Auftraggebers — fällt auf die Kontaktperson zurück,
+  // damit die Vertragskopie immer ein Ziel hat (Patient hat oft keine Mail).
+  const agEmail = (form.agGleich ? form.email : form.agEmail) || form.kpEmail;
+  const agTelefon = (form.agGleich ? form.telefon : form.agTelefon) || form.kpTelefon;
+  return {
+    datum,
+    ag: { name: agName || 'Auftraggeber', strasse: agStrasse, plz: '', ort: agOrt, email: agEmail, telefon: agTelefon },
+    // le=null wenn AG identisch mit LE → Vertrag zeigt „identisch mit Auftraggeber".
+    le: form.agGleich
+      ? null
+      : { name: leName || 'Leistungsempfänger', strasse: form.strasse, plz: '', ort: form.einsatzort },
+    vertragsbeginn: offer.anreisedatum,
+    voraussAbreise: offer.abreisedatum,
+    tagessatz: `EUR ${tagessatz},00`,
+    dl: { name: 'Ilka Wysocki', rolle: 'Bevollmächtigte' },
+  };
 }
 
 // Parse DE-Datum "12.06.2026" → Date. Tag/Monat/Jahr-Format, falls Format
@@ -260,29 +305,41 @@ export const AngebotPruefenModal: FC<{
   const [einsatzort, setEinsatzort] = useState(prefill?.einsatzort ?? '');
   const [telefon, setTelefon] = useState(prefill?.telefon ?? '');
   const [email, setEmail] = useState(prefill?.email ?? '');
+  // Auftraggeber (Vertragspartner) — default identisch mit Leistungsempfänger.
+  const [agGleich, setAgGleich] = useState(prefill?.agGleich ?? true);
+  const [agAnrede, setAgAnrede] = useState(prefill?.agAnrede ?? '');
+  const [agVorname, setAgVorname] = useState(prefill?.agVorname ?? '');
+  const [agNachname, setAgNachname] = useState(prefill?.agNachname ?? '');
+  const [agStrasse, setAgStrasse] = useState(prefill?.agStrasse ?? '');
+  const [agOrt, setAgOrt] = useState(prefill?.agOrt ?? '');
+  const [agTelefon, setAgTelefon] = useState(prefill?.agTelefon ?? '');
+  const [agEmail, setAgEmail] = useState(prefill?.agEmail ?? '');
   const [kpAnrede, setKpAnrede] = useState(prefill?.kpAnrede ?? '');
   const [kpVorname, setKpVorname] = useState(prefill?.kpVorname ?? '');
   const [kpNachname, setKpNachname] = useState(prefill?.kpNachname ?? '');
   const [kpTelefon, setKpTelefon] = useState(prefill?.kpTelefon ?? '');
   const [kpEmail, setKpEmail] = useState(prefill?.kpEmail ?? '');
-  // Seite 1 (Daten) ist vollständig → weiter zum Vertrag erlaubt.
+
+  // Aktuelle Formulardaten als ContractFormData zusammenfassen — für die
+  // Live-Vertragsvorschau (Seite 2) und beim Abschluss (onAccept).
+  const formData: ContractFormData = {
+    anrede, vorname, nachname, strasse, einsatzort, telefon, email,
+    agGleich, agAnrede, agVorname, agNachname, agStrasse, agOrt, agTelefon, agEmail,
+    kpAnrede, kpVorname, kpNachname, kpTelefon, kpEmail,
+  };
+
+  // Seite 1 (Daten) ist vollständig → weiter zum Vertrag erlaubt. Auftraggeber-
+  // Name nur dann Pflicht, wenn er abweichend vom Leistungsempfänger ist.
+  const agComplete = agGleich || (agVorname.trim() !== '' && agNachname.trim() !== '');
   const canProceed = vorname.trim() !== '' && nachname.trim() !== '' && einsatzort.trim() !== ''
+    && agComplete
     && kpVorname.trim() !== '' && kpNachname.trim() !== '' && kpTelefon.trim() !== '' && kpEmail.trim() !== '';
 
   const tagessatz = Math.round(offer.monatlicheKosten / 30);
 
-  // Vertrag-Dokument für Seite 2 — aus den eingegebenen Daten gemappt.
-  // Auftraggeber = Kontaktperson, Leistungsempfänger = Patient.
-  const heute = new Date();
-  const vertragsDaten = {
-    datum: `${String(heute.getDate()).padStart(2, '0')}.${String(heute.getMonth() + 1).padStart(2, '0')}.${heute.getFullYear()}`,
-    ag: { name: `${kpVorname} ${kpNachname}`.trim() || 'Auftraggeber', strasse, plz: '', ort: einsatzort, email: kpEmail, telefon: kpTelefon },
-    le: { name: `${vorname} ${nachname}`.trim() || 'Leistungsempfänger', strasse, plz: '', ort: einsatzort },
-    vertragsbeginn: offer.anreisedatum,
-    voraussAbreise: offer.abreisedatum,
-    tagessatz: `EUR ${tagessatz},00`,
-    dl: { name: 'Ilka Wysocki', rolle: 'Bevollmächtigte' },
-  };
+  // Vertrag-Dokument für Seite 2 — aus den eingegebenen Daten gemappt (geteilte
+  // Logik, identisch zur read-only Präsentation im gebuchten Portal).
+  const vertragsDaten = buildVertragsDaten(formData, offer);
   // Monatliche Aufstellung dynamisch aus Anreise-/Abreisedatum berechnen.
   // Inklusive Sommerzuschlag (Juli/August) + Feiertagszuschläge (Karfreitag,
   // Ostersonntag, Ostermontag, 1. Mai, Heiligabend, 1./2. Weihnachtstag,
@@ -453,7 +510,7 @@ export const AngebotPruefenModal: FC<{
             {step === 2 && (
               <div className="p-5 space-y-4" style={{background:'#FAFAF9'}}>
                 <div className={sectionCls}>
-                  <p className={sectionTitleCls}>Hauptpatient <span className="font-normal text-gray-400">(zu betreuende Person)</span></p>
+                  <p className={sectionTitleCls}>Leistungsempfänger <span className="font-normal text-gray-400">(zu betreuende Person)</span></p>
                   <div className="space-y-3">
                     <div className="grid grid-cols-2 gap-3">
                       <div>
@@ -501,6 +558,57 @@ export const AngebotPruefenModal: FC<{
                 </div>
 
                 <div className={sectionCls}>
+                  <p className={sectionTitleCls}>Auftraggeber <span className="font-normal text-gray-400">(Vertragspartner)</span></p>
+                  <label className="flex items-start gap-2.5 cursor-pointer">
+                    <input type="checkbox" checked={agGleich} onChange={e => setAgGleich(e.target.checked)} className="mt-0.5 accent-[#8B7355] w-4 h-4" />
+                    <span className="text-[13px] text-gray-700 leading-relaxed">
+                      <span className="font-semibold">Identisch mit Leistungsempfänger</span>
+                      <span className="block text-gray-500">Die betreute Person ist selbst Vertragspartner und unterschreibt.</span>
+                    </span>
+                  </label>
+
+                  {!agGleich && (
+                    <div className="space-y-3 mt-3 pt-4 border-t border-gray-100">
+                      <div>
+                        <label className={labelCls}>Anrede</label>
+                        <select value={agAnrede} onChange={e => setAgAnrede(e.target.value)} className={inputCls}>
+                          <option value="">Bitte wählen</option>
+                          <option>Frau</option><option>Herr</option><option>Divers</option>
+                        </select>
+                      </div>
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <label className={labelCls}>Vorname *</label>
+                          <input value={agVorname} onChange={e => setAgVorname(e.target.value)} placeholder="Bitte eingeben" className={inputCls} />
+                        </div>
+                        <div>
+                          <label className={labelCls}>Nachname *</label>
+                          <input value={agNachname} onChange={e => setAgNachname(e.target.value)} placeholder="Bitte eingeben" className={inputCls} />
+                        </div>
+                      </div>
+                      <div>
+                        <label className={labelCls}>Straße und Hausnummer</label>
+                        <input value={agStrasse} onChange={e => setAgStrasse(e.target.value)} placeholder="Bitte eingeben" className={inputCls} />
+                      </div>
+                      <div>
+                        <label className={labelCls}>PLZ / Ort</label>
+                        <input value={agOrt} onChange={e => setAgOrt(e.target.value)} placeholder="Bitte eingeben" className={inputCls} />
+                      </div>
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <label className={labelCls}>Telefon</label>
+                          <input value={agTelefon} onChange={e => setAgTelefon(e.target.value)} placeholder="Bitte eingeben" className={inputCls} />
+                        </div>
+                        <div>
+                          <label className={labelCls}>E-Mail</label>
+                          <input value={agEmail} onChange={e => setAgEmail(e.target.value)} placeholder="Bitte eingeben" className={inputCls} />
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                <div className={sectionCls}>
                   <p className={sectionTitleCls}>Kontaktperson</p>
                   <div className="space-y-3">
                     <div>
@@ -542,10 +650,7 @@ export const AngebotPruefenModal: FC<{
                   embedded
                   daten={vertragsDaten}
                   signDisabled={!canProceed}
-                  onSigned={(sig) => onAccept(app.id, {
-                    anrede, vorname, nachname, strasse, einsatzort, telefon, email,
-                    kpAnrede, kpVorname, kpNachname, kpTelefon, kpEmail, signatur: sig,
-                  })}
+                  onSigned={(sig) => onAccept(app.id, { ...formData, signatur: sig })}
                 />
               </div>
             )}

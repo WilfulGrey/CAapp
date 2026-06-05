@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, FC } from 'react';
-import { Check, Bell, Phone, AlertCircle, AlertTriangle, ChevronDown } from 'lucide-react';
+import { Check, Bell, Phone, AlertCircle, AlertTriangle, ChevronDown, X } from 'lucide-react';
 import { Nurse } from '../types';
 import { displayName } from '../components/portal/shared';
 import {
@@ -54,7 +54,7 @@ import { InfoPopup } from '../components/portal/InfoPopup';
 import { ContactPopup } from '../components/portal/ContactPopup';
 import { DeclineConfirmModal } from '../components/portal/DeclineConfirmModal';
 import { InviteRateLimitModal } from '../components/portal/InviteRateLimitModal';
-import { AngebotPruefenModal } from '../components/portal/AngebotPruefenModal';
+import { AngebotPruefenModal, buildVertragsDaten } from '../components/portal/AngebotPruefenModal';
 import { CustomerNurseModal } from '../components/portal/CustomerNurseModal';
 
 // ─── Dev-Only Preview-Mode (NICHT für Production) ──────────────────────────
@@ -188,6 +188,20 @@ const PREVIEW_APPLICATION: Application = {
   },
 };
 
+// Beispiel-Vertragsdaten für die ?preview=gebucht Ansicht — simuliert einen
+// bereits unterschriebenen Vertrag, damit der gebucht-Screen die read-only
+// Vertragspräsentation zeigt (statt „Vertrag folgt").
+const PREVIEW_SIGNED_FORM: ContractFormData = {
+  anrede: 'Frau', vorname: 'Gerda', nachname: 'Krumbholz',
+  strasse: 'Musterstraße 12', einsatzort: '80331, München', telefon: '', email: '',
+  agGleich: false,
+  agAnrede: 'Herr', agVorname: 'Steffen', agNachname: 'Krumbholz',
+  agStrasse: 'Beispielweg 5', agOrt: '80333, München', agTelefon: '089 1234567', agEmail: 'steffen@example.de',
+  kpAnrede: 'Herr', kpVorname: 'Steffen', kpNachname: 'Krumbholz',
+  kpTelefon: '089 1234567', kpEmail: 'steffen@example.de',
+  signatur: 'Steffen Krumbholz',
+};
+
 const PREVIEW_MATCHINGS: Array<{ nurse: Nurse; caregiverId: number }> = [
   { caregiverId: 999010, nurse: { caregiverId: 999010, name: 'Anna Nowak', age: 58, experience: '8 J. Erfahrung', experienceYears: 8, availability: 'sofort verfügbar', availableSoon: true, language: { level: 'Sehr gut', bars: 5 }, color: '#8B7355', addedTime: 'heute', isLive: true, gender: 'female', image: 'https://i.pravatar.cc/200?img=44', history: { assignments: 22, avgDurationMonths: 3.1 } } },
   { caregiverId: 999011, nurse: { caregiverId: 999011, name: 'Ewa Lewandowski', age: 65, experience: '12 J. Erfahrung', experienceYears: 12, availability: 'verfügbar ab 02.06.', availableSoon: true, language: { level: 'Gut', bars: 4 }, color: '#A18973', addedTime: 'gestern', isLive: true, gender: 'female', image: 'https://i.pravatar.cc/200?img=49', history: { assignments: 35, avgDurationMonths: 3.6 } } },
@@ -269,6 +283,12 @@ const CustomerPortalPage: FC = () => {
   const [nurseModalApp, setNurseModalApp] = useState<Application | null>(null);
   const [nurseMatchIdx, setNurseMatchIdx] = useState<number | null>(null);
   const [declineConfirmApp, setDeclineConfirmApp] = useState<Application | null>(null);
+  // Unterschriebener Vertrag (Daten + getippte Signatur) aus dem Annahme-Flow.
+  // Erlaubt die read-only Präsentation des fertigen Vertrags im gebuchten Portal.
+  const [signedForm, setSignedForm] = useState<ContractFormData | null>(
+    IS_PREVIEW_GEBUCHT ? PREVIEW_SIGNED_FORM : null,
+  );
+  const [showSignedContract, setShowSignedContract] = useState(false);
   const [showInfoPopup, setShowInfoPopup] = useState(false);
   const [showContactPopup, setShowContactPopup] = useState(false);
   const [exitingIds, setExitingIds] = useState<Set<string>>(new Set());
@@ -827,6 +847,8 @@ const CustomerPortalPage: FC = () => {
   // logic + downstream Mamamia state is too complex for first launch.
   const acceptApp = (id: string, formData: ContractFormData) => {
     setSelectedApp(null);
+    // Unterschriebenen Vertrag merken → gebucht-Screen kann ihn präsentieren.
+    setSignedForm(formData);
     animateThenProcess(id, async () => {
       // Optimistic — flips status to 'accepted' → existing acceptedApp
       // derivation truthy → BookedScreen takes over the layout.
@@ -1568,7 +1590,12 @@ const CustomerPortalPage: FC = () => {
       </nav>
 
       {acceptedApp ? (
-        <BookedScreen app={acceptedApp} onNurseClick={setSelectedNurse} />
+        <BookedScreen
+          app={acceptedApp}
+          onNurseClick={setSelectedNurse}
+          vertragSigned={!!signedForm?.signatur}
+          onShowContract={signedForm?.signatur ? () => setShowSignedContract(true) : undefined}
+        />
       ) : (
       <>
       {/* ── Hero (full-width gradient) — state-aware copy ── */}
@@ -2339,6 +2366,35 @@ const CustomerPortalPage: FC = () => {
 
       </div>
       </>
+      )}
+
+      {/* Unterschriebenen Vertrag ansehen (read-only) — vom gebucht-Screen */}
+      {showSignedContract && signedForm && acceptedApp && (
+        <>
+          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50" onClick={() => setShowSignedContract(false)} />
+          <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:p-4 pointer-events-none" style={{ animation: 'fadeIn 0.2s ease-out' }}>
+            <div
+              className="bg-white w-full sm:max-w-2xl rounded-t-3xl sm:rounded-2xl max-h-[92dvh] overflow-hidden pointer-events-auto shadow-2xl flex flex-col"
+              style={{ animation: 'slideSheet 0.3s cubic-bezier(0.32,0.72,0,1)' }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100 flex-shrink-0">
+                <h2 className="text-lg font-bold text-gray-900">Ihr Vertrag</h2>
+                <button onClick={() => setShowSignedContract(false)} className="w-8 h-8 rounded-full hover:bg-gray-100 flex items-center justify-center transition-colors">
+                  <X className="w-4 h-4 text-gray-500" />
+                </button>
+              </div>
+              <div className="flex-1 min-h-0 overflow-y-auto p-5">
+                <VertragSignieren
+                  embedded
+                  readOnly
+                  daten={buildVertragsDaten(signedForm, acceptedApp.offer)}
+                  initialSignedName={signedForm.signatur}
+                />
+              </div>
+            </div>
+          </div>
+        </>
       )}
 
       {/* Angebot prüfen Modal */}
