@@ -105,7 +105,15 @@ export const AppCard: FC<{
           number, salary breakdown (DLV/PK Netto/RK), ID stubs
           (pr-8546-1). Defense in depth: also dropped from the
           LIST_APPLICATIONS GraphQL query so it never reaches the proxy.
+          → coverMessage (separates, customer-safe Feld) wird stattdessen
+          unten als „Nachricht von …" Zitat-Box angezeigt.
         */}
+        {app.coverMessage && (
+          <div className="mb-3 rounded-xl bg-[#F8F7F5] border border-[#E5E3DF] px-4 py-3">
+            <p className="text-[11px] font-semibold text-[#8B7355] uppercase tracking-wide mb-1.5">Nachricht von {vorname}</p>
+            <p className="text-sm leading-relaxed text-gray-700 italic">„{app.coverMessage}"</p>
+          </div>
+        )}
         {onChat && (
           <button
             onClick={() => onChat(nurse)}

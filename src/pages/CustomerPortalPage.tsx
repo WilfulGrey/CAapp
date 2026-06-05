@@ -179,6 +179,8 @@ const PREVIEW_APPLICATION: Application = {
   isInvited: true,
   message:
     'Ich freue mich auf den Einsatz bei Ihnen. Ich bin seit vielen Jahren in der 24h-Betreuung tätig und habe besondere Erfahrung mit demenziell veränderten Patienten.',
+  coverMessage:
+    'Guten Tag! Ich habe Ihre Anfrage gesehen und würde Sie sehr gerne unterstützen. Ich habe mehrere Jahre Erfahrung in der Demenzbetreuung, koche gerne und mag es, gemeinsam spazieren zu gehen. Ich freue mich darauf, Sie kennenzulernen. — Maria',
   offer: {
     monatlicheKosten: 2850,
     anreisedatum: '19.05.2026',
@@ -2271,6 +2273,7 @@ const CustomerPortalPage: FC = () => {
             { q: 'Ist das legal?', a: 'Ja, vollständig. Die Pflegekräfte sind sozialversicherungspflichtig bei uns angestellt und werden von uns nach Deutschland entsandt. Für jeden Einsatz liegt eine offizielle A1-Bescheinigung vor — der Nachweis der Sozialversicherungspflicht im Herkunftsland.' },
             { q: 'Mit wem wird der Vertrag geschlossen?', a: 'Der Betreuungsvertrag wird mit unserer Muttergesellschaft, der Vitanas Group, geschlossen — einem der größten und erfahrensten Pflegeunternehmen Deutschlands.' },
             { q: 'Welche Kosten entstehen insgesamt?', a: 'Es gibt vier Kostenpunkte: Die monatlichen Betreuungskosten laut Ihrem Angebot. Anreise und Abreise pauschal je 125 €. Kost und Logis, die Sie der Pflegekraft frei zur Verfügung stellen. Fällt der Einsatz in einen Sommermonat (Juli oder August), kommen 200 €/Monat (bzw. 6,67 €/Tag) Sommerzuschlag hinzu. An folgenden Feiertagen wird der doppelte Tagessatz berechnet: Karfreitag, Ostersonntag, Ostermontag, 1. Mai, Heiligabend, 1. + 2. Weihnachtstag, Silvester und Neujahr. Darüber hinaus gibt es keinerlei versteckte Kosten.' },
+            { q: 'Was bedeuten die Deutsch-Niveaus (A1 bis C1)?', a: 'Wir nutzen den europäischen Sprachstandard (GER) — so können Sie das Niveau jeder Pflegekraft direkt einordnen:\n\n• A1 — Anfänger: einzelne Wörter und einfache Sätze (z. B. Begrüßung, Zahlen, Uhrzeit).\n• A1–A2 — Grundkenntnisse: kurze Sätze für den Alltag, einfache Fragen zur Pflege.\n• A2–B1 — Solider Alltag: versteht und führt typische Pflegegespräche, kann Anweisungen umsetzen und Beobachtungen mitteilen.\n• B1–B2 — Gut: führt auch differenziertere Gespräche, versteht Diagnosen und Medikamentenpläne ohne Mühe.\n• B2–C1 — Sehr gut: spricht nahezu fließend, auch komplexere Themen und Smalltalk sind problemlos möglich.\n\nDie Punktebalken auf der Karte zeigen das Niveau visuell (1 bis 5 Punkte).' },
           ].map((item, i, arr) => (
             <div key={i} className={i < arr.length - 1 ? 'border-b' : ''} style={{borderColor:'#E5E3DF'}}>
               <button
@@ -2292,7 +2295,7 @@ const CustomerPortalPage: FC = () => {
               </button>
               {openFaq === i && (
                 <div className="px-5 pb-6 pt-1" style={{background:'#FAFAF9'}}>
-                  <p className="text-[15px] leading-[1.75] text-gray-600">{item.a}</p>
+                  <p className="text-[15px] leading-[1.75] text-gray-600 whitespace-pre-line">{item.a}</p>
                 </div>
               )}
             </div>
