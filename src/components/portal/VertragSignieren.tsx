@@ -296,8 +296,8 @@ export const VertragSignieren: FC<{
           <div className="grid grid-cols-2 gap-6 mb-6">
             <div>
               <div className="h-12 flex items-end">
-                {signedAt
-                  ? <span className="text-xl text-gray-900" style={{ fontFamily: 'cursive' }}>{name}</span>
+                {name.trim()
+                  ? <span className="text-2xl text-[#1f3a8a]" style={{ fontFamily: '"Snell Roundhand","Segoe Script","Brush Script MT",cursive' }}>{name}</span>
                   : <span className="text-gray-300 text-sm italic">noch nicht unterschrieben</span>}
               </div>
               <div className="border-t border-gray-400 pt-1 text-[11px] text-gray-500">
