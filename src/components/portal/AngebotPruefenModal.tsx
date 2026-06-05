@@ -446,8 +446,15 @@ export const AngebotPruefenModal: FC<{
                   breakdown DLV/PK Netto/RK, ID stubs). Verified live
                   2026-05-19 on Customer 8546 (Wendt) application 7997.
                   Defense in depth: LIST_APPLICATIONS GraphQL also drops
-                  the field.
+                  the field. → coverMessage (customer-safe) wird unten als
+                  „Nachricht von …" Zitat-Box gezeigt.
                 */}
+                {app.coverMessage && (
+                  <div className="rounded-xl bg-[#F8F7F5] border border-[#E5E3DF] px-4 py-3">
+                    <p className="text-[11px] font-semibold text-[#8B7355] uppercase tracking-wide mb-1.5">Nachricht von {nurse.name.split(' ')[0]}</p>
+                    <p className="text-sm leading-relaxed text-gray-700 italic">„{app.coverMessage}"</p>
+                  </div>
+                )}
 
                 <div>
                   <div className="flex items-center justify-between mb-2">

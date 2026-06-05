@@ -33,6 +33,13 @@ export interface Application {
   message: string;
   offer: OfferDetails;
   isInvited?: boolean;
+  // Persönliche Bewerbungs-Nachricht der Pflegekraft (an den Kunden gerichtet).
+  // ACHTUNG: NICHT identisch mit Mamamias `application.message` (agency-internal,
+  // enthält Backoffice-Notizen mit Telefon/Gehalt → dauerhaft NICHT anzeigen).
+  // Quelle für dieses Feld ist offen: entweder ein neues Mamamia-Feld
+  // („caregiver cover message") oder eine personalisierte KI-Vorstellung.
+  // Aktuell nur in Preview-Modi geseedet.
+  coverMessage?: string;
 }
 
 export interface NurseStatuses {
