@@ -350,7 +350,7 @@ export const AngebotPruefenModal: FC<{
               zwischen Header und fixem Footer) + min-h-0 (erlaubt Schrumpfen
               unter Content-Höhe → echtes Scrollen) + overflow-y-auto. */}
           <div className="flex-1 min-h-0 overflow-y-auto">
-            {false && (/* Angebot/Konditionen-Seite entfernt — Konditionen stehen jetzt im Vertrag (Seite 2) */
+            {step === 1 && (/* Seite 1 oben: Pflegekraft + Konditionen (Anreise/Kosten) */
               <div className="p-5 space-y-5">
                 <div className="flex items-center gap-3 bg-gray-50 rounded-xl px-4 py-3 border border-gray-100">
                   <div className="w-12 h-12 rounded-xl flex-shrink-0 overflow-hidden">
