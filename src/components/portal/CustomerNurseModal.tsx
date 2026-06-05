@@ -41,13 +41,15 @@ export const CustomerNurseModal: FC<{
    *  parent surfaces the error (CLAUDE.md §1 — no fake animation). */
   onInvite?: () => Promise<void>;
   onDeclineMatch?: () => void;
+  /** Öffnet den (übersetzten) Chat mit der Pflegekraft. */
+  onChat?: () => void;
   isInvited?: boolean;
   /** Wenn true, hat die Pflegekraft in Mamamia Interesse signalisiert.
    *  Modal zeigt dann oben einen Hinweis-Block (warmer Coral-Ton mit
    *  Heart-Icon), der erklärt, dass eine Einladung ihre offizielle
    *  Bewerbung ermöglicht. */
   hasInterest?: boolean;
-}> = ({ nurse, profileLoading = false, aboutLoading = false, onClose, app, onReview, onDecline, onUndo, onInvite, onDeclineMatch, isInvited = false, hasInterest = false }) => {
+}> = ({ nurse, profileLoading = false, aboutLoading = false, onClose, app, onReview, onDecline, onUndo, onInvite, onDeclineMatch, onChat, isInvited = false, hasInterest = false }) => {
   const [invited, setInvited] = useState(isInvited);
   const [invitePhaseModal, setInvitePhaseModal] = useState<'idle' | 'sending' | 'done'>('idle');
   const [showLevelInfo, setShowLevelInfo] = useState(false);
@@ -398,7 +400,19 @@ export const CustomerNurseModal: FC<{
             ))}
           </div>
 
-          <div className="px-5 py-4 border-t border-gray-100 flex gap-3 flex-shrink-0">
+          <div className="px-5 py-4 border-t border-gray-100 flex-shrink-0 space-y-3">
+            {onChat && (
+              <button
+                onClick={onChat}
+                className="w-full flex items-center justify-center gap-2 rounded-xl border border-[#8B7355]/30 bg-white hover:bg-[#F8F7F5] text-[#6B5444] text-sm font-semibold py-3 transition-colors"
+              >
+                <svg className="w-4 h-4 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.86 9.86 0 01-4-.8L3 20l.8-3.2A7.9 7.9 0 013 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                </svg>
+                Frage an {nurse.name.split(' ')[0]} stellen
+              </button>
+            )}
+            <div className="flex gap-3">
             {app ? (
               app.status === 'declined' ? (
                 <button
@@ -461,6 +475,7 @@ export const CustomerNurseModal: FC<{
                 )}
               </>
             )}
+            </div>
           </div>
         </div>
       </div>

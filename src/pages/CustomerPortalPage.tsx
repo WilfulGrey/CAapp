@@ -56,6 +56,7 @@ import { DeclineConfirmModal } from '../components/portal/DeclineConfirmModal';
 import { InviteRateLimitModal } from '../components/portal/InviteRateLimitModal';
 import { AngebotPruefenModal, buildVertragsDaten } from '../components/portal/AngebotPruefenModal';
 import { CustomerNurseModal } from '../components/portal/CustomerNurseModal';
+import { PflegekraftChat } from '../components/portal/PflegekraftChat';
 
 // ─── Dev-Only Preview-Mode (NICHT für Production) ──────────────────────────
 // Aktiviert via ?preview=bewerbung oder ?preview=interesse. Skipped den
@@ -74,7 +75,10 @@ const IS_PREVIEW_INTERESSE = PREVIEW_PARAM === 'interesse';
 const IS_PREVIEW_GEBUCHT = PREVIEW_PARAM === 'gebucht';
 // Dev-only prototype of the online-signable Dienstleistungsvertrag (Stufe A).
 const IS_PREVIEW_VERTRAG = PREVIEW_PARAM === 'vertrag';
-const IS_PREVIEW_ANY = IS_PREVIEW_BEWERBUNG || IS_PREVIEW_INTERESSE || IS_PREVIEW_GEBUCHT;
+// Dev-only prototype of the (translated, guard-railed) chat with the applied
+// caregiver — opens the chat directly over the bewerbung layout.
+const IS_PREVIEW_CHAT = PREVIEW_PARAM === 'chat';
+const IS_PREVIEW_ANY = IS_PREVIEW_BEWERBUNG || IS_PREVIEW_INTERESSE || IS_PREVIEW_GEBUCHT || IS_PREVIEW_CHAT;
 
 const PREVIEW_LEAD: Lead = {
   id: 'preview-lead-1',
@@ -261,7 +265,7 @@ const CustomerPortalPage: FC = () => {
   const [applications, setApplications] = useState<Application[]>(
     IS_PREVIEW_GEBUCHT
       ? [{ ...PREVIEW_APPLICATION, status: 'accepted' }]
-      : IS_PREVIEW_BEWERBUNG
+      : (IS_PREVIEW_BEWERBUNG || IS_PREVIEW_CHAT)
       ? [PREVIEW_APPLICATION]
       : [],
   );
@@ -289,6 +293,10 @@ const CustomerPortalPage: FC = () => {
     IS_PREVIEW_GEBUCHT ? PREVIEW_SIGNED_FORM : null,
   );
   const [showSignedContract, setShowSignedContract] = useState(false);
+  // Prototyp: Chat mit der beworbenen Pflegekraft (übersetzt, mit Leitplanken).
+  const [chatNurse, setChatNurse] = useState<Nurse | null>(
+    IS_PREVIEW_CHAT ? PREVIEW_APPLICATION.nurse : null,
+  );
   const [showInfoPopup, setShowInfoPopup] = useState(false);
   const [showContactPopup, setShowContactPopup] = useState(false);
   const [exitingIds, setExitingIds] = useState<Set<string>>(new Set());
@@ -1966,6 +1974,7 @@ const CustomerPortalPage: FC = () => {
                 onReview={() => setSelectedApp(app)}
                 onDecline={() => setDeclineConfirmApp(app)}
                 onNurseClick={(n) => openNurseFromApp(n, app)}
+                onChat={(n) => setChatNurse(n)}
               />
             ))}
             {/* Beratungs-CTA direkt unter den Bewerbungen — Bewerbungen sind
@@ -2397,6 +2406,11 @@ const CustomerPortalPage: FC = () => {
         </>
       )}
 
+      {/* Chat mit der beworbenen Pflegekraft (Prototyp) */}
+      {chatNurse && (
+        <PflegekraftChat nurse={chatNurse} onClose={() => setChatNurse(null)} />
+      )}
+
       {/* Angebot prüfen Modal */}
       {selectedApp && (
         <AngebotPruefenModal
@@ -2426,6 +2440,7 @@ const CustomerPortalPage: FC = () => {
           app={nurseModalApp ?? undefined}
           onReview={() => { setSelectedNurse(null); setSelectedApp(nurseModalApp); setNurseModalApp(null); setSelectedFromInterestId(null); }}
           onDecline={() => { setDeclineConfirmApp(nurseModalApp); setSelectedNurse(null); setNurseModalApp(null); setSelectedFromInterestId(null); }}
+          onChat={nurseModalApp ? () => { const n = enrichedSelectedNurse; setSelectedNurse(null); setNurseModalApp(null); setNurseMatchIdx(null); setSelectedFromInterestId(null); setChatNurse(n); } : undefined}
           hasInterest={selectedFromInterestId !== null && enrichedSelectedNurse.caregiverId === selectedFromInterestId}
           onUndo={() => { if (nurseModalApp) undoApp(nurseModalApp.id); setNurseModalApp(null); }}
           isInvited={
