@@ -9,10 +9,13 @@ export const AppCard: FC<{
   onReview: () => void;
   onDecline: (id: string) => void;
   onNurseClick: (n: Nurse) => void;
-}> = ({ app, exiting, onReview, onDecline, onNurseClick }) => {
+  // Öffnet den (übersetzten) Chat mit der beworbenen Pflegekraft.
+  onChat?: (n: Nurse) => void;
+}> = ({ app, exiting, onReview, onDecline, onNurseClick, onChat }) => {
   const { nurse } = app;
   const inits = initials(nurse.name);
   const name = displayName(nurse.name);
+  const vorname = nurse.name.split(' ')[0];
   const bars = Array.from({ length: 5 }, (_, i) => i < nurse.language.bars);
 
   return (
@@ -103,6 +106,17 @@ export const AppCard: FC<{
           (pr-8546-1). Defense in depth: also dropped from the
           LIST_APPLICATIONS GraphQL query so it never reaches the proxy.
         */}
+        {onChat && (
+          <button
+            onClick={() => onChat(nurse)}
+            className="w-full flex items-center justify-center gap-2 rounded-xl border border-[#8B7355]/30 bg-white hover:bg-[#F8F7F5] text-[#6B5444] text-sm font-semibold py-2.5 transition-colors"
+          >
+            <svg className="w-4 h-4 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.86 9.86 0 01-4-.8L3 20l.8-3.2A7.9 7.9 0 013 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+            </svg>
+            Frage an {vorname} stellen
+          </button>
+        )}
       </div>
 
       <div className="flex items-center justify-between px-5 pb-5 pt-1">
