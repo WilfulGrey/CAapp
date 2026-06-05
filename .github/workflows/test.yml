@@ -80,6 +80,20 @@ jobs:
         working-directory: supabase/functions/detect-caregiver-events
         run: deno task test
 
+  deno-chat:
+    name: deno tests (caregiver-chat)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: "v2.x"
+
+      - name: Run caregiver-chat tests
+        working-directory: supabase/functions/caregiver-chat
+        run: deno task test
+
   # ─── Deploy CA-App Edge Functions to STAGING Supabase ─────────────────
   # Push to integration/mamamia-onboarding (= trunk) → deploys edge fns to
   # STAGING Supabase project (taggpiwpwthgpcmaiqjw via SUPABASE_STAGING_REF).
@@ -95,7 +109,7 @@ jobs:
   #   SUPABASE_STAGING_REF   — staging project ref (taggpiwpwthgpcmaiqjw)
   deploy-edge-functions:
     name: Deploy CA-App Edge Functions to Supabase (staging)
-    needs: [vitest, deno-onboard, deno-proxy, deno-detect]
+    needs: [vitest, deno-onboard, deno-proxy, deno-detect, deno-chat]
     if: (github.event_name == 'push' && github.ref == 'refs/heads/integration/mamamia-onboarding') || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     steps:
@@ -134,7 +148,7 @@ jobs:
             echo "::error::SUPABASE_STAGING_REF secret not set — cannot deploy edge fns to staging."
             exit 1
           fi
-          for fn in mamamia-proxy onboard-to-mamamia detect-caregiver-events daily-analytics-report; do
+          for fn in mamamia-proxy onboard-to-mamamia detect-caregiver-events daily-analytics-report caregiver-chat; do
             echo "::group::Deploying $fn → staging ($STAGING_REF)"
             supabase functions deploy "$fn" --project-ref "$STAGING_REF"
             echo "::endgroup::"
@@ -147,7 +161,7 @@ jobs:
   # osobny job z working-directory "project 3" + własny diff-trigger.
   deploy-kostenrechner-edge-functions:
     name: Deploy kostenrechner Edge Functions to Supabase (staging)
-    needs: [vitest, deno-onboard, deno-proxy, deno-detect]
+    needs: [vitest, deno-onboard, deno-proxy, deno-detect, deno-chat]
     if: (github.event_name == 'push' && github.ref == 'refs/heads/integration/mamamia-onboarding') || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     steps:

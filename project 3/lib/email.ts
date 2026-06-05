@@ -873,6 +873,7 @@ export function getTeamNotificationTemplate(
     application_received: '📨',
     application_accepted_internal: '🎉',
     vertrag_abgeschlossen: '🟢',
+    caregiver_chat_message: '💬',
   };
 
   const statusText = {
@@ -884,6 +885,7 @@ export function getTeamNotificationTemplate(
     application_received: 'Bewerbung an Kunden gesendet',
     application_accepted_internal: 'Neue Buchung – Kunde hat akzeptiert',
     vertrag_abgeschlossen: 'Neuer Vertrag abgeschlossen!',
+    caregiver_chat_message: 'Neue Chat-Nachricht vom Kunden an die Pflegekraft',
   };
 
   const emoji = statusEmojis[status as keyof typeof statusEmojis] || '📋';
@@ -921,13 +923,14 @@ export function getTeamNotificationTemplate(
   // einsteigen soll (Patientenprofil ansehen, Pflegekraft-Vorschau, etc.).
   const portalBase = process.env.NEXT_PUBLIC_PORTAL_URL ?? '';
   const portalUrl = portalBase && lead.token ? `${portalBase}/?token=${lead.token}` : '';
-  const CAREGIVER_NAME_STATUSES = ['caregiver_invited', 'caregiver_interest_shown', 'application_received', 'application_accepted_internal'];
+  const CAREGIVER_NAME_STATUSES = ['caregiver_invited', 'caregiver_interest_shown', 'application_received', 'application_accepted_internal', 'caregiver_chat_message'];
   const PORTAL_CTA_STATUSES = [
     'patient_data_saved',
     'caregiver_invited',
     'caregiver_interest_shown',
     'application_received',
     'application_accepted_internal',
+    'caregiver_chat_message',
   ];
   const showPortalCta = PORTAL_CTA_STATUSES.includes(status) && Boolean(portalUrl);
 
@@ -1028,9 +1031,22 @@ export function getTeamNotificationTemplate(
       ])
     : '';
 
+  // Chat-Nachricht (Vorschau) — Kunde hat der Pflegekraft geschrieben.
+  const chatPreview = (status === 'caregiver_chat_message' && additionalData?.chatPreview)
+    ? String(additionalData.chatPreview)
+    : '';
+  const chatPreviewHtml = chatPreview
+    ? `<div style="background:#f9f9f9;border-left:3px solid #8B7355;border-radius:6px;padding:14px 16px;margin:12px 0;">
+        <div style="font-weight:700;font-size:13px;color:#000;margin-bottom:6px;">Nachricht des Kunden</div>
+        <div style="font-size:14px;color:#333;white-space:pre-line;">${chatPreview}</div>
+      </div>`
+    : '';
+  const chatPreviewText = chatPreview ? `\nNachricht des Kunden:\n${chatPreview}\n` : '';
+
   // Aktionshinweis unten — Status-spezifisch.
   const actionHighlightHtml =
     status === 'application_accepted_internal' ? '<strong>🎉 Kunde hat akzeptiert — Vertragsdokumente vorbereiten und Kunden anrufen.</strong>'
+  : status === 'caregiver_chat_message'    ? '<strong>💬 Kunde hat der Pflegekraft eine Frage gestellt — bitte übersetzen und an die Pflegekraft weiterleiten.</strong>'
   : status === 'caregiver_invited'         ? '<strong>📞 Bitte Erstkontakt mit der Pflegekraft anstoßen.</strong>'
   : status === 'caregiver_interest_shown'  ? '<strong>👀 Pflegekraft zeigt Interesse — Kunde hat Hinweis per E-Mail erhalten.</strong>'
   : status === 'application_received'      ? '<strong>📨 Bewerbung wurde an den Kunden gesendet — wartet auf Buchungsbestätigung.</strong>'
@@ -1072,6 +1088,7 @@ export function getTeamNotificationTemplate(
           ` : ''}
 
           ${contractTablesHtml}
+          ${chatPreviewHtml}
 
           ${showPortalCta ? `
             <p><a href="${portalUrl}" style="display:inline-block; background:#5C4A32; color:#fff; padding:10px 18px; text-decoration:none; border-radius:6px; font-weight:bold;">➜ Im Kundenportal ansehen</a></p>
@@ -1135,7 +1152,7 @@ export function getTeamNotificationTemplate(
 ${emoji} ${text}
 ${caregiverName ? `
 ${caregiverLabel}: ${caregiverName}${status === 'application_accepted_internal' && acceptanceCaregiverId ? ` (caregiver_id ${acceptanceCaregiverId})` : ''}${status === 'application_accepted_internal' && acceptanceApplicationId ? ` · Application ${acceptanceApplicationId}` : ''}
-` : ''}${contractTablesText}${showPortalCta ? `
+` : ''}${contractTablesText}${chatPreviewText}${showPortalCta ? `
 ➜ Im Kundenportal ansehen: ${portalUrl}
 ` : ''}
 === KONTAKTDATEN ===
@@ -1967,6 +1984,103 @@ Bei Fragen erreichen Sie uns telefonisch unter +49 89 200 000 830 oder per E-Mai
 Mit freundlichen Grüßen
 Ilka Wysocki — Pflegeberaterin
 Tel: 089 200 000 830  ·  WhatsApp: https://wa.me/4989200000830
+
+Primundus Deutschland
+www.primundus.de
+`;
+
+  return { subject, html, text };
+}
+
+// Chat-Antwort der Pflegekraft → Kunden-Benachrichtigung. Gleicher Stil wie
+// die übrigen Kundenmails (Logo-Header, Ilka-Signatur, Footer). Zeigt den
+// Pflegekraft-Namen + eine Vorschau der (bereits ins Deutsche übersetzten)
+// Nachricht und führt per CTA zurück in den Portal-Chat.
+export function getChatReplyEmailTemplate(
+  lead: Lead,
+  caregiverName: string,
+  preview: string,
+  portalUrl: string,
+): EmailTemplate {
+  const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://primundus.de';
+  const greeting = customerGreeting(lead);
+  const pkName = (caregiverName && caregiverName.trim()) ? caregiverName.trim() : 'Ihre Pflegekraft';
+  const subject = `${pkName} hat Ihnen geantwortet`;
+
+  const introHtml = `<p style="font-size:15px;line-height:1.75;color:#444;margin-bottom:16px;"><strong style="color:#2D1F0F;">${pkName}</strong> hat Ihnen im Pflegekraft-Chat geantwortet:</p>`;
+
+  const quoteHtml = preview && preview.trim()
+    ? `<table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="margin:0 0 20px;"><tr>
+        <td style="background:#f8f7f5;border-left:3px solid #8B7355;border-radius:8px;padding:14px 18px;font-size:15px;line-height:1.7;color:#3D2B1F;font-style:italic;">&bdquo;${preview.trim()}&ldquo;</td>
+      </tr></table>`
+    : '';
+
+  const noteHtml = `<p style="font-size:14px;line-height:1.7;color:#555;margin-bottom:20px;">Antworten Sie ganz einfach direkt im Kundenportal — wir übersetzen Ihre Nachricht automatisch ins Polnische.</p>`;
+  const ctaText = 'Antwort lesen & antworten →';
+
+  const outroHtml = `<p style="font-size:14px;line-height:1.65;color:#555;margin:18px 0 0;">Bei Fragen erreichen Sie uns telefonisch unter <a href="tel:+4989200000830" style="color:#0066CC;text-decoration:none;">+49 89 200 000 830</a> oder per E-Mail an <a href="mailto:info@primundus.de" style="color:#0066CC;text-decoration:none;">info@primundus.de</a>.</p>`;
+
+  const ilkaSig = `
+    <p style="font-size:16px;line-height:1.7;color:#555;margin-top:24px;margin-bottom:16px;">Mit freundlichen Grüßen<br><strong style="color:#3D2B1F;">Ilka Wysocki</strong></p>
+    <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="margin:0 0 24px 0;border:1px solid #e8ddd0;border-radius:12px;overflow:hidden;">
+      <tr><td style="padding:18px 20px 16px;background:#ffffff;">
+        <table cellpadding="0" cellspacing="0" role="presentation"><tr>
+          <td style="padding-right:12px;vertical-align:top;">
+            <img src="${baseUrl}/images/ilka-wysocki_pm-mallorca.webp" alt="Ilka Wysocki" width="60" style="display:block;width:60px;height:auto;border-radius:8px;" />
+          </td>
+          <td style="vertical-align:middle;">
+            <p style="margin:0 0 2px;font-size:15px;font-weight:700;color:#3D2B1F;white-space:nowrap;">Ilka Wysocki</p>
+            <p style="margin:0 0 2px;font-size:13px;color:#555;white-space:nowrap;">Pflegeberaterin</p>
+            <p style="margin:0;font-size:12px;color:#9a8a73;white-space:nowrap;">Mo – So, 8 – 20 Uhr</p>
+          </td>
+        </tr></table>
+      </td></tr>
+    </table>`;
+
+  const content = `
+    <p style="font-size:15px;line-height:1.75;color:#444;margin-bottom:14px;">${greeting},</p>
+    ${introHtml}
+    ${quoteHtml}
+    ${noteHtml}
+    ${bulletproofButton(portalUrl, ctaText)}
+    ${outroHtml}
+    ${ilkaSig}`;
+
+  const html = `<!DOCTYPE html>
+<html lang="de"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>Primundus 24h-Pflege</title>
+<style>* { margin:0; padding:0; box-sizing:border-box; } body { font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif; line-height:1.6; color:#333; background-color:#f4f4f4; } @media only screen and (max-width:600px){ .email-content{ padding:30px 20px !important; } }</style>
+</head><body>
+  <div style="width:100%;background-color:#f4f4f4;padding:20px 0;">
+    <table width="100%" cellpadding="0" cellspacing="0" role="presentation"><tr><td align="center">
+      <div style="max-width:600px;margin:0 auto;background-color:#ffffff;border-radius:8px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.1);">
+        <div style="background:#ffffff;padding:24px 40px 20px 40px;border-bottom:1px solid #f0ebe4;">
+          <img src="${baseUrl}/images/Primundus-Logo_V6.png" alt="Primundus Logo" width="160" style="display:block;width:160px;max-width:160px;height:auto;" />
+        </div>
+        <div class="email-content" style="padding:40px 40px 32px;text-align:left;">${content}</div>
+        <div style="background-color:#f8f9fa;padding:30px;text-align:center;border-top:1px solid #e0e0e0;">
+          <div style="font-weight:600;font-size:15px;color:#3D2B1F;margin-bottom:6px;">Primundus Deutschland</div>
+          <div style="font-size:13px;color:#666;line-height:1.8;">24h-Pflege und Betreuung zu Hause<br>
+            <a href="tel:+4989200000830" style="color:#0066CC;text-decoration:none;">+49 89 200 000 830</a> |
+            <a href="mailto:info@primundus.de" style="color:#0066CC;text-decoration:none;">info@primundus.de</a></div>
+          <div style="font-size:12px;color:#999;margin-top:16px;line-height:1.5;">Diese E-Mail wurde versendet an: ${lead.email}<br>Primundus Deutschland | Vitanas Group${customerUnsubscribeUrl(lead) ? `<br><a href="${customerUnsubscribeUrl(lead)}" style="color:#999;text-decoration:underline;">Keine E-Mails mehr erhalten</a>` : ''}</div>
+        </div>
+      </div>
+    </td></tr></table>
+  </div>
+</body></html>`;
+
+  const text = `${greeting},
+
+${pkName} hat Ihnen im Pflegekraft-Chat geantwortet:
+
+${preview && preview.trim() ? `„${preview.trim()}"` : '(neue Nachricht)'}
+
+Antworten Sie direkt im Kundenportal — wir übersetzen Ihre Nachricht automatisch:
+${portalUrl}
+
+Mit freundlichen Grüßen
+Ilka Wysocki — Pflegeberaterin
+Tel: 089 200 000 830
 
 Primundus Deutschland
 www.primundus.de

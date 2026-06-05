@@ -57,6 +57,7 @@ import { InviteRateLimitModal } from '../components/portal/InviteRateLimitModal'
 import { AngebotPruefenModal, buildVertragsDaten } from '../components/portal/AngebotPruefenModal';
 import { CustomerNurseModal } from '../components/portal/CustomerNurseModal';
 import { PflegekraftChat } from '../components/portal/PflegekraftChat';
+import { listChat, hasUnreadCaregiverReply } from '../lib/caregiverChat';
 
 // ─── Dev-Only Preview-Mode (NICHT für Production) ──────────────────────────
 // Aktiviert via ?preview=bewerbung oder ?preview=interesse. Skipped den
@@ -293,9 +294,17 @@ const CustomerPortalPage: FC = () => {
     IS_PREVIEW_GEBUCHT ? PREVIEW_SIGNED_FORM : null,
   );
   const [showSignedContract, setShowSignedContract] = useState(false);
-  // Prototyp: Chat mit der beworbenen Pflegekraft (übersetzt, mit Leitplanken).
-  const [chatNurse, setChatNurse] = useState<Nurse | null>(
-    IS_PREVIEW_CHAT ? PREVIEW_APPLICATION.nurse : null,
+  // Chat mit der beworbenen Pflegekraft (übersetzt, mit Leitplanken). Echt-
+  // Modus (Lead-Token) → caregiver-chat Edge-Function; Preview → Dummy-Chat.
+  const [chatTarget, setChatTarget] = useState<{ nurse: Nurse; applicationId?: number; caregiverId?: number } | null>(
+    IS_PREVIEW_CHAT ? { nurse: PREVIEW_APPLICATION.nurse, caregiverId: PREVIEW_APPLICATION.nurse.caregiverId } : null,
+  );
+  // Application-IDs mit ungelesener Pflegekraft-Antwort → Badge am Chat-Button.
+  // Preview (bewerbung): Demo-Badge für die Beispiel-Bewerbung, damit der
+  // „… hat geantwortet"-Zustand sichtbar ist (Number('preview-app-1')=NaN,
+  // Set([NaN]).has(NaN)=true).
+  const [chatUnread, setChatUnread] = useState<Set<number>>(
+    IS_PREVIEW_BEWERBUNG ? new Set([Number(PREVIEW_APPLICATION.id)]) : new Set(),
   );
   const [showInfoPopup, setShowInfoPopup] = useState(false);
   const [showContactPopup, setShowContactPopup] = useState(false);
@@ -674,6 +683,35 @@ const CustomerPortalPage: FC = () => {
 
   const pendingApps = applications.filter((a) => a.status === 'new');
   const doneApps = applications.filter((a) => a.status !== 'new');
+
+  // In-App Badge „neue Antwort": pollt für offene Bewerbungen den Chat-Verlauf
+  // und markiert, welche eine ungelesene Pflegekraft-Antwort haben. Nur im
+  // Echt-Modus (Lead-Token, kein Preview). Re-läuft beim Öffnen/Schließen des
+  // Chats (chatTarget), damit das Badge nach dem Lesen verschwindet.
+  const pendingIdsKey = pendingApps.map((a) => a.id).join(',');
+  useEffect(() => {
+    if (IS_PREVIEW_ANY) return;
+    const token = lead?.token;
+    if (!token) return;
+    const apps = pendingApps.filter((a) => Number.isFinite(Number(a.id)));
+    if (apps.length === 0) { setChatUnread(new Set()); return; }
+    let cancelled = false;
+    const check = async () => {
+      const next = new Set<number>();
+      await Promise.all(apps.map(async (a) => {
+        const appId = Number(a.id);
+        try {
+          const msgs = await listChat(token, appId);
+          if (hasUnreadCaregiverReply(token, appId, msgs)) next.add(appId);
+        } catch { /* still booting / offline — ignore */ }
+      }));
+      if (!cancelled) setChatUnread(next);
+    };
+    check();
+    const iv = setInterval(check, 25000);
+    return () => { cancelled = true; clearInterval(iv); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [lead?.token, pendingIdsKey, chatTarget]);
   // Declined matches sind jetzt direkt in der Haupt-Matching-Liste am
   // Ende einsortiert (Status='declined', "Abgelehnt"-Pill + Undo im
   // Button). Frühere `declinedMatches`-Liste + MatchCardDone-Pfad
@@ -1992,7 +2030,8 @@ const CustomerPortalPage: FC = () => {
                 onReview={() => setSelectedApp(app)}
                 onDecline={() => setDeclineConfirmApp(app)}
                 onNurseClick={(n) => openNurseFromApp(n, app)}
-                onChat={(n) => setChatNurse(n)}
+                onChat={() => setChatTarget({ nurse: app.nurse, applicationId: Number(app.id) || undefined, caregiverId: app.nurse.caregiverId })}
+                chatUnread={chatUnread.has(Number(app.id))}
               />
             ))}
             {/* Beratungs-CTA direkt unter den Bewerbungen — Bewerbungen sind
@@ -2425,8 +2464,14 @@ const CustomerPortalPage: FC = () => {
       )}
 
       {/* Chat mit der beworbenen Pflegekraft (Prototyp) */}
-      {chatNurse && (
-        <PflegekraftChat nurse={chatNurse} onClose={() => setChatNurse(null)} />
+      {chatTarget && (
+        <PflegekraftChat
+          nurse={chatTarget.nurse}
+          token={IS_PREVIEW_ANY ? undefined : (lead?.token ?? undefined)}
+          applicationId={chatTarget.applicationId}
+          caregiverId={chatTarget.caregiverId}
+          onClose={() => setChatTarget(null)}
+        />
       )}
 
       {/* Angebot prüfen Modal */}
@@ -2458,7 +2503,8 @@ const CustomerPortalPage: FC = () => {
           app={nurseModalApp ?? undefined}
           onReview={() => { setSelectedNurse(null); setSelectedApp(nurseModalApp); setNurseModalApp(null); setSelectedFromInterestId(null); }}
           onDecline={() => { setDeclineConfirmApp(nurseModalApp); setSelectedNurse(null); setNurseModalApp(null); setSelectedFromInterestId(null); }}
-          onChat={nurseModalApp ? () => { const n = enrichedSelectedNurse; setSelectedNurse(null); setNurseModalApp(null); setNurseMatchIdx(null); setSelectedFromInterestId(null); setChatNurse(n); } : undefined}
+          onChat={nurseModalApp ? () => { const n = enrichedSelectedNurse; const appId = Number(nurseModalApp.id) || undefined; setSelectedNurse(null); setNurseModalApp(null); setNurseMatchIdx(null); setSelectedFromInterestId(null); setChatTarget({ nurse: n, applicationId: appId, caregiverId: n.caregiverId }); } : undefined}
+          chatUnread={nurseModalApp ? chatUnread.has(Number(nurseModalApp.id)) : false}
           hasInterest={selectedFromInterestId !== null && enrichedSelectedNurse.caregiverId === selectedFromInterestId}
           onUndo={() => { if (nurseModalApp) undoApp(nurseModalApp.id); setNurseModalApp(null); }}
           isInvited={

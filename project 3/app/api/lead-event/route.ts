@@ -5,6 +5,7 @@ import {
   getTeamNotificationTemplate,
   buildCustomerCaregiverMailWithInlinePhoto,
   getPatientDataSavedEmailTemplate,
+  getChatReplyEmailTemplate,
   type CaregiverDisplay,
   type CaregiverMailEvent,
   type OfferInfo,
@@ -41,6 +42,12 @@ const ALLOWED_EVENTS = [
   // manually. Acceptance row persisted in lead_application_acceptances.
   'application_accepted_internal',
   'application_rejected',        // Kunde hat eine Bewerbung abgelehnt
+  // Kunde hat der beworbenen Pflegekraft eine Chat-Nachricht geschickt
+  // (caregiver-chat Edge-Function notify). Team-Mail je Nachricht.
+  'caregiver_chat_message',
+  // Pflegekraft hat dem Kunden geantwortet (via Mamamia → reply-Action).
+  // Kundenmail „… hat Ihnen geantwortet".
+  'caregiver_chat_reply',
 ];
 const TEAM_NOTIFY_EVENTS = [
   'patient_data_saved',
@@ -48,6 +55,7 @@ const TEAM_NOTIFY_EVENTS = [
   'caregiver_interest_shown',
   'application_received',
   'application_accepted_internal',
+  'caregiver_chat_message',
 ];
 // Events, die in der Team-Mail einen Pflegekraft-Namen anzeigen sollen.
 // Liest caregiver_name aus dem Event-Metadata und steckt ihn als
@@ -68,6 +76,8 @@ const NON_DEDUPED_EVENTS = new Set([
   'caregiver_declined_undone',
   'application_received',
   'application_rejected',
+  'caregiver_chat_message',
+  'caregiver_chat_reply',
 ]);
 // Customer-facing Mails (an die Lead-Email) je Event. Trigger sind die neuen
 // Caregiver-Lifecycle-Events; das eigentliche Hooking aus Mamamia kommt
@@ -77,6 +87,7 @@ const CUSTOMER_MAIL_EVENTS = new Set([
   'caregiver_interest_shown',    // Mail A
   'application_received',        // Mail B
   'application_accepted_internal', // Mail C
+  'caregiver_chat_reply',        // Pflegekraft hat geantwortet
 ]);
 
 function extractCaregiverDisplay(metadata: any): CaregiverDisplay | null {
@@ -444,7 +455,12 @@ export async function POST(request: NextRequest) {
                   contractPatient: metadata.contract_patient ?? null,
                   contractContact: metadata.contract_contact ?? null,
                 }
-              : undefined);
+              : (event === 'caregiver_chat_message' && metadata && typeof metadata === 'object'
+                  ? {
+                      caregiverName: metadata.caregiver_name ?? metadata.caregiverName ?? '',
+                      chatPreview: metadata.preview ?? '',
+                    }
+                  : undefined));
       const teamTemplate = getTeamNotificationTemplate(lead as any, event, additionalData as any);
       sendEmail(TEAM_NOTIFY_RECIPIENT, teamTemplate, contractAttachment ? [contractAttachment] : undefined).catch((e) =>
         console.error('team notify send threw:', e instanceof Error ? e.message : String(e)),
@@ -467,7 +483,9 @@ export async function POST(request: NextRequest) {
       // Buchungsbestätigung) — der Kunde hat die Buchung gerade aktiv im
       // Portal ausgelöst, die Bestätigung ist transaktional.
       let unsubscribed = false;
-      if (event !== 'application_accepted_internal') {
+      // Transaktionale Mails (Buchungsbestätigung, Chat-Antwort der Pflegekraft
+      // auf eine vom Kunden gestellte Frage) gehen auch bei Abmeldung raus.
+      if (event !== 'application_accepted_internal' && event !== 'caregiver_chat_reply') {
         const { data: unsubEvt } = await supabase
           .from('lead_events')
           .select('id')
@@ -490,6 +508,16 @@ export async function POST(request: NextRequest) {
         const template = getPatientDataSavedEmailTemplate(lead as any, portalUrl);
         sendEmail((lead as any).email, template).catch((e) =>
           console.error('customer mail send threw:', e instanceof Error ? e.message : String(e)),
+        );
+      } else if (event === 'caregiver_chat_reply') {
+        // Pflegekraft hat geantwortet → schöne „… hat Ihnen geantwortet"-Mail
+        // mit Nachrichten-Vorschau + CTA zurück in den Portal-Chat.
+        const portalUrl = buildPortalUrl(lead as any);
+        const caregiverName = String(metadata?.caregiver_name ?? metadata?.caregiverName ?? '');
+        const previewText = String(metadata?.preview ?? '');
+        const template = getChatReplyEmailTemplate(lead as any, caregiverName, previewText, portalUrl);
+        sendEmail((lead as any).email, template).catch((e) =>
+          console.error('chat reply mail send threw:', e instanceof Error ? e.message : String(e)),
         );
       } else {
         // Caregiver-Event-Mails (A/B/C) — Foto inline einbetten (CID) —

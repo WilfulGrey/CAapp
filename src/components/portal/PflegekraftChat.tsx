@@ -1,8 +1,9 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import type { FC } from 'react';
 import { X, Send, ShieldCheck, Globe } from 'lucide-react';
 import type { Nurse } from '../../types';
 import { displayName, initials } from './shared';
+import { listChat, sendChat, markChatSeen, type ChatMessageDTO } from '../../lib/caregiverChat';
 
 // ─── Prototyp: Chat mit der beworbenen Pflegekraft ───────────────────────────
 // Freier Chat, ABER mit zwei Leitplanken (vom Kunden gefordert):
@@ -13,7 +14,7 @@ import { displayName, initials } from './shared';
 //      automatisch übersetzt (Deutsch ⇄ Polnisch) und sind fürs Team sichtbar.
 // Dummy-Daten / simulierte Antworten — echte Anbindung (Mamamia) später.
 
-type Sender = 'customer' | 'nurse' | 'system';
+type Sender = 'customer' | 'caregiver' | 'system';
 interface ChatMessage {
   id: number;
   from: Sender;
@@ -47,8 +48,8 @@ function checkBlocked(text: string): 'kontakt' | 'geld' | null {
   // Telefon: 7+ Ziffern am Stück (nach Entfernen von Leerzeichen). Datums-
   // angaben wie "19.05.2026" bleiben unberührt (Punkte werden NICHT entfernt).
   if (/\d{7,}/.test(text.replace(/\s/g, ''))) return 'kontakt';
-  // Geldbetrag mit Währung
-  if (/\d[\d.,]*\s*(€|eur|euro)\b/i.test(text)) return 'geld';
+  // Geldbetrag mit Währung (kein \b nach €, da € kein Wortzeichen ist)
+  if (/\d[\d.,]*\s*(?:€|eur|euro)/i.test(text)) return 'geld';
   // Gehalts-/Bezahl-Schlagworte (auch ohne Zahl)
   if (/(gehalt|lohn|bezahl|verdien|netto|brutto|schwarz|cash|bar\s*(zahl|geld))/i.test(text)) return 'geld';
   return null;
@@ -64,25 +65,48 @@ function nowHHMM(): string {
   return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
 }
 
+function fmtTime(iso: string): string {
+  const d = new Date(iso);
+  return Number.isFinite(d.getTime())
+    ? `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
+    : '';
+}
+
+function fromDTO(dto: ChatMessageDTO): ChatMessage {
+  return { id: dto.id, from: dto.from, text: dto.text, time: fmtTime(dto.at), translated: dto.translated };
+}
+
 export const PflegekraftChat: FC<{
   nurse: Nurse;
   onClose: () => void;
-}> = ({ nurse, onClose }) => {
+  // Echt-Modus: mit Lead-Token wird gegen die caregiver-chat Edge-Function
+  // gearbeitet (laden/senden/pollen). Ohne Token (Preview) bleibt es ein
+  // Dummy-Chat mit simulierten Antworten.
+  token?: string;
+  applicationId?: number;
+  caregiverId?: number;
+}> = ({ nurse, onClose, token, applicationId, caregiverId }) => {
+  const realMode = !!token;
   const vorname = nurse.name.split(' ')[0];
   const name = displayName(nurse.name);
   const inits = initials(nurse.name);
 
-  const [messages, setMessages] = useState<ChatMessage[]>([
-    {
-      id: 1,
-      from: 'nurse',
-      text: `Guten Tag! Ich freue mich sehr über Ihr Interesse. Wenn Sie Fragen an mich haben, schreiben Sie mir gerne. 🙂`,
-      time: nowHHMM(),
-      translated: true,
-    },
-  ]);
+  // Preview: Dummy-Begrüßung. Echt-Modus: leer starten, Verlauf via list laden.
+  const [messages, setMessages] = useState<ChatMessage[]>(
+    realMode
+      ? []
+      : [{
+          id: 1,
+          from: 'caregiver',
+          text: `Guten Tag! Ich freue mich sehr über Ihr Interesse. Wenn Sie Fragen an mich haben, schreiben Sie mir gerne. 🙂`,
+          time: nowHHMM(),
+          translated: true,
+        }],
+  );
   const [draft, setDraft] = useState('');
   const [typing, setTyping] = useState(false);
+  const [loading, setLoading] = useState(realMode);
+  const [sending, setSending] = useState(false);
   const idRef = useRef(2);
   const replyRef = useRef(0);
   const endRef = useRef<HTMLDivElement | null>(null);
@@ -98,23 +122,68 @@ export const PflegekraftChat: FC<{
     endRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
   }, [messages, typing]);
 
+  // Echt-Modus: Verlauf laden + auf neue (übersetzte) Antworten pollen.
+  const refresh = useCallback(async () => {
+    if (!token) return;
+    try {
+      const dtos = await listChat(token, applicationId);
+      setMessages(dtos.map(fromDTO));
+      // Alles aktuell Geladene gilt als gesehen → In-App Badge zurücksetzen.
+      const maxId = dtos.reduce((mx, d) => Math.max(mx, d.id), 0);
+      markChatSeen(token, applicationId, maxId);
+    } catch (e) {
+      console.error('listChat failed:', (e as Error).message);
+    } finally {
+      setLoading(false);
+    }
+  }, [token, applicationId]);
+
+  useEffect(() => {
+    if (!realMode) return;
+    refresh();
+    const iv = setInterval(refresh, 8000);
+    return () => clearInterval(iv);
+  }, [realMode, refresh]);
+
   const send = (raw: string) => {
     const text = raw.trim();
-    if (!text) return;
+    if (!text || sending) return;
+    // Client-Guardrail = sofortige UX; serverseitig nochmals autoritativ.
     const blocked = checkBlocked(text);
     if (blocked) {
       setMessages((m) => [...m, { id: idRef.current++, from: 'system', text: BLOCK_MESSAGE[blocked] }]);
       return; // Eingabe bleibt erhalten, damit der Kunde sie anpassen kann
     }
+
+    if (realMode && token) {
+      setDraft('');
+      setSending(true);
+      sendChat(token, text, applicationId, caregiverId)
+        .then((res) => {
+          if (res.ok) {
+            setMessages((m) => [...m, fromDTO(res.message)]);
+          } else {
+            // Serverseitiger Guardrail hat zusätzlich geblockt.
+            setMessages((m) => [...m, { id: idRef.current++, from: 'system', text: res.message }]);
+          }
+        })
+        .catch((e) => {
+          console.error('sendChat failed:', (e as Error).message);
+          setMessages((m) => [...m, { id: idRef.current++, from: 'system', text: 'Nachricht konnte nicht gesendet werden. Bitte versuchen Sie es erneut.' }]);
+        })
+        .finally(() => setSending(false));
+      return;
+    }
+
+    // Preview/Dummy: simulierte Antwort der Pflegekraft nach kurzer Tippzeit.
     setMessages((m) => [...m, { id: idRef.current++, from: 'customer', text, time: nowHHMM() }]);
     setDraft('');
-    // Simulierte Antwort der Pflegekraft (übersetzt) nach kurzer Tippzeit.
     setTyping(true);
     const reply = NURSE_REPLIES[replyRef.current % NURSE_REPLIES.length];
     replyRef.current += 1;
     setTimeout(() => {
       setTyping(false);
-      setMessages((m) => [...m, { id: idRef.current++, from: 'nurse', text: reply, time: nowHHMM(), translated: true }]);
+      setMessages((m) => [...m, { id: idRef.current++, from: 'caregiver', text: reply, time: nowHHMM(), translated: true }]);
     }, 1600);
   };
 
@@ -157,6 +226,20 @@ export const PflegekraftChat: FC<{
 
           {/* Verlauf */}
           <div className="flex-1 min-h-0 overflow-y-auto px-4 py-4 space-y-3" style={{ background: '#FAFAF9' }}>
+            {loading && (
+              <div className="flex justify-center py-6">
+                <svg className="w-5 h-5 animate-spin text-[#8B7355]" viewBox="0 0 24 24" fill="none">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" />
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
+                </svg>
+              </div>
+            )}
+            {!loading && realMode && messages.length === 0 && (
+              <div className="text-center text-[13px] text-gray-500 px-6 py-8 leading-relaxed">
+                Stellen Sie {vorname} Ihre erste Frage — z.B. zur Anreise oder Erfahrung.
+                <br />Wir übersetzen Ihre Nachricht und leiten sie weiter.
+              </div>
+            )}
             {messages.map((m) => {
               if (m.from === 'system') {
                 return (
