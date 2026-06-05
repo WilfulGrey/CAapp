@@ -99,14 +99,23 @@ describe('Portal integration: golden paths', () => {
     if (!kpTelefonInput) throw new Error('KP Telefon input not found');
     await user.type(kpTelefonInput, '+49 89 12345');
 
-    // AGB checkbox — click label (PR #166 — wording entfernt
-    // "Vertrag mit der Agentur"-Bezug; jetzt "Ich beauftrage die
-    // Pflegekraft verbindlich").
-    await user.click(screen.getByText(/Ich beauftrage die Pflegekraft verbindlich/));
+    // KP E-Mail ist jetzt Pflichtfeld.
+    const kpEmailInput = within(kpSection.parentElement!)
+      .getAllByPlaceholderText('Bitte eingeben')
+      .find(el => {
+        const label = el.closest('div')?.querySelector('label')?.textContent ?? '';
+        return label.includes('E-Mail') && label.includes('*');
+      });
+    if (!kpEmailInput) throw new Error('KP E-Mail input not found');
+    await user.clear(kpEmailInput);
+    await user.type(kpEmailInput, 'max@kontakt.de');
 
-    // Accept (PR #166 — CTA "Betreuungskraft akzeptieren" → "Pflegekraft
-    // beauftragen", aktiver formuliert am Entscheidungspunkt).
-    const acceptBtn = screen.getByRole('button', { name: /Pflegekraft beauftragen/i });
+    // Online-Unterschrift (Name tippen) ersetzt das frühere "verbindlich"-
+    // Häkchen — die Unterschrift IST die Beauftragung.
+    await user.type(screen.getByPlaceholderText('Vor- und Nachname'), 'Max Kontakt');
+
+    // Accept → "Unterschreiben & beauftragen".
+    const acceptBtn = screen.getByRole('button', { name: /Unterschreiben & beauftragen/i });
     await user.click(acceptBtn);
 
     // BookedScreen rendered (copy includes "Pflegekraft gebucht!" substring)
