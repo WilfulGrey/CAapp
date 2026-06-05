@@ -472,6 +472,13 @@ const CustomerPortalPage: FC = () => {
 
   const enrichedSelectedNurse = (() => {
     if (!selectedNurse) return null;
+    // Preview: Bewerbungs-Pflegekraft hat kein echtes Profil (kein Mamamia-
+    // Fetch). Ohne Anreicherung zeigt das Profil-Modal nur „Geschlecht" und
+    // wirkt leer/nicht-scrollbar. Wie bei den Interesse-Karten ein volles
+    // Dummy-Profil einsetzen, damit der Preview repräsentativ + scrollbar ist.
+    if (IS_PREVIEW_ANY && !selectedNurse.profile) {
+      return { ...selectedNurse, profile: PREVIEW_INTEREST_PROFILE, detailedAssignments: PREVIEW_INTEREST_ASSIGNMENTS };
+    }
     if (!fullCaregiver) return selectedNurse;
     const enriched = mapCaregiverToNurse(fullCaregiver, {
       nowIso: new Date().toISOString(),
