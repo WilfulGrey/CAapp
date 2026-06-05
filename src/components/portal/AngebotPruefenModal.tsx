@@ -27,6 +27,7 @@ export interface ContractFormData {
   kpNachname: string;
   kpTelefon: string;
   kpEmail: string;
+  signatur?: string; // getippter Name = elektronische Unterschrift (= Beauftragung)
 }
 
 // Parse DE-Datum "12.06.2026" → Date. Tag/Monat/Jahr-Format, falls Format
@@ -263,9 +264,10 @@ export const AngebotPruefenModal: FC<{
   const [kpNachname, setKpNachname] = useState(prefill?.kpNachname ?? '');
   const [kpTelefon, setKpTelefon] = useState(prefill?.kpTelefon ?? '');
   const [kpEmail, setKpEmail] = useState(prefill?.kpEmail ?? '');
-  const [agbChecked, setAgbChecked] = useState(false);
+  const [signatur, setSignatur] = useState('');
   const canAccept = vorname.trim() !== '' && nachname.trim() !== '' && einsatzort.trim() !== ''
-    && kpVorname.trim() !== '' && kpNachname.trim() !== '' && kpTelefon.trim() !== '' && agbChecked;
+    && kpVorname.trim() !== '' && kpNachname.trim() !== '' && kpTelefon.trim() !== '' && kpEmail.trim() !== ''
+    && signatur.trim().length >= 3;
 
   const tagessatz = Math.round(offer.monatlicheKosten / 30);
   // Monatliche Aufstellung dynamisch aus Anreise-/Abreisedatum berechnen.
@@ -486,8 +488,7 @@ export const AngebotPruefenModal: FC<{
                 </div>
 
                 <div className={sectionCls}>
-                  <p className={sectionTitleCls}>Kontaktperson <span className="font-normal text-gray-400">(in Notfällen)</span></p>
-                  <p className="text-[13px] text-gray-500 -mt-2 mb-3">Wen sollen wir im Notfall kontaktieren?</p>
+                  <p className={sectionTitleCls}>Kontaktperson</p>
                   <div className="space-y-3">
                     <div>
                       <label className={labelCls}>Anrede</label>
@@ -512,7 +513,7 @@ export const AngebotPruefenModal: FC<{
                         <input value={kpTelefon} onChange={e => setKpTelefon(e.target.value)} placeholder="Bitte eingeben" className={inputCls} />
                       </div>
                       <div>
-                        <label className={labelCls}>E-Mail</label>
+                        <label className={labelCls}>E-Mail *</label>
                         <input value={kpEmail} onChange={e => setKpEmail(e.target.value)} placeholder="Bitte eingeben" className={inputCls} />
                       </div>
                     </div>
@@ -520,60 +521,16 @@ export const AngebotPruefenModal: FC<{
                 </div>
 
                 <div className={sectionCls}>
-                  <p className={sectionTitleCls}>Zusammenfassung</p>
-                  <div className="flex items-center gap-3 mb-3">
-                    <div className="w-10 h-10 rounded-xl flex-shrink-0 overflow-hidden">
-                      {nurse.image ? (
-                        <img src={nurse.image} alt={nurse.name} className="w-full h-full object-cover" />
-                      ) : (
-                        <div className="w-full h-full flex items-center justify-center text-sm font-bold text-white" style={{ backgroundColor: nurse.color }}>{inits}</div>
-                      )}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-semibold text-gray-900 truncate">{name}</p>
-                      <p className="text-[12px] text-gray-500">Tagessatz {tagessatz} €/Tag</p>
-                    </div>
-                  </div>
-                  <div className="rounded-xl border border-gray-100 overflow-hidden divide-y divide-gray-100">
-                    <div className="flex items-center justify-between px-4 py-2.5 bg-white">
-                      <span className="text-sm text-gray-500">Anreise</span>
-                      <span className="text-sm font-semibold text-gray-700">{offer.anreisedatum}</span>
-                    </div>
-                    <div className="flex items-center justify-between px-4 py-2.5 bg-white">
-                      <span className="text-sm text-gray-500">Abreise</span>
-                      <span className="text-sm font-semibold text-gray-700">{offer.abreisedatum}</span>
-                    </div>
-                    {summary.map(m => (
-                      <div key={m.monat} className="px-4 py-2.5 bg-white">
-                        <div className="flex items-center justify-between">
-                          <span className="text-sm font-semibold text-gray-700">{m.monat}</span>
-                          <span className="text-sm font-bold text-gray-900">{m.betrag.toLocaleString('de-DE')} €</span>
-                        </div>
-                        {m.details.map(d => (
-                          <p key={d} className="text-xs text-gray-400 text-right mt-0.5">{d}</p>
-                        ))}
-                      </div>
-                    ))}
-                  </div>
-                  <p className="text-[12px] text-gray-400 mt-2.5 leading-relaxed">
-                    An- und Abreisetage werden mit vollem Tagessatz berechnet.
-                    {zuschlagRelevance.hasSummer && (
-                      <> Im Juli und August fällt ein Sommerzuschlag von 6,67 €/Tag (200 €/Monat) an.</>
-                    )}
-                    {zuschlagRelevance.relevantHolidayNames.length > 0 && (
-                      <> An {zuschlagRelevance.relevantHolidayNames.join(', ')} wird der doppelte Tagessatz berechnet.</>
-                    )}
+                  <p className={sectionTitleCls}>Vertrag &amp; Unterschrift</p>
+                  <a href="/?preview=vertrag" target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 text-sm font-semibold text-[#8B7355] hover:underline mb-4">
+                    Vollständigen Vertrag ansehen →
+                  </a>
+                  <label className={labelCls}>Ihre Unterschrift — vollständiger Name *</label>
+                  <input value={signatur} onChange={e => setSignatur(e.target.value)} placeholder="Vor- und Nachname" className={inputCls} />
+                  <p className="text-[12px] text-gray-500 leading-relaxed mt-2.5">
+                    Mit dem Tippen Ihres Namens unterschreiben Sie den Dienstleistungsvertrag rechtsverbindlich elektronisch und beauftragen die Pflegekraft. Eine Kopie geht an Ihre E-Mail.
                   </p>
                 </div>
-
-                <label className="flex items-start gap-3 cursor-pointer p-4 bg-white border border-gray-200 rounded-2xl hover:bg-gray-50 transition-colors" onClick={() => setAgbChecked(v => !v)}>
-                  <div className={`w-5 h-5 rounded flex items-center justify-center flex-shrink-0 mt-0.5 border-2 transition-all ${agbChecked ? 'bg-[#8B7355] border-[#8B7355]' : 'border-gray-300 bg-white'}`}>
-                    {agbChecked && <Check className="w-3 h-3 text-white" strokeWidth={3} />}
-                  </div>
-                  <span className="text-sm text-gray-600 leading-relaxed">
-                    Ich beauftrage die Pflegekraft verbindlich und bestätige, dass alle Angaben korrekt sind.
-                  </span>
-                </label>
               </div>
             )}
           </div>
@@ -597,12 +554,12 @@ export const AngebotPruefenModal: FC<{
                 <button
                   onClick={() => canAccept && onAccept(app.id, {
                     anrede, vorname, nachname, strasse, einsatzort, telefon, email,
-                    kpAnrede, kpVorname, kpNachname, kpTelefon, kpEmail,
+                    kpAnrede, kpVorname, kpNachname, kpTelefon, kpEmail, signatur,
                   })}
                   disabled={!canAccept}
                   className={`flex-1 rounded-xl py-3 text-sm font-bold transition-all ${canAccept ? 'bg-[#E76F63] hover:bg-[#D65E52] text-white' : 'bg-gray-100 text-gray-400 cursor-not-allowed'}`}
                 >
-                  Pflegekraft beauftragen
+                  Unterschreiben &amp; beauftragen
                 </button>
               </>
             )}
