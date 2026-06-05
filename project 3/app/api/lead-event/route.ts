@@ -9,6 +9,7 @@ import {
   type CaregiverMailEvent,
   type OfferInfo,
 } from '@/lib/email';
+import { buildVertragAttachment } from '@/lib/vertrag';
 
 // Bridge endpoint: the CA-App portal reports customer milestones back to the
 // kostenrechner lead so the Nachfass emails can branch. Token-authenticated —
@@ -338,6 +339,9 @@ export async function POST(request: NextRequest) {
           : (typeof rawCaregiverId === 'string' && rawCaregiverId
               ? Number(rawCaregiverId)
               : null);
+        const clientIp = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim()
+          || request.headers.get('x-real-ip')
+          || null;
         const { error: accErr } = await supabase
           .from('lead_application_acceptances')
           .upsert({
@@ -346,6 +350,11 @@ export async function POST(request: NextRequest) {
             caregiver_id: typeof caregiverId === 'number' && Number.isFinite(caregiverId) ? caregiverId : null,
             contract_patient: m.contract_patient ?? {},
             contract_contact: m.contract_contact ?? {},
+            // Stufe B: elektronische Signatur + Audit + Vertrags-Snapshot.
+            signatur: typeof m.signatur === 'string' ? m.signatur : null,
+            signed_at: new Date().toISOString(),
+            signed_ip: clientIp,
+            contract_snapshot: m.contract ?? null,
           }, { onConflict: 'lead_id,application_id' });
         if (accErr) {
           console.error('lead_application_acceptances upsert failed:', accErr.message);
@@ -383,6 +392,26 @@ export async function POST(request: NextRequest) {
       });
     }
 
+    // Vertrags-Anhang (Stufe B): beim Buchen aus dem Vertrags-Snapshot +
+    // elektronischer Signatur ein vollständiges HTML-Vertragsdokument bauen
+    // und an Kunde (Mail C) + Team anhängen. Best-effort — fehlen die Daten
+    // oder schlägt das Rendern fehl, wird einfach kein Anhang gesendet.
+    let contractAttachment: { filename: string; content: string; contentType: string } | null = null;
+    if (event === 'application_accepted_internal' && metadata && typeof metadata === 'object') {
+      const m = metadata as Record<string, unknown>;
+      if (m.contract && typeof m.contract === 'object' && typeof m.signatur === 'string' && m.signatur.trim()) {
+        try {
+          contractAttachment = buildVertragAttachment(m.contract as any, {
+            signaturName: m.signatur as string,
+            signedAt: typeof m.signed_at === 'string' ? (m.signed_at as string) : undefined,
+            auditNote: 'Vertragsversion v1.0',
+          });
+        } catch (e) {
+          console.error('buildVertragAttachment failed:', e instanceof Error ? e.message : String(e));
+        }
+      }
+    }
+
     // Team notification (fire-and-forget — never blocks the response).
     // - patient_data_saved → einmal pro Lead (Milestone, deduped)
     // - caregiver_invited / caregiver_interest_shown / application_received →
@@ -405,7 +434,7 @@ export async function POST(request: NextRequest) {
                 }
               : undefined);
       const teamTemplate = getTeamNotificationTemplate(lead as any, event, additionalData as any);
-      sendEmail(TEAM_NOTIFY_RECIPIENT, teamTemplate).catch((e) =>
+      sendEmail(TEAM_NOTIFY_RECIPIENT, teamTemplate, contractAttachment ? [contractAttachment] : undefined).catch((e) =>
         console.error('team notify send threw:', e instanceof Error ? e.message : String(e)),
       );
     }
@@ -469,7 +498,12 @@ export async function POST(request: NextRequest) {
             offer,
           )
             .then(({ template, attachments }) =>
-              sendEmail((lead as any).email, template, attachments),
+              // Mail C (Buchungsbestätigung): Vertrag-HTML zusätzlich anhängen.
+              sendEmail(
+                (lead as any).email,
+                template,
+                contractAttachment ? [...(attachments ?? []), contractAttachment] : attachments,
+              ),
             )
             .then((result) => {
               // Reaktions-Reminder schedulen — 1h nach Mail A/B, falls

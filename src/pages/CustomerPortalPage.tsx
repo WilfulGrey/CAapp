@@ -879,6 +879,13 @@ const CustomerPortalPage: FC = () => {
 
       if (!lead?.token) return;
 
+      // Zeitstempel der Unterschrift (menschenlesbar) + vollständige
+      // Vertragsdaten — der Server rendert daraus die Vertragskopie (HTML)
+      // und hängt sie an Kunden- + Team-Mail (Stufe B).
+      const now = new Date();
+      const signedAtLabel = `${String(now.getDate()).padStart(2, '0')}.${String(now.getMonth() + 1).padStart(2, '0')}.${now.getFullYear()} um ${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')} Uhr`;
+      const contract = targetApp ? buildVertragsDaten(formData, targetApp.offer) : undefined;
+
       try {
         const res = await fetch(`${KOSTENRECHNER_URL}/api/lead-event`, {
           method: 'POST',
@@ -906,6 +913,10 @@ const CustomerPortalPage: FC = () => {
                 telefon: formData.kpTelefon,
                 email: formData.kpEmail,
               },
+              // Elektronische Signatur + Vertrags-Snapshot für die Vertragskopie.
+              signatur: formData.signatur,
+              signed_at: signedAtLabel,
+              contract,
             },
           }),
         });
