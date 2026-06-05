@@ -470,7 +470,7 @@ export const AngebotPruefenModal: FC<{
                       <div key={row.label}>
                         <div className={`flex items-center justify-between px-4 py-2.5 ${row.label === 'Kündigungsfrist' ? 'bg-green-50' : 'bg-white'}`}>
                           <span className={`text-sm flex-shrink-0 ${row.label === 'Kündigungsfrist' ? 'font-semibold text-green-800' : 'text-gray-500'}`}>{row.label}</span>
-                          <span className={`text-sm text-right ${row.label === 'Kündigungsfrist' ? 'font-bold text-green-700' : row.bold ? 'font-bold text-gray-900' : 'font-semibold text-gray-700'}`}>{row.label === 'Kündigungsfrist' ? '✓ Täglich kündbar · kein Risiko' : row.value}</span>
+                          <span className={`text-sm text-right ${row.label === 'Kündigungsfrist' ? 'font-bold text-green-700' : row.bold ? 'font-bold text-gray-900' : 'font-semibold text-gray-700'}`}>{row.label === 'Kündigungsfrist' ? '✓ Täglich kündbar' : row.value}</span>
                         </div>
                         {/* Feiertagszuschlag-Block direkt nach Sommerzuschlag
                             einhängen, damit die Vertragskonditionen-Tabelle
