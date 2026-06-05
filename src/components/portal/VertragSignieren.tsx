@@ -8,10 +8,9 @@ import type { FC, ReactNode } from 'react';
 // Signatur: einfache elektronische Signatur (getippter Name + verbindliche
 // Bestätigung + Zeitstempel). Dummy-Daten — echte Anbindung später.
 
-// Hervorgehobenes, dynamisch befülltes Feld.
-const Fill: FC<{ children: ReactNode }> = ({ children }) => (
-  <span className="font-semibold text-gray-900 bg-[#FBF1D5] rounded px-1 py-0.5 whitespace-nowrap">{children}</span>
-);
+// Dynamisch befülltes Feld — bewusst OHNE Hervorhebung (liest sich wie
+// normaler Vertragstext). Nur Durchreichen.
+const Fill: FC<{ children: ReactNode }> = ({ children }) => <>{children}</>;
 
 interface VertragsDaten {
   datum: string;
@@ -189,7 +188,7 @@ export const VertragSignieren: FC<{
             <div className="flex items-center justify-between px-4 py-2.5"><span className="text-sm text-gray-500">Leistungsempfänger</span><span className="text-sm font-semibold text-gray-700 text-right">{daten.le ? daten.le.name : daten.ag.name}</span></div>
             <div className="flex items-center justify-between px-4 py-2.5"><span className="text-sm text-gray-500">Vertragsbeginn</span><span className="text-sm font-semibold text-gray-700"><Fill>{daten.vertragsbeginn}</Fill></span></div>
             <div className="flex items-center justify-between px-4 py-2.5"><span className="text-sm text-gray-500">Tagessatz</span><span className="text-sm font-bold text-gray-900"><Fill>{daten.tagessatz}</Fill>&nbsp;/ Tag</span></div>
-            <div className="flex items-center justify-between px-4 py-2.5"><span className="text-sm text-gray-500">Kündigung</span><span className="text-sm font-semibold text-gray-700">Täglich</span></div>
+            <div className="flex items-center justify-between px-4 py-2.5 bg-green-50"><span className="text-sm font-semibold text-green-800">Kündigung</span><span className="text-sm font-bold text-green-700">✓ Täglich kündbar · kein Risiko</span></div>
           </div>
           <button onClick={() => setVollOffen((v) => !v)} className="w-full rounded-xl border border-gray-200 bg-white hover:bg-gray-50 text-sm font-semibold text-[#6B5444] py-3 transition-colors">
             {vollOffen ? '▲ Vollständigen Vertrag ausblenden' : '▼ Vollständigen Vertrag ansehen'}
