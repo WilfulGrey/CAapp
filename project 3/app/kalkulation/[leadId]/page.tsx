@@ -77,7 +77,11 @@ export default function KalkulationPage() {
   const nachname = usableNamePart(lead.nachname);
   const vorname = usableNamePart(lead.vorname);
 
-  let greeting = 'Sehr geehrte Damen und Herren';
+  // Fallback „Guten Tag" (konsistent mit den Mails: getKalkulationEmailTemplate +
+  // customerGreeting fallen ebenfalls auf „Guten Tag" zurück). Vorher „Sehr
+  // geehrte Damen und Herren" — formell, aber für die moderne Web-Ansicht zu
+  // kalt und seit Name-optional auch häufig der Default.
+  let greeting = 'Guten Tag';
   if (anredeText === 'Frau' && nachname) greeting = `Sehr geehrte Frau ${cap(nachname)}`;
   else if (anredeText === 'Frau' && vorname) greeting = `Sehr geehrte Frau ${cap(vorname)}`;
   else if (anredeText === 'Herr' && nachname) greeting = `Sehr geehrter Herr ${cap(nachname)}`;
@@ -143,7 +147,10 @@ export default function KalkulationPage() {
           <div className="px-6 py-5">
             <div className="flex justify-between items-start mb-5">
               <div className="text-sm text-gray-600 leading-relaxed">
-                <div className="font-semibold text-gray-900">{[anredeText, cap(vorname), cap(nachname)].filter(Boolean).join(' ')}</div>
+                {(() => {
+                  const adresseZeile = [anredeText, cap(vorname), cap(nachname)].filter(Boolean).join(' ');
+                  return adresseZeile ? <div className="font-semibold text-gray-900">{adresseZeile}</div> : null;
+                })()}
                 {lead.email && <div>{lead.email}</div>}
               </div>
               <div className="text-right text-xs text-gray-500">

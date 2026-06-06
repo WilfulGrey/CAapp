@@ -372,8 +372,8 @@ export const AngebotCard: FC<{
   <div style="padding:24px 52px 20px;border-bottom:1px solid #f0f0f0;">
     <table style="width:100%;border-collapse:collapse;"><tr>
       <td style="vertical-align:top;">
-        <div style="font-size:13px;font-weight:600;color:#1a1a1a;">${kundenName}</div>
-        <div style="font-size:12px;color:#888;margin-top:2px;">${kundenEmail}</div>
+        ${kundenName ? `<div style="font-size:13px;font-weight:600;color:#1a1a1a;">${kundenName}</div>` : ''}
+        <div style="font-size:12px;color:#888;${kundenName ? 'margin-top:2px;' : ''}">${kundenEmail}</div>
       </td>
       <td style="vertical-align:top;text-align:right;">
         <div style="font-size:12px;color:#888;line-height:2.0;">
@@ -470,7 +470,7 @@ export const AngebotCard: FC<{
   <div style="padding:16px 52px;border-top:1px solid #f0f0f0;background:#f9f9f9;">
     <table style="width:100%;border-collapse:collapse;"><tr>
       <td style="font-size:11px;color:#bbb;">Primundus GmbH · primundus.de · info@primundus.de</td>
-      <td style="text-align:right;font-size:11px;color:#bbb;">Vertrauliches Angebot · Nur für ${kundenName}</td>
+      <td style="text-align:right;font-size:11px;color:#bbb;">Vertrauliches Angebot${kundenName ? ` · Nur für ${kundenName}` : ''}</td>
     </tr></table>
   </div>
 
@@ -555,7 +555,7 @@ export const AngebotCard: FC<{
             <div className="space-y-3">
               <div className="flex items-start justify-between gap-2">
                 <div>
-                  <p className="text-sm font-bold text-gray-800">{kundenName}</p>
+                  {kundenName && <p className="text-sm font-bold text-gray-800">{kundenName}</p>}
                   <p className="text-sm text-gray-500">{kundenEmail}</p>
                 </div>
                 <div className="text-right flex-shrink-0">

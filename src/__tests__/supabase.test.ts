@@ -97,8 +97,11 @@ describe('leadDisplayName', () => {
     expect(leadDisplayName(familieLead)).toBe('MüLler');
   });
 
-  it('falls back to email when both names are null', () => {
-    expect(leadDisplayName(bareLead)).toBe('noname@example.de');
+  it('returns empty string when both names are null (NOT the email — seit Name optional)', () => {
+    // Seit dem Kontaktformular-Umbau (Name optional) wollen wir die E-Mail
+    // NICHT als Anrede zeigen — sonst steht „Nur für anna@example.de" in
+    // der Angebotskarte. UI-Renderer prüfen jetzt auf Leerstring.
+    expect(leadDisplayName(bareLead)).toBe('');
   });
 });
 

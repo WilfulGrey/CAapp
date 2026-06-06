@@ -55,7 +55,10 @@ export default function KalkulationPrintPage() {
   const anredeText = lead.anrede_text || lead.anrede || '';
   const nachname = usableNamePart(lead.nachname);
   const vorname = usableNamePart(lead.vorname);
-  let greeting = 'Sehr geehrte Damen und Herren';
+  // Fallback „Guten Tag" (konsistent mit den Mails + der Web-Kalkulations-
+  // Seite). Vorher „Sehr geehrte Damen und Herren" — formell-kalt; und seit
+  // Name-optional auch häufig der gerenderte Default.
+  let greeting = 'Guten Tag';
   if (anredeText === 'Frau' && nachname) greeting = `Sehr geehrte Frau ${cap(nachname)}`;
   else if (anredeText === 'Frau' && vorname) greeting = `Sehr geehrte Frau ${cap(vorname)}`;
   else if (anredeText === 'Herr' && nachname) greeting = `Sehr geehrter Herr ${cap(nachname)}`;
@@ -150,7 +153,10 @@ export default function KalkulationPrintPage() {
         {/* ADRESSE */}
         <div style={s.addrRow}>
           <div style={{ color: '#444', lineHeight: 1.7 }}>
-            <div style={{ fontWeight: 700, color: '#222' }}>{[anredeText, cap(vorname), cap(nachname)].filter(Boolean).join(' ')}</div>
+            {(() => {
+              const adresseZeile = [anredeText, cap(vorname), cap(nachname)].filter(Boolean).join(' ');
+              return adresseZeile ? <div style={{ fontWeight: 700, color: '#222' }}>{adresseZeile}</div> : null;
+            })()}
             {lead.email && <div>{lead.email}</div>}
           </div>
           <div style={{ textAlign: 'right', color: '#888', lineHeight: 1.8 }}>
