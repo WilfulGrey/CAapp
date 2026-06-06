@@ -501,7 +501,7 @@ export function MultiStepForm() {
       case 6: return "Deutschkenntnisse der Pflegekraft";
       case 7: return "Führerschein gewünscht?";
       case 8: return "Geschlecht der Pflegekraft";
-      case 9: return "Ihr Angebot ist fertig";
+      case 9: return "An welche E-Mail-Adresse dürfen wir die Kopie senden?";
       default: return "";
     }
   };
@@ -517,7 +517,7 @@ export function MultiStepForm() {
       case 6: return "Welches Sprachniveau sollte die Betreuungskraft haben?";
       case 7: return "Sind Autofahren notwendig und nicht anders zu organisieren?";
       case 8: return "Haben Sie eine Präferenz bezüglich des Geschlechts?";
-      case 9: return "An welche E-Mail-Adresse dürfen wir die Kopie senden?";
+      case 9: return "Ihr Angebot und passende Pflegekräfte sehen Sie sofort auf der nächsten Seite. Zusätzlich erhalten Sie eine Kopie per E-Mail.";
       default: return "";
     }
   };
@@ -669,17 +669,22 @@ export function MultiStepForm() {
 
         <div className="px-3 sm:px-6 lg:px-8 pt-5 pb-6">
           <div className="w-full">
+            {/* Step 9: kleine grüne „fertig"-Pill über dem Titel, dann die
+                Frage als reguläre Step-Headline + Erklärung als italic
+                Subline (gleiches Muster wie die anderen Steps). */}
+            {currentStep === 9 && (
+              <div className="inline-flex items-center gap-1.5 mb-3 text-[12px] font-semibold text-[#22A06B] bg-green-50 border border-green-200 rounded-full px-3 py-1">
+                <svg className="w-3.5 h-3.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
+                </svg>
+                Ihr Angebot ist fertig
+              </div>
+            )}
             <h3 className="text-[21px] font-bold text-[#3D3D3D] mb-5 leading-tight">
-              {currentStep === 9 && <span className="text-[#22A06B] mr-2">✓</span>}
               {getStepTitle()}
             </h3>
             {getStepSubtext() && (
-              <p className={`text-sm text-[#8B8B8B] mb-5 ${currentStep === 9 ? '' : 'italic'}`}>{getStepSubtext()}</p>
-            )}
-            {currentStep === 9 && (
-              <p className="text-sm text-[#5E5E5E] mb-5 leading-relaxed">
-                Ihr Angebot und passende Pflegekräfte sehen Sie sofort auf der nächsten Seite. Zusätzlich erhalten Sie eine Kopie per E-Mail.
-              </p>
+              <p className="text-sm text-[#8B8B8B] mb-5 italic leading-relaxed">{getStepSubtext()}</p>
             )}
 
             <div className="space-y-3">
@@ -1000,10 +1005,16 @@ export function MultiStepForm() {
                 <button
                   onClick={() => handleNext()}
                   disabled={!canProceed() || isSubmitting}
+                  // Disabled: heller Coral-Ton mit weißer Schrift, damit die
+                  // Botschaft auch ohne Eingabe lesbar bleibt (vorher
+                  // #8B8B8B auf #E5E3DF war kaum lesbar). Inline-Style statt
+                  // Tailwind-Slash-Alpha, weil bg-[#E76F63]/55 vom JIT nicht
+                  // konsistent gerendert wird.
+                  style={!canProceed() || isSubmitting ? { backgroundColor: '#F2B5AE' } : undefined}
                   className={`w-full py-4 font-bold text-base rounded-full transition-all duration-200 ${
                     canProceed() && !isSubmitting
                       ? 'bg-[#E76F63] hover:bg-[#D65E52] text-white shadow-lg hover:shadow-xl cursor-pointer'
-                      : 'bg-[#E5E3DF] text-[#8B8B8B] cursor-not-allowed opacity-60'
+                      : 'text-white shadow-md cursor-not-allowed'
                   }`}
                 >
                   {isSubmitting ? (
