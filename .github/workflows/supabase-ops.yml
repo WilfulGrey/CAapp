@@ -24,6 +24,14 @@ on:
         description: "Resend last N application_received mails to BCC only (leer = skip)"
         type: string
         default: ""
+      deploy_caapp_function:
+        description: "CAapp Edge Function auf PROD deployen (Name, z.B. send-scheduled-emails; leer = skip)"
+        type: string
+        default: ""
+      deploy_kostenrechner_function:
+        description: "kostenrechner Edge Function auf PROD deployen (Name, z.B. send-scheduled-emails; leer = skip)"
+        type: string
+        default: ""
 
 jobs:
   ops:
@@ -153,3 +161,45 @@ jobs:
             echo "::error::Resend failed with HTTP $HTTP_CODE"
             exit 1
           fi
+
+      # ─── Edge Function PROD-Deploys (manuelle Promotion) ────────────────
+      # Staging deployt automatisch via test.yml beim Push auf integration.
+      # PROD-Deploy ist bewusst manuell hier eingewählt, damit Änderungen
+      # an Edge Functions erst nach Staging-Verifikation auf den echten
+      # Customer-Projekt landen.
+      - name: Setup Supabase CLI
+        if: github.event.inputs.deploy_caapp_function != '' || github.event.inputs.deploy_kostenrechner_function != ''
+        uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: Deploy CAapp edge function to PROD
+        if: github.event.inputs.deploy_caapp_function != ''
+        run: |
+          FN="${{ github.event.inputs.deploy_caapp_function }}"
+          if [ ! -d "supabase/functions/$FN" ]; then
+            echo "::error::CAapp function not found: supabase/functions/$FN"
+            exit 1
+          fi
+          echo "::group::Deploying $FN → PROD ($PROJECT_REF)"
+          supabase functions deploy "$FN" --project-ref "$PROJECT_REF"
+          echo "::endgroup::"
+
+      - name: Deploy kostenrechner edge function to PROD
+        if: github.event.inputs.deploy_kostenrechner_function != ''
+        run: |
+          FN="${{ github.event.inputs.deploy_kostenrechner_function }}"
+          if [ ! -d "project 3/supabase/functions/$FN" ]; then
+            echo "::error::kostenrechner function not found: project 3/supabase/functions/$FN"
+            exit 1
+          fi
+          # Katalog "project 3" hat ein Leerzeichen → bricht docker volume
+          # mount in der Supabase-CLI ("entrypoint path does not exist").
+          # Workaround analog zu test.yml: nach /tmp kopieren ohne Spaces.
+          rm -rf /tmp/kr-deploy
+          mkdir -p /tmp/kr-deploy/supabase
+          cp -r "project 3/supabase/functions" /tmp/kr-deploy/supabase/
+          cd /tmp/kr-deploy
+          echo "::group::Deploying $FN → PROD ($PROJECT_REF)"
+          supabase functions deploy "$FN" --project-ref "$PROJECT_REF"
+          echo "::endgroup::"
