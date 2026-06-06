@@ -356,7 +356,7 @@ export function MultiStepForm() {
       case 6: return Boolean(state.germanLevel);
       case 7: return Boolean(state.driving);
       case 8: return Boolean(state.gender);
-      case 9: return Boolean(formData.name && formData.email);
+      case 9: return Boolean(formData.email); // Name ist optional
       default: return false;
     }
   };
@@ -368,10 +368,8 @@ export function MultiStepForm() {
       acceptPrivacy: '',
     };
 
-    if (!formData.name.trim()) {
-      newErrors.name = 'Bitte geben Sie Ihren Namen ein';
-    }
-
+    // Name ist optional (User-Request 2026-06-06: nur E-Mail Pflichtfeld,
+    // Telefon entfernt) — keine Validierung nötig.
     if (!formData.email.trim()) {
       newErrors.email = 'Bitte geben Sie Ihre E-Mail-Adresse ein';
     } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
@@ -383,7 +381,7 @@ export function MultiStepForm() {
     // Checkbox-Validation mehr nötig.
 
     setErrors(newErrors);
-    return !newErrors.name && !newErrors.email;
+    return !newErrors.email;
   };
 
   const handleSubmit = async () => {
@@ -503,7 +501,7 @@ export function MultiStepForm() {
       case 6: return "Deutschkenntnisse der Pflegekraft";
       case 7: return "Führerschein gewünscht?";
       case 8: return "Geschlecht der Pflegekraft";
-      case 9: return "Jetzt Angebot & Pflegekräfte anzeigen";
+      case 9: return "Ihr Angebot ist fertig";
       default: return "";
     }
   };
@@ -519,7 +517,7 @@ export function MultiStepForm() {
       case 6: return "Welches Sprachniveau sollte die Betreuungskraft haben?";
       case 7: return "Sind Autofahren notwendig und nicht anders zu organisieren?";
       case 8: return "Haben Sie eine Präferenz bezüglich des Geschlechts?";
-      case 9: return "Letzter Schritt – Sie sehen sofort Ihr Angebot & passende Pflegekräfte und erhalten alles per Mail";
+      case 9: return "An welche E-Mail-Adresse dürfen wir die Kopie senden?";
       default: return "";
     }
   };
@@ -666,24 +664,22 @@ export function MultiStepForm() {
           </div>
         )}
 
-        {currentStep === 9 && (
-          <div className="flex justify-center pt-3 pb-0">
-            <div className="inline-flex items-center gap-2 bg-green-50 border border-green-200 rounded-full px-4 py-1.5 shadow-sm">
-              <svg className="w-3.5 h-3.5 text-green-600 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
-              </svg>
-              <span className="text-[12px] text-green-700 font-semibold tracking-wide">Angebot & Pflegekräfte vorbereitet</span>
-            </div>
-          </div>
-        )}
+        {/* Step 9 zeigt die Headline „✅ Ihr Angebot ist fertig" jetzt direkt
+            im Titel-Block (getStepTitle); separate Pill ist redundant. */}
 
         <div className="px-3 sm:px-6 lg:px-8 pt-5 pb-6">
           <div className="w-full">
             <h3 className="text-[21px] font-bold text-[#3D3D3D] mb-5 leading-tight">
+              {currentStep === 9 && <span className="text-[#22A06B] mr-2">✓</span>}
               {getStepTitle()}
             </h3>
             {getStepSubtext() && (
-              <p className="text-sm text-[#8B8B8B] mb-5 italic">{getStepSubtext()}</p>
+              <p className={`text-sm text-[#8B8B8B] mb-5 ${currentStep === 9 ? '' : 'italic'}`}>{getStepSubtext()}</p>
+            )}
+            {currentStep === 9 && (
+              <p className="text-sm text-[#5E5E5E] mb-5 leading-relaxed">
+                Ihr Angebot und passende Pflegekräfte sehen Sie sofort auf der nächsten Seite. Zusätzlich erhalten Sie eine Kopie per E-Mail.
+              </p>
             )}
 
             <div className="space-y-3">
@@ -948,61 +944,46 @@ export function MultiStepForm() {
                 </div>
               )}
 
-              {/* Step 9 - Kontaktformular (vorher Step 10, Timing-Frage wurde entfernt) */}
+              {/* Step 9 - Kontaktformular: nur noch E-Mail (Pflicht) +
+                  Name (optional). Telefon entfernt (User-Request 2026-06-06)
+                  — falls später wieder benötigt, formData.phone bleibt im
+                  State erhalten, nur das UI-Feld fehlt. */}
               {currentStep === 9 && (
                 <div className="space-y-3">
-                  <div className="grid grid-cols-1 gap-3">
-                    <div>
-                      <input
-                        type="text"
-                        value={formData.name}
-                        onChange={(e) => {
-                          setFormData({ ...formData, name: e.target.value });
-                          setErrors({ ...errors, name: '' });
-                        }}
-                        onFocus={() => trackFieldFocus('name')}
-                        onBlur={(e) => trackFieldBlur('name', e.target.value)}
-                        className={`w-full px-4 py-2.5 text-base border-2 rounded-full focus:outline-none focus:ring-1 focus:ring-[#8B7355]/40 focus:border-[#8B7355] ${
-                          errors.name ? 'border-red-500' : 'border-[#B8B0A6]'
-                        }`}
-                        placeholder="Vollständiger Name"
-                      />
-                      {errors.name && <p className="text-[11px] text-red-500 mt-1 px-3">{errors.name}</p>}
-                    </div>
-
-                    <div>
-                      <input
-                        type="email"
-                        value={formData.email}
-                        onChange={(e) => {
-                          setFormData({ ...formData, email: e.target.value });
-                          setErrors({ ...errors, email: '' });
-                        }}
-                        onFocus={() => trackFieldFocus('email')}
-                        onBlur={(e) => trackFieldBlur('email', e.target.value)}
-                        className={`w-full px-4 py-2.5 text-base border-2 rounded-full focus:outline-none focus:ring-1 focus:ring-[#8B7355]/40 focus:border-[#8B7355] ${
-                          errors.email ? 'border-red-500' : 'border-[#B8B0A6]'
-                        }`}
-                        placeholder="E-Mail-Adresse"
-                      />
-                      {errors.email && <p className="text-[11px] text-red-500 mt-1 px-3">{errors.email}</p>}
-                    </div>
+                  <div>
+                    <input
+                      type="email"
+                      value={formData.email}
+                      onChange={(e) => {
+                        setFormData({ ...formData, email: e.target.value });
+                        setErrors({ ...errors, email: '' });
+                      }}
+                      onFocus={() => trackFieldFocus('email')}
+                      onBlur={(e) => trackFieldBlur('email', e.target.value)}
+                      className={`w-full px-4 py-2.5 text-base border-2 rounded-full focus:outline-none focus:ring-1 focus:ring-[#8B7355]/40 focus:border-[#8B7355] ${
+                        errors.email ? 'border-red-500' : 'border-[#B8B0A6]'
+                      }`}
+                      placeholder="E-Mail-Adresse"
+                      autoComplete="email"
+                    />
+                    {errors.email && <p className="text-[11px] text-red-500 mt-1 px-3">{errors.email}</p>}
                   </div>
 
-                  <div className="grid grid-cols-1 gap-3">
-                    <div>
-                      <input
-                        type="tel"
-                        value={formData.phone}
-                        onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                        onFocus={() => trackFieldFocus('telefon')}
-                        onBlur={(e) => trackFieldBlur('telefon', e.target.value)}
-                        className="w-full px-4 py-2.5 text-base border-2 border-[#B8B0A6] rounded-full focus:outline-none focus:ring-1 focus:ring-[#8B7355]/40 focus:border-[#8B7355]"
-                        placeholder="Telefonnummer (optional)"
-                      />
-                    </div>
+                  <div>
+                    <input
+                      type="text"
+                      value={formData.name}
+                      onChange={(e) => {
+                        setFormData({ ...formData, name: e.target.value });
+                        setErrors({ ...errors, name: '' });
+                      }}
+                      onFocus={() => trackFieldFocus('name')}
+                      onBlur={(e) => trackFieldBlur('name', e.target.value)}
+                      className="w-full px-4 py-2.5 text-base border-2 border-[#B8B0A6] rounded-full focus:outline-none focus:ring-1 focus:ring-[#8B7355]/40 focus:border-[#8B7355]"
+                      placeholder="Name (optional)"
+                      autoComplete="name"
+                    />
                   </div>
-
                 </div>
               )}
             </div>
