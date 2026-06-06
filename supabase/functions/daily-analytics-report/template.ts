@@ -11,6 +11,10 @@
 
 import type { DailyStats, PeriodStats } from "./queries.ts";
 
+// Spiegelt MultiStepForm.getStepId() — 9 Schritte (Betreuungsbeginn /
+// care_start_timing wurde aus dem Funnel entfernt, Kontaktformular ist
+// jetzt Schritt 9 statt 10).
+const TOTAL_STEPS = 9;
 const STEP_NAMES: Record<number, string> = {
   1: "Anzahl Patienten",
   2: "Weitere Person im Haushalt",
@@ -20,8 +24,7 @@ const STEP_NAMES: Record<number, string> = {
   6: "Deutschkenntnisse",
   7: "Führerschein",
   8: "Geschlecht",
-  9: "Betreuungsbeginn",
-  10: "Kontaktformular",
+  9: "Kontaktformular",
 };
 
 function fmtInt(n: number): string {
@@ -106,13 +109,15 @@ export function buildReportEmail(opts: {
     </tr>`;
   }).join("");
 
-  // Funnel: Anzahl Sessions, die jeden Step gesehen haben + Drop %.
-  const funnelHtml = Array.from({ length: 10 }, (_, i) => i + 1).map((step) => {
+  // Funnel: Anzahl Sessions, die jeden Step gesehen haben + Drop %. Schritt
+  // TOTAL_STEPS ist der letzte (Kontaktformular) — danach gibt es keinen
+  // weiteren Step, drop wird nicht berechnet.
+  const funnelHtml = Array.from({ length: TOTAL_STEPS }, (_, i) => i + 1).map((step) => {
     const viewed = yesterday.funnelStepViewed[step] ?? 0;
     const next = yesterday.funnelStepViewed[step + 1] ?? 0;
-    const dropTo = step < 10 ? Math.max(0, viewed - next) : 0;
-    const dropPct = step < 10 && viewed > 0 ? ((dropTo / viewed) * 100).toFixed(0) : null;
-    const dropCell = step < 10 && viewed > 0
+    const dropTo = step < TOTAL_STEPS ? Math.max(0, viewed - next) : 0;
+    const dropPct = step < TOTAL_STEPS && viewed > 0 ? ((dropTo / viewed) * 100).toFixed(0) : null;
+    const dropCell = step < TOTAL_STEPS && viewed > 0
       ? `<span style="color:${dropPct && parseFloat(dropPct) >= 50 ? "#B71C1C" : "#9CA3AF"};font-size:12px;">drop ${dropPct}% (${dropTo})</span>`
       : `<span style="color:#9CA3AF;font-size:12px;">—</span>`;
     return `<tr>
@@ -226,10 +231,10 @@ CONVERSION-RATEN
 ${convRows.map((r) => `  ${r.label.padEnd(50)} ${r.today.padStart(6)}   Ø ${fmtPct(r.avg).padStart(6)}`).join("\n")}
 
 WIZARD-FUNNEL (Gestern)
-${Array.from({ length: 10 }, (_, i) => i + 1).map((s) => {
+${Array.from({ length: TOTAL_STEPS }, (_, i) => i + 1).map((s) => {
   const v = yesterday.funnelStepViewed[s] ?? 0;
   const next = yesterday.funnelStepViewed[s + 1] ?? 0;
-  const drop = s < 10 && v > 0 ? ` (drop ${((Math.max(0, v - next) / v) * 100).toFixed(0)}%)` : "";
+  const drop = s < TOTAL_STEPS && v > 0 ? ` (drop ${((Math.max(0, v - next) / v) * 100).toFixed(0)}%)` : "";
   return `  ${s}. ${STEP_NAMES[s].padEnd(34)} ${String(v).padStart(4)}${drop}`;
 }).join("\n")}
 
