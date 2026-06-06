@@ -1896,9 +1896,21 @@ const CustomerPortalPage: FC = () => {
             // save with an edited number re-fires.
             const phoneForLead = form.phone?.trim();
             const startDateForLead = form.startDate?.trim();
+            // Name aus dem Patientenbogen → vorname/nachname für die Bridge.
+            // Einfacher Split: erstes Wort = Vorname, der Rest = Nachname.
+            // Wenn nur ein Wort, ist es der Vorname. Bridge schreibt zurück
+            // nach leads.vorname/nachname, sodass spätere Mails den Kunden
+            // namentlich anreden können (vorher oft leer, weil im Kosten-
+            // rechner-Kontaktformular Name optional).
+            const nameForLead = form.name?.trim() ?? '';
+            const nameParts = nameForLead.split(/\s+/).filter(Boolean);
+            const vornameForLead = nameParts.length > 0 ? nameParts[0] : '';
+            const nachnameForLead = nameParts.length > 1 ? nameParts.slice(1).join(' ') : '';
             const leadEventMeta: Record<string, string> = {};
             if (phoneForLead) leadEventMeta.phone = phoneForLead;
             if (startDateForLead) leadEventMeta.startDate = startDateForLead;
+            if (vornameForLead) leadEventMeta.vorname = vornameForLead;
+            if (nachnameForLead) leadEventMeta.nachname = nachnameForLead;
             reportLeadEvent(
               lead?.token,
               'patient_data_saved',
