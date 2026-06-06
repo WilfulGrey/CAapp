@@ -7,9 +7,134 @@ import Image from "next/image";
 import { analytics } from "@/lib/analytics";
 import { useFormTracking } from "@/hooks/use-form-tracking";
 
+// ─── Matching Animation Component ────────────────────────────────────────────
+// Läuft zwischen letzter Frage (Step 8) und Kontaktformular (Step 9). 3 Schritte
+// mit Pflegekraft-Match-Zähler — baut Wertaufbau auf, bevor der Nutzer Name/
+// E-Mail eingibt. Wurde im Mai 2026 versehentlich entfernt (Commit 281e4ef
+// argumentierte mit „Friction nach Submit", aber die Animation lief VOR dem
+// Submit) — hier 1:1 wiederbelebt.
+function MatchingAnimation({ onComplete, initialCount }: { onComplete: (finalCount: number) => void; initialCount: number }) {
+  const [activeStep, setActiveStep] = useState(0);
+  const [completedSteps, setCompletedSteps] = useState<number[]>([]);
+  const [nurseCount, setNurseCount] = useState(initialCount);
+  const [done, setDone] = useState(false);
+  const onCompleteRef = useRef(onComplete);
+  onCompleteRef.current = onComplete;
+
+  const ANIM_STEPS = [
+    { label: 'Ihr persönliches Angebot wird erstellt', sub: 'Angebot & Pflegekräfte werden zusammengestellt', icon: '📋', duration: 3200 },
+    { label: 'Passende Pflegekräfte werden gematcht', sub: '', icon: '👩‍⚕️', duration: 4500 },
+    { label: 'Alles bereit', sub: 'Geben Sie Ihre Daten ein, um alles einzusehen', icon: '✓', duration: 1800 },
+  ];
+
+  useEffect(() => {
+    let t: ReturnType<typeof setTimeout>;
+    const run = (i: number) => {
+      if (i >= ANIM_STEPS.length) {
+        setTimeout(() => { setDone(true); setTimeout(() => onCompleteRef.current(nurseCount), 900); }, 300);
+        return;
+      }
+      setActiveStep(i);
+      t = setTimeout(() => { setCompletedSteps(p => [...p, i]); run(i + 1); }, ANIM_STEPS[i].duration);
+    };
+    run(0);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Pflegekraft-Zähler läuft während Step 1 (Index 1) auf eine personalisierte
+  // Endzahl (target=12) herunter — fühlt sich wie eine echte Filterung an.
+  useEffect(() => {
+    if (activeStep !== 1) return;
+    const target = 12;
+    const iv = setInterval(() => {
+      setNurseCount(prev => {
+        const next = prev - Math.ceil((prev - target) / 14);
+        if (next <= target) { clearInterval(iv); return target; }
+        return next;
+      });
+    }, 120);
+    return () => clearInterval(iv);
+  }, [activeStep]);
+
+  return (
+    <div className="bg-white rounded-2xl border-[1.5px] border-[#C0C0C0] overflow-hidden shadow-md">
+      <div className="px-4 sm:px-8 py-5 border-b-2 border-[#E5E3DF]/50 bg-[#E76F63]">
+        <p className="text-base font-bold uppercase tracking-wide text-white mb-1.5">Einen Moment bitte</p>
+        <p className="text-sm text-white" style={{ opacity: 0.85 }}>Wir bereiten Ihr persönliches Angebot vor</p>
+      </div>
+
+      <div className="px-3 sm:px-4 py-2 bg-[#F8F7F5]/50 border-b border-[#E5E3DF]/30">
+        <div className="h-1.5 bg-[#E5E3DF] rounded-full overflow-hidden">
+          <div
+            className="h-full bg-[#708A95] rounded-full transition-all duration-700 ease-out"
+            style={{ width: done ? '100%' : activeStep === 0 ? '75%' : activeStep === 1 ? '85%' : '95%' }}
+          />
+        </div>
+      </div>
+
+      <div className="px-5 sm:px-8 pt-8 pb-6">
+        <div className="space-y-6">
+          {ANIM_STEPS.map((s, i) => {
+            const isDone = completedSteps.includes(i);
+            const isActive = activeStep === i && !isDone;
+            const isPending = activeStep < i;
+            return (
+              <div key={i} className={`flex items-start gap-4 transition-all duration-500 ${isPending ? 'opacity-25' : 'opacity-100'}`}>
+                <div className={`w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 transition-all duration-500 mt-0.5
+                  ${isDone ? 'bg-[#8B7355]' : isActive ? 'bg-white border-2 border-[#8B7355]' : 'bg-white border-2 border-[#E5E3DF]'}`}
+                >
+                  {isDone ? (
+                    <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
+                    </svg>
+                  ) : isActive ? (
+                    <div className="w-4 h-4 border-2 border-[#8B7355] border-t-transparent rounded-full animate-spin" />
+                  ) : (
+                    <div className="w-2.5 h-2.5 rounded-full bg-[#E5E3DF]" />
+                  )}
+                </div>
+                <div className="flex-1 min-w-0 text-left">
+                  <p className={`text-[15px] font-semibold leading-snug transition-colors duration-300 ${isDone ? 'text-[#8B7355]' : isActive ? 'text-[#3D3D3D]' : 'text-[#AFAFAF]'}`}>
+                    {s.label}
+                    {isDone && <span className="ml-2 text-xs font-normal text-[#8B7355]">✓ Fertig</span>}
+                  </p>
+                  <p className="text-sm text-[#8B8B8B] mt-1">
+                    {i === 1 && isActive ? (
+                      <><span className="font-bold text-[#8B7355] tabular-nums">{nurseCount}</span> Pflegekräfte werden geprüft…</>
+                    ) : i === 1 && isDone ? (
+                      <><span className="font-bold text-[#8B7355]">{nurseCount}</span> passende Pflegekräfte gefunden</>
+                    ) : (isActive || isDone) ? s.sub : null}
+                  </p>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+
+        <div className="mt-8">
+          <div className="h-1.5 bg-[#E5E3DF] rounded-full overflow-hidden">
+            <div
+              className="h-full bg-[#8B7355] rounded-full transition-all duration-1000 ease-out"
+              style={{ width: done ? '100%' : activeStep === 0 ? '15%' : activeStep === 1 ? '55%' : '90%' }}
+            />
+          </div>
+        </div>
+      </div>
+
+      <div className="px-3 sm:px-6 lg:px-8 pt-4 pb-5 bg-white border-t border-[#E5E3DF]/50">
+        <p className="text-xs text-[#8B8B8B] text-center">🔒 Ihre Daten werden verschlüsselt übertragen · DSGVO-konform</p>
+      </div>
+    </div>
+  );
+}
+
 export function MultiStepForm() {
   const { state, updateState, calculate } = useCalculator();
   const [currentStep, setCurrentStep] = useState(1);
+  // Matching-Animation zwischen Step 8 (letzte Frage) und Step 9 (Kontakt).
+  // Wenn aktiv, blendet das Step-Rendering aus und zeigt nur die Animation.
+  const [showMatching, setShowMatching] = useState(false);
   // Field-level tracking for the contact step (step 10) — populates
   // analytics_form_interactions so the dashboard can show where in the
   // contact form users engage / drop off.
@@ -159,6 +284,20 @@ export function MultiStepForm() {
     });
 
     if (currentStep < totalSteps) {
+      // Letzte Frage (Step 8) → Kontaktformular (Step 9): vorher die Matching-
+      // Animation einblenden. Step-Wechsel erst nach onComplete der Animation.
+      if (currentStep === totalSteps - 1) {
+        setShowMatching(true);
+        setTimeout(() => {
+          const el = formRef.current;
+          if (!el) return;
+          window.scrollTo({
+            top: el.getBoundingClientRect().top + window.pageYOffset - 90,
+            behavior: 'smooth',
+          });
+        }, 50);
+        return;
+      }
       setCurrentStep(currentStep + 1);
       setTimeout(() => {
         const el = formRef.current;
@@ -458,6 +597,32 @@ export function MultiStepForm() {
         ? 'border-[#8B7355] bg-[#8B7355]/5 ring-1 ring-[#8B7355]/20 shadow-md'
         : 'border-[#B8B0A6] bg-white hover:border-[#8B7355] hover:bg-gray-50'
     }`;
+
+  // Wenn die Matching-Animation läuft: nur diese rendern (eigenes Layout
+  // mit Header/Progress) und nach onComplete auf Step 9 (Kontaktformular)
+  // weiterleiten. Die Animation übernimmt die Card-Optik, daher kein Outer-
+  // Wrapper mit Trust-Badge nötig.
+  if (showMatching) {
+    return (
+      <div ref={formRef} id="calculator-form" className="pt-6 pb-6 scroll-mt-24 lg:scroll-mt-32 lg:pt-4 max-w-md sm:max-w-[95%] xl:max-w-[1800px] 2xl:max-w-[2000px] mx-auto px-0 sm:px-4">
+        <MatchingAnimation
+          initialCount={getMatchingCount()}
+          onComplete={() => {
+            setShowMatching(false);
+            setCurrentStep(totalSteps); // = Step 9 (Kontaktformular)
+            setTimeout(() => {
+              const el = formRef.current;
+              if (!el) return;
+              window.scrollTo({
+                top: el.getBoundingClientRect().top + window.pageYOffset - 90,
+                behavior: 'smooth',
+              });
+            }, 50);
+          }}
+        />
+      </div>
+    );
+  }
 
   return (
     <div ref={formRef} id="calculator-form" className="pt-6 pb-6 scroll-mt-24 lg:scroll-mt-32 lg:pt-4 max-w-md sm:max-w-[95%] xl:max-w-[1800px] 2xl:max-w-[2000px] mx-auto px-0 sm:px-4">
