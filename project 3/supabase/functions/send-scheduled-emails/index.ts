@@ -95,10 +95,16 @@ function detectGenderFromName(vorname: string): "Frau" | "Herr" | "Familie" | nu
 function buildAnredeText(anrede: string | null, nachname: string, vorname: string): string {
   const effectiveAnrede = anrede || detectGenderFromName(vorname);
   const n = capitalize(cleanNamePart(nachname));
+  const v = capitalize(cleanNamePart(vorname));
   if (effectiveAnrede === "Frau" && n) return `Sehr geehrte Frau ${n}`;
   if (effectiveAnrede === "Herr" && n) return `Sehr geehrter Herr ${n}`;
   if (effectiveAnrede === "Familie" && n) return `Sehr geehrte Familie ${n}`;
-  return "Sehr geehrte Damen und Herren";
+  // Geschlecht bekannt, aber kein Nachname → Vorname allein („Guten Tag Anna").
+  if (effectiveAnrede && v) return `Guten Tag ${v}`;
+  // Salutation unknown → neutraler, freundlicher Fallback (konsistent zu
+  // den anderen Mails). Früher „Sehr geehrte Damen und Herren" — formell,
+  // aber seit Name-optional auch häufig der gerenderte Default.
+  return "Guten Tag";
 }
 
 function buildHalloAnrede(anrede: string | null, nachname: string, vorname: string): string {

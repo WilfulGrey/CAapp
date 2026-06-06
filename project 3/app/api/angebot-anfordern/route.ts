@@ -110,7 +110,7 @@ export async function POST(request: NextRequest) {
       kalkulation,
       acceptPrivacy,
     }: {
-      vorname: string;
+      vorname?: string;
       email: string;
       telefon?: string;
       careStartTiming?: string;
@@ -118,9 +118,13 @@ export async function POST(request: NextRequest) {
       acceptPrivacy?: boolean;
     } = body;
 
-    if (!vorname || !email || !kalkulation) {
+    // Seit dem Kontaktformular-Umbau ist Name optional — nur E-Mail +
+    // Kalkulation sind Pflicht. Wenn kein Name kommt, fallen alle Mails
+    // (customerGreeting, getAngebotEmailTemplate) auf neutrales „Guten Tag"
+    // zurück, und der Lead wird ohne vorname/nachname/anrede angelegt.
+    if (!email || !kalkulation) {
       return NextResponse.json(
-        { error: 'Vorname, E-Mail und Kalkulation erforderlich' },
+        { error: 'E-Mail und Kalkulation erforderlich' },
         { status: 400 }
       );
     }
@@ -135,9 +139,12 @@ export async function POST(request: NextRequest) {
 
     // The "vorname" field is a single free-text input — customers often type
     // a full name incl. title and notes ("Herr Steffen Krumbholz (Sohn)").
-    // Parse it robustly into vorname / nachname / anrede.
+    // Parse it robustly into vorname / nachname / anrede. Leerer Input →
+    // parseCustomerName liefert leere Felder, customerGreeting fällt später
+    // auf „Guten Tag" zurück.
+    const rawName = (vorname ?? '').trim();
     const { vorname: parsedVorname, nachname: parsedNachname, anrede: detectedAnrede } =
-      parseCustomerName(vorname);
+      parseCustomerName(rawName);
 
     const { lead, isNew, isUpgrade, kalkulationChanged } = await findOrCreateLead(
       email,
@@ -146,7 +153,7 @@ export async function POST(request: NextRequest) {
         // Keep parsed vorname (may be empty for "Familie Müller", where the
         // name lives in nachname). Only fall back to the raw input when the
         // parse produced no name at all.
-        vorname: parsedVorname || (parsedNachname ? '' : vorname.trim()),
+        vorname: parsedVorname || (parsedNachname ? '' : rawName),
         nachname: parsedNachname || undefined,
         anrede: detectedAnrede || undefined,
         telefon,

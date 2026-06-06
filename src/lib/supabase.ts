@@ -129,10 +129,14 @@ export function cap(s: string | null | undefined): string {
   return s.replace(/\b\w/g, c => c.toUpperCase());
 }
 
-/** Build display name from lead */
+/** Build display name from lead.
+ *  Leerer Name → leerer String (NICHT E-Mail). Seit Kontaktformular-Umbau
+ *  ist Name optional — wir wollen nicht plötzlich „Nur für anna@example.de"
+ *  als Kunden-Anrede zeigen.
+ */
 export function leadDisplayName(lead: Lead): string {
   const parts = [cap(lead.vorname), cap(lead.nachname)].filter(Boolean);
-  return parts.join(' ') || lead.email;
+  return parts.join(' ');
 }
 
 /** Build greeting (Sehr geehrte Frau X / Sehr geehrter Herr X etc.) */
