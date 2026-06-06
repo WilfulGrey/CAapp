@@ -166,6 +166,8 @@ describe('prefillPatientFromLead', () => {
       haushalt: 'Nein',         // baseLead.formularDaten.weitere_personen='nein'
       wunschGeschlecht: 'Weiblich',
       phone: '+49 89 1234567',
+      // name: kombiniert aus vorname + nachname (für Step-5-Prefill).
+      name: 'hildegard von norman',
     });
   });
 
@@ -177,6 +179,12 @@ describe('prefillPatientFromLead', () => {
     expect(prefillPatientFromLead({ ...bareLead, telefon: '+49 30 555' })).toEqual({
       phone: '+49 30 555',
     });
+  });
+
+  it('surfaces lead vorname + nachname as name', () => {
+    expect(prefillPatientFromLead({ ...bareLead, vorname: 'Anna', nachname: 'Schmidt' }).name).toBe('Anna Schmidt');
+    expect(prefillPatientFromLead({ ...bareLead, vorname: 'Anna', nachname: null }).name).toBe('Anna');
+    expect(prefillPatientFromLead({ ...bareLead, vorname: null, nachname: null }).name).toBeUndefined();
   });
 
   it('phone undefined when lead.telefon is null', () => {

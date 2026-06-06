@@ -172,6 +172,7 @@ export const AngebotCard: FC<{
     wunschGeschlecht: pick('wunschGeschlecht'),
     rauchen: pick('rauchen'), sonstigeWuensche: pick('sonstigeWuensche'),
     wunschGetriebe: pick('wunschGetriebe'),
+    name: pick('name'),
     phone: pick('phone'),
     startDate: pick('startDate'),
   });
@@ -307,7 +308,11 @@ export const AngebotCard: FC<{
       return baseOk;
     }
     if (s === 4) {
-      return isPlausibleGermanPhone(patient.phone) && patient.startDate !== '';
+      // Name: mind. zwei Zeichen + sollte aus mind. einem Wort bestehen.
+      // Vor- und/oder Nachname wird beim Save geparst (Bridge syncs in
+      // leads.vorname / leads.nachname).
+      const nameOk = patient.name.trim().length >= 2;
+      return nameOk && isPlausibleGermanPhone(patient.phone) && patient.startDate !== '';
     }
     return false;
   };
@@ -1232,14 +1237,25 @@ export const AngebotCard: FC<{
                 </>
               )}
 
-              {/* ── Step 5: Kontakt (Telefonnummer) ── */}
+              {/* ── Step 5: Kontakt (Name + Telefonnummer + Startdatum) ── */}
               {step === 4 && (
                 <>
                   <div className="rounded-2xl bg-[#FBF6EE] border border-[#E8D9BC] px-4 py-3.5 space-y-1.5">
                     <p className="text-sm font-bold text-[#5C4422]">Fast geschafft</p>
                     <p className="text-sm text-gray-700 leading-relaxed">
-                      Für eventuelle Rückfragen zur Betreuung benötigen wir noch Ihre Telefonnummer und ein voraussichtliches Startdatum (gerne grob geschätzt, falls noch unklar).
+                      Damit wir Sie persönlich ansprechen und bei Rückfragen erreichen können, benötigen wir noch Ihren Namen, Ihre Telefonnummer und ein voraussichtliches Startdatum (gerne grob geschätzt, falls noch unklar).
                     </p>
+                  </div>
+                  <div>
+                    <label className={labelCls}>Ihr Name <span className="text-red-400">*</span></label>
+                    <input
+                      type="text"
+                      value={patient.name}
+                      onChange={set('name')}
+                      placeholder="Vor- und Nachname"
+                      autoComplete="name"
+                      className={inputCls}
+                    />
                   </div>
                   <div>
                     <label className={labelCls}>Telefonnummer <span className="text-red-400">*</span></label>

@@ -322,6 +322,37 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    // Name-Sync: analog zu phone — wenn der Patientenbogen einen Namen
+    // mitgegeben hat (seit dem Name-im-Patientenbogen-Update Pflichtfeld
+    // dort), zurück nach leads.vorname/nachname schreiben. Dadurch greifen
+    // die Anreden in den späteren Mails (Buchungsbestätigung, Nachfass)
+    // auch für Kunden, die im Kostenrechner-Kontaktformular keinen Namen
+    // eingegeben hatten.
+    if (
+      event === 'patient_data_saved' &&
+      metadata &&
+      typeof metadata === 'object'
+    ) {
+      const m = metadata as Record<string, unknown>;
+      const newVorname = typeof m.vorname === 'string' ? m.vorname.trim() : '';
+      const newNachname = typeof m.nachname === 'string' ? m.nachname.trim() : '';
+      const patch: { vorname?: string; nachname?: string } = {};
+      if (newVorname && newVorname !== lead.vorname) patch.vorname = newVorname;
+      if (newNachname && newNachname !== lead.nachname) patch.nachname = newNachname;
+      if (Object.keys(patch).length > 0) {
+        const { error: nameErr } = await supabase
+          .from('leads')
+          .update(patch)
+          .eq('id', lead.id);
+        if (nameErr) {
+          console.error('leads.vorname/nachname update failed:', nameErr.message);
+        } else {
+          if (patch.vorname) lead.vorname = patch.vorname;
+          if (patch.nachname) lead.nachname = patch.nachname;
+        }
+      }
+    }
+
     // Acceptance persistence (application_accepted_internal): UPSERT a
     // dedicated row in lead_application_acceptances with the full contract
     // form data. Idempotent on (lead_id, application_id) — re-clicking

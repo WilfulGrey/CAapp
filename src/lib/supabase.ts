@@ -194,14 +194,22 @@ export interface PatientPrefill {
   /** Phone — read directly from leads.telefon (not formularDaten).
    *  Calculator collects it as optional; portal step 4 requires it. */
   phone?: string;
+  /** Name — kombiniert aus leads.vorname + leads.nachname. Wenn der
+   *  Kostenrechner-User keinen Namen eingegeben hat (seit Kontaktformular-
+   *  Umbau optional), bleibt das leer und das Portal verlangt es. */
+  name?: string;
 }
 
 export function prefillPatientFromLead(lead: Lead): PatientPrefill {
-  // Phone lives on the lead row directly (not in formularDaten), so it
-  // survives even when the calculator didn't collect anything else.
+  // Phone + Name live on the lead row directly (not in formularDaten), so
+  // they survive even when the calculator didn't collect anything else.
   const phone = lead.telefon ?? undefined;
+  const name = [lead.vorname, lead.nachname].filter(Boolean).join(' ').trim() || undefined;
+  const base: PatientPrefill = {};
+  if (phone) base.phone = phone;
+  if (name) base.name = name;
   const fd = lead.kalkulation?.formularDaten;
-  if (!fd) return phone ? { phone } : {};
+  if (!fd) return base;
 
   // Mobilitaet mapping. Marcin's NEW calculator emits one of:
   //   mobil | rollator | rollstuhl | bettlaegerig
@@ -289,5 +297,6 @@ export function prefillPatientFromLead(lead: Lead): PatientPrefill {
     p2_nacht:         isCouple ? nachtLabel : undefined,
     wunschGeschlecht: geschl ? (geschlechtMap[geschl] ?? '') : undefined,
     phone,
+    name,
   };
 }

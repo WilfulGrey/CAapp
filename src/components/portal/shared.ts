@@ -148,9 +148,15 @@ export interface PatientForm {
   diagnosen: string;
   plz: string; ort: string; haushalt: string; wohnungstyp: string; urbanisierung: string;
   familieNahe: string; pflegedienst: string; internet: string;
-  // Contact: required on step 5, prefilled from leads.telefon when the
-  // calculator collected it. Editable. Mapped to Customer.phone via
-  // patientFormMapper → mamamia-proxy.updateCustomer.
+  // Contact: required on step 5.
+  // name: vorbefüllt aus lead.vorname/nachname (vom Kostenrechner). Seit
+  // Kontaktformular Name optional → oft leer; dann hier Pflichtfeld, damit
+  // wir nach dem Patientenbogen den Kunden namentlich ansprechen können.
+  // Wird beim Save in vorname/nachname zurück synct (Bridge → leads-Tabelle).
+  name: string;
+  // phone: prefilled from leads.telefon when the calculator collected it.
+  // Editable. Mapped to Customer.phone via patientFormMapper →
+  // mamamia-proxy.updateCustomer.
   phone: string;
   // Voraussichtliches Startdatum — optional, ISO YYYY-MM-DD. Wird auf
   // Step 5 (Kontakt) abgefragt. Kann ans Mamamia Customer.arrival_at
