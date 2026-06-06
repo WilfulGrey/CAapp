@@ -636,14 +636,15 @@ export function MultiStepForm() {
       <div data-calculator-card className="bg-white rounded-2xl border-[1.5px] border-[#C0C0C0] overflow-hidden shadow-md">
         <div className="px-4 sm:px-8 py-5 border-b-2 border-[#E5E3DF]/50 bg-[#E76F63]">
           {currentStep === totalSteps ? (
-            // Step 9 — der Inhalt des Headers ändert sich auf einen Erfolgs-
-            // Ton, damit der Kunde sofort sieht, dass das Angebot fertig ist.
+            // Step 9 — der Inhalt des Headers ändert sich auf einen klaren
+            // CTA-Ton („jetzt ansehen →"), damit der Kunde sofort versteht,
+            // dass das Angebot bereitsteht und nur noch der Klick fehlt.
             <>
               <p className="text-base font-bold uppercase tracking-wide text-white/95 mb-1.5">
-                Angebot & Pflegekräfte erstellt!
+                Angebot & Pflegekräfte jetzt ansehen →
               </p>
               <p className="text-sm text-white/90">
-                Jetzt <span className="font-bold">kostenlos & unverbindlich</span> ansehen
+                Kostenlos &amp; unverbindlich
               </p>
             </>
           ) : (
@@ -688,9 +689,9 @@ export function MultiStepForm() {
                 Frage als reguläre Step-Headline + Erklärung als italic
                 Subline (gleiches Muster wie die anderen Steps). */}
             {currentStep === 9 && (
-              <div className="inline-flex items-center gap-1.5 mb-3 text-[12px] font-semibold text-[#22A06B] bg-green-50 border border-green-200 rounded-full px-3 py-1">
-                <svg className="w-3.5 h-3.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
+              <div className="inline-flex items-center gap-2 mb-4 text-sm font-bold text-white bg-[#22A06B] rounded-full px-4 py-1.5 shadow-sm">
+                <svg className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
                 </svg>
                 Ihr Angebot ist fertig
               </div>
