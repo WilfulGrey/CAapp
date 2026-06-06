@@ -141,7 +141,10 @@ export async function fetchDailyStats(
       }
     }
   }
-  for (let n = 1; n <= 10; n++) {
+  // Wizard hat 9 Schritte (siehe MultiStepForm.totalSteps + template.ts
+  // TOTAL_STEPS). Schritt 10 existiert nicht mehr — bis n<=10 zu zählen war
+  // historisches Artefakt aus der Zeit mit care_start_timing.
+  for (let n = 1; n <= 9; n++) {
     funnelStepViewed[n] = stepViewSessions[n]?.size ?? 0;
   }
   const wizardStarted = startedSessions.size;
