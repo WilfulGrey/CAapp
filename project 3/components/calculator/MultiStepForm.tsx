@@ -635,12 +635,27 @@ export function MultiStepForm() {
         </div>
       <div data-calculator-card className="bg-white rounded-2xl border-[1.5px] border-[#C0C0C0] overflow-hidden shadow-md">
         <div className="px-4 sm:px-8 py-5 border-b-2 border-[#E5E3DF]/50 bg-[#E76F63]">
-          <p className="text-base font-bold uppercase tracking-wide text-white/95 mb-1.5">
-            Angebot & Pflegekräfte sofort erhalten
-          </p>
-          <p className="text-sm text-white/90">
-            Kostenlos & unverbindlich · in <span className="font-bold">2 Minuten</span>
-          </p>
+          {currentStep === totalSteps ? (
+            // Step 9 — der Inhalt des Headers ändert sich auf einen Erfolgs-
+            // Ton, damit der Kunde sofort sieht, dass das Angebot fertig ist.
+            <>
+              <p className="text-base font-bold uppercase tracking-wide text-white/95 mb-1.5">
+                Angebot & Pflegekräfte erstellt!
+              </p>
+              <p className="text-sm text-white/90">
+                Jetzt <span className="font-bold">kostenlos & unverbindlich</span> ansehen
+              </p>
+            </>
+          ) : (
+            <>
+              <p className="text-base font-bold uppercase tracking-wide text-white/95 mb-1.5">
+                Angebot & Pflegekräfte sofort erhalten
+              </p>
+              <p className="text-sm text-white/90">
+                Kostenlos & unverbindlich · in <span className="font-bold">2 Minuten</span>
+              </p>
+            </>
+          )}
         </div>
 
         <div className="px-3 sm:px-4 py-2 bg-[#F8F7F5]/50 border-b border-[#E5E3DF]/30">
