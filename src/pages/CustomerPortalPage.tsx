@@ -32,6 +32,10 @@ import {
   mapApplicationToUI,
   mapMatchingToNurse,
   mapCaregiverToNurse,
+  germanySkillBucket,
+  germanySkillBucketRank,
+  bucketFromDeutschkenntnisseWish,
+  languagePriceUpgradeEur,
 } from '../lib/mamamia/mappers';
 import { mapPatientFormToUpdateCustomerInput } from '../lib/mamamia/patientFormMapper';
 import { callMamamia, MamamiaError } from '../lib/mamamia/client';
@@ -522,14 +526,32 @@ const CustomerPortalPage: FC = () => {
   //   primary  : available_from ASC  (next available first; null/past = top)
   //   secondary: last_contact_at DESC (recently-active CGs respond faster)
   //   tertiary : hp_total_jobs   DESC (more experience first)
+  // Sprach-Wunsch des Kunden (aus Kostenrechner-Antwort) — wird unten beim
+  // Sortieren der Matchings + bei der Berechnung des Sprach-Aufpreises pro
+  // Karte verwendet. null = unbekannt → keine Aufpreis-Logik (Karten zeigen
+  // den Angebotspreis ohne Hinweis).
+  // lead.kalkulation ist im DB-Layer als `unknown` typisiert (jsonb) — wir
+  // greifen sehr defensiv auf den Wunsch zu und akzeptieren null/undefined,
+  // wenn das Feld fehlt (Lead-Versionen vor 2025 hatten kein deutschkenntnisse).
+  const deutschWish: string | null | undefined = (() => {
+    const k = lead?.kalkulation as Record<string, unknown> | null | undefined;
+    const fd = k?.formularDaten as Record<string, unknown> | null | undefined;
+    const v = fd?.deutschkenntnisse;
+    return typeof v === 'string' ? v : null;
+  })();
+  const wishBucket = bucketFromDeutschkenntnisseWish(deutschWish);
+
   const effectiveMatched = (() => {
     if (IS_PREVIEW_ANY) {
       // Base matchings + post-invite-from-interest (so Maria erscheint nach
       // Einladung in der gleichen Liste mit Status 'invited').
       const fromInterest = [...previewInvitedFromInterest.entries()].map(
-        ([caregiverId, nurse]) => ({ caregiverId, nurse }),
+        ([caregiverId, nurse]) => ({ caregiverId, nurse, priceUpgradeEur: 0 }),
       );
-      return [...PREVIEW_MATCHINGS, ...fromInterest];
+      return [
+        ...PREVIEW_MATCHINGS.map(m => ({ ...m, priceUpgradeEur: 0 })),
+        ...fromInterest,
+      ];
     }
     if (!mmReady || !mmMatchings?.data) return [];
     const now = new Date();
@@ -554,13 +576,36 @@ const CustomerPortalPage: FC = () => {
       }
     }
 
+    // Vorsortierung nach Sprach-Bucket-Distanz zum Wunsch (siehe Helper).
+    // Reihenfolge: passende Pflegekräfte zuerst, dann „eine Stufe besser",
+    // dann „zwei Stufen besser" (jeweils kostet Aufpreis). Innerhalb gleicher
+    // Distanz greift die bestehende rankComparator-Sortierung (Verfügbarkeit,
+    // Aktivität, Erfahrung). Dadurch landen genau-passende immer zuerst in
+    // den Top-3, und nur wenn Mamamia für den gewünschten Bucket weniger als
+    // 3 Pflegekräfte mit Foto liefert, werden besser-qualifizierte mit
+    // sichtbarem Aufpreis-Badge aufgefüllt.
+    const wishRank = germanySkillBucketRank(wishBucket);
+    const rank = rankComparator(now);
     return merged
       .filter(m => m.is_show !== false)
-      .sort(rankComparator(now))
-      .map(m => ({
-        nurse: mapMatchingToNurse(m, { nowIso, nowYear }),
-        caregiverId: m.caregiver.id,
-      }));
+      .sort((a, b) => {
+        if (wishBucket) {
+          const da = Math.max(0, germanySkillBucketRank(germanySkillBucket(a.caregiver.germany_skill ?? null)) - wishRank);
+          const db = Math.max(0, germanySkillBucketRank(germanySkillBucket(b.caregiver.germany_skill ?? null)) - wishRank);
+          if (da !== db) return da - db;
+        }
+        return rank(a, b);
+      })
+      .map(m => {
+        const nurse = mapMatchingToNurse(m, { nowIso, nowYear });
+        return {
+          nurse,
+          caregiverId: m.caregiver.id,
+          // Aufpreis greift nur, wenn die Pflegekraft tatsächlich eine
+          // höhere Stufe als der Wunsch hat — sonst 0 (kein Badge).
+          priceUpgradeEur: languagePriceUpgradeEur(wishBucket, nurse.language.bucket ?? null),
+        };
+      });
   })();
 
   // Server-authoritative override for `patientSaved`. Mamamia flips
@@ -2085,7 +2130,7 @@ const CustomerPortalPage: FC = () => {
           // Behandlung wie bei Bewerbungen). Filter: caregiverId raus
           // wenn interestOriginIds das hat UND Status invited/declined.
           const allVisible = effectiveMatched
-            .map((m, i) => ({ nurse: m.nurse, i, caregiverId: m.caregiverId, status: nurseStatusById.get(m.caregiverId) ?? 'pending' as NurseStatus, virtualDeclinedFromInterest: false as const }))
+            .map((m, i) => ({ nurse: m.nurse, i, caregiverId: m.caregiverId, priceUpgradeEur: m.priceUpgradeEur ?? 0, status: nurseStatusById.get(m.caregiverId) ?? 'pending' as NurseStatus, virtualDeclinedFromInterest: false as const }))
             .filter(({ status, caregiverId }) => {
               if (status === 'pending') return true;
               // invited/declined ausschließen wenn aus Interest stammt
@@ -2104,6 +2149,7 @@ const CustomerPortalPage: FC = () => {
             nurse: Nurse;
             i: number;
             caregiverId: number;
+            priceUpgradeEur: number;
             status: NurseStatus;
             virtualDeclinedFromInterest: boolean;
           };
@@ -2150,7 +2196,7 @@ const CustomerPortalPage: FC = () => {
                         const s = badgeScore(nurse);
                         if (s > recBest) { recBest = s; recIdx = idx; }
                       });
-                      return visibleNurses.map(({ nurse, i, status }, idx) => {
+                      return visibleNurses.map(({ nurse, i, status, priceUpgradeEur }, idx) => {
                         const isRecommended = idx === recIdx;
                         return (
                           <MatchCard
@@ -2163,6 +2209,7 @@ const CustomerPortalPage: FC = () => {
                             onInviteConfirm={() => confirmInviteNurse(i, displayName(nurse.name))}
                             onUndoDecline={status === 'declined' ? () => undoDeclinedMatch(i) : undefined}
                             globalInviteLocked={inviteInFlight}
+                            languagePriceUpgradeEur={priceUpgradeEur}
                           />
                         );
                       });

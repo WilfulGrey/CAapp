@@ -36,7 +36,11 @@ export const MatchCard: FC<{
    *  all pass the gate. Local invitePhase='sending' on this card already
    *  hides the button — this prop covers the OTHER cards. */
   globalInviteLocked?: boolean;
-}> = ({ nurse, status, onNurseClick, onInvite, onInviteConfirm, onUndoDecline, hasInterestOrigin, isRecommended, globalInviteLocked }) => {
+  /** Pflegekraft hat höhere Deutschkenntnisse als der Kunde im Kostenrechner
+   *  gewählt hat → angegebener Aufpreis pro Monat (EUR). > 0 rendert ein
+   *  Badge auf der Karte; 0/undefined → kein Badge (Preis = Angebotspreis). */
+  languagePriceUpgradeEur?: number;
+}> = ({ nurse, status, onNurseClick, onInvite, onInviteConfirm, onUndoDecline, hasInterestOrigin, isRecommended, globalInviteLocked, languagePriceUpgradeEur }) => {
   const [invitePhase, setInvitePhase] = useState<'idle' | 'sending' | 'done'>('idle');
   const inits = initials(nurse.name);
   const name = displayName(nurse.name);
@@ -140,6 +144,14 @@ export const MatchCard: FC<{
                 ))}
               </div>
               <span className="text-sm text-gray-500">Deutsch {nurse.language.level}</span>
+              {languagePriceUpgradeEur && languagePriceUpgradeEur > 0 ? (
+                <span
+                  className="inline-flex items-center text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-[#FFF1EC] text-[#C04A40] border border-[#F0B0A4] whitespace-nowrap"
+                  title="Diese Pflegekraft hat bessere Deutschkenntnisse als von Ihnen gewünscht — daher dieser Aufpreis."
+                >
+                  +{languagePriceUpgradeEur} €/Mo
+                </span>
+              ) : null}
             </div>
             <p className="text-sm text-gray-500 truncate">
               <span className="font-semibold text-[#8B7355]">{nurse.experience}</span>

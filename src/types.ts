@@ -24,6 +24,9 @@ export interface Nurse {
   language: {
     level: string;
     bars: number;
+    /** 3-Stufen-Bucket der Mamamia-germany_skill (level_0..4) — Single
+     *  Source of Truth für Filter und Aufpreis-Berechnung im Portal. */
+    bucket?: import('./lib/mamamia/mappers').GermanySkillBucket | null;
   };
   color: string;
   addedTime: string;
