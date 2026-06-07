@@ -1750,7 +1750,7 @@ const CustomerPortalPage: FC = () => {
                     </div>
                     <p className="text-[13px] leading-snug flex-1" style={{color:'#ABABAB'}}>inkl. Steuern, Gebühren &amp; Sozialabgaben</p>
                   </div>
-                  <p className="text-[15px] mt-3 leading-snug" style={{color:'#3D3D3D'}}>zzgl. 125 € Anreisekosten pro Strecke sowie Kost &amp; Logis</p>
+                  <p className="text-[13px] mt-3 leading-snug" style={{color:'#3D3D3D'}}>zzgl. 125 € Reisekosten pro Strecke, Kost &amp; Logis und Sommerzuschlag 6,67 €/Tag (Juli + Aug.)</p>
                 </div>
 
                 <div className="rounded-2xl overflow-hidden border mt-3" style={{background:'white', borderColor:'#E5E3DF'}}>
