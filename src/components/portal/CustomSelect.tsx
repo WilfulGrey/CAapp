@@ -13,17 +13,17 @@ export const CustomSelect: FC<{
   const btnRef = useRef<HTMLButtonElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
-  // Dropdown-Breite: zum Inhalt passend (max-content). Minimum reicht für
-  // kurze Labels, Maximum bis zum Viewport-Rand, damit lange Options wie
-  // "Harninkontinenz" / "Stuhlinkontinenz" nicht abgeschnitten werden. KEIN
-  // forced minWidth = Button-Breite — sonst werden Menüs bei vollbreitem
-  // Trigger unnötig groß (z. B. Pflegegrad-Liste auf voller Zeilenbreite).
+  // Dropdown-Breite: immer mindestens so breit wie der Trigger-Button —
+  // sonst wirkt es inkonsistent, wenn manche Dropdowns voll, manche schmal
+  // sind (gleicher Form-Kontext, gleiche Feldbreite, unterschiedlich lange
+  // Optionen). Wird das Menü von einer langen Option wie „Harninkontinenz"
+  // gefordert, wächst es bis maxWidth weiter (bis zum Viewport-Rand).
   const buildDropdownStyle = (r: DOMRect): React.CSSProperties => ({
     position: 'fixed',
     top: r.bottom + 4,
     left: r.left,
-    minWidth: '8rem',
-    maxWidth: Math.max(160, window.innerWidth - r.left - 8),
+    minWidth: r.width,
+    maxWidth: Math.max(r.width, window.innerWidth - r.left - 8),
     width: 'max-content',
     zIndex: 9999,
   });
