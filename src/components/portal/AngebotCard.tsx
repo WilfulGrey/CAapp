@@ -1248,22 +1248,42 @@ export const AngebotCard: FC<{
                   </div>
                   <div>
                     <label className={labelCls}>Voraussichtliches Startdatum <span className="text-red-400">*</span></label>
-                    <input
-                      type="date"
-                      value={patient.startDate}
-                      min={new Date().toISOString().slice(0, 10)}
-                      onChange={set('startDate')}
-                      onClick={(e) => {
-                        // showPicker() öffnet den nativen Date-Picker direkt
-                        // (modern browsers: Safari 16.4+, Chrome 99+, Firefox 101+).
-                        // Bei älteren Browsern fällt es auf das Standard-Klick-Verhalten zurück.
-                        const el = e.currentTarget as HTMLInputElement & { showPicker?: () => void };
-                        if (typeof el.showPicker === 'function') {
-                          try { el.showPicker(); } catch { /* user gesture missing — kein Problem */ }
-                        }
-                      }}
-                      className={`${inputCls} cursor-pointer`}
-                    />
+                    {/* iOS-Safari-Tweaks am type=date:
+                        - [&::-webkit-date-and-time-value]:text-left — Wert linksbündig statt iOS-Default zentriert
+                        - [&::-webkit-calendar-picker-indicator]:opacity-0 — versteckt den Chrome/Edge-Default-Indikator,
+                          damit unser Kalender-Icon (svg) nicht doppelt erscheint
+                        - minWidth:0 — verhindert dass iOS dem date-Input eine eigene Min-Breite gibt, die über den
+                          Container hinausschießt
+                        - relative + absolute Icon: klassischer „Icon im Input"-Trick (pointer-events-none, damit der
+                          Klick durchgeht und showPicker() ausgelöst wird) */}
+                    <div className="relative w-full">
+                      <input
+                        type="date"
+                        value={patient.startDate}
+                        min={new Date().toISOString().slice(0, 10)}
+                        onChange={set('startDate')}
+                        onClick={(e) => {
+                          // showPicker() öffnet den nativen Date-Picker direkt
+                          // (modern browsers: Safari 16.4+, Chrome 99+, Firefox 101+).
+                          // Bei älteren Browsern fällt es auf das Standard-Klick-Verhalten zurück.
+                          const el = e.currentTarget as HTMLInputElement & { showPicker?: () => void };
+                          if (typeof el.showPicker === 'function') {
+                            try { el.showPicker(); } catch { /* user gesture missing — kein Problem */ }
+                          }
+                        }}
+                        style={{ minWidth: 0, textAlign: 'left' }}
+                        className={`${inputCls} cursor-pointer pr-10 [&::-webkit-date-and-time-value]:text-left [&::-webkit-calendar-picker-indicator]:opacity-0`}
+                      />
+                      <svg
+                        aria-hidden="true"
+                        className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-[#8B7355] pointer-events-none"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                      </svg>
+                    </div>
                     <p className="text-xs text-gray-500 mt-1.5">Wenn noch unklar — eine grobe Schätzung reicht.</p>
                   </div>
                   <div>
