@@ -5,6 +5,8 @@ import {
   jobOfferArrivalDisplay,
   customerDisplayName,
   mapMamamiaCustomerToPatientForm,
+  germanySkillBucket,
+  bucketFromDeutschkenntnisseWish,
 } from '../../lib/mamamia/mappers';
 import type { MamamiaCaregiverRef, MamamiaCustomer } from '../../lib/mamamia/types';
 
@@ -888,5 +890,61 @@ describe('mapMamamiaCustomerToPatientForm — phone', () => {
   it('prefers Customer.phone over customer_contract.phone when both set', () => {
     const r = mapMamamiaCustomerToPatientForm(makeCust('+49 89 TOP', '+49 30 CONTRACT'));
     expect(r.phone).toBe('+49 89 TOP');
+  });
+});
+
+// Mamamia hat 5 germany_skill-Stufen (level_0..level_4), der Kostenrechner und
+// damit das Kundenangebot kennen aber nur 3 (grundlegend, kommunikativ,
+// sehr-gut). Diese Helper-Tests sichern, dass die Stufen-Brücke korrekt zu
+// genau 3 Buckets gemappt wird und der Aufpreis nur greift, wenn die
+// Pflegekraft tatsächlich höher als der Wunsch liegt — sonst würden wir
+// Pflegekräfte mit passender Sprache zu Unrecht mit "+150 €/Mo" markieren.
+describe('germanySkillBucket (5-Stufen → 3-Stufen-Bridge)', () => {
+  it('maps level_0/level_1 → grund', () => {
+    expect(germanySkillBucket('level_0')).toBe('grund');
+    expect(germanySkillBucket('level_1')).toBe('grund');
+  });
+  it('maps level_2 → mittel (das ist Mamamias mittlere Stufe)', () => {
+    expect(germanySkillBucket('level_2')).toBe('mittel');
+  });
+  it('maps level_3/level_4 → gut', () => {
+    expect(germanySkillBucket('level_3')).toBe('gut');
+    expect(germanySkillBucket('level_4')).toBe('gut');
+  });
+  it('returns null for unknown/empty values', () => {
+    expect(germanySkillBucket(null)).toBeNull();
+    expect(germanySkillBucket('')).toBeNull();
+    expect(germanySkillBucket('level_99')).toBeNull();
+  });
+});
+
+describe('bucketFromDeutschkenntnisseWish (Kostenrechner → Bucket)', () => {
+  it('grundlegend → grund', () => {
+    expect(bucketFromDeutschkenntnisseWish('grundlegend')).toBe('grund');
+  });
+  it('kommunikativ → mittel', () => {
+    expect(bucketFromDeutschkenntnisseWish('kommunikativ')).toBe('mittel');
+  });
+  it('sehr-gut → gut (Bindestrich- und Underscore-Variante)', () => {
+    expect(bucketFromDeutschkenntnisseWish('sehr-gut')).toBe('gut');
+    expect(bucketFromDeutschkenntnisseWish('sehr_gut')).toBe('gut');
+  });
+  it('tolerates upper-case / whitespace from form noise', () => {
+    expect(bucketFromDeutschkenntnisseWish('  Kommunikativ ')).toBe('mittel');
+  });
+  it('null/unknown → null (Aufpreis-Logik bleibt aus)', () => {
+    expect(bucketFromDeutschkenntnisseWish(null)).toBeNull();
+    expect(bucketFromDeutschkenntnisseWish('???')).toBeNull();
+  });
+});
+
+describe('mapCaregiverToNurse — language.bucket füllt 3-Stufen-Bridge', () => {
+  it('füllt bucket aus germany_skill (level_4 → gut)', () => {
+    const n = mapCaregiverToNurse(makeCg({ germany_skill: 'level_4' }), { nowIso: NOW_ISO, nowYear: NOW_YEAR });
+    expect(n.language.bucket).toBe('gut');
+  });
+  it('bucket=null für unbekannte germany_skill (kein Aufpreis möglich)', () => {
+    const n = mapCaregiverToNurse(makeCg({ germany_skill: null }), { nowIso: NOW_ISO, nowYear: NOW_YEAR });
+    expect(n.language.bucket).toBeNull();
   });
 });

@@ -32,6 +32,8 @@ import {
   mapApplicationToUI,
   mapMatchingToNurse,
   mapCaregiverToNurse,
+  germanySkillBucket,
+  bucketFromDeutschkenntnisseWish,
 } from '../lib/mamamia/mappers';
 import { mapPatientFormToUpdateCustomerInput } from '../lib/mamamia/patientFormMapper';
 import { callMamamia, MamamiaError } from '../lib/mamamia/client';
@@ -522,6 +524,21 @@ const CustomerPortalPage: FC = () => {
   //   primary  : available_from ASC  (next available first; null/past = top)
   //   secondary: last_contact_at DESC (recently-active CGs respond faster)
   //   tertiary : hp_total_jobs   DESC (more experience first)
+  // ─── Sprach-Strikt-Filter (Kostenrechner 3 Stufen vs Mamamia 5) ────────
+  // Kostenrechner kennt nur grund/mittel/gut — Mamamia hat level_0..level_4.
+  // Ohne Filter sähe ein Kunde, der "kommunikativ" gewählt hat, auch level_4-
+  // Pflegekräfte und würde im Vertrag plötzlich +450 €/Mo Aufpreis sehen.
+  // Wir filtern daher strikt auf den passenden Bucket — lieber 1-2 Karten
+  // statt 3 mit falscher Preis-Erwartung. Wenn die Form das Feld nicht
+  // enthält (alte Leads pre-2025), bleibt der Filter aus.
+  const deutschWish: string | null | undefined = (() => {
+    const k = lead?.kalkulation as Record<string, unknown> | null | undefined;
+    const fd = k?.formularDaten as Record<string, unknown> | null | undefined;
+    const v = fd?.deutschkenntnisse;
+    return typeof v === 'string' ? v : null;
+  })();
+  const wishBucket = bucketFromDeutschkenntnisseWish(deutschWish);
+
   const effectiveMatched = (() => {
     if (IS_PREVIEW_ANY) {
       // Base matchings + post-invite-from-interest (so Maria erscheint nach
@@ -539,7 +556,11 @@ const CustomerPortalPage: FC = () => {
     // Merge open matchings (default listMatchings) + already-invited matchings
     // (filters: is_request:true). Dedup by caregiver.id — a row should never
     // appear in both lists, but be defensive against backend overlap.
+    // invitedIds merken wir uns explizit, weil der Sprach-Strikt-Filter
+    // unten eingeladene Pflegekräfte bewusst durchwinkt (sonst würde eine
+    // bereits eingeladene CG durch den Filter optisch verschwinden).
     const seen = new Set<number>();
+    const invitedIds = new Set<number>();
     const merged: typeof mmMatchings.data = [];
     for (const m of mmMatchings.data) {
       if (seen.has(m.caregiver.id)) continue;
@@ -548,6 +569,7 @@ const CustomerPortalPage: FC = () => {
     }
     if (mmInvitedMatchings?.data) {
       for (const m of mmInvitedMatchings.data) {
+        invitedIds.add(m.caregiver.id);
         if (seen.has(m.caregiver.id)) continue;
         seen.add(m.caregiver.id);
         merged.push(m);
@@ -556,6 +578,18 @@ const CustomerPortalPage: FC = () => {
 
     return merged
       .filter(m => m.is_show !== false)
+      // Strikter Sprach-Filter: wenn der Kunde ein Niveau gewählt hat UND wir
+      // die Stufe der Pflegekraft kennen, muss der Bucket exakt passen.
+      // Pflegekräfte mit fehlendem germany_skill (null) lassen wir durch —
+      // ohne Daten lieber zeigen als fälschlich rausfiltern (sehr seltener
+      // Fall, in der Prod-Stichprobe 2026-04 unter 1 %). Bereits eingeladene
+      // Pflegekräfte (invitedIds) sind ebenfalls immer sichtbar.
+      .filter(m => {
+        if (!wishBucket) return true;
+        if (invitedIds.has(m.caregiver.id)) return true;
+        const nurseBucket = germanySkillBucket(m.caregiver.germany_skill ?? null);
+        return nurseBucket === null || nurseBucket === wishBucket;
+      })
       .sort(rankComparator(now))
       .map(m => ({
         nurse: mapMatchingToNurse(m, { nowIso, nowYear }),

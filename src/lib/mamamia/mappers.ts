@@ -31,6 +31,44 @@ const GERMANY_SKILL_LEVELS: Record<string, { level: string; bars: number }> = {
   level_4: { level: 'Gut',    bars: 3 },
 };
 
+// Eine 3-Stufen-Bucket-Identifizierung — Single Source of Truth für jeden
+// Code-Pfad, der die Mamamia-5-Stufen auf unsere 3 Portal-Stufen reduzieren
+// muss (Anzeige, Sortierung, Preis-Aufpreis-Berechnung).
+export type GermanySkillBucket = 'grund' | 'mittel' | 'gut';
+
+export function germanySkillBucket(level: string | null | undefined): GermanySkillBucket | null {
+  switch (level) {
+    case 'level_0':
+    case 'level_1':
+      return 'grund';
+    case 'level_2':
+      return 'mittel';
+    case 'level_3':
+    case 'level_4':
+      return 'gut';
+    default:
+      return null;
+  }
+}
+
+// Mapping Kostenrechner-Sprachwunsch → unser 3-Bucket.
+// Quelle der Form-Werte: project 3/components/calculator/MultiStepForm.tsx
+// Step 6 ("deutschkenntnisse": grundlegend | kommunikativ | sehr-gut).
+// Wird im Customer-Portal benutzt, um Mamamia-Matchings strikt auf den
+// vom Kunden im Kostenrechner gewählten Bucket zu filtern. Die zugehörigen
+// Preise (0/150/450 €/Mo) leben ausschließlich in `pricing_config` — wir
+// duplizieren sie hier bewusst NICHT, damit Admin-Änderungen am Preis
+// nicht zu einer stillen Drift mit hardcoded Konstanten führen.
+export function bucketFromDeutschkenntnisseWish(
+  deutschkenntnisse: string | null | undefined,
+): GermanySkillBucket | null {
+  const v = (deutschkenntnisse ?? '').toLowerCase().trim();
+  if (v === 'grundlegend') return 'grund';
+  if (v === 'kommunikativ') return 'mittel';
+  if (v === 'sehr-gut' || v === 'sehr_gut') return 'gut';
+  return null;
+}
+
 // ─── Mamamia → German translation maps ───────────────────────────────────
 // Mamamia returns enum keys (e.g. "high_school") and English-language
 // labels (e.g. "Polish", "cooking", "Wheelchair") on Caregiver lookup
@@ -343,7 +381,7 @@ export function mapCaregiverToNurse(
       const diff = (new Date(cg.available_from).getTime() - new Date(opts.nowIso).getTime()) / (24 * 60 * 60 * 1000);
       return diff <= 14;
     })(),
-    language: skill,
+    language: { ...skill, bucket: germanySkillBucket(cg.germany_skill ?? null) },
     color: COLORS[cg.id % COLORS.length],
     addedTime: formatAddedTime(cg.last_contact_at, opts.nowIso),
     isLive: isLiveNow(cg.is_active_user, cg.last_login_at, opts.nowIso),
