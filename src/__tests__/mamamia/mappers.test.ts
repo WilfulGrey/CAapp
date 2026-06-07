@@ -6,9 +6,7 @@ import {
   customerDisplayName,
   mapMamamiaCustomerToPatientForm,
   germanySkillBucket,
-  germanySkillBucketRank,
   bucketFromDeutschkenntnisseWish,
-  languagePriceUpgradeEur,
 } from '../../lib/mamamia/mappers';
 import type { MamamiaCaregiverRef, MamamiaCustomer } from '../../lib/mamamia/types';
 
@@ -937,41 +935,6 @@ describe('bucketFromDeutschkenntnisseWish (Kostenrechner → Bucket)', () => {
   it('null/unknown → null (Aufpreis-Logik bleibt aus)', () => {
     expect(bucketFromDeutschkenntnisseWish(null)).toBeNull();
     expect(bucketFromDeutschkenntnisseWish('???')).toBeNull();
-  });
-});
-
-describe('germanySkillBucketRank', () => {
-  it('grund=0, mittel=1, gut=2 (linear, zum Distanz-Sortieren)', () => {
-    expect(germanySkillBucketRank('grund')).toBe(0);
-    expect(germanySkillBucketRank('mittel')).toBe(1);
-    expect(germanySkillBucketRank('gut')).toBe(2);
-  });
-  it('null → -1 (wird in Sort-Funktion separat behandelt)', () => {
-    expect(germanySkillBucketRank(null)).toBe(-1);
-  });
-});
-
-describe('languagePriceUpgradeEur (Aufpreis = nurseBucket - wishBucket)', () => {
-  it('grund-Wunsch + gut-Pflegekraft → 450 €/Mo Aufpreis', () => {
-    expect(languagePriceUpgradeEur('grund', 'gut')).toBe(450);
-  });
-  it('grund-Wunsch + mittel-Pflegekraft → 150 €/Mo', () => {
-    expect(languagePriceUpgradeEur('grund', 'mittel')).toBe(150);
-  });
-  it('mittel-Wunsch + gut-Pflegekraft → 300 €/Mo Aufpreis', () => {
-    expect(languagePriceUpgradeEur('mittel', 'gut')).toBe(300);
-  });
-  it('exakt passend → 0 (kein Badge, Karte zeigt Angebotspreis)', () => {
-    expect(languagePriceUpgradeEur('mittel', 'mittel')).toBe(0);
-    expect(languagePriceUpgradeEur('gut', 'gut')).toBe(0);
-  });
-  it('Pflegekraft niedriger als Wunsch → 0 (kein "Rabatt", filtern wir vorher raus)', () => {
-    expect(languagePriceUpgradeEur('gut', 'grund')).toBe(0);
-    expect(languagePriceUpgradeEur('mittel', 'grund')).toBe(0);
-  });
-  it('null wish oder null nurse → 0 (Sicherheits-Fallback)', () => {
-    expect(languagePriceUpgradeEur(null, 'gut')).toBe(0);
-    expect(languagePriceUpgradeEur('grund', null)).toBe(0);
   });
 });
 

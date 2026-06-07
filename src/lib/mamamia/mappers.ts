@@ -51,17 +51,14 @@ export function germanySkillBucket(level: string | null | undefined): GermanySki
   }
 }
 
-// Numerischer Rang fürs Sortieren — niedriger = einfachere Sprache, höher =
-// bessere. Für Distanz-Berechnungen geeignet (z.B. „eine Stufe höher als Wunsch").
-export function germanySkillBucketRank(bucket: GermanySkillBucket | null): number {
-  if (bucket === 'grund') return 0;
-  if (bucket === 'mittel') return 1;
-  if (bucket === 'gut') return 2;
-  return -1;
-}
-
 // Mapping Kostenrechner-Sprachwunsch → unser 3-Bucket.
-// (Werte siehe project 3/components/calculator/MultiStepForm.tsx Step 6.)
+// Quelle der Form-Werte: project 3/components/calculator/MultiStepForm.tsx
+// Step 6 ("deutschkenntnisse": grundlegend | kommunikativ | sehr-gut).
+// Wird im Customer-Portal benutzt, um Mamamia-Matchings strikt auf den
+// vom Kunden im Kostenrechner gewählten Bucket zu filtern. Die zugehörigen
+// Preise (0/150/450 €/Mo) leben ausschließlich in `pricing_config` — wir
+// duplizieren sie hier bewusst NICHT, damit Admin-Änderungen am Preis
+// nicht zu einer stillen Drift mit hardcoded Konstanten führen.
 export function bucketFromDeutschkenntnisseWish(
   deutschkenntnisse: string | null | undefined,
 ): GermanySkillBucket | null {
@@ -70,30 +67,6 @@ export function bucketFromDeutschkenntnisseWish(
   if (v === 'kommunikativ') return 'mittel';
   if (v === 'sehr-gut' || v === 'sehr_gut') return 'gut';
   return null;
-}
-
-// Sprach-Aufpreis pro 3-Stufen-Bucket — gespiegelt aus pricing_config
-// (kategorie='deutschkenntnisse'). Quelle: Supabase 2026-06-07.
-//   grund (grundlegend)    → +0    €/Monat
-//   mittel (kommunikativ)  → +150  €/Monat
-//   gut (sehr-gut)         → +450  €/Monat
-const LANGUAGE_BUCKET_MONTHLY_EUR: Record<GermanySkillBucket, number> = {
-  grund: 0,
-  mittel: 150,
-  gut: 450,
-};
-
-// Differenz zwischen Wunsch-Bucket und dem Bucket einer Pflegekraft.
-// Positiv → Pflegekraft ist BESSER als gewünscht (Aufpreis fällig).
-// 0 oder negativ → Pflegekraft ist auf gewünschtem Niveau oder schlechter
-// (kein Aufpreis — wir geben nichts zurück).
-export function languagePriceUpgradeEur(
-  wishBucket: GermanySkillBucket | null,
-  nurseBucket: GermanySkillBucket | null,
-): number {
-  if (!wishBucket || !nurseBucket) return 0;
-  const delta = LANGUAGE_BUCKET_MONTHLY_EUR[nurseBucket] - LANGUAGE_BUCKET_MONTHLY_EUR[wishBucket];
-  return delta > 0 ? delta : 0;
 }
 
 // ─── Mamamia → German translation maps ───────────────────────────────────
