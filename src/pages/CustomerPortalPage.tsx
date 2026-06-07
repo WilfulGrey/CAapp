@@ -78,7 +78,13 @@ const IS_PREVIEW_VERTRAG = PREVIEW_PARAM === 'vertrag';
 // Dev-only prototype of the (translated, guard-railed) chat with the applied
 // caregiver — opens the chat directly over the bewerbung layout.
 const IS_PREVIEW_CHAT = PREVIEW_PARAM === 'chat';
-const IS_PREVIEW_ANY = IS_PREVIEW_BEWERBUNG || IS_PREVIEW_INTERESSE || IS_PREVIEW_GEBUCHT || IS_PREVIEW_CHAT;
+// Dev-only preview of the patient form (AngebotCard expanded). Forces
+// patientSaved=false + no pending applications, so the Patientendaten-Card
+// ist sichtbar und der Wizard durchspielbar — sonst versteckt das Portal
+// die Karte sobald entweder Bewerbungen offen sind oder das Profil als
+// gespeichert gilt.
+const IS_PREVIEW_PATIENT = PREVIEW_PARAM === 'patient';
+const IS_PREVIEW_ANY = IS_PREVIEW_BEWERBUNG || IS_PREVIEW_INTERESSE || IS_PREVIEW_GEBUCHT || IS_PREVIEW_CHAT || IS_PREVIEW_PATIENT;
 
 const PREVIEW_LEAD: Lead = {
   id: 'preview-lead-1',
@@ -303,9 +309,13 @@ const CustomerPortalPage: FC = () => {
   const [showContactPopup, setShowContactPopup] = useState(false);
   const [exitingIds, setExitingIds] = useState<Set<string>>(new Set());
   const [toast, setToast] = useState<string | null>(null);
-  const [patientSaved, setPatientSaved] = useState(IS_PREVIEW_ANY);
+  // Patientendaten-Card im Preview-Modus normalerweise als „bereits gespeichert"
+  // markieren (versteckt die Karte). Ausnahme: ?preview=patient zeigt die
+  // Karte explizit — Profile-Card direkt geöffnet, damit man den Wizard
+  // visuell testen kann.
+  const [patientSaved, setPatientSaved] = useState(IS_PREVIEW_ANY && !IS_PREVIEW_PATIENT);
   const [showPatientReminder, setShowPatientReminder] = useState(false);
-  const [triggerOpenPatient, setTriggerOpenPatient] = useState(false);
+  const [triggerOpenPatient, setTriggerOpenPatient] = useState(IS_PREVIEW_PATIENT);
   const [openFaq, setOpenFaq] = useState<number | null>(null);
   // Manual override for the "Ihr Angebot" expand/collapse. null = follow
   // the auto rule below (expanded only in initial state). Toggling sets
@@ -1708,6 +1718,7 @@ const CustomerPortalPage: FC = () => {
           { text: 'Täglich kündbar' },
           { text: 'Tagesgenaue Abrechnung' },
           { text: 'Kosten entstehen immer erst, wenn Pflegekraft vor Ort ist' },
+          { text: 'Direktanbieter ohne Vermittlungsgebühren' },
         ];
         return (
         <div style={{background:'#F8F7F5'}}>
