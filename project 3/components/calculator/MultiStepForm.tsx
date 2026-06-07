@@ -43,10 +43,13 @@ function MatchingAnimation({ onComplete, initialCount }: { onComplete: (finalCou
   }, []);
 
   // Pflegekraft-Zähler läuft während Step 1 (Index 1) auf eine personalisierte
-  // Endzahl (target=12) herunter — fühlt sich wie eine echte Filterung an.
+  // Endzahl (target=3) herunter — fühlt sich wie eine echte Filterung an.
+  // Vorher 12 — angepasst auf 3, weil im Portal aktuell nur die Top 3
+  // Pflegekräfte angezeigt werden und größere Zahlen falsche Erwartungen
+  // wecken.
   useEffect(() => {
     if (activeStep !== 1) return;
-    const target = 12;
+    const target = 3;
     const iv = setInterval(() => {
       setNurseCount(prev => {
         const next = prev - Math.ceil((prev - target) / 14);
