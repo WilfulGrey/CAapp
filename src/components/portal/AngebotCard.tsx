@@ -1241,10 +1241,30 @@ export const AngebotCard: FC<{
               {step === 4 && (
                 <>
                   <div className="rounded-2xl bg-[#FBF6EE] border border-[#E8D9BC] px-4 py-3.5 space-y-1.5">
-                    <p className="text-sm font-bold text-[#5C4422]">Fast geschafft</p>
+                    <p className="text-sm font-bold text-[#5C4422]">Jetzt kann es losgehen.</p>
                     <p className="text-sm text-gray-700 leading-relaxed">
-                      Damit wir Sie bei Rückfragen erreichen können.
+                      Bitte vervollständigen Sie noch Ihre Angaben, damit Sie Pflegekräfte anfragen und Bewerbungen erhalten können – unverbindlich und kostenfrei.
                     </p>
+                  </div>
+                  <div>
+                    <label className={labelCls}>Voraussichtliches Startdatum <span className="text-red-400">*</span></label>
+                    <input
+                      type="date"
+                      value={patient.startDate}
+                      min={new Date().toISOString().slice(0, 10)}
+                      onChange={set('startDate')}
+                      onClick={(e) => {
+                        // showPicker() öffnet den nativen Date-Picker direkt
+                        // (modern browsers: Safari 16.4+, Chrome 99+, Firefox 101+).
+                        // Bei älteren Browsern fällt es auf das Standard-Klick-Verhalten zurück.
+                        const el = e.currentTarget as HTMLInputElement & { showPicker?: () => void };
+                        if (typeof el.showPicker === 'function') {
+                          try { el.showPicker(); } catch { /* user gesture missing — kein Problem */ }
+                        }
+                      }}
+                      className={`${inputCls} cursor-pointer`}
+                    />
+                    <p className="text-xs text-gray-500 mt-1.5">Wenn noch unklar — eine grobe Schätzung reicht.</p>
                   </div>
                   <div>
                     <label className={labelCls}>Ihr Name <span className="text-red-400">*</span></label>
@@ -1273,26 +1293,6 @@ export const AngebotCard: FC<{
                         Bitte eine gültige deutsche Telefonnummer eingeben — z.&nbsp;B. <span className="font-mono">+49&nbsp;89&nbsp;200&nbsp;000&nbsp;830</span> oder <span className="font-mono">089&nbsp;200&nbsp;000&nbsp;830</span>.
                       </p>
                     )}
-                  </div>
-                  <div>
-                    <label className={labelCls}>Voraussichtliches Startdatum <span className="text-red-400">*</span></label>
-                    <input
-                      type="date"
-                      value={patient.startDate}
-                      min={new Date().toISOString().slice(0, 10)}
-                      onChange={set('startDate')}
-                      onClick={(e) => {
-                        // showPicker() öffnet den nativen Date-Picker direkt
-                        // (modern browsers: Safari 16.4+, Chrome 99+, Firefox 101+).
-                        // Bei älteren Browsern fällt es auf das Standard-Klick-Verhalten zurück.
-                        const el = e.currentTarget as HTMLInputElement & { showPicker?: () => void };
-                        if (typeof el.showPicker === 'function') {
-                          try { el.showPicker(); } catch { /* user gesture missing — kein Problem */ }
-                        }
-                      }}
-                      className={`${inputCls} cursor-pointer`}
-                    />
-                    <p className="text-xs text-gray-500 mt-1.5">Wenn noch unklar — eine grobe Schätzung reicht.</p>
                   </div>
                 </>
               )}
