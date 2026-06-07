@@ -1243,7 +1243,7 @@ export const AngebotCard: FC<{
                   <div className="rounded-2xl bg-[#FBF6EE] border border-[#E8D9BC] px-4 py-3.5 space-y-1.5">
                     <p className="text-sm font-bold text-[#5C4422]">Fast geschafft</p>
                     <p className="text-sm text-gray-700 leading-relaxed">
-                      Damit wir Sie persönlich ansprechen und bei Rückfragen erreichen können, benötigen wir noch Ihren Namen, Ihre Telefonnummer und ein voraussichtliches Startdatum (gerne grob geschätzt, falls noch unklar).
+                      Damit wir Sie bei Rückfragen erreichen können.
                     </p>
                   </div>
                   <div>
