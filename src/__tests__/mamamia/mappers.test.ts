@@ -169,6 +169,78 @@ describe('mapCaregiverToNurse', () => {
     );
     expect(n.image).toBeUndefined();
   });
+
+  // ─── referencePdfUrl from certificates (Referenz_*.pdf) ───────────────
+  describe('referencePdfUrl', () => {
+    it('undefined when no certificates', () => {
+      const n = mapCaregiverToNurse(makeCg(), { nowIso: NOW_ISO, nowYear: NOW_YEAR });
+      expect(n.referencePdfUrl).toBeUndefined();
+    });
+
+    it('undefined when certificates have no Referenz_*.pdf', () => {
+      const n = mapCaregiverToNurse(
+        makeCg({
+          certificates: [
+            { original_name: 'Zertifikat_Pflege.pdf', aws_url: 'https://s3/z.pdf', created_at: '2026-01-01T00:00:00Z', mime_type: 'application/pdf' },
+            { original_name: 'Ausweis.jpg', aws_url: 'https://s3/a.jpg', created_at: '2026-02-01T00:00:00Z', mime_type: 'image/jpeg' },
+          ],
+        }),
+        { nowIso: NOW_ISO, nowYear: NOW_YEAR },
+      );
+      expect(n.referencePdfUrl).toBeUndefined();
+    });
+
+    it('picks the Referenz_*.pdf (CG 12082 example)', () => {
+      const n = mapCaregiverToNurse(
+        makeCg({
+          certificates: [
+            { original_name: 'Zertifikat_Pflege.pdf', aws_url: 'https://s3/z.pdf', created_at: '2026-01-01T00:00:00Z', mime_type: 'application/pdf' },
+            { original_name: 'Referenz_S_Wadysaw_2026-06-08.pdf', aws_url: 'https://s3/ref-0608.pdf', created_at: '2026-06-08T10:00:00Z', mime_type: 'application/pdf' },
+          ],
+        }),
+        { nowIso: NOW_ISO, nowYear: NOW_YEAR },
+      );
+      expect(n.referencePdfUrl).toBe('https://s3/ref-0608.pdf');
+    });
+
+    it('picks the NEWEST when multiple Referenz files exist', () => {
+      const n = mapCaregiverToNurse(
+        makeCg({
+          certificates: [
+            { original_name: 'Referenz_Alt_2025-03-01.pdf', aws_url: 'https://s3/old.pdf', created_at: '2025-03-01T00:00:00Z', mime_type: 'application/pdf' },
+            { original_name: 'Referenz_Neu_2026-06-08.pdf', aws_url: 'https://s3/new.pdf', created_at: '2026-06-08T00:00:00Z', mime_type: 'application/pdf' },
+            { original_name: 'Referenz_Mittel_2026-01-15.pdf', aws_url: 'https://s3/mid.pdf', created_at: '2026-01-15T00:00:00Z', mime_type: 'application/pdf' },
+          ],
+        }),
+        { nowIso: NOW_ISO, nowYear: NOW_YEAR },
+      );
+      expect(n.referencePdfUrl).toBe('https://s3/new.pdf');
+    });
+
+    it('ignores a Referenz match that has no aws_url', () => {
+      const n = mapCaregiverToNurse(
+        makeCg({
+          certificates: [
+            { original_name: 'Referenz_NoUrl.pdf', aws_url: null, created_at: '2026-06-08T00:00:00Z', mime_type: 'application/pdf' },
+          ],
+        }),
+        { nowIso: NOW_ISO, nowYear: NOW_YEAR },
+      );
+      expect(n.referencePdfUrl).toBeUndefined();
+    });
+
+    it('matches case-insensitively (referenz_*.pdf)', () => {
+      const n = mapCaregiverToNurse(
+        makeCg({
+          certificates: [
+            { original_name: 'referenz_klein.PDF', aws_url: 'https://s3/ci.pdf', created_at: '2026-06-08T00:00:00Z', mime_type: 'application/pdf' },
+          ],
+        }),
+        { nowIso: NOW_ISO, nowYear: NOW_YEAR },
+      );
+      expect(n.referencePdfUrl).toBe('https://s3/ci.pdf');
+    });
+  });
 });
 
 describe('mapCaregiverToNurse — full profile (translations + units)', () => {
