@@ -109,15 +109,21 @@ export function buildReportEmail(opts: {
     </tr>`;
   }).join("");
 
-  // Funnel: Anzahl Sessions, die jeden Step gesehen haben + Drop %. Schritt
-  // TOTAL_STEPS ist der letzte (Kontaktformular) — danach gibt es keinen
-  // weiteren Step, drop wird nicht berechnet.
+  // Funnel: Anzahl Sessions, die jeden Step gesehen haben + Drop %. Beim
+  // letzten Step (Kontaktformular = TOTAL_STEPS) berechnen wir den Drop
+  // gegen die ECHTEN Leads in der DB (wizardCompleted), nicht gegen einen
+  // nicht existierenden Step+1 — das ist genau der Übergang, der vorher
+  // unsichtbar war ("15 Kontaktformular-Views → 2 echte Leads" sah aus
+  // wie ein Bug, ist aber der entscheidende letzte Drop im Funnel).
   const funnelHtml = Array.from({ length: TOTAL_STEPS }, (_, i) => i + 1).map((step) => {
     const viewed = yesterday.funnelStepViewed[step] ?? 0;
-    const next = yesterday.funnelStepViewed[step + 1] ?? 0;
-    const dropTo = step < TOTAL_STEPS ? Math.max(0, viewed - next) : 0;
-    const dropPct = step < TOTAL_STEPS && viewed > 0 ? ((dropTo / viewed) * 100).toFixed(0) : null;
-    const dropCell = step < TOTAL_STEPS && viewed > 0
+    const isLastStep = step === TOTAL_STEPS;
+    const next = isLastStep
+      ? yesterday.wizardCompletedIncludingTests
+      : (yesterday.funnelStepViewed[step + 1] ?? 0);
+    const dropTo = Math.max(0, viewed - next);
+    const dropPct = viewed > 0 ? ((dropTo / viewed) * 100).toFixed(0) : null;
+    const dropCell = viewed > 0
       ? `<span style="color:${dropPct && parseFloat(dropPct) >= 50 ? "#B71C1C" : "#9CA3AF"};font-size:12px;">drop ${dropPct}% (${dropTo})</span>`
       : `<span style="color:#9CA3AF;font-size:12px;">—</span>`;
     return `<tr>
@@ -127,6 +133,30 @@ export function buildReportEmail(opts: {
       <td style="padding:6px 12px;text-align:right;width:25%;">${dropCell}</td>
     </tr>`;
   }).join("");
+
+  // Brückenzeile NACH Step 9: Lead tatsächlich in der DB gelandet. Vorher
+  // endete der Funnel bei "Kontaktformular: 15 — drop —" und die Übersicht
+  // oben zeigte "Wizard abgeschlossen: 2" — kein sichtbarer Bezug.
+  // Wir rendern hier 2 Zeilen damit der Test-Split offen liegt:
+  //   • alle Leads gestern (inkl. Tests)
+  //   • davon echte (= wizardCompleted, fließt in alle Conv-Raten)
+  const testLeadsHidden = Math.max(
+    0,
+    yesterday.wizardCompletedIncludingTests - yesterday.wizardCompleted,
+  );
+  const completionBridgeHtml = `
+    <tr style="background:#fafafa;">
+      <td style="padding:6px 12px;color:#888;font-size:12px;width:8%;border-top:1px solid #f0ebe4;">→</td>
+      <td style="padding:6px 12px;color:#3D3D3D;font-size:12px;width:42%;border-top:1px solid #f0ebe4;">Lead in DB gespeichert (alle, inkl. Tests)</td>
+      <td style="padding:6px 12px;color:#3D3D3D;font-size:12px;font-weight:700;text-align:right;width:25%;border-top:1px solid #f0ebe4;">${yesterday.wizardCompletedIncludingTests}</td>
+      <td style="padding:6px 12px;text-align:right;width:25%;border-top:1px solid #f0ebe4;"><span style="color:#9CA3AF;font-size:12px;">—</span></td>
+    </tr>
+    <tr style="background:#fafafa;">
+      <td style="padding:6px 12px;color:#888;font-size:12px;width:8%;">→</td>
+      <td style="padding:6px 12px;color:#3D3D3D;font-size:12px;width:42%;"><strong style="color:#2D6A4F;">Echte Leads (ohne Tests)</strong>${testLeadsHidden > 0 ? ` <span style="color:#9CA3AF;">· ${testLeadsHidden} Test ausgefiltert</span>` : ""}</td>
+      <td style="padding:6px 12px;color:#2D6A4F;font-size:12px;font-weight:700;text-align:right;width:25%;">${yesterday.wizardCompleted}</td>
+      <td style="padding:6px 12px;text-align:right;width:25%;"><span style="color:#9CA3AF;font-size:12px;">—</span></td>
+    </tr>`;
 
   // Geräte + Quellen
   const devTotal = yesterday.deviceMobile + yesterday.deviceDesktop + yesterday.deviceTablet || 1;
@@ -181,8 +211,13 @@ export function buildReportEmail(opts: {
 
         <p style="margin:24px 0 8px;font-size:14px;font-weight:700;color:#3D2B1F;">Wizard-Funnel (Sessions pro Step, Gestern)</p>
         <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="border:1px solid #e8ddd0;border-radius:8px;overflow:hidden;background:#fff;">
-          <tbody>${funnelHtml}</tbody>
+          <tbody>${funnelHtml}${completionBridgeHtml}</tbody>
         </table>
+        <p style="margin:6px 0 0;font-size:11px;color:#9a8a73;line-height:1.5;">
+          Steps 1–9 zählen <em>unique Sessions</em>, die den Step gesehen haben (Quelle: <code>analytics_events.step_view</code>, inkl. Tests).
+          Die letzten zwei Zeilen zählen tatsächlich gespeicherte Leads in der DB (Quelle: <code>leads.created_at</code>).
+          Der Sprung &bdquo;Step 9 → echte Leads&ldquo; ist der eigentliche letzte Drop — wer das Kontaktformular sieht, aber nicht abschickt, fällt hier raus.
+        </p>
 
         <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="margin-top:24px;">
           <tr>
@@ -233,10 +268,14 @@ ${convRows.map((r) => `  ${r.label.padEnd(50)} ${r.today.padStart(6)}   Ø ${fmt
 WIZARD-FUNNEL (Gestern)
 ${Array.from({ length: TOTAL_STEPS }, (_, i) => i + 1).map((s) => {
   const v = yesterday.funnelStepViewed[s] ?? 0;
-  const next = yesterday.funnelStepViewed[s + 1] ?? 0;
-  const drop = s < TOTAL_STEPS && v > 0 ? ` (drop ${((Math.max(0, v - next) / v) * 100).toFixed(0)}%)` : "";
+  const next = s === TOTAL_STEPS
+    ? yesterday.wizardCompletedIncludingTests
+    : (yesterday.funnelStepViewed[s + 1] ?? 0);
+  const drop = v > 0 ? ` (drop ${((Math.max(0, v - next) / v) * 100).toFixed(0)}%)` : "";
   return `  ${s}. ${STEP_NAMES[s].padEnd(34)} ${String(v).padStart(4)}${drop}`;
 }).join("\n")}
+  → Lead in DB (alle, inkl. Tests)        ${String(yesterday.wizardCompletedIncludingTests).padStart(4)}
+  → Echte Leads (ohne Tests)              ${String(yesterday.wizardCompleted).padStart(4)}
 
 GERÄTE (Gestern)
   Mobile:  ${yesterday.deviceMobile}
