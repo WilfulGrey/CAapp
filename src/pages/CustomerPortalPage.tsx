@@ -105,7 +105,20 @@ const PREVIEW_LEAD: Lead = {
     bruttopreis: 3050,
     eigenanteil: 2150,
     zuschüsse: { gesamt: 900 },
-    formularDaten: {},
+    // Realistischer anspruchsvoller Lead, damit der Chat-Preview die volle
+    // Bandbreite kontextueller Chip-Vorschläge zeigt: Ehepaar (couple-care),
+    // PG4 (pflegegrad-hoch), Rollstuhl (mobility), Demenz, Nachteinsätze,
+    // gutes Deutsch + Deutsch-Confirmation Chip.
+    formularDaten: {
+      betreuung_fuer: 'ehepaar',
+      pflegegrad: 4,
+      mobilitaet: 'rollstuhl',
+      nachteinsaetze: 'taeglich',
+      deutschkenntnisse: 'sehr-gut',
+      demenz: 'ja',
+      fuehrerschein: 'ja',
+      geschlecht: 'weiblich',
+    },
     aufschluesselung: [],
   } as any,
   created_at: new Date().toISOString(),
@@ -2485,9 +2498,73 @@ const CustomerPortalPage: FC = () => {
       )}
 
       {/* Chat mit der beworbenen Pflegekraft (Prototyp) */}
-      {chatNurse && (
-        <PflegekraftChat nurse={chatNurse} onClose={() => setChatNurse(null)} />
-      )}
+      {chatNurse && (() => {
+        // Kontextuelle Chat-Vorschläge: wir bauen den primitiven Input für
+        // buildChatSuggestions zusammen aus (a) Lead-Kalkulator-Antworten,
+        // (b) Mamamia-Customer (smoking_household), (c) erstem Patienten
+        // (Demenz, Inkontinenz) und (d) der konkreten Bewerbung dieser PK
+        // (arrival_at/departure_at). Wenn nichts davon vorhanden ist,
+        // fällt der Chat auf die generischen 5 Chips zurück.
+        const fd = (lead?.kalkulation as { formularDaten?: Record<string, unknown> } | null | undefined)?.formularDaten;
+        // Suche die konkrete Bewerbung dieser PK über die caregiver_id.
+        // In Preview-Modus existiert `apps` evtl. nicht — wir greifen
+        // defensiv darauf zu.
+        const chatApplication = chatNurse.caregiverId != null
+          ? applications.find(a => a.nurse.caregiverId === chatNurse.caregiverId)
+          : undefined;
+        // Datums-Helper: Mamamia liefert ISO (YYYY-MM-DD), die CAapp-interne
+        // Application speichert deutsche Strings (TT.MM.JJJJ — Preview-Daten).
+        // Wir konvertieren beide Seiten zu ISO, damit Vergleich + Anzeige
+        // konsistent funktionieren.
+        const toIso = (d: string | null | undefined): string | null => {
+          if (!d) return null;
+          if (/^\d{4}-\d{2}-\d{2}/.test(d)) return d;
+          const m = /^(\d{2})\.(\d{2})\.(\d{4})/.exec(d);
+          if (m) return `${m[3]}-${m[2]}-${m[1]}`;
+          return null;
+        };
+        // PK-Angebot aus der konkreten Bewerbung
+        const applicationArrivalAt = toIso(chatApplication?.offer?.anreisedatum ?? null);
+        const applicationDepartureAt = toIso(chatApplication?.offer?.abreisedatum ?? null);
+        // Kundenwunsch aus Mamamia Customer (nach Patient-Form-Save).
+        // Im Preview-Modus zeigen wir den "Anreise früher"-Chip, indem wir
+        // bewusst ein 4 Tage früheres Wunschdatum als das PK-Angebot setzen.
+        const customerArrivalAt = IS_PREVIEW_CHAT
+          ? '2026-05-15'
+          : (mmCustomer?.arrival_at ?? null);
+        // Patient-Quellen: Demenz aus Mamamia (strukturiert) oder Fallback
+        // auf den Kostenrechner-Freitext; Inkontinenz nur über Mamamia.
+        const firstPatient = mmCustomer?.patients?.[0];
+        const patientHasDementia =
+          firstPatient?.dementia === 'yes'
+          || ['ja', 'yes'].includes(((fd?.demenz ?? '') as string).toLowerCase().trim());
+        const patientHasIncontinence = !!(
+          firstPatient?.incontinence
+          || firstPatient?.incontinence_feces
+          || firstPatient?.incontinence_urine
+        );
+        // Smoking-Status: Mamamia gibt 'yes'|'yes_outside'|'no' (snake_case)
+        // — entspricht direkt unserem Helper-Enum. Bei fehlenden Werten
+        // bleibt der Chip einfach aus.
+        const householdSmoking = (mmCustomer?.smoking_household as 'yes' | 'yes_outside' | 'no' | null | undefined) ?? null;
+        const nurseSmoking = (chatNurse.profile?.smoking as 'yes' | 'yes_outside' | 'no' | null | undefined) ?? null;
+        return (
+          <PflegekraftChat
+            nurse={chatNurse}
+            onClose={() => setChatNurse(null)}
+            suggestionContext={{
+              formularDaten: fd as never,
+              applicationArrivalAt,
+              applicationDepartureAt,
+              customerArrivalAt,
+              patientHasDementia,
+              patientHasIncontinence,
+              householdSmoking,
+              nurseSmoking,
+            }}
+          />
+        );
+      })()}
 
       {/* Angebot prüfen Modal */}
       {selectedApp && (
