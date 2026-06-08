@@ -1047,7 +1047,21 @@ const generateCaregiverAbout: ActionHandler = async (_session, variables, deps) 
 // listApplications: query bound to session.job_offer_id, customer can
 // never read interests for somebody else's offer.
 const listInterests: ActionHandler = async (session, _variables, deps) => {
-  return await runGraphQL(deps, LIST_INTERESTS, { id: session.job_offer_id });
+  const r = await runGraphQL<{
+    JobOffer: { interests: Array<{ caregiver: Record<string, unknown> | null }> } | null;
+  }>(deps, LIST_INTERESTS, { id: session.job_offer_id });
+  const rows = r.JobOffer?.interests ?? [];
+  const certMap = await fetchCertificatesByCaregiver(
+    deps,
+    rows.map((i) => i.caregiver?.id as number).filter((n): n is number => typeof n === "number"),
+  );
+  for (const i of rows) {
+    const id = i.caregiver?.id as number | undefined;
+    if (i.caregiver && typeof id === "number" && certMap.has(id)) {
+      i.caregiver.certificates = certMap.get(id);
+    }
+  }
+  return r;
 };
 
 // Returns local dismiss-set for THIS lead. Frontend uses it to filter
