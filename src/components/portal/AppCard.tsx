@@ -1,4 +1,5 @@
 import type { FC } from 'react';
+import { FileText } from 'lucide-react';
 import type { Nurse } from '../../types';
 import type { Application } from './shared';
 import { nurseLevel, displayName, initials } from './shared';
@@ -74,6 +75,15 @@ export const AppCard: FC<{
                 ))}
               </div>
               <span className="text-sm text-gray-500">Deutsch {nurse.language.level}</span>
+              {nurse.referencePdfUrl && (
+                <span
+                  className="inline-flex items-center gap-0.5 text-[10px] font-medium text-[#8B7355] bg-[#F8F7F5] border border-[#C4B49A] px-1.5 py-0.5 rounded-full"
+                  title="Referenzen im Profil"
+                >
+                  <FileText className="w-2.5 h-2.5" />
+                  Referenzen
+                </span>
+              )}
             </div>
             <p className="text-sm text-gray-500 truncate">
               <span className="font-semibold text-[#8B7355]">{nurse.experience}</span>
@@ -106,11 +116,12 @@ export const AppCard: FC<{
           (pr-8546-1). Defense in depth: also dropped from the
           LIST_APPLICATIONS GraphQL query so it never reaches the proxy.
           → coverMessage (separates, customer-safe Feld) wird stattdessen
-          unten als „Nachricht von …" Zitat-Box angezeigt.
+          unten als „Vorstellung der Pflegekraft" Zitat-Box angezeigt — die
+          Agentur formuliert den Text i.d.R. in Ich-Form, nicht die PK selbst.
         */}
         {app.coverMessage && (
           <div className="mb-3 rounded-xl bg-[#F8F7F5] border border-[#E5E3DF] px-4 py-3">
-            <p className="text-[11px] font-semibold text-[#8B7355] uppercase tracking-wide mb-1.5">Nachricht von {vorname}</p>
+            <p className="text-[11px] font-semibold text-[#8B7355] uppercase tracking-wide mb-1.5">Vorstellung der Pflegekraft</p>
             <p className="text-sm leading-relaxed text-gray-700 italic">„{app.coverMessage}"</p>
           </div>
         )}

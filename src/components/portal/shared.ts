@@ -33,7 +33,11 @@ export interface Application {
   message: string;
   offer: OfferDetails;
   isInvited?: boolean;
-  // Persönliche Bewerbungs-Nachricht der Pflegekraft (an den Kunden gerichtet).
+  // Vorstellungs-Text zur Pflegekraft, an den Kunden gerichtet (im Portal
+  // unter „Vorstellung der Pflegekraft" angezeigt). Wird i.d.R. von der
+  // Vermittlungs-Agentur formuliert und in Ich-Form unterschrieben — die PK
+  // schreibt es nicht selbst. Daher Label NICHT „Nachricht von Maria"
+  // (wäre falsche Zuschreibung).
   // ACHTUNG: NICHT identisch mit Mamamias `application.message` (agency-internal,
   // enthält Backoffice-Notizen mit Telefon/Gehalt → dauerhaft NICHT anzeigen).
   // Quelle für dieses Feld ist offen: entweder ein neues Mamamia-Feld

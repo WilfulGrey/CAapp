@@ -38,6 +38,13 @@ export interface Nurse {
     avgDurationMonths: number;
   };
   detailedAssignments?: Assignment[];
+  /** URL zur Referenzen-PDF der Pflegekraft — eine Datei, die eine oder
+   *  mehrere Empfehlungen früherer Familien enthalten kann. Wird im
+   *  Profil-Modal als prominenter Link gerendert und in den Listen-Karten
+   *  als kleines Icon-Badge angezeigt, sofern vorhanden. Quelle: Mamamia
+   *  Caregiver-Feld (Backend-Anbindung folgt in separatem PR — bis dahin
+   *  nur in Preview/Tests befüllt). */
+  referencePdfUrl?: string | null;
   // Real Caregiver profile fields (from Mamamia GET_CAREGIVER).
   // Optional because Matching cards initially only have a caregiver subset;
   // populated when the modal opens and useCaregiver fetches the full profile.
