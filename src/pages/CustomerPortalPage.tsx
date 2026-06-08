@@ -37,6 +37,7 @@ import {
 } from '../lib/mamamia/mappers';
 import { mapPatientFormToUpdateCustomerInput } from '../lib/mamamia/patientFormMapper';
 import { callMamamia, MamamiaError } from '../lib/mamamia/client';
+import { buildMonthlyBreakdown, formatDeDate } from '../lib/pricing/monthlyBreakdown';
 import {
   type Application,
   type NurseStatus,
@@ -1812,6 +1813,50 @@ const CustomerPortalPage: FC = () => {
                   </div>
                   <p className="text-[13px] mt-3 leading-snug" style={{color:'#3D3D3D'}}>zzgl. 125 € Reisekosten pro Strecke, Kost &amp; Logis und Sommerzuschlag 6,67 €/Tag (Juli + Aug.)</p>
                 </div>
+
+                {/* Beispielrechnung über 7 Wochen — gibt dem Kunden ein
+                    konkretes Gefühl, was monatlich anfällt (statt nur dem
+                    abstrakten Tagessatz). Selbe Logik wie in der
+                    Bewerbungs-Übersicht (lib/pricing/monthlyBreakdown), damit
+                    die Zahlen beim Wechsel zur Bewerbung exakt
+                    übereinstimmen. Start = heute, Dauer = 49 Tage. */}
+                {(() => {
+                  const start = new Date();
+                  const end = new Date(start.getTime() + 49 * 24 * 60 * 60 * 1000);
+                  const startStr = formatDeDate(start);
+                  const endStr = formatDeDate(end);
+                  // Anreise/Abreise = 125 €, Feiertagszuschlag = tagessatz
+                  // (doppelter Tagessatz = 1× tagessatz extra).
+                  const rows = buildMonthlyBreakdown(startStr, endStr, tagessatz, 125, 125, tagessatz);
+                  if (rows.length === 0) return null;
+                  const total = rows.reduce((s, r) => s + r.betrag, 0);
+                  return (
+                    <div className="rounded-2xl border mt-3 px-5 py-4" style={{background:'white', borderColor:'#E5E3DF'}}>
+                      <p className="text-[12px] font-semibold uppercase tracking-widest mb-1" style={{color:'#8B7355'}}>Beispielrechnung</p>
+                      <p className="text-[12px] mb-3" style={{color:'#8B8B8B'}}>
+                        Wenn die Pflegekraft heute anreist und 7 Wochen bleibt ({startStr} – {endStr}):
+                      </p>
+                      <div className="space-y-2">
+                        {rows.map((r, i) => (
+                          <div key={i} className="flex items-start justify-between gap-3 text-[14px]" style={{color:'#3D3D3D'}}>
+                            <div className="min-w-0 flex-1">
+                              <p className="font-semibold leading-tight">{r.monat}</p>
+                              <p className="text-[12px] leading-snug mt-0.5" style={{color:'#8B8B8B'}}>{r.details.join(' · ')}</p>
+                            </div>
+                            <p className="font-semibold whitespace-nowrap flex-shrink-0">{formatEuro(r.betrag)}</p>
+                          </div>
+                        ))}
+                      </div>
+                      <div className="mt-3 pt-3 border-t flex items-center justify-between" style={{borderColor:'#E5E3DF'}}>
+                        <p className="text-[14px] font-bold" style={{color:'#3D3D3D'}}>Gesamt für 7 Wochen</p>
+                        <p className="text-[16px] font-bold" style={{color:'#3D3D3D'}}>{formatEuro(total)}</p>
+                      </div>
+                      <p className="text-[11px] mt-2 leading-snug" style={{color:'#ABABAB'}}>
+                        Beispiel zur Orientierung. Tatsächliche Kosten richten sich nach dem konkreten Einsatzzeitraum + Feiertagen + Sommermonaten.
+                      </p>
+                    </div>
+                  );
+                })()}
 
                 <div className="rounded-2xl overflow-hidden border mt-3" style={{background:'white', borderColor:'#E5E3DF'}}>
                   <div className="px-5 pt-4 pb-1">
