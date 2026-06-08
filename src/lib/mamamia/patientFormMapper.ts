@@ -14,6 +14,9 @@ export interface PatientFormShape {
   diagnosen: string;
   plz: string; ort: string; haushalt: string; wohnungstyp: string; urbanisierung: string;
   familieNahe: string; pflegedienst: string; internet: string;
+  // name: Kontaktname aus Schritt 5 (seit der Name im Kostenrechner optional
+  // ist). Wird via splitCustomerName zu Customer.first_name/last_name.
+  name: string;
   phone: string;
   // Pflegedienst follow-up — populated by AngebotCard step 2 when
   // pflegedienst='Ja'/'Geplant'. See buildDayCareFacilityDescription.
@@ -567,6 +570,15 @@ function buildJobDescriptionSummary(form: PatientFormShape): string {
 
 export interface MappedCustomerPatch {
   // Fields that land on Customer root.
+  // first_name/last_name: Customer-Identität → Mamamia-Panel "Kundenname".
+  // Seit Marcin den Namen aus dem Kostenrechner (jetzt optional) in Schritt 5
+  // des Portals verschoben hat, muss der Patientenbogen-Save den Namen an
+  // Mamamia nachreichen — onboard setzt ihn nur einmal beim Portal-Open aus
+  // lead.vorname/nachname, sonst bleibt der Customer namenlos
+  // (Customer.first_name/last_name = null). Aus form.name via
+  // splitCustomerName, nur wenn nicht leer (kein Überschreiben mit '').
+  first_name?: string;
+  last_name?: string;
   // job_description: base + _de mirror what the Mamamia panel sends on
   // manual agent save. Mamamia backend AI translator handles _en/_pl
   // from the German source automatically.
@@ -612,12 +624,34 @@ export interface MappedCustomerPatch {
   patients?: Array<Record<string, unknown>>;
 }
 
+// Split a free-text contact name ("Anna Maria Müller") into Vorname/Nachname:
+// first token = Vorname, the rest = Nachname (single token → only Vorname).
+// Mirrors the split the portal uses for the leads.vorname/nachname bridge
+// sync, so Mamamia Customer.first_name/last_name stays consistent with the
+// lead row. Trims; returns '' for an absent part.
+export function splitCustomerName(
+  name: string | null | undefined,
+): { vorname: string; nachname: string } {
+  const parts = (name ?? '').trim().split(/\s+/).filter(Boolean);
+  return {
+    vorname: parts.length > 0 ? parts[0] : '',
+    nachname: parts.length > 1 ? parts.slice(1).join(' ') : '',
+  };
+}
+
 export function mapPatientFormToUpdateCustomerInput(
   form: PatientFormShape,
   opts: { locationId?: number | null; existingPatientIds?: number[] } = {},
 ): MappedCustomerPatch {
   const patch: MappedCustomerPatch = {};
   const ids = opts.existingPatientIds ?? [];
+
+  // Customer identity → Mamamia first_name/last_name (panel "Kundenname").
+  // Only set when non-empty so a name-less save never clobbers an existing
+  // Mamamia name with ''. See MappedCustomerPatch.first_name comment.
+  const { vorname, nachname } = splitCustomerName(form.name);
+  if (vorname) patch.first_name = vorname;
+  if (nachname) patch.last_name = nachname;
 
   // Patient 1 always present.
   const patients: Array<Record<string, unknown>> = [
