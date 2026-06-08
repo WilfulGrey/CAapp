@@ -203,10 +203,11 @@ const PREVIEW_APPLICATION: Application = {
     image: 'https://i.pravatar.cc/200?img=47',
     history: { assignments: 14, avgDurationMonths: 2.8 },
     // Demo-PDF (Mozilla pdf.js TraceMonkey-Paper, öffentlich verfügbar) —
-    // wird im Preview-Modus gerendert, damit man die "Referenz öffnen"-UX
-    // testen kann. Echte Daten kommen via Mamamia-Anbindung in einem
-    // späteren PR.
-    referencePdfUrl: 'https://mozilla.github.io/pdf.js/web/viewer.html?file=/web/compressed.tracemonkey-pldi-09.pdf',
+    // wird im Preview-Modus gerendert, damit man die Referenz-Download-UX
+    // testen kann. Direkter PDF-Link (kein Viewer-HTML), damit der Blob-
+    // Download in handleReferenceDownload greift; GitHub Pages liefert
+    // Access-Control-Allow-Origin:* — wie der echte S3-Bucket.
+    referencePdfUrl: 'https://mozilla.github.io/pdf.js/web/compressed.tracemonkey-pldi-09.pdf',
   },
   agencyName: 'Mamamia',
   appliedAt: 'vor 12 Min.',
