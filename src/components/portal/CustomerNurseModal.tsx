@@ -1,6 +1,6 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { FC } from 'react';
-import { Check, X, UserPlus, Heart } from 'lucide-react';
+import { Check, X, UserPlus, Heart, FileText, ExternalLink } from 'lucide-react';
 import type { Nurse } from '../../types';
 import type { Application } from './shared';
 import { nurseLevel, displayName, initials } from './shared';
@@ -14,6 +14,34 @@ const EXPERIENCE_LEVELS = [
   { emoji: '🥇', label: 'Gold', desc: 'Sehr erfahren' },
   { emoji: '🏆', label: 'Platin', desc: 'Höchste Erfahrungsstufe' },
 ];
+
+// Customer-facing explanation der drei Sprach-Stufen.
+// Wortlaut 1:1 aus der bereits existierenden FAQ im CustomerPortalPage
+// übernommen (Eintrag „Was bedeuten die Deutsch-Niveaus (Grund, Mittel,
+// Gut)?"), damit die Erwartung im ganzen Portal konsistent bleibt — der
+// Kunde liest im Popup das Gleiche wie im FAQ-Akkordeon. Falls die FAQ
+// dort geändert wird, hier ebenfalls anpassen (kleine Code-Doppelung,
+// kein Refactor wert — bewusste Single-Source-Verletzung).
+const LANGUAGE_LEVELS = [
+  {
+    bars: 1, label: 'Grund',
+    desc: 'Einzelne Wörter und einfache Sätze. Für eine Verständigung im Alltag braucht es Geduld, Gesten und etwas Vorbereitung; differenzierte Gespräche sind in der Regel nicht möglich.',
+  },
+  {
+    bars: 2, label: 'Mittel',
+    desc: 'Einfache Alltagsthemen lassen sich besprechen, gängige Anweisungen werden meist verstanden. Bei komplexeren Themen (Diagnosen, Behörden, Telefonate) kann es zu Rückfragen oder Missverständnissen kommen.',
+  },
+  {
+    bars: 3, label: 'Gut',
+    desc: 'Die Verständigung im Alltag und in der Pflege funktioniert in der Regel zuverlässig. Auch ausführlichere Gespräche sind möglich; sehr seltene Fachbegriffe, schnelles Sprechen oder Dialekt können dennoch Nachfragen erfordern.',
+  },
+];
+
+const LANGUAGE_LEVELS_INTRO =
+  'Eine grobe Orientierung — kein Sprach-Zertifikat. Die genaue Kommunikation hängt immer auch vom Tempo, der Mundart und der Geduld beider Seiten ab.';
+
+const LANGUAGE_LEVELS_FOOTER =
+  'Wenn Sprachsicherheit besonders wichtig ist (z. B. Demenz, schwerhörige oder spracheingeschränkte Patienten), sprechen Sie uns gerne an — wir helfen bei der Einordnung.';
 
 export const CustomerNurseModal: FC<{
   nurse: Nurse;
@@ -53,6 +81,22 @@ export const CustomerNurseModal: FC<{
   const [invited, setInvited] = useState(isInvited);
   const [invitePhaseModal, setInvitePhaseModal] = useState<'idle' | 'sending' | 'done'>('idle');
   const [showLevelInfo, setShowLevelInfo] = useState(false);
+  const [showLanguageInfo, setShowLanguageInfo] = useState(false);
+
+  // Header kollabiert beim Scrollen — wie bei modernen App-Profilen. Im
+  // kollabierten Zustand wird das Bild kleiner und Verfügbarkeits-Chip
+  // ausgeblendet, sodass mehr vom scrollbaren Inhalt sichtbar bleibt.
+  // Schwellwert: 40px — knapp genug, damit selbst kleine Daumen-Scrolls
+  // die kompakte Variante triggern.
+  const scrollContainerRef = useRef<HTMLDivElement | null>(null);
+  const [headerCompact, setHeaderCompact] = useState(false);
+  useEffect(() => {
+    const el = scrollContainerRef.current;
+    if (!el) return;
+    const onScroll = () => setHeaderCompact(el.scrollTop > 40);
+    el.addEventListener('scroll', onScroll, { passive: true });
+    return () => el.removeEventListener('scroll', onScroll);
+  }, []);
 
   // Body-Scroll-Lock solange das Modal offen ist. Ohne diesen Lock
   // propagiert ein Scroll-Versuch im Modal-Body auf das darunter liegende
@@ -157,21 +201,34 @@ export const CustomerNurseModal: FC<{
             <div className="w-10 h-1 rounded-full bg-gray-300" />
           </div>
 
-          <div className="px-5 pb-4 flex-shrink-0" style={{ backgroundColor: `${nurse.color}12` }}>
-            <div className="flex items-start justify-between gap-3 pt-5">
+          {/* Sticky header — nur Bild + Name + Badges, KEINE Detail-Cards.
+              Schrumpft beim Scrollen (kleineres Bild, Verfügbarkeits-Chip
+              klappt weg), sodass mehr Inhalt sichtbar bleibt. */}
+          <div
+            className="px-5 flex-shrink-0 transition-all duration-200"
+            style={{ backgroundColor: `${nurse.color}12`, paddingTop: headerCompact ? '0.75rem' : '1.25rem', paddingBottom: headerCompact ? '0.5rem' : '1rem' }}
+          >
+            <div className="flex items-center gap-3">
               <div className="relative flex-shrink-0">
                 {nurse.image ? (
-                  <img src={nurse.image} alt={nurse.name} className="w-20 h-20 rounded-2xl object-cover border-2 border-white shadow" />
+                  <img
+                    src={nurse.image}
+                    alt={nurse.name}
+                    className={`rounded-2xl object-cover border-2 border-white shadow transition-all duration-200 ${headerCompact ? 'w-12 h-12' : 'w-20 h-20'}`}
+                  />
                 ) : (
-                  <div className="w-20 h-20 rounded-2xl flex items-center justify-center text-2xl font-bold text-white border-2 border-white shadow"
-                    style={{ backgroundColor: nurse.color }}>
+                  <div
+                    className={`rounded-2xl flex items-center justify-center font-bold text-white border-2 border-white shadow transition-all duration-200 ${headerCompact ? 'w-12 h-12 text-base' : 'w-20 h-20 text-2xl'}`}
+                    style={{ backgroundColor: nurse.color }}
+                  >
                     {inits}
                   </div>
                 )}
               </div>
-              <div className="flex-1 min-w-0 pt-1">
+              <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2 flex-wrap">
-                  <h2 className="text-xl font-bold text-gray-900 leading-tight">{name}</h2>
+                  <h2 className={`font-bold text-gray-900 leading-tight transition-all duration-200 ${headerCompact ? 'text-base' : 'text-xl'}`}>{name}</h2>
+                  <span className="text-sm text-gray-400 flex-shrink-0">{nurse.age} J.</span>
                   <button
                     type="button"
                     onClick={() => setShowLevelInfo(true)}
@@ -181,36 +238,57 @@ export const CustomerNurseModal: FC<{
                     <span className="text-sm leading-none">{lvl.emoji}</span>{lvl.label}
                   </button>
                 </div>
-                <p className="text-xs text-gray-500 mt-0.5">{nurse.age} Jahre</p>
-                <span className={`inline-block mt-1.5 text-xs font-bold px-2.5 py-1 rounded-full border ${
-                  nurse.availableSoon ? 'bg-[#E3F7EF] text-[#22A06B] border-[#B8E8D4]' : 'bg-[#FEF3E2] text-[#B45309] border-[#F9D99A]'
-                }`}>
-                  {nurse.availability}
-                </span>
+                {/* Verfügbarkeits-Chip klappt weg im kompakten Header — die
+                    Info ist nach dem ersten Scroll-Schritt eh schon im
+                    Bewusstsein des Kunden. */}
+                {!headerCompact && (
+                  <span className={`inline-block mt-1.5 text-xs font-bold px-2.5 py-1 rounded-full border ${
+                    nurse.availableSoon ? 'bg-[#E3F7EF] text-[#22A06B] border-[#B8E8D4]' : 'bg-[#FEF3E2] text-[#B45309] border-[#F9D99A]'
+                  }`}>
+                    {nurse.availability}
+                  </span>
+                )}
               </div>
-              <button onClick={onClose} className="w-8 h-8 rounded-full bg-white/80 flex items-center justify-center shadow-sm flex-shrink-0 mt-1">
+              <button onClick={onClose} className="w-8 h-8 rounded-full bg-white/80 flex items-center justify-center shadow-sm flex-shrink-0">
                 <X className="w-4 h-4 text-gray-500" />
               </button>
             </div>
+          </div>
 
-            <div className="grid grid-cols-2 gap-2 mt-4">
-              <div className="bg-white rounded-xl px-3 py-2.5 shadow-sm">
-                <p className="text-xs text-gray-600 mb-1">Erfahrung</p>
-                <p className="text-sm font-bold text-[#8B7355]">{nurse.experience}</p>
-              </div>
-              <div className="bg-white rounded-xl px-3 py-2.5 shadow-sm">
-                <p className="text-xs text-gray-600 mb-1">Deutschkenntnisse</p>
-                <div className="flex items-center gap-1.5">
-                  <div className="flex gap-0.5">
-                    {bars.map((f, i) => <div key={i} className={`w-3 h-1.5 rounded-full ${f ? 'bg-[#8B7355]' : 'bg-gray-200'}`} />)}
+          <div ref={scrollContainerRef} className="flex-1 min-h-0 overflow-y-auto">
+            {/* Erfahrung / Deutschkenntnisse Cards — vorher im sticky Header,
+                jetzt im scrollbaren Bereich. Spart Vertikalraum + erlaubt
+                den (i)-Button für die Sprach-FAQ direkt am Niveau. */}
+            <div className="px-5 pt-4 pb-1">
+              <div className="grid grid-cols-2 gap-2">
+                <div className="bg-white rounded-xl px-3 py-2.5 shadow-sm border border-gray-100">
+                  <p className="text-xs text-gray-600 mb-1">Erfahrung</p>
+                  <p className="text-sm font-bold text-[#8B7355]">{nurse.experience}</p>
+                </div>
+                <div className="bg-white rounded-xl px-3 py-2.5 shadow-sm border border-gray-100">
+                  <div className="flex items-center justify-between mb-1">
+                    <p className="text-xs text-gray-600">Deutschkenntnisse</p>
+                    {/* Sauberer Brand-Kreis mit "i" — weiß auf Brand-Braun,
+                        passt zur Farbpalette und ist groß genug zum Tippen
+                        ohne aufdringlich zu wirken. */}
+                    <button
+                      type="button"
+                      onClick={() => setShowLanguageInfo(true)}
+                      className="w-5 h-5 rounded-full bg-[#8B7355]/15 hover:bg-[#8B7355]/25 text-[#8B7355] transition-colors flex items-center justify-center flex-shrink-0"
+                      aria-label="Sprach-Stufen erklären"
+                    >
+                      <span className="text-[11px] font-bold leading-none" style={{ fontFamily: 'Georgia, serif' }}>i</span>
+                    </button>
                   </div>
-                  <span className="text-xs font-bold text-gray-700">{nurse.language.level}</span>
+                  <div className="flex items-center gap-1.5">
+                    <div className="flex gap-0.5">
+                      {bars.map((f, i) => <div key={i} className={`w-3 h-1.5 rounded-full ${f ? 'bg-[#8B7355]' : 'bg-gray-200'}`} />)}
+                    </div>
+                    <span className="text-xs font-bold text-gray-700">{nurse.language.level}</span>
+                  </div>
                 </div>
               </div>
             </div>
-          </div>
-
-          <div className="flex-1 min-h-0 overflow-y-auto">
             {/* "Hat Interesse"-Hinweis — nur wenn die Pflegekraft in Mamamia
                 proaktiv Interesse signalisiert hat (z.B. via Like). Erklärt
                 kurz, dass eine Einladung die offizielle Bewerbung ermöglicht. */}
@@ -261,6 +339,34 @@ export const CustomerNurseModal: FC<{
                 </div>
               )}
             </div>
+
+            {/* Referenz-PDF — wird direkt VOR den letzten Einsätzen
+                gerendert (starkes Vertrauenssignal aus erster Hand). Öffnet
+                PDF in neuem Tab; Mamamia-Backend-Wiring kommt in einem
+                separaten PR — bis dahin nur in Preview/Tests sichtbar. */}
+            {nurse.referencePdfUrl && (
+              <div className="px-5 pb-5">
+                <a
+                  href={nurse.referencePdfUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-3 rounded-2xl border border-[#C4B49A] bg-[#F8F7F5] hover:bg-[#EBE2D5] px-4 py-3 transition-colors"
+                >
+                  <div className="w-10 h-10 rounded-xl bg-white flex items-center justify-center flex-shrink-0 border border-[#E5E3DF]">
+                    <FileText className="w-5 h-5 text-[#8B7355]" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-[14px] font-semibold text-[#3D2B1F] leading-tight">
+                      Referenzen
+                    </p>
+                    <p className="text-[12px] text-gray-500 leading-tight mt-0.5">
+                      Empfehlungen früherer Familien
+                    </p>
+                  </div>
+                  <ExternalLink className="w-4 h-4 text-[#8B7355] flex-shrink-0" />
+                </a>
+              </div>
+            )}
 
             {nurse.detailedAssignments && nurse.detailedAssignments.length > 0 && (nurse.history?.assignments ?? 0) > 0 && (
               <div className="px-5 pb-5">
@@ -541,6 +647,82 @@ export const CustomerNurseModal: FC<{
                     );
                   })}
                 </div>
+              </div>
+            </div>
+          </div>
+        </>
+      )}
+
+      {/* Sprach-Stufen-Erklärung — geöffnet vom (i)-Button im
+          Deutschkenntnisse-Block. Hebt aktuell zutreffende Stufe optisch
+          hervor, damit der Kunde direkt sieht, was die Bars für DIESE
+          Pflegekraft bedeuten. */}
+      {showLanguageInfo && (
+        <>
+          <div
+            className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[70]"
+            onClick={() => setShowLanguageInfo(false)}
+            style={{ animation: 'fadeIn 0.2s ease-out' }}
+          />
+          <div
+            className="fixed z-[70] inset-x-0 bottom-0 sm:inset-0 sm:flex sm:items-center sm:justify-center sm:p-4 pointer-events-none"
+            style={{ animation: 'fadeIn 0.2s ease-out' }}
+          >
+            <div
+              className="bg-white w-full sm:max-w-sm sm:rounded-2xl rounded-t-3xl pointer-events-auto shadow-2xl"
+              style={{ animation: 'slideSheet 0.3s cubic-bezier(0.32,0.72,0,1)' }}
+              onClick={e => e.stopPropagation()}
+            >
+              <div className="flex justify-center pt-3 pb-1 sm:hidden">
+                <div className="w-10 h-1 rounded-full bg-gray-300" />
+              </div>
+              <div className="px-5 pt-3 pb-5">
+                <div className="flex items-start justify-between gap-3 mb-1.5">
+                  <h3 className="text-base font-bold text-gray-900">Deutschkenntnisse</h3>
+                  <button
+                    onClick={() => setShowLanguageInfo(false)}
+                    className="w-7 h-7 rounded-full bg-gray-100 flex items-center justify-center flex-shrink-0"
+                    aria-label="Schließen"
+                  >
+                    <X className="w-4 h-4 text-gray-500" />
+                  </button>
+                </div>
+                <p className="text-sm text-gray-600 leading-relaxed mb-4">
+                  {LANGUAGE_LEVELS_INTRO}
+                </p>
+                <div className="space-y-1.5">
+                  {LANGUAGE_LEVELS.map(level => {
+                    const isCurrent = level.bars === nurse.language.bars;
+                    return (
+                      <div
+                        key={level.label}
+                        className={`flex items-start gap-3 rounded-xl px-3 py-2.5 border ${
+                          isCurrent ? 'bg-[#F8F7F5] border-[#C4B49A]' : 'bg-gray-50 border-gray-100'
+                        }`}
+                      >
+                        <div className="flex gap-0.5 pt-1 flex-shrink-0">
+                          {Array.from({ length: 3 }, (_, i) => (
+                            <div key={i} className={`w-3 h-1.5 rounded-full ${i < level.bars ? 'bg-[#8B7355]' : 'bg-gray-200'}`} />
+                          ))}
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center gap-2">
+                            <p className={`text-sm font-bold ${isCurrent ? 'text-[#3D2B1F]' : 'text-gray-800'}`}>{level.label}</p>
+                            {isCurrent && (
+                              <span className="text-[10px] font-bold text-[#8B7355] bg-white border border-[#C4B49A] px-2 py-0.5 rounded-full">
+                                Aktuell
+                              </span>
+                            )}
+                          </div>
+                          <p className={`text-xs mt-0.5 leading-relaxed ${isCurrent ? 'text-gray-700' : 'text-gray-500'}`}>{level.desc}</p>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+                <p className="text-xs text-gray-500 leading-relaxed mt-4">
+                  {LANGUAGE_LEVELS_FOOTER}
+                </p>
               </div>
             </div>
           </div>

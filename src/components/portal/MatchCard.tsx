@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import type { FC } from 'react';
-import { Check, ChevronDown, Heart, Sparkles, UserPlus, X } from 'lucide-react';
+import { Check, ChevronDown, FileText, Heart, Sparkles, UserPlus, X } from 'lucide-react';
 import type { Nurse } from '../../types';
 import type { NurseStatus } from './shared';
 import { nurseLevel, displayName, initials } from './shared';
@@ -140,6 +140,19 @@ export const MatchCard: FC<{
                 ))}
               </div>
               <span className="text-sm text-gray-500">Deutsch {nurse.language.level}</span>
+              {nurse.referencePdfUrl && (
+                /* Indikator: PK hat Referenzen im Profil (eine PDF, die
+                   eine oder mehrere Empfehlungen enthalten kann). Kein
+                   eigener Klick-Handler — beim Klick auf die Card öffnet
+                   sich ohnehin das Profil, wo der echte Link steht. */
+                <span
+                  className="inline-flex items-center gap-0.5 text-[10px] font-medium text-[#8B7355] bg-[#F8F7F5] border border-[#C4B49A] px-1.5 py-0.5 rounded-full"
+                  title="Referenzen im Profil"
+                >
+                  <FileText className="w-2.5 h-2.5" />
+                  Referenzen
+                </span>
+              )}
             </div>
             <p className="text-sm text-gray-500 truncate">
               <span className="font-semibold text-[#8B7355]">{nurse.experience}</span>

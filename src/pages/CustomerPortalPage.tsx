@@ -193,6 +193,11 @@ const PREVIEW_APPLICATION: Application = {
     gender: 'female',
     image: 'https://i.pravatar.cc/200?img=47',
     history: { assignments: 14, avgDurationMonths: 2.8 },
+    // Demo-PDF (Mozilla pdf.js TraceMonkey-Paper, öffentlich verfügbar) —
+    // wird im Preview-Modus gerendert, damit man die "Referenz öffnen"-UX
+    // testen kann. Echte Daten kommen via Mamamia-Anbindung in einem
+    // späteren PR.
+    referencePdfUrl: 'https://mozilla.github.io/pdf.js/web/viewer.html?file=/web/compressed.tracemonkey-pldi-09.pdf',
   },
   agencyName: 'Mamamia',
   appliedAt: 'vor 12 Min.',
@@ -2343,7 +2348,34 @@ const CustomerPortalPage: FC = () => {
             { q: 'Ist das legal?', a: 'Ja, vollständig. Die Pflegekräfte sind sozialversicherungspflichtig bei uns angestellt und werden von uns nach Deutschland entsandt. Für jeden Einsatz liegt eine offizielle A1-Bescheinigung vor — der Nachweis der Sozialversicherungspflicht im Herkunftsland.' },
             { q: 'Mit wem wird der Vertrag geschlossen?', a: 'Der Betreuungsvertrag wird mit unserer Muttergesellschaft, der Vitanas Group, geschlossen — einem der größten und erfahrensten Pflegeunternehmen Deutschlands.' },
             { q: 'Welche Kosten entstehen insgesamt?', a: 'Es gibt vier Kostenpunkte: Die monatlichen Betreuungskosten laut Ihrem Angebot. Anreise und Abreise pauschal je 125 €. Kost und Logis, die Sie der Pflegekraft frei zur Verfügung stellen. Fällt der Einsatz in einen Sommermonat (Juli oder August), kommen 200 €/Monat (bzw. 6,67 €/Tag) Sommerzuschlag hinzu. An folgenden Feiertagen wird der doppelte Tagessatz berechnet: Karfreitag, Ostersonntag, Ostermontag, 1. Mai, Heiligabend, 1. + 2. Weihnachtstag, Silvester und Neujahr. Darüber hinaus gibt es keinerlei versteckte Kosten.' },
-            { q: 'Was bedeuten die Deutsch-Niveaus (Grund, Mittel, Gut)?', a: 'Eine grobe Orientierung — kein Sprach-Zertifikat. Die genaue Kommunikation hängt immer auch vom Tempo, der Mundart und der Geduld beider Seiten ab.\n\n• ● Grund — einzelne Wörter und einfache Sätze. Für eine Verständigung im Alltag braucht es Geduld, Gesten und etwas Vorbereitung; differenzierte Gespräche sind in der Regel nicht möglich.\n• ●● Mittel — einfache Alltagsthemen lassen sich besprechen, gängige Anweisungen werden meist verstanden. Bei komplexeren Themen (Diagnosen, Behörden, Telefonate) kann es zu Rückfragen oder Missverständnissen kommen.\n• ●●● Gut — die Verständigung im Alltag und in der Pflege funktioniert in der Regel zuverlässig. Auch ausführlichere Gespräche sind möglich; sehr seltene Fachbegriffe, schnelles Sprechen oder Dialekt können dennoch Nachfragen erfordern.\n\nWenn Sprachsicherheit besonders wichtig ist (z. B. komplexe Medikation, schwerhörige Angehörige), sprechen Sie uns gerne an — wir helfen bei der Einordnung.' },
+            /* Sprach-Stufen-Antwort als JSX statt String, damit wir die
+               Bar-Indikatoren genauso rendern können wie im Profil/Liste
+               (statt der Unicode-Punkte ●). Konsistente Optik im ganzen
+               Portal. Quelltext der Sätze identisch zur Modal-FAQ
+               (LANGUAGE_LEVELS in CustomerNurseModal). */
+            {
+              q: 'Was bedeuten die Deutsch-Niveaus (Grund, Mittel, Gut)?',
+              a: (
+                <div className="text-[15px] leading-[1.75] text-gray-600 space-y-3">
+                  <p>Eine grobe Orientierung — kein Sprach-Zertifikat. Die genaue Kommunikation hängt immer auch vom Tempo, der Mundart und der Geduld beider Seiten ab.</p>
+                  {[
+                    { bars: 1, label: 'Grund', desc: 'einzelne Wörter und einfache Sätze. Für eine Verständigung im Alltag braucht es Geduld, Gesten und etwas Vorbereitung; differenzierte Gespräche sind in der Regel nicht möglich.' },
+                    { bars: 2, label: 'Mittel', desc: 'einfache Alltagsthemen lassen sich besprechen, gängige Anweisungen werden meist verstanden. Bei komplexeren Themen (Diagnosen, Behörden, Telefonate) kann es zu Rückfragen oder Missverständnissen kommen.' },
+                    { bars: 3, label: 'Gut', desc: 'die Verständigung im Alltag und in der Pflege funktioniert in der Regel zuverlässig. Auch ausführlichere Gespräche sind möglich; sehr seltene Fachbegriffe, schnelles Sprechen oder Dialekt können dennoch Nachfragen erfordern.' },
+                  ].map((lvl) => (
+                    <div key={lvl.label} className="flex items-start gap-3">
+                      <div className="flex gap-0.5 pt-2.5 flex-shrink-0">
+                        {Array.from({ length: 3 }, (_, i) => (
+                          <div key={i} className={`w-3 h-1.5 rounded-full ${i < lvl.bars ? 'bg-[#8B7355]' : 'bg-gray-200'}`} />
+                        ))}
+                      </div>
+                      <p><span className="font-semibold text-[#3D2B1F]">{lvl.label}</span> — {lvl.desc}</p>
+                    </div>
+                  ))}
+                  <p>Wenn Sprachsicherheit besonders wichtig ist (z. B. Demenz, schwerhörige oder spracheingeschränkte Patienten), sprechen Sie uns gerne an — wir helfen bei der Einordnung.</p>
+                </div>
+              ),
+            },
           ].map((item, i, arr) => (
             <div key={i} className={i < arr.length - 1 ? 'border-b' : ''} style={{borderColor:'#E5E3DF'}}>
               <button
@@ -2365,7 +2397,11 @@ const CustomerPortalPage: FC = () => {
               </button>
               {openFaq === i && (
                 <div className="px-5 pb-6 pt-1" style={{background:'#FAFAF9'}}>
-                  <p className="text-[15px] leading-[1.75] text-gray-600 whitespace-pre-line">{item.a}</p>
+                  {typeof item.a === 'string' ? (
+                    <p className="text-[15px] leading-[1.75] text-gray-600 whitespace-pre-line">{item.a}</p>
+                  ) : (
+                    item.a
+                  )}
                 </div>
               )}
             </div>
