@@ -88,6 +88,14 @@ const IS_PREVIEW_CHAT = PREVIEW_PARAM === 'chat';
 const IS_PREVIEW_PATIENT = PREVIEW_PARAM === 'patient';
 const IS_PREVIEW_ANY = IS_PREVIEW_BEWERBUNG || IS_PREVIEW_INTERESSE || IS_PREVIEW_GEBUCHT || IS_PREVIEW_CHAT || IS_PREVIEW_PATIENT;
 
+// Feature-Flag: Chat (PflegekraftChat) ist im Backend noch nicht via
+// WhatsApp/caregiver-chat angebunden + Brief-Style-UX wird noch getestet.
+// Bis explizit freigegeben → keine Chat-Entry-Points für echte Kunden
+// (Buttons in MatchCard/AppCard/NurseModal werden ausgeblendet). In allen
+// Preview-Modi bleibt der Chat sichtbar, damit wir weiter intern testen
+// können. Aktivieren: einfach hier auf `true` flippen + 1 commit.
+const CHAT_ENABLED = IS_PREVIEW_ANY;
+
 const PREVIEW_LEAD: Lead = {
   id: 'preview-lead-1',
   email: 'mueller@example.com',
@@ -2069,7 +2077,7 @@ const CustomerPortalPage: FC = () => {
                 onReview={() => setSelectedApp(app)}
                 onDecline={() => setDeclineConfirmApp(app)}
                 onNurseClick={(n) => openNurseFromApp(n, app)}
-                onChat={(n) => setChatNurse(n)}
+                onChat={CHAT_ENABLED ? (n) => setChatNurse(n) : undefined}
               />
             ))}
             {/* Beratungs-CTA direkt unter den Bewerbungen — Bewerbungen sind
@@ -2536,8 +2544,11 @@ const CustomerPortalPage: FC = () => {
       {/* Nachrichten an die Pflegekraft (Prototyp).
           Bewusst KEIN klassischer Chat — Backend sendet via WhatsApp an
           die PK, also schreibt der Kunde eine kompakte Nachricht, drückt
-          Senden und wartet auf die Antwort (siehe PflegekraftChat.tsx). */}
-      {chatNurse && (
+          Senden und wartet auf die Antwort (siehe PflegekraftChat.tsx).
+          Doppelte Sperre: Modal rendert nur wenn CHAT_ENABLED — selbst
+          falls irgendwann unerwartet setChatNurse() ausgelöst wird,
+          bleibt das UI bei echten Kunden unsichtbar. */}
+      {chatNurse && CHAT_ENABLED && (
         <PflegekraftChat nurse={chatNurse} onClose={() => setChatNurse(null)} />
       )}
 
@@ -2570,7 +2581,7 @@ const CustomerPortalPage: FC = () => {
           app={nurseModalApp ?? undefined}
           onReview={() => { setSelectedNurse(null); setSelectedApp(nurseModalApp); setNurseModalApp(null); setSelectedFromInterestId(null); }}
           onDecline={() => { setDeclineConfirmApp(nurseModalApp); setSelectedNurse(null); setNurseModalApp(null); setSelectedFromInterestId(null); }}
-          onChat={nurseModalApp ? () => { const n = enrichedSelectedNurse; setSelectedNurse(null); setNurseModalApp(null); setNurseMatchIdx(null); setSelectedFromInterestId(null); setChatNurse(n); } : undefined}
+          onChat={CHAT_ENABLED && nurseModalApp ? () => { const n = enrichedSelectedNurse; setSelectedNurse(null); setNurseModalApp(null); setNurseMatchIdx(null); setSelectedFromInterestId(null); setChatNurse(n); } : undefined}
           hasInterest={selectedFromInterestId !== null && enrichedSelectedNurse.caregiverId === selectedFromInterestId}
           onUndo={() => { if (nurseModalApp) undoApp(nurseModalApp.id); setNurseModalApp(null); }}
           isInvited={
