@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   mapPatientFormToUpdateCustomerInput,
+  splitCustomerName,
   type PatientFormShape,
 } from '../../lib/mamamia/patientFormMapper';
 
@@ -47,10 +48,51 @@ function makeForm(overrides: Partial<PatientFormShape> = {}): PatientFormShape {
     sonstigeWuensche: '',
     fuehrerschein: '',
     wunschGetriebe: '',
+    name: '',
     phone: '',
     ...overrides,
   };
 }
+
+describe('splitCustomerName', () => {
+  it('first token = Vorname, rest = Nachname', () => {
+    expect(splitCustomerName('John Smith')).toEqual({ vorname: 'John', nachname: 'Smith' });
+  });
+  it('multi-word: first = Vorname, remainder joined as Nachname', () => {
+    expect(splitCustomerName('Anna Maria Müller')).toEqual({ vorname: 'Anna', nachname: 'Maria Müller' });
+  });
+  it('single token → only Vorname', () => {
+    expect(splitCustomerName('Madonna')).toEqual({ vorname: 'Madonna', nachname: '' });
+  });
+  it('trims + collapses inner whitespace', () => {
+    expect(splitCustomerName('  John   Smith  ')).toEqual({ vorname: 'John', nachname: 'Smith' });
+  });
+  it('empty / nullish → both empty', () => {
+    expect(splitCustomerName('')).toEqual({ vorname: '', nachname: '' });
+    expect(splitCustomerName(null)).toEqual({ vorname: '', nachname: '' });
+    expect(splitCustomerName(undefined)).toEqual({ vorname: '', nachname: '' });
+  });
+});
+
+// Regression: Name aus Schritt 5 erreichte leads.vorname/nachname, aber NICHT
+// Mamamia (Mapper ließ first_name/last_name fallen) → Kunden blieben namenlos.
+describe('mapPatientFormToUpdateCustomerInput → first_name/last_name', () => {
+  it('maps form.name → Customer.first_name/last_name', () => {
+    const r = mapPatientFormToUpdateCustomerInput(makeForm({ name: 'John Smith' }));
+    expect(r.first_name).toBe('John');
+    expect(r.last_name).toBe('Smith');
+  });
+  it('single-word name → first_name only, last_name omitted', () => {
+    const r = mapPatientFormToUpdateCustomerInput(makeForm({ name: 'Cher' }));
+    expect(r.first_name).toBe('Cher');
+    expect('last_name' in r).toBe(false);
+  });
+  it('empty name → neither set (never overwrites an existing Mamamia name with "")', () => {
+    const r = mapPatientFormToUpdateCustomerInput(makeForm({ name: '' }));
+    expect('first_name' in r).toBe(false);
+    expect('last_name' in r).toBe(false);
+  });
+});
 
 describe('mapPatientFormToUpdateCustomerInput', () => {
   it('anzahl=1 → 1 patient', () => {

@@ -35,7 +35,7 @@ import {
   germanySkillBucket,
   bucketFromDeutschkenntnisseWish,
 } from '../lib/mamamia/mappers';
-import { mapPatientFormToUpdateCustomerInput } from '../lib/mamamia/patientFormMapper';
+import { mapPatientFormToUpdateCustomerInput, splitCustomerName } from '../lib/mamamia/patientFormMapper';
 import { callMamamia, MamamiaError } from '../lib/mamamia/client';
 import { buildMonthlyBreakdown, formatDeDate } from '../lib/pricing/monthlyBreakdown';
 import {
@@ -2022,16 +2022,12 @@ const CustomerPortalPage: FC = () => {
             // save with an edited number re-fires.
             const phoneForLead = form.phone?.trim();
             const startDateForLead = form.startDate?.trim();
-            // Name aus dem Patientenbogen → vorname/nachname für die Bridge.
-            // Einfacher Split: erstes Wort = Vorname, der Rest = Nachname.
-            // Wenn nur ein Wort, ist es der Vorname. Bridge schreibt zurück
-            // nach leads.vorname/nachname, sodass spätere Mails den Kunden
-            // namentlich anreden können (vorher oft leer, weil im Kosten-
-            // rechner-Kontaktformular Name optional).
-            const nameForLead = form.name?.trim() ?? '';
-            const nameParts = nameForLead.split(/\s+/).filter(Boolean);
-            const vornameForLead = nameParts.length > 0 ? nameParts[0] : '';
-            const nachnameForLead = nameParts.length > 1 ? nameParts.slice(1).join(' ') : '';
+            // Vorname/Nachname für den Bridge-Sync nach leads.vorname/nachname.
+            // Identischer Split wie im Mapper (splitCustomerName) → Mamamia
+            // Customer.first_name/last_name und die leads-Spalten bleiben
+            // konsistent. Der Mapper hat den Namen bereits in den updateCustomer-
+            // Patch gelegt; hier nur für die Bridge-Metadaten wiederverwendet.
+            const { vorname: vornameForLead, nachname: nachnameForLead } = splitCustomerName(form.name);
             const leadEventMeta: Record<string, string> = {};
             if (phoneForLead) leadEventMeta.phone = phoneForLead;
             if (startDateForLead) leadEventMeta.startDate = startDateForLead;
