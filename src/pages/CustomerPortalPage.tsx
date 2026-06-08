@@ -1847,7 +1847,7 @@ const CustomerPortalPage: FC = () => {
                     <div className="rounded-2xl border mt-3 px-5 py-4" style={{background:'white', borderColor:'#E5E3DF'}}>
                       <p className="text-[12px] font-semibold uppercase tracking-widest mb-1" style={{color:'#8B7355'}}>Kalkulation</p>
                       <p className="text-[12px] mb-3" style={{color:'#8B8B8B'}}>
-                        7 Wochen ab {startStr} (bis {endStr}):
+                        Annahme: 7 Wochen ab {startStr} (bis {endStr}):
                       </p>
                       <div className="space-y-2">
                         {rows.map((r, i) => (
@@ -1861,7 +1861,7 @@ const CustomerPortalPage: FC = () => {
                         ))}
                       </div>
                       <p className="text-[11px] mt-3 leading-snug" style={{color:'#ABABAB'}}>
-                        Die tatsächlichen Kosten richten sich nach dem konkreten Einsatzzeitraum der gewählten Pflegekraft — Anreise- und Abreisedaten können vom Wunsch abweichen.
+                        Die tatsächlichen Kosten richten sich nach dem konkreten Einsatzzeitraum der gewählten Pflegekraft.
                       </p>
                     </div>
                   );
