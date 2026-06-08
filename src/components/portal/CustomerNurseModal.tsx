@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
-import type { FC } from 'react';
-import { Check, X, UserPlus, Heart, FileText, ExternalLink } from 'lucide-react';
+import type { FC, MouseEvent as ReactMouseEvent } from 'react';
+import { Check, X, UserPlus, Heart, FileText, Download } from 'lucide-react';
 import type { Nurse } from '../../types';
 import type { Application } from './shared';
 import { nurseLevel, displayName, initials } from './shared';
@@ -82,6 +82,7 @@ export const CustomerNurseModal: FC<{
   const [invitePhaseModal, setInvitePhaseModal] = useState<'idle' | 'sending' | 'done'>('idle');
   const [showLevelInfo, setShowLevelInfo] = useState(false);
   const [showLanguageInfo, setShowLanguageInfo] = useState(false);
+  const [refDownloading, setRefDownloading] = useState(false);
 
   // Header kollabiert beim Scrollen — wie bei modernen App-Profilen. Im
   // kollabierten Zustand wird das Bild kleiner und Verfügbarkeits-Chip
@@ -110,6 +111,42 @@ export const CustomerNurseModal: FC<{
       document.body.style.overflow = previous;
     };
   }, []);
+
+  // Referenz-PDF herunterladen statt im Tab öffnen. Der aws_url ist ein
+  // langer, vorsignierter S3-Link (mamamia-aws-bucket…?X-Amz-Signature=…) —
+  // den soll der Kunde nicht zu Gesicht bekommen. Wir holen die Datei per
+  // fetch (der S3-Bucket schickt Access-Control-Allow-Origin:*, fetch ist
+  // also erlaubt), bauen daraus eine Blob-URL und triggern einen Download mit
+  // sauberem Dateinamen. Schlägt der Fetch fehl (Presign abgelaufen, offline),
+  // öffnen wir als Fallback den Original-Link im neuen Tab — besser ein
+  // sichtbarer Link als ein toter Klick.
+  const handleReferenceDownload = async (e: ReactMouseEvent<HTMLAnchorElement>) => {
+    e.preventDefault();
+    const url = nurse.referencePdfUrl;
+    if (!url || refDownloading) return;
+    setRefDownloading(true);
+    try {
+      const res = await fetch(url);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const blob = await res.blob();
+      const objectUrl = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = objectUrl;
+      // displayName endet auf einem Punkt ("Maria K.") — Buchstaben/Ziffern
+      // behalten (Unicode, damit ł/ä erhalten bleiben), Rest zu _ und Rand-_
+      // strippen, sonst entsteht "Maria_K..pdf".
+      const safeName = displayName(nurse.name).replace(/[^\p{L}\p{N}]+/gu, '_').replace(/^_+|_+$/g, '');
+      a.download = `Referenzen-${safeName || 'Pflegekraft'}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(objectUrl);
+    } catch {
+      window.open(url, '_blank', 'noopener,noreferrer');
+    } finally {
+      setRefDownloading(false);
+    }
+  };
 
   const handleModalInvite = async () => {
     setInvitePhaseModal('sending');
@@ -341,15 +378,17 @@ export const CustomerNurseModal: FC<{
             </div>
 
             {/* Referenz-PDF — wird direkt VOR den letzten Einsätzen
-                gerendert (starkes Vertrauenssignal aus erster Hand). Öffnet
-                PDF in neuem Tab; Mamamia-Backend-Wiring kommt in einem
-                separaten PR — bis dahin nur in Preview/Tests sichtbar. */}
+                gerendert (starkes Vertrauenssignal aus erster Hand). Klick
+                lädt die PDF herunter (siehe handleReferenceDownload) statt
+                den langen vorsignierten S3-Link im Tab zu zeigen. Das href
+                bleibt gesetzt, damit „Link speichern unter" / Fallback
+                weiterhin funktionieren. */}
             {nurse.referencePdfUrl && (
               <div className="px-5 pb-5">
                 <a
                   href={nurse.referencePdfUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
+                  onClick={handleReferenceDownload}
+                  download
                   className="flex items-center gap-3 rounded-2xl border border-[#C4B49A] bg-[#F8F7F5] hover:bg-[#EBE2D5] px-4 py-3 transition-colors"
                 >
                   <div className="w-10 h-10 rounded-xl bg-white flex items-center justify-center flex-shrink-0 border border-[#E5E3DF]">
@@ -360,10 +399,17 @@ export const CustomerNurseModal: FC<{
                       Referenzen
                     </p>
                     <p className="text-[12px] text-gray-500 leading-tight mt-0.5">
-                      Empfehlungen früherer Familien
+                      {refDownloading ? 'Wird heruntergeladen…' : 'Empfehlungen früherer Familien'}
                     </p>
                   </div>
-                  <ExternalLink className="w-4 h-4 text-[#8B7355] flex-shrink-0" />
+                  {refDownloading ? (
+                    <svg className="w-4 h-4 animate-spin text-[#8B7355] flex-shrink-0" viewBox="0 0 24 24" fill="none">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" />
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
+                    </svg>
+                  ) : (
+                    <Download className="w-4 h-4 text-[#8B7355] flex-shrink-0" />
+                  )}
                 </a>
               </div>
             )}
