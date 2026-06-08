@@ -180,7 +180,6 @@ export const LIST_APPLICATIONS = /* GraphQL */ `
           hp_total_days
           hp_avg_mission_days
           avatar_retouched { aws_url }
-          certificates { original_name aws_url created_at mime_type }
         }
       }
     }
@@ -220,7 +219,6 @@ export const LIST_INTERESTS = /* GraphQL */ `
           hp_total_days
           hp_avg_mission_days
           avatar_retouched { aws_url }
-          certificates { original_name aws_url created_at mime_type }
         }
       }
     }
@@ -269,7 +267,6 @@ export const LIST_MATCHINGS = /* GraphQL */ `
           hp_total_days
           hp_avg_mission_days
           avatar_retouched { aws_url }
-          certificates { original_name aws_url created_at mime_type }
         }
       }
     }
@@ -315,7 +312,6 @@ export const GET_CAREGIVER = /* GraphQL */ `
       mobilities { mobility }
       languagables { level language { name } }
       avatar_retouched { aws_url }
-      certificates { original_name aws_url created_at mime_type }
       hp_recent_assignments(limit: 5) {
         arrival_date
         departure_date
