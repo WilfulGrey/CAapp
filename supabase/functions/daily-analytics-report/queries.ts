@@ -26,7 +26,11 @@ export function isRealLead(lead: { vorname?: string | null; nachname?: string | 
 export interface DailyStats {
   visitors: number;            // Unique analytics_sessions
   wizardStarted: number;       // Sessions mit mind. einem step_view-Event
-  wizardCompleted: number;     // Leads angelegt (= Step 10 erfolgreich submitted)
+  wizardCompleted: number;     // Leads angelegt + isRealLead() (= Step 9 submitted ohne Tests)
+  /** Alle Leads im Zeitraum — inkl. Test-Vornamen/-Emails. Wird im Funnel
+   *  als Brücke zwischen "Step 9 viewed" und "echte Leads" gebraucht,
+   *  damit der Test-Split sichtbar ist und 15 → 2 nicht magisch wirkt. */
+  wizardCompletedIncludingTests: number;
   patientDataSaved: number;    // lead_events.patient_data_saved
   caregiverInvited: number;    // lead_events.caregiver_invited
   interestShown: number;       // lead_events.caregiver_interest_shown
@@ -159,6 +163,7 @@ export async function fetchDailyStats(
     .gte("created_at", start)
     .lt("created_at", end);
   if (lErr) throw new Error(`leads: ${lErr.message}`);
+  const wizardCompletedIncludingTests = leadsInPeriod?.length ?? 0;
   const wizardCompleted = (leadsInPeriod ?? []).filter(isRealLead).length;
 
   // 4) Lead-Events pro Typ
@@ -187,6 +192,7 @@ export async function fetchDailyStats(
     visitors,
     wizardStarted,
     wizardCompleted,
+    wizardCompletedIncludingTests,
     patientDataSaved,
     caregiverInvited,
     interestShown,
