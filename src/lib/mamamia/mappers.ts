@@ -272,6 +272,28 @@ function formatAddedTime(lastContactIso: string | null, nowIso: string): string 
   return `vor ${Math.floor(weeks)} Wo.`;
 }
 
+// Reference PDFs live in Caregiver.certificates as File uploads named
+// `Referenz_*.pdf` (one PDF can bundle several recommendations). We show
+// ONLY the newest matching file, and ONLY when one exists — so the badge
+// appears exclusively for caregivers who actually have a reference.
+// Returns undefined when there's no match → Nurse.referencePdfUrl stays
+// undefined → MatchCard/AppCard/modal render nothing (guarded by &&).
+const REFERENCE_FILE_RE = /^Referenz_.*\.pdf$/i;
+function pickNewestReferenceUrl(
+  cg: MamamiaCaregiverRef | MamamiaCaregiverFull,
+): string | undefined {
+  const certs = cg.certificates;
+  if (!Array.isArray(certs) || certs.length === 0) return undefined;
+  const refs = certs.filter(
+    (f) => f && f.aws_url && REFERENCE_FILE_RE.test(f.original_name ?? ''),
+  );
+  if (refs.length === 0) return undefined;
+  // Newest by created_at (ISO/date strings sort lexically when same format;
+  // missing created_at sorts last so a dated file always wins).
+  refs.sort((a, b) => (b.created_at ?? '').localeCompare(a.created_at ?? ''));
+  return refs[0].aws_url ?? undefined;
+}
+
 export function mapCaregiverToNurse(
   cg: MamamiaCaregiverRef | MamamiaCaregiverFull,
   opts: { nowIso: string; nowYear: number },
@@ -387,6 +409,7 @@ export function mapCaregiverToNurse(
     isLive: isLiveNow(cg.is_active_user, cg.last_login_at, opts.nowIso),
     gender: cg.gender ?? 'female',
     image: cg.avatar_retouched?.aws_url ?? undefined,
+    referencePdfUrl: pickNewestReferenceUrl(cg),
     history: cg.hp_total_jobs
       ? {
         assignments: cg.hp_total_jobs,

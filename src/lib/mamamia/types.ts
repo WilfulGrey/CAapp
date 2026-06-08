@@ -139,6 +139,16 @@ export interface MamamiaCaregiverRef {
   hp_total_days: number | null;
   hp_avg_mission_days: number | null;
   avatar_retouched: { aws_url: string | null } | null;
+  // Caregiver document uploads. We surface only reference PDFs
+  // (original_name matching `Referenz_*.pdf`) — the newest one becomes
+  // Nurse.referencePdfUrl. Fetched by LIST_MATCHINGS / LIST_APPLICATIONS /
+  // GET_CAREGIVER so the "Referenzen" badge works in cards + profile modal.
+  certificates?: Array<{
+    original_name: string | null;
+    aws_url: string | null;
+    created_at: string | null;
+    mime_type: string | null;
+  }> | null;
 }
 
 export interface MamamiaCaregiverFull extends MamamiaCaregiverRef {
