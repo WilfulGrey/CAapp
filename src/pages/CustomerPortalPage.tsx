@@ -37,6 +37,7 @@ import {
 } from '../lib/mamamia/mappers';
 import { mapPatientFormToUpdateCustomerInput } from '../lib/mamamia/patientFormMapper';
 import { callMamamia, MamamiaError } from '../lib/mamamia/client';
+import { buildMonthlyBreakdown, formatDeDate } from '../lib/pricing/monthlyBreakdown';
 import {
   type Application,
   type NurseStatus,
@@ -1812,6 +1813,59 @@ const CustomerPortalPage: FC = () => {
                   </div>
                   <p className="text-[13px] mt-3 leading-snug" style={{color:'#3D3D3D'}}>zzgl. 125 € Reisekosten pro Strecke, Kost &amp; Logis und Sommerzuschlag 6,67 €/Tag (Juli + Aug.)</p>
                 </div>
+
+                {/* Kalkulation über 7 Wochen — gibt dem Kunden ein konkretes
+                    Gefühl, was monatlich anfällt. Selbe Logik wie in der
+                    Bewerbungs-Übersicht (lib/pricing/monthlyBreakdown), damit
+                    die Zahlen beim Wechsel zur Bewerbung exakt übereinstimmen.
+                    Start = Wunsch-Anreisedatum des Kunden (abgeleitet aus
+                    care_start_timing — Mittelwert des Bereichs), Dauer = 49
+                    Tage. Anreise/Abreisedaten der echten Bewerbung können
+                    abweichen — Hinweis-Text unter der Aufstellung macht das
+                    klar. KEINE Summenzeile, weil "Gesamt" suggeriert eine
+                    feste Vereinbarung — die hier aber noch nicht steht. */}
+                {(() => {
+                  const timingToDays: Record<string, number> = {
+                    'sofort': 0,
+                    '1-2-wochen': 10,
+                    '2-4-wochen': 21,
+                    '1-monat': 30,
+                    '1-2-monate': 45,
+                    'spaeter': 60,
+                    'unklar': 30,
+                  };
+                  const offsetDays = timingToDays[lead?.care_start_timing ?? 'sofort'] ?? 0;
+                  const start = new Date(Date.now() + offsetDays * 24 * 60 * 60 * 1000);
+                  const end = new Date(start.getTime() + 49 * 24 * 60 * 60 * 1000);
+                  const startStr = formatDeDate(start);
+                  const endStr = formatDeDate(end);
+                  // Anreise/Abreise = 125 €, Feiertagszuschlag = tagessatz
+                  // (doppelter Tagessatz = 1× tagessatz extra).
+                  const rows = buildMonthlyBreakdown(startStr, endStr, tagessatz, 125, 125, tagessatz);
+                  if (rows.length === 0) return null;
+                  return (
+                    <div className="rounded-2xl border mt-3 px-5 py-4" style={{background:'white', borderColor:'#E5E3DF'}}>
+                      <p className="text-[12px] font-semibold uppercase tracking-widest mb-1" style={{color:'#8B7355'}}>Kalkulation</p>
+                      <p className="text-[12px] mb-3" style={{color:'#8B8B8B'}}>
+                        Annahme: 7 Wochen ab {startStr} (bis {endStr}):
+                      </p>
+                      <div className="space-y-2">
+                        {rows.map((r, i) => (
+                          <div key={i} className="flex items-start justify-between gap-3 text-[14px]" style={{color:'#3D3D3D'}}>
+                            <div className="min-w-0 flex-1">
+                              <p className="font-semibold leading-tight">{r.monat}</p>
+                              <p className="text-[12px] leading-snug mt-0.5" style={{color:'#8B8B8B'}}>{r.details.join(' · ')}</p>
+                            </div>
+                            <p className="font-semibold whitespace-nowrap flex-shrink-0">{formatEuro(r.betrag)}</p>
+                          </div>
+                        ))}
+                      </div>
+                      <p className="text-[11px] mt-3 leading-snug" style={{color:'#ABABAB'}}>
+                        Die tatsächlichen Kosten richten sich nach dem konkreten Einsatzzeitraum der gewählten Pflegekraft.
+                      </p>
+                    </div>
+                  );
+                })()}
 
                 <div className="rounded-2xl overflow-hidden border mt-3" style={{background:'white', borderColor:'#E5E3DF'}}>
                   <div className="px-5 pt-4 pb-1">
