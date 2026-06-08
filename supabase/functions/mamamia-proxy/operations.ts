@@ -320,6 +320,18 @@ export const GET_CAREGIVER = /* GraphQL */ `
         status
       }
     }
+    # Reference/certificate uploads. NB: the Caregiver.certificates RELATION
+    # 500s the Mamamia backend ("Internal server error") — verified live on
+    # prod CG 12082 + beta CG 10099. The top-level CaregiverCertificates
+    # query is the working path (same source the Mamamia UI uses; also
+    # carries description + valid_from). See reference-builder
+    # docs/mamamia-integration.md §4.1.
+    CaregiverCertificates(caregiver_id: $id) {
+      id
+      description
+      valid_from
+      file { original_name aws_url created_at mime_type }
+    }
   }
 `;
 

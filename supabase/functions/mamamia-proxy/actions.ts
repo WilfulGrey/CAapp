@@ -34,6 +34,64 @@ async function runGraphQL<T>(
 }
 
 
+// ─── Reference certificates (Referenz_*.pdf) ───────────────────────────────
+//
+// The `Caregiver.certificates` RELATION 500s the Mamamia backend ("Internal
+// server error") — verified live on prod CG 12082 + beta CG 10099. The
+// top-level `CaregiverCertificates(caregiver_id:)` query is the working path
+// (same source the Mamamia UI uses; see reference-builder
+// docs/mamamia-integration.md §4.1). We fetch it here and merge the File
+// objects back onto each caregiver as `.certificates`, so the frontend
+// mapper (mapCaregiverToNurse → pickNewestReferenceUrl) sees the reference
+// uploads without any client change. Batched via GraphQL aliases so a whole
+// matchings/applications list costs one extra round-trip.
+type CertFile = { original_name?: string | null; aws_url?: string | null; created_at?: string | null; mime_type?: string | null };
+
+// Only reference uploads cross the proxy boundary to the customer's browser.
+// A caregiver's certificates relation can hold unrelated/sensitive docs
+// (verification scans, internal samples) — we surface ONLY files named
+// `Referenz_*.pdf` (the reference PDFs), and only those with a usable
+// aws_url. Filtering server-side keeps non-reference filenames off the wire
+// (privacy — cf. Bug #123 caregiver-PII leak to customer).
+const REFERENCE_FILE_RE = /^Referenz_.*\.pdf$/i;
+function referenceFilesOnly(files: Array<{ file?: CertFile | null } | CertFile | null | undefined>): CertFile[] {
+  return files
+    .map((x) => (x && "file" in (x as object) ? (x as { file?: CertFile | null }).file : (x as CertFile | null)))
+    .filter((f): f is CertFile =>
+      !!f && !!f.aws_url && REFERENCE_FILE_RE.test(f.original_name ?? "")
+    );
+}
+
+async function fetchCertificatesByCaregiver(
+  deps: ActionDeps,
+  ids: number[],
+): Promise<Map<number, CertFile[]>> {
+  const out = new Map<number, CertFile[]>();
+  const unique = [...new Set(ids)].filter((n) => Number.isInteger(n) && n > 0);
+  if (unique.length === 0) return out;
+  // Cap batch size defensively — portal lists are limit=20, but guard
+  // against an unexpectedly large set blowing Mamamia's query complexity.
+  const capped = unique.slice(0, 50);
+  const aliases = capped
+    .map((id) => `c${id}: CaregiverCertificates(caregiver_id: ${id}) { file { original_name aws_url created_at mime_type } }`)
+    .join("\n");
+  const query = `query BatchCerts {\n${aliases}\n}`;
+  let data: Record<string, Array<{ file?: CertFile | null }> | null>;
+  try {
+    data = await runGraphQL(deps, query, {});
+  } catch (e) {
+    // References are a best-effort trust signal — NEVER fail the list/profile
+    // load because the cert batch errored. Log + return empty (no badges).
+    console.warn(`[certs] batch fetch failed: ${(e as Error).message}`);
+    return out;
+  }
+  for (const id of capped) {
+    const files = referenceFilesOnly(data[`c${id}`] ?? []);
+    if (files.length > 0) out.set(id, files);
+  }
+  return out;
+}
+
 // ─── Ownership-bound actions (session overrides client variables) ───────────
 
 const getJobOffer: ActionHandler = (session, _variables, deps) =>
@@ -42,16 +100,30 @@ const getJobOffer: ActionHandler = (session, _variables, deps) =>
 const getCustomer: ActionHandler = (session, _variables, deps) =>
   runGraphQL(deps, GET_CUSTOMER, { id: session.customer_id });
 
-const listApplications: ActionHandler = (session, variables, deps) => {
+const listApplications: ActionHandler = async (session, variables, deps) => {
   const { limit, page } = variables as { limit?: number; page?: number };
-  return runGraphQL(deps, LIST_APPLICATIONS, {
+  const r = await runGraphQL<{
+    JobOfferApplicationsWithPagination: { data: Array<{ caregiver: Record<string, unknown> | null }> };
+  }>(deps, LIST_APPLICATIONS, {
     job_offer_id: session.job_offer_id,
     limit: limit ?? 20,
     page: page ?? 1,
   });
+  const rows = r.JobOfferApplicationsWithPagination?.data ?? [];
+  const certMap = await fetchCertificatesByCaregiver(
+    deps,
+    rows.map((a) => a.caregiver?.id as number).filter((n): n is number => typeof n === "number"),
+  );
+  for (const a of rows) {
+    const id = a.caregiver?.id as number | undefined;
+    if (a.caregiver && typeof id === "number" && certMap.has(id)) {
+      a.caregiver.certificates = certMap.get(id);
+    }
+  }
+  return r;
 };
 
-const listMatchings: ActionHandler = (session, variables, deps) => {
+const listMatchings: ActionHandler = async (session, variables, deps) => {
   const { limit, page, filters, order_by } = variables as {
     limit?: number;
     page?: number;
@@ -66,7 +138,21 @@ const listMatchings: ActionHandler = (session, variables, deps) => {
   };
   if (filters && Object.keys(filters).length > 0) payload.filters = filters;
   if (typeof order_by === "string" && order_by.length > 0) payload.order_by = order_by;
-  return runGraphQL(deps, LIST_MATCHINGS, payload);
+  const r = await runGraphQL<{
+    JobOfferMatchingsWithPagination: { data: Array<{ caregiver: Record<string, unknown> | null }> };
+  }>(deps, LIST_MATCHINGS, payload);
+  const rows = r.JobOfferMatchingsWithPagination?.data ?? [];
+  const certMap = await fetchCertificatesByCaregiver(
+    deps,
+    rows.map((m) => m.caregiver?.id as number).filter((n): n is number => typeof n === "number"),
+  );
+  for (const m of rows) {
+    const id = m.caregiver?.id as number | undefined;
+    if (m.caregiver && typeof id === "number" && certMap.has(id)) {
+      m.caregiver.certificates = certMap.get(id);
+    }
+  }
+  return r;
 };
 
 // Returns the set of caregiver IDs that already have an invite Request
@@ -92,7 +178,20 @@ const listInvitedCaregiverIds: ActionHandler = async (session, _variables, deps)
 const getCaregiver: ActionHandler = async (_session, variables, deps) => {
   const id = (variables as { id?: unknown }).id;
   if (typeof id !== "number") throw new Error("id required");
-  return await runGraphQL(deps, GET_CAREGIVER, { id });
+  // GET_CAREGIVER fetches Caregiver(id) + the top-level CaregiverCertificates
+  // (the relation 500s — see fetchCertificatesByCaregiver). Merge the cert
+  // File objects onto Caregiver.certificates so the frontend mapper sees them
+  // identically to the list path.
+  const r = await runGraphQL<{
+    Caregiver: Record<string, unknown> | null;
+    CaregiverCertificates?: Array<{ file?: CertFile | null }> | null;
+  }>(deps, GET_CAREGIVER, { id });
+  if (r.Caregiver) {
+    r.Caregiver.certificates = referenceFilesOnly(r.CaregiverCertificates ?? []);
+  }
+  // Return only Caregiver — frontend reads data.Caregiver; the sibling
+  // CaregiverCertificates is now merged in.
+  return { Caregiver: r.Caregiver };
 };
 
 const searchLocations: ActionHandler = (_session, variables, deps) => {

@@ -172,6 +172,88 @@ Deno.test("listMatchings: omits empty filters + order_by (Mamamia defaults)", as
   assertEquals(sent.variables.order_by, undefined);
 });
 
+// ─── Reference-certificate merge (Referenz_*.pdf via CaregiverCertificates) ──
+
+Deno.test("listMatchings: merges Referenz certs onto caregiver.certificates (filters non-Referenz)", async () => {
+  const { fetchFn } = multiFetch(
+    // 1: matchings
+    { body: { data: { JobOfferMatchingsWithPagination: { total: 1, data: [{ id: 1, caregiver: { id: 10099 } }] } } } },
+    // 2: batched CaregiverCertificates(c10099) — 2 Referenz + 1 non-Referenz
+    { body: { data: { c10099: [
+      { file: { original_name: "Referenz_Alt_2025-01-01.pdf", aws_url: "https://s3/old.pdf", created_at: "2025-01-01T00:00:00Z", mime_type: "application/pdf" } },
+      { file: { original_name: "Referenz_Neu_2026-06-08.pdf", aws_url: "https://s3/new.pdf", created_at: "2026-06-08T00:00:00Z", mime_type: "application/pdf" } },
+      { file: { original_name: "Zertifikat_Kurs.pdf", aws_url: "https://s3/z.pdf", created_at: "2026-07-01T00:00:00Z", mime_type: "application/pdf" } },
+    ] } } },
+  );
+  const r = await ACTIONS.listMatchings(SESSION, { limit: 20 }, makeDeps(fetchFn)) as {
+    JobOfferMatchingsWithPagination: { data: Array<{ caregiver: { certificates?: Array<{ original_name: string }> } }> };
+  };
+  const certs = r.JobOfferMatchingsWithPagination.data[0].caregiver.certificates ?? [];
+  // Only Referenz_*.pdf cross the proxy (Zertifikat_Kurs dropped).
+  assertEquals(certs.length, 2);
+  assertEquals(certs.every((c) => c.original_name.startsWith("Referenz_")), true);
+});
+
+Deno.test("listMatchings: caregiver with only non-Referenz files → no certificates field", async () => {
+  const { fetchFn } = multiFetch(
+    { body: { data: { JobOfferMatchingsWithPagination: { total: 1, data: [{ id: 1, caregiver: { id: 9857 } }] } } } },
+    { body: { data: { c9857: [
+      { file: { original_name: "sample2.doc", aws_url: "https://s3/s.doc", created_at: "2026-01-01T00:00:00Z" } },
+      { file: { original_name: "table.pdf", aws_url: "https://s3/t.pdf", created_at: "2026-01-01T00:00:00Z" } },
+    ] } } },
+  );
+  const r = await ACTIONS.listMatchings(SESSION, {}, makeDeps(fetchFn)) as {
+    JobOfferMatchingsWithPagination: { data: Array<{ caregiver: Record<string, unknown> }> };
+  };
+  assertEquals(r.JobOfferMatchingsWithPagination.data[0].caregiver.certificates, undefined);
+});
+
+Deno.test("listMatchings: cert batch failure does NOT fail the list (best-effort)", async () => {
+  const { fetchFn } = multiFetch(
+    { body: { data: { JobOfferMatchingsWithPagination: { total: 1, data: [{ id: 1, caregiver: { id: 10099 } }] } } } },
+    { body: { errors: [{ message: "boom" }] } }, // cert batch errors
+  );
+  const r = await ACTIONS.listMatchings(SESSION, {}, makeDeps(fetchFn)) as {
+    JobOfferMatchingsWithPagination: { data: Array<{ caregiver: Record<string, unknown> }> };
+  };
+  // List still returns; caregiver simply has no certificates.
+  assertEquals(r.JobOfferMatchingsWithPagination.data.length, 1);
+  assertEquals(r.JobOfferMatchingsWithPagination.data[0].caregiver.certificates, undefined);
+});
+
+Deno.test("listApplications: merges Referenz certs onto caregiver.certificates", async () => {
+  const { fetchFn } = multiFetch(
+    { body: { data: { JobOfferApplicationsWithPagination: { total: 1, data: [{ id: 7997, caregiver: { id: 10099 } }] } } } },
+    { body: { data: { c10099: [
+      { file: { original_name: "Referenz_S_Wadysaw_2026-06-08.pdf", aws_url: "https://s3/ref.pdf", created_at: "2026-06-08T12:13:37Z", mime_type: "application/pdf" } },
+    ] } } },
+  );
+  const r = await ACTIONS.listApplications(SESSION, { limit: 20 }, makeDeps(fetchFn)) as {
+    JobOfferApplicationsWithPagination: { data: Array<{ caregiver: { certificates?: Array<{ original_name: string }> } }> };
+  };
+  const certs = r.JobOfferApplicationsWithPagination.data[0].caregiver.certificates ?? [];
+  assertEquals(certs.length, 1);
+  assertEquals(certs[0].original_name, "Referenz_S_Wadysaw_2026-06-08.pdf");
+});
+
+Deno.test("getCaregiver: merges CaregiverCertificates (Referenz only) onto Caregiver.certificates + drops sibling", async () => {
+  const { fetchFn } = captureFetch({
+    data: {
+      Caregiver: { id: 10099, first_name: "Jolanta", last_name: "S." },
+      CaregiverCertificates: [
+        { file: { original_name: "Referenz_X.pdf", aws_url: "https://s3/r.pdf", created_at: "2026-06-08T00:00:00Z", mime_type: "application/pdf" } },
+        { file: { original_name: "verification_scan.pdf", aws_url: "https://s3/v.pdf", created_at: "2026-06-09T00:00:00Z", mime_type: "application/pdf" } },
+      ],
+    },
+  });
+  const r = await ACTIONS.getCaregiver(SESSION, { id: 10099 }, makeDeps(fetchFn)) as {
+    Caregiver: { certificates: Array<{ original_name: string }> };
+  };
+  assertEquals(r.Caregiver.certificates.length, 1); // verification_scan dropped
+  assertEquals(r.Caregiver.certificates[0].original_name, "Referenz_X.pdf");
+  assertEquals("CaregiverCertificates" in r, false); // sibling not leaked to client
+});
+
 // ─── getCaregiver ────────────────────────────────────────────────────────
 
 Deno.test("getCaregiver: takes id from variables (caregivers are public within agency)", async () => {
