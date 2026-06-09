@@ -138,6 +138,13 @@ export interface MamamiaCaregiverRef {
   hp_total_jobs: number | null;
   hp_total_days: number | null;
   hp_avg_mission_days: number | null;
+  // avatar = Roh-Upload, avatar_retouched = KI-verbessert. Mamamia retuschiert
+  // nur einen Teil, viele (v.a. erfahrene) Pflegekräfte haben `avatar` aber
+  // KEIN `avatar_retouched` → wurden bei uns fälschlich ohne Foto angezeigt.
+  // Fallback retouched → raw im Mapper + rankComparator. Beide sind einzelne
+  // File-Relationen, sicher selektierbar (anders als die `[File]`-Relation
+  // `certificates`, die den Backend 500t).
+  avatar: { aws_url: string | null } | null;
   avatar_retouched: { aws_url: string | null } | null;
   // Caregiver document uploads. We surface only reference PDFs
   // (original_name matching `Referenz_*.pdf`) — the newest one becomes

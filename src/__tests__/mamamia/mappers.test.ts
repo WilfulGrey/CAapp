@@ -30,6 +30,7 @@ function makeCg(overrides: Partial<MamamiaCaregiverRef> = {}): MamamiaCaregiverR
     hp_total_jobs: 15,
     hp_total_days: 500,
     hp_avg_mission_days: 40,
+    avatar: null,
     avatar_retouched: { aws_url: 'https://s3/avatar.jpg' },
     ...overrides,
   };
@@ -162,9 +163,25 @@ describe('mapCaregiverToNurse', () => {
     expect(n.image).toBe('https://s3/avatar.jpg');
   });
 
-  it('image: undefined when avatar_retouched is null', () => {
+  it('image: falls back to raw avatar when avatar_retouched is null', () => {
     const n = mapCaregiverToNurse(
-      makeCg({ avatar_retouched: null }),
+      makeCg({ avatar_retouched: null, avatar: { aws_url: 'https://s3/raw.jpg' } }),
+      { nowIso: NOW_ISO, nowYear: NOW_YEAR },
+    );
+    expect(n.image).toBe('https://s3/raw.jpg');
+  });
+
+  it('image: prefers avatar_retouched over raw avatar', () => {
+    const n = mapCaregiverToNurse(
+      makeCg({ avatar_retouched: { aws_url: 'https://s3/retouched.jpg' }, avatar: { aws_url: 'https://s3/raw.jpg' } }),
+      { nowIso: NOW_ISO, nowYear: NOW_YEAR },
+    );
+    expect(n.image).toBe('https://s3/retouched.jpg');
+  });
+
+  it('image: undefined when both avatar_retouched and raw avatar are null', () => {
+    const n = mapCaregiverToNurse(
+      makeCg({ avatar_retouched: null, avatar: null }),
       { nowIso: NOW_ISO, nowYear: NOW_YEAR },
     );
     expect(n.image).toBeUndefined();

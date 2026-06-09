@@ -7,9 +7,9 @@
 //   1. hp_total_jobs > 0  DESC  — caregivers with any prior assignment first.
 //                                  Veteran heuristic — customer trust + faster
 //                                  ramp-up.
-//   2. avatar_retouched.aws_url truthy  DESC  — caregivers with a real photo
-//                                                 first. Photo > initials-on-color
-//                                                 placeholder for trust.
+//   2. photo truthy  DESC  — caregivers with a real photo first (retouched
+//                            OR raw avatar). Photo > initials-on-color
+//                            placeholder for trust.
 //   3. available_from ASC  — closest to "now" (null/past = 0ms, future = delta).
 //   4. last_contact_at DESC  — recently-active caregivers respond faster.
 //   5. hp_total_jobs DESC  — numeric tie-breaker inside the "had jobs" bucket.
@@ -19,7 +19,7 @@
 //
 // Defensive handling:
 //   - hp_total_jobs null/undefined → treated as 0 (no jobs).
-//   - avatar_retouched null OR avatar_retouched.aws_url null/empty → no photo.
+//   - no avatar_retouched AND no raw avatar (both null/empty aws_url) → no photo.
 
 import type { MamamiaMatching } from './types';
 
@@ -42,7 +42,7 @@ export function rankComparator(now: Date) {
     (m.caregiver.hp_total_jobs ?? 0) > 0 ? 1 : 0;
 
   const hasPhoto = (m: MamamiaMatching): number =>
-    m.caregiver.avatar_retouched?.aws_url ? 1 : 0;
+    (m.caregiver.avatar_retouched?.aws_url || m.caregiver.avatar?.aws_url) ? 1 : 0;
 
   return (a: MamamiaMatching, b: MamamiaMatching) => {
     // 1. Prior assignments first.
