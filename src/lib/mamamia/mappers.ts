@@ -51,22 +51,40 @@ export function germanySkillBucket(level: string | null | undefined): GermanySki
   }
 }
 
-// Mapping Kostenrechner-Sprachwunsch → unser 3-Bucket.
+// Strikte 1:1-Zuordnung des Kostenrechner-Sprachtiers auf die EXAKTE
+// Mamamia-germany_skill-Stufe (Preis-Tier-Modell — je Tier genau eine Stufe,
+// kein "mind."-Bereich):
+//   grundlegend → level_1    kommunikativ → level_2    sehr-gut → level_4
 // Quelle der Form-Werte: project 3/components/calculator/MultiStepForm.tsx
 // Step 6 ("deutschkenntnisse": grundlegend | kommunikativ | sehr-gut).
-// Wird im Customer-Portal benutzt, um Mamamia-Matchings strikt auf den
-// vom Kunden im Kostenrechner gewählten Bucket zu filtern. Die zugehörigen
-// Preise (0/150/450 €/Mo) leben ausschließlich in `pricing_config` — wir
-// duplizieren sie hier bewusst NICHT, damit Admin-Änderungen am Preis
-// nicht zu einer stillen Drift mit hardcoded Konstanten führen.
-export function bucketFromDeutschkenntnisseWish(
+// level_0 (A1) und level_3 (B1) entsprechen KEINEM Kostenrechner-Tier — sie
+// erreichen das Portal nur über agency-manuelle Jobs (dort ist deutschWish
+// null, der Filter also aus). Preise (0/150/450 €/Mo) leben in `pricing_config`
+// (hier bewusst nicht dupliziert).
+export function requiredGermanyLevelForWish(
   deutschkenntnisse: string | null | undefined,
-): GermanySkillBucket | null {
+): string | null {
   const v = (deutschkenntnisse ?? '').toLowerCase().trim();
-  if (v === 'grundlegend') return 'grund';
-  if (v === 'kommunikativ') return 'mittel';
-  if (v === 'sehr-gut' || v === 'sehr_gut') return 'gut';
+  if (v === 'grundlegend') return 'level_1';
+  if (v === 'kommunikativ') return 'level_2';
+  if (v === 'sehr-gut' || v === 'sehr_gut') return 'level_4';
   return null;
+}
+
+// Erfüllt die germany_skill einer Pflegekraft den Kostenrechner-Sprachwunsch?
+// STRIKT: exakt die Stufe des gewählten Tiers. Ein "kommunikativ"-Kunde soll
+// weder eine stärkere level_4-Kraft sehen (im Vertrag plötzlich +450 €/Mo)
+// noch eine schwächere level_0/level_3, die nicht zum bezahlten Tier passt.
+// Unbekannter Wunsch (null) ODER unbekannte Stufe (null) → anzeigen (nicht auf
+// fehlenden Daten wegfiltern).
+export function matchesGermanyWish(
+  caregiverSkill: string | null | undefined,
+  deutschWish: string | null | undefined,
+): boolean {
+  const required = requiredGermanyLevelForWish(deutschWish);
+  if (!required) return true;
+  if (!caregiverSkill) return true;
+  return caregiverSkill === required;
 }
 
 // ─── Mamamia → German translation maps ───────────────────────────────────

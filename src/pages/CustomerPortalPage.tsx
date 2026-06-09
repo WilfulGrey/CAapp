@@ -32,8 +32,7 @@ import {
   mapApplicationToUI,
   mapMatchingToNurse,
   mapCaregiverToNurse,
-  germanySkillBucket,
-  bucketFromDeutschkenntnisseWish,
+  matchesGermanyWish,
 } from '../lib/mamamia/mappers';
 import { mapPatientFormToUpdateCustomerInput, splitCustomerName } from '../lib/mamamia/patientFormMapper';
 import { callMamamia, MamamiaError } from '../lib/mamamia/client';
@@ -565,7 +564,6 @@ const CustomerPortalPage: FC = () => {
     const v = fd?.deutschkenntnisse;
     return typeof v === 'string' ? v : null;
   })();
-  const wishBucket = bucketFromDeutschkenntnisseWish(deutschWish);
 
   const effectiveMatched = (() => {
     if (IS_PREVIEW_ANY) {
@@ -606,17 +604,15 @@ const CustomerPortalPage: FC = () => {
 
     return merged
       .filter(m => m.is_show !== false)
-      // Strikter Sprach-Filter: wenn der Kunde ein Niveau gewählt hat UND wir
-      // die Stufe der Pflegekraft kennen, muss der Bucket exakt passen.
-      // Pflegekräfte mit fehlendem germany_skill (null) lassen wir durch —
-      // ohne Daten lieber zeigen als fälschlich rausfiltern (sehr seltener
-      // Fall, in der Prod-Stichprobe 2026-04 unter 1 %). Bereits eingeladene
-      // Pflegekräfte (invitedIds) sind ebenfalls immer sichtbar.
+      // Strikter Sprach-Filter: wenn der Kunde ein Tier gewählt hat UND wir die
+      // Stufe der Pflegekraft kennen, muss sie EXAKT der Tier-Stufe entsprechen
+      // (grundlegend=level_1, kommunikativ=level_2, sehr-gut=level_4 — Preis-
+      // Tier-Modell, kein "mind."-Bereich). Pflegekräfte mit fehlendem
+      // germany_skill (null) lassen wir durch — ohne Daten lieber zeigen als
+      // fälschlich rausfiltern. Bereits eingeladene (invitedIds) immer sichtbar.
       .filter(m => {
-        if (!wishBucket) return true;
         if (invitedIds.has(m.caregiver.id)) return true;
-        const nurseBucket = germanySkillBucket(m.caregiver.germany_skill ?? null);
-        return nurseBucket === null || nurseBucket === wishBucket;
+        return matchesGermanyWish(m.caregiver.germany_skill ?? null, deutschWish);
       })
       .sort(rankComparator(now))
       .map(m => ({

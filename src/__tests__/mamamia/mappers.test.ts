@@ -6,7 +6,8 @@ import {
   customerDisplayName,
   mapMamamiaCustomerToPatientForm,
   germanySkillBucket,
-  bucketFromDeutschkenntnisseWish,
+  requiredGermanyLevelForWish,
+  matchesGermanyWish,
 } from '../../lib/mamamia/mappers';
 import type { MamamiaCaregiverRef, MamamiaCustomer } from '../../lib/mamamia/types';
 
@@ -1007,23 +1008,50 @@ describe('germanySkillBucket (5-Stufen → 3-Stufen-Bridge)', () => {
   });
 });
 
-describe('bucketFromDeutschkenntnisseWish (Kostenrechner → Bucket)', () => {
-  it('grundlegend → grund', () => {
-    expect(bucketFromDeutschkenntnisseWish('grundlegend')).toBe('grund');
+describe('requiredGermanyLevelForWish (Kostenrechner-Tier → EXAKTE Stufe)', () => {
+  it('grundlegend → level_1', () => {
+    expect(requiredGermanyLevelForWish('grundlegend')).toBe('level_1');
   });
-  it('kommunikativ → mittel', () => {
-    expect(bucketFromDeutschkenntnisseWish('kommunikativ')).toBe('mittel');
+  it('kommunikativ → level_2', () => {
+    expect(requiredGermanyLevelForWish('kommunikativ')).toBe('level_2');
   });
-  it('sehr-gut → gut (Bindestrich- und Underscore-Variante)', () => {
-    expect(bucketFromDeutschkenntnisseWish('sehr-gut')).toBe('gut');
-    expect(bucketFromDeutschkenntnisseWish('sehr_gut')).toBe('gut');
+  it('sehr-gut → level_4 (Bindestrich + Underscore)', () => {
+    expect(requiredGermanyLevelForWish('sehr-gut')).toBe('level_4');
+    expect(requiredGermanyLevelForWish('sehr_gut')).toBe('level_4');
   });
-  it('tolerates upper-case / whitespace from form noise', () => {
-    expect(bucketFromDeutschkenntnisseWish('  Kommunikativ ')).toBe('mittel');
+  it('tolerates upper-case / whitespace', () => {
+    expect(requiredGermanyLevelForWish('  Kommunikativ ')).toBe('level_2');
   });
-  it('null/unknown → null (Aufpreis-Logik bleibt aus)', () => {
-    expect(bucketFromDeutschkenntnisseWish(null)).toBeNull();
-    expect(bucketFromDeutschkenntnisseWish('???')).toBeNull();
+  it('null/unknown → null (Filter bleibt aus)', () => {
+    expect(requiredGermanyLevelForWish(null)).toBeNull();
+    expect(requiredGermanyLevelForWish('???')).toBeNull();
+  });
+});
+
+describe('matchesGermanyWish (STRIKT: exakte Stufe pro Tier)', () => {
+  it('grundlegend zeigt NUR level_1 (nicht level_0, nicht stärker)', () => {
+    expect(matchesGermanyWish('level_1', 'grundlegend')).toBe(true);
+    expect(matchesGermanyWish('level_0', 'grundlegend')).toBe(false);
+    expect(matchesGermanyWish('level_2', 'grundlegend')).toBe(false);
+    expect(matchesGermanyWish('level_4', 'grundlegend')).toBe(false);
+  });
+  it('kommunikativ zeigt NUR level_2', () => {
+    expect(matchesGermanyWish('level_2', 'kommunikativ')).toBe(true);
+    expect(matchesGermanyWish('level_1', 'kommunikativ')).toBe(false);
+    expect(matchesGermanyWish('level_3', 'kommunikativ')).toBe(false);
+    expect(matchesGermanyWish('level_4', 'kommunikativ')).toBe(false);
+  });
+  it('sehr-gut zeigt NUR level_4 (NICHT level_3/B1!)', () => {
+    expect(matchesGermanyWish('level_4', 'sehr-gut')).toBe(true);
+    expect(matchesGermanyWish('level_3', 'sehr-gut')).toBe(false);
+    expect(matchesGermanyWish('level_2', 'sehr-gut')).toBe(false);
+  });
+  it('kein Tier gewählt (null/leer) → alle zeigen', () => {
+    expect(matchesGermanyWish('level_3', null)).toBe(true);
+    expect(matchesGermanyWish('level_0', '')).toBe(true);
+  });
+  it('unbekannte Pflegekraft-Stufe (null) → zeigen (nicht wegfiltern)', () => {
+    expect(matchesGermanyWish(null, 'sehr-gut')).toBe(true);
   });
 });
 
