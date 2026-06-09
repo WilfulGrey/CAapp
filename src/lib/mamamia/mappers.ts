@@ -408,7 +408,9 @@ export function mapCaregiverToNurse(
     addedTime: formatAddedTime(cg.last_contact_at, opts.nowIso),
     isLive: isLiveNow(cg.is_active_user, cg.last_login_at, opts.nowIso),
     gender: cg.gender ?? 'female',
-    image: cg.avatar_retouched?.aws_url ?? undefined,
+    // Retuschiertes Foto bevorzugt; fällt auf den Roh-Avatar zurück, damit
+    // Pflegekräfte ohne KI-Retusche (oft erfahrene) nicht ohne Foto erscheinen.
+    image: cg.avatar_retouched?.aws_url ?? cg.avatar?.aws_url ?? undefined,
     referencePdfUrl: pickNewestReferenceUrl(cg),
     history: cg.hp_total_jobs
       ? {

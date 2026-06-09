@@ -22,6 +22,7 @@ function makeRef(o: Partial<MamamiaCaregiverRef>): MamamiaCaregiverRef {
     available_from: null, last_contact_at: null, last_login_at: null,
     is_active_user: true,
     hp_total_jobs: 0, hp_total_days: 0, hp_avg_mission_days: 0,
+    avatar: null,
     avatar_retouched: null,
     ...o,
   };
@@ -120,6 +121,14 @@ describe('matchings ranking — prior-jobs + photo priority', () => {
     const sorted = [
       makeMatch({ id: 1, hp_total_jobs: 3, avatar_retouched: null }),
       makeMatch({ id: 2, hp_total_jobs: 3, avatar_retouched: { aws_url: 'https://x/p.jpg' } }),
+    ].sort(rankComparator(NOW));
+    expect(sorted.map(m => m.id)).toEqual([2, 1]);
+  });
+
+  it('raw avatar counts as photo (fallback) in ranking', () => {
+    const sorted = [
+      makeMatch({ id: 1, hp_total_jobs: 3, avatar_retouched: null, avatar: null }),
+      makeMatch({ id: 2, hp_total_jobs: 3, avatar_retouched: null, avatar: { aws_url: 'https://x/raw.jpg' } }),
     ].sort(rankComparator(NOW));
     expect(sorted.map(m => m.id)).toEqual([2, 1]);
   });

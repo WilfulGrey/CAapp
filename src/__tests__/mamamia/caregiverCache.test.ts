@@ -32,6 +32,7 @@ const baseCg = {
   hp_total_jobs: 0,
   hp_total_days: 0,
   hp_avg_mission_days: 0,
+  avatar: null,
   avatar_retouched: null,
 };
 
