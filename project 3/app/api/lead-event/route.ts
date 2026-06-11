@@ -353,13 +353,22 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    // Team-Only-Resend-Modus: wenn metadata.team_only_resend === true,
+    // dann wird KEIN DB-Update gemacht und KEINE Kunden-Mail verschickt —
+    // nur die Team-Mail (mit Vertrags-PDF-Anhang, sofern Daten passen)
+    // wird neu gesendet. Use-Case: Vertrag wurde mit HTML-Anhang versendet
+    // (alter Bug, gefixt 11.06.2026) und das Team braucht nachträglich
+    // die PDF-Version, ohne den Kunden erneut zu benachrichtigen.
+    const teamOnlyResend = !!(metadata && typeof metadata === 'object'
+      && (metadata as Record<string, unknown>).team_only_resend === true);
+
     // Acceptance persistence (application_accepted_internal): UPSERT a
     // dedicated row in lead_application_acceptances with the full contract
     // form data. Idempotent on (lead_id, application_id) — re-clicking
     // "Akzeptieren" doesn't duplicate. Frontend queries this table via
     // mamamia-proxy.listAcceptedApplications on portal load to flip the
     // matching app's status to 'accepted' → BookedScreen renders.
-    if (event === 'application_accepted_internal' && metadata && typeof metadata === 'object') {
+    if (!teamOnlyResend && event === 'application_accepted_internal' && metadata && typeof metadata === 'object') {
       const m = metadata as Record<string, unknown>;
       const rawAppId = m.application_id;
       const appId = typeof rawAppId === 'number' ? rawAppId : Number(rawAppId);
@@ -490,7 +499,8 @@ export async function POST(request: NextRequest) {
     // eine Mail-Latenz blockiert werden. Bei fehlenden Pflegekraft-Daten
     // loggen wir und überspringen die Mail — der lead_event wird trotzdem
     // aufgezeichnet.
-    if (CUSTOMER_MAIL_EVENTS.has(event)) {
+    // Im Team-Only-Resend-Modus wird die Kunden-Mail komplett übersprungen.
+    if (!teamOnlyResend && CUSTOMER_MAIL_EVENTS.has(event)) {
       // patient_data_saved ist deduped (NON_DEDUPED_EVENTS enthält nur die
       // Caregiver-Events) — Mail nur beim ersten Speichern verschicken,
       // sonst spammen wir den Kunden bei jedem Patientendaten-Update.
