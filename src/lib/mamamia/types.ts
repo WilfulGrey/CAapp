@@ -244,9 +244,34 @@ export interface MamamiaDismissedCaregivers {
 // application via AngebotPruefenModal step 2. Frontend reads on portal
 // load to flip the matching Application's status to 'accepted' → existing
 // BookedScreen surfaces, persists across reload.
+/** Vollständiges Vertragsdaten-Objekt aus dem `contract_snapshot`-Feld
+ *  (lead_application_acceptances). Wird vom AngebotPruefenModal beim
+ *  Buchen geschrieben (siehe AngebotPruefenModal → buildVertragsDaten).
+ *  Frontend nutzt es, um eine synthetische Application zu rekonstruieren,
+ *  falls Mamamia die akzeptierte Application nicht (mehr) in
+ *  listApplications zurückgibt. */
+export interface MamamiaAcceptedContractSnapshot {
+  datum: string;             // "11.06.2026"
+  vertragsbeginn: string;    // "01.07.2026"
+  voraussAbreise: string;    // "12.08.2026"
+  tagessatz: string;         // "EUR 83,00"
+  ag: { name: string; strasse?: string; plz?: string; ort?: string; email?: string; telefon?: string };
+  le: { name: string; strasse?: string; plz?: string; ort?: string } | null;
+  dl: { name: string; rolle?: string };
+}
+
+export interface MamamiaAcceptedApplicationRow {
+  application_id: number;
+  caregiver_id: number | null;
+  accepted_at: string;
+  /** Vertragsdaten zum Zeitpunkt der Annahme — wird vom Frontend genutzt,
+   *  wenn Mamamia die Application nicht mehr in listApplications zurückgibt. */
+  contract_snapshot: MamamiaAcceptedContractSnapshot | null;
+}
+
 export interface MamamiaAcceptedApplications {
   application_ids: number[];
-  rows: Array<{ application_id: number; caregiver_id: number | null; accepted_at: string }>;
+  rows: MamamiaAcceptedApplicationRow[];
 }
 
 export interface MamamiaLocation {
