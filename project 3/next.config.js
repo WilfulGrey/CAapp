@@ -18,6 +18,14 @@ const nextConfig = {
     NEXT_PUBLIC_BUILT_AT: BUILT_AT,
     NEXT_PUBLIC_ENV_NAME: process.env.CONTEXT || process.env.NODE_ENV || 'unknown',
   },
+  // puppeteer-core + @sparticuz/chromium dürfen NICHT gebundlet werden —
+  // sie laden Chrome-Binary zur Laufzeit dynamisch + nutzen private
+  // class fields die Next 13s Webpack nicht unterstützt. Als external
+  // markieren = Node lädt sie zur Laufzeit direkt aus node_modules
+  // (Render-Container hat sie installiert).
+  experimental: {
+    serverComponentsExternalPackages: ['puppeteer-core', '@sparticuz/chromium'],
+  },
   webpack: (config, { isServer }) => {
     if (!isServer) {
       config.optimization.splitChunks = {
@@ -32,6 +40,14 @@ const nextConfig = {
           },
         },
       };
+    } else {
+      // Backup-Mechanismus: falls serverComponentsExternalPackages mal
+      // entfernt wird, externalize hier hart.
+      config.externals = [
+        ...(config.externals || []),
+        'puppeteer-core',
+        '@sparticuz/chromium',
+      ];
     }
     return config;
   },

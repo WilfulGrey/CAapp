@@ -1,13 +1,14 @@
 // Server-seitiger Generator für den unterschriebenen Dienstleistungsvertrag
 // als selbst-enthaltenes, druckbares HTML-Dokument. Wird beim Buchen
-// (application_accepted_internal) erzeugt und als Anhang an Kunde + Team
-// gemailt. Spiegelt den im Portal (VertragSignieren.tsx) gezeigten
-// Mustervertrag — der Text ist statische Rechtssprache, nur Kundendaten +
-// Zeitraum + Tagessatz + Unterschrift werden eingesetzt.
+// (application_accepted_internal) erzeugt und (a) für die Bridge-Logik
+// gebraucht + (b) per `buildVertragAttachmentPdf` zu PDF gerendert und an
+// Kunde + Team gemailt.
 //
-// Bewusst HTML (kein PDF): keine schwere Headless-Chrome-Abhängigkeit auf
-// Serverless; der Empfänger öffnet die Datei im Browser und kann sie bei
-// Bedarf als PDF drucken (A4-Layout via @media print).
+// Historischer Hinweis: bis 11.06.2026 wurde das HTML 1:1 als Mail-Anhang
+// versendet. Das hatte zwei Probleme — HTML-Attachments werden von vielen
+// Mail-Clients (Outlook, Gmail) als verdächtig flagged und der Vertrag
+// war nicht gerichtsfest archivierbar. Daher rendern wir jetzt via
+// puppeteer + @sparticuz/chromium zu echtem PDF (siehe unten).
 
 export interface VertragPartei {
   name?: string;
@@ -288,7 +289,84 @@ export function buildVertragHtml(daten: VertragInput, opts: VertragHtmlOptions):
 </div></body></html>`;
 }
 
-// Baut den nodemailer-Attachment-Eintrag für den Vertrag.
+// Baut den nodemailer-Attachment-Eintrag für den Vertrag — als ECHTES PDF
+// (gerendert via Headless Chrome aus dem styled HTML). Wird async, weil
+// puppeteer.launch + page.pdf insgesamt ~1-3s dauern; Aufrufer (Bridge-
+// POST in app/api/lead-event/route.ts) ist eh in einem async-Kontext.
+//
+// Render-Setup nutzt @sparticuz/chromium (vorgepacktes Chrome-Binary für
+// Vercel/Render serverless) in Production und lokales /usr/bin/chromium
+// in Dev — identisches Muster wie der alte (deaktivierte) PDF-Generator
+// im Backup `pdf-generator-puppeteer.ts.bak`.
+//
+// Fallback bei Render-Fehler: gibt das HTML-Attachment zurück damit die
+// Mail nicht ganz scheitert (Mail ohne Anhang wäre noch schlimmer als
+// Mail mit HTML-Anhang). Fehler wird gelogged für spätere Diagnose.
+export async function buildVertragAttachmentPdf(
+  daten: VertragInput,
+  opts: VertragHtmlOptions,
+): Promise<{ filename: string; content: Buffer | string; contentType: string }> {
+  const html = buildVertragHtml(daten, opts);
+  // Dynamische Imports — bevor die Mail-Generierung lädt, wollen wir den
+  // Cold-Start nicht durch Chrome-Init verlangsamen.
+  let browser: import('puppeteer-core').Browser | null = null;
+  try {
+    const puppeteer = (await import('puppeteer-core')).default;
+    const isProduction = process.env.NODE_ENV === 'production';
+    const launchOptions = isProduction
+      ? await (async () => {
+          const chromium = (await import('@sparticuz/chromium')).default;
+          return {
+            args: chromium.args,
+            executablePath: await chromium.executablePath(),
+            headless: true as const,
+          };
+        })()
+      : {
+          headless: true as const,
+          executablePath: '/usr/bin/chromium',
+          args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage'],
+        };
+
+    browser = await puppeteer.launch(launchOptions);
+    const page = await browser.newPage();
+    // Inline-HTML ohne externe Ressourcen — `domcontentloaded` reicht.
+    await page.setContent(html, { waitUntil: 'domcontentloaded' });
+    const pdfBuf = await page.pdf({
+      format: 'A4',
+      printBackground: true,
+      margin: { top: '15mm', right: '15mm', bottom: '15mm', left: '15mm' },
+    });
+    return {
+      filename: 'Betreuungsvertrag_Primundus.pdf',
+      content: Buffer.from(pdfBuf),
+      contentType: 'application/pdf',
+    };
+  } catch (err) {
+    console.error(
+      '[buildVertragAttachmentPdf] PDF-Render fehlgeschlagen, falle auf HTML-Anhang zurück:',
+      err instanceof Error ? err.message : String(err),
+    );
+    return {
+      filename: 'Betreuungsvertrag_Primundus.html',
+      content: html,
+      contentType: 'text/html; charset=utf-8',
+    };
+  } finally {
+    if (browser) {
+      try {
+        await browser.close();
+      } catch {
+        // browser.close() kann hängen — kein blocking Problem.
+      }
+    }
+  }
+}
+
+/** @deprecated Verwende `buildVertragAttachmentPdf` (async, echtes PDF).
+ *  Diese Synchron-Variante liefert HTML — Mail-Clients flaggen das als
+ *  verdächtig und der Anhang ist nicht gerichtsfest archivierbar.
+ *  Behalten für Tests / Notfall-Rollback. */
 export function buildVertragAttachment(daten: VertragInput, opts: VertragHtmlOptions) {
   return {
     filename: 'Betreuungsvertrag_Primundus.html',
