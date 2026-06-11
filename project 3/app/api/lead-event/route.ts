@@ -9,7 +9,7 @@ import {
   type CaregiverMailEvent,
   type OfferInfo,
 } from '@/lib/email';
-import { buildVertragAttachment } from '@/lib/vertrag';
+import { buildVertragAttachmentPdf } from '@/lib/vertrag';
 
 // Bridge endpoint: the CA-App portal reports customer milestones back to the
 // kostenrechner lead so the Nachfass emails can branch. Token-authenticated —
@@ -436,21 +436,24 @@ export async function POST(request: NextRequest) {
     }
 
     // Vertrags-Anhang (Stufe B): beim Buchen aus dem Vertrags-Snapshot +
-    // elektronischer Signatur ein vollständiges HTML-Vertragsdokument bauen
-    // und an Kunde (Mail C) + Team anhängen. Best-effort — fehlen die Daten
-    // oder schlägt das Rendern fehl, wird einfach kein Anhang gesendet.
-    let contractAttachment: { filename: string; content: string; contentType: string } | null = null;
+    // elektronischer Signatur ein vollständiges Vertragsdokument als PDF
+    // rendern (Headless Chrome) und an Kunde (Mail C) + Team anhängen.
+    // Best-effort — fehlen die Daten oder schlägt das Rendern fehl, fällt
+    // `buildVertragAttachmentPdf` intern auf HTML-Anhang zurück damit die
+    // Mail überhaupt einen Vertrag mitbringt; ohne Anhang würde der Kunde
+    // mit "Buchung bestätigt" ohne Dokument dastehen.
+    let contractAttachment: { filename: string; content: Buffer | string; contentType: string } | null = null;
     if (event === 'application_accepted_internal' && metadata && typeof metadata === 'object') {
       const m = metadata as Record<string, unknown>;
       if (m.contract && typeof m.contract === 'object' && typeof m.signatur === 'string' && m.signatur.trim()) {
         try {
-          contractAttachment = buildVertragAttachment(m.contract as any, {
+          contractAttachment = await buildVertragAttachmentPdf(m.contract as any, {
             signaturName: m.signatur as string,
             signedAt: typeof m.signed_at === 'string' ? (m.signed_at as string) : undefined,
             auditNote: 'Vertragsversion v1.0',
           });
         } catch (e) {
-          console.error('buildVertragAttachment failed:', e instanceof Error ? e.message : String(e));
+          console.error('buildVertragAttachmentPdf failed:', e instanceof Error ? e.message : String(e));
         }
       }
     }
