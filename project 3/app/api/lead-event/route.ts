@@ -471,9 +471,13 @@ export async function POST(request: NextRequest) {
     // - patient_data_saved → einmal pro Lead (Milestone, deduped)
     // - caregiver_invited / caregiver_interest_shown / application_received →
     //   pro Event eine Mail (kein DB-Dedupe), jede mit Pflegekraft-Name.
+    // - teamOnlyResend bypasst die Dedup-Sperre, damit ein nachträglicher
+    //   Re-Send (z.B. mit neuem PDF-Anhang nach Bugfix) die Team-Mail
+    //   tatsächlich erneut auslöst — sonst würde sie wegen isDeduped +
+    //   !isFirstOccurrence unterdrückt.
     const shouldNotifyTeam =
       TEAM_NOTIFY_EVENTS.includes(event) &&
-      (!isDeduped || isFirstOccurrence);
+      (!isDeduped || isFirstOccurrence || teamOnlyResend);
 
     if (shouldNotifyTeam) {
       const additionalData: Record<string, unknown> | undefined =
