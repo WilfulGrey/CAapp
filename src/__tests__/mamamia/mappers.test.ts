@@ -8,8 +8,9 @@ import {
   germanySkillBucket,
   requiredGermanyLevelForWish,
   matchesGermanyWish,
+  synthesizeAcceptedApplicationFromSnapshot,
 } from '../../lib/mamamia/mappers';
-import type { MamamiaCaregiverRef, MamamiaCustomer } from '../../lib/mamamia/types';
+import type { MamamiaCaregiverRef, MamamiaCaregiverFull, MamamiaCustomer, MamamiaAcceptedApplicationRow } from '../../lib/mamamia/types';
 
 const NOW_ISO = '2026-04-24T12:00:00.000Z';
 const NOW_YEAR = 2026;
@@ -1063,5 +1064,109 @@ describe('mapCaregiverToNurse — language.bucket füllt 3-Stufen-Bridge', () =>
   it('bucket=null für unbekannte germany_skill (kein Aufpreis möglich)', () => {
     const n = mapCaregiverToNurse(makeCg({ germany_skill: null }), { nowIso: NOW_ISO, nowYear: NOW_YEAR });
     expect(n.language.bucket).toBeNull();
+  });
+});
+
+// ─── Acceptance-Synthese (Bug-Fix Michael Dachs 11.06.2026) ──────────────
+// Mamamia entfernt akzeptierte Bewerbungen aus listApplications, daher
+// braucht das Portal eine Rekonstruktion aus dem contract_snapshot, sonst
+// rendert BookedScreen nicht + die anderen Bewerbungen werden weiter als
+// "offen" angezeigt.
+describe('synthesizeAcceptedApplicationFromSnapshot', () => {
+  function makeRow(overrides: Partial<MamamiaAcceptedApplicationRow> = {}): MamamiaAcceptedApplicationRow {
+    return {
+      application_id: 9006,
+      caregiver_id: 21395,
+      accepted_at: '2026-06-11T10:51:25Z',
+      contract_snapshot: {
+        datum: '11.06.2026',
+        vertragsbeginn: '01.07.2026',
+        voraussAbreise: '12.08.2026',
+        tagessatz: 'EUR 83,00',
+        ag: { name: 'Marianne Dachs' },
+        le: null,
+        dl: { name: 'Kamila Bilska-Wabik' },
+      },
+      ...overrides,
+    };
+  }
+  function makeFullCg(overrides: Partial<MamamiaCaregiverFull> = {}): MamamiaCaregiverFull {
+    return {
+      ...makeCg(),
+      ...overrides,
+    } as MamamiaCaregiverFull;
+  }
+
+  it('liefert null wenn Caregiver-Profil noch nicht geladen (kein Fallback ohne Daten)', () => {
+    const r = synthesizeAcceptedApplicationFromSnapshot(makeRow(), null, { nowIso: NOW_ISO, nowYear: NOW_YEAR });
+    expect(r).toBeNull();
+  });
+
+  it('rekonstruiert Application mit status=accepted + Mamamia-application-id als String', () => {
+    const r = synthesizeAcceptedApplicationFromSnapshot(makeRow(), makeFullCg(), { nowIso: NOW_ISO, nowYear: NOW_YEAR });
+    expect(r).not.toBeNull();
+    expect(r!.id).toBe('9006');
+    expect(r!.status).toBe('accepted');
+  });
+
+  it('parst Tagessatz "EUR 83,00" → monatlicheKosten = 83 × 30 = 2490', () => {
+    const r = synthesizeAcceptedApplicationFromSnapshot(makeRow(), makeFullCg(), { nowIso: NOW_ISO, nowYear: NOW_YEAR });
+    expect(r!.offer.monatlicheKosten).toBe(2490);
+  });
+
+  it('übernimmt Anreise- und Abreisedatum aus contract_snapshot direkt', () => {
+    const r = synthesizeAcceptedApplicationFromSnapshot(makeRow(), makeFullCg(), { nowIso: NOW_ISO, nowYear: NOW_YEAR });
+    expect(r!.offer.anreisedatum).toBe('01.07.2026');
+    expect(r!.offer.abreisedatum).toBe('12.08.2026');
+  });
+
+  it('setzt Anreise/Abreise-Kosten auf 125 € (Standard-Pauschale)', () => {
+    const r = synthesizeAcceptedApplicationFromSnapshot(makeRow(), makeFullCg(), { nowIso: NOW_ISO, nowYear: NOW_YEAR });
+    expect(r!.offer.anreisekosten).toBe(125);
+    expect(r!.offer.abreisekosten).toBe(125);
+  });
+
+  it('feiertagszuschlag = tagessatz (doppelter Tagessatz pro Feiertag)', () => {
+    const r = synthesizeAcceptedApplicationFromSnapshot(makeRow(), makeFullCg(), { nowIso: NOW_ISO, nowYear: NOW_YEAR });
+    expect(r!.offer.feiertagszuschlag).toBe(83);
+  });
+
+  it('parst englische Tausender-/Dezimaltrennung "EUR 1,234.56" → 1235', () => {
+    const r = synthesizeAcceptedApplicationFromSnapshot(
+      makeRow({ contract_snapshot: { tagessatz: 'EUR 1,234.56' } as never }),
+      makeFullCg(),
+      { nowIso: NOW_ISO, nowYear: NOW_YEAR },
+    );
+    expect(r!.offer.monatlicheKosten).toBe(1235 * 30);
+  });
+
+  it('parst deutsche Tausender "1.234,56 €" → 1235', () => {
+    const r = synthesizeAcceptedApplicationFromSnapshot(
+      makeRow({ contract_snapshot: { tagessatz: '1.234,56 €' } as never }),
+      makeFullCg(),
+      { nowIso: NOW_ISO, nowYear: NOW_YEAR },
+    );
+    expect(r!.offer.monatlicheKosten).toBe(1235 * 30);
+  });
+
+  it('fehlender / unparsbarer Tagessatz → monatlicheKosten = 0 (statt Crash)', () => {
+    const r = synthesizeAcceptedApplicationFromSnapshot(
+      makeRow({ contract_snapshot: null }),
+      makeFullCg(),
+      { nowIso: NOW_ISO, nowYear: NOW_YEAR },
+    );
+    expect(r!.offer.monatlicheKosten).toBe(0);
+    // Fallback-Strings statt "undefined"-leaks ins UI
+    expect(r!.offer.anreisedatum).toBe('—');
+    expect(r!.offer.abreisedatum).toBe('—');
+  });
+
+  it('nurse-Felder kommen vom geladenen Caregiver-Profil', () => {
+    const r = synthesizeAcceptedApplicationFromSnapshot(
+      makeRow(),
+      makeFullCg({ first_name: 'Kamila', last_name: 'Bilska-Wabik' }),
+      { nowIso: NOW_ISO, nowYear: NOW_YEAR },
+    );
+    expect(r!.nurse.name).toBe('Kamila B.');
   });
 });

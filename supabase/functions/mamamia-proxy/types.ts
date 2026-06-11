@@ -47,7 +47,16 @@ export interface ProxySupabase {
   // lead_application_acceptances, written by bridge endpoint.
   selectAcceptedApplications(
     leadId: string,
-  ): Promise<Array<{ application_id: number; caregiver_id: number | null; accepted_at: string }>>;
+  ): Promise<Array<{
+    application_id: number;
+    caregiver_id: number | null;
+    accepted_at: string;
+    /** Vollständiges Vertragsdaten-Objekt (Tagessatz, Anreise/Abreise,
+     *  AG/LE-Namen, …) — wird im Frontend benutzt, um eine synthetische
+     *  Application zu rekonstruieren, falls Mamamia die akzeptierte
+     *  Application nicht (mehr) in listApplications zurückgibt. */
+    contract_snapshot: Record<string, unknown> | null;
+  }>>;
   // Used by inviteCaregiver + getInviteRateState. Counts attempts in
   // rolling time window (most callers: 60 min). Source-of-truth row is
   // written by inviteCaregiver AFTER Mamamia StoreRequest succeeds.

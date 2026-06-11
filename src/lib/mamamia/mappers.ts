@@ -443,7 +443,7 @@ export function mapCaregiverToNurse(
 
 // ─── MamamiaApplication / MamamiaMatching → UI Application/Nurse ─────────
 
-import type { MamamiaApplication, MamamiaMatching } from './types';
+import type { MamamiaApplication, MamamiaMatching, MamamiaAcceptedApplicationRow } from './types';
 
 // UI's Application type (duplicated here for decoupling from CustomerPortalPage).
 // NOTE: must match shape expected by AppCard / AngebotPruefenModal.
@@ -504,6 +504,78 @@ export function mapApplicationToUI(
       feiertagszuschlag: app.holiday_surcharge ?? 0,
       kuendigungsfrist: 'Täglich kündbar',
       submittedAt: formatMamamiaDate(app.active_until_at) ?? '—',
+    },
+  };
+}
+
+/** Parst "EUR 83,00" → 83 (number). Wird beim Synthetisieren der
+ *  accepted Application aus contract_snapshot gebraucht: das Snapshot
+ *  speichert nur den formatierten Tagessatz-String, nicht den
+ *  numerischen Wert. Robust gegen "83", "83.00", "EUR 83", "EUR 83,00 €",
+ *  "1.234,56 EUR". Fallback 0 bei nicht-parsbarem Input. */
+function parseTagessatzString(s: string | null | undefined): number {
+  if (!s) return 0;
+  // Entferne alles außer Ziffern, Komma, Punkt
+  const cleaned = s.replace(/[^\d.,]/g, '');
+  if (!cleaned) return 0;
+  // Letztes Trennzeichen (Komma oder Punkt) ist Dezimaltrenner — alles
+  // davor sind Tausender. Bei "1.234,56" → Dezimal=",", Tausender=".".
+  const lastComma = cleaned.lastIndexOf(',');
+  const lastDot = cleaned.lastIndexOf('.');
+  let normalized: string;
+  if (lastComma > lastDot) {
+    // Deutsche Schreibweise: Punkte raus, Komma → Punkt
+    normalized = cleaned.replace(/\./g, '').replace(',', '.');
+  } else {
+    // Englisch / kein Dezimaltrenner: Kommas raus
+    normalized = cleaned.replace(/,/g, '');
+  }
+  const n = parseFloat(normalized);
+  return Number.isFinite(n) ? Math.round(n) : 0;
+}
+
+/** Rekonstruiert eine UIApplication aus einer akzeptierten
+ *  lead_application_acceptances-Zeile + dem (asynchron geladenen)
+ *  Mamamia-Caregiver-Profil. Wird gebraucht, weil Mamamia die akzeptierte
+ *  Application aus listApplications entfernt — ohne Synthese würde
+ *  BookedScreen nicht rendern und das Portal zeigte "X offene
+ *  Bewerbungen" obwohl die Annahme längst gemacht ist (Bug 11.06.2026).
+ *
+ *  Wenn das Caregiver-Profil noch nicht geladen ist, wird `null`
+ *  zurückgegeben — der Aufrufer wartet dann und ruft erneut auf, sobald
+ *  useCaregiver `data` liefert.
+ */
+export function synthesizeAcceptedApplicationFromSnapshot(
+  row: MamamiaAcceptedApplicationRow,
+  caregiver: MamamiaCaregiverFull | null,
+  opts: { nowIso: string; nowYear: number },
+): UIApplication | null {
+  if (!caregiver) return null;
+  const snap = row.contract_snapshot;
+  // Tagessatz aus dem Snapshot ist als String "EUR 83,00" gespeichert —
+  // wir parsen zurück zu number und rechnen auf monatliche Kosten hoch
+  // (×30, gleicher Faktor wie buildVertragsDaten beim Schreiben).
+  const tagessatz = parseTagessatzString((snap?.tagessatz as string) ?? null);
+  const monatlicheKosten = tagessatz * 30;
+  return {
+    id: String(row.application_id),
+    nurse: mapCaregiverToNurse(caregiver, opts),
+    agencyName: 'Pflegeagentur',
+    appliedAt: '—',
+    status: 'accepted',
+    message: '',
+    offer: {
+      monatlicheKosten,
+      anreisedatum: (snap?.vertragsbeginn as string) ?? '—',
+      abreisedatum: (snap?.voraussAbreise as string) ?? '—',
+      // Standard-Werte: der Snapshot speichert die Spesen nicht separat;
+      // 125 € pro Strecke ist die Konvention (zzgl.-Hinweis im Portal).
+      anreisekosten: 125,
+      abreisekosten: 125,
+      reisetage: 'Halb',
+      feiertagszuschlag: tagessatz, // doppelter Tagessatz = 1× extra
+      kuendigungsfrist: 'Täglich kündbar',
+      submittedAt: (snap?.datum as string) ?? '—',
     },
   };
 }

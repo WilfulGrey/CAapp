@@ -423,8 +423,8 @@ Deno.test("listAcceptedApplications: reads via session.lead_id, returns applicat
     selectAcceptedApplications: async (leadId: string) => {
       selectArg = leadId;
       return [
-        { application_id: 7997, caregiver_id: 26960, accepted_at: "2026-05-19T12:00:00Z" },
-        { application_id: 8001, caregiver_id: 27001, accepted_at: "2026-05-19T13:00:00Z" },
+        { application_id: 7997, caregiver_id: 26960, accepted_at: "2026-05-19T12:00:00Z", contract_snapshot: null },
+        { application_id: 8001, caregiver_id: 27001, accepted_at: "2026-05-19T13:00:00Z", contract_snapshot: null },
       ];
     },
     countRecentInviteAttempts: async () => 0,

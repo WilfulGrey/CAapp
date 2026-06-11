@@ -218,15 +218,24 @@ function makeRealSupabase(url: string, serviceKey: string): ProxySupabase {
       if (error) throw new Error(`supabase upsertDismissedCaregiver: ${error.message}`);
     },
     async selectAcceptedApplications(leadId) {
+      // contract_snapshot mitgeliefert, damit der Portal-Frontend eine
+      // synthetische Application bauen kann, falls Mamamia die akzeptierte
+      // Application nicht mehr in `listApplications` zurückgibt (kommt vor
+      // ab dem Moment, in dem die Bewerbung im Mamamia-Backend als
+      // abgeschlossen markiert wird). Ohne den Snapshot wäre der
+      // BookedScreen leer + die UI würde "X offene Bewerbungen" zeigen,
+      // obwohl die Annahme längst gemacht ist (Bug Michael Dachs / lead
+      // 39def7b2 vom 11.06.2026).
       const { data, error } = await client
         .from("lead_application_acceptances")
-        .select("application_id, caregiver_id, accepted_at")
+        .select("application_id, caregiver_id, accepted_at, contract_snapshot")
         .eq("lead_id", leadId);
       if (error) throw new Error(`supabase selectAcceptedApplications: ${error.message}`);
       return (data ?? []) as Array<{
         application_id: number;
         caregiver_id: number | null;
         accepted_at: string;
+        contract_snapshot: Record<string, unknown> | null;
       }>;
     },
     async countRecentInviteAttempts(leadId, windowMinutes) {

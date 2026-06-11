@@ -33,6 +33,7 @@ import {
   mapMatchingToNurse,
   mapCaregiverToNurse,
   matchesGermanyWish,
+  synthesizeAcceptedApplicationFromSnapshot,
 } from '../lib/mamamia/mappers';
 import { mapPatientFormToUpdateCustomerInput, splitCustomerName } from '../lib/mamamia/patientFormMapper';
 import { callMamamia, MamamiaError } from '../lib/mamamia/client';
@@ -436,6 +437,14 @@ const CustomerPortalPage: FC = () => {
   // existing BookedScreen renders. Persists across reload.
   const { data: acceptedApplications, refetch: refetchAcceptedApplications } = useAcceptedApplications(mmReady);
 
+  // Wenn Mamamia die akzeptierte Application aus listApplications entfernt
+  // (kommt vor sobald die Bewerbung dort als abgeschlossen markiert wird),
+  // brauchen wir die volle Pflegekraft-Daten getrennt zu laden, um eine
+  // synthetische Application zu rekonstruieren. Wir nehmen den ersten Row
+  // (in der Praxis gibt's pro Lead genau eine Annahme).
+  const firstAcceptedCaregiverId = acceptedApplications?.rows[0]?.caregiver_id ?? null;
+  const { data: acceptedCaregiverProfile } = useCaregiver(firstAcceptedCaregiverId);
+
   // K5 mutations
   const rejectAppMutation = useRejectApplication();
   const confirmMutation = useStoreConfirmation();
@@ -653,19 +662,57 @@ const CustomerPortalPage: FC = () => {
     });
   }, [mmReady, mmApplications]);
 
-  // Persistence merge — flip status to 'accepted' for applications that
-  // the customer confirmed via AngebotPruefenModal step 2 (recorded in
-  // lead_application_acceptances). Runs both on initial mount (after
-  // mmReady + acceptedApplications fetched) and after each refetch.
-  // → BookedScreen renders on reload because acceptedApp is truthy.
+  // Persistence merge — flip status to 'accepted' für Applications, die
+  // der Kunde via AngebotPruefenModal step 2 angenommen hat (gespeichert
+  // in lead_application_acceptances). Läuft sowohl beim Initial-Mount
+  // (nach mmReady + acceptedApplications fetch) als auch nach jedem
+  // Refetch. Zwei Pfade:
+  //
+  //   1) Mamamia liefert die akzeptierte Application weiter in
+  //      listApplications → wir patchen das vorhandene Objekt auf
+  //      status='accepted'.
+  //   2) Mamamia liefert sie NICHT mehr (Standardfall ab dem Moment, in
+  //      dem die Bewerbung als abgeschlossen markiert ist) → wir
+  //      rekonstruieren eine synthetische Application aus dem
+  //      contract_snapshot + den getrennt geladenen Caregiver-Daten.
+  //      Sonst wäre acceptedApp = null und BookedScreen würde nicht
+  //      rendern (Bug Michael Dachs / lead 39def7b2, 11.06.2026).
   useEffect(() => {
     if (!mmReady || !acceptedApplications) return;
     const acceptedIds = new Set(acceptedApplications.application_ids);
     if (acceptedIds.size === 0) return;
-    setApplications(prev => prev.map(a =>
-      acceptedIds.has(Number(a.id)) ? { ...a, status: 'accepted' } : a
-    ));
-  }, [mmReady, acceptedApplications]);
+
+    setApplications(prev => {
+      const presentIds = new Set(prev.map(a => Number(a.id)));
+      // Pfad 1: vorhandene Apps auf accepted patchen
+      const patched = prev.map(a =>
+        acceptedIds.has(Number(a.id)) ? { ...a, status: 'accepted' as const } : a,
+      );
+      // Pfad 2: für jede acceptedRow, die NICHT bereits in applications
+      // ist, eine synthetische Application bauen — wenn das Caregiver-
+      // Profil schon geladen ist. Sonst überspringen wir; sobald
+      // `acceptedCaregiverProfile` nachfließt, läuft der useEffect erneut
+      // (deps enthalten den Profile-State) und wir holen es nach.
+      const nowIso = new Date().toISOString();
+      const nowYear = new Date().getFullYear();
+      const additions: typeof patched = [];
+      for (const row of acceptedApplications.rows) {
+        if (presentIds.has(row.application_id)) continue;
+        // Wir können (vorerst) nur ein Profil pro Render-Cycle laden —
+        // nimmt das passende Caregiver-Profil, falls geladen.
+        const profile = row.caregiver_id === firstAcceptedCaregiverId
+          ? acceptedCaregiverProfile
+          : null;
+        const synth = synthesizeAcceptedApplicationFromSnapshot(
+          row,
+          profile ?? null,
+          { nowIso, nowYear },
+        );
+        if (synth) additions.push(synth);
+      }
+      return additions.length > 0 ? [...patched, ...additions] : patched;
+    });
+  }, [mmReady, acceptedApplications, acceptedCaregiverProfile, firstAcceptedCaregiverId]);
 
   // Background prefetch full caregiver profiles for visible matchings +
   // applications. GET_CAREGIVER takes 1.7-3.1s on Mamamia beta — without
