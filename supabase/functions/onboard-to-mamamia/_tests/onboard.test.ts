@@ -61,9 +61,12 @@ interface FakeSupabase {
   updated: Array<{ id: string; patch: Partial<Lead> }>;
   fetchLead(token: string): Lead | null;
   updateLead(id: string, patch: Partial<Lead>): void;
+  fetchLeadJob(jobId: string, leadId: string): Promise<{ mamamia_job_offer_id: number } | null>;
 }
 
-function makeFakeSupabase(initialLeads: Lead[] = []): FakeSupabase {
+interface FakeLeadJob { id: string; lead_id: string; mamamia_job_offer_id: number; }
+
+function makeFakeSupabase(initialLeads: Lead[] = [], leadJobs: FakeLeadJob[] = []): FakeSupabase {
   const leads = new Map(initialLeads.map((l) => [l.token ?? "", l]));
   const updated: FakeSupabase["updated"] = [];
   return {
@@ -77,6 +80,12 @@ function makeFakeSupabase(initialLeads: Lead[] = []): FakeSupabase {
       for (const [, lead] of leads) {
         if (lead.id === id) Object.assign(lead, patch);
       }
+    },
+    // Lead-scoped: only matches when BOTH job id and lead id match, mirroring
+    // the real `.eq("id").eq("lead_id")` ownership filter.
+    fetchLeadJob(jobId, leadId) {
+      const j = leadJobs.find((x) => x.id === jobId && x.lead_id === leadId);
+      return Promise.resolve(j ? { mamamia_job_offer_id: j.mamamia_job_offer_id } : null);
     },
   };
 }
@@ -281,6 +290,56 @@ Deno.test("onboardLead: cache hit — returns cached IDs without Mamamia calls",
   assertEquals(result.customer_id, 7566);
   assertEquals(result.job_offer_id, 16225);
   assertEquals(supa.updated.length, 0); // no write needed
+});
+
+// ─── Multi-Job (Variant A): job_id session scoping ───────────────────────
+
+const ONBOARDED = {
+  id: "lead-x",
+  mamamia_customer_id: 7566,
+  mamamia_job_offer_id: 16225, // the lead's DEFAULT job
+  mamamia_user_token: "cached-jwt",
+  mamamia_onboarded_at: "2026-04-20T00:00:00.000Z",
+} as const;
+const NO_MAMAMIA: typeof fetch = () => {
+  throw new Error("Mamamia should not be called on cache hit!");
+};
+
+Deno.test("onboardLead: NO job_id → lead's default job (backward compatible, even with other jobs)", async () => {
+  _resetAgencyTokenCache();
+  const supa = makeFakeSupabase([makeLead({ ...ONBOARDED })], [
+    { id: "job-a", lead_id: "lead-x", mamamia_job_offer_id: 16225 },
+    { id: "job-b", lead_id: "lead-x", mamamia_job_offer_id: 99999 },
+  ]);
+  const result = await onboardLead({
+    leadToken: "valid-token", secrets: SECRETS, supabase: supa, fetchFn: NO_MAMAMIA, now: NOW,
+  });
+  // Old token (no &job) must resolve to the default job, never job-b.
+  assertEquals(result.job_offer_id, 16225);
+});
+
+Deno.test("onboardLead: job_id scopes the session to that lead_job (customer unchanged)", async () => {
+  _resetAgencyTokenCache();
+  const supa = makeFakeSupabase([makeLead({ ...ONBOARDED })], [
+    { id: "job-b", lead_id: "lead-x", mamamia_job_offer_id: 99999 },
+  ]);
+  const result = await onboardLead({
+    leadToken: "valid-token", jobId: "job-b", secrets: SECRETS, supabase: supa, fetchFn: NO_MAMAMIA, now: NOW,
+  });
+  assertEquals(result.job_offer_id, 99999); // scoped to job-b
+  assertEquals(result.customer_id, 7566); // same resident (customer)
+});
+
+Deno.test("onboardLead: foreign/unknown job_id → falls back to default (no cross-lead)", async () => {
+  _resetAgencyTokenCache();
+  // job-c belongs to a DIFFERENT lead → lead-scoped lookup returns null.
+  const supa = makeFakeSupabase([makeLead({ ...ONBOARDED })], [
+    { id: "job-c", lead_id: "other-lead", mamamia_job_offer_id: 77777 },
+  ]);
+  const result = await onboardLead({
+    leadToken: "valid-token", jobId: "job-c", secrets: SECRETS, supabase: supa, fetchFn: NO_MAMAMIA, now: NOW,
+  });
+  assertEquals(result.job_offer_id, 16225); // default — NOT the foreign 77777
 });
 
 Deno.test("onboardLead: expired lead token throws", async () => {

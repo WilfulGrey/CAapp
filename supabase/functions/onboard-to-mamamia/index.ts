@@ -39,9 +39,13 @@ export async function handleRequest(req: Request, deps: HandlerDeps): Promise<Re
 
   // Body parsing
   let token: string | undefined;
+  let jobId: string | undefined;
   try {
     const body = await req.json();
     token = body?.token;
+    // Multi-Job (Variant A): optional lead_jobs.id from ?job=... deep links.
+    // Omitted (every old token / link without &job) → the lead's default job.
+    jobId = typeof body?.job_id === "string" ? body.job_id : undefined;
   } catch {
     return jsonError(400, "invalid json body", baseHeaders);
   }
@@ -55,6 +59,7 @@ export async function handleRequest(req: Request, deps: HandlerDeps): Promise<Re
   try {
     result = await onboardLead({
       leadToken: token,
+      jobId,
       secrets: deps.secrets,
       supabase: deps.supabase,
       fetchFn: deps.fetchFn,
@@ -131,6 +136,18 @@ function makeRealSupabase(url: string, serviceKey: string): SupabaseLike {
     async updateLead(id: string, patch: Record<string, unknown>) {
       const { error } = await client.from("leads").update(patch).eq("id", id);
       if (error) throw new Error(`supabase update: ${error.message}`);
+    },
+    async fetchLeadJob(jobId: string, leadId: string) {
+      // The lead_id filter IS the ownership check — a job_id belonging to
+      // another lead returns null (→ caller falls back to the lead's default).
+      const { data, error } = await client
+        .from("lead_jobs")
+        .select("mamamia_job_offer_id")
+        .eq("id", jobId)
+        .eq("lead_id", leadId)
+        .maybeSingle();
+      if (error) throw new Error(`supabase fetchLeadJob: ${error.message}`);
+      return data;
     },
   };
 }
