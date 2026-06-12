@@ -16,6 +16,7 @@ export type ProxyAction =
   | "getCaregiver"
   | "searchLocations"
   | "getInviteRateState"
+  | "listLeadJobs"
   // writes
   | "updateCustomer"
   | "updateJobDescription"
@@ -28,11 +29,28 @@ export type ProxyAction =
   | "generateJobDescription"
   | "generateCaregiverAbout";
 
+// One row of the lead_jobs table (Multi-Job, Phase 2) as surfaced to the
+// frontend "Alle meine Einsätze" overview. 'laufend' is NOT stored — it is
+// derived client-side from (status='gebucht' AND anreise <= today < abreise).
+export interface LeadJobRow {
+  id: string;
+  mamamia_job_offer_id: number;
+  status: string;
+  anreise: string | null;
+  abreise: string | null;
+  position: number;
+}
+
 // Minimal Supabase client interface used by dismissCaregiver /
 // listDismissedCaregivers. Real impl in proxy index.ts; tests inject
 // a fake. Kept narrow so tests don't have to satisfy the full @supabase
 // surface.
 export interface ProxySupabase {
+  // Multi-Job (Phase 2): the lead's jobs for the "Alle meine Einsätze"
+  // overview. Scoped by session.lead_id (the residency baked into the
+  // signed JWT) — NOT job-scoped, so a job-scoped session can still read
+  // the full overview. Read-only.
+  selectLeadJobs(leadId: string): Promise<LeadJobRow[]>;
   selectDismissedCaregivers(
     leadId: string,
   ): Promise<Array<{ caregiver_id: number; kind: string }>>;

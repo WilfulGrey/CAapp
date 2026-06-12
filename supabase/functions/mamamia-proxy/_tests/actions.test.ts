@@ -1,6 +1,6 @@
 import { assertEquals, assertRejects } from "@std/assert";
 import { ACTIONS } from "../actions.ts";
-import type { SessionPayload, ActionDeps } from "../types.ts";
+import type { SessionPayload, ActionDeps, LeadJobRow } from "../types.ts";
 
 const SESSION: SessionPayload = {
   customer_id: 7570,
@@ -25,6 +25,8 @@ function captureFetch(response: object, status = 200) {
 type FakeSupa = {
   invites: Array<{ leadId: string; caregiverId: number; attemptedAt: Date }>;
   failOnRecord?: boolean;
+  jobs?: LeadJobRow[];
+  lastLeadJobsLeadId?: string;
 };
 function makeFakeSupabase(state: FakeSupa = { invites: [] }) {
   return {
@@ -32,6 +34,10 @@ function makeFakeSupabase(state: FakeSupa = { invites: [] }) {
     adapter: {
       // dismiss / accept fakes not used by invite tests but required by
       // the interface — keep them inert.
+      async selectLeadJobs(leadId: string) {
+        state.lastLeadJobsLeadId = leadId;
+        return state.jobs ?? [];
+      },
       async selectDismissedCaregivers() { return []; },
       async upsertDismissedCaregiver() { /* no-op */ },
       async selectAcceptedApplications() { return []; },
@@ -67,6 +73,31 @@ function makeDeps(fetchFn: typeof fetch, supabase?: ActionDeps["supabase"]): Act
     supabase: supabase ?? makeFakeSupabase().adapter,
   };
 }
+
+const NOOP_FETCH = (async () => new Response("{}")) as typeof fetch;
+
+// ─── listLeadJobs (Multi-Job overview) ───────────────────────────────────
+
+Deno.test("listLeadJobs: returns the lead's jobs, queried by session.lead_id", async () => {
+  const jobs: LeadJobRow[] = [
+    { id: "j1", mamamia_job_offer_id: 100, status: "geplant", anreise: null, abreise: null, position: 0 },
+    { id: "j2", mamamia_job_offer_id: 200, status: "gebucht", anreise: "2026-07-01", abreise: "2026-09-01", position: 0 },
+  ];
+  const { state, adapter } = makeFakeSupabase({ invites: [], jobs });
+  const result = await ACTIONS.listLeadJobs(SESSION, {}, makeDeps(NOOP_FETCH, adapter));
+  // Ownership: the lead_id comes from the signed session, never from the client.
+  assertEquals(state.lastLeadJobsLeadId, SESSION.lead_id);
+  assertEquals((result as { jobs: LeadJobRow[] }).jobs, jobs);
+});
+
+Deno.test("listLeadJobs: throws when the supabase adapter is missing", async () => {
+  const deps: ActionDeps = { ...makeDeps(NOOP_FETCH), supabase: undefined };
+  await assertRejects(
+    () => ACTIONS.listLeadJobs(SESSION, {}, deps),
+    Error,
+    "supabase adapter required",
+  );
+});
 
 // ─── getJobOffer ─────────────────────────────────────────────────────────
 

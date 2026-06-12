@@ -14,7 +14,7 @@ import { isRateLimited } from "../_shared/rateLimit.ts";
 import { parseCookie, verifySessionToken } from "../_shared/session.ts";
 import { getOrRefreshAgencyToken } from "../_shared/mamamiaClient.ts";
 import { ACTIONS, isKnownAction } from "./actions.ts";
-import type { ProxySupabase } from "./types.ts";
+import type { LeadJobRow, ProxySupabase } from "./types.ts";
 
 // ─── Secrets + DI ──────────────────────────────────────────────────────────
 
@@ -200,6 +200,19 @@ function jsonError(
 function makeRealSupabase(url: string, serviceKey: string): ProxySupabase {
   const client: SupabaseClient = createClient(url, serviceKey);
   return {
+    async selectLeadJobs(leadId: string) {
+      // Manual `position` pin first (1 = oben), then chronological by anreise
+      // (nulls last — geplant jobs without a date). The frontend re-sorts by
+      // status for display; this is just a stable default order.
+      const { data, error } = await client
+        .from("lead_jobs")
+        .select("id, mamamia_job_offer_id, status, anreise, abreise, position")
+        .eq("lead_id", leadId)
+        .order("position", { ascending: false })
+        .order("anreise", { ascending: true, nullsFirst: false });
+      if (error) throw new Error(`supabase selectLeadJobs: ${error.message}`);
+      return (data ?? []) as LeadJobRow[];
+    },
     async selectDismissedCaregivers(leadId: string) {
       const { data, error } = await client
         .from("lead_dismissed_caregivers")

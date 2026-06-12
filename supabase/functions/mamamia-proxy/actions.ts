@@ -502,6 +502,22 @@ const getInviteRateState: ActionHandler = async (session, _variables, deps) => {
   };
 };
 
+// ─── listLeadJobs — Multi-Job overview ("Alle meine Einsätze") ──────────────
+//
+// Lists every job of the lead behind the session. LEAD-scoped via
+// session.lead_id (the "domownik mieszkania" residency in the signed JWT) —
+// NOT job-scoped, so even a job-scoped session (Variant A: session carries a
+// current job_offer_id) can still step back to the full overview. Read-only;
+// rows come from lead_jobs (mirror of Mamamia JobOffers, populated by the
+// Phase-2 sync). The 'laufend' status is derived in the frontend.
+const listLeadJobs: ActionHandler = async (session, _variables, deps) => {
+  if (!deps.supabase) {
+    throw new Error("supabase adapter required for listLeadJobs");
+  }
+  const jobs = await deps.supabase.selectLeadJobs(session.lead_id);
+  return { jobs };
+};
+
 
 // ─── Mutations — strict allowlist + ownership ───────────────────────────────
 
@@ -1118,6 +1134,7 @@ export const ACTIONS: Record<ProxyAction, ActionHandler> = {
   getCaregiver,
   searchLocations,
   getInviteRateState,
+  listLeadJobs,
   updateCustomer,
   updateJobDescription,
   updateJobOfferDates,
