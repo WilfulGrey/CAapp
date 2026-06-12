@@ -1,14 +1,16 @@
 // Live-Preview für Multi-Job-Übersicht im Kundenportal.
 // Aktivieren via ?preview=jobs auf kundenportal.primundus.de.
 //
-// Drei Layout-Varianten als Toggle oben — Mock-Daten identisch, nur das
-// Layout unterscheidet sich. Ziel: User-Entscheidung welche Variante in
-// die echte Multi-Job-Implementierung kommt.
+// Eingebettet im echten Portal-Chrome (iPhone-Frame auf Desktop, gleicher
+// Hintergrund, gleiche Navbar) — damit die Optik im Kontext bewertet
+// werden kann (User-Spec: "im design des aktuellen kundenportals").
 //
-// Nach Entscheidung wird der Code hierher in eine eigene Component (z.B.
-// JobUebersicht.tsx) extrahiert und in CustomerPortalPage eingebaut.
+// Drei Layout-Varianten als Toggle oben (nur Preview-Tool, fliegt nach
+// Entscheidung raus). Mock-Daten identisch, nur das Layout unterscheidet
+// sich.
 
 import { useState, type FC } from 'react';
+import { Phone } from 'lucide-react';
 
 type JobStatus = 'laufend' | 'kuenftig' | 'abgeschlossen';
 
@@ -53,7 +55,7 @@ const MOCK_JOBS: JobMock[] = [
 ];
 
 // Sortierung: laufend → künftig → abgeschlossen (User-Spec).
-// Innerhalb: nach Anreise-Datum chronologisch (frühestens zuerst).
+// Innerhalb: nach Anreise-Datum chronologisch.
 const STATUS_ORDER: Record<JobStatus, number> = {
   laufend: 0,
   kuenftig: 1,
@@ -80,9 +82,11 @@ function formatZeitraum(j: JobMock): string {
   return '—';
 }
 
-// ─── Variante 1: Akkordeon-Liste (vertikal, click-to-expand) ────────────
+// ─── Variante 1: Akkordeon-Liste ────────────────────────────────────────
 const VariantAkkordeon: FC<{ jobs: JobMock[] }> = ({ jobs }) => {
-  const [openId, setOpenId] = useState<string | null>(jobs.find((j) => j.status === 'laufend')?.id ?? null);
+  const [openId, setOpenId] = useState<string | null>(
+    jobs.find((j) => j.status === 'laufend')?.id ?? null,
+  );
   return (
     <div className="space-y-2">
       {jobs.map((j) => {
@@ -115,7 +119,7 @@ const VariantAkkordeon: FC<{ jobs: JobMock[] }> = ({ jobs }) => {
   );
 };
 
-// ─── Variante 2: Tabs oben (Aktiv / Geplant / Vergangen) ───────────────
+// ─── Variante 2: Tabs oben ──────────────────────────────────────────────
 const VariantTabs: FC<{ jobs: JobMock[] }> = ({ jobs }) => {
   const groups: Record<JobStatus, JobMock[]> = {
     laufend: jobs.filter((j) => j.status === 'laufend'),
@@ -165,12 +169,11 @@ const VariantTabs: FC<{ jobs: JobMock[] }> = ({ jobs }) => {
   );
 };
 
-// ─── Variante 3: Minimal-Karten (alle sichtbar, status-farbig) ─────────
+// ─── Variante 3: Karten mit farbigem Akzent ────────────────────────────
 const VariantKarten: FC<{ jobs: JobMock[] }> = ({ jobs }) => (
   <div className="space-y-2">
     {jobs.map((j) => {
       const badge = STATUS_BADGE[j.status];
-      // Linke Akzentlinie pro Status
       const accent =
         j.status === 'laufend'
           ? 'border-l-green-500'
@@ -196,7 +199,7 @@ const VariantKarten: FC<{ jobs: JobMock[] }> = ({ jobs }) => (
   </div>
 );
 
-// ─── Page ───────────────────────────────────────────────────────────────
+// ─── Preview-Page mit echtem Portal-Chrome ─────────────────────────────
 type Variant = 'akkordeon' | 'tabs' | 'karten';
 
 export const JobsPreviewPage: FC = () => {
@@ -204,50 +207,65 @@ export const JobsPreviewPage: FC = () => {
   const jobs = sortJobs(MOCK_JOBS);
 
   return (
-    <div className="min-h-screen bg-gray-100 py-6 px-3">
-      <div className="max-w-2xl mx-auto">
-        {/* Header */}
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-200 px-5 py-4 mb-4">
-          <p className="text-[11px] font-bold uppercase tracking-wider text-gray-400 mb-1">Live-Vorschau · Multi-Job-Übersicht</p>
-          <h1 className="text-xl font-bold text-gray-900">Ihre Einsätze</h1>
-          <p className="text-sm text-gray-500 mt-1">Mock-Daten · 4 Beispiel-Einsätze · keine echte Buchung</p>
-        </div>
+    // Outer-Wrapper exakt aus CustomerPortalPage kopiert: iPhone-Frame auf
+    // Desktop (md:w-[390px], gerundete Ecken, Schatten, "Bezel"-Look),
+    // mobile durchgängige Bahn.
+    <div className="min-h-screen bg-gray-100 md:flex md:items-start md:justify-center md:py-10">
+      <div className="min-h-screen md:min-h-0 bg-white w-full md:w-[390px] md:min-h-[844px] md:rounded-[48px] md:shadow-2xl md:overflow-hidden md:border-[8px] md:border-gray-800 md:ring-4 md:ring-gray-900/10 relative" style={{ fontFamily: 'inherit' }}>
+        <div id="portal-scroll-container" className="md:h-[844px] md:overflow-y-auto md:overflow-x-hidden">
+          {/* Navbar — identisch zum echten Portal */}
+          <nav className="sticky top-0 z-40" style={{ background: 'white', boxShadow: '0 1px 0 #E5E3DF, 0 2px 8px rgba(0,0,0,0.06)' }}>
+            <div className="max-w-3xl mx-auto px-4 py-3 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <img src="/LOGO-PRIMUNDUS.webp" alt="Primundus" className="h-6" />
+              </div>
+              <div className="flex items-center gap-2">
+                <button className="flex items-center gap-1.5 bg-white hover:bg-[#F8F7F5] text-[#8B7355] border border-[#E5E3DF] rounded-full px-3 py-1.5 text-xs font-semibold transition-colors">
+                  <Phone className="w-3.5 h-3.5" />
+                  Hilfe
+                </button>
+              </div>
+            </div>
+          </nav>
 
-        {/* Variant-Toggle */}
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-3 mb-4">
-          <p className="text-[11px] font-bold uppercase tracking-wider text-gray-500 mb-2 px-1">Layout-Variante</p>
-          <div className="flex gap-1 bg-gray-100 rounded-xl p-1">
-            {(
-              [
-                { key: 'akkordeon', label: '1 · Akkordeon' },
-                { key: 'tabs', label: '2 · Tabs' },
-                { key: 'karten', label: '3 · Karten' },
-              ] as { key: Variant; label: string }[]
-            ).map((v) => (
-              <button
-                key={v.key}
-                onClick={() => setVariant(v.key)}
-                className={`flex-1 py-2 px-3 rounded-lg text-sm font-bold transition-colors ${
-                  variant === v.key ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'
-                }`}
-              >
-                {v.label}
-              </button>
-            ))}
+          <div className="max-w-3xl mx-auto px-4 py-6 space-y-4">
+            {/* Preview-Hinweis (nur in der Vorschau) */}
+            <div className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-[12px] text-amber-800">
+              <strong>Live-Vorschau</strong> · 4 Mock-Einsätze · keine echte Buchung
+            </div>
+
+            {/* Variant-Toggle */}
+            <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-3">
+              <p className="text-[11px] font-bold uppercase tracking-wider text-gray-500 mb-2 px-1">Layout-Variante</p>
+              <div className="flex gap-1 bg-gray-100 rounded-xl p-1">
+                {(
+                  [
+                    { key: 'akkordeon', label: '1 · Akkordeon' },
+                    { key: 'tabs', label: '2 · Tabs' },
+                    { key: 'karten', label: '3 · Karten' },
+                  ] as { key: Variant; label: string }[]
+                ).map((v) => (
+                  <button
+                    key={v.key}
+                    onClick={() => setVariant(v.key)}
+                    className={`flex-1 py-2 px-2 rounded-lg text-[12px] font-bold transition-colors ${
+                      variant === v.key ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'
+                    }`}
+                  >
+                    {v.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Section-Header wie im echten Portal */}
+            <p className="text-xs font-bold text-gray-600 uppercase tracking-wider px-1">Ihre Einsätze</p>
+
+            {/* Variant-Body */}
+            {variant === 'akkordeon' && <VariantAkkordeon jobs={jobs} />}
+            {variant === 'tabs' && <VariantTabs jobs={jobs} />}
+            {variant === 'karten' && <VariantKarten jobs={jobs} />}
           </div>
-        </div>
-
-        {/* Variant-Body */}
-        {variant === 'akkordeon' && <VariantAkkordeon jobs={jobs} />}
-        {variant === 'tabs' && <VariantTabs jobs={jobs} />}
-        {variant === 'karten' && <VariantKarten jobs={jobs} />}
-
-        {/* Erklärung */}
-        <div className="mt-6 bg-white rounded-2xl shadow-sm border border-gray-200 px-5 py-4 text-sm text-gray-600 space-y-2">
-          <p className="font-bold text-gray-900">Was du hier siehst</p>
-          <p>4 Beispiel-Einsätze: 1× laufend (jetzt), 2× geplant (Folge-Jobs), 1× abgeschlossen (Historie).</p>
-          <p>Sortierung: <strong>Laufend</strong> oben → <strong>Geplant</strong> in der Mitte → <strong>Abgeschlossen</strong> unten. Innerhalb chronologisch.</p>
-          <p>Klick auf einen Einsatz öffnet (in der echten Implementierung) die Detail-Ansicht — heutiger BookedScreen / Bewerbungen / Vertrag pro Job.</p>
         </div>
       </div>
     </div>
