@@ -962,6 +962,41 @@ Deno.test("getInviteRateState: legacy NULL-job attempts count toward every job (
   assertEquals(b.blocked, true);
 });
 
+Deno.test("listDismissedCaregivers: per-job — job A's dismissals do NOT show in job B (#2b)", async () => {
+  const store = [
+    { leadId: SESSION.lead_id, caregiverId: 100, kind: "interest", jobOfferId: 16226 },
+    { leadId: SESSION.lead_id, caregiverId: 200, kind: "interest", jobOfferId: 99999 },
+  ];
+  const adapter = {
+    ...makeFakeSupabase().adapter,
+    selectDismissedCaregivers(leadId: string, jobOfferId: number) {
+      return Promise.resolve(
+        store.filter((r) => r.leadId === leadId && r.jobOfferId === jobOfferId)
+          .map((r) => ({ caregiver_id: r.caregiverId, kind: r.kind })),
+      );
+    },
+  };
+  const a = await ACTIONS.listDismissedCaregivers({ ...SESSION, job_offer_id: 16226 }, {}, makeDeps(NOOP_FETCH, adapter));
+  const b = await ACTIONS.listDismissedCaregivers({ ...SESSION, job_offer_id: 99999 }, {}, makeDeps(NOOP_FETCH, adapter));
+  assertEquals((a as { caregiver_ids: number[] }).caregiver_ids, [100]);
+  assertEquals((b as { caregiver_ids: number[] }).caregiver_ids, [200]);
+});
+
+Deno.test("dismissCaregiver: stamps the current job on the dismiss row (#2b)", async () => {
+  const captured: Array<{ leadId: string; caregiverId: number; kind: string; jobOfferId: number }> = [];
+  const adapter = {
+    ...makeFakeSupabase().adapter,
+    upsertDismissedCaregiver(leadId: string, caregiverId: number, kind: string, jobOfferId: number) {
+      captured.push({ leadId, caregiverId, kind, jobOfferId });
+      return Promise.resolve();
+    },
+  };
+  await ACTIONS.dismissCaregiver(
+    { ...SESSION, job_offer_id: 77777 }, { caregiver_id: 500, kind: "interest" }, makeDeps(NOOP_FETCH, adapter),
+  );
+  assertEquals(captured, [{ leadId: SESSION.lead_id, caregiverId: 500, kind: "interest", jobOfferId: 77777 }]);
+});
+
 Deno.test("getInviteRateState: scoped to session.lead_id (ignores other leads)", async () => {
   const supa = makeFakeSupabase({
     invites: [

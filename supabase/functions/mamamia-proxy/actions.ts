@@ -1150,7 +1150,7 @@ const listInterests: ActionHandler = async (session, _variables, deps) => {
 // Service-role bypasses RLS — ownership comes from session.lead_id.
 const listDismissedCaregivers: ActionHandler = async (session, _variables, deps) => {
   if (!deps.supabase) throw new Error("supabase adapter not configured");
-  const rows = await deps.supabase.selectDismissedCaregivers(session.lead_id);
+  const rows = await deps.supabase.selectDismissedCaregivers(session.lead_id, session.job_offer_id);
   return {
     caregiver_ids: rows.map((r) => r.caregiver_id),
     rows,
@@ -1181,7 +1181,7 @@ const dismissCaregiver: ActionHandler = async (session, variables, deps) => {
   if (v.kind !== "interest" && v.kind !== "application") {
     throw new Error("kind must be 'interest' or 'application'");
   }
-  await deps.supabase.upsertDismissedCaregiver(session.lead_id, v.caregiver_id, v.kind);
+  await deps.supabase.upsertDismissedCaregiver(session.lead_id, v.caregiver_id, v.kind, session.job_offer_id);
   return { dismissed: true };
 };
 
