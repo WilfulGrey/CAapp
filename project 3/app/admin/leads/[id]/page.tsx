@@ -1330,6 +1330,36 @@ export default function LeadDetailPage() {
                   </div>
                 );
               })()}
+
+              {/* Mamamia-Verknüpfung (read-only) — welcher Mamamia-Kunde
+                  diesem Lead beim Portal-Onboarding zugeordnet wurde. Daten
+                  stammen aus dem leads-Select('*'); reiner Abgleich fürs Team
+                  (z.B. um Doppel-Anlagen in Mamamia zu erkennen). Gesetzt erst
+                  beim Onboarding — vorher ist der Kunde noch nicht verknüpft. */}
+              <div className="pt-3 border-t border-gray-100">
+                <p className="text-sm text-gray-600 mb-1">Mamamia</p>
+                {lead.mamamia_customer_id ? (
+                  <div className="space-y-1">
+                    <p className="text-xs text-gray-700">
+                      Kunden-ID (MM):{' '}
+                      <span className="font-mono bg-gray-100 px-1.5 py-0.5 rounded">{lead.mamamia_customer_id}</span>
+                    </p>
+                    {lead.mamamia_job_offer_id && (
+                      <p className="text-xs text-gray-700">
+                        Job-Offer-ID:{' '}
+                        <span className="font-mono bg-gray-100 px-1.5 py-0.5 rounded">{lead.mamamia_job_offer_id}</span>
+                      </p>
+                    )}
+                    {lead.mamamia_onboarded_at && (
+                      <p className="text-xs text-gray-500">
+                        Onboardet: {new Date(lead.mamamia_onboarded_at).toLocaleString('de-DE')}
+                      </p>
+                    )}
+                  </div>
+                ) : (
+                  <p className="text-xs text-gray-400">Noch nicht im Portal onboardet</p>
+                )}
+              </div>
             </div>
           </Card>
 

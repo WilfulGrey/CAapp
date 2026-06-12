@@ -186,6 +186,14 @@ export default function LeadsPage() {
                             {lead.telefon}
                           </div>
                         )}
+                        {/* Mamamia-Verknüpfung (read-only): zeigt auf einen Blick,
+                            welche Leads im Portal onboardet sind + ihre MM-Kunden-ID
+                            (Abgleich, Doppel-Anlagen erkennen). */}
+                        {lead.mamamia_customer_id && (
+                          <span className="inline-block mt-1 text-[11px] font-mono bg-amber-50 text-amber-800 border border-amber-200 px-1.5 py-0.5 rounded">
+                            MM {lead.mamamia_customer_id}
+                          </span>
+                        )}
                       </div>
                     </td>
                     <td className="py-3 px-4">{getStatusBadge(lead.status)}</td>
