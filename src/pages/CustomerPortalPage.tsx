@@ -1733,22 +1733,40 @@ const CustomerPortalPage: FC = () => {
       </nav>
 
       {acceptedApp ? (
-        <BookedScreen
-          app={acceptedApp}
-          onNurseClick={setSelectedNurse}
-          vertragSigned={!!signedForm?.signatur}
-          // leadId + Token aktivieren den eingebetteten PDF-Viewer im
-          // Vertrag-Milestone (Mustervertrag-Look via /api/contract-pdf).
-          // Wenn das Lead oder der URL-Token fehlt → Fallback Modal mit
-          // React-VertragSignieren (onShowContract).
-          leadId={lead?.id}
-          leadToken={lead?.token ?? undefined}
-          onShowContract={
-            signedForm?.signatur && !(lead?.id && lead?.token)
-              ? () => setShowSignedContract(true)
-              : undefined
-          }
-        />
+        (() => {
+          // vertragSigned aus zwei Quellen ableiten:
+          //   1) signedForm — frisch im Annahme-Flow gesetzt (in-memory, lebt
+          //      nur bis Page-Reload)
+          //   2) acceptedApplications.rows[].contract_snapshot — vom Server
+          //      persistiert. Nach Reload ist signedForm null, die Acceptance-
+          //      Row aber noch in der DB. Wenn contract_snapshot existiert,
+          //      hat der Kunde signiert (Stufe-B-Update schreibt signatur +
+          //      contract_snapshot zusammen).
+          // Sonst zeigte BookedScreen "Vertrag · Folgt" obwohl die Mail-PDF
+          // längst raus ist — Michael-Dachs-Reproducer 12.06.
+          const hasPersistedContract = (acceptedApplications?.rows ?? []).some(
+            (r) => !!r.contract_snapshot,
+          );
+          const vertragSigned = !!signedForm?.signatur || hasPersistedContract;
+          return (
+            <BookedScreen
+              app={acceptedApp}
+              onNurseClick={setSelectedNurse}
+              vertragSigned={vertragSigned}
+              // leadId + Token aktivieren den eingebetteten PDF-Viewer im
+              // Vertrag-Milestone (Mustervertrag-Look via /api/contract-pdf).
+              // Wenn das Lead oder der URL-Token fehlt → Fallback Modal mit
+              // React-VertragSignieren (onShowContract).
+              leadId={lead?.id}
+              leadToken={lead?.token ?? undefined}
+              onShowContract={
+                signedForm?.signatur && !(lead?.id && lead?.token)
+                  ? () => setShowSignedContract(true)
+                  : undefined
+              }
+            />
+          );
+        })()
       ) : (
       <>
       {/* ── Hero (full-width gradient) — state-aware copy ── */}
