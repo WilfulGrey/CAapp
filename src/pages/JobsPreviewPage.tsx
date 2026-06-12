@@ -17,7 +17,14 @@
 import { type FC } from 'react';
 import { Phone, Check } from 'lucide-react';
 
-type JobStatus = 'laufend' | 'geplant' | 'abgeschlossen';
+// Vier Status im Multi-Job-Modell:
+//   laufend       — Pflegekraft ist gerade vor Ort (Anreise ≤ heute < Abreise)
+//   gebucht       — Pflegekraft + Vertrag vereinbart, Anreise in Zukunft
+//   geplant       — Suchlauf läuft (mit oder ohne Bewerbungen, keine PK gebucht)
+//   abgeschlossen — Einsatz vorbei (Abreise < heute)
+// In der echten Implementierung wird der Status zeitlich abgeleitet aus
+// (Anreise, Abreise, acceptance vorhanden) — hier statisch in den Mocks.
+type JobStatus = 'laufend' | 'gebucht' | 'geplant' | 'abgeschlossen';
 
 interface JobMock {
   id: string;
@@ -44,31 +51,40 @@ const MOCK_JOBS: JobMock[] = [
   },
   {
     id: 'job-002',
+    // Gebucht: Folge-Einsatz im Herbst — Pflegekraft + Vertrag stehen,
+    // wartet auf Anreise.
+    status: 'gebucht',
+    anreise: '20.09.2026',
+    abreise: '02.11.2026',
+    pflegekraft: 'Marianne Dachs',
+    previewMode: 'gebucht',
+  },
+  {
+    id: 'job-003',
     status: 'geplant',
-    anreise: '15.10.2026',
-    abreise: '30.11.2026',
+    anreise: '15.11.2026',
+    abreise: '30.12.2026',
     bewerbungen: 2,
     previewMode: 'bewerbung',
   },
   {
-    id: 'job-003',
+    id: 'job-004',
     status: 'geplant',
     anreise: '15.01.2027',
     bewerbungen: 0,
     previewMode: 'wartet',
   },
   {
-    id: 'job-004',
+    id: 'job-005',
     status: 'abgeschlossen',
     anreise: '01.05.2026',
     abreise: '18.06.2026',
     pflegekraft: 'Maria Lopez',
-    // Abgeschlossen rendert den BookedScreen + ?abgeschlossen=1.
     previewMode: 'gebucht',
   },
 ];
 
-const STATUS_ORDER: Record<JobStatus, number> = { laufend: 0, geplant: 1, abgeschlossen: 2 };
+const STATUS_ORDER: Record<JobStatus, number> = { laufend: 0, gebucht: 1, geplant: 2, abgeschlossen: 3 };
 
 function sortJobs(jobs: JobMock[]): JobMock[] {
   return [...jobs].sort((a, b) => {
@@ -80,6 +96,7 @@ function sortJobs(jobs: JobMock[]): JobMock[] {
 
 const STATUS_STYLE: Record<JobStatus, { label: string; badgeCls: string; accentCls: string }> = {
   laufend: { label: 'Laufend', badgeCls: 'bg-green-50 text-green-700 border-green-200', accentCls: 'border-l-green-500' },
+  gebucht: { label: 'Gebucht', badgeCls: 'bg-amber-50 text-amber-700 border-amber-200', accentCls: 'border-l-amber-500' },
   geplant: { label: 'Geplant', badgeCls: 'bg-blue-50 text-blue-700 border-blue-200', accentCls: 'border-l-blue-500' },
   abgeschlossen: { label: 'Abgeschlossen', badgeCls: 'bg-gray-100 text-gray-500 border-gray-200', accentCls: 'border-l-gray-300' },
 };
