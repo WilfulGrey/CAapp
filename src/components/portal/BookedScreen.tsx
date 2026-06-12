@@ -113,8 +113,12 @@ export const BookedScreen: FC<{
               ? `${KOSTENRECHNER_URL}/api/contract-pdf/${leadId}?token=${encodeURIComponent(leadToken)}`
               : null;
 
-          // Vertrag-Milestone bekommt einen vergrößerten Block mit PDF-
-          // Vorschau, wenn der Vertrag signiert ist + die PDF-URL bekannt ist.
+          // Vertrag-Milestone bekommt eine kompakte PDF-Attachment-Card —
+          // wie bei Mail/Chat-Anhängen: PDF-Icon + Dateiname + Klick öffnet.
+          // Frühere Variante hatte einen eingebetteten <iframe>-Viewer (560px),
+          // der aber auf iOS Safari weiß rendert + auf Desktop unnötig
+          // Bildschirmplatz frisst. Standard-Pattern (Tap = öffnen, separater
+          // Download-Link) funktioniert auf allen Geräten zuverlässig.
           if (vertragDone && pdfUrl) {
             return (
               <div key={m.title} className="bg-white border border-[#2A9D5C]/40 rounded-2xl px-4 py-3.5 shadow-sm">
@@ -131,37 +135,38 @@ export const BookedScreen: FC<{
                   </div>
                 </div>
 
-                {/* Eingebetteter PDF-Viewer ("Vertragskasten"). Höhe so
-                    gewählt, dass auf Desktop ~1 Seite sichtbar ist + Kunde
-                    scrollen kann; auf Mobile ist iframe-PDF-Support
-                    eingeschränkt, daher zusätzlich die beiden Buttons
-                    drunter ("Im neuen Tab" + "Herunterladen"). */}
-                <div className="rounded-xl overflow-hidden border border-gray-200 bg-gray-50">
-                  <iframe
-                    src={`${pdfUrl}#toolbar=0&navpanes=0&view=FitH`}
-                    title="Unterschriebener Betreuungsvertrag"
-                    className="w-full h-[560px] block"
-                    style={{ border: 0 }}
-                  />
-                </div>
+                {/* PDF-Attachment-Card (klassischer Mail-/Chat-Anhang-Look).
+                    Tap/Klick öffnet das PDF im neuen Tab — iOS Safari zeigt
+                    es dann mit eingebautem Viewer + "Teilen" → Speichern in
+                    Files / Mail; Desktop-Chrome zeigt es im PDF-Viewer der
+                    neuen Tab mit Download-Button oben rechts. */}
+                <a
+                  href={pdfUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-3 p-3 rounded-xl border border-gray-200 bg-gray-50 hover:bg-gray-100 active:bg-gray-200 transition-colors"
+                >
+                  <div className="w-10 h-12 rounded bg-red-50 border border-red-200 flex items-center justify-center flex-shrink-0">
+                    <span className="text-[9px] font-bold text-red-700">PDF</span>
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-semibold text-gray-800 truncate">Dienstleistungsvertrag.pdf</p>
+                    <p className="text-xs text-gray-500">Klicken zum Öffnen · 8 Seiten</p>
+                  </div>
+                  <span className="text-gray-400 flex-shrink-0 text-lg">↗</span>
+                </a>
 
-                <div className="flex flex-wrap gap-2 mt-3">
-                  <a
-                    href={pdfUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="inline-flex items-center gap-1.5 rounded-xl border border-[#2A9D5C]/40 bg-white hover:bg-green-50 text-[#1f7a45] text-sm font-bold px-4 py-2.5 transition-colors"
-                  >
-                    🔍 Im neuen Tab öffnen
-                  </a>
-                  <a
-                    href={pdfUrl}
-                    download="Betreuungsvertrag_Primundus.pdf"
-                    className="inline-flex items-center gap-1.5 rounded-xl border border-gray-200 bg-white hover:bg-gray-50 text-gray-700 text-sm font-bold px-4 py-2.5 transition-colors"
-                  >
-                    ⬇ Herunterladen
-                  </a>
-                </div>
+                {/* Expliziter Download (direktes Speichern statt Öffnen).
+                    `download`-Attribut nur same-origin garantiert; cross-
+                    origin schlägt die Server-Content-Disposition durch
+                    (lib/vertrag.ts setzt 'inline; filename="…pdf"'). */}
+                <a
+                  href={pdfUrl}
+                  download="Betreuungsvertrag_Primundus.pdf"
+                  className="block text-center text-sm font-semibold text-[#1f7a45] hover:underline mt-2 py-1"
+                >
+                  ⬇ Vertrag herunterladen
+                </a>
               </div>
             );
           }
