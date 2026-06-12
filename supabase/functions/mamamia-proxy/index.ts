@@ -224,20 +224,23 @@ function makeRealSupabase(url: string, serviceKey: string): ProxySupabase {
         .upsert(rows, { onConflict: "lead_id,mamamia_job_offer_id" });
       if (error) throw new Error(`supabase upsertLeadJobs: ${error.message}`);
     },
-    async selectDismissedCaregivers(leadId: string) {
+    async selectDismissedCaregivers(leadId: string, jobOfferId: number) {
+      // Per-job (Multi-Job #2b): only this job's dismissals. Legacy rows were
+      // backfilled to the lead's then-only job, so no NULL handling needed.
       const { data, error } = await client
         .from("lead_dismissed_caregivers")
         .select("caregiver_id, kind")
-        .eq("lead_id", leadId);
+        .eq("lead_id", leadId)
+        .eq("mamamia_job_offer_id", jobOfferId);
       if (error) throw new Error(`supabase selectDismissedCaregivers: ${error.message}`);
       return (data ?? []) as Array<{ caregiver_id: number; kind: string }>;
     },
-    async upsertDismissedCaregiver(leadId, caregiverId, kind) {
+    async upsertDismissedCaregiver(leadId, caregiverId, kind, jobOfferId) {
       const { error } = await client
         .from("lead_dismissed_caregivers")
         .upsert(
-          { lead_id: leadId, caregiver_id: caregiverId, kind },
-          { onConflict: "lead_id,caregiver_id,kind" },
+          { lead_id: leadId, caregiver_id: caregiverId, kind, mamamia_job_offer_id: jobOfferId },
+          { onConflict: "lead_id,caregiver_id,kind,mamamia_job_offer_id" },
         );
       if (error) throw new Error(`supabase upsertDismissedCaregiver: ${error.message}`);
     },

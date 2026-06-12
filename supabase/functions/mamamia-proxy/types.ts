@@ -59,13 +59,18 @@ export interface ProxySupabase {
     leadId: string,
     jobs: Array<{ mamamia_job_offer_id: number; status: string; anreise: string | null; abreise: string | null }>,
   ): Promise<void>;
+  // Multi-Job #2b: dismissals are PER JOB (mamamia_job_offer_id). Legacy rows
+  // were backfilled to the lead's then-only job, so reads filter on the exact
+  // job (no NULL handling).
   selectDismissedCaregivers(
     leadId: string,
+    jobOfferId: number,
   ): Promise<Array<{ caregiver_id: number; kind: string }>>;
   upsertDismissedCaregiver(
     leadId: string,
     caregiverId: number,
     kind: "interest" | "application",
+    jobOfferId: number,
   ): Promise<void>;
   // Used by listAcceptedApplications — frontend reads this set on portal
   // load to flip the matching Application's local status to 'accepted'
