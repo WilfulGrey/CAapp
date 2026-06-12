@@ -20,43 +20,63 @@ export const BookedScreen: FC<{
   // Optional: öffnet den bereits unterschriebenen Vertrag zur Ansicht (read-only).
   // Fallback wenn leadId/leadToken nicht gesetzt sind — dann React-Vertrag im Modal.
   onShowContract?: () => void;
-}> = ({ app, onNurseClick, onSignContract, vertragSigned, leadId, leadToken, onShowContract }) => {
+  // Im Multi-Job-Modus: wenn dieser Einsatz bereits beendet ist, ersetzen
+  // wir den "🎊 Vielen Dank — Pflegekraft gebucht!"-Header durch
+  // "📋 Einsatz beendet" + Datums-Zeile. Folge-Einsatz-Milestone fliegt
+  // ebenfalls raus (gibt's für abgeschlossene Einsätze nicht mehr).
+  einsatzBeendet?: boolean;
+}> = ({ app, onNurseClick, onSignContract, vertragSigned, leadId, leadToken, onShowContract, einsatzBeendet }) => {
   const { nurse, offer } = app;
   const name = displayName(nurse.name);
   const inits = initials(nurse.name);
   const lvl = nurseLevel(nurse.experienceYears ?? 0, nurse.history?.assignments ?? 0);
   const bars = Array.from({ length: 3 }, (_, i) => i < nurse.language.bars);
 
-  const milestones = [
-    {
-      icon: '📄',
-      title: 'Vertrag',
-      desc: 'Ihr Betreuungsvertrag wird vorbereitet und steht bald zum Download bereit.',
-      ready: false,
-    },
-    {
-      icon: '✈️',
-      title: 'Anreisedaten',
-      desc: `Anreise am ${offer.anreisedatum} · Abreise am ${offer.abreisedatum}. Details folgen in Kürze.`,
-      ready: false,
-    },
-    {
-      icon: '🔄',
-      title: 'Folge-Einsatz',
-      desc: 'Zur Hälfte des Einsatzes öffnet sich automatisch ein neuer Suchlauf — Sie können dann wieder Pflegekräfte einladen und neue Bewerbungen erhalten.',
-      ready: false,
-    },
-  ];
+  const milestones = einsatzBeendet
+    ? [
+        // Abgeschlossener Einsatz: nur noch der Vertrag als "Beleg".
+        // Anreise/Folge-Einsatz sind in der Vergangenheit irrelevant.
+        {
+          icon: '📄',
+          title: 'Vertrag',
+          desc: 'Ihr Betreuungsvertrag bleibt jederzeit zugänglich.',
+          ready: false,
+        },
+      ]
+    : [
+        {
+          icon: '📄',
+          title: 'Vertrag',
+          desc: 'Ihr Betreuungsvertrag wird vorbereitet und steht bald zum Download bereit.',
+          ready: false,
+        },
+        {
+          icon: '✈️',
+          title: 'Anreisedaten',
+          desc: `Anreise am ${offer.anreisedatum} · Abreise am ${offer.abreisedatum}. Details folgen in Kürze.`,
+          ready: false,
+        },
+        {
+          icon: '🔄',
+          title: 'Folge-Einsatz',
+          desc: 'Zur Hälfte des Einsatzes öffnet sich automatisch ein neuer Suchlauf — Sie können dann wieder Pflegekräfte einladen und neue Bewerbungen erhalten.',
+          ready: false,
+        },
+      ];
 
   return (
     <div className="max-w-3xl mx-auto px-4 py-6 space-y-5" style={{ animation: 'fadeIn 0.4s ease-out' }}>
       <div className="text-center py-4">
-        <div className="text-5xl mb-3">🎊</div>
-        <h1 className="text-2xl font-bold text-gray-900 mb-1.5">Vielen Dank — Pflegekraft gebucht!</h1>
+        <div className="text-5xl mb-3">{einsatzBeendet ? '📋' : '🎊'}</div>
+        <h1 className="text-2xl font-bold text-gray-900 mb-1.5">
+          {einsatzBeendet ? 'Einsatz beendet' : 'Vielen Dank — Pflegekraft gebucht!'}
+        </h1>
         <p className="text-sm text-gray-600 leading-relaxed">
-          {vertragSigned
-            ? 'Ihr Vertrag ist unterschrieben. Jemand aus dem Primundus-Team meldet sich in Kürze persönlich bei Ihnen, um die Anreise zu organisieren.'
-            : 'Wir bereiten Ihre Vertragsdokumente vor. Jemand aus dem Primundus-Team meldet sich in Kürze persönlich bei Ihnen.'}
+          {einsatzBeendet
+            ? `Der Einsatz vom ${offer.anreisedatum} bis ${offer.abreisedatum} ist abgeschlossen. Ihre Unterlagen bleiben jederzeit zugänglich.`
+            : vertragSigned
+              ? 'Ihr Vertrag ist unterschrieben. Jemand aus dem Primundus-Team meldet sich in Kürze persönlich bei Ihnen, um die Anreise zu organisieren.'
+              : 'Wir bereiten Ihre Vertragsdokumente vor. Jemand aus dem Primundus-Team meldet sich in Kürze persönlich bei Ihnen.'}
         </p>
       </div>
 

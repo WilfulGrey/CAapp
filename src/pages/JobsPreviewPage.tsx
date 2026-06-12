@@ -26,8 +26,11 @@ interface JobMock {
   abreise?: string;
   pflegekraft?: string;
   bewerbungen?: number;
-  // Ziel-Preview-Mode für den Klick (None = nicht klickbar).
-  previewMode?: 'gebucht' | 'bewerbung' | 'wartet';
+  // Ziel-Preview-Mode für den Klick. Für abgeschlossene Einsätze nehmen
+  // wir den BookedScreen ("gebucht") + den Extra-Param ?abgeschlossen=1
+  // (siehe Karten-Klick-Handler) → BookedScreen rendert dann "Einsatz
+  // beendet" statt "Vielen Dank gebucht".
+  previewMode: 'gebucht' | 'bewerbung' | 'wartet';
 }
 
 const MOCK_JOBS: JobMock[] = [
@@ -60,7 +63,8 @@ const MOCK_JOBS: JobMock[] = [
     anreise: '01.05.2026',
     abreise: '18.06.2026',
     pflegekraft: 'Maria Lopez',
-    // Noch kein Preview-Mode für abgeschlossene Einsätze → nicht klickbar.
+    // Abgeschlossen rendert den BookedScreen + ?abgeschlossen=1.
+    previewMode: 'gebucht',
   },
 ];
 
@@ -85,20 +89,27 @@ function formatZeitraum(j: JobMock): string {
   return `ab ${j.anreise}`;
 }
 
-const JobCard: FC<{ job: JobMock }> = ({ job }) => {
+const JobCard: FC<{ job: JobMock; totalCount: number }> = ({ job, totalCount }) => {
   const s = STATUS_STYLE[job.status];
   const onClick = () => {
-    if (!job.previewMode) return;
-    window.location.href = `/?preview=${job.previewMode}&back=jobs`;
+    // URL-Params füttern die Sub-Nav-Zeile in CustomerPortalPage (Status-
+    // Badge + Zeitraum) + den BookedScreen ("abgeschlossen=1" → Header
+    // "Einsatz beendet" statt "Vielen Dank gebucht").
+    const params = new URLSearchParams({
+      preview: job.previewMode,
+      back: 'jobs',
+      status: job.status,
+      von: job.anreise,
+      count: String(totalCount),
+    });
+    if (job.abreise) params.set('bis', job.abreise);
+    if (job.status === 'abgeschlossen') params.set('abgeschlossen', '1');
+    window.location.href = `/?${params.toString()}`;
   };
-  const disabled = !job.previewMode;
   return (
     <button
       onClick={onClick}
-      disabled={disabled}
-      className={`w-full bg-white border border-gray-200 border-l-4 ${s.accentCls} rounded-r-2xl rounded-l-md px-4 py-3.5 text-left transition-colors flex items-center gap-3 shadow-sm ${
-        disabled ? 'opacity-60 cursor-not-allowed' : 'hover:bg-gray-50 active:bg-gray-100'
-      }`}
+      className={`w-full bg-white border border-gray-200 border-l-4 ${s.accentCls} rounded-r-2xl rounded-l-md px-4 py-3.5 text-left transition-colors flex items-center gap-3 shadow-sm hover:bg-gray-50 active:bg-gray-100`}
     >
       <div className="flex-1 min-w-0">
         <span className={`inline-block text-[11px] font-bold border px-2 py-0.5 rounded-full ${s.badgeCls} mb-1.5`}>{s.label}</span>
@@ -113,7 +124,7 @@ const JobCard: FC<{ job: JobMock }> = ({ job }) => {
           </p>
         ) : null}
       </div>
-      {!disabled && <span className="text-gray-400 flex-shrink-0 text-lg">›</span>}
+      <span className="text-gray-400 flex-shrink-0 text-lg">›</span>
     </button>
   );
 };
@@ -173,7 +184,7 @@ export const JobsPreviewPage: FC = () => {
             <div className="max-w-3xl mx-auto px-4 py-6">
               <p className="text-xs font-bold text-gray-600 uppercase tracking-wider px-1 mb-2">Ihre Einsätze</p>
               <div className="space-y-2">
-                {jobs.map(j => <JobCard key={j.id} job={j} />)}
+                {jobs.map(j => <JobCard key={j.id} job={j} totalCount={jobs.length} />)}
               </div>
             </div>
           </div>
