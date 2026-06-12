@@ -23,7 +23,7 @@ function captureFetch(response: object, status = 200) {
 // Each test that needs to assert / preload state grabs this and tweaks
 // the maps. Functions that don't touch supabase get an inert instance.
 type FakeSupa = {
-  invites: Array<{ leadId: string; caregiverId: number; attemptedAt: Date }>;
+  invites: Array<{ leadId: string; caregiverId: number; attemptedAt: Date; jobOfferId?: number | null }>;
   failOnRecord?: boolean;
   jobs?: LeadJobRow[];
   lastLeadJobsLeadId?: string;
@@ -48,22 +48,24 @@ function makeFakeSupabase(state: FakeSupa = { invites: [] }) {
       async selectDismissedCaregivers() { return []; },
       async upsertDismissedCaregiver() { /* no-op */ },
       async selectAcceptedApplications() { return []; },
-      async countRecentInviteAttempts(leadId: string, windowMinutes: number) {
+      async countRecentInviteAttempts(leadId: string, windowMinutes: number, jobOfferId: number) {
         const cutoff = Date.now() - windowMinutes * 60_000;
         return state.invites.filter(
-          (r) => r.leadId === leadId && r.attemptedAt.getTime() >= cutoff,
+          (r) => r.leadId === leadId && r.attemptedAt.getTime() >= cutoff &&
+            (r.jobOfferId === jobOfferId || r.jobOfferId == null),
         ).length;
       },
-      async oldestInviteAttemptWithin(leadId: string, windowMinutes: number) {
+      async oldestInviteAttemptWithin(leadId: string, windowMinutes: number, jobOfferId: number) {
         const cutoff = Date.now() - windowMinutes * 60_000;
         const within = state.invites
-          .filter((r) => r.leadId === leadId && r.attemptedAt.getTime() >= cutoff)
+          .filter((r) => r.leadId === leadId && r.attemptedAt.getTime() >= cutoff &&
+            (r.jobOfferId === jobOfferId || r.jobOfferId == null))
           .sort((a, b) => a.attemptedAt.getTime() - b.attemptedAt.getTime());
         return within[0]?.attemptedAt ?? null;
       },
-      async recordInviteAttempt(leadId: string, caregiverId: number) {
+      async recordInviteAttempt(leadId: string, caregiverId: number, jobOfferId: number) {
         if (state.failOnRecord) throw new Error("simulated record failure");
-        state.invites.push({ leadId, caregiverId, attemptedAt: new Date() });
+        state.invites.push({ leadId, caregiverId, jobOfferId, attemptedAt: new Date() });
       },
     },
   };
@@ -924,6 +926,40 @@ Deno.test("getInviteRateState: at limit → blocked=true, retry_after derived fr
   if (result.retry_after_seconds < 800 || result.retry_after_seconds > 1000) {
     throw new Error(`retry_after_seconds expected ~900, got ${result.retry_after_seconds}`);
   }
+});
+
+Deno.test("getInviteRateState: rate limit is PER-JOB — job A's 5 invites do NOT block job B (#2a)", async () => {
+  const now = Date.now();
+  const supa = makeFakeSupabase({
+    invites: Array.from({ length: 5 }, (_, i) => ({
+      leadId: SESSION.lead_id, caregiverId: i + 1, jobOfferId: 16226, attemptedAt: new Date(now - i * 60_000),
+    })),
+  });
+  // Job A (16226 = SESSION's job): blocked at 5/5.
+  const a = await ACTIONS.getInviteRateState(
+    { ...SESSION, job_offer_id: 16226 }, {}, makeDeps(NOOP_FETCH, supa.adapter),
+  ) as { used: number; blocked: boolean };
+  assertEquals(a.used, 5);
+  assertEquals(a.blocked, true);
+  // Job B (99999): a fresh quota — none of job A's invites count.
+  const b = await ACTIONS.getInviteRateState(
+    { ...SESSION, job_offer_id: 99999 }, {}, makeDeps(NOOP_FETCH, supa.adapter),
+  ) as { used: number; blocked: boolean };
+  assertEquals(b.used, 0);
+  assertEquals(b.blocked, false);
+});
+
+Deno.test("getInviteRateState: legacy NULL-job attempts count toward every job (transition)", async () => {
+  const supa = makeFakeSupabase({
+    invites: Array.from({ length: 5 }, (_, i) => ({
+      leadId: SESSION.lead_id, caregiverId: i + 1, jobOfferId: null, attemptedAt: new Date(),
+    })),
+  });
+  const b = await ACTIONS.getInviteRateState(
+    { ...SESSION, job_offer_id: 99999 }, {}, makeDeps(NOOP_FETCH, supa.adapter),
+  ) as { used: number; blocked: boolean };
+  assertEquals(b.used, 5); // legacy NULL counts for any job
+  assertEquals(b.blocked, true);
 });
 
 Deno.test("getInviteRateState: scoped to session.lead_id (ignores other leads)", async () => {
