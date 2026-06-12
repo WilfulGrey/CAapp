@@ -113,60 +113,32 @@ export const BookedScreen: FC<{
               ? `${KOSTENRECHNER_URL}/api/contract-pdf/${leadId}?token=${encodeURIComponent(leadToken)}`
               : null;
 
-          // Vertrag-Milestone bekommt eine kompakte PDF-Attachment-Card —
-          // wie bei Mail/Chat-Anhängen: PDF-Icon + Dateiname + Klick öffnet.
-          // Frühere Variante hatte einen eingebetteten <iframe>-Viewer (560px),
-          // der aber auf iOS Safari weiß rendert + auf Desktop unnötig
-          // Bildschirmplatz frisst. Standard-Pattern (Tap = öffnen, separater
-          // Download-Link) funktioniert auf allen Geräten zuverlässig.
+          // Vertrag-Milestone: minimalistisch, ein einzeiliger Text-Link
+          // mit 📄-Icon. Tap/Klick → öffnet PDF im neuen Tab, dann macht der
+          // Kunde was er will (Viewer, Download, Teilen) — Browser-native.
+          // Frühere Varianten (iframe-Viewer, dann Attachment-Card mit
+          // separater Download-Zeile) waren beide zu umständlich.
           if (vertragDone && pdfUrl) {
             return (
-              <div key={m.title} className="bg-white border border-[#2A9D5C]/40 rounded-2xl px-4 py-3.5 shadow-sm">
-                <div className="flex items-start gap-3.5 mb-3">
-                  <div className="w-9 h-9 rounded-xl bg-green-50 flex items-center justify-center flex-shrink-0 text-lg">✅</div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 mb-0.5 flex-wrap">
-                      <p className="text-sm font-bold text-gray-800">{m.title}</p>
-                      <span className="text-xs font-bold text-green-700 bg-green-50 border border-green-200 px-2 py-0.5 rounded-full">✓ Unterschrieben</span>
-                    </div>
-                    <p className="text-sm text-gray-500 leading-relaxed">
-                      Ihr unterschriebener Dienstleistungsvertrag. Eine Kopie haben Sie auch per E-Mail erhalten.
-                    </p>
+              <div key={m.title} className="bg-white border border-[#2A9D5C]/40 rounded-2xl px-4 py-3.5 flex items-start gap-3.5 shadow-sm">
+                <div className="w-9 h-9 rounded-xl bg-green-50 flex items-center justify-center flex-shrink-0 text-lg">✅</div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 mb-0.5 flex-wrap">
+                    <p className="text-sm font-bold text-gray-800">{m.title}</p>
+                    <span className="text-xs font-bold text-green-700 bg-green-50 border border-green-200 px-2 py-0.5 rounded-full">✓ Unterschrieben</span>
                   </div>
+                  <p className="text-sm text-gray-500 leading-relaxed mb-1.5">
+                    Ihr unterschriebener Dienstleistungsvertrag. Eine Kopie haben Sie auch per E-Mail erhalten.
+                  </p>
+                  <a
+                    href={pdfUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1.5 text-sm font-semibold text-[#1f7a45] hover:underline"
+                  >
+                    📄 Vertrag
+                  </a>
                 </div>
-
-                {/* PDF-Attachment-Card (klassischer Mail-/Chat-Anhang-Look).
-                    Tap/Klick öffnet das PDF im neuen Tab — iOS Safari zeigt
-                    es dann mit eingebautem Viewer + "Teilen" → Speichern in
-                    Files / Mail; Desktop-Chrome zeigt es im PDF-Viewer der
-                    neuen Tab mit Download-Button oben rechts. */}
-                <a
-                  href={pdfUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex items-center gap-3 p-3 rounded-xl border border-gray-200 bg-gray-50 hover:bg-gray-100 active:bg-gray-200 transition-colors"
-                >
-                  <div className="w-10 h-12 rounded bg-red-50 border border-red-200 flex items-center justify-center flex-shrink-0">
-                    <span className="text-[9px] font-bold text-red-700">PDF</span>
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-semibold text-gray-800 truncate">Dienstleistungsvertrag.pdf</p>
-                    <p className="text-xs text-gray-500">Klicken zum Öffnen · 8 Seiten</p>
-                  </div>
-                  <span className="text-gray-400 flex-shrink-0 text-lg">↗</span>
-                </a>
-
-                {/* Expliziter Download (direktes Speichern statt Öffnen).
-                    `download`-Attribut nur same-origin garantiert; cross-
-                    origin schlägt die Server-Content-Disposition durch
-                    (lib/vertrag.ts setzt 'inline; filename="…pdf"'). */}
-                <a
-                  href={pdfUrl}
-                  download="Betreuungsvertrag_Primundus.pdf"
-                  className="block text-center text-sm font-semibold text-[#1f7a45] hover:underline mt-2 py-1"
-                >
-                  ⬇ Vertrag herunterladen
-                </a>
               </div>
             );
           }
