@@ -213,6 +213,17 @@ function makeRealSupabase(url: string, serviceKey: string): ProxySupabase {
       if (error) throw new Error(`supabase selectLeadJobs: ${error.message}`);
       return (data ?? []) as LeadJobRow[];
     },
+    async upsertLeadJobs(leadId, jobs) {
+      if (jobs.length === 0) return;
+      // onConflict (lead_id, mamamia_job_offer_id): inserts new jobs, updates
+      // status/anreise/abreise on existing. position/created_at/id untouched;
+      // updated_at maintained by trigger.
+      const rows = jobs.map((j) => ({ lead_id: leadId, ...j }));
+      const { error } = await client
+        .from("lead_jobs")
+        .upsert(rows, { onConflict: "lead_id,mamamia_job_offer_id" });
+      if (error) throw new Error(`supabase upsertLeadJobs: ${error.message}`);
+    },
     async selectDismissedCaregivers(leadId: string) {
       const { data, error } = await client
         .from("lead_dismissed_caregivers")

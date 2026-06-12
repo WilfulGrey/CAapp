@@ -51,6 +51,14 @@ export interface ProxySupabase {
   // signed JWT) — NOT job-scoped, so a job-scoped session can still read
   // the full overview. Read-only.
   selectLeadJobs(leadId: string): Promise<LeadJobRow[]>;
+  // Multi-Job (Phase 2A): upsert the synced jobs (mirror of Mamamia
+  // Customer.job_offers) into lead_jobs. Keyed on (lead_id,
+  // mamamia_job_offer_id) — inserts new jobs, updates status/anreise/abreise
+  // on existing. Optional so test fakes that don't exercise sync can skip it.
+  upsertLeadJobs?(
+    leadId: string,
+    jobs: Array<{ mamamia_job_offer_id: number; status: string; anreise: string | null; abreise: string | null }>,
+  ): Promise<void>;
   selectDismissedCaregivers(
     leadId: string,
   ): Promise<Array<{ caregiver_id: number; kind: string }>>;

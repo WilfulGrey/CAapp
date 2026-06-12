@@ -1,5 +1,5 @@
 import { assertEquals, assertRejects } from "@std/assert";
-import { ACTIONS } from "../actions.ts";
+import { ACTIONS, deriveLeadJobStatus } from "../actions.ts";
 import type { SessionPayload, ActionDeps, LeadJobRow } from "../types.ts";
 
 const SESSION: SessionPayload = {
@@ -27,6 +27,7 @@ type FakeSupa = {
   failOnRecord?: boolean;
   jobs?: LeadJobRow[];
   lastLeadJobsLeadId?: string;
+  upsertedLeadJobs?: Array<{ leadId: string; jobs: Array<{ mamamia_job_offer_id: number; status: string; anreise: string | null; abreise: string | null }> }>;
 };
 function makeFakeSupabase(state: FakeSupa = { invites: [] }) {
   return {
@@ -37,6 +38,12 @@ function makeFakeSupabase(state: FakeSupa = { invites: [] }) {
       async selectLeadJobs(leadId: string) {
         state.lastLeadJobsLeadId = leadId;
         return state.jobs ?? [];
+      },
+      async upsertLeadJobs(
+        leadId: string,
+        jobs: Array<{ mamamia_job_offer_id: number; status: string; anreise: string | null; abreise: string | null }>,
+      ) {
+        (state.upsertedLeadJobs ??= []).push({ leadId, jobs });
       },
       async selectDismissedCaregivers() { return []; },
       async upsertDismissedCaregiver() { /* no-op */ },
@@ -97,6 +104,49 @@ Deno.test("listLeadJobs: throws when the supabase adapter is missing", async () 
     Error,
     "supabase adapter required",
   );
+});
+
+// ─── Multi-Job sync (Phase 2A) ───────────────────────────────────────────
+
+Deno.test("deriveLeadJobStatus: known cases + unmapped → null (skip) with raw preserved", () => {
+  const today = "2026-06-15";
+  assertEquals(deriveLeadJobStatus({ status: "search" }, today).status, "geplant");
+  assertEquals(deriveLeadJobStatus({ status: "on_job" }, today).status, "gebucht");
+  assertEquals(deriveLeadJobStatus({ status: "search", final_confirmation: { id: 1 } }, today).status, "gebucht");
+  assertEquals(deriveLeadJobStatus({ status: "search", departure_at: "2020-01-01" }, today).status, "abgeschlossen");
+  // Past departure wins even over a confirmation.
+  assertEquals(deriveLeadJobStatus({ status: "on_job", departure_at: "2020-01-01", final_confirmation: { id: 1 } }, today).status, "abgeschlossen");
+  // Unmapped status → null (skip) + raw kept for logging/tuning.
+  const u = deriveLeadJobStatus({ status: "some_new_state" }, today);
+  assertEquals(u.status, null);
+  assertEquals(u.raw, "some_new_state");
+});
+
+Deno.test("listLeadJobs: syncs Customer.job_offers → upsert with derived statuses, skips unmapped", async () => {
+  const { fetchFn } = captureFetch({ data: { Customer: { id: 7570, job_offers: [
+    { id: 100, status: "search", arrival_at: null, departure_at: null, final_confirmation: null },
+    { id: 200, status: "on_job", arrival_at: "2020-01-01", departure_at: "2099-01-01", final_confirmation: { id: 9 } },
+    { id: 300, status: "search", arrival_at: "2019-01-01", departure_at: "2020-01-01", final_confirmation: null },
+    { id: 400, status: "cancelled_weird", arrival_at: null, departure_at: null, final_confirmation: null },
+  ] } } });
+  const { state, adapter } = makeFakeSupabase({ invites: [], jobs: [
+    { id: "x", mamamia_job_offer_id: 100, status: "geplant", anreise: null, abreise: null, position: 0 },
+  ] });
+  const result = await ACTIONS.listLeadJobs(SESSION, {}, makeDeps(fetchFn, adapter));
+  const ups = (state.upsertedLeadJobs ?? [])[0];
+  assertEquals(ups.leadId, SESSION.lead_id);
+  // 100→geplant, 200→gebucht, 300→abgeschlossen; 400 unmapped → skipped.
+  assertEquals(ups.jobs.map((j) => [j.mamamia_job_offer_id, j.status]), [[100, "geplant"], [200, "gebucht"], [300, "abgeschlossen"]]);
+  assertEquals((result as { jobs: LeadJobRow[] }).jobs.length, 1); // then read existing rows
+});
+
+Deno.test("listLeadJobs: sync failure is best-effort — still returns existing rows", async () => {
+  const fetchFn: typeof fetch = () => { throw new Error("Mamamia down"); };
+  const { adapter } = makeFakeSupabase({ invites: [], jobs: [
+    { id: "x", mamamia_job_offer_id: 100, status: "geplant", anreise: null, abreise: null, position: 0 },
+  ] });
+  const result = await ACTIONS.listLeadJobs(SESSION, {}, makeDeps(fetchFn, adapter));
+  assertEquals((result as { jobs: LeadJobRow[] }).jobs.length, 1); // read succeeded despite sync throw
 });
 
 // ─── getJobOffer ─────────────────────────────────────────────────────────
