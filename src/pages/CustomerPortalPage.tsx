@@ -406,7 +406,7 @@ const CustomerPortalPage: FC = () => {
   });
 
   // ─── Mamamia session + queries (K2-K4 integration) ───────────────────────
-  const { session, ready: mmReady, error: mmError } = useMamamiaSession(lead?.token ?? null);
+  const { session, ready: mmReady, error: mmError, expired: mmExpired } = useMamamiaSession(lead?.token ?? null);
   const { data: mmCustomer, loading: mmCustomerLoading, error: mmCustomerError } = useCustomer(mmReady);
   const { data: mmJobOffer, loading: mmJobOfferLoading, error: mmJobOfferError, refetch: refetchJobOffer } = useJobOffer(mmReady);
   const { data: mmApplications, loading: mmApplicationsLoading, error: mmApplicationsError, refetch: refetchApplications } = useApplications({ limit: 20 }, mmReady);
@@ -1626,6 +1626,21 @@ const CustomerPortalPage: FC = () => {
     return (
       <>
         <ExpiredLinkScreen token={tokenFromUrl} message={leadError} />
+        {debugOverlay}
+      </>
+    );
+  }
+
+  // Expired/invalid magic-link token: the lead row still loads
+  // (fetchLeadByToken ignores token_expires_at) but onboard returns 401, so
+  // leadError above is null and we'd otherwise fall through to the generic
+  // "Verbindung fehlgeschlagen" screen — a dead end (retry never refreshes the
+  // token). Route to the self-service ExpiredLinkScreen ("Neuen Link
+  // anfordern") so the customer can request a fresh link themselves.
+  if (lead && mmExpired && !IS_PREVIEW_ANY) {
+    return (
+      <>
+        <ExpiredLinkScreen token={tokenFromUrl} message={mmError?.message ?? 'Link nicht mehr gültig'} />
         {debugOverlay}
       </>
     );

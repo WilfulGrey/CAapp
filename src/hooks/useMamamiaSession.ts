@@ -11,6 +11,12 @@ export interface MamamiaSessionState {
   error: Error | null;
   /** True once the onboard HTTP request returned 200 (cookie is live). */
   ready: boolean;
+  /** True when onboard failed with 401 — magic-link token expired/invalid.
+   *  Lets the page show the self-service ExpiredLinkScreen instead of the
+   *  generic connection-error screen. The lead row still loads
+   *  (fetchLeadByToken ignores token_expires_at), so this is the only signal
+   *  distinguishing "expired link" from a transient network/500 failure. */
+  expired: boolean;
 }
 
 const SESSION_STORAGE_KEY = 'mamamia_session';
@@ -39,20 +45,21 @@ export function useMamamiaSession(leadToken: string | null): MamamiaSessionState
     loading: false,
     error: null,
     ready: false,
+    expired: false,
   });
 
   useEffect(() => {
     if (!leadToken) return;
     // Optimistic read — but we still call onboard to ensure cookie is fresh.
     const cached = readCached(leadToken);
-    setState({ session: cached, loading: true, error: null, ready: false });
+    setState({ session: cached, loading: true, error: null, ready: false, expired: false });
 
     let cancelled = false;
     onboardWithLeadToken(leadToken)
       .then((session) => {
         if (cancelled) return;
         writeCached(leadToken, session);
-        setState({ session, loading: false, error: null, ready: true });
+        setState({ session, loading: false, error: null, ready: true, expired: false });
       })
       .catch((e: Error) => {
         if (cancelled) return;
@@ -62,6 +69,7 @@ export function useMamamiaSession(leadToken: string | null): MamamiaSessionState
           loading: false,
           error: isAuthErr ? new Error('Link nicht mehr gültig') : e,
           ready: false,
+          expired: isAuthErr,
         });
       });
 
