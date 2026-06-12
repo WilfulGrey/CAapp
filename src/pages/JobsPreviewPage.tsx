@@ -15,11 +15,9 @@ type JobStatus = 'laufend' | 'geplant' | 'abgeschlossen';
 interface JobMock {
   id: string;
   status: JobStatus;
-  anreise?: string;  // "01.07.2026"
-  abreise?: string;  // "12.08.2026"
-  zeitraum?: string; // Fallback "Januar 2027 (in Planung)"
+  anreise: string;   // immer gesetzt — "01.07.2026"
+  abreise?: string;  // optional (offene Vertragsdauer möglich)
   pflegekraft?: string;
-  pflegekraftHerkunft?: string;
   bewerbungen?: number;
 }
 
@@ -30,7 +28,6 @@ const MOCK_JOBS: JobMock[] = [
     anreise: '01.07.2026',
     abreise: '12.08.2026',
     pflegekraft: 'Marianne Dachs',
-    pflegekraftHerkunft: 'Polen',
   },
   {
     id: 'job-002',
@@ -42,7 +39,7 @@ const MOCK_JOBS: JobMock[] = [
   {
     id: 'job-003',
     status: 'geplant',
-    zeitraum: 'ab Januar 2027',
+    anreise: '15.01.2027',
     bewerbungen: 0,
   },
   {
@@ -51,7 +48,6 @@ const MOCK_JOBS: JobMock[] = [
     anreise: '01.05.2026',
     abreise: '18.06.2026',
     pflegekraft: 'Maria Lopez',
-    pflegekraftHerkunft: 'Polen',
   },
 ];
 
@@ -66,7 +62,7 @@ function sortJobs(jobs: JobMock[]): JobMock[] {
   return [...jobs].sort((a, b) => {
     const orderDiff = STATUS_ORDER[a.status] - STATUS_ORDER[b.status];
     if (orderDiff !== 0) return orderDiff;
-    return (a.anreise ?? a.zeitraum ?? '').localeCompare(b.anreise ?? b.zeitraum ?? '');
+    return a.anreise.localeCompare(b.anreise);
   });
 }
 
@@ -93,8 +89,10 @@ const STATUS_STYLE: Record<JobStatus, {
 };
 
 function formatZeitraum(j: JobMock): string {
-  if (j.anreise && j.abreise) return `${j.anreise} – ${j.abreise}`;
-  return j.zeitraum ?? '—';
+  // Anreise ist immer gesetzt. Abreise optional — offene Vertragsdauer
+  // (täglich kündbar) zeigen wir als "ab 01.07.2026".
+  if (j.abreise) return `${j.anreise} – ${j.abreise}`;
+  return `ab ${j.anreise}`;
 }
 
 // ─── Job-Karte (Klick öffnet Detail) ───────────────────────────────────
@@ -111,10 +109,7 @@ const JobCard: FC<{ job: JobMock; onClick: () => void }> = ({ job, onClick }) =>
         </span>
         <p className="text-[15px] font-bold text-gray-900">{formatZeitraum(job)}</p>
         {job.pflegekraft ? (
-          <p className="text-sm text-gray-600 mt-0.5">
-            {job.pflegekraft}
-            {job.pflegekraftHerkunft && <span className="text-gray-400"> · {job.pflegekraftHerkunft}</span>}
-          </p>
+          <p className="text-sm text-gray-600 mt-0.5">{job.pflegekraft}</p>
         ) : job.bewerbungen !== undefined ? (
           <p className="text-sm text-gray-500 mt-0.5">
             {job.bewerbungen > 0
@@ -153,13 +148,13 @@ const JobDetail: FC<{ job: JobMock; onBack: () => void }> = ({ job, onBack }) =>
             </div>
             <div className="flex-1 min-w-0">
               <p className="font-bold text-gray-900">{job.pflegekraft}</p>
-              <p className="text-xs text-gray-500">{job.pflegekraftHerkunft} · Pflegekraft</p>
+              <p className="text-xs text-gray-500">Pflegekraft</p>
             </div>
           </div>
         )}
         <div className="px-4 py-3 space-y-1.5 text-sm">
-          <div className="flex justify-between"><span className="text-gray-500">Anreise</span><span className="font-semibold text-gray-800">{job.anreise ?? '—'}</span></div>
-          <div className="flex justify-between"><span className="text-gray-500">Abreise</span><span className="font-semibold text-gray-800">{job.abreise ?? '—'}</span></div>
+          <div className="flex justify-between"><span className="text-gray-500">Anreise</span><span className="font-semibold text-gray-800">{job.anreise}</span></div>
+          <div className="flex justify-between"><span className="text-gray-500">Abreise</span><span className="font-semibold text-gray-800">{job.abreise ?? 'offen'}</span></div>
           <div className="flex justify-between"><span className="text-gray-500">Tagessatz</span><span className="font-semibold text-gray-800">83 € / Tag</span></div>
         </div>
       </div>
