@@ -18,6 +18,7 @@ import type {
   MamamiaAcceptedApplications,
   MamamiaCaregiverFull,
   MamamiaLocation,
+  LeadJobRow,
   PaginatedResponse,
 } from './types';
 import {
@@ -179,6 +180,19 @@ export function useInvitedCaregivers(enabled = true) {
     enabled,
   );
   return { ...state, data: state.data?.caregiver_ids ?? null };
+}
+
+// Multi-Job (Variant A): the lead's jobs for the "Alle meine Einsätze"
+// overview. Lead-scoped (not job-scoped), so any session for the lead can
+// read the full list. The action best-effort syncs from Mamamia before
+// returning, so a fresh overview reflects newly-posted follow-up jobs.
+export function useLeadJobs(enabled = true) {
+  const state = useMamamiaQuery<{ jobs: LeadJobRow[] }>(
+    'listLeadJobs',
+    {},
+    enabled,
+  );
+  return { ...state, data: state.data?.jobs ?? null };
 }
 
 // Cached, dedupable fetch for the modal's heavy GET_CAREGIVER. Reads from

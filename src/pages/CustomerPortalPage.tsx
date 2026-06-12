@@ -124,6 +124,23 @@ const JOBS_BACK = readJobsBackParams();
 const HAS_JOBS_BACK = JOBS_BACK !== null;
 const IS_EINSATZ_BEENDET = JOBS_BACK?.abgeschlossen === true;
 
+// Multi-Job (Variant A): a `?job=<lead_jobs.id>` deep link scopes this portal
+// to one specific job. Passed to useMamamiaSession → the edge function
+// re-onboards with that job_offer_id (ownership-checked; foreign/unknown id
+// falls back to the lead's default job). Absent → default job (every old link).
+const JOB_ID_PARAM =
+  typeof window !== 'undefined'
+    ? new URLSearchParams(window.location.search).get('job')
+    : null;
+const TOKEN_PARAM =
+  typeof window !== 'undefined'
+    ? new URLSearchParams(window.location.search).get('token')
+    : null;
+// Link back to the real "Alle meine Einsätze" overview (?view=jobs) — only
+// meaningful once we arrived here scoped to a specific job via ?job=…
+const JOBS_OVERVIEW_HREF =
+  TOKEN_PARAM ? `?${new URLSearchParams({ token: TOKEN_PARAM, view: 'jobs' }).toString()}` : '?view=jobs';
+
 // Feature-Flag: Chat (PflegekraftChat) ist im Backend noch nicht via
 // WhatsApp/caregiver-chat angebunden + Brief-Style-UX wird noch getestet.
 // Bis explizit freigegeben → keine Chat-Entry-Points für echte Kunden
@@ -406,7 +423,7 @@ const CustomerPortalPage: FC = () => {
   });
 
   // ─── Mamamia session + queries (K2-K4 integration) ───────────────────────
-  const { session, ready: mmReady, error: mmError, expired: mmExpired } = useMamamiaSession(lead?.token ?? null);
+  const { session, ready: mmReady, error: mmError, expired: mmExpired } = useMamamiaSession(lead?.token ?? null, JOB_ID_PARAM);
   const { data: mmCustomer, loading: mmCustomerLoading, error: mmCustomerError } = useCustomer(mmReady);
   const { data: mmJobOffer, loading: mmJobOfferLoading, error: mmJobOfferError, refetch: refetchJobOffer } = useJobOffer(mmReady);
   const { data: mmApplications, loading: mmApplicationsLoading, error: mmApplicationsError, refetch: refetchApplications } = useApplications({ limit: 20 }, mmReady);
@@ -1824,6 +1841,21 @@ const CustomerPortalPage: FC = () => {
             </div>
           );
         })()}
+        {/* Real Multi-Job back-link: when this portal is scoped to a specific
+            job via ?job=<lead_jobs.id> (deep link from the real ?view=jobs
+            overview), offer a way back. Suppressed under the ?back=jobs mock
+            flow above, which renders its own "Alle Einsätze" link. */}
+        {JOB_ID_PARAM && !HAS_JOBS_BACK && (
+          <div className="max-w-3xl mx-auto px-4 pb-2 -mt-1 flex items-center">
+            <a
+              href={JOBS_OVERVIEW_HREF}
+              className="inline-flex items-center gap-1 text-xs font-semibold text-[#8B7355] hover:text-[#6B5444]"
+            >
+              <ArrowLeft className="w-3 h-3" />
+              Alle meine Einsätze
+            </a>
+          </div>
+        )}
       </nav>
 
       {acceptedApp ? (

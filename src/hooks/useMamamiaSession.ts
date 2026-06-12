@@ -21,9 +21,16 @@ export interface MamamiaSessionState {
 
 const SESSION_STORAGE_KEY = 'mamamia_session';
 
-function readCached(leadToken: string): OnboardResponse | null {
+// Cache key is per (token, job) — Multi-Job (Variant A) re-onboards with a
+// different job_id swap the scoped session, so a job B cache must not shadow
+// job A. `null`/undefined jobId → the lead's default job ('default' bucket).
+function cacheKey(leadToken: string, jobId?: string | null): string {
+  return `${SESSION_STORAGE_KEY}:${leadToken}:${jobId ?? 'default'}`;
+}
+
+function readCached(leadToken: string, jobId?: string | null): OnboardResponse | null {
   try {
-    const raw = sessionStorage.getItem(`${SESSION_STORAGE_KEY}:${leadToken}`);
+    const raw = sessionStorage.getItem(cacheKey(leadToken, jobId));
     if (!raw) return null;
     return JSON.parse(raw) as OnboardResponse;
   } catch {
@@ -31,15 +38,18 @@ function readCached(leadToken: string): OnboardResponse | null {
   }
 }
 
-function writeCached(leadToken: string, session: OnboardResponse) {
+function writeCached(leadToken: string, jobId: string | null | undefined, session: OnboardResponse) {
   try {
-    sessionStorage.setItem(`${SESSION_STORAGE_KEY}:${leadToken}`, JSON.stringify(session));
+    sessionStorage.setItem(cacheKey(leadToken, jobId), JSON.stringify(session));
   } catch {
     // ignore quota / private mode
   }
 }
 
-export function useMamamiaSession(leadToken: string | null): MamamiaSessionState {
+// `jobId` (a lead_jobs.id from a `?job=...` deep link, optional) scopes the
+// session to one job. Changing it re-onboards: the edge function swaps the
+// session's job_offer_id (ownership-checked; foreign id → default job).
+export function useMamamiaSession(leadToken: string | null, jobId?: string | null): MamamiaSessionState {
   const [state, setState] = useState<MamamiaSessionState>({
     session: null,
     loading: false,
@@ -51,14 +61,14 @@ export function useMamamiaSession(leadToken: string | null): MamamiaSessionState
   useEffect(() => {
     if (!leadToken) return;
     // Optimistic read — but we still call onboard to ensure cookie is fresh.
-    const cached = readCached(leadToken);
+    const cached = readCached(leadToken, jobId);
     setState({ session: cached, loading: true, error: null, ready: false, expired: false });
 
     let cancelled = false;
-    onboardWithLeadToken(leadToken)
+    onboardWithLeadToken(leadToken, jobId)
       .then((session) => {
         if (cancelled) return;
-        writeCached(leadToken, session);
+        writeCached(leadToken, jobId, session);
         setState({ session, loading: false, error: null, ready: true, expired: false });
       })
       .catch((e: Error) => {
@@ -76,7 +86,7 @@ export function useMamamiaSession(leadToken: string | null): MamamiaSessionState
     return () => {
       cancelled = true;
     };
-  }, [leadToken]);
+  }, [leadToken, jobId]);
 
   return state;
 }
