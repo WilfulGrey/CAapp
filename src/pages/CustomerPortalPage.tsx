@@ -113,7 +113,7 @@ function readJobsBackParams() {
   const q = new URLSearchParams(window.location.search);
   if (q.get('back') !== 'jobs') return null;
   return {
-    status: q.get('status') as 'laufend' | 'geplant' | 'abgeschlossen' | null,
+    status: q.get('status') as 'laufend' | 'gebucht' | 'geplant' | 'abgeschlossen' | null,
     von: q.get('von') || '',
     bis: q.get('bis') || '',
     count: Number(q.get('count') || '1'),
@@ -1779,6 +1779,7 @@ const CustomerPortalPage: FC = () => {
         {HAS_JOBS_BACK && JOBS_BACK && (() => {
           const statusStyle = {
             laufend: { label: 'Laufend', cls: 'bg-green-50 text-green-700 border-green-200' },
+            gebucht: { label: 'Gebucht', cls: 'bg-amber-50 text-amber-700 border-amber-200' },
             geplant: { label: 'Geplant', cls: 'bg-blue-50 text-blue-700 border-blue-200' },
             abgeschlossen: { label: 'Abgeschlossen', cls: 'bg-gray-100 text-gray-600 border-gray-200' },
           } as const;
