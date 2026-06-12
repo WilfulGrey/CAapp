@@ -34,99 +34,277 @@ const DUMMY: VertragsDaten = {
   dl: { name: 'Kamila Bilska-Wabik', rolle: 'Vitanas Group' }, // signaturImg → echter Scan später
 };
 
-// Statische §§ aus dem Mustervertrag. §3.1 und §4.1 werden separat (mit
-// dynamischen Feldern) gerendert; hier nur die rein statischen Punkte.
-const PARAGRAPHEN: { titel: string; punkte: string[] }[] = [
+// Statische §§ — Wortlaut 1:1 dem Mustervertrag (dist/primundus-mustervertrag.pdf)
+// und parallel zum Server-PDF-Generator project 3/lib/vertrag.ts. WICHTIG:
+// wenn der Mustervertrag aktualisiert wird, BEIDE Stellen updaten.
+//
+// § 3 + § 4 werden separat gerendert (dynamische Felder: Vertragsbeginn,
+// Tagessatz, Einsatz-Zeitraum); hier nur die rein statischen §§.
+
+interface Punkt {
+  text: string;
+  subList?: string[];
+}
+
+const PARAGRAPHEN: { titel: string; punkte: Punkt[] }[] = [
   {
     titel: '§ 1 Vertragsgegenstand',
     punkte: [
-      'Der DL erbringt zeitlich überwiegend Leistungen im Bereich der hauswirtschaftlichen Versorgung und unterstützt den LE bei der Ausübung alltäglicher Aktivitäten. Zusätzlich erbringt der DL in zeitlich geringerem Umfang Leistungen im Bereich der Grundpflege im Sinne des SGB XI. Eine detaillierte Beschreibung dieser Leistungen erfolgt in Anlage 2 dieses Vertrages, wobei die Art, Dauer und die Häufigkeit der Betreuung vom jeweiligen Gesundheitszustand des Leistungsempfängers abhängen. Der zeitliche Aufwand der vereinbarten grundpflegerischen Leistungen darf 50 Prozent der gesamten Leistung nicht überschreiten.',
-      'Der DL erklärt, dass notwendige medizinische Behandlungspflege nach SGB V (z. B. Injektionen, Wundversorgung, u. a.) sich ausdrücklich nicht im Umfang der Dienstleistungen befindet und nicht im Rahmen dieses Vertrages ausgeführt wird.',
-      'Der DL verpflichtet sich, die ihm in Auftrag gegebenen Dienstleistungen mit höchster Sorgfalt sowie durch die volle Anwendung seiner Kenntnisse und Erfahrungen zu erbringen.',
-      'Im Fall einer Verhinderung der Betreuungsperson ist der DL berechtigt, die Betreuungsperson schnellstmöglich (in der Regel innerhalb von 3 Tagen) zu wechseln.',
-      'Bei begründetem und nachvollziehbarem Wunsch des AG wird der DL einen Austausch der Betreuungsperson vornehmen (Zeitraum mindestens eine Woche).',
-      'Die eingesetzten Betreuungspersonen können nicht durch den AG zu anderen Zwecken eingeteilt oder verliehen werden.',
-      'Mängel und Beschwerden müssen dem DL unverzüglich schriftlich angezeigt werden.',
-      'Der AG erstellt keine Dienst-/Freizeitpläne, übt kein Direktionsrecht aus und bindet die Betreuungsperson nicht in eigene Betriebsabläufe ein.',
-      'Die wöchentliche durchschnittliche Arbeitszeit darf 40 Stunden nicht überschreiten.',
-      'Der AG stellt der Betreuungsperson die Mitbenutzung eines Telefons sowie Internet zur Verfügung.',
+      {
+        text: 'Der DL erbringt zeitlich überwiegend Leistungen im Bereich der hauswirtschaftlichen Versorgung und unterstützt den LE bei der Ausübung alltäglicher Aktivitäten. Zusätzlich erbringt der DL in zeitlich geringerem Umfang Leistungen im Bereich der Grundpflege im Sinne des SGB XI. Eine detaillierte Beschreibung dieser Leistungen erfolgt in Anlage 2 dieses Vertrages, wobei die Art, Dauer und die Häufigkeit der Betreuung vom jeweiligen Gesundheitszustand des Leistungsempfängers abhängen. Der zeitliche Aufwand der vereinbarten grundpflegerischen Leistungen darf 50 Prozent der gesamten Leistung nicht überschreiten.',
+      },
+      {
+        text: 'Der DL erklärt, dass notwendige medizinische Behandlungspflege nach SGB V (z. B. Injektionen, Wundversorgung, u. a.) sich ausdrücklich nicht im Umfang der Dienstleistungen befindet und nicht im Rahmen dieses Vertrages ausgeführt wird.',
+      },
+      {
+        text: 'Der DL verpflichtet sich, die ihm in Auftrag gegebenen Dienstleistungen mit höchster Sorgfalt sowie durch die volle Anwendung seiner Kenntnisse und Erfahrungen zu erbringen.',
+      },
+      {
+        text: 'Im Fall einer Verhinderung der Betreuungsperson ist der DL berechtigt, die Betreuungsperson schnellstmöglich (in der Regel innerhalb von 3 Tagen) zu wechseln.',
+      },
+      {
+        text: 'Bei begründetem und nachvollziehbarem Wunsch des AG wird der DL einen Austausch der Betreuungsperson vornehmen. Für die Ausführung wird dem DL ein Zeitraum von mindestens einer Woche gewährt.',
+      },
+      {
+        text: 'Die eingesetzten Betreuungspersonen des DL können nicht durch den AG zu anderen Zwecken eingeteilt oder an andere Leistungsorte verliehen werden.',
+      },
+      {
+        text: 'Mängel und Beschwerden müssen dem DL unverzüglich schriftlich angezeigt werden.',
+      },
+      {
+        text: 'Der DL erbringt seine Dienstleistungen gemäß den Vorschriften der EU am Leistungsort. Beide Vertragsparteien sind sich darüber einig:',
+        subList: [
+          'der AG erstellt weder Dienst- noch Freizeitpläne',
+          'der AG übt keinen Einfluss auf Art und Weise der Aufgaben der Betreuungsperson aus',
+          'der AG erteilt keine direkten und bindenden Weisungen und übt kein Direktionsrecht aus',
+          'der AG bindet die Betreuungsperson nicht in eigene Betriebsabläufe ein',
+        ],
+      },
+      {
+        text: 'Die wöchentliche durchschnittliche Arbeitszeit darf 40 Stunden nicht überschreiten. Außerhalb der Arbeitszeit steht es der Betreuungsperson frei, den Leistungsort zu verlassen.',
+      },
+      {
+        text: 'Der AG stellt der Betreuungsperson die Mitbenutzung eines Telefons für nationale Festnetztelefonate sowie Festnetztelefonate ins Heimatland und Internet zur Verfügung.',
+      },
     ],
   },
   {
     titel: '§ 2 Unterbringung / Verpflegung / Transfer',
     punkte: [
-      'Der AG verpflichtet sich, der Betreuungsperson ausreichenden, unentgeltlichen Wohnraum zur alleinigen, privaten Nutzung zur Verfügung zu stellen (ausreichend möbliert, beheizt, verschließbar, hygienisch einwandfrei, mit Tageslichtfenster).',
-      'Der AG trägt alle Kosten der Leistungserbringung, Ernährungs- und Lebenshaltungskosten sowie die Kosten für die mit der Betreuung verbundenen Mittel und Geräte.',
-      'Der AG verpflichtet sich, am vereinbarten Ankunftstag die Betreuungsperson am nächstgelegenen Ankunftsort auf eigene Kosten abzuholen.',
+      {
+        text: 'Der AG verpflichtet sich, der Betreuungsperson ausreichenden, unentgeltlichen Wohnraum (z. B. ein Zimmer) zur alleinigen, privaten und freiwilligen Nutzung zur Verfügung zu stellen. Der Wohnraum muss ausreichend möbliert, beheizt, verschließbar und hygienisch einwandfrei mit einem Tageslichtfenster versehen sein.',
+      },
+      {
+        text: 'Der AG trägt alle Kosten der Leistungserbringung, Ernährungs- und Lebenshaltungskosten sowie die Kosten für die mit der Betreuung verbundenen Mittel und Geräte.',
+      },
+      {
+        text: 'Der AG verpflichtet sich, am vorher vereinbarten Ankunftstag die Betreuungsperson am nächstgelegenen Ankunftsort auf eigene Kosten abzuholen. Der DL haftet nicht für Verspätungen infolge der Busreisedauer oder persönlicher Angelegenheiten der Betreuungspersonen.',
+      },
     ],
   },
 ];
 
-const PARAGRAPHEN_2: { titel: string; punkte: string[] }[] = [
+const PARAGRAPHEN_2: { titel: string; punkte: Punkt[] }[] = [
   {
     titel: '§ 5 Haftung des Dienstleisters',
     punkte: [
-      'Der DL erklärt, dass die von ihm beauftragten Betreuungspersonen über eine Haftpflichtversicherung verfügen.',
-      'Der DL haftet für Schäden an Leib, Leben oder Gesundheit nach den gesetzlichen Vorschriften und jeweils bis zu EUR 1.000.000,00 pro Schadenfall.',
-      'Der DL und die Betreuungspersonen leisten keine medizinische Behandlungspflege im Sinne des SGB V.',
-      'Im Falle der Übergabe eines Kraftfahrzeugs an die Betreuungsperson können keine Ansprüche gegenüber dem DL geltend gemacht werden.',
+      {
+        text: 'Der DL erklärt, dass die von ihm beauftragten Betreuungspersonen über eine Haftpflichtversicherung verfügen.',
+      },
+      {
+        text: 'Der Dienstleister haftet für Schäden an Leib, Leben oder Gesundheit nach den gesetzlichen Vorschriften und jeweils bis zu EUR 1.000.000,00 pro Schadenfall. Die Haftung für Schäden und Folgeschäden wird ausgeschlossen, wenn der Schaden in geringen Beschädigungen (bis zu EUR 100,00) besteht, die bei der Verrichtung alltäglicher Haushaltspflichten entstanden sind, oder wenn der Schaden einen normalen Verschleiß der Ausstattung darstellt.',
+      },
+      {
+        text: 'Der DL und die Betreuungspersonen leisten keine medizinische Behandlungspflege im Sinne des SGB V und übernehmen keine Verantwortung für Umstände, die durch Nichteinhaltung ärztlicher Anordnungen durch den AG oder LE entstehen.',
+      },
+      {
+        text: 'Im Falle der Übergabe eines Kraftfahrzeugs an die Betreuungsperson können keine Ansprüche gegenüber dem DL geltend gemacht werden.',
+      },
     ],
   },
   {
     titel: '§ 6 Datenschutz / Vertraulichkeitsvereinbarung',
     punkte: [
-      'Beide Parteien verpflichten sich zum Schutz aller personenbezogenen Daten gemäß der EU-DSGVO.',
-      'Der DL verarbeitet anvertraute personenbezogene Daten nur soweit erforderlich.',
-      'Der AG verpflichtet sich zur vollen Verschwiegenheit gegenüber Dritten.',
-      'Der AG und der LE willigen ein, dass die zur Erfüllung des Vertrages notwendigen Daten erhoben, gespeichert, verarbeitet und an Mitarbeiter und Betreuungspersonen weitergegeben werden dürfen.',
+      {
+        text: 'Beide Parteien verpflichten sich zum Schutz aller personenbezogenen Daten gemäß der EU-DSGVO. Der DL verpflichtet sich zur vertraulichen Behandlung der persönlichen Daten des AG und LE.',
+      },
+      {
+        text: 'Der DL verarbeitet anvertraute personenbezogene Daten nur soweit, als es zur Begründung, Durchführung oder Beendigung dieses Vertrages erforderlich ist.',
+      },
+      {
+        text: 'Der AG verpflichtet sich zur vollen Verschwiegenheit gegenüber Dritten in Bezug auf sämtliche Daten, die im Zusammenhang mit der Erbringung der Dienstleistung erlangt werden.',
+      },
+      {
+        text: 'Der AG und der LE willigen ein, dass die zur Erfüllung des Vertrages notwendigen Daten vom DL erhoben, gespeichert, verarbeitet und an seine Mitarbeiter und Betreuungspersonen weitergegeben werden dürfen.',
+      },
     ],
   },
   {
     titel: '§ 7 Wettbewerbsverbot',
     punkte: [
-      'Für die Betreuungspersonen gilt während der Vertragsdauer und bis 12 Monate nach Beendigung ein Konkurrenz- und Wettbewerbsverbot.',
-      'Im Falle einer schuldhaften Annahme eines Auftrages durch eine Betreuungsperson beim AG verpflichtet sich der AG, eine Vertragsstrafe in Höhe von EUR 5.000,00 zu zahlen.',
+      {
+        text: 'Für die Betreuungspersonen gilt sowohl während der Vertragsdauer als auch bis 12 Monate nach Beendigung ein Konkurrenz- und Wettbewerbsverbot. Es ist nicht gestattet, ein mittelbares oder unmittelbares Rechtsverhältnis zu einer Betreuungsperson des DL zu begründen.',
+      },
+      {
+        text: 'Im Falle einer schuldhaften Annahme eines Auftrages durch eine Betreuungsperson beim AG mit Ausschließung des DL, verpflichtet sich der AG, eine Vertragsstrafe in Höhe von EUR 5.000,00 zu zahlen.',
+      },
     ],
   },
   {
     titel: '§ 8 Widerrufsrecht',
     punkte: [
-      'Dem AG steht das Recht zu, diesen Vertrag ohne Angabe von Gründen innerhalb von 14 Tagen in Textform zu widerrufen. Die Widerrufsfrist beginnt mit Unterzeichnung dieses Vertrages. Widerruf an: Primundus Deutschland (VITANAS CARE LTD HOME SK), ul. Poznańska 21/48, 00-685 Warszawa.',
-      'Im Falle eines wirksamen Widerrufs sind die beiderseits empfangenen Leistungen zurückzugewähren (Wertersatz, z. B. entstandene Reisekosten, pauschal EUR 125,00).',
-      'Der AG bestätigt durch Unterzeichnung, dass er ausdrücklich verlangt, dass die Leistungserbringung vor Ablauf der Widerrufsfrist beginnt.',
+      {
+        text: 'Dem AG steht das Recht zu, diesen Vertrag ohne Angabe von Gründen innerhalb von 14 Tagen in Textform zu widerrufen. Die Widerrufsfrist beginnt mit Unterzeichnung dieses Vertrages. Widerruf an: Primundus Deutschland (VITANAS CARE LTD HOME SK), ul. Poznańska 21/48, 00-685 Warszawa.',
+      },
+      {
+        text: 'Im Falle eines wirksamen Widerrufs sind die beiderseits empfangenen Leistungen zurückzugewähren. Der AG ist verpflichtet, dem DL Wertersatz zu leisten (z. B. entstandene Reisekosten, pauschal EUR 125,00).',
+      },
+      {
+        text: 'Der AG bestätigt durch Unterzeichnung, dass er ausdrücklich verlangt, dass die Leistungserbringung vor Ablauf der Widerrufsfrist beginnt.',
+      },
     ],
   },
   {
-    titel: '§ 9 Einhaltung der Sozialversicherungspflichten',
+    titel: '§ 9 Einhaltung der gültigen Sozialversicherungspflichten',
     punkte: [
-      'Der DL erklärt, dass er alle Tätigkeiten nach den gültigen Gesetzen (EU-Dienstleistungsrichtlinie, Arbeitnehmer-Entsendegesetz) rechtmäßig befolgt.',
-      'Die Vergütung des Personals richtet sich nach dem deutschen Mindestlohn.',
-      'Die Betreuungspersonen sind nach polnischem Sozialversicherungsrecht versichert und mit A1-Bescheinigungen der ZUS entsandt.',
+      {
+        text: 'Der DL erklärt, dass er alle auszuführenden Tätigkeiten nach den gültigen Gesetzen, insbesondere der EU-Dienstleistungsrichtlinie und dem Arbeitnehmer-Entsendegesetz, rechtmäßig befolgt.',
+      },
+      { text: 'Die Vergütung des Personals richtet sich nach dem deutschen Mindestlohn.' },
+      {
+        text: 'Die von ihm beauftragten Betreuungspersonen sind ordnungsgemäß nach polnischem Sozialversicherungsrecht versichert und mit A1-Bescheinigungen der polnischen Sozialversicherungsanstalt (ZUS) entsandt.',
+      },
     ],
   },
   {
     titel: '§ 10 Schlussbestimmungen',
     punkte: [
-      'Änderungen und Ergänzungen bedürfen der Schriftform. Rechnungen und Korrespondenz werden an die E-Mailadresse des AG auf Seite 1 gesendet. Eine E-Mail ist gemäß diesem Vertrag ebenfalls Schriftform. Sollten einzelne Bestimmungen unwirksam sein, gelten die übrigen fort. Der AG bestätigt mit seiner Unterschrift, den gesamten Inhalt des Vertrages gelesen zu haben. Mündliche Nebenabreden bestehen nicht. Der Vertrag unterliegt deutschem Recht.',
+      { text: 'Änderungen und Ergänzungen bedürfen der Schriftform.' },
+      {
+        text: 'Rechnungen und Korrespondenz werden an die E-Mailadresse des AG auf Seite 1 gesendet.',
+      },
+      { text: 'Eine E-Mail ist gemäß diesem Vertrag ebenfalls Schriftform.' },
+      { text: 'Sollten einzelne Bestimmungen unwirksam sein, gelten die übrigen fort.' },
+      {
+        text: 'Der AG bestätigt mit seiner Unterschrift den gesamten Inhalt des Vertrages gelesen zu haben.',
+      },
+      { text: 'Mündliche Nebenabreden bestehen nicht.' },
+      { text: 'Der Vertrag unterliegt deutschem Recht.' },
     ],
   },
 ];
 
-const Paragraphen: FC<{ liste: { titel: string; punkte: string[] }[] }> = ({ liste }) => (
+const Paragraphen: FC<{ liste: { titel: string; punkte: Punkt[] }[] }> = ({ liste }) => (
   <>
     {liste.map((p) => (
       <section key={p.titel} className="mb-5 print:break-inside-avoid">
         <h2 className="text-[15px] font-bold text-[#6B5444] mb-2 pb-1 border-b border-gray-200">{p.titel}</h2>
         <ol className="space-y-1.5">
-          {p.punkte.map((t, i) => (
-            <li key={i} className="text-[13px] leading-relaxed text-gray-700 flex gap-2">
-              <span className="text-gray-400 flex-shrink-0">{i + 1}.</span>
-              <span className="text-justify">{t}</span>
+          {p.punkte.map((punkt, i) => (
+            <li key={i} className="text-[13px] leading-relaxed text-gray-700">
+              <div className="flex gap-2">
+                <span className="text-gray-400 flex-shrink-0">{i + 1}.</span>
+                <span className="text-justify">{punkt.text}</span>
+              </div>
+              {punkt.subList && (
+                <ul className="mt-1.5 ml-6 space-y-1">
+                  {punkt.subList.map((s, j) => (
+                    <li key={j} className="flex gap-2 text-[12.5px] text-gray-600">
+                      <span className="text-[#B5A184] flex-shrink-0">▸</span>
+                      <span>{s}</span>
+                    </li>
+                  ))}
+                </ul>
+              )}
             </li>
           ))}
         </ol>
       </section>
     ))}
+  </>
+);
+
+// ─── Anlagen 1 + 2 ───────────────────────────────────────────────────────
+// Werden im Mustervertrag-PDF auf separaten Seiten gerendert. Im Web als
+// eigene Sektionen unter den §§; beim Print mit break-before:page auf neue
+// Seite.
+
+const AnlagenSektion: FC<{ daten: VertragsDaten }> = ({ daten: _daten }) => (
+  <>
+    <section className="mb-5 print:break-before-page print:break-inside-avoid">
+      <h2 className="text-[15px] font-bold text-[#6B5444] mb-1">Anlage 1 zum Dienstleistungsvertrag</h2>
+      <p className="text-[12px] text-[#6B5444] font-semibold mb-2 pb-1 border-b border-gray-200">
+        Hinweise zum Datenschutz (EU-DSGVO) und Einwilligungserklärung
+      </p>
+      <div className="space-y-2 text-[13px] leading-relaxed text-gray-700 text-justify">
+        <p>
+          PRIMUNDUS ist verantwortlich für den Schutz, Sicherheit und Verwaltung Ihrer Daten. Kontakt: <strong>datenschutz@primundus.de</strong>
+        </p>
+        <p>
+          Die angegebenen personenbezogenen Daten, insbesondere Name, Anschrift, Telefonnummer, Bankdaten, Gesundheitsdaten und familiäre Daten, werden auf Grundlage der geltenden EU-DSGVO ausschließlich zum Zwecke der Durchführung des entstehenden Vertragsverhältnisses erhoben und verarbeitet.
+        </p>
+        <p>
+          Ihre Vertragsdaten speichern wir gemäß den gesetzlichen Vorgaben. Sie haben das Recht auf Auskunft, Berichtigung, Löschung, Sperrung, Einschränkung der Verarbeitung, Widerspruch und Datenübertragbarkeit sowie das Recht auf Beschwerde bei einer zuständigen Aufsichtsbehörde. Unsere Datenschutzerklärung finden Sie unter www.primundus.de.
+        </p>
+        <div className="mt-3 p-3 bg-[#FAF8F4] border-l-2 border-[#B5A184] rounded-r">
+          <strong>Einwilligung zur Datennutzung zu Werbezwecken:</strong>
+          <br />
+          Ich bin damit einverstanden, dass PRIMUNDUS mir postalisch / per E-Mail / Telefon / Fax Informationen und Angebote zum Zwecke der Eigenwerbung zusendet.
+        </div>
+      </div>
+    </section>
+
+    <section className="mb-5 print:break-before-page print:break-inside-avoid">
+      <h2 className="text-[15px] font-bold text-[#6B5444] mb-1">Anlage 2 zum Dienstleistungsvertrag</h2>
+      <p className="text-[12px] text-[#6B5444] font-semibold mb-2 pb-1 border-b border-gray-200">Leistungsumfang</p>
+      <p className="text-[13px] leading-relaxed text-gray-700 text-justify mb-3">
+        Die Vertragspartner vereinbaren, dass folgende Leistungen im Rahmen des abgeschlossenen Dienstleistungsvertrages erbracht werden. Beide Parteien sind sich darüber einig, dass zeitlich überwiegend nur Leistungen im Bereich der hauswirtschaftlichen Versorgung erbracht werden.
+      </p>
+
+      <p className="text-[13px] font-bold text-gray-800 mb-1.5">
+        Hauswirtschaftliche Leistungen <span className="font-normal text-gray-500 text-[12px]">(zeitlich überwiegend)</span>
+      </p>
+      <ul className="space-y-1 mb-4">
+        {[
+          'Alle notwendigen Maßnahmen zur Aufrechterhaltung einer eigenständigen Haushaltsführung',
+          'Ordnung und Reinigung der vom LE genutzten Zimmer/Räume (Fensterreinigung, Garage, Heizräume und Außengebäude ausgeschlossen)',
+          'Einkaufen',
+          'Spülen des alltäglichen Geschirrs',
+          'Waschen und Wechseln der Wäsche sowie Kleidung',
+          'Zubereitung von Speisen und Getränken',
+          'Pflege von Zimmerpflanzen',
+          'Begleitung bei Spaziergängen',
+          'Versorgung von Haustieren',
+          'Aktivierende Tätigkeiten und Besorgungen (z. B. Begleitung bei Kulturveranstaltungen, Spiele etc.)',
+        ].map((item, i) => (
+          <li key={i} className="flex gap-2 text-[12.5px] text-gray-700 leading-relaxed">
+            <span className="text-[#B5A184] flex-shrink-0">▸</span>
+            <span>{item}</span>
+          </li>
+        ))}
+      </ul>
+
+      <p className="text-[13px] font-bold text-gray-800 mb-1.5">
+        Grundpflege nach § 14 Abs. 4 Nr. 1–3 SGB XI <span className="font-normal text-gray-500 text-[12px]">(zeitlich nicht überwiegend)</span>
+      </p>
+      <ul className="space-y-1 mb-3">
+        {[
+          'Körperpflege (z. B. Waschen, Duschen, Baden, Rasieren, Mund- und Zahnpflege, Hautpflege)',
+          'Hilfe bei der Nahrungsaufnahme',
+          'Hilfe bei der Mobilität (z. B. Aufstehen, Zubettgehen, An- und Auskleiden, Treppensteigen)',
+          'Begleitung von Arztbesuchen',
+        ].map((item, i) => (
+          <li key={i} className="flex gap-2 text-[12.5px] text-gray-700 leading-relaxed">
+            <span className="text-[#B5A184] flex-shrink-0">▸</span>
+            <span>{item}</span>
+          </li>
+        ))}
+      </ul>
+
+      <p className="text-[12px] italic text-gray-500">
+        Ausdrücklich ausgenommen: Leistungen der medizinischen Behandlungspflege nach SGB V.
+      </p>
+    </section>
   </>
 );
 
@@ -272,7 +450,10 @@ export const VertragSignieren: FC<{
         <div className="px-6 sm:px-10 py-6 border-t border-gray-100">
           <Paragraphen liste={PARAGRAPHEN} />
 
-          {/* § 3 — mit dynamischem Vertragsbeginn */}
+          {/* § 3 — Vertragsdauer / Vertragskündigung. Punkt 1 mit dynamischem
+              Vertragsbeginn, sonst 1:1 Mustervertrag. Footnote unten zeigt
+              den konkreten Einsatz-Zeitraum dieser Buchung (nicht im
+              Mustervertrag, aber Buchungs-spezifisch nützlich). */}
           <section className="mb-5 print:break-inside-avoid">
             <h2 className="text-[15px] font-bold text-[#6B5444] mb-2 pb-1 border-b border-gray-200">§ 3 Vertragsdauer / Vertragskündigung</h2>
             <ol className="space-y-1.5 text-[13px] leading-relaxed text-gray-700">
@@ -280,29 +461,39 @@ export const VertragSignieren: FC<{
               <li className="flex gap-2"><span className="text-gray-400">2.</span><span className="text-justify">Der AG verlangt vom DL ausdrücklich, dass dieser mit der Leistungserbringung bereits vor Ablauf der Widerrufsfrist gemäß § 8 beginnt.</span></li>
               <li className="flex gap-2"><span className="text-gray-400">3.</span><span className="text-justify">Der Vertrag kann von beiden Seiten ohne Einhaltung einer Kündigungsfrist gekündigt werden.</span></li>
               <li className="flex gap-2"><span className="text-gray-400">4.</span><span className="text-justify">Die Kündigung bedarf zu ihrer Wirksamkeit zwingend der Textform (Brief, Fax, E-Mail).</span></li>
-              <li className="flex gap-2"><span className="text-gray-400">5.</span><span className="text-justify">Der AG gewährt dem DL eine Frist von maximal 3 Tagen zur Organisation der Rückreise sowie während dieser Frist weiterhin Unterkunft und Verpflegung.</span></li>
-              <li className="flex gap-2"><span className="text-gray-400">6.</span><span className="text-justify">Die Abwesenheit des LE am Leistungsort bis zu 7 Tagen lässt den Vertragsbestand unberührt. Ab dem 8. Tag ruht der Vertrag kostenlos.</span></li>
-              <li className="flex gap-2"><span className="text-gray-400">7.</span><span className="text-justify">Bei Beschwerden ist der DL unverzüglich zu informieren. Eine Minderung kann nur erfolgen, wenn der Grund innerhalb von 5 Tagen angezeigt wurde.</span></li>
+              <li className="flex gap-2"><span className="text-gray-400">5.</span><span className="text-justify">Der Auftraggeber gewährt dem Dienstleister eine Frist von maximal 3 Tagen zur Organisation der Rückreise der Betreuungsperson sowie während dieser Frist weiterhin Unterkunft und Verpflegung.</span></li>
+              <li className="flex gap-2"><span className="text-gray-400">6.</span><span className="text-justify">Die Abwesenheit des LE am Leistungsort bis zu 7 Tagen lässt den Vertragsbestand unberührt. Ab dem 8. Tag ruht der Vertrag kostenlos für den AG bis die Betreuung wieder fortgesetzt wird.</span></li>
+              <li className="flex gap-2"><span className="text-gray-400">7.</span><span className="text-justify">Bei Beschwerden über die Erbringung der vereinbarten Leistungen ist der DL unverzüglich zu informieren. Eine Minderung kann nur erfolgen, wenn der Minderungsgrund innerhalb von 5 Tagen angezeigt wurde und zwischen den Parteien unstrittig ist.</span></li>
             </ol>
-            <p className="text-[12px] text-gray-500 mt-2">Geplanter Einsatz-Zeitraum (Rotation): <Fill>{daten.vertragsbeginn} – voraussichtlich {daten.voraussAbreise}</Fill>. Der Vertrag selbst ist täglich kündbar (§ 3.3).</p>
+            <p className="text-[12px] text-gray-500 mt-2 p-2 bg-[#FAF8F4] border-l-2 border-[#B5A184] rounded-r">Geplanter Einsatz-Zeitraum (Rotation): <Fill>{daten.vertragsbeginn} – voraussichtlich {daten.voraussAbreise}</Fill>. Der Vertrag selbst ist täglich kündbar (§ 3.3).</p>
           </section>
 
-          {/* § 4 — mit dynamischem Tagessatz */}
+          {/* § 4 — Vergütung. Punkt 1 mit dynamischem Tagessatz, sonst 1:1
+              Mustervertrag — alle 12 Punkte (vorher nur 8). */}
           <section className="mb-5 print:break-inside-avoid">
             <h2 className="text-[15px] font-bold text-[#6B5444] mb-2 pb-1 border-b border-gray-200">§ 4 Vergütung</h2>
             <ol className="space-y-1.5 text-[13px] leading-relaxed text-gray-700">
               <li className="flex gap-2"><span className="text-gray-400">1.</span><span className="text-justify">Der DL erhält für die vereinbarten Dienstleistungen eine Vergütung von <Fill>{daten.tagessatz}</Fill> pro Tag (Tagessatz) zzgl. einer Reisekostenpauschale i.H.v. EUR 125,00 pro Fahrt.</span></li>
               <li className="flex gap-2"><span className="text-gray-400">2.</span><span className="text-justify">Die Vergütung wird berechnet ab dem Tag der Ankunft der Betreuungsperson am Leistungsort.</span></li>
-              <li className="flex gap-2"><span className="text-gray-400">3.</span><span className="text-justify">Beginnt oder endet die Vertragslaufzeit im Laufe eines Monats, erfolgt eine anteilige Berechnung.</span></li>
-              <li className="flex gap-2"><span className="text-gray-400">4.</span><span className="text-justify">Die Rechnungen werden monatlich zum 15. ausgestellt und sind bis spätestens 7 Tage nach Erhalt zu überweisen.</span></li>
-              <li className="flex gap-2"><span className="text-gray-400">7.</span><span className="text-justify">Der Anreisetag und der Abreisetag werden als volle Dienstleistungstage berechnet.</span></li>
+              <li className="flex gap-2"><span className="text-gray-400">3.</span><span className="text-justify">Beginnt oder endet die Vertragslaufzeit im Laufe eines Monats, erfolgt eine anteilige Berechnung der vereinbarten Vergütung.</span></li>
+              <li className="flex gap-2"><span className="text-gray-400">4.</span><span className="text-justify">Die Rechnungen werden monatlich zum 15. ausgestellt. Der Rechnungsbetrag ist bis spätestens 7 Tage nach Erhalt zu überweisen.</span></li>
+              <li className="flex gap-2"><span className="text-gray-400">5.</span><span className="text-justify">Sollten sich die Betreuungsbedürfnisse der zu betreuenden Person ändern, behält sich der DL das Recht zur Anpassung des Honorars vor.</span></li>
+              <li className="flex gap-2"><span className="text-gray-400">6.</span><span className="text-justify">Im Falle einer Arbeitsunfähigkeit der Betreuungsperson wird für die Zeit der Verhinderung kein Honorar berechnet.</span></li>
+              <li className="flex gap-2"><span className="text-gray-400">7.</span><span className="text-justify">Der Anreisetag und der Abreisetag werden als volle Dienstleistungstage berechnet. Bei einem Personalwechsel wird der volle Tagessatz für beide Betreuungspersonen berechnet.</span></li>
               <li className="flex gap-2"><span className="text-gray-400">8.</span><span className="text-justify">An gesetzlichen Feiertagen wird der doppelte Tagessatz berechnet.</span></li>
               <li className="flex gap-2"><span className="text-gray-400">9.</span><span className="text-justify">In den Sommermonaten Juli und August wird ein Sommerzuschlag von 6,67 € pro Tag berechnet.</span></li>
-              <li className="flex gap-2"><span className="text-gray-400">10.</span><span className="text-justify">Nach aktueller Gesetzeslage ist auf die Dienstleistungen keine gesetzliche Mehrwertsteuer zu entrichten.</span></li>
+              <li className="flex gap-2"><span className="text-gray-400">10.</span><span className="text-justify">Nach der aktuellen Gesetzeslage ist auf die Dienstleistungen des DL keine gesetzliche Mehrwertsteuer zu entrichten.</span></li>
+              <li className="flex gap-2"><span className="text-gray-400">11.</span><span className="text-justify">Bei Zahlungsverzug hat der DL das Recht, Dritte mit der Rechnungsabwicklung zu beauftragen und Verzugszinsen in Höhe von 5 Prozent p. a. über dem jeweiligen Basiszinssatz zu berechnen.</span></li>
+              <li className="flex gap-2"><span className="text-gray-400">12.</span><span className="text-justify">Der DL ist berechtigt, bei ausbleibender Zahlung die Betreuungsperson ersatzlos abreisen zu lassen und den Vertrag außerordentlich fristlos zu kündigen.</span></li>
             </ol>
           </section>
 
           <Paragraphen liste={PARAGRAPHEN_2} />
+
+          {/* Anlage 1 (DSGVO) + Anlage 2 (Leistungsumfang). Im Web als
+              direkt anschließende Sektionen, beim Print mit
+              break-before:page auf neue Seite (wie im Mustervertrag). */}
+          <AnlagenSektion daten={daten} />
         </div>
         </div>
 
