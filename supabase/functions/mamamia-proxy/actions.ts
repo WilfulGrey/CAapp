@@ -414,11 +414,13 @@ const inviteCaregiver: ActionHandler = async (session, variables, deps) => {
   const used = await deps.supabase.countRecentInviteAttempts(
     session.lead_id,
     INVITE_WINDOW_MINUTES,
+    session.job_offer_id,
   );
   if (used >= INVITE_LIMIT) {
     const oldest = await deps.supabase.oldestInviteAttemptWithin(
       session.lead_id,
       INVITE_WINDOW_MINUTES,
+      session.job_offer_id,
     );
     // oldest + window = the moment the oldest row "ages out" of the
     // window, freeing one slot. Anything sooner is undefined-precision.
@@ -455,7 +457,7 @@ const inviteCaregiver: ActionHandler = async (session, variables, deps) => {
   // anyway. Worst case the next attempt re-counts and gets a free slot
   // we already used — drift of 1, same magnitude as the race above.
   try {
-    await deps.supabase.recordInviteAttempt(session.lead_id, id);
+    await deps.supabase.recordInviteAttempt(session.lead_id, id, session.job_offer_id);
   } catch (e) {
     console.warn(
       `[inviteCaregiver][record-failed] lead=${session.lead_id} cg=${id} err=${(e as Error).message}`,
@@ -481,9 +483,10 @@ const getInviteRateState: ActionHandler = async (session, _variables, deps) => {
   const used = await deps.supabase.countRecentInviteAttempts(
     session.lead_id,
     INVITE_WINDOW_MINUTES,
+    session.job_offer_id,
   );
   const oldest = used > 0
-    ? await deps.supabase.oldestInviteAttemptWithin(session.lead_id, INVITE_WINDOW_MINUTES)
+    ? await deps.supabase.oldestInviteAttemptWithin(session.lead_id, INVITE_WINDOW_MINUTES, session.job_offer_id)
     : null;
   const retryAfterSeconds = used >= INVITE_LIMIT && oldest
     ? Math.max(

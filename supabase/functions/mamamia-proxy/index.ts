@@ -262,33 +262,36 @@ function makeRealSupabase(url: string, serviceKey: string): ProxySupabase {
         contract_snapshot: Record<string, unknown> | null;
       }>;
     },
-    async countRecentInviteAttempts(leadId, windowMinutes) {
+    async countRecentInviteAttempts(leadId, windowMinutes, jobOfferId) {
       const cutoff = new Date(Date.now() - windowMinutes * 60_000).toISOString();
+      // Per-job (Multi-Job #2a): count this job's attempts + legacy NULL-job rows.
       const { count, error } = await client
         .from("caregiver_invite_attempts")
         .select("id", { count: "exact", head: true })
         .eq("lead_id", leadId)
-        .gte("attempted_at", cutoff);
+        .gte("attempted_at", cutoff)
+        .or(`mamamia_job_offer_id.eq.${jobOfferId},mamamia_job_offer_id.is.null`);
       if (error) throw new Error(`supabase countRecentInviteAttempts: ${error.message}`);
       return count ?? 0;
     },
-    async oldestInviteAttemptWithin(leadId, windowMinutes) {
+    async oldestInviteAttemptWithin(leadId, windowMinutes, jobOfferId) {
       const cutoff = new Date(Date.now() - windowMinutes * 60_000).toISOString();
       const { data, error } = await client
         .from("caregiver_invite_attempts")
         .select("attempted_at")
         .eq("lead_id", leadId)
         .gte("attempted_at", cutoff)
+        .or(`mamamia_job_offer_id.eq.${jobOfferId},mamamia_job_offer_id.is.null`)
         .order("attempted_at", { ascending: true })
         .limit(1);
       if (error) throw new Error(`supabase oldestInviteAttemptWithin: ${error.message}`);
       const row = (data ?? [])[0] as { attempted_at: string } | undefined;
       return row ? new Date(row.attempted_at) : null;
     },
-    async recordInviteAttempt(leadId, caregiverId) {
+    async recordInviteAttempt(leadId, caregiverId, jobOfferId) {
       const { error } = await client
         .from("caregiver_invite_attempts")
-        .insert({ lead_id: leadId, caregiver_id: caregiverId });
+        .insert({ lead_id: leadId, caregiver_id: caregiverId, mamamia_job_offer_id: jobOfferId });
       if (error) throw new Error(`supabase recordInviteAttempt: ${error.message}`);
     },
   };

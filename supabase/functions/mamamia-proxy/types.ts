@@ -83,26 +83,30 @@ export interface ProxySupabase {
      *  Application nicht (mehr) in listApplications zurückgibt. */
     contract_snapshot: Record<string, unknown> | null;
   }>>;
-  // Used by inviteCaregiver + getInviteRateState. Counts attempts in
-  // rolling time window (most callers: 60 min). Source-of-truth row is
-  // written by inviteCaregiver AFTER Mamamia StoreRequest succeeds.
+  // Used by inviteCaregiver + getInviteRateState. Counts attempts in the
+  // rolling window FOR THE GIVEN JOB (Multi-Job #2a: per-job rate limit, not
+  // per-lead). Includes legacy rows with NULL job (pre-scoping) so they keep
+  // counting until they age out. Source-of-truth row written by
+  // inviteCaregiver AFTER Mamamia StoreRequest succeeds.
   countRecentInviteAttempts(
     leadId: string,
     windowMinutes: number,
+    jobOfferId: number,
   ): Promise<number>;
-  // Returns the timestamp of the oldest attempt within the window, or
-  // null if window is empty. Used to compute retry_after_seconds for
-  // rate-limited responses (= oldest + window - now).
+  // Oldest attempt within the window FOR THE GIVEN JOB (+ legacy NULL), or
+  // null if empty. Used to compute retry_after_seconds (= oldest + window - now).
   oldestInviteAttemptWithin(
     leadId: string,
     windowMinutes: number,
+    jobOfferId: number,
   ): Promise<Date | null>;
-  // Writes a single attempt row. ONLY called after the upstream
-  // Mamamia StoreRequest call succeeds — failed calls do NOT consume
-  // the user's rate quota.
+  // Writes a single attempt row stamped with the current job. ONLY called
+  // after the upstream Mamamia StoreRequest succeeds — failed calls do NOT
+  // consume the user's rate quota.
   recordInviteAttempt(
     leadId: string,
     caregiverId: number,
+    jobOfferId: number,
   ): Promise<void>;
 }
 
