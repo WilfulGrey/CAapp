@@ -94,13 +94,35 @@ const IS_PREVIEW_PATIENT = PREVIEW_PARAM === 'patient';
 const IS_PREVIEW_WARTET = PREVIEW_PARAM === 'wartet';
 const IS_PREVIEW_ANY = IS_PREVIEW_BEWERBUNG || IS_PREVIEW_INTERESSE || IS_PREVIEW_GEBUCHT || IS_PREVIEW_CHAT || IS_PREVIEW_PATIENT || IS_PREVIEW_WARTET;
 
-// Sub-Nav-Link "← Alle meine Einsätze" anzeigen, wenn der Kunde aus der
-// Multi-Job-Übersicht (?preview=jobs) in einen Detail-Preview rein-
-// navigiert ist. Erkannt am ?back=jobs URL-Param.
-const HAS_JOBS_BACK =
-  typeof window !== 'undefined'
-    ? new URLSearchParams(window.location.search).get('back') === 'jobs'
-    : false;
+// Sub-Nav-Zeile mit Job-Kontext (Status-Badge + Zeitraum links) +
+// "Alle Einsätze →" rechts, wenn der Kunde aus der Multi-Job-Übersicht
+// (?preview=jobs) in einen Detail-Preview rein-navigiert ist.
+//
+// URL-Params:
+//   back=jobs                              Sub-Nav anzeigen
+//   status=laufend|geplant|abgeschlossen   Badge
+//   von=01.07.2026                         Start-Datum
+//   bis=12.08.2026                         End-Datum (optional, sonst "offen")
+//   count=4                                Gesamtanzahl Einsätze
+//                                          ("Alle…"-Link nur wenn >1)
+//   abgeschlossen=1                        BookedScreen rendert
+//                                          "Einsatz beendet" statt
+//                                          "Vielen Dank — gerade gebucht"
+function readJobsBackParams() {
+  if (typeof window === 'undefined') return null;
+  const q = new URLSearchParams(window.location.search);
+  if (q.get('back') !== 'jobs') return null;
+  return {
+    status: q.get('status') as 'laufend' | 'geplant' | 'abgeschlossen' | null,
+    von: q.get('von') || '',
+    bis: q.get('bis') || '',
+    count: Number(q.get('count') || '1'),
+    abgeschlossen: q.get('abgeschlossen') === '1',
+  };
+}
+const JOBS_BACK = readJobsBackParams();
+const HAS_JOBS_BACK = JOBS_BACK !== null;
+const IS_EINSATZ_BEENDET = JOBS_BACK?.abgeschlossen === true;
 
 // Feature-Flag: Chat (PflegekraftChat) ist im Backend noch nicht via
 // WhatsApp/caregiver-chat angebunden + Brief-Style-UX wird noch getestet.
@@ -1749,21 +1771,43 @@ const CustomerPortalPage: FC = () => {
             </button>
           </div>
         </div>
-        {/* Sub-Nav: "← Alle meine Einsätze" — nur wenn der Kunde aus der
-            Multi-Job-Übersicht in einen Job rein-navigiert ist (?back=jobs).
-            Logo bleibt oben sichtbar; Rück-Link sitzt darunter als zweite
-            Reihe. Wird später durch das echte Multi-Job-Routing ersetzt. */}
-        {HAS_JOBS_BACK && (
-          <div className="max-w-3xl mx-auto px-4 pb-2.5 -mt-1">
-            <a
-              href="?preview=jobs"
-              className="inline-flex items-center gap-1.5 text-xs font-semibold text-[#8B7355] hover:text-[#6B5444]"
-            >
-              <ArrowLeft className="w-3.5 h-3.5" />
-              Alle meine Einsätze
-            </a>
-          </div>
-        )}
+        {/* Sub-Nav: Einsatz-Kontext (Status + Zeitraum) links, Link zur
+            Einsätze-Übersicht rechts. Logo bleibt darüber sichtbar.
+            Rendert nur wenn ?back=jobs gesetzt (= aus Multi-Job-Übersicht
+            rein-navigiert). Wird später durch das echte Multi-Job-Routing
+            (lead_jobs Tabelle) ersetzt. */}
+        {HAS_JOBS_BACK && JOBS_BACK && (() => {
+          const statusStyle = {
+            laufend: { label: 'Laufend', cls: 'bg-green-50 text-green-700 border-green-200' },
+            geplant: { label: 'Geplant', cls: 'bg-blue-50 text-blue-700 border-blue-200' },
+            abgeschlossen: { label: 'Abgeschlossen', cls: 'bg-gray-100 text-gray-600 border-gray-200' },
+          } as const;
+          const s = JOBS_BACK.status ? statusStyle[JOBS_BACK.status] : null;
+          const zeitraum = JOBS_BACK.bis
+            ? `${JOBS_BACK.von} – ${JOBS_BACK.bis}`
+            : JOBS_BACK.von ? `ab ${JOBS_BACK.von}` : '';
+          return (
+            <div className="max-w-3xl mx-auto px-4 pb-2 -mt-1 flex items-center justify-between gap-3">
+              <div className="flex items-center gap-2 min-w-0">
+                {s && (
+                  <span className={`text-[10px] font-bold border px-1.5 py-0.5 rounded-full flex-shrink-0 ${s.cls}`}>{s.label}</span>
+                )}
+                {zeitraum && (
+                  <span className="text-xs font-semibold text-gray-700 truncate">{zeitraum}</span>
+                )}
+              </div>
+              {JOBS_BACK.count > 1 && (
+                <a
+                  href="?preview=jobs"
+                  className="inline-flex items-center gap-1 text-xs font-semibold text-[#8B7355] hover:text-[#6B5444] flex-shrink-0"
+                >
+                  Alle Einsätze
+                  <ArrowLeft className="w-3 h-3 rotate-180" />
+                </a>
+              )}
+            </div>
+          );
+        })()}
       </nav>
 
       {acceptedApp ? (
@@ -1798,6 +1842,9 @@ const CustomerPortalPage: FC = () => {
                   ? () => setShowSignedContract(true)
                   : undefined
               }
+              // Multi-Job-Vorschau: abgeschlossener Einsatz → Header
+              // "📋 Einsatz beendet" statt "🎊 Vielen Dank gebucht".
+              einsatzBeendet={IS_EINSATZ_BEENDET}
             />
           );
         })()
