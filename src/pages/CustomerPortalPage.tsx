@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, FC } from 'react';
-import { Check, Bell, Phone, AlertCircle, AlertTriangle, ChevronDown, X } from 'lucide-react';
+import { Check, Bell, Phone, AlertCircle, AlertTriangle, ChevronDown, X, ArrowLeft } from 'lucide-react';
 import { Nurse } from '../types';
 import { displayName } from '../components/portal/shared';
 import {
@@ -87,7 +87,20 @@ const IS_PREVIEW_CHAT = PREVIEW_PARAM === 'chat';
 // die Karte sobald entweder Bewerbungen offen sind oder das Profil als
 // gespeichert gilt.
 const IS_PREVIEW_PATIENT = PREVIEW_PARAM === 'patient';
-const IS_PREVIEW_ANY = IS_PREVIEW_BEWERBUNG || IS_PREVIEW_INTERESSE || IS_PREVIEW_GEBUCHT || IS_PREVIEW_CHAT || IS_PREVIEW_PATIENT;
+// Dev-only preview: Profil erfasst, 0 Bewerbungen, 0 Interest → der
+// "ready"-State ("Profil vollständig. Bewerbungen werden für Sie
+// vorbereitet. ✨"). Wird vom Multi-Job-Vorschau (?preview=jobs) als
+// Detail-View für geplante Jobs ohne Bewerbungen genutzt.
+const IS_PREVIEW_WARTET = PREVIEW_PARAM === 'wartet';
+const IS_PREVIEW_ANY = IS_PREVIEW_BEWERBUNG || IS_PREVIEW_INTERESSE || IS_PREVIEW_GEBUCHT || IS_PREVIEW_CHAT || IS_PREVIEW_PATIENT || IS_PREVIEW_WARTET;
+
+// Sub-Nav-Link "← Alle meine Einsätze" anzeigen, wenn der Kunde aus der
+// Multi-Job-Übersicht (?preview=jobs) in einen Detail-Preview rein-
+// navigiert ist. Erkannt am ?back=jobs URL-Param.
+const HAS_JOBS_BACK =
+  typeof window !== 'undefined'
+    ? new URLSearchParams(window.location.search).get('back') === 'jobs'
+    : false;
 
 // Feature-Flag: Chat (PflegekraftChat) ist im Backend noch nicht via
 // WhatsApp/caregiver-chat angebunden + Brief-Style-UX wird noch getestet.
@@ -846,7 +859,13 @@ const CustomerPortalPage: FC = () => {
   // Preview-Modi: beide (bewerbung + interesse) bekommen die Interest-Dummy
   // damit das Szenario "pending Bewerbung UND offenes Interesse" getestet
   // werden kann.
-  const sourceInterests = IS_PREVIEW_ANY ? [PREVIEW_INTEREST as any] : (mmInterests ?? []);
+  // ?preview=wartet simuliert "Profil voll, 0 Bewerbungen, 0 Interest" —
+  // ist der einzige Preview-Mode, der KEINE Interest-Dummy haben soll.
+  const sourceInterests = IS_PREVIEW_WARTET
+    ? []
+    : IS_PREVIEW_ANY
+      ? [PREVIEW_INTEREST as any]
+      : (mmInterests ?? []);
   // Akkumuliere Interest-Origin-IDs aus sourceInterests + Preview-State.
   // Wird in einem Effect synchronisiert (statt direkt in setState im
   // Render) damit React nicht über setState-in-render schreit.
@@ -1730,6 +1749,21 @@ const CustomerPortalPage: FC = () => {
             </button>
           </div>
         </div>
+        {/* Sub-Nav: "← Alle meine Einsätze" — nur wenn der Kunde aus der
+            Multi-Job-Übersicht in einen Job rein-navigiert ist (?back=jobs).
+            Logo bleibt oben sichtbar; Rück-Link sitzt darunter als zweite
+            Reihe. Wird später durch das echte Multi-Job-Routing ersetzt. */}
+        {HAS_JOBS_BACK && (
+          <div className="max-w-3xl mx-auto px-4 pb-2.5 -mt-1">
+            <a
+              href="?preview=jobs"
+              className="inline-flex items-center gap-1.5 text-xs font-semibold text-[#8B7355] hover:text-[#6B5444]"
+            >
+              <ArrowLeft className="w-3.5 h-3.5" />
+              Alle meine Einsätze
+            </a>
+          </div>
+        )}
       </nav>
 
       {acceptedApp ? (
