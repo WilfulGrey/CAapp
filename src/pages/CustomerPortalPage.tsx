@@ -1737,7 +1737,17 @@ const CustomerPortalPage: FC = () => {
           app={acceptedApp}
           onNurseClick={setSelectedNurse}
           vertragSigned={!!signedForm?.signatur}
-          onShowContract={signedForm?.signatur ? () => setShowSignedContract(true) : undefined}
+          // leadId + Token aktivieren den eingebetteten PDF-Viewer im
+          // Vertrag-Milestone (Mustervertrag-Look via /api/contract-pdf).
+          // Wenn das Lead oder der URL-Token fehlt → Fallback Modal mit
+          // React-VertragSignieren (onShowContract).
+          leadId={lead?.id}
+          leadToken={lead?.token ?? undefined}
+          onShowContract={
+            signedForm?.signatur && !(lead?.id && lead?.token)
+              ? () => setShowSignedContract(true)
+              : undefined
+          }
         />
       ) : (
       <>

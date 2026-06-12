@@ -3,6 +3,7 @@ import type { Nurse } from '../../types';
 import type { Application } from './shared';
 import { nurseLevel, displayName, initials } from './shared';
 import { MonatsAufstellung } from './MonatsAufstellung';
+import { KOSTENRECHNER_URL } from '../../lib/leadEvents';
 
 export const BookedScreen: FC<{
   app: Application;
@@ -10,9 +11,16 @@ export const BookedScreen: FC<{
   // Optional: macht den "Vertrag"-Schritt aktiv (öffnet die Signatur-Ansicht).
   onSignContract?: () => void;
   vertragSigned?: boolean;
+  // Wenn gesetzt + vertragSigned, embedden wir das gerenderte PDF
+  // (lib/vertrag.ts → /api/contract-pdf/[leadId]) direkt im Vertrag-
+  // Milestone als <iframe>. Genau die gleiche PDF, die der Kunde + das
+  // Team auch per Mail bekommen — Mustervertrag-Look, 8 Seiten.
+  leadId?: string;
+  leadToken?: string;
   // Optional: öffnet den bereits unterschriebenen Vertrag zur Ansicht (read-only).
+  // Fallback wenn leadId/leadToken nicht gesetzt sind — dann React-Vertrag im Modal.
   onShowContract?: () => void;
-}> = ({ app, onNurseClick, onSignContract, vertragSigned, onShowContract }) => {
+}> = ({ app, onNurseClick, onSignContract, vertragSigned, leadId, leadToken, onShowContract }) => {
   const { nurse, offer } = app;
   const name = displayName(nurse.name);
   const inits = initials(nurse.name);
@@ -94,6 +102,70 @@ export const BookedScreen: FC<{
           const isVertrag = m.title === 'Vertrag';
           const vertragActionable = isVertrag && !!onSignContract && !vertragSigned;
           const vertragDone = isVertrag && vertragSigned;
+
+          // Vertrags-PDF-URL für den eingebetteten Viewer (nur wenn leadId
+          // + Token vorhanden). Server-Route rendert via puppeteer den
+          // schönen Mustervertrag (lib/vertrag.ts → buildVertragAttachmentPdf).
+          // Browser-PDF-Viewer-Hash #toolbar=0&navpanes=0&view=FitH versteckt
+          // die Chrome-Toolbar im iframe, damit's wie ein "Kasten" wirkt.
+          const pdfUrl =
+            vertragDone && leadId && leadToken
+              ? `${KOSTENRECHNER_URL}/api/contract-pdf/${leadId}?token=${encodeURIComponent(leadToken)}`
+              : null;
+
+          // Vertrag-Milestone bekommt einen vergrößerten Block mit PDF-
+          // Vorschau, wenn der Vertrag signiert ist + die PDF-URL bekannt ist.
+          if (vertragDone && pdfUrl) {
+            return (
+              <div key={m.title} className="bg-white border border-[#2A9D5C]/40 rounded-2xl px-4 py-3.5 shadow-sm">
+                <div className="flex items-start gap-3.5 mb-3">
+                  <div className="w-9 h-9 rounded-xl bg-green-50 flex items-center justify-center flex-shrink-0 text-lg">✅</div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 mb-0.5 flex-wrap">
+                      <p className="text-sm font-bold text-gray-800">{m.title}</p>
+                      <span className="text-xs font-bold text-green-700 bg-green-50 border border-green-200 px-2 py-0.5 rounded-full">✓ Unterschrieben</span>
+                    </div>
+                    <p className="text-sm text-gray-500 leading-relaxed">
+                      Ihr unterschriebener Dienstleistungsvertrag. Eine Kopie haben Sie auch per E-Mail erhalten.
+                    </p>
+                  </div>
+                </div>
+
+                {/* Eingebetteter PDF-Viewer ("Vertragskasten"). Höhe so
+                    gewählt, dass auf Desktop ~1 Seite sichtbar ist + Kunde
+                    scrollen kann; auf Mobile ist iframe-PDF-Support
+                    eingeschränkt, daher zusätzlich die beiden Buttons
+                    drunter ("Im neuen Tab" + "Herunterladen"). */}
+                <div className="rounded-xl overflow-hidden border border-gray-200 bg-gray-50">
+                  <iframe
+                    src={`${pdfUrl}#toolbar=0&navpanes=0&view=FitH`}
+                    title="Unterschriebener Betreuungsvertrag"
+                    className="w-full h-[560px] block"
+                    style={{ border: 0 }}
+                  />
+                </div>
+
+                <div className="flex flex-wrap gap-2 mt-3">
+                  <a
+                    href={pdfUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1.5 rounded-xl border border-[#2A9D5C]/40 bg-white hover:bg-green-50 text-[#1f7a45] text-sm font-bold px-4 py-2.5 transition-colors"
+                  >
+                    🔍 Im neuen Tab öffnen
+                  </a>
+                  <a
+                    href={pdfUrl}
+                    download="Betreuungsvertrag_Primundus.pdf"
+                    className="inline-flex items-center gap-1.5 rounded-xl border border-gray-200 bg-white hover:bg-gray-50 text-gray-700 text-sm font-bold px-4 py-2.5 transition-colors"
+                  >
+                    ⬇ Herunterladen
+                  </a>
+                </div>
+              </div>
+            );
+          }
+
           return (
             <div key={m.title} className={`bg-white border rounded-2xl px-4 py-3.5 flex items-start gap-3.5 shadow-sm ${vertragActionable ? 'border-[#2A9D5C]/40' : 'border-gray-200'}`}>
               <div className="w-9 h-9 rounded-xl bg-gray-100 flex items-center justify-center flex-shrink-0 text-lg">
@@ -121,6 +193,8 @@ export const BookedScreen: FC<{
                     Vertrag ansehen &amp; unterschreiben →
                   </button>
                 )}
+                {/* Fallback: wenn keine leadId/Token verfügbar (sollte nicht
+                    passieren, aber Defensive UI) → alter Modal-Weg. */}
                 {vertragDone && onShowContract && (
                   <button onClick={onShowContract}
                     className="mt-2.5 inline-flex items-center gap-1.5 rounded-xl border border-[#2A9D5C]/40 bg-white hover:bg-green-50 text-[#1f7a45] text-sm font-bold px-4 py-2.5 transition-colors">
