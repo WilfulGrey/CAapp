@@ -217,6 +217,7 @@ Deno.test("POST inviteCaregiver with cat=authorization surfaces category in 502 
   // flow auth-category error path (Mamamia returns Unauthorized after
   // the gate has already passed).
   const supabase = {
+    selectLeadJobs: async () => [],
     selectDismissedCaregivers: async () => [],
     upsertDismissedCaregiver: async () => {},
     selectAcceptedApplications: async () => [],
@@ -325,6 +326,7 @@ Deno.test("dismissCaregiver: writes via Supabase adapter, idempotent", async () 
   const cookie = await makeCookie();
   const upsertCalls: Array<{ leadId: string; caregiverId: number; kind: string }> = [];
   const supabase = {
+    selectLeadJobs: async () => [],
     selectDismissedCaregivers: async () => [],
     upsertDismissedCaregiver: async (leadId: string, caregiverId: number, kind: "interest" | "application") => {
       upsertCalls.push({ leadId, caregiverId, kind });
@@ -350,6 +352,7 @@ Deno.test("dismissCaregiver: rejects missing caregiver_id", async () => {
   _resetRateLimit(); _resetAgencyTokenCache();
   const cookie = await makeCookie();
   const supabase = {
+    selectLeadJobs: async () => [],
     selectDismissedCaregivers: async () => [],
     upsertDismissedCaregiver: async () => {},
     selectAcceptedApplications: async () => [],
@@ -368,6 +371,7 @@ Deno.test("dismissCaregiver: rejects bad kind", async () => {
   _resetRateLimit(); _resetAgencyTokenCache();
   const cookie = await makeCookie();
   const supabase = {
+    selectLeadJobs: async () => [],
     selectDismissedCaregivers: async () => [],
     upsertDismissedCaregiver: async () => {},
     selectAcceptedApplications: async () => [],
@@ -387,6 +391,7 @@ Deno.test("listDismissedCaregivers: reads via session.lead_id, returns caregiver
   const cookie = await makeCookie();
   let selectArg: string | null = null;
   const supabase = {
+    selectLeadJobs: async () => [],
     selectDismissedCaregivers: async (leadId: string) => {
       selectArg = leadId;
       return [
@@ -418,6 +423,7 @@ Deno.test("listAcceptedApplications: reads via session.lead_id, returns applicat
   const cookie = await makeCookie();
   let selectArg: string | null = null;
   const supabase = {
+    selectLeadJobs: async () => [],
     selectDismissedCaregivers: async () => [],
     upsertDismissedCaregiver: async () => {},
     selectAcceptedApplications: async (leadId: string) => {
@@ -449,6 +455,7 @@ Deno.test("listAcceptedApplications: empty returns application_ids=[]", async ()
   _resetRateLimit(); _resetAgencyTokenCache();
   const cookie = await makeCookie();
   const supabase = {
+    selectLeadJobs: async () => [],
     selectDismissedCaregivers: async () => [],
     upsertDismissedCaregiver: async () => {},
     selectAcceptedApplications: async () => [],
