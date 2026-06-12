@@ -115,7 +115,7 @@ const PARAGRAPHEN_2: { titel: string; punkte: string[] }[] = [
 const Paragraphen: FC<{ liste: { titel: string; punkte: string[] }[] }> = ({ liste }) => (
   <>
     {liste.map((p) => (
-      <section key={p.titel} className="mb-5">
+      <section key={p.titel} className="mb-5 print:break-inside-avoid">
         <h2 className="text-[15px] font-bold text-[#6B5444] mb-2 pb-1 border-b border-gray-200">{p.titel}</h2>
         <ol className="space-y-1.5">
           {p.punkte.map((t, i) => (
@@ -177,7 +177,18 @@ export const VertragSignieren: FC<{
   };
 
   const inner = (
-      <div className={embedded ? 'bg-white' : 'max-w-2xl mx-auto bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden'}>
+      <div className={`${embedded ? 'bg-white' : 'max-w-2xl mx-auto bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden'} print:max-w-none print:mx-0 print:my-0 print:rounded-none print:border-0 print:shadow-none print:overflow-visible`}>
+        {/* @page rules + Tailwind-Print-Override: A4-Format, sauberer Hintergrund,
+            Page-break-Steuerung. Wirkt nur beim Drucken (Cmd+P → Als PDF speichern). */}
+        <style>{`
+          @media print {
+            @page { size: A4; margin: 18mm 16mm 22mm 16mm; }
+            html, body { background: #fff !important; }
+            /* Browser-default Header/Footer (URL/Datum) wegblenden — Chrome+Safari
+               lassen das nicht aus CSS, daher Hinweis im Dialog; aber das ist
+               OS-Druckdialog-Sache. Hier nur was wir kontrollieren können. */
+          }
+        `}</style>
         {/* Dokument-Kopf */}
         <div className="px-6 sm:px-10 pt-8 pb-6">
           <div className="flex items-start justify-between mb-6">
@@ -190,8 +201,11 @@ export const VertragSignieren: FC<{
           </div>
         </div>
 
-        {/* Eckdaten — immer sichtbar (kompakt) */}
-        <div className="px-6 sm:px-10 py-5 border-t border-gray-100">
+        {/* Eckdaten — UX-Übersicht für den Kunden im Web. Beim Druck (Cmd+P
+            → Als PDF speichern) komplett ausgeblendet, weil der gedruckte
+            Vertrag 1:1 dem statischen Mustervertrag entsprechen muss
+            (kein Eckdaten-Vorblock im Original). */}
+        <div className="px-6 sm:px-10 py-5 border-t border-gray-100 print:hidden">
           <p className="text-[13px] text-gray-600 mb-4">{readOnly ? 'Ihr unterschriebener Betreuungsvertrag — hier sehen Sie alle Eckdaten und den vollständigen Vertragstext.' : 'Ihr Betreuungsvertrag ist bereit. Prüfen Sie die Eckdaten und unterschreiben Sie unten online.'}</p>
           <div className="rounded-xl border border-gray-100 overflow-hidden divide-y divide-gray-100 mb-3">
             <div className="flex items-center justify-between px-4 py-2.5"><span className="text-sm text-gray-500">Auftraggeber</span><span className="text-sm font-semibold text-gray-700 text-right">{daten.ag.name}</span></div>
@@ -205,13 +219,16 @@ export const VertragSignieren: FC<{
           </button>
         </div>
 
-        {vollOffen && (
-        <>
-        {/* Vollständiger Vertrag: Vertragsparteien + §§ */}
+        {/* Vollständiger Vertrag: Vertragsparteien + §§
+            Im Web nur sichtbar wenn vollOffen=true; beim Print IMMER sichtbar
+            (print:block), damit der Kunde beim "Als PDF speichern" auch
+            zugeklappt den vollen Vertrag bekommt. */}
+        <div className={vollOffen ? '' : 'hidden print:block'}>
+        {/* Vertragsparteien */}
         <div className="px-6 sm:px-10 py-6 border-t border-gray-100">
           <p className="text-center text-[12px] text-gray-500 mb-4">geschlossen zwischen den folgenden Vertragsparteien</p>
           {/* Vertragsparteien */}
-          <div className="rounded-xl border border-gray-200 bg-[#FAF8F4] px-4 py-3 mb-3">
+          <div className="rounded-xl border border-gray-200 bg-[#FAF8F4] px-4 py-3 mb-3 print:break-inside-avoid">
             <p className="text-[11px] font-bold tracking-wider text-gray-500 mb-1">AUFTRAGGEBER (AG)</p>
             <ParteiZeile label="Name / Firma" value={daten.ag.name} />
             <ParteiZeile label="Straße + Nr." value={daten.ag.strasse} />
@@ -224,7 +241,7 @@ export const VertragSignieren: FC<{
           </div>
           <p className="text-center text-[12px] text-gray-500 mb-3">im Folgenden <strong>Auftraggeber (AG)</strong> genannt</p>
 
-          <div className="rounded-xl border border-gray-200 bg-[#FAF8F4] px-4 py-3 mb-3">
+          <div className="rounded-xl border border-gray-200 bg-[#FAF8F4] px-4 py-3 mb-3 print:break-inside-avoid">
             <p className="text-[11px] font-bold tracking-wider text-gray-500 mb-1">LEISTUNGSEMPFÄNGER (LE) — FALLS ABWEICHEND VOM AG</p>
             {daten.le ? (
               <>
@@ -242,7 +259,7 @@ export const VertragSignieren: FC<{
           <p className="text-center text-[12px] text-gray-500 mb-3">im Folgenden <strong>Leistungsempfänger (LE)</strong> genannt</p>
           <p className="text-center text-[13px] font-semibold text-gray-600 mb-3">— und —</p>
 
-          <div className="rounded-xl border border-gray-200 bg-[#FAF8F4] px-4 py-3 mb-2">
+          <div className="rounded-xl border border-gray-200 bg-[#FAF8F4] px-4 py-3 mb-2 print:break-inside-avoid">
             <p className="text-[11px] font-bold tracking-wider text-gray-500 mb-1">DIENSTLEISTER (DL)</p>
             <p className="text-[15px] font-bold text-gray-900">PRIMUNDUS Deutschland</p>
             <p className="text-[12px] text-gray-600">VITANAS CARE LTD HOME SK · ul. Poznańska 21/48, 00-685 Warszawa</p>
@@ -256,7 +273,7 @@ export const VertragSignieren: FC<{
           <Paragraphen liste={PARAGRAPHEN} />
 
           {/* § 3 — mit dynamischem Vertragsbeginn */}
-          <section className="mb-5">
+          <section className="mb-5 print:break-inside-avoid">
             <h2 className="text-[15px] font-bold text-[#6B5444] mb-2 pb-1 border-b border-gray-200">§ 3 Vertragsdauer / Vertragskündigung</h2>
             <ol className="space-y-1.5 text-[13px] leading-relaxed text-gray-700">
               <li className="flex gap-2"><span className="text-gray-400">1.</span><span className="text-justify">Der Vertrag beginnt voraussichtlich am <Fill>{daten.vertragsbeginn}</Fill> und wird <Fill>auf unbestimmte Zeit</Fill> geschlossen.</span></li>
@@ -271,7 +288,7 @@ export const VertragSignieren: FC<{
           </section>
 
           {/* § 4 — mit dynamischem Tagessatz */}
-          <section className="mb-5">
+          <section className="mb-5 print:break-inside-avoid">
             <h2 className="text-[15px] font-bold text-[#6B5444] mb-2 pb-1 border-b border-gray-200">§ 4 Vergütung</h2>
             <ol className="space-y-1.5 text-[13px] leading-relaxed text-gray-700">
               <li className="flex gap-2"><span className="text-gray-400">1.</span><span className="text-justify">Der DL erhält für die vereinbarten Dienstleistungen eine Vergütung von <Fill>{daten.tagessatz}</Fill> pro Tag (Tagessatz) zzgl. einer Reisekostenpauschale i.H.v. EUR 125,00 pro Fahrt.</span></li>
@@ -287,11 +304,10 @@ export const VertragSignieren: FC<{
 
           <Paragraphen liste={PARAGRAPHEN_2} />
         </div>
-        </>
-        )}
+        </div>
 
         {/* Unterschrift + Online-Signatur */}
-        <div className="px-6 sm:px-10 py-6 border-t border-gray-100 bg-[#FAFAF9]">
+        <div className="px-6 sm:px-10 py-6 border-t border-gray-100 bg-[#FAFAF9] print:bg-white print:break-inside-avoid">
           <h2 className="text-[15px] font-bold text-[#6B5444] mb-4">Unterschriften</h2>
           <div className="grid grid-cols-2 gap-6 mb-6">
             <div>
@@ -318,7 +334,7 @@ export const VertragSignieren: FC<{
           </div>
 
           {signedAt ? (
-            <div className="rounded-xl border border-green-200 bg-green-50 px-4 py-4">
+            <div className="rounded-xl border border-green-200 bg-green-50 px-4 py-4 print:break-inside-avoid">
               <p className="text-sm font-bold text-green-800 mb-1">✓ Vertrag rechtsverbindlich unterschrieben</p>
               <p className="text-[12px] text-green-700 leading-relaxed">
                 Elektronisch signiert von <strong>{name}</strong>{signedAt && signedAt !== 'bereits unterschrieben' ? <> am <strong>{signedAt}</strong></> : ''}.
@@ -337,7 +353,9 @@ export const VertragSignieren: FC<{
               )}
             </div>
           ) : (
-            <div className="rounded-xl border-2 border-[#8B7355]/30 bg-white px-4 py-4">
+            /* Signatur-Panel ist UI, beim Print nicht relevant (Kunde druckt
+               den fertigen Vertrag, nicht das Unterschrift-Formular). */
+            <div className="rounded-xl border-2 border-[#8B7355]/30 bg-white px-4 py-4 print:hidden">
               <p className="text-sm font-bold text-gray-800 mb-1">Jetzt online unterschreiben</p>
               <p className="text-[12px] text-gray-500 mb-4">Tippen Sie Ihren vollständigen Namen — das gilt als Ihre rechtsverbindliche elektronische Unterschrift.</p>
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-3">
@@ -374,6 +392,6 @@ export const VertragSignieren: FC<{
   );
 
   return embedded ? inner : (
-    <div className="min-h-screen bg-gray-100 py-6 px-3">{inner}</div>
+    <div className="min-h-screen bg-gray-100 py-6 px-3 print:min-h-0 print:bg-white print:py-0 print:px-0">{inner}</div>
   );
 };
