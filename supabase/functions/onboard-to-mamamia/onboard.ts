@@ -13,6 +13,15 @@ import { getOrRefreshAgencyToken, mamamiaRequest } from "../_shared/mamamiaClien
 export interface SupabaseLike {
   fetchLead(token: string): Lead | null | Promise<Lead | null>;
   updateLead(id: string, patch: Partial<Lead>): void | Promise<void>;
+  // Multi-Job (Variant A): resolve a specific job of the lead by its
+  // lead_jobs.id. The leadId filter IS the ownership check — returns null for
+  // an unknown/foreign job_id, so the caller falls back to the lead's default
+  // job (never cross-lead). Optional: a SupabaseLike without it simply ignores
+  // job_id (→ default), keeping old callers / tests working.
+  fetchLeadJob?(
+    jobId: string,
+    leadId: string,
+  ): Promise<{ mamamia_job_offer_id: number } | null>;
 }
 
 // ─── Secrets bundle ─────────────────────────────────────────────────────────
@@ -31,6 +40,10 @@ export interface OnboardSecrets {
 
 export interface OnboardOptions {
   leadToken: string;
+  /** Multi-Job (Variant A): optional lead_jobs.id to scope the session to a
+   *  specific job. Omitted (every old token / magic-link without &job) → the
+   *  lead's default job (lead.mamamia_job_offer_id) — 100% backward compatible. */
+  jobId?: string;
   secrets: OnboardSecrets;
   supabase: SupabaseLike;
   fetchFn?: typeof fetch;
@@ -153,10 +166,33 @@ export function loadPrimundusAgencyId(): number {
   return parsed;
 }
 
+// Multi-Job (Variant A): pick the session's job_offer_id. With no jobId
+// (every old token / link without &job) it's the lead's default job —
+// identical to pre-multi-job behaviour. With a jobId we scope to that
+// lead_jobs row IF it belongs to the lead (ownership via leadId); an
+// unknown/foreign job_id falls back to the default (safe — never cross-lead;
+// robust — stale deep-links don't break the portal).
+async function resolveScopedJobOfferId(
+  supabase: SupabaseLike,
+  leadId: string,
+  defaultJobOfferId: number,
+  jobId: string | undefined,
+): Promise<number> {
+  if (!jobId || !supabase.fetchLeadJob) return defaultJobOfferId;
+  const leadJob = await supabase.fetchLeadJob(jobId, leadId);
+  if (leadJob && Number.isInteger(leadJob.mamamia_job_offer_id)) {
+    return leadJob.mamamia_job_offer_id;
+  }
+  console.warn(
+    `[onboard] job_id ${jobId} not found for lead ${leadId} — falling back to default job`,
+  );
+  return defaultJobOfferId;
+}
+
 // ─── Main flow ─────────────────────────────────────────────────────────────
 
 export async function onboardLead(opts: OnboardOptions): Promise<OnboardResult & { lead_id: string; email: string }> {
-  const { leadToken, secrets, supabase, fetchFn = globalThis.fetch, now = () => new Date() } = opts;
+  const { leadToken, jobId, secrets, supabase, fetchFn = globalThis.fetch, now = () => new Date() } = opts;
 
   // 1. Lookup lead
   const lead = await supabase.fetchLead(leadToken);
@@ -176,7 +212,9 @@ export async function onboardLead(opts: OnboardOptions): Promise<OnboardResult &
   if (lead.mamamia_customer_id && lead.mamamia_job_offer_id) {
     return {
       customer_id: lead.mamamia_customer_id,
-      job_offer_id: lead.mamamia_job_offer_id,
+      job_offer_id: await resolveScopedJobOfferId(
+        supabase, lead.id, lead.mamamia_job_offer_id, jobId,
+      ),
       lead_id: lead.id,
       email: lead.email,
     };
@@ -255,7 +293,9 @@ export async function onboardLead(opts: OnboardOptions): Promise<OnboardResult &
 
   return {
     customer_id: mamamiaCustomerId,
-    job_offer_id: mamamiaJobOfferId,
+    job_offer_id: await resolveScopedJobOfferId(
+      supabase, lead.id, mamamiaJobOfferId, jobId,
+    ),
     lead_id: lead.id,
     email: lead.email,
   };
