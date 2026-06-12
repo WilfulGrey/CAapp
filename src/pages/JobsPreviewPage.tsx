@@ -187,7 +187,10 @@ export const JobsPreviewPage: FC = () => {
               <div className="inline-flex items-center gap-2 rounded-full px-4 py-2" style={{ background: 'rgba(255,255,255,0.15)', border: '1px solid rgba(255,255,255,0.3)' }}>
                 <Check className="w-3.5 h-3.5 flex-shrink-0" strokeWidth={3} style={{ color: 'rgba(255,255,255,0.9)' }} />
                 <span className="text-[14px] font-medium" style={{ color: 'rgba(255,255,255,0.95)' }}>
-                  {jobs.filter(j => j.status === 'laufend').length} laufend · {jobs.filter(j => j.status === 'geplant').length} geplant
+                  {/* Pill summarized: gebucht zählt zu "geplant" (= in der
+                      Zukunft). Im Detail/Karten-Badge bleiben die zwei
+                      Status optisch getrennt (Amber vs Blau). */}
+                  {jobs.filter(j => j.status === 'laufend').length} laufend · {jobs.filter(j => j.status === 'gebucht' || j.status === 'geplant').length} geplant
                 </span>
               </div>
             </div>
