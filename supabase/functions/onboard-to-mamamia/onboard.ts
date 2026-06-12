@@ -179,13 +179,23 @@ async function resolveScopedJobOfferId(
   jobId: string | undefined,
 ): Promise<number> {
   if (!jobId || !supabase.fetchLeadJob) return defaultJobOfferId;
-  const leadJob = await supabase.fetchLeadJob(jobId, leadId);
-  if (leadJob && Number.isInteger(leadJob.mamamia_job_offer_id)) {
-    return leadJob.mamamia_job_offer_id;
+  // Best-effort: job_id only selects WHICH job to show. A lookup failure
+  // (lead_jobs not yet migrated on this env, transient DB error, …) must NOT
+  // break portal entry — onboard is the gateway. Any problem → degrade to the
+  // lead's default job. Old tokens (no job_id) never reach here.
+  try {
+    const leadJob = await supabase.fetchLeadJob(jobId, leadId);
+    if (leadJob && Number.isInteger(leadJob.mamamia_job_offer_id)) {
+      return leadJob.mamamia_job_offer_id;
+    }
+    console.warn(
+      `[onboard] job_id ${jobId} not found for lead ${leadId} — falling back to default job`,
+    );
+  } catch (e) {
+    console.warn(
+      `[onboard] fetchLeadJob failed for ${jobId}/${leadId}: ${(e as Error).message} — falling back to default job`,
+    );
   }
-  console.warn(
-    `[onboard] job_id ${jobId} not found for lead ${leadId} — falling back to default job`,
-  );
   return defaultJobOfferId;
 }
 

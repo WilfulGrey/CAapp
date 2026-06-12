@@ -342,6 +342,18 @@ Deno.test("onboardLead: foreign/unknown job_id → falls back to default (no cro
   assertEquals(result.job_offer_id, 16225); // default — NOT the foreign 77777
 });
 
+Deno.test("onboardLead: fetchLeadJob error → falls back to default (onboard never 500s on job lookup)", async () => {
+  _resetAgencyTokenCache();
+  const base = makeFakeSupabase([makeLead({ ...ONBOARDED })]);
+  // Simulate a DB failure (e.g. lead_jobs not migrated on this env / transient).
+  const supa = { ...base, fetchLeadJob: () => Promise.reject(new Error("lead_jobs table missing")) };
+  const result = await onboardLead({
+    leadToken: "valid-token", jobId: "job-x", secrets: SECRETS, supabase: supa, fetchFn: NO_MAMAMIA, now: NOW,
+  });
+  // Lookup blew up, but onboard still resolved to the lead's default job.
+  assertEquals(result.job_offer_id, 16225);
+});
+
 Deno.test("onboardLead: expired lead token throws", async () => {
   _resetAgencyTokenCache();
   const lead = makeLead({
