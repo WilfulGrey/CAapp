@@ -1,17 +1,21 @@
 import CustomerPortalPage from './pages/CustomerPortalPage';
 import JobsPreviewPage from './pages/JobsPreviewPage';
+import JobsOverviewPage from './pages/JobsOverviewPage';
 
 // Top-level routing via URL-Query (kein React-Router — Single-Page-Portal
-// braucht keinen Overhead). ?preview=jobs öffnet die Multi-Job-Übersicht
-// als Live-Vorschau; alle anderen ?preview=… Werte werden von
-// CustomerPortalPage selbst behandelt (bewerbung/interesse/gebucht/…).
+// braucht keinen Overhead).
+//   ?view=jobs    → ECHTE Multi-Job-Übersicht (onboard + listLeadJobs,
+//                   braucht ?token=…). Karten deep-linken nach ?token&job=…
+//   ?preview=jobs → Design-Mock derselben Übersicht (Mock-Daten, kein Token)
+//   sonst         → CustomerPortalPage (behandelt ?preview=bewerbung/… selbst)
 function App() {
-  const preview =
-    typeof window !== 'undefined'
-      ? new URLSearchParams(window.location.search).get('preview')
-      : null;
+  const params =
+    typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : new URLSearchParams();
 
-  if (preview === 'jobs') {
+  if (params.get('view') === 'jobs') {
+    return <JobsOverviewPage />;
+  }
+  if (params.get('preview') === 'jobs') {
     return <JobsPreviewPage />;
   }
   return <CustomerPortalPage />;

@@ -5,6 +5,24 @@ export interface MamamiaSession {
   job_offer_id: number;
 }
 
+// ─── Multi-Job (Variant A): "Alle meine Einsätze" overview ──────────────────
+// One row of the lead_jobs table as surfaced by the `listLeadJobs` proxy
+// action (returns `{ jobs: LeadJobRow[] }`). Mirrors the edge function's
+// LeadJobRow. `status` is the STORED status; 'laufend' is NOT stored — it is
+// derived client-side via deriveJobDisplayStatus().
+export type LeadJobStoredStatus = 'geplant' | 'gebucht' | 'abgeschlossen' | 'storniert';
+export type LeadJobDisplayStatus = 'laufend' | 'gebucht' | 'geplant' | 'abgeschlossen' | 'storniert';
+
+export interface LeadJobRow {
+  // lead_jobs.id (UUID) — the value that goes into a `?job=<id>` deep link.
+  id: string;
+  mamamia_job_offer_id: number;
+  status: string;
+  anreise: string | null; // ISO date (yyyy-mm-dd) or null
+  abreise: string | null;
+  position: number;
+}
+
 export interface MamamiaJobOffer {
   id: number;
   job_offer_id: string;

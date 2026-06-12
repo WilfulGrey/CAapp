@@ -56,3 +56,53 @@ describe('useMamamiaSession — expired flag (routes expired link → ExpiredLin
     expect(onboardMock).not.toHaveBeenCalled();
   });
 });
+
+describe('useMamamiaSession — Multi-Job (Variant A) job scoping', () => {
+  beforeEach(() => {
+    onboardMock.mockReset();
+    sessionStorage.clear();
+  });
+
+  it('forwards jobId to onboardWithLeadToken', async () => {
+    onboardMock.mockResolvedValue({ session_token: 'jwt', job_offer_id: 42 } as never);
+    const { result } = renderHook(() => useMamamiaSession('tok', 'job-uuid-1'));
+    await waitFor(() => expect(result.current.ready).toBe(true));
+    expect(onboardMock).toHaveBeenCalledWith('tok', 'job-uuid-1');
+  });
+
+  it('omitted jobId → onboard called with undefined (default job)', async () => {
+    onboardMock.mockResolvedValue({ session_token: 'jwt' } as never);
+    const { result } = renderHook(() => useMamamiaSession('tok'));
+    await waitFor(() => expect(result.current.ready).toBe(true));
+    expect(onboardMock).toHaveBeenCalledWith('tok', undefined);
+  });
+
+  it('re-onboards when jobId changes (job swap)', async () => {
+    onboardMock.mockResolvedValue({ session_token: 'jwt' } as never);
+    const { result, rerender } = renderHook(
+      ({ job }: { job: string }) => useMamamiaSession('tok', job),
+      { initialProps: { job: 'job-A' } },
+    );
+    await waitFor(() => expect(result.current.ready).toBe(true));
+    rerender({ job: 'job-B' });
+    await waitFor(() => expect(onboardMock).toHaveBeenCalledTimes(2));
+    expect(onboardMock).toHaveBeenNthCalledWith(1, 'tok', 'job-A');
+    expect(onboardMock).toHaveBeenNthCalledWith(2, 'tok', 'job-B');
+  });
+
+  it('caches per (token, job) — job A and job B sessions do not collide', async () => {
+    onboardMock.mockImplementation((_t: string, job?: string | null) =>
+      Promise.resolve({ session_token: `jwt-${job}`, job_offer_id: job === 'job-A' ? 1 : 2 } as never),
+    );
+    const { result, rerender } = renderHook(
+      ({ job }: { job: string }) => useMamamiaSession('tok', job),
+      { initialProps: { job: 'job-A' } },
+    );
+    await waitFor(() => expect(result.current.session?.job_offer_id).toBe(1));
+    rerender({ job: 'job-B' });
+    await waitFor(() => expect(result.current.session?.job_offer_id).toBe(2));
+    // Both cache buckets written independently.
+    expect(sessionStorage.getItem('mamamia_session:tok:job-A')).toContain('"job_offer_id":1');
+    expect(sessionStorage.getItem('mamamia_session:tok:job-B')).toContain('"job_offer_id":2');
+  });
+});

@@ -125,10 +125,18 @@ export interface OnboardResponse {
   session_token: string;
 }
 
-export async function onboardWithLeadToken(leadToken: string): Promise<OnboardResponse> {
+// Multi-Job (Variant A): the session is scoped to ONE job. `jobId` is a
+// `lead_jobs.id` (UUID) from a `?job=...` deep link — the edge function
+// resolves it to that job's mamamia_job_offer_id, ownership-checked against
+// the lead (a foreign/unknown id silently falls back to the lead's default
+// job). Omitted (every old link / `?token` without `&job`) → default job.
+export async function onboardWithLeadToken(
+  leadToken: string,
+  jobId?: string | null,
+): Promise<OnboardResponse> {
   const result = await postJson<OnboardResponse>(
     '/functions/v1/onboard-to-mamamia',
-    { token: leadToken },
+    jobId ? { token: leadToken, job_id: jobId } : { token: leadToken },
   );
   if (result.session_token) writeSessionToken(result.session_token);
   return result;
@@ -149,6 +157,7 @@ export type ProxyAction =
   | 'getCaregiver'
   | 'searchLocations'
   | 'getInviteRateState'
+  | 'listLeadJobs'
   // writes
   | 'updateCustomer'
   | 'updateJobDescription'
