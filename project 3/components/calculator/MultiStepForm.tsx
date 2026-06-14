@@ -200,6 +200,7 @@ export function MultiStepForm() {
   const [errors, setErrors] = useState({
     name: '',
     email: '',
+    phone: '',
     acceptPrivacy: '',
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -359,7 +360,10 @@ export function MultiStepForm() {
       case 6: return Boolean(state.germanLevel);
       case 7: return Boolean(state.driving);
       case 8: return Boolean(state.gender);
-      case 9: return Boolean(formData.email); // Name ist optional
+      // Step 9 Kontaktformular: Name + E-Mail + Telefon alle drei Pflicht.
+      // Telefon-Plausibilität wird in validateForm() detailliert geprüft;
+      // hier reicht "nicht leer" für die Weiter-Button-Aktivierung.
+      case 9: return Boolean(formData.name.trim() && formData.email.trim() && formData.phone.trim());
       default: return false;
     }
   };
@@ -368,15 +372,33 @@ export function MultiStepForm() {
     const newErrors = {
       name: '',
       email: '',
+      phone: '',
       acceptPrivacy: '',
     };
 
-    // Name ist optional (User-Request 2026-06-06: nur E-Mail Pflichtfeld,
-    // Telefon entfernt) — keine Validierung nötig.
+    // Name + E-Mail + Telefon wieder alle drei Pflicht (Rückrollung der
+    // Änderung vom 06.06.2026). Begründung 14.06.2026: Tel-Quote ist seit
+    // 06.06. von 67 % auf 34 % gefallen, ohne Conversion-Vorteil — der
+    // Lead-Wert leidet, weil das Sales-Team ohne Telefonnummer nicht
+    // nachhaken kann. Daten ohne Telefon können nicht zu Mamamia weiter,
+    // d.h. Pflegekräfte sehen den Lead nicht.
+    if (!formData.name.trim()) {
+      newErrors.name = 'Bitte geben Sie Ihren Namen ein';
+    }
     if (!formData.email.trim()) {
       newErrors.email = 'Bitte geben Sie Ihre E-Mail-Adresse ein';
     } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
       newErrors.email = 'Bitte geben Sie eine gültige E-Mail-Adresse ein';
+    }
+    // Telefon mild geprüft — alles mit ≥6 Ziffern akzeptieren. Lässt
+    // gängige DACH-Formate zu (+49 30 123456, 030/12345, 015123…) und
+    // lehnt klare Fehleingaben ("abc", "1") ab. Strengere Formate hätten
+    // False-Negatives produziert.
+    const phoneDigits = (formData.phone ?? '').replace(/\D/g, '');
+    if (!formData.phone.trim()) {
+      newErrors.phone = 'Bitte geben Sie Ihre Telefonnummer ein';
+    } else if (phoneDigits.length < 6) {
+      newErrors.phone = 'Bitte geben Sie eine gültige Telefonnummer ein';
     }
 
     // Datenschutz-Einwilligung wurde durch Soft-Consent ersetzt (Hinweistext
@@ -384,7 +406,7 @@ export function MultiStepForm() {
     // Checkbox-Validation mehr nötig.
 
     setErrors(newErrors);
-    return !newErrors.email;
+    return !newErrors.name && !newErrors.email && !newErrors.phone;
   };
 
   const handleSubmit = async () => {
@@ -968,12 +990,30 @@ export function MultiStepForm() {
                 </div>
               )}
 
-              {/* Step 9 - Kontaktformular: nur noch E-Mail (Pflicht) +
-                  Name (optional). Telefon entfernt (User-Request 2026-06-06)
-                  — falls später wieder benötigt, formData.phone bleibt im
-                  State erhalten, nur das UI-Feld fehlt. */}
+              {/* Step 9 - Kontaktformular: Name + E-Mail + Telefon alle
+                  drei Pflicht (Rückrollung 14.06.2026 der Änderung vom
+                  06.06.2026). Begründung im validateForm()-Kommentar. */}
               {currentStep === 9 && (
                 <div className="space-y-3">
+                  <div>
+                    <input
+                      type="text"
+                      value={formData.name}
+                      onChange={(e) => {
+                        setFormData({ ...formData, name: e.target.value });
+                        setErrors({ ...errors, name: '' });
+                      }}
+                      onFocus={() => trackFieldFocus('name')}
+                      onBlur={(e) => trackFieldBlur('name', e.target.value)}
+                      className={`w-full px-4 py-2.5 text-base border-2 rounded-full focus:outline-none focus:ring-1 focus:ring-[#8B7355]/40 focus:border-[#8B7355] ${
+                        errors.name ? 'border-red-500' : 'border-[#B8B0A6]'
+                      }`}
+                      placeholder="Name"
+                      autoComplete="name"
+                    />
+                    {errors.name && <p className="text-[11px] text-red-500 mt-1 px-3">{errors.name}</p>}
+                  </div>
+
                   <div>
                     <input
                       type="email"
@@ -995,18 +1035,21 @@ export function MultiStepForm() {
 
                   <div>
                     <input
-                      type="text"
-                      value={formData.name}
+                      type="tel"
+                      value={formData.phone}
                       onChange={(e) => {
-                        setFormData({ ...formData, name: e.target.value });
-                        setErrors({ ...errors, name: '' });
+                        setFormData({ ...formData, phone: e.target.value });
+                        setErrors({ ...errors, phone: '' });
                       }}
-                      onFocus={() => trackFieldFocus('name')}
-                      onBlur={(e) => trackFieldBlur('name', e.target.value)}
-                      className="w-full px-4 py-2.5 text-base border-2 border-[#B8B0A6] rounded-full focus:outline-none focus:ring-1 focus:ring-[#8B7355]/40 focus:border-[#8B7355]"
-                      placeholder="Name (optional)"
-                      autoComplete="name"
+                      onFocus={() => trackFieldFocus('phone')}
+                      onBlur={(e) => trackFieldBlur('phone', e.target.value)}
+                      className={`w-full px-4 py-2.5 text-base border-2 rounded-full focus:outline-none focus:ring-1 focus:ring-[#8B7355]/40 focus:border-[#8B7355] ${
+                        errors.phone ? 'border-red-500' : 'border-[#B8B0A6]'
+                      }`}
+                      placeholder="Telefonnummer"
+                      autoComplete="tel"
                     />
+                    {errors.phone && <p className="text-[11px] text-red-500 mt-1 px-3">{errors.phone}</p>}
                   </div>
                 </div>
               )}

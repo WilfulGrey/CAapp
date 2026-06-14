@@ -118,13 +118,28 @@ export async function POST(request: NextRequest) {
       acceptPrivacy?: boolean;
     } = body;
 
-    // Seit dem Kontaktformular-Umbau ist Name optional — nur E-Mail +
-    // Kalkulation sind Pflicht. Wenn kein Name kommt, fallen alle Mails
-    // (customerGreeting, getAngebotEmailTemplate) auf neutrales „Guten Tag"
-    // zurück, und der Lead wird ohne vorname/nachname/anrede angelegt.
+    // Name + E-Mail + Telefon + Kalkulation alle Pflicht (Rückrollung
+    // 14.06.2026 der Änderung vom 06.06.2026). Begründung: Tel-Quote war
+    // seit 06.06. von 67 % auf 34 % gefallen, ohne Conversion-Vorteil. Ohne
+    // Telefon kann das Team nicht nachhaken + die Daten nicht zu Mamamia
+    // weiterleiten → Pflegekräfte sehen den Lead nicht.
     if (!email || !kalkulation) {
       return NextResponse.json(
         { error: 'E-Mail und Kalkulation erforderlich' },
+        { status: 400 }
+      );
+    }
+    if (!vorname || !vorname.trim()) {
+      return NextResponse.json(
+        { error: 'Name erforderlich' },
+        { status: 400 }
+      );
+    }
+    // Mild geprüft (≥6 Ziffern), siehe MultiStepForm.validateForm()-Kommentar.
+    const phoneDigits = (telefon ?? '').replace(/\D/g, '');
+    if (!telefon || phoneDigits.length < 6) {
+      return NextResponse.json(
+        { error: 'Telefonnummer erforderlich' },
         { status: 400 }
       );
     }
