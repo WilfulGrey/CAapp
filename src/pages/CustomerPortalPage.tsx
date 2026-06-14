@@ -663,7 +663,7 @@ const CustomerPortalPage: FC = () => {
       }
     }
 
-    return merged
+    const langFiltered = merged
       .filter(m => m.is_show !== false)
       // Strikter Sprach-Filter: wenn der Kunde ein Tier gewählt hat UND wir die
       // Stufe der Pflegekraft kennen, muss sie EXAKT der Tier-Stufe entsprechen
@@ -675,11 +675,34 @@ const CustomerPortalPage: FC = () => {
         if (invitedIds.has(m.caregiver.id)) return true;
         return matchesGermanyWish(m.caregiver.germany_skill ?? null, deutschWish);
       })
-      .sort(rankComparator(now))
-      .map(m => ({
-        nurse: mapMatchingToNurse(m, { nowIso, nowYear }),
-        caregiverId: m.caregiver.id,
-      }));
+      .sort(rankComparator(now));
+
+    // Alters-Filter mit Fallback (User-Spec 14.06.): Pflegekräfte > 60 J. nur
+    // anzeigen, wenn sonst zu wenig sichtbar wäre. Unbekanntes Geburtsjahr
+    // läuft durch (defensiv — wer keine Daten hat, könnte jung oder alt sein).
+    // Eingeladene immer drin (sonst würden sie aus der Sicht des Kunden
+    // verschwinden, das wäre verwirrend).
+    const TARGET_VISIBLE = 5;
+    const MAX_AGE = 60;
+    const isTooOld = (yob: number | null): boolean =>
+      yob !== null && (nowYear - yob) > MAX_AGE;
+    const young = langFiltered.filter(m => {
+      if (invitedIds.has(m.caregiver.id)) return true;
+      return !isTooOld(m.caregiver.year_of_birth);
+    });
+    const old = langFiltered.filter(m => {
+      if (invitedIds.has(m.caregiver.id)) return false; // schon im young-bucket
+      return isTooOld(m.caregiver.year_of_birth);
+    });
+    // Wenn der junge Pool < 5, mit Älteren auffüllen (in derselben Rank-Reihenfolge).
+    const ageFiltered = young.length >= TARGET_VISIBLE
+      ? young
+      : [...young, ...old];
+
+    return ageFiltered.map(m => ({
+      nurse: mapMatchingToNurse(m, { nowIso, nowYear }),
+      caregiverId: m.caregiver.id,
+    }));
   })();
 
   // Server-authoritative override for `patientSaved`. Mamamia flips
@@ -2421,7 +2444,10 @@ const CustomerPortalPage: FC = () => {
             status: NurseStatus;
             virtualDeclinedFromInterest: boolean;
           };
-          const pendingNurses: VisibleNurse[] = allVisible.filter(({ status }) => status === 'pending').slice(0, 3);
+          // 14.06.: Cap 3 → 5 (User-Wunsch — mehr Auswahl gleich sichtbar
+          // ohne Scrollen). Das matched die TARGET_VISIBLE=5 im
+          // Alters-Filter-Fallback in effectiveMatched.
+          const pendingNurses: VisibleNurse[] = allVisible.filter(({ status }) => status === 'pending').slice(0, 5);
           // Die Empfehlung (höchste Badge-Bewertung, Score = Erfahrungsjahre +
           // Einsätze) nach ganz oben ziehen — die anderen behalten ihre
           // Reihenfolge. So steht "Empfehlung des Beraters" immer zuoberst.
@@ -2439,7 +2465,15 @@ const CustomerPortalPage: FC = () => {
           return (
             <>
               {hasAnyCard && (
-                <div>
+                /* 14.06.: Karten-Bereich mit leichtem Primundus-Beige-
+                   Hintergrund + Innen-Padding, damit der Pflegekraft-
+                   Auswahl-Bereich visuell als zusammenhängender, wichtiger
+                   Block wirkt (vorher waren die Karten lose auf weißer
+                   Page-Background). Border subtle, nicht aufdringlich. */
+                <div
+                  className="rounded-3xl px-3 py-4 border"
+                  style={{ background: '#FAF8F4', borderColor: '#EAE3D8' }}
+                >
                   <p className="text-[14px] leading-relaxed pb-2 px-1" style={{color:'#3D3D3D'}}>
                     {!patientSaved
                       ? 'Damit sich Pflegekräfte bewerben bzw. Sie diese einladen können, vervollständigen Sie bitte die Patienteninformationen.'
