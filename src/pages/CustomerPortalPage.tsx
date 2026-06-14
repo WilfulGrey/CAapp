@@ -2125,7 +2125,11 @@ const CustomerPortalPage: FC = () => {
             <AlertTriangle className="w-5 h-5 flex-shrink-0 mt-0.5" style={{color:'#D97706'}} />
             <div>
               <p className="text-[15px] font-semibold" style={{color:'#3D3D3D'}}>Achtung: Profil unvollständig</p>
-              <p className="text-[15px] mt-1 leading-relaxed" style={{color:'#8B8B8B'}}>
+              {/* 14.06.: color #8B8B8B → #3D3D3D (war zu hellgrau und schlecht
+                  lesbar). Wir bleiben unterhalb des bold-Headers, daher kein
+                  font-medium hier — Hierarchie bleibt durch das semibold oben
+                  erhalten. */}
+              <p className="text-[15px] mt-1 leading-relaxed" style={{color:'#3D3D3D'}}>
                 Damit Sie Bewerbungen erhalten und Pflegekräfte einladen können, vervollständigen Sie bitte das Patientenprofil hier.
               </p>
             </div>
@@ -2436,10 +2440,7 @@ const CustomerPortalPage: FC = () => {
             <>
               {hasAnyCard && (
                 <div>
-                  {/* Erklärtext (14.06.: 14→15px, color heller-grau→dunkles
-                      Charcoal, font-medium). Vorher wirkte er trotz #3D3D3D
-                      grau und schwer lesbar — User-Feedback. */}
-                  <p className="text-[15px] font-medium leading-relaxed pb-2 px-1" style={{color:'#1F2937'}}>
+                  <p className="text-[14px] leading-relaxed pb-2 px-1" style={{color:'#3D3D3D'}}>
                     {!patientSaved
                       ? 'Damit sich Pflegekräfte bewerben bzw. Sie diese einladen können, vervollständigen Sie bitte die Patienteninformationen.'
                       : 'Tippen Sie auf „Einladen", wenn Ihnen eine Pflegekraft gefällt — die Anfrage geht direkt an die Pflegekraft.'}
