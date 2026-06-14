@@ -1,30 +1,50 @@
 // Client-side ranking for Mamamia matchings ("Passende Pflegekräfte" section).
 //
-// Mamamia returns matchings unordered — frontend ranks. The portal caps the
-// visible list at 5 pending caregivers, so the comparator decides which 5
-// the customer sees first. Hierarchy (top → bottom):
+// Mamamia returns matchings unordered — frontend ranks. Das Portal zeigt
+// max 5 pending Pflegekräfte, daher entscheidet diese Reihenfolge welche
+// fünf der Kunde zuerst sieht.
 //
-//   1. hp_total_jobs > 0  DESC  — caregivers with any prior assignment first.
-//                                  Veteran heuristic — customer trust + faster
-//                                  ramp-up.
-//   2. photo truthy  DESC  — caregivers with a real photo first (retouched
-//                            OR raw avatar). Photo > initials-on-color
-//                            placeholder for trust.
-//   3. available_from ASC  — closest to "now" (null/past = 0ms, future = delta).
-//   4. last_contact_at DESC  — recently-active caregivers respond faster.
-//   5. hp_total_jobs DESC  — numeric tie-breaker inside the "had jobs" bucket.
+// Hierarchie (von oben nach unten, jedes Kriterium ist ein Tie-Breaker
+// für das nächste):
 //
-// Extracted from CustomerPortalPage so the comparator can be unit-tested
-// without rendering the page AND so the test + page can't drift.
+//   1. **Badge-Tier DESC** (Platin > Gold > Silber > Bronze > Starter).
+//      User-Spec 14.06.: „vor allem sortiert nach Badge (bestes zuerst —
+//      also Platin am besten alle)". Score = experienceYears + assignments,
+//      gleiche Berechnung wie nurseLevel() im UI.
+//   2. **Foto vorhanden** DESC (avatar_retouched.aws_url OR avatar.aws_url).
+//      Bild > Initialen-Platzhalter — wirkt vertrauenswürdiger.
+//   3. **Weiblich zuerst** DESC. User-Spec: Mehrheit der Kundschaft
+//      bevorzugt weibliche Pflegekräfte; explizite Wahl nicht gefragt.
+//   4. **Alter ≤ 60** DESC (year_of_birth ≥ nowYear-60). User-Spec
+//      „nicht älter als 60 Jahre" — als Soft-Ranking (nicht Hart-Filter),
+//      damit bei kleinem Pool trotzdem etwas sichtbar bleibt. Unbekanntes
+//      Geburtsjahr wird wie >60 behandelt (defensiv, damit die mit
+//      bekanntem jungem Alter klar oben sind).
+//   5. available_from ASC (Sofort = top).
+//   6. last_contact_at DESC.
+//   7. hp_total_jobs DESC (numerischer Tie-Breaker).
 //
 // Defensive handling:
-//   - hp_total_jobs null/undefined → treated as 0 (no jobs).
-//   - no avatar_retouched AND no raw avatar (both null/empty aws_url) → no photo.
+//   - hp_total_jobs / care_experience null/undefined → 0.
+//   - Avatar mit null aws_url → kein Foto.
+//   - year_of_birth null → wie >60 behandelt.
 
 import type { MamamiaMatching } from './types';
 
+// Badge-Tier: identisch mit nurseLevel() im UI (shared.ts), aber als
+// numerischer Score statt Label. Höher = besser.
+function badgeTierScore(experienceYears: number, assignments: number): number {
+  const score = (experienceYears || 0) + (assignments || 0);
+  if (score >= 26) return 4; // Platin
+  if (score >= 13) return 3; // Gold
+  if (score >= 5)  return 2; // Silber
+  if (score >= 1)  return 1; // Bronze
+  return 0;                  // Starter
+}
+
 export function rankComparator(now: Date) {
   const nowMs = now.getTime();
+  const nowYear = now.getFullYear();
 
   const availMs = (iso: string | null): number => {
     if (!iso) return 0;
@@ -38,34 +58,59 @@ export function rankComparator(now: Date) {
     return Number.isFinite(t) ? t : -Infinity;
   };
 
-  const hasJobs = (m: MamamiaMatching): number =>
-    (m.caregiver.hp_total_jobs ?? 0) > 0 ? 1 : 0;
+  const badge = (m: MamamiaMatching): number => {
+    const cg = m.caregiver;
+    // care_experience ist im Mamamia-Schema ein numerischer String (z.B. "5").
+    const exp = typeof cg.care_experience === 'string'
+      ? Math.max(0, parseInt(cg.care_experience, 10) || 0)
+      : 0;
+    return badgeTierScore(exp, cg.hp_total_jobs ?? 0);
+  };
 
   const hasPhoto = (m: MamamiaMatching): number =>
     (m.caregiver.avatar_retouched?.aws_url || m.caregiver.avatar?.aws_url) ? 1 : 0;
 
-  return (a: MamamiaMatching, b: MamamiaMatching) => {
-    // 1. Prior assignments first.
-    const aj = hasJobs(a);
-    const bj = hasJobs(b);
-    if (aj !== bj) return bj - aj;
+  const isFemale = (m: MamamiaMatching): number =>
+    m.caregiver.gender === 'female' ? 1 : 0;
 
-    // 2. Photo first (within the same jobs-bucket).
+  const isYoung = (m: MamamiaMatching): number => {
+    const yob = m.caregiver.year_of_birth;
+    if (!yob) return 0; // unbekanntes Alter → defensiv wie >60
+    return (nowYear - yob) <= 60 ? 1 : 0;
+  };
+
+  return (a: MamamiaMatching, b: MamamiaMatching) => {
+    // 1. Badge-Tier (Platin > Gold > Silber > Bronze > Starter).
+    const ba = badge(a);
+    const bb = badge(b);
+    if (ba !== bb) return bb - ba;
+
+    // 2. Foto vorhanden.
     const ap = hasPhoto(a);
     const bp = hasPhoto(b);
     if (ap !== bp) return bp - ap;
 
-    // 3. available_from closest to "now".
+    // 3. Weiblich zuerst.
+    const af = isFemale(a);
+    const bf = isFemale(b);
+    if (af !== bf) return bf - af;
+
+    // 4. Alter ≤ 60.
+    const ay = isYoung(a);
+    const by = isYoung(b);
+    if (ay !== by) return by - ay;
+
+    // 5. available_from closest to "now".
     const av = availMs(a.caregiver.available_from);
     const bv = availMs(b.caregiver.available_from);
     if (av !== bv) return av - bv;
 
-    // 4. Most-recently active.
+    // 6. Most-recently active.
     const ac = contactMs(a.caregiver.last_contact_at);
     const bc = contactMs(b.caregiver.last_contact_at);
     if (ac !== bc) return bc - ac;
 
-    // 5. Numeric hp_total_jobs DESC (tie-breaker inside "had jobs" bucket).
+    // 7. Numeric hp_total_jobs DESC.
     const ajn = a.caregiver.hp_total_jobs ?? 0;
     const bjn = b.caregiver.hp_total_jobs ?? 0;
     return bjn - ajn;
