@@ -263,6 +263,11 @@ export const CustomerNurseModal: FC<{
                 )}
               </div>
               <div className="flex-1 min-w-0">
+                {/* 14.06.: Verfügbarkeits-Chip in dieselbe flex-wrap-Zeile
+                    wie Name/Alter/Badge gezogen (war vorher mt-1.5 + eigene
+                    Zeile, was 3-zeilig wirkte). flex-wrap erlaubt umbruch,
+                    falls Mobile-Breite knapp wird. Header-Compact-Modus
+                    blendet ihn weiterhin aus. */}
                 <div className="flex items-center gap-2 flex-wrap">
                   <h2 className={`font-bold text-gray-900 leading-tight transition-all duration-200 ${headerCompact ? 'text-base' : 'text-xl'}`}>{name}</h2>
                   <span className="text-sm text-gray-400 flex-shrink-0">{nurse.age} J.</span>
@@ -274,17 +279,14 @@ export const CustomerNurseModal: FC<{
                   >
                     <span className="text-sm leading-none">{lvl.emoji}</span>{lvl.label}
                   </button>
+                  {!headerCompact && (
+                    <span className={`text-xs font-bold px-2.5 py-0.5 rounded-full border flex-shrink-0 ${
+                      nurse.availableSoon ? 'bg-[#E3F7EF] text-[#22A06B] border-[#B8E8D4]' : 'bg-[#FEF3E2] text-[#B45309] border-[#F9D99A]'
+                    }`}>
+                      {nurse.availability}
+                    </span>
+                  )}
                 </div>
-                {/* Verfügbarkeits-Chip klappt weg im kompakten Header — die
-                    Info ist nach dem ersten Scroll-Schritt eh schon im
-                    Bewusstsein des Kunden. */}
-                {!headerCompact && (
-                  <span className={`inline-block mt-1.5 text-xs font-bold px-2.5 py-1 rounded-full border ${
-                    nurse.availableSoon ? 'bg-[#E3F7EF] text-[#22A06B] border-[#B8E8D4]' : 'bg-[#FEF3E2] text-[#B45309] border-[#F9D99A]'
-                  }`}>
-                    {nurse.availability}
-                  </span>
-                )}
               </div>
               <button onClick={onClose} className="w-8 h-8 rounded-full bg-white/80 flex items-center justify-center shadow-sm flex-shrink-0">
                 <X className="w-4 h-4 text-gray-500" />
