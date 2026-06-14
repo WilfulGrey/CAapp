@@ -647,8 +647,13 @@ export function mapPatientFormToUpdateCustomerInput(
   const ids = opts.existingPatientIds ?? [];
 
   // Customer identity → Mamamia first_name/last_name (panel "Kundenname").
-  // Only set when non-empty so a name-less save never clobbers an existing
-  // Mamamia name with ''. See MappedCustomerPatch.first_name comment.
+  // Seit 14.06.2026 ist `form.name` deprecated — der Name kommt jetzt aus
+  // dem Kostenrechner und wird via onboard-to-mamamia gesetzt. Das Patient-
+  // Form-UI fragt ihn nicht mehr ab, also ist `form.name` praktisch immer
+  // leer und der if-Guard greift. Der Block bleibt für (a) Defensive bei
+  // alten localStorage-Drafts mit gesetztem Wert und (b) Test-Kompatibilität
+  // — die existierenden Tests sind so geschrieben, dass ein gesetzter
+  // form.name das first_name/last_name-Mapping triggert.
   const { vorname, nachname } = splitCustomerName(form.name);
   if (vorname) patch.first_name = vorname;
   if (nachname) patch.last_name = nachname;
@@ -737,8 +742,9 @@ export function mapPatientFormToUpdateCustomerInput(
   const net = yesNoToApi(form.internet);
   if (net) patch.internet = net;
 
-  // Phone — trim + skip empty so a bypassed-validation empty form doesn't
-  // overwrite an existing Customer.phone with ''.
+  // Phone — Seit 14.06.2026 deprecated parallel zu form.name: das Telefon
+  // kommt jetzt aus dem Kostenrechner via onboard-to-mamamia. Block bleibt
+  // defensiv für alte localStorage-Drafts + Test-Kompatibilität.
   //
   // Write to both Customer.phone (top-level) AND customer_contract.phone.
   // The Mamamia panel's contact section renders contract.phone — top-level

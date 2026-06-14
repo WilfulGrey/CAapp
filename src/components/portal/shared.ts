@@ -152,15 +152,17 @@ export interface PatientForm {
   diagnosen: string;
   plz: string; ort: string; haushalt: string; wohnungstyp: string; urbanisierung: string;
   familieNahe: string; pflegedienst: string; internet: string;
-  // Contact: required on step 5.
-  // name: vorbefüllt aus lead.vorname/nachname (vom Kostenrechner). Seit
-  // Kontaktformular Name optional → oft leer; dann hier Pflichtfeld, damit
-  // wir nach dem Patientenbogen den Kunden namentlich ansprechen können.
-  // Wird beim Save in vorname/nachname zurück synct (Bridge → leads-Tabelle).
+  // ─── Kontakt-Daten ehemals auf Step 5 ─────────────────────────────
+  // Rückrollung 14.06.2026: Name + Telefon wurden zurück in den Kostenrechner
+  // verlegt (siehe project 3/components/calculator/MultiStepForm.tsx). Hier
+  // bleiben sie als optionale Felder bestehen, damit:
+  //  - alte localStorage-Drafts mit gesetzten Werten weiterhin laden
+  //  - PatientFormMapper-Tests weiterhin compilen (Mapping zu Mamamia ist
+  //    parallel zur Frontend-Änderung entfernt worden)
+  // Step 5 UI rendert sie NICHT mehr — Lead hat sie schon vom Funnel.
+  /** @deprecated kommt jetzt aus dem Kostenrechner (lead.vorname/nachname). */
   name: string;
-  // phone: prefilled from leads.telefon when the calculator collected it.
-  // Editable. Mapped to Customer.phone via patientFormMapper →
-  // mamamia-proxy.updateCustomer.
+  /** @deprecated kommt jetzt aus dem Kostenrechner (lead.telefon). */
   phone: string;
   // Voraussichtliches Startdatum — optional, ISO YYYY-MM-DD. Wird auf
   // Step 5 (Kontakt) abgefragt. Kann ans Mamamia Customer.arrival_at
@@ -185,4 +187,7 @@ export interface PatientForm {
   wunschGetriebe: string;
 }
 
-export const STEP_LABELS = ['Zur Person', 'Pflegebedarf', 'Wohnsituation', 'Wünsche zur PK', 'Kontakt'];
+// Step 5 hieß "Kontakt" als dort noch Name + Telefon abgefragt wurden.
+// Seit Rückrollung 14.06.2026 fragt Step 5 nur noch das Startdatum ab —
+// Label entsprechend geändert.
+export const STEP_LABELS = ['Zur Person', 'Pflegebedarf', 'Wohnsituation', 'Wünsche zur PK', 'Startdatum'];

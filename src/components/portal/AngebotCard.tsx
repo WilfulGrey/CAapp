@@ -308,11 +308,10 @@ export const AngebotCard: FC<{
       return baseOk;
     }
     if (s === 4) {
-      // Name: mind. zwei Zeichen + sollte aus mind. einem Wort bestehen.
-      // Vor- und/oder Nachname wird beim Save geparst (Bridge syncs in
-      // leads.vorname / leads.nachname).
-      const nameOk = patient.name.trim().length >= 2;
-      return nameOk && isPlausibleGermanPhone(patient.phone) && patient.startDate !== '';
+      // Step 5 prüft nur noch das Startdatum. Name + Telefon kommen seit
+      // 14.06.2026 vom Kostenrechner (Rückrollung der Änderung vom 06.06.,
+      // weil Tel-Quote sonst halbiert war ohne Conversion-Vorteil).
+      return patient.startDate !== '';
     }
     return false;
   };
@@ -1237,13 +1236,18 @@ export const AngebotCard: FC<{
                 </>
               )}
 
-              {/* ── Step 5: Kontakt (Name + Telefonnummer + Startdatum) ── */}
+              {/* ── Step 5: Startdatum (Name + Tel kommen vom Kostenrechner) ──
+                  Rückrollung 14.06.2026: Name- und Telefon-Felder wurden hier
+                  entfernt, weil sie seit 06.06. aus dem Kostenrechner-Funnel
+                  ausgelagert waren — was die Tel-Quote von 67 % auf 34 %
+                  halbiert hat, ohne Conversion-Vorteil. Jetzt fragt Step 5
+                  nur noch das Startdatum ab. */}
               {step === 4 && (
                 <>
                   <div className="rounded-2xl bg-[#FBF6EE] border border-[#E8D9BC] px-4 py-3.5 space-y-1.5">
                     <p className="text-sm font-bold text-[#5C4422]">Jetzt kann es losgehen.</p>
                     <p className="text-sm text-gray-700 leading-relaxed">
-                      Bitte vervollständigen Sie noch Ihre Angaben, damit Sie Pflegekräfte anfragen und Bewerbungen erhalten können – unverbindlich und kostenfrei.
+                      Ein letzter Schritt: Ab wann brauchen Sie die Betreuung? Danach starten wir den Suchlauf.
                     </p>
                   </div>
                   <div>
@@ -1285,34 +1289,6 @@ export const AngebotCard: FC<{
                       </svg>
                     </div>
                     <p className="text-xs text-gray-500 mt-1.5">Wenn noch unklar — eine grobe Schätzung reicht.</p>
-                  </div>
-                  <div>
-                    <label className={labelCls}>Ihr Name <span className="text-red-400">*</span></label>
-                    <input
-                      type="text"
-                      value={patient.name}
-                      onChange={set('name')}
-                      placeholder="Vor- und Nachname"
-                      autoComplete="name"
-                      className={inputCls}
-                    />
-                  </div>
-                  <div>
-                    <label className={labelCls}>Telefonnummer <span className="text-red-400">*</span></label>
-                    <input
-                      type="tel"
-                      value={patient.phone}
-                      onChange={set('phone')}
-                      placeholder="z.B. +49 89 200 000 830"
-                      autoComplete="tel"
-                      inputMode="tel"
-                      className={inputCls}
-                    />
-                    {patient.phone.trim() !== '' && !isPlausibleGermanPhone(patient.phone) && (
-                      <p className="text-xs text-red-500 mt-1.5">
-                        Bitte eine gültige deutsche Telefonnummer eingeben — z.&nbsp;B. <span className="font-mono">+49&nbsp;89&nbsp;200&nbsp;000&nbsp;830</span> oder <span className="font-mono">089&nbsp;200&nbsp;000&nbsp;830</span>.
-                      </p>
-                    )}
                   </div>
                 </>
               )}
