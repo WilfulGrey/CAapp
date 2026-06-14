@@ -2015,17 +2015,16 @@ const CustomerPortalPage: FC = () => {
                   <p className="text-[13px] mt-3 leading-snug" style={{color:'#3D3D3D'}}>zzgl. 125 € Reisekosten pro Strecke, Kost &amp; Logis und Sommerzuschlag 6,67 €/Tag (Juli + Aug.)</p>
                 </div>
 
-                {/* Kalkulation über 7 Wochen — gibt dem Kunden ein konkretes
-                    Gefühl, was monatlich anfällt. Selbe Logik wie in der
-                    Bewerbungs-Übersicht (lib/pricing/monthlyBreakdown), damit
-                    die Zahlen beim Wechsel zur Bewerbung exakt übereinstimmen.
-                    Start = Wunsch-Anreisedatum des Kunden (abgeleitet aus
-                    care_start_timing — Mittelwert des Bereichs), Dauer = 49
-                    Tage. Anreise/Abreisedaten der echten Bewerbung können
-                    abweichen — Hinweis-Text unter der Aufstellung macht das
-                    klar. KEINE Summenzeile, weil "Gesamt" suggeriert eine
-                    feste Vereinbarung — die hier aber noch nicht steht. */}
-                {(() => {
+                {/* Kalkulation über 7 Wochen — DEAKTIVIERT 14.06.2026.
+                    Begründung: zusammen mit dem aufgeklappten "Ihr Angebot"-
+                    Toggle wirkten zwei Klapp-/Detail-Blöcke gleichzeitig
+                    überladen. Die Monats-Aufstellung erscheint später beim
+                    konkreten Bewerbungs-Vergleich (MonatsAufstellung im
+                    AngebotPruefenModal + BookedScreen), wo die Daten zur
+                    realen Pflegekraft auch wirklich passen.
+                    `false &&` lässt den Code intakt für späteres Re-Enable
+                    via Flag / A/B-Test. */}
+                {false && (() => {
                   const timingToDays: Record<string, number> = {
                     'sofort': 0,
                     '1-2-wochen': 10,
@@ -2437,7 +2436,10 @@ const CustomerPortalPage: FC = () => {
             <>
               {hasAnyCard && (
                 <div>
-                  <p className="text-[14px] leading-relaxed pb-2 px-1" style={{color:'#3D3D3D'}}>
+                  {/* Erklärtext (14.06.: 14→15px, color heller-grau→dunkles
+                      Charcoal, font-medium). Vorher wirkte er trotz #3D3D3D
+                      grau und schwer lesbar — User-Feedback. */}
+                  <p className="text-[15px] font-medium leading-relaxed pb-2 px-1" style={{color:'#1F2937'}}>
                     {!patientSaved
                       ? 'Damit sich Pflegekräfte bewerben bzw. Sie diese einladen können, vervollständigen Sie bitte die Patienteninformationen.'
                       : 'Tippen Sie auf „Einladen", wenn Ihnen eine Pflegekraft gefällt — die Anfrage geht direkt an die Pflegekraft.'}

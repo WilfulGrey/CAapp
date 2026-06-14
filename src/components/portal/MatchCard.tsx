@@ -107,7 +107,13 @@ export const MatchCard: FC<{
           : 'border-[#C4B49A] hover:border-[#8B7355] hover:shadow-[0_4px_16px_rgba(139,115,85,0.12)]'
       }`}
     >
-      <div className="px-4 pt-4 pb-3 cursor-pointer active:bg-gray-50" onClick={onNurseClick}>
+      {/* User-Feedback 14.06.: Card-Innenleben war zu dicht zusammen
+          (Name-Badge zu Sprachen-Zeile, Sprachen zur Erfahrung-Zeile,
+          Referenzen-Badge eng). Vertikales Spacing erhöht (mb-1 → mb-2),
+          Top-Padding etwas mehr (pt-4 pb-3 → pt-4 pb-4), Referenzen-Badge
+          locker (px-1.5 py-0.5 → px-2 py-1, gap-0.5 → gap-1, ohne Größe
+          zu ändern). */}
+      <div className="px-4 pt-4 pb-4 cursor-pointer active:bg-gray-50" onClick={onNurseClick}>
         <div className="flex items-center gap-3">
           <div className="flex-shrink-0">
             {nurse.image ? (
@@ -121,7 +127,7 @@ export const MatchCard: FC<{
           </div>
 
           <div className="flex-1 min-w-0">
-            <div className="flex items-start justify-between gap-2 mb-1">
+            <div className="flex items-start justify-between gap-2 mb-2">
               <div className="flex items-baseline gap-1.5 min-w-0">
                 <span className="font-bold text-gray-900 leading-tight">{name}</span>
                 <span className="text-sm text-gray-400 flex-shrink-0">{nurse.age} J.</span>
@@ -133,7 +139,7 @@ export const MatchCard: FC<{
                 </span>
               ); })()}
             </div>
-            <div className="flex items-center gap-2 mb-1">
+            <div className="flex items-center gap-2 mb-2">
               <div className="flex gap-0.5">
                 {bars.map((f, i) => (
                   <div key={i} className={`w-3 h-1.5 rounded-full ${f ? 'bg-[#8B7355]' : 'bg-gray-200'}`} />
@@ -144,9 +150,11 @@ export const MatchCard: FC<{
                 /* Indikator: PK hat Referenzen im Profil (eine PDF, die
                    eine oder mehrere Empfehlungen enthalten kann). Kein
                    eigener Klick-Handler — beim Klick auf die Card öffnet
-                   sich ohnehin das Profil, wo der echte Link steht. */
+                   sich ohnehin das Profil, wo der echte Link steht.
+                   14.06.: gap-0.5→gap-1, px-1.5→px-2, py-0.5→py-1
+                   (Innen-Luft, keine Größe). */
                 <span
-                  className="inline-flex items-center gap-0.5 text-[10px] font-medium text-[#8B7355] bg-[#F8F7F5] border border-[#C4B49A] px-1.5 py-0.5 rounded-full"
+                  className="inline-flex items-center gap-1 text-[10px] font-medium text-[#8B7355] bg-[#F8F7F5] border border-[#C4B49A] px-2 py-1 rounded-full"
                   title="Referenzen im Profil"
                 >
                   <FileText className="w-2.5 h-2.5" />
