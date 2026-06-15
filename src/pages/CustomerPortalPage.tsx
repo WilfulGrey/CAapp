@@ -430,7 +430,12 @@ const CustomerPortalPage: FC = () => {
   // limit=20 is intentional — client-side ranking (see `effectiveMatched`)
   // re-orders the page-1 batch by our own criteria (availability, freshness,
   // experience) rather than relying on Mamamia's server-side `order_by`.
-  const { data: mmMatchings, loading: mmMatchingsLoading, error: mmMatchingsError, refetch: refetchMatchings } = useMatchings({ limit: 20 }, mmReady);
+  // limit=200: deckt aktuelle Mamamia-Pools (max ~110 verfügbare Matches
+  // pro Lead, Stand 14.06.) mit Sicherheitsmarge ab. Vorher limit=20 hat
+  // bei größeren Pools (Krentler: 112 verfügbar) ~80 % der besten PKs
+  // verschluckt. Performance bleibt vertretbar — Mamamia liefert pro
+  // Match einen schlanken Caregiver-Ref ohne avatar-Blob.
+  const { data: mmMatchings, loading: mmMatchingsLoading, error: mmMatchingsError, refetch: refetchMatchings } = useMatchings({ limit: 200 }, mmReady);
   // Mamamia's default listMatchings excludes matchings where is_request=true
   // (already-invited caregivers), so without this second call the invited
   // ones simply vanish from the list after F5 — only their ids would survive
@@ -677,29 +682,60 @@ const CustomerPortalPage: FC = () => {
       })
       .sort(rankComparator(now));
 
-    // Alters-Filter mit Fallback (User-Spec 14.06.): Pflegekräfte > 60 J. nur
-    // anzeigen, wenn sonst zu wenig sichtbar wäre. Unbekanntes Geburtsjahr
-    // läuft durch (defensiv — wer keine Daten hat, könnte jung oder alt sein).
-    // Eingeladene immer drin (sonst würden sie aus der Sicht des Kunden
-    // verschwinden, das wäre verwirrend).
+    // Zwei Hartfilter mit Fallback (User-Spec 14.06.):
+    //   (a) Alter ≤ 60 — wer drüber ist, kommt nur rein wenn sonst <5 sichtbar
+    //   (b) Badge ≥ Silber — Bronze/Starter kommen nur rein wenn sonst <5
+    //
+    // Beide Filter werden NACH dem rankComparator-Sort angewendet, damit die
+    // best-rangierten Kandidaten der jeweiligen Filter-Bucket-Ebene zuerst
+    // kommen. Eingeladene Pflegekräfte umgehen beide Filter (sonst würden
+    // sie aus Kundensicht verschwinden, was verwirrend wäre).
+    //
+    // Unbekanntes Geburtsjahr läuft beim Alters-Filter durch (defensiv —
+    // könnte jung oder alt sein).
     const TARGET_VISIBLE = 5;
     const MAX_AGE = 60;
+    // Badge-Score wie nurseLevel(): experienceYears + assignments, dann
+    //   ≥26 Platin / ≥13 Gold / ≥5 Silber / ≥1 Bronze / sonst Starter.
+    // Filter zielt auf "Silber+" → Score ≥ 5.
+    const MIN_BADGE_SCORE = 5;
     const isTooOld = (yob: number | null): boolean =>
       yob !== null && (nowYear - yob) > MAX_AGE;
+    const badgeScore = (m: typeof langFiltered[number]): number => {
+      const cg = m.caregiver;
+      const exp = typeof cg.care_experience === 'string'
+        ? Math.max(0, parseInt(cg.care_experience, 10) || 0)
+        : 0;
+      return exp + (cg.hp_total_jobs ?? 0);
+    };
+
+    // Stufe 1: Alter ≤ 60
     const young = langFiltered.filter(m => {
       if (invitedIds.has(m.caregiver.id)) return true;
       return !isTooOld(m.caregiver.year_of_birth);
     });
-    const old = langFiltered.filter(m => {
-      if (invitedIds.has(m.caregiver.id)) return false; // schon im young-bucket
+    const ageRest = langFiltered.filter(m => {
+      if (invitedIds.has(m.caregiver.id)) return false;
       return isTooOld(m.caregiver.year_of_birth);
     });
-    // Wenn der junge Pool < 5, mit Älteren auffüllen (in derselben Rank-Reihenfolge).
     const ageFiltered = young.length >= TARGET_VISIBLE
       ? young
-      : [...young, ...old];
+      : [...young, ...ageRest];
 
-    return ageFiltered.map(m => ({
+    // Stufe 2: Badge ≥ Silber (innerhalb des Alters-Buckets)
+    const goodBadge = ageFiltered.filter(m => {
+      if (invitedIds.has(m.caregiver.id)) return true;
+      return badgeScore(m) >= MIN_BADGE_SCORE;
+    });
+    const badgeRest = ageFiltered.filter(m => {
+      if (invitedIds.has(m.caregiver.id)) return false;
+      return badgeScore(m) < MIN_BADGE_SCORE;
+    });
+    const final = goodBadge.length >= TARGET_VISIBLE
+      ? goodBadge
+      : [...goodBadge, ...badgeRest];
+
+    return final.map(m => ({
       nurse: mapMatchingToNurse(m, { nowIso, nowYear }),
       caregiverId: m.caregiver.id,
     }));
