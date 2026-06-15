@@ -18,23 +18,8 @@ export const GET_JOB_OFFER = /* GraphQL */ `
   }
 `;
 
-// Multi-Job sync (Phase 2A): all job offers of a customer → mirrored into
-// lead_jobs. final_confirmation is the "booked" signal; arrival/departure
-// drive abgeschlossen + (frontend-derived) laufend.
-export const GET_CUSTOMER_JOB_OFFERS = /* GraphQL */ `
-  query GetCustomerJobOffers($id: Int!) {
-    Customer(id: $id) {
-      id
-      job_offers {
-        id
-        status
-        arrival_at
-        departure_at
-        final_confirmation { id }
-      }
-    }
-  }
-`;
+// Multi-Job sync query (GET_CUSTOMER_JOB_OFFERS) lives in
+// ../_shared/leadJobsSync.ts — shared with the detect-caregiver-events cron.
 
 // GET_CUSTOMER pulls every field the in-portal patient-form wizard
 // needs to seed itself. Without these we'd silently fall back to the

@@ -13,6 +13,7 @@ import {
   mapHpToBadge,
 } from "../index.ts";
 import { _resetAgencyTokenCache } from "../../_shared/mamamiaClient.ts";
+import type { RawJobOffer } from "../../_shared/leadJobsSync.ts";
 
 // ─── Fixtures ──────────────────────────────────────────────────────────────
 
@@ -63,6 +64,9 @@ interface MamamiaPayload {
   // Sammelt application_ids, für die RejectApplication aufgerufen wurde
   // (Auto-Reject-Tests). Im Dry-Run muss dieser Recorder leer bleiben.
   rejectRecorder?: number[];
+  // Multi-Job background sync: Customer.job_offers, die GetCustomerJobOffers
+  // zurückgibt.
+  jobOffers?: RawJobOffer[];
 }
 
 interface BridgeOptions {
@@ -117,6 +121,14 @@ function makeFetch(mamamia: MamamiaPayload, bridge: BridgeOptions = {}): typeof 
         return new Response(
           JSON.stringify({
             data: { RejectApplication: { id: body.variables.id, rejected_at: "2026-05-25T00:00:00Z", reject_message: body.variables.reject_message } },
+          }),
+          { status: 200, headers: { "Content-Type": "application/json" } },
+        );
+      }
+      if (opName === "GetCustomerJobOffers") {
+        return new Response(
+          JSON.stringify({
+            data: { Customer: { id: body.variables.id, job_offers: mamamia.jobOffers ?? [] } },
           }),
           { status: 200, headers: { "Content-Type": "application/json" } },
         );
@@ -704,4 +716,53 @@ Deno.test("auto-reject LIVE (AUTO_REJECT_ENABLED=true): stale app → Mamamia-Re
   } finally {
     Deno.env.delete("AUTO_REJECT_ENABLED");
   }
+});
+
+Deno.test("batch: background-syncs lead_jobs from Customer.job_offers (Multi-Job)", async () => {
+  resetCaches();
+  const captured: Array<{ leadId: string; jobs: Array<Record<string, unknown>> }> = [];
+  const supabase: DetectSupabase = {
+    ...makeSupabase(VALID_LEAD),
+    upsertLeadJobs(leadId, jobs) {
+      captured.push({ leadId, jobs });
+      return Promise.resolve();
+    },
+  };
+  const res = await handleRequest(makeReq({}), {
+    secrets: SECRETS,
+    supabase,
+    fetchFn: makeFetch({
+      jobOffers: [
+        { id: 16371, status: "search", arrival_at: "2026-06-15 00:00:00", departure_at: null, final_confirmation: null },
+        { id: 16356, status: "on_job", arrival_at: "2099-01-01 00:00:00", departure_at: "2099-12-31 00:00:00", final_confirmation: null },
+        { id: 99999, status: "some_unmapped_state", arrival_at: null, departure_at: null, final_confirmation: null },
+      ],
+    }),
+  });
+  const body = await res.json();
+  assertEquals(res.status, 200);
+  // 2 mapped (search→geplant, on_job→gebucht), 1 unmapped → skipped + logged
+  assertEquals(body.total_lead_jobs_synced, 2);
+  assertEquals(captured.length, 1);
+  assertEquals(captured[0].leadId, VALID_LEAD.id);
+  assertEquals(captured[0].jobs, [
+    { mamamia_job_offer_id: 16371, status: "geplant", anreise: "2026-06-15", abreise: null },
+    { mamamia_job_offer_id: 16356, status: "gebucht", anreise: "2099-01-01", abreise: "2099-12-31" },
+  ]);
+});
+
+Deno.test("batch: no upsertLeadJobs adapter → job sync skipped, no crash", async () => {
+  resetCaches();
+  // makeSupabase fake has NO upsertLeadJobs → the sync block is skipped entirely
+  // (same shape as production before this feature). total stays 0.
+  const res = await handleRequest(makeReq({}), {
+    secrets: SECRETS,
+    supabase: makeSupabase(VALID_LEAD),
+    fetchFn: makeFetch({
+      jobOffers: [{ id: 1, status: "search", arrival_at: null, departure_at: null, final_confirmation: null }],
+    }),
+  });
+  const body = await res.json();
+  assertEquals(res.status, 200);
+  assertEquals(body.total_lead_jobs_synced, 0);
 });
