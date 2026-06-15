@@ -695,10 +695,11 @@ const CustomerPortalPage: FC = () => {
     // könnte jung oder alt sein).
     const TARGET_VISIBLE = 5;
     const MAX_AGE = 60;
-    // Badge-Score wie nurseLevel(): experienceYears + assignments, dann
-    //   ≥26 Platin / ≥13 Gold / ≥5 Silber / ≥1 Bronze / sonst Starter.
-    // Filter zielt auf "Silber+" → Score ≥ 5.
-    const MIN_BADGE_SCORE = 5;
+    // Badge-Score wie nurseLevel(): experienceYears + assignments. Schwellen
+    // 14.06. nach Live-Pool-Analyse angepasst:
+    //   ≥18 Platin / ≥10 Gold / ≥4 Silber / ≥1 Bronze / sonst Starter.
+    // Filter zielt auf "Silber+" → Score ≥ 4.
+    const MIN_BADGE_SCORE = 4;
     const isTooOld = (yob: number | null): boolean =>
       yob !== null && (nowYear - yob) > MAX_AGE;
     const badgeScore = (m: typeof langFiltered[number]): number => {

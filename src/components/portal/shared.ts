@@ -65,9 +65,15 @@ export function nurseLevel(experienceYears: number, assignments: number): {
   cls: string;
 } {
   const score = (experienceYears || 0) + (assignments || 0);
-  if (score >= 26) return { label: 'Platin',  emoji: '🏆', cls: 'bg-amber-50 text-amber-700 border-amber-200' };
-  if (score >= 13) return { label: 'Gold',    emoji: '🥇', cls: 'bg-yellow-50 text-yellow-600 border-yellow-300' };
-  if (score >= 5)  return { label: 'Silber',  emoji: '🥈', cls: 'bg-slate-100 text-slate-500 border-slate-300' };
+  // Schwellen 14.06.2026 angepasst nach Live-Pool-Analyse (144 PKs aus 4 Leads):
+  // Score = experienceYears + hp_total_jobs. Max im Pool war 24, kein Platin
+  // bei alter Schwelle ≥26. Neue Schwellen geben ~10 % Platin (Rarität),
+  // ~30 % Gold (Hauptteil), ~25 % Silber, Rest Bronze/Starter — saubere
+  // Pyramide. WICHTIG: badgeTierScore() in matchingsRanking.ts + Filter-Cut
+  // (MIN_BADGE_SCORE) in CustomerPortalPage.tsx parallel halten.
+  if (score >= 18) return { label: 'Platin',  emoji: '🏆', cls: 'bg-amber-50 text-amber-700 border-amber-200' };
+  if (score >= 10) return { label: 'Gold',    emoji: '🥇', cls: 'bg-yellow-50 text-yellow-600 border-yellow-300' };
+  if (score >= 4)  return { label: 'Silber',  emoji: '🥈', cls: 'bg-slate-100 text-slate-500 border-slate-300' };
   if (score >= 1)  return { label: 'Bronze',  emoji: '🥉', cls: 'bg-amber-50 text-amber-700 border-amber-200' };
   return                  { label: 'Starter', emoji: '⭐', cls: 'bg-gray-100 text-gray-500 border-gray-200' };
 }
