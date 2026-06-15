@@ -35,9 +35,12 @@ import type { MamamiaMatching } from './types';
 // numerischer Score statt Label. Höher = besser.
 function badgeTierScore(experienceYears: number, assignments: number): number {
   const score = (experienceYears || 0) + (assignments || 0);
-  if (score >= 26) return 4; // Platin
-  if (score >= 13) return 3; // Gold
-  if (score >= 5)  return 2; // Silber
+  // Schwellen 1:1 mit nurseLevel() in shared.ts. Live-Pool-Analyse 14.06.
+  // ergab Pool-Max Score=24, alte Platin-Schwelle (≥26) war unerreichbar.
+  // Neue Schwellen: ~10 % Platin / ~30 % Gold / ~25 % Silber / ~14 % Bronze.
+  if (score >= 18) return 4; // Platin
+  if (score >= 10) return 3; // Gold
+  if (score >= 4)  return 2; // Silber
   if (score >= 1)  return 1; // Bronze
   return 0;                  // Starter
 }
