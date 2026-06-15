@@ -36,6 +36,7 @@ import {
   synthesizeAcceptedApplicationFromSnapshot,
 } from '../lib/mamamia/mappers';
 import { mapPatientFormToUpdateCustomerInput, splitCustomerName } from '../lib/mamamia/patientFormMapper';
+import { caregiverBadgeScore, badgeScore as nurseBadgeScore, MIN_BADGE_SCORE } from '../lib/mamamia/badge';
 import { callMamamia, MamamiaError } from '../lib/mamamia/client';
 import { buildMonthlyBreakdown, formatDeDate } from '../lib/pricing/monthlyBreakdown';
 import {
@@ -695,20 +696,12 @@ const CustomerPortalPage: FC = () => {
     // könnte jung oder alt sein).
     const TARGET_VISIBLE = 5;
     const MAX_AGE = 60;
-    // Badge-Score wie nurseLevel(): experienceYears + assignments. Schwellen
-    // 14.06. nach Live-Pool-Analyse angepasst:
-    //   ≥18 Platin / ≥10 Gold / ≥4 Silber / ≥1 Bronze / sonst Starter.
-    // Filter zielt auf "Silber+" → Score ≥ 4.
-    const MIN_BADGE_SCORE = 4;
+    // Badge-Score + Schwellen + "Silber+"-Cut (MIN_BADGE_SCORE): zentrale
+    // Quelle lib/mamamia/badge.ts (geteilt mit nurseLevel + rankComparator).
     const isTooOld = (yob: number | null): boolean =>
       yob !== null && (nowYear - yob) > MAX_AGE;
-    const badgeScore = (m: typeof langFiltered[number]): number => {
-      const cg = m.caregiver;
-      const exp = typeof cg.care_experience === 'string'
-        ? Math.max(0, parseInt(cg.care_experience, 10) || 0)
-        : 0;
-      return exp + (cg.hp_total_jobs ?? 0);
-    };
+    const badgeScore = (m: typeof langFiltered[number]): number =>
+      caregiverBadgeScore(m.caregiver);
 
     // Stufe 1: Alter ≤ 60
     const young = langFiltered.filter(m => {
@@ -2488,7 +2481,7 @@ const CustomerPortalPage: FC = () => {
           // Die Empfehlung (höchste Badge-Bewertung, Score = Erfahrungsjahre +
           // Einsätze) nach ganz oben ziehen — die anderen behalten ihre
           // Reihenfolge. So steht "Empfehlung des Beraters" immer zuoberst.
-          const badgeScore = (n: Nurse) => (n.experienceYears ?? 0) + (n.history?.assignments ?? 0);
+          const badgeScore = (n: Nurse) => nurseBadgeScore(n.experienceYears, n.history?.assignments);
           let bestIdx = -1;
           let bestScore = -Infinity;
           pendingNurses.forEach((p, idx) => {
@@ -2527,7 +2520,7 @@ const CustomerPortalPage: FC = () => {
                       // Erfahrungsjahre + Einsätze (gleiche Formel wie
                       // nurseLevel → höchster Score = bestes Tier). Eine klare
                       // Empfehlung wirkt stärker als zwei.
-                      const badgeScore = (n: Nurse) => (n.experienceYears ?? 0) + (n.history?.assignments ?? 0);
+                      const badgeScore = (n: Nurse) => nurseBadgeScore(n.experienceYears, n.history?.assignments);
                       let recIdx = -1;
                       let recBest = -Infinity;
                       visibleNurses.forEach(({ nurse, status }, idx) => {
