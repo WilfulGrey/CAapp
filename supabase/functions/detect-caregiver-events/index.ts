@@ -17,6 +17,7 @@ import {
 import {
   buildLeadJobRows,
   GET_CUSTOMER_JOB_OFFERS,
+  type LeadJobUpsertRow,
   type RawJobOffer,
   todayISO,
 } from "../_shared/leadJobsSync.ts";
@@ -91,7 +92,7 @@ export interface DetectSupabase {
   // skips the sync entirely (same shape as mamamia-proxy's ProxySupabase).
   upsertLeadJobs?(
     leadId: string,
-    jobs: Array<{ mamamia_job_offer_id: number; status: string; anreise: string | null; abreise: string | null }>,
+    jobs: LeadJobUpsertRow[],
   ): Promise<void>;
 }
 

@@ -21,6 +21,10 @@ export interface LeadJobRow {
   anreise: string | null; // ISO date (yyyy-mm-dd) or null
   abreise: string | null;
   position: number;
+  // Card enrichment (mirrored from Mamamia into lead_jobs by the sync): booked
+  // caregiver name + application count. Null when not applicable.
+  pflegekraft: string | null;
+  bewerbungen: number | null;
 }
 
 export interface MamamiaJobOffer {

@@ -6,11 +6,20 @@
 // which re-onboards the session to that job's job_offer_id.
 
 import { type FC, useMemo } from 'react';
-import { Phone } from 'lucide-react';
+import { Phone, Check } from 'lucide-react';
 import { useMamamiaSession } from '../hooks/useMamamiaSession';
-import { useLeadJobs } from '../lib/mamamia/hooks';
-import type { LeadJobRow, LeadJobDisplayStatus } from '../lib/mamamia/types';
+import { useLeadJobs, useCustomer } from '../lib/mamamia/hooks';
+import type { LeadJobRow, LeadJobDisplayStatus, MamamiaCustomer } from '../lib/mamamia/types';
 import { deriveJobDisplayStatus, sortLeadJobs, formatJobZeitraum } from '../lib/mamamia/leadJobs';
+
+// "Guten Tag, Frau Dachs." — salutation from gender, last name from the
+// Mamamia customer. Falls back to a plain greeting when the name is unknown.
+function greetingFor(c: MamamiaCustomer | null): string {
+  if (!c) return 'Guten Tag.';
+  const sal = c.gender === 'female' ? 'Frau' : c.gender === 'male' ? 'Herr' : '';
+  const name = [sal, c.last_name].filter(Boolean).join(' ').trim();
+  return name ? `Guten Tag, ${name}.` : 'Guten Tag.';
+}
 
 const STATUS_STYLE: Record<LeadJobDisplayStatus, { label: string; badgeCls: string; accentCls: string }> = {
   laufend: { label: 'Laufend', badgeCls: 'bg-green-50 text-green-700 border-green-200', accentCls: 'border-l-green-500' },
@@ -47,16 +56,18 @@ const Frame: FC<{ children: React.ReactNode }> = ({ children }) => (
   </div>
 );
 
-const Hero: FC<{ laufend: number; geplant: number }> = ({ laufend, geplant }) => (
+const Hero: FC<{ greeting: string; laufend: number; geplant: number }> = ({ greeting, laufend, geplant }) => (
   <div className="relative overflow-hidden" style={{ background: 'linear-gradient(135deg, #6B5444 0%, #8B7355 55%, #A18973 100%)' }}>
     <div className="absolute -top-12 -right-12 w-52 h-52 rounded-full" style={{ background: 'rgba(255,255,255,0.06)' }} />
     <div className="absolute -bottom-10 -left-10 w-40 h-40 rounded-full" style={{ background: 'rgba(255,255,255,0.06)' }} />
     <div className="relative max-w-3xl mx-auto px-5 pt-8 pb-3">
+      <p className="text-[15px] font-medium mb-3" style={{ color: 'rgba(255,255,255,0.8)' }}>{greeting}</p>
       <h1 className="text-[1.65rem] font-bold text-white leading-tight mb-2">Ihre Einsätze auf einen Blick</h1>
       <p className="text-[14px] leading-relaxed mb-5" style={{ color: 'rgba(255,255,255,0.8)' }}>
         Ihr laufender Einsatz, geplante Folge-Einsätze und Ihre Historie — alles an einem Ort.
       </p>
       <div className="inline-flex items-center gap-2 rounded-full px-4 py-2" style={{ background: 'rgba(255,255,255,0.15)', border: '1px solid rgba(255,255,255,0.3)' }}>
+        <Check className="w-3.5 h-3.5 flex-shrink-0" strokeWidth={3} style={{ color: 'rgba(255,255,255,0.9)' }} />
         <span className="text-[14px] font-medium" style={{ color: 'rgba(255,255,255,0.95)' }}>
           {laufend} laufend · {geplant} geplant
         </span>
@@ -79,6 +90,15 @@ const JobCard: FC<{ token: string; job: LeadJobRow }> = ({ token, job }) => {
       <div className="flex-1 min-w-0">
         <span className={`inline-block text-[11px] font-bold border px-2 py-0.5 rounded-full ${s.badgeCls} mb-1.5`}>{s.label}</span>
         <p className="text-[15px] font-bold text-gray-900">{formatJobZeitraum(job)}</p>
+        {job.pflegekraft ? (
+          <p className="text-sm text-gray-600 mt-0.5">{job.pflegekraft}</p>
+        ) : display === 'geplant' ? (
+          <p className="text-sm text-gray-500 mt-0.5">
+            {job.bewerbungen && job.bewerbungen > 0
+              ? `${job.bewerbungen} ${job.bewerbungen === 1 ? 'Bewerbung' : 'Bewerbungen'}`
+              : 'Suchlauf läuft — noch keine Bewerbungen'}
+          </p>
+        ) : null}
       </div>
       <span className="text-gray-400 flex-shrink-0 text-lg">›</span>
     </a>
@@ -95,6 +115,7 @@ export const JobsOverviewPage: FC = () => {
   const token = typeof window !== 'undefined' ? new URLSearchParams(window.location.search).get('token') : null;
   const { ready, loading, expired, error } = useMamamiaSession(token);
   const { data: jobs, loading: jobsLoading, error: jobsError } = useLeadJobs(ready);
+  const { data: customer } = useCustomer(ready);
 
   const sorted = useMemo(() => (jobs ? sortLeadJobs(jobs) : []), [jobs]);
   const laufendCount = sorted.filter((j) => deriveJobDisplayStatus(j) === 'laufend').length;
@@ -140,7 +161,7 @@ export const JobsOverviewPage: FC = () => {
 
   return (
     <Frame>
-      <Hero laufend={laufendCount} geplant={geplantCount} />
+      <Hero greeting={greetingFor(customer)} laufend={laufendCount} geplant={geplantCount} />
       <div style={{ background: '#F8F7F5' }}>
         <div className="max-w-3xl mx-auto px-4 py-6">
           <p className="text-xs font-bold text-gray-600 uppercase tracking-wider px-1 mb-2">Ihre Einsätze</p>
