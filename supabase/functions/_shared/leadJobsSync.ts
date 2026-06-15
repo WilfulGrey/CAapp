@@ -16,9 +16,20 @@ export const GET_CUSTOMER_JOB_OFFERS = /* GraphQL */ `
         status
         arrival_at
         departure_at
-        applications_count
         final_confirmation { id caregiver { first_name last_name } }
       }
+    }
+  }
+`;
+
+// Per-job application count. Mamamia does NOT populate JobOffer.applications_count
+// (nor the nested `applications` relation) when reached via Customer.job_offers —
+// both come back null/empty. The only reliable source is this top-level
+// paginated query's `total`, so the sync fetches it per (geplant) job.
+export const GET_JOB_OFFER_APPLICATION_COUNT = /* GraphQL */ `
+  query LeadJobApplicationCount($job_offer_id: Int!) {
+    JobOfferApplicationsWithPagination(job_offer_id: $job_offer_id, limit: 1, page: 1) {
+      total
     }
   }
 `;
@@ -28,7 +39,6 @@ export type RawJobOffer = {
   status?: string | null;
   arrival_at?: string | null;
   departure_at?: string | null;
-  applications_count?: number | null;
   final_confirmation?:
     | { id?: number | null; caregiver?: { first_name?: string | null; last_name?: string | null } | null }
     | null;
@@ -99,8 +109,29 @@ export function buildLeadJobRows(
       anreise: jo.arrival_at ? jo.arrival_at.slice(0, 10) : null,
       abreise: jo.departure_at ? jo.departure_at.slice(0, 10) : null,
       pflegekraft: caregiverName(jo),
-      bewerbungen: typeof jo.applications_count === "number" ? jo.applications_count : null,
+      // Filled per-job by enrichBewerbungen() — buildLeadJobRows is pure (no I/O).
+      bewerbungen: null,
     });
   }
   return { rows, skipped };
+}
+
+// Fill `bewerbungen` for the planned ("geplant") jobs by calling `fetchCount`
+// (a per-job GET_JOB_OFFER_APPLICATION_COUNT, supplied by each caller using its
+// own GraphQL runner). Only geplant jobs get a count — booked/laufend cards show
+// the caregiver instead, abgeschlossen/storniert show nothing. Per-job
+// best-effort: one failing count leaves that job's bewerbungen null, never aborts
+// the whole sync. Mutates rows in place.
+export async function enrichBewerbungen(
+  rows: LeadJobUpsertRow[],
+  fetchCount: (jobOfferId: number) => Promise<number | null>,
+): Promise<void> {
+  for (const row of rows) {
+    if (row.status !== "geplant") continue;
+    try {
+      row.bewerbungen = await fetchCount(row.mamamia_job_offer_id);
+    } catch {
+      // best-effort — leave null
+    }
+  }
 }

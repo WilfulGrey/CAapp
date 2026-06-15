@@ -4,7 +4,9 @@ import type { ActionDeps, ActionHandler, ProxyAction, SessionPayload } from "./t
 import {
   buildLeadJobRows,
   deriveLeadJobStatus,
+  enrichBewerbungen,
   GET_CUSTOMER_JOB_OFFERS,
+  GET_JOB_OFFER_APPLICATION_COUNT,
   type RawJobOffer,
   todayISO,
 } from "../_shared/leadJobsSync.ts";
@@ -538,6 +540,12 @@ async function syncLeadJobsFromMamamia(deps: ActionDeps, session: SessionPayload
   for (const s of skipped) {
     console.warn(`[syncLeadJobs] lead=${session.lead_id} jo=${s.id} unmapped status=${s.raw} — skipped`);
   }
+  await enrichBewerbungen(rows, async (jobOfferId) => {
+    const c = await runGraphQL<{ JobOfferApplicationsWithPagination?: { total?: number | null } | null }>(
+      deps, GET_JOB_OFFER_APPLICATION_COUNT, { job_offer_id: jobOfferId },
+    );
+    return c.JobOfferApplicationsWithPagination?.total ?? null;
+  });
   if (rows.length > 0) await deps.supabase.upsertLeadJobs(session.lead_id, rows);
 }
 

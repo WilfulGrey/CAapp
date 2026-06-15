@@ -67,6 +67,8 @@ interface MamamiaPayload {
   // Multi-Job background sync: Customer.job_offers, die GetCustomerJobOffers
   // zurückgibt.
   jobOffers?: RawJobOffer[];
+  // Per-job application totals (LeadJobApplicationCount), keyed by job_offer_id.
+  jobAppCounts?: Record<number, number>;
 }
 
 interface BridgeOptions {
@@ -130,6 +132,13 @@ function makeFetch(mamamia: MamamiaPayload, bridge: BridgeOptions = {}): typeof 
           JSON.stringify({
             data: { Customer: { id: body.variables.id, job_offers: mamamia.jobOffers ?? [] } },
           }),
+          { status: 200, headers: { "Content-Type": "application/json" } },
+        );
+      }
+      if (opName === "LeadJobApplicationCount") {
+        const total = (mamamia.jobAppCounts ?? {})[body.variables.job_offer_id as number] ?? 0;
+        return new Response(
+          JSON.stringify({ data: { JobOfferApplicationsWithPagination: { total } } }),
           { status: 200, headers: { "Content-Type": "application/json" } },
         );
       }
@@ -733,12 +742,13 @@ Deno.test("batch: background-syncs lead_jobs from Customer.job_offers (Multi-Job
     supabase,
     fetchFn: makeFetch({
       jobOffers: [
-        // geplant with applications → bewerbungen count, no pflegekraft
-        { id: 16371, status: "search", arrival_at: "2026-06-15 00:00:00", departure_at: null, applications_count: 2, final_confirmation: null },
-        // booked → pflegekraft from final_confirmation.caregiver
-        { id: 16356, status: "on_job", arrival_at: "2099-01-01 00:00:00", departure_at: "2099-12-31 00:00:00", applications_count: null, final_confirmation: { id: 1, caregiver: { first_name: "Anna", last_name: "T." } } },
+        // geplant → bewerbungen from the per-job count query, no pflegekraft
+        { id: 16371, status: "search", arrival_at: "2026-06-15 00:00:00", departure_at: null, final_confirmation: null },
+        // booked → pflegekraft from final_confirmation.caregiver (not geplant → no count)
+        { id: 16356, status: "on_job", arrival_at: "2099-01-01 00:00:00", departure_at: "2099-12-31 00:00:00", final_confirmation: { id: 1, caregiver: { first_name: "Anna", last_name: "T." } } },
         { id: 99999, status: "some_unmapped_state", arrival_at: null, departure_at: null, final_confirmation: null },
       ],
+      jobAppCounts: { 16371: 2 },
     }),
   });
   const body = await res.json();
