@@ -59,7 +59,9 @@ export const AppCard: FC<{
             <div className="flex items-start justify-between gap-2 mb-1">
               <div className="flex items-baseline gap-1.5 min-w-0">
                 <p className="text-base font-bold text-gray-900 leading-tight">{name}</p>
-                <span className="text-sm text-gray-400 flex-shrink-0">{nurse.age} J.</span>
+                {nurse.age ? (
+                  <span className="text-sm text-gray-400 flex-shrink-0">{nurse.age} J.</span>
+                ) : null}
               </div>
               {(() => { const lvl = nurseLevel(nurse.experienceYears ?? 0, nurse.history?.assignments ?? 0); return (
                 <span className={`flex items-center gap-1 text-xs font-bold pl-1.5 pr-2.5 py-0.5 rounded-full border flex-shrink-0 ${lvl.cls}`}>
