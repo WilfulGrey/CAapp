@@ -30,20 +30,7 @@
 //   - year_of_birth null → wie >60 behandelt.
 
 import type { MamamiaMatching } from './types';
-
-// Badge-Tier: identisch mit nurseLevel() im UI (shared.ts), aber als
-// numerischer Score statt Label. Höher = besser.
-function badgeTierScore(experienceYears: number, assignments: number): number {
-  const score = (experienceYears || 0) + (assignments || 0);
-  // Schwellen 1:1 mit nurseLevel() in shared.ts. Live-Pool-Analyse 14.06.
-  // ergab Pool-Max Score=24, alte Platin-Schwelle (≥26) war unerreichbar.
-  // Neue Schwellen: ~10 % Platin / ~30 % Gold / ~25 % Silber / ~14 % Bronze.
-  if (score >= 18) return 4; // Platin
-  if (score >= 10) return 3; // Gold
-  if (score >= 4)  return 2; // Silber
-  if (score >= 1)  return 1; // Bronze
-  return 0;                  // Starter
-}
+import { badgeTier, caregiverBadgeScore } from './badge';
 
 export function rankComparator(now: Date) {
   const nowMs = now.getTime();
@@ -61,14 +48,8 @@ export function rankComparator(now: Date) {
     return Number.isFinite(t) ? t : -Infinity;
   };
 
-  const badge = (m: MamamiaMatching): number => {
-    const cg = m.caregiver;
-    // care_experience ist im Mamamia-Schema ein numerischer String (z.B. "5").
-    const exp = typeof cg.care_experience === 'string'
-      ? Math.max(0, parseInt(cg.care_experience, 10) || 0)
-      : 0;
-    return badgeTierScore(exp, cg.hp_total_jobs ?? 0);
-  };
+  const badge = (m: MamamiaMatching): number =>
+    badgeTier(caregiverBadgeScore(m.caregiver));
 
   const hasPhoto = (m: MamamiaMatching): number =>
     (m.caregiver.avatar_retouched?.aws_url || m.caregiver.avatar?.aws_url) ? 1 : 0;

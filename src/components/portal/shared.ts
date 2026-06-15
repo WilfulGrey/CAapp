@@ -6,6 +6,7 @@
 // never from inline seeds.
 
 import type { Nurse } from '../../types';
+import { badgeScore, badgeTier } from '../../lib/mamamia/badge';
 
 // ─── Types ────────────────────────────────────────────────────────────────
 
@@ -52,30 +53,26 @@ export interface NurseStatuses {
 
 // ─── Helpers ──────────────────────────────────────────────────────────────
 
-// Badge tier from a combined score: years of experience + number of
-// completed assignments (equal weighting — 1 Einsatz counts as 1 Jahr).
-// Examples:
-//   1 J. + 4 Eins. = 5 → Bronze
-//   3 J. + 8 Eins. = 11 → Silber
-//   6 J. + 10 Eins. = 16 → Gold
-//   10 J. + 16 Eins. = 26 → Platin
+// Maps the experience badge tier to its UI presentation (label/emoji/colour).
+// Score + thresholds live in lib/mamamia/badge.ts — the single source of truth
+// shared with the matching ranking (rankComparator) and the portal "Silber+"
+// funnel (MIN_BADGE_SCORE). With the current thresholds
+// (Platin ≥18 / Gold ≥10 / Silber ≥4 / Bronze ≥1 / sonst Starter):
+//   1 J. + 3 Eins. = 4  → Silber
+//   6 J. + 4 Eins. = 10 → Gold
+//   12 J. + 6 Eins. = 18 → Platin
 export function nurseLevel(experienceYears: number, assignments: number): {
   label: string;
   emoji: string;
   cls: string;
 } {
-  const score = (experienceYears || 0) + (assignments || 0);
-  // Schwellen 14.06.2026 angepasst nach Live-Pool-Analyse (144 PKs aus 4 Leads):
-  // Score = experienceYears + hp_total_jobs. Max im Pool war 24, kein Platin
-  // bei alter Schwelle ≥26. Neue Schwellen geben ~10 % Platin (Rarität),
-  // ~30 % Gold (Hauptteil), ~25 % Silber, Rest Bronze/Starter — saubere
-  // Pyramide. WICHTIG: badgeTierScore() in matchingsRanking.ts + Filter-Cut
-  // (MIN_BADGE_SCORE) in CustomerPortalPage.tsx parallel halten.
-  if (score >= 18) return { label: 'Platin',  emoji: '🏆', cls: 'bg-amber-50 text-amber-700 border-amber-200' };
-  if (score >= 10) return { label: 'Gold',    emoji: '🥇', cls: 'bg-yellow-50 text-yellow-600 border-yellow-300' };
-  if (score >= 4)  return { label: 'Silber',  emoji: '🥈', cls: 'bg-slate-100 text-slate-500 border-slate-300' };
-  if (score >= 1)  return { label: 'Bronze',  emoji: '🥉', cls: 'bg-amber-50 text-amber-700 border-amber-200' };
-  return                  { label: 'Starter', emoji: '⭐', cls: 'bg-gray-100 text-gray-500 border-gray-200' };
+  switch (badgeTier(badgeScore(experienceYears, assignments))) {
+    case 4:  return { label: 'Platin',  emoji: '🏆', cls: 'bg-amber-50 text-amber-700 border-amber-200' };
+    case 3:  return { label: 'Gold',    emoji: '🥇', cls: 'bg-yellow-50 text-yellow-600 border-yellow-300' };
+    case 2:  return { label: 'Silber',  emoji: '🥈', cls: 'bg-slate-100 text-slate-500 border-slate-300' };
+    case 1:  return { label: 'Bronze',  emoji: '🥉', cls: 'bg-amber-50 text-amber-700 border-amber-200' };
+    default: return { label: 'Starter', emoji: '⭐', cls: 'bg-gray-100 text-gray-500 border-gray-200' };
+  }
 }
 
 export function displayName(fullName: string): string {
