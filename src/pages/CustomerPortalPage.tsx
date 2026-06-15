@@ -1260,7 +1260,9 @@ const CustomerPortalPage: FC = () => {
     // transiently wipes patient description fields for ~5-7s. During that
     // window StoreRequest fails with cat=validation. We hide this from the
     // user: flip optimistic state immediately, retry silently for up to
-    // 30s (6 attempts × 5s), only surface the toast if every retry fails.
+    // 10s (3 attempts × 5s), only surface the toast if every retry fails.
+    // 10s covers the worst-case warm-up (translator wipe + a just-opened job
+    // needing 3-5s); longer just makes a genuine failure feel laggy.
     setStatusOverrides((prev) => {
       const next = new Map(prev);
       next.set(id, 'invited');
@@ -1273,7 +1275,7 @@ const CustomerPortalPage: FC = () => {
     }
 
     const RETRY_DELAY_MS = 5000;
-    const MAX_ATTEMPTS = 6;
+    const MAX_ATTEMPTS = 3;
     let lastErr: Error | null = null;
 
     for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
@@ -1315,7 +1317,7 @@ const CustomerPortalPage: FC = () => {
         // still being processed server-side (translator + permission cache
         // warm-up). Retry only this exact shape — other auth failures
         // (genuine permission denial, expired session, etc.) also surface
-        // as cat=authorization, but those won't resolve in 30s either and
+        // as cat=authorization, but those won't resolve in 10s either and
         // delaying the toast is the lesser evil vs spamming a confused user.
         const isRaceShape = err instanceof MamamiaError && err.category === 'authorization';
         if (!isRaceShape) break;
@@ -1399,7 +1401,7 @@ const CustomerPortalPage: FC = () => {
     });
 
     const RETRY_DELAY_MS = 5000;
-    const MAX_ATTEMPTS = 6;
+    const MAX_ATTEMPTS = 3;
     let lastErr: Error | null = null;
 
     for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
