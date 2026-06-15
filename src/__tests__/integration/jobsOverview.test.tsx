@@ -33,6 +33,8 @@ function row(p: Partial<LeadJobRow>): LeadJobRow {
     anreise: p.anreise ?? null,
     abreise: p.abreise ?? null,
     position: p.position ?? 0,
+    pflegekraft: p.pflegekraft ?? null,
+    bewerbungen: p.bewerbungen ?? null,
   };
 }
 
@@ -88,6 +90,35 @@ describe('JobsOverviewPage (?view=jobs)', () => {
     // otherwise we can race the optimistic loading→ready transition.
     await waitFor(() => expect(callMock).toHaveBeenCalledWith('listLeadJobs', {}));
     expect(await screen.findByText(/keine Einsätze hinterlegt/i, undefined, FIND)).toBeInTheDocument();
+  });
+
+  it('enriches cards (Pflegekraft / Bewerbungen) + greets the customer', async () => {
+    setUrl('/?token=tok123&view=jobs');
+    onboardMock.mockResolvedValue({ session_token: 'jwt', job_offer_id: 1, customer_id: 1 } as never);
+    callMock.mockImplementation((action: string) =>
+      Promise.resolve(
+        action === 'getCustomer'
+          ? { Customer: { last_name: 'Dachs', gender: 'female' } }
+          : {
+              jobs: [
+                // wide window → laufend; shows the booked Pflegekraft
+                row({ id: 'booked', status: 'gebucht', anreise: '2000-01-01', abreise: '2999-01-01', pflegekraft: 'Anna T.' }),
+                row({ id: 'plan-apps', status: 'geplant', anreise: '2026-08-01', abreise: null, bewerbungen: 2 }),
+                row({ id: 'plan-empty', status: 'geplant', anreise: '2026-09-01', abreise: null, bewerbungen: null }),
+              ],
+            },
+      ) as never,
+    );
+
+    render(<JobsOverviewPage />);
+
+    // Booked job → caregiver name on the card
+    expect(await screen.findByText('Anna T.', undefined, FIND)).toBeInTheDocument();
+    // geplant with applications → count; without → Suchlauf-Hinweis
+    expect(screen.getByText('2 Bewerbungen')).toBeInTheDocument();
+    expect(screen.getByText(/Suchlauf läuft/i)).toBeInTheDocument();
+    // Personalised greeting from getCustomer (gender → salutation)
+    expect(await screen.findByText('Guten Tag, Frau Dachs.', undefined, FIND)).toBeInTheDocument();
   });
 
   it('expired token → shows expired message (onboard 401)', async () => {

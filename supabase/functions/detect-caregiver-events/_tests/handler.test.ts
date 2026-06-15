@@ -13,7 +13,7 @@ import {
   mapHpToBadge,
 } from "../index.ts";
 import { _resetAgencyTokenCache } from "../../_shared/mamamiaClient.ts";
-import type { RawJobOffer } from "../../_shared/leadJobsSync.ts";
+import type { LeadJobUpsertRow, RawJobOffer } from "../../_shared/leadJobsSync.ts";
 
 // ─── Fixtures ──────────────────────────────────────────────────────────────
 
@@ -720,7 +720,7 @@ Deno.test("auto-reject LIVE (AUTO_REJECT_ENABLED=true): stale app → Mamamia-Re
 
 Deno.test("batch: background-syncs lead_jobs from Customer.job_offers (Multi-Job)", async () => {
   resetCaches();
-  const captured: Array<{ leadId: string; jobs: Array<Record<string, unknown>> }> = [];
+  const captured: Array<{ leadId: string; jobs: LeadJobUpsertRow[] }> = [];
   const supabase: DetectSupabase = {
     ...makeSupabase(VALID_LEAD),
     upsertLeadJobs(leadId, jobs) {
@@ -733,8 +733,10 @@ Deno.test("batch: background-syncs lead_jobs from Customer.job_offers (Multi-Job
     supabase,
     fetchFn: makeFetch({
       jobOffers: [
-        { id: 16371, status: "search", arrival_at: "2026-06-15 00:00:00", departure_at: null, final_confirmation: null },
-        { id: 16356, status: "on_job", arrival_at: "2099-01-01 00:00:00", departure_at: "2099-12-31 00:00:00", final_confirmation: null },
+        // geplant with applications → bewerbungen count, no pflegekraft
+        { id: 16371, status: "search", arrival_at: "2026-06-15 00:00:00", departure_at: null, applications_count: 2, final_confirmation: null },
+        // booked → pflegekraft from final_confirmation.caregiver
+        { id: 16356, status: "on_job", arrival_at: "2099-01-01 00:00:00", departure_at: "2099-12-31 00:00:00", applications_count: null, final_confirmation: { id: 1, caregiver: { first_name: "Anna", last_name: "T." } } },
         { id: 99999, status: "some_unmapped_state", arrival_at: null, departure_at: null, final_confirmation: null },
       ],
     }),
@@ -746,8 +748,8 @@ Deno.test("batch: background-syncs lead_jobs from Customer.job_offers (Multi-Job
   assertEquals(captured.length, 1);
   assertEquals(captured[0].leadId, VALID_LEAD.id);
   assertEquals(captured[0].jobs, [
-    { mamamia_job_offer_id: 16371, status: "geplant", anreise: "2026-06-15", abreise: null },
-    { mamamia_job_offer_id: 16356, status: "gebucht", anreise: "2099-01-01", abreise: "2099-12-31" },
+    { mamamia_job_offer_id: 16371, status: "geplant", anreise: "2026-06-15", abreise: null, pflegekraft: null, bewerbungen: 2 },
+    { mamamia_job_offer_id: 16356, status: "gebucht", anreise: "2099-01-01", abreise: "2099-12-31", pflegekraft: "Anna T.", bewerbungen: null },
   ]);
 });
 

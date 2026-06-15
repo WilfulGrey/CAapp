@@ -89,8 +89,8 @@ const NOOP_FETCH = (async () => new Response("{}")) as typeof fetch;
 
 Deno.test("listLeadJobs: returns the lead's jobs, queried by session.lead_id", async () => {
   const jobs: LeadJobRow[] = [
-    { id: "j1", mamamia_job_offer_id: 100, status: "geplant", anreise: null, abreise: null, position: 0 },
-    { id: "j2", mamamia_job_offer_id: 200, status: "gebucht", anreise: "2026-07-01", abreise: "2026-09-01", position: 0 },
+    { id: "j1", mamamia_job_offer_id: 100, status: "geplant", anreise: null, abreise: null, position: 0, pflegekraft: null, bewerbungen: 2 },
+    { id: "j2", mamamia_job_offer_id: 200, status: "gebucht", anreise: "2026-07-01", abreise: "2026-09-01", position: 0, pflegekraft: "Anna T.", bewerbungen: null },
   ];
   const { state, adapter } = makeFakeSupabase({ invites: [], jobs });
   const result = await ACTIONS.listLeadJobs(SESSION, {}, makeDeps(NOOP_FETCH, adapter));
@@ -132,7 +132,7 @@ Deno.test("listLeadJobs: syncs Customer.job_offers → upsert with derived statu
     { id: 400, status: "cancelled_weird", arrival_at: null, departure_at: null, final_confirmation: null },
   ] } } });
   const { state, adapter } = makeFakeSupabase({ invites: [], jobs: [
-    { id: "x", mamamia_job_offer_id: 100, status: "geplant", anreise: null, abreise: null, position: 0 },
+    { id: "x", mamamia_job_offer_id: 100, status: "geplant", anreise: null, abreise: null, position: 0, pflegekraft: null, bewerbungen: null },
   ] });
   const result = await ACTIONS.listLeadJobs(SESSION, {}, makeDeps(fetchFn, adapter));
   const ups = (state.upsertedLeadJobs ?? [])[0];
@@ -145,7 +145,7 @@ Deno.test("listLeadJobs: syncs Customer.job_offers → upsert with derived statu
 Deno.test("listLeadJobs: sync failure is best-effort — still returns existing rows", async () => {
   const fetchFn: typeof fetch = () => { throw new Error("Mamamia down"); };
   const { adapter } = makeFakeSupabase({ invites: [], jobs: [
-    { id: "x", mamamia_job_offer_id: 100, status: "geplant", anreise: null, abreise: null, position: 0 },
+    { id: "x", mamamia_job_offer_id: 100, status: "geplant", anreise: null, abreise: null, position: 0, pflegekraft: null, bewerbungen: null },
   ] });
   const result = await ACTIONS.listLeadJobs(SESSION, {}, makeDeps(fetchFn, adapter));
   assertEquals((result as { jobs: LeadJobRow[] }).jobs.length, 1); // read succeeded despite sync throw

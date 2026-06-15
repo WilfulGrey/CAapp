@@ -17,6 +17,8 @@ function job(p: Partial<LeadJobRow>): LeadJobRow {
     anreise: p.anreise ?? null,
     abreise: p.abreise ?? null,
     position: p.position ?? 0,
+    pflegekraft: p.pflegekraft ?? null,
+    bewerbungen: p.bewerbungen ?? null,
   };
 }
 

@@ -206,7 +206,7 @@ function makeRealSupabase(url: string, serviceKey: string): ProxySupabase {
       // status for display; this is just a stable default order.
       const { data, error } = await client
         .from("lead_jobs")
-        .select("id, mamamia_job_offer_id, status, anreise, abreise, position")
+        .select("id, mamamia_job_offer_id, status, anreise, abreise, position, pflegekraft, bewerbungen")
         .eq("lead_id", leadId)
         .order("position", { ascending: false })
         .order("anreise", { ascending: true, nullsFirst: false });

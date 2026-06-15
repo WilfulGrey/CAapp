@@ -1,4 +1,5 @@
 import type { SessionPayload } from "../_shared/sessionTypes.ts";
+import type { LeadJobUpsertRow } from "../_shared/leadJobsSync.ts";
 
 export type { SessionPayload };
 
@@ -39,6 +40,10 @@ export interface LeadJobRow {
   anreise: string | null;
   abreise: string | null;
   position: number;
+  // Card enrichment (Design-Parität): booked caregiver name / application count,
+  // mirrored from Mamamia by the sync. Null when not applicable.
+  pflegekraft: string | null;
+  bewerbungen: number | null;
 }
 
 // Minimal Supabase client interface used by dismissCaregiver /
@@ -57,7 +62,7 @@ export interface ProxySupabase {
   // on existing. Optional so test fakes that don't exercise sync can skip it.
   upsertLeadJobs?(
     leadId: string,
-    jobs: Array<{ mamamia_job_offer_id: number; status: string; anreise: string | null; abreise: string | null }>,
+    jobs: LeadJobUpsertRow[],
   ): Promise<void>;
   // Multi-Job #2b: dismissals are PER JOB (mamamia_job_offer_id). Legacy rows
   // were backfilled to the lead's then-only job, so reads filter on the exact
