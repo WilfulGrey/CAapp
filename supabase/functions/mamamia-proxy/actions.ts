@@ -2,9 +2,18 @@ import { mamamiaRequest } from "../_shared/mamamiaClient.ts";
 import { loginAsAgency, panelMutateAsCustomer } from "../_shared/mamamiaPanelClient.ts";
 import type { ActionDeps, ActionHandler, ProxyAction, SessionPayload } from "./types.ts";
 import {
+  buildLeadJobRows,
+  deriveLeadJobStatus,
+  GET_CUSTOMER_JOB_OFFERS,
+  type RawJobOffer,
+  todayISO,
+} from "../_shared/leadJobsSync.ts";
+// Re-export so existing importers (e.g. _tests/actions.test.ts) keep working
+// after the derivation moved to _shared.
+export { deriveLeadJobStatus };
+import {
   GET_CAREGIVER,
   GET_CUSTOMER,
-  GET_CUSTOMER_JOB_OFFERS,
   GET_JOB_OFFER,
   LIST_APPLICATIONS,
   LIST_INTERESTS,
@@ -516,54 +525,18 @@ const getInviteRateState: ActionHandler = async (session, _variables, deps) => {
 // Phase-2 sync). The 'laufend' status is derived in the frontend.
 // ─── Multi-Job sync (Phase 2A): lead_jobs ← Mamamia Customer.job_offers ─────
 
-type RawJobOffer = {
-  id?: number | null;
-  status?: string | null;
-  arrival_at?: string | null;
-  departure_at?: string | null;
-  final_confirmation?: { id?: number | null } | null;
-};
-
-// Defensive lead_jobs.status derivation from a Mamamia JobOffer. KNOWN cases
-// only; an unmapped JobOffer.status returns null → the caller SKIPS the job and
-// LOGS the raw value, so we tune from real data (esp. cancellation → storniert)
-// rather than mislabeling a job as active. 'laufend' is NOT produced here — the
-// frontend derives it from (gebucht + anreise <= today < abreise).
-export function deriveLeadJobStatus(
-  jo: RawJobOffer,
-  todayISO: string,
-): { status: string | null; raw: string | null } {
-  const raw = jo.status ?? null;
-  const dep = (jo.departure_at ?? "").slice(0, 10);
-  if (dep && dep < todayISO) return { status: "abgeschlossen", raw };
-  if (jo.final_confirmation?.id || jo.status === "on_job") return { status: "gebucht", raw };
-  if (jo.status === "search") return { status: "geplant", raw };
-  return { status: null, raw }; // unmapped (incl. cancellation) → skip + log
-}
-
 // Pull the customer's job offers from Mamamia and mirror them into lead_jobs.
-// Best-effort — callers wrap this; a sync failure must never break the read.
+// Derivation + row-building live in _shared/leadJobsSync.ts (shared with the
+// detect-caregiver-events background cron). Best-effort — callers wrap this; a
+// sync failure must never break the read.
 async function syncLeadJobsFromMamamia(deps: ActionDeps, session: SessionPayload): Promise<void> {
   if (!deps.supabase?.upsertLeadJobs) return;
   const r = await runGraphQL<{ Customer: { job_offers?: RawJobOffer[] | null } | null }>(
     deps, GET_CUSTOMER_JOB_OFFERS, { id: session.customer_id },
   );
-  const offers = r.Customer?.job_offers ?? [];
-  const today = new Date().toISOString().slice(0, 10);
-  const rows: Array<{ mamamia_job_offer_id: number; status: string; anreise: string | null; abreise: string | null }> = [];
-  for (const jo of offers) {
-    if (typeof jo.id !== "number") continue;
-    const { status, raw } = deriveLeadJobStatus(jo, today);
-    if (!status) {
-      console.warn(`[syncLeadJobs] lead=${session.lead_id} jo=${jo.id} unmapped status=${raw} — skipped`);
-      continue;
-    }
-    rows.push({
-      mamamia_job_offer_id: jo.id,
-      status,
-      anreise: jo.arrival_at ? jo.arrival_at.slice(0, 10) : null,
-      abreise: jo.departure_at ? jo.departure_at.slice(0, 10) : null,
-    });
+  const { rows, skipped } = buildLeadJobRows(r.Customer?.job_offers ?? [], todayISO());
+  for (const s of skipped) {
+    console.warn(`[syncLeadJobs] lead=${session.lead_id} jo=${s.id} unmapped status=${s.raw} — skipped`);
   }
   if (rows.length > 0) await deps.supabase.upsertLeadJobs(session.lead_id, rows);
 }

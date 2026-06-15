@@ -15,6 +15,12 @@ import {
   mamamiaRequest,
 } from "../_shared/mamamiaClient.ts";
 import {
+  buildLeadJobRows,
+  GET_CUSTOMER_JOB_OFFERS,
+  type RawJobOffer,
+  todayISO,
+} from "../_shared/leadJobsSync.ts";
+import {
   type ApplicationNode,
   type CaregiverNode,
   type InterestNode,
@@ -79,6 +85,14 @@ export interface DetectSupabase {
   // ist beim Versand also ≤15 Min alt und damit gültig. Liefert Anzahl
   // aktualisierter Rows.
   refreshReminderPhotos(leadId: string, photoByCaregiver: Map<number, string>): Promise<number>;
+  // Multi-Job (Phase 2A): mirror the customer's Mamamia job_offers into
+  // lead_jobs (keyed lead_id + mamamia_job_offer_id). Optional so test fakes
+  // that don't exercise the job sync can skip it — and when absent, detect()
+  // skips the sync entirely (same shape as mamamia-proxy's ProxySupabase).
+  upsertLeadJobs?(
+    leadId: string,
+    jobs: Array<{ mamamia_job_offer_id: number; status: string; anreise: string | null; abreise: string | null }>,
+  ): Promise<void>;
 }
 
 export interface DetectResult {
@@ -90,6 +104,9 @@ export interface DetectResult {
   // 48h-Auto-Reject (PR: feat/auto-reject-48h-dryrun). auto_rejected zählt
   // tatsächlich (oder im Dry-Run: hypothetisch) abgelehnte Bewerbungen.
   auto_rejected: number;
+  // Multi-Job (Phase 2A): wie viele lead_jobs-Zeilen aus Mamamias
+  // Customer.job_offers gespiegelt wurden (0 wenn kein Adapter / kein Sync).
+  lead_jobs_synced: number;
 }
 
 export interface BatchResult {
@@ -100,6 +117,7 @@ export interface BatchResult {
   total_skipped_no_caregiver_data: number;
   total_bridge_errors: number;
   total_auto_rejected: number;
+  total_lead_jobs_synced: number;
   per_lead_errors: number;
 }
 
@@ -163,6 +181,7 @@ async function handleBatch(deps: HandlerDeps): Promise<Response> {
     total_skipped_no_caregiver_data: 0,
     total_bridge_errors: 0,
     total_auto_rejected: 0,
+    total_lead_jobs_synced: 0,
     per_lead_errors: 0,
   };
 
@@ -178,6 +197,7 @@ async function handleBatch(deps: HandlerDeps): Promise<Response> {
       batch.total_skipped_no_caregiver_data += r.skipped_no_caregiver_data;
       batch.total_bridge_errors += r.bridge_errors;
       batch.total_auto_rejected += r.auto_rejected;
+      batch.total_lead_jobs_synced += r.lead_jobs_synced;
     } catch (e) {
       console.error(`detect lead ${lead.id} threw:`, (e as Error).message);
       batch.per_lead_errors += 1;
@@ -314,7 +334,37 @@ export async function detect(
     console.error(`refreshReminderPhotos failed (lead ${lead.id}):`, e instanceof Error ? e.message : String(e));
   }
 
-  return { lead_id: lead.id, ...counts };
+  // Multi-Job (Phase 2A): mirror this customer's Mamamia job_offers into
+  // lead_jobs in the background, so the "Alle meine Einsätze" overview stays
+  // warm without relying on the customer opening it (the on-demand sync in
+  // mamamia-proxy/listLeadJobs is a top-up on top of this). Reuses the agency
+  // token already fetched above. Best-effort — must NEVER break caregiver-event
+  // detection (the cron's primary job). Skipped when the adapter has no
+  // upsertLeadJobs or the lead isn't linked to a Mamamia customer.
+  let lead_jobs_synced = 0;
+  if (lead.mamamia_customer_id && supabase.upsertLeadJobs) {
+    try {
+      const jr = await mamamiaRequest<{ Customer: { job_offers?: RawJobOffer[] | null } | null }>({
+        endpoint: secrets.mamamiaEndpoint,
+        token: agencyToken,
+        query: GET_CUSTOMER_JOB_OFFERS,
+        variables: { id: lead.mamamia_customer_id },
+        fetchFn: fetcher,
+      });
+      const { rows, skipped } = buildLeadJobRows(jr.Customer?.job_offers ?? [], todayISO());
+      for (const s of skipped) {
+        console.warn(`[detect][leadJobs] lead=${lead.id} jo=${s.id} unmapped status=${s.raw} — skipped`);
+      }
+      if (rows.length > 0) {
+        await supabase.upsertLeadJobs(lead.id, rows);
+        lead_jobs_synced = rows.length;
+      }
+    } catch (e) {
+      console.warn(`[detect][leadJobs] lead=${lead.id} sync failed: ${e instanceof Error ? e.message : String(e)}`);
+    }
+  }
+
+  return { lead_id: lead.id, ...counts, lead_jobs_synced };
 }
 
 // ─── 48h Auto-Reject ───────────────────────────────────────────────────────
@@ -682,6 +732,16 @@ function makeRealSupabase(url: string, serviceKey: string): DetectSupabase {
         updated += 1;
       }
       return updated;
+    },
+    async upsertLeadJobs(leadId, jobs) {
+      if (jobs.length === 0) return;
+      const { error } = await client
+        .from("lead_jobs")
+        .upsert(
+          jobs.map((j) => ({ lead_id: leadId, ...j })),
+          { onConflict: "lead_id,mamamia_job_offer_id" },
+        );
+      if (error) throw new Error(`supabase upsertLeadJobs: ${error.message}`);
     },
   };
 }
