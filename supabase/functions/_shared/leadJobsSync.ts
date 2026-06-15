@@ -7,10 +7,28 @@
 // Keeping the derivation here means tuning the mapping (e.g. adding a
 // cancellation → storniert case) updates both call sites at once.
 
+// One Customer fetch serves two purposes for detect-caregiver-events: the
+// job_offers (multi-job scan set + lead_jobs mirror) AND the identity fields
+// for the reverse-sync (team edits in Mamamia → leads, see buildLeadIdentityPatch).
+// The identity fields are harmless for mamamia-proxy's listLeadJobs (it ignores
+// them). Op name stays GetCustomerJobOffers so existing test-mock routing holds.
 export const GET_CUSTOMER_JOB_OFFERS = /* GraphQL */ `
   query GetCustomerJobOffers($id: Int!) {
     Customer(id: $id) {
       id
+      first_name
+      last_name
+      email
+      phone
+      customer_contract {
+        first_name
+        last_name
+        phone
+        email
+        zip_code
+        city
+        street_number
+      }
       job_offers {
         id
         status
@@ -134,4 +152,99 @@ export async function enrichBewerbungen(
       // best-effort — leave null
     }
   }
+}
+
+// ─── Reverse-sync: Mamamia Customer → leads identity ─────────────────────────
+// After onboarding (one-way lead → Mamamia), the ops team manages the customer
+// in Mamamia. When they fill/correct a field there (e.g. enter the real patient,
+// who was unknown at onboard), nothing pulls it back → the kostenrechner admin
+// (which reads `leads`) stays stale. buildLeadIdentityPatch maps the current
+// Mamamia Customer back onto the `leads` columns the admin shows.
+//
+// Mamamia's model (VERIFIED LIVE on customer 7737):
+//   Customer top-level   = the CONTACT person / Osoba Kontaktowa (the orderer our
+//                          lead represents — John Smith on 7737).
+//   customer_contract    = the CARE RECIPIENT / patient + the Einsatzort/address
+//                          (Hans Kloss, Kassel on 7737).
+// We must NOT conflate the two: the contact is NOT the patient.
+
+// The Mamamia Customer fields the reverse-sync reads (selected by
+// GET_CUSTOMER_JOB_OFFERS above). All optional/nullable — Mamamia may omit any.
+export interface CustomerContract {
+  first_name?: string | null;
+  last_name?: string | null;
+  phone?: string | null;
+  email?: string | null;
+  zip_code?: string | null;
+  city?: string | null;
+  street_number?: string | null;
+}
+
+export interface CustomerIdentity {
+  first_name?: string | null;
+  last_name?: string | null;
+  email?: string | null;
+  phone?: string | null;
+  customer_contract?: CustomerContract | null;
+}
+
+// The subset of `leads` columns the reverse-sync touches. A LeadRow (detect's
+// shape) is structurally assignable to this.
+export interface LeadIdentity {
+  patient_vorname?: string | null;
+  patient_nachname?: string | null;
+  email?: string | null;
+  telefon?: string | null;
+  vorname?: string | null;
+  nachname?: string | null;
+  patient_street?: string | null;
+  patient_zip?: string | null;
+  patient_city?: string | null;
+}
+
+// Build the leads patch for a team edit on the Mamamia Customer. Mamamia is the
+// source of truth: a column is included ONLY when the Mamamia value is present
+// (non-empty after trim) AND differs from the current lead value. Returns ONLY
+// the changed columns — an empty object means there's nothing to update. Pure
+// (no I/O), so it's unit-testable.
+//
+// Mapping (Mamamia → leads), per the verified model above:
+//   Customer.first_name / last_name            → vorname / nachname                  (the CONTACT)
+//   Customer.email / phone                      → email / telefon                     (the contact)
+//   customer_contract.first_name / last_name    → patient_vorname / patient_nachname  (the PATIENT)
+//   customer_contract.street_number/zip/city    → patient_street / patient_zip / patient_city (Einsatzort)
+export function buildLeadIdentityPatch(
+  customer: CustomerIdentity,
+  lead: LeadIdentity,
+): Partial<LeadIdentity> {
+  const patch: Partial<LeadIdentity> = {};
+  const cc = customer.customer_contract ?? null;
+
+  const consider = (col: keyof LeadIdentity, raw: string | null | undefined): void => {
+    if (typeof raw !== "string") return;
+    const next = raw.trim();
+    if (next.length === 0) return;
+    const current = typeof lead[col] === "string" ? (lead[col] as string).trim() : "";
+    if (next === current) return;
+    patch[col] = next;
+  };
+
+  // Customer top-level = the CONTACT person (Osoba Kontaktowa) — the orderer our
+  // lead represents. (NOT the patient: verified live on 7737, Customer = John Smith.)
+  consider("vorname", customer.first_name);
+  consider("nachname", customer.last_name);
+  consider("email", customer.email);
+  consider("telefon", customer.phone);
+
+  // customer_contract = the care recipient (the PATIENT) + Einsatzort. Skipped
+  // entirely when there's no contract yet. (7737: customer_contract = Hans Kloss.)
+  if (cc) {
+    consider("patient_vorname", cc.first_name);
+    consider("patient_nachname", cc.last_name);
+    consider("patient_street", cc.street_number);
+    consider("patient_zip", cc.zip_code);
+    consider("patient_city", cc.city);
+  }
+
+  return patch;
 }
