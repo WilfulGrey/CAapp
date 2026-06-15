@@ -157,6 +157,7 @@ async function scheduleReactionReminder(
   triggerEvent: 'caregiver_interest_shown' | 'application_received',
   caregiver: CaregiverDisplay,
   caregiverId: number | string | undefined,
+  jobOfferId: number | null,
 ): Promise<void> {
   // Pflegekraft-Snapshot für den Mail-Build beim Versand. Photo-URL ist
   // eine presigned S3-URL mit 30 Min Gültigkeit — beim 1h/4h/12h-Reminder
@@ -174,6 +175,9 @@ async function scheduleReactionReminder(
     caregiver_photo_url: caregiver.photoUrl ?? null,
     caregiver_about_text: caregiver.aboutText ?? null,
     trigger_event: triggerEvent,
+    // Multi-Job: which job this reminder belongs to (for future per-job
+    // reminder handling; cancellation logic unchanged for now).
+    mamamia_job_offer_id: jobOfferId,
   };
 
   const tiers = triggerEvent === 'caregiver_interest_shown'
@@ -272,7 +276,7 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const { token, event, metadata } = await request.json();
+    const { token, event, metadata, notify } = await request.json();
 
     if (!token || typeof token !== 'string') {
       return NextResponse.json({ error: 'token required' }, { status: 400, headers: corsHeaders });
@@ -280,6 +284,18 @@ export async function POST(request: NextRequest) {
     if (!ALLOWED_EVENTS.includes(event)) {
       return NextResponse.json({ error: 'invalid event' }, { status: 400, headers: corsHeaders });
     }
+
+    // Multi-Job: detect-caregiver-events transports the concrete Mamamia job
+    // in metadata.mamamia_job_offer_id; we promote it to a dedicated column.
+    // `notify: false` = silent seed pass (record the event for per-job dedup,
+    // but send NO customer mail / team mail / reminder — used on the first scan
+    // of a follow-up job to register pre-existing applications without spamming).
+    const silent = notify === false;
+    const jobOfferIdNum =
+      metadata && typeof metadata === 'object' && (metadata as Record<string, unknown>).mamamia_job_offer_id != null
+        ? Number((metadata as Record<string, unknown>).mamamia_job_offer_id)
+        : null;
+    const mamamiaJobOfferId = Number.isFinite(jobOfferIdNum as number) ? (jobOfferIdNum as number) : null;
 
     const supabase = createClient(supabaseUrl, supabaseServiceKey, { auth: { persistSession: false, autoRefreshToken: false } });
 
@@ -438,6 +454,7 @@ export async function POST(request: NextRequest) {
       await supabase.from('lead_events').insert({
         lead_id: lead.id,
         event_type: event,
+        mamamia_job_offer_id: mamamiaJobOfferId,
         metadata: metadata && typeof metadata === 'object'
           ? { source: 'caapp', ...metadata }
           : { source: 'caapp' },
@@ -476,6 +493,7 @@ export async function POST(request: NextRequest) {
     //   tatsächlich erneut auslöst — sonst würde sie wegen isDeduped +
     //   !isFirstOccurrence unterdrückt.
     const shouldNotifyTeam =
+      !silent &&
       TEAM_NOTIFY_EVENTS.includes(event) &&
       (!isDeduped || isFirstOccurrence || teamOnlyResend);
 
@@ -504,7 +522,7 @@ export async function POST(request: NextRequest) {
     // loggen wir und überspringen die Mail — der lead_event wird trotzdem
     // aufgezeichnet.
     // Im Team-Only-Resend-Modus wird die Kunden-Mail komplett übersprungen.
-    if (!teamOnlyResend && CUSTOMER_MAIL_EVENTS.has(event)) {
+    if (!teamOnlyResend && !silent && CUSTOMER_MAIL_EVENTS.has(event)) {
       // patient_data_saved ist deduped (NON_DEDUPED_EVENTS enthält nur die
       // Caregiver-Events) — Mail nur beim ersten Speichern verschicken,
       // sonst spammen wir den Kunden bei jedem Patientendaten-Update.
@@ -581,6 +599,7 @@ export async function POST(request: NextRequest) {
                   event,
                   caregiver,
                   caregiverIdRaw,
+                  mamamiaJobOfferId,
                 );
               }
             })

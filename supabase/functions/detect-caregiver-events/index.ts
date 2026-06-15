@@ -60,6 +60,10 @@ export interface LeadRow {
 export interface EventRow {
   event_type: EventType;
   caregiver_id: number | null;
+  // Multi-Job: which job this event was for. NULL/undefined on legacy
+  // (pre-migration) rows → treated as the lead's default job by the per-job
+  // dedup. Optional so test fixtures can omit it.
+  mamamia_job_offer_id?: number | null;
 }
 
 // Für den 48h-Auto-Reject: application_received (mit created_at als
@@ -73,6 +77,12 @@ export interface AppStatusEventRow {
   event_type: AppStatusEventType;
   caregiver_id: number | null;
   created_at: string;
+  // Multi-Job: NULL/undefined legacy → default job (per-job auto-reject anchor).
+  mamamia_job_offer_id?: number | null;
+  // Seeded events (silent first-scan of a follow-up job) were NEVER mailed to
+  // the customer → auto-reject must NOT use them as the "informed" anchor
+  // (guard 1). Derived from metadata.seeded. Optional (defaults to not-seeded).
+  seeded?: boolean;
 }
 
 export interface DetectSupabase {
@@ -110,6 +120,10 @@ export interface DetectResult {
   // Multi-Job (Phase 2A): wie viele lead_jobs-Zeilen aus Mamamias
   // Customer.job_offers gespiegelt wurden (0 wenn kein Adapter / kein Sync).
   lead_jobs_synced: number;
+  // Multi-Job (Phase 2B): wie viele Jobs des Leads gescannt wurden (>1 für
+  // Multi-Job-Kunden) + wie viele davon mit Fehler abbrachen (isoliert).
+  jobs_scanned: number;
+  job_scan_errors: number;
 }
 
 export interface BatchResult {
@@ -121,6 +135,8 @@ export interface BatchResult {
   total_bridge_errors: number;
   total_auto_rejected: number;
   total_lead_jobs_synced: number;
+  total_jobs_scanned: number;
+  total_job_scan_errors: number;
   per_lead_errors: number;
 }
 
@@ -185,6 +201,8 @@ async function handleBatch(deps: HandlerDeps): Promise<Response> {
     total_bridge_errors: 0,
     total_auto_rejected: 0,
     total_lead_jobs_synced: 0,
+    total_jobs_scanned: 0,
+    total_job_scan_errors: 0,
     per_lead_errors: 0,
   };
 
@@ -201,6 +219,8 @@ async function handleBatch(deps: HandlerDeps): Promise<Response> {
       batch.total_bridge_errors += r.bridge_errors;
       batch.total_auto_rejected += r.auto_rejected;
       batch.total_lead_jobs_synced += r.lead_jobs_synced;
+      batch.total_jobs_scanned += r.jobs_scanned;
+      batch.total_job_scan_errors += r.job_scan_errors;
     } catch (e) {
       console.error(`detect lead ${lead.id} threw:`, (e as Error).message);
       batch.per_lead_errors += 1;
@@ -230,46 +250,189 @@ export async function detect(
     fetchFn: fetcher,
   });
 
-  // Pull Mamamia state (applications + interests) in parallel.
-  const [appsRes, interestsRes, pastEvents] = await Promise.all([
+  // ── Build the scan set: all of the lead's jobs (geplant/gebucht), plus the
+  // default job as a guaranteed fallback. The Customer.job_offers fetch happens
+  // ONCE here; its rows are reused for the lead_jobs sync at the end (no
+  // double-fetch). Single-job leads — or any Customer-fetch failure — degrade to
+  // scanning only the default job, identical to the pre-multi-job behavior.
+  let jobRows: LeadJobUpsertRow[] = [];
+  const scanJobIds = new Set<number>([lead.mamamia_job_offer_id]);
+  if (lead.mamamia_customer_id) {
+    try {
+      const jr = await mamamiaRequest<{ Customer: { job_offers?: RawJobOffer[] | null } | null }>({
+        endpoint: secrets.mamamiaEndpoint,
+        token: agencyToken,
+        query: GET_CUSTOMER_JOB_OFFERS,
+        variables: { id: lead.mamamia_customer_id },
+        fetchFn: fetcher,
+      });
+      const built = buildLeadJobRows(jr.Customer?.job_offers ?? [], todayISO());
+      jobRows = built.rows;
+      for (const s of built.skipped) {
+        console.warn(`[detect][leadJobs] lead=${lead.id} jo=${s.id} unmapped status=${s.raw} — skipped`);
+      }
+      for (const r of jobRows) {
+        // Only scan jobs that can still receive applications worth mailing.
+        // abgeschlossen (departure past) is excluded; storniert/unmapped were
+        // already dropped by buildLeadJobRows.
+        if (r.status === "geplant" || r.status === "gebucht") scanJobIds.add(r.mamamia_job_offer_id);
+      }
+    } catch (e) {
+      console.warn(`[detect][leadJobs] lead=${lead.id} job_offers fetch failed: ${e instanceof Error ? e.message : String(e)}`);
+      // degrade to scanning the default job only (already in scanJobIds)
+    }
+  }
+
+  // ── Past events (lead-scoped) → per-(job, caregiver) dedup sets + per-job
+  // history flags. Legacy events with NULL job map onto the lead's default job,
+  // so default-job dedup is preserved while non-default jobs (no prior events)
+  // start fresh. pastEvents failure fails the lead (caught by handleBatch);
+  // statusEvents failure only disables auto-reject (best-effort, as before).
+  const pastEvents = await supabase.fetchPastEvents(lead.id);
+  let statusEvents: AppStatusEventRow[] = [];
+  try {
+    statusEvents = await supabase.fetchAppStatusEvents(lead.id);
+  } catch (e) {
+    console.error(`auto-reject: fetchAppStatusEvents failed (lead ${lead.id}):`, e instanceof Error ? e.message : String(e));
+  }
+
+  const jk = (job: number, cg: number) => `${job}:${cg}`;
+  const seenApps = new Set<string>();
+  const seenInterests = new Set<string>();
+  const jobsWithHistory = new Set<number>();
+  for (const e of pastEvents) {
+    if (e.caregiver_id == null) continue;
+    const job = e.mamamia_job_offer_id ?? lead.mamamia_job_offer_id;
+    jobsWithHistory.add(job);
+    if (e.event_type === "application_received") seenApps.add(jk(job, e.caregiver_id));
+    else if (e.event_type === "caregiver_interest_shown") seenInterests.add(jk(job, e.caregiver_id));
+  }
+
+  const counts = {
+    new_applications: 0,
+    new_interests: 0,
+    skipped_no_caregiver_data: 0,
+    bridge_errors: 0,
+    auto_rejected: 0,
+    jobs_scanned: 0,
+    job_scan_errors: 0,
+  };
+  const photoByCaregiver = new Map<number, string>();
+
+  // ── Scan each job. Per-job try/catch isolates one failing job from the rest.
+  for (const jobOfferId of scanJobIds) {
+    try {
+      await detectForJob(lead, jobOfferId, agencyToken, deps, fetcher, {
+        seenApps,
+        seenInterests,
+        // The DEFAULT job always notifies (preserves today's behavior — a new
+        // lead's first application still mails). Only NON-default jobs seed
+        // silently on their first scan (no prior events).
+        notify: jobsWithHistory.has(jobOfferId) || jobOfferId === lead.mamamia_job_offer_id,
+        statusEvents,
+        counts,
+        photoByCaregiver,
+        jk,
+      });
+      counts.jobs_scanned += 1;
+    } catch (e) {
+      console.error(`[detect] lead=${lead.id} job=${jobOfferId} scan failed: ${e instanceof Error ? e.message : String(e)}`);
+      counts.job_scan_errors += 1;
+    }
+  }
+
+  // Reminder photo refresh — once, aggregated across all jobs.
+  try {
+    await supabase.refreshReminderPhotos(lead.id, photoByCaregiver);
+  } catch (e) {
+    console.error(`refreshReminderPhotos failed (lead ${lead.id}):`, e instanceof Error ? e.message : String(e));
+  }
+
+  // Multi-Job (Phase 2A): mirror lead_jobs from the SAME Customer.job_offers
+  // rows already fetched above (+ per-geplant bewerbungen counts). Best-effort;
+  // the on-demand sync in mamamia-proxy/listLeadJobs is a top-up.
+  let lead_jobs_synced = 0;
+  if (supabase.upsertLeadJobs && jobRows.length > 0) {
+    try {
+      await enrichBewerbungen(jobRows, async (jobOfferId) => {
+        const c = await mamamiaRequest<{ JobOfferApplicationsWithPagination?: { total?: number | null } | null }>({
+          endpoint: secrets.mamamiaEndpoint,
+          token: agencyToken,
+          query: GET_JOB_OFFER_APPLICATION_COUNT,
+          variables: { job_offer_id: jobOfferId },
+          fetchFn: fetcher,
+        });
+        return c.JobOfferApplicationsWithPagination?.total ?? null;
+      });
+      await supabase.upsertLeadJobs(lead.id, jobRows);
+      lead_jobs_synced = jobRows.length;
+    } catch (e) {
+      console.warn(`[detect][leadJobs] lead=${lead.id} upsert failed: ${e instanceof Error ? e.message : String(e)}`);
+    }
+  }
+
+  return { lead_id: lead.id, ...counts, lead_jobs_synced };
+}
+
+// Scan ONE of the lead's jobs: fetch its applications + interests, fire bridge
+// events for new ones (per-(job,caregiver) dedup via the shared seen-sets), and
+// run the 48h auto-reject for that job. On the FIRST scan of a job with no event
+// history, events are SEEDED silently (notify=false) so the customer isn't
+// burst-mailed about pre-existing applications.
+async function detectForJob(
+  lead: LeadRow & { token: string; mamamia_job_offer_id: number },
+  jobOfferId: number,
+  agencyToken: string,
+  deps: HandlerDeps,
+  fetcher: typeof fetch,
+  ctx: {
+    seenApps: Set<string>;
+    seenInterests: Set<string>;
+    notify: boolean;
+    statusEvents: AppStatusEventRow[];
+    counts: {
+      new_applications: number;
+      new_interests: number;
+      skipped_no_caregiver_data: number;
+      bridge_errors: number;
+      auto_rejected: number;
+    };
+    photoByCaregiver: Map<number, string>;
+    jk: (job: number, cg: number) => string;
+  },
+): Promise<void> {
+  const { secrets } = deps;
+  const { seenApps, seenInterests, notify, statusEvents, counts, photoByCaregiver, jk } = ctx;
+
+  const [appsRes, interestsRes] = await Promise.all([
     mamamiaRequest<ListApplicationsResponse>({
       endpoint: secrets.mamamiaEndpoint,
       token: agencyToken,
       query: LIST_APPLICATIONS,
-      variables: { job_offer_id: lead.mamamia_job_offer_id, limit: 100, page: 1 },
+      variables: { job_offer_id: jobOfferId, limit: 100, page: 1 },
       fetchFn: fetcher,
     }),
     mamamiaRequest<ListInterestsResponse>({
       endpoint: secrets.mamamiaEndpoint,
       token: agencyToken,
       query: LIST_INTERESTS_FOR_OFFER,
-      variables: { id: lead.mamamia_job_offer_id },
+      variables: { id: jobOfferId },
       fetchFn: fetcher,
     }),
-    supabase.fetchPastEvents(lead.id),
   ]);
-
   const apps = appsRes.JobOfferApplicationsWithPagination?.data ?? [];
   const interests = interestsRes.JobOffer?.interests ?? [];
 
-  const seenApps = new Set<number>();
-  const seenInterests = new Set<number>();
-  for (const e of pastEvents) {
-    if (e.caregiver_id == null) continue;
-    if (e.event_type === "application_received") seenApps.add(e.caregiver_id);
-    else if (e.event_type === "caregiver_interest_shown") seenInterests.add(e.caregiver_id);
-  }
-
-  const counts = { new_applications: 0, new_interests: 0, skipped_no_caregiver_data: 0, bridge_errors: 0, auto_rejected: 0 };
-
   for (const app of apps) {
     if (app.caregiver_id == null) continue;
-    if (seenApps.has(app.caregiver_id)) continue;
+    if (seenApps.has(jk(jobOfferId, app.caregiver_id))) continue;
     const ok = await fireBridgeEvent(
       "application_received",
       lead.token,
       app.caregiver_id,
       app.caregiver,
+      jobOfferId,
+      notify,
       secrets.kostenrechnerUrl,
       counts,
       fetcher,
@@ -283,43 +446,37 @@ export async function detect(
     );
     if (ok) {
       counts.new_applications += 1;
-      seenApps.add(app.caregiver_id); // guard against duplicate apps from same caregiver in one sweep
+      seenApps.add(jk(jobOfferId, app.caregiver_id)); // guard against dup apps in one sweep
     }
   }
 
   for (const interest of interests) {
     if (interest.rejected_at) continue;
     if (interest.caregiver_id == null) continue;
-    if (seenInterests.has(interest.caregiver_id)) continue;
-    // Skip if the customer has already been pinged about this caregiver as an
-    // application — converting interest→application produces two records on
-    // Mamamia's side but the customer only needs one mail (the application
-    // version, which is the stronger signal).
-    if (seenApps.has(interest.caregiver_id)) continue;
+    if (seenInterests.has(jk(jobOfferId, interest.caregiver_id))) continue;
+    // Per-job interest→application suppression: if the customer was already
+    // pinged about this caregiver AS AN APPLICATION on THIS job, skip the
+    // weaker interest signal.
+    if (seenApps.has(jk(jobOfferId, interest.caregiver_id))) continue;
     const ok = await fireBridgeEvent(
       "caregiver_interest_shown",
       lead.token,
       interest.caregiver_id,
       interest.caregiver,
+      jobOfferId,
+      notify,
       secrets.kostenrechnerUrl,
       counts,
       fetcher,
     );
     if (ok) {
       counts.new_interests += 1;
-      seenInterests.add(interest.caregiver_id);
+      seenInterests.add(jk(jobOfferId, interest.caregiver_id));
     }
   }
 
-  // 48h-Auto-Reject: unbeantwortete Bewerbungen (≥48h seit der
-  // application_received-Mail, keine Reaktion) automatisch ablehnen.
-  // apps + agencyToken sind hier bereits geladen — wiederverwenden.
-  counts.auto_rejected += await autoRejectStaleApplications(lead, apps, agencyToken, deps, fetcher);
-
-  // Reminder-Foto-Refresh: frische presigned URLs aus apps + interests in
-  // die offenen Reminder-Rows schreiben, damit das Foto beim (späteren)
-  // Versand nicht abgelaufen ist (siehe refreshReminderPhotos-Doc).
-  const photoByCaregiver = new Map<number, string>();
+  // Collect fresh presigned photo URLs (lead-scoped, keyed by caregiver) for the
+  // reminder-photo refresh the caller runs once after all jobs.
   for (const a of apps) {
     const url = a.caregiver?.avatar_retouched?.aws_url;
     if (a.caregiver_id != null && url) photoByCaregiver.set(a.caregiver_id, url);
@@ -330,54 +487,9 @@ export async function detect(
       photoByCaregiver.set(i.caregiver_id, url);
     }
   }
-  try {
-    await supabase.refreshReminderPhotos(lead.id, photoByCaregiver);
-  } catch (e) {
-    // Best-effort — Foto-Refresh darf den Sweep nicht scheitern lassen.
-    console.error(`refreshReminderPhotos failed (lead ${lead.id}):`, e instanceof Error ? e.message : String(e));
-  }
 
-  // Multi-Job (Phase 2A): mirror this customer's Mamamia job_offers into
-  // lead_jobs in the background, so the "Alle meine Einsätze" overview stays
-  // warm without relying on the customer opening it (the on-demand sync in
-  // mamamia-proxy/listLeadJobs is a top-up on top of this). Reuses the agency
-  // token already fetched above. Best-effort — must NEVER break caregiver-event
-  // detection (the cron's primary job). Skipped when the adapter has no
-  // upsertLeadJobs or the lead isn't linked to a Mamamia customer.
-  let lead_jobs_synced = 0;
-  if (lead.mamamia_customer_id && supabase.upsertLeadJobs) {
-    try {
-      const jr = await mamamiaRequest<{ Customer: { job_offers?: RawJobOffer[] | null } | null }>({
-        endpoint: secrets.mamamiaEndpoint,
-        token: agencyToken,
-        query: GET_CUSTOMER_JOB_OFFERS,
-        variables: { id: lead.mamamia_customer_id },
-        fetchFn: fetcher,
-      });
-      const { rows, skipped } = buildLeadJobRows(jr.Customer?.job_offers ?? [], todayISO());
-      for (const s of skipped) {
-        console.warn(`[detect][leadJobs] lead=${lead.id} jo=${s.id} unmapped status=${s.raw} — skipped`);
-      }
-      await enrichBewerbungen(rows, async (jobOfferId) => {
-        const c = await mamamiaRequest<{ JobOfferApplicationsWithPagination?: { total?: number | null } | null }>({
-          endpoint: secrets.mamamiaEndpoint,
-          token: agencyToken,
-          query: GET_JOB_OFFER_APPLICATION_COUNT,
-          variables: { job_offer_id: jobOfferId },
-          fetchFn: fetcher,
-        });
-        return c.JobOfferApplicationsWithPagination?.total ?? null;
-      });
-      if (rows.length > 0) {
-        await supabase.upsertLeadJobs(lead.id, rows);
-        lead_jobs_synced = rows.length;
-      }
-    } catch (e) {
-      console.warn(`[detect][leadJobs] lead=${lead.id} sync failed: ${e instanceof Error ? e.message : String(e)}`);
-    }
-  }
-
-  return { lead_id: lead.id, ...counts, lead_jobs_synced };
+  // 48h auto-reject for THIS job's stale applications.
+  counts.auto_rejected += await autoRejectStaleApplications(lead, jobOfferId, apps, statusEvents, agencyToken, deps, fetcher, jk);
 }
 
 // ─── 48h Auto-Reject ───────────────────────────────────────────────────────
@@ -412,36 +524,36 @@ function autoRejectIsLive(): boolean {
 
 async function autoRejectStaleApplications(
   lead: LeadRow & { token: string; mamamia_job_offer_id: number },
+  jobOfferId: number,
   apps: ApplicationNode[],
+  statusEvents: AppStatusEventRow[],
   agencyToken: string,
   deps: HandlerDeps,
   fetcher: typeof fetch,
+  jk: (job: number, cg: number) => string,
 ): Promise<number> {
-  const { secrets, supabase } = deps;
+  const { secrets } = deps;
   const live = autoRejectIsLive();
 
-  let statusEvents: AppStatusEventRow[];
-  try {
-    statusEvents = await supabase.fetchAppStatusEvents(lead.id);
-  } catch (e) {
-    console.error(`auto-reject: fetchAppStatusEvents failed (lead ${lead.id}):`, e instanceof Error ? e.message : String(e));
-    return 0;
-  }
-
-  // Frühestes application_received pro Pflegekraft (Alters-Anker) +
-  // Reaktions-Set (accept/reject).
-  const receivedAt = new Map<number, number>(); // caregiver_id → ms timestamp
-  const reacted = new Set<number>();
+  // Per-(job, caregiver) age anchor + reaction set. Legacy NULL-job events map
+  // onto the lead's default job. SEEDED application_received events (silent
+  // first-scan, never mailed) are NOT anchors — guard 1: never auto-reject what
+  // the customer was never told about.
+  const receivedAt = new Map<string, number>(); // `${job}:${cg}` → ms
+  const reacted = new Set<string>();
   for (const ev of statusEvents) {
     if (ev.caregiver_id == null) continue;
+    const job = ev.mamamia_job_offer_id ?? lead.mamamia_job_offer_id;
+    const k = jk(job, ev.caregiver_id);
     if (ev.event_type === "application_received") {
+      if (ev.seeded) continue; // seeded == never mailed → not a reject anchor
       const ms = Date.parse(ev.created_at);
       if (!Number.isFinite(ms)) continue;
-      const prev = receivedAt.get(ev.caregiver_id);
-      if (prev == null || ms < prev) receivedAt.set(ev.caregiver_id, ms);
+      const prev = receivedAt.get(k);
+      if (prev == null || ms < prev) receivedAt.set(k, ms);
     } else {
       // application_accepted_internal | application_rejected
-      reacted.add(ev.caregiver_id);
+      reacted.add(k);
     }
   }
 
@@ -451,15 +563,16 @@ async function autoRejectStaleApplications(
 
   for (const app of apps) {
     if (app.caregiver_id == null) continue;
-    if (reacted.has(app.caregiver_id)) continue;        // Guard 2
-    const received = receivedAt.get(app.caregiver_id);
+    const k = jk(jobOfferId, app.caregiver_id);
+    if (reacted.has(k)) continue;                        // Guard 2
+    const received = receivedAt.get(k);
     if (received == null) continue;                      // Guard 1
     const ageMs = now - received;
     if (ageMs < cutoffMs) continue;                      // Guard 3
 
     const ageH = Math.round(ageMs / 3_600_000);
     if (!live) {
-      console.log(`auto-reject [DRY-RUN] would reject application ${app.id} (caregiver ${app.caregiver_id}, lead ${lead.id}, age ${ageH}h)`);
+      console.log(`auto-reject [DRY-RUN] would reject application ${app.id} (caregiver ${app.caregiver_id}, lead ${lead.id}, job ${jobOfferId}, age ${ageH}h)`);
       rejected += 1;
       continue;
     }
@@ -490,6 +603,7 @@ async function autoRejectStaleApplications(
           metadata: {
             application_id: app.id,
             caregiver_id: app.caregiver_id,
+            mamamia_job_offer_id: jobOfferId,
             reject_message: AUTO_REJECT_MESSAGE,
             reason: "auto_timeout_48h",
             source: "detect-caregiver-events",
@@ -498,12 +612,9 @@ async function autoRejectStaleApplications(
       });
     } catch (e) {
       // Mamamia-Reject ist schon durch — Bridge-Event-Fehler nur loggen.
-      // Beim nächsten Sweep verhindert die Mamamia-Seite (Bewerbung ist
-      // rejected) bzw. das fehlende Event ein Doppel-Reject ist unkritisch
-      // (RejectApplication auf bereits abgelehnte App ist idempotent/no-op).
       console.error(`auto-reject: bridge event failed (app ${app.id}, lead ${lead.id}):`, e instanceof Error ? e.message : String(e));
     }
-    console.log(`auto-reject [LIVE] rejected application ${app.id} (caregiver ${app.caregiver_id}, lead ${lead.id}, age ${ageH}h)`);
+    console.log(`auto-reject [LIVE] rejected application ${app.id} (caregiver ${app.caregiver_id}, lead ${lead.id}, job ${jobOfferId}, age ${ageH}h)`);
     rejected += 1;
   }
 
@@ -517,6 +628,8 @@ async function fireBridgeEvent(
   token: string,
   caregiverId: number,
   caregiver: CaregiverNode | null,
+  jobOfferId: number,
+  notify: boolean,
   kostenrechnerUrl: string,
   counts: { skipped_no_caregiver_data: number; bridge_errors: number },
   fetchFn: typeof fetch,
@@ -527,6 +640,12 @@ async function fireBridgeEvent(
     counts.skipped_no_caregiver_data += 1;
     return false;
   }
+
+  // Multi-Job: stamp the job; mark seeded (silent first-scan) events so the
+  // bridge stores them but auto-reject never uses them as a "customer informed"
+  // anchor.
+  metadata.mamamia_job_offer_id = jobOfferId;
+  if (!notify) metadata.seeded = true;
 
   // Konditionen der Bewerbung mitschicken (nur application_received) — Mail B
   // rendert daraus die Konditionen-Bühne (Tagessatz/Datum/Reisekosten).
@@ -539,10 +658,12 @@ async function fireBridgeEvent(
   }
 
   try {
+    // notify=false → bridge records the event but sends NO customer/team mail +
+    // schedules NO reminder (seed pass).
     const res = await fetchFn(`${kostenrechnerUrl}/api/lead-event`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ token, event, metadata }),
+      body: JSON.stringify({ token, event, notify, metadata }),
     });
     if (!res.ok) {
       console.error(`bridge ${event} HTTP ${res.status}`);
@@ -685,19 +806,20 @@ function makeRealSupabase(url: string, serviceKey: string): DetectSupabase {
     async fetchPastEvents(leadId: string) {
       const { data, error } = await client
         .from("lead_events")
-        .select("event_type, metadata")
+        .select("event_type, metadata, mamamia_job_offer_id")
         .eq("lead_id", leadId)
         .in("event_type", ["caregiver_interest_shown", "application_received"]);
       if (error) throw new Error(`supabase fetchPastEvents: ${error.message}`);
-      return (data ?? []).map((row: { event_type: string; metadata: unknown }) => ({
+      return (data ?? []).map((row: { event_type: string; metadata: unknown; mamamia_job_offer_id: number | null }) => ({
         event_type: row.event_type as EventType,
         caregiver_id: extractCaregiverId(row.metadata),
+        mamamia_job_offer_id: row.mamamia_job_offer_id ?? null,
       }));
     },
     async fetchAppStatusEvents(leadId: string) {
       const { data, error } = await client
         .from("lead_events")
-        .select("event_type, metadata, created_at")
+        .select("event_type, metadata, created_at, mamamia_job_offer_id")
         .eq("lead_id", leadId)
         .in("event_type", [
           "application_received",
@@ -705,10 +827,12 @@ function makeRealSupabase(url: string, serviceKey: string): DetectSupabase {
           "application_rejected",
         ]);
       if (error) throw new Error(`supabase fetchAppStatusEvents: ${error.message}`);
-      return (data ?? []).map((row: { event_type: string; metadata: unknown; created_at: string }) => ({
+      return (data ?? []).map((row: { event_type: string; metadata: unknown; created_at: string; mamamia_job_offer_id: number | null }) => ({
         event_type: row.event_type as AppStatusEventType,
         caregiver_id: extractCaregiverId(row.metadata),
         created_at: row.created_at,
+        mamamia_job_offer_id: row.mamamia_job_offer_id ?? null,
+        seeded: !!(row.metadata && typeof row.metadata === "object" && (row.metadata as Record<string, unknown>).seeded === true),
       }));
     },
     async refreshReminderPhotos(leadId: string, photoByCaregiver: Map<number, string>) {

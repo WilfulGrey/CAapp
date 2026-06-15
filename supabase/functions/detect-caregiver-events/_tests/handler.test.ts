@@ -53,14 +53,17 @@ function makeCaregiver(overrides: Partial<CaregiverNode> = {}): CaregiverNode {
   };
 }
 
+type AppFixture = { id: number; caregiver_id: number | null; caregiver: CaregiverNode | null };
+type InterestFixture = { id: number; caregiver_id: number | null; rejected_at: string | null; caregiver: CaregiverNode | null };
+
 interface MamamiaPayload {
-  apps?: Array<{ id: number; caregiver_id: number | null; caregiver: CaregiverNode | null }>;
-  interests?: Array<{
-    id: number;
-    caregiver_id: number | null;
-    rejected_at: string | null;
-    caregiver: CaregiverNode | null;
-  }>;
+  apps?: AppFixture[];
+  interests?: InterestFixture[];
+  // Multi-Job: per-job applications/interests keyed by job_offer_id. When set,
+  // DetectListApplications/DetectListInterests return the per-job list (else
+  // they fall back to the flat apps/interests for single-job tests).
+  appsByJob?: Record<number, AppFixture[]>;
+  interestsByJob?: Record<number, InterestFixture[]>;
   // Sammelt application_ids, für die RejectApplication aufgerufen wurde
   // (Auto-Reject-Tests). Im Dry-Run muss dieser Recorder leer bleiben.
   rejectRecorder?: number[];
@@ -73,7 +76,7 @@ interface MamamiaPayload {
 
 interface BridgeOptions {
   status?: number;
-  recorder?: Array<{ event: string; metadata: Record<string, unknown> }>;
+  recorder?: Array<{ event: string; metadata: Record<string, unknown>; notify?: boolean }>;
 }
 
 function makeFetch(mamamia: MamamiaPayload, bridge: BridgeOptions = {}): typeof fetch {
@@ -96,23 +99,26 @@ function makeFetch(mamamia: MamamiaPayload, bridge: BridgeOptions = {}): typeof 
     if (url.includes("mamamia.test/graphql")) {
       const opName = (body.query.match(/(?:query|mutation)\s+(\w+)/) || [, ""])[1];
       if (opName === "DetectListApplications") {
+        const apps = mamamia.appsByJob
+          ? (mamamia.appsByJob[body.variables.job_offer_id as number] ?? [])
+          : (mamamia.apps ?? []);
         return new Response(
           JSON.stringify({
             data: {
-              JobOfferApplicationsWithPagination: {
-                total: (mamamia.apps ?? []).length,
-                data: mamamia.apps ?? [],
-              },
+              JobOfferApplicationsWithPagination: { total: apps.length, data: apps },
             },
           }),
           { status: 200, headers: { "Content-Type": "application/json" } },
         );
       }
       if (opName === "DetectListInterests") {
+        const interests = mamamia.interestsByJob
+          ? (mamamia.interestsByJob[body.variables.id as number] ?? [])
+          : (mamamia.interests ?? []);
         return new Response(
           JSON.stringify({
             data: {
-              JobOffer: { id: body.variables.id, interests: mamamia.interests ?? [] },
+              JobOffer: { id: body.variables.id, interests },
             },
           }),
           { status: 200, headers: { "Content-Type": "application/json" } },
@@ -145,7 +151,7 @@ function makeFetch(mamamia: MamamiaPayload, bridge: BridgeOptions = {}): typeof 
     }
 
     if (url.includes("/api/lead-event")) {
-      if (bridge.recorder) bridge.recorder.push({ event: body.event, metadata: body.metadata });
+      if (bridge.recorder) bridge.recorder.push({ event: body.event, metadata: body.metadata, notify: body.notify });
       return new Response(JSON.stringify({ ok: true }), { status: bridge.status ?? 200 });
     }
 
@@ -477,7 +483,7 @@ Deno.test("batch mode: 2 active leads with apps → aggregate counts + per-lead 
   assertEquals(recorder.length, 2);
 });
 
-Deno.test("batch mode: one lead's Mamamia call throws → per_lead_errors increments, sweep continues", async () => {
+Deno.test("batch mode: one lead's job scan throws → isolated as job_scan_error, sweep continues", async () => {
   resetCaches();
   const recorder: BridgeOptions["recorder"] = [];
   const leadA: LeadRow = { ...VALID_LEAD, id: "lead-a", token: "tok-a", mamamia_job_offer_id: 1001 };
@@ -520,9 +526,12 @@ Deno.test("batch mode: one lead's Mamamia call throws → per_lead_errors increm
     },
   );
   const body = await res.json();
-  assertEquals(body.leads_processed, 1); // only lead A succeeded
-  assertEquals(body.per_lead_errors, 1);
-  assertEquals(body.total_new_applications, 1);
+  // Per-job isolation: lead B's job 9999 apps query errors, but that's caught
+  // inside the per-job loop — the lead is still "processed", no per_lead_error.
+  assertEquals(body.leads_processed, 2);
+  assertEquals(body.per_lead_errors, 0);
+  assertEquals(body.total_job_scan_errors, 1); // lead B's job 9999
+  assertEquals(body.total_new_applications, 1); // lead A's app (default job notifies)
 });
 
 Deno.test("mapHpToBadge thresholds", () => {
@@ -777,4 +786,165 @@ Deno.test("batch: no upsertLeadJobs adapter → job sync skipped, no crash", asy
   const body = await res.json();
   assertEquals(res.status, 200);
   assertEquals(body.total_lead_jobs_synced, 0);
+});
+
+// ─── Multi-Job per-job detection (Phase 2B) ─────────────────────────────────
+
+const JOB_B = 16371; // a follow-up (non-default) job; default = VALID_LEAD.mamamia_job_offer_id
+const searchJob = (id: number): RawJobOffer => ({ id, status: "search", arrival_at: "2099-01-01 00:00:00", departure_at: null, final_confirmation: null });
+const appOn = (id: number, cg: number) => ({ id, caregiver_id: cg, caregiver: makeCaregiver({ id: cg }) });
+
+Deno.test("multi-job: first scan of a follow-up job SEEDS silently (notify=false, seeded)", async () => {
+  resetCaches();
+  const recorder: BridgeOptions["recorder"] = [];
+  const res = await handleRequest(makeReq({ lead_id: VALID_LEAD.id }), {
+    secrets: SECRETS,
+    supabase: makeSupabase(VALID_LEAD), // no past events → JOB_B has no history
+    fetchFn: makeFetch({ jobOffers: [searchJob(JOB_B)], appsByJob: { [JOB_B]: [appOn(1, 60001)] } }, { recorder }),
+  });
+  const body = await res.json();
+  assertEquals(body.new_applications, 1);
+  assertEquals(body.jobs_scanned, 2); // default + JOB_B
+  assertEquals(recorder.length, 1);
+  assertEquals(recorder[0].event, "application_received");
+  assertEquals(recorder[0].notify, false); // seed → silent
+  assertEquals(recorder[0].metadata.seeded, true);
+  assertEquals(recorder[0].metadata.mamamia_job_offer_id, JOB_B);
+});
+
+Deno.test("multi-job: follow-up job WITH history notifies a new application (notify=true)", async () => {
+  resetCaches();
+  const recorder: BridgeOptions["recorder"] = [];
+  const past: EventRow[] = [{ event_type: "caregiver_interest_shown", caregiver_id: 70000, mamamia_job_offer_id: JOB_B }];
+  const res = await handleRequest(makeReq({ lead_id: VALID_LEAD.id }), {
+    secrets: SECRETS,
+    supabase: makeSupabase(VALID_LEAD, past),
+    fetchFn: makeFetch({ jobOffers: [searchJob(JOB_B)], appsByJob: { [JOB_B]: [appOn(1, 60001)] } }, { recorder }),
+  });
+  const body = await res.json();
+  assertEquals(body.new_applications, 1);
+  const appEvt = recorder.find((r) => r.event === "application_received");
+  assertEquals(appEvt?.notify, true);
+  assertEquals(appEvt?.metadata.mamamia_job_offer_id, JOB_B);
+});
+
+Deno.test("multi-job: same caregiver on default + follow-up → two events (one per job)", async () => {
+  resetCaches();
+  const recorder: BridgeOptions["recorder"] = [];
+  const def = VALID_LEAD.mamamia_job_offer_id as number;
+  const res = await handleRequest(makeReq({ lead_id: VALID_LEAD.id }), {
+    secrets: SECRETS,
+    supabase: makeSupabase(VALID_LEAD),
+    fetchFn: makeFetch({ jobOffers: [searchJob(JOB_B)], appsByJob: { [def]: [appOn(1, 50001)], [JOB_B]: [appOn(2, 50001)] } }, { recorder }),
+  });
+  const body = await res.json();
+  assertEquals(body.new_applications, 2);
+  assertEquals(recorder.find((r) => r.metadata.mamamia_job_offer_id === def)?.notify, true); // default notifies
+  assertEquals(recorder.find((r) => r.metadata.mamamia_job_offer_id === JOB_B)?.notify, false); // follow-up first scan seeds
+});
+
+Deno.test("multi-job: per-job dedup — past app on default suppresses default, fires on follow-up", async () => {
+  resetCaches();
+  const recorder: BridgeOptions["recorder"] = [];
+  const def = VALID_LEAD.mamamia_job_offer_id as number;
+  const past: EventRow[] = [{ event_type: "application_received", caregiver_id: 50001, mamamia_job_offer_id: def }];
+  const res = await handleRequest(makeReq({ lead_id: VALID_LEAD.id }), {
+    secrets: SECRETS,
+    supabase: makeSupabase(VALID_LEAD, past),
+    fetchFn: makeFetch({ jobOffers: [searchJob(JOB_B)], appsByJob: { [def]: [appOn(1, 50001)], [JOB_B]: [appOn(2, 50001)] } }, { recorder }),
+  });
+  const body = await res.json();
+  assertEquals(body.new_applications, 1); // default suppressed, JOB_B fires
+  assertEquals(recorder.length, 1);
+  assertEquals(recorder[0].metadata.mamamia_job_offer_id, JOB_B);
+});
+
+Deno.test("multi-job: legacy NULL-job past event maps onto the default job (dedups default)", async () => {
+  resetCaches();
+  const recorder: BridgeOptions["recorder"] = [];
+  const def = VALID_LEAD.mamamia_job_offer_id as number;
+  const past: EventRow[] = [{ event_type: "application_received", caregiver_id: 50001, mamamia_job_offer_id: null }];
+  const res = await handleRequest(makeReq({ lead_id: VALID_LEAD.id }), {
+    secrets: SECRETS,
+    supabase: makeSupabase(VALID_LEAD, past),
+    fetchFn: makeFetch({ appsByJob: { [def]: [appOn(1, 50001)] } }, { recorder }), // no jobOffers → default only
+  });
+  const body = await res.json();
+  assertEquals(body.new_applications, 0); // NULL legacy → default job → caregiver already seen
+  assertEquals(recorder.length, 0);
+});
+
+Deno.test("multi-job: interest→application suppression is per-job", async () => {
+  resetCaches();
+  const recorder: BridgeOptions["recorder"] = [];
+  const def = VALID_LEAD.mamamia_job_offer_id as number;
+  // App on the DEFAULT job for cg 50001 must NOT suppress that caregiver's
+  // interest on the follow-up job.
+  const past: EventRow[] = [{ event_type: "application_received", caregiver_id: 50001, mamamia_job_offer_id: def }];
+  const res = await handleRequest(makeReq({ lead_id: VALID_LEAD.id }), {
+    secrets: SECRETS,
+    supabase: makeSupabase(VALID_LEAD, past),
+    fetchFn: makeFetch({
+      jobOffers: [searchJob(JOB_B)],
+      interestsByJob: { [JOB_B]: [{ id: 5, caregiver_id: 50001, rejected_at: null, caregiver: makeCaregiver({ id: 50001 }) }] },
+    }, { recorder }),
+  });
+  const body = await res.json();
+  assertEquals(body.new_interests, 1);
+  assertEquals(recorder.find((r) => r.event === "caregiver_interest_shown")?.metadata.mamamia_job_offer_id, JOB_B);
+});
+
+Deno.test("multi-job: backward compat — no mamamia_customer_id scans only the default job", async () => {
+  resetCaches();
+  const recorder: BridgeOptions["recorder"] = [];
+  const lead: LeadRow = { ...VALID_LEAD, mamamia_customer_id: null };
+  const res = await handleRequest(makeReq({ lead_id: lead.id }), {
+    secrets: SECRETS,
+    supabase: makeSupabase(lead),
+    fetchFn: makeFetch({ apps: [appOn(1, 50001)] }, { recorder }), // flat fallback
+  });
+  const body = await res.json();
+  assertEquals(body.jobs_scanned, 1);
+  assertEquals(body.lead_jobs_synced, 0);
+  assertEquals(body.new_applications, 1);
+  assertEquals(recorder[0].notify, true); // default job always notifies
+  assertEquals(recorder[0].metadata.mamamia_job_offer_id, lead.mamamia_job_offer_id);
+});
+
+Deno.test("multi-job: auto-reject is per-job; a seeded-only anchor is never rejected", async () => {
+  resetCaches();
+  const recorder: BridgeOptions["recorder"] = [];
+  const rejectRecorder: number[] = [];
+  const old = new Date(Date.now() - 49 * 3600 * 1000).toISOString();
+  const statusEvents: AppStatusEventRow[] = [
+    // real (mailed) anchor → reject-eligible
+    { event_type: "application_received", caregiver_id: 50001, created_at: old, mamamia_job_offer_id: JOB_B },
+    // seeded anchor (never mailed) → must NOT be rejected (guard 1)
+    { event_type: "application_received", caregiver_id: 80002, created_at: old, mamamia_job_offer_id: JOB_B, seeded: true },
+  ];
+  // past events mark both caregivers as already seen so the scan doesn't re-fire.
+  const past: EventRow[] = [
+    { event_type: "application_received", caregiver_id: 50001, mamamia_job_offer_id: JOB_B },
+    { event_type: "application_received", caregiver_id: 80002, mamamia_job_offer_id: JOB_B },
+  ];
+  Deno.env.set("AUTO_REJECT_ENABLED", "true");
+  try {
+    const res = await handleRequest(makeReq({ lead_id: VALID_LEAD.id }), {
+      secrets: SECRETS,
+      supabase: makeSupabase(VALID_LEAD, past, statusEvents),
+      fetchFn: makeFetch({
+        jobOffers: [searchJob(JOB_B)],
+        appsByJob: { [JOB_B]: [appOn(777, 50001), appOn(888, 80002)] },
+        rejectRecorder,
+      }, { recorder }),
+    });
+    const body = await res.json();
+    assertEquals(body.auto_rejected, 1); // only 777 (real anchor); 888 seeded → spared
+    assertEquals(rejectRecorder, [777]);
+    const rej = recorder.find((r) => r.event === "application_rejected");
+    assertEquals(rej?.metadata.mamamia_job_offer_id, JOB_B);
+    assertEquals(rej?.metadata.application_id, 777);
+  } finally {
+    Deno.env.delete("AUTO_REJECT_ENABLED");
+  }
 });
