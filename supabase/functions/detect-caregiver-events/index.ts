@@ -16,7 +16,9 @@ import {
 } from "../_shared/mamamiaClient.ts";
 import {
   buildLeadJobRows,
+  enrichBewerbungen,
   GET_CUSTOMER_JOB_OFFERS,
+  GET_JOB_OFFER_APPLICATION_COUNT,
   type LeadJobUpsertRow,
   type RawJobOffer,
   todayISO,
@@ -356,6 +358,16 @@ export async function detect(
       for (const s of skipped) {
         console.warn(`[detect][leadJobs] lead=${lead.id} jo=${s.id} unmapped status=${s.raw} — skipped`);
       }
+      await enrichBewerbungen(rows, async (jobOfferId) => {
+        const c = await mamamiaRequest<{ JobOfferApplicationsWithPagination?: { total?: number | null } | null }>({
+          endpoint: secrets.mamamiaEndpoint,
+          token: agencyToken,
+          query: GET_JOB_OFFER_APPLICATION_COUNT,
+          variables: { job_offer_id: jobOfferId },
+          fetchFn: fetcher,
+        });
+        return c.JobOfferApplicationsWithPagination?.total ?? null;
+      });
       if (rows.length > 0) {
         await supabase.upsertLeadJobs(lead.id, rows);
         lead_jobs_synced = rows.length;
