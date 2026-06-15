@@ -270,7 +270,9 @@ export const CustomerNurseModal: FC<{
                     blendet ihn weiterhin aus. */}
                 <div className="flex items-center gap-2 flex-wrap">
                   <h2 className={`font-bold text-gray-900 leading-tight transition-all duration-200 ${headerCompact ? 'text-base' : 'text-xl'}`}>{name}</h2>
-                  <span className="text-sm text-gray-400 flex-shrink-0">{nurse.age} J.</span>
+                  {nurse.age ? (
+                    <span className="text-sm text-gray-400 flex-shrink-0">{nurse.age} J.</span>
+                  ) : null}
                   <button
                     type="button"
                     onClick={() => setShowLevelInfo(true)}

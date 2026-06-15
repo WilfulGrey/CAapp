@@ -112,7 +112,9 @@ export const InterestCard: FC<{
             <div className="flex items-start justify-between gap-2 mb-1">
               <div className="flex items-baseline gap-1.5 min-w-0">
                 <span className="font-bold text-gray-900 leading-tight">{name}</span>
-                <span className="text-sm text-gray-400 flex-shrink-0">{nurse.age} J.</span>
+                {nurse.age ? (
+                  <span className="text-sm text-gray-400 flex-shrink-0">{nurse.age} J.</span>
+                ) : null}
               </div>
               {/* Badge identisch zur MatchCard (top-right neben Name) —
                   damit Interesse- und Matching-Karten visuell konsistent
