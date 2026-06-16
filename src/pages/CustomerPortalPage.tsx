@@ -2258,6 +2258,14 @@ const CustomerPortalPage: FC = () => {
             const patch = mapPatientFormToUpdateCustomerInput(form, {
               existingPatientIds,
               locationId,
+              // Kontaktperson (Osoba Kontaktowa) aus dem Lead → customer_contract
+              // (salutation/first_name/last_name), damit das Mamamia-Panel die
+              // Kontaktdaten zeigt statt nur Customer.first_name top-level.
+              contact: {
+                anrede: lead?.anrede_text ?? lead?.anrede ?? null,
+                vorname: lead?.vorname ?? null,
+                nachname: lead?.nachname ?? null,
+              },
             });
 
             // ── Gating write: full mechanical patch. Awaited so the caller
