@@ -412,10 +412,15 @@ export function buildCustomerInput(
   const arrivalAt = computeArrivalDate(lead.care_start_timing, nowISO);
 
   return {
-    // Identity — patient_* (stage-B) → fallback to lead.* (orderer).
-    // Customer.first_name/last_name is the panel-display identity.
-    first_name: resolvePatientFirstName(lead) ?? null,
-    last_name: resolvePatientLastName(lead) ?? null,
+    // Identity — Customer.first_name/last_name = die KONTAKTPERSON / Osoba
+    // Kontaktowa (der Besteller, der den Kostenrechner ausgefüllt hat). Verified
+    // im Mamamia-Panel: dorthin, wo "John Smith" steht, gehört der Lead-Kontakt.
+    // Also lead.vorname/nachname (der Orderer); patient_* ist die GEPFLEGTE
+    // PERSON und gehört in die Patienten-/Vertrags-Records, NICHT in den
+    // Kontakt-Slot. (War invertiert: resolvePatient* bevorzugte patient_*, was
+    // bei gelaufenem Stage-B den Patienten in den Kontakt-Slot schrieb.)
+    first_name: lead.vorname ?? lead.patient_vorname ?? null,
+    last_name: lead.nachname ?? lead.patient_nachname ?? null,
     email: lead.email,
     phone: lead.telefon,
     // Location — best-effort. Null when PLZ unknown; patient form fills

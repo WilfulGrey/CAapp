@@ -702,7 +702,7 @@ Deno.test("buildCustomerInput: weitere_personen=ja propagates only to other_peop
   assertEquals(input.patients.length, 1);
 });
 
-Deno.test("buildCustomerInput: stage-B patient_* override lead.* for top-level identity", () => {
+Deno.test("buildCustomerInput: Customer identity = CONTACT (lead.vorname), NOT patient_*", () => {
   const lead = makeLead({
     vorname: "Michał",
     nachname: "Test",
@@ -712,8 +712,10 @@ Deno.test("buildCustomerInput: stage-B patient_* override lead.* for top-level i
     patient_nachname: "Test",
   });
   const input = buildCustomerInput(lead, 1148);
-  // Customer top-level identity = patient (Zenon), since stage-B has run.
-  assertEquals(input.first_name, "Zenon");
+  // Customer top-level = Osoba Kontaktowa = der Besteller (Michał), AUCH wenn
+  // Stage-B patient_* (Zenon) gesetzt hat — der Patient gehört in patients/
+  // contracts, nicht in den Kontakt-Slot.
+  assertEquals(input.first_name, "Michał");
   assertEquals(input.last_name, "Test");
 });
 

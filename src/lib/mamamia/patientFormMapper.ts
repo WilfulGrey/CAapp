@@ -618,7 +618,23 @@ export interface MappedCustomerPatch {
   // NOT Customer.phone top-level (same trap as Bug #13l with location_id).
   // We write to both so panel renders + agency tooling that queries the
   // top-level field also sees the value.
-  customer_contract?: { location_id?: number; phone?: string };
+  // Voll befüllt, weil das Mamamia-Panel "Lokalizacja opieki" UND die
+  // Kontakt-/Adressdaten aus diesem (singularen patient_contact) Record liest.
+  // Nur location_id+phone (alt) → Panel halb leer: zip/city/Name fehlen.
+  // email wird bewusst NICHT geschrieben — Mamamia validiert
+  // customer_contract.email streng (lehnt plus-adressierte/Test-Domains ab) und
+  // eine abgelehnte Email lässt den GANZEN UpdateCustomer fehlschlagen → die
+  // patients werden gewiped. Customer.email trägt die Email ohnehin.
+  customer_contract?: {
+    location_id?: number;
+    location_custom_text?: string;
+    phone?: string;
+    zip_code?: string;
+    city?: string;
+    salutation?: string;
+    first_name?: string;
+    last_name?: string;
+  };
   customer_caregiver_wish?: CaregiverWishPatch;
   // Patient array.
   patients?: Array<Record<string, unknown>>;
@@ -639,9 +655,25 @@ export function splitCustomerName(
   };
 }
 
+// Lead-Anrede (deutsch "Herr"/"Frau") → Mamamia salutation enum "Mr."/"Mrs.".
+// Unbekannt/leer → undefined (kein falscher Default in den Vertrag schreiben).
+function salutationToApi(anrede: string | null | undefined): 'Mr.' | 'Mrs.' | undefined {
+  const v = (anrede ?? '').toString().trim().toLowerCase();
+  if (v === 'frau' || v === 'mrs.' || v === 'mrs') return 'Mrs.';
+  if (v === 'herr' || v === 'mr.' || v === 'mr') return 'Mr.';
+  return undefined;
+}
+
 export function mapPatientFormToUpdateCustomerInput(
   form: PatientFormShape,
-  opts: { locationId?: number | null; existingPatientIds?: number[] } = {},
+  opts: {
+    locationId?: number | null;
+    existingPatientIds?: number[];
+    // Kontaktperson (Osoba Kontaktowa) aus dem Lead/Kostenrechner — füllt
+    // customer_contract.salutation/first_name/last_name, damit das Panel die
+    // Kontaktdaten zeigt (nicht nur Customer.first_name top-level).
+    contact?: { anrede?: string | null; vorname?: string | null; nachname?: string | null };
+  } = {},
 ): MappedCustomerPatch {
   const patch: MappedCustomerPatch = {};
   const ids = opts.existingPatientIds ?? [];
@@ -694,15 +726,34 @@ export function mapPatientFormToUpdateCustomerInput(
 
   patch.patients = patients;
 
-  // Location — prefer explicit id from autocomplete; else custom text "PLZ Ort".
-  // Bug #13l + Bug #16: Mamamia panel "Lokalizacja opieki" czyta z
-  // customer_contract.location_id. Singular field na obu środowiskach
-  // (beta + prod). Patrz comment w MappedCustomerPatch type.
+  // customer_contract — das Mamamia-Panel liest "Lokalizacja opieki" UND die
+  // Kontakt-/Adressdaten aus diesem singularen Record. VOLL befüllen, sonst ist
+  // das Panel halb leer:
+  //   - location_id (resolved PLZ) → Lokalizacja opieki
+  //   - location_custom_text + zip_code/city (aus dem Formular) → Adresse
+  //     vollständig (location_id allein lässt zip/city null = "nur teilweise")
+  //   - salutation/first_name/last_name (Lead-Kontakt) → Kontaktdaten
+  // phone wird unten (phone-Block) ergänzt; email NICHT (siehe Typ-Kommentar).
+  const cc: NonNullable<MappedCustomerPatch['customer_contract']> = {};
   if (opts.locationId) {
     patch.location_id = opts.locationId;
-    patch.customer_contract = { location_id: opts.locationId };
-  } else if (form.plz || form.ort) {
-    patch.location_custom_text = `${form.plz} ${form.ort}`.trim();
+    cc.location_id = opts.locationId;
+  } else {
+    const locText = `${form.plz ?? ''} ${form.ort ?? ''}`.trim();
+    if (locText) patch.location_custom_text = locText;
+  }
+  const plzTrim = form.plz?.trim();
+  if (plzTrim) cc.zip_code = plzTrim;
+  const ortTrim = form.ort?.trim();
+  if (ortTrim) cc.city = ortTrim;
+  const cSal = salutationToApi(opts.contact?.anrede);
+  if (cSal) cc.salutation = cSal;
+  const cVor = opts.contact?.vorname?.trim();
+  if (cVor) cc.first_name = cVor;
+  const cNach = opts.contact?.nachname?.trim();
+  if (cNach) cc.last_name = cNach;
+  if (Object.keys(cc).length > 0) {
+    patch.customer_contract = { ...(patch.customer_contract ?? {}), ...cc };
   }
 
   // ── Customer-level fields ────────────────────────────────────────────

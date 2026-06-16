@@ -223,16 +223,29 @@ describe('mapPatientFormToUpdateCustomerInput', () => {
     const r = mapPatientFormToUpdateCustomerInput(makeForm(), { locationId: 1148 });
     expect(r.location_id).toBe(1148);
     expect(r.location_custom_text).toBeUndefined();
-    expect(r.customer_contract).toEqual({ location_id: 1148 });
+    // customer_contract trägt location_id + Adresse (zip/city aus dem Formular),
+    // damit das Panel nicht nur location_id, sondern vollständige Adresse zeigt.
+    expect(r.customer_contract).toEqual({ location_id: 1148, zip_code: '10115', city: 'Berlin' });
   });
 
-  it('location_custom_text fallback when no id (no customer_contract emitted)', () => {
+  it('no resolved id → customer_contract trägt trotzdem zip/city (Adresse), Customer.location_custom_text als Fallback', () => {
     const r = mapPatientFormToUpdateCustomerInput(makeForm());
     expect(r.location_custom_text).toBe('10115 Berlin');
     expect(r.location_id).toBeUndefined();
-    // Without resolved id nie zapisujemy customer_contract (Mamamia panel
-    // dropdown wymaga canonical location_id, nie custom text).
-    expect(r.customer_contract).toBeUndefined();
+    // Ohne canonical location_id schreiben wir keinen customer_contract.location_id,
+    // aber zip/city (Adresse) füllen das Panel teilweise statt gar nicht.
+    expect(r.customer_contract).toEqual({ zip_code: '10115', city: 'Berlin' });
+  });
+
+  it('contact (Lead) → customer_contract salutation/first_name/last_name', () => {
+    const r = mapPatientFormToUpdateCustomerInput(makeForm(), {
+      locationId: 1148,
+      contact: { anrede: 'Frau', vorname: 'Anna', nachname: 'Schmidt' },
+    });
+    expect(r.customer_contract).toEqual({
+      location_id: 1148, zip_code: '10115', city: 'Berlin',
+      salutation: 'Mrs.', first_name: 'Anna', last_name: 'Schmidt',
+    });
   });
 
   it('maps familieNahe + internet yes/no (live-verified working enums)', () => {
@@ -548,7 +561,7 @@ describe('mapPatientFormToUpdateCustomerInput', () => {
         makeForm({ phone: '+49 89 123' }),
         { locationId: 13035 },
       );
-      expect(r.customer_contract).toEqual({ location_id: 13035, phone: '+49 89 123' });
+      expect(r.customer_contract).toEqual({ location_id: 13035, zip_code: '10115', city: 'Berlin', phone: '+49 89 123' });
     });
 
     it('trims whitespace on both fields', () => {
@@ -557,13 +570,15 @@ describe('mapPatientFormToUpdateCustomerInput', () => {
       expect(r.customer_contract?.phone).toBe('+49 89 123');
     });
 
-    it('empty / whitespace-only → patch.phone + customer_contract.phone both omitted', () => {
+    it('empty / whitespace-only phone → phone omitted (customer_contract still carries the address)', () => {
       const empty = mapPatientFormToUpdateCustomerInput(makeForm({ phone: '' }));
       expect(empty.phone).toBeUndefined();
-      expect(empty.customer_contract).toBeUndefined();
+      expect(empty.customer_contract?.phone).toBeUndefined();
+      // makeForm has plz/ort → customer_contract carries zip/city regardless of phone.
+      expect(empty.customer_contract).toEqual({ zip_code: '10115', city: 'Berlin' });
       const spaces = mapPatientFormToUpdateCustomerInput(makeForm({ phone: '   ' }));
       expect(spaces.phone).toBeUndefined();
-      expect(spaces.customer_contract).toBeUndefined();
+      expect(spaces.customer_contract?.phone).toBeUndefined();
     });
   });
 });
