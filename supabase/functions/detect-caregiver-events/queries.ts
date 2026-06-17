@@ -16,6 +16,10 @@ export interface CaregiverNode {
   hp_total_days: number | null;
   hp_avg_mission_days: number | null;
   avatar_retouched: { aws_url: string | null } | null;
+  // Neuer Promo-Avatar — höchste Priorität in der Foto-Queue
+  // (promo → retouched). Optional, damit bestehende Test-Fixtures ohne das
+  // Feld weiter kompilieren; die Query selektiert es, Runtime liefert es.
+  avatar_retouched_promo?: { aws_url: string | null } | null;
   about_de: string | null;
 }
 
@@ -51,6 +55,7 @@ const CAREGIVER_FRAGMENT = /* GraphQL */ `
   hp_total_jobs
   hp_total_days
   hp_avg_mission_days
+  avatar_retouched_promo { aws_url }
   avatar_retouched { aws_url }
   about_de
 `;

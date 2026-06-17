@@ -565,6 +565,20 @@ Deno.test("buildCaregiverMetadata initials + optional fields", () => {
   assertEquals(typeof meta.caregiver_age, "number");
 });
 
+Deno.test("buildCaregiverMetadata Foto-Queue: avatar_retouched_promo bevorzugt vor retouched", () => {
+  const promo = buildCaregiverMetadata(50001, makeCaregiver({
+    avatar_retouched_promo: { aws_url: "https://cdn.test/promo.jpg" },
+    avatar_retouched: { aws_url: "https://cdn.test/retouched.jpg" },
+  }));
+  assertEquals(promo.caregiver_photo_url, "https://cdn.test/promo.jpg");
+  // promo fehlt / leer → fällt auf retouched zurück
+  const fallback = buildCaregiverMetadata(50001, makeCaregiver({
+    avatar_retouched_promo: { aws_url: null },
+    avatar_retouched: { aws_url: "https://cdn.test/retouched.jpg" },
+  }));
+  assertEquals(fallback.caregiver_photo_url, "https://cdn.test/retouched.jpg");
+});
+
 Deno.test("germanLevelLabel mappt germany_skill auf CEFR", () => {
   assertEquals(germanLevelLabel("level_0"), "A1");
   assertEquals(germanLevelLabel("level_3"), "B1-B2");
