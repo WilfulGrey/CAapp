@@ -904,10 +904,28 @@ export async function buildVertragAttachmentPdf(
     };
   } finally {
     if (browser) {
+      // Den OS-Prozess VOR close() greifen — nach close() liefert
+      // browser.process() ggf. null.
+      const proc = browser.process();
       try {
-        await browser.close();
+        // close() kann auf @sparticuz/chromium in einem langlebigen (Nicht-
+        // Lambda) Render-Prozess hängen → mit Timeout rennen, damit der
+        // Request nicht blockiert.
+        await Promise.race([
+          browser.close(),
+          new Promise((resolve) => setTimeout(resolve, 4000)),
+        ]);
       } catch {
-        // browser.close() kann hängen — kein blocking Problem.
+        // ignore — Force-Kill unten räumt auf.
+      }
+      // Force-Kill: wenn close() den Chromium-Prozess nicht reaped hat, sammeln
+      // sich Zombie-Chromiums über die Buchungen an → tägliches 512Mi-OOM auf
+      // Render (genau das Symptom). SIGKILL stellt sicher, dass der Prozess
+      // wirklich stirbt. No-op wenn der Prozess bereits tot ist.
+      try {
+        proc?.kill('SIGKILL');
+      } catch {
+        // bereits beendet / kein eigener Prozess (ws-Connection) — ignorieren.
       }
     }
   }
