@@ -478,11 +478,11 @@ async function detectForJob(
   // Collect fresh presigned photo URLs (lead-scoped, keyed by caregiver) for the
   // reminder-photo refresh the caller runs once after all jobs.
   for (const a of apps) {
-    const url = a.caregiver?.avatar_retouched?.aws_url;
+    const url = a.caregiver?.avatar_retouched_promo?.aws_url ?? a.caregiver?.avatar_retouched?.aws_url;
     if (a.caregiver_id != null && url) photoByCaregiver.set(a.caregiver_id, url);
   }
   for (const i of interests) {
-    const url = i.caregiver?.avatar_retouched?.aws_url;
+    const url = i.caregiver?.avatar_retouched_promo?.aws_url ?? i.caregiver?.avatar_retouched?.aws_url;
     if (i.caregiver_id != null && url && !photoByCaregiver.has(i.caregiver_id)) {
       photoByCaregiver.set(i.caregiver_id, url);
     }
@@ -709,8 +709,10 @@ export function buildCaregiverMetadata(
   }
   const germanLevel = germanLevelLabel(caregiver.germany_skill);
   if (germanLevel) meta.caregiver_german_level = germanLevel;
-  if (caregiver.avatar_retouched?.aws_url) {
-    meta.caregiver_photo_url = caregiver.avatar_retouched.aws_url;
+  // Foto-Queue: promo → retouched (raw avatar wird in detect nicht abgefragt).
+  const photoUrl = caregiver.avatar_retouched_promo?.aws_url ?? caregiver.avatar_retouched?.aws_url;
+  if (photoUrl) {
+    meta.caregiver_photo_url = photoUrl;
   }
   const about = cleanAboutText(caregiver.about_de);
   if (about) {

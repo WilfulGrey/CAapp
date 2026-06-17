@@ -52,7 +52,7 @@ export function rankComparator(now: Date) {
     badgeTier(caregiverBadgeScore(m.caregiver));
 
   const hasPhoto = (m: MamamiaMatching): number =>
-    (m.caregiver.avatar_retouched?.aws_url || m.caregiver.avatar?.aws_url) ? 1 : 0;
+    (m.caregiver.avatar_retouched_promo?.aws_url || m.caregiver.avatar_retouched?.aws_url || m.caregiver.avatar?.aws_url) ? 1 : 0;
 
   const isFemale = (m: MamamiaMatching): number =>
     m.caregiver.gender === 'female' ? 1 : 0;

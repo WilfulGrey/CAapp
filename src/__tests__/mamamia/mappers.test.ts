@@ -181,6 +181,26 @@ describe('mapCaregiverToNurse', () => {
     expect(n.image).toBe('https://s3/retouched.jpg');
   });
 
+  it('image: prefers avatar_retouched_promo over retouched + raw (Foto-Queue Spitze)', () => {
+    const n = mapCaregiverToNurse(
+      makeCg({
+        avatar_retouched_promo: { aws_url: 'https://s3/promo.jpg' },
+        avatar_retouched: { aws_url: 'https://s3/retouched.jpg' },
+        avatar: { aws_url: 'https://s3/raw.jpg' },
+      }),
+      { nowIso: NOW_ISO, nowYear: NOW_YEAR },
+    );
+    expect(n.image).toBe('https://s3/promo.jpg');
+  });
+
+  it('image: promo null/leer → fällt auf retouched zurück', () => {
+    const n = mapCaregiverToNurse(
+      makeCg({ avatar_retouched_promo: { aws_url: null }, avatar_retouched: { aws_url: 'https://s3/retouched.jpg' } }),
+      { nowIso: NOW_ISO, nowYear: NOW_YEAR },
+    );
+    expect(n.image).toBe('https://s3/retouched.jpg');
+  });
+
   it('image: undefined when both avatar_retouched and raw avatar are null', () => {
     const n = mapCaregiverToNurse(
       makeCg({ avatar_retouched: null, avatar: null }),
