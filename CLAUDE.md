@@ -985,8 +985,31 @@ npx supabase secrets unset DEBUG_PROXY --project-ref ycdwtrklpoqprabtwahi
 
 ### Render API
 
-Brak — w razie potrzeby Render dashboard. Auto-deploy z GitHub push, więc
-zwykle wystarczy patrzeć w Render dashboard 2-3min po push.
+**Dostępne** — `RENDER_API_KEY` (`rnd_…`) jest w shell env, `render` CLI w
+`/opt/homebrew/bin/render`, a skille `/deploy-staging` + `/deploy-prod` go
+używają. Base URL `https://api.render.com/v1`, auth `Authorization: Bearer
+$RENDER_API_KEY`. Normalna ścieżka deploy to wciąż auto-deploy z GitHub push
+(2-3 min) — API używaj do env-vars i wymuszonych redeploy'ów.
+
+Service IDs:
+
+| Slot | PROD | STAGING |
+|---|---|---|
+| CAapp | `srv-d7phc0rrjlhs73dtismg` | `srv-d8anbsfavr4c73do33mg` |
+| Kostenrechner | `srv-d7phc1n7f7vs739kaa5g` | `srv-d8anc9b7uimc73ajhdm0` |
+
+```bash
+RK="$RENDER_API_KEY"; SID=srv-...
+curl -sS "https://api.render.com/v1/services/$SID/env-vars?limit=100" -H "Authorization: Bearer $RK"        # read env
+curl -sS -X PUT "https://api.render.com/v1/services/$SID/env-vars" -H "Authorization: Bearer $RK" -d '[...]' # bulk replace ALL (atomic)
+curl -sS -X POST "https://api.render.com/v1/services/$SID/deploys" -H "Authorization: Bearer $RK" -d '{"clearCache":"do_not_clear"}'
+```
+
+**Gotcha:** zmiana env-vars przez API **NIE** auto-deployuje — nowe wartości
+łapie dopiero kolejny deploy (`POST .../deploys` albo push). Bulk `PUT
+/env-vars` zastępuje CAŁY zestaw, więc GET → modyfikuj → PUT (nie zgub
+pozostałych zmiennych). Vary `value:` w `render.yaml` są nadpisywane przez
+blueprint na każdym sync; `sync:false` zostają dashboard/API-managed.
 
 ### Email transport (Amazon SES)
 
