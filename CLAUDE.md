@@ -137,6 +137,7 @@ ludzie ufają temu co przeczytają, a stare dokumenty kłamią z autorytetem.
 | Nowe pole w `PatientForm` interface lub `mapMamamiaCustomerToPatientForm` | CLAUDE.md sekcja „Field mapping reference" + [docs/customer-portal-flow.md](docs/customer-portal-flow.md) §6 (`getCustomer` / `updateCustomer`) |
 | Bugfix (każdy) | CLAUDE.md sekcja „Recent bug fixes — registry" — kolejny numer, plik(i), one-line fix highlight |
 | Nowa edge function lub usunięcie istniejącej | CLAUDE.md sekcja „Kluczowe pliki" + [docs/customer-portal-flow.md](docs/customer-portal-flow.md) (jeśli wpływa na browser↔mamamia path) |
+| Zmiana w SMTP transport / email provider (`lib/email.ts`, `send-scheduled-emails`, `get_smtp_config`, SMTP secrets) | [docs/ses-email-migration.md](docs/ses-email-migration.md) + CLAUDE.md sekcja „Email transport (Amazon SES)" |
 | Zmiana w `.github/workflows/*` lub wymaganiach branch protection | CLAUDE.md sekcja „GitHub workflow (PR / CI / branch protection)" — tabela reguł + status check names |
 | Nowe wymagania środowiskowe (env var / `.env*` / Render secret) | ONBOARDING.md (§2 / §3) + jeśli runtime → CLAUDE.md sekcja „Deploy workflow" → „Supabase secrets" |
 
@@ -986,6 +987,33 @@ npx supabase secrets unset DEBUG_PROXY --project-ref ycdwtrklpoqprabtwahi
 
 Brak — w razie potrzeby Render dashboard. Auto-deploy z GitHub push, więc
 zwykle wystarczy patrzeć w Render dashboard 2-3min po push.
+
+### Email transport (Amazon SES)
+
+Maile wychodzą przez **nodemailer over SMTP** (Amazon SES, region
+`eu-central-1`, host `email-smtp.eu-central-1.amazonaws.com`, port 587
+STARTTLS). SES zastąpił Ionos (throttling/timeouty z Rendera). Pełny runbook
++ per-env wartości: [docs/ses-email-migration.md](docs/ses-email-migration.md).
+
+Dwie ścieżki transportu, **dwa różne magazyny configu** — łatwo pomylić:
+
+| Ścieżka | Kod | Config żyje w | Czym przełączasz |
+|---|---|---|---|
+| **A — edge fn** `send-scheduled-emails` (maile do klienta: Eingangsbestätigung + Nachfass) | `sendEmailSmtp` | **Supabase Vault** (`vault.decrypted_secrets`: `smtp_host`, `smtp_user`, `smtp_pass`, `smtp_from`, …) przez RPC `get_smtp_config()` | SQL update Vault na danym projekcie. **Bez redeploy** — RPC czyta Vault per-call. |
+| **B — Next.js** `sendEmail` (team notif, Vertrag, resend) | `project 3/lib/email.ts` | **Render env vars** (`SMTP_HOST`, `SMTP_USER`, …) | Render dashboard (brak Render API tokena). |
+
+Gotchas:
+- **Vault ≠ `supabase secrets`.** SMTP secrets ścieżki A siedzą w Vault (SQL
+  `vault.create_secret`/`update_secret`), NIE w edge-fn env (`supabase secrets set`).
+- `requireTLS: true` + bounded timeouts w obu transportach — choking provider
+  pada szybko i widocznie zamiast wisieć. Provider-neutral (działa też z Ionos).
+- `SMTP_FROM` MUSI być ustawiony (verified SES identity, `kostenrechner@primundus.de`).
+  Inaczej kod fallbackuje na `SMTP_USER` = SMTP username `AKIA…` (nie email) → invalid From.
+- `render.yaml` hardkoduje `SMTP_HOST=smtp.ionos.de` (prod blueprint). Przy
+  prod cutover trzeba to zmienić — inaczej redeploy prod resetuje host na Ionos.
+- Przełączenie env odbywa się **per-environment**: staging (Vault `taggpiwpwthgpcmaiqjw`
+  + Render `kostenrechner-staging`) pierwszy, prod (`ycdwtrklpoqprabtwahi` +
+  `kostenrechner`) dopiero po weryfikacji. SMTP password = sekret, nigdy do gita.
 
 ---
 

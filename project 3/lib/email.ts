@@ -2400,6 +2400,18 @@ export async function sendEmail(
       host: process.env.SMTP_HOST || 'smtp.ionos.de',
       port: parseInt(process.env.SMTP_PORT || '587'),
       secure: false,
+      // Mandate the STARTTLS upgrade on the submission port. Amazon SES
+      // rejects any plaintext session, and we never want to silently send
+      // credentials in the clear — requireTLS makes a failed upgrade error
+      // out instead. Harmless for Ionos (its 587 speaks STARTTLS too).
+      requireTLS: true,
+      tls: { minVersion: 'TLSv1.2' },
+      // Bound the handshake/send so a choking provider fails fast and
+      // visibly instead of hanging the request — the Render→Ionos stalls
+      // are exactly what pushed customer mail onto the scheduled pipeline.
+      connectionTimeout: 10000,
+      greetingTimeout: 10000,
+      socketTimeout: 20000,
       auth: {
         user: process.env.SMTP_USER,
         pass: process.env.SMTP_PASS || process.env.SMTP_PASSWORD,
