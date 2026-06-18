@@ -85,8 +85,12 @@ services:
         sync: false
       - key: ADMIN_PASSWORD
         sync: false
+      # Amazon SES (eu-central-1), port 587 + STARTTLS — replaces Ionos.
+      # Host + From are non-secret and pinned here so a redeploy can't reset
+      # them; only the SES SMTP user/pass are secrets (set in the dashboard).
+      # See docs/ses-email-migration.md.
       - key: SMTP_HOST
-        value: smtp.ionos.de
+        value: email-smtp.eu-central-1.amazonaws.com
       - key: SMTP_PORT
         value: "587"
       - key: SMTP_USER
@@ -94,7 +98,7 @@ services:
       - key: SMTP_PASS
         sync: false
       - key: SMTP_FROM
-        sync: false
+        value: kostenrechner@primundus.de
       - key: SMTP_FROM_NAME
         value: Primundus 24h-Pflege
       - key: SMTP_ADMIN_EMAIL
