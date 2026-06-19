@@ -1507,7 +1507,19 @@ function customerGreeting(lead: Lead): string {
   if (anrede === 'Frau' && n)     return `Guten Tag Frau ${n}`;
   if (anrede === 'Herr' && n)     return `Guten Tag Herr ${n}`;
   if (anrede === 'Familie' && n)  return `Guten Tag Familie ${n}`;
-  if (lead.vorname)               return `Guten Tag ${lead.vorname}`;
+  // Vorname als Anrede nur wenn wir ihn als echten Vornamen einschätzen:
+  //   (a) in der Namens-DB (detectGenderFromName liefert Geschlecht), ODER
+  //   (b) es gibt einen separaten Nachnamen → der Parser hatte 2+ Tokens,
+  //       also ist das erste Token sehr wahrscheinlich ein Vorname
+  //       ("Tomasz Kowalski" → "Guten Tag Tomasz", auch wenn Tomasz nicht
+  //       in der DB ist).
+  // Reiner Einzel-Token, nicht in DB → vermutlich Nachname. Seit der
+  // Kostenrechner nur ein freies "Name"-Feld hat (PR #298), tippen Kunden
+  // oft nur ihren Nachnamen ("Zielke"), der fälschlich als vorname geparst
+  // wird. Dann lieber neutral "Guten Tag" als "Guten Tag Zielke".
+  if (lead.vorname && (detectGenderFromName(lead.vorname) || n)) {
+    return `Guten Tag ${lead.vorname}`;
+  }
   return 'Guten Tag';
 }
 
