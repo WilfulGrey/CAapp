@@ -58,6 +58,11 @@ const TEAM_NOTIFY_CAREGIVER_EVENTS = new Set([
   'application_received',
 ]);
 const TEAM_NOTIFY_RECIPIENT = 'info@primundus.de';
+// Zusätzliche BCC-Empfänger NUR für die Accept-/Buchungs-Team-Mail
+// (application_accepted_internal). Andere Team-Notifications behalten den
+// Default-BCC (SMTP_BCC = info@primundus.de,info@mamamia.app). Kommasepariert.
+const ACCEPT_TEAM_NOTIFY_EXTRA_BCC =
+  'm.kepinski@mamamia.app,marta.kapcio@vitanas.pl,kamila.bilska-wabik@vitanas.pl';
 // Events, die KEINEN DB-Dedupe verwenden — pro Auftreten ein Eintrag und
 // (falls eine Mail dranhängt) eine Mail. Mehrere Pflegekräfte können Interesse
 // zeigen, mehrere Bewerbungen können auf einen Lead landen.
@@ -511,7 +516,11 @@ export async function POST(request: NextRequest) {
                 }
               : undefined);
       const teamTemplate = getTeamNotificationTemplate(lead as any, event, additionalData as any);
-      sendEmail(TEAM_NOTIFY_RECIPIENT, teamTemplate, contractAttachment ? [contractAttachment] : undefined).catch((e) =>
+      // Nur die Accept-/Buchungs-Mail bekommt das erweiterte interne BCC.
+      const teamMailOptions = event === 'application_accepted_internal'
+        ? { extraBcc: ACCEPT_TEAM_NOTIFY_EXTRA_BCC }
+        : undefined;
+      sendEmail(TEAM_NOTIFY_RECIPIENT, teamTemplate, contractAttachment ? [contractAttachment] : undefined, teamMailOptions).catch((e) =>
         console.error('team notify send threw:', e instanceof Error ? e.message : String(e)),
       );
     }
