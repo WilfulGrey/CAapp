@@ -1693,7 +1693,7 @@ Deno.serve(async (req: Request) => {
           eventTypeSent = "email_nachfass_3_sent";
           eventTypeFailed = "email_nachfass_3_failed";
         } else if (scheduledEmail.email_type === "profil_nudge_1") {
-          subject = "Nur noch 1 Schritt bis zu Ihren Pflegekraft-Vorschlägen";
+          subject = "5 passende Pflegekräfte warten auf Sie";
           html = buildProfilNudge1Html(lead as Lead, smtpConfig.siteUrl, portalBase);
           text = buildProfilNudge1Text(lead as Lead, smtpConfig.siteUrl, portalBase);
           eventTypeSent = "email_profil_nudge_1_sent";
