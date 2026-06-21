@@ -491,6 +491,108 @@ Ilka Wysocki
 Primundus Deutschland | +49 89 200 000 830 | www.primundus.de`;
 }
 
+// ─── Profil-Nudges (gegen den 58%-Abbruch Portal-geöffnet → Profil) ──────
+// Zwei dedizierte Mails, die NUR feuern solange das Patientenprofil offen
+// ist (Skip-Logik im Handler: patient_data_saved / gebucht / nicht-int. /
+// eingeladen → cancel). Anker: "5 vorbereitete Pflegekräfte".
+
+function buildProfilNudge1Html(lead: Lead, siteUrl: string, portalBase: string): string {
+  const portalUrl = (portalBase && lead.token) ? buildPortalUrl(portalBase, lead.token) : siteUrl;
+  const halloAnrede = buildHalloAnrede(lead.anrede_text || null, lead.nachname || "", lead.vorname || "");
+  const content = `
+    <p style="font-size:15px;line-height:1.75;color:#444;margin-bottom:14px;">${halloAnrede},</p>
+    <p style="font-size:15px;line-height:1.75;color:#444;margin-bottom:14px;">Sie haben vor Kurzem Ihr persönliches Angebot zur 24-Stunden-Betreuung erhalten &ndash; und ich habe bereits <strong>passende Pflegekräfte für Sie vorbereitet</strong>, kostenfrei und unverbindlich.</p>
+    <p style="font-size:15px;line-height:1.75;color:#444;margin-bottom:14px;">Konnten Sie sich die <strong>5 Pflegekräfte</strong> schon ansehen?</p>
+
+    <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="margin:18px 0 8px;background:#F1F8F3;border:1px solid #CDE9D6;border-radius:10px;overflow:hidden;">
+      <tr><td style="padding:18px 24px 20px;">
+        <p style="margin:0 0 6px;font-size:11px;font-weight:700;color:#22894C;letter-spacing:.08em;text-transform:uppercase;">Für Sie bereit</p>
+        <p style="margin:0 0 8px;font-size:19px;font-weight:700;color:#1C5C34;line-height:1.35;">5 passende Pflegekräfte warten auf Sie</p>
+        <p style="margin:0;font-size:14px;line-height:1.65;color:#33503D;">Darunter Kräfte mit <strong>Platin- &amp; Gold-Erfahrung</strong>. So geht es weiter: <strong>Patientendaten ausfüllen &rarr; Wunschkräfte einladen &rarr; Bewerbungen erhalten.</strong></p>
+      </td></tr>
+    </table>
+
+    <p style="font-size:15px;line-height:1.75;color:#444;margin:16px 0 6px;">Das Ausfüllen dauert nur <strong>2 Minuten</strong> &ndash; vieles ist aus Ihrer Anfrage schon vorausgefüllt.</p>
+
+    ${bulletproofButton(portalUrl, "Patientendaten vervollständigen&nbsp;&nbsp;&rarr;", "#2A9D5C")}
+
+    <p style="font-size:13px;line-height:1.65;color:#8a8a8a;text-align:center;margin:6px 0 4px;">Beliebte Pflegekräfte sind oft schnell vergeben.</p>
+
+    <p style="font-size:15px;line-height:1.75;color:#444;margin:28px 0 18px;">Wenn Sie Hilfe beim Ausfüllen brauchen oder eine Frage haben &ndash; rufen Sie mich an, schreiben Sie mir per WhatsApp oder antworten Sie einfach auf diese E-Mail. Ich bin gerne für Sie da.</p>
+
+    ${buildIlkaSig(siteUrl)}`;
+  return buildEmailWrapper(lead, siteUrl, content);
+}
+
+function buildProfilNudge1Text(lead: Lead, siteUrl: string, portalBase: string): string {
+  const portalUrl = (portalBase && lead.token) ? buildPortalUrl(portalBase, lead.token) : siteUrl;
+  const halloAnrede = buildHalloAnrede(lead.anrede_text || null, lead.nachname || "", lead.vorname || "");
+  return `${halloAnrede},
+
+Sie haben vor Kurzem Ihr persönliches Angebot zur 24-Stunden-Betreuung erhalten – und ich habe bereits passende Pflegekräfte für Sie vorbereitet, kostenfrei und unverbindlich.
+
+Konnten Sie sich die 5 Pflegekräfte schon ansehen? Darunter Kräfte mit Platin- & Gold-Erfahrung.
+
+So geht es weiter: Patientendaten ausfüllen → Wunschkräfte einladen → Bewerbungen erhalten. Das dauert nur 2 Minuten – vieles ist aus Ihrer Anfrage schon vorausgefüllt.
+
+Patientendaten vervollständigen: ${portalUrl}
+
+Beliebte Pflegekräfte sind oft schnell vergeben.
+
+Mit freundlichen Grüßen
+Ilka Wysocki
+
+---
+Primundus Deutschland | +49 89 200 000 830 | www.primundus.de`;
+}
+
+function buildProfilNudge2Html(lead: Lead, siteUrl: string, portalBase: string): string {
+  const portalUrl = (portalBase && lead.token) ? buildPortalUrl(portalBase, lead.token) : siteUrl;
+  const halloAnrede = buildHalloAnrede(lead.anrede_text || null, lead.nachname || "", lead.vorname || "");
+  const content = `
+    <p style="font-size:15px;line-height:1.75;color:#444;margin-bottom:14px;">${halloAnrede},</p>
+    <p style="font-size:15px;line-height:1.75;color:#444;margin-bottom:14px;">manchmal ist der Pflegebedarf gar nicht so einfach in ein Formular zu fassen &ndash; das verstehe ich gut. Deshalb mein Angebot: <strong>Wir füllen die Angaben gemeinsam am Telefon aus.</strong> Das dauert keine 5 Minuten, und Sie müssen sich um nichts allein kümmern.</p>
+
+    <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="margin:18px 0 8px;background:#FAF8F4;border:1px solid #ECE3D4;border-radius:10px;overflow:hidden;">
+      <tr><td style="padding:18px 24px 20px;">
+        <p style="margin:0 0 6px;font-size:11px;font-weight:700;color:#B8860B;letter-spacing:.08em;text-transform:uppercase;">Persönliche Hilfe</p>
+        <p style="margin:0 0 8px;font-size:18px;font-weight:700;color:#2D1F0F;line-height:1.35;">Ich rufe Sie gerne an</p>
+        <p style="margin:0;font-size:14px;line-height:1.65;color:#555;">Antworten Sie einfach kurz auf diese E-Mail mit einer <strong>Uhrzeit, die Ihnen passt</strong> &ndash; oder rufen Sie mich direkt an. Sobald Ihre Angaben stehen, können Sie Ihre <strong>5 vorbereiteten Pflegekräfte</strong> einladen.</p>
+      </td></tr>
+    </table>
+
+    ${bulletproofButton("https://wa.me/4989200000830", "Per WhatsApp einen Rückruf vereinbaren", "#25D366")}
+
+    <p style="font-size:14px;line-height:1.7;color:#777;text-align:center;margin:10px 0 4px;">Oder direkt selbst ausfüllen (nur 2 Minuten):<br>
+      <a href="${portalUrl}" target="_blank" style="color:#2A9D5C;text-decoration:underline;font-weight:600;">Patientendaten im Portal vervollständigen &rarr;</a>
+    </p>
+
+    <p style="font-size:15px;line-height:1.75;color:#444;margin:28px 0 18px;">Ich bin Mo&ndash;So von 8 bis 20 Uhr für Sie da &ndash; rufen Sie mich an, schreiben Sie mir per WhatsApp oder antworten Sie einfach auf diese E-Mail.</p>
+
+    ${buildIlkaSig(siteUrl)}`;
+  return buildEmailWrapper(lead, siteUrl, content);
+}
+
+function buildProfilNudge2Text(lead: Lead, siteUrl: string, portalBase: string): string {
+  const portalUrl = (portalBase && lead.token) ? buildPortalUrl(portalBase, lead.token) : siteUrl;
+  const halloAnrede = buildHalloAnrede(lead.anrede_text || null, lead.nachname || "", lead.vorname || "");
+  return `${halloAnrede},
+
+manchmal ist der Pflegebedarf gar nicht so einfach in ein Formular zu fassen – das verstehe ich gut. Deshalb mein Angebot: Wir füllen die Angaben gemeinsam am Telefon aus. Das dauert keine 5 Minuten, und Sie müssen sich um nichts allein kümmern.
+
+Antworten Sie einfach kurz auf diese E-Mail mit einer Uhrzeit, die Ihnen passt – oder rufen Sie mich direkt an unter 089 200 000 830. Sobald Ihre Angaben stehen, können Sie Ihre 5 vorbereiteten Pflegekräfte einladen.
+
+Oder direkt selbst ausfüllen (nur 2 Minuten): ${portalUrl}
+
+Ich bin Mo–So von 8 bis 20 Uhr für Sie da.
+
+Mit freundlichen Grüßen
+Ilka Wysocki
+
+---
+Primundus Deutschland | +49 89 200 000 830 | www.primundus.de`;
+}
+
 function buildNachfass2Html(lead: Lead, siteUrl: string, portalBase: string, milestone: LeadMilestone): string {
   const portalUrl = (portalBase && lead.token) ? buildPortalUrl(portalBase, lead.token) : siteUrl;
   const halloAnrede = buildHalloAnrede(lead.anrede_text || null, lead.nachname || "", lead.vorname || "");
@@ -1483,9 +1585,16 @@ Deno.serve(async (req: Request) => {
           scheduledEmail.email_type === "nachfass_2" ||
           scheduledEmail.email_type === "nachfass_3";
 
+        // Profil-Nudges (gegen Profil-Abbruch). Feuern nur solange das
+        // Patientenprofil offen ist \u2014 bei patient_data_saved/eingeladen
+        // ist das Ziel erreicht und der Nudge cancelt sich selbst.
+        const isProfilNudge =
+          scheduledEmail.email_type === "profil_nudge_1" ||
+          scheduledEmail.email_type === "profil_nudge_2";
+
         // Lead-Meilenstein aus den CA-App-Events (portal_opened, patient_data_saved,
         // caregiver_invited) \u2014 steuert die Nachfass-Variante + den Abbruch.
-        const milestone = isNachfass
+        const milestone = (isNachfass || isProfilNudge)
           ? await getLeadMilestone(supabase, scheduledEmail.lead_id)
           : "none" as LeadMilestone;
 
@@ -1502,6 +1611,32 @@ Deno.serve(async (req: Request) => {
             event_type: `email_${scheduledEmail.email_type}_cancelled`,
             metadata: {
               reason: milestone === "caregiver_invited"
+                ? "caregiver_invited"
+                : isNichtInteressiert ? "nicht_interessiert" : "betreuung_beauftragt",
+            },
+          });
+
+          results.push({ id: scheduledEmail.id, success: true });
+          continue;
+        }
+
+        // Profil-Nudge-Abbruch: sobald das Profil steht (patient_data_saved)
+        // ODER der Kunde schon eingeladen / gebucht hat / nicht interessiert
+        // ist, ist der Nudge gegenstandslos.
+        if (isProfilNudge && (isBeauftragt || isNichtInteressiert
+            || milestone === "patient_data_saved" || milestone === "caregiver_invited")) {
+          await supabase
+            .from("scheduled_emails")
+            .update({ status: "cancelled", updated_at: new Date().toISOString() })
+            .eq("id", scheduledEmail.id);
+
+          await supabase.from("lead_events").insert({
+            lead_id: scheduledEmail.lead_id,
+            event_type: `email_${scheduledEmail.email_type}_cancelled`,
+            metadata: {
+              reason: milestone === "patient_data_saved"
+                ? "patient_data_saved"
+                : milestone === "caregiver_invited"
                 ? "caregiver_invited"
                 : isNichtInteressiert ? "nicht_interessiert" : "betreuung_beauftragt",
             },
@@ -1557,6 +1692,18 @@ Deno.serve(async (req: Request) => {
           text = buildNachfass3Text(lead as Lead, smtpConfig.siteUrl);
           eventTypeSent = "email_nachfass_3_sent";
           eventTypeFailed = "email_nachfass_3_failed";
+        } else if (scheduledEmail.email_type === "profil_nudge_1") {
+          subject = "Nur noch 1 Schritt bis zu Ihren Pflegekraft-Vorschlägen";
+          html = buildProfilNudge1Html(lead as Lead, smtpConfig.siteUrl, portalBase);
+          text = buildProfilNudge1Text(lead as Lead, smtpConfig.siteUrl, portalBase);
+          eventTypeSent = "email_profil_nudge_1_sent";
+          eventTypeFailed = "email_profil_nudge_1_failed";
+        } else if (scheduledEmail.email_type === "profil_nudge_2") {
+          subject = "Soll ich Ihnen beim Ausfüllen helfen?";
+          html = buildProfilNudge2Html(lead as Lead, smtpConfig.siteUrl, portalBase);
+          text = buildProfilNudge2Text(lead as Lead, smtpConfig.siteUrl, portalBase);
+          eventTypeSent = "email_profil_nudge_2_sent";
+          eventTypeFailed = "email_profil_nudge_2_failed";
         } else if (
           scheduledEmail.email_type === "interest_reminder" ||
           scheduledEmail.email_type === "application_reminder" ||
@@ -1737,15 +1884,23 @@ Deno.serve(async (req: Request) => {
  
           // Nachfass-Kette: startet jetzt nach der (gemergten) Eingangsbestätigung.
           // `angebot` bleibt für evtl. eingeplante Alt-Rows ebenfalls als Anker.
-          // Sequenz: Eingangsbest +24h → Nachfass_1 +48h → Nachfass_2 +48h →
-          // Nachfass_3 (Quick-Reaktion mit mailto-Buttons, "letzter Versuch").
+          // Sequenz (Profil-Abbruch-optimiert, Stand 15.06.2026):
+          //   0h    Eingangsbestätigung
+          //   +4h   profil_nudge_1  ("5 Pflegekräfte warten", Neugier)
+          //   +28h  profil_nudge_2  ("Ich helf am Telefon", persönlich)
+          //   +48h  warum_primundus (Trust/Bestpreis)
+          //   +72h  nachfass_2      (kurze persönliche Nachfrage)
+          //   +120h nachfass_3      (Break-up, mailto-Buttons)
+          // nachfass_1 wurde durch die zwei dedizierten Profil-Nudges
+          // ersetzt (war generisch + kollidierte zeitlich). Der nachfass_1-
+          // Handler bleibt für evtl. noch eingeplante Alt-Rows.
+          // Alle Profil-Nudges + Nachfässe canceln sich selbst, sobald das
+          // Profil steht / gebucht / nicht interessiert (Skip-Logik oben).
           if (scheduledEmail.email_type === "eingangsbestaetigung" || scheduledEmail.email_type === "angebot") {
-            await scheduleFollowUp(supabase, lead as Lead, "nachfass_1", 24 * 60);
-            // Trust-/Bestpreis-Mail in der Vergleichsphase — +48h, also im
-            // sauberen Slot zwischen Nachfass_1 (+24h) und Nachfass_2 (+72h).
+            await scheduleFollowUp(supabase, lead as Lead, "profil_nudge_1", 4 * 60);
+            await scheduleFollowUp(supabase, lead as Lead, "profil_nudge_2", 28 * 60);
             await scheduleFollowUp(supabase, lead as Lead, "warum_primundus", 48 * 60);
-          } else if (scheduledEmail.email_type === "nachfass_1") {
-            await scheduleFollowUp(supabase, lead as Lead, "nachfass_2", 48 * 60);
+            await scheduleFollowUp(supabase, lead as Lead, "nachfass_2", 72 * 60);
           } else if (scheduledEmail.email_type === "nachfass_2") {
             await scheduleFollowUp(supabase, lead as Lead, "nachfass_3", 48 * 60);
           }
