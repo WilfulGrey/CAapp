@@ -2403,7 +2403,7 @@ export async function sendEmail(
   to: string | string[],
   template: EmailTemplate,
   attachments?: any[],
-  options?: { skipBcc?: boolean }
+  options?: { skipBcc?: boolean; extraBcc?: string }
 ): Promise<{ success: boolean; error?: string }> {
   try {
     const nodemailer = await import('nodemailer');
@@ -2438,7 +2438,13 @@ export async function sendEmail(
     // Callers can opt out per-call via options.skipBcc (e.g. when the `to`
     // already IS the ops audience, like the admin resend-to-BCC endpoint).
     const bccRaw = process.env.SMTP_BCC ?? 'info@primundus.de,info@mamamia.app';
-    const bccAddr = options?.skipBcc ? '' : bccRaw.trim();
+    // extraBcc: per-call zusätzliche BCC-Empfänger (kommasepariert), an den
+    // Default-Ops-BCC angehängt. Genutzt z.B. für Accept-Mails
+    // (application_accepted_internal), die über das Standard-Publikum hinaus
+    // an weitere interne Adressen kopiert werden sollen.
+    const bccAddr = options?.skipBcc
+      ? ''
+      : [bccRaw.trim(), options?.extraBcc?.trim()].filter(Boolean).join(',');
 
     const mailOptions: any = {
       from: `"${process.env.SMTP_FROM_NAME || 'Primundus 24h-Pflege'}" <${process.env.SMTP_FROM || process.env.SMTP_USER}>`,
