@@ -964,6 +964,87 @@ www.primundus.de`;
 }
 
 
+// ---------------------------------------------------------------------------
+// Domain-Tippfehler-Schutz
+// ---------------------------------------------------------------------------
+// Kunden vertippen sich in ihrer eigenen E-Mail-Domain (z. B. "t-onlne.de"
+// statt "t-online.de"). Solche Mails bouncen still — der Kunde wartet, wir
+// merken nichts. Vor dem Versand prüfen wir die Empfänger-Domain gegen gängige
+// Provider und flaggen offensichtliche Tippfehler statt blind zu senden.
+//
+// WICHTIG: Unbekannte, aber valide Firmen-/Uni-Domains (cavacom.biz,
+// hsx-stahl.de, alumni.uni-heidelberg.de) dürfen NICHT geflaggt werden. Darum
+// flaggen wir nur, wenn die Domain genau 1 Zeichen neben einem gängigen
+// Provider liegt ODER in der bekannten-Tippfehler-Liste steht. Firmen-Domains
+// sind von allen Providern weit entfernt → bleiben unangetastet.
+const COMMON_EMAIL_DOMAINS = [
+  "t-online.de", "gmail.com", "googlemail.com", "web.de", "gmx.de", "gmx.net",
+  "gmx.at", "gmx.ch", "yahoo.de", "yahoo.com", "hotmail.de", "hotmail.com",
+  "outlook.de", "outlook.com", "live.de", "live.com", "freenet.de", "aol.com",
+  "icloud.com", "me.com", "mail.de", "arcor.de",
+];
+
+// Eindeutige Tippfehler, die die Distanz-1-Heuristik nicht erwischt
+// (v. a. Buchstabendreher = Levenshtein-Distanz 2).
+const KNOWN_DOMAIN_TYPOS: Record<string, string> = {
+  "gmial.com": "gmail.com",
+  "gmai.com": "gmail.com",
+  "gmaill.com": "gmail.com",
+  "gnail.com": "gmail.com",
+  "hotmial.com": "hotmail.com",
+  "hotmai.com": "hotmail.com",
+  "outlok.com": "outlook.com",
+  "yahho.de": "yahoo.de",
+  "freent.de": "freenet.de",
+  "t-onine.de": "t-online.de",
+  // .ed/.de-Buchstabendreher (Levenshtein-Distanz 2, daher explizit):
+  "gmx.ed": "gmx.de",
+  "web.ed": "web.de",
+  "t-online.ed": "t-online.de",
+  "freenet.ed": "freenet.de",
+};
+
+function levenshtein(a: string, b: string): number {
+  const m = a.length, n = b.length;
+  if (m === 0) return n;
+  if (n === 0) return m;
+  let prev = new Array(n + 1);
+  let curr = new Array(n + 1);
+  for (let j = 0; j <= n; j++) prev[j] = j;
+  for (let i = 1; i <= m; i++) {
+    curr[0] = i;
+    for (let j = 1; j <= n; j++) {
+      const cost = a[i - 1] === b[j - 1] ? 0 : 1;
+      curr[j] = Math.min(prev[j] + 1, curr[j - 1] + 1, prev[j - 1] + cost);
+    }
+    [prev, curr] = [curr, prev];
+  }
+  return prev[n];
+}
+
+function detectEmailDomainTypo(
+  email: string,
+): { suspicious: boolean; suggestion?: string; reason?: string } {
+  const at = (email ?? "").lastIndexOf("@");
+  if (at < 0) return { suspicious: true, reason: "keine gültige Adresse (kein @)" };
+  const domain = email.slice(at + 1).trim().toLowerCase();
+  if (!domain || !domain.includes(".") || domain.startsWith(".") || domain.endsWith(".")) {
+    return { suspicious: true, reason: "ungültige Domain" };
+  }
+  // Exakt gängig → in Ordnung.
+  if (COMMON_EMAIL_DOMAINS.includes(domain)) return { suspicious: false };
+  // Bekannter Tippfehler?
+  const known = KNOWN_DOMAIN_TYPOS[domain];
+  if (known) return { suspicious: true, suggestion: known, reason: "bekannter Tippfehler" };
+  // Genau 1 Zeichen neben einem gängigen Provider → sehr wahrscheinlich Tippfehler.
+  for (const good of COMMON_EMAIL_DOMAINS) {
+    if (levenshtein(domain, good) === 1) {
+      return { suspicious: true, suggestion: good, reason: "1 Zeichen daneben" };
+    }
+  }
+  return { suspicious: false };
+}
+
 async function sendEmailSmtp(
   smtpConfig: SmtpConfig,
   to: string,
@@ -1520,7 +1601,7 @@ Deno.serve(async (req: Request) => {
       );
     }
  
-    const results: { id: string; success: boolean; error?: string }[] = [];
+    const results: { id: string; success: boolean; error?: string; flagged?: boolean }[] = [];
  
     for (const scheduledEmail of pendingEmails as ScheduledEmail[]) {
       try {
@@ -1865,6 +1946,34 @@ Deno.serve(async (req: Request) => {
           if (reminderInline) attachments = [reminderInline];
         }
 
+        // Domain-Tippfehler-Schutz: offensichtlich vertippte Empfänger-Domains
+        // (z. B. t-onlne.de statt t-online.de) NICHT blind versenden — sonst
+        // stiller Bounce. Stattdessen als needs_review flaggen + Event loggen,
+        // damit jemand die Adresse beim Kunden korrigieren kann.
+        const domainCheck = detectEmailDomainTypo(scheduledEmail.recipient_email);
+        if (domainCheck.suspicious) {
+          const note = domainCheck.suggestion
+            ? `Verdächtige Empfänger-Domain (${domainCheck.reason}): ${scheduledEmail.recipient_email} → vermutlich gemeint: …@${domainCheck.suggestion}`
+            : `Verdächtige Empfänger-Domain (${domainCheck.reason}): ${scheduledEmail.recipient_email}`;
+          await supabase
+            .from("scheduled_emails")
+            .update({ status: "needs_review", error_message: note, updated_at: new Date().toISOString() })
+            .eq("id", scheduledEmail.id);
+          await supabase.from("lead_events").insert({
+            lead_id: scheduledEmail.lead_id,
+            event_type: "email_domain_flagged",
+            metadata: {
+              to: scheduledEmail.recipient_email,
+              email_type: scheduledEmail.email_type,
+              suggestion: domainCheck.suggestion ?? null,
+              reason: domainCheck.reason ?? null,
+            },
+          });
+          console.warn(`[domain-flag] ${note} (lead ${scheduledEmail.lead_id}, type ${scheduledEmail.email_type})`);
+          results.push({ id: scheduledEmail.id, success: false, flagged: true, error: note });
+          continue;
+        }
+
         const emailResult = await sendEmailSmtp(smtpConfig, scheduledEmail.recipient_email, subject, html, text, attachments);
  
         if (emailResult.success) {
@@ -1942,14 +2051,16 @@ Deno.serve(async (req: Request) => {
     }
  
     const successCount = results.filter((r) => r.success).length;
-    const failCount = results.filter((r) => !r.success).length;
- 
+    const flaggedCount = results.filter((r) => r.flagged).length;
+    const failCount = results.filter((r) => !r.success && !r.flagged).length;
+
     return new Response(
       JSON.stringify({
         message: `Processed ${results.length} emails`,
         processed: results.length,
         success: successCount,
         failed: failCount,
+        flagged: flaggedCount,
         results,
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
