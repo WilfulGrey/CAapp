@@ -10,7 +10,12 @@ import type { Nurse } from '../../types';
 import type { Application } from './shared';
 import { displayName, initials } from './shared';
 import { VertragSignieren, type VertragsDaten } from './VertragSignieren';
-import { MonatsAufstellung } from './MonatsAufstellung';
+import {
+  parseDeDate,
+  holidaysForYear,
+  buildMonthlyBreakdown,
+  type SummaryRow,
+} from '../../lib/pricing/monthlyBreakdown';
 
 // Contract form data captured in step 2. Returned to parent via onAccept
 // so it can be POSTed to the kostenrechner bridge (which fires the team
@@ -77,6 +82,53 @@ export function buildVertragsDaten(
   };
 }
 
+// parseDeDate / holidaysForYear / buildMonthlyBreakdown / SummaryRow
+// jetzt in src/lib/pricing/monthlyBreakdown.ts — Single Source of Truth
+// für Portal-Preis-Beispielrechnung + Bewerbungs-Übersicht.
+
+// Prüft ob ein Einsatz-Zeitraum tatsächlich Sommer-Monate (Juli/August)
+// berührt und welche Feiertage aus unserer Policy-Liste reinfallen.
+// Wird für die konditionale Footnote unter der Zusammenfassung verwendet —
+// damit der Sommer-/Feiertag-Hinweis nur dann erscheint, wenn er für
+// diesen konkreten Einsatz relevant ist.
+function computeZuschlagRelevance(anreiseStr: string, abreiseStr: string): {
+  hasSummer: boolean;
+  relevantHolidayNames: string[];
+} {
+  const start = parseDeDate(anreiseStr);
+  const end = parseDeDate(abreiseStr);
+  if (!start || !end || end < start) return { hasSummer: false, relevantHolidayNames: [] };
+
+  let hasSummer = false;
+  let y = start.getFullYear();
+  let m = start.getMonth();
+  for (let i = 0; i < 24; i++) {
+    // Juli=6, August=7 — inline statt SOMMER_MONTHS-Konstante, weil die
+    // Logik außer hier nirgendwo gebraucht wird (innerhalb der Lib
+    // gekapselt).
+    if (m === 6 || m === 7) hasSummer = true;
+    if (y === end.getFullYear() && m === end.getMonth()) break;
+    m += 1;
+    if (m > 11) { m = 0; y += 1; }
+  }
+
+  const all: { name: string; date: Date }[] = [];
+  for (let yr = start.getFullYear(); yr <= end.getFullYear(); yr++) {
+    all.push(...holidaysForYear(yr));
+  }
+  // Dedupe Namen (Karfreitag könnte bei Mehrjahres-Range doppelt vorkommen)
+  // und in Datums-Reihenfolge sortieren.
+  const seen = new Set<string>();
+  const relevantHolidayNames: string[] = [];
+  for (const h of all.filter(h => h.date >= start && h.date <= end).sort((a, b) => a.date.getTime() - b.date.getTime())) {
+    if (!seen.has(h.name)) {
+      seen.add(h.name);
+      relevantHolidayNames.push(h.name);
+    }
+  }
+  return { hasSummer, relevantHolidayNames };
+}
+
 export const AngebotPruefenModal: FC<{
   app: Application;
   /** Parent-supplied defaults derived from lead + mmCustomer. Empty values
@@ -138,6 +190,21 @@ export const AngebotPruefenModal: FC<{
   // Vertrag-Dokument für Seite 2 — aus den eingegebenen Daten gemappt (geteilte
   // Logik, identisch zur read-only Präsentation im gebuchten Portal).
   const vertragsDaten = buildVertragsDaten(formData, offer);
+  // Monatliche Aufstellung dynamisch aus Anreise-/Abreisedatum berechnen.
+  // Inklusive Sommerzuschlag (Juli/August) + Feiertagszuschläge (Karfreitag,
+  // Ostersonntag, Ostermontag, 1. Mai, Heiligabend, 1./2. Weihnachtstag,
+  // Silvester, Neujahr). Feiertagszuschlag = tagessatz (doppelter
+  // Tagessatz an Feiertagen — Policy, nicht offer.feiertagszuschlag aus
+  // Mamamia).
+  const summary = buildMonthlyBreakdown(
+    offer.anreisedatum,
+    offer.abreisedatum,
+    tagessatz,
+    offer.anreisekosten,
+    offer.abreisekosten,
+    tagessatz,
+  );
+  const zuschlagRelevance = computeZuschlagRelevance(offer.anreisedatum, offer.abreisedatum);
 
   const inputCls = 'w-full border border-gray-200 rounded-xl px-3.5 py-3 text-sm text-gray-800 focus:outline-none focus:border-[#8B7355] focus:ring-2 focus:ring-[#8B7355]/10 transition-all bg-white';
   const labelCls = 'block text-[13px] font-semibold text-gray-700 mb-1.5';
@@ -296,16 +363,6 @@ export const AngebotPruefenModal: FC<{
                     ))}
                   </div>
                 </div>
-
-                {/* Monatliche Kosten-Aufstellung — was der Kunde pro Monat
-                    zahlt und warum (Reisetage voller Tagessatz, Sommerzuschlag
-                    Juli/Aug., Feiertage namentlich mit doppeltem Tagessatz).
-                    War bis #260 (Refactor) + #299 (Kalkulation-Sub-Box aus)
-                    aus der Bewerbungs-Prüfung verschwunden — die Berechnung
-                    blieb als toter Code übrig. Hier wieder eingehängt, weil die
-                    Begründung der Kosten genau in der Angebotsprüfung gebraucht
-                    wird. */}
-                <MonatsAufstellung offer={offer} title="Monatliche Kosten" />
               </div>
             )}
 
