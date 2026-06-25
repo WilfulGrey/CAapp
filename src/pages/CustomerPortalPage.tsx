@@ -36,6 +36,7 @@ import {
   synthesizeAcceptedApplicationFromSnapshot,
 } from '../lib/mamamia/mappers';
 import { mapPatientFormToUpdateCustomerInput, splitCustomerName } from '../lib/mamamia/patientFormMapper';
+import { customerSalutation } from '../lib/names';
 import { caregiverBadgeScore, badgeScore as nurseBadgeScore, MIN_BADGE_SCORE } from '../lib/mamamia/badge';
 import { callMamamia, MamamiaError } from '../lib/mamamia/client';
 import { buildMonthlyBreakdown, formatDeDate } from '../lib/pricing/monthlyBreakdown';
@@ -1752,7 +1753,9 @@ const CustomerPortalPage: FC = () => {
 
   // Lead loaded but Mamamia session still bootstrapping.
   if (lead && !mmReady && !IS_PREVIEW_ANY) {
-    const firstName = lead.vorname ?? null;
+    // Einheitliche formale Anrede (Herr/Frau Nachname), sonst neutral — siehe
+    // customerSalutation. Kein bloßer Vorname/Nachname mehr.
+    const salutation = customerSalutation(lead);
     return (
       <>
       <div className="min-h-screen flex flex-col items-center justify-center relative overflow-hidden px-8"
@@ -1793,7 +1796,7 @@ const CustomerPortalPage: FC = () => {
         {/* Headline */}
         <div className="text-center mb-8">
           <h2 className="text-[1.7rem] font-bold text-white leading-tight mb-3">
-            {firstName ? `${firstName}, wir` : 'Wir'} bereiten<br/>Ihre Pflegekräfte vor
+            {salutation ? `${salutation}, wir` : 'Wir'} bereiten<br/>Ihre Pflegekräfte vor
           </h2>
           <p className="text-sm leading-relaxed" style={{color:'rgba(255,255,255,0.72)'}}>
             Gleich sehen Sie Ihr persönliches Angebot<br/>und passende Betreuungspersonen.
@@ -1955,14 +1958,10 @@ const CustomerPortalPage: FC = () => {
       <>
       {/* ── Hero (full-width gradient) — state-aware copy ── */}
       {(() => {
-        const anrede = lead?.anrede_text ?? lead?.anrede;
-        const nachname = cap(lead?.nachname);
-        const vorname = cap(lead?.vorname);
-        const heroNameLine = lead
-          ? (anrede && nachname
-              ? `${anrede} ${nachname}`
-              : nachname || vorname || '')
-          : 'Herr Mustermann';
+        // Einheitliche formale Anrede (Herr/Frau Nachname), abgeleitet via
+        // Geschlechts-Erkennung wenn das anrede-Feld leer ist; sonst neutral
+        // ("Guten Tag."). Nie bloßer Nachname. Siehe customerSalutation.
+        const heroNameLine = lead ? customerSalutation(lead) : 'Herr Mustermann';
 
         // Hero copy adapts to where the customer is in the flow:
         //   pending  — at least one application waiting on a decision
