@@ -3,6 +3,11 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
 import nodemailer from "npm:nodemailer@6.9.10";
+// Buffer ist in Deno kein Global. nodemailer erwartet für Attachments einen
+// Node-Buffer (siehe sendEmailSmtp). Ohne diesen Import schlugen alle Mails
+// MIT Anhang (Reminder-Inline-Foto, Angebots-PDF) mit "Buffer is not defined"
+// fehl — die Edge-Runtime liefert ihn über den node:-Specifier.
+import { Buffer } from "node:buffer";
  
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
