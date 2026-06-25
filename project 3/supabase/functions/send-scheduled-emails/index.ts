@@ -1124,6 +1124,67 @@ async function sendEmailSmtp(
   }
 }
 
+// Sammel-Alarm ans Team, wenn in einem Lauf Mails fehlschlugen. Bewusst EINE
+// Mail pro Lauf (nicht pro Fehlschlag) — bei einem systemischen Fehler (z. B.
+// "Buffer is not defined" über alle Reminder) sonst hunderte Alarme. Ohne
+// Anhang (kann den Attachment-/Buffer-Pfad nicht selbst auslösen) und in
+// try/catch gekapselt: ein fehlschlagender Alarm darf den Cron nie umwerfen
+// und löst keinen weiteren Alarm aus. Ziel via OPS_ALERT_TO überschreibbar.
+async function notifyOpsOfFailures(
+  smtpConfig: SmtpConfig,
+  failures: { emailType: string; recipient: string; leadId: string; error: string }[],
+): Promise<void> {
+  if (failures.length === 0) return;
+  try {
+    const to = Deno.env.get("OPS_ALERT_TO") ?? "info@primundus.de";
+    // Nach Fehlertyp aggregieren — Massenfehler auf einen Blick.
+    const byError = new Map<string, number>();
+    for (const f of failures) byError.set(f.error, (byError.get(f.error) ?? 0) + 1);
+    const errorSummary = [...byError.entries()]
+      .sort((a, b) => b[1] - a[1])
+      .map(([e, n]) => `${n}× ${e}`)
+      .join("\n");
+
+    const MAX = 50;
+    const shown = failures.slice(0, MAX);
+    const esc = (s: string) =>
+      s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+    const rowsHtml = shown.map((f) =>
+      `<tr>
+        <td style="padding:6px 10px;border-bottom:1px solid #eee;font-size:13px;">${esc(f.emailType)}</td>
+        <td style="padding:6px 10px;border-bottom:1px solid #eee;font-size:13px;">${esc(f.recipient)}</td>
+        <td style="padding:6px 10px;border-bottom:1px solid #eee;font-size:13px;color:#b00;">${esc(f.error)}</td>
+        <td style="padding:6px 10px;border-bottom:1px solid #eee;font-size:11px;color:#888;">${esc(f.leadId)}</td>
+      </tr>`).join("");
+    const moreHtml = failures.length > MAX
+      ? `<p style="font-size:12px;color:#888;">… und ${failures.length - MAX} weitere.</p>` : "";
+
+    const subject = `⚠️ ${failures.length} Mail(s) fehlgeschlagen — Primundus Portal`;
+    const html = `<div style="font-family:-apple-system,Segoe UI,Roboto,Arial,sans-serif;color:#222;">
+      <p style="font-size:15px;">Beim automatischen Mailversand sind <strong>${failures.length}</strong> Mail(s) fehlgeschlagen (letzter Lauf).</p>
+      <p style="font-size:13px;color:#555;white-space:pre-line;background:#faf6f6;border:1px solid #f0d9d9;border-radius:8px;padding:10px 12px;">${esc(errorSummary)}</p>
+      <table style="border-collapse:collapse;width:100%;margin-top:8px;">
+        <tr style="text-align:left;background:#f6f6f6;">
+          <th style="padding:6px 10px;font-size:12px;">Typ</th>
+          <th style="padding:6px 10px;font-size:12px;">Empfänger</th>
+          <th style="padding:6px 10px;font-size:12px;">Fehler</th>
+          <th style="padding:6px 10px;font-size:12px;">Lead-ID</th>
+        </tr>
+        ${rowsHtml}
+      </table>
+      ${moreHtml}
+      <p style="font-size:11px;color:#999;margin-top:14px;">Automatische Meldung aus send-scheduled-emails. Betroffene Zeilen stehen in scheduled_emails auf status=failed.</p>
+    </div>`;
+    const text = `${failures.length} Mail(s) fehlgeschlagen (letzter Lauf).\n\nNach Fehlertyp:\n${errorSummary}\n\nDetails:\n` +
+      shown.map((f) => `- ${f.emailType} -> ${f.recipient}: ${f.error} (lead ${f.leadId})`).join("\n") +
+      (failures.length > MAX ? `\n… und ${failures.length - MAX} weitere.` : "");
+
+    await sendEmailSmtp(smtpConfig, to, subject, html, text);
+  } catch (e) {
+    console.error("[ops-alert] Fehler-Benachrichtigung konnte nicht gesendet werden:", e instanceof Error ? e.message : String(e));
+  }
+}
+
 // Reaktions-Reminder-Helpers (für interest_reminder / application_reminder).
 // Logik: nach 1h kontrollieren ob der Kunde auf den ursprünglichen
 // caregiver_interest_shown / application_received reagiert hat (Reaktion =
@@ -1607,6 +1668,10 @@ Deno.serve(async (req: Request) => {
     }
  
     const results: { id: string; success: boolean; error?: string; flagged?: boolean }[] = [];
+    // Echte Versand-Fehlschläge dieses Laufs sammeln → EINE Sammel-Alarm-Mail
+    // ans Team am Ende (siehe notifyOpsOfFailures). Geflaggte Domains zählen
+    // hier NICHT rein (das ist kein Versandfehler, sondern bewusst geblockt).
+    const failures: { emailType: string; recipient: string; leadId: string; error: string }[] = [];
  
     for (const scheduledEmail of pendingEmails as ScheduledEmail[]) {
       try {
@@ -1638,6 +1703,7 @@ Deno.serve(async (req: Request) => {
             .eq("id", scheduledEmail.id);
  
           results.push({ id: scheduledEmail.id, success: false, error: "Lead not found" });
+          failures.push({ emailType: scheduledEmail.email_type, recipient: scheduledEmail.recipient_email, leadId: scheduledEmail.lead_id, error: leadError?.message || "Lead not found" });
           continue;
         }
  
@@ -1811,6 +1877,7 @@ Deno.serve(async (req: Request) => {
               .update({ status: "failed", error_message: "reminder missing caregiver_id in metadata", updated_at: new Date().toISOString() })
               .eq("id", scheduledEmail.id);
             results.push({ id: scheduledEmail.id, success: false, error: "no caregiver_id" });
+            failures.push({ emailType: scheduledEmail.email_type, recipient: scheduledEmail.recipient_email, leadId: scheduledEmail.lead_id, error: "reminder missing caregiver_id in metadata" });
             continue;
           }
 
@@ -1932,6 +1999,7 @@ Deno.serve(async (req: Request) => {
             .eq("id", scheduledEmail.id);
 
           results.push({ id: scheduledEmail.id, success: false, error: `Unknown email type: ${scheduledEmail.email_type}` });
+          failures.push({ emailType: scheduledEmail.email_type, recipient: scheduledEmail.recipient_email, leadId: scheduledEmail.lead_id, error: `Unknown email type: ${scheduledEmail.email_type}` });
           continue;
         }
  
@@ -2036,12 +2104,13 @@ Deno.serve(async (req: Request) => {
             event_type: eventTypeFailed,
             metadata: { to: scheduledEmail.recipient_email, error: emailResult.error, triggered_by: "scheduled_email" },
           });
- 
+
           results.push({ id: scheduledEmail.id, success: false, error: emailResult.error });
+          failures.push({ emailType: scheduledEmail.email_type, recipient: scheduledEmail.recipient_email, leadId: scheduledEmail.lead_id, error: emailResult.error ?? "unbekannt" });
         }
       } catch (emailError) {
         const errorMsg = emailError instanceof Error ? emailError.message : String(emailError);
- 
+
         await supabase
           .from("scheduled_emails")
           .update({
@@ -2050,10 +2119,16 @@ Deno.serve(async (req: Request) => {
             updated_at: new Date().toISOString(),
           })
           .eq("id", scheduledEmail.id);
- 
+
         results.push({ id: scheduledEmail.id, success: false, error: errorMsg });
+        failures.push({ emailType: scheduledEmail.email_type, recipient: scheduledEmail.recipient_email, leadId: scheduledEmail.lead_id, error: errorMsg });
       }
     }
+
+    // Sammel-Alarm ans Team, falls dieser Lauf Versand-Fehlschläge hatte.
+    // Bewusst NACH der Schleife (eine Mail statt einer pro Fehlschlag) und
+    // gekapselt — darf den Lauf nie umwerfen.
+    await notifyOpsOfFailures(smtpConfig, failures);
  
     const successCount = results.filter((r) => r.success).length;
     const flaggedCount = results.filter((r) => r.flagged).length;
