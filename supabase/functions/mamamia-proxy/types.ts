@@ -118,6 +118,12 @@ export interface ProxySupabase {
     caregiverId: number,
     jobOfferId: number,
   ): Promise<void>;
+  // Plant (bzw. verschiebt) die "neue Pflegekräfte verfügbar"-Mail auf +24h
+  // ab JETZT. Reschedult bei jeder Einladung → 24h ab der LETZTEN Einladung.
+  // Best-effort: schlägt der Versand-Scheduler fehl, bleibt die Einladung
+  // trotzdem erfolgreich. send-scheduled-emails cancelt sie bei Reaktion.
+  // Optional, damit bestehende Test-Mocks ohne diese Methode gültig bleiben.
+  scheduleNeuePflegekraefteMail?(leadId: string): Promise<void>;
 }
 
 export interface ActionDeps {

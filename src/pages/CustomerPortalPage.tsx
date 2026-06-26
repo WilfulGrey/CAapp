@@ -2483,10 +2483,15 @@ const CustomerPortalPage: FC = () => {
             status: NurseStatus;
             virtualDeclinedFromInterest: boolean;
           };
-          // 14.06.: Cap 3 → 5 (User-Wunsch — mehr Auswahl gleich sichtbar
-          // ohne Scrollen). Das matched die TARGET_VISIBLE=5 im
-          // Alters-Filter-Fallback in effectiveMatched.
-          const pendingNurses: VisibleNurse[] = allVisible.filter(({ status }) => status === 'pending').slice(0, 5);
+          // Batch-Reveal (User-Wunsch 25.06.): sichtbarer Pool = 5 −
+          // Einladungen der letzten 24h. Einladen hält den Slot 24h (die
+          // Pflegekraft wartet auf Antwort); nach 24h ohne Reaktion füllt sich
+          // der Pool wieder auf 5 + die "neue Pflegekräfte"-Mail geht raus.
+          // Ablehnen zählt NICHT mit (caregiver_invite_attempts erfasst nur
+          // echte Einladungen) → rückt sofort nach. used_24h aus getInviteRateState.
+          const heldInvites = inviteRate?.used_24h ?? 0;
+          const visibleCount = Math.max(0, 5 - heldInvites);
+          const pendingNurses: VisibleNurse[] = allVisible.filter(({ status }) => status === 'pending').slice(0, visibleCount);
           // Die Empfehlung (höchste Badge-Bewertung, Score = Erfahrungsjahre +
           // Einsätze) nach ganz oben ziehen — die anderen behalten ihre
           // Reihenfolge. So steht "Empfehlung des Beraters" immer zuoberst.
@@ -2567,6 +2572,20 @@ const CustomerPortalPage: FC = () => {
                       />
                     </div>
                   )}
+                </div>
+              )}
+
+              {/* Warte-Hinweis: alle frischen Slots sind durch Einladungen der
+                  letzten 24h "gehalten" (visibleCount 0). Ruhig formuliert —
+                  kein Drängen. Nach 24h ohne Reaktion füllt sich der Pool wieder
+                  auf + die "neue Pflegekräfte"-Mail geht raus. Nur zeigen, wenn
+                  wirklich gehalten (heldInvites > 0), nicht wenn der Pool leer ist. */}
+              {!hasAnyCard && heldInvites > 0 && (
+                <div className="rounded-3xl px-5 py-5 border text-center" style={{ background: '#FAF8F4', borderColor: '#EAE3D8' }}>
+                  <p className="text-[15px] font-semibold mb-1" style={{color:'#3D3D3D'}}>Ihre Auswahl ist eingeladen</p>
+                  <p className="text-[14px] leading-relaxed" style={{color:'#6b6b6b'}}>
+                    Die Pflegekräfte melden sich meist innerhalb von 1&ndash;2 Tagen. Sobald Rückmeldungen da sind, sehen Sie sie hier &mdash; meldet sich niemand, schlagen wir Ihnen automatisch weitere Pflegekräfte vor.
+                  </p>
                 </div>
               )}
 

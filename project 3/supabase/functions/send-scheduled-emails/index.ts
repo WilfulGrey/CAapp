@@ -599,6 +599,44 @@ Ilka Wysocki
 Primundus Deutschland | +49 89 200 000 830 | www.primundus.de`;
 }
 
+// "Neue Pflegekräfte verfügbar" — feuert +24h nach der letzten Einladung,
+// wenn der Kunde keine Reaktion erhalten hat (Batch-Nachlade-Hinweis, passend
+// zur Portal-Reveal-Logik). Bewusst kurz: kein Lob, keine Erklärung — nur der
+// Hinweis, dass neue Vorschläge bereitstehen. Anrede/Wrapper/Signatur identisch
+// zu den übrigen Mails (buildHalloAnrede).
+function buildNeuePflegekraefteHtml(lead: Lead, siteUrl: string, portalBase: string): string {
+  const portalUrl = (portalBase && lead.token) ? buildPortalUrl(portalBase, lead.token) : siteUrl;
+  const halloAnrede = buildHalloAnrede(lead.anrede_text || null, lead.nachname || "", lead.vorname || "");
+  const content = `
+    <p style="font-size:15px;line-height:1.75;color:#444;margin-bottom:14px;">${halloAnrede},</p>
+    <p style="font-size:15px;line-height:1.75;color:#444;margin-bottom:14px;">ich habe <strong>weitere passende Pflegekräfte</strong> für Sie herausgesucht. Schauen Sie sie sich gern an und laden Sie Ihre Wunschkräfte unverbindlich ein.</p>
+
+    ${bulletproofButton(portalUrl, "Neue Pflegekräfte ansehen", "#2A9D5C")}
+
+    <p style="font-size:15px;line-height:1.75;color:#444;margin:24px 0 18px;">Bei Fragen bin ich gerne für Sie da – telefonisch, per WhatsApp oder als Antwort auf diese E-Mail.</p>
+
+    ${buildIlkaSig(siteUrl)}`;
+  return buildEmailWrapper(lead, siteUrl, content);
+}
+
+function buildNeuePflegekraefteText(lead: Lead, siteUrl: string, portalBase: string): string {
+  const portalUrl = (portalBase && lead.token) ? buildPortalUrl(portalBase, lead.token) : siteUrl;
+  const halloAnrede = buildHalloAnrede(lead.anrede_text || null, lead.nachname || "", lead.vorname || "");
+  return `${halloAnrede},
+
+ich habe weitere passende Pflegekräfte für Sie herausgesucht. Schauen Sie sie sich gern an und laden Sie Ihre Wunschkräfte unverbindlich ein:
+
+${portalUrl}
+
+Bei Fragen bin ich gerne für Sie da – telefonisch, per WhatsApp oder als Antwort auf diese E-Mail.
+
+Mit freundlichen Grüßen
+Ilka Wysocki
+
+---
+Primundus Deutschland | +49 89 200 000 830 | www.primundus.de`;
+}
+
 function buildNachfass2Html(lead: Lead, siteUrl: string, portalBase: string, milestone: LeadMilestone): string {
   const portalUrl = (portalBase && lead.token) ? buildPortalUrl(portalBase, lead.token) : siteUrl;
   const halloAnrede = buildHalloAnrede(lead.anrede_text || null, lead.nachname || "", lead.vorname || "");
@@ -1799,6 +1837,40 @@ Deno.serve(async (req: Request) => {
           continue;
         }
 
+        // "Neue Pflegekräfte verfügbar" (+24h nach der letzten Einladung):
+        // nur senden, wenn der Kunde NICHT reagiert hat. Cancelt bei Buchung /
+        // nicht interessiert ODER wenn seit dem Einplanen eine Reaktion kam
+        // (Bewerbung / Interesse) — dann hat der Kunde schon etwas zu tun und
+        // die "schau dir weitere an"-Mail wäre fehl am Platz.
+        const isNeuePk = scheduledEmail.email_type === "neue_pflegekraefte_verfuegbar";
+        if (isNeuePk) {
+          const { data: reactEvents } = await supabase
+            .from("lead_events")
+            .select("id")
+            .eq("lead_id", scheduledEmail.lead_id)
+            .in("event_type", ["application_received", "caregiver_interest_shown"])
+            .gte("created_at", (scheduledEmail as any).created_at ?? "1970-01-01")
+            .limit(1);
+          const reacted = Array.isArray(reactEvents) && reactEvents.length > 0;
+          if (isBeauftragt || isNichtInteressiert || reacted) {
+            await supabase
+              .from("scheduled_emails")
+              .update({ status: "cancelled", updated_at: new Date().toISOString() })
+              .eq("id", scheduledEmail.id);
+            await supabase.from("lead_events").insert({
+              lead_id: scheduledEmail.lead_id,
+              event_type: `email_${scheduledEmail.email_type}_cancelled`,
+              metadata: {
+                reason: reacted
+                  ? "reaction_received"
+                  : isNichtInteressiert ? "nicht_interessiert" : "betreuung_beauftragt",
+              },
+            });
+            results.push({ id: scheduledEmail.id, success: true });
+            continue;
+          }
+        }
+
         let subject = "";
         let html = "";
         let text = "";
@@ -1857,6 +1929,12 @@ Deno.serve(async (req: Request) => {
           text = buildProfilNudge2Text(lead as Lead, smtpConfig.siteUrl, portalBase);
           eventTypeSent = "email_profil_nudge_2_sent";
           eventTypeFailed = "email_profil_nudge_2_failed";
+        } else if (scheduledEmail.email_type === "neue_pflegekraefte_verfuegbar") {
+          subject = "Neue Pflegekräfte für Sie";
+          html = buildNeuePflegekraefteHtml(lead as Lead, smtpConfig.siteUrl, portalBase);
+          text = buildNeuePflegekraefteText(lead as Lead, smtpConfig.siteUrl, portalBase);
+          eventTypeSent = "email_neue_pflegekraefte_verfuegbar_sent";
+          eventTypeFailed = "email_neue_pflegekraefte_verfuegbar_failed";
         } else if (
           scheduledEmail.email_type === "interest_reminder" ||
           scheduledEmail.email_type === "application_reminder" ||

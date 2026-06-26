@@ -297,6 +297,31 @@ function makeRealSupabase(url: string, serviceKey: string): ProxySupabase {
         .insert({ lead_id: leadId, caregiver_id: caregiverId, mamamia_job_offer_id: jobOfferId });
       if (error) throw new Error(`supabase recordInviteAttempt: ${error.message}`);
     },
+    async scheduleNeuePflegekraefteMail(leadId) {
+      const { data: lead } = await client
+        .from("leads")
+        .select("email")
+        .eq("id", leadId)
+        .maybeSingle();
+      const email = (lead as { email?: string } | null)?.email;
+      if (!email) return;
+      // Vorhandene pending Mail desselben Typs canceln → reschedule auf 24h ab
+      // JETZT (= 24h ab der letzten Einladung).
+      await client
+        .from("scheduled_emails")
+        .update({ status: "cancelled" })
+        .eq("lead_id", leadId)
+        .eq("email_type", "neue_pflegekraefte_verfuegbar")
+        .eq("status", "pending");
+      const scheduledFor = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
+      await client.from("scheduled_emails").insert({
+        lead_id: leadId,
+        email_type: "neue_pflegekraefte_verfuegbar",
+        recipient_email: email,
+        scheduled_for: scheduledFor,
+        status: "pending",
+      });
+    },
   };
 }
 

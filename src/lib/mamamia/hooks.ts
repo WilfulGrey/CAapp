@@ -305,6 +305,9 @@ export function useSearchLocations(
 // the count in sync without polling.
 export interface InviteRateState {
   used: number;
+  /** Einladungen der letzten 24h — steuert die Batch-Reveal-Logik im Portal
+   *  (sichtbarer Pool = 5 − used_24h). Unabhängig vom 60-Min-Rate-Limit. */
+  used_24h?: number;
   limit: number;
   window_minutes: number;
   oldest_at: string | null;
