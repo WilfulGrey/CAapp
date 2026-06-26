@@ -305,6 +305,58 @@ const PREVIEW_MATCHINGS: Array<{ nurse: Nurse; caregiverId: number }> = [
   { caregiverId: 999013, nurse: { caregiverId: 999013, name: 'Pavel Kowalski', age: 61, experience: '7 J. Erfahrung', experienceYears: 7, availability: 'verfügbar ab 26.05.', availableSoon: true, language: { level: 'Grund', bars: 1 }, color: '#6B5444', addedTime: 'heute', isLive: true, gender: 'male', image: 'https://i.pravatar.cc/200?img=12', history: { assignments: 18, avgDurationMonths: 2.9 } } },
 ];
 
+// Rekonstruiert eine Nurse aus einem gespeicherten CaregiverSnapshot (volle
+// Karte: Foto, Erfahrung, Sprache, Historie) ODER — wenn kein Snapshot da ist
+// (z. B. Alt-Einladung, die nur den Namen geloggt hat) — aus dem Namen allein
+// (MatchCardDone zeigt dann Initialen + Name + Status, kein Alter). Damit ist
+// "Bereits bearbeitet" unabhängig davon, ob Mamamia die PK noch in den
+// Matchings zurückgibt.
+function nurseFromProcessedEvent(cgId: number, name: string, snapshot?: CaregiverSnapshot): Nurse {
+  const base = {
+    caregiverId: cgId, availability: '', availableSoon: false, addedTime: '',
+    isLive: false, gender: 'female' as const,
+  };
+  if (snapshot) {
+    return {
+      ...base,
+      name: snapshot.name || name || '?',
+      age: snapshot.age ?? 0,
+      experience: snapshot.experience ?? '',
+      experienceYears: snapshot.experienceYears ?? 0,
+      language: { level: snapshot.languageLevel ?? '', bars: snapshot.languageBars ?? 0 },
+      color: snapshot.color ?? '#999999',
+      image: snapshot.image,
+      history: (snapshot.historyAssignments != null || snapshot.historyAvgDurationMonths != null)
+        ? { assignments: snapshot.historyAssignments ?? 0, avgDurationMonths: snapshot.historyAvgDurationMonths ?? 0 }
+        : undefined,
+    };
+  }
+  return {
+    ...base,
+    name: name || '?', age: 0, experience: '', experienceYears: 0,
+    language: { level: '', bars: 0 }, color: '#B5A184', image: undefined,
+  };
+}
+
+// Baut einen CaregiverSnapshot aus einer Nurse — beim Einladen mitgeloggt,
+// damit "Bereits bearbeitet" die PK später voll rekonstruieren kann, auch wenn
+// Mamamia sie nicht mehr in den Matchings liefert. Gleiche Felder wie der
+// Snapshot bei caregiver_declined.
+function snapshotFromNurse(n: Nurse): CaregiverSnapshot {
+  return {
+    name: n.name,
+    age: n.age,
+    image: n.image,
+    color: n.color,
+    experience: n.experience,
+    experienceYears: n.experienceYears,
+    languageLevel: n.language?.level,
+    languageBars: n.language?.bars,
+    historyAssignments: n.history?.assignments,
+    historyAvgDurationMonths: n.history?.avgDurationMonths,
+  };
+}
+
 // ─── Main Page ────────────────────────────────────────────────────────────────
 
 const CustomerPortalPage: FC = () => {
@@ -1081,6 +1133,49 @@ const CustomerPortalPage: FC = () => {
     return () => { cancelled = true; };
   }, [lead?.token]);
 
+  // Vollständige Bearbeitet-Historie aus UNSEREN Events (unabhängig davon, ob
+  // Mamamia die PK noch in den Matchings liefert): alle eingeladenen + alle
+  // abgelehnten Pflegekräfte. Snapshot → volle Karte, sonst Name-only. Wird im
+  // "Bereits bearbeitet"-Bereich für die PKs genutzt, die NICHT mehr in
+  // effectiveMatched stecken (3 sichtbar + "Weitere anzeigen").
+  const [extraProcessed, setExtraProcessed] = useState<{ caregiverId: number; nurse: Nurse; status: 'invited' | 'declined' }[]>([]);
+  useEffect(() => {
+    if (!lead?.token) return;
+    let cancelled = false;
+    fetchLeadEvents(lead.token, ['caregiver_invited', 'caregiver_declined', 'caregiver_declined_undone']).then((events) => {
+      if (cancelled) return;
+      // Chronologisch: letzte Aktion pro caregiver gewinnt; eine Ablehnung kann
+      // per späterem caregiver_declined_undone aufgehoben werden.
+      const byId = new Map<number, { status: 'invited' | 'declined'; ts: string; name?: string; snapshot?: CaregiverSnapshot; undoneTs?: string }>();
+      const sorted = [...events].sort((a, b) => (a.created_at < b.created_at ? -1 : 1));
+      for (const e of sorted) {
+        const cgId = Number(e.metadata?.caregiver_id);
+        if (!Number.isFinite(cgId) || cgId <= 0) continue;
+        const b = byId.get(cgId) ?? { status: 'invited', ts: '' };
+        const snap = e.metadata?.caregiver_snapshot as CaregiverSnapshot | undefined;
+        const nm = e.metadata?.caregiver_name as string | undefined;
+        if (e.event_type === 'caregiver_invited') {
+          b.status = 'invited'; b.ts = e.created_at; if (nm) b.name = nm; if (snap) b.snapshot = snap;
+        } else if (e.event_type === 'caregiver_declined') {
+          b.status = 'declined'; b.ts = e.created_at; if (nm) b.name = nm; if (snap) b.snapshot = snap;
+        } else if (e.event_type === 'caregiver_declined_undone') {
+          b.undoneTs = e.created_at;
+        }
+        byId.set(cgId, b);
+      }
+      const out: { caregiverId: number; nurse: Nurse; status: 'invited' | 'declined' }[] = [];
+      for (const [cgId, b] of byId.entries()) {
+        // Ablehnung durch späteres Undo aufgehoben → nicht als bearbeitet zählen.
+        if (b.status === 'declined' && b.undoneTs && b.undoneTs > b.ts) continue;
+        out.push({ caregiverId: cgId, nurse: nurseFromProcessedEvent(cgId, b.name ?? '', b.snapshot), status: b.status });
+      }
+      setExtraProcessed(out);
+    });
+    return () => { cancelled = true; };
+  }, [lead?.token]);
+
+  const [showAllDone, setShowAllDone] = useState(false);
+
   const visibleInterests = sourceInterests.filter((i) => {
     if (i.rejected_at) return false;
     if (dismissedSet.has(i.caregiver_id)) return false;
@@ -1305,6 +1400,7 @@ const CustomerPortalPage: FC = () => {
         reportLeadEvent(lead?.token, 'caregiver_invited', {
           caregiver_id: id,
           caregiver_name: nurseName,
+          caregiver_snapshot: snapshotFromNurse(match.nurse),
         });
         refetchInvited();
         refetchInviteRate();
@@ -1424,9 +1520,16 @@ const CustomerPortalPage: FC = () => {
     for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
       try {
         await inviteMutation.mutate({ caregiver_id: caregiverId });
+        // Snapshot aus dem Interest-Caregiver mitloggen → volle Karte in
+        // "Bereits bearbeitet", auch wenn Mamamia die PK später nicht mehr liefert.
+        const interestForSnap = sourceInterests.find((i: { caregiver_id: number }) => i.caregiver_id === caregiverId);
+        const snapNurse = interestForSnap
+          ? mapCaregiverToNurse((interestForSnap as { caregiver: unknown }).caregiver as Parameters<typeof mapCaregiverToNurse>[0], { nowIso: new Date().toISOString(), nowYear: new Date().getFullYear() })
+          : null;
         reportLeadEvent(lead?.token, 'caregiver_invited', {
           caregiver_id: caregiverId,
           caregiver_name: displayLabel,
+          ...(snapNurse ? { caregiver_snapshot: snapshotFromNurse(snapNurse) } : {}),
         });
         refetchInvited();
         refetchInterests();
@@ -2650,26 +2753,52 @@ const CustomerPortalPage: FC = () => {
             .map((m) => ({ nurse: m.nurse, caregiverId: m.caregiverId, status: 'invited' as const, key: `ii-${m.caregiverId}`, matchIdx: -1, interest: true }));
           const interestDeclined = Array.from(declinedFromInterest.entries())
             .map(([cgId, nurse]) => ({ nurse, caregiverId: cgId, status: 'declined' as const, key: `id-${cgId}`, matchIdx: -1, interest: true }));
-          // Eingeladen zuerst, abgelehnt zuletzt.
-          const doneMatches = [...matchInvited, ...interestInvited, ...matchDeclined, ...interestDeclined];
-          const hasAny = doneApps.length > 0 || doneMatches.length > 0;
+          // Eingeladen zuerst, abgelehnt zuletzt. Aus effectiveMatched (volle
+          // Daten + Undo-Handler).
+          const fromMatched = [...matchInvited, ...interestInvited, ...matchDeclined, ...interestDeclined]
+            .map((d) => ({ ...d, fromEvent: false as const }));
+          // Bearbeitete PKs, die Mamamia NICHT mehr in den Matchings liefert →
+          // aus unseren Events rekonstruiert (Snapshot/Name). Dedupe gegen das,
+          // was schon aus effectiveMatched kommt + Interesse-Aktionen.
+          const matchedIds = new Set(fromMatched.map((d) => d.caregiverId));
+          const fromEvents = extraProcessed
+            .filter((p) => !matchedIds.has(p.caregiverId) && !interestOriginIds.has(p.caregiverId))
+            .map((p) => ({ nurse: p.nurse, caregiverId: p.caregiverId, status: p.status, key: `ev-${p.caregiverId}`, matchIdx: -1, interest: false, fromEvent: true as const }));
+          // Eingeladene zuerst, dann Abgelehnte (über beide Quellen).
+          const allDone = [...fromMatched, ...fromEvents]
+            .sort((a, b) => (a.status === b.status ? 0 : a.status === 'invited' ? -1 : 1));
+          const hasAny = doneApps.length > 0 || allDone.length > 0;
           if (!hasAny) return null;
+          // 3 sichtbar, Rest hinter "Weitere anzeigen" (User-Wunsch 26.06.).
+          const VISIBLE_DONE = 3;
+          const shownDone = showAllDone ? allDone : allDone.slice(0, VISIBLE_DONE);
+          const moreCount = allDone.length - shownDone.length;
           return (
             <div className="space-y-2">
               <p className="text-xs font-semibold uppercase tracking-wider text-gray-400 px-1">Bereits bearbeitet</p>
               {doneApps.map((app) => (
                 <AppCardDone key={app.id} app={app} onNurseClick={(n, a) => { setNurseModalApp(a); setSelectedNurse(n); }} onUndo={undoApp} />
               ))}
-              {doneMatches.map(({ nurse, caregiverId, status, key, matchIdx, interest }) => (
+              {shownDone.map(({ nurse, caregiverId, status, key, matchIdx, interest, fromEvent }) => (
                 <MatchCardDone
                   key={key}
                   nurse={nurse}
                   status={status}
                   hasInterestOrigin={interest}
-                  onNurseClick={() => interest ? setSelectedNurse(nurse) : openNurseFromMatch(nurse, matchIdx)}
-                  onUndo={status === 'declined' ? (interest ? () => undoDismissInterest(caregiverId) : () => undoDeclinedMatch(matchIdx)) : undefined}
+                  onNurseClick={() => (fromEvent || interest) ? setSelectedNurse(nurse) : openNurseFromMatch(nurse, matchIdx)}
+                  onUndo={(!fromEvent && status === 'declined') ? (interest ? () => undoDismissInterest(caregiverId) : () => undoDeclinedMatch(matchIdx)) : undefined}
                 />
               ))}
+              {!showAllDone && moreCount > 0 && (
+                <button
+                  type="button"
+                  onClick={() => setShowAllDone(true)}
+                  className="w-full text-center text-[13px] font-semibold py-2.5 rounded-xl transition-colors"
+                  style={{ color: '#8B7355', background: '#F6F2EC' }}
+                >
+                  Weitere anzeigen ({moreCount})
+                </button>
+              )}
             </div>
           );
         })()}
