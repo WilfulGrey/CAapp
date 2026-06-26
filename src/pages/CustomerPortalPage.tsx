@@ -905,6 +905,22 @@ const CustomerPortalPage: FC = () => {
   const hasPending = pendingApps.length > 0;
   const matchesUnlocked = !hasPending;
 
+  // Mamamia-Matchings vorübergehend nicht erreichbar (Upstream-500/Netzwerk)
+  // ODER noch am Laden — UND wir haben (noch) keine Daten. Dann zeigt das
+  // Portal einen ruhigen Lade-Zustand statt einer leeren "keine Pflegekräfte"-
+  // Seite (2026-06-26: Mamamia-Matchings 500'ten kurz → Kunden sahen 0 PKs).
+  // Bei echtem "0 Treffer" ist mmMatchings.data = [] (truthy) → NICHT hier.
+  const matchingsLoadingOrError = mmReady && !mmMatchings?.data && (!!mmMatchingsError || mmMatchingsLoading);
+
+  // Auto-Retry, solange die Matchings-Abfrage fehlerhaft ist: alle 8s im
+  // Hintergrund nachladen, bis Mamamia wieder antwortet — der Kunde muss
+  // nicht selbst neu laden.
+  useEffect(() => {
+    if (!mmReady || !mmMatchingsError) return;
+    const t = setInterval(() => { refetchMatchings(); }, 8000);
+    return () => clearInterval(t);
+  }, [mmReady, mmMatchingsError, refetchMatchings]);
+
   // Prefill for AngebotPruefenModal step 2 — replaces the previous
   // hardcoded fixture (Hildegard/Müller/Rosenstraße/München) that bled
   // through to every customer regardless of their actual data.
@@ -2454,7 +2470,18 @@ const CustomerPortalPage: FC = () => {
              die proaktiv Interesse signalisiert haben) werden ganz oben in
              die gleiche Liste eingehängt — keine eigene Section, kein
              Erklär-Text. ── */}
-        {!hasPending && (() => {
+        {/* Mamamia-Matchings vorübergehend nicht erreichbar / noch am Laden →
+            ruhiger Lade-Zustand STATT einer leeren "keine Pflegekräfte"-Seite.
+            Auto-Retry (useEffect oben) lädt im Hintergrund nach. */}
+        {!hasPending && matchingsLoadingOrError && (
+          <div className="rounded-3xl px-5 py-8 border text-center" style={{ background: '#FAF8F4', borderColor: '#EAE3D8' }}>
+            <div className="inline-block w-6 h-6 rounded-full border-2 animate-spin mb-3" style={{ borderColor: '#C4B49A', borderTopColor: 'transparent' }} />
+            <p className="text-[15px] font-semibold mb-1" style={{ color: '#3D3D3D' }}>Wir laden Ihre Pflegekräfte …</p>
+            <p className="text-[14px] leading-relaxed" style={{ color: '#6b6b6b' }}>Einen Moment bitte — gleich sehen Sie Ihre persönlichen Vorschläge.</p>
+          </div>
+        )}
+
+        {!hasPending && !matchingsLoadingOrError && (() => {
           // Interest-Pflegekräfte (sowohl invited als auch declined)
           // werden NICHT in der Matching-Liste gerendert sondern unten
           // in der "Bereits bearbeitet"-Sektion (User-Wunsch: gleiche
