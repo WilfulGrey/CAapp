@@ -475,6 +475,16 @@ const inviteCaregiver: ActionHandler = async (session, variables, deps) => {
     );
   }
 
+  // "Neue Pflegekräfte verfügbar"-Mail auf +24h planen (reschedule bei jeder
+  // Einladung → 24h ab der letzten). Best-effort — darf die Einladung nie kippen.
+  try {
+    await deps.supabase.scheduleNeuePflegekraefteMail?.(session.lead_id);
+  } catch (e) {
+    console.warn(
+      `[inviteCaregiver][schedule-mail-failed] lead=${session.lead_id} err=${(e as Error).message}`,
+    );
+  }
+
   return result;
 };
 
@@ -496,6 +506,15 @@ const getInviteRateState: ActionHandler = async (session, _variables, deps) => {
     INVITE_WINDOW_MINUTES,
     session.job_offer_id,
   );
+  // 24h-Fenster für die Portal-Reveal-Logik: so viele Pflegekraft-Slots sind
+  // aktuell "gehalten" (eingeladen, wartet auf Antwort). Sichtbarer Pool =
+  // 5 − used_24h; nach 24h fällt jede Einladung aus dem Fenster → Pool füllt
+  // sich wieder auf. Unabhängig vom 60-Min-Rate-Limit oben.
+  const used24h = await deps.supabase.countRecentInviteAttempts(
+    session.lead_id,
+    24 * 60,
+    session.job_offer_id,
+  );
   const oldest = used > 0
     ? await deps.supabase.oldestInviteAttemptWithin(session.lead_id, INVITE_WINDOW_MINUTES, session.job_offer_id)
     : null;
@@ -509,6 +528,7 @@ const getInviteRateState: ActionHandler = async (session, _variables, deps) => {
     : 0;
   return {
     used,
+    used_24h: used24h,
     limit: INVITE_LIMIT,
     window_minutes: INVITE_WINDOW_MINUTES,
     oldest_at: oldest ? oldest.toISOString() : null,
