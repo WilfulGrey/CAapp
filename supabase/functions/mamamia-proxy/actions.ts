@@ -36,13 +36,33 @@ async function runGraphQL<T>(
   query: string,
   variables: Record<string, unknown>,
 ): Promise<T> {
-  return await mamamiaRequest<T>({
-    endpoint: deps.endpoint,
-    token: await deps.getAgencyToken(),
-    query,
-    variables,
-    fetchFn: deps.fetchFn,
-  });
+  // Resilienz gegen VORÜBERGEHENDE Mamamia-Ausfälle (2026-06-26: Matchings
+  // 500'ten für ein paar Minuten → Kunden sahen 0 Pflegekräfte). Nur
+  // Lese-Queries (`query ...`) werden wiederholt — Mutationen NICHT (könnten
+  // sonst doppelt anwenden). Validierungs-/Auth-Fehler tragen `cat=` und
+  // werden NICHT wiederholt (kein Selbstheilen durch Retry). Max 3 Versuche,
+  // kurzer Backoff.
+  const isRead = /^\s*query\b/.test(query);
+  const maxAttempts = isRead ? 3 : 1;
+  let lastErr: unknown;
+  for (let attempt = 0; attempt < maxAttempts; attempt++) {
+    try {
+      return await mamamiaRequest<T>({
+        endpoint: deps.endpoint,
+        token: await deps.getAgencyToken(),
+        query,
+        variables,
+        fetchFn: deps.fetchFn,
+      });
+    } catch (e) {
+      lastErr = e;
+      const msg = (e as Error)?.message ?? "";
+      // letzter Versuch ODER nicht-vorübergehender Fehler (cat=) → durchreichen
+      if (attempt === maxAttempts - 1 || /\bcat=/.test(msg)) break;
+      await new Promise((r) => setTimeout(r, 300 * (attempt + 1)));
+    }
+  }
+  throw lastErr;
 }
 
 
