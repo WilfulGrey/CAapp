@@ -467,6 +467,11 @@ export interface UIApplication {
     submittedAt: string;
   };
   isInvited?: boolean;
+  /** true = aus contract_snapshot rekonstruierte "accepted"-App (Mamamia
+   *  liefert sie nicht mehr). Der Caller leitet diese jeden Render neu ab,
+   *  damit die Platzhalter-Karte aufs volle Profil upgradet, sobald
+   *  getCaregiver lädt. */
+  synthetic?: boolean;
 }
 
 function fmtRelativeTime(iso: string | null, nowIso: string): string {
@@ -542,25 +547,38 @@ function parseTagessatzString(s: string | null | undefined): number {
  *  BookedScreen nicht rendern und das Portal zeigte "X offene
  *  Bewerbungen" obwohl die Annahme längst gemacht ist (Bug 11.06.2026).
  *
- *  Wenn das Caregiver-Profil noch nicht geladen ist, wird `null`
- *  zurückgegeben — der Aufrufer wartet dann und ruft erneut auf, sobald
- *  useCaregiver `data` liefert.
+ *  Caregiver-Profil noch nicht geladen (z. B. getCaregiver bei Mamamia-Hiccup
+ *  nicht erreichbar)? Dann wird eine PLATZHALTER-Karte gebaut (Name aus
+ *  `fallbackName`, sonst "Ihre Pflegekraft") statt `null`. So bleibt der
+ *  gebuchte BookedScreen inkl. Vertrags-PDF IMMER sichtbar — der Kunde fällt
+ *  nie in den Annahme-/HTML-Flow zurück. Sobald das Profil nachlädt, leitet der
+ *  Aufrufer die Karte neu ab und ersetzt den Platzhalter durchs volle Profil.
  */
 export function synthesizeAcceptedApplicationFromSnapshot(
   row: MamamiaAcceptedApplicationRow,
   caregiver: MamamiaCaregiverFull | null,
   opts: { nowIso: string; nowYear: number },
-): UIApplication | null {
-  if (!caregiver) return null;
+  fallbackName?: string,
+): UIApplication {
   const snap = row.contract_snapshot;
   // Tagessatz aus dem Snapshot ist als String "EUR 83,00" gespeichert —
   // wir parsen zurück zu number und rechnen auf monatliche Kosten hoch
   // (×30, gleicher Faktor wie buildVertragsDaten beim Schreiben).
   const tagessatz = parseTagessatzString((snap?.tagessatz as string) ?? null);
   const monatlicheKosten = tagessatz * 30;
+  const nurse: Nurse = caregiver
+    ? mapCaregiverToNurse(caregiver, opts)
+    : {
+        caregiverId: row.caregiver_id ?? undefined,
+        name: fallbackName?.trim() || 'Ihre Pflegekraft',
+        age: 0, experience: '', experienceYears: 0,
+        availability: '', availableSoon: false,
+        language: { level: '', bars: 0 },
+        color: '#8B7355', addedTime: '', isLive: false, gender: 'female', image: undefined,
+      };
   return {
     id: String(row.application_id),
-    nurse: mapCaregiverToNurse(caregiver, opts),
+    nurse,
     agencyName: 'Pflegeagentur',
     appliedAt: '—',
     status: 'accepted',

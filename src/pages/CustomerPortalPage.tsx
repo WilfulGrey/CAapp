@@ -841,34 +841,35 @@ const CustomerPortalPage: FC = () => {
     if (acceptedIds.size === 0) return;
 
     setApplications(prev => {
-      const presentIds = new Set(prev.map(a => Number(a.id)));
-      // Pfad 1: vorhandene Apps auf accepted patchen
-      const patched = prev.map(a =>
+      // Synthetische (Pfad-2-)Apps jeden Lauf verwerfen + frisch ableiten →
+      // eine Platzhalter-Karte upgradet automatisch aufs volle Profil, sobald
+      // getCaregiver lädt (deps enthalten acceptedCaregiverProfile).
+      const base = prev.filter(a => !a.synthetic);
+      const presentIds = new Set(base.map(a => Number(a.id)));
+      // Pfad 1: vorhandene (Mamamia-)Apps auf accepted patchen
+      const patched = base.map(a =>
         acceptedIds.has(Number(a.id)) ? { ...a, status: 'accepted' as const } : a,
       );
-      // Pfad 2: für jede acceptedRow, die NICHT bereits in applications
-      // ist, eine synthetische Application bauen — wenn das Caregiver-
-      // Profil schon geladen ist. Sonst überspringen wir; sobald
-      // `acceptedCaregiverProfile` nachfließt, läuft der useEffect erneut
-      // (deps enthalten den Profile-State) und wir holen es nach.
+      // Pfad 2: für jede acceptedRow, die NICHT als echte Mamamia-App da ist,
+      // eine synthetische "accepted"-App bauen. synthesize liefert NIE null
+      // mehr — wenn das Caregiver-Profil (noch) nicht geladen ist, kommt eine
+      // Platzhalter-Karte. So bleibt der BookedScreen inkl. Vertrags-PDF IMMER
+      // sichtbar, auch wenn getCaregiver gerade nicht erreichbar ist
+      // (Mamamia-Hiccup) — der gebuchte Kunde fällt nie in den HTML-Flow zurück.
       const nowIso = new Date().toISOString();
       const nowYear = new Date().getFullYear();
       const additions: typeof patched = [];
       for (const row of acceptedApplications.rows) {
         if (presentIds.has(row.application_id)) continue;
-        // Wir können (vorerst) nur ein Profil pro Render-Cycle laden —
-        // nimmt das passende Caregiver-Profil, falls geladen.
         const profile = row.caregiver_id === firstAcceptedCaregiverId
           ? acceptedCaregiverProfile
           : null;
-        const synth = synthesizeAcceptedApplicationFromSnapshot(
-          row,
-          profile ?? null,
-          { nowIso, nowYear },
-        );
-        if (synth) additions.push(synth);
+        additions.push({
+          ...synthesizeAcceptedApplicationFromSnapshot(row, profile ?? null, { nowIso, nowYear }),
+          synthetic: true,
+        });
       }
-      return additions.length > 0 ? [...patched, ...additions] : patched;
+      return [...patched, ...additions];
     });
   }, [mmReady, acceptedApplications, acceptedCaregiverProfile, firstAcceptedCaregiverId]);
 

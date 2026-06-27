@@ -1117,9 +1117,18 @@ describe('synthesizeAcceptedApplicationFromSnapshot', () => {
     } as MamamiaCaregiverFull;
   }
 
-  it('liefert null wenn Caregiver-Profil noch nicht geladen (kein Fallback ohne Daten)', () => {
+  it('liefert Platzhalter-App wenn Caregiver-Profil noch nicht geladen (BookedScreen + PDF dürfen nie verschwinden)', () => {
     const r = synthesizeAcceptedApplicationFromSnapshot(makeRow(), null, { nowIso: NOW_ISO, nowYear: NOW_YEAR });
-    expect(r).toBeNull();
+    expect(r).not.toBeNull();
+    expect(r!.status).toBe('accepted');
+    expect(r!.id).toBe('9006');
+    expect(r!.nurse.name).toBe('Ihre Pflegekraft');
+  });
+
+  it('nutzt fallbackName für die Platzhalter-Karte (Name aus unseren Events)', () => {
+    const r = synthesizeAcceptedApplicationFromSnapshot(makeRow(), null, { nowIso: NOW_ISO, nowYear: NOW_YEAR }, 'Edyta T.');
+    expect(r!.nurse.name).toBe('Edyta T.');
+    expect(r!.nurse.caregiverId).toBe(21395);
   });
 
   it('rekonstruiert Application mit status=accepted + Mamamia-application-id als String', () => {
