@@ -2,9 +2,30 @@ import { Lead } from './lead-management';
 import { Kalkulation, detectGenderFromName, usableNamePart as cleanNamePart } from './calculation';
 import { getEmailLayout } from './email-template';
 
+// Eigennamen sauber großschreiben: jedes Wort + jeden Bindestrich-Teil
+// kapitalisieren. Namens-Partikel (von, van, de, zu, …) bleiben klein —
+// außer ganz am Anfang ("Von Stein" wenn es das erste Wort ist). ALL-CAPS
+// wird normalisiert ("SANTUS" → "Santus"), gemischte Schreibung bleibt
+// erhalten ("McDonald" → "McDonald"). Kunden tippen oft alles klein
+// ("marco santus") — die Anrede + Kontaktdaten sollen trotzdem sauber sein.
+const NAME_PARTICLES = new Set([
+  'von', 'vom', 'van', 'de', 'del', 'della', 'di', 'da', 'dos', 'das',
+  'der', 'den', 'ten', 'ter', 'zu', 'zur', 'zum', 'le', 'la', 'y', 'af', 'of',
+]);
+function capWord(w: string): string {
+  if (!w) return w;
+  const rest = w === w.toUpperCase() ? w.slice(1).toLowerCase() : w.slice(1);
+  return w.charAt(0).toUpperCase() + rest;
+}
 function capitalize(name: string): string {
   if (!name) return name;
-  return name.charAt(0).toUpperCase() + name.slice(1);
+  return name.trim().split(/\s+/).map((word) =>
+    word.split('-').map((part) =>
+      // Partikel (von, van, de, zu, …) immer klein — auch am Anfang, weil im
+      // Namen eine Anrede davorsteht ("Herr von Stein", nicht "Herr Von Stein").
+      NAME_PARTICLES.has(part.toLowerCase()) ? part.toLowerCase() : capWord(part),
+    ).join('-'),
+  ).join(' ');
 }
 
 export interface EmailTemplate {
@@ -396,7 +417,7 @@ export function getEingangsbestaetigungEmailTemplate(
         <td style="padding: 4px 20px 8px;">
           <table width="100%" cellpadding="0" cellspacing="0">
             ${[
-              ['Name', [lead.anrede_text, lead.vorname, lead.nachname].filter(Boolean).join(' ') || 'Nicht angegeben'],
+              ['Name', [lead.anrede_text, capitalize(lead.vorname || ''), capitalize(lead.nachname || '')].filter(Boolean).join(' ') || 'Nicht angegeben'],
               ['E-Mail', lead.email],
               lead.telefon ? ['Telefon', lead.telefon] : null,
               ['Betreuung für', betreuungFuer],
@@ -1080,7 +1101,7 @@ export function getTeamNotificationTemplate(
           <div class="section-title">Kontaktdaten</div>
           <table>
             <tr><th>Feld</th><th>Wert</th></tr>
-            <tr><td><strong>Name</strong></td><td>${[lead.anrede_text, lead.vorname, lead.nachname].filter(Boolean).join(' ') || 'N/A'}</td></tr>
+            <tr><td><strong>Name</strong></td><td>${[lead.anrede_text, capitalize(lead.vorname || ''), capitalize(lead.nachname || '')].filter(Boolean).join(' ') || 'N/A'}</td></tr>
             <tr><td><strong>E-Mail</strong></td><td>${lead.email}</td></tr>
             <tr><td><strong>Telefon</strong></td><td>${lead.telefon || 'N/A'}</td></tr>
             <tr><td><strong>Status</strong></td><td>${lead.status}</td></tr>
@@ -1139,7 +1160,7 @@ ${caregiverLabel}: ${caregiverName}${status === 'application_accepted_internal' 
 ➜ Im Kundenportal ansehen: ${portalUrl}
 ` : ''}
 === KONTAKTDATEN ===
-Name: ${[lead.anrede_text, lead.vorname, lead.nachname].filter(Boolean).join(' ') || 'N/A'}
+Name: ${[lead.anrede_text, capitalize(lead.vorname || ''), capitalize(lead.nachname || '')].filter(Boolean).join(' ') || 'N/A'}
 E-Mail: ${lead.email}
 Telefon: ${lead.telefon || 'N/A'}
 Status: ${lead.status}
@@ -1503,7 +1524,7 @@ function caregiverBadgeStyle(level?: string): { label: string; gradient: string;
 
 function customerGreeting(lead: Lead): string {
   const anrede = lead.anrede_text || detectGenderFromName(lead.vorname || '');
-  const n = lead.nachname || '';
+  const n = capitalize(lead.nachname || '');
   if (anrede === 'Frau' && n)     return `Guten Tag Frau ${n}`;
   if (anrede === 'Herr' && n)     return `Guten Tag Herr ${n}`;
   if (anrede === 'Familie' && n)  return `Guten Tag Familie ${n}`;
@@ -1518,7 +1539,7 @@ function customerGreeting(lead: Lead): string {
   // oft nur ihren Nachnamen ("Zielke"), der fälschlich als vorname geparst
   // wird. Dann lieber neutral "Guten Tag" als "Guten Tag Zielke".
   if (lead.vorname && (detectGenderFromName(lead.vorname) || n)) {
-    return `Guten Tag ${lead.vorname}`;
+    return `Guten Tag ${capitalize(lead.vorname)}`;
   }
   return 'Guten Tag';
 }
