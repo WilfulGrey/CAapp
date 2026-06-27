@@ -45,6 +45,10 @@ export interface Application {
   // („caregiver cover message") oder eine personalisierte KI-Vorstellung.
   // Aktuell nur in Preview-Modi geseedet.
   coverMessage?: string;
+  /** true = aus contract_snapshot rekonstruierte "accepted"-App (Mamamia
+   *  liefert sie nicht mehr). Wird jeden Render neu abgeleitet → Platzhalter-
+   *  Karte upgradet aufs volle Profil, sobald getCaregiver lädt. */
+  synthetic?: boolean;
 }
 
 export interface NurseStatuses {
