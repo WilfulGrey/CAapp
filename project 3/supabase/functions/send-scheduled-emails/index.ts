@@ -1768,7 +1768,22 @@ Deno.serve(async (req: Request) => {
           continue;
         }
 
-        const isBeauftragt = lead.status === "vertrag_abgeschlossen" || lead.status === "betreuung_beauftragt" || lead.order_confirmed === true;
+        let isBeauftragt = lead.status === "vertrag_abgeschlossen" || lead.status === "betreuung_beauftragt" || lead.order_confirmed === true;
+        // Buchung erkennen: die MVP-Annahme (Kunde akzeptiert eine Pflegekraft
+        // im Portal) setzt lead.status NICHT auf "beauftragt", loggt aber ein
+        // application_accepted_internal-Event. Ohne diesen Check blieb
+        // isBeauftragt false → ALLE Nurture-/Reminder-Mails (v. a.
+        // warum_primundus) liefen nach der Buchung weiter. Als beauftragt
+        // werten → alle bestehenden Skip-Branches greifen automatisch.
+        if (!isBeauftragt) {
+          const { data: acceptedEvt } = await supabase
+            .from("lead_events")
+            .select("id")
+            .eq("lead_id", scheduledEmail.lead_id)
+            .eq("event_type", "application_accepted_internal")
+            .limit(1);
+          if (Array.isArray(acceptedEvt) && acceptedEvt.length > 0) isBeauftragt = true;
+        }
         const isNichtInteressiert = lead.status === "nicht_interessiert";
 
         const isNachfass =
