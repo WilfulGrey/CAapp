@@ -190,6 +190,15 @@ const PERSONALITY_DE: Record<string, string> = {
   dynamic: 'dynamisch',
   independent: 'selbstständig',
   warm: 'herzlich',
+  // Prod-Werte (2026-06, Live-Stichprobe) — vorher fehlten sie → englisch sichtbar.
+  helpful: 'hilfsbereit',
+  sympathetic: 'mitfühlend',
+  relaxed: 'entspannt',
+  sociable: 'gesellig',
+  humorous: 'humorvoll',
+  tolerant: 'tolerant',
+  loving: 'liebevoll',
+  punctual: 'pünktlich',
 };
 
 // Caregiver.hobbies[].hobby — values from beta sample.
@@ -214,6 +223,21 @@ const HOBBY_DE: Record<string, string> = {
   crossword: 'Kreuzworträtsel',
   handicraft: 'Handarbeit',
   photography: 'Fotografie',
+  // Prod-Werte (2026-06, Live-Stichprobe) — Mamamia nutzt z. T. andere Keys
+  // als das alte Beta-Sample (film_cinema statt cinema, garden statt
+  // gardening, sports statt sport) + zusätzliche, die vorher englisch erschienen.
+  film_cinema: 'Kino',
+  riding_bicycle: 'Radfahren',
+  garden: 'Gärtnern',
+  hiking: 'Wandern',
+  sports: 'Sport',
+  board_games: 'Brettspiele',
+  video_games: 'Videospiele',
+  fishing: 'Angeln',
+  singing: 'Singen',
+  theater: 'Theater',
+  nature: 'Natur',
+  animals: 'Tiere',
 };
 
 // Caregiver.marital_status — English enum from beta sample.
@@ -226,9 +250,30 @@ const MARITAL_DE: Record<string, string> = {
   partnership: 'In Partnerschaft',
 };
 
+// Unbekannte Enum-Werte wenigstens lesbar machen: Unterstriche → Leerzeichen,
+// jedes Wort groß. So erscheint nie ein roher Key wie "riding_bicycle" im
+// Portal, falls Mamamia einen neuen Wert einführt, den die Map (noch) nicht hat.
+function prettifyEnum(v: string): string {
+  return v.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
 function translate(map: Record<string, string>, value: string | null | undefined): string | undefined {
   if (!value) return undefined;
-  return map[value] ?? value;
+  return map[value] ?? prettifyEnum(value);
+}
+
+// Sprachniveau (level_0..4) → deutsches Label. Für ANDERE Sprachen als Deutsch
+// (z. B. "Polski (level_4)"). Vorher wurde das rohe "level_4" angezeigt.
+const LANG_LEVEL_DE: Record<string, string> = {
+  level_0: 'Grundkenntnisse',
+  level_1: 'Grundkenntnisse',
+  level_2: 'Gut',
+  level_3: 'Sehr gut',
+  level_4: 'Fließend',
+};
+function translateLangLevel(level: string | null | undefined): string {
+  if (!level) return '';
+  return LANG_LEVEL_DE[level] ?? prettifyEnum(level);
 }
 
 function computeAge(birthDate: string | null, yearOfBirth: number | null, nowYear: number): number {
@@ -401,7 +446,7 @@ export function mapCaregiverToNurse(
       )],
       otherLanguages: (full.languagables ?? [])
         .filter(l => l.language?.name && l.language.name.toLowerCase() !== 'german')
-        .map(l => ({ name: l.language!.name!, level: l.level ?? '—' })),
+        .map(l => ({ name: l.language!.name!, level: translateLangLevel(l.level) || '—' })),
     };
   }
 

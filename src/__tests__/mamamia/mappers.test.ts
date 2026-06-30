@@ -348,7 +348,7 @@ describe('mapCaregiverToNurse — full profile (translations + units)', () => {
         personalities: [
           { personality: 'friendly' },
           { personality: 'independent' },
-          { personality: 'totally-unknown-trait' },
+          { personality: 'brand_new_trait' },
         ],
         hobbies: [
           { hobby: 'cooking' },
@@ -357,7 +357,9 @@ describe('mapCaregiverToNurse — full profile (translations + units)', () => {
       }) as any,
       { nowIso: NOW_ISO, nowYear: NOW_YEAR },
     );
-    expect(n.profile?.personalities).toEqual(['freundlich', 'selbstständig', 'totally-unknown-trait']);
+    // Unbekannte Enum-Werte werden "prettified" (Unterstriche → Leerzeichen,
+    // jedes Wort groß) statt roh durchgereicht — nie ein "brand_new_trait" im UI.
+    expect(n.profile?.personalities).toEqual(['freundlich', 'selbstständig', 'Brand New Trait']);
     expect(n.profile?.hobbies).toEqual(['Kochen', 'Kreuzworträtsel']);
   });
 
