@@ -495,10 +495,12 @@ export const CustomerNurseModal: FC<{
               const hasIsNurse = p?.isNurse != null;
               const hasQualifications = !!p?.qualifications;
               const hasEducation = !!p?.education;
-              const hasOtherLanguages = !!(p && p.otherLanguages.length > 0);
+              // "Andere Sprachkenntnisse" (Muttersprache, z. B. Polski) bewusst
+              // NICHT zeigen: für den Kunden zählt immer das DEUTSCH-Niveau, und
+              // das steht prominent oben (Karte) + im 3-Stufen-Block weiter unten.
               const showSpecial = profileLoading
                 || hasDrivingLicense || hasSmoking || hasIsNurse
-                || hasQualifications || hasEducation || hasOtherLanguages;
+                || hasQualifications || hasEducation;
               if (!showSpecial) return null;
               return (
                 <div className="px-5 pb-5">
@@ -530,13 +532,6 @@ export const CustomerNurseModal: FC<{
                       )}
                       {hasEducation && (
                         <InfoRow emoji="📚" label="Ausbildung" value={p!.education} />
-                      )}
-                      {hasOtherLanguages && (
-                        <InfoRow
-                          emoji="🌐"
-                          label="Andere Sprachkenntnisse"
-                          chips={p!.otherLanguages.map(l => `${l.name} (${l.level})`)}
-                        />
                       )}
                     </div>
                   )}
