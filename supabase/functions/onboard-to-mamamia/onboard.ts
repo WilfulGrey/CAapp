@@ -7,6 +7,7 @@ import {
   extractPlzFromLead,
 } from "./mappers.ts";
 import { getOrRefreshAgencyToken, mamamiaRequest } from "../_shared/mamamiaClient.ts";
+import { loginAsAgency, panelMutateAsCustomer } from "../_shared/mamamiaPanelClient.ts";
 
 // ─── Supabase-like interface (dependency injection for testability) ────────
 
@@ -34,6 +35,10 @@ export interface OnboardSecrets {
   mamamiaAgencyEmail: string;
   mamamiaAgencyPassword: string;
   sessionJwtSecret: string;
+  // Panel (Sanctum) base URL, e.g. https://beta.mamamia.app/backend. Used to
+  // mirror the portal token onto the Mamamia customer via the panel-only
+  // UpdateCustomerToken mutation (same auth path as inviteCaregiver in proxy).
+  mamamiaPanelUrl: string;
 }
 
 // ─── Options ────────────────────────────────────────────────────────────────
@@ -137,6 +142,15 @@ const STORE_JOB_OFFER = /* GraphQL */ `
   }
 `;
 
+// Panel-only mutation (nie ma jej na agency /graphql) — mirror portalowego
+// tokenu na rekord klienta w Mamamii, żeby zespół MM mógł wejść po tokenie do
+// portalu klienta (?token=…) i pomóc wypełnić formularz pacjenta.
+const UPDATE_CUSTOMER_TOKEN = /* GraphQL */ `
+  mutation UpdateCustomerToken($id: Int!, $token: String) {
+    UpdateCustomerToken(id: $id, token: $token) { id token }
+  }
+`;
+
 // Primundus ServiceAgency id w Mamamia — per-tenant, zawsze z env.
 //   beta.mamamia.app:           id = 18 (Primundus beta, used by STAGING)
 //   backend.prod.mamamia.app:   id = 3  (Primundus prod, used by PROD)
@@ -164,6 +178,38 @@ export function loadPrimundusAgencyId(): number {
     );
   }
   return parsed;
+}
+
+// Best-effort push tokenu portalu na klienta w Mamamii (panel-only mutation,
+// sesja agency Sanctum — ta sama ścieżka co inviteCaregiver). Cel: zespół MM
+// może otworzyć portal klienta po tokenie i pomóc wypełnić formularz pacjenta.
+// NIGDY nie rzuca — awaria panelu nie może zablokować wejścia do portalu.
+async function pushCustomerToken(args: {
+  panelBaseUrl: string;
+  agencyEmail: string;
+  agencyPassword: string;
+  customerId: number;
+  token: string;
+  fetchFn: typeof fetch;
+}): Promise<void> {
+  try {
+    const session = await loginAsAgency(
+      { baseUrl: args.panelBaseUrl, fetchFn: args.fetchFn },
+      args.agencyEmail,
+      args.agencyPassword,
+    );
+    await panelMutateAsCustomer(
+      { baseUrl: args.panelBaseUrl, fetchFn: args.fetchFn },
+      session,
+      UPDATE_CUSTOMER_TOKEN,
+      { id: args.customerId, token: args.token },
+      "UpdateCustomerToken",
+    );
+  } catch (e) {
+    console.warn(
+      `[onboard] pushCustomerToken failed for customer ${args.customerId}: ${(e as Error).message}`,
+    );
+  }
 }
 
 // Multi-Job (Variant A): pick the session's job_offer_id. With no jobId
@@ -299,6 +345,17 @@ export async function onboardLead(opts: OnboardOptions): Promise<OnboardResult &
     mamamia_job_offer_id: mamamiaJobOfferId,
     mamamia_user_token: agencyToken,
     mamamia_onboarded_at: now().toISOString(),
+  });
+
+  // 8. Mirror the portal token onto the Mamamia customer (best-effort, panel-only)
+  //    so MM staff can open the customer's portal and help fill the patient form.
+  await pushCustomerToken({
+    panelBaseUrl: secrets.mamamiaPanelUrl,
+    agencyEmail: secrets.mamamiaAgencyEmail,
+    agencyPassword: secrets.mamamiaAgencyPassword,
+    customerId: mamamiaCustomerId,
+    token: leadToken,
+    fetchFn,
   });
 
   return {

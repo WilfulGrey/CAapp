@@ -98,12 +98,32 @@ interface FakeMamamia {
   requests: Array<{ query: string; variables: Record<string, unknown> }>;
 }
 
-function fakeMamamia(responses: Array<object>): FakeMamamia {
+function fakeMamamia(responses: Array<object>, opts: { panelFails?: boolean } = {}): FakeMamamia {
   let i = 0;
   const requests: FakeMamamia["requests"] = [];
   return {
     requests,
-    fetch: (async (_input: RequestInfo | URL, init?: RequestInit) => {
+    fetch: (async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = typeof input === "string" ? input : input instanceof URL ? input.href : (input as Request).url;
+
+      // Panel (Sanctum) calls — routed by URL (`/backend/…`), NOT by ordered
+      // responses. Mirrors the real flow: csrf-cookie → LoginAgency →
+      // UpdateCustomerToken (the best-effort token push at the end of onboard).
+      if (url.includes("/backend/")) {
+        if (opts.panelFails) return new Response("panel down", { status: 500 });
+        if (url.includes("/sanctum/csrf-cookie")) {
+          return new Response("", { status: 200, headers: { "set-cookie": "XSRF-TOKEN=testxsrf; Path=/" } });
+        }
+        let parsed: { query?: string; variables?: Record<string, unknown> } = {};
+        try { parsed = JSON.parse((init?.body ?? "{}") as string); } catch (_) { /* swallow */ }
+        requests.push({ query: parsed.query ?? "", variables: parsed.variables ?? {} });
+        const data = url.endsWith("/graphql/auth")
+          ? { data: { LoginAgency: { id: 1, email: "x" } } }
+          : { data: { UpdateCustomerToken: { id: parsed.variables?.id ?? null, token: parsed.variables?.token ?? null } } };
+        return new Response(JSON.stringify(data), { status: 200, headers: { "set-cookie": "mamamia_beta_session=sess; Path=/" } });
+      }
+
+      // Regular agency API calls — ordered responses (existing behaviour).
       const body = responses[i++];
       if (!body) throw new Error(`fakeMamamia: unexpected call #${i}`);
       // capture outgoing body for assertion
@@ -124,6 +144,7 @@ const SECRETS = {
   mamamiaAgencyEmail: "primundus+portal@mamamia.app",
   mamamiaAgencyPassword: "pw",
   sessionJwtSecret: "a".repeat(40),
+  mamamiaPanelUrl: "https://beta.mamamia.app/backend",
 };
 
 const NOW = () => new Date("2026-04-23T10:00:00.000Z");
@@ -489,4 +510,55 @@ Deno.test("onboardLead: null kalkulation lead throws (no soft default — Świę
     }
   }
   if (!threw) throw new Error("expected throw on null kalkulation");
+});
+
+// ─── UpdateCustomerToken push (mirror portal token onto Mamamia customer) ────
+
+Deno.test("onboardLead: pushes portal token to Mamamia via UpdateCustomerToken (id + lead.token)", async () => {
+  _resetAgencyTokenCache();
+  const lead = makeLead(); // token: "valid-token"
+  const supa = makeFakeSupabase([lead]);
+
+  const mm = fakeMamamia([
+    { data: { LoginAgency: { id: 1, name: "P", email: "x", token: "t" } } },
+    { data: { StoreCustomer: { id: 7566, customer_id: "ts-18-7566", status: "draft" } } },
+    { data: { StoreJobOffer: { id: 16225, job_offer_id: "ts-18-7566-1", title: "t", status: "search" } } },
+  ]);
+
+  await onboardLead({
+    leadToken: "valid-token", secrets: SECRETS, supabase: supa, fetchFn: mm.fetch, now: NOW,
+  });
+
+  // The panel UpdateCustomerToken mutation carries the NEW customer id + the
+  // portal magic-link token (what MM staff use to open ?token=… and help).
+  const tokenReq = mm.requests.find((r) => r.query.includes("UpdateCustomerToken"));
+  if (!tokenReq) throw new Error("UpdateCustomerToken request not captured");
+  assertEquals(tokenReq.variables.id, 7566);
+  assertEquals(tokenReq.variables.token, "valid-token");
+});
+
+Deno.test("onboardLead: panel token push failure is best-effort — onboard still succeeds + caches IDs", async () => {
+  _resetAgencyTokenCache();
+  const lead = makeLead();
+  const supa = makeFakeSupabase([lead]);
+
+  // Every panel call 500s → pushCustomerToken swallows; onboard must not throw.
+  const mm = fakeMamamia([
+    { data: { LoginAgency: { id: 1, name: "P", email: "x", token: "t" } } },
+    { data: { StoreCustomer: { id: 7566, customer_id: "ts-18-7566", status: "draft" } } },
+    { data: { StoreJobOffer: { id: 16225, job_offer_id: "ts-18-7566-1", title: "t", status: "search" } } },
+  ], { panelFails: true });
+
+  const result = await onboardLead({
+    leadToken: "valid-token", secrets: SECRETS, supabase: supa, fetchFn: mm.fetch, now: NOW,
+  });
+
+  // Onboard succeeded despite the panel being down.
+  assertEquals(result.customer_id, 7566);
+  assertEquals(result.job_offer_id, 16225);
+  // Cache written (the push runs AFTER updateLead) — portal entry unaffected.
+  assertEquals(supa.updated.length, 1);
+  assertEquals(supa.updated[0].patch.mamamia_customer_id, 7566);
+  // No token mutation reached Mamamia (panel was down).
+  assertEquals(mm.requests.some((r) => r.query.includes("UpdateCustomerToken")), false);
 });

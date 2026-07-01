@@ -51,6 +51,7 @@ const SECRETS = {
   mamamiaAgencyEmail: "p@e",
   mamamiaAgencyPassword: "pw",
   sessionJwtSecret: "x".repeat(40),
+  mamamiaPanelUrl: "https://beta/backend",
 };
 
 function okMamamia(): typeof fetch {
