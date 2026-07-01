@@ -155,6 +155,16 @@ function makeRealSupabase(url: string, serviceKey: string): SupabaseLike {
 // ─── Deno.serve bootstrap ──────────────────────────────────────────────────
 
 if (import.meta.main) {
+  // MAMAMIA_PANEL_URL — panel SPA base (per-tenant, e.g. beta.mamamia.app/backend
+  // vs portal.mamamia.app/backend). Required for the UpdateCustomerToken push;
+  // throw loudly if missing (Święta zasada nr 1 — NO SOFT FALLBACKS). Already a
+  // project-wide secret (mamamia-proxy requires it too).
+  const panelUrl = Deno.env.get("MAMAMIA_PANEL_URL");
+  if (!panelUrl) {
+    throw new Error(
+      "MAMAMIA_PANEL_URL secret missing — required to push the portal token to Mamamia (UpdateCustomerToken, panel-side).",
+    );
+  }
   const secrets: OnboardSecrets = {
     supabaseUrl: Deno.env.get("SUPABASE_URL")!,
     supabaseServiceKey: Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
@@ -163,6 +173,7 @@ if (import.meta.main) {
     mamamiaAgencyEmail: Deno.env.get("MAMAMIA_AGENCY_EMAIL")!,
     mamamiaAgencyPassword: Deno.env.get("MAMAMIA_AGENCY_PASSWORD")!,
     sessionJwtSecret: Deno.env.get("SESSION_JWT_SECRET")!,
+    mamamiaPanelUrl: panelUrl,
   };
 
   const deps: HandlerDeps = {

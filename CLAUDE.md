@@ -646,6 +646,22 @@ Mamamia panel rate-limit'uje agency calls (~60 req/min/account po naszym
 shared agency). Heavy bursty operations (np. invite 50 caregivers w pętli)
 muszą być sequenced. `mamamia-proxy` ma własny in-memory rate limit per IP.
 
+### 10. UpdateCustomerToken — lustro tokenu portalu w Mamamii (panel-only)
+
+Onboard po utworzeniu klienta wysyła `lead.token` (magic-link portalu) na rekord
+klienta w Mamamii mutacją **panel-only** `UpdateCustomerToken(id, token)` (odczyt:
+query `CustomerToken(id)`). Cel: zespół MM może otworzyć portal klienta po tokenie
+(`?token=…`) i pomóc wypełnić formularz pacjenta.
+
+- **Panel-only** — mutacji NIE ma na agency `/graphql` (zweryfikowane Mamamia MCP).
+  Idzie przez sesję agency Sanctum (`_shared/mamamiaPanelClient.ts`) — ta sama ścieżka
+  co `inviteCaregiver`.
+- **onboard czyta teraz `MAMAMIA_PANEL_URL`** (wcześniej tylko `mamamia-proxy`). Sekret
+  jest project-wide, ale bootstrap onboardu throw'uje gdy brak (Święta zasada nr 1).
+- **Best-effort** — push w try/catch, awaria panelu NIE blokuje wejścia do portalu.
+  Wykonuje się tylko przy cache-miss. Kod: `onboard-to-mamamia/onboard.ts:pushCustomerToken`
+  + `UPDATE_CUSTOMER_TOKEN`.
+
 ---
 
 ## Field mapping reference

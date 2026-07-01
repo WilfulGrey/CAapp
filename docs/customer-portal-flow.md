@@ -483,6 +483,22 @@ UPDATE leads SET
 WHERE id = <lead.id>
 ```
 
+#### ⑦½ Push tokenu portalu do Mamamii (`UpdateCustomerToken` — best-effort)
+
+Po zapisaniu cache onboard lustrzenie kopiuje `lead.token` (magic-link portalu) na
+rekord klienta w Mamamii — mutacja **panel-only** `UpdateCustomerToken(id, token)`
+przez sesję agency Sanctum (`${MAMAMIA_PANEL_URL}/graphql`, ta sama ścieżka co
+`inviteCaregiver`). Cel: zespół Mamamii może po tokenie otworzyć portal klienta
+(`kundenportal.primundus.de/?token=…`) i pomóc wypełnić formularz pacjenta. Odczyt
+po stronie MM: query `CustomerToken(id)`.
+
+- **Panel-only** — mutacji NIE ma na agency `/graphql` (zweryfikowane Mamamia MCP).
+- **onboard czyta teraz `MAMAMIA_PANEL_URL`** (wcześniej tylko `mamamia-proxy`); bootstrap
+  throw'uje gdy brak (Święta zasada nr 1).
+- **Best-effort** — awaria panelu jest łapana (`console.warn`) i NIE blokuje onboardu.
+  Wykonuje się tylko przy cache-miss. Kod:
+  [onboard.ts:pushCustomerToken](../supabase/functions/onboard-to-mamamia/onboard.ts).
+
 #### ⑧ Sign session JWT + Set-Cookie
 
 [index.ts:71-90](../supabase/functions/onboard-to-mamamia/index.ts:71):
@@ -722,7 +738,7 @@ warunkiem że Customer ma `status='active'` ORAZ JobOffer też jest active
 
 | Scenariusz | Wywołania mamamii | Czas |
 |---|---|---|
-| Pierwsze wejście klienta (cache miss) | 4 onboard (LoginAgency + Locations + StoreCustomer + StoreJobOffer) + ~5 readów (getCustomer, getJobOffer, listApplications, listMatchings, listInvitedCaregiverIds) | ~5–8 s |
+| Pierwsze wejście klienta (cache miss) | 4 onboard (LoginAgency + Locations + StoreCustomer + StoreJobOffer) + panel push (csrf + LoginAgency + UpdateCustomerToken, best-effort) + ~5 readów (getCustomer, getJobOffer, listApplications, listMatchings, listInvitedCaregiverIds) | ~6–10 s |
 | Drugie wejście (cache hit) | 0 onboard + ~5 readów | ~1 s |
 | Save patient form | PRESERVE_QUERY (1 read) + UpdateCustomer (1 write) | ~500 ms–1 s |
 | Akceptacja zgłoszenia | AssertAppBelongs (1 read) + StoreConfirmation (1 write) | ~500 ms–1 s |
