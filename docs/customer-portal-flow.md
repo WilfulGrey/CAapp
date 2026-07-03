@@ -731,6 +731,7 @@ warunkiem że Customer ma `status='active'` ORAZ JobOffer też jest active
 | `rejectApplication` | write | `/graphql` | agency-jwt |
 | `storeConfirmation` | write | `/graphql` | agency-jwt |
 | `inviteCaregiver` | write | **`/backend/graphql`** | **panel/Sanctum** |
+| `generateCaregiverGermanDescription` | write (LLM) | `/graphql` | agency-jwt |
 
 ---
 

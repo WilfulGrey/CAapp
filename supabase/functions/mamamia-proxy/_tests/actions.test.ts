@@ -360,6 +360,51 @@ Deno.test("getCaregiver: rejects missing id", async () => {
   );
 });
 
+// ─── generateCaregiverGermanDescription (Mamamia regenerates about_de) ─────
+
+Deno.test("generateCaregiverGermanDescription: regenerates + returns flattened about_de/motivation", async () => {
+  const { state, fetchFn } = captureFetch({
+    data: {
+      GenerateCaregiverGermanDescription: {
+        id: 10053,
+        about_de: "x".repeat(300),
+        motivation: "meine Worte",
+      },
+    },
+  });
+
+  const r = await ACTIONS.generateCaregiverGermanDescription(SESSION, { id: 10053 }, makeDeps(fetchFn)) as {
+    about_de: string | null;
+    motivation: string | null;
+  };
+
+  assertEquals(r.about_de, "x".repeat(300));
+  assertEquals(r.motivation, "meine Worte");
+
+  // Mutation carries the caregiver id + translate_to_pl=false (German-only).
+  const sent = state.body as { variables: { id: number; translate_to_pl: boolean } };
+  assertEquals(sent.variables.id, 10053);
+  assertEquals(sent.variables.translate_to_pl, false);
+});
+
+Deno.test("generateCaregiverGermanDescription: rejects missing id", async () => {
+  const { fetchFn } = captureFetch({ data: {} });
+  await assertRejects(
+    () => ACTIONS.generateCaregiverGermanDescription(SESSION, {}, makeDeps(fetchFn)),
+    Error,
+    "id required",
+  );
+});
+
+Deno.test("generateCaregiverGermanDescription: null result → throws", async () => {
+  const { fetchFn } = captureFetch({ data: { GenerateCaregiverGermanDescription: null } });
+  await assertRejects(
+    () => ACTIONS.generateCaregiverGermanDescription(SESSION, { id: 10053 }, makeDeps(fetchFn)),
+    Error,
+    "returned null",
+  );
+});
+
 // ─── searchLocations ─────────────────────────────────────────────────────
 
 Deno.test("searchLocations: passes search string + caps limit", async () => {

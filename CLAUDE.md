@@ -662,6 +662,25 @@ query `CustomerToken(id)`). Cel: zespół MM może otworzyć portal klienta po t
   Wykonuje się tylko przy cache-miss. Kod: `onboard-to-mamamia/onboard.ts:pushCustomerToken`
   + `UPDATE_CUSTOMER_TOKEN`.
 
+### 11. Opis opiekunki (`about_de`) — bierzemy z Mamamii, nie generujemy u siebie
+
+Portal pokazuje **surowy `Caregiver.about_de` z Mamamii** (już NIE generujemy bio
+opiekunki własnym Anthropic — akcja `generateCaregiverAbout` + `aiAboutCache.ts` usunięte).
+Część opisów w Mamamii jest **stara** (limit 200 znaków); nowe są dłuższe. Kryterium
+świeżości = **długość**: `isAboutDeStale(about_de) = (about_de ?? '').length <= 200`
+(null/pusty → stary).
+
+- **Stale → regeneracja przez Mamamię**: akcja proxy `generateCaregiverGermanDescription`
+  woła mutację `GenerateCaregiverGermanDescription(id, translate_to_pl:false)` (przez
+  `runGraphQL`, agency `/graphql`) → świeży `about_de` (>200) + `motivation`. **LLM-write
+  (kosztuje)** → dedup per-CG na froncie (`src/lib/mamamia/caregiverAbout.ts`), proxy
+  rate-limit per IP. Po regeneracji Mamamia trzyma świeży opis na stałe → następne otwarcia
+  zero-cost.
+- **Display** (`CustomerNurseModal`): stale → spinner **zamiast** starego → świeży; fresh →
+  `about_de` wprost; błąd regeneracji → zostaje stary (realny) tekst → `motivation` → mechaniczny.
+- `generateJobDescription` (podsumowanie pacjenta) i `ANTHROPIC_API_KEY` **zostają** —
+  usunęliśmy tylko caregiver-bio. Wzorzec portowany z Sadash/saportal.
+
 ---
 
 ## Field mapping reference

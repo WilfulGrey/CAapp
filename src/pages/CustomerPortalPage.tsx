@@ -13,7 +13,7 @@ import { useMamamiaSession } from '../hooks/useMamamiaSession';
 import { useCustomer, useJobOffer, useApplications, useInterests, useDismissedCaregivers, useAcceptedApplications, useMatchings, useCaregiver, useInvitedCaregivers, useInviteRateState } from '../lib/mamamia/hooks';
 import { rankComparator } from '../lib/mamamia/matchingsRanking';
 import { prefetchCaregivers } from '../lib/mamamia/caregiverCache';
-import { scheduleAiAbouts, getAiAbout, subscribeAiAbout } from '../lib/mamamia/aiAboutCache';
+import { isAboutDeStale, regenerateGermanDescription } from '../lib/mamamia/caregiverAbout';
 import { reportLeadEvent, fetchLeadEvents, KOSTENRECHNER_URL } from '../lib/leadEvents';
 import type { CaregiverSnapshot } from '../lib/leadEvents';
 import { identifyClarity } from '../lib/clarity';
@@ -599,36 +599,33 @@ const CustomerPortalPage: FC = () => {
     selectedNurse?.caregiverId ?? null,
   );
 
-  // AI "Über die Pflegekraft" — reads from aiAboutCache (pre-baked during
-  // prefetch). 3-state to distinguish "in flight" from "resolved-but-null":
-  //   kind='loading'                  → modal shows a friendly "we're
-  //                                       preparing the introduction" loader
-  //                                       (no Mamamia-text flash, then swap)
-  //   kind='resolved', text=string    → modal shows AI text
-  //   kind='resolved', text=null      → modal falls back to Mamamia motivation
-  //                                       / synthesized sentence
-  type AiAboutState = { kind: 'loading' } | { kind: 'resolved'; text: string | null };
-  const [aiAboutState, setAiAboutState] = useState<AiAboutState>({ kind: 'loading' });
-  const [aiAboutForId, setAiAboutForId] = useState<number | null>(null);
+  // "Über die Pflegekraft" — take about_de straight from Mamamia. If it's
+  // STALE (Mamamia's old ≤200-char descriptions), regenerate via Mamamia and
+  // swap in the fresh text; the modal shows a spinner meanwhile. Fresh (>200)
+  // → shown directly, no LLM cost. Error → keep the old (real) text.
+  const [aboutRegen, setAboutRegen] = useState<{ forId: number | null; loading: boolean; text: string | null }>(
+    { forId: null, loading: false, text: null },
+  );
   useEffect(() => {
     if (!fullCaregiver) return;
     const id = fullCaregiver.id;
-    if (aiAboutForId === id) return; // already wired for this nurse
-    setAiAboutForId(id);
-
-    const cached = getAiAbout(id);
-    if (cached !== undefined) {
-      // Cache hit — instant (pre-baked during prefetch).
-      setAiAboutState({ kind: 'resolved', text: cached });
+    if (!isAboutDeStale(fullCaregiver.about_de)) {
+      // Fresh Mamamia description → use as-is, no regeneration.
+      setAboutRegen({ forId: id, loading: false, text: null });
       return;
     }
-    // Still pending — subscribe; scheduleAiAbouts already fired the call.
-    setAiAboutState({ kind: 'loading' });
-    const unsub = subscribeAiAbout(id, () => {
-      const text = getAiAbout(id);
-      if (text !== undefined) setAiAboutState({ kind: 'resolved', text });
-    });
-    return unsub;
+    // Stale → regenerate (dedup'd per caregiver). Spinner meanwhile.
+    setAboutRegen({ forId: id, loading: true, text: null });
+    let cancelled = false;
+    regenerateGermanDescription(id)
+      .then(({ aboutDe }) => {
+        if (!cancelled) setAboutRegen({ forId: id, loading: false, text: aboutDe });
+      })
+      .catch(() => {
+        // Error → drop the spinner, fall back to the old (real) text.
+        if (!cancelled) setAboutRegen({ forId: id, loading: false, text: null });
+      });
+    return () => { cancelled = true; };
   }, [fullCaregiver?.id]);
 
   const enrichedSelectedNurse = (() => {
@@ -646,15 +643,14 @@ const CustomerPortalPage: FC = () => {
       nowYear: new Date().getFullYear(),
     });
     const base = { ...selectedNurse, ...enriched };
-    // Inject AI-generated about text once available — overrides Mamamia's
-    // about_de / motivation fields which are often empty or low quality.
+    // profile.aboutDe is Mamamia's raw about_de (from the mapper). If it was
+    // stale and we regenerated a fresh one, swap that in.
     if (
-      aiAboutState.kind === 'resolved'
-      && aiAboutState.text
-      && aiAboutForId === fullCaregiver.id
+      aboutRegen.text
+      && aboutRegen.forId === fullCaregiver.id
       && base.profile
     ) {
-      base.profile = { ...base.profile, aboutDe: aiAboutState.text };
+      base.profile = { ...base.profile, aboutDe: aboutRegen.text };
     }
     // Preserve color (deterministic by id, identical anyway) + caregiverId.
     return base;
@@ -887,10 +883,6 @@ const CustomerPortalPage: FC = () => {
     }
     if (ids.size > 0) {
       prefetchCaregivers([...ids]);
-      // Once each full profile lands in caregiverCache, scheduleAiAbouts
-      // fires the AI generation immediately — so "Über die Pflegekraft" text
-      // is often pre-baked by the time the user opens a modal.
-      scheduleAiAbouts([...ids]);
     }
     // intentionally not depending on `effectiveMatched` reference identity —
     // its caregiverIds is what we care about, derived from mmMatchings.
@@ -3072,13 +3064,11 @@ const CustomerPortalPage: FC = () => {
           nurse={enrichedSelectedNurse}
           profileLoading={caregiverLoading && !fullCaregiver}
           aboutLoading={
-            // Show "we're preparing the intro" loader instead of the Mamamia
-            // motivation text while AI is in flight. Once AI resolves
-            // (success OR null-failure) the loader collapses and the modal
-            // shows whichever text the fallback chain ends on.
+            // Spinner instead of the old text while we regenerate a STALE
+            // about_de. Fresh descriptions skip this entirely.
             !!fullCaregiver
-            && aiAboutForId === fullCaregiver.id
-            && aiAboutState.kind === 'loading'
+            && aboutRegen.forId === fullCaregiver.id
+            && aboutRegen.loading
           }
           onClose={() => { setSelectedNurse(null); setNurseModalApp(null); setNurseMatchIdx(null); setSelectedFromInterestId(null); }}
           app={nurseModalApp ?? undefined}

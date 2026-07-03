@@ -14,6 +14,7 @@ import {
 // after the derivation moved to _shared.
 export { deriveLeadJobStatus };
 import {
+  GENERATE_CAREGIVER_GERMAN_DESCRIPTION,
   GET_CAREGIVER,
   GET_CUSTOMER,
   GET_JOB_OFFER,
@@ -1035,14 +1036,7 @@ const generateJobDescription: ActionHandler = async (_session, variables, deps) 
   }
 };
 
-// ─── generateCaregiverAbout — AI-generated caregiver introduction ───────────
-//
-// Produces a 3–4 sentence professional German introduction for the caregiver
-// profile modal ("Über die Pflegekraft"). Built from real Mamamia fields:
-// first name, experience, language level, nationality, personality traits,
-// assignments count, nurse qualification. Falls back to null on failure so
-// the modal shows its existing mechanical fallback text.
-
+// Shared Anthropic Messages API helper — used by generateJobDescription.
 async function callAnthropicForText(
   apiKey: string,
   system: string,
@@ -1071,76 +1065,22 @@ async function callAnthropicForText(
   return body.content?.find(b => b.type === 'text')?.text?.trim() ?? null;
 }
 
-interface CaregiverAboutInput {
-  firstName?: string;
-  experienceYears?: string;
-  assignments?: number;
-  experienceLevel?: string;      // badge label: Starter / Bronze / Silber / Gold / Platin
-  languageLevel?: string;
-  nationality?: string;
-  personalities?: string[];
-  hobbies?: string[];
-  furtherHobbies?: string;
-  isNurse?: boolean;
-  qualifications?: string;
-  education?: string;
-  drivingLicense?: string;
-  recentAssignments?: string[];  // e.g. ["München, 3 Monate"]
-  motivation?: string;
-}
-
-const CAREGIVER_ABOUT_SYSTEM = `Du schreibst eine warme, sehr persönliche Vorstellung einer Pflegekraft für eine Familie, die einen Angehörigen betreuen lassen möchte. Die Familie soll ein Gefühl für den Menschen hinter dem Profil bekommen — nicht eine Bewerbung lesen.
-
-PFLICHT:
-- IMMER dritte Person, nur Vorname (z.B. "Maria ist..."). Niemals "Ich" verwenden.
-- MAXIMAL 3 Sätze. Warm, menschlich, ehrlich. Keine Werbephrasen, keine leeren Floskeln.
-- Jede Aussage muss durch die übergebenen Daten gedeckt sein — nichts erfinden.
-- Nationalität NICHT erwähnen, wenn sie polnisch ist (das ist der Standard im 24h-Pflege-Kontext, füllt nur Worte). Nur wenn die Nationalität abweicht (z.B. Ukrainisch, Rumänisch), darf sie kurz vorkommen.
-
-Aufbau:
-- Satz 1: Wer sie als Mensch ist — Persönlichkeit + ein greifbares Detail (Hobby, Lebenssituation, persönliches Interesse). Macht sie greifbar, nicht generisch.
-- Satz 2: Ihre Erfahrung in der 24h-Pflege — IMMER die Anzahl Jahre UND die Anzahl Einsätze nennen, als natürliche Erzählung statt trockener Aufzählung. Wenn ein konkreter letzter Einsatz mit Ort und Dauer vorliegt, als Beispiel einweben. Pflegerische Stärken (Deutsch, Führerschein, Qualifikationen) hier nur einbauen, wenn sie sich natürlich anfügen.
-- Satz 3: Was die Familie an ihr besonders schätzen wird — eine empathische Aussage, die das Mensch-zu-Mensch-Match betont (Geduld, Ruhe, Verlässlichkeit etc., abgeleitet aus den Persönlichkeits-Daten).
-
-Ausgabe: ausschließlich der fertige Fließtext — keine Überschrift, keine Liste, kein Kommentar.`;
-
-const generateCaregiverAbout: ActionHandler = async (_session, variables, deps) => {
-  if (!deps.anthropicApiKey) return { about: null };
-
-  const v = variables as CaregiverAboutInput;
-  if (!v.firstName) return { about: null };
-
-  const lines: string[] = [];
-  lines.push(`Vorname: ${v.firstName}`);
-  if (v.nationality) lines.push(`Nationalität: ${v.nationality}`);
-  if (v.experienceYears) lines.push(`Erfahrung: ${v.experienceYears} in der 24h-Seniorenpflege`);
-  if (typeof v.assignments === 'number' && v.assignments > 0) {
-    lines.push(`Abgeschlossene Einsätze in Deutschland: ${v.assignments}`);
-  }
-  if (v.experienceLevel) lines.push(`Erfahrungs-Level (Badge im Profil): ${v.experienceLevel}`);
-  if (v.languageLevel) lines.push(`Deutschkenntnisse: ${v.languageLevel}`);
-  if (v.drivingLicense) lines.push(`Führerschein: ${v.drivingLicense}`);
-  if (v.recentAssignments?.length) lines.push(`Letzte Einsätze: ${v.recentAssignments.join(' | ')}`);
-  if (v.isNurse) lines.push(`Ausbildung: Ausgebildete Pflegefachkraft`);
-  if (v.education) lines.push(`Bildung: ${v.education}`);
-  if (v.qualifications) lines.push(`Qualifikationen / Pflegeschwerpunkte: ${v.qualifications}`);
-  if (v.personalities?.length) lines.push(`Persönlichkeit: ${v.personalities.join(', ')}`);
-  if (v.hobbies?.length) lines.push(`Hobbys: ${v.hobbies.join(', ')}`);
-  if (v.furtherHobbies) lines.push(`Weitere Interessen: ${v.furtherHobbies}`);
-  if (v.motivation) lines.push(`Eigene Worte / Motivation: ${v.motivation}`);
-
-  try {
-    const about = await callAnthropicForText(
-      deps.anthropicApiKey,
-      CAREGIVER_ABOUT_SYSTEM,
-      lines.join('\n'),
-      deps.fetchFn,
-    );
-    return { about };
-  } catch (e) {
-    console.error('generateCaregiverAbout failed:', (e as Error).message);
-    return { about: null };
-  }
+// ─── generateCaregiverGermanDescription — Mamamia regenerates the caregiver's
+// German "about" text (about_de). We no longer generate the caregiver bio
+// ourselves; the portal reads about_de straight from Mamamia and only calls
+// this when it's stale (length ≤ 200). LLM-write on Mamamia's side (costs) →
+// the frontend dedups per caregiver and the proxy rate-limits per IP.
+const generateCaregiverGermanDescription: ActionHandler = async (_session, variables, deps) => {
+  const id = (variables as { id?: unknown }).id;
+  if (typeof id !== "number") throw new Error("id required (number)");
+  const r = await runGraphQL<{
+    GenerateCaregiverGermanDescription:
+      | { id: number; about_de: string | null; motivation: string | null }
+      | null;
+  }>(deps, GENERATE_CAREGIVER_GERMAN_DESCRIPTION, { id, translate_to_pl: false });
+  const cg = r.GenerateCaregiverGermanDescription;
+  if (!cg) throw new Error("GenerateCaregiverGermanDescription returned null");
+  return { about_de: cg.about_de ?? null, motivation: cg.motivation ?? null };
 };
 
 // ─── Interest actions (new — list + dismiss locally) ───────────────────────
@@ -1229,7 +1169,7 @@ export const ACTIONS: Record<ProxyAction, ActionHandler> = {
   inviteCaregiver,
   dismissCaregiver,
   generateJobDescription,
-  generateCaregiverAbout,
+  generateCaregiverGermanDescription,
 };
 
 export function isKnownAction(name: string): name is ProxyAction {

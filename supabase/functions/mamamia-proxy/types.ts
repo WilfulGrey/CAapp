@@ -28,7 +28,7 @@ export type ProxyAction =
   | "dismissCaregiver"
   // AI
   | "generateJobDescription"
-  | "generateCaregiverAbout";
+  | "generateCaregiverGermanDescription";
 
 // One row of the lead_jobs table (Multi-Job, Phase 2) as surfaced to the
 // frontend "Alle meine Einsätze" overview. 'laufend' is NOT stored — it is
