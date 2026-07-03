@@ -2,6 +2,11 @@
 
 *Plan-mode wynik z 2026-05-22. Źródło prawdy: ten plik (committed). Kopia robocza w `~/.claude/plans/ok-potrzebujemy-jeszcze-z-crystalline-steele.md`.*
 
+> **⚠️ AKTUALIZACJA 2026-07-03:** Skill `/deploy-prod` (opisany niżej) został **usunięty** —
+> opierał się na fałszywym założeniu że prod-front jest gated (NIE jest — auto-deployuje się
+> na merge, zweryfikowane). Ten plik zostaje jako **zapis historyczny** oryginalnego planu;
+> aktualny workflow deployu → CLAUDE.md §"Prod deploy — manual". `/deploy-staging` został.
+
 ## Context
 
 Obecnie pracujemy w trybie "trunk = prod". Każdy merge do `integration/mamamia-onboarding`:

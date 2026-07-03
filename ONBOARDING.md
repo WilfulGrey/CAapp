@@ -256,38 +256,37 @@ w PR comments + zaczekaj. CI łapie regresje techniczne; nie łapie
 
 Mamy **dwa środowiska**:
 
-| | STAGING (auto) | PROD (gated) |
+| | STAGING (auto) | PROD |
 |---|---|---|
 | Komu służy | Zespołowi do verify przed wypuszczeniem | Żywym klientom |
-| Trigger | Każdy push do `main` (= merge twojego PR) | `/deploy-prod` w Claude Code |
+| Trigger | Push do trunka (= merge PR) → front + edge fns | Push → **front auto-live** (Render). Edge fns/migracje: **manual CLI** |
 | URL CAapp | https://caapp-staging.onrender.com | https://kundenportal.primundus.de |
 | URL Kostenrechner | https://kostenrechner-staging.onrender.com | https://kostenrechner.primundus.de |
 | Supabase | Osobny staging project (niech inni) | `ycdwtrklpoqprabtwahi` |
 | Mamamia tenant | `backend.beta.mamamia.app` | `backend.prod.mamamia.app` |
 | Render slot slug | `caapp-staging` / `kostenrechner-staging` | `caapp-beta` / `kostenrechner-beta` (historic naming) |
 
-> **🚧 STATUS (2026-05-22):** staging infra w trakcie setup'u. Do czasu
-> aż user-side ops podniesie staging Supabase + Render staging services,
-> faktyczny flow to nadal "trunk → prod" (per `docs/staging-environment-plan.md`).
-> Cala docs poniżej opisuje target state. Treść której jeszcze nie ma — oznaczona.
+> **STATUS (2026-07-03):** staging jest **live** (od 2026-05-26). **Prod front
+> auto-deployuje się na merge** (Render auto-deploy ON — NIE jest gated). Prod
+> edge fns + migracje są manualne przez CLI (skill `/deploy-prod` usunięty —
+> patrz CLAUDE.md §"Prod deploy — manual").
 
 ### Twój dev cycle (target state)
 
 ```
-feature/xyz branch → PR → CI green → self-merge to main
+feature/xyz → PR → CI green → (front+edge: prod EDGE FN najpierw) → self-merge
                                        ↓
-                                    Render auto-build STAGING (~3 min)
+   merge = Render auto-deploy FRONTU na PROD (~2-3 min) + staging; CI → edge fns staging
                                        ↓
-                                    Manual verify staging URL
-                                       ↓
-                                    "Działa" → poproś Claude: /deploy-prod
-                                       ↓
-                                    Claude robi sekwencję + raportuje
+   prod edge fns / migracje (jeśli dotyczy) — MANUAL CLI:
+     scripts/apply-migrations.sh ycdwtrklpoqprabtwahi   # migracje pierwsze
+     supabase functions deploy <name> --project-ref ycdwtrklpoqprabtwahi
                                        ↓
                                     PROD live
 ```
 
-`/deploy-prod` jest **jedyną** ścieżką żeby klienci coś zobaczyli. Merge do `main` daje ci tylko staging.
+**Merge = frontend live na prodzie od razu** (NIE jest gated). Prod edge fns/migracje
+dokładasz manualnie (dla zmian front+edge — **przed** merge). Skill `/deploy-prod` usunięty.
 
 ### Render team access
 
@@ -301,7 +300,7 @@ blueprint — to zarezerwowane dla Admin role.
 
 **Staging:** automatyczny via GitHub Actions (`test.yml` job `deploy-edge-functions`) po merge do `main`. Działa też dla `project 3/supabase/functions/` (kostenrechner edge fns).
 
-**Prod:** wyłącznie via `/deploy-prod` skill — żaden push do `main` nie ruszy prod Supabase.
+**Prod:** manual — `supabase functions deploy <name> --project-ref ycdwtrklpoqprabtwahi` (push do trunka NIE ruszy prod Supabase; ruszy tylko prod **front** na Render). Skill `/deploy-prod` usunięty 2026-07-03.
 
 **Local manual deploy** (NIE rób tego dla prod — patrz CLAUDE.md §"Emergency hotfix"):
 

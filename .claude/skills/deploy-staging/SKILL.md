@@ -149,6 +149,6 @@ that lives outside source control).
 
 ## Related
 
-- **/deploy-prod** — promotes staging → prod. Use after staging passes manual verification.
-- `docs/staging-environment-plan.md` — full architecture rationale.
-- CLAUDE.md §"Promotion workflow" — narrative summary.
+- **Prod deploy — manual** (skill `/deploy-prod` usunięty 2026-07-03): prod front auto-deployuje się na merge; edge fns/migracje ręcznie via `supabase functions deploy <name> --project-ref ycdwtrklpoqprabtwahi` + `scripts/apply-migrations.sh ycdwtrklpoqprabtwahi`.
+- `docs/staging-environment-plan.md` — historyczny rationale (skill retired).
+- CLAUDE.md §"Prod deploy — manual" — aktualny workflow.
