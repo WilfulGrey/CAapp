@@ -403,6 +403,20 @@ export const STORE_CONFIRMATION = /* GraphQL */ `
   }
 `;
 
+// Regenerate the caregiver's German "about" text on Mamamia's side. LLM-write
+// (costs) → the portal only calls this when about_de is stale (length ≤ 200).
+// translate_to_pl=false — the portal is German-only. Reply carries the fresh
+// about_de (> 200) + motivation (generated together).
+export const GENERATE_CAREGIVER_GERMAN_DESCRIPTION = /* GraphQL */ `
+  mutation GenerateCaregiverGermanDescription($id: Int!, $translate_to_pl: Boolean) {
+    GenerateCaregiverGermanDescription(id: $id, translate_to_pl: $translate_to_pl) {
+      id
+      about_de
+      motivation
+    }
+  }
+`;
+
 // Invited caregivers — lightweight Set source-of-truth. Mamamia exposes
 // Matching.is_request as null in the default field selection, but the
 // `filters: {is_request: true}` server-side filter on

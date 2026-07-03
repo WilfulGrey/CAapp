@@ -168,7 +168,7 @@ export type ProxyAction =
   | 'dismissCaregiver'
   // AI
   | 'generateJobDescription'
-  | 'generateCaregiverAbout';
+  | 'generateCaregiverGermanDescription';
 
 export async function callMamamia<T>(
   action: ProxyAction,
