@@ -6,25 +6,25 @@
 > projekt miał jeden tryb: `git push` do trunk = deploy do prod. Klient widział
 > twoje zmiany natychmiast. Od **2026-05-26** mamy dwa równoległe targets:
 >
-> | | STAGING (default) | PROD (gated) |
+> | | STAGING (default) | PROD |
 > |---|---|---|
 > | URL CAapp | `caapp-staging.onrender.com` | `kundenportal.primundus.de` |
 > | URL Kostenrechner | `kostenrechner-staging.onrender.com` | `kostenrechner.primundus.de` |
 > | Supabase | `taggpiwpwthgpcmaiqjw` | `ycdwtrklpoqprabtwahi` |
 > | Mamamia | `backend.beta.mamamia.app` (agency_id=18) | `backend.prod.mamamia.app` (agency_id=3) |
-> | Trigger | Push do `integration/mamamia-onboarding` → Render auto-build + CI deploy edge fns automatycznie | **TYLKO** `/deploy-prod` skill |
+> | Trigger | Push → Render auto-build (front) + CI auto-deploy edge fns | Push → **front auto-live na Render** (auto-deploy ON — zweryfikowane 2026-07-03). Edge fns + migracje: **manual CLI** |
 >
 > **Co to oznacza dla twojego workflow:**
 >
-> 1. **Merge PR jak zwykle** → automatycznie ląduje na STAGING (frontend Render + edge fns przez CI). Klient NIC nie widzi.
-> 2. **Otwórz `caapp-staging.onrender.com`**, przetestuj swoją zmianę, kliknij się przez flow.
-> 3. **Wszystko OK?** → poproś Claude'a o `/deploy-prod`. Claude zrobi sekwencję: migracje → edge fns → Render API → smoke tests → raport. Pyta o potwierdzenie przed dotknięciem prod.
+> 1. **Merge PR** → **FRONTEND auto-live na PROD** (Render auto-deploy ON dla obu slotów) **oraz** na staging. Edge fns lecą przez CI **tylko na staging**. ⚠️ Klient widzi nowy frontend od razu po merge — prod-front NIE jest gated.
+> 2. **Prod edge fns / migracje** (jeśli zmiana ich dotyczy) — **manual przez CLI** (masz `supabase` CLI zalogowany per-user): `supabase functions deploy <name> --project-ref ycdwtrklpoqprabtwahi`; migracje `scripts/apply-migrations.sh ycdwtrklpoqprabtwahi`. Skilla `/deploy-prod` **już nie ma** — patrz niżej.
+> 3. **Weryfikacja** na `caapp-staging.onrender.com` **przed** merge (bo merge = prod-front live), albo na becie przez curl (§"E2e verification recipe").
 >
-> **Edge functions:** PR merge NIE deploy'uje już edge fns na prod automatycznie. Tylko na staging. Żeby zaaktualizować prod edge fns — `/deploy-prod`.
+> **⚠️ KOLEJNOŚĆ dla zmian front+edge:** merge wysyła frontend na prod NATYCHMIAST, a prod edge fn jest manualny → **zdeployuj prod edge fn PRZED merge** (albo upewnij się że frontend degraduje gracefully). Inaczej jest okno gdzie prod-front woła akcję/pole którego prod-edge-fn jeszcze nie ma. Migracje: zawsze przed kodem (Święta zasada nr 3).
 >
 > **Migracje DB:** ZAWSZE backward-compatible z poprzednią wersją kodu (patrz Święta zasada nr 3 niżej). Nowa NOT NULL bez DEFAULT = zepsujesz prod między momentem zaaplikowania migracji a deploy'em kodu.
 >
-> **Skille dostępne:** `/deploy-staging` (manual refresh stagingu — rzadko potrzebny, CI to robi) + `/deploy-prod` (jedyny sposób na klient-facing change). Definicje w `.claude/skills/`. Wymagają env vars: `SUPABASE_STAGING_REF`, `SUPABASE_PROD_REF`, `RENDER_API_KEY`, `STAGING_CAAPP_SERVICE_ID`, `STAGING_KOSTENRECHNER_SERVICE_ID`, `PROD_CAAPP_SERVICE_ID`, `PROD_KOSTENRECHNER_SERVICE_ID`. Michał wkleja ci to w pierwszej wiadomości albo masz w shell rc.
+> **Skille:** `/deploy-staging` **został** (ręczny refresh stagingu — rzadko potrzebny, CI to robi). **`/deploy-prod` USUNIĘTY 2026-07-03** — opierał się na fałszywym założeniu że prod-front jest gated (NIE jest — auto-deployuje się na merge), robił zbędną ceremonię (Render API, migracje, smoke) i wprowadzał w błąd. **Prod deploy = manual CLI:** `supabase functions deploy <name> --project-ref ycdwtrklpoqprabtwahi` (edge fns) + `scripts/apply-migrations.sh ycdwtrklpoqprabtwahi` (migracje). `supabase` CLI zalogowany per-user (Windows Credential Manager).
 >
 > **Pełna dokumentacja:** `docs/staging-environment-plan.md`. Sekcja "Deploy workflow" w tym pliku niżej + URL convention (kostenrechner-beta slot = prod, mental-model "slot z custom domain = prod, slot bez = staging").
 >
@@ -181,10 +181,11 @@ running kodem (= wersją przed twoim deploy'em).** Inaczej między momentem
 zaaplikowania migracji a deploy'em nowego kodu masz okno gdzie żywy ruch
 hituje błąd. Klient widzi 500. Lead się gubi.
 
-To wynika z faktu że `/deploy-prod` (patrz §"Deploy workflow") robi migracje
-**pierwsze**, potem deploy edge fns + Render. Sekwencja celowa — schema musi
-być gotowa zanim nowy kod jej zacznie używać. Ale to znaczy że stary kod
-przez ~30-60 sekund działa na nowej schemie.
+To wynika z sekwencji prod deployu (patrz §"Deploy workflow"): migracje
+**pierwsze**, potem kod (edge fns manual; frontend auto na Render po merge).
+Sekwencja celowa — schema musi być gotowa zanim nowy kod jej zacznie używać.
+Ale to znaczy że stary kod przez chwilę działa na nowej schemie (a frontend
+auto-live na merge — tym bardziej migracja musi być gotowa wcześniej).
 
 ### Konkretne reguły
 
@@ -205,10 +206,10 @@ przez ~30-60 sekund działa na nowej schemie.
 
 Gdy MUSISZ zrobić destruktywną zmianę (np. rename `lead.email` → `lead.contact_email`):
 
-1. **PR 1 (expand)**: dodaj `contact_email` (nullable). Code: dual-read (`row.contact_email ?? row.email`), dual-write (zapisz w oba pola na każdy save). `/deploy-prod`.
-2. **PR 2 (backfill)**: skrypt SQL kopiuje istniejące wartości `email` → `contact_email`. Run manually w Supabase Studio lub jako migration. `/deploy-prod`.
-3. **PR 3 (switch)**: code czyta tylko `contact_email`. Pisze tylko `contact_email`. `email` nieużywane ale jeszcze w DB. `/deploy-prod`.
-4. **PR 4 (contract)**: migration drop'ująca kolumnę `email`. `/deploy-prod`.
+1. **PR 1 (expand)**: dodaj `contact_email` (nullable). Code: dual-read (`row.contact_email ?? row.email`), dual-write (zapisz w oba pola na każdy save). Deploy prod (migracja pierwsza, potem kod).
+2. **PR 2 (backfill)**: skrypt SQL kopiuje istniejące wartości `email` → `contact_email`. Run manually w Supabase Studio lub jako migration. Deploy prod.
+3. **PR 3 (switch)**: code czyta tylko `contact_email`. Pisze tylko `contact_email`. `email` nieużywane ale jeszcze w DB. Deploy prod.
+4. **PR 4 (contract)**: migration drop'ująca kolumnę `email`. Deploy prod.
 
 Cztery deploy cycles, ale ZERO downtime + zero customer-visible error.
 
@@ -217,13 +218,13 @@ Cztery deploy cycles, ale ZERO downtime + zero customer-visible error.
 - **Maintenance window** ogłoszony klientom (np. niedziela 2:00-4:00 AM CET, banner w portalu wcześniej) — wtedy "stop-the-world" rebuild OK. Ale do tego potrzebujesz dummy-mode lub przekierowania na statyczną stronę "Wir machen ein Update". Obecnie nie mamy.
 - **Migracja na pustej tabeli** (np. nowo dodana w poprzednim PR, jeszcze brak rows) — NOT NULL bez DEFAULT OK bo nie ma row'a do złamania.
 
-### Co `/deploy-prod` robi z tą zasadą
+### Kto pilnuje tej zasady
 
-Skill `/deploy-prod` ma sekcję "Migration safety reminder" która listuje warunki. Jeśli ostatni diff zawiera zmianę w `supabase/migrations/` która łamie te reguły, skill **OSTRZEGA** user'a w confirmation modal'u zanim wystrzeli. User świadomie potwierdza lub anuluje. Skill nie blokuje silnie — ale zostawia ślad w raporcie.
+Skill `/deploy-prod` (usunięty 2026-07-03) miał to sprawdzać automatycznie — teraz **trzymasz to sam**: przed deployem migracji na prod sprawdź w powyższej tabeli czy zmiana jest backward-compatible z aktualnie running kodem. Jeśli nie (NOT NULL bez DEFAULT, drop, rename) → expand-contract. Zawsze: **migracja pierwsza (`scripts/apply-migrations.sh ycdwtrklpoqprabtwahi`), kod drugi.**
 
 ### Anti-pattern
 
-Najczęstsza pokusa: "dodam NOT NULL z DEFAULT, ale chcę żeby kolumna była strict bez default na future inserts → zaraz po deploy zrobię ALTER TABLE DROP DEFAULT". To dwie migracje. Pierwsza puszcza się z DEFAULT (compat z starym kodem). Druga (DROP DEFAULT) puszcza się w następnym `/deploy-prod` JUŻ z nowym kodem który ZAWSZE wpisuje wartość. To jest zgodne z regułą.
+Najczęstsza pokusa: "dodam NOT NULL z DEFAULT, ale chcę żeby kolumna była strict bez default na future inserts → zaraz po deploy zrobię ALTER TABLE DROP DEFAULT". To dwie migracje. Pierwsza puszcza się z DEFAULT (compat z starym kodem). Druga (DROP DEFAULT) puszcza się w następnym prod deployu JUŻ z nowym kodem który ZAWSZE wpisuje wartość. To jest zgodne z regułą.
 
 ---
 
@@ -890,16 +891,16 @@ to nie nasze — projekt 3 ma inną tsconfig. Skupić się na `src/` clean.
 **Przed:** `git push origin integration/mamamia-onboarding` → wszystko auto-deployowało się na prod (Render + edge fns + migracje).
 
 **Po:**
-- **Frontend (Render):** push → BOTH prod + staging Render slots auto-build z tego samego commit'a. Bez zmian dla frontu.
-- **Edge functions:** CI deployuje **tylko na STAGING** Supabase (`taggpiwpwthgpcmaiqjw`). PROD Supabase (`ycdwtrklpoqprabtwahi`) **NIE dostaje auto-deploy**. Musisz albo `/deploy-prod` (skill w Claude Code), albo manual `supabase functions deploy --project-ref ycdwtrklpoqprabtwahi`.
-- **Migracje SQL:** brak auto-deploy w żadnym kierunku — zawsze manual przez `supabase db push --linked` lub `/deploy-prod`.
+- **Frontend (Render):** push → BOTH prod + staging Render slots **auto-build** z tego samego commit'a (auto-deploy ON dla obu — zweryfikowane: prod deploy trigger=`new_commit`, status `live`). **Frontend na prod jest AUTO, nie gated.**
+- **Edge functions:** CI deployuje **tylko na STAGING** Supabase (`taggpiwpwthgpcmaiqjw`). PROD Supabase (`ycdwtrklpoqprabtwahi`) **NIE dostaje auto-deploy** — manual `supabase functions deploy <name> --project-ref ycdwtrklpoqprabtwahi`.
+- **Migracje SQL:** brak auto-deploy w żadnym kierunku — zawsze manual przez `scripts/apply-migrations.sh <ref>` (lub `supabase db push --linked`).
 
 **Implikacja:** jeśli zmieniasz cokolwiek w `supabase/functions/*` lub `project 3/supabase/functions/*` lub `supabase/migrations/*` → po merge frontend dotrze na prod automatycznie, **edge functions + migracje NIE**. Klient zobaczy nowy UI ale rozmawiający z nim Supabase ma stary kod → kruche.
 
 **Co robić:**
-1. **Zwykła sytuacja:** merge PR → automatycznie staging dostaje wszystko (front + edge + bez migracji). Otwórz `caapp-staging.onrender.com/?token=<test>`, sprawdź. Jeśli OK → `/deploy-prod` w Claude Code. Skill przepyta + zrobi sekwencję.
-2. **Hot-fix bez stagingu:** patrz §"Emergency hotfix" niżej — manualny deploy z explicit `--project-ref ycdwtrklpoqprabtwahi`.
-3. **Tylko-frontend change** (np. tylko `src/` lub `project 3/components/`): Render auto-deploy załatwia obie strony. Nie wymaga `/deploy-prod`.
+1. **Tylko-frontend change** (np. tylko `src/` lub `project 3/components/`): merge → Render auto-deployuje na prod **i** staging. **Nic więcej nie trzeba** — front live na prodzie po ~2-3 min. (Zweryfikuj na stagingu PRZED merge, bo merge = prod live.)
+2. **Zmiana z edge fns / migracjami:** zdeployuj je na **prod manualnie** (`supabase functions deploy … --project-ref ycdwtrklpoqprabtwahi`, migracje `scripts/apply-migrations.sh ycdwtrklpoqprabtwahi`) — dla zmian front+edge **przed** merge (patrz KOLEJNOŚĆ w banerze u góry). Staging dostaje edge fns przez CI po merge.
+3. **Hot-fix:** patrz §"Emergency hotfix" niżej.
 
 ### Dwa środowiska
 
@@ -913,46 +914,40 @@ to nie nasze — projekt 3 ma inną tsconfig. Skupić się na `src/` clean.
 | Supabase region | eu-central-1 (Frankfurt) | eu-west-1 (Ireland) |
 | Mamamia tenant | `backend.beta.mamamia.app` | `backend.prod.mamamia.app` |
 | Mamamia agency_id | `18` (Primundus beta) | `3` (Primundus prod) |
-| Frontend deploy | Render auto on push do trunk | Render auto on push do trunk |
-| Edge fn deploy | CI auto via `test.yml` (po merge) | **Manual via `/deploy-prod` skill** lub `supabase functions deploy --project-ref ycdwtrklpoqprabtwahi` |
-| Migration deploy | Manual via `/deploy-staging` skill lub `supabase db push --linked --project-ref taggpiwpwthgpcmaiqjw` | **Manual via `/deploy-prod` skill** |
+| Frontend deploy | Render auto on push do trunk | **Render auto on push do trunk** (auto-deploy ON — nie gated) |
+| Edge fn deploy | CI auto via `test.yml` (po merge) | **Manual:** `supabase functions deploy <name> --project-ref ycdwtrklpoqprabtwahi` |
+| Migration deploy | Manual: `scripts/apply-migrations.sh taggpiwpwthgpcmaiqjw` (lub `/deploy-staging`) | **Manual:** `scripts/apply-migrations.sh ycdwtrklpoqprabtwahi` |
 
 (Slot slug `caapp-beta` istniał historycznie i został przemianowany na `caapp` — w starszych docsach możesz zobaczyć obie nazwy. To ten sam serwis.)
 
-### Promotion workflow — `/deploy-staging` i `/deploy-prod`
+### Prod deploy — manual (skill `/deploy-prod` usunięty 2026-07-03)
 
-Skills żyją w `.claude/skills/deploy-staging/SKILL.md` + `.claude/skills/deploy-prod/SKILL.md` (commited do repo, więc każdy dev po `git pull` ma dostęp w swoim Claude Code).
+`/deploy-prod` został **usunięty** — zakładał że prod-front jest gated (NIE jest,
+auto-deployuje się na merge) i robił zbędną Render-API ceremonię. Prod deploy jest
+teraz jawny i manualny; `/deploy-staging` **został** (opcjonalny refresh stagingu).
 
 **Typowy dev cycle:**
 
 ```
-feature/xyz branch → PR → CI green → self-merge to main
-                                       ↓ (Render auto-deploy)
-                                    STAGING live (~3 min)
+feature/xyz → PR → CI green → (dla front+edge: deploy prod EDGE FN najpierw) → self-merge
                                        ↓
-                                    Manual verify: open
-                                    caapp-staging.onrender.com
+   merge = Render auto-deploy FRONTU na PROD (~2-3 min) + staging; CI → edge fns na staging
                                        ↓
-                                    "Looks good" → /deploy-prod
+   prod edge fns / migracje (jeśli dotyczy) — MANUAL:
+     scripts/apply-migrations.sh ycdwtrklpoqprabtwahi        # migracje PIERWSZE
+     supabase functions deploy <name> --project-ref ycdwtrklpoqprabtwahi
                                        ↓
-                                    Claude: pre-flight + confirm + migrate +
-                                            edge fns + Render API call +
-                                            poll + smoke + report
-                                       ↓
-                                    PROD live (kundenportal.primundus.de)
+                          PROD live (kundenportal.primundus.de)
 ```
 
-**Czego `/deploy-staging` użyć (rzadkie):** ręczny refresh stagingu po
-transient CI flake (esm.sh 522, Render build timeout), albo gdy chcesz
-przepuścić tę samą wersję jeszcze raz po zmianie staging secrets.
+**Reguły które trzymasz sam (były w skillu, teraz ręcznie):**
+- **migracje pierwsze, kod drugi** (Święta zasada nr 3) — prod migracja musi być backward-compatible.
+- **front+edge → prod edge fn PRZED merge** (merge = front live na prodzie od razu).
+- smoke po deploy: `curl -sS -o /dev/null -w "%{http_code}" https://kundenportal.primundus.de/` (200) + edge fn `{"token":"x"}` → 401.
+- Mamamia schema-parity (Bug #16): dla zmian dotykających GraphQL — zweryfikuj że pole/mutacja istnieje na prod tenancie zanim wypuścisz.
 
-**Czego `/deploy-prod` użyć (zawsze):** każda zmiana która ma trafić
-do klienta. Skill enforce'uje:
-- local SHA == staging SHA (nie skipujemy stagingu)
-- interactive confirmation z listą migracji + funkcji do deploy
-- migracje **pierwsze**, kod **drugi** (kolejność krytyczna — patrz Święta zasada nr 3)
-- smoke test po deploy
-- raport z URLs + czasem trwania
+**`/deploy-staging` (rzadkie):** ręczny refresh stagingu po transient CI flake
+(esm.sh 522, Render build timeout), albo po zmianie staging secrets.
 
 ### Emergency hotfix (tylko gdy klient krwawi)
 
@@ -1020,11 +1015,13 @@ npx supabase secrets unset DEBUG_PROXY --project-ref ycdwtrklpoqprabtwahi
 
 ### Render API
 
-**Dostępne** — `RENDER_API_KEY` (`rnd_…`) jest w shell env, `render` CLI w
-`/opt/homebrew/bin/render`, a skille `/deploy-staging` + `/deploy-prod` go
-używają. Base URL `https://api.render.com/v1`, auth `Authorization: Bearer
-$RENDER_API_KEY`. Normalna ścieżka deploy to wciąż auto-deploy z GitHub push
-(2-3 min) — API używaj do env-vars i wymuszonych redeploy'ów.
+**Dostępne** — `render` CLI zainstalowany (na Windows: `~/bin/render`), **zalogowany
+per-user** (`render workspace current` działa nawet gdy `RENDER_API_KEY` w shellu jest
+nieustawiony — CLI trzyma własny token). REST: base URL `https://api.render.com/v1`,
+auth `Authorization: Bearer $RENDER_API_KEY` (wymaga klucza w env). Normalna ścieżka
+deploy to auto-deploy z GitHub push (2-3 min — **front na prod i staging**); CLI/API
+używaj do env-vars, statusu (`render deploys list <id> --confirm -o json`) i
+wymuszonych redeploy'ów.
 
 Service IDs:
 

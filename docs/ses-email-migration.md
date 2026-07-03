@@ -124,8 +124,8 @@ versa) at the same time. Do all of a path's secrets together.
    prod service. Also update `render.yaml` so the blueprint stops hardcoding
    `SMTP_HOST=smtp.ionos.de` (convert to `sync:false` or set the SES host) —
    otherwise the next prod redeploy resets the host back to Ionos.
-3. **Edge fn:** promote `send-scheduled-emails` to prod via `/deploy-prod`
-   (or `supabase functions deploy send-scheduled-emails --project-ref ycdwtrklpoqprabtwahi`)
+3. **Edge fn:** promote `send-scheduled-emails` to prod manually:
+   `supabase functions deploy send-scheduled-emails --project-ref ycdwtrklpoqprabtwahi`
    so prod runs the hardened transport.
 4. **Verify prod** with one real send, then watch `scheduled_emails` for a few
    cycles. Keep the Ionos creds around for ~a day as a rollback option.
