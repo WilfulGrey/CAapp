@@ -22,10 +22,12 @@ export function WhatsAppFloat() {
   }, []);
 
   useEffect(() => {
-    // Observe the form card itself (not the whole #calculator-form wrapper —
-    // that also contains the badges + Ilka contact block, which kept the
-    // float hidden far too long after scrolling past the form).
-    const cards = document.querySelectorAll('[data-calculator-card]');
+    // Auf Höhe des Formulars KOMPLETT weg (Martin, 2026-07-08): Karte UND
+    // #calculator-form-Wrapper beobachten — sobald irgendein Teil des
+    // Formularbereichs sichtbar ist, verschwindet der Button. Die frühere
+    // engere Variante (nur Karte) ließ ihn neben Badges/Kontaktblock wieder
+    // auftauchen und überdeckte auf kleinen Screens den Weiter-Button.
+    const cards = document.querySelectorAll('[data-calculator-card], #calculator-form');
     if (cards.length === 0) return;
     const visible = new Set<Element>();
     const observer = new IntersectionObserver((entries) => {

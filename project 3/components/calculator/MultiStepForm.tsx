@@ -765,7 +765,13 @@ export function MultiStepForm() {
                   ].map(({ value, label }) => (
                     <button
                       key={value}
-                      onClick={() => setWarmupAudience(value)}
+                      onClick={() => {
+                        // Bewusst KEIN step_view/step_complete: die Warm-up-Frage
+                        // zählt nicht als Schritt (Auswertung bleibt kompatibel);
+                        // eigenes Event macht sie trotzdem messbar.
+                        analytics.trackEvent('wizard', 'warmup_answered', { answer: value });
+                        setWarmupAudience(value);
+                      }}
                       className={btnClass(false)}
                     >
                       <div className="flex items-center justify-start gap-3.5">
