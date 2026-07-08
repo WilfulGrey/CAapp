@@ -15,6 +15,7 @@ import {
   prefillPatientFromLead,
 } from '../../lib/supabase';
 import { CustomSelect } from './CustomSelect';
+import { reportLeadEvent } from '../../lib/leadEvents';
 import type { PatientForm } from './shared';
 import { STEP_LABELS } from './shared';
 import type { MamamiaCustomer } from '../../lib/mamamia/types';
@@ -262,10 +263,16 @@ export const AngebotCard: FC<{
     if (!storageKey) return;
     if (initialMountRef.current) { initialMountRef.current = false; return; }
     if (!userDirty.current && !saved) return;
-    localStorage.setItem(
-      storageKey,
-      JSON.stringify({ ...patient, _isDraft: !saved }),
-    );
+    try {
+      localStorage.setItem(
+        storageKey,
+        JSON.stringify({ ...patient, _isDraft: !saved }),
+      );
+    } catch (err) {
+      // iOS Private Mode / volle Quota: Entwurf kann lokal nicht gehalten
+      // werden — nicht crashen; der echte Save geht ohnehin zum Server.
+      console.warn('Draft konnte nicht lokal gespeichert werden:', err);
+    }
   }, [patient, storageKey, saved]);
 
   const set = (f: keyof PatientForm) =>
@@ -291,13 +298,9 @@ export const AngebotCard: FC<{
       const baseOk = patient.plz !== '' && patient.ort !== ''
         && patient.wohnungstyp !== '' && patient.urbanisierung !== '' && patient.familieNahe !== ''
         && patient.pflegedienst !== '' && patient.internet !== '' && patient.badezimmer !== '';
-      // When Pflegedienst='Ja' or 'Geplant', Mamamia requires a description
-      // of frequency + tasks (panel form gates customer completion on it).
-      // 'Nein' skips both follow-ups.
-      const pflegedienstActive = patient.pflegedienst === 'Ja' || patient.pflegedienst === 'Geplant';
-      if (pflegedienstActive) {
-        return baseOk && patient.pflegedienstHaeufigkeit !== '' && patient.pflegedienstAufgaben !== '';
-      }
+      // Pflegedienst-Zusatzfelder (Häufigkeit/Aufgaben) bewusst entfernt
+      // (Martin, 2026-07-08) — mamamias Pflicht-Beschreibung liefert der
+      // Mapper jetzt als Standard-Text (siehe patientFormMapper).
       return baseOk;
     }
     if (s === 3) {
@@ -323,6 +326,17 @@ export const AngebotCard: FC<{
   // truth — if it says saved, we should agree.
   const effectiveSaved = saved || !!forceSaved;
 
+  // Schritt-Tracking (einmal je Schritt/Sitzung): endlich sichtbar, WO im
+  // Patientenbogen die Abbrüche passieren (lead_events → Dashboard/Report).
+  const trackedSteps = useRef<Set<number>>(new Set());
+  const trackStep = (s: number) => {
+    if (!lead?.token || trackedSteps.current.has(s)) return;
+    trackedSteps.current.add(s);
+    reportLeadEvent(lead.token, 'patient_form_step', { step: s });
+  };
+
+  // Pflichtfeld leer → dezenter roter Rahmen (wie im SA-Portal); gefüllt → normal.
+  const req = (v: string) => (v === '' ? ' border-red-300 bg-red-50/40' : '');
   const inputCls = 'w-full border border-gray-300 rounded-xl px-3 py-2.5 text-base text-gray-800 placeholder-gray-400 focus:outline-none focus:border-[#8B7355] focus:ring-2 focus:ring-[#8B7355]/10 transition-all bg-white';
   const labelCls = 'block text-[15px] font-medium text-gray-700 mb-1.5';
 
@@ -841,18 +855,18 @@ export const AngebotCard: FC<{
                       <div className={gridRow2}>
                         <div>
                           <label className={labelCls}>Geschlecht <span className="text-red-400">*</span></label>
-                          <CustomSelect value={patient.geschlecht} onChange={v => updatePatient(p=>({...p,geschlecht:v}))}
+                          <CustomSelect invalid={patient.geschlecht === ''} value={patient.geschlecht} onChange={v => updatePatient(p=>({...p,geschlecht:v}))}
                             options={['Männlich','Weiblich']} />
                         </div>
                         <div>
                           <label className={labelCls}>Geburtsjahr <span className="text-red-400">*</span></label>
-                          <CustomSelect value={patient.geburtsjahr} onChange={v => updatePatient(p=>({...p,geburtsjahr:v}))}
+                          <CustomSelect invalid={patient.geburtsjahr === ''} value={patient.geburtsjahr} onChange={v => updatePatient(p=>({...p,geburtsjahr:v}))}
                             options={Array.from({length:70},(_,i)=>String(1931+i))} />
                         </div>
                       </div>
                       <div>
                         <label className={labelCls}>Pflegegrad <span className="text-red-400">*</span></label>
-                        <CustomSelect value={patient.pflegegrad} onChange={v => updatePatient(p=>({...p,pflegegrad:v}))}
+                        <CustomSelect invalid={patient.pflegegrad === ''} value={patient.pflegegrad} onChange={v => updatePatient(p=>({...p,pflegegrad:v}))}
                           options={['Kein/e','Pflegegrad 1','Pflegegrad 2','Pflegegrad 3','Pflegegrad 4','Pflegegrad 5']} />
                       </div>
                       <div className={gridRow2}>
@@ -878,18 +892,18 @@ export const AngebotCard: FC<{
                         <div className={gridRow2}>
                           <div>
                             <label className={labelCls}>Geschlecht <span className="text-red-400">*</span></label>
-                            <CustomSelect value={patient.p2_geschlecht} onChange={v => updatePatient(p=>({...p,p2_geschlecht:v}))}
+                            <CustomSelect invalid={patient.p2_geschlecht === ''} value={patient.p2_geschlecht} onChange={v => updatePatient(p=>({...p,p2_geschlecht:v}))}
                               options={['Männlich','Weiblich']} />
                           </div>
                           <div>
                             <label className={labelCls}>Geburtsjahr <span className="text-red-400">*</span></label>
-                            <CustomSelect value={patient.p2_geburtsjahr} onChange={v => updatePatient(p=>({...p,p2_geburtsjahr:v}))}
+                            <CustomSelect invalid={patient.p2_geburtsjahr === ''} value={patient.p2_geburtsjahr} onChange={v => updatePatient(p=>({...p,p2_geburtsjahr:v}))}
                               options={Array.from({length:70},(_,i)=>String(1931+i))} />
                           </div>
                         </div>
                         <div className="mt-2">
                           <label className={labelCls}>Pflegegrad <span className="text-red-400">*</span></label>
-                          <CustomSelect value={patient.p2_pflegegrad} onChange={v => updatePatient(p=>({...p,p2_pflegegrad:v}))}
+                          <CustomSelect invalid={patient.p2_pflegegrad === ''} value={patient.p2_pflegegrad} onChange={v => updatePatient(p=>({...p,p2_pflegegrad:v}))}
                             options={['Kein/e','Pflegegrad 1','Pflegegrad 2','Pflegegrad 3','Pflegegrad 4','Pflegegrad 5']} />
                         </div>
                         <div className="grid grid-cols-2 gap-2 mt-2">
@@ -934,19 +948,19 @@ export const AngebotCard: FC<{
                   <div className={gridRow2}>
                     <div>
                       <label className={labelCls}>Heben erforderlich? <span className="text-red-400">*</span></label>
-                      <CustomSelect value={patient.heben} onChange={v => updatePatient(p=>({...p,heben:v}))}
+                      <CustomSelect invalid={patient.heben === ''} value={patient.heben} onChange={v => updatePatient(p=>({...p,heben:v}))}
                         options={['Ja','Nein']} />
                     </div>
                     <div>
                       <label className={labelCls}>Demenz <span className="text-red-400">*</span></label>
-                      <CustomSelect value={patient.demenz} onChange={v => updatePatient(p=>({...p,demenz:v}))}
+                      <CustomSelect invalid={patient.demenz === ''} value={patient.demenz} onChange={v => updatePatient(p=>({...p,demenz:v}))}
                         options={['Nein','Leichtgradig','Mittelgradig','Schwer']} />
                     </div>
                   </div>
                   <div className={gridRow2}>
                     <div>
                       <label className={labelCls}>Inkontinenz <span className="text-red-400">*</span></label>
-                      <CustomSelect value={patient.inkontinenz} onChange={v => updatePatient(p=>({...p,inkontinenz:v}))}
+                      <CustomSelect invalid={patient.inkontinenz === ''} value={patient.inkontinenz} onChange={v => updatePatient(p=>({...p,inkontinenz:v}))}
                         options={['Nein','Harninkontinenz','Stuhlinkontinenz','Beides']} />
                     </div>
                     <div>
@@ -973,30 +987,30 @@ export const AngebotCard: FC<{
                       <div className="space-y-3">
                         <div>
                           <label className={`${labelCls} flex items-center gap-1.5`}>Mobilität <span className="text-red-400">*</span><svg className="w-3.5 h-3.5 text-gray-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><circle cx="12" cy="12" r="10"/><path strokeLinecap="round" strokeLinejoin="round" d="M12 16v-4m0-4h.01"/></svg></label>
-                          <CustomSelect value={patient.p2_mobilitaet} onChange={v => updatePatient(p=>({...p,p2_mobilitaet:v}))}
+                          <CustomSelect invalid={patient.p2_mobilitaet === ''} value={patient.p2_mobilitaet} onChange={v => updatePatient(p=>({...p,p2_mobilitaet:v}))}
                             options={['Vollständig mobil','Am Gehstock','Rollatorfähig','Rollstuhlfähig','Bettlägerig']} />
                         </div>
                         <div className={gridRow2}>
                           <div>
                             <label className={labelCls}>Heben erforderlich? <span className="text-red-400">*</span></label>
-                            <CustomSelect value={patient.p2_heben} onChange={v => updatePatient(p=>({...p,p2_heben:v}))}
+                            <CustomSelect invalid={patient.p2_heben === ''} value={patient.p2_heben} onChange={v => updatePatient(p=>({...p,p2_heben:v}))}
                               options={['Ja','Nein']} />
                           </div>
                           <div>
                             <label className={labelCls}>Demenz <span className="text-red-400">*</span></label>
-                            <CustomSelect value={patient.p2_demenz} onChange={v => updatePatient(p=>({...p,p2_demenz:v}))}
+                            <CustomSelect invalid={patient.p2_demenz === ''} value={patient.p2_demenz} onChange={v => updatePatient(p=>({...p,p2_demenz:v}))}
                               options={['Nein','Leichtgradig','Mittelgradig','Schwer']} />
                           </div>
                         </div>
                         <div className={gridRow2}>
                           <div>
                             <label className={labelCls}>Inkontinenz <span className="text-red-400">*</span></label>
-                            <CustomSelect value={patient.p2_inkontinenz} onChange={v => updatePatient(p=>({...p,p2_inkontinenz:v}))}
+                            <CustomSelect invalid={patient.p2_inkontinenz === ''} value={patient.p2_inkontinenz} onChange={v => updatePatient(p=>({...p,p2_inkontinenz:v}))}
                               options={['Nein','Harninkontinenz','Stuhlinkontinenz','Beides']} />
                           </div>
                           <div>
                             <label className={`${labelCls} flex items-center gap-1.5`}>Nachteinsätze <span className="text-red-400">*</span><svg className="w-3.5 h-3.5 text-gray-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><circle cx="12" cy="12" r="10"/><path strokeLinecap="round" strokeLinejoin="round" d="M12 16v-4m0-4h.01"/></svg></label>
-                            <CustomSelect value={patient.p2_nacht} onChange={v => updatePatient(p=>({...p,p2_nacht:v}))}
+                            <CustomSelect invalid={patient.p2_nacht === ''} value={patient.p2_nacht} onChange={v => updatePatient(p=>({...p,p2_nacht:v}))}
                               options={['Nein','Bis zu 1 Mal','1–2 Mal','Mehr als 2']} />
                           </div>
                         </div>
@@ -1019,11 +1033,11 @@ export const AngebotCard: FC<{
                   <div className="grid grid-cols-5 gap-2">
                     <div className="col-span-2">
                       <label className={labelCls}>PLZ <span className="text-red-400">*</span></label>
-                      <input value={patient.plz} onChange={set('plz')} placeholder="80331" maxLength={5} className={inputCls} />
+                      <input value={patient.plz} onChange={set('plz')} placeholder="80331" maxLength={5} className={inputCls + req(patient.plz)} />
                     </div>
                     <div className="col-span-3">
                       <label className={labelCls}>Ort <span className="text-red-400">*</span></label>
-                      <input value={patient.ort} onChange={set('ort')} placeholder="München" className={inputCls} />
+                      <input value={patient.ort} onChange={set('ort')} placeholder="München" className={inputCls + req(patient.ort)} />
                     </div>
                   </div>
                   <div>
@@ -1047,18 +1061,18 @@ export const AngebotCard: FC<{
                   </div>
                   <div>
                     <label className={labelCls}>Familie in der Nähe (bis 20 km) <span className="text-red-400">*</span></label>
-                    <CustomSelect value={patient.familieNahe} onChange={v => updatePatient(p=>({...p,familieNahe:v}))}
+                    <CustomSelect invalid={patient.familieNahe === ''} value={patient.familieNahe} onChange={v => updatePatient(p=>({...p,familieNahe:v}))}
                       options={['Ja','Nein']} />
                   </div>
                   <div className={gridRow2}>
                     <div>
                       <label className={labelCls}>Urbanisation <span className="text-red-400">*</span></label>
-                      <CustomSelect value={patient.urbanisierung} onChange={v => updatePatient(p=>({...p,urbanisierung:v}))}
+                      <CustomSelect invalid={patient.urbanisierung === ''} value={patient.urbanisierung} onChange={v => updatePatient(p=>({...p,urbanisierung:v}))}
                         options={['Großstadt','Kleinstadt','Dorf/Land']} />
                     </div>
                     <div>
                       <label className={labelCls}>Wohnungstyp <span className="text-red-400">*</span></label>
-                      <CustomSelect value={patient.wohnungstyp} onChange={v => updatePatient(p=>({...p,wohnungstyp:v}))}
+                      <CustomSelect invalid={patient.wohnungstyp === ''} value={patient.wohnungstyp} onChange={v => updatePatient(p=>({...p,wohnungstyp:v}))}
                         options={['Einfamilienhaus','Wohnung in Mehrfamilienhaus','Andere']} />
                     </div>
                   </div>
@@ -1070,13 +1084,13 @@ export const AngebotCard: FC<{
                     </div>
                     <div>
                       <label className={labelCls}>Eigenes Badezimmer <span className="text-red-400">*</span></label>
-                      <CustomSelect value={patient.badezimmer} onChange={v => updatePatient(p=>({...p,badezimmer:v}))}
+                      <CustomSelect invalid={patient.badezimmer === ''} value={patient.badezimmer} onChange={v => updatePatient(p=>({...p,badezimmer:v}))}
                         options={['Ja','Nein']} />
                     </div>
                   </div>
                   <div>
                     <label className={labelCls}>Internet vorhanden? <span className="text-red-400">*</span></label>
-                    <CustomSelect value={patient.internet} onChange={v => updatePatient(p=>({...p,internet:v}))}
+                    <CustomSelect invalid={patient.internet === ''} value={patient.internet} onChange={v => updatePatient(p=>({...p,internet:v}))}
                       options={['Ja','Nein']} />
                   </div>
                   <div>
@@ -1086,7 +1100,7 @@ export const AngebotCard: FC<{
                   </div>
                   <div>
                     <label className={labelCls}>Pflegedienst kommt? <span className="text-red-400">*</span></label>
-                    <CustomSelect value={patient.pflegedienst} onChange={v => updatePatient(p=>{
+                    <CustomSelect invalid={patient.pflegedienst === ''} value={patient.pflegedienst} onChange={v => updatePatient(p=>{
                       // When user switches to 'Nein', clear the follow-ups so
                       // a stale frequency/tasks selection doesn't sneak into
                       // the Mamamia description string on save.
@@ -1100,69 +1114,8 @@ export const AngebotCard: FC<{
                       options={['Ja','Nein','Geplant']} />
                   </div>
 
-                  {/* Pflegedienst follow-up: frequency + tasks. Required by
-                      Mamamia panel form when pflegedienst='Ja'/'Geplant' —
-                      pre-2026-05-05 we sent day_care_facility=yes without a
-                      description and the customer flow stalled with
-                      "Wie oft und welche Aufgaben übernimmt der Pflegedienst?"
-                      validation error. */}
-                  {(patient.pflegedienst === 'Ja' || patient.pflegedienst === 'Geplant') && (
-                    <div className="space-y-3 pl-3 border-l-2 border-[#8B7355]/20">
-                      <div>
-                        <label className={labelCls}>Wie oft kommt der Pflegedienst? <span className="text-red-400">*</span></label>
-                        <CustomSelect value={patient.pflegedienstHaeufigkeit}
-                          onChange={v => updatePatient(p=>({...p,pflegedienstHaeufigkeit:v}))}
-                          options={['1× pro Woche','2× pro Woche','3× pro Woche','Täglich','Mehrmals täglich']} />
-                      </div>
-                      <div>
-                        <label className={labelCls}>Welche Aufgaben übernimmt der Pflegedienst? <span className="text-red-400">*</span></label>
-                        <p className="text-xs text-gray-500 mb-2">Mehrfachauswahl möglich</p>
-                        <div className="grid grid-cols-1 gap-1.5">
-                          {[
-                            'Grundpflege (Körperpflege, Anziehen)',
-                            'Medikamentengabe',
-                            'Wundversorgung',
-                            'Injektionen / Blutzucker',
-                            'Behandlungspflege (z.B. Verbandwechsel)',
-                          ].map(task => {
-                            // Use '; ' as separator: task labels contain
-                            // commas inside parens, so a comma-joined string
-                            // can't be split back unambiguously.
-                            const selected = patient.pflegedienstAufgaben
-                              .split('; ')
-                              .map(s => s.trim())
-                              .filter(Boolean);
-                            const checked = selected.includes(task);
-                            return (
-                              <label key={task}
-                                className={`flex items-center gap-2.5 px-3 py-2 rounded-xl border cursor-pointer transition-colors ${
-                                  checked
-                                    ? 'bg-[#8B7355]/5 border-[#8B7355]/40'
-                                    : 'bg-white border-gray-200 hover:bg-gray-50'
-                                }`}>
-                                <input
-                                  type="checkbox"
-                                  checked={checked}
-                                  onChange={() => updatePatient(p => {
-                                    const cur = p.pflegedienstAufgaben
-                                      .split('; ')
-                                      .map(s => s.trim())
-                                      .filter(Boolean);
-                                    const next = checked
-                                      ? cur.filter(t => t !== task)
-                                      : [...cur, task];
-                                    return { ...p, pflegedienstAufgaben: next.join('; ') };
-                                  })}
-                                  className="w-4 h-4 rounded border-gray-300 text-[#8B7355] focus:ring-[#8B7355]/30"
-                                />
-                                <span className="text-sm text-gray-700">{task}</span>
-                              </label>
-                            );
-                          })}
-                        </div>
-                      </div>
-                    </div>
-                  )}
+                  {/* Pflegedienst-Zusatzfelder (Häufigkeit/Aufgaben) entfernt —
+                      unnötige Hürde (Martin, 2026-07-08); Standard-Text kommt vom Mapper. */}
                 </>
               )}
 
@@ -1171,7 +1124,7 @@ export const AngebotCard: FC<{
                 <>
                   <div>
                     <label className={labelCls}>Gewünschtes Geschlecht der PK <span className="text-red-400">*</span></label>
-                    <CustomSelect value={patient.wunschGeschlecht} onChange={v => updatePatient(p=>({...p,wunschGeschlecht:v}))}
+                    <CustomSelect invalid={patient.wunschGeschlecht === ''} value={patient.wunschGeschlecht} onChange={v => updatePatient(p=>({...p,wunschGeschlecht:v}))}
                       options={['Egal','Weiblich','Männlich']} />
                   </div>
 
@@ -1199,7 +1152,7 @@ export const AngebotCard: FC<{
                   {/* Führerschein — eigene volle Zeile, damit das Label nicht wrappt */}
                   <div>
                     <label className={labelCls}>Führerschein erforderlich? <span className="text-red-400">*</span></label>
-                    <CustomSelect value={patient.fuehrerschein}
+                    <CustomSelect invalid={patient.fuehrerschein === ''} value={patient.fuehrerschein}
                       onChange={v => updatePatient(p => ({ ...p, fuehrerschein: v, wunschGetriebe: v === 'Nein' ? '' : p.wunschGetriebe }))}
                       options={['Ja', 'Nein']}
                       placeholder="Bitte wählen" />
@@ -1209,7 +1162,7 @@ export const AngebotCard: FC<{
                   {patient.fuehrerschein === 'Ja' && (
                     <div>
                       <label className={labelCls}>Getriebe <span className="text-red-400">*</span></label>
-                      <CustomSelect value={patient.wunschGetriebe}
+                      <CustomSelect invalid={patient.wunschGetriebe === ''} value={patient.wunschGetriebe}
                         onChange={v => updatePatient(p => ({ ...p, wunschGetriebe: v }))}
                         options={['Automatik', 'Schaltung', 'Egal']}
                         placeholder="Bitte wählen" />
@@ -1218,7 +1171,7 @@ export const AngebotCard: FC<{
 
                   <div>
                     <label className={labelCls}>Darf die Betreuungsperson rauchen? <span className="text-red-400">*</span></label>
-                    <CustomSelect value={patient.rauchen} onChange={v => updatePatient(p=>({...p,rauchen:v}))}
+                    <CustomSelect invalid={patient.rauchen === ''} value={patient.rauchen} onChange={v => updatePatient(p=>({...p,rauchen:v}))}
                       options={['Ja (nur Draußen)','Nein']} />
                   </div>
                   <div>
@@ -1276,7 +1229,7 @@ export const AngebotCard: FC<{
                           }
                         }}
                         style={{ minWidth: 0, textAlign: 'left' }}
-                        className={`${inputCls} cursor-pointer pr-10 [&::-webkit-date-and-time-value]:text-left [&::-webkit-calendar-picker-indicator]:opacity-0`}
+                        className={`${inputCls}${req(patient.startDate)} cursor-pointer pr-10 [&::-webkit-date-and-time-value]:text-left [&::-webkit-calendar-picker-indicator]:opacity-0`}
                       />
                       <svg
                         aria-hidden="true"
@@ -1305,7 +1258,7 @@ export const AngebotCard: FC<{
                 )}
                 {step < STEP_LABELS.length - 1 ? (
                   <button
-                    onClick={() => { if (stepComplete(step)) { setStep(s => s + 1); scrollToFormTop(); } }}
+                    onClick={() => { if (stepComplete(step)) { trackStep(step + 1); setStep(s => s + 1); scrollToFormTop(); } }}
                     className={`flex-1 py-2.5 text-sm font-bold rounded-xl transition-all ${
                       stepComplete(step)
                         ? 'bg-[#E76F63] hover:bg-[#D65E52] text-white shadow-sm'

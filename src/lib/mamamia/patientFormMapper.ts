@@ -868,11 +868,14 @@ export function mapPatientFormToUpdateCustomerInput(
       form.pflegedienstHaeufigkeit ?? '',
       form.pflegedienstAufgaben ?? '',
     );
-    if (desc) {
-      // base + _de only; _en/_pl auto-filled by Mamamia AI translator.
-      patch.day_care_facility_description = desc.de;
-      patch.day_care_facility_description_de = desc.de;
-    }
+    // Die Zusatzfelder (Häufigkeit/Aufgaben) wurden aus dem Portal-Formular
+    // entfernt (Martin, 2026-07-08) — mamamia verlangt bei 'yes' aber weiter
+    // eine Beschreibung (sonst Validierungs-Deadlock, siehe pre-2026-05-05).
+    // Ohne Details deshalb ein ehrlicher Standard-Text.
+    const de = desc?.de || 'Pflegedienst ist im Einsatz — Details (Häufigkeit/Aufgaben) bitte im Erstgespräch klären.';
+    // base + _de only; _en/_pl auto-filled by Mamamia AI translator.
+    patch.day_care_facility_description = de;
+    patch.day_care_facility_description_de = de;
   }
 
   // ── job_description: auto-summary + medical diagnoses ─────────────────

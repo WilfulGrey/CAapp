@@ -30,6 +30,10 @@ const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
 const ALLOWED_EVENTS = [
   'portal_opened',
   'patient_data_saved',
+  // Patientenbogen-Diagnose (2026-07-08): Schritt erreicht + Save-Fehler —
+  // reine Analyse-Events, KEINE Team-Mail/Nachfass-Verzweigung.
+  'patient_form_step',
+  'patient_form_save_failed',
   'caregiver_invited',
   'caregiver_interest_shown',
   'caregiver_declined',          // Kunde hat eine Pflegekraft abgelehnt (matching ODER interest)
