@@ -43,13 +43,13 @@ function MatchingAnimation({ onComplete, initialCount }: { onComplete: (finalCou
   }, []);
 
   // Pflegekraft-Zähler läuft während Step 1 (Index 1) auf eine personalisierte
-  // Endzahl (target=3) herunter — fühlt sich wie eine echte Filterung an.
-  // Vorher 12 — angepasst auf 3, weil im Portal aktuell nur die Top 3
-  // Pflegekräfte angezeigt werden und größere Zahlen falsche Erwartungen
-  // wecken.
+  // Endzahl (target=5) herunter — fühlt sich wie eine echte Filterung an.
+  // 2026-07-08 (Martin): 3 → 5, passend zur gesperrten Ergebnis-Karte im
+  // Kontakt-Schritt. Hinweis: Portal-Vorschau zeigt aktuell Top 3 — ggf.
+  // dort nachziehen.
   useEffect(() => {
     if (activeStep !== 1) return;
-    const target = 3;
+    const target = 5;
     const iv = setInterval(() => {
       setNurseCount(prev => {
         const next = prev - Math.ceil((prev - target) / 14);
@@ -661,11 +661,11 @@ export function MultiStepForm() {
             <svg className="w-3 h-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
             </svg>
-            100% sorgenfrei
+            Persönliche Beratung inklusive
           </div>
         </div>
       <div data-calculator-card className="bg-white rounded-2xl border-[1.5px] border-[#C0C0C0] overflow-hidden shadow-md">
-        <div className="px-4 sm:px-8 py-5 border-b-2 border-[#E5E3DF]/50 bg-[#E76F63]">
+        <div className={`px-4 sm:px-8 py-5 border-b-2 border-[#E5E3DF]/50 ${currentStep === totalSteps ? 'bg-[#22A06B]' : 'bg-[#E76F63]'}`}>
           {currentStep === totalSteps ? (
             // Step 9 — der Inhalt des Headers ändert sich auf einen klaren
             // CTA-Ton („jetzt ansehen →"), damit der Kunde sofort versteht,
@@ -1047,10 +1047,10 @@ export function MultiStepForm() {
                       seitig und darf hier nie im Quelltext stehen) + 3 verpixelte
                       Pflegekraft-Avatare. Kontaktdaten = der Schlüssel. */}
                   <div className="border-[1.5px] border-[#E5E3DF] rounded-2xl overflow-hidden mb-1">
-                    <div className="bg-[#F8F7F5] border-b border-[#E5E3DF] px-4 py-3">
-                      <p className="text-[11px] font-bold uppercase tracking-wider text-[#8B8B8B] mb-0.5">Ihr berechneter Monatspreis</p>
-                      <div className="flex items-center gap-2.5">
-                        <p className="text-[24px] font-extrabold text-[#3D3D3D] select-none" style={{ filter: 'blur(7px)' }} aria-hidden="true">3.256 €</p>
+                    <div className="bg-[#F8F7F5] border-b border-[#E5E3DF] px-4 py-5 text-center">
+                      <p className="text-[11px] font-bold uppercase tracking-wider text-[#8B8B8B] mb-2">Ihr berechneter Monatspreis</p>
+                      <div className="flex items-center justify-center gap-3">
+                        <p className="text-[26px] font-extrabold text-[#3D3D3D] select-none" style={{ filter: 'blur(7px)' }} aria-hidden="true">3.256 €</p>
                         <svg className="w-4 h-4 flex-shrink-0 text-[#8B7355]" fill="none" stroke="currentColor" strokeWidth={2.2} viewBox="0 0 24 24"><rect x="5" y="11" width="14" height="9" rx="2" /><path d="M8 11V7a4 4 0 018 0v4" /></svg>
                       </div>
                     </div>
