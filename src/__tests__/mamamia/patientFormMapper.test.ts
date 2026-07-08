@@ -536,14 +536,15 @@ describe('mapPatientFormToUpdateCustomerInput', () => {
       expect(r.job_description).not.toContain('Pflegedienst:');
     });
 
-    it('pflegedienst=Ja with empty follow-ups → no description (defense in depth)', () => {
+    it('pflegedienst=Ja with empty follow-ups → Standard-Text (Felder aus dem Formular entfernt, mamamia verlangt Beschreibung)', () => {
       const r = mapPatientFormToUpdateCustomerInput(makeForm({
         pflegedienst: 'Ja',
         pflegedienstHaeufigkeit: '',
         pflegedienstAufgaben: '',
       }));
       expect(r.day_care_facility).toBe('yes');
-      expect(r.day_care_facility_description).toBeUndefined();
+      expect(r.day_care_facility_description).toContain('Pflegedienst ist im Einsatz');
+      expect(r.day_care_facility_description_de).toContain('Erstgespräch');
       expect(r.job_description).not.toContain('Pflegedienst:');
     });
   });

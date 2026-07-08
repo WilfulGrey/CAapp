@@ -16,7 +16,9 @@ export type LeadEvent =
   | 'caregiver_invited'
   | 'caregiver_declined'           // customer hat eine Pflegekraft abgelehnt (matching ODER interest)
   | 'caregiver_declined_undone'    // customer hat die Ablehnung rückgängig gemacht (Undo)
-  | 'application_rejected';        // customer Bewerbung abgelehnt
+  | 'application_rejected'        // customer Bewerbung abgelehnt
+  | 'patient_form_step'           // Patientenbogen: Schritt erreicht (metadata.step) — Abbruch-Analyse
+  | 'patient_form_save_failed';   // Patientenbogen: Server-Save gescheitert (metadata.error)
 
 // Mini-Snapshot der Nurse-Daten, die wir brauchen um eine declined-from-
 // Interest Pflegekraft im bearbeitet-Bereich als virtuelle MatchCard zu
@@ -38,6 +40,9 @@ export interface CaregiverSnapshot {
 }
 
 export interface LeadEventMetadata {
+  // patient_form_step: erreichter Schritt (0-basiert); patient_form_save_failed: Fehlertext.
+  step?: number;
+  error?: string;
   // caregiver_invited / caregiver_declined / application_rejected:
   // which caregiver (id + display name). Optional — older callers without
   // these fields still work.

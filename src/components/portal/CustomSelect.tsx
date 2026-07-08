@@ -7,7 +7,10 @@ export const CustomSelect: FC<{
   onChange: (v: string) => void;
   options: string[];
   placeholder?: string;
-}> = ({ value, onChange, options, placeholder = 'Bitte wählen' }) => {
+  // Pflichtfeld noch leer → dezenter roter Rahmen (SA-Portal-Muster:
+  // „field-open"); sobald gefüllt, normaler Rahmen. Rein visuell.
+  invalid?: boolean;
+}> = ({ value, onChange, options, placeholder = 'Bitte wählen', invalid = false }) => {
   const [open, setOpen] = useState(false);
   const [dropdownStyle, setDropdownStyle] = useState<React.CSSProperties>({});
   const btnRef = useRef<HTMLButtonElement>(null);
@@ -71,7 +74,7 @@ export const CustomSelect: FC<{
         onClick={e => { e.stopPropagation(); handleOpen(); }}
         className={`w-full border rounded-xl px-3 py-2.5 text-base text-left flex items-center justify-between gap-2 transition-all bg-white ${
           open ? 'border-[#8B7355] ring-2 ring-[#8B7355]/10' : 'border-gray-300'
-        } ${value ? 'text-gray-800' : 'text-gray-400'}`}
+        } ${value ? 'text-gray-800' : 'text-gray-400'} ${invalid ? "border-red-300 bg-red-50/40" : ""}`}
       >
         <span className="truncate">{value || placeholder}</span>
         <ChevronDown className={`w-4 h-4 text-gray-400 flex-shrink-0 transition-transform ${open ? 'rotate-180' : ''}`} />
