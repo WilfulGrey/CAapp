@@ -1043,7 +1043,9 @@ export function MultiStepForm() {
                     <div className="bg-[#F8F7F5] border-b border-[#E5E3DF] px-4 py-5 text-center">
                       <p className="text-[14px] font-extrabold uppercase tracking-wide text-[#3D3D3D] mb-2">Ihr berechneter Monatspreis</p>
                       <div className="flex items-center justify-center gap-3">
-                        <p className="text-[26px] font-extrabold text-[#3D3D3D] select-none" style={{ filter: 'blur(7px)' }} aria-hidden="true">3.256 €</p>
+                        <span className="price-shimmer inline-block rounded-lg">
+                          <p className="text-[26px] font-extrabold text-[#3D3D3D] select-none" style={{ filter: 'blur(7px)' }} aria-hidden="true">3.256 €</p>
+                        </span>
                         <svg className="w-4 h-4 flex-shrink-0 text-[#8B7355]" fill="none" stroke="currentColor" strokeWidth={2.2} viewBox="0 0 24 24"><rect x="5" y="11" width="14" height="9" rx="2" /><path d="M8 11V7a4 4 0 018 0v4" /></svg>
                       </div>
                     </div>
@@ -1051,12 +1053,14 @@ export function MultiStepForm() {
                       <div className="flex">
                         {/* Echte Fotos (Motive wie das Seiten-Carousel), leicht
                             verpixelt = gesperrte Vorschau statt Fake-Kreise. */}
+                        {/* Echte Pflegekräfte aus dem eigenen Bestand (S3-Fotos,
+                            verkleinert als lokale Assets) — keine Stock-Fotos. */}
                         {[
-                          'https://images.pexels.com/photos/5214997/pexels-photo-5214997.jpeg?auto=compress&cs=tinysrgb&w=120',
-                          'https://images.pexels.com/photos/5452293/pexels-photo-5452293.jpeg?auto=compress&cs=tinysrgb&w=120',
-                          'https://images.pexels.com/photos/8460157/pexels-photo-8460157.jpeg?auto=compress&cs=tinysrgb&w=120',
-                          'https://images.pexels.com/photos/7551613/pexels-photo-7551613.jpeg?auto=compress&cs=tinysrgb&w=120',
-                          'https://images.pexels.com/photos/5722166/pexels-photo-5722166.jpeg?auto=compress&cs=tinysrgb&w=120',
+                          '/images/caregivers/pk-1.jpg',
+                          '/images/caregivers/pk-2.jpg',
+                          '/images/caregivers/pk-3.jpg',
+                          '/images/caregivers/pk-4.jpg',
+                          '/images/caregivers/pk-5.jpg',
                         ].map((src, i) => (
                           <span key={src} className={`relative w-7 h-7 rounded-full overflow-hidden border-2 border-white flex-shrink-0 ${i > 0 ? '-ml-2' : ''}`}>
                             {/* Plain <img>: images.pexels.com ist NICHT in next.config
