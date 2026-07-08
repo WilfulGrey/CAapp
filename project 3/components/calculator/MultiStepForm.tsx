@@ -368,8 +368,8 @@ export function MultiStepForm() {
       // Step 9 Kontaktformular: Name + E-Mail + Telefon alle drei Pflicht.
       // Telefon-Plausibilität wird in validateForm() detailliert geprüft;
       // hier reicht "nicht leer" für die Weiter-Button-Aktivierung.
-      // Telefon wieder optional (Martin, 2026-07-08) — Name + E-Mail reichen.
-      case 9: return Boolean(formData.name.trim() && formData.email.trim());
+      // Telefon ist Pflicht (Rückrufe durch die Beratung; Server verlangt es ebenso).
+      case 9: return Boolean(formData.name.trim() && formData.email.trim() && formData.phone.trim());
       default: return false;
     }
   };
@@ -400,10 +400,10 @@ export function MultiStepForm() {
     // gängige DACH-Formate zu (+49 30 123456, 030/12345, 015123…) und
     // lehnt klare Fehleingaben ("abc", "1") ab. Strengere Formate hätten
     // False-Negatives produziert.
-    // Telefon ist optional (Martin, 2026-07-08): leer = ok; wenn angegeben,
-    // muss es plausibel sein (≥6 Ziffern).
     const phoneDigits = (formData.phone ?? '').replace(/\D/g, '');
-    if (formData.phone.trim() && phoneDigits.length < 6) {
+    if (!formData.phone.trim()) {
+      newErrors.phone = 'Bitte geben Sie Ihre Telefonnummer ein';
+    } else if (phoneDigits.length < 6) {
       newErrors.phone = 'Bitte geben Sie eine gültige Telefonnummer ein';
     }
 
@@ -1127,7 +1127,7 @@ export function MultiStepForm() {
                       className={`w-full px-4 py-2.5 text-base border-2 rounded-full focus:outline-none focus:ring-1 focus:ring-[#8B7355]/40 focus:border-[#8B7355] ${
                         errors.phone ? 'border-red-500' : 'border-[#B8B0A6]'
                       }`}
-                      placeholder="Telefonnummer (optional)"
+                      placeholder="Telefonnummer"
                       autoComplete="tel"
                     />
                     {errors.phone && <p className="text-[11px] text-red-500 mt-1 px-3">{errors.phone}</p>}
