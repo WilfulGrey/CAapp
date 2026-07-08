@@ -116,3 +116,23 @@ html {
     animation-play-state: paused;
   }
 }
+
+
+/* Lade-Schimmer über dem gesperrten Preis im Kontakt-Schritt — signalisiert
+   „Ihr Wert liegt bereit". Läuft als sanfte Lichtwelle über die Blur-Zahl. */
+.price-shimmer { position: relative; overflow: hidden; }
+.price-shimmer::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  transform: translateX(-100%);
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.85), transparent);
+  animation: price-shimmer 1.8s ease-in-out infinite;
+}
+@keyframes price-shimmer {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(200%); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .price-shimmer::after { animation: none; }
+}
