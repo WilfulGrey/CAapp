@@ -1058,7 +1058,11 @@ export function MultiStepForm() {
                           'https://images.pexels.com/photos/5722166/pexels-photo-5722166.jpeg?auto=compress&cs=tinysrgb&w=120',
                         ].map((src, i) => (
                           <span key={src} className={`relative w-7 h-7 rounded-full overflow-hidden border-2 border-white flex-shrink-0 ${i > 0 ? '-ml-2' : ''}`} style={{ filter: 'blur(2px)' }}>
-                            <Image src={src} alt="" fill sizes="28px" className="object-cover" />
+                            {/* Plain <img>: images.pexels.com ist NICHT in next.config
+                                whitelisted — next/image würde zur Laufzeit werfen und
+                                den Schritt zerlegen. 28px braucht keinen Optimizer. */}
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img src={src} alt="" className="absolute inset-0 w-full h-full object-cover" loading="lazy" />
                           </span>
                         ))}
                       </div>
