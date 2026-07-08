@@ -478,6 +478,9 @@ const CustomerPortalPage: FC = () => {
 
   // ─── Mamamia session + queries (K2-K4 integration) ───────────────────────
   const { session, ready: mmReady, error: mmError, expired: mmExpired } = useMamamiaSession(lead?.token ?? null, JOB_ID_PARAM);
+  // Token lief WÄHREND der Sitzung ab (z. B. beim Speichern erkannt) —
+  // gleiches Ziel wie mmExpired: Selbst-Service-Screen für neuen Link.
+  const [saveTokenExpired, setSaveTokenExpired] = useState(false);
   const { data: mmCustomer, loading: mmCustomerLoading, error: mmCustomerError } = useCustomer(mmReady);
   const { data: mmJobOffer, loading: mmJobOfferLoading, error: mmJobOfferError, refetch: refetchJobOffer } = useJobOffer(mmReady);
   const { data: mmApplications, loading: mmApplicationsLoading, error: mmApplicationsError, refetch: refetchApplications } = useApplications({ limit: 20 }, mmReady);
@@ -1822,7 +1825,7 @@ const CustomerPortalPage: FC = () => {
   // "Verbindung fehlgeschlagen" screen — a dead end (retry never refreshes the
   // token). Route to the self-service ExpiredLinkScreen ("Neuen Link
   // anfordern") so the customer can request a fresh link themselves.
-  if (lead && mmExpired && !IS_PREVIEW_ANY) {
+  if (lead && (mmExpired || saveTokenExpired) && !IS_PREVIEW_ANY) {
     return (
       <>
         <ExpiredLinkScreen token={tokenFromUrl} message={mmError?.message ?? 'Link nicht mehr gültig'} />
@@ -2385,7 +2388,24 @@ const CustomerPortalPage: FC = () => {
             try {
               await updateCustomerMutation.mutate(patch as Record<string, unknown>);
             } catch (err) {
-              showToast('Speichern fehlgeschlagen. Bitte erneut versuchen.');
+              const raw = err instanceof Error ? err.message : String(err ?? '');
+              // Token während des Ausfüllens abgelaufen → ehrlich sagen und in
+              // den Selbst-Service (neuen Link anfordern) leiten statt eines
+              // ratlosen „fehlgeschlagen".
+              if (/401|unauthorized|unauthenticated|token/i.test(raw)) {
+                showToast('Ihr Zugangslink ist abgelaufen. Sie können sich gleich einen neuen Link zusenden lassen.');
+                setSaveTokenExpired(true);
+              } else {
+                // Sprechende Meldung statt Ratespiel — häufige mamamia-Ablehnungen übersetzt.
+                const friendly = /location/i.test(raw)
+                  ? 'Die Postleitzahl konnte nicht zugeordnet werden — bitte PLZ und Ort prüfen.'
+                  : /too long|exceeds|max/i.test(raw)
+                    ? 'Eine Angabe ist zu lang (z. B. Diagnosen) — bitte etwas kürzen und erneut speichern.'
+                    : `Speichern fehlgeschlagen: ${raw.slice(0, 140)}`;
+                showToast(friendly);
+              }
+              // Fürs Team sichtbar machen, WORAN Kunden scheitern (Dashboard/Report).
+              reportLeadEvent(lead?.token, 'patient_form_save_failed', { error: raw.slice(0, 200) });
               throw err;
             }
 
