@@ -28,6 +28,15 @@ export interface PatientFormShape {
   fuehrerschein: string;
   // Getriebe — only shown when fuehrerschein='Ja'. Empty = no preference.
   wunschGetriebe: string;
+  // ── SA-Abgleich (2026-07-08) — optional, damit Alt-Drafts und bestehende
+  // Test-Literale ohne die Felder weiter kompilieren/laden.
+  hilfsmittel?: string;      // CSV-Labels → patient.tool_ids (gewinnt gegen Ableitung)
+  p2_hilfsmittel?: string;
+  nachtDetail?: string;      // echter Text statt Standard-Platzhalter
+  p2_nachtDetail?: string;
+  einkaeufe?: string;        // Ja/Gelegentlich/Nein → wish.shopping
+  einkaeufeWie?: string;     // fließt in die Job-Beschreibung ein
+  raucherhaushalt?: string;  // → Customer.smoking_household
 }
 
 // Mobility label → Mamamia mobility_id (SADASH docs + live-verified in K1).
@@ -375,6 +384,12 @@ function deriveToolIds(mobilityId: number): number[] {
 // surface details, but Mamamia panel UI shows the description field as
 // empty if not populated). Generic enough to be true regardless of the
 // actual mix of overnight tasks.
+// Exportiert, damit der Reverse-Mapper (mappers.ts) den Platzhalter vom
+// echten Nutzertext unterscheiden kann und ihn nicht ins Formularfeld
+// „Was ist in der Nacht zu machen?" zurückspiegelt.
+export const STANDARD_NIGHT_OPS_DE =
+  'Konkrete nächtliche Aufgaben werden direkt mit der Pflegekraft abgestimmt — typischerweise Toilettenbegleitung, Lagerung oder Beruhigung.';
+
 function standardNightOpsDescription(no: string): {
   de: string;
   en: string;
@@ -382,8 +397,7 @@ function standardNightOpsDescription(no: string): {
 } | null {
   if (no === 'no') return null;
   return {
-    de:
-      'Konkrete nächtliche Aufgaben werden direkt mit der Pflegekraft abgestimmt — typischerweise Toilettenbegleitung, Lagerung oder Beruhigung.',
+    de: STANDARD_NIGHT_OPS_DE,
     en:
       'Specific night-time tasks will be coordinated directly with the caregiver — typically toilet assistance, repositioning, or reassurance.',
     pl:
@@ -415,6 +429,26 @@ function standardLiftDescription(liftId: number): {
 // Threading existing `patientId` is critical — Mamamia SILENTLY DROPS fields
 // like night_operations and incontinence when patient is new (no id) inside
 // UpdateCustomer. With id, the same fields persist correctly.
+// Hilfsmittel-Labels (Formular-Chips) → Mamamia-Tools-IDs — identisch zum
+// SA-Wizard (mamamia-sadash NewJobWizard.vue TOOLS 1–7).
+const TOOL_ID_BY_LABEL: Record<string, number> = {
+  Gehstock: 1,
+  Rollator: 2,
+  Rollstuhl: 3,
+  Patientenlifter: 4,
+  Treppenlift: 5,
+  Pflegebett: 6,
+  Sonstiges: 7,
+};
+
+function toolIdsFromCsv(csv?: string): number[] {
+  if (!csv) return [];
+  return csv
+    .split(',')
+    .map(s => TOOL_ID_BY_LABEL[s.trim()])
+    .filter((n): n is number => typeof n === 'number');
+}
+
 function buildPatient(
   gender: string,
   year: string,
@@ -426,6 +460,8 @@ function buildPatient(
   inkontinenz: string,
   gewicht: string,
   groesse: string,
+  hilfsmittel: string,
+  nachtDetail: string,
   patientId?: number,
 ): Record<string, unknown> {
   const p: Record<string, unknown> = {};
@@ -450,6 +486,10 @@ function buildPatient(
     // from a previous mobility — Bug #13b on Customer 7655 patient[1]).
     p.tool_ids = deriveToolIds(mob);
   }
+  // Explizite Hilfsmittel-Auswahl aus dem Formular gewinnt gegen die
+  // Mobilitäts-Ableitung — der Nutzer weiß, was wirklich im Haus ist.
+  const explicitTools = toolIdsFromCsv(hilfsmittel);
+  if (explicitTools.length > 0) p.tool_ids = explicitTools;
 
   const na = nachtToApi(nacht);
   if (na) p.night_operations = na;
@@ -488,12 +528,14 @@ function buildPatient(
     p.dementia_description_de = demDesc.de;
   }
 
-  // night_operations_description: base + _de only.
-  if (na) {
-    const ndesc = standardNightOpsDescription(na);
-    if (ndesc) {
-      p.night_operations_description = ndesc.de;
-      p.night_operations_description_de = ndesc.de;
+  // night_operations_description: base + _de only. Echter Nutzertext aus
+  // „Was ist in der Nacht zu machen?" gewinnt gegen den Platzhalter.
+  if (na && na !== 'no') {
+    const userText = nachtDetail.trim();
+    const text = userText || standardNightOpsDescription(na)?.de;
+    if (text) {
+      p.night_operations_description = text;
+      p.night_operations_description_de = text;
     }
   }
 
@@ -565,6 +607,13 @@ function buildJobDescriptionSummary(form: PatientFormShape): string {
     parts.push(`Nächtliche Unterstützung: ${form.nacht.toLowerCase()}.`);
   }
 
+  // Einkäufe — das „Wie" hat kein eigenes Mamamia-Feld (wish.shopping ist
+  // nur das Enum), darum landet es hier in der Beschreibung.
+  if (form.einkaeufe && form.einkaeufe !== 'Nein') {
+    const wie = form.einkaeufeWie?.trim();
+    parts.push(`Einkäufe durch die Betreuungskraft: ${form.einkaeufe === 'Gelegentlich' ? 'gelegentlich' : 'ja'}${wie ? ` (${wie})` : ''}.`);
+  }
+
   return parts.join(' ');
 }
 
@@ -585,6 +634,7 @@ export interface MappedCustomerPatch {
   job_description?: string;
   job_description_de?: string;
   other_people_in_house?: string;
+  smoking_household?: 'yes' | 'yes_outside' | 'no';
   has_family_near_by?: 'yes' | 'no';
   internet?: 'yes' | 'no';
   accommodation?: string;
@@ -703,6 +753,8 @@ export function mapPatientFormToUpdateCustomerInput(
       form.inkontinenz,
       form.gewicht,
       form.groesse,
+      form.hilfsmittel ?? '',
+      form.nachtDetail ?? '',
       ids[0],
     ),
   ];
@@ -720,6 +772,8 @@ export function mapPatientFormToUpdateCustomerInput(
       form.p2_inkontinenz,
       form.p2_gewicht,
       form.p2_groesse,
+      form.p2_hilfsmittel ?? '',
+      form.p2_nachtDetail ?? '',
       ids[1],
     ));
   }
@@ -838,14 +892,22 @@ export function mapPatientFormToUpdateCustomerInput(
     wish.other_wishes = form.sonstigeWuensche;
     wish.other_wishes_de = form.sonstigeWuensche;
   }
-  // Mamamia panel "Czy opiekun musi robić zakupy?" is a mandatory-looking
-  // dropdown but the patient form doesn't ask. Default 'no' (prod-most-
-  // common at 43%) so the agency doesn't see an empty field. Customer
-  // can update via panel if needed.
-  wish.shopping = 'no';
+  // Einkäufe: seit dem SA-Abgleich (2026-07-08) fragt das Formular echt.
+  // Ohne Antwort bleibt der bisherige Default 'no' (häufigster Prod-Wert),
+  // damit das Panel-Dropdown nie leer aussieht.
+  if (form.einkaeufe === 'Ja') wish.shopping = 'yes';
+  else if (form.einkaeufe === 'Gelegentlich') wish.shopping = 'occasionally';
+  else wish.shopping = 'no';
   if (Object.keys(wish).length > 0) {
     patch.customer_caregiver_wish = wish;
   }
+
+  // ── Raucherhaushalt → Customer.smoking_household (in der Proxy-Allow-
+  // List enthalten; Enum wie onboard-to-mamamia/types.ts). Nur setzen wenn
+  // beantwortet — kein Überschreiben mit einem stillen Default.
+  if (form.raucherhaushalt === 'Ja') patch.smoking_household = 'yes';
+  else if (form.raucherhaushalt === 'Ja, nur draußen') patch.smoking_household = 'yes_outside';
+  else if (form.raucherhaushalt === 'Nein') patch.smoking_household = 'no';
 
   // ── equipment_ids: derived from form.badezimmer (Eigenes Badezimmer).
   // id=1 = Own TV (always included — assumed standard).

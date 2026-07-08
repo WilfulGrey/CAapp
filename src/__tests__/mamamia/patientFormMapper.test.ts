@@ -583,3 +583,65 @@ describe('mapPatientFormToUpdateCustomerInput', () => {
     });
   });
 });
+
+// ── SA-Abgleich (2026-07-08): Hilfsmittel, Nacht-Detail, Einkäufe, Raucherhaushalt ──
+describe('SA-Abgleich: neue Formularfragen', () => {
+  it('explizite Hilfsmittel überschreiben die Mobilitäts-Ableitung (tool_ids)', () => {
+    const r = mapPatientFormToUpdateCustomerInput(
+      makeForm({ hilfsmittel: 'Rollator, Pflegebett, Sonstiges' }),
+    );
+    expect((r.patients as Array<Record<string, unknown>>)[0].tool_ids).toEqual([2, 6, 7]);
+  });
+
+  it('ohne explizite Hilfsmittel bleibt die Ableitung aus der Mobilität', () => {
+    const r = mapPatientFormToUpdateCustomerInput(makeForm({ hilfsmittel: '' }));
+    const tools = (r.patients as Array<Record<string, unknown>>)[0].tool_ids as number[];
+    expect(Array.isArray(tools)).toBe(true);
+    expect(tools.length).toBeGreaterThan(0); // Rollstuhlfähig → abgeleitete Tools
+  });
+
+  it('unbekannte Hilfsmittel-Labels werden ignoriert statt NaN zu senden', () => {
+    const r = mapPatientFormToUpdateCustomerInput(
+      makeForm({ hilfsmittel: 'Rollator, Quatschlabel' }),
+    );
+    expect((r.patients as Array<Record<string, unknown>>)[0].tool_ids).toEqual([2]);
+  });
+
+  it('Nacht-Detailtext ersetzt den Standard-Platzhalter', () => {
+    const r = mapPatientFormToUpdateCustomerInput(
+      makeForm({ nacht: '1–2 Mal', nachtDetail: 'Toilettengang und Umlagern' }),
+    );
+    const p = (r.patients as Array<Record<string, unknown>>)[0];
+    expect(p.night_operations_description).toBe('Toilettengang und Umlagern');
+    expect(p.night_operations_description_de).toBe('Toilettengang und Umlagern');
+  });
+
+  it('ohne Nacht-Detailtext bleibt der Standard-Platzhalter erhalten', () => {
+    const r = mapPatientFormToUpdateCustomerInput(makeForm({ nacht: '1–2 Mal', nachtDetail: '' }));
+    const p = (r.patients as Array<Record<string, unknown>>)[0];
+    expect(String(p.night_operations_description)).toContain('Konkrete nächtliche Aufgaben');
+  });
+
+  it('Einkäufe Ja/Gelegentlich/unbeantwortet → wish.shopping yes/occasionally/no', () => {
+    const ja = mapPatientFormToUpdateCustomerInput(makeForm({ einkaeufe: 'Ja' }));
+    expect(ja.customer_caregiver_wish?.shopping).toBe('yes');
+    const gel = mapPatientFormToUpdateCustomerInput(makeForm({ einkaeufe: 'Gelegentlich' }));
+    expect(gel.customer_caregiver_wish?.shopping).toBe('occasionally');
+    const leer = mapPatientFormToUpdateCustomerInput(makeForm({}));
+    expect(leer.customer_caregiver_wish?.shopping).toBe('no');
+  });
+
+  it('Einkäufe-Wie fließt in die Job-Beschreibung ein', () => {
+    const r = mapPatientFormToUpdateCustomerInput(
+      makeForm({ einkaeufe: 'Gelegentlich', einkaeufeWie: 'zu Fuß oder Taxi' }),
+    );
+    expect(String(r.job_description)).toContain('gelegentlich (zu Fuß oder Taxi)');
+  });
+
+  it('Raucherhaushalt mappt auf smoking_household, unbeantwortet bleibt weg', () => {
+    expect(mapPatientFormToUpdateCustomerInput(makeForm({ raucherhaushalt: 'Ja' })).smoking_household).toBe('yes');
+    expect(mapPatientFormToUpdateCustomerInput(makeForm({ raucherhaushalt: 'Ja, nur draußen' })).smoking_household).toBe('yes_outside');
+    expect(mapPatientFormToUpdateCustomerInput(makeForm({ raucherhaushalt: 'Nein' })).smoking_household).toBe('no');
+    expect(mapPatientFormToUpdateCustomerInput(makeForm({})).smoking_household).toBeUndefined();
+  });
+});

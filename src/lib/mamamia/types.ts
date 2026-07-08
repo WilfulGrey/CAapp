@@ -53,6 +53,10 @@ export interface MamamiaPatient {
   weight?: string | null;
   height?: string | null;
   night_operations?: string | null;
+  // Nacht-Beschreibung — im GET selektiert; Basis + _de reichen für die
+  // Rückspiegelung von „Was ist in der Nacht zu machen?".
+  night_operations_description?: string | null;
+  night_operations_description_de?: string | null;
   dementia?: 'yes' | 'no' | null;
   dementia_description?: string | null;
   incontinence?: boolean | null;

@@ -39,6 +39,16 @@ function isPlausibleGermanPhone(raw: string): boolean {
   return m !== null;
 }
 
+// Hilfsmittel wie im SA-Wizard — Labels 1:1 = Mamamia-Tools-IDs 1–7
+// (Mapping in patientFormMapper.TOOL_ID_BY_LABEL).
+const HILFSMITTEL = ['Gehstock', 'Rollator', 'Rollstuhl', 'Patientenlifter', 'Treppenlift', 'Pflegebett', 'Sonstiges'];
+
+// Toggle in einer comma-separierten Label-Liste („Gehstock, Rollator").
+function toggleCsv(csv: string, label: string): string {
+  const list = csv ? csv.split(', ') : [];
+  return (list.includes(label) ? list.filter(x => x !== label) : [...list, label]).join(', ');
+}
+
 export const AngebotCard: FC<{
   lead?: Lead | null;
   /** Snapshot of the customer's Mamamia state — used to seed the
@@ -178,6 +188,10 @@ export const AngebotCard: FC<{
     name: pick('name'),
     phone: pick('phone'),
     startDate: pick('startDate'),
+    hilfsmittel: pick('hilfsmittel'), p2_hilfsmittel: pick('p2_hilfsmittel'),
+    nachtDetail: pick('nachtDetail'), p2_nachtDetail: pick('p2_nachtDetail'),
+    einkaeufe: pick('einkaeufe'), einkaeufeWie: pick('einkaeufeWie'),
+    raucherhaushalt: pick('raucherhaushalt'),
   });
 
   const zwei = patient.anzahl === '2';
@@ -381,6 +395,34 @@ export const AngebotCard: FC<{
   const req = (v: string) => (v === '' ? ' border-red-300 bg-red-50/40' : '');
   const inputCls = 'w-full border border-gray-300 rounded-xl px-3 py-2.5 text-base text-gray-800 placeholder-gray-400 focus:outline-none focus:border-[#8B7355] focus:ring-2 focus:ring-[#8B7355]/10 transition-all bg-white';
   const labelCls = 'block text-[15px] font-medium text-gray-700 mb-1.5';
+
+  // Hilfsmittel-Chips (SA-Abgleich): Mehrfachauswahl als antippbare Pills —
+  // schneller als 7 Checkboxen, gleicher Datenstand wie der SA-Wizard.
+  const hilfsmittelChips = (field: 'hilfsmittel' | 'p2_hilfsmittel') => {
+    const selected = patient[field] ? patient[field].split(', ') : [];
+    return (
+      <div>
+        <label className={labelCls}>Vorhandene Hilfsmittel <span className="font-normal text-gray-400">(optional)</span></label>
+        <div className="flex flex-wrap gap-1.5">
+          {HILFSMITTEL.map(h => {
+            const active = selected.includes(h);
+            return (
+              <button
+                key={h}
+                type="button"
+                onClick={() => updatePatient(p => ({ ...p, [field]: toggleCsv(p[field], h) }))}
+                className={`px-3 py-1.5 rounded-full border text-sm transition-colors ${active
+                  ? 'bg-[#8B7355] border-[#8B7355] text-white font-semibold'
+                  : 'bg-white border-gray-300 text-gray-700 hover:border-[#8B7355]'}`}
+              >
+                {h}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+    );
+  };
 
   // Desktop: the phone-frame div (#portal-scroll-container) is the scroller.
   // Mobile: that div has no overflow, so `window` is the actual scroller.
@@ -1021,6 +1063,14 @@ export const AngebotCard: FC<{
                       <div className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm text-gray-700 bg-gray-50 cursor-not-allowed">{patient.nacht}</div>
                     </div>
                   </div>
+                  {patient.nacht !== '' && patient.nacht !== 'Nein' && (
+                    <div>
+                      <label className={labelCls}>Was ist in der Nacht zu machen? <span className="font-normal text-gray-400">(optional)</span></label>
+                      <input value={patient.nachtDetail} onChange={set('nachtDetail')}
+                        placeholder="z. B. Toilettengang, Umlagern, Medikamente" className={inputCls} />
+                    </div>
+                  )}
+                  {hilfsmittelChips('hilfsmittel')}
 
                   {/* Patient 2 Pflegebedarf */}
                   {zwei && (
@@ -1056,6 +1106,14 @@ export const AngebotCard: FC<{
                               options={['Nein','Bis zu 1 Mal','1–2 Mal','Mehr als 2']} />
                           </div>
                         </div>
+                        {patient.p2_nacht !== '' && patient.p2_nacht !== 'Nein' && (
+                          <div>
+                            <label className={labelCls}>Was ist in der Nacht zu machen? <span className="font-normal text-gray-400">(optional)</span></label>
+                            <input value={patient.p2_nachtDetail} onChange={set('p2_nachtDetail')}
+                              placeholder="z. B. Toilettengang, Umlagern, Medikamente" className={inputCls} />
+                          </div>
+                        )}
+                        {hilfsmittelChips('p2_hilfsmittel')}
                       </div>
                     </div>
                   )}
@@ -1170,10 +1228,17 @@ export const AngebotCard: FC<{
                     <CustomSelect invalid={patient.internet === ''} value={patient.internet} onChange={v => updatePatient(p=>({...p,internet:v}))}
                       options={['Ja','Nein']} />
                   </div>
-                  <div>
-                    <label className={labelCls}>Haustiere <span className="font-normal text-gray-400">(opt.)</span></label>
-                    <CustomSelect value={patient.tiere} onChange={v => updatePatient(p=>({...p,tiere:v}))}
-                      options={['Keine','Hund','Katze','Andere']} placeholder="Keine" />
+                  <div className={gridRow2}>
+                    <div>
+                      <label className={labelCls}>Haustiere <span className="font-normal text-gray-400">(opt.)</span></label>
+                      <CustomSelect value={patient.tiere} onChange={v => updatePatient(p=>({...p,tiere:v}))}
+                        options={['Keine','Hund','Katze','Andere']} placeholder="Keine" />
+                    </div>
+                    <div>
+                      <label className={labelCls}>Raucherhaushalt <span className="font-normal text-gray-400">(opt.)</span></label>
+                      <CustomSelect value={patient.raucherhaushalt} onChange={v => updatePatient(p=>({...p,raucherhaushalt:v}))}
+                        options={['Nein','Ja, nur draußen','Ja']} placeholder="Nein" />
+                    </div>
                   </div>
                   <div>
                     <label className={labelCls}>Pflegedienst kommt?&nbsp;<span className="text-red-400">*</span></label>
@@ -1251,6 +1316,23 @@ export const AngebotCard: FC<{
                     <CustomSelect invalid={patient.rauchen === ''} value={patient.rauchen} onChange={v => updatePatient(p=>({...p,rauchen:v}))}
                       options={['Ja (nur Draußen)','Nein']} />
                   </div>
+                  <div>
+                    <label className={labelCls}>Muss die Betreuungskraft Einkäufe erledigen? <span className="font-normal text-gray-400">(optional)</span></label>
+                    <CustomSelect value={patient.einkaeufe} onChange={v => updatePatient(p => {
+                      // Beim Wechsel auf 'Nein' das Detailfeld leeren, damit kein
+                      // veralteter Text in die Job-Beschreibung rutscht.
+                      const next = { ...p, einkaeufe: v };
+                      if (v === 'Nein') next.einkaeufeWie = '';
+                      return next;
+                    })} options={['Ja','Gelegentlich','Nein']} placeholder="Bitte wählen" />
+                  </div>
+                  {(patient.einkaeufe === 'Ja' || patient.einkaeufe === 'Gelegentlich') && (
+                    <div>
+                      <label className={labelCls}>Wie werden die Einkäufe erledigt? <span className="font-normal text-gray-400">(optional)</span></label>
+                      <input value={patient.einkaeufeWie} onChange={set('einkaeufeWie')}
+                        placeholder="ÖPNV, zu Fuß, Fahrrad, Taxi, Auto …" className={inputCls} />
+                    </div>
+                  )}
                   <div>
                     <label className={labelCls}>Aufgaben der Pflegekraft <span className="font-normal text-gray-400">(optional)</span></label>
                     <textarea value={patient.aufgaben} onChange={set('aufgaben')}
