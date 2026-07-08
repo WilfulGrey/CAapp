@@ -325,6 +325,11 @@ export function MultiStepForm() {
   // Animation gesehen wird). Der "Weiter"-Button wurde auf diesen Steps
   // entfernt — die Pause entlastet User, die ihre Wahl noch ändern wollen
   // (eine andere Option zu klicken startet den Timer neu).
+  // Warm-up-Einstiegsfrage (Martin, 2026-07-08): bewusst trivial („Für wen
+  // suchen Sie…?"), senkt die Hürde vor der ersten echten Frage (62 % Verlust
+  // Anzeige→Frage 1). Antwort wird NICHT mitgesendet — reiner Commitment-Start.
+  const [warmupAudience, setWarmupAudience] = useState<string | null>(null);
+
   const selectAndAdvance = (answerValue: string, update: () => void) => {
     update();
     if (advanceTimer.current) clearTimeout(advanceTimer.current);
@@ -517,6 +522,7 @@ export function MultiStepForm() {
 
   const getStepTitle = () => {
     if (showResults) return "Ihr persönliches Angebot";
+    if (currentStep === 1 && !warmupAudience) return "Für wen suchen Sie eine Betreuungskraft?";
     switch (currentStep) {
       case 1: return "Wie viele Personen benötigen Pflege?";
       case 2: return "Weitere Personen im Haushalt?";
@@ -674,9 +680,15 @@ export function MultiStepForm() {
             </>
           ) : (
             <>
-              <p className="text-base font-bold uppercase tracking-wide text-white/95 mb-1.5">
-                Angebot & Pflegekräfte sofort erhalten
-              </p>
+              {/* Als Link (unterstrichen + Pfeil): klickbar → scrollt direkt zum
+                  Fragebereich — „ah, ich kann das SOFORT einsehen" (Martin, 2026-07-08). */}
+              <button
+                type="button"
+                onClick={() => document.getElementById('calc-step-content')?.scrollIntoView({ behavior: 'smooth', block: 'center' })}
+                className="text-base font-bold uppercase tracking-wide text-white mb-1.5 underline underline-offset-4 decoration-2 cursor-pointer bg-transparent border-0 p-0 text-left"
+              >
+                Angebot &amp; Pflegekräfte sofort einsehen →
+              </button>
               <p className="text-sm text-white/90">
                 Kostenlos & unverbindlich · in <span className="font-bold">2 Minuten</span>
               </p>
@@ -708,7 +720,7 @@ export function MultiStepForm() {
         {/* Step 9 zeigt die Headline „✅ Ihr Angebot ist fertig" jetzt direkt
             im Titel-Block (getStepTitle); separate Pill ist redundant. */}
 
-        <div className="px-3 sm:px-6 lg:px-8 pt-5 pb-6">
+        <div id="calc-step-content" className="px-3 sm:px-6 lg:px-8 pt-5 pb-6">
           <div className="w-full">
             {/* Step 9: kleine grüne „fertig"-Pill über dem Titel, dann die
                 Frage als reguläre Step-Headline + Erklärung als italic
@@ -733,7 +745,30 @@ export function MultiStepForm() {
                   Timing-Frage (alter Step 9) wurde komplett entfernt — das
                   konkrete Startdatum wird jetzt im CA-App-Patientenformular
                   abgefragt (PatientForm.startDate). */}
-              {currentStep === 1 && (
+              {/* Warm-up (nicht mitgesendet): trivialer Einstieg vor der ersten
+                  echten Frage — Antwort setzt nur warmupAudience. */}
+              {currentStep === 1 && !warmupAudience && (
+                <div className="grid grid-cols-1 gap-3">
+                  {[
+                    { value: 'angehoerige', label: 'Für eine:n Angehörige:n' },
+                    { value: 'selbst', label: 'Für mich selbst' },
+                    { value: 'andere', label: 'Für jemand anderen' },
+                  ].map(({ value, label }) => (
+                    <button
+                      key={value}
+                      onClick={() => setWarmupAudience(value)}
+                      className={btnClass(false)}
+                    >
+                      <div className="flex items-center justify-start gap-3.5">
+                        <div className="w-5 h-5 rounded-full border flex-shrink-0 transition-all duration-200 border-gray-300 bg-white border-2"></div>
+                        <span className="text-base font-medium text-[#3D3D3D]">{label}</span>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              )}
+
+              {currentStep === 1 && warmupAudience && (
                 <div className="grid grid-cols-1 gap-3">
                   {[{ value: '1-person', label: '1 Pflegebedürftige/r' }, { value: 'ehepaar', label: '2 Pflegebedürftige (Ehepaar)' }].map(({ value, label }) => (
                     <button
