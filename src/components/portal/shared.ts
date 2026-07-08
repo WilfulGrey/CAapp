@@ -212,4 +212,4 @@ export interface PatientForm {
 // Step 5 hieß "Kontakt" als dort noch Name + Telefon abgefragt wurden.
 // Seit Rückrollung 14.06.2026 fragt Step 5 nur noch das Startdatum ab —
 // Label entsprechend geändert.
-export const STEP_LABELS = ['Zur Person', 'Pflegebedarf', 'Wohnsituation', 'Wünsche zur PK', 'Startdatum'];
+export const STEP_LABELS = ['Zur Person', 'Pflegebedarf', 'Wohnsituation', 'Wünsche & Aufgaben', 'Startdatum'];

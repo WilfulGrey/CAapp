@@ -338,13 +338,15 @@ export const AngebotCard: FC<{
   const stepComplete = (s: number): boolean => {
     if (s === 0) {
       if (!patient.anzahl) return false;
-      const p1ok = patient.geschlecht !== '' && patient.geburtsjahr !== '' && patient.pflegegrad !== '';
-      const p2ok = !zwei || (patient.p2_geschlecht !== '' && patient.p2_geburtsjahr !== '' && patient.p2_pflegegrad !== '');
+      // SA-Linie (Martin, 2026-07-08): nur aktivierungsrelevante Felder
+      // blockieren — Geburtsjahr/Pflegegrad sind wie im SA-Wizard optional.
+      const p1ok = patient.geschlecht !== '';
+      const p2ok = !zwei || patient.p2_geschlecht !== '';
       return p1ok && p2ok;
     }
     if (s === 1) {
-      const p1ok = patient.mobilitaet !== '' && patient.heben !== '' && patient.demenz !== '' && patient.inkontinenz !== '' && patient.nacht !== '';
-      const p2ok = !zwei || (patient.p2_mobilitaet !== '' && patient.p2_heben !== '' && patient.p2_demenz !== '' && patient.p2_inkontinenz !== '' && patient.p2_nacht !== '');
+      const p1ok = patient.mobilitaet !== '' && patient.heben !== '' && patient.demenz !== '' && patient.nacht !== '';
+      const p2ok = !zwei || (patient.p2_mobilitaet !== '' && patient.p2_heben !== '' && patient.p2_demenz !== '' && patient.p2_nacht !== '');
       return p1ok && p2ok;
     }
     if (s === 2) {
@@ -352,19 +354,15 @@ export const AngebotCard: FC<{
       // Validation aufnehmen, sonst kann ein Kunde mit fehlendem Wert nicht
       // weiter, ohne die Möglichkeit, das Feld selbst zu füllen (Deadlock).
       const baseOk = patient.plz !== '' && patient.ort !== ''
-        && patient.wohnungstyp !== '' && patient.urbanisierung !== '' && patient.familieNahe !== ''
-        && patient.pflegedienst !== '' && patient.internet !== '' && patient.badezimmer !== '';
+        && patient.wohnungstyp !== '' && patient.urbanisierung !== '';
       // Pflegedienst-Zusatzfelder (Häufigkeit/Aufgaben) bewusst entfernt
       // (Martin, 2026-07-08) — mamamias Pflicht-Beschreibung liefert der
       // Mapper jetzt als Standard-Text (siehe patientFormMapper).
       return baseOk;
     }
     if (s === 3) {
-      const baseOk = patient.wunschGeschlecht !== '' && patient.rauchen !== '' && patient.fuehrerschein !== '';
-      if (patient.fuehrerschein === 'Ja') {
-        return baseOk && patient.wunschGetriebe !== '';
-      }
-      return baseOk;
+      // Rauchen + Getriebe sind wie bei SA optional.
+      return patient.wunschGeschlecht !== '' && patient.fuehrerschein !== '';
     }
     if (s === 4) {
       // Step 5 prüft nur noch das Startdatum. Name + Telefon kommen seit
@@ -943,15 +941,10 @@ export const AngebotCard: FC<{
                             options={['Männlich','Weiblich']} />
                         </div>
                         <div>
-                          <label className={labelCls}>Geburtsjahr&nbsp;<span className="text-red-400">*</span></label>
-                          <CustomSelect invalid={patient.geburtsjahr === ''} value={patient.geburtsjahr} onChange={v => updatePatient(p=>({...p,geburtsjahr:v}))}
+                          <label className={labelCls}>Geburtsjahr <span className="font-normal text-gray-400">(optional)</span></label>
+                          <CustomSelect value={patient.geburtsjahr} onChange={v => updatePatient(p=>({...p,geburtsjahr:v}))}
                             options={Array.from({length:70},(_,i)=>String(1931+i))} />
                         </div>
-                      </div>
-                      <div>
-                        <label className={labelCls}>Pflegegrad&nbsp;<span className="text-red-400">*</span></label>
-                        <CustomSelect invalid={patient.pflegegrad === ''} value={patient.pflegegrad} onChange={v => updatePatient(p=>({...p,pflegegrad:v}))}
-                          options={['Kein/e','Pflegegrad 1','Pflegegrad 2','Pflegegrad 3','Pflegegrad 4','Pflegegrad 5']} />
                       </div>
                       <div className={gridRow2}>
                         <div>
@@ -964,6 +957,11 @@ export const AngebotCard: FC<{
                           <CustomSelect value={patient.groesse} onChange={v => updatePatient(p=>({...p,groesse:v}))}
                             options={['Unter 151 cm','151-160 cm','161-170 cm','171-180 cm','181-190 cm','Über 190 cm']} />
                         </div>
+                      </div>
+                      <div>
+                        <label className={labelCls}>Pflegegrad <span className="font-normal text-gray-400">(optional)</span></label>
+                        <CustomSelect value={patient.pflegegrad} onChange={v => updatePatient(p=>({...p,pflegegrad:v}))}
+                          options={['Kein/e','Pflegegrad 1','Pflegegrad 2','Pflegegrad 3','Pflegegrad 4','Pflegegrad 5']} />
                       </div>
                     </>
                   )}
@@ -980,15 +978,10 @@ export const AngebotCard: FC<{
                               options={['Männlich','Weiblich']} />
                           </div>
                           <div>
-                            <label className={labelCls}>Geburtsjahr&nbsp;<span className="text-red-400">*</span></label>
-                            <CustomSelect invalid={patient.p2_geburtsjahr === ''} value={patient.p2_geburtsjahr} onChange={v => updatePatient(p=>({...p,p2_geburtsjahr:v}))}
+                            <label className={labelCls}>Geburtsjahr <span className="font-normal text-gray-400">(optional)</span></label>
+                            <CustomSelect value={patient.p2_geburtsjahr} onChange={v => updatePatient(p=>({...p,p2_geburtsjahr:v}))}
                               options={Array.from({length:70},(_,i)=>String(1931+i))} />
                           </div>
-                        </div>
-                        <div className="mt-2">
-                          <label className={labelCls}>Pflegegrad&nbsp;<span className="text-red-400">*</span></label>
-                          <CustomSelect invalid={patient.p2_pflegegrad === ''} value={patient.p2_pflegegrad} onChange={v => updatePatient(p=>({...p,p2_pflegegrad:v}))}
-                            options={['Kein/e','Pflegegrad 1','Pflegegrad 2','Pflegegrad 3','Pflegegrad 4','Pflegegrad 5']} />
                         </div>
                         <div className="grid grid-cols-2 gap-2 mt-2">
                           <div>
@@ -1001,6 +994,11 @@ export const AngebotCard: FC<{
                             <CustomSelect value={patient.p2_groesse} onChange={v => updatePatient(p=>({...p,p2_groesse:v}))}
                               options={['Unter 151 cm','151-160 cm','161-170 cm','171-180 cm','181-190 cm','Über 190 cm']} />
                           </div>
+                        </div>
+                        <div className="mt-2">
+                          <label className={labelCls}>Pflegegrad <span className="font-normal text-gray-400">(optional)</span></label>
+                          <CustomSelect value={patient.p2_pflegegrad} onChange={v => updatePatient(p=>({...p,p2_pflegegrad:v}))}
+                            options={['Kein/e','Pflegegrad 1','Pflegegrad 2','Pflegegrad 3','Pflegegrad 4','Pflegegrad 5']} />
                         </div>
                       </div>
                     </>
@@ -1029,6 +1027,7 @@ export const AngebotCard: FC<{
                     )}
                     <div className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm text-gray-700 bg-gray-50 cursor-not-allowed">{patient.mobilitaet}</div>
                   </div>
+                  {hilfsmittelChips('hilfsmittel')}
                   <div className={gridRow2}>
                     <div>
                       <label className={labelCls}>Heben erforderlich?&nbsp;<span className="text-red-400">*</span></label>
@@ -1042,11 +1041,6 @@ export const AngebotCard: FC<{
                     </div>
                   </div>
                   <div className={gridRow2}>
-                    <div>
-                      <label className={labelCls}>Inkontinenz&nbsp;<span className="text-red-400">*</span></label>
-                      <CustomSelect invalid={patient.inkontinenz === ''} value={patient.inkontinenz} onChange={v => updatePatient(p=>({...p,inkontinenz:v}))}
-                        options={['Nein','Harninkontinenz','Stuhlinkontinenz','Beides']} />
-                    </div>
                     <div>
                       <label className={`${labelCls} flex items-center gap-1.5`}>
                         Nachteinsätze
@@ -1062,6 +1056,11 @@ export const AngebotCard: FC<{
                       )}
                       <div className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm text-gray-700 bg-gray-50 cursor-not-allowed">{patient.nacht}</div>
                     </div>
+                    <div>
+                      <label className={labelCls}>Inkontinenz <span className="font-normal text-gray-400">(optional)</span></label>
+                      <CustomSelect value={patient.inkontinenz} onChange={v => updatePatient(p=>({...p,inkontinenz:v}))}
+                        options={['Nein','Harninkontinenz','Stuhlinkontinenz','Beides']} />
+                    </div>
                   </div>
                   {patient.nacht !== '' && patient.nacht !== 'Nein' && (
                     <div>
@@ -1070,7 +1069,6 @@ export const AngebotCard: FC<{
                         placeholder="z. B. Toilettengang, Umlagern, Medikamente" className={inputCls} />
                     </div>
                   )}
-                  {hilfsmittelChips('hilfsmittel')}
 
                   {/* Patient 2 Pflegebedarf */}
                   {zwei && (
@@ -1082,6 +1080,7 @@ export const AngebotCard: FC<{
                           <CustomSelect invalid={patient.p2_mobilitaet === ''} value={patient.p2_mobilitaet} onChange={v => updatePatient(p=>({...p,p2_mobilitaet:v}))}
                             options={['Vollständig mobil','Am Gehstock','Rollatorfähig','Rollstuhlfähig','Bettlägerig']} />
                         </div>
+                        {hilfsmittelChips('p2_hilfsmittel')}
                         <div className={gridRow2}>
                           <div>
                             <label className={labelCls}>Heben erforderlich?&nbsp;<span className="text-red-400">*</span></label>
@@ -1096,14 +1095,14 @@ export const AngebotCard: FC<{
                         </div>
                         <div className={gridRow2}>
                           <div>
-                            <label className={labelCls}>Inkontinenz&nbsp;<span className="text-red-400">*</span></label>
-                            <CustomSelect invalid={patient.p2_inkontinenz === ''} value={patient.p2_inkontinenz} onChange={v => updatePatient(p=>({...p,p2_inkontinenz:v}))}
-                              options={['Nein','Harninkontinenz','Stuhlinkontinenz','Beides']} />
-                          </div>
-                          <div>
                             <label className={`${labelCls} flex items-center gap-1.5`}>Nachteinsätze&nbsp;<span className="text-red-400">*</span><svg className="w-3.5 h-3.5 text-gray-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><circle cx="12" cy="12" r="10"/><path strokeLinecap="round" strokeLinejoin="round" d="M12 16v-4m0-4h.01"/></svg></label>
                             <CustomSelect invalid={patient.p2_nacht === ''} value={patient.p2_nacht} onChange={v => updatePatient(p=>({...p,p2_nacht:v}))}
                               options={['Nein','Bis zu 1 Mal','1–2 Mal','Mehr als 2']} />
+                          </div>
+                          <div>
+                            <label className={labelCls}>Inkontinenz <span className="font-normal text-gray-400">(optional)</span></label>
+                            <CustomSelect value={patient.p2_inkontinenz} onChange={v => updatePatient(p=>({...p,p2_inkontinenz:v}))}
+                              options={['Nein','Harninkontinenz','Stuhlinkontinenz','Beides']} />
                           </div>
                         </div>
                         {patient.p2_nacht !== '' && patient.p2_nacht !== 'Nein' && (
@@ -1113,7 +1112,6 @@ export const AngebotCard: FC<{
                               placeholder="z. B. Toilettengang, Umlagern, Medikamente" className={inputCls} />
                           </div>
                         )}
-                        {hilfsmittelChips('p2_hilfsmittel')}
                       </div>
                     </div>
                   )}
@@ -1195,8 +1193,8 @@ export const AngebotCard: FC<{
                     </div>
                   </div>
                   <div>
-                    <label className={labelCls}>Familie in der Nähe (bis 20 km)&nbsp;<span className="text-red-400">*</span></label>
-                    <CustomSelect invalid={patient.familieNahe === ''} value={patient.familieNahe} onChange={v => updatePatient(p=>({...p,familieNahe:v}))}
+                    <label className={labelCls}>Familie in der Nähe (bis 20 km) <span className="font-normal text-gray-400">(optional)</span></label>
+                    <CustomSelect value={patient.familieNahe} onChange={v => updatePatient(p=>({...p,familieNahe:v}))}
                       options={['Ja','Nein']} />
                   </div>
                   <div className={gridRow2}>
@@ -1211,6 +1209,9 @@ export const AngebotCard: FC<{
                         options={['Einfamilienhaus','Wohnung in Mehrfamilienhaus','Andere']} />
                     </div>
                   </div>
+                  {/* SA-Gruppierung: Unterbringung → Haustiere → Badezimmer →
+                      Raucherhaushalt → Internet; „Pflegedienst kommt?" wohnt
+                      jetzt wie bei SA im Schritt „Wünsche & Aufgaben". */}
                   <div className={gridRow2}>
                     <div>
                       <label className={labelCls}>Unterbringung der PK</label>
@@ -1218,21 +1219,16 @@ export const AngebotCard: FC<{
                         options={['Zimmer in den Räumlichkeiten','Gesamter Bereich','Zimmer extern','Bereich extern']} />
                     </div>
                     <div>
-                      <label className={labelCls}>Eigenes Badezimmer&nbsp;<span className="text-red-400">*</span></label>
-                      <CustomSelect invalid={patient.badezimmer === ''} value={patient.badezimmer} onChange={v => updatePatient(p=>({...p,badezimmer:v}))}
-                        options={['Ja','Nein']} />
-                    </div>
-                  </div>
-                  <div>
-                    <label className={labelCls}>Internet vorhanden?&nbsp;<span className="text-red-400">*</span></label>
-                    <CustomSelect invalid={patient.internet === ''} value={patient.internet} onChange={v => updatePatient(p=>({...p,internet:v}))}
-                      options={['Ja','Nein']} />
-                  </div>
-                  <div className={gridRow2}>
-                    <div>
                       <label className={labelCls}>Haustiere <span className="font-normal text-gray-400">(opt.)</span></label>
                       <CustomSelect value={patient.tiere} onChange={v => updatePatient(p=>({...p,tiere:v}))}
                         options={['Keine','Hund','Katze','Andere']} placeholder="Keine" />
+                    </div>
+                  </div>
+                  <div className={gridRow2}>
+                    <div>
+                      <label className={labelCls}>Eigenes Badezimmer <span className="font-normal text-gray-400">(opt.)</span></label>
+                      <CustomSelect value={patient.badezimmer} onChange={v => updatePatient(p=>({...p,badezimmer:v}))}
+                        options={['Ja','Nein']} />
                     </div>
                     <div>
                       <label className={labelCls}>Raucherhaushalt <span className="font-normal text-gray-400">(opt.)</span></label>
@@ -1241,23 +1237,10 @@ export const AngebotCard: FC<{
                     </div>
                   </div>
                   <div>
-                    <label className={labelCls}>Pflegedienst kommt?&nbsp;<span className="text-red-400">*</span></label>
-                    <CustomSelect invalid={patient.pflegedienst === ''} value={patient.pflegedienst} onChange={v => updatePatient(p=>{
-                      // When user switches to 'Nein', clear the follow-ups so
-                      // a stale frequency/tasks selection doesn't sneak into
-                      // the Mamamia description string on save.
-                      const next = { ...p, pflegedienst: v };
-                      if (v === 'Nein') {
-                        next.pflegedienstHaeufigkeit = '';
-                        next.pflegedienstAufgaben = '';
-                      }
-                      return next;
-                    })}
-                      options={['Ja','Nein','Geplant']} />
+                    <label className={labelCls}>Internet vorhanden? <span className="font-normal text-gray-400">(optional)</span></label>
+                    <CustomSelect value={patient.internet} onChange={v => updatePatient(p=>({...p,internet:v}))}
+                      options={['Ja','Nein']} />
                   </div>
-
-                  {/* Pflegedienst-Zusatzfelder (Häufigkeit/Aufgaben) entfernt —
-                      unnötige Hürde (Martin, 2026-07-08); Standard-Text kommt vom Mapper. */}
                 </>
               )}
 
@@ -1303,8 +1286,8 @@ export const AngebotCard: FC<{
                   {/* Getriebe — eigene volle Zeile, nur wenn Führerschein='Ja' */}
                   {patient.fuehrerschein === 'Ja' && (
                     <div>
-                      <label className={labelCls}>Getriebe&nbsp;<span className="text-red-400">*</span></label>
-                      <CustomSelect invalid={patient.wunschGetriebe === ''} value={patient.wunschGetriebe}
+                      <label className={labelCls}>Getriebe <span className="font-normal text-gray-400">(optional)</span></label>
+                      <CustomSelect value={patient.wunschGetriebe}
                         onChange={v => updatePatient(p => ({ ...p, wunschGetriebe: v }))}
                         options={['Automatik', 'Schaltung', 'Egal']}
                         placeholder="Bitte wählen" />
@@ -1312,10 +1295,37 @@ export const AngebotCard: FC<{
                   )}
 
                   <div>
-                    <label className={labelCls}>Darf die Betreuungsperson rauchen?&nbsp;<span className="text-red-400">*</span></label>
-                    <CustomSelect invalid={patient.rauchen === ''} value={patient.rauchen} onChange={v => updatePatient(p=>({...p,rauchen:v}))}
+                    <label className={labelCls}>Darf die Betreuungsperson rauchen? <span className="font-normal text-gray-400">(optional)</span></label>
+                    <CustomSelect value={patient.rauchen} onChange={v => updatePatient(p=>({...p,rauchen:v}))}
                       options={['Ja (nur Draußen)','Nein']} />
                   </div>
+                  <div>
+                    <label className={labelCls}>Sonstige Wünsche <span className="font-normal text-gray-400">(optional)</span></label>
+                    <textarea value={patient.sonstigeWuensche} onChange={set('sonstigeWuensche')}
+                      placeholder="z.B. Erfahrung mit Demenz, ruhige Person, tierlieb…"
+                      rows={2} className={`${inputCls} resize-none`} />
+                  </div>
+
+                  {/* SA-Gruppierung „Aufgaben & Pflegedienst" — Pflegedienst ist
+                      aus der Wohnsituation hierher gezogen (wie im SA-Wizard). */}
+                  <p className="text-xs font-bold text-gray-400 uppercase tracking-wider pt-2">Aufgaben & Pflegedienst</p>
+                  <div>
+                    <label className={labelCls}>Pflegedienst kommt? <span className="font-normal text-gray-400">(optional)</span></label>
+                    <CustomSelect value={patient.pflegedienst} onChange={v => updatePatient(p=>{
+                      // When user switches to 'Nein', clear the follow-ups so
+                      // a stale frequency/tasks selection doesn't sneak into
+                      // the Mamamia description string on save.
+                      const next = { ...p, pflegedienst: v };
+                      if (v === 'Nein') {
+                        next.pflegedienstHaeufigkeit = '';
+                        next.pflegedienstAufgaben = '';
+                      }
+                      return next;
+                    })}
+                      options={['Ja','Nein','Geplant']} />
+                  </div>
+                  {/* Pflegedienst-Zusatzfelder (Häufigkeit/Aufgaben) entfernt —
+                      unnötige Hürde (Martin, 2026-07-08); Standard-Text kommt vom Mapper. */}
                   <div>
                     <label className={labelCls}>Muss die Betreuungskraft Einkäufe erledigen? <span className="font-normal text-gray-400">(optional)</span></label>
                     <CustomSelect value={patient.einkaeufe} onChange={v => updatePatient(p => {
@@ -1338,12 +1348,6 @@ export const AngebotCard: FC<{
                     <textarea value={patient.aufgaben} onChange={set('aufgaben')}
                       placeholder="z.B. Körperpflege, Mahlzeiten, Arztbegleitung, Einkäufe…"
                       rows={3} className={`${inputCls} resize-none`} />
-                  </div>
-                  <div>
-                    <label className={labelCls}>Sonstige Wünsche <span className="font-normal text-gray-400">(optional)</span></label>
-                    <textarea value={patient.sonstigeWuensche} onChange={set('sonstigeWuensche')}
-                      placeholder="z.B. Erfahrung mit Demenz, ruhige Person, tierlieb…"
-                      rows={2} className={`${inputCls} resize-none`} />
                   </div>
                 </>
               )}
