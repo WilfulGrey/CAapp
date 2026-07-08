@@ -21,8 +21,7 @@ import {
   fetchBookedCustomers,
   fetchDailyStats,
   fetchPeriodStats,
-  fetchTotalLeads,
-} from "./queries.ts";
+  fetchTotalLeads, fetchMailHealth } from "./queries.ts";
 import { buildReportEmail } from "./template.ts";
 
 // Vergleichs-Periode für den Daily Report. 7 Tage liefert einen stabilen
@@ -124,11 +123,12 @@ Deno.serve(async (req: Request) => {
   try {
     const yesterday = berlinDayRange(daysAgo);
 
-    const [yesterdayStats, periodStats, totalLeads, booked] = await Promise.all([
+    const [yesterdayStats, periodStats, totalLeads, booked, mailHealth] = await Promise.all([
       fetchDailyStats(supabase, yesterday.start, yesterday.end),
       fetchPeriodStats(supabase, PERIOD_DAYS_BACK),
       fetchTotalLeads(supabase),
       fetchBookedCustomers(supabase),
+      fetchMailHealth(supabase),
     ]);
 
     const smtp = await getSmtpConfig(supabase);
@@ -143,6 +143,7 @@ Deno.serve(async (req: Request) => {
       bookedCustomers: booked.uniqueCustomers,
       totalBookings: booked.totalBookings,
       siteUrl: smtp.siteUrl,
+      mailHealth,
     });
 
     const result = await sendEmailSmtp(smtp, recipients, subject, html, text);
