@@ -684,12 +684,21 @@ export function MultiStepForm() {
                   Fragebereich — „ah, ich kann das SOFORT einsehen" (Martin, 2026-07-08). */}
               <button
                 type="button"
-                onClick={() => document.getElementById('calc-step-content')?.scrollIntoView({ behavior: 'smooth', block: 'center' })}
-                className="text-base font-bold uppercase tracking-wide text-white mb-1.5 underline underline-offset-4 decoration-2 cursor-pointer bg-transparent border-0 p-0 text-left"
+                onClick={() => {
+                  // Standard-Sprungziel wie alle CTA-Buttons: Formular-Oberkante
+                  // sauber unter den Sticky-Header (-90) — nicht tiefer.
+                  const el = formRef.current;
+                  if (!el) return;
+                  window.scrollTo({
+                    top: el.getBoundingClientRect().top + window.pageYOffset - 90,
+                    behavior: 'smooth',
+                  });
+                }}
+                className="block w-full text-center text-base font-bold uppercase tracking-wide text-white mb-1.5 underline underline-offset-4 decoration-2 cursor-pointer bg-transparent border-0 p-0"
               >
                 Angebot &amp; Pflegekräfte sofort einsehen →
               </button>
-              <p className="text-sm text-white/90">
+              <p className="text-sm text-white/90 text-center">
                 Kostenlos & unverbindlich · in <span className="font-bold">2 Minuten</span>
               </p>
             </>
