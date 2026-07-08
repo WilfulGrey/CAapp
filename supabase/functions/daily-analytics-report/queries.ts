@@ -358,3 +358,34 @@ export async function fetchBookedCustomers(supabase: SupabaseClient): Promise<{
   const realBookings = bookingLeadIds.filter((id) => realLeadIds.has(id));
   return { uniqueCustomers: realLeadIds.size, totalBookings: realBookings.length };
 }
+
+// ── Mail-Ausfall-Überwachung: der Reminder-Blackout 25.05.–25.06.2026 (207
+// stille Fehlschläge, „Buffer is not defined") darf nie wieder unbemerkt bleiben.
+export interface MailHealth {
+  failed24h: number;
+  overduePending: number;              // scheduled_for > 2h überfällig, status pending
+  samples: Array<{ type: string; error: string }>;
+}
+
+export async function fetchMailHealth(supabase: SupabaseClient): Promise<MailHealth> {
+  const since = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+  const overdueBefore = new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString();
+
+  const [failedRes, overdueRes] = await Promise.all([
+    supabase.from("scheduled_emails")
+      .select("email_type,error_message", { count: "exact" })
+      .eq("status", "failed").gte("updated_at", since).limit(5),
+    supabase.from("scheduled_emails")
+      .select("id", { count: "exact", head: true })
+      .eq("status", "pending").lt("scheduled_for", overdueBefore),
+  ]);
+
+  return {
+    failed24h: failedRes.count ?? 0,
+    overduePending: overdueRes.count ?? 0,
+    samples: (failedRes.data ?? []).map((r) => ({
+      type: String(r.email_type ?? "?"),
+      error: String(r.error_message ?? "").slice(0, 120),
+    })),
+  };
+}

@@ -54,10 +54,21 @@ export function buildReportEmail(opts: {
   bookedCustomers: number;   // distinct lead_ids mit ≥1 Buchung (lifetime)
   totalBookings: number;     // Buchungs-Vorgänge insgesamt (lifetime)
   siteUrl: string;
+  mailHealth?: { failed24h: number; overduePending: number; samples: Array<{ type: string; error: string }> };
 }): { subject: string; html: string; text: string } {
-  const { yesterday, period, yesterdayLabel, periodLabel, totalLeads, bookedCustomers, totalBookings, siteUrl } = opts;
+  const { yesterday, period, yesterdayLabel, periodLabel, totalLeads, bookedCustomers, totalBookings, siteUrl, mailHealth } = opts;
 
-  const subject = `📊 Primundus Daily — ${yesterdayLabel} · ${yesterday.wizardCompleted} neue Leads`;
+  const mailAlarm = mailHealth && (mailHealth.failed24h > 0 || mailHealth.overduePending > 0);
+  const subject = `${mailAlarm ? '🚨 ' : ''}📊 Primundus Daily — ${yesterdayLabel} · ${yesterday.wizardCompleted} neue Leads`;
+
+  // Mail-Ausfall-Alarm ganz oben — der stille Reminder-Blackout (25.05.–25.06.,
+  // 207 Fehlschläge) darf sich nicht wiederholen.
+  const mailAlarmHtml = mailAlarm
+    ? `<div style="background:#fef2f2;border:2px solid #fca5a5;border-radius:10px;padding:14px 16px;margin:0 0 16px;">
+        <p style="margin:0 0 6px;font-size:15px;font-weight:bold;color:#b91c1c;">🚨 Mail-System: ${mailHealth!.failed24h} fehlgeschlagen (24h) · ${mailHealth!.overduePending} überfällig</p>
+        ${mailHealth!.samples.map((s) => `<p style=\"margin:2px 0;font-size:12px;color:#b91c1c;\">· ${s.type}: ${s.error}</p>`).join('')}
+       </div>`
+    : '';
 
   // Absolutwerte-Tabelle: Gestern · 7-T-Ø · Top (Datum)
   const rows: Array<{ label: string; today: number; avg: number; top: number; topDate: string }> = [
@@ -170,6 +181,7 @@ export function buildReportEmail(opts: {
   <title>Primundus Daily Report — ${yesterdayLabel}</title>
 </head>
 <body style="margin:0;padding:0;background:#f4f4f4;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;color:#333;">
+${mailAlarmHtml}
   <div style="background:#f4f4f4;padding:24px 0;">
     <div style="max-width:720px;margin:0 auto;background:#fff;border-radius:8px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.08);">
 
