@@ -1034,33 +1034,29 @@ export function MultiStepForm() {
                   06.06.2026). Begründung im validateForm()-Kommentar. */}
               {currentStep === 9 && (
                 <div className="space-y-3">
-                  {/* V6 (Martin, 2026-07-08): Der Preisbereich spiegelt 1:1 den
-                      Konditionen-Block der Kundenportal-Angebotsseite — alle
-                      Infos sichtbar, NUR der Preis verpixelt (Dummy-Zahl! Die
-                      echte Kalkulation läuft erst nach dem Absenden server-
-                      seitig und darf hier nie im Quelltext stehen). Wer später
-                      im Portal landet, erkennt den Block wieder. */}
+                  {/* V7 (Martin, 2026-07-08): Der Preiskasten ist die 1:1-Kopie
+                      des GROSSEN Betreuungskosten-Kastens der Portal-Angebots-
+                      seite (CustomerPortalPage ~2175): Tagespreis groß links,
+                      „inkl. Steuern…" rechts daneben, Zzgl.-Zeile unten. NUR
+                      die Zahl ist verpixelt (Dummy! Die echte Kalkulation
+                      läuft erst nach dem Absenden serverseitig und darf hier
+                      nie im Quelltext stehen). */}
                   <div className="border-[1.5px] border-[#E5E3DF] rounded-2xl overflow-hidden mb-1 divide-y divide-[#E5E3DF]">
-                    <div className="flex items-center justify-between px-4 py-3 bg-[#F8F7F5]">
-                      <span className="text-sm font-bold text-[#8B7355]">Ihre Konditionen</span>
-                      <svg className="w-4 h-4 flex-shrink-0 text-[#8B7355]" fill="none" stroke="currentColor" strokeWidth={2.2} viewBox="0 0 24 24"><rect x="5" y="11" width="14" height="9" rx="2" /><path d="M8 11V7a4 4 0 018 0v4" /></svg>
-                    </div>
-                    <div className="flex items-center justify-between px-4 py-2.5 bg-white gap-4">
-                      <div>
-                        <span className="text-sm text-[#3D3D3D]">Mtl. Betreuungskosten</span>
-                        <p className="text-[13px] text-[#7A7A7A] mt-0.5">Inkl. Steuern, Gebühren &amp; Sozialabgaben</p>
+                    <div className="px-5 pt-5 pb-4 bg-white">
+                      <div className="flex items-center justify-between mb-2">
+                        <p className="text-[12px] font-semibold uppercase tracking-widest text-[#8B7355]">Betreuungskosten</p>
+                        <svg className="w-4 h-4 flex-shrink-0 text-[#8B7355]" fill="none" stroke="currentColor" strokeWidth={2.2} viewBox="0 0 24 24"><rect x="5" y="11" width="14" height="9" rx="2" /><path d="M8 11V7a4 4 0 018 0v4" /></svg>
                       </div>
-                      <span className="price-shimmer inline-block rounded-md flex-shrink-0">
-                        <span className="text-[17px] font-extrabold text-[#3D3D3D] select-none" style={{ filter: 'blur(6px)' }} aria-hidden="true">3.256 €</span>
-                      </span>
-                    </div>
-                    <div className="flex items-center justify-between px-4 py-2.5 bg-white gap-4">
-                      <span className="text-sm text-[#3D3D3D]">Anreise</span>
-                      <span className="text-sm text-[#7A7A7A] text-right flex-shrink-0">Zzgl. 125 € / Strecke</span>
-                    </div>
-                    <div className="flex items-center justify-between px-4 py-2.5 bg-white gap-4">
-                      <span className="text-sm text-[#3D3D3D]">Unterkunft</span>
-                      <span className="text-sm text-[#7A7A7A] text-right flex-shrink-0">Zzgl. Kost &amp; Logis</span>
+                      <div className="flex items-center gap-4">
+                        <div className="flex items-baseline gap-1 flex-shrink-0" style={{ minWidth: '55%' }}>
+                          <span className="price-shimmer inline-block rounded-lg">
+                            <span className="text-[2.2rem] font-bold leading-none text-[#3D3D3D] select-none" style={{ filter: 'blur(9px)' }} aria-hidden="true">109 €</span>
+                          </span>
+                          <span className="text-[15px] text-[#8B8B8B]">/&nbsp;Tag</span>
+                        </div>
+                        <p className="text-[13px] leading-snug flex-1 text-[#ABABAB]">inkl. Steuern, Gebühren &amp; Sozialabgaben</p>
+                      </div>
+                      <p className="text-[13px] mt-3 leading-snug text-[#3D3D3D]">zzgl. 125 € Reisekosten pro Strecke, Kost &amp; Logis und Sommerzuschlag 6,67 €/Tag (Juli + Aug.)</p>
                     </div>
                     <div className="flex items-center gap-2.5 px-4 py-3">
                       <div className="flex">
