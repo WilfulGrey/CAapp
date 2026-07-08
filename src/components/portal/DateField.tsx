@@ -88,7 +88,10 @@ export const DateField: FC<{
       </button>
 
       {open && (
-        <div className="absolute z-30 top-full mt-1.5 left-0 w-[290px] max-w-full bg-white border border-gray-200 rounded-2xl shadow-xl p-3">
+        // Bewusst KEIN absolute-Dropdown: die Angebots-Karte hat
+        // overflow-hidden und würde den Kalender abschneiden (Martin,
+        // Screenshot 08.07.). Im Fluss gerendert wächst die Karte mit.
+        <div className="mt-1.5 w-full max-w-[320px] bg-white border border-gray-200 rounded-2xl shadow-sm p-3">
           <div className="flex items-center justify-between mb-2 px-1">
             <button type="button" onClick={prevMonth} aria-label="Voriger Monat" className="w-8 h-8 rounded-lg hover:bg-[#F8F7F5] flex items-center justify-center text-gray-500">
               <ChevronLeft className="w-4 h-4" />
