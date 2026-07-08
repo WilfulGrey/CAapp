@@ -656,14 +656,6 @@ export function MultiStepForm() {
   return (
     <div ref={formRef} id="calculator-form" className="pt-6 pb-6 scroll-mt-24 lg:scroll-mt-32 lg:pt-4 max-w-md sm:max-w-[95%] xl:max-w-[1800px] 2xl:max-w-[2000px] mx-auto px-0 sm:px-4">
       <div className="relative">
-        <div className="absolute -top-3.5 left-1/2 -translate-x-1/2 z-10 whitespace-nowrap">
-          <div className="inline-flex items-center gap-1.5 bg-white border border-[#D4C4B0] text-[#8B7355] text-[11px] font-semibold uppercase tracking-wide px-4 py-1.5 rounded-full shadow-sm">
-            <svg className="w-3 h-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
-            </svg>
-            Persönliche Beratung inklusive
-          </div>
-        </div>
       <div data-calculator-card className="bg-white rounded-2xl border-[1.5px] border-[#C0C0C0] overflow-hidden shadow-md">
         <div className={`px-4 sm:px-8 py-5 border-b-2 border-[#E5E3DF]/50 ${currentStep === totalSteps ? 'bg-[#22A06B]' : 'bg-[#E76F63]'}`}>
           {currentStep === totalSteps ? (
@@ -1048,7 +1040,7 @@ export function MultiStepForm() {
                       Pflegekraft-Avatare. Kontaktdaten = der Schlüssel. */}
                   <div className="border-[1.5px] border-[#E5E3DF] rounded-2xl overflow-hidden mb-1">
                     <div className="bg-[#F8F7F5] border-b border-[#E5E3DF] px-4 py-5 text-center">
-                      <p className="text-[11px] font-bold uppercase tracking-wider text-[#8B8B8B] mb-2">Ihr berechneter Monatspreis</p>
+                      <p className="text-[14px] font-extrabold uppercase tracking-wide text-[#3D3D3D] mb-2">Ihr berechneter Monatspreis</p>
                       <div className="flex items-center justify-center gap-3">
                         <p className="text-[26px] font-extrabold text-[#3D3D3D] select-none" style={{ filter: 'blur(7px)' }} aria-hidden="true">3.256 €</p>
                         <svg className="w-4 h-4 flex-shrink-0 text-[#8B7355]" fill="none" stroke="currentColor" strokeWidth={2.2} viewBox="0 0 24 24"><rect x="5" y="11" width="14" height="9" rx="2" /><path d="M8 11V7a4 4 0 018 0v4" /></svg>
@@ -1056,11 +1048,19 @@ export function MultiStepForm() {
                     </div>
                     <div className="flex items-center gap-2.5 px-4 py-3">
                       <div className="flex">
-                        <span className="w-7 h-7 rounded-full bg-[#9B7E6B] border-2 border-white" style={{ filter: 'blur(2.5px)' }}></span>
-                        <span className="w-7 h-7 rounded-full bg-[#7E8F9B] border-2 border-white -ml-2" style={{ filter: 'blur(2.5px)' }}></span>
-                        <span className="w-7 h-7 rounded-full bg-[#8B9B7E] border-2 border-white -ml-2" style={{ filter: 'blur(2.5px)' }}></span>
-                        <span className="w-7 h-7 rounded-full bg-[#A6876F] border-2 border-white -ml-2" style={{ filter: 'blur(2.5px)' }}></span>
-                        <span className="w-7 h-7 rounded-full bg-[#7E9B8F] border-2 border-white -ml-2" style={{ filter: 'blur(2.5px)' }}></span>
+                        {/* Echte Fotos (Motive wie das Seiten-Carousel), leicht
+                            verpixelt = gesperrte Vorschau statt Fake-Kreise. */}
+                        {[
+                          'https://images.pexels.com/photos/5214997/pexels-photo-5214997.jpeg?auto=compress&cs=tinysrgb&w=120',
+                          'https://images.pexels.com/photos/5452293/pexels-photo-5452293.jpeg?auto=compress&cs=tinysrgb&w=120',
+                          'https://images.pexels.com/photos/8460157/pexels-photo-8460157.jpeg?auto=compress&cs=tinysrgb&w=120',
+                          'https://images.pexels.com/photos/7551613/pexels-photo-7551613.jpeg?auto=compress&cs=tinysrgb&w=120',
+                          'https://images.pexels.com/photos/5722166/pexels-photo-5722166.jpeg?auto=compress&cs=tinysrgb&w=120',
+                        ].map((src, i) => (
+                          <span key={src} className={`relative w-7 h-7 rounded-full overflow-hidden border-2 border-white flex-shrink-0 ${i > 0 ? '-ml-2' : ''}`} style={{ filter: 'blur(2px)' }}>
+                            <Image src={src} alt="" fill sizes="28px" className="object-cover" />
+                          </span>
+                        ))}
                       </div>
                       <p className="text-[13px] font-bold text-[#3D3D3D]"><span className="text-[#22A06B]">5 passende Pflegekräfte</span> gefunden</p>
                       <svg className="w-3.5 h-3.5 flex-shrink-0 text-[#8B7355] ml-auto" fill="none" stroke="currentColor" strokeWidth={2.2} viewBox="0 0 24 24"><rect x="5" y="11" width="14" height="9" rx="2" /><path d="M8 11V7a4 4 0 018 0v4" /></svg>
