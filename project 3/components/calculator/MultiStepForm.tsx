@@ -532,7 +532,7 @@ export function MultiStepForm() {
       case 6: return "Deutschkenntnisse der Pflegekraft";
       case 7: return "Führerschein gewünscht?";
       case 8: return "Geschlecht der Pflegekraft";
-      case 9: return "An welche E-Mail-Adresse dürfen wir die Kopie senden?";
+      case 9: return ""; // V5 (Martin, 2026-07-08): gesperrte Ergebnis-Karte ersetzt Titel + Erklärtext
       default: return "";
     }
   };
@@ -548,7 +548,7 @@ export function MultiStepForm() {
       case 6: return "Welches Sprachniveau sollte die Betreuungskraft haben?";
       case 7: return "Sind Autofahren notwendig und nicht anders zu organisieren?";
       case 8: return "Haben Sie eine Präferenz bezüglich des Geschlechts?";
-      case 9: return "Ihr Angebot und passende Pflegekräfte sehen Sie sofort auf der nächsten Seite. Zusätzlich erhalten Sie eine Kopie per E-Mail.";
+      case 9: return "";
       default: return "";
     }
   };
@@ -742,9 +742,11 @@ export function MultiStepForm() {
                 Ihr Angebot ist fertig
               </div>
             )}
-            <h3 className="text-[21px] font-bold text-[#3D3D3D] mb-5 leading-tight">
-              {getStepTitle()}
-            </h3>
+            {getStepTitle() && (
+              <h3 className="text-[21px] font-bold text-[#3D3D3D] mb-5 leading-tight">
+                {getStepTitle()}
+              </h3>
+            )}
             {getStepSubtext() && (
               <p className="text-sm text-[#8B8B8B] mb-5 italic leading-relaxed">{getStepSubtext()}</p>
             )}
@@ -1045,6 +1047,29 @@ export function MultiStepForm() {
                   06.06.2026). Begründung im validateForm()-Kommentar. */}
               {currentStep === 9 && (
                 <div className="space-y-3">
+                  {/* V5 (Martin, 2026-07-08): Das fertige Ergebnis steht sichtbar,
+                      aber GESPERRT über den Feldern — Preis verpixelt (Dummy-Zahl!
+                      Die echte Kalkulation läuft erst nach dem Absenden server-
+                      seitig und darf hier nie im Quelltext stehen) + 3 verpixelte
+                      Pflegekraft-Avatare. Kontaktdaten = der Schlüssel. */}
+                  <div className="border-[1.5px] border-[#E5E3DF] rounded-2xl overflow-hidden mb-1">
+                    <div className="bg-[#F8F7F5] border-b border-[#E5E3DF] px-4 py-3">
+                      <p className="text-[11px] font-bold uppercase tracking-wider text-[#8B8B8B] mb-0.5">Ihr berechneter Monatspreis</p>
+                      <div className="flex items-center gap-2.5">
+                        <p className="text-[24px] font-extrabold text-[#3D3D3D] select-none" style={{ filter: 'blur(7px)' }} aria-hidden="true">3.256 €</p>
+                        <svg className="w-4 h-4 flex-shrink-0 text-[#8B7355]" fill="none" stroke="currentColor" strokeWidth={2.2} viewBox="0 0 24 24"><rect x="5" y="11" width="14" height="9" rx="2" /><path d="M8 11V7a4 4 0 018 0v4" /></svg>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2.5 px-4 py-3">
+                      <div className="flex">
+                        <span className="w-7 h-7 rounded-full bg-[#9B7E6B] border-2 border-white" style={{ filter: 'blur(2.5px)' }}></span>
+                        <span className="w-7 h-7 rounded-full bg-[#7E8F9B] border-2 border-white -ml-2" style={{ filter: 'blur(2.5px)' }}></span>
+                        <span className="w-7 h-7 rounded-full bg-[#8B9B7E] border-2 border-white -ml-2" style={{ filter: 'blur(2.5px)' }}></span>
+                      </div>
+                      <p className="text-[13px] font-bold text-[#3D3D3D]"><span className="text-[#22A06B]">3 passende Pflegekräfte</span> gefunden</p>
+                      <svg className="w-3.5 h-3.5 flex-shrink-0 text-[#8B7355] ml-auto" fill="none" stroke="currentColor" strokeWidth={2.2} viewBox="0 0 24 24"><rect x="5" y="11" width="14" height="9" rx="2" /><path d="M8 11V7a4 4 0 018 0v4" /></svg>
+                    </div>
+                  </div>
                   <div>
                     <input
                       type="text"
@@ -1135,11 +1160,11 @@ export function MultiStepForm() {
                       <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
                     </div>
                   ) : (
-                    <span>Angebot & Pflegekräfte anzeigen →</span>
+                    <span>Jetzt freischalten →</span>
                   )}
                 </button>
                 <p className="text-center text-xs text-[#8B8B8B] leading-snug">
-                  100% kostenfrei &amp; unverbindlich · Mit dem Absenden stimmen Sie unserer{' '}
+                  Öffnet sofort · 100&nbsp;% kostenfrei · keine Werbeanrufe<br />Mit dem Absenden stimmen Sie unserer{' '}
                   <a href="/datenschutz" target="_blank" className="text-[#8B7355] underline hover:text-[#A68968]">
                     Datenschutzerklärung
                   </a>{' '}zu.
