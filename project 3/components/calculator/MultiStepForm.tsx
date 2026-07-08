@@ -1166,7 +1166,7 @@ export function MultiStepForm() {
                       <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
                     </div>
                   ) : (
-                    <span>Jetzt freischalten →</span>
+                    <span>Angebot & Pflegekräfte anzeigen →</span>
                   )}
                 </button>
                 <p className="text-center text-xs text-[#8B8B8B] leading-snug">
