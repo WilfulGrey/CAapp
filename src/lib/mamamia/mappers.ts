@@ -8,6 +8,7 @@ import type {
   MamamiaJobOffer,
   MamamiaCustomer,
 } from './types';
+import { STANDARD_NIGHT_OPS_DE } from './patientFormMapper';
 
 // Deterministic 20-color palette for avatar fallback (Salead pattern).
 const COLORS = [
@@ -873,6 +874,10 @@ export interface PatientFormPrefill {
   wunschGetriebe?: string;
   aufgaben?: string; sonstigeWuensche?: string;
   phone?: string;
+  // SA-Abgleich (2026-07-08): Rückspiegelung der neuen Fragen.
+  nachtDetail?: string; p2_nachtDetail?: string;
+  einkaeufe?: string;
+  raucherhaushalt?: string;
 }
 
 function mamamiaPatientToForm(
@@ -881,7 +886,7 @@ function mamamiaPatientToForm(
   geschlecht?: string; geburtsjahr?: string; pflegegrad?: string;
   gewicht?: string; groesse?: string;
   mobilitaet?: string; heben?: string; demenz?: string;
-  inkontinenz?: string; nacht?: string;
+  inkontinenz?: string; nacht?: string; nachtDetail?: string;
 } {
   // Pflegegrad: Mamamia natywnie wspiera "Keine" jako `care_level: null`
   // (zweryfikowane live na Customer 7658 po ręcznym ustawieniu "brak"
@@ -908,7 +913,19 @@ function mamamiaPatientToForm(
     nacht: p.night_operations
       ? (MAMAMIA_NIGHT_OPS_TO_FORM[p.night_operations] ?? '')
       : '',
+    nachtDetail: mamamiaNightDescToForm(
+      p.night_operations_description_de ?? p.night_operations_description,
+    ),
   };
+}
+
+// „Was ist in der Nacht zu machen?" — nur echten Nutzertext zurückspiegeln.
+// Der Standard-Platzhalter (Mapper-Fallback wenn das Feld leer blieb) darf
+// nicht als scheinbare Nutzereingabe im Formular auftauchen.
+function mamamiaNightDescToForm(desc: string | null | undefined): string {
+  const t = desc?.trim();
+  if (!t || t === STANDARD_NIGHT_OPS_DE) return '';
+  return t;
 }
 
 export function mapMamamiaCustomerToPatientForm(
@@ -960,6 +977,7 @@ export function mapMamamiaCustomerToPatientForm(
     out.p2_demenz = p2.demenz;
     out.p2_inkontinenz = p2.inkontinenz;
     out.p2_nacht = p2.nacht;
+    out.p2_nachtDetail = p2.nachtDetail;
   }
 
   // Customer-level enums
@@ -1001,6 +1019,11 @@ export function mapMamamiaCustomerToPatientForm(
 
   if (cust.internet === 'yes') out.internet = 'Ja';
   else if (cust.internet === 'no') out.internet = 'Nein';
+
+  // Raucherhaushalt (SA-Abgleich) — 1:1-Rückabbildung von smoking_household.
+  if (cust.smoking_household === 'yes') out.raucherhaushalt = 'Ja';
+  else if (cust.smoking_household === 'yes_outside') out.raucherhaushalt = 'Ja, nur draußen';
+  else if (cust.smoking_household === 'no') out.raucherhaushalt = 'Nein';
 
   // Prefer Customer.phone but fall back to customer_contract.phone — the
   // panel writes only to contract when an agent edits, so a customer who
@@ -1068,6 +1091,11 @@ export function mapMamamiaCustomerToPatientForm(
   if (wish) {
     out.wunschGeschlecht = mamamiaWishGenderToForm(wish.gender);
     out.rauchen = mamamiaWishSmokingToForm(wish.smoking);
+    // Einkäufe (SA-Abgleich): 'no' NICHT als „Nein" zurückspiegeln — der
+    // Mapper schreibt 'no' auch als stillen Default für Unbeantwortet;
+    // das Formular soll dann weiterhin leer aussehen.
+    if (wish.shopping === 'yes') out.einkaeufe = 'Ja';
+    else if (wish.shopping === 'occasionally') out.einkaeufe = 'Gelegentlich';
     out.aufgaben = wish.tasks ?? '';
     out.sonstigeWuensche = wish.other_wishes ?? '';
     // Bug #13: onboard ships nothing for driving_license_gearbox; Mamamia

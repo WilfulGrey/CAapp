@@ -192,6 +192,21 @@ export interface PatientForm {
   fuehrerschein: string;
   // Getriebe — only shown when fuehrerschein='Ja'. Maps to driving_license_gearbox.
   wunschGetriebe: string;
+  // ── SA-Abgleich (2026-07-08): Fragen aus dem SA-Neuanlage-Wizard ──────
+  // Hilfsmittel je Patient — comma-separierte Labels („Gehstock, Rollator");
+  // Labels = Mamamia-Tools 1–7, identisch zum SA-Wizard. Explizite Auswahl
+  // gewinnt im Mapper gegen die Ableitung aus der Mobilität.
+  hilfsmittel: string;
+  p2_hilfsmittel: string;
+  // „Was ist in der Nacht zu machen?" — nur sichtbar wenn nacht ≠ Nein;
+  // ersetzt den Standard-Platzhalter in night_operations_description.
+  nachtDetail: string;
+  p2_nachtDetail: string;
+  // Einkäufe → customer_caregiver_wish.shopping (war bisher hart 'no').
+  einkaeufe: string;
+  einkaeufeWie: string;
+  // Raucherhaushalt → Customer.smoking_household.
+  raucherhaushalt: string;
 }
 
 // Step 5 hieß "Kontakt" als dort noch Name + Telefon abgefragt wurden.
