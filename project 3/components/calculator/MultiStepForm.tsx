@@ -1058,7 +1058,7 @@ export function MultiStepForm() {
                           'https://images.pexels.com/photos/7551613/pexels-photo-7551613.jpeg?auto=compress&cs=tinysrgb&w=120',
                           'https://images.pexels.com/photos/5722166/pexels-photo-5722166.jpeg?auto=compress&cs=tinysrgb&w=120',
                         ].map((src, i) => (
-                          <span key={src} className={`relative w-7 h-7 rounded-full overflow-hidden border-2 border-white flex-shrink-0 ${i > 0 ? '-ml-2' : ''}`} style={{ filter: 'blur(2px)' }}>
+                          <span key={src} className={`relative w-7 h-7 rounded-full overflow-hidden border-2 border-white flex-shrink-0 ${i > 0 ? '-ml-2' : ''}`}>
                             {/* Plain <img>: images.pexels.com ist NICHT in next.config
                                 whitelisted — next/image würde zur Laufzeit werfen und
                                 den Schritt zerlegen. 28px braucht keinen Optimizer. */}
@@ -1071,6 +1071,7 @@ export function MultiStepForm() {
                       <svg className="w-3.5 h-3.5 flex-shrink-0 text-[#8B7355] ml-auto" fill="none" stroke="currentColor" strokeWidth={2.2} viewBox="0 0 24 24"><rect x="5" y="11" width="14" height="9" rx="2" /><path d="M8 11V7a4 4 0 018 0v4" /></svg>
                     </div>
                   </div>
+                  <p className="text-[15px] font-bold text-[#3D3D3D] pt-1">Persönliches Angebot an:</p>
                   <div>
                     <input
                       type="text"
