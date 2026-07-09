@@ -400,7 +400,7 @@ export const AngebotCard: FC<{
     const selected = patient[field] ? patient[field].split(', ') : [];
     return (
       <div>
-        <label className={labelCls}>Vorhandene Hilfsmittel <span className="font-normal text-gray-400">(optional)</span></label>
+        <label className={labelCls}>Vorhandene Hilfsmittel</label>
         <div className="flex flex-wrap gap-1.5">
           {HILFSMITTEL.map(h => {
             const active = selected.includes(h);
@@ -941,25 +941,25 @@ export const AngebotCard: FC<{
                             options={['Männlich','Weiblich']} />
                         </div>
                         <div>
-                          <label className={labelCls}>Geburtsjahr <span className="font-normal text-gray-400">(optional)</span></label>
+                          <label className={labelCls}>Geburtsjahr</label>
                           <CustomSelect value={patient.geburtsjahr} onChange={v => updatePatient(p=>({...p,geburtsjahr:v}))}
                             options={Array.from({length:70},(_,i)=>String(1931+i))} />
                         </div>
                       </div>
                       <div className={gridRow2}>
                         <div>
-                          <label className={labelCls}>Gewicht <span className="font-normal text-gray-400">(optional)</span></label>
+                          <label className={labelCls}>Gewicht</label>
                           <CustomSelect value={patient.gewicht} onChange={v => updatePatient(p=>({...p,gewicht:v}))}
                             options={['Unter 50 kg','51-60 kg','61-70 kg','71-80 kg','81-90 kg','91-100 kg','Über 100 kg']} />
                         </div>
                         <div>
-                          <label className={labelCls}>Größe <span className="font-normal text-gray-400">(optional)</span></label>
+                          <label className={labelCls}>Größe</label>
                           <CustomSelect value={patient.groesse} onChange={v => updatePatient(p=>({...p,groesse:v}))}
                             options={['Unter 151 cm','151-160 cm','161-170 cm','171-180 cm','181-190 cm','Über 190 cm']} />
                         </div>
                       </div>
                       <div>
-                        <label className={labelCls}>Pflegegrad <span className="font-normal text-gray-400">(optional)</span></label>
+                        <label className={labelCls}>Pflegegrad</label>
                         <CustomSelect value={patient.pflegegrad} onChange={v => updatePatient(p=>({...p,pflegegrad:v}))}
                           options={['Kein/e','Pflegegrad 1','Pflegegrad 2','Pflegegrad 3','Pflegegrad 4','Pflegegrad 5']} />
                       </div>
@@ -978,25 +978,25 @@ export const AngebotCard: FC<{
                               options={['Männlich','Weiblich']} />
                           </div>
                           <div>
-                            <label className={labelCls}>Geburtsjahr <span className="font-normal text-gray-400">(optional)</span></label>
+                            <label className={labelCls}>Geburtsjahr</label>
                             <CustomSelect value={patient.p2_geburtsjahr} onChange={v => updatePatient(p=>({...p,p2_geburtsjahr:v}))}
                               options={Array.from({length:70},(_,i)=>String(1931+i))} />
                           </div>
                         </div>
                         <div className="grid grid-cols-2 gap-2 mt-2">
                           <div>
-                            <label className={labelCls}>Gewicht <span className="font-normal text-gray-400">(optional)</span></label>
+                            <label className={labelCls}>Gewicht</label>
                             <CustomSelect value={patient.p2_gewicht} onChange={v => updatePatient(p=>({...p,p2_gewicht:v}))}
                               options={['Unter 50 kg','51-60 kg','61-70 kg','71-80 kg','81-90 kg','91-100 kg','Über 100 kg']} />
                           </div>
                           <div>
-                            <label className={labelCls}>Größe <span className="font-normal text-gray-400">(optional)</span></label>
+                            <label className={labelCls}>Größe</label>
                             <CustomSelect value={patient.p2_groesse} onChange={v => updatePatient(p=>({...p,p2_groesse:v}))}
                               options={['Unter 151 cm','151-160 cm','161-170 cm','171-180 cm','181-190 cm','Über 190 cm']} />
                           </div>
                         </div>
                         <div className="mt-2">
-                          <label className={labelCls}>Pflegegrad <span className="font-normal text-gray-400">(optional)</span></label>
+                          <label className={labelCls}>Pflegegrad</label>
                           <CustomSelect value={patient.p2_pflegegrad} onChange={v => updatePatient(p=>({...p,p2_pflegegrad:v}))}
                             options={['Kein/e','Pflegegrad 1','Pflegegrad 2','Pflegegrad 3','Pflegegrad 4','Pflegegrad 5']} />
                         </div>
@@ -1057,14 +1057,14 @@ export const AngebotCard: FC<{
                       <div className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm text-gray-700 bg-gray-50 cursor-not-allowed">{patient.nacht}</div>
                     </div>
                     <div>
-                      <label className={labelCls}>Inkontinenz <span className="font-normal text-gray-400">(optional)</span></label>
+                      <label className={labelCls}>Inkontinenz</label>
                       <CustomSelect value={patient.inkontinenz} onChange={v => updatePatient(p=>({...p,inkontinenz:v}))}
                         options={['Nein','Harninkontinenz','Stuhlinkontinenz','Beides']} />
                     </div>
                   </div>
                   {patient.nacht !== '' && patient.nacht !== 'Nein' && (
                     <div>
-                      <label className={labelCls}>Was ist in der Nacht zu machen? <span className="font-normal text-gray-400">(optional)</span></label>
+                      <label className={labelCls}>Was ist in der Nacht zu machen?</label>
                       <input value={patient.nachtDetail} onChange={set('nachtDetail')}
                         placeholder="z. B. Toilettengang, Umlagern, Medikamente" className={inputCls} />
                     </div>
@@ -1100,14 +1100,14 @@ export const AngebotCard: FC<{
                               options={['Nein','Bis zu 1 Mal','1–2 Mal','Mehr als 2']} />
                           </div>
                           <div>
-                            <label className={labelCls}>Inkontinenz <span className="font-normal text-gray-400">(optional)</span></label>
+                            <label className={labelCls}>Inkontinenz</label>
                             <CustomSelect value={patient.p2_inkontinenz} onChange={v => updatePatient(p=>({...p,p2_inkontinenz:v}))}
                               options={['Nein','Harninkontinenz','Stuhlinkontinenz','Beides']} />
                           </div>
                         </div>
                         {patient.p2_nacht !== '' && patient.p2_nacht !== 'Nein' && (
                           <div>
-                            <label className={labelCls}>Was ist in der Nacht zu machen? <span className="font-normal text-gray-400">(optional)</span></label>
+                            <label className={labelCls}>Was ist in der Nacht zu machen?</label>
                             <input value={patient.p2_nachtDetail} onChange={set('p2_nachtDetail')}
                               placeholder="z. B. Toilettengang, Umlagern, Medikamente" className={inputCls} />
                           </div>
@@ -1117,7 +1117,7 @@ export const AngebotCard: FC<{
                   )}
 
                   <div>
-                    <label className={labelCls}>Weitere Diagnosen <span className="font-normal text-gray-400">(optional)</span></label>
+                    <label className={labelCls}>Weitere Diagnosen</label>
                     <textarea value={patient.diagnosen} onChange={set('diagnosen')}
                       placeholder="z.B. Parkinson, Herzinsuffizienz, Diabetes…"
                       rows={2} className={`${inputCls} resize-none`} />
@@ -1193,7 +1193,7 @@ export const AngebotCard: FC<{
                     </div>
                   </div>
                   <div>
-                    <label className={labelCls}>Familie in der Nähe (bis 20 km) <span className="font-normal text-gray-400">(optional)</span></label>
+                    <label className={labelCls}>Familie in der Nähe (bis 20 km)</label>
                     <CustomSelect value={patient.familieNahe} onChange={v => updatePatient(p=>({...p,familieNahe:v}))}
                       options={['Ja','Nein']} />
                   </div>
@@ -1219,25 +1219,25 @@ export const AngebotCard: FC<{
                         options={['Zimmer in den Räumlichkeiten','Gesamter Bereich','Zimmer extern','Bereich extern']} />
                     </div>
                     <div>
-                      <label className={labelCls}>Haustiere <span className="font-normal text-gray-400">(opt.)</span></label>
+                      <label className={labelCls}>Haustiere</label>
                       <CustomSelect value={patient.tiere} onChange={v => updatePatient(p=>({...p,tiere:v}))}
                         options={['Keine','Hund','Katze','Andere']} placeholder="Keine" />
                     </div>
                   </div>
                   <div className={gridRow2}>
                     <div>
-                      <label className={labelCls}>Eigenes Badezimmer <span className="font-normal text-gray-400">(opt.)</span></label>
+                      <label className={labelCls}>Eigenes Badezimmer</label>
                       <CustomSelect value={patient.badezimmer} onChange={v => updatePatient(p=>({...p,badezimmer:v}))}
                         options={['Ja','Nein']} />
                     </div>
                     <div>
-                      <label className={labelCls}>Raucherhaushalt <span className="font-normal text-gray-400">(opt.)</span></label>
+                      <label className={labelCls}>Raucherhaushalt</label>
                       <CustomSelect value={patient.raucherhaushalt} onChange={v => updatePatient(p=>({...p,raucherhaushalt:v}))}
                         options={['Nein','Ja, nur draußen','Ja']} placeholder="Nein" />
                     </div>
                   </div>
                   <div>
-                    <label className={labelCls}>Internet vorhanden? <span className="font-normal text-gray-400">(optional)</span></label>
+                    <label className={labelCls}>Internet vorhanden?</label>
                     <CustomSelect value={patient.internet} onChange={v => updatePatient(p=>({...p,internet:v}))}
                       options={['Ja','Nein']} />
                   </div>
@@ -1286,7 +1286,7 @@ export const AngebotCard: FC<{
                   {/* Getriebe — eigene volle Zeile, nur wenn Führerschein='Ja' */}
                   {patient.fuehrerschein === 'Ja' && (
                     <div>
-                      <label className={labelCls}>Getriebe <span className="font-normal text-gray-400">(optional)</span></label>
+                      <label className={labelCls}>Getriebe</label>
                       <CustomSelect value={patient.wunschGetriebe}
                         onChange={v => updatePatient(p => ({ ...p, wunschGetriebe: v }))}
                         options={['Automatik', 'Schaltung', 'Egal']}
@@ -1295,12 +1295,12 @@ export const AngebotCard: FC<{
                   )}
 
                   <div>
-                    <label className={labelCls}>Darf die Betreuungsperson rauchen? <span className="font-normal text-gray-400">(optional)</span></label>
+                    <label className={labelCls}>Darf die Betreuungsperson rauchen?</label>
                     <CustomSelect value={patient.rauchen} onChange={v => updatePatient(p=>({...p,rauchen:v}))}
                       options={['Ja (nur Draußen)','Nein']} />
                   </div>
                   <div>
-                    <label className={labelCls}>Sonstige Wünsche <span className="font-normal text-gray-400">(optional)</span></label>
+                    <label className={labelCls}>Sonstige Wünsche</label>
                     <textarea value={patient.sonstigeWuensche} onChange={set('sonstigeWuensche')}
                       placeholder="z.B. Erfahrung mit Demenz, ruhige Person, tierlieb…"
                       rows={2} className={`${inputCls} resize-none`} />
@@ -1310,7 +1310,7 @@ export const AngebotCard: FC<{
                       aus der Wohnsituation hierher gezogen (wie im SA-Wizard). */}
                   <p className="text-xs font-bold text-gray-400 uppercase tracking-wider pt-2">Aufgaben & Pflegedienst</p>
                   <div>
-                    <label className={labelCls}>Pflegedienst kommt? <span className="font-normal text-gray-400">(optional)</span></label>
+                    <label className={labelCls}>Pflegedienst kommt?</label>
                     <CustomSelect value={patient.pflegedienst} onChange={v => updatePatient(p=>{
                       // When user switches to 'Nein', clear the follow-ups so
                       // a stale frequency/tasks selection doesn't sneak into
@@ -1327,7 +1327,7 @@ export const AngebotCard: FC<{
                   {/* Pflegedienst-Zusatzfelder (Häufigkeit/Aufgaben) entfernt —
                       unnötige Hürde (Martin, 2026-07-08); Standard-Text kommt vom Mapper. */}
                   <div>
-                    <label className={labelCls}>Muss die Betreuungskraft Einkäufe erledigen? <span className="font-normal text-gray-400">(optional)</span></label>
+                    <label className={labelCls}>Muss die Betreuungskraft Einkäufe erledigen?</label>
                     <CustomSelect value={patient.einkaeufe} onChange={v => updatePatient(p => {
                       // Beim Wechsel auf 'Nein' das Detailfeld leeren, damit kein
                       // veralteter Text in die Job-Beschreibung rutscht.
@@ -1338,13 +1338,13 @@ export const AngebotCard: FC<{
                   </div>
                   {(patient.einkaeufe === 'Ja' || patient.einkaeufe === 'Gelegentlich') && (
                     <div>
-                      <label className={labelCls}>Wie werden die Einkäufe erledigt? <span className="font-normal text-gray-400">(optional)</span></label>
+                      <label className={labelCls}>Wie werden die Einkäufe erledigt?</label>
                       <input value={patient.einkaeufeWie} onChange={set('einkaeufeWie')}
                         placeholder="ÖPNV, zu Fuß, Fahrrad, Taxi, Auto …" className={inputCls} />
                     </div>
                   )}
                   <div>
-                    <label className={labelCls}>Aufgaben der Pflegekraft <span className="font-normal text-gray-400">(optional)</span></label>
+                    <label className={labelCls}>Aufgaben der Pflegekraft</label>
                     <textarea value={patient.aufgaben} onChange={set('aufgaben')}
                       placeholder="z.B. Körperpflege, Mahlzeiten, Arztbegleitung, Einkäufe…"
                       rows={3} className={`${inputCls} resize-none`} />
