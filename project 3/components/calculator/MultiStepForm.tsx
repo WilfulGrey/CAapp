@@ -85,28 +85,28 @@ function MatchingAnimation({ onComplete, initialCount }: { onComplete: (finalCou
             return (
               <div key={i} className={`flex items-start gap-4 transition-all duration-500 ${isPending ? 'opacity-25' : 'opacity-100'}`}>
                 <div className={`w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 transition-all duration-500 mt-0.5
-                  ${isDone ? 'bg-[#8B7355]' : isActive ? 'bg-white border-2 border-[#8B7355]' : 'bg-white border-2 border-[#E5E3DF]'}`}
+                  ${isDone ? 'bg-[#22A06B]' : isActive ? 'bg-white border-2 border-[#22A06B]' : 'bg-white border-2 border-[#E5E3DF]'}`}
                 >
                   {isDone ? (
                     <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
                     </svg>
                   ) : isActive ? (
-                    <div className="w-4 h-4 border-2 border-[#8B7355] border-t-transparent rounded-full animate-spin" />
+                    <div className="w-4 h-4 border-2 border-[#22A06B] border-t-transparent rounded-full animate-spin" />
                   ) : (
                     <div className="w-2.5 h-2.5 rounded-full bg-[#E5E3DF]" />
                   )}
                 </div>
                 <div className="flex-1 min-w-0 text-left">
-                  <p className={`text-[15px] font-semibold leading-snug transition-colors duration-300 ${isDone ? 'text-[#8B7355]' : isActive ? 'text-[#3D3D3D]' : 'text-[#AFAFAF]'}`}>
+                  <p className={`text-[15px] font-semibold leading-snug transition-colors duration-300 ${isDone ? 'text-[#3D3D3D]' : isActive ? 'text-[#3D3D3D]' : 'text-[#AFAFAF]'}`}>
                     {s.label}
-                    {isDone && <span className="ml-2 text-xs font-normal text-[#8B7355]">✓ Fertig</span>}
+                    {isDone && <span className="ml-2 text-xs font-normal text-[#22A06B]">✓ Fertig</span>}
                   </p>
                   <p className="text-sm text-[#8B8B8B] mt-1">
                     {i === 1 && isActive ? (
-                      <><span className="font-bold text-[#8B7355] tabular-nums">{nurseCount}</span> Pflegekräfte werden geprüft…</>
+                      <><span className="font-bold text-[#22A06B] tabular-nums">{nurseCount}</span> Pflegekräfte werden geprüft…</>
                     ) : i === 1 && isDone ? (
-                      <><span className="font-bold text-[#8B7355]">{nurseCount}</span> passende Pflegekräfte gefunden</>
+                      <><span className="font-bold text-[#22A06B]">{nurseCount}</span> passende Pflegekräfte gefunden</>
                     ) : (isActive || isDone) ? s.sub : null}
                   </p>
                 </div>
@@ -118,7 +118,7 @@ function MatchingAnimation({ onComplete, initialCount }: { onComplete: (finalCou
         <div className="mt-8">
           <div className="h-1.5 bg-[#E5E3DF] rounded-full overflow-hidden">
             <div
-              className="h-full bg-[#8B7355] rounded-full transition-all duration-1000 ease-out"
+              className="h-full bg-[#22A06B] rounded-full transition-all duration-1000 ease-out"
               style={{ width: done ? '100%' : activeStep === 0 ? '15%' : activeStep === 1 ? '55%' : '90%' }}
             />
           </div>
@@ -1056,7 +1056,7 @@ export function MultiStepForm() {
                         </div>
                         <p className="text-[13px] leading-snug flex-1 text-[#ABABAB]">inkl. Steuern, Gebühren &amp; Sozialabgaben</p>
                       </div>
-                      <p className="text-[13px] mt-3 leading-snug text-[#3D3D3D]">zzgl. 125 € Reisekosten pro Strecke, Kost &amp; Logis und Sommerzuschlag 6,67 €/Tag (Juli + Aug.)</p>
+                      <p className="text-[13px] mt-3 leading-snug text-left text-[#3D3D3D]">zzgl. 125 € Reisekosten pro Strecke, Kost &amp; Logis und Sommerzuschlag 6,67 €/Tag (Juli + Aug.)</p>
                     </div>
                     <div className="flex items-center gap-2.5 px-4 py-3">
                       <div className="flex">
