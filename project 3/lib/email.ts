@@ -941,7 +941,10 @@ export function getTeamNotificationTemplate(
   // Portal-Deeplink für Status, bei denen das Team direkt ins Kundenportal
   // einsteigen soll (Patientenprofil ansehen, Pflegekraft-Vorschau, etc.).
   const portalBase = process.env.NEXT_PUBLIC_PORTAL_URL ?? '';
-  const portalUrl = portalBase && lead.token ? `${portalBase}/?token=${lead.token}` : '';
+  // Bei Bewerbungs-Status direkt zur Bewerbungs-Sektion springen (goto),
+  // statt den Klicker oben auf der Portal-Startansicht abzusetzen.
+  const gotoSuffix = status === 'application_received' ? '&goto=bewerbungen' : '';
+  const portalUrl = portalBase && lead.token ? `${portalBase}/?token=${lead.token}${gotoSuffix}` : '';
   const CAREGIVER_NAME_STATUSES = ['caregiver_invited', 'caregiver_interest_shown', 'application_received', 'application_accepted_internal'];
   const PORTAL_CTA_STATUSES = [
     'patient_data_saved',

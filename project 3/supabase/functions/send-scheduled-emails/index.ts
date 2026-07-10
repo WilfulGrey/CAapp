@@ -285,8 +285,11 @@ function buildIlkaSig(siteUrl: string): string {
 // ── Portal-Link + Lead-Meilenstein ────────────────────────────────────────
 // Der kostenrechner-Lead erfährt vom CA-App-Portal über `lead_events`, die
 // per /api/lead-event reingeschrieben werden (token-authentifiziert).
-function buildPortalUrl(portalBase: string, token: string): string {
-  return `${portalBase.replace(/\/$/, "")}/?token=${encodeURIComponent(token)}`;
+function buildPortalUrl(portalBase: string, token: string, goto?: string): string {
+  // goto: Sprungziel im Portal (z. B. "bewerbungen") — der Kunde landet
+  // direkt bei der Bewerbung statt oben auf der Portal-Startansicht.
+  const base = `${portalBase.replace(/\/$/, "")}/?token=${encodeURIComponent(token)}`;
+  return goto ? `${base}&goto=${encodeURIComponent(goto)}` : base;
 }
 
 type LeadMilestone = "none" | "portal_opened" | "patient_data_saved" | "caregiver_invited";
@@ -2041,9 +2044,11 @@ Deno.serve(async (req: Request) => {
             subject = `${firstName}: letzte Erinnerung — wir schließen die Bewerbung bald`;
           }
 
-          // Portal-URL mit Token bauen
+          // Portal-URL mit Token bauen. Bewerbungs-Reminder springen per
+          // goto direkt zur Bewerbungs-Sektion (Martin, 2026-07-09: Kunde
+          // landete auf "Bewerbungen werden vorbereitet" statt der Bewerbung).
           const portalUrl = (portalBase && (lead as Lead).token)
-            ? buildPortalUrl(portalBase, (lead as Lead).token)
+            ? buildPortalUrl(portalBase, (lead as Lead).token, variant === "application" ? "bewerbungen" : undefined)
             : smtpConfig.siteUrl;
 
           const inline = await fetchInlinePhotoDeno(meta.caregiver_photo_url);
