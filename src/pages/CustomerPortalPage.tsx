@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, FC } from 'react';
+import { useState, useEffect, useMemo, useRef, FC } from 'react';
 import { Check, Bell, Phone, AlertCircle, AlertTriangle, ChevronDown, X, ArrowLeft } from 'lucide-react';
 import { Nurse } from '../types';
 import { displayName } from '../components/portal/shared';
@@ -137,6 +137,13 @@ const JOB_ID_PARAM =
 const TOKEN_PARAM =
   typeof window !== 'undefined'
     ? new URLSearchParams(window.location.search).get('token')
+    : null;
+// Sprungziel aus Mail-CTAs (z. B. goto=bewerbungen aus der Bewerbungs-Mail):
+// nach dem Laden der Mamamia-Daten scrollt das Portal zur Ziel-Sektion,
+// statt den Kunden oben auf der Startansicht abzusetzen.
+const GOTO_PARAM =
+  typeof window !== 'undefined'
+    ? new URLSearchParams(window.location.search).get('goto')
     : null;
 // Link back to the real "Alle meine Einsätze" overview (?view=jobs) — only
 // meaningful once we arrived here scoped to a specific job via ?job=…
@@ -944,6 +951,19 @@ const CustomerPortalPage: FC = () => {
   };
 
   const pendingApps = applications.filter((a) => a.status === 'new');
+
+  // Mail-Deeplink goto=bewerbungen: sobald die Bewerbungen geladen sind,
+  // EINMAL zur Sektion scrollen (ref-Guard gegen Re-Scroll bei Refetches).
+  const gotoScrolledRef = useRef(false);
+  useEffect(() => {
+    if (GOTO_PARAM !== 'bewerbungen' || gotoScrolledRef.current) return;
+    if (pendingApps.length === 0) return;
+    gotoScrolledRef.current = true;
+    // Nächster Frame — die Sektion muss erst gerendert sein.
+    requestAnimationFrame(() => {
+      document.getElementById('bewerbungen')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
+  }, [pendingApps.length]);
   const doneApps = applications.filter((a) => a.status !== 'new');
   // Declined matches sind jetzt direkt in der Haupt-Matching-Liste am
   // Ende einsortiert (Status='declined', "Abgelehnt"-Pill + Undo im
@@ -2096,6 +2116,15 @@ const CustomerPortalPage: FC = () => {
                 : 'Schauen Sie sich die Bewerbung in Ruhe an und entscheiden Sie, ob die Pflegekraft passt.',
               pill: n > 1 ? `${n} Bewerbungen aktiv` : '1 Bewerbung aktiv',
             }
+          : patientSaved && (!mmReady || mmApplicationsLoading || !mmApplications)
+          ? {
+              // Mamamia-Daten laden noch (oder der Abruf hakt) — hier NICHT
+              // "werden vorbereitet" behaupten: Wer aus der Bewerbungs-Mail
+              // kommt, hat nachweislich eine Bewerbung (Martin, 2026-07-09).
+              title: 'Einen Moment — Ihre Bewerbungen werden geladen.',
+              subtitle: 'Wir holen gerade den aktuellen Stand Ihrer Anfrage. Das dauert nur wenige Sekunden.',
+              pill: 'Portal wird geladen',
+            }
           : patientSaved
           ? {
               title: 'Profil vollständig. Bewerbungen werden für Sie vorbereitet. ✨',
@@ -2513,7 +2542,7 @@ const CustomerPortalPage: FC = () => {
              Höchste Priorität: pending Bewerbungen wollen eine Entscheidung
              vom Kunden — die kommen ZUERST, vor allem anderen. */}
         {hasPending && (
-          <div className="space-y-3">
+          <div id="bewerbungen" className="space-y-3 scroll-mt-4">
             <p className="text-[14px] leading-relaxed px-1" style={{color:'#3D3D3D'}}>
               Tippen Sie auf <span className="font-semibold">"Angebot prüfen"</span>, um die Details der Pflegekraft zu sehen und über das Angebot zu entscheiden.
             </p>
