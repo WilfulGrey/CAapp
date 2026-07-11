@@ -85,6 +85,16 @@ export interface AppStatusEventRow {
   seeded?: boolean;
 }
 
+// Reminder-Mail-Typen in scheduled_emails — geteilt von Photo-Refresh und
+// Orphan-Cancel-Sweep.
+const REMINDER_TYPES = [
+  "interest_reminder",
+  "application_reminder",
+  "application_reminder_4h",
+  "application_reminder_12h",
+  "application_last_chance",
+];
+
 export interface DetectSupabase {
   fetchLead(id: string): Promise<LeadRow | null>;
   fetchActiveLeads(): Promise<LeadRow[]>;
@@ -98,6 +108,16 @@ export interface DetectSupabase {
   // ist beim Versand also ≤15 Min alt und damit gültig. Liefert Anzahl
   // aktualisierter Rows.
   refreshReminderPhotos(leadId: string, photoByCaregiver: Map<number, string>): Promise<number>;
+  // Reminder-Stopp (Martin, 2026-07-11 — Kunde Hagedorn): Bewerbungen, die
+  // in mamamia nicht mehr aktiv sind (Panel-/SA-Ablehnung LOESCHT die
+  // Application, Portal-Reject setzt rejected_at), duerfen keine weiteren
+  // Reminder ausloesen. Cancelt pending Reminder-Rows, deren Pflegekraft
+  // keine aktive Bewerbung (bzw. Interesse) mehr hat. Optional wie
+  // upsertLeadJobs, damit Test-Fakes ohne die Methode kompilieren.
+  cancelOrphanedReminders?(
+    leadId: string,
+    active: { apps: Set<number>; interests: Set<number> },
+  ): Promise<number>;
   // Multi-Job (Phase 2A): mirror the customer's Mamamia job_offers into
   // lead_jobs (keyed lead_id + mamamia_job_offer_id). Optional so test fakes
   // that don't exercise the job sync can skip it — and when absent, detect()
@@ -316,8 +336,13 @@ export async function detect(
     auto_rejected: 0,
     jobs_scanned: 0,
     job_scan_errors: 0,
+    reminders_cancelled: 0,
   };
   const photoByCaregiver = new Map<number, string>();
+  // Aktive Engagements (lead-weit, ueber alle gescannten Jobs) fuer den
+  // Orphan-Cancel-Sweep: nur wer hier drinsteht, darf weiter Reminder
+  // bekommen.
+  const activeCg = { apps: new Set<number>(), interests: new Set<number>() };
 
   // ── Scan each job. Per-job try/catch isolates one failing job from the rest.
   for (const jobOfferId of scanJobIds) {
@@ -332,6 +357,7 @@ export async function detect(
         statusEvents,
         counts,
         photoByCaregiver,
+        activeCg,
         jk,
       });
       counts.jobs_scanned += 1;
@@ -346,6 +372,17 @@ export async function detect(
     await supabase.refreshReminderPhotos(lead.id, photoByCaregiver);
   } catch (e) {
     console.error(`refreshReminderPhotos failed (lead ${lead.id}):`, e instanceof Error ? e.message : String(e));
+  }
+
+  // Reminder-Stopp fuer abgelehnte/verschwundene Bewerbungen — NUR wenn alle
+  // Jobs fehlerfrei gescannt wurden: ein API-Schluckauf (leere App-Liste)
+  // darf nicht faelschlich alle Reminder canceln.
+  if (supabase.cancelOrphanedReminders && counts.job_scan_errors === 0 && counts.jobs_scanned > 0) {
+    try {
+      counts.reminders_cancelled += await supabase.cancelOrphanedReminders(lead.id, activeCg);
+    } catch (e) {
+      console.error(`cancelOrphanedReminders failed (lead ${lead.id}):`, e instanceof Error ? e.message : String(e));
+    }
   }
 
   // Multi-Job (Phase 2A): mirror lead_jobs from the SAME Customer.job_offers
@@ -396,13 +433,15 @@ async function detectForJob(
       skipped_no_caregiver_data: number;
       bridge_errors: number;
       auto_rejected: number;
+      reminders_cancelled?: number;
     };
     photoByCaregiver: Map<number, string>;
+    activeCg: { apps: Set<number>; interests: Set<number> };
     jk: (job: number, cg: number) => string;
   },
 ): Promise<void> {
   const { secrets } = deps;
-  const { seenApps, seenInterests, notify, statusEvents, counts, photoByCaregiver, jk } = ctx;
+  const { seenApps, seenInterests, notify, statusEvents, counts, photoByCaregiver, activeCg, jk } = ctx;
 
   const [appsRes, interestsRes] = await Promise.all([
     mamamiaRequest<ListApplicationsResponse>({
@@ -480,12 +519,17 @@ async function detectForJob(
   for (const a of apps) {
     const url = a.caregiver?.avatar_retouched_promo?.aws_url ?? a.caregiver?.avatar_retouched?.aws_url;
     if (a.caregiver_id != null && url) photoByCaregiver.set(a.caregiver_id, url);
+    // Aktiv = vorhanden und nicht abgelehnt. Panel-/SA-Ablehnungen LOESCHEN
+    // die Application (siehe Dashboard-Feed-Fix 2026-07-11) — die fehlt hier
+    // dann einfach und faellt aus dem Set.
+    if (a.caregiver_id != null && !a.rejected_at) activeCg.apps.add(a.caregiver_id);
   }
   for (const i of interests) {
     const url = i.caregiver?.avatar_retouched_promo?.aws_url ?? i.caregiver?.avatar_retouched?.aws_url;
     if (i.caregiver_id != null && url && !photoByCaregiver.has(i.caregiver_id)) {
       photoByCaregiver.set(i.caregiver_id, url);
     }
+    if (i.caregiver_id != null && !i.rejected_at) activeCg.interests.add(i.caregiver_id);
   }
 
   // 48h auto-reject for THIS job's stale applications.
@@ -839,13 +883,6 @@ function makeRealSupabase(url: string, serviceKey: string): DetectSupabase {
     },
     async refreshReminderPhotos(leadId: string, photoByCaregiver: Map<number, string>) {
       if (photoByCaregiver.size === 0) return 0;
-      const REMINDER_TYPES = [
-        "interest_reminder",
-        "application_reminder",
-        "application_reminder_4h",
-        "application_reminder_12h",
-        "application_last_chance",
-      ];
       const { data, error } = await client
         .from("scheduled_emails")
         .select("id, metadata")
@@ -871,6 +908,42 @@ function makeRealSupabase(url: string, serviceKey: string): DetectSupabase {
         updated += 1;
       }
       return updated;
+    },
+    async cancelOrphanedReminders(leadId: string, active: { apps: Set<number>; interests: Set<number> }) {
+      const { data, error } = await client
+        .from("scheduled_emails")
+        .select("id, email_type, metadata")
+        .eq("lead_id", leadId)
+        .eq("status", "pending")
+        .in("email_type", REMINDER_TYPES);
+      if (error) throw new Error(`supabase cancelOrphanedReminders select: ${error.message}`);
+      let cancelled = 0;
+      for (const row of (data ?? []) as { id: string; email_type: string; metadata: unknown }[]) {
+        const cgId = extractCaregiverId(row.metadata);
+        if (cgId == null) continue;
+        // Interest-Reminder bleiben auch am Leben, wenn aus dem Interesse
+        // inzwischen eine aktive Bewerbung wurde.
+        const stillActive = row.email_type === "interest_reminder"
+          ? active.interests.has(cgId) || active.apps.has(cgId)
+          : active.apps.has(cgId);
+        if (stillActive) continue;
+        const { error: uErr } = await client
+          .from("scheduled_emails")
+          .update({ status: "cancelled", updated_at: new Date().toISOString() })
+          .eq("id", row.id)
+          .eq("status", "pending");
+        if (uErr) {
+          console.error(`cancelOrphanedReminders update row ${row.id} failed:`, uErr.message);
+          continue;
+        }
+        await client.from("lead_events").insert({
+          lead_id: leadId,
+          event_type: `email_${row.email_type}_cancelled`,
+          metadata: { caregiver_id: cgId, reason: "application_no_longer_active" },
+        });
+        cancelled += 1;
+      }
+      return cancelled;
     },
     async upsertLeadJobs(leadId, jobs) {
       if (jobs.length === 0) return;
