@@ -459,6 +459,10 @@ const CustomerPortalPage: FC = () => {
   const [patientSaved, setPatientSaved] = useState(IS_PREVIEW_ANY && !IS_PREVIEW_PATIENT);
   const [showPatientReminder, setShowPatientReminder] = useState(false);
   const [triggerOpenPatient, setTriggerOpenPatient] = useState(IS_PREVIEW_PATIENT);
+  // Sektion „2 · Patientendaten" klappt wie „1 · Ihr Angebot" ueber die
+  // Kopfzeile (Martin, 2026-07-12): offen solange nicht gespeichert,
+  // danach eingeklappt mit Status-Pill; manueller Toggle gewinnt.
+  const [patientExpandedManual, setPatientExpandedManual] = useState<boolean | null>(null);
   const [openFaq, setOpenFaq] = useState<number | null>(null);
   // Manual override for the "Ihr Angebot" expand/collapse. null = follow
   // the auto rule below (expanded only in initial state). Toggling sets
@@ -2355,17 +2359,43 @@ const CustomerPortalPage: FC = () => {
         {/* ── SECTION: 2 · Patientendaten — der Onboarding-Schritt steht VOR
              den Pflegekräften (vorher lag die Karte zwischen PK-Header und
              PK-Karten — genau die „zwei Kästen"-Verwirrung, Martin 2026-07-12). ── */}
-        {!hasPending && (
-          <div className="px-1 pt-1">
-            <h2 className="text-[1.1rem] font-bold" style={{color:'#3D3D3D'}}>2 · Patientendaten</h2>
-            <div className="mt-1.5 h-[2px] w-10 rounded-full" style={{background:'#8B7355'}} />
+        {!hasPending && (() => {
+          const patientExpanded = patientExpandedManual ?? !patientSaved;
+          return (
+          <div id="patientendaten" className="px-1 pt-1">
+            <button
+              type="button"
+              className="w-full flex items-center justify-between text-left"
+              onClick={() => {
+                const next = !patientExpanded;
+                setPatientExpandedManual(next);
+                // Nach dem Speichern direkt in den bearbeitbaren Stepper
+                // springen — sonst braeuchte es einen zweiten Klick auf den
+                // Karten-Kopf.
+                if (next && patientSaved) setTriggerOpenPatient(true);
+              }}
+            >
+              <div>
+                <h2 className="text-[1.1rem] font-bold" style={{color:'#3D3D3D'}}>2 · Patientendaten</h2>
+                <div className="mt-1.5 h-[2px] w-10 rounded-full" style={{background:'#8B7355'}} />
+              </div>
+              <div className="flex items-center gap-2 flex-shrink-0">
+                {patientSaved ? (
+                  <span className="text-[12px] font-semibold px-3 py-1 rounded-full" style={{background:'#E3F7EF', color:'#2a9a6f'}}>✓ Vollständig</span>
+                ) : (
+                  <span className="text-[12px] font-semibold px-3 py-1 rounded-full" style={{background:'#FDF1E2', color:'#B45309'}}>Noch offen</span>
+                )}
+                <ChevronDown className={`w-5 h-5 text-[#8B7355] transition-transform duration-200 ${patientExpanded ? 'rotate-180' : ''}`} />
+              </div>
+            </button>
           </div>
-        )}
+          );
+        })()}
         {/* ── Kombinierte Karte: Identität + Anfrage + Stepper ──
              Hidden once a Bewerbung is in: customer should focus on the
              pending application, not on revisiting saved patient data. */}
-        {!hasPending && (
-        <div id="patientendaten">
+        {!hasPending && (patientExpandedManual ?? !patientSaved) && (
+        <div>
         <AngebotCard
           lead={lead}
           mmCustomer={mmCustomer}
@@ -2567,15 +2597,6 @@ const CustomerPortalPage: FC = () => {
 
 
 
-        {/* ── INFO-Box: Passende PK vorbereitet (state B only) ── */}
-        {patientSaved && !hasPending && (
-          <div className="rounded-2xl border px-5 py-4 flex gap-3" style={{background:'#F0EBE3', borderColor:'#D9CFC4'}}>
-            <span className="text-lg flex-shrink-0 mt-0.5">👋</span>
-            <p className="text-sm leading-relaxed" style={{color:'#4A3F35'}}>
-              Wir haben passende Pflegekräfte für Sie vorbereitet – laden Sie jetzt Ihre Wunschpflegekräfte ein, sich bei Ihnen zu bewerben. Für Sie völlig unverbindlich.
-            </p>
-          </div>
-        )}
 
         {/* ── SECTION HEADER: Passende Pflegekräfte / Ihre Bewerbungen (state-aware) ── */}
         <div className="px-1" id="pflegekraefte">
@@ -2925,7 +2946,7 @@ const CustomerPortalPage: FC = () => {
                 <p className="text-[15px] mt-0.5 leading-relaxed" style={{color: s.done ? '#B5B5B5' : '#8B8B8B'}}>{s.desc}</p>
                 {s.cta && (
                   <button
-                    onClick={() => { setTriggerOpenPatient(true); document.getElementById('patientendaten')?.scrollIntoView({ behavior: 'smooth', block: 'start' }); }}
+                    onClick={() => { setPatientExpandedManual(true); setTriggerOpenPatient(true); document.getElementById('patientendaten')?.scrollIntoView({ behavior: 'smooth', block: 'start' }); }}
                     className="mt-1.5 text-[13px] font-semibold flex items-center gap-1 transition-colors"
                     style={{color:'#8B7355'}}
                   >
@@ -3307,6 +3328,7 @@ const CustomerPortalPage: FC = () => {
                 <button
                   onClick={() => {
                     setShowPatientReminder(false);
+                    setPatientExpandedManual(true);
                     setTriggerOpenPatient(true);
                     document.getElementById('patientendaten')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
                   }}
