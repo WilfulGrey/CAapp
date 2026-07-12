@@ -459,9 +459,6 @@ const CustomerPortalPage: FC = () => {
   const [patientSaved, setPatientSaved] = useState(IS_PREVIEW_ANY && !IS_PREVIEW_PATIENT);
   const [showPatientReminder, setShowPatientReminder] = useState(false);
   const [triggerOpenPatient, setTriggerOpenPatient] = useState(IS_PREVIEW_PATIENT);
-  // Onboarding-Schritt 2 nach dem Speichern: die Wizard-Karte weicht einer
-  // schmalen Haken-Zeile; „Bearbeiten" holt sie zurueck (Martin, 2026-07-12).
-  const [patientEditRequested, setPatientEditRequested] = useState(false);
   const [openFaq, setOpenFaq] = useState<number | null>(null);
   // Manual override for the "Ihr Angebot" expand/collapse. null = follow
   // the auto rule below (expanded only in initial state). Toggling sets
@@ -2364,23 +2361,10 @@ const CustomerPortalPage: FC = () => {
             <div className="mt-1.5 h-[2px] w-10 rounded-full" style={{background:'#8B7355'}} />
           </div>
         )}
-        {/* Nach dem Speichern bleibt Schritt 2 als Haken-Zeile stehen —
-            die Nummerierung 1-2-3 bleibt vollstaendig, Bearbeiten bleibt
-            erreichbar. */}
-        {!hasPending && patientSaved && !patientEditRequested && (
-          <div id="patientendaten" className="rounded-2xl border px-5 py-4 flex items-center gap-3 bg-white" style={{borderColor:'#E5E3DF'}}>
-            <span className="w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0" style={{background:'#E3F7EF'}}>
-              <Check className="w-4 h-4" strokeWidth={3} style={{color:'#22A06B'}} />
-            </span>
-            <p className="text-[15px] font-semibold flex-1" style={{color:'#3D3D3D'}}>Patientendaten gespeichert</p>
-            <button type="button" onClick={() => { setPatientEditRequested(true); setTriggerOpenPatient(true); }}
-              className="text-[14px] font-semibold" style={{color:'#8B7355'}}>Bearbeiten</button>
-          </div>
-        )}
         {/* ── Kombinierte Karte: Identität + Anfrage + Stepper ──
              Hidden once a Bewerbung is in: customer should focus on the
              pending application, not on revisiting saved patient data. */}
-        {!hasPending && (!patientSaved || patientEditRequested) && (
+        {!hasPending && (
         <div id="patientendaten">
         <AngebotCard
           lead={lead}
