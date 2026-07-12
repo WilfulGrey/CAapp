@@ -2597,15 +2597,6 @@ const CustomerPortalPage: FC = () => {
 
 
 
-        {/* ── INFO-Box: Passende PK vorbereitet (state B only) ── */}
-        {patientSaved && !hasPending && (
-          <div className="rounded-2xl border px-5 py-4 flex gap-3" style={{background:'#F0EBE3', borderColor:'#D9CFC4'}}>
-            <span className="text-lg flex-shrink-0 mt-0.5">👋</span>
-            <p className="text-sm leading-relaxed" style={{color:'#4A3F35'}}>
-              Wir haben passende Pflegekräfte für Sie vorbereitet – laden Sie jetzt Ihre Wunschpflegekräfte ein, sich bei Ihnen zu bewerben. Für Sie völlig unverbindlich.
-            </p>
-          </div>
-        )}
 
         {/* ── SECTION HEADER: Passende Pflegekräfte / Ihre Bewerbungen (state-aware) ── */}
         <div className="px-1" id="pflegekraefte">
