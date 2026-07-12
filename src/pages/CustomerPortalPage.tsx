@@ -2212,7 +2212,7 @@ const CustomerPortalPage: FC = () => {
               </div>
             </div>
             <svg viewBox="0 0 390 28" className="w-full block" style={{marginBottom:'-1px'}} preserveAspectRatio="none">
-              <path d="M0,14 C100,28 290,0 390,14 L390,28 L0,28 Z" fill="#FFFFFF"/>
+              <path d="M0,14 C100,28 290,0 390,14 L390,28 L0,28 Z" fill="#F8F7F5"/>
             </svg>
           </div>
         );
@@ -2236,7 +2236,7 @@ const CustomerPortalPage: FC = () => {
           { text: 'Direktanbieter ohne Vermittlungsgebühren' },
         ];
         return (
-        <div>
+        <div style={{background:'#F8F7F5'}}>
         <div className="max-w-3xl mx-auto">
           <button
             onClick={() => setOfferExpandedManual(!offerExpanded)}
@@ -2354,8 +2354,9 @@ const CustomerPortalPage: FC = () => {
         );
       })()}
 
-      <div className="max-w-3xl mx-auto px-4 pt-1 pb-6 space-y-4">
-
+      {!hasPending && (
+      <div style={{background: (patientSaved && !(patientExpandedManual ?? !patientSaved)) ? '#F8F7F5' : '#FFFFFF'}}>
+      <div className="max-w-3xl mx-auto px-4 pt-1 pb-4 space-y-4">
         {/* ── SECTION: 2 · Patientendaten — der Onboarding-Schritt steht VOR
              den Pflegekräften (vorher lag die Karte zwischen PK-Header und
              PK-Karten — genau die „zwei Kästen"-Verwirrung, Martin 2026-07-12). ── */}
@@ -2597,6 +2598,12 @@ const CustomerPortalPage: FC = () => {
 
 
 
+
+      </div>
+      </div>
+      )}
+
+      <div className="max-w-3xl mx-auto px-4 pt-1 pb-6 space-y-4">
 
         {/* ── SECTION HEADER: Passende Pflegekräfte / Ihre Bewerbungen (state-aware) ── */}
         <div className="px-1 pt-2" id="pflegekraefte">
