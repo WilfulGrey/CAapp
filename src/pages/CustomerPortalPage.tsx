@@ -2135,7 +2135,7 @@ const CustomerPortalPage: FC = () => {
           ? {
               title: 'Profil vollständig. Bewerbungen werden für Sie vorbereitet. ✨',
               subtitle: 'Sobald sich Pflegekräfte bewerben, erscheinen die Angebote hier. Laden Sie in der Zwischenzeit weitere Pflegekräfte ein, sich bei Ihnen zu bewerben.',
-              pill: 'Profil vollständig',
+              pill: '100 % kostenfrei & unverbindlich',
               steps: 'saved' as 'initial' | 'saved' | null,
             }
           : {
