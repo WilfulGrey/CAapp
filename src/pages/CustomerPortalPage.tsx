@@ -459,6 +459,9 @@ const CustomerPortalPage: FC = () => {
   const [patientSaved, setPatientSaved] = useState(IS_PREVIEW_ANY && !IS_PREVIEW_PATIENT);
   const [showPatientReminder, setShowPatientReminder] = useState(false);
   const [triggerOpenPatient, setTriggerOpenPatient] = useState(IS_PREVIEW_PATIENT);
+  // Onboarding-Schritt 2 nach dem Speichern: die Wizard-Karte weicht einer
+  // schmalen Haken-Zeile; „Bearbeiten" holt sie zurueck (Martin, 2026-07-12).
+  const [patientEditRequested, setPatientEditRequested] = useState(false);
   const [openFaq, setOpenFaq] = useState<number | null>(null);
   // Manual override for the "Ihr Angebot" expand/collapse. null = follow
   // the auto rule below (expanded only in initial state). Toggling sets
@@ -2115,6 +2118,7 @@ const CustomerPortalPage: FC = () => {
                 ? 'Schauen Sie sich die Pflegekräfte in Ruhe an und entscheiden Sie, welche am besten passt.'
                 : 'Schauen Sie sich die Bewerbung in Ruhe an und entscheiden Sie, ob die Pflegekraft passt.',
               pill: n > 1 ? `${n} Bewerbungen aktiv` : '1 Bewerbung aktiv',
+              steps: null as 'initial' | 'saved' | null,
             }
           : patientSaved && (!mmReady || mmApplicationsLoading || !mmApplications)
           ? {
@@ -2124,18 +2128,56 @@ const CustomerPortalPage: FC = () => {
               title: 'Einen Moment — Ihre Bewerbungen werden geladen.',
               subtitle: 'Wir holen gerade den aktuellen Stand Ihrer Anfrage. Das dauert nur wenige Sekunden.',
               pill: 'Portal wird geladen',
+              steps: null as 'initial' | 'saved' | null,
             }
           : patientSaved
           ? {
               title: 'Profil vollständig. Bewerbungen werden für Sie vorbereitet. ✨',
               subtitle: 'Sobald sich Pflegekräfte bewerben, erscheinen die Angebote hier. Laden Sie in der Zwischenzeit weitere Pflegekräfte ein, sich bei Ihnen zu bewerben.',
               pill: 'Profil vollständig',
+              steps: 'saved' as 'initial' | 'saved' | null,
             }
           : {
               title: 'Ihr Angebot ist fertig. 🎉',
               subtitle: 'Prüfen Sie Ihr persönliches Angebot, ergänzen Sie die Patientendaten und laden Sie Ihre Wunsch-Pflegekraft direkt ein.',
               pill: 'Angebot kostenlos & unverbindlich',
+              steps: 'initial' as 'initial' | 'saved' | null,
             };
+
+        // Nummerierte Schritt-Checkliste (Martin, 2026-07-12): der Kunde soll
+        // SEHEN, dass genau ein Schritt fehlt. Erledigte Schritte bleiben als
+        // Haken stehen (1-2-3 bleibt vollstaendig); mit der ersten Bewerbung
+        // verschwindet das Geruest komplett (hasPending-Zweig ohne steps).
+        const heroStep = (opts: { n: number; label: string; state: 'done' | 'active' | 'locked'; target?: string; hint?: string }) => {
+          const inner = (
+            <>
+              {opts.state === 'done' ? (
+                <span className="w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0" style={{background:'rgba(255,255,255,0.25)'}}>
+                  <Check className="w-3.5 h-3.5" strokeWidth={3} style={{color:'#fff'}} />
+                </span>
+              ) : (
+                <span className="w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0 text-[13px] font-bold"
+                  style={opts.state === 'active' ? {background:'#fff', color:'#8B7355'} : {background:'rgba(255,255,255,0.15)', color:'rgba(255,255,255,0.7)'}}>
+                  {opts.n}
+                </span>
+              )}
+              <span className={`text-[14px] ${opts.state === 'active' ? 'font-bold' : 'font-medium'}`}
+                style={{color: opts.state === 'locked' ? 'rgba(255,255,255,0.65)' : 'rgba(255,255,255,0.95)'}}>
+                {opts.label}
+                {opts.state === 'locked' && <span className="font-normal" style={{color:'rgba(255,255,255,0.55)'}}> · 🔒 {opts.hint}</span>}
+                {opts.state === 'active' && ' ↓'}
+              </span>
+            </>
+          );
+          return opts.target ? (
+            <button key={opts.n} type="button" className="w-full flex items-center gap-2.5 text-left"
+              onClick={() => document.getElementById(opts.target!)?.scrollIntoView({ behavior: 'smooth', block: 'start' })}>
+              {inner}
+            </button>
+          ) : (
+            <div key={opts.n} className="flex items-center gap-2.5">{inner}</div>
+          );
+        };
 
         return (
           <div className="relative overflow-hidden" style={{background:'linear-gradient(135deg, #6B5444 0%, #8B7355 55%, #A18973 100%)'}}>
@@ -2148,9 +2190,21 @@ const CustomerPortalPage: FC = () => {
               <h1 className="text-[1.65rem] font-bold text-white leading-tight mb-2">
                 {heroCopy.title}
               </h1>
-              <p className="text-[14px] leading-relaxed mb-5" style={{color:'rgba(255,255,255,0.8)'}}>
-                {heroCopy.subtitle}
-              </p>
+              {heroCopy.steps ? (
+                <div className="mb-5 space-y-2.5">
+                  {heroStep({ n: 1, label: 'Ihr Angebot ist erstellt', state: 'done' })}
+                  {heroCopy.steps === 'initial'
+                    ? heroStep({ n: 2, label: 'Patientendaten ergänzen (ca. 2 Min.)', state: 'active', target: 'patientendaten' })
+                    : heroStep({ n: 2, label: 'Patientendaten ergänzt', state: 'done' })}
+                  {heroCopy.steps === 'initial'
+                    ? heroStep({ n: 3, label: 'Pflegekräfte einladen & Bewerbungen erhalten', state: 'locked', hint: 'nach Schritt 2' })
+                    : heroStep({ n: 3, label: 'Pflegekräfte einladen & Bewerbungen erhalten', state: 'active', target: 'pflegekraefte' })}
+                </div>
+              ) : (
+                <p className="text-[14px] leading-relaxed mb-5" style={{color:'rgba(255,255,255,0.8)'}}>
+                  {heroCopy.subtitle}
+                </p>
+              )}
               <div className="inline-flex items-center gap-2 rounded-full px-4 py-2" style={{background:'rgba(255,255,255,0.15)', border:'1px solid rgba(255,255,255,0.3)'}}>
                 <Check className="w-3.5 h-3.5 flex-shrink-0" strokeWidth={3} style={{color:'rgba(255,255,255,0.9)'}} />
                 <span className="text-[14px] font-medium" style={{color:'rgba(255,255,255,0.95)'}}>{heroCopy.pill}</span>
@@ -2188,7 +2242,7 @@ const CustomerPortalPage: FC = () => {
             className="w-full px-5 pt-6 pb-4 flex items-center justify-between text-left transition-colors hover:bg-black/[0.02]"
           >
             <div>
-              <h2 className="text-[1.1rem] font-bold" style={{color:'#3D3D3D'}}>Ihr Angebot</h2>
+              <h2 className="text-[1.1rem] font-bold" style={{color:'#3D3D3D'}}>{hasPending ? 'Ihr Angebot' : '1 · Ihr Angebot'}</h2>
               <div className="mt-1.5 h-[2px] w-10 rounded-full" style={{background:'#8B7355'}} />
             </div>
             <div className="flex items-center gap-2 flex-shrink-0">
@@ -2301,43 +2355,32 @@ const CustomerPortalPage: FC = () => {
 
       <div className="max-w-3xl mx-auto px-4 py-6 space-y-4">
 
-        {/* ── INFO-Box: Passende PK vorbereitet (state B only) ── */}
-        {patientSaved && !hasPending && (
-          <div className="rounded-2xl border px-5 py-4 flex gap-3" style={{background:'#F0EBE3', borderColor:'#D9CFC4'}}>
-            <span className="text-lg flex-shrink-0 mt-0.5">👋</span>
-            <p className="text-sm leading-relaxed" style={{color:'#4A3F35'}}>
-              Wir haben passende Pflegekräfte für Sie vorbereitet – laden Sie jetzt Ihre Wunschpflegekräfte ein, sich bei Ihnen zu bewerben. Für Sie völlig unverbindlich.
-            </p>
+        {/* ── SECTION: 2 · Patientendaten — der Onboarding-Schritt steht VOR
+             den Pflegekräften (vorher lag die Karte zwischen PK-Header und
+             PK-Karten — genau die „zwei Kästen"-Verwirrung, Martin 2026-07-12). ── */}
+        {!hasPending && (
+          <div className="px-1 pt-1">
+            <h2 className="text-[1.1rem] font-bold" style={{color:'#3D3D3D'}}>2 · Patientendaten</h2>
+            <div className="mt-1.5 h-[2px] w-10 rounded-full" style={{background:'#8B7355'}} />
           </div>
         )}
-
-        {/* ── SECTION HEADER: Passende Pflegekräfte / Ihre Bewerbungen (state-aware) ── */}
-        <div className="px-1">
-          <h2 className="text-[1.1rem] font-bold" style={{color:'#3D3D3D'}}>{hasPending ? 'Ihre Bewerbungen' : 'Passende Pflegekräfte einladen'}</h2>
-          <div className="mt-1.5 h-[2px] w-10 rounded-full" style={{background:'#8B7355'}} />
-        </div>
-
-        {/* ── INFO-Box: Profil unvollständig ── */}
-        {!patientSaved && (
-          <div className="rounded-2xl border px-5 py-4 flex gap-3" style={{background:'#FFFBF5', borderColor:'#E8D9C0'}}>
-            <AlertTriangle className="w-5 h-5 flex-shrink-0 mt-0.5" style={{color:'#D97706'}} />
-            <div>
-              <p className="text-[15px] font-semibold" style={{color:'#3D3D3D'}}>Achtung: Profil unvollständig</p>
-              {/* 14.06.: color #8B8B8B → #3D3D3D (war zu hellgrau und schlecht
-                  lesbar). Wir bleiben unterhalb des bold-Headers, daher kein
-                  font-medium hier — Hierarchie bleibt durch das semibold oben
-                  erhalten. */}
-              <p className="text-[15px] mt-1 leading-relaxed" style={{color:'#3D3D3D'}}>
-                Damit Sie Bewerbungen erhalten und Pflegekräfte einladen können, vervollständigen Sie bitte das Patientenprofil hier.
-              </p>
-            </div>
+        {/* Nach dem Speichern bleibt Schritt 2 als Haken-Zeile stehen —
+            die Nummerierung 1-2-3 bleibt vollstaendig, Bearbeiten bleibt
+            erreichbar. */}
+        {!hasPending && patientSaved && !patientEditRequested && (
+          <div id="patientendaten" className="rounded-2xl border px-5 py-4 flex items-center gap-3 bg-white" style={{borderColor:'#E5E3DF'}}>
+            <span className="w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0" style={{background:'#E3F7EF'}}>
+              <Check className="w-4 h-4" strokeWidth={3} style={{color:'#22A06B'}} />
+            </span>
+            <p className="text-[15px] font-semibold flex-1" style={{color:'#3D3D3D'}}>Patientendaten gespeichert</p>
+            <button type="button" onClick={() => { setPatientEditRequested(true); setTriggerOpenPatient(true); }}
+              className="text-[14px] font-semibold" style={{color:'#8B7355'}}>Bearbeiten</button>
           </div>
         )}
-
         {/* ── Kombinierte Karte: Identität + Anfrage + Stepper ──
              Hidden once a Bewerbung is in: customer should focus on the
              pending application, not on revisiting saved patient data. */}
-        {!hasPending && !patientSaved && (
+        {!hasPending && (!patientSaved || patientEditRequested) && (
         <div id="patientendaten">
         <AngebotCard
           lead={lead}
@@ -2538,6 +2581,25 @@ const CustomerPortalPage: FC = () => {
         </div>
         )}
 
+
+
+        {/* ── INFO-Box: Passende PK vorbereitet (state B only) ── */}
+        {patientSaved && !hasPending && (
+          <div className="rounded-2xl border px-5 py-4 flex gap-3" style={{background:'#F0EBE3', borderColor:'#D9CFC4'}}>
+            <span className="text-lg flex-shrink-0 mt-0.5">👋</span>
+            <p className="text-sm leading-relaxed" style={{color:'#4A3F35'}}>
+              Wir haben passende Pflegekräfte für Sie vorbereitet – laden Sie jetzt Ihre Wunschpflegekräfte ein, sich bei Ihnen zu bewerben. Für Sie völlig unverbindlich.
+            </p>
+          </div>
+        )}
+
+        {/* ── SECTION HEADER: Passende Pflegekräfte / Ihre Bewerbungen (state-aware) ── */}
+        <div className="px-1" id="pflegekraefte">
+          <h2 className="text-[1.1rem] font-bold" style={{color:'#3D3D3D'}}>{hasPending ? 'Ihre Bewerbungen' : '3 · Passende Pflegekräfte'}</h2>
+          <div className="mt-1.5 h-[2px] w-10 rounded-full" style={{background:'#8B7355'}} />
+        </div>
+
+
         {/* ── SECTION: Pending Applications ──
              Höchste Priorität: pending Bewerbungen wollen eine Entscheidung
              vom Kunden — die kommen ZUERST, vor allem anderen. */}
@@ -2691,9 +2753,17 @@ const CustomerPortalPage: FC = () => {
                   style={{ background: '#FAF8F4', borderColor: '#EAE3D8' }}
                 >
                   <p className="text-[14px] leading-relaxed pb-2 px-1" style={{color:'#3D3D3D'}}>
-                    {!patientSaved
-                      ? 'Damit sich Pflegekräfte bewerben bzw. Sie diese einladen können, vervollständigen Sie bitte die Patienteninformationen.'
-                      : 'Tippen Sie auf „Einladen", wenn Ihnen eine Pflegekraft gefällt — die Anfrage geht direkt an die Pflegekraft.'}
+                    {!patientSaved ? (
+                      <>🔒 Einladen wird nach Schritt 2 freigeschaltet — {' '}
+                        <button type="button" className="font-semibold underline underline-offset-2"
+                          style={{color:'#8B7355'}}
+                          onClick={() => { document.getElementById('patientendaten')?.scrollIntoView({ behavior: 'smooth', block: 'start' }); }}>
+                          Patientendaten ergänzen ↑
+                        </button>
+                      </>
+                    ) : (
+                      'Tippen Sie auf „Einladen", wenn Ihnen eine Pflegekraft gefällt — die Anfrage geht direkt an die Pflegekraft.'
+                    )}
                   </p>
                   <div className="space-y-3">
                     {/* Interest-Karten werden jetzt OBEN in einer eigenen
