@@ -2212,7 +2212,7 @@ const CustomerPortalPage: FC = () => {
               </div>
             </div>
             <svg viewBox="0 0 390 28" className="w-full block" style={{marginBottom:'-1px'}} preserveAspectRatio="none">
-              <path d="M0,14 C100,28 290,0 390,14 L390,28 L0,28 Z" fill="#F8F7F5"/>
+              <path d="M0,14 C100,28 290,0 390,14 L390,28 L0,28 Z" fill="#FFFFFF"/>
             </svg>
           </div>
         );
@@ -2236,7 +2236,7 @@ const CustomerPortalPage: FC = () => {
           { text: 'Direktanbieter ohne Vermittlungsgebühren' },
         ];
         return (
-        <div style={{background:'#F8F7F5'}}>
+        <div>
         <div className="max-w-3xl mx-auto">
           <button
             onClick={() => setOfferExpandedManual(!offerExpanded)}
@@ -2354,7 +2354,7 @@ const CustomerPortalPage: FC = () => {
         );
       })()}
 
-      <div className="max-w-3xl mx-auto px-4 py-6 space-y-4">
+      <div className="max-w-3xl mx-auto px-4 pt-1 pb-6 space-y-4">
 
         {/* ── SECTION: 2 · Patientendaten — der Onboarding-Schritt steht VOR
              den Pflegekräften (vorher lag die Karte zwischen PK-Header und
@@ -2362,7 +2362,7 @@ const CustomerPortalPage: FC = () => {
         {!hasPending && (() => {
           const patientExpanded = patientExpandedManual ?? !patientSaved;
           return (
-          <div id="patientendaten" className="px-1 pt-1">
+          <div id="patientendaten" className="px-1 pt-2">
             <button
               type="button"
               className="w-full flex items-center justify-between text-left"
@@ -2599,7 +2599,7 @@ const CustomerPortalPage: FC = () => {
 
 
         {/* ── SECTION HEADER: Passende Pflegekräfte / Ihre Bewerbungen (state-aware) ── */}
-        <div className="px-1" id="pflegekraefte">
+        <div className="px-1 pt-2" id="pflegekraefte">
           <h2 className="text-[1.1rem] font-bold" style={{color:'#3D3D3D'}}>{hasPending ? 'Ihre Bewerbungen' : '3 · Passende Pflegekräfte'}</h2>
           <div className="mt-1.5 h-[2px] w-10 rounded-full" style={{background:'#8B7355'}} />
         </div>
