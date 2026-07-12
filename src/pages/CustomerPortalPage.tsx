@@ -2165,7 +2165,7 @@ const CustomerPortalPage: FC = () => {
                 style={{color: opts.state === 'locked' ? 'rgba(255,255,255,0.65)' : 'rgba(255,255,255,0.95)'}}>
                 {opts.label}
                 {opts.state === 'locked' && <span className="font-normal" style={{color:'rgba(255,255,255,0.55)'}}> · 🔒 {opts.hint}</span>}
-                {opts.state === 'active' && ' ↓'}
+                {opts.state === 'active' && '\u00A0↓'}
               </span>
             </>
           );
@@ -2386,10 +2386,10 @@ const CustomerPortalPage: FC = () => {
           lead={lead}
           mmCustomer={mmCustomer}
           onPatientSaved={(saved) => {
-            setPatientSaved(saved);
-            if (saved) {
+            if (saved && !patientSaved) {
               showToast('✓ Vielen Dank! Ihre Daten sind gespeichert. Sie können jetzt Pflegekräfte einladen und Bewerbungen erhalten.', 7000);
             }
+            setPatientSaved(saved);
           }}
           forceSaved={patientSaved}
           triggerOpenPatient={triggerOpenPatient}
