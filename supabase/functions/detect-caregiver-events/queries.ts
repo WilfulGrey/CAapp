@@ -26,9 +26,12 @@ export interface CaregiverNode {
 export interface ApplicationNode {
   id: number;
   caregiver_id: number | null;
-  // Ablehnungszeitpunkt — Portal-Rejects setzen ihn, Panel-Ablehnungen
-  // loeschen die Application ganz. Fuer den Reminder-Orphan-Sweep.
-  rejected_at: string | null;
+  // NICHT selektiert: JobOfferApplicationsWithPagination kennt rejected_at
+  // auf prod nicht — die Selektion brach dort JEDE Abfrage (11.-13.07.:
+  // keine Bewerbungs-Erkennung, keine Kundenmails). Panel-Ablehnungen
+  // erkennt der Sweep ueber das Fehlen der Application; Portal-Rejects
+  // stoppen ueber lead_events. Feld bleibt optional fuer den Sweep-Check.
+  rejected_at?: string | null;
   // Konditionen der Bewerbung — für Mail B (Bewerbung) ans Kunden-Postfach.
   salary: number | null;          // Monatssatz €/Monat
   arrival_at: string | null;      // Anreisedatum (ISO)
@@ -70,7 +73,6 @@ export const LIST_APPLICATIONS = /* GraphQL */ `
       data {
         id
         caregiver_id
-        rejected_at
         salary
         arrival_at
         departure_at
