@@ -13,7 +13,12 @@ import {
   mapHpToBadge,
 } from "../index.ts";
 import { _resetAgencyTokenCache } from "../../_shared/mamamiaClient.ts";
-import type { LeadJobUpsertRow, RawJobOffer } from "../../_shared/leadJobsSync.ts";
+import {
+  buildLeadIdentityPatch,
+  type CustomerIdentity,
+  type LeadJobUpsertRow,
+  type RawJobOffer,
+} from "../../_shared/leadJobsSync.ts";
 
 // ─── Fixtures ──────────────────────────────────────────────────────────────
 
@@ -72,6 +77,9 @@ interface MamamiaPayload {
   jobOffers?: RawJobOffer[];
   // Per-job application totals (LeadJobApplicationCount), keyed by job_offer_id.
   jobAppCounts?: Record<number, number>;
+  // Reverse-sync: identity fields the Customer carries (merged into the
+  // GetCustomerJobOffers response alongside job_offers).
+  customerIdentity?: CustomerIdentity;
 }
 
 interface BridgeOptions {
@@ -136,7 +144,13 @@ function makeFetch(mamamia: MamamiaPayload, bridge: BridgeOptions = {}): typeof 
       if (opName === "GetCustomerJobOffers") {
         return new Response(
           JSON.stringify({
-            data: { Customer: { id: body.variables.id, job_offers: mamamia.jobOffers ?? [] } },
+            data: {
+              Customer: {
+                id: body.variables.id,
+                ...(mamamia.customerIdentity ?? {}),
+                job_offers: mamamia.jobOffers ?? [],
+              },
+            },
           }),
           { status: 200, headers: { "Content-Type": "application/json" } },
         );
@@ -961,4 +975,150 @@ Deno.test("multi-job: auto-reject is per-job; a seeded-only anchor is never reje
   } finally {
     Deno.env.delete("AUTO_REJECT_ENABLED");
   }
+});
+
+// ─── Reverse-sync: Mamamia Customer → leads identity ────────────────────────
+// Mamamia model (verified live on 7737): Customer top-level = the CONTACT
+// (Osoba Kontaktowa) → leads.vorname/nachname/email/telefon; customer_contract
+// = the PATIENT + Einsatzort → leads.patient_vorname/nachname/street/zip/city.
+
+Deno.test("buildLeadIdentityPatch: Customer top-level → contact (vorname/nachname)", () => {
+  const patch = buildLeadIdentityPatch(
+    { first_name: "Neu", last_name: "Kontakt" },
+    { vorname: "Alt", nachname: "Wert" },
+  );
+  assertEquals(patch, { vorname: "Neu", nachname: "Kontakt" });
+});
+
+Deno.test("buildLeadIdentityPatch: customer_contract → patient (patient_vorname/nachname)", () => {
+  const patch = buildLeadIdentityPatch(
+    { customer_contract: { first_name: "Hans", last_name: "Kloss" } },
+    { patient_vorname: null, patient_nachname: null },
+  );
+  assertEquals(patch, { patient_vorname: "Hans", patient_nachname: "Kloss" });
+});
+
+Deno.test("buildLeadIdentityPatch: skips empty/whitespace-only Mamamia values", () => {
+  const patch = buildLeadIdentityPatch(
+    { first_name: "", last_name: "   ", email: null, phone: undefined },
+    { vorname: "Alt", nachname: "Wert", email: "a@b.de", telefon: "0151" },
+  );
+  assertEquals(patch, {});
+});
+
+Deno.test("buildLeadIdentityPatch: skips unchanged values (trim-insensitive)", () => {
+  const patch = buildLeadIdentityPatch(
+    { first_name: "  John  ", email: "a@b.de" },
+    { vorname: "John", email: "a@b.de" },
+  );
+  assertEquals(patch, {});
+});
+
+Deno.test("buildLeadIdentityPatch: null customer_contract → patient columns untouched", () => {
+  const patch = buildLeadIdentityPatch(
+    { first_name: "Neu", email: "neu@b.de", customer_contract: null },
+    { vorname: "Alt", email: "alt@b.de", patient_vorname: "Soll", patient_city: "Soll" },
+  );
+  // patient-derived columns (from customer_contract) stay untouched when null.
+  assertEquals(patch, { vorname: "Neu", email: "neu@b.de" });
+});
+
+Deno.test("buildLeadIdentityPatch: full mapping (Customer=contact, customer_contract=patient+Einsatzort)", () => {
+  const patch = buildLeadIdentityPatch(
+    {
+      first_name: "John", // contact
+      last_name: "Smith",
+      email: "kontakt@b.de",
+      phone: "0160-111",
+      customer_contract: {
+        first_name: "Hans", // patient
+        last_name: "Kloss",
+        street_number: "Hauptstr. 1",
+        zip_code: "10115",
+        city: "Berlin",
+      },
+    },
+    {}, // empty lead → every present, non-empty Mamamia value is "changed"
+  );
+  assertEquals(patch, {
+    vorname: "John",
+    nachname: "Smith",
+    email: "kontakt@b.de",
+    telefon: "0160-111",
+    patient_vorname: "Hans",
+    patient_nachname: "Kloss",
+    patient_street: "Hauptstr. 1",
+    patient_zip: "10115",
+    patient_city: "Berlin",
+  });
+});
+
+Deno.test("reverse-sync: team fills patient + keeps contact → updateLead patch applied", async () => {
+  resetCaches();
+  const updates: Array<{ leadId: string; patch: Record<string, unknown> }> = [];
+  const supabase: DetectSupabase = {
+    ...makeSupabase(VALID_LEAD), // no vorname/nachname/patient_* yet
+    updateLead(leadId, patch) {
+      updates.push({ leadId, patch });
+      return Promise.resolve();
+    },
+  };
+  const res = await handleRequest(makeReq({ lead_id: VALID_LEAD.id }), {
+    secrets: SECRETS,
+    supabase,
+    fetchFn: makeFetch({
+      customerIdentity: {
+        first_name: "John", // contact → vorname/nachname
+        last_name: "Smith",
+        customer_contract: { first_name: "Hans", last_name: "Kloss" }, // patient
+      },
+    }),
+  });
+  const body = await res.json();
+  assertEquals(body.identity_fields_synced, 4);
+  assertEquals(updates.length, 1);
+  assertEquals(updates[0].leadId, VALID_LEAD.id);
+  assertEquals(updates[0].patch, {
+    vorname: "John",
+    nachname: "Smith",
+    patient_vorname: "Hans",
+    patient_nachname: "Kloss",
+  });
+});
+
+Deno.test("reverse-sync: Customer matches the lead → no updateLead call, counter 0", async () => {
+  resetCaches();
+  const synced: LeadRow = { ...VALID_LEAD, vorname: "John", nachname: "Smith" };
+  const updates: Array<{ leadId: string; patch: Record<string, unknown> }> = [];
+  const supabase: DetectSupabase = {
+    ...makeSupabase(synced),
+    updateLead(leadId, patch) {
+      updates.push({ leadId, patch });
+      return Promise.resolve();
+    },
+  };
+  const res = await handleRequest(makeReq({ lead_id: synced.id }), {
+    secrets: SECRETS,
+    supabase,
+    fetchFn: makeFetch({
+      // contact matches the lead, no customer_contract → patient untouched.
+      customerIdentity: { first_name: "John", last_name: "Smith", email: synced.email },
+    }),
+  });
+  const body = await res.json();
+  assertEquals(body.identity_fields_synced, 0);
+  assertEquals(updates.length, 0);
+});
+
+Deno.test("reverse-sync: no updateLead adapter → skipped, no crash, counter 0", async () => {
+  resetCaches();
+  // makeSupabase fake has NO updateLead → reverse-sync block is skipped entirely.
+  const res = await handleRequest(makeReq({ lead_id: VALID_LEAD.id }), {
+    secrets: SECRETS,
+    supabase: makeSupabase(VALID_LEAD),
+    fetchFn: makeFetch({ customerIdentity: { first_name: "John", last_name: "Smith" } }),
+  });
+  const body = await res.json();
+  assertEquals(res.status, 200);
+  assertEquals(body.identity_fields_synced, 0);
 });

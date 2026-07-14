@@ -15,10 +15,13 @@ import {
   mamamiaRequest,
 } from "../_shared/mamamiaClient.ts";
 import {
+  buildLeadIdentityPatch,
   buildLeadJobRows,
+  type CustomerIdentity,
   enrichBewerbungen,
   GET_CUSTOMER_JOB_OFFERS,
   GET_JOB_OFFER_APPLICATION_COUNT,
+  type LeadIdentity,
   type LeadJobUpsertRow,
   type RawJobOffer,
   todayISO,
@@ -55,6 +58,17 @@ export interface LeadRow {
   email: string | null;
   mamamia_customer_id: number | null;
   mamamia_job_offer_id: number | null;
+  // Reverse-sync (Customer → leads): read to diff against the current Mamamia
+  // Customer; overwritten when the ops team has edited it in Mamamia. Optional
+  // so test fixtures (and the LeadIdentity structural match) can omit them.
+  patient_vorname?: string | null;
+  patient_nachname?: string | null;
+  vorname?: string | null;
+  nachname?: string | null;
+  telefon?: string | null;
+  patient_street?: string | null;
+  patient_zip?: string | null;
+  patient_city?: string | null;
 }
 
 export interface EventRow {
@@ -126,6 +140,10 @@ export interface DetectSupabase {
     leadId: string,
     jobs: LeadJobUpsertRow[],
   ): Promise<void>;
+  // Reverse-sync (Customer → leads): apply a partial identity patch built by
+  // buildLeadIdentityPatch. Optional — test fakes that don't exercise the sync
+  // skip it, and when absent detect() skips the reverse-sync entirely.
+  updateLead?(leadId: string, patch: Partial<LeadIdentity>): Promise<void>;
 }
 
 export interface DetectResult {
@@ -144,6 +162,9 @@ export interface DetectResult {
   // Multi-Job-Kunden) + wie viele davon mit Fehler abbrachen (isoliert).
   jobs_scanned: number;
   job_scan_errors: number;
+  // Reverse-sync: wie viele leads-Spalten aus dem Mamamia-Customer aktualisiert
+  // wurden (Team-Edit in Mamamia → leads/Admin). 0 wenn nichts abwich.
+  identity_fields_synced: number;
 }
 
 export interface BatchResult {
@@ -157,6 +178,7 @@ export interface BatchResult {
   total_lead_jobs_synced: number;
   total_jobs_scanned: number;
   total_job_scan_errors: number;
+  total_identity_fields_synced: number;
   per_lead_errors: number;
 }
 
@@ -223,6 +245,7 @@ async function handleBatch(deps: HandlerDeps): Promise<Response> {
     total_lead_jobs_synced: 0,
     total_jobs_scanned: 0,
     total_job_scan_errors: 0,
+    total_identity_fields_synced: 0,
     per_lead_errors: 0,
   };
 
@@ -241,6 +264,7 @@ async function handleBatch(deps: HandlerDeps): Promise<Response> {
       batch.total_lead_jobs_synced += r.lead_jobs_synced;
       batch.total_jobs_scanned += r.jobs_scanned;
       batch.total_job_scan_errors += r.job_scan_errors;
+      batch.total_identity_fields_synced += r.identity_fields_synced;
     } catch (e) {
       console.error(`detect lead ${lead.id} threw:`, (e as Error).message);
       batch.per_lead_errors += 1;
@@ -276,16 +300,20 @@ export async function detect(
   // double-fetch). Single-job leads — or any Customer-fetch failure — degrade to
   // scanning only the default job, identical to the pre-multi-job behavior.
   let jobRows: LeadJobUpsertRow[] = [];
+  // Captured from the SAME Customer fetch for the reverse-sync below (null if the
+  // fetch failed or the lead has no Mamamia customer → reverse-sync is skipped).
+  let customerIdentity: CustomerIdentity | null = null;
   const scanJobIds = new Set<number>([lead.mamamia_job_offer_id]);
   if (lead.mamamia_customer_id) {
     try {
-      const jr = await mamamiaRequest<{ Customer: { job_offers?: RawJobOffer[] | null } | null }>({
+      const jr = await mamamiaRequest<{ Customer: (CustomerIdentity & { job_offers?: RawJobOffer[] | null }) | null }>({
         endpoint: secrets.mamamiaEndpoint,
         token: agencyToken,
         query: GET_CUSTOMER_JOB_OFFERS,
         variables: { id: lead.mamamia_customer_id },
         fetchFn: fetcher,
       });
+      customerIdentity = jr.Customer ?? null;
       const built = buildLeadJobRows(jr.Customer?.job_offers ?? [], todayISO());
       jobRows = built.rows;
       for (const s of built.skipped) {
@@ -300,6 +328,27 @@ export async function detect(
     } catch (e) {
       console.warn(`[detect][leadJobs] lead=${lead.id} job_offers fetch failed: ${e instanceof Error ? e.message : String(e)}`);
       // degrade to scanning the default job only (already in scanJobIds)
+    }
+  }
+
+  // ── Reverse-sync: pull team edits on the Mamamia Customer (patient name,
+  // contact, address) back into the leads row so the kostenrechner admin
+  // reflects them. Mamamia is the source of truth (overwrite-if-different, see
+  // buildLeadIdentityPatch). Reuses the Customer fetch above — no extra
+  // round-trip. Best-effort + isolated: a sync failure must NEVER break
+  // caregiver detection, and runs only when the adapter supports it.
+  let identity_fields_synced = 0;
+  if (customerIdentity && supabase.updateLead) {
+    try {
+      const patch = buildLeadIdentityPatch(customerIdentity, lead);
+      const changed = Object.keys(patch);
+      if (changed.length > 0) {
+        await supabase.updateLead(lead.id, patch);
+        identity_fields_synced = changed.length;
+        console.log(`[detect][identitySync] lead=${lead.id} updated ${changed.join(", ")}`);
+      }
+    } catch (e) {
+      console.warn(`[detect][identitySync] lead=${lead.id} failed: ${e instanceof Error ? e.message : String(e)}`);
     }
   }
 
@@ -408,7 +457,7 @@ export async function detect(
     }
   }
 
-  return { lead_id: lead.id, ...counts, lead_jobs_synced };
+  return { lead_id: lead.id, ...counts, lead_jobs_synced, identity_fields_synced };
 }
 
 // Scan ONE of the lead's jobs: fetch its applications + interests, fire bridge
@@ -829,7 +878,7 @@ function makeRealSupabase(url: string, serviceKey: string): DetectSupabase {
     async fetchLead(id: string) {
       const { data, error } = await client
         .from("leads")
-        .select("id, token, email, mamamia_customer_id, mamamia_job_offer_id")
+        .select("id, token, email, mamamia_customer_id, mamamia_job_offer_id, patient_vorname, patient_nachname, vorname, nachname, telefon, patient_street, patient_zip, patient_city")
         .eq("id", id)
         .maybeSingle();
       if (error) throw new Error(`supabase fetchLead: ${error.message}`);
@@ -841,7 +890,7 @@ function makeRealSupabase(url: string, serviceKey: string): DetectSupabase {
       // exclusions as `send-scheduled-emails` uses for Nachfass cancellation.
       const { data, error } = await client
         .from("leads")
-        .select("id, token, email, mamamia_customer_id, mamamia_job_offer_id")
+        .select("id, token, email, mamamia_customer_id, mamamia_job_offer_id, patient_vorname, patient_nachname, vorname, nachname, telefon, patient_street, patient_zip, patient_city")
         .not("mamamia_job_offer_id", "is", null)
         .not("token", "is", null)
         .gt("token_expires_at", new Date().toISOString())
@@ -954,6 +1003,14 @@ function makeRealSupabase(url: string, serviceKey: string): DetectSupabase {
           { onConflict: "lead_id,mamamia_job_offer_id" },
         );
       if (error) throw new Error(`supabase upsertLeadJobs: ${error.message}`);
+    },
+    async updateLead(leadId, patch) {
+      if (Object.keys(patch).length === 0) return;
+      const { error } = await client
+        .from("leads")
+        .update(patch)
+        .eq("id", leadId);
+      if (error) throw new Error(`supabase updateLead: ${error.message}`);
     },
   };
 }
