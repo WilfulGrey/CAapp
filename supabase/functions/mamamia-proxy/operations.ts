@@ -600,3 +600,17 @@ export const UPDATE_JOB_OFFER_DATES = /* GraphQL */ `
     }
   }
 `;
+
+// Unterschriebenen Vertrag an die Confirmation haengen — Schritt 2 nach
+// StoreFile (Multipart, siehe actions.storeFileAsAgency). Gleiches Muster
+// wie im SA-Portal live verifiziert: UpdateConfirmation verlangt zusaetzlich
+// application_id + is_confirm_binding (Resolver-Pflicht); file_tokens wird
+// serverseitig auf signed_contract geroutet.
+export const UPDATE_CONFIRMATION_FILES = /* GraphQL */ `
+  mutation UpdateConfirmation($id: Int, $application_id: Int, $is_confirm_binding: Boolean, $file_tokens: [String]) {
+    UpdateConfirmation(id: $id, application_id: $application_id, is_confirm_binding: $is_confirm_binding, file_tokens: $file_tokens) {
+      id
+      signed_contract { id original_name }
+    }
+  }
+`;

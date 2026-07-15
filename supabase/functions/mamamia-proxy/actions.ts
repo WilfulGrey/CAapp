@@ -26,6 +26,7 @@ import {
   SEARCH_LOCATIONS,
   STORE_CONFIRMATION,
   STORE_REQUEST,
+  UPDATE_CONFIRMATION_FILES,
   UPDATE_CUSTOMER,
   UPDATE_JOB_OFFER_DATES,
 } from "./operations.ts";
@@ -364,6 +365,74 @@ const storeConfirmation: ActionHandler = async (session, variables, deps) => {
   };
 
   return await runGraphQL(deps, STORE_CONFIRMATION, payload);
+};
+
+// ─── Unterschriebenen Vertrag hochladen (Auto-Ablage nach Portal-Annahme) ──
+//
+// Zwei Schritte, 1:1 das Muster des SA-Portals (dort live verifiziert):
+//   1. StoreFile(for:"confirmation_signed_contract", file: Upload) — Multipart
+//      nach GraphQL-multipart-request-spec, als Agentur-Token.
+//   2. UpdateConfirmation(id, application_id, is_confirm_binding, file_tokens).
+// Das PDF kommt vom Kostenrechner (/api/contract-pdf/<lead>) und wird vom
+// Portal als base64 durchgereicht. Ownership wie storeConfirmation: die
+// Application muss zum Session-Job gehoeren.
+
+async function storeFileAsAgency(
+  deps: ActionDeps,
+  base64: string,
+  filename: string,
+): Promise<string> {
+  const token = await deps.getAgencyToken();
+  const bytes = Uint8Array.from(atob(base64), (c) => c.charCodeAt(0));
+  const form = new FormData();
+  form.append(
+    "operations",
+    JSON.stringify({
+      query:
+        "mutation($for: String!, $type: String, $title: String, $file: Upload) { StoreFile(for: $for, type: $type, title: $title, file: $file) { id token } }",
+      variables: { for: "confirmation_signed_contract", type: "attachment", title: filename, file: null },
+    }),
+  );
+  form.append("map", JSON.stringify({ "0": ["variables.file"] }));
+  form.append("0", new Blob([bytes], { type: "application/pdf" }), filename);
+  const res = await (deps.fetchFn ?? fetch)(deps.endpoint, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}` },
+    body: form,
+  });
+  const body = await res.json().catch(() => null);
+  const fileToken = body?.data?.StoreFile?.token;
+  if (!res.ok || !fileToken) {
+    throw new Error(`StoreFile failed (${res.status}): ${JSON.stringify(body?.errors ?? body).slice(0, 300)}`);
+  }
+  return fileToken as string;
+}
+
+const uploadSignedContract: ActionHandler = async (session, variables, deps) => {
+  const v = variables as {
+    application_id?: unknown;
+    confirmation_id?: unknown;
+    file_base64?: unknown;
+    filename?: unknown;
+  };
+  if (typeof v.application_id !== "number") throw new Error("application_id required");
+  if (typeof v.confirmation_id !== "number") throw new Error("confirmation_id required");
+  if (typeof v.file_base64 !== "string" || v.file_base64.length === 0) throw new Error("file_base64 required");
+  // ~6 MB Datei-Limit (base64 +33%) — Vertrags-PDFs liegen bei ~100-300 KB.
+  if (v.file_base64.length > 8_000_000) throw new Error("file too large");
+  await assertApplicationBelongsToSession(deps, session, v.application_id);
+
+  const filename = typeof v.filename === "string" && v.filename.trim()
+    ? v.filename.trim()
+    : "Dienstleistungsvertrag-signiert.pdf";
+  const fileToken = await storeFileAsAgency(deps, v.file_base64, filename);
+
+  return await runGraphQL(deps, UPDATE_CONFIRMATION_FILES, {
+    id: v.confirmation_id,
+    application_id: v.application_id,
+    is_confirm_binding: true,
+    file_tokens: [fileToken],
+  });
 };
 
 // ─── Invite caregiver ──────────────────────────────────────────────────────
@@ -1166,6 +1235,7 @@ export const ACTIONS: Record<ProxyAction, ActionHandler> = {
   updateJobOfferDates,
   rejectApplication,
   storeConfirmation,
+  uploadSignedContract,
   inviteCaregiver,
   dismissCaregiver,
   generateJobDescription,
