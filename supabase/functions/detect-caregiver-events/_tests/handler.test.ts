@@ -925,6 +925,178 @@ Deno.test("multi-job: backward compat — no mamamia_customer_id scans only the 
   assertEquals(recorder[0].metadata.mamamia_job_offer_id, lead.mamamia_job_offer_id);
 });
 
+// ─── Annahme-Detektor (SA-Portal-Annahme → final_confirmation → Mail C) ─────
+// Erkennt frische final_confirmations der gescannten Jobs und feuert das
+// Bridge-Event application_accepted_internal (Mail C + Team-Buchungsmail baut
+// route.ts). Dedupe lead-weit über lead_events (fetchPastEvents), 7-Tage-
+// Cutoff gegen Altbestand, kein Feuern ohne notify (silent-seed Jobs).
+
+const daysAgoISO = (d: number) => new Date(Date.now() - d * 24 * 3_600_000).toISOString();
+
+function bookedJob(
+  id: number,
+  confirmedAt: string | null,
+  cg: { id?: number | null; first_name?: string | null; last_name?: string | null } | null = { id: 50001, first_name: "Helena", last_name: "Kowalski" },
+): RawJobOffer {
+  return {
+    id,
+    status: "on_job",
+    arrival_at: "2099-01-01 00:00:00",
+    departure_at: "2099-12-31 00:00:00",
+    final_confirmation: { id: 900, final_confirmed_at: confirmedAt, caregiver: cg },
+  };
+}
+
+Deno.test("annahme: frische final_confirmation ohne vorhandenes Event → application_accepted_internal mit Caregiver + Job-Konditionen", async () => {
+  resetCaches();
+  const recorder: BridgeOptions["recorder"] = [];
+  const def = VALID_LEAD.mamamia_job_offer_id as number;
+  const res = await handleRequest(makeReq({ lead_id: VALID_LEAD.id }), {
+    secrets: SECRETS,
+    supabase: makeSupabase(VALID_LEAD),
+    fetchFn: makeFetch({ jobOffers: [bookedJob(def, daysAgoISO(1))] }, { recorder }),
+  });
+  assertEquals(res.status, 200);
+  const body = await res.json();
+  assertEquals(body.accepted_detected, 1);
+  assertEquals(recorder.length, 1);
+  assertEquals(recorder[0].event, "application_accepted_internal");
+  assertEquals(recorder[0].notify, true);
+  assertEquals(recorder[0].metadata.caregiver_id, 50001);
+  assertEquals(recorder[0].metadata.caregiver_name, "Helena K.");
+  assertEquals(recorder[0].metadata.mamamia_job_offer_id, def);
+  assertEquals(recorder[0].metadata.offer_arrival_at, "2099-01-01 00:00:00");
+  assertEquals(recorder[0].metadata.offer_departure_at, "2099-12-31 00:00:00");
+  assertEquals(recorder[0].metadata.seeded, undefined); // echte Annahme, kein Seed
+});
+
+Deno.test("annahme: Event existiert bereits (Portal-Annahme, NULL-Job) → kein Bridge-Call", async () => {
+  resetCaches();
+  const recorder: BridgeOptions["recorder"] = [];
+  const def = VALID_LEAD.mamamia_job_offer_id as number;
+  // Portal-Annahmen tragen keine mamamia_job_offer_id-Spalte → Dedupe muss
+  // lead-weit über die caregiver_id greifen.
+  const past: EventRow[] = [
+    { event_type: "application_accepted_internal", caregiver_id: 50001 },
+  ];
+  const res = await handleRequest(makeReq({ lead_id: VALID_LEAD.id }), {
+    secrets: SECRETS,
+    supabase: makeSupabase(VALID_LEAD, past),
+    fetchFn: makeFetch({ jobOffers: [bookedJob(def, daysAgoISO(1))] }, { recorder }),
+  });
+  const body = await res.json();
+  assertEquals(body.accepted_detected, 0);
+  assertEquals(recorder.length, 0);
+});
+
+Deno.test("annahme: final_confirmed_at älter als 7 Tage (Altbestand) → kein Bridge-Call", async () => {
+  resetCaches();
+  const recorder: BridgeOptions["recorder"] = [];
+  const def = VALID_LEAD.mamamia_job_offer_id as number;
+  const res = await handleRequest(makeReq({ lead_id: VALID_LEAD.id }), {
+    secrets: SECRETS,
+    supabase: makeSupabase(VALID_LEAD),
+    fetchFn: makeFetch({ jobOffers: [bookedJob(def, daysAgoISO(8))] }, { recorder }),
+  });
+  const body = await res.json();
+  assertEquals(body.accepted_detected, 0);
+  assertEquals(recorder.length, 0);
+});
+
+Deno.test("annahme: fehlendes final_confirmed_at → kein Bridge-Call (kein Frische-Anker)", async () => {
+  resetCaches();
+  const recorder: BridgeOptions["recorder"] = [];
+  const def = VALID_LEAD.mamamia_job_offer_id as number;
+  const res = await handleRequest(makeReq({ lead_id: VALID_LEAD.id }), {
+    secrets: SECRETS,
+    supabase: makeSupabase(VALID_LEAD),
+    fetchFn: makeFetch({ jobOffers: [bookedJob(def, null)] }, { recorder }),
+  });
+  const body = await res.json();
+  assertEquals(body.accepted_detected, 0);
+  assertEquals(recorder.length, 0);
+});
+
+Deno.test("annahme: zweiter Scan-Lauf (Event aus Lauf 1 in lead_events) → kein Doppel-Call", async () => {
+  resetCaches();
+  const def = VALID_LEAD.mamamia_job_offer_id as number;
+  const offers = { jobOffers: [bookedJob(def, daysAgoISO(1))] };
+
+  // Lauf 1: keine Events → feuert.
+  const rec1: BridgeOptions["recorder"] = [];
+  const res1 = await handleRequest(makeReq({ lead_id: VALID_LEAD.id }), {
+    secrets: SECRETS,
+    supabase: makeSupabase(VALID_LEAD),
+    fetchFn: makeFetch(offers, { recorder: rec1 }),
+  });
+  assertEquals((await res1.json()).accepted_detected, 1);
+  assertEquals(rec1.filter((r) => r.event === "application_accepted_internal").length, 1);
+
+  // Lauf 2: die Bridge hat das Event inzwischen persistiert → Dedupe greift.
+  const rec2: BridgeOptions["recorder"] = [];
+  const past: EventRow[] = [
+    { event_type: "application_accepted_internal", caregiver_id: 50001, mamamia_job_offer_id: def },
+  ];
+  const res2 = await handleRequest(makeReq({ lead_id: VALID_LEAD.id }), {
+    secrets: SECRETS,
+    supabase: makeSupabase(VALID_LEAD, past),
+    fetchFn: makeFetch(offers, { recorder: rec2 }),
+  });
+  assertEquals((await res2.json()).accepted_detected, 0);
+  assertEquals(rec2.length, 0);
+});
+
+Deno.test("annahme: Follow-up-Job ohne Historie (notify=false) → Event wird GAR NICHT gefeuert", async () => {
+  resetCaches();
+  const recorder: BridgeOptions["recorder"] = [];
+  // Gebuchter Nicht-Default-Job ohne jede Event-Historie → silent-seed-Modus.
+  // Ein seeded Accepted-Event würde route.ts' Lead-Dedupe für spätere echte
+  // Buchungen blockieren → hier darf überhaupt nichts gefeuert werden.
+  const res = await handleRequest(makeReq({ lead_id: VALID_LEAD.id }), {
+    secrets: SECRETS,
+    supabase: makeSupabase(VALID_LEAD),
+    fetchFn: makeFetch({ jobOffers: [bookedJob(JOB_B, daysAgoISO(1))] }, { recorder }),
+  });
+  const body = await res.json();
+  assertEquals(body.jobs_scanned, 2); // default + JOB_B wurden gescannt
+  assertEquals(body.accepted_detected, 0);
+  assertEquals(recorder.length, 0); // weder Annahme- noch Seed-Event
+});
+
+Deno.test("annahme: Follow-up-Job MIT Historie → feuert (notify=true)", async () => {
+  resetCaches();
+  const recorder: BridgeOptions["recorder"] = [];
+  // Historie: die Bewerbung wurde dem Kunden früher gemailt (application_received).
+  const past: EventRow[] = [
+    { event_type: "application_received", caregiver_id: 50001, mamamia_job_offer_id: JOB_B },
+  ];
+  const res = await handleRequest(makeReq({ lead_id: VALID_LEAD.id }), {
+    secrets: SECRETS,
+    supabase: makeSupabase(VALID_LEAD, past),
+    fetchFn: makeFetch({ jobOffers: [bookedJob(JOB_B, daysAgoISO(1))] }, { recorder }),
+  });
+  const body = await res.json();
+  assertEquals(body.accepted_detected, 1);
+  const evt = recorder.find((r) => r.event === "application_accepted_internal");
+  assertEquals(evt?.notify, true);
+  assertEquals(evt?.metadata.mamamia_job_offer_id, JOB_B);
+});
+
+Deno.test("annahme: Confirmation ohne caregiver.id → kein Call, Scan läuft weiter", async () => {
+  resetCaches();
+  const recorder: BridgeOptions["recorder"] = [];
+  const def = VALID_LEAD.mamamia_job_offer_id as number;
+  const res = await handleRequest(makeReq({ lead_id: VALID_LEAD.id }), {
+    secrets: SECRETS,
+    supabase: makeSupabase(VALID_LEAD),
+    fetchFn: makeFetch({ jobOffers: [bookedJob(def, daysAgoISO(1), { first_name: "Helena", last_name: "Kowalski" })] }, { recorder }),
+  });
+  const body = await res.json();
+  assertEquals(res.status, 200);
+  assertEquals(body.accepted_detected, 0);
+  assertEquals(recorder.length, 0);
+});
+
 Deno.test("multi-job: auto-reject is per-job; a seeded-only anchor is never rejected", async () => {
   resetCaches();
   const recorder: BridgeOptions["recorder"] = [];
