@@ -1334,6 +1334,36 @@ const CustomerPortalPage: FC = () => {
     };
   };
 
+  // Signiertes Vertrags-PDF in mamamia an der Confirmation ablegen — geteilt
+  // von acceptApp (Schritt 3) und submitContractOnly (Vertrag nachträglich).
+  // Rendert das PDF aus der frisch geschriebenen Acceptance-Row und lädt es
+  // über die Proxy-Action hoch. Fire-and-forget + fail-soft: schlägt es fehl,
+  // bleibt der manuelle Upload aus der Team-Mail der Fallback.
+  const uploadContractPdfToMamamia = (applicationId: number, confirmationId: number) => {
+    if (!lead?.id) return;
+    void (async () => {
+      try {
+        const pdfRes = await fetch(
+          `${KOSTENRECHNER_URL}/api/contract-pdf/${lead.id}?token=${encodeURIComponent(lead.token ?? '')}`,
+        );
+        if (!pdfRes.ok) throw new Error(`contract-pdf HTTP ${pdfRes.status}`);
+        const bytes = new Uint8Array(await pdfRes.arrayBuffer());
+        let bin = '';
+        for (let i = 0; i < bytes.length; i += 0x8000) {
+          bin += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+        }
+        await callMamamia('uploadSignedContract', {
+          application_id: applicationId,
+          confirmation_id: confirmationId,
+          file_base64: btoa(bin),
+          filename: 'Dienstleistungsvertrag-signiert.pdf',
+        });
+      } catch (err) {
+        console.error('Vertrag-Ablage in mamamia fehlgeschlagen:', (err as Error).message);
+      }
+    })();
+  };
+
   const acceptApp = (id: string, formData: ContractFormData) => {
     setSelectedApp(null);
     // Unterschriebenen Vertrag merken → gebucht-Screen kann ihn präsentieren.
@@ -1406,32 +1436,11 @@ const CustomerPortalPage: FC = () => {
         //    Auftrag 15.07.: „Vertrag muss im SA-Portal sichtbar sein").
         //    Das PDF rendert der Kostenrechner aus der soeben (Schritt 2)
         //    gespeicherten Acceptance-Row — deshalb ERST nach dem
-        //    Bridge-POST. Fire-and-forget + fail-soft: schlägt es fehl,
-        //    bleibt der bisherige Weg (Team lädt das PDF aus der Team-Mail
-        //    manuell hoch). Ohne confirmationId (z. B. mamamia-500 mit
-        //    nachträglicher Erfolgs-Erkennung) überspringen wir ebenfalls.
-        if (mamamiaAccepted && confirmationId != null && lead?.id) {
-          void (async () => {
-            try {
-              const pdfRes = await fetch(
-                `${KOSTENRECHNER_URL}/api/contract-pdf/${lead.id}?token=${encodeURIComponent(lead.token ?? '')}`,
-              );
-              if (!pdfRes.ok) throw new Error(`contract-pdf HTTP ${pdfRes.status}`);
-              const bytes = new Uint8Array(await pdfRes.arrayBuffer());
-              let bin = '';
-              for (let i = 0; i < bytes.length; i += 0x8000) {
-                bin += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
-              }
-              await callMamamia('uploadSignedContract', {
-                application_id: Number(id),
-                confirmation_id: confirmationId,
-                file_base64: btoa(bin),
-                filename: 'Dienstleistungsvertrag-signiert.pdf',
-              });
-            } catch (err) {
-              console.error('Vertrag-Ablage in mamamia fehlgeschlagen:', (err as Error).message);
-            }
-          })();
+        //    Bridge-POST. Ohne confirmationId (z. B. mamamia-500 mit
+        //    nachträglicher Erfolgs-Erkennung) überspringen wir (Fallback:
+        //    manueller Upload aus der Team-Mail).
+        if (mamamiaAccepted && confirmationId != null) {
+          uploadContractPdfToMamamia(Number(id), confirmationId);
         }
       } catch (err) {
         console.error('application_accepted_internal failed:', (err as Error).message);
@@ -1494,6 +1503,16 @@ const CustomerPortalPage: FC = () => {
       setSignedForm(formData);
       showToast('✓ Vielen Dank — Ihr Vertrag ist abgeschlossen.');
       refetchAcceptedApplications();
+      // Vertrag auch in mamamia an der (längst existierenden) Confirmation
+      // ablegen: bei synthetischen fc-Apps steckt deren ID hinter dem
+      // 'fc-'-Präfix (= appIdNumeric), sonst final_confirmation des
+      // Session-Jobs. Wichtig für PK-Wechsel-Fälle (Schiffer/Dachs 15.07.):
+      // die Neu-Signatur für die aktuelle Kraft landet damit automatisch
+      // im SA-Portal.
+      const confId = id.startsWith('fc-')
+        ? appIdNumeric
+        : (mamamiaConfirmedJob?.final_confirmation?.id ?? null);
+      if (confId != null) uploadContractPdfToMamamia(appIdNumeric, confId);
       // Team-Mail-Resend, best-effort: Fehler nur loggen — die kritische
       // Persistenz (Upsert oben) ist bereits erfolgreich gelaufen.
       fetch(`${KOSTENRECHNER_URL}/api/lead-event`, {
