@@ -8,7 +8,11 @@ import { KOSTENRECHNER_URL } from '../../lib/leadEvents';
 export const BookedScreen: FC<{
   app: Application;
   onNurseClick: (n: Nurse) => void;
-  // Optional: macht den "Vertrag"-Schritt aktiv (öffnet die Signatur-Ansicht).
+  // Optional: macht den "Vertrag"-Schritt aktiv — „Vertrag nachträglich
+  // abschließen" (Martin, 2026-07-15). Gesetzt, wenn die Annahme NICHT im
+  // Portal erfolgte (synthetische fc-App aus mamamia-final_confirmation, kein
+  // signedForm/contract_snapshot): Klick öffnet das Vertragsformular
+  // (AngebotPruefenModal contractOnly). Nie zusammen mit vertragSigned.
   onSignContract?: () => void;
   vertragSigned?: boolean;
   // Wenn gesetzt + vertragSigned, embedden wir das gerenderte PDF
@@ -76,7 +80,9 @@ export const BookedScreen: FC<{
             ? `Der Einsatz vom ${offer.anreisedatum} bis ${offer.abreisedatum} ist abgeschlossen. Ihre Unterlagen bleiben jederzeit zugänglich.`
             : vertragSigned
               ? 'Ihr Vertrag ist unterschrieben. Jemand aus dem Primundus-Team meldet sich in Kürze persönlich bei Ihnen, um die Anreise zu organisieren.'
-              : 'Wir bereiten Ihre Vertragsdokumente vor. Jemand aus dem Primundus-Team meldet sich in Kürze persönlich bei Ihnen.'}
+              : onSignContract
+                ? 'Ihre Pflegekraft ist gebucht. Bitte schließen Sie noch Ihren Betreuungsvertrag ab — alles Weitere übernimmt das Primundus-Team.'
+                : 'Wir bereiten Ihre Vertragsdokumente vor. Jemand aus dem Primundus-Team meldet sich in Kürze persönlich bei Ihnen.'}
         </p>
       </div>
 
@@ -120,7 +126,9 @@ export const BookedScreen: FC<{
         <p className="text-xs font-bold text-gray-600 uppercase tracking-wider px-1">Als nächstes</p>
         {milestones.map((m) => {
           const isVertrag = m.title === 'Vertrag';
-          const vertragActionable = isVertrag && !!onSignContract && !vertragSigned;
+          // !einsatzBeendet als Gürtel+Hosenträger: für abgeschlossene
+          // Einsätze gibt es keinen nachholbaren Vertragsschritt mehr.
+          const vertragActionable = isVertrag && !!onSignContract && !vertragSigned && !einsatzBeendet;
           const vertragDone = isVertrag && vertragSigned;
 
           // Vertrags-PDF-URL für den eingebetteten Viewer (nur wenn leadId
@@ -174,20 +182,20 @@ export const BookedScreen: FC<{
                   {vertragDone ? (
                     <span className="text-xs font-bold text-green-700 bg-green-50 border border-green-200 px-2 py-0.5 rounded-full">✓ Unterschrieben</span>
                   ) : vertragActionable ? (
-                    <span className="text-xs font-bold text-[#2A9D5C] bg-[#2A9D5C]/10 border border-[#2A9D5C]/30 px-2 py-0.5 rounded-full">Bereit</span>
+                    <span className="text-xs font-bold text-[#2A9D5C] bg-[#2A9D5C]/10 border border-[#2A9D5C]/30 px-2 py-0.5 rounded-full">Offen</span>
                   ) : (
                     <span className="text-xs font-bold text-gray-400 bg-gray-100 border border-gray-200 px-2 py-0.5 rounded-full">Folgt</span>
                   )}
                 </div>
                 <p className="text-sm text-gray-500 leading-relaxed">
                   {vertragDone ? 'Ihr Vertrag ist online unterschrieben. Eine Kopie wurde Ihnen per E-Mail gesendet — Sie können ihn jederzeit hier ansehen.'
-                    : vertragActionable ? 'Ihr Betreuungsvertrag liegt zur Unterschrift bereit.'
+                    : vertragActionable ? 'Bitte schließen Sie noch Ihren Betreuungsvertrag ab.'
                     : m.desc}
                 </p>
                 {vertragActionable && (
                   <button onClick={onSignContract}
                     className="mt-2.5 inline-flex items-center gap-1.5 rounded-xl bg-[#2A9D5C] hover:bg-[#248a50] text-white text-sm font-bold px-4 py-2.5 transition-colors">
-                    Vertrag ansehen &amp; unterschreiben →
+                    Vertrag jetzt abschließen →
                   </button>
                 )}
                 {/* Fallback: wenn keine leadId/Token verfügbar (sollte nicht

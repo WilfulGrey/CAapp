@@ -156,6 +156,7 @@ export interface ProxyActionHandlers {
   rejectApplication?: (vars: Record<string, unknown>) => unknown;
   storeConfirmation?: (vars: Record<string, unknown>) => unknown;
   inviteCaregiver?: (vars: Record<string, unknown>) => unknown;
+  listAcceptedApplications?: () => unknown;
 }
 
 export function proxyHandler(overrides: ProxyActionHandlers = {}) {
@@ -174,6 +175,10 @@ export function proxyHandler(overrides: ProxyActionHandlers = {}) {
     rejectApplication: () => ({ RejectApplication: { id: 333, rejected_at: '2026-04-24T11:00Z', reject_message: null } }),
     storeConfirmation: () => ({ StoreConfirmation: { id: 77, application_id: 333, is_confirm_binding: true } }),
     inviteCaregiver: () => ({ SendInvitationCaregiver: true }),
+    // lead_application_acceptances-Leseseite (Portal-Annahmen). Leerer Default
+    // — die Overlay-Logik (applyAcceptedOverlay) läuft damit fail-soft durch
+    // wie in Produktion ohne Annahme. Tests überschreiben für Gebucht-Szenarien.
+    listAcceptedApplications: () => ({ application_ids: [], rows: [] }),
     ...overrides,
   };
 

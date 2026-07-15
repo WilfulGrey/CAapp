@@ -135,11 +135,18 @@ export const AngebotPruefenModal: FC<{
    *  render empty fields (NOT hardcoded fixture data). Step 2 lets the
    *  customer correct/fill before accepting. */
   prefill?: Partial<ContractFormData>;
+  /** „Vertrag nachträglich abschließen" (Martin, 2026-07-15): öffnet das Modal
+   *  DIREKT auf Schritt 2 (Vertragsformular) und blendet den Angebots-Schritt
+   *  komplett aus (keine Tabs, kein „Zurück zum Angebot"-Footer). Genutzt vom
+   *  BookedScreen, wenn die Annahme agentur-seitig erfolgte (synthetische
+   *  fc-App) und der Kunde nur noch den Vertrag nachholt — das Angebot ist
+   *  längst angenommen, es gibt nichts mehr zu prüfen. */
+  contractOnly?: boolean;
   onClose: () => void;
   onAccept: (id: string, data: ContractFormData) => void | Promise<void>;
   onNurseClick: (n: Nurse) => void;
-}> = ({ app, prefill, onClose, onAccept, onNurseClick }) => {
-  const [step, setStep] = useState<1 | 2>(1);
+}> = ({ app, prefill, contractOnly, onClose, onAccept, onNurseClick }) => {
+  const [step, setStep] = useState<1 | 2>(contractOnly ? 2 : 1);
   const [feiertagInfoOpen, setFeiertagInfoOpen] = useState(false);
   const { nurse, offer } = app;
   const inits = initials(nurse.name);
@@ -237,20 +244,23 @@ export const AngebotPruefenModal: FC<{
               </button>
             </div>
 
-            <div className="flex border-b border-gray-100 mt-1">
-              <button
-                onClick={() => setStep(1)}
-                className={`flex items-center gap-1.5 px-1 pb-2.5 text-xs font-semibold mr-5 border-b-2 transition-colors ${step === 1 ? 'border-[#8B7355] text-[#8B7355]' : 'border-transparent text-gray-400'}`}
-              >
-                {step === 2 && <Check className="w-3 h-3 text-[#22A06B]" />}
-                1 · Angebot
-              </button>
-              <button
-                className={`flex items-center gap-1.5 px-1 pb-2.5 text-xs font-semibold border-b-2 transition-colors ${step === 2 ? 'border-[#8B7355] text-[#8B7355]' : 'border-transparent text-gray-400'}`}
-              >
-                2 · Daten & Vertrag
-              </button>
-            </div>
+            {/* contractOnly: nur ein Schritt → Tab-Navigation entfällt komplett. */}
+            {!contractOnly && (
+              <div className="flex border-b border-gray-100 mt-1">
+                <button
+                  onClick={() => setStep(1)}
+                  className={`flex items-center gap-1.5 px-1 pb-2.5 text-xs font-semibold mr-5 border-b-2 transition-colors ${step === 1 ? 'border-[#8B7355] text-[#8B7355]' : 'border-transparent text-gray-400'}`}
+                >
+                  {step === 2 && <Check className="w-3 h-3 text-[#22A06B]" />}
+                  1 · Angebot
+                </button>
+                <button
+                  className={`flex items-center gap-1.5 px-1 pb-2.5 text-xs font-semibold border-b-2 transition-colors ${step === 2 ? 'border-[#8B7355] text-[#8B7355]' : 'border-transparent text-gray-400'}`}
+                >
+                  2 · Daten & Vertrag
+                </button>
+              </div>
+            )}
           </div>
 
           {/* Scrollbarer Body — robustes Flex-Muster: flex-1 (füllt den Platz
@@ -515,23 +525,27 @@ export const AngebotPruefenModal: FC<{
             )}
           </div>
 
-          <div className="flex gap-2.5 px-5 py-4 border-t border-gray-100 flex-shrink-0">
-            {step === 1 ? (
-              <button
-                onClick={() => setStep(2)}
-                className="w-full rounded-xl py-3.5 text-sm font-bold bg-[#E76F63] hover:bg-[#D65E52] text-white transition-all"
-              >
-                Weiter →
-              </button>
-            ) : (
-              <button
-                onClick={() => setStep(1)}
-                className="w-full flex items-center justify-center gap-1.5 px-4 py-3 border border-gray-200 rounded-xl text-sm font-semibold text-gray-600 hover:bg-gray-50 transition-all"
-              >
-                ← Zurück zum Angebot
-              </button>
-            )}
-          </div>
+          {/* contractOnly: Footer entfällt — er dient nur der Navigation zwischen
+              den Schritten; Abschluss passiert im eingebetteten VertragSignieren. */}
+          {!contractOnly && (
+            <div className="flex gap-2.5 px-5 py-4 border-t border-gray-100 flex-shrink-0">
+              {step === 1 ? (
+                <button
+                  onClick={() => setStep(2)}
+                  className="w-full rounded-xl py-3.5 text-sm font-bold bg-[#E76F63] hover:bg-[#D65E52] text-white transition-all"
+                >
+                  Weiter →
+                </button>
+              ) : (
+                <button
+                  onClick={() => setStep(1)}
+                  className="w-full flex items-center justify-center gap-1.5 px-4 py-3 border border-gray-200 rounded-xl text-sm font-semibold text-gray-600 hover:bg-gray-50 transition-all"
+                >
+                  ← Zurück zum Angebot
+                </button>
+              )}
+            </div>
+          )}
         </div>
       </div>
     </>

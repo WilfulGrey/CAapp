@@ -365,6 +365,20 @@ function snapshotFromNurse(n: Nurse): CaregiverSnapshot {
   };
 }
 
+// Numerische Bridge-Referenz einer accepted App für den
+// lead_application_acceptances-Upsert (route.ts verlangt Number.isFinite):
+// echte Bewerbungs-IDs sind bereits numerisch; synthetische fc-Apps
+// (agentur-seitige Annahme, PR #378) tragen die mamamia-final_confirmation-ID
+// hinter dem 'fc-'-Präfix — die einzige echte mamamia-Referenz in dem Fall.
+// null = keine belastbare Referenz → der „Vertrag jetzt abschließen"-Button
+// wird gar nicht erst angeboten (fail-soft).
+function acceptanceApplicationId(appId: string): number | null {
+  const raw = appId.startsWith('fc-') ? appId.slice(3) : appId;
+  if (!raw.trim()) return null;
+  const n = Number(raw);
+  return Number.isFinite(n) ? n : null;
+}
+
 // ─── Main Page ────────────────────────────────────────────────────────────────
 
 const CustomerPortalPage: FC = () => {
@@ -445,6 +459,11 @@ const CustomerPortalPage: FC = () => {
     IS_PREVIEW_GEBUCHT ? PREVIEW_SIGNED_FORM : null,
   );
   const [showSignedContract, setShowSignedContract] = useState(false);
+  // „Vertrag nachträglich abschließen" (Martin, 2026-07-15): App, für die das
+  // AngebotPruefenModal im contractOnly-Modus (NUR Schritt 2 / Vertragsformular)
+  // offen ist. Gesetzt vom BookedScreen-Button, wenn die Annahme agentur-seitig
+  // erfolgte (synthetische fc-App) und noch kein Vertrag vorliegt.
+  const [contractApp, setContractApp] = useState<Application | null>(null);
   // Prototyp: Chat mit der beworbenen Pflegekraft (übersetzt, mit Leitplanken).
   const [chatNurse, setChatNurse] = useState<Nurse | null>(
     IS_PREVIEW_CHAT ? PREVIEW_APPLICATION.nurse : null,
@@ -1224,6 +1243,48 @@ const CustomerPortalPage: FC = () => {
   // Mamamia learns about the booking only when a Primundus team member
   // manually processes it. This is intentional for MVP — confirmation
   // logic + downstream Mamamia state is too complex for first launch.
+  // Event-Metadata für application_accepted_internal — geteilt zwischen
+  // acceptApp (Portal-Annahme) und submitContractOnly (Vertrag nachträglich).
+  // route.ts baut daraus den lead_application_acceptances-Upsert inkl.
+  // contract_snapshot + die Vertragskopie (PDF) für Kunden-/Team-Mail.
+  const buildAcceptanceMetadata = (
+    appIdNumeric: number,
+    targetApp: Application | undefined,
+    formData: ContractFormData,
+  ) => {
+    // Zeitstempel der Unterschrift (menschenlesbar) + vollständige
+    // Vertragsdaten — der Server rendert daraus die Vertragskopie (HTML)
+    // und hängt sie an Kunden- + Team-Mail (Stufe B).
+    const now = new Date();
+    const signedAtLabel = `${String(now.getDate()).padStart(2, '0')}.${String(now.getMonth() + 1).padStart(2, '0')}.${now.getFullYear()} um ${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')} Uhr`;
+    const contract = targetApp ? buildVertragsDaten(formData, targetApp.offer) : undefined;
+    return {
+      application_id: appIdNumeric,
+      caregiver_id: targetApp?.nurse?.caregiverId,
+      caregiver_name: targetApp?.nurse?.name,
+      contract_patient: {
+        anrede: formData.anrede,
+        vorname: formData.vorname,
+        nachname: formData.nachname,
+        strasse: formData.strasse,
+        einsatzort: formData.einsatzort,
+        telefon: formData.telefon,
+        email: formData.email,
+      },
+      contract_contact: {
+        anrede: formData.kpAnrede,
+        vorname: formData.kpVorname,
+        nachname: formData.kpNachname,
+        telefon: formData.kpTelefon,
+        email: formData.kpEmail,
+      },
+      // Elektronische Signatur + Vertrags-Snapshot für die Vertragskopie.
+      signatur: formData.signatur,
+      signed_at: signedAtLabel,
+      contract,
+    };
+  };
+
   const acceptApp = (id: string, formData: ContractFormData) => {
     setSelectedApp(null);
     // Unterschriebenen Vertrag merken → gebucht-Screen kann ihn präsentieren.
@@ -1243,13 +1304,6 @@ const CustomerPortalPage: FC = () => {
 
       if (!lead?.token) return;
 
-      // Zeitstempel der Unterschrift (menschenlesbar) + vollständige
-      // Vertragsdaten — der Server rendert daraus die Vertragskopie (HTML)
-      // und hängt sie an Kunden- + Team-Mail (Stufe B).
-      const now = new Date();
-      const signedAtLabel = `${String(now.getDate()).padStart(2, '0')}.${String(now.getMonth() + 1).padStart(2, '0')}.${now.getFullYear()} um ${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')} Uhr`;
-      const contract = targetApp ? buildVertragsDaten(formData, targetApp.offer) : undefined;
-
       try {
         const res = await fetch(`${KOSTENRECHNER_URL}/api/lead-event`, {
           method: 'POST',
@@ -1257,31 +1311,7 @@ const CustomerPortalPage: FC = () => {
           body: JSON.stringify({
             token: lead.token,
             event: 'application_accepted_internal',
-            metadata: {
-              application_id: Number(id),
-              caregiver_id: targetApp?.nurse?.caregiverId,
-              caregiver_name: targetApp?.nurse?.name,
-              contract_patient: {
-                anrede: formData.anrede,
-                vorname: formData.vorname,
-                nachname: formData.nachname,
-                strasse: formData.strasse,
-                einsatzort: formData.einsatzort,
-                telefon: formData.telefon,
-                email: formData.email,
-              },
-              contract_contact: {
-                anrede: formData.kpAnrede,
-                vorname: formData.kpVorname,
-                nachname: formData.kpNachname,
-                telefon: formData.kpTelefon,
-                email: formData.kpEmail,
-              },
-              // Elektronische Signatur + Vertrags-Snapshot für die Vertragskopie.
-              signatur: formData.signatur,
-              signed_at: signedAtLabel,
-              contract,
-            },
+            metadata: buildAcceptanceMetadata(Number(id), targetApp, formData),
           }),
         });
         if (!res.ok) throw new Error(`bridge HTTP ${res.status}`);
@@ -1296,6 +1326,69 @@ const CustomerPortalPage: FC = () => {
         showToast('Etwas ist schiefgelaufen. Bitte erneut versuchen oder uns anrufen.');
       }
     });
+  };
+
+  // „Vertrag nachträglich abschließen" (Martin, 2026-07-15): Die Annahme kam
+  // NICHT aus dem Portal — die Agentur hat im SA-Portal akzeptiert, das Portal
+  // zeigt die synthetische fc-App ohne contract_snapshot. Der Kunde holt hier
+  // NUR den Vertrag nach; KEIN erneutes Accept: kein Status-Flip (die App ist
+  // längst accepted), keine Mamamia-Mutation, keine Annahme-Animation.
+  // Gleiche Bridge-Kette wie acceptApp, in zwei Schritten:
+  //   1. POST application_accepted_internal → route.ts UPSERTet
+  //      lead_application_acceptances inkl. contract_snapshot (der Upsert läuft
+  //      dort VOR dem Event-Dedupe). Die Kunden-Buchungsmail (Mail C) ist per
+  //      Dedupe geschützt — der Annahme-Detektor hat sie bereits verschickt.
+  //   2. POST mit team_only_resend=true → Team-Mail mit Vertragsdaten + PDF,
+  //      die der Event-Dedupe in Schritt 1 sonst verschluckt (bestehender
+  //      route.ts-Mechanismus: nur Team-Mail, kein DB-Write, keine Kunden-Mail).
+  // setSignedForm erst NACH erfolgreichem Upsert — dann zeigt der BookedScreen
+  // den Vertrag sofort inkl. PDF-Link (/api/contract-pdf liest die frisch
+  // geschriebene Acceptance-Row). route.ts bleibt unverändert.
+  const submitContractOnly = async (id: string, formData: ContractFormData) => {
+    const targetApp = contractApp?.id === id
+      ? contractApp
+      : applications.find((a) => a.id === id);
+    setContractApp(null);
+    const appIdNumeric = acceptanceApplicationId(id);
+    if (!lead?.token || !targetApp || appIdNumeric === null) {
+      // Sollte nie passieren (Button wird nur mit gültiger Referenz angeboten)
+      // — Defensive: nicht crashen, Kunde kann anrufen.
+      showToast('Etwas ist schiefgelaufen. Bitte erneut versuchen oder uns anrufen.');
+      return;
+    }
+    const metadata = buildAcceptanceMetadata(appIdNumeric, targetApp, formData);
+    try {
+      const res = await fetch(`${KOSTENRECHNER_URL}/api/lead-event`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          token: lead.token,
+          event: 'application_accepted_internal',
+          metadata,
+        }),
+      });
+      if (!res.ok) throw new Error(`bridge HTTP ${res.status}`);
+      // Persistenz ist durch → Vertrag sofort im Kasten präsentieren.
+      setSignedForm(formData);
+      showToast('✓ Vielen Dank — Ihr Vertrag ist abgeschlossen.');
+      refetchAcceptedApplications();
+      // Team-Mail-Resend, best-effort: Fehler nur loggen — die kritische
+      // Persistenz (Upsert oben) ist bereits erfolgreich gelaufen.
+      fetch(`${KOSTENRECHNER_URL}/api/lead-event`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          token: lead.token,
+          event: 'application_accepted_internal',
+          metadata: { ...metadata, team_only_resend: true },
+        }),
+      }).catch((err) => {
+        console.error('contract team mail resend failed:', (err as Error).message);
+      });
+    } catch (err) {
+      console.error('nachtraeglicher Vertrag failed:', (err as Error).message);
+      showToast('Etwas ist schiefgelaufen. Bitte erneut versuchen oder uns anrufen.');
+    }
   };
 
   const declineApp = (id: string, message?: string) => {
@@ -2075,11 +2168,27 @@ const CustomerPortalPage: FC = () => {
             (r) => !!r.contract_snapshot,
           );
           const vertragSigned = !!signedForm?.signatur || hasPersistedContract;
+          // Vertrag nachträglich abschließen (Martin, 2026-07-15): Fehlt der
+          // unterschriebene Vertrag (Annahme kam agentur-seitig → synthetische
+          // fc-App ohne signedForm/contract_snapshot), wird der Vertrag-
+          // Milestone zum aktiven Schritt. Nur mit belastbarer numerischer
+          // Bridge-Referenz (fail-soft) + echtem Lead-Token; nie im Preview,
+          // nie für beendete Einsätze, nie wenn der Vertrag schon vorliegt.
+          const contractAppId = acceptanceApplicationId(acceptedApp.id);
+          const canCompleteContract =
+            !vertragSigned
+            && !IS_EINSATZ_BEENDET
+            && !IS_PREVIEW_ANY
+            && !!lead?.token
+            && contractAppId !== null;
           return (
             <BookedScreen
               app={acceptedApp}
               onNurseClick={setSelectedNurse}
               vertragSigned={vertragSigned}
+              onSignContract={
+                canCompleteContract ? () => setContractApp(acceptedApp) : undefined
+              }
               // leadId + Token aktivieren den eingebetteten PDF-Viewer im
               // Vertrag-Milestone (Mustervertrag-Look via /api/contract-pdf).
               // Wenn das Lead oder der URL-Token fehlt → Fallback Modal mit
@@ -3190,6 +3299,24 @@ const CustomerPortalPage: FC = () => {
           onClose={() => setSelectedApp(null)}
           onAccept={acceptApp}
           onNurseClick={(n) => openNurseFromApp(n, selectedApp)}
+        />
+      )}
+
+      {/* Vertrag nachträglich abschließen — gleiches Modal, NUR Schritt 2
+          (Vertragsformular). app.offer trägt die Eckdaten der gebuchten
+          Kraft/des Jobs (Anreise/Abreise/Konditionen aus der fc-Synthese),
+          pruefenPrefill die Personendaten aus Lead + mmCustomer. */}
+      {contractApp && (
+        <AngebotPruefenModal
+          app={contractApp}
+          prefill={pruefenPrefill}
+          contractOnly
+          onClose={() => setContractApp(null)}
+          onAccept={submitContractOnly}
+          // Nur Profil-Ansicht (wie im BookedScreen) — KEIN nurseModalApp,
+          // sonst böte das Profil-Modal „Angebot prüfen"/„Ablehnen" für die
+          // längst gebuchte Pflegekraft an.
+          onNurseClick={setSelectedNurse}
         />
       )}
 
