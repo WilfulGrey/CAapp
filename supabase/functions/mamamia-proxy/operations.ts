@@ -131,6 +131,29 @@ export const GET_CUSTOMER = /* GraphQL */ `
         id
         equipment
       }
+      # Gebucht-Ableitung (Fix Hagedorn 2026-07-15): akzeptiert die AGENTUR
+      # eine Bewerbung im SA-Portal, entsteht KEINE
+      # lead_application_acceptances-Zeile und Mamamia entfernt die Bewerbung
+      # aus listApplications — der einzige sichtbare Beleg ist
+      # JobOffer.final_confirmation. Feld-Kombination prod-verifiziert (das
+      # SA-Portal fragt exakt diese final_confirmation-Felder täglich ab;
+      # job_offers-Basisfelder wie in _shared/leadJobsSync.ts).
+      job_offers {
+        id
+        arrival_at
+        departure_at
+        salary_offered
+        status
+        final_confirmation {
+          id
+          final_confirmed_at
+          caregiver {
+            id
+            first_name
+            last_name
+          }
+        }
+      }
     }
   }
 `;

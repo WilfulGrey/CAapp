@@ -95,6 +95,31 @@ export interface MamamiaCustomerContract {
   street_number?: string | null;
 }
 
+// Job-Offer-Teilmenge aus GET_CUSTOMER (Customer.job_offers). Für die
+// Gebucht-Ableitung aus dem Mamamia-Stand (Fix Hagedorn 2026-07-15):
+// akzeptiert die Agentur eine Bewerbung im SA-Portal, entsteht KEINE
+// lead_application_acceptances-Zeile — JobOffer.final_confirmation ist
+// dann der einzige Beleg. ALLE Felder optional (fail-soft): eine alte
+// Proxy-Version ohne job_offers-Selektion darf das Verhalten nicht ändern.
+export interface MamamiaFinalConfirmationRef {
+  id: number;
+  final_confirmed_at?: string | null;
+  caregiver?: {
+    id: number;
+    first_name?: string | null;
+    last_name?: string | null;
+  } | null;
+}
+
+export interface MamamiaCustomerJobOffer {
+  id: number;
+  arrival_at?: string | null;
+  departure_at?: string | null;
+  salary_offered?: number | null;
+  status?: string | null;
+  final_confirmation?: MamamiaFinalConfirmationRef | null;
+}
+
 export interface MamamiaCustomer {
   id: number;
   customer_id: string;
@@ -146,6 +171,9 @@ export interface MamamiaCustomer {
   /** Accommodation equipment — fetched by GET_CUSTOMER as `equipments { id equipment }`.
    *  id=1 = Own TV, id=2 = Own Bathroom. Used to prefill the `badezimmer` field. */
   equipments?: Array<{ id: number; equipment?: string | null }> | null;
+  /** Jobs des Kunden inkl. final_confirmation — nur gefüllt, wenn der Proxy
+   *  die job_offers-Selektion schon kennt (fail-soft, s. MamamiaCustomerJobOffer). */
+  job_offers?: MamamiaCustomerJobOffer[] | null;
 }
 
 export interface MamamiaCaregiverRef {
