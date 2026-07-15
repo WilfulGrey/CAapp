@@ -27,13 +27,14 @@ import {
   useUpdateJobOfferDates,
 } from '../lib/mamamia/mutations';
 import {
+  applyAcceptedOverlay,
   customerDisplayName,
   jobOfferArrivalDisplay,
   mapApplicationToUI,
   mapMatchingToNurse,
   mapCaregiverToNurse,
   matchesGermanyWish,
-  synthesizeAcceptedApplicationFromSnapshot,
+  pickFinalConfirmedJob,
 } from '../lib/mamamia/mappers';
 import { mapPatientFormToUpdateCustomerInput, splitCustomerName } from '../lib/mamamia/patientFormMapper';
 import { customerSalutation } from '../lib/names';
@@ -562,12 +563,26 @@ const CustomerPortalPage: FC = () => {
   // existing BookedScreen renders. Persists across reload.
   const { data: acceptedApplications, refetch: refetchAcceptedApplications } = useAcceptedApplications(mmReady);
 
+  // Gebucht-Ableitung aus dem Mamamia-Stand (Fix Hagedorn 2026-07-15):
+  // akzeptiert die AGENTUR die Bewerbung im SA-Portal, gibt es keine
+  // lead_application_acceptances-Zeile — der einzige Beleg ist
+  // JobOffer.final_confirmation (via GET_CUSTOMER job_offers). Fail-soft:
+  // liefert der Proxy die job_offers (noch) nicht, bleibt das null und am
+  // heutigen Verhalten ändert sich nichts.
+  const mamamiaConfirmedJob = useMemo(
+    () => pickFinalConfirmedJob(mmCustomer?.job_offers, session?.job_offer_id ?? null),
+    [mmCustomer, session],
+  );
+
   // Wenn Mamamia die akzeptierte Application aus listApplications entfernt
   // (kommt vor sobald die Bewerbung dort als abgeschlossen markiert wird),
   // brauchen wir die volle Pflegekraft-Daten getrennt zu laden, um eine
   // synthetische Application zu rekonstruieren. Wir nehmen den ersten Row
-  // (in der Praxis gibt's pro Lead genau eine Annahme).
-  const firstAcceptedCaregiverId = acceptedApplications?.rows[0]?.caregiver_id ?? null;
+  // (in der Praxis gibt's pro Lead genau eine Annahme). Fallback: die per
+  // final_confirmation bestätigte Pflegekraft (agentur-seitige Annahme).
+  const firstAcceptedCaregiverId = acceptedApplications?.rows[0]?.caregiver_id
+    ?? mamamiaConfirmedJob?.final_confirmation?.caregiver?.id
+    ?? null;
   const { data: acceptedCaregiverProfile } = useCaregiver(firstAcceptedCaregiverId);
 
   // K5 mutations
@@ -834,7 +849,8 @@ const CustomerPortalPage: FC = () => {
   // der Kunde via AngebotPruefenModal step 2 angenommen hat (gespeichert
   // in lead_application_acceptances). Läuft sowohl beim Initial-Mount
   // (nach mmReady + acceptedApplications fetch) als auch nach jedem
-  // Refetch. Zwei Pfade:
+  // Refetch. Drei Pfade (Logik extrahiert nach mappers.applyAcceptedOverlay,
+  // damit sie testbar ist):
   //
   //   1) Mamamia liefert die akzeptierte Application weiter in
   //      listApplications → wir patchen das vorhandene Objekt auf
@@ -845,43 +861,31 @@ const CustomerPortalPage: FC = () => {
   //      contract_snapshot + den getrennt geladenen Caregiver-Daten.
   //      Sonst wäre acceptedApp = null und BookedScreen würde nicht
   //      rendern (Bug Michael Dachs / lead 39def7b2, 11.06.2026).
+  //   3) KEINE Portal-Annahme, aber ein Job hat eine Mamamia-
+  //      final_confirmation (die Agentur hat im SA-Portal akzeptiert —
+  //      Bug Hagedorn, 15.07.2026) → synthetische accepted-App aus dem
+  //      Job-Stand, damit acceptedApp + BookedScreen trotzdem greifen.
+  //
+  // mmApplications ist bewusst in den Deps: der Sync-Effect oben ersetzt
+  // den applications-State komplett (synthetische Apps fallen raus) — der
+  // Overlay muss danach erneut laufen. Idempotent, daher unkritisch.
   useEffect(() => {
     if (!mmReady || !acceptedApplications) return;
-    const acceptedIds = new Set(acceptedApplications.application_ids);
-    if (acceptedIds.size === 0) return;
+    const hasPortalAcceptance = acceptedApplications.application_ids.length > 0;
+    // Heutiges Verhalten unverändert, wenn weder Portal-Annahme noch
+    // Mamamia-Confirmation existieren (Fail-soft bei alter Proxy-Version).
+    if (!hasPortalAcceptance && !mamamiaConfirmedJob) return;
 
-    setApplications(prev => {
-      // Synthetische (Pfad-2-)Apps jeden Lauf verwerfen + frisch ableiten →
-      // eine Platzhalter-Karte upgradet automatisch aufs volle Profil, sobald
-      // getCaregiver lädt (deps enthalten acceptedCaregiverProfile).
-      const base = prev.filter(a => !a.synthetic);
-      const presentIds = new Set(base.map(a => Number(a.id)));
-      // Pfad 1: vorhandene (Mamamia-)Apps auf accepted patchen
-      const patched = base.map(a =>
-        acceptedIds.has(Number(a.id)) ? { ...a, status: 'accepted' as const } : a,
-      );
-      // Pfad 2: für jede acceptedRow, die NICHT als echte Mamamia-App da ist,
-      // eine synthetische "accepted"-App bauen. synthesize liefert NIE null
-      // mehr — wenn das Caregiver-Profil (noch) nicht geladen ist, kommt eine
-      // Platzhalter-Karte. So bleibt der BookedScreen inkl. Vertrags-PDF IMMER
-      // sichtbar, auch wenn getCaregiver gerade nicht erreichbar ist
-      // (Mamamia-Hiccup) — der gebuchte Kunde fällt nie in den HTML-Flow zurück.
-      const nowIso = new Date().toISOString();
-      const nowYear = new Date().getFullYear();
-      const additions: typeof patched = [];
-      for (const row of acceptedApplications.rows) {
-        if (presentIds.has(row.application_id)) continue;
-        const profile = row.caregiver_id === firstAcceptedCaregiverId
-          ? acceptedCaregiverProfile
-          : null;
-        additions.push({
-          ...synthesizeAcceptedApplicationFromSnapshot(row, profile ?? null, { nowIso, nowYear }),
-          synthetic: true,
-        });
-      }
-      return [...patched, ...additions];
-    });
-  }, [mmReady, acceptedApplications, acceptedCaregiverProfile, firstAcceptedCaregiverId]);
+    const nowIso = new Date().toISOString();
+    const nowYear = new Date().getFullYear();
+    setApplications(prev => applyAcceptedOverlay(prev, {
+      acceptances: acceptedApplications,
+      confirmedJob: mamamiaConfirmedJob,
+      caregiverProfile: acceptedCaregiverProfile,
+      firstAcceptedCaregiverId,
+      opts: { nowIso, nowYear },
+    }));
+  }, [mmReady, mmApplications, acceptedApplications, acceptedCaregiverProfile, firstAcceptedCaregiverId, mamamiaConfirmedJob]);
 
   // Background prefetch full caregiver profiles for visible matchings +
   // applications. GET_CAREGIVER takes 1.7-3.1s on Mamamia beta — without

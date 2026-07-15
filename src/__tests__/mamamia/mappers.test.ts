@@ -9,8 +9,19 @@ import {
   requiredGermanyLevelForWish,
   matchesGermanyWish,
   synthesizeAcceptedApplicationFromSnapshot,
+  synthesizeAcceptedApplicationFromFinalConfirmation,
+  pickFinalConfirmedJob,
+  applyAcceptedOverlay,
+  type UIApplication,
 } from '../../lib/mamamia/mappers';
-import type { MamamiaCaregiverRef, MamamiaCaregiverFull, MamamiaCustomer, MamamiaAcceptedApplicationRow } from '../../lib/mamamia/types';
+import type {
+  MamamiaCaregiverRef,
+  MamamiaCaregiverFull,
+  MamamiaCustomer,
+  MamamiaAcceptedApplicationRow,
+  MamamiaAcceptedApplications,
+  MamamiaCustomerJobOffer,
+} from '../../lib/mamamia/types';
 
 const NOW_ISO = '2026-04-24T12:00:00.000Z';
 const NOW_YEAR = 2026;
@@ -1199,5 +1210,264 @@ describe('synthesizeAcceptedApplicationFromSnapshot', () => {
       { nowIso: NOW_ISO, nowYear: NOW_YEAR },
     );
     expect(r!.nurse.name).toBe('Kamila B.');
+  });
+});
+
+// ─── Gebucht-Ableitung aus dem Mamamia-Stand (Bug-Fix Hagedorn 15.07.2026) ──
+// Akzeptiert die AGENTUR die Bewerbung im SA-Portal, gibt es keine
+// lead_application_acceptances-Zeile UND Mamamia entfernt die Bewerbung aus
+// listApplications — das Portal zeigte weiter den Onboarding-Zustand statt
+// BookedScreen. Einziger Beleg: JobOffer.final_confirmation (GET_CUSTOMER
+// job_offers).
+
+const OPTS = { nowIso: NOW_ISO, nowYear: NOW_YEAR };
+
+function makeConfirmedJob(overrides: Partial<MamamiaCustomerJobOffer> = {}): MamamiaCustomerJobOffer {
+  return {
+    id: 16226,
+    arrival_at: '2026-08-01 00:00:00',
+    departure_at: '2026-09-12 00:00:00',
+    salary_offered: 2490,
+    status: 'on_job',
+    final_confirmation: {
+      id: 5511,
+      final_confirmed_at: '2026-07-14 09:30:00',
+      caregiver: { id: 21395, first_name: 'Edyta', last_name: 'Testowa' },
+    },
+    ...overrides,
+  };
+}
+
+function makeUiApp(overrides: Partial<UIApplication> = {}): UIApplication {
+  return {
+    id: '7997',
+    nurse: mapCaregiverToNurse(makeCg(), OPTS),
+    agencyName: 'Pflegeagentur',
+    appliedAt: 'vor 2 Std.',
+    status: 'new',
+    message: '',
+    offer: {
+      monatlicheKosten: 2400,
+      anreisedatum: '01.08.2026',
+      abreisedatum: '12.09.2026',
+      anreisekosten: 125,
+      abreisekosten: 125,
+      reisetage: 'Halb',
+      feiertagszuschlag: 80,
+      kuendigungsfrist: 'Täglich kündbar',
+      submittedAt: '10.07.2026',
+    },
+    ...overrides,
+  };
+}
+
+const NO_ACCEPTANCES: MamamiaAcceptedApplications = { application_ids: [], rows: [] };
+
+describe('pickFinalConfirmedJob', () => {
+  it('fail-soft: alte Proxy-Version ohne job_offers (undefined/null) → null', () => {
+    expect(pickFinalConfirmedJob(undefined, 16226)).toBeNull();
+    expect(pickFinalConfirmedJob(null, 16226)).toBeNull();
+  });
+
+  it('kein Job mit final_confirmation → null', () => {
+    expect(pickFinalConfirmedJob([{ id: 16226, status: 'search' }], 16226)).toBeNull();
+  });
+
+  it('final_confirmation ohne caregiver zählt NICHT (kein halber Gebucht-Zustand)', () => {
+    const job = makeConfirmedJob({
+      final_confirmation: { id: 5511, final_confirmed_at: null, caregiver: null },
+    });
+    expect(pickFinalConfirmedJob([job], 16226)).toBeNull();
+  });
+
+  it('bevorzugt den zur Session gehörenden Job (session.job_offer_id)', () => {
+    const other = makeConfirmedJob({ id: 999 });
+    const sessionJob = makeConfirmedJob({ id: 16226 });
+    expect(pickFinalConfirmedJob([other, sessionJob], 16226)).toBe(sessionJob);
+  });
+
+  it('fällt auf den ersten bestätigten Job zurück, wenn der Session-Job keine Confirmation hat', () => {
+    const unconfirmed = { id: 16226, status: 'search' };
+    const confirmed = makeConfirmedJob({ id: 999 });
+    expect(pickFinalConfirmedJob([unconfirmed, confirmed], 16226)).toBe(confirmed);
+  });
+});
+
+describe('synthesizeAcceptedApplicationFromFinalConfirmation', () => {
+  it('baut accepted-App mit fc-Präfix-ID (Kollision mit echten Bewerbungs-IDs ausgeschlossen)', () => {
+    const r = synthesizeAcceptedApplicationFromFinalConfirmation(makeConfirmedJob(), null, OPTS);
+    expect(r).not.toBeNull();
+    expect(r!.status).toBe('accepted');
+    expect(r!.id).toBe('fc-5511');
+  });
+
+  it('Platzhalter-Name aus dem Confirmation-Caregiver, solange getCaregiver nicht geladen ist', () => {
+    const r = synthesizeAcceptedApplicationFromFinalConfirmation(makeConfirmedJob(), null, OPTS);
+    expect(r!.nurse.name).toBe('Edyta Testowa');
+    expect(r!.nurse.caregiverId).toBe(21395);
+  });
+
+  it('volles Profil (getCaregiver) gewinnt über den Platzhalter', () => {
+    const cg = { ...makeCg({ id: 21395, first_name: 'Edyta', last_name: 'Testowa' }) } as MamamiaCaregiverFull;
+    const r = synthesizeAcceptedApplicationFromFinalConfirmation(makeConfirmedJob(), cg, OPTS);
+    expect(r!.nurse.name).toBe('Edyta T.');
+  });
+
+  it('Konditionen kommen aus dem Job: salary_offered = Monatskosten, Tagessatz = Monat/30', () => {
+    const r = synthesizeAcceptedApplicationFromFinalConfirmation(makeConfirmedJob(), null, OPTS);
+    expect(r!.offer.monatlicheKosten).toBe(2490);
+    expect(r!.offer.feiertagszuschlag).toBe(83); // 2490 / 30
+    expect(r!.offer.anreisedatum).toBe('01.08.2026');
+    expect(r!.offer.abreisedatum).toBe('12.09.2026');
+    expect(r!.offer.submittedAt).toBe('14.07.2026');
+  });
+
+  it('fail-soft bei fehlenden Feldern: Daten "—", Kosten 0 (statt Crash/undefined)', () => {
+    const r = synthesizeAcceptedApplicationFromFinalConfirmation(
+      makeConfirmedJob({
+        arrival_at: null,
+        departure_at: null,
+        salary_offered: null,
+        final_confirmation: { id: 5511, caregiver: { id: 21395 } },
+      }),
+      null,
+      OPTS,
+    );
+    expect(r!.offer.monatlicheKosten).toBe(0);
+    expect(r!.offer.feiertagszuschlag).toBe(0);
+    expect(r!.offer.anreisedatum).toBe('—');
+    expect(r!.offer.abreisedatum).toBe('—');
+    expect(r!.nurse.name).toBe('Ihre Pflegekraft');
+  });
+
+  it('null ohne caregiver in der Confirmation', () => {
+    const r = synthesizeAcceptedApplicationFromFinalConfirmation(
+      makeConfirmedJob({ final_confirmation: { id: 5511, caregiver: null } }),
+      null,
+      OPTS,
+    );
+    expect(r).toBeNull();
+  });
+});
+
+describe('applyAcceptedOverlay', () => {
+  it('(a) Mamamia-Confirmation OHNE Portal-Annahme → synthetische accepted-App, BookedScreen-Bedingung wahr', () => {
+    const prev = [makeUiApp()]; // offene Bewerbung einer ANDEREN Pflegekraft (10053)
+    const result = applyAcceptedOverlay(prev, {
+      acceptances: NO_ACCEPTANCES,
+      confirmedJob: makeConfirmedJob(),
+      caregiverProfile: null,
+      firstAcceptedCaregiverId: 21395,
+      opts: OPTS,
+    });
+    const acceptedApp = result.find((a) => a.status === 'accepted') ?? null;
+    expect(acceptedApp).not.toBeNull(); // exakt die acceptedApp-Derivation der Page
+    expect(acceptedApp!.synthetic).toBe(true);
+    expect(acceptedApp!.id).toBe('fc-5511');
+    // die offene Bewerbung bleibt unangetastet erhalten
+    expect(result.filter((a) => a.status === 'new')).toHaveLength(1);
+  });
+
+  it('(a) geladenes Caregiver-Profil ersetzt den Platzhalter (gleicher Mechanismus wie Pfad 2)', () => {
+    const cg = { ...makeCg({ id: 21395, first_name: 'Edyta', last_name: 'Testowa' }) } as MamamiaCaregiverFull;
+    const result = applyAcceptedOverlay([], {
+      acceptances: NO_ACCEPTANCES,
+      confirmedJob: makeConfirmedJob(),
+      caregiverProfile: cg,
+      firstAcceptedCaregiverId: 21395,
+      opts: OPTS,
+    });
+    expect(result[0].nurse.name).toBe('Edyta T.');
+  });
+
+  it('(b) beides vorhanden → Portal-Annahme hat Vorrang, KEINE Doppel-Synthese', () => {
+    // Portal-Annahme für App 7997 (noch in listApplications) + Mamamia-Confirmation
+    const prev = [makeUiApp({ id: '7997' })];
+    const result = applyAcceptedOverlay(prev, {
+      acceptances: { application_ids: [7997], rows: [{ application_id: 7997, caregiver_id: 10053, accepted_at: '2026-07-10T10:00:00Z', contract_snapshot: null }] },
+      confirmedJob: makeConfirmedJob(),
+      caregiverProfile: null,
+      firstAcceptedCaregiverId: 10053,
+      opts: OPTS,
+    });
+    expect(result.filter((a) => a.status === 'accepted')).toHaveLength(1);
+    expect(result.find((a) => a.id === 'fc-5511')).toBeUndefined();
+    expect(result).toHaveLength(1);
+  });
+
+  it('(b) Portal-Annahme mit contract_snapshot-Synthese + Mamamia-Confirmation → nur EINE synthetische App (aus dem Snapshot)', () => {
+    const result = applyAcceptedOverlay([], {
+      acceptances: {
+        application_ids: [9006],
+        rows: [{ application_id: 9006, caregiver_id: 21395, accepted_at: '2026-06-11T10:51:25Z', contract_snapshot: null }],
+      },
+      confirmedJob: makeConfirmedJob(),
+      caregiverProfile: null,
+      firstAcceptedCaregiverId: 21395,
+      opts: OPTS,
+    });
+    expect(result).toHaveLength(1);
+    expect(result[0].id).toBe('9006'); // Snapshot-Pfad, NICHT fc-5511
+    expect(result[0].status).toBe('accepted');
+  });
+
+  it('(c) keine Confirmation + keine Portal-Annahme → applications unverändert', () => {
+    const prev = [makeUiApp()];
+    const result = applyAcceptedOverlay(prev, {
+      acceptances: NO_ACCEPTANCES,
+      confirmedJob: null,
+      caregiverProfile: null,
+      firstAcceptedCaregiverId: null,
+      opts: OPTS,
+    });
+    expect(result).toEqual(prev);
+  });
+
+  it('Pfad 3 patcht eine noch gelistete Bewerbung derselben Pflegekraft statt zu doppeln', () => {
+    // Edge: final_confirmation existiert, aber Mamamia listet die Bewerbung
+    // (noch) in listApplications → patchen, keine zweite Karte.
+    const sameCg = makeUiApp({
+      id: '8001',
+      nurse: mapCaregiverToNurse(makeCg({ id: 21395, first_name: 'Edyta', last_name: 'Testowa' }), OPTS),
+    });
+    const result = applyAcceptedOverlay([sameCg], {
+      acceptances: NO_ACCEPTANCES,
+      confirmedJob: makeConfirmedJob(),
+      caregiverProfile: null,
+      firstAcceptedCaregiverId: 21395,
+      opts: OPTS,
+    });
+    expect(result).toHaveLength(1);
+    expect(result[0].id).toBe('8001');
+    expect(result[0].status).toBe('accepted');
+    expect(result[0].synthetic).toBeUndefined();
+  });
+
+  it('Pfad 3 synthetisiert NICHT, wenn schon eine accepted-App da ist (optimistisches Update)', () => {
+    const prev = [makeUiApp({ status: 'accepted' })];
+    const result = applyAcceptedOverlay(prev, {
+      acceptances: NO_ACCEPTANCES,
+      confirmedJob: makeConfirmedJob(),
+      caregiverProfile: null,
+      firstAcceptedCaregiverId: 21395,
+      opts: OPTS,
+    });
+    expect(result).toHaveLength(1);
+    expect(result.filter((a) => a.status === 'accepted')).toHaveLength(1);
+    expect(result.find((a) => a.id === 'fc-5511')).toBeUndefined();
+  });
+
+  it('synthetische Apps werden jeden Lauf verworfen + frisch abgeleitet (Platzhalter-Upgrade)', () => {
+    const stale = { ...synthesizeAcceptedApplicationFromFinalConfirmation(makeConfirmedJob(), null, OPTS)!, synthetic: true };
+    const cg = { ...makeCg({ id: 21395, first_name: 'Edyta', last_name: 'Testowa' }) } as MamamiaCaregiverFull;
+    const result = applyAcceptedOverlay([stale], {
+      acceptances: NO_ACCEPTANCES,
+      confirmedJob: makeConfirmedJob(),
+      caregiverProfile: cg,
+      firstAcceptedCaregiverId: 21395,
+      opts: OPTS,
+    });
+    expect(result).toHaveLength(1);
+    expect(result[0].nurse.name).toBe('Edyta T.'); // upgegradet, nicht dupliziert
   });
 });

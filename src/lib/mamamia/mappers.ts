@@ -490,7 +490,13 @@ export function mapCaregiverToNurse(
 
 // ─── MamamiaApplication / MamamiaMatching → UI Application/Nurse ─────────
 
-import type { MamamiaApplication, MamamiaMatching, MamamiaAcceptedApplicationRow } from './types';
+import type {
+  MamamiaApplication,
+  MamamiaMatching,
+  MamamiaAcceptedApplicationRow,
+  MamamiaAcceptedApplications,
+  MamamiaCustomerJobOffer,
+} from './types';
 
 // UI's Application type (duplicated here for decoupling from CustomerPortalPage).
 // NOTE: must match shape expected by AppCard / AngebotPruefenModal.
@@ -643,6 +649,138 @@ export function synthesizeAcceptedApplicationFromSnapshot(
       submittedAt: (snap?.datum as string) ?? '—',
     },
   };
+}
+
+/** Wählt den Job für die Gebucht-Ableitung aus Customer.job_offers:
+ *  bevorzugt der zur Session gehörende Job (session.job_offer_id), sonst der
+ *  erste mit final_confirmation + caregiver. null, wenn der Proxy die
+ *  job_offers (noch) nicht liefert (alte Version / Schema-Drift) oder kein
+ *  Job bestätigt ist — dann ändert sich am heutigen Verhalten NICHTS. */
+export function pickFinalConfirmedJob(
+  jobs: MamamiaCustomerJobOffer[] | null | undefined,
+  sessionJobOfferId: number | null | undefined,
+): MamamiaCustomerJobOffer | null {
+  if (!Array.isArray(jobs)) return null;
+  const confirmed = jobs.filter(
+    (j) => typeof j?.final_confirmation?.caregiver?.id === 'number',
+  );
+  if (confirmed.length === 0) return null;
+  return confirmed.find((j) => j.id === sessionJobOfferId) ?? confirmed[0];
+}
+
+/** Gebucht-Ableitung aus dem Mamamia-Stand (Fix Hagedorn 2026-07-15).
+ *  Akzeptiert die AGENTUR die Bewerbung im SA-Portal, entsteht keine
+ *  lead_application_acceptances-Zeile und Mamamia entfernt die Bewerbung aus
+ *  listApplications — das Portal wäre blind und zeigte weiter Onboarding.
+ *  Der einzige Beleg ist JobOffer.final_confirmation. Wir bauen daraus über
+ *  denselben Baustein wie beim contract_snapshot-Pfad
+ *  (synthesizeAcceptedApplicationFromSnapshot, snapshot=null) eine
+ *  synthetische accepted-Application und überschreiben die Konditionen mit
+ *  den Job-Daten (salary_offered = Monatskosten; Tagessatz = Monat/30,
+ *  Kundenportal-Konvention). Kein Vertrags-PDF vorhanden → BookedScreen
+ *  zeigt seinen „Vertrag wird vorbereitet"-Zustand. */
+export function synthesizeAcceptedApplicationFromFinalConfirmation(
+  job: MamamiaCustomerJobOffer,
+  caregiver: MamamiaCaregiverFull | null,
+  opts: { nowIso: string; nowYear: number },
+): UIApplication | null {
+  const fc = job.final_confirmation;
+  const cg = fc?.caregiver;
+  if (!fc || typeof cg?.id !== 'number') return null;
+  const fallbackName = `${cg.first_name ?? ''} ${cg.last_name ?? ''}`.trim();
+  const base = synthesizeAcceptedApplicationFromSnapshot(
+    {
+      application_id: fc.id,
+      caregiver_id: cg.id,
+      accepted_at: fc.final_confirmed_at ?? '',
+      contract_snapshot: null,
+    },
+    caregiver,
+    opts,
+    fallbackName || undefined,
+  );
+  const monatlicheKosten = job.salary_offered ?? 0;
+  const tagessatz = monatlicheKosten > 0 ? Math.round(monatlicheKosten / 30) : 0;
+  return {
+    ...base,
+    // 'fc-'-Präfix: Confirmation-IDs leben in einem anderen Nummernraum als
+    // Application-IDs — eine Kollision mit einer echten (offenen) Bewerbung
+    // im applications-State wird so ausgeschlossen.
+    id: `fc-${fc.id}`,
+    offer: {
+      ...base.offer,
+      monatlicheKosten,
+      anreisedatum: formatMamamiaDate(job.arrival_at ?? null) ?? '—',
+      abreisedatum: formatMamamiaDate(job.departure_at ?? null) ?? '—',
+      feiertagszuschlag: tagessatz,
+      submittedAt: formatMamamiaDate(fc.final_confirmed_at ?? null) ?? '—',
+    },
+  };
+}
+
+/** Persistenz-Merge für den applications-State (extrahiert aus dem
+ *  CustomerPortalPage-Effect, damit alle Pfade testbar sind). Drei Pfade:
+ *    1) Portal-Annahme, Application noch in listApplications → patchen.
+ *    2) Portal-Annahme, Application weg → Synthese aus contract_snapshot.
+ *    3) KEINE Portal-Annahme, aber Mamamia-final_confirmation (die Annahme
+ *       kam agentur-seitig — Fix Hagedorn) → Synthese aus dem Job-Stand.
+ *  lead_application_acceptances hat VORRANG: sobald Pfad 1/2 greifen, läuft
+ *  Pfad 3 nicht (keine Doppel-Synthese). Synthetische Apps werden jeden Lauf
+ *  verworfen + frisch abgeleitet, damit die Platzhalter-Karte aufs volle
+ *  Profil upgradet, sobald getCaregiver lädt. */
+export function applyAcceptedOverlay(
+  prev: UIApplication[],
+  args: {
+    acceptances: MamamiaAcceptedApplications | null;
+    confirmedJob: MamamiaCustomerJobOffer | null;
+    caregiverProfile: MamamiaCaregiverFull | null;
+    firstAcceptedCaregiverId: number | null;
+    opts: { nowIso: string; nowYear: number };
+  },
+): UIApplication[] {
+  const { acceptances, confirmedJob, caregiverProfile, firstAcceptedCaregiverId, opts } = args;
+  const base = prev.filter((a) => !a.synthetic);
+  const acceptedIds = new Set(acceptances?.application_ids ?? []);
+
+  if (acceptedIds.size > 0) {
+    // ── Portal-Annahme-Pfad (Verhalten unverändert, hat Vorrang) ──
+    const presentIds = new Set(base.map((a) => Number(a.id)));
+    // Pfad 1: vorhandene (Mamamia-)Apps auf accepted patchen
+    const patched = base.map((a) =>
+      acceptedIds.has(Number(a.id)) ? { ...a, status: 'accepted' as const } : a,
+    );
+    // Pfad 2: fehlende accepted-Apps aus contract_snapshot synthetisieren.
+    // synthesize liefert NIE null — ohne geladenes Profil kommt eine
+    // Platzhalter-Karte, damit BookedScreen inkl. Vertrags-PDF IMMER
+    // sichtbar bleibt (Mamamia-Hiccup ≠ Rückfall in den HTML-Flow).
+    const additions: UIApplication[] = [];
+    for (const row of acceptances?.rows ?? []) {
+      if (presentIds.has(row.application_id)) continue;
+      const profile = row.caregiver_id === firstAcceptedCaregiverId ? caregiverProfile : null;
+      additions.push({
+        ...synthesizeAcceptedApplicationFromSnapshot(row, profile ?? null, opts),
+        synthetic: true,
+      });
+    }
+    return [...patched, ...additions];
+  }
+
+  // ── Pfad 3: Mamamia-final_confirmation ohne Portal-Annahme ──
+  const cgId = confirmedJob?.final_confirmation?.caregiver?.id;
+  if (!confirmedJob || typeof cgId !== 'number') return base;
+  // Schon eine accepted-App da (z. B. optimistisches Update nach Annahme im
+  // Portal, bevor der Acceptance-Refetch durch ist) → keine Doppel-Synthese.
+  if (base.some((a) => a.status === 'accepted')) return base;
+  // Liefert Mamamia die Bewerbung derselben Pflegekraft (noch) in
+  // listApplications, patchen wir sie statt eine Doppel-Karte zu bauen.
+  if (base.some((a) => a.nurse.caregiverId === cgId)) {
+    return base.map((a) =>
+      a.nurse.caregiverId === cgId ? { ...a, status: 'accepted' as const } : a,
+    );
+  }
+  const profile = cgId === firstAcceptedCaregiverId ? caregiverProfile : null;
+  const synthetic = synthesizeAcceptedApplicationFromFinalConfirmation(confirmedJob, profile, opts);
+  return synthetic ? [...base, { ...synthetic, synthetic: true }] : base;
 }
 
 export function mapMatchingToNurse(
