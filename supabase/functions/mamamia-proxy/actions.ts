@@ -418,9 +418,25 @@ const uploadSignedContract: ActionHandler = async (session, variables, deps) => 
   if (typeof v.application_id !== "number") throw new Error("application_id required");
   if (typeof v.confirmation_id !== "number") throw new Error("confirmation_id required");
   if (typeof v.file_base64 !== "string" || v.file_base64.length === 0) throw new Error("file_base64 required");
-  // ~6 MB Datei-Limit (base64 +33%) — Vertrags-PDFs liegen bei ~100-300 KB.
+  // ~6 MB Datei-Limit (base64 +33%) — Vertrags-PDFs liegen bei ~300-700 KB.
   if (v.file_base64.length > 8_000_000) throw new Error("file too large");
-  await assertApplicationBelongsToSession(deps, session, v.application_id);
+  // Ownership-Anker ist die CONFIRMATION, nicht die Application: mamamia
+  // entfernt bestätigte Bewerbungen sofort aus JobOfferApplicationsWithPagination
+  // (gleiche Eigenheit wie bei Ablehnungen) — Sekunden nach StoreConfirmation
+  // würde der Application-Check also fehlschlagen (live gesehen, 15.07.).
+  // Stattdessen: die confirmation_id muss als final_confirmation an einem
+  // Job DIESES Session-Kunden hängen.
+  const cust = await runGraphQL<{
+    Customer: { job_offers: Array<{ final_confirmation: { id: number } | null }> | null } | null;
+  }>(deps, GET_CUSTOMER, { id: session.customer_id });
+  const fcIds = new Set(
+    (cust.Customer?.job_offers ?? [])
+      .map((j) => j?.final_confirmation?.id)
+      .filter((n): n is number => typeof n === "number"),
+  );
+  if (!fcIds.has(v.confirmation_id)) {
+    throw new Error("forbidden: confirmation not owned by session");
+  }
 
   const filename = typeof v.filename === "string" && v.filename.trim()
     ? v.filename.trim()
