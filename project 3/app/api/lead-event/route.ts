@@ -534,6 +534,13 @@ export async function POST(request: NextRequest) {
                   applicationId: metadata.application_id ?? null,
                   contractPatient: metadata.contract_patient ?? null,
                   contractContact: metadata.contract_contact ?? null,
+                  // Auto-Annahme (2026-07-15): true = StoreConfirmation in mamamia
+                  // ist bereits durch (Buchung synchron), false = fehlgeschlagen →
+                  // Team-Mail warnt „bitte manuell im SA-Portal annehmen".
+                  // undefined (Detektor / ältere Clients) → kein Hinweis.
+                  mamamiaAccepted: typeof (metadata as Record<string, unknown>).mamamia_accepted === 'boolean'
+                    ? (metadata as Record<string, unknown>).mamamia_accepted
+                    : undefined,
                 }
               : undefined);
       const teamTemplate = getTeamNotificationTemplate(lead as any, event, additionalData as any);

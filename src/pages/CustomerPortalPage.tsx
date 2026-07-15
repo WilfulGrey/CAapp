@@ -1234,15 +1234,19 @@ const CustomerPortalPage: FC = () => {
     setTimeout(() => setToast(null), durationMs);
   };
 
-  // MVP path — acceptance does NOT call Mamamia (no STORE_CONFIRMATION).
-  // Instead we POST to the kostenrechner bridge, which:
-  //   1. fires the team mail to info@primundus.de with the full contract
-  //      form data (step 2 of the modal)
-  //   2. UPSERTs into lead_application_acceptances so portal reload still
-  //      shows the BookedScreen
-  // Mamamia learns about the booking only when a Primundus team member
-  // manually processes it. This is intentional for MVP — confirmation
-  // logic + downstream Mamamia state is too complex for first launch.
+  // Annahme-Pfad (seit 2026-07-15 automatisch — vorher MVP mit manueller
+  // Nacharbeit): die Portal-Annahme führt BEIDES aus:
+  //   1. StoreConfirmation in mamamia (über den Proxy, Ownership-geprüft) —
+  //      Buchung ist sofort im SA-Portal/mamamia sichtbar, keine manuelle
+  //      Annahme mehr nötig.
+  //   2. POST an die kostenrechner-Bridge (application_accepted_internal):
+  //      Team-Mail mit Vertragsdaten, UPSERT lead_application_acceptances
+  //      (BookedScreen nach Reload), Mail C an den Kunden.
+  // Schlägt (1) fehl, läuft (2) trotzdem — die Team-Mail trägt dann eine
+  // rote Warnung „bitte manuell im SA-Portal annehmen" (alter Ablauf als
+  // Fallback). Schlägt (2) fehl, obwohl (1) durch ist, heilt der Detektor
+  // nach: er erkennt die final_confirmation und liefert Mails + internen
+  // Datensatz beim nächsten Tick (Dedupe-sicher) nach.
   // Event-Metadata für application_accepted_internal — geteilt zwischen
   // acceptApp (Portal-Annahme) und submitContractOnly (Vertrag nachträglich).
   // route.ts baut daraus den lead_application_acceptances-Upsert inkl.
@@ -1285,6 +1289,32 @@ const CustomerPortalPage: FC = () => {
     };
   };
 
+  // Vertragsdaten aus dem Modal → mamamia-Feldnamen für StoreConfirmation.
+  // einsatzort ist im Formular EIN Feld („PLZ, Ort") → für mamamia aufteilen.
+  const contractForMamamia = (formData: ContractFormData) => {
+    const clean = (s: unknown) => { const t = String(s ?? '').trim(); return t || null; };
+    const [zipRaw, ...cityRest] = String(formData.einsatzort || '').split(',');
+    return {
+      contract_patient: {
+        salutation: clean(formData.anrede),
+        first_name: clean(formData.vorname),
+        last_name: clean(formData.nachname),
+        street_number: clean(formData.strasse),
+        zip_code: clean(zipRaw),
+        city: clean(cityRest.join(',')),
+        phone: clean(formData.telefon),
+        email: clean(formData.email),
+      },
+      contract_contact: {
+        salutation: clean(formData.kpAnrede),
+        first_name: clean(formData.kpVorname),
+        last_name: clean(formData.kpNachname),
+        phone: clean(formData.kpTelefon),
+        email: clean(formData.kpEmail),
+      },
+    };
+  };
+
   const acceptApp = (id: string, formData: ContractFormData) => {
     setSelectedApp(null);
     // Unterschriebenen Vertrag merken → gebucht-Screen kann ihn präsentieren.
@@ -1304,6 +1334,23 @@ const CustomerPortalPage: FC = () => {
 
       if (!lead?.token) return;
 
+      // 1) Verbindliche Annahme in mamamia. Fail-soft: der Kunde hat
+      //    verbindlich akzeptiert — ein mamamia-Fehler bricht die
+      //    Portal-Buchung nicht ab, die Team-Mail trägt dann die Warnung
+      //    und das Team nimmt wie früher manuell im SA-Portal an.
+      let mamamiaAccepted = false;
+      try {
+        await callMamamia('storeConfirmation', {
+          application_id: Number(id),
+          is_confirm_binding: true,
+          ...contractForMamamia(formData),
+        });
+        mamamiaAccepted = true;
+      } catch (err) {
+        console.error('auto-accept (StoreConfirmation) failed:', (err as Error).message);
+      }
+
+      // 2) Interne Buchung + Mails über die Bridge.
       try {
         const res = await fetch(`${KOSTENRECHNER_URL}/api/lead-event`, {
           method: 'POST',
@@ -1311,7 +1358,12 @@ const CustomerPortalPage: FC = () => {
           body: JSON.stringify({
             token: lead.token,
             event: 'application_accepted_internal',
-            metadata: buildAcceptanceMetadata(Number(id), targetApp, formData),
+            metadata: {
+              ...buildAcceptanceMetadata(Number(id), targetApp, formData),
+              // Steuert den Hinweis in der Team-Mail: false ⇒ „bitte manuell
+              // im SA-Portal annehmen", true ⇒ Buchung bereits synchron.
+              mamamia_accepted: mamamiaAccepted,
+            },
           }),
         });
         if (!res.ok) throw new Error(`bridge HTTP ${res.status}`);
@@ -1320,6 +1372,13 @@ const CustomerPortalPage: FC = () => {
         refetchAcceptedApplications();
       } catch (err) {
         console.error('application_accepted_internal failed:', (err as Error).message);
+        if (mamamiaAccepted) {
+          // Die mamamia-Buchung steht bereits — Status NICHT zurückdrehen.
+          // Der BookedScreen leitet sich beim Reload aus der
+          // final_confirmation ab; Mails + internen Datensatz holt der
+          // Detektor beim nächsten Tick nach (Dedupe-sicher).
+          return;
+        }
         setApplications((prev) =>
           prev.map((a) => (a.id === id ? { ...a, status: 'new' } : a))
         );
