@@ -37,7 +37,13 @@ import {
 
 // ─── Types ─────────────────────────────────────────────────────────────────
 
-export type EventType = "caregiver_interest_shown" | "application_received";
+export type EventType =
+  | "caregiver_interest_shown"
+  | "application_received"
+  // Annahme-Detektor: Agentur akzeptiert im SA-Portal (mamamia setzt
+  // final_confirmation am Job) → gleiche Mail-Kette wie eine Portal-Annahme
+  // (Mail C + Team-Buchungsmail, beides baut route.ts /api/lead-event).
+  | "application_accepted_internal";
 
 export interface DetectSecrets {
   supabaseUrl: string;
@@ -137,6 +143,9 @@ export interface DetectResult {
   // 48h-Auto-Reject (PR: feat/auto-reject-48h-dryrun). auto_rejected zählt
   // tatsächlich (oder im Dry-Run: hypothetisch) abgelehnte Bewerbungen.
   auto_rejected: number;
+  // Annahme-Detektor: wie viele frische final_confirmations in diesem Lauf
+  // als application_accepted_internal an die Bridge gemeldet wurden.
+  accepted_detected: number;
   // Multi-Job (Phase 2A): wie viele lead_jobs-Zeilen aus Mamamias
   // Customer.job_offers gespiegelt wurden (0 wenn kein Adapter / kein Sync).
   lead_jobs_synced: number;
@@ -154,6 +163,7 @@ export interface BatchResult {
   total_skipped_no_caregiver_data: number;
   total_bridge_errors: number;
   total_auto_rejected: number;
+  total_accepted_detected: number;
   total_lead_jobs_synced: number;
   total_jobs_scanned: number;
   total_job_scan_errors: number;
@@ -220,6 +230,7 @@ async function handleBatch(deps: HandlerDeps): Promise<Response> {
     total_skipped_no_caregiver_data: 0,
     total_bridge_errors: 0,
     total_auto_rejected: 0,
+    total_accepted_detected: 0,
     total_lead_jobs_synced: 0,
     total_jobs_scanned: 0,
     total_job_scan_errors: 0,
@@ -238,6 +249,7 @@ async function handleBatch(deps: HandlerDeps): Promise<Response> {
       batch.total_skipped_no_caregiver_data += r.skipped_no_caregiver_data;
       batch.total_bridge_errors += r.bridge_errors;
       batch.total_auto_rejected += r.auto_rejected;
+      batch.total_accepted_detected += r.accepted_detected;
       batch.total_lead_jobs_synced += r.lead_jobs_synced;
       batch.total_jobs_scanned += r.jobs_scanned;
       batch.total_job_scan_errors += r.job_scan_errors;
@@ -276,6 +288,8 @@ export async function detect(
   // double-fetch). Single-job leads — or any Customer-fetch failure — degrade to
   // scanning only the default job, identical to the pre-multi-job behavior.
   let jobRows: LeadJobUpsertRow[] = [];
+  // Raw job_offers (inkl. final_confirmation) für den Annahme-Detektor unten.
+  let rawOffers: RawJobOffer[] = [];
   const scanJobIds = new Set<number>([lead.mamamia_job_offer_id]);
   if (lead.mamamia_customer_id) {
     try {
@@ -286,7 +300,8 @@ export async function detect(
         variables: { id: lead.mamamia_customer_id },
         fetchFn: fetcher,
       });
-      const built = buildLeadJobRows(jr.Customer?.job_offers ?? [], todayISO());
+      rawOffers = jr.Customer?.job_offers ?? [];
+      const built = buildLeadJobRows(rawOffers, todayISO());
       jobRows = built.rows;
       for (const s of built.skipped) {
         console.warn(`[detect][leadJobs] lead=${lead.id} jo=${s.id} unmapped status=${s.raw} — skipped`);
@@ -319,6 +334,11 @@ export async function detect(
   const jk = (job: number, cg: number) => `${job}:${cg}`;
   const seenApps = new Set<string>();
   const seenInterests = new Set<string>();
+  // Annahme-Dedupe: lead-weit pro caregiver_id (NICHT pro Job) — Portal-
+  // Annahmen tragen keine mamamia_job_offer_id-Spalte, müssen den Detektor
+  // aber trotzdem stoppen. Deckt Portal-Annahmen UND frühere Detektor-Läufe
+  // ab (beide landen als application_accepted_internal in lead_events).
+  const acceptedCg = new Set<number>();
   const jobsWithHistory = new Set<number>();
   for (const e of pastEvents) {
     if (e.caregiver_id == null) continue;
@@ -326,6 +346,7 @@ export async function detect(
     jobsWithHistory.add(job);
     if (e.event_type === "application_received") seenApps.add(jk(job, e.caregiver_id));
     else if (e.event_type === "caregiver_interest_shown") seenInterests.add(jk(job, e.caregiver_id));
+    else if (e.event_type === "application_accepted_internal") acceptedCg.add(e.caregiver_id);
   }
 
   const counts = {
@@ -334,6 +355,7 @@ export async function detect(
     skipped_no_caregiver_data: 0,
     bridge_errors: 0,
     auto_rejected: 0,
+    accepted_detected: 0,
     jobs_scanned: 0,
     job_scan_errors: 0,
     reminders_cancelled: 0,
@@ -364,6 +386,76 @@ export async function detect(
     } catch (e) {
       console.error(`[detect] lead=${lead.id} job=${jobOfferId} scan failed: ${e instanceof Error ? e.message : String(e)}`);
       counts.job_scan_errors += 1;
+    }
+  }
+
+  // ── Annahme-Detektor: Agentur akzeptiert eine Bewerbung im SA-Portal →
+  // mamamia setzt final_confirmation am Job. Frische Confirmations werden als
+  // application_accepted_internal an die Bridge gemeldet — dieselbe Kette wie
+  // eine Portal-Annahme (Mail C + Team-Buchungsmail baut route.ts komplett).
+  // Guards:
+  //   1. Dedupe lead-weit über acceptedCg (Portal-Annahme ODER früherer
+  //      Detektor-Lauf → nie doppelt feuern).
+  //   2. final_confirmed_at fehlt oder älter als ACCEPTED_MAX_AGE_MS →
+  //      Altbestand, beim ersten Scan KEINE Mails auslösen.
+  //   3. Job ohne Event-Historie (silent-seed, notify=false) → Event GAR NICHT
+  //      feuern: application_accepted_internal ist in route.ts lead-weit
+  //      deduped, ein seeded Event würde spätere echte Buchungsmails blocken.
+  // Fail-soft: Fehler pro Job loggen, Scan nie brechen.
+  for (const jo of rawOffers) {
+    try {
+      if (typeof jo.id !== "number" || !scanJobIds.has(jo.id)) continue;
+      const fc = jo.final_confirmation;
+      if (!fc) continue;
+      const notify = jobsWithHistory.has(jo.id) || jo.id === lead.mamamia_job_offer_id;
+      if (!notify) continue; // Guard 3 — Verhalten von application_received gespiegelt, nur ohne Seed-Event
+      const cg = fc.caregiver ?? null;
+      const cgId = typeof cg?.id === "number" ? cg.id : null;
+      if (cgId == null) continue; // ohne caregiver_id kein Dedupe möglich → nicht feuern
+      if (acceptedCg.has(cgId)) continue; // Guard 1
+      const confirmedMs = parseMamamiaTimestamp(fc.final_confirmed_at);
+      if (confirmedMs == null || Date.now() - confirmedMs > ACCEPTED_MAX_AGE_MS) continue; // Guard 2
+      const caregiverNode: CaregiverNode = {
+        id: cgId,
+        first_name: cg?.first_name ?? null,
+        last_name: cg?.last_name ?? null,
+        year_of_birth: null,
+        care_experience: null,
+        germany_skill: null,
+        hp_caregiver_id: null,
+        hp_total_jobs: null,
+        hp_total_days: null,
+        hp_avg_mission_days: null,
+        avatar_retouched: null,
+        about_de: null,
+      };
+      const ok = await fireBridgeEvent(
+        "application_accepted_internal",
+        lead.token,
+        cgId,
+        caregiverNode,
+        jo.id,
+        true,
+        secrets.kostenrechnerUrl,
+        counts,
+        fetcher,
+        // Konditionen des Jobs, sofern vorhanden (salary_offered wird in
+        // GET_CUSTOMER_JOB_OFFERS bewusst NICHT selektiert — ungetestetes
+        // Feld, Lehre vom 11.07.).
+        {
+          salary: null,
+          arrival_at: jo.arrival_at ?? null,
+          departure_at: jo.departure_at ?? null,
+          arrival_fee: null,
+          departure_fee: null,
+        },
+      );
+      if (ok) {
+        counts.accepted_detected += 1;
+        acceptedCg.add(cgId); // Guard gegen Doppel-Confirmations im selben Sweep
+      }
+    } catch (e) {
+      console.error(`[detect][accepted] lead=${lead.id} jo=${jo.id} failed: ${e instanceof Error ? e.message : String(e)}`);
     }
   }
 
@@ -409,6 +501,21 @@ export async function detect(
   }
 
   return { lead_id: lead.id, ...counts, lead_jobs_synced };
+}
+
+// ─── Annahme-Detektor: Konstanten + Zeitstempel-Parser ─────────────────────
+// final_confirmed_at älter als 7 Tage = Altbestand: beim allerersten Scan
+// eines Leads/Jobs dürfen historische Buchungen KEINE Mail-Kette auslösen.
+const ACCEPTED_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
+
+// Mamamia liefert Timestamps teils als "YYYY-MM-DD HH:MM:SS" (kein ISO-T).
+// Date.parse versteht das in V8, der Ersatz mit "T" ist der Fallback.
+export function parseMamamiaTimestamp(raw: string | null | undefined): number | null {
+  const t = (raw ?? "").trim();
+  if (!t) return null;
+  let ms = Date.parse(t);
+  if (!Number.isFinite(ms)) ms = Date.parse(t.replace(" ", "T"));
+  return Number.isFinite(ms) ? ms : null;
 }
 
 // Scan ONE of the lead's jobs: fetch its applications + interests, fire bridge
@@ -850,11 +957,14 @@ function makeRealSupabase(url: string, serviceKey: string): DetectSupabase {
       return (data ?? []) as LeadRow[];
     },
     async fetchPastEvents(leadId: string) {
+      // application_accepted_internal ist Dedupe-Quelle des Annahme-Detektors:
+      // Portal-Annahmen UND frühere Detektor-Läufe landen hier — beide
+      // verhindern ein erneutes Feuern.
       const { data, error } = await client
         .from("lead_events")
         .select("event_type, metadata, mamamia_job_offer_id")
         .eq("lead_id", leadId)
-        .in("event_type", ["caregiver_interest_shown", "application_received"]);
+        .in("event_type", ["caregiver_interest_shown", "application_received", "application_accepted_internal"]);
       if (error) throw new Error(`supabase fetchPastEvents: ${error.message}`);
       return (data ?? []).map((row: { event_type: string; metadata: unknown; mamamia_job_offer_id: number | null }) => ({
         event_type: row.event_type as EventType,
