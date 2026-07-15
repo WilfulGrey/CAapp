@@ -1358,12 +1358,14 @@ const CustomerPortalPage: FC = () => {
       //    Portal-Buchung nicht ab, die Team-Mail trägt dann die Warnung
       //    und das Team nimmt wie früher manuell im SA-Portal an.
       let mamamiaAccepted = false;
+      let confirmationId: number | null = null;
       try {
-        await callMamamia('storeConfirmation', {
+        const confRes = await callMamamia<{ StoreConfirmation?: { id?: number } }>('storeConfirmation', {
           application_id: Number(id),
           is_confirm_binding: true,
           ...contractForMamamia(formData),
         });
+        confirmationId = typeof confRes?.StoreConfirmation?.id === 'number' ? confRes.StoreConfirmation.id : null;
         mamamiaAccepted = true;
       } catch (err) {
         console.error('auto-accept (StoreConfirmation) failed:', (err as Error).message);
@@ -1399,6 +1401,38 @@ const CustomerPortalPage: FC = () => {
         // Refetch so the persistence merge useEffect re-flips status on
         // next render even if optimistic state somehow drops.
         refetchAcceptedApplications();
+
+        // 3) Signierten Vertrag automatisch in mamamia ablegen (Martins
+        //    Auftrag 15.07.: „Vertrag muss im SA-Portal sichtbar sein").
+        //    Das PDF rendert der Kostenrechner aus der soeben (Schritt 2)
+        //    gespeicherten Acceptance-Row — deshalb ERST nach dem
+        //    Bridge-POST. Fire-and-forget + fail-soft: schlägt es fehl,
+        //    bleibt der bisherige Weg (Team lädt das PDF aus der Team-Mail
+        //    manuell hoch). Ohne confirmationId (z. B. mamamia-500 mit
+        //    nachträglicher Erfolgs-Erkennung) überspringen wir ebenfalls.
+        if (mamamiaAccepted && confirmationId != null && lead?.id) {
+          void (async () => {
+            try {
+              const pdfRes = await fetch(
+                `${KOSTENRECHNER_URL}/api/contract-pdf/${lead.id}?token=${encodeURIComponent(lead.token ?? '')}`,
+              );
+              if (!pdfRes.ok) throw new Error(`contract-pdf HTTP ${pdfRes.status}`);
+              const bytes = new Uint8Array(await pdfRes.arrayBuffer());
+              let bin = '';
+              for (let i = 0; i < bytes.length; i += 0x8000) {
+                bin += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+              }
+              await callMamamia('uploadSignedContract', {
+                application_id: Number(id),
+                confirmation_id: confirmationId,
+                file_base64: btoa(bin),
+                filename: 'Dienstleistungsvertrag-signiert.pdf',
+              });
+            } catch (err) {
+              console.error('Vertrag-Ablage in mamamia fehlgeschlagen:', (err as Error).message);
+            }
+          })();
+        }
       } catch (err) {
         console.error('application_accepted_internal failed:', (err as Error).message);
         if (mamamiaAccepted) {

@@ -164,6 +164,7 @@ export type ProxyAction =
   | 'updateJobOfferDates'
   | 'rejectApplication'
   | 'storeConfirmation'
+  | 'uploadSignedContract'
   | 'inviteCaregiver'
   | 'dismissCaregiver'
   // AI
