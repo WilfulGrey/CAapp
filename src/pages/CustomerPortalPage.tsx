@@ -1290,23 +1290,42 @@ const CustomerPortalPage: FC = () => {
   };
 
   // Vertragsdaten aus dem Modal → mamamia-Feldnamen für StoreConfirmation.
-  // einsatzort ist im Formular EIN Feld („PLZ, Ort") → für mamamia aufteilen.
+  // ACHTUNG mamamia-Validierung (live gelernt, Fall Diesmann 15.07. 18:44):
+  // salutation ist ein Enum ('Mr.'/'Mrs.' — dieselben Tokens sendet das
+  // SA-Portal) — die deutschen Labels 'Herr'/'Frau' werden mit
+  // „salutation ist ungültig" abgelehnt. einsatzort ist im Formular EIN
+  // Feld; Kunden tippen „PLZ, Ort" ODER „PLZ Ort" ohne Komma → beides parsen.
+  const SALUTATION_TOKEN: Record<string, string> = { Herr: 'Mr.', Frau: 'Mrs.', 'Mr.': 'Mr.', 'Mrs.': 'Mrs.' };
   const contractForMamamia = (formData: ContractFormData) => {
     const clean = (s: unknown) => { const t = String(s ?? '').trim(); return t || null; };
-    const [zipRaw, ...cityRest] = String(formData.einsatzort || '').split(',');
+    const sal = (s: unknown) => SALUTATION_TOKEN[String(s ?? '').trim()] ?? null;
+    const ort = String(formData.einsatzort || '').trim();
+    let zip: string | null = null;
+    let city: string | null = null;
+    const commaSplit = ort.split(',');
+    const spaceMatch = /^(\d{4,5})\s+(.+)$/.exec(ort);
+    if (commaSplit.length > 1) {
+      zip = clean(commaSplit[0]);
+      city = clean(commaSplit.slice(1).join(','));
+    } else if (spaceMatch) {
+      zip = clean(spaceMatch[1]);
+      city = clean(spaceMatch[2]);
+    } else {
+      zip = clean(ort);
+    }
     return {
       contract_patient: {
-        salutation: clean(formData.anrede),
+        salutation: sal(formData.anrede),
         first_name: clean(formData.vorname),
         last_name: clean(formData.nachname),
         street_number: clean(formData.strasse),
-        zip_code: clean(zipRaw),
-        city: clean(cityRest.join(',')),
+        zip_code: zip,
+        city,
         phone: clean(formData.telefon),
         email: clean(formData.email),
       },
       contract_contact: {
-        salutation: clean(formData.kpAnrede),
+        salutation: sal(formData.kpAnrede),
         first_name: clean(formData.kpVorname),
         last_name: clean(formData.kpNachname),
         phone: clean(formData.kpTelefon),
@@ -1348,6 +1367,16 @@ const CustomerPortalPage: FC = () => {
         mamamiaAccepted = true;
       } catch (err) {
         console.error('auto-accept (StoreConfirmation) failed:', (err as Error).message);
+        // mamamia kann NACH dem erfolgreichen Write noch mit 500 antworten
+        // (live gesehen, Fall Diesmann: Confirmation angelegt, Response
+        // „Internal server error"). Nachkontrolle: hat der Session-Job
+        // jetzt eine Confirmation, war die Annahme trotzdem erfolgreich —
+        // sonst würde die Team-Mail fälschlich zur manuellen (Doppel-)
+        // Annahme auffordern.
+        try {
+          const jo = await callMamamia<{ JobOffer?: { confirmations_count?: number } }>('getJobOffer');
+          if ((jo?.JobOffer?.confirmations_count ?? 0) > 0) mamamiaAccepted = true;
+        } catch { /* Nachkontrolle fehlgeschlagen → bei false bleiben (ehrliche Warnung) */ }
       }
 
       // 2) Interne Buchung + Mails über die Bridge.
