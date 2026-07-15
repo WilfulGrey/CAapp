@@ -1068,6 +1068,24 @@ export function getTeamNotificationTemplate(
   : status === 'patient_data_saved'        ? '👀 Patientenprofil ist gefüllt — Lead ist warm.'
   : '⏰ Keine Aktion erforderlich - Lead wurde automatisch im System erfasst';
 
+  // Auto-Annahme-Status (Portal-Annahme → StoreConfirmation in mamamia,
+  // seit 2026-07-15): true = Buchung ist bereits synchron im SA-Portal;
+  // false = Automatik fehlgeschlagen → MANUELL annehmen; undefined
+  // (Detektor-Pfad / ältere Clients) = kein Hinweis.
+  const mamamiaAccepted = status === 'application_accepted_internal'
+    ? (additionalData as Record<string, unknown> | undefined)?.mamamiaAccepted
+    : undefined;
+  const autoAcceptHtml = mamamiaAccepted === true
+    ? `<div style="background:#EDF9EE;border-left:4px solid #2D6A4F;padding:12px 15px;margin:10px 0;"><strong>✓ Bewerbung wurde automatisch in mamamia angenommen</strong> — die Buchung ist im SA-Portal bereits sichtbar, keine manuelle Annahme nötig.</div>`
+    : mamamiaAccepted === false
+    ? `<div style="background:#FDF1F1;border-left:4px solid #B02A2A;padding:12px 15px;margin:10px 0;"><strong>⚠️ Automatische Annahme in mamamia FEHLGESCHLAGEN</strong> — bitte die Bewerbung im SA-Portal manuell annehmen, sonst bleibt die Buchung nur intern erfasst.</div>`
+    : '';
+  const autoAcceptText = mamamiaAccepted === true
+    ? '✓ Bewerbung wurde automatisch in mamamia angenommen — keine manuelle Annahme nötig.\n\n'
+    : mamamiaAccepted === false
+    ? '⚠️ Automatische Annahme in mamamia FEHLGESCHLAGEN — bitte die Bewerbung im SA-Portal manuell annehmen!\n\n'
+    : '';
+
   return {
     subject: `${emoji} ${text}`,
     html: `
@@ -1094,6 +1112,8 @@ export function getTeamNotificationTemplate(
               <strong>${caregiverLabel}:</strong> ${caregiverName}${status === 'application_accepted_internal' && acceptanceCaregiverId ? ` (caregiver_id ${acceptanceCaregiverId})` : ''}${status === 'application_accepted_internal' && acceptanceApplicationId ? ` · Application ${acceptanceApplicationId}` : ''}
             </div>
           ` : ''}
+
+          ${autoAcceptHtml}
 
           ${contractTablesHtml}
 
@@ -1159,7 +1179,7 @@ export function getTeamNotificationTemplate(
 ${emoji} ${text}
 ${caregiverName ? `
 ${caregiverLabel}: ${caregiverName}${status === 'application_accepted_internal' && acceptanceCaregiverId ? ` (caregiver_id ${acceptanceCaregiverId})` : ''}${status === 'application_accepted_internal' && acceptanceApplicationId ? ` · Application ${acceptanceApplicationId}` : ''}
-` : ''}${contractTablesText}${showPortalCta ? `
+` : ''}${autoAcceptText}${contractTablesText}${showPortalCta ? `
 ➜ Im Kundenportal ansehen: ${portalUrl}
 ` : ''}
 === KONTAKTDATEN ===
