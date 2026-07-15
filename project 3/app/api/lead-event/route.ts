@@ -5,6 +5,7 @@ import {
   getTeamNotificationTemplate,
   buildCustomerCaregiverMailWithInlinePhoto,
   getPatientDataSavedEmailTemplate,
+  getOfferUpdatedEmailTemplate,
   type CaregiverDisplay,
   type CaregiverMailEvent,
   type OfferInfo,
@@ -45,6 +46,12 @@ const ALLOWED_EVENTS = [
   // manually. Acceptance row persisted in lead_application_acceptances.
   'application_accepted_internal',
   'application_rejected',        // Kunde hat eine Bewerbung abgelehnt
+  // Angebots-Anpassung (2026-07-15): der Berater hat preisrelevante Kundendaten
+  // korrigiert und die Lead-Kalkulation wurde neu geschrieben (direkter
+  // Service-Key-Write aus dem SA-Portal — bewusst NICHT über diesen Endpoint,
+  // Token liegt beim Kunden). Event = Audit-Trail + optionale Kundenmail
+  // (notify:false → nur Aufzeichnung, keine Mail).
+  'offer_updated',
 ];
 const TEAM_NOTIFY_EVENTS = [
   'patient_data_saved',
@@ -77,6 +84,7 @@ const NON_DEDUPED_EVENTS = new Set([
   'caregiver_declined_undone',
   'application_received',
   'application_rejected',
+  'offer_updated',               // Preis kann mehrfach angepasst werden
 ]);
 // Customer-facing Mails (an die Lead-Email) je Event. Trigger sind die neuen
 // Caregiver-Lifecycle-Events; das eigentliche Hooking aus Mamamia kommt
@@ -86,6 +94,15 @@ const CUSTOMER_MAIL_EVENTS = new Set([
   'caregiver_interest_shown',    // Mail A
   'application_received',        // Mail B
   'application_accepted_internal', // Mail C
+  'offer_updated',               // Aktualisiertes Angebot (alt → neu Preis)
+]);
+
+// Transaktionale Mails, die den Abmelde-Status ignorieren: der Kunde hat die
+// Aktion selbst ausgelöst (Buchung) bzw. muss sie zwingend erfahren
+// (Preisänderung seines Angebots) — das ist keine Werbe-/Nurture-Mail.
+const TRANSACTIONAL_MAIL_EVENTS = new Set([
+  'application_accepted_internal',
+  'offer_updated',
 ]);
 
 function extractCaregiverDisplay(metadata: any): CaregiverDisplay | null {
@@ -542,11 +559,11 @@ export async function POST(request: NextRequest) {
       const shouldSendCustomerMail = !isDeduped || isFirstOccurrence;
 
       // Abmeldung (Abmelde-Link, Art. 21 DSGVO): keine automatisierten
-      // Kundenmails mehr. Ausnahme: Mail C (application_accepted_internal /
-      // Buchungsbestätigung) — der Kunde hat die Buchung gerade aktiv im
-      // Portal ausgelöst, die Bestätigung ist transaktional.
+      // Kundenmails mehr. Ausnahme: transaktionale Mails (Mail C /
+      // Buchungsbestätigung, offer_updated / Preisänderung des eigenen
+      // Angebots) — siehe TRANSACTIONAL_MAIL_EVENTS.
       let unsubscribed = false;
-      if (event !== 'application_accepted_internal') {
+      if (!TRANSACTIONAL_MAIL_EVENTS.has(event)) {
         const { data: unsubEvt } = await supabase
           .from('lead_events')
           .select('id')
@@ -570,6 +587,37 @@ export async function POST(request: NextRequest) {
         sendEmail((lead as any).email, template).catch((e) =>
           console.error('customer mail send threw:', e instanceof Error ? e.message : String(e)),
         );
+      } else if (event === 'offer_updated') {
+        // Aktualisiertes Angebot — alter/neuer Preis + geänderte Angaben aus
+        // der Metadata (vom SA-Portal gesetzt; die Kalkulation selbst wurde
+        // dort bereits per Service-Key auf den Lead geschrieben). Ohne
+        // plausible Preise keine Mail — Event bleibt trotzdem aufgezeichnet.
+        const m = (metadata ?? {}) as Record<string, unknown>;
+        const oldB = Number(m.old_bruttopreis);
+        const newB = Number(m.new_bruttopreis);
+        if (!Number.isFinite(oldB) || !Number.isFinite(newB) || newB <= 0) {
+          console.warn(`lead-event offer_updated: missing/invalid prices in metadata — mail skipped (lead ${lead.id})`);
+        } else {
+          const rawChanged = Array.isArray(m.changed) ? (m.changed as Array<Record<string, unknown>>) : [];
+          const portalUrl = buildPortalUrl(lead as any);
+          const template = getOfferUpdatedEmailTemplate(
+            lead as any,
+            {
+              oldBruttopreis: oldB,
+              newBruttopreis: newB,
+              newEigenanteil: Number.isFinite(Number(m.new_eigenanteil)) ? Number(m.new_eigenanteil) : null,
+              changed: rawChanged.map((c) => ({
+                name: typeof c?.name === 'string' ? c.name : undefined,
+                alt: typeof c?.alt === 'string' ? c.alt : undefined,
+                neu: typeof c?.neu === 'string' ? c.neu : undefined,
+              })),
+            },
+            portalUrl,
+          );
+          sendEmail((lead as any).email, template).catch((e) =>
+            console.error('customer mail send threw:', e instanceof Error ? e.message : String(e)),
+          );
+        }
       } else {
         // Caregiver-Event-Mails (A/B/C) — Foto inline einbetten (CID) —
         // presigned S3-URLs laufen nach 30 Min ab, daher nicht zuverlässig

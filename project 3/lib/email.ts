@@ -2011,6 +2011,115 @@ www.primundus.de
   return { subject, html, text };
 }
 
+// ─── „Aktualisiertes Angebot" (offer_updated) ────────────────────────────────
+// Der Berater hat preisrelevante Angaben des Kunden korrigiert (SA-Portal),
+// die Lead-Kalkulation wurde bereits serverseitig neu geschrieben (direkter
+// Supabase-Write mit Service-Key — NICHT über diesen token-authentifizierten
+// Endpoint, damit ein Kunde mit seinem Magic-Link-Token seinen eigenen Preis
+// nicht manipulieren kann). Diese Mail informiert den Kunden: alter → neuer
+// Monatspreis, geänderte Angaben, CTA ins Portal. Wird nur verschickt, wenn
+// der Berater das Häkchen „Aktualisiertes Angebot per Mail senden" gesetzt hat.
+export interface OfferUpdatedInfo {
+  oldBruttopreis: number;
+  newBruttopreis: number;
+  newEigenanteil?: number | null;
+  changed?: Array<{ name?: string; alt?: string; neu?: string }>;
+}
+
+// Minimaler HTML-Escape für die Änderungs-Labels — die kommen zwar aus dem
+// SA-Portal (vertrauenswürdig), aber der Endpoint ist token-authentifiziert,
+// also defensiv escapen statt roh interpolieren.
+function escBasic(v: unknown): string {
+  return String(v ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
+export function getOfferUpdatedEmailTemplate(
+  lead: Lead,
+  info: OfferUpdatedInfo,
+  portalUrl: string,
+): EmailTemplate {
+  const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://primundus.de';
+  const greeting = customerGreeting(lead);
+  const fmt = (n: number) => Math.round(n).toLocaleString('de-DE');
+  const subject = 'Ihr aktualisiertes Betreuungsangebot';
+
+  const oldP = fmt(info.oldBruttopreis);
+  const newP = fmt(info.newBruttopreis);
+  const changed = (info.changed ?? []).filter((c) => c && (c.name || c.alt || c.neu));
+
+  const changedHtml = changed.length
+    ? `<p style="font-size:15px;line-height:1.75;color:#444;margin:0 0 10px;">Folgende Angaben wurden angepasst:</p>
+      <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="border:1px solid #e8ddd0;border-radius:12px;overflow:hidden;margin:0 0 22px;">
+        ${changed
+          .map(
+            (c, i) => `<tr>
+          <td style="padding:10px 14px;font-size:13px;font-weight:700;color:#3D2B1F;white-space:nowrap;vertical-align:top;${i ? 'border-top:1px solid #f0ebe4;' : ''}">${escBasic(c.name)}</td>
+          <td style="padding:10px 14px;font-size:13px;color:#999;vertical-align:top;${i ? 'border-top:1px solid #f0ebe4;' : ''}">${escBasic(c.alt) || '—'}</td>
+          <td style="padding:10px 6px;font-size:13px;color:#9a8a73;vertical-align:top;${i ? 'border-top:1px solid #f0ebe4;' : ''}">→</td>
+          <td style="padding:10px 14px;font-size:13px;font-weight:600;color:#2D1F0F;vertical-align:top;${i ? 'border-top:1px solid #f0ebe4;' : ''}">${escBasic(c.neu) || '—'}</td>
+        </tr>`,
+          )
+          .join('')}
+      </table>`
+    : '';
+
+  const eigenanteilHtml =
+    info.newEigenanteil != null && Number.isFinite(info.newEigenanteil)
+      ? `<p style="font-size:14px;line-height:1.65;color:#555;margin:0 0 20px;text-align:center;">Ihr voraussichtlicher Eigenanteil nach Zuschüssen: <strong style="color:#2D1F0F;">${fmt(info.newEigenanteil)} €/Monat</strong></p>`
+      : '';
+
+  const content = `
+    <p style="font-size:15px;line-height:1.75;color:#444;margin-bottom:14px;">${greeting},</p>
+    <p style="font-size:15px;line-height:1.75;color:#444;margin-bottom:18px;">Ihre Betreuungsangaben wurden aktualisiert. Dadurch ändert sich der monatliche Gesamtpreis Ihres Angebots — Ihr Angebot im Kundenportal ist bereits auf dem neuen Stand.</p>
+    ${changedHtml}
+    <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="border:1px solid #e8ddd0;border-radius:12px;overflow:hidden;margin:0 0 14px;">
+      <tr>
+        <td class="cond-top-cell" style="width:50%;padding:18px 22px 16px;border-right:1px solid #ebe2d2;background:#faf8f5;text-align:center;">
+          <p style="margin:0 0 4px;font-size:11px;color:#9a8a73;text-transform:uppercase;letter-spacing:.05em;font-weight:700;">Bisher</p>
+          <p style="margin:0;font-size:19px;color:#999;"><span style="text-decoration:line-through;">${oldP} €</span><span style="font-size:13px;">/Monat</span></p>
+        </td>
+        <td class="cond-top-cell" style="width:50%;padding:18px 22px 16px;background:#ffffff;text-align:center;">
+          <p style="margin:0 0 4px;font-size:11px;color:#2D6A4F;text-transform:uppercase;letter-spacing:.05em;font-weight:700;">Neu</p>
+          <p style="margin:0;font-size:23px;font-weight:800;color:#2D1F0F;">${newP} €<span style="font-size:14px;font-weight:600;color:#555;">/Monat</span></p>
+        </td>
+      </tr>
+    </table>
+    ${eigenanteilHtml}
+    ${bulletproofButton(portalUrl, 'Aktualisiertes Angebot ansehen →')}
+    <p style="font-size:14px;line-height:1.65;color:#555;margin:18px 0 0;">Bei Fragen zur Anpassung erreichen Sie uns telefonisch unter <a href="tel:+4989200000830" style="color:#0066CC;text-decoration:none;">+49 89 200 000 830</a> oder per E-Mail an <a href="mailto:info@primundus.de" style="color:#0066CC;text-decoration:none;">info@primundus.de</a>.</p>
+    ${caregiverIlkaSig(baseUrl)}`;
+
+  const html = caregiverMailShell(baseUrl, lead.email, content, customerUnsubscribeUrl(lead) || undefined);
+
+  const changedText = changed.length
+    ? `Folgende Angaben wurden angepasst:\n${changed.map((c) => `- ${c.name ?? ''}: ${c.alt ?? '—'} → ${c.neu ?? '—'}`).join('\n')}\n\n`
+    : '';
+  const text = `${greeting},
+
+Ihre Betreuungsangaben wurden aktualisiert. Dadurch ändert sich der monatliche Gesamtpreis Ihres Angebots — Ihr Angebot im Kundenportal ist bereits auf dem neuen Stand.
+
+${changedText}Bisher: ${oldP} €/Monat
+Neu: ${newP} €/Monat
+${info.newEigenanteil != null && Number.isFinite(info.newEigenanteil) ? `Ihr voraussichtlicher Eigenanteil nach Zuschüssen: ${fmt(info.newEigenanteil)} €/Monat\n` : ''}
+Aktualisiertes Angebot ansehen: ${portalUrl}
+
+Bei Fragen zur Anpassung erreichen Sie uns telefonisch unter +49 89 200 000 830 oder per E-Mail an info@primundus.de.
+
+Mit freundlichen Grüßen
+Ilka Wysocki — Pflegeberaterin
+Tel: 089 200 000 830  ·  WhatsApp: https://wa.me/4989200000830
+
+Primundus Deutschland
+www.primundus.de
+`;
+
+  return { subject, html, text };
+}
+
 // Mail 11 (Mail A — Interesse). Eigenständiges Layout (NICHT
 // buildCaregiverEventEmail), damit Mail B/C unberührt bleiben:
 // kompakte Pflegekraft-Kachel (Foto · Name·Alter · Badge · Erfahrung ·
