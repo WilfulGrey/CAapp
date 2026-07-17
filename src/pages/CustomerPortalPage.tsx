@@ -2726,8 +2726,14 @@ const CustomerPortalPage: FC = () => {
             // ── Gating write: full mechanical patch. Awaited so the caller
             // (AngebotCard) keeps patientSaved=false until Mamamia has the
             // complete profile — invite gate opens only on success.
+            // portal_form_snapshot: der ROHE Patientenbogen — der Proxy friert ihn
+            // nach erfolgreichem Write an leads.patient_form ein (SA-Portal zeigt
+            // ihn im Anfrage-Block); Mamamia erreicht das Feld nie (Allowlist).
             try {
-              await updateCustomerMutation.mutate(patch as Record<string, unknown>);
+              await updateCustomerMutation.mutate({
+                ...(patch as Record<string, unknown>),
+                portal_form_snapshot: form,
+              });
             } catch (err) {
               const raw = err instanceof Error ? err.message : String(err ?? '');
               // Token während des Ausfüllens abgelaufen → ehrlich sagen und in
