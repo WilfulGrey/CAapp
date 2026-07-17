@@ -880,7 +880,24 @@ const updateCustomer: ActionHandler = async (session, variables, deps) => {
   }
 
   console.log(`[DBG][updateCustomer][3-BEFORE-GQL] cid=${session.customer_id} ${JSON.stringify(patch).slice(0, 12000)}`);
-  return runGraphQL(deps, UPDATE_CUSTOMER, patch);
+  const result = await runGraphQL(deps, UPDATE_CUSTOMER, patch);
+
+  // ── Patientenbogen einfrieren (leads.patient_form) ──
+  // Das SA-Portal zeigt im Anfrage-Block, was der Kunde URSPRÜNGLICH angegeben
+  // hat — der Mamamia-Datensatz wird später von der Agentur editiert und taugt
+  // nicht als Beleg. `portal_form_snapshot` steht nicht in UPDATE_CUSTOMER_ALLOWED
+  // und erreicht Mamamia nie; hier landet es best-effort am Lead (nach dem
+  // erfolgreichen Write, damit der Freeze den angelegten Stand widerspiegelt).
+  const snapshot = (variables as Record<string, unknown>).portal_form_snapshot;
+  if (snapshot && typeof snapshot === "object" && !Array.isArray(snapshot)) {
+    try {
+      await deps.supabase?.saveLeadPatientForm?.(session.lead_id, snapshot as Record<string, unknown>);
+    } catch (e) {
+      console.warn(`[updateCustomer][freeze-failed] lead=${session.lead_id} err=${(e as Error).message}`);
+    }
+  }
+
+  return result;
 };
 
 // ─── updateJobDescription — narrow write for the AI overlay ────────────────

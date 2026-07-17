@@ -297,6 +297,13 @@ function makeRealSupabase(url: string, serviceKey: string): ProxySupabase {
         .insert({ lead_id: leadId, caregiver_id: caregiverId, mamamia_job_offer_id: jobOfferId });
       if (error) throw new Error(`supabase recordInviteAttempt: ${error.message}`);
     },
+    async saveLeadPatientForm(leadId, form) {
+      const { error } = await client
+        .from("leads")
+        .update({ patient_form: form })
+        .eq("id", leadId);
+      if (error) throw new Error(`supabase saveLeadPatientForm: ${error.message}`);
+    },
     async scheduleNeuePflegekraefteMail(leadId) {
       const { data: lead } = await client
         .from("leads")

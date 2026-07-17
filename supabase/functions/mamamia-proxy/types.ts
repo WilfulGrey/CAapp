@@ -125,6 +125,10 @@ export interface ProxySupabase {
   // trotzdem erfolgreich. send-scheduled-emails cancelt sie bei Reaktion.
   // Optional, damit bestehende Test-Mocks ohne diese Methode gültig bleiben.
   scheduleNeuePflegekraefteMail?(leadId: string): Promise<void>;
+  // Friert den Patientenbogen (Roh-Formular) am Lead ein (leads.patient_form) —
+  // das SA-Portal zeigt ihn im Anfrage-Block als "was der Kunde angegeben hat".
+  // Best-effort nach erfolgreichem UpdateCustomer; optional für Test-Mocks.
+  saveLeadPatientForm?(leadId: string, form: Record<string, unknown>): Promise<void>;
 }
 
 export interface ActionDeps {
