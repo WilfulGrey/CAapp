@@ -300,7 +300,7 @@ function makeRealSupabase(url: string, serviceKey: string): ProxySupabase {
     async saveLeadPatientForm(leadId, form) {
       const { error } = await client
         .from("leads")
-        .update({ patient_form: form })
+        .update({ patient_form: form, patient_form_at: new Date().toISOString() })
         .eq("id", leadId);
       if (error) throw new Error(`supabase saveLeadPatientForm: ${error.message}`);
     },
