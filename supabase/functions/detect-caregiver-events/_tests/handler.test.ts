@@ -628,7 +628,7 @@ Deno.test("buildCaregiverMetadata: Platzhalter-about_de wird nicht übernommen",
   assertEquals(meta.caregiver_about_text, undefined);
 });
 
-// ─── 48h Auto-Reject ─────────────────────────────────────────────────────────
+// ─── 72h Auto-Reject ─────────────────────────────────────────────────────────
 const hoursAgo = (h: number) => new Date(Date.now() - h * 3_600_000).toISOString();
 
 // Bewerbung schon als application_received "gesehen" (kein neuer Bridge-Event),
@@ -642,7 +642,7 @@ Deno.test("auto-reject DRY-RUN (Kill-Switch AUTO_REJECT_ENABLED=false): stale ap
     const recorder: BridgeOptions["recorder"] = [];
     const rejectRecorder: number[] = [];
     const appStatus: AppStatusEventRow[] = [
-      { event_type: "application_received", caregiver_id: 50001, created_at: hoursAgo(49) },
+      { event_type: "application_received", caregiver_id: 50001, created_at: hoursAgo(73) },
     ];
     const res = await handleRequest(makeReq({ lead_id: VALID_LEAD.id }), {
       secrets: SECRETS,
@@ -665,7 +665,7 @@ Deno.test("auto-reject DEFAULT (kein Env): stale app → SCHARF, Mamamia-Reject 
   const recorder: BridgeOptions["recorder"] = [];
   const rejectRecorder: number[] = [];
   const appStatus: AppStatusEventRow[] = [
-    { event_type: "application_received", caregiver_id: 50001, created_at: hoursAgo(49) },
+    { event_type: "application_received", caregiver_id: 50001, created_at: hoursAgo(73) },
   ];
   const res = await handleRequest(makeReq({ lead_id: VALID_LEAD.id }), {
     secrets: SECRETS,
@@ -678,7 +678,7 @@ Deno.test("auto-reject DEFAULT (kein Env): stale app → SCHARF, Mamamia-Reject 
   assertEquals(recorder.filter((r) => r.event === "application_rejected").length, 1);
 });
 
-Deno.test("auto-reject: app jünger als 48h → nicht abgelehnt", async () => {
+Deno.test("auto-reject: app jünger als 72h → nicht abgelehnt", async () => {
   resetCaches();
   const rejectRecorder: number[] = [];
   const appStatus: AppStatusEventRow[] = [
@@ -698,7 +698,7 @@ Deno.test("auto-reject: Kunde hat bereits reagiert → nicht abgelehnt", async (
   resetCaches();
   const rejectRecorder: number[] = [];
   const appStatus: AppStatusEventRow[] = [
-    { event_type: "application_received", caregiver_id: 50001, created_at: hoursAgo(49) },
+    { event_type: "application_received", caregiver_id: 50001, created_at: hoursAgo(73) },
     { event_type: "application_rejected", caregiver_id: 50001, created_at: hoursAgo(10) },
   ];
   const res = await handleRequest(makeReq({ lead_id: VALID_LEAD.id }), {
@@ -731,7 +731,7 @@ Deno.test("auto-reject LIVE (AUTO_REJECT_ENABLED=true): stale app → Mamamia-Re
     const recorder: BridgeOptions["recorder"] = [];
     const rejectRecorder: number[] = [];
     const appStatus: AppStatusEventRow[] = [
-      { event_type: "application_received", caregiver_id: 50001, created_at: hoursAgo(49) },
+      { event_type: "application_received", caregiver_id: 50001, created_at: hoursAgo(73) },
     ];
     const res = await handleRequest(makeReq({ lead_id: VALID_LEAD.id }), {
       secrets: SECRETS,
@@ -744,7 +744,7 @@ Deno.test("auto-reject LIVE (AUTO_REJECT_ENABLED=true): stale app → Mamamia-Re
     const rej = recorder.filter((r) => r.event === "application_rejected");
     assertEquals(rej.length, 1);
     assertEquals(rej[0].metadata.application_id, 777);
-    assertEquals(rej[0].metadata.reason, "auto_timeout_48h");
+    assertEquals(rej[0].metadata.reason, "auto_timeout_72h");
   } finally {
     Deno.env.delete("AUTO_REJECT_ENABLED");
   }
@@ -1101,7 +1101,7 @@ Deno.test("multi-job: auto-reject is per-job; a seeded-only anchor is never reje
   resetCaches();
   const recorder: BridgeOptions["recorder"] = [];
   const rejectRecorder: number[] = [];
-  const old = new Date(Date.now() - 49 * 3600 * 1000).toISOString();
+  const old = new Date(Date.now() - 73 * 3600 * 1000).toISOString();
   const statusEvents: AppStatusEventRow[] = [
     // real (mailed) anchor → reject-eligible
     { event_type: "application_received", caregiver_id: 50001, created_at: old, mamamia_job_offer_id: JOB_B },
