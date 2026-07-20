@@ -1423,38 +1423,37 @@ function buildReminderHtml(
   let introHtml: string;
   let middleHtml: string;
   let ctaText: string;
-  const PpassT = `So weiß ${firstName}, woran sie ist — und falls es nicht passt, schlage ich Ihnen gern jemand anderen vor.`;
   if (variant === "interest") {
-    introHtml = `<p style="font-size:15px;line-height:1.75;color:#444;margin-bottom:18px;">vor einer Stunde haben wir Ihnen geschrieben, dass <strong style="color:#2D1F0F;">${cgName}</strong> Interesse an Ihrer Anfrage hat. Eine kurze Erinnerung — die nächsten Stunden zählen:</p>`;
-    middleHtml = `<p style="font-size:15px;line-height:1.75;color:#444;margin-bottom:20px;">Pflegekräfte mit guten Profilen werden häufig schnell von anderen Familien angefragt. <strong style="color:#2D1F0F;">Damit ${firstName} für Sie verfügbar bleibt</strong>, schauen Sie sich ihr Profil jetzt an und laden Sie sie ein, sich bei Ihnen zu bewerben.</p>`;
+    introHtml = `<p style="font-size:15px;line-height:1.75;color:#444;margin-bottom:18px;">vorhin haben wir Ihnen geschrieben, dass <strong style="color:#2D1F0F;">${cgName}</strong> gern für Sie da wäre.</p>`;
+    middleHtml = `<p style="font-size:15px;line-height:1.75;color:#444;margin-bottom:20px;">Schauen Sie sich ihr Profil in Ruhe im Portal an — wenn ${firstName} Ihnen zusagt, laden Sie sie mit einem Klick ein, sich bei Ihnen zu bewerben. Und wenn nicht, ist das auch völlig okay: Ein kurzes Nein hilft ${firstName} mehr als Warten.</p>`;
     ctaText = "Profil ansehen und einladen →";
   } else if (tier === "1h") {
     introHtml = `<p style="font-size:15px;line-height:1.75;color:#444;margin-bottom:18px;">konnten Sie sich schon mit <strong style="color:#2D1F0F;">${firstName}s Bewerbung</strong> beschäftigen?</p>`;
-    middleHtml = `<p style="font-size:15px;line-height:1.75;color:#444;margin-bottom:20px;">Teilen Sie mir gern kurz mit, ob ${firstName} zu Ihnen passt oder nicht. ${PpassT}</p>`;
+    middleHtml = `<p style="font-size:15px;line-height:1.75;color:#444;margin-bottom:20px;">Im Portal können Sie ${firstName} mit einem Klick zu- oder absagen — und falls sie nicht passt, schlage ich Ihnen gern jemand anderen vor.</p>`;
     ctaText = `${firstName}s Bewerbung ansehen →`;
   } else if (tier === "4h") {
-    introHtml = `<p style="font-size:15px;line-height:1.75;color:#444;margin-bottom:18px;">konnten Sie schon einen Blick auf <strong style="color:#2D1F0F;">${firstName}s Bewerbung</strong> werfen?</p>`;
-    middleHtml = `<p style="font-size:15px;line-height:1.75;color:#444;margin-bottom:20px;">Teilen Sie mir gern kurz mit, ob sie zu Ihnen passt oder nicht. ${PpassT}</p>`;
+    introHtml = `<p style="font-size:15px;line-height:1.75;color:#444;margin-bottom:18px;">falls Sie noch unsicher sind: Im Portal finden Sie <strong style="color:#2D1F0F;">${firstName}s vollständiges Profil</strong> mit allen Konditionen — von den Kosten bis zum Anreisetermin.</p>`;
+    middleHtml = `<p style="font-size:15px;line-height:1.75;color:#444;margin-bottom:20px;">Ein Klick auf Zusagen oder Absagen genügt.</p>`;
     ctaText = `${firstName}s Bewerbung ansehen →`;
   } else if (tier === "12h") {
-    introHtml = `<p style="font-size:15px;line-height:1.75;color:#444;margin-bottom:18px;">ich wollte kurz nachhören: Wie ist Ihr Eindruck von <strong style="color:#2D1F0F;">${firstName}s Bewerbung</strong>?</p>`;
-    middleHtml = `<p style="font-size:15px;line-height:1.75;color:#444;margin-bottom:20px;">Teilen Sie mir gern kurz mit, ob ${firstName} zu Ihnen passt oder nicht. So weiß ${firstName}, woran sie ist. Und wenn Sie unsicher sind, berate ich Sie natürlich gerne persönlich.</p>`;
+    introHtml = `<p style="font-size:15px;line-height:1.75;color:#444;margin-bottom:18px;">ich wollte einmal nachhören, wie Ihnen <strong style="color:#2D1F0F;">${firstName}s Bewerbung</strong> gefällt.</p>`;
+    middleHtml = `<p style="font-size:15px;line-height:1.75;color:#444;margin-bottom:20px;">Vielleicht hatten Sie noch keine ruhige Minute — das ist völlig in Ordnung. Ein Klick im Portal genügt, Ja oder Nein — alles Weitere übernehme ich.</p>`;
     ctaText = `${firstName}s Bewerbung ansehen →`;
   } else {
     // tier === "70h" — letzte Erinnerung vor dem automatischen Freigeben
     // (~2h später durch den Auto-Reject). Positiv gerahmt: Barbara nicht
     // unnötig warten lassen; weitere Vorschläge nur auf Wunsch.
     introHtml = `<p style="font-size:15px;line-height:1.75;color:#444;margin-bottom:18px;">passt <strong style="color:#2D1F0F;">${firstName}</strong> zu Ihnen?</p>`;
-    middleHtml = `<p style="font-size:15px;line-height:1.75;color:#444;margin-bottom:20px;">Teilen Sie mir gern kurz mit, ob ja oder nein. Wenn ich nichts von Ihnen höre, gebe ich ${firstName} in den nächsten Stunden wieder frei, damit sie nicht unnötig wartet. Und wenn Sie lieber andere Vorschläge möchten, melden Sie sich einfach kurz — ich kümmere mich.</p>`;
+    middleHtml = `<p style="font-size:15px;line-height:1.75;color:#444;margin-bottom:20px;">Sagen Sie ihr im Portal kurz zu oder ab. Wenn ich nichts von Ihnen höre, gebe ich ${firstName} in den nächsten Stunden wieder frei, damit sie nicht unnötig wartet. Und wenn Sie lieber andere Vorschläge möchten, melden Sie sich einfach kurz — ich kümmere mich.</p>`;
     ctaText = `${firstName}s Bewerbung ansehen →`;
   }
 
   // Interest behält den dezenten Soft-Out unter dem CTA. Application
   // braucht ihn nicht mehr — der "passt nicht?"-Hinweis steckt jetzt
   // direkt in middleHtml ("an- oder ablehnen / auf diese Mail antworten").
-  const softOut = variant === "interest"
-    ? `<p style="font-size:13px;line-height:1.6;color:#888;margin:18px 0 0;font-style:italic;">Falls ${firstName} nicht zu Ihnen passt, lehnen Sie sie im Portal kurz ab — so weiß sie Bescheid und kann sich auf andere Familien konzentrieren.</p>`
-    : "";
+  // Ilka als Rettungsanker in ALLEN Mails (Martin, 20.07.): Portal ist der
+  // Hauptweg, der PS-Hinweis der persönliche Fallback.
+  const softOut = `<p style="font-size:13px;line-height:1.6;color:#888;margin:18px 0 0;">PS: Klappt im Portal etwas nicht, oder möchten Sie das lieber persönlich klären? Sie erreichen mich unter <a href="tel:+4989200000830" style="color:#8B7355;text-decoration:none;">089&nbsp;200&nbsp;000&nbsp;830</a> oder per <a href="https://wa.me/4989200000830" style="color:#8B7355;text-decoration:none;">WhatsApp</a>.</p>`;
 
   // Aufbau wie eine persönliche Nachricht: Begrüßung → kurze Situation →
   // kompakte Pflegekraft-Box (mit "Profil ansehen"-Button) → freundliche
@@ -1488,13 +1487,13 @@ function buildReminderText(
   if (variant === "interest") {
     return `${halloAnrede},
 
-vor einer Stunde haben wir Ihnen geschrieben, dass ${cgName} Interesse an Ihrer Anfrage hat. Eine kurze Erinnerung — die nächsten Stunden zählen:
+vorhin haben wir Ihnen geschrieben, dass ${cgName} gern für Sie da wäre.
 
-Pflegekräfte mit guten Profilen werden häufig schnell von anderen Familien angefragt. Damit ${firstName} für Sie verfügbar bleibt, schauen Sie sich ihr Profil jetzt an und laden Sie sie ein, sich bei Ihnen zu bewerben.
+Schauen Sie sich ihr Profil in Ruhe im Portal an — wenn ${firstName} Ihnen zusagt, laden Sie sie mit einem Klick ein, sich bei Ihnen zu bewerben. Und wenn nicht, ist das auch völlig okay: Ein kurzes Nein hilft ${firstName} mehr als Warten.
 
 Profil ansehen und einladen: ${portalUrl}
 
-Falls ${firstName} nicht zu Ihnen passt, lehnen Sie sie im Portal kurz ab — so weiß sie Bescheid und kann sich auf andere Familien konzentrieren.
+PS: Klappt im Portal etwas nicht, oder möchten Sie das lieber persönlich klären? Sie erreichen mich unter 089 200 000 830 oder per WhatsApp (https://wa.me/4989200000830).
 
 Mit freundlichen Grüßen
 Ilka Wysocki — Pflegeberaterin
@@ -1508,20 +1507,19 @@ Primundus Deutschland | www.primundus.de
   // "Kundenportal"-Wording (der Link führt direkt hin), keine Drohkulisse.
   let intro: string;
   let body: string;
-  const passT = `So weiß ${firstName}, woran sie ist — und falls es nicht passt, schlage ich Ihnen gern jemand anderen vor.`;
   if (tier === "1h") {
     intro = `konnten Sie sich schon mit ${firstName}s Bewerbung beschäftigen?`;
-    body = `Teilen Sie mir gern kurz mit, ob ${firstName} zu Ihnen passt oder nicht. ${passT}`;
+    body = `Im Portal können Sie ${firstName} mit einem Klick zu- oder absagen — und falls sie nicht passt, schlage ich Ihnen gern jemand anderen vor.`;
   } else if (tier === "4h") {
-    intro = `konnten Sie schon einen Blick auf ${firstName}s Bewerbung werfen?`;
-    body = `Teilen Sie mir gern kurz mit, ob sie zu Ihnen passt oder nicht. ${passT}`;
+    intro = `falls Sie noch unsicher sind: Im Portal finden Sie ${firstName}s vollständiges Profil mit allen Konditionen — von den Kosten bis zum Anreisetermin.`;
+    body = `Ein Klick auf Zusagen oder Absagen genügt.`;
   } else if (tier === "12h") {
-    intro = `ich wollte kurz nachhören: Wie ist Ihr Eindruck von ${firstName}s Bewerbung?`;
-    body = `Teilen Sie mir gern kurz mit, ob ${firstName} zu Ihnen passt oder nicht. So weiß ${firstName}, woran sie ist. Und wenn Sie unsicher sind, berate ich Sie natürlich gerne persönlich.`;
+    intro = `ich wollte einmal nachhören, wie Ihnen ${firstName}s Bewerbung gefällt.`;
+    body = `Vielleicht hatten Sie noch keine ruhige Minute — das ist völlig in Ordnung. Ein Klick im Portal genügt, Ja oder Nein — alles Weitere übernehme ich.`;
   } else {
     // tier === "70h" — letzte Erinnerung; weitere Vorschläge nur auf Wunsch.
     intro = `passt ${firstName} zu Ihnen?`;
-    body = `Teilen Sie mir gern kurz mit, ob ja oder nein. Wenn ich nichts von Ihnen höre, gebe ich ${firstName} in den nächsten Stunden wieder frei, damit sie nicht unnötig wartet. Und wenn Sie lieber andere Vorschläge möchten, melden Sie sich einfach kurz — ich kümmere mich.`;
+    body = `Sagen Sie ihr im Portal kurz zu oder ab. Wenn ich nichts von Ihnen höre, gebe ich ${firstName} in den nächsten Stunden wieder frei, damit sie nicht unnötig wartet. Und wenn Sie lieber andere Vorschläge möchten, melden Sie sich einfach kurz — ich kümmere mich.`;
   }
 
   const infoBits: string[] = [];
@@ -1537,6 +1535,8 @@ ${body}
 
 ${cgName}${infoLine}
 ${firstName}s Profil ansehen: ${portalUrl}
+
+PS: Klappt im Portal etwas nicht, oder möchten Sie das lieber persönlich klären? Sie erreichen mich unter 089 200 000 830 oder per WhatsApp (https://wa.me/4989200000830).
 
 Mit freundlichen Grüßen
 Ilka Wysocki — Pflegeberaterin
