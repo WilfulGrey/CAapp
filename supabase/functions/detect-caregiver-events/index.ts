@@ -72,7 +72,7 @@ export interface EventRow {
   mamamia_job_offer_id?: number | null;
 }
 
-// Für den 48h-Auto-Reject: application_received (mit created_at als
+// Für den 72h-Auto-Reject: application_received (mit created_at als
 // Alters-Anker) + Reaktions-Events (accept/reject) pro Pflegekraft.
 export type AppStatusEventType =
   | "application_received"
@@ -520,7 +520,7 @@ export function parseMamamiaTimestamp(raw: string | null | undefined): number | 
 
 // Scan ONE of the lead's jobs: fetch its applications + interests, fire bridge
 // events for new ones (per-(job,caregiver) dedup via the shared seen-sets), and
-// run the 48h auto-reject for that job. On the FIRST scan of a job with no event
+// run the 72h auto-reject for that job. On the FIRST scan of a job with no event
 // history, events are SEEDED silently (notify=false) so the customer isn't
 // burst-mailed about pre-existing applications.
 async function detectForJob(
@@ -639,13 +639,13 @@ async function detectForJob(
     if (i.caregiver_id != null && !i.rejected_at) activeCg.interests.add(i.caregiver_id);
   }
 
-  // 48h auto-reject for THIS job's stale applications.
+  // 72h auto-reject for THIS job's stale applications.
   counts.auto_rejected += await autoRejectStaleApplications(lead, jobOfferId, apps, statusEvents, agencyToken, deps, fetcher, jk);
 }
 
-// ─── 48h Auto-Reject ───────────────────────────────────────────────────────
-// Lehnt Bewerbungen automatisch ab, auf die der Kunde 48h nach der
-// Bewerbungs-Mail (application_received) nicht reagiert hat. Die 46h-
+// ─── 72h Auto-Reject ───────────────────────────────────────────────────────
+// Lehnt Bewerbungen automatisch ab, auf die der Kunde 72h nach der
+// Bewerbungs-Mail (application_received) nicht reagiert hat. Die 70h-
 // "Letzte Chance"-Mail (send-scheduled-emails) warnt ~2h vorher.
 //
 // Sicherheits-Guards:
@@ -661,9 +661,9 @@ async function detectForJob(
 // "would reject", schreibt NICHTS). Alternativ AUTO_REJECT_DEFAULT_LIVE
 // hier auf false + Deploy. Explizites Env überschreibt den Default in
 // beide Richtungen.
-const AUTO_REJECT_AFTER_HOURS = 48;
+const AUTO_REJECT_AFTER_HOURS = 72;
 const AUTO_REJECT_MESSAGE =
-  "Automatische Absage — keine Rückmeldung des Kunden innerhalb 48 Stunden.";
+  "Automatische Absage — keine Rückmeldung des Kunden innerhalb 72 Stunden.";
 const AUTO_REJECT_DEFAULT_LIVE = true;
 
 function autoRejectIsLive(): boolean {
@@ -756,7 +756,7 @@ async function autoRejectStaleApplications(
             caregiver_id: app.caregiver_id,
             mamamia_job_offer_id: jobOfferId,
             reject_message: AUTO_REJECT_MESSAGE,
-            reason: "auto_timeout_48h",
+            reason: "auto_timeout_72h",
             source: "detect-caregiver-events",
           },
         }),

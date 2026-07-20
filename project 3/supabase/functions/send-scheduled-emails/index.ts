@@ -1334,7 +1334,7 @@ function reminderBadgeStyle(level?: string | null): { label: string; gradient: s
 // interest bleibt 1-stufig. Tier steuert Intro-Wording, CTA-Text und ob
 // ein prominenter "Schnell Bescheid geben"-Block (WhatsApp + Phone)
 // eingeblendet wird.
-type ReminderTier = "1h" | "4h" | "12h" | "46h";
+type ReminderTier = "1h" | "4h" | "12h" | "70h";
 
 // Reminder-Mail-HTML. Beide Varianten (interest / application) teilen sich
 // dasselbe Layout — nur Subject, Intro, Action-Satz + CTA-Text unterscheiden
@@ -1423,7 +1423,7 @@ function buildReminderHtml(
   let introHtml: string;
   let middleHtml: string;
   let ctaText: string;
-  const PpassT = `So weiß ${firstName}, woran sie ist, und Sie erhalten bei Bedarf gerne weitere Bewerbungen.`;
+  const PpassT = `So weiß ${firstName}, woran sie ist — und falls es nicht passt, schlage ich Ihnen gern jemand anderen vor.`;
   if (variant === "interest") {
     introHtml = `<p style="font-size:15px;line-height:1.75;color:#444;margin-bottom:18px;">vor einer Stunde haben wir Ihnen geschrieben, dass <strong style="color:#2D1F0F;">${cgName}</strong> Interesse an Ihrer Anfrage hat. Eine kurze Erinnerung — die nächsten Stunden zählen:</p>`;
     middleHtml = `<p style="font-size:15px;line-height:1.75;color:#444;margin-bottom:20px;">Pflegekräfte mit guten Profilen werden häufig schnell von anderen Familien angefragt. <strong style="color:#2D1F0F;">Damit ${firstName} für Sie verfügbar bleibt</strong>, schauen Sie sich ihr Profil jetzt an und laden Sie sie ein, sich bei Ihnen zu bewerben.</p>`;
@@ -1437,15 +1437,15 @@ function buildReminderHtml(
     middleHtml = `<p style="font-size:15px;line-height:1.75;color:#444;margin-bottom:20px;">Teilen Sie mir gern kurz mit, ob sie zu Ihnen passt oder nicht. ${PpassT}</p>`;
     ctaText = `${firstName}s Bewerbung ansehen →`;
   } else if (tier === "12h") {
-    introHtml = `<p style="font-size:15px;line-height:1.75;color:#444;margin-bottom:18px;"><strong style="color:#2D1F0F;">${firstName}s Bewerbung</strong> wartet noch auf Ihre Rückmeldung.</p>`;
+    introHtml = `<p style="font-size:15px;line-height:1.75;color:#444;margin-bottom:18px;">ich wollte kurz nachhören: Wie ist Ihr Eindruck von <strong style="color:#2D1F0F;">${firstName}s Bewerbung</strong>?</p>`;
     middleHtml = `<p style="font-size:15px;line-height:1.75;color:#444;margin-bottom:20px;">Teilen Sie mir gern kurz mit, ob ${firstName} zu Ihnen passt oder nicht. So weiß ${firstName}, woran sie ist. Und wenn Sie unsicher sind, berate ich Sie natürlich gerne persönlich.</p>`;
     ctaText = `${firstName}s Bewerbung ansehen →`;
   } else {
-    // tier === "46h" — letzte Erinnerung vor dem automatischen Freigeben
+    // tier === "70h" — letzte Erinnerung vor dem automatischen Freigeben
     // (~2h später durch den Auto-Reject). Positiv gerahmt: Barbara nicht
     // unnötig warten lassen; weitere Vorschläge nur auf Wunsch.
     introHtml = `<p style="font-size:15px;line-height:1.75;color:#444;margin-bottom:18px;">passt <strong style="color:#2D1F0F;">${firstName}</strong> zu Ihnen?</p>`;
-    middleHtml = `<p style="font-size:15px;line-height:1.75;color:#444;margin-bottom:20px;">Teilen Sie mir gern kurz mit, ob ja oder nein. Wenn ich nichts von Ihnen höre, gebe ich ${firstName} in den nächsten Stunden wieder frei, damit sie nicht unnötig wartet. Möchten Sie weitere Pflegekräfte sehen? Dann melden Sie sich einfach kurz bei uns.</p>`;
+    middleHtml = `<p style="font-size:15px;line-height:1.75;color:#444;margin-bottom:20px;">Teilen Sie mir gern kurz mit, ob ja oder nein. Wenn ich nichts von Ihnen höre, gebe ich ${firstName} in den nächsten Stunden wieder frei, damit sie nicht unnötig wartet. Und wenn Sie lieber andere Vorschläge möchten, melden Sie sich einfach kurz — ich kümmere mich.</p>`;
     ctaText = `${firstName}s Bewerbung ansehen →`;
   }
 
@@ -1508,7 +1508,7 @@ Primundus Deutschland | www.primundus.de
   // "Kundenportal"-Wording (der Link führt direkt hin), keine Drohkulisse.
   let intro: string;
   let body: string;
-  const passT = `So weiß ${firstName}, woran sie ist, und Sie erhalten bei Bedarf gerne weitere Bewerbungen.`;
+  const passT = `So weiß ${firstName}, woran sie ist — und falls es nicht passt, schlage ich Ihnen gern jemand anderen vor.`;
   if (tier === "1h") {
     intro = `konnten Sie sich schon mit ${firstName}s Bewerbung beschäftigen?`;
     body = `Teilen Sie mir gern kurz mit, ob ${firstName} zu Ihnen passt oder nicht. ${passT}`;
@@ -1516,12 +1516,12 @@ Primundus Deutschland | www.primundus.de
     intro = `konnten Sie schon einen Blick auf ${firstName}s Bewerbung werfen?`;
     body = `Teilen Sie mir gern kurz mit, ob sie zu Ihnen passt oder nicht. ${passT}`;
   } else if (tier === "12h") {
-    intro = `${firstName}s Bewerbung wartet noch auf Ihre Rückmeldung.`;
+    intro = `ich wollte kurz nachhören: Wie ist Ihr Eindruck von ${firstName}s Bewerbung?`;
     body = `Teilen Sie mir gern kurz mit, ob ${firstName} zu Ihnen passt oder nicht. So weiß ${firstName}, woran sie ist. Und wenn Sie unsicher sind, berate ich Sie natürlich gerne persönlich.`;
   } else {
-    // tier === "46h" — letzte Erinnerung; weitere Vorschläge nur auf Wunsch.
+    // tier === "70h" — letzte Erinnerung; weitere Vorschläge nur auf Wunsch.
     intro = `passt ${firstName} zu Ihnen?`;
-    body = `Teilen Sie mir gern kurz mit, ob ja oder nein. Wenn ich nichts von Ihnen höre, gebe ich ${firstName} in den nächsten Stunden wieder frei, damit sie nicht unnötig wartet. Möchten Sie weitere Pflegekräfte sehen? Dann melden Sie sich einfach kurz bei uns.`;
+    body = `Teilen Sie mir gern kurz mit, ob ja oder nein. Wenn ich nichts von Ihnen höre, gebe ich ${firstName} in den nächsten Stunden wieder frei, damit sie nicht unnötig wartet. Und wenn Sie lieber andere Vorschläge möchten, melden Sie sich einfach kurz — ich kümmere mich.`;
   }
 
   const infoBits: string[] = [];
@@ -2028,20 +2028,20 @@ Deno.serve(async (req: Request) => {
           const tier: ReminderTier =
             scheduledEmail.email_type === "application_reminder_4h" ? "4h"
             : scheduledEmail.email_type === "application_reminder_12h" ? "12h"
-            : scheduledEmail.email_type === "application_last_chance" ? "46h"
+            : scheduledEmail.email_type === "application_last_chance" ? "70h"
             : "1h";
           const cgName = meta.caregiver_name || "Ihre Pflegekraft";
           const firstName = cgName.split(/\s+/)[0] || cgName;
           if (variant === "interest") {
-            subject = `${firstName} wartet auf Ihre Rückmeldung`;
+            subject = `${firstName} würde sich gern bei Ihnen vorstellen`;
           } else if (tier === "1h") {
-            subject = `${firstName} wartet auf Ihre Entscheidung`;
+            subject = `Haben Sie ${firstName}s Bewerbung schon gesehen?`;
           } else if (tier === "4h") {
-            subject = `${firstName}: bitte kurz Bescheid geben`;
+            subject = `Kurze Frage zu ${firstName}`;
           } else if (tier === "12h") {
-            subject = `${firstName}: ist die Bewerbung noch aktuell?`;
+            subject = `Wie ist Ihr Eindruck von ${firstName}?`;
           } else {
-            subject = `${firstName}: letzte Erinnerung — wir schließen die Bewerbung bald`;
+            subject = `Bevor ich ${firstName} wieder freigebe …`;
           }
 
           // Portal-URL mit Token bauen. Bewerbungs-Reminder springen per

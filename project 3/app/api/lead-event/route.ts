@@ -157,11 +157,12 @@ function buildPortalUrl(lead: { token?: string | null }): string {
 // damit die Edge Function beim Versand die richtige Mail bauen kann.
 //
 // caregiver_interest_shown → 1 Reminder nach 1h (interest_reminder).
-// application_received → 4 Reminder im Crescendo:
-//   1h  (application_reminder)        sanft, "schon einen Blick werfen können?"
-//   4h  (application_reminder_4h)     dringender, "Pflegekraft prüft andere Anfragen"
-//   12h (application_reminder_12h)    dringendster, "wahrscheinlich nicht mehr verfügbar"
-//   46h (application_last_chance)     letzte Erinnerung vor dem 48h-Auto-Reject
+// application_received → 4 Reminder im Crescendo (Ton: persönliche Nachfrage
+// von Ilka, keine Drohkulisse — Martin, 2026-07-20):
+//   1h  (application_reminder)        "schon gesehen?"
+//   4h  (application_reminder_4h)     "kurze Frage"
+//   12h (application_reminder_12h)    "wie ist Ihr Eindruck?"
+//   70h (application_last_chance)     letzte Erinnerung vor dem 72h-Auto-Reject
 // Alle 3 tragen identische Cancel-Logik (siehe Edge Function): sobald der
 // Kunde reagiert hat (accept/reject) ODER der Lead beauftragt/nicht
 // interessiert ist, cancelt sich der jeweilige Reminder beim nächsten Tick.
@@ -170,10 +171,10 @@ const REMINDER_DELAYS_APPLICATION_MIN: { emailType: string; delay: number }[] = 
   { emailType: 'application_reminder',     delay: 60 },
   { emailType: 'application_reminder_4h',  delay: 4 * 60 },
   { emailType: 'application_reminder_12h', delay: 12 * 60 },
-  // 46h — "letzte Chance"-Mail, ~2h vor dem 48h-Auto-Reject (separater
-  // Cron in detect-caregiver-events). Kündigt das automatische Schließen
+  // 70h — "letzte Chance"-Mail, ~2h vor dem 72h-Auto-Reject (separater
+  // Cron in detect-caregiver-events). Kündigt das automatische Freigeben
   // an und bittet um Reaktion.
-  { emailType: 'application_last_chance',  delay: 46 * 60 },
+  { emailType: 'application_last_chance',  delay: 70 * 60 },
 ];
 
 async function scheduleReactionReminder(
