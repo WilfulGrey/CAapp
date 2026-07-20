@@ -504,30 +504,18 @@ Primundus Deutschland | +49 89 200 000 830 | www.primundus.de`;
 // ist (Skip-Logik im Handler: patient_data_saved / gebucht / nicht-int. /
 // eingeladen → cancel). Anker: "5 vorbereitete Pflegekräfte".
 
+// Profil-Nudges v2 (Martin, 20.07.): ehrliche Logik statt Verknappung — ohne
+// Patientenprofil können die Pflegekräfte nichts sehen und sich nicht bewerben.
+// „Unverbindlich" ist das beruhigende Wort; Ilka steht als PS-Fallback drin.
 function buildProfilNudge1Html(lead: Lead, siteUrl: string, portalBase: string): string {
   const portalUrl = (portalBase && lead.token) ? buildPortalUrl(portalBase, lead.token) : siteUrl;
   const halloAnrede = buildHalloAnrede(lead.anrede_text || null, lead.nachname || "", lead.vorname || "");
   const content = `
     <p style="font-size:15px;line-height:1.75;color:#444;margin-bottom:14px;">${halloAnrede},</p>
-    <p style="font-size:15px;line-height:1.75;color:#444;margin-bottom:14px;">Sie haben vor Kurzem Ihr persönliches Angebot zur 24-Stunden-Betreuung erhalten &ndash; und ich habe bereits <strong>passende Pflegekräfte für Sie vorbereitet</strong>, kostenfrei und unverbindlich.</p>
-    <p style="font-size:15px;line-height:1.75;color:#444;margin-bottom:14px;">Konnten Sie sich die <strong>5 Pflegekräfte</strong> schon ansehen?</p>
-
-    <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="margin:18px 0 8px;background:#F1F8F3;border:1px solid #CDE9D6;border-radius:10px;overflow:hidden;">
-      <tr><td style="padding:18px 24px 20px;text-align:center;">
-        <p style="margin:0 0 4px;font-size:32px;font-weight:700;color:#1C5C34;line-height:1;">5</p>
-        <p style="margin:0 0 6px;font-size:17px;font-weight:700;color:#1C5C34;line-height:1.35;">passende Pflegekräfte sind bereit</p>
-        <p style="margin:0;font-size:14px;line-height:1.6;color:#33503D;">sorgfältig für Ihre Situation ausgewählt &ndash; darunter erfahrene Kräfte mit <strong>Gold- und Platin-Auszeichnung</strong></p>
-      </td></tr>
-    </table>
-
-    <p style="font-size:15px;line-height:1.75;color:#444;margin:16px 0 6px;">Sie können sie sich jederzeit unverbindlich ansehen. Für die Einladung fehlt nur noch <strong>ein kurzer Schritt</strong> &ndash; Ihre Patientendaten. Das dauert nur 2 Minuten, vieles ist schon vorausgefüllt.</p>
-
-    ${bulletproofButton(portalUrl, "Meine 5 Pflegekräfte ansehen&nbsp;&nbsp;&rarr;", "#2A9D5C")}
-
-    <p style="font-size:13px;line-height:1.65;color:#8a8a8a;text-align:center;margin:6px 0 4px;">Beliebte Pflegekräfte sind oft schnell vergeben.</p>
-
-    <p style="font-size:15px;line-height:1.75;color:#444;margin:28px 0 18px;">Wenn Sie Hilfe beim Ausfüllen brauchen oder eine Frage haben &ndash; rufen Sie mich an, schreiben Sie mir per WhatsApp oder antworten Sie einfach auf diese E-Mail. Ich bin gerne für Sie da.</p>
-
+    <p style="font-size:15px;line-height:1.75;color:#444;margin-bottom:14px;">ein Hinweis, der oft untergeht: Die Pflegekräfte entscheiden selbst, wo sie sich vorstellen &ndash; und dafür müssen sie wissen, wen sie betreuen würden. Solange Ihr Patientenprofil leer ist, können wir ihnen nichts zeigen, und Sie können <strong>keine Bewerbungen erhalten</strong>.</p>
+    <p style="font-size:15px;line-height:1.75;color:#444;margin-bottom:14px;">Mit ein paar Angaben (etwa 5 Minuten) ändern Sie das: Danach können sich passende Pflegekräfte <strong>unverbindlich</strong> bei Ihnen bewerben &ndash; Sie schauen in Ruhe, wer Ihnen zusagt, und entscheiden erst dann.</p>
+    ${bulletproofButton(portalUrl, "Patientenprofil ausfüllen&nbsp;&nbsp;&rarr;", "#2A9D5C")}
+    <p style="font-size:13px;line-height:1.6;color:#888;margin:18px 0 0;">PS: Klappt im Portal etwas nicht, oder möchten Sie das lieber persönlich klären? Sie erreichen mich unter <a href="tel:+4989200000830" style="color:#8B7355;text-decoration:none;">089&nbsp;200&nbsp;000&nbsp;830</a> oder per <a href="https://wa.me/4989200000830" style="color:#8B7355;text-decoration:none;">WhatsApp</a>.</p>
     ${buildIlkaSig(siteUrl)}`;
   return buildEmailWrapper(lead, siteUrl, content);
 }
@@ -537,15 +525,13 @@ function buildProfilNudge1Text(lead: Lead, siteUrl: string, portalBase: string):
   const halloAnrede = buildHalloAnrede(lead.anrede_text || null, lead.nachname || "", lead.vorname || "");
   return `${halloAnrede},
 
-Sie haben vor Kurzem Ihr persönliches Angebot zur 24-Stunden-Betreuung erhalten – und ich habe bereits passende Pflegekräfte für Sie vorbereitet, kostenfrei und unverbindlich.
+ein Hinweis, der oft untergeht: Die Pflegekräfte entscheiden selbst, wo sie sich vorstellen — und dafür müssen sie wissen, wen sie betreuen würden. Solange Ihr Patientenprofil leer ist, können wir ihnen nichts zeigen, und Sie können keine Bewerbungen erhalten.
 
-Konnten Sie sich die 5 Pflegekräfte schon ansehen? Sorgfältig für Ihre Situation ausgewählt – darunter erfahrene Kräfte mit Gold- und Platin-Auszeichnung.
+Mit ein paar Angaben (etwa 5 Minuten) ändern Sie das: Danach können sich passende Pflegekräfte unverbindlich bei Ihnen bewerben — Sie schauen in Ruhe, wer Ihnen zusagt, und entscheiden erst dann.
 
-Sie können sie sich jederzeit unverbindlich ansehen. Für die Einladung fehlt nur noch ein kurzer Schritt – Ihre Patientendaten. Das dauert nur 2 Minuten, vieles ist schon vorausgefüllt.
+Patientenprofil ausfüllen: ${portalUrl}
 
-Meine 5 Pflegekräfte ansehen: ${portalUrl}
-
-Beliebte Pflegekräfte sind oft schnell vergeben.
+PS: Klappt im Portal etwas nicht, oder möchten Sie das lieber persönlich klären? Sie erreichen mich unter 089 200 000 830 oder per WhatsApp (https://wa.me/4989200000830).
 
 Mit freundlichen Grüßen
 Ilka Wysocki
@@ -559,25 +545,10 @@ function buildProfilNudge2Html(lead: Lead, siteUrl: string, portalBase: string):
   const halloAnrede = buildHalloAnrede(lead.anrede_text || null, lead.nachname || "", lead.vorname || "");
   const content = `
     <p style="font-size:15px;line-height:1.75;color:#444;margin-bottom:14px;">${halloAnrede},</p>
-    <p style="font-size:15px;line-height:1.75;color:#444;margin-bottom:14px;">Ihre <strong>5 passenden Pflegekräfte</strong> liegen in Ihrem Kundenportal bereit &ndash; die Profile können Sie sich jederzeit in Ruhe und völlig <strong>unverbindlich ansehen</strong>.</p>
-    <p style="font-size:15px;line-height:1.75;color:#444;margin-bottom:14px;">Damit Sie eine Pflegekraft <strong>einladen</strong> können und <strong>Bewerbungen</strong> erhalten, brauchen die Pflegekräfte noch ein paar Angaben zu Ihrer Pflegesituation. Das müssen Sie aber nicht allein ausfüllen.</p>
-
-    <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="margin:18px 0 8px;background:#FAF8F4;border:1px solid #ECE3D4;border-radius:10px;overflow:hidden;">
-      <tr><td style="padding:18px 24px 20px;">
-        <p style="margin:0 0 6px;font-size:11px;font-weight:700;color:#B8860B;letter-spacing:.08em;text-transform:uppercase;">Persönliche Hilfe</p>
-        <p style="margin:0 0 8px;font-size:18px;font-weight:700;color:#2D1F0F;line-height:1.35;">Wir machen das gemeinsam am Telefon</p>
-        <p style="margin:0;font-size:14px;line-height:1.65;color:#555;">Antworten Sie einfach kurz mit einer <strong>Uhrzeit, die Ihnen passt</strong> &ndash; oder rufen Sie mich direkt an. Wir gehen die Angaben in keine 5 Minuten zusammen durch, danach können Sie Ihre Wunschkräfte einladen.</p>
-      </td></tr>
-    </table>
-
-    ${bulletproofButton("https://wa.me/4989200000830", "Per WhatsApp einen Rückruf vereinbaren", "#25D366")}
-
-    <p style="font-size:14px;line-height:1.7;color:#777;text-align:center;margin:10px 0 4px;">Oder direkt selbst ausfüllen (nur 2 Minuten):<br>
-      <a href="${portalUrl}" target="_blank" style="color:#2A9D5C;text-decoration:underline;font-weight:600;">Patientendaten im Portal vervollständigen &rarr;</a>
-    </p>
-
-    <p style="font-size:15px;line-height:1.75;color:#444;margin:28px 0 18px;">Ich bin Mo&ndash;So von 8 bis 20 Uhr für Sie da &ndash; rufen Sie mich an, schreiben Sie mir per WhatsApp oder antworten Sie einfach auf diese E-Mail.</p>
-
+    <p style="font-size:15px;line-height:1.75;color:#444;margin-bottom:14px;">manche Angaben im Patientenprofil sind gar nicht so einfach &ndash; Pflegegrad, Mobilität, was im Alltag wirklich anfällt. Wenn Sie mögen, gehen wir das zusammen durch: Rufen Sie mich kurz an unter <a href="tel:+4989200000830" style="color:#8B7355;text-decoration:none;font-weight:600;">089&nbsp;200&nbsp;000&nbsp;830</a> oder schreiben Sie mir per <a href="https://wa.me/4989200000830" style="color:#8B7355;text-decoration:none;font-weight:600;">WhatsApp</a>, dann füllen wir es gemeinsam in zehn Minuten aus.</p>
+    <p style="font-size:15px;line-height:1.75;color:#444;margin-bottom:14px;">Sobald das Profil steht, können sich passende Pflegekräfte unverbindlich bei Ihnen bewerben.</p>
+    ${bulletproofButton(portalUrl, "Patientenprofil ausfüllen&nbsp;&nbsp;&rarr;", "#2A9D5C")}
+    <p style="font-size:13px;line-height:1.6;color:#888;margin:18px 0 0;">PS: Klappt im Portal etwas nicht, oder möchten Sie das lieber persönlich klären? Sie erreichen mich unter <a href="tel:+4989200000830" style="color:#8B7355;text-decoration:none;">089&nbsp;200&nbsp;000&nbsp;830</a> oder per <a href="https://wa.me/4989200000830" style="color:#8B7355;text-decoration:none;">WhatsApp</a>.</p>
     ${buildIlkaSig(siteUrl)}`;
   return buildEmailWrapper(lead, siteUrl, content);
 }
@@ -587,13 +558,97 @@ function buildProfilNudge2Text(lead: Lead, siteUrl: string, portalBase: string):
   const halloAnrede = buildHalloAnrede(lead.anrede_text || null, lead.nachname || "", lead.vorname || "");
   return `${halloAnrede},
 
-Ihre 5 passenden Pflegekräfte liegen in Ihrem Kundenportal bereit – die Profile können Sie sich jederzeit in Ruhe und völlig unverbindlich ansehen.
+manche Angaben im Patientenprofil sind gar nicht so einfach — Pflegegrad, Mobilität, was im Alltag wirklich anfällt. Wenn Sie mögen, gehen wir das zusammen durch: Rufen Sie mich kurz an (089 200 000 830) oder schreiben Sie mir per WhatsApp (https://wa.me/4989200000830), dann füllen wir es gemeinsam in zehn Minuten aus.
 
-Damit Sie eine Pflegekraft einladen können und Bewerbungen erhalten, brauchen die Pflegekräfte noch ein paar Angaben zu Ihrer Pflegesituation. Das müssen Sie aber nicht allein ausfüllen: Antworten Sie einfach kurz mit einer Uhrzeit, die Ihnen passt – oder rufen Sie mich direkt an unter 089 200 000 830. Wir gehen die Angaben in keine 5 Minuten zusammen durch.
+Sobald das Profil steht, können sich passende Pflegekräfte unverbindlich bei Ihnen bewerben.
 
-Oder direkt selbst ausfüllen (nur 2 Minuten): ${portalUrl}
+Patientenprofil ausfüllen: ${portalUrl}
 
-Ich bin Mo–So von 8 bis 20 Uhr für Sie da.
+PS: Klappt im Portal etwas nicht, oder möchten Sie das lieber persönlich klären? Sie erreichen mich unter 089 200 000 830 oder per WhatsApp (https://wa.me/4989200000830).
+
+Mit freundlichen Grüßen
+Ilka Wysocki
+
+---
+Primundus Deutschland | +49 89 200 000 830 | www.primundus.de`;
+}
+
+// Tag-7-Reaktivierung: nützliche Infos statt Druck (Martin, 20.07. — „mit
+// normalen Infos bekommt man Leute wieder"). Cancel-Logik wie alle Nudges.
+function buildProfilNudge3Html(lead: Lead, siteUrl: string, portalBase: string): string {
+  const portalUrl = (portalBase && lead.token) ? buildPortalUrl(portalBase, lead.token) : siteUrl;
+  const halloAnrede = buildHalloAnrede(lead.anrede_text || null, lead.nachname || "", lead.vorname || "");
+  const li = 'p style="font-size:14.5px;line-height:1.7;color:#444;margin:0 0 10px;"';
+  const content = `
+    <p style="font-size:15px;line-height:1.75;color:#444;margin-bottom:14px;">${halloAnrede},</p>
+    <p style="font-size:15px;line-height:1.75;color:#444;margin-bottom:14px;">vor einer Woche haben Sie sich bei uns nach einer 24-Stunden-Betreuung erkundigt. Vielleicht ist zwischenzeitlich viel passiert &ndash; das kennen wir gut.</p>
+    <p style="font-size:15px;line-height:1.75;color:#444;margin-bottom:14px;">Drei Dinge, die vielen Familien in dieser Phase helfen:</p>
+    <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="margin:0 0 16px;background:#FAF8F4;border:1px solid #ECE3D4;border-radius:10px;"><tr><td style="padding:16px 20px;">
+      <${li}><strong>1. Der Pflegegrad zahlt mit.</strong> Ab Pflegegrad 2 unterstützt die Pflegekasse monatlich mit Pflegegeld, das Sie frei für die Betreuung einsetzen können.</p>
+      <${li}><strong>2. Verhinderungspflege nicht verschenken.</strong> Zusammen mit der Kurzzeitpflege stehen dafür bis zu 3.539&nbsp;&euro; im Jahr bereit &ndash; viele Familien lassen das ungenutzt.</p>
+      <p style="font-size:14.5px;line-height:1.7;color:#444;margin:0;"><strong>3. Gute Pflegekräfte brauchen Vorlauf.</strong> Zwischen Anfrage und Anreise liegen meist 1&ndash;2 Wochen.</p>
+    </td></tr></table>
+    <p style="font-size:15px;line-height:1.75;color:#444;margin-bottom:14px;">Ihr Zugang ist weiterhin offen. Wenn Sie das Patientenprofil ausfüllen, können sich passende Pflegekräfte unverbindlich bei Ihnen bewerben &ndash; Sie binden sich damit an nichts.</p>
+    ${bulletproofButton(portalUrl, "Weiter zu meinem Portal&nbsp;&nbsp;&rarr;", "#2A9D5C")}
+    <p style="font-size:13px;line-height:1.6;color:#888;margin:18px 0 0;">PS: Klappt im Portal etwas nicht, oder möchten Sie das lieber persönlich klären? Sie erreichen mich unter <a href="tel:+4989200000830" style="color:#8B7355;text-decoration:none;">089&nbsp;200&nbsp;000&nbsp;830</a> oder per <a href="https://wa.me/4989200000830" style="color:#8B7355;text-decoration:none;">WhatsApp</a>.</p>
+    ${buildIlkaSig(siteUrl)}`;
+  return buildEmailWrapper(lead, siteUrl, content);
+}
+
+function buildProfilNudge3Text(lead: Lead, siteUrl: string, portalBase: string): string {
+  const portalUrl = (portalBase && lead.token) ? buildPortalUrl(portalBase, lead.token) : siteUrl;
+  const halloAnrede = buildHalloAnrede(lead.anrede_text || null, lead.nachname || "", lead.vorname || "");
+  return `${halloAnrede},
+
+vor einer Woche haben Sie sich bei uns nach einer 24-Stunden-Betreuung erkundigt. Vielleicht ist zwischenzeitlich viel passiert — das kennen wir gut.
+
+Drei Dinge, die vielen Familien in dieser Phase helfen:
+
+1. Der Pflegegrad zahlt mit. Ab Pflegegrad 2 unterstützt die Pflegekasse monatlich mit Pflegegeld, das Sie frei für die Betreuung einsetzen können.
+2. Verhinderungspflege nicht verschenken. Zusammen mit der Kurzzeitpflege stehen dafür bis zu 3.539 € im Jahr bereit — viele Familien lassen das ungenutzt.
+3. Gute Pflegekräfte brauchen Vorlauf. Zwischen Anfrage und Anreise liegen meist 1–2 Wochen.
+
+Ihr Zugang ist weiterhin offen. Wenn Sie das Patientenprofil ausfüllen, können sich passende Pflegekräfte unverbindlich bei Ihnen bewerben — Sie binden sich damit an nichts.
+
+Weiter zu meinem Portal: ${portalUrl}
+
+PS: Klappt im Portal etwas nicht, oder möchten Sie das lieber persönlich klären? Sie erreichen mich unter 089 200 000 830 oder per WhatsApp (https://wa.me/4989200000830).
+
+Mit freundlichen Grüßen
+Ilka Wysocki
+
+---
+Primundus Deutschland | +49 89 200 000 830 | www.primundus.de`;
+}
+
+// Tag-49-Reaktivierung: das Wechsel-Fenster — bei fremd-vergebenen Betreuungen
+// steht nach 6–8 Wochen der erste Pflegekraft-Wechsel an. Info-Ton, kein Druck.
+// Geht NUR an stumme Leads: nicht_interessiert/beauftragt/Profil fertig → cancel.
+function buildReaktivierungWechselHtml(lead: Lead, siteUrl: string, portalBase: string): string {
+  const portalUrl = (portalBase && lead.token) ? buildPortalUrl(portalBase, lead.token) : siteUrl;
+  const halloAnrede = buildHalloAnrede(lead.anrede_text || null, lead.nachname || "", lead.vorname || "");
+  const content = `
+    <p style="font-size:15px;line-height:1.75;color:#444;margin-bottom:14px;">${halloAnrede},</p>
+    <p style="font-size:15px;line-height:1.75;color:#444;margin-bottom:14px;">vor einigen Wochen haben Sie sich bei uns nach einer Betreuung erkundigt. Falls Sie sich damals für einen anderen Weg entschieden haben, ist das völlig in Ordnung &ndash; ich melde mich aus einem praktischen Grund: Bei den meisten Betreuungen steht nach <strong>sechs bis acht Wochen der erste Wechsel der Pflegekraft</strong> an. Das ist oft der Moment, in dem Familien vergleichen möchten.</p>
+    <p style="font-size:15px;line-height:1.75;color:#444;margin-bottom:14px;">Ihr Zugang bei uns ist weiterhin offen &ndash; mit tagesaktuellen Pflegekräften und unserer Bestpreis-Garantie. Ein Blick kostet nichts, Bewerbungen sind unverbindlich.</p>
+    ${bulletproofButton(portalUrl, "Pflegekräfte ansehen&nbsp;&nbsp;&rarr;", "#2A9D5C")}
+    <p style="font-size:13px;line-height:1.6;color:#888;margin:18px 0 0;">PS: Klappt im Portal etwas nicht, oder möchten Sie das lieber persönlich klären? Sie erreichen mich unter <a href="tel:+4989200000830" style="color:#8B7355;text-decoration:none;">089&nbsp;200&nbsp;000&nbsp;830</a> oder per <a href="https://wa.me/4989200000830" style="color:#8B7355;text-decoration:none;">WhatsApp</a>.</p>
+    ${buildIlkaSig(siteUrl)}`;
+  return buildEmailWrapper(lead, siteUrl, content);
+}
+
+function buildReaktivierungWechselText(lead: Lead, siteUrl: string, portalBase: string): string {
+  const portalUrl = (portalBase && lead.token) ? buildPortalUrl(portalBase, lead.token) : siteUrl;
+  const halloAnrede = buildHalloAnrede(lead.anrede_text || null, lead.nachname || "", lead.vorname || "");
+  return `${halloAnrede},
+
+vor einigen Wochen haben Sie sich bei uns nach einer Betreuung erkundigt. Falls Sie sich damals für einen anderen Weg entschieden haben, ist das völlig in Ordnung — ich melde mich aus einem praktischen Grund: Bei den meisten Betreuungen steht nach sechs bis acht Wochen der erste Wechsel der Pflegekraft an. Das ist oft der Moment, in dem Familien vergleichen möchten.
+
+Ihr Zugang bei uns ist weiterhin offen — mit tagesaktuellen Pflegekräften und unserer Bestpreis-Garantie. Ein Blick kostet nichts, Bewerbungen sind unverbindlich.
+
+Pflegekräfte ansehen: ${portalUrl}
+
+PS: Klappt im Portal etwas nicht, oder möchten Sie das lieber persönlich klären? Sie erreichen mich unter 089 200 000 830 oder per WhatsApp (https://wa.me/4989200000830).
 
 Mit freundlichen Grüßen
 Ilka Wysocki
@@ -1799,7 +1854,9 @@ Deno.serve(async (req: Request) => {
         // ist das Ziel erreicht und der Nudge cancelt sich selbst.
         const isProfilNudge =
           scheduledEmail.email_type === "profil_nudge_1" ||
-          scheduledEmail.email_type === "profil_nudge_2";
+          scheduledEmail.email_type === "profil_nudge_2" ||
+          scheduledEmail.email_type === "profil_nudge_3" ||
+          scheduledEmail.email_type === "reaktivierung_wechsel";
 
         // Lead-Meilenstein aus den CA-App-Events (portal_opened, patient_data_saved,
         // caregiver_invited) \u2014 steuert die Nachfass-Variante + den Abbruch.
@@ -1947,6 +2004,18 @@ Deno.serve(async (req: Request) => {
           text = buildProfilNudge2Text(lead as Lead, smtpConfig.siteUrl, portalBase);
           eventTypeSent = "email_profil_nudge_2_sent";
           eventTypeFailed = "email_profil_nudge_2_failed";
+        } else if (scheduledEmail.email_type === "profil_nudge_3") {
+          subject = "Falls das Thema Betreuung noch aktuell ist";
+          html = buildProfilNudge3Html(lead as Lead, smtpConfig.siteUrl, portalBase);
+          text = buildProfilNudge3Text(lead as Lead, smtpConfig.siteUrl, portalBase);
+          eventTypeSent = "email_profil_nudge_3_sent";
+          eventTypeFailed = "email_profil_nudge_3_failed";
+        } else if (scheduledEmail.email_type === "reaktivierung_wechsel") {
+          subject = "Wenn demnächst der erste Wechsel ansteht";
+          html = buildReaktivierungWechselHtml(lead as Lead, smtpConfig.siteUrl, portalBase);
+          text = buildReaktivierungWechselText(lead as Lead, smtpConfig.siteUrl, portalBase);
+          eventTypeSent = "email_reaktivierung_wechsel_sent";
+          eventTypeFailed = "email_reaktivierung_wechsel_failed";
         } else if (scheduledEmail.email_type === "neue_pflegekraefte_verfuegbar") {
           subject = "Neue Pflegekräfte für Sie";
           html = buildNeuePflegekraefteHtml(lead as Lead, smtpConfig.siteUrl, portalBase);
@@ -2167,11 +2236,13 @@ Deno.serve(async (req: Request) => {
           // `angebot` bleibt für evtl. eingeplante Alt-Rows ebenfalls als Anker.
           // Sequenz (Profil-Abbruch-optimiert, Stand 15.06.2026):
           //   0h    Eingangsbestätigung
-          //   +4h   profil_nudge_1  ("5 Pflegekräfte warten", Neugier)
-          //   +28h  profil_nudge_2  ("Ich helf am Telefon", persönlich)
+          //   +4h   profil_nudge_1  (das Warum: ohne Profil keine Bewerbungen)
+          //   +28h  profil_nudge_2  ("Soll ich Ihnen beim Ausfüllen helfen?")
           //   +48h  warum_primundus (Trust/Bestpreis)
           //   +72h  nachfass_2      (kurze persönliche Nachfrage)
           //   +120h nachfass_3      (Break-up, mailto-Buttons)
+          //   +7d   profil_nudge_3  (Reaktivierung: nützliche Infos, kein Druck)
+          //   +49d  reaktivierung_wechsel (Wechsel-Fenster nach 6–8 Wochen)
           // nachfass_1 wurde durch die zwei dedizierten Profil-Nudges
           // ersetzt (war generisch + kollidierte zeitlich). Der nachfass_1-
           // Handler bleibt für evtl. noch eingeplante Alt-Rows.
@@ -2182,6 +2253,8 @@ Deno.serve(async (req: Request) => {
             await scheduleFollowUp(supabase, lead as Lead, "profil_nudge_2", 28 * 60);
             await scheduleFollowUp(supabase, lead as Lead, "warum_primundus", 48 * 60);
             await scheduleFollowUp(supabase, lead as Lead, "nachfass_2", 72 * 60);
+            await scheduleFollowUp(supabase, lead as Lead, "profil_nudge_3", 7 * 24 * 60);
+            await scheduleFollowUp(supabase, lead as Lead, "reaktivierung_wechsel", 49 * 24 * 60);
           } else if (scheduledEmail.email_type === "nachfass_2") {
             await scheduleFollowUp(supabase, lead as Lead, "nachfass_3", 48 * 60);
           }
