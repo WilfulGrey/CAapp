@@ -48,6 +48,20 @@ export interface HandlerDeps {
   getAgencyToken?: () => Promise<string>;
 }
 
+// Role-Claim aus einem (vom Gateway bereits signatur-geprüften) JWT lesen.
+// KEINE eigene Signaturprüfung — die macht verify_jwt am Gateway; hier nur
+// Payload-Decode. Nicht-JWT-Strings → null.
+function jwtRole(token: string): string | null {
+  const parts = token.split(".");
+  if (parts.length !== 3) return null;
+  try {
+    const payload = JSON.parse(atob(parts[1].replace(/-/g, "+").replace(/_/g, "/")));
+    return typeof payload?.role === "string" ? payload.role : null;
+  } catch {
+    return null;
+  }
+}
+
 // Constant-time string compare — Timing-Angriffe auf den Service-Key-Vergleich
 // sind praktisch irrelevant (interner Endpunkt), aber der Vergleich kostet nichts.
 function timingSafeEqual(a: string, b: string): boolean {
@@ -66,10 +80,18 @@ export async function handleRequest(req: Request, deps: HandlerDeps): Promise<Re
     return json(405, { error: "method not allowed" });
   }
 
-  // Server-to-server Auth: exakt der Service-Role-Key als Bearer.
+  // Server-to-server Auth, zwei akzeptierte Wege:
+  //   a) Bearer == exakt der Service-Role-Key aus dem Env (fast path), ODER
+  //   b) Bearer ist ein GÜLTIGES Projekt-JWT mit role='service_role'.
+  // Zu (b): das Supabase-Gateway (verify_jwt, default AN) hat die SIGNATUR
+  // bereits geprüft, bevor der Request diese Funktion erreicht — hier bleibt
+  // nur der Role-Claim zu prüfen. Das ist rotations-sicher: nach einer
+  // Key-Rotation unterscheiden sich Render-Env (Bridge) und Edge-Env
+  // stringweise, aber beide tragen role='service_role'. anon-JWTs
+  // (role='anon') passieren das Gateway ebenfalls → deshalb der Claim-Check.
   const auth = req.headers.get("authorization") ?? "";
   const bearer = auth.startsWith("Bearer ") ? auth.slice(7) : "";
-  if (!bearer || !timingSafeEqual(bearer, deps.secrets.supabaseServiceKey)) {
+  if (!bearer || (!timingSafeEqual(bearer, deps.secrets.supabaseServiceKey) && jwtRole(bearer) !== "service_role")) {
     return json(401, { error: "unauthorized" });
   }
 
