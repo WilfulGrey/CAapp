@@ -74,6 +74,8 @@ interface FakeNet {
   bridgeStatus?: number;
   // Kein bestehender Contract am Customer (kein location_id-Carry möglich).
   noExistingContract?: boolean;
+  // PLZ→location_id Katalog (AcceptanceSyncLocations); fehlende PLZ ⇒ [].
+  locationHits?: Record<string, number>;
 }
 
 function makeNet(opts: Partial<FakeNet> = {}): FakeNet {
@@ -81,6 +83,7 @@ function makeNet(opts: Partial<FakeNet> = {}): FakeNet {
     ops: [],
     pdfBody: new TextEncoder().encode("%PDF-1.7 fake"),
     finalConfirmations: [],
+    locationHits: { "80331": 111, "80333": 222 },
     bridgePosts: [],
     fetch: (async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = typeof input === "string" ? input : input instanceof URL ? input.href : (input as Request).url;
@@ -103,6 +106,19 @@ function makeNet(opts: Partial<FakeNet> = {}): FakeNet {
       const parsed = JSON.parse((init?.body ?? "{}") as string);
       const q: string = parsed.query ?? "";
       const v: Record<string, unknown> = parsed.variables ?? {};
+      if (q.includes("AcceptanceSyncLocations")) {
+        net.ops.push({ op: "AcceptanceSyncLocations", variables: v });
+        const hit = net.locationHits?.[String(v.search)];
+        return new Response(JSON.stringify({
+          data: {
+            LocationsWithPagination: {
+              data: hit
+                ? [{ id: hit, location: "Fake", zip_code: v.search, country_code: "DE" }]
+                : [],
+            },
+          },
+        }), { status: 200 });
+      }
       if (q.includes("AcceptanceSyncCustomer")) {
         net.ops.push({ op: "AcceptanceSyncCustomer", variables: v });
         return new Response(JSON.stringify({
@@ -236,13 +252,16 @@ Deno.test("sync: frischer Akzept — Reihenfolge UpdateCustomer→StoreConfirmat
   });
 
   // Michałs Reihenfolge: 1. UpdateCustomer VOR 2. StoreConfirmation
+  // (dazwischen best-effort Location-Lookups — Reihenfolge relativ prüfen).
   const order = net.ops.map((o) => o.op);
   assertEquals(order[0], "AcceptanceSyncCustomer");
-  assertEquals(order[1], "UpdateCustomerContract");
-  assertEquals(order[2], "StoreConfirmation");
+  const idxUc = order.indexOf("UpdateCustomerContract");
+  const idxSc = order.indexOf("StoreConfirmation");
+  assertEquals(idxUc > 0, true);
+  assertEquals(idxSc > idxUc, true);
   // Preserve: equipments zurückgereicht; patients = non-empty Stubs mit
   // tool_ids (Beta-Tenant verlangt non-empty; Stubs preserven Tools).
-  const uc = net.ops[1].variables;
+  const uc = net.ops[idxUc].variables;
   assertEquals(uc.equipment_ids, [1, 2]);
   assertEquals(uc.patients, [{ id: 42, tool_ids: [3] }]);
   // Die DREI Personen in Mamamias native Slots (Fix „Customer 8394"):
@@ -253,6 +272,8 @@ Deno.test("sync: frischer Akzept — Reihenfolge UpdateCustomer→StoreConfirmat
   // Flagi is_same_as_* IMMER explizit false (sonst spiegelt Mamamia die
   // Patientendaten in die Row und die Panel-Checkbox bleibt an) — AUSSER
   // invoice_contract bei agGleich (separater AG hier ⇒ false).
+  // location_id per Row aus IHRER PLZ (Katalog-Lookup wie Bug #13d): LE 80331
+  // → 111, AG 80333 → 222 (AG wohnt NICHT am Einsatzort — Feedback Michał).
   assertEquals(uc.patient_contracts, [{
     contact_type: "patient_contact",
     is_same_as_first_patient: false,
@@ -265,7 +286,7 @@ Deno.test("sync: frischer Akzept — Reihenfolge UpdateCustomer→StoreConfirmat
     city: "München",
     phone: "089 111",
     email: "gerda@example.de",
-    location_id: 13035,
+    location_id: 111,
   }]);
   assertEquals(uc.invoice_contract, {
     contact_type: "contract_contact",
@@ -278,6 +299,7 @@ Deno.test("sync: frischer Akzept — Reihenfolge UpdateCustomer→StoreConfirmat
     city: "München",
     phone: "089 222",
     email: "steffen@example.de",
+    location_id: 222,
   });
   assertEquals(uc.customer_contacts, [{
     is_same_as_first_patient: false,
@@ -360,7 +382,7 @@ Deno.test("sync: HTML-Fallback vom Renderer ⇒ Magic-Byte-Gate blockt Upload (d
   assertStringIncludes(r.deferred.join("|"), "non-PDF");
 });
 
-Deno.test("sync: agGleich (le=null) ⇒ invoice_contract = LE-Daten (mit Salutation); ohne Contract kein location_id-Carry", async () => {
+Deno.test("sync: agGleich (le=null) ⇒ invoice_contract = LE-Daten (mit Salutation) + gleiche location_id (EIN Lookup)", async () => {
   const net = makeNet({ noExistingContract: true });
   const stamps = makeStamps();
   const row = makeRow({ contract_snapshot: { ...makeRow().contract_snapshot!, le: null } });
@@ -383,11 +405,25 @@ Deno.test("sync: agGleich (le=null) ⇒ invoice_contract = LE-Daten (mit Salutat
     city: "München",
     phone: "089 111",
     email: "gerda@example.de",
+    location_id: 111,
   });
-  // Kein bestehender Contract ⇒ patient_contact ohne location_id (nur Text-Adresse).
   const pc = (uc.patient_contracts as Array<Record<string, unknown>>)[0];
-  assertEquals("location_id" in pc, false);
-  assertEquals(pc.zip_code, "80331");
+  assertEquals(pc.location_id, 111);
+  // Gleiche PLZ ⇒ EIN Katalog-Lookup, nicht zwei.
+  assertEquals(net.ops.filter((o) => o.op === "AcceptanceSyncLocations").length, 1);
+});
+
+Deno.test("sync: Katalog ohne Treffer ⇒ LE-Row fällt auf getragene location_id zurück; AG-Row ohne location_id", async () => {
+  const net = makeNet({ locationHits: {} }); // Lookup liefert nichts
+  const stamps = makeStamps();
+  await syncAcceptance({
+    lead: LEAD, row: makeRow(), secrets: SECRETS,
+    supabase: stamps.supabase, getAgencyToken: agencyToken, fetchFn: net.fetch,
+  });
+  const uc = net.ops.find((o) => o.op === "UpdateCustomerContract")!.variables;
+  const pc = (uc.patient_contracts as Array<Record<string, unknown>>)[0];
+  assertEquals(pc.location_id, 13035); // Carry aus bestehendem Contract (Patientenbogen)
+  assertEquals("location_id" in (uc.invoice_contract as Record<string, unknown>), false);
 });
 
 // ─── Confirm-Fehlerklassifikation + interne Retries (Alarm-Policy) ────────

@@ -20,12 +20,16 @@ Edge sync-acceptance → _shared/acceptanceSync.ts (współdzielony z cronem):
   1. UpdateCustomer  — TRZY osoby z formularza konfirmacji w NATYWNE sloty
                        klienta MM (fix 2026-07-21, Bug #19 / Customer 8394):
                        • LE → patient_contracts[{contact_type:"patient_contact"}]
-                         (+ carry location_id z istniejącego contractu — MM
-                         REPLACES listę przy zapisie)
+                         (location_id rozwiązywane z PLZ LE przez katalog
+                         Locations — ta sama metoda co główna lokalizacja
+                         klienta [Bug #13d]; fallback: carry z istniejącego
+                         contractu — MM REPLACES listę przy zapisie)
                        • AG → invoice_contract{contact_type:"contract_contact"}
                          (panel: „Person für den Vertrag/Rechnung"; agGleich ⇒
                          dyskretne pola LE, AG odrębny ⇒ split composed ag.name
-                         na ostatniej spacji, bez salutation)
+                         na ostatniej spacji, bez salutation; location_id z PLZ
+                         AG — Stadt-dropdown AG to JEGO miasto, nie adres opieki.
+                         Uwaga: Location select-uje pole `location`, NIE `name`)
                        • KP → customer_contacts[] (panel: „Kontaktperson")
                        Flagi is_same_as_first_patient/is_same_as_contact ZAWSZE
                        jawnie (default MM = true ⇒ lustruje dane pacjenta w
