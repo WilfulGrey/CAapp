@@ -110,6 +110,21 @@ User-action items (Claude nie ma uprawnień):
    npx supabase db push --linked
    ```
 3. **Setup pg_cron jobs** (`detect-caregiver-events` co 15 min, `daily-analytics-report` o 06:00 UTC) — istnieją w migracjach `20260519080000_*` i `20260520070000_*`, zaaplikują się z push. **Sprawdzić** że `vault` extension działa i secrets są ustawione w nowej DB.
+   > **⚠️ GOTCHA (wykryte 2026-07-21):** komenda każdego crona buduje URL+auth z
+   > Vault-secrets **`supabase_url`** i **`supabase_service_role_key`** (fallback: GUC
+   > `app.settings.*`). Migracje tworzą JOBY, ale NIE te secrety — bez nich `url` w
+   > `net.http_post` jest NULL i **każdy tik pada** (`null value in column "url" of
+   > relation "http_request_queue"`). Na stagingu (`taggpiwpwthgpcmaiqjw`) brakowało ich
+   > od utworzenia projektu — **wszystkie 3 crony (detect, send-scheduled-emails,
+   > daily-analytics) miały 0 udanych przebiegów 2026-05-26→2026-07-21**: zero maili
+   > reminder/+15min-PDF ze stagingu, zero cron-gwaranta acceptance-sync. Fix (SQL editor,
+   > wartości z Dashboard → Settings → API):
+   > ```sql
+   > select vault.create_secret('https://<REF>.supabase.co', 'supabase_url');
+   > select vault.create_secret('<SERVICE_ROLE_KEY>', 'supabase_service_role_key');
+   > ```
+   > Weryfikacja: `SELECT jobname, status FROM cron.job_run_details ORDER BY start_time
+   > DESC LIMIT 3` po najbliższym tiku (oraz `net._http_response` — statusy 200/NULL-long-call).
 4. **Mamamia beta agency**: confirm że nasze beta credentials (`MAMAMIA_AGENCY_EMAIL` / `_PASSWORD` dla beta tenant) działają. Discover beta agency ID:
    ```bash
    # Po LoginAgency mutation:
