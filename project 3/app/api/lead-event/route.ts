@@ -214,20 +214,21 @@ function buildAcceptanceSyncAlarmTemplate(lead: any, info: AcceptanceAlarmInfo):
   return { subject, html, text };
 }
 
-// Mail + (bei Erfolg) Alarm-Stempel + Audit-Row. Mail-Fehler ⇒ false und
-// KEIN Stempel — der Cron re-alarmiert beim nächsten Lauf.
+// Mail + (bei Erfolg) Alarm-Stempel + Audit-Row. Mail-Fehler ⇒ {ok:false,
+// error} und KEIN Stempel — der Cron re-alarmiert beim nächsten Lauf. Der
+// Fehlertext wandert in die 502-Antwort (Diagnose ohne Render-Log-Zugriff).
 async function raiseAcceptanceSyncAlarm(
   supabase: any,
   lead: any,
   info: AcceptanceAlarmInfo,
-): Promise<boolean> {
+): Promise<{ ok: boolean; error?: string }> {
   const template = buildAcceptanceSyncAlarmTemplate(lead, info);
   const res = await sendEmail(TEAM_NOTIFY_RECIPIENT, template, undefined, {
     extraBcc: ACCEPT_TEAM_NOTIFY_EXTRA_BCC,
   });
   if (!res.success) {
     console.error(`acceptance alarm mail failed (lead=${lead.id}, app=${info.application_id}):`, res.error);
-    return false;
+    return { ok: false, error: res.error };
   }
   const appIdNum = Number(info.application_id);
   if (Number.isFinite(appIdNum)) {
@@ -238,7 +239,7 @@ async function raiseAcceptanceSyncAlarm(
       .eq('application_id', appIdNum);
     if (stampErr) console.error('mamamia_sync_alerted_at stamp failed:', stampErr.message);
   }
-  return true;
+  return { ok: true };
 }
 
 function extractCaregiverDisplay(metadata: any): CaregiverDisplay | null {
@@ -642,15 +643,15 @@ export async function POST(request: NextRequest) {
               age_minutes: 0,
               source: 'bridge',
             };
-            const alarmOk = await raiseAcceptanceSyncAlarm(supabase, lead, alarmInfo);
-            if (alarmOk) {
+            const alarmRes = await raiseAcceptanceSyncAlarm(supabase, lead, alarmInfo);
+            if (alarmRes.ok) {
               await supabase.from('lead_events').insert({
                 lead_id: lead.id,
                 event_type: 'acceptance_sync_alarm',
                 metadata: { ...alarmInfo }, // trägt bereits source:'bridge'
               });
             }
-            // alarmOk=false ⇒ kein Stempel (raiseAcceptanceSyncAlarm) ⇒ der
+            // alarmRes.ok=false ⇒ kein Stempel (raiseAcceptanceSyncAlarm) ⇒ der
             // Cron re-alarmiert (permanent ⇒ altersunabhängig) im nächsten Lauf.
           }
         } catch (e) {
@@ -707,8 +708,11 @@ export async function POST(request: NextRequest) {
         age_minutes: typeof m.age_minutes === 'number' ? m.age_minutes : null,
         source: 'cron',
       });
-      if (!ok) {
-        return NextResponse.json({ error: 'alarm mail failed' }, { status: 502, headers: corsHeaders });
+      if (!ok.ok) {
+        return NextResponse.json(
+          { error: `alarm mail failed: ${(ok.error ?? 'unknown').slice(0, 300)}` },
+          { status: 502, headers: corsHeaders },
+        );
       }
       return NextResponse.json({ ok: true }, { headers: corsHeaders });
     }

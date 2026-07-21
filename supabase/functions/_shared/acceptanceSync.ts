@@ -1,8 +1,10 @@
 // Server-side Acceptance→Mamamia sync — die verbindliche Sequenz nach der
 // Online-Unterschrift (Michał, 2026-07-22):
 //
-//   1. UpdateCustomer  — Kontaktdaten aus dem Konfirmationsprozess auf den
-//                        Customer (customer_contract)
+//   1. UpdateCustomer  — die DREI Personen aus dem Konfirmationsprozess:
+//                        LE→patient_contracts[patient_contact],
+//                        AG→invoice_contract[contract_contact],
+//                        KP→customer_contacts[]
 //   2. StoreConfirmation — verbindlicher Akzept der Bewerbung
 //   3. Vertrag (PDF)   — gerendert vom Kostenrechner (/api/contract-pdf, aus
 //                        der frisch geschriebenen Acceptance-Row)
@@ -102,13 +104,17 @@ export interface AcceptanceSyncResult {
 
 // EIN Read für alles, was die Sequenz braucht: equipments (Preserve gegen
 // Association-Wipe, gotcha #3) + final_confirmations aller Jobs (Guard +
-// Verarbeitungs-Bramka für den Upload).
+// Verarbeitungs-Bramka für den Upload) + location_id des bestehenden
+// Contracts (kanonische "Lokalizacja opieki" aus dem Patientenbogen,
+// Bug #13d — wird in die neue patient_contact-Row übernommen, da Mamamia
+// die Contract-Liste beim Schreiben ERSETZT).
 const SYNC_CUSTOMER_QUERY = /* GraphQL */ `
   query AcceptanceSyncCustomer($id: Int!) {
     Customer(id: $id) {
       id
       equipments { id }
       patients { id tools { id } }
+      customer_contract { location_id }
       job_offers {
         id
         final_confirmation { id caregiver { id } }
@@ -122,6 +128,7 @@ interface SyncCustomerData {
     id: number;
     equipments: Array<{ id: number }> | null;
     patients: Array<{ id: number; tools: Array<{ id: number }> | null }> | null;
+    customer_contract: { location_id: number | null } | null;
     job_offers: Array<{
       id: number;
       final_confirmation: { id: number; caregiver: { id: number } | null } | null;
@@ -129,7 +136,18 @@ interface SyncCustomerData {
   } | null;
 }
 
-// Schmaler UpdateCustomer — NUR customer_contract (+ Preserve-Pflichten).
+// Schmaler UpdateCustomer — die DREI Personen aus dem Konfirmationsformular
+// in Mamamias NATIVE Slots (live verifiziert 2026-07-21, Customer 8394 beta
+// + Validation-Probe prod — beide Tenants haben die Args inzwischen, der
+// Bug-#16-Drift ist von Mamamia aufgeholt):
+//   - patient_contracts[{contact_type:"patient_contact"}]  = LE (Person +
+//     Einsatzadresse — speist die Panel-"Lokalizacja opieki")
+//   - invoice_contract{contact_type:"contract_contact"}    = AG (Vertragspartner)
+//   - customer_contacts[]                                  = KP (Kontaktperson)
+// NIE das Singular-Feld customer_contract schreiben: es adressiert die ERSTE
+// Row der Plural-Liste und Mamamia typt sie als patient_contact — AG-Daten
+// darin landen im Pacjent-/Care-Location-Slot (Ursprungs-Bug, Customer 8394:
+// "3 różne osoby w formularzu, do mamamia trafiły tylko jedne").
 // patients: NICHT-leere Stubs {id, tool_ids} sind Pflicht — der BETA-Tenant
 // lehnt ein leeres Array mit "Das Feld patients ist erforderlich" ab
 // (live 2026-07-22, Customer 8312), während preprod [] toleriert (Proxy-
@@ -140,13 +158,17 @@ const UPDATE_CUSTOMER_CONTRACT = /* GraphQL */ `
     $id: Int
     $equipment_ids: [Int]
     $patients: [PatientInputType]
-    $customer_contract: CustomerContractInputType
+    $patient_contracts: [CustomerContractInputType]
+    $invoice_contract: CustomerContractInputType
+    $customer_contacts: [CustomerContactInputType]
   ) {
     UpdateCustomer(
       id: $id
       equipment_ids: $equipment_ids
       patients: $patients
-      customer_contract: $customer_contract
+      patient_contracts: $patient_contracts
+      invoice_contract: $invoice_contract
+      customer_contacts: $customer_contacts
     ) { id customer_id }
   }
 `;
@@ -237,7 +259,15 @@ export function mapContractContact(de: Record<string, unknown> | null): Record<s
   };
 }
 
-// customer_contract = Vertragspartner (AG). Der Browser liefert AG nur
+// agGleich: der Kunde hat im Portal-Formular "AG == LE" gewählt (Snapshot
+// trägt dann le === null). Fehlt der Snapshot ganz (Legacy-Rows), kennen wir
+// nur die LE-Daten → ebenfalls Spiegel-Semantik.
+export function isAgGleich(row: AcceptanceRow): boolean {
+  const snap = row.contract_snapshot;
+  return !snap || snap.le === null;
+}
+
+// Vertragspartner (AG) für invoice_contract. Der Browser liefert AG nur
 // EINKOMPONIERT im Snapshot (contract.ag: name zusammengesetzt, strasse, ort,
 // telefon, email); bei agGleich (snapshot.le === null) ist AG == LE und wir
 // haben die DISKRETEN Felder aus contract_patient — die gewinnen.
@@ -384,23 +414,59 @@ export async function syncAcceptance(opts: AcceptanceSyncOpts): Promise<Acceptan
     .map((j) => j?.final_confirmation)
     .filter((fc): fc is { id: number; caregiver: { id: number } | null } => !!fc);
 
-  // ── 1. UpdateCustomer: Kontaktdaten (customer_contract) ──
+  // ── 1. UpdateCustomer: die DREI Personen aus dem Konfirmationsformular ──
+  // LE → patient_contracts[patient_contact] (+ location_id-Übernahme aus dem
+  // bestehenden Contract, denn Mamamia ERSETZT die Liste beim Schreiben),
+  // AG → invoice_contract[contract_contact], KP → customer_contacts[].
   // Idempotent (gleiche Daten ⇒ gleicher Zustand) → läuft auch im Retry
   // erneut, kein eigener Stempel nötig.
-  const customerContract = buildCustomerContract(row);
-  if (customerContract) {
+  const locationId = cust.Customer?.customer_contract?.location_id ?? null;
+  const lePatient = mapContractPatient(row.contract_patient);
+  const agContract = buildCustomerContract(row);
+  const kpContact = mapContractContact(row.contract_contact);
+  if (lePatient || agContract || kpContact) {
+    const variables: Record<string, unknown> = {
+      id: lead.mamamia_customer_id,
+      // Non-empty Stubs (Beta-Pflicht) + tool_ids-Preserve (gotcha #13b).
+      patients: patientStubs,
+      // equipments MÜSSEN zurückgereicht werden (omitted ⇒ Wipe, gotcha #3).
+      equipment_ids: equipmentIds,
+    };
+    // is_same_as_*-Flagi IMMER explizit setzen: ohne sie defaultet Mamamia
+    // auf is_same_as_first_patient=true und SPIEGELT die Patientendaten in
+    // die Row (live 2026-07-21, Customer 8394: Zenobia wurde beim nächsten
+    // UpdateCustomer durch "Test Signature" überschrieben, Panel-Checkbox
+    // "Die Daten sind die gleichen wie die des Patienten" blieb an).
+    if (lePatient) {
+      variables.patient_contracts = [{
+        contact_type: "patient_contact",
+        is_same_as_first_patient: false,
+        is_same_as_contact: false,
+        ...lePatient,
+        // Kanonische Care-Location NUR hier — die AG-Adresse kann eine
+        // ANDERE sein (Vertragspartner wohnt nicht zwingend am Einsatzort).
+        ...(locationId != null ? { location_id: locationId } : {}),
+      }];
+    }
+    if (agContract) {
+      variables.invoice_contract = {
+        contact_type: "contract_contact",
+        // agGleich = Kunde hat "AG == LE" gewählt → Spiegel-Flag ehrlich TRUE
+        // (Panel-Checkbox an, Mamamia hält die Row mit dem Patienten synchron).
+        // Separater AG → false, sonst überschreibt der Spiegel die AG-Person.
+        is_same_as_first_patient: isAgGleich(row),
+        is_same_as_contact: false,
+        ...agContract,
+      };
+    }
+    if (kpContact) {
+      variables.customer_contacts = [{ is_same_as_first_patient: false, ...kpContact }];
+    }
     await mamamiaRequest({
       endpoint: secrets.mamamiaEndpoint,
       token: agencyToken,
       query: UPDATE_CUSTOMER_CONTRACT,
-      variables: {
-        id: lead.mamamia_customer_id,
-        customer_contract: customerContract,
-        // Non-empty Stubs (Beta-Pflicht) + tool_ids-Preserve (gotcha #13b).
-        patients: patientStubs,
-        // equipments MÜSSEN zurückgereicht werden (omitted ⇒ Wipe, gotcha #3).
-        equipment_ids: equipmentIds,
-      },
+      variables,
       fetchFn,
     });
     result.customer_updated = true;

@@ -7,6 +7,7 @@ import { assertEquals, assertStringIncludes } from "@std/assert";
 import {
   type AcceptanceRow,
   buildCustomerContract,
+  isAgGleich,
   isPdfBytes,
   mapContractContact,
   mapContractPatient,
@@ -71,6 +72,8 @@ interface FakeNet {
   // Bridge-Route /api/lead-event — Alarm-POSTs des Crons (Body gesammelt).
   bridgePosts: Array<Record<string, unknown>>;
   bridgeStatus?: number;
+  // Kein bestehender Contract am Customer (kein location_id-Carry möglich).
+  noExistingContract?: boolean;
 }
 
 function makeNet(opts: Partial<FakeNet> = {}): FakeNet {
@@ -108,6 +111,7 @@ function makeNet(opts: Partial<FakeNet> = {}): FakeNet {
               id: 7777,
               equipments: [{ id: 1 }, { id: 2 }],
               patients: [{ id: 42, tools: [{ id: 3 }] }],
+              customer_contract: net.noExistingContract ? null : { location_id: 13035 },
               job_offers: [
                 { id: 100, final_confirmation: net.finalConfirmations!.length ? net.finalConfirmations![0] : null },
               ],
@@ -210,6 +214,12 @@ Deno.test("buildCustomerContract: AG separat → Composed-Name-Split (letzte Lee
   assertEquals(cc.city, "München");
 });
 
+Deno.test("isAgGleich: le=null ⇒ true; separater AG ⇒ false; kein Snapshot (Legacy) ⇒ true", () => {
+  assertEquals(isAgGleich(makeRow({ contract_snapshot: { ...makeRow().contract_snapshot!, le: null } })), true);
+  assertEquals(isAgGleich(makeRow()), false);
+  assertEquals(isAgGleich(makeRow({ contract_snapshot: null })), true);
+});
+
 Deno.test("isPdfBytes: %PDF- ja, HTML nein", () => {
   assertEquals(isPdfBytes(new TextEncoder().encode("%PDF-1.7")), true);
   assertEquals(isPdfBytes(new TextEncoder().encode("<!DOCTYPE html>")), false);
@@ -235,6 +245,49 @@ Deno.test("sync: frischer Akzept — Reihenfolge UpdateCustomer→StoreConfirmat
   const uc = net.ops[1].variables;
   assertEquals(uc.equipment_ids, [1, 2]);
   assertEquals(uc.patients, [{ id: 42, tool_ids: [3] }]);
+  // Die DREI Personen in Mamamias native Slots (Fix „Customer 8394"):
+  // LE → patient_contracts[patient_contact] mit location_id-Carry,
+  // AG → invoice_contract[contract_contact] (Snapshot-AG, Composed-Split),
+  // KP → customer_contacts[]. Singular customer_contract wird NICHT mehr
+  // geschrieben (typte die AG-Daten als patient_contact — Ursprungs-Bug).
+  // Flagi is_same_as_* IMMER explizit false (sonst spiegelt Mamamia die
+  // Patientendaten in die Row und die Panel-Checkbox bleibt an) — AUSSER
+  // invoice_contract bei agGleich (separater AG hier ⇒ false).
+  assertEquals(uc.patient_contracts, [{
+    contact_type: "patient_contact",
+    is_same_as_first_patient: false,
+    is_same_as_contact: false,
+    salutation: "Mrs.",
+    first_name: "Gerda",
+    last_name: "Krumbholz",
+    street_number: "Musterstraße 12",
+    zip_code: "80331",
+    city: "München",
+    phone: "089 111",
+    email: "gerda@example.de",
+    location_id: 13035,
+  }]);
+  assertEquals(uc.invoice_contract, {
+    contact_type: "contract_contact",
+    is_same_as_first_patient: false,
+    is_same_as_contact: false,
+    first_name: "Steffen",
+    last_name: "Krumbholz",
+    street_number: "Beispielweg 5",
+    zip_code: "80333",
+    city: "München",
+    phone: "089 222",
+    email: "steffen@example.de",
+  });
+  assertEquals(uc.customer_contacts, [{
+    is_same_as_first_patient: false,
+    salutation: "Mr.",
+    first_name: "Steffen",
+    last_name: "Krumbholz",
+    phone: "089 222",
+    email: "steffen@example.de",
+  }]);
+  assertEquals("customer_contract" in uc, false);
   // Confirm-Ergebnis + Stempel
   assertEquals(r.confirmed, true);
   assertEquals(r.confirmation_id, 555);
@@ -305,6 +358,36 @@ Deno.test("sync: HTML-Fallback vom Renderer ⇒ Magic-Byte-Gate blockt Upload (d
   assertEquals(r.pdf_uploaded, false);
   assertEquals(net.ops.map((o) => o.op).includes("StoreFile"), false);
   assertStringIncludes(r.deferred.join("|"), "non-PDF");
+});
+
+Deno.test("sync: agGleich (le=null) ⇒ invoice_contract = LE-Daten (mit Salutation); ohne Contract kein location_id-Carry", async () => {
+  const net = makeNet({ noExistingContract: true });
+  const stamps = makeStamps();
+  const row = makeRow({ contract_snapshot: { ...makeRow().contract_snapshot!, le: null } });
+  await syncAcceptance({
+    lead: LEAD, row, secrets: SECRETS,
+    supabase: stamps.supabase, getAgencyToken: agencyToken, fetchFn: net.fetch,
+  });
+  const uc = net.ops.find((o) => o.op === "UpdateCustomerContract")!.variables;
+  // AG == LE ⇒ Vertragspartner-Slot bekommt die diskreten LE-Felder und
+  // is_same_as_first_patient: TRUE (ehrlicher Spiegel — Panel-Checkbox an).
+  assertEquals(uc.invoice_contract, {
+    contact_type: "contract_contact",
+    is_same_as_first_patient: true,
+    is_same_as_contact: false,
+    salutation: "Mrs.",
+    first_name: "Gerda",
+    last_name: "Krumbholz",
+    street_number: "Musterstraße 12",
+    zip_code: "80331",
+    city: "München",
+    phone: "089 111",
+    email: "gerda@example.de",
+  });
+  // Kein bestehender Contract ⇒ patient_contact ohne location_id (nur Text-Adresse).
+  const pc = (uc.patient_contracts as Array<Record<string, unknown>>)[0];
+  assertEquals("location_id" in pc, false);
+  assertEquals(pc.zip_code, "80331");
 });
 
 // ─── Confirm-Fehlerklassifikation + interne Retries (Alarm-Policy) ────────
