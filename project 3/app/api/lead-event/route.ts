@@ -69,28 +69,6 @@ const TEAM_NOTIFY_CAREGIVER_EVENTS = new Set([
   'application_received',
 ]);
 const TEAM_NOTIFY_RECIPIENT = 'info@primundus.de';
-// Version des Vertragstextes — landet in der Acceptance-Row
-// (contract_version) UND im PDF-Audit-Footer. Der §§-Text lebt im Code
-// (lib/vertrag.ts); ohne gepinnte Version würden alte Verträge nach einer
-// Textänderung mit NEUEM Wortlaut re-rendern. Bump NUR zusammen mit einer
-// bewussten Textänderung (dann alten Text als eingefrorene Version behalten).
-const CONTRACT_VERSION = 'v1.0';
-// Unterschrifts-Zeitstempel fürs PDF: neue Clients senden ISO
-// (maschinenlesbar), alte noch das deutsche Label "DD.MM.YYYY um HH:MM Uhr".
-// ISO → deutsches Label (Europe/Berlin); Label → unverändert durchreichen.
-function formatSignedAtLabel(raw: string | undefined): string | undefined {
-  if (!raw) return undefined;
-  if (!/^\d{4}-\d{2}-\d{2}T/.test(raw)) return raw; // Legacy-Label
-  const d = new Date(raw);
-  if (Number.isNaN(d.getTime())) return raw;
-  const parts = new Intl.DateTimeFormat('de-DE', {
-    timeZone: 'Europe/Berlin',
-    day: '2-digit', month: '2-digit', year: 'numeric',
-    hour: '2-digit', minute: '2-digit',
-  }).formatToParts(d);
-  const get = (t: string) => parts.find(p => p.type === t)?.value ?? '';
-  return `${get('day')}.${get('month')}.${get('year')} um ${get('hour')}:${get('minute')} Uhr`;
-}
 // Zusätzliche BCC-Empfänger NUR für die Accept-/Buchungs-Team-Mail
 // (application_accepted_internal). Andere Team-Notifications behalten den
 // Default-BCC (SMTP_BCC = info@primundus.de,info@mamamia.app). Kommasepariert.
@@ -427,16 +405,12 @@ export async function POST(request: NextRequest) {
     const teamOnlyResend = !!(metadata && typeof metadata === 'object'
       && (metadata as Record<string, unknown>).team_only_resend === true);
 
-    // Acceptance persistence (application_accepted_internal): EIN atomarer
-    // UPSERT in lead_application_acceptances — Kern + Signatur-Audit +
-    // Snapshot + Consents zusammen. Der frühere Zwei-Statement-Split
-    // („best-effort", Schutz gegen fehlende Migration) ist obsolet — die
-    // Signatur-Migration läuft seit 06/2026 auf Staging+Prod — und war
-    // gefährlich: die Buchung konnte OHNE Signatur/Snapshot „gelingen"
-    // (Kunde sieht Erfolg, /api/contract-pdf 404t). Jetzt: schlägt der
-    // Write fehl → 500, das Portal zeigt den Fehler + Retry
-    // (Święta zasada nr 1 — kein stiller Teilerfolg).
-    // Idempotent auf (lead_id, application_id) — Re-Click dupliziert nicht.
+    // Acceptance persistence (application_accepted_internal): UPSERT a
+    // dedicated row in lead_application_acceptances with the full contract
+    // form data. Idempotent on (lead_id, application_id) — re-clicking
+    // "Akzeptieren" doesn't duplicate. Frontend queries this table via
+    // mamamia-proxy.listAcceptedApplications on portal load to flip the
+    // matching app's status to 'accepted' → BookedScreen renders.
     if (!teamOnlyResend && event === 'application_accepted_internal' && metadata && typeof metadata === 'object') {
       const m = metadata as Record<string, unknown>;
       const rawAppId = m.application_id;
@@ -451,6 +425,7 @@ export async function POST(request: NextRequest) {
         const clientIp = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim()
           || request.headers.get('x-real-ip')
           || null;
+        // Kern-Upsert (kritisch für die Buchungs-Persistenz / BookedScreen).
         const { error: accErr } = await supabase
           .from('lead_application_acceptances')
           .upsert({
@@ -459,25 +434,25 @@ export async function POST(request: NextRequest) {
             caregiver_id: typeof caregiverId === 'number' && Number.isFinite(caregiverId) ? caregiverId : null,
             contract_patient: m.contract_patient ?? {},
             contract_contact: m.contract_contact ?? {},
-            // Signatur-Audit (PR1): getippter Name + Server-Empfangszeit + IP
-            // + Ort + die beiden Pflicht-Checkboxen + AG-Block diskret +
-            // Vertragstext-Version. contract_snapshot = Dokumentdaten.
-            signatur: typeof m.signatur === 'string' ? m.signatur : null,
-            signed_at: new Date().toISOString(),
-            signed_ip: clientIp,
-            signed_ort: typeof m.signed_ort === 'string' && m.signed_ort.trim() ? m.signed_ort.trim() : null,
-            consent_read: m.consent_read === true,
-            consent_widerruf: m.consent_widerruf === true,
-            contract_ag: m.contract_ag && typeof m.contract_ag === 'object' ? m.contract_ag : null,
-            contract_snapshot: m.contract ?? null,
-            contract_version: CONTRACT_VERSION,
           }, { onConflict: 'lead_id,application_id' });
         if (accErr) {
           console.error('lead_application_acceptances upsert failed:', accErr.message);
-          return NextResponse.json(
-            { error: 'acceptance persistence failed' },
-            { status: 500, headers: corsHeaders },
-          );
+        }
+        // Stufe B: Signatur-Audit + Vertrags-Snapshot SEPARAT + best-effort.
+        // Entkoppelt von der Kern-Persistenz, damit eine noch nicht angewendete
+        // Migration (Signatur-Spalten fehlen) die Buchung nicht bricht.
+        const { error: sigErr } = await supabase
+          .from('lead_application_acceptances')
+          .update({
+            signatur: typeof m.signatur === 'string' ? m.signatur : null,
+            signed_at: new Date().toISOString(),
+            signed_ip: clientIp,
+            contract_snapshot: m.contract ?? null,
+          })
+          .eq('lead_id', lead.id)
+          .eq('application_id', appId);
+        if (sigErr) {
+          console.warn('signature audit update skipped (Migration noch nicht angewendet?):', sigErr.message);
         }
       } else {
         console.warn('application_accepted_internal: missing/invalid application_id in metadata');
@@ -527,13 +502,8 @@ export async function POST(request: NextRequest) {
         try {
           contractAttachment = await buildVertragAttachmentPdf(m.contract as any, {
             signaturName: m.signatur as string,
-            signedAt: formatSignedAtLabel(typeof m.signed_at === 'string' ? m.signed_at : undefined),
-            signedOrt: typeof m.signed_ort === 'string' && m.signed_ort.trim() ? m.signed_ort.trim() : undefined,
-            consents: {
-              read: m.consent_read === true,
-              widerruf: m.consent_widerruf === true,
-            },
-            auditNote: `Vertragsversion ${CONTRACT_VERSION}`,
+            signedAt: typeof m.signed_at === 'string' ? (m.signed_at as string) : undefined,
+            auditNote: 'Vertragsversion v1.0',
           });
         } catch (e) {
           console.error('buildVertragAttachmentPdf failed:', e instanceof Error ? e.message : String(e));
