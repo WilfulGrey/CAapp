@@ -15,7 +15,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
-import { buildVertragAttachmentPdf, type VertragInput } from '../../../../lib/vertrag';
+import { buildVertragAttachmentPdf, formatSignedAtBerlin, type VertragInput } from '../../../../lib/vertrag';
 
 export const dynamic = 'force-dynamic';
 // PDF-Render dauert 1-3s + braucht Chromium → forciert Node.js-Runtime,
@@ -91,7 +91,7 @@ export async function GET(
     // Safety, falls historisch zwei Acceptances drin sind.
     const { data: acceptance, error: accErr } = await supabase
       .from('lead_application_acceptances')
-      .select('contract_snapshot, signatur, signed_at')
+      .select('application_id, contract_snapshot, signatur, signed_at')
       .eq('lead_id', leadId)
       .order('signed_at', { ascending: false, nullsFirst: false })
       .limit(1)
@@ -109,6 +109,35 @@ export async function GET(
         { error: 'no signed contract yet' },
         { status: 404, headers: corsHeaders },
       );
+    }
+
+    // KANON zuerst (Michał: „1 i ten sam, niezmieniany plik"): der beim
+    // Akzept einmalig gerenderte PDF aus dem Bucket — Byte-identisch mit
+    // Mail-Anhang und Mamamia-Upload. Nur wenn er (Alt-Buchung) fehlt,
+    // fällt der Endpoint auf einen Re-Render zurück.
+    const appIdNum = Number(acceptance.application_id);
+    if (Number.isFinite(appIdNum)) {
+      try {
+        const { data: canon } = await supabase.storage
+          .from('contracts')
+          .download(`${leadId}/${appIdNum}.pdf`);
+        if (canon) {
+          const buf = Buffer.from(await canon.arrayBuffer());
+          if (buf.subarray(0, 5).toString('latin1') === '%PDF-') {
+            return new NextResponse(new Uint8Array(buf), {
+              status: 200,
+              headers: {
+                ...corsHeaders,
+                'Content-Type': 'application/pdf',
+                'Content-Disposition': 'inline; filename="Betreuungsvertrag_Primundus.pdf"',
+                'Cache-Control': 'private, max-age=300',
+              },
+            });
+          }
+        }
+      } catch (e) {
+        console.error('[contract-pdf] canonical download failed, falling back to render:', e instanceof Error ? e.message : String(e));
+      }
     }
 
     const snap = acceptance.contract_snapshot as Record<string, unknown>;
@@ -133,18 +162,12 @@ export async function GET(
       typeof acceptance.signatur === 'string' && acceptance.signatur.trim()
         ? acceptance.signatur.trim()
         : (vertragsDaten.ag?.name ?? 'Auftraggeber');
-    // signed_at: ISO-String aus DB → menschenlesbares DE-Format
-    let signedAt: string | undefined;
-    if (typeof acceptance.signed_at === 'string') {
-      const d = new Date(acceptance.signed_at);
-      if (!Number.isNaN(d.getTime())) {
-        const dd = String(d.getDate()).padStart(2, '0');
-        const mm = String(d.getMonth() + 1).padStart(2, '0');
-        const hh = String(d.getHours()).padStart(2, '0');
-        const mi = String(d.getMinutes()).padStart(2, '0');
-        signedAt = `${dd}.${mm}.${d.getFullYear()} um ${hh}:${mi} Uhr`;
-      }
-    }
+    // signed_at: ISO-String aus DB → deutsches Format in Europe/Berlin.
+    // NIE getHours(): der Server läuft UTC — genau daraus entstanden zwei
+    // Verträge mit zwei Uhrzeiten (17:00 UTC vs 19:00 deutscher Zeit).
+    const signedAt = typeof acceptance.signed_at === 'string'
+      ? formatSignedAtBerlin(acceptance.signed_at)
+      : undefined;
 
     const attachment = await buildVertragAttachmentPdf(vertragsDaten, {
       signaturName,

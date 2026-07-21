@@ -125,6 +125,8 @@ export async function handleRequest(req: Request, deps: HandlerDeps): Promise<Re
       secrets: {
         mamamiaEndpoint: deps.secrets.mamamiaEndpoint,
         kostenrechnerUrl: deps.secrets.kostenrechnerUrl,
+        supabaseUrl: deps.secrets.supabaseUrl,
+        supabaseServiceKey: deps.secrets.supabaseServiceKey,
       },
       supabase: {
         stampConfirmed: deps.store.stampConfirmed.bind(deps.store),
@@ -173,7 +175,7 @@ export function makeRealStore(url: string, serviceKey: string): SyncStore {
     async fetchAcceptance(leadId: string, applicationId: number) {
       const { data, error } = await client
         .from("lead_application_acceptances")
-        .select("lead_id, application_id, caregiver_id, signatur, contract_patient, contract_contact, contract_snapshot, mamamia_confirmed_at, mamamia_confirmation_id, mamamia_pdf_uploaded_at")
+        .select("lead_id, application_id, caregiver_id, signatur, contract_patient, contract_contact, contract_snapshot, mamamia_confirmed_at, mamamia_confirmation_id, mamamia_pdf_uploaded_at, pdf_sha256")
         .eq("lead_id", leadId)
         .eq("application_id", applicationId)
         .maybeSingle();

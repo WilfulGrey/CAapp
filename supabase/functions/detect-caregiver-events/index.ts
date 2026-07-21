@@ -417,6 +417,8 @@ export async function retryAcceptanceSyncs(
         secrets: {
           mamamiaEndpoint: deps.secrets.mamamiaEndpoint,
           kostenrechnerUrl: deps.secrets.kostenrechnerUrl,
+          supabaseUrl: deps.secrets.supabaseUrl,
+          supabaseServiceKey: deps.secrets.supabaseServiceKey,
         },
         supabase: {
           stampConfirmed: supa.stampAcceptanceConfirmed.bind(supa),
@@ -1184,7 +1186,7 @@ function makeRealSupabase(url: string, serviceKey: string): DetectSupabase {
       // idx_acceptances_mamamia_sync_pending deckt genau dieses WHERE.
       const { data, error } = await client
         .from("lead_application_acceptances")
-        .select("lead_id, application_id, caregiver_id, signatur, contract_patient, contract_contact, contract_snapshot, mamamia_confirmed_at, mamamia_confirmation_id, mamamia_pdf_uploaded_at, accepted_at, mamamia_sync_alerted_at, leads!inner(token, mamamia_customer_id)")
+        .select("lead_id, application_id, caregiver_id, signatur, contract_patient, contract_contact, contract_snapshot, mamamia_confirmed_at, mamamia_confirmation_id, mamamia_pdf_uploaded_at, pdf_sha256, accepted_at, mamamia_sync_alerted_at, leads!inner(token, mamamia_customer_id)")
         .not("signatur", "is", null)
         .gt("accepted_at", cutoff)
         .or("mamamia_confirmed_at.is.null,mamamia_pdf_uploaded_at.is.null");
@@ -1202,6 +1204,7 @@ function makeRealSupabase(url: string, serviceKey: string): DetectSupabase {
           mamamia_confirmed_at: r.mamamia_confirmed_at ?? null,
           mamamia_confirmation_id: r.mamamia_confirmation_id ?? null,
           mamamia_pdf_uploaded_at: r.mamamia_pdf_uploaded_at ?? null,
+          pdf_sha256: r.pdf_sha256 ?? null,
           accepted_at: r.accepted_at,
           mamamia_sync_alerted_at: r.mamamia_sync_alerted_at ?? null,
           lead_token: lead?.token ?? null,
