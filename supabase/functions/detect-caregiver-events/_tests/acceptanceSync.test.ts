@@ -93,6 +93,7 @@ function makeNet(opts: Partial<FakeNet> = {}): FakeNet {
             Customer: {
               id: 7777,
               equipments: [{ id: 1 }, { id: 2 }],
+              patients: [{ id: 42, tools: [{ id: 3 }] }],
               job_offers: [
                 { id: 100, final_confirmation: net.finalConfirmations!.length ? net.finalConfirmations![0] : null },
               ],
@@ -205,10 +206,11 @@ Deno.test("sync: frischer Akzept — Reihenfolge UpdateCustomer→StoreConfirmat
   assertEquals(order[0], "AcceptanceSyncCustomer");
   assertEquals(order[1], "UpdateCustomerContract");
   assertEquals(order[2], "StoreConfirmation");
-  // Preserve: equipments zurückgereicht, patients leer (kein Wipe)
+  // Preserve: equipments zurückgereicht; patients = non-empty Stubs mit
+  // tool_ids (Beta-Tenant verlangt non-empty; Stubs preserven Tools).
   const uc = net.ops[1].variables;
   assertEquals(uc.equipment_ids, [1, 2]);
-  assertEquals(uc.patients, []);
+  assertEquals(uc.patients, [{ id: 42, tool_ids: [3] }]);
   // Confirm-Ergebnis + Stempel
   assertEquals(r.confirmed, true);
   assertEquals(r.confirmation_id, 555);

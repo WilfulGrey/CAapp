@@ -96,6 +96,7 @@ const SYNC_CUSTOMER_QUERY = /* GraphQL */ `
     Customer(id: $id) {
       id
       equipments { id }
+      patients { id tools { id } }
       job_offers {
         id
         final_confirmation { id caregiver { id } }
@@ -108,6 +109,7 @@ interface SyncCustomerData {
   Customer: {
     id: number;
     equipments: Array<{ id: number }> | null;
+    patients: Array<{ id: number; tools: Array<{ id: number }> | null }> | null;
     job_offers: Array<{
       id: number;
       final_confirmation: { id: number; caregiver: { id: number } | null } | null;
@@ -116,8 +118,11 @@ interface SyncCustomerData {
 }
 
 // Schmaler UpdateCustomer — NUR customer_contract (+ Preserve-Pflichten).
-// patients: [] ist safe (kein Wipe; umgeht den preprod NPE bei omitted) —
-// Muster 1:1 aus mamamia-proxy updateCustomer/updateJobDescription.
+// patients: NICHT-leere Stubs {id, tool_ids} sind Pflicht — der BETA-Tenant
+// lehnt ein leeres Array mit "Das Feld patients ist erforderlich" ab
+// (live 2026-07-22, Customer 8312), während preprod [] toleriert (Proxy-
+// Notiz 2026-05-14). Stubs mit tool_ids preserven zugleich die Tools
+// (gotcha #3/#13b) — funktioniert auf BEIDEN Tenants.
 const UPDATE_CUSTOMER_CONTRACT = /* GraphQL */ `
   mutation UpdateCustomerContract(
     $id: Int
@@ -338,6 +343,11 @@ export async function syncAcceptance(opts: AcceptanceSyncOpts): Promise<Acceptan
     fetchFn,
   });
   const equipmentIds = (cust.Customer?.equipments ?? []).map((e) => e.id);
+  // Patient-Stubs: id + tool_ids (Preserve). Beta verlangt non-empty patients.
+  const patientStubs = (cust.Customer?.patients ?? []).map((p) => ({
+    id: p.id,
+    tool_ids: (p.tools ?? []).map((t) => t.id),
+  }));
   const finalConfirmations = (cust.Customer?.job_offers ?? [])
     .map((j) => j?.final_confirmation)
     .filter((fc): fc is { id: number; caregiver: { id: number } | null } => !!fc);
@@ -354,8 +364,8 @@ export async function syncAcceptance(opts: AcceptanceSyncOpts): Promise<Acceptan
       variables: {
         id: lead.mamamia_customer_id,
         customer_contract: customerContract,
-        // patients: [] = kein Wipe + umgeht preprod NPE (Muster aus proxy).
-        patients: [],
+        // Non-empty Stubs (Beta-Pflicht) + tool_ids-Preserve (gotcha #13b).
+        patients: patientStubs,
         // equipments MÜSSEN zurückgereicht werden (omitted ⇒ Wipe, gotcha #3).
         equipment_ids: equipmentIds,
       },
