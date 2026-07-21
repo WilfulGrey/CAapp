@@ -8,6 +8,7 @@ import {
   getOfferUpdatedEmailTemplate,
   type CaregiverDisplay,
   type CaregiverMailEvent,
+  type EmailTemplate,
   type OfferInfo,
 } from '@/lib/email';
 import { buildVertragAttachmentPdf } from '@/lib/vertrag';
@@ -52,6 +53,12 @@ const ALLOWED_EVENTS = [
   // Token liegt beim Kunden). Event = Audit-Trail + optionale Kundenmail
   // (notify:false → nur Aufzeichnung, keine Mail).
   'offer_updated',
+  // Alarm-Policy (2026-07-21): Buchung unterschrieben, aber Mamamia-Sync
+  // unvollständig (z.B. Bewerbung von der Agentur zurückgezogen ⇒
+  // StoreConfirmation dauerhaft abgelehnt). Gesendet vom
+  // detect-caregiver-events-Cron; TEAM-MAIL-ONLY — nie in
+  // GET_PUBLIC_EVENT_TYPES, keine Kundenmail. Audit-Row in lead_events.
+  'acceptance_sync_alarm',
 ];
 const TEAM_NOTIFY_EVENTS = [
   'patient_data_saved',
@@ -90,6 +97,7 @@ const NON_DEDUPED_EVENTS = new Set([
   'application_received',
   'application_rejected',
   'offer_updated',               // Preis kann mehrfach angepasst werden
+  'acceptance_sync_alarm',       // jeder Alarm-Versuch wird aufgezeichnet
 ]);
 // Customer-facing Mails (an die Lead-Email) je Event. Trigger sind die neuen
 // Caregiver-Lifecycle-Events; das eigentliche Hooking aus Mamamia kommt
@@ -109,6 +117,129 @@ const TRANSACTIONAL_MAIL_EVENTS = new Set([
   'application_accepted_internal',
   'offer_updated',
 ]);
+
+// ─── Acceptance-Sync-Alarm (2026-07-21) ────────────────────────────────────
+// "Nie możemy mieć sytuacji, gdzie klient myśli że zlecenie jest obstawione,
+// a nie jest" (Michał). Zwei Auslöser, EIN Mail-Kanal (Team):
+//   a) T+0: der synchrone sync-acceptance-Call meldet einen PERMANENTEN
+//      StoreConfirmation-Fehler (Mamamia lehnt deterministisch ab, z.B.
+//      Bewerbung von der Agentur zurückgezogen) → Alarm sofort aus der Bridge.
+//   b) Cron: Row nach Retry weiter unbestätigt und >5 Min alt (bzw. PDF >24h)
+//      → Cron POSTet Event acceptance_sync_alarm hierher; die Mail ist die
+//      Antwort-Bedingung (Fehler ⇒ 502 ⇒ Cron stempelt nicht ⇒ Re-Alarm).
+
+interface AcceptanceAlarmInfo {
+  application_id: number | string;
+  caregiver_id?: number | string | null;
+  caregiver_name?: string | null;
+  confirmed: boolean;
+  pdf_uploaded: boolean;
+  permanent: boolean;
+  error?: string | null;
+  age_minutes?: number | null;
+  source: 'bridge' | 'cron';
+}
+
+function buildAcceptanceSyncAlarmTemplate(lead: any, info: AcceptanceAlarmInfo): EmailTemplate {
+  const kunde = [lead.vorname, lead.nachname].filter(Boolean).join(' ') || lead.email || lead.id;
+  const confirmCase = !info.confirmed;
+  const subject = confirmCase
+    ? `🚨 ALARM: Buchung OHNE Mamamia-Bestätigung — ${kunde} (Bewerbung ${info.application_id})`
+    : `⚠️ ALARM: Vertrags-PDF fehlt in Mamamia — ${kunde} (Bewerbung ${info.application_id})`;
+
+  const lage = confirmCase
+    ? 'Der Kunde hat die Buchung im Portal abgeschlossen (Unterschrift + Bestätigungsseite), aber in Mamamia existiert KEINE verbindliche Confirmation für diese Bewerbung. Der Kunde glaubt an eine Buchung, die aktuell nicht besteht.'
+    : 'Die Buchung ist in Mamamia bestätigt, aber der signierte Vertrag (PDF) konnte seit über 24 Stunden nicht hochgeladen werden. Kein unmittelbares Kundenrisiko — das Vertragsarchiv in Mamamia ist aber unvollständig.';
+  const ursache = confirmCase
+    ? (info.permanent
+        ? 'Mamamia hat den Akzept DAUERHAFT abgelehnt — wahrscheinlichste Ursache: die Bewerbung wurde von der Agentur zurückgezogen oder existiert nicht mehr. Automatische Wiederholungen ändern daran nichts.'
+        : 'Der automatische Sync schlägt bisher fehl (transienter Fehler). Weitere automatische Versuche laufen alle 15 Minuten weiter — dieser Alarm kommt trotzdem, damit niemand auf den Automatismus wartet.')
+    : 'Der Upload-Schritt (StoreFile/UpdateConfirmation bzw. das PDF-Rendering) schlägt wiederholt fehl — Details in den Supabase-Logs (sync-acceptance / detect-caregiver-events).';
+  const schritte = confirmCase
+    ? [
+        'SA-Portal → Kunde → Bewerbung öffnen: existiert sie noch, welcher Status?',
+        'Bewerbung zurückgezogen/weg: Kunden SOFORT kontaktieren — er wartet auf eine Pflegekraft, die nicht kommt.',
+        'Bewerbung in Ordnung: Annahme manuell im SA-Portal durchführen.',
+      ]
+    : [
+        'Supabase-Logs (sync-acceptance / detect-caregiver-events) prüfen.',
+        'Notfalls Vertrag aus der Buchungs-Team-Mail manuell in Mamamia hochladen.',
+      ];
+
+  const daten: Array<[string, string]> = [
+    ['Kunde', String(kunde)],
+    ['E-Mail', String(lead.email ?? '—')],
+    ['Telefon', String(lead.telefon ?? '—')],
+    ['Lead-ID', String(lead.id)],
+    ['Bewerbung (application_id)', String(info.application_id)],
+    ['Pflegekraft', [info.caregiver_name, info.caregiver_id != null ? `(ID ${info.caregiver_id})` : null].filter(Boolean).join(' ') || '—'],
+    ['Mamamia-Fehler', info.error || '—'],
+    ['Alter der Buchung', info.age_minutes != null ? `${info.age_minutes} Min` : '—'],
+    ['Alarm-Quelle', info.source === 'bridge' ? 'sofort (synchroner Sync)' : 'Cron (detect-caregiver-events)'],
+  ];
+
+  const text = [
+    subject,
+    '',
+    lage,
+    '',
+    ursache,
+    '',
+    'Daten:',
+    ...daten.map(([k, v]) => `- ${k}: ${v}`),
+    '',
+    'Bitte SOFORT prüfen:',
+    ...schritte.map((s, i) => `${i + 1}. ${s}`),
+  ].join('\n');
+
+  const html = `
+    <div style="font-family: Arial, sans-serif; max-width: 640px; margin: 0 auto;">
+      <div style="background-color: ${confirmCase ? '#dc2626' : '#d97706'}; color: white; padding: 16px 20px; border-radius: 8px 8px 0 0;">
+        <h2 style="margin: 0; font-size: 18px;">${subject}</h2>
+      </div>
+      <div style="border: 2px solid ${confirmCase ? '#dc2626' : '#d97706'}; border-top: none; border-radius: 0 0 8px 8px; padding: 20px;">
+        <p style="margin-top: 0;"><strong>${lage}</strong></p>
+        <p>${ursache}</p>
+        <table style="border-collapse: collapse; width: 100%; font-size: 14px;">
+          ${daten.map(([k, v]) => `<tr><td style="padding: 4px 8px; border: 1px solid #e5e7eb; background: #f9fafb; white-space: nowrap;">${k}</td><td style="padding: 4px 8px; border: 1px solid #e5e7eb;">${v}</td></tr>`).join('')}
+        </table>
+        <p style="margin-bottom: 4px;"><strong>Bitte SOFORT prüfen:</strong></p>
+        <ol style="margin-top: 4px;">
+          ${schritte.map((s) => `<li>${s}</li>`).join('')}
+        </ol>
+      </div>
+    </div>
+  `;
+
+  return { subject, html, text };
+}
+
+// Mail + (bei Erfolg) Alarm-Stempel + Audit-Row. Mail-Fehler ⇒ false und
+// KEIN Stempel — der Cron re-alarmiert beim nächsten Lauf.
+async function raiseAcceptanceSyncAlarm(
+  supabase: any,
+  lead: any,
+  info: AcceptanceAlarmInfo,
+): Promise<boolean> {
+  const template = buildAcceptanceSyncAlarmTemplate(lead, info);
+  const res = await sendEmail(TEAM_NOTIFY_RECIPIENT, template, undefined, {
+    extraBcc: ACCEPT_TEAM_NOTIFY_EXTRA_BCC,
+  });
+  if (!res.success) {
+    console.error(`acceptance alarm mail failed (lead=${lead.id}, app=${info.application_id}):`, res.error);
+    return false;
+  }
+  const appIdNum = Number(info.application_id);
+  if (Number.isFinite(appIdNum)) {
+    const { error: stampErr } = await supabase
+      .from('lead_application_acceptances')
+      .update({ mamamia_sync_alerted_at: new Date().toISOString() })
+      .eq('lead_id', lead.id)
+      .eq('application_id', appIdNum);
+    if (stampErr) console.error('mamamia_sync_alerted_at stamp failed:', stampErr.message);
+  }
+  return true;
+}
 
 function extractCaregiverDisplay(metadata: any): CaregiverDisplay | null {
   if (!metadata || typeof metadata !== 'object') return null;
@@ -488,6 +619,40 @@ export async function POST(request: NextRequest) {
           clearTimeout(timer);
           const syncBody = await syncRes.json().catch(() => null);
           console.log(`[sync-acceptance] lead=${lead.id} app=${appId} http=${syncRes.status} result=${JSON.stringify(syncBody).slice(0, 400)}`);
+
+          // Alarm-Policy (2026-07-21): PERMANENTER StoreConfirmation-Fehler
+          // (Mamamia lehnt deterministisch ab — z.B. Bewerbung von der
+          // Agentur zurückgezogen) ⇒ Team-Alarm SOFORT, nicht erst nach dem
+          // Cron-Fenster. Der Kunde sieht gerade "Buchung bestätigt", ohne
+          // dass in Mamamia etwas gebucht ist. Transiente Fehler alarmieren
+          // hier NICHT (sync-acceptance hat intern schon 3× versucht; Cron
+          // übernimmt, Alarm dort nach 5 Min). Audit-Row wird mitgeloggt.
+          const confErr = syncBody && typeof syncBody === 'object'
+            ? (syncBody as Record<string, any>).confirm_error
+            : null;
+          if (confErr && confErr.permanent === true) {
+            const alarmInfo: AcceptanceAlarmInfo = {
+              application_id: appId,
+              caregiver_id: typeof caregiverId === 'number' && Number.isFinite(caregiverId) ? caregiverId : null,
+              caregiver_name: typeof m.caregiver_name === 'string' ? m.caregiver_name : null,
+              confirmed: false,
+              pdf_uploaded: false,
+              permanent: true,
+              error: typeof confErr.message === 'string' ? confErr.message : String(confErr.message ?? ''),
+              age_minutes: 0,
+              source: 'bridge',
+            };
+            const alarmOk = await raiseAcceptanceSyncAlarm(supabase, lead, alarmInfo);
+            if (alarmOk) {
+              await supabase.from('lead_events').insert({
+                lead_id: lead.id,
+                event_type: 'acceptance_sync_alarm',
+                metadata: { ...alarmInfo }, // trägt bereits source:'bridge'
+              });
+            }
+            // alarmOk=false ⇒ kein Stempel (raiseAcceptanceSyncAlarm) ⇒ der
+            // Cron re-alarmiert (permanent ⇒ altersunabhängig) im nächsten Lauf.
+          }
         } catch (e) {
           console.error(`[sync-acceptance] trigger failed (cron will retry): lead=${lead.id} app=${appId}:`, e instanceof Error ? e.message : String(e));
         }
@@ -523,6 +688,29 @@ export async function POST(request: NextRequest) {
           ? { source: 'caapp', ...metadata }
           : { source: 'caapp' },
       });
+    }
+
+    // 🚨 Acceptance-Sync-Alarm (Cron-Pfad): Team-Mail ist die EINZIGE Wirkung
+    // dieses Events — keine Kundenmail, kein Reminder. Die Mail entscheidet
+    // die Antwort: Fehler ⇒ 502 ⇒ der Cron stempelt mamamia_sync_alerted_at
+    // NICHT und re-alarmiert im nächsten Lauf (15 Min).
+    if (event === 'acceptance_sync_alarm') {
+      const m = (metadata ?? {}) as Record<string, unknown>;
+      const ok = await raiseAcceptanceSyncAlarm(supabase, lead, {
+        application_id: (m.application_id as number | string | undefined) ?? '?',
+        caregiver_id: (m.caregiver_id as number | string | null | undefined) ?? null,
+        caregiver_name: typeof m.caregiver_name === 'string' ? m.caregiver_name : null,
+        confirmed: m.confirmed === true,
+        pdf_uploaded: m.pdf_uploaded === true,
+        permanent: m.permanent === true,
+        error: typeof m.error === 'string' ? m.error : null,
+        age_minutes: typeof m.age_minutes === 'number' ? m.age_minutes : null,
+        source: 'cron',
+      });
+      if (!ok) {
+        return NextResponse.json({ error: 'alarm mail failed' }, { status: 502, headers: corsHeaders });
+      }
+      return NextResponse.json({ ok: true }, { headers: corsHeaders });
     }
 
     // Vertrags-Anhang (Stufe B): beim Buchen aus dem Vertrags-Snapshot +

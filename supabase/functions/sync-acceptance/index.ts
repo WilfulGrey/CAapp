@@ -46,6 +46,8 @@ export interface HandlerDeps {
   store: SyncStore;
   fetchFn?: typeof fetch;
   getAgencyToken?: () => Promise<string>;
+  /** Injectable für Tests — Backoff-Pausen der Confirm-Retries. */
+  sleepFn?: (ms: number) => Promise<void>;
 }
 
 // Role-Claim aus einem (vom Gateway bereits signatur-geprüften) JWT lesen.
@@ -136,6 +138,7 @@ export async function handleRequest(req: Request, deps: HandlerDeps): Promise<Re
           fetchFn: deps.fetchFn,
         })),
       fetchFn: deps.fetchFn,
+      sleepFn: deps.sleepFn,
     });
     return json(200, result);
   } catch (e) {

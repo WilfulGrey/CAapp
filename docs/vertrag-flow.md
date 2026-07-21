@@ -24,7 +24,12 @@ Edge sync-acceptance → _shared/acceptanceSync.ts (współdzielony z cronem):
   2. StoreConfirmation — akcept aplikacji (contract_patient/contract_contact,
                        mapowanie niemieckie→Mamamia SERVER-SIDE: SALUTATION
                        enum Mr./Mrs. [Fall Diesmann], split einsatzort)
-                       → stempel mamamia_confirmed_at + mamamia_confirmation_id
+                       → stempel mamamia_confirmed_at + mamamia_confirmation_id.
+                       Błąd NIE jest rzucany — klasyfikacja + structured
+                       result.confirm_error (patrz „Polityka alarmowa" niżej):
+                       transient ⇒ 3 próby wewnątrz calla (backoff 2s+4s),
+                       permanent (GraphQL-level, np. wycofana Bewerbung) ⇒
+                       bez retry, bridge alarmuje NATYCHMIAST.
   3. Render umowy    — GET {KOSTENRECHNER}/api/contract-pdf/<leadId>?token=
                        (jedyne źródło renderu — z wiersza DB)
   4. Upload do MM    — BRAMKA: dopiero gdy Mamamia PRZETWORZYŁA confirmation
@@ -36,10 +41,28 @@ Edge sync-acceptance → _shared/acceptanceSync.ts (współdzielony z cronem):
 
 Cron detect-caregiver-events (co 15 min) — GWARANT:
   retry-scan: signatur NOT NULL AND (confirmed IS NULL OR pdf IS NULL)
-  AND accepted_at > now()-30d → ten sam moduł. Alert: >24h niedomknięte ⇒
-  GŁOŚNY console.error (Supabase logs) + stempel mamamia_sync_alerted_at
-  (jednorazowo). Celowo bez nowego maila.
+  AND accepted_at > now()-30d → ten sam moduł. Alarm: patrz niżej.
 ```
+
+## Polityka alarmowa (Michał 2026-07-21: „retry przez 5 minut i potem od razu alarm")
+
+Zasada: **klient nigdy nie może wierzyć, że zlecenie jest obstawione, gdy w Mamamii
+nie ma wiążącej confirmation** (np. agencja wycofała Bewerbung między wyświetleniem
+a podpisem). Kanał alarmu = **mail do teamu** (`info@primundus.de` + extra BCC jak
+mail bukingowy), wysyłany przez bridge (event `acceptance_sync_alarm`, team-mail-only:
+nie ma go w GET_PUBLIC_EVENT_TYPES, zero maili do klienta; każdy alarm zostawia
+audit-row w `lead_events`).
+
+| Sytuacja | Kiedy alarm | Kto wysyła |
+|---|---|---|
+| StoreConfirmation odrzucone **permanentnie** (GraphQL-level error — deterministyczna odmowa, klasyfikacja po `graphqlErrors` na errorze, bez zgadywania treści komunikatu) | **NATYCHMIAST (T+0)** | bridge, zaraz po odpowiedzi synchronicznego sync-acceptance (`result.confirm_error.permanent=true`); stempel `mamamia_sync_alerted_at` po udanym mailu |
+| StoreConfirmation pada **transient** (network/HTTP/5xx) | 3 próby w callu (2s+4s backoff); potem cron retry'uje — **alarm gdy po retry danego przebiegu wciąż brak confirm i wiersz starszy niż 5 min** (permanent w cronie ⇒ bez progu wieku) | cron → POST `acceptance_sync_alarm` do bridge'a → mail; stempel TYLKO gdy mail przeszedł (błąd ⇒ 502 ⇒ re-alarm za 15 min) |
+| Confirm OK, **tylko PDF-upload** niedomknięty | po **24h** (archiwum, zero ryzyka klienta — bramka final_confirmation potrzebuje z natury drugiego przebiegu) | cron, ten sam kanał |
+| Wiersz naprawiony w tym samym przebiegu crona | **bez alarmu** (alarm ocenia stan PO retry, nie sprzed) | — |
+
+Stałe: `ACCEPTANCE_CONFIRM_ALERT_AFTER_MS = 5 min`, `ACCEPTANCE_PDF_ALERT_AFTER_MS = 24h`
+(`detect-caregiver-events/index.ts`); retry wewnętrzny `CONFIRM_TRANSIENT_RETRIES = 2`
+(`_shared/acceptanceSync.ts`). Stempel `mamamia_sync_alerted_at` = jednorazowość alarmu.
 
 ## Guardy idempotencji (nigdy podwójny akcept)
 

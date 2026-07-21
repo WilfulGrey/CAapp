@@ -688,6 +688,18 @@ skip_confirm dla starych bundli, stemple `mamamia_*`): [docs/vertrag-flow.md](do
   stuby `{id, tool_ids}` (przy okazji preserve tools, gotcha #13b). Tak robi
   `acceptanceSync`; proxy `updateCustomer` z `[]` działa, bo prod == preprod — ale
   przy każdym nowym narrow-write używaj stubów.
+- **Polityka alarmowa** (Michał 2026-07-21: „retry przez 5 minut i potem od razu
+  alarm" — klient NIGDY nie może wierzyć w obstawione zlecenie bez confirmation w MM,
+  np. po wycofaniu Bewerbung przez agencję): StoreConfirmation-error jest klasyfikowany
+  (`graphqlErrors` na errorze = **permanent**, deterministyczna odmowa MM — bez retry,
+  alarm **T+0 z bridge'a**; network/HTTP = transient — 3 próby w callu 2s+4s, potem
+  cron, alarm gdy po retry przebiegu wciąż brak confirm i wiersz >5 min). Confirm OK
+  a tylko PDF wisi ⇒ alarm dopiero po 24h (archiwum, nie ryzyko klienta). Kanał:
+  team-mail przez bridge (event `acceptance_sync_alarm`, team-mail-only, audit-row
+  w lead_events); stempel `mamamia_sync_alerted_at` TYLKO po udanym mailu (inaczej
+  re-alarm co 15 min). Klasyfikować WYŁĄCZNIE po strukturze błędu, nie po treści
+  komunikatu (Święta zasada 1.5). Szczegóły: [docs/vertrag-flow.md](docs/vertrag-flow.md)
+  §„Polityka alarmowa".
 
 ### 11. Opis opiekunki (`about_de`) — bierzemy z Mamamii, nie generujemy u siebie
 
