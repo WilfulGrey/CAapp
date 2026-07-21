@@ -717,16 +717,24 @@ skip_confirm dla starych bundli, stemple `mamamia_*`): [docs/vertrag-flow.md](do
   (serwer działa w UTC; stąd były dwie umowy z godzinami 17:00 vs 19:00), NIGDY
   etykieta z przeglądarki, NIGDY czas renderu. Render-fallback zostaje tylko dla
   alt-wierszy sprzed kanonu.
-- **Polityka alarmowa** (Michał 2026-07-21: „retry przez 5 minut i potem od razu
-  alarm" — klient NIGDY nie może wierzyć w obstawione zlecenie bez confirmation w MM,
-  np. po wycofaniu Bewerbung przez agencję): StoreConfirmation-error jest klasyfikowany
-  (`graphqlErrors` na errorze = **permanent**, deterministyczna odmowa MM — bez retry,
-  alarm **T+0 z bridge'a**; network/HTTP = transient — 3 próby w callu 2s+4s, potem
-  cron, alarm gdy po retry przebiegu wciąż brak confirm i wiersz >5 min). Confirm OK
-  a tylko PDF wisi ⇒ alarm dopiero po 24h (archiwum, nie ryzyko klienta). Kanał:
-  team-mail przez bridge (event `acceptance_sync_alarm`, team-mail-only, audit-row
-  w lead_events); stempel `mamamia_sync_alerted_at` TYLKO po udanym mailu (inaczej
-  re-alarm co 15 min). Klasyfikować WYŁĄCZNIE po strukturze błędu, nie po treści
+- **Retry-chain zamiast czekania na cron** (Michał 2026-07-21: „zwykły retry po 15-30
+  i 60 sekundach", „cron to słaby pomysł"): niekompletny pierwszy przebieg (typowo:
+  PDF czeka na bramkę przetworzenia) ⇒ sync-acceptance odpowiada od razu i przez
+  `EdgeRuntime.waitUntil` odpala w tle łańcuch **+15s → +30s → +60s** (`RETRY_DELAYS_MS`);
+  każda stufa czyta wiersz świeżo i wykonuje pełną sekwencję. Efekt: confirm+PDF w MM
+  ≤ ~2 min po podpisie. Cron detect (15 min) = WYŁĄCZNIE backstop (śmierć procesu,
+  dłuższa awaria MM). Permanent confirm-error ⇒ chain się NIE odpala (bridge alarmuje T+0).
+- **Polityka alarmowa** (Michał 2026-07-21: klient NIGDY nie może wierzyć w obstawione
+  zlecenie bez confirmation w MM, np. po wycofaniu Bewerbung przez agencję):
+  StoreConfirmation-error jest klasyfikowany (`graphqlErrors` na errorze = **permanent**,
+  deterministyczna odmowa MM — bez retry, alarm **T+0 z bridge'a**; network/HTTP =
+  transient — 3 próby w callu 2s+4s + retry-chain 15/30/60 s, po wyczerpaniu wciąż
+  brak confirm ⇒ **alarm ≈ T+2 min** POST-em `acceptance_sync_alarm` [source
+  `sync-retry`] do bridge'a; cron-owy próg 5 min zostaje jako niezależny bezpiecznik).
+  Confirm OK a tylko PDF wisi ⇒ alarm dopiero po 24h (archiwum, nie ryzyko klienta).
+  Kanał: team-mail przez bridge (event `acceptance_sync_alarm`, team-mail-only,
+  audit-row w lead_events); stempel `mamamia_sync_alerted_at` TYLKO po udanym mailu
+  (inaczej re-alarm). Klasyfikować WYŁĄCZNIE po strukturze błędu, nie po treści
   komunikatu (Święta zasada 1.5). Szczegóły: [docs/vertrag-flow.md](docs/vertrag-flow.md)
   §„Polityka alarmowa".
 

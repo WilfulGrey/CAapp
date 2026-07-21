@@ -6,8 +6,11 @@
 // und führt die verbindliche Sequenz aus (_shared/acceptanceSync.ts):
 //   1. UpdateCustomer (Kontaktdaten) → 2. StoreConfirmation → 3.+4. PDF →
 //   Upload (mit final_confirmation-Bramka). Mails macht die Bridge selbst.
-// Unvollständige Läufe (z.B. Confirmation noch nicht verarbeitet) holt der
-// detect-caregiver-events-Cron alle 15 Min nach — gleicher Modul-Code.
+// Unvollständige Läufe holt eine HINTERGRUND-RETRY-CHAIN nach: +15s → +30s →
+// +60s nach dem Erstversuch (EdgeRuntime.waitUntil — Michał: „zwykły retry,
+// nie cron"); nach Ausschöpfung ohne Confirmation ⇒ sofortiger Team-Alarm.
+// Der detect-caregiver-events-Cron (15 Min) bleibt NUR als Backstop
+// (Prozess-Tod, längere Mamamia-Ausfälle) — gleicher Modul-Code.
 //
 // Auth: Authorization: Bearer <SUPABASE_SERVICE_ROLE_KEY> — constant-time
 // Vergleich. KEIN Kunden-Session-JWT, KEIN anon key. Der Service-Key liegt
@@ -18,6 +21,7 @@ import { getOrRefreshAgencyToken } from "../_shared/mamamiaClient.ts";
 import {
   type AcceptanceLead,
   type AcceptanceRow,
+  type AcceptanceSyncResult,
   type AcceptanceSyncSupabase,
   syncAcceptance,
 } from "../_shared/acceptanceSync.ts";
@@ -46,9 +50,33 @@ export interface HandlerDeps {
   store: SyncStore;
   fetchFn?: typeof fetch;
   getAgencyToken?: () => Promise<string>;
-  /** Injectable für Tests — Backoff-Pausen der Confirm-Retries. */
+  /** Injectable für Tests — Backoff-Pausen (Confirm-Retries + Retry-Chain). */
   sleepFn?: (ms: number) => Promise<void>;
+  /** Injectable für Tests — ersetzt die echte Hintergrund-Retry-Chain. */
+  runRetriesFn?: (deps: HandlerDeps, leadId: string, applicationId: number, skipConfirm: boolean) => Promise<void>;
 }
+
+// Hintergrund-Ausführung nach der Response — die Supabase Edge Runtime hält
+// die Function mit waitUntil() am Leben. Außerhalb (deno test) existiert das
+// Global nicht → fire-and-forget (Tests injizieren runRetriesFn).
+declare const EdgeRuntime: { waitUntil(p: Promise<unknown>): void } | undefined;
+
+function scheduleBackground(p: Promise<unknown>): void {
+  try {
+    if (typeof EdgeRuntime !== "undefined" && EdgeRuntime) {
+      EdgeRuntime.waitUntil(p);
+      return;
+    }
+  } catch { /* kein EdgeRuntime-Global */ }
+  p.catch((e) => console.error("background retry chain failed:", (e as Error).message));
+}
+
+// Retry-Kadenz (Michał 2026-07-21: „zwykły retry po 15-30 i 60 sekundach" —
+// zamiast czekania na 15-minutowy cron). Mamamia przetwarza confirmation
+// zwykle w kilkanaście-kilkadziesiąt sekund → po +15/+30/+60 s całość jest
+// domknięta ~2 min po podpisie. Cron zostaje WYŁĄCZNIE jako bezpiecznik
+// (śmierć procesu / dłuższa awaria Mamamii).
+const RETRY_DELAYS_MS = [15_000, 30_000, 60_000];
 
 // Role-Claim aus einem (vom Gateway bereits signatur-geprüften) JWT lesen.
 // KEINE eigene Signaturprüfung — die macht verify_jwt am Gateway; hier nur
@@ -117,37 +145,131 @@ export async function handleRequest(req: Request, deps: HandlerDeps): Promise<Re
   const row = await deps.store.fetchAcceptance(leadId, applicationId);
   if (!row) return json(404, { error: "acceptance not found" });
 
+  const runner = deps.runRetriesFn ?? runRetryChain;
   try {
-    const result = await syncAcceptance({
-      lead,
-      row,
-      skipConfirm,
-      secrets: {
-        mamamiaEndpoint: deps.secrets.mamamiaEndpoint,
-        kostenrechnerUrl: deps.secrets.kostenrechnerUrl,
-        supabaseUrl: deps.secrets.supabaseUrl,
-        supabaseServiceKey: deps.secrets.supabaseServiceKey,
-      },
-      supabase: {
-        stampConfirmed: deps.store.stampConfirmed.bind(deps.store),
-        stampPdfUploaded: deps.store.stampPdfUploaded.bind(deps.store),
-      } satisfies AcceptanceSyncSupabase,
-      getAgencyToken: deps.getAgencyToken ?? (() =>
-        getOrRefreshAgencyToken({
-          authEndpoint: deps.secrets.mamamiaAuthEndpoint,
-          email: deps.secrets.mamamiaAgencyEmail,
-          password: deps.secrets.mamamiaAgencyPassword,
-          fetchFn: deps.fetchFn,
-        })),
-      fetchFn: deps.fetchFn,
-      sleepFn: deps.sleepFn,
-    });
-    return json(200, result);
+    const result = await runSyncOnce(deps, lead, row, skipConfirm);
+    const complete = result.confirmed && result.pdf_uploaded;
+    const permanent = result.confirm_error?.permanent === true;
+    // Retry-Chain 15/30/60 s IM HINTERGRUND (Michał: „zwykły retry, nie
+    // cron") — für alles Unvollständige AUSSER permanenten Confirm-Fehlern
+    // (deterministyczna odmowa — Bridge alarmiert T+0, retry nic nie zmienia).
+    let retriesScheduled = false;
+    if (!complete && !permanent) {
+      scheduleBackground(runner(deps, lead.id, row.application_id, skipConfirm));
+      retriesScheduled = true;
+    }
+    return json(200, { ...result, retries_scheduled: retriesScheduled });
   } catch (e) {
     // Fehler hier ist NICHT fatal fürs Business: die Buchung steht (DB-Write
-    // in der Bridge), der Cron retryt. Loud loggen, ehrlich antworten.
+    // in der Bridge). Retry-Chain übernimmt sofort, Cron bleibt Backstop.
     console.error(`sync-acceptance failed (lead=${leadId}, app=${applicationId}):`, (e as Error).message);
-    return json(502, { error: "sync failed", detail: (e as Error).message.slice(0, 300) });
+    scheduleBackground(runner(deps, lead.id, row.application_id, skipConfirm));
+    return json(502, { error: "sync failed", detail: (e as Error).message.slice(0, 300), retries_scheduled: true });
+  }
+}
+
+// Eine Sync-Ausführung mit den Deps des Handlers (geteilt: Erstversuch +
+// jede Stufe der Retry-Chain — identische Guards, frische Row je Anlauf).
+async function runSyncOnce(
+  deps: HandlerDeps,
+  lead: AcceptanceLead,
+  row: AcceptanceRow,
+  skipConfirm: boolean,
+): Promise<AcceptanceSyncResult> {
+  return await syncAcceptance({
+    lead,
+    row,
+    skipConfirm,
+    secrets: {
+      mamamiaEndpoint: deps.secrets.mamamiaEndpoint,
+      kostenrechnerUrl: deps.secrets.kostenrechnerUrl,
+      supabaseUrl: deps.secrets.supabaseUrl,
+      supabaseServiceKey: deps.secrets.supabaseServiceKey,
+    },
+    supabase: {
+      stampConfirmed: deps.store.stampConfirmed.bind(deps.store),
+      stampPdfUploaded: deps.store.stampPdfUploaded.bind(deps.store),
+    } satisfies AcceptanceSyncSupabase,
+    getAgencyToken: deps.getAgencyToken ?? (() =>
+      getOrRefreshAgencyToken({
+        authEndpoint: deps.secrets.mamamiaAuthEndpoint,
+        email: deps.secrets.mamamiaAgencyEmail,
+        password: deps.secrets.mamamiaAgencyPassword,
+        fetchFn: deps.fetchFn,
+      })),
+    fetchFn: deps.fetchFn,
+    sleepFn: deps.sleepFn,
+  });
+}
+
+// Hintergrund-Retry-Chain: +15s → +30s → +60s nach dem Erstversuch. Jede
+// Stufe liest die Row FRISCH (Stempel eines parallelen Laufs beenden die
+// Chain), führt die volle Sequenz erneut aus und stoppt bei Komplettierung.
+// Nach Ausschöpfung: fehlt die CONFIRMATION noch ⇒ SOFORT Team-Alarm über
+// die Bridge (Kunde glaubt an eine Buchung, die Mamamia nicht hat — Mail +
+// Stempel macht raiseAcceptanceSyncAlarm bridge-seitig). Fehlt nur der PDF
+// ⇒ kein Alarm (Archiv-Thema, Cron-Backstop lädt nach, Alarm erst >24h).
+export async function runRetryChain(
+  deps: HandlerDeps,
+  leadId: string,
+  applicationId: number,
+  skipConfirm: boolean,
+  delays: number[] = RETRY_DELAYS_MS,
+): Promise<void> {
+  const sleep = deps.sleepFn ?? ((ms: number) => new Promise<void>((r) => setTimeout(r, ms)));
+  let lastResult: AcceptanceSyncResult | null = null;
+  for (const d of delays) {
+    await sleep(d);
+    try {
+      const lead = await deps.store.fetchLead(leadId);
+      const row = await deps.store.fetchAcceptance(leadId, applicationId);
+      if (!lead || !row) return;
+      if (row.mamamia_confirmed_at && row.mamamia_pdf_uploaded_at) return; // anderweitig komplett
+      lastResult = await runSyncOnce(deps, lead, row, skipConfirm);
+      if (lastResult.confirmed && lastResult.pdf_uploaded) {
+        console.log(`[retry-chain] complete (lead=${leadId}, app=${applicationId})`);
+        return;
+      }
+      if (lastResult.confirm_error?.permanent) break; // weitere Versuche sinnlos
+    } catch (e) {
+      console.error(`[retry-chain] attempt failed (lead=${leadId}, app=${applicationId}):`, (e as Error).message);
+    }
+  }
+
+  try {
+    const lead = await deps.store.fetchLead(leadId);
+    const row = await deps.store.fetchAcceptance(leadId, applicationId);
+    if (!lead || !row) return;
+    if (row.mamamia_confirmed_at) {
+      console.log(`[retry-chain] exhausted — confirm OK, PDF pending, Cron-Backstop übernimmt (lead=${leadId}, app=${applicationId})`);
+      return;
+    }
+    if (row.mamamia_sync_alerted_at || !lead.token) return; // schon alarmiert / kein Bridge-Zugang
+    const fetcher = deps.fetchFn ?? globalThis.fetch;
+    const res = await fetcher(`${deps.secrets.kostenrechnerUrl.replace(/\/$/, "")}/api/lead-event`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        token: lead.token,
+        event: "acceptance_sync_alarm",
+        metadata: {
+          application_id: applicationId,
+          caregiver_id: row.caregiver_id,
+          confirmed: false,
+          pdf_uploaded: !!row.mamamia_pdf_uploaded_at,
+          permanent: lastResult?.confirm_error?.permanent === true,
+          error: lastResult?.confirm_error?.message
+            ?? "confirm still missing after 15/30/60s retry chain",
+          age_minutes: 2,
+          source: "sync-retry",
+        },
+      }),
+    });
+    if (!res.ok) {
+      console.error(`[retry-chain] alarm POST failed HTTP ${res.status} — Cron re-alarmiert (lead=${leadId}, app=${applicationId})`);
+    }
+  } catch (e) {
+    console.error(`[retry-chain] alarm phase failed (lead=${leadId}, app=${applicationId}):`, (e as Error).message);
   }
 }
 
@@ -175,7 +297,7 @@ export function makeRealStore(url: string, serviceKey: string): SyncStore {
     async fetchAcceptance(leadId: string, applicationId: number) {
       const { data, error } = await client
         .from("lead_application_acceptances")
-        .select("lead_id, application_id, caregiver_id, signatur, contract_patient, contract_contact, contract_snapshot, mamamia_confirmed_at, mamamia_confirmation_id, mamamia_pdf_uploaded_at, pdf_sha256")
+        .select("lead_id, application_id, caregiver_id, signatur, contract_patient, contract_contact, contract_snapshot, mamamia_confirmed_at, mamamia_confirmation_id, mamamia_pdf_uploaded_at, pdf_sha256, mamamia_sync_alerted_at")
         .eq("lead_id", leadId)
         .eq("application_id", applicationId)
         .maybeSingle();

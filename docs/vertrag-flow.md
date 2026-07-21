@@ -65,7 +65,18 @@ Edge sync-acceptance → _shared/acceptanceSync.ts (współdzielony z cronem):
                        → Confirmation.signed_contract (S3 Mamamii)
                        → stempel mamamia_pdf_uploaded_at
 
-Cron detect-caregiver-events (co 15 min) — GWARANT:
+RETRY-CHAIN w tle edge fn (Michał 2026-07-21: „zwykły retry po 15-30
+i 60 sekundach", „cron to słaby pomysł"):
+  Erstversuch niekompletny (i błąd nie-permanent) ⇒ sync-acceptance
+  odpowiada bridge'owi NATYCHMIAST i przez EdgeRuntime.waitUntil odpala
+  łańcuch +15s → +30s → +60s (RETRY_DELAYS_MS). Każda stufa czyta wiersz
+  ŚWIEŻO (stemple równoległego przebiegu kończą chain) i wykonuje pełną
+  sekwencję. Typowy efekt: confirm + PDF w MM ≤ ~2 min po podpisie.
+  Po wyczerpaniu: brak confirm ⇒ NATYCHMIAST alarm (POST acceptance_sync_alarm
+  do bridge'a, source 'sync-retry'); tylko PDF wisi ⇒ bez alarmu (cron).
+
+Cron detect-caregiver-events (co 15 min) — WYŁĄCZNIE BACKSTOP
+(śmierć procesu edge, dłuższa awaria MM — normalnie nic nie robi):
   retry-scan: signatur NOT NULL AND (confirmed IS NULL OR pdf IS NULL)
   AND accepted_at > now()-30d → ten sam moduł. Alarm: patrz niżej.
 ```
@@ -82,11 +93,13 @@ audit-row w `lead_events`).
 | Sytuacja | Kiedy alarm | Kto wysyła |
 |---|---|---|
 | StoreConfirmation odrzucone **permanentnie** (GraphQL-level error — deterministyczna odmowa, klasyfikacja po `graphqlErrors` na errorze, bez zgadywania treści komunikatu) | **NATYCHMIAST (T+0)** | bridge, zaraz po odpowiedzi synchronicznego sync-acceptance (`result.confirm_error.permanent=true`); stempel `mamamia_sync_alerted_at` po udanym mailu |
-| StoreConfirmation pada **transient** (network/HTTP/5xx) | 3 próby w callu (2s+4s backoff); potem cron retry'uje — **alarm gdy po retry danego przebiegu wciąż brak confirm i wiersz starszy niż 5 min** (permanent w cronie ⇒ bez progu wieku) | cron → POST `acceptance_sync_alarm` do bridge'a → mail; stempel TYLKO gdy mail przeszedł (błąd ⇒ 502 ⇒ re-alarm za 15 min) |
-| Confirm OK, **tylko PDF-upload** niedomknięty | po **24h** (archiwum, zero ryzyka klienta — bramka final_confirmation potrzebuje z natury drugiego przebiegu) | cron, ten sam kanał |
-| Wiersz naprawiony w tym samym przebiegu crona | **bez alarmu** (alarm ocenia stan PO retry, nie sprzed) | — |
+| StoreConfirmation pada **transient** (network/HTTP/5xx) | 3 próby w callu (2s+4s backoff) + **retry-chain +15/+30/+60 s** — po wyczerpaniu łańcucha wciąż brak confirm ⇒ **alarm ≈ T+2 min** | retry-chain (edge, w tle) → POST `acceptance_sync_alarm` (source `sync-retry`) do bridge'a → mail; stempel TYLKO gdy mail przeszedł |
+| j.w., ale proces edge zginął zanim chain skończył | próg **5 min** od akceptu (niezależny bezpiecznik) | cron → ten sam POST (source `cron`); błąd maila ⇒ 502 ⇒ re-alarm za 15 min |
+| Confirm OK, **tylko PDF-upload** niedomknięty | po **24h** (archiwum, zero ryzyka klienta — bramka final_confirmation potrzebuje z natury drugiego przebiegu; chain zwykle domyka go w ≤2 min) | cron, ten sam kanał |
+| Wiersz naprawiony w tym samym przebiegu crona / stufie chaina | **bez alarmu** (alarm ocenia stan PO retry, nie sprzed) | — |
 
-Stałe: `ACCEPTANCE_CONFIRM_ALERT_AFTER_MS = 5 min`, `ACCEPTANCE_PDF_ALERT_AFTER_MS = 24h`
+Stałe: `RETRY_DELAYS_MS = [15s, 30s, 60s]` (`sync-acceptance/index.ts`);
+`ACCEPTANCE_CONFIRM_ALERT_AFTER_MS = 5 min`, `ACCEPTANCE_PDF_ALERT_AFTER_MS = 24h`
 (`detect-caregiver-events/index.ts`); retry wewnętrzny `CONFIRM_TRANSIENT_RETRIES = 2`
 (`_shared/acceptanceSync.ts`). Stempel `mamamia_sync_alerted_at` = jednorazowość alarmu.
 

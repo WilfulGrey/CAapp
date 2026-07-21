@@ -14,7 +14,7 @@ import {
   splitEinsatzort,
   syncAcceptance,
 } from "../../_shared/acceptanceSync.ts";
-import { handleRequest as syncHandler, type SyncStore } from "../../sync-acceptance/index.ts";
+import { handleRequest as syncHandler, runRetryChain, type SyncStore } from "../../sync-acceptance/index.ts";
 import { retryAcceptanceSyncs, type HandlerDeps, type PendingAcceptanceSync } from "../index.ts";
 
 // ─── Fixtures ──────────────────────────────────────────────────────────────
@@ -762,13 +762,14 @@ Deno.test("sync-acceptance: JWT mit role=anon ⇒ 401; role=service_role ⇒ lä
       headers: { Authorization: `Bearer ${fakeJwt("service_role")}` },
       body: JSON.stringify({ lead_id: "lead-1", application_id: 9001 }),
     }),
-    { secrets: SYNC_FN_SECRETS, store: makeStore(makeRow()), fetchFn: net.fetch, getAgencyToken: agencyToken },
+    { secrets: SYNC_FN_SECRETS, store: makeStore(makeRow()), fetchFn: net.fetch, getAgencyToken: agencyToken, runRetriesFn: () => Promise.resolve() },
   );
   assertEquals(srvRes.status, 200);
 });
 
-Deno.test("sync-acceptance: korrekter Bearer ⇒ Sequenz läuft (200 + Ergebnis)", async () => {
-  const net = makeNet();
+Deno.test("sync-acceptance: korrekter Bearer ⇒ Sequenz läuft (200 + Ergebnis); unvollständig ⇒ Retry-Chain geplant", async () => {
+  const net = makeNet(); // frisch bestätigt, PDF wartet auf Verarbeitung ⇒ unvollständig
+  const scheduled: Array<{ leadId: string; applicationId: number }> = [];
   const res = await syncHandler(
     new Request("https://edge/sync-acceptance", {
       method: "POST",
@@ -780,12 +781,122 @@ Deno.test("sync-acceptance: korrekter Bearer ⇒ Sequenz läuft (200 + Ergebnis)
       store: makeStore(makeRow()),
       fetchFn: net.fetch,
       getAgencyToken: agencyToken,
+      runRetriesFn: (_deps, leadId, applicationId) => {
+        scheduled.push({ leadId, applicationId });
+        return Promise.resolve();
+      },
     },
   );
   assertEquals(res.status, 200);
   const body = await res.json();
   assertEquals(body.confirmed, true);
   assertEquals(body.customer_updated, true);
+  assertEquals(body.retries_scheduled, true);
+  assertEquals(scheduled, [{ leadId: "lead-1", applicationId: 9001 }]);
+});
+
+Deno.test("sync-acceptance: permanenter Confirm-Fehler ⇒ KEINE Retry-Chain (Bridge alarmiert T+0)", async () => {
+  const net = makeNet({ confirmFailMode: "graphql" }); // deterministyczna odmowa MM
+  let scheduledCount = 0;
+  const res = await syncHandler(
+    new Request("https://edge/sync-acceptance", {
+      method: "POST",
+      headers: { Authorization: "Bearer service-role-key-123" },
+      body: JSON.stringify({ lead_id: "lead-1", application_id: 9001 }),
+    }),
+    {
+      secrets: SYNC_FN_SECRETS,
+      store: makeStore(makeRow()),
+      fetchFn: net.fetch,
+      getAgencyToken: agencyToken,
+      runRetriesFn: () => {
+        scheduledCount += 1;
+        return Promise.resolve();
+      },
+    },
+  );
+  assertEquals(res.status, 200);
+  const body = await res.json();
+  assertEquals(body.confirm_error?.permanent, true);
+  assertEquals(body.retries_scheduled, false);
+  assertEquals(scheduledCount, 0);
+});
+
+// ─── Hintergrund-Retry-Chain (15/30/60 s) ──────────────────────────────────
+
+Deno.test("retry-chain: PDF dopięty w pierwszej stufie ⇒ stop, bez alarmu", async () => {
+  // Zwischen Erstversuch und +15s hat Mamamia die Confirmation verarbeitet.
+  const net = makeNet({
+    finalConfirmations: [{ id: 555, caregiver: { id: 501 } }],
+    storageBody: new TextEncoder().encode("%PDF-1.7 canon"),
+  });
+  const row = makeRow({ mamamia_confirmed_at: "2026-07-21T20:00:00Z", mamamia_confirmation_id: 555 });
+  const delays: number[] = [];
+  await runRetryChain(
+    {
+      secrets: SYNC_FN_SECRETS,
+      store: makeStore(row),
+      fetchFn: net.fetch,
+      getAgencyToken: agencyToken,
+      sleepFn: (ms) => {
+        delays.push(ms);
+        return Promise.resolve();
+      },
+    },
+    "lead-1",
+    9001,
+    false,
+  );
+  assertEquals(delays, [15000]); // po pierwszej stufie komplet — 30/60 nie odpalają
+  assertEquals(net.ops.filter((o) => o.op === "StoreFile").length, 1);
+  assertEquals(net.bridgePosts.length, 0);
+});
+
+Deno.test("retry-chain: wyczerpana bez confirm (transient) ⇒ NATYCHMIAST alarm przez bridge (source sync-retry)", async () => {
+  const net = makeNet({ confirmFailMode: "http500" }); // MM leży na każdej próbie
+  const delays: number[] = [];
+  await runRetryChain(
+    {
+      secrets: SYNC_FN_SECRETS,
+      store: makeStore(makeRow()),
+      fetchFn: net.fetch,
+      getAgencyToken: agencyToken,
+      sleepFn: (ms) => {
+        delays.push(ms);
+        return Promise.resolve();
+      },
+    },
+    "lead-1",
+    9001,
+    false,
+  );
+  // 3 Stufen (15/30/60) — dazwischen interne Confirm-Retries mit eigenen Pausen.
+  assertEquals(delays.filter((d) => d >= 15000).slice(0, 3), [15000, 30000, 60000]);
+  assertEquals(net.bridgePosts.length, 1);
+  const post = net.bridgePosts[0] as { token: string; event: string; metadata: Record<string, unknown> };
+  assertEquals(post.token, "tok-abc");
+  assertEquals(post.event, "acceptance_sync_alarm");
+  assertEquals(post.metadata.source, "sync-retry");
+  assertEquals(post.metadata.confirmed, false);
+});
+
+Deno.test("retry-chain: confirm OK, tylko PDF wisi ⇒ wyczerpana BEZ alarmu (cron-backstop, 24h-próg)", async () => {
+  // finalConfirmations leer ⇒ Verarbeitungs-Bramka defer't den Upload in jeder Stufe.
+  const net = makeNet();
+  const row = makeRow({ mamamia_confirmed_at: "2026-07-21T20:00:00Z", mamamia_confirmation_id: 555 });
+  await runRetryChain(
+    {
+      secrets: SYNC_FN_SECRETS,
+      store: makeStore(row),
+      fetchFn: net.fetch,
+      getAgencyToken: agencyToken,
+      sleepFn: () => Promise.resolve(),
+    },
+    "lead-1",
+    9001,
+    false,
+  );
+  assertEquals(net.bridgePosts.length, 0);
 });
 
 Deno.test("sync-acceptance: unbekannte Acceptance ⇒ 404", async () => {
