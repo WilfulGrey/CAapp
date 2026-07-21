@@ -682,6 +682,12 @@ skip_confirm dla starych bundli, stemple `mamamia_*`): [docs/vertrag-flow.md](do
 - Magic-bytes `%PDF-` przed każdym uploadem (renderer ma HTML-fallback).
 - Mapowanie niemieckie→Mamamia (SALUTATION enum Mr./Mrs. — „Fall Diesmann", split
   einsatzort) żyje w `_shared/acceptanceSync.ts` — NIE duplikować we froncie.
+- **Dryf walidacji beta↔preprod na `patients[]`** (2026-07-22, klasa Bug #16): beta
+  odrzuca `patients: []` w UpdateCustomer („Das Feld patients ist erforderlich"),
+  preprod toleruje (notatka proxy 2026-05-14). Bezpieczne na OBU tenantach: non-empty
+  stuby `{id, tool_ids}` (przy okazji preserve tools, gotcha #13b). Tak robi
+  `acceptanceSync`; proxy `updateCustomer` z `[]` działa, bo prod == preprod — ale
+  przy każdym nowym narrow-write używaj stubów.
 
 ### 11. Opis opiekunki (`about_de`) — bierzemy z Mamamii, nie generujemy u siebie
 
