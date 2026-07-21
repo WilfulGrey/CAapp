@@ -690,9 +690,13 @@ skip_confirm dla starych bundli, stemple `mamamia_*`): [docs/vertrag-flow.md](do
   przy każdym nowym narrow-write używaj stubów.
 - **Trzy osoby z konfirmacji → NATYWNE sloty klienta MM** (2026-07-21, Customer 8394
   beta): krok 1 sekwencji pisze LE → `patient_contracts[{contact_type:
-  "patient_contact"}]` (+ carry `location_id` z istniejącego contractu — MM REPLACES
-  listę), AG → `invoice_contract{contact_type:"contract_contact"}` (Person für den
-  Vertrag/Rechnung), KP → `customer_contacts[]`. **NIGDY singular `customer_contract`**
+  "patient_contact"}]`, AG → `invoice_contract{contact_type:"contract_contact"}` (Person
+  für den Vertrag/Rechnung), KP → `customer_contacts[]`. **`location_id` per wiersz z
+  JEGO własnego PLZ** (Stadt-dropdown panelu czyta location_id, nie tekst; metoda 1:1
+  jak główna lokalizacja klienta = `LocationsWithPagination(search: PLZ)` → pierwszy
+  DE; AG mieszka niekoniecznie pod adresem opieki — 34117 vs 34123, feedback Michała);
+  LE-fallback: carry z istniejącego contractu (MM REPLACES listę). Typ `Location` ma
+  pole **`location`**, NIE `name` — zła selekcja wygląda jak pusty wynik. **NIGDY singular `customer_contract`**
   — MM typuje pierwszy wiersz plurala jako patient_contact, więc AG-dane lądują w
   slocie pacjenta/lokalizacji opieki (pierwotny bug: „3 osoby w formularzu, w mamamii
   jedna"). **ZAWSZE jawne flagi `is_same_as_first_patient`/`is_same_as_contact`** —

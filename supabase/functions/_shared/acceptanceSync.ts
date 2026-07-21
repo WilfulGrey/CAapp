@@ -173,6 +173,20 @@ const UPDATE_CUSTOMER_CONTRACT = /* GraphQL */ `
   }
 `;
 
+// Stadt-Dropdown na wierszach osób w panelu MM czyta location_id z katalogu
+// Locations — czysty tekst zip/city go NIE wypełnia. Rozwiązujemy location_id
+// DOKŁADNIE tą samą metodą co główna lokalizacja klienta (Bug #13d, proxy
+// searchLocations): LocationsWithPagination(search: PLZ) → pierwszy trafiony
+// country_code=DE. Selekcja pól: `location` (NIE `name` — pola name nie ma,
+// błędna selekcja wygląda jak pusty wynik; przejechałem się 2026-07-21).
+const LOCATIONS_QUERY = /* GraphQL */ `
+  query AcceptanceSyncLocations($search: String, $limit: Int, $page: Int) {
+    LocationsWithPagination(search: $search, limit: $limit, page: $page) {
+      data { id location zip_code country_code }
+    }
+  }
+`;
+
 const STORE_CONFIRMATION = /* GraphQL */ `
   mutation StoreConfirmation(
     $application_id: Int
@@ -317,6 +331,33 @@ export function isPdfBytes(bytes: Uint8Array): boolean {
   return PDF_MAGIC.every((b, i) => bytes[i] === b);
 }
 
+// Best-effort: PLZ → location_id. Brak trafienia / błąd sieci ⇒ null (wiersz
+// idzie z samym tekstem zip/city — panel pokaże Stadt do ręcznego wyboru).
+async function resolveLocationId(
+  zip: unknown,
+  ctx: { endpoint: string; token: string; fetchFn: typeof fetch },
+): Promise<number | null> {
+  const z = String(zip ?? "").trim();
+  if (!/^\d{4,5}$/.test(z)) return null;
+  try {
+    const res = await mamamiaRequest<{
+      LocationsWithPagination: {
+        data: Array<{ id: number; zip_code: string | null; country_code: string | null }> | null;
+      } | null;
+    }>({
+      endpoint: ctx.endpoint,
+      token: ctx.token,
+      query: LOCATIONS_QUERY,
+      variables: { search: z, limit: 5, page: 1 },
+      fetchFn: ctx.fetchFn,
+    });
+    const rows = res.LocationsWithPagination?.data ?? [];
+    return rows.find((l) => l.country_code === "DE")?.id ?? null;
+  } catch {
+    return null;
+  }
+}
+
 async function sha256Hex(bytes: Uint8Array): Promise<string> {
   const digest = await crypto.subtle.digest("SHA-256", bytes.buffer as ArrayBuffer);
   return [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, "0")).join("");
@@ -420,10 +461,19 @@ export async function syncAcceptance(opts: AcceptanceSyncOpts): Promise<Acceptan
   // AG → invoice_contract[contract_contact], KP → customer_contacts[].
   // Idempotent (gleiche Daten ⇒ gleicher Zustand) → läuft auch im Retry
   // erneut, kein eigener Stempel nötig.
-  const locationId = cust.Customer?.customer_contract?.location_id ?? null;
+  const carriedLocationId = cust.Customer?.customer_contract?.location_id ?? null;
   const lePatient = mapContractPatient(row.contract_patient);
   const agContract = buildCustomerContract(row);
   const kpContact = mapContractContact(row.contract_contact);
+  // location_id per Row z JEJ własnego PLZ (metoda 1:1 jak główna lokalizacja
+  // klienta) — AG mieszka niekoniecznie pod adresem opieki. Fallback dla LE:
+  // location_id przeniesione z istniejącego contractu (zapis patient formy).
+  const locCtx = { endpoint: secrets.mamamiaEndpoint, token: agencyToken, fetchFn };
+  const leLocationId = (await resolveLocationId(lePatient?.zip_code, locCtx)) ?? carriedLocationId;
+  const agZip = String(agContract?.zip_code ?? "").trim();
+  const agLocationId = agZip && agZip === String(lePatient?.zip_code ?? "").trim()
+    ? leLocationId
+    : await resolveLocationId(agZip, locCtx);
   if (lePatient || agContract || kpContact) {
     const variables: Record<string, unknown> = {
       id: lead.mamamia_customer_id,
@@ -443,9 +493,7 @@ export async function syncAcceptance(opts: AcceptanceSyncOpts): Promise<Acceptan
         is_same_as_first_patient: false,
         is_same_as_contact: false,
         ...lePatient,
-        // Kanonische Care-Location NUR hier — die AG-Adresse kann eine
-        // ANDERE sein (Vertragspartner wohnt nicht zwingend am Einsatzort).
-        ...(locationId != null ? { location_id: locationId } : {}),
+        ...(leLocationId != null ? { location_id: leLocationId } : {}),
       }];
     }
     if (agContract) {
@@ -457,6 +505,9 @@ export async function syncAcceptance(opts: AcceptanceSyncOpts): Promise<Acceptan
         is_same_as_first_patient: isAgGleich(row),
         is_same_as_contact: false,
         ...agContract,
+        // Stadt-Dropdown der Vertrags-/Rechnungsperson = IHRE PLZ (34117,
+        // nicht die Care-Location 34123 — Feedback Michał 2026-07-21).
+        ...(agLocationId != null ? { location_id: agLocationId } : {}),
       };
     }
     if (kpContact) {
