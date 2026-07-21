@@ -75,6 +75,8 @@ export interface AcceptanceSyncOpts {
   supabase: AcceptanceSyncSupabase;
   getAgencyToken: () => Promise<string>;
   fetchFn?: typeof fetch;
+  /** Injectable für Tests — echte Backoff-Pausen zwischen Confirm-Retries. */
+  sleepFn?: (ms: number) => Promise<void>;
 }
 
 export interface AcceptanceSyncResult {
@@ -84,6 +86,16 @@ export interface AcceptanceSyncResult {
   pdf_uploaded: boolean;
   /** Was dem Cron überlassen wurde (z.B. "pdf: confirmation not processed yet"). */
   deferred: string[];
+  /**
+   * StoreConfirmation fehlgeschlagen (Alarm-Policy Michał 2026-07-21):
+   * permanent=true ⇒ Mamamia hat den Akzept DETERMINISTISCH abgelehnt
+   * (GraphQL-Fehler, z.B. Bewerbung von der Agentur zurückgezogen) —
+   * Retry ändert nichts, Alarm SOFORT. permanent=false ⇒ transient
+   * (Netz/HTTP), interne Retries ausgeschöpft — Cron versucht weiter,
+   * Alarm nach 5 Min. Feld fehlt, wenn Confirm gar nicht dran war
+   * (schon bestätigt / skipConfirm / Adoption) oder gelungen ist.
+   */
+  confirm_error?: { message: string; permanent: boolean };
 }
 
 // ─── GraphQL ────────────────────────────────────────────────────────────────
@@ -313,11 +325,31 @@ async function storeFileAsAgency(
   return fileToken as string;
 }
 
+// ─── Fehlerklassifikation + Confirm-Retry ──────────────────────────────────
+
+// Permanent = die Anfrage hat Mamamia ERREICHT und wurde GraphQL-seitig
+// abgelehnt (mamamiaRequest hängt dann `graphqlErrors` an den Error) —
+// identischer Payload ⇒ identisches Ergebnis, Wiederholen ist sinnlos.
+// Alles andere (fetch-Throw, HTTP !ok, fehlendes data-Feld) = transient.
+// Bewusst KEINE Message-Pattern-Heuristik (Święta zasada nr 1.5).
+function isPermanentMamamiaError(e: unknown): boolean {
+  return !!(e as { graphqlErrors?: unknown } | null)?.graphqlErrors;
+}
+
+// Kurze interne Retries NUR für transiente Confirm-Fehler — "jakieś retry
+// przez 5 minut i potem od razu alarm" (Michał 2026-07-21). Muss ins
+// 25s-Timeout der Bridge passen: 3 Versuche, Pausen 2s + 4s.
+const CONFIRM_TRANSIENT_RETRIES = 2;
+const CONFIRM_RETRY_DELAYS_MS = [2000, 4000];
+
+const defaultSleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
+
 // ─── Hauptsequenz ──────────────────────────────────────────────────────────
 
 export async function syncAcceptance(opts: AcceptanceSyncOpts): Promise<AcceptanceSyncResult> {
   const { lead, row, secrets, supabase, getAgencyToken } = opts;
   const fetchFn = opts.fetchFn ?? globalThis.fetch;
+  const sleep = opts.sleepFn ?? defaultSleep;
   const result: AcceptanceSyncResult = {
     customer_updated: false,
     confirmed: !!row.mamamia_confirmed_at,
@@ -390,22 +422,48 @@ export async function syncAcceptance(opts: AcceptanceSyncOpts): Promise<Acceptan
       // Cron übernimmt sobald sie sichtbar ist.
       result.deferred.push("confirm: client already accepted, awaiting processing");
     } else {
-      const conf = await mamamiaRequest<{
-        StoreConfirmation: { id: number; application_id: number } | null;
-      }>({
-        endpoint: secrets.mamamiaEndpoint,
-        token: agencyToken,
-        query: STORE_CONFIRMATION,
-        variables: {
-          application_id: row.application_id,
-          is_confirm_binding: true,
-          contract_patient: mapContractPatient(row.contract_patient),
-          contract_contact: mapContractContact(row.contract_contact),
-        },
-        fetchFn,
-      });
+      // StoreConfirmation mit Klassifikation + kurzen internen Retries
+      // (Alarm-Policy 2026-07-21). Fehler wird NICHT geworfen, sondern
+      // strukturiert zurückgegeben — die Bridge alarmiert bei permanent
+      // SOFORT (Kunde glaubt sonst an eine Buchung, die es nicht gibt,
+      // z.B. weil die Agentur die Bewerbung zurückgezogen hat).
+      let conf: { StoreConfirmation: { id: number; application_id: number } | null } | null = null;
+      let confErr: { message: string; permanent: boolean } | null = null;
+      for (let attempt = 0; ; attempt++) {
+        try {
+          conf = await mamamiaRequest<{
+            StoreConfirmation: { id: number; application_id: number } | null;
+          }>({
+            endpoint: secrets.mamamiaEndpoint,
+            token: agencyToken,
+            query: STORE_CONFIRMATION,
+            variables: {
+              application_id: row.application_id,
+              is_confirm_binding: true,
+              contract_patient: mapContractPatient(row.contract_patient),
+              contract_contact: mapContractContact(row.contract_contact),
+            },
+            fetchFn,
+          });
+          confErr = null;
+          break;
+        } catch (e) {
+          const permanent = isPermanentMamamiaError(e);
+          confErr = { message: (e as Error).message.slice(0, 300), permanent };
+          if (permanent || attempt >= CONFIRM_TRANSIENT_RETRIES) break;
+          await sleep(CONFIRM_RETRY_DELAYS_MS[attempt] ?? 4000);
+        }
+      }
+      if (confErr) {
+        result.confirm_error = confErr;
+        result.deferred.push(
+          `confirm: ${confErr.permanent ? "PERMANENT" : "transient"} error — ${confErr.message}`,
+        );
+        // Ohne Confirm kein PDF (Sequenz 2 vor 3+4) — Cron/Alarm übernehmen.
+        return result;
+      }
       result.confirmed = true;
-      result.confirmation_id = conf.StoreConfirmation?.id ?? null;
+      result.confirmation_id = conf!.StoreConfirmation?.id ?? null;
     }
     if (result.confirmed) {
       await supabase.stampConfirmed(row.lead_id, row.application_id, result.confirmation_id);

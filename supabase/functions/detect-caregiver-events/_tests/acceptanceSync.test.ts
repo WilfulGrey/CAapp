@@ -63,6 +63,14 @@ interface FakeNet {
   ops: Array<{ op: string; variables: Record<string, unknown> }>;
   pdfBody?: Uint8Array | string;
   finalConfirmations?: Array<{ id: number; caregiver: { id: number } | null }>;
+  // Fehler-Injektion für StoreConfirmation (Alarm-Policy-Tests):
+  //   "graphql" = GraphQL-Fehler (⇒ permanent), "http500" = HTTP 500 (⇒ transient).
+  // confirmFailTimes = wie viele Versuche fehlschlagen (undefined ⇒ alle).
+  confirmFailMode?: "graphql" | "http500";
+  confirmFailTimes?: number;
+  // Bridge-Route /api/lead-event — Alarm-POSTs des Crons (Body gesammelt).
+  bridgePosts: Array<Record<string, unknown>>;
+  bridgeStatus?: number;
 }
 
 function makeNet(opts: Partial<FakeNet> = {}): FakeNet {
@@ -70,12 +78,18 @@ function makeNet(opts: Partial<FakeNet> = {}): FakeNet {
     ops: [],
     pdfBody: new TextEncoder().encode("%PDF-1.7 fake"),
     finalConfirmations: [],
+    bridgePosts: [],
     fetch: (async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = typeof input === "string" ? input : input instanceof URL ? input.href : (input as Request).url;
       // contract-pdf Render (Kostenrechner)
       if (url.includes("/api/contract-pdf/")) {
         const body = net.pdfBody!;
         return new Response(typeof body === "string" ? body : (body.buffer as ArrayBuffer), { status: 200 });
+      }
+      // Bridge: Alarm-Event-POST (Cron → Team-Mail)
+      if (url.includes("/api/lead-event")) {
+        net.bridgePosts.push(JSON.parse((init?.body ?? "{}") as string));
+        return new Response("{}", { status: net.bridgeStatus ?? 200 });
       }
       // StoreFile Multipart (FormData-Body)
       if (init?.body instanceof FormData) {
@@ -107,6 +121,16 @@ function makeNet(opts: Partial<FakeNet> = {}): FakeNet {
       }
       if (q.includes("StoreConfirmation")) {
         net.ops.push({ op: "StoreConfirmation", variables: v });
+        if (net.confirmFailMode && (net.confirmFailTimes === undefined || net.confirmFailTimes > 0)) {
+          if (net.confirmFailTimes !== undefined) net.confirmFailTimes -= 1;
+          if (net.confirmFailMode === "http500") return new Response("oops", { status: 500 });
+          return new Response(JSON.stringify({
+            errors: [{
+              message: "Anwendungs-ID ungültig.",
+              extensions: { validation: { application_id: ["Anwendungs-ID ungültig."] } },
+            }],
+          }), { status: 200 });
+        }
         return new Response(JSON.stringify({ data: { StoreConfirmation: { id: 555, application_id: v.application_id, is_confirm_binding: true } } }), { status: 200 });
       }
       if (q.includes("UpdateConfirmation")) {
@@ -283,6 +307,60 @@ Deno.test("sync: HTML-Fallback vom Renderer ⇒ Magic-Byte-Gate blockt Upload (d
   assertStringIncludes(r.deferred.join("|"), "non-PDF");
 });
 
+// ─── Confirm-Fehlerklassifikation + interne Retries (Alarm-Policy) ────────
+
+Deno.test("sync: StoreConfirmation GraphQL-Fehler ⇒ permanent, KEIN Retry, kein Throw", async () => {
+  const net = makeNet({ confirmFailMode: "graphql" }); // Mamamia lehnt deterministisch ab
+  const stamps = makeStamps();
+  const sleeps: number[] = [];
+  const r = await syncAcceptance({
+    lead: LEAD, row: makeRow(), secrets: SECRETS,
+    supabase: stamps.supabase, getAgencyToken: agencyToken, fetchFn: net.fetch,
+    sleepFn: (ms) => { sleeps.push(ms); return Promise.resolve(); },
+  });
+  // Genau EIN Versuch — permanente Fehler werden nicht wiederholt.
+  assertEquals(net.ops.filter((o) => o.op === "StoreConfirmation").length, 1);
+  assertEquals(sleeps, []);
+  assertEquals(r.confirmed, false);
+  assertEquals(r.confirm_error?.permanent, true);
+  assertStringIncludes(r.confirm_error!.message, "ungültig");
+  // Kein Stempel, kein PDF (Sequenz 2 vor 3+4), UpdateCustomer lief davor.
+  assertEquals(stamps.calls.length, 0);
+  assertEquals(net.ops.map((o) => o.op).includes("StoreFile"), false);
+  assertEquals(r.customer_updated, true);
+});
+
+Deno.test("sync: StoreConfirmation transient (HTTP 500) ⇒ 3 Versuche mit Backoff, permanent=false", async () => {
+  const net = makeNet({ confirmFailMode: "http500" }); // alle Versuche scheitern
+  const stamps = makeStamps();
+  const sleeps: number[] = [];
+  const r = await syncAcceptance({
+    lead: LEAD, row: makeRow(), secrets: SECRETS,
+    supabase: stamps.supabase, getAgencyToken: agencyToken, fetchFn: net.fetch,
+    sleepFn: (ms) => { sleeps.push(ms); return Promise.resolve(); },
+  });
+  assertEquals(net.ops.filter((o) => o.op === "StoreConfirmation").length, 3);
+  assertEquals(sleeps, [2000, 4000]);
+  assertEquals(r.confirmed, false);
+  assertEquals(r.confirm_error?.permanent, false);
+  assertEquals(stamps.calls.length, 0);
+});
+
+Deno.test("sync: transient, 2. Versuch klappt ⇒ confirmed + Stempel, kein confirm_error", async () => {
+  const net = makeNet({ confirmFailMode: "http500", confirmFailTimes: 1 });
+  const stamps = makeStamps();
+  const r = await syncAcceptance({
+    lead: LEAD, row: makeRow(), secrets: SECRETS,
+    supabase: stamps.supabase, getAgencyToken: agencyToken, fetchFn: net.fetch,
+    sleepFn: () => Promise.resolve(),
+  });
+  assertEquals(net.ops.filter((o) => o.op === "StoreConfirmation").length, 2);
+  assertEquals(r.confirmed, true);
+  assertEquals(r.confirmation_id, 555);
+  assertEquals(r.confirm_error, undefined);
+  assertEquals(stamps.calls[0], { kind: "confirmed", confirmationId: 555 });
+});
+
 // ─── Detect-Cron Retry-Phase ───────────────────────────────────────────────
 
 const DETECT_SECRETS = {
@@ -304,31 +382,36 @@ Deno.test("retryAcceptanceSyncs: Adapter ohne Retry-Methoden ⇒ No-op", async (
   assertEquals(r, { scanned: 0, completed: 0, errors: 0, alerts: 0 });
 });
 
-Deno.test("retryAcceptanceSyncs: >24h unvollständig ⇒ Alert-Stempel (einmalig)", async () => {
-  // Login-Call der Agency-Token-Beschaffung mitrouten.
-  const net = makeNet({ finalConfirmations: [{ id: 555, caregiver: { id: 501 } }] });
+// Login-Call der Agency-Token-Beschaffung mitrouten (alle Cron-Tests).
+function withAuthRoute(net: FakeNet): typeof fetch {
   const baseFetch = net.fetch;
-  const fetchWithAuth = (async (input: RequestInfo | URL, init?: RequestInit) => {
+  return (async (input: RequestInfo | URL, init?: RequestInit) => {
     const url = typeof input === "string" ? input : String(input);
     if (url.includes("/graphql/auth")) {
       return new Response(JSON.stringify({ data: { LoginAgency: { id: 1, name: "P", email: "x", token: "agency-jwt" } } }), { status: 200 });
     }
     return baseFetch(input as RequestInfo, init);
   }) as typeof fetch;
+}
 
-  const alerted: string[] = [];
-  const pending: PendingAcceptanceSync = {
-    ...makeRow({ mamamia_confirmed_at: "2026-07-20T10:00:00Z", mamamia_confirmation_id: 555 }),
-    accepted_at: new Date(Date.now() - 48 * 3600_000).toISOString(), // 48h alt
+function makePending(overrides: Partial<PendingAcceptanceSync> = {}): PendingAcceptanceSync {
+  return {
+    ...makeRow(),
+    accepted_at: new Date(Date.now() - 60_000).toISOString(), // 1 Min alt
     mamamia_sync_alerted_at: null,
     lead_token: LEAD.token,
     lead_mamamia_customer_id: LEAD.mamamia_customer_id,
+    ...overrides,
   };
-  const deps = {
+}
+
+function makeCronDeps(net: FakeNet, pending: PendingAcceptanceSync[], alerted: string[]): HandlerDeps {
+  return {
     secrets: DETECT_SECRETS,
-    fetchFn: fetchWithAuth,
+    fetchFn: withAuthRoute(net),
+    sleepFn: () => Promise.resolve(),
     supabase: {
-      selectPendingAcceptanceSyncs: () => Promise.resolve([pending]),
+      selectPendingAcceptanceSyncs: () => Promise.resolve(pending),
       stampAcceptanceConfirmed: () => Promise.resolve(),
       stampAcceptancePdfUploaded: () => Promise.resolve(),
       stampAcceptanceSyncAlerted: (l: string, a: number) => {
@@ -337,12 +420,93 @@ Deno.test("retryAcceptanceSyncs: >24h unvollständig ⇒ Alert-Stempel (einmalig
       },
     },
   } as unknown as HandlerDeps;
+}
 
-  const r = await retryAcceptanceSyncs(deps);
+Deno.test("retryAcceptanceSyncs: Retry repariert den Row ⇒ completed, KEIN Alarm (auch wenn alt)", async () => {
+  const net = makeNet({ finalConfirmations: [{ id: 555, caregiver: { id: 501 } }] });
+  const alerted: string[] = [];
+  const pending = makePending({
+    mamamia_confirmed_at: "2026-07-20T10:00:00Z",
+    mamamia_confirmation_id: 555,
+    accepted_at: new Date(Date.now() - 48 * 3600_000).toISOString(), // 48h alt
+  });
+  const r = await retryAcceptanceSyncs(makeCronDeps(net, [pending], alerted));
   assertEquals(r.scanned, 1);
-  assertEquals(r.completed, 1); // PDF-Upload lief durch (verarbeitet + PDF ok)
+  assertEquals(r.completed, 1); // PDF-Upload lief in DIESEM Lauf durch
+  assertEquals(r.alerts, 0); // repariert ⇒ kein Alarmfall
+  assertEquals(alerted, []);
+  assertEquals(net.bridgePosts.length, 0);
+});
+
+Deno.test("retryAcceptanceSyncs: Confirm PERMANENT abgelehnt ⇒ Alarm SOFORT (auch <5 Min alt)", async () => {
+  const net = makeNet({ confirmFailMode: "graphql" }); // Bewerbung zurückgezogen o.ä.
+  const alerted: string[] = [];
+  const pending = makePending(); // 1 Min alt — unter dem 5-Min-Fenster
+  const r = await retryAcceptanceSyncs(makeCronDeps(net, [pending], alerted));
   assertEquals(r.alerts, 1);
   assertEquals(alerted, ["lead-1:9001"]);
+  assertEquals(net.bridgePosts.length, 1);
+  const post = net.bridgePosts[0] as { event: string; token: string; metadata: Record<string, unknown> };
+  assertEquals(post.event, "acceptance_sync_alarm");
+  assertEquals(post.token, "tok-abc");
+  assertEquals(post.metadata.permanent, true);
+  assertEquals(post.metadata.confirmed, false);
+  assertStringIncludes(String(post.metadata.error), "ungültig");
+});
+
+Deno.test("retryAcceptanceSyncs: transient + jünger als 5 Min ⇒ KEIN Alarm (Cron versucht weiter)", async () => {
+  const net = makeNet({ confirmFailMode: "http500" });
+  const alerted: string[] = [];
+  const pending = makePending({ accepted_at: new Date(Date.now() - 2 * 60_000).toISOString() }); // 2 Min
+  const r = await retryAcceptanceSyncs(makeCronDeps(net, [pending], alerted));
+  assertEquals(r.alerts, 0);
+  assertEquals(alerted, []);
+  assertEquals(net.bridgePosts.length, 0);
+});
+
+Deno.test("retryAcceptanceSyncs: transient + älter als 5 Min ⇒ Alarm über die Bridge + Stempel", async () => {
+  const net = makeNet({ confirmFailMode: "http500" });
+  const alerted: string[] = [];
+  const pending = makePending({ accepted_at: new Date(Date.now() - 10 * 60_000).toISOString() }); // 10 Min
+  const r = await retryAcceptanceSyncs(makeCronDeps(net, [pending], alerted));
+  assertEquals(r.alerts, 1);
+  assertEquals(alerted, ["lead-1:9001"]);
+  assertEquals(net.bridgePosts.length, 1);
+  const post = net.bridgePosts[0] as { metadata: Record<string, unknown> };
+  assertEquals(post.metadata.permanent, false);
+});
+
+Deno.test("retryAcceptanceSyncs: Bridge-Mail schlägt fehl ⇒ KEIN Stempel (Re-Alarm nächster Lauf)", async () => {
+  const net = makeNet({ confirmFailMode: "graphql", bridgeStatus: 500 });
+  const alerted: string[] = [];
+  const pending = makePending({ accepted_at: new Date(Date.now() - 10 * 60_000).toISOString() });
+  const r = await retryAcceptanceSyncs(makeCronDeps(net, [pending], alerted));
+  assertEquals(net.bridgePosts.length, 1); // Versuch fand statt …
+  assertEquals(r.alerts, 0); // … aber ohne Mail kein Stempel
+  assertEquals(alerted, []);
+});
+
+Deno.test("retryAcceptanceSyncs: Confirm ok, nur PDF offen ⇒ Alarm erst nach 24h (kein Kundenrisiko)", async () => {
+  // final_confirmation NICHT sichtbar ⇒ PDF-Upload bleibt deferred.
+  const net = makeNet();
+  const alerted: string[] = [];
+  const confirmedRow = {
+    mamamia_confirmed_at: "2026-07-20T10:00:00Z" as string | null,
+    mamamia_confirmation_id: 555 as number | null,
+  };
+  // 30 Min alt ⇒ unter der 24h-PDF-Schwelle ⇒ kein Alarm.
+  const young = makePending({ ...confirmedRow, accepted_at: new Date(Date.now() - 30 * 60_000).toISOString() });
+  const r1 = await retryAcceptanceSyncs(makeCronDeps(net, [young], alerted));
+  assertEquals(r1.alerts, 0);
+  assertEquals(net.bridgePosts.length, 0);
+  // 48h alt ⇒ PDF-Alarm (confirmed=true im Metadata ⇒ „PDF fehlt"-Variante).
+  const old = makePending({ ...confirmedRow, accepted_at: new Date(Date.now() - 48 * 3600_000).toISOString() });
+  const r2 = await retryAcceptanceSyncs(makeCronDeps(net, [old], alerted));
+  assertEquals(r2.alerts, 1);
+  assertEquals(net.bridgePosts.length, 1);
+  const post = net.bridgePosts[0] as { metadata: Record<string, unknown> };
+  assertEquals(post.metadata.confirmed, true);
+  assertEquals(post.metadata.pdf_uploaded, false);
 });
 
 // ─── sync-acceptance Edge Fn: Auth ─────────────────────────────────────────

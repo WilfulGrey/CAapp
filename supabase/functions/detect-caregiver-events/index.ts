@@ -201,6 +201,8 @@ export interface HandlerDeps {
   secrets: DetectSecrets;
   supabase: DetectSupabase;
   fetchFn?: typeof fetch;
+  /** Injectable für Tests — Backoff-Pausen der Confirm-Retries in acceptanceSync. */
+  sleepFn?: (ms: number) => Promise<void>;
 }
 
 // ─── Handler ───────────────────────────────────────────────────────────────
@@ -307,12 +309,73 @@ async function handleBatch(deps: HandlerDeps): Promise<Response> {
 // Dopycha niedokończone sekwencje (UpdateCustomer→Confirm→PDF-Upload) przez
 // wspólny moduł _shared/acceptanceSync — te same guardy co ścieżka
 // synchroniczna (sync-acceptance Edge Fn). Skanuje ≤30 dni wstecz.
-// Alert: wiersz >24h niedomknięty → GŁOŚNY console.error (widoczny w
-// Supabase-Logs) + jednorazowy stempel mamamia_sync_alerted_at.
-// Celowo BEZ nowego maila (decyzja Michała: maile bez zmian).
+//
+// Alarm-Policy (Michał 2026-07-21: "retry przez 5 minut i potem od razu
+// alarm"): der Kunde darf NIE glauben, eine Buchung stehe, wenn Mamamia sie
+// nicht bestätigt hat (z.B. Bewerbung von der Agentur zurückgezogen).
+//   - Confirm fehlt NACH dem Retry dieses Laufs und Row älter als 5 Min —
+//     oder Confirm-Fehler ist PERMANENT (deterministisch abgelehnt), dann
+//     altersunabhängig ⇒ ALARM: Team-Mail über die Bridge (Event
+//     acceptance_sync_alarm) + console.error + einmaliger Stempel
+//     mamamia_sync_alerted_at. Gestempelt wird NUR, wenn die Bridge-Mail
+//     durchging — sonst re-alarmiert der nächste Lauf (15 Min).
+//   - Confirm ok, nur PDF-Upload offen ⇒ Archiv-Thema ohne Kundenrisiko:
+//     Alarm erst nach 24h (gleicher Kanal).
+// Ein Row, den der Retry dieses Laufs gerade REPARIERT hat, ist kein
+// Alarmfall. Der T+0-Pfad (Bridge nach synchronem sync-acceptance)
+// alarmiert bei permanent SOFORT selbst — der Cron ist der Garant dahinter.
 
 const ACCEPTANCE_SYNC_MAX_AGE_DAYS = 30;
-const ACCEPTANCE_SYNC_ALERT_AFTER_MS = 24 * 60 * 60 * 1000;
+const ACCEPTANCE_CONFIRM_ALERT_AFTER_MS = 5 * 60 * 1000;
+const ACCEPTANCE_PDF_ALERT_AFTER_MS = 24 * 60 * 60 * 1000;
+
+// Team-Alarm über die Bridge — sie besitzt den SMTP-Transport. Das Event
+// acceptance_sync_alarm ist in route.ts team-mail-only (nicht in
+// GET_PUBLIC_EVENT_TYPES, keine Kundenmail) → erreicht NIE den Kunden.
+async function postAcceptanceAlarm(
+  deps: HandlerDeps,
+  row: PendingAcceptanceSync,
+  info: {
+    confirmed: boolean;
+    pdf_uploaded: boolean;
+    permanent: boolean;
+    error: string | null;
+    age_minutes: number | null;
+  },
+): Promise<boolean> {
+  if (!row.lead_token) return false;
+  const fetcher = deps.fetchFn ?? globalThis.fetch;
+  try {
+    const res = await fetcher(`${deps.secrets.kostenrechnerUrl.replace(/\/$/, "")}/api/lead-event`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        token: row.lead_token,
+        event: "acceptance_sync_alarm",
+        metadata: {
+          application_id: row.application_id,
+          caregiver_id: row.caregiver_id,
+          confirmed: info.confirmed,
+          pdf_uploaded: info.pdf_uploaded,
+          permanent: info.permanent,
+          error: info.error,
+          age_minutes: info.age_minutes,
+          source: "cron",
+        },
+      }),
+    });
+    if (!res.ok) {
+      console.error(
+        `acceptance alarm bridge POST failed: HTTP ${res.status} (lead=${row.lead_id}, app=${row.application_id})`,
+      );
+      return false;
+    }
+    return true;
+  } catch (e) {
+    console.error("acceptance alarm bridge POST threw:", (e as Error).message);
+    return false;
+  }
+}
 
 export async function retryAcceptanceSyncs(
   deps: HandlerDeps,
@@ -337,6 +400,12 @@ export async function retryAcceptanceSyncs(
 
   for (const row of pending) {
     out.scanned += 1;
+    // Frischer Zustand NACH dem Retry dieses Laufs — Alarm nur auf das,
+    // was danach noch offen ist (Row-Spalten sind der Stand vor dem Retry).
+    let confirmedNow = !!row.mamamia_confirmed_at;
+    let pdfNow = !!row.mamamia_pdf_uploaded_at;
+    let permanentConfirmError = false;
+    let lastError: string | null = null;
     try {
       const result = await syncAcceptance({
         lead: {
@@ -361,32 +430,54 @@ export async function retryAcceptanceSyncs(
             fetchFn: deps.fetchFn,
           }),
         fetchFn: deps.fetchFn,
+        sleepFn: deps.sleepFn,
       });
+      confirmedNow = result.confirmed;
+      pdfNow = result.pdf_uploaded;
+      permanentConfirmError = result.confirm_error?.permanent === true;
+      lastError = result.confirm_error?.message ?? null;
       if (result.confirmed && result.pdf_uploaded) out.completed += 1;
     } catch (e) {
       console.error(
         `acceptance-sync retry failed (lead=${row.lead_id}, app=${row.application_id}):`,
         (e as Error).message,
       );
+      lastError = (e as Error).message;
       out.errors += 1;
     }
 
-    // Alert: >24h niedomknięte i jeszcze nie alarmowane.
     const ageMs = Date.now() - Date.parse(row.accepted_at);
-    if (
-      Number.isFinite(ageMs) && ageMs > ACCEPTANCE_SYNC_ALERT_AFTER_MS &&
-      !row.mamamia_sync_alerted_at && supa.stampAcceptanceSyncAlerted
-    ) {
+    const confirmOverdue = !confirmedNow &&
+      (permanentConfirmError ||
+        (Number.isFinite(ageMs) && ageMs > ACCEPTANCE_CONFIRM_ALERT_AFTER_MS));
+    const pdfOverdue = confirmedNow && !pdfNow &&
+      Number.isFinite(ageMs) && ageMs > ACCEPTANCE_PDF_ALERT_AFTER_MS;
+    if ((confirmOverdue || pdfOverdue) && !row.mamamia_sync_alerted_at && supa.stampAcceptanceSyncAlerted) {
+      const ageMin = Number.isFinite(ageMs) ? Math.round(ageMs / 60000) : null;
       console.error(
-        `🚨 ACCEPTANCE-SYNC ALERT: lead=${row.lead_id} app=${row.application_id} ` +
-          `unvollständig seit >24h (confirmed=${!!row.mamamia_confirmed_at}, ` +
-          `pdf=${!!row.mamamia_pdf_uploaded_at}) — manuell prüfen (SA-Portal / Supabase).`,
+        `🚨 ACCEPTANCE-SYNC ALARM: lead=${row.lead_id} app=${row.application_id} ` +
+          (confirmOverdue
+            ? `Buchung OHNE Mamamia-Bestätigung (permanent=${permanentConfirmError}, ` +
+              `alter=${ageMin ?? "?"}min, error=${lastError ?? "—"})`
+            : "Vertrags-PDF fehlt seit >24h") +
+          " — Team-Mail via Bridge + SA-Portal prüfen.",
       );
-      try {
-        await supa.stampAcceptanceSyncAlerted(row.lead_id, row.application_id);
-        out.alerts += 1;
-      } catch (e) {
-        console.error("stampAcceptanceSyncAlerted failed:", (e as Error).message);
+      const mailed = await postAcceptanceAlarm(deps, row, {
+        confirmed: confirmedNow,
+        pdf_uploaded: pdfNow,
+        permanent: permanentConfirmError,
+        error: lastError,
+        age_minutes: ageMin,
+      });
+      // Ohne lead_token ist die Mail für immer unmöglich → trotzdem stempeln,
+      // damit der Lauf nicht endlos spammt (console.error bleibt der Kanal).
+      if (mailed || !row.lead_token) {
+        try {
+          await supa.stampAcceptanceSyncAlerted(row.lead_id, row.application_id);
+          out.alerts += 1;
+        } catch (e) {
+          console.error("stampAcceptanceSyncAlerted failed:", (e as Error).message);
+        }
       }
     }
   }
