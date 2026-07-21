@@ -364,7 +364,15 @@ function makeStore(row: AcceptanceRow | null): SyncStore {
   };
 }
 
-Deno.test("sync-acceptance: falscher Bearer ⇒ 401 (Service-Role-Key ist der einzige Schlüssel)", async () => {
+// Hilfe: Unsigniertes Test-JWT mit gegebenem role-Claim. In Produktion prüft
+// das Gateway (verify_jwt) die Signatur VOR der Funktion — der Handler prüft
+// nur noch den Claim (rotations-sicher gegen Key-String-Drift Bridge↔Edge).
+function fakeJwt(role: string): string {
+  const b64 = (o: unknown) => btoa(JSON.stringify(o)).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+  return `${b64({ alg: "HS256", typ: "JWT" })}.${b64({ role })}.sig`;
+}
+
+Deno.test("sync-acceptance: falscher Bearer (kein JWT, kein Key-Match) ⇒ 401", async () => {
   const res = await syncHandler(
     new Request("https://edge/sync-acceptance", {
       method: "POST",
@@ -374,6 +382,29 @@ Deno.test("sync-acceptance: falscher Bearer ⇒ 401 (Service-Role-Key ist der ei
     { secrets: SYNC_FN_SECRETS, store: makeStore(makeRow()) },
   );
   assertEquals(res.status, 401);
+});
+
+Deno.test("sync-acceptance: JWT mit role=anon ⇒ 401; role=service_role ⇒ läuft", async () => {
+  const anonRes = await syncHandler(
+    new Request("https://edge/sync-acceptance", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${fakeJwt("anon")}` },
+      body: JSON.stringify({ lead_id: "lead-1", application_id: 9001 }),
+    }),
+    { secrets: SYNC_FN_SECRETS, store: makeStore(makeRow()) },
+  );
+  assertEquals(anonRes.status, 401);
+
+  const net = makeNet();
+  const srvRes = await syncHandler(
+    new Request("https://edge/sync-acceptance", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${fakeJwt("service_role")}` },
+      body: JSON.stringify({ lead_id: "lead-1", application_id: 9001 }),
+    }),
+    { secrets: SYNC_FN_SECRETS, store: makeStore(makeRow()), fetchFn: net.fetch, getAgencyToken: agencyToken },
+  );
+  assertEquals(srvRes.status, 200);
 });
 
 Deno.test("sync-acceptance: korrekter Bearer ⇒ Sequenz läuft (200 + Ergebnis)", async () => {
