@@ -672,6 +672,14 @@ mutation RejectApplication($id: Int, $reject_message: String) {
 
 #### `storeConfirmation` — akceptacja zgłoszenia (binding)
 
+> **⚠️ REFACTOR 2026-07-22:** portal NIE woła już tej akcji z przeglądarki.
+> Akcept wykonuje server-side sekwencja `sync-acceptance` (edge fn triggerowana
+> przez bridge po atomowym zapisie acceptance; cron detect-caregiver-events jako
+> gwarant): 1. UpdateCustomer(customer_contract) → 2. StoreConfirmation →
+> 3. render PDF → 4. upload do MM po przetworzeniu confirmation. Pełny opis:
+> [docs/vertrag-flow.md](vertrag-flow.md). Akcja w proxy ZOSTAJE (kompat dla
+> starych zakeszowanych bundli — guard final_confirmation zapobiega dublom).
+
 Też `assertApplicationBelongsToSession`. Pola `contract_patient` /
 `contract_contact` przechodzą przez whitelisty `CONTRACT_PATIENT_ALLOWED`
 i `CONTRACT_CONTACT_ALLOWED` ([actions.ts:159-189](../supabase/functions/mamamia-proxy/actions.ts:159)).
