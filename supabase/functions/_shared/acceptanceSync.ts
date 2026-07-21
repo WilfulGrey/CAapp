@@ -48,6 +48,8 @@ export interface AcceptanceRow {
   mamamia_confirmed_at: string | null;
   mamamia_confirmation_id: number | null;
   mamamia_pdf_uploaded_at: string | null;
+  /** sha256 des KANONISCHEN PDFs (beim Akzept von der Bridge gestempelt). */
+  pdf_sha256: string | null;
 }
 
 export interface AcceptanceSyncSupabase {
@@ -66,6 +68,9 @@ export interface AcceptanceSyncSupabase {
 export interface AcceptanceSyncSecrets {
   mamamiaEndpoint: string;
   kostenrechnerUrl: string;
+  /** Storage-Zugriff auf den Kanon-Bucket `contracts` (Bridge legt ihn an). */
+  supabaseUrl: string;
+  supabaseServiceKey: string;
 }
 
 export interface AcceptanceSyncOpts {
@@ -587,7 +592,13 @@ export async function syncAcceptance(opts: AcceptanceSyncOpts): Promise<Acceptan
     }
   }
 
-  // ── 3+4. Vertrag rendern (Kostenrechner) + zu Mamamia hochladen ──
+  // ── 3+4. KANONISCHER Vertrag (Storage) + Upload zu Mamamia ──
+  // Michał: „1 PDF — do klienta, do nas i na serwer. Ten sam, niezmieniany
+  // plik." Die Bridge rendert beim Akzept GENAU EINMAL und legt die Bytes in
+  // contracts/<lead>/<app>.pdf — wir laden EXAKT diese Bytes zu Mamamia hoch.
+  // Fallback (Alt-Buchungen vor dem Kanon / Chromium-Ausfall beim Akzept):
+  // Render via Kostenrechner — der Endpoint liest inzwischen selbst
+  // Bucket-first, rendert also nur, wenn wirklich kein Kanon existiert.
   // BRAMKA (Michał): Upload ERST wenn Mamamia die Confirmation VERARBEITET
   // hat — d.h. final_confirmation ist am Job sichtbar. Direkt nach
   // StoreConfirmation ist sie das oft noch nicht → dann übernimmt der Cron.
@@ -602,22 +613,54 @@ export async function syncAcceptance(opts: AcceptanceSyncOpts): Promise<Acceptan
       result.deferred.push("pdf: confirmation not processed yet (final_confirmation missing)");
       return result;
     }
-    if (!lead.token) {
-      result.deferred.push("pdf: lead token missing");
-      return result;
+
+    let bytes: Uint8Array | null = null;
+    let source: "storage" | "render" = "storage";
+    const objectUrl = `${secrets.supabaseUrl.replace(/\/$/, "")}/storage/v1/object/contracts/${lead.id}/${row.application_id}.pdf`;
+    try {
+      const objRes = await fetchFn(objectUrl, {
+        headers: {
+          Authorization: `Bearer ${secrets.supabaseServiceKey}`,
+          apikey: secrets.supabaseServiceKey,
+        },
+      });
+      if (objRes.ok) bytes = new Uint8Array(await objRes.arrayBuffer());
+    } catch {
+      bytes = null; // Storage-Hickser ⇒ Fallback unten
     }
 
-    const pdfUrl = `${secrets.kostenrechnerUrl.replace(/\/$/, "")}/api/contract-pdf/${lead.id}?token=${encodeURIComponent(lead.token)}`;
-    const pdfRes = await fetchFn(pdfUrl);
-    if (!pdfRes.ok) {
-      result.deferred.push(`pdf: contract-pdf HTTP ${pdfRes.status}`);
-      return result;
+    if (!bytes || !isPdfBytes(bytes)) {
+      source = "render";
+      if (!lead.token) {
+        result.deferred.push("pdf: no canonical file and lead token missing");
+        return result;
+      }
+      const pdfUrl = `${secrets.kostenrechnerUrl.replace(/\/$/, "")}/api/contract-pdf/${lead.id}?token=${encodeURIComponent(lead.token)}`;
+      const pdfRes = await fetchFn(pdfUrl);
+      if (!pdfRes.ok) {
+        result.deferred.push(`pdf: contract-pdf HTTP ${pdfRes.status}`);
+        return result;
+      }
+      bytes = new Uint8Array(await pdfRes.arrayBuffer());
+      // Magic-Byte-Gate: der HTML-Fallback des Renderers darf NIE als
+      // "Dienstleistungsvertrag-signiert.pdf" in Mamamia landen.
+      if (!isPdfBytes(bytes)) {
+        result.deferred.push("pdf: render returned non-PDF (HTML fallback?) — retry later");
+        return result;
+      }
     }
-    const bytes = new Uint8Array(await pdfRes.arrayBuffer());
-    // Magic-Byte-Gate: der HTML-Fallback des Renderers darf NIE als
-    // "Dienstleistungsvertrag-signiert.pdf" in Mamamia landen.
-    if (!isPdfBytes(bytes)) {
-      result.deferred.push("pdf: render returned non-PDF (HTML fallback?) — retry later");
+
+    // Integrität: Kanon-Bytes müssen zur beim Akzept gestempelten sha256
+    // passen — sonst NICHT hochladen (Tamper-Evidence, kein stilles Ersetzen).
+    if (source === "storage" && row.pdf_sha256) {
+      const sha = await sha256Hex(bytes);
+      if (sha !== row.pdf_sha256) {
+        result.deferred.push("pdf: storage bytes do not match pdf_sha256 — not uploading");
+        return result;
+      }
+    }
+    if (!bytes) {
+      result.deferred.push("pdf: no bytes available");
       return result;
     }
 

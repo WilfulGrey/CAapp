@@ -11,7 +11,8 @@ import {
   type EmailTemplate,
   type OfferInfo,
 } from '@/lib/email';
-import { buildVertragAttachmentPdf } from '@/lib/vertrag';
+import { buildVertragAttachmentPdf, formatSignedAtBerlin } from '@/lib/vertrag';
+import { createHash } from 'crypto';
 
 // Bridge endpoint: the CA-App portal reports customer milestones back to the
 // kostenrechner lead so the Nachfass emails can branch. Token-authenticated —
@@ -240,6 +241,98 @@ async function raiseAcceptanceSyncAlarm(
     if (stampErr) console.error('mamamia_sync_alerted_at stamp failed:', stampErr.message);
   }
   return { ok: true };
+}
+
+// ─── EIN kanonischer Vertrags-PDF (Michał 2026-07-21) ──────────────────────
+// „Generować 1 PDF, wysyłać go do klienta, do nas i na serwer. 1 i ten sam,
+// niezmieniany plik." — Der Vertrag wird GENAU EINMAL gerendert (beim Akzept),
+// als Bytes im Storage-Bucket `contracts/<lead>/<app>.pdf` abgelegt und von
+// dort überall identisch verwendet: Mail C (Kunde), Team-Mail, Mamamia-Upload
+// (sync-acceptance/Cron) und Portal-Vertragskasten (/api/contract-pdf).
+// Zeitstempel auf dem Dokument = Server-Moment der Unterschrift (signed_at)
+// in Europe/Berlin — nie Browser-Label, nie Render-Zeit, nie UTC.
+const CONTRACT_BUCKET = 'contracts';
+const CONTRACT_FILENAME = 'Betreuungsvertrag_Primundus.pdf';
+
+function contractObjectPath(leadId: string, applicationId: number): string {
+  return `${leadId}/${applicationId}.pdf`;
+}
+
+type ContractAttachment = { filename: string; content: Buffer | string; contentType: string };
+
+async function downloadCanonicalContractPdf(
+  supabase: any,
+  leadId: string,
+  applicationId: number,
+): Promise<Buffer | null> {
+  try {
+    const { data, error } = await supabase.storage
+      .from(CONTRACT_BUCKET)
+      .download(contractObjectPath(leadId, applicationId));
+    if (error || !data) return null;
+    const buf = Buffer.from(await data.arrayBuffer());
+    return buf.subarray(0, 5).toString('latin1') === '%PDF-' ? buf : null;
+  } catch {
+    return null;
+  }
+}
+
+// Kanon holen oder (einmalig) erzeugen: Bucket-Hit ⇒ exakt diese Bytes.
+// Miss ⇒ EIN Render mit kanonischem signed_at-Label, echte PDFs landen im
+// Bucket + sha256 in der Acceptance-Row. HTML-Fallback (Chromium down) wird
+// NIE gespeichert — Mail bekommt ihn als Notlösung, der Kanon entsteht dann
+// beim Cron-Retry über /api/contract-pdf (der ebenfalls Bucket-first liest).
+async function getOrCreateCanonicalContract(
+  supabase: any,
+  leadId: string,
+  applicationId: number | null,
+  snapshot: Record<string, unknown>,
+  signaturName: string,
+  signedAtIso: string | null,
+  legacyLabel: string | null,
+): Promise<ContractAttachment | null> {
+  if (applicationId != null) {
+    const cached = await downloadCanonicalContractPdf(supabase, leadId, applicationId);
+    if (cached) {
+      return { filename: CONTRACT_FILENAME, content: cached, contentType: 'application/pdf' };
+    }
+  }
+  let attachment: ContractAttachment;
+  try {
+    attachment = await buildVertragAttachmentPdf(snapshot as any, {
+      signaturName,
+      signedAt: (signedAtIso ? formatSignedAtBerlin(signedAtIso) : undefined) ?? legacyLabel ?? undefined,
+      auditNote: 'Vertragsversion v1.0',
+    });
+  } catch (e) {
+    console.error('buildVertragAttachmentPdf failed:', e instanceof Error ? e.message : String(e));
+    return null;
+  }
+  const isRealPdf =
+    attachment.contentType.startsWith('application/pdf') &&
+    Buffer.isBuffer(attachment.content) &&
+    attachment.content.subarray(0, 5).toString('latin1') === '%PDF-';
+  if (isRealPdf && applicationId != null) {
+    const bytes = attachment.content as Buffer;
+    const { error: upErr } = await supabase.storage
+      .from(CONTRACT_BUCKET)
+      .upload(contractObjectPath(leadId, applicationId), bytes, {
+        contentType: 'application/pdf',
+        upsert: true,
+      });
+    if (upErr) {
+      console.error('contract canonical upload failed:', upErr.message ?? String(upErr));
+    } else {
+      const sha = createHash('sha256').update(bytes).digest('hex');
+      const { error: shaErr } = await supabase
+        .from('lead_application_acceptances')
+        .update({ pdf_sha256: sha })
+        .eq('lead_id', leadId)
+        .eq('application_id', applicationId);
+      if (shaErr) console.error('pdf_sha256 stamp failed:', shaErr.message);
+    }
+  }
+  return attachment;
 }
 
 function extractCaregiverDisplay(metadata: any): CaregiverDisplay | null {
@@ -548,6 +641,10 @@ export async function POST(request: NextRequest) {
     // "Akzeptieren" doesn't duplicate. Frontend queries this table via
     // mamamia-proxy.listAcceptedApplications on portal load to flip the
     // matching app's status to 'accepted' → BookedScreen renders.
+    // EIN kanonischer Vertrags-PDF für alle Kanäle (Kunde/Team/Mamamia/Portal)
+    // — befüllt im Accept-Block (frischer Akzept) oder unten (Resend-Pfad).
+    let contractAttachment: ContractAttachment | null = null;
+
     if (!teamOnlyResend && event === 'application_accepted_internal' && metadata && typeof metadata === 'object') {
       const m = metadata as Record<string, unknown>;
       const rawAppId = m.application_id;
@@ -562,6 +659,9 @@ export async function POST(request: NextRequest) {
         const clientIp = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim()
           || request.headers.get('x-real-ip')
           || null;
+        // Kanonischer Unterschrifts-Moment: EIN Server-Zeitpunkt für die Row
+        // (signed_at) UND das Dokument-Label — nie zwei Uhren.
+        const signedAtIso = new Date().toISOString();
         // EIN atomarer Upsert: Kern + Signatur-Audit + Snapshot + Version.
         // Der frühere Zwei-Statement-Split („best-effort", Schutz gegen fehlende
         // Migration) war gefährlich: die Buchung konnte OHNE Signatur/Snapshot
@@ -578,7 +678,7 @@ export async function POST(request: NextRequest) {
             contract_patient: m.contract_patient ?? {},
             contract_contact: m.contract_contact ?? {},
             signatur: typeof m.signatur === 'string' ? m.signatur : null,
-            signed_at: new Date().toISOString(),
+            signed_at: signedAtIso,
             signed_ip: clientIp,
             contract_snapshot: m.contract ?? null,
             contract_version: CONTRACT_VERSION,
@@ -591,9 +691,27 @@ export async function POST(request: NextRequest) {
           );
         }
 
+        // KANON: Vertrag GENAU EINMAL rendern (Zeitstempel = signedAtIso in
+        // Europe/Berlin — derselbe Moment, der in der Row steht) und in den
+        // Bucket legen — BEVOR der Sync feuert, damit auch ein sofortiger
+        // Mamamia-Upload (Confirmation schon verarbeitet) dieselben Bytes
+        // nimmt. Mails unten hängen exakt dieses Attachment an.
+        if (m.contract && typeof m.contract === 'object' && typeof m.signatur === 'string' && m.signatur.trim()) {
+          contractAttachment = await getOrCreateCanonicalContract(
+            supabase,
+            lead.id,
+            appId,
+            m.contract as Record<string, unknown>,
+            (m.signatur as string).trim(),
+            signedAtIso,
+            typeof m.signed_at === 'string' ? (m.signed_at as string) : null,
+          );
+        }
+
         // Mamamia-Sync (Refactor 2026-07-22, Sequenz Michał):
         //   1. UpdateCustomer (Kontaktdaten) → 2. StoreConfirmation →
-        //   3. Vertrag rendern → 4. Upload (nach Verarbeitung der Confirmation).
+        //   3. Vertrag = KANON aus dem Bucket (oben gerade abgelegt) →
+        //   4. Upload (nach Verarbeitung der Confirmation).
         // Läuft in der Edge Fn sync-acceptance (Agentur-Creds leben NUR dort).
         // Best-effort mit kurzem Timeout: schlägt der synchrone Versuch fehl
         // oder ist die Confirmation noch nicht verarbeitet, holt der
@@ -717,26 +835,34 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ ok: true }, { headers: corsHeaders });
     }
 
-    // Vertrags-Anhang (Stufe B): beim Buchen aus dem Vertrags-Snapshot +
-    // elektronischer Signatur ein vollständiges Vertragsdokument als PDF
-    // rendern (Headless Chrome) und an Kunde (Mail C) + Team anhängen.
-    // Best-effort — fehlen die Daten oder schlägt das Rendern fehl, fällt
-    // `buildVertragAttachmentPdf` intern auf HTML-Anhang zurück damit die
-    // Mail überhaupt einen Vertrag mitbringt; ohne Anhang würde der Kunde
-    // mit "Buchung bestätigt" ohne Dokument dastehen.
-    let contractAttachment: { filename: string; content: Buffer | string; contentType: string } | null = null;
-    if (event === 'application_accepted_internal' && metadata && typeof metadata === 'object') {
+    // Vertrags-Anhang für den RESEND-Pfad (teamOnlyResend — der Accept-Block
+    // oben wurde übersprungen): Kanon aus dem Bucket; fehlt er (Alt-Buchung
+    // vor dem Kanon-Refactor), EIN Render mit signed_at der Row (Europe/
+    // Berlin) — der dann als Kanon gespeichert wird.
+    if (contractAttachment === null && event === 'application_accepted_internal' && metadata && typeof metadata === 'object') {
       const m = metadata as Record<string, unknown>;
       if (m.contract && typeof m.contract === 'object' && typeof m.signatur === 'string' && m.signatur.trim()) {
-        try {
-          contractAttachment = await buildVertragAttachmentPdf(m.contract as any, {
-            signaturName: m.signatur as string,
-            signedAt: typeof m.signed_at === 'string' ? (m.signed_at as string) : undefined,
-            auditNote: 'Vertragsversion v1.0',
-          });
-        } catch (e) {
-          console.error('buildVertragAttachmentPdf failed:', e instanceof Error ? e.message : String(e));
+        const rawAppId = Number(m.application_id);
+        const appIdNum = Number.isFinite(rawAppId) ? rawAppId : null;
+        let rowSignedAtIso: string | null = null;
+        if (appIdNum != null) {
+          const { data: accRow } = await supabase
+            .from('lead_application_acceptances')
+            .select('signed_at')
+            .eq('lead_id', lead.id)
+            .eq('application_id', appIdNum)
+            .maybeSingle();
+          rowSignedAtIso = typeof accRow?.signed_at === 'string' ? accRow.signed_at : null;
         }
+        contractAttachment = await getOrCreateCanonicalContract(
+          supabase,
+          lead.id,
+          appIdNum,
+          m.contract as Record<string, unknown>,
+          (m.signatur as string).trim(),
+          rowSignedAtIso,
+          typeof m.signed_at === 'string' ? (m.signed_at as string) : null,
+        );
       }
     }
 

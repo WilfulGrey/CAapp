@@ -47,14 +47,23 @@ Edge sync-acceptance → _shared/acceptanceSync.ts (współdzielony z cronem):
                        transient ⇒ 3 próby wewnątrz calla (backoff 2s+4s),
                        permanent (GraphQL-level, np. wycofana Bewerbung) ⇒
                        bez retry, bridge alarmuje NATYCHMIAST.
-  3. Render umowy    — GET {KOSTENRECHNER}/api/contract-pdf/<leadId>?token=
-                       (jedyne źródło renderu — z wiersza DB)
+  3. KANON umowy     — JEDEN render przy akcepcie (bridge, PRZED triggerem
+                       syncu): bajty → Storage `contracts/<lead>/<app>.pdf`,
+                       sha256 → pdf_sha256. Zeitstempel dokumentu =
+                       signed_at wiersza w Europe/Berlin (formatSignedAtBerlin
+                       — NIGDY getHours()/czas renderu/etykieta przeglądarki;
+                       stąd były „dwie umowy z dwiema godzinami").
+                       Mail C + mail teamowy + portal (/api/contract-pdf,
+                       bucket-first) + upload do MM = TEN SAM PLIK.
   4. Upload do MM    — BRAMKA: dopiero gdy Mamamia PRZETWORZYŁA confirmation
                        (final_confirmation widoczne na jobie klienta);
+                       bajty = KANON ze Storage (integralność: sha musi
+                       zgadzać się z pdf_sha256, inaczej defer); fallback
+                       dla alt-wierszy: render via /api/contract-pdf;
                        magic-bytes %PDF- (HTML-fallback NIGDY jako .pdf);
                        StoreFile → UpdateConfirmation(file_tokens)
                        → Confirmation.signed_contract (S3 Mamamii)
-                       → stempel mamamia_pdf_uploaded_at + pdf_sha256
+                       → stempel mamamia_pdf_uploaded_at
 
 Cron detect-caregiver-events (co 15 min) — GWARANT:
   retry-scan: signatur NOT NULL AND (confirmed IS NULL OR pdf IS NULL)
@@ -97,13 +106,14 @@ Stałe: `ACCEPTANCE_CONFIRM_ALERT_AFTER_MS = 5 min`, `ACCEPTANCE_PDF_ALERT_AFTER
 
 | Miejsce | Forma | Trwałe? |
 |---|---|---|
-| `lead_application_acceptances.contract_snapshot` | JSONB (VertragsDaten — dane dokumentu) | ✅ kanoniczny rekord |
+| **Supabase Storage `contracts/<lead_id>/<application_id>.pdf`** | **KANONICZNY plik PDF** — render 1× przy akcepcie; bucket prywatny (service-role only) | ✅ jedyne źródło bajtów |
+| `lead_application_acceptances.contract_snapshot` | JSONB (VertragsDaten — dane dokumentu) | ✅ kanoniczny rekord danych |
 | `.contract_patient` / `.contract_contact` | JSONB (surowy formularz, niemieckie klucze) | ✅ |
 | `.signatur` / `.signed_at` / `.signed_ip` / `.contract_version` | text / timestamptz / text / text | ✅ audyt podpisu |
-| `.pdf_sha256` | text (hex) — hash bajtów wgranych do MM | ✅ tamper-evidence |
-| Mamamia `Confirmation.signed_contract` | plik PDF w S3 Mamamii | ✅ archiwum binarne |
-| Maile (klient + team, `Betreuungsvertrag_Primundus.pdf`) | załącznik PDF (render z metadata — jak dotychczas) | skrzynki |
-| `GET /api/contract-pdf/<leadId>?token=` | PDF renderowany на żądanie z wiersza | ❌ efemeryczny |
+| `.pdf_sha256` | text (hex) — sha256 KANONU, stemplowana przy akcepcie; sync weryfikuje przed uploadem do MM | ✅ tamper-evidence |
+| Mamamia `Confirmation.signed_contract` | TEN SAM plik (bajty kanonu) w S3 Mamamii | ✅ archiwum binarne |
+| Maile (klient + team, `Betreuungsvertrag_Primundus.pdf`) | załącznik = TEN SAM plik (bajty kanonu) | skrzynki |
+| `GET /api/contract-pdf/<leadId>?token=` | serwuje KANON z bucketu (bucket-first); render tylko gdy kanonu brak (alt-buchungi) | proxy do kanonu |
 
 Treść §§ żyje w kodzie (`project 3/lib/vertrag.ts` + JSX `VertragSignieren.tsx` — duplikacja
 świadoma, patrz plan refactoru; `contract_version` w wierszu pinuje wersję tekstu — bump

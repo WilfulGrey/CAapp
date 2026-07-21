@@ -309,6 +309,28 @@ export interface VertragHtmlOptions {
   auditNote?: string; // z.B. "IP 1.2.3.4 · Vertragsversion v1.0"
 }
 
+// KANONISCHES Format des Unterschrifts-Zeitstempels: der Server-ISO-Moment
+// (lead_application_acceptances.signed_at) in deutscher Ortszeit. NIEMALS
+// getHours() o.ä. verwenden — Render läuft in UTC, das ergab "17:00 Uhr"
+// statt 19:00 (Bug „zwei Verträge mit zwei Uhrzeiten", 2026-07-21). Alle
+// Render-Pfade (Mail-Anhang, Storage-Kanon, Portal-Fallback) nutzen DIESE
+// Funktion → ein Vertrag, eine Uhrzeit.
+export function formatSignedAtBerlin(iso: string): string | undefined {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return undefined;
+  const parts = new Intl.DateTimeFormat('de-DE', {
+    timeZone: 'Europe/Berlin',
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  }).formatToParts(d);
+  const g = (t: string) => parts.find((p) => p.type === t)?.value ?? '';
+  return `${g('day')}.${g('month')}.${g('year')} um ${g('hour')}:${g('minute')} Uhr`;
+}
+
 export function buildVertragHtml(daten: VertragInput, opts: VertragHtmlOptions): string {
   const datum = esc(daten.datum || '');
   const ag = daten.ag ?? {};

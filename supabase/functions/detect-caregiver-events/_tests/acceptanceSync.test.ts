@@ -51,12 +51,18 @@ function makeRow(overrides: Partial<AcceptanceRow> = {}): AcceptanceRow {
     mamamia_confirmed_at: null,
     mamamia_confirmation_id: null,
     mamamia_pdf_uploaded_at: null,
+    pdf_sha256: null,
     ...overrides,
   };
 }
 
 const LEAD = { id: "lead-1", token: "tok-abc", mamamia_customer_id: 7777 };
-const SECRETS = { mamamiaEndpoint: "https://mm.example/graphql", kostenrechnerUrl: "https://kr.example" };
+const SECRETS = {
+  mamamiaEndpoint: "https://mm.example/graphql",
+  kostenrechnerUrl: "https://kr.example",
+  supabaseUrl: "https://supa.example",
+  supabaseServiceKey: "srv-key",
+};
 
 // Fake-Fetch: routet nach URL/Body — sammelt GraphQL-Operationen zur Assertion.
 interface FakeNet {
@@ -76,6 +82,8 @@ interface FakeNet {
   noExistingContract?: boolean;
   // PLZ→location_id Katalog (AcceptanceSyncLocations); fehlende PLZ ⇒ [].
   locationHits?: Record<string, number>;
+  // Kanonischer PDF im Storage-Bucket; null/undefined ⇒ 404 (Fallback-Render).
+  storageBody?: Uint8Array | string | null;
 }
 
 function makeNet(opts: Partial<FakeNet> = {}): FakeNet {
@@ -87,8 +95,19 @@ function makeNet(opts: Partial<FakeNet> = {}): FakeNet {
     bridgePosts: [],
     fetch: (async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = typeof input === "string" ? input : input instanceof URL ? input.href : (input as Request).url;
-      // contract-pdf Render (Kostenrechner)
+      // KANON aus dem Storage-Bucket (contracts/<lead>/<app>.pdf)
+      if (url.includes("/storage/v1/object/contracts/")) {
+        net.ops.push({ op: "StorageDownload", variables: { url } });
+        const body = net.storageBody;
+        if (body == null) return new Response("not found", { status: 404 });
+        return new Response(
+          typeof body === "string" ? body : (body.buffer as ArrayBuffer),
+          { status: 200 },
+        );
+      }
+      // contract-pdf Render (Kostenrechner) — Fallback für Alt-Rows
       if (url.includes("/api/contract-pdf/")) {
+        net.ops.push({ op: "ContractPdfRender", variables: { url } });
         const body = net.pdfBody!;
         return new Response(typeof body === "string" ? body : (body.buffer as ArrayBuffer), { status: 200 });
       }
@@ -364,6 +383,62 @@ Deno.test("sync: skipConfirm (Alt-Bundle hat akzeptiert, noch unverarbeitet) ⇒
   assertEquals(r.confirmed, false);
   assertEquals(stamps.calls.length, 0);
   assertStringIncludes(r.deferred.join("|"), "client already accepted");
+});
+
+async function shaHex(bytes: Uint8Array): Promise<string> {
+  const d = await crypto.subtle.digest("SHA-256", bytes.buffer as ArrayBuffer);
+  return [...new Uint8Array(d)].map((b) => b.toString(16).padStart(2, "0")).join("");
+}
+
+Deno.test("sync: KANON aus dem Storage ⇒ genau diese Bytes zu Mamamia, KEIN Re-Render", async () => {
+  const canon = new TextEncoder().encode("%PDF-1.7 canonical");
+  const net = makeNet({
+    finalConfirmations: [{ id: 555, caregiver: { id: 501 } }],
+    storageBody: canon,
+  });
+  const stamps = makeStamps();
+  const r = await syncAcceptance({
+    lead: LEAD,
+    row: makeRow({ mamamia_confirmed_at: "2026-07-22T10:00:00Z", mamamia_confirmation_id: 555, pdf_sha256: await shaHex(canon) }),
+    secrets: SECRETS, supabase: stamps.supabase, getAgencyToken: agencyToken, fetchFn: net.fetch,
+  });
+  assertEquals(r.pdf_uploaded, true);
+  const order = net.ops.map((o) => o.op);
+  assertEquals(order.includes("StorageDownload"), true);
+  assertEquals(order.includes("ContractPdfRender"), false); // 1 Datei — nie neu rendern
+  assertEquals(order.includes("StoreFile"), true);
+  const pdfStamp = stamps.calls.find((c) => c.kind === "pdf")!;
+  assertEquals(pdfStamp.sha, await shaHex(canon)); // Stempel == Kanon-Bytes
+});
+
+Deno.test("sync: Kanon-Bytes ≠ pdf_sha256 ⇒ Integritäts-Gate blockt Upload (deferred)", async () => {
+  const net = makeNet({
+    finalConfirmations: [{ id: 555, caregiver: { id: 501 } }],
+    storageBody: new TextEncoder().encode("%PDF-1.7 tampered"),
+  });
+  const stamps = makeStamps();
+  const r = await syncAcceptance({
+    lead: LEAD,
+    row: makeRow({ mamamia_confirmed_at: "2026-07-22T10:00:00Z", mamamia_confirmation_id: 555, pdf_sha256: "00".repeat(32) }),
+    secrets: SECRETS, supabase: stamps.supabase, getAgencyToken: agencyToken, fetchFn: net.fetch,
+  });
+  assertEquals(r.pdf_uploaded, false);
+  assertEquals(net.ops.map((o) => o.op).includes("StoreFile"), false);
+  assertStringIncludes(r.deferred.join("|"), "pdf_sha256");
+});
+
+Deno.test("sync: kein Kanon im Storage (404) ⇒ Fallback-Render via Kostenrechner (Alt-Rows)", async () => {
+  const net = makeNet({ finalConfirmations: [{ id: 555, caregiver: { id: 501 } }] }); // storageBody undefined ⇒ 404
+  const stamps = makeStamps();
+  const r = await syncAcceptance({
+    lead: LEAD,
+    row: makeRow({ mamamia_confirmed_at: "2026-07-22T10:00:00Z", mamamia_confirmation_id: 555 }),
+    secrets: SECRETS, supabase: stamps.supabase, getAgencyToken: agencyToken, fetchFn: net.fetch,
+  });
+  assertEquals(r.pdf_uploaded, true);
+  const order = net.ops.map((o) => o.op);
+  assertEquals(order.includes("StorageDownload"), true);
+  assertEquals(order.includes("ContractPdfRender"), true);
 });
 
 Deno.test("sync: HTML-Fallback vom Renderer ⇒ Magic-Byte-Gate blockt Upload (deferred)", async () => {
