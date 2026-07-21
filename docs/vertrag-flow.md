@@ -17,10 +17,23 @@ Bridge (project 3/app/api/lead-event/route.ts):
   → maile jak dotychczas (NIEZMIENIONE — render z metadata, Mail C + team)
 
 Edge sync-acceptance → _shared/acceptanceSync.ts (współdzielony z cronem):
-  1. UpdateCustomer  — customer_contract = dane kontaktowe z formularza
-                       konfirmacji (agGleich ⇒ dyskretne pola LE;
-                       AG odrębny ⇒ split composed ag.name na ostatniej spacji,
-                       bez salutation) + preserve equipments + patients:[]
+  1. UpdateCustomer  — TRZY osoby z formularza konfirmacji w NATYWNE sloty
+                       klienta MM (fix 2026-07-21, Bug #19 / Customer 8394):
+                       • LE → patient_contracts[{contact_type:"patient_contact"}]
+                         (+ carry location_id z istniejącego contractu — MM
+                         REPLACES listę przy zapisie)
+                       • AG → invoice_contract{contact_type:"contract_contact"}
+                         (panel: „Person für den Vertrag/Rechnung"; agGleich ⇒
+                         dyskretne pola LE, AG odrębny ⇒ split composed ag.name
+                         na ostatniej spacji, bez salutation)
+                       • KP → customer_contacts[] (panel: „Kontaktperson")
+                       Flagi is_same_as_first_patient/is_same_as_contact ZAWSZE
+                       jawnie (default MM = true ⇒ lustruje dane pacjenta w
+                       wiersz i panel pokazuje „gleiche wie Patient"); wyjątek
+                       agGleich ⇒ is_same_as_first_patient:true na invoice.
+                       NIGDY singular customer_contract (pierwszy wiersz plurala
+                       = patient_contact ⇒ AG lądowałby w slocie pacjenta).
+                       + preserve equipments + non-empty patients-stuby
   2. StoreConfirmation — akcept aplikacji (contract_patient/contract_contact,
                        mapowanie niemieckie→Mamamia SERVER-SIDE: SALUTATION
                        enum Mr./Mrs. [Fall Diesmann], split einsatzort)
