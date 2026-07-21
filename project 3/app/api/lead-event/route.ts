@@ -138,7 +138,7 @@ interface AcceptanceAlarmInfo {
   permanent: boolean;
   error?: string | null;
   age_minutes?: number | null;
-  source: 'bridge' | 'cron';
+  source: 'bridge' | 'cron' | 'sync-retry' | string;
 }
 
 function buildAcceptanceSyncAlarmTemplate(lead: any, info: AcceptanceAlarmInfo): EmailTemplate {
@@ -824,7 +824,8 @@ export async function POST(request: NextRequest) {
         permanent: m.permanent === true,
         error: typeof m.error === 'string' ? m.error : null,
         age_minutes: typeof m.age_minutes === 'number' ? m.age_minutes : null,
-        source: 'cron',
+        // 'cron' (15-Min-Backstop) oder 'sync-retry' (Chain 15/30/60 s).
+        source: typeof m.source === 'string' ? m.source : 'cron',
       });
       if (!ok.ok) {
         return NextResponse.json(

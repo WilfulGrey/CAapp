@@ -50,6 +50,8 @@ export interface AcceptanceRow {
   mamamia_pdf_uploaded_at: string | null;
   /** sha256 des KANONISCHEN PDFs (beim Akzept von der Bridge gestempelt). */
   pdf_sha256: string | null;
+  /** Alarm-Einmaligkeit (optional — Retry-Chain und Cron lesen ihn). */
+  mamamia_sync_alerted_at?: string | null;
 }
 
 export interface AcceptanceSyncSupabase {
