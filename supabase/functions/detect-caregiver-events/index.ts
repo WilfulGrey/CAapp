@@ -24,6 +24,10 @@ import {
   todayISO,
 } from "../_shared/leadJobsSync.ts";
 import {
+  type AcceptanceRow,
+  syncAcceptance,
+} from "../_shared/acceptanceSync.ts";
+import {
   type ApplicationNode,
   type CaregiverNode,
   type InterestNode,
@@ -132,6 +136,24 @@ export interface DetectSupabase {
     leadId: string,
     jobs: LeadJobUpsertRow[],
   ): Promise<void>;
+  // Acceptance-Sync-Retry (Refactor 2026-07-22): unterschriebene Acceptances,
+  // deren Mamamia-Sequenz (UpdateCustomer→StoreConfirmation→PDF-Upload) noch
+  // unvollständig ist — die Bridge triggert sync-acceptance synchron, der
+  // Cron ist der GARANT (final_confirmation-Bramka fürs PDF braucht oft den
+  // zweiten Anlauf). Alle vier optional → bestehende Test-Fakes kompilieren;
+  // fehlen sie, wird die Retry-Phase komplett übersprungen.
+  selectPendingAcceptanceSyncs?(maxAgeDays: number): Promise<PendingAcceptanceSync[]>;
+  stampAcceptanceConfirmed?(leadId: string, applicationId: number, confirmationId: number | null): Promise<void>;
+  stampAcceptancePdfUploaded?(leadId: string, applicationId: number, sha256: string | null): Promise<void>;
+  stampAcceptanceSyncAlerted?(leadId: string, applicationId: number): Promise<void>;
+}
+
+// Pending-Row inkl. Lead-Anker (Join) — alles, was syncAcceptance braucht.
+export interface PendingAcceptanceSync extends AcceptanceRow {
+  accepted_at: string;
+  mamamia_sync_alerted_at: string | null;
+  lead_token: string | null;
+  lead_mamamia_customer_id: number | null;
 }
 
 export interface DetectResult {
@@ -168,6 +190,11 @@ export interface BatchResult {
   total_jobs_scanned: number;
   total_job_scan_errors: number;
   per_lead_errors: number;
+  // Acceptance-Sync-Retry (Refactor 2026-07-22):
+  acceptance_syncs_scanned: number;
+  acceptance_syncs_completed: number;
+  acceptance_sync_errors: number;
+  acceptance_sync_alerts: number;
 }
 
 export interface HandlerDeps {
@@ -235,6 +262,10 @@ async function handleBatch(deps: HandlerDeps): Promise<Response> {
     total_jobs_scanned: 0,
     total_job_scan_errors: 0,
     per_lead_errors: 0,
+    acceptance_syncs_scanned: 0,
+    acceptance_syncs_completed: 0,
+    acceptance_sync_errors: 0,
+    acceptance_sync_alerts: 0,
   };
 
   for (const lead of leads) {
@@ -259,10 +290,108 @@ async function handleBatch(deps: HandlerDeps): Promise<Response> {
     }
   }
 
+  // ── Acceptance-Sync-Retry (Refactor 2026-07-22) ──
+  const rr = await retryAcceptanceSyncs(deps);
+  batch.acceptance_syncs_scanned = rr.scanned;
+  batch.acceptance_syncs_completed = rr.completed;
+  batch.acceptance_sync_errors = rr.errors;
+  batch.acceptance_sync_alerts = rr.alerts;
+
   return new Response(JSON.stringify(batch), {
     status: 200,
     headers: { "Content-Type": "application/json" },
   });
+}
+
+// ─── Acceptance-Sync-Retry ─────────────────────────────────────────────────
+// Dopycha niedokończone sekwencje (UpdateCustomer→Confirm→PDF-Upload) przez
+// wspólny moduł _shared/acceptanceSync — te same guardy co ścieżka
+// synchroniczna (sync-acceptance Edge Fn). Skanuje ≤30 dni wstecz.
+// Alert: wiersz >24h niedomknięty → GŁOŚNY console.error (widoczny w
+// Supabase-Logs) + jednorazowy stempel mamamia_sync_alerted_at.
+// Celowo BEZ nowego maila (decyzja Michała: maile bez zmian).
+
+const ACCEPTANCE_SYNC_MAX_AGE_DAYS = 30;
+const ACCEPTANCE_SYNC_ALERT_AFTER_MS = 24 * 60 * 60 * 1000;
+
+export async function retryAcceptanceSyncs(
+  deps: HandlerDeps,
+): Promise<{ scanned: number; completed: number; errors: number; alerts: number }> {
+  const out = { scanned: 0, completed: 0, errors: 0, alerts: 0 };
+  const supa = deps.supabase;
+  if (
+    !supa.selectPendingAcceptanceSyncs || !supa.stampAcceptanceConfirmed ||
+    !supa.stampAcceptancePdfUploaded
+  ) {
+    return out; // Adapter ohne Retry-Support (z.B. alte Test-Fakes) → no-op
+  }
+
+  let pending: PendingAcceptanceSync[];
+  try {
+    pending = await supa.selectPendingAcceptanceSyncs(ACCEPTANCE_SYNC_MAX_AGE_DAYS);
+  } catch (e) {
+    console.error("acceptance-sync scan failed:", (e as Error).message);
+    out.errors += 1;
+    return out;
+  }
+
+  for (const row of pending) {
+    out.scanned += 1;
+    try {
+      const result = await syncAcceptance({
+        lead: {
+          id: row.lead_id,
+          token: row.lead_token,
+          mamamia_customer_id: row.lead_mamamia_customer_id,
+        },
+        row,
+        secrets: {
+          mamamiaEndpoint: deps.secrets.mamamiaEndpoint,
+          kostenrechnerUrl: deps.secrets.kostenrechnerUrl,
+        },
+        supabase: {
+          stampConfirmed: supa.stampAcceptanceConfirmed.bind(supa),
+          stampPdfUploaded: supa.stampAcceptancePdfUploaded.bind(supa),
+        },
+        getAgencyToken: () =>
+          getOrRefreshAgencyToken({
+            authEndpoint: deps.secrets.mamamiaAuthEndpoint,
+            email: deps.secrets.mamamiaAgencyEmail,
+            password: deps.secrets.mamamiaAgencyPassword,
+            fetchFn: deps.fetchFn,
+          }),
+        fetchFn: deps.fetchFn,
+      });
+      if (result.confirmed && result.pdf_uploaded) out.completed += 1;
+    } catch (e) {
+      console.error(
+        `acceptance-sync retry failed (lead=${row.lead_id}, app=${row.application_id}):`,
+        (e as Error).message,
+      );
+      out.errors += 1;
+    }
+
+    // Alert: >24h niedomknięte i jeszcze nie alarmowane.
+    const ageMs = Date.now() - Date.parse(row.accepted_at);
+    if (
+      Number.isFinite(ageMs) && ageMs > ACCEPTANCE_SYNC_ALERT_AFTER_MS &&
+      !row.mamamia_sync_alerted_at && supa.stampAcceptanceSyncAlerted
+    ) {
+      console.error(
+        `🚨 ACCEPTANCE-SYNC ALERT: lead=${row.lead_id} app=${row.application_id} ` +
+          `unvollständig seit >24h (confirmed=${!!row.mamamia_confirmed_at}, ` +
+          `pdf=${!!row.mamamia_pdf_uploaded_at}) — manuell prüfen (SA-Portal / Supabase).`,
+      );
+      try {
+        await supa.stampAcceptanceSyncAlerted(row.lead_id, row.application_id);
+        out.alerts += 1;
+      } catch (e) {
+        console.error("stampAcceptanceSyncAlerted failed:", (e as Error).message);
+      }
+    }
+  }
+
+  return out;
 }
 
 // ─── Core detect logic (testable) ──────────────────────────────────────────
@@ -955,6 +1084,63 @@ function makeRealSupabase(url: string, serviceKey: string): DetectSupabase {
         .not("status", "in", "(vertrag_abgeschlossen,betreuung_beauftragt,nicht_interessiert)");
       if (error) throw new Error(`supabase fetchActiveLeads: ${error.message}`);
       return (data ?? []) as LeadRow[];
+    },
+    // ── Acceptance-Sync-Retry (Refactor 2026-07-22) ──
+    async selectPendingAcceptanceSyncs(maxAgeDays: number) {
+      const cutoff = new Date(Date.now() - maxAgeDays * 24 * 60 * 60 * 1000).toISOString();
+      // Join auf leads über den FK lead_id — liefert token + customer_id,
+      // die syncAcceptance braucht. Partial-Index
+      // idx_acceptances_mamamia_sync_pending deckt genau dieses WHERE.
+      const { data, error } = await client
+        .from("lead_application_acceptances")
+        .select("lead_id, application_id, caregiver_id, signatur, contract_patient, contract_contact, contract_snapshot, mamamia_confirmed_at, mamamia_confirmation_id, mamamia_pdf_uploaded_at, accepted_at, mamamia_sync_alerted_at, leads!inner(token, mamamia_customer_id)")
+        .not("signatur", "is", null)
+        .gt("accepted_at", cutoff)
+        .or("mamamia_confirmed_at.is.null,mamamia_pdf_uploaded_at.is.null");
+      if (error) throw new Error(`supabase selectPendingAcceptanceSyncs: ${error.message}`);
+      return (data ?? []).map((r: Record<string, unknown>) => {
+        const lead = r.leads as { token?: string | null; mamamia_customer_id?: number | null } | null;
+        return {
+          lead_id: r.lead_id,
+          application_id: r.application_id,
+          caregiver_id: r.caregiver_id ?? null,
+          signatur: r.signatur ?? null,
+          contract_patient: r.contract_patient ?? null,
+          contract_contact: r.contract_contact ?? null,
+          contract_snapshot: r.contract_snapshot ?? null,
+          mamamia_confirmed_at: r.mamamia_confirmed_at ?? null,
+          mamamia_confirmation_id: r.mamamia_confirmation_id ?? null,
+          mamamia_pdf_uploaded_at: r.mamamia_pdf_uploaded_at ?? null,
+          accepted_at: r.accepted_at,
+          mamamia_sync_alerted_at: r.mamamia_sync_alerted_at ?? null,
+          lead_token: lead?.token ?? null,
+          lead_mamamia_customer_id: lead?.mamamia_customer_id ?? null,
+        } as PendingAcceptanceSync;
+      });
+    },
+    async stampAcceptanceConfirmed(leadId: string, applicationId: number, confirmationId: number | null) {
+      const { error } = await client
+        .from("lead_application_acceptances")
+        .update({ mamamia_confirmed_at: new Date().toISOString(), mamamia_confirmation_id: confirmationId })
+        .eq("lead_id", leadId)
+        .eq("application_id", applicationId);
+      if (error) throw new Error(`supabase stampAcceptanceConfirmed: ${error.message}`);
+    },
+    async stampAcceptancePdfUploaded(leadId: string, applicationId: number, sha256: string | null) {
+      const { error } = await client
+        .from("lead_application_acceptances")
+        .update({ mamamia_pdf_uploaded_at: new Date().toISOString(), pdf_sha256: sha256 })
+        .eq("lead_id", leadId)
+        .eq("application_id", applicationId);
+      if (error) throw new Error(`supabase stampAcceptancePdfUploaded: ${error.message}`);
+    },
+    async stampAcceptanceSyncAlerted(leadId: string, applicationId: number) {
+      const { error } = await client
+        .from("lead_application_acceptances")
+        .update({ mamamia_sync_alerted_at: new Date().toISOString() })
+        .eq("lead_id", leadId)
+        .eq("application_id", applicationId);
+      if (error) throw new Error(`supabase stampAcceptanceSyncAlerted: ${error.message}`);
     },
     async fetchPastEvents(leadId: string) {
       // application_accepted_internal ist Dedupe-Quelle des Annahme-Detektors:

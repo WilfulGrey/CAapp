@@ -69,6 +69,11 @@ const TEAM_NOTIFY_CAREGIVER_EVENTS = new Set([
   'application_received',
 ]);
 const TEAM_NOTIFY_RECIPIENT = 'info@primundus.de';
+// Version des Vertragstextes — gepinnt in der Acceptance-Row. Der §§-Text lebt
+// im Code (lib/vertrag.ts); ohne Version würden alte Verträge nach einer
+// Textänderung mit NEUEM Wortlaut re-rendern. Bump NUR mit bewusster
+// Textänderung (alten Text dann als eingefrorene Version behalten).
+const CONTRACT_VERSION = 'v1.0';
 // Zusätzliche BCC-Empfänger NUR für die Accept-/Buchungs-Team-Mail
 // (application_accepted_internal). Andere Team-Notifications behalten den
 // Default-BCC (SMTP_BCC = info@primundus.de,info@mamamia.app). Kommasepariert.
@@ -425,7 +430,13 @@ export async function POST(request: NextRequest) {
         const clientIp = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim()
           || request.headers.get('x-real-ip')
           || null;
-        // Kern-Upsert (kritisch für die Buchungs-Persistenz / BookedScreen).
+        // EIN atomarer Upsert: Kern + Signatur-Audit + Snapshot + Version.
+        // Der frühere Zwei-Statement-Split („best-effort", Schutz gegen fehlende
+        // Migration) war gefährlich: die Buchung konnte OHNE Signatur/Snapshot
+        // „gelingen" (Kunde sieht Erfolg, /api/contract-pdf 404t). Die Spalten
+        // sind seit 06+07/2026 auf Staging UND Prod → Schutz obsolet.
+        // Fehler ⇒ 500 — der bestehende acceptApp-Error-Pfad zeigt dem Kunden
+        // Toast + Retry (Święta zasada nr 1: kein stiller Teilerfolg).
         const { error: accErr } = await supabase
           .from('lead_application_acceptances')
           .upsert({
@@ -434,25 +445,51 @@ export async function POST(request: NextRequest) {
             caregiver_id: typeof caregiverId === 'number' && Number.isFinite(caregiverId) ? caregiverId : null,
             contract_patient: m.contract_patient ?? {},
             contract_contact: m.contract_contact ?? {},
-          }, { onConflict: 'lead_id,application_id' });
-        if (accErr) {
-          console.error('lead_application_acceptances upsert failed:', accErr.message);
-        }
-        // Stufe B: Signatur-Audit + Vertrags-Snapshot SEPARAT + best-effort.
-        // Entkoppelt von der Kern-Persistenz, damit eine noch nicht angewendete
-        // Migration (Signatur-Spalten fehlen) die Buchung nicht bricht.
-        const { error: sigErr } = await supabase
-          .from('lead_application_acceptances')
-          .update({
             signatur: typeof m.signatur === 'string' ? m.signatur : null,
             signed_at: new Date().toISOString(),
             signed_ip: clientIp,
             contract_snapshot: m.contract ?? null,
-          })
-          .eq('lead_id', lead.id)
-          .eq('application_id', appId);
-        if (sigErr) {
-          console.warn('signature audit update skipped (Migration noch nicht angewendet?):', sigErr.message);
+            contract_version: CONTRACT_VERSION,
+          }, { onConflict: 'lead_id,application_id' });
+        if (accErr) {
+          console.error('lead_application_acceptances upsert failed:', accErr.message);
+          return NextResponse.json(
+            { error: 'acceptance persistence failed' },
+            { status: 500, headers: corsHeaders },
+          );
+        }
+
+        // Mamamia-Sync (Refactor 2026-07-22, Sequenz Michał):
+        //   1. UpdateCustomer (Kontaktdaten) → 2. StoreConfirmation →
+        //   3. Vertrag rendern → 4. Upload (nach Verarbeitung der Confirmation).
+        // Läuft in der Edge Fn sync-acceptance (Agentur-Creds leben NUR dort).
+        // Best-effort mit kurzem Timeout: schlägt der synchrone Versuch fehl
+        // oder ist die Confirmation noch nicht verarbeitet, holt der
+        // detect-caregiver-events-Cron (15 Min) alles nach — die Buchung
+        // selbst steht bereits (Upsert oben). Mails (unten) laufen unverändert.
+        // skip_confirm: Alt-Bundles feuern storeConfirmation noch selbst
+        // (metadata.mamamia_accepted === true) — dann NICHT doppelt akzeptieren.
+        try {
+          const ctrl = new AbortController();
+          const timer = setTimeout(() => ctrl.abort(), 25_000);
+          const syncRes = await fetch(`${supabaseUrl}/functions/v1/sync-acceptance`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${supabaseServiceKey}`,
+            },
+            body: JSON.stringify({
+              lead_id: lead.id,
+              application_id: appId,
+              skip_confirm: m.mamamia_accepted === true,
+            }),
+            signal: ctrl.signal,
+          });
+          clearTimeout(timer);
+          const syncBody = await syncRes.json().catch(() => null);
+          console.log(`[sync-acceptance] lead=${lead.id} app=${appId} http=${syncRes.status} result=${JSON.stringify(syncBody).slice(0, 400)}`);
+        } catch (e) {
+          console.error(`[sync-acceptance] trigger failed (cron will retry): lead=${lead.id} app=${appId}:`, e instanceof Error ? e.message : String(e));
         }
       } else {
         console.warn('application_accepted_internal: missing/invalid application_id in metadata');

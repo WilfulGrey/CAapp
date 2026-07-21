@@ -160,7 +160,7 @@ jobs:
             echo "::error::SUPABASE_STAGING_REF secret not set — cannot deploy edge fns to staging."
             exit 1
           fi
-          for fn in mamamia-proxy onboard-to-mamamia detect-caregiver-events daily-analytics-report; do
+          for fn in mamamia-proxy onboard-to-mamamia detect-caregiver-events daily-analytics-report sync-acceptance; do
             echo "::group::Deploying $fn → staging ($STAGING_REF)"
             supabase functions deploy "$fn" --project-ref "$STAGING_REF"
             echo "::endgroup::"

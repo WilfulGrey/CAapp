@@ -421,6 +421,8 @@ CA app → Mamamia:
 | `onboard-to-mamamia/onboard.ts` | StoreCustomer + StoreJobOffer + Locations(search) flow |
 | `onboard-to-mamamia/mappers.ts` | **formularDaten → Mamamia input** (`buildCustomerInput`, `buildPatients`, `buildCaregiverWish`, `mapNightOperations`, `mapMobilityToId`, etc.) |
 | `onboard-to-mamamia/types.ts` | `FormularDaten`, `Lead`, `CustomerInput`, `CaregiverWishInput` |
+| `sync-acceptance/index.ts` | **Server-to-server only** (Bearer = SERVICE_ROLE_KEY) — sekwencja akceptu po podpisie (gotcha #12), triggerowana przez bridge |
+| `_shared/acceptanceSync.ts` | Moduł sekwencji 1→4 (UpdateCustomer→StoreConfirmation→PDF→upload z bramką) — współdzielony przez sync-acceptance i detect-cron (retry) |
 | `mamamia-proxy/index.ts` | HTTP handler — verify session + dispatch action + run GraphQL |
 | `mamamia-proxy/actions.ts` | Whitelisted actions (`getCustomer`, `updateCustomer`, `listMatchings`, `inviteCaregiver`, `rejectApplication`, `storeConfirmation`, etc.). Każda waliduje ownership przez `session.customer_id` |
 | `mamamia-proxy/operations.ts` | GraphQL queries/mutations (`GET_CUSTOMER`, `UPDATE_CUSTOMER`, `PRESERVE_QUERY`, etc.) |
@@ -662,6 +664,24 @@ query `CustomerToken(id)`). Cel: zespół MM może otworzyć portal klienta po t
 - **Best-effort** — push w try/catch, awaria panelu NIE blokuje wejścia do portalu.
   Wykonuje się tylko przy cache-miss. Kod: `onboard-to-mamamia/onboard.ts:pushCustomerToken`
   + `UPDATE_CUSTOMER_TOKEN`.
+
+### 12. Akcept aplikacji — SERVER-SIDE sekwencja (sync-acceptance), nie przeglądarka
+
+Od refactoru 2026-07-22 przeglądarka po podpisie robi **jeden POST** do bridge'a;
+sekwencję wykonuje edge fn `sync-acceptance` (+ cron detect jako gwarant/retry):
+**1.** UpdateCustomer(customer_contract z formularza konfirmacji) → **2.** StoreConfirmation
+→ **3.** render PDF (`/api/contract-pdf`) → **4.** upload do MM (StoreFile→UpdateConfirmation)
+**dopiero gdy MM przetworzyła confirmation** (final_confirmation widoczne) → **5.** maile
+(bridge, niezmienione). Szczegóły + guardy idempotencji (adopcja po caregiver-match,
+skip_confirm dla starych bundli, stemple `mamamia_*`): [docs/vertrag-flow.md](docs/vertrag-flow.md).
+
+- **NIGDY nie wołaj StoreConfirmation dwa razy** — najpierw guard na
+  `Customer.job_offers[].final_confirmation` (Mamamia usuwa przetworzoną aplikację
+  z listy w sekundy — ownership kotwiczy się na confirmation, nie aplikacji).
+- Upload pliku przed przetworzeniem confirmation = błąd — bramka jest twardym wymogiem.
+- Magic-bytes `%PDF-` przed każdym uploadem (renderer ma HTML-fallback).
+- Mapowanie niemieckie→Mamamia (SALUTATION enum Mr./Mrs. — „Fall Diesmann", split
+  einsatzort) żyje w `_shared/acceptanceSync.ts` — NIE duplikować we froncie.
 
 ### 11. Opis opiekunki (`about_de`) — bierzemy z Mamamii, nie generujemy u siebie
 
@@ -1575,8 +1595,9 @@ to potencjalny attack vector.
 - **Admin panel:** w `project 3/app/admin/` istnieje ale nie cherry-picked
   z Marcin's fork — inny statuses.ts, inny StatusDropdown. Nie ruszać
   bez świadomej decyzji.
-- **Vertrag flow (`/betreuung-beauftragen`):** explicitly dropped w cherry-pick
-  decision. Customer flow kończy się patient form save → Mamamia matching.
-  In-app contract editing było duplikatem CA app patient form.
+- **Vertrag flow:** stary stage-B `/betreuung-beauftragen` został dropnięty w cherry-pick,
+  ALE od 06/2026 istnieje **nowy** in-portal flow podpisu (VertragSignieren + acceptance
+  + server-side sync do Mamamii) — patrz [docs/vertrag-flow.md](docs/vertrag-flow.md)
+  i gotcha #12.
 - **Migration to new Supabase project:** `ptdlgmpuqgbydglqnjgd` istnieje
   (Marcin's fork) ale nie używamy. Nasza beta na `ycdwtrklpoqprabtwahi`.

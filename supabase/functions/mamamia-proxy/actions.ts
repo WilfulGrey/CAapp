@@ -420,6 +420,17 @@ const uploadSignedContract: ActionHandler = async (session, variables, deps) => 
   if (typeof v.file_base64 !== "string" || v.file_base64.length === 0) throw new Error("file_base64 required");
   // ~6 MB Datei-Limit (base64 +33%) — Vertrags-PDFs liegen bei ~300-700 KB.
   if (v.file_base64.length > 8_000_000) throw new Error("file too large");
+  // Magic-Byte-Gate: der Kostenrechner-Renderer fällt bei Chromium-Fehlern
+  // auf HTML zurück — der Client wrappt die Bytes aber blind als
+  // application/pdf. HTML darf NIE als "…-signiert.pdf" in Mamamia landen.
+  try {
+    if (!atob(v.file_base64.slice(0, 8)).startsWith("%PDF-")) {
+      throw new Error("file is not a PDF (magic bytes)");
+    }
+  } catch (e) {
+    if ((e as Error).message.includes("magic bytes")) throw e;
+    throw new Error("file_base64 is not valid base64");
+  }
   // Ownership-Anker ist die CONFIRMATION, nicht die Application: mamamia
   // entfernt bestätigte Bewerbungen sofort aus JobOfferApplicationsWithPagination
   // (gleiche Eigenheit wie bei Ablehnungen) — Sekunden nach StoreConfirmation
