@@ -296,14 +296,15 @@ const PREVIEW_APPLICATION: Application = {
 // bereits unterschriebenen Vertrag, damit der gebucht-Screen die read-only
 // Vertragspräsentation zeigt (statt „Vertrag folgt").
 const PREVIEW_SIGNED_FORM: ContractFormData = {
-  anrede: 'Frau', vorname: 'Gerda', nachname: 'Krumbholz',
-  strasse: 'Musterstraße 12', einsatzort: '80331, München', telefon: '', email: '',
+  anrede: 'Frau', titel: '', vorname: 'Gerda', nachname: 'Krumbholz',
+  strasse: 'Musterstraße 12', plz: '80331', einsatzort: 'München', telefon: '', email: '',
   agGleich: false,
-  agAnrede: 'Herr', agVorname: 'Steffen', agNachname: 'Krumbholz',
+  agAnrede: 'Herr', agTitel: '', agVorname: 'Steffen', agNachname: 'Krumbholz',
   agStrasse: 'Beispielweg 5', agOrt: '80333, München', agTelefon: '089 1234567', agEmail: 'steffen@example.de',
-  kpAnrede: 'Herr', kpVorname: 'Steffen', kpNachname: 'Krumbholz',
+  kpAnrede: 'Herr', kpTitel: '', kpVorname: 'Steffen', kpNachname: 'Krumbholz',
   kpTelefon: '089 1234567', kpEmail: 'steffen@example.de',
   signatur: 'Steffen Krumbholz',
+  signaturOrt: 'München', consentRead: true, consentWiderruf: true,
 };
 
 const PREVIEW_MATCHINGS: Array<{ nurse: Nurse; caregiverId: number }> = [
@@ -1026,13 +1027,15 @@ const CustomerPortalPage: FC = () => {
     const stageBStreet = lead?.patient_street ?? '';
     const stageBZip = lead?.patient_zip ?? mmCustomer?.customer_contract?.zip_code ?? '';
     const stageBCity = lead?.patient_city ?? mmCustomer?.customer_contract?.city ?? '';
-    const ortLine = [stageBZip, stageBCity].filter(Boolean).join(', ');
     return {
       anrede: lead?.patient_anrede || lead?.anrede_text || 'Frau',
       vorname: lead?.patient_vorname || lead?.vorname || '',
       nachname: lead?.patient_nachname || lead?.nachname || '',
       strasse: stageBStreet || mmCustomer?.customer_contract?.street_number || '',
-      einsatzort: ortLine,
+      // PLZ + Ort jetzt getrennte Felder (kein "PLZ, Ort"-Join mehr —
+      // der zwang uns beim Mamamia-Mapping zu Regex-Raterei).
+      plz: stageBZip,
+      einsatzort: stageBCity,
       // Patient hat meist KEINE eigene Telefon/E-Mail — die vorhandenen
       // Kontaktdaten gehören i.d.R. der Kontaktperson, daher dort vorausfüllen.
       telefon: '',
@@ -1256,11 +1259,9 @@ const CustomerPortalPage: FC = () => {
     targetApp: Application | undefined,
     formData: ContractFormData,
   ) => {
-    // Zeitstempel der Unterschrift (menschenlesbar) + vollständige
-    // Vertragsdaten — der Server rendert daraus die Vertragskopie (HTML)
-    // und hängt sie an Kunden- + Team-Mail (Stufe B).
-    const now = new Date();
-    const signedAtLabel = `${String(now.getDate()).padStart(2, '0')}.${String(now.getMonth() + 1).padStart(2, '0')}.${now.getFullYear()} um ${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')} Uhr`;
+    // signed_at als ISO (maschinenlesbar; die Bridge formatiert fürs PDF
+    // selbst nach DE) + vollständige Vertragsdaten — der Server rendert
+    // daraus die Vertragskopie und hängt sie an Kunden- + Team-Mail.
     const contract = targetApp ? buildVertragsDaten(formData, targetApp.offer) : undefined;
     return {
       application_id: appIdNumeric,
@@ -1268,23 +1269,58 @@ const CustomerPortalPage: FC = () => {
       caregiver_name: targetApp?.nurse?.name,
       contract_patient: {
         anrede: formData.anrede,
+        titel: formData.titel,
         vorname: formData.vorname,
         nachname: formData.nachname,
         strasse: formData.strasse,
+        plz: formData.plz,
         einsatzort: formData.einsatzort,
         telefon: formData.telefon,
         email: formData.email,
       },
       contract_contact: {
         anrede: formData.kpAnrede,
+        titel: formData.kpTitel,
         vorname: formData.kpVorname,
         nachname: formData.kpNachname,
         telefon: formData.kpTelefon,
         email: formData.kpEmail,
       },
-      // Elektronische Signatur + Vertrags-Snapshot für die Vertragskopie.
+      // Auftraggeber als DISKRETE Felder (bisher überlebte er nur
+      // einkomponiert im contract-Snapshot → nicht abfragbar). Bei
+      // agGleich=true ist der AG der Leistungsempfänger.
+      contract_ag: formData.agGleich
+        ? {
+            gleich: true,
+            anrede: formData.anrede,
+            titel: formData.titel,
+            vorname: formData.vorname,
+            nachname: formData.nachname,
+            strasse: formData.strasse,
+            plz: formData.plz,
+            ort: formData.einsatzort,
+            telefon: formData.telefon || formData.kpTelefon,
+            email: formData.email || formData.kpEmail,
+          }
+        : {
+            gleich: false,
+            anrede: formData.agAnrede,
+            titel: formData.agTitel,
+            vorname: formData.agVorname,
+            nachname: formData.agNachname,
+            strasse: formData.agStrasse,
+            plz: '',
+            ort: formData.agOrt,
+            telefon: formData.agTelefon || formData.kpTelefon,
+            email: formData.agEmail || formData.kpEmail,
+          },
+      // Elektronische Signatur + Audit (Ort + Pflicht-Checkboxen) +
+      // Vertrags-Snapshot für die Vertragskopie.
       signatur: formData.signatur,
-      signed_at: signedAtLabel,
+      signed_at: new Date().toISOString(),
+      signed_ort: formData.signaturOrt,
+      consent_read: formData.consentRead === true,
+      consent_widerruf: formData.consentWiderruf === true,
       contract,
     };
   };
@@ -1299,23 +1335,29 @@ const CustomerPortalPage: FC = () => {
   const contractForMamamia = (formData: ContractFormData) => {
     const clean = (s: unknown) => { const t = String(s ?? '').trim(); return t || null; };
     const sal = (s: unknown) => SALUTATION_TOKEN[String(s ?? '').trim()] ?? null;
-    const ort = String(formData.einsatzort || '').trim();
-    let zip: string | null = null;
-    let city: string | null = null;
-    const commaSplit = ort.split(',');
-    const spaceMatch = /^(\d{4,5})\s+(.+)$/.exec(ort);
-    if (commaSplit.length > 1) {
-      zip = clean(commaSplit[0]);
-      city = clean(commaSplit.slice(1).join(','));
-    } else if (spaceMatch) {
-      zip = clean(spaceMatch[1]);
-      city = clean(spaceMatch[2]);
-    } else {
-      zip = clean(ort);
+    // PLZ + Ort sind jetzt getrennte Felder → direkt 1:1. Legacy-Fallback
+    // (plz leer, z.B. alter localStorage-Draft): das alte "PLZ, Ort"-Parsing.
+    let zip: string | null = clean(formData.plz);
+    let city: string | null = clean(formData.einsatzort);
+    if (!zip) {
+      const ort = String(formData.einsatzort || '').trim();
+      const commaSplit = ort.split(',');
+      const spaceMatch = /^(\d{4,5})\s+(.+)$/.exec(ort);
+      if (commaSplit.length > 1) {
+        zip = clean(commaSplit[0]);
+        city = clean(commaSplit.slice(1).join(','));
+      } else if (spaceMatch) {
+        zip = clean(spaceMatch[1]);
+        city = clean(spaceMatch[2]);
+      } else {
+        zip = clean(ort);
+        city = null;
+      }
     }
     return {
       contract_patient: {
         salutation: sal(formData.anrede),
+        title: clean(formData.titel),
         first_name: clean(formData.vorname),
         last_name: clean(formData.nachname),
         street_number: clean(formData.strasse),
@@ -1326,6 +1368,7 @@ const CustomerPortalPage: FC = () => {
       },
       contract_contact: {
         salutation: sal(formData.kpAnrede),
+        title: clean(formData.kpTitel),
         first_name: clean(formData.kpVorname),
         last_name: clean(formData.kpNachname),
         phone: clean(formData.kpTelefon),

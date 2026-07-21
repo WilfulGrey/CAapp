@@ -17,23 +17,29 @@ import {
   type SummaryRow,
 } from '../../lib/pricing/monthlyBreakdown';
 
-// Contract form data captured in step 2. Returned to parent via onAccept
-// so it can be POSTed to the kostenrechner bridge (which fires the team
-// mail + persists in lead_application_acceptances). MVP: this data does
-// NOT go to Mamamia.
+// Contract form data captured in step 2. Returned to parent via onAccept and
+// POSTed to the kostenrechner bridge (persists in lead_application_acceptances
+// + team/customer mail). LE + KP reach Mamamia via StoreConfirmation
+// (contract_patient/contract_contact); AG geht als contract_ag ins Audit und
+// (PR2) via UpdateCustomer.customer_contract nach Mamamia.
 export interface ContractFormData {
   // Leistungsempfänger (zu betreuende Person) = LE im Vertrag
   anrede: string;
+  titel: string; // '' = kein Titel; sonst 'Dr.' / 'Prof.' → Mamamia contract_patient.title
   vorname: string;
   nachname: string;
   strasse: string;
-  einsatzort: string;
+  // PLZ + Ort getrennt (früher EIN "einsatzort"-Feld → Parsing-Fehlablagen in
+  // Mamamia zip_code, wenn Kunden kein "PLZ, Ort"-Muster tippten).
+  plz: string;
+  einsatzort: string; // = Ort/Stadt
   telefon: string;
   email: string;
   // Auftraggeber (Vertragspartner) = AG im Vertrag. agGleich=true → identisch
   // mit dem Leistungsempfänger (Patient unterschreibt für sich selbst).
   agGleich: boolean;
   agAnrede: string;
+  agTitel: string;
   agVorname: string;
   agNachname: string;
   agStrasse: string;
@@ -42,11 +48,16 @@ export interface ContractFormData {
   agEmail: string;
   // Kontaktperson (Ansprechpartner)
   kpAnrede: string;
+  kpTitel: string;
   kpVorname: string;
   kpNachname: string;
   kpTelefon: string;
   kpEmail: string;
   signatur?: string; // getippter Name = elektronische Unterschrift (= Beauftragung)
+  // Unterschrifts-Audit (aus VertragSignieren.onSigned — SignaturErgebnis):
+  signaturOrt?: string;
+  consentRead?: boolean;
+  consentWiderruf?: boolean;
 }
 
 // Baut das Vertrag-Dokument (VertragsDaten) aus den erfassten Formulardaten.
@@ -60,9 +71,14 @@ export function buildVertragsDaten(
 ): VertragsDaten {
   const tagessatz = Math.round(offer.monatlicheKosten / 30);
   const datum = `${String(heute.getDate()).padStart(2, '0')}.${String(heute.getMonth() + 1).padStart(2, '0')}.${heute.getFullYear()}`;
-  const leName = `${form.vorname} ${form.nachname}`.trim();
-  const agName = form.agGleich ? leName : `${form.agVorname} ${form.agNachname}`.trim();
+  // Namen inkl. Anrede + Titel — beides wurde bisher im Dokument verworfen
+  // (agAnrede komplett, Titel gab es nicht als Feld).
+  const composeName = (anrede: string, titel: string, vor: string, nach: string) =>
+    [anrede, titel, vor, nach].map(s => (s ?? '').trim()).filter(Boolean).join(' ');
+  const leName = composeName(form.anrede, form.titel, form.vorname, form.nachname);
+  const agName = form.agGleich ? leName : composeName(form.agAnrede, form.agTitel, form.agVorname, form.agNachname);
   const agStrasse = form.agGleich ? form.strasse : form.agStrasse;
+  const agPlz = form.agGleich ? form.plz : '';
   const agOrt = form.agGleich ? form.einsatzort : form.agOrt;
   // E-Mail/Telefon des Auftraggebers — fällt auf die Kontaktperson zurück,
   // damit die Vertragskopie immer ein Ziel hat (Patient hat oft keine Mail).
@@ -70,11 +86,11 @@ export function buildVertragsDaten(
   const agTelefon = (form.agGleich ? form.telefon : form.agTelefon) || form.kpTelefon;
   return {
     datum,
-    ag: { name: agName || 'Auftraggeber', strasse: agStrasse, plz: '', ort: agOrt, email: agEmail, telefon: agTelefon },
+    ag: { name: agName || 'Auftraggeber', strasse: agStrasse, plz: agPlz, ort: agOrt, email: agEmail, telefon: agTelefon },
     // le=null wenn AG identisch mit LE → Vertrag zeigt „identisch mit Auftraggeber".
     le: form.agGleich
       ? null
-      : { name: leName || 'Leistungsempfänger', strasse: form.strasse, plz: '', ort: form.einsatzort },
+      : { name: leName || 'Leistungsempfänger', strasse: form.strasse, plz: form.plz, ort: form.einsatzort },
     vertragsbeginn: offer.anreisedatum,
     voraussAbreise: offer.abreisedatum,
     tagessatz: `EUR ${tagessatz},00`,
@@ -156,15 +172,18 @@ export const AngebotPruefenModal: FC<{
   const germanBars = Array.from({ length: 3 }, (_, i) => i < nurse.language.bars);
 
   const [anrede, setAnrede] = useState(prefill?.anrede ?? 'Frau');
+  const [titel, setTitel] = useState(prefill?.titel ?? '');
   const [vorname, setVorname] = useState(prefill?.vorname ?? '');
   const [nachname, setNachname] = useState(prefill?.nachname ?? '');
   const [strasse, setStrasse] = useState(prefill?.strasse ?? '');
+  const [plz, setPlz] = useState(prefill?.plz ?? '');
   const [einsatzort, setEinsatzort] = useState(prefill?.einsatzort ?? '');
   const [telefon, setTelefon] = useState(prefill?.telefon ?? '');
   const [email, setEmail] = useState(prefill?.email ?? '');
   // Auftraggeber (Vertragspartner) — default identisch mit Leistungsempfänger.
   const [agGleich, setAgGleich] = useState(prefill?.agGleich ?? true);
   const [agAnrede, setAgAnrede] = useState(prefill?.agAnrede ?? '');
+  const [agTitel, setAgTitel] = useState(prefill?.agTitel ?? '');
   const [agVorname, setAgVorname] = useState(prefill?.agVorname ?? '');
   const [agNachname, setAgNachname] = useState(prefill?.agNachname ?? '');
   const [agStrasse, setAgStrasse] = useState(prefill?.agStrasse ?? '');
@@ -172,6 +191,7 @@ export const AngebotPruefenModal: FC<{
   const [agTelefon, setAgTelefon] = useState(prefill?.agTelefon ?? '');
   const [agEmail, setAgEmail] = useState(prefill?.agEmail ?? '');
   const [kpAnrede, setKpAnrede] = useState(prefill?.kpAnrede ?? '');
+  const [kpTitel, setKpTitel] = useState(prefill?.kpTitel ?? '');
   const [kpVorname, setKpVorname] = useState(prefill?.kpVorname ?? '');
   const [kpNachname, setKpNachname] = useState(prefill?.kpNachname ?? '');
   const [kpTelefon, setKpTelefon] = useState(prefill?.kpTelefon ?? '');
@@ -180,15 +200,18 @@ export const AngebotPruefenModal: FC<{
   // Aktuelle Formulardaten als ContractFormData zusammenfassen — für die
   // Live-Vertragsvorschau (Seite 2) und beim Abschluss (onAccept).
   const formData: ContractFormData = {
-    anrede, vorname, nachname, strasse, einsatzort, telefon, email,
-    agGleich, agAnrede, agVorname, agNachname, agStrasse, agOrt, agTelefon, agEmail,
-    kpAnrede, kpVorname, kpNachname, kpTelefon, kpEmail,
+    anrede, titel, vorname, nachname, strasse, plz, einsatzort, telefon, email,
+    agGleich, agAnrede, agTitel, agVorname, agNachname, agStrasse, agOrt, agTelefon, agEmail,
+    kpAnrede, kpTitel, kpVorname, kpNachname, kpTelefon, kpEmail,
   };
 
   // Seite 1 (Daten) ist vollständig → weiter zum Vertrag erlaubt. Auftraggeber-
   // Name nur dann Pflicht, wenn er abweichend vom Leistungsempfänger ist.
+  // PLZ ist Pflicht — sie landet 1:1 in Mamamia contract_patient.zip_code
+  // (das alte kombinierte Feld produzierte Fehlablagen beim Parsen).
   const agComplete = agGleich || (agVorname.trim() !== '' && agNachname.trim() !== '');
-  const canProceed = vorname.trim() !== '' && nachname.trim() !== '' && strasse.trim() !== '' && einsatzort.trim() !== ''
+  const canProceed = vorname.trim() !== '' && nachname.trim() !== '' && strasse.trim() !== ''
+    && plz.trim() !== '' && einsatzort.trim() !== ''
     && agComplete
     && kpVorname.trim() !== '' && kpNachname.trim() !== '' && kpTelefon.trim() !== '' && kpEmail.trim() !== '';
 
@@ -390,8 +413,9 @@ export const AngebotPruefenModal: FC<{
                       </div>
                       <div>
                         <label className={labelCls}>Titel</label>
-                        <select className={inputCls}>
-                          <option>Kein Titel</option><option>Dr.</option><option>Prof.</option>
+                        {/* value='' = Kein Titel; wandert als contract_patient.title nach Mamamia */}
+                        <select value={titel} onChange={e => setTitel(e.target.value)} className={inputCls}>
+                          <option value="">Kein Titel</option><option>Dr.</option><option>Prof.</option>
                         </select>
                       </div>
                     </div>
@@ -409,9 +433,18 @@ export const AngebotPruefenModal: FC<{
                       <label className={labelCls}>Straße und Hausnummer *</label>
                       <input value={strasse} onChange={e => setStrasse(e.target.value)} className={inputCls} />
                     </div>
-                    <div>
-                      <label className={labelCls}>Einsatzort *</label>
-                      <input value={einsatzort} onChange={e => setEinsatzort(e.target.value)} className={inputCls} />
+                    {/* PLZ + Ort getrennt — das alte Ein-Feld "Einsatzort" zwang uns
+                        zu Regex-Raterei und legte Nicht-"PLZ, Ort"-Eingaben falsch
+                        in Mamamia zip_code ab. */}
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className={labelCls}>PLZ *</label>
+                        <input value={plz} onChange={e => setPlz(e.target.value)} inputMode="numeric" placeholder="z.B. 80331" className={inputCls} />
+                      </div>
+                      <div>
+                        <label className={labelCls}>Ort *</label>
+                        <input value={einsatzort} onChange={e => setEinsatzort(e.target.value)} placeholder="z.B. München" className={inputCls} />
+                      </div>
                     </div>
                     <div className="grid grid-cols-2 gap-3">
                       <div>
@@ -438,12 +471,20 @@ export const AngebotPruefenModal: FC<{
 
                   {!agGleich && (
                     <div className="space-y-3 mt-3 pt-4 border-t border-gray-100">
-                      <div>
-                        <label className={labelCls}>Anrede</label>
-                        <select value={agAnrede} onChange={e => setAgAnrede(e.target.value)} className={inputCls}>
-                          <option value="">Bitte wählen</option>
-                          <option>Frau</option><option>Herr</option><option>Divers</option>
-                        </select>
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <label className={labelCls}>Anrede</label>
+                          <select value={agAnrede} onChange={e => setAgAnrede(e.target.value)} className={inputCls}>
+                            <option value="">Bitte wählen</option>
+                            <option>Frau</option><option>Herr</option><option>Divers</option>
+                          </select>
+                        </div>
+                        <div>
+                          <label className={labelCls}>Titel</label>
+                          <select value={agTitel} onChange={e => setAgTitel(e.target.value)} className={inputCls}>
+                            <option value="">Kein Titel</option><option>Dr.</option><option>Prof.</option>
+                          </select>
+                        </div>
                       </div>
                       <div className="grid grid-cols-2 gap-3">
                         <div>
@@ -480,12 +521,20 @@ export const AngebotPruefenModal: FC<{
                 <div className={sectionCls}>
                   <p className={sectionTitleCls}>Kontaktperson</p>
                   <div className="space-y-3">
-                    <div>
-                      <label className={labelCls}>Anrede</label>
-                      <select value={kpAnrede} onChange={e => setKpAnrede(e.target.value)} className={inputCls}>
-                        <option value="">Bitte wählen</option>
-                        <option>Frau</option><option>Herr</option><option>Divers</option>
-                      </select>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className={labelCls}>Anrede</label>
+                        <select value={kpAnrede} onChange={e => setKpAnrede(e.target.value)} className={inputCls}>
+                          <option value="">Bitte wählen</option>
+                          <option>Frau</option><option>Herr</option><option>Divers</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label className={labelCls}>Titel</label>
+                        <select value={kpTitel} onChange={e => setKpTitel(e.target.value)} className={inputCls}>
+                          <option value="">Kein Titel</option><option>Dr.</option><option>Prof.</option>
+                        </select>
+                      </div>
                     </div>
                     <div className="grid grid-cols-2 gap-3">
                       <div>
@@ -519,7 +568,13 @@ export const AngebotPruefenModal: FC<{
                   embedded
                   daten={vertragsDaten}
                   signDisabled={!canProceed}
-                  onSigned={(sig) => onAccept(app.id, { ...formData, signatur: sig })}
+                  onSigned={(sig) => onAccept(app.id, {
+                    ...formData,
+                    signatur: sig.name,
+                    signaturOrt: sig.ort,
+                    consentRead: sig.consentRead,
+                    consentWiderruf: sig.consentWiderruf,
+                  })}
                 />
               </div>
             )}

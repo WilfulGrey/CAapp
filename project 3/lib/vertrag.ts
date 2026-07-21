@@ -307,6 +307,13 @@ export interface VertragHtmlOptions {
   signaturName: string;
   signedAt?: string; // menschenlesbarer Zeitstempel, z.B. "05.06.2026 um 14:30 Uhr"
   auditNote?: string; // z.B. "IP 1.2.3.4 · Vertragsversion v1.0"
+  // Ort der Unterschrift (aus VertragSignieren) — hat Vorrang vor ag.ort
+  // in der Ort/Datum-Zeile des Unterschriftenblocks.
+  signedOrt?: string;
+  // Die beiden Pflicht-Checkboxen der Online-Unterschrift — werden als
+  // Bestätigungszeilen ins Audit-Banner gerendert, damit das archivierte
+  // Dokument selbst die Zustimmungen belegt (PR1, Beweislücke geschlossen).
+  consents?: { read: boolean; widerruf: boolean };
 }
 
 export function buildVertragHtml(daten: VertragInput, opts: VertragHtmlOptions): string {
@@ -318,7 +325,9 @@ export function buildVertragHtml(daten: VertragInput, opts: VertragHtmlOptions):
   const tagessatz = esc(daten.tagessatz || '—');
   const dlName = esc(daten.dl?.name || 'Kamila Bilska-Wabik');
   const dlRolle = esc(daten.dl?.rolle || 'Vitanas Group');
-  const ort = esc(ag.ort || '');
+  // Ort der Unterschrift: explizit erfasster signedOrt (VertragSignieren)
+  // gewinnt; Fallback ag.ort (Alt-Verträge ohne persistierten Ort).
+  const ort = esc(opts.signedOrt || ag.ort || '');
   const signaturName = esc(opts.signaturName);
   const signedAt = esc(opts.signedAt || '');
   const signDatum = opts.signedAt ? esc(opts.signedAt.split(' um ')[0]) : datum;
@@ -710,7 +719,9 @@ export function buildVertragHtml(daten: VertragInput, opts: VertragHtmlOptions):
 
     <div class="audit-banner">
       <div class="h">✓ Vertrag rechtsverbindlich unterschrieben</div>
-      <div class="t">Elektronisch signiert von <strong>${signaturName}</strong>${signedAt ? ` am <strong>${signedAt}</strong>` : ''}.</div>
+      <div class="t">Elektronisch signiert von <strong>${signaturName}</strong>${signedAt ? ` am <strong>${signedAt}</strong>` : ''}${ort ? ` in <strong>${ort}</strong>` : ''}.</div>
+      ${opts.consents?.read ? '<div class="t">✓ Vertragstext vollständig gelesen und bestätigt</div>' : ''}
+      ${opts.consents?.widerruf ? '<div class="t">✓ Widerrufsbelehrung (Anlage 2) zur Kenntnis genommen</div>' : ''}
       <div class="a">Einfache elektronische Signatur${opts.auditNote ? ` · ${esc(opts.auditNote)}` : ''}</div>
     </div>
   </div>

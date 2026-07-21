@@ -91,7 +91,7 @@ export async function GET(
     // Safety, falls historisch zwei Acceptances drin sind.
     const { data: acceptance, error: accErr } = await supabase
       .from('lead_application_acceptances')
-      .select('contract_snapshot, signatur, signed_at')
+      .select('contract_snapshot, signatur, signed_at, signed_ort, consent_read, consent_widerruf, contract_version')
       .eq('lead_id', leadId)
       .order('signed_at', { ascending: false, nullsFirst: false })
       .limit(1)
@@ -146,10 +146,25 @@ export async function GET(
       }
     }
 
+    // Version aus der Row (gepinnt beim Signieren); Alt-Zeilen ohne Spalte
+    // → v1.0 (der bis dahin einzige Text). Ort + Consents rendern mit,
+    // damit Portal-PDF == Mail-PDF (gleiche Datenquelle, gleiche Optik).
+    const contractVersion =
+      typeof acceptance.contract_version === 'string' && acceptance.contract_version.trim()
+        ? acceptance.contract_version.trim()
+        : 'v1.0';
     const attachment = await buildVertragAttachmentPdf(vertragsDaten, {
       signaturName,
       signedAt,
-      auditNote: 'Vertragsversion v1.0',
+      signedOrt:
+        typeof acceptance.signed_ort === 'string' && acceptance.signed_ort.trim()
+          ? acceptance.signed_ort.trim()
+          : undefined,
+      consents: {
+        read: acceptance.consent_read === true,
+        widerruf: acceptance.consent_widerruf === true,
+      },
+      auditNote: `Vertragsversion ${contractVersion}`,
     });
 
     // Wenn der Fallback HTML statt PDF geliefert hat (Chrome-Render fail),

@@ -315,9 +315,19 @@ const ParteiZeile: FC<{ label: string; value?: string }> = ({ label, value }) =>
   </div>
 );
 
+// Ergebnis der Unterschrift — ALLES was der Kunde beim Signieren bestätigt.
+// Ort + die beiden Pflicht-Checkboxen wurden bisher im Browser verworfen
+// (Beweislücke); ab jetzt wandern sie mit ins Acceptance-Audit (PR1).
+export interface SignaturErgebnis {
+  name: string;
+  ort: string;
+  consentRead: boolean;     // „Ich habe den Vertragstext gelesen"
+  consentWiderruf: boolean; // „Widerrufsbelehrung zur Kenntnis genommen"
+}
+
 export const VertragSignieren: FC<{
   daten?: VertragsDaten;
-  onSigned?: (name: string) => void;
+  onSigned?: (sig: SignaturErgebnis) => void;
   // embedded = ohne eigenen Seiten-Rahmen (z.B. in einem Modal-Schritt);
   // die Unterschrift schließt dann direkt ab (kein Zwischen-„Weiter").
   embedded?: boolean;
@@ -350,8 +360,10 @@ export const VertragSignieren: FC<{
     const hh = String(now.getHours()).padStart(2, '0');
     const mi = String(now.getMinutes()).padStart(2, '0');
     setSignedAt(`${dd}.${mm}.${now.getFullYear()} um ${hh}:${mi} Uhr`);
-    // Eingebettet (Modal): Unterschrift schließt direkt ab.
-    if (embedded && onSigned) onSigned(name);
+    // Eingebettet (Modal): Unterschrift schließt direkt ab. Ort + Consents
+    // gehen mit — canSign garantiert beide Checkboxen, wir übergeben trotzdem
+    // den echten State (kein hartes true).
+    if (embedded && onSigned) onSigned({ name, ort, consentRead: bestaetigt, consentWiderruf: widerruf });
   };
 
   const inner = (
@@ -537,7 +549,7 @@ export const VertragSignieren: FC<{
                 Audit: einfache elektronische Signatur · Zeitstempel + IP protokolliert · Vertragsversion v1.0
               </p>
               {onSigned && !embedded && !readOnly && (
-                <button onClick={() => onSigned(name)}
+                <button onClick={() => onSigned({ name, ort, consentRead: bestaetigt, consentWiderruf: widerruf })}
                   className="mt-3 w-full rounded-xl bg-[#8B7355] hover:bg-[#766145] text-white text-sm font-bold py-3 transition-colors">
                   Weiter zum Portal →
                 </button>
