@@ -10,7 +10,7 @@ import {
   setDeclinedCaregiver,
 } from '../lib/supabase';
 import { useMamamiaSession } from '../hooks/useMamamiaSession';
-import { useCustomer, useJobOffer, useApplications, useInterests, useDismissedCaregivers, useAcceptedApplications, useMatchings, useCaregiver, useInvitedCaregivers, useInviteRateState } from '../lib/mamamia/hooks';
+import { useCustomer, useJobOffer, useApplications, useInterests, useDismissedCaregivers, useAcceptedApplications, useMatchings, useCaregiver, useInvitedCaregivers, useInviteRateState, useLeadJobs } from '../lib/mamamia/hooks';
 import { rankComparator } from '../lib/mamamia/matchingsRanking';
 import { prefetchCaregivers } from '../lib/mamamia/caregiverCache';
 import { isAboutDeStale, regenerateGermanDescription } from '../lib/mamamia/caregiverAbout';
@@ -581,6 +581,16 @@ const CustomerPortalPage: FC = () => {
   // On portal load we flip the matching app's status to 'accepted' →
   // existing BookedScreen renders. Persists across reload.
   const { data: acceptedApplications, refetch: refetchAcceptedApplications } = useAcceptedApplications(mmReady);
+
+  // Multi-Job (Opcja B, Dachs 8899): die Jobs des Leads — speist den
+  // "Alle meine Einsätze"-Link auch OHNE ?job=-Deeplink (vorher war die
+  // Übersicht nur von einem ?job=-Einstieg aus erreichbar; Kunden mit
+  // Folge-Einsatz konnten den alten gebuchten Job nie wiederfinden).
+  // Nebeneffekt erwünscht: listLeadJobs synct best-effort aus Mamamia →
+  // der lead_jobs-Spiegel (Basis der Aktiv-Job-Wahl beim Onboard) ist
+  // nach jedem Portal-Besuch frisch.
+  const { data: leadJobs } = useLeadJobs(mmReady);
+  const hasMultipleJobs = (leadJobs?.length ?? 0) > 1;
 
   // Gebucht-Ableitung aus dem Mamamia-Stand (Fix Hagedorn 2026-07-15):
   // akzeptiert die AGENTUR die Bewerbung im SA-Portal, gibt es keine
@@ -1289,80 +1299,15 @@ const CustomerPortalPage: FC = () => {
     };
   };
 
-  // Vertragsdaten aus dem Modal → mamamia-Feldnamen für StoreConfirmation.
-  // ACHTUNG mamamia-Validierung (live gelernt, Fall Diesmann 15.07. 18:44):
-  // salutation ist ein Enum ('Mr.'/'Mrs.' — dieselben Tokens sendet das
-  // SA-Portal) — die deutschen Labels 'Herr'/'Frau' werden mit
-  // „salutation ist ungültig" abgelehnt. einsatzort ist im Formular EIN
-  // Feld; Kunden tippen „PLZ, Ort" ODER „PLZ Ort" ohne Komma → beides parsen.
-  const SALUTATION_TOKEN: Record<string, string> = { Herr: 'Mr.', Frau: 'Mrs.', 'Mr.': 'Mr.', 'Mrs.': 'Mrs.' };
-  const contractForMamamia = (formData: ContractFormData) => {
-    const clean = (s: unknown) => { const t = String(s ?? '').trim(); return t || null; };
-    const sal = (s: unknown) => SALUTATION_TOKEN[String(s ?? '').trim()] ?? null;
-    const ort = String(formData.einsatzort || '').trim();
-    let zip: string | null = null;
-    let city: string | null = null;
-    const commaSplit = ort.split(',');
-    const spaceMatch = /^(\d{4,5})\s+(.+)$/.exec(ort);
-    if (commaSplit.length > 1) {
-      zip = clean(commaSplit[0]);
-      city = clean(commaSplit.slice(1).join(','));
-    } else if (spaceMatch) {
-      zip = clean(spaceMatch[1]);
-      city = clean(spaceMatch[2]);
-    } else {
-      zip = clean(ort);
-    }
-    return {
-      contract_patient: {
-        salutation: sal(formData.anrede),
-        first_name: clean(formData.vorname),
-        last_name: clean(formData.nachname),
-        street_number: clean(formData.strasse),
-        zip_code: zip,
-        city,
-        phone: clean(formData.telefon),
-        email: clean(formData.email),
-      },
-      contract_contact: {
-        salutation: sal(formData.kpAnrede),
-        first_name: clean(formData.kpVorname),
-        last_name: clean(formData.kpNachname),
-        phone: clean(formData.kpTelefon),
-        email: clean(formData.kpEmail),
-      },
-    };
-  };
+  // (Refactor 2026-07-22) Das Deutsch→Mamamia-Mapping (SALUTATION_TOKEN,
+  // einsatzort-Split, contract_patient/contract_contact) lebt jetzt SERVER-SIDE
+  // in supabase/functions/_shared/acceptanceSync.ts — der Browser schickt nur
+  // noch die deutschen Roh-Felder an die Bridge (buildAcceptanceMetadata).
 
-  // Signiertes Vertrags-PDF in mamamia an der Confirmation ablegen — geteilt
-  // von acceptApp (Schritt 3) und submitContractOnly (Vertrag nachträglich).
-  // Rendert das PDF aus der frisch geschriebenen Acceptance-Row und lädt es
-  // über die Proxy-Action hoch. Fire-and-forget + fail-soft: schlägt es fehl,
-  // bleibt der manuelle Upload aus der Team-Mail der Fallback.
-  const uploadContractPdfToMamamia = (applicationId: number, confirmationId: number) => {
-    if (!lead?.id) return;
-    void (async () => {
-      try {
-        const pdfRes = await fetch(
-          `${KOSTENRECHNER_URL}/api/contract-pdf/${lead.id}?token=${encodeURIComponent(lead.token ?? '')}`,
-        );
-        if (!pdfRes.ok) throw new Error(`contract-pdf HTTP ${pdfRes.status}`);
-        const bytes = new Uint8Array(await pdfRes.arrayBuffer());
-        let bin = '';
-        for (let i = 0; i < bytes.length; i += 0x8000) {
-          bin += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
-        }
-        await callMamamia('uploadSignedContract', {
-          application_id: applicationId,
-          confirmation_id: confirmationId,
-          file_base64: btoa(bin),
-          filename: 'Dienstleistungsvertrag-signiert.pdf',
-        });
-      } catch (err) {
-        console.error('Vertrag-Ablage in mamamia fehlgeschlagen:', (err as Error).message);
-      }
-    })();
-  };
+  // (Refactor 2026-07-22) Der PDF-Upload zu Mamamia (früher hier:
+  // download → base64 → uploadSignedContract aus dem Browser) läuft jetzt
+  // server-side in sync-acceptance/detect-Cron — mit final_confirmation-
+  // Bramka und garantiertem Retry statt Fire-and-forget aus dem Tab.
 
   const acceptApp = (id: string, formData: ContractFormData) => {
     setSelectedApp(null);
@@ -1383,35 +1328,15 @@ const CustomerPortalPage: FC = () => {
 
       if (!lead?.token) return;
 
-      // 1) Verbindliche Annahme in mamamia. Fail-soft: der Kunde hat
-      //    verbindlich akzeptiert — ein mamamia-Fehler bricht die
-      //    Portal-Buchung nicht ab, die Team-Mail trägt dann die Warnung
-      //    und das Team nimmt wie früher manuell im SA-Portal an.
-      let mamamiaAccepted = false;
-      let confirmationId: number | null = null;
-      try {
-        const confRes = await callMamamia<{ StoreConfirmation?: { id?: number } }>('storeConfirmation', {
-          application_id: Number(id),
-          is_confirm_binding: true,
-          ...contractForMamamia(formData),
-        });
-        confirmationId = typeof confRes?.StoreConfirmation?.id === 'number' ? confRes.StoreConfirmation.id : null;
-        mamamiaAccepted = true;
-      } catch (err) {
-        console.error('auto-accept (StoreConfirmation) failed:', (err as Error).message);
-        // mamamia kann NACH dem erfolgreichen Write noch mit 500 antworten
-        // (live gesehen, Fall Diesmann: Confirmation angelegt, Response
-        // „Internal server error"). Nachkontrolle: hat der Session-Job
-        // jetzt eine Confirmation, war die Annahme trotzdem erfolgreich —
-        // sonst würde die Team-Mail fälschlich zur manuellen (Doppel-)
-        // Annahme auffordern.
-        try {
-          const jo = await callMamamia<{ JobOffer?: { confirmations_count?: number } }>('getJobOffer');
-          if ((jo?.JobOffer?.confirmations_count ?? 0) > 0) mamamiaAccepted = true;
-        } catch { /* Nachkontrolle fehlgeschlagen → bei false bleiben (ehrliche Warnung) */ }
-      }
-
-      // 2) Interne Buchung + Mails über die Bridge.
+      // Server-side Sequenz (Refactor 2026-07-22): der Browser macht NUR noch
+      // diesen einen POST. Die Bridge persistiert ATOMAR und triggert die Edge
+      // Fn sync-acceptance, die Michałs Reihenfolge ausführt:
+      //   1. UpdateCustomer (Kontaktdaten aus dem Konfirmationsformular)
+      //   2. StoreConfirmation (verbindlicher Akzept)
+      //   3. Vertrag rendern → 4. Upload zu Mamamia (nach Verarbeitung)
+      //   5. Mails wie bisher (Bridge, unverändert)
+      // Fällt irgendwas davon aus, holt der detect-Cron es ≤15 Min nach —
+      // die Buchung hängt NICHT mehr am Leben dieses Browser-Tabs.
       try {
         const res = await fetch(`${KOSTENRECHNER_URL}/api/lead-event`, {
           method: 'POST',
@@ -1419,38 +1344,18 @@ const CustomerPortalPage: FC = () => {
           body: JSON.stringify({
             token: lead.token,
             event: 'application_accepted_internal',
-            metadata: {
-              ...buildAcceptanceMetadata(Number(id), targetApp, formData),
-              // Steuert den Hinweis in der Team-Mail: false ⇒ „bitte manuell
-              // im SA-Portal annehmen", true ⇒ Buchung bereits synchron.
-              mamamia_accepted: mamamiaAccepted,
-            },
+            metadata: buildAcceptanceMetadata(Number(id), targetApp, formData),
           }),
         });
         if (!res.ok) throw new Error(`bridge HTTP ${res.status}`);
         // Refetch so the persistence merge useEffect re-flips status on
         // next render even if optimistic state somehow drops.
         refetchAcceptedApplications();
-
-        // 3) Signierten Vertrag automatisch in mamamia ablegen (Martins
-        //    Auftrag 15.07.: „Vertrag muss im SA-Portal sichtbar sein").
-        //    Das PDF rendert der Kostenrechner aus der soeben (Schritt 2)
-        //    gespeicherten Acceptance-Row — deshalb ERST nach dem
-        //    Bridge-POST. Ohne confirmationId (z. B. mamamia-500 mit
-        //    nachträglicher Erfolgs-Erkennung) überspringen wir (Fallback:
-        //    manueller Upload aus der Team-Mail).
-        if (mamamiaAccepted && confirmationId != null) {
-          uploadContractPdfToMamamia(Number(id), confirmationId);
-        }
       } catch (err) {
+        // Bridge-Write fehlgeschlagen ⇒ es existiert KEINE Buchung (weder bei
+        // uns noch in Mamamia — der Akzept läuft jetzt server-side hinter dem
+        // Upsert). Ehrlich zurückdrehen + Retry anbieten.
         console.error('application_accepted_internal failed:', (err as Error).message);
-        if (mamamiaAccepted) {
-          // Die mamamia-Buchung steht bereits — Status NICHT zurückdrehen.
-          // Der BookedScreen leitet sich beim Reload aus der
-          // final_confirmation ab; Mails + internen Datensatz holt der
-          // Detektor beim nächsten Tick nach (Dedupe-sicher).
-          return;
-        }
         setApplications((prev) =>
           prev.map((a) => (a.id === id ? { ...a, status: 'new' } : a))
         );
@@ -1474,7 +1379,8 @@ const CustomerPortalPage: FC = () => {
   //      route.ts-Mechanismus: nur Team-Mail, kein DB-Write, keine Kunden-Mail).
   // setSignedForm erst NACH erfolgreichem Upsert — dann zeigt der BookedScreen
   // den Vertrag sofort inkl. PDF-Link (/api/contract-pdf liest die frisch
-  // geschriebene Acceptance-Row). route.ts bleibt unverändert.
+  // geschriebene Acceptance-Row). Den Mamamia-Teil (Vertrag an die existierende
+  // Confirmation hängen) erledigt die von route.ts getriggerte sync-acceptance.
   const submitContractOnly = async (id: string, formData: ContractFormData) => {
     const targetApp = contractApp?.id === id
       ? contractApp
@@ -1503,16 +1409,10 @@ const CustomerPortalPage: FC = () => {
       setSignedForm(formData);
       showToast('✓ Vielen Dank — Ihr Vertrag ist abgeschlossen.');
       refetchAcceptedApplications();
-      // Vertrag auch in mamamia an der (längst existierenden) Confirmation
-      // ablegen: bei synthetischen fc-Apps steckt deren ID hinter dem
-      // 'fc-'-Präfix (= appIdNumeric), sonst final_confirmation des
-      // Session-Jobs. Wichtig für PK-Wechsel-Fälle (Schiffer/Dachs 15.07.):
-      // die Neu-Signatur für die aktuelle Kraft landet damit automatisch
-      // im SA-Portal.
-      const confId = id.startsWith('fc-')
-        ? appIdNumeric
-        : (mamamiaConfirmedJob?.final_confirmation?.id ?? null);
-      if (confId != null) uploadContractPdfToMamamia(appIdNumeric, confId);
+      // PDF-Upload zu Mamamia übernimmt jetzt die Server-Sequenz
+      // (sync-acceptance, von der Bridge getriggert): der Guard adoptiert die
+      // längst existierende final_confirmation (Caregiver-Match) und hängt den
+      // Vertrag dort an — wichtig für PK-Wechsel-Fälle (Schiffer/Dachs 15.07.).
       // Team-Mail-Resend, best-effort: Fehler nur loggen — die kritische
       // Persistenz (Upsert oben) ist bereits erfolgreich gelaufen.
       fetch(`${KOSTENRECHNER_URL}/api/lead-event`, {
@@ -2276,11 +2176,13 @@ const CustomerPortalPage: FC = () => {
             </div>
           );
         })()}
-        {/* Real Multi-Job back-link: when this portal is scoped to a specific
-            job via ?job=<lead_jobs.id> (deep link from the real ?view=jobs
-            overview), offer a way back. Suppressed under the ?back=jobs mock
-            flow above, which renders its own "Alle Einsätze" link. */}
-        {JOB_ID_PARAM && !HAS_JOBS_BACK && (
+        {/* Real Multi-Job back-link: sichtbar wenn (a) das Portal via
+            ?job=<lead_jobs.id> auf einen Job scoped ist ODER (b) der Lead
+            mehrere Einsätze hat (Opcja B, Dachs 8899 — ohne den Link war
+            die ?view=jobs-Übersicht von einem Deeplink-losen Einstieg aus
+            unerreichbar). Suppressed unter dem ?back=jobs Mock-Flow oben,
+            der seinen eigenen "Alle Einsätze"-Link rendert. */}
+        {(JOB_ID_PARAM || hasMultipleJobs) && !HAS_JOBS_BACK && (
           <div className="max-w-3xl mx-auto px-4 pb-2 -mt-1 flex items-center">
             <a
               href={JOBS_OVERVIEW_HREF}

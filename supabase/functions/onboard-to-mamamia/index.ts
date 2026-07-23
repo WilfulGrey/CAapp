@@ -149,6 +149,21 @@ function makeRealSupabase(url: string, serviceKey: string): SupabaseLike {
       if (error) throw new Error(`supabase fetchLeadJob: ${error.message}`);
       return data;
     },
+    async fetchNewestPlannedJob(leadId: string) {
+      // Neuester 'geplant'-Job (Mamamia-IDs sind monoton wachsend). Kein
+      // geplanter Job (typisch: Single-Job-Kunde nach der Buchung) → null
+      // → Caller bleibt beim Default-Job des Leads.
+      const { data, error } = await client
+        .from("lead_jobs")
+        .select("mamamia_job_offer_id")
+        .eq("lead_id", leadId)
+        .eq("status", "geplant")
+        .order("mamamia_job_offer_id", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (error) throw new Error(`supabase fetchNewestPlannedJob: ${error.message}`);
+      return data;
+    },
   };
 }
 

@@ -62,9 +62,10 @@ interface FakeSupabase {
   fetchLead(token: string): Lead | null;
   updateLead(id: string, patch: Partial<Lead>): void;
   fetchLeadJob(jobId: string, leadId: string): Promise<{ mamamia_job_offer_id: number } | null>;
+  fetchNewestPlannedJob(leadId: string): Promise<{ mamamia_job_offer_id: number } | null>;
 }
 
-interface FakeLeadJob { id: string; lead_id: string; mamamia_job_offer_id: number; }
+interface FakeLeadJob { id: string; lead_id: string; mamamia_job_offer_id: number; status?: string; }
 
 function makeFakeSupabase(initialLeads: Lead[] = [], leadJobs: FakeLeadJob[] = []): FakeSupabase {
   const leads = new Map(initialLeads.map((l) => [l.token ?? "", l]));
@@ -86,6 +87,14 @@ function makeFakeSupabase(initialLeads: Lead[] = [], leadJobs: FakeLeadJob[] = [
     fetchLeadJob(jobId, leadId) {
       const j = leadJobs.find((x) => x.id === jobId && x.lead_id === leadId);
       return Promise.resolve(j ? { mamamia_job_offer_id: j.mamamia_job_offer_id } : null);
+    },
+    // Neuester 'geplant'-Job des Leads (Opcja B) — spiegelt die reale Query
+    // `.eq("status","geplant").order("mamamia_job_offer_id", desc).limit(1)`.
+    fetchNewestPlannedJob(leadId) {
+      const planned = leadJobs
+        .filter((x) => x.lead_id === leadId && x.status === "geplant")
+        .sort((a, b) => b.mamamia_job_offer_id - a.mamamia_job_offer_id);
+      return Promise.resolve(planned[0] ? { mamamia_job_offer_id: planned[0].mamamia_job_offer_id } : null);
     },
   };
 }
@@ -326,16 +335,65 @@ const NO_MAMAMIA: typeof fetch = () => {
   throw new Error("Mamamia should not be called on cache hit!");
 };
 
-Deno.test("onboardLead: NO job_id → lead's default job (backward compatible, even with other jobs)", async () => {
+Deno.test("onboardLead: NO job_id + kein geplanter Job → lead's default job (Single-Job nach Buchung)", async () => {
   _resetAgencyTokenCache();
   const supa = makeFakeSupabase([makeLead({ ...ONBOARDED })], [
-    { id: "job-a", lead_id: "lead-x", mamamia_job_offer_id: 16225 },
-    { id: "job-b", lead_id: "lead-x", mamamia_job_offer_id: 99999 },
+    { id: "job-a", lead_id: "lead-x", mamamia_job_offer_id: 16225, status: "gebucht" },
+    { id: "job-b", lead_id: "lead-x", mamamia_job_offer_id: 99999, status: "beendet" },
   ]);
   const result = await onboardLead({
     leadToken: "valid-token", secrets: SECRETS, supabase: supa, fetchFn: NO_MAMAMIA, now: NOW,
   });
-  // Old token (no &job) must resolve to the default job, never job-b.
+  assertEquals(result.job_offer_id, 16225);
+});
+
+Deno.test("onboardLead: NO job_id → AKTIVER Job = neuester 'geplant' (Opcja B, Dachs 8899)", async () => {
+  _resetAgencyTokenCache();
+  // Alter gebuchter Job (Default des Leads) + neuer geplanter Folge-Job:
+  // Einstieg ohne Deeplink landet auf dem NEUEN Job mit seinen Bewerbungen.
+  const supa = makeFakeSupabase([makeLead({ ...ONBOARDED })], [
+    { id: "job-a", lead_id: "lead-x", mamamia_job_offer_id: 16225, status: "gebucht" },
+    { id: "job-b", lead_id: "lead-x", mamamia_job_offer_id: 99999, status: "geplant" },
+  ]);
+  const result = await onboardLead({
+    leadToken: "valid-token", secrets: SECRETS, supabase: supa, fetchFn: NO_MAMAMIA, now: NOW,
+  });
+  assertEquals(result.job_offer_id, 99999);
+  assertEquals(result.customer_id, 7566); // gleicher Kunde, nur anderer Job-Scope
+});
+
+Deno.test("onboardLead: NO job_id + zwei geplante Jobs → der NEUESTE gewinnt", async () => {
+  _resetAgencyTokenCache();
+  const supa = makeFakeSupabase([makeLead({ ...ONBOARDED })], [
+    { id: "job-a", lead_id: "lead-x", mamamia_job_offer_id: 16225, status: "geplant" },
+    { id: "job-b", lead_id: "lead-x", mamamia_job_offer_id: 99999, status: "geplant" },
+  ]);
+  const result = await onboardLead({
+    leadToken: "valid-token", secrets: SECRETS, supabase: supa, fetchFn: NO_MAMAMIA, now: NOW,
+  });
+  assertEquals(result.job_offer_id, 99999);
+});
+
+Deno.test("onboardLead: explizites job_id hat Vorrang vor der Aktiv-Job-Wahl", async () => {
+  _resetAgencyTokenCache();
+  const supa = makeFakeSupabase([makeLead({ ...ONBOARDED })], [
+    { id: "job-a", lead_id: "lead-x", mamamia_job_offer_id: 16225, status: "gebucht" },
+    { id: "job-b", lead_id: "lead-x", mamamia_job_offer_id: 99999, status: "geplant" },
+  ]);
+  const result = await onboardLead({
+    leadToken: "valid-token", jobId: "job-a", secrets: SECRETS, supabase: supa, fetchFn: NO_MAMAMIA, now: NOW,
+  });
+  // ?job=<alter Einsatz> aus der Übersicht → genau der, kein Auto-Umschwenk.
+  assertEquals(result.job_offer_id, 16225);
+});
+
+Deno.test("onboardLead: fetchNewestPlannedJob-Fehler → Default-Job (Portal-Eintritt bricht nie)", async () => {
+  _resetAgencyTokenCache();
+  const base = makeFakeSupabase([makeLead({ ...ONBOARDED })]);
+  const supa = { ...base, fetchNewestPlannedJob: () => Promise.reject(new Error("db down")) };
+  const result = await onboardLead({
+    leadToken: "valid-token", secrets: SECRETS, supabase: supa, fetchFn: NO_MAMAMIA, now: NOW,
+  });
   assertEquals(result.job_offer_id, 16225);
 });
 

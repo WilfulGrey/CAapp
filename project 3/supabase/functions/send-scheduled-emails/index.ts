@@ -504,30 +504,20 @@ Primundus Deutschland | +49 89 200 000 830 | www.primundus.de`;
 // ist (Skip-Logik im Handler: patient_data_saved / gebucht / nicht-int. /
 // eingeladen → cancel). Anker: "5 vorbereitete Pflegekräfte".
 
+// Profil-Nudges v3 (Texte wortwoertlich von Martin freigegeben, 20.07. abends):
+// Einstieg = Dank + „Ihr Angebot haben Sie erhalten" (Kunde weiss, wo er steht),
+// dann der Schwenk auf die Pflegekraefte (passen + gerade verfuegbar, unverbindlich).
+// Kein „schwierig auszufuellen", kein „es eilt nicht", keine Verknappung.
 function buildProfilNudge1Html(lead: Lead, siteUrl: string, portalBase: string): string {
   const portalUrl = (portalBase && lead.token) ? buildPortalUrl(portalBase, lead.token) : siteUrl;
   const halloAnrede = buildHalloAnrede(lead.anrede_text || null, lead.nachname || "", lead.vorname || "");
   const content = `
     <p style="font-size:15px;line-height:1.75;color:#444;margin-bottom:14px;">${halloAnrede},</p>
-    <p style="font-size:15px;line-height:1.75;color:#444;margin-bottom:14px;">Sie haben vor Kurzem Ihr persönliches Angebot zur 24-Stunden-Betreuung erhalten &ndash; und ich habe bereits <strong>passende Pflegekräfte für Sie vorbereitet</strong>, kostenfrei und unverbindlich.</p>
-    <p style="font-size:15px;line-height:1.75;color:#444;margin-bottom:14px;">Konnten Sie sich die <strong>5 Pflegekräfte</strong> schon ansehen?</p>
-
-    <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="margin:18px 0 8px;background:#F1F8F3;border:1px solid #CDE9D6;border-radius:10px;overflow:hidden;">
-      <tr><td style="padding:18px 24px 20px;text-align:center;">
-        <p style="margin:0 0 4px;font-size:32px;font-weight:700;color:#1C5C34;line-height:1;">5</p>
-        <p style="margin:0 0 6px;font-size:17px;font-weight:700;color:#1C5C34;line-height:1.35;">passende Pflegekräfte sind bereit</p>
-        <p style="margin:0;font-size:14px;line-height:1.6;color:#33503D;">sorgfältig für Ihre Situation ausgewählt &ndash; darunter erfahrene Kräfte mit <strong>Gold- und Platin-Auszeichnung</strong></p>
-      </td></tr>
-    </table>
-
-    <p style="font-size:15px;line-height:1.75;color:#444;margin:16px 0 6px;">Sie können sie sich jederzeit unverbindlich ansehen. Für die Einladung fehlt nur noch <strong>ein kurzer Schritt</strong> &ndash; Ihre Patientendaten. Das dauert nur 2 Minuten, vieles ist schon vorausgefüllt.</p>
-
-    ${bulletproofButton(portalUrl, "Meine 5 Pflegekräfte ansehen&nbsp;&nbsp;&rarr;", "#2A9D5C")}
-
-    <p style="font-size:13px;line-height:1.65;color:#8a8a8a;text-align:center;margin:6px 0 4px;">Beliebte Pflegekräfte sind oft schnell vergeben.</p>
-
-    <p style="font-size:15px;line-height:1.75;color:#444;margin:28px 0 18px;">Wenn Sie Hilfe beim Ausfüllen brauchen oder eine Frage haben &ndash; rufen Sie mich an, schreiben Sie mir per WhatsApp oder antworten Sie einfach auf diese E-Mail. Ich bin gerne für Sie da.</p>
-
+    <p style="font-size:15px;line-height:1.75;color:#444;margin-bottom:14px;">vielen Dank für Ihre Anfrage &ndash; Ihr persönliches Angebot für die 24-Stunden-Betreuung von Primundus haben Sie bereits erhalten.</p>
+    <p style="font-size:15px;line-height:1.75;color:#444;margin-bottom:14px;">Jetzt kommt der schönste Teil: Möchten Sie sehen, welche Pflegekräfte zu Ihnen passen und <strong>gerade verfügbar</strong> sind? Mit Foto, Anreisedatum und Preis &ndash; alles unverbindlich.</p>
+    <p style="font-size:15px;line-height:1.75;color:#444;margin-bottom:14px;">Dafür brauchen die Pflegekräfte nur ein paar Details zur Pflegesituation. Die tragen Sie in etwa 5 Minuten im Patientenprofil ein &ndash; vieles ist schon vorausgefüllt.</p>
+    ${bulletproofButton(portalUrl, "Pflegekräfte ansehen&nbsp;&nbsp;&rarr;", "#2A9D5C")}
+    <p style="font-size:13px;line-height:1.6;color:#888;margin:18px 0 0;">PS: Klappt im Portal etwas nicht, oder möchten Sie das lieber persönlich klären? Sie erreichen mich unter <a href="tel:+4989200000830" style="color:#8B7355;text-decoration:none;">089&nbsp;200&nbsp;000&nbsp;830</a> oder per <a href="https://wa.me/4989200000830" style="color:#8B7355;text-decoration:none;">WhatsApp</a>.</p>
     ${buildIlkaSig(siteUrl)}`;
   return buildEmailWrapper(lead, siteUrl, content);
 }
@@ -537,15 +527,15 @@ function buildProfilNudge1Text(lead: Lead, siteUrl: string, portalBase: string):
   const halloAnrede = buildHalloAnrede(lead.anrede_text || null, lead.nachname || "", lead.vorname || "");
   return `${halloAnrede},
 
-Sie haben vor Kurzem Ihr persönliches Angebot zur 24-Stunden-Betreuung erhalten – und ich habe bereits passende Pflegekräfte für Sie vorbereitet, kostenfrei und unverbindlich.
+vielen Dank für Ihre Anfrage — Ihr persönliches Angebot für die 24-Stunden-Betreuung von Primundus haben Sie bereits erhalten.
 
-Konnten Sie sich die 5 Pflegekräfte schon ansehen? Sorgfältig für Ihre Situation ausgewählt – darunter erfahrene Kräfte mit Gold- und Platin-Auszeichnung.
+Jetzt kommt der schönste Teil: Möchten Sie sehen, welche Pflegekräfte zu Ihnen passen und gerade verfügbar sind? Mit Foto, Anreisedatum und Preis — alles unverbindlich.
 
-Sie können sie sich jederzeit unverbindlich ansehen. Für die Einladung fehlt nur noch ein kurzer Schritt – Ihre Patientendaten. Das dauert nur 2 Minuten, vieles ist schon vorausgefüllt.
+Dafür brauchen die Pflegekräfte nur ein paar Details zur Pflegesituation. Die tragen Sie in etwa 5 Minuten im Patientenprofil ein — vieles ist schon vorausgefüllt.
 
-Meine 5 Pflegekräfte ansehen: ${portalUrl}
+Pflegekräfte ansehen: ${portalUrl}
 
-Beliebte Pflegekräfte sind oft schnell vergeben.
+PS: Klappt im Portal etwas nicht, oder möchten Sie das lieber persönlich klären? Sie erreichen mich unter 089 200 000 830 oder per WhatsApp (https://wa.me/4989200000830).
 
 Mit freundlichen Grüßen
 Ilka Wysocki
@@ -559,25 +549,10 @@ function buildProfilNudge2Html(lead: Lead, siteUrl: string, portalBase: string):
   const halloAnrede = buildHalloAnrede(lead.anrede_text || null, lead.nachname || "", lead.vorname || "");
   const content = `
     <p style="font-size:15px;line-height:1.75;color:#444;margin-bottom:14px;">${halloAnrede},</p>
-    <p style="font-size:15px;line-height:1.75;color:#444;margin-bottom:14px;">Ihre <strong>5 passenden Pflegekräfte</strong> liegen in Ihrem Kundenportal bereit &ndash; die Profile können Sie sich jederzeit in Ruhe und völlig <strong>unverbindlich ansehen</strong>.</p>
-    <p style="font-size:15px;line-height:1.75;color:#444;margin-bottom:14px;">Damit Sie eine Pflegekraft <strong>einladen</strong> können und <strong>Bewerbungen</strong> erhalten, brauchen die Pflegekräfte noch ein paar Angaben zu Ihrer Pflegesituation. Das müssen Sie aber nicht allein ausfüllen.</p>
-
-    <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="margin:18px 0 8px;background:#FAF8F4;border:1px solid #ECE3D4;border-radius:10px;overflow:hidden;">
-      <tr><td style="padding:18px 24px 20px;">
-        <p style="margin:0 0 6px;font-size:11px;font-weight:700;color:#B8860B;letter-spacing:.08em;text-transform:uppercase;">Persönliche Hilfe</p>
-        <p style="margin:0 0 8px;font-size:18px;font-weight:700;color:#2D1F0F;line-height:1.35;">Wir machen das gemeinsam am Telefon</p>
-        <p style="margin:0;font-size:14px;line-height:1.65;color:#555;">Antworten Sie einfach kurz mit einer <strong>Uhrzeit, die Ihnen passt</strong> &ndash; oder rufen Sie mich direkt an. Wir gehen die Angaben in keine 5 Minuten zusammen durch, danach können Sie Ihre Wunschkräfte einladen.</p>
-      </td></tr>
-    </table>
-
-    ${bulletproofButton("https://wa.me/4989200000830", "Per WhatsApp einen Rückruf vereinbaren", "#25D366")}
-
-    <p style="font-size:14px;line-height:1.7;color:#777;text-align:center;margin:10px 0 4px;">Oder direkt selbst ausfüllen (nur 2 Minuten):<br>
-      <a href="${portalUrl}" target="_blank" style="color:#2A9D5C;text-decoration:underline;font-weight:600;">Patientendaten im Portal vervollständigen &rarr;</a>
-    </p>
-
-    <p style="font-size:15px;line-height:1.75;color:#444;margin:28px 0 18px;">Ich bin Mo&ndash;So von 8 bis 20 Uhr für Sie da &ndash; rufen Sie mich an, schreiben Sie mir per WhatsApp oder antworten Sie einfach auf diese E-Mail.</p>
-
+    <p style="font-size:15px;line-height:1.75;color:#444;margin-bottom:14px;">kurze Frage: Soll ich das Patientenprofil mit Ihnen am Telefon ausfüllen? Zehn Minuten, dann sehen Sie, welche Pflegekräfte für Sie verfügbar wären &ndash; mit Foto, Anreisedatum und Preis, und Sie erhalten unverbindliche Bewerbungen.</p>
+    <p style="font-size:15px;line-height:1.75;color:#444;margin-bottom:14px;">Rufen Sie mich einfach an &ndash; <a href="tel:+4989200000830" style="color:#8B7355;text-decoration:none;font-weight:600;">089&nbsp;200&nbsp;000&nbsp;830</a> &ndash; oder schreiben Sie mir per <a href="https://wa.me/4989200000830" style="color:#8B7355;text-decoration:none;font-weight:600;">WhatsApp</a>, wann es Ihnen passt.</p>
+    ${bulletproofButton(portalUrl, "Oder gleich selbst ausfüllen&nbsp;&nbsp;&rarr;", "#2A9D5C")}
+    <p style="font-size:13px;line-height:1.6;color:#888;margin:18px 0 0;">PS: Klappt im Portal etwas nicht, oder möchten Sie das lieber persönlich klären? Sie erreichen mich unter <a href="tel:+4989200000830" style="color:#8B7355;text-decoration:none;">089&nbsp;200&nbsp;000&nbsp;830</a> oder per <a href="https://wa.me/4989200000830" style="color:#8B7355;text-decoration:none;">WhatsApp</a>.</p>
     ${buildIlkaSig(siteUrl)}`;
   return buildEmailWrapper(lead, siteUrl, content);
 }
@@ -587,13 +562,88 @@ function buildProfilNudge2Text(lead: Lead, siteUrl: string, portalBase: string):
   const halloAnrede = buildHalloAnrede(lead.anrede_text || null, lead.nachname || "", lead.vorname || "");
   return `${halloAnrede},
 
-Ihre 5 passenden Pflegekräfte liegen in Ihrem Kundenportal bereit – die Profile können Sie sich jederzeit in Ruhe und völlig unverbindlich ansehen.
+kurze Frage: Soll ich das Patientenprofil mit Ihnen am Telefon ausfüllen? Zehn Minuten, dann sehen Sie, welche Pflegekräfte für Sie verfügbar wären — mit Foto, Anreisedatum und Preis, und Sie erhalten unverbindliche Bewerbungen.
 
-Damit Sie eine Pflegekraft einladen können und Bewerbungen erhalten, brauchen die Pflegekräfte noch ein paar Angaben zu Ihrer Pflegesituation. Das müssen Sie aber nicht allein ausfüllen: Antworten Sie einfach kurz mit einer Uhrzeit, die Ihnen passt – oder rufen Sie mich direkt an unter 089 200 000 830. Wir gehen die Angaben in keine 5 Minuten zusammen durch.
+Rufen Sie mich einfach an — 089 200 000 830 — oder schreiben Sie mir per WhatsApp (https://wa.me/4989200000830), wann es Ihnen passt.
 
-Oder direkt selbst ausfüllen (nur 2 Minuten): ${portalUrl}
+Oder gleich selbst ausfüllen: ${portalUrl}
 
-Ich bin Mo–So von 8 bis 20 Uhr für Sie da.
+PS: Klappt im Portal etwas nicht, oder möchten Sie das lieber persönlich klären? Sie erreichen mich unter 089 200 000 830 oder per WhatsApp (https://wa.me/4989200000830).
+
+Mit freundlichen Grüßen
+Ilka Wysocki
+
+---
+Primundus Deutschland | +49 89 200 000 830 | www.primundus.de`;
+}
+
+// Tag-7: kurzer ehrlicher Einstieg + drei nuetzliche Infos, kein Druck.
+function buildProfilNudge3Html(lead: Lead, siteUrl: string, portalBase: string): string {
+  const portalUrl = (portalBase && lead.token) ? buildPortalUrl(portalBase, lead.token) : siteUrl;
+  const halloAnrede = buildHalloAnrede(lead.anrede_text || null, lead.nachname || "", lead.vorname || "");
+  const li = 'p style="font-size:14.5px;line-height:1.7;color:#444;margin:0 0 10px;"';
+  const content = `
+    <p style="font-size:15px;line-height:1.75;color:#444;margin-bottom:14px;">${halloAnrede},</p>
+    <p style="font-size:15px;line-height:1.75;color:#444;margin-bottom:14px;">vor einer Woche hatten Sie Ihr Angebot für die 24-Stunden-Betreuung erhalten &ndash; ich weiß nicht, wo Sie gerade stehen, deshalb nur drei Dinge, die den meisten Familien jetzt helfen:</p>
+    <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="margin:0 0 16px;background:#FAF8F4;border:1px solid #ECE3D4;border-radius:10px;"><tr><td style="padding:16px 20px;">
+      <${li}><strong>Der Pflegegrad zahlt mit</strong> &ndash; ab Pflegegrad 2 gibt es monatlich Pflegegeld.</p>
+      <${li}><strong>Verhinderungspflege nutzen</strong> &ndash; zusammen mit der Kurzzeitpflege bis zu 3.539&nbsp;&euro; im Jahr.</p>
+      <p style="font-size:14.5px;line-height:1.7;color:#444;margin:0;"><strong>Vorlauf einplanen</strong> &ndash; zwischen Anfrage und Anreise liegen meist 1&ndash;2 Wochen.</p>
+    </td></tr></table>
+    <p style="font-size:15px;line-height:1.75;color:#444;margin-bottom:14px;">Und falls Sie neugierig sind, welche Pflegekräfte Sie bekommen könnten: Reinschauen und vergleichen ist unverbindlich &ndash; passt eine nicht, bekommen Sie einfach weitere Vorschläge. Ein Vertrag entsteht erst, wenn Sie Ihre Pflegekraft gefunden haben.</p>
+    ${bulletproofButton(portalUrl, "Pflegekräfte ansehen&nbsp;&nbsp;&rarr;", "#2A9D5C")}
+    <p style="font-size:13px;line-height:1.6;color:#888;margin:18px 0 0;">PS: Klappt im Portal etwas nicht, oder möchten Sie das lieber persönlich klären? Sie erreichen mich unter <a href="tel:+4989200000830" style="color:#8B7355;text-decoration:none;">089&nbsp;200&nbsp;000&nbsp;830</a> oder per <a href="https://wa.me/4989200000830" style="color:#8B7355;text-decoration:none;">WhatsApp</a>.</p>
+    ${buildIlkaSig(siteUrl)}`;
+  return buildEmailWrapper(lead, siteUrl, content);
+}
+
+function buildProfilNudge3Text(lead: Lead, siteUrl: string, portalBase: string): string {
+  const portalUrl = (portalBase && lead.token) ? buildPortalUrl(portalBase, lead.token) : siteUrl;
+  const halloAnrede = buildHalloAnrede(lead.anrede_text || null, lead.nachname || "", lead.vorname || "");
+  return `${halloAnrede},
+
+vor einer Woche hatten Sie Ihr Angebot für die 24-Stunden-Betreuung erhalten — ich weiß nicht, wo Sie gerade stehen, deshalb nur drei Dinge, die den meisten Familien jetzt helfen:
+
+- Der Pflegegrad zahlt mit — ab Pflegegrad 2 gibt es monatlich Pflegegeld.
+- Verhinderungspflege nutzen — zusammen mit der Kurzzeitpflege bis zu 3.539 € im Jahr.
+- Vorlauf einplanen — zwischen Anfrage und Anreise liegen meist 1–2 Wochen.
+
+Und falls Sie neugierig sind, welche Pflegekräfte Sie bekommen könnten: Reinschauen und vergleichen ist unverbindlich — passt eine nicht, bekommen Sie einfach weitere Vorschläge. Ein Vertrag entsteht erst, wenn Sie Ihre Pflegekraft gefunden haben.
+
+Pflegekräfte ansehen: ${portalUrl}
+
+PS: Klappt im Portal etwas nicht, oder möchten Sie das lieber persönlich klären? Sie erreichen mich unter 089 200 000 830 oder per WhatsApp (https://wa.me/4989200000830).
+
+Mit freundlichen Grüßen
+Ilka Wysocki
+
+---
+Primundus Deutschland | +49 89 200 000 830 | www.primundus.de`;
+}
+
+// Tag-49: Wechsel-Fenster (nach 6–8 Wochen erster Pflegekraft-Wechsel) — Info-Ton.
+function buildReaktivierungWechselHtml(lead: Lead, siteUrl: string, portalBase: string): string {
+  const portalUrl = (portalBase && lead.token) ? buildPortalUrl(portalBase, lead.token) : siteUrl;
+  const halloAnrede = buildHalloAnrede(lead.anrede_text || null, lead.nachname || "", lead.vorname || "");
+  const content = `
+    <p style="font-size:15px;line-height:1.75;color:#444;margin-bottom:14px;">${halloAnrede},</p>
+    <p style="font-size:15px;line-height:1.75;color:#444;margin-bottom:14px;">vielleicht haben Sie längst eine Betreuung gefunden &ndash; dann wünsche ich Ihnen alles Gute damit. Ich melde mich, weil nach sechs bis acht Wochen meist der <strong>erste Wechsel der Pflegekraft</strong> ansteht. Falls Sie dann vergleichen möchten: Bei uns sehen Sie jederzeit unverbindlich, wer aktuell verfügbar wäre &ndash; ab wann, zu welchem Preis, mit Bestpreis-Garantie. Ein Vertrag entsteht erst, wenn Sie wirklich jemanden gefunden haben.</p>
+    ${bulletproofButton(portalUrl, "Aktuelle Pflegekräfte ansehen&nbsp;&nbsp;&rarr;", "#2A9D5C")}
+    <p style="font-size:13px;line-height:1.6;color:#888;margin:18px 0 0;">PS: Klappt im Portal etwas nicht, oder möchten Sie das lieber persönlich klären? Sie erreichen mich unter <a href="tel:+4989200000830" style="color:#8B7355;text-decoration:none;">089&nbsp;200&nbsp;000&nbsp;830</a> oder per <a href="https://wa.me/4989200000830" style="color:#8B7355;text-decoration:none;">WhatsApp</a>.</p>
+    ${buildIlkaSig(siteUrl)}`;
+  return buildEmailWrapper(lead, siteUrl, content);
+}
+
+function buildReaktivierungWechselText(lead: Lead, siteUrl: string, portalBase: string): string {
+  const portalUrl = (portalBase && lead.token) ? buildPortalUrl(portalBase, lead.token) : siteUrl;
+  const halloAnrede = buildHalloAnrede(lead.anrede_text || null, lead.nachname || "", lead.vorname || "");
+  return `${halloAnrede},
+
+vielleicht haben Sie längst eine Betreuung gefunden — dann wünsche ich Ihnen alles Gute damit. Ich melde mich, weil nach sechs bis acht Wochen meist der erste Wechsel der Pflegekraft ansteht. Falls Sie dann vergleichen möchten: Bei uns sehen Sie jederzeit unverbindlich, wer aktuell verfügbar wäre — ab wann, zu welchem Preis, mit Bestpreis-Garantie. Ein Vertrag entsteht erst, wenn Sie wirklich jemanden gefunden haben.
+
+Aktuelle Pflegekräfte ansehen: ${portalUrl}
+
+PS: Klappt im Portal etwas nicht, oder möchten Sie das lieber persönlich klären? Sie erreichen mich unter 089 200 000 830 oder per WhatsApp (https://wa.me/4989200000830).
 
 Mit freundlichen Grüßen
 Ilka Wysocki
@@ -1334,7 +1384,7 @@ function reminderBadgeStyle(level?: string | null): { label: string; gradient: s
 // interest bleibt 1-stufig. Tier steuert Intro-Wording, CTA-Text und ob
 // ein prominenter "Schnell Bescheid geben"-Block (WhatsApp + Phone)
 // eingeblendet wird.
-type ReminderTier = "1h" | "4h" | "12h" | "46h";
+type ReminderTier = "1h" | "4h" | "12h" | "70h";
 
 // Reminder-Mail-HTML. Beide Varianten (interest / application) teilen sich
 // dasselbe Layout — nur Subject, Intro, Action-Satz + CTA-Text unterscheiden
@@ -1423,38 +1473,37 @@ function buildReminderHtml(
   let introHtml: string;
   let middleHtml: string;
   let ctaText: string;
-  const PpassT = `So weiß ${firstName}, woran sie ist, und Sie erhalten bei Bedarf gerne weitere Bewerbungen.`;
   if (variant === "interest") {
-    introHtml = `<p style="font-size:15px;line-height:1.75;color:#444;margin-bottom:18px;">vor einer Stunde haben wir Ihnen geschrieben, dass <strong style="color:#2D1F0F;">${cgName}</strong> Interesse an Ihrer Anfrage hat. Eine kurze Erinnerung — die nächsten Stunden zählen:</p>`;
-    middleHtml = `<p style="font-size:15px;line-height:1.75;color:#444;margin-bottom:20px;">Pflegekräfte mit guten Profilen werden häufig schnell von anderen Familien angefragt. <strong style="color:#2D1F0F;">Damit ${firstName} für Sie verfügbar bleibt</strong>, schauen Sie sich ihr Profil jetzt an und laden Sie sie ein, sich bei Ihnen zu bewerben.</p>`;
+    introHtml = `<p style="font-size:15px;line-height:1.75;color:#444;margin-bottom:18px;">vorhin haben wir Ihnen geschrieben, dass <strong style="color:#2D1F0F;">${cgName}</strong> gern für Sie da wäre.</p>`;
+    middleHtml = `<p style="font-size:15px;line-height:1.75;color:#444;margin-bottom:20px;">Schauen Sie sich ihr Profil in Ruhe im Portal an — wenn ${firstName} Ihnen zusagt, laden Sie sie mit einem Klick ein, sich bei Ihnen zu bewerben. Und wenn nicht, ist das auch völlig okay: Ein kurzes Nein hilft ${firstName} mehr als Warten.</p>`;
     ctaText = "Profil ansehen und einladen →";
   } else if (tier === "1h") {
     introHtml = `<p style="font-size:15px;line-height:1.75;color:#444;margin-bottom:18px;">konnten Sie sich schon mit <strong style="color:#2D1F0F;">${firstName}s Bewerbung</strong> beschäftigen?</p>`;
-    middleHtml = `<p style="font-size:15px;line-height:1.75;color:#444;margin-bottom:20px;">Teilen Sie mir gern kurz mit, ob ${firstName} zu Ihnen passt oder nicht. ${PpassT}</p>`;
+    middleHtml = `<p style="font-size:15px;line-height:1.75;color:#444;margin-bottom:20px;">Im Portal können Sie ${firstName} mit einem Klick zu- oder absagen — und falls sie nicht passt, schlage ich Ihnen gern jemand anderen vor.</p>`;
     ctaText = `${firstName}s Bewerbung ansehen →`;
   } else if (tier === "4h") {
-    introHtml = `<p style="font-size:15px;line-height:1.75;color:#444;margin-bottom:18px;">konnten Sie schon einen Blick auf <strong style="color:#2D1F0F;">${firstName}s Bewerbung</strong> werfen?</p>`;
-    middleHtml = `<p style="font-size:15px;line-height:1.75;color:#444;margin-bottom:20px;">Teilen Sie mir gern kurz mit, ob sie zu Ihnen passt oder nicht. ${PpassT}</p>`;
+    introHtml = `<p style="font-size:15px;line-height:1.75;color:#444;margin-bottom:18px;">falls Sie noch unsicher sind: Im Portal finden Sie <strong style="color:#2D1F0F;">${firstName}s vollständiges Profil</strong> mit allen Konditionen — von den Kosten bis zum Anreisetermin.</p>`;
+    middleHtml = `<p style="font-size:15px;line-height:1.75;color:#444;margin-bottom:20px;">Ein Klick auf Zusagen oder Absagen genügt.</p>`;
     ctaText = `${firstName}s Bewerbung ansehen →`;
   } else if (tier === "12h") {
-    introHtml = `<p style="font-size:15px;line-height:1.75;color:#444;margin-bottom:18px;"><strong style="color:#2D1F0F;">${firstName}s Bewerbung</strong> wartet noch auf Ihre Rückmeldung.</p>`;
-    middleHtml = `<p style="font-size:15px;line-height:1.75;color:#444;margin-bottom:20px;">Teilen Sie mir gern kurz mit, ob ${firstName} zu Ihnen passt oder nicht. So weiß ${firstName}, woran sie ist. Und wenn Sie unsicher sind, berate ich Sie natürlich gerne persönlich.</p>`;
+    introHtml = `<p style="font-size:15px;line-height:1.75;color:#444;margin-bottom:18px;">ich wollte einmal nachhören, wie Ihnen <strong style="color:#2D1F0F;">${firstName}s Bewerbung</strong> gefällt.</p>`;
+    middleHtml = `<p style="font-size:15px;line-height:1.75;color:#444;margin-bottom:20px;">Vielleicht hatten Sie noch keine ruhige Minute — das ist völlig in Ordnung. Ein Klick im Portal genügt, Ja oder Nein — alles Weitere übernehme ich.</p>`;
     ctaText = `${firstName}s Bewerbung ansehen →`;
   } else {
-    // tier === "46h" — letzte Erinnerung vor dem automatischen Freigeben
+    // tier === "70h" — letzte Erinnerung vor dem automatischen Freigeben
     // (~2h später durch den Auto-Reject). Positiv gerahmt: Barbara nicht
     // unnötig warten lassen; weitere Vorschläge nur auf Wunsch.
     introHtml = `<p style="font-size:15px;line-height:1.75;color:#444;margin-bottom:18px;">passt <strong style="color:#2D1F0F;">${firstName}</strong> zu Ihnen?</p>`;
-    middleHtml = `<p style="font-size:15px;line-height:1.75;color:#444;margin-bottom:20px;">Teilen Sie mir gern kurz mit, ob ja oder nein. Wenn ich nichts von Ihnen höre, gebe ich ${firstName} in den nächsten Stunden wieder frei, damit sie nicht unnötig wartet. Möchten Sie weitere Pflegekräfte sehen? Dann melden Sie sich einfach kurz bei uns.</p>`;
+    middleHtml = `<p style="font-size:15px;line-height:1.75;color:#444;margin-bottom:20px;">Sagen Sie ihr im Portal kurz zu oder ab. Wenn ich nichts von Ihnen höre, gebe ich ${firstName} in den nächsten Stunden wieder frei, damit sie nicht unnötig wartet. Und wenn Sie lieber andere Vorschläge möchten, melden Sie sich einfach kurz — ich kümmere mich.</p>`;
     ctaText = `${firstName}s Bewerbung ansehen →`;
   }
 
   // Interest behält den dezenten Soft-Out unter dem CTA. Application
   // braucht ihn nicht mehr — der "passt nicht?"-Hinweis steckt jetzt
   // direkt in middleHtml ("an- oder ablehnen / auf diese Mail antworten").
-  const softOut = variant === "interest"
-    ? `<p style="font-size:13px;line-height:1.6;color:#888;margin:18px 0 0;font-style:italic;">Falls ${firstName} nicht zu Ihnen passt, lehnen Sie sie im Portal kurz ab — so weiß sie Bescheid und kann sich auf andere Familien konzentrieren.</p>`
-    : "";
+  // Ilka als Rettungsanker in ALLEN Mails (Martin, 20.07.): Portal ist der
+  // Hauptweg, der PS-Hinweis der persönliche Fallback.
+  const softOut = `<p style="font-size:13px;line-height:1.6;color:#888;margin:18px 0 0;">PS: Klappt im Portal etwas nicht, oder möchten Sie das lieber persönlich klären? Sie erreichen mich unter <a href="tel:+4989200000830" style="color:#8B7355;text-decoration:none;">089&nbsp;200&nbsp;000&nbsp;830</a> oder per <a href="https://wa.me/4989200000830" style="color:#8B7355;text-decoration:none;">WhatsApp</a>.</p>`;
 
   // Aufbau wie eine persönliche Nachricht: Begrüßung → kurze Situation →
   // kompakte Pflegekraft-Box (mit "Profil ansehen"-Button) → freundliche
@@ -1488,13 +1537,13 @@ function buildReminderText(
   if (variant === "interest") {
     return `${halloAnrede},
 
-vor einer Stunde haben wir Ihnen geschrieben, dass ${cgName} Interesse an Ihrer Anfrage hat. Eine kurze Erinnerung — die nächsten Stunden zählen:
+vorhin haben wir Ihnen geschrieben, dass ${cgName} gern für Sie da wäre.
 
-Pflegekräfte mit guten Profilen werden häufig schnell von anderen Familien angefragt. Damit ${firstName} für Sie verfügbar bleibt, schauen Sie sich ihr Profil jetzt an und laden Sie sie ein, sich bei Ihnen zu bewerben.
+Schauen Sie sich ihr Profil in Ruhe im Portal an — wenn ${firstName} Ihnen zusagt, laden Sie sie mit einem Klick ein, sich bei Ihnen zu bewerben. Und wenn nicht, ist das auch völlig okay: Ein kurzes Nein hilft ${firstName} mehr als Warten.
 
 Profil ansehen und einladen: ${portalUrl}
 
-Falls ${firstName} nicht zu Ihnen passt, lehnen Sie sie im Portal kurz ab — so weiß sie Bescheid und kann sich auf andere Familien konzentrieren.
+PS: Klappt im Portal etwas nicht, oder möchten Sie das lieber persönlich klären? Sie erreichen mich unter 089 200 000 830 oder per WhatsApp (https://wa.me/4989200000830).
 
 Mit freundlichen Grüßen
 Ilka Wysocki — Pflegeberaterin
@@ -1508,20 +1557,19 @@ Primundus Deutschland | www.primundus.de
   // "Kundenportal"-Wording (der Link führt direkt hin), keine Drohkulisse.
   let intro: string;
   let body: string;
-  const passT = `So weiß ${firstName}, woran sie ist, und Sie erhalten bei Bedarf gerne weitere Bewerbungen.`;
   if (tier === "1h") {
     intro = `konnten Sie sich schon mit ${firstName}s Bewerbung beschäftigen?`;
-    body = `Teilen Sie mir gern kurz mit, ob ${firstName} zu Ihnen passt oder nicht. ${passT}`;
+    body = `Im Portal können Sie ${firstName} mit einem Klick zu- oder absagen — und falls sie nicht passt, schlage ich Ihnen gern jemand anderen vor.`;
   } else if (tier === "4h") {
-    intro = `konnten Sie schon einen Blick auf ${firstName}s Bewerbung werfen?`;
-    body = `Teilen Sie mir gern kurz mit, ob sie zu Ihnen passt oder nicht. ${passT}`;
+    intro = `falls Sie noch unsicher sind: Im Portal finden Sie ${firstName}s vollständiges Profil mit allen Konditionen — von den Kosten bis zum Anreisetermin.`;
+    body = `Ein Klick auf Zusagen oder Absagen genügt.`;
   } else if (tier === "12h") {
-    intro = `${firstName}s Bewerbung wartet noch auf Ihre Rückmeldung.`;
-    body = `Teilen Sie mir gern kurz mit, ob ${firstName} zu Ihnen passt oder nicht. So weiß ${firstName}, woran sie ist. Und wenn Sie unsicher sind, berate ich Sie natürlich gerne persönlich.`;
+    intro = `ich wollte einmal nachhören, wie Ihnen ${firstName}s Bewerbung gefällt.`;
+    body = `Vielleicht hatten Sie noch keine ruhige Minute — das ist völlig in Ordnung. Ein Klick im Portal genügt, Ja oder Nein — alles Weitere übernehme ich.`;
   } else {
-    // tier === "46h" — letzte Erinnerung; weitere Vorschläge nur auf Wunsch.
+    // tier === "70h" — letzte Erinnerung; weitere Vorschläge nur auf Wunsch.
     intro = `passt ${firstName} zu Ihnen?`;
-    body = `Teilen Sie mir gern kurz mit, ob ja oder nein. Wenn ich nichts von Ihnen höre, gebe ich ${firstName} in den nächsten Stunden wieder frei, damit sie nicht unnötig wartet. Möchten Sie weitere Pflegekräfte sehen? Dann melden Sie sich einfach kurz bei uns.`;
+    body = `Sagen Sie ihr im Portal kurz zu oder ab. Wenn ich nichts von Ihnen höre, gebe ich ${firstName} in den nächsten Stunden wieder frei, damit sie nicht unnötig wartet. Und wenn Sie lieber andere Vorschläge möchten, melden Sie sich einfach kurz — ich kümmere mich.`;
   }
 
   const infoBits: string[] = [];
@@ -1537,6 +1585,8 @@ ${body}
 
 ${cgName}${infoLine}
 ${firstName}s Profil ansehen: ${portalUrl}
+
+PS: Klappt im Portal etwas nicht, oder möchten Sie das lieber persönlich klären? Sie erreichen mich unter 089 200 000 830 oder per WhatsApp (https://wa.me/4989200000830).
 
 Mit freundlichen Grüßen
 Ilka Wysocki — Pflegeberaterin
@@ -1799,7 +1849,9 @@ Deno.serve(async (req: Request) => {
         // ist das Ziel erreicht und der Nudge cancelt sich selbst.
         const isProfilNudge =
           scheduledEmail.email_type === "profil_nudge_1" ||
-          scheduledEmail.email_type === "profil_nudge_2";
+          scheduledEmail.email_type === "profil_nudge_2" ||
+          scheduledEmail.email_type === "profil_nudge_3" ||
+          scheduledEmail.email_type === "reaktivierung_wechsel";
 
         // Lead-Meilenstein aus den CA-App-Events (portal_opened, patient_data_saved,
         // caregiver_invited) \u2014 steuert die Nachfass-Variante + den Abbruch.
@@ -1936,17 +1988,29 @@ Deno.serve(async (req: Request) => {
           eventTypeSent = "email_nachfass_3_sent";
           eventTypeFailed = "email_nachfass_3_failed";
         } else if (scheduledEmail.email_type === "profil_nudge_1") {
-          subject = "5 passende Pflegekräfte warten auf Sie";
+          subject = "Möchten Sie sehen, welche Pflegekräfte gerade verfügbar sind?";
           html = buildProfilNudge1Html(lead as Lead, smtpConfig.siteUrl, portalBase);
           text = buildProfilNudge1Text(lead as Lead, smtpConfig.siteUrl, portalBase);
           eventTypeSent = "email_profil_nudge_1_sent";
           eventTypeFailed = "email_profil_nudge_1_failed";
         } else if (scheduledEmail.email_type === "profil_nudge_2") {
-          subject = "Soll ich Ihnen beim Ausfüllen helfen?";
+          subject = "Soll ich das mit Ihnen zusammen machen?";
           html = buildProfilNudge2Html(lead as Lead, smtpConfig.siteUrl, portalBase);
           text = buildProfilNudge2Text(lead as Lead, smtpConfig.siteUrl, portalBase);
           eventTypeSent = "email_profil_nudge_2_sent";
           eventTypeFailed = "email_profil_nudge_2_failed";
+        } else if (scheduledEmail.email_type === "profil_nudge_3") {
+          subject = "Wie ist Ihr Stand?";
+          html = buildProfilNudge3Html(lead as Lead, smtpConfig.siteUrl, portalBase);
+          text = buildProfilNudge3Text(lead as Lead, smtpConfig.siteUrl, portalBase);
+          eventTypeSent = "email_profil_nudge_3_sent";
+          eventTypeFailed = "email_profil_nudge_3_failed";
+        } else if (scheduledEmail.email_type === "reaktivierung_wechsel") {
+          subject = "Steht bei Ihnen der erste Wechsel an?";
+          html = buildReaktivierungWechselHtml(lead as Lead, smtpConfig.siteUrl, portalBase);
+          text = buildReaktivierungWechselText(lead as Lead, smtpConfig.siteUrl, portalBase);
+          eventTypeSent = "email_reaktivierung_wechsel_sent";
+          eventTypeFailed = "email_reaktivierung_wechsel_failed";
         } else if (scheduledEmail.email_type === "neue_pflegekraefte_verfuegbar") {
           subject = "Neue Pflegekräfte für Sie";
           html = buildNeuePflegekraefteHtml(lead as Lead, smtpConfig.siteUrl, portalBase);
@@ -2028,20 +2092,20 @@ Deno.serve(async (req: Request) => {
           const tier: ReminderTier =
             scheduledEmail.email_type === "application_reminder_4h" ? "4h"
             : scheduledEmail.email_type === "application_reminder_12h" ? "12h"
-            : scheduledEmail.email_type === "application_last_chance" ? "46h"
+            : scheduledEmail.email_type === "application_last_chance" ? "70h"
             : "1h";
           const cgName = meta.caregiver_name || "Ihre Pflegekraft";
           const firstName = cgName.split(/\s+/)[0] || cgName;
           if (variant === "interest") {
-            subject = `${firstName} wartet auf Ihre Rückmeldung`;
+            subject = `${firstName} würde sich gern bei Ihnen vorstellen`;
           } else if (tier === "1h") {
-            subject = `${firstName} wartet auf Ihre Entscheidung`;
+            subject = `Haben Sie ${firstName}s Bewerbung schon gesehen?`;
           } else if (tier === "4h") {
-            subject = `${firstName}: bitte kurz Bescheid geben`;
+            subject = `Kurze Frage zu ${firstName}`;
           } else if (tier === "12h") {
-            subject = `${firstName}: ist die Bewerbung noch aktuell?`;
+            subject = `Wie ist Ihr Eindruck von ${firstName}?`;
           } else {
-            subject = `${firstName}: letzte Erinnerung — wir schließen die Bewerbung bald`;
+            subject = `Bevor ich ${firstName} wieder freigebe …`;
           }
 
           // Portal-URL mit Token bauen. Bewerbungs-Reminder springen per
@@ -2167,11 +2231,13 @@ Deno.serve(async (req: Request) => {
           // `angebot` bleibt für evtl. eingeplante Alt-Rows ebenfalls als Anker.
           // Sequenz (Profil-Abbruch-optimiert, Stand 15.06.2026):
           //   0h    Eingangsbestätigung
-          //   +4h   profil_nudge_1  ("5 Pflegekräfte warten", Neugier)
-          //   +28h  profil_nudge_2  ("Ich helf am Telefon", persönlich)
+          //   +4h   profil_nudge_1  (das Warum: ohne Profil keine Bewerbungen)
+          //   +28h  profil_nudge_2  ("Soll ich Ihnen beim Ausfüllen helfen?")
           //   +48h  warum_primundus (Trust/Bestpreis)
           //   +72h  nachfass_2      (kurze persönliche Nachfrage)
           //   +120h nachfass_3      (Break-up, mailto-Buttons)
+          //   +7d   profil_nudge_3  (Reaktivierung: nützliche Infos, kein Druck)
+          //   +49d  reaktivierung_wechsel (Wechsel-Fenster nach 6–8 Wochen)
           // nachfass_1 wurde durch die zwei dedizierten Profil-Nudges
           // ersetzt (war generisch + kollidierte zeitlich). Der nachfass_1-
           // Handler bleibt für evtl. noch eingeplante Alt-Rows.
@@ -2182,6 +2248,8 @@ Deno.serve(async (req: Request) => {
             await scheduleFollowUp(supabase, lead as Lead, "profil_nudge_2", 28 * 60);
             await scheduleFollowUp(supabase, lead as Lead, "warum_primundus", 48 * 60);
             await scheduleFollowUp(supabase, lead as Lead, "nachfass_2", 72 * 60);
+            await scheduleFollowUp(supabase, lead as Lead, "profil_nudge_3", 7 * 24 * 60);
+            await scheduleFollowUp(supabase, lead as Lead, "reaktivierung_wechsel", 49 * 24 * 60);
           } else if (scheduledEmail.email_type === "nachfass_2") {
             await scheduleFollowUp(supabase, lead as Lead, "nachfass_3", 48 * 60);
           }

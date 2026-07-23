@@ -421,6 +421,8 @@ CA app → Mamamia:
 | `onboard-to-mamamia/onboard.ts` | StoreCustomer + StoreJobOffer + Locations(search) flow |
 | `onboard-to-mamamia/mappers.ts` | **formularDaten → Mamamia input** (`buildCustomerInput`, `buildPatients`, `buildCaregiverWish`, `mapNightOperations`, `mapMobilityToId`, etc.) |
 | `onboard-to-mamamia/types.ts` | `FormularDaten`, `Lead`, `CustomerInput`, `CaregiverWishInput` |
+| `sync-acceptance/index.ts` | **Server-to-server only** (Bearer = SERVICE_ROLE_KEY) — sekwencja akceptu po podpisie (gotcha #12), triggerowana przez bridge |
+| `_shared/acceptanceSync.ts` | Moduł sekwencji 1→4 (UpdateCustomer→StoreConfirmation→PDF→upload z bramką) — współdzielony przez sync-acceptance i detect-cron (retry) |
 | `mamamia-proxy/index.ts` | HTTP handler — verify session + dispatch action + run GraphQL |
 | `mamamia-proxy/actions.ts` | Whitelisted actions (`getCustomer`, `updateCustomer`, `listMatchings`, `inviteCaregiver`, `rejectApplication`, `storeConfirmation`, etc.). Każda waliduje ownership przez `session.customer_id` |
 | `mamamia-proxy/operations.ts` | GraphQL queries/mutations (`GET_CUSTOMER`, `UPDATE_CUSTOMER`, `PRESERVE_QUERY`, etc.) |
@@ -663,6 +665,79 @@ query `CustomerToken(id)`). Cel: zespół MM może otworzyć portal klienta po t
   Wykonuje się tylko przy cache-miss. Kod: `onboard-to-mamamia/onboard.ts:pushCustomerToken`
   + `UPDATE_CUSTOMER_TOKEN`.
 
+### 12. Akcept aplikacji — SERVER-SIDE sekwencja (sync-acceptance), nie przeglądarka
+
+Od refactoru 2026-07-22 przeglądarka po podpisie robi **jeden POST** do bridge'a;
+sekwencję wykonuje edge fn `sync-acceptance` (+ cron detect jako gwarant/retry):
+**1.** UpdateCustomer(customer_contract z formularza konfirmacji) → **2.** StoreConfirmation
+→ **3.** render PDF (`/api/contract-pdf`) → **4.** upload do MM (StoreFile→UpdateConfirmation)
+**dopiero gdy MM przetworzyła confirmation** (final_confirmation widoczne) → **5.** maile
+(bridge, niezmienione). Szczegóły + guardy idempotencji (adopcja po caregiver-match,
+skip_confirm dla starych bundli, stemple `mamamia_*`): [docs/vertrag-flow.md](docs/vertrag-flow.md).
+
+- **NIGDY nie wołaj StoreConfirmation dwa razy** — najpierw guard na
+  `Customer.job_offers[].final_confirmation` (Mamamia usuwa przetworzoną aplikację
+  z listy w sekundy — ownership kotwiczy się na confirmation, nie aplikacji).
+- Upload pliku przed przetworzeniem confirmation = błąd — bramka jest twardym wymogiem.
+- Magic-bytes `%PDF-` przed każdym uploadem (renderer ma HTML-fallback).
+- Mapowanie niemieckie→Mamamia (SALUTATION enum Mr./Mrs. — „Fall Diesmann", split
+  einsatzort) żyje w `_shared/acceptanceSync.ts` — NIE duplikować we froncie.
+- **Dryf walidacji beta↔preprod na `patients[]`** (2026-07-22, klasa Bug #16): beta
+  odrzuca `patients: []` w UpdateCustomer („Das Feld patients ist erforderlich"),
+  preprod toleruje (notatka proxy 2026-05-14). Bezpieczne na OBU tenantach: non-empty
+  stuby `{id, tool_ids}` (przy okazji preserve tools, gotcha #13b). Tak robi
+  `acceptanceSync`; proxy `updateCustomer` z `[]` działa, bo prod == preprod — ale
+  przy każdym nowym narrow-write używaj stubów.
+- **Trzy osoby z konfirmacji → NATYWNE sloty klienta MM** (2026-07-21, Customer 8394
+  beta): krok 1 sekwencji pisze LE → `patient_contracts[{contact_type:
+  "patient_contact"}]`, AG → `invoice_contract{contact_type:"contract_contact"}` (Person
+  für den Vertrag/Rechnung), KP → `customer_contacts[]`. **`location_id` per wiersz z
+  JEGO własnego PLZ** (Stadt-dropdown panelu czyta location_id, nie tekst; metoda 1:1
+  jak główna lokalizacja klienta = `LocationsWithPagination(search: PLZ)` → pierwszy
+  DE; AG mieszka niekoniecznie pod adresem opieki — 34117 vs 34123, feedback Michała);
+  LE-fallback: carry z istniejącego contractu (MM REPLACES listę). Typ `Location` ma
+  pole **`location`**, NIE `name` — zła selekcja wygląda jak pusty wynik. **NIGDY singular `customer_contract`**
+  — MM typuje pierwszy wiersz plurala jako patient_contact, więc AG-dane lądują w
+  slocie pacjenta/lokalizacji opieki (pierwotny bug: „3 osoby w formularzu, w mamamii
+  jedna"). **ZAWSZE jawne flagi `is_same_as_first_patient`/`is_same_as_contact`** —
+  bez nich MM defaultuje `true` i LUSTRUJE dane pacjenta w wiersz przy kolejnych
+  UpdateCustomer (panel: zahaczone „Die Daten sind die gleichen wie die des
+  Patienten"). Wyjątek: `agGleich` (AG==LE, snapshot.le===null lub brak snapshotu) ⇒
+  `is_same_as_first_patient: true` na invoice_contract (uczciwy spiegel). Schema-parity:
+  prod dogonił betę — plural args + `customer_contacts` są na OBU tenantach
+  (walidacyjna sonda z `$nope`, 2026-07-21).
+- **JEDEN kanoniczny PDF umowy** (Michał 2026-07-21: „generować 1 PDF, wysyłać go do
+  klienta, do nas i na serwer. 1 i ten sam, niezmieniany plik"): bridge renderuje
+  umowę RAZ przy akcepcie → bajty w Storage `contracts/<lead>/<app>.pdf` (bucket
+  prywatny, migracja 20260722190000) + sha256 w `pdf_sha256`. Mail C, mail teamowy,
+  portal (`/api/contract-pdf`, bucket-first) i upload do MM używają TYCH SAMYCH
+  bajtów; sync weryfikuje sha przed uploadem (mismatch ⇒ defer, nie podmienia).
+  Zeitstempel na dokumencie = `signed_at` wiersza w **Europe/Berlin**
+  (`formatSignedAtBerlin` w `project 3/lib/vertrag.ts`) — NIGDY `getHours()`
+  (serwer działa w UTC; stąd były dwie umowy z godzinami 17:00 vs 19:00), NIGDY
+  etykieta z przeglądarki, NIGDY czas renderu. Render-fallback zostaje tylko dla
+  alt-wierszy sprzed kanonu.
+- **Retry-chain zamiast czekania na cron** (Michał 2026-07-21: „zwykły retry po 15-30
+  i 60 sekundach", „cron to słaby pomysł"): niekompletny pierwszy przebieg (typowo:
+  PDF czeka na bramkę przetworzenia) ⇒ sync-acceptance odpowiada od razu i przez
+  `EdgeRuntime.waitUntil` odpala w tle łańcuch **+15s → +30s → +60s** (`RETRY_DELAYS_MS`);
+  każda stufa czyta wiersz świeżo i wykonuje pełną sekwencję. Efekt: confirm+PDF w MM
+  ≤ ~2 min po podpisie. Cron detect (15 min) = WYŁĄCZNIE backstop (śmierć procesu,
+  dłuższa awaria MM). Permanent confirm-error ⇒ chain się NIE odpala (bridge alarmuje T+0).
+- **Polityka alarmowa** (Michał 2026-07-21: klient NIGDY nie może wierzyć w obstawione
+  zlecenie bez confirmation w MM, np. po wycofaniu Bewerbung przez agencję):
+  StoreConfirmation-error jest klasyfikowany (`graphqlErrors` na errorze = **permanent**,
+  deterministyczna odmowa MM — bez retry, alarm **T+0 z bridge'a**; network/HTTP =
+  transient — 3 próby w callu 2s+4s + retry-chain 15/30/60 s, po wyczerpaniu wciąż
+  brak confirm ⇒ **alarm ≈ T+2 min** POST-em `acceptance_sync_alarm` [source
+  `sync-retry`] do bridge'a; cron-owy próg 5 min zostaje jako niezależny bezpiecznik).
+  Confirm OK a tylko PDF wisi ⇒ alarm dopiero po 24h (archiwum, nie ryzyko klienta).
+  Kanał: team-mail przez bridge (event `acceptance_sync_alarm`, team-mail-only,
+  audit-row w lead_events); stempel `mamamia_sync_alerted_at` TYLKO po udanym mailu
+  (inaczej re-alarm). Klasyfikować WYŁĄCZNIE po strukturze błędu, nie po treści
+  komunikatu (Święta zasada 1.5). Szczegóły: [docs/vertrag-flow.md](docs/vertrag-flow.md)
+  §„Polityka alarmowa".
+
 ### 11. Opis opiekunki (`about_de`) — bierzemy z Mamamii, nie generujemy u siebie
 
 Portal pokazuje **surowy `Caregiver.about_de` z Mamamii** (już NIE generujemy bio
@@ -815,6 +890,9 @@ Wszystkie z 2026-04 → 2026-05. Lista ma być wyczerpana — jak coś znów
 | 17 | **inviteCaregiver flow padał na preprod** (2026-05-12). Frontend "Pflegekraft einladen" → proxy → `csrf-cookie` lookup pod złym hostem → DNS error: `https://prod.mamamia.app/backend/sanctum/csrf-cookie` `failed to lookup address`. Przyczyna: `derivePanelBaseUrl` w `mamamia-proxy/index.ts` zakładało że panel SPA siedzi na tym samym hoście co GraphQL API (strip `backend.` prefix + `/backend` path) — konwencja **tylko** beta. Mamamia hostuje panel SPA na **osobnym subdomain'ie** per tenant: beta=`beta.mamamia.app/backend`, preprod=`portal.mamamia.app/backend`. Nie da się tego derive'ować z `MAMAMIA_ENDPOINT` host'a — to zupełnie inny DNS record. **False-trail diagnoza (2 godziny)**: pierwsza próba fix'a wyderywowała `panelBaseUrl = origin(MAMAMIA_ENDPOINT)` → `https://backend.prod.mamamia.app` (host GraphQL API, NIE panel). Sanctum tam też ma middleware, więc cookies się ustawiały + LoginAgency zwracało 200. Ale StoreRequest → `Unauthorized` (HTTP 200 + `cat=authorization`). Błędnie zinterpretowane jako "tenant role permission gap" — eskalacja do Mamamia ops jako action item. Dopiero user otworzył panel w przeglądarce + skopiował URL z DevTools Network: `https://portal.mamamia.app/backend/graphql`. Inny host. Po przekierowaniu na właściwy URL `Unauthorized` nadal — ale przyczyna była **JobOffer.status='inactive'** dla tego konkretnego customer'a (8450, test setup), nie permission gap. Panel-mode StoreRequest wymaga active job offer. | supabase/functions/mamamia-proxy/index.ts (ProxySecrets + bootstrap), supabase/functions/_shared/mamamiaPanelClient.ts (verbose error format), supabase/functions/mamamia-proxy/_tests/handler.test.ts (SECRETS), Supabase secret `MAMAMIA_PANEL_URL` | (1) `MAMAMIA_PANEL_URL` jako **wymagany** secret (no soft fallback per Święta zasada nr 1), bootstrap throws gdy brak — wartość per-tenant ustalana przez inspekcję DevTools Network w żywym panelu Mamamii (beta=`https://beta.mamamia.app/backend`, preprod=`https://portal.mamamia.app/backend`). (2) `panelGraphQL` error format wzbogacony o `http=<status> cat=<extensions.category> cookies=<names>` — ułatwia rozróżnianie network/CSRF vs policy denial. **Lekcje:**  (a) URL endpoint'ów panel'a Mamamia jest **per-tenant, nie derywowalny** z GraphQL API URL'a — zawsze otwórz panel w przeglądarce + DevTools Network przed kodowaniem. (b) Sanctum cookies + LoginAgency 200 to NIE dowód że jesteśmy na właściwym endpoincie. `cat=authorization` może wskazywać na permission gap LUB na resource state (np. inactive job offer) LUB na sam zły endpoint — diagnoza wymaga real-panel comparison. (c) Anti-pattern: zacząć "policy denial → eskalacja do ops" przed zwykłą weryfikacją "co panel UI rzeczywiście fires" w DevTools. **Reguła do § Environment switch checklist:** krok 0 — otwórz panel SPA w przeglądarce, pobierz panel URL z DevTools, ustaw jako `MAMAMIA_PANEL_URL` secret. |
 | 16 | **Patient form save (4-stopniowy wizard) nie zapisywał po preprod switch** (2026-05-12). `getCustomer` zwracał `Cannot query field "customer_contracts" on type "Customer". Did you mean "customer_contacts" or "customer_contract"?`. Beta Mamamia ma plural `customer_contracts` (1:n contracts z `contact_type` discriminator) — prod ma legacy singular `customer_contract` (1:1). Bug #13l fix (2026-05-07) napisany pod beta extension, niedostępny w prod. Probe beta + prod schema dowodzi: singular `customer_contract` istnieje w obu środowiskach (na becie zwraca pierwszy z plural'a) i jest writable via `UpdateCustomer(customer_contract: CustomerContractInputType, ...)` w obu. Plural args (`patient_contracts`, `invoice_contract`) — beta only | supabase/functions/mamamia-proxy/operations.ts (GET_CUSTOMER + UPDATE_CUSTOMER), supabase/functions/mamamia-proxy/actions.ts (UPDATE_CUSTOMER_ALLOWED), src/lib/mamamia/types.ts (MamamiaCustomer), src/lib/mamamia/mappers.ts (reverse), src/lib/mamamia/patientFormMapper.ts (forward + MappedCustomerPatch type), 2 testy | Refactor `customer_contracts[]`/`patient_contracts[]`/`invoice_contract` → `customer_contract` (singular) wszędzie. Universal lowest-common-denominator — działa na obu środowiskach. Beta tracimy 2-contract distinction (patient_contact vs contract_contact) ale i tak pisaliśmy w oba ten sam `location_id` (zero data loss). Verified live 2026-05-12: getCustomer + UpdateCustomer + verify roundtrip działa na Customer 8420 (prod). **Lesson:** beta i prod mogą mieć schema drift — zawsze probe pełen GraphQL przed env switch zamiast ufać że Mamamia tenants są spójne. Patrz §"Environment switch checklist" → krok 5 ("Verify hardcoded IDs") + rozszerz na pełen field-probe gdy schema-related fields są pod ryzykiem. |
 | 18 | **Google Translate / browser translator → biały ekran w 5-step patient formie** (2026-05-22). User reportuje: włącza GT na kundenportal, klika "Weiter" w środku wizarda → strona blank. Klasyczny React + DOM-mutating extension crash: GT wrap'uje text-nody w `<font>` żeby je translować in-place. React reconciler trzyma referencję do oryginalnego text-noda + jego *zapamiętanego* parenta (`<p>`/`<div>`), więc gdy `step === N → N+1` triggeruje unmount konditionalnego bloku, `Node.prototype.removeChild` rzuca `DOMException: Node was not found` (child.parentNode = `<font>`, nie oryginalny parent). Throw bąbla się do root'a → cały root unmount → biała strona. **Wyłączenie GT NIE jest opcją** — niemieccy klienci mają rodzinę PL/UA/RU która używa translatora żeby pomagać. | src/lib/translateGuard.ts (NEW), src/main.tsx (install before mount), src/__tests__/translateGuard.test.ts (5 tests) | Defensive monkey-patch `Node.prototype.removeChild` + `insertBefore` — gdy `child.parentNode !== this` (= reparented przez translator), zamiast throw'a wrap'er logguje warning i no-op'uje (removeChild) lub appendChild fallback (insertBefore). Idempotent (sentinel `__caappTranslatePatched`). Install w `main.tsx` PRZED `createRoot(...)`. Standardowy workaround z facebook/react#11538 — używany przez Gatsby, w Next.js docs, large multilingual production apps. Tests symulują GT scenario przez ręczne reparenting text-node do `<font>` + assert że removeChild już nie throw'uje. **Reguła:** nigdy nie zakładać że text-nody w React tree zostaną tam gdzie React je zostawi — browser extensions (GT, password managers, ad blockers) mogą je przemiełać. Defensive DOM patch ma akceptowalny koszt (2 funkcje patch'owane raz przy mount) i ogromny upside (app survival vs white screen). |
+| 19 | **Akcept: z 3 osób formularza konfirmacji w Mamamii lądowała jedna — i to w złym slocie** (2026-07-21, Customer 8394 beta, test Michała). Krok 1 sekwencji (#396) pisał AG w singular `customer_contract` → MM typuje pierwszy wiersz plurala `customer_contracts` jako **patient_contact** → dane Auftraggebera (inny adres!) lądowały w slocie pacjenta/lokalizacji opieki; LE i KP szły tylko do Confirmation (klient-level nigdy). Do tego brak flag `is_same_as_*` → MM defaultuje `true` i przy kolejnym UpdateCustomer LUSTRUJE dane pacjenta w wiersz (nadpisała Zenobię „Test Signature"; panel: zahaczone „Die Daten sind die gleichen wie die des Patienten" — screenshot Michała). | supabase/functions/_shared/acceptanceSync.ts (SYNC_CUSTOMER_QUERY + UPDATE_CUSTOMER_CONTRACT + krok 1, `isAgGleich`), _tests/acceptanceSync.test.ts, project 3/app/api/lead-event/route.ts (502 z przyczyną mail-fail) | LE→`patient_contracts[{contact_type:"patient_contact", is_same_as_first_patient:false, is_same_as_contact:false, +location_id carry}]`, AG→`invoice_contract{contact_type:"contract_contact", is_same_as_first_patient: agGleich, is_same_as_contact:false}`, KP→`customer_contacts[{is_same_as_first_patient:false}]`; singular `customer_contract` wycięty z mutacji. Weryfikacja live na 8394 (payload 1:1) + sonda walidacyjna `$nope` na prodzie (plural args są na obu tenantach — drift z Bug #16 nadrobiony przez MM). Patrz gotcha #12 (bullet „Trzy osoby"). |
+| 20 | **Dwie różne wersje umowy z dwiema różnymi godzinami podpisu** (2026-07-21, test Michała). Umowa była renderowana DWUKROTNIE: (1) przy akcepcie do maili — z etykietą czasu OD PRZEGLĄDARKI („21.07.2026, 17:15"); (2) przy syncu/cronie do uploadu MM — świeży render z `signed_at` formatowanym `getHours()` na serwerze **UTC** → „um 17:00 Uhr" zamiast 19:00 niemieckiego. Dwa pliki, dwa czasy, oba formaty inne, jeden błędny o 2h. | project 3/lib/vertrag.ts (`formatSignedAtBerlin`), project 3/app/api/lead-event/route.ts (`getOrCreateCanonicalContract` + kanon przed sync-triggerem), project 3/app/api/contract-pdf/[leadId]/route.ts (bucket-first + TZ-fix), supabase/functions/_shared/acceptanceSync.ts (storage-first + sha-gate), migracja 20260722190000 (bucket `contracts`), testy | **JEDEN render przy akcepcie** → kanon w Storage `contracts/<lead>/<app>.pdf` + `pdf_sha256`; klient/team/MM/portal dostają TEN SAM plik; czas na dokumencie = `signed_at` w Europe/Berlin. Sync: kanon ze Storage z bramką sha (mismatch ⇒ defer); render-fallback tylko dla alt-wierszy. Patrz gotcha #12 (bullet „JEDEN kanoniczny PDF"). |
+| 21 | **Multi-job klient klika nową Bewerbung, widzi starą PK** (2026-07-22, Kunde Dachs 8899 prod, zgłoszenie teamu: „wenn er darauf klickt, erscheint immer die Bewerbung der alten PK Renata N."). Multi-job był zaimplementowany (#289–#313: lead_jobs, detect skanuje wszystkie joby, przegląd `?view=jobs`, scoping `?job=`), ale DWIE dziury zostały: (1) wejście bez deeplinka = zawsze STARY default-job (maile nie doklejają `&job=`), a link „Alle meine Einsätze" renderował się tylko przy wejściu z `?job=` — klient z maila nigdy nie odkrył drugiego joba; (2) `pickFinalConfirmedJob` fallbackował na fc DOWOLNEGO joba, a ścieżka 2 `applyAcceptedOverlay` syntetyzowała accepted z lead-weitych acceptance-rows job-blind → BookedScreen starej PK porywał layout nawet pod `?job=<nowy>`. | supabase/functions/onboard-to-mamamia/{onboard,index}.ts (`fetchNewestPlannedJob` + wybór aktywnego joba), src/lib/mamamia/mappers.ts (`pickFinalConfirmedJob` strict per session-job; path-2 gate po fc-caregiver), src/pages/CustomerPortalPage.tsx (useLeadJobs + link „Alle meine Einsätze" bez `?job=`), testy | Opcja B (decyzja Michała): wejście bez `?job=` → sesja na NAJNOWSZYM `geplant` z lead_jobs (fallback: dotychczasowy job; jawny `?job=` ma zawsze pierwszeństwo); BookedScreen tylko gdy akcept dotyczy AKTYWNEGO joba (fc sesyjnego joba); świadoma mini-luka: MM przetwarza confirmation w max ~10 s (korekta Michała 2026-07-22 — NIE minuty; „1-2 min" było artefaktem kadencji ręcznych powtórek), więc tylko reload w tym ≤10-sekundowym oknie pokazuje krótko normalny portal (samoleczące; w samym momencie akceptu trzyma optimistic local-state). Side-effect: `listLeadJobs` przy każdym wejściu odświeża spiegel lead_jobs. |
 
 ---
 
@@ -1087,7 +1165,7 @@ curl -sS -X POST "https://kostenrechner-beta.onrender.com/api/angebot-anfordern"
   -H "Content-Type: application/json" \
   -d "{
     \"vorname\": \"Test E2e\",
-    \"email\": \"e2e-${TS}@mailinator.com\",
+    \"email\": \"m.kepinski+e2e-${TS}@mamamia.app\",
     \"careStartTiming\": \"sofort\",
     \"kalkulation\": {
       \"bruttopreis\": 3200,
@@ -1144,8 +1222,13 @@ curl -sS -X POST "$SUPA_URL/functions/v1/mamamia-proxy" \
 # → {"data":{"UpdateCustomer":{"id":7641,"customer_id":"ts-18-7641"}}}
 ```
 
-Mamailinator inbox: https://www.mailinator.com/v4/public/inboxes.jsp?to=e2e-XXX
-do sprawdzenia Eingangsbestätigung.
+**Test-maile: ZAWSZE plus-alias `m.kepinski+<tag>@mamamia.app`** (konwencja
+Michała, np. `+testsignature`, `+e2e-<ts>`). **NIGDY mailinator ani inne
+publiczne disposable-skrzynki** — mamy SES (reputacja nadawcy primundus.de),
+a Eingangsbestätigung zawiera magic-link token, który w publicznej skrzynce
+jest jawny dla każdego (feedback Michała 2026-07-21, ostro). Weryfikacja
+odbioru: Michał widzi aliasy we własnej skrzynce; dowodem wysyłki po stronie
+kodu jest event `email_eingangsbestaetigung_sent` w `lead_events`.
 
 ---
 
@@ -1575,8 +1658,9 @@ to potencjalny attack vector.
 - **Admin panel:** w `project 3/app/admin/` istnieje ale nie cherry-picked
   z Marcin's fork — inny statuses.ts, inny StatusDropdown. Nie ruszać
   bez świadomej decyzji.
-- **Vertrag flow (`/betreuung-beauftragen`):** explicitly dropped w cherry-pick
-  decision. Customer flow kończy się patient form save → Mamamia matching.
-  In-app contract editing było duplikatem CA app patient form.
+- **Vertrag flow:** stary stage-B `/betreuung-beauftragen` został dropnięty w cherry-pick,
+  ALE od 06/2026 istnieje **nowy** in-portal flow podpisu (VertragSignieren + acceptance
+  + server-side sync do Mamamii) — patrz [docs/vertrag-flow.md](docs/vertrag-flow.md)
+  i gotcha #12.
 - **Migration to new Supabase project:** `ptdlgmpuqgbydglqnjgd` istnieje
   (Marcin's fork) ale nie używamy. Nasza beta na `ycdwtrklpoqprabtwahi`.

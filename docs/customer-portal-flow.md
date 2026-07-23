@@ -312,6 +312,18 @@ Jeśli `lead.mamamia_customer_id IS NOT NULL` AND `mamamia_job_offer_id IS NOT
 NULL` → return natychmiast `{ customer_id, job_offer_id }`. **Kroki ③–⑥
 poniżej lecą TYLKO przy pierwszym wejściu klienta.**
 
+**Wybór joba sesji (Multi-Job):** `job_offer_id` w sesji ≠ ślepo
+`lead.mamamia_job_offer_id`:
+1. jawny deeplink `?job=<lead_jobs.id>` (przegląd `?view=jobs`) → ten job
+   (ownership-check po lead_id; obcy/nieznany → fallback niżej) — Variant A;
+2. bez deeplinka → **AKTYWNY job = najnowszy `status='geplant'` z `lead_jobs`**
+   (Opcja B, Dachs 8899 2026-07-22 — klient z gebuchtym starym jobem ma lądować
+   na nowym einsatzu z jego Bewerbungami, nie na BookedScreen starej PK);
+3. brak geplant / błąd lookupu → `lead.mamamia_job_offer_id` (fail-soft,
+   Portal-Eintritt nigdy nie pęka). Front dodatkowo: `pickFinalConfirmedJob`
+   jest STRICT per job sesji (fc innego joba nie kaperuje aktywnego), a link
+   „Alle meine Einsätze" renderuje się też bez `?job=`, gdy lead ma >1 job.
+
 #### ③ LoginAgency (auth do mamamii, BEZ tokena)
 
 ```http
@@ -671,6 +683,14 @@ mutation RejectApplication($id: Int, $reject_message: String) {
 `undo`. Decline jest finalne (przycisk „rückgängig machen" usunięty w K5).
 
 #### `storeConfirmation` — akceptacja zgłoszenia (binding)
+
+> **⚠️ REFACTOR 2026-07-22:** portal NIE woła już tej akcji z przeglądarki.
+> Akcept wykonuje server-side sekwencja `sync-acceptance` (edge fn triggerowana
+> przez bridge po atomowym zapisie acceptance; cron detect-caregiver-events jako
+> gwarant): 1. UpdateCustomer(customer_contract) → 2. StoreConfirmation →
+> 3. render PDF → 4. upload do MM po przetworzeniu confirmation. Pełny opis:
+> [docs/vertrag-flow.md](vertrag-flow.md). Akcja w proxy ZOSTAJE (kompat dla
+> starych zakeszowanych bundli — guard final_confirmation zapobiega dublom).
 
 Też `assertApplicationBelongsToSession`. Pola `contract_patient` /
 `contract_contact` przechodzą przez whitelisty `CONTRACT_PATIENT_ALLOWED`

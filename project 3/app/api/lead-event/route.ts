@@ -8,9 +8,11 @@ import {
   getOfferUpdatedEmailTemplate,
   type CaregiverDisplay,
   type CaregiverMailEvent,
+  type EmailTemplate,
   type OfferInfo,
 } from '@/lib/email';
-import { buildVertragAttachmentPdf } from '@/lib/vertrag';
+import { buildVertragAttachmentPdf, formatSignedAtBerlin } from '@/lib/vertrag';
+import { createHash } from 'crypto';
 
 // Bridge endpoint: the CA-App portal reports customer milestones back to the
 // kostenrechner lead so the Nachfass emails can branch. Token-authenticated —
@@ -52,6 +54,12 @@ const ALLOWED_EVENTS = [
   // Token liegt beim Kunden). Event = Audit-Trail + optionale Kundenmail
   // (notify:false → nur Aufzeichnung, keine Mail).
   'offer_updated',
+  // Alarm-Policy (2026-07-21): Buchung unterschrieben, aber Mamamia-Sync
+  // unvollständig (z.B. Bewerbung von der Agentur zurückgezogen ⇒
+  // StoreConfirmation dauerhaft abgelehnt). Gesendet vom
+  // detect-caregiver-events-Cron; TEAM-MAIL-ONLY — nie in
+  // GET_PUBLIC_EVENT_TYPES, keine Kundenmail. Audit-Row in lead_events.
+  'acceptance_sync_alarm',
 ];
 const TEAM_NOTIFY_EVENTS = [
   'patient_data_saved',
@@ -69,6 +77,11 @@ const TEAM_NOTIFY_CAREGIVER_EVENTS = new Set([
   'application_received',
 ]);
 const TEAM_NOTIFY_RECIPIENT = 'info@primundus.de';
+// Version des Vertragstextes — gepinnt in der Acceptance-Row. Der §§-Text lebt
+// im Code (lib/vertrag.ts); ohne Version würden alte Verträge nach einer
+// Textänderung mit NEUEM Wortlaut re-rendern. Bump NUR mit bewusster
+// Textänderung (alten Text dann als eingefrorene Version behalten).
+const CONTRACT_VERSION = 'v1.0';
 // Zusätzliche BCC-Empfänger NUR für die Accept-/Buchungs-Team-Mail
 // (application_accepted_internal). Andere Team-Notifications behalten den
 // Default-BCC (SMTP_BCC = info@primundus.de,info@mamamia.app). Kommasepariert.
@@ -85,6 +98,7 @@ const NON_DEDUPED_EVENTS = new Set([
   'application_received',
   'application_rejected',
   'offer_updated',               // Preis kann mehrfach angepasst werden
+  'acceptance_sync_alarm',       // jeder Alarm-Versuch wird aufgezeichnet
 ]);
 // Customer-facing Mails (an die Lead-Email) je Event. Trigger sind die neuen
 // Caregiver-Lifecycle-Events; das eigentliche Hooking aus Mamamia kommt
@@ -104,6 +118,222 @@ const TRANSACTIONAL_MAIL_EVENTS = new Set([
   'application_accepted_internal',
   'offer_updated',
 ]);
+
+// ─── Acceptance-Sync-Alarm (2026-07-21) ────────────────────────────────────
+// "Nie możemy mieć sytuacji, gdzie klient myśli że zlecenie jest obstawione,
+// a nie jest" (Michał). Zwei Auslöser, EIN Mail-Kanal (Team):
+//   a) T+0: der synchrone sync-acceptance-Call meldet einen PERMANENTEN
+//      StoreConfirmation-Fehler (Mamamia lehnt deterministisch ab, z.B.
+//      Bewerbung von der Agentur zurückgezogen) → Alarm sofort aus der Bridge.
+//   b) Cron: Row nach Retry weiter unbestätigt und >5 Min alt (bzw. PDF >24h)
+//      → Cron POSTet Event acceptance_sync_alarm hierher; die Mail ist die
+//      Antwort-Bedingung (Fehler ⇒ 502 ⇒ Cron stempelt nicht ⇒ Re-Alarm).
+
+interface AcceptanceAlarmInfo {
+  application_id: number | string;
+  caregiver_id?: number | string | null;
+  caregiver_name?: string | null;
+  confirmed: boolean;
+  pdf_uploaded: boolean;
+  permanent: boolean;
+  error?: string | null;
+  age_minutes?: number | null;
+  source: 'bridge' | 'cron' | 'sync-retry' | string;
+}
+
+function buildAcceptanceSyncAlarmTemplate(lead: any, info: AcceptanceAlarmInfo): EmailTemplate {
+  const kunde = [lead.vorname, lead.nachname].filter(Boolean).join(' ') || lead.email || lead.id;
+  const confirmCase = !info.confirmed;
+  const subject = confirmCase
+    ? `🚨 ALARM: Buchung OHNE Mamamia-Bestätigung — ${kunde} (Bewerbung ${info.application_id})`
+    : `⚠️ ALARM: Vertrags-PDF fehlt in Mamamia — ${kunde} (Bewerbung ${info.application_id})`;
+
+  const lage = confirmCase
+    ? 'Der Kunde hat die Buchung im Portal abgeschlossen (Unterschrift + Bestätigungsseite), aber in Mamamia existiert KEINE verbindliche Confirmation für diese Bewerbung. Der Kunde glaubt an eine Buchung, die aktuell nicht besteht.'
+    : 'Die Buchung ist in Mamamia bestätigt, aber der signierte Vertrag (PDF) konnte seit über 24 Stunden nicht hochgeladen werden. Kein unmittelbares Kundenrisiko — das Vertragsarchiv in Mamamia ist aber unvollständig.';
+  const ursache = confirmCase
+    ? (info.permanent
+        ? 'Mamamia hat den Akzept DAUERHAFT abgelehnt — wahrscheinlichste Ursache: die Bewerbung wurde von der Agentur zurückgezogen oder existiert nicht mehr. Automatische Wiederholungen ändern daran nichts.'
+        : 'Der automatische Sync schlägt bisher fehl (transienter Fehler). Weitere automatische Versuche laufen alle 15 Minuten weiter — dieser Alarm kommt trotzdem, damit niemand auf den Automatismus wartet.')
+    : 'Der Upload-Schritt (StoreFile/UpdateConfirmation bzw. das PDF-Rendering) schlägt wiederholt fehl — Details in den Supabase-Logs (sync-acceptance / detect-caregiver-events).';
+  const schritte = confirmCase
+    ? [
+        'SA-Portal → Kunde → Bewerbung öffnen: existiert sie noch, welcher Status?',
+        'Bewerbung zurückgezogen/weg: Kunden SOFORT kontaktieren — er wartet auf eine Pflegekraft, die nicht kommt.',
+        'Bewerbung in Ordnung: Annahme manuell im SA-Portal durchführen.',
+      ]
+    : [
+        'Supabase-Logs (sync-acceptance / detect-caregiver-events) prüfen.',
+        'Notfalls Vertrag aus der Buchungs-Team-Mail manuell in Mamamia hochladen.',
+      ];
+
+  const daten: Array<[string, string]> = [
+    ['Kunde', String(kunde)],
+    ['E-Mail', String(lead.email ?? '—')],
+    ['Telefon', String(lead.telefon ?? '—')],
+    ['Lead-ID', String(lead.id)],
+    ['Bewerbung (application_id)', String(info.application_id)],
+    ['Pflegekraft', [info.caregiver_name, info.caregiver_id != null ? `(ID ${info.caregiver_id})` : null].filter(Boolean).join(' ') || '—'],
+    ['Mamamia-Fehler', info.error || '—'],
+    ['Alter der Buchung', info.age_minutes != null ? `${info.age_minutes} Min` : '—'],
+    ['Alarm-Quelle', info.source === 'bridge' ? 'sofort (synchroner Sync)' : 'Cron (detect-caregiver-events)'],
+  ];
+
+  const text = [
+    subject,
+    '',
+    lage,
+    '',
+    ursache,
+    '',
+    'Daten:',
+    ...daten.map(([k, v]) => `- ${k}: ${v}`),
+    '',
+    'Bitte SOFORT prüfen:',
+    ...schritte.map((s, i) => `${i + 1}. ${s}`),
+  ].join('\n');
+
+  const html = `
+    <div style="font-family: Arial, sans-serif; max-width: 640px; margin: 0 auto;">
+      <div style="background-color: ${confirmCase ? '#dc2626' : '#d97706'}; color: white; padding: 16px 20px; border-radius: 8px 8px 0 0;">
+        <h2 style="margin: 0; font-size: 18px;">${subject}</h2>
+      </div>
+      <div style="border: 2px solid ${confirmCase ? '#dc2626' : '#d97706'}; border-top: none; border-radius: 0 0 8px 8px; padding: 20px;">
+        <p style="margin-top: 0;"><strong>${lage}</strong></p>
+        <p>${ursache}</p>
+        <table style="border-collapse: collapse; width: 100%; font-size: 14px;">
+          ${daten.map(([k, v]) => `<tr><td style="padding: 4px 8px; border: 1px solid #e5e7eb; background: #f9fafb; white-space: nowrap;">${k}</td><td style="padding: 4px 8px; border: 1px solid #e5e7eb;">${v}</td></tr>`).join('')}
+        </table>
+        <p style="margin-bottom: 4px;"><strong>Bitte SOFORT prüfen:</strong></p>
+        <ol style="margin-top: 4px;">
+          ${schritte.map((s) => `<li>${s}</li>`).join('')}
+        </ol>
+      </div>
+    </div>
+  `;
+
+  return { subject, html, text };
+}
+
+// Mail + (bei Erfolg) Alarm-Stempel + Audit-Row. Mail-Fehler ⇒ {ok:false,
+// error} und KEIN Stempel — der Cron re-alarmiert beim nächsten Lauf. Der
+// Fehlertext wandert in die 502-Antwort (Diagnose ohne Render-Log-Zugriff).
+async function raiseAcceptanceSyncAlarm(
+  supabase: any,
+  lead: any,
+  info: AcceptanceAlarmInfo,
+): Promise<{ ok: boolean; error?: string }> {
+  const template = buildAcceptanceSyncAlarmTemplate(lead, info);
+  const res = await sendEmail(TEAM_NOTIFY_RECIPIENT, template, undefined, {
+    extraBcc: ACCEPT_TEAM_NOTIFY_EXTRA_BCC,
+  });
+  if (!res.success) {
+    console.error(`acceptance alarm mail failed (lead=${lead.id}, app=${info.application_id}):`, res.error);
+    return { ok: false, error: res.error };
+  }
+  const appIdNum = Number(info.application_id);
+  if (Number.isFinite(appIdNum)) {
+    const { error: stampErr } = await supabase
+      .from('lead_application_acceptances')
+      .update({ mamamia_sync_alerted_at: new Date().toISOString() })
+      .eq('lead_id', lead.id)
+      .eq('application_id', appIdNum);
+    if (stampErr) console.error('mamamia_sync_alerted_at stamp failed:', stampErr.message);
+  }
+  return { ok: true };
+}
+
+// ─── EIN kanonischer Vertrags-PDF (Michał 2026-07-21) ──────────────────────
+// „Generować 1 PDF, wysyłać go do klienta, do nas i na serwer. 1 i ten sam,
+// niezmieniany plik." — Der Vertrag wird GENAU EINMAL gerendert (beim Akzept),
+// als Bytes im Storage-Bucket `contracts/<lead>/<app>.pdf` abgelegt und von
+// dort überall identisch verwendet: Mail C (Kunde), Team-Mail, Mamamia-Upload
+// (sync-acceptance/Cron) und Portal-Vertragskasten (/api/contract-pdf).
+// Zeitstempel auf dem Dokument = Server-Moment der Unterschrift (signed_at)
+// in Europe/Berlin — nie Browser-Label, nie Render-Zeit, nie UTC.
+const CONTRACT_BUCKET = 'contracts';
+const CONTRACT_FILENAME = 'Betreuungsvertrag_Primundus.pdf';
+
+function contractObjectPath(leadId: string, applicationId: number): string {
+  return `${leadId}/${applicationId}.pdf`;
+}
+
+type ContractAttachment = { filename: string; content: Buffer | string; contentType: string };
+
+async function downloadCanonicalContractPdf(
+  supabase: any,
+  leadId: string,
+  applicationId: number,
+): Promise<Buffer | null> {
+  try {
+    const { data, error } = await supabase.storage
+      .from(CONTRACT_BUCKET)
+      .download(contractObjectPath(leadId, applicationId));
+    if (error || !data) return null;
+    const buf = Buffer.from(await data.arrayBuffer());
+    return buf.subarray(0, 5).toString('latin1') === '%PDF-' ? buf : null;
+  } catch {
+    return null;
+  }
+}
+
+// Kanon holen oder (einmalig) erzeugen: Bucket-Hit ⇒ exakt diese Bytes.
+// Miss ⇒ EIN Render mit kanonischem signed_at-Label, echte PDFs landen im
+// Bucket + sha256 in der Acceptance-Row. HTML-Fallback (Chromium down) wird
+// NIE gespeichert — Mail bekommt ihn als Notlösung, der Kanon entsteht dann
+// beim Cron-Retry über /api/contract-pdf (der ebenfalls Bucket-first liest).
+async function getOrCreateCanonicalContract(
+  supabase: any,
+  leadId: string,
+  applicationId: number | null,
+  snapshot: Record<string, unknown>,
+  signaturName: string,
+  signedAtIso: string | null,
+  legacyLabel: string | null,
+): Promise<ContractAttachment | null> {
+  if (applicationId != null) {
+    const cached = await downloadCanonicalContractPdf(supabase, leadId, applicationId);
+    if (cached) {
+      return { filename: CONTRACT_FILENAME, content: cached, contentType: 'application/pdf' };
+    }
+  }
+  let attachment: ContractAttachment;
+  try {
+    attachment = await buildVertragAttachmentPdf(snapshot as any, {
+      signaturName,
+      signedAt: (signedAtIso ? formatSignedAtBerlin(signedAtIso) : undefined) ?? legacyLabel ?? undefined,
+      auditNote: 'Vertragsversion v1.0',
+    });
+  } catch (e) {
+    console.error('buildVertragAttachmentPdf failed:', e instanceof Error ? e.message : String(e));
+    return null;
+  }
+  const isRealPdf =
+    attachment.contentType.startsWith('application/pdf') &&
+    Buffer.isBuffer(attachment.content) &&
+    attachment.content.subarray(0, 5).toString('latin1') === '%PDF-';
+  if (isRealPdf && applicationId != null) {
+    const bytes = attachment.content as Buffer;
+    const { error: upErr } = await supabase.storage
+      .from(CONTRACT_BUCKET)
+      .upload(contractObjectPath(leadId, applicationId), bytes, {
+        contentType: 'application/pdf',
+        upsert: true,
+      });
+    if (upErr) {
+      console.error('contract canonical upload failed:', upErr.message ?? String(upErr));
+    } else {
+      const sha = createHash('sha256').update(bytes).digest('hex');
+      const { error: shaErr } = await supabase
+        .from('lead_application_acceptances')
+        .update({ pdf_sha256: sha })
+        .eq('lead_id', leadId)
+        .eq('application_id', applicationId);
+      if (shaErr) console.error('pdf_sha256 stamp failed:', shaErr.message);
+    }
+  }
+  return attachment;
+}
 
 function extractCaregiverDisplay(metadata: any): CaregiverDisplay | null {
   if (!metadata || typeof metadata !== 'object') return null;
@@ -157,11 +387,12 @@ function buildPortalUrl(lead: { token?: string | null }): string {
 // damit die Edge Function beim Versand die richtige Mail bauen kann.
 //
 // caregiver_interest_shown → 1 Reminder nach 1h (interest_reminder).
-// application_received → 4 Reminder im Crescendo:
-//   1h  (application_reminder)        sanft, "schon einen Blick werfen können?"
-//   4h  (application_reminder_4h)     dringender, "Pflegekraft prüft andere Anfragen"
-//   12h (application_reminder_12h)    dringendster, "wahrscheinlich nicht mehr verfügbar"
-//   46h (application_last_chance)     letzte Erinnerung vor dem 48h-Auto-Reject
+// application_received → 4 Reminder im Crescendo (Ton: persönliche Nachfrage
+// von Ilka, keine Drohkulisse — Martin, 2026-07-20):
+//   1h  (application_reminder)        "schon gesehen?"
+//   4h  (application_reminder_4h)     "kurze Frage"
+//   12h (application_reminder_12h)    "wie ist Ihr Eindruck?"
+//   70h (application_last_chance)     letzte Erinnerung vor dem 72h-Auto-Reject
 // Alle 3 tragen identische Cancel-Logik (siehe Edge Function): sobald der
 // Kunde reagiert hat (accept/reject) ODER der Lead beauftragt/nicht
 // interessiert ist, cancelt sich der jeweilige Reminder beim nächsten Tick.
@@ -170,10 +401,10 @@ const REMINDER_DELAYS_APPLICATION_MIN: { emailType: string; delay: number }[] = 
   { emailType: 'application_reminder',     delay: 60 },
   { emailType: 'application_reminder_4h',  delay: 4 * 60 },
   { emailType: 'application_reminder_12h', delay: 12 * 60 },
-  // 46h — "letzte Chance"-Mail, ~2h vor dem 48h-Auto-Reject (separater
-  // Cron in detect-caregiver-events). Kündigt das automatische Schließen
+  // 70h — "letzte Chance"-Mail, ~2h vor dem 72h-Auto-Reject (separater
+  // Cron in detect-caregiver-events). Kündigt das automatische Freigeben
   // an und bittet um Reaktion.
-  { emailType: 'application_last_chance',  delay: 46 * 60 },
+  { emailType: 'application_last_chance',  delay: 70 * 60 },
 ];
 
 async function scheduleReactionReminder(
@@ -410,6 +641,10 @@ export async function POST(request: NextRequest) {
     // "Akzeptieren" doesn't duplicate. Frontend queries this table via
     // mamamia-proxy.listAcceptedApplications on portal load to flip the
     // matching app's status to 'accepted' → BookedScreen renders.
+    // EIN kanonischer Vertrags-PDF für alle Kanäle (Kunde/Team/Mamamia/Portal)
+    // — befüllt im Accept-Block (frischer Akzept) oder unten (Resend-Pfad).
+    let contractAttachment: ContractAttachment | null = null;
+
     if (!teamOnlyResend && event === 'application_accepted_internal' && metadata && typeof metadata === 'object') {
       const m = metadata as Record<string, unknown>;
       const rawAppId = m.application_id;
@@ -424,7 +659,16 @@ export async function POST(request: NextRequest) {
         const clientIp = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim()
           || request.headers.get('x-real-ip')
           || null;
-        // Kern-Upsert (kritisch für die Buchungs-Persistenz / BookedScreen).
+        // Kanonischer Unterschrifts-Moment: EIN Server-Zeitpunkt für die Row
+        // (signed_at) UND das Dokument-Label — nie zwei Uhren.
+        const signedAtIso = new Date().toISOString();
+        // EIN atomarer Upsert: Kern + Signatur-Audit + Snapshot + Version.
+        // Der frühere Zwei-Statement-Split („best-effort", Schutz gegen fehlende
+        // Migration) war gefährlich: die Buchung konnte OHNE Signatur/Snapshot
+        // „gelingen" (Kunde sieht Erfolg, /api/contract-pdf 404t). Die Spalten
+        // sind seit 06+07/2026 auf Staging UND Prod → Schutz obsolet.
+        // Fehler ⇒ 500 — der bestehende acceptApp-Error-Pfad zeigt dem Kunden
+        // Toast + Retry (Święta zasada nr 1: kein stiller Teilerfolg).
         const { error: accErr } = await supabase
           .from('lead_application_acceptances')
           .upsert({
@@ -433,25 +677,103 @@ export async function POST(request: NextRequest) {
             caregiver_id: typeof caregiverId === 'number' && Number.isFinite(caregiverId) ? caregiverId : null,
             contract_patient: m.contract_patient ?? {},
             contract_contact: m.contract_contact ?? {},
+            signatur: typeof m.signatur === 'string' ? m.signatur : null,
+            signed_at: signedAtIso,
+            signed_ip: clientIp,
+            contract_snapshot: m.contract ?? null,
+            contract_version: CONTRACT_VERSION,
           }, { onConflict: 'lead_id,application_id' });
         if (accErr) {
           console.error('lead_application_acceptances upsert failed:', accErr.message);
+          return NextResponse.json(
+            { error: 'acceptance persistence failed' },
+            { status: 500, headers: corsHeaders },
+          );
         }
-        // Stufe B: Signatur-Audit + Vertrags-Snapshot SEPARAT + best-effort.
-        // Entkoppelt von der Kern-Persistenz, damit eine noch nicht angewendete
-        // Migration (Signatur-Spalten fehlen) die Buchung nicht bricht.
-        const { error: sigErr } = await supabase
-          .from('lead_application_acceptances')
-          .update({
-            signatur: typeof m.signatur === 'string' ? m.signatur : null,
-            signed_at: new Date().toISOString(),
-            signed_ip: clientIp,
-            contract_snapshot: m.contract ?? null,
-          })
-          .eq('lead_id', lead.id)
-          .eq('application_id', appId);
-        if (sigErr) {
-          console.warn('signature audit update skipped (Migration noch nicht angewendet?):', sigErr.message);
+
+        // KANON: Vertrag GENAU EINMAL rendern (Zeitstempel = signedAtIso in
+        // Europe/Berlin — derselbe Moment, der in der Row steht) und in den
+        // Bucket legen — BEVOR der Sync feuert, damit auch ein sofortiger
+        // Mamamia-Upload (Confirmation schon verarbeitet) dieselben Bytes
+        // nimmt. Mails unten hängen exakt dieses Attachment an.
+        if (m.contract && typeof m.contract === 'object' && typeof m.signatur === 'string' && m.signatur.trim()) {
+          contractAttachment = await getOrCreateCanonicalContract(
+            supabase,
+            lead.id,
+            appId,
+            m.contract as Record<string, unknown>,
+            (m.signatur as string).trim(),
+            signedAtIso,
+            typeof m.signed_at === 'string' ? (m.signed_at as string) : null,
+          );
+        }
+
+        // Mamamia-Sync (Refactor 2026-07-22, Sequenz Michał):
+        //   1. UpdateCustomer (Kontaktdaten) → 2. StoreConfirmation →
+        //   3. Vertrag = KANON aus dem Bucket (oben gerade abgelegt) →
+        //   4. Upload (nach Verarbeitung der Confirmation).
+        // Läuft in der Edge Fn sync-acceptance (Agentur-Creds leben NUR dort).
+        // Best-effort mit kurzem Timeout: schlägt der synchrone Versuch fehl
+        // oder ist die Confirmation noch nicht verarbeitet, holt der
+        // detect-caregiver-events-Cron (15 Min) alles nach — die Buchung
+        // selbst steht bereits (Upsert oben). Mails (unten) laufen unverändert.
+        // skip_confirm: Alt-Bundles feuern storeConfirmation noch selbst
+        // (metadata.mamamia_accepted === true) — dann NICHT doppelt akzeptieren.
+        try {
+          const ctrl = new AbortController();
+          const timer = setTimeout(() => ctrl.abort(), 25_000);
+          const syncRes = await fetch(`${supabaseUrl}/functions/v1/sync-acceptance`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${supabaseServiceKey}`,
+            },
+            body: JSON.stringify({
+              lead_id: lead.id,
+              application_id: appId,
+              skip_confirm: m.mamamia_accepted === true,
+            }),
+            signal: ctrl.signal,
+          });
+          clearTimeout(timer);
+          const syncBody = await syncRes.json().catch(() => null);
+          console.log(`[sync-acceptance] lead=${lead.id} app=${appId} http=${syncRes.status} result=${JSON.stringify(syncBody).slice(0, 400)}`);
+
+          // Alarm-Policy (2026-07-21): PERMANENTER StoreConfirmation-Fehler
+          // (Mamamia lehnt deterministisch ab — z.B. Bewerbung von der
+          // Agentur zurückgezogen) ⇒ Team-Alarm SOFORT, nicht erst nach dem
+          // Cron-Fenster. Der Kunde sieht gerade "Buchung bestätigt", ohne
+          // dass in Mamamia etwas gebucht ist. Transiente Fehler alarmieren
+          // hier NICHT (sync-acceptance hat intern schon 3× versucht; Cron
+          // übernimmt, Alarm dort nach 5 Min). Audit-Row wird mitgeloggt.
+          const confErr = syncBody && typeof syncBody === 'object'
+            ? (syncBody as Record<string, any>).confirm_error
+            : null;
+          if (confErr && confErr.permanent === true) {
+            const alarmInfo: AcceptanceAlarmInfo = {
+              application_id: appId,
+              caregiver_id: typeof caregiverId === 'number' && Number.isFinite(caregiverId) ? caregiverId : null,
+              caregiver_name: typeof m.caregiver_name === 'string' ? m.caregiver_name : null,
+              confirmed: false,
+              pdf_uploaded: false,
+              permanent: true,
+              error: typeof confErr.message === 'string' ? confErr.message : String(confErr.message ?? ''),
+              age_minutes: 0,
+              source: 'bridge',
+            };
+            const alarmRes = await raiseAcceptanceSyncAlarm(supabase, lead, alarmInfo);
+            if (alarmRes.ok) {
+              await supabase.from('lead_events').insert({
+                lead_id: lead.id,
+                event_type: 'acceptance_sync_alarm',
+                metadata: { ...alarmInfo }, // trägt bereits source:'bridge'
+              });
+            }
+            // alarmRes.ok=false ⇒ kein Stempel (raiseAcceptanceSyncAlarm) ⇒ der
+            // Cron re-alarmiert (permanent ⇒ altersunabhängig) im nächsten Lauf.
+          }
+        } catch (e) {
+          console.error(`[sync-acceptance] trigger failed (cron will retry): lead=${lead.id} app=${appId}:`, e instanceof Error ? e.message : String(e));
         }
       } else {
         console.warn('application_accepted_internal: missing/invalid application_id in metadata');
@@ -487,26 +809,61 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    // Vertrags-Anhang (Stufe B): beim Buchen aus dem Vertrags-Snapshot +
-    // elektronischer Signatur ein vollständiges Vertragsdokument als PDF
-    // rendern (Headless Chrome) und an Kunde (Mail C) + Team anhängen.
-    // Best-effort — fehlen die Daten oder schlägt das Rendern fehl, fällt
-    // `buildVertragAttachmentPdf` intern auf HTML-Anhang zurück damit die
-    // Mail überhaupt einen Vertrag mitbringt; ohne Anhang würde der Kunde
-    // mit "Buchung bestätigt" ohne Dokument dastehen.
-    let contractAttachment: { filename: string; content: Buffer | string; contentType: string } | null = null;
-    if (event === 'application_accepted_internal' && metadata && typeof metadata === 'object') {
+    // 🚨 Acceptance-Sync-Alarm (Cron-Pfad): Team-Mail ist die EINZIGE Wirkung
+    // dieses Events — keine Kundenmail, kein Reminder. Die Mail entscheidet
+    // die Antwort: Fehler ⇒ 502 ⇒ der Cron stempelt mamamia_sync_alerted_at
+    // NICHT und re-alarmiert im nächsten Lauf (15 Min).
+    if (event === 'acceptance_sync_alarm') {
+      const m = (metadata ?? {}) as Record<string, unknown>;
+      const ok = await raiseAcceptanceSyncAlarm(supabase, lead, {
+        application_id: (m.application_id as number | string | undefined) ?? '?',
+        caregiver_id: (m.caregiver_id as number | string | null | undefined) ?? null,
+        caregiver_name: typeof m.caregiver_name === 'string' ? m.caregiver_name : null,
+        confirmed: m.confirmed === true,
+        pdf_uploaded: m.pdf_uploaded === true,
+        permanent: m.permanent === true,
+        error: typeof m.error === 'string' ? m.error : null,
+        age_minutes: typeof m.age_minutes === 'number' ? m.age_minutes : null,
+        // 'cron' (15-Min-Backstop) oder 'sync-retry' (Chain 15/30/60 s).
+        source: typeof m.source === 'string' ? m.source : 'cron',
+      });
+      if (!ok.ok) {
+        return NextResponse.json(
+          { error: `alarm mail failed: ${(ok.error ?? 'unknown').slice(0, 300)}` },
+          { status: 502, headers: corsHeaders },
+        );
+      }
+      return NextResponse.json({ ok: true }, { headers: corsHeaders });
+    }
+
+    // Vertrags-Anhang für den RESEND-Pfad (teamOnlyResend — der Accept-Block
+    // oben wurde übersprungen): Kanon aus dem Bucket; fehlt er (Alt-Buchung
+    // vor dem Kanon-Refactor), EIN Render mit signed_at der Row (Europe/
+    // Berlin) — der dann als Kanon gespeichert wird.
+    if (contractAttachment === null && event === 'application_accepted_internal' && metadata && typeof metadata === 'object') {
       const m = metadata as Record<string, unknown>;
       if (m.contract && typeof m.contract === 'object' && typeof m.signatur === 'string' && m.signatur.trim()) {
-        try {
-          contractAttachment = await buildVertragAttachmentPdf(m.contract as any, {
-            signaturName: m.signatur as string,
-            signedAt: typeof m.signed_at === 'string' ? (m.signed_at as string) : undefined,
-            auditNote: 'Vertragsversion v1.0',
-          });
-        } catch (e) {
-          console.error('buildVertragAttachmentPdf failed:', e instanceof Error ? e.message : String(e));
+        const rawAppId = Number(m.application_id);
+        const appIdNum = Number.isFinite(rawAppId) ? rawAppId : null;
+        let rowSignedAtIso: string | null = null;
+        if (appIdNum != null) {
+          const { data: accRow } = await supabase
+            .from('lead_application_acceptances')
+            .select('signed_at')
+            .eq('lead_id', lead.id)
+            .eq('application_id', appIdNum)
+            .maybeSingle();
+          rowSignedAtIso = typeof accRow?.signed_at === 'string' ? accRow.signed_at : null;
         }
+        contractAttachment = await getOrCreateCanonicalContract(
+          supabase,
+          lead.id,
+          appIdNum,
+          m.contract as Record<string, unknown>,
+          (m.signatur as string).trim(),
+          rowSignedAtIso,
+          typeof m.signed_at === 'string' ? (m.signed_at as string) : null,
+        );
       }
     }
 
