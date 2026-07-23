@@ -524,6 +524,9 @@ export interface UIApplication {
    *  damit die Platzhalter-Karte aufs volle Profil upgradet, sobald
    *  getCaregiver lädt. */
   synthetic?: boolean;
+  /** Kundensicherer "Hinweis der Agentur" — serverseitig aus der Roh-Nachricht
+   *  der Bewerbung LLM-redigiert (PII raus). Leer = nichts anzuzeigen. */
+  coverMessage?: string;
 }
 
 function fmtRelativeTime(iso: string | null, nowIso: string): string {
@@ -552,6 +555,7 @@ export function mapApplicationToUI(
     appliedAt: fmtRelativeTime(app.active_until_at, opts.nowIso),
     status: 'new',
     message: app.message ?? '',
+    coverMessage: app.coverMessage ?? undefined,
     offer: {
       monatlicheKosten: app.salary ?? 0,
       anreisedatum: formatMamamiaDate(app.arrival_at) ?? '—',

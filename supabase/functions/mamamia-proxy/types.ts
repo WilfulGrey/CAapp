@@ -129,6 +129,21 @@ export interface ProxySupabase {
   // das SA-Portal zeigt ihn im Anfrage-Block als "was der Kunde angegeben hat".
   // Best-effort nach erfolgreichem UpdateCustomer; optional für Test-Mocks.
   saveLeadPatientForm?(leadId: string, form: Record<string, unknown>): Promise<void>;
+  // Customer-safe "Hinweis der Agentur" cache, keyed by Mamamia application_id.
+  // Derived by LLM from the raw application.message (PII-laden) and redacted.
+  // getApplicationIntros returns existing rows so listApplications can skip
+  // regeneration when source_hash matches; upsertApplicationIntro writes the
+  // redacted text + hash (intro_text null = generated but nothing customer-
+  // usable to show). Optional so existing test mocks stay valid.
+  getApplicationIntros?(
+    applicationIds: number[],
+  ): Promise<Array<{ application_id: number; intro_text: string | null; source_hash: string }>>;
+  upsertApplicationIntro?(
+    applicationId: number,
+    jobOfferId: number,
+    introText: string | null,
+    sourceHash: string,
+  ): Promise<void>;
 }
 
 export interface ActionDeps {

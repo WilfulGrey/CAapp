@@ -254,6 +254,10 @@ export interface MamamiaApplication {
   is_counter_offer: boolean | null;
   salary: number | null;
   message: string | null;
+  // Customer-safe "Hinweis der Agentur", server-side derived + redacted from
+  // `message` by the proxy (listApplications) and attached per row. Never the
+  // raw message (which carries PII).
+  coverMessage?: string | null;
   arrival_at: string | null;
   departure_at: string | null;
   arrival_fee: number | null;
