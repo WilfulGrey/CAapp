@@ -182,6 +182,11 @@ describe('Vertrag nachträglich abschließen (agentur-seitige Annahme)', () => {
     server.use(
       ...defaultHandlers({
         proxy: {
+          // Realer Zustand nach dem Server-Sync (#396): die Portal-Annahme hat
+          // binnen Minuten eine final_confirmation am SESSION-Job — das Multi-
+          // Job-Gate (Opcja B, Dachs 8899) synthetisiert NUR dann. Ohne fc am
+          // Session-Job gehörte der Akzept zu einem anderen Einsatz.
+          getCustomer: () => ({ Customer: confirmedCustomer }),
           listApplications: () => ({ JobOfferApplicationsWithPagination: { total: 0, data: [] } }),
           // Portal-Annahme liegt vor, inkl. Snapshot → Vertrag ist erledigt.
           listAcceptedApplications: () => ({

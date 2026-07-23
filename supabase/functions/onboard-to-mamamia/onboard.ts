@@ -23,6 +23,13 @@ export interface SupabaseLike {
     jobId: string,
     leadId: string,
   ): Promise<{ mamamia_job_offer_id: number } | null>;
+  // Multi-Job (Opcja B, Dachs 8899): der NEUESTE 'geplant'-Job des Leads aus
+  // lead_jobs (Spiegel via detect-Cron). Einstieg OHNE ?job= landet auf ihm —
+  // der Kunde sieht den AKTIVEN Einsatz (neue Bewerbungen) statt des alten
+  // gebuchten Jobs. Optional wie fetchLeadJob (alte Fakes kompilieren).
+  fetchNewestPlannedJob?(
+    leadId: string,
+  ): Promise<{ mamamia_job_offer_id: number } | null>;
 }
 
 // ─── Secrets bundle ─────────────────────────────────────────────────────────
@@ -224,7 +231,28 @@ async function resolveScopedJobOfferId(
   defaultJobOfferId: number,
   jobId: string | undefined,
 ): Promise<number> {
-  if (!jobId || !supabase.fetchLeadJob) return defaultJobOfferId;
+  // Opcja B (Dachs 8899, 2026-07-22): Einstieg OHNE expliziten ?job= landet
+  // auf dem AKTIVEN Job = neuester 'geplant' aus lead_jobs. Kunden mit einem
+  // einzigen Job verhalten sich identisch (ihr Job ist der neueste geplant;
+  // nach der Buchung gibt es keinen geplanten → Default). Multi-Job-Kunden
+  // sehen den neuen Einsatz mit seinen Bewerbungen statt des alten gebuchten
+  // (der über ?view=jobs / ?job= weiterhin erreichbar ist). Fail-soft: jeder
+  // Fehler ⇒ bisheriger Default — der Portal-Eintritt darf NIE brechen.
+  if (!jobId) {
+    if (!supabase.fetchNewestPlannedJob) return defaultJobOfferId;
+    try {
+      const planned = await supabase.fetchNewestPlannedJob(leadId);
+      if (planned && Number.isInteger(planned.mamamia_job_offer_id)) {
+        return planned.mamamia_job_offer_id;
+      }
+    } catch (e) {
+      console.warn(
+        `[onboard] fetchNewestPlannedJob failed for lead ${leadId}: ${(e as Error).message} — falling back to default job`,
+      );
+    }
+    return defaultJobOfferId;
+  }
+  if (!supabase.fetchLeadJob) return defaultJobOfferId;
   // Best-effort: job_id only selects WHICH job to show. A lookup failure
   // (lead_jobs not yet migrated on this env, transient DB error, …) must NOT
   // break portal entry — onboard is the gateway. Any problem → degrade to the
