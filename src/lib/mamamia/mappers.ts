@@ -768,11 +768,13 @@ export function applyAcceptedOverlay(
     // trägt dieselbe Pflegekraft. Sonst gehört die Buchung zu einem anderen
     // (alten) Einsatz → kein BookedScreen-Hijack im Kontext des neuen Jobs
     // (der alte bleibt über ?view=jobs erreichbar). Bewusste Mini-Lücke:
-    // Reload in den ~1-2 Min zwischen StoreConfirmation und Mamamias
-    // final_confirmation zeigt kurz den normalen Portal-Zustand — heilt
-    // sich, sobald Mamamia verarbeitet hat (Retry-Chain lädt ohnehin binnen
-    // ~2 Min alles nach). Im Accept-Moment selbst hält der optimistische
-    // Local-State den BookedScreen ohne Synthese.
+    // Mamamia verarbeitet die Confirmation binnen max ~10 s (Korrektur
+    // Michał 2026-07-22 — nicht Minuten; live 8394: fc ≤26 s inkl. Upload,
+    // Defer bei T+0 nur weil der Sync Sekunden nach StoreConfirmation
+    // feuert). Ein Reload in DIESEM ≤10-s-Fenster zeigt kurz den normalen
+    // Portal-Zustand — selbstheilend beim nächsten Fetch. Im Accept-Moment
+    // selbst hält der optimistische Local-State den BookedScreen ohne
+    // Synthese.
     const fcCaregiverId = confirmedJob?.final_confirmation?.caregiver?.id;
     const additions: UIApplication[] = [];
     for (const row of acceptances?.rows ?? []) {
