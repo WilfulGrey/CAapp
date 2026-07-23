@@ -120,6 +120,13 @@ export const BookedScreen: FC<{
 
       </div>
 
+      {app.coverMessage && (
+        <div className="rounded-2xl bg-[#F8F7F5] border border-[#E5E3DF] px-4 py-3">
+          <p className="text-[11px] font-semibold text-[#8B7355] uppercase tracking-wide mb-1.5">Hinweis der Agentur</p>
+          <p className="text-sm leading-relaxed text-gray-700 italic">„{app.coverMessage}"</p>
+        </div>
+      )}
+
       <MonatsAufstellung offer={offer} />
 
       <div className="space-y-2.5">

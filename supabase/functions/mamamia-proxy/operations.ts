@@ -214,6 +214,27 @@ export const LIST_APPLICATIONS = /* GraphQL */ `
   }
 `;
 
+// K3d — raw application messages (agency-side ONLY). The customer-facing
+// LIST_APPLICATIONS deliberately DROPS `message` (it carries agency-internal
+// PII: caregiver full name, phone, salary DLV/PK-Netto/RK, ID stubs). This
+// query fetches it server-side in the proxy so we can derive a redacted,
+// customer-safe "Hinweis der Agentur" (cached in application_intros). The raw
+// text never reaches the client.
+export const LIST_APPLICATION_MESSAGES = /* GraphQL */ `
+  query ListApplicationMessages($job_offer_id: Int!, $limit: Int, $page: Int) {
+    JobOfferApplicationsWithPagination(
+      job_offer_id: $job_offer_id
+      limit: $limit
+      page: $page
+    ) {
+      data {
+        id
+        message
+      }
+    }
+  }
+`;
+
 // K3b — interests on a JobOffer. Mamamia "Interest" = caregiver expressed
 // soft interest via panel (precursor to formal application). Schema:
 //   JobOffer { interests: [Interest] }; Interest { id, caregiver_id,

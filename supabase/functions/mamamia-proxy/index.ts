@@ -265,6 +265,30 @@ function makeRealSupabase(url: string, serviceKey: string): ProxySupabase {
         contract_snapshot: Record<string, unknown> | null;
       }>;
     },
+    async getApplicationIntros(applicationIds) {
+      if (applicationIds.length === 0) return [];
+      const { data, error } = await client
+        .from("application_intros")
+        .select("application_id, intro_text, source_hash")
+        .in("application_id", applicationIds);
+      if (error) throw new Error(`supabase getApplicationIntros: ${error.message}`);
+      return (data ?? []) as Array<{ application_id: number; intro_text: string | null; source_hash: string }>;
+    },
+    async upsertApplicationIntro(applicationId, jobOfferId, introText, sourceHash) {
+      const { error } = await client
+        .from("application_intros")
+        .upsert(
+          {
+            application_id: applicationId,
+            job_offer_id: jobOfferId,
+            intro_text: introText,
+            source_hash: sourceHash,
+            generated_at: new Date().toISOString(),
+          },
+          { onConflict: "application_id" },
+        );
+      if (error) throw new Error(`supabase upsertApplicationIntro: ${error.message}`);
+    },
     async countRecentInviteAttempts(leadId, windowMinutes, jobOfferId) {
       const cutoff = new Date(Date.now() - windowMinutes * 60_000).toISOString();
       // Per-job (Multi-Job #2a): count this job's attempts + legacy NULL-job rows.

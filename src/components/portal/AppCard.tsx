@@ -118,12 +118,13 @@ export const AppCard: FC<{
           (pr-8546-1). Defense in depth: also dropped from the
           LIST_APPLICATIONS GraphQL query so it never reaches the proxy.
           → coverMessage (separates, customer-safe Feld) wird stattdessen
-          unten als „Vorstellung der Pflegekraft" Zitat-Box angezeigt — die
-          Agentur formuliert den Text i.d.R. in Ich-Form, nicht die PK selbst.
+          unten als „Hinweis der Agentur" Zitat-Box angezeigt — der Text wird
+          serverseitig aus der Roh-Nachricht LLM-redigiert (PII raus), in
+          dritter Person / Agentur-Stimme, nicht in Ich-Form.
         */}
         {app.coverMessage && (
           <div className="mb-3 rounded-xl bg-[#F8F7F5] border border-[#E5E3DF] px-4 py-3">
-            <p className="text-[11px] font-semibold text-[#8B7355] uppercase tracking-wide mb-1.5">Vorstellung der Pflegekraft</p>
+            <p className="text-[11px] font-semibold text-[#8B7355] uppercase tracking-wide mb-1.5">Hinweis der Agentur</p>
             <p className="text-sm leading-relaxed text-gray-700 italic">„{app.coverMessage}"</p>
           </div>
         )}
