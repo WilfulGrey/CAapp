@@ -665,7 +665,15 @@ export function pickFinalConfirmedJob(
     (j) => typeof j?.final_confirmation?.caregiver?.id === 'number',
   );
   if (confirmed.length === 0) return null;
-  return confirmed.find((j) => j.id === sessionJobOfferId) ?? confirmed[0];
+  // Multi-Job (Opcja B, Dachs 8899): STRENG auf den Session-Job scoped —
+  // die Bestätigung eines ANDEREN (alten) Jobs darf den aktiven Job nicht
+  // kapern (sonst BookedScreen der alten PK im Kontext des neuen Einsatzes).
+  // Fallback auf confirmed[0] NUR wenn die Session keinen Job kennt
+  // (alte Session-JWTs / Proxy-Übergangsversion — fail-soft wie bisher).
+  if (sessionJobOfferId != null) {
+    return confirmed.find((j) => j.id === sessionJobOfferId) ?? null;
+  }
+  return confirmed[0];
 }
 
 /** Gebucht-Ableitung aus dem Mamamia-Stand (Fix Hagedorn 2026-07-15).
@@ -743,7 +751,7 @@ export function applyAcceptedOverlay(
   const acceptedIds = new Set(acceptances?.application_ids ?? []);
 
   if (acceptedIds.size > 0) {
-    // ── Portal-Annahme-Pfad (Verhalten unverändert, hat Vorrang) ──
+    // ── Portal-Annahme-Pfad (hat Vorrang) ──
     const presentIds = new Set(base.map((a) => Number(a.id)));
     // Pfad 1: vorhandene (Mamamia-)Apps auf accepted patchen
     const patched = base.map((a) =>
@@ -751,11 +759,25 @@ export function applyAcceptedOverlay(
     );
     // Pfad 2: fehlende accepted-Apps aus contract_snapshot synthetisieren.
     // synthesize liefert NIE null — ohne geladenes Profil kommt eine
-    // Platzhalter-Karte, damit BookedScreen inkl. Vertrags-PDF IMMER
-    // sichtbar bleibt (Mamamia-Hiccup ≠ Rückfall in den HTML-Flow).
+    // Platzhalter-Karte, damit BookedScreen inkl. Vertrags-PDF sichtbar
+    // bleibt (Mamamia-Hiccup ≠ Rückfall in den HTML-Flow).
+    //
+    // Multi-Job-Gate (Opcja B, Dachs 8899, 2026-07-22): Acceptance-Rows sind
+    // LEAD-weit — die Synthese läuft aber nur, wenn der Akzept zum AKTIVEN
+    // (Session-)Job gehört. Signal: die final_confirmation DES SESSION-JOBS
+    // trägt dieselbe Pflegekraft. Sonst gehört die Buchung zu einem anderen
+    // (alten) Einsatz → kein BookedScreen-Hijack im Kontext des neuen Jobs
+    // (der alte bleibt über ?view=jobs erreichbar). Bewusste Mini-Lücke:
+    // Reload in den ~1-2 Min zwischen StoreConfirmation und Mamamias
+    // final_confirmation zeigt kurz den normalen Portal-Zustand — heilt
+    // sich, sobald Mamamia verarbeitet hat (Retry-Chain lädt ohnehin binnen
+    // ~2 Min alles nach). Im Accept-Moment selbst hält der optimistische
+    // Local-State den BookedScreen ohne Synthese.
+    const fcCaregiverId = confirmedJob?.final_confirmation?.caregiver?.id;
     const additions: UIApplication[] = [];
     for (const row of acceptances?.rows ?? []) {
       if (presentIds.has(row.application_id)) continue;
+      if (typeof fcCaregiverId !== 'number' || fcCaregiverId !== row.caregiver_id) continue;
       const profile = row.caregiver_id === firstAcceptedCaregiverId ? caregiverProfile : null;
       additions.push({
         ...synthesizeAcceptedApplicationFromSnapshot(row, profile ?? null, opts),

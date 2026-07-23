@@ -1286,10 +1286,19 @@ describe('pickFinalConfirmedJob', () => {
     expect(pickFinalConfirmedJob([other, sessionJob], 16226)).toBe(sessionJob);
   });
 
-  it('fällt auf den ersten bestätigten Job zurück, wenn der Session-Job keine Confirmation hat', () => {
+  it('Multi-Job (Opcja B, Dachs 8899): Confirmation eines ANDEREN Jobs kapert den Session-Job NICHT → null', () => {
+    // Session = neuer geplanter Job 16226 (keine fc); Job 999 = alter gebuchter
+    // Einsatz. Vorher: Fallback auf confirmed[0] → BookedScreen der alten PK
+    // im Kontext des neuen Jobs. Jetzt: streng session-scoped.
     const unconfirmed = { id: 16226, status: 'search' };
     const confirmed = makeConfirmedJob({ id: 999 });
-    expect(pickFinalConfirmedJob([unconfirmed, confirmed], 16226)).toBe(confirmed);
+    expect(pickFinalConfirmedJob([unconfirmed, confirmed], 16226)).toBeNull();
+  });
+
+  it('fail-soft: Session ohne job_offer_id (alte JWTs) → erster bestätigter Job wie bisher', () => {
+    const unconfirmed = { id: 16226, status: 'search' };
+    const confirmed = makeConfirmedJob({ id: 999 });
+    expect(pickFinalConfirmedJob([unconfirmed, confirmed], null)).toBe(confirmed);
   });
 });
 
@@ -1409,6 +1418,43 @@ describe('applyAcceptedOverlay', () => {
     expect(result).toHaveLength(1);
     expect(result[0].id).toBe('9006'); // Snapshot-Pfad, NICHT fc-5511
     expect(result[0].status).toBe('accepted');
+  });
+
+  it('Pfad 2 Multi-Job-Gate (Dachs 8899): Acceptance eines ANDEREN Jobs synthetisiert NICHT im aktiven Job', () => {
+    // Session = neuer geplanter Job (confirmedJob null, weil der Session-Job
+    // keine fc hat — strict pickFinalConfirmedJob). Die lead-weite Acceptance-
+    // Row (alte PK Renata, App 9006) darf hier KEINEN BookedScreen erzeugen —
+    // der Kunde soll die NEUE Bewerbung (10430, Grzegorz) prüfen können.
+    const neueBewerbung = makeUiApp({ id: '10430' });
+    const result = applyAcceptedOverlay([neueBewerbung], {
+      acceptances: {
+        application_ids: [9006],
+        rows: [{ application_id: 9006, caregiver_id: 21395, accepted_at: '2026-06-11T10:51:25Z', contract_snapshot: null }],
+      },
+      confirmedJob: null,
+      caregiverProfile: null,
+      firstAcceptedCaregiverId: 21395,
+      opts: OPTS,
+    });
+    expect(result).toHaveLength(1);
+    expect(result[0].id).toBe('10430');
+    expect(result[0].status).toBe('new'); // acceptedApp-Derivation bleibt null → kein BookedScreen
+  });
+
+  it('Pfad 2 synthetisiert weiterhin, wenn die fc des Session-Jobs zur Acceptance-PK passt', () => {
+    const result = applyAcceptedOverlay([], {
+      acceptances: {
+        application_ids: [9006],
+        rows: [{ application_id: 9006, caregiver_id: 21395, accepted_at: '2026-06-11T10:51:25Z', contract_snapshot: null }],
+      },
+      confirmedJob: makeConfirmedJob(), // fc-Caregiver 21395 == Acceptance-PK
+      caregiverProfile: null,
+      firstAcceptedCaregiverId: 21395,
+      opts: OPTS,
+    });
+    expect(result).toHaveLength(1);
+    expect(result[0].status).toBe('accepted');
+    expect(result[0].id).toBe('9006');
   });
 
   it('(c) keine Confirmation + keine Portal-Annahme → applications unverändert', () => {

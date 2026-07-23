@@ -10,7 +10,7 @@ import {
   setDeclinedCaregiver,
 } from '../lib/supabase';
 import { useMamamiaSession } from '../hooks/useMamamiaSession';
-import { useCustomer, useJobOffer, useApplications, useInterests, useDismissedCaregivers, useAcceptedApplications, useMatchings, useCaregiver, useInvitedCaregivers, useInviteRateState } from '../lib/mamamia/hooks';
+import { useCustomer, useJobOffer, useApplications, useInterests, useDismissedCaregivers, useAcceptedApplications, useMatchings, useCaregiver, useInvitedCaregivers, useInviteRateState, useLeadJobs } from '../lib/mamamia/hooks';
 import { rankComparator } from '../lib/mamamia/matchingsRanking';
 import { prefetchCaregivers } from '../lib/mamamia/caregiverCache';
 import { isAboutDeStale, regenerateGermanDescription } from '../lib/mamamia/caregiverAbout';
@@ -581,6 +581,16 @@ const CustomerPortalPage: FC = () => {
   // On portal load we flip the matching app's status to 'accepted' →
   // existing BookedScreen renders. Persists across reload.
   const { data: acceptedApplications, refetch: refetchAcceptedApplications } = useAcceptedApplications(mmReady);
+
+  // Multi-Job (Opcja B, Dachs 8899): die Jobs des Leads — speist den
+  // "Alle meine Einsätze"-Link auch OHNE ?job=-Deeplink (vorher war die
+  // Übersicht nur von einem ?job=-Einstieg aus erreichbar; Kunden mit
+  // Folge-Einsatz konnten den alten gebuchten Job nie wiederfinden).
+  // Nebeneffekt erwünscht: listLeadJobs synct best-effort aus Mamamia →
+  // der lead_jobs-Spiegel (Basis der Aktiv-Job-Wahl beim Onboard) ist
+  // nach jedem Portal-Besuch frisch.
+  const { data: leadJobs } = useLeadJobs(mmReady);
+  const hasMultipleJobs = (leadJobs?.length ?? 0) > 1;
 
   // Gebucht-Ableitung aus dem Mamamia-Stand (Fix Hagedorn 2026-07-15):
   // akzeptiert die AGENTUR die Bewerbung im SA-Portal, gibt es keine
@@ -2166,11 +2176,13 @@ const CustomerPortalPage: FC = () => {
             </div>
           );
         })()}
-        {/* Real Multi-Job back-link: when this portal is scoped to a specific
-            job via ?job=<lead_jobs.id> (deep link from the real ?view=jobs
-            overview), offer a way back. Suppressed under the ?back=jobs mock
-            flow above, which renders its own "Alle Einsätze" link. */}
-        {JOB_ID_PARAM && !HAS_JOBS_BACK && (
+        {/* Real Multi-Job back-link: sichtbar wenn (a) das Portal via
+            ?job=<lead_jobs.id> auf einen Job scoped ist ODER (b) der Lead
+            mehrere Einsätze hat (Opcja B, Dachs 8899 — ohne den Link war
+            die ?view=jobs-Übersicht von einem Deeplink-losen Einstieg aus
+            unerreichbar). Suppressed unter dem ?back=jobs Mock-Flow oben,
+            der seinen eigenen "Alle Einsätze"-Link rendert. */}
+        {(JOB_ID_PARAM || hasMultipleJobs) && !HAS_JOBS_BACK && (
           <div className="max-w-3xl mx-auto px-4 pb-2 -mt-1 flex items-center">
             <a
               href={JOBS_OVERVIEW_HREF}
