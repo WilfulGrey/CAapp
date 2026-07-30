@@ -1781,7 +1781,7 @@ Deno.serve(async (req: Request) => {
           const subject = item.subjectPrefix ? `${item.subjectPrefix}${m.subject}` : m.subject;
           const html = b ? m.html.replace('<div class="email-content">', `${bannerHtml(b)}<div class="email-content">`) : m.html;
           const text = b ? `(${b})\n\n${m.text}` : m.text;
-          const r = await sendEmailSmtp(smtpConfig, to, subject, html, text, undefined, false);
+          const r = await sendEmailSmtp(smtpConfig, to, subject, html, text, undefined, demoBody.skipBcc === true);
           results.push({ email_type: item.email_type, to, subject, ...r });
         } catch (e) {
           results.push({ email_type: item.email_type, success: false, error: String(e) });
