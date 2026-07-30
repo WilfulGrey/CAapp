@@ -513,10 +513,10 @@ function buildProfilNudge1Html(lead: Lead, siteUrl: string, portalBase: string):
   const halloAnrede = buildHalloAnrede(lead.anrede_text || null, lead.nachname || "", lead.vorname || "");
   const content = `
     <p style="font-size:15px;line-height:1.75;color:#444;margin-bottom:14px;">${halloAnrede},</p>
-    <p style="font-size:15px;line-height:1.75;color:#444;margin-bottom:14px;">vielen Dank für Ihre Anfrage &ndash; Ihr persönliches Angebot für die 24-Stunden-Betreuung von Primundus haben Sie bereits erhalten.</p>
-    <p style="font-size:15px;line-height:1.75;color:#444;margin-bottom:14px;">Jetzt kommt der schönste Teil: Möchten Sie sehen, welche Pflegekräfte zu Ihnen passen und <strong>gerade verfügbar</strong> sind? Mit Foto, Anreisedatum und Preis &ndash; alles unverbindlich.</p>
-    <p style="font-size:15px;line-height:1.75;color:#444;margin-bottom:14px;">Dafür brauchen die Pflegekräfte nur ein paar Details zur Pflegesituation. Die tragen Sie in etwa 5 Minuten im Patientenprofil ein &ndash; vieles ist schon vorausgefüllt.</p>
-    ${bulletproofButton(portalUrl, "Pflegekräfte ansehen&nbsp;&nbsp;&rarr;", "#2A9D5C")}
+    <p style="font-size:15px;line-height:1.75;color:#444;margin-bottom:14px;">Ihr Angebot haben Sie bereits &ndash; doch wichtiger als jedes Angebot ist die Frage: Wer wird Ihren Angehörigen betreuen? Bei uns sehen Sie genau das vorab. Sie lernen die Pflegekräfte mit Foto, Erfahrung und Anreisedatum kennen und entscheiden erst dann &ndash; bevor irgendein Vertrag geschlossen wird. Keine Katze im Sack.</p>
+    <p style="font-size:15px;line-height:1.75;color:#444;margin-bottom:14px;">Im Moment geht das noch nicht: In Ihrem Patientenprofil fehlen ein paar Angaben, und ohne sie kann unser System keine passenden Pflegekräfte für Sie finden und vorschlagen.</p>
+    <p style="font-size:15px;line-height:1.75;color:#444;margin-bottom:14px;">Vervollständigen Sie das Profil kurz &ndash; vieles ist schon vorausgefüllt. Danach erhalten Sie ganz unverbindlich Bewerbungen und sehen sich in Ruhe an, wer die Betreuung übernehmen möchte. Und wenn Sie mögen, laden Sie zusätzlich weitere Pflegekräfte ein, sich bei Ihnen zu bewerben.</p>
+    ${bulletproofButton(portalUrl, "Profil vervollständigen&nbsp;&nbsp;&rarr;", "#2A9D5C")}
     <p style="font-size:13px;line-height:1.6;color:#888;margin:18px 0 0;">PS: Klappt im Portal etwas nicht, oder möchten Sie das lieber persönlich klären? Sie erreichen mich unter <a href="tel:+4989200000830" style="color:#8B7355;text-decoration:none;">089&nbsp;200&nbsp;000&nbsp;830</a> oder per <a href="https://wa.me/4989200000830" style="color:#8B7355;text-decoration:none;">WhatsApp</a>.</p>
     ${buildIlkaSig(siteUrl)}`;
   return buildEmailWrapper(lead, siteUrl, content);
@@ -527,13 +527,13 @@ function buildProfilNudge1Text(lead: Lead, siteUrl: string, portalBase: string):
   const halloAnrede = buildHalloAnrede(lead.anrede_text || null, lead.nachname || "", lead.vorname || "");
   return `${halloAnrede},
 
-vielen Dank für Ihre Anfrage — Ihr persönliches Angebot für die 24-Stunden-Betreuung von Primundus haben Sie bereits erhalten.
+Ihr Angebot haben Sie bereits — doch wichtiger als jedes Angebot ist die Frage: Wer wird Ihren Angehörigen betreuen? Bei uns sehen Sie genau das vorab. Sie lernen die Pflegekräfte mit Foto, Erfahrung und Anreisedatum kennen und entscheiden erst dann — bevor irgendein Vertrag geschlossen wird. Keine Katze im Sack.
 
-Jetzt kommt der schönste Teil: Möchten Sie sehen, welche Pflegekräfte zu Ihnen passen und gerade verfügbar sind? Mit Foto, Anreisedatum und Preis — alles unverbindlich.
+Im Moment geht das noch nicht: In Ihrem Patientenprofil fehlen ein paar Angaben, und ohne sie kann unser System keine passenden Pflegekräfte für Sie finden und vorschlagen.
 
-Dafür brauchen die Pflegekräfte nur ein paar Details zur Pflegesituation. Die tragen Sie in etwa 5 Minuten im Patientenprofil ein — vieles ist schon vorausgefüllt.
+Vervollständigen Sie das Profil kurz — vieles ist schon vorausgefüllt. Danach erhalten Sie ganz unverbindlich Bewerbungen und sehen sich in Ruhe an, wer die Betreuung übernehmen möchte. Und wenn Sie mögen, laden Sie zusätzlich weitere Pflegekräfte ein, sich bei Ihnen zu bewerben.
 
-Pflegekräfte ansehen: ${portalUrl}
+Profil vervollständigen: ${portalUrl}
 
 PS: Klappt im Portal etwas nicht, oder möchten Sie das lieber persönlich klären? Sie erreichen mich unter 089 200 000 830 oder per WhatsApp (https://wa.me/4989200000830).
 
@@ -1988,7 +1988,7 @@ Deno.serve(async (req: Request) => {
           eventTypeSent = "email_nachfass_3_sent";
           eventTypeFailed = "email_nachfass_3_failed";
         } else if (scheduledEmail.email_type === "profil_nudge_1") {
-          subject = "Möchten Sie sehen, welche Pflegekräfte gerade verfügbar sind?";
+          subject = "Pflegekräfte können sich noch nicht bei Ihnen bewerben";
           html = buildProfilNudge1Html(lead as Lead, smtpConfig.siteUrl, portalBase);
           text = buildProfilNudge1Text(lead as Lead, smtpConfig.siteUrl, portalBase);
           eventTypeSent = "email_profil_nudge_1_sent";
