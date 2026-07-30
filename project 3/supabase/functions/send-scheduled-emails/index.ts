@@ -411,8 +411,8 @@ function nachfassContent(milestone: LeadMilestone): { intro: string; body: strin
 function nachfass2Content(milestone: LeadMilestone): { intro: string; cta: string } {
   if (milestone === "patient_data_saved") {
     return {
-      intro: "kommen Sie mit der Auswahl der Pflegekräfte zurecht? Ich gehe gern mit Ihnen durch die Profile — antworten Sie kurz oder rufen Sie mich an.",
-      cta: "Pflegekräfte einladen →",
+      intro: "gute Nachricht: Wir haben passende Pflegekräfte für Ihre Betreuung gefunden. Möchten Sie sie selbst im Portal ansehen und Ihre Favoriten zur Bewerbung einladen — oder soll ich das für Sie übernehmen? Ein kurzer Anruf oder eine Antwort auf diese Mail genügt, ich kümmere mich gern.",
+      cta: "Pflegekräfte ansehen →",
     };
   }
   if (milestone === "portal_opened") {
@@ -422,8 +422,8 @@ function nachfass2Content(milestone: LeadMilestone): { intro: string; cta: strin
     };
   }
   return {
-    intro: "brauchen Sie noch Hilfe? Falls Ihnen etwas unklar war oder Sie nicht weiterkommen, melden Sie sich einfach bei mir — ich rufe Sie gern an.",
-    cta: "Im Portal weitersehen →",
+    intro: "für Sie stehen Pflegekräfte bereit, die Ihre Betreuung übernehmen würden. Damit sie sich bei Ihnen bewerben können, fehlen im Portal noch ein paar Angaben zu Ihrer Pflegesituation. Das müssen Sie nicht allein machen — rufen Sie mich an oder antworten Sie kurz auf diese Mail, wir gehen es gemeinsam durch. Danach kommen die Bewerbungen ganz unverbindlich zu Ihnen.",
+    cta: "Angaben vervollständigen →",
   };
 }
 
@@ -513,10 +513,10 @@ function buildProfilNudge1Html(lead: Lead, siteUrl: string, portalBase: string):
   const halloAnrede = buildHalloAnrede(lead.anrede_text || null, lead.nachname || "", lead.vorname || "");
   const content = `
     <p style="font-size:15px;line-height:1.75;color:#444;margin-bottom:14px;">${halloAnrede},</p>
-    <p style="font-size:15px;line-height:1.75;color:#444;margin-bottom:14px;">vielen Dank für Ihre Anfrage &ndash; Ihr persönliches Angebot für die 24-Stunden-Betreuung von Primundus haben Sie bereits erhalten.</p>
-    <p style="font-size:15px;line-height:1.75;color:#444;margin-bottom:14px;">Jetzt kommt der schönste Teil: Möchten Sie sehen, welche Pflegekräfte zu Ihnen passen und <strong>gerade verfügbar</strong> sind? Mit Foto, Anreisedatum und Preis &ndash; alles unverbindlich.</p>
-    <p style="font-size:15px;line-height:1.75;color:#444;margin-bottom:14px;">Dafür brauchen die Pflegekräfte nur ein paar Details zur Pflegesituation. Die tragen Sie in etwa 5 Minuten im Patientenprofil ein &ndash; vieles ist schon vorausgefüllt.</p>
-    ${bulletproofButton(portalUrl, "Pflegekräfte ansehen&nbsp;&nbsp;&rarr;", "#2A9D5C")}
+    <p style="font-size:15px;line-height:1.75;color:#444;margin-bottom:14px;">Ihr Angebot haben Sie bereits &ndash; doch wichtiger als jedes Angebot ist die Frage: Wer wird Ihren Angehörigen betreuen? Bei uns sehen Sie genau das vorab. Sie lernen die Pflegekräfte mit Foto, Erfahrung und Anreisedatum kennen und entscheiden erst dann &ndash; bevor irgendein Vertrag geschlossen wird. Keine Katze im Sack.</p>
+    <p style="font-size:15px;line-height:1.75;color:#444;margin-bottom:14px;">Im Moment geht das noch nicht: In Ihrem Patientenprofil fehlen ein paar Angaben, und ohne sie kann unser System keine passenden Pflegekräfte für Sie finden und vorschlagen.</p>
+    <p style="font-size:15px;line-height:1.75;color:#444;margin-bottom:14px;">Vervollständigen Sie das Profil kurz &ndash; vieles ist schon vorausgefüllt. Danach erhalten Sie ganz unverbindlich Bewerbungen und sehen sich in Ruhe an, wer die Betreuung übernehmen möchte. Und wenn Sie mögen, laden Sie zusätzlich weitere Pflegekräfte ein, sich bei Ihnen zu bewerben.</p>
+    ${bulletproofButton(portalUrl, "Profil vervollständigen&nbsp;&nbsp;&rarr;", "#2A9D5C")}
     <p style="font-size:13px;line-height:1.6;color:#888;margin:18px 0 0;">PS: Klappt im Portal etwas nicht, oder möchten Sie das lieber persönlich klären? Sie erreichen mich unter <a href="tel:+4989200000830" style="color:#8B7355;text-decoration:none;">089&nbsp;200&nbsp;000&nbsp;830</a> oder per <a href="https://wa.me/4989200000830" style="color:#8B7355;text-decoration:none;">WhatsApp</a>.</p>
     ${buildIlkaSig(siteUrl)}`;
   return buildEmailWrapper(lead, siteUrl, content);
@@ -527,13 +527,13 @@ function buildProfilNudge1Text(lead: Lead, siteUrl: string, portalBase: string):
   const halloAnrede = buildHalloAnrede(lead.anrede_text || null, lead.nachname || "", lead.vorname || "");
   return `${halloAnrede},
 
-vielen Dank für Ihre Anfrage — Ihr persönliches Angebot für die 24-Stunden-Betreuung von Primundus haben Sie bereits erhalten.
+Ihr Angebot haben Sie bereits — doch wichtiger als jedes Angebot ist die Frage: Wer wird Ihren Angehörigen betreuen? Bei uns sehen Sie genau das vorab. Sie lernen die Pflegekräfte mit Foto, Erfahrung und Anreisedatum kennen und entscheiden erst dann — bevor irgendein Vertrag geschlossen wird. Keine Katze im Sack.
 
-Jetzt kommt der schönste Teil: Möchten Sie sehen, welche Pflegekräfte zu Ihnen passen und gerade verfügbar sind? Mit Foto, Anreisedatum und Preis — alles unverbindlich.
+Im Moment geht das noch nicht: In Ihrem Patientenprofil fehlen ein paar Angaben, und ohne sie kann unser System keine passenden Pflegekräfte für Sie finden und vorschlagen.
 
-Dafür brauchen die Pflegekräfte nur ein paar Details zur Pflegesituation. Die tragen Sie in etwa 5 Minuten im Patientenprofil ein — vieles ist schon vorausgefüllt.
+Vervollständigen Sie das Profil kurz — vieles ist schon vorausgefüllt. Danach erhalten Sie ganz unverbindlich Bewerbungen und sehen sich in Ruhe an, wer die Betreuung übernehmen möchte. Und wenn Sie mögen, laden Sie zusätzlich weitere Pflegekräfte ein, sich bei Ihnen zu bewerben.
 
-Pflegekräfte ansehen: ${portalUrl}
+Profil vervollständigen: ${portalUrl}
 
 PS: Klappt im Portal etwas nicht, oder möchten Sie das lieber persönlich klären? Sie erreichen mich unter 089 200 000 830 oder per WhatsApp (https://wa.me/4989200000830).
 
@@ -549,9 +549,10 @@ function buildProfilNudge2Html(lead: Lead, siteUrl: string, portalBase: string):
   const halloAnrede = buildHalloAnrede(lead.anrede_text || null, lead.nachname || "", lead.vorname || "");
   const content = `
     <p style="font-size:15px;line-height:1.75;color:#444;margin-bottom:14px;">${halloAnrede},</p>
-    <p style="font-size:15px;line-height:1.75;color:#444;margin-bottom:14px;">kurze Frage: Soll ich das Patientenprofil mit Ihnen am Telefon ausfüllen? Zehn Minuten, dann sehen Sie, welche Pflegekräfte für Sie verfügbar wären &ndash; mit Foto, Anreisedatum und Preis, und Sie erhalten unverbindliche Bewerbungen.</p>
-    <p style="font-size:15px;line-height:1.75;color:#444;margin-bottom:14px;">Rufen Sie mich einfach an &ndash; <a href="tel:+4989200000830" style="color:#8B7355;text-decoration:none;font-weight:600;">089&nbsp;200&nbsp;000&nbsp;830</a> &ndash; oder schreiben Sie mir per <a href="https://wa.me/4989200000830" style="color:#8B7355;text-decoration:none;font-weight:600;">WhatsApp</a>, wann es Ihnen passt.</p>
-    ${bulletproofButton(portalUrl, "Oder gleich selbst ausfüllen&nbsp;&nbsp;&rarr;", "#2A9D5C")}
+    <p style="font-size:15px;line-height:1.75;color:#444;margin-bottom:14px;">Sie haben bisher keine unverbindlichen Bewerbungen erhalten &ndash; und können deshalb nicht sehen, welche Pflegekräfte die Betreuung übernehmen möchten. Dazu fehlen nur einige Angaben in Ihrem Patientenprofil.</p>
+    <p style="font-size:15px;line-height:1.75;color:#444;margin-bottom:14px;">Soll ich das gemeinsam mit Ihnen ausfüllen? Rufen Sie mich einfach an &ndash; <a href="tel:+4989200000830" style="color:#8B7355;text-decoration:none;font-weight:600;">089&nbsp;200&nbsp;000&nbsp;830</a> &ndash; oder schreiben Sie mir per <a href="https://wa.me/4989200000830" style="color:#8B7355;text-decoration:none;font-weight:600;">WhatsApp</a>, wann es Ihnen passt.</p>
+    <p style="font-size:15px;line-height:1.75;color:#444;margin-bottom:14px;">Oder Sie erledigen es direkt selbst: einmal klicken, Angaben vervollständigen, Bewerbungen erhalten. Kostenfrei und unverbindlich.</p>
+    ${bulletproofButton(portalUrl, "Angaben vervollständigen&nbsp;&nbsp;&rarr;", "#2A9D5C")}
     <p style="font-size:13px;line-height:1.6;color:#888;margin:18px 0 0;">PS: Klappt im Portal etwas nicht, oder möchten Sie das lieber persönlich klären? Sie erreichen mich unter <a href="tel:+4989200000830" style="color:#8B7355;text-decoration:none;">089&nbsp;200&nbsp;000&nbsp;830</a> oder per <a href="https://wa.me/4989200000830" style="color:#8B7355;text-decoration:none;">WhatsApp</a>.</p>
     ${buildIlkaSig(siteUrl)}`;
   return buildEmailWrapper(lead, siteUrl, content);
@@ -562,11 +563,13 @@ function buildProfilNudge2Text(lead: Lead, siteUrl: string, portalBase: string):
   const halloAnrede = buildHalloAnrede(lead.anrede_text || null, lead.nachname || "", lead.vorname || "");
   return `${halloAnrede},
 
-kurze Frage: Soll ich das Patientenprofil mit Ihnen am Telefon ausfüllen? Zehn Minuten, dann sehen Sie, welche Pflegekräfte für Sie verfügbar wären — mit Foto, Anreisedatum und Preis, und Sie erhalten unverbindliche Bewerbungen.
+Sie haben bisher keine unverbindlichen Bewerbungen erhalten — und können deshalb nicht sehen, welche Pflegekräfte die Betreuung übernehmen möchten. Dazu fehlen nur einige Angaben in Ihrem Patientenprofil.
 
-Rufen Sie mich einfach an — 089 200 000 830 — oder schreiben Sie mir per WhatsApp (https://wa.me/4989200000830), wann es Ihnen passt.
+Soll ich das gemeinsam mit Ihnen ausfüllen? Rufen Sie mich einfach an — 089 200 000 830 — oder schreiben Sie mir per WhatsApp (https://wa.me/4989200000830), wann es Ihnen passt.
 
-Oder gleich selbst ausfüllen: ${portalUrl}
+Oder Sie erledigen es direkt selbst: einmal klicken, Angaben vervollständigen, Bewerbungen erhalten. Kostenfrei und unverbindlich.
+
+Angaben vervollständigen: ${portalUrl}
 
 PS: Klappt im Portal etwas nicht, oder möchten Sie das lieber persönlich klären? Sie erreichen mich unter 089 200 000 830 oder per WhatsApp (https://wa.me/4989200000830).
 
@@ -584,14 +587,10 @@ function buildProfilNudge3Html(lead: Lead, siteUrl: string, portalBase: string):
   const li = 'p style="font-size:14.5px;line-height:1.7;color:#444;margin:0 0 10px;"';
   const content = `
     <p style="font-size:15px;line-height:1.75;color:#444;margin-bottom:14px;">${halloAnrede},</p>
-    <p style="font-size:15px;line-height:1.75;color:#444;margin-bottom:14px;">vor einer Woche hatten Sie Ihr Angebot für die 24-Stunden-Betreuung erhalten &ndash; ich weiß nicht, wo Sie gerade stehen, deshalb nur drei Dinge, die den meisten Familien jetzt helfen:</p>
-    <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="margin:0 0 16px;background:#FAF8F4;border:1px solid #ECE3D4;border-radius:10px;"><tr><td style="padding:16px 20px;">
-      <${li}><strong>Der Pflegegrad zahlt mit</strong> &ndash; ab Pflegegrad 2 gibt es monatlich Pflegegeld.</p>
-      <${li}><strong>Verhinderungspflege nutzen</strong> &ndash; zusammen mit der Kurzzeitpflege bis zu 3.539&nbsp;&euro; im Jahr.</p>
-      <p style="font-size:14.5px;line-height:1.7;color:#444;margin:0;"><strong>Vorlauf einplanen</strong> &ndash; zwischen Anfrage und Anreise liegen meist 1&ndash;2 Wochen.</p>
-    </td></tr></table>
-    <p style="font-size:15px;line-height:1.75;color:#444;margin-bottom:14px;">Und falls Sie neugierig sind, welche Pflegekräfte Sie bekommen könnten: Reinschauen und vergleichen ist unverbindlich &ndash; passt eine nicht, bekommen Sie einfach weitere Vorschläge. Ein Vertrag entsteht erst, wenn Sie Ihre Pflegekraft gefunden haben.</p>
-    ${bulletproofButton(portalUrl, "Pflegekräfte ansehen&nbsp;&nbsp;&rarr;", "#2A9D5C")}
+    <p style="font-size:15px;line-height:1.75;color:#444;margin-bottom:14px;">vor einer Woche haben Sie Ihr Angebot erhalten &ndash; darf ich kurz nachfragen, wo Sie stehen? Gibt es offene Fragen, oder etwas, bei dem wir Sie unterstützen können?</p>
+    <p style="font-size:15px;line-height:1.75;color:#444;margin-bottom:14px;">Falls die Betreuung noch ansteht: Bisher haben Sie keine Bewerbungen von Pflegekräften erhalten, weil im Patientenprofil noch einige Angaben fehlen. Kurz vervollständigen &ndash; und Sie sehen kostenfrei und unverbindlich, wer die Betreuung übernehmen möchte.</p>
+    ${bulletproofButton(portalUrl, "Angaben vervollständigen&nbsp;&nbsp;&rarr;", "#2A9D5C")}
+    <p style="font-size:15px;line-height:1.75;color:#444;margin:16px 0 0;">Antworten Sie einfach auf diese E-Mail &ndash; oder rufen Sie mich an: <a href="tel:+4989200000830" style="color:#8B7355;text-decoration:none;font-weight:600;">089&nbsp;200&nbsp;000&nbsp;830</a>, gern auch per <a href="https://wa.me/4989200000830" style="color:#8B7355;text-decoration:none;font-weight:600;">WhatsApp</a>.</p>
     <p style="font-size:13px;line-height:1.6;color:#888;margin:18px 0 0;">PS: Klappt im Portal etwas nicht, oder möchten Sie das lieber persönlich klären? Sie erreichen mich unter <a href="tel:+4989200000830" style="color:#8B7355;text-decoration:none;">089&nbsp;200&nbsp;000&nbsp;830</a> oder per <a href="https://wa.me/4989200000830" style="color:#8B7355;text-decoration:none;">WhatsApp</a>.</p>
     ${buildIlkaSig(siteUrl)}`;
   return buildEmailWrapper(lead, siteUrl, content);
@@ -602,15 +601,13 @@ function buildProfilNudge3Text(lead: Lead, siteUrl: string, portalBase: string):
   const halloAnrede = buildHalloAnrede(lead.anrede_text || null, lead.nachname || "", lead.vorname || "");
   return `${halloAnrede},
 
-vor einer Woche hatten Sie Ihr Angebot für die 24-Stunden-Betreuung erhalten — ich weiß nicht, wo Sie gerade stehen, deshalb nur drei Dinge, die den meisten Familien jetzt helfen:
+vor einer Woche haben Sie Ihr Angebot erhalten — darf ich kurz nachfragen, wo Sie stehen? Gibt es offene Fragen, oder etwas, bei dem wir Sie unterstützen können?
 
-- Der Pflegegrad zahlt mit — ab Pflegegrad 2 gibt es monatlich Pflegegeld.
-- Verhinderungspflege nutzen — zusammen mit der Kurzzeitpflege bis zu 3.539 € im Jahr.
-- Vorlauf einplanen — zwischen Anfrage und Anreise liegen meist 1–2 Wochen.
+Falls die Betreuung noch ansteht: Bisher haben Sie keine Bewerbungen von Pflegekräften erhalten, weil im Patientenprofil noch einige Angaben fehlen. Kurz vervollständigen — und Sie sehen kostenfrei und unverbindlich, wer die Betreuung übernehmen möchte.
 
-Und falls Sie neugierig sind, welche Pflegekräfte Sie bekommen könnten: Reinschauen und vergleichen ist unverbindlich — passt eine nicht, bekommen Sie einfach weitere Vorschläge. Ein Vertrag entsteht erst, wenn Sie Ihre Pflegekraft gefunden haben.
+Angaben vervollständigen: ${portalUrl}
 
-Pflegekräfte ansehen: ${portalUrl}
+Antworten Sie einfach auf diese E-Mail — oder rufen Sie mich an: 089 200 000 830, gern auch per WhatsApp (https://wa.me/4989200000830).
 
 PS: Klappt im Portal etwas nicht, oder möchten Sie das lieber persönlich klären? Sie erreichen mich unter 089 200 000 830 oder per WhatsApp (https://wa.me/4989200000830).
 
@@ -627,7 +624,7 @@ function buildReaktivierungWechselHtml(lead: Lead, siteUrl: string, portalBase: 
   const halloAnrede = buildHalloAnrede(lead.anrede_text || null, lead.nachname || "", lead.vorname || "");
   const content = `
     <p style="font-size:15px;line-height:1.75;color:#444;margin-bottom:14px;">${halloAnrede},</p>
-    <p style="font-size:15px;line-height:1.75;color:#444;margin-bottom:14px;">vielleicht haben Sie längst eine Betreuung gefunden &ndash; dann wünsche ich Ihnen alles Gute damit. Ich melde mich, weil nach sechs bis acht Wochen meist der <strong>erste Wechsel der Pflegekraft</strong> ansteht. Falls Sie dann vergleichen möchten: Bei uns sehen Sie jederzeit unverbindlich, wer aktuell verfügbar wäre &ndash; ab wann, zu welchem Preis, mit Bestpreis-Garantie. Ein Vertrag entsteht erst, wenn Sie wirklich jemanden gefunden haben.</p>
+    <p style="font-size:15px;line-height:1.75;color:#444;margin-bottom:14px;">vielleicht haben Sie längst eine Betreuung gefunden &ndash; dann wünsche ich Ihnen alles Gute damit. Ich melde mich, weil bei vielen Familien nach einiger Zeit ein <strong>Wechsel der Pflegekraft</strong> ansteht. Falls das auch bei Ihnen der Fall ist: Gerne zeigen wir Ihnen unverbindlich, welche Pflegekräfte gerade verfügbar wären &ndash; damit Sie besser vergleichen können und die beste Lösung für Ihre Betreuungssituation finden. Ein Vertrag entsteht erst, wenn Sie wirklich jemanden gefunden haben.</p>
     ${bulletproofButton(portalUrl, "Aktuelle Pflegekräfte ansehen&nbsp;&nbsp;&rarr;", "#2A9D5C")}
     <p style="font-size:13px;line-height:1.6;color:#888;margin:18px 0 0;">PS: Klappt im Portal etwas nicht, oder möchten Sie das lieber persönlich klären? Sie erreichen mich unter <a href="tel:+4989200000830" style="color:#8B7355;text-decoration:none;">089&nbsp;200&nbsp;000&nbsp;830</a> oder per <a href="https://wa.me/4989200000830" style="color:#8B7355;text-decoration:none;">WhatsApp</a>.</p>
     ${buildIlkaSig(siteUrl)}`;
@@ -639,7 +636,7 @@ function buildReaktivierungWechselText(lead: Lead, siteUrl: string, portalBase: 
   const halloAnrede = buildHalloAnrede(lead.anrede_text || null, lead.nachname || "", lead.vorname || "");
   return `${halloAnrede},
 
-vielleicht haben Sie längst eine Betreuung gefunden — dann wünsche ich Ihnen alles Gute damit. Ich melde mich, weil nach sechs bis acht Wochen meist der erste Wechsel der Pflegekraft ansteht. Falls Sie dann vergleichen möchten: Bei uns sehen Sie jederzeit unverbindlich, wer aktuell verfügbar wäre — ab wann, zu welchem Preis, mit Bestpreis-Garantie. Ein Vertrag entsteht erst, wenn Sie wirklich jemanden gefunden haben.
+vielleicht haben Sie längst eine Betreuung gefunden — dann wünsche ich Ihnen alles Gute damit. Ich melde mich, weil bei vielen Familien nach einiger Zeit ein Wechsel der Pflegekraft ansteht. Falls das auch bei Ihnen der Fall ist: Gerne zeigen wir Ihnen unverbindlich, welche Pflegekräfte gerade verfügbar wären — damit Sie besser vergleichen können und die beste Lösung für Ihre Betreuungssituation finden. Ein Vertrag entsteht erst, wenn Sie wirklich jemanden gefunden haben.
 
 Aktuelle Pflegekräfte ansehen: ${portalUrl}
 
@@ -1147,7 +1144,8 @@ async function sendEmailSmtp(
   subject: string,
   html: string,
   text: string,
-  attachments?: { filename: string; content: Uint8Array; contentType: string; cid?: string }[]
+  attachments?: { filename: string; content: Uint8Array; contentType: string; cid?: string }[],
+  skipBcc: boolean = false
 ): Promise<{ success: boolean; error?: string }> {
   try {
     const transport = nodemailer.createTransport({
@@ -1187,7 +1185,7 @@ async function sendEmailSmtp(
       replyTo: "info@primundus.de",
       text,
       html,
-      ...(bccAddr ? { bcc: bccAddr } : {}),
+      ...(!skipBcc && bccAddr ? { bcc: bccAddr } : {}),
     };
 
     if (attachments && attachments.length > 0) {
@@ -1740,6 +1738,59 @@ Deno.serve(async (req: Request) => {
  
     const now = new Date().toISOString();
  
+    // ── DEMO-MODUS ────────────────────────────────────────────────────────────
+    // Vorschau der KOMPLETTEN Kette an eine beliebige Adresse, damit ein (künftiger)
+    // Partner die Automatik nachvollziehen kann. Body:
+    //   { demo:true, lead_id, recipient, items:[{email_type, banner}], milestone? }
+    // Rendert jede Mail für den echten Lead, setzt oben einen Klammer-Hinweis ein.
+    // Fasst scheduled_emails/lead_events NICHT an — die echte (ggf. gestoppte) Kette
+    // des Leads bleibt unberührt (Lehre aus dem Fülbrandt-Vorfall 30.07.).
+    let demoBody: any = null;
+    try { demoBody = await req.clone().json(); } catch { demoBody = null; }
+    if (demoBody && demoBody.demo === true) {
+      const jsonH = { ...corsHeaders, "Content-Type": "application/json" };
+      const { data: lead } = await supabase.from("leads").select("*").eq("id", demoBody.lead_id).single();
+      if (!lead) return new Response(JSON.stringify({ error: "lead not found" }), { status: 404, headers: jsonH });
+      const portalBase = Deno.env.get("PORTAL_URL") || "https://kundenportal.primundus.de";
+      const site = smtpConfig.siteUrl;
+      const to = demoBody.recipient;
+      const ms = (demoBody.milestone || "none") as LeadMilestone;
+      const pu = (portalBase && (lead as Lead).token) ? buildPortalUrl(portalBase, (lead as Lead).token) : site;
+
+      const render = (t: string): { subject: string; html: string; text: string } => {
+        switch (t) {
+          case "eingangsbestaetigung": return { subject: "Ihr persönliches Angebot zur 24-Stunden-Betreuung", html: buildEingangsbestaetigungHtml(lead as Lead, site, portalBase), text: buildEingangsbestaetigungText(lead as Lead, portalBase) };
+          case "profil_nudge_1": return { subject: "Pflegekräfte können sich noch nicht bei Ihnen bewerben", html: buildProfilNudge1Html(lead as Lead, site, portalBase), text: buildProfilNudge1Text(lead as Lead, site, portalBase) };
+          case "profil_nudge_2": return { subject: "Profil unvollständig — Sie können noch keine Bewerbungen erhalten", html: buildProfilNudge2Html(lead as Lead, site, portalBase), text: buildProfilNudge2Text(lead as Lead, site, portalBase) };
+          case "warum_primundus": return { subject: "Kennen Sie die Primundus-Bestpreis-Garantie?", html: buildWarumPrimundusHtml(lead as Lead, pu, site), text: buildWarumPrimundusText(lead as Lead, pu) };
+          case "nachfass_2": return { subject: "Ihre Betreuung — kann ich Ihnen etwas abnehmen?", html: buildNachfass2Html(lead as Lead, site, portalBase, ms), text: buildNachfass2Text(lead as Lead, site, portalBase, ms) };
+          case "nachfass_3": return { subject: "Eine letzte Frage — wie schaut's bei Ihnen aus?", html: buildNachfass3Html(lead as Lead, site), text: buildNachfass3Text(lead as Lead, site) };
+          case "profil_nudge_3": return { subject: "Können wir Sie bei etwas unterstützen?", html: buildProfilNudge3Html(lead as Lead, site, portalBase), text: buildProfilNudge3Text(lead as Lead, site, portalBase) };
+          case "reaktivierung_wechsel": return { subject: "Steht bei Ihnen ein Pflegekraft-Wechsel an?", html: buildReaktivierungWechselHtml(lead as Lead, site, portalBase), text: buildReaktivierungWechselText(lead as Lead, site, portalBase) };
+          default: return { subject: `Unbekannt: ${t}`, html: `<p>Unbekannter Typ ${t}</p>`, text: `Unbekannter Typ ${t}` };
+        }
+      };
+      const bannerHtml = (b: string) => `<table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="max-width:600px;margin:12px auto 0;"><tr><td style="background:#FFF7E6;border:1px solid #F0D68A;border-radius:8px;padding:11px 16px;font-family:sans-serif;font-size:13px;color:#8A6D00;line-height:1.5;">(${b})</td></tr></table>`;
+
+      const results: any[] = [];
+      for (const item of (demoBody.items || [])) {
+        try {
+          const m = render(item.email_type);
+          const b = item.banner || "";
+          // subjectPrefix wird VORNE an den Original-Betreff gehängt (z. B. "Test - Mail 2: ").
+          const subject = item.subjectPrefix ? `${item.subjectPrefix}${m.subject}` : m.subject;
+          const html = b ? m.html.replace('<div class="email-content">', `${bannerHtml(b)}<div class="email-content">`) : m.html;
+          const text = b ? `(${b})\n\n${m.text}` : m.text;
+          const r = await sendEmailSmtp(smtpConfig, to, subject, html, text, undefined, demoBody.skipBcc === true);
+          results.push({ email_type: item.email_type, to, subject, ...r });
+        } catch (e) {
+          results.push({ email_type: item.email_type, success: false, error: String(e) });
+        }
+      }
+      return new Response(JSON.stringify({ demo: true, recipient: to, results }), { status: 200, headers: jsonH });
+    }
+    // ── Ende DEMO-MODUS ───────────────────────────────────────────────────────
+
     const { data: pendingEmails, error: fetchError } = await supabase
       .from("scheduled_emails")
       .select("*")
@@ -1976,7 +2027,9 @@ Deno.serve(async (req: Request) => {
           eventTypeSent = "email_nachfass_1_sent";
           eventTypeFailed = "email_nachfass_1_failed";
         } else if (scheduledEmail.email_type === "nachfass_2") {
-          subject = "Brauchen Sie noch Hilfe?";
+          // Betreff trägt alle drei Varianten (Kräfte gefunden / Hilfe beim
+          // Ausfüllen / Angaben fehlen) — daher bewusst offen gehalten.
+          subject = "Ihre Betreuung — kann ich Ihnen etwas abnehmen?";
           html = buildNachfass2Html(lead as Lead, smtpConfig.siteUrl, portalBase, milestone);
           text = buildNachfass2Text(lead as Lead, smtpConfig.siteUrl, portalBase, milestone);
           eventTypeSent = "email_nachfass_2_sent";
@@ -1988,25 +2041,25 @@ Deno.serve(async (req: Request) => {
           eventTypeSent = "email_nachfass_3_sent";
           eventTypeFailed = "email_nachfass_3_failed";
         } else if (scheduledEmail.email_type === "profil_nudge_1") {
-          subject = "Möchten Sie sehen, welche Pflegekräfte gerade verfügbar sind?";
+          subject = "Pflegekräfte können sich noch nicht bei Ihnen bewerben";
           html = buildProfilNudge1Html(lead as Lead, smtpConfig.siteUrl, portalBase);
           text = buildProfilNudge1Text(lead as Lead, smtpConfig.siteUrl, portalBase);
           eventTypeSent = "email_profil_nudge_1_sent";
           eventTypeFailed = "email_profil_nudge_1_failed";
         } else if (scheduledEmail.email_type === "profil_nudge_2") {
-          subject = "Soll ich das mit Ihnen zusammen machen?";
+          subject = "Profil unvollständig — Sie können noch keine Bewerbungen erhalten";
           html = buildProfilNudge2Html(lead as Lead, smtpConfig.siteUrl, portalBase);
           text = buildProfilNudge2Text(lead as Lead, smtpConfig.siteUrl, portalBase);
           eventTypeSent = "email_profil_nudge_2_sent";
           eventTypeFailed = "email_profil_nudge_2_failed";
         } else if (scheduledEmail.email_type === "profil_nudge_3") {
-          subject = "Wie ist Ihr Stand?";
+          subject = "Können wir Sie bei etwas unterstützen?";
           html = buildProfilNudge3Html(lead as Lead, smtpConfig.siteUrl, portalBase);
           text = buildProfilNudge3Text(lead as Lead, smtpConfig.siteUrl, portalBase);
           eventTypeSent = "email_profil_nudge_3_sent";
           eventTypeFailed = "email_profil_nudge_3_failed";
         } else if (scheduledEmail.email_type === "reaktivierung_wechsel") {
-          subject = "Steht bei Ihnen der erste Wechsel an?";
+          subject = "Steht bei Ihnen ein Pflegekraft-Wechsel an?";
           html = buildReaktivierungWechselHtml(lead as Lead, smtpConfig.siteUrl, portalBase);
           text = buildReaktivierungWechselText(lead as Lead, smtpConfig.siteUrl, portalBase);
           eventTypeSent = "email_reaktivierung_wechsel_sent";
