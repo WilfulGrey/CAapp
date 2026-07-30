@@ -624,7 +624,7 @@ function buildReaktivierungWechselHtml(lead: Lead, siteUrl: string, portalBase: 
   const halloAnrede = buildHalloAnrede(lead.anrede_text || null, lead.nachname || "", lead.vorname || "");
   const content = `
     <p style="font-size:15px;line-height:1.75;color:#444;margin-bottom:14px;">${halloAnrede},</p>
-    <p style="font-size:15px;line-height:1.75;color:#444;margin-bottom:14px;">vielleicht haben Sie längst eine Betreuung gefunden &ndash; dann wünsche ich Ihnen alles Gute damit. Ich melde mich, weil nach sechs bis acht Wochen meist der <strong>erste Wechsel der Pflegekraft</strong> ansteht. Falls Sie dann vergleichen möchten: Bei uns sehen Sie jederzeit unverbindlich, wer aktuell verfügbar wäre &ndash; ab wann, mit Bestpreis-Garantie. Ein Vertrag entsteht erst, wenn Sie wirklich jemanden gefunden haben.</p>
+    <p style="font-size:15px;line-height:1.75;color:#444;margin-bottom:14px;">vielleicht haben Sie längst eine Betreuung gefunden &ndash; dann wünsche ich Ihnen alles Gute damit. Ich melde mich, weil bei vielen Familien nach einiger Zeit ein <strong>Wechsel der Pflegekraft</strong> ansteht. Falls das auch bei Ihnen der Fall ist: Gerne zeigen wir Ihnen unverbindlich, welche Pflegekräfte gerade verfügbar wären &ndash; damit Sie besser vergleichen können und die beste Lösung für Ihre Betreuungssituation finden. Ein Vertrag entsteht erst, wenn Sie wirklich jemanden gefunden haben.</p>
     ${bulletproofButton(portalUrl, "Aktuelle Pflegekräfte ansehen&nbsp;&nbsp;&rarr;", "#2A9D5C")}
     <p style="font-size:13px;line-height:1.6;color:#888;margin:18px 0 0;">PS: Klappt im Portal etwas nicht, oder möchten Sie das lieber persönlich klären? Sie erreichen mich unter <a href="tel:+4989200000830" style="color:#8B7355;text-decoration:none;">089&nbsp;200&nbsp;000&nbsp;830</a> oder per <a href="https://wa.me/4989200000830" style="color:#8B7355;text-decoration:none;">WhatsApp</a>.</p>
     ${buildIlkaSig(siteUrl)}`;
@@ -636,7 +636,7 @@ function buildReaktivierungWechselText(lead: Lead, siteUrl: string, portalBase: 
   const halloAnrede = buildHalloAnrede(lead.anrede_text || null, lead.nachname || "", lead.vorname || "");
   return `${halloAnrede},
 
-vielleicht haben Sie längst eine Betreuung gefunden — dann wünsche ich Ihnen alles Gute damit. Ich melde mich, weil nach sechs bis acht Wochen meist der erste Wechsel der Pflegekraft ansteht. Falls Sie dann vergleichen möchten: Bei uns sehen Sie jederzeit unverbindlich, wer aktuell verfügbar wäre — ab wann, mit Bestpreis-Garantie. Ein Vertrag entsteht erst, wenn Sie wirklich jemanden gefunden haben.
+vielleicht haben Sie längst eine Betreuung gefunden — dann wünsche ich Ihnen alles Gute damit. Ich melde mich, weil bei vielen Familien nach einiger Zeit ein Wechsel der Pflegekraft ansteht. Falls das auch bei Ihnen der Fall ist: Gerne zeigen wir Ihnen unverbindlich, welche Pflegekräfte gerade verfügbar wären — damit Sie besser vergleichen können und die beste Lösung für Ihre Betreuungssituation finden. Ein Vertrag entsteht erst, wenn Sie wirklich jemanden gefunden haben.
 
 Aktuelle Pflegekräfte ansehen: ${portalUrl}
 
@@ -1144,7 +1144,8 @@ async function sendEmailSmtp(
   subject: string,
   html: string,
   text: string,
-  attachments?: { filename: string; content: Uint8Array; contentType: string; cid?: string }[]
+  attachments?: { filename: string; content: Uint8Array; contentType: string; cid?: string }[],
+  skipBcc: boolean = false
 ): Promise<{ success: boolean; error?: string }> {
   try {
     const transport = nodemailer.createTransport({
@@ -1184,7 +1185,7 @@ async function sendEmailSmtp(
       replyTo: "info@primundus.de",
       text,
       html,
-      ...(bccAddr ? { bcc: bccAddr } : {}),
+      ...(!skipBcc && bccAddr ? { bcc: bccAddr } : {}),
     };
 
     if (attachments && attachments.length > 0) {
@@ -1737,6 +1738,59 @@ Deno.serve(async (req: Request) => {
  
     const now = new Date().toISOString();
  
+    // ── DEMO-MODUS ────────────────────────────────────────────────────────────
+    // Vorschau der KOMPLETTEN Kette an eine beliebige Adresse, damit ein (künftiger)
+    // Partner die Automatik nachvollziehen kann. Body:
+    //   { demo:true, lead_id, recipient, items:[{email_type, banner}], milestone? }
+    // Rendert jede Mail für den echten Lead, setzt oben einen Klammer-Hinweis ein.
+    // Fasst scheduled_emails/lead_events NICHT an — die echte (ggf. gestoppte) Kette
+    // des Leads bleibt unberührt (Lehre aus dem Fülbrandt-Vorfall 30.07.).
+    let demoBody: any = null;
+    try { demoBody = await req.clone().json(); } catch { demoBody = null; }
+    if (demoBody && demoBody.demo === true) {
+      const jsonH = { ...corsHeaders, "Content-Type": "application/json" };
+      const { data: lead } = await supabase.from("leads").select("*").eq("id", demoBody.lead_id).single();
+      if (!lead) return new Response(JSON.stringify({ error: "lead not found" }), { status: 404, headers: jsonH });
+      const portalBase = Deno.env.get("PORTAL_URL") || "https://kundenportal.primundus.de";
+      const site = smtpConfig.siteUrl;
+      const to = demoBody.recipient;
+      const ms = (demoBody.milestone || "none") as LeadMilestone;
+      const pu = (portalBase && (lead as Lead).token) ? buildPortalUrl(portalBase, (lead as Lead).token) : site;
+
+      const render = (t: string): { subject: string; html: string; text: string } => {
+        switch (t) {
+          case "eingangsbestaetigung": return { subject: "Ihr persönliches Angebot zur 24-Stunden-Betreuung", html: buildEingangsbestaetigungHtml(lead as Lead, site, portalBase), text: buildEingangsbestaetigungText(lead as Lead, portalBase) };
+          case "profil_nudge_1": return { subject: "Pflegekräfte können sich noch nicht bei Ihnen bewerben", html: buildProfilNudge1Html(lead as Lead, site, portalBase), text: buildProfilNudge1Text(lead as Lead, site, portalBase) };
+          case "profil_nudge_2": return { subject: "Profil unvollständig — Sie können noch keine Bewerbungen erhalten", html: buildProfilNudge2Html(lead as Lead, site, portalBase), text: buildProfilNudge2Text(lead as Lead, site, portalBase) };
+          case "warum_primundus": return { subject: "Kennen Sie die Primundus-Bestpreis-Garantie?", html: buildWarumPrimundusHtml(lead as Lead, pu, site), text: buildWarumPrimundusText(lead as Lead, pu) };
+          case "nachfass_2": return { subject: "Ihre Betreuung — kann ich Ihnen etwas abnehmen?", html: buildNachfass2Html(lead as Lead, site, portalBase, ms), text: buildNachfass2Text(lead as Lead, site, portalBase, ms) };
+          case "nachfass_3": return { subject: "Eine letzte Frage — wie schaut's bei Ihnen aus?", html: buildNachfass3Html(lead as Lead, site), text: buildNachfass3Text(lead as Lead, site) };
+          case "profil_nudge_3": return { subject: "Können wir Sie bei etwas unterstützen?", html: buildProfilNudge3Html(lead as Lead, site, portalBase), text: buildProfilNudge3Text(lead as Lead, site, portalBase) };
+          case "reaktivierung_wechsel": return { subject: "Steht bei Ihnen ein Pflegekraft-Wechsel an?", html: buildReaktivierungWechselHtml(lead as Lead, site, portalBase), text: buildReaktivierungWechselText(lead as Lead, site, portalBase) };
+          default: return { subject: `Unbekannt: ${t}`, html: `<p>Unbekannter Typ ${t}</p>`, text: `Unbekannter Typ ${t}` };
+        }
+      };
+      const bannerHtml = (b: string) => `<table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="max-width:600px;margin:12px auto 0;"><tr><td style="background:#FFF7E6;border:1px solid #F0D68A;border-radius:8px;padding:11px 16px;font-family:sans-serif;font-size:13px;color:#8A6D00;line-height:1.5;">(${b})</td></tr></table>`;
+
+      const results: any[] = [];
+      for (const item of (demoBody.items || [])) {
+        try {
+          const m = render(item.email_type);
+          const b = item.banner || "";
+          // subjectPrefix wird VORNE an den Original-Betreff gehängt (z. B. "Test - Mail 2: ").
+          const subject = item.subjectPrefix ? `${item.subjectPrefix}${m.subject}` : m.subject;
+          const html = b ? m.html.replace('<div class="email-content">', `${bannerHtml(b)}<div class="email-content">`) : m.html;
+          const text = b ? `(${b})\n\n${m.text}` : m.text;
+          const r = await sendEmailSmtp(smtpConfig, to, subject, html, text, undefined, false);
+          results.push({ email_type: item.email_type, to, subject, ...r });
+        } catch (e) {
+          results.push({ email_type: item.email_type, success: false, error: String(e) });
+        }
+      }
+      return new Response(JSON.stringify({ demo: true, recipient: to, results }), { status: 200, headers: jsonH });
+    }
+    // ── Ende DEMO-MODUS ───────────────────────────────────────────────────────
+
     const { data: pendingEmails, error: fetchError } = await supabase
       .from("scheduled_emails")
       .select("*")
@@ -1999,13 +2053,13 @@ Deno.serve(async (req: Request) => {
           eventTypeSent = "email_profil_nudge_2_sent";
           eventTypeFailed = "email_profil_nudge_2_failed";
         } else if (scheduledEmail.email_type === "profil_nudge_3") {
-          subject = "Wie ist Ihr Stand?";
+          subject = "Können wir Sie bei etwas unterstützen?";
           html = buildProfilNudge3Html(lead as Lead, smtpConfig.siteUrl, portalBase);
           text = buildProfilNudge3Text(lead as Lead, smtpConfig.siteUrl, portalBase);
           eventTypeSent = "email_profil_nudge_3_sent";
           eventTypeFailed = "email_profil_nudge_3_failed";
         } else if (scheduledEmail.email_type === "reaktivierung_wechsel") {
-          subject = "Steht bei Ihnen der erste Wechsel an?";
+          subject = "Steht bei Ihnen ein Pflegekraft-Wechsel an?";
           html = buildReaktivierungWechselHtml(lead as Lead, smtpConfig.siteUrl, portalBase);
           text = buildReaktivierungWechselText(lead as Lead, smtpConfig.siteUrl, portalBase);
           eventTypeSent = "email_reaktivierung_wechsel_sent";
