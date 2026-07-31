@@ -73,7 +73,16 @@ describe('Portal integration: golden paths', () => {
 
     // Wait for the pending-applications card to render with "Angebot prüfen"
     const reviewBtn = await screen.findByRole('button', { name: /Angebot prüfen/i }, { timeout: 5000 });
+
+    // Rekruter-Hinweis (application.message) VERBATIM — schon auf der Karte
+    // (Registry #22: kein LLM, kein Filter; Fixture-Text 1:1 durch den vollen
+    // Pfad proxy → mapper → UI).
+    expect(screen.getByText('Test application message')).toBeTruthy();
+
     await user.click(reviewBtn);
+
+    // …und im Modal an der Entscheidungsstelle (dort amber hervorgehoben).
+    await waitFor(() => expect(screen.getAllByText('Test application message').length).toBeGreaterThan(1));
 
     // Seite 1 = Angebot/Konditionen → weiter zu Daten & Vertrag (Seite 2).
     await user.click(await screen.findByRole('button', { name: /Weiter →/ }));

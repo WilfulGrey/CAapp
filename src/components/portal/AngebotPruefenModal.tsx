@@ -299,22 +299,18 @@ export const AngebotPruefenModal: FC<{
                 </div>
 
                 {/*
-                  'Nachricht der Agentur' (app.message) intentionally NOT
-                  rendered. Same redaction as AppCard.tsx — the Mamamia
-                  application.message field carries agency-internal back-
-                  office notes (caregiver full name, phone, salary
-                  breakdown DLV/PK Netto/RK, ID stubs). Verified live
-                  2026-05-19 on Customer 8546 (Wendt) application 7997.
-                  Defense in depth: LIST_APPLICATIONS GraphQL also drops
-                  the field. → coverMessage (customer-safe) wird unten als
-                  „Hinweis der Agentur" Zitat-Box gezeigt — serverseitig aus
-                  der Roh-Nachricht LLM-redigiert (PII raus), in dritter
-                  Person / Agentur-Stimme, nicht in Ich-Form.
+                  „Hinweis der Agentur" = application.message VERBATIM
+                  (Entscheidung Michał 2026-07-22, Registry #22). Der Kunde
+                  MUSS den Rekruter-Hinweis („Die Pflegekraft reist mit einem
+                  Hund") vor der Annahme sehen — sonst akzeptiert er einen
+                  Rozjazd unbewusst. Keine LLM-Redaktion, kein Filter; hier
+                  bewusst hervorgehoben (amber), weil dies der Entscheidungs-
+                  moment ist. coverMessage = nur noch Preview-Mocks.
                 */}
-                {app.coverMessage && (
-                  <div className="rounded-xl bg-[#F8F7F5] border border-[#E5E3DF] px-4 py-3">
-                    <p className="text-[11px] font-semibold text-[#8B7355] uppercase tracking-wide mb-1.5">Hinweis der Agentur</p>
-                    <p className="text-sm leading-relaxed text-gray-700 italic">„{app.coverMessage}"</p>
+                {(app.message?.trim() || app.coverMessage) && (
+                  <div className="rounded-xl bg-amber-50 border border-amber-200 px-4 py-3">
+                    <p className="text-[11px] font-semibold text-amber-700 uppercase tracking-wide mb-1.5">Hinweis der Agentur</p>
+                    <p className="text-sm leading-relaxed text-gray-800 whitespace-pre-wrap">{app.message?.trim() || app.coverMessage}</p>
                   </div>
                 )}
 

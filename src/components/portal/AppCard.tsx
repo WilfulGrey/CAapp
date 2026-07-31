@@ -110,22 +110,17 @@ export const AppCard: FC<{
           </div>
         </div>
         {/*
-          'Nachricht der Agentur' (application.message) intentionally NOT
-          rendered. The Mamamia field carries agency-internal back-office
-          notes — verified live 2026-05-19 on Customer 8546 (Wendt)
-          application 7997: caregiver full name (Monika Jaremowicz), phone
-          number, salary breakdown (DLV/PK Netto/RK), ID stubs
-          (pr-8546-1). Defense in depth: also dropped from the
-          LIST_APPLICATIONS GraphQL query so it never reaches the proxy.
-          → coverMessage (separates, customer-safe Feld) wird stattdessen
-          unten als „Hinweis der Agentur" Zitat-Box angezeigt — der Text wird
-          serverseitig aus der Roh-Nachricht LLM-redigiert (PII raus), in
-          dritter Person / Agentur-Stimme, nicht in Ich-Form.
+          „Hinweis der Agentur" = application.message VERBATIM (Entscheidung
+          Michał 2026-07-22, Registry #22): Rekruter schreiben dort kunden-
+          relevante Hinweise („Die Pflegekraft reist mit einem Hund"). KEINE
+          LLM-Redaktion, KEIN Filter — die frühere Zwischenschicht ist raus,
+          für den Inhalt des Felds ist Mamamia verantwortlich. Anzeige 1:1,
+          Zeilenumbrüche erhalten. coverMessage = nur noch Preview-Mocks.
         */}
-        {app.coverMessage && (
+        {(app.message?.trim() || app.coverMessage) && (
           <div className="mb-3 rounded-xl bg-[#F8F7F5] border border-[#E5E3DF] px-4 py-3">
             <p className="text-[11px] font-semibold text-[#8B7355] uppercase tracking-wide mb-1.5">Hinweis der Agentur</p>
-            <p className="text-sm leading-relaxed text-gray-700 italic">„{app.coverMessage}"</p>
+            <p className="text-sm leading-relaxed text-gray-700 whitespace-pre-wrap">{app.message?.trim() || app.coverMessage}</p>
           </div>
         )}
         {onChat && (
