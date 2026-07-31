@@ -19,7 +19,6 @@ import {
   GET_CUSTOMER,
   GET_JOB_OFFER,
   LIST_APPLICATIONS,
-  LIST_APPLICATION_MESSAGES,
   LIST_INTERESTS,
   LIST_INVITED_CAREGIVER_IDS,
   LIST_MATCHINGS,
@@ -135,107 +134,11 @@ const getJobOffer: ActionHandler = (session, _variables, deps) =>
 const getCustomer: ActionHandler = (session, _variables, deps) =>
   runGraphQL(deps, GET_CUSTOMER, { id: session.customer_id });
 
-// ─── Hinweis der Agentur — customer-safe intro from the raw application.message
-// Mamamia's application.message mixes recruiter notes worth showing the family
-// (pet, availability caveat, special experience) with hard PII (caregiver full
-// name, phone, salary DLV/PK-Netto/RK, ID stubs pr-XXXX-N). The customer-facing
-// LIST_APPLICATIONS drops the field; here we fetch it agency-side, LLM-redact +
-// reword it into a THIRD-PERSON / agency voice ("Die Pflegekraft würde …", NOT
-// Ich-Form — the info comes from the agency, not the caregiver), never invent
-// facts, and cache per application_id. The raw text never leaves the proxy.
-const INTRO_SYSTEM = [
-  "Du redigierst interne Recruiter-Notizen zu einer Pflegekraft-Bewerbung in einen kurzen, kundensicheren Hinweis für die suchende Familie.",
-  "Sprich in der DRITTEN Person über die Pflegekraft (\"Die Pflegekraft …\"), NIEMALS in Ich-Form — die Information kommt von der Agentur, nicht von der Pflegekraft.",
-  "Gib ausschließlich kundenrelevante Fakten wieder, die im Text tatsächlich stehen (z. B. Haustier, Verfügbarkeit ab einem Datum, Besonderheiten). Erfinde nichts dazu.",
-  "Lass alles Interne strikt weg: Namen, Telefonnummern, E-Mail-Adressen, Geldbeträge/Gehalt (DLV, PK-Netto, RK), interne IDs (z. B. pr-1234-5). Nenne die Pflegekraft nie beim Namen.",
-  "Wenn im Text keine kundenrelevante Information steht, antworte exakt mit dem Wort KEINE.",
-  "Antworte mit 1–2 sachlich-freundlichen Sätzen auf Deutsch, nur der reine Hinweistext, ohne Anführungszeichen.",
-].join(" ");
-
-async function sha256Hex(s: string): Promise<string> {
-  const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(s));
-  return Array.from(new Uint8Array(buf)).map((b) => b.toString(16).padStart(2, "0")).join("");
-}
-
-// Deterministic PII net — second line of defense after the LLM. Redacts phone
-// / email / currency / salary-term / ID-stub patterns even if the model
-// slipped one through. If redaction leaves too little, show nothing
-// (fail-safe = no intro rather than a leaky one).
-const INTRO_PII_PATTERNS: RegExp[] = [
-  /\+?\d[\d\s/().-]{6,}\d/g, // phone numbers
-  /[\w.+-]+@[\w-]+\.[\w.-]+/g, // e-mail
-  /\d[\d.,]*\s?(?:€|eur|euro)\b/gi, // currency / salary amounts
-  /\b(?:dlv|pk[-\s]?netto|rk)\b/gi, // salary breakdown terms
-  /\bpr-\d+-\d+\b/gi, // internal ID stubs
-];
-function stripIntroPII(text: string): string | null {
-  let out = text;
-  for (const re of INTRO_PII_PATTERNS) out = out.replace(re, "");
-  out = out.replace(/\s{2,}/g, " ").replace(/\s+([.,;:!?])/g, "$1").trim();
-  return out.length >= 8 ? out : null;
-}
-
-// Fills Map<application_id, introText> for the given applications, using the
-// application_intros cache (keyed by application_id + source_hash). Missing or
-// changed rows are (re)generated in parallel and cached. Best-effort: any
-// failure just omits that application's intro.
-async function buildApplicationIntros(
-  deps: ActionDeps,
-  jobOfferId: number,
-  apps: Array<{ id: number; message: string | null }>,
-): Promise<Map<number, string>> {
-  const out = new Map<number, string>();
-  const store = deps.supabase;
-  if (!store?.getApplicationIntros || !store.upsertApplicationIntro || !deps.anthropicApiKey) return out;
-
-  const withMsg = apps.filter(
-    (a) => typeof a.id === "number" && typeof a.message === "string" && a.message.trim().length > 0,
-  );
-  if (withMsg.length === 0) return out;
-
-  const hashes = new Map<number, string>();
-  for (const a of withMsg) hashes.set(a.id, await sha256Hex(a.message as string));
-
-  const cached = await store.getApplicationIntros(withMsg.map((a) => a.id));
-  const cachedById = new Map(cached.map((c) => [c.application_id, c]));
-
-  const toGenerate: Array<{ id: number; message: string }> = [];
-  for (const a of withMsg) {
-    const hit = cachedById.get(a.id);
-    if (hit && hit.source_hash === hashes.get(a.id)) {
-      if (hit.intro_text) out.set(a.id, hit.intro_text); // unchanged (null = nothing to show)
-    } else {
-      toGenerate.push({ id: a.id, message: a.message as string });
-    }
-  }
-
-  await Promise.all(
-    toGenerate.map(async ({ id, message }) => {
-      let intro: string | null = null;
-      try {
-        const raw = await callAnthropicForText(deps.anthropicApiKey as string, INTRO_SYSTEM, message, deps.fetchFn);
-        if (raw && !/^keine\b/i.test(raw.trim())) intro = stripIntroPII(raw.trim());
-      } catch (e) {
-        console.warn(`[applicationIntro][gen-failed] app=${id} err=${(e as Error).message}`);
-        return; // don't cache on failure → retry next load
-      }
-      try {
-        await store.upsertApplicationIntro!(id, jobOfferId, intro, hashes.get(id) as string);
-      } catch (e) {
-        console.warn(`[applicationIntro][cache-failed] app=${id} err=${(e as Error).message}`);
-      }
-      if (intro) out.set(id, intro);
-    }),
-  );
-
-  return out;
-}
-
 const listApplications: ActionHandler = async (session, variables, deps) => {
   const { limit, page } = variables as { limit?: number; page?: number };
   const r = await runGraphQL<{
     JobOfferApplicationsWithPagination: {
-      data: Array<{ id?: number; caregiver: Record<string, unknown> | null; coverMessage?: string }>;
+      data: Array<{ id?: number; caregiver: Record<string, unknown> | null }>;
     };
   }>(deps, LIST_APPLICATIONS, {
     job_offer_id: session.job_offer_id,
@@ -254,30 +157,8 @@ const listApplications: ActionHandler = async (session, variables, deps) => {
     }
   }
 
-  // "Hinweis der Agentur": fetch raw messages agency-side, redact + cache,
-  // attach as coverMessage. Best-effort — never blocks the applications list.
-  try {
-    const msgRes = await runGraphQL<{
-      JobOfferApplicationsWithPagination: { data: Array<{ id: number; message: string | null }> };
-    }>(deps, LIST_APPLICATION_MESSAGES, {
-      job_offer_id: session.job_offer_id,
-      limit: limit ?? 20,
-      page: page ?? 1,
-    });
-    const intros = await buildApplicationIntros(
-      deps,
-      session.job_offer_id,
-      msgRes.JobOfferApplicationsWithPagination?.data ?? [],
-    );
-    if (intros.size > 0) {
-      for (const a of rows) {
-        if (typeof a.id === "number" && intros.has(a.id)) a.coverMessage = intros.get(a.id);
-      }
-    }
-  } catch (e) {
-    console.warn(`[listApplications][intro-skip] lead=${session.lead_id} err=${(e as Error).message}`);
-  }
-
+  // `message` (Hinweis des Rekruters) geht VERBATIM mit — kein LLM, kein
+  // Filter, kein Cache (Entscheidung Michał 2026-07-22, Registry #22).
   return r;
 };
 

@@ -524,8 +524,9 @@ export interface UIApplication {
    *  damit die Platzhalter-Karte aufs volle Profil upgradet, sobald
    *  getCaregiver lädt. */
   synthetic?: boolean;
-  /** Kundensicherer "Hinweis der Agentur" — serverseitig aus der Roh-Nachricht
-   *  der Bewerbung LLM-redigiert (PII raus). Leer = nichts anzuzeigen. */
+  /** Preview-only Vorstellungstext (Design-Mocks). Der ECHTE Rekruter-Hinweis
+   *  kommt seit 2026-07-22 VERBATIM in `message` — kein LLM, kein Filter
+   *  (Registry #22). */
   coverMessage?: string;
 }
 
@@ -554,8 +555,8 @@ export function mapApplicationToUI(
     agencyName: 'Pflegeagentur',
     appliedAt: fmtRelativeTime(app.active_until_at, opts.nowIso),
     status: 'new',
+    // Rekruter-Hinweis 1:1 aus Mamamia (Registry #22) — keine Redaktion.
     message: app.message ?? '',
-    coverMessage: app.coverMessage ?? undefined,
     offer: {
       monatlicheKosten: app.salary ?? 0,
       anreisedatum: formatMamamiaDate(app.arrival_at) ?? '—',

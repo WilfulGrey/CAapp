@@ -569,6 +569,14 @@ zwraca `{ total, data: [{ application + caregiver }] }`. Mamamia zwraca
 `AnonymousApplication` dla customer-side queries (agency-side fields jak
 `rejected_at` / `is_active` strippowane).
 
+`application.message` (hinweis rekrutera, np. „Die Pflegekraft reist mit
+einem Hund") idzie **VERBATIM** do klienta — box „Hinweis der Agentur"
+na karcie Bewerbung i w AngebotPruefenModal (krok 1, amber). Decyzja
+Michała 2026-07-22 (Registry #22): zero filtrów i zero LLM-redakcji —
+wcześniejsza warstwa (`application_intros` + Anthropic w proxy) została
+usunięta; tabela została w DB, ale nikt jej nie czyta. Za treść pola
+odpowiada Mamamia/rekruterzy.
+
 #### `listMatchings`
 GraphQL: `JobOfferMatchingsWithPagination(job_offer_id, limit, page, filters, order_by)`
 — zwraca `{ total, data: [{ id, percentage_match, is_show, is_best_matching, caregiver }] }`.

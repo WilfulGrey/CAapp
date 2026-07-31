@@ -161,6 +161,13 @@ export const GET_CUSTOMER = /* GraphQL */ `
 // K3 — list applications for customer's job_offer_id (ownership via session).
 // Mamamia returns AnonymousApplication for customer-facing queries —
 // agency-side fields (rejected_at/reject_type/is_active/is_reserved) stripped.
+//
+// `message` (Hinweis des Rekruters) geht VERBATIM an den Kunden — Entscheidung
+// Michał 2026-07-22 (Registry #22): Rekruter schreiben dort kundenrelevante
+// Hinweise („Die Pflegekraft reist mit einem Hund", beta ts-18-9868-1). Ohne
+// die Info akzeptiert der Kunde einen Rozjazd unbewusst. KEINE Filter, KEINE
+// LLM-Redaktion (die frühere Zwischenschicht wurde entfernt) — der Inhalt des
+// Felds liegt in Mamamias/der Rekruter Verantwortung.
 export const LIST_APPLICATIONS = /* GraphQL */ `
   query ListApplications($job_offer_id: Int!, $limit: Int, $page: Int) {
     JobOfferApplicationsWithPagination(
@@ -176,13 +183,7 @@ export const LIST_APPLICATIONS = /* GraphQL */ `
         parent_id
         is_counter_offer
         salary
-        # 'message' intentionally NOT fetched. Defense in depth for the
-        # AppCard / AngebotPruefenModal redaction — Mamamia's application
-        # message field carries agency-internal back-office notes (caregiver
-        # full name, phone, salary breakdown DLV/PK Netto/RK, ID stubs like
-        # pr-XXXX-N). Verified live 2026-05-19 on Customer 8546 application
-        # 7997. By dropping the field at the GraphQL boundary the data
-        # never crosses the proxy, even if the frontend regresses.
+        message
         arrival_at
         departure_at
         arrival_fee
@@ -209,27 +210,6 @@ export const LIST_APPLICATIONS = /* GraphQL */ `
           avatar_retouched_promo { aws_url }
           avatar_retouched { aws_url }
         }
-      }
-    }
-  }
-`;
-
-// K3d — raw application messages (agency-side ONLY). The customer-facing
-// LIST_APPLICATIONS deliberately DROPS `message` (it carries agency-internal
-// PII: caregiver full name, phone, salary DLV/PK-Netto/RK, ID stubs). This
-// query fetches it server-side in the proxy so we can derive a redacted,
-// customer-safe "Hinweis der Agentur" (cached in application_intros). The raw
-// text never reaches the client.
-export const LIST_APPLICATION_MESSAGES = /* GraphQL */ `
-  query ListApplicationMessages($job_offer_id: Int!, $limit: Int, $page: Int) {
-    JobOfferApplicationsWithPagination(
-      job_offer_id: $job_offer_id
-      limit: $limit
-      page: $page
-    ) {
-      data {
-        id
-        message
       }
     }
   }

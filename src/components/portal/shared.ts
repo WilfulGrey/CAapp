@@ -31,19 +31,17 @@ export interface Application {
   agencyName: string;
   appliedAt: string;
   status: AppStatus;
+  // Mamamias `application.message` — Hinweis des Rekruters zur Bewerbung.
+  // Geht seit 2026-07-22 VERBATIM an den Kunden (Registry #22) und wird als
+  // „Hinweis der Agentur" in AppCard + AngebotPruefenModal gezeigt: z.B.
+  // „Die Pflegekraft reist mit einem Hund". Keine Redaktion, kein Filter —
+  // der Kunde muss den Hinweis VOR der Annahme sehen.
   message: string;
   offer: OfferDetails;
   isInvited?: boolean;
-  // Vorstellungs-Text zur Pflegekraft, an den Kunden gerichtet (im Portal
-  // unter „Vorstellung der Pflegekraft" angezeigt). Wird i.d.R. von der
-  // Vermittlungs-Agentur formuliert und in Ich-Form unterschrieben — die PK
-  // schreibt es nicht selbst. Daher Label NICHT „Nachricht von Maria"
-  // (wäre falsche Zuschreibung).
-  // ACHTUNG: NICHT identisch mit Mamamias `application.message` (agency-internal,
-  // enthält Backoffice-Notizen mit Telefon/Gehalt → dauerhaft NICHT anzeigen).
-  // Quelle für dieses Feld ist offen: entweder ein neues Mamamia-Feld
-  // („caregiver cover message") oder eine personalisierte KI-Vorstellung.
-  // Aktuell nur in Preview-Modi geseedet.
+  // Preview-only: Vorstellungstext in den Design-Mocks (?preview=…). Echte
+  // Portale zeigen `message`; dieses Feld ist der Fallback in den Previews,
+  // die keine Mamamia-Daten laden.
   coverMessage?: string;
   /** true = aus contract_snapshot rekonstruierte "accepted"-App (Mamamia
    *  liefert sie nicht mehr). Wird jeden Render neu abgeleitet → Platzhalter-

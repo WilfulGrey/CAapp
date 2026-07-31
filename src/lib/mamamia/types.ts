@@ -253,11 +253,10 @@ export interface MamamiaApplication {
   parent_id: number | null;
   is_counter_offer: boolean | null;
   salary: number | null;
+  // Hinweis des Rekruters — geht seit 2026-07-22 VERBATIM an den Kunden
+  // (Registry #22): keine LLM-Redaktion, kein Filter. Anzeige: AppCard +
+  // AngebotPruefenModal, Label „Hinweis der Agentur".
   message: string | null;
-  // Customer-safe "Hinweis der Agentur", server-side derived + redacted from
-  // `message` by the proxy (listApplications) and attached per row. Never the
-  // raw message (which carries PII).
-  coverMessage?: string | null;
   arrival_at: string | null;
   departure_at: string | null;
   arrival_fee: number | null;
