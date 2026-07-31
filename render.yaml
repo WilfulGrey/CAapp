@@ -55,7 +55,10 @@ services:
   - type: web
     name: kostenrechner-beta
     runtime: node
-    plan: free
+    # Starter (bezahlt, ~7 $/Mo) statt free: free-Web-Services schlafen nach
+    # 15 Min Leerlauf ein und liefern beim Kaltstart 502 (Vorfall 31.07.2026,
+    # /admin/preise). Starter läuft dauerhaft warm → kein Spin-down-502.
+    plan: starter
     branch: integration/mamamia-onboarding
     rootDir: project 3
     buildCommand: npm install && npm run build
