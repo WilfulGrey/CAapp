@@ -319,6 +319,44 @@ Deno.test("listApplications: merges Referenz certs onto caregiver.certificates",
   assertEquals(certs[0].original_name, "Referenz_S_Wadysaw_2026-06-08.pdf");
 });
 
+// Kill-Switch Rekruter-Hinweis (Registry #23, Michał 2026-07-31): DEFAULT AUS
+// — `message` wird serverseitig gestrippt und erreicht den Browser nicht.
+Deno.test("listApplications: ohne SHOW_APPLICATION_MESSAGE=1 wird `message` gestrippt (Default)", async () => {
+  Deno.env.delete("SHOW_APPLICATION_MESSAGE");
+  const { fetchFn } = multiFetch(
+    { body: { data: { JobOfferApplicationsWithPagination: { total: 1, data: [
+      { id: 7997, message: "Die Pflegekraft reist mit einem Hund", caregiver: { id: 10099 } },
+    ] } } } },
+    { body: { data: {} } }, // cert batch
+  );
+  const r = await ACTIONS.listApplications(SESSION, { limit: 20 }, makeDeps(fetchFn)) as {
+    JobOfferApplicationsWithPagination: { data: Array<Record<string, unknown>> };
+  };
+  const row = r.JobOfferApplicationsWithPagination.data[0];
+  assertEquals("message" in row, false);
+});
+
+Deno.test("listApplications: mit SHOW_APPLICATION_MESSAGE=1 geht `message` VERBATIM durch", async () => {
+  Deno.env.set("SHOW_APPLICATION_MESSAGE", "1");
+  try {
+    const { fetchFn } = multiFetch(
+      { body: { data: { JobOfferApplicationsWithPagination: { total: 1, data: [
+        { id: 7997, message: "Die Pflegekraft reist mit einem Hund", caregiver: { id: 10099 } },
+      ] } } } },
+      { body: { data: {} } },
+    );
+    const r = await ACTIONS.listApplications(SESSION, { limit: 20 }, makeDeps(fetchFn)) as {
+      JobOfferApplicationsWithPagination: { data: Array<{ message?: string }> };
+    };
+    assertEquals(
+      r.JobOfferApplicationsWithPagination.data[0].message,
+      "Die Pflegekraft reist mit einem Hund",
+    );
+  } finally {
+    Deno.env.delete("SHOW_APPLICATION_MESSAGE");
+  }
+});
+
 Deno.test("getCaregiver: merges CaregiverCertificates (Referenz only) onto Caregiver.certificates + drops sibling", async () => {
   const { fetchFn } = captureFetch({
     data: {
