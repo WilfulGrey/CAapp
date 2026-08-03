@@ -577,6 +577,12 @@ wcześniejsza warstwa (`application_intros` + Anthropic w proxy) została
 usunięta; tabela została w DB, ale nikt jej nie czyta. Za treść pola
 odpowiada Mamamia/rekruterzy.
 
+> **⛔ AKTUALNIE WYŁĄCZONE** (2026-07-31, Registry #23 — część rekruterów
+> wpisała tam treści nie dla klienta). Proxy **strippuje `message`** z
+> odpowiedzi, dopóki nie ustawisz secretu `SHOW_APPLICATION_MESSAGE=1`
+> (per env, bez redeployu). Wyłączone = pole nie opuszcza proxy, front nie
+> ma czego renderować.
+
 #### `listMatchings`
 GraphQL: `JobOfferMatchingsWithPagination(job_offer_id, limit, page, filters, order_by)`
 — zwraca `{ total, data: [{ id, percentage_match, is_show, is_best_matching, caregiver }] }`.
