@@ -8,8 +8,6 @@ import nodemailer from "npm:nodemailer@6.9.10";
 // MIT Anhang (Reminder-Inline-Foto, Angebots-PDF) mit "Buffer is not defined"
 // fehl — die Edge-Runtime liefert ihn über den node:-Specifier.
 import { Buffer } from "node:buffer";
-// Multi-Job-Helfer (Bug #25) — pure Funktionen, separat wegen Testbarkeit.
-import { appendJobParam, reminderBookedCancel } from "./followupJobs.ts";
  
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -1345,10 +1343,6 @@ interface ReminderMeta {
   caregiver_german_level?: string | null;
   caregiver_photo_url?: string | null;
   caregiver_about_text?: string | null;
-  // Multi-Job (Bug #25): Job, zu dem dieser Reminder gehört. Reminder eines
-  // AKTUELL geplanten Jobs überleben den lead-weiten "beauftragt"-Cancel
-  // (die alte Buchung betraf einen ANDEREN Einsatz).
-  mamamia_job_offer_id?: number | null;
 }
 
 function reminderCaregiverInitials(name: string): string {
@@ -2101,21 +2095,7 @@ Deno.serve(async (req: Request) => {
           }
 
           // Lead schon "fertig"? Status-Abbruch greift wie bei Nachfass.
-          // Multi-Job-Ausnahme (Bug #25): "beauftragt" ist lead-weit (alter
-          // Accept-Event existiert bei JEDEM Folge-Einsatz-Kunden) — Reminder,
-          // deren Job AKTUELL 'geplant' ist, gehören zum NEUEN Einsatz und
-          // überleben. Entscheidung: followupJobs.ts (reminderBookedCancel).
-          let reminderJobStatus: string | null = null;
-          if (isBeauftragt && !isNichtInteressiert && meta.mamamia_job_offer_id != null) {
-            const { data: jobRow } = await supabase
-              .from("lead_jobs")
-              .select("status")
-              .eq("lead_id", scheduledEmail.lead_id)
-              .eq("mamamia_job_offer_id", meta.mamamia_job_offer_id)
-              .maybeSingle();
-            reminderJobStatus = typeof jobRow?.status === "string" ? jobRow.status : null;
-          }
-          if (reminderBookedCancel({ isBeauftragt, isNichtInteressiert, reminderJobStatus })) {
+          if (isBeauftragt || isNichtInteressiert) {
             await supabase
               .from("scheduled_emails")
               .update({ status: "cancelled", updated_at: new Date().toISOString() })
@@ -2184,26 +2164,9 @@ Deno.serve(async (req: Request) => {
           // Portal-URL mit Token bauen. Bewerbungs-Reminder springen per
           // goto direkt zur Bewerbungs-Sektion (Martin, 2026-07-09: Kunde
           // landete auf "Bewerbungen werden vorbereitet" statt der Bewerbung).
-          let portalUrl = (portalBase && (lead as Lead).token)
+          const portalUrl = (portalBase && (lead as Lead).token)
             ? buildPortalUrl(portalBase, (lead as Lead).token, variant === "application" ? "bewerbungen" : undefined)
             : smtpConfig.siteUrl;
-          // Multi-Job (Bug #25): Reminder eines konkreten Jobs verlinkt das
-          // Portal MIT &job=<lead_jobs.id> — der Kunde landet auf DEM Einsatz,
-          // um den es geht (nicht auf dem Default-/neuesten Job). Fail-soft:
-          // kein Mirror-Wiersz ⇒ plain Link.
-          if (portalUrl !== smtpConfig.siteUrl && meta.mamamia_job_offer_id != null) {
-            try {
-              const { data: jobRow } = await supabase
-                .from("lead_jobs")
-                .select("id")
-                .eq("lead_id", scheduledEmail.lead_id)
-                .eq("mamamia_job_offer_id", meta.mamamia_job_offer_id)
-                .maybeSingle();
-              portalUrl = appendJobParam(portalUrl, typeof jobRow?.id === "string" ? jobRow.id : null);
-            } catch (e) {
-              console.warn(`reminder job-deeplink lookup failed (lead ${scheduledEmail.lead_id}):`, e instanceof Error ? e.message : String(e));
-            }
-          }
 
           const inline = await fetchInlinePhotoDeno(meta.caregiver_photo_url);
           html = buildReminderHtml(lead as Lead, meta, portalUrl, smtpConfig.siteUrl, variant, inline?.cid ?? null, tier);
