@@ -37,6 +37,9 @@ const ALLOWED_EVENTS = [
   // reine Analyse-Events, KEINE Team-Mail/Nachfass-Verzweigung.
   'patient_form_step',
   'patient_form_save_failed',
+  // Einsatzort eingegeben, aber nicht auf einen Mamamia-location_id auflösbar
+  // (z. B. österreichische PLZ) — Analyse-Event fürs Team, KEINE Mail.
+  'patient_form_location_unresolved',
   'caregiver_invited',
   'caregiver_interest_shown',
   'caregiver_declined',          // Kunde hat eine Pflegekraft abgelehnt (matching ODER interest)
@@ -946,11 +949,24 @@ export async function POST(request: NextRequest) {
       } else if (event === 'patient_data_saved') {
         // Mail D — kein Caregiver involviert, einfacher Action-CTA in
         // Richtung "Pflegekräfte ansehen + einladen".
-        const portalUrl = buildPortalUrl(lead as any);
-        const template = getPatientDataSavedEmailTemplate(lead as any, portalUrl);
-        sendEmail((lead as any).email, template).catch((e) =>
-          console.error('customer mail send threw:', e instanceof Error ? e.message : String(e)),
-        );
+        // ABER: konnte der Einsatzort nicht aufgelöst werden (Flag
+        // location_unresolved vom Portal, z. B. österreichische PLZ ohne
+        // Mamamia-Location), bleibt der Kunde in Mamamia Entwurf — dann wäre
+        // "Pflegekräfte können sich bewerben" schlicht falsch. Mail
+        // unterdrücken; das Team-Event patient_form_location_unresolved hat den
+        // Fall bereits gemeldet, die übrigen patient_data_saved-Effekte
+        // (Nudge-Stopp, Kontakt-Sync, Team-Notiz) bleiben.
+        const locationUnresolved = !!(metadata && typeof metadata === 'object'
+          && (metadata as Record<string, unknown>).location_unresolved);
+        if (locationUnresolved) {
+          console.log(`lead-event patient_data_saved: Einsatzort unresolved — Mail D unterdrückt (lead ${lead.id})`);
+        } else {
+          const portalUrl = buildPortalUrl(lead as any);
+          const template = getPatientDataSavedEmailTemplate(lead as any, portalUrl);
+          sendEmail((lead as any).email, template).catch((e) =>
+            console.error('customer mail send threw:', e instanceof Error ? e.message : String(e)),
+          );
+        }
       } else if (event === 'offer_updated') {
         // Aktualisiertes Angebot — alter/neuer Preis + geänderte Angaben aus
         // der Metadata (vom SA-Portal gesetzt; die Kalkulation selbst wurde
