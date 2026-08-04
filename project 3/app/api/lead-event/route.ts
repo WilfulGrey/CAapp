@@ -12,6 +12,7 @@ import {
   type OfferInfo,
 } from '@/lib/email';
 import { buildVertragAttachmentPdf, formatSignedAtBerlin } from '@/lib/vertrag';
+import { appendJobParam } from '@/lib/portal-url';
 import { createHash } from 'crypto';
 
 // Bridge endpoint: the CA-App portal reports customer milestones back to the
@@ -380,6 +381,33 @@ function buildPortalUrl(lead: { token?: string | null }): string {
   const portalBase = process.env.NEXT_PUBLIC_PORTAL_URL || '';
   if (!portalBase || !lead.token) return '';
   return `${portalBase.replace(/\/$/, '')}/?token=${encodeURIComponent(lead.token)}`;
+}
+
+// appendJobParam (Multi-Job-Deeplink) importiert aus '@/lib/portal-url' —
+// pure Modul, dort auch die Doku + der Hinweis aufs Edge-Fn-Duplikat.
+
+// mamamia_job_offer_id (int, aus dem Event) → lead_jobs.id (uuid, was das
+// Portal in ?job= erwartet). Fail-soft: kein Wiersz (Job noch nicht im
+// Mirror — sollte seit dem Upsert-Vorziehen in detect selten sein) ⇒ null ⇒
+// plain Link; der landet seit #406 ohnehin auf dem neuesten geplanten Job.
+async function resolveLeadJobUuid(
+  supabase: any,
+  leadId: string,
+  mamamiaJobOfferId: number | null,
+): Promise<string | null> {
+  if (mamamiaJobOfferId == null) return null;
+  try {
+    const { data } = await supabase
+      .from('lead_jobs')
+      .select('id')
+      .eq('lead_id', leadId)
+      .eq('mamamia_job_offer_id', mamamiaJobOfferId)
+      .maybeSingle();
+    return typeof data?.id === 'string' ? data.id : null;
+  } catch (e) {
+    console.warn('resolveLeadJobUuid failed:', e instanceof Error ? e.message : String(e));
+    return null;
+  }
 }
 
 // Plant Reaktions-Reminder nach dem ursprünglichen caregiver_interest_shown
@@ -786,15 +814,31 @@ export async function POST(request: NextRequest) {
     // - caregiver_invited / caregiver_interest_shown / application_received →
     //   multiple events per lead expected (different caregivers, mehrere
     //   Bewerbungen); insert every time so one mail goes per event.
+    // - application_accepted_internal → dedupe pro APPLICATION, nicht pro
+    //   Lead (Bug #24, Michał: „8 jobów rocznie i więcej") — der ZWEITE und
+    //   jeder weitere Booking desselben Kunden muss Mail C + Team-Mail
+    //   bekommen; re-Klick derselben Annahme bleibt dedupliziert.
     const isDeduped = !NON_DEDUPED_EVENTS.has(event);
     let isFirstOccurrence = true;
     if (isDeduped) {
-      const { data: existing } = await supabase
+      const acceptAppId = event === 'application_accepted_internal'
+        && metadata && typeof metadata === 'object'
+        && (metadata as Record<string, unknown>).application_id != null
+        ? String((metadata as Record<string, unknown>).application_id)
+        : null;
+      let query = supabase
         .from('lead_events')
         .select('id')
         .eq('lead_id', lead.id)
-        .eq('event_type', event)
-        .limit(1);
+        .eq('event_type', event);
+      if (acceptAppId != null) {
+        query = query.eq('metadata->>application_id', acceptAppId);
+      } else if (event === 'application_accepted_internal' && mamamiaJobOfferId != null) {
+        // Annahme-Detektor (SA-Portal-Buchung) liefert keine application_id,
+        // aber den Job → Dedupe pro Job (zweite Buchung auf NEUEM Job mailt).
+        query = query.eq('mamamia_job_offer_id', mamamiaJobOfferId);
+      }
+      const { data: existing } = await query.limit(1);
       isFirstOccurrence = !existing || existing.length === 0;
     }
 
@@ -990,7 +1034,10 @@ export async function POST(request: NextRequest) {
         if (!caregiver) {
           console.warn(`lead-event ${event}: caregiver display data missing in metadata — mail skipped (lead ${lead.id})`);
         } else {
-          const portalUrl = buildPortalUrl(lead as any);
+          // Multi-Job (Bug #24): Mail über eine Bewerbung auf Job X öffnet das
+          // Portal AUF Job X (&job=<lead_jobs.id>) — nicht auf dem Default-Job.
+          const leadJobUuid = await resolveLeadJobUuid(supabase, lead.id, mamamiaJobOfferId);
+          const portalUrl = appendJobParam(buildPortalUrl(lead as any), leadJobUuid);
           const caregiverIdRaw = metadata?.caregiver_id ?? metadata?.caregiverId;
           const offer = extractOffer(metadata);
           buildCustomerCaregiverMailWithInlinePhoto(

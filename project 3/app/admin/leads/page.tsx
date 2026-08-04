@@ -38,9 +38,11 @@ export default function LeadsPage() {
   const loadLeads = async () => {
     try {
       setLoading(true);
+      // lead_jobs(count) via FK-Embedding: liefert pro Lead die Anzahl
+      // Mamamia-Einsätze OHNE N+1 (Badge „N Einsätze" bei Multi-Job-Kunden).
       const { data } = await supabase
         .from('leads')
-        .select('*')
+        .select('*, lead_jobs(count)')
         .order('created_at', { ascending: false });
 
       if (data) {
@@ -77,12 +79,14 @@ export default function LeadsPage() {
     const styles: Record<string, string> = {
       info_requested: 'bg-yellow-100 text-yellow-800',
       angebot_requested: 'bg-orange-100 text-orange-800',
+      folge_einsatz: 'bg-blue-100 text-blue-800',
       vertrag_abgeschlossen: 'bg-green-100 text-green-800',
       nicht_interessiert: 'bg-gray-200 text-gray-600',
     };
     const labels: Record<string, string> = {
       info_requested: 'Info angefordert',
       angebot_requested: 'Angebot angefordert',
+      folge_einsatz: 'Folge-Einsatz',
       vertrag_abgeschlossen: 'Vertrag abgeschlossen',
       nicht_interessiert: 'Nicht interessiert',
     };
@@ -134,6 +138,7 @@ export default function LeadsPage() {
               <SelectItem value="all">Alle Status</SelectItem>
               <SelectItem value="info_requested">Info angefordert</SelectItem>
               <SelectItem value="angebot_requested">Angebot angefordert</SelectItem>
+              <SelectItem value="folge_einsatz">Folge-Einsatz</SelectItem>
               <SelectItem value="vertrag_abgeschlossen">Vertrag abgeschlossen</SelectItem>
               <SelectItem value="nicht_interessiert">Nicht interessiert</SelectItem>
             </SelectContent>
@@ -192,6 +197,14 @@ export default function LeadsPage() {
                         {lead.mamamia_customer_id && (
                           <span className="inline-block mt-1 text-[11px] font-mono bg-amber-50 text-amber-800 border border-amber-200 px-1.5 py-0.5 rounded">
                             MM {lead.mamamia_customer_id}
+                          </span>
+                        )}
+                        {/* Multi-Job-Badge: >1 Einsatz im lead_jobs-Spiegel =
+                            Folge-Einsatz-Kunde (Bug #24) — Detailseite zeigt
+                            die Liste in der Card „Einsätze (Mamamia)". */}
+                        {(lead.lead_jobs?.[0]?.count ?? 0) > 1 && (
+                          <span className="inline-block mt-1 ml-1 text-[11px] font-medium bg-blue-50 text-blue-800 border border-blue-200 px-1.5 py-0.5 rounded">
+                            {lead.lead_jobs[0].count} Einsätze
                           </span>
                         )}
                       </div>

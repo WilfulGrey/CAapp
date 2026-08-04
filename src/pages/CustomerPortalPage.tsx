@@ -1296,6 +1296,10 @@ const CustomerPortalPage: FC = () => {
       signatur: formData.signatur,
       signed_at: signedAtLabel,
       contract,
+      // Multi-Job (Bug #24): Job der Session — die Bridge dedupliziert Mail C
+      // pro Application/Job (Folge-Buchungen mailen!), promotet den Wert in
+      // die lead_events-Spalte und baut den &job=-Deeplink der Mail C.
+      mamamia_job_offer_id: session?.job_offer_id ?? null,
     };
   };
 

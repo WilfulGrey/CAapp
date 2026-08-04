@@ -757,6 +757,45 @@ Część opisów w Mamamii jest **stara** (limit 200 znaków); nowe są dłuższ
 - `generateJobDescription` (podsumowanie pacjenta) i `ANTHROPIC_API_KEY` **zostają** —
   usunęliśmy tylko caregiver-bio. Wzorzec portowany z Sadash/saportal.
 
+### 13. Follow-up joby (multi-job) — notify, discovery `folge_einsatz`, deeplinki `&job=`
+
+Od 2026-08-04 (Bug #24, dowód: prod lead 9239 — Bewerbung na follow-up jobie
+połknięta jako `seeded`, klientka nie dostała maila). Zasady:
+
+- **Notify w detect:** job z historią eventów LUB default-job LUB **job LIVE
+  `geplant`** ⇒ maile. Silent-seed został TYLKO dla pierwszego skanu joba
+  `gebucht` (rejestracja altbestandu w mirrorze). Geplant follow-up job mailuje
+  od PIERWSZEJ Bewerbung.
+- **Cap:** max `NOTIFY_CAP_PER_JOB_RUN=3` kunden-maili per job per run
+  (najnowsze `application.id` pierwsze). Nadwyżka w danym runie **NIE jest
+  postowana w ogóle** (żadnego eventu ⇒ żadnego dedupe) i skapuje w kolejnych
+  runach po 3 — nic nie ginie na stałe. Seeds (notify=false) bez capa.
+- **Discovery (dziedziczenie stanu z Mamamii):** leady POZA active-setem
+  (status `vertrag_abgeschlossen`/`betreuung_beauftragt` lub wygasły token;
+  `nicht_interessiert` i `folge_einsatz` wykluczone) sondowane
+  `GET_CUSTOMER_JOB_OFFERS` co ≥6h, max 50/run (`leads.mamamia_jobs_checked_at`).
+  Jest job `geplant` ⇒ `leads.status='folge_einsatz'` + event
+  `folge_einsatz_detected` + mirror upsert. Discovery NIC nie mailuje — maile
+  robi normalny skan od następnego runa (lead w active-secie; `folge_einsatz`
+  skanowany TAKŻE z wygasłym tokenem). **ZERO auto-przedłużania tokenu**
+  (decyzja Michała: klient sam kliknie „Neuen Link senden" — ExpiredLinkScreen
+  działa, bo `folge_einsatz` ∉ CLOSED_STATUSES). `statusOrder.folge_einsatz=2`
+  w `lead-management.ts` — bez tego resubmit kalkulatora tworzyłby drugi lead.
+- **Deeplinki:** maile o Bewerbungach (bridge A/B/C + remindery
+  send-scheduled-emails) doklejają `&job=<lead_jobs.id>`; helper
+  `appendJobParam` ISTNIEJE W DWÓCH KOPIACH (`project 3/lib/portal-url.ts` +
+  `send-scheduled-emails/followupJobs.ts`) bo edge fn nie może importować z
+  `lib/` (CI-deploy kopiuje tylko folder functions) — zmiany synchronizować.
+- **Mail C bez limitu bookingów:** dedupe bridge per `application_id`
+  (fallback: per `mamamia_job_offer_id` dla eventów detektora, legacy
+  lead-wide tylko bez obu); `acceptedJk` w detect per (job, caregiver).
+  Reminder-cancel „beauftragt" jest job-aware: reminder joba aktualnie
+  `geplant` przeżywa (`followupJobs.ts:reminderBookedCancel`).
+- **Admin:** Card „Einsätze (Mamamia)" w detalu leada (RLS anon-SELECT na
+  `lead_jobs`, migracja 20260804090000), badge „N Einsätze" na liście, status
+  `folge_einsatz` w filtrach, timeline z etykietami eventów portalowych +
+  „(Seed — keine Mail versendet)" przy `metadata.seeded=true`.
+
 ---
 
 ## Field mapping reference
@@ -895,6 +934,7 @@ Wszystkie z 2026-04 → 2026-05. Lista ma być wyczerpana — jak coś znów
 | 21 | **Multi-job klient klika nową Bewerbung, widzi starą PK** (2026-07-22, Kunde Dachs 8899 prod, zgłoszenie teamu: „wenn er darauf klickt, erscheint immer die Bewerbung der alten PK Renata N."). Multi-job był zaimplementowany (#289–#313: lead_jobs, detect skanuje wszystkie joby, przegląd `?view=jobs`, scoping `?job=`), ale DWIE dziury zostały: (1) wejście bez deeplinka = zawsze STARY default-job (maile nie doklejają `&job=`), a link „Alle meine Einsätze" renderował się tylko przy wejściu z `?job=` — klient z maila nigdy nie odkrył drugiego joba; (2) `pickFinalConfirmedJob` fallbackował na fc DOWOLNEGO joba, a ścieżka 2 `applyAcceptedOverlay` syntetyzowała accepted z lead-weitych acceptance-rows job-blind → BookedScreen starej PK porywał layout nawet pod `?job=<nowy>`. | supabase/functions/onboard-to-mamamia/{onboard,index}.ts (`fetchNewestPlannedJob` + wybór aktywnego joba), src/lib/mamamia/mappers.ts (`pickFinalConfirmedJob` strict per session-job; path-2 gate po fc-caregiver), src/pages/CustomerPortalPage.tsx (useLeadJobs + link „Alle meine Einsätze" bez `?job=`), testy | Opcja B (decyzja Michała): wejście bez `?job=` → sesja na NAJNOWSZYM `geplant` z lead_jobs (fallback: dotychczasowy job; jawny `?job=` ma zawsze pierwszeństwo); BookedScreen tylko gdy akcept dotyczy AKTYWNEGO joba (fc sesyjnego joba); świadoma mini-luka: MM przetwarza confirmation w max ~10 s (korekta Michała 2026-07-22 — NIE minuty; „1-2 min" było artefaktem kadencji ręcznych powtórek), więc tylko reload w tym ≤10-sekundowym oknie pokazuje krótko normalny portal (samoleczące; w samym momencie akceptu trzyma optimistic local-state). Side-effect: `listLeadJobs` przy każdym wejściu odświeża spiegel lead_jobs. |
 | 22 | **Hinweis rekrutera przy Bewerbung nie docierał do klienta verbatim** (2026-07-22, decyzja Michała; przykład z bety: „Die Pflegekraft reist mit einem Hund", job ts-18-9868-1). Historia pola `application.message`: (a) 2026-05-19 — pełna redakcja na 3 warstwach (LIST_APPLICATIONS nie pobierało, AppCard i modal nie renderowały), bo pole niosło notatki back-office (nazwisko PK, telefon, stawki DLV/PK-Netto/RK, id-stuby); (b) 2026-07-23 (#408, Marcin) — LLM-redakcja server-side w proxy + cache `application_intros` → box „Hinweis der Agentur"; (c) **2026-07-22 (ta zmiana)** — Michał: „ma iść verbatim co napisał rekruter, jeśli są tam jakieś cenzury to wywal". Klient akceptował wklejkę nieświadomy rozjazdu (pies/termin), a LLM mógł treść przekształcić lub zjeść. | supabase/functions/mamamia-proxy/{operations,actions,types,index}.ts (pole `message` w LIST_APPLICATIONS; wycięte: LIST_APPLICATION_MESSAGES, INTRO_SYSTEM, stripIntroPII, buildApplicationIntros, store getApplicationIntros/upsertApplicationIntro), src/lib/mamamia/{mappers,types}.ts, src/components/portal/{AppCard,AngebotPruefenModal,shared}.tsx/ts, portal.test.tsx | Pole idzie **VERBATIM** (zero filtrów/LLM) i renderuje się jako „Hinweis der Agentur" na karcie ORAZ w modalu akceptacji (tam amber — moment decyzji), `whitespace-pre-wrap`. Pipeline LLM usunięty; tabela `application_intros` **zostaje w DB** (bez dropu, migracja 20260723120000 nietknięta) — gdyby wracać do redakcji. `coverMessage` = odtąd tylko preview-mocki. Odpowiedzialność za treść pola: Mamamia/rekruterzy. Zweryfikowane live na becie: joby 33389 → „Die Pflegekraft reist mit einem Hund / Tochter". |
 | 23 | **Kill-switch dla hinweisu rekrutera** (2026-07-31, Michał: „wyłącz/ukryj wyświetlanie tego dodatkowego tekstu na razie u klientów — mamy jeszcze kilku rekruterów którzy uzupełnili błędnie"). Po włączeniu verbatim (#22) okazało się, że część rekruterów wpisuje w `application.message` treści nieprzeznaczone dla klienta. | supabase/functions/mamamia-proxy/actions.ts (`applicationMessageEnabled` + strip w `listApplications`), _tests/actions.test.ts | Gate **server-side, DEFAULT WYŁĄCZONY**: proxy usuwa `message` z odpowiedzi, więc tekst **nie dociera do przeglądarki** (nie jest tylko ukryty CSS-em — istotne, bo chodzi o treści wrażliwe). Front bez zmian: brak pola ⇒ box „Hinweis der Agentur" po prostu się nie renderuje. **Włączenie z powrotem** (gdy teksty rekruterów będą czyste): `npx supabase secrets set SHOW_APPLICATION_MESSAGE=1 --project-ref <ref>` — działa bez redeployu (cold start czyta env); wyłączenie: `secrets unset`. Zweryfikowane live na prodzie: aplikacja 11049 miała `message` (567 zn.) → po deployu `has_message_key: false`, reszta pól nietknięta. |
+| 24 | **Follow-up joby: Bewerbungi na nowych jobach nie mailowały, zamknięte leady nie wracały do obiegu, maile bez kontekstu joba, admin ślepy na multi-job** (2026-08-04; dowód prod lead 9239 Elke Zwolan: job 33415 `geplant` od 29.07, Bewerbung Agnieszki J. 03.08 zapisana `seeded:true` ⇒ zero maili — pierwsza Bewerbung KAŻDEGO follow-up joba była połykana przez warunek notify „historia lub default-job"). Systemowo: fetchActiveLeads pomijał leady z wygasłym tokenem/zamkniętym statusem (typowy klient follow-up ma oba), Mail C dedupe lead-wide (druga buchung = brak maila), remindery kasowane lead-wide przez `isBeauftragt`, linki w mailach bez `&job=`, admin bez `lead_jobs`. | supabase/functions/detect-caregiver-events/{index.ts,_tests/handler.test.ts}, migracja 20260804090000 (leads.mamamia_jobs_checked_at + RLS anon-SELECT lead_jobs), project 3: lib/lead-management.ts (`statusOrder.folge_einsatz=2`), lib/portal-url.ts (NEW), app/api/lead-event/route.ts (deeplink + dedupe per application_id), supabase/functions/send-scheduled-emails/{index.ts,followupJobs.ts NEW,_tests/} , app/admin/leads/{page,[id]/page}.tsx, src/pages/CustomerPortalPage.tsx (accept-metadata `mamamia_job_offer_id`), src/__tests__/{portalUrl.test.ts NEW,integration/portal.test.tsx}, .github/workflows/test.yml (job deno-send-scheduled) | Decyzje Michała: status **`folge_einsatz`** (dziedziczenie stanu z MM przez discovery, ZERO auto-przedłużania tokenu — self-service regen), Mail C dla KAŻDEGO bookingu („możemy mieć i 8 jobów rocznie"), deeplink = „klucz do mieszkania, pokój = job". Mechanika: notify += `liveStatus==='geplant'`; cap 3 maile/job/run z drip (nadwyżka BEZ eventu — nic nie ginie); discovery co 6h/50 leadów; per-(job,cg) `acceptedJk`; job-aware reminder-cancel. Szczegóły: gotcha #13. E2e staging przed prod-deployem; seeded-event 9239 re-fire tylko za osobnym OK Michała. |
 
 ---
 
@@ -921,6 +961,8 @@ Suites:
 - `src/__tests__/supabase.test.ts` — `prefillPatientFromLead`, `careStartLabel`, helpers
 - `src/__tests__/integration/portal.test.tsx` — RTL+MSW golden paths
   (token → review → accept; decline path)
+- `src/__tests__/portalUrl.test.ts` — `appendJobParam` (cross-import z
+  `project 3/lib/portal-url.ts` — jedyny dozwolony cross-app import, pure modul)
 
 ### Edge Functions (Deno)
 
@@ -930,6 +972,12 @@ cd supabase/functions/onboard-to-mamamia && deno task test
 
 # Proxy
 cd supabase/functions/mamamia-proxy && deno task test
+
+# Detect (cron Bewerbungen/multi-job/discovery)
+cd supabase/functions/detect-caregiver-events && deno task test
+
+# Kostenrechner send-scheduled-emails (pure helpery followupJobs.ts)
+cd "project 3/supabase/functions/send-scheduled-emails" && deno task test
 ```
 
 ### TypeScript build check
@@ -1323,7 +1371,7 @@ Skonfigurowane via `gh api repos/WilfulGrey/CAapp/branches/.../protection`
 | `required_pull_request_reviews.required_approving_review_count` | **0** | PR wymagany ALE **bez approve** — autor sam mergeuje gdy CI green. Decyzja 2026-05-08: Michał nie chce być review-bottleneckiem; CI + PR-only path uznane za wystarczający quality gate. |
 | `required_pull_request_reviews.dismiss_stale_reviews` | false | (irrelevant przy 0 approvals) |
 | `required_status_checks.strict` | true | Branch musi być up-to-date z target zanim merge. |
-| `required_status_checks.contexts` | `vitest (frontend)`, `deno tests (onboard-to-mamamia)`, `deno tests (mamamia-proxy)` | 3 jobs musi być green. **To jedyna realna brama.** |
+| `required_status_checks.contexts` | `vitest (frontend)`, `deno tests (onboard-to-mamamia)`, `deno tests (mamamia-proxy)`, `deno tests (detect-caregiver-events)` | 4 jobs musi być green. **To jedyna realna brama.** (`deno tests (send-scheduled-emails)` runuje, ale NIE jest required.) |
 | `enforce_admins` | false | Michał (admin) może obejść w hot-fix. **Używaj świadomie.** |
 | `allow_force_pushes` / `allow_deletions` | false | Nie da się zniszczyć historii brancha. |
 
@@ -1334,12 +1382,15 @@ na 1 przez `gh api -X PUT .../protection`.
 
 ### CI workflow (`.github/workflows/test.yml`)
 
-3 jobs runują na każdy PR + push do `integration/mamamia-onboarding`:
+5 test-jobs runuje na każdy PR + push do `integration/mamamia-onboarding`:
 
 1. **`vitest (frontend)`** — `npm ci` + `npx vitest run` + `tsc --noEmit`.
    Pin `TZ=Europe/Berlin` w env (patrz Bug #14 dla rationale).
 2. **`deno tests (onboard-to-mamamia)`** — Deno setup + `deno task test`.
 3. **`deno tests (mamamia-proxy)`** — Deno setup + `deno task test`.
+4. **`deno tests (detect-caregiver-events)`** — Deno setup + `deno task test`.
+5. **`deno tests (send-scheduled-emails)`** — pure helpery `followupJobs.ts`
+   z `project 3/supabase/functions/` (Bug #24). Jedyny NIE-required check.
 
 Jobs runują równolegle (≈40-60s każdy). Cache: npm cache action automatic;
 Deno nie ma persistent cache w tym workflow (dla deps reload at start —
