@@ -2697,10 +2697,18 @@ const CustomerPortalPage: FC = () => {
             //     irreführende "Pflegekräfte können sich bewerben"-Mail.
             if (locationUnresolved) {
               const ortLabel = [plz, form.ort?.trim()].filter(Boolean).join(' ');
-              showToast(`Ihre Angaben sind gespeichert. Ihren Ort${ortLabel ? ` „${ortLabel}"` : ''} konnten wir aber nicht automatisch übernehmen — wir kümmern uns darum und melden uns bei Ihnen.`);
+              // Deutsche PLZ sind IMMER 5-stellig; eine 4-stellige PLZ ist
+              // Österreich/Schweiz — dort vermittelt Primundus nicht. Dann eine
+              // ehrliche Absage statt „wir kümmern uns darum" (Marcin 03.08.:
+              // „wir bedienen kein Österreich — Info an Kunde wäre perfekt").
+              const outsideGermany = /^\d{4}$/.test(plz ?? '');
+              showToast(outsideGermany
+                ? `Wir vermitteln 24-Stunden-Betreuung aktuell ausschließlich innerhalb Deutschlands${ortLabel ? ` — für Ihren Ort „${ortLabel}"` : ''} können wir daher leider keine Pflegekraft anbieten. Bei Fragen melden Sie sich gern bei uns.`
+                : `Ihre Angaben sind gespeichert. Ihren Ort${ortLabel ? ` „${ortLabel}"` : ''} konnten wir aber nicht automatisch übernehmen — wir kümmern uns darum und melden uns bei Ihnen.`);
               reportLeadEvent(lead?.token, 'patient_form_location_unresolved', {
                 plz: plz ?? '',
                 ort: form.ort?.trim() ?? '',
+                ...(outsideGermany ? { outside_germany: '1' } : {}),
               });
               leadEventMeta.location_unresolved = '1';
             }
