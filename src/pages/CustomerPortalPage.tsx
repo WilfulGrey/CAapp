@@ -2597,6 +2597,7 @@ const CustomerPortalPage: FC = () => {
             // Location lookup synchronous, ~500 ms typical. Required before
             // building the patch so customer_contract carries the id.
             let locationId: number | undefined;
+            let locationUnresolved = false;
             const plz = form.plz?.trim();
             if (plz && /^\d{4,5}$/.test(plz)) {
               try {
@@ -2608,8 +2609,14 @@ const CustomerPortalPage: FC = () => {
                 const rows = r.LocationsWithPagination.data;
                 locationId = (rows.find(l => l.country_code === 'DE') ?? rows[0])?.id as number | undefined;
               } catch {
-                // swallow — mapper falls back to location_custom_text
+                // Lookup-Call selbst fehlgeschlagen → wie "nicht gefunden"
+                // behandeln (unten sichtbar gemeldet, NICHT mehr still).
               }
+              // Ort eingegeben, aber Mamamia kennt keinen passenden Einsatzort
+              // (z. B. österreichische PLZ — Mamamias Locations sind deutsch).
+              // location_id ist das Aktivierungs-Gate; ohne ihn bleibt der Kunde
+              // Entwurf → NICHT verschlucken, sondern unten melden (Kunde + Team).
+              locationUnresolved = locationId == null;
             }
 
             const patch = mapPatientFormToUpdateCustomerInput(form, {
@@ -2679,6 +2686,24 @@ const CustomerPortalPage: FC = () => {
             if (startDateForLead) leadEventMeta.startDate = startDateForLead;
             if (vornameForLead) leadEventMeta.vorname = vornameForLead;
             if (nachnameForLead) leadEventMeta.nachname = nachnameForLead;
+            // Einsatzort nicht auflösbar (Ort eingegeben, aber kein Mamamia-
+            // Location-Treffer): NICHT als sauberen Erfolg ausgeben. Die
+            // Patientendaten sind gespeichert (bleiben), aber ohne location_id
+            // bleibt der Kunde in Mamamia Entwurf (keine Einladung/Veröffentlichung).
+            //  1) Kunde sichtbar informieren statt stillem "fertig".
+            //  2) Team-Ereignis loggen — unterscheidet "Ort eingegeben, nicht
+            //     auflösbar" von "leer gelassen" (Dashboard/Report).
+            //  3) Flag am patient_data_saved → der Kostenrechner unterdrückt die
+            //     irreführende "Pflegekräfte können sich bewerben"-Mail.
+            if (locationUnresolved) {
+              const ortLabel = [plz, form.ort?.trim()].filter(Boolean).join(' ');
+              showToast(`Ihre Angaben sind gespeichert. Ihren Ort${ortLabel ? ` „${ortLabel}"` : ''} konnten wir aber nicht automatisch übernehmen — wir kümmern uns darum und melden uns bei Ihnen.`);
+              reportLeadEvent(lead?.token, 'patient_form_location_unresolved', {
+                plz: plz ?? '',
+                ort: form.ort?.trim() ?? '',
+              });
+              leadEventMeta.location_unresolved = '1';
+            }
             reportLeadEvent(
               lead?.token,
               'patient_data_saved',
