@@ -72,6 +72,9 @@ export interface LeadEventMetadata {
   // patient_data_saved: gesetzt ('1'), wenn der Einsatzort nicht aufgelöst
   // werden konnte → Kostenrechner unterdrückt die "fertig"-Mail.
   location_unresolved?: string;
+  // patient_form_location_unresolved: gesetzt ('1') bei 4-stelliger PLZ
+  // (Österreich/Schweiz — nicht bedient) → Team weiß: nicht nachfassen.
+  outside_germany?: string;
 }
 
 // Session-level dedupe so a re-render or repeated save doesn't spam the
