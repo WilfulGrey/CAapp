@@ -6,7 +6,7 @@ import { describe, it, expect } from 'vitest';
 // beide Seiten des Vertrags im selben Repo-Check zusammen.
 import { appendJobParam } from '../../project 3/lib/portal-url';
 
-describe('appendJobParam (Multi-Job-Deeplink, Bug #24)', () => {
+describe('appendJobParam (Multi-Job-Deeplink, Bug #25)', () => {
   it('hängt &job an eine URL mit ?token an', () => {
     expect(appendJobParam('https://portal.test/?token=abc', 'aaaa-bbbb')).toBe(
       'https://portal.test/?token=abc&job=aaaa-bbbb',

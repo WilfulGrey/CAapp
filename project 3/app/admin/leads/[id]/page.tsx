@@ -20,7 +20,7 @@ export default function LeadDetailPage() {
   const [lead, setLead] = useState<any>(null);
   const [events, setEvents] = useState<any[]>([]);
   const [scheduledEmails, setScheduledEmails] = useState<any[]>([]);
-  // Multi-Job (Bug #24): Einsätze des Kunden aus dem lead_jobs-Mirror
+  // Multi-Job (Bug #25): Einsätze des Kunden aus dem lead_jobs-Mirror
   // (detect-Cron aktualisiert alle 15 Min; Discovery reaktivierter Leads
   // spätestens alle 6h). RLS: anon-read seit Migration 20260804090000.
   const [leadJobs, setLeadJobs] = useState<any[]>([]);
@@ -1378,7 +1378,7 @@ export default function LeadDetailPage() {
             </div>
           </Card>
 
-          {/* Multi-Job (Bug #24): alle Einsätze des Kunden aus dem lead_jobs-
+          {/* Multi-Job (Bug #25): alle Einsätze des Kunden aus dem lead_jobs-
               Mirror. Follow-up-Jobs (neuer Termin in Mamamia) erscheinen hier
               mit Status + Zeitraum + Bewerbungszähler — Konditionen können
               sich pro Einsatz ändern, der Mirror wird vom detect-Cron alle
@@ -1551,7 +1551,7 @@ export default function LeadDetailPage() {
                     team_notified_beauftragt: { label: 'Team über Beauftragung informiert', color: 'bg-[#5C4A32]' },
                     betreuung_beauftragt: { label: 'Betreuung beauftragt', color: 'bg-green-700' },
                     status_upgrade_to_angebot_requested: { label: 'Status auf Angebot hochgestuft', color: 'bg-blue-500' },
-                    // Portal-/Mamamia-Events (Bug #24 — vorher nur roher
+                    // Portal-/Mamamia-Events (Bug #25 — vorher nur roher
                     // event_type-Fallback, „application received" sah aus wie
                     // Datenmüll und niemand wusste, ob eine Mail rausging):
                     portal_opened: { label: 'Portal geöffnet', color: 'bg-blue-500' },

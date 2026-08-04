@@ -81,7 +81,7 @@ jobs:
         run: deno task test
 
   # Kostenrechner-Edge-Fn (project 3/): pure Helfer aus followupJobs.ts
-  # (Bug #24 — job-aware Reminder-Cancel + &job-Deeplink). Kein required
+  # (Bug #25 — job-aware Reminder-Cancel + &job-Deeplink). Kein required
   # check in der Branch-Protection (die listet 4), läuft aber auf jedem PR.
   deno-send-scheduled:
     name: deno tests (send-scheduled-emails)

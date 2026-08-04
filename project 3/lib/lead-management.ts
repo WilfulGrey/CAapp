@@ -64,7 +64,7 @@ export async function findOrCreateLead(
   const statusOrder = {
     info_requested: 1,
     angebot_requested: 2,
-    // Follow-up-Einsatz (Bug #24): detect-Discovery setzt diesen Status, wenn
+    // Follow-up-Einsatz (Bug #25): detect-Discovery setzt diesen Status, wenn
     // Mamamia einen NEUEN geplanten Job für den Kunden eröffnet hat. Level 2
     // wie angebot_requested: ein erneuter Kalkulator-Submit desselben Kunden
     // landet im Duplicate-Zweig (Kalkulation-Update, Token/Status bleiben) —

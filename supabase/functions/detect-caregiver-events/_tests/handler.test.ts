@@ -816,7 +816,7 @@ const JOB_B = 16371; // a follow-up (non-default) job; default = VALID_LEAD.mama
 const searchJob = (id: number): RawJobOffer => ({ id, status: "search", arrival_at: "2099-01-01 00:00:00", departure_at: null, final_confirmation: null });
 const appOn = (id: number, cg: number) => ({ id, caregiver_id: cg, caregiver: makeCaregiver({ id: cg }) });
 
-Deno.test("multi-job: erste Bewerbung auf LIVE-geplantem Folge-Job → NOTIFY (Bug #24, Fall 9239)", async () => {
+Deno.test("multi-job: erste Bewerbung auf LIVE-geplantem Folge-Job → NOTIFY (Bug #25, Fall 9239)", async () => {
   resetCaches();
   // Regression Fall 9239 (Elke Zwolan): Folge-Job seit Tagen 'geplant', erste
   // Bewerbung kam — und wurde still geseedet (Kundin erfuhr NICHTS). Neu:
@@ -883,7 +883,7 @@ Deno.test("multi-job: same caregiver on default + follow-up → two events (one 
   const body = await res.json();
   assertEquals(body.new_applications, 2);
   assertEquals(recorder.find((r) => r.metadata.mamamia_job_offer_id === def)?.notify, true); // default notifies
-  assertEquals(recorder.find((r) => r.metadata.mamamia_job_offer_id === JOB_B)?.notify, true); // geplant follow-up notifies too (Bug #24)
+  assertEquals(recorder.find((r) => r.metadata.mamamia_job_offer_id === JOB_B)?.notify, true); // geplant follow-up notifies too (Bug #25)
 });
 
 Deno.test("multi-job: per-job dedup — past app on default suppresses default, fires on follow-up", async () => {
@@ -1004,7 +1004,7 @@ Deno.test("annahme: Event existiert bereits (Portal-Annahme, NULL-Job) → kein 
   const recorder: BridgeOptions["recorder"] = [];
   const def = VALID_LEAD.mamamia_job_offer_id as number;
   // Legacy-Portal-Annahmen ohne mamamia_job_offer_id mappen auf den
-  // Default-Job (Bug #24: Dedupe ist per (Job, Caregiver), nicht mehr
+  // Default-Job (Bug #25: Dedupe ist per (Job, Caregiver), nicht mehr
   // lead-weit) — für den Default-Job greift der Guard also weiterhin.
   const past: EventRow[] = [
     { event_type: "application_accepted_internal", caregiver_id: 50001 },
@@ -1114,7 +1114,7 @@ Deno.test("annahme: Follow-up-Job MIT Historie → feuert (notify=true)", async 
 
 Deno.test("annahme: DIESELBE Pflegekraft erneut auf Folge-Job gebucht → feuert erneut (Mail C ohne Buchungs-Limit)", async () => {
   resetCaches();
-  // Bug #24: acceptedJk ist per (Job, Caregiver) — die alte Buchung derselben
+  // Bug #25: acceptedJk ist per (Job, Caregiver) — die alte Buchung derselben
   // PK auf dem Default-Job darf den Annahme-Detektor für den Folge-Job NICHT
   // stumm schalten (Michał: „przecież możemy mieć i 8 jobów rocznie").
   const recorder: BridgeOptions["recorder"] = [];
@@ -1152,7 +1152,7 @@ Deno.test("annahme: Confirmation ohne caregiver.id → kein Call, Scan läuft we
   assertEquals(recorder.length, 0);
 });
 
-// ─── Mail-Burst-Cap (Bug #24: max 3 Kunden-Mails pro Job & Run) ─────────────
+// ─── Mail-Burst-Cap (Bug #25: max 3 Kunden-Mails pro Job & Run) ─────────────
 
 Deno.test("cap: 5 frische Bewerbungen → nur die 3 NEUESTEN mailen, Rest tropft in Folge-Runs nach", async () => {
   resetCaches();
@@ -1227,7 +1227,7 @@ Deno.test("cap: gilt NICHT für Seeds — gebuchter Job registriert seine Histor
   for (const r of recorder) assertEquals(r.notify, false);
 });
 
-// ─── Follow-up Discovery (Bug #24: Status-Dziedziczenie aus Mamamia) ────────
+// ─── Follow-up Discovery (Bug #25: Status-Dziedziczenie aus Mamamia) ────────
 
 function makeDiscoverySupabase(
   candidates: Array<LeadRow & { status?: string | null }>,

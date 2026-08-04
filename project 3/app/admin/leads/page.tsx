@@ -200,7 +200,7 @@ export default function LeadsPage() {
                           </span>
                         )}
                         {/* Multi-Job-Badge: >1 Einsatz im lead_jobs-Spiegel =
-                            Folge-Einsatz-Kunde (Bug #24) — Detailseite zeigt
+                            Folge-Einsatz-Kunde (Bug #25) — Detailseite zeigt
                             die Liste in der Card „Einsätze (Mamamia)". */}
                         {(lead.lead_jobs?.[0]?.count ?? 0) > 1 && (
                           <span className="inline-block mt-1 ml-1 text-[11px] font-medium bg-blue-50 text-blue-800 border border-blue-200 px-1.5 py-0.5 rounded">

@@ -232,12 +232,12 @@ mamamia_job_offer_id  integer  NULL
 mamamia_user_token    text     NULL
 mamamia_onboarded_at  timestamptz NULL
 
--- follow-up discovery (Bug #24, cron detect-caregiver-events)
+-- follow-up discovery (Bug #25, cron detect-caregiver-events)
 mamamia_jobs_checked_at timestamptz NULL      -- ostatnia sonda "czy Mamamia
                                               -- otworzyła nowy job?" (takt 6h)
 ```
 
-**Status `folge_einsatz` (Bug #24):** ustawiany WYŁĄCZNIE przez fazę discovery
+**Status `folge_einsatz` (Bug #25):** ustawiany WYŁĄCZNIE przez fazę discovery
 crona detect — lead z zamkniętym statusem (`vertrag_abgeschlossen` /
 `betreuung_beauftragt`) lub wygasłym tokenem, dla którego Mamamia otworzyła
 NOWY job `geplant`. Lead wraca do active-setu crona (skan Bewerbungen + maile,
@@ -345,7 +345,7 @@ poniżej lecą TYLKO przy pierwszym wejściu klienta.**
    jest STRICT per job sesji (fc innego joba nie kaperuje aktywnego), a link
    „Alle meine Einsätze" renderuje się też bez `?job=`, gdy lead ma >1 job.
 
-**Deeplinki w mailach (Bug #24):** wszystkie maile o Bewerbungach doklejają
+**Deeplinki w mailach (Bug #25):** wszystkie maile o Bewerbungach doklejają
 `&job=<lead_jobs.id>` do linku portalu — Mail A/B/C przez bridge
 (`appendJobParam` w `project 3/lib/portal-url.ts` + lookup `lead_jobs` po
 `metadata.mamamia_job_offer_id`), remindery przez `send-scheduled-emails`

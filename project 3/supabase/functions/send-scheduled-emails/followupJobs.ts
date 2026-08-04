@@ -1,4 +1,4 @@
-// Multi-Job / Folge-Einsatz-Helfer (Bug #24) — pure Funktionen, aus index.ts
+// Multi-Job / Folge-Einsatz-Helfer (Bug #25) — pure Funktionen, aus index.ts
 // extrahiert, damit sie deno-testbar sind (index.ts zieht nodemailer + Deno.serve
 // und ist als Ganzes nicht importierbar).
 //
@@ -22,7 +22,7 @@ export function appendJobParam(portalUrl: string, leadJobUuid: string | null | u
 // Entscheidet, ob ein Pflegekraft-Reminder wegen "Lead ist beauftragt /
 // nicht interessiert" gecancelt wird.
 //
-// Kern des Bug-#24-Fixes: "beauftragt" ist LEAD-weit (jeder Folge-Einsatz-
+// Kern des Bug-#25-Fixes: "beauftragt" ist LEAD-weit (jeder Folge-Einsatz-
 // Kunde hat einen alten Accept), der Reminder gehört aber zu EINEM Job.
 // Ist dieser Job im lead_jobs-Spiegel AKTUELL 'geplant', betrifft der
 // Reminder den NEUEN Einsatz und überlebt. nicht_interessiert cancelt

@@ -125,7 +125,7 @@ describe('Portal integration: golden paths', () => {
     const meta = bridgePayload!.metadata as Record<string, unknown>;
     expect((meta.contract_contact as Record<string, unknown>).vorname).toBe('Max');
     expect((meta.contract_contact as Record<string, unknown>).nachname).toBe('Kontakt');
-    // Multi-Job (Bug #24): der Accept trägt den Job der Session — Bridge-
+    // Multi-Job (Bug #25): der Accept trägt den Job der Session — Bridge-
     // Dedupe für Mail C ist damit job-scoped (2. Buchung mailt wieder).
     expect(meta.mamamia_job_offer_id).toBe(TEST_JOB_OFFER_ID);
   }, 15000);

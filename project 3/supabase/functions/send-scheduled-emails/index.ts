@@ -8,7 +8,7 @@ import nodemailer from "npm:nodemailer@6.9.10";
 // MIT Anhang (Reminder-Inline-Foto, Angebots-PDF) mit "Buffer is not defined"
 // fehl — die Edge-Runtime liefert ihn über den node:-Specifier.
 import { Buffer } from "node:buffer";
-// Multi-Job-Helfer (Bug #24) — pure Funktionen, separat wegen Testbarkeit.
+// Multi-Job-Helfer (Bug #25) — pure Funktionen, separat wegen Testbarkeit.
 import { appendJobParam, reminderBookedCancel } from "./followupJobs.ts";
  
 const corsHeaders = {
@@ -1345,7 +1345,7 @@ interface ReminderMeta {
   caregiver_german_level?: string | null;
   caregiver_photo_url?: string | null;
   caregiver_about_text?: string | null;
-  // Multi-Job (Bug #24): Job, zu dem dieser Reminder gehört. Reminder eines
+  // Multi-Job (Bug #25): Job, zu dem dieser Reminder gehört. Reminder eines
   // AKTUELL geplanten Jobs überleben den lead-weiten "beauftragt"-Cancel
   // (die alte Buchung betraf einen ANDEREN Einsatz).
   mamamia_job_offer_id?: number | null;
@@ -2101,7 +2101,7 @@ Deno.serve(async (req: Request) => {
           }
 
           // Lead schon "fertig"? Status-Abbruch greift wie bei Nachfass.
-          // Multi-Job-Ausnahme (Bug #24): "beauftragt" ist lead-weit (alter
+          // Multi-Job-Ausnahme (Bug #25): "beauftragt" ist lead-weit (alter
           // Accept-Event existiert bei JEDEM Folge-Einsatz-Kunden) — Reminder,
           // deren Job AKTUELL 'geplant' ist, gehören zum NEUEN Einsatz und
           // überleben. Entscheidung: followupJobs.ts (reminderBookedCancel).
@@ -2187,7 +2187,7 @@ Deno.serve(async (req: Request) => {
           let portalUrl = (portalBase && (lead as Lead).token)
             ? buildPortalUrl(portalBase, (lead as Lead).token, variant === "application" ? "bewerbungen" : undefined)
             : smtpConfig.siteUrl;
-          // Multi-Job (Bug #24): Reminder eines konkreten Jobs verlinkt das
+          // Multi-Job (Bug #25): Reminder eines konkreten Jobs verlinkt das
           // Portal MIT &job=<lead_jobs.id> — der Kunde landet auf DEM Einsatz,
           // um den es geht (nicht auf dem Default-/neuesten Job). Fail-soft:
           // kein Mirror-Wiersz ⇒ plain Link.

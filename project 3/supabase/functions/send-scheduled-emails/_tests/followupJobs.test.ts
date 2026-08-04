@@ -33,7 +33,7 @@ Deno.test("appendJobParam: UUID wird URL-encodiert", () => {
   );
 });
 
-// ─── reminderBookedCancel (Bug #24: job-aware Cancel) ───────────────────────
+// ─── reminderBookedCancel (Bug #25: job-aware Cancel) ───────────────────────
 
 Deno.test("cancel: nicht_interessiert cancelt IMMER — auch bei geplantem Job", () => {
   assertEquals(

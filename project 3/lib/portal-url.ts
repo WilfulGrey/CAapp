@@ -1,4 +1,4 @@
-// Multi-Job-Deeplink (Bug #24, Metafora Michała: Token = Schlüssel zur
+// Multi-Job-Deeplink (Bug #25, Metafora Michała: Token = Schlüssel zur
 // Wohnung, ?job= = Zimmer): Kunden-Mails über eine Bewerbung auf einem
 // KONKRETEN Job verlinken das Portal mit &job=<lead_jobs.id> — das Portal
 // scoped die Session dann exakt auf diesen Einsatz (Variant A, seit #296).

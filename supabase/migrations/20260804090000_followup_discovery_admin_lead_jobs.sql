@@ -1,5 +1,5 @@
 /*
-  # Follow-up joby (Bug #24): discovery-stempel + admin-widok lead_jobs
+  # Follow-up joby (Bug #25): discovery-stempel + admin-widok lead_jobs
 
   1. `leads.mamamia_jobs_checked_at` — samostrojenie fazy discovery w cronie
      detect-caregiver-events: leady POZA active-setem (status zamknięty lub
