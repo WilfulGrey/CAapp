@@ -2,276 +2,35 @@
 // Wird beim Buchen (application_accepted_internal) erzeugt und per
 // `buildVertragAttachmentPdf` zu PDF gerendert → an Kunde + Team gemailt.
 //
-// LAYOUT-VORLAGE: dist/primundus-mustervertrag.pdf (8 Seiten). Wortlaut +
-// Reihenfolge + Seitenstruktur sind 1:1 dem Original nachgebaut. Wenn das
-// Original aktualisiert wird, muss /tmp/mustervertrag.txt neu extrahiert
-// (pdftotext -layout) und dieser Generator angepasst werden.
+// TREŚĆ dokumentu (Wortlaut 1:1 z dist/primundus-mustervertrag.pdf) żyje w
+// lib/vertrag-content.ts — ten plik jest fasadą: składa HTML z tych samych
+// danych, z których renderer PDF buduje dokument. Zmiany treści robić TAM.
 //
 // Historischer Hinweis: bis 11.06.2026 wurde HTML 1:1 als Mail-Anhang
 // versendet. Outlook/Gmail flaggen HTML-Anhänge als verdächtig und der
 // Vertrag war nicht gerichtsfest archivierbar. Daher rendern wir jetzt
 // via puppeteer + @sparticuz/chromium zu echtem PDF (siehe unten).
 
-export interface VertragPartei {
-  name?: string;
-  strasse?: string;
-  plz?: string;
-  ort?: string;
-  email?: string;
-  telefon?: string;
-}
+import {
+  type Paragraph,
+  type VertragHtmlOptions,
+  type VertragInput,
+  resolveVertragFelder,
+  T,
+  HW_CHECKLIST,
+  GP_CHECKLIST,
+} from './vertrag-content';
 
-export interface VertragInput {
-  datum?: string;
-  ag?: VertragPartei;
-  le?: VertragPartei | null; // null = identisch mit Auftraggeber
-  vertragsbeginn?: string;
-  voraussAbreise?: string;
-  tagessatz?: string; // z.B. "EUR 95,00"
-  dl?: { name?: string; rolle?: string };
-}
+export {
+  formatSignedAtBerlin,
+  buildVertragDocument,
+  documentPlainText,
+  type VertragBlock,
+  type VertragHtmlOptions,
+  type VertragInput,
+  type VertragPartei,
+} from './vertrag-content';
 
-// ─── Punkte aus dem Mustervertrag (1:1 verbatim) ────────────────────────
-// Pro § ein Block. `subList` optional für Punkt 8 in § 1 (vier ▸-Bullets).
-
-interface Punkt {
-  text: string;
-  subList?: string[];
-}
-
-interface Paragraph {
-  titel: string;
-  punkte: Punkt[];
-  footnote?: string;
-}
-
-const PARA_1: Paragraph = {
-  titel: '§ 1 Vertragsgegenstand',
-  punkte: [
-    {
-      text: 'Der DL erbringt zeitlich überwiegend Leistungen im Bereich der hauswirtschaftlichen Versorgung und unterstützt den LE bei der Ausübung alltäglicher Aktivitäten. Zusätzlich erbringt der DL in zeitlich geringerem Umfang Leistungen im Bereich der Grundpflege im Sinne des SGB XI. Eine detaillierte Beschreibung dieser Leistungen erfolgt in Anlage 2 dieses Vertrages, wobei die Art, Dauer und die Häufigkeit der Betreuung vom jeweiligen Gesundheitszustand des Leistungsempfängers abhängen. Der zeitliche Aufwand der vereinbarten grundpflegerischen Leistungen darf 50 Prozent der gesamten Leistung nicht überschreiten.',
-    },
-    {
-      text: 'Der DL erklärt, dass notwendige medizinische Behandlungspflege nach SGB V (z. B. Injektionen, Wundversorgung, u. a.) sich ausdrücklich nicht im Umfang der Dienstleistungen befindet und nicht im Rahmen dieses Vertrages ausgeführt wird.',
-    },
-    {
-      text: 'Der DL verpflichtet sich, die ihm in Auftrag gegebenen Dienstleistungen mit höchster Sorgfalt sowie durch die volle Anwendung seiner Kenntnisse und Erfahrungen zu erbringen.',
-    },
-    {
-      text: 'Im Fall einer Verhinderung der Betreuungsperson ist der DL berechtigt, die Betreuungsperson schnellstmöglich (in der Regel innerhalb von 3 Tagen) zu wechseln.',
-    },
-    {
-      text: 'Bei begründetem und nachvollziehbarem Wunsch des AG wird der DL einen Austausch der Betreuungsperson vornehmen. Für die Ausführung wird dem DL ein Zeitraum von mindestens einer Woche gewährt.',
-    },
-    {
-      text: 'Die eingesetzten Betreuungspersonen des DL können nicht durch den AG zu anderen Zwecken eingeteilt oder an andere Leistungsorte verliehen werden.',
-    },
-    {
-      text: 'Mängel und Beschwerden müssen dem DL unverzüglich schriftlich angezeigt werden.',
-    },
-    {
-      text: 'Der DL erbringt seine Dienstleistungen gemäß den Vorschriften der EU am Leistungsort. Beide Vertragsparteien sind sich darüber einig:',
-      subList: [
-        'der AG erstellt weder Dienst- noch Freizeitpläne',
-        'der AG übt keinen Einfluss auf Art und Weise der Aufgaben der Betreuungsperson aus',
-        'der AG erteilt keine direkten und bindenden Weisungen und übt kein Direktionsrecht aus',
-        'der AG bindet die Betreuungsperson nicht in eigene Betriebsabläufe ein',
-      ],
-    },
-    {
-      text: 'Die wöchentliche durchschnittliche Arbeitszeit darf 40 Stunden nicht überschreiten. Außerhalb der Arbeitszeit steht es der Betreuungsperson frei, den Leistungsort zu verlassen.',
-    },
-    {
-      text: 'Der AG stellt der Betreuungsperson die Mitbenutzung eines Telefons für nationale Festnetztelefonate sowie Festnetztelefonate ins Heimatland und Internet zur Verfügung.',
-    },
-  ],
-};
-
-const PARA_2: Paragraph = {
-  titel: '§ 2 Unterbringung / Verpflegung / Transfer',
-  punkte: [
-    {
-      text: 'Der AG verpflichtet sich, der Betreuungsperson ausreichenden, unentgeltlichen Wohnraum (z. B. ein Zimmer) zur alleinigen, privaten und freiwilligen Nutzung zur Verfügung zu stellen. Der Wohnraum muss ausreichend möbliert, beheizt, verschließbar und hygienisch einwandfrei mit einem Tageslichtfenster versehen sein.',
-    },
-    {
-      text: 'Der AG trägt alle Kosten der Leistungserbringung, Ernährungs- und Lebenshaltungskosten sowie die Kosten für die mit der Betreuung verbundenen Mittel und Geräte.',
-    },
-    {
-      text: 'Der AG verpflichtet sich, am vorher vereinbarten Ankunftstag die Betreuungsperson am nächstgelegenen Ankunftsort auf eigene Kosten abzuholen. Der DL haftet nicht für Verspätungen infolge der Busreisedauer oder persönlicher Angelegenheiten der Betreuungspersonen.',
-    },
-  ],
-};
-
-function paragraph3(beginn: string, abreise: string): Paragraph {
-  return {
-    titel: '§ 3 Vertragsdauer / Vertragskündigung',
-    punkte: [
-      {
-        text: `Der Vertrag beginnt voraussichtlich am ${beginn} und wird auf unbestimmte Zeit geschlossen.`,
-      },
-      {
-        text: 'Der AG verlangt vom DL ausdrücklich, dass dieser mit der Leistungserbringung bereits vor Ablauf der Widerrufsfrist gemäß § 8 beginnt.',
-      },
-      {
-        text: 'Der Vertrag kann von beiden Seiten ohne Einhaltung einer Kündigungsfrist gekündigt werden.',
-      },
-      {
-        text: 'Die Kündigung bedarf zu ihrer Wirksamkeit zwingend der Textform (Brief, Fax, E-Mail).',
-      },
-      {
-        text: 'Der Auftraggeber gewährt dem Dienstleister eine Frist von maximal 3 Tagen zur Organisation der Rückreise der Betreuungsperson sowie während dieser Frist weiterhin Unterkunft und Verpflegung.',
-      },
-      {
-        text: 'Die Abwesenheit des LE am Leistungsort bis zu 7 Tagen lässt den Vertragsbestand unberührt. Ab dem 8. Tag ruht der Vertrag kostenlos für den AG bis die Betreuung wieder fortgesetzt wird.',
-      },
-      {
-        text: 'Bei Beschwerden über die Erbringung der vereinbarten Leistungen ist der DL unverzüglich zu informieren. Eine Minderung kann nur erfolgen, wenn der Minderungsgrund innerhalb von 5 Tagen angezeigt wurde und zwischen den Parteien unstrittig ist.',
-      },
-    ],
-    footnote: `Geplanter Einsatz-Zeitraum (Rotation): ${beginn} – voraussichtlich ${abreise}. Der Vertrag selbst ist täglich kündbar (§ 3.3).`,
-  };
-}
-
-function paragraph4(tagessatz: string): Paragraph {
-  return {
-    titel: '§ 4 Vergütung',
-    punkte: [
-      {
-        text: `Der DL erhält für die vereinbarten Dienstleistungen eine Vergütung von ${tagessatz} pro Tag (Tagessatz) zzgl. einer Reisekostenpauschale i.H.v. EUR 125,00 pro Fahrt.`,
-      },
-      {
-        text: 'Die Vergütung wird berechnet ab dem Tag der Ankunft der Betreuungsperson am Leistungsort.',
-      },
-      {
-        text: 'Beginnt oder endet die Vertragslaufzeit im Laufe eines Monats, erfolgt eine anteilige Berechnung der vereinbarten Vergütung.',
-      },
-      {
-        text: 'Die Rechnungen werden monatlich zum 15. ausgestellt. Der Rechnungsbetrag ist bis spätestens 7 Tage nach Erhalt zu überweisen.',
-      },
-      {
-        text: 'Sollten sich die Betreuungsbedürfnisse der zu betreuenden Person ändern, behält sich der DL das Recht zur Anpassung des Honorars vor.',
-      },
-      {
-        text: 'Im Falle einer Arbeitsunfähigkeit der Betreuungsperson wird für die Zeit der Verhinderung kein Honorar berechnet.',
-      },
-      {
-        text: 'Der Anreisetag und der Abreisetag werden als volle Dienstleistungstage berechnet. Bei einem Personalwechsel wird der volle Tagessatz für beide Betreuungspersonen berechnet.',
-      },
-      {
-        text: 'An gesetzlichen Feiertagen wird der doppelte Tagessatz berechnet.',
-      },
-      {
-        text: 'In den Sommermonaten Juli und August wird ein Sommerzuschlag von 6,67 € pro Tag berechnet.',
-      },
-      {
-        text: 'Nach der aktuellen Gesetzeslage ist auf die Dienstleistungen des DL keine gesetzliche Mehrwertsteuer zu entrichten.',
-      },
-      {
-        text: 'Bei Zahlungsverzug hat der DL das Recht, Dritte mit der Rechnungsabwicklung zu beauftragen und Verzugszinsen in Höhe von 5 Prozent p. a. über dem jeweiligen Basiszinssatz zu berechnen.',
-      },
-      {
-        text: 'Der DL ist berechtigt, bei ausbleibender Zahlung die Betreuungsperson ersatzlos abreisen zu lassen und den Vertrag außerordentlich fristlos zu kündigen.',
-      },
-    ],
-  };
-}
-
-const PARA_5: Paragraph = {
-  titel: '§ 5 Haftung des Dienstleisters',
-  punkte: [
-    {
-      text: 'Der DL erklärt, dass die von ihm beauftragten Betreuungspersonen über eine Haftpflichtversicherung verfügen.',
-    },
-    {
-      text: 'Der Dienstleister haftet für Schäden an Leib, Leben oder Gesundheit nach den gesetzlichen Vorschriften und jeweils bis zu EUR 1.000.000,00 pro Schadenfall. Die Haftung für Schäden und Folgeschäden wird ausgeschlossen, wenn der Schaden in geringen Beschädigungen (bis zu EUR 100,00) besteht, die bei der Verrichtung alltäglicher Haushaltspflichten entstanden sind, oder wenn der Schaden einen normalen Verschleiß der Ausstattung darstellt.',
-    },
-    {
-      text: 'Der DL und die Betreuungspersonen leisten keine medizinische Behandlungspflege im Sinne des SGB V und übernehmen keine Verantwortung für Umstände, die durch Nichteinhaltung ärztlicher Anordnungen durch den AG oder LE entstehen.',
-    },
-    {
-      text: 'Im Falle der Übergabe eines Kraftfahrzeugs an die Betreuungsperson können keine Ansprüche gegenüber dem DL geltend gemacht werden.',
-    },
-  ],
-};
-
-const PARA_6: Paragraph = {
-  titel: '§ 6 Datenschutz / Vertraulichkeitsvereinbarung',
-  punkte: [
-    {
-      text: 'Beide Parteien verpflichten sich zum Schutz aller personenbezogenen Daten gemäß der EU-DSGVO. Der DL verpflichtet sich zur vertraulichen Behandlung der persönlichen Daten des AG und LE.',
-    },
-    {
-      text: 'Der DL verarbeitet anvertraute personenbezogene Daten nur soweit, als es zur Begründung, Durchführung oder Beendigung dieses Vertrages erforderlich ist.',
-    },
-    {
-      text: 'Der AG verpflichtet sich zur vollen Verschwiegenheit gegenüber Dritten in Bezug auf sämtliche Daten, die im Zusammenhang mit der Erbringung der Dienstleistung erlangt werden.',
-    },
-    {
-      text: 'Der AG und der LE willigen ein, dass die zur Erfüllung des Vertrages notwendigen Daten vom DL erhoben, gespeichert, verarbeitet und an seine Mitarbeiter und Betreuungspersonen weitergegeben werden dürfen.',
-    },
-  ],
-};
-
-const PARA_7: Paragraph = {
-  titel: '§ 7 Wettbewerbsverbot',
-  punkte: [
-    {
-      text: 'Für die Betreuungspersonen gilt sowohl während der Vertragsdauer als auch bis 12 Monate nach Beendigung ein Konkurrenz- und Wettbewerbsverbot. Es ist nicht gestattet, ein mittelbares oder unmittelbares Rechtsverhältnis zu einer Betreuungsperson des DL zu begründen.',
-    },
-    {
-      text: 'Im Falle einer schuldhaften Annahme eines Auftrages durch eine Betreuungsperson beim AG mit Ausschließung des DL, verpflichtet sich der AG, eine Vertragsstrafe in Höhe von EUR 5.000,00 zu zahlen.',
-    },
-  ],
-};
-
-const PARA_8: Paragraph = {
-  titel: '§ 8 Widerrufsrecht',
-  punkte: [
-    {
-      text: 'Dem AG steht das Recht zu, diesen Vertrag ohne Angabe von Gründen innerhalb von 14 Tagen in Textform zu widerrufen. Die Widerrufsfrist beginnt mit Unterzeichnung dieses Vertrages. Widerruf an: Primundus Deutschland (VITANAS CARE LTD HOME SK), ul. Poznańska 21/48, 00-685 Warszawa.',
-    },
-    {
-      text: 'Im Falle eines wirksamen Widerrufs sind die beiderseits empfangenen Leistungen zurückzugewähren. Der AG ist verpflichtet, dem DL Wertersatz zu leisten (z. B. entstandene Reisekosten, pauschal EUR 125,00).',
-    },
-    {
-      text: 'Der AG bestätigt durch Unterzeichnung, dass er ausdrücklich verlangt, dass die Leistungserbringung vor Ablauf der Widerrufsfrist beginnt.',
-    },
-  ],
-};
-
-const PARA_9: Paragraph = {
-  titel: '§ 9 Einhaltung der gültigen Sozialversicherungspflichten',
-  punkte: [
-    {
-      text: 'Der DL erklärt, dass er alle auszuführenden Tätigkeiten nach den gültigen Gesetzen, insbesondere der EU-Dienstleistungsrichtlinie und dem Arbeitnehmer-Entsendegesetz, rechtmäßig befolgt.',
-    },
-    {
-      text: 'Die Vergütung des Personals richtet sich nach dem deutschen Mindestlohn.',
-    },
-    {
-      text: 'Die von ihm beauftragten Betreuungspersonen sind ordnungsgemäß nach polnischem Sozialversicherungsrecht versichert und mit A1-Bescheinigungen der polnischen Sozialversicherungsanstalt (ZUS) entsandt.',
-    },
-  ],
-};
-
-const PARA_10: Paragraph = {
-  titel: '§ 10 Schlussbestimmungen',
-  punkte: [
-    { text: 'Änderungen und Ergänzungen bedürfen der Schriftform.' },
-    {
-      text: 'Rechnungen und Korrespondenz werden an die E-Mailadresse des AG auf Seite 1 gesendet.',
-    },
-    { text: 'Eine E-Mail ist gemäß diesem Vertrag ebenfalls Schriftform.' },
-    {
-      text: 'Sollten einzelne Bestimmungen unwirksam sein, gelten die übrigen fort.',
-    },
-    {
-      text: 'Der AG bestätigt mit seiner Unterschrift den gesamten Inhalt des Vertrages gelesen zu haben.',
-    },
-    { text: 'Mündliche Nebenabreden bestehen nicht.' },
-    { text: 'Der Vertrag unterliegt deutschem Recht.' },
-  ],
-};
 
 // ─── Helfer ──────────────────────────────────────────────────────────────
 
@@ -302,55 +61,29 @@ function renderParagraph(p: Paragraph): string {
 }
 
 // ─── Bildung des HTML-Dokuments ──────────────────────────────────────────
-
-export interface VertragHtmlOptions {
-  signaturName: string;
-  signedAt?: string; // menschenlesbarer Zeitstempel, z.B. "05.06.2026 um 14:30 Uhr"
-  auditNote?: string; // z.B. "IP 1.2.3.4 · Vertragsversion v1.0"
-}
-
-// KANONISCHES Format des Unterschrifts-Zeitstempels: der Server-ISO-Moment
-// (lead_application_acceptances.signed_at) in deutscher Ortszeit. NIEMALS
-// getHours() o.ä. verwenden — Render läuft in UTC, das ergab "17:00 Uhr"
-// statt 19:00 (Bug „zwei Verträge mit zwei Uhrzeiten", 2026-07-21). Alle
-// Render-Pfade (Mail-Anhang, Storage-Kanon, Portal-Fallback) nutzen DIESE
-// Funktion → ein Vertrag, eine Uhrzeit.
-export function formatSignedAtBerlin(iso: string): string | undefined {
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return undefined;
-  const parts = new Intl.DateTimeFormat('de-DE', {
-    timeZone: 'Europe/Berlin',
-    day: '2-digit',
-    month: '2-digit',
-    year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-    hour12: false,
-  }).formatToParts(d);
-  const g = (t: string) => parts.find((p) => p.type === t)?.value ?? '';
-  return `${g('day')}.${g('month')}.${g('year')} um ${g('hour')}:${g('minute')} Uhr`;
-}
+// (VertragHtmlOptions + formatSignedAtBerlin żyją w vertrag-content.ts —
+// tu tylko składanie HTML z tych samych pól/reguł co renderer PDF.)
 
 export function buildVertragHtml(daten: VertragInput, opts: VertragHtmlOptions): string {
-  const datum = esc(daten.datum || '');
-  const ag = daten.ag ?? {};
-  const le = daten.le ?? null;
-  const beginn = esc(daten.vertragsbeginn || '—');
-  const abreise = esc(daten.voraussAbreise || '—');
-  const tagessatz = esc(daten.tagessatz || '—');
-  const dlName = esc(daten.dl?.name || 'Kamila Bilska-Wabik');
-  const dlRolle = esc(daten.dl?.rolle || 'Vitanas Group');
-  const ort = esc(ag.ort || '');
-  const signaturName = esc(opts.signaturName);
-  const signedAt = esc(opts.signedAt || '');
-  const signDatum = opts.signedAt ? esc(opts.signedAt.split(' um ')[0]) : datum;
+  // Wspólna derywacja pól (defaulty, reguła signDatum) — RAW z
+  // resolveVertragFelder, escaping wyłącznie tutaj, na krawędzi HTML.
+  const f = resolveVertragFelder(daten, opts);
+  const datum = esc(f.datum);
+  const ag = f.ag;
+  const le = f.le;
+  const dlName = esc(f.dlName);
+  const dlRolle = esc(f.dlRolle);
+  const ort = esc(f.ort);
+  const signaturName = esc(f.signaturName);
+  const signedAt = esc(f.signedAt);
+  const signDatum = esc(f.signDatum);
 
   const parteiZeile = (label: string, value?: string) =>
     `<div class="pz"><span class="pl">${esc(label)}</span><span class="pv">${esc(value || '—')}</span></div>`;
 
   const leBlock = le
-    ? `${parteiZeile('Name', le.name)}${parteiZeile('Straße + Nr.', le.strasse)}${parteiZeile('PLZ / Ort', [le.plz, le.ort].filter(Boolean).join(' '))}`
-    : `<div class="pz le-empty"><span class="pv italic">identisch mit Auftraggeber</span></div>`;
+    ? `${parteiZeile(T.leLabels.name, le.name)}${parteiZeile(T.leLabels.strasse, le.strasse)}${parteiZeile(T.leLabels.plzOrt, [le.plz, le.ort].filter(Boolean).join(' '))}`
+    : `<div class="pz le-empty"><span class="pv italic">${T.leIdentisch}</span></div>`;
 
   // Layout 1:1 dem Mustervertrag (dist/primundus-mustervertrag.pdf, 8 Seiten):
   //  Seite 1: Header + Datum + "Dienstleistungsvertrag" + Vertragsparteien
@@ -650,90 +383,81 @@ export function buildVertragHtml(daten: VertragInput, opts: VertragHtmlOptions):
        ═══════════════════════════════════════════════════════════════ -->
   <div class="head">
     <img class="brand" src="https://kostenrechner.primundus.de/images/Primundus-Logo_V6.png" alt="Primundus">
-    <span class="datum">Ort, Datum: ${ort}${ort ? ', ' : ''}${datum}</span>
+    <span class="datum">${T.ortDatumPrefix}${ort}${ort ? ', ' : ''}${datum}</span>
   </div>
 
-  <h1>Dienstleistungsvertrag</h1>
+  <h1>${T.titel}</h1>
   <div class="rule"></div>
 
-  <p class="intro-center">geschlossen zwischen den folgenden Vertragsparteien</p>
+  <p class="intro-center">${T.intro}</p>
 
   <div class="parteien">
     <div class="partei-block">
       <div class="box">
-        <div class="tag">Auftraggeber (AG)</div>
-        ${parteiZeile('Name / Firma', ag.name)}
-        ${parteiZeile('Straße + Nr.', ag.strasse)}
-        ${parteiZeile('PLZ / Ort', [ag.plz, ag.ort].filter(Boolean).join(' '))}
-        ${parteiZeile('E-Mail', ag.email)}
-        ${parteiZeile('Telefon', ag.telefon)}
+        <div class="tag">${T.agTag}</div>
+        ${parteiZeile(T.agLabels.name, ag.name)}
+        ${parteiZeile(T.agLabels.strasse, ag.strasse)}
+        ${parteiZeile(T.agLabels.plzOrt, [ag.plz, ag.ort].filter(Boolean).join(' '))}
+        ${parteiZeile(T.agLabels.email, ag.email)}
+        ${parteiZeile(T.agLabels.telefon, ag.telefon)}
       </div>
-      <p class="between">im Folgenden <strong>Auftraggeber (AG)</strong> genannt</p>
+      <p class="between">${T.betweenPrefix}<strong>${T.agBetweenBold}</strong>${T.betweenSuffix}</p>
     </div>
 
     <div class="partei-block">
       <div class="box">
-        <div class="tag">Leistungsempfänger (LE) — falls abweichend vom AG</div>
+        <div class="tag">${T.leTag}</div>
         ${leBlock}
       </div>
-      <p class="between">im Folgenden <strong>Leistungsempfänger (LE)</strong> genannt</p>
+      <p class="between">${T.betweenPrefix}<strong>${T.leBetweenBold}</strong>${T.betweenSuffix}</p>
     </div>
 
-    <p class="between und">— und —</p>
+    <p class="between und">${T.und}</p>
 
     <div class="partei-block">
       <div class="box">
-        <div class="tag">Dienstleister (DL)</div>
-        <div class="firma">PRIMUNDUS Deutschland</div>
-        <div class="firma-sub">VITANAS CARE LTD HOME SK · ul. Poznańska 21/48, 00-685 Warszawa</div>
-        <div class="firma-sub">NIP: 7011301447 · REGON: 544074862</div>
+        <div class="tag">${T.dlTag}</div>
+        <div class="firma">${T.dlFirma}</div>
+        <div class="firma-sub">${T.dlFirmaSub1}</div>
+        <div class="firma-sub">${T.dlFirmaSub2}</div>
       </div>
-      <p class="between">im Folgenden <strong>Dienstleister (DL oder PRIMUNDUS)</strong> genannt.</p>
+      <p class="between">${T.betweenPrefix}<strong>${T.dlBetweenBold}</strong>${T.dlBetweenSuffix}</p>
     </div>
   </div>
 
   <!-- ═══════════════════════════════════════════════════════════════════
        SEITEN 2-6: §§ 1 - 10
        ═══════════════════════════════════════════════════════════════ -->
-  ${renderParagraph(PARA_1)}
-  ${renderParagraph(PARA_2)}
-  ${renderParagraph(paragraph3(daten.vertragsbeginn || '—', daten.voraussAbreise || '—'))}
-  ${renderParagraph(paragraph4(daten.tagessatz || '—'))}
-  ${renderParagraph(PARA_5)}
-  ${renderParagraph(PARA_6)}
-  ${renderParagraph(PARA_7)}
-  ${renderParagraph(PARA_8)}
-  ${renderParagraph(PARA_9)}
-  ${renderParagraph(PARA_10)}
+  ${f.paragraphs.map(renderParagraph).join('\n  ')}
 
   <!-- Unterschriften (Ende Seite 6) -->
   <div class="sign-block">
-    <div class="signs-title">Unterschriften</div>
+    <div class="signs-title">${T.signsTitle}</div>
     <div class="ort-datum">
-      <div class="col"><div class="lbl">Ort</div><div class="val">${ort || '&nbsp;'}</div></div>
-      <div class="col"><div class="lbl">Datum</div><div class="val">${signDatum || datum || '&nbsp;'}</div></div>
+      <div class="col"><div class="lbl">${T.lblOrt}</div><div class="val">${ort || '&nbsp;'}</div></div>
+      <div class="col"><div class="lbl">${T.lblDatum}</div><div class="val">${signDatum || datum || '&nbsp;'}</div></div>
     </div>
     <div class="sign-grid">
       <div class="col">
         <div class="name-line"><span class="name">${signaturName}</span></div>
         <div class="cap">
-          Ort, Datum, Unterschrift Auftraggeber
-          <div class="cap-sub">(bzw. Bevollmächtigter oder gesetzlicher Vertreter)</div>
+          ${T.capAg}
+          <div class="cap-sub">${T.capAgSub}</div>
         </div>
       </div>
       <div class="col">
         <div class="name-line"><span class="name">${dlName}</span></div>
         <div class="cap">
-          Ort, Datum, Unterschrift Dienstleister
+          ${T.capDl}
           <div class="cap-sub">i. A. ${dlName}, ${dlRolle} · Warszawa, ${datum}</div>
         </div>
       </div>
     </div>
 
     <div class="audit-banner">
-      <div class="h">✓ Vertrag rechtsverbindlich unterschrieben</div>
-      <div class="t">Elektronisch signiert von <strong>${signaturName}</strong>${signedAt ? ` am <strong>${signedAt}</strong>` : ''}.</div>
-      <div class="a">Einfache elektronische Signatur${opts.auditNote ? ` · ${esc(opts.auditNote)}` : ''}</div>
+      <div class="h">${T.auditHead}</div>
+      <div class="t">${T.auditSigniertVon}<strong>${signaturName}</strong>${signedAt ? `${T.auditAm}<strong>${signedAt}</strong>` : ''}.</div>
+      <div class="a">${T.auditSub}${opts.auditNote ? ` · ${esc(opts.auditNote)}` : ''}</div>
     </div>
   </div>
 
@@ -741,32 +465,32 @@ export function buildVertragHtml(daten: VertragInput, opts: VertragHtmlOptions):
        SEITE 7: Anlage 1 — Datenschutz
        ═══════════════════════════════════════════════════════════════ -->
   <section class="anlage">
-    <h1 class="anlage-h">Anlage 1 zum Dienstleistungsvertrag</h1>
-    <div class="anlage-sub">Hinweise zum Datenschutz (EU-DSGVO) und Einwilligungserklärung</div>
+    <h1 class="anlage-h">${T.anlage1H}</h1>
+    <div class="anlage-sub">${T.anlage1Sub}</div>
     <div class="anlage-rule"></div>
 
-    <p>PRIMUNDUS ist verantwortlich für den Schutz, Sicherheit und Verwaltung Ihrer Daten. Kontakt: <strong>datenschutz@primundus.de</strong></p>
+    <p>${T.anlage1P1Prefix}<strong>${T.anlage1P1Email}</strong></p>
 
-    <p>Die angegebenen personenbezogenen Daten, insbesondere Name, Anschrift, Telefonnummer, Bankdaten, Gesundheitsdaten und familiäre Daten, werden auf Grundlage der geltenden EU-DSGVO ausschließlich zum Zwecke der Durchführung des entstehenden Vertragsverhältnisses erhoben und verarbeitet.</p>
+    <p>${T.anlage1P2}</p>
 
-    <p>Ihre Vertragsdaten speichern wir gemäß den gesetzlichen Vorgaben. Sie haben das Recht auf Auskunft, Berichtigung, Löschung, Sperrung, Einschränkung der Verarbeitung, Widerspruch und Datenübertragbarkeit sowie das Recht auf Beschwerde bei einer zuständigen Aufsichtsbehörde. Unsere Datenschutzerklärung finden Sie unter www.primundus.de.</p>
+    <p>${T.anlage1P3}</p>
 
     <div class="einwilligung">
-      <strong>Einwilligung zur Datennutzung zu Werbezwecken:</strong><br>
-      Ich bin damit einverstanden, dass PRIMUNDUS mir postalisch / per E-Mail / Telefon / Fax Informationen und Angebote zum Zwecke der Eigenwerbung zusendet.
+      <strong>${T.einwilligungHead}</strong><br>
+      ${T.einwilligungText}
     </div>
 
     <div class="anlage-sign">
       <div class="ort-datum">
-        <div class="col"><div class="lbl">Ort</div><div class="val">${ort || '&nbsp;'}</div></div>
-        <div class="col"><div class="lbl">Datum</div><div class="val">${signDatum || datum || '&nbsp;'}</div></div>
+        <div class="col"><div class="lbl">${T.lblOrt}</div><div class="val">${ort || '&nbsp;'}</div></div>
+        <div class="col"><div class="lbl">${T.lblDatum}</div><div class="val">${signDatum || datum || '&nbsp;'}</div></div>
       </div>
       <div class="sign-grid">
         <div class="col">
           <div class="name-line"><span class="name">${signaturName}</span></div>
           <div class="cap">
-            Ort, Datum, Unterschrift Auftraggeber
-            <div class="cap-sub">(bzw. Bevollmächtigter oder gesetzlicher Vertreter)</div>
+            ${T.capAg}
+            <div class="cap-sub">${T.capAgSub}</div>
           </div>
         </div>
         <div class="col"><!-- DL signiert hier nicht --></div>
@@ -778,53 +502,41 @@ export function buildVertragHtml(daten: VertragInput, opts: VertragHtmlOptions):
        SEITE 8: Anlage 2 — Leistungsumfang
        ═══════════════════════════════════════════════════════════════ -->
   <section class="anlage">
-    <h1 class="anlage-h">Anlage 2 zum Dienstleistungsvertrag</h1>
-    <div class="anlage-sub">Leistungsumfang</div>
+    <h1 class="anlage-h">${T.anlage2H}</h1>
+    <div class="anlage-sub">${T.anlage2Sub}</div>
     <div class="anlage-rule"></div>
 
-    <p>Die Vertragspartner vereinbaren, dass folgende Leistungen im Rahmen des abgeschlossenen Dienstleistungsvertrages erbracht werden. Beide Parteien sind sich darüber einig, dass zeitlich überwiegend nur Leistungen im Bereich der hauswirtschaftlichen Versorgung erbracht werden.</p>
+    <p>${T.anlage2Intro}</p>
 
-    <div class="lead-head">Hauswirtschaftliche Leistungen <span style="font-weight:400;color:#6b7280;font-size:10.5pt;">(zeitlich überwiegend)</span></div>
+    <div class="lead-head">${T.hwHead} <span style="font-weight:400;color:#6b7280;font-size:10.5pt;">${T.hwNote}</span></div>
     <ul class="checklist">
-      <li>Alle notwendigen Maßnahmen zur Aufrechterhaltung einer eigenständigen Haushaltsführung</li>
-      <li>Ordnung und Reinigung der vom LE genutzten Zimmer/Räume (Fensterreinigung, Garage, Heizräume und Außengebäude ausgeschlossen)</li>
-      <li>Einkaufen</li>
-      <li>Spülen des alltäglichen Geschirrs</li>
-      <li>Waschen und Wechseln der Wäsche sowie Kleidung</li>
-      <li>Zubereitung von Speisen und Getränken</li>
-      <li>Pflege von Zimmerpflanzen</li>
-      <li>Begleitung bei Spaziergängen</li>
-      <li>Versorgung von Haustieren</li>
-      <li>Aktivierende Tätigkeiten und Besorgungen (z. B. Begleitung bei Kulturveranstaltungen, Spiele etc.)</li>
+      ${HW_CHECKLIST.map((s) => `<li>${esc(s)}</li>`).join('\n      ')}
     </ul>
 
-    <div class="lead-head">Grundpflege nach § 14 Abs. 4 Nr. 1–3 SGB XI <span style="font-weight:400;color:#6b7280;font-size:10.5pt;">(zeitlich nicht überwiegend)</span></div>
+    <div class="lead-head">${T.gpHead} <span style="font-weight:400;color:#6b7280;font-size:10.5pt;">${T.gpNote}</span></div>
     <ul class="checklist">
-      <li>Körperpflege (z. B. Waschen, Duschen, Baden, Rasieren, Mund- und Zahnpflege, Hautpflege)</li>
-      <li>Hilfe bei der Nahrungsaufnahme</li>
-      <li>Hilfe bei der Mobilität (z. B. Aufstehen, Zubettgehen, An- und Auskleiden, Treppensteigen)</li>
-      <li>Begleitung von Arztbesuchen</li>
+      ${GP_CHECKLIST.map((s) => `<li>${esc(s)}</li>`).join('\n      ')}
     </ul>
 
-    <p class="footnote-anlage">Ausdrücklich ausgenommen: Leistungen der medizinischen Behandlungspflege nach SGB V.</p>
+    <p class="footnote-anlage">${T.anlage2Footnote}</p>
 
     <div class="anlage-sign">
       <div class="ort-datum">
-        <div class="col"><div class="lbl">Ort</div><div class="val">${ort || '&nbsp;'}</div></div>
-        <div class="col"><div class="lbl">Datum</div><div class="val">${signDatum || datum || '&nbsp;'}</div></div>
+        <div class="col"><div class="lbl">${T.lblOrt}</div><div class="val">${ort || '&nbsp;'}</div></div>
+        <div class="col"><div class="lbl">${T.lblDatum}</div><div class="val">${signDatum || datum || '&nbsp;'}</div></div>
       </div>
       <div class="sign-grid">
         <div class="col">
           <div class="name-line"><span class="name">${signaturName}</span></div>
           <div class="cap">
-            Ort, Datum, Unterschrift Auftraggeber
-            <div class="cap-sub">(bzw. Bevollmächtigter oder gesetzlicher Vertreter)</div>
+            ${T.capAg}
+            <div class="cap-sub">${T.capAgSub}</div>
           </div>
         </div>
         <div class="col">
           <div class="name-line"><span class="name">${dlName}</span></div>
           <div class="cap">
-            Ort, Datum, Unterschrift Dienstleister
+            ${T.capDl}
             <div class="cap-sub">i. A. ${dlName}, ${dlRolle} · Warszawa, ${datum}</div>
           </div>
         </div>
