@@ -959,6 +959,9 @@ Deno.test("multi-job: backward compat — no mamamia_customer_id scans only the 
 // Bridge-Event application_accepted_internal (Mail C + Team-Buchungsmail baut
 // route.ts). Dedupe lead-weit über lead_events (fetchPastEvents), 7-Tage-
 // Cutoff gegen Altbestand, kein Feuern ohne notify (silent-seed Jobs).
+// Frische-Anker: created_at (Buchungsmoment; final_confirmed_at ist auf
+// beta UND prod immer null — Sonde 2026-08-05, Bug #26) mit
+// final_confirmed_at als Fallback.
 
 const daysAgoISO = (d: number) => new Date(Date.now() - d * 24 * 3_600_000).toISOString();
 
@@ -966,15 +969,52 @@ function bookedJob(
   id: number,
   confirmedAt: string | null,
   cg: { id?: number | null; first_name?: string | null; last_name?: string | null } | null = { id: 50001, first_name: "Helena", last_name: "Kowalski" },
+  // Reale mamamia-Antworten stempeln created_at und lassen final_confirmed_at
+  // null — Tests, die confirmedAt setzen, prüfen bewusst den Fallback-Pfad.
+  createdAt: string | null = null,
 ): RawJobOffer {
   return {
     id,
     status: "on_job",
     arrival_at: "2099-01-01 00:00:00",
     departure_at: "2099-12-31 00:00:00",
-    final_confirmation: { id: 900, final_confirmed_at: confirmedAt, caregiver: cg },
+    final_confirmation: { id: 900, created_at: createdAt, final_confirmed_at: confirmedAt, caregiver: cg },
   };
 }
+
+Deno.test("annahme (Bug #26): Panel-Buchung — created_at frisch, final_confirmed_at NULL → feuert Mail-C-Event", async () => {
+  resetCaches();
+  const recorder: BridgeOptions["recorder"] = [];
+  const def = VALID_LEAD.mamamia_job_offer_id as number;
+  // Exakt die Antwortform beider Tenants (Marianna-Fall, Confirmation 667):
+  // mamamia stempelt created_at im Buchungsmoment, final_confirmed_at bleibt null.
+  const res = await handleRequest(makeReq({ lead_id: VALID_LEAD.id }), {
+    secrets: SECRETS,
+    supabase: makeSupabase(VALID_LEAD),
+    fetchFn: makeFetch({ jobOffers: [bookedJob(def, null, undefined, daysAgoISO(0.02))] }, { recorder }),
+  });
+  const body = await res.json();
+  assertEquals(body.accepted_detected, 1);
+  assertEquals(recorder.length, 1);
+  assertEquals(recorder[0].event, "application_accepted_internal");
+  assertEquals(recorder[0].notify, true);
+  assertEquals(recorder[0].metadata.caregiver_id, 50001);
+  assertEquals(recorder[0].metadata.mamamia_job_offer_id, def);
+});
+
+Deno.test("annahme (Bug #26): created_at älter als 7 Tage, final_confirmed_at NULL → Altbestand, kein Call", async () => {
+  resetCaches();
+  const recorder: BridgeOptions["recorder"] = [];
+  const def = VALID_LEAD.mamamia_job_offer_id as number;
+  const res = await handleRequest(makeReq({ lead_id: VALID_LEAD.id }), {
+    secrets: SECRETS,
+    supabase: makeSupabase(VALID_LEAD),
+    fetchFn: makeFetch({ jobOffers: [bookedJob(def, null, undefined, daysAgoISO(8))] }, { recorder }),
+  });
+  const body = await res.json();
+  assertEquals(body.accepted_detected, 0);
+  assertEquals(recorder.length, 0);
+});
 
 Deno.test("annahme: frische final_confirmation ohne vorhandenes Event → application_accepted_internal mit Caregiver + Job-Konditionen", async () => {
   resetCaches();
