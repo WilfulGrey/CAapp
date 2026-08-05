@@ -765,8 +765,13 @@ export async function detect(
   //   1. Dedupe per (Job, Caregiver) über acceptedJk (Portal-Annahme ODER
   //      früherer Detektor-Lauf → nie doppelt feuern; Folge-Buchung derselben
   //      Pflegekraft auf NEUEM Job feuert wieder — Bug #25).
-  //   2. final_confirmed_at fehlt oder älter als ACCEPTED_MAX_AGE_MS →
-  //      Altbestand, beim ersten Scan KEINE Mails auslösen.
+  //   2. Buchung älter als ACCEPTED_MAX_AGE_MS (oder ohne Zeitstempel) →
+  //      Altbestand, beim ersten Scan KEINE Mails auslösen. Anker ist
+  //      final_confirmation.created_at (= Buchungsmoment; live-verifiziert
+  //      2026-08-05 auf beta UND prod). final_confirmed_at ist auf beiden
+  //      Tenants IMMER null (Panel-Buchung wie Portal-Akzept) — deshalb hat
+  //      der Detektor seit #379 nie gefeuert (Bug #26); es bleibt nur als
+  //      Fallback, falls mamamia das Feld je zu stempeln beginnt.
   //   3. Job ohne Event-Historie (silent-seed, notify=false) → Event GAR NICHT
   //      feuern: application_accepted_internal ist in route.ts lead-weit
   //      deduped, ein seeded Event würde spätere echte Buchungsmails blocken.
@@ -782,7 +787,7 @@ export async function detect(
       const cgId = typeof cg?.id === "number" ? cg.id : null;
       if (cgId == null) continue; // ohne caregiver_id kein Dedupe möglich → nicht feuern
       if (acceptedJk.has(jk(jo.id, cgId))) continue; // Guard 1 — per (Job, Caregiver), Bug #25
-      const confirmedMs = parseMamamiaTimestamp(fc.final_confirmed_at);
+      const confirmedMs = parseMamamiaTimestamp(fc.created_at ?? fc.final_confirmed_at);
       if (confirmedMs == null || Date.now() - confirmedMs > ACCEPTED_MAX_AGE_MS) continue; // Guard 2
       const caregiverNode: CaregiverNode = {
         id: cgId,
