@@ -20,6 +20,10 @@ export default function LeadDetailPage() {
   const [lead, setLead] = useState<any>(null);
   const [events, setEvents] = useState<any[]>([]);
   const [scheduledEmails, setScheduledEmails] = useState<any[]>([]);
+  // Multi-Job (Bug #25): Einsätze des Kunden aus dem lead_jobs-Mirror
+  // (detect-Cron aktualisiert alle 15 Min; Discovery reaktivierter Leads
+  // spätestens alle 6h). RLS: anon-read seit Migration 20260804090000.
+  const [leadJobs, setLeadJobs] = useState<any[]>([]);
   const [vertrag, setVertrag] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [isEditMode, setIsEditMode] = useState(false);
@@ -77,6 +81,12 @@ export default function LeadDetailPage() {
         .eq('lead_id', leadId)
         .order('scheduled_for', { ascending: true });
 
+      const { data: leadJobsData } = await supabase
+        .from('lead_jobs')
+        .select('*')
+        .eq('lead_id', leadId)
+        .order('mamamia_job_offer_id', { ascending: false });
+
       if (leadData) {
         setLead(leadData);
         setAdminNotes(leadData.admin_notes || '');
@@ -84,6 +94,7 @@ export default function LeadDetailPage() {
       if (eventsData) setEvents(eventsData);
       if (vertragData) setVertrag(vertragData);
       if (scheduledEmailsData) setScheduledEmails(scheduledEmailsData);
+      if (leadJobsData) setLeadJobs(leadJobsData);
 
       setLoading(false);
     } catch (error) {
@@ -1168,6 +1179,8 @@ export default function LeadDetailPage() {
                       ? 'bg-green-100 text-green-800'
                       : lead.status === 'angebot_requested'
                       ? 'bg-orange-100 text-orange-800'
+                      : lead.status === 'folge_einsatz'
+                      ? 'bg-blue-100 text-blue-800'
                       : lead.status === 'nicht_interessiert'
                       ? 'bg-gray-200 text-gray-600'
                       : 'bg-yellow-100 text-yellow-800'
@@ -1179,6 +1192,8 @@ export default function LeadDetailPage() {
                     ? 'Angebot angefordert'
                     : lead.status === 'info_requested'
                     ? 'Info angefordert'
+                    : lead.status === 'folge_einsatz'
+                    ? 'Folge-Einsatz'
                     : lead.status === 'nicht_interessiert'
                     ? 'Nicht interessiert'
                     : lead.status}
@@ -1363,6 +1378,53 @@ export default function LeadDetailPage() {
             </div>
           </Card>
 
+          {/* Multi-Job (Bug #25): alle Einsätze des Kunden aus dem lead_jobs-
+              Mirror. Follow-up-Jobs (neuer Termin in Mamamia) erscheinen hier
+              mit Status + Zeitraum + Bewerbungszähler — Konditionen können
+              sich pro Einsatz ändern, der Mirror wird vom detect-Cron alle
+              15 Min (aktive Leads) bzw. ≤6h (Discovery) aktualisiert. */}
+          {leadJobs.length > 0 && (
+            <Card className="p-6">
+              <h2 className="text-xl font-bold mb-3">
+                Einsätze (Mamamia) {leadJobs.length > 1 && (
+                  <span className="ml-1 text-sm font-semibold text-[#8B7355]">× {leadJobs.length}</span>
+                )}
+              </h2>
+              <div className="space-y-2">
+                {leadJobs.map((job: any) => {
+                  const jobStatusStyles: Record<string, { label: string; className: string }> = {
+                    geplant: { label: 'Geplant', className: 'bg-blue-50 text-blue-700 border-blue-200' },
+                    gebucht: { label: 'Gebucht', className: 'bg-green-50 text-green-700 border-green-200' },
+                    abgeschlossen: { label: 'Abgeschlossen', className: 'bg-gray-100 text-gray-600 border-gray-200' },
+                    storniert: { label: 'Storniert', className: 'bg-red-50 text-red-600 border-red-200' },
+                  };
+                  const s = jobStatusStyles[job.status] ?? { label: job.status, className: 'bg-gray-100 text-gray-600 border-gray-200' };
+                  const zeitraum = job.anreise
+                    ? `${new Date(job.anreise).toLocaleDateString('de-DE')}${job.abreise ? ` – ${new Date(job.abreise).toLocaleDateString('de-DE')}` : ' – offen'}`
+                    : '—';
+                  return (
+                    <div key={job.id} className="flex items-center justify-between gap-3 rounded-lg border border-gray-100 px-3 py-2">
+                      <div className="min-w-0">
+                        <p className="text-sm font-semibold text-gray-800">
+                          Job <span className="font-mono bg-gray-100 px-1.5 py-0.5 rounded text-xs">{job.mamamia_job_offer_id}</span>
+                          {job.mamamia_job_offer_id === lead.mamamia_job_offer_id && (
+                            <span className="ml-1.5 text-[10px] text-gray-400">(Erst-Einsatz)</span>
+                          )}
+                        </p>
+                        <p className="text-xs text-gray-500">
+                          {zeitraum}
+                          {job.pflegekraft ? ` · ${job.pflegekraft}` : ''}
+                          {job.status === 'geplant' && job.bewerbungen != null ? ` · ${job.bewerbungen} Bewerbung${job.bewerbungen === 1 ? '' : 'en'}` : ''}
+                        </p>
+                      </div>
+                      <span className={`text-[10px] font-bold border px-1.5 py-0.5 rounded-full flex-shrink-0 ${s.className}`}>{s.label}</span>
+                    </div>
+                  );
+                })}
+              </div>
+            </Card>
+          )}
+
           <Card className="p-6">
             <div className="flex items-center justify-between mb-3">
               <h2 className="text-xl font-bold flex items-center gap-2">
@@ -1489,8 +1551,28 @@ export default function LeadDetailPage() {
                     team_notified_beauftragt: { label: 'Team über Beauftragung informiert', color: 'bg-[#5C4A32]' },
                     betreuung_beauftragt: { label: 'Betreuung beauftragt', color: 'bg-green-700' },
                     status_upgrade_to_angebot_requested: { label: 'Status auf Angebot hochgestuft', color: 'bg-blue-500' },
+                    // Portal-/Mamamia-Events (Bug #25 — vorher nur roher
+                    // event_type-Fallback, „application received" sah aus wie
+                    // Datenmüll und niemand wusste, ob eine Mail rausging):
+                    portal_opened: { label: 'Portal geöffnet', color: 'bg-blue-500' },
+                    patient_data_saved: { label: 'Patientendaten gespeichert', color: 'bg-green-600' },
+                    caregiver_invited: { label: 'Pflegekraft eingeladen', color: 'bg-[#8B7355]' },
+                    caregiver_interest_shown: { label: 'Pflegekraft-Interesse (Mail A)', color: 'bg-[#8B7355]' },
+                    caregiver_declined: { label: 'Pflegekraft abgelehnt (Kunde)', color: 'bg-gray-400' },
+                    caregiver_declined_undone: { label: 'Ablehnung zurückgenommen', color: 'bg-gray-400' },
+                    application_received: { label: 'Bewerbung eingegangen (Mail B)', color: 'bg-[#E76F63]' },
+                    application_rejected: { label: 'Bewerbung abgelehnt (Kunde)', color: 'bg-gray-500' },
+                    application_accepted_internal: { label: 'Pflegekraft gebucht (Mail C)', color: 'bg-green-700' },
+                    offer_updated: { label: 'Angebot angepasst', color: 'bg-amber-500' },
+                    acceptance_sync_alarm: { label: '🚨 Mamamia-Sync-Alarm (Team-Mail)', color: 'bg-red-600' },
+                    token_regenerated: { label: 'Portal-Link erneuert', color: 'bg-blue-400' },
+                    folge_einsatz_detected: { label: 'Folge-Einsatz erkannt (neuer Mamamia-Job)', color: 'bg-[#E76F63]' },
                   };
                   const cfg = eventLabels[event.event_type] ?? { label: event.event_type.replace(/_/g, ' '), color: 'bg-[#5C4A32]' };
+                  // Seed-Events (Multi-Job-Erstscan, notify=false) haben NIE
+                  // eine Mail ausgelöst — ohne Kennzeichnung denkt das Team
+                  // bei Vorfällen wie 9239, die Kundin sei informiert worden.
+                  const isSeeded = event.metadata?.seeded === true || event.metadata?.seeded === 'true';
                   return (
                     <div key={event.id} className="flex gap-3">
                       <div className="flex flex-col items-center">
@@ -1504,6 +1586,16 @@ export default function LeadDetailPage() {
                       <div className="flex-1 min-w-0 pb-4">
                         <p className="text-sm font-semibold text-gray-900">
                           {cfg.label}
+                          {(event.mamamia_job_offer_id ?? event.metadata?.mamamia_job_offer_id) != null && (
+                            <span className="ml-2 text-xs font-normal text-gray-400">
+                              Job {String(event.mamamia_job_offer_id ?? event.metadata?.mamamia_job_offer_id)}
+                            </span>
+                          )}
+                          {isSeeded && (
+                            <span className="ml-2 text-xs font-normal text-amber-600">
+                              (Seed — keine Mail versendet)
+                            </span>
+                          )}
                         </p>
                         <p className="text-xs text-gray-400 mb-1">
                           {new Date(event.created_at).toLocaleString('de-DE')}

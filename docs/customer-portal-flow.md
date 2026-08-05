@@ -216,7 +216,10 @@ email                 <email>
 vorname, nachname     <parsed>
 anrede                <detected from vorname>
 telefon               <phone | null>
-status                'angebot_requested'
+status                'angebot_requested'     -- pełen cykl: info_requested |
+                                              -- angebot_requested | folge_einsatz |
+                                              -- vertrag_abgeschlossen |
+                                              -- betreuung_beauftragt | nicht_interessiert
 token                 <32 chars>              -- magic-link
 token_expires_at      now() + 14 days
 token_used            false
@@ -228,6 +231,24 @@ mamamia_customer_id   integer  NULL
 mamamia_job_offer_id  integer  NULL
 mamamia_user_token    text     NULL
 mamamia_onboarded_at  timestamptz NULL
+
+-- follow-up discovery (Bug #25, cron detect-caregiver-events)
+mamamia_jobs_checked_at timestamptz NULL      -- ostatnia sonda "czy Mamamia
+                                              -- otworzyła nowy job?" (takt 6h)
+```
+
+**Status `folge_einsatz` (Bug #25):** ustawiany WYŁĄCZNIE przez fazę discovery
+crona detect — lead z zamkniętym statusem (`vertrag_abgeschlossen` /
+`betreuung_beauftragt`) lub wygasłym tokenem, dla którego Mamamia otworzyła
+NOWY job `geplant`. Lead wraca do active-setu crona (skan Bewerbungen + maile,
+**także z wygasłym tokenem** — martwy link w mailu ⇒ ExpiredLinkScreen ⇒
+self-service „Neuen Link senden", działa bo `folge_einsatz` ∉ CLOSED_STATUSES;
+świadomie ZERO auto-przedłużania tokenu). Poziom w `statusOrder` = 2 (jak
+`angebot_requested`) — ponowny submit kalkulatora aktualizuje istniejący lead
+zamiast tworzyć drugi wiersz. `nicht_interessiert` nigdy nie wchodzi do
+discovery. Audit: event `folge_einsatz_detected` w `lead_events`.
+
+```
 
 -- stage-B fields ("Betreuung beauftragen" form, nie używane w MVP)
 patient_zip           NULL
@@ -323,6 +344,15 @@ poniżej lecą TYLKO przy pierwszym wejściu klienta.**
    Portal-Eintritt nigdy nie pęka). Front dodatkowo: `pickFinalConfirmedJob`
    jest STRICT per job sesji (fc innego joba nie kaperuje aktywnego), a link
    „Alle meine Einsätze" renderuje się też bez `?job=`, gdy lead ma >1 job.
+
+**Deeplinki w mailach (Bug #25):** wszystkie maile o Bewerbungach doklejają
+`&job=<lead_jobs.id>` do linku portalu — Mail A/B/C przez bridge
+(`appendJobParam` w `project 3/lib/portal-url.ts` + lookup `lead_jobs` po
+`metadata.mamamia_job_offer_id`), remindery przez `send-scheduled-emails`
+(kopia helpera w `followupJobs.ts` — edge fn nie może importować z `lib/`).
+Fail-soft: brak wiersza w mirrorze ⇒ plain link ⇒ i tak ląduje na najnowszym
+geplant (punkt 2 wyżej). Metafora Michała: token = klucz do mieszkania,
+`?job=` = pokój.
 
 #### ③ LoginAgency (auth do mamamii, BEZ tokena)
 

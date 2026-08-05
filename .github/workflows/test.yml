@@ -80,6 +80,23 @@ jobs:
         working-directory: supabase/functions/detect-caregiver-events
         run: deno task test
 
+  # Kostenrechner-Edge-Fn (project 3/): pure Helfer aus followupJobs.ts
+  # (Bug #25 — job-aware Reminder-Cancel + &job-Deeplink). Kein required
+  # check in der Branch-Protection (die listet 4), läuft aber auf jedem PR.
+  deno-send-scheduled:
+    name: deno tests (send-scheduled-emails)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: "v2.x"
+
+      - name: Run send-scheduled-emails tests
+        working-directory: project 3/supabase/functions/send-scheduled-emails
+        run: deno task test
+
   # ─── Apply DB migrations to STAGING (schema before code) ──────────────
   # Bisher liefen Migrationen nur manuell auf PROD (run_query, prod-only);
   # Staging driftete, sobald eine edge-fn eine neue Spalte nutzte (Invite-Bug
