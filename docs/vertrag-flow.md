@@ -128,9 +128,32 @@ Stałe: `RETRY_DELAYS_MS = [15s, 30s, 60s]` (`sync-acceptance/index.ts`);
 | Maile (klient + team, `Betreuungsvertrag_Primundus.pdf`) | załącznik = TEN SAM plik (bajty kanonu) | skrzynki |
 | `GET /api/contract-pdf/<leadId>?token=` | serwuje KANON z bucketu (bucket-first); render tylko gdy kanonu brak (alt-buchungi) | proxy do kanonu |
 
-Treść §§ żyje w kodzie (`project 3/lib/vertrag.ts` + JSX `VertragSignieren.tsx` — duplikacja
-świadoma, patrz plan refactoru; `contract_version` w wierszu pinuje wersję tekstu — bump
-TYLKO ze świadomą zmianą treści + zamrożeniem starej wersji).
+Treść §§ żyje w kodzie (`project 3/lib/vertrag-content.ts` — model blokowy, single source
+dla renderera PDF i HTML-fallbacku; + JSX `VertragSignieren.tsx` — duplikacja świadoma,
+patrz plan refactoru; `contract_version` w wierszu pinuje wersję tekstu — bump TYLKO ze
+świadomą zmianą treści + zamrożeniem starej wersji).
+
+## Renderer PDF (od 08/2026: pdfkit — Registry #27)
+
+Kanoniczny PDF renderuje `project 3/lib/vertrag-pdf.ts` (**pdfkit**, ~20-30 MB/render).
+Wcześniejszy renderer (puppeteer + @sparticuz/chromium) odpalał pełnego Chromium w procesie
+Next.js i wywalał kontener Render (512 MB) OOM-em. Kluczowe fakty:
+
+- **Fonty z pomiaru, nie z CSS**: stare kanony składał fontconfig kontenera Render —
+  body = Liberation Sans (deklarowane „Helvetica Neue/Arial" nie istniały), **podpisy
+  24 pt = Liberation SERIF** (fallback stacka „Snell Roundhand…cursive"), symbole ✓ ▸ =
+  DejaVu Sans. pdfkit bundluje te same kroje z `project 3/assets/fonts/` (Liberation 2.1.5
+  official, DejaVu 2.37 z npm; licencje obok). Wbudowana Helvetica pdfkit (WinAnsi) NIE MA
+  `ń` — bundlowane TTF są obowiązkowe („ul. Poznańska" ×2 w treści + dowolne nazwiska).
+- **Parytet zweryfikowany ×4**: baseline-lock HTML (PR1), parity-check na 9 realnych
+  prod-kanonach (identyczna sekwencja znaków w porządku wizualnym, równe strony/stopki/
+  numeracja — `scripts/vertrag/parity-check.ts`), galeria stary/nowy dla Michała,
+  CI job `vertrag-render-smoke` (8 stron, ń/▸/✓, stopki, komplet stringów modelu).
+- **Stare kanony w buckecie NIETYKANE** — bucket-first wszędzie; upload kanonu z
+  `upsert:false` (konflikt ⇒ zwrot istniejących bajtów; render nigdy nie nadpisuje
+  dokumentu, który klient już dostał).
+- HTML-fallback zostaje (render-fail ⇒ mail z `.html`); magic-byte gate'y nie wpuszczą
+  HTML do kanonu/MM.
 
 ## Otwarte (świadomie poza — wymagałoby zmian we froncie, tylko za osobnym OK Michała)
 

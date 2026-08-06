@@ -18,13 +18,13 @@ const nextConfig = {
     NEXT_PUBLIC_BUILT_AT: BUILT_AT,
     NEXT_PUBLIC_ENV_NAME: process.env.CONTEXT || process.env.NODE_ENV || 'unknown',
   },
-  // puppeteer-core + @sparticuz/chromium dürfen NICHT gebundlet werden —
-  // sie laden Chrome-Binary zur Laufzeit dynamisch + nutzen private
-  // class fields die Next 13s Webpack nicht unterstützt. Als external
-  // markieren = Node lädt sie zur Laufzeit direkt aus node_modules
-  // (Render-Container hat sie installiert).
+  // pdfkit (renderer umowy) NIE może być bundlowany — czyta pliki .afm/.ttf
+  // przez fs względem node_modules; webpack by je zgubił. External = Node
+  // ładuje z node_modules w runtime (Render: npm install && next start).
+  // puppeteer-core + @sparticuz/chromium: wpisy zostają do PR3 (rollback-
+  // ready — git revert PR2 przywraca renderer chromium bez zmian configu).
   experimental: {
-    serverComponentsExternalPackages: ['puppeteer-core', '@sparticuz/chromium'],
+    serverComponentsExternalPackages: ['puppeteer-core', '@sparticuz/chromium', 'pdfkit'],
   },
   webpack: (config, { isServer }) => {
     if (!isServer) {
@@ -47,6 +47,7 @@ const nextConfig = {
         ...(config.externals || []),
         'puppeteer-core',
         '@sparticuz/chromium',
+        'pdfkit',
       ];
     }
     return config;
