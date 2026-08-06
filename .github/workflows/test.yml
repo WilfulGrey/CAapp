@@ -97,6 +97,31 @@ jobs:
         working-directory: project 3/supabase/functions/send-scheduled-emails
         run: deno task test
 
+  # Smoke renderera PDF umowy (pdfkit, Registry #27): renderuje 3 syntetyczne
+  # fixture'y i asertuje %PDF-, 8 stron, komplet stringów modelu, ń/▸/✓,
+  # stopki. Jedyna trwała ochrona samego RENDERU (root-vitest pilnuje tylko
+  # pure-treści — nie może dotykać pdfkit, bo npm ci leci tylko w root).
+  # NIE-required check (jak deno-send-scheduled).
+  vertrag-render-smoke:
+    name: vertrag render smoke (pdfkit)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: project 3/package-lock.json
+
+      - name: Install deps
+        working-directory: project 3
+        run: npm ci
+
+      - name: Render + assertions
+        working-directory: project 3
+        run: npx tsx scripts/vertrag/render-smoke.ts
+
   # ─── Apply DB migrations to STAGING (schema before code) ──────────────
   # Bisher liefen Migrationen nur manuell auf PROD (run_query, prod-only);
   # Staging driftete, sobald eine edge-fn eine neue Spalte nutzte (Invite-Bug

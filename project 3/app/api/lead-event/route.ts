@@ -318,13 +318,27 @@ async function getOrCreateCanonicalContract(
     attachment.content.subarray(0, 5).toString('latin1') === '%PDF-';
   if (isRealPdf && applicationId != null) {
     const bytes = attachment.content as Buffer;
+    // upsert:false (hardening, Registry #27): istniejący kanon NIGDY nie
+    // jest nadpisywany świeżym renderem. Wcześniejsze upsert:true mogło po
+    // transient-fail downloadu podmienić bajty, które klient dostał mailem
+    // i które leżą w Mamamii — od zmiany renderera (pdfkit vs puppeteer)
+    // taka podmiana byłaby dodatkowo widoczna. Konflikt ⇒ re-download i
+    // zwrot ISTNIEJĄCYCH bajtów; ponowny fail ⇒ świeży render idzie TYLKO
+    // do maila (bez uploadu i bez stempla sha — kanon nietknięty).
     const { error: upErr } = await supabase.storage
       .from(CONTRACT_BUCKET)
       .upload(contractObjectPath(leadId, applicationId), bytes, {
         contentType: 'application/pdf',
-        upsert: true,
+        upsert: false,
       });
     if (upErr) {
+      const isConflict = /exists|duplicate|409/i.test(upErr.message ?? '');
+      if (isConflict) {
+        const existing = await downloadCanonicalContractPdf(supabase, leadId, applicationId);
+        if (existing) {
+          return { filename: CONTRACT_FILENAME, content: existing, contentType: 'application/pdf' };
+        }
+      }
       console.error('contract canonical upload failed:', upErr.message ?? String(upErr));
     } else {
       const sha = createHash('sha256').update(bytes).digest('hex');

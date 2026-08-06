@@ -76,7 +76,10 @@ const VARIANTS: Array<{ name: string; daten: VertragInput; opts: VertragHtmlOpti
 
 describe('vertrag-content: baseline-lock (bajtowa niezmienność HTML po ekstrakcji)', () => {
   it('buildVertragHtml(BASELINE) === fixture wygenerowany z kodu sprzed refactoru', () => {
-    const fixture = readFileSync(join(__dirname, 'fixtures', 'vertrag-baseline.html'), 'utf8');
+    // \r-strip: git na Windows checkoutuje fixture z CRLF (autocrlf), a
+    // template literal emituje LF — normalizacja EOL to artefakt gita, nie
+    // treści. Poza tym porównanie jest bajtowe.
+    const fixture = readFileSync(join(__dirname, 'fixtures', 'vertrag-baseline.html'), 'utf8').replace(/\r\n/g, '\n');
     const actual = buildVertragHtml(BASELINE_INPUT, BASELINE_OPTS);
     expect(actual.length).toBe(fixture.length);
     expect(actual).toBe(fixture);
