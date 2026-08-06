@@ -4,7 +4,7 @@
 //   cd "project 3" && npx tsx scripts/vertrag/check-baseline.ts
 import { readFileSync } from 'fs';
 import { join } from 'path';
-import { buildVertragHtml } from '../../lib/vertrag';
+import { buildVertragHtml } from '../../lib/vertrag-content';
 import { BASELINE_INPUT, BASELINE_OPTS } from './gen-baseline';
 
 const fixturePath = join(__dirname, '..', '..', '..', 'src', '__tests__', 'fixtures', 'vertrag-baseline.html');

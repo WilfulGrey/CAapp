@@ -10,7 +10,7 @@
 // w podpisie, legacy auditNote, signedAt w formacie kanonicznym.
 import { writeFileSync, mkdirSync } from 'fs';
 import { join } from 'path';
-import { buildVertragHtml } from '../../lib/vertrag';
+import { buildVertragHtml } from '../../lib/vertrag-content';
 // Jedno źródło inputu — współdzielone z testem baseline-lock w root-vitest.
 export { BASELINE_INPUT, BASELINE_OPTS } from '../../../src/__tests__/fixtures/vertragBaselineInput';
 import { BASELINE_INPUT, BASELINE_OPTS } from '../../../src/__tests__/fixtures/vertragBaselineInput';

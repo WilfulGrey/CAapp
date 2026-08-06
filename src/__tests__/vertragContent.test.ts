@@ -14,8 +14,14 @@
 import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'fs';
 import { join } from 'path';
+// UWAGA: importujemy WYŁĄCZNIE z vertrag-content (pure). Fasada lib/vertrag.ts
+// zawiera dynamic import puppeteer-core, który Vite próbuje ROZWIĄZAĆ przy
+// transformie — a CI robi npm ci tylko w root (project 3/node_modules brak)
+// → import fasady wywala cały plik testowy na CI. buildVertragHtml żyje
+// dlatego w content-module, fasada tylko go re-eksportuje.
 import {
   buildVertragDocument,
+  buildVertragHtml,
   documentPlainText,
   formatSignedAtBerlin,
   resolveVertragFelder,
@@ -25,7 +31,6 @@ import {
   type VertragHtmlOptions,
   type VertragInput,
 } from '../../project 3/lib/vertrag-content';
-import { buildVertragHtml } from '../../project 3/lib/vertrag';
 import { BASELINE_INPUT, BASELINE_OPTS } from './fixtures/vertragBaselineInput';
 
 // ─── Normalizacja: HTML → płaski tekst treści ────────────────────────────
