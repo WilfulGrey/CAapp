@@ -69,7 +69,7 @@ interface FakeNet {
   fetch: typeof fetch;
   ops: Array<{ op: string; variables: Record<string, unknown> }>;
   pdfBody?: Uint8Array | string;
-  finalConfirmations?: Array<{ id: number; caregiver: { id: number } | null }>;
+  finalConfirmations?: Array<{ id: number; application_id?: number | null; caregiver: { id: number } | null }>;
   // Fehler-Injektion für StoreConfirmation (Alarm-Policy-Tests):
   //   "graphql" = GraphQL-Fehler (⇒ permanent), "http500" = HTTP 500 (⇒ transient).
   // confirmFailTimes = wie viele Versuche fehlschlagen (undefined ⇒ alle).
@@ -354,9 +354,44 @@ Deno.test("sync: Retry — final_confirmation verarbeitet ⇒ PDF wird hochgelad
   const upd = net.ops.find((o) => o.op === "UpdateConfirmation")!.variables;
   assertEquals(upd.id, 555);
   assertEquals(upd.file_tokens, ["ft-1"]);
+  // Echte Bewerbung (application_id ≠ confirmation_id) ⇒ Feld geht mit.
+  assertEquals(upd.application_id, makeRow().application_id);
   const pdfStamp = stamps.calls.find((c) => c.kind === "pdf")!;
   assertEquals(typeof pdfStamp.sha, "string");
   assertEquals((pdfStamp.sha as string).length, 64); // sha256 hex
+});
+
+Deno.test("sync: Adoptions-Row (application_id == confirmation_id) ⇒ Upload mit ORIGINAL-application_id der Confirmation", async () => {
+  // Vertrag nachträglich nach Panel-Buchung: die Row ankert auf der
+  // Confirmation-ID. Mamamias Validator VERLANGT application_id UND lehnt
+  // IDs ab, die nie eine Application waren (beides live, staging 2026-08-06,
+  // app=667: mit 667 „ungültig", ohne Feld „erforderlich"). Korrekt ist die
+  // Original-Bewerbung der Confirmation (final_confirmation.application_id).
+  const net = makeNet({ finalConfirmations: [{ id: 667, application_id: 1673, caregiver: { id: 501 } }] });
+  const stamps = makeStamps();
+  const r = await syncAcceptance({
+    lead: LEAD,
+    row: makeRow({ application_id: 667, mamamia_confirmed_at: "2026-08-06T06:26:00Z", mamamia_confirmation_id: 667 }),
+    secrets: SECRETS, supabase: stamps.supabase, getAgencyToken: agencyToken, fetchFn: net.fetch,
+  });
+  assertEquals(r.pdf_uploaded, true);
+  const upd = net.ops.find((o) => o.op === "UpdateConfirmation")!.variables;
+  assertEquals(upd.id, 667);
+  assertEquals(upd.application_id, 1673);
+  assertEquals(upd.file_tokens, ["ft-1"]);
+});
+
+Deno.test("sync: Adoptions-Row und Confirmation OHNE application_id ⇒ defer (kein blinder Upload)", async () => {
+  const net = makeNet({ finalConfirmations: [{ id: 667, caregiver: { id: 501 } }] });
+  const stamps = makeStamps();
+  const r = await syncAcceptance({
+    lead: LEAD,
+    row: makeRow({ application_id: 667, mamamia_confirmed_at: "2026-08-06T06:26:00Z", mamamia_confirmation_id: 667 }),
+    secrets: SECRETS, supabase: stamps.supabase, getAgencyToken: agencyToken, fetchFn: net.fetch,
+  });
+  assertEquals(r.pdf_uploaded, false);
+  assertEquals(net.ops.map((o) => o.op).includes("UpdateConfirmation"), false);
+  assertStringIncludes(r.deferred.join("|"), "original application_id");
 });
 
 Deno.test("sync: Adoption — final_confirmation existiert (SA-Portal/Alt-Client) ⇒ KEIN doppelter Accept", async () => {

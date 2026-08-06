@@ -124,7 +124,13 @@ const SYNC_CUSTOMER_QUERY = /* GraphQL */ `
       customer_contract { location_id }
       job_offers {
         id
-        final_confirmation { id caregiver { id } }
+        # application_id: Original-Bewerbung der Confirmation — für den
+        # Datei-Upload bei Adoptions-Rows (Panel-Buchung, echte Application
+        # von mamamia nach Verarbeitung entfernt; UpdateConfirmation
+        # VERLANGT application_id und validiert es — Confirmation-ID wird
+        # abgelehnt). Feld-Kombination live verifiziert 2026-08-06 (beta;
+        # selber Typ Confirmation, den StoreConfirmation seit #396 liefert).
+        final_confirmation { id application_id caregiver { id } }
       }
     }
   }
@@ -138,7 +144,7 @@ interface SyncCustomerData {
     customer_contract: { location_id: number | null } | null;
     job_offers: Array<{
       id: number;
-      final_confirmation: { id: number; caregiver: { id: number } | null } | null;
+      final_confirmation: { id: number; application_id?: number | null; caregiver: { id: number } | null } | null;
     }> | null;
   } | null;
 }
@@ -460,7 +466,7 @@ export async function syncAcceptance(opts: AcceptanceSyncOpts): Promise<Acceptan
   }));
   const finalConfirmations = (cust.Customer?.job_offers ?? [])
     .map((j) => j?.final_confirmation)
-    .filter((fc): fc is { id: number; caregiver: { id: number } | null } => !!fc);
+    .filter((fc): fc is { id: number; application_id?: number | null; caregiver: { id: number } | null } => !!fc);
 
   // ── 1. UpdateCustomer: die DREI Personen aus dem Konfirmationsformular ──
   // LE → patient_contracts[patient_contact] (+ location_id-Übernahme aus dem
@@ -673,13 +679,28 @@ export async function syncAcceptance(opts: AcceptanceSyncOpts): Promise<Acceptan
       "Dienstleistungsvertrag-signiert.pdf",
       fetchFn,
     );
+    // application_id: mamamias Validator VERLANGT das Feld („erforderlich")
+    // UND validiert es gegen Applications („ungültig" für IDs, die nie eine
+    // Application waren) — beides live gelernt, staging 2026-08-06, app=667.
+    // Adoptions-Rows (Vertrag nachträglich nach Panel-Buchung) ankern auf der
+    // Confirmation-ID ⇒ die ORIGINAL-Bewerbung der Confirmation mitschicken
+    // (final_confirmation.application_id; soft-deleted IDs akzeptiert mamamia,
+    // nie-existente nicht). Echte Rows: weiterhin row.application_id.
+    const isAdoptionAnchor = row.application_id === confirmationId;
+    const uploadApplicationId = isAdoptionAnchor
+      ? finalConfirmations.find((fc) => fc.id === confirmationId)?.application_id ?? null
+      : row.application_id;
+    if (uploadApplicationId == null) {
+      result.deferred.push("pdf: adoption row without original application_id on confirmation — cannot attach file");
+      return result;
+    }
     await mamamiaRequest({
       endpoint: secrets.mamamiaEndpoint,
       token: agencyToken,
       query: UPDATE_CONFIRMATION_FILES,
       variables: {
         id: confirmationId,
-        application_id: row.application_id,
+        application_id: uploadApplicationId,
         is_confirm_binding: true,
         file_tokens: [fileToken],
       },
