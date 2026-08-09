@@ -2355,8 +2355,8 @@ const CustomerPortalPage: FC = () => {
                 <div className="mb-5 space-y-2.5">
                   {heroStep({ n: 1, label: 'Ihr Angebot ist erstellt', state: 'done' })}
                   {heroCopy.steps === 'initial'
-                    ? heroStep({ n: 2, label: 'Patientendaten ergänzen (ca. 2 Min.)', state: 'active', target: 'patientendaten' })
-                    : heroStep({ n: 2, label: 'Patientendaten ergänzt', state: 'done' })}
+                    ? heroStep({ n: 2, label: 'Pflegesituation beschreiben (ca. 2 Min.)', state: 'active', target: 'patientendaten' })
+                    : heroStep({ n: 2, label: 'Pflegesituation beschrieben', state: 'done' })}
                   {heroCopy.steps === 'initial'
                     ? heroStep({ n: 3, label: 'Pflegekräfte einladen & Bewerbungen erhalten', state: 'locked', hint: 'nach Schritt 2' })
                     : heroStep({ n: 3, label: 'Pflegekräfte einladen & Bewerbungen erhalten', state: 'active', target: 'pflegekraefte' })}
@@ -2537,7 +2537,7 @@ const CustomerPortalPage: FC = () => {
               }}
             >
               <div>
-                <h2 className="text-[1.1rem] font-bold" style={{color:'#3D3D3D'}}>2 · Patientendaten</h2>
+                <h2 className="text-[1.1rem] font-bold" style={{color:'#3D3D3D'}}>2 · Pflegesituation</h2>
                 <div className="mt-1.5 h-[2px] w-10 rounded-full" style={{background:'#8B7355'}} />
               </div>
               <div className="flex items-center gap-2 flex-shrink-0">
@@ -2751,7 +2751,7 @@ const CustomerPortalPage: FC = () => {
                   // user knows to retry the form Save if the date was
                   // critical, but don't block the flow.
                   console.warn('updateJobOfferDates failed:', err);
-                  showToast('Startdatum konnte nicht aktualisiert werden. Patientendaten wurden gespeichert.');
+                  showToast('Startdatum konnte nicht aktualisiert werden. Ihre Angaben wurden gespeichert.');
                 }
               })();
             }
@@ -2969,7 +2969,7 @@ const CustomerPortalPage: FC = () => {
                         <button type="button" className="font-semibold underline underline-offset-2"
                           style={{color:'#8B7355'}}
                           onClick={() => { document.getElementById('patientendaten')?.scrollIntoView({ behavior: 'smooth', block: 'start' }); }}>
-                          Patientendaten ergänzen ↑
+                          Pflegesituation beschreiben ↑
                         </button>
                       </>
                     ) : (
