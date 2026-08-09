@@ -134,11 +134,26 @@ const getJobOffer: ActionHandler = (session, _variables, deps) =>
 const getCustomer: ActionHandler = (session, _variables, deps) =>
   runGraphQL(deps, GET_CUSTOMER, { id: session.customer_id });
 
+// Kill-Switch für den Rekruter-Hinweis (Michał 2026-07-31: „wyłącz/ukryj
+// wyświetlanie tego dodatkowego tekstu na razie u klientów — mamy jeszcze
+// kilku rekruterów którzy uzupełnili błędnie"). DEFAULT: AUS — `message` wird
+// serverseitig entfernt und erreicht den Browser gar nicht erst (nicht nur
+// ausgeblendet). Wieder einschalten, sobald die Rekruter-Texte sauber sind:
+//   npx supabase secrets set SHOW_APPLICATION_MESSAGE=1 --project-ref <ref>
+// (Aus = Secret fehlt oder ≠ "1". Kein Redeploy nötig — Cold Start liest neu.)
+function applicationMessageEnabled(): boolean {
+  try {
+    return Deno.env.get("SHOW_APPLICATION_MESSAGE") === "1";
+  } catch {
+    return false; // kein Env-Zugriff (Tests) ⇒ sicherer Default: verbergen
+  }
+}
+
 const listApplications: ActionHandler = async (session, variables, deps) => {
   const { limit, page } = variables as { limit?: number; page?: number };
   const r = await runGraphQL<{
     JobOfferApplicationsWithPagination: {
-      data: Array<{ id?: number; caregiver: Record<string, unknown> | null }>;
+      data: Array<{ id?: number; caregiver: Record<string, unknown> | null; message?: string | null }>;
     };
   }>(deps, LIST_APPLICATIONS, {
     job_offer_id: session.job_offer_id,
@@ -158,7 +173,14 @@ const listApplications: ActionHandler = async (session, variables, deps) => {
   }
 
   // `message` (Hinweis des Rekruters) geht VERBATIM mit — kein LLM, kein
-  // Filter, kein Cache (Entscheidung Michał 2026-07-22, Registry #22).
+  // Filter, kein Cache (Entscheidung Michał 2026-07-22, Registry #22) —
+  // ABER nur wenn der Kill-Switch an ist (Registry #23). Aus ⇒ Feld hier
+  // strippen: der Text verlässt den Proxy nicht, egal was das Frontend tut.
+  if (!applicationMessageEnabled()) {
+    for (const a of rows) {
+      if ("message" in a) delete a.message;
+    }
+  }
   return r;
 };
 

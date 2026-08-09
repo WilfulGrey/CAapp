@@ -146,6 +146,13 @@ export interface DetectSupabase {
   stampAcceptanceConfirmed?(leadId: string, applicationId: number, confirmationId: number | null): Promise<void>;
   stampAcceptancePdfUploaded?(leadId: string, applicationId: number, sha256: string | null): Promise<void>;
   stampAcceptanceSyncAlerted?(leadId: string, applicationId: number): Promise<void>;
+  // Follow-up Discovery (Bug #25): Leads außerhalb des Active-Sets, deren
+  // Mamamia-Customer einen NEU eröffneten geplanten Job haben könnte.
+  // Selbst-taktend via leads.mamamia_jobs_checked_at. Alle drei optional —
+  // fehlen sie, wird die Discovery-Phase übersprungen (alte Test-Fakes).
+  fetchDiscoveryLeads?(recheckHours: number, batchSize: number): Promise<Array<LeadRow & { status?: string | null }>>;
+  stampLeadJobsChecked?(leadId: string): Promise<void>;
+  markLeadFolgeEinsatz?(leadId: string, mamamiaJobOfferId: number): Promise<void>;
 }
 
 // Pending-Row inkl. Lead-Anker (Join) — alles, was syncAcceptance braucht.
@@ -195,6 +202,11 @@ export interface BatchResult {
   acceptance_syncs_completed: number;
   acceptance_sync_errors: number;
   acceptance_sync_alerts: number;
+  // Follow-up Discovery (Bug #25): sondierte Leads / neu erkannte
+  // Folge-Einsätze (status → folge_einsatz) / Fehler.
+  discovery_probed: number;
+  discovery_folge_einsatz: number;
+  discovery_errors: number;
 }
 
 export interface HandlerDeps {
@@ -268,6 +280,9 @@ async function handleBatch(deps: HandlerDeps): Promise<Response> {
     acceptance_syncs_completed: 0,
     acceptance_sync_errors: 0,
     acceptance_sync_alerts: 0,
+    discovery_probed: 0,
+    discovery_folge_einsatz: 0,
+    discovery_errors: 0,
   };
 
   for (const lead of leads) {
@@ -299,10 +314,102 @@ async function handleBatch(deps: HandlerDeps): Promise<Response> {
   batch.acceptance_sync_errors = rr.errors;
   batch.acceptance_sync_alerts = rr.alerts;
 
+  // ── Follow-up Discovery (Bug #25) ──
+  const disc = await discoverFolgeEinsaetze(deps);
+  batch.discovery_probed = disc.probed;
+  batch.discovery_folge_einsatz = disc.folgeEinsatz;
+  batch.discovery_errors = disc.errors;
+
   return new Response(JSON.stringify(batch), {
     status: 200,
     headers: { "Content-Type": "application/json" },
   });
+}
+
+// ─── Follow-up Discovery (Bug #25) ─────────────────────────────────────────
+// „Sprawdzamy czy nie został otwarty nowy job w Mamamii i stamtąd
+// dziedziczymy stan" (Michał 2026-08-04). Leady POZA active-setem (status
+// zamknięty LUB wygasły token), które mają Mamamia-Customer: jeden tani
+// GET_CUSTOMER_JOB_OFFERS → jest job 'geplant' ⇒ mirror lead_jobs +
+// leads.status='folge_einsatz' + audit-event. Discovery NIC nie mailuje —
+// maile robi normalny scan-pfad, gdy lead (od następnego runa) jest w
+// active-secie. Selbst-taktend: re-probe per Lead frühestens alle
+// DISCOVERY_RECHECK_HOURS, höchstens DISCOVERY_BATCH_SIZE Leads pro Run —
+// gleichmäßige Mamamia-API-Last (Rate-Limit ~60 req/min, gotcha #9).
+const DISCOVERY_RECHECK_HOURS = 6;
+const DISCOVERY_BATCH_SIZE = 50;
+
+export async function discoverFolgeEinsaetze(
+  deps: HandlerDeps,
+): Promise<{ probed: number; folgeEinsatz: number; errors: number }> {
+  const out = { probed: 0, folgeEinsatz: 0, errors: 0 };
+  const supa = deps.supabase;
+  if (!supa.fetchDiscoveryLeads || !supa.stampLeadJobsChecked || !supa.markLeadFolgeEinsatz || !supa.upsertLeadJobs) {
+    return out; // Adapter ohne Discovery-Support (alte Test-Fakes) → no-op
+  }
+
+  let candidates: Array<LeadRow & { status?: string | null }>;
+  try {
+    candidates = await supa.fetchDiscoveryLeads(DISCOVERY_RECHECK_HOURS, DISCOVERY_BATCH_SIZE);
+  } catch (e) {
+    console.error("discovery scan failed:", (e as Error).message);
+    out.errors += 1;
+    return out;
+  }
+  if (candidates.length === 0) return out;
+
+  const fetcher = deps.fetchFn ?? globalThis.fetch;
+  let agencyToken: string;
+  try {
+    agencyToken = await getOrRefreshAgencyToken({
+      authEndpoint: deps.secrets.mamamiaAuthEndpoint,
+      email: deps.secrets.mamamiaAgencyEmail,
+      password: deps.secrets.mamamiaAgencyPassword,
+      fetchFn: fetcher,
+    });
+  } catch (e) {
+    console.error("discovery agency login failed:", (e as Error).message);
+    out.errors += 1;
+    return out;
+  }
+
+  for (const lead of candidates) {
+    try {
+      if (!lead.mamamia_customer_id) continue;
+      const jr = await mamamiaRequest<{ Customer: { job_offers?: RawJobOffer[] | null } | null }>({
+        endpoint: deps.secrets.mamamiaEndpoint,
+        token: agencyToken,
+        query: GET_CUSTOMER_JOB_OFFERS,
+        variables: { id: lead.mamamia_customer_id },
+        fetchFn: fetcher,
+      });
+      out.probed += 1;
+      const built = buildLeadJobRows(jr.Customer?.job_offers ?? [], todayISO());
+      // Mirror IMMER aktualisieren (Admin-Card zeigt frische Job-Stände,
+      // auch wenn kein geplanter dabei ist).
+      await supa.upsertLeadJobs(lead.id, built.rows);
+      const planned = built.rows.find((r) => r.status === "geplant");
+      if (planned) {
+        await supa.markLeadFolgeEinsatz(lead.id, planned.mamamia_job_offer_id);
+        out.folgeEinsatz += 1;
+        console.log(
+          `[discovery] lead=${lead.id} (status=${lead.status ?? "?"}) → folge_einsatz (neuer geplanter Job ${planned.mamamia_job_offer_id})`,
+        );
+      }
+      await supa.stampLeadJobsChecked(lead.id);
+    } catch (e) {
+      out.errors += 1;
+      console.error(`[discovery] lead=${lead.id} probe failed:`, (e as Error).message);
+      // Stempel trotzdem setzen? NEIN — ohne Stempel probiert der nächste Run
+      // erneut (transienter Mamamia-Fehler soll den Lead nicht 6h blocken)…
+      // aber ein PERMANENT kaputter Customer würde dann jeden Run belegen.
+      // Kompromiss: Stempel setzen, Fehler bleibt geloggt (Re-Probe in 6h).
+      try {
+        await supa.stampLeadJobsChecked(lead.id);
+      } catch { /* bereits geloggt */ }
+    }
+  }
+  return out;
 }
 
 // ─── Acceptance-Sync-Retry ─────────────────────────────────────────────────
@@ -513,6 +620,9 @@ export async function detect(
   // Raw job_offers (inkl. final_confirmation) für den Annahme-Detektor unten.
   let rawOffers: RawJobOffer[] = [];
   const scanJobIds = new Set<number>([lead.mamamia_job_offer_id]);
+  // Live-Status je Job aus Mamamia (geplant/gebucht/…). Fetch-Fehler ⇒ Map
+  // bleibt leer ⇒ notify degradiert exakt aufs heutige Verhalten.
+  const liveStatusByJob = new Map<number, string>();
   if (lead.mamamia_customer_id) {
     try {
       const jr = await mamamiaRequest<{ Customer: { job_offers?: RawJobOffer[] | null } | null }>({
@@ -533,6 +643,9 @@ export async function detect(
         // abgeschlossen (departure past) is excluded; storniert/unmapped were
         // already dropped by buildLeadJobRows.
         if (r.status === "geplant" || r.status === "gebucht") scanJobIds.add(r.mamamia_job_offer_id);
+        // Live-Status pro Job — Grundlage der notify-Entscheidung (Bug #25:
+        // geplante Follow-up-Jobs mailen IMMER, auch die erste Bewerbung).
+        liveStatusByJob.set(r.mamamia_job_offer_id, r.status);
       }
     } catch (e) {
       console.warn(`[detect][leadJobs] lead=${lead.id} job_offers fetch failed: ${e instanceof Error ? e.message : String(e)}`);
@@ -556,11 +669,12 @@ export async function detect(
   const jk = (job: number, cg: number) => `${job}:${cg}`;
   const seenApps = new Set<string>();
   const seenInterests = new Set<string>();
-  // Annahme-Dedupe: lead-weit pro caregiver_id (NICHT pro Job) — Portal-
-  // Annahmen tragen keine mamamia_job_offer_id-Spalte, müssen den Detektor
-  // aber trotzdem stoppen. Deckt Portal-Annahmen UND frühere Detektor-Läufe
-  // ab (beide landen als application_accepted_internal in lead_events).
-  const acceptedCg = new Set<number>();
+  // Annahme-Dedupe: pro (Job, Caregiver) — NICHT mehr lead-weit (Bug #25:
+  // Folge-Einsätze buchen oft DIESELBE Pflegekraft erneut; lead-weites Set
+  // hätte den Annahme-Detektor für jede weitere Buchung stumm geschaltet).
+  // Legacy-Events ohne mamamia_job_offer_id mappen auf den Default-Job —
+  // alte Buchungen blocken also weiterhin nur den ursprünglichen Job.
+  const acceptedJk = new Set<string>();
   const jobsWithHistory = new Set<number>();
   for (const e of pastEvents) {
     if (e.caregiver_id == null) continue;
@@ -568,7 +682,7 @@ export async function detect(
     jobsWithHistory.add(job);
     if (e.event_type === "application_received") seenApps.add(jk(job, e.caregiver_id));
     else if (e.event_type === "caregiver_interest_shown") seenInterests.add(jk(job, e.caregiver_id));
-    else if (e.event_type === "application_accepted_internal") acceptedCg.add(e.caregiver_id);
+    else if (e.event_type === "application_accepted_internal") acceptedJk.add(jk(job, e.caregiver_id));
   }
 
   const counts = {
@@ -588,16 +702,48 @@ export async function detect(
   // bekommen.
   const activeCg = { apps: new Set<number>(), interests: new Set<number>() };
 
+  // Multi-Job (Phase 2A): mirror lead_jobs — BEWUSST VOR der Scan-Schleife
+  // (Bug #25): die Bridge mappt mamamia_job_offer_id → lead_jobs.id für den
+  // &job=-Deeplink in Kundenmails; der Wiersz muss also existieren, BEVOR der
+  // erste Mail-POST dieses Jobs rausgeht. Best-effort; the on-demand sync in
+  // mamamia-proxy/listLeadJobs is a top-up.
+  let lead_jobs_synced = 0;
+  if (supabase.upsertLeadJobs && jobRows.length > 0) {
+    try {
+      await enrichBewerbungen(jobRows, async (jobOfferId) => {
+        const c = await mamamiaRequest<{ JobOfferApplicationsWithPagination?: { total?: number | null } | null }>({
+          endpoint: secrets.mamamiaEndpoint,
+          token: agencyToken,
+          query: GET_JOB_OFFER_APPLICATION_COUNT,
+          variables: { job_offer_id: jobOfferId },
+          fetchFn: fetcher,
+        });
+        return c.JobOfferApplicationsWithPagination?.total ?? null;
+      });
+      await supabase.upsertLeadJobs(lead.id, jobRows);
+      lead_jobs_synced = jobRows.length;
+    } catch (e) {
+      console.warn(`[detect][leadJobs] lead=${lead.id} upsert failed: ${e instanceof Error ? e.message : String(e)}`);
+    }
+  }
+
   // ── Scan each job. Per-job try/catch isolates one failing job from the rest.
   for (const jobOfferId of scanJobIds) {
     try {
       await detectForJob(lead, jobOfferId, agencyToken, deps, fetcher, {
         seenApps,
         seenInterests,
-        // The DEFAULT job always notifies (preserves today's behavior — a new
-        // lead's first application still mails). Only NON-default jobs seed
-        // silently on their first scan (no prior events).
-        notify: jobsWithHistory.has(jobOfferId) || jobOfferId === lead.mamamia_job_offer_id,
+        // Notify-Regel (Bug #25, Fall 9239 „Elke Zwolan"):
+        //   - DEFAULT-Job: immer (heutiges Verhalten — erste Bewerbung mailt).
+        //   - Job mit Event-Historie: immer (auch geseedete Events zählen).
+        //   - Job LIVE 'geplant': IMMER — ein geplanter Folge-Einsatz ist
+        //     aktive Rekrutierung, seine erste Bewerbung MUSS mailen. Vorher
+        //     wurde genau sie still geseedet (Kundin erfuhr nichts).
+        //   Silent-Seed bleibt nur für den ersten Scan eines 'gebucht'-Jobs
+        //   (Legacy-Eintritt in den Mirror — Altbestand nicht nachspammen).
+        notify: jobsWithHistory.has(jobOfferId)
+          || jobOfferId === lead.mamamia_job_offer_id
+          || liveStatusByJob.get(jobOfferId) === "geplant",
         statusEvents,
         counts,
         photoByCaregiver,
@@ -616,10 +762,16 @@ export async function detect(
   // application_accepted_internal an die Bridge gemeldet — dieselbe Kette wie
   // eine Portal-Annahme (Mail C + Team-Buchungsmail baut route.ts komplett).
   // Guards:
-  //   1. Dedupe lead-weit über acceptedCg (Portal-Annahme ODER früherer
-  //      Detektor-Lauf → nie doppelt feuern).
-  //   2. final_confirmed_at fehlt oder älter als ACCEPTED_MAX_AGE_MS →
-  //      Altbestand, beim ersten Scan KEINE Mails auslösen.
+  //   1. Dedupe per (Job, Caregiver) über acceptedJk (Portal-Annahme ODER
+  //      früherer Detektor-Lauf → nie doppelt feuern; Folge-Buchung derselben
+  //      Pflegekraft auf NEUEM Job feuert wieder — Bug #25).
+  //   2. Buchung älter als ACCEPTED_MAX_AGE_MS (oder ohne Zeitstempel) →
+  //      Altbestand, beim ersten Scan KEINE Mails auslösen. Anker ist
+  //      final_confirmation.created_at (= Buchungsmoment; live-verifiziert
+  //      2026-08-05 auf beta UND prod). final_confirmed_at ist auf beiden
+  //      Tenants IMMER null (Panel-Buchung wie Portal-Akzept) — deshalb hat
+  //      der Detektor seit #379 nie gefeuert (Bug #26); es bleibt nur als
+  //      Fallback, falls mamamia das Feld je zu stempeln beginnt.
   //   3. Job ohne Event-Historie (silent-seed, notify=false) → Event GAR NICHT
   //      feuern: application_accepted_internal ist in route.ts lead-weit
   //      deduped, ein seeded Event würde spätere echte Buchungsmails blocken.
@@ -634,8 +786,8 @@ export async function detect(
       const cg = fc.caregiver ?? null;
       const cgId = typeof cg?.id === "number" ? cg.id : null;
       if (cgId == null) continue; // ohne caregiver_id kein Dedupe möglich → nicht feuern
-      if (acceptedCg.has(cgId)) continue; // Guard 1
-      const confirmedMs = parseMamamiaTimestamp(fc.final_confirmed_at);
+      if (acceptedJk.has(jk(jo.id, cgId))) continue; // Guard 1 — per (Job, Caregiver), Bug #25
+      const confirmedMs = parseMamamiaTimestamp(fc.created_at ?? fc.final_confirmed_at);
       if (confirmedMs == null || Date.now() - confirmedMs > ACCEPTED_MAX_AGE_MS) continue; // Guard 2
       const caregiverNode: CaregiverNode = {
         id: cgId,
@@ -674,7 +826,7 @@ export async function detect(
       );
       if (ok) {
         counts.accepted_detected += 1;
-        acceptedCg.add(cgId); // Guard gegen Doppel-Confirmations im selben Sweep
+        acceptedJk.add(jk(jo.id, cgId)); // Guard gegen Doppel-Confirmations im selben Sweep
       }
     } catch (e) {
       console.error(`[detect][accepted] lead=${lead.id} jo=${jo.id} failed: ${e instanceof Error ? e.message : String(e)}`);
@@ -696,29 +848,6 @@ export async function detect(
       counts.reminders_cancelled += await supabase.cancelOrphanedReminders(lead.id, activeCg);
     } catch (e) {
       console.error(`cancelOrphanedReminders failed (lead ${lead.id}):`, e instanceof Error ? e.message : String(e));
-    }
-  }
-
-  // Multi-Job (Phase 2A): mirror lead_jobs from the SAME Customer.job_offers
-  // rows already fetched above (+ per-geplant bewerbungen counts). Best-effort;
-  // the on-demand sync in mamamia-proxy/listLeadJobs is a top-up.
-  let lead_jobs_synced = 0;
-  if (supabase.upsertLeadJobs && jobRows.length > 0) {
-    try {
-      await enrichBewerbungen(jobRows, async (jobOfferId) => {
-        const c = await mamamiaRequest<{ JobOfferApplicationsWithPagination?: { total?: number | null } | null }>({
-          endpoint: secrets.mamamiaEndpoint,
-          token: agencyToken,
-          query: GET_JOB_OFFER_APPLICATION_COUNT,
-          variables: { job_offer_id: jobOfferId },
-          fetchFn: fetcher,
-        });
-        return c.JobOfferApplicationsWithPagination?.total ?? null;
-      });
-      await supabase.upsertLeadJobs(lead.id, jobRows);
-      lead_jobs_synced = jobRows.length;
-    } catch (e) {
-      console.warn(`[detect][leadJobs] lead=${lead.id} upsert failed: ${e instanceof Error ? e.message : String(e)}`);
     }
   }
 
@@ -791,13 +920,33 @@ async function detectForJob(
   const apps = appsRes.JobOfferApplicationsWithPagination?.data ?? [];
   const interests = interestsRes.JobOffer?.interests ?? [];
 
-  for (const app of apps) {
-    if (app.caregiver_id == null) continue;
-    if (seenApps.has(jk(jobOfferId, app.caregiver_id))) continue;
+  // Mail-Burst-Cap (Bug #25): pro Job & Run maximal NOTIFY_CAP_PER_JOB_RUN
+  // Kunden-Mails — schützt vor Fluten, wenn ein Job mit vielen aufgelaufenen
+  // Bewerbungen in den Scan kommt (Discovery reaktivierter Leads, manueller
+  // handleSingle, Cron-Downtime). Bewerbungen zuerst (höchste application.id
+  // = neueste), Interests teilen sich das Budget. Bei notify=true werden
+  // Überzählige in diesem Run GAR NICHT gepostet (kein Event ⇒ kein Dedup)
+  // und tropfen in den Folge-Runs nach — nichts wird dauerhaft verschluckt.
+  // Bei notify=false (Silent-Seed eines gebucht-Jobs) greift kein Cap:
+  // Seeds sind mail-los und sollen die Historie VOLLSTÄNDIG registrieren.
+  let notifyBudget = NOTIFY_CAP_PER_JOB_RUN;
+
+  const freshApps = apps
+    .filter((a) => a.caregiver_id != null && !seenApps.has(jk(jobOfferId, a.caregiver_id)))
+    .sort((a, b) => (b.id ?? 0) - (a.id ?? 0));
+
+  for (const app of freshApps) {
+    if (notify && notifyBudget <= 0) {
+      console.warn(
+        `[detect][cap] lead=${lead.id} job=${jobOfferId}: Notify-Budget (${NOTIFY_CAP_PER_JOB_RUN}) erschöpft — Bewerbung cg=${app.caregiver_id} wartet auf den nächsten Run`,
+      );
+      continue; // kein Event ⇒ nächster Run holt sie mit frischem Budget nach
+    }
+    if (notify) notifyBudget -= 1;
     const ok = await fireBridgeEvent(
       "application_received",
       lead.token,
-      app.caregiver_id,
+      app.caregiver_id as number,
       app.caregiver,
       jobOfferId,
       notify,
@@ -814,7 +963,7 @@ async function detectForJob(
     );
     if (ok) {
       counts.new_applications += 1;
-      seenApps.add(jk(jobOfferId, app.caregiver_id)); // guard against dup apps in one sweep
+      seenApps.add(jk(jobOfferId, app.caregiver_id as number)); // guard against dup apps in one sweep
     }
   }
 
@@ -826,6 +975,13 @@ async function detectForJob(
     // pinged about this caregiver AS AN APPLICATION on THIS job, skip the
     // weaker interest signal.
     if (seenApps.has(jk(jobOfferId, interest.caregiver_id))) continue;
+    if (notify && notifyBudget <= 0) {
+      console.warn(
+        `[detect][cap] lead=${lead.id} job=${jobOfferId}: Notify-Budget erschöpft — Interest cg=${interest.caregiver_id} wartet auf den nächsten Run`,
+      );
+      continue;
+    }
+    if (notify) notifyBudget -= 1;
     const ok = await fireBridgeEvent(
       "caregiver_interest_shown",
       lead.token,
@@ -884,6 +1040,14 @@ async function detectForJob(
 // hier auf false + Deploy. Explizites Env überschreibt den Default in
 // beide Richtungen.
 const AUTO_REJECT_AFTER_HOURS = 72;
+
+// Mail-Burst-Cap (Bug #25): maximale Kunden-Notifications pro Job & Run.
+// Schützt reaktivierte Leads (Discovery/handleSingle/Cron-Downtime) vor
+// einer Flut aufgelaufener Bewerbungen. Überzählige werden in DIESEM Run
+// GAR NICHT gepostet (kein Event ⇒ kein Dedup-Eintrag) und tropfen in den
+// Folge-Runs nach — 3 pro 15 Minuten, bis alles gemailt ist. Nichts wird
+// dauerhaft verschluckt (Fall 9239).
+const NOTIFY_CAP_PER_JOB_RUN = 3;
 const AUTO_REJECT_MESSAGE =
   "Automatische Absage — keine Rückmeldung des Kunden innerhalb 72 Stunden.";
 const AUTO_REJECT_DEFAULT_LIVE = true;
@@ -1168,15 +1332,68 @@ function makeRealSupabase(url: string, serviceKey: string): DetectSupabase {
       // Active = onboarded to Mamamia (has job_offer_id + token) AND token still
       // valid AND status not in terminal-converted/declined states. Same set of
       // exclusions as `send-scheduled-emails` uses for Nachfass cancellation.
+      //
+      // Multi-Job/Folge-Einsatz (Bug #25): Leads mit status='folge_einsatz'
+      // sind IMMER aktiv — auch mit abgelaufenem Token (Michał: kein Auto-
+      // Verlängern; Mails gehen mit dem alten Link, toter Link ⇒
+      // ExpiredLinkScreen ⇒ Self-Service „Neuen Link senden" — funktioniert,
+      // weil folge_einsatz kein CLOSED_STATUS ist).
       const { data, error } = await client
         .from("leads")
         .select("id, token, email, mamamia_customer_id, mamamia_job_offer_id")
         .not("mamamia_job_offer_id", "is", null)
         .not("token", "is", null)
-        .gt("token_expires_at", new Date().toISOString())
-        .not("status", "in", "(vertrag_abgeschlossen,betreuung_beauftragt,nicht_interessiert)");
+        .or(`and(token_expires_at.gt.${new Date().toISOString()},status.not.in.(vertrag_abgeschlossen,betreuung_beauftragt,nicht_interessiert)),status.eq.folge_einsatz`);
       if (error) throw new Error(`supabase fetchActiveLeads: ${error.message}`);
       return (data ?? []) as LeadRow[];
+    },
+    // ── Follow-up Discovery (Bug #25) ──
+    // Leads AUSSERHALB des Active-Sets (geschlossene Status ODER abgelaufener
+    // Token), die einen Mamamia-Customer haben: Kandidaten für „hat Mamamia
+    // einen neuen Job eröffnet?". Selbst-taktend über mamamia_jobs_checked_at
+    // (Re-Probe frühestens nach DISCOVERY_RECHECK_HOURS, max BATCH pro Run) —
+    // gleichmäßige API-Last statt Stoßbetrieb.
+    async fetchDiscoveryLeads(recheckHours: number, batchSize: number) {
+      const cutoff = new Date(Date.now() - recheckHours * 3600_000).toISOString();
+      const { data, error } = await client
+        .from("leads")
+        .select("id, token, email, mamamia_customer_id, mamamia_job_offer_id, status")
+        .not("mamamia_customer_id", "is", null)
+        .not("mamamia_job_offer_id", "is", null)
+        .not("token", "is", null)
+        .neq("status", "nicht_interessiert")
+        .neq("status", "folge_einsatz")
+        .or(`status.in.(vertrag_abgeschlossen,betreuung_beauftragt),token_expires_at.lte.${new Date().toISOString()}`)
+        .or(`mamamia_jobs_checked_at.is.null,mamamia_jobs_checked_at.lt.${cutoff}`)
+        .order("mamamia_jobs_checked_at", { ascending: true, nullsFirst: true })
+        .limit(batchSize);
+      if (error) throw new Error(`supabase fetchDiscoveryLeads: ${error.message}`);
+      return (data ?? []) as Array<LeadRow & { status?: string | null }>;
+    },
+    async stampLeadJobsChecked(leadId: string) {
+      const { error } = await client
+        .from("leads")
+        .update({ mamamia_jobs_checked_at: new Date().toISOString() })
+        .eq("id", leadId);
+      if (error) throw new Error(`supabase stampLeadJobsChecked: ${error.message}`);
+    },
+    // Stan odziedziczony z Mamamii: neuer geplanter Job ⇒ Lead wird
+    // 'folge_einsatz' + Audit-Event für die Admin-Timeline. KEINE Mails hier —
+    // die schickt der normale Scan-Pfad, sobald der Lead (nächster Run) im
+    // Active-Set ist.
+    async markLeadFolgeEinsatz(leadId: string, mamamiaJobOfferId: number) {
+      const { error } = await client
+        .from("leads")
+        .update({ status: "folge_einsatz" })
+        .eq("id", leadId);
+      if (error) throw new Error(`supabase markLeadFolgeEinsatz: ${error.message}`);
+      const { error: evErr } = await client.from("lead_events").insert({
+        lead_id: leadId,
+        event_type: "folge_einsatz_detected",
+        mamamia_job_offer_id: mamamiaJobOfferId,
+        metadata: { source: "detect-discovery", mamamia_job_offer_id: mamamiaJobOfferId },
+      });
+      if (evErr) console.error(`folge_einsatz_detected event insert failed (lead ${leadId}):`, evErr.message);
     },
     // ── Acceptance-Sync-Retry (Refactor 2026-07-22) ──
     async selectPendingAcceptanceSyncs(maxAgeDays: number) {

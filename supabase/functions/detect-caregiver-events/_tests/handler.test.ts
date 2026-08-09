@@ -70,6 +70,8 @@ interface MamamiaPayload {
   // Multi-Job background sync: Customer.job_offers, die GetCustomerJobOffers
   // zurückgibt.
   jobOffers?: RawJobOffer[];
+  // GetCustomerJobOffers antwortet mit GraphQL-Error (Discovery-Fehlerpfad).
+  jobOffersError?: boolean;
   // Per-job application totals (LeadJobApplicationCount), keyed by job_offer_id.
   jobAppCounts?: Record<number, number>;
 }
@@ -134,6 +136,12 @@ function makeFetch(mamamia: MamamiaPayload, bridge: BridgeOptions = {}): typeof 
         );
       }
       if (opName === "GetCustomerJobOffers") {
+        if (mamamia.jobOffersError) {
+          return new Response(
+            JSON.stringify({ errors: [{ message: "boom (test)" }] }),
+            { status: 200, headers: { "Content-Type": "application/json" } },
+          );
+        }
         return new Response(
           JSON.stringify({
             data: { Customer: { id: body.variables.id, job_offers: mamamia.jobOffers ?? [] } },
@@ -808,8 +816,11 @@ const JOB_B = 16371; // a follow-up (non-default) job; default = VALID_LEAD.mama
 const searchJob = (id: number): RawJobOffer => ({ id, status: "search", arrival_at: "2099-01-01 00:00:00", departure_at: null, final_confirmation: null });
 const appOn = (id: number, cg: number) => ({ id, caregiver_id: cg, caregiver: makeCaregiver({ id: cg }) });
 
-Deno.test("multi-job: first scan of a follow-up job SEEDS silently (notify=false, seeded)", async () => {
+Deno.test("multi-job: erste Bewerbung auf LIVE-geplantem Folge-Job → NOTIFY (Bug #25, Fall 9239)", async () => {
   resetCaches();
+  // Regression Fall 9239 (Elke Zwolan): Folge-Job seit Tagen 'geplant', erste
+  // Bewerbung kam — und wurde still geseedet (Kundin erfuhr NICHTS). Neu:
+  // Live-Status 'geplant' ⇒ notify, auch ohne jede Event-Historie des Jobs.
   const recorder: BridgeOptions["recorder"] = [];
   const res = await handleRequest(makeReq({ lead_id: VALID_LEAD.id }), {
     secrets: SECRETS,
@@ -821,9 +832,27 @@ Deno.test("multi-job: first scan of a follow-up job SEEDS silently (notify=false
   assertEquals(body.jobs_scanned, 2); // default + JOB_B
   assertEquals(recorder.length, 1);
   assertEquals(recorder[0].event, "application_received");
-  assertEquals(recorder[0].notify, false); // seed → silent
-  assertEquals(recorder[0].metadata.seeded, true);
+  assertEquals(recorder[0].notify, true); // geplant ⇒ Kundin bekommt Mail B
+  assertEquals(recorder[0].metadata.seeded, undefined); // kein Seed mehr
   assertEquals(recorder[0].metadata.mamamia_job_offer_id, JOB_B);
+});
+
+Deno.test("multi-job: first scan eines GEBUCHTEN Folge-Jobs SEEDS silently (Legacy-Eintritt)", async () => {
+  resetCaches();
+  // Silent-Seed bleibt NUR für gebucht-Jobs ohne Historie: Altbestand beim
+  // ersten Mirror-Eintritt registrieren, ohne den Kunden nachzuspammen.
+  const recorder: BridgeOptions["recorder"] = [];
+  const bookedNoFc: RawJobOffer = { id: JOB_B, status: "on_job", arrival_at: "2099-01-01 00:00:00", departure_at: "2099-12-31 00:00:00", final_confirmation: null };
+  const res = await handleRequest(makeReq({ lead_id: VALID_LEAD.id }), {
+    secrets: SECRETS,
+    supabase: makeSupabase(VALID_LEAD),
+    fetchFn: makeFetch({ jobOffers: [bookedNoFc], appsByJob: { [JOB_B]: [appOn(1, 60001)] } }, { recorder }),
+  });
+  const body = await res.json();
+  assertEquals(body.new_applications, 1);
+  assertEquals(recorder.length, 1);
+  assertEquals(recorder[0].notify, false); // gebucht + keine Historie → seed
+  assertEquals(recorder[0].metadata.seeded, true);
 });
 
 Deno.test("multi-job: follow-up job WITH history notifies a new application (notify=true)", async () => {
@@ -854,7 +883,7 @@ Deno.test("multi-job: same caregiver on default + follow-up → two events (one 
   const body = await res.json();
   assertEquals(body.new_applications, 2);
   assertEquals(recorder.find((r) => r.metadata.mamamia_job_offer_id === def)?.notify, true); // default notifies
-  assertEquals(recorder.find((r) => r.metadata.mamamia_job_offer_id === JOB_B)?.notify, false); // follow-up first scan seeds
+  assertEquals(recorder.find((r) => r.metadata.mamamia_job_offer_id === JOB_B)?.notify, true); // geplant follow-up notifies too (Bug #25)
 });
 
 Deno.test("multi-job: per-job dedup — past app on default suppresses default, fires on follow-up", async () => {
@@ -930,6 +959,9 @@ Deno.test("multi-job: backward compat — no mamamia_customer_id scans only the 
 // Bridge-Event application_accepted_internal (Mail C + Team-Buchungsmail baut
 // route.ts). Dedupe lead-weit über lead_events (fetchPastEvents), 7-Tage-
 // Cutoff gegen Altbestand, kein Feuern ohne notify (silent-seed Jobs).
+// Frische-Anker: created_at (Buchungsmoment; final_confirmed_at ist auf
+// beta UND prod immer null — Sonde 2026-08-05, Bug #26) mit
+// final_confirmed_at als Fallback.
 
 const daysAgoISO = (d: number) => new Date(Date.now() - d * 24 * 3_600_000).toISOString();
 
@@ -937,15 +969,52 @@ function bookedJob(
   id: number,
   confirmedAt: string | null,
   cg: { id?: number | null; first_name?: string | null; last_name?: string | null } | null = { id: 50001, first_name: "Helena", last_name: "Kowalski" },
+  // Reale mamamia-Antworten stempeln created_at und lassen final_confirmed_at
+  // null — Tests, die confirmedAt setzen, prüfen bewusst den Fallback-Pfad.
+  createdAt: string | null = null,
 ): RawJobOffer {
   return {
     id,
     status: "on_job",
     arrival_at: "2099-01-01 00:00:00",
     departure_at: "2099-12-31 00:00:00",
-    final_confirmation: { id: 900, final_confirmed_at: confirmedAt, caregiver: cg },
+    final_confirmation: { id: 900, created_at: createdAt, final_confirmed_at: confirmedAt, caregiver: cg },
   };
 }
+
+Deno.test("annahme (Bug #26): Panel-Buchung — created_at frisch, final_confirmed_at NULL → feuert Mail-C-Event", async () => {
+  resetCaches();
+  const recorder: BridgeOptions["recorder"] = [];
+  const def = VALID_LEAD.mamamia_job_offer_id as number;
+  // Exakt die Antwortform beider Tenants (Marianna-Fall, Confirmation 667):
+  // mamamia stempelt created_at im Buchungsmoment, final_confirmed_at bleibt null.
+  const res = await handleRequest(makeReq({ lead_id: VALID_LEAD.id }), {
+    secrets: SECRETS,
+    supabase: makeSupabase(VALID_LEAD),
+    fetchFn: makeFetch({ jobOffers: [bookedJob(def, null, undefined, daysAgoISO(0.02))] }, { recorder }),
+  });
+  const body = await res.json();
+  assertEquals(body.accepted_detected, 1);
+  assertEquals(recorder.length, 1);
+  assertEquals(recorder[0].event, "application_accepted_internal");
+  assertEquals(recorder[0].notify, true);
+  assertEquals(recorder[0].metadata.caregiver_id, 50001);
+  assertEquals(recorder[0].metadata.mamamia_job_offer_id, def);
+});
+
+Deno.test("annahme (Bug #26): created_at älter als 7 Tage, final_confirmed_at NULL → Altbestand, kein Call", async () => {
+  resetCaches();
+  const recorder: BridgeOptions["recorder"] = [];
+  const def = VALID_LEAD.mamamia_job_offer_id as number;
+  const res = await handleRequest(makeReq({ lead_id: VALID_LEAD.id }), {
+    secrets: SECRETS,
+    supabase: makeSupabase(VALID_LEAD),
+    fetchFn: makeFetch({ jobOffers: [bookedJob(def, null, undefined, daysAgoISO(8))] }, { recorder }),
+  });
+  const body = await res.json();
+  assertEquals(body.accepted_detected, 0);
+  assertEquals(recorder.length, 0);
+});
 
 Deno.test("annahme: frische final_confirmation ohne vorhandenes Event → application_accepted_internal mit Caregiver + Job-Konditionen", async () => {
   resetCaches();
@@ -974,8 +1043,9 @@ Deno.test("annahme: Event existiert bereits (Portal-Annahme, NULL-Job) → kein 
   resetCaches();
   const recorder: BridgeOptions["recorder"] = [];
   const def = VALID_LEAD.mamamia_job_offer_id as number;
-  // Portal-Annahmen tragen keine mamamia_job_offer_id-Spalte → Dedupe muss
-  // lead-weit über die caregiver_id greifen.
+  // Legacy-Portal-Annahmen ohne mamamia_job_offer_id mappen auf den
+  // Default-Job (Bug #25: Dedupe ist per (Job, Caregiver), nicht mehr
+  // lead-weit) — für den Default-Job greift der Guard also weiterhin.
   const past: EventRow[] = [
     { event_type: "application_accepted_internal", caregiver_id: 50001 },
   ];
@@ -1082,6 +1152,31 @@ Deno.test("annahme: Follow-up-Job MIT Historie → feuert (notify=true)", async 
   assertEquals(evt?.metadata.mamamia_job_offer_id, JOB_B);
 });
 
+Deno.test("annahme: DIESELBE Pflegekraft erneut auf Folge-Job gebucht → feuert erneut (Mail C ohne Buchungs-Limit)", async () => {
+  resetCaches();
+  // Bug #25: acceptedJk ist per (Job, Caregiver) — die alte Buchung derselben
+  // PK auf dem Default-Job darf den Annahme-Detektor für den Folge-Job NICHT
+  // stumm schalten (Michał: „przecież możemy mieć i 8 jobów rocznie").
+  const recorder: BridgeOptions["recorder"] = [];
+  const def = VALID_LEAD.mamamia_job_offer_id as number;
+  const past: EventRow[] = [
+    // Legacy-Buchung (NULL-Job → mappt auf Default) derselben Caregiverin
+    { event_type: "application_accepted_internal", caregiver_id: 50001 },
+    // Historie auf dem Folge-Job → notify=true für JOB_B
+    { event_type: "application_received", caregiver_id: 50001, mamamia_job_offer_id: JOB_B },
+  ];
+  const res = await handleRequest(makeReq({ lead_id: VALID_LEAD.id }), {
+    secrets: SECRETS,
+    supabase: makeSupabase(VALID_LEAD, past),
+    fetchFn: makeFetch({ jobOffers: [bookedJob(JOB_B, daysAgoISO(1))] }, { recorder }),
+  });
+  const body = await res.json();
+  assertEquals(body.accepted_detected, 1); // def wäre geblockt, JOB_B feuert
+  const evt = recorder.find((r) => r.event === "application_accepted_internal");
+  assertEquals(evt?.metadata.caregiver_id, 50001);
+  assertEquals(evt?.metadata.mamamia_job_offer_id, JOB_B);
+});
+
 Deno.test("annahme: Confirmation ohne caregiver.id → kein Call, Scan läuft weiter", async () => {
   resetCaches();
   const recorder: BridgeOptions["recorder"] = [];
@@ -1095,6 +1190,188 @@ Deno.test("annahme: Confirmation ohne caregiver.id → kein Call, Scan läuft we
   assertEquals(res.status, 200);
   assertEquals(body.accepted_detected, 0);
   assertEquals(recorder.length, 0);
+});
+
+// ─── Mail-Burst-Cap (Bug #25: max 3 Kunden-Mails pro Job & Run) ─────────────
+
+Deno.test("cap: 5 frische Bewerbungen → nur die 3 NEUESTEN mailen, Rest tropft in Folge-Runs nach", async () => {
+  resetCaches();
+  const recorder: BridgeOptions["recorder"] = [];
+  const def = VALID_LEAD.mamamia_job_offer_id as number;
+  const apps = [appOn(1, 61001), appOn(2, 61002), appOn(3, 61003), appOn(4, 61004), appOn(5, 61005)];
+  const res = await handleRequest(makeReq({ lead_id: VALID_LEAD.id }), {
+    secrets: SECRETS,
+    supabase: makeSupabase(VALID_LEAD),
+    fetchFn: makeFetch({ appsByJob: { [def]: apps } }, { recorder }),
+  });
+  const body = await res.json();
+  // Nur 3 gepostet — Überzählige bekommen KEIN Event (auch kein Seed!),
+  // sonst würde der Dedupe sie dauerhaft verschlucken (genau Fall 9239).
+  assertEquals(body.new_applications, 3);
+  assertEquals(recorder.length, 3);
+  assertEquals(recorder.map((r) => r.metadata.caregiver_id), [61005, 61004, 61003]); // application.id desc = neueste zuerst
+  for (const r of recorder) {
+    assertEquals(r.notify, true);
+    assertEquals(r.metadata.seeded, undefined);
+  }
+
+  // Folge-Run: die 3 gemailten sind jetzt Historie → die restlichen 2 kommen dran.
+  const recorder2: BridgeOptions["recorder"] = [];
+  const past: EventRow[] = [61003, 61004, 61005].map((cg) => (
+    { event_type: "application_received", caregiver_id: cg, mamamia_job_offer_id: def }
+  ));
+  const res2 = await handleRequest(makeReq({ lead_id: VALID_LEAD.id }), {
+    secrets: SECRETS,
+    supabase: makeSupabase(VALID_LEAD, past),
+    fetchFn: makeFetch({ appsByJob: { [def]: apps } }, { recorder: recorder2 }),
+  });
+  assertEquals((await res2.json()).new_applications, 2);
+  assertEquals(recorder2.map((r) => r.metadata.caregiver_id), [61002, 61001]);
+});
+
+Deno.test("cap: Interests teilen sich das Budget mit Bewerbungen (Apps zuerst)", async () => {
+  resetCaches();
+  const recorder: BridgeOptions["recorder"] = [];
+  const def = VALID_LEAD.mamamia_job_offer_id as number;
+  const res = await handleRequest(makeReq({ lead_id: VALID_LEAD.id }), {
+    secrets: SECRETS,
+    supabase: makeSupabase(VALID_LEAD),
+    fetchFn: makeFetch({
+      appsByJob: { [def]: [appOn(1, 61001), appOn(2, 61002), appOn(3, 61003)] },
+      interestsByJob: { [def]: [
+        { id: 9, caregiver_id: 62001, rejected_at: null, caregiver: makeCaregiver({ id: 62001 }) },
+      ] },
+    }, { recorder }),
+  });
+  const body = await res.json();
+  assertEquals(body.new_applications, 3); // Budget von den Apps aufgebraucht
+  assertEquals(body.new_interests, 0); // Interest wartet auf den nächsten Run
+  assertEquals(recorder.filter((r) => r.event === "caregiver_interest_shown").length, 0);
+});
+
+Deno.test("cap: gilt NICHT für Seeds — gebuchter Job registriert seine Historie vollständig", async () => {
+  resetCaches();
+  const recorder: BridgeOptions["recorder"] = [];
+  const bookedNoFc: RawJobOffer = { id: JOB_B, status: "on_job", arrival_at: "2099-01-01 00:00:00", departure_at: "2099-12-31 00:00:00", final_confirmation: null };
+  const res = await handleRequest(makeReq({ lead_id: VALID_LEAD.id }), {
+    secrets: SECRETS,
+    supabase: makeSupabase(VALID_LEAD),
+    fetchFn: makeFetch({
+      jobOffers: [bookedNoFc],
+      appsByJob: { [JOB_B]: [appOn(1, 63001), appOn(2, 63002), appOn(3, 63003), appOn(4, 63004), appOn(5, 63005)] },
+    }, { recorder }),
+  });
+  const body = await res.json();
+  assertEquals(body.new_applications, 5); // alle 5 geseedet, kein Cap
+  assertEquals(recorder.length, 5);
+  for (const r of recorder) assertEquals(r.notify, false);
+});
+
+// ─── Follow-up Discovery (Bug #25: Status-Dziedziczenie aus Mamamia) ────────
+
+function makeDiscoverySupabase(
+  candidates: Array<LeadRow & { status?: string | null }>,
+  rec: {
+    upserts?: Array<{ leadId: string; jobs: LeadJobUpsertRow[] }>;
+    stamped?: string[];
+    marked?: Array<{ leadId: string; jobId: number }>;
+  },
+): DetectSupabase {
+  return {
+    fetchLead: () => Promise.resolve(null),
+    fetchActiveLeads: () => Promise.resolve([]), // nur Discovery soll laufen
+    fetchPastEvents: () => Promise.resolve([]),
+    fetchAppStatusEvents: () => Promise.resolve([]),
+    refreshReminderPhotos: () => Promise.resolve(0),
+    upsertLeadJobs(leadId, jobs) {
+      rec.upserts?.push({ leadId, jobs });
+      return Promise.resolve();
+    },
+    fetchDiscoveryLeads: () => Promise.resolve(candidates),
+    stampLeadJobsChecked(leadId) {
+      rec.stamped?.push(leadId);
+      return Promise.resolve();
+    },
+    markLeadFolgeEinsatz(leadId, jobId) {
+      rec.marked?.push({ leadId, jobId });
+      return Promise.resolve();
+    },
+  };
+}
+
+const CLOSED_LEAD: LeadRow & { status?: string | null } = {
+  ...VALID_LEAD,
+  status: "betreuung_beauftragt",
+};
+
+Deno.test("discovery: geschlossener Lead + neuer geplanter MM-Job → folge_einsatz + Mirror + Stempel", async () => {
+  resetCaches();
+  const upserts: Array<{ leadId: string; jobs: LeadJobUpsertRow[] }> = [];
+  const stamped: string[] = [];
+  const marked: Array<{ leadId: string; jobId: number }> = [];
+  const res = await handleRequest(makeReq({}), {
+    secrets: SECRETS,
+    supabase: makeDiscoverySupabase([CLOSED_LEAD], { upserts, stamped, marked }),
+    fetchFn: makeFetch({ jobOffers: [searchJob(33777)] }),
+  });
+  const body = await res.json();
+  assertEquals(res.status, 200);
+  assertEquals(body.discovery_probed, 1);
+  assertEquals(body.discovery_folge_einsatz, 1);
+  assertEquals(body.discovery_errors, 0);
+  assertEquals(marked, [{ leadId: CLOSED_LEAD.id, jobId: 33777 }]);
+  assertEquals(stamped, [CLOSED_LEAD.id]);
+  assertEquals(upserts.length, 1); // Mirror aktualisiert (Admin-Card)
+  assertEquals(upserts[0].jobs[0].mamamia_job_offer_id, 33777);
+  assertEquals(upserts[0].jobs[0].status, "geplant");
+});
+
+Deno.test("discovery: geschlossener Lead ohne geplanten Job → NUR Stempel + Mirror, kein Statuswechsel", async () => {
+  resetCaches();
+  const upserts: Array<{ leadId: string; jobs: LeadJobUpsertRow[] }> = [];
+  const stamped: string[] = [];
+  const marked: Array<{ leadId: string; jobId: number }> = [];
+  const gebucht: RawJobOffer = { id: 400, status: "on_job", arrival_at: "2099-01-01 00:00:00", departure_at: "2099-12-31 00:00:00", final_confirmation: null };
+  const res = await handleRequest(makeReq({}), {
+    secrets: SECRETS,
+    supabase: makeDiscoverySupabase([CLOSED_LEAD], { upserts, stamped, marked }),
+    fetchFn: makeFetch({ jobOffers: [gebucht] }),
+  });
+  const body = await res.json();
+  assertEquals(body.discovery_probed, 1);
+  assertEquals(body.discovery_folge_einsatz, 0);
+  assertEquals(marked, []);
+  assertEquals(stamped, [CLOSED_LEAD.id]); // 6h-Takt greift trotzdem
+  assertEquals(upserts.length, 1);
+});
+
+Deno.test("discovery: Adapter ohne Discovery-Methoden (Legacy-Fake) → Phase übersprungen, kein Crash", async () => {
+  resetCaches();
+  const res = await handleRequest(makeReq({}), {
+    secrets: SECRETS,
+    supabase: makeBatchSupabase([]),
+    fetchFn: makeFetch({}),
+  });
+  const body = await res.json();
+  assertEquals(res.status, 200);
+  assertEquals(body.discovery_probed, 0);
+  assertEquals(body.discovery_folge_einsatz, 0);
+});
+
+Deno.test("discovery: Mamamia-Probe wirft → error gezählt, Stempel TROTZDEM gesetzt (Re-Probe in 6h)", async () => {
+  resetCaches();
+  const stamped: string[] = [];
+  const marked: Array<{ leadId: string; jobId: number }> = [];
+  const res = await handleRequest(makeReq({}), {
+    secrets: SECRETS,
+    supabase: makeDiscoverySupabase([CLOSED_LEAD], { stamped, marked }),
+    fetchFn: makeFetch({ jobOffersError: true }),
+  });
+  const body = await res.json();
+  assertEquals(body.discovery_errors, 1);
+  assertEquals(body.discovery_folge_einsatz, 0);
+  assertEquals(marked, []);
+  assertEquals(stamped, [CLOSED_LEAD.id]); // Kompromiss: permanent kaputter Customer blockiert nicht jeden Run
 });
 
 Deno.test("multi-job: auto-reject is per-job; a seeded-only anchor is never rejected", async () => {

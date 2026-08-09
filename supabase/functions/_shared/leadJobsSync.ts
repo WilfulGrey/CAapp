@@ -7,10 +7,12 @@
 // Keeping the derivation here means tuning the mapping (e.g. adding a
 // cancellation → storniert case) updates both call sites at once.
 
-// final_confirmation-Selektion: id + final_confirmed_at + caregiver
-// { id first_name last_name } sind prod-verifiziert (das SA-Portal fragt
-// exakt diese Felder täglich ab). KEINE weiteren Felder ergänzen ohne
-// Prod-Test — Lehre vom 11.07. (rejected_at brach jede Abfrage).
+// final_confirmation-Selektion: id + created_at + final_confirmed_at +
+// caregiver { id first_name last_name } sind live-verifiziert (SA-Portal
+// fragt die Felder täglich ab; created_at per Sonde 2026-08-05 auf BEIDEN
+// Tenants: beta Confirmation 667, prod Confirmation 4005). KEINE weiteren
+// Felder ergänzen ohne Prod-Test — Lehre vom 11.07. (rejected_at brach
+// jede Abfrage).
 export const GET_CUSTOMER_JOB_OFFERS = /* GraphQL */ `
   query GetCustomerJobOffers($id: Int!) {
     Customer(id: $id) {
@@ -20,7 +22,7 @@ export const GET_CUSTOMER_JOB_OFFERS = /* GraphQL */ `
         status
         arrival_at
         departure_at
-        final_confirmation { id final_confirmed_at caregiver { id first_name last_name } }
+        final_confirmation { id created_at final_confirmed_at caregiver { id first_name last_name } }
       }
     }
   }
@@ -46,8 +48,11 @@ export type RawJobOffer = {
   final_confirmation?:
     | {
       id?: number | null;
-      // Annahme-Zeitpunkt (Agentur akzeptiert im SA-Portal / mamamia-Panel) —
-      // Frische-Anker für den Annahme-Detektor in detect-caregiver-events.
+      // Buchungszeitpunkt (Anlage der Confirmation) — der Frische-Anker des
+      // Annahme-Detektors. final_confirmed_at kommt auf BEIDEN Tenants als
+      // null zurück (Panel-Buchung UND Portal-Akzept; Sonde 2026-08-05) und
+      // bleibt nur als Fallback selektiert, falls mamamia es je stempelt.
+      created_at?: string | null;
       final_confirmed_at?: string | null;
       caregiver?: { id?: number | null; first_name?: string | null; last_name?: string | null } | null;
     }

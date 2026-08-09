@@ -12,6 +12,7 @@ import {
   type OfferInfo,
 } from '@/lib/email';
 import { buildVertragAttachmentPdf, formatSignedAtBerlin } from '@/lib/vertrag';
+import { appendJobParam } from '@/lib/portal-url';
 import { createHash } from 'crypto';
 
 // Bridge endpoint: the CA-App portal reports customer milestones back to the
@@ -37,6 +38,9 @@ const ALLOWED_EVENTS = [
   // reine Analyse-Events, KEINE Team-Mail/Nachfass-Verzweigung.
   'patient_form_step',
   'patient_form_save_failed',
+  // Einsatzort eingegeben, aber nicht auf einen Mamamia-location_id auflösbar
+  // (z. B. österreichische PLZ) — Analyse-Event fürs Team, KEINE Mail.
+  'patient_form_location_unresolved',
   'caregiver_invited',
   'caregiver_interest_shown',
   'caregiver_declined',          // Kunde hat eine Pflegekraft abgelehnt (matching ODER interest)
@@ -314,13 +318,27 @@ async function getOrCreateCanonicalContract(
     attachment.content.subarray(0, 5).toString('latin1') === '%PDF-';
   if (isRealPdf && applicationId != null) {
     const bytes = attachment.content as Buffer;
+    // upsert:false (hardening, Registry #27): istniejący kanon NIGDY nie
+    // jest nadpisywany świeżym renderem. Wcześniejsze upsert:true mogło po
+    // transient-fail downloadu podmienić bajty, które klient dostał mailem
+    // i które leżą w Mamamii — od zmiany renderera (pdfkit vs puppeteer)
+    // taka podmiana byłaby dodatkowo widoczna. Konflikt ⇒ re-download i
+    // zwrot ISTNIEJĄCYCH bajtów; ponowny fail ⇒ świeży render idzie TYLKO
+    // do maila (bez uploadu i bez stempla sha — kanon nietknięty).
     const { error: upErr } = await supabase.storage
       .from(CONTRACT_BUCKET)
       .upload(contractObjectPath(leadId, applicationId), bytes, {
         contentType: 'application/pdf',
-        upsert: true,
+        upsert: false,
       });
     if (upErr) {
+      const isConflict = /exists|duplicate|409/i.test(upErr.message ?? '');
+      if (isConflict) {
+        const existing = await downloadCanonicalContractPdf(supabase, leadId, applicationId);
+        if (existing) {
+          return { filename: CONTRACT_FILENAME, content: existing, contentType: 'application/pdf' };
+        }
+      }
       console.error('contract canonical upload failed:', upErr.message ?? String(upErr));
     } else {
       const sha = createHash('sha256').update(bytes).digest('hex');
@@ -380,6 +398,33 @@ function buildPortalUrl(lead: { token?: string | null }): string {
   const portalBase = process.env.NEXT_PUBLIC_PORTAL_URL || '';
   if (!portalBase || !lead.token) return '';
   return `${portalBase.replace(/\/$/, '')}/?token=${encodeURIComponent(lead.token)}`;
+}
+
+// appendJobParam (Multi-Job-Deeplink) importiert aus '@/lib/portal-url' —
+// pure Modul, dort auch die Doku + der Hinweis aufs Edge-Fn-Duplikat.
+
+// mamamia_job_offer_id (int, aus dem Event) → lead_jobs.id (uuid, was das
+// Portal in ?job= erwartet). Fail-soft: kein Wiersz (Job noch nicht im
+// Mirror — sollte seit dem Upsert-Vorziehen in detect selten sein) ⇒ null ⇒
+// plain Link; der landet seit #406 ohnehin auf dem neuesten geplanten Job.
+async function resolveLeadJobUuid(
+  supabase: any,
+  leadId: string,
+  mamamiaJobOfferId: number | null,
+): Promise<string | null> {
+  if (mamamiaJobOfferId == null) return null;
+  try {
+    const { data } = await supabase
+      .from('lead_jobs')
+      .select('id')
+      .eq('lead_id', leadId)
+      .eq('mamamia_job_offer_id', mamamiaJobOfferId)
+      .maybeSingle();
+    return typeof data?.id === 'string' ? data.id : null;
+  } catch (e) {
+    console.warn('resolveLeadJobUuid failed:', e instanceof Error ? e.message : String(e));
+    return null;
+  }
 }
 
 // Plant Reaktions-Reminder nach dem ursprünglichen caregiver_interest_shown
@@ -786,15 +831,31 @@ export async function POST(request: NextRequest) {
     // - caregiver_invited / caregiver_interest_shown / application_received →
     //   multiple events per lead expected (different caregivers, mehrere
     //   Bewerbungen); insert every time so one mail goes per event.
+    // - application_accepted_internal → dedupe pro APPLICATION, nicht pro
+    //   Lead (Bug #25, Michał: „8 jobów rocznie i więcej") — der ZWEITE und
+    //   jeder weitere Booking desselben Kunden muss Mail C + Team-Mail
+    //   bekommen; re-Klick derselben Annahme bleibt dedupliziert.
     const isDeduped = !NON_DEDUPED_EVENTS.has(event);
     let isFirstOccurrence = true;
     if (isDeduped) {
-      const { data: existing } = await supabase
+      const acceptAppId = event === 'application_accepted_internal'
+        && metadata && typeof metadata === 'object'
+        && (metadata as Record<string, unknown>).application_id != null
+        ? String((metadata as Record<string, unknown>).application_id)
+        : null;
+      let query = supabase
         .from('lead_events')
         .select('id')
         .eq('lead_id', lead.id)
-        .eq('event_type', event)
-        .limit(1);
+        .eq('event_type', event);
+      if (acceptAppId != null) {
+        query = query.eq('metadata->>application_id', acceptAppId);
+      } else if (event === 'application_accepted_internal' && mamamiaJobOfferId != null) {
+        // Annahme-Detektor (SA-Portal-Buchung) liefert keine application_id,
+        // aber den Job → Dedupe pro Job (zweite Buchung auf NEUEM Job mailt).
+        query = query.eq('mamamia_job_offer_id', mamamiaJobOfferId);
+      }
+      const { data: existing } = await query.limit(1);
       isFirstOccurrence = !existing || existing.length === 0;
     }
 
@@ -946,11 +1007,24 @@ export async function POST(request: NextRequest) {
       } else if (event === 'patient_data_saved') {
         // Mail D — kein Caregiver involviert, einfacher Action-CTA in
         // Richtung "Pflegekräfte ansehen + einladen".
-        const portalUrl = buildPortalUrl(lead as any);
-        const template = getPatientDataSavedEmailTemplate(lead as any, portalUrl);
-        sendEmail((lead as any).email, template).catch((e) =>
-          console.error('customer mail send threw:', e instanceof Error ? e.message : String(e)),
-        );
+        // ABER: konnte der Einsatzort nicht aufgelöst werden (Flag
+        // location_unresolved vom Portal, z. B. österreichische PLZ ohne
+        // Mamamia-Location), bleibt der Kunde in Mamamia Entwurf — dann wäre
+        // "Pflegekräfte können sich bewerben" schlicht falsch. Mail
+        // unterdrücken; das Team-Event patient_form_location_unresolved hat den
+        // Fall bereits gemeldet, die übrigen patient_data_saved-Effekte
+        // (Nudge-Stopp, Kontakt-Sync, Team-Notiz) bleiben.
+        const locationUnresolved = !!(metadata && typeof metadata === 'object'
+          && (metadata as Record<string, unknown>).location_unresolved);
+        if (locationUnresolved) {
+          console.log(`lead-event patient_data_saved: Einsatzort unresolved — Mail D unterdrückt (lead ${lead.id})`);
+        } else {
+          const portalUrl = buildPortalUrl(lead as any);
+          const template = getPatientDataSavedEmailTemplate(lead as any, portalUrl);
+          sendEmail((lead as any).email, template).catch((e) =>
+            console.error('customer mail send threw:', e instanceof Error ? e.message : String(e)),
+          );
+        }
       } else if (event === 'offer_updated') {
         // Aktualisiertes Angebot — alter/neuer Preis + geänderte Angaben aus
         // der Metadata (vom SA-Portal gesetzt; die Kalkulation selbst wurde
@@ -990,7 +1064,10 @@ export async function POST(request: NextRequest) {
         if (!caregiver) {
           console.warn(`lead-event ${event}: caregiver display data missing in metadata — mail skipped (lead ${lead.id})`);
         } else {
-          const portalUrl = buildPortalUrl(lead as any);
+          // Multi-Job (Bug #25): Mail über eine Bewerbung auf Job X öffnet das
+          // Portal AUF Job X (&job=<lead_jobs.id>) — nicht auf dem Default-Job.
+          const leadJobUuid = await resolveLeadJobUuid(supabase, lead.id, mamamiaJobOfferId);
+          const portalUrl = appendJobParam(buildPortalUrl(lead as any), leadJobUuid);
           const caregiverIdRaw = metadata?.caregiver_id ?? metadata?.caregiverId;
           const offer = extractOffer(metadata);
           buildCustomerCaregiverMailWithInlinePhoto(

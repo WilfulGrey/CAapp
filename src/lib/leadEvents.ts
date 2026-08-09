@@ -18,7 +18,8 @@ export type LeadEvent =
   | 'caregiver_declined_undone'    // customer hat die Ablehnung rückgängig gemacht (Undo)
   | 'application_rejected'        // customer Bewerbung abgelehnt
   | 'patient_form_step'           // Patientenbogen: Schritt erreicht (metadata.step) — Abbruch-Analyse
-  | 'patient_form_save_failed';   // Patientenbogen: Server-Save gescheitert (metadata.error)
+  | 'patient_form_save_failed'    // Patientenbogen: Server-Save gescheitert (metadata.error)
+  | 'patient_form_location_unresolved'; // Einsatzort eingegeben, aber kein Mamamia-location_id (z. B. AT-PLZ) — Team-Flag, keine Mail
 
 // Mini-Snapshot der Nurse-Daten, die wir brauchen um eine declined-from-
 // Interest Pflegekraft im bearbeitet-Bereich als virtuelle MatchCard zu
@@ -64,6 +65,16 @@ export interface LeadEventMetadata {
   // Dismiss-Pfad gekommen (= virtual declined MatchCard rendern),
   // 'matching' (oder undefined) wenn normal aus declineNurse.
   decline_origin?: 'interest' | 'matching';
+  // patient_form_location_unresolved: die vom Kunden eingegebene PLZ + Ort,
+  // die sich nicht auf einen Mamamia-location_id auflösen ließen (z. B. AT).
+  plz?: string;
+  ort?: string;
+  // patient_data_saved: gesetzt ('1'), wenn der Einsatzort nicht aufgelöst
+  // werden konnte → Kostenrechner unterdrückt die "fertig"-Mail.
+  location_unresolved?: string;
+  // patient_form_location_unresolved: gesetzt ('1') bei 4-stelliger PLZ
+  // (Österreich/Schweiz — nicht bedient) → Team weiß: nicht nachfassen.
+  outside_germany?: string;
 }
 
 // Session-level dedupe so a re-render or repeated save doesn't spam the
