@@ -2300,7 +2300,7 @@ const CustomerPortalPage: FC = () => {
             }
           : {
               title: 'Ihr Angebot ist fertig. 🎉',
-              subtitle: 'Prüfen Sie Ihr persönliches Angebot, ergänzen Sie die Patientendaten und laden Sie Ihre Wunsch-Pflegekraft direkt ein.',
+              subtitle: 'Ihr persönliches Angebot ist da. Beschreiben Sie uns kurz die Pflegesituation — dann sehen Sie sofort, welche Pflegekräfte passen und verfügbar sind. Ganz unverbindlich.',
               pill: 'Angebot kostenlos & unverbindlich',
               steps: 'initial' as 'initial' | 'saved' | null,
             };
@@ -3134,7 +3134,7 @@ const CustomerPortalPage: FC = () => {
         </div>
         <div className="rounded-2xl overflow-hidden border" style={{background:'white', borderColor:'#E5E3DF'}}>
           {[
-            { n: 1, title: 'Patientendaten vervollständigen', desc: 'Das Angebot sagt Ihnen zu? Ergänzen Sie jetzt die Angaben zum Patienten — so können sich Pflegekräfte optimal vorbereiten.', cta: !patientSaved, done: patientSaved },
+            { n: 1, title: 'Pflegesituation beschreiben', desc: 'Kurz beschreiben — vieles ist schon vorausgefüllt. Dann sehen Sie sofort, welche Pflegekräfte passen und verfügbar sind. Unverbindlich.', cta: !patientSaved, done: patientSaved },
             { n: 2, title: 'Bewerbungen erhalten & Pflegekräfte einladen', desc: 'Geeignete Pflegekräfte bewerben sich bei Ihnen. In der Zwischenzeit können Sie Wunschkandidatinnen gezielt einladen.', cta: false, done: hasPending },
             { n: 3, title: 'Vertrag abschließen', desc: 'Sie wählen Ihre Favoritin aus und bestätigen das Angebot — den Rest übernehmen wir.', cta: false, done: false },
             { n: 4, title: 'Laufende Betreuung', desc: 'Die Pflegekraft ist da. Ihr persönlicher Ansprechpartner begleitet Sie während des gesamten Einsatzes.', cta: false, done: false },
@@ -3171,7 +3171,7 @@ const CustomerPortalPage: FC = () => {
         </div>
         <div className="rounded-2xl overflow-hidden border" style={{background:'white', borderColor:'#E5E3DF'}}>
           {[
-            { q: 'Was bedeutet „Einladen"?', a: 'Wenn Ihnen eine Pflegekraft gefällt, können Sie sie einladen, sich bei Ihnen zu bewerben. Voraussetzung ist, dass das Patientenprofil vollständig ausgefüllt ist — damit sich die Pflegekraft optimal vorbereiten kann. Erst wenn Sie ein konkretes Angebot annehmen, kommt ein Vertrag zustande.' },
+            { q: 'Was bedeutet „Einladen"?', a: 'Wenn Ihnen eine Pflegekraft gefällt, laden Sie sie ein, sich bei Ihnen zu bewerben. Dafür müssen Sie nur kurz die Pflegesituation angeben — damit wir Ihnen passende, verfügbare Pflegekräfte zeigen können. Alles unverbindlich; ein Vertrag entsteht erst, wenn Sie ein konkretes Angebot annehmen.' },
             { q: 'Gehe ich mit dem Einladen einen Vertrag ein?', a: 'Nein — das Einladen und Anschauen von Profilen ist vollständig unverbindlich. Ein Vertrag kommt erst zustande, wenn Sie ein konkretes Angebot ausdrücklich annehmen.' },
             { q: 'Kann ich jederzeit kündigen?', a: 'Ja, täglich kündbar — ohne Mindestlaufzeit und ohne Angabe von Gründen. Kosten entstehen ausschließlich für Tage, an denen die Pflegekraft tatsächlich vor Ort ist.' },
             { q: 'Wie funktioniert die Abrechnung?', a: 'Tagesgenau: Sie zahlen nur für geleistete Betreuungstage. Die Rechnung für den laufenden Monat wird jeweils zur Monatsmitte erstellt — transparent, nachvollziehbar, ohne versteckte Posten.' },
@@ -3542,9 +3542,9 @@ const CustomerPortalPage: FC = () => {
                   <AlertTriangle className="w-5 h-5" style={{color:'#D97706'}} />
                 </div>
                 <div>
-                  <p className="text-base font-bold text-gray-900">Noch ein Schritt — die Patientendaten</p>
+                  <p className="text-base font-bold text-gray-900">Nur ein kurzer Schritt: die Pflegesituation</p>
                   <p className="text-sm text-gray-600 mt-1 leading-relaxed">
-                    Damit sich Pflegekräfte gut auf Ihre Situation vorbereiten können, fehlen uns noch ein paar Angaben zum Patienten. Sobald das ausgefüllt ist, können Sie Pflegekräfte einladen und Bewerbungen erhalten.
+                    Das meiste ist schon vorausgefüllt (ca. 2 Min.). Dann sehen Sie sofort, welche Pflegekräfte zu Ihnen passen und verfügbar sind — ganz unverbindlich.
                   </p>
                 </div>
               </div>
@@ -3558,7 +3558,7 @@ const CustomerPortalPage: FC = () => {
                   }}
                   className="w-full bg-[#E76F63] text-white font-bold py-3.5 rounded-2xl text-sm hover:bg-[#D65E52] shadow-sm transition-colors"
                 >
-                  Jetzt Patientendaten ausfüllen
+                  Pflegesituation beschreiben
                 </button>
                 <button
                   onClick={() => setShowPatientReminder(false)}
