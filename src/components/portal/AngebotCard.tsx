@@ -863,8 +863,8 @@ export const AngebotCard: FC<{
                 <FileText className="w-3.5 h-3.5 text-white" />
               </div>
               <div>
-                <p className="text-[15px] font-bold text-white">Patientendaten ausfüllen</p>
-                <p className="text-[13px] text-white/75">Damit Pflegekräfte sich optimal vorbereiten können</p>
+                <p className="text-[15px] font-bold text-white">Pflegesituation beschreiben</p>
+                <p className="text-[13px] text-white/75">Damit Sie sehen, welche Pflegekräfte passen und verfügbar sind</p>
               </div>
             </div>
 
