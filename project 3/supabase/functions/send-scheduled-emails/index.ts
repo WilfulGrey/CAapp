@@ -93,7 +93,7 @@ function detectGenderFromName(vorname: string): "Frau" | "Herr" | "Familie" | nu
   if (!vorname?.trim()) return null;
   const v = vorname.trim();
   if (v.toLowerCase().includes(" und ") || v.includes(" & ") || v.includes("/")) return "Familie";
-  const first = v.split(" ")[0].toLowerCase();
+  const first = v.split(/[\s-]+/)[0].toLowerCase();
   if (FEMALE_NAMES_SET.has(first)) return "Frau";
   if (MALE_NAMES_SET.has(first)) return "Herr";
   return null;
@@ -102,12 +102,10 @@ function detectGenderFromName(vorname: string): "Frau" | "Herr" | "Familie" | nu
 function buildAnredeText(anrede: string | null, nachname: string, vorname: string): string {
   const effectiveAnrede = anrede || detectGenderFromName(vorname);
   const n = capitalize(cleanNamePart(nachname));
-  const v = capitalize(cleanNamePart(vorname));
   if (effectiveAnrede === "Frau" && n) return `Sehr geehrte Frau ${n}`;
   if (effectiveAnrede === "Herr" && n) return `Sehr geehrter Herr ${n}`;
   if (effectiveAnrede === "Familie" && n) return `Sehr geehrte Familie ${n}`;
-  // Geschlecht bekannt, aber kein Nachname → Vorname allein („Guten Tag Anna").
-  if (effectiveAnrede && v) return `Guten Tag ${v}`;
+  // KEIN Vorname-Fallback (Martin 2026-08): immer formal + Nachname, sonst neutral.
   // Salutation unknown → neutraler, freundlicher Fallback (konsistent zu
   // den anderen Mails). Früher „Sehr geehrte Damen und Herren" — formell,
   // aber seit Name-optional auch häufig der gerenderte Default.
@@ -117,11 +115,10 @@ function buildAnredeText(anrede: string | null, nachname: string, vorname: strin
 function buildHalloAnrede(anrede: string | null, nachname: string, vorname: string): string {
   const effectiveAnrede = anrede || detectGenderFromName(vorname);
   const n = capitalize(cleanNamePart(nachname));
-  const v = capitalize(cleanNamePart(vorname));
   if (effectiveAnrede === "Frau" && n) return `Hallo Frau ${n}`;
   if (effectiveAnrede === "Herr" && n) return `Hallo Herr ${n}`;
   if (effectiveAnrede === "Familie" && n) return `Hallo Familie ${n}`;
-  if (effectiveAnrede && v) return `Hallo ${v}`;
+  // KEIN Vorname-Fallback (Martin 2026-08).
   // Salutation unknown → neutral, warm fallback (no name).
   return "Guten Tag";
 }
@@ -814,11 +811,10 @@ function eingangsLabel(key: string, val: string | undefined): string {
 function buildEingangsGreeting(lead: Lead): string {
   const detectedAnrede = lead.anrede_text || detectGenderFromName(lead.vorname || "");
   const n = capitalize(cleanNamePart(lead.nachname));
-  const v = capitalize(cleanNamePart(lead.vorname));
   if (detectedAnrede === "Frau" && n) return `Guten Tag Frau ${n}`;
   if (detectedAnrede === "Herr" && n) return `Guten Tag Herr ${n}`;
   if (detectedAnrede === "Familie" && n) return `Guten Tag Familie ${n}`;
-  if (detectedAnrede && v) return `Guten Tag ${v}`;
+  // KEIN Vorname-Fallback (Martin 2026-08).
   // Salutation unknown → neutral fallback (no name).
   return "Guten Tag";
 }

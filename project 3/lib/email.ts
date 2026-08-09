@@ -117,7 +117,7 @@ export function getKalkulationEmailTemplate(
     greeting = `Guten Tag ${effectiveAnrede} ${capitalize(safeNachname)}`;
   } else if (effectiveAnrede && safeVorname) {
     // Gender known but no usable last name → first name only.
-    greeting = `Guten Tag ${capitalize(safeVorname)}`;
+    greeting = 'Guten Tag';
   }
   // else: salutation unknown → neutral "Guten Tag," (no name).
 
@@ -314,7 +314,7 @@ export function getEingangsbestaetigungEmailTemplate(
   } else if (detectedAnrede === 'Familie' && eingangsNachname) {
     eingangsGreeting = `Guten Tag Familie ${capitalize(eingangsNachname)}`;
   } else if (detectedAnrede && eingangsVorname) {
-    eingangsGreeting = `Guten Tag ${capitalize(eingangsVorname)}`;
+    eingangsGreeting = 'Guten Tag';
   } else {
     eingangsGreeting = 'Guten Tag';
   }
@@ -558,7 +558,7 @@ export function getAngebotsEmailTemplate(
   } else if (anrede === 'Familie' && nachname) {
     anredeText = `Sehr geehrte Familie ${capitalize(nachname)}`;
   } else if (anrede && vorname) {
-    anredeText = `Guten Tag ${capitalize(vorname)}`;
+    anredeText = 'Guten Tag';
   } else {
     anredeText = 'Guten Tag';
   }
@@ -800,7 +800,7 @@ export function getVertragsbestaetigungTemplate(
   } else if (vertragDetectedAnrede === 'Familie' && vertragNachname) {
     vertragGreeting = `Guten Tag Familie ${capitalize(vertragNachname)}`;
   } else if (vertragDetectedAnrede && vertragVorname) {
-    vertragGreeting = `Guten Tag ${capitalize(vertragVorname)}`;
+    vertragGreeting = 'Guten Tag';
   } else {
     vertragGreeting = 'Guten Tag';
   }
@@ -1240,7 +1240,7 @@ export function getVertragEmailTemplate(
   if (anrede === 'Frau' && nachname) anredeText = `Sehr geehrte Frau ${capitalize(nachname)}`;
   else if (anrede === 'Herr' && nachname) anredeText = `Sehr geehrter Herr ${capitalize(nachname)}`;
   else if (anrede === 'Familie' && nachname) anredeText = `Sehr geehrte Familie ${capitalize(nachname)}`;
-  else if (anrede && vorname) anredeText = `Guten Tag ${capitalize(vorname)}`;
+  else if (anrede && vorname) anredeText = 'Guten Tag';
   else anredeText = 'Guten Tag';
 
   const subject = options.subject || `Ihr Dienstleistungsvertrag – PRIMUNDUS Deutschland`;

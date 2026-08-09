@@ -249,7 +249,7 @@ export function detectGenderFromName(vorname: string): 'Frau' | 'Herr' | 'Famili
 
   if (hasMultiplePeople) return 'Familie';
 
-  const firstWord = vornameClean.split(' ')[0].toLowerCase();
+  const firstWord = vornameClean.split(/[\s-]+/)[0].toLowerCase();
 
   if (FEMALE_NAMES.has(firstWord)) return 'Frau';
   if (MALE_NAMES.has(firstWord)) return 'Herr';
