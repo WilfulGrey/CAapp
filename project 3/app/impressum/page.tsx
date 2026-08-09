@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { ArrowLeft, Phone, Mail } from 'lucide-react';
 import type { Metadata } from 'next';
+import { COMPANY } from '../../lib/company';
 
 export const metadata: Metadata = {
   title: 'Impressum | PRIMUNDUS',
@@ -35,14 +36,13 @@ export default function ImpressumPage() {
 
               <div className="border-t pt-6">
                 <h3 className="text-lg font-semibold mb-3 text-gray-900">Rechtlicher Sitz</h3>
-                <p className="text-gray-700 font-semibold mb-2">Primundus ist eine Marke von:</p>
-                <p className="text-gray-700">Vitanas Group spolka zoo</p>
-                <p className="text-gray-700">Poznanska 21/48</p>
-                <p className="text-gray-700">00-685 Warszawa</p>
-                <p className="text-gray-700">Polen</p>
+                <p className="text-gray-700 font-semibold">{COMPANY.firma}</p>
+                <p className="text-gray-700">{COMPANY.strasse}</p>
+                <p className="text-gray-700">{COMPANY.plz} {COMPANY.ort}</p>
+                <p className="text-gray-700">{COMPANY.land}</p>
                 <div className="mt-4 space-y-1">
-                  <p className="text-gray-700">NIP (Steuer-ID): 7011172300</p>
-                  <p className="text-gray-700">REGON: 526823071</p>
+                  <p className="text-gray-700">KRS: {COMPANY.krs}</p>
+                  <p className="text-gray-700">NIP (Steuer-ID): {COMPANY.nip}</p>
                 </div>
               </div>
             </div>
@@ -77,7 +77,7 @@ export default function ImpressumPage() {
 
           <section>
             <h2 className="text-2xl font-bold mb-4 text-gray-900">Vertretungsberechtigte Geschäftsführung</h2>
-            <p className="text-gray-700 font-semibold">Kamila Bilska</p>
+            <p className="text-gray-700 font-semibold">{COMPANY.geschaeftsfuehrer}</p>
             <p className="text-gray-700 mt-2">
               Die Geschäftsführung wird über die oben genannten Kontaktdaten erreicht.
             </p>
@@ -86,9 +86,9 @@ export default function ImpressumPage() {
           <section>
             <h2 className="text-2xl font-bold mb-4 text-gray-900">Registereintrag</h2>
             <div className="space-y-2 text-gray-700">
-              <p>Registergericht: Warszawa</p>
-              <p>REGON-Nummer: 526823071</p>
-              <p>NIP (Steuer-ID): 7011172300</p>
+              <p>Registergericht: {COMPANY.ort}</p>
+              <p>KRS-Nummer: {COMPANY.krs}</p>
+              <p>NIP (Steuer-ID): {COMPANY.nip}</p>
             </div>
           </section>
 
@@ -97,7 +97,7 @@ export default function ImpressumPage() {
             <p className="text-gray-700">
               Umsatzsteuer-Identifikationsnummer gemäß §27 a Umsatzsteuergesetz:
             </p>
-            <p className="text-gray-900 font-semibold mt-2">NIP: 7011172300</p>
+            <p className="text-gray-900 font-semibold mt-2">NIP: {COMPANY.nip}</p>
           </section>
 
           <section>
@@ -110,7 +110,7 @@ export default function ImpressumPage() {
 
           <section>
             <h2 className="text-2xl font-bold mb-4 text-gray-900">Verantwortlich für den Inhalt nach § 55 Abs. 2 RStV</h2>
-            <p className="text-gray-700 font-semibold">Kamila Bilska</p>
+            <p className="text-gray-700 font-semibold">{COMPANY.geschaeftsfuehrer}</p>
             <p className="text-gray-700">Geschäftsführung PRIMUNDUS</p>
             <p className="text-gray-700">Landsberger Str. 155</p>
             <p className="text-gray-700">80687 München</p>

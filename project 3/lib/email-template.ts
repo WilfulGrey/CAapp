@@ -298,7 +298,7 @@ export function getEmailLayout({ content, preheader, siteUrl }: EmailLayoutProps
               </div>
               <div class="legal">
                 Diese E-Mail wurde versendet an: {{EMAIL}}<br>
-                Primundus Deutschland | Vitanas Group<br>
+                Primundus Deutschland<br>
                 <br>
                 Sie erhalten diese E-Mail, weil Sie eine Kalkulation auf primundus.de angefordert haben.
               </div>

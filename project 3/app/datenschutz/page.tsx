@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { ArrowLeft } from 'lucide-react';
 import type { Metadata } from 'next';
+import { COMPANY } from '../../lib/company';
 
 export const metadata: Metadata = {
   title: 'Datenschutz | PRIMUNDUS',
@@ -31,11 +32,11 @@ export default function DatenschutzPage() {
               <p className="font-semibold mb-2">Primundus Deutschland</p>
               <p>Landsberger Str. 155</p>
               <p>80687 München</p>
-              <p className="mt-4">Primundus ist eine Marke von:</p>
-              <p>Poznanska 21/48</p>
-              <p>00-685 Warszawa</p>
-              <p>NIP 7011172300</p>
-              <p>REGON 526823071</p>
+              <p className="mt-4 font-semibold">{COMPANY.firma}</p>
+              <p>{COMPANY.strasse}</p>
+              <p>{COMPANY.plz} {COMPANY.ort}, {COMPANY.land}</p>
+              <p>KRS {COMPANY.krs}</p>
+              <p>NIP {COMPANY.nip}</p>
               <p className="mt-4">
                 Telefon: <a href="tel:+4989200000830" className="text-blue-600 hover:underline">+49 89 200 000 830</a>
               </p>

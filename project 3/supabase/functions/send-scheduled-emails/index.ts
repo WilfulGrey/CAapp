@@ -190,7 +190,7 @@ function buildEmailWrapper(lead: Lead, siteUrl: string, content: string): string
             </div>
             <div style="font-size:12px;color:#999;margin-top:16px;line-height:1.5;">
               Diese E-Mail wurde versendet an: ${lead.email}<br>
-              Primundus Deutschland | Vitanas Group<br><br>
+              Primundus Deutschland<br><br>
               Sie erhalten diese E-Mail, weil Sie eine Kalkulation auf primundus.de angefordert haben.${lead.token ? `<br><a href="${siteUrl.replace(/\/$/, "")}/abmelden?token=${encodeURIComponent(lead.token)}" style="color:#999;text-decoration:underline;">Keine E-Mails mehr erhalten</a>` : ""}
             </div>
           </div>

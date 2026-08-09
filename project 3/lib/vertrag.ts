@@ -12,6 +12,8 @@
 // Vertrag war nicht gerichtsfest archivierbar. Daher rendern wir jetzt
 // via puppeteer + @sparticuz/chromium zu echtem PDF (siehe unten).
 
+import { COMPANY, COMPANY_ADDRESS } from './company';
+
 export interface VertragPartei {
   name?: string;
   strasse?: string;
@@ -228,7 +230,7 @@ const PARA_8: Paragraph = {
   titel: '§ 8 Widerrufsrecht',
   punkte: [
     {
-      text: 'Dem AG steht das Recht zu, diesen Vertrag ohne Angabe von Gründen innerhalb von 14 Tagen in Textform zu widerrufen. Die Widerrufsfrist beginnt mit Unterzeichnung dieses Vertrages. Widerruf an: Primundus Deutschland (VITANAS CARE LTD HOME SK), ul. Poznańska 21/48, 00-685 Warszawa.',
+      text: `Dem AG steht das Recht zu, diesen Vertrag ohne Angabe von Gründen innerhalb von 14 Tagen in Textform zu widerrufen. Die Widerrufsfrist beginnt mit Unterzeichnung dieses Vertrages. Widerruf an: ${COMPANY.firma}, ${COMPANY_ADDRESS}.`,
     },
     {
       text: 'Im Falle eines wirksamen Widerrufs sind die beiderseits empfangenen Leistungen zurückzugewähren. Der AG ist verpflichtet, dem DL Wertersatz zu leisten (z. B. entstandene Reisekosten, pauschal EUR 125,00).',
@@ -338,8 +340,8 @@ export function buildVertragHtml(daten: VertragInput, opts: VertragHtmlOptions):
   const beginn = esc(daten.vertragsbeginn || '—');
   const abreise = esc(daten.voraussAbreise || '—');
   const tagessatz = esc(daten.tagessatz || '—');
-  const dlName = esc(daten.dl?.name || 'Kamila Bilska-Wabik');
-  const dlRolle = esc(daten.dl?.rolle || 'Vitanas Group');
+  const dlName = esc(daten.dl?.name || COMPANY.geschaeftsfuehrer);
+  const dlRolle = esc(daten.dl?.rolle || COMPANY.funktion);
   const ort = esc(ag.ort || '');
   const signaturName = esc(opts.signaturName);
   const signedAt = esc(opts.signedAt || '');
@@ -684,9 +686,9 @@ export function buildVertragHtml(daten: VertragInput, opts: VertragHtmlOptions):
     <div class="partei-block">
       <div class="box">
         <div class="tag">Dienstleister (DL)</div>
-        <div class="firma">PRIMUNDUS Deutschland</div>
-        <div class="firma-sub">VITANAS CARE LTD HOME SK · ul. Poznańska 21/48, 00-685 Warszawa</div>
-        <div class="firma-sub">NIP: 7011301447 · REGON: 544074862</div>
+        <div class="firma">${COMPANY.firma}</div>
+        <div class="firma-sub">${COMPANY_ADDRESS}</div>
+        <div class="firma-sub">KRS: ${COMPANY.krs} · NIP: ${COMPANY.nip}</div>
       </div>
       <p class="between">im Folgenden <strong>Dienstleister (DL oder PRIMUNDUS)</strong> genannt.</p>
     </div>
@@ -725,7 +727,7 @@ export function buildVertragHtml(daten: VertragInput, opts: VertragHtmlOptions):
         <div class="name-line"><span class="name">${dlName}</span></div>
         <div class="cap">
           Ort, Datum, Unterschrift Dienstleister
-          <div class="cap-sub">i. A. ${dlName}, ${dlRolle} · Warszawa, ${datum}</div>
+          <div class="cap-sub">i. A. ${dlName}, ${dlRolle} · ${COMPANY.ort}, ${datum}</div>
         </div>
       </div>
     </div>
@@ -825,7 +827,7 @@ export function buildVertragHtml(daten: VertragInput, opts: VertragHtmlOptions):
           <div class="name-line"><span class="name">${dlName}</span></div>
           <div class="cap">
             Ort, Datum, Unterschrift Dienstleister
-            <div class="cap-sub">i. A. ${dlName}, ${dlRolle} · Warszawa, ${datum}</div>
+            <div class="cap-sub">i. A. ${dlName}, ${dlRolle} · ${COMPANY.ort}, ${datum}</div>
           </div>
         </div>
       </div>
