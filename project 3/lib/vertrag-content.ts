@@ -9,6 +9,11 @@
 // WORTLAUT: 1:1 z dist/primundus-mustervertrag.pdf (8 stron) — przy zmianie
 // oryginału zaktualizować TUTAJ (oba renderery konsumują ten moduł).
 
+// Firmendaten zentral aus company.ts. Das ist ein reines Daten-Modul OHNE
+// eigene Importe/Abhängigkeiten → die „keine schweren Importe"-Regel dieses
+// Moduls bleibt sinngemäß gewahrt, Firmenwechsel passiert weiterhin an 1 Ort.
+import { COMPANY, COMPANY_ADDRESS } from './company';
+
 // ─── Typy wejścia (przeniesione z lib/vertrag.ts — re-eksportowane tam) ──
 
 export interface VertragPartei {
@@ -233,7 +238,7 @@ export const PARA_8: Paragraph = {
   titel: '§ 8 Widerrufsrecht',
   punkte: [
     {
-      text: 'Dem AG steht das Recht zu, diesen Vertrag ohne Angabe von Gründen innerhalb von 14 Tagen in Textform zu widerrufen. Die Widerrufsfrist beginnt mit Unterzeichnung dieses Vertrages. Widerruf an: Primundus Deutschland (VITANAS CARE LTD HOME SK), ul. Poznańska 21/48, 00-685 Warszawa.',
+      text: `Dem AG steht das Recht zu, diesen Vertrag ohne Angabe von Gründen innerhalb von 14 Tagen in Textform zu widerrufen. Die Widerrufsfrist beginnt mit Unterzeichnung dieses Vertrages. Widerruf an: ${COMPANY.firma}, ${COMPANY_ADDRESS}.`,
     },
     {
       text: 'Im Falle eines wirksamen Widerrufs sind die beiderseits empfangenen Leistungen zurückzugewähren. Der AG ist verpflichtet, dem DL Wertersatz zu leisten (z. B. entstandene Reisekosten, pauschal EUR 125,00).',
@@ -280,8 +285,8 @@ export const PARA_10: Paragraph = {
 
 // ─── Statyczne teksty poza §§ (verbatim z szablonu HTML) ─────────────────
 
-export const DL_NAME_DEFAULT = 'Kamila Bilska-Wabik';
-export const DL_ROLLE_DEFAULT = 'Vitanas Group';
+export const DL_NAME_DEFAULT = COMPANY.geschaeftsfuehrer;
+export const DL_ROLLE_DEFAULT = COMPANY.funktion;
 
 export const T = {
   titel: 'Dienstleistungsvertrag',
@@ -308,9 +313,9 @@ export const T = {
   und: '— und —',
 
   dlTag: 'Dienstleister (DL)',
-  dlFirma: 'PRIMUNDUS Deutschland',
-  dlFirmaSub1: 'VITANAS CARE LTD HOME SK · ul. Poznańska 21/48, 00-685 Warszawa',
-  dlFirmaSub2: 'NIP: 7011301447 · REGON: 544074862',
+  dlFirma: COMPANY.firma,
+  dlFirmaSub1: COMPANY_ADDRESS,
+  dlFirmaSub2: `KRS: ${COMPANY.krs} · NIP: ${COMPANY.nip}`,
   dlBetweenBold: 'Dienstleister (DL oder PRIMUNDUS)',
   dlBetweenSuffix: ' genannt.',
 
@@ -500,7 +505,7 @@ export function buildVertragDocument(daten: VertragInput, opts: VertragHtmlOptio
         : {
           name: f.dlName,
           caption: T.capDl,
-          capSub: `i. A. ${f.dlName}, ${f.dlRolle} · Warszawa, ${f.datum}`,
+          capSub: `i. A. ${f.dlName}, ${f.dlRolle} · ${COMPANY.ort}, ${f.datum}`,
         },
   });
 
@@ -1082,7 +1087,7 @@ export function buildVertragHtml(daten: VertragInput, opts: VertragHtmlOptions):
         <div class="name-line"><span class="name">${dlName}</span></div>
         <div class="cap">
           ${T.capDl}
-          <div class="cap-sub">i. A. ${dlName}, ${dlRolle} · Warszawa, ${datum}</div>
+          <div class="cap-sub">i. A. ${dlName}, ${dlRolle} · ${COMPANY.ort}, ${datum}</div>
         </div>
       </div>
     </div>
@@ -1170,7 +1175,7 @@ export function buildVertragHtml(daten: VertragInput, opts: VertragHtmlOptions):
           <div class="name-line"><span class="name">${dlName}</span></div>
           <div class="cap">
             ${T.capDl}
-            <div class="cap-sub">i. A. ${dlName}, ${dlRolle} · Warszawa, ${datum}</div>
+            <div class="cap-sub">i. A. ${dlName}, ${dlRolle} · ${COMPANY.ort}, ${datum}</div>
           </div>
         </div>
       </div>
