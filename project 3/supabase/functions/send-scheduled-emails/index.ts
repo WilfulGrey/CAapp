@@ -385,7 +385,7 @@ Telefon: +49 89 200 000 830 | info@primundus.de | www.primundus.de`;
 function nachfassContent(milestone: LeadMilestone): { intro: string; body: string; cta: string } {
   if (milestone === "patient_data_saved") {
     return {
-      intro: "Ihre Patientendaten sind vollständig – perfekt.",
+      intro: "Ihre Angaben zur Pflegesituation sind vollständig – perfekt.",
       body: "Jetzt fehlt nur noch der letzte Schritt: Laden Sie Ihre <strong>Wunsch-Pflegekräfte ein</strong>. Die Anfrage geht direkt an die Betreuungskraft, und Sie erhalten zeitnah eine Rückmeldung.",
       cta: "Pflegekräfte einladen →",
     };
@@ -393,8 +393,8 @@ function nachfassContent(milestone: LeadMilestone): { intro: string; body: strin
   if (milestone === "portal_opened") {
     return {
       intro: "wir haben gesehen, dass Sie schon in Ihrem Kundenportal waren – schön!",
-      body: "Damit es weitergeht, fehlt nur noch <strong>ein Schritt: die Patientendaten vervollständigen</strong>. Erst damit kennen die Pflegekräfte den konkreten Pflegebedarf – und Sie können Ihre Wunsch-Pflegekräfte einladen und Bewerbungen erhalten. Es dauert nur 2 Minuten.",
-      cta: "Patientendaten vervollständigen →",
+      body: "Damit es weitergeht, fehlt nur noch <strong>ein Schritt: kurz die Pflegesituation beschreiben</strong>. Erst damit kennen die Pflegekräfte den konkreten Pflegebedarf – und Sie können Ihre Wunsch-Pflegekräfte einladen und Bewerbungen erhalten. Es dauert nur 2 Minuten.",
+      cta: "Pflegesituation beschreiben →",
     };
   }
   return {
@@ -416,8 +416,8 @@ function nachfass2Content(milestone: LeadMilestone): { intro: string; cta: strin
   }
   if (milestone === "portal_opened") {
     return {
-      intro: "brauchen Sie Hilfe beim Ausfüllen der Patientendaten? Antworten Sie einfach kurz oder rufen Sie mich an — ich helfe Ihnen gern.",
-      cta: "Patientendaten vervollständigen →",
+      intro: "brauchen Sie Hilfe beim Beschreiben der Pflegesituation? Antworten Sie einfach kurz oder rufen Sie mich an — ich helfe Ihnen gern.",
+      cta: "Pflegesituation beschreiben →",
     };
   }
   return {
@@ -513,9 +513,9 @@ function buildProfilNudge1Html(lead: Lead, siteUrl: string, portalBase: string):
   const content = `
     <p style="font-size:15px;line-height:1.75;color:#444;margin-bottom:14px;">${halloAnrede},</p>
     <p style="font-size:15px;line-height:1.75;color:#444;margin-bottom:14px;">Ihr Angebot haben Sie bereits &ndash; doch wichtiger als jedes Angebot ist die Frage: Wer wird Ihren Angehörigen betreuen? Bei uns sehen Sie genau das vorab. Sie lernen die Pflegekräfte mit Foto, Erfahrung und Anreisedatum kennen und entscheiden erst dann &ndash; bevor irgendein Vertrag geschlossen wird. Keine Katze im Sack.</p>
-    <p style="font-size:15px;line-height:1.75;color:#444;margin-bottom:14px;">Im Moment geht das noch nicht: In Ihrem Patientenprofil fehlen ein paar Angaben, und ohne sie kann unser System keine passenden Pflegekräfte für Sie finden und vorschlagen.</p>
-    <p style="font-size:15px;line-height:1.75;color:#444;margin-bottom:14px;">Vervollständigen Sie das Profil kurz &ndash; vieles ist schon vorausgefüllt. Danach erhalten Sie ganz unverbindlich Bewerbungen und sehen sich in Ruhe an, wer die Betreuung übernehmen möchte. Und wenn Sie mögen, laden Sie zusätzlich weitere Pflegekräfte ein, sich bei Ihnen zu bewerben.</p>
-    ${bulletproofButton(portalUrl, "Profil vervollständigen&nbsp;&nbsp;&rarr;", "#2A9D5C")}
+    <p style="font-size:15px;line-height:1.75;color:#444;margin-bottom:14px;">Im Moment geht das noch nicht: Zur Pflegesituation fehlen uns noch ein paar Angaben, und ohne sie kann unser System keine passenden Pflegekräfte für Sie finden und vorschlagen.</p>
+    <p style="font-size:15px;line-height:1.75;color:#444;margin-bottom:14px;">Beschreiben Sie kurz die Pflegesituation &ndash; vieles ist schon vorausgefüllt. Danach erhalten Sie ganz unverbindlich Bewerbungen und sehen sich in Ruhe an, wer die Betreuung übernehmen möchte. Und wenn Sie mögen, laden Sie zusätzlich weitere Pflegekräfte ein, sich bei Ihnen zu bewerben.</p>
+    ${bulletproofButton(portalUrl, "Pflegesituation beschreiben&nbsp;&nbsp;&rarr;", "#2A9D5C")}
     <p style="font-size:13px;line-height:1.6;color:#888;margin:18px 0 0;">PS: Klappt im Portal etwas nicht, oder möchten Sie das lieber persönlich klären? Sie erreichen mich unter <a href="tel:+4989200000830" style="color:#8B7355;text-decoration:none;">089&nbsp;200&nbsp;000&nbsp;830</a> oder per <a href="https://wa.me/4989200000830" style="color:#8B7355;text-decoration:none;">WhatsApp</a>.</p>
     ${buildIlkaSig(siteUrl)}`;
   return buildEmailWrapper(lead, siteUrl, content);
@@ -528,11 +528,11 @@ function buildProfilNudge1Text(lead: Lead, siteUrl: string, portalBase: string):
 
 Ihr Angebot haben Sie bereits — doch wichtiger als jedes Angebot ist die Frage: Wer wird Ihren Angehörigen betreuen? Bei uns sehen Sie genau das vorab. Sie lernen die Pflegekräfte mit Foto, Erfahrung und Anreisedatum kennen und entscheiden erst dann — bevor irgendein Vertrag geschlossen wird. Keine Katze im Sack.
 
-Im Moment geht das noch nicht: In Ihrem Patientenprofil fehlen ein paar Angaben, und ohne sie kann unser System keine passenden Pflegekräfte für Sie finden und vorschlagen.
+Im Moment geht das noch nicht: Zur Pflegesituation fehlen uns noch ein paar Angaben, und ohne sie kann unser System keine passenden Pflegekräfte für Sie finden und vorschlagen.
 
-Vervollständigen Sie das Profil kurz — vieles ist schon vorausgefüllt. Danach erhalten Sie ganz unverbindlich Bewerbungen und sehen sich in Ruhe an, wer die Betreuung übernehmen möchte. Und wenn Sie mögen, laden Sie zusätzlich weitere Pflegekräfte ein, sich bei Ihnen zu bewerben.
+Beschreiben Sie kurz die Pflegesituation — vieles ist schon vorausgefüllt. Danach erhalten Sie ganz unverbindlich Bewerbungen und sehen sich in Ruhe an, wer die Betreuung übernehmen möchte. Und wenn Sie mögen, laden Sie zusätzlich weitere Pflegekräfte ein, sich bei Ihnen zu bewerben.
 
-Profil vervollständigen: ${portalUrl}
+Pflegesituation beschreiben: ${portalUrl}
 
 PS: Klappt im Portal etwas nicht, oder möchten Sie das lieber persönlich klären? Sie erreichen mich unter 089 200 000 830 oder per WhatsApp (https://wa.me/4989200000830).
 
@@ -548,7 +548,7 @@ function buildProfilNudge2Html(lead: Lead, siteUrl: string, portalBase: string):
   const halloAnrede = buildHalloAnrede(lead.anrede_text || null, lead.nachname || "", lead.vorname || "");
   const content = `
     <p style="font-size:15px;line-height:1.75;color:#444;margin-bottom:14px;">${halloAnrede},</p>
-    <p style="font-size:15px;line-height:1.75;color:#444;margin-bottom:14px;">Sie haben bisher keine unverbindlichen Bewerbungen erhalten &ndash; und können deshalb nicht sehen, welche Pflegekräfte die Betreuung übernehmen möchten. Dazu fehlen nur einige Angaben in Ihrem Patientenprofil.</p>
+    <p style="font-size:15px;line-height:1.75;color:#444;margin-bottom:14px;">Sie haben bisher keine unverbindlichen Bewerbungen erhalten &ndash; und können deshalb nicht sehen, welche Pflegekräfte die Betreuung übernehmen möchten. Dazu fehlen nur einige Angaben zur Pflegesituation.</p>
     <p style="font-size:15px;line-height:1.75;color:#444;margin-bottom:14px;">Soll ich das gemeinsam mit Ihnen ausfüllen? Rufen Sie mich einfach an &ndash; <a href="tel:+4989200000830" style="color:#8B7355;text-decoration:none;font-weight:600;">089&nbsp;200&nbsp;000&nbsp;830</a> &ndash; oder schreiben Sie mir per <a href="https://wa.me/4989200000830" style="color:#8B7355;text-decoration:none;font-weight:600;">WhatsApp</a>, wann es Ihnen passt.</p>
     <p style="font-size:15px;line-height:1.75;color:#444;margin-bottom:14px;">Oder Sie erledigen es direkt selbst: einmal klicken, Angaben vervollständigen, Bewerbungen erhalten. Kostenfrei und unverbindlich.</p>
     ${bulletproofButton(portalUrl, "Angaben vervollständigen&nbsp;&nbsp;&rarr;", "#2A9D5C")}
@@ -562,7 +562,7 @@ function buildProfilNudge2Text(lead: Lead, siteUrl: string, portalBase: string):
   const halloAnrede = buildHalloAnrede(lead.anrede_text || null, lead.nachname || "", lead.vorname || "");
   return `${halloAnrede},
 
-Sie haben bisher keine unverbindlichen Bewerbungen erhalten — und können deshalb nicht sehen, welche Pflegekräfte die Betreuung übernehmen möchten. Dazu fehlen nur einige Angaben in Ihrem Patientenprofil.
+Sie haben bisher keine unverbindlichen Bewerbungen erhalten — und können deshalb nicht sehen, welche Pflegekräfte die Betreuung übernehmen möchten. Dazu fehlen nur einige Angaben zur Pflegesituation.
 
 Soll ich das gemeinsam mit Ihnen ausfüllen? Rufen Sie mich einfach an — 089 200 000 830 — oder schreiben Sie mir per WhatsApp (https://wa.me/4989200000830), wann es Ihnen passt.
 
@@ -587,7 +587,7 @@ function buildProfilNudge3Html(lead: Lead, siteUrl: string, portalBase: string):
   const content = `
     <p style="font-size:15px;line-height:1.75;color:#444;margin-bottom:14px;">${halloAnrede},</p>
     <p style="font-size:15px;line-height:1.75;color:#444;margin-bottom:14px;">vor einer Woche haben Sie Ihr Angebot erhalten &ndash; darf ich kurz nachfragen, wo Sie stehen? Gibt es offene Fragen, oder etwas, bei dem wir Sie unterstützen können?</p>
-    <p style="font-size:15px;line-height:1.75;color:#444;margin-bottom:14px;">Falls die Betreuung noch ansteht: Bisher haben Sie keine Bewerbungen von Pflegekräften erhalten, weil im Patientenprofil noch einige Angaben fehlen. Kurz vervollständigen &ndash; und Sie sehen kostenfrei und unverbindlich, wer die Betreuung übernehmen möchte.</p>
+    <p style="font-size:15px;line-height:1.75;color:#444;margin-bottom:14px;">Falls die Betreuung noch ansteht: Bisher haben Sie keine Bewerbungen von Pflegekräften erhalten, weil zur Pflegesituation noch einige Angaben fehlen. Kurz beschreiben &ndash; und Sie sehen kostenfrei und unverbindlich, wer die Betreuung übernehmen möchte.</p>
     ${bulletproofButton(portalUrl, "Angaben vervollständigen&nbsp;&nbsp;&rarr;", "#2A9D5C")}
     <p style="font-size:15px;line-height:1.75;color:#444;margin:16px 0 0;">Antworten Sie einfach auf diese E-Mail &ndash; oder rufen Sie mich an: <a href="tel:+4989200000830" style="color:#8B7355;text-decoration:none;font-weight:600;">089&nbsp;200&nbsp;000&nbsp;830</a>, gern auch per <a href="https://wa.me/4989200000830" style="color:#8B7355;text-decoration:none;font-weight:600;">WhatsApp</a>.</p>
     <p style="font-size:13px;line-height:1.6;color:#888;margin:18px 0 0;">PS: Klappt im Portal etwas nicht, oder möchten Sie das lieber persönlich klären? Sie erreichen mich unter <a href="tel:+4989200000830" style="color:#8B7355;text-decoration:none;">089&nbsp;200&nbsp;000&nbsp;830</a> oder per <a href="https://wa.me/4989200000830" style="color:#8B7355;text-decoration:none;">WhatsApp</a>.</p>
@@ -602,7 +602,7 @@ function buildProfilNudge3Text(lead: Lead, siteUrl: string, portalBase: string):
 
 vor einer Woche haben Sie Ihr Angebot erhalten — darf ich kurz nachfragen, wo Sie stehen? Gibt es offene Fragen, oder etwas, bei dem wir Sie unterstützen können?
 
-Falls die Betreuung noch ansteht: Bisher haben Sie keine Bewerbungen von Pflegekräften erhalten, weil im Patientenprofil noch einige Angaben fehlen. Kurz vervollständigen — und Sie sehen kostenfrei und unverbindlich, wer die Betreuung übernehmen möchte.
+Falls die Betreuung noch ansteht: Bisher haben Sie keine Bewerbungen von Pflegekräften erhalten, weil zur Pflegesituation noch einige Angaben fehlen. Kurz beschreiben — und Sie sehen kostenfrei und unverbindlich, wer die Betreuung übernehmen möchte.
 
 Angaben vervollständigen: ${portalUrl}
 
@@ -910,7 +910,7 @@ function buildEingangsbestaetigungHtml(lead: Lead, siteUrl: string, portalBase: 
     <p style="font-size:15px;line-height:1.75;color:#2D1F0F;margin:0 0 16px;"><strong>So geht es weiter:</strong></p>
     <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="margin:0 0 26px;">
       ${stepRow("1", "Angebot und erste Pflegekräfte ansehen", "Im Portal finden Sie Ihr Angebot im Detail sowie erste passende Pflegekräfte mit Profil, Erfahrung und Sprachkenntnissen.")}
-      ${stepRow("2", "Patientendaten ergänzen", "Damit Pflegekräfte den konkreten Bedarf einschätzen können. Dauert wenige Minuten.")}
+      ${stepRow("2", "Pflegesituation beschreiben", "Damit wir Ihnen passende, verfügbare Pflegekräfte zeigen können. Dauert wenige Minuten.")}
       ${stepRow("3", "Wunsch-Pflegekräfte einladen", "Sobald Sie eingeladen haben, erhalten Sie konkrete Bewerbungen — mit Anreisedatum und Reisekosten.", true)}
     </table>`;
 
@@ -1027,7 +1027,7 @@ ${priceLine}Angebot & Pflegekräfte ansehen: ${ctaUrl}
 SO GEHT ES WEITER
 
 1. Angebot und erste Pflegekräfte ansehen — im Portal finden Sie Ihr Angebot im Detail sowie erste passende Pflegekräfte mit Profil, Erfahrung und Sprachkenntnissen.
-2. Patientendaten ergänzen — damit Pflegekräfte den konkreten Bedarf einschätzen können. Dauert wenige Minuten.
+2. Pflegesituation beschreiben — damit wir Ihnen passende, verfügbare Pflegekräfte zeigen können. Dauert wenige Minuten.
 3. Wunsch-Pflegekräfte einladen — sobald Sie eingeladen haben, erhalten Sie konkrete Bewerbungen, mit Anreisedatum und Reisekosten.
 
 PFLEGESITUATION & ANFORDERUNGEN
