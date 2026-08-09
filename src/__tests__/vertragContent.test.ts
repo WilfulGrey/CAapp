@@ -137,9 +137,9 @@ describe('vertrag-content: inwarianty treści', () => {
     expect(resolveVertragFelder({ datum: '01.02.2026' }, { signaturName: 'X' }).signDatum).toBe('01.02.2026');
   });
 
-  it('defaulty DL: Kamila Bilska-Wabik / Vitanas Group', () => {
-    expect(resolveVertragFelder({}, { signaturName: 'X' }).dlName).toBe('Kamila Bilska-Wabik');
-    expect(resolveVertragFelder({}, { signaturName: 'X' }).dlRolle).toBe('Vitanas Group');
+  it('defaulty DL: Karolina Jakubowska / Geschäftsführerin', () => {
+    expect(resolveVertragFelder({}, { signaturName: 'X' }).dlName).toBe('Karolina Jakubowska');
+    expect(resolveVertragFelder({}, { signaturName: 'X' }).dlRolle).toBe('Geschäftsführerin');
   });
 });
 
