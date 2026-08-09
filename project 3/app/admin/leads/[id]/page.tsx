@@ -408,7 +408,7 @@ export default function LeadDetailPage() {
           </Button>
           <div>
             <h1 className="text-3xl font-bold text-gray-900">
-              {lead.vorname || 'Lead'} #{lead.id.slice(0, 8)}
+              {[lead.anrede_text, lead.vorname, lead.nachname].filter(Boolean).join(' ') || 'Lead'} #{lead.id.slice(0, 8)}
             </h1>
             <p className="text-gray-600 mt-1">Lead-Details und Timeline</p>
           </div>
