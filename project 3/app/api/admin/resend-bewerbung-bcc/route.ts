@@ -64,7 +64,7 @@ function buildPortalUrl(lead: { token?: string | null }): string {
   return `${portalBase.replace(/\/$/, '')}/?token=${encodeURIComponent(lead.token)}`;
 }
 
-export async function POST(request: NextRequest) {
+async function handlePost(request: NextRequest) {
   // Auth: Bearer must match service role key.
   const authHeader = request.headers.get('authorization') ?? '';
   const token = authHeader.replace(/^Bearer\s+/i, '').trim();
@@ -154,3 +154,7 @@ export async function POST(request: NextRequest) {
 
   return NextResponse.json({ results });
 }
+
+// ─── Telemetria RAM (diagnoza OOM — plan 2026-08-09; format: [req] …) ───
+import { withMem } from '@/lib/memlog';
+export const POST = withMem('resend-bewerbung-bcc', handlePost);

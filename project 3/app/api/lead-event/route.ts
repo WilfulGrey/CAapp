@@ -533,7 +533,7 @@ const GET_PUBLIC_EVENT_TYPES = new Set([
   'application_rejected',
 ]);
 
-export async function GET(request: NextRequest) {
+async function handleGet(request: NextRequest) {
   try {
     const token = request.nextUrl.searchParams.get('token');
     const typesParam = request.nextUrl.searchParams.get('types') ?? '';
@@ -576,7 +576,7 @@ export async function GET(request: NextRequest) {
   }
 }
 
-export async function POST(request: NextRequest) {
+async function handlePost(request: NextRequest) {
   try {
     const { token, event, metadata, notify } = await request.json();
 
@@ -1118,3 +1118,8 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'failed' }, { status: 500, headers: corsHeaders });
   }
 }
+
+// ─── Telemetria RAM (diagnoza OOM — plan 2026-08-09; format: [req] …) ───
+import { withMem } from '@/lib/memlog';
+export const GET = withMem('lead-event GET', handleGet);
+export const POST = withMem('lead-event POST', handlePost);

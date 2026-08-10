@@ -3,7 +3,7 @@ import { findOrCreateLead, logEvent } from '@/lib/lead-management';
 import { Kalkulation, berechnePreis, FormularDaten, generateAnrede } from '@/lib/calculation';
 import { sendEmail, getKalkulationEmailTemplate, getTeamNotificationTemplate } from '@/lib/email';
 
-export async function POST(request: NextRequest) {
+async function handlePost(request: NextRequest) {
   const envCheck = {
     SMTP_HOST: !!process.env.SMTP_HOST,
     SMTP_PORT: !!process.env.SMTP_PORT,
@@ -152,3 +152,7 @@ export async function POST(request: NextRequest) {
     );
   }
 }
+
+// ─── Telemetria RAM (diagnoza OOM — plan 2026-08-09; format: [req] …) ───
+import { withMem } from '@/lib/memlog';
+export const POST = withMem('kalkulation-email', handlePost);

@@ -10,7 +10,7 @@ const supabase = createClient(
 
 export const dynamic = 'force-dynamic';
 
-export async function GET(
+async function handleGet(
   request: NextRequest,
   { params }: { params: { leadId: string } }
 ) {
@@ -74,3 +74,7 @@ export async function GET(
     return new NextResponse('Fehler beim Generieren der HTML-Vorschau', { status: 500 });
   }
 }
+
+// ─── Telemetria RAM (diagnoza OOM — plan 2026-08-09; format: [req] …) ───
+import { withMem } from '@/lib/memlog';
+export const GET = withMem('preview-kalkulation', handleGet);

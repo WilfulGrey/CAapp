@@ -94,7 +94,7 @@ async function flushScheduledEmails(): Promise<void> {
   }
 }
 
-export async function POST(request: NextRequest) {
+async function handlePost(request: NextRequest) {
   try {
     const body = await request.json();
 
@@ -353,3 +353,7 @@ async function handleSendAngebotsEmailOnly(leadId: string) {
     );
   }
 }
+
+// ─── Telemetria RAM (diagnoza OOM — plan 2026-08-09; format: [req] …) ───
+import { withMem } from '@/lib/memlog';
+export const POST = withMem('angebot-anfordern', handlePost);

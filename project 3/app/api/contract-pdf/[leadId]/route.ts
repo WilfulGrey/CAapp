@@ -37,7 +37,7 @@ export async function OPTIONS() {
 // Liefert das unterschriebene Vertrags-PDF (application/pdf) für den Lead.
 // 404 wenn keine Acceptance-Row existiert (= noch nicht gebucht) oder die
 // Acceptance-Row keinen contract_snapshot hat (= alte Buchung vor B3).
-export async function GET(
+async function handleGet(
   request: NextRequest,
   { params }: { params: { leadId: string } },
 ) {
@@ -206,3 +206,7 @@ export async function GET(
     );
   }
 }
+
+// ─── Telemetria RAM (diagnoza OOM — plan 2026-08-09; format: [req] …) ───
+import { withMem } from '@/lib/memlog';
+export const GET = withMem('contract-pdf', handleGet);
