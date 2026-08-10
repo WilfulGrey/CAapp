@@ -26,7 +26,7 @@ export default function HomePage() {
       <div className="w-full mb-8 lg:mb-0 lg:min-h-[90vh] lg:flex lg:items-center lg:bg-gradient-to-b lg:from-[#F8F7F5] lg:via-white lg:to-white">
         {/* Mobile/Tablet: Stacked Layout */}
         <div className="lg:hidden">
-          <div className="relative w-full h-[240px] md:h-[280px] overflow-hidden mb-8 bg-[#F8F7F5]">
+          <div className="relative w-full h-[150px] md:h-[190px] overflow-hidden mb-6 bg-[#F8F7F5]">
             {/* LCP element — explicit priority + sizes so the optimizer
                 generates a mobile-sized WebP/AVIF and the browser fetches
                 it eagerly with fetchpriority="high". */}
@@ -41,12 +41,36 @@ export default function HomePage() {
             <div className="absolute inset-0 bg-gradient-to-b from-black/15 via-transparent to-transparent pointer-events-none"></div>
           </div>
           <div className="px-5 text-center mb-8">
-            <h1 className="text-[28px] md:text-[40px] leading-[1.2] font-bold text-[#3D3D3D] mb-3 tracking-tight">
-              24-Stunden-Pflege im eigenen Zuhause
+            <h1 className="text-[28px] md:text-[40px] leading-[1.2] font-bold text-[#3D3D3D] mb-4 tracking-tight">
+              24-Stunden-Pflege zu Hause – die bezahlbare Alternative zum Pflegeheim
             </h1>
-            <p className="text-[18px] md:text-[19px] leading-[1.5] text-[#5A5A5A] mb-8">
-              Bezahlbare Alternative zum Pflegeheim – <strong>Angebot & Pflegekräfte sofort einsehen,</strong> Betreuung in 4–7 Werktagen organisiert.
-            </p>
+            <ul className="max-w-sm mx-auto flex flex-col gap-3 mb-5 text-left">
+              <li className="flex items-center gap-3">
+                <span className="w-7 h-7 rounded-full bg-[#FBEEEA] flex items-center justify-center flex-shrink-0"><svg className="w-[16px] h-[16px] text-[#E76F63]" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" /></svg></span>
+                <span className="text-[16px] leading-snug text-[#3D3D3D]"><strong className="font-semibold">Sofortangebot</strong> in 2 Minuten</span>
+              </li>
+              <li className="flex items-center gap-3">
+                <span className="w-7 h-7 rounded-full bg-[#FBEEEA] flex items-center justify-center flex-shrink-0"><svg className="w-[16px] h-[16px] text-[#E76F63]" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197m13.5-9a2.5 2.5 0 11-5 0 2.5 2.5 0 015 0z" /></svg></span>
+                <span className="text-[16px] leading-snug text-[#3D3D3D]"><strong className="font-semibold">Pflegekräfte</strong> sofort einsehen</span>
+              </li>
+              <li className="flex items-center gap-3">
+                <span className="w-7 h-7 rounded-full bg-[#FBEEEA] flex items-center justify-center flex-shrink-0"><svg className="w-[16px] h-[16px] text-[#E76F63]" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" /></svg></span>
+                <span className="text-[16px] leading-snug text-[#3D3D3D]"><strong className="font-semibold">Kein Vertrag</strong> vor der Buchung</span>
+              </li>
+            </ul>
+
+            {/* Presse-Logos als einziges Trust-Element, auf weißem Grund (Logos sind weiß hinterlegt) */}
+            <div className="max-w-md mx-auto mb-6">
+              <div className="bg-white rounded-2xl border border-[#ECE7DF] px-4 py-3.5">
+                <p className="text-[11px] font-semibold text-[#B7AC9C] uppercase tracking-[0.1em] text-center mb-2.5">Bekannt aus</p>
+                <div className="flex items-center justify-center gap-5">
+                  <img src="/images/media/ard.webp" alt="ARD" loading="lazy" decoding="async" className="h-[18px] object-contain opacity-80" />
+                  <img src="/images/media/ndr.webp" alt="NDR" loading="lazy" decoding="async" className="h-[18px] object-contain opacity-80" />
+                  <img src="/images/media/sat1.webp" alt="SAT.1" loading="lazy" decoding="async" className="h-[18px] object-contain opacity-80" />
+                  <img src="/images/media/die-welt.webp" alt="Die Welt" loading="lazy" decoding="async" className="h-[18px] object-contain opacity-80" />
+                </div>
+              </div>
+            </div>
 
             {/* Direct Form Integration */}
             <div className="max-w-md mx-auto mb-8">
@@ -123,12 +147,23 @@ export default function HomePage() {
         {/* Desktop: Side-by-side Layout */}
         <div className="hidden lg:grid lg:grid-cols-[55fr_45fr] items-center max-w-[1280px] mx-auto px-8 gap-12 xl:gap-16 w-full">
           <div className="text-left">
-            <h1 className="text-[clamp(2rem,3.5vw,3rem)] leading-[1.15] font-bold text-[#3D3D3D] mb-4 tracking-tight">
-              24-Stunden-Pflege im eigenen Zuhause
+            <h1 className="text-[clamp(2rem,3.5vw,3rem)] leading-[1.15] font-bold text-[#3D3D3D] mb-5 tracking-tight">
+              24-Stunden-Pflege zu Hause – die bezahlbare Alternative zum Pflegeheim
             </h1>
-            <p className="text-[18px] xl:text-[18px] leading-[1.5] text-[#5A5A5A] mb-8">
-              Bezahlbare Alternative zum Pflegeheim – <strong>Angebot & Pflegekräfte sofort einsehen,</strong> Betreuung in 4–7 Werktagen organisiert.
-            </p>
+            <ul className="flex flex-col gap-3 mb-6">
+              <li className="flex items-center gap-3">
+                <span className="w-8 h-8 rounded-full bg-[#FBEEEA] flex items-center justify-center flex-shrink-0"><svg className="w-[18px] h-[18px] text-[#E76F63]" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" /></svg></span>
+                <span className="text-[18px] text-[#3D3D3D]"><strong className="font-semibold">Sofortangebot</strong> in 2 Minuten</span>
+              </li>
+              <li className="flex items-center gap-3">
+                <span className="w-8 h-8 rounded-full bg-[#FBEEEA] flex items-center justify-center flex-shrink-0"><svg className="w-[18px] h-[18px] text-[#E76F63]" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197m13.5-9a2.5 2.5 0 11-5 0 2.5 2.5 0 015 0z" /></svg></span>
+                <span className="text-[18px] text-[#3D3D3D]"><strong className="font-semibold">Pflegekräfte</strong> sofort einsehen</span>
+              </li>
+              <li className="flex items-center gap-3">
+                <span className="w-8 h-8 rounded-full bg-[#FBEEEA] flex items-center justify-center flex-shrink-0"><svg className="w-[18px] h-[18px] text-[#E76F63]" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" /></svg></span>
+                <span className="text-[18px] text-[#3D3D3D]"><strong className="font-semibold">Kein Vertrag</strong> vor der Buchung</span>
+              </li>
+            </ul>
 
             {/* USP Section Desktop */}
             <div className="bg-white rounded-xl p-6 shadow-sm border border-[#E5E3DF]">
