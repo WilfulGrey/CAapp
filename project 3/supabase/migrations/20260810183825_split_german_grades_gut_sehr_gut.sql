@@ -19,14 +19,19 @@
   Idempotent: mehrfaches Ausführen ändert nichts.
 */
 
-UPDATE pricing_config
-   SET antwort_label = 'Gut',
-       updated_at    = now()
- WHERE kategorie  = 'deutschkenntnisse'
-   AND antwort_key = 'sehr-gut';
+-- Labels tragen die mamamia-Stufe (L1..L4) im Klartext — im Admin sofort
+-- erkennbar, welcher Preis zu welcher Stufe im SA-Portal gehört (Martin, 10.08.).
+UPDATE pricing_config SET antwort_label = 'Grundlegend (L1)', updated_at = now()
+ WHERE kategorie = 'deutschkenntnisse' AND antwort_key = 'grundlegend';
+
+UPDATE pricing_config SET antwort_label = 'Kommunikativ (L2)', updated_at = now()
+ WHERE kategorie = 'deutschkenntnisse' AND antwort_key = 'kommunikativ';
+
+UPDATE pricing_config SET antwort_label = 'Gut (L3)', updated_at = now()
+ WHERE kategorie = 'deutschkenntnisse' AND antwort_key = 'sehr-gut';
 
 INSERT INTO pricing_config (kategorie, antwort_key, antwort_label, aufschlag_euro, sortierung, aktiv)
-SELECT 'deutschkenntnisse', 'sehr-gut-sa', 'Sehr gut', 600, 4, true
+SELECT 'deutschkenntnisse', 'sehr-gut-sa', 'Sehr gut (L4) — nur SA-Portal', 600, 4, true
  WHERE NOT EXISTS (
    SELECT 1 FROM pricing_config
     WHERE kategorie = 'deutschkenntnisse' AND antwort_key = 'sehr-gut-sa'
