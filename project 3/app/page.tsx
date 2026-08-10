@@ -42,7 +42,7 @@ export default function HomePage() {
           </div>
           <div className="px-5 text-center mb-8">
             <h1 className="text-[28px] md:text-[40px] leading-[1.2] font-bold text-[#3D3D3D] mb-3 tracking-tight">
-              24-Stunden-Pflege im eigenen Zuhause
+              24-Stunden-Pflege im eigenen Zuhause – was kostet das?
             </h1>
             <p className="text-[18px] md:text-[19px] leading-[1.5] text-[#5A5A5A] mb-8">
               Bezahlbare Alternative zum Pflegeheim – <strong>Angebot & Pflegekräfte sofort einsehen,</strong> Betreuung in 4–7 Werktagen organisiert.
@@ -124,7 +124,7 @@ export default function HomePage() {
         <div className="hidden lg:grid lg:grid-cols-[55fr_45fr] items-center max-w-[1280px] mx-auto px-8 gap-12 xl:gap-16 w-full">
           <div className="text-left">
             <h1 className="text-[clamp(2rem,3.5vw,3rem)] leading-[1.15] font-bold text-[#3D3D3D] mb-4 tracking-tight">
-              24-Stunden-Pflege im eigenen Zuhause
+              24-Stunden-Pflege im eigenen Zuhause – was kostet das?
             </h1>
             <p className="text-[18px] xl:text-[18px] leading-[1.5] text-[#5A5A5A] mb-8">
               Bezahlbare Alternative zum Pflegeheim – <strong>Angebot & Pflegekräfte sofort einsehen,</strong> Betreuung in 4–7 Werktagen organisiert.
