@@ -106,16 +106,22 @@ describe('leadDisplayName', () => {
 });
 
 describe('leadGreeting', () => {
-  it('produces "Sehr geehrte Frau {nachname}"', () => {
-    expect(leadGreeting(baseLead)).toBe('Sehr geehrte Frau von norman');
+  // Namen werden so gezeigt, wie man sie schreibt — nicht wie der Kunde sie
+  // getippt hat (Martin, 10.08.: „wir haben doch keine Großbuchstaben").
+  it('produces "Sehr geehrte Frau {nachname}" (Partikel bleibt klein)', () => {
+    expect(leadGreeting(baseLead)).toBe('Sehr geehrte Frau von Norman');
   });
 
   it('produces "Sehr geehrter Herr {nachname}"', () => {
-    expect(leadGreeting(herrLead)).toBe('Sehr geehrter Herr schmidt');
+    expect(leadGreeting(herrLead)).toBe('Sehr geehrter Herr Schmidt');
   });
 
   it('produces "Sehr geehrte Familie {nachname}"', () => {
-    expect(leadGreeting(familieLead)).toBe('Sehr geehrte Familie müller');
+    expect(leadGreeting(familieLead)).toBe('Sehr geehrte Familie Müller');
+  });
+
+  it('normalisiert VERSALIEN aus dem Lead-Datensatz', () => {
+    expect(leadGreeting({ ...baseLead, nachname: 'RUPPERT' })).toBe('Sehr geehrte Frau Ruppert');
   });
 
   it('falls back to "Guten Tag" when no salutation/name', () => {
@@ -124,7 +130,7 @@ describe('leadGreeting', () => {
 
   it('handles vorname-only lead without anrede', () => {
     const lead = { ...bareLead, vorname: 'anna', nachname: null, anrede_text: null };
-    expect(leadGreeting(lead)).toBe('Guten Tag anna');
+    expect(leadGreeting(lead)).toBe('Guten Tag Anna');
   });
 });
 

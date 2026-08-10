@@ -72,9 +72,45 @@ export function detectGenderFromName(vorname?: string | null): Anrede | null {
   return null;
 }
 
+// Namens-Partikel bleiben klein, weil im Text eine Anrede davorsteht:
+// „Frau von Stein", nicht „Frau Von Stein".
+const NAME_PARTICLES = new Set([
+  'von', 'vom', 'van', 'de', 'del', 'della', 'di', 'da', 'dos', 'das',
+  'der', 'den', 'ten', 'ter', 'zu', 'zur', 'zum', 'le', 'la', 'y', 'af', 'of',
+]);
+
+function capWord(w: string): string {
+  if (!w) return w;
+  // Nur wenn der Name SCHREIT, wird der Rest kleingeschrieben — sonst bleibt
+  // die bewusste Schreibweise erhalten (McDonald, DiCaprio).
+  const rest = w === w.toUpperCase() ? w.slice(1).toLowerCase() : w.slice(1);
+  return w.charAt(0).toUpperCase() + rest;
+}
+
+/**
+ * Eigennamen so schreiben, wie man sie schreibt — nicht wie der Kunde sie
+ * getippt hat (Martin, 10.08.2026: „wir haben doch keine Großbuchstaben, immer
+ * nur der erste Buchstabe"). „RUPPERT" → „Ruppert", „marco" → „Marco",
+ * „MÜLLER-LÜDENSCHEIDT" → „Müller-Lüdenscheidt"; bewusst gemischte Schreibung
+ * („McDonald") bleibt unangetastet.
+ *
+ * Gleiche Regel wie in `project 3/lib/email.ts` und der Edge Function
+ * `send-scheduled-emails/names.ts` — die drei Runtimes können sich nicht
+ * gegenseitig importieren, Änderungen also überall nachziehen.
+ */
+export function capitalizeName(name?: string | null): string {
+  const t = (name ?? '').trim();
+  if (!t) return '';
+
+  return t.split(/\s+/).map((word) =>
+    word.split('-').map((part) =>
+      NAME_PARTICLES.has(part.toLowerCase()) ? part.toLowerCase() : capWord(part),
+    ).join('-'),
+  ).join(' ');
+}
+
 function cap(s?: string | null): string {
-  const t = (s ?? '').trim();
-  return t ? t.charAt(0).toUpperCase() + t.slice(1) : '';
+  return capitalizeName(s);
 }
 
 /**
