@@ -1049,9 +1049,13 @@ describe('requiredGermanyLevelForWish (Kostenrechner-Tier → EXAKTE Stufe)', ()
   it('kommunikativ → level_2', () => {
     expect(requiredGermanyLevelForWish('kommunikativ')).toBe('level_2');
   });
-  it('sehr-gut → level_4 (Bindestrich + Underscore)', () => {
-    expect(requiredGermanyLevelForWish('sehr-gut')).toBe('level_4');
-    expect(requiredGermanyLevelForWish('sehr_gut')).toBe('level_4');
+  // Der Key heißt historisch `sehr-gut`, die Stufe IST aber „Gut" (450 €/Mo)
+  // und damit level_3. „Sehr gut" (level_4, 600 €/Mo) vergibt nur das SA-Portal
+  // und ist im Formular nicht wählbar (Martin, 10.08.2026).
+  it('„Gut" → level_3 (Key historisch sehr-gut, auch Underscore/Klartext)', () => {
+    expect(requiredGermanyLevelForWish('sehr-gut')).toBe('level_3');
+    expect(requiredGermanyLevelForWish('sehr_gut')).toBe('level_3');
+    expect(requiredGermanyLevelForWish('gut')).toBe('level_3');
   });
   it('tolerates upper-case / whitespace', () => {
     expect(requiredGermanyLevelForWish('  Kommunikativ ')).toBe('level_2');
@@ -1075,9 +1079,12 @@ describe('matchesGermanyWish (STRIKT: exakte Stufe pro Tier)', () => {
     expect(matchesGermanyWish('level_3', 'kommunikativ')).toBe(false);
     expect(matchesGermanyWish('level_4', 'kommunikativ')).toBe(false);
   });
-  it('sehr-gut zeigt NUR level_4 (NICHT level_3/B1!)', () => {
-    expect(matchesGermanyWish('level_4', 'sehr-gut')).toBe(true);
-    expect(matchesGermanyWish('level_3', 'sehr-gut')).toBe(false);
+  // „Gut" (Key historisch `sehr-gut`, 450 €/Mo) = level_3. Eine stärkere
+  // level_4-Kraft („Sehr gut", 600 €/Mo) darf dieser Kunde NICHT sehen — sonst
+  // stünden im Vertrag plötzlich 150 €/Mo mehr, als er bezahlt hat.
+  it('„Gut" zeigt NUR level_3 (nicht die teurere level_4!)', () => {
+    expect(matchesGermanyWish('level_3', 'sehr-gut')).toBe(true);
+    expect(matchesGermanyWish('level_4', 'sehr-gut')).toBe(false);
     expect(matchesGermanyWish('level_2', 'sehr-gut')).toBe(false);
   });
   it('kein Tier gewählt (null/leer) → alle zeigen', () => {

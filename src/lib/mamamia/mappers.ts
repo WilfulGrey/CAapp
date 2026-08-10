@@ -55,20 +55,28 @@ export function germanySkillBucket(level: string | null | undefined): GermanySki
 // Strikte 1:1-Zuordnung des Kostenrechner-Sprachtiers auf die EXAKTE
 // Mamamia-germany_skill-Stufe (Preis-Tier-Modell — je Tier genau eine Stufe,
 // kein "mind."-Bereich):
-//   grundlegend → level_1    kommunikativ → level_2    sehr-gut → level_4
+//   grundlegend → level_1    kommunikativ → level_2    „Gut" → level_3
 // Quelle der Form-Werte: project 3/components/calculator/MultiStepForm.tsx
 // Step 6 ("deutschkenntnisse": grundlegend | kommunikativ | sehr-gut).
-// level_0 (A1) und level_3 (B1) entsprechen KEINEM Kostenrechner-Tier — sie
-// erreichen das Portal nur über agency-manuelle Jobs (dort ist deutschWish
-// null, der Filter also aus). Preise (0/150/450 €/Mo) leben in `pricing_config`
-// (hier bewusst nicht dupliziert).
+//
+// ACHTUNG (Martin, 10.08.2026): Der Antwort-Key heißt historisch `sehr-gut`,
+// die Stufe IST aber „Gut" (so heißt sie im Formular und seit der Migration
+// auch in `pricing_config`) und kostet 450 €/Mo. Sie bildet deshalb auf
+// level_3 ab — vorher stand hier level_4, der im SA-Portal mit 600 €/Mo
+// bewertet wird; dadurch lag die Empfehlung des Portals bei jedem
+// Kostenrechner-Kunden 150 € über dessen eigenem Angebot (Kunde Schiffer).
+// „Sehr gut" (level_4, 600 €) ist bewusst NICHT im Formular wählbar — diese
+// Stufe vergibt nur die Agentur im SA-Portal.
+// level_0 (A1) entspricht KEINEM Kostenrechner-Tier — es erreicht das Portal
+// nur über agency-manuelle Jobs (dort ist deutschWish null, der Filter also
+// aus). Preise leben in `pricing_config` (hier bewusst nicht dupliziert).
 export function requiredGermanyLevelForWish(
   deutschkenntnisse: string | null | undefined,
 ): string | null {
   const v = (deutschkenntnisse ?? '').toLowerCase().trim();
   if (v === 'grundlegend') return 'level_1';
   if (v === 'kommunikativ') return 'level_2';
-  if (v === 'sehr-gut' || v === 'sehr_gut') return 'level_4';
+  if (v === 'sehr-gut' || v === 'sehr_gut' || v === 'gut') return 'level_3';
   return null;
 }
 
