@@ -34,7 +34,7 @@ services:
     buildCommand: npm install && npm run build
     staticPublishPath: ./dist
     autoDeploy: true
-    pullRequestPreviewsEnabled: false
+    pullRequestPreviewsEnabled: true
     envVars:
       - key: VITE_SUPABASE_URL
         value: https://ycdwtrklpoqprabtwahi.supabase.co
@@ -64,7 +64,7 @@ services:
     buildCommand: npm install && npm run build
     startCommand: npm run start
     autoDeploy: true
-    pullRequestPreviewsEnabled: false
+    pullRequestPreviewsEnabled: true
     envVars:
       # Public — baked into the client bundle; safe to commit-or-prompt.
       # NEXT_PUBLIC_SITE_URL: once the service has its assigned URL, swap
