@@ -110,7 +110,7 @@ Next.js 13 SSR, deployowane na `kostenrechner-beta.onrender.com` z brancha
 | 4 | `pflegegrad` | `0` / `1` / `2` / `3` / `4` / `5` |
 | 5 | `mobility` | `mobil` / `rollator` / `rollstuhl` / `bettlaegerig` |
 | 6 | `nachteinsaetze` | `nein` / `gelegentlich` / `taeglich` / `mehrmals` |
-| 7 | `deutschkenntnisse` | `grundlegend` / `kommunikativ` / `sehr-gut` |
+| 7 | `deutschkenntnisse` | `grundlegend` / `kommunikativ` / `sehr-gut` (label w UI: **„Gut"**, 450 €/Mo → `level_3`; wyższy grad „Sehr gut" 600 €/Mo = `level_4` NIE jest wybieralny w formularzu — tylko SA-Portal) |
 | 8 | `fuehrerschein` | `ja` / `nein` |
 | 9 | `geschlecht` (preferowana opiekunka, NIE płeć pacjenta) | `egal` / `weiblich` / `maennlich` |
 | 10 | Kontakt | `vorname`, `email`, `telefon`, `accept_privacy` |
