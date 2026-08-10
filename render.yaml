@@ -111,3 +111,12 @@ services:
       # consistency with the CA app build.
       - key: NODE_VERSION
         value: "20"
+
+      # Tripwire diagnostyczny OOM-a (plan 2026-08-09, tymczasowy do diagnozy):
+      # ogranicza V8-heap do 384MB, żeby HEAPOWY winowajca (np. analytics/stats
+      # ciągnący 200k wierszy) zabił proces V8-owym "JavaScript heap out of
+      # memory" ZE STACK-TRACE w logach, zamiast cichego kontener-killa przy
+      # 512MB. Zabójcy WASM/external (squoosh) ten limit nie dotyczy — od tego
+      # jest sampler [mem] (ext/ab) z instrumentation.ts.
+      - key: NODE_OPTIONS
+        value: "--max-old-space-size=384"

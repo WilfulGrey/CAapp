@@ -25,6 +25,9 @@ const nextConfig = {
   // ready — git revert PR2 przywraca renderer chromium bez zmian configu).
   experimental: {
     serverComponentsExternalPackages: ['puppeteer-core', '@sparticuz/chromium', 'pdfkit'],
+    // Telemetria pamięci (diagnoza OOM 512MB): instrumentation.ts rejestruje
+    // sampler RSS/heap/ext + crash-monitor przy starcie procesu Node.
+    instrumentationHook: true,
   },
   webpack: (config, { isServer }) => {
     if (!isServer) {

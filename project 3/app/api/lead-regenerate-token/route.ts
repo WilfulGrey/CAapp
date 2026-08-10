@@ -46,7 +46,7 @@ export async function OPTIONS() {
   return new NextResponse(null, { status: 204, headers: corsHeaders });
 }
 
-export async function POST(request: NextRequest) {
+async function handlePost(request: NextRequest) {
   let body: { token?: unknown; lead_id?: unknown; source?: unknown };
   try {
     body = await request.json();
@@ -195,3 +195,7 @@ function maskEmail(email: string | null | undefined): string {
   if (local.length <= 2) return `${local[0] ?? ''}*@${domain}`;
   return `${local[0]}***${local[local.length - 1]}@${domain}`;
 }
+
+// ─── Telemetria RAM (diagnoza OOM — plan 2026-08-09; format: [req] …) ───
+import { withMem } from '@/lib/memlog';
+export const POST = withMem('lead-regenerate-token', handlePost);

@@ -61,7 +61,7 @@ async function unsubscribeByToken(token: unknown): Promise<{ ok: boolean; status
   return { ok: true, status: 200 };
 }
 
-export async function POST(request: NextRequest) {
+async function handlePost(request: NextRequest) {
   try {
     const { token } = await request.json();
     const r = await unsubscribeByToken(token);
@@ -74,7 +74,7 @@ export async function POST(request: NextRequest) {
 
 // One-Click-Unsubscribe (RFC 8058 / List-Unsubscribe-Post) + direkter
 // Link-Aufruf. Liefert ok auch bei unbekanntem Token (kein Enumeration-Hinweis).
-export async function GET(request: NextRequest) {
+async function handleGet(request: NextRequest) {
   try {
     const token = request.nextUrl.searchParams.get('token');
     const r = await unsubscribeByToken(token);
@@ -84,3 +84,8 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: 'Fehler' }, { status: 500 });
   }
 }
+
+// ─── Telemetria RAM (diagnoza OOM — plan 2026-08-09; format: [req] …) ───
+import { withMem } from '@/lib/memlog';
+export const POST = withMem('unsubscribe POST', handlePost);
+export const GET = withMem('unsubscribe GET', handleGet);

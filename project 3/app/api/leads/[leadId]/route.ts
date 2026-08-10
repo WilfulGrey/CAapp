@@ -15,7 +15,7 @@ function getSupabaseClient() {
   return createClient(url, key, { auth: { persistSession: false, autoRefreshToken: false } });
 }
 
-export async function GET(
+async function handleGet(
   request: NextRequest,
   { params }: { params: { leadId: string } }
 ) {
@@ -54,7 +54,7 @@ export async function GET(
   }
 }
 
-export async function PATCH(
+async function handlePatch(
   request: NextRequest,
   { params }: { params: { leadId: string } }
 ) {
@@ -87,3 +87,8 @@ export async function PATCH(
     );
   }
 }
+
+// ─── Telemetria RAM (diagnoza OOM — plan 2026-08-09; format: [req] …) ───
+import { withMem } from '@/lib/memlog';
+export const GET = withMem('leads-get', handleGet);
+export const PATCH = withMem('leads-patch', handlePatch);
