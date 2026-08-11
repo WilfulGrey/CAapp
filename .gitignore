@@ -2,6 +2,7 @@ node_modules
 dist
 .DS_Store
 supabase/.temp/
+"project 3"/supabase/.temp/
 .env
 .env.local
 .env.*.local
