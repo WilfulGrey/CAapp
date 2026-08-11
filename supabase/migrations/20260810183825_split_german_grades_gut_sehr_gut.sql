@@ -17,6 +17,12 @@
      SA-Portal, das die mamamia-Stufe level_4 darauf abbildet.
 
   Idempotent: mehrfaches Ausführen ändert nichts.
+
+  Liegt bewusst in `supabase/migrations/` (Repo-Wurzel), NICHT unter
+  `project 3/supabase/migrations/`: nur die Wurzel wird von
+  `scripts/apply-migrations.sh` und dem CI-Job „Apply migrations to Supabase"
+  angefasst. Beide Apps teilen sich dieselbe Supabase pro Umgebung, die
+  Tabelle ist also von hier aus erreichbar.
 */
 
 -- Labels tragen die mamamia-Stufe (L1..L4) im Klartext — im Admin sofort
