@@ -1,5 +1,6 @@
 import { createClient } from '@supabase/supabase-js';
 
+import { capitalizeName } from './names';
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string;
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string;
 
@@ -142,8 +143,10 @@ export function leadDisplayName(lead: Lead): string {
 /** Build greeting (Sehr geehrte Frau X / Sehr geehrter Herr X etc.) */
 export function leadGreeting(lead: Lead): string {
   const anrede = lead.anrede_text;
-  const nachname = lead.nachname;
-  const vorname = lead.vorname;
+  // Namen kommen aus dem Lead so, wie der Kunde sie getippt hat („RUPPERT",
+  // „marco") — vor der Anrede sauber schreiben (Martin, 10.08.).
+  const nachname = lead.nachname ? capitalizeName(lead.nachname) : lead.nachname;
+  const vorname = lead.vorname ? capitalizeName(lead.vorname) : lead.vorname;
   if (anrede === 'Frau' && nachname) return `Sehr geehrte Frau ${nachname}`;
   if (anrede === 'Herr' && nachname) return `Sehr geehrter Herr ${nachname}`;
   if (anrede === 'Familie' && nachname) return `Sehr geehrte Familie ${nachname}`;
