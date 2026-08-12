@@ -103,7 +103,7 @@ describe('vertrag-content: inwarianty treści', () => {
   const f = resolveVertragFelder(BASELINE_INPUT, BASELINE_OPTS);
 
   it('liczności punktów §§ 1-10 zgodne z Mustervertrag', () => {
-    expect(f.paragraphs.map((p) => p.punkte.length)).toEqual([10, 3, 7, 12, 4, 4, 2, 3, 3, 7]);
+    expect(f.paragraphs.map((p) => p.punkte.length)).toEqual([9, 3, 7, 12, 4, 4, 2, 3, 3, 7]);
   });
 
   it('§ 1 punkt 8 ma dokładnie 4 sub-bullety; tylko on ma subListę', () => {

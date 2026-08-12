@@ -130,8 +130,15 @@ Stałe: `RETRY_DELAYS_MS = [15s, 30s, 60s]` (`sync-acceptance/index.ts`);
 
 Treść §§ żyje w kodzie (`project 3/lib/vertrag-content.ts` — model blokowy, single source
 dla renderera PDF i HTML-fallbacku; + JSX `VertragSignieren.tsx` — duplikacja świadoma,
-patrz plan refactoru; `contract_version` w wierszu pinuje wersję tekstu — bump TYLKO ze
-świadomą zmianą treści + zamrożeniem starej wersji).
+patrz plan refactoru). `contract_version` w wierszu to **czysty stempel audytowy** (zero
+odczytów w runtime) pinujący wersję tekstu, którą klient podpisał — bump TYLKO ze świadomą
+zmianą treści. **Zamrożenie starej wersji = bajty kanonów w buckecie** (bucket-first +
+`upsert:false`), NIE martwy kod — repo trzyma wyłącznie AKTUALNĄ treść. Historia wersji:
+**v1.0** (do 2026-08-12) = § 1 z 10 punktami; **v1.1** (od 2026-08-12, Registry #32) =
+§ 1 z 9 punktami — usunięty pkt 10 (telefon z rozmowami do kraju opiekunki + internet,
+decyzja Michała). Mustervertrag (`public/primundus-mustervertrag.pdf` + kopia na
+primundus.de) generowany z renderera: `scripts/vertrag/render-muster.ts` (pusty input,
+blok auditBanner odfiltrowany).
 
 ## Renderer PDF (od 08/2026: pdfkit — Registry #27)
 

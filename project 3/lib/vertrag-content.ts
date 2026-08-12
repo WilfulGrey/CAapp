@@ -38,7 +38,7 @@ export interface VertragInput {
 export interface VertragHtmlOptions {
   signaturName: string;
   signedAt?: string; // menschenlesbarer Zeitstempel, z.B. "05.06.2026 um 14:30 Uhr"
-  auditNote?: string; // z.B. "IP 1.2.3.4 · Vertragsversion v1.0"
+  auditNote?: string; // z.B. "IP 1.2.3.4 · Vertragsversion v1.1"
 }
 
 // ─── Punkte aus dem Mustervertrag (1:1 verbatim) ────────────────────────
@@ -91,9 +91,11 @@ export const PARA_1: Paragraph = {
     {
       text: 'Die wöchentliche durchschnittliche Arbeitszeit darf 40 Stunden nicht überschreiten. Außerhalb der Arbeitszeit steht es der Betreuungsperson frei, den Leistungsort zu verlassen.',
     },
-    {
-      text: 'Der AG stellt der Betreuungsperson die Mitbenutzung eines Telefons für nationale Festnetztelefonate sowie Festnetztelefonate ins Heimatland und Internet zur Verfügung.',
-    },
+    // § 1 pkt 10 (telefon z rozmowami do kraju opiekunki + internet) USUNIĘTY
+    // 2026-08-12 na decyzję Michała — Vertragsversion v1.1. Umowy podpisane
+    // wcześniej (v1.0) pozostają w brzmieniu z 10 punktami: chroni je kanon
+    // PDF w buckecie contracts/ (bucket-first, upsert:false) — kod trzyma
+    // wyłącznie AKTUALNĄ treść.
   ],
 };
 
@@ -725,7 +727,7 @@ export function buildVertragHtml(daten: VertragInput, opts: VertragHtmlOptions):
 
   // Layout 1:1 dem Mustervertrag (dist/primundus-mustervertrag.pdf, 8 Seiten):
   //  Seite 1: Header + Datum + "Dienstleistungsvertrag" + Vertragsparteien
-  //  Seite 2: § 1 (10 Punkte) + § 2 Anfang
+  //  Seite 2: § 1 (9 Punkte, v1.1 — pkt „Telefon/Internet" usunięty 2026-08-12) + § 2 Anfang
   //  Seite 3: § 2 Rest + § 3 (7 Punkte)
   //  Seite 4: § 4 (12 Punkte)
   //  Seite 5: § 5 + § 6 + § 7

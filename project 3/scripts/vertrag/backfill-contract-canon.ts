@@ -118,7 +118,7 @@ async function main() {
     const blocks = buildVertragDocument(daten, {
       signaturName: String(signaturName),
       signedAt: r.signed_at ? formatSignedAtBerlin(r.signed_at) : undefined,
-      auditNote: 'Vertragsversion v1.0',
+      auditNote: 'Vertragsversion v1.1',
     });
     const pdf = await renderVertragPdf(blocks);
     const sha = sha256(pdf);

@@ -39,7 +39,7 @@ async function main() {
     const blocks = buildVertragDocument(daten, {
       signaturName: typeof signaturName === 'string' ? signaturName : String(signaturName),
       signedAt,
-      auditNote: 'Vertragsversion v1.0',
+      auditNote: 'Vertragsversion v1.1',
     });
     const buf = await renderVertragPdf(blocks);
     const out = join(dir, `${r.application_id}.new.pdf`);

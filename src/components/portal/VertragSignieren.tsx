@@ -83,9 +83,8 @@ const PARAGRAPHEN: { titel: string; punkte: Punkt[] }[] = [
       {
         text: 'Die wöchentliche durchschnittliche Arbeitszeit darf 40 Stunden nicht überschreiten. Außerhalb der Arbeitszeit steht es der Betreuungsperson frei, den Leistungsort zu verlassen.',
       },
-      {
-        text: 'Der AG stellt der Betreuungsperson die Mitbenutzung eines Telefons für nationale Festnetztelefonate sowie Festnetztelefonate ins Heimatland und Internet zur Verfügung.',
-      },
+      // § 1 pkt 10 (telefon/internet dla opiekunki) usunięty 2026-08-12 —
+      // Vertragsversion v1.1; trzymać w sync z project 3/lib/vertrag-content.ts.
     ],
   },
   {
@@ -534,7 +533,7 @@ export const VertragSignieren: FC<{
                   : ` Sie erhalten umgehend eine Kopie des unterschriebenen Vertrags per E-Mail an ${daten.ag.email}.`}
               </p>
               <p className="text-[11px] text-green-600/80 mt-2">
-                Audit: einfache elektronische Signatur · Zeitstempel + IP protokolliert · Vertragsversion v1.0
+                Audit: einfache elektronische Signatur · Zeitstempel + IP protokolliert · Vertragsversion v1.1
               </p>
               {onSigned && !embedded && !readOnly && (
                 <button onClick={() => onSigned(name)}

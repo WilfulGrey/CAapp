@@ -17,7 +17,7 @@ const CASES: Array<{ name: string; daten: VertragInput; opts: VertragHtmlOptions
       voraussAbreise: '31.10.2026',
       tagessatz: 'EUR 95,00',
     },
-    opts: { signaturName: 'Erika Mustermann', signedAt: '06.08.2026 um 09:15 Uhr', auditNote: 'Vertragsversion v1.0' },
+    opts: { signaturName: 'Erika Mustermann', signedAt: '06.08.2026 um 09:15 Uhr', auditNote: 'Vertragsversion v1.1' },
   },
   {
     name: 'polskie-znaki-dlugie',
@@ -36,7 +36,7 @@ const CASES: Array<{ name: string; daten: VertragInput; opts: VertragHtmlOptions
       voraussAbreise: '13.10.2026',
       tagessatz: 'EUR 123,00',
     },
-    opts: { signaturName: 'Grzegorz Brzęczyszczykiewicz-Świątłodziedzicki', signedAt: '06.08.2026 um 14:30 Uhr', auditNote: 'Vertragsversion v1.0' },
+    opts: { signaturName: 'Grzegorz Brzęczyszczykiewicz-Świątłodziedzicki', signedAt: '06.08.2026 um 14:30 Uhr', auditNote: 'Vertragsversion v1.1' },
   },
   {
     name: 'wszystko-puste',
