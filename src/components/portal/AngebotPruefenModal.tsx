@@ -373,7 +373,7 @@ export const AngebotPruefenModal: FC<{
             )}
 
             {step === 2 && (
-              <div className="p-5 space-y-4" style={{background:'#FAFAF9'}}>
+              <div className="p-5 space-y-4" style={{background:'#F5F5F6'}}>
                 <div className={sectionCls}>
                   <p className={sectionTitleCls}>Leistungsempfänger <span className="font-normal text-gray-400">(zu betreuende Person)</span></p>
                   <div className="space-y-3">

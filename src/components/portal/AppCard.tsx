@@ -24,14 +24,14 @@ export const AppCard: FC<{
       className="bg-white rounded-2xl border-2 border-[#E76F63] overflow-hidden shadow-[0_4px_16px_rgba(231,111,99,0.15)]"
       style={exiting ? { animation: 'exitCard 0.32s ease-in forwards' } : undefined}
     >
-      <div className="flex items-center justify-between px-5 py-2 bg-[#F8F7F5] border-b border-[#E5E3DF]">
+      <div className="flex items-center justify-between px-5 py-2 bg-[#F5F5F6] border-b border-[#E9E9EB]">
         <div className="flex items-center gap-2">
           <span className="text-xs font-semibold text-[#8B7355]">Bewerbung</span>
           {app.status === 'new' && (
             <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-[#E3F7EF] text-[#22A06B] border border-[#B8E8D4]">Neu</span>
           )}
           {app.isInvited && (
-            <span className="flex items-center gap-1 text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-[#EBE2D5] text-[#8B7355] border border-[#E5E3DF]">
+            <span className="flex items-center gap-1 text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-[#EBE2D5] text-[#8B7355] border border-[#E9E9EB]">
               <svg className="w-3 h-3 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
               </svg>
@@ -63,12 +63,14 @@ export const AppCard: FC<{
                   <span className="text-sm text-gray-400 flex-shrink-0">{nurse.age} J.</span>
                 ) : null}
               </div>
-              {(() => { const lvl = nurseLevel(nurse.experienceYears ?? 0, nurse.history?.assignments ?? 0); return (
-                <span className={`flex items-center gap-1 text-xs font-bold pl-1.5 pr-2.5 py-0.5 rounded-full border flex-shrink-0 ${lvl.cls}`}>
-                  <span className="text-sm leading-none">{lvl.emoji}</span>
+              {/* Ohne Einsatz KEINE Pille — sonst steht hier ein leerer
+                  Rahmen (12.08.: gleicher Fehler wie im Profil, dort schon
+                  gefixt; MatchCard/InterestCard hatten den Guard bereits). */}
+              {(() => { const lvl = nurseLevel(nurse.experienceYears ?? 0, nurse.history?.assignments ?? 0); return lvl.label ? (
+                <span className={`flex items-center gap-1 text-xs font-bold px-2.5 py-0.5 rounded-full border flex-shrink-0 ${lvl.cls}`}>
                   {lvl.label}
                 </span>
-              ); })()}
+              ) : null; })()}
             </div>
             <div className="flex items-center gap-2 mb-1">
               <div className="flex gap-0.5">
@@ -79,7 +81,7 @@ export const AppCard: FC<{
               <span className="text-sm text-gray-500">Deutsch {nurse.language.level}</span>
               {nurse.referencePdfUrl && (
                 <span
-                  className="inline-flex items-center gap-0.5 text-[10px] font-medium text-[#8B7355] bg-[#F8F7F5] border border-[#C4B49A] px-1.5 py-0.5 rounded-full"
+                  className="inline-flex items-center gap-0.5 text-[10px] font-medium text-[#8B7355] bg-[#F5F5F6] border border-zinc-200 px-1.5 py-0.5 rounded-full"
                   title="Referenzen im Profil"
                 >
                   <FileText className="w-2.5 h-2.5" />
@@ -88,7 +90,7 @@ export const AppCard: FC<{
               )}
             </div>
             <p className="text-sm text-gray-500 truncate">
-              <span className="font-semibold text-[#8B7355]">{nurse.experience}</span>
+              <span>{nurse.experience}</span>
               {nurse.history && <span> · {nurse.history.assignments} Einsätze · Ø {Math.round(nurse.history.avgDurationMonths * 4.3)} Wo.</span>}
             </p>
           </div>
@@ -96,7 +98,7 @@ export const AppCard: FC<{
       </div>
 
       <div className="border-t border-gray-100 px-5 py-4">
-        <div className="bg-[#F8F7F5] rounded-xl px-4 py-3 mb-3">
+        <div className="bg-[#F5F5F6] rounded-xl px-4 py-3 mb-3">
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
               <p className="text-xs text-gray-500">{app.offer.anreisedatum} – {app.offer.abreisedatum}</p>
@@ -118,7 +120,7 @@ export const AppCard: FC<{
           Zeilenumbrüche erhalten. coverMessage = nur noch Preview-Mocks.
         */}
         {(app.message?.trim() || app.coverMessage) && (
-          <div className="mb-3 rounded-xl bg-[#F8F7F5] border border-[#E5E3DF] px-4 py-3">
+          <div className="mb-3 rounded-xl bg-[#F5F5F6] border border-[#E9E9EB] px-4 py-3">
             <p className="text-[11px] font-semibold text-[#8B7355] uppercase tracking-wide mb-1.5">Hinweis der Agentur</p>
             <p className="text-sm leading-relaxed text-gray-700 whitespace-pre-wrap">{app.message?.trim() || app.coverMessage}</p>
           </div>
@@ -126,7 +128,7 @@ export const AppCard: FC<{
         {onChat && (
           <button
             onClick={() => onChat(nurse)}
-            className="w-full flex items-center justify-center gap-2 rounded-xl border border-[#8B7355]/30 bg-white hover:bg-[#F8F7F5] text-[#6B5444] text-sm font-semibold py-2.5 transition-colors"
+            className="w-full flex items-center justify-center gap-2 rounded-xl border border-[#8B7355]/30 bg-white hover:bg-[#F5F5F6] text-[#6B5444] text-sm font-semibold py-2.5 transition-colors"
           >
             <svg className="w-4 h-4 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.86 9.86 0 01-4-.8L3 20l.8-3.2A7.9 7.9 0 013 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />

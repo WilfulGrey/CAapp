@@ -1,54 +1,63 @@
-// Single source of truth for the caregiver experience badge
-// (Starter / Bronze / Silber / Gold / Platin).
+// Single source of truth für die Erfahrungsstufe einer Pflegekraft.
 //
-// Score = years of experience + completed assignments (equal weighting,
-// 1 Einsatz = 1 Jahr). Thresholds last recalibrated 14.06.2026 (#305) after a
-// live-pool analysis (144 PKs / 4 Leads): pool-max score was 24, so the old
-// Platin threshold (≥26) was unreachable. The current thresholds give a clean
-// pyramid (~10 % Platin / ~30 % Gold / ~25 % Silber / ~14 % Bronze / Rest
-// Starter).
+// Basis seit 12.08.2026: AUSSCHLIESSLICH die Zahl UNSERER Einsätze
+// (`Caregiver.hp_total_jobs` — abgeschlossene Missionen über mamamia/HP).
+// Damit rechnet das Portal dasselbe wie das SA-Portal, das am 03.08. auf
+// dieselbe Basis umgestellt hat (mamamia-sadash `lib/caregiverBadge.js`,
+// Schwellen 12 / 6 / 2 / 1). Vorher addierte das Portal `care_experience`
+// (Jahre) dazu und rechnete gegen 18 / 10 / 4 / 1 — dieselbe Pflegekraft
+// bekam in den beiden Systemen unterschiedliche Stufen.
 //
-// EVERYTHING badge-related funnels through here so the three consumers can't
+// Warum Jahre raus sind: `care_experience` ist Selbstauskunft und sagt
+// nichts darüber, wie oft jemand bei UNS gearbeitet hat. Ein Einsatz
+// wog dadurch genauso viel wie ein behauptetes Berufsjahr.
+//
+// EVERYTHING badge-related funnels through here so the consumers can't
 // drift apart:
 //   1. nurseLevel()          (components/portal/shared.ts)      — UI badge
 //   2. rankComparator()      (lib/mamamia/matchingsRanking.ts)  — sort order
-//   3. MIN_BADGE_SCORE funnel (pages/CustomerPortalPage.tsx)    — "Silber+" cut
+//   3. MIN_BADGE_SCORE funnel (pages/CustomerPortalPage.tsx)    — "Bewährt+"
+//   4. EXPERIENCE_LEVELS     (components/portal/CustomerNurseModal.tsx)
+//                                                        — Erklär-Popup
+// Ausserhalb dieses Repos zieht `detect-caregiver-events/index.ts`
+// (`mapHpToBadge`) dieselben Schwellen — bei Änderungen mitziehen; die
+// Edge Function wird separat deployt.
 
-/** Tier index: 0 Starter · 1 Bronze · 2 Silber · 3 Gold · 4 Platin. */
+/** Tier index: 0 ohne Label · 1 Bekannt · 2 Bewährt · 3 Stammkraft · 4 Elite.
+ *  Die Wörter selbst leben in `nurseLevel` (components/portal/shared.ts). */
 export type BadgeTier = 0 | 1 | 2 | 3 | 4;
 
 /** Parse Mamamia's `care_experience` (a numeric string like "5") into a
- *  non-negative integer year count. Empty/non-string/unparseable → 0. */
+ *  non-negative integer year count. Empty/non-string/unparseable → 0.
+ *  Zählt seit 12.08. NICHT mehr in die Stufe — die Jahre werden weiterhin
+ *  auf der Karte als „N J. Erfahrung" angezeigt. */
 export function parseExperienceYears(careExperience: string | null | undefined): number {
   return typeof careExperience === 'string'
     ? Math.max(0, parseInt(careExperience, 10) || 0)
     : 0;
 }
 
-/** Combined experience score from already-numeric inputs (Nurse shape). */
-export function badgeScore(
-  experienceYears: number | null | undefined,
-  assignments: number | null | undefined,
-): number {
-  return (experienceYears || 0) + (assignments || 0);
+/** Score = Anzahl abgeschlossener Einsätze über uns (Nurse-Shape). */
+export function badgeScore(assignments: number | null | undefined): number {
+  return assignments || 0;
 }
 
-/** Combined experience score straight from a raw Mamamia caregiver
- *  (parses care_experience, adds hp_total_jobs). */
+/** Score straight from a raw Mamamia caregiver. */
 export function caregiverBadgeScore(
-  cg: { care_experience?: string | null; hp_total_jobs?: number | null },
+  cg: { hp_total_jobs?: number | null },
 ): number {
-  return parseExperienceYears(cg.care_experience) + (cg.hp_total_jobs ?? 0);
+  return cg.hp_total_jobs ?? 0;
 }
 
-/** Score → tier index. Single place that owns the thresholds. */
+/** Score → tier index. Single place that owns the thresholds.
+ *  Identisch zu mamamia-sadash `caregiverBadge.js`. */
 export function badgeTier(score: number): BadgeTier {
-  if (score >= 18) return 4; // Platin
-  if (score >= 10) return 3; // Gold
-  if (score >= 4) return 2;  // Silber
-  if (score >= 1) return 1;  // Bronze
-  return 0;                  // Starter
+  if (score >= 12) return 4; // Elite      (SA-Portal: Platin — gleiches Wort)
+  if (score >= 6) return 3;  // Stammkraft (SA-Portal: Gold — gleiches Wort)
+  if (score >= 2) return 2;  // Bewährt    (SA-Portal: Silber)
+  if (score >= 1) return 1;  // Bekannt    (SA-Portal: Bronze)
+  return 0;                  // kein Label (SA-Portal: Starter)
 }
 
-/** Minimum score the portal matching funnel prefers (Silber+, i.e. tier ≥ 2). */
-export const MIN_BADGE_SCORE = 4;
+/** Mindest-Score, den der Matching-Trichter bevorzugt (Tier ≥ 2 = „Bewährt"). */
+export const MIN_BADGE_SCORE = 2;

@@ -156,7 +156,7 @@ export const PflegekraftChat: FC<{
 
           {/* Verlauf — nur wenn schon Nachrichten existieren */}
           {messages.length > 0 && (
-            <div className="flex-1 min-h-0 overflow-y-auto px-4 py-4 space-y-3" style={{ background: '#FAFAF9' }}>
+            <div className="flex-1 min-h-0 overflow-y-auto px-4 py-4 space-y-3" style={{ background: '#F5F5F6' }}>
               {messages.map((m) => (
                 <div key={m.id} className={`flex ${m.from === 'customer' ? 'justify-end' : 'justify-start'}`}>
                   <div className={`max-w-[85%] rounded-2xl px-4 py-2.5 shadow-sm ${
@@ -180,7 +180,7 @@ export const PflegekraftChat: FC<{
 
           {/* Eingabe ODER Warte-Panel — nie beides gleichzeitig */}
           {awaitingReply ? (
-            <div className="flex-shrink-0 px-5 py-5 bg-[#F8F7F5] border-t border-gray-200">
+            <div className="flex-shrink-0 px-5 py-5 bg-[#F5F5F6] border-t border-gray-200">
               <div className="flex items-start gap-3">
                 <div className="w-9 h-9 rounded-full bg-[#EBE2D5] flex items-center justify-center flex-shrink-0">
                   <Clock className="w-4 h-4 text-[#8B7355]" />

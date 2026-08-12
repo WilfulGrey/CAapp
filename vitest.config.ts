@@ -13,6 +13,12 @@ export default defineConfig({
     env: {
       VITE_SUPABASE_URL: 'https://test.supabase.co',
       VITE_SUPABASE_ANON_KEY: 'test-anon-key',
+      // Muss hier stehen, sonst zieht ein lokal gesetztes
+      // VITE_KOSTENRECHNER_URL die Bridge-Aufrufe an `bridgeHandler` vorbei
+      // (leadEvents.ts fällt sonst auf genau diese Prod-URL zurück) und der
+      // Accept-Pfad-Test scheitert mit „bridgePayload is null" — ohne dass
+      // am Code irgendetwas kaputt wäre. Gefunden 11.08.
+      VITE_KOSTENRECHNER_URL: 'https://kostenrechner.primundus.de',
     },
     // Edge Functions run under Deno (deno test). Playwright E2E under playwright test.
     // Vitest owns src/** only. `**/node_modules/**` (not `node_modules/**`)

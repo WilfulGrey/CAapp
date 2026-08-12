@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useRef, FC } from 'react';
-import { Check, Bell, Phone, AlertCircle, AlertTriangle, ChevronDown, X, ArrowLeft } from 'lucide-react';
+import { Check, Bell, Phone, AlertCircle, AlertTriangle, ChevronDown, X, ArrowLeft, ArrowRight, Heart } from 'lucide-react';
 import { Nurse } from '../types';
 import { displayName } from '../components/portal/shared';
 import {
@@ -51,6 +51,8 @@ import { AngebotCard } from '../components/portal/AngebotCard';
 import { AppCard } from '../components/portal/AppCard';
 import { AppCardDone } from '../components/portal/AppCardDone';
 import { BeratungCTA } from '../components/portal/BeratungCTA';
+import { AngebotsFeedback } from '../components/portal/AngebotsFeedback';
+import type { FeedbackAnswer } from '../components/portal/AngebotsFeedback';
 import { MatchCard } from '../components/portal/MatchCard';
 import { MatchCardDone } from '../components/portal/MatchCardDone';
 import { InterestCard, type InterestActionStatus } from '../components/portal/InterestCard';
@@ -174,8 +176,34 @@ const PREVIEW_LEAD: Lead = {
   care_start_timing: 'sofort',
   kalkulation: {
     bruttopreis: 3050,
-    eigenanteil: 2150,
-    zuschüsse: { gesamt: 900 },
+    eigenanteil: 1621.75,
+    // Items 1:1 wie `berechneZuschüsse` (project 3/lib/calculation.ts) sie für
+    // diesen Lead liefert — am 12.08.2026 gegen die Live-`subsidies_config`
+    // geprüft. Genau DREI Posten stehen auf `in_kalkulation: true`:
+    //   pflegegeld · entlastungsbudget_neu · steuervorteil
+    // (verhinderungspflege, kurzzeitpflege, entlastungsbetrag,
+    // wohnraumanpassung, pflegehilfsmittel, hilfe_zur_pflege sind aktiv, aber
+    // NICHT in der Kalkulation.)
+    //
+    // Werte für diesen Lead (Pflegegrad 4, Brutto 3.050 €):
+    //   Pflegegeld PG4      800,00 €/Mon (fix aus subsidies_values)
+    //   Entlastungsbudget   294,92 €/Mon (3.539 €/Jahr ÷ 12)
+    //   Steuervorteil       333,33 €/Mon (min(3.050×12×20 %, 4.000) ÷ 12
+    //                                     — die 4.000-€-Deckelung greift)
+    //   Summe 1.428,25 → Eigenanteil 1.621,75 €
+    //
+    // Der Mock stand bis 12.08. auf zwei Posten (Pflegegeld 545 €,
+    // „Steuerersparnis" 355 €) — das Entlastungsbudget fehlte ganz und die
+    // Steuerzahl war frei erfunden. Beim Ändern hier: gegen
+    // `berechneZuschüsse` gegenrechnen, nicht schätzen.
+    zuschüsse: {
+      gesamt: 1428.25,
+      items: [
+        { name: 'pflegegeld', label: 'Pflegegeld', beschreibung: '', betrag_monatlich: 800, betrag_jaehrlich: 9600, typ: 'monatlich', hinweis: null, in_kalkulation: true },
+        { name: 'entlastungsbudget_neu', label: 'Entlastungsbudget (3.539 Euro/Jahr ab Pflegegrad 2)', beschreibung: '', betrag_monatlich: 294.92, betrag_jaehrlich: 3539, typ: 'jaehrlich', hinweis: 'Bis zu 3.539 €/Jahr (seit 1.7.2025)', in_kalkulation: true },
+        { name: 'steuervorteil', label: 'Steuerliche Absetzbarkeit', beschreibung: '', betrag_monatlich: 333.33, betrag_jaehrlich: 4000, typ: 'jaehrlich', hinweis: 'Max. 4.000 € pro Jahr (= ca. 333 €/Monat). 20% der Kosten, direkt von der Steuerschuld abziehbar.', in_kalkulation: true },
+      ],
+    },
     // Realistischer anspruchsvoller Lead, damit der Chat-Preview die volle
     // Bandbreite kontextueller Chip-Vorschläge zeigt: Ehepaar (couple-care),
     // PG4 (pflegegrad-hoch), Rollstuhl (mobility), Demenz, Nachteinsätze,
@@ -332,7 +360,7 @@ function nurseFromProcessedEvent(cgId: number, name: string, snapshot?: Caregive
       experience: snapshot.experience ?? '',
       experienceYears: snapshot.experienceYears ?? 0,
       language: { level: snapshot.languageLevel ?? '', bars: snapshot.languageBars ?? 0 },
-      color: snapshot.color ?? '#999999',
+      color: snapshot.color ?? '#71717A',
       image: snapshot.image,
       history: (snapshot.historyAssignments != null || snapshot.historyAvgDurationMonths != null)
         ? { assignments: snapshot.historyAssignments ?? 0, avgDurationMonths: snapshot.historyAvgDurationMonths ?? 0 }
@@ -479,7 +507,55 @@ const CustomerPortalPage: FC = () => {
   const [patientSaved, setPatientSaved] = useState(IS_PREVIEW_ANY && !IS_PREVIEW_PATIENT);
   const [showPatientReminder, setShowPatientReminder] = useState(false);
   const [triggerOpenPatient, setTriggerOpenPatient] = useState(IS_PREVIEW_PATIENT);
-  // Sektion „2 · Patientendaten" klappt wie „1 · Ihr Angebot" ueber die
+
+  // Ehrliche Aufwandsangabe für den Bogen: Beim Ehepaar verlangt er die
+  // doppelte Personenspalte (~40 statt ~29 Felder). „ca. 2 Min." ist dort ein
+  // Versprechen, das das Formular nicht hält — und ein gebrochenes Versprechen
+  // mitten drin erzeugt genau den Abbruch, den wir vermeiden wollen.
+  const formMinutes =
+    String(lead?.kalkulation?.formularDaten?.betreuung_fuer ?? '') === 'ehepaar' ? 4 : 2;
+
+  // Rückmeldung zum Angebot: einmal beantwortet oder weggeklickt, ist die
+  // Blase für diese Sitzung weg. Bewusst KEIN localStorage — beim nächsten
+  // Besuch kann sich die Lage geändert haben, und ein zweites „wie geht es
+  // weiter?" nach Tagen ist keine Belästigung, sondern die richtige Frage.
+  const [feedbackWeg, setFeedbackWeg] = useState(false);
+  // Sie erscheint NICHT sofort: Erst wenn der Kunde am Angebot und an den
+  // Pflegekräften vorbei ist. Eine Frage, die über dem Preis aufpoppt,
+  // unterbricht mitten im Lesen und bietet einen Ausstieg an, bevor er die
+  // Pflegekräfte überhaupt gesehen hat.
+  //
+  // Ausgelöst wird sie, sobald der Pflegesituation-Abschnitt ins Bild kommt —
+  // NICHT über eine Pixelschwelle am Scroll-Ereignis. Der Abschnitt IST die
+  // Grenze („alles gesehen, jetzt käme die Arbeit"), das ist also die
+  // ehrliche Bedingung statt einer geratenen Zahl. Und es funktioniert
+  // unabhängig davon, WIE der Kunde dorthin kam: wischen, Sprungmarke,
+  // wiederhergestellte Scroll-Position nach Reload. (Ein scroll-Listener
+  // verpasst genau die letzten beiden — beim Prüfen am 12.08. feuerte
+  // programmatisches Scrollen gar kein Ereignis.)
+  //
+  // In der Vorschau von Anfang an „reif": Dort soll die Blase sofort zu sehen
+  // sein, ohne erst hinscrollen zu müssen — und die Vorschau-Umgebung meldet
+  // ohnehin weder scroll- noch Intersection-Ereignisse (12.08. geprüft: auch
+  // ein manuell gesetzter Observer feuert dort nie).
+  const [feedbackReif, setFeedbackReif] = useState(IS_PREVIEW_ANY);
+  useEffect(() => {
+    if (feedbackReif) return;
+    const el = document.getElementById('patientendaten');
+    if (!el || typeof IntersectionObserver === 'undefined') return;
+    const io = new IntersectionObserver(
+      entries => { if (entries.some(e => e.isIntersecting)) setFeedbackReif(true); },
+      { rootMargin: '0px 0px -20% 0px' },
+    );
+    io.observe(el);
+    return () => io.disconnect();
+    // `patientSaved` in den Abhängigkeiten, weil der beobachtete Abschnitt
+    // erst existiert, wenn er gerendert ist. `hasPending` bewusst NICHT —
+    // es ist hier oben noch nicht deklariert, und wenn Bewerbungen offen
+    // sind, blendet die Render-Bedingung die Blase ohnehin aus.
+  }, [feedbackReif, patientSaved]);
+
+  // Sektion „Pflegesituation" klappt wie „Ihr persönliches Angebot" ueber die
   // Kopfzeile (Martin, 2026-07-12): offen solange nicht gespeichert,
   // danach eingeklappt mit Status-Pill; manueller Toggle gewinnt.
   const [patientExpandedManual, setPatientExpandedManual] = useState<boolean | null>(null);
@@ -488,6 +564,12 @@ const CustomerPortalPage: FC = () => {
   // the auto rule below (expanded only in initial state). Toggling sets
   // an explicit value that wins over the auto rule.
   const [offerExpandedManual, setOfferExpandedManual] = useState<boolean | null>(null);
+  // Zweiter, unabhängiger Zustand seit 11.08.: Der Kopf-Chevron klappt den
+  // ganzen Abschnitt zu (wichtig für spätere Zustände, in denen das Angebot
+  // nur noch Referenz ist), „Alle Kosten im Überblick" klappt die
+  // Kostenaufstellung IM Kasten auf. Beim Umbau war das kurzzeitig derselbe
+  // Schalter — dadurch fehlte das Einklappen des Abschnitts ganz.
+  const [costsExpanded, setCostsExpanded] = useState(false);
   // Erstbesuch pro Lead (localStorage): beim ERSTEN Reingehen ins Portal soll
   // "Ihr Angebot" aufgeklappt sein — danach folgt es der Fortschritts-Regel
   // (collapsed sobald Patientendaten erfasst sind). In Preview immer true,
@@ -739,6 +821,19 @@ const CustomerPortalPage: FC = () => {
     return typeof v === 'string' ? v : null;
   })();
 
+  // Zähler des Matching-Trichters für das ?debug=1-Overlay. Anlass: die
+  // Meldung „beim Ablehnen verschwinden mehrere Karten" (11.08.) liess sich
+  // in der Vorschau nicht nachstellen — dort geht immer genau eine. Der
+  // wahrscheinliche Grund steckt in den beiden Fallback-Filtern unten: sie
+  // hängen den GANZEN Rest-Eimer an, solange weniger als TARGET_VISIBLE
+  // Kräfte durchkommen, und lassen ihn komplett fallen, sobald die Schwelle
+  // erreicht ist. Ohne diese Zahlen ist im Nachhinein nicht zu sehen, ob
+  // eine Karte oder ein ganzer Eimer gewandert ist.
+  const funnel = {
+    merged: 0, langFiltered: 0, young: 0, ageRest: 0,
+    goodBadge: 0, badgeRest: 0, final: 0, ageFallback: false, badgeFallback: false,
+  };
+
   const effectiveMatched = (() => {
     if (IS_PREVIEW_ANY) {
       // Base matchings + post-invite-from-interest (so Maria erscheint nach
@@ -835,6 +930,18 @@ const CustomerPortalPage: FC = () => {
     const final = goodBadge.length >= TARGET_VISIBLE
       ? goodBadge
       : [...goodBadge, ...badgeRest];
+
+    funnel.merged = merged.length;
+    funnel.langFiltered = langFiltered.length;
+    funnel.young = young.length;
+    funnel.ageRest = ageRest.length;
+    funnel.goodBadge = goodBadge.length;
+    funnel.badgeRest = badgeRest.length;
+    funnel.final = final.length;
+    // true = der Rest-Eimer hängt gerade dran. Kippt dieser Wert zwischen
+    // zwei Renders, wandern mehrere Karten auf einmal.
+    funnel.ageFallback = young.length < TARGET_VISIBLE;
+    funnel.badgeFallback = goodBadge.length < TARGET_VISIBLE;
 
     return final.map(m => ({
       nurse: mapMatchingToNurse(m, { nowIso, nowYear }),
@@ -1162,7 +1269,7 @@ const CustomerPortalPage: FC = () => {
           availability: '',
           availableSoon: false,
           language: { level: s.languageLevel ?? '', bars: s.languageBars ?? 0 },
-          color: s.color ?? '#999999',
+          color: s.color ?? '#71717A',
           addedTime: '',
           isLive: false,
           gender: 'female',
@@ -1958,6 +2065,15 @@ const CustomerPortalPage: FC = () => {
       <div>mmApplications: loading={String(mmApplicationsLoading)} err={fmtErr(mmApplicationsError)} total={fmtVal(mmApplications?.total)} count={fmtVal(mmApplications?.data.length)}</div>
       <div>mmMatchings: loading={String(mmMatchingsLoading)} err={fmtErr(mmMatchingsError)} total={fmtVal(mmMatchings?.total)} count={fmtVal(mmMatchings?.data.length)}</div>
       <div>invitedCaregiverIds: loading={String(invitedLoading)} err={fmtErr(invitedError)} count={fmtVal(invitedCaregiverIds?.length)}</div>
+      <hr style={{borderColor:'#0f04',margin:'4px 0'}}/>
+      {/* Matching-Trichter — für die Diagnose „mehrere Karten verschwinden".
+          Beim Ablehnen VORHER und NACHHER ablesen: ändert sich nur `sichtbar`
+          um 1, ist alles normal. Kippt `ageFallback`/`badgeFallback`, wandert
+          ein ganzer Eimer (ageRest bzw. badgeRest) rein oder raus. */}
+      <div style={{color:'#ff0'}}>Matching-Trichter (TARGET_VISIBLE=5)</div>
+      <div>merged={funnel.merged} → sprachOk={funnel.langFiltered} → alter≤60={funnel.young} (+rest {funnel.ageRest}{funnel.ageFallback ? ' ANGEHÄNGT' : ' verworfen'})</div>
+      <div>badge≥Bewährt={funnel.goodBadge} (+rest {funnel.badgeRest}{funnel.badgeFallback ? ' ANGEHÄNGT' : ' verworfen'}) → final={funnel.final}</div>
+      <div>gehaltene Einladungen 24h={fmtVal(inviteRate?.used_24h)} → Slots={Math.max(0, 5 - (inviteRate?.used_24h ?? 0))} · abgelehnt lokal={statusOverrides.size}</div>
     </div>
   ) : null;
 
@@ -2063,11 +2179,11 @@ const CustomerPortalPage: FC = () => {
             <div className="w-11 h-11 rounded-xl flex-shrink-0 flex items-center justify-center text-white font-bold text-base"
                  style={{background:'linear-gradient(135deg,#8B7355,#A18973)'}}>A</div>
             <div className="flex-1 min-w-0">
-              <div className="h-2.5 rounded-full mb-2" style={{background:'#F0EBE3', width:'72%', animation:'shimmer 1.8s ease-in-out infinite'}} />
-              <div className="h-2 rounded-full mb-2.5" style={{background:'#F0EBE3', width:'52%'}} />
+              <div className="h-2.5 rounded-full mb-2" style={{background:'#F5F5F6', width:'72%', animation:'shimmer 1.8s ease-in-out infinite'}} />
+              <div className="h-2 rounded-full mb-2.5" style={{background:'#F5F5F6', width:'52%'}} />
               <div className="flex gap-1">
                 {[...Array(5)].map((_, i) => (
-                  <div key={i} className="w-4 h-1.5 rounded-full" style={{background: i < 4 ? '#C4B49A' : '#F0EBE3'}} />
+                  <div key={i} className="w-4 h-1.5 rounded-full" style={{background: i < 4 ? '#C4B49A' : '#F5F5F6'}} />
                 ))}
               </div>
             </div>
@@ -2127,7 +2243,7 @@ const CustomerPortalPage: FC = () => {
       )}
 
       {/* Navbar */}
-      <nav className="sticky top-0 z-40" style={{background:'white', boxShadow:'0 1px 0 #E5E3DF, 0 2px 8px rgba(0,0,0,0.06)'}}>
+      <nav className="sticky top-0 z-40" style={{background:'white', boxShadow:'0 1px 0 #E9E9EB, 0 2px 8px rgba(0,0,0,0.06)'}}>
         <div className="max-w-3xl mx-auto px-4 py-3 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <img src="/LOGO-PRIMUNDUS.webp" alt="Primundus" className="h-6" />
@@ -2135,7 +2251,7 @@ const CustomerPortalPage: FC = () => {
           <div className="flex items-center gap-2">
             <button
               onClick={() => setShowContactPopup(true)}
-              className="flex items-center gap-1.5 bg-white hover:bg-[#F8F7F5] text-[#8B7355] border border-[#E5E3DF] rounded-full px-3 py-1.5 text-xs font-semibold transition-colors"
+              className="flex items-center gap-1.5 bg-white hover:bg-[#F5F5F6] text-[#8B7355] border border-[#E9E9EB] rounded-full px-3 py-1.5 text-xs font-semibold transition-colors"
             >
               <Phone className="w-3.5 h-3.5" />
               Hilfe
@@ -2270,6 +2386,7 @@ const CustomerPortalPage: FC = () => {
         //   initial  — fresh portal, profile not filled
         //              → explain what the portal does next
         const n = pendingApps.length;
+
         const heroCopy = hasPending
           ? {
               title: n > 1
@@ -2281,11 +2398,16 @@ const CustomerPortalPage: FC = () => {
               pill: n > 1 ? `${n} Bewerbungen aktiv` : '1 Bewerbung aktiv',
               steps: null as 'initial' | 'saved' | null,
             }
-          : patientSaved && (!mmReady || mmApplicationsLoading || !mmApplications)
+          : patientSaved && !IS_PREVIEW_ANY && (!mmReady || mmApplicationsLoading || !mmApplications)
           ? {
               // Mamamia-Daten laden noch (oder der Abruf hakt) — hier NICHT
               // "werden vorbereitet" behaupten: Wer aus der Bewerbungs-Mail
               // kommt, hat nachweislich eine Bewerbung (Martin, 2026-07-09).
+              //
+              // In der Vorschau ist dieser Zweig ausgeschlossen: ohne echtes
+              // mamamia wird `mmReady` nie true, dadurch hing JEDER gespeicherte
+              // Zustand lokal auf "Einen Moment" fest — auch ?preview=wartet,
+              // das genau den Zweig darunter zeigen soll (Übergabe 11.08.).
               title: 'Einen Moment — Ihre Bewerbungen werden geladen.',
               subtitle: 'Wir holen gerade den aktuellen Stand Ihrer Anfrage. Das dauert nur wenige Sekunden.',
               pill: 'Portal wird geladen',
@@ -2293,140 +2415,201 @@ const CustomerPortalPage: FC = () => {
             }
           : patientSaved
           ? {
-              title: 'Profil vollständig. Bewerbungen werden für Sie vorbereitet. ✨',
-              subtitle: 'Sobald sich Pflegekräfte bewerben, erscheinen die Angebote hier. Laden Sie in der Zwischenzeit weitere Pflegekräfte ein, sich bei Ihnen zu bewerben.',
+              // Gleiche Überschrift wie im Ausgangszustand: Der Header ist die
+              // Überschrift des Angebots, keine Statusmeldung (Martin, 11.08.).
+              // "Profil vollständig. ✨" war genau die Statuszeile, die im
+              // Ausgangszustand bewusst gestrichen wurde — dass gespeichert ist,
+              // sagen der Toast beim Speichern und das ✓ am Abschnitt.
+              title: 'Ihr persönliches Angebot',
+              // Beschreibt den Stand NACH dem Speichern — der Satz aus dem
+              // Ausgangszustand ("Sobald Sie die Pflegesituation beschrieben
+              // haben …") verlangte hier einen bereits erledigten Schritt.
+              subtitle:
+                'Ihre Angaben liegen uns vor. Passende Pflegekräfte können sich jetzt ganz unverbindlich bei Ihnen bewerben — Sie können unten auch selbst welche einladen.',
               pill: '100 % kostenfrei & unverbindlich',
               steps: 'saved' as 'initial' | 'saved' | null,
             }
           : {
-              title: 'Ihr Angebot ist fertig. 🎉',
-              subtitle: 'Ihr persönliches Angebot ist da. Beschreiben Sie uns kurz die Pflegesituation — dann sehen Sie sofort, welche Pflegekräfte passen und verfügbar sind. Ganz unverbindlich.',
-              pill: 'Angebot kostenlos & unverbindlich',
+              // Der Header IST die Überschrift des Angebots (Martin, 11.08.) —
+              // keine Statusmeldung („fertig"), sondern die Sache selbst. Der
+              // Abschnitt darunter heißt deshalb „Ihre Betreuungskosten" und
+              // wiederholt den Titel nicht.
+              title: 'Ihr persönliches Angebot',
+              // Wird im Ausgangszustand NICHT im Hero gerendert: Die Begründung
+              // steht dort, wo gehandelt wird — als Einleitung über dem
+              // Formular (Martin, 11.08.: erst Angebot und Pflegekräfte
+              // zeigen, dann um die Pflegesituation bitten).
+              subtitle:
+                // "beschrieben" — dasselbe Verb wie über dem Formular, im
+                // Text über den Pflegekräften und in der Schritt-Liste
+                // ("Pflegesituation beschreiben"). "vervollständigt" klang
+                // nach einem zweiten, anderen Schritt (Übergabe 11.08.).
+                'Hier finden Sie Ihre Betreuungskosten inklusive aller Gebühren und passende Pflegekräfte, die verfügbar sind. Sobald Sie die Pflegesituation beschrieben haben, können sich diese ganz unverbindlich bei Ihnen bewerben.',
+              // Kein Pill hier: Der Einleitungssatz darüber sagt bereits, was
+              // den Kunden erwartet. In den anderen Zuständen trägt die Zeile
+              // echten Status („1 Bewerbung aktiv") — dort bleibt sie.
+              pill: '',
               steps: 'initial' as 'initial' | 'saved' | null,
             };
 
-        // Nummerierte Schritt-Checkliste (Martin, 2026-07-12): der Kunde soll
-        // SEHEN, dass genau ein Schritt fehlt. Erledigte Schritte bleiben als
-        // Haken stehen (1-2-3 bleibt vollstaendig); mit der ersten Bewerbung
-        // verschwindet das Geruest komplett (hasPending-Zweig ohne steps).
-        const heroStep = (opts: { n: number; label: string; state: 'done' | 'active' | 'locked'; target?: string; hint?: string }) => {
-          const inner = (
-            <>
-              {opts.state === 'done' ? (
-                <span className="w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0" style={{background:'rgba(255,255,255,0.25)'}}>
-                  <Check className="w-3.5 h-3.5" strokeWidth={3} style={{color:'#fff'}} />
-                </span>
-              ) : (
-                <span className="w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0 text-[13px] font-bold"
-                  style={opts.state === 'active' ? {background:'#fff', color:'#8B7355'} : {background:'rgba(255,255,255,0.15)', color:'rgba(255,255,255,0.7)'}}>
-                  {opts.n}
-                </span>
-              )}
-              <span className={`text-[14px] ${opts.state === 'active' ? 'font-bold' : 'font-medium'}`}
-                style={{color: opts.state === 'locked' ? 'rgba(255,255,255,0.65)' : 'rgba(255,255,255,0.95)'}}>
-                {opts.label}
-                {opts.state === 'locked' && <span className="font-normal" style={{color:'rgba(255,255,255,0.55)'}}> · 🔒 {opts.hint}</span>}
-                {opts.state === 'active' && '\u00A0↓'}
-              </span>
-            </>
-          );
-          return opts.target ? (
-            <button key={opts.n} type="button" className="w-full flex items-center gap-2.5 text-left"
-              onClick={() => document.getElementById(opts.target!)?.scrollIntoView({ behavior: 'smooth', block: 'start' })}>
-              {inner}
-            </button>
-          ) : (
-            <div key={opts.n} className="flex items-center gap-2.5">{inner}</div>
-          );
-        };
+        // Die nummerierte Schritt-Checkliste (Martin, 2026-07-12: „der Kunde
+        // soll SEHEN, dass genau ein Schritt fehlt") ist am 11.08. entfallen.
+        // Sie war inhaltlich richtig, kostete aber den halben ersten Bildschirm
+        // und erzählte genau die Struktur, die die Abschnitte darunter ohnehin
+        // tragen. Der Kunde kommt aus dem Kostenrechner von „✓ Ihr Angebot ist
+        // fertig" + Button „Angebot & Pflegekräfte anzeigen →" — und muss genau
+        // das sehen, nicht eine Aufgabenliste davor. Die Führung liegt jetzt in
+        // der Reihenfolge der Abschnitte selbst:
+        //   Angebot → Passende Pflegekräfte → Pflegesituation → Vorteile/FAQ
 
         return (
-          <div className="relative overflow-hidden" style={{background:'linear-gradient(135deg, #6B5444 0%, #8B7355 55%, #A18973 100%)'}}>
-            <div className="absolute -top-12 -right-12 w-52 h-52 rounded-full" style={{background:'rgba(255,255,255,0.06)'}} />
-            <div className="absolute -bottom-10 -left-10 w-40 h-40 rounded-full" style={{background:'rgba(255,255,255,0.06)'}} />
+          <div className="relative" style={{background:'#FFFFFF', borderBottom:'1px solid #E9E9EB'}}>
             <div className="relative max-w-3xl mx-auto px-5 pt-8 pb-3">
-              <p className="text-[15px] font-medium mb-3" style={{color:'rgba(255,255,255,0.8)'}}>
+              <p className="text-[15px] font-medium mb-3" style={{color:'#71717A'}}>
                 Guten Tag{heroNameLine ? `, ${heroNameLine}` : ''}.
               </p>
-              <h1 className="text-[1.65rem] font-bold text-white leading-tight mb-2">
+              <h1 className="text-[1.75rem] font-bold leading-tight tracking-tight mb-2" style={{color:'#18181B'}}>
                 {heroCopy.title}
               </h1>
-              {heroCopy.steps ? (
-                <div className="mb-5 space-y-2.5">
-                  {heroStep({ n: 1, label: 'Ihr Angebot ist erstellt', state: 'done' })}
-                  {heroCopy.steps === 'initial'
-                    ? heroStep({ n: 2, label: 'Pflegesituation beschreiben (ca. 2 Min.)', state: 'active', target: 'patientendaten' })
-                    : heroStep({ n: 2, label: 'Pflegesituation beschrieben', state: 'done' })}
-                  {heroCopy.steps === 'initial'
-                    ? heroStep({ n: 3, label: 'Pflegekräfte einladen & Bewerbungen erhalten', state: 'locked', hint: 'nach Schritt 2' })
-                    : heroStep({ n: 3, label: 'Pflegekräfte einladen & Bewerbungen erhalten', state: 'active', target: 'pflegekraefte' })}
-                </div>
-              ) : (
-                <p className="text-[14px] leading-relaxed mb-5" style={{color:'rgba(255,255,255,0.8)'}}>
-                  {heroCopy.subtitle}
-                </p>
-              )}
-              <div className="inline-flex items-center gap-2 rounded-full px-4 py-2" style={{background:'rgba(255,255,255,0.15)', border:'1px solid rgba(255,255,255,0.3)'}}>
-                <Check className="w-3.5 h-3.5 flex-shrink-0" strokeWidth={3} style={{color:'rgba(255,255,255,0.9)'}} />
-                <span className="text-[14px] font-medium" style={{color:'rgba(255,255,255,0.95)'}}>{heroCopy.pill}</span>
+              {/* Im Ausgangszustand steht hier NICHTS mehr außer der
+                  Bestätigung — kein Erklärabsatz, keine Checkliste, kein
+                  Button. Alle drei waren Kopien dessen, was die Abschnitte
+                  darunter ohnehin tragen (Abschnitt „Pflegesituation" hat
+                  einen eigenen Karten-Kopf mit genau diesem Aufruf). */}
+              <p className="text-[16px] leading-relaxed mb-5" style={{color:'#71717A'}}>
+                {heroCopy.subtitle}
+              </p>
+
+              {/* Trust-Zeile: ohne Fläche und Rahmen im schlanken Hero — als
+                  Pill wirkte sie wie der Primärbutton und war ein
+                  Fehlklick-Magnet, der nichts tut. */}
+              {heroCopy.pill && (
+              <div
+                className={`inline-flex items-center gap-2 ${heroCopy.steps ? '' : 'rounded-full px-4 py-2'}`}
+                style={heroCopy.steps ? undefined : {background:'#F5F5F6', border:'1px solid #E9E9EB'}}
+              >
+                <Check className="w-4 h-4 flex-shrink-0" strokeWidth={3} style={{color:'#8B7355'}} />
+                <span className="text-[15px]" style={{color:'#18181B'}}>{heroCopy.pill}</span>
               </div>
+              )}
             </div>
-            <svg viewBox="0 0 390 28" className="w-full block" style={{marginBottom:'-1px'}} preserveAspectRatio="none">
-              <path d="M0,14 C100,28 290,0 390,14 L390,28 L0,28 Z" fill="#F8F7F5"/>
-            </svg>
+            {/* Die geschwungene Welle als Übergang zum Body ist am 11.08.
+                entfallen (Martin: „diese Trennung zwischen Header und Rest ist
+                krass unpassend"). Sie war das einzige verspielte Element in
+                einem sonst sachlichen Layout und ließ den Hero wie einen
+                aufgeklebten Banner wirken. Jetzt: gerade Kante, der Header
+                sitzt als Block auf der Seite. */}
           </div>
         );
       })()}
 
       {/* ── SECTION: Ihr Angebot (collapsible) ── */}
       {(() => {
-        // Beim Erstbesuch immer aufgeklappt (offerFirstVisit). Sonst: nur im
-        // initialen Zustand — sobald Patientendaten erfasst sind, ist das
-        // Angebot Referenzmaterial und wird eingeklappt. Bei offener Bewerbung
-        // (hasPending) hat die Bewerbung Priorität → immer eingeklappt.
-        // Manueller Toggle (offerExpandedManual) überschreibt die Auto-Regel.
-        const autoExpanded = !hasPending && (offerFirstVisit || !patientSaved);
-        const offerExpanded = offerExpandedManual ?? autoExpanded;
+        // Seit 11.08. steuert dieser Toggle NUR noch die Konditionen und den
+        // Mustervertrag — der Preis steht immer. Default zu: Der Kunde soll
+        // nach dem Preis direkt bei den Pflegekräften landen, nicht erst an
+        // vier Vertrauens-Zeilen vorbei. Wer sie sucht, findet sie über den
+        // Chevron („Details").
+        // Abschnitt offen beim Erstbesuch und solange die Patientendaten
+        // fehlen; sobald eine Bewerbung da ist, hat die Vorrang. Manueller
+        // Toggle gewinnt. (Wieder die Regel von vor dem 11.08.-Umbau —
+        // Martin: „muss einklappbar sein für spätere Zustände".)
+        const offerExpanded =
+          offerExpandedManual ?? (!hasPending && (offerFirstVisit || !patientSaved));
         const brutto = lead?.kalkulation?.bruttopreis ?? 3050;
         const tagessatz = Math.round(brutto / 30);
+        // Gekürzt (Martin, 11.08.: „die Punkte schöner darstellen"). Zwei der
+        // vier Texte brachen auf 375 px um — eine Liste, in der die Hälfte der
+        // Zeilen zweizeilig ist, wirkt unruhig, egal wie sie gestylt ist.
+        // Inhalt unverändert, nur knapper gesagt; die Langfassung steht im
+        // Snapshot, falls eine Formulierung so nicht stimmt.
         const items = [
           { text: 'Täglich kündbar' },
           { text: 'Tagesgenaue Abrechnung' },
-          { text: 'Kosten entstehen immer erst, wenn Pflegekraft vor Ort ist' },
-          { text: 'Direktanbieter ohne Vermittlungsgebühren' },
+          // „Zahlung erst ab Anreise" → „Kein Vertrag vor Auswahl nötig"
+          // (Martin, 12.08.): Im Ausgangszustand steht der Kunde vor der
+          // Frage, ob er sich mit dem Weiterklicken schon bindet — nicht vor
+          // einer Zahlungsfrage.
+          { text: 'Kein Vertrag vor Auswahl nötig' },
+          { text: 'Keine Vermittlungsgebühren' },
         ];
         return (
-        <div style={{background:'#F8F7F5'}}>
+        <div style={{background:'#FFFFFF', borderBottom:'1px solid #E9E9EB'}}>
         <div className="max-w-3xl mx-auto">
+          {/* „Ihr persönliches Angebot" steht im Header unter dem Namen
+              (Martin, 11.08.) — der Abschnitt heißt deshalb nach seinem
+              Inhalt und wiederholt den Titel nicht. Der Chevron klappt den
+              ganzen Abschnitt zu, sobald er nur noch Referenz ist. */}
           <button
             onClick={() => setOfferExpandedManual(!offerExpanded)}
-            className="w-full px-5 pt-6 pb-4 flex items-center justify-between text-left transition-colors hover:bg-black/[0.02]"
+            className={`w-full px-5 pt-6 flex items-center justify-between gap-3 text-left ${offerExpanded ? 'pb-3' : 'pb-6'}`}
           >
             <div>
-              <h2 className="text-[1.1rem] font-bold" style={{color:'#3D3D3D'}}>{hasPending ? 'Ihr Angebot' : '1 · Ihr Angebot'}</h2>
-              <div className="mt-1.5 h-[2px] w-10 rounded-full" style={{background:'#8B7355'}} />
+              <h2 className="text-[1.2rem] font-bold tracking-tight" style={{color:'#18181B'}}>{hasPending ? 'Ihr Angebot' : 'Ihre Betreuungskosten'}</h2>
             </div>
-            <div className="flex items-center gap-2 flex-shrink-0">
-              <span className="text-[12px] font-semibold px-3 py-1 rounded-full" style={{background:'#E3F7EF', color:'#2a9a6f'}}>
-                100 % risikofrei
-              </span>
-              <ChevronDown className={`w-5 h-5 text-[#8B7355] transition-transform duration-200 ${offerExpanded ? 'rotate-180' : ''}`} />
-            </div>
+            <ChevronDown className={`w-5 h-5 flex-shrink-0 transition-transform duration-200 ${offerExpanded ? 'rotate-180' : ''}`} style={{color:'#71717A'}} />
           </button>
 
+          {/* Die Kosten stehen IMMER (Martin, 11.08.). Der Kunde kam für den
+              Preis; ihn hinter einen Toggle zu legen wäre die teuerste
+              Ersparnis an Bildschirmhöhe.
+
+              Der MONATSBETRAG führt, nicht der Tagessatz: Angehörige rechnen
+              in Monaten, und der Tagessatz allein (Brutto/30) lässt die
+              Zuschüsse unsichtbar — der Kunde überschätzt seine Belastung um
+              genau deren Summe. `eigenanteil` und `zuschüsse` liegen im Lead
+              und wurden bis 11.08. nirgends angezeigt; im Kostenrechner sieht
+              er sie auch nicht (der Ergebnis-Block dort ist seit dem
+              Direct-Redirect toter Code, setShowResults(true) existiert
+              nicht). Das Portal ist die EINZIGE Stelle. */}
           {offerExpanded && (
-            <div className="px-4 pb-4">
-                <div className="rounded-2xl border px-5 pt-5 pb-4" style={{background:'white', borderColor:'#E5E3DF'}}>
-                  <p className="text-[12px] font-semibold uppercase tracking-widest mb-2" style={{color:'#8B7355'}}>Betreuungskosten</p>
-                  <div className="flex items-center gap-4">
-                    <div className="flex items-baseline gap-1 flex-shrink-0" style={{minWidth:'55%'}}>
-                      <span className="text-[2.2rem] font-bold leading-none" style={{color:'#3D3D3D'}}>{formatEuro(tagessatz)}</span>
-                      <span className="text-[15px]" style={{color:'#8B8B8B'}}>/&nbsp;Tag</span>
-                    </div>
-                    <p className="text-[13px] leading-snug flex-1" style={{color:'#ABABAB'}}>inkl. Steuern, Gebühren &amp; Sozialabgaben</p>
+          <div className="px-4 pb-4">
+                {/* NUR unser Angebot (Martin, 11.08.). Pflegegeld,
+                    Steuerersparnis und der daraus gebildete Eigenanteil sind
+                    bewusst NICHT hier: Das sind fremde Leistungen mit eigenen
+                    Voraussetzungen — wir nennen unseren Preis, nicht eine
+                    Rechnung über das Geld anderer. `eigenanteil` und
+                    `zuschüsse` bleiben unangetastet im Lead. */}
+                <div className="rounded-2xl border px-5 py-5" style={{background:'#F4F4F6', borderColor:'#D4D4D8'}}>
+                  <p className="text-[2.5rem] font-bold leading-none tracking-tight tabular-nums" style={{color:'#18181B'}}>{formatEuro(brutto)}</p>
+                  <p className="text-[15px] mt-2.5 leading-relaxed" style={{color:'#71717A'}}>
+                    Monatlich inkl. Steuern, Gebühren und Sozialabgaben.
+                  </p>
+
+                  {/* Konditionen stehen OFFEN unter dem Preis (Martin, 11.08.):
+                      Sie sind das Verkaufsargument — hinter einem Toggle
+                      erreichen sie niemanden. Die Zahlen (Reisekosten, Kost &
+                      Logis, Sommerzuschlag) sind umgekehrt Nachschlagewerk und
+                      liegen im Aufklapper.
+
+                      Einspaltig, nicht im 2er-Raster: Auf 375 px bleiben pro
+                      Spalte ~18 Zeichen, „Tagesgenaue Abrechnung" und „Ohne
+                      Vermittlungsgebühr" brachen dort erneut um — vier
+                      umbrechende Halbzeilen sind unruhiger als vier ganze.
+                      Mit den gekürzten Texten passt jetzt jede Zeile. */}
+                  <div className="mt-5 pt-5 space-y-3" style={{borderTop:'1px solid #E9E9EB'}}>
+                    {items.map((item, i) => (
+                      <div key={i} className="flex items-center gap-2.5">
+                        <Check className="w-4 h-4 flex-shrink-0" strokeWidth={3} style={{color:'#8B7355'}} />
+                        <span className="text-[15px]" style={{color:'#18181B'}}>{item.text}</span>
+                      </div>
+                    ))}
                   </div>
-                  <p className="text-[13px] mt-3 leading-snug" style={{color:'#3D3D3D'}}>zzgl. 125 € Reisekosten pro Strecke, Kost &amp; Logis und Sommerzuschlag 6,67 €/Tag (Juli + Aug.)</p>
+
+                  {/* Der Toggle sitzt IM Kasten (Martin, 11.08.) — er gehört
+                      zum Angebot, nicht daneben. */}
+                  <button
+                    type="button"
+                    onClick={() => setCostsExpanded(!costsExpanded)}
+                    className="mt-5 -mb-1 w-full flex items-center justify-center gap-1.5 pt-4 pb-1 text-[15px] font-semibold"
+                    style={{color:'#8B7355', borderTop:'1px solid #E9E9EB'}}
+                  >
+                    {costsExpanded ? 'Weniger anzeigen' : 'Alle Kosten im Überblick'}
+                    <ChevronDown className={`w-4 h-4 transition-transform duration-200 ${costsExpanded ? 'rotate-180' : ''}`} />
+                  </button>
                 </div>
+
+                {costsExpanded && (<>
 
                 {/* Kalkulation über 7 Wochen — DEAKTIVIERT 14.06.2026.
                     Begründung: zusammen mit dem aufgeklappten "Ihr Angebot"-
@@ -2457,42 +2640,149 @@ const CustomerPortalPage: FC = () => {
                   const rows = buildMonthlyBreakdown(startStr, endStr, tagessatz, 125, 125, tagessatz);
                   if (rows.length === 0) return null;
                   return (
-                    <div className="rounded-2xl border mt-3 px-5 py-4" style={{background:'white', borderColor:'#E5E3DF'}}>
+                    <div className="rounded-2xl border mt-3 px-5 py-4" style={{background:'#F4F4F6', borderColor:'#D4D4D8'}}>
                       <p className="text-[12px] font-semibold uppercase tracking-widest mb-1" style={{color:'#8B7355'}}>Kalkulation</p>
-                      <p className="text-[12px] mb-3" style={{color:'#8B8B8B'}}>
+                      <p className="text-[12px] mb-3" style={{color:'#71717A'}}>
                         Annahme: 7 Wochen ab {startStr} (bis {endStr}):
                       </p>
                       <div className="space-y-2">
                         {rows.map((r, i) => (
-                          <div key={i} className="flex items-start justify-between gap-3 text-[14px]" style={{color:'#3D3D3D'}}>
+                          <div key={i} className="flex items-start justify-between gap-3 text-[14px]" style={{color:'#18181B'}}>
                             <div className="min-w-0 flex-1">
                               <p className="font-semibold leading-tight">{r.monat}</p>
-                              <p className="text-[12px] leading-snug mt-0.5" style={{color:'#8B8B8B'}}>{r.details.join(' · ')}</p>
+                              <p className="text-[12px] leading-snug mt-0.5" style={{color:'#71717A'}}>{r.details.join(' · ')}</p>
                             </div>
                             <p className="font-semibold whitespace-nowrap flex-shrink-0">{formatEuro(r.betrag)}</p>
                           </div>
                         ))}
                       </div>
-                      <p className="text-[11px] mt-3 leading-snug" style={{color:'#ABABAB'}}>
+                      <p className="text-[11px] mt-3 leading-snug" style={{color:'#71717A'}}>
                         Die tatsächlichen Kosten richten sich nach dem konkreten Einsatzzeitraum der gewählten Pflegekraft.
                       </p>
                     </div>
                   );
                 })()}
 
-                <div className="rounded-2xl overflow-hidden border mt-3" style={{background:'white', borderColor:'#E5E3DF'}}>
-                  <div className="px-5 pt-4 pb-1">
-                    <p className="text-[12px] font-semibold uppercase tracking-widest" style={{color:'#8B7355'}}>Unsere fairen Konditionen</p>
-                  </div>
-                  {items.map((item, i, arr) => (
-                    <div key={i} className={`flex items-start gap-3 px-5 py-3.5 ${i < arr.length - 1 ? 'border-b' : ''}`} style={{borderColor:'#E5E3DF'}}>
-                      <div className="w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5" style={{background:'#E3F7EF'}}>
-                        <Check className="w-3 h-3" strokeWidth={3} style={{color:'#2a9a6f'}} />
-                      </div>
-                      <span className="text-[15px] leading-snug" style={{color:'#3D3D3D'}}>{item.text}</span>
+                {/* „Alle Kosten im Überblick" — die Aufstellung, die vorher als
+                    Fließtext-Zeile unter dem Preis stand. Keine zweite
+                    Überschrift im Kasten: der Toggle darüber benennt ihn schon
+                    (Martin, 11.08.: „nicht doppeln"). */}
+                <div className="rounded-2xl border mt-3 px-5 py-4 space-y-3" style={{background:'#F4F4F6', borderColor:'#D4D4D8'}}>
+                  {[
+                    { label: 'Betreuung', value: `${formatEuro(brutto)} / Monat`, note: '' },
+                    { label: 'Entspricht', value: `${formatEuro(tagessatz)} / Tag`, note: 'tagesgenau abgerechnet' },
+                    { label: 'Reisekosten', value: '125 € pro Strecke', note: '' },
+                    { label: 'Kost & Logis', value: 'stellt der Haushalt', note: '' },
+                    { label: 'Sommerzuschlag', value: '6,67 € / Tag', note: 'Juli + August' },
+                  ].map((row, i) => (
+                    <div key={i} className="flex items-baseline justify-between gap-4">
+                      <span className="text-[15px] flex-shrink-0" style={{color:'#71717A'}}>{row.label}</span>
+                      <span className="text-right">
+                        <span className="block text-[15px] tabular-nums" style={{color:'#18181B'}}>{row.value}</span>
+                        {row.note && <span className="block text-[13px] mt-0.5" style={{color:'#71717A'}}>{row.note}</span>}
+                      </span>
                     </div>
                   ))}
                 </div>
+
+                {/* ── Was bleibt für Sie übrig ──────────────────────────────
+                    Martin, 12.08.: Eigenanteil doch zeigen — aber HIER, nicht
+                    am Hauptpreis. Die Regel vom 11.08. („wir nennen unseren
+                    Preis, nicht eine Rechnung über das Geld anderer") gilt für
+                    den Betrag oben; der Aufklapper ist ausdrücklich
+                    Nachschlagewerk, dort gehört die Rechnung hin.
+
+                    Der Eigenanteil wird AUS DEM ANGEZEIGTEN BRUTTO gerechnet,
+                    nicht aus `kalkulation.eigenanteil` gelesen: Der gespeicherte
+                    Wert stammt vom Kostenrechner-Zeitpunkt und driftet, sobald
+                    das Angebot nachträglich angepasst wird — dann stünden oben
+                    3.050 € und hier ein Eigenanteil zu einem anderen Brutto.
+                    Summiert werden nur Posten mit `in_kalkulation`, genau wie
+                    `zuschüsse.gesamt` es serverseitig tut. */}
+                {(() => {
+                  const posten = (lead?.kalkulation?.['zuschüsse']?.items ?? [])
+                    .filter(z => z.in_kalkulation && z.betrag_monatlich > 0);
+                  if (posten.length === 0) return null;
+                  const summe = posten.reduce((a, z) => a + z.betrag_monatlich, 0);
+                  const eigen = Math.max(0, brutto - summe);
+                  // vdek-Auswertung zum 01.07.2026: bundesweiter Durchschnitt
+                  // des Eigenanteils im ERSTEN Heimjahr. Bewusst das erste Jahr
+                  // — später sinkt es durch den Leistungszuschlag, und wer jetzt
+                  // entscheidet, vergleicht mit dem, was er zuerst zahlt.
+                  // Stand + Quelle stehen mit in der Zeile: Ohne sie wäre es
+                  // eine Behauptung. Beim nächsten vdek-Update (jeweils 01.01.
+                  // und 01.07.) nachziehen.
+                  const HEIM_EIGENANTEIL = 3364;
+                  const guenstiger = HEIM_EIGENANTEIL - eigen;
+                  return (
+                    <div className="rounded-2xl border mt-3 px-5 py-4" style={{background:'#F4F4F6', borderColor:'#D4D4D8'}}>
+                      <p className="text-[12px] font-semibold uppercase tracking-widest mb-3" style={{color:'#8B7355'}}>
+                        Was bleibt für Sie übrig
+                      </p>
+                      <div className="space-y-3">
+                        <div className="flex items-baseline justify-between gap-4">
+                          <span className="text-[15px] flex-shrink-0" style={{color:'#71717A'}}>Betreuung</span>
+                          <span className="text-[15px] tabular-nums" style={{color:'#18181B'}}>{formatEuro(brutto)}</span>
+                        </div>
+                        {posten.map((z, i) => (
+                          <div key={i} className="flex items-baseline justify-between gap-4">
+                            <span className="text-[15px] min-w-0" style={{color:'#71717A'}}>
+                              {/* `label` kommt aus subsidies_config und ist für
+                                  die Admin-Oberfläche geschrieben — das
+                                  Entlastungsbudget heisst dort „Entlastungs-
+                                  budget (3.539 Euro/Jahr ab Pflegegrad 2)".
+                                  Neben „− 295 €" gelesen widerspricht sich das.
+                                  Die Klammer fliegt raus; die Jahreszahl steht
+                                  ohnehin im `hinweis` darunter. */}
+                              {z.label.replace(/\s*\([^)]*\)\s*$/, '')}
+                              {/* Der Vorbehalt steht AM Posten, nicht im FAQ. */}
+                              {(z.hinweis || z.name === 'steuervorteil') && (
+                                <span className="block text-[13px] mt-0.5 leading-snug">
+                                  {/* Fallback nur, falls jemand den hinweis in
+                                      subsidies_config leert. NICHT „hängt vom
+                                      Steuersatz ab": §35a ist ein direkter
+                                      Abzug von der Steuerschuld, nicht vom zu
+                                      versteuernden Einkommen — die Voraussetzung
+                                      ist, dass überhaupt so viel Steuer anfällt. */}
+                                  {z.hinweis ?? 'Setzt voraus, dass entsprechend Steuern anfallen.'}
+                                </span>
+                              )}
+                            </span>
+                            <span className="text-[15px] tabular-nums whitespace-nowrap flex-shrink-0" style={{color:'#18181B'}}>
+                              − {formatEuro(z.betrag_monatlich)}
+                            </span>
+                          </div>
+                        ))}
+                        <div className="flex items-baseline justify-between gap-4 pt-3" style={{borderTop:'1px solid #E9E9EB'}}>
+                          <span className="text-[15px] font-semibold flex-shrink-0" style={{color:'#18181B'}}>Ihr Eigenanteil</span>
+                          <span className="text-[17px] font-bold tabular-nums" style={{color:'#18181B'}}>{formatEuro(eigen)}</span>
+                        </div>
+                      </div>
+
+                      {/* Heim-Vergleich: die einzige Zeile, die „ist das viel?"
+                          beantwortet. Nur zeigen, wenn wir wirklich günstiger
+                          sind — sonst wäre es ein Argument gegen uns. */}
+                      {guenstiger > 0 && (
+                        <p className="text-[14px] leading-relaxed mt-4 pt-4" style={{color:'#71717A', borderTop:'1px solid #E9E9EB'}}>
+                          Im Pflegeheim liegt der Eigenanteil im ersten Jahr bundesweit bei
+                          durchschnittlich <span className="font-semibold" style={{color:'#18181B'}}>{formatEuro(HEIM_EIGENANTEIL)}</span> im Monat
+                          {/* Nur die Ersparnis grün (#22A06B, das Portal-Grün
+                              aus den Verfügbarkeits-Chips). Der Heim-Betrag
+                              bleibt schwarz — grün wäre er ein Gütesiegel für
+                              die Zahl, gegen die wir argumentieren. */}
+                          — bei Ihnen zu Hause sind es <span className="font-bold" style={{color:'#22A06B'}}>{formatEuro(guenstiger)} weniger</span>.
+                          <span className="block mt-1 text-[13px]">Quelle: vdek-Auswertung, Stand 1. Juli 2026.</span>
+                        </p>
+                      )}
+
+                      <p className="text-[13px] leading-snug mt-3" style={{color:'#71717A'}}>
+                        Pflegegeld, Entlastungsbudget und Steuervorteil sind Leistungen
+                        Dritter mit eigenen Voraussetzungen — die Beträge sind eine
+                        Orientierung, keine Zusage. Jahresbeträge sind auf den Monat umgelegt.
+                      </p>
+                    </div>
+                  );
+                })()}
 
                 <div className="mt-2 flex justify-center">
                   <a
@@ -2501,12 +2791,13 @@ const CustomerPortalPage: FC = () => {
                     rel="noopener noreferrer"
                     className="flex items-center gap-1.5 transition-opacity hover:opacity-70"
                   >
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" style={{width:14,height:14,color:'#3D3D3D'}}>
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" style={{width:14,height:14,color:'#18181B'}}>
                       <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="12" x2="12" y2="18"/><polyline points="9 15 12 18 15 15"/>
                     </svg>
-                    <span className="text-[13px] underline" style={{color:'#3D3D3D'}}>Mustervertrag als PDF herunterladen</span>
+                    <span className="text-[13px] underline" style={{color:'#18181B'}}>Mustervertrag als PDF herunterladen</span>
                   </a>
                 </div>
+                </>)}
             </div>
           )}
         </div>
@@ -2514,14 +2805,373 @@ const CustomerPortalPage: FC = () => {
         );
       })()}
 
+
+      <div className="max-w-3xl mx-auto px-4 pt-1 pb-6 space-y-4" style={{background:'#FFFFFF'}}>
+
+        {/* ── SECTION: Interest-Karten ──
+             IMMER sichtbar wenn proaktiv interessierte Pflegekräfte da sind,
+             egal ob hasPending oder nicht. Steht UNTER pending Bewerbungen
+             (Bewerbung hat Priorität: schnelle Entscheidung nötig), aber
+             ÜBER der Matching-Liste (Interest ist heißer als ein normales
+             Matching). */}
+        {visibleInterests.length > 0 && (
+          /* Eigener, hervorgehobener Kasten ÜBER den passenden Pflegekräften
+             (Martin, 11.08.): Proaktives Interesse ist mehr wert als ein
+             Matching — vorher lag es optisch gleichauf in derselben Liste und
+             ging unter. Kräftigerer Rahmen als die Matching-Karten. */
+          <div className="rounded-3xl px-3 py-4 border space-y-3" style={{ background: '#FFFFFF', borderColor: '#8B7355' }}>
+            <p className="flex items-start gap-2 text-[15px] font-semibold leading-relaxed px-1" style={{color:'#8B7355'}}>
+              <Heart className="w-4 h-4 flex-shrink-0 mt-1" fill="currentColor" />
+              <span>
+                {visibleInterests.length === 1
+                  ? <>Eine Pflegekraft interessiert<br />sich für die Betreuung</>
+                  : <>{visibleInterests.length} Pflegekräfte interessieren<br />sich für die Betreuung</>}
+              </span>
+            </p>
+            {visibleInterests.map((i) => {
+              const baseNurse = mapCaregiverToNurse(i.caregiver, {
+                nowIso: new Date().toISOString(),
+                nowYear: new Date().getFullYear(),
+              });
+              const nurse = IS_PREVIEW_ANY
+                ? { ...baseNurse, profile: PREVIEW_INTEREST_PROFILE, detailedAssignments: PREVIEW_INTEREST_ASSIGNMENTS }
+                : baseNurse;
+              const status: InterestActionStatus =
+                interestStatusOverrides.get(i.caregiver_id) ?? 'idle';
+              const label = displayName(nurse.name);
+              return (
+                <InterestCard
+                  key={`interest-${i.id}`}
+                  nurse={nurse}
+                  status={status}
+                  onNurseClick={() => {
+                    setSelectedNurse(nurse);
+                    setSelectedFromInterestId(i.caregiver_id);
+                  }}
+                  onInvite={() => canInviteNurse(0)}
+                  onInviteConfirm={() => confirmInviteInterest(i.caregiver_id, label)}
+                  onDismiss={() => confirmDismissInterest(i.caregiver_id)}
+                  globalInviteLocked={inviteInFlight}
+                />
+              );
+            })}
+          </div>
+        )}
+
+        {/* ── SECTION HEADER: Passende Pflegekräfte / Ihre Bewerbungen (state-aware) ── */}
+        <div className="px-1 pt-2" id="pflegekraefte">
+          <h2 className="text-[1.2rem] font-bold tracking-tight" style={{color:'#18181B'}}>{hasPending ? 'Ihre Bewerbungen' : 'Passende Pflegekräfte'}</h2>
+        </div>
+
+
+        {/* ── SECTION: Pending Applications ──
+             Höchste Priorität: pending Bewerbungen wollen eine Entscheidung
+             vom Kunden — die kommen ZUERST, vor allem anderen. */}
+        {hasPending && (
+          <div id="bewerbungen" className="space-y-3 scroll-mt-4">
+            <p className="text-[16px] leading-relaxed px-1" style={{color:'#18181B'}}>
+              Tippen Sie auf <span className="font-semibold">"Angebot prüfen"</span>, um die Details der Pflegekraft zu sehen und über das Angebot zu entscheiden.
+            </p>
+            {pendingApps.map((app) => (
+              <AppCard
+                key={app.id}
+                app={app}
+                exiting={exitingIds.has(app.id)}
+                onReview={() => setSelectedApp(app)}
+                onDecline={() => setDeclineConfirmApp(app)}
+                onNurseClick={(n) => openNurseFromApp(n, app)}
+                onChat={CHAT_ENABLED ? (n) => setChatNurse(n) : undefined}
+              />
+            ))}
+            {/* Beratungs-CTA direkt unter den Bewerbungen — Bewerbungen sind
+                der entscheidungsstärkste Moment, hier sind Kunden besonders
+                empfänglich für persönliche Hilfe. */}
+            <BeratungCTA
+              headline="Fragen zur Bewerbung?"
+              body="Ich gehe das Angebot gerne mit Ihnen durch und beantworte alle offenen Fragen."
+            />
+          </div>
+        )}
+
+        {/* ── SECTION: Matched Nurses — pending + invited + Interests, nur
+             wenn keine offenen Bewerbungen. Interest-Karten (Pflegekräfte,
+             die proaktiv Interesse signalisiert haben) werden ganz oben in
+             die gleiche Liste eingehängt — keine eigene Section, kein
+             Erklär-Text. ── */}
+        {/* Mamamia-Matchings vorübergehend nicht erreichbar / noch am Laden →
+            ruhiger Lade-Zustand STATT einer leeren "keine Pflegekräfte"-Seite.
+            Auto-Retry (useEffect oben) lädt im Hintergrund nach. */}
+        {!hasPending && matchingsLoadingOrError && (
+          <div className="rounded-3xl px-5 py-8 border text-center" style={{ background: '#F5F5F6', borderColor: '#D4D4D8' }}>
+            <div className="inline-block w-6 h-6 rounded-full border-2 animate-spin mb-3" style={{ borderColor: '#C4B49A', borderTopColor: 'transparent' }} />
+            <p className="text-[15px] font-semibold mb-1" style={{ color: '#18181B' }}>Wir laden Ihre Pflegekräfte …</p>
+            <p className="text-[14px] leading-relaxed" style={{ color: '#71717A' }}>Einen Moment bitte — gleich sehen Sie Ihre persönlichen Vorschläge.</p>
+          </div>
+        )}
+
+        {!hasPending && !matchingsLoadingOrError && (() => {
+          // Interest-Pflegekräfte (sowohl invited als auch declined)
+          // werden NICHT in der Matching-Liste gerendert sondern unten
+          // in der "Bereits bearbeitet"-Sektion (User-Wunsch: gleiche
+          // Behandlung wie bei Bewerbungen). Filter: caregiverId raus
+          // wenn interestOriginIds das hat UND Status invited/declined.
+          const allVisible = effectiveMatched
+            .map((m, i) => ({ nurse: m.nurse, i, caregiverId: m.caregiverId, status: nurseStatusById.get(m.caregiverId) ?? 'pending' as NurseStatus, virtualDeclinedFromInterest: false as const }))
+            .filter(({ status, caregiverId }) => {
+              if (status === 'pending') return true;
+              // invited/declined ausschließen wenn aus Interest stammt
+              return !interestOriginIds.has(caregiverId);
+            });
+          // Order: pending (cap 5, oben) → invited → declined (ganz unten,
+          // ausgegraut mit "Abgelehnt"-Pill + Undo-Link). User-Wunsch:
+          // bearbeitete (normale) Pflegekräfte rutschen nach unten in der
+          // Matching-Liste. Interest-Aktionen leben in "Bereits bearbeitet"
+          // (siehe unten — InterestActionCards in der doneApps-Sektion).
+          // Oben NUR die frischen Vorschläge (max 3). Bereits bearbeitete
+          // Matchings (invited/declined) wandern in die gedämpfte
+          // "Bereits bearbeitet"-Sektion unten (MatchCardDone) — sonst
+          // wirken sie zu prominent / zu ähnlich wie die offenen Vorschläge.
+          type VisibleNurse = {
+            nurse: Nurse;
+            i: number;
+            caregiverId: number;
+            status: NurseStatus;
+            virtualDeclinedFromInterest: boolean;
+          };
+          // Batch-Reveal (User-Wunsch 25.06.): sichtbarer Pool = 5 −
+          // Einladungen der letzten 24h. Einladen hält den Slot 24h (die
+          // Pflegekraft wartet auf Antwort); nach 24h ohne Reaktion füllt sich
+          // der Pool wieder auf 5 + die "neue Pflegekräfte"-Mail geht raus.
+          // Ablehnen zählt NICHT mit (caregiver_invite_attempts erfasst nur
+          // echte Einladungen) → rückt sofort nach. used_24h aus getInviteRateState.
+          const heldInvites = inviteRate?.used_24h ?? 0;
+          const visibleCount = Math.max(0, 5 - heldInvites);
+          const pendingNurses: VisibleNurse[] = allVisible.filter(({ status }) => status === 'pending').slice(0, visibleCount);
+          // Die Empfehlung (höchste Badge-Bewertung, Score = Erfahrungsjahre +
+          // Einsätze) nach ganz oben ziehen — die anderen behalten ihre
+          // Reihenfolge. So steht "Empfehlung des Beraters" immer zuoberst.
+          const badgeScore = (n: Nurse) => nurseBadgeScore(n.history?.assignments);
+          let bestIdx = -1;
+          let bestScore = -Infinity;
+          pendingNurses.forEach((p, idx) => {
+            const s = badgeScore(p.nurse);
+            if (s > bestScore) { bestScore = s; bestIdx = idx; }
+          });
+          const visibleNurses: VisibleNurse[] = bestIdx > 0
+            ? [pendingNurses[bestIdx], ...pendingNurses.filter((_, idx) => idx !== bestIdx)]
+            : pendingNurses;
+          const hasAnyCard = visibleNurses.length > 0;
+          return (
+            <>
+              {hasAnyCard && (
+                <>
+                {/* Der Erklärtext steht ÜBER dem Kasten auf Weiß (Martin,
+                    11.08.), nicht darin: Er beschreibt, was im Kasten kommt —
+                    innen wirkte er wie ein weiteres Element der Liste und
+                    schob die erste Pflegekraft nach unten. */}
+                {!patientSaved && (
+                <p className="text-[16px] leading-relaxed px-1 mb-3" style={{color:'#18181B'}}>
+                  {(
+                    // Kein Schloss, keine Schritt-Nummer: Seit dem Umbau am
+                    // 11.08. steht die Pflegesituation UNTER den
+                    // Pflegekräften — der alte Text („nach Schritt 2", Pfeil
+                    // nach oben) zeigte ins Leere. Formuliert als
+                    // Gegenleistung, nicht als Schranke.
+                    <>Diese Pflegekräfte passen zu Ihrer Anfrage und sind im gewünschten Zeitraum frei. Damit sie sich bei Ihnen bewerben können, brauchen sie noch ein paar Angaben zur Pflegesituation. {' '}
+                      <button type="button" className="font-semibold underline underline-offset-2"
+                        style={{color:'#8B7355'}}
+                        onClick={() => { document.getElementById('patientendaten')?.scrollIntoView({ behavior: 'smooth', block: 'start' }); }}>
+                        Pflegesituation beschreiben ↓
+                      </button>
+                    </>
+                  )}
+                </p>
+                )}
+                <div
+                  className="rounded-3xl px-3 py-4 border"
+                  style={{ background: '#F5F5F6', borderColor: '#D4D4D8' }}
+                >
+                  <div className="space-y-3">
+                    {/* Interest-Karten werden jetzt OBEN in einer eigenen
+                        always-visible Section gerendert (siehe oben), nicht
+                        mehr hier — damit sie auch bei hasPending sichtbar
+                        bleiben. */}
+                    {(() => {
+                      // Genau EINE "Empfehlung des Beraters": die pending
+                      // Pflegekraft mit der höchsten Badge-Bewertung. Score =
+                      // Erfahrungsjahre + Einsätze (gleiche Formel wie
+                      // nurseLevel → höchster Score = bestes Tier). Eine klare
+                      // Empfehlung wirkt stärker als zwei.
+                      const badgeScore = (n: Nurse) => nurseBadgeScore(n.history?.assignments);
+                      let recIdx = -1;
+                      let recBest = -Infinity;
+                      visibleNurses.forEach(({ nurse, status }, idx) => {
+                        if (status !== 'pending') return;
+                        const s = badgeScore(nurse);
+                        if (s > recBest) { recBest = s; recIdx = idx; }
+                      });
+                      return visibleNurses.map(({ nurse, i, status }, idx) => {
+                        const isRecommended = idx === recIdx;
+                        return (
+                          <MatchCard
+                            key={`m-${i}`}
+                            nurse={nurse}
+                            status={status}
+                            isRecommended={isRecommended}
+                            onNurseClick={() => openNurseFromMatch(nurse, i)}
+                            onInvite={() => canInviteNurse(i)}
+                            onInviteConfirm={() => confirmInviteNurse(i, displayName(nurse.name))}
+                            onUndoDecline={status === 'declined' ? () => undoDeclinedMatch(i) : undefined}
+                            globalInviteLocked={inviteInFlight}
+                          />
+                        );
+                      });
+                    })()}
+                  </div>
+
+                  {/* Beratungs-CTA — direkt unter den 3 Match-Karten.
+                       Fängt Kunden ab die überfordert oder unsicher sind
+                       und sonst still abspringen würden. */}
+                  {patientSaved && (
+                    <div className="mt-4">
+                      <BeratungCTA
+                        headline="Unsicher bei der Auswahl?"
+                        body="Ich helfe Ihnen gerne, die passende Pflegekraft für Ihre Situation zu finden — schnell und unverbindlich."
+                      />
+                    </div>
+                  )}
+                </div>
+                </>
+              )}
+
+              {/* Warte-Hinweis: alle frischen Slots sind durch Einladungen der
+                  letzten 24h "gehalten" (visibleCount 0). Ruhig formuliert —
+                  kein Drängen. Nach 24h ohne Reaktion füllt sich der Pool wieder
+                  auf + die "neue Pflegekräfte"-Mail geht raus. Nur zeigen, wenn
+                  wirklich gehalten (heldInvites > 0), nicht wenn der Pool leer ist. */}
+              {!hasAnyCard && heldInvites > 0 && (
+                <div className="rounded-3xl px-5 py-5 border text-center" style={{ background: '#F5F5F6', borderColor: '#D4D4D8' }}>
+                  <p className="text-[15px] font-semibold mb-1" style={{color:'#18181B'}}>Ihre Auswahl ist eingeladen</p>
+                  <p className="text-[14px] leading-relaxed" style={{color:'#71717A'}}>
+                    Die Pflegekräfte melden sich meist innerhalb von 1&ndash;2 Tagen. Sobald Rückmeldungen da sind, sehen Sie sie hier &mdash; meldet sich niemand, schlagen wir Ihnen automatisch weitere Pflegekräfte vor.
+                  </p>
+                </div>
+              )}
+
+              {/* "Bereits bearbeitet" wird einheitlich unten gerendert
+                  (außerhalb dieser IIFE) — beide Branches (hasPending /
+                  !hasPending) sehen dieselbe Sektion am Ende. */}
+            </>
+          );
+        })()}
+
+        {/* ── SECTION: Bereits bearbeitet ──
+             Immer unten sichtbar wenn doneApps ODER bearbeitete Matchings
+             existieren. Bewusst gedämpft (MatchCardDone: kompakt, grau) +
+             klar getrennt unter den frischen Vorschlägen — sonst wirken die
+             bearbeiteten Karten zu ähnlich wie die offenen. Sammelt:
+             - bearbeitete Bewerbungen (AppCardDone)
+             - eingeladene Pflegekräfte (normal + aus Interesse) — kein Undo
+               (Mamamia kennt keine uninvite-Mutation)
+             - abgelehnte Pflegekräfte (normal + aus Interesse) — mit Undo
+             Reihenfolge: eingeladen zuerst, abgelehnt (ausgegraut) zuletzt. */}
+        {(() => {
+          // Normale Matchings (NICHT aus Interesse) nach Status, mit
+          // effectiveMatched-Index für die Undo-/Detail-Handler.
+          const matchInvited = effectiveMatched
+            .map((m, i) => ({ m, i }))
+            .filter(({ m }) => nurseStatusById.get(m.caregiverId) === 'invited' && !interestOriginIds.has(m.caregiverId))
+            .map(({ m, i }) => ({ nurse: m.nurse, caregiverId: m.caregiverId, status: 'invited' as const, key: `mi-${m.caregiverId}`, matchIdx: i, interest: false }));
+          const matchDeclined = effectiveMatched
+            .map((m, i) => ({ m, i }))
+            .filter(({ m }) => nurseStatusById.get(m.caregiverId) === 'declined' && !interestOriginIds.has(m.caregiverId))
+            .map(({ m, i }) => ({ nurse: m.nurse, caregiverId: m.caregiverId, status: 'declined' as const, key: `md-${m.caregiverId}`, matchIdx: i, interest: false }));
+          // Aktionen die aus einer Interest-Karte stammen (♥ Interesse-Label).
+          const interestInvited = effectiveMatched
+            .filter((m) => nurseStatusById.get(m.caregiverId) === 'invited' && interestOriginIds.has(m.caregiverId))
+            .map((m) => ({ nurse: m.nurse, caregiverId: m.caregiverId, status: 'invited' as const, key: `ii-${m.caregiverId}`, matchIdx: -1, interest: true }));
+          const interestDeclined = Array.from(declinedFromInterest.entries())
+            .map(([cgId, nurse]) => ({ nurse, caregiverId: cgId, status: 'declined' as const, key: `id-${cgId}`, matchIdx: -1, interest: true }));
+          // Eingeladen zuerst, abgelehnt zuletzt. Aus effectiveMatched (volle
+          // Daten + Undo-Handler).
+          const fromMatched = [...matchInvited, ...interestInvited, ...matchDeclined, ...interestDeclined]
+            .map((d) => ({ ...d, fromEvent: false as const }));
+          // Bearbeitete PKs, die Mamamia NICHT mehr in den Matchings liefert →
+          // aus unseren Events rekonstruiert (Snapshot/Name). Dedupe gegen das,
+          // was schon aus effectiveMatched kommt + Interesse-Aktionen.
+          const matchedIds = new Set(fromMatched.map((d) => d.caregiverId));
+          const fromEvents = extraProcessed
+            .filter((p) => !matchedIds.has(p.caregiverId) && !interestOriginIds.has(p.caregiverId))
+            .map((p) => ({ nurse: p.nurse, caregiverId: p.caregiverId, status: p.status, key: `ev-${p.caregiverId}`, matchIdx: -1, interest: false, fromEvent: true as const }));
+          // Eingeladene zuerst, dann Abgelehnte (über beide Quellen).
+          const allDone = [...fromMatched, ...fromEvents]
+            .sort((a, b) => (a.status === b.status ? 0 : a.status === 'invited' ? -1 : 1));
+          const hasAny = doneApps.length > 0 || allDone.length > 0;
+          if (!hasAny) return null;
+          // 3 sichtbar, Rest hinter "Weitere anzeigen" (User-Wunsch 26.06.).
+          const VISIBLE_DONE = 3;
+          const shownDone = showAllDone ? allDone : allDone.slice(0, VISIBLE_DONE);
+          const moreCount = allDone.length - shownDone.length;
+          return (
+            <div className="space-y-2">
+              <p className="text-xs font-semibold uppercase tracking-wider text-gray-400 px-1">Bereits bearbeitet</p>
+              {doneApps.map((app) => (
+                <AppCardDone key={app.id} app={app} onNurseClick={(n, a) => { setNurseModalApp(a); setSelectedNurse(n); }} onUndo={undoApp} />
+              ))}
+              {shownDone.map(({ nurse, caregiverId, status, key, matchIdx, interest, fromEvent }) => (
+                <MatchCardDone
+                  key={key}
+                  nurse={nurse}
+                  status={status}
+                  hasInterestOrigin={interest}
+                  onNurseClick={() => (fromEvent || interest) ? setSelectedNurse(nurse) : openNurseFromMatch(nurse, matchIdx)}
+                  onUndo={(!fromEvent && status === 'declined') ? (interest ? () => undoDismissInterest(caregiverId) : () => undoDeclinedMatch(matchIdx)) : undefined}
+                />
+              ))}
+              {!showAllDone && moreCount > 0 && (
+                <button
+                  type="button"
+                  onClick={() => setShowAllDone(true)}
+                  className="w-full text-center text-[13px] font-semibold py-2.5 rounded-xl transition-colors"
+                  style={{ color: '#8B7355', background: '#F6F2EC' }}
+                >
+                  Weitere anzeigen ({moreCount})
+                </button>
+              )}
+            </div>
+          );
+        })()}
+
+      </div>
+
       {!hasPending && (
-      <div style={{background: (patientSaved && !(patientExpandedManual ?? !patientSaved)) ? '#F8F7F5' : '#FFFFFF'}}>
+      <div style={{background:'#FFFFFF'}}>
       <div className="max-w-3xl mx-auto px-4 pt-1 pb-4 space-y-4">
         {/* ── SECTION: 2 · Patientendaten — der Onboarding-Schritt steht VOR
              den Pflegekräften (vorher lag die Karte zwischen PK-Header und
              PK-Karten — genau die „zwei Kästen"-Verwirrung, Martin 2026-07-12). ── */}
+        {/* EIN Rahmen um Kopf UND Formular — nicht zwei (Martin, 12.08.:
+             prominenter machen; die Trennung in zwei Kaesten war schon im
+             Juli als verwirrend aufgefallen). Weiss mit braunem Rand ist die
+             seit 11.08. etablierte Hervorhebung fuer „wichtiger als der
+             Rest"; nach dem Speichern faellt der Abschnitt darauf zurueck,
+             ruhig zu sein. */}
+        <div
+          className={!hasPending && !patientSaved ? 'rounded-3xl border px-3 py-3' : undefined}
+          style={!hasPending && !patientSaved ? { background: '#FFFFFF', borderColor: '#8B7355' } : undefined}
+        >
         {!hasPending && (() => {
           const patientExpanded = patientExpandedManual ?? !patientSaved;
+          // Der Abschnitt ist die SCHRANKE: ohne ihn keine Bewerbungen.
+          // Optisch hatte er bis 12.08. aber dasselbe Gewicht wie „So
+          // funktioniert's" oder die FAQ (Martin: „sollten wir den nicht
+          // prominenter machen, ohne den geht nichts?"). Jetzt trägt er
+          // denselben hervorgehobenen Rahmen wie der Interesse-Kasten — weiß
+          // mit braunem Rand. Bewusst KEIN neues Gestaltungsmittel: Diese
+          // Hervorhebung ist im Portal seit dem 11.08. etabliert und genau
+          // für „das hier ist wichtiger als der Rest" reserviert. Nur solange
+          // offen — nach dem Speichern ist es Referenz und fällt auf den
+          // ruhigen Rahmen zurück.
           return (
           <div id="patientendaten" className="px-1 pt-2">
             <button
@@ -2536,9 +3186,15 @@ const CustomerPortalPage: FC = () => {
                 if (next && patientSaved) setTriggerOpenPatient(true);
               }}
             >
-              <div>
-                <h2 className="text-[1.1rem] font-bold" style={{color:'#3D3D3D'}}>2 · Pflegesituation</h2>
-                <div className="mt-1.5 h-[2px] w-10 rounded-full" style={{background:'#8B7355'}} />
+              <div className="min-w-0">
+                <h2 className="text-[1.2rem] font-bold tracking-tight" style={{color:'#18181B'}}>Pflegesituation</h2>
+                {/* Sagt in fünf Wörtern, warum dieser Abschnitt anders ist
+                    als die darüber. */}
+                {!patientSaved && (
+                  <p className="text-[13px] font-semibold mt-0.5" style={{color:'#8B7355'}}>
+                    Ohne diese Angaben keine Bewerbungen
+                  </p>
+                )}
               </div>
               <div className="flex items-center gap-2 flex-shrink-0">
                 {patientSaved ? (
@@ -2549,6 +3205,22 @@ const CustomerPortalPage: FC = () => {
                 <ChevronDown className={`w-5 h-5 text-[#8B7355] transition-transform duration-200 ${patientExpanded ? 'rotate-180' : ''}`} />
               </div>
             </button>
+
+            {/* Einleitung „warum" (Martin, 11.08.). Sie stand vorher im Hero,
+                wo sie den Kunden vor dem Angebot abfing. Hier steht sie an der
+                richtigen Stelle: Er hat Preis und Pflegekräfte gesehen — jetzt
+                erfährt er, warum wir noch etwas brauchen, und was es kostet.
+                Die Minutenangabe ist ehrlich: beim Ehepaar verlangt der Bogen
+                die doppelte Personenspalte (~40 statt ~29 Felder). */}
+            {!patientSaved && (
+              <p className="text-[16px] leading-relaxed mt-3" style={{color:'#18181B'}}>
+                Sobald Sie die Pflegesituation beschrieben haben, erhalten Sie
+                ganz unverbindlich Bewerbungen und sehen, welche Pflegekräfte
+                die Betreuung übernehmen können. Das dauert{' '}
+                <span className="font-semibold">ca. {formMinutes} Minuten</span> —
+                Ihre Angaben aus dem Kostenrechner sind schon übernommen.
+              </p>
+            )}
           </div>
           );
         })()}
@@ -2794,352 +3466,30 @@ const CustomerPortalPage: FC = () => {
         />
         </div>
         )}
-
-
-
+        </div>{/* Ende Hervorhebung Pflegesituation (Kopf + Formular) */}
 
       </div>
       </div>
       )}
 
-      <div className="max-w-3xl mx-auto px-4 pt-1 pb-6 space-y-4">
-
-        {/* ── SECTION HEADER: Passende Pflegekräfte / Ihre Bewerbungen (state-aware) ── */}
-        <div className="px-1 pt-2" id="pflegekraefte">
-          <h2 className="text-[1.1rem] font-bold" style={{color:'#3D3D3D'}}>{hasPending ? 'Ihre Bewerbungen' : '3 · Passende Pflegekräfte'}</h2>
-          <div className="mt-1.5 h-[2px] w-10 rounded-full" style={{background:'#8B7355'}} />
-        </div>
-
-
-        {/* ── SECTION: Pending Applications ──
-             Höchste Priorität: pending Bewerbungen wollen eine Entscheidung
-             vom Kunden — die kommen ZUERST, vor allem anderen. */}
-        {hasPending && (
-          <div id="bewerbungen" className="space-y-3 scroll-mt-4">
-            <p className="text-[14px] leading-relaxed px-1" style={{color:'#3D3D3D'}}>
-              Tippen Sie auf <span className="font-semibold">"Angebot prüfen"</span>, um die Details der Pflegekraft zu sehen und über das Angebot zu entscheiden.
-            </p>
-            {pendingApps.map((app) => (
-              <AppCard
-                key={app.id}
-                app={app}
-                exiting={exitingIds.has(app.id)}
-                onReview={() => setSelectedApp(app)}
-                onDecline={() => setDeclineConfirmApp(app)}
-                onNurseClick={(n) => openNurseFromApp(n, app)}
-                onChat={CHAT_ENABLED ? (n) => setChatNurse(n) : undefined}
-              />
-            ))}
-            {/* Beratungs-CTA direkt unter den Bewerbungen — Bewerbungen sind
-                der entscheidungsstärkste Moment, hier sind Kunden besonders
-                empfänglich für persönliche Hilfe. */}
-            <BeratungCTA
-              headline="Fragen zur Bewerbung?"
-              body="Ich gehe das Angebot gerne mit Ihnen durch und beantworte alle offenen Fragen."
-            />
-          </div>
-        )}
-
-        {/* ── SECTION: Interest-Karten ──
-             IMMER sichtbar wenn proaktiv interessierte Pflegekräfte da sind,
-             egal ob hasPending oder nicht. Steht UNTER pending Bewerbungen
-             (Bewerbung hat Priorität: schnelle Entscheidung nötig), aber
-             ÜBER der Matching-Liste (Interest ist heißer als ein normales
-             Matching). */}
-        {visibleInterests.length > 0 && (
-          <div className="space-y-3">
-            <p className="text-[14px] leading-relaxed px-1" style={{color:'#3D3D3D'}}>
-              {visibleInterests.length === 1
-                ? 'Eine Pflegekraft hat proaktiv Interesse an Ihnen signalisiert.'
-                : `${visibleInterests.length} Pflegekräfte haben proaktiv Interesse an Ihnen signalisiert.`}
-            </p>
-            {visibleInterests.map((i) => {
-              const baseNurse = mapCaregiverToNurse(i.caregiver, {
-                nowIso: new Date().toISOString(),
-                nowYear: new Date().getFullYear(),
-              });
-              const nurse = IS_PREVIEW_ANY
-                ? { ...baseNurse, profile: PREVIEW_INTEREST_PROFILE, detailedAssignments: PREVIEW_INTEREST_ASSIGNMENTS }
-                : baseNurse;
-              const status: InterestActionStatus =
-                interestStatusOverrides.get(i.caregiver_id) ?? 'idle';
-              const label = displayName(nurse.name);
-              return (
-                <InterestCard
-                  key={`interest-${i.id}`}
-                  nurse={nurse}
-                  status={status}
-                  onNurseClick={() => {
-                    setSelectedNurse(nurse);
-                    setSelectedFromInterestId(i.caregiver_id);
-                  }}
-                  onInvite={() => canInviteNurse(0)}
-                  onInviteConfirm={() => confirmInviteInterest(i.caregiver_id, label)}
-                  onDismiss={() => confirmDismissInterest(i.caregiver_id)}
-                  globalInviteLocked={inviteInFlight}
-                />
-              );
-            })}
-          </div>
-        )}
-
-        {/* ── SECTION: Matched Nurses — pending + invited + Interests, nur
-             wenn keine offenen Bewerbungen. Interest-Karten (Pflegekräfte,
-             die proaktiv Interesse signalisiert haben) werden ganz oben in
-             die gleiche Liste eingehängt — keine eigene Section, kein
-             Erklär-Text. ── */}
-        {/* Mamamia-Matchings vorübergehend nicht erreichbar / noch am Laden →
-            ruhiger Lade-Zustand STATT einer leeren "keine Pflegekräfte"-Seite.
-            Auto-Retry (useEffect oben) lädt im Hintergrund nach. */}
-        {!hasPending && matchingsLoadingOrError && (
-          <div className="rounded-3xl px-5 py-8 border text-center" style={{ background: '#FAF8F4', borderColor: '#EAE3D8' }}>
-            <div className="inline-block w-6 h-6 rounded-full border-2 animate-spin mb-3" style={{ borderColor: '#C4B49A', borderTopColor: 'transparent' }} />
-            <p className="text-[15px] font-semibold mb-1" style={{ color: '#3D3D3D' }}>Wir laden Ihre Pflegekräfte …</p>
-            <p className="text-[14px] leading-relaxed" style={{ color: '#6b6b6b' }}>Einen Moment bitte — gleich sehen Sie Ihre persönlichen Vorschläge.</p>
-          </div>
-        )}
-
-        {!hasPending && !matchingsLoadingOrError && (() => {
-          // Interest-Pflegekräfte (sowohl invited als auch declined)
-          // werden NICHT in der Matching-Liste gerendert sondern unten
-          // in der "Bereits bearbeitet"-Sektion (User-Wunsch: gleiche
-          // Behandlung wie bei Bewerbungen). Filter: caregiverId raus
-          // wenn interestOriginIds das hat UND Status invited/declined.
-          const allVisible = effectiveMatched
-            .map((m, i) => ({ nurse: m.nurse, i, caregiverId: m.caregiverId, status: nurseStatusById.get(m.caregiverId) ?? 'pending' as NurseStatus, virtualDeclinedFromInterest: false as const }))
-            .filter(({ status, caregiverId }) => {
-              if (status === 'pending') return true;
-              // invited/declined ausschließen wenn aus Interest stammt
-              return !interestOriginIds.has(caregiverId);
-            });
-          // Order: pending (cap 5, oben) → invited → declined (ganz unten,
-          // ausgegraut mit "Abgelehnt"-Pill + Undo-Link). User-Wunsch:
-          // bearbeitete (normale) Pflegekräfte rutschen nach unten in der
-          // Matching-Liste. Interest-Aktionen leben in "Bereits bearbeitet"
-          // (siehe unten — InterestActionCards in der doneApps-Sektion).
-          // Oben NUR die frischen Vorschläge (max 3). Bereits bearbeitete
-          // Matchings (invited/declined) wandern in die gedämpfte
-          // "Bereits bearbeitet"-Sektion unten (MatchCardDone) — sonst
-          // wirken sie zu prominent / zu ähnlich wie die offenen Vorschläge.
-          type VisibleNurse = {
-            nurse: Nurse;
-            i: number;
-            caregiverId: number;
-            status: NurseStatus;
-            virtualDeclinedFromInterest: boolean;
-          };
-          // Batch-Reveal (User-Wunsch 25.06.): sichtbarer Pool = 5 −
-          // Einladungen der letzten 24h. Einladen hält den Slot 24h (die
-          // Pflegekraft wartet auf Antwort); nach 24h ohne Reaktion füllt sich
-          // der Pool wieder auf 5 + die "neue Pflegekräfte"-Mail geht raus.
-          // Ablehnen zählt NICHT mit (caregiver_invite_attempts erfasst nur
-          // echte Einladungen) → rückt sofort nach. used_24h aus getInviteRateState.
-          const heldInvites = inviteRate?.used_24h ?? 0;
-          const visibleCount = Math.max(0, 5 - heldInvites);
-          const pendingNurses: VisibleNurse[] = allVisible.filter(({ status }) => status === 'pending').slice(0, visibleCount);
-          // Die Empfehlung (höchste Badge-Bewertung, Score = Erfahrungsjahre +
-          // Einsätze) nach ganz oben ziehen — die anderen behalten ihre
-          // Reihenfolge. So steht "Empfehlung des Beraters" immer zuoberst.
-          const badgeScore = (n: Nurse) => nurseBadgeScore(n.experienceYears, n.history?.assignments);
-          let bestIdx = -1;
-          let bestScore = -Infinity;
-          pendingNurses.forEach((p, idx) => {
-            const s = badgeScore(p.nurse);
-            if (s > bestScore) { bestScore = s; bestIdx = idx; }
-          });
-          const visibleNurses: VisibleNurse[] = bestIdx > 0
-            ? [pendingNurses[bestIdx], ...pendingNurses.filter((_, idx) => idx !== bestIdx)]
-            : pendingNurses;
-          const hasAnyCard = visibleNurses.length > 0;
-          return (
-            <>
-              {hasAnyCard && (
-                /* 14.06.: Karten-Bereich mit leichtem Primundus-Beige-
-                   Hintergrund + Innen-Padding, damit der Pflegekraft-
-                   Auswahl-Bereich visuell als zusammenhängender, wichtiger
-                   Block wirkt (vorher waren die Karten lose auf weißer
-                   Page-Background). Border subtle, nicht aufdringlich. */
-                <div
-                  className="rounded-3xl px-3 py-4 border"
-                  style={{ background: '#FAF8F4', borderColor: '#EAE3D8' }}
-                >
-                  <p className="text-[14px] leading-relaxed pb-2 px-1" style={{color:'#3D3D3D'}}>
-                    {!patientSaved ? (
-                      <>🔒 Einladen wird nach Schritt 2 freigeschaltet — {' '}
-                        <button type="button" className="font-semibold underline underline-offset-2"
-                          style={{color:'#8B7355'}}
-                          onClick={() => { document.getElementById('patientendaten')?.scrollIntoView({ behavior: 'smooth', block: 'start' }); }}>
-                          Pflegesituation beschreiben ↑
-                        </button>
-                      </>
-                    ) : (
-                      'Tippen Sie auf „Einladen", wenn Ihnen eine Pflegekraft gefällt — die Anfrage geht direkt an die Pflegekraft.'
-                    )}
-                  </p>
-                  <div className="space-y-3">
-                    {/* Interest-Karten werden jetzt OBEN in einer eigenen
-                        always-visible Section gerendert (siehe oben), nicht
-                        mehr hier — damit sie auch bei hasPending sichtbar
-                        bleiben. */}
-                    {(() => {
-                      // Genau EINE "Empfehlung des Beraters": die pending
-                      // Pflegekraft mit der höchsten Badge-Bewertung. Score =
-                      // Erfahrungsjahre + Einsätze (gleiche Formel wie
-                      // nurseLevel → höchster Score = bestes Tier). Eine klare
-                      // Empfehlung wirkt stärker als zwei.
-                      const badgeScore = (n: Nurse) => nurseBadgeScore(n.experienceYears, n.history?.assignments);
-                      let recIdx = -1;
-                      let recBest = -Infinity;
-                      visibleNurses.forEach(({ nurse, status }, idx) => {
-                        if (status !== 'pending') return;
-                        const s = badgeScore(nurse);
-                        if (s > recBest) { recBest = s; recIdx = idx; }
-                      });
-                      return visibleNurses.map(({ nurse, i, status }, idx) => {
-                        const isRecommended = idx === recIdx;
-                        return (
-                          <MatchCard
-                            key={`m-${i}`}
-                            nurse={nurse}
-                            status={status}
-                            isRecommended={isRecommended}
-                            onNurseClick={() => openNurseFromMatch(nurse, i)}
-                            onInvite={() => canInviteNurse(i)}
-                            onInviteConfirm={() => confirmInviteNurse(i, displayName(nurse.name))}
-                            onUndoDecline={status === 'declined' ? () => undoDeclinedMatch(i) : undefined}
-                            globalInviteLocked={inviteInFlight}
-                          />
-                        );
-                      });
-                    })()}
-                  </div>
-
-                  {/* Beratungs-CTA — direkt unter den 3 Match-Karten.
-                       Fängt Kunden ab die überfordert oder unsicher sind
-                       und sonst still abspringen würden. */}
-                  {patientSaved && (
-                    <div className="mt-4">
-                      <BeratungCTA
-                        headline="Unsicher bei der Auswahl?"
-                        body="Ich helfe Ihnen gerne, die passende Pflegekraft für Ihre Situation zu finden — schnell und unverbindlich."
-                      />
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {/* Warte-Hinweis: alle frischen Slots sind durch Einladungen der
-                  letzten 24h "gehalten" (visibleCount 0). Ruhig formuliert —
-                  kein Drängen. Nach 24h ohne Reaktion füllt sich der Pool wieder
-                  auf + die "neue Pflegekräfte"-Mail geht raus. Nur zeigen, wenn
-                  wirklich gehalten (heldInvites > 0), nicht wenn der Pool leer ist. */}
-              {!hasAnyCard && heldInvites > 0 && (
-                <div className="rounded-3xl px-5 py-5 border text-center" style={{ background: '#FAF8F4', borderColor: '#EAE3D8' }}>
-                  <p className="text-[15px] font-semibold mb-1" style={{color:'#3D3D3D'}}>Ihre Auswahl ist eingeladen</p>
-                  <p className="text-[14px] leading-relaxed" style={{color:'#6b6b6b'}}>
-                    Die Pflegekräfte melden sich meist innerhalb von 1&ndash;2 Tagen. Sobald Rückmeldungen da sind, sehen Sie sie hier &mdash; meldet sich niemand, schlagen wir Ihnen automatisch weitere Pflegekräfte vor.
-                  </p>
-                </div>
-              )}
-
-              {/* "Bereits bearbeitet" wird einheitlich unten gerendert
-                  (außerhalb dieser IIFE) — beide Branches (hasPending /
-                  !hasPending) sehen dieselbe Sektion am Ende. */}
-            </>
-          );
-        })()}
-
-        {/* ── SECTION: Bereits bearbeitet ──
-             Immer unten sichtbar wenn doneApps ODER bearbeitete Matchings
-             existieren. Bewusst gedämpft (MatchCardDone: kompakt, grau) +
-             klar getrennt unter den frischen Vorschlägen — sonst wirken die
-             bearbeiteten Karten zu ähnlich wie die offenen. Sammelt:
-             - bearbeitete Bewerbungen (AppCardDone)
-             - eingeladene Pflegekräfte (normal + aus Interesse) — kein Undo
-               (Mamamia kennt keine uninvite-Mutation)
-             - abgelehnte Pflegekräfte (normal + aus Interesse) — mit Undo
-             Reihenfolge: eingeladen zuerst, abgelehnt (ausgegraut) zuletzt. */}
-        {(() => {
-          // Normale Matchings (NICHT aus Interesse) nach Status, mit
-          // effectiveMatched-Index für die Undo-/Detail-Handler.
-          const matchInvited = effectiveMatched
-            .map((m, i) => ({ m, i }))
-            .filter(({ m }) => nurseStatusById.get(m.caregiverId) === 'invited' && !interestOriginIds.has(m.caregiverId))
-            .map(({ m, i }) => ({ nurse: m.nurse, caregiverId: m.caregiverId, status: 'invited' as const, key: `mi-${m.caregiverId}`, matchIdx: i, interest: false }));
-          const matchDeclined = effectiveMatched
-            .map((m, i) => ({ m, i }))
-            .filter(({ m }) => nurseStatusById.get(m.caregiverId) === 'declined' && !interestOriginIds.has(m.caregiverId))
-            .map(({ m, i }) => ({ nurse: m.nurse, caregiverId: m.caregiverId, status: 'declined' as const, key: `md-${m.caregiverId}`, matchIdx: i, interest: false }));
-          // Aktionen die aus einer Interest-Karte stammen (♥ Interesse-Label).
-          const interestInvited = effectiveMatched
-            .filter((m) => nurseStatusById.get(m.caregiverId) === 'invited' && interestOriginIds.has(m.caregiverId))
-            .map((m) => ({ nurse: m.nurse, caregiverId: m.caregiverId, status: 'invited' as const, key: `ii-${m.caregiverId}`, matchIdx: -1, interest: true }));
-          const interestDeclined = Array.from(declinedFromInterest.entries())
-            .map(([cgId, nurse]) => ({ nurse, caregiverId: cgId, status: 'declined' as const, key: `id-${cgId}`, matchIdx: -1, interest: true }));
-          // Eingeladen zuerst, abgelehnt zuletzt. Aus effectiveMatched (volle
-          // Daten + Undo-Handler).
-          const fromMatched = [...matchInvited, ...interestInvited, ...matchDeclined, ...interestDeclined]
-            .map((d) => ({ ...d, fromEvent: false as const }));
-          // Bearbeitete PKs, die Mamamia NICHT mehr in den Matchings liefert →
-          // aus unseren Events rekonstruiert (Snapshot/Name). Dedupe gegen das,
-          // was schon aus effectiveMatched kommt + Interesse-Aktionen.
-          const matchedIds = new Set(fromMatched.map((d) => d.caregiverId));
-          const fromEvents = extraProcessed
-            .filter((p) => !matchedIds.has(p.caregiverId) && !interestOriginIds.has(p.caregiverId))
-            .map((p) => ({ nurse: p.nurse, caregiverId: p.caregiverId, status: p.status, key: `ev-${p.caregiverId}`, matchIdx: -1, interest: false, fromEvent: true as const }));
-          // Eingeladene zuerst, dann Abgelehnte (über beide Quellen).
-          const allDone = [...fromMatched, ...fromEvents]
-            .sort((a, b) => (a.status === b.status ? 0 : a.status === 'invited' ? -1 : 1));
-          const hasAny = doneApps.length > 0 || allDone.length > 0;
-          if (!hasAny) return null;
-          // 3 sichtbar, Rest hinter "Weitere anzeigen" (User-Wunsch 26.06.).
-          const VISIBLE_DONE = 3;
-          const shownDone = showAllDone ? allDone : allDone.slice(0, VISIBLE_DONE);
-          const moreCount = allDone.length - shownDone.length;
-          return (
-            <div className="space-y-2">
-              <p className="text-xs font-semibold uppercase tracking-wider text-gray-400 px-1">Bereits bearbeitet</p>
-              {doneApps.map((app) => (
-                <AppCardDone key={app.id} app={app} onNurseClick={(n, a) => { setNurseModalApp(a); setSelectedNurse(n); }} onUndo={undoApp} />
-              ))}
-              {shownDone.map(({ nurse, caregiverId, status, key, matchIdx, interest, fromEvent }) => (
-                <MatchCardDone
-                  key={key}
-                  nurse={nurse}
-                  status={status}
-                  hasInterestOrigin={interest}
-                  onNurseClick={() => (fromEvent || interest) ? setSelectedNurse(nurse) : openNurseFromMatch(nurse, matchIdx)}
-                  onUndo={(!fromEvent && status === 'declined') ? (interest ? () => undoDismissInterest(caregiverId) : () => undoDeclinedMatch(matchIdx)) : undefined}
-                />
-              ))}
-              {!showAllDone && moreCount > 0 && (
-                <button
-                  type="button"
-                  onClick={() => setShowAllDone(true)}
-                  className="w-full text-center text-[13px] font-semibold py-2.5 rounded-xl transition-colors"
-                  style={{ color: '#8B7355', background: '#F6F2EC' }}
-                >
-                  Weitere anzeigen ({moreCount})
-                </button>
-              )}
-            </div>
-          );
-        })()}
-
+      <div className="max-w-3xl mx-auto px-4 pt-1 pb-6 space-y-4" style={{background:'#FFFFFF'}}>
         {/* ── SECTION HEADER: So funktioniert's ── */}
         <div className="px-1 pt-3">
-          <h2 className="text-[1.1rem] font-bold" style={{color:'#3D3D3D'}}>So funktioniert's</h2>
-          <div className="mt-1.5 h-[2px] w-10 rounded-full" style={{background:'#8B7355'}} />
-          <p className="text-[15px] mt-2" style={{color:'#8B8B8B'}}>Von der ersten Anfrage bis zur laufenden Betreuung.</p>
+          <h2 className="text-[1.2rem] font-bold tracking-tight" style={{color:'#18181B'}}>So funktioniert's</h2>
+          <p className="text-[15px] mt-2" style={{color:'#71717A'}}>Von der ersten Anfrage bis zur laufenden Betreuung.</p>
         </div>
-        <div className="rounded-2xl overflow-hidden border" style={{background:'white', borderColor:'#E5E3DF'}}>
+        <div className="rounded-2xl overflow-hidden border" style={{background:'#F4F4F6', borderColor:'#D4D4D8'}}>
           {[
-            { n: 1, title: 'Pflegesituation beschreiben', desc: 'Kurz beschreiben — vieles ist schon vorausgefüllt. Dann sehen Sie sofort, welche Pflegekräfte passen und verfügbar sind. Unverbindlich.', cta: !patientSaved, done: patientSaved },
+            // „vieles ist schon vorausgefüllt" war falsch (Martin, 12.08.):
+            // Aus dem Kostenrechner kommen anzahl, pflegegrad, mobilität,
+            // nachteinsätze, haushalt und das gewünschte Geschlecht — von
+            // zwölf Pflichtfeldern also vier. Jetzt ohne Mengenangabe.
+            { n: 1, title: 'Pflegesituation beschreiben', desc: 'Ein paar Angaben, die aus dem Kostenrechner sind schon übernommen. Dann sehen Sie sofort, welche Pflegekräfte passen und verfügbar sind. Unverbindlich.', cta: !patientSaved, done: patientSaved },
             { n: 2, title: 'Bewerbungen erhalten & Pflegekräfte einladen', desc: 'Geeignete Pflegekräfte bewerben sich bei Ihnen. In der Zwischenzeit können Sie Wunschkandidatinnen gezielt einladen.', cta: false, done: hasPending },
             { n: 3, title: 'Vertrag abschließen', desc: 'Sie wählen Ihre Favoritin aus und bestätigen das Angebot — den Rest übernehmen wir.', cta: false, done: false },
             { n: 4, title: 'Laufende Betreuung', desc: 'Die Pflegekraft ist da. Ihr persönlicher Ansprechpartner begleitet Sie während des gesamten Einsatzes.', cta: false, done: false },
           ].map((s, i, arr) => (
-            <div key={s.n} className={`flex items-start gap-4 px-5 py-4 ${i < arr.length - 1 ? 'border-b' : ''}`} style={{borderColor:'#E5E3DF'}}>
+            <div key={s.n} className={`flex items-start gap-4 px-5 py-4 ${i < arr.length - 1 ? 'border-b' : ''}`} style={{borderColor:'#E9E9EB'}}>
               {s.done ? (
                 <div className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5" style={{background:'#E3F7EF'}}>
                   <Check className="w-4 h-4" strokeWidth={3} style={{color:'#22A06B'}} />
@@ -3148,8 +3498,8 @@ const CustomerPortalPage: FC = () => {
                 <div className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 font-bold text-white mt-0.5" style={{background:'#8B7355', fontSize:'15px'}}>{s.n}</div>
               )}
               <div>
-                <p className="text-[15px] font-semibold" style={{color: s.done ? '#9CA3AF' : '#3D3D3D'}}>{s.title}</p>
-                <p className="text-[15px] mt-0.5 leading-relaxed" style={{color: s.done ? '#B5B5B5' : '#8B8B8B'}}>{s.desc}</p>
+                <p className="text-[15px] font-semibold" style={{color: s.done ? '#9CA3AF' : '#18181B'}}>{s.title}</p>
+                <p className="text-[15px] mt-0.5 leading-relaxed" style={{color: s.done ? '#B5B5B5' : '#71717A'}}>{s.desc}</p>
                 {s.cta && (
                   <button
                     onClick={() => { setPatientExpandedManual(true); setTriggerOpenPatient(true); document.getElementById('patientendaten')?.scrollIntoView({ behavior: 'smooth', block: 'start' }); }}
@@ -3166,10 +3516,9 @@ const CustomerPortalPage: FC = () => {
 
         {/* ── SECTION HEADER: Häufige Fragen ── */}
         <div className="px-1 pt-3">
-          <h2 className="text-[1.1rem] font-bold" style={{color:'#3D3D3D'}}>Häufige Fragen</h2>
-          <div className="mt-1.5 h-[2px] w-10 rounded-full" style={{background:'#8B7355'}} />
+          <h2 className="text-[1.2rem] font-bold tracking-tight" style={{color:'#18181B'}}>Häufige Fragen</h2>
         </div>
-        <div className="rounded-2xl overflow-hidden border" style={{background:'white', borderColor:'#E5E3DF'}}>
+        <div className="rounded-2xl overflow-hidden border" style={{background:'#F4F4F6', borderColor:'#D4D4D8'}}>
           {[
             { q: 'Was bedeutet „Einladen"?', a: 'Wenn Ihnen eine Pflegekraft gefällt, laden Sie sie ein, sich bei Ihnen zu bewerben. Dafür müssen Sie nur kurz die Pflegesituation angeben — damit wir Ihnen passende, verfügbare Pflegekräfte zeigen können. Alles unverbindlich; ein Vertrag entsteht erst, wenn Sie ein konkretes Angebot annehmen.' },
             { q: 'Gehe ich mit dem Einladen einen Vertrag ein?', a: 'Nein — das Einladen und Anschauen von Profilen ist vollständig unverbindlich. Ein Vertrag kommt erst zustande, wenn Sie ein konkretes Angebot ausdrücklich annehmen.' },
@@ -3210,14 +3559,14 @@ const CustomerPortalPage: FC = () => {
               ),
             },
           ].map((item, i, arr) => (
-            <div key={i} className={i < arr.length - 1 ? 'border-b' : ''} style={{borderColor:'#E5E3DF'}}>
+            <div key={i} className={i < arr.length - 1 ? 'border-b' : ''} style={{borderColor:'#E9E9EB'}}>
               <button
                 onClick={() => setOpenFaq(openFaq === i ? null : i)}
                 className="w-full flex items-center justify-between px-5 py-5 text-left transition-colors duration-150"
-                style={{background: openFaq === i ? '#FAFAF9' : 'transparent'}}
+                style={{background: openFaq === i ? '#F5F5F6' : 'transparent'}}
               >
                 <span className="text-[15px] font-semibold pr-4 leading-snug transition-colors duration-150"
-                  style={{color: openFaq === i ? '#6B5444' : '#3D3D3D'}}>
+                  style={{color: openFaq === i ? '#6B5444' : '#18181B'}}>
                   {item.q}
                 </span>
                 <div className={`w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0 transition-all duration-200 ${
@@ -3229,7 +3578,7 @@ const CustomerPortalPage: FC = () => {
                 </div>
               </button>
               {openFaq === i && (
-                <div className="px-5 pb-6 pt-1" style={{background:'#FAFAF9'}}>
+                <div className="px-5 pb-6 pt-1" style={{background:'#F5F5F6'}}>
                   {typeof item.a === 'string' ? (
                     <p className="text-[15px] leading-[1.75] text-gray-600 whitespace-pre-line">{item.a}</p>
                   ) : (
@@ -3242,7 +3591,7 @@ const CustomerPortalPage: FC = () => {
         </div>
 
         {/* ── Ilka-Box (Beraterin / Trust / CTA) ── */}
-        <div className="rounded-2xl overflow-hidden border bg-white" style={{borderColor:'#E5E3DF'}}>
+        <div className="rounded-2xl overflow-hidden border bg-white" style={{borderColor:'#E9E9EB'}}>
           <div className="px-5 pt-5 pb-5 space-y-5">
             <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Noch Fragen? Ihre Beraterin</p>
             <div className="flex items-center gap-4">
@@ -3375,6 +3724,46 @@ const CustomerPortalPage: FC = () => {
           bleibt das UI bei echten Kunden unsichtbar. */}
       {chatNurse && CHAT_ENABLED && (
         <PflegekraftChat nurse={chatNurse} onClose={() => setChatNurse(null)} />
+      )}
+
+      {/* ── Rückmeldung zum Angebot (schwebend, unten rechts) ────────────
+           Als Kasten im Fluss saß sie ~3000 px weit unten und wurde kaum
+           gesehen (Martin, 12.08.). Jetzt schwebend mit Ilkas Gesicht:
+           erst zusammengeklappt als ein Satz, wegklickbar, und sie taucht
+           erst auf, wenn der Kunde am Angebot und an den Pflegekräften
+           vorbei ist (`feedbackReif`).
+
+           Nur solange das Profil offen ist: Wer gespeichert hat, hat die
+           Frage „wie geht es weiter" beantwortet, und wer offene
+           Bewerbungen hat, soll sich um die kümmern. Chat und Modale
+           liegen auf z-[60]+ — die Blase auf z-40 verdeckt sie nicht. */}
+      {!hasPending && !patientSaved && !feedbackWeg && feedbackReif && !chatNurse && !selectedApp && !selectedNurse && (
+        <AngebotsFeedback
+          onDismiss={() => setFeedbackWeg(true)}
+          onGoToForm={() => {
+            document.getElementById('patientendaten')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            setPatientExpandedManual(true);
+            setTriggerOpenPatient(true);
+          }}
+          onAnswer={(answer, detail, endgueltig) => {
+            // Der erste Tap geht STILL raus (notify:false) — er sichert die
+            // Antwort, falls der Kunde jetzt abbricht, löst aber keine Mail
+            // aus. Die Team-Mail hängt am endgültigen Aufruf, der genau
+            // einmal kommt. Sonst bekäme info@primundus.de zwei Mails pro
+            // Rückmeldung (Martin, 12.08.: „ich will immer eine Antwort
+            // erhalten" — eine, nicht zwei).
+            reportLeadEvent(
+              lead?.token,
+              'angebots_feedback',
+              {
+                feedback_answer: answer,
+                feedback_detail: detail,
+                ...(endgueltig ? { feedback_final: '1' } : {}),
+              },
+              endgueltig ? undefined : false,
+            );
+          }}
+        />
       )}
 
       {/* Angebot prüfen Modal */}

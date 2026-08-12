@@ -893,6 +893,7 @@ export function getTeamNotificationTemplate(
     caregiver_interest_shown: '💚',
     application_received: '📨',
     application_accepted_internal: '🎉',
+    angebots_feedback: '💬',
     vertrag_abgeschlossen: '🟢',
   };
 
@@ -904,6 +905,7 @@ export function getTeamNotificationTemplate(
     caregiver_interest_shown: 'Pflegekraft hat Interesse gezeigt',
     application_received: 'Bewerbung an Kunden gesendet',
     application_accepted_internal: 'Neue Buchung – Kunde hat akzeptiert',
+    angebots_feedback: 'Rückmeldung zum Angebot',
     vertrag_abgeschlossen: 'Neuer Vertrag abgeschlossen!',
   };
 
@@ -954,6 +956,13 @@ export function getTeamNotificationTemplate(
     'application_accepted_internal',
   ];
   const showPortalCta = PORTAL_CTA_STATUSES.includes(status) && Boolean(portalUrl);
+
+  // Rückmeldung zum Angebot (12.08.2026): Die Antwort MUSS in der Mail
+  // stehen — „Rückmeldung eingegangen" ohne den Inhalt zwingt zum Nachsehen
+  // im Admin und die Mail wäre reiner Lärm.
+  const feedbackText = status === 'angebots_feedback' && additionalData?.feedbackText
+    ? String(additionalData.feedbackText)
+    : '';
 
   // Pflegekraft-Name aus additionalData (nur bei Caregiver-Events).
   const caregiverName = (CAREGIVER_NAME_STATUSES.includes(status) && additionalData?.caregiverName)
@@ -1107,6 +1116,12 @@ export function getTeamNotificationTemplate(
         <div class="container">
           <h2>${emoji} ${text}</h2>
 
+          ${feedbackText ? `
+            <div class="highlight">
+              <strong>Antwort des Kunden:</strong> ${feedbackText}
+            </div>
+          ` : ''}
+
           ${caregiverName ? `
             <div class="highlight">
               <strong>${caregiverLabel}:</strong> ${caregiverName}${status === 'application_accepted_internal' && acceptanceCaregiverId ? ` (caregiver_id ${acceptanceCaregiverId})` : ''}${status === 'application_accepted_internal' && acceptanceApplicationId ? ` · Application ${acceptanceApplicationId}` : ''}
@@ -1177,7 +1192,9 @@ export function getTeamNotificationTemplate(
     `,
     text: `
 ${emoji} ${text}
-${caregiverName ? `
+${feedbackText ? `
+Antwort des Kunden: ${feedbackText}
+` : ''}${caregiverName ? `
 ${caregiverLabel}: ${caregiverName}${status === 'application_accepted_internal' && acceptanceCaregiverId ? ` (caregiver_id ${acceptanceCaregiverId})` : ''}${status === 'application_accepted_internal' && acceptanceApplicationId ? ` · Application ${acceptanceApplicationId}` : ''}
 ` : ''}${autoAcceptText}${contractTablesText}${showPortalCta ? `
 ➜ Im Kundenportal ansehen: ${portalUrl}

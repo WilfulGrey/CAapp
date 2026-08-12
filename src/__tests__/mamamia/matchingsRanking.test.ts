@@ -2,7 +2,8 @@
 // rules used by CustomerPortalPage's `effectiveMatched`. Hierarchy
 // (höchste Priorität zuerst):
 //
-//   1. Badge-Tier DESC (Platin > Gold > Silber > Bronze > Starter)
+//   1. Badge-Tier DESC (Elite > Stammkraft > Bewährt > Bekannt
+//      > kein Label) — seit 12.08.2026 allein aus hp_total_jobs
 //   2. Foto vorhanden DESC
 //   3. Weiblich DESC
 //   4. Alter ≤ 60 DESC
@@ -53,40 +54,38 @@ const NOW = new Date('2026-04-29T12:00:00.000Z');
 // ─── PRIMÄRE HIERARCHIE: Badge → Foto → Weiblich → Alter ─────────────
 
 describe('matchings ranking — badge tier first', () => {
-  it('Platin (score≥26) ranks above Gold (≥13)', () => {
-    // 30 Jahre Erfahrung + 0 Jobs = Platin (30 ≥ 26)
-    // 15 Jahre Erfahrung + 0 Jobs = Gold (15 ≥ 13)
+  it('Elite (≥12 Einsätze) ranks above Stammkraft (≥6)', () => {
     const sorted = [
-      makeMatch({ id: 1, care_experience: '15', hp_total_jobs: 0 }),
-      makeMatch({ id: 2, care_experience: '30', hp_total_jobs: 0 }),
+      makeMatch({ id: 1, hp_total_jobs: 7 }),
+      makeMatch({ id: 2, hp_total_jobs: 14 }),
     ].sort(rankComparator(NOW));
     expect(sorted.map(m => m.id)).toEqual([2, 1]);
   });
 
-  it('Gold > Silber > Bronze > Starter', () => {
+  it('Stammkraft > Bewährt > Bekannt > kein Label', () => {
     const sorted = [
-      makeMatch({ id: 1, care_experience: '0', hp_total_jobs: 0 }),  // Starter
-      makeMatch({ id: 2, care_experience: '2', hp_total_jobs: 0 }),  // Bronze
-      makeMatch({ id: 3, care_experience: '6', hp_total_jobs: 0 }),  // Silber
-      makeMatch({ id: 4, care_experience: '14', hp_total_jobs: 0 }), // Gold
+      makeMatch({ id: 1, hp_total_jobs: 0 }),  // kein Label
+      makeMatch({ id: 2, hp_total_jobs: 1 }),  // Bekannt
+      makeMatch({ id: 3, hp_total_jobs: 3 }),  // Bewährt
+      makeMatch({ id: 4, hp_total_jobs: 8 }),  // Stammkraft
     ].sort(rankComparator(NOW));
     expect(sorted.map(m => m.id)).toEqual([4, 3, 2, 1]);
   });
 
-  it('Badge-Score addiert experienceYears + hp_total_jobs', () => {
-    // 5 + 21 = 26 → Platin
-    // 25 + 0 = 25 → Gold (one shy of Platin)
+  it('care_experience zählt NICHT mehr in den Score (seit 12.08.2026)', () => {
+    // 30 behauptete Berufsjahre, aber kein Einsatz über uns — schlägt
+    // die Kraft mit 2 echten Einsätzen NICHT.
     const sorted = [
-      makeMatch({ id: 1, care_experience: '25', hp_total_jobs: 0 }),
-      makeMatch({ id: 2, care_experience: '5', hp_total_jobs: 21 }),
+      makeMatch({ id: 1, care_experience: '30', hp_total_jobs: 0 }),
+      makeMatch({ id: 2, care_experience: '0', hp_total_jobs: 2 }),
     ].sort(rankComparator(NOW));
     expect(sorted.map(m => m.id)).toEqual([2, 1]);
   });
 
-  it('Badge beats Foto: Platin-without-photo > Bronze-with-photo', () => {
+  it('Badge beats Foto: Stammkraft ohne Foto > Bekannt mit Foto', () => {
     const sorted = [
-      makeMatch({ id: 1, care_experience: '1', hp_total_jobs: 0, avatar: { aws_url: 'p' }, avatar_retouched: { aws_url: 'p' } }), // Bronze + photo
-      makeMatch({ id: 2, care_experience: '30', hp_total_jobs: 0, avatar: null, avatar_retouched: null }), // Platin no photo
+      makeMatch({ id: 1, hp_total_jobs: 1, avatar: { aws_url: 'p' }, avatar_retouched: { aws_url: 'p' } }),
+      makeMatch({ id: 2, hp_total_jobs: 14, avatar: null, avatar_retouched: null }),
     ].sort(rankComparator(NOW));
     expect(sorted.map(m => m.id)).toEqual([2, 1]);
   });
@@ -224,12 +223,12 @@ describe('matchings ranking — stable sort on full tie', () => {
 describe('matchings ranking — combined scenarios', () => {
   it('Hierarchy respected: badge dominiert alle anderen', () => {
     const sorted = [
-      // Bronze, weiblich, jung, mit Foto — gut auf 2-4 aber nur Bronze
-      makeMatch({ id: 'low-badge', care_experience: '1', gender: 'female', year_of_birth: 1990, avatar: { aws_url: 'p' } } as never),
-      // Platin, männlich, alt, ohne Foto — schlechtest auf 2-4 aber Platin
-      makeMatch({ id: 'platin', care_experience: '30', gender: 'male', year_of_birth: 1955, avatar: null, avatar_retouched: null } as never),
+      // Bekannt, weiblich, jung, mit Foto — gut auf 2-4, aber nur 1 Einsatz
+      makeMatch({ id: 'low-badge', hp_total_jobs: 1, gender: 'female', year_of_birth: 1990, avatar: { aws_url: 'p' } } as never),
+      // Stammkraft, männlich, alt, ohne Foto — schlecht auf 2-4, aber 14 Einsätze
+      makeMatch({ id: 'stammkraft', hp_total_jobs: 14, gender: 'male', year_of_birth: 1955, avatar: null, avatar_retouched: null } as never),
     ].sort(rankComparator(NOW));
-    expect(sorted.map(m => m.id)).toEqual(['platin', 'low-badge']);
+    expect(sorted.map(m => m.id)).toEqual(['stammkraft', 'low-badge']);
   });
 
   it('Bei gleichem Badge: Foto > Gender > Alter', () => {

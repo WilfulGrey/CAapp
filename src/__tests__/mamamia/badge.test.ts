@@ -6,6 +6,7 @@ import {
   badgeTier,
   MIN_BADGE_SCORE,
 } from '../../lib/mamamia/badge';
+import { nurseLevel } from '../../components/portal/shared';
 
 describe('parseExperienceYears', () => {
   it('parses a numeric string', () => {
@@ -23,53 +24,78 @@ describe('parseExperienceYears', () => {
   });
 });
 
-describe('badgeScore (numeric inputs)', () => {
-  it('sums years + assignments', () => {
-    expect(badgeScore(6, 4)).toBe(10);
+describe('badgeScore — nur Einsätze (seit 12.08.2026)', () => {
+  it('ist die Zahl der Einsätze', () => {
+    expect(badgeScore(4)).toBe(4);
   });
-  it('null/undefined → 0 component', () => {
-    expect(badgeScore(null, 3)).toBe(3);
-    expect(badgeScore(5, undefined)).toBe(5);
-    expect(badgeScore(null, null)).toBe(0);
+  it('null/undefined → 0', () => {
+    expect(badgeScore(null)).toBe(0);
+    expect(badgeScore(undefined)).toBe(0);
   });
 });
 
 describe('caregiverBadgeScore (raw caregiver)', () => {
-  it('parses care_experience + hp_total_jobs', () => {
-    expect(caregiverBadgeScore({ care_experience: '6', hp_total_jobs: 4 })).toBe(10);
-  });
-  it('missing/non-string fields → treated as 0', () => {
-    expect(caregiverBadgeScore({ care_experience: null, hp_total_jobs: null })).toBe(0);
-    expect(caregiverBadgeScore({ care_experience: '3' })).toBe(3);
+  it('liest hp_total_jobs', () => {
     expect(caregiverBadgeScore({ hp_total_jobs: 7 })).toBe(7);
+  });
+  it('fehlend/null → 0', () => {
+    expect(caregiverBadgeScore({ hp_total_jobs: null })).toBe(0);
+    expect(caregiverBadgeScore({})).toBe(0);
+  });
+  it('care_experience zählt NICHT mehr mit', () => {
+    // Vor dem 12.08. war das 6 + 4 = 10. Jahre sind Selbstauskunft und
+    // sagen nichts über Einsätze bei uns.
+    expect(caregiverBadgeScore({ care_experience: '6', hp_total_jobs: 4 } as {
+      care_experience?: string | null; hp_total_jobs?: number | null;
+    })).toBe(4);
   });
 });
 
-describe('badgeTier (thresholds — single source of truth)', () => {
-  it('Starter: 0', () => {
+describe('badgeTier — Schwellen wie im SA-Portal (12/6/2/1)', () => {
+  it('kein Label: 0', () => {
     expect(badgeTier(0)).toBe(0);
   });
-  it('Bronze: 1..3', () => {
+  it('Bekannt: genau 1', () => {
     expect(badgeTier(1)).toBe(1);
-    expect(badgeTier(3)).toBe(1);
   });
-  it('Silber: 4..9', () => {
-    expect(badgeTier(4)).toBe(2);
-    expect(badgeTier(9)).toBe(2);
+  it('Bewährt: 2..5', () => {
+    expect(badgeTier(2)).toBe(2);
+    expect(badgeTier(5)).toBe(2);
   });
-  it('Gold: 10..17', () => {
-    expect(badgeTier(10)).toBe(3);
-    expect(badgeTier(17)).toBe(3);
+  it('Stammkraft: 6..11', () => {
+    expect(badgeTier(6)).toBe(3);
+    expect(badgeTier(11)).toBe(3);
   });
-  it('Platin: ≥18', () => {
-    expect(badgeTier(18)).toBe(4);
-    expect(badgeTier(26)).toBe(4);
+  it('Elite: ≥12', () => {
+    expect(badgeTier(12)).toBe(4);
+    expect(badgeTier(35)).toBe(4);
   });
 });
 
 describe('MIN_BADGE_SCORE', () => {
-  it('is the Silber threshold (4)', () => {
-    expect(MIN_BADGE_SCORE).toBe(4);
-    expect(badgeTier(MIN_BADGE_SCORE)).toBe(2); // Silber
+  it('ist die „Bewährt"-Schwelle (2)', () => {
+    expect(MIN_BADGE_SCORE).toBe(2);
+    expect(badgeTier(MIN_BADGE_SCORE)).toBe(2);
+  });
+});
+
+describe('nurseLevel — Labels folgen den Schwellen', () => {
+  it('Einsätze bestimmen das Label, Jahre nicht', () => {
+    // 12 Jahre Erfahrung, aber erst 1 Einsatz über uns → „Bekannt".
+    expect(nurseLevel(12, 1).label).toBe('Bekannt');
+    expect(nurseLevel(0, 2).label).toBe('Bewährt');
+    expect(nurseLevel(0, 6).label).toBe('Stammkraft');
+    expect(nurseLevel(0, 12).label).toBe('Elite');
+  });
+  it('„Stammkraft" liegt auf derselben Stufe wie im SA-Portal (Gold, 6–11)', () => {
+    // Verhindert, dass Berater und Kunde bei demselben Wort verschiedene
+    // Stufen meinen — mamamia-sadash caregiverBadge.js: gold min 6.
+    expect(nurseLevel(0, 5).label).not.toBe('Stammkraft');
+    expect(nurseLevel(0, 6).label).toBe('Stammkraft');
+    expect(nurseLevel(0, 11).label).toBe('Stammkraft');
+    expect(nurseLevel(0, 12).label).not.toBe('Stammkraft');
+  });
+  it('ohne Einsatz kein Label', () => {
+    expect(nurseLevel(20, 0).label).toBe('');
   });
 });

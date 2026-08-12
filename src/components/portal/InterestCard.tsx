@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import type { FC } from 'react';
-import { Check, ChevronDown, FileText, Heart, UserPlus } from 'lucide-react';
+import { Check, ChevronDown, FileText, UserPlus } from 'lucide-react';
 import type { Nurse } from '../../types';
 import { nurseLevel, displayName, initials } from './shared';
 
@@ -34,7 +34,6 @@ export const InterestCard: FC<{
   const [dismissPhase, setDismissPhase] = useState<'idle' | 'sending'>('idle');
   const inits = initials(nurse.name);
   const name = displayName(nurse.name);
-  const bars = Array.from({ length: 3 }, (_, i) => i < nurse.language.bars);
 
   const handleInvite = async () => {
     const allowed = onInvite ? onInvite() : true;
@@ -65,116 +64,82 @@ export const InterestCard: FC<{
 
   return (
     <div className="relative">
-      {/* "Hat Interesse" Top-Edge Badge — sitzt mittig auf der Card-Oberkante,
-          warmer Coral-Ton in der Marken-Palette. Außerhalb des overflow-hidden
-          Containers, damit der Pin über den Card-Rand ragen kann. */}
-      <div className="absolute -top-2.5 left-1/2 -translate-x-1/2 z-10 whitespace-nowrap">
-        <span
-          className="inline-flex items-center gap-1.5 text-[11px] font-bold tracking-wide px-3 py-1 rounded-full shadow-sm border"
-          style={{
-            background: 'linear-gradient(135deg, #FFE5DE 0%, #FFCFC4 100%)',
-            color: '#C04A40',
-            borderColor: '#F0B0A4',
-          }}
-        >
-          <Heart className="w-3 h-3" fill="currentColor" />
-          Hat Interesse
-        </span>
-      </div>
-
       <div
-        className={`bg-white rounded-2xl border overflow-hidden transition-all ${
+        className={`group bg-[#F4F4F6] rounded-2xl border overflow-hidden transition-all ${
           exiting ? 'opacity-0 -translate-x-2 pointer-events-none' : ''
         } ${
           status === 'dismissed'
             ? 'opacity-40 border-gray-200'
             : status === 'invited'
-            ? 'border-[#C4B49A]'
-            : 'border-[#C4B49A] hover:border-[#8B7355] hover:shadow-[0_4px_16px_rgba(139,115,85,0.12)]'
+            ? 'border-zinc-300'
+            : 'border-zinc-300 hover:border-zinc-500'
         }`}
       >
       <div className="px-4 pt-4 pb-3 cursor-pointer active:bg-gray-50" onClick={onNurseClick}>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3.5">
           <div className="flex-shrink-0">
             {nurse.image ? (
-              <img src={nurse.image} alt={nurse.name} className="w-14 h-14 rounded-2xl object-cover" />
+              <img src={nurse.image} alt={nurse.name} className="w-16 h-16 rounded-xl object-cover" />
             ) : (
-              <div
-                className="w-14 h-14 rounded-2xl flex items-center justify-center text-lg font-bold text-white"
-                style={{ backgroundColor: nurse.color }}
-              >
+              <div className="w-16 h-16 rounded-xl flex items-center justify-center text-lg font-bold text-white"
+                style={{ backgroundColor: nurse.color }}>
                 {inits}
               </div>
             )}
           </div>
 
           <div className="flex-1 min-w-0">
-            <div className="flex items-start justify-between gap-2 mb-1">
-              <div className="flex items-baseline gap-1.5 min-w-0">
-                <span className="font-bold text-gray-900 leading-tight">{name}</span>
-                {nurse.age ? (
-                  <span className="text-sm text-gray-400 flex-shrink-0">{nurse.age} J.</span>
-                ) : null}
-              </div>
-              {/* Badge identisch zur MatchCard (top-right neben Name) —
-                  damit Interesse- und Matching-Karten visuell konsistent
-                  sind. */}
-              {(() => {
-                const lvl = nurseLevel(nurse.experienceYears ?? 0, nurse.history?.assignments ?? 0);
-                return (
-                  <span className={`flex items-center gap-1 text-xs font-bold pl-1.5 pr-2.5 py-0.5 rounded-full border flex-shrink-0 ${lvl.cls}`}>
-                    <span className="text-sm leading-none">{lvl.emoji}</span>
-                    {lvl.label}
-                  </span>
-                );
-              })()}
+            {/* Umbau 11.08. (Martin: „CG-Kasten sieht immer noch scheisse aus —
+                Farben austauschen bringt nichts"). Es lag an der Struktur:
+                drei Kleinschrift-Zeilen neben einem 56px-Foto, die Faktenzeile
+                mit `truncate` (der Kunde las „Ø 1…" — eine abgeschnittene
+                Zahl), dazu ein Sprachbalken, der genau das wiederholte, was
+                daneben im Klartext stand.
+                Jetzt: größeres Foto, Name als Zeile, darunter EINE Meta-Zeile,
+                darunter die Fakten ausgeschrieben und umbrechend. */}
+            <div className="flex items-center justify-between gap-2">
+              <p className="text-[17px] font-semibold leading-snug" style={{ color: '#18181B' }}>
+                {name}
+                {nurse.age ? <span className="font-normal" style={{ color: '#71717A' }}>, {nurse.age}</span> : null}
+              </p>
+              {/* Öffnen-Hinweis statt „Details"-Link im Footer (11.08.) */}
+              <ChevronDown className="w-4 h-4 -rotate-90 flex-shrink-0 text-zinc-400 group-hover:text-zinc-700 transition-colors" />
             </div>
-            <div className="flex items-center gap-2 mb-1">
-              <div className="flex gap-0.5">
-                {bars.map((f, i) => (
-                  <div key={i} className={`w-3 h-1.5 rounded-full ${f ? 'bg-[#8B7355]' : 'bg-gray-200'}`} />
-                ))}
-              </div>
-              <span className="text-sm text-gray-500">Deutsch {nurse.language.level}</span>
+
+            <div className="flex flex-wrap items-center gap-x-1.5 gap-y-1 mt-1">
+              <span className="text-[16px]" style={{ color: '#71717A' }}>Deutsch {nurse.language.level}</span>
               {nurse.referencePdfUrl && (
-                /* PK hat Referenzen im Profil (eine PDF mit einer/mehreren
-                   Empfehlungen). Klick auf die Card öffnet das Profil mit
-                   dem echten Link. Mirror der MatchCard. */
-                <span
-                  className="inline-flex items-center gap-0.5 text-[10px] font-medium text-[#8B7355] bg-[#F8F7F5] border border-[#C4B49A] px-1.5 py-0.5 rounded-full"
-                  title="Referenzen im Profil"
-                >
-                  <FileText className="w-2.5 h-2.5" />
+                <span className="inline-flex items-center gap-1 text-[14px]" style={{ color: '#71717A' }} title="Referenzen im Profil">
+                  <FileText className="w-3 h-3" />
                   Referenzen
                 </span>
               )}
             </div>
-            <p className="text-sm text-gray-500 truncate">
-              <span className="font-semibold text-[#8B7355]">{nurse.experience}</span>
-              {nurse.history && (
-                <span>
-                  {' '}· {nurse.history.assignments} Einsätze · Ø {Math.round(nurse.history.avgDurationMonths * 4.3)} Wo.
-                </span>
-              )}
-            </p>
           </div>
         </div>
+
+        {/* Fakten über die VOLLE Kartenbreite (11.08.), nicht in der schmalen
+            Spalte neben dem Foto — dort brach die Zeile mitten in der Zahl um
+            („· im / Schnitt 12 Wochen"). */}
+        <p className="text-[16px] mt-3" style={{ color: '#71717A' }}>
+          {(() => { const lvl = nurseLevel(nurse.experienceYears ?? 0, nurse.history?.assignments ?? 0); return lvl.label ? (
+            <span className="font-semibold" style={{ color: '#18181B' }}>{lvl.label}: </span>
+          ) : null; })()}
+          {nurse.experience}
+          {nurse.history && (
+            <> · {nurse.history.assignments} Einsätze · Ø {Math.round(nurse.history.avgDurationMonths * 4.3)} Wochen pro Einsatz</>
+          )}
+        </p>
       </div>
 
-      <div className="border-t border-gray-100 px-4 py-2.5 flex items-center justify-between gap-2">
-        <button
-          onClick={onNurseClick}
-          className="text-sm font-semibold text-[#8B7355] flex items-center gap-1 hover:underline shrink-0"
-        >
-          Details <ChevronDown className="w-3.5 h-3.5 -rotate-90" />
-        </button>
+      <div className="border-t border-gray-100 px-4 py-2.5 flex items-center justify-end gap-3">
         <div className="flex items-center gap-2">
           {status === 'invited' || invitePhase === 'done' ? (
             <span className="flex items-center gap-1.5 text-xs font-bold text-[#22A06B] bg-[#E3F7EF] border border-[#B8E8D4] px-4 py-1.5 rounded-full">
               <Check className="w-3 h-3 flex-shrink-0" /> Einladung gesendet
             </span>
           ) : invitePhase === 'sending' ? (
-            <span className="flex items-center gap-1.5 text-xs font-bold text-[#8B7355] bg-[#F8F7F5] border border-[#E5E3DF] px-4 py-1.5 rounded-full">
+            <span className="flex items-center gap-1.5 text-xs font-bold text-[#8B7355] bg-[#F5F5F6] border border-[#E9E9EB] px-4 py-1.5 rounded-full">
               <svg className="w-3 h-3 animate-spin flex-shrink-0" viewBox="0 0 24 24" fill="none">
                 <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3"/>
                 <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"/>
@@ -202,7 +167,7 @@ export const InterestCard: FC<{
                 <button
                   disabled
                   aria-disabled="true"
-                  className="flex items-center gap-1.5 text-xs font-bold text-[#8B7355] bg-[#F8F7F5] border border-[#E5E3DF] px-4 py-1.5 rounded-full cursor-not-allowed shadow-sm"
+                  className="flex items-center gap-1.5 text-xs font-bold text-[#8B7355] bg-[#F5F5F6] border border-[#E9E9EB] px-4 py-1.5 rounded-full cursor-not-allowed shadow-sm"
                 >
                   <svg className="w-3 h-3 animate-spin flex-shrink-0" viewBox="0 0 24 24" fill="none">
                     <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3"/>

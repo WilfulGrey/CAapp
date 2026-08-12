@@ -55,25 +55,53 @@ export interface NurseStatuses {
 
 // ─── Helpers ──────────────────────────────────────────────────────────────
 
-// Maps the experience badge tier to its UI presentation (label/emoji/colour).
-// Score + thresholds live in lib/mamamia/badge.ts — the single source of truth
-// shared with the matching ranking (rankComparator) and the portal "Silber+"
-// funnel (MIN_BADGE_SCORE). With the current thresholds
-// (Platin ≥18 / Gold ≥10 / Silber ≥4 / Bronze ≥1 / sonst Starter):
-//   1 J. + 3 Eins. = 4  → Silber
-//   6 J. + 4 Eins. = 10 → Gold
-//   12 J. + 6 Eins. = 18 → Platin
-export function nurseLevel(experienceYears: number, assignments: number): {
+// Maps the experience badge tier to its UI presentation (label).
+// Score + Schwellen leben in lib/mamamia/badge.ts — einzige Quelle,
+// geteilt mit dem Matching-Ranking (rankComparator), dem „Bewährt+"-Trichter
+// (MIN_BADGE_SCORE) und dem Erklär-Popup im Profil. Basis seit 12.08. ist
+// allein die Zahl unserer Einsätze (Elite ≥12 / Stammkraft ≥6 / Bewährt ≥2 /
+// Bekannt ≥1 / sonst kein Label) — gleiche Rechnung UND gleiche Wortwahl wie
+// im SA-Portal (mamamia-sadash `lib/caregiverBadge.js`).
+//
+// `assignments` = Caregiver.hp_total_jobs. `experienceYears` wird NICHT mehr
+// eingerechnet; der Parameter bleibt in der Signatur, weil die Karten die
+// Jahre weiterhin danebenschreiben („Bewährt: 4 J. Erfahrung · 9 Einsätze")
+// und alle Aufrufer beides ohnehin zur Hand haben.
+export function nurseLevel(_experienceYears: number, assignments: number): {
   label: string;
   emoji: string;
   cls: string;
 } {
-  switch (badgeTier(badgeScore(experienceYears, assignments))) {
-    case 4:  return { label: 'Platin',  emoji: '🏆', cls: 'bg-amber-50 text-amber-700 border-amber-200' };
-    case 3:  return { label: 'Gold',    emoji: '🥇', cls: 'bg-yellow-50 text-yellow-600 border-yellow-300' };
-    case 2:  return { label: 'Silber',  emoji: '🥈', cls: 'bg-slate-100 text-slate-500 border-slate-300' };
-    case 1:  return { label: 'Bronze',  emoji: '🥉', cls: 'bg-amber-50 text-amber-700 border-amber-200' };
-    default: return { label: 'Starter', emoji: '⭐', cls: 'bg-gray-100 text-gray-500 border-gray-200' };
+  // Darstellung neutralisiert (Martin, 11.08.: „viel moderner und klarer").
+  // Vorher: fünf Medaillen-Emojis und fünf Farbschemata (amber/yellow/slate/
+  // amber/gray) — auf einer Karte neben Foto, Sprachbalken und CTA war das
+  // Jahrmarkt, kein Qualitätssignal. Die Stufe steht jetzt im Wort.
+  //
+  // Wortwahl seit 12.08. auf Bekanntheit statt Erfahrung umgestellt: Die Zahl
+  // sagt aus, wie oft jemand SCHON BEI UNS war — „sehr erfahren" hätte das als
+  // allgemeines Können gelesen.
+  // „Stammkraft" sitzt auf 6–11, NICHT auf der Spitze (Martin, 12.08.):
+  // Das SA-Portal nennt seinen Gold-Rang (ebenfalls 6–11) schon so
+  // („Gold — Stammkraft — 6–11 Einsätze über uns", caregiverBadge.js). Läge
+  // das Wort im Portal auf ≥12, meinten Berater und Kunde bei „Stammkraft"
+  // zwei verschiedene Stufen.
+  //
+  // Auch die Spitze kommt aus caregiverBadge.js: Der Platin-Rang heisst dort
+  // „Elite — 12+ Einsätze über uns". Damit ist die GANZE Leiter mit dem
+  // SA-Portal deckungsgleich, Wort für Wort und Schwelle für Schwelle.
+  //
+  // Zwei Wörter sind vorher durchgefallen: „Spitzenkraft" (Martin, 12.08.:
+  // „Spitzenkräfte können die anderen doch auch sein" — gezählt wird, WIE OFT
+  // jemand über uns im Einsatz war, nicht wie gut sie pflegt) und „Vielfach
+  // gebucht" (richtig, aber blass). „Elite" macht keine NEUE Behauptung auf:
+  // Es ist bereits unsere interne Bezeichnung für genau diese Stufe, und auf
+  // der Karte steht die Einsatzzahl direkt daneben.
+  switch (badgeTier(badgeScore(assignments))) {
+    case 4:  return { label: 'Elite',      emoji: '', cls: '' };
+    case 3:  return { label: 'Stammkraft', emoji: '', cls: '' };
+    case 2:  return { label: 'Bewährt',    emoji: '', cls: '' };
+    case 1:  return { label: 'Bekannt',    emoji: '', cls: '' };
+    default: return { label: '',           emoji: '', cls: '' };
   }
 }
 
@@ -210,4 +238,4 @@ export interface PatientForm {
 // Step 5 hieß "Kontakt" als dort noch Name + Telefon abgefragt wurden.
 // Seit Rückrollung 14.06.2026 fragt Step 5 nur noch das Startdatum ab —
 // Label entsprechend geändert.
-export const STEP_LABELS = ['Zur Person', 'Pflegebedarf', 'Wohnsituation', 'Wünsche & Aufgaben', 'Startdatum'];
+export const STEP_LABELS = ['Zur Person', 'Pflegebedarf', 'Einsatzort & Start', 'Wünsche & Aufgaben'];

@@ -313,7 +313,9 @@ Deno.test("one app, zero seen → 1 bridge POST with full caregiver metadata", a
   assertEquals(recorder[0].event, "application_received");
   assertEquals(recorder[0].metadata.caregiver_id, 50001);
   assertEquals(recorder[0].metadata.caregiver_name, "Helena K.");
-  assertEquals(recorder[0].metadata.caregiver_badge_level, "Gold");
+  // 12 Einsätze = höchste Stufe (Schwellen 12/6/2/1 seit 12.08.2026 —
+  // vorher 20/10/5/1, da war 12 noch "Gold").
+  assertEquals(recorder[0].metadata.caregiver_badge_level, "Platin");
   assertEquals(recorder[0].metadata.caregiver_einsatz_count, 12);
 });
 

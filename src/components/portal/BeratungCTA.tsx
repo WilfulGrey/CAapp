@@ -12,12 +12,12 @@ export const BeratungCTA: FC<{
   body?: string;
 }> = ({ headline, body = 'Ich helfe Ihnen gerne weiter — schnell und unverbindlich.' }) => {
   return (
-    <div className="rounded-2xl border border-[#E5E3DF] bg-[#FAF8F4] p-4">
+    <div className="rounded-2xl border border-[#E9E9EB] bg-[#F5F5F6] p-4">
       <div className="flex items-start gap-3">
         <img
           src="/ilka.webp"
           alt="Ilka Wysocki"
-          className="w-14 h-14 rounded-full object-cover object-top flex-shrink-0 border border-[#E5E3DF]"
+          className="w-14 h-14 rounded-full object-cover object-top flex-shrink-0 border border-[#E9E9EB]"
         />
         <div className="flex-1 min-w-0">
           <p className="text-[14px] font-semibold text-[#3D2B1F] leading-tight">{headline}</p>
@@ -37,7 +37,7 @@ export const BeratungCTA: FC<{
             </a>
             <a
               href={PHONE_HREF}
-              className="flex-1 inline-flex items-center justify-center gap-1.5 text-xs font-semibold bg-white text-[#3D2B1F] border border-[#E5E3DF] px-3.5 py-2 rounded-full hover:bg-gray-50 transition-colors"
+              className="flex-1 inline-flex items-center justify-center gap-1.5 text-xs font-semibold bg-white text-[#3D2B1F] border border-[#E9E9EB] px-3.5 py-2 rounded-full hover:bg-gray-50 transition-colors"
             >
               <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} aria-hidden="true">
                 <path strokeLinecap="round" strokeLinejoin="round" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.95.68l1.5 4.5a1 1 0 01-.5 1.21l-2.26 1.13a11.04 11.04 0 005.52 5.52l1.13-2.26a1 1 0 011.21-.5l4.5 1.5a1 1 0 01.68.95V19a2 2 0 01-2 2h-1C9.72 21 3 14.28 3 6V5z" />

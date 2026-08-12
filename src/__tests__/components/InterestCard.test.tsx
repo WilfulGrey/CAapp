@@ -32,17 +32,6 @@ describe('InterestCard', () => {
     expect(screen.queryByText(/Ablehnen/)).toBeNull();
   });
 
-  it('shows "Hat Interesse" badge', () => {
-    render(
-      <InterestCard
-        nurse={makeNurse()}
-        status="idle"
-        onNurseClick={() => {}}
-      />,
-    );
-    expect(screen.getByText(/Hat Interesse/)).toBeTruthy();
-  });
-
   it('Einladen click → onInviteConfirm called, shows "wird eingeladen" pill while pending', async () => {
     let resolve!: () => void;
     const onInviteConfirm = vi.fn().mockReturnValue(new Promise<void>((r) => { resolve = r; }));

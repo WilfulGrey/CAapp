@@ -1567,12 +1567,34 @@ export default function LeadDetailPage() {
                     acceptance_sync_alarm: { label: '🚨 Mamamia-Sync-Alarm (Team-Mail)', color: 'bg-red-600' },
                     token_regenerated: { label: 'Portal-Link erneuert', color: 'bg-blue-400' },
                     folge_einsatz_detected: { label: 'Folge-Einsatz erkannt (neuer Mamamia-Job)', color: 'bg-[#E76F63]' },
+                    angebots_feedback: { label: 'Rückmeldung zum Angebot', color: 'bg-[#8B7355]' },
                   };
                   const cfg = eventLabels[event.event_type] ?? { label: event.event_type.replace(/_/g, ' '), color: 'bg-[#5C4A32]' };
                   // Seed-Events (Multi-Job-Erstscan, notify=false) haben NIE
                   // eine Mail ausgelöst — ohne Kennzeichnung denkt das Team
                   // bei Vorfällen wie 9239, die Kundin sei informiert worden.
                   const isSeeded = event.metadata?.seeded === true || event.metadata?.seeded === 'true';
+                  // Rückmeldung zum Angebot: den Enum-Wert lesbar machen und
+                  // nach oben holen. Roh stand da „feedback_answer:
+                  // passt_nicht" zwischen den anderen Metadata-Zeilen — das
+                  // muss man erst entziffern.
+                  const FEEDBACK_ANTWORT: Record<string, string> = {
+                    passt_nicht: 'Passt nicht',
+                    spaeter: 'Vielleicht später',
+                    loslegen: 'Interessant',
+                  };
+                  const feedbackText = event.event_type === 'angebots_feedback'
+                    ? [
+                        FEEDBACK_ANTWORT[String(event.metadata?.feedback_answer ?? '')]
+                          ?? event.metadata?.feedback_answer,
+                        event.metadata?.feedback_detail,
+                      ].filter(Boolean).join(' — ')
+                    : '';
+                  // Der erste Tap geht still raus (notify:false). Ohne
+                  // Kennzeichnung sähen beide Zeilen gleich aus und niemand
+                  // wüsste, welche die Team-Mail ausgelöst hat.
+                  const isFeedbackZwischenstand =
+                    event.event_type === 'angebots_feedback' && !event.metadata?.feedback_final;
                   return (
                     <div key={event.id} className="flex gap-3">
                       <div className="flex flex-col items-center">
@@ -1596,7 +1618,15 @@ export default function LeadDetailPage() {
                               (Seed — keine Mail versendet)
                             </span>
                           )}
+                          {isFeedbackZwischenstand && (
+                            <span className="ml-2 text-xs font-normal text-amber-600">
+                              (Zwischenstand — keine Mail versendet)
+                            </span>
+                          )}
                         </p>
+                        {feedbackText && (
+                          <p className="text-sm font-semibold text-[#8B7355]">{feedbackText}</p>
+                        )}
                         <p className="text-xs text-gray-400 mb-1">
                           {new Date(event.created_at).toLocaleString('de-DE')}
                         </p>

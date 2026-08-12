@@ -168,7 +168,7 @@ export const ExpiredLinkScreen: FC<{
               <button
                 onClick={requestNewLink}
                 className="inline-flex items-center gap-2 text-sm font-bold rounded-2xl px-6 py-3 border"
-                style={{ color: '#8B7355', borderColor: '#C4B49A', background: 'white' }}
+                style={{ color: '#8B7355', borderColor: '#E9E9EB', background: 'white' }}
               >
                 Erneut versuchen
               </button>

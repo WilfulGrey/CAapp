@@ -1291,16 +1291,26 @@ export function cleanAboutText(raw: string | null | undefined): string | null {
   return t;
 }
 
-// Mirror of frontend src/lib/mamamia/mappers.ts badge thresholds. Mamamia
-// Bronze/Silber/Gold/Platin badges are derived from hp_total_jobs (cumulative
-// completed assignments). Starter = zero history.
+// Schwellen-Spiegel von src/lib/mamamia/badge.ts (`badgeTier`) und
+// mamamia-sadash `lib/caregiverBadge.js`. Basis überall: hp_total_jobs
+// (abgeschlossene Einsätze über uns), Starter = keine Historie.
+//
+// 12.08.2026: Schwellen von 20/10/5/1 auf 12/6/2/1 korrigiert. Der Kommentar
+// behauptete schon vorher „Mirror of frontend badge thresholds", die Zahlen
+// waren aber eine dritte, eigene Reihe — dieselbe Pflegekraft konnte in der
+// Mail Silber und im Portal eine Stufe höher sein.
+//
+// Die Namen bleiben vorerst metallisch, weil die Kundenmails sie mit
+// Farbverlauf rendern (send-scheduled-emails `reminderBadgeStyle`); das
+// Portal UND SA-Portal zeigen seit 12.08. Klartext (Bekannt / Bewährt /
+// Stammkraft / Elite). Angleichen der Mail-Wortwahl ist eine eigene Entscheidung.
 export function mapHpToBadge(
   hpTotalJobs: number | null | undefined,
 ): "Starter" | "Bronze" | "Silber" | "Gold" | "Platin" | null {
   if (hpTotalJobs == null) return null;
-  if (hpTotalJobs >= 20) return "Platin";
-  if (hpTotalJobs >= 10) return "Gold";
-  if (hpTotalJobs >= 5) return "Silber";
+  if (hpTotalJobs >= 12) return "Platin";
+  if (hpTotalJobs >= 6) return "Gold";
+  if (hpTotalJobs >= 2) return "Silber";
   if (hpTotalJobs >= 1) return "Bronze";
   return "Starter";
 }
