@@ -85,7 +85,7 @@ const TEAM_NOTIFY_RECIPIENT = 'info@primundus.de';
 // im Code (lib/vertrag.ts); ohne Version würden alte Verträge nach einer
 // Textänderung mit NEUEM Wortlaut re-rendern. Bump NUR mit bewusster
 // Textänderung (alten Text dann als eingefrorene Version behalten).
-const CONTRACT_VERSION = 'v1.0';
+const CONTRACT_VERSION = 'v1.1';
 // Zusätzliche BCC-Empfänger NUR für die Accept-/Buchungs-Team-Mail
 // (application_accepted_internal). Andere Team-Notifications behalten den
 // Default-BCC (SMTP_BCC = info@primundus.de,info@mamamia.app). Kommasepariert.
@@ -306,7 +306,7 @@ async function getOrCreateCanonicalContract(
     attachment = await buildVertragAttachmentPdf(snapshot as any, {
       signaturName,
       signedAt: (signedAtIso ? formatSignedAtBerlin(signedAtIso) : undefined) ?? legacyLabel ?? undefined,
-      auditNote: 'Vertragsversion v1.0',
+      auditNote: 'Vertragsversion v1.1',
     });
   } catch (e) {
     console.error('buildVertragAttachmentPdf failed:', e instanceof Error ? e.message : String(e));

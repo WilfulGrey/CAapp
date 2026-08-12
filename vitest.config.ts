@@ -18,7 +18,10 @@ export default defineConfig({
     // Vitest owns src/** only. `**/node_modules/**` (not `node_modules/**`)
     // so nested node_modules — e.g. `project 3/node_modules` — are excluded too.
     // `project 3/**` is the kostenrechner (separate Next.js app, own tooling).
-    exclude: ['supabase/**', 'e2e/**', '**/node_modules/**', 'dist/**', 'project 3/**'],
+    // `**/.claude/**` — stare worktree'y agentowych sesji (`.claude/worktrees/*`
+    // z pełnymi kopiami src/) zatruwały lokalny run duplikatami testów na
+    // nieaktualnym kodzie (177 "failed files" przy zielonym CI, 2026-08-12).
+    exclude: ['supabase/**', 'e2e/**', '**/node_modules/**', 'dist/**', 'project 3/**', '**/.claude/**'],
     coverage: {
       provider: 'v8',
       reporter: ['text', 'html'],
