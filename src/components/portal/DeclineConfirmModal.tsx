@@ -50,9 +50,12 @@ export const DeclineConfirmModal: FC<{
                 <div className="flex items-center gap-2 flex-wrap mb-1">
                   <span className="font-bold text-base text-gray-900">{name}</span>
                   <span className="text-sm text-gray-500">{nurse.age} J.</span>
-                  <span className={`flex items-center gap-0.5 text-xs font-bold pl-1.5 pr-2 py-0.5 rounded-full border flex-shrink-0 ${lvl.cls}`}>
-                    <span className="text-xs leading-none">{lvl.emoji}</span>{lvl.label}
-                  </span>
+                  {/* Ohne Einsatz KEINE Pille (12.08.) — sonst leerer Rahmen. */}
+                  {lvl.label && (
+                    <span className={`text-xs font-bold px-2.5 py-0.5 rounded-full border flex-shrink-0 ${lvl.cls}`}>
+                      {lvl.label}
+                    </span>
+                  )}
                 </div>
                 <p className="text-sm font-medium text-gray-700 mt-0.5">{nurse.experience}</p>
               </div>

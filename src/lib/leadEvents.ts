@@ -19,7 +19,8 @@ export type LeadEvent =
   | 'application_rejected'        // customer Bewerbung abgelehnt
   | 'patient_form_step'           // Patientenbogen: Schritt erreicht (metadata.step) — Abbruch-Analyse
   | 'patient_form_save_failed'    // Patientenbogen: Server-Save gescheitert (metadata.error)
-  | 'patient_form_location_unresolved'; // Einsatzort eingegeben, aber kein Mamamia-location_id (z. B. AT-PLZ) — Team-Flag, keine Mail
+  | 'patient_form_location_unresolved' // Einsatzort eingegeben, aber kein Mamamia-location_id (z. B. AT-PLZ) — Team-Flag, keine Mail
+  | 'angebots_feedback';          // Rückmeldung zum Angebot: ein Tap + optionales Detail
 
 // Mini-Snapshot der Nurse-Daten, die wir brauchen um eine declined-from-
 // Interest Pflegekraft im bearbeitet-Bereich als virtuelle MatchCard zu
@@ -75,6 +76,18 @@ export interface LeadEventMetadata {
   // patient_form_location_unresolved: gesetzt ('1') bei 4-stelliger PLZ
   // (Österreich/Schweiz — nicht bedient) → Team weiß: nicht nachfassen.
   outside_germany?: string;
+  // angebots_feedback: die Antwort auf „Wie geht es bei Ihnen weiter?" und —
+  // sofern der Kunde die Rückfrage nicht übersprungen hat — das Detail
+  // (Grund bei „passt_nicht", Zeitpunkt bei „spaeter"). Das Detail kommt in
+  // einem ZWEITEN Event nach; das erste trägt nur die Antwort.
+  feedback_answer?: 'passt_nicht' | 'spaeter' | 'loslegen';
+  feedback_detail?: string;
+  // '1' = die ENDGÜLTIGE Meldung, an der die Team-Mail hängt. Der erste Tap
+  // wird still aufgezeichnet (notify:false) und trägt die Markierung NICHT.
+  // Ohne sie stünden in der Timeline zwei gleich aussehende Zeilen und
+  // niemand wüsste, welche eine Mail ausgelöst hat (Lehre aus den Seed-
+  // Events, Bug #25).
+  feedback_final?: string;
 }
 
 // Session-level dedupe so a re-render or repeated save doesn't spam the
@@ -91,6 +104,13 @@ function dedupeKey(token: string, event: LeadEvent, metadata?: LeadEventMetadata
   if (event === 'patient_data_saved' && metadata?.phone) {
     return `${token}:${event}:${metadata.phone}`;
   }
+  // Rückmeldung zum Angebot: Antwort UND Detail gehören in den Schlüssel.
+  // Sonst schluckt der Sitzungs-Dedupe den zweiten Aufruf (erst der Tap, dann
+  // das Detail) — das Detail käme nie am Server an, und wer seine Antwort
+  // korrigiert, würde ebenfalls ignoriert.
+  if (event === 'angebots_feedback') {
+    return `${token}:${event}:${metadata?.feedback_answer ?? ''}:${metadata?.feedback_detail ?? ''}`;
+  }
   return `${token}:${event}`;
 }
 
@@ -98,6 +118,11 @@ export function reportLeadEvent(
   token: string | null | undefined,
   event: LeadEvent,
   metadata?: LeadEventMetadata,
+  /** `false` = nur aufzeichnen, keine Mail (Bridge: `silent`). Gebraucht für
+   *  Zwischenstände, die den Eintrag sichern sollen, ohne das Team zu
+   *  benachrichtigen — z. B. der erste Tap der Angebots-Rückmeldung, bevor
+   *  die endgültige Antwort feststeht. */
+  notify?: boolean,
 ): void {
   if (!token) return;
   const key = dedupeKey(token, event, metadata);
@@ -107,6 +132,9 @@ export function reportLeadEvent(
   const body: Record<string, unknown> = { token, event };
   if (metadata && Object.keys(metadata).length > 0) {
     body.metadata = metadata;
+  }
+  if (notify === false) {
+    body.notify = false;
   }
 
   fetch(`${KOSTENRECHNER_URL}/api/lead-event`, {

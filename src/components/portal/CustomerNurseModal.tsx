@@ -5,14 +5,17 @@ import type { Nurse } from '../../types';
 import type { Application } from './shared';
 import { nurseLevel, displayName, initials } from './shared';
 
-// Customer-facing explanation of the experience-level badge. No exact
-// score thresholds — just the progression and a one-line descriptor.
+// Erklärung der Stufe. Die Labels MÜSSEN mit `nurseLevel`
+// (components/portal/shared.ts) und den Schwellen in lib/mamamia/badge.ts
+// übereinstimmen. Hier standen bis 12.08. noch „⭐ Starter / 🥉 Bronze /
+// 🥈 Silber / 🥇 Gold / 🏆 Platin" — Ränge, die es im Portal seit dem 11.08.
+// nirgends mehr gibt; die Zeile „Aktuell" markierte deshalb nie etwas.
+// Reihenfolge: niedrigste Stufe zuerst.
 const EXPERIENCE_LEVELS = [
-  { emoji: '⭐', label: 'Starter', desc: 'Am Anfang der Laufbahn' },
-  { emoji: '🥉', label: 'Bronze', desc: 'Erste solide Praxiserfahrung' },
-  { emoji: '🥈', label: 'Silber', desc: 'Mehrjährige Erfahrung' },
-  { emoji: '🥇', label: 'Gold', desc: 'Sehr erfahren' },
-  { emoji: '🏆', label: 'Platin', desc: 'Höchste Erfahrungsstufe' },
+  { label: 'Bekannt', desc: 'Ein Einsatz über uns' },
+  { label: 'Bewährt', desc: '2 bis 5 Einsätze — sie kam wieder' },
+  { label: 'Stammkraft', desc: '6 bis 11 Einsätze — fest bei uns im Einsatz' },
+  { label: 'Elite', desc: '12 Einsätze und mehr — die erfahrensten Kräfte in unserem Bestand' },
 ];
 
 // Customer-facing explanation der drei Sprach-Stufen.
@@ -36,6 +39,14 @@ const LANGUAGE_LEVELS = [
     desc: 'Die Verständigung im Alltag und in der Pflege funktioniert in der Regel zuverlässig. Auch ausführlichere Gespräche sind möglich; sehr seltene Fachbegriffe, schnelles Sprechen oder Dialekt können dennoch Nachfragen erfordern.',
   },
 ];
+
+// Gemeinsame Klassen für den Design-Durchgang vom 11./12.08.: abgesetzte
+// Kästen (Fläche #F5F5F6, Rand #D4D4D8) statt randloser Grauflächen,
+// Fließtext 16 px, Abschnittsköpfe eine Stufe über dem Fließtext.
+const boxCls = 'rounded-2xl p-4 border border-[#D4D4D8] bg-[#F5F5F6]';
+const sectionHeadCls = 'text-[1.05rem] font-bold text-[#18181B] mb-2';
+const assignLabelCls = 'text-[12px] uppercase tracking-wide mb-0.5 text-[#A1A1AA]';
+const assignValueCls = 'text-[15px] font-semibold text-[#18181B]';
 
 const LANGUAGE_LEVELS_INTRO =
   'Eine grobe Orientierung — kein Sprach-Zertifikat. Die genaue Kommunikation hängt immer auch vom Tempo, der Mundart und der Geduld beider Seiten ab.';
@@ -192,11 +203,14 @@ export const CustomerNurseModal: FC<{
     <div className="flex gap-3.5 py-3 border-b border-gray-100 last:border-0">
       <span className="text-xl w-7 flex-shrink-0 text-center leading-none mt-0.5">{emoji}</span>
       <div className="min-w-0">
-        <p className="text-xs text-gray-500 mb-0.5">{label}</p>
-        {value && <p className="text-sm font-bold text-gray-800">{value}</p>}
+        <p className="text-[13px] mb-0.5" style={{ color: '#71717A' }}>{label}</p>
+        {value && <p className="text-[16px] font-semibold" style={{ color: '#18181B' }}>{value}</p>}
         {chips && (
           <div className="flex flex-wrap gap-1.5 mt-1">
-            {chips.map(c => <span key={c} className="text-xs bg-gray-100 text-gray-600 px-2.5 py-1 rounded-full">{c}</span>)}
+            {chips.map(c => (
+              <span key={c} className="text-[13px] px-2.5 py-1 rounded-full"
+                style={{ background: '#F5F5F6', border: '1px solid #D4D4D8', color: '#52525B' }}>{c}</span>
+            ))}
           </div>
         )}
       </div>
@@ -273,14 +287,19 @@ export const CustomerNurseModal: FC<{
                   {nurse.age ? (
                     <span className="text-sm text-gray-400 flex-shrink-0">{nurse.age} J.</span>
                   ) : null}
+                  {/* Ohne Stufe (keine Jahre, keine Einsätze) KEIN Chip —
+                      vorher rendete `nurseLevel` dort ein leeres Label und
+                      der Kunde sah eine leere Pille mit Rahmen. */}
+                  {lvl.label && (
                   <button
                     type="button"
                     onClick={() => setShowLevelInfo(true)}
-                    className={`flex items-center gap-1 text-xs font-bold pl-1.5 pr-2 py-0.5 rounded-full border flex-shrink-0 cursor-pointer transition-transform active:scale-95 hover:brightness-95 ${lvl.cls}`}
+                    className={`text-xs font-bold px-2.5 py-0.5 rounded-full border flex-shrink-0 cursor-pointer transition-transform active:scale-95 hover:brightness-95 ${lvl.cls}`}
                     aria-label="Erfahrungs-Level erklären"
                   >
-                    <span className="text-sm leading-none">{lvl.emoji}</span>{lvl.label}
+                    {lvl.label}
                   </button>
+                  )}
                   {!headerCompact && (
                     <span className={`text-xs font-bold px-2.5 py-0.5 rounded-full border flex-shrink-0 ${
                       nurse.availableSoon ? 'bg-[#E3F7EF] text-[#22A06B] border-[#B8E8D4]' : 'bg-[#FEF3E2] text-[#B45309] border-[#F9D99A]'
@@ -302,13 +321,13 @@ export const CustomerNurseModal: FC<{
                 den (i)-Button für die Sprach-FAQ direkt am Niveau. */}
             <div className="px-5 pt-4 pb-1">
               <div className="grid grid-cols-2 gap-2">
-                <div className="bg-white rounded-xl px-3 py-2.5 shadow-sm border border-gray-100">
-                  <p className="text-xs text-gray-600 mb-1">Erfahrung</p>
-                  <p className="text-sm font-bold text-[#8B7355]">{nurse.experience}</p>
+                <div className="rounded-xl px-3 py-2.5 border" style={{ background: '#FFFFFF', borderColor: '#D4D4D8' }}>
+                  <p className="text-[13px] mb-1" style={{ color: '#71717A' }}>Erfahrung</p>
+                  <p className="text-[16px] font-bold text-[#8B7355]">{nurse.experience}</p>
                 </div>
-                <div className="bg-white rounded-xl px-3 py-2.5 shadow-sm border border-gray-100">
+                <div className="rounded-xl px-3 py-2.5 border" style={{ background: '#FFFFFF', borderColor: '#D4D4D8' }}>
                   <div className="flex items-center justify-between mb-1">
-                    <p className="text-xs text-gray-600">Deutschkenntnisse</p>
+                    <p className="text-[13px]" style={{ color: '#71717A' }}>Deutschkenntnisse</p>
                     {/* Sauberer Brand-Kreis mit "i" — weiß auf Brand-Braun,
                         passt zur Farbpalette und ist groß genug zum Tippen
                         ohne aufdringlich zu wirken. */}
@@ -325,7 +344,7 @@ export const CustomerNurseModal: FC<{
                     <div className="flex gap-0.5">
                       {bars.map((f, i) => <div key={i} className={`w-3 h-1.5 rounded-full ${f ? 'bg-[#8B7355]' : 'bg-gray-200'}`} />)}
                     </div>
-                    <span className="text-xs font-bold text-gray-700">{nurse.language.level}</span>
+                    <span className="text-[16px] font-bold" style={{ color: '#18181B' }}>{nurse.language.level}</span>
                   </div>
                 </div>
               </div>
@@ -351,16 +370,20 @@ export const CustomerNurseModal: FC<{
                 </div>
               </div>
             )}
+            {/* Design-Angleichung 12.08.: Der Rest des Portals wurde am
+                11.08. auf abgesetzte Kästen (#F5F5F6 + Rand #D4D4D8) und
+                16-px-Fließtext umgestellt — das Profil hatte nur die Farben
+                mitbekommen und stand noch auf 14 px in randlosen Flächen. */}
             <div className="px-5 pt-4 pb-5">
-              <h3 className="text-sm font-bold text-gray-900 mb-2">Über {nurse.name.split(' ')[0]}</h3>
+              <h3 className={sectionHeadCls}>Über {nurse.name.split(' ')[0]}</h3>
               {profileLoading && !p ? (
-                <div className="bg-[#F8F7F5] rounded-xl p-4 animate-pulse">
+                <div className={boxCls + ' animate-pulse'}>
                   <div className="h-3 w-full bg-gray-200 rounded mb-2" />
                   <div className="h-3 w-11/12 bg-gray-200 rounded mb-2" />
                   <div className="h-3 w-9/12 bg-gray-200 rounded" />
                 </div>
               ) : aboutLoading ? (
-                <div className="bg-[#F8F7F5] rounded-xl p-4 flex items-start gap-3">
+                <div className={boxCls + ' flex items-start gap-3'}>
                   <svg
                     className="w-5 h-5 animate-spin text-[#8B7355] flex-shrink-0 mt-0.5"
                     viewBox="0 0 24 24"
@@ -370,13 +393,13 @@ export const CustomerNurseModal: FC<{
                     <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" />
                     <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
                   </svg>
-                  <p className="text-sm text-gray-600 italic leading-relaxed">
+                  <p className="text-[16px] italic leading-relaxed" style={{ color: '#71717A' }}>
                     Wir bereiten Ihnen gerade eine persönliche Vorstellung von {nurse.name.split(' ')[0]} vor…
                   </p>
                 </div>
               ) : (
-                <div className="bg-[#F8F7F5] rounded-xl p-4">
-                  <p className="text-sm text-gray-700 leading-relaxed whitespace-pre-line">{aboutSentence}</p>
+                <div className={boxCls}>
+                  <p className="text-[16px] leading-relaxed whitespace-pre-line" style={{ color: '#18181B' }}>{aboutSentence}</p>
                 </div>
               )}
             </div>
@@ -393,9 +416,9 @@ export const CustomerNurseModal: FC<{
                   href={nurse.referencePdfUrl}
                   onClick={handleReferenceDownload}
                   download
-                  className="flex items-center gap-3 rounded-2xl border border-[#C4B49A] bg-[#F8F7F5] hover:bg-[#EBE2D5] px-4 py-3 transition-colors"
+                  className="flex items-center gap-3 rounded-2xl border border-zinc-200 bg-[#F5F5F6] hover:bg-[#EBE2D5] px-4 py-3 transition-colors"
                 >
-                  <div className="w-10 h-10 rounded-xl bg-white flex items-center justify-center flex-shrink-0 border border-[#E5E3DF]">
+                  <div className="w-10 h-10 rounded-xl bg-white flex items-center justify-center flex-shrink-0 border border-[#E9E9EB]">
                     <FileText className="w-5 h-5 text-[#8B7355]" />
                   </div>
                   <div className="flex-1 min-w-0">
@@ -420,22 +443,23 @@ export const CustomerNurseModal: FC<{
 
             {nurse.detailedAssignments && nurse.detailedAssignments.length > 0 && (nurse.history?.assignments ?? 0) > 0 && (
               <div className="px-5 pb-5">
-                <div className="flex items-center justify-between mb-2">
-                  <h3 className="text-sm font-bold text-gray-900">Letzte Einsätze</h3>
+                <div className="flex items-center justify-between mb-2 gap-2">
+                  <h3 className={sectionHeadCls + ' mb-0'}>Letzte Einsätze</h3>
                   {nurse.history && (
-                    <span className="text-xs font-semibold text-gray-500 bg-gray-100 border border-gray-200 px-2.5 py-0.5 rounded-full">
+                    <span className="text-[13px] font-semibold px-2.5 py-0.5 rounded-full flex-shrink-0"
+                      style={{ color: '#71717A', background: '#F5F5F6', border: '1px solid #D4D4D8' }}>
                       {nurse.history.assignments} Einsätze · Ø {avgWo} Wo.
                     </span>
                   )}
                 </div>
                 <div className="space-y-2">
                   {nurse.detailedAssignments.map((a, i) => (
-                    <div key={i} className="bg-gray-50 rounded-xl p-4 border border-gray-100">
+                    <div key={i} className={boxCls}>
                       <div className="grid grid-cols-2 gap-x-4 gap-y-2.5">
-                        <div><p className="text-xs text-gray-400 uppercase tracking-wide mb-0.5">Zeitraum</p><p className="text-xs font-semibold text-gray-800">{a.startDate} – {a.endDate}</p></div>
-                        <div><p className="text-xs text-gray-400 uppercase tracking-wide mb-0.5">Ort</p><p className="text-xs font-semibold text-gray-800">{a.postalCode} {a.city}</p></div>
-                        <div><p className="text-xs text-gray-400 uppercase tracking-wide mb-0.5">Patienten</p><p className="text-xs font-semibold text-gray-800">{a.patientCount} {a.patientCount === 1 ? 'Patient' : 'Patienten'}</p></div>
-                        <div><p className="text-xs text-gray-400 uppercase tracking-wide mb-0.5">Dauer</p><p className="text-xs font-semibold text-gray-800">{a.duration}</p></div>
+                        <div><p className={assignLabelCls}>Zeitraum</p><p className={assignValueCls}>{a.startDate} – {a.endDate}</p></div>
+                        <div><p className={assignLabelCls}>Ort</p><p className={assignValueCls}>{a.postalCode} {a.city}</p></div>
+                        <div><p className={assignLabelCls}>Patienten</p><p className={assignValueCls}>{a.patientCount} {a.patientCount === 1 ? 'Patient' : 'Patienten'}</p></div>
+                        <div><p className={assignLabelCls}>Dauer</p><p className={assignValueCls}>{a.duration}</p></div>
                       </div>
                     </div>
                   ))}
@@ -444,7 +468,7 @@ export const CustomerNurseModal: FC<{
             )}
 
             <div className="px-5 pb-5">
-              <h3 className="text-sm font-bold text-gray-900 mb-3">Über mich</h3>
+              <h3 className={sectionHeadCls + ' mb-3'}>Über mich</h3>
               {profileLoading ? (
                 <div className="divide-y divide-gray-100">
                   <SkeletonRow />
@@ -504,7 +528,7 @@ export const CustomerNurseModal: FC<{
               if (!showSpecial) return null;
               return (
                 <div className="px-5 pb-5">
-                  <h3 className="text-sm font-bold text-gray-900 mb-3">Besondere Merkmale</h3>
+                  <h3 className={sectionHeadCls + ' mb-3'}>Besondere Merkmale</h3>
                   {profileLoading ? (
                     <div className="divide-y divide-gray-100">
                       <SkeletonRow />
@@ -541,14 +565,14 @@ export const CustomerNurseModal: FC<{
 
             {profileLoading ? (
               <div className="px-5 pb-6">
-                <h3 className="text-sm font-bold text-gray-900 mb-3">Berufliche Anforderungen</h3>
+                <h3 className={sectionHeadCls + ' mb-3'}>Berufliche Anforderungen</h3>
                 <div className="divide-y divide-gray-100">
                   <SkeletonRow chips />
                 </div>
               </div>
             ) : (p && p.acceptedMobilities.length > 0 && (
               <div className="px-5 pb-6">
-                <h3 className="text-sm font-bold text-gray-900 mb-3">Berufliche Anforderungen</h3>
+                <h3 className={sectionHeadCls + ' mb-3'}>Berufliche Anforderungen</h3>
                 <div className="divide-y divide-gray-100">
                   <InfoRow emoji="🦽" label="Akzeptierte Mobilität" chips={p.acceptedMobilities} />
                 </div>
@@ -560,7 +584,7 @@ export const CustomerNurseModal: FC<{
             {onChat && (
               <button
                 onClick={onChat}
-                className="w-full flex items-center justify-center gap-2 rounded-xl border border-[#8B7355]/30 bg-white hover:bg-[#F8F7F5] text-[#6B5444] text-sm font-semibold py-3 transition-colors"
+                className="w-full flex items-center justify-center gap-2 rounded-xl border border-[#8B7355]/30 bg-white hover:bg-[#F5F5F6] text-[#6B5444] text-sm font-semibold py-3 transition-colors"
               >
                 <svg className="w-4 h-4 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                   <path strokeLinecap="round" strokeLinejoin="round" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.86 9.86 0 01-4-.8L3 20l.8-3.2A7.9 7.9 0 013 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
@@ -573,7 +597,7 @@ export const CustomerNurseModal: FC<{
               app.status === 'declined' ? (
                 <button
                   onClick={() => { onUndo?.(); onClose(); }}
-                  className="flex-1 bg-[#F8F7F5] text-[#8B7355] border border-[#E5E3DF] rounded-xl py-3 font-bold text-sm hover:bg-[#EBE2D5] transition-colors flex items-center justify-center gap-2"
+                  className="flex-1 bg-[#F5F5F6] text-[#8B7355] border border-[#E9E9EB] rounded-xl py-3 font-bold text-sm hover:bg-[#EBE2D5] transition-colors flex items-center justify-center gap-2"
                 >
                   ↩ Ablehnung rückgängig machen
                 </button>
@@ -604,7 +628,7 @@ export const CustomerNurseModal: FC<{
                       Nein danke
                     </button>
                     {invitePhaseModal === 'sending' ? (
-                      <div className="flex-[2] bg-[#F8F7F5] text-[#8B7355] rounded-xl py-3 font-bold text-sm border border-[#E5E3DF] flex items-center justify-center gap-2">
+                      <div className="flex-[2] bg-[#F5F5F6] text-[#8B7355] rounded-xl py-3 font-bold text-sm border border-[#E9E9EB] flex items-center justify-center gap-2">
                         <svg className="w-4 h-4 animate-spin flex-shrink-0" viewBox="0 0 24 24" fill="none">
                           <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3"/>
                           <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"/>
@@ -625,7 +649,7 @@ export const CustomerNurseModal: FC<{
                     )}
                   </>
                 ) : (
-                  <div className="flex-1 bg-[#F8F7F5] text-[#8B7355] rounded-xl py-3 font-bold text-sm border border-[#E5E3DF] flex items-center justify-center gap-2">
+                  <div className="flex-1 bg-[#F5F5F6] text-[#8B7355] rounded-xl py-3 font-bold text-sm border border-[#E9E9EB] flex items-center justify-center gap-2">
                     <Check className="w-4 h-4" /> Eingeladen — warten auf Bewerbung
                   </div>
                 )}
@@ -658,7 +682,7 @@ export const CustomerNurseModal: FC<{
               </div>
               <div className="px-5 pt-3 pb-5">
                 <div className="flex items-start justify-between gap-3 mb-1.5">
-                  <h3 className="text-base font-bold text-gray-900">Erfahrungs-Level</h3>
+                  <h3 className="text-[1.05rem] font-bold" style={{ color: '#18181B' }}>Erfahrungsstufe</h3>
                   <button
                     onClick={() => setShowLevelInfo(false)}
                     className="w-7 h-7 rounded-full bg-gray-100 flex items-center justify-center flex-shrink-0"
@@ -667,10 +691,10 @@ export const CustomerNurseModal: FC<{
                     <X className="w-4 h-4 text-gray-500" />
                   </button>
                 </div>
-                <p className="text-sm text-gray-600 leading-relaxed mb-4">
-                  Das Level zeigt auf einen Blick, wie viel Praxis eine Pflegekraft
-                  mitbringt — aus Jahren in der Betreuung und bereits abgeschlossenen
-                  Einsätzen.
+                <p className="text-[15px] leading-relaxed mb-4" style={{ color: '#71717A' }}>
+                  Die Stufe zeigt, wie oft eine Pflegekraft schon über uns im
+                  Einsatz war — gezählt werden nur abgeschlossene Einsätze.
+                  Wer wiederkommt, hat sich bei Familien vor Ihnen bewährt.
                 </p>
                 <div className="space-y-1.5">
                   {EXPERIENCE_LEVELS.map(level => {
@@ -678,16 +702,20 @@ export const CustomerNurseModal: FC<{
                     return (
                       <div
                         key={level.label}
-                        className={`flex items-center gap-3 rounded-xl px-3 py-2.5 border ${
-                          isCurrent ? lvl.cls : 'bg-gray-50 border-gray-100'
-                        }`}
+                        className="flex items-center gap-3 rounded-xl px-3 py-2.5 border"
+                        style={
+                          isCurrent
+                            ? { background: '#FFFFFF', borderColor: '#8B7355' }
+                            : { background: '#F5F5F6', borderColor: '#E4E4E7' }
+                        }
                       >
-                        <span className="text-xl leading-none flex-shrink-0">{level.emoji}</span>
                         <div className="min-w-0 flex-1">
-                          <p className={`text-sm font-bold ${isCurrent ? '' : 'text-gray-800'}`}>{level.label}</p>
-                          <p className={`text-xs ${isCurrent ? 'opacity-80' : 'text-gray-500'}`}>{level.desc}</p>
+                          <p className="text-[15px] font-bold" style={{ color: '#18181B' }}>{level.label}</p>
+                          <p className="text-[13px]" style={{ color: '#71717A' }}>{level.desc}</p>
                         </div>
-                        {isCurrent && <span className="text-xs font-bold flex-shrink-0">Aktuell</span>}
+                        {isCurrent && (
+                          <span className="text-[12px] font-bold flex-shrink-0" style={{ color: '#8B7355' }}>Aktuell</span>
+                        )}
                       </div>
                     );
                   })}
@@ -742,7 +770,7 @@ export const CustomerNurseModal: FC<{
                       <div
                         key={level.label}
                         className={`flex items-start gap-3 rounded-xl px-3 py-2.5 border ${
-                          isCurrent ? 'bg-[#F8F7F5] border-[#C4B49A]' : 'bg-gray-50 border-gray-100'
+                          isCurrent ? 'bg-[#F5F5F6] border-zinc-200' : 'bg-gray-50 border-gray-100'
                         }`}
                       >
                         <div className="flex gap-0.5 pt-1 flex-shrink-0">
@@ -754,7 +782,7 @@ export const CustomerNurseModal: FC<{
                           <div className="flex items-center gap-2">
                             <p className={`text-sm font-bold ${isCurrent ? 'text-[#3D2B1F]' : 'text-gray-800'}`}>{level.label}</p>
                             {isCurrent && (
-                              <span className="text-[10px] font-bold text-[#8B7355] bg-white border border-[#C4B49A] px-2 py-0.5 rounded-full">
+                              <span className="text-[10px] font-bold text-[#8B7355] bg-white border border-zinc-200 px-2 py-0.5 rounded-full">
                                 Aktuell
                               </span>
                             )}

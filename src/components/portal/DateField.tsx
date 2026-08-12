@@ -93,11 +93,11 @@ export const DateField: FC<{
         // Screenshot 08.07.). Im Fluss gerendert wächst die Karte mit.
         <div className="mt-1.5 w-full max-w-[320px] bg-white border border-gray-200 rounded-2xl shadow-sm p-3">
           <div className="flex items-center justify-between mb-2 px-1">
-            <button type="button" onClick={prevMonth} aria-label="Voriger Monat" className="w-8 h-8 rounded-lg hover:bg-[#F8F7F5] flex items-center justify-center text-gray-500">
+            <button type="button" onClick={prevMonth} aria-label="Voriger Monat" className="w-8 h-8 rounded-lg hover:bg-[#F5F5F6] flex items-center justify-center text-gray-500">
               <ChevronLeft className="w-4 h-4" />
             </button>
             <span className="text-sm font-bold text-gray-800">{MONTHS[viewMonth]} {viewYear}</span>
-            <button type="button" onClick={nextMonth} aria-label="Nächster Monat" className="w-8 h-8 rounded-lg hover:bg-[#F8F7F5] flex items-center justify-center text-gray-500">
+            <button type="button" onClick={nextMonth} aria-label="Nächster Monat" className="w-8 h-8 rounded-lg hover:bg-[#F5F5F6] flex items-center justify-center text-gray-500">
               <ChevronRight className="w-4 h-4" />
             </button>
           </div>
@@ -126,7 +126,7 @@ export const DateField: FC<{
                       ? 'bg-[#8B7355] text-white font-bold'
                       : disabled
                         ? 'text-gray-300 cursor-default'
-                        : 'text-gray-700 hover:bg-[#F8F7F5]'
+                        : 'text-gray-700 hover:bg-[#F5F5F6]'
                   }${isToday && !selected ? ' font-bold ring-1 ring-inset ring-[#8B7355]/40' : ''}`}
                 >
                   {d}

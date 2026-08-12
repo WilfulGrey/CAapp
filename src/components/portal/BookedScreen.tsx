@@ -102,9 +102,14 @@ export const BookedScreen: FC<{
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 mb-0.5">
               <span className="font-bold text-gray-900">{name}</span>
-              <span className={`flex items-center gap-0.5 text-xs font-bold pl-1 pr-2 py-0.5 rounded-full border flex-shrink-0 ${lvl.cls}`}>
-                <span className="text-xs leading-none">{lvl.emoji}</span>{lvl.label}
-              </span>
+              {/* Ohne Einsatz KEINE Pille (12.08.) — sonst leerer Rahmen.
+                  `lvl.emoji` ist seit dem Design-Durchgang immer '' und
+                  fliegt hier mit raus. */}
+              {lvl.label && (
+                <span className={`text-xs font-bold px-2.5 py-0.5 rounded-full border flex-shrink-0 ${lvl.cls}`}>
+                  {lvl.label}
+                </span>
+              )}
             </div>
             <div className="flex items-center gap-1.5">
               <div className="flex gap-0.5">
@@ -121,7 +126,7 @@ export const BookedScreen: FC<{
       </div>
 
       {app.coverMessage && (
-        <div className="rounded-2xl bg-[#F8F7F5] border border-[#E5E3DF] px-4 py-3">
+        <div className="rounded-2xl bg-[#F5F5F6] border border-[#E9E9EB] px-4 py-3">
           <p className="text-[11px] font-semibold text-[#8B7355] uppercase tracking-wide mb-1.5">Hinweis der Agentur</p>
           <p className="text-sm leading-relaxed text-gray-700 italic">„{app.coverMessage}"</p>
         </div>

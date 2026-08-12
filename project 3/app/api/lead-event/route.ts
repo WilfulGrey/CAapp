@@ -58,6 +58,15 @@ const ALLOWED_EVENTS = [
   // Token liegt beim Kunden). Event = Audit-Trail + optionale Kundenmail
   // (notify:false → nur Aufzeichnung, keine Mail).
   'offer_updated',
+  // Rückmeldung des Kunden zum Angebot (12.08.2026): EIN Tap im Portal —
+  // „Passt so nicht" / „Noch nicht so weit" / „Wir wollen loslegen", dazu ein
+  // optionales Detail (Grund bzw. Zeitpunkt) aus der Rückfrage. Reines
+  // Analyse-/Team-Signal, KEINE Kundenmail und KEINE automatische
+  // Statusänderung: „zu teuer" ist ein Berater-Fall (Angebots-Anpassung),
+  // kein Abschied, und ein automatischer Sende-Stopp aus einem einzelnen Tap
+  // wäre zu grob. NON_DEDUPED, weil die Antwort zweimal kommt (Tap, dann
+  // Detail) und sich bei einem späteren Besuch ändern darf.
+  'angebots_feedback',
   // Alarm-Policy (2026-07-21): Buchung unterschrieben, aber Mamamia-Sync
   // unvollständig (z.B. Bewerbung von der Agentur zurückgezogen ⇒
   // StoreConfirmation dauerhaft abgelehnt). Gesendet vom
@@ -67,6 +76,12 @@ const ALLOWED_EVENTS = [
 ];
 const TEAM_NOTIFY_EVENTS = [
   'patient_data_saved',
+  // Martin, 12.08.2026: „ich will immer eine Antwort erhalten" — also bei
+  // JEDER Rückmeldung eine Team-Mail, nicht nur bei „zu teuer". Das Portal
+  // schickt den ersten Tap mit `notify: false` (stille Aufzeichnung als
+  // Netz, falls der Kunde abbricht) und die endgültige Antwort normal —
+  // sonst kämen zwei Mails pro Kunde.
+  'angebots_feedback',
   'caregiver_invited',
   'caregiver_interest_shown',
   'application_received',
@@ -103,6 +118,7 @@ const NON_DEDUPED_EVENTS = new Set([
   'application_rejected',
   'offer_updated',               // Preis kann mehrfach angepasst werden
   'acceptance_sync_alarm',       // jeder Alarm-Versuch wird aufgezeichnet
+  'angebots_feedback',           // Tap + Detail = zwei Einträge; darf sich später ändern
 ]);
 // Customer-facing Mails (an die Lead-Email) je Event. Trigger sind die neuen
 // Caregiver-Lifecycle-Events; das eigentliche Hooking aus Mamamia kommt
@@ -942,7 +958,21 @@ async function handlePost(request: NextRequest) {
       (!isDeduped || isFirstOccurrence || teamOnlyResend);
 
     if (shouldNotifyTeam) {
+      const FEEDBACK_ANTWORT: Record<string, string> = {
+        passt_nicht: 'Passt nicht',
+        spaeter: 'Vielleicht später',
+        loslegen: 'Interessant',
+      };
       const additionalData: Record<string, unknown> | undefined =
+        event === 'angebots_feedback' && metadata && typeof metadata === 'object'
+          ? {
+              feedbackText: [
+                FEEDBACK_ANTWORT[String((metadata as Record<string, unknown>).feedback_answer)]
+                  ?? String((metadata as Record<string, unknown>).feedback_answer ?? '—'),
+                (metadata as Record<string, unknown>).feedback_detail,
+              ].filter(Boolean).join(' — '),
+            }
+          :
         TEAM_NOTIFY_CAREGIVER_EVENTS.has(event) && metadata && typeof metadata === 'object'
           ? { caregiverName: metadata.caregiver_name ?? metadata.caregiverName ?? '' }
           : (event === 'application_accepted_internal' && metadata && typeof metadata === 'object'
