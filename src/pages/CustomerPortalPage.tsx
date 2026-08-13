@@ -3606,7 +3606,7 @@ const CustomerPortalPage: FC = () => {
         </div>
         <div className="rounded-2xl overflow-hidden border" style={{background:'#F4F4F6', borderColor:'#D4D4D8'}}>
           {[
-            { q: 'Was bedeutet „Einladen"?', a: 'Wenn Ihnen eine Pflegekraft gefällt, laden Sie sie ein, sich bei Ihnen zu bewerben. Dafür müssen Sie nur kurz die Pflegesituation angeben — damit wir Ihnen passende, verfügbare Pflegekräfte zeigen können. Alles unverbindlich; ein Vertrag entsteht erst, wenn Sie ein konkretes Angebot annehmen.' },
+            { q: 'Was bedeutet „Einladen"?', a: 'Wenn Ihnen eine Pflegekraft gefällt, laden Sie sie ein, sich bei Ihnen zu bewerben. Dafür müssen Sie nur kurz die Pflegesituation beschreiben — damit wir Ihnen passende, verfügbare Pflegekräfte zeigen können. Alles unverbindlich; ein Vertrag entsteht erst, wenn Sie ein konkretes Angebot annehmen.' },
             { q: 'Gehe ich mit dem Einladen einen Vertrag ein?', a: 'Nein — das Einladen und Anschauen von Profilen ist vollständig unverbindlich. Ein Vertrag kommt erst zustande, wenn Sie ein konkretes Angebot ausdrücklich annehmen.' },
             { q: 'Kann ich jederzeit kündigen?', a: 'Ja, täglich kündbar — ohne Mindestlaufzeit und ohne Angabe von Gründen. Kosten entstehen ausschließlich für Tage, an denen die Pflegekraft tatsächlich vor Ort ist.' },
             { q: 'Wie funktioniert die Abrechnung?', a: 'Tagesgenau: Sie zahlen nur für geleistete Betreuungstage. Die Rechnung für den laufenden Monat wird jeweils zur Monatsmitte erstellt — transparent, nachvollziehbar, ohne versteckte Posten.' },
