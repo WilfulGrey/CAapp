@@ -2909,6 +2909,16 @@ const CustomerPortalPage: FC = () => {
               {visibleInterests.length === 1 ? 'Interessierte Pflegekraft' : 'Interessierte Pflegekräfte'}
             </h2>
           </div>
+          {/* Erklärtext ÜBER dem Kasten (gleiches Muster wie bei den
+              passenden Pflegekräften): Was heißt „Interesse", und was
+              passiert beim Einladen (Martin, 13.08.) — die Pflegekraft
+              findet den Einsatz gut, ein Mitarbeiter stößt nach der
+              Einladung die offizielle Bewerbung an. */}
+          <p className="text-[16px] leading-relaxed px-1 mb-3" style={{ color: '#18181B' }}>
+            {visibleInterests.length === 1
+              ? 'Diese Pflegekraft hat Ihre Anfrage gesehen und würde die Betreuung gerne übernehmen. Wenn Sie sie einladen, stößt ein Mitarbeiter von uns die offizielle Bewerbung an — für Sie ganz unverbindlich.'
+              : 'Diese Pflegekräfte haben Ihre Anfrage gesehen und würden die Betreuung gerne übernehmen. Wenn Sie eine einladen, stößt ein Mitarbeiter von uns die offizielle Bewerbung an — für Sie ganz unverbindlich.'}
+          </p>
           {/* Eigener, hervorgehobener Kasten ÜBER den passenden Pflegekräften
              (Martin, 11.08.): Proaktives Interesse ist mehr wert als ein
              Matching — vorher lag es optisch gleichauf in derselben Liste und
@@ -3606,16 +3616,11 @@ const CustomerPortalPage: FC = () => {
         </div>
         <div className="rounded-2xl overflow-hidden border" style={{background:'#F4F4F6', borderColor:'#D4D4D8'}}>
           {[
-            { q: 'Was bedeutet „Einladen"?', a: 'Wenn Ihnen eine Pflegekraft gefällt, laden Sie sie ein, sich bei Ihnen zu bewerben. Dafür müssen Sie nur kurz die Pflegesituation beschreiben — damit wir Ihnen passende, verfügbare Pflegekräfte zeigen können. Alles unverbindlich; ein Vertrag entsteht erst, wenn Sie ein konkretes Angebot annehmen.' },
-            { q: 'Gehe ich mit dem Einladen einen Vertrag ein?', a: 'Nein — das Einladen und Anschauen von Profilen ist vollständig unverbindlich. Ein Vertrag kommt erst zustande, wenn Sie ein konkretes Angebot ausdrücklich annehmen.' },
-            { q: 'Kann ich jederzeit kündigen?', a: 'Ja, täglich kündbar — ohne Mindestlaufzeit und ohne Angabe von Gründen. Kosten entstehen ausschließlich für Tage, an denen die Pflegekraft tatsächlich vor Ort ist.' },
-            { q: 'Wie funktioniert die Abrechnung?', a: 'Tagesgenau: Sie zahlen nur für geleistete Betreuungstage. Die Rechnung für den laufenden Monat wird jeweils zur Monatsmitte erstellt — transparent, nachvollziehbar, ohne versteckte Posten.' },
-            { q: 'Wie lange bleibt die Pflegekraft — und wie läuft der Wechsel?', a: 'Pflegekräfte bleiben im Durchschnitt 6 bis 8 Wochen. Zur Mitte des Einsatzes beginnen wir bereits mit der Planung der Nachfolge, damit der Übergang nahtlos klappt. Sie müssen sich um nichts kümmern — Primundus organisiert den gesamten Wechsel.' },
-            { q: 'Was passiert, wenn die Pflegekraft ausfällt?', a: 'Primundus kümmert sich umgehend um eine qualifizierte Vertretung. Ihr persönlicher Ansprechpartner informiert Sie proaktiv und begleitet die Übergabe.' },
-            { q: 'Wie werden Reisekosten abgerechnet?', a: 'Die Reisekosten betragen pauschal 125 € pro Strecke — also je einmal bei der Anreise und bei der Abreise. Weitere versteckte Reisekosten gibt es nicht.' },
-            { q: 'Ist das legal?', a: 'Ja, vollständig. Die Pflegekräfte sind sozialversicherungspflichtig bei uns angestellt und werden von uns nach Deutschland entsandt. Für jeden Einsatz liegt eine offizielle A1-Bescheinigung vor — der Nachweis der Sozialversicherungspflicht im Herkunftsland.' },
-            { q: 'Mit wem wird der Vertrag geschlossen?', a: 'Der Betreuungsvertrag wird mit unserer Muttergesellschaft, der Vitanas Group, geschlossen — einem der größten und erfahrensten Pflegeunternehmen Deutschlands.' },
-            { q: 'Welche Kosten entstehen insgesamt?', a: 'Es gibt vier Kostenpunkte: Die monatlichen Betreuungskosten laut Ihrem Angebot. Anreise und Abreise pauschal je 125 €. Kost und Logis, die Sie der Pflegekraft frei zur Verfügung stellen. Fällt der Einsatz in einen Sommermonat (Juli oder August), kommen 200 €/Monat (bzw. 6,67 €/Tag) Sommerzuschlag hinzu. An folgenden Feiertagen wird der doppelte Tagessatz berechnet: Karfreitag, Ostersonntag, Ostermontag, 1. Mai, Heiligabend, 1. + 2. Weihnachtstag, Silvester und Neujahr. Darüber hinaus gibt es keinerlei versteckte Kosten.' },
+            /* Reihenfolge (Martin, 13.08.): Sprach-Niveaus ZUERST — die
+               Stufen (Grund/Mittel/Gut) stehen auf jeder Pflegekraft-Karte,
+               also ist das die Frage, die der Kunde beim Lesen der Liste
+               zuerst hat. Der Rest folgt dem Weg: Einladen → Vertrag →
+               Kündigung → Abrechnung → … */
             /* Sprach-Stufen-Antwort als JSX statt String, damit wir die
                Bar-Indikatoren genauso rendern können wie im Profil/Liste
                (statt der Unicode-Punkte ●). Konsistente Optik im ganzen
@@ -3644,6 +3649,24 @@ const CustomerPortalPage: FC = () => {
                 </div>
               ),
             },
+            { q: 'Was bedeutet „Einladen"?', a: 'Wenn Ihnen eine Pflegekraft gefällt, laden Sie sie ein, sich bei Ihnen zu bewerben. Dafür müssen Sie nur kurz die Pflegesituation beschreiben — damit wir Ihnen passende, verfügbare Pflegekräfte zeigen können. Alles unverbindlich; ein Vertrag entsteht erst, wenn Sie ein konkretes Angebot annehmen.' },
+            { q: 'Gehe ich mit dem Einladen einen Vertrag ein?', a: 'Nein — das Einladen und Anschauen von Profilen ist vollständig unverbindlich. Ein Vertrag kommt erst zustande, wenn Sie ein konkretes Angebot ausdrücklich annehmen.' },
+            { q: 'Kann ich jederzeit kündigen?', a: 'Ja, täglich kündbar — ohne Mindestlaufzeit und ohne Angabe von Gründen. Kosten entstehen ausschließlich für Tage, an denen die Pflegekraft tatsächlich vor Ort ist.' },
+            { q: 'Wie funktioniert die Abrechnung?', a: 'Tagesgenau: Sie zahlen nur für geleistete Betreuungstage. Die Rechnung für den laufenden Monat wird jeweils zur Monatsmitte erstellt — transparent, nachvollziehbar, ohne versteckte Posten.' },
+            { q: 'Wie lange bleibt die Pflegekraft — und wie läuft der Wechsel?', a: 'Pflegekräfte bleiben im Durchschnitt 6 bis 8 Wochen. Zur Mitte des Einsatzes beginnen wir bereits mit der Planung der Nachfolge, damit der Übergang nahtlos klappt. Sie müssen sich um nichts kümmern — Primundus organisiert den gesamten Wechsel.' },
+            { q: 'Was passiert, wenn die Pflegekraft ausfällt?', a: 'Primundus kümmert sich umgehend um eine qualifizierte Vertretung. Ihr persönlicher Ansprechpartner informiert Sie proaktiv und begleitet die Übergabe.' },
+            { q: 'Wie werden Reisekosten abgerechnet?', a: 'Die Reisekosten betragen pauschal 125 € pro Strecke — also je einmal bei der Anreise und bei der Abreise. Weitere versteckte Reisekosten gibt es nicht.' },
+            { q: 'Ist das legal?', a: 'Ja, vollständig. Die Pflegekräfte sind sozialversicherungspflichtig bei uns angestellt und werden von uns nach Deutschland entsandt. Für jeden Einsatz liegt eine offizielle A1-Bescheinigung vor — der Nachweis der Sozialversicherungspflicht im Herkunftsland.' },
+            { q: 'Mit wem wird der Vertrag geschlossen?', a: 'Der Betreuungsvertrag wird mit unserer Muttergesellschaft, der Vitanas Group, geschlossen — einem der größten und erfahrensten Pflegeunternehmen Deutschlands.' },
+            { q: 'Welche Kosten entstehen insgesamt?', a: 'Es gibt vier Kostenpunkte: Die monatlichen Betreuungskosten laut Ihrem Angebot. Anreise und Abreise pauschal je 125 €. Kost und Logis, die Sie der Pflegekraft frei zur Verfügung stellen. Fällt der Einsatz in einen Sommermonat (Juli oder August), kommen 200 €/Monat (bzw. 6,67 €/Tag) Sommerzuschlag hinzu. An folgenden Feiertagen wird der doppelte Tagessatz berechnet: Karfreitag, Ostersonntag, Ostermontag, 1. Mai, Heiligabend, 1. + 2. Weihnachtstag, Silvester und Neujahr. Darüber hinaus gibt es keinerlei versteckte Kosten.' },
+            /* Sachleistungs-Frage (Martin, 13.08.): kommt in Beratungen
+               regelmäßig. Fachlich: 24h-Betreuung im Entsendemodell ist
+               KEINE ambulante Pflegesachleistung (§ 36 SGB XI, zugelassenen
+               Pflegediensten vorbehalten) — der Kunde nutzt die
+               GELDleistungen (Pflegegeld u. a.). Bewusst ohne Beträge: die
+               stehen personalisiert im Angebot unter „Alle Kosten im
+               Überblick" (Block „Was bleibt für Sie übrig"). */
+            { q: 'Kann ich die Pflegesachleistungen der Pflegekasse dafür einsetzen?', a: 'Nein — die 24-Stunden-Betreuung zählt nicht als Pflegesachleistung; diese sind zugelassenen ambulanten Pflegediensten vorbehalten. Sie nutzen stattdessen die Geldleistungen Ihrer Pflegekasse, allen voran das Pflegegeld. Welche Leistungen in Ihrer Situation zusammenkommen, sehen Sie in Ihrem Angebot unter „Alle Kosten im Überblick".' },
           ].map((item, i, arr) => (
             <div key={i} className={i < arr.length - 1 ? 'border-b' : ''} style={{borderColor:'#E9E9EB'}}>
               <button
