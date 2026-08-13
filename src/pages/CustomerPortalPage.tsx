@@ -2842,16 +2842,35 @@ const CustomerPortalPage: FC = () => {
       <div className="max-w-3xl mx-auto px-4 pt-1 pb-6 space-y-4" style={{background:'#FFFFFF'}}>
 
         {/* ── SECTION: Interest-Karten ──
-             IMMER sichtbar wenn proaktiv interessierte Pflegekräfte da sind,
-             egal ob hasPending oder nicht. Steht UNTER pending Bewerbungen
+             Sichtbar wenn proaktiv interessierte Pflegekräfte da sind, egal
+             ob hasPending oder nicht. Steht UNTER pending Bewerbungen
              (Bewerbung hat Priorität: schnelle Entscheidung nötig), aber
              ÜBER der Matching-Liste (Interest ist heißer als ein normales
-             Matching). */}
-        {visibleInterests.length > 0 && (
-          /* Eigener, hervorgehobener Kasten ÜBER den passenden Pflegekräften
+             Matching).
+
+             NUR bei vollständiger Pflegesituation (Martin, 13.08.): Vorher
+             ist der Kunde in mamamia `draft`, der Job nicht öffentlich —
+             keine Pflegekraft kann ihn sehen, Interesse ist dort eine
+             logische Unmöglichkeit. Real käme der Fall nie vor (Interests
+             existieren erst ab `active`), aber die Vorschau-Mocks zeigten
+             ihn und stifteten Verwirrung; das Gate macht Darstellung und
+             Wirklichkeit deckungsgleich. */}
+        {patientSaved && visibleInterests.length > 0 && (<>
+          {/* Kleine Abschnitts-Überschrift wie bei den Nachbarn (Martin,
+              13.08.) — der Kasten hing vorher ohne Einordnung zwischen
+              Kosten und Pflegekräften. */}
+          <div className="px-1 pt-2">
+            <h2 className="text-[1.2rem] font-bold tracking-tight" style={{color:'#18181B'}}>
+              {visibleInterests.length === 1 ? 'Interessierte Pflegekraft' : 'Interessierte Pflegekräfte'}
+            </h2>
+          </div>
+          {/* Eigener, hervorgehobener Kasten ÜBER den passenden Pflegekräften
              (Martin, 11.08.): Proaktives Interesse ist mehr wert als ein
              Matching — vorher lag es optisch gleichauf in derselben Liste und
-             ging unter. Kräftigerer Rahmen als die Matching-Karten. */
+             ging unter. Kräftigerer Rahmen als die Matching-Karten. Seit dem
+             Fragment-Umbau 13.08. MUSS das ein JSX-Kommentar sein — als
+             blanker /*-Block zwischen Elementen wurde er als TEXT gerendert
+             und stand wörtlich auf der Seite. */}
           <div className="rounded-3xl px-3 py-4 border space-y-3" style={{ background: '#FFFFFF', borderColor: '#8B7355' }}>
             <p className="flex items-start gap-2 text-[15px] font-semibold leading-relaxed px-1" style={{color:'#8B7355'}}>
               <Heart className="w-4 h-4 flex-shrink-0 mt-1" fill="currentColor" />
@@ -2889,7 +2908,7 @@ const CustomerPortalPage: FC = () => {
               );
             })}
           </div>
-        )}
+        </>)}
 
         {/* ── SECTION HEADER: Passende Pflegekräfte / Ihre Bewerbungen (state-aware) ── */}
         <div className="px-1 pt-2" id="pflegekraefte">
