@@ -3222,7 +3222,7 @@ const CustomerPortalPage: FC = () => {
                     als die darüber. */}
                 {!patientSaved && (
                   <p className="text-[13px] font-semibold mt-0.5" style={{color:'#8B7355'}}>
-                    Ohne diese Angaben keine Bewerbungen
+                    Ohne diese Angaben keine Bewerbungen möglich
                   </p>
                 )}
               </div>
@@ -3230,7 +3230,7 @@ const CustomerPortalPage: FC = () => {
                 {patientSaved ? (
                   <span className="text-[12px] font-semibold px-3 py-1 rounded-full" style={{background:'#E3F7EF', color:'#2a9a6f'}}>✓ Vollständig</span>
                 ) : (
-                  <span className="text-[12px] font-semibold px-3 py-1 rounded-full" style={{background:'#FDF1E2', color:'#B45309'}}>Noch offen</span>
+                  <span className="text-[12px] font-semibold px-3 py-1 rounded-full" style={{background:'#FDF1E2', color:'#B45309'}}>Unvollständig</span>
                 )}
                 <ChevronDown className={`w-5 h-5 text-[#8B7355] transition-transform duration-200 ${patientExpanded ? 'rotate-180' : ''}`} />
               </div>

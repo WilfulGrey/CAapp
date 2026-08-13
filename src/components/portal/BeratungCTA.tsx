@@ -11,7 +11,7 @@ export const BeratungCTA: FC<{
   body?: string;
 }> = ({ headline, body = 'Ich helfe Ihnen gerne weiter — schnell und unverbindlich.' }) => {
   return (
-    <div className="rounded-2xl border border-[#E9E9EB] bg-[#F5F5F6] p-4">
+    <div className="rounded-2xl border border-[#D4D4D8] bg-white p-4 shadow-sm">
       {/* Aufbau (Martin, 13.08.): Überschrift über die volle Breite, darunter
           Foto mit Name/Rolle rechts daneben, dann der Text wieder volle
           Breite, und die beiden Wege NEBENEINANDER — wie in der Kontaktbox
