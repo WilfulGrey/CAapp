@@ -95,7 +95,12 @@ describe('nurseLevel — Labels folgen den Schwellen', () => {
     expect(nurseLevel(0, 11).label).toBe('Stammkraft');
     expect(nurseLevel(0, 12).label).not.toBe('Stammkraft');
   });
-  it('ohne Einsatz kein Label', () => {
-    expect(nurseLevel(20, 0).label).toBe('');
+  it('ohne Einsatz: Ersatz-Wort statt Leere — je nachdem, ob Jahre da sind', () => {
+    // Keine fünfte Stufe der Leiter, sondern eine andere Achse: Die Stufen
+    // messen Einsätze BEI UNS, „Berufserfahren" spricht über die (selbst
+    // ausgewiesenen) Jahre davor, „Neu dabei" behauptet gar nichts.
+    expect(nurseLevel(20, 0).label).toBe('Berufserfahren');
+    expect(nurseLevel(1, 0).label).toBe('Berufserfahren');
+    expect(nurseLevel(0, 0).label).toBe('Neu dabei');
   });
 });
