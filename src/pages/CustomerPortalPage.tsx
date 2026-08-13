@@ -2357,7 +2357,7 @@ const CustomerPortalPage: FC = () => {
                       unten im Kontakt-Block. */}
                   <div className="mt-4 pt-4 flex items-center gap-3" style={{borderTop:'1px solid #E9E9EB'}}>
                     <img src="/badge-testsieger.webp" alt="Testsieger Die Welt" className="h-11 w-auto flex-shrink-0 object-contain" />
-                    <p className="text-[13.5px] leading-snug" style={{color:'#52525B'}}>
+                    <p className="text-[15px] leading-snug" style={{color:'#52525B'}}>
                       <span className="font-semibold" style={{color:'#18181B'}}>Testsieger – DIE&nbsp;WELT</span> mit über 20&nbsp;Jahren Erfahrung und 60.000 Betreuungseinsätzen
                     </p>
                   </div>
