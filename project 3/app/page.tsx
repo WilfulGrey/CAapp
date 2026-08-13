@@ -44,7 +44,7 @@ export default function HomePage() {
             <h1 className="text-[28px] md:text-[40px] leading-[1.2] font-bold text-[#3D3D3D] mb-4 tracking-tight">
               24-Stunden-Pflege zu Hause – die bezahlbare Alternative zum Pflegeheim
             </h1>
-            <ul className="max-w-sm mx-auto flex flex-col gap-3 mb-5 text-left pl-3">
+            <ul className="max-w-sm mx-auto flex flex-col gap-3 mb-5 text-left pl-2">
               <li className="flex items-center gap-3">
                 <span className="w-7 h-7 rounded-full bg-[#FBEEEA] flex items-center justify-center flex-shrink-0"><svg className="w-[16px] h-[16px] text-[#E76F63]" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" /></svg></span>
                 <span className="text-[16px] leading-snug text-[#3D3D3D]"><strong className="font-semibold">Sofortangebot</strong> in 2 Minuten</span>
@@ -53,9 +53,9 @@ export default function HomePage() {
                 <span className="w-7 h-7 rounded-full bg-[#FBEEEA] flex items-center justify-center flex-shrink-0"><svg className="w-[16px] h-[16px] text-[#E76F63]" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197m13.5-9a2.5 2.5 0 11-5 0 2.5 2.5 0 015 0z" /></svg></span>
                 <span className="text-[16px] leading-snug text-[#3D3D3D]"><strong className="font-semibold">Pflegekräfte</strong> sofort einsehen</span>
               </li>
-              <li className="flex items-center gap-3">
+              <li className="flex items-center gap-3 -mr-4">
                 <span className="w-7 h-7 rounded-full bg-[#FBEEEA] flex items-center justify-center flex-shrink-0"><svg className="w-[16px] h-[16px] text-[#E76F63]" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" /></svg></span>
-                <span className="text-[14px] leading-snug text-[#3D3D3D] whitespace-nowrap"><strong className="font-semibold">Erst Pflegekraft aussuchen,</strong> dann buchen</span>
+                <span className="text-[16px] leading-snug tracking-tight text-[#3D3D3D]"><strong className="font-semibold">Erst Pflegekraft aussuchen,</strong> dann buchen</span>
               </li>
             </ul>
 
