@@ -178,3 +178,28 @@ export async function fetchLeadEvents(
     return [];
   }
 }
+
+// ─── Angebots-Rückmeldung: Ruhezeit ────────────────────────────────────────
+// Nach einer Antwort (oder einem Wegklicken) ist für RUHEZEIT_TAGE Ruhe.
+// Vorher galt das nur für die Sitzung — wer antwortete und neu lud, wurde
+// sofort wieder gefragt (Martin, 12.08.). Danach darf die Frage wieder
+// auftauchen: Nach einer Woche IST „Vielleicht später" eine neue Frage.
+//
+// Als reine Funktion, damit die Regel prüfbar ist statt nur im Effekt zu leben.
+export const FEEDBACK_RUHEZEIT_TAGE = 7;
+
+/** Liegt der Stempel (ms seit Epoche, als String aus localStorage) noch
+ *  innerhalb der Ruhezeit? Unlesbare/fehlende/zukünftige Werte → false,
+ *  also lieber fragen als für immer verstummen. */
+export function feedbackInRuhezeit(
+  stamp: string | null | undefined,
+  now: number = Date.now(),
+  tage: number = FEEDBACK_RUHEZEIT_TAGE,
+): boolean {
+  if (!stamp) return false;
+  const t = Number(stamp);
+  if (!Number.isFinite(t) || t <= 0) return false;
+  const alter = now - t;
+  if (alter < 0) return false; // Uhr verstellt / Stempel aus der Zukunft
+  return alter < tage * 24 * 60 * 60 * 1000;
+}

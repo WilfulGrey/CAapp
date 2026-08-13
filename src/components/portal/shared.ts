@@ -63,11 +63,11 @@ export interface NurseStatuses {
 // Bekannt ≥1 / sonst kein Label) — gleiche Rechnung UND gleiche Wortwahl wie
 // im SA-Portal (mamamia-sadash `lib/caregiverBadge.js`).
 //
-// `assignments` = Caregiver.hp_total_jobs. `experienceYears` wird NICHT mehr
-// eingerechnet; der Parameter bleibt in der Signatur, weil die Karten die
-// Jahre weiterhin danebenschreiben („Bewährt: 4 J. Erfahrung · 9 Einsätze")
-// und alle Aufrufer beides ohnehin zur Hand haben.
-export function nurseLevel(_experienceYears: number, assignments: number): {
+// `assignments` = Caregiver.hp_total_jobs. `experienceYears` wird NICHT in
+// die STUFE eingerechnet — aber ohne Einsätze entscheidet es das Ersatz-Wort
+// (siehe default-Zweig): Die Karte hätte sonst gar kein Label und im
+// schlimmsten Fall nur einen Strich als Qualifikationszeile (Martin, 13.08.).
+export function nurseLevel(experienceYears: number, assignments: number): {
   label: string;
   emoji: string;
   cls: string;
@@ -101,8 +101,39 @@ export function nurseLevel(_experienceYears: number, assignments: number): {
     case 3:  return { label: 'Stammkraft', emoji: '', cls: '' };
     case 2:  return { label: 'Bewährt',    emoji: '', cls: '' };
     case 1:  return { label: 'Bekannt',    emoji: '', cls: '' };
-    default: return { label: '',           emoji: '', cls: '' };
+    // Ohne Einsatz über uns: BEWUSST keine fünfte Stufe der Leiter, sondern
+    // eine andere Achse — deshalb tauchen die beiden Wörter auch nicht im
+    // Erklär-Popup auf (dort bleibt die Vier-Stufen-Leiter, ohne „Aktuell").
+    //   Jahre > 0 → „Berufserfahren": Erfahrung ja, nur woanders gesammelt.
+    //     Die Jahre sind Selbstauskunft (care_experience) — das Wort behauptet
+    //     nichts Neues, es steht vor genau der Zahl, die eh auf der Karte steht.
+    //   Jahre = 0 → „Neu dabei": ehrlich statt leerem Strich.
+    default: return experienceYears > 0
+      ? { label: 'Berufserfahren', emoji: '', cls: '' }
+      : { label: 'Neu dabei',      emoji: '', cls: '' };
   }
+}
+
+// Faktenzeile der Karte (nach dem fetten Label). Zentral, weil MatchCard und
+// InterestCard sie bisher identisch dupliziert haben — und beide dieselben
+// Löcher hatten: ohne `care_experience` stand dort wörtlich „—" als einzige
+// Qualifikation, und ohne Einsätze fehlte nach „Neu dabei" jeder Inhalt.
+// Leere Teile werden gefiltert statt als Strich gerendert; ist NICHTS da,
+// füllt ein kurzer, ehrlicher Satz die Zeile (Martin, 13.08.: „kurzen Text,
+// weil Erfahrungsinfo eh fehlt").
+export function nurseFacts(nurse: {
+  experience: string;
+  history?: { assignments: number; avgDurationMonths: number };
+}): string {
+  const teile: string[] = [];
+  if (nurse.experience && nurse.experience !== '—') teile.push(nurse.experience);
+  if (nurse.history) {
+    teile.push(`${nurse.history.assignments} Einsätze`);
+    teile.push(`Ø ${Math.round(nurse.history.avgDurationMonths * 4.3)} Wochen pro Einsatz`);
+  }
+  // Kein Versprechen, keine erfundene Qualifikation — nur, was der nächste
+  // Schritt wäre. Verfügbarkeit steht separat als Chip auf der Karte.
+  return teile.length > 0 ? teile.join(' · ') : 'bereit für den ersten Einsatz';
 }
 
 export function displayName(fullName: string): string {

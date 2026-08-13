@@ -3,7 +3,7 @@ import type { FC } from 'react';
 import { Check, ChevronDown, FileText, Heart, Sparkles, UserPlus, X } from 'lucide-react';
 import type { Nurse } from '../../types';
 import type { NurseStatus } from './shared';
-import { nurseLevel, displayName, initials } from './shared';
+import { nurseFacts, nurseLevel, displayName, initials } from './shared';
 
 export const MatchCard: FC<{
   nurse: Nurse;
@@ -158,10 +158,7 @@ export const MatchCard: FC<{
           {(() => { const lvl = nurseLevel(nurse.experienceYears ?? 0, nurse.history?.assignments ?? 0); return lvl.label ? (
             <span className="font-semibold" style={{ color: '#18181B' }}>{lvl.label}: </span>
           ) : null; })()}
-          {nurse.experience}
-          {nurse.history && (
-            <> · {nurse.history.assignments} Einsätze · Ø {Math.round(nurse.history.avgDurationMonths * 4.3)} Wochen pro Einsatz</>
-          )}
+          {nurseFacts(nurse)}
         </p>
       </div>
 

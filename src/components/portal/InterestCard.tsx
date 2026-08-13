@@ -2,7 +2,7 @@ import { useState } from 'react';
 import type { FC } from 'react';
 import { Check, ChevronDown, FileText, UserPlus } from 'lucide-react';
 import type { Nurse } from '../../types';
-import { nurseLevel, displayName, initials } from './shared';
+import { nurseFacts, nurseLevel, displayName, initials } from './shared';
 
 export type InterestActionStatus = 'idle' | 'invited' | 'dismissed';
 
@@ -125,10 +125,7 @@ export const InterestCard: FC<{
           {(() => { const lvl = nurseLevel(nurse.experienceYears ?? 0, nurse.history?.assignments ?? 0); return lvl.label ? (
             <span className="font-semibold" style={{ color: '#18181B' }}>{lvl.label}: </span>
           ) : null; })()}
-          {nurse.experience}
-          {nurse.history && (
-            <> · {nurse.history.assignments} Einsätze · Ø {Math.round(nurse.history.avgDurationMonths * 4.3)} Wochen pro Einsatz</>
-          )}
+          {nurseFacts(nurse)}
         </p>
       </div>
 

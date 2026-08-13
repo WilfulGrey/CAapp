@@ -14,7 +14,7 @@ import { useCustomer, useJobOffer, useApplications, useInterests, useDismissedCa
 import { rankComparator } from '../lib/mamamia/matchingsRanking';
 import { prefetchCaregivers } from '../lib/mamamia/caregiverCache';
 import { isAboutDeStale, regenerateGermanDescription } from '../lib/mamamia/caregiverAbout';
-import { reportLeadEvent, fetchLeadEvents, KOSTENRECHNER_URL } from '../lib/leadEvents';
+import { feedbackInRuhezeit, reportLeadEvent, fetchLeadEvents, KOSTENRECHNER_URL } from '../lib/leadEvents';
 import type { CaregiverSnapshot } from '../lib/leadEvents';
 import { identifyClarity } from '../lib/clarity';
 import {
@@ -515,11 +515,33 @@ const CustomerPortalPage: FC = () => {
   const formMinutes =
     String(lead?.kalkulation?.formularDaten?.betreuung_fuer ?? '') === 'ehepaar' ? 4 : 2;
 
-  // Rückmeldung zum Angebot: einmal beantwortet oder weggeklickt, ist die
-  // Blase für diese Sitzung weg. Bewusst KEIN localStorage — beim nächsten
-  // Besuch kann sich die Lage geändert haben, und ein zweites „wie geht es
-  // weiter?" nach Tagen ist keine Belästigung, sondern die richtige Frage.
+  // Rückmeldung zum Angebot: einmal beantwortet oder weggeklickt, ist Ruhe —
+  // und zwar RUHEZEIT_TAGE lang, nicht nur für diese Sitzung (Martin, 12.08.:
+  // „wann zeigen wir das eigentlich?"). Vorher stand hier bewusst KEIN
+  // localStorage, mit dem Gedanken „beim nächsten Besuch kann sich die Lage
+  // geändert haben". In der Praxis hiess das: antworten, Seite neu laden,
+  // sofort wieder gefragt werden. Das ist keine Auffrischung, sondern Nerven.
+  //
+  // Nach einer Woche darf sie wieder auftauchen — dann IST „Vielleicht später"
+  // eine neue Frage. Wer das Formular ausgefüllt hat, sieht sie ohnehin nie
+  // wieder (`patientSaved` schaltet sie ab).
+  const feedbackKey = lead?.token ? `pm_feedback_${lead.token}` : null;
   const [feedbackWeg, setFeedbackWeg] = useState(false);
+  // Gespeicherten Stempel EINMAL lesen, sobald der Token da ist. iOS-WebKit im
+  // privaten Modus wirft beim Zugriff → dann bleibt es beim Sitzungsverhalten.
+  useEffect(() => {
+    if (!feedbackKey || IS_PREVIEW_ANY) return;
+    try {
+      if (feedbackInRuhezeit(localStorage.getItem(feedbackKey))) setFeedbackWeg(true);
+    } catch { /* privater Modus — dann eben nur für die Sitzung */ }
+  }, [feedbackKey]);
+  const feedbackErledigt = () => {
+    setFeedbackWeg(true);
+    // In der Vorschau NICHT stempeln — sonst wäre die Blase nach einmal
+    // Wegklicken für sieben Tage weg und nicht mehr vorführbar.
+    if (IS_PREVIEW_ANY) return;
+    try { if (feedbackKey) localStorage.setItem(feedbackKey, String(Date.now())); } catch { /* s.o. */ }
+  };
   // Sie erscheint NICHT sofort: Erst wenn der Kunde am Angebot und an den
   // Pflegekräften vorbei ist. Eine Frage, die über dem Preis aufpoppt,
   // unterbricht mitten im Lesen und bietet einen Ausstieg an, bevor er die
@@ -538,6 +560,18 @@ const CustomerPortalPage: FC = () => {
   // sein, ohne erst hinscrollen zu müssen — und die Vorschau-Umgebung meldet
   // ohnehin weder scroll- noch Intersection-Ereignisse (12.08. geprüft: auch
   // ein manuell gesetzter Observer feuert dort nie).
+  // Zweite Bedingung neben dem Scrollen: eine Mindest-Verweildauer. Scrollen
+  // allein beweist nicht, dass jemand gelesen hat — wer einmal schnell
+  // durchwischt, hat zum Angebot noch keine Meinung, und eine Frage danach
+  // erzeugt eine Zufallsantwort statt einer echten (Martin, 12.08.).
+  const VERWEILDAUER_MS = 45_000;
+  const [feedbackVerweilt, setFeedbackVerweilt] = useState(IS_PREVIEW_ANY);
+  useEffect(() => {
+    if (feedbackVerweilt) return;
+    const t = setTimeout(() => setFeedbackVerweilt(true), VERWEILDAUER_MS);
+    return () => clearTimeout(t);
+  }, [feedbackVerweilt]);
+
   const [feedbackReif, setFeedbackReif] = useState(IS_PREVIEW_ANY);
   useEffect(() => {
     if (feedbackReif) return;
@@ -3737,9 +3771,9 @@ const CustomerPortalPage: FC = () => {
            Frage „wie geht es weiter" beantwortet, und wer offene
            Bewerbungen hat, soll sich um die kümmern. Chat und Modale
            liegen auf z-[60]+ — die Blase auf z-40 verdeckt sie nicht. */}
-      {!hasPending && !patientSaved && !feedbackWeg && feedbackReif && !chatNurse && !selectedApp && !selectedNurse && (
+      {!hasPending && !patientSaved && !feedbackWeg && feedbackReif && feedbackVerweilt && !chatNurse && !selectedApp && !selectedNurse && (
         <AngebotsFeedback
-          onDismiss={() => setFeedbackWeg(true)}
+          onDismiss={feedbackErledigt}
           onGoToForm={() => {
             document.getElementById('patientendaten')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
             setPatientExpandedManual(true);
