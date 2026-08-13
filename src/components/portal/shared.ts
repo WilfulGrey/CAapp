@@ -128,8 +128,12 @@ export function nurseFacts(nurse: {
   const teile: string[] = [];
   if (nurse.experience && nurse.experience !== '—') teile.push(nurse.experience);
   if (nurse.history) {
-    teile.push(`${nurse.history.assignments} Einsätze`);
-    teile.push(`Ø ${Math.round(nurse.history.avgDurationMonths * 4.3)} Wochen pro Einsatz`);
+    // Einzahl korrekt: „1 Einsätze" und „Ø 1 Wochen" standen wörtlich so auf
+    // Prod (Martin, 13.08., Screenshot Ewelina S. — 1 Einsatz, 1 Woche).
+    const n = nurse.history.assignments;
+    teile.push(`${n} ${n === 1 ? 'Einsatz' : 'Einsätze'}`);
+    const wochen = Math.round(nurse.history.avgDurationMonths * 4.3);
+    teile.push(`Ø ${wochen} ${wochen === 1 ? 'Woche' : 'Wochen'} pro Einsatz`);
   }
   // Kein Versprechen, keine erfundene Qualifikation — nur, was der nächste
   // Schritt wäre. Verfügbarkeit steht separat als Chip auf der Karte.

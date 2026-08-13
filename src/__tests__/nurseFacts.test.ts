@@ -24,4 +24,9 @@ describe('nurseFacts', () => {
     expect(nurseFacts({ experience: '—' })).toBe('bereit für den ersten Einsatz');
     expect(nurseFacts({ experience: '' })).toBe('bereit für den ersten Einsatz');
   });
+
+  it('Einzahl: „1 Einsatz" und „Ø 1 Woche" — nicht „1 Einsätze" (Prod-Screenshot 13.08.)', () => {
+    expect(nurseFacts({ experience: '—', history: { assignments: 1, avgDurationMonths: 0.23 } }))
+      .toBe('1 Einsatz · Ø 1 Woche pro Einsatz');
+  });
 });

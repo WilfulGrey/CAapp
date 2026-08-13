@@ -147,8 +147,19 @@ export const AngebotCard: FC<{
   // the explicit "Daten speichern" click handler) — meaning the strict
   // invite-gate would block invitations for a returning customer who
   // already has a complete profile.
+  //
+  // ABER: Dieser Effekt meldet AUSSCHLIESSLICH Aufwertungen (saved=true).
+  // Martin, 13.08., prod: Daten in mamamia komplett, Kunde tippt den
+  // Abschnittskopf an, das Formular mountet — auf dem Gerät liegt kein
+  // localStorage-Vermerk, `saved` startet false, und der Effekt überschrieb
+  // das server-bestätigte „Vollständig" mit „Noch offen". localStorage ist
+  // GERÄTE-Wissen, mamamia ist die Wahrheit — ein fehlender lokaler Vermerk
+  // ist kein Beleg für „unvollständig". (Erster Fix war ein Mount-Ref und
+  // hielt StrictMode nicht stand — Doppel-Ausführung verbraucht den Ref.)
+  // Die Abwertung läuft NUR noch über updatePatient, also über eine echte
+  // Bearbeitung durch den Kunden.
   useEffect(() => {
-    onPatientSaved?.(saved);
+    if (saved) onPatientSaved?.(true);
   }, [saved]);
 
   // Open the Patientendaten row when the parent flips `triggerOpenPatient`
@@ -218,6 +229,10 @@ export const AngebotCard: FC<{
   const updatePatient = (updater: (prev: PatientForm) => PatientForm) => {
     userDirty.current = true;
     setSaved(false);
+    // Abwertung EXPLIZIT nach oben melden — der saved-Effekt oben propagiert
+    // bewusst nur Aufwertungen (siehe Kommentar dort). Eine Bearbeitung ist
+    // der einzige legitime Weg von „Vollständig" zurück zu „Unvollständig".
+    onPatientSaved?.(false);
     setPatient(updater);
   };
 
@@ -856,7 +871,11 @@ export const AngebotCard: FC<{
              Abschnittskopf oben trägt Titel und Status; hier beginnt direkt
              die Arbeit. */
           <div ref={patientFormRef} className="scroll-mt-16">
-          <div className="rounded-2xl border overflow-hidden" style={{ background: '#F4F4F6', borderColor: '#D4D4D8' }}>
+          {/* Der Formular-Kasten traegt die Hervorhebung selbst (Martin,
+              13.08.): brauner Rand + weicher warmer Schatten statt eines
+              Aussenrahmens um den ganzen Abschnitt. Fläche bleibt #F4F4F6 —
+              auf Weiss verloeren die weissen Auswahl-Chips ihre Kontur. */}
+          <div className="rounded-2xl border overflow-hidden" style={{ background: '#F4F4F6', borderColor: '#8B7355', boxShadow: '0 10px 30px rgba(139, 115, 85, 0.16)' }}>
 
             {/* Progress bar */}
             <div className="px-4 pt-3 pb-2 flex items-center gap-3">
