@@ -2349,6 +2349,19 @@ const CustomerPortalPage: FC = () => {
                     ))}
                   </div>
 
+                  {/* Beweis-Zeile direkt am Preis (Martin, 13.08.): die vier
+                      Checks sind Konditionen, hier steht, WER das verspricht.
+                      Form nach zwei verworfenen Anläufen (graue Textzeile,
+                      Statistik-Spalten): echtes Welt-Siegel + EIN Fließsatz —
+                      Wortlaut von Martin. Die ausführlichen Kacheln bleiben
+                      unten im Kontakt-Block. */}
+                  <div className="mt-4 pt-4 flex items-center gap-3" style={{borderTop:'1px solid #E9E9EB'}}>
+                    <img src="/badge-testsieger.webp" alt="Testsieger Die Welt" className="h-11 w-auto flex-shrink-0 object-contain" />
+                    <p className="text-[13.5px] leading-snug" style={{color:'#52525B'}}>
+                      <span className="font-semibold" style={{color:'#18181B'}}>Testsieger – DIE&nbsp;WELT</span> mit über 20&nbsp;Jahren Erfahrung und 60.000 Betreuungseinsätzen
+                    </p>
+                  </div>
+
                   {/* Der Toggle sitzt IM Kasten (Martin, 11.08.) — er gehört
                       zum Angebot, nicht daneben. */}
                   <button
