@@ -2756,7 +2756,9 @@ const CustomerPortalPage: FC = () => {
               title: 'Ihr Betreuungsportal',
               subtitle:
                 'Hier sehen Sie eingehende Bewerbungen und können in der Zwischenzeit passende Pflegekräfte zur Bewerbung einladen — es bleibt alles unverbindlich.',
-              pill: '100 % kostenfrei & unverbindlich',
+              // Kein Pill (Martin, 13.08.): „unverbindlich" steht schon im
+              // Satz darüber — die Zeile war eine Wiederholung.
+              pill: '',
               steps: 'saved' as 'initial' | 'saved' | null,
             }
           : {
@@ -2891,7 +2893,7 @@ const CustomerPortalPage: FC = () => {
 
         {/* ── SECTION HEADER: Passende Pflegekräfte / Ihre Bewerbungen (state-aware) ── */}
         <div className="px-1 pt-2" id="pflegekraefte">
-          <h2 className="text-[1.2rem] font-bold tracking-tight" style={{color:'#18181B'}}>{hasPending ? 'Ihre Bewerbungen' : 'Passende Pflegekräfte'}</h2>
+          <h2 className="text-[1.2rem] font-bold tracking-tight" style={{color:'#18181B'}}>{hasPending ? 'Ihre Bewerbungen' : 'Passende Pflegekräfte einladen'}</h2>
         </div>
 
 
