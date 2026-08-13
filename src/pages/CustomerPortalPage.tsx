@@ -508,13 +508,6 @@ const CustomerPortalPage: FC = () => {
   const [showPatientReminder, setShowPatientReminder] = useState(false);
   const [triggerOpenPatient, setTriggerOpenPatient] = useState(IS_PREVIEW_PATIENT);
 
-  // Ehrliche Aufwandsangabe für den Bogen: Beim Ehepaar verlangt er die
-  // doppelte Personenspalte (~40 statt ~29 Felder). „ca. 2 Min." ist dort ein
-  // Versprechen, das das Formular nicht hält — und ein gebrochenes Versprechen
-  // mitten drin erzeugt genau den Abbruch, den wir vermeiden wollen.
-  const formMinutes =
-    String(lead?.kalkulation?.formularDaten?.betreuung_fuer ?? '') === 'ehepaar' ? 4 : 2;
-
   // Rückmeldung zum Angebot: einmal beantwortet oder weggeklickt, ist Ruhe —
   // und zwar RUHEZEIT_TAGE lang, nicht nur für diese Sitzung (Martin, 12.08.:
   // „wann zeigen wir das eigentlich?"). Vorher stand hier bewusst KEIN
@@ -2258,287 +2251,13 @@ const CustomerPortalPage: FC = () => {
     );
   }
 
-  return (
-    <>
-    <div className="min-h-screen bg-gray-100 md:flex md:items-start md:justify-center md:py-10">
-    <div className="min-h-screen md:min-h-0 bg-white w-full md:w-[390px] md:min-h-[844px] md:rounded-[48px] md:shadow-2xl md:overflow-hidden md:border-[8px] md:border-gray-800 md:ring-4 md:ring-gray-900/10 relative" style={{fontFamily: 'inherit'}}>
-    <div id="portal-scroll-container" className="md:h-[844px] md:overflow-y-auto md:overflow-x-hidden">
-      {/* Toast */}
-      {toast && (
-        <div
-          className="fixed top-5 left-1/2 -translate-x-1/2 z-[60] max-w-[85vw] bg-white border border-[#E8D0EA] text-gray-800 px-4 py-3 rounded-2xl shadow-lg text-sm font-medium flex items-center gap-2.5"
-          style={{ animation: 'slideDown 0.25s ease-out' }}
-        >
-          <div className="w-5 h-5 rounded-full bg-[#9B1FA1] flex items-center justify-center flex-shrink-0">
-            <Check className="w-3 h-3 text-white" strokeWidth={3} />
-          </div>
-          <span className="leading-snug">{toast.replace(/^✓\s*/, '')}</span>
-        </div>
-      )}
-
-      {/* Navbar */}
-      <nav className="sticky top-0 z-40" style={{background:'white', boxShadow:'0 1px 0 #E9E9EB, 0 2px 8px rgba(0,0,0,0.06)'}}>
-        <div className="max-w-3xl mx-auto px-4 py-3 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <img src="/LOGO-PRIMUNDUS.webp" alt="Primundus" className="h-6" />
-          </div>
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => setShowContactPopup(true)}
-              className="flex items-center gap-1.5 bg-white hover:bg-[#F5F5F6] text-[#8B7355] border border-[#E9E9EB] rounded-full px-3 py-1.5 text-xs font-semibold transition-colors"
-            >
-              <Phone className="w-3.5 h-3.5" />
-              Hilfe
-            </button>
-          </div>
-        </div>
-        {/* Sub-Nav: Einsatz-Kontext (Status + Zeitraum) links, Link zur
-            Einsätze-Übersicht rechts. Logo bleibt darüber sichtbar.
-            Rendert nur wenn ?back=jobs gesetzt (= aus Multi-Job-Übersicht
-            rein-navigiert). Wird später durch das echte Multi-Job-Routing
-            (lead_jobs Tabelle) ersetzt. */}
-        {HAS_JOBS_BACK && JOBS_BACK && (() => {
-          const statusStyle = {
-            laufend: { label: 'Laufend', cls: 'bg-green-50 text-green-700 border-green-200' },
-            gebucht: { label: 'Gebucht', cls: 'bg-amber-50 text-amber-700 border-amber-200' },
-            geplant: { label: 'Geplant', cls: 'bg-blue-50 text-blue-700 border-blue-200' },
-            abgeschlossen: { label: 'Abgeschlossen', cls: 'bg-gray-100 text-gray-600 border-gray-200' },
-          } as const;
-          const s = JOBS_BACK.status ? statusStyle[JOBS_BACK.status] : null;
-          const zeitraum = JOBS_BACK.bis
-            ? `${JOBS_BACK.von} – ${JOBS_BACK.bis}`
-            : JOBS_BACK.von ? `ab ${JOBS_BACK.von}` : '';
-          return (
-            <div className="max-w-3xl mx-auto px-4 pb-2 -mt-1 flex items-center justify-between gap-3">
-              <div className="flex items-center gap-2 min-w-0">
-                {s && (
-                  <span className={`text-[10px] font-bold border px-1.5 py-0.5 rounded-full flex-shrink-0 ${s.cls}`}>{s.label}</span>
-                )}
-                {zeitraum && (
-                  <span className="text-xs font-semibold text-gray-700 truncate">{zeitraum}</span>
-                )}
-              </div>
-              {JOBS_BACK.count > 1 && (
-                <a
-                  href="?preview=jobs"
-                  className="inline-flex items-center gap-1 text-xs font-semibold text-[#8B7355] hover:text-[#6B5444] flex-shrink-0"
-                >
-                  Alle Einsätze
-                  <ArrowLeft className="w-3 h-3 rotate-180" />
-                </a>
-              )}
-            </div>
-          );
-        })()}
-        {/* Real Multi-Job back-link: sichtbar wenn (a) das Portal via
-            ?job=<lead_jobs.id> auf einen Job scoped ist ODER (b) der Lead
-            mehrere Einsätze hat (Opcja B, Dachs 8899 — ohne den Link war
-            die ?view=jobs-Übersicht von einem Deeplink-losen Einstieg aus
-            unerreichbar). Suppressed unter dem ?back=jobs Mock-Flow oben,
-            der seinen eigenen "Alle Einsätze"-Link rendert. */}
-        {(JOB_ID_PARAM || hasMultipleJobs) && !HAS_JOBS_BACK && (
-          <div className="max-w-3xl mx-auto px-4 pb-2 -mt-1 flex items-center">
-            <a
-              href={JOBS_OVERVIEW_HREF}
-              className="inline-flex items-center gap-1 text-xs font-semibold text-[#8B7355] hover:text-[#6B5444]"
-            >
-              <ArrowLeft className="w-3 h-3" />
-              Alle meine Einsätze
-            </a>
-          </div>
-        )}
-      </nav>
-
-      {acceptedApp ? (
-        (() => {
-          // vertragSigned aus zwei Quellen ableiten:
-          //   1) signedForm — frisch im Annahme-Flow gesetzt (in-memory, lebt
-          //      nur bis Page-Reload)
-          //   2) acceptedApplications.rows[].contract_snapshot — vom Server
-          //      persistiert. Nach Reload ist signedForm null, die Acceptance-
-          //      Row aber noch in der DB. Wenn contract_snapshot existiert,
-          //      hat der Kunde signiert (Stufe-B-Update schreibt signatur +
-          //      contract_snapshot zusammen).
-          // Sonst zeigte BookedScreen "Vertrag · Folgt" obwohl die Mail-PDF
-          // längst raus ist — Michael-Dachs-Reproducer 12.06.
-          const hasPersistedContract = (acceptedApplications?.rows ?? []).some(
-            (r) => !!r.contract_snapshot,
-          );
-          const vertragSigned = !!signedForm?.signatur || hasPersistedContract;
-          // Vertrag nachträglich abschließen (Martin, 2026-07-15): Fehlt der
-          // unterschriebene Vertrag (Annahme kam agentur-seitig → synthetische
-          // fc-App ohne signedForm/contract_snapshot), wird der Vertrag-
-          // Milestone zum aktiven Schritt. Nur mit belastbarer numerischer
-          // Bridge-Referenz (fail-soft) + echtem Lead-Token; nie im Preview,
-          // nie für beendete Einsätze, nie wenn der Vertrag schon vorliegt.
-          const contractAppId = acceptanceApplicationId(acceptedApp.id);
-          const canCompleteContract =
-            !vertragSigned
-            && !IS_EINSATZ_BEENDET
-            && !IS_PREVIEW_ANY
-            && !!lead?.token
-            && contractAppId !== null;
-          return (
-            <BookedScreen
-              app={acceptedApp}
-              onNurseClick={setSelectedNurse}
-              vertragSigned={vertragSigned}
-              onSignContract={
-                canCompleteContract ? () => setContractApp(acceptedApp) : undefined
-              }
-              // leadId + Token aktivieren den eingebetteten PDF-Viewer im
-              // Vertrag-Milestone (Mustervertrag-Look via /api/contract-pdf).
-              // Wenn das Lead oder der URL-Token fehlt → Fallback Modal mit
-              // React-VertragSignieren (onShowContract).
-              leadId={lead?.id}
-              leadToken={lead?.token ?? undefined}
-              onShowContract={
-                signedForm?.signatur && !(lead?.id && lead?.token)
-                  ? () => setShowSignedContract(true)
-                  : undefined
-              }
-              // Multi-Job-Vorschau: abgeschlossener Einsatz → Header
-              // "📋 Einsatz beendet" statt "🎊 Vielen Dank gebucht".
-              einsatzBeendet={IS_EINSATZ_BEENDET}
-            />
-          );
-        })()
-      ) : (
-      <>
-      {/* ── Hero (full-width gradient) — state-aware copy ── */}
-      {(() => {
-        // Einheitliche formale Anrede (Herr/Frau Nachname), abgeleitet via
-        // Geschlechts-Erkennung wenn das anrede-Feld leer ist; sonst neutral
-        // ("Guten Tag."). Nie bloßer Nachname. Siehe customerSalutation.
-        const heroNameLine = lead ? customerSalutation(lead) : 'Herr Mustermann';
-
-        // Hero copy adapts to where the customer is in the flow:
-        //   pending  — at least one application waiting on a decision
-        //              → focus the customer on reviewing it now
-        //   ready    — patient profile saved, no applications yet
-        //              → encourage them to invite a Wunschkraft
-        //   initial  — fresh portal, profile not filled
-        //              → explain what the portal does next
-        const n = pendingApps.length;
-
-        const heroCopy = hasPending
-          ? {
-              title: n > 1
-                ? `Sie haben ${n} neue Bewerbungen. 📨`
-                : 'Sie haben eine neue Bewerbung. 📨',
-              subtitle: n > 1
-                ? 'Schauen Sie sich die Pflegekräfte in Ruhe an und entscheiden Sie, welche am besten passt.'
-                : 'Schauen Sie sich die Bewerbung in Ruhe an und entscheiden Sie, ob die Pflegekraft passt.',
-              pill: n > 1 ? `${n} Bewerbungen aktiv` : '1 Bewerbung aktiv',
-              steps: null as 'initial' | 'saved' | null,
-            }
-          : patientSaved && !IS_PREVIEW_ANY && (!mmReady || mmApplicationsLoading || !mmApplications)
-          ? {
-              // Mamamia-Daten laden noch (oder der Abruf hakt) — hier NICHT
-              // "werden vorbereitet" behaupten: Wer aus der Bewerbungs-Mail
-              // kommt, hat nachweislich eine Bewerbung (Martin, 2026-07-09).
-              //
-              // In der Vorschau ist dieser Zweig ausgeschlossen: ohne echtes
-              // mamamia wird `mmReady` nie true, dadurch hing JEDER gespeicherte
-              // Zustand lokal auf "Einen Moment" fest — auch ?preview=wartet,
-              // das genau den Zweig darunter zeigen soll (Übergabe 11.08.).
-              title: 'Einen Moment — Ihre Bewerbungen werden geladen.',
-              subtitle: 'Wir holen gerade den aktuellen Stand Ihrer Anfrage. Das dauert nur wenige Sekunden.',
-              pill: 'Portal wird geladen',
-              steps: null as 'initial' | 'saved' | null,
-            }
-          : patientSaved
-          ? {
-              // Gleiche Überschrift wie im Ausgangszustand: Der Header ist die
-              // Überschrift des Angebots, keine Statusmeldung (Martin, 11.08.).
-              // "Profil vollständig. ✨" war genau die Statuszeile, die im
-              // Ausgangszustand bewusst gestrichen wurde — dass gespeichert ist,
-              // sagen der Toast beim Speichern und das ✓ am Abschnitt.
-              title: 'Ihr persönliches Angebot',
-              // Beschreibt den Stand NACH dem Speichern — der Satz aus dem
-              // Ausgangszustand ("Sobald Sie die Pflegesituation beschrieben
-              // haben …") verlangte hier einen bereits erledigten Schritt.
-              subtitle:
-                'Ihre Angaben liegen uns vor. Passende Pflegekräfte können sich jetzt ganz unverbindlich bei Ihnen bewerben — Sie können unten auch selbst welche einladen.',
-              pill: '100 % kostenfrei & unverbindlich',
-              steps: 'saved' as 'initial' | 'saved' | null,
-            }
-          : {
-              // Der Header IST die Überschrift des Angebots (Martin, 11.08.) —
-              // keine Statusmeldung („fertig"), sondern die Sache selbst. Der
-              // Abschnitt darunter heißt deshalb „Ihre Betreuungskosten" und
-              // wiederholt den Titel nicht.
-              title: 'Ihr persönliches Angebot',
-              // Wird im Ausgangszustand NICHT im Hero gerendert: Die Begründung
-              // steht dort, wo gehandelt wird — als Einleitung über dem
-              // Formular (Martin, 11.08.: erst Angebot und Pflegekräfte
-              // zeigen, dann um die Pflegesituation bitten).
-              subtitle:
-                // "beschrieben" — dasselbe Verb wie über dem Formular, im
-                // Text über den Pflegekräften und in der Schritt-Liste
-                // ("Pflegesituation beschreiben"). "vervollständigt" klang
-                // nach einem zweiten, anderen Schritt (Übergabe 11.08.).
-                'Hier finden Sie Ihre Betreuungskosten inklusive aller Gebühren und passende Pflegekräfte, die verfügbar sind. Sobald Sie die Pflegesituation beschrieben haben, können sich diese ganz unverbindlich bei Ihnen bewerben.',
-              // Kein Pill hier: Der Einleitungssatz darüber sagt bereits, was
-              // den Kunden erwartet. In den anderen Zuständen trägt die Zeile
-              // echten Status („1 Bewerbung aktiv") — dort bleibt sie.
-              pill: '',
-              steps: 'initial' as 'initial' | 'saved' | null,
-            };
-
-        // Die nummerierte Schritt-Checkliste (Martin, 2026-07-12: „der Kunde
-        // soll SEHEN, dass genau ein Schritt fehlt") ist am 11.08. entfallen.
-        // Sie war inhaltlich richtig, kostete aber den halben ersten Bildschirm
-        // und erzählte genau die Struktur, die die Abschnitte darunter ohnehin
-        // tragen. Der Kunde kommt aus dem Kostenrechner von „✓ Ihr Angebot ist
-        // fertig" + Button „Angebot & Pflegekräfte anzeigen →" — und muss genau
-        // das sehen, nicht eine Aufgabenliste davor. Die Führung liegt jetzt in
-        // der Reihenfolge der Abschnitte selbst:
-        //   Angebot → Passende Pflegekräfte → Pflegesituation → Vorteile/FAQ
-
-        return (
-          <div className="relative" style={{background:'#FFFFFF', borderBottom:'1px solid #E9E9EB'}}>
-            <div className="relative max-w-3xl mx-auto px-5 pt-8 pb-3">
-              <p className="text-[15px] font-medium mb-3" style={{color:'#71717A'}}>
-                Guten Tag{heroNameLine ? `, ${heroNameLine}` : ''}.
-              </p>
-              <h1 className="text-[1.75rem] font-bold leading-tight tracking-tight mb-2" style={{color:'#18181B'}}>
-                {heroCopy.title}
-              </h1>
-              {/* Im Ausgangszustand steht hier NICHTS mehr außer der
-                  Bestätigung — kein Erklärabsatz, keine Checkliste, kein
-                  Button. Alle drei waren Kopien dessen, was die Abschnitte
-                  darunter ohnehin tragen (Abschnitt „Pflegesituation" hat
-                  einen eigenen Karten-Kopf mit genau diesem Aufruf). */}
-              <p className="text-[16px] leading-relaxed mb-5" style={{color:'#71717A'}}>
-                {heroCopy.subtitle}
-              </p>
-
-              {/* Trust-Zeile: ohne Fläche und Rahmen im schlanken Hero — als
-                  Pill wirkte sie wie der Primärbutton und war ein
-                  Fehlklick-Magnet, der nichts tut. */}
-              {heroCopy.pill && (
-              <div
-                className={`inline-flex items-center gap-2 ${heroCopy.steps ? '' : 'rounded-full px-4 py-2'}`}
-                style={heroCopy.steps ? undefined : {background:'#F5F5F6', border:'1px solid #E9E9EB'}}
-              >
-                <Check className="w-4 h-4 flex-shrink-0" strokeWidth={3} style={{color:'#8B7355'}} />
-                <span className="text-[15px]" style={{color:'#18181B'}}>{heroCopy.pill}</span>
-              </div>
-              )}
-            </div>
-            {/* Die geschwungene Welle als Übergang zum Body ist am 11.08.
-                entfallen (Martin: „diese Trennung zwischen Header und Rest ist
-                krass unpassend"). Sie war das einzige verspielte Element in
-                einem sonst sachlichen Layout und ließ den Hero wie einen
-                aufgeklebten Banner wirken. Jetzt: gerade Kante, der Header
-                sitzt als Block auf der Seite. */}
-          </div>
-        );
-      })()}
-
-      {/* ── SECTION: Ihr Angebot (collapsible) ── */}
-      {(() => {
+  // ── Angebots-Sektion als Konstante ────────────────────────────────────
+  // Seit 13.08. wandert das Angebot im GESPEICHERTEN Zustand nach unten
+  // (Martin: „das Angebot kann eher nach unten rutschen — wir sehen nur
+  // Bewerbungen, und wenn nicht da, dann Pflegekräfte"). Dieselbe Sektion
+  // an zwei möglichen Stellen — deshalb einmal gebaut und unten je nach
+  // Zustand eingehängt, statt 300 Zeilen zu duplizieren.
+      const angebotSection = (() => {
         // Seit 11.08. steuert dieser Toggle NUR noch die Konditionen und den
         // Mustervertrag — der Preis steht immer. Default zu: Der Kunde soll
         // nach dem Preis direkt bei den Pflegekräften landen, nicht erst an
@@ -2837,7 +2556,285 @@ const CustomerPortalPage: FC = () => {
         </div>
         </div>
         );
+      })();
+
+  return (
+    <>
+    <div className="min-h-screen bg-gray-100 md:flex md:items-start md:justify-center md:py-10">
+    <div className="min-h-screen md:min-h-0 bg-white w-full md:w-[390px] md:min-h-[844px] md:rounded-[48px] md:shadow-2xl md:overflow-hidden md:border-[8px] md:border-gray-800 md:ring-4 md:ring-gray-900/10 relative" style={{fontFamily: 'inherit'}}>
+    <div id="portal-scroll-container" className="md:h-[844px] md:overflow-y-auto md:overflow-x-hidden">
+      {/* Toast */}
+      {toast && (
+        <div
+          className="fixed top-5 left-1/2 -translate-x-1/2 z-[60] max-w-[85vw] bg-white border border-[#E8D0EA] text-gray-800 px-4 py-3 rounded-2xl shadow-lg text-sm font-medium flex items-center gap-2.5"
+          style={{ animation: 'slideDown 0.25s ease-out' }}
+        >
+          <div className="w-5 h-5 rounded-full bg-[#9B1FA1] flex items-center justify-center flex-shrink-0">
+            <Check className="w-3 h-3 text-white" strokeWidth={3} />
+          </div>
+          <span className="leading-snug">{toast.replace(/^✓\s*/, '')}</span>
+        </div>
+      )}
+
+      {/* Navbar */}
+      <nav className="sticky top-0 z-40" style={{background:'white', boxShadow:'0 1px 0 #E9E9EB, 0 2px 8px rgba(0,0,0,0.06)'}}>
+        <div className="max-w-3xl mx-auto px-4 py-3 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <img src="/LOGO-PRIMUNDUS.webp" alt="Primundus" className="h-6" />
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setShowContactPopup(true)}
+              className="flex items-center gap-1.5 bg-white hover:bg-[#F5F5F6] text-[#8B7355] border border-[#E9E9EB] rounded-full px-3 py-1.5 text-xs font-semibold transition-colors"
+            >
+              <Phone className="w-3.5 h-3.5" />
+              Hilfe
+            </button>
+          </div>
+        </div>
+        {/* Sub-Nav: Einsatz-Kontext (Status + Zeitraum) links, Link zur
+            Einsätze-Übersicht rechts. Logo bleibt darüber sichtbar.
+            Rendert nur wenn ?back=jobs gesetzt (= aus Multi-Job-Übersicht
+            rein-navigiert). Wird später durch das echte Multi-Job-Routing
+            (lead_jobs Tabelle) ersetzt. */}
+        {HAS_JOBS_BACK && JOBS_BACK && (() => {
+          const statusStyle = {
+            laufend: { label: 'Laufend', cls: 'bg-green-50 text-green-700 border-green-200' },
+            gebucht: { label: 'Gebucht', cls: 'bg-amber-50 text-amber-700 border-amber-200' },
+            geplant: { label: 'Geplant', cls: 'bg-blue-50 text-blue-700 border-blue-200' },
+            abgeschlossen: { label: 'Abgeschlossen', cls: 'bg-gray-100 text-gray-600 border-gray-200' },
+          } as const;
+          const s = JOBS_BACK.status ? statusStyle[JOBS_BACK.status] : null;
+          const zeitraum = JOBS_BACK.bis
+            ? `${JOBS_BACK.von} – ${JOBS_BACK.bis}`
+            : JOBS_BACK.von ? `ab ${JOBS_BACK.von}` : '';
+          return (
+            <div className="max-w-3xl mx-auto px-4 pb-2 -mt-1 flex items-center justify-between gap-3">
+              <div className="flex items-center gap-2 min-w-0">
+                {s && (
+                  <span className={`text-[10px] font-bold border px-1.5 py-0.5 rounded-full flex-shrink-0 ${s.cls}`}>{s.label}</span>
+                )}
+                {zeitraum && (
+                  <span className="text-xs font-semibold text-gray-700 truncate">{zeitraum}</span>
+                )}
+              </div>
+              {JOBS_BACK.count > 1 && (
+                <a
+                  href="?preview=jobs"
+                  className="inline-flex items-center gap-1 text-xs font-semibold text-[#8B7355] hover:text-[#6B5444] flex-shrink-0"
+                >
+                  Alle Einsätze
+                  <ArrowLeft className="w-3 h-3 rotate-180" />
+                </a>
+              )}
+            </div>
+          );
+        })()}
+        {/* Real Multi-Job back-link: sichtbar wenn (a) das Portal via
+            ?job=<lead_jobs.id> auf einen Job scoped ist ODER (b) der Lead
+            mehrere Einsätze hat (Opcja B, Dachs 8899 — ohne den Link war
+            die ?view=jobs-Übersicht von einem Deeplink-losen Einstieg aus
+            unerreichbar). Suppressed unter dem ?back=jobs Mock-Flow oben,
+            der seinen eigenen "Alle Einsätze"-Link rendert. */}
+        {(JOB_ID_PARAM || hasMultipleJobs) && !HAS_JOBS_BACK && (
+          <div className="max-w-3xl mx-auto px-4 pb-2 -mt-1 flex items-center">
+            <a
+              href={JOBS_OVERVIEW_HREF}
+              className="inline-flex items-center gap-1 text-xs font-semibold text-[#8B7355] hover:text-[#6B5444]"
+            >
+              <ArrowLeft className="w-3 h-3" />
+              Alle meine Einsätze
+            </a>
+          </div>
+        )}
+      </nav>
+
+      {acceptedApp ? (
+        (() => {
+          // vertragSigned aus zwei Quellen ableiten:
+          //   1) signedForm — frisch im Annahme-Flow gesetzt (in-memory, lebt
+          //      nur bis Page-Reload)
+          //   2) acceptedApplications.rows[].contract_snapshot — vom Server
+          //      persistiert. Nach Reload ist signedForm null, die Acceptance-
+          //      Row aber noch in der DB. Wenn contract_snapshot existiert,
+          //      hat der Kunde signiert (Stufe-B-Update schreibt signatur +
+          //      contract_snapshot zusammen).
+          // Sonst zeigte BookedScreen "Vertrag · Folgt" obwohl die Mail-PDF
+          // längst raus ist — Michael-Dachs-Reproducer 12.06.
+          const hasPersistedContract = (acceptedApplications?.rows ?? []).some(
+            (r) => !!r.contract_snapshot,
+          );
+          const vertragSigned = !!signedForm?.signatur || hasPersistedContract;
+          // Vertrag nachträglich abschließen (Martin, 2026-07-15): Fehlt der
+          // unterschriebene Vertrag (Annahme kam agentur-seitig → synthetische
+          // fc-App ohne signedForm/contract_snapshot), wird der Vertrag-
+          // Milestone zum aktiven Schritt. Nur mit belastbarer numerischer
+          // Bridge-Referenz (fail-soft) + echtem Lead-Token; nie im Preview,
+          // nie für beendete Einsätze, nie wenn der Vertrag schon vorliegt.
+          const contractAppId = acceptanceApplicationId(acceptedApp.id);
+          const canCompleteContract =
+            !vertragSigned
+            && !IS_EINSATZ_BEENDET
+            && !IS_PREVIEW_ANY
+            && !!lead?.token
+            && contractAppId !== null;
+          return (
+            <BookedScreen
+              app={acceptedApp}
+              onNurseClick={setSelectedNurse}
+              vertragSigned={vertragSigned}
+              onSignContract={
+                canCompleteContract ? () => setContractApp(acceptedApp) : undefined
+              }
+              // leadId + Token aktivieren den eingebetteten PDF-Viewer im
+              // Vertrag-Milestone (Mustervertrag-Look via /api/contract-pdf).
+              // Wenn das Lead oder der URL-Token fehlt → Fallback Modal mit
+              // React-VertragSignieren (onShowContract).
+              leadId={lead?.id}
+              leadToken={lead?.token ?? undefined}
+              onShowContract={
+                signedForm?.signatur && !(lead?.id && lead?.token)
+                  ? () => setShowSignedContract(true)
+                  : undefined
+              }
+              // Multi-Job-Vorschau: abgeschlossener Einsatz → Header
+              // "📋 Einsatz beendet" statt "🎊 Vielen Dank gebucht".
+              einsatzBeendet={IS_EINSATZ_BEENDET}
+            />
+          );
+        })()
+      ) : (
+      <>
+      {/* ── Hero (full-width gradient) — state-aware copy ── */}
+      {(() => {
+        // Einheitliche formale Anrede (Herr/Frau Nachname), abgeleitet via
+        // Geschlechts-Erkennung wenn das anrede-Feld leer ist; sonst neutral
+        // ("Guten Tag."). Nie bloßer Nachname. Siehe customerSalutation.
+        const heroNameLine = lead ? customerSalutation(lead) : 'Herr Mustermann';
+
+        // Hero copy adapts to where the customer is in the flow:
+        //   pending  — at least one application waiting on a decision
+        //              → focus the customer on reviewing it now
+        //   ready    — patient profile saved, no applications yet
+        //              → encourage them to invite a Wunschkraft
+        //   initial  — fresh portal, profile not filled
+        //              → explain what the portal does next
+        const n = pendingApps.length;
+
+        const heroCopy = hasPending
+          ? {
+              title: n > 1
+                ? `Sie haben ${n} neue Bewerbungen. 📨`
+                : 'Sie haben eine neue Bewerbung. 📨',
+              subtitle: n > 1
+                ? 'Schauen Sie sich die Pflegekräfte in Ruhe an und entscheiden Sie, welche am besten passt.'
+                : 'Schauen Sie sich die Bewerbung in Ruhe an und entscheiden Sie, ob die Pflegekraft passt.',
+              pill: n > 1 ? `${n} Bewerbungen aktiv` : '1 Bewerbung aktiv',
+              steps: null as 'initial' | 'saved' | null,
+            }
+          : patientSaved && !IS_PREVIEW_ANY && (!mmReady || mmApplicationsLoading || !mmApplications)
+          ? {
+              // Mamamia-Daten laden noch (oder der Abruf hakt) — hier NICHT
+              // "werden vorbereitet" behaupten: Wer aus der Bewerbungs-Mail
+              // kommt, hat nachweislich eine Bewerbung (Martin, 2026-07-09).
+              //
+              // In der Vorschau ist dieser Zweig ausgeschlossen: ohne echtes
+              // mamamia wird `mmReady` nie true, dadurch hing JEDER gespeicherte
+              // Zustand lokal auf "Einen Moment" fest — auch ?preview=wartet,
+              // das genau den Zweig darunter zeigen soll (Übergabe 11.08.).
+              title: 'Einen Moment — Ihre Bewerbungen werden geladen.',
+              subtitle: 'Wir holen gerade den aktuellen Stand Ihrer Anfrage. Das dauert nur wenige Sekunden.',
+              pill: 'Portal wird geladen',
+              steps: null as 'initial' | 'saved' | null,
+            }
+          : patientSaved
+          ? {
+              // Nach dem Speichern ist die Seite kein Angebot mehr, sondern
+              // der Arbeitsplatz des Kunden (Martin, 13.08.: „Ihr
+              // Betreuungsportal" — „Ihr persönliches Angebot" passte nicht
+              // mehr, das Angebot rutscht in diesem Zustand auch nach unten).
+              title: 'Ihr Betreuungsportal',
+              subtitle:
+                'Hier sehen Sie eingehende Bewerbungen und können in der Zwischenzeit passende Pflegekräfte zur Bewerbung einladen — es bleibt alles unverbindlich.',
+              pill: '100 % kostenfrei & unverbindlich',
+              steps: 'saved' as 'initial' | 'saved' | null,
+            }
+          : {
+              // Der Header IST die Überschrift des Angebots (Martin, 11.08.) —
+              // keine Statusmeldung („fertig"), sondern die Sache selbst. Der
+              // Abschnitt darunter heißt deshalb „Ihre Betreuungskosten" und
+              // wiederholt den Titel nicht.
+              title: 'Ihr persönliches Angebot',
+              // Wird im Ausgangszustand NICHT im Hero gerendert: Die Begründung
+              // steht dort, wo gehandelt wird — als Einleitung über dem
+              // Formular (Martin, 11.08.: erst Angebot und Pflegekräfte
+              // zeigen, dann um die Pflegesituation bitten).
+              subtitle:
+                // "beschrieben" — dasselbe Verb wie über dem Formular, im
+                // Text über den Pflegekräften und in der Schritt-Liste
+                // ("Pflegesituation beschreiben"). "vervollständigt" klang
+                // nach einem zweiten, anderen Schritt (Übergabe 11.08.).
+                'Hier finden Sie Ihre Betreuungskosten inklusive aller Gebühren und passende Pflegekräfte, die verfügbar sind. Sobald Sie die Pflegesituation beschrieben haben, können sich diese ganz unverbindlich bei Ihnen bewerben.',
+              // Kein Pill hier: Der Einleitungssatz darüber sagt bereits, was
+              // den Kunden erwartet. In den anderen Zuständen trägt die Zeile
+              // echten Status („1 Bewerbung aktiv") — dort bleibt sie.
+              pill: '',
+              steps: 'initial' as 'initial' | 'saved' | null,
+            };
+
+        // Die nummerierte Schritt-Checkliste (Martin, 2026-07-12: „der Kunde
+        // soll SEHEN, dass genau ein Schritt fehlt") ist am 11.08. entfallen.
+        // Sie war inhaltlich richtig, kostete aber den halben ersten Bildschirm
+        // und erzählte genau die Struktur, die die Abschnitte darunter ohnehin
+        // tragen. Der Kunde kommt aus dem Kostenrechner von „✓ Ihr Angebot ist
+        // fertig" + Button „Angebot & Pflegekräfte anzeigen →" — und muss genau
+        // das sehen, nicht eine Aufgabenliste davor. Die Führung liegt jetzt in
+        // der Reihenfolge der Abschnitte selbst:
+        //   Angebot → Passende Pflegekräfte → Pflegesituation → Vorteile/FAQ
+
+        return (
+          <div className="relative" style={{background:'#FFFFFF', borderBottom:'1px solid #E9E9EB'}}>
+            <div className="relative max-w-3xl mx-auto px-5 pt-8 pb-3">
+              <p className="text-[15px] font-medium mb-3" style={{color:'#71717A'}}>
+                Guten Tag{heroNameLine ? `, ${heroNameLine}` : ''}.
+              </p>
+              <h1 className="text-[1.75rem] font-bold leading-tight tracking-tight mb-2" style={{color:'#18181B'}}>
+                {heroCopy.title}
+              </h1>
+              {/* Im Ausgangszustand steht hier NICHTS mehr außer der
+                  Bestätigung — kein Erklärabsatz, keine Checkliste, kein
+                  Button. Alle drei waren Kopien dessen, was die Abschnitte
+                  darunter ohnehin tragen (Abschnitt „Pflegesituation" hat
+                  einen eigenen Karten-Kopf mit genau diesem Aufruf). */}
+              <p className="text-[16px] leading-relaxed mb-5" style={{color:'#71717A'}}>
+                {heroCopy.subtitle}
+              </p>
+
+              {/* Trust-Zeile: ohne Fläche und Rahmen im schlanken Hero — als
+                  Pill wirkte sie wie der Primärbutton und war ein
+                  Fehlklick-Magnet, der nichts tut. */}
+              {heroCopy.pill && (
+              <div
+                className={`inline-flex items-center gap-2 ${heroCopy.steps ? '' : 'rounded-full px-4 py-2'}`}
+                style={heroCopy.steps ? undefined : {background:'#F5F5F6', border:'1px solid #E9E9EB'}}
+              >
+                <Check className="w-4 h-4 flex-shrink-0" strokeWidth={3} style={{color:'#8B7355'}} />
+                <span className="text-[15px]" style={{color:'#18181B'}}>{heroCopy.pill}</span>
+              </div>
+              )}
+            </div>
+            {/* Die geschwungene Welle als Übergang zum Body ist am 11.08.
+                entfallen (Martin: „diese Trennung zwischen Header und Rest ist
+                krass unpassend"). Sie war das einzige verspielte Element in
+                einem sonst sachlichen Layout und ließ den Hero wie einen
+                aufgeklebten Banner wirken. Jetzt: gerade Kante, der Header
+                sitzt als Block auf der Seite. */}
+          </div>
+        );
       })()}
+
+      {/* ── SECTION: Ihr Angebot (collapsible) ── */}
+      {!patientSaved && angebotSection}
 
 
       <div className="max-w-3xl mx-auto px-4 pt-1 pb-6 space-y-4" style={{background:'#FFFFFF'}}>
@@ -3184,16 +3181,13 @@ const CustomerPortalPage: FC = () => {
         {/* ── SECTION: 2 · Patientendaten — der Onboarding-Schritt steht VOR
              den Pflegekräften (vorher lag die Karte zwischen PK-Header und
              PK-Karten — genau die „zwei Kästen"-Verwirrung, Martin 2026-07-12). ── */}
-        {/* EIN Rahmen um Kopf UND Formular — nicht zwei (Martin, 12.08.:
-             prominenter machen; die Trennung in zwei Kaesten war schon im
-             Juli als verwirrend aufgefallen). Weiss mit braunem Rand ist die
-             seit 11.08. etablierte Hervorhebung fuer „wichtiger als der
-             Rest"; nach dem Speichern faellt der Abschnitt darauf zurueck,
-             ruhig zu sein. */}
-        <div
-          className={!hasPending && !patientSaved ? 'rounded-3xl border px-3 py-3' : undefined}
-          style={!hasPending && !patientSaved ? { background: '#FFFFFF', borderColor: '#8B7355' } : undefined}
-        >
+        {/* Die Hervorhebung sitzt seit 13.08. am FORMULAR selbst (brauner
+             Rand + Schatten in AngebotCard), nicht mehr als Rahmen um Kopf
+             UND Formular: Auf dem Handy presste der Aussenrahmen Einleitung
+             und Formular aneinander (Martin: „zu eng"). Der Kopf mit
+             „Ohne diese Angaben keine Bewerbungen" traegt die Dringlichkeit
+             im Text weiter. Das div bleibt als neutraler Anker. */}
+        <div>
         {!hasPending && (() => {
           const patientExpanded = patientExpandedManual ?? !patientSaved;
           // Der Abschnitt ist die SCHRANKE: ohne ihn keine Bewerbungen.
@@ -3240,19 +3234,16 @@ const CustomerPortalPage: FC = () => {
               </div>
             </button>
 
-            {/* Einleitung „warum" (Martin, 11.08.). Sie stand vorher im Hero,
-                wo sie den Kunden vor dem Angebot abfing. Hier steht sie an der
-                richtigen Stelle: Er hat Preis und Pflegekräfte gesehen — jetzt
-                erfährt er, warum wir noch etwas brauchen, und was es kostet.
-                Die Minutenangabe ist ehrlich: beim Ehepaar verlangt der Bogen
-                die doppelte Personenspalte (~40 statt ~29 Felder). */}
+            {/* Einleitung „warum" (Martin, 11.08.) — seit 13.08. ohne den
+                Minuten-/Kostenrechner-Satz: Auf dem Handy stand der Text
+                gequetscht direkt auf dem Formular („zu eng"). Ein Satz plus
+                Luft; die Dauer erklaert sich im Formular von selbst
+                (Fortschrittsbalken, 4 Schritte). */}
             {!patientSaved && (
-              <p className="text-[16px] leading-relaxed mt-3" style={{color:'#18181B'}}>
+              <p className="text-[16px] leading-relaxed mt-3 mb-4" style={{color:'#18181B'}}>
                 Sobald Sie die Pflegesituation beschrieben haben, erhalten Sie
                 ganz unverbindlich Bewerbungen und sehen, welche Pflegekräfte
-                die Betreuung übernehmen können. Das dauert{' '}
-                <span className="font-semibold">ca. {formMinutes} Minuten</span> —
-                Ihre Angaben aus dem Kostenrechner sind schon übernommen.
+                die Betreuung übernehmen können.
               </p>
             )}
           </div>
@@ -3506,6 +3497,13 @@ const CustomerPortalPage: FC = () => {
       </div>
       )}
 
+      {/* Im gespeicherten Zustand steht das Angebot HIER — unter Bewerbungen/
+          Pflegekräften und der Pflegesituation, vor dem FAQ-Block (Martin,
+          13.08.). Der Kunde hat den Preis längst gesehen; jetzt ist die Seite
+          sein Betreuungsportal, und oben gehören die Dinge hin, auf die er
+          wartet. Als Referenz bleibt das Angebot vollständig erreichbar. */}
+      {patientSaved && angebotSection}
+
       <div className="max-w-3xl mx-auto px-4 pt-1 pb-6 space-y-4" style={{background:'#FFFFFF'}}>
         {/* ── SECTION HEADER: So funktioniert's ── */}
         <div className="px-1 pt-3">
@@ -3644,13 +3642,13 @@ const CustomerPortalPage: FC = () => {
                 </div>
               </div>
               <div className="flex-1 min-w-0">
-                <p className="font-bold text-gray-900 text-base leading-tight">Ilka Wysocki</p>
-                <p className="text-xs text-gray-500 mb-2">Pflegeberaterin · Primundus</p>
-                <a href="tel:089200000830" className="inline-flex items-center gap-1.5 text-[#8B7355] font-bold text-sm hover:opacity-80 transition-opacity">
-                  <Phone className="w-3.5 h-3.5 flex-shrink-0" />
+                <p className="font-bold text-gray-900 text-[17px] leading-tight">Ilka Wysocki</p>
+                <p className="text-[14px] text-gray-500 mb-2">Pflegeberaterin · Primundus</p>
+                <a href="tel:089200000830" className="inline-flex items-center gap-1.5 text-[#8B7355] font-bold text-[16px] hover:opacity-80 transition-opacity">
+                  <Phone className="w-4 h-4 flex-shrink-0" />
                   089 200 000 830
                 </a>
-                <p className="text-xs text-gray-500 mt-0.5">Mo–So, 8:00–18:00 Uhr</p>
+                <p className="text-[14px] text-gray-500 mt-0.5">Mo–So, 8:00–18:00 Uhr</p>
               </div>
             </div>
 

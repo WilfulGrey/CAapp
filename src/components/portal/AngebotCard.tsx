@@ -856,7 +856,11 @@ export const AngebotCard: FC<{
              Abschnittskopf oben trägt Titel und Status; hier beginnt direkt
              die Arbeit. */
           <div ref={patientFormRef} className="scroll-mt-16">
-          <div className="rounded-2xl border overflow-hidden" style={{ background: '#F4F4F6', borderColor: '#D4D4D8' }}>
+          {/* Der Formular-Kasten traegt die Hervorhebung selbst (Martin,
+              13.08.): brauner Rand + weicher warmer Schatten statt eines
+              Aussenrahmens um den ganzen Abschnitt. Fläche bleibt #F4F4F6 —
+              auf Weiss verloeren die weissen Auswahl-Chips ihre Kontur. */}
+          <div className="rounded-2xl border overflow-hidden" style={{ background: '#F4F4F6', borderColor: '#8B7355', boxShadow: '0 10px 30px rgba(139, 115, 85, 0.16)' }}>
 
             {/* Progress bar */}
             <div className="px-4 pt-3 pb-2 flex items-center gap-3">
