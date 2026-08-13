@@ -611,11 +611,14 @@ export function MultiStepForm() {
     );
   }
 
+  // Antwort-Buttons bewusst als BUTTONS erkennbar (Martin 13.08.: „gehen
+  // noch ein bisschen unter" — Funnel: 59 % klicken die erste Frage nie an):
+  // kräftigerer Rand, echter Schatten, mehr Höhe.
   const btnClass = (isSelected: boolean) =>
-    `w-full relative rounded-xl px-4 py-2.5 border transition-all duration-200 text-left ${
+    `w-full relative rounded-xl px-4 py-3.5 border-[1.5px] shadow-[0_2px_6px_rgba(61,61,61,0.10)] transition-all duration-200 text-left ${
       isSelected
         ? 'border-[#8B7355] bg-[#8B7355]/5 ring-1 ring-[#8B7355]/20'
-        : 'border-[#E4DED4] bg-white hover:border-[#8B7355] hover:bg-[#FBFAF8]'
+        : 'border-[#CFC6B8] bg-white hover:border-[#E76F63] hover:shadow-[0_3px_10px_rgba(231,111,99,0.22)] hover:bg-[#FFFDFB]'
     }`;
 
   // Fokus-Modus nach der ersten Frage: der Rest wird abgedunkelt, das
