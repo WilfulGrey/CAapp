@@ -36,7 +36,7 @@ export default function HomePage() {
               fill
               priority
               sizes="(max-width: 1024px) 100vw, 0px"
-              className="object-contain scale-[1.35]"
+              className="object-contain scale-[1.2]"
             />
             <div className="absolute inset-0 bg-gradient-to-b from-black/15 via-transparent to-transparent pointer-events-none"></div>
           </div>
@@ -55,7 +55,7 @@ export default function HomePage() {
               </li>
               <li className="flex items-center gap-3">
                 <span className="w-7 h-7 rounded-full bg-[#FBEEEA] flex items-center justify-center flex-shrink-0"><svg className="w-[16px] h-[16px] text-[#E76F63]" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" /></svg></span>
-                <span className="text-[13px] leading-snug tracking-tight text-[#3D3D3D] whitespace-nowrap"><strong className="font-semibold">Erst Pflegekraft,</strong> dann Buchung <span className="text-[11px] text-[#6B6B6B]">(täglich kündbar)</span></span>
+                <span className="text-[14px] leading-snug text-[#3D3D3D] whitespace-nowrap"><strong className="font-semibold">Erst Pflegekraft aussuchen,</strong> dann buchen</span>
               </li>
             </ul>
 
@@ -161,7 +161,7 @@ export default function HomePage() {
               </li>
               <li className="flex items-center gap-3">
                 <span className="w-8 h-8 rounded-full bg-[#FBEEEA] flex items-center justify-center flex-shrink-0"><svg className="w-[18px] h-[18px] text-[#E76F63]" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" /></svg></span>
-                <span className="text-[18px] text-[#3D3D3D] whitespace-nowrap"><strong className="font-semibold">Erst Pflegekraft,</strong> dann Buchung <span className="text-[15px] text-[#6B6B6B]">(täglich kündbar)</span></span>
+                <span className="text-[18px] text-[#3D3D3D] whitespace-nowrap"><strong className="font-semibold">Erst Pflegekraft aussuchen,</strong> dann buchen</span>
               </li>
             </ul>
 
