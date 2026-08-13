@@ -1017,8 +1017,8 @@ export function MultiStepForm() {
                       }}
                       onFocus={() => trackFieldFocus('name')}
                       onBlur={(e) => trackFieldBlur('name', e.target.value)}
-                      className={`w-full px-4 py-3 text-base border rounded-xl bg-[#FBFAF8] focus:outline-none focus:ring-1 focus:ring-[#8B7355]/40 focus:border-[#8B7355] focus:bg-white ${
-                        errors.name ? 'border-red-500' : 'border-[#C9B79E]'
+                      className={`w-full px-4 py-3 text-base border-[1.5px] rounded-xl bg-white focus:outline-none focus:ring-1 focus:ring-[#8B7355]/40 focus:border-[#8B7355] ${
+                        errors.name ? 'border-red-500' : 'border-[#CFC6B8]'
                       }`}
                       placeholder="Name"
                       autoComplete="name"
@@ -1036,8 +1036,8 @@ export function MultiStepForm() {
                       }}
                       onFocus={() => trackFieldFocus('email')}
                       onBlur={(e) => trackFieldBlur('email', e.target.value)}
-                      className={`w-full px-4 py-3 text-base border rounded-xl bg-[#FBFAF8] focus:outline-none focus:ring-1 focus:ring-[#8B7355]/40 focus:border-[#8B7355] focus:bg-white ${
-                        errors.email ? 'border-red-500' : 'border-[#C9B79E]'
+                      className={`w-full px-4 py-3 text-base border-[1.5px] rounded-xl bg-white focus:outline-none focus:ring-1 focus:ring-[#8B7355]/40 focus:border-[#8B7355] ${
+                        errors.email ? 'border-red-500' : 'border-[#CFC6B8]'
                       }`}
                       placeholder="E-Mail-Adresse"
                       autoComplete="email"
@@ -1055,8 +1055,8 @@ export function MultiStepForm() {
                       }}
                       onFocus={() => trackFieldFocus('phone')}
                       onBlur={(e) => trackFieldBlur('phone', e.target.value)}
-                      className={`w-full px-4 py-3 text-base border rounded-xl bg-[#FBFAF8] focus:outline-none focus:ring-1 focus:ring-[#8B7355]/40 focus:border-[#8B7355] focus:bg-white ${
-                        errors.phone ? 'border-red-500' : 'border-[#C9B79E]'
+                      className={`w-full px-4 py-3 text-base border-[1.5px] rounded-xl bg-white focus:outline-none focus:ring-1 focus:ring-[#8B7355]/40 focus:border-[#8B7355] ${
+                        errors.phone ? 'border-red-500' : 'border-[#CFC6B8]'
                       }`}
                       placeholder="Telefonnummer"
                       autoComplete="tel"
