@@ -2841,11 +2841,56 @@ const CustomerPortalPage: FC = () => {
 
       <div className="max-w-3xl mx-auto px-4 pt-1 pb-6 space-y-4" style={{background:'#FFFFFF'}}>
 
+
+        {/* ── SECTION HEADER: Ihre Bewerbungen — NUR bei offenen
+             Bewerbungen. Der Header war state-aware für beide Listen; seit
+             13.08. ist er geteilt, weil das Interesse ZWISCHEN beide rückt:
+             Bewerbung zuerst (Hero kündigt sie an, Entscheidung eilt), dann
+             Interesse, dann die Matching-Liste. Vorher stand die
+             Interesse-Karte VOR der Bewerbung — der Hero sagte „Sie haben
+             eine neue Bewerbung" und das Erste im Bild war etwas anderes. */}
+        {hasPending && (
+          <div className="px-1 pt-2">
+            <h2 className="text-[1.2rem] font-bold tracking-tight" style={{color:'#18181B'}}>Ihre Bewerbungen</h2>
+          </div>
+        )}
+
+
+        {/* ── SECTION: Pending Applications ──
+             Höchste Priorität: pending Bewerbungen wollen eine Entscheidung
+             vom Kunden — die kommen ZUERST, vor allem anderen. */}
+        {hasPending && (
+          <div id="bewerbungen" className="space-y-3 scroll-mt-4">
+            <p className="text-[16px] leading-relaxed px-1" style={{color:'#18181B'}}>
+              Tippen Sie auf <span className="font-semibold">"Angebot prüfen"</span>, um die Details der Pflegekraft zu sehen und über das Angebot zu entscheiden.
+            </p>
+            {pendingApps.map((app) => (
+              <AppCard
+                key={app.id}
+                app={app}
+                exiting={exitingIds.has(app.id)}
+                onReview={() => setSelectedApp(app)}
+                onDecline={() => setDeclineConfirmApp(app)}
+                onNurseClick={(n) => openNurseFromApp(n, app)}
+                onChat={CHAT_ENABLED ? (n) => setChatNurse(n) : undefined}
+              />
+            ))}
+            {/* Beratungs-CTA direkt unter den Bewerbungen — Bewerbungen sind
+                der entscheidungsstärkste Moment, hier sind Kunden besonders
+                empfänglich für persönliche Hilfe. */}
+            <BeratungCTA
+              headline="Fragen zur Bewerbung?"
+              body="Ich gehe das Angebot gerne mit Ihnen durch und beantworte alle offenen Fragen."
+            />
+          </div>
+        )}
+
         {/* ── SECTION: Interest-Karten ──
-             Sichtbar wenn proaktiv interessierte Pflegekräfte da sind, egal
-             ob hasPending oder nicht. Steht UNTER pending Bewerbungen
-             (Bewerbung hat Priorität: schnelle Entscheidung nötig), aber
-             ÜBER der Matching-Liste (Interest ist heißer als ein normales
+             NUR ohne offene Bewerbung (Martin, 13.08.: „interessierte würde
+             ich ausblenden, weil Bewerbung doch wichtiger"): Liegt eine
+             Bewerbung zur Entscheidung, ist alles andere Ablenkung — das
+             Interesse taucht wieder auf, sobald entschieden ist. Sonst ÜBER
+             der Matching-Liste (Interest ist heißer als ein normales
              Matching).
 
              NUR bei vollständiger Pflegesituation (Martin, 13.08.): Vorher
@@ -2855,7 +2900,7 @@ const CustomerPortalPage: FC = () => {
              existieren erst ab `active`), aber die Vorschau-Mocks zeigten
              ihn und stifteten Verwirrung; das Gate macht Darstellung und
              Wirklichkeit deckungsgleich. */}
-        {patientSaved && visibleInterests.length > 0 && (<>
+        {!hasPending && patientSaved && visibleInterests.length > 0 && (<>
           {/* Kleine Abschnitts-Überschrift wie bei den Nachbarn (Martin,
               13.08.) — der Kasten hing vorher ohne Einordnung zwischen
               Kosten und Pflegekräften. */}
@@ -2910,38 +2955,12 @@ const CustomerPortalPage: FC = () => {
           </div>
         </>)}
 
-        {/* ── SECTION HEADER: Passende Pflegekräfte / Ihre Bewerbungen (state-aware) ── */}
-        <div className="px-1 pt-2" id="pflegekraefte">
-          <h2 className="text-[1.2rem] font-bold tracking-tight" style={{color:'#18181B'}}>{hasPending ? 'Ihre Bewerbungen' : 'Passende Pflegekräfte einladen'}</h2>
-        </div>
-
-
-        {/* ── SECTION: Pending Applications ──
-             Höchste Priorität: pending Bewerbungen wollen eine Entscheidung
-             vom Kunden — die kommen ZUERST, vor allem anderen. */}
-        {hasPending && (
-          <div id="bewerbungen" className="space-y-3 scroll-mt-4">
-            <p className="text-[16px] leading-relaxed px-1" style={{color:'#18181B'}}>
-              Tippen Sie auf <span className="font-semibold">"Angebot prüfen"</span>, um die Details der Pflegekraft zu sehen und über das Angebot zu entscheiden.
-            </p>
-            {pendingApps.map((app) => (
-              <AppCard
-                key={app.id}
-                app={app}
-                exiting={exitingIds.has(app.id)}
-                onReview={() => setSelectedApp(app)}
-                onDecline={() => setDeclineConfirmApp(app)}
-                onNurseClick={(n) => openNurseFromApp(n, app)}
-                onChat={CHAT_ENABLED ? (n) => setChatNurse(n) : undefined}
-              />
-            ))}
-            {/* Beratungs-CTA direkt unter den Bewerbungen — Bewerbungen sind
-                der entscheidungsstärkste Moment, hier sind Kunden besonders
-                empfänglich für persönliche Hilfe. */}
-            <BeratungCTA
-              headline="Fragen zur Bewerbung?"
-              body="Ich gehe das Angebot gerne mit Ihnen durch und beantworte alle offenen Fragen."
-            />
+        {/* ── SECTION HEADER: Passende Pflegekräfte einladen — nur ohne
+             offene Bewerbungen (mit Bewerbung ist die Matching-Liste eh
+             ausgeblendet, der Kunde soll erst entscheiden). */}
+        {!hasPending && (
+          <div className="px-1 pt-2" id="pflegekraefte">
+            <h2 className="text-[1.2rem] font-bold tracking-tight" style={{color:'#18181B'}}>Passende Pflegekräfte einladen</h2>
           </div>
         )}
 
@@ -3587,7 +3606,7 @@ const CustomerPortalPage: FC = () => {
         </div>
         <div className="rounded-2xl overflow-hidden border" style={{background:'#F4F4F6', borderColor:'#D4D4D8'}}>
           {[
-            { q: 'Was bedeutet „Einladen"?', a: 'Wenn Ihnen eine Pflegekraft gefällt, laden Sie sie ein, sich bei Ihnen zu bewerben. Dafür müssen Sie nur kurz die Pflegesituation angeben — damit wir Ihnen passende, verfügbare Pflegekräfte zeigen können. Alles unverbindlich; ein Vertrag entsteht erst, wenn Sie ein konkretes Angebot annehmen.' },
+            { q: 'Was bedeutet „Einladen"?', a: 'Wenn Ihnen eine Pflegekraft gefällt, laden Sie sie ein, sich bei Ihnen zu bewerben. Dafür müssen Sie nur kurz die Pflegesituation beschreiben — damit wir Ihnen passende, verfügbare Pflegekräfte zeigen können. Alles unverbindlich; ein Vertrag entsteht erst, wenn Sie ein konkretes Angebot annehmen.' },
             { q: 'Gehe ich mit dem Einladen einen Vertrag ein?', a: 'Nein — das Einladen und Anschauen von Profilen ist vollständig unverbindlich. Ein Vertrag kommt erst zustande, wenn Sie ein konkretes Angebot ausdrücklich annehmen.' },
             { q: 'Kann ich jederzeit kündigen?', a: 'Ja, täglich kündbar — ohne Mindestlaufzeit und ohne Angabe von Gründen. Kosten entstehen ausschließlich für Tage, an denen die Pflegekraft tatsächlich vor Ort ist.' },
             { q: 'Wie funktioniert die Abrechnung?', a: 'Tagesgenau: Sie zahlen nur für geleistete Betreuungstage. Die Rechnung für den laufenden Monat wird jeweils zur Monatsmitte erstellt — transparent, nachvollziehbar, ohne versteckte Posten.' },
