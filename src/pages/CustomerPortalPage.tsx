@@ -3191,7 +3191,11 @@ const CustomerPortalPage: FC = () => {
              im Text weiter. Das div bleibt als neutraler Anker. */}
         <div>
         {!hasPending && (() => {
-          const patientExpanded = patientExpandedManual ?? !patientSaved;
+          // Unvollständig = IMMER offen (Martin, 13.08.): Solange die
+          // Angaben fehlen, gibt es nichts wegzuklappen — der Bogen ist die
+          // Aufgabe. Erst „Vollständig" macht den Abschnitt zur Referenz,
+          // die eingeklappt startet und per Chevron zu öffnen ist.
+          const patientExpanded = patientSaved ? (patientExpandedManual ?? false) : true;
           // Der Abschnitt ist die SCHRANKE: ohne ihn keine Bewerbungen.
           // Optisch hatte er bis 12.08. aber dasselbe Gewicht wie „So
           // funktioniert's" oder die FAQ (Martin: „sollten wir den nicht
@@ -3208,12 +3212,16 @@ const CustomerPortalPage: FC = () => {
               type="button"
               className="w-full flex items-center justify-between text-left"
               onClick={() => {
+                // Unvollständig ist nicht zuklappbar — der Klick täte sonst
+                // heimlich nichts bzw. würde einen manual-Zustand setzen,
+                // der nach dem Speichern falsch nachwirkt.
+                if (!patientSaved) return;
                 const next = !patientExpanded;
                 setPatientExpandedManual(next);
                 // Nach dem Speichern direkt in den bearbeitbaren Stepper
                 // springen — sonst braeuchte es einen zweiten Klick auf den
                 // Karten-Kopf.
-                if (next && patientSaved) setTriggerOpenPatient(true);
+                if (next) setTriggerOpenPatient(true);
               }}
             >
               <div className="min-w-0">
@@ -3232,7 +3240,9 @@ const CustomerPortalPage: FC = () => {
                 ) : (
                   <span className="text-[12px] font-semibold px-3 py-1 rounded-full" style={{background:'#FDF1E2', color:'#B45309'}}>Unvollständig</span>
                 )}
-                <ChevronDown className={`w-5 h-5 text-[#8B7355] transition-transform duration-200 ${patientExpanded ? 'rotate-180' : ''}`} />
+                {patientSaved && (
+                  <ChevronDown className={`w-5 h-5 text-[#8B7355] transition-transform duration-200 ${patientExpanded ? 'rotate-180' : ''}`} />
+                )}
               </div>
             </button>
 
@@ -3254,7 +3264,7 @@ const CustomerPortalPage: FC = () => {
         {/* ── Kombinierte Karte: Identität + Anfrage + Stepper ──
              Hidden once a Bewerbung is in: customer should focus on the
              pending application, not on revisiting saved patient data. */}
-        {!hasPending && (patientExpandedManual ?? !patientSaved) && (
+        {!hasPending && (patientSaved ? (patientExpandedManual ?? false) : true) && (
         <div>
         <AngebotCard
           lead={lead}
@@ -3262,6 +3272,10 @@ const CustomerPortalPage: FC = () => {
           onPatientSaved={(saved) => {
             if (saved && !patientSaved) {
               showToast('✓ Vielen Dank! Ihre Daten sind gespeichert. Sie können jetzt Pflegekräfte einladen und Bewerbungen erhalten.', 7000);
+              // Frisch gespeichert → Abschnitt klappt zu (Referenz-Zustand).
+              // Ohne den Reset würde ein früher gesetzter manual-Wert den
+              // Bogen offen halten, obwohl die Aufgabe erledigt ist.
+              setPatientExpandedManual(null);
             }
             setPatientSaved(saved);
           }}
