@@ -152,8 +152,27 @@ export default function DatenschutzPage() {
               <li>Analyse-Cookies zur Verbesserung unseres Angebots (Google Analytics)</li>
               <li>Conversion-Tracking für Werbezwecke (Google Ads)</li>
             </ul>
-            <p className="text-gray-700 leading-relaxed">
+            <p className="text-gray-700 leading-relaxed mb-4">
               Sie können Ihre Cookie-Einstellungen jederzeit in Ihrem Browser anpassen.
+            </p>
+            <p className="text-gray-700 leading-relaxed mb-4">
+              <strong>Google Ads Conversion-Tracking und Klick-Kennungen:</strong>{' '}
+              Gelangen Sie über eine Google-Anzeige auf unsere Website, wird der Landing-URL
+              eine Klick-Kennung (z.&nbsp;B. &bdquo;gclid&ldquo;) angehängt, die wir speichern. Schließen
+              Sie den Kostenrechner ab, übermitteln wir auf Grundlage Ihrer Einwilligung an
+              Google, dass dieser Anzeigenklick zu einer Anfrage geführt hat &ndash; einschließlich
+              des berechneten Angebotswerts. Vervollständigen Sie später im Kundenportal Ihre
+              Angaben, melden wir Google zusätzlich, dass aus dem Anzeigenklick eine
+              qualifizierte Anfrage wurde (sog. Offline-Conversion-Abgleich anhand der
+              Klick-Kennung). Dabei übermitteln wir keine Namen, Kontakt- oder
+              Gesundheitsdaten an Google &ndash; ausschließlich die Klick-Kennung, den Zeitpunkt,
+              den Angebotswert sowie eine interne Vorgangsnummer.
+            </p>
+            <p className="text-gray-700 leading-relaxed">
+              Rechtsgrundlage ist Ihre Einwilligung (Art. 6 Abs. 1 lit. a DSGVO), die Sie
+              jederzeit mit Wirkung für die Zukunft über die Cookie-Einstellungen widerrufen
+              können. Anbieter: Google Ireland Limited, Gordon House, Barrow Street, Dublin 4,
+              Irland.
             </p>
           </section>
 
@@ -170,7 +189,7 @@ export default function DatenschutzPage() {
           <section>
             <h2 className="text-2xl font-bold mb-4 text-gray-900">10. Aktualität und Änderung dieser Datenschutzerklärung</h2>
             <p className="text-gray-700 leading-relaxed">
-              Diese Datenschutzerklärung ist aktuell gültig und hat den Stand Februar 2026.
+              Diese Datenschutzerklärung ist aktuell gültig und hat den Stand August 2026.
               Durch die Weiterentwicklung unserer Website oder aufgrund geänderter gesetzlicher
               Vorgaben kann es notwendig werden, diese Datenschutzerklärung zu ändern.
             </p>
