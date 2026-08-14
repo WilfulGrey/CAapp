@@ -2,9 +2,43 @@
 const BUILD_ID = process.env.COMMIT_REF || process.env.CF_PAGES_COMMIT_SHA || `build-${Date.now()}`;
 const BUILT_AT = new Date().toISOString();
 
+// Routen, die nie in Suchmaschinen auftauchen sollen (SEO-Audit 2026-08-14):
+// Wizard-Zwischenschritte, persönliche Angebotsseiten (/kalkulation/<leadId>),
+// Admin-Bereich, Abmelde-Seite. Bewusst X-Robots-Tag statt robots.txt-Disallow:
+// nur so sieht Googlebot das noindex und wirft bereits indexierte URLs raus.
+const NOINDEX_PATHS = [
+  '/admin',
+  '/admin/:path*',
+  '/admin-login',
+  '/kalkulation/:path*',
+  '/result',
+  '/step-2',
+  '/abmelden',
+];
+
 const nextConfig = {
   eslint: {
     ignoreDuringBuilds: true,
+  },
+  async headers() {
+    return [
+      {
+        // Basis-Security-Header für alle Routen. Bewusst ohne CSP
+        // (GTM/Inline-Scripts würden brechen) — Apex primundus.de dient
+        // als Vorbild (HSTS, nosniff, Referrer-Policy).
+        source: '/:path*',
+        headers: [
+          { key: 'Strict-Transport-Security', value: 'max-age=31536000' },
+          { key: 'X-Content-Type-Options', value: 'nosniff' },
+          { key: 'Referrer-Policy', value: 'strict-origin-when-cross-origin' },
+          { key: 'X-Frame-Options', value: 'SAMEORIGIN' },
+        ],
+      },
+      ...NOINDEX_PATHS.map((source) => ({
+        source,
+        headers: [{ key: 'X-Robots-Tag', value: 'noindex, nofollow' }],
+      })),
+    ];
   },
   // Image optimization stays on (was disabled when this app shipped on
   // Cloudflare Pages — Render runs Next as a real Node server, so the

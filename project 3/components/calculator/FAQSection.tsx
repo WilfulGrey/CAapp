@@ -1,41 +1,10 @@
 "use client";
 
 import { useState } from "react";
-
-interface FAQItem {
-  question: string;
-  answer: string;
-}
+import { faqs } from "./faqData";
 
 export function FAQSection() {
   const [openIndex, setOpenIndex] = useState<number | null>(0);
-
-  const faqs: FAQItem[] = [
-    {
-      question: "Was kostet eine 24-Stunden-Pflege ungefähr?",
-      answer: "Die Kosten variieren je nach Pflegebedarf und Qualifikation der Betreuungskraft. In 2 Minuten sehen Sie sofort Ihr persönliches Angebot & passende Pflegekräfte – inklusive möglicher Zuschüsse durch die Pflegekasse, die den Eigenanteil erheblich senken können."
-    },
-    {
-      question: "Wie schnell kann eine Betreuungskraft starten?",
-      answer: "In der Regel können wir innerhalb von 4–7 Tagen eine passende Betreuungskraft vermitteln. Bei dringendem Bedarf auch schneller – sprechen Sie uns einfach an."
-    },
-    {
-      question: "Was passiert, wenn die Betreuungskraft krank wird?",
-      answer: "Wir organisieren schnellstmöglich eine Ersatzkraft. Unser Netzwerk umfasst tausende geprüfte Betreuungskräfte, sodass wir in der Regel innerhalb kurzer Zeit Ersatz stellen können."
-    },
-    {
-      question: "Kann ich die Betreuung jederzeit kündigen?",
-      answer: "Ja, die Betreuung ist täglich kündbar. Es gibt keine Mindestlaufzeit und keine versteckten Gebühren. Sie gehen kein Risiko ein."
-    },
-    {
-      question: "Welche Zuschüsse kann ich von der Pflegekasse erhalten?",
-      answer: "Je nach Pflegegrad können Sie Verhinderungspflege, Pflegegeld und weitere Leistungen nutzen. In Ihrem Angebot zeigen wir Ihnen genau, welche Zuschüsse Ihnen zustehen und wie sich der Eigenanteil reduziert."
-    },
-    {
-      question: "Sind die Betreuungskräfte qualifiziert?",
-      answer: "Alle Betreuungskräfte werden von uns persönlich geprüft. Sie verfügen über Erfahrung in der häuslichen Pflege und werden anhand Ihres individuellen Bedarfs ausgewählt."
-    }
-  ];
 
   const toggleFAQ = (index: number) => {
     setOpenIndex(openIndex === index ? null : index);
@@ -87,7 +56,7 @@ export function FAQSection() {
               </button>
               <div
                 className={`overflow-hidden transition-all duration-300 ease-in-out ${
-                  openIndex === index ? "max-h-[400px]" : "max-h-0"
+                  openIndex === index ? "max-h-[600px]" : "max-h-0"
                 }`}
               >
                 <div className="px-6 pb-6 pt-2">
@@ -105,7 +74,7 @@ export function FAQSection() {
             Weitere Fragen? Wir beraten Sie gerne persönlich.
           </p>
           <a
-            href="tel:+49301234567"
+            href="tel:+4989200000830"
             className="inline-flex items-center gap-2 text-[#8B7355] font-semibold text-[15px] hover:text-[#6B5738] transition-colors"
           >
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">

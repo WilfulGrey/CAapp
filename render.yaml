@@ -50,6 +50,18 @@ services:
       - type: rewrite
         source: /*
         destination: /index.html
+    headers:
+      # Token-gated Portal — nie indexieren. Doppelt verankert mit dem
+      # noindex-Meta in index.html (SEO-Audit 2026-08-14). robots.txt hat
+      # bewusst KEIN Disallow, damit Googlebot dieses noindex sehen kann.
+      - path: /*
+        name: X-Robots-Tag
+        value: noindex, nofollow
+      # Gehashte Vite-Bundles sind immutable — vorher revalidierte der
+      # Browser das 1,25-MB-Bundle bei jedem Besuch (max-age=0).
+      - path: /assets/*
+        name: Cache-Control
+        value: public, max-age=31536000, immutable
 
   # ── 2. Primundus calculator (project 3) — Next.js Web Service ──────────
   - type: web

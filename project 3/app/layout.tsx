@@ -5,14 +5,28 @@ import { CalculatorProvider } from '@/lib/calculator-context';
 import { AnalyticsProvider } from '@/components/AnalyticsProvider';
 import { CookieConsent } from '@/components/CookieConsent';
 import Script from 'next/script';
+import { organizationGraph, jsonLdString } from '@/lib/seo-schema';
 
 const inter = Inter({ subsets: ['latin'] });
 
+// OG/Twitter-Texte spiegeln bewusst Title/Description 1:1 — vorher fehlten
+// og:title/og:description/og:url komplett (WhatsApp-/Facebook-Previews ohne
+// Text, SEO-Audit 2026-08-14). Fallback-Domain war primundus.de (Apex) —
+// korrigiert auf die eigene Subdomain.
 export const metadata: Metadata = {
-  metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL || 'https://primundus.de'),
+  metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL || 'https://kostenrechner.primundus.de'),
   title: 'PRIMUNDUS - 24-Stunden-Pflege Kostenrechner',
   description: 'Berechnen Sie in nur 2 Minuten die Kosten für 24-Stunden-Pflege. Vom Testsieger mit Preisgarantie.',
+  alternates: {
+    canonical: '/',
+  },
   openGraph: {
+    type: 'website',
+    locale: 'de_DE',
+    url: '/',
+    siteName: 'PRIMUNDUS',
+    title: 'PRIMUNDUS - 24-Stunden-Pflege Kostenrechner',
+    description: 'Berechnen Sie in nur 2 Minuten die Kosten für 24-Stunden-Pflege. Vom Testsieger mit Preisgarantie.',
     images: [
       {
         url: '/images/primundus_logo_header.webp',
@@ -21,6 +35,8 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: 'summary_large_image',
+    title: 'PRIMUNDUS - 24-Stunden-Pflege Kostenrechner',
+    description: 'Berechnen Sie in nur 2 Minuten die Kosten für 24-Stunden-Pflege. Vom Testsieger mit Preisgarantie.',
     images: [
       {
         url: '/images/primundus_logo_header.webp',
@@ -37,6 +53,10 @@ export default function RootLayout({
   return (
     <html lang="de">
       <body className={inter.className}>
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: jsonLdString(organizationGraph()) }}
+        />
         <Script
           id="gtm"
           strategy="afterInteractive"
