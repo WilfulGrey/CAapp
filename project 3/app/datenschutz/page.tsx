@@ -6,6 +6,9 @@ import { COMPANY } from '../../lib/company';
 export const metadata: Metadata = {
   title: 'Datenschutz | PRIMUNDUS',
   description: 'Datenschutzerklärung der PRIMUNDUS - Informationen zum Umgang mit Ihren personenbezogenen Daten.',
+  alternates: {
+    canonical: '/datenschutz',
+  },
 };
 
 export default function DatenschutzPage() {

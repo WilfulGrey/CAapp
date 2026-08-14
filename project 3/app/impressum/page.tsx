@@ -6,6 +6,9 @@ import { COMPANY } from '../../lib/company';
 export const metadata: Metadata = {
   title: 'Impressum | PRIMUNDUS',
   description: 'Impressum und Kontaktdaten der PRIMUNDUS - 24-Stunden-Pflege und Betreuung.',
+  alternates: {
+    canonical: '/impressum',
+  },
 };
 
 export default function ImpressumPage() {
