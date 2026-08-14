@@ -423,6 +423,7 @@ CA app → Mamamia:
 | `onboard-to-mamamia/types.ts` | `FormularDaten`, `Lead`, `CustomerInput`, `CaregiverWishInput` |
 | `sync-acceptance/index.ts` | **Server-to-server only** (Bearer = SERVICE_ROLE_KEY) — sekwencja akceptu po podpisie (gotcha #12), triggerowana przez bridge |
 | `_shared/acceptanceSync.ts` | Moduł sekwencji 1→4 (UpdateCustomer→StoreConfirmation→PDF→upload z bramką) — współdzielony przez sync-acceptance i detect-cron (retry) |
+| `upload-offline-conversions/` | **Cron täglich 06:20 UTC** — lädt „Qualifizierte Leads" (erstes `patient_data_saved`, Lead trägt gclid/wbraid/gbraid) als Offline-Conversions zu Google Ads (Aktion `conversionActions/7720728390`, secondary). Status in `offline_conversion_uploads`; ohne Google-Secrets (Staging) inert. Doku: docs/google-ads-tracking.md |
 | `mamamia-proxy/index.ts` | HTTP handler — verify session + dispatch action + run GraphQL |
 | `mamamia-proxy/actions.ts` | Whitelisted actions (`getCustomer`, `updateCustomer`, `listMatchings`, `inviteCaregiver`, `rejectApplication`, `storeConfirmation`, etc.). Każda waliduje ownership przez `session.customer_id` |
 | `mamamia-proxy/operations.ts` | GraphQL queries/mutations (`GET_CUSTOMER`, `UPDATE_CUSTOMER`, `PRESERVE_QUERY`, etc.) |
@@ -1148,6 +1149,12 @@ Podstawowe secrets (NIGDY nie commitować):
 - `MAMAMIA_AUTH_ENDPOINT` / `MAMAMIA_ENDPOINT`
 - `SESSION_JWT_SECRET`
 - `OPENAI_API_KEY` (jeśli używamy)
+- `GOOGLE_ADS_DEVELOPER_TOKEN` + `GOOGLE_OAUTH_CLIENT_ID` /
+  `GOOGLE_OAUTH_CLIENT_SECRET` / `GOOGLE_OAUTH_REFRESH_TOKEN` — nur PROD,
+  für `upload-offline-conversions` (Google-Ads-Offline-Upload; Quelle:
+  `.google.secrets` bei Martin). Staging bewusst OHNE → Function skippt.
+  Optionale Overrides: `GOOGLE_ADS_CUSTOMER_ID`, `GOOGLE_ADS_LOGIN_CUSTOMER_ID`,
+  `GOOGLE_ADS_QUALIFIED_LEAD_ACTION` (Defaults im Code = Prod-Konto).
 
 ### DEBUG_PROXY
 
