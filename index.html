@@ -4,10 +4,11 @@
     <meta charset="UTF-8" />
     <link rel="icon" type="image/png" href="/icon.png" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <!-- Token-gated Kundenbereich — gehört nicht in Suchmaschinen. Zweite
+         Verankerung: X-Robots-Tag-Header in render.yaml. -->
+    <meta name="robots" content="noindex, nofollow" />
     <title>Primundus · Kundenportal</title>
-    <!-- Google Tag Manager — same container as kostenrechner (GTM-59V6N7RC)
-         so Clarity (and any other tags inside the container) auto-applies.
-         Loader pattern mirrored from project 3/app/layout.tsx:40-48. -->
+    <!-- Google Tag Manager — same container as kostenrechner (GTM-59V6N7RC). -->
     <script>(function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':
     new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],
     j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
