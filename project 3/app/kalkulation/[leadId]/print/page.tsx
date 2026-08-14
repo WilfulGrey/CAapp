@@ -246,7 +246,7 @@ export default function KalkulationPrintPage() {
             <Image src="/images/primundus_testsieger-2021.webp" alt="Testsieger" width={52} height={52} style={{ height: '40pt', width: 'auto', border: '1pt solid #e8d9a0', borderRadius: '3pt', flexShrink: 0 }} />
             <div>
               <div style={{ fontSize: '10pt', fontWeight: 700, color: '#2D1F0F', marginBottom: '3pt' }}>Testsieger bei DIE WELT</div>
-              <div style={{ fontSize: '8.5pt', color: '#555', fontStyle: 'italic', lineHeight: 1.5 }}>„Primundus überzeugte mit der besten Kombination aus Preis, Qualität und Kundenservice."</div>
+              <div style={{ fontSize: '8.5pt', color: '#555', lineHeight: 1.5 }}>Nr. 1 der Pflegekräfte-Vermittler (DIE WELT/ServiceValue) – die beste Kombination aus Preis, Qualität und Kundenservice.</div>
             </div>
           </div>
         </div>
