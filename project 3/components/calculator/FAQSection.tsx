@@ -56,7 +56,7 @@ export function FAQSection() {
               </button>
               <div
                 className={`overflow-hidden transition-all duration-300 ease-in-out ${
-                  openIndex === index ? "max-h-[400px]" : "max-h-0"
+                  openIndex === index ? "max-h-[600px]" : "max-h-0"
                 }`}
               >
                 <div className="px-6 pb-6 pt-2">

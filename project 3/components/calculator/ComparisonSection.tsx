@@ -113,8 +113,10 @@ export function ComparisonSection() {
               <div className="text-center">
                 <p className="text-sm text-[#3D3D3D] mb-2">Durchschnittlicher Eigenanteil pro Monat:</p>
                 <p className="text-4xl font-bold text-[#708A95]">1.500 €</p>
+                {/* 3.245 − 1.500 = 1.745 → "rund 1.700", nicht "bis zu 2.000"
+                    (rechnerisch falscher Claim wäre §5-UWG-Angriffsfläche). */}
                 <p className="text-sm font-semibold text-[#708A95] mt-2">
-                  Bis zu 2.000 € günstiger!
+                  Rund 1.700 € günstiger!
                 </p>
               </div>
             </div>
