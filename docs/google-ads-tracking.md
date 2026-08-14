@@ -35,33 +35,51 @@ utm_source=google&utm_medium=cpc&utm_campaign={campaignid}&utm_term={keyword}&ut
 - Wirkung sofort ab Speichern; ab dann sind Ads-Sessions in
   `analytics_sessions` an `utm_medium='cpc'` erkennbar.
 
-## Schritt 2 — Conversion-Aktion + GTM-Tag (Martin, ~15 Min)
+## Schritt 2 — Bestehenden GTM-Tag erweitern (Martin, ~10 Min)
 
-1. **Google Ads → Ziele → Conversions → Neue Conversion-Aktion →
-   Website → manuell**: Kategorie „Lead senden", Name z. B.
-   `Kostenrechner Lead`, Wert: „Unterschiedliche Werte" (kommt aus dem
-   dataLayer als `conversion_value`, = Monats-Bruttopreis), Zählung
-   „Eine", Klick-Fenster 90 Tage, Attribution „Datengetrieben".
-   → Tag-ID (`AW-XXXXXXXXX`) + Conversion-Label notieren.
-2. **GTM (`GTM-59V6N7RC`)**:
-   - Trigger: Benutzerdefiniertes Ereignis, Ereignisname
-     `angebot_erfolgreich`.
-   - Tag 1: „Google Ads-Conversion-Verknüpfung" (einmal pro Container,
-     falls noch nicht vorhanden), Trigger: All Pages.
-   - Tag 2: „Google Ads-Conversion-Tracking" mit Tag-ID + Label;
-     Conversion-Wert `{{dlv - conversion_value}}` (Datenschichtvariable
-     `conversion_value`), Bestell-ID `{{dlv - lead_id}}` (dedupliziert
-     Doppel-Submits), Währung EUR; Trigger: `angebot_erfolgreich`.
-   - Vorschau testen → Veröffentlichen.
-3. **Consent Mode:** Der Conversion-Tag unterliegt der
+> **Befund SEA-Lauf 1 (API + Container-Analyse 14.08.):** Conversion-Aktion
+> **und** GTM-Tag existieren BEREITS — nichts neu anlegen, sonst zählt
+> alles doppelt!
+>
+> - Ads-Konto (924-028-6999) zählt in „Conversions" genau EINE Aktion:
+>   **„DE – Angebot angefordert"** (WEBPAGE, ONE_PER_CLICK, primary).
+>   „DE – Kalkulation Mail" ist sekundär (zählt nicht), „Anrufe über
+>   Anzeigen" hatte 30 Tage lang 0.
+> - Im Container GTM-59V6N7RC feuert der zugehörige Tag
+>   (`AW-17906103518`, Label `yKlhCKnCx_wbEN7ppdpC`) auf dem
+>   dataLayer-Event **`angebot_erfolgreich`** — also auf ECHTEN
+>   erfolgreichen Submits. Die gemeldeten Conversions sind keine
+>   Seitenaufruf-Inflation; Differenzen zu lead_events erklären sich
+>   durch das 90-Tage-Klick-Fenster (Anzeigenklick → Tage später
+>   organisch abgeschickt = zählt trotzdem als Ads-Conversion) und
+>   dadurch, dass der Tag bis PR #444 im Redirect-Race ebenfalls
+>   Conversions VERLOR.
+
+Was am bestehenden Tag fehlt und ergänzt werden sollte (GTM →
+Tags → der `__awct`-Tag auf `angebot_erfolgreich`):
+
+1. **Conversion-Wert:** `{{dlv - conversion_value}}` (Datenschicht-
+   variable anlegen, Pfad `conversion_value` = Monats-Bruttopreis),
+   Währung EUR. In der Ads-Conversion-Aktion auf „Unterschiedliche
+   Werte" stellen. → Voraussetzung, um später von Max. Conversions auf
+   tROAS/Wert-Gebote zu wechseln.
+2. **Bestell-ID:** `{{dlv - lead_id}}` — dedupliziert Mehrfach-Submits
+   desselben Leads über Klicks hinweg.
+3. Optional: **Enhanced Conversions** aktivieren (derzeit aus) — braucht
+   gehashte E-Mail im dataLayer, separater Code-Schritt, erst später.
+4. Vorschau testen → Veröffentlichen.
+5. **Consent Mode:** Der Conversion-Tag unterliegt der
    Cookie-Einwilligung (Banner/`cookie-consent`). Prüfen, dass GTM
    Consent-Standardeinstellungen gesetzt sind (Consent Mode v2:
-   `ad_storage`/`ad_user_data`/`ad_conversion_measurement`), sonst
-   modelliert Google die Conversions nur teilweise. Ggf.
-   Datenschutzerklärung um Google-Ads-Conversion-Tracking ergänzen.
+   `ad_storage`/`ad_user_data`), sonst modelliert Google die Conversions
+   nur teilweise. Ggf. Datenschutzerklärung um Google-Ads-
+   Conversion-Tracking ergänzen.
 
 Der Code-seitige Redirect wartet via `eventCallback` max. ~900 ms auf den
-Tag — nichts weiter nötig.
+Tag (PR #444) — vorher verlor auch dieser Tag einen Teil der Conversions
+an den Sofort-Redirect. Nach dem Merge ist mit einem SPRUNG der
+gemeldeten Ads-Conversions zu rechnen (Mess-Artefakt, kein echter
+Anstieg — bei Vergleichen berücksichtigen).
 
 ## Schritt 3 (Ausbaustufe) — Offline-Import qualifizierter Leads
 
