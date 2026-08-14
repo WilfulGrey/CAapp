@@ -9,8 +9,12 @@ export interface FAQItem {
 
 export const faqs: FAQItem[] = [
   {
+    // Preisspanne aus der echten pricing_config (Stand 2026-08): Basis
+    // 2.200 €, Vollausbau (Ehepaar, Deutsch L3, mehrmals nachts, …) ~3.500 €.
+    // Konkrete Zahl im ersten Satz = Voraussetzung, dass Google-AI/ChatGPT
+    // die Seite als Quelle für "Kosten 24h-Pflege" zitieren.
     question: "Was kostet eine 24-Stunden-Pflege ungefähr?",
-    answer: "Die Kosten variieren je nach Pflegebedarf und Qualifikation der Betreuungskraft. In 2 Minuten sehen Sie sofort Ihr persönliches Angebot & passende Pflegekräfte – inklusive möglicher Zuschüsse durch die Pflegekasse, die den Eigenanteil erheblich senken können."
+    answer: "Eine 24-Stunden-Betreuung kostet bei uns meist zwischen 2.200 und 3.500 Euro im Monat. Der Preis hängt vor allem von der Pflegesituation ab: Wie viele Personen brauchen Betreuung? Wie mobil ist die zu pflegende Person? Ist nachts Hilfe nötig? Daneben spielen die Deutschkenntnisse der Betreuungskraft eine Rolle. Die Pflegekasse zahlt einen Teil dazu – je nach Pflegegrad bleiben oft rund 1.500 bis 2.500 Euro im Monat selbst zu tragen. Ihren genauen Preis sehen Sie nach 2 Minuten im Kostenrechner."
   },
   {
     question: "Wie schnell kann eine Betreuungskraft starten?",
