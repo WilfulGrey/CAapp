@@ -282,17 +282,19 @@ export default function HomePage() {
                   />
                 </div>
 
+                {/* Wortlaut identisch zu TestsiegerSection.tsx (mit Martin
+                    2026-08-14 abgestimmt) — Eigenaussage statt Zitat. */}
                 <div className="flex-1">
                   <h3 className="text-[22px] font-bold text-[#3D3D3D] mb-2">
                     Testsieger bei DIE WELT
                   </h3>
 
                   <p className="text-[14px] text-[#8A8279] mb-4">
-                    Deutschlands größter Vergleichstest für 24-Stunden-Pflege
+                    Nr. 1 der Pflegekräfte-Vermittler – ausgezeichnet in Deutschlands großer Service-Studie von DIE WELT und ServiceValue
                   </p>
 
-                  <p className="text-[15px] italic text-[#5A5A5A] leading-relaxed">
-                    „Primundus überzeugte mit der besten Kombination aus Preis, Qualität und Kundenservice."
+                  <p className="text-[15px] text-[#5A5A5A] leading-relaxed">
+                    Als bester Vermittler von 24-Stunden-Pflegekräften ausgezeichnet: Primundus steht für die beste Kombination aus Preis, Qualität und Kundenservice.
                   </p>
                 </div>
               </div>

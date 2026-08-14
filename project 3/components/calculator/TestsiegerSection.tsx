@@ -26,17 +26,22 @@ export function TestsiegerSection() {
               />
             </a>
 
+            {/* Texte 2026-08-14 mit Martin abgestimmt: keine Prozentzahl;
+                "Nr. 1 der Pflegekräfte-Vermittler" ist der wörtliche
+                Siegel-Claim; das Preis/Qualität-Statement ist bewusst KEIN
+                Zitat (steht so nicht in der Veröffentlichung), sondern
+                eigene Aussage — deshalb ohne Anführungszeichen/Kursiv. */}
             <div className="flex-1">
               <h3 className="text-[22px] font-bold text-[#3D3D3D] mb-2">
                 Testsieger bei DIE WELT
               </h3>
 
               <p className="text-[14px] text-[#8A8279] mb-4">
-                Deutschlands größter Vergleichstest für 24-Stunden-Pflege
+                Nr. 1 der Pflegekräfte-Vermittler – ausgezeichnet in Deutschlands großer Service-Studie von DIE WELT und ServiceValue
               </p>
 
-              <p className="text-[15px] italic text-[#5A5A5A] leading-relaxed lg:px-0 px-2">
-                „Primundus überzeugte mit der besten Kombination aus Preis, Qualität und Kundenservice."
+              <p className="text-[15px] text-[#5A5A5A] leading-relaxed lg:px-0 px-2">
+                Als bester Vermittler von 24-Stunden-Pflegekräften ausgezeichnet: Primundus steht für die beste Kombination aus Preis, Qualität und Kundenservice.
               </p>
 
               <a
