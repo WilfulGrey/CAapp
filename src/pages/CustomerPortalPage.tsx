@@ -442,8 +442,11 @@ const CustomerPortalPage: FC = () => {
       } else {
         setLead(l);
         // Report back to the kostenrechner lead so the Nachfass emails know
-        // the customer reached the portal. Fire-and-forget.
-        reportLeadEvent(l.token, 'portal_opened');
+        // the customer reached the portal. Fire-and-forget. `m` ist die
+        // Quell-Markierung aus den Nachfass-Mail-Links (pn1/pn2/pn3/wp) —
+        // damit wird messbar, welche Mail den Besuch gebracht hat.
+        const mailSource = new URLSearchParams(window.location.search).get('m');
+        reportLeadEvent(l.token, 'portal_opened', mailSource ? { mail_source: mailSource } : undefined);
         // Stitch this portal session to the customer's earlier
         // kostenrechner session in Clarity. The kalkulation page does the
         // matching identify on its side. Idempotent + retries until the

@@ -448,6 +448,47 @@ function nachfassCtaButton(url: string, label: string): string {
   return bulletproofButton(url, label, "#9A8A73");
 }
 
+// Pflegeheim-Vergleich (Martin, 14.08.): das emotionalste Argument des
+// Angebots (Portal-Block „Was bleibt für Sie übrig") — die Zahl pro Kunde
+// kommt aus SEINER Kalkulation (Pflegegeld nach Pflegegrad, Entlastungs-
+// budget, Steuervorteil), NIE pauschal. Fehlt die Kalkulation oder liegt
+// der Eigenanteil über dem Heim-Schnitt, erscheint der Kasten NICHT —
+// wir rechnen niemandem etwas schön. Quelle Heim-Wert: vdek-Bundes-
+// durchschnitt, Stand 01.07.2026 — bei neuen Werten (01.01./01.07.) hier
+// UND im Portal (CustomerPortalPage, HEIM_EIGENANTEIL) aktualisieren.
+const HEIM_EIGENANTEIL = 3364;
+export function heimVergleichDaten(lead: Lead): { eigen: number; diff: number; pgText: string } | null {
+  const k = lead.kalkulation || {};
+  const eigen = typeof k.eigenanteil === "number" ? Math.round(k.eigenanteil) : NaN;
+  if (!Number.isFinite(eigen) || eigen <= 0 || eigen >= HEIM_EIGENANTEIL) return null;
+  const pg = k.formularDaten?.pflegegrad;
+  const pgText = typeof pg === "number" && pg >= 1 ? ` (Pflegegrad ${pg})` : "";
+  return { eigen, diff: HEIM_EIGENANTEIL - eigen, pgText };
+}
+const fmtEuro0 = (n: number) => n.toLocaleString("de-DE", { maximumFractionDigits: 0 }) + " €";
+export function buildHeimVergleichBoxHtml(lead: Lead): string {
+  const d = heimVergleichDaten(lead);
+  if (!d) return "";
+  return `
+    <div style="margin:18px 0;padding:16px 18px;background:#F3F8F4;border:1px solid #cfe3d4;border-radius:12px;">
+      <p style="margin:0;font-size:14px;line-height:1.7;color:#444;"><strong style="color:#2D1F0F;">Und im Vergleich zum Pflegeheim?</strong> Im Pflegeheim zahlen Familien im Bundesdurchschnitt <strong style="color:#2D1F0F;">${fmtEuro0(HEIM_EIGENANTEIL)} Eigenanteil im Monat</strong> (vdek, Stand 07/2026). Bei Ihrer Betreuung zu Hause liegt der rechnerische Eigenanteil auf Basis Ihrer Angaben${d.pgText} bei <strong style="color:#2D1F0F;">ca. ${fmtEuro0(d.eigen)}</strong> &ndash; rund <strong style="color:#1F7A46;">${fmtEuro0(d.diff)} weniger, Monat für Monat</strong>. Die genaue Rechnung sehen Sie in Ihrem Angebot unter &bdquo;Alle Kosten im Überblick&ldquo;.</p>
+    </div>`;
+}
+export function buildHeimVergleichText(lead: Lead): string {
+  const d = heimVergleichDaten(lead);
+  if (!d) return "";
+  return `Und im Vergleich zum Pflegeheim? Im Pflegeheim zahlen Familien im Bundesdurchschnitt ${fmtEuro0(HEIM_EIGENANTEIL)} Eigenanteil im Monat (vdek, Stand 07/2026). Bei Ihrer Betreuung zu Hause liegt der rechnerische Eigenanteil auf Basis Ihrer Angaben${d.pgText} bei ca. ${fmtEuro0(d.eigen)} — rund ${fmtEuro0(d.diff)} weniger, Monat für Monat. Die genaue Rechnung sehen Sie in Ihrem Angebot unter „Alle Kosten im Überblick".
+
+`;
+}
+
+// Quell-Markierung (14.08.): &m=<kürzel> pro Nachfass-Mail — das Portal
+// schreibt den Wert in die portal_opened-Metadata, damit die Wirkung der
+// einzelnen Mails messbar wird (vorher Blindflug bei der Attribution).
+function withMailMark(url: string, m: string): string {
+  return url.includes("?") ? `${url}&m=${m}` : `${url}?m=${m}`;
+}
+
 // Bestpreis-PS — kurzer Reinforcer für Nurture-Mails (Eingangsbestätigung,
 // Nachfass_1). Bewusst NICHT in Nachfass_2/_3, die als minimale persönliche
 // Nachfrage gestaltet sind. Claim abgesichert ("vergleichbare Leistung").
@@ -506,30 +547,30 @@ Primundus Deutschland | +49 89 200 000 830 | www.primundus.de`;
 // Einstieg = Dank + „Ihr Angebot haben Sie erhalten" (Kunde weiss, wo er steht),
 // dann der Schwenk auf die Pflegekraefte (passen + gerade verfuegbar, unverbindlich).
 // Kein „schwierig auszufuellen", kein „es eilt nicht", keine Verknappung.
-function buildProfilNudge1Html(lead: Lead, siteUrl: string, portalBase: string): string {
-  const portalUrl = (portalBase && lead.token) ? buildPortalUrl(portalBase, lead.token) : siteUrl;
+export function buildProfilNudge1Html(lead: Lead, siteUrl: string, portalBase: string): string {
+  const portalUrl = (portalBase && lead.token) ? withMailMark(buildPortalUrl(portalBase, lead.token), "pn1") : siteUrl;
   const halloAnrede = buildHalloAnrede(lead.anrede_text || null, lead.nachname || "", lead.vorname || "");
   const content = `
     <p style="font-size:15px;line-height:1.75;color:#444;margin-bottom:14px;">${halloAnrede},</p>
     <p style="font-size:15px;line-height:1.75;color:#444;margin-bottom:14px;">Ihr Angebot haben Sie bereits &ndash; doch wichtiger als jedes Angebot ist die Frage: Wer wird Ihren Angehörigen betreuen? Bei uns sehen Sie genau das vorab. Sie lernen die Pflegekräfte mit Foto, Erfahrung und Anreisedatum kennen und entscheiden erst dann &ndash; bevor irgendein Vertrag geschlossen wird. Keine Katze im Sack.</p>
-    <p style="font-size:15px;line-height:1.75;color:#444;margin-bottom:14px;">Im Moment geht das noch nicht: Zur Pflegesituation fehlen uns noch ein paar Angaben, und ohne sie kann unser System keine passenden Pflegekräfte für Sie finden und vorschlagen.</p>
-    <p style="font-size:15px;line-height:1.75;color:#444;margin-bottom:14px;">Beschreiben Sie kurz die Pflegesituation &ndash; vieles ist schon vorausgefüllt. Danach erhalten Sie ganz unverbindlich Bewerbungen und sehen sich in Ruhe an, wer die Betreuung übernehmen möchte. Und wenn Sie mögen, laden Sie zusätzlich weitere Pflegekräfte ein, sich bei Ihnen zu bewerben.</p>
+    <p style="font-size:15px;line-height:1.75;color:#444;margin-bottom:14px;">Im Moment geht das noch nicht: Ohne ein paar Angaben zur Pflegesituation können sich keine Pflegekräfte bei Ihnen bewerben. Ein Teil ist aus dem Kostenrechner schon übernommen &ndash; danach sehen Sie sofort, welche Pflegekräfte passen und verfügbar sind. Ihre Wunsch-Pflegekraft könnte die Betreuung <strong>bereits in 4&ndash;7 Werktagen</strong> übernehmen.</p>
+    ${buildHeimVergleichBoxHtml(lead)}
     ${bulletproofButton(portalUrl, "Pflegesituation beschreiben&nbsp;&nbsp;&rarr;", "#2A9D5C")}
     <p style="font-size:13px;line-height:1.6;color:#888;margin:18px 0 0;">PS: Klappt im Portal etwas nicht, oder möchten Sie das lieber persönlich klären? Sie erreichen mich unter <a href="tel:+4989200000830" style="color:#8B7355;text-decoration:none;">089&nbsp;200&nbsp;000&nbsp;830</a> oder per <a href="https://wa.me/4989200000830" style="color:#8B7355;text-decoration:none;">WhatsApp</a>.</p>
     ${buildIlkaSig(siteUrl)}`;
   return buildEmailWrapper(lead, siteUrl, content);
 }
 
-function buildProfilNudge1Text(lead: Lead, siteUrl: string, portalBase: string): string {
-  const portalUrl = (portalBase && lead.token) ? buildPortalUrl(portalBase, lead.token) : siteUrl;
+export function buildProfilNudge1Text(lead: Lead, siteUrl: string, portalBase: string): string {
+  const portalUrl = (portalBase && lead.token) ? withMailMark(buildPortalUrl(portalBase, lead.token), "pn1") : siteUrl;
   const halloAnrede = buildHalloAnrede(lead.anrede_text || null, lead.nachname || "", lead.vorname || "");
   return `${halloAnrede},
 
 Ihr Angebot haben Sie bereits — doch wichtiger als jedes Angebot ist die Frage: Wer wird Ihren Angehörigen betreuen? Bei uns sehen Sie genau das vorab. Sie lernen die Pflegekräfte mit Foto, Erfahrung und Anreisedatum kennen und entscheiden erst dann — bevor irgendein Vertrag geschlossen wird. Keine Katze im Sack.
 
-Im Moment geht das noch nicht: Zur Pflegesituation fehlen uns noch ein paar Angaben, und ohne sie kann unser System keine passenden Pflegekräfte für Sie finden und vorschlagen.
+Im Moment geht das noch nicht: Ohne ein paar Angaben zur Pflegesituation können sich keine Pflegekräfte bei Ihnen bewerben. Ein Teil ist aus dem Kostenrechner schon übernommen — danach sehen Sie sofort, welche Pflegekräfte passen und verfügbar sind. Ihre Wunsch-Pflegekraft könnte die Betreuung bereits in 4–7 Werktagen übernehmen.
 
-Beschreiben Sie kurz die Pflegesituation — vieles ist schon vorausgefüllt. Danach erhalten Sie ganz unverbindlich Bewerbungen und sehen sich in Ruhe an, wer die Betreuung übernehmen möchte. Und wenn Sie mögen, laden Sie zusätzlich weitere Pflegekräfte ein, sich bei Ihnen zu bewerben.
+${buildHeimVergleichText(lead)}
 
 Pflegesituation beschreiben: ${portalUrl}
 
@@ -543,7 +584,7 @@ Primundus Deutschland | +49 89 200 000 830 | www.primundus.de`;
 }
 
 function buildProfilNudge2Html(lead: Lead, siteUrl: string, portalBase: string): string {
-  const portalUrl = (portalBase && lead.token) ? buildPortalUrl(portalBase, lead.token) : siteUrl;
+  const portalUrl = (portalBase && lead.token) ? withMailMark(buildPortalUrl(portalBase, lead.token), "pn2") : siteUrl;
   const halloAnrede = buildHalloAnrede(lead.anrede_text || null, lead.nachname || "", lead.vorname || "");
   const content = `
     <p style="font-size:15px;line-height:1.75;color:#444;margin-bottom:14px;">${halloAnrede},</p>
@@ -557,7 +598,7 @@ function buildProfilNudge2Html(lead: Lead, siteUrl: string, portalBase: string):
 }
 
 function buildProfilNudge2Text(lead: Lead, siteUrl: string, portalBase: string): string {
-  const portalUrl = (portalBase && lead.token) ? buildPortalUrl(portalBase, lead.token) : siteUrl;
+  const portalUrl = (portalBase && lead.token) ? withMailMark(buildPortalUrl(portalBase, lead.token), "pn2") : siteUrl;
   const halloAnrede = buildHalloAnrede(lead.anrede_text || null, lead.nachname || "", lead.vorname || "");
   return `${halloAnrede},
 
@@ -580,7 +621,7 @@ Primundus Deutschland | +49 89 200 000 830 | www.primundus.de`;
 
 // Tag-7: kurzer ehrlicher Einstieg + drei nuetzliche Infos, kein Druck.
 function buildProfilNudge3Html(lead: Lead, siteUrl: string, portalBase: string): string {
-  const portalUrl = (portalBase && lead.token) ? buildPortalUrl(portalBase, lead.token) : siteUrl;
+  const portalUrl = (portalBase && lead.token) ? withMailMark(buildPortalUrl(portalBase, lead.token), "pn3") : siteUrl;
   const halloAnrede = buildHalloAnrede(lead.anrede_text || null, lead.nachname || "", lead.vorname || "");
   const li = 'p style="font-size:14.5px;line-height:1.7;color:#444;margin:0 0 10px;"';
   const content = `
@@ -595,7 +636,7 @@ function buildProfilNudge3Html(lead: Lead, siteUrl: string, portalBase: string):
 }
 
 function buildProfilNudge3Text(lead: Lead, siteUrl: string, portalBase: string): string {
-  const portalUrl = (portalBase && lead.token) ? buildPortalUrl(portalBase, lead.token) : siteUrl;
+  const portalUrl = (portalBase && lead.token) ? withMailMark(buildPortalUrl(portalBase, lead.token), "pn3") : siteUrl;
   const halloAnrede = buildHalloAnrede(lead.anrede_text || null, lead.nachname || "", lead.vorname || "");
   return `${halloAnrede},
 
@@ -1603,7 +1644,7 @@ Primundus Deutschland | www.primundus.de
 // Provision → Bestpreis-Garantie. Claim bewusst abgesichert ("bei
 // vergleichbarer Qualifikation und Leistung").
 // ─────────────────────────────────────────────────────────────────────────
-function buildWarumPrimundusHtml(lead: Lead, portalUrl: string, siteUrl: string): string {
+export function buildWarumPrimundusHtml(lead: Lead, portalUrl: string, siteUrl: string): string {
   const greeting = buildHalloAnrede(lead.anrede_text || null, lead.nachname || "", lead.vorname || "");
 
   const usp = (title: string, desc: string) => `
@@ -1633,6 +1674,7 @@ function buildWarumPrimundusHtml(lead: Lead, portalUrl: string, siteUrl: string)
     <div style="margin:18px 0;padding:16px 18px;background:#FAF8F4;border:1px solid #e8ddd0;border-radius:12px;">
       <p style="margin:0;font-size:14px;line-height:1.7;color:#444;"><strong style="color:#2D1F0F;">Warum wir günstiger sein können:</strong> Als Direktanbieter sparen wir die Vermittler-Provisionen, die in Deutschland sonst üblich sind. Das Ergebnis: Die Pflegekraft verdient <strong style="color:#2D1F0F;">mehr</strong> — und Sie zahlen <strong style="color:#2D1F0F;">weniger</strong>.</p>
     </div>
+    ${buildHeimVergleichBoxHtml(lead)}
     ${bulletproofButton(portalUrl, "Pflegekräfte im Portal ansehen →")}
     <div style="font-size:12px;color:#888;line-height:1.8;margin:0 0 18px;text-align:center;">
       <span style="color:#2D6A4F;font-weight:600;">✓ Keine Vertragsbindung</span>&ensp;&middot;&ensp;
@@ -1645,7 +1687,7 @@ function buildWarumPrimundusHtml(lead: Lead, portalUrl: string, siteUrl: string)
   return buildEmailWrapper(lead, siteUrl, content);
 }
 
-function buildWarumPrimundusText(lead: Lead, portalUrl: string): string {
+export function buildWarumPrimundusText(lead: Lead, portalUrl: string): string {
   const greeting = buildHalloAnrede(lead.anrede_text || null, lead.nachname || "", lead.vorname || "");
   return `${greeting},
 
@@ -1657,7 +1699,7 @@ Sie vergleichen gerade verschiedene Anbieter für die 24-Stunden-Betreuung? Dann
 
 Warum wir günstiger sein können: Als Direktanbieter sparen wir die Vermittler-Provisionen, die in Deutschland sonst üblich sind. Das Ergebnis: Die Pflegekraft verdient mehr — und Sie zahlen weniger.
 
-Pflegekräfte im Portal ansehen: ${portalUrl}
+${buildHeimVergleichText(lead)}Pflegekräfte im Portal ansehen: ${portalUrl}
 
 ✓ Keine Vertragsbindung  ·  ✓ Tagesgenaue Abrechnung  ·  ✓ Kosten erst bei Anreise
 
@@ -1763,7 +1805,7 @@ Deno.serve(async (req: Request) => {
           case "eingangsbestaetigung": return { subject: "Ihr persönliches Angebot zur 24-Stunden-Betreuung", html: buildEingangsbestaetigungHtml(lead as Lead, site, portalBase), text: buildEingangsbestaetigungText(lead as Lead, portalBase) };
           case "profil_nudge_1": return { subject: "Pflegekräfte können sich noch nicht bei Ihnen bewerben", html: buildProfilNudge1Html(lead as Lead, site, portalBase), text: buildProfilNudge1Text(lead as Lead, site, portalBase) };
           case "profil_nudge_2": return { subject: "Profil unvollständig — Sie können noch keine Bewerbungen erhalten", html: buildProfilNudge2Html(lead as Lead, site, portalBase), text: buildProfilNudge2Text(lead as Lead, site, portalBase) };
-          case "warum_primundus": return { subject: "Kennen Sie die Primundus-Bestpreis-Garantie?", html: buildWarumPrimundusHtml(lead as Lead, pu, site), text: buildWarumPrimundusText(lead as Lead, pu) };
+          case "warum_primundus": return { subject: "Kennen Sie die Primundus-Bestpreis-Garantie?", html: buildWarumPrimundusHtml(lead as Lead, withMailMark(pu, "wp"), site), text: buildWarumPrimundusText(lead as Lead, withMailMark(pu, "wp")) };
           case "nachfass_2": return { subject: "Ihre Betreuung — kann ich Ihnen etwas abnehmen?", html: buildNachfass2Html(lead as Lead, site, portalBase, ms), text: buildNachfass2Text(lead as Lead, site, portalBase, ms) };
           case "nachfass_3": return { subject: "Eine letzte Frage — wie schaut's bei Ihnen aus?", html: buildNachfass3Html(lead as Lead, site), text: buildNachfass3Text(lead as Lead, site) };
           case "profil_nudge_3": return { subject: "Können wir Sie bei etwas unterstützen?", html: buildProfilNudge3Html(lead as Lead, site, portalBase), text: buildProfilNudge3Text(lead as Lead, site, portalBase) };

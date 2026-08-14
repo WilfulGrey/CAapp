@@ -22,35 +22,73 @@ export function Footer() {
             </p>
           </div>
           <div className="flex-shrink-0">
-            <Image
-              src="/images/primundus_testsieger-2021.webp"
-              alt="Service Champions"
-              width={100}
-              height={120}
-              className="rounded-lg"
-            />
+            {/* Badge verlinkt den Beleg auf der Hauptdomain (SEO-Cross-Link
+                Rechner→Apex, vorher 0 Links in diese Richtung). */}
+            <a
+              href="https://primundus.de/testsieger-24-stunden-pflege"
+              target="_blank"
+              rel="noopener"
+              aria-label="Mehr zur Testsieger-Auszeichnung von Primundus"
+            >
+              <Image
+                src="/images/primundus_testsieger-2021.webp"
+                alt="Service Champions"
+                width={100}
+                height={120}
+                className="rounded-lg"
+              />
+            </a>
           </div>
         </div>
 
-        <div className="mb-8">
-          <h4 className="text-[18px] font-bold mb-4 uppercase tracking-wider text-gray-400">
-            Kontakt
-          </h4>
-          <ul className="space-y-3">
-            <li>
-              <a href="tel:+4989200000830" className="text-[20px] font-bold text-white hover:text-gray-300 transition-colors">
-                089 200 000 830
-              </a>
-            </li>
-            <li>
-              <a href="mailto:info@primundus.de" className="text-[16px] text-gray-300 hover:text-white transition-colors">
-                info@primundus.de
-              </a>
-            </li>
-            <li className="text-[14px] text-gray-400 pt-2">
-              Mo-So: 8-20 Uhr
-            </li>
-          </ul>
+        <div className="mb-8 grid md:grid-cols-2 gap-8">
+          <div>
+            <h4 className="text-[18px] font-bold mb-4 uppercase tracking-wider text-gray-400">
+              Kontakt
+            </h4>
+            <ul className="space-y-3">
+              <li>
+                <a href="tel:+4989200000830" className="text-[20px] font-bold text-white hover:text-gray-300 transition-colors">
+                  089 200 000 830
+                </a>
+              </li>
+              <li>
+                <a href="mailto:info@primundus.de" className="text-[16px] text-gray-300 hover:text-white transition-colors">
+                  info@primundus.de
+                </a>
+              </li>
+              <li className="text-[14px] text-gray-400 pt-2">
+                Mo-So: 8-20 Uhr
+              </li>
+            </ul>
+          </div>
+          <div>
+            <h4 className="text-[18px] font-bold mb-4 uppercase tracking-wider text-gray-400">
+              Gut zu wissen
+            </h4>
+            <ul className="space-y-3">
+              <li>
+                <a href="https://primundus.de/kosten" target="_blank" rel="noopener" className="text-[15px] text-gray-300 hover:text-white transition-colors">
+                  Was kostet 24-Stunden-Pflege?
+                </a>
+              </li>
+              <li>
+                <a href="https://primundus.de/testsieger-24-stunden-pflege" target="_blank" rel="noopener" className="text-[15px] text-gray-300 hover:text-white transition-colors">
+                  Unsere Testsieger-Auszeichnung
+                </a>
+              </li>
+              <li>
+                <a href="https://primundus.de/pflegekraft-aus-polen" target="_blank" rel="noopener" className="text-[15px] text-gray-300 hover:text-white transition-colors">
+                  Polnische Pflegekräfte — legal & sicher
+                </a>
+              </li>
+              <li>
+                <a href="https://primundus.de/regionen" target="_blank" rel="noopener" className="text-[15px] text-gray-300 hover:text-white transition-colors">
+                  Unsere Einsatzorte in Deutschland
+                </a>
+              </li>
+            </ul>
+          </div>
         </div>
 
         <div className="border-t border-gray-600 pt-6">
