@@ -1873,6 +1873,15 @@ Deno.serve(async (req: Request) => {
           continue;
         }
 
+        // Empfänger IMMER frisch aus dem Lead. scheduled_emails.recipient_email
+        // ist nur eine Kopie vom Zeitpunkt der Einplanung — korrigiert jemand die
+        // Adresse (Admin-Kontaktformular), würde die geplante Mail sonst weiter
+        // an die alte Adresse gehen. Der Snapshot bleibt Fallback für Alt-Zeilen
+        // ohne lead.email. Alle Queue-Typen sind Kundenmails — Team-Mails laufen
+        // an der Warteschlange vorbei (direkter SMTP-Versand), daher ist der Lead
+        // hier ausnahmslos der richtige Adressat.
+        const recipient = (lead.email ?? "").trim() || scheduledEmail.recipient_email;
+
         let isBeauftragt = lead.status === "vertrag_abgeschlossen" || lead.status === "betreuung_beauftragt" || lead.order_confirmed === true;
         // Buchung erkennen: die MVP-Annahme (Kunde akzeptiert eine Pflegekraft
         // im Portal) setzt lead.status NICHT auf "beauftragt", loggt aber ein
@@ -2091,7 +2100,7 @@ Deno.serve(async (req: Request) => {
               .update({ status: "failed", error_message: "reminder missing caregiver_id in metadata", updated_at: new Date().toISOString() })
               .eq("id", scheduledEmail.id);
             results.push({ id: scheduledEmail.id, success: false, error: "no caregiver_id" });
-            failures.push({ emailType: scheduledEmail.email_type, recipient: scheduledEmail.recipient_email, leadId: scheduledEmail.lead_id, error: "reminder missing caregiver_id in metadata" });
+            failures.push({ emailType: scheduledEmail.email_type, recipient, leadId: scheduledEmail.lead_id, error: "reminder missing caregiver_id in metadata" });
             continue;
           }
 
@@ -2246,7 +2255,7 @@ Deno.serve(async (req: Request) => {
             .eq("id", scheduledEmail.id);
 
           results.push({ id: scheduledEmail.id, success: false, error: `Unknown email type: ${scheduledEmail.email_type}` });
-          failures.push({ emailType: scheduledEmail.email_type, recipient: scheduledEmail.recipient_email, leadId: scheduledEmail.lead_id, error: `Unknown email type: ${scheduledEmail.email_type}` });
+          failures.push({ emailType: scheduledEmail.email_type, recipient, leadId: scheduledEmail.lead_id, error: `Unknown email type: ${scheduledEmail.email_type}` });
           continue;
         }
  
@@ -2270,11 +2279,14 @@ Deno.serve(async (req: Request) => {
         // (z. B. t-onlne.de statt t-online.de) NICHT blind versenden — sonst
         // stiller Bounce. Stattdessen als needs_review flaggen + Event loggen,
         // damit jemand die Adresse beim Kunden korrigieren kann.
-        const domainCheck = detectEmailDomainTypo(scheduledEmail.recipient_email);
+        // Geprüft wird die AUFGELÖSTE Adresse: nach einer Korrektur im Admin
+        // darf der Snapshot die Zeile nicht erneut auf den alten Tippfehler
+        // flaggen.
+        const domainCheck = detectEmailDomainTypo(recipient);
         if (domainCheck.suspicious) {
           const note = domainCheck.suggestion
-            ? `Verdächtige Empfänger-Domain (${domainCheck.reason}): ${scheduledEmail.recipient_email} → vermutlich gemeint: …@${domainCheck.suggestion}`
-            : `Verdächtige Empfänger-Domain (${domainCheck.reason}): ${scheduledEmail.recipient_email}`;
+            ? `Verdächtige Empfänger-Domain (${domainCheck.reason}): ${recipient} → vermutlich gemeint: …@${domainCheck.suggestion}`
+            : `Verdächtige Empfänger-Domain (${domainCheck.reason}): ${recipient}`;
           await supabase
             .from("scheduled_emails")
             .update({ status: "needs_review", error_message: note, updated_at: new Date().toISOString() })
@@ -2283,7 +2295,7 @@ Deno.serve(async (req: Request) => {
             lead_id: scheduledEmail.lead_id,
             event_type: "email_domain_flagged",
             metadata: {
-              to: scheduledEmail.recipient_email,
+              to: recipient,
               email_type: scheduledEmail.email_type,
               suggestion: domainCheck.suggestion ?? null,
               reason: domainCheck.reason ?? null,
@@ -2294,8 +2306,8 @@ Deno.serve(async (req: Request) => {
           continue;
         }
 
-        const emailResult = await sendEmailSmtp(smtpConfig, scheduledEmail.recipient_email, subject, html, text, attachments);
- 
+        const emailResult = await sendEmailSmtp(smtpConfig, recipient, subject, html, text, attachments);
+
         if (emailResult.success) {
           await supabase
             .from("scheduled_emails")
@@ -2303,13 +2315,16 @@ Deno.serve(async (req: Request) => {
               status: "sent",
               sent_at: new Date().toISOString(),
               updated_at: new Date().toISOString(),
+              // Verlauf ehrlich halten: die Zeile soll die Adresse zeigen, an
+              // die tatsächlich versendet wurde, nicht den Snapshot von damals.
+              recipient_email: recipient,
             })
             .eq("id", scheduledEmail.id);
- 
+
           await supabase.from("lead_events").insert({
             lead_id: scheduledEmail.lead_id,
             event_type: eventTypeSent,
-            metadata: { to: scheduledEmail.recipient_email, triggered_by: "scheduled_email" },
+            metadata: { to: recipient, triggered_by: "scheduled_email" },
           });
  
           // Nachfass-Kette: startet jetzt nach der (gemergten) Eingangsbestätigung.
@@ -2353,11 +2368,11 @@ Deno.serve(async (req: Request) => {
           await supabase.from("lead_events").insert({
             lead_id: scheduledEmail.lead_id,
             event_type: eventTypeFailed,
-            metadata: { to: scheduledEmail.recipient_email, error: emailResult.error, triggered_by: "scheduled_email" },
+            metadata: { to: recipient, error: emailResult.error, triggered_by: "scheduled_email" },
           });
 
           results.push({ id: scheduledEmail.id, success: false, error: emailResult.error });
-          failures.push({ emailType: scheduledEmail.email_type, recipient: scheduledEmail.recipient_email, leadId: scheduledEmail.lead_id, error: emailResult.error ?? "unbekannt" });
+          failures.push({ emailType: scheduledEmail.email_type, recipient, leadId: scheduledEmail.lead_id, error: emailResult.error ?? "unbekannt" });
         }
       } catch (emailError) {
         const errorMsg = emailError instanceof Error ? emailError.message : String(emailError);
