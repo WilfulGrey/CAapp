@@ -42,6 +42,9 @@ export interface CaregiverSnapshot {
 }
 
 export interface LeadEventMetadata {
+  // portal_opened: Quell-Markierung aus dem Mail-Link (?m=pn1|pn2|pn3|wp) —
+  // ordnet den Portal-Besuch der auslösenden Nachfass-Mail zu (14.08.).
+  mail_source?: string;
   // patient_form_step: erreichter Schritt (0-basiert); patient_form_save_failed: Fehlertext.
   step?: number;
   error?: string;
