@@ -268,7 +268,9 @@ export default function LeadDetailPage() {
         p_anrede_text: anrede_text
       });
 
-      if (!error && (email !== lead.email || telefon !== lead.telefon)) {
+      const emailChanged = email !== lead.email;
+
+      if (!error && (emailChanged || telefon !== lead.telefon)) {
         await supabase
           .from('leads')
           .update({ email, telefon })
@@ -279,6 +281,31 @@ export default function LeadDetailPage() {
         console.error('Fehler beim Speichern:', error);
         alert(`Fehler beim Speichern: ${error.message}`);
         return;
+      }
+
+      // Adressänderung auf die Warteschlange durchschreiben. scheduled_emails
+      // hält eine KOPIE der Adresse vom Zeitpunkt der Einplanung — ohne das hier
+      // gingen alle bereits geplanten Mails weiter an die alte Adresse.
+      // Verlauf (sent/failed/cancelled) und laufende Sends (processing) bleiben
+      // unangetastet; needs_review bekommt die neue Adresse, behält aber die
+      // Flagge (das Entsperren bleibt eine bewusste manuelle Entscheidung).
+      if (emailChanged && email) {
+        const { data: requeued, error: queueError } = await supabase
+          .from('scheduled_emails')
+          .update({ recipient_email: email, updated_at: new Date().toISOString() })
+          .eq('lead_id', leadId)
+          .in('status', ['pending', 'needs_review'])
+          .select('id');
+
+        if (queueError) {
+          console.error('Warteschlange-Update fehlgeschlagen:', queueError);
+          alert(
+            `Kontakt gespeichert, aber die geplanten E-Mails wurden NICHT auf ${email} umgestellt ` +
+            `(${queueError.message}). Sie gehen sonst weiter an die alte Adresse — bitte melden.`
+          );
+        } else {
+          console.log(`✅ ${requeued?.length ?? 0} geplante E-Mail(s) auf ${email} umgestellt`);
+        }
       }
 
       console.log('✅ Kontaktdaten gespeichert');
@@ -1511,6 +1538,14 @@ export default function LeadDetailPage() {
                           {dateValue && (
                             <span className="text-xs text-gray-400 ml-2">
                               {dateLabel}: {new Date(dateValue).toLocaleString('de-DE')}
+                            </span>
+                          )}
+                          {/* Empfänger nur bei noch nicht versendeten Mails: dort ist
+                              er änderbar (Kontaktformular schreibt ihn um) und damit
+                              die einzige Stelle, an der man das nachprüfen kann. */}
+                          {(email.status === 'pending' || email.status === 'needs_review') && email.recipient_email && (
+                            <span className="block text-xs text-gray-400 truncate">
+                              An: {email.recipient_email}
                             </span>
                           )}
                         </div>
