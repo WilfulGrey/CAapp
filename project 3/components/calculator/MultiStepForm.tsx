@@ -281,12 +281,19 @@ export function MultiStepForm() {
     // state sieht (setState wurde gerade erst geschedulet). Beim Klick auf
     // den manuellen "Weiter"-Button bleibt overrideAnswer undefined und wir
     // fallen auf den getCurrentAnswer-Lookup zurück.
-    analytics.trackEvent('wizard', 'step_complete', {
-      step: currentStep,
-      step_name: getStepId(currentStep),
-      answer: overrideAnswer !== undefined ? overrideAnswer : getCurrentAnswer(currentStep),
-      time_on_step_seconds: timeOnStep,
-    });
+    //
+    // Letzter Step (Kontaktformular): step_complete feuert NICHT hier,
+    // sondern erst nach ERFOLGREICHEM Submit in handleSubmit — per Beacon
+    // (Bug #33). Vorher feuerte es (a) auch bei fehlgeschlagener Validierung
+    // und (b) ging in ~50 % der Fälle beim Portal-Redirect verloren.
+    if (currentStep !== totalSteps) {
+      analytics.trackEvent('wizard', 'step_complete', {
+        step: currentStep,
+        step_name: getStepId(currentStep),
+        answer: overrideAnswer !== undefined ? overrideAnswer : getCurrentAnswer(currentStep),
+        time_on_step_seconds: timeOnStep,
+      });
+    }
 
     if (currentStep < totalSteps) {
       // Letzte Frage (Step 8) → Kontaktformular (Step 9): vorher die Matching-
@@ -460,6 +467,10 @@ export function MultiStepForm() {
       const kalkulation = await kalkulationResponse.json();
 
       // Sende an angebot-anfordern API (erstellt Lead + versendet Angebots-E-Mails)
+      // adParams: Google-Klick-IDs (gclid/wbraid/gbraid) aus der Landing-URL
+      // dieser Session — die Route sanitisiert und hängt sie an den Lead,
+      // damit qualifizierte Leads später als Offline-Conversions zu Google
+      // importiert werden können (docs/google-ads-tracking.md).
       const response = await fetch('/api/angebot-anfordern', {
         method: 'POST',
         headers: {
@@ -470,6 +481,7 @@ export function MultiStepForm() {
           email: formData.email,
           telefon: formData.phone,
           careStartTiming: state.careStartTiming,
+          adParams: analytics.getAdParams(),
           kalkulation: {
             ...kalkulation,
             formularDaten,
@@ -485,12 +497,42 @@ export function MultiStepForm() {
 
       if (data.success && data.leadId) {
         trackFormSubmit();
-        analytics.trackConversion('angebot_angefordert', data.leadId, kalkulation.bruttopreis, {
-          pflegegrad: state.pflegegrad,
-          care_start_timing: state.careStartTiming,
-          patient_count: state.patientCount,
+        // step_complete(contact_form) + Conversion in EINEM Beacon — überlebt
+        // den Redirect garantiert (Bug #33). Ersetzt die früheren racy
+        // supabase-js-Inserts (analytics.trackConversion + step_complete aus
+        // handleNext), von denen ~die Hälfte beim window.location.assign starb.
+        analytics.trackCriticalSubmit({
+          step: totalSteps,
+          stepName: getStepId(totalSteps),
+          timeOnStepSeconds: Math.round((Date.now() - stepStartRef.current) / 1000),
+          conversion: {
+            leadId: data.leadId,
+            conversionType: 'angebot_angefordert',
+            conversionValue: kalkulation.bruttopreis,
+            formData: {
+              pflegegrad: state.pflegegrad,
+              care_start_timing: state.careStartTiming,
+              patient_count: state.patientCount,
+            },
+          },
         });
-        if (typeof window !== 'undefined') {
+        // Direct redirect into the CA app — no thank-you interstitial, no
+        // countdown, no MatchingAnimation. User already filled name/email/
+        // phone on step 10 and clicked submit. Anything between submit and
+        // CA app is friction.
+        if (typeof data.portalUrl === 'string' && data.portalUrl.length > 0) {
+          // GTM-Tags (Google-Ads-Conversion auf `angebot_erfolgreich`, siehe
+          // docs/google-ads-tracking.md) brauchen einen Moment zum Feuern,
+          // bevor die Navigation alle offenen Requests killt: eventCallback
+          // meldet „alle Tags fertig", eventTimeout/setTimeout sichern den
+          // Redirect ab, falls GTM geblockt ist (Adblocker) oder hängt.
+          // Kostet im Normalfall ~100-300 ms, im Worst Case 900 ms.
+          let redirected = false;
+          const goToPortal = () => {
+            if (redirected) return;
+            redirected = true;
+            window.location.assign(data.portalUrl);
+          };
           (window as any).dataLayer = (window as any).dataLayer || [];
           (window as any).dataLayer.push({
             event: 'angebot_erfolgreich',
@@ -498,14 +540,10 @@ export function MultiStepForm() {
             pflegegrad: state.pflegegrad,
             care_start_timing: state.careStartTiming,
             conversion_value: kalkulation.bruttopreis,
+            eventCallback: goToPortal,
+            eventTimeout: 700,
           });
-        }
-        // Direct redirect into the CA app — no thank-you interstitial, no
-        // countdown, no MatchingAnimation. User already filled name/email/
-        // phone on step 10 and clicked submit. Anything between submit and
-        // CA app is friction.
-        if (typeof data.portalUrl === 'string' && data.portalUrl.length > 0) {
-          window.location.assign(data.portalUrl);
+          setTimeout(goToPortal, 900);
           return;
         }
         // No portalUrl from server is a deploy/config bug — surface it so
