@@ -137,7 +137,7 @@ export default function KalkulationPage() {
             <div className="flex items-center gap-3">
               <Image src="/images/ilka-wysocki_pm-mallorca.webp" alt="Ilka Wysocki" width={34} height={34} className="w-9 h-9 rounded-full object-cover object-top border border-[#F0997B] hidden sm:block flex-shrink-0" />
               <div className="flex flex-col items-end">
-                <a href="tel:08920000830" className="flex items-center gap-1 text-[#8B6914] text-sm font-semibold">
+                <a href="tel:+4989200000830" className="flex items-center gap-1 text-[#8B6914] text-sm font-semibold">
                   <Phone className="w-3 h-3" /> 089 200 000 830
                 </a>
                 <span className="text-xs text-[#B5A184]">Ilka Wysocki · Mo–So 8–18 Uhr</span>
@@ -327,7 +327,7 @@ export default function KalkulationPage() {
               <div className="text-sm font-semibold text-[#2D1F0F] mb-1">Noch offene Fragen?</div>
               <div className="text-xs text-gray-600 leading-relaxed mb-3">Ich begleite Sie persönlich durch den gesamten Prozess – von der Auswahl der passenden Pflegekraft bis zum Start der Betreuung.</div>
               <div className="flex gap-2 flex-wrap">
-                <a href="tel:08920000830" className="inline-flex items-center gap-1.5 h-10 px-4 bg-white text-[#2D1F0F] border border-gray-200 rounded-lg text-sm font-semibold transition-all hover:-translate-y-0.5 hover:shadow-md active:scale-[.97]">
+                <a href="tel:+4989200000830" className="inline-flex items-center gap-1.5 h-10 px-4 bg-white text-[#2D1F0F] border border-gray-200 rounded-lg text-sm font-semibold transition-all hover:-translate-y-0.5 hover:shadow-md active:scale-[.97]">
                   <Phone className="w-3.5 h-3.5" />
                   <span className="sm:hidden">Jetzt anrufen</span>
                   <span className="hidden sm:inline">089 200 000 830</span>

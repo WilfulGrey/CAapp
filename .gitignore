@@ -22,6 +22,9 @@ supabase/.temp/
 !.claude/commands/
 !.claude/commands/**
 coverage/
+# Lokalne dumpy/backupy robione ad-hoc (np. analytics_backup_*) — duże i
+# mogą nieść dane klientów. Trzymaj poza repo.
+.local-backups/
 # Onboarding paczki dla nowych devów — mogą zawierać klucze .env w plain text.
 # Trzymaj poza repo, przekaż osobnym kanałem (Signal / 1Password / GPG).
 *-env-package.zip

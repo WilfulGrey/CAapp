@@ -1,0 +1,6 @@
+# Kundenportal — soll NICHT im Suchindex landen. Bewusst KEIN "Disallow: /":
+# ein Disallow würde Googlebot am Crawlen hindern und damit auch daran, das
+# noindex (Meta-Tag in index.html + X-Robots-Tag aus render.yaml) je zu
+# sehen — bereits indexierte URLs blieben dann als Zombies im Index.
+User-agent: *
+Allow: /

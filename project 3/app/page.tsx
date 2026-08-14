@@ -16,10 +16,17 @@ import { WhatIs24hCare } from "@/components/calculator/WhatIs24hCare";
 import { RequirementsSection } from "@/components/calculator/RequirementsSection";
 import { KeyBenefitsBar } from "@/components/calculator/KeyBenefitsBar";
 import { WhatsAppFloat } from "@/components/calculator/WhatsAppFloat";
+import { homePageGraph, jsonLdString } from "@/lib/seo-schema";
 
 export default function HomePage() {
   return (
     <div className="min-h-screen bg-[#F8F7F5]">
+      {/* Service + FAQPage-JSON-LD: landet über den SSR-Prerender im
+          initialen HTML, auch wenn diese Page "use client" ist. */}
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: jsonLdString(homePageGraph()) }}
+      />
       <Header />
 
       {/* Hero Section - Split Layout on Desktop */}

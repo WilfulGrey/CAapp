@@ -109,6 +109,7 @@ async function handlePost(request: NextRequest) {
       careStartTiming,
       kalkulation,
       acceptPrivacy,
+      adParams,
     }: {
       vorname?: string;
       email: string;
@@ -116,7 +117,22 @@ async function handlePost(request: NextRequest) {
       careStartTiming?: string;
       kalkulation: Kalkulation;
       acceptPrivacy?: boolean;
+      adParams?: Record<string, unknown>;
     } = body;
+
+    // Google-Klick-IDs für den späteren Offline-Conversion-Import
+    // (docs/google-ads-tracking.md). Strikt allowlisted + gekappt — der
+    // Client schickt sessionStorage-Inhalt, hier entscheidet der Server,
+    // was den Lead erreicht.
+    const clickIds: { gclid?: string; wbraid?: string; gbraid?: string } = {};
+    if (adParams && typeof adParams === 'object') {
+      for (const key of ['gclid', 'wbraid', 'gbraid'] as const) {
+        const value = adParams[key];
+        if (typeof value === 'string' && value.trim() && value.length <= 200) {
+          clickIds[key] = value.trim();
+        }
+      }
+    }
 
     // Name + E-Mail + Telefon + Kalkulation alle Pflicht (Rückrollung
     // 14.06.2026 der Änderung vom 06.06.2026). Begründung: Tel-Quote war
@@ -176,6 +192,24 @@ async function handlePost(request: NextRequest) {
         kalkulation,
       }
     );
+
+    // Klick-IDs als SEPARATES best-effort Update (nicht im Insert/Update von
+    // findOrCreateLead): Lead-Erstellung darf NIE an fehlenden Spalten
+    // scheitern, falls Migration 20260814090000 noch nicht appliziert ist.
+    // Re-Submit mit neuer Klick-ID überschreibt — letzter Klick gewinnt.
+    if (Object.keys(clickIds).length > 0) {
+      try {
+        const { error: clickIdError } = await supabase
+          .from('leads')
+          .update(clickIds)
+          .eq('id', lead.id);
+        if (clickIdError) {
+          console.error('Klick-IDs nicht gespeichert (Lead existiert trotzdem):', clickIdError.message);
+        }
+      } catch (e) {
+        console.error('Klick-IDs nicht gespeichert (Lead existiert trotzdem):', e instanceof Error ? e.message : String(e));
+      }
+    }
 
     // DSGVO Art. 7 Abs. 1 — Einwilligung nachweisbar protokollieren. Als
     // append-only lead_event (Zeitpunkt = created_at, Text + Version + Quelle

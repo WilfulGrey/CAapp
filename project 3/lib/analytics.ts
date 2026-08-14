@@ -20,6 +20,29 @@ interface SessionData {
   os: string;
 }
 
+// Kampagnen-Parameter, die Google Ads (UTM-Suffix + Auto-Tagging) an die
+// Landing-URL hängt. utm_source/medium/campaign stehen direkt auf dem
+// Session-Insert (Spalten existieren seit jeher); die hier gelisteten
+// werden per best-effort Update nachgetragen (Bug #33 — fail-soft, damit
+// Sessions auch dann entstehen, wenn die Migration noch nicht appliziert
+// ist) und in sessionStorage gemerkt, damit der Angebot-Submit die
+// Klick-IDs Minuten später noch an den Lead hängen kann.
+const AD_PARAM_KEYS = ['gclid', 'wbraid', 'gbraid', 'utm_term', 'utm_content'] as const;
+type AdParams = Partial<Record<(typeof AD_PARAM_KEYS)[number], string>>;
+const AD_PARAMS_KEY = '_prim_ad_params';
+
+export interface CriticalSubmitInput {
+  step: number;
+  stepName: string;
+  timeOnStepSeconds?: number;
+  conversion?: {
+    leadId?: string;
+    conversionType: string;
+    conversionValue?: number;
+    formData?: any;
+  };
+}
+
 class Analytics {
   private sessionId: string | null = null;
   private sessionDbId: string | null = null;
@@ -44,9 +67,11 @@ class Analytics {
 
     this.sessionId = this.getOrCreateSessionId();
     this.fingerprint = await this.generateFingerprint();
+    this.rememberAdParams();
 
     const sessionData = this.collectSessionData();
     await this.createOrUpdateSession(sessionData);
+    await this.persistAdParams();
 
     this.trackPageView();
     this.setupPageViewTracking();
@@ -373,6 +398,119 @@ class Analytics {
 
   getSessionDbId(): string | null {
     return this.sessionDbId;
+  }
+
+  // Liest die Ad-Parameter der AKTUELLEN URL (nicht sessionStorage).
+  private collectAdParamsFromUrl(): AdParams {
+    const urlParams = new URLSearchParams(window.location.search);
+    const out: AdParams = {};
+    for (const key of AD_PARAM_KEYS) {
+      const value = urlParams.get(key);
+      if (value && value.length <= 200) out[key] = value;
+    }
+    return out;
+  }
+
+  // Merge in sessionStorage: ein späterer Ad-Klick in derselben Session
+  // überschreibt nur die Keys, die er tatsächlich mitbringt (letzter
+  // Klick gewinnt), organische Folge-Landings löschen nichts.
+  private rememberAdParams() {
+    const fromUrl = this.collectAdParamsFromUrl();
+    if (Object.keys(fromUrl).length === 0) return;
+    try {
+      const existing = JSON.parse(sessionStorage.getItem(AD_PARAMS_KEY) || '{}');
+      sessionStorage.setItem(AD_PARAMS_KEY, JSON.stringify({ ...existing, ...fromUrl }));
+    } catch {
+      // sessionStorage gesperrt (Safari private mode) — Attribution entfällt.
+    }
+  }
+
+  // Klick-IDs + utm_term/utm_content auf die Session-Zeile schreiben.
+  // Bewusst als SEPARATES best-effort Update statt im Insert: so entstehen
+  // Sessions auch dann, wenn die Spalten-Migration (20260814090000) noch
+  // nicht appliziert ist — es fehlt dann nur die Attribution, nicht die
+  // ganze Session.
+  private async persistAdParams() {
+    if (!this.sessionDbId) return;
+    const params = this.collectAdParamsFromUrl();
+    if (Object.keys(params).length === 0) return;
+    const { error } = await supabase
+      .from('analytics_sessions')
+      .update(params)
+      .eq('id', this.sessionDbId);
+    if (error) {
+      console.error('Analytics ad-param update error:', error.message);
+    }
+  }
+
+  // Für den Lead-Submit: alles, was wir in dieser Session an Ad-Parametern
+  // gesehen haben (sessionStorage überlebt die Wizard-Interaktion).
+  getAdParams(): AdParams {
+    try {
+      return JSON.parse(sessionStorage.getItem(AD_PARAMS_KEY) || '{}');
+    } catch {
+      return {};
+    }
+  }
+
+  // Letzte Events vor einer harten Navigation (Bug #33): der Sofort-Redirect
+  // ins Portal hat die supabase-js-Inserts (step_complete contact_form +
+  // conversion) in ~50 % der Fälle abgebrochen. sendBeacon überlebt die
+  // Navigation garantiert; Fallback fetch(keepalive) für Browser ohne
+  // sendBeacon. Insert passiert server-seitig in /api/analytics/critical-event.
+  trackCriticalSubmit(input: CriticalSubmitInput) {
+    if (!this.sessionDbId) {
+      console.warn('[Analytics] Cannot track critical submit: no session ID');
+      return;
+    }
+    if (!this.hasAnalyticsConsent()) {
+      console.log('[Analytics] Skipping critical submit tracking - no consent');
+      return;
+    }
+
+    const payload = JSON.stringify({
+      sessionId: this.sessionDbId,
+      pagePath: window.location.pathname,
+      events: [
+        {
+          event_type: 'wizard',
+          event_name: 'step_complete',
+          event_data: {
+            step: input.step,
+            step_name: input.stepName,
+            time_on_step_seconds: input.timeOnStepSeconds,
+          },
+        },
+      ],
+      conversion: input.conversion
+        ? {
+            lead_id: input.conversion.leadId,
+            conversion_type: input.conversion.conversionType,
+            conversion_value: input.conversion.conversionValue,
+            form_data: input.conversion.formData || {},
+          }
+        : undefined,
+    });
+
+    try {
+      if (
+        typeof navigator.sendBeacon === 'function' &&
+        navigator.sendBeacon(
+          '/api/analytics/critical-event',
+          new Blob([payload], { type: 'application/json' })
+        )
+      ) {
+        return;
+      }
+    } catch {
+      // sendBeacon geworfen/abgelehnt — unten der keepalive-Fallback.
+    }
+    fetch('/api/analytics/critical-event', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: payload,
+      keepalive: true,
+    }).catch(() => {});
   }
 }
 
