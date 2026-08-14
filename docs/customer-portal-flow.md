@@ -100,6 +100,13 @@ Next.js 13 SSR, deployowane na `kostenrechner-beta.onrender.com` z brancha
 
 ### Co user wypełnia (10 kroków)
 
+> ⚠️ **Stale (stan sprzed PR #428, Funnel-Redesign 10.08.):** wizard ma dziś
+> Warm-up-Frage („Für wen suchen Sie Betreuung?", nie trackowana jako step)
+> + 8 pytań + Kontaktformular (`totalSteps = 9`); `careStartTiming` wypadł
+> z wizarda (pyta o niego patient form w CAapp). Tabela niżej opisuje
+> nadal poprawnie ZBIERANE POLA (formularDaten), ale numeracja kroków
+> jest historyczna.
+
 `project 3/components/calculator/MultiStepForm.tsx`:
 
 | # | Pole | Wartości |
@@ -114,6 +121,28 @@ Next.js 13 SSR, deployowane na `kostenrechner-beta.onrender.com` z brancha
 | 8 | `fuehrerschein` | `ja` / `nein` |
 | 9 | `geschlecht` (preferowana opiekunka, NIE płeć pacjenta) | `egal` / `weiblich` / `maennlich` |
 | 10 | Kontakt | `vorname`, `email`, `telefon`, `accept_privacy` |
+
+### Tracking Stage A (analytics_*, Bug #33)
+
+`lib/analytics.ts` pisze bezpośrednio (anon key) do `analytics_sessions` /
+`analytics_events` / `analytics_conversions`. Wizard-Events:
+`warmup_answered`, `step_view` / `step_complete` (step 1–9, step 9 =
+`contact_form`), `step_back`.
+
+- **`step_complete(9)` = ERFOLGREICHER Submit** (seit Bug #33). Feuert nicht
+  mehr in `handleNext` (dort feuerte es auch bei fehlgeschlagener
+  Validierung), sondern nach Server-Erfolg in `handleSubmit` — zusammen mit
+  der `angebot_angefordert`-Conversion in EINEM `navigator.sendBeacon` an
+  `/api/analytics/critical-event` (Fallback `fetch keepalive`). Grund: der
+  Sofort-Redirect ins Portal killte vorher ~50 % dieser Inserts.
+- **Redirect ist GTM-sicher:** `dataLayer.push('angebot_erfolgreich')` mit
+  `eventCallback` + `eventTimeout: 700` + Safety-`setTimeout(900)` vor
+  `window.location.assign` — der Google-Ads-Conversion-Tag (GTM) bekommt
+  Zeit zu feuern, Adblocker blockieren nur den Tag, nie den Redirect.
+- **Ad-Parameter:** `gclid`/`wbraid`/`gbraid`/`utm_term`/`utm_content` aus
+  der Landing-URL landen per best-effort Update auf `analytics_sessions`
+  (utm_source/medium/campaign standen schon im Insert) + in sessionStorage
+  `_prim_ad_params` für den Lead-Submit. Setup: [google-ads-tracking.md](google-ads-tracking.md).
 
 **Czego kalkulator NIE zbiera** (ważne — dlatego onboard wstrzykuje defaulty,
 a patient form w CAapp dopełnia później):
@@ -235,7 +264,21 @@ mamamia_onboarded_at  timestamptz NULL
 -- follow-up discovery (Bug #25, cron detect-caregiver-events)
 mamamia_jobs_checked_at timestamptz NULL      -- ostatnia sonda "czy Mamamia
                                               -- otworzyła nowy job?" (takt 6h)
+
+-- Google-Ads-Attribution (Bug #33, migracja 20260814090000)
+gclid                 text NULL               -- Google-Klick-ID z landing-URL
+wbraid, gbraid        text NULL               -- iOS-Varianty klick-ID
 ```
+
+**Klick-IDs (Bug #33):** `MultiStepForm` schickt beim Submit
+`adParams` (sessionStorage `_prim_ad_params`, befüllt von
+`lib/analytics.ts` aus der Landing-URL). Die Route allowlistet
+`gclid`/`wbraid`/`gbraid` (≤200 Zeichen) und schreibt sie als
+**separates best-effort Update** nach `findOrCreateLead` — Lead-Erstellung
+scheitert nie an fehlenden Spalten, Re-Submit mit neuer Klick-ID
+überschreibt (letzter Klick gewinnt). Zweck: Offline-Conversion-Import
+qualifizierter Leads zu Google Ads — Setup-Anleitung in
+[google-ads-tracking.md](google-ads-tracking.md).
 
 **Status `folge_einsatz` (Bug #25):** ustawiany WYŁĄCZNIE przez fazę discovery
 crona detect — lead z zamkniętym statusem (`vertrag_abgeschlossen` /
