@@ -21,13 +21,39 @@ export const LOGIN_CUSTOMER_ID = Deno.env.get("GOOGLE_ADS_LOGIN_CUSTOMER_ID") ??
 export const QUALIFIED_LEAD_ACTION = Deno.env.get("GOOGLE_ADS_QUALIFIED_LEAD_ACTION") ??
   `customers/${CUSTOMER_ID}/conversionActions/7720728390`;
 
-export function readSecrets(): GoogleAdsSecrets | null {
-  const developerToken = Deno.env.get("GOOGLE_ADS_DEVELOPER_TOKEN") ?? "";
-  const clientId = Deno.env.get("GOOGLE_OAUTH_CLIENT_ID") ?? "";
-  const clientSecret = Deno.env.get("GOOGLE_OAUTH_CLIENT_SECRET") ?? "";
-  const refreshToken = Deno.env.get("GOOGLE_OAUTH_REFRESH_TOKEN") ?? "";
-  if (!developerToken || !clientId || !clientSecret || !refreshToken) return null;
-  return { developerToken, clientId, clientSecret, refreshToken };
+// Secrets: Env zuerst (falls jemand sie doch als Function-Secrets setzt),
+// sonst Supabase Vault via RPC get_google_ads_secrets (Migration
+// 20260814122000). Hintergrund: das CLI-Token darf auf diesem Projekt
+// keine Function-Env-Secrets setzen (403) — der Vault ist der Weg, den
+// auch get_smtp_config nutzt. Fehlen beide Quellen → null (Function
+// skippt inert, z. B. Staging).
+export async function readSecrets(
+  supabase: { rpc: (fn: string) => PromiseLike<{ data: unknown; error: { message: string } | null }> },
+): Promise<GoogleAdsSecrets | null> {
+  const fromEnv: GoogleAdsSecrets = {
+    developerToken: Deno.env.get("GOOGLE_ADS_DEVELOPER_TOKEN") ?? "",
+    clientId: Deno.env.get("GOOGLE_OAUTH_CLIENT_ID") ?? "",
+    clientSecret: Deno.env.get("GOOGLE_OAUTH_CLIENT_SECRET") ?? "",
+    refreshToken: Deno.env.get("GOOGLE_OAUTH_REFRESH_TOKEN") ?? "",
+  };
+  if (fromEnv.developerToken && fromEnv.clientId && fromEnv.clientSecret && fromEnv.refreshToken) {
+    return fromEnv;
+  }
+
+  const { data, error } = await supabase.rpc("get_google_ads_secrets");
+  if (error) {
+    console.warn("get_google_ads_secrets RPC:", error.message);
+    return null;
+  }
+  const v = (data ?? {}) as Record<string, unknown>;
+  const s: GoogleAdsSecrets = {
+    developerToken: typeof v.developerToken === "string" ? v.developerToken : "",
+    clientId: typeof v.clientId === "string" ? v.clientId : "",
+    clientSecret: typeof v.clientSecret === "string" ? v.clientSecret : "",
+    refreshToken: typeof v.refreshToken === "string" ? v.refreshToken : "",
+  };
+  if (!s.developerToken || !s.clientId || !s.clientSecret || !s.refreshToken) return null;
+  return s;
 }
 
 export async function fetchAccessToken(s: GoogleAdsSecrets): Promise<string> {

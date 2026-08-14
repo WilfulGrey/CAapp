@@ -105,9 +105,12 @@ category QUALIFIED_LEAD, ONE_PER_CLICK, 90-Tage-Fenster — angelegt
   permanent_failure mit Fehlercode); Leads ohne Zeile = offen, werden
   täglich erneut versucht (z. B. TOO_RECENT_CLICK). 6h-Mindestabstand
   zum Event ist eingebaut.
-- Secrets (nur Prod): `GOOGLE_ADS_DEVELOPER_TOKEN`,
-  `GOOGLE_OAUTH_CLIENT_ID/_SECRET/_REFRESH_TOKEN` — fehlen sie
-  (Staging), antwortet die Function 200 `{skipped}`.
+- Secrets (nur Prod) liegen im **Supabase Vault**
+  (`google_ads_developer_token`, `google_oauth_client_id/_secret`,
+  `google_oauth_refresh_token`), gelesen über die service_role-only RPC
+  `get_google_ads_secrets()` (Migration `20260814122000`) — Function-Env
+  hätte `secrets set`-Rechte gebraucht, die das CLI-Token nicht hat.
+  Fehlen die Einträge (Staging), antwortet die Function 200 `{skipped}`.
 - Manueller Lauf / Probelauf:
   `curl -X POST -H "Authorization: Bearer <service_role_key>" -H "Content-Type: application/json" -d '{"dryRun":true}' https://ycdwtrklpoqprabtwahi.supabase.co/functions/v1/upload-offline-conversions`
 

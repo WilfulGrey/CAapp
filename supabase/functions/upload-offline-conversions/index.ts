@@ -84,13 +84,13 @@ Deno.serve(async (req: Request) => {
     // leerer Body ist ok (Cron schickt {})
   }
 
-  const secrets = readSecrets();
+  const supabase = createClient(Deno.env.get("SUPABASE_URL")!, serviceKey);
+
+  const secrets = await readSecrets(supabase);
   if (!secrets) {
-    console.log("upload-offline-conversions: Google-Secrets fehlen — skip (Staging?)");
+    console.log("upload-offline-conversions: Google-Secrets fehlen (Env+Vault) — skip (Staging?)");
     return json(200, { skipped: "google secrets not configured" });
   }
-
-  const supabase = createClient(Deno.env.get("SUPABASE_URL")!, serviceKey);
   const sinceIso = new Date(Date.now() - LOOKBACK_DAYS * 86_400_000).toISOString();
 
   // 1) Erstes patient_data_saved je Lead im Klick-Fenster

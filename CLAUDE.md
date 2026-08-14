@@ -1149,12 +1149,18 @@ Podstawowe secrets (NIGDY nie commitować):
 - `MAMAMIA_AUTH_ENDPOINT` / `MAMAMIA_ENDPOINT`
 - `SESSION_JWT_SECRET`
 - `OPENAI_API_KEY` (jeśli używamy)
-- `GOOGLE_ADS_DEVELOPER_TOKEN` + `GOOGLE_OAUTH_CLIENT_ID` /
-  `GOOGLE_OAUTH_CLIENT_SECRET` / `GOOGLE_OAUTH_REFRESH_TOKEN` — nur PROD,
-  für `upload-offline-conversions` (Google-Ads-Offline-Upload; Quelle:
-  `.google.secrets` bei Martin). Staging bewusst OHNE → Function skippt.
-  Optionale Overrides: `GOOGLE_ADS_CUSTOMER_ID`, `GOOGLE_ADS_LOGIN_CUSTOMER_ID`,
-  `GOOGLE_ADS_QUALIFIED_LEAD_ACTION` (Defaults im Code = Prod-Konto).
+- Google-Ads-Zugänge für `upload-offline-conversions` liegen **im Supabase
+  VAULT** (nicht als Function-Env — das CLI-Token darf `secrets set` auf
+  diesem Projekt nicht, 403): `google_ads_developer_token`,
+  `google_oauth_client_id`, `google_oauth_client_secret`,
+  `google_oauth_refresh_token`. Zugriff via RPC `get_google_ads_secrets()`
+  (Migration 20260814122000, service_role-only — Muster wie
+  `get_smtp_config`). Quelle der Werte: `.google.secrets` bei Martin;
+  einspielen per Management-API-SQL (`vault.create_secret`/`update_secret`),
+  NIE über Migrationen. Staging bewusst ohne Vault-Einträge → Function
+  skippt. Env-Overrides (optional, Function liest Env zuerst):
+  `GOOGLE_ADS_DEVELOPER_TOKEN`, `GOOGLE_OAUTH_*`, `GOOGLE_ADS_CUSTOMER_ID`,
+  `GOOGLE_ADS_LOGIN_CUSTOMER_ID`, `GOOGLE_ADS_QUALIFIED_LEAD_ACTION`.
 
 ### DEBUG_PROXY
 
