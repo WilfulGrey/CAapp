@@ -20,20 +20,22 @@ Migration: `supabase/migrations/20260814090000_ad_click_ids.sql`
 (nullable-Spalten; Code ist fail-soft, aber ohne Migration fehlt die
 Attribution).
 
-## Schritt 1 — UTM-Suffix im Ads-Konto (Martin, ~5 Min)
+## Schritt 1 — UTM-Suffix im Ads-Konto (ERLEDIGT 14.08., via API)
 
-Google Ads → Konto-Ebene (oder pro Kampagne) → **Einstellungen →
-Kampagnen-URL-Optionen → Suffix der finalen URL**:
+Auf KONTO-Ebene (customer.final_url_suffix, Konto 924-028-6999) gesetzt:
 
 ```
 utm_source=google&utm_medium=cpc&utm_campaign={campaignid}&utm_term={keyword}&utm_content={creative}
 ```
 
-- Suffix, NICHT Tracking-Vorlage — bricht paralleles Tracking nicht.
-- Auto-Tagging (`gclid`) eingeschaltet lassen (Konto-Einstellung
-  „Automatisches Tagging" = Ja) — der Code liest `gclid` zusätzlich.
-- Wirkung sofort ab Speichern; ab dann sind Ads-Sessions in
-  `analytics_sessions` an `utm_medium='cpc'` erkennbar.
+- Suffix, NICHT Tracking-Vorlage — bricht paralleles Tracking nicht;
+  gilt automatisch für alle (auch künftige) Kampagnen, solange keine
+  Kampagne ein eigenes Suffix setzt.
+- Auto-Tagging (`gclid`) war bereits aktiv — der Code liest `gclid`
+  zusätzlich (PR #444).
+- Ab sofort sind Ads-Sessions in `analytics_sessions` an
+  `utm_medium='cpc'` erkennbar; `utm_campaign` trägt die Kampagnen-ID
+  (Mapping auf Namen per API/GAQL).
 
 ## Schritt 2 — Bestehenden GTM-Tag erweitern (Martin, ~10 Min)
 
@@ -81,23 +83,36 @@ an den Sofort-Redirect. Nach dem Merge ist mit einem SPRUNG der
 gemeldeten Ads-Conversions zu rechnen (Mess-Artefakt, kein echter
 Anstieg — bei Vergleichen berücksichtigen).
 
-## Schritt 3 (Ausbaustufe) — Offline-Import qualifizierter Leads
+## Schritt 3 — Offline-Import qualifizierter Leads (AUTOMATISIERT seit 14.08.)
 
-Sobald Klick-IDs auf `leads` liegen: `patient_data_saved`-Leads (=
-qualifiziert) mit `gclid` als zweite Conversion-Aktion „Qualifizierter
-Lead" importieren — CSV-Upload (Google Ads → Ziele → Conversions →
-Uploads) oder später Google Ads API. Query-Basis:
+Läuft ohne manuelles Zutun: Edge Function
+`supabase/functions/upload-offline-conversions` (Cron täglich 06:20 UTC,
+Migration `20260814121000`) lädt das jeweils ERSTE `patient_data_saved`
+jedes Leads mit Klick-ID (gclid > wbraid > gbraid) per
+`uploadClickConversions` in die Conversion-Aktion
+**„Qualifizierter Lead (Patientendaten)"**
+(`customers/9240286999/conversionActions/7720728390`, type UPLOAD_CLICKS,
+category QUALIFIED_LEAD, ONE_PER_CLICK, 90-Tage-Fenster — angelegt
+14.08.2026 via API). Details:
 
-```sql
-select l.gclid, le.created_at, l.id
-from lead_events le join leads l on l.id = le.lead_id
-where le.event_type = 'patient_data_saved' and l.gclid is not null;
-```
-
-CSV-Spalten: `Google Click ID`, `Conversion Name`, `Conversion Time`
-(Format `yyyy-MM-dd HH:mm:ss+02:00`), optional `Conversion Value` +
-`Conversion Currency`. Frühestens ~4 h nach dem Klick hochladen, spätestens
-innerhalb des Klick-Fensters (90 Tage).
+- **Secondary** (`primaryForGoal=false`): erscheint in Berichten
+  („Alle Conversions"), beeinflusst Smart Bidding NICHT. Primär schalten
+  ist eine bewusste Bidding-Entscheidung (Google Ads → Ziele), erst nach
+  2–3 Wochen Datenlage.
+- Conversion-Wert = Monats-Bruttopreis aus `leads.kalkulation` (EUR),
+  Bestell-ID = `lead_id` (Google-seitige Dedup).
+- Status je Lead in `offline_conversion_uploads` (uploaded /
+  permanent_failure mit Fehlercode); Leads ohne Zeile = offen, werden
+  täglich erneut versucht (z. B. TOO_RECENT_CLICK). 6h-Mindestabstand
+  zum Event ist eingebaut.
+- Secrets (nur Prod) liegen im **Supabase Vault**
+  (`google_ads_developer_token`, `google_oauth_client_id/_secret`,
+  `google_oauth_refresh_token`), gelesen über die service_role-only RPC
+  `get_google_ads_secrets()` (Migration `20260814122000`) — Function-Env
+  hätte `secrets set`-Rechte gebraucht, die das CLI-Token nicht hat.
+  Fehlen die Einträge (Staging), antwortet die Function 200 `{skipped}`.
+- Manueller Lauf / Probelauf:
+  `curl -X POST -H "Authorization: Bearer <service_role_key>" -H "Content-Type: application/json" -d '{"dryRun":true}' https://ycdwtrklpoqprabtwahi.supabase.co/functions/v1/upload-offline-conversions`
 
 ## Messdefinitionen (für Auswertungen)
 
