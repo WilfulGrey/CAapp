@@ -5,6 +5,7 @@ import { useCalculator, formatEuro } from "@/lib/calculator-context";
 import { CircleCheck as CheckCircle2, Phone } from "lucide-react";
 import Image from "next/image";
 import { analytics } from "@/lib/analytics";
+import { cookieConsent } from "@/lib/cookie-consent";
 import { useFormTracking } from "@/hooks/use-form-tracking";
 
 // ─── Matching Animation Component ────────────────────────────────────────────
@@ -225,6 +226,54 @@ export function MultiStepForm() {
     });
     stepStartRef.current = Date.now();
   }, [currentStep]);
+
+  // CRO 15.08.: Das Cookie-Banner lädt die Seite nicht mehr neu. Der
+  // step_view des aktuellen Steps ist vor der Einwilligung am Consent-Gate
+  // abgeprallt — hier einmalig nachfeuern, sobald Analytics erlaubt wird,
+  // sonst fehlen diese Sessions im Funnel (vorher erledigte das der Reload).
+  const consentReplayedRef = useRef(false);
+  useEffect(() => {
+    const unsubscribe = cookieConsent.subscribe((consent) => {
+      if (consent.analytics && !consentReplayedRef.current) {
+        consentReplayedRef.current = true;
+        analytics.trackEvent('wizard', 'step_view', {
+          step: currentStep,
+          step_name: getStepId(currentStep),
+          replayed_after_consent: true,
+        });
+      }
+    });
+    return unsubscribe;
+    // currentStep bewusst als Dep: der Replay soll den Step melden, der beim
+    // Klick auf „Akzeptieren" wirklich sichtbar ist.
+  }, [currentStep]);
+
+  // CRO 15.08.: „Wizard wirklich gesehen" messbar machen. step_view feuert
+  // beim Mounten — auch wenn die Antwort-Buttons unter der Falz liegen
+  // (Funnel-Befund: 62 % beantworten die Warm-up-Frage nie, Clarity zeigt
+  // exakt an dieser Stelle den Scroll-Cliff 92 %→42 %). wizard_visible
+  // feuert erst, wenn das Formular zur Hälfte im Viewport war — einmal pro
+  // Session (sessionStorage-Guard, weil Mobile- und Desktop-Layout je eine
+  // Instanz rendern; die unsichtbare intersected nie).
+  useEffect(() => {
+    if (typeof IntersectionObserver === 'undefined') return;
+    const el = formRef.current;
+    if (!el) return;
+    const KEY = '_prim_wizard_visible';
+    if (sessionStorage.getItem(KEY)) return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((e) => e.isIntersecting) && !sessionStorage.getItem(KEY)) {
+          sessionStorage.setItem(KEY, '1');
+          analytics.trackEvent('wizard', 'wizard_visible', {});
+          observer.disconnect();
+        }
+      },
+      { threshold: 0.5 }
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
 
   // Step-Reihenfolge: Step 1 ist die konkrete Sachfrage "Wie viele Personen
   // benötigen Pflege?", damit der Einstieg ohne planerisches Commitment
@@ -1041,9 +1090,13 @@ export function MultiStepForm() {
                     </div>
                     <p className="text-[14px] leading-snug text-[#2F5A38]"><span className="font-semibold">5 passende Pflegekräfte</span> für Sie gefunden</p>
                   </div>
+                  {/* CRO 15.08.: Preisspanne steht im HERO (app/page.tsx),
+                      nicht hier — auf diesem Schritt sagen wir „Ihr Angebot
+                      ist fertig", eine generische Spanne daneben wirkte
+                      widersprüchlich (Martins Einwand 15.08.). */}
                   <div className="pt-1">
                     <p className="text-[16px] font-bold text-[#3D3D3D]">Wohin dürfen wir Ihr Angebot senden?</p>
-                    <p className="text-[12.5px] text-[#8B8B8B] mt-0.5">Ihr Preis &amp; 5 passende Pflegekräfte werden sofort sichtbar.</p>
+                    <p className="text-[12.5px] text-[#8B8B8B] mt-0.5">Ihr genauer Preis &amp; 5 passende Pflegekräfte werden sofort sichtbar.</p>
                   </div>
                   <div>
                     <input

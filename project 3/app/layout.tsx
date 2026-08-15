@@ -90,10 +90,13 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
   }
 
   try {
-    var consent = localStorage.getItem('cookie-consent');
-    if (consent) {
-      var prefs = JSON.parse(consent);
-      if (prefs.analytics) {
+    // Bugfix CRO 15.08.: Der Consent-Manager speichert unter
+    // 'primundus_cookie_consent' als {version, consent:{analytics,...}} —
+    // hier stand 'cookie-consent' (flach), daher lud GA4 nie.
+    var stored = localStorage.getItem('primundus_cookie_consent');
+    if (stored) {
+      var data = JSON.parse(stored);
+      if (data && data.consent && data.consent.analytics) {
         loadGoogleAnalytics();
       }
     }

@@ -31,9 +31,15 @@ export default function HomePage() {
 
       {/* Hero Section - Split Layout on Desktop */}
       <div className="w-full mb-8 lg:mb-0 lg:min-h-[90vh] lg:flex lg:items-center lg:bg-gradient-to-b lg:from-[#F8F7F5] lg:via-white lg:to-white">
-        {/* Mobile/Tablet: Stacked Layout */}
+        {/* Mobile/Tablet: Stacked Layout.
+            CRO 15.08. (Funnel-Befund): Beim Laden war KEIN Antwort-Button
+            sichtbar (erster Button bei 824px, Viewport endet bei 812px) —
+            nur 38 % der Besucher tippten überhaupt eine erste Antwort an,
+            danach liefen 95 % durch. Deshalb: Bild flacher (110px), H1
+            kompakter (24px), Wizard DIREKT unter die H1; USP-Bullets und
+            Presse-Box rutschen unter das Formular (Inhalte unverändert). */}
         <div className="lg:hidden">
-          <div className="relative w-full h-[150px] md:h-[190px] overflow-hidden mb-6 bg-[#F8F7F5]">
+          <div className="relative w-full h-[96px] md:h-[190px] overflow-hidden mb-3 bg-[#F8F7F5]">
             {/* LCP element — explicit priority + sizes so the optimizer
                 generates a mobile-sized WebP/AVIF and the browser fetches
                 it eagerly with fetchpriority="high". */}
@@ -48,9 +54,25 @@ export default function HomePage() {
             <div className="absolute inset-0 bg-gradient-to-b from-black/15 via-transparent to-transparent pointer-events-none"></div>
           </div>
           <div className="px-5 text-center mb-8">
-            <h1 className="text-[28px] md:text-[40px] leading-[1.2] font-bold text-[#3D3D3D] mb-4 tracking-tight">
+            <h1 className="text-[24px] md:text-[40px] leading-[1.2] font-bold text-[#3D3D3D] mb-2 tracking-tight">
               24-Stunden-Pflege zu Hause – die bezahlbare Alternative zum Pflegeheim
             </h1>
+            {/* CRO 15.08. (Hypothese 4, Platzierung Martin): Preisspanne als
+                Hero-Subline statt im Kontakt-Schritt. Bewusst SPANNE statt
+                „ab 2.200 €" — ein Ab-Preis ankert am Minimum und enttäuscht
+                bei jedem teureren Angebot. Wortlaut deckt sich mit der
+                öffentlichen FAQ-Antwort (faqData.ts), kein neues Versprechen. */}
+            {/* whitespace-nowrap erst ab 360px — auf 320er-Geräten (SE) darf
+                die Zeile normal umbrechen statt zu überlaufen. */}
+            <p className="text-[12.5px] leading-snug text-[#8B8B8B] mb-4 min-[360px]:whitespace-nowrap">
+              Meist <strong className="font-semibold text-[#3D3D3D]">2.200–3.500 €/Monat</strong> — Pflegekasse zahlt mit.
+            </p>
+
+            {/* Direct Form Integration — über der Falz (CRO 15.08.) */}
+            <div className="max-w-md mx-auto mb-6">
+              <MultiStepForm />
+            </div>
+
             <ul className="max-w-sm mx-auto flex flex-col gap-3 mb-5 text-left pl-2">
               <li className="flex items-center gap-3">
                 <span className="w-7 h-7 rounded-full bg-[#FBEEEA] flex items-center justify-center flex-shrink-0"><svg className="w-[16px] h-[16px] text-[#E76F63]" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" /></svg></span>
@@ -77,11 +99,6 @@ export default function HomePage() {
                   <img src="/images/media/die-welt.webp" alt="Die Welt" loading="lazy" decoding="async" className="h-[18px] object-contain opacity-80" />
                 </div>
               </div>
-            </div>
-
-            {/* Direct Form Integration */}
-            <div className="max-w-md mx-auto mb-8">
-              <MultiStepForm />
             </div>
 
             {/* USP Section */}
@@ -154,9 +171,13 @@ export default function HomePage() {
         {/* Desktop: Side-by-side Layout */}
         <div className="hidden lg:grid lg:grid-cols-[55fr_45fr] items-center max-w-[1280px] mx-auto px-8 gap-12 xl:gap-16 w-full">
           <div className="text-left">
-            <h1 className="text-[clamp(2rem,3.5vw,3rem)] leading-[1.15] font-bold text-[#3D3D3D] mb-5 tracking-tight">
+            <h1 className="text-[clamp(2rem,3.5vw,3rem)] leading-[1.15] font-bold text-[#3D3D3D] mb-3 tracking-tight">
               24-Stunden-Pflege zu Hause – die bezahlbare Alternative zum Pflegeheim
             </h1>
+            {/* CRO 15.08.: Preisspanne im Hero — gleiche Zeile wie mobil. */}
+            <p className="text-[16px] leading-snug text-[#8B8B8B] mb-5">
+              Meist <strong className="font-semibold text-[#3D3D3D]">2.200–3.500 € im Monat</strong> — die Pflegekasse zahlt einen Teil dazu.
+            </p>
             <ul className="flex flex-col gap-3 mb-6">
               <li className="flex items-center gap-3">
                 <span className="w-8 h-8 rounded-full bg-[#FBEEEA] flex items-center justify-center flex-shrink-0"><svg className="w-[18px] h-[18px] text-[#E76F63]" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" /></svg></span>

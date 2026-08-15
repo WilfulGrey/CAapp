@@ -25,17 +25,22 @@ export function CookieConsent() {
   });
 
   useEffect(() => {
-    const hasConsent = cookieConsent.hasConsent();
-    if (!hasConsent) {
-      const timer = setTimeout(() => setShowBanner(true), 1000);
-      return () => clearTimeout(timer);
+    // CRO 15.08.: sofort zeigen statt nach 1 s — vorher erschien das Banner
+    // genau dann, wenn der Besucher zu lesen begonnen hatte, und verdeckte
+    // auf Mobil 38 % des Bildschirms inkl. der ersten Wizard-Frage.
+    if (!cookieConsent.hasConsent()) {
+      setShowBanner(true);
     }
   }, []);
 
+  // CRO 15.08.: kein window.location.reload() mehr. GA/GTM hören jetzt auf
+  // das 'cookie-consent-changed'-Event (lib/cookie-consent.ts dispatcht es),
+  // und lib/analytics.ts feuert Pageview + aktuellen Wizard-Step nach
+  // Einwilligung selbst nach. Der Reload warf den Besucher an den
+  // Seitenanfang zurück und baute die App komplett neu auf.
   const handleAcceptAll = () => {
     cookieConsent.acceptAll();
     setShowBanner(false);
-    window.location.reload();
   };
 
   const handleAcceptNecessary = () => {
@@ -55,30 +60,24 @@ export function CookieConsent() {
     cookieConsent.saveConsent(preferences);
     setShowSettings(false);
     setShowBanner(false);
-    window.location.reload();
   };
 
   if (!showBanner) return null;
 
   return (
     <>
-      <div className="fixed bottom-0 left-0 right-0 z-50 bg-white border-t border-gray-200 shadow-2xl animate-in slide-in-from-bottom duration-500">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
-            <div className="flex-shrink-0">
-              <div className="w-10 h-10 bg-[#708A95]/10 rounded-full flex items-center justify-center">
-                <Cookie className="w-5 h-5 text-[#708A95]" />
-              </div>
-            </div>
-
-            <div className="flex-1 min-w-0">
-              <h3 className="text-sm font-semibold text-gray-900 mb-1">
-                Cookies & Datenschutz
-              </h3>
-              <p className="text-xs text-gray-600 leading-relaxed">
-                Wir verwenden Cookies, um Ihnen das beste Erlebnis auf unserer Website zu bieten.
-                Notwendige Cookies sind für die Funktion der Website erforderlich. Analytics-Cookies helfen
-                uns, die Nutzung zu verstehen und unseren Service zu verbessern.{" "}
+      {/* CRO 15.08.: kompaktes Banner. Vorher 307px hoch (38 % eines
+          Handy-Bildschirms) und damit genau über der ersten Wizard-Frage;
+          12 % aller Taps der Seite gingen ans Banner. Jetzt: 2-Zeilen-Text,
+          Buttons in einer Reihe, „Nur notwendige" gleichwertig sichtbar. */}
+      <div className="fixed bottom-0 left-0 right-0 z-50 bg-white border-t border-gray-200 shadow-2xl">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3">
+          <div className="flex flex-col sm:flex-row sm:items-center gap-2.5 sm:gap-4">
+            <div className="flex-1 min-w-0 flex items-start gap-2.5">
+              <Cookie className="w-4 h-4 text-[#708A95] flex-shrink-0 mt-0.5" aria-hidden="true" />
+              <p className="text-xs text-gray-600 leading-snug">
+                <span className="font-semibold text-gray-900">Cookies:</span>{" "}
+                Notwendige für die Funktion, Analytics zur Verbesserung.{" "}
                 <a
                   href="/datenschutz"
                   className="text-[#708A95] hover:underline font-medium"
@@ -90,20 +89,26 @@ export function CookieConsent() {
               </p>
             </div>
 
-            <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+            <div className="flex items-center gap-2 w-full sm:w-auto">
+              <button
+                onClick={handleOpenSettings}
+                aria-label="Cookie-Einstellungen öffnen"
+                className="flex-shrink-0 p-2 rounded-md border border-gray-300 text-gray-500 hover:bg-gray-50"
+              >
+                <Settings className="w-4 h-4" />
+              </button>
               <Button
                 variant="outline"
                 size="sm"
-                onClick={handleOpenSettings}
-                className="text-xs border-gray-300 hover:bg-gray-50"
+                onClick={handleAcceptNecessary}
+                className="flex-1 sm:flex-none text-xs border-gray-300 hover:bg-gray-50"
               >
-                <Settings className="w-3.5 h-3.5 mr-1.5" />
-                Einstellungen
+                Nur notwendige
               </Button>
               <Button
                 size="sm"
                 onClick={handleAcceptAll}
-                className="text-xs bg-[#708A95] hover:bg-[#62808A] text-white"
+                className="flex-1 sm:flex-none text-xs bg-[#708A95] hover:bg-[#62808A] text-white"
               >
                 Alle akzeptieren
               </Button>

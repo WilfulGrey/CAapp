@@ -54,6 +54,11 @@ class Analytics {
   // Events fired before createOrUpdateSession() set sessionDbId — e.g. the
   // wizard's step-1 step_view on mount. Replayed by flushPendingEvents().
   private pendingEvents: Array<() => void> = [];
+  // Guard: Pageview/consent_choice nur einmal nachholen, auch wenn der
+  // Nutzer die Einstellungen mehrfach speichert.
+  private consentReplayed = false;
+  // Scroll-Tiefe: erreichte Schwellen dieser Seite (einmal pro Pageview).
+  private scrollDepthsFired = new Set<number>();
 
   private flushPendingEvents() {
     if (this.pendingEvents.length === 0) return;
@@ -82,8 +87,23 @@ class Analytics {
         console.log('[Analytics] Analytics consent revoked, stopping tracking');
       } else {
         console.log('[Analytics] Analytics consent granted, tracking enabled');
+        // CRO 15.08.: Das Banner lädt die Seite nicht mehr neu. Alles, was
+        // vor der Einwilligung am Consent-Gate abprallte (Pageview der
+        // Landung), wird hier einmalig nachgeholt, sonst fehlte die Session
+        // im Funnel. consent_choice macht die Einwilligung selbst zählbar —
+        // Ablehnungen bleiben konsequent untrackt (kein Event ohne Consent).
+        if (!this.consentReplayed) {
+          this.consentReplayed = true;
+          this.trackPageView();
+          this.trackEvent('consent', 'consent_choice', {
+            analytics: true,
+            marketing: consent.marketing === true,
+          });
+        }
       }
     });
+
+    this.setupScrollDepthTracking();
   }
 
   private hasAnalyticsConsent(): boolean {
@@ -264,6 +284,8 @@ class Analytics {
 
       this.lastPageView = currentPath;
       this.pageViewStartTime = Date.now();
+      // Neue Seite -> Scroll-Schwellen neu zaehlen (SPA-Navigation).
+      this.scrollDepthsFired.clear();
     } catch (error) {
       console.error('Analytics page view error:', error);
     }
@@ -374,6 +396,31 @@ class Analytics {
     } catch (error) {
       console.error('[Analytics] Conversion error:', error);
     }
+  }
+
+  // CRO 15.08.: Scroll-Tiefe als Event (25/50/75/100 %). Clarity liefert die
+  // Kurve nur aggregiert im Dashboard — als analytics_event ist sie mit dem
+  // Funnel derselben Session verknüpfbar (z. B. „gescrollt, aber Warm-up nie
+  // beantwortet"). Passiv + rAF-throttled; Consent-Gate greift in trackEvent.
+  private setupScrollDepthTracking() {
+    let ticking = false;
+    const onScroll = () => {
+      if (ticking) return;
+      ticking = true;
+      requestAnimationFrame(() => {
+        ticking = false;
+        const max = document.documentElement.scrollHeight - window.innerHeight;
+        if (max <= 0) return;
+        const pct = (window.scrollY / max) * 100;
+        for (const threshold of [25, 50, 75, 100]) {
+          if (pct >= threshold && !this.scrollDepthsFired.has(threshold)) {
+            this.scrollDepthsFired.add(threshold);
+            this.trackEvent('engagement', 'scroll_depth', { depth: threshold });
+          }
+        }
+      });
+    };
+    window.addEventListener('scroll', onScroll, { passive: true });
   }
 
   private setupEventListeners() {
