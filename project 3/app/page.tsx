@@ -46,19 +46,20 @@ export default function HomePage() {
               Seitenverhältnis des Zuschnitts (843:427) -> auf JEDER Breite
               ist das komplette Bild sichtbar (375px -> 190px hoch,
               430px -> 218px). */}
-          <div className="relative w-full aspect-[843/427] overflow-hidden mb-2 bg-[#F8F7F5]">
+          <div className="relative w-full aspect-[850/427] overflow-hidden mb-2 bg-[#F8F7F5]">
             {/* LCP element — explicit priority + sizes so the optimizer
                 generates a mobile-sized WebP/AVIF and the browser fetches
                 it eagerly with fetchpriority="high". */}
-            {/* PM-Betreuung_hero_mobil.webp (Martin 15.08., 3. Iteration:
-                "man muss die Körper sehen"): Zuschnitt 843x427 = 375:190,
-                x ab 437 = RECHTS vom einmontierten Foto-Siegel, y 60-487 =
-                Köpfe bis Schoß. Kein cleanes Original vorhanden (Inpainting
-                lokal + KI-Dienste gescheitert/leer) — so bleibt das
-                Foto-Siegel sicher draußen; das Overlay-Siegel rechts ist
-                die einzige, immer ungeschnittene Instanz. */}
+            {/* PM-Betreuung_hero_mobil-v2.webp (Martin 15.08., 4. Iteration:
+                Personen zur Mitte, Siegel größer): Zuschnitt 850x427 =
+                (280,55,1130,482) aus PM-Betreuung_frontal_desktop — Köpfe
+                bis Schoß, Paar mittig. Der Rest des einmontierten
+                Foto-Siegels ragt unten links rein und wird vom
+                Overlay-Siegel exakt überdeckt. Dateiname VERSIONIEREN bei
+                jedem neuen Zuschnitt (-v3, …) — Optimizer + Browser cachen
+                per URL, sonst sieht man alte Bilder. */}
             <Image
-              src="/images/PM-Betreuung_hero_mobil.webp"
+              src="/images/PM-Betreuung_hero_mobil-v2.webp"
               alt="Professionelle 24-Stunden-Betreuung"
               fill
               priority
@@ -67,10 +68,13 @@ export default function HomePage() {
             />
             <div className="absolute inset-0 bg-gradient-to-b from-black/15 via-transparent to-transparent pointer-events-none"></div>
             {/* eslint-disable-next-line @next/next/no-img-element */}
+            {/* Siegel groesser (Martin) + BEWUSST buendig unten links: dort
+                deckt es den ins Foto einmontierten Siegel-Rest des breiteren
+                Zuschnitts vollstaendig ab (Position wie im Originalfoto). */}
             <img
               src="/images/primundus_testsieger-2021.webp"
               alt="DIE WELT Service-Champions — Nr. 1 der Pflegekräfte-Vermittler"
-              className="absolute right-3 top-1/2 -translate-y-1/2 h-[100px] w-auto rounded-[4px] shadow-md"
+              className="absolute left-0 bottom-0 h-[62%] w-auto rounded-tr-[8px] shadow-md"
             />
           </div>
           <div className="px-5 text-center mb-8">
