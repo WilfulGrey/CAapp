@@ -749,7 +749,7 @@ export function MultiStepForm() {
     <div ref={formRef} id="calculator-form" className={outerClass}>
       <div className="relative">
       <div data-calculator-card className="bg-white rounded-2xl border-[1.5px] border-[#C0C0C0] overflow-hidden shadow-md">
-        <div className={`relative px-4 sm:px-8 py-3.5 border-b-2 border-[#E5E3DF]/50 ${currentStep === totalSteps ? 'bg-[#22A06B]' : 'bg-[#E76F63]'}`}>
+        <div className={`relative px-4 sm:px-8 py-3 border-b-2 border-[#E5E3DF]/50 ${currentStep === totalSteps ? 'bg-[#22A06B]' : 'bg-[#E76F63]'}`}>
           {fullscreen && currentStep !== totalSteps && (
             <button
               type="button"
@@ -793,7 +793,7 @@ export function MultiStepForm() {
         )}
 
         {currentStep >= 1 && currentStep <= 8 && (
-          <div className="flex justify-center pt-3 pb-0">
+          <div className="flex justify-center pt-2 pb-0">
             <div className="inline-flex items-center gap-2 bg-[#F0F7F1] border border-[#A8D5B0] rounded-full pl-1.5 pr-3 py-1">
               {currentStep === 1 ? (
                 <div className="flex">
@@ -823,13 +823,13 @@ export function MultiStepForm() {
         {/* Step 9 zeigt die Headline „✅ Ihr Angebot ist fertig" jetzt direkt
             im Titel-Block (getStepTitle); separate Pill ist redundant. */}
 
-        <div id="calc-step-content" className="px-3 sm:px-6 lg:px-8 pt-4 pb-5">
+        <div id="calc-step-content" className="px-3 sm:px-6 lg:px-8 pt-3 pb-5">
           <div className="w-full">
             {/* Step 9: kleine grüne „fertig"-Pill über dem Titel, dann die
                 Frage als reguläre Step-Headline + Erklärung als italic
                 Subline (gleiches Muster wie die anderen Steps). */}
             {getStepTitle() && (
-              <h3 className="text-[20px] font-bold text-[#3D3D3D] mb-4 leading-snug min-h-[3.25rem] flex items-center justify-center text-center">
+              <h3 className="text-[20px] font-bold text-[#3D3D3D] mb-3 leading-snug min-h-[2.75rem] flex items-center justify-center text-center">
                 {getStepTitle()}
               </h3>
             )}

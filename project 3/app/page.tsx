@@ -39,19 +39,30 @@ export default function HomePage() {
             kompakter (24px), Wizard DIREKT unter die H1; USP-Bullets und
             Presse-Box rutschen unter das Formular (Inhalte unverändert). */}
         <div className="lg:hidden">
-          <div className="relative w-full h-[96px] md:h-[190px] overflow-hidden mb-3 bg-[#F8F7F5]">
+          <div className="relative w-full h-[120px] md:h-[190px] overflow-hidden mb-2 bg-[#F8F7F5]">
             {/* LCP element — explicit priority + sizes so the optimizer
                 generates a mobile-sized WebP/AVIF and the browser fetches
                 it eagerly with fetchpriority="high". */}
+            {/* PM-Betreuung_hero_mobil.webp (Martin 15.08.): eigener
+                Zuschnitt RECHTS vom einmontierten Siegel (nur die beiden
+                Personen, 840x269 = exakt 375:120) — kein cleanes Original
+                vorhanden, so ist das Foto-Siegel sicher draußen und das
+                Overlay-Siegel links ist die einzige, saubere Instanz. */}
             <Image
-              src="/images/PM-Betreuung_frontal_desktop.webp"
+              src="/images/PM-Betreuung_hero_mobil.webp"
               alt="Professionelle 24-Stunden-Betreuung"
               fill
               priority
               sizes="(max-width: 1024px) 100vw, 0px"
-              className="object-contain scale-[1.2]"
+              className="object-cover"
             />
             <div className="absolute inset-0 bg-gradient-to-b from-black/15 via-transparent to-transparent pointer-events-none"></div>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src="/images/primundus_testsieger-2021.webp"
+              alt="DIE WELT Service-Champions — Nr. 1 der Pflegekräfte-Vermittler"
+              className="absolute right-3 top-1/2 -translate-y-1/2 h-[100px] w-auto rounded-[4px] shadow-md"
+            />
           </div>
           <div className="px-5 text-center mb-8">
             <h1 className="text-[24px] md:text-[40px] leading-[1.2] font-bold text-[#3D3D3D] mb-2 tracking-tight">
@@ -62,9 +73,13 @@ export default function HomePage() {
                 „ab 2.200 €" — ein Ab-Preis ankert am Minimum und enttäuscht
                 bei jedem teureren Angebot. Wortlaut deckt sich mit der
                 öffentlichen FAQ-Antwort (faqData.ts), kein neues Versprechen. */}
-            {/* whitespace-nowrap erst ab 360px — auf 320er-Geräten (SE) darf
-                die Zeile normal umbrechen statt zu überlaufen. */}
-            <p className="text-[12.5px] leading-snug text-[#8B8B8B] mb-4 min-[360px]:whitespace-nowrap">
+            {/* Zweizeilig (Martin 15.08.): Zeile 1 = die alten USP-Punkte als
+                Satz, Zeile 2 = Preisspanne. Die Bullet-Liste unterm Formular
+                ist damit redundant und entfernt. <br> ab 360px erzwingt den
+                sauberen Umbruch; auf 320ern fließt der Text natürlich. */}
+            <p className="text-[12.5px] leading-[1.5] text-[#8B8B8B] mb-3">
+              <strong className="font-semibold text-[#3D3D3D]">Sofortangebot</strong> in 2 Minuten · kein Vertrag vor Auswahl
+              <br className="hidden min-[360px]:inline" />{' '}
               Meist <strong className="font-semibold text-[#3D3D3D]">2.200–3.500 €/Monat</strong> — Pflegekasse zahlt mit.
             </p>
 
@@ -73,20 +88,8 @@ export default function HomePage() {
               <MultiStepForm />
             </div>
 
-            <ul className="max-w-sm mx-auto flex flex-col gap-3 mb-5 text-left pl-2">
-              <li className="flex items-center gap-3">
-                <span className="w-7 h-7 rounded-full bg-[#FBEEEA] flex items-center justify-center flex-shrink-0"><svg className="w-[16px] h-[16px] text-[#E76F63]" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" /></svg></span>
-                <span className="text-[16px] leading-snug text-[#3D3D3D]"><strong className="font-semibold">Sofortangebot</strong> in 2 Minuten</span>
-              </li>
-              <li className="flex items-center gap-3">
-                <span className="w-7 h-7 rounded-full bg-[#FBEEEA] flex items-center justify-center flex-shrink-0"><svg className="w-[16px] h-[16px] text-[#E76F63]" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197m13.5-9a2.5 2.5 0 11-5 0 2.5 2.5 0 015 0z" /></svg></span>
-                <span className="text-[16px] leading-snug text-[#3D3D3D]"><strong className="font-semibold">Pflegekräfte</strong> sofort einsehen</span>
-              </li>
-              <li className="flex items-center gap-3">
-                <span className="w-7 h-7 rounded-full bg-[#FBEEEA] flex items-center justify-center flex-shrink-0"><svg className="w-[16px] h-[16px] text-[#E76F63]" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" /></svg></span>
-                <span className="text-[16px] leading-snug text-[#3D3D3D]"><strong className="font-semibold">Kein Vertrag</strong> vor Auswahl nötig</span>
-              </li>
-            </ul>
+            {/* USP-Bullets entfernt (Martin 15.08.): stecken jetzt als
+                zweizeiliger Satz unter der H1. */}
 
             {/* Presse-Logos als einziges Trust-Element, auf weißem Grund (Logos sind weiß hinterlegt) */}
             <div className="max-w-md mx-auto mb-6">
