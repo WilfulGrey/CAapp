@@ -35,20 +35,23 @@ export default function HomePage() {
             CRO 15.08. (Funnel-Befund): Beim Laden war KEIN Antwort-Button
             sichtbar (erster Button bei 824px, Viewport endet bei 812px) —
             nur 38 % der Besucher tippten überhaupt eine erste Antwort an,
-            danach liefen 95 % durch. Deshalb: Bild flacher (110px), H1
-            kompakter (24px), Wizard DIREKT unter die H1; USP-Bullets und
-            Presse-Box rutschen unter das Formular (Inhalte unverändert). */}
+            danach liefen 95 % durch. Deshalb: Wizard DIREKT unter die H1
+            (Bild 190px, H1 24px, USPs+Preis als 2-Zeilen-Subline). Bewusster
+            Trade-off (Martin 15.08.): Bildhöhe schlägt Falz — Button 3 ist
+            beim Erstbesuch hinterm Cookie-Banner, Frage + Buttons 1-2 immer
+            sichtbar; nach dem Consent-Klick (ohne Reload) alles frei. */}
         <div className="lg:hidden">
-          <div className="relative w-full h-[150px] md:h-[190px] overflow-hidden mb-2 bg-[#F8F7F5]">
+          <div className="relative w-full h-[190px] overflow-hidden mb-2 bg-[#F8F7F5]">
             {/* LCP element — explicit priority + sizes so the optimizer
                 generates a mobile-sized WebP/AVIF and the browser fetches
                 it eagerly with fetchpriority="high". */}
-            {/* PM-Betreuung_hero_mobil.webp (Martin 15.08.): eigener
-                Zuschnitt RECHTS vom einmontierten Siegel (840x336 = exakt
-                375:150, Gesichter + Schultern, "mehr von den Menschen") —
-                kein cleanes Original vorhanden, so ist das Foto-Siegel
-                sicher draußen; das Overlay-Siegel rechts ist die einzige,
-                immer ungeschnittene Instanz. */}
+            {/* PM-Betreuung_hero_mobil.webp (Martin 15.08., 3. Iteration:
+                "man muss die Körper sehen"): Zuschnitt 843x427 = 375:190,
+                x ab 437 = RECHTS vom einmontierten Foto-Siegel, y 60-487 =
+                Köpfe bis Schoß. Kein cleanes Original vorhanden (Inpainting
+                lokal + KI-Dienste gescheitert/leer) — so bleibt das
+                Foto-Siegel sicher draußen; das Overlay-Siegel rechts ist
+                die einzige, immer ungeschnittene Instanz. */}
             <Image
               src="/images/PM-Betreuung_hero_mobil.webp"
               alt="Professionelle 24-Stunden-Betreuung"
@@ -66,7 +69,7 @@ export default function HomePage() {
             />
           </div>
           <div className="px-5 text-center mb-8">
-            <h1 className="text-[24px] md:text-[40px] leading-[1.2] font-bold text-[#3D3D3D] mb-2 tracking-tight">
+            <h1 className="text-[24px] md:text-[40px] leading-[1.2] font-bold text-[#3D3D3D] mb-1.5 tracking-tight">
               24-Stunden-Pflege zu Hause – die bezahlbare Alternative zum Pflegeheim
             </h1>
             {/* CRO 15.08. (Hypothese 4, Platzierung Martin): Preisspanne als
@@ -78,7 +81,7 @@ export default function HomePage() {
                 Satz, Zeile 2 = Preisspanne. Die Bullet-Liste unterm Formular
                 ist damit redundant und entfernt. <br> ab 360px erzwingt den
                 sauberen Umbruch; auf 320ern fließt der Text natürlich. */}
-            <p className="text-[12.5px] leading-[1.5] text-[#8B8B8B] mb-3">
+            <p className="text-[12.5px] leading-[1.5] text-[#8B8B8B] mb-2.5">
               <strong className="font-semibold text-[#3D3D3D]">Sofortangebot</strong> in 2 Minuten · kein Vertrag vor Auswahl
               <br className="hidden min-[360px]:inline" />{' '}
               Meist <strong className="font-semibold text-[#3D3D3D]">2.200–3.500 €/Monat</strong> — Pflegekasse zahlt mit.
