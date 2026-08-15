@@ -1662,26 +1662,23 @@ export function buildWarumPrimundusHtml(lead: Lead, portalUrl: string, siteUrl: 
       </tr>
     </table>`;
 
+  // Nutzen-first statt Anbieter-Lob (Martin, 14.08.): jeder Punkt beginnt
+  // mit dem, was der Kunde davon hat; Vertragsvorteile eingewoben.
+  // Bestpreis-Garantie bewusst raus („scheint nicht zu ziehen"); Punkt 1
+  // betont den Bestand („Tausende bewährte Pflegekräfte"), nicht Features.
   const uspBlock =
-    usp("Testsieger DIE WELT", "Ausgezeichnet für Preis, Qualität &amp; Kundenservice.") +
-    usp("Direktanbieter mit über 60.000 erfolgreichen Einsätzen", "Wir vermitteln nicht — wir sind der Anbieter. Ohne Zwischenhändler-Kette.") +
-    usp("Bestpreis-Garantie", "Erhalten Sie bei vergleichbarer Qualifikation und Leistung ein günstigeres Angebot, unterbieten wir es.");
+    usp("Sie wissen vorher, wer ins Haus kommt.", "Tausende bewährte Pflegekräfte in unserem Bestand &mdash; Sie sehen vorab, wer die Betreuung übernehmen möchte, und entscheiden in Ruhe.") +
+    usp("Sie binden sich nicht.", "Kein Vertrag vor Auswahl, täglich kündbar, tagesgenaue Abrechnung &mdash; Kosten erst ab Anreise der Pflegekraft.") +
+    usp("Sie zahlen nie zu viel.", "Keine Vermittlungsgebühren &mdash; als Direktanbieter sparen wir die Vermittler-Provision: Die Pflegekraft verdient mehr, und Sie zahlen trotzdem weniger.") +
+    usp("Sie sind nie allein.", "Persönlicher Ansprechpartner 7 Tage die Woche &mdash; mit der Erfahrung aus über 60.000 Einsätzen, ausgezeichnet als Testsieger von DIE WELT.");
 
   const content = `
     <p style="font-size:15px;line-height:1.75;color:#444;margin-bottom:14px;">${greeting},</p>
-    <p style="font-size:15px;line-height:1.75;color:#444;margin-bottom:18px;">Sie vergleichen gerade verschiedene Anbieter für die 24-Stunden-Betreuung? Dann lohnt sich ein kurzer Blick darauf, was Primundus auszeichnet:</p>
+    <p style="font-size:15px;line-height:1.75;color:#444;margin-bottom:18px;">Sie vergleichen gerade Anbieter für die 24-Stunden-Betreuung? Dann zählt am Ende nur, was Sie davon haben:</p>
     ${uspBlock}
-    <div style="margin:18px 0;padding:16px 18px;background:#FAF8F4;border:1px solid #e8ddd0;border-radius:12px;">
-      <p style="margin:0;font-size:14px;line-height:1.7;color:#444;"><strong style="color:#2D1F0F;">Warum wir günstiger sein können:</strong> Als Direktanbieter sparen wir die Vermittler-Provisionen, die in Deutschland sonst üblich sind. Das Ergebnis: Die Pflegekraft verdient <strong style="color:#2D1F0F;">mehr</strong> — und Sie zahlen <strong style="color:#2D1F0F;">weniger</strong>.</p>
-    </div>
     ${buildHeimVergleichBoxHtml(lead)}
     ${bulletproofButton(portalUrl, "Pflegekräfte im Portal ansehen →")}
-    <div style="font-size:12px;color:#888;line-height:1.8;margin:0 0 18px;text-align:center;">
-      <span style="color:#2D6A4F;font-weight:600;">✓ Keine Vertragsbindung</span>&ensp;&middot;&ensp;
-      <span style="color:#2D6A4F;font-weight:600;">✓ Tagesgenaue Abrechnung</span>&ensp;&middot;&ensp;
-      <span style="color:#2D6A4F;font-weight:600;">✓ Kosten erst bei Anreise</span>
-    </div>
-    <p style="font-size:14px;line-height:1.65;color:#555;margin:0 0 4px;">Fragen zum Preis oder zur Bestpreis-Garantie? Rufen Sie uns gerne <a href="tel:+4989200000830" style="color:#0066CC;text-decoration:none;white-space:nowrap;">direkt an</a> oder schreiben Sie per <a href="https://wa.me/4989200000830" style="color:#25D366;text-decoration:none;font-weight:600;white-space:nowrap;">WhatsApp</a> — oder antworten Sie einfach auf diese E-Mail.</p>
+    <p style="font-size:14px;line-height:1.65;color:#555;margin:0 0 4px;">Fragen zum Preis oder zur Betreuung? Rufen Sie mich gerne <a href="tel:+4989200000830" style="color:#0066CC;text-decoration:none;white-space:nowrap;">direkt an</a> oder schreiben Sie per <a href="https://wa.me/4989200000830" style="color:#25D366;text-decoration:none;font-weight:600;white-space:nowrap;">WhatsApp</a> &mdash; oder antworten Sie einfach auf diese E-Mail.</p>
     ${buildIlkaSig(siteUrl)}`;
 
   return buildEmailWrapper(lead, siteUrl, content);
@@ -1691,19 +1688,16 @@ export function buildWarumPrimundusText(lead: Lead, portalUrl: string): string {
   const greeting = buildHalloAnrede(lead.anrede_text || null, lead.nachname || "", lead.vorname || "");
   return `${greeting},
 
-Sie vergleichen gerade verschiedene Anbieter für die 24-Stunden-Betreuung? Dann lohnt sich ein kurzer Blick darauf, was Primundus auszeichnet:
+Sie vergleichen gerade Anbieter für die 24-Stunden-Betreuung? Dann zählt am Ende nur, was Sie davon haben:
 
-✓ Testsieger DIE WELT — ausgezeichnet für Preis, Qualität & Kundenservice.
-✓ Direktanbieter mit über 60.000 erfolgreichen Einsätzen — wir vermitteln nicht, wir sind der Anbieter. Ohne Zwischenhändler-Kette.
-✓ Bestpreis-Garantie — erhalten Sie bei vergleichbarer Qualifikation und Leistung ein günstigeres Angebot, unterbieten wir es.
-
-Warum wir günstiger sein können: Als Direktanbieter sparen wir die Vermittler-Provisionen, die in Deutschland sonst üblich sind. Das Ergebnis: Die Pflegekraft verdient mehr — und Sie zahlen weniger.
+✓ Sie wissen vorher, wer ins Haus kommt. Tausende bewährte Pflegekräfte in unserem Bestand — Sie sehen vorab, wer die Betreuung übernehmen möchte, und entscheiden in Ruhe.
+✓ Sie binden sich nicht. Kein Vertrag vor Auswahl, täglich kündbar, tagesgenaue Abrechnung — Kosten erst ab Anreise der Pflegekraft.
+✓ Sie zahlen nie zu viel. Keine Vermittlungsgebühren — als Direktanbieter sparen wir die Vermittler-Provision: Die Pflegekraft verdient mehr, und Sie zahlen trotzdem weniger.
+✓ Sie sind nie allein. Persönlicher Ansprechpartner 7 Tage die Woche — mit der Erfahrung aus über 60.000 Einsätzen, ausgezeichnet als Testsieger von DIE WELT.
 
 ${buildHeimVergleichText(lead)}Pflegekräfte im Portal ansehen: ${portalUrl}
 
-✓ Keine Vertragsbindung  ·  ✓ Tagesgenaue Abrechnung  ·  ✓ Kosten erst bei Anreise
-
-Fragen zum Preis oder zur Bestpreis-Garantie? Rufen Sie uns gerne direkt an (089 200 000 830) oder schreiben Sie per WhatsApp (wa.me/4989200000830) — oder antworten Sie einfach auf diese E-Mail.
+Fragen zum Preis oder zur Betreuung? Rufen Sie mich gerne direkt an (089 200 000 830) oder schreiben Sie per WhatsApp (wa.me/4989200000830) — oder antworten Sie einfach auf diese E-Mail.
 
 Mit freundlichen Grüßen
 Ilka Wysocki — Pflegeberaterin
@@ -1805,7 +1799,7 @@ Deno.serve(async (req: Request) => {
           case "eingangsbestaetigung": return { subject: "Ihr persönliches Angebot zur 24-Stunden-Betreuung", html: buildEingangsbestaetigungHtml(lead as Lead, site, portalBase), text: buildEingangsbestaetigungText(lead as Lead, portalBase) };
           case "profil_nudge_1": return { subject: "Pflegekräfte können sich noch nicht bei Ihnen bewerben", html: buildProfilNudge1Html(lead as Lead, site, portalBase), text: buildProfilNudge1Text(lead as Lead, site, portalBase) };
           case "profil_nudge_2": return { subject: "Profil unvollständig — Sie können noch keine Bewerbungen erhalten", html: buildProfilNudge2Html(lead as Lead, site, portalBase), text: buildProfilNudge2Text(lead as Lead, site, portalBase) };
-          case "warum_primundus": return { subject: "Kennen Sie die Primundus-Bestpreis-Garantie?", html: buildWarumPrimundusHtml(lead as Lead, withMailMark(pu, "wp"), site), text: buildWarumPrimundusText(lead as Lead, withMailMark(pu, "wp")) };
+          case "warum_primundus": return { subject: "Warum Familien sich für Primundus entscheiden", html: buildWarumPrimundusHtml(lead as Lead, withMailMark(pu, "wp"), site), text: buildWarumPrimundusText(lead as Lead, withMailMark(pu, "wp")) };
           case "nachfass_2": return { subject: "Ihre Betreuung — kann ich Ihnen etwas abnehmen?", html: buildNachfass2Html(lead as Lead, site, portalBase, ms), text: buildNachfass2Text(lead as Lead, site, portalBase, ms) };
           case "nachfass_3": return { subject: "Eine letzte Frage — wie schaut's bei Ihnen aus?", html: buildNachfass3Html(lead as Lead, site), text: buildNachfass3Text(lead as Lead, site) };
           case "profil_nudge_3": return { subject: "Können wir Sie bei etwas unterstützen?", html: buildProfilNudge3Html(lead as Lead, site, portalBase), text: buildProfilNudge3Text(lead as Lead, site, portalBase) };
