@@ -39,15 +39,16 @@ export default function HomePage() {
             kompakter (24px), Wizard DIREKT unter die H1; USP-Bullets und
             Presse-Box rutschen unter das Formular (Inhalte unverändert). */}
         <div className="lg:hidden">
-          <div className="relative w-full h-[120px] md:h-[190px] overflow-hidden mb-2 bg-[#F8F7F5]">
+          <div className="relative w-full h-[150px] md:h-[190px] overflow-hidden mb-2 bg-[#F8F7F5]">
             {/* LCP element — explicit priority + sizes so the optimizer
                 generates a mobile-sized WebP/AVIF and the browser fetches
                 it eagerly with fetchpriority="high". */}
             {/* PM-Betreuung_hero_mobil.webp (Martin 15.08.): eigener
-                Zuschnitt RECHTS vom einmontierten Siegel (nur die beiden
-                Personen, 840x269 = exakt 375:120) — kein cleanes Original
-                vorhanden, so ist das Foto-Siegel sicher draußen und das
-                Overlay-Siegel links ist die einzige, saubere Instanz. */}
+                Zuschnitt RECHTS vom einmontierten Siegel (840x336 = exakt
+                375:150, Gesichter + Schultern, "mehr von den Menschen") —
+                kein cleanes Original vorhanden, so ist das Foto-Siegel
+                sicher draußen; das Overlay-Siegel rechts ist die einzige,
+                immer ungeschnittene Instanz. */}
             <Image
               src="/images/PM-Betreuung_hero_mobil.webp"
               alt="Professionelle 24-Stunden-Betreuung"
