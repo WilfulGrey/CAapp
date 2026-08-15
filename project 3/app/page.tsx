@@ -50,7 +50,7 @@ export default function HomePage() {
             {/* LCP element — explicit priority + sizes so the optimizer
                 generates a mobile-sized WebP/AVIF and the browser fetches
                 it eagerly with fetchpriority="high". */}
-            {/* PM-Betreuung_hero_mobil-v2.webp (Martin 15.08., 4. Iteration:
+            {/* PM-Betreuung_hero_mobil-v3.webp (Martin 15.08., 5. Iteration:
                 Personen zur Mitte, Siegel größer): Zuschnitt 850x427 =
                 (280,55,1130,482) aus PM-Betreuung_frontal_desktop — Köpfe
                 bis Schoß, Paar mittig. Der Rest des einmontierten
@@ -59,7 +59,7 @@ export default function HomePage() {
                 jedem neuen Zuschnitt (-v3, …) — Optimizer + Browser cachen
                 per URL, sonst sieht man alte Bilder. */}
             <Image
-              src="/images/PM-Betreuung_hero_mobil-v2.webp"
+              src="/images/PM-Betreuung_hero_mobil-v3.webp"
               alt="Professionelle 24-Stunden-Betreuung"
               fill
               priority
@@ -68,13 +68,13 @@ export default function HomePage() {
             />
             <div className="absolute inset-0 bg-gradient-to-b from-black/15 via-transparent to-transparent pointer-events-none"></div>
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            {/* Siegel groesser (Martin) + BEWUSST buendig unten links: dort
-                deckt es den ins Foto einmontierten Siegel-Rest des breiteren
-                Zuschnitts vollstaendig ab (Position wie im Originalfoto). */}
+            {/* Siegel moderat (Martin 15.08.: 62% buendig war "zu extrem"),
+                mit Abstand unten links — die Ecke darunter ist in v3
+                wegretuschiert (weicher Decken-Verlauf), kein Doppel-Siegel. */}
             <img
               src="/images/primundus_testsieger-2021.webp"
               alt="DIE WELT Service-Champions — Nr. 1 der Pflegekräfte-Vermittler"
-              className="absolute left-0 bottom-0 h-[62%] w-auto rounded-tr-[8px] shadow-md"
+              className="absolute left-2.5 bottom-2.5 h-[52%] w-auto rounded-[5px] shadow-md"
             />
           </div>
           <div className="px-5 text-center mb-8">
