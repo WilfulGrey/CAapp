@@ -41,7 +41,12 @@ export default function HomePage() {
             beim Erstbesuch hinterm Cookie-Banner, Frage + Buttons 1-2 immer
             sichtbar; nach dem Consent-Klick (ohne Reload) alles frei. */}
         <div className="lg:hidden">
-          <div className="relative w-full h-[190px] overflow-hidden mb-2 bg-[#F8F7F5]">
+          {/* aspect statt fester Höhe (Martin 15.08.: auf breiteren Handys
+              schnitt object-cover unten den Kopf ab): Container = exaktes
+              Seitenverhältnis des Zuschnitts (843:427) -> auf JEDER Breite
+              ist das komplette Bild sichtbar (375px -> 190px hoch,
+              430px -> 218px). */}
+          <div className="relative w-full aspect-[843/427] overflow-hidden mb-2 bg-[#F8F7F5]">
             {/* LCP element — explicit priority + sizes so the optimizer
                 generates a mobile-sized WebP/AVIF and the browser fetches
                 it eagerly with fetchpriority="high". */}
