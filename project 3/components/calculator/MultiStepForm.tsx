@@ -844,17 +844,17 @@ export function MultiStepForm() {
                   abgefragt (PatientForm.startDate). */}
               {/* Warm-up (nicht mitgesendet): trivialer Einstieg vor der ersten
                   echten Frage — Antwort setzt nur warmupAudience. */}
-              {/* CRO 15.08. (Martin): nur noch ZWEI Antworten — der dritte
-                  Button lag beim Erstbesuch hinterm Cookie-Banner. „Für
-                  jemand anderen" (10 % der Klicks) ist in Option 2
-                  aufgegangen; die Antwort wird nirgends hingesendet, nur
-                  als warmup_answered getrackt (neuer Wert
-                  'selbst-oder-andere' = Zeitreihen-Bruch am Deploy-Tag). */}
+              {/* CRO 15.08. (Martin): nur noch ZWEI Antworten ("die beiden
+                  reichen ja") — der dritte Button lag beim Erstbesuch
+                  hinterm Cookie-Banner. Werte 'angehoerige'/'selbst' sind
+                  die historischen (Zeitreihe kompatibel), nur 'andere'
+                  entfällt; die Antwort wird nirgends hingesendet, nur als
+                  warmup_answered getrackt. */}
               {currentStep === 1 && !warmupAudience && (
                 <div className="grid grid-cols-1 gap-2.5">
                   {[
                     { value: 'angehoerige', label: 'Für eine:n Angehörige:n' },
-                    { value: 'selbst-oder-andere', label: 'Für mich oder jemand anderen' },
+                    { value: 'selbst', label: 'Für mich' },
                   ].map(({ value, label }) => (
                     <button
                       key={value}

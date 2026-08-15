@@ -91,10 +91,11 @@ export default function HomePage() {
                 Satz, Zeile 2 = Preisspanne. Die Bullet-Liste unterm Formular
                 ist damit redundant und entfernt. <br> ab 360px erzwingt den
                 sauberen Umbruch; auf 320ern fließt der Text natürlich. */}
-            <p className="text-[12.5px] leading-[1.5] text-[#8B8B8B] mb-2.5">
-              <strong className="font-semibold text-[#3D3D3D]">Sofortangebot</strong> in 2 Minuten · kein Vertrag vor Auswahl
-              <br className="hidden min-[360px]:inline" />{' '}
-              Meist <strong className="font-semibold text-[#3D3D3D]">2.200–3.500 €/Monat</strong> — Pflegekasse zahlt mit.
+            {/* 14px + dunkleres Grau (Martin 15.08.: 12.5px/#8B8B8B war
+                "zu klein, zu grau, kann man nicht lesen"). */}
+            <p className="text-[14px] leading-snug text-[#5B5B5B] mb-2.5">
+              <strong className="font-semibold text-[#3D3D3D]">Sofortangebot</strong> in 2 Minuten · kein Vertrag vor Auswahl —{' '}
+              meist <strong className="font-semibold text-[#3D3D3D]">2.200&#8211;3.500&nbsp;€/Monat</strong>
             </p>
 
             {/* Direct Form Integration — über der Falz (CRO 15.08.) */}
