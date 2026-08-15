@@ -50,7 +50,8 @@ export default function HomePage() {
             {/* LCP element — explicit priority + sizes so the optimizer
                 generates a mobile-sized WebP/AVIF and the browser fetches
                 it eagerly with fetchpriority="high". */}
-            {/* PM-Betreuung_hero_mobil-v3.webp (Martin 15.08., 5. Iteration:
+            {/* PM-Betreuung_hero_mobil-v4.webp (Martin 15.08., 6. Iteration —
+                Personen rechts, Siegel-Zone links freigelegt):
                 Personen zur Mitte, Siegel größer): Zuschnitt 850x427 =
                 (280,55,1130,482) aus PM-Betreuung_frontal_desktop — Köpfe
                 bis Schoß, Paar mittig. Der Rest des einmontierten
@@ -59,7 +60,7 @@ export default function HomePage() {
                 jedem neuen Zuschnitt (-v3, …) — Optimizer + Browser cachen
                 per URL, sonst sieht man alte Bilder. */}
             <Image
-              src="/images/PM-Betreuung_hero_mobil-v3.webp"
+              src="/images/PM-Betreuung_hero_mobil-v4.webp"
               alt="Professionelle 24-Stunden-Betreuung"
               fill
               priority
