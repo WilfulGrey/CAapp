@@ -18,6 +18,7 @@ import nodemailer from "npm:nodemailer@6.9.10";
 import { Buffer } from "node:buffer";
 import {
   berlinDayRange,
+  fetchAgentNotes,
   fetchBookedCustomers,
   fetchDailyStats,
   fetchPeriodStats,
@@ -99,12 +100,16 @@ function parseRecipients(raw: string | undefined): string[] {
 Deno.serve(async (req: Request) => {
   // Optionaler daysAgo-Param im Body, sonst Default 1 (= gestern).
   let daysAgo = 1;
+  // dryRun: baut die Mail, sendet aber NICHT — für Vorschau/Verifikation
+  // nach Deploys, ohne die Empfänger mit Test-Mails zu fluten.
+  let dryRun = false;
   try {
     if (req.method === "POST") {
       const body = await req.json().catch(() => ({}));
       if (typeof body?.daysAgo === "number" && body.daysAgo > 0) {
         daysAgo = Math.floor(body.daysAgo);
       }
+      if (body?.dryRun === true) dryRun = true;
     }
   } catch {
     // Body parse fail ignorieren — daysAgo bleibt 1.
@@ -123,12 +128,15 @@ Deno.serve(async (req: Request) => {
   try {
     const yesterday = berlinDayRange(daysAgo);
 
-    const [yesterdayStats, periodStats, totalLeads, booked, mailHealth] = await Promise.all([
+    const [yesterdayStats, periodStats, prevPeriodStats, totalLeads, booked, mailHealth, agentNotes] = await Promise.all([
       fetchDailyStats(supabase, yesterday.start, yesterday.end),
       fetchPeriodStats(supabase, PERIOD_DAYS_BACK),
+      // Die 7 Tage VOR der Vergleichsperiode — Basis für den Trend-Pfeil.
+      fetchPeriodStats(supabase, PERIOD_DAYS_BACK, PERIOD_DAYS_BACK),
       fetchTotalLeads(supabase),
       fetchBookedCustomers(supabase),
       fetchMailHealth(supabase),
+      fetchAgentNotes(supabase, yesterday.start),
     ]);
 
     const smtp = await getSmtpConfig(supabase);
@@ -144,7 +152,16 @@ Deno.serve(async (req: Request) => {
       totalBookings: booked.totalBookings,
       siteUrl: smtp.siteUrl,
       mailHealth,
+      prevPeriod: prevPeriodStats,
+      agentNotes,
     });
+
+    if (dryRun) {
+      return new Response(
+        JSON.stringify({ ok: true, dryRun: true, date: yesterday.iso, subject, html }),
+        { status: 200, headers: { "Content-Type": "application/json" } },
+      );
+    }
 
     const result = await sendEmailSmtp(smtp, recipients, subject, html, text);
     if (!result.success) {
