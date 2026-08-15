@@ -242,9 +242,12 @@ export interface PeriodStats {
 export async function fetchPeriodStats(
   supabase: SupabaseClient,
   daysBack: number,
+  // offsetDays: 0 = letzte N Tage ab gestern; 7 = die 7 Tage DAVOR
+  // (Vorwochen-Vergleich für den Trend-Pfeil im Tagesfazit, 15.08.).
+  offsetDays = 0,
 ): Promise<PeriodStats> {
   const perDay: { label: string; stats: DailyStats }[] = [];
-  for (let i = 1; i <= daysBack; i++) {
+  for (let i = 1 + offsetDays; i <= daysBack + offsetDays; i++) {
     const r = berlinDayRange(i);
     const stats = await fetchDailyStats(supabase, r.start, r.end);
     perDay.push({ label: r.label, stats });
@@ -388,4 +391,24 @@ export async function fetchMailHealth(supabase: SupabaseClient): Promise<MailHea
       error: String(r.error_message ?? "").slice(0, 120),
     })),
   };
+}
+
+/**
+ * Notizen der SEO-/SEA-Agenten für den Report-Tag (Tabelle
+ * daily_report_notes, Migration 20260815090000). Agenten schreiben nach
+ * jedem Lauf 1-3 Kernerkenntnisse hinein; der Report nimmt alles seit
+ * Tagesbeginn des Report-Tags mit (deckt „gestern" + heutigen Morgenlauf
+ * vor Mailversand ab). Fehler wird sichtbar zurückgegeben, nicht
+ * verschluckt (Święta zasada 1).
+ */
+export interface AgentNotes { notes: Array<{ source: string; note: string }>; error?: string }
+export async function fetchAgentNotes(supabase: SupabaseClient, sinceIso: string): Promise<AgentNotes> {
+  const { data, error } = await supabase
+    .from("daily_report_notes")
+    .select("source, note, created_at")
+    .gte("created_at", sinceIso)
+    .order("created_at", { ascending: true })
+    .limit(20);
+  if (error) return { notes: [], error: error.message };
+  return { notes: (data ?? []).map((r: { source?: string; note?: string }) => ({ source: String(r.source || "?"), note: String(r.note || "") })) };
 }

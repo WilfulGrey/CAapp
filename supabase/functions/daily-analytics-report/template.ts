@@ -55,11 +55,58 @@ export function buildReportEmail(opts: {
   totalBookings: number;     // Buchungs-Vorgänge insgesamt (lifetime)
   siteUrl: string;
   mailHealth?: { failed24h: number; overduePending: number; samples: Array<{ type: string; error: string }> };
+  prevPeriod?: PeriodStats;   // die 7 Tage VOR der Vergleichsperiode (Trend)
+  agentNotes?: { notes: Array<{ source: string; note: string }>; error?: string };
 }): { subject: string; html: string; text: string } {
-  const { yesterday, period, yesterdayLabel, periodLabel, totalLeads, bookedCustomers, totalBookings, siteUrl, mailHealth } = opts;
+  const { yesterday, period, yesterdayLabel, periodLabel, totalLeads, bookedCustomers, totalBookings, siteUrl, mailHealth, prevPeriod, agentNotes } = opts;
 
   const mailAlarm = mailHealth && (mailHealth.failed24h > 0 || mailHealth.overduePending > 0);
-  const subject = `${mailAlarm ? '🚨 ' : ''}📊 Primundus Daily — ${yesterdayLabel} · ${yesterday.wizardCompleted} neue Leads`;
+
+  // Tagesfazit (Martin, 15.08.): die Mail beantwortet selbst, ob es ein
+  // guter Tag war und wohin der Trend zeigt — Klartext oben statt nur
+  // Tabellen. Maßstab: echte Leads gestern vs. 7-Tage-Schnitt; Trend:
+  // 7-Tage-Schnitt vs. die 7 Tage davor.
+  const leadsY = yesterday.wizardCompleted;
+  const leadsAvg = period.wizardCompleted.avg;
+  const verdict = leadsY >= Math.max(leadsAvg * 1.25, leadsAvg + 1)
+    ? { emoji: "✅", wort: "Guter Tag" }
+    : leadsY <= leadsAvg * 0.6
+      ? { emoji: "🔻", wort: "Schwacher Tag" }
+      : { emoji: "➖", wort: "Normaler Tag" };
+  const prevAvg = prevPeriod?.wizardCompleted.avg ?? 0;
+  const trendPct = prevAvg > 0 ? ((leadsAvg - prevAvg) / prevAvg) * 100 : 0;
+  const trend = prevAvg <= 0
+    ? { pfeil: "→", text: "kein Vorwochen-Vergleich" }
+    : trendPct > 10
+      ? { pfeil: "↗", text: `+${trendPct.toFixed(0)} % vs. Vorwoche (Ø ${leadsAvg.toFixed(1)} nach ${prevAvg.toFixed(1)} Leads/Tag)` }
+      : trendPct < -10
+        ? { pfeil: "↘", text: `${trendPct.toFixed(0)} % vs. Vorwoche (Ø ${leadsAvg.toFixed(1)} nach ${prevAvg.toFixed(1)} Leads/Tag)` }
+        : { pfeil: "→", text: `stabil (Ø ${leadsAvg.toFixed(1)} vs. ${prevAvg.toFixed(1)} Leads/Tag Vorwoche)` };
+  const profilQuoteY = leadsY > 0 ? (yesterday.patientDataSaved / leadsY) * 100 : 0;
+  const fazitPunkte: string[] = [
+    `${leadsY >= leadsAvg ? "✅" : "⚠️"} ${leadsY} neue Leads (7-T-Ø ${leadsAvg.toFixed(1)})`,
+    `${yesterday.patientDataSaved > 0 ? "✅" : "⚠️"} ${yesterday.patientDataSaved} Patientenprofil(e) ausgefüllt${leadsY > 0 ? ` — ${profilQuoteY.toFixed(0)} % der neuen Leads (Ø ${period.convProfilLead.toFixed(0)} %)` : ""}`,
+    `${yesterday.visitors >= period.visitors.avg ? "✅" : "⚠️"} ${yesterday.visitors} Besucher (Ø ${period.visitors.avg.toFixed(0)})`,
+  ];
+  const fazitHtml = `
+        <div style="margin:0 0 18px;padding:14px 16px;background:${verdict.wort === "Guter Tag" ? "#F0FAF4" : verdict.wort === "Schwacher Tag" ? "#FEF5F2" : "#FAF7F0"};border:1px solid #e8ddd0;border-radius:10px;">
+          <p style="margin:0 0 6px;font-size:15px;font-weight:700;color:#2D1F0F;">${verdict.emoji} ${verdict.wort} · Trend ${trend.pfeil} <span style="font-weight:400;color:#5C4A32;font-size:13px;">${trend.text}</span></p>
+          ${fazitPunkte.map((pt) => `<p style="margin:2px 0;font-size:13px;color:#444;">${pt}</p>`).join("")}
+        </div>`;
+  const notesHtml = (() => {
+    const n = agentNotes?.notes ?? [];
+    const inner = n.length > 0
+      ? n.map((x) => `<p style="margin:3px 0;font-size:13px;color:#444;line-height:1.6;"><strong style="color:#5C4A32;font-size:11px;text-transform:uppercase;letter-spacing:0.04em;">${x.source}</strong> &middot; ${x.note}</p>`).join("")
+      : `<p style="margin:0;font-size:13px;color:#9a8a73;">Keine Notizen der Agenten für diesen Tag.</p>`;
+    const errLine = agentNotes?.error ? `<p style="margin:6px 0 0;font-size:11px;color:#b91c1c;">Notizen nicht lesbar: ${agentNotes.error}</p>` : "";
+    return `
+        <div style="margin-top:16px;padding:14px 16px;background:#fff;border:1px solid #e8ddd0;border-radius:10px;">
+          <p style="margin:0 0 6px;font-size:13px;font-weight:700;color:#3D2B1F;">🧭 Notizen der Agenten (SEO / SEA)</p>
+          ${inner}${errLine}
+        </div>`;
+  })();
+
+  const subject = `${mailAlarm ? '🚨 ' : ''}📊 Primundus Daily — ${yesterdayLabel} · ${yesterday.wizardCompleted} neue Leads · ${verdict.wort} ${trend.pfeil}`;
 
   // Mail-Ausfall-Alarm ganz oben — der stille Reminder-Blackout (25.05.–25.06.,
   // 207 Fehlschläge) darf sich nicht wiederholen.
@@ -198,6 +245,7 @@ ${mailAlarmHtml}
       </div>
 
       <div style="padding:24px 32px;">
+        ${fazitHtml}
         <p style="margin:0 0 4px;font-size:15px;color:#555;">📊 Übersicht für <strong style="color:#2D1F0F;">${yesterdayLabel}</strong></p>
         <p style="margin:0 0 18px;font-size:12px;color:#9a8a73;">Vergleich: ${periodLabel} (Ø + Top-Tag)</p>
 
@@ -255,6 +303,7 @@ ${mailAlarmHtml}
           <strong>📊 Echte Leads im System (lifetime, ohne Tests):</strong> ${totalLeads}<br>
           <strong>🎉 Gebuchte Kunden (lifetime, distinct):</strong> ${bookedCustomers} <span style="color:#9a8a73;font-weight:400;">(${totalBookings} Buchungs-Vorgänge total)</span>
         </div>
+        ${notesHtml}
       </div>
 
       <div style="background:#f8f9fa;padding:18px 32px;border-top:1px solid #e0e0e0;text-align:center;">
@@ -270,6 +319,8 @@ ${mailAlarmHtml}
 </html>`;
 
   const text = `Primundus Daily Report — ${yesterdayLabel}
+${verdict.emoji} ${verdict.wort} · Trend ${trend.pfeil} — ${trend.text}
+${fazitPunkte.join("\n")}
 (Vergleich: ${periodLabel} Ø + Top-Tag)
 
 ${rows.map((r) => `${r.label.padEnd(50)} ${String(fmtInt(r.today)).padStart(6)}   Ø ${fmtAvg(r.avg).padStart(5)}   Top ${fmtInt(r.top).padStart(4)} (${r.topDate.slice(0, 5)})`).join("\n")}
@@ -300,6 +351,9 @@ QUELLEN (Gestern)
 
 Gesamt Leads im System:    ${totalLeads}
 Gebuchte Kunden (lifetime): ${bookedCustomers} (${totalBookings} Buchungs-Vorgänge)
+
+NOTIZEN DER AGENTEN
+${(agentNotes?.notes ?? []).length > 0 ? (agentNotes!.notes).map((x) => `  [${x.source}] ${x.note}`).join("\n") : "  (keine)"}${agentNotes?.error ? `\n  Notizen nicht lesbar: ${agentNotes.error}` : ""}
 `;
 
   return { subject, html, text };
