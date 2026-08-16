@@ -75,11 +75,25 @@ export default function HomePage() {
             <img
               src="/images/primundus_testsieger-2021.webp"
               alt="DIE WELT Service-Champions — Nr. 1 der Pflegekräfte-Vermittler"
-              className="absolute left-2.5 bottom-2.5 h-[52%] w-auto rounded-[5px] shadow-md"
+              className="absolute left-2.5 top-2.5 h-[52%] w-auto rounded-[5px] shadow-md"
             />
+            {/* Presselogos als weisser Streifen AUF der Bildunterkante
+                (Martin 16.08.: "ob man die auf das Bild mit draufpackt …
+                die haben natuerlich weissen Hintergrund"). Genau deshalb
+                ein weisser Balken: die Logos bleiben farbecht (SAT.1 und
+                die Globen sind farbig; Weissfaerben waere markenrechtlich
+                heikel und optisch schlecht). Kostet NULL Bauhoehe, weil er
+                auf dem Foto liegt — die gewonnenen ~35px gehen als Luft an
+                Ueberschrift und USP-Zeilen zurueck. */}
+            <div className="absolute inset-x-0 bottom-0 flex items-center justify-center gap-5 bg-white px-3 py-[5px]">
+              <img src="/images/media/ard.webp" alt="Bekannt aus ARD" loading="eager" decoding="async" className="h-[16px] object-contain" />
+              <img src="/images/media/ndr.webp" alt="Bekannt aus NDR" loading="eager" decoding="async" className="h-[16px] object-contain" />
+              <img src="/images/media/sat1.webp" alt="Bekannt aus SAT.1" loading="eager" decoding="async" className="h-[16px] object-contain" />
+              <img src="/images/media/die-welt.webp" alt="Bekannt aus DIE WELT" loading="eager" decoding="async" className="h-[16px] object-contain" />
+            </div>
           </div>
           <div className="px-5 text-center mb-8">
-            <h1 className="text-[22px] md:text-[40px] leading-[1.2] font-bold text-[#3D3D3D] mb-2.5 tracking-tight">
+            <h1 className="text-[24px] md:text-[40px] leading-[1.2] font-bold text-[#3D3D3D] mb-3.5 tracking-tight">
               24-Stunden-Pflege zu Hause – die bezahlbare Alternative zum Pflegeheim
             </h1>
             {/* Hero-USPs ersetzen die alte Bullet-Liste (CRO 15.08.,
@@ -99,7 +113,7 @@ export default function HomePage() {
                 bevor man irgendetwas unterschreibt. Genau das kann weder
                 Pflegehelden noch Promedica, und es stand nirgends mehr.
                 Der Preis bleibt in der FAQ und im Kontakt-Schritt. */}
-            <ul className="mx-auto mb-2.5 flex max-w-[300px] flex-col gap-[3px] text-left text-[15px] leading-tight text-[#5B5B5B]">
+            <ul className="mx-auto mb-4 flex max-w-[300px] flex-col gap-1.5 text-left text-[15px] leading-tight text-[#5B5B5B]">
               {[
                 { bold: 'Pflegekräfte sofort einsehen', rest: '' },
                 { bold: '', rest: 'Keine Vermittlungsgebühr' },
@@ -111,17 +125,6 @@ export default function HomePage() {
                 </li>
               ))}
             </ul>
-
-            {/* Presselogos in den Hero (Martin 16.08.: "die Medialogos
-                waren DER Vertrauensding") — schmaler Streifen statt eigener
-                Kasten, damit er keine Bauhöhe über der Falz frisst. Der
-                grosse "Bekannt aus"-Block weiter unten bleibt. */}
-            <div className="mx-auto mb-2.5 flex max-w-[330px] items-center justify-center gap-4 opacity-85">
-              <img src="/images/media/ard.webp" alt="Bekannt aus ARD" loading="eager" decoding="async" className="h-[13px] object-contain" />
-              <img src="/images/media/ndr.webp" alt="Bekannt aus NDR" loading="eager" decoding="async" className="h-[13px] object-contain" />
-              <img src="/images/media/sat1.webp" alt="Bekannt aus SAT.1" loading="eager" decoding="async" className="h-[13px] object-contain" />
-              <img src="/images/media/die-welt.webp" alt="Bekannt aus DIE WELT" loading="eager" decoding="async" className="h-[13px] object-contain" />
-            </div>
 
             {/* Direct Form Integration — über der Falz (CRO 15.08.) */}
             <div className="max-w-md mx-auto mb-6">
