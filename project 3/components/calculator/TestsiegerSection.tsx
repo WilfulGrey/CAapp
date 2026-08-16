@@ -1,6 +1,9 @@
 export function TestsiegerSection() {
   return (
-    <section className="py-14 md:py-16 lg:py-20 px-5 bg-[#F8F7F5]">
+    // id = Sprungziel des Siegels im mobilen Hero (app/page.tsx). Die
+    // content-checkliste verlangt zur Auszeichnung einen Beleg-Link; das
+    // Original-PDF haengt in dieser Sektion.
+    <section id="testsieger" className="scroll-mt-24 py-14 md:py-16 lg:py-20 px-5 bg-[#F8F7F5]">
       <div className="max-w-[560px] md:max-w-[700px] lg:max-w-[1000px] mx-auto">
         <div className="bg-white border-2 border-[#D4A843] rounded-2xl p-7 md:p-9 lg:p-10 relative">
           <div className="absolute top-[-14px] left-1/2 -translate-x-1/2 bg-[#D4A843] text-white px-6 py-1.5 rounded-full text-sm font-bold uppercase tracking-wide whitespace-nowrap shadow-md z-10">

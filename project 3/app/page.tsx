@@ -55,14 +55,20 @@ export default function HomePage() {
               430px -> 218px). */}
           {/* Randloser, hoher Hero statt 229px-Streifen (Martin 16.08. im
               Vergleich mit marta.de: "es ist nicht geiler, nicht schoener,
-              nicht groesser"). marta zeigt mobil ein Foto ueber ~2/3 des
-              Bildschirms, randlos, OHNE Badge. Genau das hier:
-              - aspect 1.17:1 statt 1.63:1 -> Foto fast dreimal so praesent
-              - Testsieger-Siegel RUNTER vom Foto: weder marta noch
-                Pflegehelden kleben ein Badge ins Hero-Bild, das ist ein
-                Merkmal alter Pflegeseiten und der groesste Billig-
-                Verstaerker. Der Testsieger steht weiterhin im
-                Trust-Kasten ("20+ Jahre Erfahrung & Testsieger"). */}
+              nicht groesser"): aspect 1.17:1 statt 1.63:1 -> Foto fast
+              dreimal so praesent.
+
+              SIEGEL LINKS IM FOTO (Martin 16.08.: "nur Siegel im Header
+              links wie damals"). Ich hatte es am 16.08. vom Foto genommen
+              mit dem Argument, aufgeklebte Badges seien ein Merkmal alter
+              Pflegeseiten — Martin hat das revidiert, die Entscheidung
+              steht. NICHT wieder "aufraeumen". Der Zuschnitt
+              PM-Header-Shooting_hero-v3.webp ist genau dafuer gebaut, die
+              Personen sitzen rechts.
+
+              Das Siegel ist klickbar und springt auf die Testsieger-Sektion
+              mit der Original-Veroeffentlichung als PDF — die
+              content-checkliste verlangt Beleg-Link plus sichtbares Jahr. */}
           <div className="relative w-full aspect-[1100/941] overflow-hidden bg-[#F8F7F5]">
             <Image
               src="/images/PM-Header-Shooting_hero-v3.webp"
@@ -72,134 +78,128 @@ export default function HomePage() {
               sizes="(max-width: 1024px) 100vw, 0px"
               className="object-cover"
             />
-          </div>
-          <div className="px-5 text-center mb-8 pt-6">
-            {/* EINE Botschaft statt drei Gruppen (Martin 16.08.: "bei uns
-                ist wieder in 3 Gruppen geteilt ohne richtige Botschaft —
-                was wollen wir erreichen, was bieten wir, pack das in einen
-                geilen Text").
-
-                Ziel: der Angehoerige startet den Fragebogen (87 % der
-                Warm-up-Antworten waren "fuer eine:n Angehoerige:n").
-                Unser Alleinstellungsmerkmal gegen Pflegehelden/Promedica:
-                dort fuellt man ein Formular aus und wird dann angerufen —
-                bei uns sieht man die echten Pflegekraefte MIT Foto und
-                Preis, bevor man sich bindet. Genau das ist jetzt die
-                Headline; die drei frueheren Haekchen-Zeilen (Gebuehr,
-                Vertrag, Pflegekraefte sehen) stecken im Flie\u00dftext der
-                Unterzeile, statt als eigener Block zu konkurrieren.
-
-                MENSCH STATT FEATURE (Martin 16.08.: "wuerde das den Kunden
-                ueberzeugen?" — nein). Alle bisherigen Fassungen beschrieben
-                unser PRODUKT in unserer Innensprache ("Sofortangebot",
-                "startklar in 4-7 Werktagen", "erst sehen, dann
-                entscheiden"). Die Zielgruppe — zu 87 % Angehoerige — hat
-                aber eine andere Angst als Preis oder Tempo: ein fremder
-                Mensch zieht bei den Eltern ein. Genau darauf haben wir die
-                beste Antwort im Markt, und die steht jetzt in der Headline:
-                DU entscheidest, wer es ist. Die Mechanik (2 Minuten, Foto,
-                Preis) belegt sie in der Unterzeile.
-                ACHTUNG SEO: Keyword "24-Stunden-Pflege" steht dadurch nicht
-                mehr in der H1, sondern als "24-Stunden-Betreuung" in der
-                Unterzeile — vor einem Prod-Deploy mit dem SEO-Lauf abgleichen.
-                Unterzeile loest den Schmerz statt aufzuzaehlen: bei
-                Pflegehelden/Promedica fuellt man ein Formular aus und wartet
-                auf einen Rueckruf. Gebuehr/Vertrag stehen NICHT mehr hier
-                (Martin: nicht alles zusammenpacken) — sie stehen im
-                Trust-Kasten. Keyword "24-Stunden-Pflege" bleibt in der H1. */}
-            <h1 className="text-[33px] md:text-[42px] leading-[1.14] font-bold text-[#3D3D3D] mb-3.5 tracking-tight">
-              Sie wählen, wer Ihre Eltern betreut.
-            </h1>
-            <p className="mx-auto mb-6 max-w-[335px] text-[17px] leading-snug text-[#5B5B5B]">
-              24-Stunden-Betreuung zu Hause: In 2 Minuten sehen Sie passende
-              Betreuungskräfte — mit Foto, Erfahrung und Preis.
-            </p>
-
-            {/* CTA statt Fragebogen auf der Seite (Martin 16.08., Muster von
-                marta.de: "Jetzt Betreuungskraft finden"). Der Klick oeffnet
-                den Wizard als Overlay und ueberspringt die Warm-up-Frage —
-                der Buttonklick ist jetzt der kleine erste Schritt. Damit ist
-                der Hero ruhig: Foto, Ueberschrift, drei Argumente, ein
-                Button. Desktop bleibt vorerst inline (unten). */}
-            <div className="max-w-md mx-auto mb-6">
-              <MultiStepForm mode="cta" />
-            </div>
-
-            {/* Siegel zurueck in den Hero (Martin 16.08.: "Siegel muss
-                rein") — aber als eigene Vertrauenszeile unter dem Button,
-                NICHT aufs Foto geklebt. Dort war es der groesste
-                Billig-Verstaerker; hier belegt es die Aussage, statt das
-                Motiv zu zerschneiden. */}
-            <div className="mx-auto mb-8 flex max-w-[330px] items-center justify-center gap-3">
+            <a
+              href="#testsieger"
+              className="absolute bottom-4 left-4 z-10 block"
+              aria-label="Testsieger DIE WELT 2021 — zur Original-Veröffentlichung"
+            >
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 src="/images/primundus_testsieger-2021.webp"
-                alt="DIE WELT Service-Champions 2021"
-                className="h-[52px] w-auto rounded-[4px] border border-[#ECE7DF]"
-                loading="lazy"
+                alt="Testsieger DIE WELT Service-Champions 2021"
+                className="h-[100px] w-auto drop-shadow-[0_2px_10px_rgba(0,0,0,0.25)]"
               />
-              <p className="text-left text-[13px] leading-snug text-[#5B5B5B]">
-                <strong className="font-semibold text-[#3D3D3D]">Nr. 1 der Pflegekräfte-Vermittler</strong><br />
-                Testsieger DIE WELT · 20+ Jahre Erfahrung
-              </p>
+            </a>
+          </div>
+          {/* Weisser Grund statt #F8F7F5 (Martin 16.08.). Nicht nur Optik:
+              die Medialogo-Dateien bringen eigene weisse Kaesten mit, die
+              sich auf dem warmen Ton als graue Rechtecke abzeichnen — genau
+              der Effekt, der schon am 15.08. beim Logo-Balken auffiel. Auf
+              Weiss verschwindet er. Ob die GANZE Seite auf Weiss geht, ist
+              ein eigener Schritt (betrifft jede Sektion). */}
+          <div className="bg-white px-5 pb-9 pt-6 text-left">
+            {/* DER KERN, NICHT DIE DIENSTLEISTUNG (Martin 16.08.: "warum
+                erklaeren wir die Dienstleistung, statt auf den Kern
+                einzugehen?"). Acht Fassungen davor haben die Mechanik
+                beschrieben ("Sofortangebot in 2 Minuten", "eine
+                Betreuungskraft zieht ein und ist rund um die Uhr da").
+                Der Kern ist aber die Entscheidung, vor der die Person
+                steht: Heim oder nicht.
+
+                Belegt durch die Abstimmung mit SEA/SEO (16.08.): die
+                konvertierenden Ads-Suchbegriffe sind Wettbewerber-Namen +
+                "erfahrungen" (deutsche seniorenbetreuung, marta de,
+                pflegehelden, promedica, hausengel). Wer so sucht, ist in
+                der AUSWAHLPHASE und braucht keine Erklaerung des Modells —
+                er will wissen, wem er das antun kann. 87 % der
+                Warm-up-Antworten sind "fuer eine:n Angehoerige:n"; die
+                Ansprache deckt sich mit den freigegebenen Anzeigen
+                ("Statt Pflegeheim: zuhause").
+
+                KICKER STEHT IN DER H1 (Martin: "der Kunde muss zumindest
+                einen Kontext haben, was wir anbieten" + "vielleicht auch
+                24 Stunden Pflege vom Testsieger"). Er traegt Kategorie,
+                Keyword und Vertrauensanker in EINER Zeile, und das Siegel
+                im Foto darueber belegt ihn. Damit ist die frueher hier
+                notierte SEO-Warnung erledigt: "24-Stunden-Pflege" steht
+                wieder IN der H1, nicht nur in der Unterzeile.
+
+                UNTERZEILE = Martins Wortlaut (16.08.). Sie beschreibt
+                nichts mehr, sie sagt zu, was auf den Klick folgt — fuer den
+                Vergleichs-Sucher ist genau das die neue Information.
+                "Heim" ist die Alternative, die der Kunde selbst erwaegt,
+                kein benannter Wettbewerber (§6 UWG unkritisch). */}
+            <h1 className="mb-3.5 tracking-tight text-[#3D3D3D]">
+              <span className="mb-2 block text-[11px] font-semibold uppercase tracking-[0.08em] text-[#E76F63]">
+                24-Stunden-Pflege vom Testsieger
+              </span>
+              <span className="block text-[33px] md:text-[42px] font-bold leading-[1.1]">
+                Ihre Eltern müssen nicht ins Heim.
+              </span>
+            </h1>
+            <p className="mb-6 max-w-[400px] text-[16px] leading-relaxed text-[#5B5B5B]">
+              Wir zeigen Ihnen sofort, was es kostet und welche Pflegekräfte
+              verfügbar sind – 100 % kostenfrei und unverbindlich.
+            </p>
+
+            {/* CTA statt Fragebogen auf der Seite (Martin 16.08., Muster von
+                marta.de). Der Klick oeffnet den Wizard als Overlay und
+                ueberspringt die Warm-up-Frage — der Buttonklick ist der
+                kleine erste Schritt. Buttontext = die Zusage der Unterzeile
+                und wortgleich mit den CTAs in HowItWorks und FinalCTA
+                ("Kosten & Pflegekraefte ansehen"); vorher stand hier
+                "Betreuungskraft finden" ueber einem Zaehler, der
+                "Pflegekraefte" sagt. Die drei Punkte unter dem Button
+                stecken in MultiStepForm (mode="cta").
+                Desktop bleibt vorerst inline (unten). */}
+            <div className="max-w-md mb-7">
+              <MultiStepForm mode="cta" />
             </div>
 
-            {/* USP-Bullets entfernt (Martin 15.08.): stecken jetzt als
-                zweizeiliger Satz unter der H1. */}
+            {/* Testsieger + Erfahrung als Streifen "wie im Kundenportal"
+                (Martin 16.08.) — spiegelt die Stats-Leiste aus
+                app/kalkulation/[leadId]/page.tsx. Das Siegel selbst sitzt
+                oben im Foto, hier stehen nur die Zahlen dazu.
 
-            {/* USP Section */}
-            <div className="mt-6 max-w-md mx-auto">
-              <div className="bg-white rounded-2xl p-6 shadow-sm border border-[#E5E3DF]">
-                {/* Logos statisch statt Marquee (Martin 15.08.): der
-                    scrollende Streifen war am Rand angeschnitten, und der
-                    freistehende "Bekannt aus"-Kasten darueber zeigte
-                    dieselben Logos ein zweites Mal. Jetzt EIN Trust-Kasten
-                    mit sauber sitzender Reihe. Bild der Frau + FAZ laufen
-                    weiter im Desktop-Karussell. */}
-                <div className="mb-5 pb-5 border-b border-[#E5E3DF]">
-                  <p className="text-[11px] font-semibold text-[#8B8B8B] uppercase tracking-[0.08em] text-center mb-4">Bekannt aus</p>
-                  <div className="flex items-center justify-center gap-5">
-                    <img src="/images/media/ard.webp" alt="ARD" loading="lazy" decoding="async" className="h-[20px] object-contain opacity-80" />
-                    <img src="/images/media/ndr.webp" alt="NDR" loading="lazy" decoding="async" className="h-[20px] object-contain opacity-80" />
-                    <img src="/images/media/sat1.webp" alt="SAT.1" loading="lazy" decoding="async" className="h-[20px] object-contain opacity-80" />
-                    <img src="/images/media/die-welt.webp" alt="Die Welt" loading="lazy" decoding="async" className="h-[20px] object-contain opacity-80" />
-                  </div>
-                </div>
+                ACHTUNG: "60.000+ Einsaetze" und "20+ Jahre Erfahrung" sind
+                sitewide und in den Anzeigen gesetzt, haben aber im Repo
+                KEINE hinterlegte Quelle — anders als der Testsieger, dessen
+                Original-PDF unter /downloads liegt. Hier uebernommen, nicht
+                neu behauptet; Beleg ist nachzuziehen (content-checkliste). */}
+            <div className="grid max-w-md grid-cols-3 gap-3 border-t border-[#E5E3DF] pt-6">
+              <div>
+                <p className="text-[17px] font-bold leading-tight text-[#3D3D3D]">Testsieger</p>
+                <p className="mt-1 text-[13px] leading-tight text-[#8B8B8B]">DIE WELT 2021</p>
+              </div>
+              <div>
+                <p className="text-[17px] font-bold leading-tight text-[#3D3D3D]">20+ Jahre</p>
+                <p className="mt-1 text-[13px] leading-tight text-[#8B8B8B]">Erfahrung</p>
+              </div>
+              <div>
+                <p className="text-[17px] font-bold leading-tight text-[#3D3D3D]">60.000+</p>
+                <p className="mt-1 text-[13px] leading-tight text-[#8B8B8B]">Einsätze</p>
+              </div>
+            </div>
 
-                <div className="grid grid-cols-1 gap-4">
-                  <div className="flex items-center gap-3">
-                    <div className="flex-shrink-0 w-9 h-9 rounded-full bg-[#8B7355]/10 flex items-center justify-center">
-                      <svg className="w-[18px] h-[18px] text-[#8B7355]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
-                      </svg>
-                    </div>
-                    <p className="text-[15px] text-[#3D3D3D] font-semibold text-left">Persönlicher Ansprechpartner 7 Tage/Woche</p>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <div className="flex-shrink-0 w-9 h-9 rounded-full bg-[#8B7355]/10 flex items-center justify-center">
-                      <svg className="w-[18px] h-[18px] text-[#8B7355]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                      </svg>
-                    </div>
-                    <p className="text-[15px] text-[#3D3D3D] font-semibold text-left">Täglich kündbar & taggenaue Abrechnung</p>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <div className="flex-shrink-0 w-9 h-9 rounded-full bg-[#8B7355]/10 flex items-center justify-center">
-                      <svg className="w-[18px] h-[18px] text-[#8B7355]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
-                      </svg>
-                    </div>
-                    <p className="text-[15px] text-[#3D3D3D] font-semibold text-left">Betreuung startklar in 4–7 Werktagen</p>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <div className="flex-shrink-0 w-9 h-9 rounded-full bg-[#8B7355]/10 flex items-center justify-center">
-                      <svg className="w-[18px] h-[18px] text-[#8B7355]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" />
-                      </svg>
-                    </div>
-                    <p className="text-[15px] text-[#3D3D3D] font-semibold text-left">20+ Jahre Erfahrung & Testsieger</p>
-                  </div>
-                </div>
+            {/* Medialogos als eigene Ebene statt im weissen Trust-Kasten
+                (Martin 16.08.: "dann Testsieger mit der Erfahrung wie im
+                Kundenportal und die Medialogos"). Der Kasten ist damit
+                aufgeloest — er zeigte dieselben Logos und dasselbe
+                "20+ Jahre Erfahrung & Testsieger" ein zweites Mal. Seine
+                beiden uebrigen Zeilen (persoenlicher Ansprechpartner,
+                Startzeit) stehen weiter unten in HowItWorks /
+                CareServicesSection / FAQ und werden dort in einem eigenen
+                Schritt ueberarbeitet (Martin 16.08.: "startklar in 4-7
+                Werktagen klingt nicht schoen ... weiter unten inhaltlich
+                anpassen").
+                Bild der Frau + FAZ laufen weiter im Desktop-Karussell. */}
+            <div className="mt-6 max-w-md border-t border-[#E5E3DF] pt-6">
+              <p className="mb-4 text-[11px] font-semibold uppercase tracking-[0.08em] text-[#8B8B8B]">Bekannt aus</p>
+              <div className="flex items-center gap-5">
+                <img src="/images/media/ard.webp" alt="ARD" loading="lazy" decoding="async" className="h-[20px] object-contain opacity-80" />
+                <img src="/images/media/ndr.webp" alt="NDR" loading="lazy" decoding="async" className="h-[20px] object-contain opacity-80" />
+                <img src="/images/media/sat1.webp" alt="SAT.1" loading="lazy" decoding="async" className="h-[20px] object-contain opacity-80" />
+                <img src="/images/media/die-welt.webp" alt="Die Welt" loading="lazy" decoding="async" className="h-[20px] object-contain opacity-80" />
               </div>
             </div>
           </div>

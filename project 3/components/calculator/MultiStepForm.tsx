@@ -780,11 +780,11 @@ export function MultiStepForm({ mode = 'inline' }: MultiStepFormProps = {}) {
             setWarmupAudience('direct');
             setFullscreen(true);
           }}
-          className="w-full rounded-xl bg-[#E76F63] px-6 py-[18px] text-[18px] font-bold text-white shadow-[0_4px_14px_rgba(231,111,99,0.32)] transition-all duration-200 hover:bg-[#D65E52]"
+          className="w-full rounded-xl bg-[#E76F63] px-4 py-[18px] text-[17px] font-bold text-white shadow-[0_4px_14px_rgba(231,111,99,0.32)] transition-all duration-200 hover:bg-[#D65E52]"
         >
-          Betreuungskraft finden →
+          Kosten &amp; Pflegekräfte ansehen →
         </button>
-        <div className="mt-3 flex justify-center">
+        <div className="mt-3 flex">
           <div className="inline-flex items-center gap-2 rounded-full border border-[#A8D5B0] bg-[#F0F7F1] py-1 pl-1.5 pr-3">
             <div className="flex">
               {['/images/caregivers/pk-1.jpg','/images/caregivers/pk-2.jpg','/images/caregivers/pk-3.jpg','/images/caregivers/pk-4.jpg'].map((src,i)=>(
@@ -799,7 +799,35 @@ export function MultiStepForm({ mode = 'inline' }: MultiStepFormProps = {}) {
             </span>
           </div>
         </div>
-        <p className="mt-2 text-center text-[12px] text-[#8B8B8B]">Kostenlos &amp; unverbindlich · in 2 Minuten</p>
+        {/* Die drei Punkte, die kein Wettbewerber so setzen kann (Martin
+            16.08.). "Keine Vermittlungsgebuehr" stand seit dem 16.08. in
+            JEDER Google-Anzeige, aber nirgends auf der Seite — der Klick
+            fuehrte auf ein Versprechen, das hier nicht wieder auftauchte.
+            Belege: marta 99-999 EUR Aufnahmegebuehr, Hausengel 220 EUR/Mo
+            Vermittlung, Dt. Seniorenbetreuung 280 EUR Pauschale; taeglich
+            kuendbar ist bei uns vertraglich hinterlegt (vertrag-content.ts
+            §3.3). Alle drei gehoeren zur selben Kategorie: nichts, worin man
+            haengenbleibt — die Startzeit ist bewusst NICHT dabei, sie ist
+            eine andere Aussage und steht weiter unten (Martin 16.08.).
+            "Kostenlos & unverbindlich" ist entfallen, das sagt jetzt die
+            Hero-Unterzeile. */}
+        {/* Schriftgroesse: NIE kleiner als die Hero-Unterzeile ueber dem
+            Button (16px, app/page.tsx) — Martin 16.08. Diese drei Zeilen
+            sind der Message-Match zu den Anzeigen, nicht Kleingedrucktes. */}
+        <ul className="mt-5 flex flex-col gap-3">
+          {[
+            'Keine Vermittlungsgebühr',
+            'Kein Vertrag vor Ihrer Auswahl',
+            'Täglich kündbar, taggenau abgerechnet',
+          ].map((punkt) => (
+            <li key={punkt} className="flex items-center gap-2.5">
+              <svg className="h-[18px] w-[18px] flex-shrink-0 text-[#E76F63]" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24" aria-hidden="true">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+              </svg>
+              <span className="text-[16px] leading-snug text-[#3D3D3D]">{punkt}</span>
+            </li>
+          ))}
+        </ul>
       </div>
     );
   }
