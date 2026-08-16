@@ -7,7 +7,7 @@ export function HowItWorks() {
   return (
     <section id="ablauf" className="scroll-mt-20 py-14 md:py-16 lg:py-20 px-5 bg-[#F8F7F5]">
       <div className="max-w-[560px] md:max-w-[900px] lg:max-w-[1100px] mx-auto">
-        <p className="text-xs md:text-sm font-bold uppercase tracking-wider text-[#A89279] mb-2">
+        <p className="text-[14px] font-bold uppercase tracking-wider text-[#A89279] mb-2">
           So funktioniert's
         </p>
         <h2 className="text-[26px] md:text-[32px] lg:text-[38px] leading-[1.25] font-bold text-[#3D3D3D] mb-8 md:mb-10 lg:mb-12">
@@ -26,7 +26,7 @@ export function HowItWorks() {
               <h3 className="font-bold text-[17px] md:text-[18px] lg:text-[20px] mb-1.5 md:mb-2.5 text-[#3D3D3D] leading-snug md:text-center">
                 Angebot online einholen
               </h3>
-              <p className="text-[14px] md:text-[15px] lg:text-[16px] leading-[1.55] text-[#5A5A5A] mb-2.5 md:text-center">
+              <p className="text-[16px] leading-[1.55] text-[#5A5A5A] mb-2.5 md:text-center">
                 Beantworten Sie wenige kurze Fragen zu Ihrer Pflegesituation. Sie sehen sofort Ihr Angebot & passende Pflegekräfte – inklusive möglicher Zuschüsse und Steuervorteile.
               </p>
               <span className="inline-flex items-center gap-1.5 bg-[#E8F5E9] text-[#2E7D32] px-3 py-1.5 rounded-lg text-xs font-semibold md:mx-auto">
@@ -47,7 +47,7 @@ export function HowItWorks() {
               <h3 className="font-bold text-[17px] md:text-[18px] lg:text-[20px] mb-1.5 md:mb-2.5 text-[#3D3D3D] leading-snug md:text-center">
                 Fundierte Entscheidungsgrundlage
               </h3>
-              <p className="text-[14px] md:text-[15px] lg:text-[16px] leading-[1.55] text-[#5A5A5A] mb-2.5 md:text-center">
+              <p className="text-[16px] leading-[1.55] text-[#5A5A5A] mb-2.5 md:text-center">
                 Sie erhalten eine vollständige Übersicht mit allen Zuschüssen, Steuervorteilen und Finanzierungsoptionen – zum Vergleichen und Besprechen mit der Familie.
               </p>
               <span className="inline-flex items-center gap-1.5 bg-[#E8F5E9] text-[#2E7D32] px-3 py-1.5 rounded-lg text-xs font-semibold md:mx-auto">
@@ -67,7 +67,7 @@ export function HowItWorks() {
               <h3 className="font-bold text-[17px] md:text-[18px] lg:text-[20px] mb-1.5 md:mb-2.5 text-[#3D3D3D] leading-snug md:text-center">
                 Passende Pflegekräfte erhalten
               </h3>
-              <p className="text-[14px] md:text-[15px] lg:text-[16px] leading-[1.55] text-[#5A5A5A] mb-2.5 md:text-center">
+              <p className="text-[16px] leading-[1.55] text-[#5A5A5A] mb-2.5 md:text-center">
                 Auf Wunsch übermitteln wir Ihnen direkt passende Pflegekräfte-Profile – ohne weiteren Aufwand für Sie.
               </p>
               <span className="inline-flex items-center gap-1.5 bg-[#E8F5E9] text-[#2E7D32] px-3 py-1.5 rounded-lg text-xs font-semibold md:mx-auto">
@@ -82,10 +82,10 @@ export function HowItWorks() {
         <div className="mt-10 md:mt-12 lg:mt-14 text-center">
           <button
             onClick={() => scrollToCalculator()}
-            className="inline-flex items-center gap-2 px-8 py-4 bg-[#E76F63] hover:bg-[#D65E52] text-white font-bold text-base md:text-lg rounded-xl transition-all duration-200 shadow-lg hover:shadow-xl"
+            className="inline-flex w-full sm:w-auto items-center justify-center gap-2 px-4 sm:px-8 py-4 bg-[#E76F63] hover:bg-[#D65E52] text-white font-bold text-base md:text-lg rounded-xl transition-all duration-200 shadow-lg hover:shadow-xl"
           >
             Kosten & Pflegekräfte ansehen
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg className="hidden sm:block w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
             </svg>
           </button>

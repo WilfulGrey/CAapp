@@ -46,7 +46,7 @@ export function RequirementsSection() {
     <section className="bg-white py-12 md:py-16 lg:py-20">
       <div className="container mx-auto px-6 max-w-5xl">
         <div className="text-center mb-10 md:mb-14">
-          <p className="text-xs md:text-sm font-bold uppercase tracking-wider text-[#A89279] mb-2">
+          <p className="text-[14px] font-bold uppercase tracking-wider text-[#A89279] mb-2">
             Voraussetzungen
           </p>
           <h2 className="text-[28px] md:text-[36px] lg:text-[42px] leading-[1.2] font-bold text-[#3D3D3D] mb-6">
@@ -73,7 +73,7 @@ export function RequirementsSection() {
                   <h3 className="text-lg font-bold text-[#3D3D3D] mb-2">
                     {requirement.title}
                   </h3>
-                  <p className="text-[15px] text-[#5A5A5A] leading-relaxed">
+                  <p className="text-[16px] text-[#5A5A5A] leading-relaxed">
                     {requirement.description}
                   </p>
                 </div>
@@ -82,7 +82,11 @@ export function RequirementsSection() {
           ))}
         </div>
 
-        <div className="bg-[#E8F5E3] rounded-2xl p-8 text-center">
+        {/* p-6 auf dem Handy statt p-8: mit 32px Innenabstand je Seite blieben
+            fuer den Button nur 231px, der Text braucht 235px — er brach in
+            zwei Zeilen um und der Pfeil stand daneben (Martin 16.08.:
+            "warum ist hier der Text 2-spaltig?"). */}
+        <div className="bg-[#E8F5E3] rounded-2xl p-6 sm:p-8 text-center">
           <div className="max-w-2xl mx-auto">
             <div className="w-16 h-16 bg-[#708A95] rounded-full flex items-center justify-center mx-auto mb-4">
               <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -97,10 +101,10 @@ export function RequirementsSection() {
             </p>
             <button
               onClick={() => scrollToCalculator()}
-              className="inline-flex items-center gap-2 px-8 py-4 bg-[#E76F63] hover:bg-[#D65E52] text-white font-bold text-base md:text-lg rounded-xl transition-all duration-200 shadow-lg hover:shadow-xl"
+              className="inline-flex w-full sm:w-auto items-center justify-center gap-2 px-4 sm:px-8 py-4 bg-[#E76F63] hover:bg-[#D65E52] text-white font-bold text-base md:text-lg rounded-xl transition-all duration-200 shadow-lg hover:shadow-xl"
             >
               Kosten & Pflegekräfte ansehen
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg className="hidden sm:block w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
               </svg>
             </button>
