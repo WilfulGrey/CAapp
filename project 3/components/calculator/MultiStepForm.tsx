@@ -334,13 +334,14 @@ export function MultiStepForm() {
     const card = formRef.current?.querySelector('[data-calculator-card]');
     if (!card) return;
     const r = card.getBoundingClientRect();
-    // Kartenkopf ganz nach oben (12px Luft) — ausgerichtet am LAENGSTEN
+    // Kartenkopf nach oben mit 24px Luft — ausgerichtet am LAENGSTEN
     // Schritt (Martin 15.08.): 4-Antworten-Fragen und das Kontaktformular
-    // sind hoeher als der erste Schritt; nur mit dem Kopf am oberen Rand
-    // ist bei JEDER Antwort maximal viel von der Karte sichtbar.
-    if (r.top <= 20) return; // steht schon oben
+    // sind hoeher als der erste Schritt. 24px statt buendig: bei 12px
+    // schnitt iOS (einklappende URL-Leiste) den Kartenkopf oben an
+    // (Martins Screenshot 15.08. — "springt unnoetig hoch").
+    if (r.top <= 32) return; // steht schon (fast) oben — nicht springen
     window.scrollTo({
-      top: r.top + window.pageYOffset - 12,
+      top: r.top + window.pageYOffset - 24,
       behavior: 'smooth',
     });
   };
