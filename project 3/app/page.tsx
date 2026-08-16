@@ -79,7 +79,7 @@ export default function HomePage() {
             />
           </div>
           <div className="px-5 text-center mb-8">
-            <h1 className="text-[20px] md:text-[40px] leading-[1.2] font-bold text-[#3D3D3D] mb-2 tracking-tight">
+            <h1 className="text-[24px] md:text-[40px] leading-[1.2] font-bold text-[#3D3D3D] mb-2 tracking-tight">
               24-Stunden-Pflege zu Hause – die bezahlbare Alternative zum Pflegeheim
             </h1>
             {/* Hero-USPs ersetzen die alte Bullet-Liste (CRO 15.08.,
@@ -89,15 +89,15 @@ export default function HomePage() {
                 EIN Hinweis-Icon links, Rest als Fließtext (Martin 15.08.:
                 "ein Icon und Rest als Fließtext") — die zwischenzeitliche
                 Variante mit Check-Icon je Zeile war ihm zu listig. */}
-            {/* Hinweis-Kasten statt freier Zeile (Martin 15.08.: "auf
-                schönem Hintergrund, deutlich professioneller"). Bewusst die
-                Karten-Sprache der Seite: weiße Karte + #ECE7DF-Rand wie die
-                "Bekannt aus"-Box, Icon im #FBEEEA-Kreis wie die früheren
-                USP-Bullets. Text LINKSBÜNDIG — zentriert wirkten die drei
-                Zeilen ausgefranst. */}
-            <div className="mx-auto mb-1 flex max-w-[420px] items-center gap-2 rounded-xl border border-[#ECE7DF] bg-white px-3 py-2 text-left">
-              <span className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full bg-[#FBEEEA]">
-                <svg className="h-[16px] w-[16px] text-[#E76F63]" fill="none" stroke="currentColor" strokeWidth={1.9} strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24" aria-hidden="true"><path d="M15 14c.2-1 .7-1.7 1.5-2.5A5.6 5.6 0 0 0 18 7.7 6 6 0 0 0 6 8c0 1 .2 2.1 1.5 3.5.8.8 1.3 1.5 1.5 2.5" /><path d="M9.2 17.5h5.6" /><path d="M10.3 20.5h3.4" /></svg>
+            {/* Kein weißer Kasten mehr (Martin 15.08.: stand direkt über der
+                weißen Wizard-Karte und wirkte als zweite Karte) — aber die
+                Glühbirne behält ihren Kreis, und der Block ist linksbündig
+                (Martin: "die Glühbirne darf schon ihre Umrandung haben …
+                und das darf auch linksbündig sein"). Kreis-Ton #FBEEEA wie
+                bei den früheren USP-Bullets. */}
+            <div className="mx-auto mb-2 flex max-w-[340px] items-center gap-2.5 text-left">
+              <span className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-[#FBEEEA]">
+                <svg className="h-[17px] w-[17px] text-[#E76F63]" fill="none" stroke="currentColor" strokeWidth={1.9} strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24" aria-hidden="true"><path d="M15 14c.2-1 .7-1.7 1.5-2.5A5.6 5.6 0 0 0 18 7.7 6 6 0 0 0 6 8c0 1 .2 2.1 1.5 3.5.8.8 1.3 1.5 1.5 2.5" /><path d="M9.2 17.5h5.6" /><path d="M10.3 20.5h3.4" /></svg>
               </span>
               <p className="text-[15px] leading-snug text-[#5B5B5B]">
                 <strong className="font-semibold text-[#3D3D3D]">Sofortangebot ab 2.200&nbsp;€</strong> · keine Vermittlungsgebühr · kein Vertrag vor Auswahl nötig
