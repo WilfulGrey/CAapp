@@ -780,7 +780,7 @@ export function MultiStepForm({ mode = 'inline' }: MultiStepFormProps = {}) {
             setWarmupAudience('direct');
             setFullscreen(true);
           }}
-          className="w-full rounded-full bg-[#E76F63] px-6 py-4 text-[17px] font-bold text-white shadow-lg transition-all duration-200 hover:bg-[#D65E52] hover:shadow-xl"
+          className="w-full rounded-xl bg-[#E76F63] px-6 py-[18px] text-[18px] font-bold text-white shadow-[0_4px_14px_rgba(231,111,99,0.32)] transition-all duration-200 hover:bg-[#D65E52]"
         >
           Betreuungskraft finden →
         </button>

@@ -53,58 +53,40 @@ export default function HomePage() {
               Seitenverhältnis des Zuschnitts (843:427) -> auf JEDER Breite
               ist das komplette Bild sichtbar (375px -> 190px hoch,
               430px -> 218px). */}
-          <div className="relative w-full aspect-[850/520] overflow-hidden mb-4 bg-[#F8F7F5]">
-            {/* LCP element — explicit priority + sizes so the optimizer
-                generates a mobile-sized WebP/AVIF and the browser fetches
-                it eagerly with fetchpriority="high". */}
-            {/* Neues Shooting von Martin (16.08.) — endlich OHNE einmontiertes
-                Testsieger-Siegel. Bis dahin musste jeder Zuschnitt um das
-                eingebrannte Siegel herumgelegt werden (daher die krummen
-                Crops der Versionen v1-v4). Jetzt: 1672x941 Original, mobil
-                auf 1,63:1 vorbeschnitten (`_mobil`), Siegel liegt frei als
-                Overlay. Dateiname bei neuem Zuschnitt VERSIONIEREN —
-                Optimizer und Browser cachen per URL. */}
+          {/* Randloser, hoher Hero statt 229px-Streifen (Martin 16.08. im
+              Vergleich mit marta.de: "es ist nicht geiler, nicht schoener,
+              nicht groesser"). marta zeigt mobil ein Foto ueber ~2/3 des
+              Bildschirms, randlos, OHNE Badge. Genau das hier:
+              - aspect 1.17:1 statt 1.63:1 -> Foto fast dreimal so praesent
+              - Testsieger-Siegel RUNTER vom Foto: weder marta noch
+                Pflegehelden kleben ein Badge ins Hero-Bild, das ist ein
+                Merkmal alter Pflegeseiten und der groesste Billig-
+                Verstaerker. Der Testsieger steht weiterhin im
+                Trust-Kasten ("20+ Jahre Erfahrung & Testsieger"). */}
+          <div className="relative w-full aspect-[1100/941] overflow-hidden bg-[#F8F7F5]">
             <Image
-              src="/images/PM-Header-Shooting_mobil-v2.webp"
-              alt="Professionelle 24-Stunden-Betreuung zu Hause"
+              src="/images/PM-Header-Shooting_hero-v3.webp"
+              alt="Betreuungskraft und Seniorin zu Hause im Wohnzimmer"
               fill
               priority
               sizes="(max-width: 1024px) 100vw, 0px"
               className="object-cover"
             />
-            <div className="absolute inset-0 bg-gradient-to-b from-black/15 via-transparent to-transparent pointer-events-none"></div>
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            {/* Siegel moderat (Martin 15.08.: 62% buendig war "zu extrem"),
-                mit Abstand unten links — die Ecke darunter ist in v3
-                wegretuschiert (weicher Decken-Verlauf), kein Doppel-Siegel. */}
-            <img
-              src="/images/primundus_testsieger-2021.webp"
-              alt="DIE WELT Service-Champions — Nr. 1 der Pflegekräfte-Vermittler"
-              className="absolute left-2.5 bottom-2.5 h-[48%] w-auto rounded-[5px] shadow-md"
-            />
           </div>
-          <div className="px-5 text-center mb-8">
-            <h1 className="text-[24px] md:text-[40px] leading-[1.2] font-bold text-[#3D3D3D] mb-3.5 tracking-tight">
-              24-Stunden-Pflege zu Hause – die bezahlbare Alternative zum Pflegeheim
+          <div className="px-5 text-center mb-8 pt-6">
+            {/* UNSER Text, nur aufgeteilt (Martin 16.08.: "unseren nehmen
+                bzw. anpassen, aber nicht kopieren") — ein erster Entwurf mit
+                "für Ihre Liebsten" war praktisch martas Formulierung. Eine
+                grosse Headline braucht kurzen Text, also steht der Kern in
+                der H1 und unser Positionierungssatz als Unterzeile. Wortlaut
+                unveraendert, nur die Zeilenaufteilung ist neu. */}
+            <h1 className="text-[33px] md:text-[40px] leading-[1.12] font-bold text-[#3D3D3D] mb-3 tracking-tight">
+              24-Stunden-Pflege zu Hause
             </h1>
-            {/* Hero-USPs ersetzen die alte Bullet-Liste (CRO 15.08.,
-                Hypothese 4: Preis vor der E-Mail-Wand zeigen). Wortlaut von
-                Martin freigegeben (15.08.); "in 2 Minuten" steht bewusst
-                NICHT hier — es steht 100px tiefer im roten Wizard-Balken.
-                EIN Hinweis-Icon links, Rest als Fließtext (Martin 15.08.:
-                "ein Icon und Rest als Fließtext") — die zwischenzeitliche
-                Variante mit Check-Icon je Zeile war ihm zu listig. */}
-            {/* USPs als drei linksbündige Zeilen (Wettbewerbsvergleich:
-                Pflegehelden und Promedica24 setzen im Hero beide exakt DREI
-                getrennte Punkte).
-
-                PREIS RAUS, PFLEGEKRÄFTE REIN (Martin 16.08.): Steht der
-                Preis schon im Hero, fehlt der Grund für die Anfrage — und
-                der ist bei uns, dass man echte, passende Pflegekräfte SIEHT,
-                bevor man irgendetwas unterschreibt. Genau das kann weder
-                Pflegehelden noch Promedica, und es stand nirgends mehr.
-                Der Preis bleibt in der FAQ und im Kontakt-Schritt. */}
-            <ul className="mx-auto mb-4 flex max-w-[300px] flex-col gap-1.5 text-left text-[15px] leading-tight text-[#5B5B5B]">
+            <p className="mx-auto mb-5 max-w-[330px] text-[17px] leading-snug text-[#5B5B5B]">
+              Die bezahlbare Alternative zum Pflegeheim.
+            </p>
+            <ul className="mx-auto mb-6 flex max-w-[300px] flex-col gap-2 text-left text-[15px] leading-tight text-[#5B5B5B]">
               {[
                 { bold: 'Pflegekräfte sofort einsehen', rest: '' },
                 { bold: '', rest: 'Keine Vermittlungsgebühr' },
