@@ -1338,7 +1338,10 @@ export function MultiStepForm({ mode = 'inline' }: MultiStepFormProps = {}) {
           </div>
           <div className="flex items-center gap-1.5">
             <CheckCircle2 className="w-4 h-4 text-[#8B7355] flex-shrink-0" />
-            <span className="text-[#3D3D3D] font-medium">Keine Werbeanrufe</span>
+            {/* War "Keine Werbeanrufe" (Martin 16.08. geaendert). Passt
+                zusaetzlich zur Leitplanke des SEA-Laufs: keine Aussagen
+                ueber Anrufe — das Gespraech ist Teil des Modells. */}
+            <span className="text-[#3D3D3D] font-medium">100 % kostenfrei &amp; unverbindlich</span>
           </div>
         </div>
       </div>
