@@ -110,6 +110,11 @@ class Analytics {
     return cookieConsent.hasCategory('analytics');
   }
 
+  /** Fuer Komponenten, die ein Event erst nach der Einwilligung feuern duerfen. */
+  hasConsent(): boolean {
+    return this.hasAnalyticsConsent();
+  }
+
   private getOrCreateSessionId(): string {
     const SESSION_KEY = '_prim_session';
     let sessionId = sessionStorage.getItem(SESSION_KEY);
@@ -413,10 +418,15 @@ class Analytics {
         if (max <= 0) return;
         const pct = (window.scrollY / max) * 100;
         for (const threshold of [25, 50, 75, 100]) {
-          if (pct >= threshold && !this.scrollDepthsFired.has(threshold)) {
-            this.scrollDepthsFired.add(threshold);
-            this.trackEvent('engagement', 'scroll_depth', { depth: threshold });
-          }
+          if (pct < threshold || this.scrollDepthsFired.has(threshold)) continue;
+          // Ohne Einwilligung verwirft trackEvent das Event still. Dann die
+          // Schwelle NICHT abhaken, sonst ist sie fuer die restliche Session
+          // verbrannt — der naechste Scroll nach dem Consent holt sie nach.
+          // (Bug 16.08.: deshalb kam seit dem Deploy kein einziges
+          // scroll_depth an — das Gate greift, bevor jemand zugestimmt hat.)
+          if (!this.hasAnalyticsConsent()) continue;
+          this.scrollDepthsFired.add(threshold);
+          this.trackEvent('engagement', 'scroll_depth', { depth: threshold });
         }
       });
     };

@@ -256,24 +256,38 @@ export function MultiStepForm() {
   // feuert erst, wenn das Formular zur Hälfte im Viewport war — einmal pro
   // Session (sessionStorage-Guard, weil Mobile- und Desktop-Layout je eine
   // Instanz rendern; die unsichtbare intersected nie).
+  const wizardSeenRef = useRef(false);
   useEffect(() => {
     if (typeof IntersectionObserver === 'undefined') return;
     const el = formRef.current;
     if (!el) return;
     const KEY = '_prim_wizard_visible';
     if (sessionStorage.getItem(KEY)) return;
+    // Bug 16.08.: Vorher wurde beim ersten Sichtbarwerden sofort markiert und
+    // der Observer beendet. Der Wizard steht seit dem Falz-Umbau aber schon
+    // beim Laden im Bild — also BEVOR jemand eingewilligt hat. trackEvent
+    // verwarf das Event still, die Markierung blieb: seit dem Deploy kam kein
+    // einziges wizard_visible an. Jetzt merken wir uns nur, DASS er gesehen
+    // wurde; gesendet wird, sobald die Einwilligung vorliegt.
+    const sende = () => {
+      if (!analytics.hasConsent() || sessionStorage.getItem(KEY)) return;
+      sessionStorage.setItem(KEY, '1');
+      analytics.trackEvent('wizard', 'wizard_visible', {});
+    };
     const observer = new IntersectionObserver(
       (entries) => {
-        if (entries.some((e) => e.isIntersecting) && !sessionStorage.getItem(KEY)) {
-          sessionStorage.setItem(KEY, '1');
-          analytics.trackEvent('wizard', 'wizard_visible', {});
-          observer.disconnect();
-        }
+        if (!entries.some((e) => e.isIntersecting)) return;
+        wizardSeenRef.current = true;
+        sende();
+        if (sessionStorage.getItem(KEY)) observer.disconnect();
       },
       { threshold: 0.5 }
     );
     observer.observe(el);
-    return () => observer.disconnect();
+    const unsubscribe = cookieConsent.subscribe(() => {
+      if (wizardSeenRef.current) sende();
+    });
+    return () => { observer.disconnect(); unsubscribe(); };
   }, []);
 
   // Step-Reihenfolge: Step 1 ist die konkrete Sachfrage "Wie viele Personen

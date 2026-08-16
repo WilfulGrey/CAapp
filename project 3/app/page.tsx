@@ -79,7 +79,7 @@ export default function HomePage() {
             />
           </div>
           <div className="px-5 text-center mb-8">
-            <h1 className="text-[24px] md:text-[40px] leading-[1.2] font-bold text-[#3D3D3D] mb-3 tracking-tight">
+            <h1 className="text-[22px] md:text-[40px] leading-[1.2] font-bold text-[#3D3D3D] mb-2.5 tracking-tight">
               24-Stunden-Pflege zu Hause – die bezahlbare Alternative zum Pflegeheim
             </h1>
             {/* Hero-USPs ersetzen die alte Bullet-Liste (CRO 15.08.,
@@ -89,17 +89,19 @@ export default function HomePage() {
                 EIN Hinweis-Icon links, Rest als Fließtext (Martin 15.08.:
                 "ein Icon und Rest als Fließtext") — die zwischenzeitliche
                 Variante mit Check-Icon je Zeile war ihm zu listig. */}
-            {/* USPs als drei linksbündige Zeilen (CRO 15.08., Wettbewerbs-
-                vergleich): Pflegehelden und Promedica24 setzen im Hero beide
-                exakt DREI getrennte Punkte statt eines Fließtexts — unsere
-                Trennpunkt-Zeile brach in drei ausgefranste Zeilen um. Der
-                Preis bleibt der Differenzierer: Promedica nennt ausdrücklich
-                erst nach Beratung einen Preis, Pflegehelden gar keinen.
-                Häkchen statt Glühbirne, weil pro Zeile ein Icon steht —
-                gleiche Sprache wie die Trust-Zeile am Kartenfuß. */}
-            <ul className="mx-auto mb-3 flex max-w-[300px] flex-col gap-1 text-left text-[15px] leading-tight text-[#5B5B5B]">
+            {/* USPs als drei linksbündige Zeilen (Wettbewerbsvergleich:
+                Pflegehelden und Promedica24 setzen im Hero beide exakt DREI
+                getrennte Punkte).
+
+                PREIS RAUS, PFLEGEKRÄFTE REIN (Martin 16.08.): Steht der
+                Preis schon im Hero, fehlt der Grund für die Anfrage — und
+                der ist bei uns, dass man echte, passende Pflegekräfte SIEHT,
+                bevor man irgendetwas unterschreibt. Genau das kann weder
+                Pflegehelden noch Promedica, und es stand nirgends mehr.
+                Der Preis bleibt in der FAQ und im Kontakt-Schritt. */}
+            <ul className="mx-auto mb-2.5 flex max-w-[300px] flex-col gap-[3px] text-left text-[15px] leading-tight text-[#5B5B5B]">
               {[
-                { bold: 'Sofortangebot ab 2.200 €', rest: '' },
+                { bold: 'Pflegekräfte sofort einsehen', rest: '' },
                 { bold: '', rest: 'Keine Vermittlungsgebühr' },
                 { bold: '', rest: 'Kein Vertrag vor Auswahl nötig' },
               ].map(({ bold, rest }) => (
@@ -109,6 +111,17 @@ export default function HomePage() {
                 </li>
               ))}
             </ul>
+
+            {/* Presselogos in den Hero (Martin 16.08.: "die Medialogos
+                waren DER Vertrauensding") — schmaler Streifen statt eigener
+                Kasten, damit er keine Bauhöhe über der Falz frisst. Der
+                grosse "Bekannt aus"-Block weiter unten bleibt. */}
+            <div className="mx-auto mb-2.5 flex max-w-[330px] items-center justify-center gap-4 opacity-85">
+              <img src="/images/media/ard.webp" alt="Bekannt aus ARD" loading="eager" decoding="async" className="h-[13px] object-contain" />
+              <img src="/images/media/ndr.webp" alt="Bekannt aus NDR" loading="eager" decoding="async" className="h-[13px] object-contain" />
+              <img src="/images/media/sat1.webp" alt="Bekannt aus SAT.1" loading="eager" decoding="async" className="h-[13px] object-contain" />
+              <img src="/images/media/die-welt.webp" alt="Bekannt aus DIE WELT" loading="eager" decoding="async" className="h-[13px] object-contain" />
+            </div>
 
             {/* Direct Form Integration — über der Falz (CRO 15.08.) */}
             <div className="max-w-md mx-auto mb-6">
