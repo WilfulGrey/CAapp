@@ -31,40 +31,92 @@ export default function HomePage() {
 
       {/* Hero Section - Split Layout on Desktop */}
       <div className="w-full mb-8 lg:mb-0 lg:min-h-[90vh] lg:flex lg:items-center lg:bg-gradient-to-b lg:from-[#F8F7F5] lg:via-white lg:to-white">
-        {/* Mobile/Tablet: Stacked Layout */}
+        {/* Mobile/Tablet: Stacked Layout.
+            CRO 15.08. (Funnel-Befund): Beim Laden war KEIN Antwort-Button
+            sichtbar (erster Button bei 824px, Viewport endet bei 812px) —
+            nur 38 % der Besucher tippten überhaupt eine erste Antwort an,
+            danach liefen 95 % durch. Deshalb: Wizard DIREKT unter die H1
+            (Bild 190px, H1 24px, USPs+Preis als 2-Zeilen-Subline). Bewusster
+            Trade-off (Martin 15.08.): Bildhöhe schlägt Falz — Button 3 ist
+            beim Erstbesuch hinterm Cookie-Banner, Frage + Buttons 1-2 immer
+            sichtbar; nach dem Consent-Klick (ohne Reload) alles frei. */}
         <div className="lg:hidden">
-          <div className="relative w-full h-[150px] md:h-[190px] overflow-hidden mb-6 bg-[#F8F7F5]">
+          {/* aspect statt fester Höhe (Martin 15.08.: auf breiteren Handys
+              schnitt object-cover unten den Kopf ab): Container = exaktes
+              Seitenverhältnis des Zuschnitts (843:427) -> auf JEDER Breite
+              ist das komplette Bild sichtbar (375px -> 190px hoch,
+              430px -> 218px). */}
+          <div className="relative w-full aspect-[850/427] overflow-hidden mb-3 bg-[#F8F7F5]">
             {/* LCP element — explicit priority + sizes so the optimizer
                 generates a mobile-sized WebP/AVIF and the browser fetches
                 it eagerly with fetchpriority="high". */}
+            {/* PM-Betreuung_hero_mobil-v4.webp (Martin 15.08., 6. Iteration —
+                Personen rechts, Siegel-Zone links freigelegt):
+                Personen zur Mitte, Siegel größer): Zuschnitt 850x427 =
+                (280,55,1130,482) aus PM-Betreuung_frontal_desktop — Köpfe
+                bis Schoß, Paar mittig. Der Rest des einmontierten
+                Foto-Siegels ragt unten links rein und wird vom
+                Overlay-Siegel exakt überdeckt. Dateiname VERSIONIEREN bei
+                jedem neuen Zuschnitt (-v3, …) — Optimizer + Browser cachen
+                per URL, sonst sieht man alte Bilder. */}
             <Image
-              src="/images/PM-Betreuung_frontal_desktop.webp"
+              src="/images/PM-Betreuung_hero_mobil-v4.webp"
               alt="Professionelle 24-Stunden-Betreuung"
               fill
               priority
               sizes="(max-width: 1024px) 100vw, 0px"
-              className="object-contain scale-[1.2]"
+              className="object-cover"
             />
             <div className="absolute inset-0 bg-gradient-to-b from-black/15 via-transparent to-transparent pointer-events-none"></div>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            {/* Siegel moderat (Martin 15.08.: 62% buendig war "zu extrem"),
+                mit Abstand unten links — die Ecke darunter ist in v3
+                wegretuschiert (weicher Decken-Verlauf), kein Doppel-Siegel. */}
+            <img
+              src="/images/primundus_testsieger-2021.webp"
+              alt="DIE WELT Service-Champions — Nr. 1 der Pflegekräfte-Vermittler"
+              className="absolute left-2.5 bottom-2.5 h-[52%] w-auto rounded-[5px] shadow-md"
+            />
           </div>
           <div className="px-5 text-center mb-8">
-            <h1 className="text-[28px] md:text-[40px] leading-[1.2] font-bold text-[#3D3D3D] mb-4 tracking-tight">
+            <h1 className="text-[24px] md:text-[40px] leading-[1.2] font-bold text-[#3D3D3D] mb-3 tracking-tight">
               24-Stunden-Pflege zu Hause – die bezahlbare Alternative zum Pflegeheim
             </h1>
-            <ul className="max-w-sm mx-auto flex flex-col gap-3 mb-5 text-left pl-2">
-              <li className="flex items-center gap-3">
-                <span className="w-7 h-7 rounded-full bg-[#FBEEEA] flex items-center justify-center flex-shrink-0"><svg className="w-[16px] h-[16px] text-[#E76F63]" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" /></svg></span>
-                <span className="text-[16px] leading-snug text-[#3D3D3D]"><strong className="font-semibold">Sofortangebot</strong> in 2 Minuten</span>
-              </li>
-              <li className="flex items-center gap-3">
-                <span className="w-7 h-7 rounded-full bg-[#FBEEEA] flex items-center justify-center flex-shrink-0"><svg className="w-[16px] h-[16px] text-[#E76F63]" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197m13.5-9a2.5 2.5 0 11-5 0 2.5 2.5 0 015 0z" /></svg></span>
-                <span className="text-[16px] leading-snug text-[#3D3D3D]"><strong className="font-semibold">Pflegekräfte</strong> sofort einsehen</span>
-              </li>
-              <li className="flex items-center gap-3">
-                <span className="w-7 h-7 rounded-full bg-[#FBEEEA] flex items-center justify-center flex-shrink-0"><svg className="w-[16px] h-[16px] text-[#E76F63]" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" /></svg></span>
-                <span className="text-[16px] leading-snug text-[#3D3D3D]"><strong className="font-semibold">Kein Vertrag</strong> vor Auswahl nötig</span>
-              </li>
+            {/* Hero-USPs ersetzen die alte Bullet-Liste (CRO 15.08.,
+                Hypothese 4: Preis vor der E-Mail-Wand zeigen). Wortlaut von
+                Martin freigegeben (15.08.); "in 2 Minuten" steht bewusst
+                NICHT hier — es steht 100px tiefer im roten Wizard-Balken.
+                EIN Hinweis-Icon links, Rest als Fließtext (Martin 15.08.:
+                "ein Icon und Rest als Fließtext") — die zwischenzeitliche
+                Variante mit Check-Icon je Zeile war ihm zu listig. */}
+            {/* USPs als drei linksbündige Zeilen (CRO 15.08., Wettbewerbs-
+                vergleich): Pflegehelden und Promedica24 setzen im Hero beide
+                exakt DREI getrennte Punkte statt eines Fließtexts — unsere
+                Trennpunkt-Zeile brach in drei ausgefranste Zeilen um. Der
+                Preis bleibt der Differenzierer: Promedica nennt ausdrücklich
+                erst nach Beratung einen Preis, Pflegehelden gar keinen.
+                Häkchen statt Glühbirne, weil pro Zeile ein Icon steht —
+                gleiche Sprache wie die Trust-Zeile am Kartenfuß. */}
+            <ul className="mx-auto mb-3 flex max-w-[300px] flex-col gap-1 text-left text-[15px] leading-tight text-[#5B5B5B]">
+              {[
+                { bold: 'Sofortangebot ab 2.200 €', rest: '' },
+                { bold: '', rest: 'Keine Vermittlungsgebühr' },
+                { bold: '', rest: 'Kein Vertrag vor Auswahl nötig' },
+              ].map(({ bold, rest }) => (
+                <li key={bold + rest} className="flex items-center gap-2">
+                  <svg className="h-[16px] w-[16px] flex-shrink-0 text-[#E76F63]" fill="none" stroke="currentColor" strokeWidth={2.6} strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 13l4 4L19 7" /></svg>
+                  {bold ? <strong className="font-semibold text-[#3D3D3D]">{bold}</strong> : rest}
+                </li>
+              ))}
             </ul>
+
+            {/* Direct Form Integration — über der Falz (CRO 15.08.) */}
+            <div className="max-w-md mx-auto mb-6">
+              <MultiStepForm />
+            </div>
+
+            {/* USP-Bullets entfernt (Martin 15.08.): stecken jetzt als
+                zweizeiliger Satz unter der H1. */}
 
             {/* Presse-Logos als einziges Trust-Element, auf weißem Grund (Logos sind weiß hinterlegt) */}
             <div className="max-w-md mx-auto mb-6">
@@ -77,11 +129,6 @@ export default function HomePage() {
                   <img src="/images/media/die-welt.webp" alt="Die Welt" loading="lazy" decoding="async" className="h-[18px] object-contain opacity-80" />
                 </div>
               </div>
-            </div>
-
-            {/* Direct Form Integration */}
-            <div className="max-w-md mx-auto mb-8">
-              <MultiStepForm />
             </div>
 
             {/* USP Section */}
@@ -154,9 +201,13 @@ export default function HomePage() {
         {/* Desktop: Side-by-side Layout */}
         <div className="hidden lg:grid lg:grid-cols-[55fr_45fr] items-center max-w-[1280px] mx-auto px-8 gap-12 xl:gap-16 w-full">
           <div className="text-left">
-            <h1 className="text-[clamp(2rem,3.5vw,3rem)] leading-[1.15] font-bold text-[#3D3D3D] mb-5 tracking-tight">
+            <h1 className="text-[clamp(2rem,3.5vw,3rem)] leading-[1.15] font-bold text-[#3D3D3D] mb-3 tracking-tight">
               24-Stunden-Pflege zu Hause – die bezahlbare Alternative zum Pflegeheim
             </h1>
+            {/* CRO 15.08.: Preisspanne im Hero — gleiche Zeile wie mobil. */}
+            <p className="text-[16px] leading-snug text-[#8B8B8B] mb-5">
+              Meist <strong className="font-semibold text-[#3D3D3D]">2.200–3.500 € im Monat</strong> — die Pflegekasse zahlt einen Teil dazu.
+            </p>
             <ul className="flex flex-col gap-3 mb-6">
               <li className="flex items-center gap-3">
                 <span className="w-8 h-8 rounded-full bg-[#FBEEEA] flex items-center justify-center flex-shrink-0"><svg className="w-[18px] h-[18px] text-[#E76F63]" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" /></svg></span>

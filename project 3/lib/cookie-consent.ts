@@ -117,6 +117,15 @@ export class CookieConsentManager {
 
   private notifyListeners(state: ConsentState): void {
     this.listeners.forEach((listener) => listener(state));
+    // CRO 15.08.: Window-Event zusätzlich zu den internen Listenern. Das
+    // ga-consent-Inline-Script in app/layout.tsx wartet seit jeher auf
+    // 'cookie-consent-changed' — dispatcht hat es aber nie jemand, weshalb
+    // GA4 nach Einwilligung nur über den (jetzt entfernten) Full-Reload kam.
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(
+        new CustomEvent('cookie-consent-changed', { detail: state })
+      );
+    }
   }
 }
 

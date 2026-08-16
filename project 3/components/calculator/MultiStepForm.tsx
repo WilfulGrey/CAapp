@@ -5,6 +5,8 @@ import { useCalculator, formatEuro } from "@/lib/calculator-context";
 import { CircleCheck as CheckCircle2, Phone } from "lucide-react";
 import Image from "next/image";
 import { analytics } from "@/lib/analytics";
+import { cookieConsent } from "@/lib/cookie-consent";
+import { scrollToCalculator, isCalculatorAligned } from "@/lib/scroll-to-calculator";
 import { useFormTracking } from "@/hooks/use-form-tracking";
 
 // ─── Matching Animation Component ────────────────────────────────────────────
@@ -226,6 +228,54 @@ export function MultiStepForm() {
     stepStartRef.current = Date.now();
   }, [currentStep]);
 
+  // CRO 15.08.: Das Cookie-Banner lädt die Seite nicht mehr neu. Der
+  // step_view des aktuellen Steps ist vor der Einwilligung am Consent-Gate
+  // abgeprallt — hier einmalig nachfeuern, sobald Analytics erlaubt wird,
+  // sonst fehlen diese Sessions im Funnel (vorher erledigte das der Reload).
+  const consentReplayedRef = useRef(false);
+  useEffect(() => {
+    const unsubscribe = cookieConsent.subscribe((consent) => {
+      if (consent.analytics && !consentReplayedRef.current) {
+        consentReplayedRef.current = true;
+        analytics.trackEvent('wizard', 'step_view', {
+          step: currentStep,
+          step_name: getStepId(currentStep),
+          replayed_after_consent: true,
+        });
+      }
+    });
+    return unsubscribe;
+    // currentStep bewusst als Dep: der Replay soll den Step melden, der beim
+    // Klick auf „Akzeptieren" wirklich sichtbar ist.
+  }, [currentStep]);
+
+  // CRO 15.08.: „Wizard wirklich gesehen" messbar machen. step_view feuert
+  // beim Mounten — auch wenn die Antwort-Buttons unter der Falz liegen
+  // (Funnel-Befund: 62 % beantworten die Warm-up-Frage nie, Clarity zeigt
+  // exakt an dieser Stelle den Scroll-Cliff 92 %→42 %). wizard_visible
+  // feuert erst, wenn das Formular zur Hälfte im Viewport war — einmal pro
+  // Session (sessionStorage-Guard, weil Mobile- und Desktop-Layout je eine
+  // Instanz rendern; die unsichtbare intersected nie).
+  useEffect(() => {
+    if (typeof IntersectionObserver === 'undefined') return;
+    const el = formRef.current;
+    if (!el) return;
+    const KEY = '_prim_wizard_visible';
+    if (sessionStorage.getItem(KEY)) return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((e) => e.isIntersecting) && !sessionStorage.getItem(KEY)) {
+          sessionStorage.setItem(KEY, '1');
+          analytics.trackEvent('wizard', 'wizard_visible', {});
+          observer.disconnect();
+        }
+      },
+      { threshold: 0.5 }
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
+
   // Step-Reihenfolge: Step 1 ist die konkrete Sachfrage "Wie viele Personen
   // benötigen Pflege?", damit der Einstieg ohne planerisches Commitment
   // funktioniert. Die Timing-Frage (care_start_timing) wurde komplett aus dem
@@ -274,6 +324,24 @@ export function MultiStepForm() {
     };
   }, []);
 
+  // CRO 15.08., Martins Entscheid (zweistufig): (1) Beim Start des
+  // Wizards — Antwort auf die Warm-up-Frage — wird EINMAL gescrollt,
+  // sodass die gesamte Karte bis zum unteren Rand im Viewport steht.
+  // (2) Danach bleibt die Karte fuer alle weiteren Fragen exakt an
+  // dieser Stelle — bei Step-Wechseln wird grundsaetzlich NICHT mehr
+  // gescrollt (die alten Spruenge stammten aus der Zeit, als das
+  // Formular tief auf der Seite lag).
+  // Die eine Ausrichtung beim Wizard-Start zielt auf DIESELBE zentrale
+  // Marke wie alle CTA-Buttons (lib/scroll-to-calculator.ts). Wer ueber
+  // einen CTA gekommen ist, steht damit schon richtig — isCalculatorAligned
+  // verhindert den zweiten Scroll (Martin 15.08.: "springe gleich an die
+  // richtige Stelle von allen CTA-Buttons"). 'auto' statt 'smooth': ein
+  // nachlaufender weicher Scroll fuehlte sich wie ein zweiter Sprung an.
+  const alignCardOnce = () => {
+    if (isCalculatorAligned()) return;
+    scrollToCalculator('auto');
+  };
+
   const handleNext = async (overrideAnswer?: string | null) => {
     const timeOnStep = Math.round((Date.now() - stepStartRef.current) / 1000);
     // overrideAnswer wird bei Auto-Advance gesetzt (selectAndAdvance), weil
@@ -300,29 +368,9 @@ export function MultiStepForm() {
       // Animation einblenden. Step-Wechsel erst nach onComplete der Animation.
       if (currentStep === totalSteps - 1) {
         setShowMatching(true);
-        setTimeout(() => {
-          const el = formRef.current;
-          if (!el) return;
-          window.scrollTo({
-            top: el.getBoundingClientRect().top + window.pageYOffset - 90,
-            behavior: 'smooth',
-          });
-        }, 50);
         return;
       }
       setCurrentStep(currentStep + 1);
-      setTimeout(() => {
-        const el = formRef.current;
-        if (!el) return;
-        // Same jump target as the CTA buttons (HowItWorks / FinalCTA /
-        // RequirementsSection) — `-90` lands the form cleanly below the
-        // sticky header. formRef instead of getElementById so the desktop
-        // layout's instance is targeted too (both share id="calculator-form").
-        window.scrollTo({
-          top: el.getBoundingClientRect().top + window.pageYOffset - 90,
-          behavior: 'smooth',
-        });
-      }, 50);
     } else if (currentStep === totalSteps) {
       await handleSubmit();
     }
@@ -568,7 +616,7 @@ export function MultiStepForm() {
       case 2: return "Weitere Personen im Haushalt?";
       case 3: return "Vorhandener Pflegegrad?";
       case 4: return "Mobilität der zu betreuenden Person";
-      case 5: return "Nachteinsätze erforderlich?";
+      case 5: return "Ist nachts Hilfe nötig?";
       case 6: return "Deutschkenntnisse der Pflegekraft";
       case 7: return "Führerschein gewünscht?";
       case 8: return "Geschlecht der Pflegekraft";
@@ -661,9 +709,12 @@ export function MultiStepForm() {
 
   // Fokus-Modus nach der ersten Frage: der Rest wird abgedunkelt, das
   // Formular bleibt exakt an seiner Stelle (kein Sprung) und liegt vorne.
+  // pt-2 statt pt-6 mobil (CRO 15.08.): der Platz ueber der Karte finanziert
+  // die groesseren USP-Zeilen im Hero, ohne die Antwort-Buttons unter das
+  // Cookie-Banner zu druecken. Desktop unveraendert (lg:pt-4).
   const outerClass = fullscreen
-    ? "pt-6 pb-6 scroll-mt-24 lg:scroll-mt-32 lg:pt-4 max-w-md sm:max-w-[95%] xl:max-w-[1800px] 2xl:max-w-[2000px] mx-auto px-0 sm:px-4 relative z-[90]"
-    : "pt-6 pb-6 scroll-mt-24 lg:scroll-mt-32 lg:pt-4 max-w-md sm:max-w-[95%] xl:max-w-[1800px] 2xl:max-w-[2000px] mx-auto px-0 sm:px-4";
+    ? "pt-1 pb-6 scroll-mt-24 lg:scroll-mt-32 lg:pt-4 max-w-md sm:max-w-[95%] xl:max-w-[1800px] 2xl:max-w-[2000px] mx-auto px-0 sm:px-4 relative z-[90]"
+    : "pt-1 pb-6 scroll-mt-24 lg:scroll-mt-32 lg:pt-4 max-w-md sm:max-w-[95%] xl:max-w-[1800px] 2xl:max-w-[2000px] mx-auto px-0 sm:px-4";
 
   // Wenn die Matching-Animation läuft: nur diese rendern (eigenes Layout
   // mit Header/Progress) und nach onComplete auf Step 9 (Kontaktformular)
@@ -679,14 +730,6 @@ export function MultiStepForm() {
           onComplete={() => {
             setShowMatching(false);
             setCurrentStep(totalSteps); // = Step 9 (Kontaktformular)
-            setTimeout(() => {
-              const el = formRef.current;
-              if (!el) return;
-              window.scrollTo({
-                top: el.getBoundingClientRect().top + window.pageYOffset - 90,
-                behavior: 'smooth',
-              });
-            }, 50);
           }}
         />
       </div>
@@ -700,7 +743,7 @@ export function MultiStepForm() {
     <div ref={formRef} id="calculator-form" className={outerClass}>
       <div className="relative">
       <div data-calculator-card className="bg-white rounded-2xl border-[1.5px] border-[#C0C0C0] overflow-hidden shadow-md">
-        <div className={`relative px-4 sm:px-8 py-3.5 border-b-2 border-[#E5E3DF]/50 ${currentStep === totalSteps ? 'bg-[#22A06B]' : 'bg-[#E76F63]'}`}>
+        <div className={`relative px-4 sm:px-8 py-3 border-b-2 border-[#E5E3DF]/50 ${currentStep === totalSteps ? 'bg-[#22A06B]' : 'bg-[#E76F63]'}`}>
           {fullscreen && currentStep !== totalSteps && (
             <button
               type="button"
@@ -744,7 +787,7 @@ export function MultiStepForm() {
         )}
 
         {currentStep >= 1 && currentStep <= 8 && (
-          <div className="flex justify-center pt-3 pb-0">
+          <div className="flex justify-center pt-2 pb-0">
             <div className="inline-flex items-center gap-2 bg-[#F0F7F1] border border-[#A8D5B0] rounded-full pl-1.5 pr-3 py-1">
               {currentStep === 1 ? (
                 <div className="flex">
@@ -774,13 +817,13 @@ export function MultiStepForm() {
         {/* Step 9 zeigt die Headline „✅ Ihr Angebot ist fertig" jetzt direkt
             im Titel-Block (getStepTitle); separate Pill ist redundant. */}
 
-        <div id="calc-step-content" className="px-3 sm:px-6 lg:px-8 pt-4 pb-5">
+        <div id="calc-step-content" className="px-3 sm:px-6 lg:px-8 pt-3 pb-5">
           <div className="w-full">
             {/* Step 9: kleine grüne „fertig"-Pill über dem Titel, dann die
                 Frage als reguläre Step-Headline + Erklärung als italic
                 Subline (gleiches Muster wie die anderen Steps). */}
             {getStepTitle() && (
-              <h3 className="text-[20px] font-bold text-[#3D3D3D] mb-4 leading-snug min-h-[3.25rem] flex items-center justify-center text-center">
+              <h3 className="text-[20px] font-bold text-[#3D3D3D] mb-3 leading-snug min-h-[2.75rem] flex items-center justify-center text-center">
                 {getStepTitle()}
               </h3>
             )}
@@ -795,12 +838,17 @@ export function MultiStepForm() {
                   abgefragt (PatientForm.startDate). */}
               {/* Warm-up (nicht mitgesendet): trivialer Einstieg vor der ersten
                   echten Frage — Antwort setzt nur warmupAudience. */}
+              {/* CRO 15.08. (Martin): nur noch ZWEI Antworten ("die beiden
+                  reichen ja") — der dritte Button lag beim Erstbesuch
+                  hinterm Cookie-Banner. Werte 'angehoerige'/'selbst' sind
+                  die historischen (Zeitreihe kompatibel), nur 'andere'
+                  entfällt; die Antwort wird nirgends hingesendet, nur als
+                  warmup_answered getrackt. */}
               {currentStep === 1 && !warmupAudience && (
                 <div className="grid grid-cols-1 gap-2.5">
                   {[
                     { value: 'angehoerige', label: 'Für eine:n Angehörige:n' },
-                    { value: 'selbst', label: 'Für mich selbst' },
-                    { value: 'andere', label: 'Für jemand anderen' },
+                    { value: 'selbst', label: 'Für mich' },
                   ].map(({ value, label }) => (
                     <button
                       key={value}
@@ -811,6 +859,9 @@ export function MultiStepForm() {
                         analytics.trackEvent('wizard', 'warmup_answered', { answer: value });
                         setWarmupAudience(value);
                         setFullscreen(true);
+                        // Die eine Ausrichtung (siehe alignCardOnce) — nach
+                        // dem Re-Render mit den Buttons von Frage 1.
+                        setTimeout(alignCardOnce, 80);
                       }}
                       className={btnClass(false)}
                     >
@@ -906,10 +957,10 @@ export function MultiStepForm() {
               {currentStep === 5 && (
                 <div className="grid grid-cols-1 gap-2.5">
                   {[
-                    { value: 'nein', label: 'Nein' },
-                    { value: 'gelegentlich', label: 'Gelegentlich' },
-                    { value: 'taeglich', label: 'Täglich (1×)' },
-                    { value: 'mehrmals', label: 'Mehrmals nachts' }
+                    { value: 'nein', label: 'Nein, nachts keine Hilfe nötig' },
+                    { value: 'gelegentlich', label: 'Gelegentlich, nicht jede Nacht' },
+                    { value: 'taeglich', label: 'Jede Nacht, bis zu 1 Einsatz' },
+                    { value: 'mehrmals', label: 'Jede Nacht, mehrere Einsätze' }
                   ].map(({ value, label }) => (
                     <button
                       key={value}
@@ -1041,9 +1092,13 @@ export function MultiStepForm() {
                     </div>
                     <p className="text-[14px] leading-snug text-[#2F5A38]"><span className="font-semibold">5 passende Pflegekräfte</span> für Sie gefunden</p>
                   </div>
+                  {/* CRO 15.08.: Preisspanne steht im HERO (app/page.tsx),
+                      nicht hier — auf diesem Schritt sagen wir „Ihr Angebot
+                      ist fertig", eine generische Spanne daneben wirkte
+                      widersprüchlich (Martins Einwand 15.08.). */}
                   <div className="pt-1">
                     <p className="text-[16px] font-bold text-[#3D3D3D]">Wohin dürfen wir Ihr Angebot senden?</p>
-                    <p className="text-[12.5px] text-[#8B8B8B] mt-0.5">Ihr Preis &amp; 5 passende Pflegekräfte werden sofort sichtbar.</p>
+                    <p className="text-[12.5px] text-[#8B8B8B] mt-0.5">Ihr genauer Preis &amp; 5 passende Pflegekräfte werden sofort sichtbar.</p>
                   </div>
                   <div>
                     <input

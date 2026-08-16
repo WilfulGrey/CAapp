@@ -1,5 +1,7 @@
 'use client';
 
+import { scrollToCalculator } from '@/lib/scroll-to-calculator';
+
 export function RequirementsSection() {
   const requirements = [
     {
@@ -39,10 +41,6 @@ export function RequirementsSection() {
       )
     }
   ];
-
-  const scrollToCalculator = () => {
-    const el = document.getElementById('calculator-form'); if (el) { window.scrollTo({ top: el.getBoundingClientRect().top + window.pageYOffset - 90, behavior: 'smooth' }); }
-  };
 
   return (
     <section className="bg-white py-12 md:py-16 lg:py-20">
@@ -98,7 +96,7 @@ export function RequirementsSection() {
               Kein Problem! Wir beraten Sie gerne kostenlos und unverbindlich, ob die 24-Stunden-Betreuung für Ihre individuelle Situation die richtige Lösung ist.
             </p>
             <button
-              onClick={scrollToCalculator}
+              onClick={() => scrollToCalculator()}
               className="inline-flex items-center gap-2 px-8 py-4 bg-[#E76F63] hover:bg-[#D65E52] text-white font-bold text-base md:text-lg rounded-full transition-all duration-200 shadow-lg hover:shadow-xl"
             >
               Kosten & Pflegekräfte ansehen

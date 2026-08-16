@@ -3,6 +3,7 @@
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Phone, Calculator, Check } from "lucide-react";
 import Image from "next/image";
+import { scrollToCalculator } from '@/lib/scroll-to-calculator';
 
 const WA_URL = `https://wa.me/4989200000830?text=${encodeURIComponent("Hallo Frau Wysocki, ich habe eine Rückfrage:")}`;
 
@@ -88,7 +89,13 @@ export function HelpDialog({ open, onOpenChange }: HelpDialogProps) {
 
           <a
             href="#calculator-form"
-            onClick={() => onOpenChange(false)}
+            onClick={(e) => {
+              // Zentrale Marke statt CSS-Anker: sonst landet der Sprung
+              // anders als bei allen anderen CTAs (CRO 15.08.).
+              e.preventDefault();
+              onOpenChange(false);
+              setTimeout(() => scrollToCalculator(), 60);
+            }}
             className="w-full flex items-center justify-center gap-2 px-6 py-3.5 bg-[#E76F63] hover:bg-[#D65E52] text-white font-semibold text-sm rounded-full transition-all duration-200 shadow-md hover:shadow-lg"
           >
             <Calculator className="w-4 h-4" />

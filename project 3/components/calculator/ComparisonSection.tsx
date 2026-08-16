@@ -1,10 +1,8 @@
 'use client';
 
-export function ComparisonSection() {
-  const scrollToCalculator = () => {
-    const el = document.getElementById('calculator-form'); if (el) { window.scrollTo({ top: el.getBoundingClientRect().top + window.pageYOffset - 90, behavior: 'smooth' }); }
-  };
+import { scrollToCalculator } from '@/lib/scroll-to-calculator';
 
+export function ComparisonSection() {
   return (
     <section id="kostenvergleich" className="bg-white py-16 md:py-20 scroll-mt-20">
       <div className="w-full max-w-[520px] md:max-w-[720px] lg:max-w-[1080px] mx-auto px-5">
@@ -130,7 +128,7 @@ export function ComparisonSection() {
           </p>
 
           <button
-            onClick={scrollToCalculator}
+            onClick={() => scrollToCalculator()}
             className="inline-flex items-center gap-2 px-8 py-4 bg-[#E76F63] hover:bg-[#D65E52] text-white font-bold text-base md:text-lg rounded-full transition-all duration-200 shadow-lg hover:shadow-xl"
           >
             Kosten & Pflegekräfte ansehen
