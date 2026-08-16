@@ -34,19 +34,26 @@ export default function HomePage() {
         {/* Mobile/Tablet: Stacked Layout.
             CRO 15.08. (Funnel-Befund): Beim Laden war KEIN Antwort-Button
             sichtbar (erster Button bei 824px, Viewport endet bei 812px) —
-            nur 38 % der Besucher tippten überhaupt eine erste Antwort an,
-            danach liefen 95 % durch. Deshalb: Wizard DIREKT unter die H1
-            (Bild 190px, H1 24px, USPs+Preis als 2-Zeilen-Subline). Bewusster
-            Trade-off (Martin 15.08.): Bildhöhe schlägt Falz — Button 3 ist
-            beim Erstbesuch hinterm Cookie-Banner, Frage + Buttons 1-2 immer
-            sichtbar; nach dem Consent-Klick (ohne Reload) alles frei. */}
+            nur 38 % beantworteten die erste Frage, danach liefen 95 % durch.
+            Deshalb steht der Wizard direkt unter der H1.
+
+            NEUE GEWICHTUNG (Martin 16.08.: "wirkt so billig"): Bis dahin
+            galt "alles über dem Cookie-Banner" als harte Regel — dafür
+            wurde das Foto auf einen 188px-Briefschlitz gestaucht, Abstände
+            gekürzt und zuletzt sogar ein Logo-Balken aufs Bild gelegt. Das
+            Ergebnis wirkte gedrängt und billig, und das Banner ist nach
+            EINEM Tipp weg. Bindend ist jetzt nur noch: Frage + ERSTER
+            Antwort-Button sofort sichtbar (87 % wählen ohnehin Antwort 1);
+            Button 2 darf beim Erstkontakt hinterm Banner liegen. Vertrauens-
+            würdigkeit ist bei dieser Kaufentscheidung selbst ein
+            Conversion-Faktor. */}
         <div className="lg:hidden">
           {/* aspect statt fester Höhe (Martin 15.08.: auf breiteren Handys
               schnitt object-cover unten den Kopf ab): Container = exaktes
               Seitenverhältnis des Zuschnitts (843:427) -> auf JEDER Breite
               ist das komplette Bild sichtbar (375px -> 190px hoch,
               430px -> 218px). */}
-          <div className="relative w-full aspect-[850/427] overflow-hidden mb-3 bg-[#F8F7F5]">
+          <div className="relative w-full aspect-[850/520] overflow-hidden mb-4 bg-[#F8F7F5]">
             {/* LCP element — explicit priority + sizes so the optimizer
                 generates a mobile-sized WebP/AVIF and the browser fetches
                 it eagerly with fetchpriority="high". */}
@@ -65,7 +72,7 @@ export default function HomePage() {
               fill
               priority
               sizes="(max-width: 1024px) 100vw, 0px"
-              className="object-cover"
+              className="object-cover object-[62%_center]"
             />
             <div className="absolute inset-0 bg-gradient-to-b from-black/15 via-transparent to-transparent pointer-events-none"></div>
             {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -75,22 +82,8 @@ export default function HomePage() {
             <img
               src="/images/primundus_testsieger-2021.webp"
               alt="DIE WELT Service-Champions — Nr. 1 der Pflegekräfte-Vermittler"
-              className="absolute left-2.5 top-2.5 h-[52%] w-auto rounded-[5px] shadow-md"
+              className="absolute left-2.5 bottom-2.5 h-[48%] w-auto rounded-[5px] shadow-md"
             />
-            {/* Presselogos als weisser Streifen AUF der Bildunterkante
-                (Martin 16.08.: "ob man die auf das Bild mit draufpackt …
-                die haben natuerlich weissen Hintergrund"). Genau deshalb
-                ein weisser Balken: die Logos bleiben farbecht (SAT.1 und
-                die Globen sind farbig; Weissfaerben waere markenrechtlich
-                heikel und optisch schlecht). Kostet NULL Bauhoehe, weil er
-                auf dem Foto liegt — die gewonnenen ~35px gehen als Luft an
-                Ueberschrift und USP-Zeilen zurueck. */}
-            <div className="absolute inset-x-0 bottom-0 flex items-center justify-center gap-5 bg-white px-3 py-[5px]">
-              <img src="/images/media/ard.webp" alt="Bekannt aus ARD" loading="eager" decoding="async" className="h-[16px] object-contain" />
-              <img src="/images/media/ndr.webp" alt="Bekannt aus NDR" loading="eager" decoding="async" className="h-[16px] object-contain" />
-              <img src="/images/media/sat1.webp" alt="Bekannt aus SAT.1" loading="eager" decoding="async" className="h-[16px] object-contain" />
-              <img src="/images/media/die-welt.webp" alt="Bekannt aus DIE WELT" loading="eager" decoding="async" className="h-[16px] object-contain" />
-            </div>
           </div>
           <div className="px-5 text-center mb-8">
             <h1 className="text-[24px] md:text-[40px] leading-[1.2] font-bold text-[#3D3D3D] mb-3.5 tracking-tight">
