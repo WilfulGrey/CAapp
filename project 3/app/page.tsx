@@ -15,6 +15,7 @@ import { MultiStepForm } from "@/components/calculator/MultiStepForm";
 import { WhatIs24hCare } from "@/components/calculator/WhatIs24hCare";
 import { RequirementsSection } from "@/components/calculator/RequirementsSection";
 import { KeyBenefitsBar } from "@/components/calculator/KeyBenefitsBar";
+import { PersonalContact } from "@/components/calculator/PersonalContact";
 import { WhatsAppFloat } from "@/components/calculator/WhatsAppFloat";
 import { homePageGraph, jsonLdString } from "@/lib/seo-schema";
 
@@ -171,10 +172,12 @@ export default function HomePage() {
                 Uebernommen, nicht neu behauptet; Beleg nachziehen. */}
             <div className="flex max-w-md items-center gap-3 border-t border-[#E5E3DF] pt-6">
               {/* eslint-disable-next-line @next/next/no-img-element */}
+              {/* h-16 statt h-12: der Satz laeuft ueber drei Zeilen (~66px),
+                  das Siegel schliesst damit buendig ab (Martin 16.08.). */}
               <img
                 src="/images/primundus_testsieger-2021.webp"
                 alt="Testsieger DIE WELT Service-Champions 2021"
-                className="h-12 w-auto flex-shrink-0 object-contain"
+                className="h-16 w-auto flex-shrink-0 object-contain"
                 loading="lazy"
               />
               <p className="text-[16px] leading-snug text-[#5B5B5B]">
@@ -300,9 +303,21 @@ export default function HomePage() {
         </div>
       </div>
 
-      {/* Bestpreis & Testsieger Sections - direkt nach Hero */}
-      {/* Mobile: Stacked */}
+      {/* Mobile-Reihenfolge nach dem Hero (Martin 16.08.): Ablauf direkt
+          unter "Bekannt aus", darunter Ilka, dann erst Bestpreis und
+          Testsieger. Der Ablauf beantwortet die naechste Frage, die sich
+          nach dem Versprechen stellt ("und wie laeuft das jetzt?"), Ilka
+          gibt ihr ein Gesicht.
+          HowItWorks steht deshalb HIER fuer mobil und weiter unten in einem
+          `hidden lg:block`-Wrapper fuer Desktop — die Desktop-Reihenfolge
+          bleibt damit unveraendert. */}
       <div className="lg:hidden">
+        <HowItWorks />
+        <section className="px-5 pb-12 bg-[#F8F7F5]">
+          <div className="mx-auto max-w-[520px]">
+            <PersonalContact />
+          </div>
+        </section>
         <BestpriceGuarantee />
         <TestsiegerSection />
       </div>
@@ -369,7 +384,11 @@ export default function HomePage() {
         </div>
       </section>
 
-      <HowItWorks />
+      {/* Desktop behaelt den Ablauf an dieser Stelle; mobil steht er oben
+          direkt nach dem Hero (siehe lg:hidden-Block weiter oben). */}
+      <div className="hidden lg:block">
+        <HowItWorks />
+      </div>
 
       <WhatIs24hCare />
       <RequirementsSection />
