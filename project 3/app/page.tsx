@@ -118,44 +118,22 @@ export default function HomePage() {
             {/* USP-Bullets entfernt (Martin 15.08.): stecken jetzt als
                 zweizeiliger Satz unter der H1. */}
 
-            {/* Presse-Logos als einziges Trust-Element, auf weißem Grund (Logos sind weiß hinterlegt) */}
-            <div className="max-w-md mx-auto mb-6">
-              <div className="bg-white rounded-2xl border border-[#ECE7DF] px-4 py-3.5">
-                <p className="text-[11px] font-semibold text-[#B7AC9C] uppercase tracking-[0.1em] text-center mb-2.5">Bekannt aus</p>
-                <div className="flex items-center justify-center gap-5">
-                  <img src="/images/media/ard.webp" alt="ARD" loading="lazy" decoding="async" className="h-[18px] object-contain opacity-80" />
-                  <img src="/images/media/ndr.webp" alt="NDR" loading="lazy" decoding="async" className="h-[18px] object-contain opacity-80" />
-                  <img src="/images/media/sat1.webp" alt="SAT.1" loading="lazy" decoding="async" className="h-[18px] object-contain opacity-80" />
-                  <img src="/images/media/die-welt.webp" alt="Die Welt" loading="lazy" decoding="async" className="h-[18px] object-contain opacity-80" />
-                </div>
-              </div>
-            </div>
-
             {/* USP Section */}
             <div className="mt-6 max-w-md mx-auto">
               <div className="bg-white rounded-2xl p-6 shadow-sm border border-[#E5E3DF]">
-                {/* Media Logos Carousel */}
-                <div className="mb-6 pb-6 border-b border-[#E5E3DF]">
-                  <p className="text-[11px] font-semibold text-[#8B8B8B] uppercase tracking-[0.08em] text-center mb-5">Bekannt aus</p>
-                  <div className="relative overflow-hidden">
-                    <div className="flex animate-scroll">
-                      <div className="flex items-center gap-8 shrink-0">
-                        <img src="/images/media/ard.webp" alt="ARD" loading="lazy" decoding="async" className="h-[20px] object-contain opacity-70 hover:opacity-100 transition-opacity duration-300" />
-                        <img src="/images/media/ndr.webp" alt="NDR" loading="lazy" decoding="async" className="h-[20px] object-contain opacity-70 hover:opacity-100 transition-opacity duration-300" />
-                        <img src="/images/media/sat1.webp" alt="SAT.1" loading="lazy" decoding="async" className="h-[20px] object-contain opacity-70 hover:opacity-100 transition-opacity duration-300" />
-                        <img src="/images/media/die-welt.webp" alt="Die Welt" loading="lazy" decoding="async" className="h-[20px] object-contain opacity-70 hover:opacity-100 transition-opacity duration-300" />
-                        <img src="/images/media/bild-der-frau.webp" alt="Bild der Frau" loading="lazy" decoding="async" className="h-[20px] object-contain opacity-70 hover:opacity-100 transition-opacity duration-300" />
-                        <img src="/images/media/frankfurter-allgemeine.webp" alt="Frankfurter Allgemeine" loading="lazy" decoding="async" className="h-[20px] object-contain opacity-70 hover:opacity-100 transition-opacity duration-300" />
-                      </div>
-                      <div className="flex items-center gap-8 shrink-0 ml-8">
-                        <img src="/images/media/ard.webp" alt="ARD" loading="lazy" decoding="async" className="h-[20px] object-contain opacity-70 hover:opacity-100 transition-opacity duration-300" />
-                        <img src="/images/media/ndr.webp" alt="NDR" loading="lazy" decoding="async" className="h-[20px] object-contain opacity-70 hover:opacity-100 transition-opacity duration-300" />
-                        <img src="/images/media/sat1.webp" alt="SAT.1" loading="lazy" decoding="async" className="h-[20px] object-contain opacity-70 hover:opacity-100 transition-opacity duration-300" />
-                        <img src="/images/media/die-welt.webp" alt="Die Welt" loading="lazy" decoding="async" className="h-[20px] object-contain opacity-70 hover:opacity-100 transition-opacity duration-300" />
-                        <img src="/images/media/bild-der-frau.webp" alt="Bild der Frau" loading="lazy" decoding="async" className="h-[20px] object-contain opacity-70 hover:opacity-100 transition-opacity duration-300" />
-                        <img src="/images/media/frankfurter-allgemeine.webp" alt="Frankfurter Allgemeine" loading="lazy" decoding="async" className="h-[20px] object-contain opacity-70 hover:opacity-100 transition-opacity duration-300" />
-                      </div>
-                    </div>
+                {/* Logos statisch statt Marquee (Martin 15.08.): der
+                    scrollende Streifen war am Rand angeschnitten, und der
+                    freistehende "Bekannt aus"-Kasten darueber zeigte
+                    dieselben Logos ein zweites Mal. Jetzt EIN Trust-Kasten
+                    mit sauber sitzender Reihe. Bild der Frau + FAZ laufen
+                    weiter im Desktop-Karussell. */}
+                <div className="mb-5 pb-5 border-b border-[#E5E3DF]">
+                  <p className="text-[11px] font-semibold text-[#8B8B8B] uppercase tracking-[0.08em] text-center mb-4">Bekannt aus</p>
+                  <div className="flex items-center justify-center gap-5">
+                    <img src="/images/media/ard.webp" alt="ARD" loading="lazy" decoding="async" className="h-[20px] object-contain opacity-80" />
+                    <img src="/images/media/ndr.webp" alt="NDR" loading="lazy" decoding="async" className="h-[20px] object-contain opacity-80" />
+                    <img src="/images/media/sat1.webp" alt="SAT.1" loading="lazy" decoding="async" className="h-[20px] object-contain opacity-80" />
+                    <img src="/images/media/die-welt.webp" alt="Die Welt" loading="lazy" decoding="async" className="h-[20px] object-contain opacity-80" />
                   </div>
                 </div>
 
