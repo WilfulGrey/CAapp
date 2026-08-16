@@ -758,7 +758,12 @@ export function MultiStepForm({ mode = 'inline' }: MultiStepFormProps = {}) {
   // ueberhaupt kein Scrollen mehr noetig, weder beim Oeffnen noch beim
   // Fragenwechsel — das war der letzte verbliebene Sprung.
   const outerClass = fullscreen
-    ? "fixed inset-x-0 top-0 z-[90] mx-auto max-h-[100dvh] overflow-y-auto overscroll-contain px-3 pt-3 pb-6 max-w-md sm:max-w-[95%] sm:px-4 xl:max-w-[1800px] 2xl:max-w-[2000px]"
+    // Breite bewusst GEDECKELT: die alten `sm:max-w-[95%] xl:max-w-[1800px]`
+    // stammten aus der Zeit, als der Fragebogen auf dem Desktop inline in
+    // einer schmalen Spalte stand und Vollbild ihn aufziehen sollte. Seit
+    // der Hero ueberall den CTA nutzt, ist das ein Modal — bei 1280px wurde
+    // es sonst 1248px breit (gemessen 16.08.).
+    ? "fixed inset-x-0 top-0 z-[90] mx-auto max-h-[100dvh] w-full max-w-md overflow-y-auto overscroll-contain px-3 pt-3 pb-6 sm:max-w-[520px] sm:px-4"
     : "pt-1 pb-6 scroll-mt-24 lg:scroll-mt-32 lg:pt-4 max-w-md sm:max-w-[95%] xl:max-w-[1800px] 2xl:max-w-[2000px] mx-auto px-0 sm:px-4";
 
   // Wenn die Matching-Animation läuft: nur diese rendern (eigenes Layout
