@@ -323,6 +323,23 @@ export function MultiStepForm() {
     };
   }, []);
 
+  // CRO 15.08. (Martin: "vor dieser Frage springt der Bildschirm"): Der
+  // Scroll bei jedem Step-Wechsel stammt aus der Zeit, als das Formular
+  // tief auf der Seite lag. Seit dem Ueber-der-Falz-Umbau steht es beim
+  // Step-Wechsel fast immer schon richtig — dann erzeugte das smooth-
+  // Scrollen nur noch ein sichtbares Zucken. Jetzt wird NUR gescrollt,
+  // wenn der Formular-Kopf wirklich aus dem sichtbaren Bereich raus ist.
+  const scrollFormIntoViewIfNeeded = () => {
+    const el = formRef.current;
+    if (!el) return;
+    const top = el.getBoundingClientRect().top;
+    if (top >= -10 && top <= 160) return; // Kopf ist sichtbar — nicht springen
+    window.scrollTo({
+      top: top + window.pageYOffset - 90,
+      behavior: 'smooth',
+    });
+  };
+
   const handleNext = async (overrideAnswer?: string | null) => {
     const timeOnStep = Math.round((Date.now() - stepStartRef.current) / 1000);
     // overrideAnswer wird bei Auto-Advance gesetzt (selectAndAdvance), weil
@@ -349,29 +366,13 @@ export function MultiStepForm() {
       // Animation einblenden. Step-Wechsel erst nach onComplete der Animation.
       if (currentStep === totalSteps - 1) {
         setShowMatching(true);
-        setTimeout(() => {
-          const el = formRef.current;
-          if (!el) return;
-          window.scrollTo({
-            top: el.getBoundingClientRect().top + window.pageYOffset - 90,
-            behavior: 'smooth',
-          });
-        }, 50);
+        setTimeout(scrollFormIntoViewIfNeeded, 50);
         return;
       }
       setCurrentStep(currentStep + 1);
-      setTimeout(() => {
-        const el = formRef.current;
-        if (!el) return;
-        // Same jump target as the CTA buttons (HowItWorks / FinalCTA /
-        // RequirementsSection) — `-90` lands the form cleanly below the
-        // sticky header. formRef instead of getElementById so the desktop
-        // layout's instance is targeted too (both share id="calculator-form").
-        window.scrollTo({
-          top: el.getBoundingClientRect().top + window.pageYOffset - 90,
-          behavior: 'smooth',
-        });
-      }, 50);
+      // -90-Ziel wie die CTA-Buttons (HowItWorks / FinalCTA) — aber nur
+      // noch, wenn der Kopf nicht ohnehin sichtbar ist (kein Zucken).
+      setTimeout(scrollFormIntoViewIfNeeded, 50);
     } else if (currentStep === totalSteps) {
       await handleSubmit();
     }
@@ -617,7 +618,7 @@ export function MultiStepForm() {
       case 2: return "Weitere Personen im Haushalt?";
       case 3: return "Vorhandener Pflegegrad?";
       case 4: return "Mobilität der zu betreuenden Person";
-      case 5: return "Nachteinsätze erforderlich?";
+      case 5: return "Ist nachts Hilfe nötig?";
       case 6: return "Deutschkenntnisse der Pflegekraft";
       case 7: return "Führerschein gewünscht?";
       case 8: return "Geschlecht der Pflegekraft";
@@ -728,14 +729,7 @@ export function MultiStepForm() {
           onComplete={() => {
             setShowMatching(false);
             setCurrentStep(totalSteps); // = Step 9 (Kontaktformular)
-            setTimeout(() => {
-              const el = formRef.current;
-              if (!el) return;
-              window.scrollTo({
-                top: el.getBoundingClientRect().top + window.pageYOffset - 90,
-                behavior: 'smooth',
-              });
-            }, 50);
+            setTimeout(scrollFormIntoViewIfNeeded, 50);
           }}
         />
       </div>
@@ -960,10 +954,10 @@ export function MultiStepForm() {
               {currentStep === 5 && (
                 <div className="grid grid-cols-1 gap-2.5">
                   {[
-                    { value: 'nein', label: 'Nein' },
-                    { value: 'gelegentlich', label: 'Gelegentlich' },
-                    { value: 'taeglich', label: 'Täglich (1×)' },
-                    { value: 'mehrmals', label: 'Mehrmals nachts' }
+                    { value: 'nein', label: 'Nein, nachts keine Hilfe nötig' },
+                    { value: 'gelegentlich', label: 'Gelegentlich, nicht jede Nacht' },
+                    { value: 'taeglich', label: 'Jede Nacht, bis zu 1 Einsatz' },
+                    { value: 'mehrmals', label: 'Jede Nacht, mehrere Einsätze' }
                   ].map(({ value, label }) => (
                     <button
                       key={value}
