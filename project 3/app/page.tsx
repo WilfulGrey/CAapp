@@ -89,23 +89,30 @@ export default function HomePage() {
                 Vertrag, Pflegekraefte sehen) stecken im Flie\u00dftext der
                 Unterzeile, statt als eigener Block zu konkurrieren.
 
-                EINE konkrete Botschaft (Martin 16.08.: "marta konzentriert
-                sich auf konkrete Botschaft, wir packen alles zusammen — was
-                soll die 4-7 Tage im Header, wir zeigen Sofortangebot und
-                passende Pflegekraefte"). Die Headline ist jetzt woertlich
-                sein Satz. Verworfen unterwegs: Prozess-Headline ("erst
-                sehen, dann entscheiden") und Lieferzeit-Headline ("startklar
-                in 4-7 Werktagen") — beides Detail statt Angebot.
+                MENSCH STATT FEATURE (Martin 16.08.: "wuerde das den Kunden
+                ueberzeugen?" — nein). Alle bisherigen Fassungen beschrieben
+                unser PRODUKT in unserer Innensprache ("Sofortangebot",
+                "startklar in 4-7 Werktagen", "erst sehen, dann
+                entscheiden"). Die Zielgruppe — zu 87 % Angehoerige — hat
+                aber eine andere Angst als Preis oder Tempo: ein fremder
+                Mensch zieht bei den Eltern ein. Genau darauf haben wir die
+                beste Antwort im Markt, und die steht jetzt in der Headline:
+                DU entscheidest, wer es ist. Die Mechanik (2 Minuten, Foto,
+                Preis) belegt sie in der Unterzeile.
+                ACHTUNG SEO: Keyword "24-Stunden-Pflege" steht dadurch nicht
+                mehr in der H1, sondern als "24-Stunden-Betreuung" in der
+                Unterzeile — vor einem Prod-Deploy mit dem SEO-Lauf abgleichen.
                 Unterzeile loest den Schmerz statt aufzuzaehlen: bei
                 Pflegehelden/Promedica fuellt man ein Formular aus und wartet
                 auf einen Rueckruf. Gebuehr/Vertrag stehen NICHT mehr hier
                 (Martin: nicht alles zusammenpacken) — sie stehen im
                 Trust-Kasten. Keyword "24-Stunden-Pflege" bleibt in der H1. */}
-            <h1 className="text-[31px] md:text-[40px] leading-[1.15] font-bold text-[#3D3D3D] mb-3.5 tracking-tight">
-              24-Stunden-Pflege: Sofortangebot und passende Pflegekräfte
+            <h1 className="text-[33px] md:text-[42px] leading-[1.14] font-bold text-[#3D3D3D] mb-3.5 tracking-tight">
+              Sie wählen, wer Ihre Eltern betreut.
             </h1>
-            <p className="mx-auto mb-6 max-w-[330px] text-[17px] leading-snug text-[#5B5B5B]">
-              Beides sehen Sie sofort — ohne Rückruf, ohne Wartezeit.
+            <p className="mx-auto mb-6 max-w-[335px] text-[17px] leading-snug text-[#5B5B5B]">
+              24-Stunden-Betreuung zu Hause: In 2 Minuten sehen Sie passende
+              Betreuungskräfte — mit Foto, Erfahrung und Preis.
             </p>
 
             {/* CTA statt Fragebogen auf der Seite (Martin 16.08., Muster von
