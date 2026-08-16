@@ -77,12 +77,12 @@ export function TestimonialCard() {
                       <Star key={i} className="w-3.5 h-3.5 fill-[#FBBC04] text-[#FBBC04]" />
                     ))}
                   </div>
-                  <p className="text-xs text-[#8B8B8B] font-medium truncate">
+                  <p className="text-[14px] text-[#8B8B8B] font-medium truncate">
                     {testimonial.name}
                   </p>
                 </div>
               </div>
-              <p className="text-sm text-[#3D3D3D] leading-relaxed">
+              <p className="text-[16px] text-[#3D3D3D] leading-relaxed">
                 „{testimonial.text}"
               </p>
             </div>

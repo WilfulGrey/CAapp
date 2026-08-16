@@ -18,7 +18,7 @@ export function BestpriceGuarantee() {
               <h3 className="text-[22px] font-bold text-[#3D3D3D] mb-3">
                 100 % sorgenfrei
               </h3>
-              <p className="text-[15px] leading-relaxed text-[#5A5A5A]">
+              <p className="text-[16px] leading-relaxed text-[#5A5A5A]">
                 Überlassen Sie die Betreuung nicht dem Zufall. Vertrauen Sie auf über 20 Jahre Erfahrung aus mehr als 60.000 Betreuungen – mit einem 100 % sorgenfreien Modell: Bestpreis-Garantie, täglich kündbar, taggenaue Abrechnung und Kosten erst, wenn die Betreuungskraft tatsächlich bei Ihnen ankommt.
               </p>
             </div>

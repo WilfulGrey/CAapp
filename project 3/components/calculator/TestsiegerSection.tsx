@@ -1,6 +1,9 @@
 export function TestsiegerSection() {
   return (
-    <section className="py-14 md:py-16 lg:py-20 px-5 bg-[#F8F7F5]">
+    // id = Sprungziel des Siegels im mobilen Hero (app/page.tsx). Die
+    // content-checkliste verlangt zur Auszeichnung einen Beleg-Link; das
+    // Original-PDF haengt in dieser Sektion.
+    <section id="testsieger" className="scroll-mt-24 py-14 md:py-16 lg:py-20 px-5 bg-[#F8F7F5]">
       <div className="max-w-[560px] md:max-w-[700px] lg:max-w-[1000px] mx-auto">
         <div className="bg-white border-2 border-[#D4A843] rounded-2xl p-7 md:p-9 lg:p-10 relative">
           <div className="absolute top-[-14px] left-1/2 -translate-x-1/2 bg-[#D4A843] text-white px-6 py-1.5 rounded-full text-sm font-bold uppercase tracking-wide whitespace-nowrap shadow-md z-10">
@@ -36,11 +39,11 @@ export function TestsiegerSection() {
                 Testsieger bei DIE WELT
               </h3>
 
-              <p className="text-[14px] text-[#8A8279] mb-4">
+              <p className="text-[16px] text-[#8A8279] mb-4">
                 Nr. 1 der Pflegekräfte-Vermittler – ausgezeichnet in Deutschlands großer Service-Studie von DIE WELT und ServiceValue
               </p>
 
-              <p className="text-[15px] text-[#5A5A5A] leading-relaxed lg:px-0 px-2">
+              <p className="text-[16px] text-[#5A5A5A] leading-relaxed lg:px-0 px-2">
                 Als bester Vermittler von 24-Stunden-Pflegekräften ausgezeichnet: Primundus steht für die beste Kombination aus Preis, Qualität und Kundenservice.
               </p>
 
@@ -48,7 +51,7 @@ export function TestsiegerSection() {
                 href="/downloads/die-welt-service-champions-2021.pdf"
                 target="_blank"
                 rel="noopener"
-                className="inline-flex items-center gap-1.5 mt-4 text-[14px] font-semibold text-[#8B7355] hover:text-[#6B5738] underline underline-offset-2 transition-colors"
+                className="inline-flex items-center gap-1.5 mt-4 text-[16px] font-semibold text-[#8B7355] hover:text-[#6B5738] underline underline-offset-2 transition-colors"
               >
                 Original-Veröffentlichung ansehen (PDF)
               </a>

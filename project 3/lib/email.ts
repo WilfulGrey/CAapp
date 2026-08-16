@@ -287,7 +287,7 @@ export function getEingangsbestaetigungEmailTemplate(
     geschlecht: { 'egal': 'Egal', 'weiblich': 'Weiblich', 'maennlich': 'Männlich' },
     erfahrung: { 'keine': 'Keine Anforderung', 'wuenschenswert': 'Wünschenswert', 'zwingend': 'Zwingend erforderlich' },
     weitere_personen: { 'ja': 'Ja', 'nein': 'Nein' },
-    care_start_timing: { 'sofort': 'Sofort (4–7 Tage)', '2-4-wochen': 'In 2–4 Wochen', '1-2-monate': 'In 1–2 Monaten', 'unklar': 'Ich informiere mich nur' },
+    care_start_timing: { 'sofort': 'Sofort (4–7 Werktage)', '2-4-wochen': 'In 2–4 Wochen', '1-2-monate': 'In 1–2 Monaten', 'unklar': 'Ich informiere mich nur' },
   };
 
   const lbl = (key: string, val: string) => LABELS[key]?.[val] || val || 'Nicht angegeben';
@@ -2344,7 +2344,7 @@ export function getApplicationReceivedEmailTemplate(
       </tr>
       <tr>
         <td colspan="2" style="padding:14px 24px 18px;border-top:1px solid #ebe2d2;">
-          <p style="margin:0;font-size:13px;line-height:1.6;color:#666;"><a href="https://primundus.de/primundus-mustervertrag.pdf" target="_blank" style="color:#8B7355;text-decoration:none;font-weight:600;">Mustervertrag vorab einsehen &rarr;</a></p>
+          <p style="margin:0;font-size:13px;line-height:1.6;color:#666;"><a href="https://kundenportal.primundus.de/primundus-mustervertrag.pdf" target="_blank" style="color:#8B7355;text-decoration:none;font-weight:600;">Mustervertrag vorab einsehen &rarr;</a></p>
         </td>
       </tr>
     </table>` : '';
@@ -2407,7 +2407,7 @@ export function getApplicationReceivedEmailTemplate(
   const condPlain = hasConditions ? `KONDITIONEN
 ${salary > 0 ? `Tagessatz: ${fmtEuro(tagessatz)} € / Tag (inkl. Steuern & Sozialabgaben)\nMonatssatz: ${fmtEuro(salary)} € / Monat${zuschuesse > 0 ? ` — rechn. Eigenanteil ca. ${fmtEuro(eigenanteil)} €` : ''}\n` : ''}${anreiseDatum ? `Anreisedatum: ${anreiseDatum}\n` : ''}${abreiseDatum ? `Abreisedatum (voraussichtlich): ${abreiseDatum}\n` : ''}${offer?.arrivalFee != null ? `Anreisekosten: ${fmtEuro(offer.arrivalFee)} €\n` : ''}${offer?.departureFee != null ? `Abreisekosten: ${fmtEuro(offer.departureFee)} €\n` : ''}${showSummer ? 'Sommerzuschlag (Juli & August): 6,67 € / Tag\n' : ''}Feiertagszuschlag (an gesetzlichen Feiertagen): doppelter Tagessatz
 Kündigungsfrist: täglich
-Mustervertrag: https://primundus.de/primundus-mustervertrag.pdf
+Mustervertrag: https://kundenportal.primundus.de/primundus-mustervertrag.pdf
 
 ` : '';
 

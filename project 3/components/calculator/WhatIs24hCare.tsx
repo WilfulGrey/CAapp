@@ -5,7 +5,7 @@ export function WhatIs24hCare() {
     <section className="bg-gradient-to-b from-white to-[#F8F7F5] py-12 md:py-16 lg:py-20">
       <div className="container mx-auto px-6 max-w-5xl">
         <div className="text-center mb-10 md:mb-14">
-          <p className="text-xs md:text-sm font-bold uppercase tracking-wider text-[#A89279] mb-2">
+          <p className="text-[14px] font-bold uppercase tracking-wider text-[#A89279] mb-2">
             Das Betreuungskonzept
           </p>
           <h2 className="text-[28px] md:text-[36px] lg:text-[42px] leading-[1.2] font-bold text-[#3D3D3D] mb-6">
@@ -29,7 +29,7 @@ export function WhatIs24hCare() {
                   </div>
                   <div>
                     <h3 className="text-lg font-bold text-[#3D3D3D] mb-2">Leben zu Hause</h3>
-                    <p className="text-[15px] text-[#5A5A5A] leading-relaxed">
+                    <p className="text-[16px] text-[#5A5A5A] leading-relaxed">
                       Ihr Angehöriger bleibt in seiner vertrauten Umgebung, mit seinen Möbeln, Erinnerungen und Gewohnheiten.
                     </p>
                   </div>
@@ -45,7 +45,7 @@ export function WhatIs24hCare() {
                   </div>
                   <div>
                     <h3 className="text-lg font-bold text-[#3D3D3D] mb-2">Persönliche Betreuung</h3>
-                    <p className="text-[15px] text-[#5A5A5A] leading-relaxed">
+                    <p className="text-[16px] text-[#5A5A5A] leading-relaxed">
                       Eine feste Bezugsperson, die sich ausschließlich um Ihren Angehörigen kümmert – keine Schichtarbeit.
                     </p>
                   </div>
@@ -61,7 +61,7 @@ export function WhatIs24hCare() {
                   </div>
                   <div>
                     <h3 className="text-lg font-bold text-[#3D3D3D] mb-2">Flexible Gestaltung</h3>
-                    <p className="text-[15px] text-[#5A5A5A] leading-relaxed">
+                    <p className="text-[16px] text-[#5A5A5A] leading-relaxed">
                       Der Tagesablauf richtet sich nach den Bedürfnissen und Wünschen Ihres Angehörigen.
                     </p>
                   </div>
@@ -77,7 +77,7 @@ export function WhatIs24hCare() {
                   </div>
                   <div>
                     <h3 className="text-lg font-bold text-[#3D3D3D] mb-2">Entlastung für Familien</h3>
-                    <p className="text-[15px] text-[#5A5A5A] leading-relaxed">
+                    <p className="text-[16px] text-[#5A5A5A] leading-relaxed">
                       Sie können sich als Angehöriger zurücklehnen und wieder Zeit für sich selbst haben.
                     </p>
                   </div>
