@@ -57,22 +57,20 @@ export default function HomePage() {
             {/* LCP element — explicit priority + sizes so the optimizer
                 generates a mobile-sized WebP/AVIF and the browser fetches
                 it eagerly with fetchpriority="high". */}
-            {/* PM-Betreuung_hero_mobil-v4.webp (Martin 15.08., 6. Iteration —
-                Personen rechts, Siegel-Zone links freigelegt):
-                Personen zur Mitte, Siegel größer): Zuschnitt 850x427 =
-                (280,55,1130,482) aus PM-Betreuung_frontal_desktop — Köpfe
-                bis Schoß, Paar mittig. Der Rest des einmontierten
-                Foto-Siegels ragt unten links rein und wird vom
-                Overlay-Siegel exakt überdeckt. Dateiname VERSIONIEREN bei
-                jedem neuen Zuschnitt (-v3, …) — Optimizer + Browser cachen
-                per URL, sonst sieht man alte Bilder. */}
+            {/* Neues Shooting von Martin (16.08.) — endlich OHNE einmontiertes
+                Testsieger-Siegel. Bis dahin musste jeder Zuschnitt um das
+                eingebrannte Siegel herumgelegt werden (daher die krummen
+                Crops der Versionen v1-v4). Jetzt: 1672x941 Original, mobil
+                auf 1,63:1 vorbeschnitten (`_mobil`), Siegel liegt frei als
+                Overlay. Dateiname bei neuem Zuschnitt VERSIONIEREN —
+                Optimizer und Browser cachen per URL. */}
             <Image
-              src="/images/PM-Betreuung_hero_mobil-v4.webp"
-              alt="Professionelle 24-Stunden-Betreuung"
+              src="/images/PM-Header-Shooting_mobil-v2.webp"
+              alt="Professionelle 24-Stunden-Betreuung zu Hause"
               fill
               priority
               sizes="(max-width: 1024px) 100vw, 0px"
-              className="object-cover object-[62%_center]"
+              className="object-cover"
             />
             <div className="absolute inset-0 bg-gradient-to-b from-black/15 via-transparent to-transparent pointer-events-none"></div>
             {/* eslint-disable-next-line @next/next/no-img-element */}
