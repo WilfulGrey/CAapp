@@ -739,8 +739,26 @@ export function MultiStepForm({ mode = 'inline' }: MultiStepFormProps = {}) {
   // pt-2 statt pt-6 mobil (CRO 15.08.): der Platz ueber der Karte finanziert
   // die groesseren USP-Zeilen im Hero, ohne die Antwort-Buttons unter das
   // Cookie-Banner zu druecken. Desktop unveraendert (lg:pt-4).
+  // Solange das Overlay offen ist, darf die Seite dahinter nicht mitscrollen —
+  // sonst scrollt der Wisch im Wizard die Landingpage weg.
+  useEffect(() => {
+    if (!fullscreen) return;
+    const vorher = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => { document.body.style.overflow = vorher; };
+  }, [fullscreen]);
+
+  // Offen = ECHTES Overlay (fixed), nicht mehr `relative` im Textfluss
+  // (Martin 16.08.: "warum oeffnet sich das so weit unten und nicht wie bei
+  // allen CTA oben schoen, damit es auch nicht mehr springt").
+  // Vorher stand die Karte an ihrer Stelle im Dokument — beim CTA-Hero also
+  // weit unten hinter dem Text, und die Seite musste erst dorthin scrollen.
+  // Jetzt sitzt sie unabhaengig vom Scrollstand oben im Bild, mit eigenem
+  // Scrollbereich (max-h/overflow) fuer die laengeren Fragen. Damit ist
+  // ueberhaupt kein Scrollen mehr noetig, weder beim Oeffnen noch beim
+  // Fragenwechsel — das war der letzte verbliebene Sprung.
   const outerClass = fullscreen
-    ? "pt-1 pb-6 scroll-mt-24 lg:scroll-mt-32 lg:pt-4 max-w-md sm:max-w-[95%] xl:max-w-[1800px] 2xl:max-w-[2000px] mx-auto px-0 sm:px-4 relative z-[90]"
+    ? "fixed inset-x-0 top-0 z-[90] mx-auto max-h-[100dvh] overflow-y-auto overscroll-contain px-3 pt-3 pb-6 max-w-md sm:max-w-[95%] sm:px-4 xl:max-w-[1800px] 2xl:max-w-[2000px]"
     : "pt-1 pb-6 scroll-mt-24 lg:scroll-mt-32 lg:pt-4 max-w-md sm:max-w-[95%] xl:max-w-[1800px] 2xl:max-w-[2000px] mx-auto px-0 sm:px-4";
 
   // Wenn die Matching-Animation läuft: nur diese rendern (eigenes Layout
