@@ -323,22 +323,11 @@ export function MultiStepForm() {
     };
   }, []);
 
-  // CRO 15.08. (Martin: "vor dieser Frage springt der Bildschirm"): Der
-  // Scroll bei jedem Step-Wechsel stammt aus der Zeit, als das Formular
-  // tief auf der Seite lag. Seit dem Ueber-der-Falz-Umbau steht es beim
-  // Step-Wechsel fast immer schon richtig — dann erzeugte das smooth-
-  // Scrollen nur noch ein sichtbares Zucken. Jetzt wird NUR gescrollt,
-  // wenn der Formular-Kopf wirklich aus dem sichtbaren Bereich raus ist.
-  const scrollFormIntoViewIfNeeded = () => {
-    const el = formRef.current;
-    if (!el) return;
-    const top = el.getBoundingClientRect().top;
-    if (top >= -10 && top <= 160) return; // Kopf ist sichtbar — nicht springen
-    window.scrollTo({
-      top: top + window.pageYOffset - 90,
-      behavior: 'smooth',
-    });
-  };
+  // CRO 15.08., Martins Entscheid: Der Wizard bleibt IMMER an seiner
+  // Startstelle — es wird bei Step-Wechseln grundsaetzlich NICHT
+  // gescrollt (die alten window.scrollTo-Spruenge stammten aus der Zeit,
+  // als das Formular tief auf der Seite lag). Der Nutzer hat gerade an
+  // dieser Position geklickt; die naechste Frage erscheint exakt dort.
 
   const handleNext = async (overrideAnswer?: string | null) => {
     const timeOnStep = Math.round((Date.now() - stepStartRef.current) / 1000);
@@ -366,13 +355,9 @@ export function MultiStepForm() {
       // Animation einblenden. Step-Wechsel erst nach onComplete der Animation.
       if (currentStep === totalSteps - 1) {
         setShowMatching(true);
-        setTimeout(scrollFormIntoViewIfNeeded, 50);
         return;
       }
       setCurrentStep(currentStep + 1);
-      // -90-Ziel wie die CTA-Buttons (HowItWorks / FinalCTA) — aber nur
-      // noch, wenn der Kopf nicht ohnehin sichtbar ist (kein Zucken).
-      setTimeout(scrollFormIntoViewIfNeeded, 50);
     } else if (currentStep === totalSteps) {
       await handleSubmit();
     }
@@ -729,7 +714,6 @@ export function MultiStepForm() {
           onComplete={() => {
             setShowMatching(false);
             setCurrentStep(totalSteps); // = Step 9 (Kontaktformular)
-            setTimeout(scrollFormIntoViewIfNeeded, 50);
           }}
         />
       </div>
