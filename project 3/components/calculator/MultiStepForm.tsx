@@ -340,9 +340,13 @@ export function MultiStepForm() {
     // schnitt iOS (einklappende URL-Leiste) den Kartenkopf oben an
     // (Martins Screenshot 15.08. — "springt unnoetig hoch").
     if (r.top <= 32) return; // steht schon (fast) oben — nicht springen
+    // 'auto' (instant) statt 'smooth': der weiche Scroll lief beim
+    // naechsten schnellen Tap noch und fuehlte sich wie ein ZWEITER
+    // Sprung an (Martin 15.08.). Instant = ein sauberer Schnitt im
+    // Moment des Overlay-Aufklappens, nichts laeuft nach.
     window.scrollTo({
       top: r.top + window.pageYOffset - 24,
-      behavior: 'smooth',
+      behavior: 'auto',
     });
   };
 
