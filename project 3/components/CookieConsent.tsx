@@ -71,13 +71,13 @@ export function CookieConsent() {
           12 % aller Taps der Seite gingen ans Banner. Jetzt: 2-Zeilen-Text,
           Buttons in einer Reihe, „Nur notwendige" gleichwertig sichtbar. */}
       <div className="fixed bottom-0 left-0 right-0 z-50 bg-white border-t border-gray-200 shadow-2xl">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-2">
           <div className="flex flex-col sm:flex-row sm:items-center gap-2.5 sm:gap-4">
             <div className="flex-1 min-w-0 flex items-start gap-2.5">
               <Cookie className="w-4 h-4 text-[#708A95] flex-shrink-0 mt-0.5" aria-hidden="true" />
               <p className="text-xs text-gray-600 leading-snug">
                 <span className="font-semibold text-gray-900">Cookies:</span>{" "}
-                Notwendige für die Funktion, Analytics zur Verbesserung.{" "}
+                notwendige &amp; Analyse-Cookies.{" "}
                 <a
                   href="/datenschutz"
                   className="text-[#708A95] hover:underline font-medium"

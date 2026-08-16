@@ -5,6 +5,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { useState } from "react";
 import { HelpDialog } from "./HelpDialog";
+import { scrollToCalculator } from '@/lib/scroll-to-calculator';
 
 const WA_URL = `https://wa.me/4989200000830?text=${encodeURIComponent("Hallo Frau Wysocki, ich habe eine Rückfrage:")}`;
 
@@ -68,10 +69,7 @@ export function Header() {
 
             {/* Mobile: Anfrage icon (scroll to form) */}
             <button
-              onClick={() => {
-                const el = document.getElementById('calculator-form');
-                if (el) { window.scrollTo({ top: el.getBoundingClientRect().top + window.pageYOffset - 90, behavior: 'smooth' }); }
-              }}
+              onClick={() => scrollToCalculator()}
               className="md:hidden flex w-10 h-10 rounded-full bg-[#E76F63] hover:bg-[#D65E52] transition-all duration-200 items-center justify-center text-white"
               aria-label="Zum Formular"
             >

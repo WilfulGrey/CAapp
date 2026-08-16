@@ -6,6 +6,7 @@ import { CircleCheck as CheckCircle2, Phone } from "lucide-react";
 import Image from "next/image";
 import { analytics } from "@/lib/analytics";
 import { cookieConsent } from "@/lib/cookie-consent";
+import { scrollToCalculator, isCalculatorAligned } from "@/lib/scroll-to-calculator";
 import { useFormTracking } from "@/hooks/use-form-tracking";
 
 // ─── Matching Animation Component ────────────────────────────────────────────
@@ -330,24 +331,15 @@ export function MultiStepForm() {
   // dieser Stelle — bei Step-Wechseln wird grundsaetzlich NICHT mehr
   // gescrollt (die alten Spruenge stammten aus der Zeit, als das
   // Formular tief auf der Seite lag).
+  // Die eine Ausrichtung beim Wizard-Start zielt auf DIESELBE zentrale
+  // Marke wie alle CTA-Buttons (lib/scroll-to-calculator.ts). Wer ueber
+  // einen CTA gekommen ist, steht damit schon richtig — isCalculatorAligned
+  // verhindert den zweiten Scroll (Martin 15.08.: "springe gleich an die
+  // richtige Stelle von allen CTA-Buttons"). 'auto' statt 'smooth': ein
+  // nachlaufender weicher Scroll fuehlte sich wie ein zweiter Sprung an.
   const alignCardOnce = () => {
-    const card = formRef.current?.querySelector('[data-calculator-card]');
-    if (!card) return;
-    const r = card.getBoundingClientRect();
-    // Kartenkopf nach oben mit 24px Luft — ausgerichtet am LAENGSTEN
-    // Schritt (Martin 15.08.): 4-Antworten-Fragen und das Kontaktformular
-    // sind hoeher als der erste Schritt. 24px statt buendig: bei 12px
-    // schnitt iOS (einklappende URL-Leiste) den Kartenkopf oben an
-    // (Martins Screenshot 15.08. — "springt unnoetig hoch").
-    if (r.top <= 32) return; // steht schon (fast) oben — nicht springen
-    // 'auto' (instant) statt 'smooth': der weiche Scroll lief beim
-    // naechsten schnellen Tap noch und fuehlte sich wie ein ZWEITER
-    // Sprung an (Martin 15.08.). Instant = ein sauberer Schnitt im
-    // Moment des Overlay-Aufklappens, nichts laeuft nach.
-    window.scrollTo({
-      top: r.top + window.pageYOffset - 24,
-      behavior: 'auto',
-    });
+    if (isCalculatorAligned()) return;
+    scrollToCalculator('auto');
   };
 
   const handleNext = async (overrideAnswer?: string | null) => {
@@ -717,9 +709,12 @@ export function MultiStepForm() {
 
   // Fokus-Modus nach der ersten Frage: der Rest wird abgedunkelt, das
   // Formular bleibt exakt an seiner Stelle (kein Sprung) und liegt vorne.
+  // pt-2 statt pt-6 mobil (CRO 15.08.): der Platz ueber der Karte finanziert
+  // die groesseren USP-Zeilen im Hero, ohne die Antwort-Buttons unter das
+  // Cookie-Banner zu druecken. Desktop unveraendert (lg:pt-4).
   const outerClass = fullscreen
-    ? "pt-6 pb-6 scroll-mt-24 lg:scroll-mt-32 lg:pt-4 max-w-md sm:max-w-[95%] xl:max-w-[1800px] 2xl:max-w-[2000px] mx-auto px-0 sm:px-4 relative z-[90]"
-    : "pt-6 pb-6 scroll-mt-24 lg:scroll-mt-32 lg:pt-4 max-w-md sm:max-w-[95%] xl:max-w-[1800px] 2xl:max-w-[2000px] mx-auto px-0 sm:px-4";
+    ? "pt-1 pb-6 scroll-mt-24 lg:scroll-mt-32 lg:pt-4 max-w-md sm:max-w-[95%] xl:max-w-[1800px] 2xl:max-w-[2000px] mx-auto px-0 sm:px-4 relative z-[90]"
+    : "pt-1 pb-6 scroll-mt-24 lg:scroll-mt-32 lg:pt-4 max-w-md sm:max-w-[95%] xl:max-w-[1800px] 2xl:max-w-[2000px] mx-auto px-0 sm:px-4";
 
   // Wenn die Matching-Animation läuft: nur diese rendern (eigenes Layout
   // mit Header/Progress) und nach onComplete auf Step 9 (Kontaktformular)

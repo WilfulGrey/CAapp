@@ -1,10 +1,8 @@
 'use client';
 
-export function FinalCTA() {
-  const scrollToCalculator = () => {
-    const el = document.getElementById('calculator-form'); if (el) { window.scrollTo({ top: el.getBoundingClientRect().top + window.pageYOffset - 90, behavior: 'smooth' }); }
-  };
+import { scrollToCalculator } from '@/lib/scroll-to-calculator';
 
+export function FinalCTA() {
   return (
     <section className="py-16 px-5 bg-[#8B7355]">
       <div className="max-w-[640px] mx-auto">
@@ -19,7 +17,7 @@ export function FinalCTA() {
 
         <div className="flex flex-col items-center gap-6">
           <button
-            onClick={scrollToCalculator}
+            onClick={() => scrollToCalculator()}
             className="inline-flex items-center gap-2 px-8 py-4 bg-[#E76F63] hover:bg-[#D65E52] text-white rounded-full text-base md:text-lg font-bold shadow-lg hover:shadow-xl transition-all duration-200"
           >
             Kosten & Pflegekräfte ansehen

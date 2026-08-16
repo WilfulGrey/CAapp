@@ -2,6 +2,7 @@
 
 import Image from 'next/image';
 import { Check, Award, Calendar, Euro, Clock } from 'lucide-react';
+import { scrollToCalculator } from '@/lib/scroll-to-calculator';
 
 export function CareServicesSection() {
   const services = [
@@ -35,10 +36,6 @@ export function CareServicesSection() {
       description: 'Keine Vorauszahlung'
     }
   ];
-
-  const scrollToCalculator = () => {
-    const el = document.getElementById('calculator-form'); if (el) { window.scrollTo({ top: el.getBoundingClientRect().top + window.pageYOffset - 90, behavior: 'smooth' }); }
-  };
 
   return (
     <section className="bg-white py-12 md:py-16 lg:py-20">
@@ -129,7 +126,7 @@ export function CareServicesSection() {
               {/* Block 5: CTA Button */}
               <div className="flex justify-center">
                 <button
-                  onClick={scrollToCalculator}
+                  onClick={() => scrollToCalculator()}
                   className="inline-flex items-center gap-2 px-8 py-4 bg-[#E76F63] hover:bg-[#D65E52] text-white font-bold text-base md:text-lg rounded-full transition-all duration-200 shadow-lg hover:shadow-xl"
                 >
                   Kosten & Pflegekräfte ansehen

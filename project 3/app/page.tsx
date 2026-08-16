@@ -79,17 +79,30 @@ export default function HomePage() {
             />
           </div>
           <div className="px-5 text-center mb-8">
-            <h1 className="text-[24px] md:text-[40px] leading-[1.2] font-bold text-[#3D3D3D] mb-1.5 tracking-tight">
+            <h1 className="text-[22px] md:text-[40px] leading-[1.2] font-bold text-[#3D3D3D] mb-2 tracking-tight">
               24-Stunden-Pflege zu Hause – die bezahlbare Alternative zum Pflegeheim
             </h1>
-            {/* Hero-Subline ersetzt die alte USP-Bullet-Liste (CRO 15.08.,
+            {/* Hero-USPs ersetzen die alte Bullet-Liste (CRO 15.08.,
                 Hypothese 4: Preis vor der E-Mail-Wand zeigen). Wortlaut von
-                Martin freigegeben (15.08., Variante A): Preis + die beiden
-                Kosten-/Risiko-USPs; "in 2 Minuten" steht bewusst NICHT hier
-                — es steht 100px tiefer im roten Wizard-Balken. */}
-            <p className="text-[15px] leading-snug text-[#5B5B5B] mb-2">
-              <strong className="font-semibold text-[#3D3D3D]">Sofortangebot ab 2.200&nbsp;€</strong> · keine Vermittlungsgebühr · kein Vertrag vor Auswahl
-            </p>
+                Martin freigegeben (15.08.); "in 2 Minuten" steht bewusst
+                NICHT hier — es steht 100px tiefer im roten Wizard-Balken.
+                EIN Hinweis-Icon links, Rest als Fließtext (Martin 15.08.:
+                "ein Icon und Rest als Fließtext") — die zwischenzeitliche
+                Variante mit Check-Icon je Zeile war ihm zu listig. */}
+            {/* Hinweis-Kasten statt freier Zeile (Martin 15.08.: "auf
+                schönem Hintergrund, deutlich professioneller"). Bewusst die
+                Karten-Sprache der Seite: weiße Karte + #ECE7DF-Rand wie die
+                "Bekannt aus"-Box, Icon im #FBEEEA-Kreis wie die früheren
+                USP-Bullets. Text LINKSBÜNDIG — zentriert wirkten die drei
+                Zeilen ausgefranst. */}
+            <div className="mx-auto mb-1 flex max-w-[420px] items-center gap-2.5 rounded-xl border border-[#ECE7DF] bg-white px-3.5 py-2.5 text-left shadow-[0_1px_3px_rgba(61,61,61,0.05)]">
+              <span className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-[#FBEEEA]">
+                <svg className="h-[18px] w-[18px] text-[#E76F63]" fill="none" stroke="currentColor" strokeWidth={1.9} strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24" aria-hidden="true"><path d="M15 14c.2-1 .7-1.7 1.5-2.5A5.6 5.6 0 0 0 18 7.7 6 6 0 0 0 6 8c0 1 .2 2.1 1.5 3.5.8.8 1.3 1.5 1.5 2.5" /><path d="M9.2 17.5h5.6" /><path d="M10.3 20.5h3.4" /></svg>
+              </span>
+              <p className="text-[15px] leading-snug text-[#5B5B5B]">
+                <strong className="font-semibold text-[#3D3D3D]">Sofortangebot ab 2.200&nbsp;€</strong> · keine Vermittlungsgebühr · kein Vertrag vor Auswahl nötig
+              </p>
+            </div>
 
             {/* Direct Form Integration — über der Falz (CRO 15.08.) */}
             <div className="max-w-md mx-auto mb-6">
