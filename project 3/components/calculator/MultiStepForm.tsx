@@ -323,11 +323,24 @@ export function MultiStepForm() {
     };
   }, []);
 
-  // CRO 15.08., Martins Entscheid: Der Wizard bleibt IMMER an seiner
-  // Startstelle — es wird bei Step-Wechseln grundsaetzlich NICHT
-  // gescrollt (die alten window.scrollTo-Spruenge stammten aus der Zeit,
-  // als das Formular tief auf der Seite lag). Der Nutzer hat gerade an
-  // dieser Position geklickt; die naechste Frage erscheint exakt dort.
+  // CRO 15.08., Martins Entscheid (zweistufig): (1) Beim Start des
+  // Wizards — Antwort auf die Warm-up-Frage — wird EINMAL gescrollt,
+  // sodass die gesamte Karte bis zum unteren Rand im Viewport steht.
+  // (2) Danach bleibt die Karte fuer alle weiteren Fragen exakt an
+  // dieser Stelle — bei Step-Wechseln wird grundsaetzlich NICHT mehr
+  // gescrollt (die alten Spruenge stammten aus der Zeit, als das
+  // Formular tief auf der Seite lag).
+  const alignCardOnce = () => {
+    const card = formRef.current?.querySelector('[data-calculator-card]');
+    if (!card) return;
+    const r = card.getBoundingClientRect();
+    // Nur wenn die Karte nicht ohnehin komplett sichtbar ist.
+    if (r.top >= 0 && r.bottom <= window.innerHeight) return;
+    window.scrollTo({
+      top: r.top + window.pageYOffset - 12,
+      behavior: 'smooth',
+    });
+  };
 
   const handleNext = async (overrideAnswer?: string | null) => {
     const timeOnStep = Math.round((Date.now() - stepStartRef.current) / 1000);
@@ -843,6 +856,9 @@ export function MultiStepForm() {
                         analytics.trackEvent('wizard', 'warmup_answered', { answer: value });
                         setWarmupAudience(value);
                         setFullscreen(true);
+                        // Die eine Ausrichtung (siehe alignCardOnce) — nach
+                        // dem Re-Render mit den Buttons von Frage 1.
+                        setTimeout(alignCardOnce, 80);
                       }}
                       className={btnClass(false)}
                     >
