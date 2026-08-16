@@ -82,20 +82,14 @@ export default function HomePage() {
             <h1 className="text-[24px] md:text-[40px] leading-[1.2] font-bold text-[#3D3D3D] mb-1.5 tracking-tight">
               24-Stunden-Pflege zu Hause – die bezahlbare Alternative zum Pflegeheim
             </h1>
-            {/* CRO 15.08. (Hypothese 4, Platzierung Martin): Preisspanne als
-                Hero-Subline statt im Kontakt-Schritt. Bewusst SPANNE statt
-                „ab 2.200 €" — ein Ab-Preis ankert am Minimum und enttäuscht
-                bei jedem teureren Angebot. Wortlaut deckt sich mit der
-                öffentlichen FAQ-Antwort (faqData.ts), kein neues Versprechen. */}
-            {/* Zweizeilig (Martin 15.08.): Zeile 1 = die alten USP-Punkte als
-                Satz, Zeile 2 = Preisspanne. Die Bullet-Liste unterm Formular
-                ist damit redundant und entfernt. <br> ab 360px erzwingt den
-                sauberen Umbruch; auf 320ern fließt der Text natürlich. */}
-            {/* 14px + dunkleres Grau (Martin 15.08.: 12.5px/#8B8B8B war
-                "zu klein, zu grau, kann man nicht lesen"). */}
-            <p className="text-[14px] leading-snug text-[#5B5B5B] mb-2.5">
-              <strong className="font-semibold text-[#3D3D3D]">Sofortangebot</strong> in 2 Minuten · kein Vertrag vor Auswahl —{' '}
-              meist <strong className="font-semibold text-[#3D3D3D]">2.200&#8211;3.500&nbsp;€/Monat</strong>
+            {/* Hero-Subline ersetzt die alte USP-Bullet-Liste (CRO 15.08.,
+                Hypothese 4: Preis vor der E-Mail-Wand zeigen).
+                Wortlaut + Größe exakt nach Martins Vorgabe (15.08.):
+                "Sofortangebot in 2 Minuten ab 2.200 € · kein Vertrag vor
+                Auswahl nötig", Text etwas größer (15px, dunkles Grau). */}
+            <p className="text-[15px] leading-snug text-[#5B5B5B] mb-2">
+              <strong className="font-semibold text-[#3D3D3D]">Sofortangebot</strong> in 2 Minuten ab{' '}
+              <strong className="font-semibold text-[#3D3D3D]">2.200&nbsp;€</strong> · kein Vertrag vor Auswahl nötig
             </p>
 
             {/* Direct Form Integration — über der Falz (CRO 15.08.) */}
