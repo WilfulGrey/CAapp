@@ -130,7 +130,7 @@ export default function HomePage() {
                 "Heim" ist die Alternative, die der Kunde selbst erwaegt,
                 kein benannter Wettbewerber (§6 UWG unkritisch). */}
             <h1 className="mb-3.5 tracking-tight text-[#3D3D3D]">
-              <span className="mb-2 block text-[11px] font-semibold uppercase tracking-[0.08em] text-[#E76F63]">
+              <span className="mb-2.5 block text-[14px] font-semibold uppercase tracking-[0.07em] text-[#E76F63]">
                 24-Stunden-Pflege vom Testsieger
               </span>
               <span className="block text-[33px] md:text-[42px] font-bold leading-[1.1]">
@@ -156,29 +156,30 @@ export default function HomePage() {
               <MultiStepForm mode="cta" />
             </div>
 
-            {/* Testsieger + Erfahrung als Streifen "wie im Kundenportal"
-                (Martin 16.08.) — spiegelt die Stats-Leiste aus
-                app/kalkulation/[leadId]/page.tsx. Das Siegel selbst sitzt
-                oben im Foto, hier stehen nur die Zahlen dazu.
+            {/* Beweis-Zeile 1:1 wie im Kundenportal (Martin 16.08.: "den
+                Bereich mit dem Testsieger machen wie im Kundenportal") —
+                Vorlage: src/pages/CustomerPortalPage.tsx, Siegel + EIN
+                Fliesssatz mit fettem Auftakt, Wortlaut von Martin.
+                Der Kommentar dort haelt fest, dass genau die Form, die ich
+                hier zuerst gebaut hatte (Statistik-Spalten), im Portal
+                bereits verworfen wurde. Nicht erneut dorthin zurueck.
 
-                ACHTUNG: "60.000+ Einsaetze" und "20+ Jahre Erfahrung" sind
-                sitewide und in den Anzeigen gesetzt, haben aber im Repo
-                KEINE hinterlegte Quelle — anders als der Testsieger, dessen
-                Original-PDF unter /downloads liegt. Hier uebernommen, nicht
-                neu behauptet; Beleg ist nachzuziehen (content-checkliste). */}
-            <div className="grid max-w-md grid-cols-3 gap-3 border-t border-[#E5E3DF] pt-6">
-              <div>
-                <p className="text-[17px] font-bold leading-tight text-[#3D3D3D]">Testsieger</p>
-                <p className="mt-1 text-[13px] leading-tight text-[#8B8B8B]">DIE WELT 2021</p>
-              </div>
-              <div>
-                <p className="text-[17px] font-bold leading-tight text-[#3D3D3D]">20+ Jahre</p>
-                <p className="mt-1 text-[13px] leading-tight text-[#8B8B8B]">Erfahrung</p>
-              </div>
-              <div>
-                <p className="text-[17px] font-bold leading-tight text-[#3D3D3D]">60.000+</p>
-                <p className="mt-1 text-[13px] leading-tight text-[#8B8B8B]">Einsätze</p>
-              </div>
+                ACHTUNG: "20 Jahre" und "60.000 Betreuungseinsaetze" sind
+                sitewide, im Portal und in den Anzeigen gesetzt, haben aber
+                im Repo KEINE hinterlegte Quelle — anders als der
+                Testsieger, dessen Original-PDF unter /downloads liegt.
+                Uebernommen, nicht neu behauptet; Beleg nachziehen. */}
+            <div className="flex max-w-md items-center gap-3 border-t border-[#E5E3DF] pt-6">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src="/images/primundus_testsieger-2021.webp"
+                alt="Testsieger DIE WELT Service-Champions 2021"
+                className="h-12 w-auto flex-shrink-0 object-contain"
+                loading="lazy"
+              />
+              <p className="text-[16px] leading-snug text-[#5B5B5B]">
+                <span className="font-semibold text-[#3D3D3D]">Testsieger&nbsp;– DIE&nbsp;WELT</span> mit über 20&nbsp;Jahren Erfahrung und 60.000 Betreuungseinsätzen
+              </p>
             </div>
 
             {/* Medialogos als eigene Ebene statt im weissen Trust-Kasten
