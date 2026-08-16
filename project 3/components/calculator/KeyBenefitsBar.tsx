@@ -7,7 +7,7 @@ export function KeyBenefitsBar() {
     {
       icon: Clock,
       title: 'Kurzfristiger',
-      subtitle: 'Betreuungsbeginn (4–7 Tagen)',
+      subtitle: 'Betreuungsbeginn (4–7 Werktagen)',
     },
     {
       icon: Shield,

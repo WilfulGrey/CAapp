@@ -489,7 +489,7 @@ export default function ResultPage() {
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
                 </svg>
               </div>
-              <p className="text-[15px] text-[#3D3D3D] font-semibold text-left">Betreuung startklar in 4–7 Tagen</p>
+              <p className="text-[15px] text-[#3D3D3D] font-semibold text-left">Betreuung startklar in 4–7 Werktagen</p>
             </div>
             <div className="flex items-center gap-3">
               <div className="flex-shrink-0 w-9 h-9 rounded-full bg-[#8B7355]/10 flex items-center justify-center">

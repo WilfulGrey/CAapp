@@ -1,6 +1,6 @@
 'use client';
 
-import { Clock, Mail, Check } from 'lucide-react';
+import { Clock, Check } from 'lucide-react';
 import { scrollToCalculator } from '@/lib/scroll-to-calculator';
 
 export function HowItWorks() {
@@ -24,10 +24,10 @@ export function HowItWorks() {
             </div>
             <div className="pt-0.5 md:pt-5 flex-1">
               <h3 className="font-bold text-[17px] md:text-[18px] lg:text-[20px] mb-1.5 md:mb-2.5 text-[#3D3D3D] leading-snug md:text-center">
-                Angebot online einholen
+                Angebot einholen
               </h3>
               <p className="text-[16px] leading-[1.55] text-[#5A5A5A] mb-2.5 md:text-center">
-                Beantworten Sie wenige kurze Fragen zu Ihrer Pflegesituation. Sie sehen sofort Ihr Angebot & passende Pflegekräfte – inklusive möglicher Zuschüsse und Steuervorteile.
+                Wenige kurze Fragen zur Pflegesituation. Danach sehen Sie sofort Ihren Preis und passende Pflegekräfte — mit allen Zuschüssen und Steuervorteilen.
               </p>
               <span className="inline-flex items-center gap-1.5 bg-[#E8F5E9] text-[#2E7D32] px-3 py-1.5 rounded-lg text-xs font-semibold md:mx-auto">
                 <Clock className="w-3.5 h-3.5" strokeWidth={2} />
@@ -45,14 +45,14 @@ export function HowItWorks() {
             </div>
             <div className="pt-0.5 md:pt-5 flex-1">
               <h3 className="font-bold text-[17px] md:text-[18px] lg:text-[20px] mb-1.5 md:mb-2.5 text-[#3D3D3D] leading-snug md:text-center">
-                Fundierte Entscheidungsgrundlage
+                Auswahl Ihrer Pflegekraft
               </h3>
               <p className="text-[16px] leading-[1.55] text-[#5A5A5A] mb-2.5 md:text-center">
-                Sie erhalten eine vollständige Übersicht mit allen Zuschüssen, Steuervorteilen und Finanzierungsoptionen – zum Vergleichen und Besprechen mit der Familie.
+                Sie erhalten passende Profile mit Foto, Erfahrung und Verfügbarkeit. Sie entscheiden.
               </p>
               <span className="inline-flex items-center gap-1.5 bg-[#E8F5E9] text-[#2E7D32] px-3 py-1.5 rounded-lg text-xs font-semibold md:mx-auto">
-                <Mail className="w-3.5 h-3.5" strokeWidth={2} />
-                Auch per E-Mail erhältlich
+                <Check className="w-3.5 h-3.5" strokeWidth={2.5} />
+                Kein Vertrag vor Ihrer Auswahl
               </span>
             </div>
           </div>
@@ -65,14 +65,16 @@ export function HowItWorks() {
             </div>
             <div className="pt-0.5 md:pt-5 flex-1">
               <h3 className="font-bold text-[17px] md:text-[18px] lg:text-[20px] mb-1.5 md:mb-2.5 text-[#3D3D3D] leading-snug md:text-center">
-                Passende Pflegekräfte erhalten
+                Anreise & Betreuungsbeginn
               </h3>
               <p className="text-[16px] leading-[1.55] text-[#5A5A5A] mb-2.5 md:text-center">
-                Auf Wunsch übermitteln wir Ihnen direkt passende Pflegekräfte-Profile – ohne weiteren Aufwand für Sie.
+                Wir organisieren den Betreuungsvertrag und den Anreisetermin. Unterschrieben wird online im Portal — den{" "}
+                <a href="https://kundenportal.primundus.de/primundus-mustervertrag.pdf" target="_blank" rel="noopener" className="underline underline-offset-2 hover:text-[#3D3D3D]">Mustervertrag</a>{" "}
+                können Sie vorher lesen.
               </p>
               <span className="inline-flex items-center gap-1.5 bg-[#E8F5E9] text-[#2E7D32] px-3 py-1.5 rounded-lg text-xs font-semibold md:mx-auto">
-                <Check className="w-3.5 h-3.5" strokeWidth={2.5} />
-                Mit Bestpreis-Garantie vom Testsieger
+                <Clock className="w-3.5 h-3.5" strokeWidth={2} />
+                Start in 4–7 Werktagen
               </span>
             </div>
           </div>
