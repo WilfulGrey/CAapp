@@ -207,10 +207,10 @@ Deno.test("mapNightOperations: missing → 'no'", () => {
 
 // ─── mapGermanySkill ────────────────────────────────────────────────────────
 // Mapping updated 2026-05-12 (decyzja biznesowa Michała):
-//   grundlegend → level_1 (było level_2)
-//   kommunikativ → level_2 (było level_3)
-//   sehr-gut    → level_4 (unchanged)
-//   level_3 świadomie pomijany — agency picks manually w Mamamia panel.
+//   grundlegend → level_1
+//   kommunikativ → level_2
+//   sehr-gut    → level_3 (poprawka 2026-08-16 — formularz oferuje najwyżej
+//     „Gut"=450 €/Mo; level_4 „Sehr gut"=600 €/Mo tylko przez SA-Portal)
 // NO soft default — unknown/missing value triggers throw (Święta zasada nr 1).
 
 Deno.test("mapGermanySkill: grundlegend → level_1", () => {
@@ -221,12 +221,12 @@ Deno.test("mapGermanySkill: kommunikativ → level_2", () => {
   assertEquals(mapGermanySkill(makeFormularDaten({ deutschkenntnisse: "kommunikativ" })), "level_2");
 });
 
-Deno.test("mapGermanySkill: sehr-gut → level_4", () => {
-  assertEquals(mapGermanySkill(makeFormularDaten({ deutschkenntnisse: "sehr-gut" })), "level_4");
+Deno.test("mapGermanySkill: sehr-gut → level_3", () => {
+  assertEquals(mapGermanySkill(makeFormularDaten({ deutschkenntnisse: "sehr-gut" })), "level_3");
 });
 
-Deno.test("mapGermanySkill: sehr_gut underscore alias → level_4", () => {
-  assertEquals(mapGermanySkill(makeFormularDaten({ deutschkenntnisse: "sehr_gut" })), "level_4");
+Deno.test("mapGermanySkill: sehr_gut underscore alias → level_3", () => {
+  assertEquals(mapGermanySkill(makeFormularDaten({ deutschkenntnisse: "sehr_gut" })), "level_3");
 });
 
 Deno.test("mapGermanySkill: missing throws (no soft default)", () => {
@@ -534,7 +534,7 @@ Deno.test("buildCaregiverWish: real Primundus stage-A fields override defaults",
     fuehrerschein: "ja",
     geschlecht: "maennlich",
   }));
-  assertEquals(wish.germany_skill, "level_4");
+  assertEquals(wish.germany_skill, "level_3");
   assertEquals(wish.driving_license, "yes");
   assertEquals(wish.gender, "male");
 });

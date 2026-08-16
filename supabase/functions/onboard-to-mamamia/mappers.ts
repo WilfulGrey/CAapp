@@ -257,11 +257,24 @@ export function mapOtherPeopleInHouse(fd: FormularDaten): "yes" | "no" {
 // Primundus calculator collects 3 levels (step 7 wymagany, canProceed blokuje
 // dalej bez wyboru). Mapowanie zaktualizowane 2026-05-12 wg decyzji
 // biznesowej Michała:
-//   "grundlegend"  → Mamamia "level_1"   (było level_2)
-//   "kommunikativ" → Mamamia "level_2"   (było level_3)
-//   "sehr-gut"     → Mamamia "level_4"   (unchanged)
-// `level_3` świadomie pomijany — calculator nie ma odpowiadającego pytania,
-// agency może je samodzielnie pickować w panelu Mamamia jeśli chce.
+//   "grundlegend"  → Mamamia "level_1"
+//   "kommunikativ" → Mamamia "level_2"
+//   "sehr-gut"     → Mamamia "level_3"   (POPRAWKA 2026-08-16, patrz niżej)
+//
+// ⚠️ 2026-08-16 (zgłoszenie Martina, klient Felsch pr-10182): klucz
+// "sehr-gut" mapował się TU dalej na level_4, mimo że Bug #30 (10.08.)
+// rozdzielił stopnie: formularz oferuje najwyżej „Gut" = level_3 = 450 €/Mo,
+// a level_4 („Sehr gut", 600 €/Mo) wystawia WYŁĄCZNIE agencja w SA-Portalu.
+// Bug #30 poprawił tylko stronę portalu (`src/lib/mamamia/mappers.ts:
+// requiredGermanyLevelForWish`) — ten mapper został przeoczony, choć tabela
+// w CLAUDE.md już deklarowała level_3.
+// Skutek do dziś: KAŻDY lead z „Gut" startował w mamamii jako level_4;
+// dopiero zapis formularza pacjenta nadpisywał to na level_3 — a robi to
+// tylko ~22 % klientów. Reszta zostawała na level_4 → SA-Portal liczył im
+// 600 €/Mo i rekomendował ~150 € ponad ich własną ofertą.
+// Dowód (prod, 16.08.): Hümmer/Bähr/Krohne/Glatz — bez formularza → level_4;
+// Felsch/Türschmann — z formularzem → level_3.
+// `level_4` NIE jest tu osiągalny — to świadome ograniczenie, nie luka.
 // Mamamia enum 0..4 + "not_important" verified prod sweep 2026-04-28.
 //
 // NO SOFT DEFAULT (Święta zasada nr 1) — gdy formularDaten missing albo
@@ -271,11 +284,11 @@ export function mapOtherPeopleInHouse(fd: FormularDaten): "yes" | "no" {
 // gdy DEBUG_ONBOARD=1).
 export function mapGermanySkill(
   fd: FormularDaten,
-): "level_1" | "level_2" | "level_4" {
+): "level_1" | "level_2" | "level_3" {
   const v = (fd?.deutschkenntnisse ?? "").toString().toLowerCase();
   if (v === "grundlegend") return "level_1";
   if (v === "kommunikativ") return "level_2";
-  if (v === "sehr-gut" || v === "sehr_gut") return "level_4";
+  if (v === "sehr-gut" || v === "sehr_gut") return "level_3";
   throw new Error(
     `mapGermanySkill: unknown deutschkenntnisse value ${JSON.stringify(v)} — ` +
       `calculator should emit one of "grundlegend" / "kommunikativ" / "sehr-gut". ` +
