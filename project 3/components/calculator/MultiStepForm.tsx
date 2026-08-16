@@ -134,7 +134,20 @@ function MatchingAnimation({ onComplete, initialCount }: { onComplete: (finalCou
   );
 }
 
-export function MultiStepForm() {
+interface MultiStepFormProps {
+  /**
+   * 'inline' (Default): Der Wizard liegt direkt auf der Seite — bisheriges
+   * Verhalten, weiter so auf Desktop.
+   * 'cta': Es steht nur ein Button auf der Seite ("Betreuungskraft finden");
+   * der Klick oeffnet den Wizard als Overlay und ueberspringt die
+   * Warm-up-Frage (Martin 16.08., Muster von marta.de/Pflegehelden). Der
+   * Buttonklick IST der kleine erste Schritt, den vorher die Warm-up-Frage
+   * geliefert hat.
+   */
+  mode?: 'inline' | 'cta';
+}
+
+export function MultiStepForm({ mode = 'inline' }: MultiStepFormProps = {}) {
   const { state, updateState, calculate } = useCalculator();
   const [currentStep, setCurrentStep] = useState(1);
   const [fullscreen, setFullscreen] = useState(false);
@@ -751,9 +764,49 @@ export function MultiStepForm() {
     );
   }
 
+  // CTA-Modus: statt des Fragebogens steht nur der Button auf der Seite.
+  // Erst sein Klick oeffnet das Overlay — und zwar direkt bei Frage 1, die
+  // Warm-up-Frage wird uebersprungen (warmupAudience wird gesetzt, ohne dass
+  // der Nutzer sie beantwortet; der Wert ging ohnehin nie irgendwohin).
+  // Messung: 'wizard_opened' ersetzt 'warmup_answered' als Einstiegs-Event;
+  // vergleichbar bleibt ueber beide Varianten step_complete(1).
+  if (mode === 'cta' && !fullscreen) {
+    return (
+      <div ref={formRef} id="calculator-form" className="scroll-mt-24 lg:scroll-mt-32">
+        <button
+          type="button"
+          onClick={() => {
+            analytics.trackEvent('wizard', 'wizard_opened', { source: 'hero_cta' });
+            setWarmupAudience('direct');
+            setFullscreen(true);
+          }}
+          className="w-full rounded-full bg-[#E76F63] px-6 py-4 text-[17px] font-bold text-white shadow-lg transition-all duration-200 hover:bg-[#D65E52] hover:shadow-xl"
+        >
+          Betreuungskraft finden →
+        </button>
+        <div className="mt-3 flex justify-center">
+          <div className="inline-flex items-center gap-2 rounded-full border border-[#A8D5B0] bg-[#F0F7F1] py-1 pl-1.5 pr-3">
+            <div className="flex">
+              {['/images/caregivers/pk-1.jpg','/images/caregivers/pk-2.jpg','/images/caregivers/pk-3.jpg','/images/caregivers/pk-4.jpg'].map((src,i)=>(
+                <span key={src} className={`relative h-6 w-6 flex-shrink-0 overflow-hidden rounded-full border-2 border-white ${i>0?'-ml-2':''}`}>
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={src} alt="" className="absolute inset-0 h-full w-full object-cover" loading="lazy" />
+                </span>
+              ))}
+            </div>
+            <span className="text-[12px] text-[#3A6B42]">
+              <span className="font-bold tabular-nums">{displayCount}</span> Pflegekräfte sofort verfügbar
+            </span>
+          </div>
+        </div>
+        <p className="mt-2 text-center text-[12px] text-[#8B8B8B]">Kostenlos &amp; unverbindlich · in 2 Minuten</p>
+      </div>
+    );
+  }
+
   return (
     <>
-    {fullscreen && <div className="fixed inset-0 bg-black/60 z-[80]" aria-hidden="true" onClick={() => { setFullscreen(false); setWarmupAudience(null); setCurrentStep(1); }} />}
+    {fullscreen && <div className="fixed inset-0 bg-black/60 z-[80]" aria-hidden="true" onClick={() => { setFullscreen(false); if (mode !== 'cta') setWarmupAudience(null); setCurrentStep(1); }} />}
     <div ref={formRef} id="calculator-form" className={outerClass}>
       <div className="relative">
       <div data-calculator-card className="bg-white rounded-2xl border-[1.5px] border-[#C0C0C0] overflow-hidden shadow-md">
@@ -761,7 +814,7 @@ export function MultiStepForm() {
           {fullscreen && currentStep !== totalSteps && (
             <button
               type="button"
-              onClick={() => { setFullscreen(false); setWarmupAudience(null); setCurrentStep(1); }}
+              onClick={() => { setFullscreen(false); if (mode !== 'cta') setWarmupAudience(null); setCurrentStep(1); }}
               aria-label="Schließen"
               className="absolute right-2.5 top-1/2 -translate-y-1/2 w-8 h-8 flex items-center justify-center rounded-full text-white hover:bg-white/20"
             >

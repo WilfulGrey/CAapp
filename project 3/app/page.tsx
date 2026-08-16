@@ -117,9 +117,14 @@ export default function HomePage() {
               ))}
             </ul>
 
-            {/* Direct Form Integration — über der Falz (CRO 15.08.) */}
+            {/* CTA statt Fragebogen auf der Seite (Martin 16.08., Muster von
+                marta.de: "Jetzt Betreuungskraft finden"). Der Klick oeffnet
+                den Wizard als Overlay und ueberspringt die Warm-up-Frage —
+                der Buttonklick ist jetzt der kleine erste Schritt. Damit ist
+                der Hero ruhig: Foto, Ueberschrift, drei Argumente, ein
+                Button. Desktop bleibt vorerst inline (unten). */}
             <div className="max-w-md mx-auto mb-6">
-              <MultiStepForm />
+              <MultiStepForm mode="cta" />
             </div>
 
             {/* USP-Bullets entfernt (Martin 15.08.): stecken jetzt als
