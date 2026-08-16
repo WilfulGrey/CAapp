@@ -334,8 +334,11 @@ export function MultiStepForm() {
     const card = formRef.current?.querySelector('[data-calculator-card]');
     if (!card) return;
     const r = card.getBoundingClientRect();
-    // Nur wenn die Karte nicht ohnehin komplett sichtbar ist.
-    if (r.top >= 0 && r.bottom <= window.innerHeight) return;
+    // Kartenkopf ganz nach oben (12px Luft) — ausgerichtet am LAENGSTEN
+    // Schritt (Martin 15.08.): 4-Antworten-Fragen und das Kontaktformular
+    // sind hoeher als der erste Schritt; nur mit dem Kopf am oberen Rand
+    // ist bei JEDER Antwort maximal viel von der Karte sichtbar.
+    if (r.top <= 20) return; // steht schon oben
     window.scrollTo({
       top: r.top + window.pageYOffset - 12,
       behavior: 'smooth',
