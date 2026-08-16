@@ -82,7 +82,7 @@ export function HowItWorks() {
         <div className="mt-10 md:mt-12 lg:mt-14 text-center">
           <button
             onClick={() => scrollToCalculator()}
-            className="inline-flex items-center gap-2 px-8 py-4 bg-[#E76F63] hover:bg-[#D65E52] text-white font-bold text-base md:text-lg rounded-full transition-all duration-200 shadow-lg hover:shadow-xl"
+            className="inline-flex items-center gap-2 px-8 py-4 bg-[#E76F63] hover:bg-[#D65E52] text-white font-bold text-base md:text-lg rounded-xl transition-all duration-200 shadow-lg hover:shadow-xl"
           >
             Kosten & Pflegekräfte ansehen
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">

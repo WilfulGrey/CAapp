@@ -28,7 +28,7 @@ export function PrimaryCTA({
       onClick={onClick}
       disabled={disabled}
       className={cn(
-        "w-full font-bold py-4 px-6 rounded-full",
+        "w-full font-bold py-4 px-6 rounded-xl",
         "hover:shadow-xl hover:scale-[1.01] active:scale-[0.99]",
         "transition-all duration-200",
         "disabled:opacity-60 disabled:cursor-not-allowed disabled:hover:scale-100 disabled:hover:shadow-lg",
