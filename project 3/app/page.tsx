@@ -74,30 +74,39 @@ export default function HomePage() {
             />
           </div>
           <div className="px-5 text-center mb-8 pt-6">
-            {/* UNSER Text, nur aufgeteilt (Martin 16.08.: "unseren nehmen
-                bzw. anpassen, aber nicht kopieren") — ein erster Entwurf mit
-                "für Ihre Liebsten" war praktisch martas Formulierung. Eine
-                grosse Headline braucht kurzen Text, also steht der Kern in
-                der H1 und unser Positionierungssatz als Unterzeile. Wortlaut
-                unveraendert, nur die Zeilenaufteilung ist neu. */}
-            <h1 className="text-[33px] md:text-[40px] leading-[1.12] font-bold text-[#3D3D3D] mb-3 tracking-tight">
-              24-Stunden-Pflege zu Hause
+            {/* EINE Botschaft statt drei Gruppen (Martin 16.08.: "bei uns
+                ist wieder in 3 Gruppen geteilt ohne richtige Botschaft —
+                was wollen wir erreichen, was bieten wir, pack das in einen
+                geilen Text").
+
+                Ziel: der Angehoerige startet den Fragebogen (87 % der
+                Warm-up-Antworten waren "fuer eine:n Angehoerige:n").
+                Unser Alleinstellungsmerkmal gegen Pflegehelden/Promedica:
+                dort fuellt man ein Formular aus und wird dann angerufen —
+                bei uns sieht man die echten Pflegekraefte MIT Foto und
+                Preis, bevor man sich bindet. Genau das ist jetzt die
+                Headline; die drei frueheren Haekchen-Zeilen (Gebuehr,
+                Vertrag, Pflegekraefte sehen) stecken im Flie\u00dftext der
+                Unterzeile, statt als eigener Block zu konkurrieren.
+
+                EINE konkrete Botschaft (Martin 16.08.: "marta konzentriert
+                sich auf konkrete Botschaft, wir packen alles zusammen — was
+                soll die 4-7 Tage im Header, wir zeigen Sofortangebot und
+                passende Pflegekraefte"). Die Headline ist jetzt woertlich
+                sein Satz. Verworfen unterwegs: Prozess-Headline ("erst
+                sehen, dann entscheiden") und Lieferzeit-Headline ("startklar
+                in 4-7 Werktagen") — beides Detail statt Angebot.
+                Unterzeile loest den Schmerz statt aufzuzaehlen: bei
+                Pflegehelden/Promedica fuellt man ein Formular aus und wartet
+                auf einen Rueckruf. Gebuehr/Vertrag stehen NICHT mehr hier
+                (Martin: nicht alles zusammenpacken) — sie stehen im
+                Trust-Kasten. Keyword "24-Stunden-Pflege" bleibt in der H1. */}
+            <h1 className="text-[31px] md:text-[40px] leading-[1.15] font-bold text-[#3D3D3D] mb-3.5 tracking-tight">
+              24-Stunden-Pflege: Sofortangebot und passende Pflegekräfte
             </h1>
-            <p className="mx-auto mb-5 max-w-[330px] text-[17px] leading-snug text-[#5B5B5B]">
-              Die bezahlbare Alternative zum Pflegeheim.
+            <p className="mx-auto mb-6 max-w-[330px] text-[17px] leading-snug text-[#5B5B5B]">
+              Beides sehen Sie sofort — ohne Rückruf, ohne Wartezeit.
             </p>
-            <ul className="mx-auto mb-6 flex max-w-[300px] flex-col gap-2 text-left text-[15px] leading-tight text-[#5B5B5B]">
-              {[
-                { bold: 'Pflegekräfte sofort einsehen', rest: '' },
-                { bold: '', rest: 'Keine Vermittlungsgebühr' },
-                { bold: '', rest: 'Kein Vertrag vor Auswahl nötig' },
-              ].map(({ bold, rest }) => (
-                <li key={bold + rest} className="flex items-center gap-2">
-                  <svg className="h-[16px] w-[16px] flex-shrink-0 text-[#E76F63]" fill="none" stroke="currentColor" strokeWidth={2.6} strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 13l4 4L19 7" /></svg>
-                  {bold ? <strong className="font-semibold text-[#3D3D3D]">{bold}</strong> : rest}
-                </li>
-              ))}
-            </ul>
 
             {/* CTA statt Fragebogen auf der Seite (Martin 16.08., Muster von
                 marta.de: "Jetzt Betreuungskraft finden"). Der Klick oeffnet
@@ -107,6 +116,25 @@ export default function HomePage() {
                 Button. Desktop bleibt vorerst inline (unten). */}
             <div className="max-w-md mx-auto mb-6">
               <MultiStepForm mode="cta" />
+            </div>
+
+            {/* Siegel zurueck in den Hero (Martin 16.08.: "Siegel muss
+                rein") — aber als eigene Vertrauenszeile unter dem Button,
+                NICHT aufs Foto geklebt. Dort war es der groesste
+                Billig-Verstaerker; hier belegt es die Aussage, statt das
+                Motiv zu zerschneiden. */}
+            <div className="mx-auto mb-8 flex max-w-[330px] items-center justify-center gap-3">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src="/images/primundus_testsieger-2021.webp"
+                alt="DIE WELT Service-Champions 2021"
+                className="h-[52px] w-auto rounded-[4px] border border-[#ECE7DF]"
+                loading="lazy"
+              />
+              <p className="text-left text-[13px] leading-snug text-[#5B5B5B]">
+                <strong className="font-semibold text-[#3D3D3D]">Nr. 1 der Pflegekräfte-Vermittler</strong><br />
+                Testsieger DIE WELT · 20+ Jahre Erfahrung
+              </p>
             </div>
 
             {/* USP-Bullets entfernt (Martin 15.08.): stecken jetzt als
