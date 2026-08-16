@@ -14,11 +14,19 @@ export function Header() {
       <header className="w-full border-b border-[#E5E3DF] bg-white/95 backdrop-blur-lg sticky top-0 z-50 shadow-sm">
         <div className="max-w-[520px] md:max-w-[720px] lg:max-w-[1200px] mx-auto px-5 h-16 md:h-18 lg:h-20 flex items-center justify-between">
           <Link href="/" className="flex items-center">
+            {/* Unschaerfe-Fix (Martin 15.08.): width/height waren mit
+                160x40 (4:1) angegeben, die Datei ist aber 600x106 (5,66:1).
+                Next leitet daraus die srcset-Groessen ab und lieferte fuer
+                den ~181px breiten Slot nur eine 320px-Variante — auf einem
+                3x-Display 1,8-fach hochskaliert = sichtbar unscharf. Jetzt
+                die echten Intrinsic-Masse + sizes, damit die 640er-Variante
+                gezogen wird (~3,4x). */}
             <Image
               src="/images/primundus_logo_header.webp"
               alt="Primundus Logo"
-              width={160}
-              height={40}
+              width={600}
+              height={106}
+              sizes="(max-width: 767px) 190px, (max-width: 1023px) 230px, 250px"
               className="h-8 md:h-10 lg:h-11 w-auto"
               priority
             />

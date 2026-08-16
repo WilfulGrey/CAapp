@@ -46,7 +46,7 @@ export default function HomePage() {
               Seitenverhältnis des Zuschnitts (843:427) -> auf JEDER Breite
               ist das komplette Bild sichtbar (375px -> 190px hoch,
               430px -> 218px). */}
-          <div className="relative w-full aspect-[850/427] overflow-hidden mb-2 bg-[#F8F7F5]">
+          <div className="relative w-full aspect-[850/427] overflow-hidden mb-3 bg-[#F8F7F5]">
             {/* LCP element — explicit priority + sizes so the optimizer
                 generates a mobile-sized WebP/AVIF and the browser fetches
                 it eagerly with fetchpriority="high". */}
@@ -79,7 +79,7 @@ export default function HomePage() {
             />
           </div>
           <div className="px-5 text-center mb-8">
-            <h1 className="text-[24px] md:text-[40px] leading-[1.2] font-bold text-[#3D3D3D] mb-2 tracking-tight">
+            <h1 className="text-[24px] md:text-[40px] leading-[1.2] font-bold text-[#3D3D3D] mb-3 tracking-tight">
               24-Stunden-Pflege zu Hause – die bezahlbare Alternative zum Pflegeheim
             </h1>
             {/* Hero-USPs ersetzen die alte Bullet-Liste (CRO 15.08.,
@@ -97,7 +97,7 @@ export default function HomePage() {
                 erst nach Beratung einen Preis, Pflegehelden gar keinen.
                 Häkchen statt Glühbirne, weil pro Zeile ein Icon steht —
                 gleiche Sprache wie die Trust-Zeile am Kartenfuß. */}
-            <ul className="mx-auto mb-2 flex max-w-[300px] flex-col gap-[3px] text-left text-[15px] leading-tight text-[#5B5B5B]">
+            <ul className="mx-auto mb-3 flex max-w-[300px] flex-col gap-1 text-left text-[15px] leading-tight text-[#5B5B5B]">
               {[
                 { bold: 'Sofortangebot ab 2.200 €', rest: '' },
                 { bold: '', rest: 'Keine Vermittlungsgebühr' },

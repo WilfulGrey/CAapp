@@ -72,12 +72,12 @@ export function CookieConsent() {
           Buttons in einer Reihe, „Nur notwendige" gleichwertig sichtbar. */}
       <div className="fixed bottom-0 left-0 right-0 z-50 bg-white border-t border-gray-200 shadow-2xl">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-2">
-          <div className="flex flex-col sm:flex-row sm:items-center gap-2.5 sm:gap-4">
+          <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4">
             <div className="flex-1 min-w-0 flex items-start gap-2.5">
               <Cookie className="w-4 h-4 text-[#708A95] flex-shrink-0 mt-0.5" aria-hidden="true" />
               <p className="text-xs text-gray-600 leading-snug">
                 <span className="font-semibold text-gray-900">Cookies:</span>{" "}
-                notwendige &amp; Analyse-Cookies.{" "}
+                Funktion &amp; Analyse.{" "}
                 <a
                   href="/datenschutz"
                   className="text-[#708A95] hover:underline font-medium"
@@ -93,7 +93,7 @@ export function CookieConsent() {
               <button
                 onClick={handleOpenSettings}
                 aria-label="Cookie-Einstellungen öffnen"
-                className="flex-shrink-0 p-2 rounded-md border border-gray-300 text-gray-500 hover:bg-gray-50"
+                className="h-8 w-8 flex flex-shrink-0 items-center justify-center rounded-md border border-gray-300 text-gray-500 hover:bg-gray-50"
               >
                 <Settings className="w-4 h-4" />
               </button>
@@ -101,14 +101,14 @@ export function CookieConsent() {
                 variant="outline"
                 size="sm"
                 onClick={handleAcceptNecessary}
-                className="flex-1 sm:flex-none text-xs border-gray-300 hover:bg-gray-50"
+                className="h-8 flex-1 sm:flex-none text-xs border-gray-300 hover:bg-gray-50"
               >
                 Nur notwendige
               </Button>
               <Button
                 size="sm"
                 onClick={handleAcceptAll}
-                className="flex-1 sm:flex-none text-xs bg-[#708A95] hover:bg-[#62808A] text-white"
+                className="h-8 flex-1 sm:flex-none text-xs bg-[#708A95] hover:bg-[#62808A] text-white"
               >
                 Alle akzeptieren
               </Button>
