@@ -83,13 +83,12 @@ export default function HomePage() {
               24-Stunden-Pflege zu Hause – die bezahlbare Alternative zum Pflegeheim
             </h1>
             {/* Hero-Subline ersetzt die alte USP-Bullet-Liste (CRO 15.08.,
-                Hypothese 4: Preis vor der E-Mail-Wand zeigen).
-                Wortlaut + Größe exakt nach Martins Vorgabe (15.08.):
-                "Sofortangebot in 2 Minuten ab 2.200 € · kein Vertrag vor
-                Auswahl nötig", Text etwas größer (15px, dunkles Grau). */}
+                Hypothese 4: Preis vor der E-Mail-Wand zeigen). Wortlaut von
+                Martin freigegeben (15.08., Variante A): Preis + die beiden
+                Kosten-/Risiko-USPs; "in 2 Minuten" steht bewusst NICHT hier
+                — es steht 100px tiefer im roten Wizard-Balken. */}
             <p className="text-[15px] leading-snug text-[#5B5B5B] mb-2">
-              <strong className="font-semibold text-[#3D3D3D]">Sofortangebot</strong> in 2 Minuten ab{' '}
-              <strong className="font-semibold text-[#3D3D3D]">2.200&nbsp;€</strong> · kein Vertrag vor Auswahl nötig
+              <strong className="font-semibold text-[#3D3D3D]">Sofortangebot ab 2.200&nbsp;€</strong> · keine Vermittlungsgebühr · kein Vertrag vor Auswahl
             </p>
 
             {/* Direct Form Integration — über der Falz (CRO 15.08.) */}
