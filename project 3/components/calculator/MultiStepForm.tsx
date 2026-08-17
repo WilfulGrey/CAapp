@@ -1364,7 +1364,7 @@ export function MultiStepForm({ mode = 'inline' }: MultiStepFormProps = {}) {
             {/* War "Keine Werbeanrufe" (Martin 16.08. geaendert). Passt
                 zusaetzlich zur Leitplanke des SEA-Laufs: keine Aussagen
                 ueber Anrufe — das Gespraech ist Teil des Modells. */}
-            <span className="text-[#3D3D3D] font-medium">100 % kostenfrei &amp; unverbindlich</span>
+            <span className="text-[#3D3D3D] font-medium">100&nbsp;% kostenfrei &amp; unverbindlich</span>
           </div>
         </div>
       </div>

@@ -27,14 +27,14 @@ export function HowItWorks() {
             </div>
             <div className="pt-0.5 md:pt-5 flex-1">
               <h3 className="font-bold text-[17px] md:text-[18px] lg:text-[20px] mb-1.5 md:mb-2.5 text-[#3D3D3D] leading-snug">
-                Angebot einholen
+                Sofort Angebot und Pflegekräfte einsehen
               </h3>
               <p className="text-[16px] leading-[1.55] text-[#5A5A5A] mb-2.5">
-                Wenige kurze Fragen zur Pflegesituation. Danach sehen Sie sofort Ihren Preis und passende Pflegekräfte — mit allen Zuschüssen und Steuervorteilen.
+                Sie machen wenige preisrelevante Angaben und hinterlassen für die Kopie des Angebots Ihre Kontaktdaten. Sofort danach sehen Sie Ihr Angebot samt Zuschüssen und Steuervorteilen sowie die passenden Pflegekräfte — die Kopie kommt zusätzlich per E-Mail.
               </p>
               <span className="inline-flex items-center gap-1.5 bg-[#E8F5E9] text-[#2E7D32] px-3 py-1.5 rounded-lg text-xs font-semibold">
                 <Clock className="w-3.5 h-3.5" strokeWidth={2} />
-                Dauert unter 2 Minuten
+                Unter 2 Minuten
               </span>
             </div>
           </div>
@@ -51,14 +51,14 @@ export function HowItWorks() {
             </div>
             <div className="pt-0.5 md:pt-5 flex-1">
               <h3 className="font-bold text-[17px] md:text-[18px] lg:text-[20px] mb-1.5 md:mb-2.5 text-[#3D3D3D] leading-snug">
-                Auswahl Ihrer Pflegekraft
+                Profil vervollständigen — Bewerbungen erhalten
               </h3>
               <p className="text-[16px] leading-[1.55] text-[#5A5A5A] mb-2.5">
-                Sie erhalten passende Profile mit Foto, Erfahrung und Verfügbarkeit. Sie entscheiden.
+                Passt das für Sie, ergänzen Sie die Angaben zu Ihrem Angehörigen. Dann bewerben sich Pflegekräfte bei Ihnen — mit Foto, Erfahrung und Verfügbarkeit.
               </p>
               <span className="inline-flex items-center gap-1.5 bg-[#E8F5E9] text-[#2E7D32] px-3 py-1.5 rounded-lg text-xs font-semibold">
                 <Check className="w-3.5 h-3.5" strokeWidth={2.5} />
-                Kein Vertrag vor Ihrer Auswahl
+                Unverbindlich
               </span>
             </div>
           </div>
@@ -74,12 +74,12 @@ export function HowItWorks() {
             </div>
             <div className="pt-0.5 md:pt-5 flex-1">
               <h3 className="font-bold text-[17px] md:text-[18px] lg:text-[20px] mb-1.5 md:mb-2.5 text-[#3D3D3D] leading-snug">
-                Anreise & Betreuungsbeginn
+                Aussuchen — erst dann der Vertrag
               </h3>
               <p className="text-[16px] leading-[1.55] text-[#5A5A5A] mb-2.5">
-                Wir organisieren den Betreuungsvertrag und den Anreisetermin. Unterschrieben wird online im Portal — den{" "}
+                Sie entscheiden, wer es wird. Erst nach Ihrer Auswahl kommt der Betreuungsvertrag — den{" "}
                 <a href="https://kundenportal.primundus.de/primundus-mustervertrag.pdf" target="_blank" rel="noopener" className="underline underline-offset-2 hover:text-[#3D3D3D]">Mustervertrag</a>{" "}
-                können Sie vorher lesen.
+                können Sie jederzeit vorher lesen. Danach reist Ihre Betreuungskraft an.
               </p>
               <span className="inline-flex items-center gap-1.5 bg-[#E8F5E9] text-[#2E7D32] px-3 py-1.5 rounded-lg text-xs font-semibold">
                 <Clock className="w-3.5 h-3.5" strokeWidth={2} />
