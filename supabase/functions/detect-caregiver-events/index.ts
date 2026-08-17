@@ -74,6 +74,10 @@ export interface EventRow {
   // (pre-migration) rows → treated as the lead's default job by the per-job
   // dedup. Optional so test fixtures can omit it.
   mamamia_job_offer_id?: number | null;
+  // Identität DER Bewerbung (Registry #35). Vor der Umstellung stempelten wir
+  // sie nicht — solche Zeilen liefern null und werden per (Job, Pflegekraft)
+  // behandelt (siehe `seenApps`). Optional, damit Test-Fixtures sie weglassen.
+  application_id?: number | null;
 }
 
 // Für den 72h-Auto-Reject: application_received (mit created_at als
@@ -676,6 +680,12 @@ export async function detect(
   // alte Buchungen blocken also weiterhin nur den ursprünglichen Job.
   const acceptedJk = new Set<string>();
   const jobsWithHistory = new Set<number>();
+  // Bewerbungs-Dedupe: pro APPLICATION (Registry #35). `seenApps` (Paar
+  // Job:Pflegekraft) bleibt daneben bestehen — aber nur noch als Marker
+  // "für dieses Paar existiert Historie OHNE application_id", also für
+  // Zeilen von vor der Umstellung. Erklärung der Auswertung: `freshApps`.
+  const seenAppIds = new Set<number>();
+  const pairsWithAppId = new Set<string>();
   for (const e of pastEvents) {
     if (e.caregiver_id == null) continue;
     const job = e.mamamia_job_offer_id ?? lead.mamamia_job_offer_id;
@@ -683,6 +693,10 @@ export async function detect(
     if (e.event_type === "application_received") seenApps.add(jk(job, e.caregiver_id));
     else if (e.event_type === "caregiver_interest_shown") seenInterests.add(jk(job, e.caregiver_id));
     else if (e.event_type === "application_accepted_internal") acceptedJk.add(jk(job, e.caregiver_id));
+    if (e.event_type === "application_received" && e.application_id != null) {
+      seenAppIds.add(e.application_id);
+      pairsWithAppId.add(jk(job, e.caregiver_id));
+    }
   }
 
   const counts = {
@@ -732,6 +746,8 @@ export async function detect(
     try {
       await detectForJob(lead, jobOfferId, agencyToken, deps, fetcher, {
         seenApps,
+        seenAppIds,
+        pairsWithAppId,
         seenInterests,
         // Notify-Regel (Bug #25, Fall 9239 „Elke Zwolan"):
         //   - DEFAULT-Job: immer (heutiges Verhalten — erste Bewerbung mailt).
@@ -882,6 +898,8 @@ async function detectForJob(
   fetcher: typeof fetch,
   ctx: {
     seenApps: Set<string>;
+    seenAppIds: Set<number>;
+    pairsWithAppId: Set<string>;
     seenInterests: Set<string>;
     notify: boolean;
     statusEvents: AppStatusEventRow[];
@@ -899,7 +917,7 @@ async function detectForJob(
   },
 ): Promise<void> {
   const { secrets } = deps;
-  const { seenApps, seenInterests, notify, statusEvents, counts, photoByCaregiver, activeCg, jk } = ctx;
+  const { seenApps, seenAppIds, pairsWithAppId, seenInterests, notify, statusEvents, counts, photoByCaregiver, activeCg, jk } = ctx;
 
   const [appsRes, interestsRes] = await Promise.all([
     mamamiaRequest<ListApplicationsResponse>({
@@ -931,29 +949,56 @@ async function detectForJob(
   // Seeds sind mail-los und sollen die Historie VOLLSTÄNDIG registrieren.
   let notifyBudget = NOTIFY_CAP_PER_JOB_RUN;
 
+  // Dedupe-Schlüssel ist die APPLICATION, nicht das Paar (Job, Pflegekraft)
+  // (Registry #35). Vorher galt: eine Pflegekraft, die auf denselben Job schon
+  // einmal beworben war, konnte NIE wieder eine Mail auslösen — die zweite
+  // Einstellung derselben Pflegekraft (neue Bewerbung, typischerweise mit
+  // anderem Satz und anderen Terminen) war für den Kunden unsichtbar.
+  //
+  // Drei Fälle, in dieser Reihenfolge:
+  //   a) id ist bekannt          → still (Idempotenz des 15-Minuten-Scans;
+  //                                DAS ist der eigentliche Zweck des Dedupe)
+  //   b) Paar hat NUR Historie ohne application_id (Zeilen von vor der
+  //      Umstellung) → wir können "dieselbe" nicht von "neu" unterscheiden.
+  //      Deshalb EINMAL still registrieren (seed, keine Mail) statt zu raten;
+  //      ab dann greift (a)/(c) exakt. Selbstheilend nach einem Lauf.
+  //   c) alles andere            → neue Bewerbung ⇒ Mail (auch bei derselben
+  //                                Pflegekraft auf demselben Job)
+  const seedOnly = new Set<number>();
   const freshApps = apps
-    .filter((a) => a.caregiver_id != null && !seenApps.has(jk(jobOfferId, a.caregiver_id)))
+    .filter((a) => {
+      if (a.caregiver_id == null) return false;
+      if (a.id != null && seenAppIds.has(a.id)) return false; // (a)
+      const pair = jk(jobOfferId, a.caregiver_id);
+      if (seenApps.has(pair) && !pairsWithAppId.has(pair)) {
+        if (a.id != null) seedOnly.add(a.id); // (b)
+      }
+      return true; // (c)
+    })
     .sort((a, b) => (b.id ?? 0) - (a.id ?? 0));
 
   for (const app of freshApps) {
-    if (notify && notifyBudget <= 0) {
+    // Seed-Zeilen (Fall b) verbrauchen kein Notify-Budget und mailen nicht.
+    const notifyThis = notify && !(app.id != null && seedOnly.has(app.id));
+    if (notifyThis && notifyBudget <= 0) {
       console.warn(
         `[detect][cap] lead=${lead.id} job=${jobOfferId}: Notify-Budget (${NOTIFY_CAP_PER_JOB_RUN}) erschöpft — Bewerbung cg=${app.caregiver_id} wartet auf den nächsten Run`,
       );
       continue; // kein Event ⇒ nächster Run holt sie mit frischem Budget nach
     }
-    if (notify) notifyBudget -= 1;
+    if (notifyThis) notifyBudget -= 1;
     const ok = await fireBridgeEvent(
       "application_received",
       lead.token,
       app.caregiver_id as number,
       app.caregiver,
       jobOfferId,
-      notify,
+      notifyThis,
       secrets.kostenrechnerUrl,
       counts,
       fetcher,
       {
+        id: app.id,
         salary: app.salary,
         arrival_at: app.arrival_at,
         departure_at: app.departure_at,
@@ -963,7 +1008,15 @@ async function detectForJob(
     );
     if (ok) {
       counts.new_applications += 1;
-      seenApps.add(jk(jobOfferId, app.caregiver_id as number)); // guard against dup apps in one sweep
+      const pair = jk(jobOfferId, app.caregiver_id as number);
+      seenApps.add(pair); // guard against dup apps in one sweep
+      // Ab jetzt trägt dieses Paar eine application_id — die Legacy-Regel (b)
+      // greift nicht mehr, die nächste ANDERE Bewerbung derselben Pflegekraft
+      // mailt also.
+      if (app.id != null) {
+        seenAppIds.add(app.id);
+        pairsWithAppId.add(pair);
+      }
     }
   }
 
@@ -1170,7 +1223,9 @@ async function fireBridgeEvent(
   kostenrechnerUrl: string,
   counts: { skipped_no_caregiver_data: number; bridge_errors: number },
   fetchFn: typeof fetch,
-  offer?: Pick<ApplicationNode, "salary" | "arrival_at" | "departure_at" | "arrival_fee" | "departure_fee">,
+  // `id` = application_id; optional, weil der Annahme-Detektor (Buchung im
+  // Panel) keine Bewerbung in der Hand hat, nur den Job.
+  offer?: Pick<ApplicationNode, "salary" | "arrival_at" | "departure_at" | "arrival_fee" | "departure_fee"> & { id?: number | null },
 ): Promise<boolean> {
   const metadata = buildCaregiverMetadata(caregiverId, caregiver);
   if (!metadata.caregiver_name) {
@@ -1187,6 +1242,9 @@ async function fireBridgeEvent(
   // Konditionen der Bewerbung mitschicken (nur application_received) — Mail B
   // rendert daraus die Konditionen-Bühne (Tagessatz/Datum/Reisekosten).
   if (offer) {
+    // Identität DER Bewerbung (Registry #35) — Grundlage des Dedupe im nächsten
+    // Lauf. Ohne dieses Feld fällt das Paar zurück auf die Legacy-Regel.
+    if (offer.id != null) metadata.application_id = offer.id;
     if (offer.salary != null) metadata.offer_salary = offer.salary;
     if (offer.arrival_at != null) metadata.offer_arrival_at = offer.arrival_at;
     if (offer.departure_at != null) metadata.offer_departure_at = offer.departure_at;
@@ -1477,6 +1535,7 @@ function makeRealSupabase(url: string, serviceKey: string): DetectSupabase {
         event_type: row.event_type as EventType,
         caregiver_id: extractCaregiverId(row.metadata),
         mamamia_job_offer_id: row.mamamia_job_offer_id ?? null,
+        application_id: extractMetadataInt(row.metadata, "application_id"),
       }));
     },
     async fetchAppStatusEvents(leadId: string) {
@@ -1575,15 +1634,19 @@ function makeRealSupabase(url: string, serviceKey: string): DetectSupabase {
   };
 }
 
-function extractCaregiverId(metadata: unknown): number | null {
+function extractMetadataInt(metadata: unknown, key: string): number | null {
   if (!metadata || typeof metadata !== "object") return null;
-  const raw = (metadata as Record<string, unknown>).caregiver_id;
+  const raw = (metadata as Record<string, unknown>)[key];
   if (typeof raw === "number") return raw;
   if (typeof raw === "string") {
     const n = Number(raw);
     return Number.isFinite(n) ? n : null;
   }
   return null;
+}
+
+function extractCaregiverId(metadata: unknown): number | null {
+  return extractMetadataInt(metadata, "caregiver_id");
 }
 
 // ─── Deno.serve bootstrap ──────────────────────────────────────────────────
