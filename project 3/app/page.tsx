@@ -182,12 +182,12 @@ export default function HomePage() {
             {/* Linie OBEN und UNTEN (Martin 16.08.: "auch unter den Logos
                 einen Strich wie drueber") — die Reihe wird dadurch zu einem
                 eigenen Band statt zu einem offenen Anhaengsel. */}
-            <div className="mx-auto max-w-[560px] border-y border-[#E5E3DF] py-6 lg:mx-0 lg:max-w-none">
+            <div className="mx-auto max-w-[560px] border-t border-[#E5E3DF] py-6 lg:mx-0 lg:max-w-none lg:border-b">
               <p className="mb-4 text-[11px] font-semibold uppercase tracking-[0.08em] text-[#8B8B8B]">Bekannt aus</p>
               {/* Ab lg ueber die ganze Breite verteilt statt in einer Ecke
                   geklumpt — dafuer `justify-between`. Bild der Frau + FAZ
                   erst ab sm, sonst wird die Reihe auf dem Handy zu eng. */}
-              <div className="flex flex-wrap items-center gap-x-4 gap-y-3 sm:gap-x-5 lg:justify-between lg:gap-x-8">
+              <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-3 sm:gap-x-5 lg:gap-x-8">
                 <img src="/images/media/ard.webp" alt="ARD" loading="lazy" decoding="async" className="h-[20px] object-contain opacity-80 sm:h-[24px] lg:h-[32px]" />
                 <img src="/images/media/ndr.webp" alt="NDR" loading="lazy" decoding="async" className="h-[20px] object-contain opacity-80 sm:h-[24px] lg:h-[32px]" />
                 <img src="/images/media/sat1.webp" alt="SAT.1" loading="lazy" decoding="async" className="h-[20px] object-contain opacity-80 sm:h-[24px] lg:h-[32px]" />
