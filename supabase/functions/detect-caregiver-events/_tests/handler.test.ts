@@ -343,6 +343,31 @@ Deno.test("Legacy-Event ohne application_id → stiller Seed, KEINE Mail", async
   assertEquals(recorder[0].metadata.application_id, 1); // ab jetzt bekannt
 });
 
+Deno.test("Legacy-Paar, aber Bewerbung NACH der Umstellung (hohe id) → Mail, kein Seed", async () => {
+  resetCaches();
+  const recorder: BridgeOptions["recorder"] = [];
+  // Alt-Historie ohne application_id — die Bewerbung selbst ist aber neu
+  // (id > PRE_SWITCH_MAX_APP_ID). Genau der Fall app11664/Robert S.: vorher
+  // wurde er still geseedet und die Kundin erfuhr nichts.
+  const seenEvents: EventRow[] = [
+    { event_type: "application_received", caregiver_id: 50001 },
+  ];
+  const res = await handleRequest(makeReq({ lead_id: VALID_LEAD.id }), {
+    secrets: SECRETS,
+    supabase: makeSupabase(VALID_LEAD, seenEvents),
+    fetchFn: makeFetch(
+      { apps: [{ id: 99999, caregiver_id: 50001, salary: 2450, caregiver: makeCaregiver() }] },
+      { recorder },
+    ),
+  });
+  const body = await res.json();
+  assertEquals(body.new_applications, 1);
+  assertEquals(recorder.length, 1);
+  assertEquals(recorder[0].notify, true);
+  assertEquals(recorder[0].metadata.seeded, undefined);
+  assertEquals(recorder[0].metadata.application_id, 99999);
+});
+
 Deno.test("bekannte application_id → still (Idempotenz des 15-Minuten-Scans)", async () => {
   resetCaches();
   const recorder: BridgeOptions["recorder"] = [];
