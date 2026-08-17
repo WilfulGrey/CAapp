@@ -163,7 +163,10 @@ export default function HomePage() {
                 Wir zeigen Ihnen sofort,{" "}
                 <span className="font-semibold text-[#3D3D3D]">was es kostet</span> und{" "}
                 <span className="font-semibold text-[#3D3D3D]">welche Pflegekräfte verfügbar sind</span>{" "}
-                – 100 % kostenfrei und unverbindlich.
+                {/* Geschuetztes Leerzeichen: durch die fetten Anker verschob
+                    sich der Umbruch, und bei 375 px stand "– 100" am Zeilenende
+                    und "% kostenfrei" in der naechsten Zeile. */}
+                – 100&nbsp;% kostenfrei und unverbindlich.
               </p>
 
               {/* CTA-Modus jetzt auf ALLEN Breiten. Vorher lief auf dem
