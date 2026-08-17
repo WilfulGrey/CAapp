@@ -16,20 +16,23 @@ export function HowItWorks() {
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8 md:gap-6 lg:gap-10">
           <div className="flex md:flex-col gap-5">
-            <div className="flex flex-col items-center flex-shrink-0">
+            {/* items-start ab md: die Zahl stand sonst mittig ueber dem
+                    linksbuendigen Text (Martin 16.08.: "die Punkte 1,2,3
+                    muessen dann auch linksbuendig"). */}
+            <div className="flex flex-col items-center md:items-start flex-shrink-0">
               <div className="w-12 h-12 md:w-14 md:h-14 lg:w-16 lg:h-16 rounded-full bg-[#5C4033] text-white flex items-center justify-center font-bold text-lg md:text-xl lg:text-2xl">
                 1
               </div>
               <div className="w-0.5 flex-1 md:hidden bg-[#F0EBE3] mt-1.5"></div>
             </div>
             <div className="pt-0.5 md:pt-5 flex-1">
-              <h3 className="font-bold text-[17px] md:text-[18px] lg:text-[20px] mb-1.5 md:mb-2.5 text-[#3D3D3D] leading-snug md:text-center">
+              <h3 className="font-bold text-[17px] md:text-[18px] lg:text-[20px] mb-1.5 md:mb-2.5 text-[#3D3D3D] leading-snug">
                 Angebot einholen
               </h3>
-              <p className="text-[16px] leading-[1.55] text-[#5A5A5A] mb-2.5 md:text-center">
+              <p className="text-[16px] leading-[1.55] text-[#5A5A5A] mb-2.5">
                 Wenige kurze Fragen zur Pflegesituation. Danach sehen Sie sofort Ihren Preis und passende Pflegekräfte — mit allen Zuschüssen und Steuervorteilen.
               </p>
-              <span className="inline-flex items-center gap-1.5 bg-[#E8F5E9] text-[#2E7D32] px-3 py-1.5 rounded-lg text-xs font-semibold md:mx-auto">
+              <span className="inline-flex items-center gap-1.5 bg-[#E8F5E9] text-[#2E7D32] px-3 py-1.5 rounded-lg text-xs font-semibold">
                 <Clock className="w-3.5 h-3.5" strokeWidth={2} />
                 Dauert unter 2 Minuten
               </span>
@@ -37,20 +40,23 @@ export function HowItWorks() {
           </div>
 
           <div className="flex md:flex-col gap-5">
-            <div className="flex flex-col items-center flex-shrink-0">
+            {/* items-start ab md: die Zahl stand sonst mittig ueber dem
+                    linksbuendigen Text (Martin 16.08.: "die Punkte 1,2,3
+                    muessen dann auch linksbuendig"). */}
+            <div className="flex flex-col items-center md:items-start flex-shrink-0">
               <div className="w-12 h-12 md:w-14 md:h-14 lg:w-16 lg:h-16 rounded-full bg-[#5C4033] text-white flex items-center justify-center font-bold text-lg md:text-xl lg:text-2xl">
                 2
               </div>
               <div className="w-0.5 flex-1 md:hidden bg-[#F0EBE3] mt-1.5"></div>
             </div>
             <div className="pt-0.5 md:pt-5 flex-1">
-              <h3 className="font-bold text-[17px] md:text-[18px] lg:text-[20px] mb-1.5 md:mb-2.5 text-[#3D3D3D] leading-snug md:text-center">
+              <h3 className="font-bold text-[17px] md:text-[18px] lg:text-[20px] mb-1.5 md:mb-2.5 text-[#3D3D3D] leading-snug">
                 Auswahl Ihrer Pflegekraft
               </h3>
-              <p className="text-[16px] leading-[1.55] text-[#5A5A5A] mb-2.5 md:text-center">
+              <p className="text-[16px] leading-[1.55] text-[#5A5A5A] mb-2.5">
                 Sie erhalten passende Profile mit Foto, Erfahrung und Verfügbarkeit. Sie entscheiden.
               </p>
-              <span className="inline-flex items-center gap-1.5 bg-[#E8F5E9] text-[#2E7D32] px-3 py-1.5 rounded-lg text-xs font-semibold md:mx-auto">
+              <span className="inline-flex items-center gap-1.5 bg-[#E8F5E9] text-[#2E7D32] px-3 py-1.5 rounded-lg text-xs font-semibold">
                 <Check className="w-3.5 h-3.5" strokeWidth={2.5} />
                 Kein Vertrag vor Ihrer Auswahl
               </span>
@@ -58,21 +64,24 @@ export function HowItWorks() {
           </div>
 
           <div className="flex md:flex-col gap-5">
-            <div className="flex flex-col items-center flex-shrink-0">
+            {/* items-start ab md: die Zahl stand sonst mittig ueber dem
+                    linksbuendigen Text (Martin 16.08.: "die Punkte 1,2,3
+                    muessen dann auch linksbuendig"). */}
+            <div className="flex flex-col items-center md:items-start flex-shrink-0">
               <div className="w-12 h-12 md:w-14 md:h-14 lg:w-16 lg:h-16 rounded-full bg-[#5C4033] text-white flex items-center justify-center font-bold text-lg md:text-xl lg:text-2xl">
                 3
               </div>
             </div>
             <div className="pt-0.5 md:pt-5 flex-1">
-              <h3 className="font-bold text-[17px] md:text-[18px] lg:text-[20px] mb-1.5 md:mb-2.5 text-[#3D3D3D] leading-snug md:text-center">
+              <h3 className="font-bold text-[17px] md:text-[18px] lg:text-[20px] mb-1.5 md:mb-2.5 text-[#3D3D3D] leading-snug">
                 Anreise & Betreuungsbeginn
               </h3>
-              <p className="text-[16px] leading-[1.55] text-[#5A5A5A] mb-2.5 md:text-center">
+              <p className="text-[16px] leading-[1.55] text-[#5A5A5A] mb-2.5">
                 Wir organisieren den Betreuungsvertrag und den Anreisetermin. Unterschrieben wird online im Portal — den{" "}
                 <a href="https://kundenportal.primundus.de/primundus-mustervertrag.pdf" target="_blank" rel="noopener" className="underline underline-offset-2 hover:text-[#3D3D3D]">Mustervertrag</a>{" "}
                 können Sie vorher lesen.
               </p>
-              <span className="inline-flex items-center gap-1.5 bg-[#E8F5E9] text-[#2E7D32] px-3 py-1.5 rounded-lg text-xs font-semibold md:mx-auto">
+              <span className="inline-flex items-center gap-1.5 bg-[#E8F5E9] text-[#2E7D32] px-3 py-1.5 rounded-lg text-xs font-semibold">
                 <Clock className="w-3.5 h-3.5" strokeWidth={2} />
                 Start in 4–7 Werktagen
               </span>
