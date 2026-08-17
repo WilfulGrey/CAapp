@@ -16,7 +16,10 @@ export function HowItWorks() {
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8 md:gap-6 lg:gap-10">
           <div className="flex md:flex-col gap-5">
-            <div className="flex flex-col items-center flex-shrink-0">
+            {/* items-start ab md: die Zahl stand sonst mittig ueber dem
+                    linksbuendigen Text (Martin 16.08.: "die Punkte 1,2,3
+                    muessen dann auch linksbuendig"). */}
+            <div className="flex flex-col items-center md:items-start flex-shrink-0">
               <div className="w-12 h-12 md:w-14 md:h-14 lg:w-16 lg:h-16 rounded-full bg-[#5C4033] text-white flex items-center justify-center font-bold text-lg md:text-xl lg:text-2xl">
                 1
               </div>
@@ -37,7 +40,10 @@ export function HowItWorks() {
           </div>
 
           <div className="flex md:flex-col gap-5">
-            <div className="flex flex-col items-center flex-shrink-0">
+            {/* items-start ab md: die Zahl stand sonst mittig ueber dem
+                    linksbuendigen Text (Martin 16.08.: "die Punkte 1,2,3
+                    muessen dann auch linksbuendig"). */}
+            <div className="flex flex-col items-center md:items-start flex-shrink-0">
               <div className="w-12 h-12 md:w-14 md:h-14 lg:w-16 lg:h-16 rounded-full bg-[#5C4033] text-white flex items-center justify-center font-bold text-lg md:text-xl lg:text-2xl">
                 2
               </div>
@@ -58,7 +64,10 @@ export function HowItWorks() {
           </div>
 
           <div className="flex md:flex-col gap-5">
-            <div className="flex flex-col items-center flex-shrink-0">
+            {/* items-start ab md: die Zahl stand sonst mittig ueber dem
+                    linksbuendigen Text (Martin 16.08.: "die Punkte 1,2,3
+                    muessen dann auch linksbuendig"). */}
+            <div className="flex flex-col items-center md:items-start flex-shrink-0">
               <div className="w-12 h-12 md:w-14 md:h-14 lg:w-16 lg:h-16 rounded-full bg-[#5C4033] text-white flex items-center justify-center font-bold text-lg md:text-xl lg:text-2xl">
                 3
               </div>

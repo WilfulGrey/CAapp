@@ -31,10 +31,14 @@ export default function HomePage() {
       <Header />
 
       {/* Hero Section - Split Layout on Desktop */}
-      {/* `lg:flex` zentriert den Hero vertikal in der Bildschirmhoehe. Alles
-          darin muss deshalb in EINEM Flex-Kind stecken — sonst stellt sich
-          ein zweiter Block (die Beweis-Zeile) daneben statt darunter. */}
-      <div className="w-full mb-8 lg:mb-0 lg:min-h-[90vh] lg:flex lg:items-center lg:bg-gradient-to-b lg:from-[#F8F7F5] lg:via-white lg:to-white">
+      {/* FESTER Abstand statt vertikaler Zentrierung (Martin 16.08.: "oben
+          ist jetzt zu viel Luft zum Menuebalken auf Desktop").
+          Vorher: `lg:min-h-[90vh] lg:flex lg:items-center`. Der Hero ist
+          aber nur ~580px hoch, der Rest der 90vh wurde als Luft ueber und
+          unter dem Inhalt verteilt — gemessen 156px zwischen Header und
+          Kicker, und auf hohen Bildschirmen waere es noch mehr geworden.
+          Jetzt ein Padding, das auf jeder Bildschirmhoehe gleich bleibt. */}
+      <div className="w-full mb-8 lg:mb-0 lg:bg-gradient-to-b lg:from-[#F8F7F5] lg:via-white lg:to-white lg:pb-4 lg:pt-12">
        <div className="w-full">
         {/* Mobile/Tablet: Stacked Layout.
             CRO 15.08. (Funnel-Befund): Beim Laden war KEIN Antwort-Button
@@ -71,10 +75,9 @@ export default function HomePage() {
             darueber proportional (gedeckelt, damit es auf sehr breiten
             Schirmen nicht das Motiv frisst). Auch Abstaende prozentual,
             sonst klebt es bei grossen Breiten in der Ecke. */}
-        {/* lg:pt-12 — der Kicker stand sonst direkt unter dem Sticky-Header
-            (Martin 16.08.: "24-Stunden-Pflege vom Testsieger ist zu nah
-            oben am Menue"). */}
-        <div className="mx-auto grid w-full max-w-[1280px] items-center lg:grid-cols-[46fr_54fr] lg:gap-12 lg:px-8 lg:pt-12 xl:gap-16">
+        {/* Der Abstand zum Menue sitzt am Wrapper darueber (lg:pt-12), nicht
+            hier — sonst addieren sich zwei Paddings. */}
+        <div className="mx-auto grid w-full max-w-[1280px] items-center lg:grid-cols-[46fr_54fr] lg:gap-12 lg:px-8 xl:gap-16">
 
           <div className="relative aspect-[1100/941] w-full overflow-hidden bg-[#F8F7F5] lg:order-2 lg:rounded-2xl">
             <Image
@@ -174,19 +177,21 @@ export default function HomePage() {
             zu zeigen war Wiederholung, kein Beweis. */}
         <div className="bg-white lg:bg-transparent">
           <div className="mx-auto w-full max-w-[1280px] px-5 pb-9 lg:px-8 lg:pb-0 lg:pt-10">
-            <div className="mx-auto max-w-[560px] border-t border-[#E5E3DF] pt-6 lg:mx-0 lg:max-w-none">
+            {/* Linie OBEN und UNTEN (Martin 16.08.: "auch unter den Logos
+                einen Strich wie drueber") — die Reihe wird dadurch zu einem
+                eigenen Band statt zu einem offenen Anhaengsel. */}
+            <div className="mx-auto max-w-[560px] border-y border-[#E5E3DF] py-6 lg:mx-0 lg:max-w-none">
               <p className="mb-4 text-[11px] font-semibold uppercase tracking-[0.08em] text-[#8B8B8B]">Bekannt aus</p>
               {/* Ab lg ueber die ganze Breite verteilt statt in einer Ecke
-                  geklumpt — dafuer `justify-between` und etwas groessere
-                  Logos. Bild der Frau + FAZ erst ab sm, sonst wird die
-                  Reihe auf dem Handy zu eng. */}
+                  geklumpt — dafuer `justify-between`. Bild der Frau + FAZ
+                  erst ab sm, sonst wird die Reihe auf dem Handy zu eng. */}
               <div className="flex flex-wrap items-center gap-x-5 gap-y-3 lg:justify-between lg:gap-x-8">
-                <img src="/images/media/ard.webp" alt="ARD" loading="lazy" decoding="async" className="h-[20px] object-contain opacity-80 lg:h-[26px]" />
-                <img src="/images/media/ndr.webp" alt="NDR" loading="lazy" decoding="async" className="h-[20px] object-contain opacity-80 lg:h-[26px]" />
-                <img src="/images/media/sat1.webp" alt="SAT.1" loading="lazy" decoding="async" className="h-[20px] object-contain opacity-80 lg:h-[26px]" />
-                <img src="/images/media/die-welt.webp" alt="Die Welt" loading="lazy" decoding="async" className="h-[20px] object-contain opacity-80 lg:h-[26px]" />
-                <img src="/images/media/bild-der-frau.webp" alt="Bild der Frau" loading="lazy" decoding="async" className="hidden h-[20px] object-contain opacity-80 sm:block lg:h-[26px]" />
-                <img src="/images/media/frankfurter-allgemeine.webp" alt="Frankfurter Allgemeine" loading="lazy" decoding="async" className="hidden h-[20px] object-contain opacity-80 sm:block lg:h-[26px]" />
+                <img src="/images/media/ard.webp" alt="ARD" loading="lazy" decoding="async" className="h-[24px] object-contain opacity-80 lg:h-[32px]" />
+                <img src="/images/media/ndr.webp" alt="NDR" loading="lazy" decoding="async" className="h-[24px] object-contain opacity-80 lg:h-[32px]" />
+                <img src="/images/media/sat1.webp" alt="SAT.1" loading="lazy" decoding="async" className="h-[24px] object-contain opacity-80 lg:h-[32px]" />
+                <img src="/images/media/die-welt.webp" alt="Die Welt" loading="lazy" decoding="async" className="h-[24px] object-contain opacity-80 lg:h-[32px]" />
+                <img src="/images/media/bild-der-frau.webp" alt="Bild der Frau" loading="lazy" decoding="async" className="hidden h-[24px] object-contain opacity-80 sm:block lg:h-[32px]" />
+                <img src="/images/media/frankfurter-allgemeine.webp" alt="Frankfurter Allgemeine" loading="lazy" decoding="async" className="hidden h-[24px] object-contain opacity-80 sm:block lg:h-[32px]" />
               </div>
             </div>
           </div>
