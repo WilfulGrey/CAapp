@@ -1,6 +1,6 @@
 'use client';
 
-import { scrollToCalculator } from '@/lib/scroll-to-calculator';
+import { openCalculator } from '@/lib/scroll-to-calculator';
 
 export function ComparisonSection() {
   return (
@@ -128,7 +128,7 @@ export function ComparisonSection() {
           </p>
 
           <button
-            onClick={() => scrollToCalculator()}
+            onClick={() => openCalculator('vergleich')}
             className="inline-flex w-full sm:w-auto items-center justify-center gap-2 px-4 sm:px-8 py-4 bg-[#E76F63] hover:bg-[#D65E52] text-white font-bold text-base md:text-lg rounded-xl transition-all duration-200 shadow-lg hover:shadow-xl"
           >
             Kosten & Pflegekräfte ansehen

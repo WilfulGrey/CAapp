@@ -6,7 +6,7 @@ import { CircleCheck as CheckCircle2, Phone } from "lucide-react";
 import Image from "next/image";
 import { analytics } from "@/lib/analytics";
 import { cookieConsent } from "@/lib/cookie-consent";
-import { scrollToCalculator, isCalculatorAligned } from "@/lib/scroll-to-calculator";
+import { scrollToCalculator, isCalculatorAligned, OPEN_CALCULATOR_EVENT } from "@/lib/scroll-to-calculator";
 import { useFormTracking } from "@/hooks/use-form-tracking";
 
 // ─── Matching Animation Component ────────────────────────────────────────────
@@ -69,15 +69,12 @@ function MatchingAnimation({ onComplete, initialCount }: { onComplete: (finalCou
         <p className="text-sm text-white" style={{ opacity: 0.85 }}>Wir bereiten Ihr persönliches Angebot vor</p>
       </div>
 
-      <div className="px-3 sm:px-4 py-2 bg-[#F8F7F5]/50 border-b border-[#E5E3DF]/30">
-        <div className="h-1.5 bg-[#E5E3DF] rounded-full overflow-hidden">
-          <div
-            className="h-full bg-[#708A95] rounded-full transition-all duration-700 ease-out"
-            style={{ width: done ? '100%' : activeStep === 0 ? '75%' : activeStep === 1 ? '85%' : '95%' }}
-          />
-        </div>
-      </div>
-
+      {/* KEIN Fortschrittsbalken hier (Martin 17.08.: "mach die
+          Schrittebalken im Formular nicht auch noch fuer diesen
+          Warte-Screen als Schritte — das ist ja nix, was der Kunde
+          ausfuellt"). Der Balken gehoert zu den Fragen, die der Kunde
+          beantwortet; hier arbeiten wir, er wartet nur. Die drei
+          animierten Zeilen darunter zeigen den Fortschritt ohnehin. */}
       <div className="px-5 sm:px-8 pt-8 pb-6">
         <div className="space-y-6">
           {ANIM_STEPS.map((s, i) => {
@@ -739,6 +736,23 @@ export function MultiStepForm({ mode = 'inline' }: MultiStepFormProps = {}) {
   // pt-2 statt pt-6 mobil (CRO 15.08.): der Platz ueber der Karte finanziert
   // die groesseren USP-Zeilen im Hero, ohne die Antwort-Buttons unter das
   // Cookie-Banner zu druecken. Desktop unveraendert (lg:pt-4).
+  // CTAs ueber die ganze Seite oeffnen den Wizard direkt (Martin 17.08.).
+  // Sie liegen in Komponenten, die den Wizard sonst nicht kennen — deshalb
+  // ein Fenster-Event statt Context/Prop-Kette (lib/scroll-to-calculator.ts).
+  // Der Hero rendert MultiStepForm genau EINMAL, also gibt es auch nur einen
+  // Zuhoerer; `source` unterscheidet im Event, welcher Button es war.
+  useEffect(() => {
+    const oeffnen = (e: Event) => {
+      const source = (e as CustomEvent<{ source?: string }>).detail?.source ?? 'cta';
+      analytics.trackEvent('wizard', 'wizard_opened', { source });
+      setWarmupAudience('direct');
+      setCurrentStep(1);
+      setFullscreen(true);
+    };
+    window.addEventListener(OPEN_CALCULATOR_EVENT, oeffnen);
+    return () => window.removeEventListener(OPEN_CALCULATOR_EVENT, oeffnen);
+  }, []);
+
   // Solange das Overlay offen ist, darf die Seite dahinter nicht mitscrollen —
   // sonst scrollt der Wisch im Wizard die Landingpage weg.
   useEffect(() => {
