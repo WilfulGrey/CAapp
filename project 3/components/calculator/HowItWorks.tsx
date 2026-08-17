@@ -30,7 +30,7 @@ export function HowItWorks() {
                 Sofort Angebot und Pflegekräfte einsehen
               </h3>
               <p className="text-[16px] leading-[1.55] text-[#5A5A5A] mb-2.5">
-                Sie machen ein paar preisrelevante Angaben — Pflegegrad, Mobilität, Hilfe in der Nacht — und hinterlassen Ihre Kontaktdaten. Ihr Angebot mit allen Zuschüssen und Steuervorteilen erhalten Sie zusätzlich per E-Mail.
+                Sie machen wenige preisrelevante Angaben und hinterlassen für die Kopie des Angebots Ihre Kontaktdaten. Sofort danach sehen Sie Ihr Angebot samt Zuschüssen und Steuervorteilen sowie die passenden Pflegekräfte — die Kopie kommt zusätzlich per E-Mail.
               </p>
               <span className="inline-flex items-center gap-1.5 bg-[#E8F5E9] text-[#2E7D32] px-3 py-1.5 rounded-lg text-xs font-semibold">
                 <Clock className="w-3.5 h-3.5" strokeWidth={2} />
