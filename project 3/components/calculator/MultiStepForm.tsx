@@ -807,7 +807,9 @@ export function MultiStepForm({ mode = 'inline' }: MultiStepFormProps = {}) {
         >
           Kosten &amp; Pflegekräfte ansehen →
         </button>
-        <div className="mt-3 flex">
+        {/* Zaehler zentriert unter dem Button (Martin 16.08.) — er gehoert
+            zum Button, nicht zur linksbuendigen Textspalte darueber. */}
+        <div className="mt-3 flex justify-center">
           <div className="inline-flex items-center gap-2 rounded-full border border-[#A8D5B0] bg-[#F0F7F1] py-1 pl-1.5 pr-3">
             <div className="flex">
               {['/images/caregivers/pk-1.jpg','/images/caregivers/pk-2.jpg','/images/caregivers/pk-3.jpg','/images/caregivers/pk-4.jpg'].map((src,i)=>(
@@ -837,7 +839,7 @@ export function MultiStepForm({ mode = 'inline' }: MultiStepFormProps = {}) {
         {/* Schriftgroesse: NIE kleiner als die Hero-Unterzeile ueber dem
             Button (16px, app/page.tsx) — Martin 16.08. Diese drei Zeilen
             sind der Message-Match zu den Anzeigen, nicht Kleingedrucktes. */}
-        <ul className="mt-5 flex flex-col gap-3">
+        <ul className="mt-5 flex flex-col gap-3 pl-1.5">
           {[
             'Keine Vermittlungsgebühr',
             'Kein Vertrag vor Ihrer Auswahl',

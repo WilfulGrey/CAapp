@@ -71,7 +71,10 @@ export default function HomePage() {
             darueber proportional (gedeckelt, damit es auf sehr breiten
             Schirmen nicht das Motiv frisst). Auch Abstaende prozentual,
             sonst klebt es bei grossen Breiten in der Ecke. */}
-        <div className="mx-auto grid w-full max-w-[1280px] items-center lg:grid-cols-[46fr_54fr] lg:gap-12 lg:px-8 xl:gap-16">
+        {/* lg:pt-12 — der Kicker stand sonst direkt unter dem Sticky-Header
+            (Martin 16.08.: "24-Stunden-Pflege vom Testsieger ist zu nah
+            oben am Menue"). */}
+        <div className="mx-auto grid w-full max-w-[1280px] items-center lg:grid-cols-[46fr_54fr] lg:gap-12 lg:px-8 lg:pt-12 xl:gap-16">
 
           <div className="relative aspect-[1100/941] w-full overflow-hidden bg-[#F8F7F5] lg:order-2 lg:rounded-2xl">
             <Image
@@ -161,61 +164,30 @@ export default function HomePage() {
           </div>
         </div>
 
-        {/* Beweis-Zeile UNTER Bild und Text, ueber die volle Breite
-            (Martin 16.08.: "mach den Testsieger links und dann die
-            Medialogos daneben, dann ist das unter dem Bild und eine
-            bessere Aufteilung").
+        {/* Nur noch die MEDIALOGOS unter Bild und Text, ueber die volle
+            Breite (Martin 16.08.).
 
-            Vorher standen beide unten in der Textspalte: die linke Seite
-            wurde dadurch deutlich laenger als das Foto daneben, und die
-            sechs Logos passten nicht in die halbe Breite — die
-            Frankfurter Allgemeine rutschte allein in eine zweite Zeile.
-            Hier unten haben sie die ganze Breite und stehen nebeneinander.
-
-            ACHTUNG zu den Zahlen: "20 Jahre" und "60.000
-            Betreuungseinsaetze" sind sitewide, im Portal und in den
-            Anzeigen gesetzt, haben aber im Repo KEINE hinterlegte Quelle —
-            anders als der Testsieger mit seinem PDF unter /downloads.
-            Uebernommen, nicht neu behauptet; Beleg nachziehen. */}
+            Die Testsieger-Zeile stand hier bis eben daneben und ist RAUS:
+            "brauchen wir im Header nicht, weil im Bild und darunter sofort
+            sichtbar" — das Siegel liegt im Foto, und die Testsieger-Sektion
+            mit dem Beleg-PDF folgt weiter unten auf der Seite. Sie dreimal
+            zu zeigen war Wiederholung, kein Beweis. */}
         <div className="bg-white lg:bg-transparent">
           <div className="mx-auto w-full max-w-[1280px] px-5 pb-9 lg:px-8 lg:pb-0 lg:pt-10">
-            <div className="mx-auto flex max-w-[560px] flex-col gap-6 border-t border-[#E5E3DF] pt-6 lg:mx-0 lg:max-w-none lg:flex-row lg:items-center lg:justify-between lg:gap-12">
-
-              {/* Wortlaut und Aufbau 1:1 wie im Kundenportal
-                  (src/pages/CustomerPortalPage.tsx): Siegel links, EIN
-                  Fliesssatz mit fettem Auftakt. Der Kommentar dort haelt
-                  fest, dass Statistik-Spalten bereits verworfen wurden —
-                  nicht dorthin zurueck. */}
-              <div className="flex flex-shrink-0 items-center gap-3 lg:max-w-[440px]">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src="/images/primundus_testsieger-2021.webp"
-                  alt="Testsieger DIE WELT Service-Champions 2021"
-                  className="h-16 w-auto flex-shrink-0 object-contain"
-                  loading="lazy"
-                />
-                <p className="text-[16px] leading-snug text-[#5B5B5B]">
-                  <span className="font-semibold text-[#3D3D3D]">Testsieger&nbsp;– DIE&nbsp;WELT</span> mit über 20&nbsp;Jahren Erfahrung und 60.000 Betreuungseinsätzen
-                </p>
+            <div className="mx-auto max-w-[560px] border-t border-[#E5E3DF] pt-6 lg:mx-0 lg:max-w-none">
+              <p className="mb-4 text-[11px] font-semibold uppercase tracking-[0.08em] text-[#8B8B8B]">Bekannt aus</p>
+              {/* Ab lg ueber die ganze Breite verteilt statt in einer Ecke
+                  geklumpt — dafuer `justify-between` und etwas groessere
+                  Logos. Bild der Frau + FAZ erst ab sm, sonst wird die
+                  Reihe auf dem Handy zu eng. */}
+              <div className="flex flex-wrap items-center gap-x-5 gap-y-3 lg:justify-between lg:gap-x-8">
+                <img src="/images/media/ard.webp" alt="ARD" loading="lazy" decoding="async" className="h-[20px] object-contain opacity-80 lg:h-[26px]" />
+                <img src="/images/media/ndr.webp" alt="NDR" loading="lazy" decoding="async" className="h-[20px] object-contain opacity-80 lg:h-[26px]" />
+                <img src="/images/media/sat1.webp" alt="SAT.1" loading="lazy" decoding="async" className="h-[20px] object-contain opacity-80 lg:h-[26px]" />
+                <img src="/images/media/die-welt.webp" alt="Die Welt" loading="lazy" decoding="async" className="h-[20px] object-contain opacity-80 lg:h-[26px]" />
+                <img src="/images/media/bild-der-frau.webp" alt="Bild der Frau" loading="lazy" decoding="async" className="hidden h-[20px] object-contain opacity-80 sm:block lg:h-[26px]" />
+                <img src="/images/media/frankfurter-allgemeine.webp" alt="Frankfurter Allgemeine" loading="lazy" decoding="async" className="hidden h-[20px] object-contain opacity-80 sm:block lg:h-[26px]" />
               </div>
-
-              {/* Medialogos daneben statt im weissen Trust-Kasten (der ist
-                  aufgeloest — er zeigte dieselben Logos und dasselbe
-                  "20+ Jahre & Testsieger" ein zweites Mal).
-                  Bild der Frau + FAZ erst ab sm, sonst wird die Reihe auf
-                  dem Handy zu eng. */}
-              <div className="border-t border-[#E5E3DF] pt-6 lg:border-t-0 lg:pt-0">
-                <p className="mb-4 text-[11px] font-semibold uppercase tracking-[0.08em] text-[#8B8B8B] lg:text-right">Bekannt aus</p>
-                <div className="flex flex-wrap items-center gap-x-5 gap-y-3 lg:justify-end lg:gap-x-6">
-                  <img src="/images/media/ard.webp" alt="ARD" loading="lazy" decoding="async" className="h-[20px] object-contain opacity-80" />
-                  <img src="/images/media/ndr.webp" alt="NDR" loading="lazy" decoding="async" className="h-[20px] object-contain opacity-80" />
-                  <img src="/images/media/sat1.webp" alt="SAT.1" loading="lazy" decoding="async" className="h-[20px] object-contain opacity-80" />
-                  <img src="/images/media/die-welt.webp" alt="Die Welt" loading="lazy" decoding="async" className="h-[20px] object-contain opacity-80" />
-                  <img src="/images/media/bild-der-frau.webp" alt="Bild der Frau" loading="lazy" decoding="async" className="hidden h-[20px] object-contain opacity-80 sm:block" />
-                  <img src="/images/media/frankfurter-allgemeine.webp" alt="Frankfurter Allgemeine" loading="lazy" decoding="async" className="hidden h-[20px] object-contain opacity-80 sm:block" />
-                </div>
-              </div>
-
             </div>
           </div>
         </div>
