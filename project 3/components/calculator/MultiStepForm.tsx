@@ -8,6 +8,7 @@ import { analytics } from "@/lib/analytics";
 import { cookieConsent } from "@/lib/cookie-consent";
 import { scrollToCalculator, isCalculatorAligned, OPEN_CALCULATOR_EVENT } from "@/lib/scroll-to-calculator";
 import { useFormTracking } from "@/hooks/use-form-tracking";
+import { naechsterDrift, naechsterAbstandMs } from "@/lib/counter-drift";
 
 // ─── Matching Animation Component ────────────────────────────────────────────
 // Läuft zwischen letzter Frage (Step 8) und Kontaktformular (Step 9). 3 Schritte
@@ -182,12 +183,51 @@ export function MultiStepForm({ mode = 'inline' }: MultiStepFormProps = {}) {
   const displayCountRef = useRef(dailyBase);
   const [displayCount, setDisplayCount] = useState(dailyBase);
 
+  /**
+   * Leichte Eigenbewegung des Zaehlers — Schrittlogik und Grenzen liegen in
+   * `lib/counter-drift.ts` (dort steht auch, warum die Zahl lebendiger, aber
+   * nicht echter wird).
+   *
+   * Der Versatz ist bewusst eigener State und NICHT Teil von
+   * getMatchingCount(): so bleibt die Antwort-Logik pur, und beide Effekte
+   * laufen durch dieselbe Tween-Schleife — kein Ruckeln, wenn eine Antwort
+   * und ein Drift-Schritt zusammenfallen.
+   *
+   * ERST NACH MOUNT: der Server rendert Versatz 0, sonst Hydration-Mismatch.
+   */
+  const [drift, setDrift] = useState(0);
+
   useEffect(() => {
-    const target = getMatchingCount();
+    // Wer Bewegung im System abgestellt hat, bekommt auch hier keine.
+    if (
+      typeof window === 'undefined' ||
+      window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
+    ) {
+      return;
+    }
+    let timer: ReturnType<typeof setTimeout>;
+    const tick = () => {
+      // Im unsichtbaren Tab NICHT weiterlaufen: requestAnimationFrame ruht
+      // dort, die Tweens wuerden sich aufstauen und beim Zurueckkommen alle
+      // auf einmal abfeuern. Der Schritt wird uebersprungen, nicht nachgeholt.
+      if (!document.hidden) {
+        setDrift((d) => naechsterDrift(d, Math.random()));
+      }
+      timer = setTimeout(tick, naechsterAbstandMs(Math.random()));
+    };
+    timer = setTimeout(tick, naechsterAbstandMs(Math.random()));
+    return () => clearTimeout(timer);
+  }, []);
+
+  useEffect(() => {
+    const target = Math.max(12, getMatchingCount() + drift);
     const start = displayCountRef.current;
     if (target === start) return;
     let rafId: number;
-    const duration = 600;
+    // Die Drift laeuft langsamer als ein Antwort-Sprung: eine Antwort ist
+    // eine Reaktion auf den Klick und darf zackig sein, die Drift soll
+    // nebenbei passieren.
+    const duration = Math.abs(target - start) <= 1 ? 1400 : 600;
     const startTime = performance.now();
     const frame = (now: number) => {
       const t = Math.min((now - startTime) / duration, 1);
@@ -198,7 +238,7 @@ export function MultiStepForm({ mode = 'inline' }: MultiStepFormProps = {}) {
     };
     rafId = requestAnimationFrame(frame);
     return () => cancelAnimationFrame(rafId);
-  }, [currentStep, state.patientCount, state.householdOthers, state.pflegegrad, state.mobility, state.nightCare, state.germanLevel, state.driving, state.gender]);
+  }, [currentStep, drift, state.patientCount, state.householdOthers, state.pflegegrad, state.mobility, state.nightCare, state.germanLevel, state.driving, state.gender]);
   const [formData, setFormData] = useState({
     name: '',
     email: '',
