@@ -27,10 +27,10 @@ export function HowItWorks() {
             </div>
             <div className="pt-0.5 md:pt-5 flex-1">
               <h3 className="font-bold text-[17px] md:text-[18px] lg:text-[20px] mb-1.5 md:mb-2.5 text-[#3D3D3D] leading-snug">
-                Angebot einholen
+                Sofort Angebot und Pflegekräfte einsehen
               </h3>
               <p className="text-[16px] leading-[1.55] text-[#5A5A5A] mb-2.5">
-                Ein paar Fragen zum Pflegebedarf, dann Ihre Kontaktdaten — und Sie sehen sofort Ihr Angebot mit allen Zuschüssen und die passenden Pflegekräfte.
+                Ein paar Fragen zum Pflegebedarf, dann Ihre Kontaktdaten — mehr braucht es nicht. Inklusive aller Zuschüsse und Steuervorteile.
               </p>
               <span className="inline-flex items-center gap-1.5 bg-[#E8F5E9] text-[#2E7D32] px-3 py-1.5 rounded-lg text-xs font-semibold">
                 <Clock className="w-3.5 h-3.5" strokeWidth={2} />
