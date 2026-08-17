@@ -958,10 +958,10 @@ async function detectForJob(
   // Drei Fälle, in dieser Reihenfolge:
   //   a) id ist bekannt          → still (Idempotenz des 15-Minuten-Scans;
   //                                DAS ist der eigentliche Zweck des Dedupe)
-  //   b) Paar hat NUR Historie ohne application_id (Zeilen von vor der
-  //      Umstellung) → wir können "dieselbe" nicht von "neu" unterscheiden.
-  //      Deshalb EINMAL still registrieren (seed, keine Mail) statt zu raten;
-  //      ab dann greift (a)/(c) exakt. Selbstheilend nach einem Lauf.
+  //   b) Paar hat NUR Historie ohne application_id UND die Bewerbung ist selbst
+  //      älter als die Umstellung (id <= PRE_SWITCH_MAX_APP_ID) → "dieselbe oder
+  //      neu?" ist nicht entscheidbar. Deshalb EINMAL still registrieren (seed,
+  //      keine Mail) statt zu raten; ab dann greift (a)/(c) exakt.
   //   c) alles andere            → neue Bewerbung ⇒ Mail (auch bei derselben
   //                                Pflegekraft auf demselben Job)
   const seedOnly = new Set<number>();
@@ -970,8 +970,11 @@ async function detectForJob(
       if (a.caregiver_id == null) return false;
       if (a.id != null && seenAppIds.has(a.id)) return false; // (a)
       const pair = jk(jobOfferId, a.caregiver_id);
-      if (seenApps.has(pair) && !pairsWithAppId.has(pair)) {
-        if (a.id != null) seedOnly.add(a.id); // (b)
+      if (
+        seenApps.has(pair) && !pairsWithAppId.has(pair) &&
+        a.id != null && a.id <= PRE_SWITCH_MAX_APP_ID
+      ) {
+        seedOnly.add(a.id); // (b)
       }
       return true; // (c)
     })
@@ -1101,6 +1104,17 @@ const AUTO_REJECT_AFTER_HOURS = 72;
 // Folge-Runs nach — 3 pro 15 Minuten, bis alles gemailt ist. Nichts wird
 // dauerhaft verschluckt (Fall 9239).
 const NOTIFY_CAP_PER_JOB_RUN = 3;
+
+// Höchste application_id, die es zum Umstellungszeitpunkt auf application_id-
+// Dedupe gab (Registry #35, prod 17.08.2026, live aus den Scan-Logs abgelesen).
+// Mamamias application_id ist auto-increment, also gilt: alles DARÜBER ist nach
+// der Umstellung entstanden und damit zweifelsfrei eine NEUE Bewerbung — die
+// muss mailen, auch wenn das Paar (Job, Pflegekraft) nur id-lose Alt-Historie
+// hat. Ohne diese Grenze hätte jedes Alt-Paar genau eine echte, neue Bewerbung
+// still verschluckt (aufgefallen an app11664/Robert S., 2450 €).
+// Die Konstante ist ein historischer Stempel und muss NICHT gepflegt werden:
+// jede neue Bewerbung stempelt ihre id ins Event, damit läuft Fall (b) aus.
+const PRE_SWITCH_MAX_APP_ID = 11652;
 const AUTO_REJECT_MESSAGE =
   "Automatische Absage — keine Rückmeldung des Kunden innerhalb 72 Stunden.";
 const AUTO_REJECT_DEFAULT_LIVE = true;
