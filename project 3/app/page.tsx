@@ -38,7 +38,7 @@ export default function HomePage() {
           unter dem Inhalt verteilt — gemessen 156px zwischen Header und
           Kicker, und auf hohen Bildschirmen waere es noch mehr geworden.
           Jetzt ein Padding, das auf jeder Bildschirmhoehe gleich bleibt. */}
-      <div className="w-full mb-8 lg:mb-0 lg:bg-gradient-to-b lg:from-[#F8F7F5] lg:via-white lg:to-white lg:pb-4 lg:pt-12">
+      <div className="w-full lg:bg-gradient-to-b lg:from-[#F8F7F5] lg:via-white lg:to-white lg:pb-4 lg:pt-12">
        <div className="w-full">
         {/* Mobile/Tablet: Stacked Layout.
             CRO 15.08. (Funnel-Befund): Beim Laden war KEIN Antwort-Button
@@ -178,7 +178,7 @@ export default function HomePage() {
             mit dem Beleg-PDF folgt weiter unten auf der Seite. Sie dreimal
             zu zeigen war Wiederholung, kein Beweis. */}
         <div className="bg-white lg:bg-transparent">
-          <div className="mx-auto w-full max-w-[1280px] px-5 pb-9 lg:px-8 lg:pb-0 lg:pt-10">
+          <div className="mx-auto w-full max-w-[1280px] px-5 pb-2 lg:px-8 lg:pb-0 lg:pt-10">
             {/* Linie OBEN und UNTEN (Martin 16.08.: "auch unter den Logos
                 einen Strich wie drueber") — die Reihe wird dadurch zu einem
                 eigenen Band statt zu einem offenen Anhaengsel. */}
