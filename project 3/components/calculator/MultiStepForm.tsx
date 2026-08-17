@@ -839,7 +839,9 @@ export function MultiStepForm({ mode = 'inline' }: MultiStepFormProps = {}) {
         {/* Schriftgroesse: NIE kleiner als die Hero-Unterzeile ueber dem
             Button (16px, app/page.tsx) — Martin 16.08. Diese drei Zeilen
             sind der Message-Match zu den Anzeigen, nicht Kleingedrucktes. */}
-        <ul className="mt-5 flex flex-col gap-3 pl-1.5">
+        {/* Einrueckung erst ab lg: auf 375px schob sie "Taeglich kuendbar,
+            taggenau abgerechnet" in eine zweite Zeile. */}
+        <ul className="mt-5 flex flex-col gap-3 lg:pl-1.5">
           {[
             'Keine Vermittlungsgebühr',
             'Kein Vertrag vor Ihrer Auswahl',

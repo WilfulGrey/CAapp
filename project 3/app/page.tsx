@@ -135,7 +135,9 @@ export default function HomePage() {
                   Vertrauensanker in EINER Zeile, das Siegel im Foto belegt
                   ihn. Damit steht "24-Stunden-Pflege" wieder IN der H1. */}
               <h1 className="mb-3.5 tracking-tight text-[#3D3D3D]">
-                <span className="mb-2.5 block text-[14px] font-semibold uppercase tracking-[0.07em] text-[#E76F63]">
+                {/* Auf dem Desktop groesser (Martin 16.08.): 14px standen
+                    dort unter einer 44px-H1 wie eine Fussnote. */}
+                <span className="mb-2.5 block text-[14px] font-semibold uppercase tracking-[0.07em] text-[#E76F63] lg:mb-3 lg:text-[18px] lg:tracking-[0.06em]">
                   24-Stunden-Pflege vom Testsieger
                 </span>
                 <span className="block text-[33px] font-bold leading-[1.1] sm:text-[40px] lg:text-[44px] xl:text-[50px]">
@@ -185,13 +187,13 @@ export default function HomePage() {
               {/* Ab lg ueber die ganze Breite verteilt statt in einer Ecke
                   geklumpt — dafuer `justify-between`. Bild der Frau + FAZ
                   erst ab sm, sonst wird die Reihe auf dem Handy zu eng. */}
-              <div className="flex flex-wrap items-center gap-x-5 gap-y-3 lg:justify-between lg:gap-x-8">
-                <img src="/images/media/ard.webp" alt="ARD" loading="lazy" decoding="async" className="h-[24px] object-contain opacity-80 lg:h-[32px]" />
-                <img src="/images/media/ndr.webp" alt="NDR" loading="lazy" decoding="async" className="h-[24px] object-contain opacity-80 lg:h-[32px]" />
-                <img src="/images/media/sat1.webp" alt="SAT.1" loading="lazy" decoding="async" className="h-[24px] object-contain opacity-80 lg:h-[32px]" />
-                <img src="/images/media/die-welt.webp" alt="Die Welt" loading="lazy" decoding="async" className="h-[24px] object-contain opacity-80 lg:h-[32px]" />
-                <img src="/images/media/bild-der-frau.webp" alt="Bild der Frau" loading="lazy" decoding="async" className="hidden h-[24px] object-contain opacity-80 sm:block lg:h-[32px]" />
-                <img src="/images/media/frankfurter-allgemeine.webp" alt="Frankfurter Allgemeine" loading="lazy" decoding="async" className="hidden h-[24px] object-contain opacity-80 sm:block lg:h-[32px]" />
+              <div className="flex flex-wrap items-center gap-x-4 gap-y-3 sm:gap-x-5 lg:justify-between lg:gap-x-8">
+                <img src="/images/media/ard.webp" alt="ARD" loading="lazy" decoding="async" className="h-[20px] object-contain opacity-80 sm:h-[24px] lg:h-[32px]" />
+                <img src="/images/media/ndr.webp" alt="NDR" loading="lazy" decoding="async" className="h-[20px] object-contain opacity-80 sm:h-[24px] lg:h-[32px]" />
+                <img src="/images/media/sat1.webp" alt="SAT.1" loading="lazy" decoding="async" className="h-[20px] object-contain opacity-80 sm:h-[24px] lg:h-[32px]" />
+                <img src="/images/media/die-welt.webp" alt="Die Welt" loading="lazy" decoding="async" className="h-[20px] object-contain opacity-80 sm:h-[24px] lg:h-[32px]" />
+                <img src="/images/media/bild-der-frau.webp" alt="Bild der Frau" loading="lazy" decoding="async" className="hidden h-[20px] object-contain opacity-80 sm:block sm:h-[24px] lg:h-[32px]" />
+                <img src="/images/media/frankfurter-allgemeine.webp" alt="Frankfurter Allgemeine" loading="lazy" decoding="async" className="hidden h-[20px] object-contain opacity-80 sm:block sm:h-[24px] lg:h-[32px]" />
               </div>
             </div>
           </div>
