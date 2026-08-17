@@ -150,9 +150,20 @@ export default function HomePage() {
                   ist genau das die neue Information. "Heim" ist die
                   Alternative, die der Kunde selbst erwaegt, kein benannter
                   Wettbewerber (§6 UWG unkritisch). */}
+              {/* Zwei Anker im Satz (Martin 17.08.: "wollen wir hier noch mehr
+                  Aufmerksamkeit erzeugen, damit es nicht ueberlesen wird, dass
+                  wir Angebot und passende Pflegekraefte zeigen?"). Die Zeile war
+                  durchgehend grau — beim Ueberfliegen verschwanden genau die
+                  beiden Dinge, die sie wertvoll machen. Bewusst NUR zwei:
+                  "100 % kostenfrei und unverbindlich" mitzubetonen wuerde die
+                  Hierarchie aufheben, und der Punkt steht ohnehin unter dem
+                  Button. Dunkelgrau + halbfett statt Koralle — Koralle wuerde
+                  mit dem Button direkt darunter konkurrieren. */}
               <p className="mb-6 max-w-[520px] text-[16px] leading-relaxed text-[#5B5B5B] lg:text-[18px]">
-                Wir zeigen Ihnen sofort, was es kostet und welche Pflegekräfte
-                verfügbar sind – 100 % kostenfrei und unverbindlich.
+                Wir zeigen Ihnen sofort,{" "}
+                <span className="font-semibold text-[#3D3D3D]">was es kostet</span> und{" "}
+                <span className="font-semibold text-[#3D3D3D]">welche Pflegekräfte verfügbar sind</span>{" "}
+                – 100 % kostenfrei und unverbindlich.
               </p>
 
               {/* CTA-Modus jetzt auf ALLEN Breiten. Vorher lief auf dem
