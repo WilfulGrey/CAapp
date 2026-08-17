@@ -1,6 +1,6 @@
 'use client';
 
-import { scrollToCalculator } from '@/lib/scroll-to-calculator';
+import { openCalculator } from '@/lib/scroll-to-calculator';
 
 export function FinalCTA() {
   return (
@@ -17,7 +17,7 @@ export function FinalCTA() {
 
         <div className="flex flex-col items-center gap-6">
           <button
-            onClick={() => scrollToCalculator()}
+            onClick={() => openCalculator('final_cta')}
             className="inline-flex w-full sm:w-auto items-center justify-center gap-2 px-4 sm:px-8 py-4 bg-[#E76F63] hover:bg-[#D65E52] text-white rounded-xl text-base md:text-lg font-bold shadow-lg hover:shadow-xl transition-all duration-200"
           >
             Kosten & Pflegekräfte ansehen

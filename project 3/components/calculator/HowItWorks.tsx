@@ -1,7 +1,7 @@
 'use client';
 
 import { Clock, Check } from 'lucide-react';
-import { scrollToCalculator } from '@/lib/scroll-to-calculator';
+import { openCalculator } from '@/lib/scroll-to-calculator';
 
 export function HowItWorks() {
   return (
@@ -92,7 +92,7 @@ export function HowItWorks() {
         {/* CTA Button */}
         <div className="mt-10 md:mt-12 lg:mt-14 text-center">
           <button
-            onClick={() => scrollToCalculator()}
+            onClick={() => openCalculator('ablauf')}
             className="inline-flex w-full sm:w-auto items-center justify-center gap-2 px-4 sm:px-8 py-4 bg-[#E76F63] hover:bg-[#D65E52] text-white font-bold text-base md:text-lg rounded-xl transition-all duration-200 shadow-lg hover:shadow-xl"
           >
             Kosten & Pflegekräfte ansehen

@@ -58,9 +58,33 @@ export function isCalculatorAligned(tolerance = 28): boolean {
   return top !== null && Math.abs(window.pageYOffset - top) <= tolerance;
 }
 
-/** Zur Marke scrollen. Alle CTAs der Seite benutzen genau das hier. */
+/** Zur Marke scrollen. Fallback, wenn kein Wizard zum Oeffnen da ist. */
 export function scrollToCalculator(behavior: ScrollBehavior = 'smooth'): void {
   const top = getCalculatorScrollTop();
   if (top === null) return;
   window.scrollTo({ top, behavior });
+}
+
+/**
+ * Der Wizard soll sich OEFFNEN, nicht nur angesprungen werden (Martin 17.08.:
+ * "CTA-Button sollen nicht nur nach oben linken, sondern doch direkt das
+ * Formular oeffnen").
+ *
+ * Seit der Hero auf allen Breiten den CTA-Modus nutzt, liegt der Fragebogen
+ * als Overlay hinter EINEM Button — hochscrollen und dort nochmal klicken
+ * sind zwei Schritte fuer dieselbe Absicht.
+ *
+ * Umgesetzt als Fenster-Event statt als Context/Prop-Kette: MultiStepForm
+ * haelt seinen `fullscreen`-State intern, und die CTAs liegen ueber die
+ * ganze Seite verstreut in Komponenten, die den Wizard sonst nicht kennen.
+ *
+ * `source` landet im `wizard_opened`-Event — damit ist messbar, WELCHER CTA
+ * den Fragebogen oeffnet.
+ */
+export const OPEN_CALCULATOR_EVENT = 'primundus:open-calculator';
+
+export function openCalculator(source: string): void {
+  window.dispatchEvent(
+    new CustomEvent(OPEN_CALCULATOR_EVENT, { detail: { source } })
+  );
 }
