@@ -875,7 +875,7 @@ async function hasPreviousEingangsbestaetigungSent(supabase: any, leadId: string
   return Array.isArray(data) && data.length > 0;
 }
 
-function buildEingangsbestaetigungHtml(lead: Lead, siteUrl: string, portalBase: string, isResubmit: boolean = false): string {
+export function buildEingangsbestaetigungHtml(lead: Lead, siteUrl: string, portalBase: string, isResubmit: boolean = false): string {
   const greeting = buildEingangsGreeting(lead);
   const fd = (lead.kalkulation as any)?.formularDaten || {};
   const careStartTiming = (lead as any).care_start_timing || "";
@@ -894,7 +894,14 @@ function buildEingangsbestaetigungHtml(lead: Lead, siteUrl: string, portalBase: 
   // Wiederverwendbares Label-Styling (Preis-Bühne + Angaben-Sektionen).
   const psLabel = "font-size:11px;font-weight:700;color:#9a8a73;letter-spacing:.08em;text-transform:uppercase;";
 
-  // ── Preis-Bühne: Preise + Trust + Bestpreis in einer Klammer ──────────────
+  // ── Preis-Bühne: Preise + Konditionen + Testsieger in einer Klammer ───────
+  // Angleichung an Website/Portal (Martin, 17.08.): Die Mail erzählte an drei
+  // Stellen eine eigene Geschichte. Jetzt gilt überall dasselbe Vokabular —
+  // die VIER Konditionen wortgleich zum Angebot-Kasten im Portal, die
+  // Testsieger-Zeile wortgleich zur Portal-Zeile, und der Pflegeheim-Vergleich
+  // (buildHeimVergleichBoxHtml) direkt unter den Preisen, weil dort schon der
+  // Eigenanteil steht. Bestpreis-Garantie ist RAUS (Martin, 14.08.: „scheint
+  // nicht zu ziehen") — sie lud zum Anbietervergleich ein statt zum Nutzen.
   const priceRows = bruttopreis > 0 ? `
       <tr>
         <td class="price-stage-cell" style="width:50%;padding:22px 24px 18px;border-right:1px solid #ebe2d2;vertical-align:top;">
@@ -919,18 +926,19 @@ function buildEingangsbestaetigungHtml(lead: Lead, siteUrl: string, portalBase: 
       ${priceRows}
       <tr>
         <td colspan="2" style="padding:16px 24px 16px;${bruttopreis > 0 ? "border-top:1px solid #ebe2d2;" : ""}">
-          <p style="margin:0 0 6px;${psLabel}color:#2A9D5C;">100&thinsp;% risikofrei</p>
-          <p style="margin:0;font-size:14px;line-height:1.65;color:#2D1F0F;">Bei Primundus zahlen Sie <strong>tagesgenau</strong>, ohne Vertragsbindung. Kosten entstehen erst, wenn Ihre Pflegekraft vor Ort ist — bis dahin bleibt alles für Sie unverbindlich.</p>
+          <p style="margin:0 0 10px;${psLabel}color:#2A9D5C;">Ihre Konditionen</p>
+          ${["Täglich kündbar", "Tagesgenaue Abrechnung", "Kein Vertrag vor Auswahl nötig", "Keine Vermittlungsgebühren"].map((t) => `<p style="margin:0 0 6px;font-size:14px;line-height:1.6;color:#2D1F0F;"><span style="color:#2A9D5C;font-weight:700;">&#10003;</span>&nbsp;&nbsp;${t}</p>`).join("")}
+          <p style="margin:8px 0 0;font-size:13px;line-height:1.6;color:#666;">Kosten entstehen erst, wenn Ihre Pflegekraft vor Ort ist.</p>
         </td>
       </tr>
       <tr>
         <td colspan="2" style="padding:16px 24px 20px;border-top:1px solid #ebe2d2;">
-          <p style="margin:0 0 6px;${psLabel}color:#B8860B;">Bestpreis-Garantie</p>
-          <p style="margin:0 0 6px;font-size:14px;line-height:1.65;color:#2D1F0F;">Als <strong>Direktanbieter ohne Vermittler</strong> sparen wir die Provision — und geben diesen Vorteil direkt an Sie weiter.</p>
-          <p style="margin:0;font-size:14px;line-height:1.65;color:#2D1F0F;">Sollten Sie bei vergleichbarer Leistung ein günstigeres Angebot finden, <strong>unterbieten wir es.</strong></p>
+          <p style="margin:0 0 6px;${psLabel}color:#B8860B;">Testsieger</p>
+          <p style="margin:0;font-size:14px;line-height:1.65;color:#2D1F0F;"><strong>Testsieger &ndash; DIE&nbsp;WELT</strong> mit über 20&nbsp;Jahren Erfahrung und 60.000 Betreuungseinsätzen.</p>
         </td>
       </tr>
-    </table>`;
+    </table>
+    ${buildHeimVergleichBoxHtml(lead)}`;
 
   // ── "So geht es weiter" — 3 Schritte ──────────────────────────────────────
   const stepRow = (n: string, title: string, desc: string, last = false) => `
@@ -949,9 +957,9 @@ function buildEingangsbestaetigungHtml(lead: Lead, siteUrl: string, portalBase: 
   const stepsTable = `
     <p style="font-size:15px;line-height:1.75;color:#2D1F0F;margin:0 0 16px;"><strong>So geht es weiter:</strong></p>
     <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="margin:0 0 26px;">
-      ${stepRow("1", "Angebot und erste Pflegekräfte ansehen", "Im Portal finden Sie Ihr Angebot im Detail sowie erste passende Pflegekräfte mit Profil, Erfahrung und Sprachkenntnissen.")}
-      ${stepRow("2", "Pflegesituation beschreiben", "Damit wir Ihnen passende, verfügbare Pflegekräfte zeigen können. Dauert wenige Minuten.")}
-      ${stepRow("3", "Wunsch-Pflegekräfte einladen", "Sobald Sie eingeladen haben, erhalten Sie konkrete Bewerbungen — mit Anreisedatum und Reisekosten.", true)}
+      ${stepRow("1", "Pflegesituation beschreiben", "Ein Teil ist aus dem Kostenrechner schon übernommen. Danach sehen Sie sofort, welche Pflegekräfte passen und verfügbar sind.")}
+      ${stepRow("2", "Bewerbungen erhalten & Pflegekräfte einladen", "Passende Pflegekräfte bewerben sich bei Ihnen — mit Profil, Erfahrung und Anreisedatum. In der Zwischenzeit können Sie Wunschkandidatinnen gezielt einladen.")}
+      ${stepRow("3", "Auswählen und starten", "Sie entscheiden, wir übernehmen den Rest. Ihre Wunsch-Pflegekraft kann die Betreuung bereits in 4–7 Werktagen übernehmen.", true)}
     </table>`;
 
   // ── CTA-Button (Gradient + Schatten, mit Outlook-Fallback) ────────────────
@@ -1035,9 +1043,16 @@ function buildEingangsbestaetigungText(lead: Lead, portalBase: string, isResubmi
 Monatssatz: ${fmt(bruttopreis)} / Monat — rechn. Eigenanteil ca. ${fmt(eigenanteil)}
 zzgl. ca. 125 € Anreise- und Abreisekosten je Strecke sowie Kost und Logis.
 
-100 % risikofrei: Bei Primundus zahlen Sie tagesgenau, ohne Vertragsbindung. Kosten entstehen erst, wenn Ihre Pflegekraft vor Ort ist.
+Ihre Konditionen:
+  ✓ Täglich kündbar
+  ✓ Tagesgenaue Abrechnung
+  ✓ Kein Vertrag vor Auswahl nötig
+  ✓ Keine Vermittlungsgebühren
+Kosten entstehen erst, wenn Ihre Pflegekraft vor Ort ist.
 
-Bestpreis-Garantie: Als Direktanbieter ohne Vermittler sparen wir die Provision — und geben diesen Vorteil direkt an Sie weiter. Sollten Sie bei vergleichbarer Leistung ein günstigeres Angebot finden, unterbieten wir es.
+Testsieger – DIE WELT mit über 20 Jahren Erfahrung und 60.000 Betreuungseinsätzen.
+
+${buildHeimVergleichText(lead)}
 
 `
     : "";
@@ -1066,9 +1081,9 @@ ${priceLine}Angebot & Pflegekräfte ansehen: ${ctaUrl}
 
 SO GEHT ES WEITER
 
-1. Angebot und erste Pflegekräfte ansehen — im Portal finden Sie Ihr Angebot im Detail sowie erste passende Pflegekräfte mit Profil, Erfahrung und Sprachkenntnissen.
-2. Pflegesituation beschreiben — damit wir Ihnen passende, verfügbare Pflegekräfte zeigen können. Dauert wenige Minuten.
-3. Wunsch-Pflegekräfte einladen — sobald Sie eingeladen haben, erhalten Sie konkrete Bewerbungen, mit Anreisedatum und Reisekosten.
+1. Pflegesituation beschreiben — ein Teil ist aus dem Kostenrechner schon übernommen. Danach sehen Sie sofort, welche Pflegekräfte passen und verfügbar sind.
+2. Bewerbungen erhalten & Pflegekräfte einladen — passende Pflegekräfte bewerben sich bei Ihnen, mit Profil, Erfahrung und Anreisedatum. In der Zwischenzeit können Sie Wunschkandidatinnen gezielt einladen.
+3. Auswählen und starten — Sie entscheiden, wir übernehmen den Rest. Ihre Wunsch-Pflegekraft kann die Betreuung bereits in 4–7 Werktagen übernehmen.
 
 PFLEGESITUATION & ANFORDERUNGEN
 
