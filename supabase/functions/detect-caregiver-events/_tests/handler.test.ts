@@ -53,7 +53,7 @@ function makeCaregiver(overrides: Partial<CaregiverNode> = {}): CaregiverNode {
   };
 }
 
-type AppFixture = { id: number; caregiver_id: number | null; caregiver: CaregiverNode | null };
+type AppFixture = { id: number; caregiver_id: number | null; caregiver: CaregiverNode | null; salary?: number | null };
 type InterestFixture = { id: number; caregiver_id: number | null; rejected_at: string | null; caregiver: CaregiverNode | null };
 
 interface MamamiaPayload {
@@ -319,7 +319,10 @@ Deno.test("one app, zero seen → 1 bridge POST with full caregiver metadata", a
   assertEquals(recorder[0].metadata.caregiver_einsatz_count, 12);
 });
 
-Deno.test("app where caregiver already in past application_received events → dedupe", async () => {
+// Registry #35: Dedupe-Schlüssel ist die application_id. Legacy-Historie (ohne
+// id) kann "dieselbe" nicht von "neu" unterscheiden → EINMALIGER stiller Seed,
+// keine Mail. Danach ist die id bekannt und der Fall ist exakt entscheidbar.
+Deno.test("Legacy-Event ohne application_id → stiller Seed, KEINE Mail", async () => {
   resetCaches();
   const recorder: BridgeOptions["recorder"] = [];
   const seenEvents: EventRow[] = [
@@ -333,9 +336,81 @@ Deno.test("app where caregiver already in past application_received events → d
       { recorder },
     ),
   });
+  await res.json();
+  assertEquals(recorder.length, 1);
+  assertEquals(recorder[0].notify, false); // kein Kunden-Mail
+  assertEquals(recorder[0].metadata.seeded, true);
+  assertEquals(recorder[0].metadata.application_id, 1); // ab jetzt bekannt
+});
+
+Deno.test("Legacy-Paar, aber Bewerbung NACH der Umstellung (hohe id) → Mail, kein Seed", async () => {
+  resetCaches();
+  const recorder: BridgeOptions["recorder"] = [];
+  // Alt-Historie ohne application_id — die Bewerbung selbst ist aber neu
+  // (id > PRE_SWITCH_MAX_APP_ID). Genau der Fall app11664/Robert S.: vorher
+  // wurde er still geseedet und die Kundin erfuhr nichts.
+  const seenEvents: EventRow[] = [
+    { event_type: "application_received", caregiver_id: 50001 },
+  ];
+  const res = await handleRequest(makeReq({ lead_id: VALID_LEAD.id }), {
+    secrets: SECRETS,
+    supabase: makeSupabase(VALID_LEAD, seenEvents),
+    fetchFn: makeFetch(
+      { apps: [{ id: 99999, caregiver_id: 50001, salary: 2450, caregiver: makeCaregiver() }] },
+      { recorder },
+    ),
+  });
+  const body = await res.json();
+  assertEquals(body.new_applications, 1);
+  assertEquals(recorder.length, 1);
+  assertEquals(recorder[0].notify, true);
+  assertEquals(recorder[0].metadata.seeded, undefined);
+  assertEquals(recorder[0].metadata.application_id, 99999);
+});
+
+Deno.test("bekannte application_id → still (Idempotenz des 15-Minuten-Scans)", async () => {
+  resetCaches();
+  const recorder: BridgeOptions["recorder"] = [];
+  const seenEvents: EventRow[] = [
+    { event_type: "application_received", caregiver_id: 50001, application_id: 1 },
+  ];
+  const res = await handleRequest(makeReq({ lead_id: VALID_LEAD.id }), {
+    secrets: SECRETS,
+    supabase: makeSupabase(VALID_LEAD, seenEvents),
+    fetchFn: makeFetch(
+      { apps: [{ id: 1, caregiver_id: 50001, caregiver: makeCaregiver() }] },
+      { recorder },
+    ),
+  });
   const body = await res.json();
   assertEquals(body.new_applications, 0);
   assertEquals(recorder.length, 0);
+});
+
+Deno.test("ERNEUTE Bewerbung derselben Pflegekraft auf demselben Job → Mail", async () => {
+  resetCaches();
+  const recorder: BridgeOptions["recorder"] = [];
+  // Historie: dieselbe Pflegekraft, derselbe Job, ANDERE Bewerbung (id 1).
+  const seenEvents: EventRow[] = [
+    { event_type: "application_received", caregiver_id: 50001, application_id: 1 },
+  ];
+  const res = await handleRequest(makeReq({ lead_id: VALID_LEAD.id }), {
+    secrets: SECRETS,
+    supabase: makeSupabase(VALID_LEAD, seenEvents),
+    fetchFn: makeFetch(
+      // Neue Einstellung: id 2, anderer Satz — genau der Fall, der vorher
+      // dauerhaft verschluckt wurde (Registry #35).
+      { apps: [{ id: 2, caregiver_id: 50001, salary: 3050, caregiver: makeCaregiver() }] },
+      { recorder },
+    ),
+  });
+  const body = await res.json();
+  assertEquals(body.new_applications, 1);
+  assertEquals(recorder.length, 1);
+  assertEquals(recorder[0].notify, true);
+  assertEquals(recorder[0].metadata.seeded, undefined);
+  assertEquals(recorder[0].metadata.application_id, 2);
+  assertEquals(recorder[0].metadata.offer_salary, 3050);
 });
 
 Deno.test("rejected interest → skipped, not POSTed", async () => {
@@ -892,14 +967,14 @@ Deno.test("multi-job: per-job dedup — past app on default suppresses default, 
   resetCaches();
   const recorder: BridgeOptions["recorder"] = [];
   const def = VALID_LEAD.mamamia_job_offer_id as number;
-  const past: EventRow[] = [{ event_type: "application_received", caregiver_id: 50001, mamamia_job_offer_id: def }];
+  const past: EventRow[] = [{ event_type: "application_received", caregiver_id: 50001, mamamia_job_offer_id: def, application_id: 1 }];
   const res = await handleRequest(makeReq({ lead_id: VALID_LEAD.id }), {
     secrets: SECRETS,
     supabase: makeSupabase(VALID_LEAD, past),
     fetchFn: makeFetch({ jobOffers: [searchJob(JOB_B)], appsByJob: { [def]: [appOn(1, 50001)], [JOB_B]: [appOn(2, 50001)] } }, { recorder }),
   });
   const body = await res.json();
-  assertEquals(body.new_applications, 1); // default suppressed, JOB_B fires
+  assertEquals(body.new_applications, 1); // default: id 1 bekannt → still; JOB_B feuert
   assertEquals(recorder.length, 1);
   assertEquals(recorder[0].metadata.mamamia_job_offer_id, JOB_B);
 });
@@ -908,14 +983,14 @@ Deno.test("multi-job: legacy NULL-job past event maps onto the default job (dedu
   resetCaches();
   const recorder: BridgeOptions["recorder"] = [];
   const def = VALID_LEAD.mamamia_job_offer_id as number;
-  const past: EventRow[] = [{ event_type: "application_received", caregiver_id: 50001, mamamia_job_offer_id: null }];
+  const past: EventRow[] = [{ event_type: "application_received", caregiver_id: 50001, mamamia_job_offer_id: null, application_id: 1 }];
   const res = await handleRequest(makeReq({ lead_id: VALID_LEAD.id }), {
     secrets: SECRETS,
     supabase: makeSupabase(VALID_LEAD, past),
     fetchFn: makeFetch({ appsByJob: { [def]: [appOn(1, 50001)] } }, { recorder }), // no jobOffers → default only
   });
   const body = await res.json();
-  assertEquals(body.new_applications, 0); // NULL legacy → default job → caregiver already seen
+  assertEquals(body.new_applications, 0); // NULL legacy → default job → dieselbe Bewerbung
   assertEquals(recorder.length, 0);
 });
 
@@ -1217,10 +1292,11 @@ Deno.test("cap: 5 frische Bewerbungen → nur die 3 NEUESTEN mailen, Rest tropft
     assertEquals(r.metadata.seeded, undefined);
   }
 
-  // Folge-Run: die 3 gemailten sind jetzt Historie → die restlichen 2 kommen dran.
+  // Folge-Run: die 3 gemailten sind jetzt Historie (mit application_id, so wie
+  // der Lauf oben sie gestempelt hat) → die restlichen 2 kommen dran.
   const recorder2: BridgeOptions["recorder"] = [];
-  const past: EventRow[] = [61003, 61004, 61005].map((cg) => (
-    { event_type: "application_received", caregiver_id: cg, mamamia_job_offer_id: def }
+  const past: EventRow[] = [[61003, 3], [61004, 4], [61005, 5]].map(([cg, appId]) => (
+    { event_type: "application_received" as const, caregiver_id: cg, mamamia_job_offer_id: def, application_id: appId }
   ));
   const res2 = await handleRequest(makeReq({ lead_id: VALID_LEAD.id }), {
     secrets: SECRETS,
