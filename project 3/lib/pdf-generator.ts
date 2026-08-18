@@ -88,7 +88,7 @@ function addHeader(doc: jsPDF, leadData?: LeadData) {
   doc.setFontSize(8);
   doc.setTextColor(...lightGray);
   doc.text(`Erstellt am: ${formatDate(today)}`, 200, 15, { align: 'right' });
-  doc.text(`Bestpreis-Garantie gueltig bis: ${formatDate(validUntil)}`, 200, 19, { align: 'right' });
+  doc.text(`Angebot gueltig bis: ${formatDate(validUntil)}`, 200, 19, { align: 'right' });
 
   if (leadData?.vorname) {
     doc.setFontSize(9);
@@ -677,8 +677,8 @@ function addPage4(doc: jsPDF, leadData?: LeadData, vertragsToken?: string) {
 
   const vorteile = [
     {
-      titel: 'Bestpreis-Garantie',
-      text: 'Wir garantieren Ihnen den besten Preis. Finden Sie ein vergleichbares Angebot guenstiger,\npassen wir unseren Preis an. Diese Kalkulation ist 14 Tage reserviert.',
+      titel: 'Keine Vermittlungsgebuehr',
+      text: 'Keine Anzahlung, keine Aufnahmegebuehr, keine Bearbeitungspauschale — der Monatspreis\nist der Preis. Diese Kalkulation ist 14 Tage reserviert.',
     },
     {
       titel: 'Sie zahlen erst, wenn die Pflegekraft arbeitet',

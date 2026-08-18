@@ -19,7 +19,7 @@ export function BestpriceGuarantee() {
                 100 % sorgenfrei
               </h3>
               <p className="text-[16px] leading-relaxed text-[#5A5A5A]">
-                Überlassen Sie die Betreuung nicht dem Zufall. Vertrauen Sie auf über 20 Jahre Erfahrung aus mehr als 60.000 Betreuungen – mit einem 100 % sorgenfreien Modell: Bestpreis-Garantie, täglich kündbar, taggenaue Abrechnung und Kosten erst, wenn die Betreuungskraft tatsächlich bei Ihnen ankommt.
+                Überlassen Sie die Betreuung nicht dem Zufall. Vertrauen Sie auf über 20 Jahre Erfahrung aus mehr als 60.000 Betreuungen – ohne Vermittlungsgebühr, täglich kündbar, taggenau abgerechnet. Kosten entstehen erst, wenn die Betreuungskraft tatsächlich bei Ihnen ist.
               </p>
             </div>
           </div>

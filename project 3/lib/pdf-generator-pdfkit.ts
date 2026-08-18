@@ -64,7 +64,7 @@ export async function generateKalkulationPDF(
       doc.fontSize(10).fillColor(grayColor);
       doc.text('PRIMUNDUS GMBH', 60, 50, { align: 'left' });
       doc.text(`Erstellt am: ${formatDate(today)}`, 400, 50, { align: 'right', width: 135 });
-      doc.text(`Bestpreis-Garantie bis: ${formatDate(gueltigBis)}`, 400, 65, { align: 'right', width: 135 });
+      doc.text(`Angebot gültig bis: ${formatDate(gueltigBis)}`, 400, 65, { align: 'right', width: 135 });
  
       doc.moveTo(60, 95).lineTo(535, 95).lineWidth(2).strokeColor(accentColor).stroke();
  
