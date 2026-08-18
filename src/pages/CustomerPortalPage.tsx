@@ -3170,6 +3170,19 @@ const CustomerPortalPage: FC = () => {
                 </div>
               )}
 
+              {/* Alle Vorschläge bearbeitet (abgelehnt), keine offene Einladung
+                  und nichts Frisches mehr im Pool → sonst stünde hier nur die
+                  Überschrift ohne Karten (wirkt wie ein Bug). Ruhiger Hinweis,
+                  dass weitere folgen (Martin, 18.08.). */}
+              {!hasAnyCard && heldInvites === 0 && allVisible.length > 0 && (
+                <div className="rounded-3xl px-5 py-5 border text-center" style={{ background: '#F5F5F6', borderColor: '#D4D4D8' }}>
+                  <p className="text-[15px] font-semibold mb-1" style={{color:'#18181B'}}>Alle aktuellen Vorschläge bearbeitet</p>
+                  <p className="text-[14px] leading-relaxed" style={{color:'#71717A'}}>
+                    Sie haben alle passenden Pflegekräfte durchgesehen. Wir schlagen Ihnen in Kürze weitere vor &mdash; Sie hören von uns.
+                  </p>
+                </div>
+              )}
+
               {/* "Bereits bearbeitet" wird einheitlich unten gerendert
                   (außerhalb dieser IIFE) — beide Branches (hasPending /
                   !hasPending) sehen dieselbe Sektion am Ende. */}
