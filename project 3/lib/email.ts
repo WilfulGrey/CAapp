@@ -1509,7 +1509,10 @@ function bestpreisPsHtml(): string {
 
 export interface CaregiverDisplay {
   name: string;                  // "Maria K." — caller liefert schon gekürzt
-  badgeLevel?: string;           // "Starter" | "Bronze" | "Silber" | "Gold" | "Platin"
+  badgeLevel?: string;           // LEGACY (Alt-Wörter Starter…Platin) — wird für
+                                 // die Karte NICHT mehr gerendert; die Stufe wird
+                                 // aus einsatzCount/yearsExperience abgeleitet
+                                 // (caregiverTierLabel, wortgleich zum Portal).
   yearsExperience?: number;
   einsatzCount?: number;
   age?: number;                  // Alter in Jahren (aus year_of_birth)
@@ -1546,20 +1549,33 @@ function cleanCaregiverAbout(raw: string | null | undefined): string | null {
   return markers.some((m) => lower.includes(m)) ? null : t;
 }
 
-function caregiverBadgeStyle(level?: string): { label: string; gradient: string; solid: string } | null {
-  if (!level) return null;
-  const key = level.trim().toLowerCase();
-  // `solid` ist der Start-Farbton des Gradient — Outlook (Word-Renderer) kann
-  // `linear-gradient` nicht und ignoriert das Background → braucht solide
-  // Farbe als Fallback (sonst weißer Text auf weiß).
-  const map: Record<string, { label: string; gradient: string; solid: string }> = {
-    starter:  { label: 'STARTER-PFLEGEKRAFT', gradient: 'linear-gradient(135deg,#8AB47C 0%,#5E8C50 100%)', solid: '#5E8C50' },
-    bronze:   { label: 'BRONZE-PFLEGEKRAFT',  gradient: 'linear-gradient(135deg,#C68850 0%,#8B5A2B 100%)', solid: '#8B5A2B' },
-    silber:   { label: 'SILBER-PFLEGEKRAFT',  gradient: 'linear-gradient(135deg,#B8B8B8 0%,#7E7E7E 100%)', solid: '#7E7E7E' },
-    gold:     { label: 'GOLD-PFLEGEKRAFT',    gradient: 'linear-gradient(135deg,#E0AC32 0%,#B8860B 100%)', solid: '#B8860B' },
-    platin:   { label: 'PLATIN-PFLEGEKRAFT',  gradient: 'linear-gradient(135deg,#D4DCE0 0%,#7E8E96 100%)', solid: '#7E8E96' },
-  };
-  return map[key] || null;
+// Erfahrungsstufe der Pflegekraft — WORTGLEICH zum Kunden- und SA-Portal
+// (src/lib/mamamia/badge.ts + components/portal/shared.ts `nurseLevel`, sowie
+// mamamia-sadash `caregiverBadge.js`). Basis seit 12.08.2026: AUSSCHLIESSLICH
+// die Zahl UNSERER Einsätze (`hp_total_jobs` → einsatzCount). Erfahrungsjahre
+// zählen NICHT in die Stufe (Selbstauskunft), entscheiden aber ohne Einsätze
+// das Ersatzwort. Kein Medaillen-Badge mehr — die Stufe steht als fettes Wort
+// vor der Faktenzeile (Martin, 11.08.: „viel moderner und klarer").
+//   Elite ≥12 · Stammkraft ≥6 · Bewährt ≥2 · Bekannt ≥1
+//   0 Einsätze: Jahre>0 → „Berufserfahren", sonst „Neu dabei".
+function caregiverTierLabel(einsatzCount?: number, yearsExperience?: number): string {
+  const jobs = einsatzCount ?? 0;
+  if (jobs >= 12) return 'Elite';
+  if (jobs >= 6) return 'Stammkraft';
+  if (jobs >= 2) return 'Bewährt';
+  if (jobs >= 1) return 'Bekannt';
+  return (yearsExperience ?? 0) > 0 ? 'Berufserfahren' : 'Neu dabei';
+}
+
+// Faktenzeile wie im Portal (`nurseFacts`): Jahre Erfahrung · Einsätze. Die
+// Ø-Einsatzdauer aus dem Portal fehlt in der Mail-Pipeline (kein history-Feld
+// in den lead-event-Metadaten) und bleibt daher weg. Ist nichts vorhanden,
+// füllt ein ehrlicher Satz die Zeile statt eines Strichs.
+function caregiverFactsLine(cg: CaregiverDisplay): string {
+  const teile: string[] = [];
+  if (cg.yearsExperience && cg.yearsExperience > 0) teile.push(`${cg.yearsExperience} ${cg.yearsExperience === 1 ? 'Jahr' : 'Jahre'} Erfahrung`);
+  if (cg.einsatzCount && cg.einsatzCount > 0) teile.push(`${cg.einsatzCount} ${cg.einsatzCount === 1 ? 'Einsatz' : 'Einsätze'}`);
+  return teile.length > 0 ? teile.join(' &middot; ') : 'bereit für den ersten Einsatz';
 }
 
 function customerGreeting(lead: Lead): string {
@@ -1724,41 +1740,36 @@ function caregiverMailShell(baseUrl: string, leadEmail: string, content: string,
 // rendert in Gmail/Outlook nicht).
 function caregiverKachelHtml(cg: CaregiverDisplay, portalUrl: string): string {
   const firstName = cg.name.split(' ')[0];
+  // Abgerundetes Quadrat wie im Portal (MatchCard: `rounded-xl`), nicht mehr
+  // der runde Avatar — Mail und Portal zeigen dieselbe Karte.
   const photoHtml = cg.photoUrl
-    ? `<img src="${cg.photoUrl}" alt="${cg.name}" width="80" style="display:block;width:80px;height:80px;border-radius:50%;object-fit:cover;border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.08);" />`
-    : `<div style="width:80px;height:80px;border-radius:50%;background-color:#B5A184;color:#fff;font-size:28px;font-weight:700;line-height:80px;text-align:center;border:2px solid #fff;">${caregiverInitials(cg.name)}</div>`;
+    ? `<img src="${cg.photoUrl}" alt="${cg.name}" width="76" style="display:block;width:76px;height:76px;border-radius:12px;object-fit:cover;" />`
+    : `<div style="width:76px;height:76px;border-radius:12px;background-color:#B5A184;color:#fff;font-size:26px;font-weight:700;line-height:76px;text-align:center;">${caregiverInitials(cg.name)}</div>`;
 
-  const badge = caregiverBadgeStyle(cg.badgeLevel);
-  const badgeHtml = badge
-    ? `<span style="display:inline-block;background-color:${badge.solid};background:${badge.gradient};color:#fff;padding:5px 12px;border-radius:14px;font-size:12px;font-weight:700;letter-spacing:.04em;white-space:nowrap;">&#127941; ${(cg.badgeLevel || '').toUpperCase()}</span>`
-    : '';
-
-  const metaParts: string[] = [];
-  if (cg.yearsExperience && cg.yearsExperience > 0) metaParts.push(`${cg.yearsExperience} ${cg.yearsExperience === 1 ? 'Jahr' : 'Jahre'} Erfahrung`);
-  if (cg.einsatzCount && cg.einsatzCount > 0)       metaParts.push(`${cg.einsatzCount} ${cg.einsatzCount === 1 ? 'Einsatz' : 'Einsätze'}`);
-  const metaLine = metaParts.length > 0
-    ? `<p style="margin:0 0 3px;font-size:14px;color:#666;">${metaParts.join(' &middot; ')}</p>`
-    : '';
+  // Alter dezent hinter dem Namen ("Grazyna J., 70") — Portal-Stil.
+  const ageSuffix = cg.age ? `<span style="font-weight:400;color:#71717A;">, ${cg.age}</span>` : '';
   const deutschLine = cg.germanLevel
-    ? `<p style="margin:0;font-size:14px;color:#666;">Deutsch ${cg.germanLevel}</p>`
+    ? `<p style="margin:0;font-size:15px;color:#71717A;">Deutsch ${cg.germanLevel}</p>`
     : '';
-  const ageSuffix = cg.age ? ` <span style="font-size:15px;font-weight:400;color:#9a8a73;">&middot; ${cg.age} J.</span>` : '';
+  // Stufe als fettes Wort vor der Faktenzeile (kein Medaillen-Badge mehr) —
+  // exakt wie die Portal-Karte: „Bewährt: 12 Jahre Erfahrung · 3 Einsätze".
+  const tier = caregiverTierLabel(cg.einsatzCount, cg.yearsExperience);
+  const factsHtml = `<p style="margin:10px 0 0;font-size:15px;line-height:1.5;color:#71717A;"><span style="font-weight:700;color:#18181B;">${tier}:</span> ${caregiverFactsLine(cg)}</p>`;
 
   return `
-    <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="margin:0 0 26px;border-radius:12px;background:#FAF8F4;overflow:hidden;">
-      <tr><td style="padding:20px 22px;">
+    <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="margin:0 0 26px;border:1px solid #ECE7DF;border-radius:14px;background:#ffffff;overflow:hidden;">
+      <tr><td style="padding:18px 20px;">
         <table width="100%" cellpadding="0" cellspacing="0" role="presentation">
           <tr>
-            <td style="vertical-align:middle;width:96px;padding-right:16px;">${photoHtml}</td>
-            <td style="vertical-align:middle;">
-              <p style="margin:0 0 4px;font-size:18px;font-weight:700;color:#2D1F0F;">${cg.name}${ageSuffix}</p>
-              ${metaLine}
+            <td style="vertical-align:top;width:76px;padding-right:16px;">${photoHtml}</td>
+            <td style="vertical-align:top;">
+              <p style="margin:0 0 3px;font-size:18px;font-weight:700;color:#18181B;line-height:1.3;">${cg.name}${ageSuffix}</p>
               ${deutschLine}
             </td>
-            ${badgeHtml ? `<td style="vertical-align:top;text-align:right;padding-left:10px;">${badgeHtml}</td>` : ''}
           </tr>
         </table>
-        <div style="border-top:1px solid #ebe2d2;margin:16px 0 0;padding-top:14px;">
+        ${factsHtml}
+        <div style="border-top:1px solid #ECE7DF;margin:14px 0 0;padding-top:14px;">
           <a href="${portalUrl}" style="color:#8B7355;text-decoration:none;font-weight:700;font-size:15px;">${firstName}s Profil ansehen &rarr;</a>
         </div>
       </td></tr>
@@ -1783,24 +1794,22 @@ function buildCaregiverEventEmail(opts: {
   const greeting = customerGreeting(opts.lead);
   const cg = opts.caregiver;
 
-  const badge = caregiverBadgeStyle(cg.badgeLevel);
-  // Background: solid color first (Outlook reads this), then linear-gradient
-  // (modern clients override the solid). So fällt die Pille in Outlook nicht
-  // ins Weiße sondern bleibt sichtbar.
-  const badgeHtml = badge
-    ? `<span style="display:inline-block;background-color:${badge.solid};background:${badge.gradient};color:#fff;padding:4px 11px;border-radius:14px;font-size:11px;font-weight:700;letter-spacing:.04em;">${badge.label}</span>`
+  // Stufe + Fakten wortgleich zum Portal (caregiverTierLabel/caregiverFactsLine).
+  const tier = caregiverTierLabel(cg.einsatzCount, cg.yearsExperience);
+  const factsHtml = `<p style="margin:8px 0 0;font-size:15px;line-height:1.5;color:#71717A;"><span style="font-weight:700;color:#18181B;">${tier}:</span> ${caregiverFactsLine(cg)}</p>`;
+  const ageSuffix = cg.age ? `<span style="font-weight:400;color:#71717A;">, ${cg.age}</span>` : '';
+  const deutschLine = cg.germanLevel
+    ? `<p style="margin:0;font-size:15px;color:#71717A;">Deutsch ${cg.germanLevel}</p>`
     : '';
 
+  // Plaintext-Reflex der Kachel (nur für den Text-Teil unten).
   const metaParts: string[] = [];
   if (cg.yearsExperience && cg.yearsExperience > 0) metaParts.push(`${cg.yearsExperience} ${cg.yearsExperience === 1 ? 'Jahr' : 'Jahre'} Erfahrung`);
   if (cg.einsatzCount && cg.einsatzCount > 0)       metaParts.push(`${cg.einsatzCount} ${cg.einsatzCount === 1 ? 'Einsatz' : 'Einsätze'}`);
-  const metaLine = metaParts.length > 0
-    ? `<p style="margin:0 0 6px;font-size:13px;color:#666;">${metaParts.join(' &middot; ')}</p>`
-    : '';
 
   const photoHtml = cg.photoUrl
-    ? `<img src="${cg.photoUrl}" alt="${cg.name}" width="80" style="display:block;width:80px;height:80px;border-radius:50%;object-fit:cover;border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.08);" />`
-    : `<div style="width:80px;height:80px;border-radius:50%;background-color:#B5A184;color:#fff;font-size:28px;font-weight:700;line-height:80px;text-align:center;border:2px solid #fff;">${caregiverInitials(cg.name)}</div>`;
+    ? `<img src="${cg.photoUrl}" alt="${cg.name}" width="76" style="display:block;width:76px;height:76px;border-radius:12px;object-fit:cover;" />`
+    : `<div style="width:76px;height:76px;border-radius:12px;background-color:#B5A184;color:#fff;font-size:26px;font-weight:700;line-height:76px;text-align:center;">${caregiverInitials(cg.name)}</div>`;
 
   // Mamamia liefert teils unübersetzte Platzhalter in about_de (z.B. "Bitte
   // geben Sie den Text an, den Sie ins Deutsche übersetzen möchten.") — nie
@@ -1811,18 +1820,18 @@ function buildCaregiverEventEmail(opts: {
     : '';
 
   const kachel = `
-    <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="margin:0 0 22px 0;border:1px solid #e8ddd0;border-radius:12px;overflow:hidden;">
-      <tr><td style="padding:18px 20px;background:#FAF8F4;">
+    <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="margin:0 0 22px 0;border:1px solid #ECE7DF;border-radius:14px;overflow:hidden;">
+      <tr><td style="padding:18px 20px;background:#ffffff;">
         <table width="100%" cellpadding="0" cellspacing="0" role="presentation">
           <tr>
-            <td style="vertical-align:middle;width:96px;padding-right:16px;">${photoHtml}</td>
-            <td style="vertical-align:middle;">
-              <p style="margin:0 0 4px;font-size:18px;font-weight:700;color:#2D1F0F;">${cg.name}</p>
-              ${metaLine}
-              ${badgeHtml}
+            <td style="vertical-align:top;width:76px;padding-right:16px;">${photoHtml}</td>
+            <td style="vertical-align:top;">
+              <p style="margin:0 0 3px;font-size:18px;font-weight:700;color:#18181B;line-height:1.3;">${cg.name}${ageSuffix}</p>
+              ${deutschLine}
             </td>
           </tr>
         </table>
+        ${factsHtml}
         ${aboutHtml}
       </td></tr>
     </table>`;
@@ -1856,7 +1865,7 @@ function buildCaregiverEventEmail(opts: {
 ${opts.plainSummary}
 
 PFLEGEKRAFT
-${cg.name}${cg.badgeLevel ? ` · ${cg.badgeLevel}-Pflegekraft` : ''}
+${cg.name}${cg.age ? `, ${cg.age}` : ''} · ${tier}
 ${metaParts.length > 0 ? metaParts.join(' · ') + '\n' : ''}${aboutClean ? `„${aboutClean}"\n` : ''}
 ${opts.ctaText.replace(/\s*→\s*$/, '')}: ${opts.portalUrl}
 
@@ -2229,7 +2238,7 @@ export function getCaregiverInterestEmailTemplate(
 eine Pflegekraft hat Interesse an Ihrer Betreuungsstelle. Schauen Sie sich ihr Profil in Ruhe an — und laden Sie sie ein, sich zu bewerben, oder lehnen Sie ab.
 
 PFLEGEKRAFT
-${cg.name}${cg.age ? ` · ${cg.age} J.` : ''}${cg.badgeLevel ? ` · ${cg.badgeLevel}-Pflegekraft` : ''}
+${cg.name}${cg.age ? `, ${cg.age}` : ''} · ${caregiverTierLabel(cg.einsatzCount, cg.yearsExperience)}
 ${metaPlain ? metaPlain + '\n' : ''}${cg.germanLevel ? `Deutsch ${cg.germanLevel}\n` : ''}${firstName}s Profil ansehen: ${portalUrl}
 
 WAS SIE ALS NÄCHSTES TUN KÖNNEN

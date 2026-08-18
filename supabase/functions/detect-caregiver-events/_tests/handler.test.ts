@@ -645,8 +645,8 @@ Deno.test("buildCaregiverMetadata initials + optional fields", () => {
   assertEquals(meta.caregiver_einsatz_count, undefined);
   assertEquals(meta.caregiver_photo_url, undefined);
   assertEquals(meta.caregiver_about_text, undefined);
-  // germany_skill level_3 (Fixture-Default) → "B1-B2"; year_of_birth 1980 → Alter
-  assertEquals(meta.caregiver_german_level, "B1-B2");
+  // germany_skill level_3 (Fixture-Default) → "Gut" (Portal-Skala); year_of_birth 1980 → Alter
+  assertEquals(meta.caregiver_german_level, "Gut");
   assertEquals(typeof meta.caregiver_age, "number");
 });
 
@@ -664,10 +664,12 @@ Deno.test("buildCaregiverMetadata Foto-Queue: avatar_retouched_promo bevorzugt v
   assertEquals(fallback.caregiver_photo_url, "https://cdn.test/retouched.jpg");
 });
 
-Deno.test("germanLevelLabel mappt germany_skill auf CEFR", () => {
-  assertEquals(germanLevelLabel("level_0"), "A1");
-  assertEquals(germanLevelLabel("level_3"), "B1-B2");
-  assertEquals(germanLevelLabel("level_4"), "B2-C1");
+Deno.test("germanLevelLabel mappt germany_skill auf Portal-Skala (Grund/Mittel/Gut)", () => {
+  assertEquals(germanLevelLabel("level_0"), "Grund");
+  assertEquals(germanLevelLabel("level_1"), "Grund");
+  assertEquals(germanLevelLabel("level_2"), "Mittel");
+  assertEquals(germanLevelLabel("level_3"), "Gut");
+  assertEquals(germanLevelLabel("level_4"), "Gut");
   assertEquals(germanLevelLabel(null), null);
   assertEquals(germanLevelLabel("weird"), null);
 });

@@ -20,6 +20,11 @@ export interface CaregiverNode {
   // (promo → retouched). Optional, damit bestehende Test-Fixtures ohne das
   // Feld weiter kompilieren; die Query selektiert es, Runtime liefert es.
   avatar_retouched_promo?: { aws_url: string | null } | null;
+  // Roh-Avatar — LETZTER Foto-Fallback (promo → retouched → avatar), exakt wie
+  // im Portal (mappers.ts). Viele Pflegekräfte haben (noch) kein retouched/
+  // promo-Foto; ohne diesen Fallback zeigt die Mail dann nur Initialen
+  // (Martin, 18.08.: „warum haben wir häufig keine Fotos").
+  avatar?: { aws_url: string | null } | null;
   about_de: string | null;
 }
 
@@ -63,6 +68,7 @@ const CAREGIVER_FRAGMENT = /* GraphQL */ `
   hp_avg_mission_days
   avatar_retouched_promo { aws_url }
   avatar_retouched { aws_url }
+  avatar { aws_url }
   about_de
 `;
 

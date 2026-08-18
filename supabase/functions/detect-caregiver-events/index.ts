@@ -1058,7 +1058,7 @@ async function detectForJob(
   // Collect fresh presigned photo URLs (lead-scoped, keyed by caregiver) for the
   // reminder-photo refresh the caller runs once after all jobs.
   for (const a of apps) {
-    const url = a.caregiver?.avatar_retouched_promo?.aws_url ?? a.caregiver?.avatar_retouched?.aws_url;
+    const url = a.caregiver?.avatar_retouched_promo?.aws_url ?? a.caregiver?.avatar_retouched?.aws_url ?? a.caregiver?.avatar?.aws_url;
     if (a.caregiver_id != null && url) photoByCaregiver.set(a.caregiver_id, url);
     // Aktiv = vorhanden und nicht abgelehnt. Panel-/SA-Ablehnungen LOESCHEN
     // die Application (siehe Dashboard-Feed-Fix 2026-07-11) — die fehlt hier
@@ -1066,7 +1066,7 @@ async function detectForJob(
     if (a.caregiver_id != null && !a.rejected_at) activeCg.apps.add(a.caregiver_id);
   }
   for (const i of interests) {
-    const url = i.caregiver?.avatar_retouched_promo?.aws_url ?? i.caregiver?.avatar_retouched?.aws_url;
+    const url = i.caregiver?.avatar_retouched_promo?.aws_url ?? i.caregiver?.avatar_retouched?.aws_url ?? i.caregiver?.avatar?.aws_url;
     if (i.caregiver_id != null && url && !photoByCaregiver.has(i.caregiver_id)) {
       photoByCaregiver.set(i.caregiver_id, url);
     }
@@ -1318,8 +1318,10 @@ export function buildCaregiverMetadata(
   }
   const germanLevel = germanLevelLabel(caregiver.germany_skill);
   if (germanLevel) meta.caregiver_german_level = germanLevel;
-  // Foto-Queue: promo → retouched (raw avatar wird in detect nicht abgefragt).
-  const photoUrl = caregiver.avatar_retouched_promo?.aws_url ?? caregiver.avatar_retouched?.aws_url;
+  // Foto-Queue: promo → retouched → raw avatar (wie im Portal, mappers.ts).
+  // Der Roh-Avatar als 3. Fallback verhindert die häufige Initialen-Kachel bei
+  // Pflegekräften ohne retouched/promo-Foto (Martin, 18.08.).
+  const photoUrl = caregiver.avatar_retouched_promo?.aws_url ?? caregiver.avatar_retouched?.aws_url ?? caregiver.avatar?.aws_url;
   if (photoUrl) {
     meta.caregiver_photo_url = photoUrl;
   }
@@ -1339,12 +1341,16 @@ export function buildCaregiverMetadata(
 // identisch zur Portal-Anzeige (src/lib/mamamia/mappers.ts GERMANY_SKILL_LEVELS).
 // So steht in der Mail dasselbe wie im Pflegekraft-Profil.
 export function germanLevelLabel(skill: string | null | undefined): string | null {
+  // Vereinfachte 3-Stufen-Skala WORTGLEICH zum Kundenportal
+  // (src/lib/mamamia/mappers.ts GERMANY_SKILL_LEVELS: Grund/Mittel/Gut) —
+  // „für Kunden besser einzuordnen" als die 5 CEFR-Niveaus. Damit zeigt die
+  // Pflegekraft-Kachel in Mail und Portal denselben Deutsch-Text.
   const map: Record<string, string> = {
-    level_0: "A1",
-    level_1: "A1-A2",
-    level_2: "A2-B1",
-    level_3: "B1-B2",
-    level_4: "B2-C1",
+    level_0: "Grund",
+    level_1: "Grund",
+    level_2: "Mittel",
+    level_3: "Gut",
+    level_4: "Gut",
   };
   return (skill && map[skill]) || null;
 }
