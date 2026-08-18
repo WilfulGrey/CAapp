@@ -232,7 +232,7 @@ export default function KalkulationPage() {
             {[
               [Users, '20+ Jahre Erfahrung'],
               [Award, '60.000+ Einsätze'],
-              [Shield, 'Bestpreis-Garantie'],
+              [Shield, 'Keine Vermittlungsgebühr'],
             ].map(([Icon, label]: any) => (
               <div key={label} className="flex items-center gap-1.5 text-xs text-[#7A5C2E] font-semibold">
                 <Icon className="w-3.5 h-3.5 text-[#B5A184]" />{label}
@@ -344,7 +344,7 @@ export default function KalkulationPage() {
             {[
               [Users, '20+ Jahre Erfahrung'],
               [Award, '60.000+ Einsätze'],
-              [Shield, 'Bestpreis-Garantie'],
+              [Shield, 'Keine Vermittlungsgebühr'],
             ].map(([Icon, label]: any, i) => (
               <div key={label} className="flex items-center gap-3">
                 <div className="flex items-center gap-1.5 text-xs text-[#7A4030] font-semibold">

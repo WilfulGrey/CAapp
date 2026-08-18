@@ -216,7 +216,7 @@ export default function HomePage() {
       </div>
 
       {/* Mobile-Reihenfolge nach dem Hero (Martin 16.08.): Ablauf direkt
-          unter "Bekannt aus", darunter Ilka, dann erst Bestpreis und
+          unter "Bekannt aus", darunter Ilka, dann erst der Vertrauensblock und
           Testsieger. Der Ablauf beantwortet die naechste Frage, die sich
           nach dem Versprechen stellt ("und wie laeuft das jetzt?"), Ilka
           gibt ihr ein Gesicht.
@@ -255,7 +255,7 @@ export default function HomePage() {
                    Überlassen Sie die Betreuung nicht dem Zufall.
                   </h3>
                   <p className="text-[15px] leading-relaxed text-[#5A5A5A]">
-                     Vertrauen Sie auf über 20 Jahre Erfahrung aus mehr als 60.000 Betreuungen – mit einem 100 % sorgenfreien Modell: Bestpreis-Garantie, täglich kündbar, taggenaue Abrechnung und Kosten immer nur, wenn die Betreuungskraft tatsächlich bei Ihnen ist.
+                     Vertrauen Sie auf über 20 Jahre Erfahrung aus mehr als 60.000 Betreuungen – ohne Vermittlungsgebühr, täglich kündbar, taggenau abgerechnet. Kosten entstehen erst, wenn die Betreuungskraft tatsächlich bei Ihnen ist.
                   </p>
                 </div>
               </div>
