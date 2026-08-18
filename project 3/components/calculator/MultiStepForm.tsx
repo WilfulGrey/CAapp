@@ -793,6 +793,34 @@ export function MultiStepForm({ mode = 'inline' }: MultiStepFormProps = {}) {
     return () => window.removeEventListener(OPEN_CALCULATOR_EVENT, oeffnen);
   }, []);
 
+  // Direkt-Start aus einem EXTERNEN CTA (Martin, 18.08.): Wer auf
+  // primundus.de „Kosten berechnen" klickt, hat seine Absicht schon erklärt —
+  // ihn hier noch einmal auf einen Button tippen zu lassen, ist derselbe
+  // doppelte Schritt, den wir am 17.08. INNERHALB des Rechners abgeschafft
+  // haben (#457). `?start=1` öffnet den Fragebogen deshalb sofort.
+  //
+  // `src` (z. B. `?start=1&src=apex-startseite`) landet im wizard_opened-
+  // Event — damit ist getrennt messbar, was der Website-Traffic tut und was
+  // der Direkteinstieg. Ohne diese Trennung würden sich die beiden
+  // CTA-Änderungen in derselben Kennzahl vermischen.
+  //
+  // Bewusst NUR beim ersten Mount und nur in der CTA-Variante: Der Nutzer
+  // soll das Overlay schließen können, ohne dass es beim nächsten Render
+  // wieder aufspringt.
+  const startVerarbeitet = useRef(false);
+  useEffect(() => {
+    if (mode !== 'cta' || startVerarbeitet.current) return;
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('start') !== '1') return;
+    startVerarbeitet.current = true;
+    analytics.trackEvent('wizard', 'wizard_opened', {
+      source: params.get('src') || 'extern',
+    });
+    setWarmupAudience('direct');
+    setCurrentStep(1);
+    setFullscreen(true);
+  }, [mode]);
+
   // Solange das Overlay offen ist, darf die Seite dahinter nicht mitscrollen —
   // sonst scrollt der Wisch im Wizard die Landingpage weg.
   useEffect(() => {
