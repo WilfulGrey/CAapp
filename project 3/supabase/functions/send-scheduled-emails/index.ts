@@ -1409,17 +1409,6 @@ function reminderCaregiverInitials(name: string): string {
   return (parts[0].charAt(0) + parts[parts.length - 1].charAt(0)).toUpperCase();
 }
 
-// Filtert unübersetzte Mamamia-Platzhalter aus about_de — die dürfen nie als
-// Pflegekraft-Zitat in der Mail landen. Spiegelt cleanAboutText() aus
-// detect-caregiver-events (dort an der Quelle, hier defensiv beim Render).
-function cleanReminderAbout(raw: string | null | undefined): string | null {
-  const t = (raw ?? "").trim();
-  if (!t) return null;
-  const lower = t.toLowerCase();
-  const markers = ["übersetzen möchten", "bitte geben sie den text", "ins deutsche übersetzen", "lorem ipsum"];
-  return markers.some((m) => lower.includes(m)) ? null : t;
-}
-
 // Erfahrungsstufe — WORTGLEICH zu Portal/SA-Portal und zu lib/email.ts
 // (caregiverTierLabel). Basis: nur UNSERE Einsätze (caregiver_einsatz_count =
 // hp_total_jobs). Elite ≥12 / Stammkraft ≥6 / Bewährt ≥2 / Bekannt ≥1 / sonst
@@ -1480,7 +1469,7 @@ function buildReminderHtml(
   // Karte, damit die ganze Mail-Reihe optisch UND inhaltlich zusammenpasst
   // (Martin, 18.08.: „alle mails gleiche infos und optik mit bild").
   const stufe = reminderTierLabel(meta.caregiver_einsatz_count, meta.caregiver_years_experience);
-  const factsHtml = `<p style="margin:10px 0 0;font-size:15px;line-height:1.5;color:#71717A;"><span style="font-weight:700;color:#18181B;">${stufe}:</span> ${reminderFactsLine(meta)}</p>`;
+  const factsHtml = `<p style="margin:16px 0 0;font-size:15px;line-height:1.5;color:#71717A;"><span style="font-weight:700;color:#18181B;">${stufe}:</span> ${reminderFactsLine(meta)}</p>`;
   const ageSuffix = meta.caregiver_age && meta.caregiver_age > 0
     ? `<span style="font-weight:400;color:#71717A;">, ${meta.caregiver_age}</span>`
     : "";
@@ -1495,10 +1484,6 @@ function buildReminderHtml(
     ? `<img src="cid:${photoCid}" alt="${cgName}" width="76" style="display:block;width:76px;height:76px;border-radius:12px;object-fit:cover;" />`
     : `<div style="width:76px;height:76px;border-radius:12px;background-color:#B5A184;color:#fff;font-size:26px;font-weight:700;line-height:76px;text-align:center;">${reminderCaregiverInitials(cgName)}</div>`;
 
-  const aboutClean = cleanReminderAbout(meta.caregiver_about_text);
-  const aboutHtml = aboutClean
-    ? `<p style="margin:12px 0 0;font-size:14px;line-height:1.65;color:#555;font-style:italic;">„${aboutClean}"</p>`
-    : "";
   const profilFooter = `<div style="border-top:1px solid #ECE7DF;margin:14px 0 0;padding-top:14px;"><a href="${portalUrl}" target="_blank" style="color:#8B7355;text-decoration:none;font-weight:700;font-size:15px;">${firstName}s Profil ansehen &rarr;</a></div>`;
 
   const kachel = `
@@ -1514,7 +1499,6 @@ function buildReminderHtml(
           </tr>
         </table>
         ${factsHtml}
-        ${aboutHtml}
         ${profilFooter}
       </td></tr>
     </table>`;
