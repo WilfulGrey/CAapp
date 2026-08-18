@@ -1486,13 +1486,22 @@ function buildReminderHtml(
 
   const profilFooter = `<div style="border-top:1px solid #ECE7DF;margin:14px 0 0;padding-top:14px;"><a href="${portalUrl}" target="_blank" style="color:#8B7355;text-decoration:none;font-weight:700;font-size:15px;">${firstName}s Profil ansehen &rarr;</a></div>`;
 
+  // Abstand Foto→Text als EIGENE Spalte, nicht als padding-right an der
+  // Foto-Zelle: mehrere Mail-Renderer verwerfen padding an einer <td>, die
+  // zugleich eine feste width traegt — dann klebt der Name am Bild (Martin
+  // 18.08. mit Screenshot: "viel zu eng name und bild", gemessener Abstand
+  // ~1 px statt 16). In Chrome war das NICHT reproduzierbar, das Padding
+  // greift dort; die leere Spalte kommt ganz ohne padding-Unterstuetzung aus
+  // und ist damit unabhaengig vom Client. Text mittig statt oben, sonst
+  // haengen zwei kurze Zeilen an der Oberkante eines 76-px-Fotos.
   const kachel = `
     <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="margin:0 0 22px 0;border:1px solid #ECE7DF;border-radius:14px;background:#ffffff;overflow:hidden;">
       <tr><td style="padding:18px 20px;">
         <table width="100%" cellpadding="0" cellspacing="0" role="presentation">
           <tr>
-            <td style="vertical-align:top;width:76px;padding-right:16px;">${photoHtml}</td>
-            <td style="vertical-align:top;">
+            <td width="76" style="vertical-align:middle;width:76px;">${photoHtml}</td>
+            <td width="18" style="width:18px;font-size:0;line-height:0;">&nbsp;</td>
+            <td style="vertical-align:middle;">
               <p style="margin:0 0 3px;font-size:18px;font-weight:700;color:#18181B;line-height:1.3;">${cgName}${ageSuffix}</p>
               ${deutschLine}
             </td>
