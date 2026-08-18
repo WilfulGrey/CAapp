@@ -2942,15 +2942,21 @@ const CustomerPortalPage: FC = () => {
              Fragment-Umbau 13.08. MUSS das ein JSX-Kommentar sein — als
              blanker /*-Block zwischen Elementen wurde er als TEXT gerendert
              und stand wörtlich auf der Seite. */}
-          <div className="rounded-3xl px-3 py-4 border space-y-3" style={{ background: '#FFFFFF', borderColor: '#8B7355' }}>
-            <p className="flex items-start gap-2 text-[15px] font-semibold leading-relaxed px-1" style={{color:'#8B7355'}}>
-              <Heart className="w-4 h-4 flex-shrink-0 mt-1" fill="currentColor" />
-              <span>
+          <div className="rounded-3xl px-3 py-4 border space-y-3" style={{ background: '#FFFFFF', borderColor: '#F0B0A4' }}>
+            {/* Coral „Interesse"-Kopf wie im Profil-Modal (CustomerNurseModal):
+                Herz im Kreis + coral Fettzeile. Proaktives Interesse soll auch
+                in der Liste warm/hervorgehoben wirken statt blass-braun
+                (Martin, 18.08.). */}
+            <div className="flex items-center gap-2.5 px-1">
+              <div className="flex-shrink-0 w-7 h-7 rounded-full flex items-center justify-center" style={{ background: '#FFCFC4' }}>
+                <Heart className="w-3.5 h-3.5" fill="currentColor" style={{ color: '#C04A40' }} />
+              </div>
+              <p className="text-[15px] font-bold leading-snug" style={{ color: '#C04A40' }}>
                 {visibleInterests.length === 1
-                  ? <>Eine Pflegekraft interessiert<br />sich für die Betreuung</>
-                  : <>{visibleInterests.length} Pflegekräfte interessieren<br />sich für die Betreuung</>}
-              </span>
-            </p>
+                  ? 'Eine Pflegekraft interessiert sich für die Betreuung'
+                  : `${visibleInterests.length} Pflegekräfte interessieren sich für die Betreuung`}
+              </p>
+            </div>
             {visibleInterests.map((i) => {
               const baseNurse = mapCaregiverToNurse(i.caregiver, {
                 nowIso: new Date().toISOString(),
