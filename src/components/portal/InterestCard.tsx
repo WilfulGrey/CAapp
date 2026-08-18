@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import type { FC } from 'react';
-import { Check, ChevronDown, FileText, UserPlus } from 'lucide-react';
+import { Check, ChevronDown, UserPlus } from 'lucide-react';
 import type { Nurse } from '../../types';
 import { nurseFacts, nurseLevel, displayName, initials } from './shared';
 
@@ -106,15 +106,7 @@ export const InterestCard: FC<{
               <ChevronDown className="w-4 h-4 -rotate-90 flex-shrink-0 text-zinc-400 group-hover:text-zinc-700 transition-colors" />
             </div>
 
-            <div className="flex flex-wrap items-center gap-x-1.5 gap-y-1 mt-1">
-              <span className="text-[16px]" style={{ color: '#71717A' }}>Deutsch {nurse.language.level}</span>
-              {nurse.referencePdfUrl && (
-                <span className="inline-flex items-center gap-1 text-[14px]" style={{ color: '#71717A' }} title="Referenzen im Profil">
-                  <FileText className="w-3 h-3" />
-                  Referenzen
-                </span>
-              )}
-            </div>
+            <p className="text-[16px] mt-1" style={{ color: '#71717A' }}>Deutsch {nurse.language.level}</p>
           </div>
         </div>
 
