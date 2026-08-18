@@ -162,6 +162,33 @@ Pre-existing errors w `project 3/` (`next/navigation`, lucide `CircleCheck`) to 
 
 ## 5. Branch & PR workflow
 
+### Kilka równoległych sesji? Osobny worktree dla każdej
+
+Jeśli na tym samym klonie pracuje **więcej niż jedna sesja naraz** (np. kilka
+sesji Claude Code — CRO, SEO, SEA — u Marcina), NIE dzielcie jednego katalogu
+roboczego. Gdy jedna sesja zrobi `git checkout`, pozostałe pracują dalej
+nieświadome zmiany. 16.–17.08.2026 zdarzyło się to sześć razy; dwa razy o włos
+od realnej szkody: raz osiem cudzych commitów wylądowało na otwartym PR-ze, raz
+siedem bezpośrednio na trunku (push ominąłby CI i poszedłby prosto na prod).
+Dodatkowo `git checkout` **zabiera ze sobą** niezacommitowane zmiany na obcy
+branch — bez ostrzeżenia, jeśli plik jest po obu stronach identyczny.
+
+```bash
+./scripts/agent-worktree.sh cro          # → ~/SA-Zugang_Neu-cro
+./scripts/agent-worktree.sh seo
+./scripts/agent-worktree.sh --remove cro # branch zostaje, znika tylko katalog
+```
+
+Skrypt tworzy katalog o tym samym kształcie co główny (`CAapp/` +
+`.claude/launch.json`), klonuje `node_modules` przez APFS-clonefile (sekundy
+zamiast `npm ci`, copy-on-write — praktycznie zero miejsca na dysku), kopiuje
+oba pliki `.env.local` i przydziela **wolne, jeszcze nikomu nieprzypisane
+porty**. Sesję odpalasz potem z `~/SA-Zugang_Neu-<nazwa>` zamiast
+`~/SA-Zugang_Neu`.
+
+Worktree'e dzielą jedną bazę obiektów — to nie jest drugi klon, nie ma drugiego
+`fetch`, a `git worktree list` pokazuje kto gdzie siedzi.
+
 ### Złota reguła — żadnego direct push do `integration/mamamia-onboarding`
 
 **Każda zmiana = feature branch + Pull Request.** Nawet 1-linijkowe fixy. Powód: Render auto-deploy'uje beta z każdego push'a do `integration/mamamia-onboarding` — chcemy review'ować zanim coś poleci na live.
