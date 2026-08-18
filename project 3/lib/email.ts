@@ -1538,17 +1538,6 @@ function caregiverInitials(name: string): string {
   return (parts[0].charAt(0) + parts[parts.length - 1].charAt(0)).toUpperCase();
 }
 
-// Mamamia liefert teils unübersetzte Platzhalter in about_de (z.B. "Bitte
-// geben Sie den Text an, den Sie ins Deutsche übersetzen möchten.") statt
-// einer echten Beschreibung — nie als Pflegekraft-Zitat rendern.
-function cleanCaregiverAbout(raw: string | null | undefined): string | null {
-  const t = (raw ?? '').trim();
-  if (!t) return null;
-  const lower = t.toLowerCase();
-  const markers = ['übersetzen möchten', 'bitte geben sie den text', 'ins deutsche übersetzen', 'lorem ipsum'];
-  return markers.some((m) => lower.includes(m)) ? null : t;
-}
-
 // Erfahrungsstufe der Pflegekraft — WORTGLEICH zum Kunden- und SA-Portal
 // (src/lib/mamamia/badge.ts + components/portal/shared.ts `nurseLevel`, sowie
 // mamamia-sadash `caregiverBadge.js`). Basis seit 12.08.2026: AUSSCHLIESSLICH
@@ -1754,7 +1743,7 @@ function caregiverKachelHtml(cg: CaregiverDisplay, portalUrl: string): string {
   // Stufe als fettes Wort vor der Faktenzeile (kein Medaillen-Badge mehr) —
   // exakt wie die Portal-Karte: „Bewährt: 12 Jahre Erfahrung · 3 Einsätze".
   const tier = caregiverTierLabel(cg.einsatzCount, cg.yearsExperience);
-  const factsHtml = `<p style="margin:10px 0 0;font-size:15px;line-height:1.5;color:#71717A;"><span style="font-weight:700;color:#18181B;">${tier}:</span> ${caregiverFactsLine(cg)}</p>`;
+  const factsHtml = `<p style="margin:16px 0 0;font-size:15px;line-height:1.5;color:#71717A;"><span style="font-weight:700;color:#18181B;">${tier}:</span> ${caregiverFactsLine(cg)}</p>`;
 
   return `
     <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="margin:0 0 26px;border:1px solid #ECE7DF;border-radius:14px;background:#ffffff;overflow:hidden;">
@@ -1796,7 +1785,7 @@ function buildCaregiverEventEmail(opts: {
 
   // Stufe + Fakten wortgleich zum Portal (caregiverTierLabel/caregiverFactsLine).
   const tier = caregiverTierLabel(cg.einsatzCount, cg.yearsExperience);
-  const factsHtml = `<p style="margin:8px 0 0;font-size:15px;line-height:1.5;color:#71717A;"><span style="font-weight:700;color:#18181B;">${tier}:</span> ${caregiverFactsLine(cg)}</p>`;
+  const factsHtml = `<p style="margin:16px 0 0;font-size:15px;line-height:1.5;color:#71717A;"><span style="font-weight:700;color:#18181B;">${tier}:</span> ${caregiverFactsLine(cg)}</p>`;
   const ageSuffix = cg.age ? `<span style="font-weight:400;color:#71717A;">, ${cg.age}</span>` : '';
   const deutschLine = cg.germanLevel
     ? `<p style="margin:0;font-size:15px;color:#71717A;">Deutsch ${cg.germanLevel}</p>`
@@ -1811,14 +1800,6 @@ function buildCaregiverEventEmail(opts: {
     ? `<img src="${cg.photoUrl}" alt="${cg.name}" width="76" style="display:block;width:76px;height:76px;border-radius:12px;object-fit:cover;" />`
     : `<div style="width:76px;height:76px;border-radius:12px;background-color:#B5A184;color:#fff;font-size:26px;font-weight:700;line-height:76px;text-align:center;">${caregiverInitials(cg.name)}</div>`;
 
-  // Mamamia liefert teils unübersetzte Platzhalter in about_de (z.B. "Bitte
-  // geben Sie den Text an, den Sie ins Deutsche übersetzen möchten.") — nie
-  // als Zitat rendern.
-  const aboutClean = cleanCaregiverAbout(cg.aboutText);
-  const aboutHtml = aboutClean
-    ? `<p style="margin:14px 0 0;font-size:14px;line-height:1.65;color:#555;font-style:italic;">„${aboutClean}"</p>`
-    : '';
-
   const kachel = `
     <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="margin:0 0 22px 0;border:1px solid #ECE7DF;border-radius:14px;overflow:hidden;">
       <tr><td style="padding:18px 20px;background:#ffffff;">
@@ -1832,7 +1813,6 @@ function buildCaregiverEventEmail(opts: {
           </tr>
         </table>
         ${factsHtml}
-        ${aboutHtml}
       </td></tr>
     </table>`;
 
@@ -1866,8 +1846,7 @@ ${opts.plainSummary}
 
 PFLEGEKRAFT
 ${cg.name}${cg.age ? `, ${cg.age}` : ''} · ${tier}
-${metaParts.length > 0 ? metaParts.join(' · ') + '\n' : ''}${aboutClean ? `„${aboutClean}"\n` : ''}
-${opts.ctaText.replace(/\s*→\s*$/, '')}: ${opts.portalUrl}
+${metaParts.length > 0 ? metaParts.join(' · ') + '\n' : ''}${opts.ctaText.replace(/\s*→\s*$/, '')}: ${opts.portalUrl}
 
 ✓ Keine Vertragsbindung  ·  ✓ Tagesgenaue Abrechnung  ·  ✓ Kosten erst bei Anreise
 
