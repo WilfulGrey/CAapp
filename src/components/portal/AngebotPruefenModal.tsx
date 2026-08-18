@@ -8,7 +8,7 @@ import { Check, Info, X } from 'lucide-react';
 const FEIERTAGE_LIST = 'Karfreitag, Ostersonntag, Ostermontag, 1. Mai, Heiligabend, 1. + 2. Weihnachtstag, Silvester, Neujahr';
 import type { Nurse } from '../../types';
 import type { Application } from './shared';
-import { displayName, initials } from './shared';
+import { displayName, initials, nurseLevel, nurseFacts } from './shared';
 import { VertragSignieren, type VertragsDaten } from './VertragSignieren';
 import {
   parseDeDate,
@@ -153,7 +153,6 @@ export const AngebotPruefenModal: FC<{
   const name = displayName(nurse.name);
   // Deutsch-Punktebalken — identisch zur geteilten PK-Karte (AppCard),
   // damit die Sprach-Optik im Modal konsistent zum restlichen Portal ist.
-  const germanBars = Array.from({ length: 3 }, (_, i) => i < nurse.language.bars);
 
   const [anrede, setAnrede] = useState(prefill?.anrede ?? 'Frau');
   const [vorname, setVorname] = useState(prefill?.vorname ?? '');
@@ -279,19 +278,19 @@ export const AngebotPruefenModal: FC<{
                       </div>
                     )}
                   </div>
+                  {/* CG-Box im einheitlichen Portal-Stil (wie MatchCard):
+                      „Name, Alter" · Deutsch · Stufe + Fakten, keine Balken. */}
                   <div className="flex-1 min-w-0">
-                    <p className="font-bold text-sm text-gray-900">{name}</p>
-                    <p className="text-sm text-gray-500">{nurse.age} J. · {nurse.experience}</p>
-                    {/* Deutsch mit Punktebalken — gleiche Optik wie in der
-                        Standard-PK-Karte (AppCard), nicht nur Text. */}
-                    <div className="flex items-center gap-1.5 mt-0.5">
-                      <div className="flex gap-0.5">
-                        {germanBars.map((f, i) => (
-                          <div key={i} className={`w-3 h-1.5 rounded-full ${f ? 'bg-[#8B7355]' : 'bg-gray-200'}`} />
-                        ))}
-                      </div>
-                      <span className="text-sm text-gray-500">Deutsch {nurse.language.level}</span>
-                    </div>
+                    <p className="font-bold text-sm" style={{ color: '#18181B' }}>
+                      {name}{nurse.age ? <span className="font-normal" style={{ color: '#71717A' }}>, {nurse.age}</span> : null}
+                    </p>
+                    <p className="text-sm mt-0.5" style={{ color: '#71717A' }}>Deutsch {nurse.language.level}</p>
+                    <p className="text-sm mt-0.5" style={{ color: '#71717A' }}>
+                      {(() => { const lvl = nurseLevel(nurse.experienceYears ?? 0, nurse.history?.assignments ?? 0); return lvl.label ? (
+                        <span className="font-semibold" style={{ color: '#18181B' }}>{lvl.label}: </span>
+                      ) : null; })()}
+                      {nurseFacts(nurse)}
+                    </p>
                   </div>
                   <button onClick={() => onNurseClick(nurse)} className="text-sm font-semibold text-[#8B7355] hover:underline flex-shrink-0">
                     Profil →

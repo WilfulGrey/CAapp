@@ -1,7 +1,7 @@
 import type { FC } from 'react';
 import type { Nurse } from '../../types';
 import type { Application } from './shared';
-import { nurseLevel, displayName, initials } from './shared';
+import { nurseLevel, nurseFacts, displayName, initials } from './shared';
 import { MonatsAufstellung } from './MonatsAufstellung';
 import { KOSTENRECHNER_URL } from '../../lib/leadEvents';
 
@@ -34,7 +34,6 @@ export const BookedScreen: FC<{
   const name = displayName(nurse.name);
   const inits = initials(nurse.name);
   const lvl = nurseLevel(nurse.experienceYears ?? 0, nurse.history?.assignments ?? 0);
-  const bars = Array.from({ length: 3 }, (_, i) => i < nurse.language.bars);
 
   const milestones = einsatzBeendet
     ? [
@@ -99,26 +98,16 @@ export const BookedScreen: FC<{
                 style={{ backgroundColor: nurse.color }}>{inits}</div>
             )}
           </div>
+          {/* CG-Box im einheitlichen Portal-Stil (wie MatchCard). */}
           <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-2 mb-0.5">
-              <span className="font-bold text-gray-900">{name}</span>
-              {/* Ohne Einsatz KEINE Pille (12.08.) — sonst leerer Rahmen.
-                  `lvl.emoji` ist seit dem Design-Durchgang immer '' und
-                  fliegt hier mit raus. */}
-              {lvl.label && (
-                <span className={`text-xs font-bold px-2.5 py-0.5 rounded-full border flex-shrink-0 ${lvl.cls}`}>
-                  {lvl.label}
-                </span>
-              )}
-            </div>
-            <div className="flex items-center gap-1.5">
-              <div className="flex gap-0.5">
-                {bars.map((f, i) => <div key={i} className={`w-2.5 h-[5px] rounded-full ${f ? 'bg-[#9B1FA1]' : 'bg-gray-200'}`} />)}
-              </div>
-              <span className="text-xs text-gray-500">{nurse.language.level}</span>
-              <span className="text-gray-300 text-xs">·</span>
-              <span className="text-xs font-bold text-[#9B1FA1]">{nurse.experience}</span>
-            </div>
+            <p className="font-bold" style={{ color: '#18181B' }}>
+              {name}{nurse.age ? <span className="font-normal" style={{ color: '#71717A' }}>, {nurse.age}</span> : null}
+            </p>
+            <p className="text-sm" style={{ color: '#71717A' }}>Deutsch {nurse.language.level}</p>
+            <p className="text-sm mt-0.5" style={{ color: '#71717A' }}>
+              {lvl.label && <span className="font-semibold" style={{ color: '#18181B' }}>{lvl.label}: </span>}
+              {nurseFacts(nurse)}
+            </p>
           </div>
           <span className="text-xs text-gray-500 flex-shrink-0">Profil →</span>
         </div>

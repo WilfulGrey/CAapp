@@ -1,8 +1,8 @@
 import type { FC } from 'react';
-import { FileText } from 'lucide-react';
+import { ChevronDown, Mail } from 'lucide-react';
 import type { Nurse } from '../../types';
 import type { Application } from './shared';
-import { nurseLevel, displayName, initials } from './shared';
+import { nurseLevel, nurseFacts, displayName, initials } from './shared';
 
 export const AppCard: FC<{
   app: Application;
@@ -17,85 +17,59 @@ export const AppCard: FC<{
   const inits = initials(nurse.name);
   const name = displayName(nurse.name);
   const vorname = nurse.name.split(' ')[0];
-  const bars = Array.from({ length: 3 }, (_, i) => i < nurse.language.bars);
-
   return (
-    <div
-      className="bg-white rounded-2xl border-2 border-[#E76F63] overflow-hidden shadow-[0_4px_16px_rgba(231,111,99,0.15)]"
-      style={exiting ? { animation: 'exitCard 0.32s ease-in forwards' } : undefined}
-    >
-      <div className="flex items-center justify-between px-5 py-2 bg-[#F5F5F6] border-b border-[#E9E9EB]">
-        <div className="flex items-center gap-2">
-          <span className="text-xs font-semibold text-[#8B7355]">Bewerbung</span>
-          {app.status === 'new' && (
-            <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-[#E3F7EF] text-[#22A06B] border border-[#B8E8D4]">Neu</span>
-          )}
-          {app.isInvited && (
-            <span className="flex items-center gap-1 text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-[#EBE2D5] text-[#8B7355] border border-[#E9E9EB]">
-              <svg className="w-3 h-3 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-              </svg>
-              Eingeladen
-            </span>
-          )}
-        </div>
-        <span className="text-[10px] text-[#8B7355]">{app.appliedAt}</span>
-      </div>
-
-      <div className="px-5 pt-5 pb-5 cursor-pointer active:bg-gray-50" onClick={() => onNurseClick(nurse)}>
-        <div className="flex items-center gap-4">
-          <div className="flex-shrink-0">
-            {nurse.image ? (
-              <img src={nurse.image} alt={nurse.name} className="w-16 h-16 rounded-2xl object-cover" />
-            ) : (
-              <div className="w-16 h-16 rounded-2xl flex items-center justify-center text-xl font-bold text-white"
-                style={{ backgroundColor: nurse.color }}>
-                {inits}
-              </div>
-            )}
+    <div style={exiting ? { animation: 'exitCard 0.32s ease-in forwards' } : undefined}>
+      {/* Grün umrandeter Kasten: eine echte Bewerbung ist das stärkste
+          positive Signal → Grün statt Coral (Martin, 18.08.). */}
+      <div className="bg-white rounded-2xl border-2 border-[#22A06B] overflow-hidden shadow-[0_4px_16px_rgba(34,160,107,0.13)]">
+        {/* Status-Kopf IN der Box oben, mit Icon — gleiches Muster wie der
+            Interesse-/Empfehlung-Kopf (Icon im Kreis + farbige Fettzeile),
+            hier grün (Martin, 18.08.). */}
+        <div className="flex items-center gap-2.5 px-5 pt-4 pb-1">
+          <div className="flex-shrink-0 w-7 h-7 rounded-full flex items-center justify-center" style={{ background: '#E3F7EF' }}>
+            <Mail className="w-3.5 h-3.5" style={{ color: '#22A06B' }} />
           </div>
-
-          <div className="flex-1 min-w-0">
-            <div className="flex items-start justify-between gap-2 mb-1">
-              <div className="flex items-baseline gap-1.5 min-w-0">
-                <p className="text-base font-bold text-gray-900 leading-tight">{name}</p>
-                {nurse.age ? (
-                  <span className="text-sm text-gray-400 flex-shrink-0">{nurse.age} J.</span>
-                ) : null}
-              </div>
-              {/* Ohne Einsatz KEINE Pille — sonst steht hier ein leerer
-                  Rahmen (12.08.: gleicher Fehler wie im Profil, dort schon
-                  gefixt; MatchCard/InterestCard hatten den Guard bereits). */}
-              {(() => { const lvl = nurseLevel(nurse.experienceYears ?? 0, nurse.history?.assignments ?? 0); return lvl.label ? (
-                <span className={`flex items-center gap-1 text-xs font-bold px-2.5 py-0.5 rounded-full border flex-shrink-0 ${lvl.cls}`}>
-                  {lvl.label}
-                </span>
-              ) : null; })()}
-            </div>
-            <div className="flex items-center gap-2 mb-1">
-              <div className="flex gap-0.5">
-                {bars.map((f, i) => (
-                  <div key={i} className={`w-3 h-1.5 rounded-full ${f ? 'bg-[#8B7355]' : 'bg-gray-200'}`} />
-                ))}
-              </div>
-              <span className="text-sm text-gray-500">Deutsch {nurse.language.level}</span>
-              {nurse.referencePdfUrl && (
-                <span
-                  className="inline-flex items-center gap-0.5 text-[10px] font-medium text-[#8B7355] bg-[#F5F5F6] border border-zinc-200 px-1.5 py-0.5 rounded-full"
-                  title="Referenzen im Profil"
-                >
-                  <FileText className="w-2.5 h-2.5" />
-                  Referenzen
-                </span>
+          <p className="text-[15px] font-bold leading-snug" style={{ color: '#22A06B' }}>
+            Neue Bewerbung{app.isInvited ? ' Ihrer eingeladenen Pflegekraft' : ''}
+          </p>
+        </div>
+        <div className="px-5 pt-3 pb-5 cursor-pointer active:bg-gray-50" onClick={() => onNurseClick(nurse)}>
+          <div className="flex items-center gap-3.5">
+            <div className="flex-shrink-0">
+              {nurse.image ? (
+                <img src={nurse.image} alt={nurse.name} className="w-16 h-16 rounded-xl object-cover" />
+              ) : (
+                <div className="w-16 h-16 rounded-xl flex items-center justify-center text-xl font-bold text-white"
+                  style={{ backgroundColor: nurse.color }}>
+                  {inits}
+                </div>
               )}
             </div>
-            <p className="text-sm text-gray-500 truncate">
-              <span>{nurse.experience}</span>
-              {nurse.history && <span> · {nurse.history.assignments} Einsätze · Ø {Math.round(nurse.history.avgDurationMonths * 4.3)} Wo.</span>}
-            </p>
+
+            {/* CG-Box wortgleich zur normalen Portal-Karte (MatchCard):
+                „Name, Alter" · „Deutsch X" · „Stufe: Fakten" — kein Pillen-
+                Badge, keine Sprachbalken, kein „J." (Martin, 18.08.). */}
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center justify-between gap-2">
+                <p className="text-[17px] font-semibold leading-snug" style={{ color: '#18181B' }}>
+                  {name}
+                  {nurse.age ? <span className="font-normal" style={{ color: '#71717A' }}>, {nurse.age}</span> : null}
+                </p>
+                <ChevronDown className="w-4 h-4 -rotate-90 flex-shrink-0 text-zinc-400" />
+              </div>
+              <p className="text-[16px] mt-1" style={{ color: '#71717A' }}>Deutsch {nurse.language.level}</p>
+            </div>
           </div>
+          {/* Fakten über die VOLLE Kartenbreite (wie MatchCard) — in der
+              schmalen Spalte neben dem Foto brach die Zeile sonst mitten in
+              der Zahl um („Ø 12 / Wochen pro Einsatz"). */}
+          <p className="text-[16px] mt-3" style={{ color: '#71717A' }}>
+            {(() => { const lvl = nurseLevel(nurse.experienceYears ?? 0, nurse.history?.assignments ?? 0); return lvl.label ? (
+              <span className="font-semibold" style={{ color: '#18181B' }}>{lvl.label}: </span>
+            ) : null; })()}
+            {nurseFacts(nurse)}
+          </p>
         </div>
-      </div>
 
       <div className="border-t border-gray-100 px-5 py-4">
         <div className="bg-[#F5F5F6] rounded-xl px-4 py-3 mb-3">
@@ -151,6 +125,7 @@ export const AppCard: FC<{
         >
           Angebot prüfen →
         </button>
+      </div>
       </div>
     </div>
   );

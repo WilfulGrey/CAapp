@@ -1413,6 +1413,15 @@ const CustomerPortalPage: FC = () => {
       application_id: appIdNumeric,
       caregiver_id: targetApp?.nurse?.caregiverId,
       caregiver_name: targetApp?.nurse?.name,
+      // Pflegekraft-Profil für die Buchungs-Mail (Mail C) — ohne diese Felder
+      // stand in der Kachel nur der Name (Martin, 18.08.: „CG-Box fast kaputt
+      // ohne Info"). Quelle ist dasselbe nurse-Objekt wie in der Portal-Karte,
+      // damit die Box in Mail = Portal denselben Inhalt zeigt.
+      caregiver_age: targetApp?.nurse?.age,
+      caregiver_german_level: targetApp?.nurse?.language?.level,
+      caregiver_einsatz_count: targetApp?.nurse?.history?.assignments,
+      caregiver_years_experience: targetApp?.nurse?.experienceYears,
+      caregiver_photo_url: targetApp?.nurse?.image,
       contract_patient: {
         anrede: formData.anrede,
         vorname: formData.vorname,
