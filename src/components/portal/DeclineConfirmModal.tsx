@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import type { FC } from 'react';
 import type { Application } from './shared';
-import { nurseLevel, displayName, initials } from './shared';
+import { nurseLevel, nurseFacts, displayName, initials } from './shared';
 
 export const DeclineConfirmModal: FC<{
   app: Application;
@@ -38,26 +38,24 @@ export const DeclineConfirmModal: FC<{
             <div className="flex items-center gap-3.5 bg-gray-50 rounded-2xl px-4 py-3.5 border border-gray-200">
               <div className="flex-shrink-0">
                 {nurse.image ? (
-                  <img src={nurse.image} alt={nurse.name} className="w-16 h-16 rounded-2xl object-cover" />
+                  <img src={nurse.image} alt={nurse.name} className="w-16 h-16 rounded-xl object-cover" />
                 ) : (
-                  <div className="w-16 h-16 rounded-2xl flex items-center justify-center text-lg font-bold text-white"
+                  <div className="w-16 h-16 rounded-xl flex items-center justify-center text-lg font-bold text-white"
                     style={{ backgroundColor: nurse.color }}>
                     {inits}
                   </div>
                 )}
               </div>
+              {/* CG-Box im einheitlichen Portal-Stil (wie MatchCard). */}
               <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2 flex-wrap mb-1">
-                  <span className="font-bold text-base text-gray-900">{name}</span>
-                  <span className="text-sm text-gray-500">{nurse.age} J.</span>
-                  {/* Ohne Einsatz KEINE Pille (12.08.) — sonst leerer Rahmen. */}
-                  {lvl.label && (
-                    <span className={`text-xs font-bold px-2.5 py-0.5 rounded-full border flex-shrink-0 ${lvl.cls}`}>
-                      {lvl.label}
-                    </span>
-                  )}
-                </div>
-                <p className="text-sm font-medium text-gray-700 mt-0.5">{nurse.experience}</p>
+                <p className="font-bold text-base" style={{ color: '#18181B' }}>
+                  {name}{nurse.age ? <span className="font-normal" style={{ color: '#71717A' }}>, {nurse.age}</span> : null}
+                </p>
+                <p className="text-sm mt-0.5" style={{ color: '#71717A' }}>Deutsch {nurse.language.level}</p>
+                <p className="text-sm mt-1" style={{ color: '#71717A' }}>
+                  {lvl.label && <span className="font-semibold" style={{ color: '#18181B' }}>{lvl.label}: </span>}
+                  {nurseFacts(nurse)}
+                </p>
               </div>
             </div>
 

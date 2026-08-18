@@ -1409,30 +1409,31 @@ function reminderCaregiverInitials(name: string): string {
   return (parts[0].charAt(0) + parts[parts.length - 1].charAt(0)).toUpperCase();
 }
 
-// Filtert unübersetzte Mamamia-Platzhalter aus about_de — die dürfen nie als
-// Pflegekraft-Zitat in der Mail landen. Spiegelt cleanAboutText() aus
-// detect-caregiver-events (dort an der Quelle, hier defensiv beim Render).
-function cleanReminderAbout(raw: string | null | undefined): string | null {
-  const t = (raw ?? "").trim();
-  if (!t) return null;
-  const lower = t.toLowerCase();
-  const markers = ["übersetzen möchten", "bitte geben sie den text", "ins deutsche übersetzen", "lorem ipsum"];
-  return markers.some((m) => lower.includes(m)) ? null : t;
+// Erfahrungsstufe — WORTGLEICH zu Portal/SA-Portal und zu lib/email.ts
+// (caregiverTierLabel). Basis: nur UNSERE Einsätze (caregiver_einsatz_count =
+// hp_total_jobs). Elite ≥12 / Stammkraft ≥6 / Bewährt ≥2 / Bekannt ≥1 / sonst
+// Berufserfahren (Jahre>0) bzw. Neu dabei. Kein Medaillen-Badge mehr — die
+// Stufe steht als fettes Wort vor der Faktenzeile.
+function reminderTierLabel(einsatzCount?: number | null, yearsExperience?: number | null): string {
+  const jobs = einsatzCount ?? 0;
+  if (jobs >= 12) return "Elite";
+  if (jobs >= 6) return "Stammkraft";
+  if (jobs >= 2) return "Bewährt";
+  if (jobs >= 1) return "Bekannt";
+  return (yearsExperience ?? 0) > 0 ? "Berufserfahren" : "Neu dabei";
 }
 
-function reminderBadgeStyle(level?: string | null): { label: string; gradient: string; solid: string } | null {
-  if (!level) return null;
-  const key = level.trim().toLowerCase();
-  // `solid` ist der Start-Farbton — Outlook (Word-Renderer) kann
-  // linear-gradient nicht, braucht solide Farbe als Background-Fallback.
-  const map: Record<string, { label: string; gradient: string; solid: string }> = {
-    starter: { label: "STARTER-PFLEGEKRAFT", gradient: "linear-gradient(135deg,#8AB47C 0%,#5E8C50 100%)", solid: "#5E8C50" },
-    bronze:  { label: "BRONZE-PFLEGEKRAFT",  gradient: "linear-gradient(135deg,#C68850 0%,#8B5A2B 100%)", solid: "#8B5A2B" },
-    silber:  { label: "SILBER-PFLEGEKRAFT",  gradient: "linear-gradient(135deg,#B8B8B8 0%,#7E7E7E 100%)", solid: "#7E7E7E" },
-    gold:    { label: "GOLD-PFLEGEKRAFT",    gradient: "linear-gradient(135deg,#E0AC32 0%,#B8860B 100%)", solid: "#B8860B" },
-    platin:  { label: "PLATIN-PFLEGEKRAFT",  gradient: "linear-gradient(135deg,#D4DCE0 0%,#7E8E96 100%)", solid: "#7E8E96" },
-  };
-  return map[key] || null;
+// Faktenzeile wie im Portal/in lib/email.ts (caregiverFactsLine): Jahre
+// Erfahrung · Einsätze. Ist nichts da, ehrlicher Ersatzsatz.
+function reminderFactsLine(meta: ReminderMeta): string {
+  const teile: string[] = [];
+  if (meta.caregiver_years_experience && meta.caregiver_years_experience > 0) {
+    teile.push(`${meta.caregiver_years_experience} ${meta.caregiver_years_experience === 1 ? "Jahr" : "Jahre"} Erfahrung`);
+  }
+  if (meta.caregiver_einsatz_count && meta.caregiver_einsatz_count > 0) {
+    teile.push(`${meta.caregiver_einsatz_count} ${meta.caregiver_einsatz_count === 1 ? "Einsatz" : "Einsätze"}`);
+  }
+  return teile.length > 0 ? teile.join(" &middot; ") : "bereit für den ersten Einsatz";
 }
 
 // Reminder-Tier — application-Reminder eskalieren in 3 Stufen (1h/4h/12h),
@@ -1461,64 +1462,44 @@ function buildReminderHtml(
   const cgName = meta.caregiver_name || "Ihre Pflegekraft";
   const firstName = cgName.split(/\s+/)[0] || cgName;
 
-  const badge = reminderBadgeStyle(meta.caregiver_badge_level || null);
-  const badgeHtml = badge
-    ? `<span style="display:inline-block;background-color:${badge.solid};background:${badge.gradient};color:#fff;padding:4px 11px;border-radius:14px;font-size:11px;font-weight:700;letter-spacing:.04em;">${badge.label}</span>`
+  // Einheitliche Pflegekraft-Box — identisch zu Mail A/B/C
+  // (lib/email.ts caregiverKachelHtml): abgerundetes Quadrat-Foto, Name +
+  // Alter, Deutsch-Level, Stufe als fettes Wort + Faktenzeile, „Profil
+  // ansehen". BEIDE Varianten (application/interest) zeigen jetzt dieselbe
+  // Karte, damit die ganze Mail-Reihe optisch UND inhaltlich zusammenpasst
+  // (Martin, 18.08.: „alle mails gleiche infos und optik mit bild").
+  const stufe = reminderTierLabel(meta.caregiver_einsatz_count, meta.caregiver_years_experience);
+  const factsHtml = `<p style="margin:16px 0 0;font-size:15px;line-height:1.5;color:#71717A;"><span style="font-weight:700;color:#18181B;">${stufe}:</span> ${reminderFactsLine(meta)}</p>`;
+  const ageSuffix = meta.caregiver_age && meta.caregiver_age > 0
+    ? `<span style="font-weight:400;color:#71717A;">, ${meta.caregiver_age}</span>`
     : "";
-
-  const metaParts: string[] = [];
-  if (meta.caregiver_years_experience && meta.caregiver_years_experience > 0) {
-    metaParts.push(`${meta.caregiver_years_experience} ${meta.caregiver_years_experience === 1 ? "Jahr" : "Jahre"} Erfahrung`);
-  }
-  if (meta.caregiver_einsatz_count && meta.caregiver_einsatz_count > 0) {
-    metaParts.push(`${meta.caregiver_einsatz_count} ${meta.caregiver_einsatz_count === 1 ? "Einsatz" : "Einsätze"}`);
-  }
-  const metaLine = metaParts.length > 0
-    ? `<p style="margin:0 0 6px;font-size:13px;color:#666;">${metaParts.join(" &middot; ")}</p>`
+  const deutschLine = meta.caregiver_german_level
+    ? `<p style="margin:0;font-size:15px;color:#71717A;">Deutsch ${meta.caregiver_german_level}</p>`
     : "";
 
   // Nur Inline-CID nutzen — der presigned S3-URL ist nach 30 Min meist tot,
   // daher bei fehlgeschlagenem Inline-Fetch direkt auf Initialen-Avatar
   // ausweichen statt eine kaputte Bild-Ref im HTML zu lassen.
   const photoHtml = photoCid
-    ? `<img src="cid:${photoCid}" alt="${cgName}" width="80" style="display:block;width:80px;height:80px;border-radius:50%;object-fit:cover;border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.08);" />`
-    : `<div style="width:80px;height:80px;border-radius:50%;background-color:#B5A184;color:#fff;font-size:28px;font-weight:700;line-height:80px;text-align:center;border:2px solid #fff;">${reminderCaregiverInitials(cgName)}</div>`;
+    ? `<img src="cid:${photoCid}" alt="${cgName}" width="76" style="display:block;width:76px;height:76px;border-radius:12px;object-fit:cover;" />`
+    : `<div style="width:76px;height:76px;border-radius:12px;background-color:#B5A184;color:#fff;font-size:26px;font-weight:700;line-height:76px;text-align:center;">${reminderCaregiverInitials(cgName)}</div>`;
 
-  // Einheitliche Pflegekraft-Box.
-  // - application: Foto + Name + "Alter · Deutsch-Level" + Button
-  //   "{Vorname}s Profil ansehen". Kein Badge/Einsätze/Bio — kompakt.
-  // - interest: Foto + Name + Erfahrung/Einsätze + Badge + Bio (wie gehabt).
-  const aboutClean = cleanReminderAbout(meta.caregiver_about_text);
-
-  const infoBits: string[] = [];
-  if (meta.caregiver_age && meta.caregiver_age > 0) infoBits.push(`${meta.caregiver_age} J.`);
-  if (meta.caregiver_german_level) infoBits.push(`Deutsch ${meta.caregiver_german_level}`);
-  const infoLine = infoBits.length > 0
-    ? `<p style="margin:0;font-size:14px;color:#555;">${infoBits.join(" &middot; ")}</p>`
-    : "";
-
-  const profilButton = `<p style="margin:12px 0 0;"><a href="${portalUrl}" target="_blank" style="color:#8B7355;text-decoration:none;font-weight:700;font-size:14px;">${firstName}s Profil ansehen &rarr;</a></p>`;
-
-  const kachelBody = variant === "application"
-    ? `<p style="margin:0 0 3px;font-size:18px;font-weight:700;color:#2D1F0F;">${cgName}</p>${infoLine}`
-    : `<p style="margin:0 0 4px;font-size:18px;font-weight:700;color:#2D1F0F;">${cgName}</p>${metaLine}${badgeHtml}`;
-
-  const kachelFooter = variant === "application"
-    ? profilButton
-    : (aboutClean ? `<p style="margin:14px 0 0;font-size:14px;line-height:1.65;color:#555;font-style:italic;">„${aboutClean}"</p>` : "");
+  const profilFooter = `<div style="border-top:1px solid #ECE7DF;margin:14px 0 0;padding-top:14px;"><a href="${portalUrl}" target="_blank" style="color:#8B7355;text-decoration:none;font-weight:700;font-size:15px;">${firstName}s Profil ansehen &rarr;</a></div>`;
 
   const kachel = `
-    <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="margin:0 0 22px 0;border:1px solid #e8ddd0;border-radius:12px;overflow:hidden;">
-      <tr><td style="padding:18px 20px;background:#FAF8F4;">
+    <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="margin:0 0 22px 0;border:1px solid #ECE7DF;border-radius:14px;background:#ffffff;overflow:hidden;">
+      <tr><td style="padding:18px 20px;">
         <table width="100%" cellpadding="0" cellspacing="0" role="presentation">
           <tr>
-            <td style="vertical-align:middle;width:96px;padding-right:16px;">${photoHtml}</td>
-            <td style="vertical-align:middle;">
-              ${kachelBody}
+            <td style="vertical-align:top;width:76px;padding-right:16px;">${photoHtml}</td>
+            <td style="vertical-align:top;">
+              <p style="margin:0 0 3px;font-size:18px;font-weight:700;color:#18181B;line-height:1.3;">${cgName}${ageSuffix}</p>
+              ${deutschLine}
             </td>
           </tr>
         </table>
-        ${kachelFooter}
+        ${factsHtml}
+        ${profilFooter}
       </td></tr>
     </table>`;
 
@@ -1627,10 +1608,17 @@ Primundus Deutschland | www.primundus.de
     body = `Sagen Sie ihr im Portal kurz zu oder ab. Wenn ich nichts von Ihnen höre, gebe ich ${firstName} in den nächsten Stunden wieder frei, damit sie nicht unnötig wartet. Und wenn Sie lieber andere Vorschläge möchten, melden Sie sich einfach kurz — ich kümmere mich.`;
   }
 
-  const infoBits: string[] = [];
-  if (meta.caregiver_age && meta.caregiver_age > 0) infoBits.push(`${meta.caregiver_age} J.`);
-  if (meta.caregiver_german_level) infoBits.push(`Deutsch ${meta.caregiver_german_level}`);
-  const infoLine = infoBits.length > 0 ? ` (${infoBits.join(" · ")})` : "";
+  const agePart = meta.caregiver_age && meta.caregiver_age > 0 ? `, ${meta.caregiver_age}` : "";
+  const deutschPart = meta.caregiver_german_level ? ` · Deutsch ${meta.caregiver_german_level}` : "";
+  const stufe = reminderTierLabel(meta.caregiver_einsatz_count, meta.caregiver_years_experience);
+  const factsParts: string[] = [];
+  if (meta.caregiver_years_experience && meta.caregiver_years_experience > 0) {
+    factsParts.push(`${meta.caregiver_years_experience} ${meta.caregiver_years_experience === 1 ? "Jahr" : "Jahre"} Erfahrung`);
+  }
+  if (meta.caregiver_einsatz_count && meta.caregiver_einsatz_count > 0) {
+    factsParts.push(`${meta.caregiver_einsatz_count} ${meta.caregiver_einsatz_count === 1 ? "Einsatz" : "Einsätze"}`);
+  }
+  const factsPlain = factsParts.length > 0 ? factsParts.join(" · ") : "bereit für den ersten Einsatz";
 
   return `${halloAnrede},
 
@@ -1638,7 +1626,8 @@ ${intro}
 
 ${body}
 
-${cgName}${infoLine}
+${cgName}${agePart}${deutschPart}
+${stufe}: ${factsPlain}
 ${firstName}s Profil ansehen: ${portalUrl}
 
 PS: Klappt im Portal etwas nicht, oder möchten Sie das lieber persönlich klären? Sie erreichen mich unter 089 200 000 830 oder per WhatsApp (https://wa.me/4989200000830).

@@ -1413,6 +1413,15 @@ const CustomerPortalPage: FC = () => {
       application_id: appIdNumeric,
       caregiver_id: targetApp?.nurse?.caregiverId,
       caregiver_name: targetApp?.nurse?.name,
+      // Pflegekraft-Profil für die Buchungs-Mail (Mail C) — ohne diese Felder
+      // stand in der Kachel nur der Name (Martin, 18.08.: „CG-Box fast kaputt
+      // ohne Info"). Quelle ist dasselbe nurse-Objekt wie in der Portal-Karte,
+      // damit die Box in Mail = Portal denselben Inhalt zeigt.
+      caregiver_age: targetApp?.nurse?.age,
+      caregiver_german_level: targetApp?.nurse?.language?.level,
+      caregiver_einsatz_count: targetApp?.nurse?.history?.assignments,
+      caregiver_years_experience: targetApp?.nurse?.experienceYears,
+      caregiver_photo_url: targetApp?.nurse?.image,
       contract_patient: {
         anrede: formData.anrede,
         vorname: formData.vorname,
@@ -2942,15 +2951,21 @@ const CustomerPortalPage: FC = () => {
              Fragment-Umbau 13.08. MUSS das ein JSX-Kommentar sein — als
              blanker /*-Block zwischen Elementen wurde er als TEXT gerendert
              und stand wörtlich auf der Seite. */}
-          <div className="rounded-3xl px-3 py-4 border space-y-3" style={{ background: '#FFFFFF', borderColor: '#8B7355' }}>
-            <p className="flex items-start gap-2 text-[15px] font-semibold leading-relaxed px-1" style={{color:'#8B7355'}}>
-              <Heart className="w-4 h-4 flex-shrink-0 mt-1" fill="currentColor" />
-              <span>
+          <div className="rounded-3xl px-3 py-4 border space-y-3" style={{ background: '#FFFFFF', borderColor: '#F0B0A4' }}>
+            {/* Coral „Interesse"-Kopf wie im Profil-Modal (CustomerNurseModal):
+                Herz im Kreis + coral Fettzeile. Proaktives Interesse soll auch
+                in der Liste warm/hervorgehoben wirken statt blass-braun
+                (Martin, 18.08.). */}
+            <div className="flex items-center gap-2.5 px-1">
+              <div className="flex-shrink-0 w-7 h-7 rounded-full flex items-center justify-center" style={{ background: '#FFCFC4' }}>
+                <Heart className="w-3.5 h-3.5" fill="currentColor" style={{ color: '#C04A40' }} />
+              </div>
+              <p className="text-[15px] font-bold leading-snug" style={{ color: '#C04A40' }}>
                 {visibleInterests.length === 1
-                  ? <>Eine Pflegekraft interessiert<br />sich für die Betreuung</>
-                  : <>{visibleInterests.length} Pflegekräfte interessieren<br />sich für die Betreuung</>}
-              </span>
-            </p>
+                  ? 'Eine Pflegekraft interessiert sich für die Betreuung'
+                  : `${visibleInterests.length} Pflegekräfte interessieren sich für die Betreuung`}
+              </p>
+            </div>
             {visibleInterests.map((i) => {
               const baseNurse = mapCaregiverToNurse(i.caregiver, {
                 nowIso: new Date().toISOString(),
@@ -3151,6 +3166,19 @@ const CustomerPortalPage: FC = () => {
                   <p className="text-[15px] font-semibold mb-1" style={{color:'#18181B'}}>Ihre Auswahl ist eingeladen</p>
                   <p className="text-[14px] leading-relaxed" style={{color:'#71717A'}}>
                     Die Pflegekräfte melden sich meist innerhalb von 1&ndash;2 Tagen. Sobald Rückmeldungen da sind, sehen Sie sie hier &mdash; meldet sich niemand, schlagen wir Ihnen automatisch weitere Pflegekräfte vor.
+                  </p>
+                </div>
+              )}
+
+              {/* Alle Vorschläge bearbeitet (abgelehnt), keine offene Einladung
+                  und nichts Frisches mehr im Pool → sonst stünde hier nur die
+                  Überschrift ohne Karten (wirkt wie ein Bug). Ruhiger Hinweis,
+                  dass weitere folgen (Martin, 18.08.). */}
+              {!hasAnyCard && heldInvites === 0 && allVisible.length > 0 && (
+                <div className="rounded-3xl px-5 py-5 border text-center" style={{ background: '#F5F5F6', borderColor: '#D4D4D8' }}>
+                  <p className="text-[15px] font-semibold mb-1" style={{color:'#18181B'}}>Alle aktuellen Vorschläge bearbeitet</p>
+                  <p className="text-[14px] leading-relaxed" style={{color:'#71717A'}}>
+                    Sie haben alle passenden Pflegekräfte durchgesehen. Wir schlagen Ihnen in Kürze weitere vor &mdash; Sie hören von uns.
                   </p>
                 </div>
               )}
