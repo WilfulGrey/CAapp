@@ -1516,7 +1516,12 @@ export interface CaregiverDisplay {
   yearsExperience?: number;
   einsatzCount?: number;
   age?: number;                  // Alter in Jahren (aus year_of_birth)
-  germanLevel?: string;          // CEFR-Level, z.B. "B1-B2" (aus germany_skill)
+  germanLevel?: string;          // 3-Stufen-Wort: "Grund" | "Mittel" | "Gut"
+                                 // (NICHT CEFR — die 5 mamamia-Stufen werden
+                                 // zusammengefasst; Quelle: detect-caregiver-
+                                 // events germanLevelLabel bzw. im Portal
+                                 // GERMANY_SKILL_LEVELS. Wortgleich in Mail
+                                 // und Portal — nie roh CEFR ausgeben.)
   photoUrl?: string;             // vollständige URL — leer = Initialen-Avatar
   aboutText?: string;            // 2-3 Satz AI-Beschreibung
 }
