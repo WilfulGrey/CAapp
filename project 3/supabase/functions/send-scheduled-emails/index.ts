@@ -1394,6 +1394,9 @@ interface ReminderMeta {
   caregiver_years_experience?: number | null;
   caregiver_einsatz_count?: number | null;
   caregiver_age?: number | null;
+  // Rohwert aus mamamia (level_0…level_4) — QUELLE, hat Vorrang.
+  caregiver_germany_skill?: string | null;
+  // Vom Erzeuger abgeleitetes Wort — Rückfall für Altzeilen ohne Rohwert.
   caregiver_german_level?: string | null;
   caregiver_photo_url?: string | null;
   caregiver_about_text?: string | null;
@@ -1474,7 +1477,7 @@ function buildReminderHtml(
   const ageSuffix = meta.caregiver_age && meta.caregiver_age > 0
     ? `<span style="font-weight:400;color:#71717A;">, ${meta.caregiver_age}</span>`
     : "";
-  const deutschWort = deutschStufe(meta.caregiver_german_level);
+  const deutschWort = deutschStufe(meta.caregiver_germany_skill, meta.caregiver_german_level);
   const deutschLine = deutschWort
     ? `<p style="margin:0;font-size:15px;color:#71717A;">Deutsch ${deutschWort}</p>`
     : "";
@@ -1620,7 +1623,7 @@ Primundus Deutschland | www.primundus.de
   }
 
   const agePart = meta.caregiver_age && meta.caregiver_age > 0 ? `, ${meta.caregiver_age}` : "";
-  const deutschStufeText = deutschStufe(meta.caregiver_german_level);
+  const deutschStufeText = deutschStufe(meta.caregiver_germany_skill, meta.caregiver_german_level);
   const deutschPart = deutschStufeText ? ` · Deutsch ${deutschStufeText}` : "";
   const stufe = reminderTierLabel(meta.caregiver_einsatz_count, meta.caregiver_years_experience);
   const factsParts: string[] = [];

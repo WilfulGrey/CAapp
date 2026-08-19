@@ -1,42 +1,46 @@
 import { assertEquals } from "@std/assert";
 import { deutschStufe } from "../deutschStufe.ts";
 
-// Anlass (Martin, 19.08.2026, Screenshot einer Nachfassmail um 01:35):
-// „Deutsch A2-B1" statt „Deutsch Mittel". Ursache war NICHT der Code — der
-// sagte seit #470 das Richtige —, sondern der Schnappschuss in
-// scheduled_emails.metadata: der Detektor schrieb bis zum (nie erfolgten)
-// Prod-Deploy von #470 CEFR-Kürzel. Wartende Zeilen tragen ihren alten Wert
-// bis zum Versand mit sich, deshalb wird beim Rendern normalisiert.
+// Anlass (Martin, 19.08.2026): In einer Nachfassmail stand „Deutsch A2-B1"
+// statt „Deutsch Mittel". Erste Korrektur bildete den CEFR-TEXT rückwärts ab
+// und erfand damit eine vierte Definition derselben Skala — zurückgebaut.
+// Jetzt gilt: beschriftet wird aus dem ROHWERT des Systems, das Wort ist nur
+// Rückfall. Muster vom Kundenportal (language.bucket + language.level).
 
-Deno.test("CEFR-Altbestand wird auf die 3 Kundenwörter gehoben", () => {
-  assertEquals(deutschStufe("A1"), "Grund");
-  assertEquals(deutschStufe("A1-A2"), "Grund");
-  assertEquals(deutschStufe("A2-B1"), "Mittel");
-  assertEquals(deutschStufe("B1-B2"), "Gut");
-  assertEquals(deutschStufe("B2-C1"), "Gut");
+Deno.test("mamamia-Rohwert (Detektor) hat Vorrang", () => {
+  assertEquals(deutschStufe("level_0"), "Grund");
+  assertEquals(deutschStufe("level_1"), "Grund");
+  assertEquals(deutschStufe("level_2"), "Mittel");
+  assertEquals(deutschStufe("level_3"), "Gut");
+  assertEquals(deutschStufe("level_4"), "Gut");
 });
 
-Deno.test("bereits korrekte Wörter bleiben unverändert", () => {
-  assertEquals(deutschStufe("Grund"), "Grund");
-  assertEquals(deutschStufe("Mittel"), "Mittel");
-  assertEquals(deutschStufe("Gut"), "Gut");
+Deno.test("Portal-Bucket wird ebenso verstanden", () => {
+  assertEquals(deutschStufe("grund"), "Grund");
+  assertEquals(deutschStufe("mittel"), "Mittel");
+  assertEquals(deutschStufe("gut"), "Gut");
 });
 
-Deno.test("Leerraum stört nicht", () => {
-  assertEquals(deutschStufe(" A2-B1 "), "Mittel");
-  assertEquals(deutschStufe("  Gut"), "Gut");
+Deno.test("Rohwert schlaegt ein abweichendes Wort", () => {
+  // Genau der Vorfall: Warteschlange traegt veralteten Text, Rohwert stimmt.
+  assertEquals(deutschStufe("level_2", "A2-B1"), "Mittel");
+  assertEquals(deutschStufe("level_3", "B1-B2"), "Gut");
 });
 
-Deno.test("leer/fehlend ergibt null — Zeile entfällt", () => {
-  assertEquals(deutschStufe(null), null);
-  assertEquals(deutschStufe(undefined), null);
-  assertEquals(deutschStufe(""), null);
+Deno.test("ohne Rohwert dient ein gueltiges Wort als Rueckfall", () => {
+  assertEquals(deutschStufe(null, "Mittel"), "Mittel");
+  assertEquals(deutschStufe(undefined, "Gut"), "Gut");
+  assertEquals(deutschStufe("", "Grund"), "Grund");
 });
 
-Deno.test("Unbekanntes wird NICHT roh ausgegeben", () => {
-  // Lieber keine Angabe als eine, die der Kunde nicht einordnen kann
-  // (Święta zasada 1: keine dummen Daten).
-  assertEquals(deutschStufe("C2"), null);
-  assertEquals(deutschStufe("level_3"), null);
-  assertEquals(deutschStufe("fließend"), null);
+Deno.test("CEFR-Altbestand ohne Rohwert wird NICHT geraten", () => {
+  // Lieber keine Angabe als eine erfundene Rueckabbildung (Święta zasada 1.5).
+  assertEquals(deutschStufe(null, "A2-B1"), null);
+  assertEquals(deutschStufe(null, "B1-B2"), null);
+});
+
+Deno.test("leer und unbekannt ergeben null — Zeile entfaellt", () => {
+  assertEquals(deutschStufe(null, null), null);
+  assertEquals(deutschStufe(undefined, undefined), null);
+  assertEquals(deutschStufe("level_9", "fliessend"), null);
 });
