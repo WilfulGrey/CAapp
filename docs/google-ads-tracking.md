@@ -114,6 +114,16 @@ category QUALIFIED_LEAD, ONE_PER_CLICK, 90-Tage-Fenster — angelegt
 - Manueller Lauf / Probelauf:
   `curl -X POST -H "Authorization: Bearer <service_role_key>" -H "Content-Type: application/json" -d '{"dryRun":true}' https://ycdwtrklpoqprabtwahi.supabase.co/functions/v1/upload-offline-conversions`
 
+## Morgen-Mail (daily-analytics-report)
+
+Seit 16.08. enthält der 8:00-Report einen Block „Google Ads — Kosten":
+Spend, Kosten je Lead und je Patientenprofil (gestern + 7 Tage, blended
+— Spend ÷ alle echten Leads). Quelle: `fetchAdsSpend` in
+`daily-analytics-report/queries.ts` via `_shared/googleAdsAuth.ts`
+(Vault-Secrets). Fail-soft: ohne Ads-Zugriff entfällt nur der Block,
+die Mail kommt trotzdem. Kunden-CAC bewusst nicht in der Mail
+(Martin 16.08.) — steht im Memory/Bericht.
+
 ## Messdefinitionen (für Auswertungen)
 
 - **Lead** = `lead_events.event_type='email_eingangsbestaetigung_sent'`

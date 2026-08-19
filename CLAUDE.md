@@ -423,6 +423,7 @@ CA app → Mamamia:
 | `onboard-to-mamamia/types.ts` | `FormularDaten`, `Lead`, `CustomerInput`, `CaregiverWishInput` |
 | `sync-acceptance/index.ts` | **Server-to-server only** (Bearer = SERVICE_ROLE_KEY) — sekwencja akceptu po podpisie (gotcha #12), triggerowana przez bridge |
 | `_shared/acceptanceSync.ts` | Moduł sekwencji 1→4 (UpdateCustomer→StoreConfirmation→PDF→upload z bramką) — współdzielony przez sync-acceptance i detect-cron (retry) |
+| `_shared/googleAdsAuth.ts` | Google-Ads-Zugang für Edge Fns (Secrets Env→Vault-RPC `get_google_ads_secrets`, Token-Refresh, GAQL-Search; Konto 924-028-6999). Genutzt vom daily-analytics-report (Ads-Kosten-Block); upload-offline-conversions hat noch eine lokale Kopie (Konsolidierungs-Kandidat) |
 | `upload-offline-conversions/` | **Cron täglich 06:20 UTC** — lädt „Qualifizierte Leads" (erstes `patient_data_saved`, Lead trägt gclid/wbraid/gbraid) als Offline-Conversions zu Google Ads (Aktion `conversionActions/7720728390`, secondary). Status in `offline_conversion_uploads`; ohne Google-Secrets (Staging) inert. Doku: docs/google-ads-tracking.md |
 | `mamamia-proxy/index.ts` | HTTP handler — verify session + dispatch action + run GraphQL |
 | `mamamia-proxy/actions.ts` | Whitelisted actions (`getCustomer`, `updateCustomer`, `listMatchings`, `inviteCaregiver`, `rejectApplication`, `storeConfirmation`, etc.). Każda waliduje ownership przez `session.customer_id` |
