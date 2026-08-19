@@ -83,13 +83,22 @@ an den Sofort-Redirect. Nach dem Merge ist mit einem SPRUNG der
 gemeldeten Ads-Conversions zu rechnen (Mess-Artefakt, kein echter
 Anstieg — bei Vergleichen berücksichtigen).
 
-## Schritt 3 — Offline-Import qualifizierter Leads (AUTOMATISIERT seit 14.08.)
+## Schritt 3 — Offline-Import qualifizierter Leads (AUTOMATISIERT; seit 19.08. via Data Manager API)
+
+> **Transport-Wechsel 19.08.:** Google sperrt `uploadClickConversions` für
+> neue Integrationen (CUSTOMER_NOT_ALLOWLISTED_FOR_THIS_FEATURE) — Upload
+> läuft jetzt über `datamanager.googleapis.com/v1/events:ingest` mit
+> EIGENEM OAuth-Scope (`auth/datamanager`; Vault:
+> `google_oauth_refresh_token_dm`) und aktivierter Data Manager API im
+> Cloud-Projekt 345198555489. Feld-Mapping: gclid→adIdentifiers.gclid,
+> order_id→transactionId, Wert→conversionValue/currency; Consent
+> request-level GRANTED (Cookie-Banner-gedeckt).
 
 Läuft ohne manuelles Zutun: Edge Function
 `supabase/functions/upload-offline-conversions` (Cron täglich 06:20 UTC,
 Migration `20260814121000`) lädt das jeweils ERSTE `patient_data_saved`
 jedes Leads mit Klick-ID (gclid > wbraid > gbraid) per
-`uploadClickConversions` in die Conversion-Aktion
+Data-Manager-API (`events:ingest`) in die Conversion-Aktion
 **„Qualifizierter Lead (Patientendaten)"**
 (`customers/9240286999/conversionActions/7720728390`, type UPLOAD_CLICKS,
 category QUALIFIED_LEAD, ONE_PER_CLICK, 90-Tage-Fenster — angelegt

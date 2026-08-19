@@ -1,18 +1,16 @@
 import { assertEquals, assertThrows } from "@std/assert";
 import {
-  buildClickConversion,
-  classifyFailure,
+  buildDmEvent,
   extractValue,
-  formatConversionDateTime,
+  formatRfc3339,
   isOldEnough,
-  parsePartialFailures,
   pickClickId,
   type QualifiedLeadCandidate,
 } from "../conversions.ts";
 
 const BASE: QualifiedLeadCandidate = {
   leadId: "11111111-2222-3333-4444-555555555555",
-  conversionAt: "2026-08-14T07:30:05.123456+00:00",
+  conversionAt: "2026-08-15T11:57:20.123456+00:00",
   gclid: null,
   wbraid: null,
   gbraid: null,
@@ -26,11 +24,10 @@ Deno.test("pickClickId: gclid vor wbraid vor gbraid, null ohne IDs", () => {
   assertEquals(pickClickId({ gclid: null, wbraid: null, gbraid: null }), null);
 });
 
-Deno.test("formatConversionDateTime: UTC mit +00:00, Mikrosekunden gekappt", () => {
-  assertEquals(formatConversionDateTime("2026-08-14T07:30:05.123456+00:00"), "2026-08-14 07:30:05+00:00");
-  // CEST-Input wird nach UTC gedreht (09:15 Berlin = 07:15 UTC)
-  assertEquals(formatConversionDateTime("2026-08-14T09:15:00+02:00"), "2026-08-14 07:15:00+00:00");
-  assertThrows(() => formatConversionDateTime("kaputt"));
+Deno.test("formatRfc3339: UTC mit Z, Mikrosekunden gekappt, TZ-Umrechnung", () => {
+  assertEquals(formatRfc3339("2026-08-15T11:57:20.123456+00:00"), "2026-08-15T11:57:20Z");
+  assertEquals(formatRfc3339("2026-08-14T09:15:00+02:00"), "2026-08-14T07:15:00Z");
+  assertThrows(() => formatRfc3339("kaputt"));
 });
 
 Deno.test("isOldEnough: 6h-Guard", () => {
@@ -40,64 +37,27 @@ Deno.test("isOldEnough: 6h-Guard", () => {
   assertEquals(isOldEnough("invalid", now), false);
 });
 
-Deno.test("buildClickConversion: gclid + orderId + Wert nur wenn > 0", () => {
-  const withValue = buildClickConversion(
-    { ...BASE, gclid: "GCLID1", value: 3999 },
-    "customers/9240286999/conversionActions/7720728390",
-  )!;
-  assertEquals(withValue.gclid, "GCLID1");
-  assertEquals(withValue.orderId, BASE.leadId);
-  assertEquals(withValue.conversionValue, 3999);
-  assertEquals(withValue.currencyCode, "EUR");
-  assertEquals(withValue.conversionDateTime, "2026-08-14 07:30:05+00:00");
+Deno.test("buildDmEvent: gclid + transactionId + Wert nur wenn > 0", () => {
+  const withValue = buildDmEvent({ ...BASE, gclid: "GCLID1", value: 2850 }, "qualified_lead")!;
+  assertEquals(withValue.adIdentifiers, { gclid: "GCLID1" });
+  assertEquals(withValue.transactionId, BASE.leadId);
+  assertEquals(withValue.destinationReferences, ["qualified_lead"]);
+  assertEquals(withValue.eventTimestamp, "2026-08-15T11:57:20Z");
+  assertEquals(withValue.conversionValue, 2850);
+  assertEquals(withValue.currency, "EUR");
 
-  const noValue = buildClickConversion({ ...BASE, wbraid: "WB1", value: null }, "act")!;
-  assertEquals(noValue.wbraid, "WB1");
+  const noValue = buildDmEvent({ ...BASE, wbraid: "WB1", value: 0 }, "qualified_lead")!;
+  assertEquals(noValue.adIdentifiers, { wbraid: "WB1" });
   assertEquals("conversionValue" in noValue, false);
-  assertEquals("gclid" in noValue, false);
+  assertEquals("currency" in noValue, false);
 
-  assertEquals(buildClickConversion(BASE, "act"), null);
+  assertEquals(buildDmEvent(BASE, "qualified_lead"), null);
 });
 
 Deno.test("extractValue: bruttopreis fail-soft", () => {
-  assertEquals(extractValue({ bruttopreis: 4172.5 }), 4172.5);
+  assertEquals(extractValue({ bruttopreis: 2750 }), 2750);
   assertEquals(extractValue({ bruttopreis: 0 }), null);
-  assertEquals(extractValue({ bruttopreis: "4000" }), null);
+  assertEquals(extractValue({ bruttopreis: "2750" }), null);
   assertEquals(extractValue(null), null);
   assertEquals(extractValue("x"), null);
-});
-
-Deno.test("classifyFailure: CLICK_NOT_FOUND permanent, Unbekanntes retriable", () => {
-  assertEquals(classifyFailure("CLICK_NOT_FOUND"), "permanent");
-  assertEquals(classifyFailure("EXPIRED_CLICK"), "permanent");
-  assertEquals(classifyFailure("TOO_RECENT_CLICK"), "retriable");
-  assertEquals(classifyFailure("IRGENDWAS_NEUES"), "retriable");
-  assertEquals(classifyFailure(undefined), "retriable");
-});
-
-Deno.test("parsePartialFailures: Index-Mapping aus GoogleAdsFailure", () => {
-  const failures = parsePartialFailures({
-    code: 3,
-    message: "partial failure",
-    details: [{
-      "@type": "type.googleapis.com/google.ads.googleads.v23.errors.GoogleAdsFailure",
-      errors: [
-        {
-          errorCode: { conversionUploadError: "CLICK_NOT_FOUND" },
-          message: "The click could not be found.",
-          location: { fieldPathElements: [{ fieldName: "conversions", index: 2 }] },
-        },
-        {
-          errorCode: { conversionUploadError: "TOO_RECENT_CLICK" },
-          message: "too recent",
-          location: { fieldPathElements: [{ fieldName: "conversions", index: 0 }] },
-        },
-      ],
-    }],
-  });
-  assertEquals(failures.size, 2);
-  assertEquals(failures.get(2)?.code, "CLICK_NOT_FOUND");
-  assertEquals(failures.get(0)?.code, "TOO_RECENT_CLICK");
-  assertEquals(parsePartialFailures(undefined).size, 0);
-  assertEquals(parsePartialFailures({ details: "x" }).size, 0);
 });
