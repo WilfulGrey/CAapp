@@ -548,7 +548,7 @@ export default function ResultPage() {
           <div className="flex items-center gap-4">
             <div className="relative w-20 h-20 md:w-24 md:h-24 rounded-full overflow-hidden flex-shrink-0 ring-2 ring-[#A89279]">
               <Image
-                src="/images/ilka-wysocki_pm-mallorca.webp"
+                src="/images/ilka-wysocki-2026.webp"
                 alt="Ilka Wysocki"
                 width={96}
                 height={96}

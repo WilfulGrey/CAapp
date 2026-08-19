@@ -202,7 +202,7 @@ function buildEmailWrapper(lead: Lead, siteUrl: string, content: string): string
 }
  
 function buildIlkaSig(siteUrl: string): string {
-  const ilkaUrl = `${siteUrl}/images/ilka-wysocki_pm-mallorca.webp`;
+  const ilkaUrl = `${siteUrl}/images/ilka-wysocki-2026.webp`;
   const testUrl = `${siteUrl}/images/primundus_testsieger-2021.webp`;
   const mediaBase = `${siteUrl}/images/media`;
   return `
