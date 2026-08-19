@@ -1497,14 +1497,16 @@ function persoenlichHinweisHtml(): string {
   return `<p style="font-size:14px;line-height:1.65;color:#555;margin:4px 0 16px;">Lieber persönlich? Rufen Sie uns gerne <a href="tel:+4989200000830" style="color:#0066CC;text-decoration:none;white-space:nowrap;">direkt an</a> oder schreiben Sie per <a href="https://wa.me/4989200000830" style="color:#25D366;text-decoration:none;font-weight:600;white-space:nowrap;">WhatsApp</a> — oder antworten Sie einfach auf diese E-Mail. Ganz wie es für Sie am bequemsten ist.</p>`;
 }
 
-// Bestpreis-PS — kurzer, unaufdringlicher Reinforcer für alle Nurture-Mails
-// (NICHT Buchungsbestätigung — da schon gebucht). Direktanbieter-Argument
-// + abgesicherter Garantie-Claim. Bewusst als P.S., damit es den Haupt-
-// inhalt nicht überlagert aber an jedem Touchpoint präsent ist.
+// Preis-PS — kurzer, unaufdringlicher Reinforcer für alle Nurture-Mails
+// (NICHT Buchungsbestätigung — da schon gebucht). Bewusst als P.S., damit
+// es den Hauptinhalt nicht überlagert, aber an jedem Touchpoint präsent ist.
+// Die frühere Bestpreis-Garantie („unterbieten wir es") ist am 18.08.2026 auf
+// Entscheidung des Inhabers entfallen — sie war nicht belegbar. An ihre Stelle
+// tritt die belegbare Gebührenfreiheit (USP 4).
 const BESTPREIS_PS_TEXT =
-  'P.S. Kennen Sie schon die Primundus-Bestpreis-Garantie? Als Direktanbieter ohne Vermittler-Provision bieten wir faire Preise — finden Sie bei vergleichbarer Leistung ein günstigeres Angebot, unterbieten wir es.';
+  'P.S. Bei uns fällt keine Vermittlungsgebühr an. Keine Anzahlung, keine Aufnahmegebühr, keine Bearbeitungspauschale — der Monatspreis, den Sie sehen, ist der Preis.';
 function bestpreisPsHtml(): string {
-  return `<p style="font-size:13px;line-height:1.65;color:#777;margin:18px 0 0;border-top:1px solid #f0ebe4;padding-top:14px;"><strong style="color:#5C4A32;">P.S.</strong> Kennen Sie schon die <strong style="color:#2D1F0F;">Primundus-Bestpreis-Garantie?</strong> Als Direktanbieter ohne Vermittler-Provision bieten wir faire Preise — finden Sie bei vergleichbarer Leistung ein günstigeres Angebot, unterbieten wir es.</p>`;
+  return `<p style="font-size:13px;line-height:1.65;color:#777;margin:18px 0 0;border-top:1px solid #f0ebe4;padding-top:14px;"><strong style="color:#5C4A32;">P.S.</strong> Bei uns fällt <strong style="color:#2D1F0F;">keine Vermittlungsgebühr</strong> an. Keine Anzahlung, keine Aufnahmegebühr, keine Bearbeitungspauschale — der Monatspreis, den Sie sehen, ist der Preis.</p>`;
 }
 
 export interface CaregiverDisplay {
@@ -1790,7 +1792,7 @@ function buildCaregiverEventEmail(opts: {
   ctaText: string;         // Button-Text
   portalUrl: string;       // URL hinter dem Button
   plainSummary: string;    // Plaintext-Fallback (intro + middle, ohne HTML)
-  psHtml?: string;         // optionales P.S. (z.B. Bestpreis) — vor der Sig
+  psHtml?: string;         // optionales P.S. (z.B. Gebührenfreiheit) — vor der Sig
   psText?: string;         // Plaintext-Pendant des P.S.
 }): EmailTemplate {
   const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://primundus.de';
@@ -2164,7 +2166,7 @@ www.primundus.de
 // buildCaregiverEventEmail), damit Mail B/C unberührt bleiben:
 // kompakte Pflegekraft-Kachel (Foto · Name·Alter · Badge · Erfahrung ·
 // Deutsch · „Profil ansehen"-Link, kein grüner Button, keine Bio),
-// „Was Sie als Nächstes tun können"-Schritte und Bestpreis-Box mit der
+// „Was Sie als Nächstes tun können"-Schritte und Gebühren-Box mit der
 // abgestimmten Formulierung. Header/Footer/Signatur über die geteilten
 // Helper (caregiverMailShell / caregiverIlkaSig).
 export function getCaregiverInterestEmailTemplate(
@@ -2209,9 +2211,9 @@ export function getCaregiverInterestEmailTemplate(
   const bestpreisBox = `
     <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="margin:0 0 8px;background:#FAF8F4;border-radius:10px;overflow:hidden;">
       <tr><td style="padding:16px 24px 20px;">
-        <p style="margin:0 0 6px;${psLabel}color:#B8860B;">Bestpreis-Garantie</p>
+        <p style="margin:0 0 6px;${psLabel}color:#B8860B;">Keine Vermittlungsgebühr</p>
         <p style="margin:0 0 6px;font-size:14px;line-height:1.65;color:#2D1F0F;">Als <strong>Direktanbieter ohne Vermittler</strong> sparen wir die Provision — und geben diesen Vorteil direkt an Sie weiter.</p>
-        <p style="margin:0;font-size:14px;line-height:1.65;color:#2D1F0F;">Sollten Sie bei vergleichbarer Leistung ein günstigeres Angebot finden, <strong>unterbieten wir es.</strong></p>
+        <p style="margin:0;font-size:14px;line-height:1.65;color:#2D1F0F;">Keine Anzahlung, keine Aufnahmegebühr, keine Bearbeitungspauschale — <strong>der Monatspreis ist der Preis.</strong></p>
       </td></tr>
     </table>`;
 
@@ -2240,7 +2242,7 @@ WAS SIE ALS NÄCHSTES TUN KÖNNEN
 2. Einladen, sich zu bewerben — wenn Sie ebenfalls den Eindruck haben, dass ${firstName} passt, laden Sie sie mit einem Klick ein, sich bei Ihnen formal zu bewerben.
 3. Konkrete Bewerbung erhalten — die formale Bewerbung erhalten Sie per E-Mail und sehen sie auch im Portal, mit Anreisedatum, Reisekosten und allen Konditionen. Erst dann entscheiden Sie verbindlich.
 
-Bestpreis-Garantie: Als Direktanbieter ohne Vermittler sparen wir die Provision — und geben diesen Vorteil direkt an Sie weiter. Sollten Sie bei vergleichbarer Leistung ein günstigeres Angebot finden, unterbieten wir es.
+Keine Vermittlungsgebühr: Keine Anzahlung, keine Aufnahmegebühr, keine Bearbeitungspauschale — der Monatspreis, den Sie sehen, ist der Preis.
 
 Wenn Sie Fragen zu ${firstName}s Profil haben oder Unterstützung bei der Einschätzung möchten — rufen Sie mich an, schreiben Sie mir per WhatsApp oder antworten Sie einfach auf diese E-Mail. Ich bin gerne für Sie da.
 
@@ -2387,9 +2389,9 @@ export function getApplicationReceivedEmailTemplate(
   const bestpreisBox = `
     <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="margin:0 0 8px;background:#FAF8F4;border-radius:10px;overflow:hidden;">
       <tr><td style="padding:16px 24px 20px;">
-        <p style="margin:0 0 6px;${psLabel}color:#B8860B;">Bestpreis-Garantie</p>
+        <p style="margin:0 0 6px;${psLabel}color:#B8860B;">Keine Vermittlungsgebühr</p>
         <p style="margin:0 0 6px;font-size:14px;line-height:1.65;color:#2D1F0F;">Als <strong>Direktanbieter ohne Vermittler</strong> sparen wir die Provision — und geben diesen Vorteil direkt an Sie weiter.</p>
-        <p style="margin:0;font-size:14px;line-height:1.65;color:#2D1F0F;">Sollten Sie bei vergleichbarer Leistung ein günstigeres Angebot finden, <strong>unterbieten wir es.</strong></p>
+        <p style="margin:0;font-size:14px;line-height:1.65;color:#2D1F0F;">Keine Anzahlung, keine Aufnahmegebühr, keine Bearbeitungspauschale — <strong>der Monatspreis ist der Preis.</strong></p>
       </td></tr>
     </table>`;
 
@@ -2425,7 +2427,7 @@ SO GEHT ES WEITER
 2. Konditionen prüfen — Tagessatz, Anreise- und Abreisedatum, Reisekosten und etwaige Zuschläge im Detail durchgehen.
 3. Annehmen oder ablehnen — wenn ${firstName} passt: Kontaktdaten ergänzen und Pflegekraft beauftragen. Andernfalls die Bewerbung mit einem Klick ablehnen.
 
-Bestpreis-Garantie: Als Direktanbieter ohne Vermittler sparen wir die Provision — und geben diesen Vorteil direkt an Sie weiter. Sollten Sie bei vergleichbarer Leistung ein günstigeres Angebot finden, unterbieten wir es.
+Keine Vermittlungsgebühr: Keine Anzahlung, keine Aufnahmegebühr, keine Bearbeitungspauschale — der Monatspreis, den Sie sehen, ist der Preis.
 
 Wenn Sie Fragen zu ${firstName}s Bewerbung haben oder Unterstützung bei der Entscheidung möchten — rufen Sie mich an, schreiben Sie mir per WhatsApp oder antworten Sie einfach auf diese E-Mail. Ich bin gerne für Sie da.
 
