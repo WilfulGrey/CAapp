@@ -489,6 +489,9 @@ async function scheduleReactionReminder(
     caregiver_years_experience: caregiver.yearsExperience ?? null,
     caregiver_einsatz_count: caregiver.einsatzCount ?? null,
     caregiver_age: caregiver.age ?? null,
+    // Rohwert mitschleifen, damit der Versand frisch beschriften kann
+    // (Schnappschuss-Falle wie Registry-Bug #34).
+    caregiver_germany_skill: (metadata as Record<string, unknown>).caregiver_germany_skill ?? null,
     caregiver_german_level: caregiver.germanLevel ?? null,
     caregiver_photo_url: caregiver.photoUrl ?? null,
     caregiver_about_text: caregiver.aboutText ?? null,

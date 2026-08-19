@@ -1316,6 +1316,11 @@ export function buildCaregiverMetadata(
     const age = new Date().getFullYear() - caregiver.year_of_birth;
     if (age > 0 && age < 120) meta.caregiver_age = age;
   }
+  // Rohwert UND Wort mitgeben — wie das Kundenportal es im nurse-Objekt
+  // haelt (language.bucket + language.level). Der Rohwert ueberlebt jede
+  // spaetere Aenderung der Beschriftung; wartende Mails koennen damit beim
+  // Versand frisch beschriftet werden statt einen alten Text zu zeigen.
+  if (caregiver.germany_skill) meta.caregiver_germany_skill = caregiver.germany_skill;
   const germanLevel = germanLevelLabel(caregiver.germany_skill);
   if (germanLevel) meta.caregiver_german_level = germanLevel;
   // Foto-Queue: promo → retouched → raw avatar (wie im Portal, mappers.ts).
