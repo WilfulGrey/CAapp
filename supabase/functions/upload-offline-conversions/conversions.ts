@@ -23,6 +23,8 @@ export interface QualifiedLeadCandidate {
 export interface DmEvent {
   destinationReferences: string[];
   eventTimestamp: string; // RFC 3339
+  /** Pflicht trotz "Optional" im Schema (REQUIRED_FIELD_MISSING ohne). */
+  eventSource: "WEB";
   transactionId: string;  // = lead_id (Dedup)
   adIdentifiers: { gclid?: string; wbraid?: string; gbraid?: string };
   conversionValue?: number;
@@ -64,6 +66,7 @@ export function buildDmEvent(
   const event: DmEvent = {
     destinationReferences: [destinationReference],
     eventTimestamp: formatRfc3339(c.conversionAt),
+    eventSource: "WEB",
     transactionId: c.leadId,
     adIdentifiers: { [click.type]: click.id },
   };

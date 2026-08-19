@@ -43,6 +43,7 @@ Deno.test("buildDmEvent: gclid + transactionId + Wert nur wenn > 0", () => {
   assertEquals(withValue.transactionId, BASE.leadId);
   assertEquals(withValue.destinationReferences, ["qualified_lead"]);
   assertEquals(withValue.eventTimestamp, "2026-08-15T11:57:20Z");
+  assertEquals(withValue.eventSource, "WEB");
   assertEquals(withValue.conversionValue, 2850);
   assertEquals(withValue.currency, "EUR");
 

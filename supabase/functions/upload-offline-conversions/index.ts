@@ -239,7 +239,26 @@ Deno.serve(async (req: Request) => {
     return json(502, { error: `ingest HTTP ${batch.status}, will retry next run` });
   }
 
+  let persisted = 0;
+  let persistError: string | null = null;
+  if (rows.length > 0) {
+    const { error: insErr } = await supabase
+      .from("offline_conversion_uploads")
+      .upsert(rows, { onConflict: "lead_id" });
+    if (insErr) {
+      // Upload war ggf. erfolgreich, nur das Festschreiben scheiterte —
+      // nächster Lauf lädt erneut, Google dedupliziert über transactionId.
+      // LAUT machen (steht auch im Response-Summary, nicht nur im Log).
+      persistError = insErr.message;
+      console.error("upload-offline-conversions: Statusschreiben fehlgeschlagen:", insErr.message);
+    } else {
+      persisted = rows.length;
+    }
+  }
+
   const summary = {
+    persisted,
+    persistError,
     candidates: candidates.length,
     uploaded,
     permanentFailures: permanent,
