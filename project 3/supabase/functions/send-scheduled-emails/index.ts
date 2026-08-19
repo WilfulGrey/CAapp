@@ -13,6 +13,7 @@ import { appendJobParam, reminderBookedCancel } from "./followupJobs.ts";
 // Anrede-Namen sauber schreiben (Versalien → „Ruppert") — Kopie aus lib/email.ts,
 // weil Edge Functions nicht aus lib/ importieren können. Siehe names.ts.
 import { capitalizeName as capitalize } from "./names.ts";
+import { deutschStufe } from "./deutschStufe.ts";
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
@@ -1473,8 +1474,9 @@ function buildReminderHtml(
   const ageSuffix = meta.caregiver_age && meta.caregiver_age > 0
     ? `<span style="font-weight:400;color:#71717A;">, ${meta.caregiver_age}</span>`
     : "";
-  const deutschLine = meta.caregiver_german_level
-    ? `<p style="margin:0;font-size:15px;color:#71717A;">Deutsch ${meta.caregiver_german_level}</p>`
+  const deutschWort = deutschStufe(meta.caregiver_german_level);
+  const deutschLine = deutschWort
+    ? `<p style="margin:0;font-size:15px;color:#71717A;">Deutsch ${deutschWort}</p>`
     : "";
 
   // Nur Inline-CID nutzen — der presigned S3-URL ist nach 30 Min meist tot,
@@ -1618,7 +1620,8 @@ Primundus Deutschland | www.primundus.de
   }
 
   const agePart = meta.caregiver_age && meta.caregiver_age > 0 ? `, ${meta.caregiver_age}` : "";
-  const deutschPart = meta.caregiver_german_level ? ` · Deutsch ${meta.caregiver_german_level}` : "";
+  const deutschStufeText = deutschStufe(meta.caregiver_german_level);
+  const deutschPart = deutschStufeText ? ` · Deutsch ${deutschStufeText}` : "";
   const stufe = reminderTierLabel(meta.caregiver_einsatz_count, meta.caregiver_years_experience);
   const factsParts: string[] = [];
   if (meta.caregiver_years_experience && meta.caregiver_years_experience > 0) {
