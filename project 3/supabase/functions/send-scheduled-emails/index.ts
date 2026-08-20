@@ -205,7 +205,15 @@ function buildEmailWrapper(lead: Lead, siteUrl: string, content: string): string
 }
  
 function buildIlkaSig(siteUrl: string): string {
-  const ilkaUrl = `${siteUrl}/images/ilka-wysocki-2026.webp`;
+  // Ilkas Foto kommt aus primundus.de statt vom Kostenrechner (20.08.):
+  // Beide Dienste deployen unabhaengig voneinander. Nach dem Foto-Wechsel
+  // (#481) war die neue Datei auf primundus.de sofort da, der
+  // Kostenrechner-Build haing >45 Min in Renders Warteschlange — in dieser
+  // Zeit verlinkte JEDE Mail ein 404 (eine Kundenmail um 07:50 war
+  // betroffen). Die Mail-Funktion deployt manuell und ist damit IMMER
+  // schneller als der Kostenrechner; Bilder gehoeren deshalb an die
+  // Adresse, die unabhaengig davon steht.
+  const ilkaUrl = "https://primundus.de/images/ilka-wysocki-2026.webp";
   const testUrl = `${siteUrl}/images/primundus_testsieger-2021.webp`;
   const mediaBase = `${siteUrl}/images/media`;
   return `
