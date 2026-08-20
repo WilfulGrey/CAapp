@@ -13,6 +13,9 @@ import { appendJobParam, reminderBookedCancel } from "./followupJobs.ts";
 // Anrede-Namen sauber schreiben (Versalien → „Ruppert") — Kopie aus lib/email.ts,
 // weil Edge Functions nicht aus lib/ importieren können. Siehe names.ts.
 import { capitalizeName as capitalize } from "./names.ts";
+// Nachtruhe-Fenster — Kopie von lib/quiet-hours.ts (Edge Fns koennen nicht aus
+// lib/ importieren); Aenderungen immer in BEIDEN Dateien.
+import { sendezeitIso } from "./quietHours.ts";
 import { deutschStufe } from "./deutschStufe.ts";
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -1758,7 +1761,10 @@ async function scheduleFollowUp(
   emailType: string,
   delayMinutes: number
 ): Promise<void> {
-  const scheduledFor = new Date(Date.now() + delayMinutes * 60 * 1000).toISOString();
+  // Nachtruhe (Martin, 19.08.): Nudges/Nachfaesse rechnen relativ (+4 h,
+  // +28 h, +48 h ...) und landeten dadurch regelmaessig mitten in der Nacht.
+  // Faellig zwischen 21:00 und 08:00 Berliner Zeit ⇒ 8:00 morgens.
+  const scheduledFor = sendezeitIso(new Date(Date.now() + delayMinutes * 60 * 1000));
  
   await supabase
     .from("scheduled_emails")

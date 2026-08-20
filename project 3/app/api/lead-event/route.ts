@@ -13,6 +13,7 @@ import {
 } from '@/lib/email';
 import { buildVertragAttachmentPdf, formatSignedAtBerlin } from '@/lib/vertrag';
 import { appendJobParam } from '@/lib/portal-url';
+import { sendezeitIso } from '@/lib/quiet-hours';
 import { createHash } from 'crypto';
 
 // Bridge endpoint: the CA-App portal reports customer milestones back to the
@@ -506,7 +507,11 @@ async function scheduleReactionReminder(
     : REMINDER_DELAYS_APPLICATION_MIN;
 
   for (const { emailType, delay } of tiers) {
-    const scheduledFor = new Date(Date.now() + delay * 60 * 1000).toISOString();
+    // Nachtruhe (Martin, 19.08.): faellt die Erinnerung zwischen 21:00 und
+    // 08:00 Berliner Zeit, wird sie auf 8:00 morgens geschoben. Der
+    // 12-Stunden-Tier war der groesste Nacht-Sender (72 Mails in 30 Tagen),
+    // weil eine Bewerbung am fruehen Nachmittag zwangslaeufig nachts erinnert.
+    const scheduledFor = sendezeitIso(new Date(Date.now() + delay * 60 * 1000));
     try {
       await supabaseAdmin.from('scheduled_emails').insert({
         lead_id: leadId,
