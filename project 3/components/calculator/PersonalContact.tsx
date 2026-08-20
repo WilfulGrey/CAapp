@@ -38,7 +38,7 @@ export function PersonalContact({
       <div className="flex items-center gap-3 mb-3">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
-          src="/images/ilka-wysocki_pm-mallorca.webp"
+          src="/images/ilka-wysocki-2026.webp"
           alt="Ilka Wysocki"
           className="w-14 h-14 rounded-full object-cover object-top flex-shrink-0 border border-[#E9E9EB]"
           loading="lazy"

@@ -1445,7 +1445,7 @@ export function MultiStepForm({ mode = 'inline' }: MultiStepFormProps = {}) {
           <p className="text-[13px] text-[#8B8B8B] mb-3 text-left">Benötigen Sie Hilfe?</p>
           <div className="flex items-center gap-4">
             <Image
-              src="/images/ilka-wysocki_pm-mallorca.webp"
+              src="/images/ilka-wysocki-2026.webp"
               alt="Ilka Wysocki"
               width={84}
               height={104}

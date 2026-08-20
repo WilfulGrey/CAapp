@@ -282,7 +282,7 @@ export default function KalkulationPrintPage() {
         {/* ILKA */}
         <div style={s.ilkaBox}>
           <div style={s.ilkaInner}>
-            <Image src="/images/ilka-wysocki_pm-mallorca.webp" alt="Ilka Wysocki" width={44} height={44} style={{ width: '34pt', height: '34pt', borderRadius: '50%', objectFit: 'cover', objectPosition: 'top', border: '1.5pt solid #F0997B', flexShrink: 0 }} />
+            <Image src="/images/ilka-wysocki-2026.webp" alt="Ilka Wysocki" width={44} height={44} style={{ width: '34pt', height: '34pt', borderRadius: '50%', objectFit: 'cover', objectPosition: 'top', border: '1.5pt solid #F0997B', flexShrink: 0 }} />
             <div>
               <div style={{ fontSize: '10pt', fontWeight: 700, color: '#2D1F0F', marginBottom: '1pt' }}>Ilka Wysocki</div>
               <div style={{ fontSize: '8pt', color: '#aaa', marginBottom: '5pt' }}>Ihre persönliche Beraterin · Mo–So, 8:00–20:00 Uhr</div>

@@ -330,7 +330,7 @@ export function getEingangsbestaetigungEmailTemplate(
                 <table cellpadding="0" cellspacing="0" role="presentation">
                   <tr>
                     <td style="padding-right: 12px; vertical-align: top;">
-                      <img src="${baseUrl}/images/ilka-wysocki_pm-mallorca.webp" alt="Ilka Wysocki" width="60" style="display: block; width: 60px; height: auto; border-radius: 8px;" />
+                      <img src="${baseUrl}/images/ilka-wysocki-2026.webp" alt="Ilka Wysocki" width="60" style="display: block; width: 60px; height: auto; border-radius: 8px;" />
                     </td>
                     <td style="vertical-align: middle;">
                       <p style="margin: 0 0 2px 0; font-size: 15px; font-weight: 700; color: #3D2B1F; white-space: nowrap; text-align: left;">Ilka Wysocki</p>
@@ -653,7 +653,7 @@ export function getAngebotsEmailTemplate(
                 <table cellpadding="0" cellspacing="0" role="presentation">
                   <tr>
                     <td style="padding-right: 12px; vertical-align: top;">
-                      <img src="${baseUrl}/images/ilka-wysocki_pm-mallorca.webp" alt="Ilka Wysocki" width="60"
+                      <img src="${baseUrl}/images/ilka-wysocki-2026.webp" alt="Ilka Wysocki" width="60"
                         style="display: block; width: 60px; height: auto; border-radius: 8px;" />
                     </td>
                     <td style="vertical-align: middle;">
@@ -1283,7 +1283,7 @@ export function getVertragEmailTemplate(
                 <table cellpadding="0" cellspacing="0" role="presentation">
                   <tr>
                     <td style="padding-right: 12px; vertical-align: top;">
-                      <img src="${baseUrl}/images/ilka-wysocki_pm-mallorca.webp" alt="Ilka Wysocki" width="60" style="display: block; width: 60px; height: auto; border-radius: 8px;" />
+                      <img src="${baseUrl}/images/ilka-wysocki-2026.webp" alt="Ilka Wysocki" width="60" style="display: block; width: 60px; height: auto; border-radius: 8px;" />
                     </td>
                     <td style="vertical-align: middle;">
                       <p style="margin: 0 0 2px 0; font-size: 15px; font-weight: 700; color: #3D2B1F; white-space: nowrap; text-align: left;">Ilka Wysocki</p>
@@ -1611,7 +1611,7 @@ function caregiverIlkaSig(baseUrl: string): string {
                 <table cellpadding="0" cellspacing="0" role="presentation">
                   <tr>
                     <td style="padding-right:12px;vertical-align:top;">
-                      <img src="${baseUrl}/images/ilka-wysocki_pm-mallorca.webp" alt="Ilka Wysocki" width="60" style="display:block;width:60px;height:auto;border-radius:8px;" />
+                      <img src="${baseUrl}/images/ilka-wysocki-2026.webp" alt="Ilka Wysocki" width="60" style="display:block;width:60px;height:auto;border-radius:8px;" />
                     </td>
                     <td style="vertical-align:middle;">
                       <p style="margin:0 0 2px;font-size:15px;font-weight:700;color:#3D2B1F;white-space:nowrap;">Ilka Wysocki</p>
@@ -1917,7 +1917,7 @@ export function getPatientDataSavedEmailTemplate(
                 <table cellpadding="0" cellspacing="0" role="presentation">
                   <tr>
                     <td style="padding-right:12px;vertical-align:top;">
-                      <img src="${baseUrl}/images/ilka-wysocki_pm-mallorca.webp" alt="Ilka Wysocki" width="60" style="display:block;width:60px;height:auto;border-radius:8px;" />
+                      <img src="${baseUrl}/images/ilka-wysocki-2026.webp" alt="Ilka Wysocki" width="60" style="display:block;width:60px;height:auto;border-radius:8px;" />
                     </td>
                     <td style="vertical-align:middle;">
                       <p style="margin:0 0 2px;font-size:15px;font-weight:700;color:#3D2B1F;white-space:nowrap;">Ilka Wysocki</p>
@@ -2489,7 +2489,7 @@ export function getTokenRegenerationEmailTemplate(
                 <table cellpadding="0" cellspacing="0" role="presentation">
                   <tr>
                     <td style="padding-right: 12px; vertical-align: top;">
-                      <img src="${baseUrl}/images/ilka-wysocki_pm-mallorca.webp" alt="Ilka Wysocki" width="60" style="display: block; width: 60px; height: auto; border-radius: 8px;" />
+                      <img src="${baseUrl}/images/ilka-wysocki-2026.webp" alt="Ilka Wysocki" width="60" style="display: block; width: 60px; height: auto; border-radius: 8px;" />
                     </td>
                     <td style="vertical-align: middle;">
                       <p style="margin: 0 0 2px 0; font-size: 15px; font-weight: 700; color: #3D2B1F; white-space: nowrap; text-align: left;">Ilka Wysocki</p>

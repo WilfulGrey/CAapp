@@ -3755,7 +3755,7 @@ const CustomerPortalPage: FC = () => {
             <div className="flex items-center gap-4">
               <div className="relative flex-shrink-0">
                 <img
-                  src="/ilka.webp"
+                  src="/ilka-wysocki-2026.webp"
                   alt="Ilka Wysocki"
                   className="w-[72px] h-[72px] rounded-2xl object-cover object-top"
                   style={{border:'1.5px solid #F0C4B4'}}
