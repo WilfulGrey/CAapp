@@ -20,11 +20,11 @@ export const BeratungCTA: FC<{
       <p className="text-[17px] font-bold text-[#3D2B1F] leading-tight mb-3">{headline}</p>
       <div className="flex items-center gap-3 mb-3">
         <img
-          src="/ilka-wysocki-2026.webp"
-          alt="Ilka Wysocki"
+          src="/marta-kapcio.jpg"
+          alt="Marta Kapcio"
           className="w-14 h-14 rounded-full object-cover object-top flex-shrink-0 border border-[#E9E9EB]"
         />
-        <p className="text-[15px] text-[#8B7355] font-medium leading-snug">Ilka Wysocki<br/>Ihre Beraterin</p>
+        <p className="text-[15px] text-[#8B7355] font-medium leading-snug">Marta Kapcio<br/>Ihre Beraterin</p>
       </div>
       <p className="text-[16px] text-[#52525B] leading-relaxed mb-3.5">{body}</p>
       <div className="flex gap-2">

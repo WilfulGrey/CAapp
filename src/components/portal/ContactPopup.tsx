@@ -44,8 +44,8 @@ export const ContactPopup: FC<{ onClose: () => void }> = ({ onClose }) => (
           <div className="flex items-center gap-4">
             <div className="relative flex-shrink-0">
               <img
-                src="/ilka-wysocki-2026.webp"
-                alt="Ilka Wysocki"
+                src="/marta-kapcio.jpg"
+                alt="Marta Kapcio"
                 className="w-[72px] h-[72px] rounded-2xl object-cover object-top"
                 style={{ border: '1.5px solid #F0C4B4' }}
               />
@@ -57,7 +57,7 @@ export const ContactPopup: FC<{ onClose: () => void }> = ({ onClose }) => (
               </div>
             </div>
             <div className="flex-1 min-w-0">
-              <p className="font-bold text-gray-900 text-base leading-tight">Ilka Wysocki</p>
+              <p className="font-bold text-gray-900 text-base leading-tight">Marta Kapcio</p>
               <p className="text-xs text-gray-500 mb-2.5">Pflegeberaterin · Primundus</p>
               <a
                 href="tel:089200000830"

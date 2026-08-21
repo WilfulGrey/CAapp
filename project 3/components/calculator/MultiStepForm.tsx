@@ -1445,15 +1445,15 @@ export function MultiStepForm({ mode = 'inline' }: MultiStepFormProps = {}) {
           <p className="text-[13px] text-[#8B8B8B] mb-3 text-left">Benötigen Sie Hilfe?</p>
           <div className="flex items-center gap-4">
             <Image
-              src="/images/ilka-wysocki-2026.webp"
-              alt="Ilka Wysocki"
+              src="/images/marta-kapcio.jpg"
+              alt="Marta Kapcio"
               width={84}
               height={104}
               className="rounded-xl w-[84px] h-[104px] object-cover flex-shrink-0"
               style={{ objectPosition: '50% 20%' }}
             />
             <div className="min-w-0 flex-1 text-left">
-              <p className="text-[17px] font-bold text-[#3D2B1F] mb-2.5">Ilka Wysocki</p>
+              <p className="text-[17px] font-bold text-[#3D2B1F] mb-2.5">Marta Kapcio</p>
               <div className="flex gap-2">
             <a
               href="tel:+4989200000830"

@@ -548,15 +548,15 @@ export default function ResultPage() {
           <div className="flex items-center gap-4">
             <div className="relative w-20 h-20 md:w-24 md:h-24 rounded-full overflow-hidden flex-shrink-0 ring-2 ring-[#A89279]">
               <Image
-                src="/images/ilka-wysocki-2026.webp"
-                alt="Ilka Wysocki"
+                src="/images/marta-kapcio.jpg"
+                alt="Marta Kapcio"
                 width={96}
                 height={96}
                 className="object-cover"
               />
             </div>
             <div className="flex-1 min-w-0">
-              <p className="font-bold text-[#3D3D3D] text-lg md:text-xl mb-2">Ilka Wysocki</p>
+              <p className="font-bold text-[#3D3D3D] text-lg md:text-xl mb-2">Marta Kapcio</p>
               <a
                 href="tel:+4989200000830"
                 className="inline-flex items-center gap-2 text-[#708A95] hover:text-[#62808A] transition-colors group"

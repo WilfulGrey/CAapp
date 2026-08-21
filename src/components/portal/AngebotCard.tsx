@@ -498,7 +498,7 @@ export const AngebotCard: FC<{
       </td>
       <td style="vertical-align:middle;text-align:right;">
         <div style="font-size:13px;color:#444;line-height:1.5;">089 200 000 830</div>
-        <div style="font-size:12px;color:#888;line-height:1.5;">Ilka Wysocki · Mo–Sa 8–18 Uhr</div>
+        <div style="font-size:12px;color:#888;line-height:1.5;">Marta Kapcio · Mo–Sa 8–18 Uhr</div>
       </td>
     </tr></table>
   </div>
@@ -525,7 +525,7 @@ export const AngebotCard: FC<{
     <p style="font-size:13.5px;color:#333;margin:0 0 10px;">${greeting},</p>
     <p style="font-size:13.5px;color:#555;line-height:1.7;margin:0 0 10px;">vielen Dank für Ihre Anfrage. Gerne können wir die Betreuung übernehmen. Da unsere Betreuungskräfte direkt angestellt sind, kann die Betreuung bereits <strong style="color:#1a1a1a;">innerhalb von 4–7 Werktagen</strong> beginnen.</p>
     <p style="font-size:13.5px;color:#555;line-height:1.7;margin:0 0 18px;">Unser nachfolgendes Angebot ist auf Ihre individuelle Situation zugeschnitten.</p>
-    <div style="font-size:13px;color:#888;">Ihre Ilka Wysocki</div>
+    <div style="font-size:13px;color:#888;">Ihre Marta Kapcio</div>
   </div>
 
   <!-- TRUST BAR -->
@@ -703,7 +703,7 @@ export const AngebotCard: FC<{
                 <p className="text-sm text-gray-600 mb-2">{greeting},</p>
                 <p className="text-sm text-gray-600 leading-relaxed">vielen Dank für Ihre Anfrage. Gerne können wir die Betreuung übernehmen. Da unsere Betreuungskräfte direkt angestellt sind, kann die Betreuung bereits <span className="font-semibold">innerhalb von 4–7 Werktagen</span> beginnen.</p>
                 <p className="text-sm text-gray-600 leading-relaxed mt-2">Nachfolgend finden Sie die Konditionen sowie bereits vorausgewählte Pflegekräfte. Melden Sie sich jederzeit bei Fragen.</p>
-                <p className="text-sm text-gray-400 mt-3">Ihre Ilka Wysocki</p>
+                <p className="text-sm text-gray-400 mt-3">Ihre Marta Kapcio</p>
               </div>
             </div>
 

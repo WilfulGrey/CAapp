@@ -216,9 +216,9 @@ export default function HomePage() {
       </div>
 
       {/* Mobile-Reihenfolge nach dem Hero (Martin 16.08.): Ablauf direkt
-          unter "Bekannt aus", darunter Ilka, dann erst der Vertrauensblock und
+          unter "Bekannt aus", darunter Marta, dann erst der Vertrauensblock und
           Testsieger. Der Ablauf beantwortet die naechste Frage, die sich
-          nach dem Versprechen stellt ("und wie laeuft das jetzt?"), Ilka
+          nach dem Versprechen stellt ("und wie laeuft das jetzt?"), Marta
           gibt ihr ein Gesicht.
           HowItWorks steht deshalb HIER fuer mobil und weiter unten in einem
           `hidden lg:block`-Wrapper fuer Desktop — die Desktop-Reihenfolge

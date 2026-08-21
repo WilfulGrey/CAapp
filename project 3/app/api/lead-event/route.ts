@@ -457,7 +457,7 @@ async function resolveLeadJobUuid(
 //
 // caregiver_interest_shown → 1 Reminder nach 1h (interest_reminder).
 // application_received → 4 Reminder im Crescendo (Ton: persönliche Nachfrage
-// von Ilka, keine Drohkulisse — Martin, 2026-07-20):
+// von Marta, keine Drohkulisse — Martin, 2026-07-20):
 //   1h  (application_reminder)        "schon gesehen?"
 //   4h  (application_reminder_4h)     "kurze Frage"
 //   12h (application_reminder_12h)    "wie ist Ihr Eindruck?"

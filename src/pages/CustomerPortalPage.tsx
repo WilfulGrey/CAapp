@@ -3748,15 +3748,15 @@ const CustomerPortalPage: FC = () => {
           ))}
         </div>
 
-        {/* ── Ilka-Box (Beraterin / Trust / CTA) ── */}
+        {/* ── Marta-Box (Beraterin / Trust / CTA) ── */}
         <div className="rounded-2xl overflow-hidden border bg-white" style={{borderColor:'#E9E9EB'}}>
           <div className="px-5 pt-5 pb-5 space-y-5">
             <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Noch Fragen? Ihre Beraterin</p>
             <div className="flex items-center gap-4">
               <div className="relative flex-shrink-0">
                 <img
-                  src="/ilka-wysocki-2026.webp"
-                  alt="Ilka Wysocki"
+                  src="/marta-kapcio.jpg"
+                  alt="Marta Kapcio"
                   className="w-[72px] h-[72px] rounded-2xl object-cover object-top"
                   style={{border:'1.5px solid #F0C4B4'}}
                 />
@@ -3768,7 +3768,7 @@ const CustomerPortalPage: FC = () => {
                 </div>
               </div>
               <div className="flex-1 min-w-0">
-                <p className="font-bold text-gray-900 text-[17px] leading-tight">Ilka Wysocki</p>
+                <p className="font-bold text-gray-900 text-[17px] leading-tight">Marta Kapcio</p>
                 <p className="text-[14px] text-gray-500 mb-2">Pflegeberaterin · Primundus</p>
                 <a href="tel:089200000830" className="inline-flex items-center gap-1.5 text-[#8B7355] font-bold text-[16px] hover:opacity-80 transition-opacity">
                   <Phone className="w-4 h-4 flex-shrink-0" />
@@ -3886,7 +3886,7 @@ const CustomerPortalPage: FC = () => {
 
       {/* ── Rückmeldung zum Angebot (schwebend, unten rechts) ────────────
            Als Kasten im Fluss saß sie ~3000 px weit unten und wurde kaum
-           gesehen (Martin, 12.08.). Jetzt schwebend mit Ilkas Gesicht:
+           gesehen (Martin, 12.08.). Jetzt schwebend mit Martas Gesicht:
            erst zusammengeklappt als ein Satz, wegklickbar, und sie taucht
            erst auf, wenn der Kunde am Angebot und an den Pflegekräften
            vorbei ist (`feedbackReif`).

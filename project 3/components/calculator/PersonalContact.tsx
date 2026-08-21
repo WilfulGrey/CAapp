@@ -1,10 +1,10 @@
 "use client";
 
 /**
- * Beratungs-Karte mit Ilka.
+ * Beratungs-Karte mit Marta.
  *
  * DECKUNGSGLEICH mit `src/components/portal/BeratungCTA.tsx` im
- * Kundenportal (Martin 16.08.: "warum sieht Ilkas Kasten ploetzlich anders
+ * Kundenportal (Martin 16.08.: "warum sieht Martas Kasten ploetzlich anders
  * aus als im Kundenportal, wir sollten uns da konsistenter verhalten").
  *
  * Die Portal-Fassung ist die Referenz — ihr Aufbau ist dort ausdruecklich
@@ -18,7 +18,7 @@
  * eingebunden. Wenn die eine Seite geaendert wird, muss die andere mit.
  *
  * Zwei bewusste Unterschiede zum Portal:
- * - Bildpfad: das Portal liegt in einer anderen App und laedt /ilka.webp.
+ * - Bildpfad: das Portal liegt in einer anderen App und laedt /marta-kapcio.jpg.
  * - Buttonform: hier eckig (rounded-xl) wie ALLE Buttons des Rechners
  *   (Martin 16.08.: "warum ist der oberste Button jetzt schoen und die
  *   anderen noch alt und rund"). Die Form ist ein Seiten-Token, nicht Teil
@@ -38,12 +38,12 @@ export function PersonalContact({
       <div className="flex items-center gap-3 mb-3">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
-          src="/images/ilka-wysocki-2026.webp"
-          alt="Ilka Wysocki"
+          src="/images/marta-kapcio.jpg"
+          alt="Marta Kapcio"
           className="w-14 h-14 rounded-full object-cover object-top flex-shrink-0 border border-[#E9E9EB]"
           loading="lazy"
         />
-        <p className="text-[15px] text-[#8B7355] font-medium leading-snug">Ilka Wysocki<br />Ihre Beraterin</p>
+        <p className="text-[15px] text-[#8B7355] font-medium leading-snug">Marta Kapcio<br />Ihre Beraterin</p>
       </div>
       <p className="text-[16px] text-[#52525B] leading-relaxed mb-3.5">{body}</p>
       <div className="flex gap-2">

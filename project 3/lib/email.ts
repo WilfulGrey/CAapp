@@ -319,8 +319,8 @@ export function getEingangsbestaetigungEmailTemplate(
     eingangsGreeting = 'Guten Tag';
   }
 
-  const ilkaSignatur = `
-    <!-- Ilka Signatur-Block -->
+  const martaSignatur = `
+    <!-- Marta Signatur-Block -->
     <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="margin: 0 0 32px 0; border: 1px solid #e8ddd0; border-radius: 12px; overflow: hidden;">
       <tr>
         <td style="padding: 18px 20px 16px; background: #ffffff;">
@@ -330,10 +330,10 @@ export function getEingangsbestaetigungEmailTemplate(
                 <table cellpadding="0" cellspacing="0" role="presentation">
                   <tr>
                     <td style="padding-right: 12px; vertical-align: top;">
-                      <img src="${baseUrl}/images/ilka-wysocki-2026.webp" alt="Ilka Wysocki" width="60" style="display: block; width: 60px; height: auto; border-radius: 8px;" />
+                      <img src="${baseUrl}/images/marta-kapcio.jpg" alt="Marta Kapcio" width="60" style="display: block; width: 60px; height: auto; border-radius: 8px;" />
                     </td>
                     <td style="vertical-align: middle;">
-                      <p style="margin: 0 0 2px 0; font-size: 15px; font-weight: 700; color: #3D2B1F; white-space: nowrap; text-align: left;">Ilka Wysocki</p>
+                      <p style="margin: 0 0 2px 0; font-size: 15px; font-weight: 700; color: #3D2B1F; white-space: nowrap; text-align: left;">Marta Kapcio</p>
                       <p style="margin: 0 0 2px 0; font-size: 13px; color: #555; white-space: nowrap; text-align: left;">Pflegeberaterin</p>
                       <p style="margin: 0; font-size: 12px; color: #9a8a73; white-space: nowrap; text-align: left;">Mo – So, 8 – 20 Uhr</p>
                     </td>
@@ -474,9 +474,9 @@ export function getEingangsbestaetigungEmailTemplate(
     </div>`;
     })()}
 
-    <p style="font-size: 16px; line-height: 1.7; color: #555; margin-bottom: 20px; text-align: left;">Mit freundlichen Grüßen<br><strong style="color: #3D2B1F;">Ilka Wysocki</strong></p>
+    <p style="font-size: 16px; line-height: 1.7; color: #555; margin-bottom: 20px; text-align: left;">Mit freundlichen Grüßen<br><strong style="color: #3D2B1F;">Marta Kapcio</strong></p>
 
-    ${ilkaSignatur}
+    ${martaSignatur}
   `;
 
   const preheader = 'Ihre Anfrage ist eingegangen - Wir melden uns in Kürze';
@@ -638,11 +638,11 @@ export function getAngebotsEmailTemplate(
       <p style="color: #444; font-size: 15px; margin: 0; line-height: 1.6;">Für Sie bleibt selbstverständlich alles <strong>unverbindlich</strong>, bis Sie sich für eine passende Betreuungskraft entscheiden und diese anreist.</p>
     </div>
 
-    <p style="font-size: 16px; line-height: 1.7; color: #555; margin-top: 30px; margin-bottom: 20px;">Mit freundlichen Grüßen<br><strong style="color: #3D2B1F;">Ilka Wysocki</strong></p>
+    <p style="font-size: 16px; line-height: 1.7; color: #555; margin-top: 30px; margin-bottom: 20px;">Mit freundlichen Grüßen<br><strong style="color: #3D2B1F;">Marta Kapcio</strong></p>
 
-    <!-- Ilka Signatur-Block -->
+    <!-- Marta Signatur-Block -->
     <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="margin: 0 0 32px 0; border: 1px solid #e8ddd0; border-radius: 12px; overflow: hidden;">
-      <!-- Ilka + Testsieger -->
+      <!-- Marta + Testsieger -->
       <tr>
         <td style="padding: 18px 20px 16px; background: #ffffff;">
           <table width="100%" cellpadding="0" cellspacing="0" role="presentation">
@@ -653,11 +653,11 @@ export function getAngebotsEmailTemplate(
                 <table cellpadding="0" cellspacing="0" role="presentation">
                   <tr>
                     <td style="padding-right: 12px; vertical-align: top;">
-                      <img src="${baseUrl}/images/ilka-wysocki-2026.webp" alt="Ilka Wysocki" width="60"
+                      <img src="${baseUrl}/images/marta-kapcio.jpg" alt="Marta Kapcio" width="60"
                         style="display: block; width: 60px; height: auto; border-radius: 8px;" />
                     </td>
                     <td style="vertical-align: middle;">
-                      <p style="margin: 0 0 2px 0; font-size: 15px; font-weight: 700; color: #3D2B1F; text-align: left; white-space: nowrap;">Ilka Wysocki</p>
+                      <p style="margin: 0 0 2px 0; font-size: 15px; font-weight: 700; color: #3D2B1F; text-align: left; white-space: nowrap;">Marta Kapcio</p>
                       <p style="margin: 0 0 2px 0; font-size: 13px; color: #555; text-align: left; white-space: nowrap;">Pflegeberaterin</p>
                       <p style="margin: 0; font-size: 12px; color: #9a8a73; text-align: left; white-space: nowrap;">Mo – So, 8 – 20 Uhr</p>
                     </td>
@@ -775,7 +775,7 @@ Wenn alles für Sie passt, benötigen wir lediglich eine kurze Bestätigung von 
 Für Sie bleibt selbstverständlich alles unverbindlich, bis Sie sich für eine passende Betreuungskraft entscheiden und diese anreist.
 
 Mit freundlichen Grüßen
-Ilka Wysocki
+Marta Kapcio
 
 ---
 Primundus Deutschland | 24h-Pflege und Betreuung
@@ -1272,8 +1272,8 @@ export function getVertragEmailTemplate(
     { icon: '☀️', label: 'Sommermonate Juli & August', value: '+ 200 €/Monat Aufschlag (§ 4.9)' },
   ];
 
-  const ilkaSignatur = `
-    <!-- Ilka Signatur-Block -->
+  const martaSignatur = `
+    <!-- Marta Signatur-Block -->
     <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="margin: 0 0 32px 0; border: 1px solid #e8ddd0; border-radius: 12px; overflow: hidden;">
       <tr>
         <td style="padding: 18px 20px 16px; background: #ffffff;">
@@ -1283,10 +1283,10 @@ export function getVertragEmailTemplate(
                 <table cellpadding="0" cellspacing="0" role="presentation">
                   <tr>
                     <td style="padding-right: 12px; vertical-align: top;">
-                      <img src="${baseUrl}/images/ilka-wysocki-2026.webp" alt="Ilka Wysocki" width="60" style="display: block; width: 60px; height: auto; border-radius: 8px;" />
+                      <img src="${baseUrl}/images/marta-kapcio.jpg" alt="Marta Kapcio" width="60" style="display: block; width: 60px; height: auto; border-radius: 8px;" />
                     </td>
                     <td style="vertical-align: middle;">
-                      <p style="margin: 0 0 2px 0; font-size: 15px; font-weight: 700; color: #3D2B1F; white-space: nowrap; text-align: left;">Ilka Wysocki</p>
+                      <p style="margin: 0 0 2px 0; font-size: 15px; font-weight: 700; color: #3D2B1F; white-space: nowrap; text-align: left;">Marta Kapcio</p>
                       <p style="margin: 0 0 2px 0; font-size: 13px; color: #555; white-space: nowrap; text-align: left;">Pflegeberaterin</p>
                       <p style="margin: 0; font-size: 12px; color: #9a8a73; white-space: nowrap; text-align: left;">Mo – So, 8 – 20 Uhr</p>
                     </td>
@@ -1407,9 +1407,9 @@ export function getVertragEmailTemplate(
 
     <p style="font-size: 14px; line-height: 1.7; color: #888; margin-bottom: 28px;">Den vollständigen Vertrag finden Sie im Anhang dieser E-Mail. Bei Fragen stehen wir Ihnen jederzeit gerne zur Verfügung.</p>
 
-    <p style="font-size: 16px; line-height: 1.7; color: #555; margin-bottom: 20px; text-align: left;">Mit freundlichen Grüßen<br><strong style="color: #3D2B1F;">Ilka Wysocki</strong></p>
+    <p style="font-size: 16px; line-height: 1.7; color: #555; margin-bottom: 20px; text-align: left;">Mit freundlichen Grüßen<br><strong style="color: #3D2B1F;">Marta Kapcio</strong></p>
 
-    ${ilkaSignatur}
+    ${martaSignatur}
   `;
 
   const preheader = 'Ihr Dienstleistungsvertrag mit PRIMUNDUS Deutschland – bitte lesen und unterschreiben';
@@ -1431,7 +1431,7 @@ ${options.vertragsBeginn && options.vertragsBeginn !== '_______________' ? `\nVe
 Den vollständigen Vertrag finden Sie im Anhang.
 
 Mit freundlichen Grüßen
-Ilka Wysocki · Pflegeberaterin
+Marta Kapcio · Pflegeberaterin
 
 PRIMUNDUS Deutschland · Telefon: 089 200 000 830 · info@primundus.de`;
 
@@ -1448,7 +1448,7 @@ export async function sendConfirmationEmail(data: {
 
 // ─────────────────────────────────────────────────────────────────────────
 // Caregiver-Event-Mails (Mail A: Interesse, Mail B: Bewerbung erhalten)
-// Beide teilen sich Wrapper, Pflegekraft-Kachel, Trust-Zeile, Ilka-Sig.
+// Beide teilen sich Wrapper, Pflegekraft-Kachel, Trust-Zeile, Marta-Sig.
 // Trigger sind Bridge-Events `caregiver_interest_shown` und
 // `application_received` (siehe app/api/lead-event/route.ts).
 // ─────────────────────────────────────────────────────────────────────────
@@ -1596,12 +1596,12 @@ function customerGreeting(lead: Lead): string {
   return 'Guten Tag';
 }
 
-// Ilka-Signatur-Karte — zentral für alle Caregiver-Event-Mails (A/B/C) und
+// Marta-Signatur-Karte — zentral für alle Caregiver-Event-Mails (A/B/C) und
 // das neue Mail-11-Layout. Identisch zur Eingangsbestätigung, damit die
 // gesamte Mail-Reihe optisch zusammenpasst.
-function caregiverIlkaSig(baseUrl: string): string {
+function caregiverMartaSig(baseUrl: string): string {
   return `
-    <p style="font-size:16px;line-height:1.7;color:#555;margin-top:24px;margin-bottom:16px;">Mit freundlichen Grüßen<br><strong style="color:#3D2B1F;">Ilka Wysocki</strong></p>
+    <p style="font-size:16px;line-height:1.7;color:#555;margin-top:24px;margin-bottom:16px;">Mit freundlichen Grüßen<br><strong style="color:#3D2B1F;">Marta Kapcio</strong></p>
     <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="margin:0 0 24px 0;border:1px solid #e8ddd0;border-radius:12px;overflow:hidden;">
       <tr>
         <td style="padding:18px 20px 16px;background:#ffffff;">
@@ -1611,10 +1611,10 @@ function caregiverIlkaSig(baseUrl: string): string {
                 <table cellpadding="0" cellspacing="0" role="presentation">
                   <tr>
                     <td style="padding-right:12px;vertical-align:top;">
-                      <img src="${baseUrl}/images/ilka-wysocki-2026.webp" alt="Ilka Wysocki" width="60" style="display:block;width:60px;height:auto;border-radius:8px;" />
+                      <img src="${baseUrl}/images/marta-kapcio.jpg" alt="Marta Kapcio" width="60" style="display:block;width:60px;height:auto;border-radius:8px;" />
                     </td>
                     <td style="vertical-align:middle;">
-                      <p style="margin:0 0 2px;font-size:15px;font-weight:700;color:#3D2B1F;white-space:nowrap;">Ilka Wysocki</p>
+                      <p style="margin:0 0 2px;font-size:15px;font-weight:700;color:#3D2B1F;white-space:nowrap;">Marta Kapcio</p>
                       <p style="margin:0 0 2px;font-size:13px;color:#555;white-space:nowrap;">Pflegeberaterin</p>
                       <p style="margin:0;font-size:12px;color:#9a8a73;white-space:nowrap;">Mo – So, 8 – 20 Uhr</p>
                     </td>
@@ -1833,7 +1833,7 @@ function buildCaregiverEventEmail(opts: {
       </td></tr>
     </table>`;
 
-  const ilkaSig = caregiverIlkaSig(baseUrl);
+  const martaSig = caregiverMartaSig(baseUrl);
 
   const content = `
     <p style="font-size:15px;line-height:1.75;color:#444;margin-bottom:14px;">${greeting},</p>
@@ -1851,7 +1851,7 @@ function buildCaregiverEventEmail(opts: {
       Für Sie bleibt alles <strong>unverbindlich</strong>, bis Sie sich für eine passende Betreuungskraft entscheiden und diese anreist.
     </div>
     ${opts.psHtml ?? ''}
-    ${ilkaSig}`;
+    ${martaSig}`;
 
   const html = caregiverMailShell(baseUrl, opts.lead.email, content, customerUnsubscribeUrl(opts.lead));
 
@@ -1871,7 +1871,7 @@ Für Sie bleibt alles unverbindlich, bis Sie sich für eine passende
 Betreuungskraft entscheiden und diese anreist.
 ${opts.psText ? '\n' + opts.psText + '\n' : ''}
 Mit freundlichen Grüßen
-Ilka Wysocki — Pflegeberaterin
+Marta Kapcio — Pflegeberaterin
 Tel: 089 200 000 830  ·  WhatsApp: https://wa.me/4989200000830
 
 Primundus Deutschland
@@ -1904,10 +1904,10 @@ export function getPatientDataSavedEmailTemplate(
 
   const outroHtml = `<p style="font-size:14px;line-height:1.65;color:#555;margin:18px 0 0;">Bei Fragen erreichen Sie uns telefonisch unter <a href="tel:+4989200000830" style="color:#0066CC;text-decoration:none;">+49 89 200 000 830</a> oder per E-Mail an <a href="mailto:info@primundus.de" style="color:#0066CC;text-decoration:none;">info@primundus.de</a>.</p>`;
 
-  // Ilka-Sig — identisch zu buildCaregiverEventEmail, damit die Mail-Reihe
+  // Marta-Sig — identisch zu buildCaregiverEventEmail, damit die Mail-Reihe
   // optisch konsistent bleibt.
-  const ilkaSig = `
-    <p style="font-size:16px;line-height:1.7;color:#555;margin-top:24px;margin-bottom:16px;">Mit freundlichen Grüßen<br><strong style="color:#3D2B1F;">Ilka Wysocki</strong></p>
+  const martaSig = `
+    <p style="font-size:16px;line-height:1.7;color:#555;margin-top:24px;margin-bottom:16px;">Mit freundlichen Grüßen<br><strong style="color:#3D2B1F;">Marta Kapcio</strong></p>
     <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="margin:0 0 24px 0;border:1px solid #e8ddd0;border-radius:12px;overflow:hidden;">
       <tr>
         <td style="padding:18px 20px 16px;background:#ffffff;">
@@ -1917,10 +1917,10 @@ export function getPatientDataSavedEmailTemplate(
                 <table cellpadding="0" cellspacing="0" role="presentation">
                   <tr>
                     <td style="padding-right:12px;vertical-align:top;">
-                      <img src="${baseUrl}/images/ilka-wysocki-2026.webp" alt="Ilka Wysocki" width="60" style="display:block;width:60px;height:auto;border-radius:8px;" />
+                      <img src="${baseUrl}/images/marta-kapcio.jpg" alt="Marta Kapcio" width="60" style="display:block;width:60px;height:auto;border-radius:8px;" />
                     </td>
                     <td style="vertical-align:middle;">
-                      <p style="margin:0 0 2px;font-size:15px;font-weight:700;color:#3D2B1F;white-space:nowrap;">Ilka Wysocki</p>
+                      <p style="margin:0 0 2px;font-size:15px;font-weight:700;color:#3D2B1F;white-space:nowrap;">Marta Kapcio</p>
                       <p style="margin:0 0 2px;font-size:13px;color:#555;white-space:nowrap;">Pflegeberaterin</p>
                       <p style="margin:0;font-size:12px;color:#9a8a73;white-space:nowrap;">Mo – So, 8 – 20 Uhr</p>
                     </td>
@@ -1968,7 +1968,7 @@ export function getPatientDataSavedEmailTemplate(
       <span style="color:#2D6A4F;font-weight:600;">✓ Kosten erst bei Anreise</span>
     </div>
     ${outroHtml}
-    ${ilkaSig}`;
+    ${martaSig}`;
 
   const html = `<!DOCTYPE html>
 <html lang="de">
@@ -2043,7 +2043,7 @@ Jetzt Pflegekräfte ansehen und einladen: ${portalUrl}
 Bei Fragen erreichen Sie uns telefonisch unter +49 89 200 000 830 oder per E-Mail an info@primundus.de.
 
 Mit freundlichen Grüßen
-Ilka Wysocki — Pflegeberaterin
+Marta Kapcio — Pflegeberaterin
 Tel: 089 200 000 830  ·  WhatsApp: https://wa.me/4989200000830
 
 Primundus Deutschland
@@ -2133,7 +2133,7 @@ export function getOfferUpdatedEmailTemplate(
     ${eigenanteilHtml}
     ${bulletproofButton(portalUrl, 'Aktualisiertes Angebot ansehen →')}
     <p style="font-size:14px;line-height:1.65;color:#555;margin:18px 0 0;">Bei Fragen zur Anpassung erreichen Sie uns telefonisch unter <a href="tel:+4989200000830" style="color:#0066CC;text-decoration:none;">+49 89 200 000 830</a> oder per E-Mail an <a href="mailto:info@primundus.de" style="color:#0066CC;text-decoration:none;">info@primundus.de</a>.</p>
-    ${caregiverIlkaSig(baseUrl)}`;
+    ${caregiverMartaSig(baseUrl)}`;
 
   const html = caregiverMailShell(baseUrl, lead.email, content, customerUnsubscribeUrl(lead) || undefined);
 
@@ -2152,7 +2152,7 @@ Aktualisiertes Angebot ansehen: ${portalUrl}
 Bei Fragen zur Anpassung erreichen Sie uns telefonisch unter +49 89 200 000 830 oder per E-Mail an info@primundus.de.
 
 Mit freundlichen Grüßen
-Ilka Wysocki — Pflegeberaterin
+Marta Kapcio — Pflegeberaterin
 Tel: 089 200 000 830  ·  WhatsApp: https://wa.me/4989200000830
 
 Primundus Deutschland
@@ -2168,7 +2168,7 @@ www.primundus.de
 // Deutsch · „Profil ansehen"-Link, kein grüner Button, keine Bio),
 // „Was Sie als Nächstes tun können"-Schritte und Gebühren-Box mit der
 // abgestimmten Formulierung. Header/Footer/Signatur über die geteilten
-// Helper (caregiverMailShell / caregiverIlkaSig).
+// Helper (caregiverMailShell / caregiverMartaSig).
 export function getCaregiverInterestEmailTemplate(
   lead: Lead,
   caregiver: CaregiverDisplay,
@@ -2224,7 +2224,7 @@ export function getCaregiverInterestEmailTemplate(
     ${stepsTable}
     ${bestpreisBox}
     <p style="font-size:15px;line-height:1.75;color:#444;margin:30px 0 18px;">Wenn Sie Fragen zu ${firstName}s Profil haben oder Unterstützung bei der Einschätzung möchten — rufen Sie mich an, schreiben Sie mir per WhatsApp oder antworten Sie einfach auf diese E-Mail. Ich bin gerne für Sie da.</p>
-    ${caregiverIlkaSig(baseUrl)}`;
+    ${caregiverMartaSig(baseUrl)}`;
 
   const html = caregiverMailShell(baseUrl, lead.email, content, customerUnsubscribeUrl(lead));
 
@@ -2247,7 +2247,7 @@ Keine Vermittlungsgebühr: Keine Anzahlung, keine Aufnahmegebühr, keine Bearbei
 Wenn Sie Fragen zu ${firstName}s Profil haben oder Unterstützung bei der Einschätzung möchten — rufen Sie mich an, schreiben Sie mir per WhatsApp oder antworten Sie einfach auf diese E-Mail. Ich bin gerne für Sie da.
 
 Mit freundlichen Grüßen
-Ilka Wysocki — Pflegeberaterin
+Marta Kapcio — Pflegeberaterin
 Tel: 089 200 000 830  ·  WhatsApp: https://wa.me/4989200000830
 
 Primundus Deutschland
@@ -2404,7 +2404,7 @@ export function getApplicationReceivedEmailTemplate(
     ${stepsTable}
     ${bestpreisBox}
     <p style="font-size:15px;line-height:1.75;color:#444;margin:28px 0 18px;">Wenn Sie Fragen zu ${firstName}s Bewerbung haben oder Unterstützung bei der Entscheidung möchten — rufen Sie mich an, schreiben Sie mir per WhatsApp oder antworten Sie einfach auf diese E-Mail. Ich bin gerne für Sie da.</p>
-    ${caregiverIlkaSig(baseUrl)}`;
+    ${caregiverMartaSig(baseUrl)}`;
 
   const html = caregiverMailShell(baseUrl, lead.email, content, customerUnsubscribeUrl(lead));
 
@@ -2432,7 +2432,7 @@ Keine Vermittlungsgebühr: Keine Anzahlung, keine Aufnahmegebühr, keine Bearbei
 Wenn Sie Fragen zu ${firstName}s Bewerbung haben oder Unterstützung bei der Entscheidung möchten — rufen Sie mich an, schreiben Sie mir per WhatsApp oder antworten Sie einfach auf diese E-Mail. Ich bin gerne für Sie da.
 
 Mit freundlichen Grüßen
-Ilka Wysocki — Pflegeberaterin
+Marta Kapcio — Pflegeberaterin
 Tel: 089 200 000 830  ·  WhatsApp: https://wa.me/4989200000830
 
 Primundus Deutschland
@@ -2479,7 +2479,7 @@ export function getTokenRegenerationEmailTemplate(
   const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://primundus.de';
   const greeting = customerGreeting(lead);
 
-  const ilkaSignatur = `
+  const martaSignatur = `
     <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="margin: 0 0 32px 0; border: 1px solid #e8ddd0; border-radius: 12px; overflow: hidden;">
       <tr>
         <td style="padding: 18px 20px 16px; background: #ffffff;">
@@ -2489,10 +2489,10 @@ export function getTokenRegenerationEmailTemplate(
                 <table cellpadding="0" cellspacing="0" role="presentation">
                   <tr>
                     <td style="padding-right: 12px; vertical-align: top;">
-                      <img src="${baseUrl}/images/ilka-wysocki-2026.webp" alt="Ilka Wysocki" width="60" style="display: block; width: 60px; height: auto; border-radius: 8px;" />
+                      <img src="${baseUrl}/images/marta-kapcio.jpg" alt="Marta Kapcio" width="60" style="display: block; width: 60px; height: auto; border-radius: 8px;" />
                     </td>
                     <td style="vertical-align: middle;">
-                      <p style="margin: 0 0 2px 0; font-size: 15px; font-weight: 700; color: #3D2B1F; white-space: nowrap; text-align: left;">Ilka Wysocki</p>
+                      <p style="margin: 0 0 2px 0; font-size: 15px; font-weight: 700; color: #3D2B1F; white-space: nowrap; text-align: left;">Marta Kapcio</p>
                       <p style="margin: 0 0 2px 0; font-size: 13px; color: #555; white-space: nowrap; text-align: left;">Pflegeberaterin</p>
                       <p style="margin: 0; font-size: 12px; color: #9a8a73; white-space: nowrap; text-align: left;">Mo – So, 8 – 20 Uhr</p>
                     </td>
@@ -2531,9 +2531,9 @@ export function getTokenRegenerationEmailTemplate(
 
     <p style="font-size: 16px; line-height: 1.7; color: #555; margin: 0 0 20px 0;">Bei Fragen melden Sie sich gerne — wir sind 7 Tage die Woche für Sie da.</p>
 
-    <p style="font-size: 16px; line-height: 1.7; color: #555; margin-bottom: 20px; text-align: left;">Mit freundlichen Grüßen<br><strong style="color: #3D2B1F;">Ilka Wysocki</strong></p>
+    <p style="font-size: 16px; line-height: 1.7; color: #555; margin-bottom: 20px; text-align: left;">Mit freundlichen Grüßen<br><strong style="color: #3D2B1F;">Marta Kapcio</strong></p>
 
-    ${ilkaSignatur}
+    ${martaSignatur}
   `;
 
   const preheader = 'Ihr neuer Zugangslink zum Primundus-Kundenportal';
@@ -2557,7 +2557,7 @@ Aus Sicherheitsgründen ist auch dieser Link 14 Tage gültig. Falls Sie diese E-
 Bei Fragen melden Sie sich gerne — wir sind 7 Tage die Woche für Sie da.
 
 Mit freundlichen Grüßen
-Ilka Wysocki
+Marta Kapcio
 Pflegeberaterin · Mo – So, 8 – 20 Uhr
 +49 89 200 000 830
 WhatsApp: https://wa.me/4989200000830
@@ -2860,7 +2860,7 @@ export function getBewertungsanfrageTemplate(
       </td></tr></table>
       <![endif]-->
 
-      <!-- Ilka-Block wie in den uebrigen Kundenmails (mail-templates/02, 04):
+      <!-- Marta-Block wie in den uebrigen Kundenmails (mail-templates/02, 04):
            Bild links, Name/Rolle/Zeiten rechts, darunter die Kontaktwege.
            Die Pillen bewusst kleiner und leiser als die Antwort-Knoepfe darueber —
            sie sollen nicht mit ihnen um den Klick konkurrieren (Martin, 19.08.). -->
@@ -2873,11 +2873,11 @@ export function getBewertungsanfrageTemplate(
           </p>
           <table cellpadding="0" cellspacing="0" role="presentation"><tr>
             <td style="padding-right:12px;vertical-align:top;">
-              <img src="${cdn}/ilka-wysocki-2026.webp" alt="Ilka Wysocki" width="60"
+              <img src="${cdn}/marta-kapcio.jpg" alt="Marta Kapcio" width="60"
                    style="display:block;width:60px;height:auto;border-radius:8px;" />
             </td>
             <td style="vertical-align:middle;">
-              <p style="margin:0 0 2px;font-size:15px;font-weight:700;color:#3D2B1F;white-space:nowrap;">Ilka Wysocki</p>
+              <p style="margin:0 0 2px;font-size:15px;font-weight:700;color:#3D2B1F;white-space:nowrap;">Marta Kapcio</p>
               <p style="margin:0 0 2px;font-size:13px;color:#555;white-space:nowrap;">Pflegeberaterin</p>
               <p style="margin:0;font-size:12px;color:#9a8a73;white-space:nowrap;">Mo &ndash; So, 8 &ndash; 20 Uhr</p>
             </td>
@@ -2896,10 +2896,10 @@ export function getBewertungsanfrageTemplate(
                         font-weight:500;color:#777777;white-space:nowrap;font-family:${SANS};">WhatsApp</a>
             </td>
             <td>
-              <a href="mailto:ilka@primundus.de"
+              <a href="mailto:info@primundus.de"
                  style="display:inline-block;background-color:#ffffff;border:1px solid #dcdcdc;
                         border-radius:16px;padding:6px 13px;text-decoration:none;font-size:12px;
-                        font-weight:500;color:#777777;white-space:nowrap;font-family:${SANS};">ilka@primundus.de</a>
+                        font-weight:500;color:#777777;white-space:nowrap;font-family:${SANS};">info@primundus.de</a>
             </td>
           </tr></table>
         </td>
@@ -2940,8 +2940,8 @@ Teilweise: ${link('teils')}
 Nein, eher nicht: ${link('nein')}
 
 Herzliche Gr\u00fc\u00dfe
-Ilka Wysocki \u2014 Pflegeberaterin
-089 200 000 830 \u00b7 ilka@primundus.de
+Marta Kapcio \u2014 Pflegeberaterin
+089 200 000 830 \u00b7 info@primundus.de
 
 Primundus Deutschland
 www.primundus.de

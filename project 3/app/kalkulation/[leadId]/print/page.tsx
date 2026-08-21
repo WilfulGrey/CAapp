@@ -97,9 +97,9 @@ export default function KalkulationPrintPage() {
     sNum: { width: '18pt', height: '18pt', borderRadius: '50%', border: '1.5pt solid #B5A184', color: '#8B6914', fontSize: '8pt', fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginTop: '1pt' },
     sNumDone: { width: '18pt', height: '18pt', borderRadius: '50%', background: '#2D6A4F', border: '1.5pt solid #2D6A4F', color: '#fff', fontSize: '9pt', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginTop: '1pt' },
     hemm: { display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8pt', padding: '5pt 12pt', borderTop: '1pt solid #f0ece5', flexWrap: 'wrap' as const },
-    ilkaBox: { border: '1pt solid #F0C4B4', borderRadius: '4pt', overflow: 'hidden', marginBottom: '8pt', pageBreakInside: 'avoid' as const },
-    ilkaInner: { display: 'flex', gap: '10pt', padding: '10pt 12pt', background: '#FFF8F6', alignItems: 'flex-start' },
-    ilkaFooter: { display: 'flex', gap: '8pt', flexWrap: 'wrap' as const, alignItems: 'center', justifyContent: 'center', padding: '6pt 12pt', borderTop: '1pt solid #F0C4B4', background: '#FFF3EE' },
+    martaBox: { border: '1pt solid #F0C4B4', borderRadius: '4pt', overflow: 'hidden', marginBottom: '8pt', pageBreakInside: 'avoid' as const },
+    martaInner: { display: 'flex', gap: '10pt', padding: '10pt 12pt', background: '#FFF8F6', alignItems: 'flex-start' },
+    martaFooter: { display: 'flex', gap: '8pt', flexWrap: 'wrap' as const, alignItems: 'center', justifyContent: 'center', padding: '6pt 12pt', borderTop: '1pt solid #F0C4B4', background: '#FFF3EE' },
     vGrid: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6pt', padding: '8pt 12pt' },
     tagsBox: { border: '1pt solid #e5e0d8', borderRadius: '4pt', padding: '7pt 10pt', marginBottom: '8pt' },
     tag: { display: 'inline-block', fontSize: '7.5pt', background: '#F7F5F0', border: '1pt solid #EDE9E1', borderRadius: '8pt', padding: '1.5pt 6pt', color: '#888', margin: '2pt 2pt 0 0' },
@@ -145,7 +145,7 @@ export default function KalkulationPrintPage() {
             </div>
             <div style={{ textAlign: 'right', fontSize: '8pt', color: '#888', lineHeight: 1.6 }}>
               <div style={{ color: '#8B6914', fontWeight: 700, fontSize: '9pt' }}>089 200 000 830</div>
-              <div>Ilka Wysocki · Mo–So 8–18 Uhr</div>
+              <div>Marta Kapcio · Mo–So 8–18 Uhr</div>
             </div>
           </div>
         </div>
@@ -171,7 +171,7 @@ export default function KalkulationPrintPage() {
           <p style={{ marginBottom: '6pt' }}>{greeting},</p>
           <p style={{ marginBottom: '6pt' }}>vielen Dank für Ihre Anfrage. Gerne können wir die Betreuung übernehmen. Da unsere Betreuungskräfte direkt angestellt sind, kann die Betreuung bereits <strong>innerhalb von 4–7 Werktagen</strong> beginnen.</p>
           <p style={{ marginBottom: '6pt' }}>Unser nachfolgendes Angebot ist auf Ihre individuelle Situation zugeschnitten.</p>
-          <p>Ihre Ilka Wysocki</p>
+          <p>Ihre Marta Kapcio</p>
         </div>
 
         {/* MEDIA LOGOS */}
@@ -279,19 +279,19 @@ export default function KalkulationPrintPage() {
           </div>
         </div>
 
-        {/* ILKA */}
-        <div style={s.ilkaBox}>
-          <div style={s.ilkaInner}>
-            <Image src="/images/ilka-wysocki-2026.webp" alt="Ilka Wysocki" width={44} height={44} style={{ width: '34pt', height: '34pt', borderRadius: '50%', objectFit: 'cover', objectPosition: 'top', border: '1.5pt solid #F0997B', flexShrink: 0 }} />
+        {/* MARTA */}
+        <div style={s.martaBox}>
+          <div style={s.martaInner}>
+            <Image src="/images/marta-kapcio.jpg" alt="Marta Kapcio" width={44} height={44} style={{ width: '34pt', height: '34pt', borderRadius: '50%', objectFit: 'cover', objectPosition: 'top', border: '1.5pt solid #F0997B', flexShrink: 0 }} />
             <div>
-              <div style={{ fontSize: '10pt', fontWeight: 700, color: '#2D1F0F', marginBottom: '1pt' }}>Ilka Wysocki</div>
+              <div style={{ fontSize: '10pt', fontWeight: 700, color: '#2D1F0F', marginBottom: '1pt' }}>Marta Kapcio</div>
               <div style={{ fontSize: '8pt', color: '#aaa', marginBottom: '5pt' }}>Ihre persönliche Beraterin · Mo–So, 8:00–20:00 Uhr</div>
               <div style={{ fontSize: '9pt', fontWeight: 600, color: '#2D1F0F', marginBottom: '3pt' }}>Noch offene Fragen?</div>
               <div style={{ fontSize: '8.5pt', color: '#666', lineHeight: 1.5, marginBottom: '5pt' }}>Ich begleite Sie persönlich durch den gesamten Prozess – von der Auswahl der passenden Pflegekraft bis zum Start der Betreuung.</div>
               <div style={{ fontSize: '10pt', fontWeight: 700, color: '#E76F63' }}>089 200 000 830</div>
             </div>
           </div>
-          <div style={s.ilkaFooter}>
+          <div style={s.martaFooter}>
             <Image src="/images/primundus_testsieger-2021.webp" alt="Testsieger" width={28} height={28} style={{ height: '22pt', width: 'auto' }} />
             <span style={{ width: '1pt', height: '14pt', background: '#F0C4B4', display: 'inline-block' }} />
             {[['M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2M9 7a4 4 0 100 8 4 4 0 000-8z', '20+ Jahre Erfahrung'], ['M12 2a6 6 0 100 12A6 6 0 0012 2z', '60.000+ Einsätze'], ['M20 6L9 17l-5-5', 'Täglich kündbar']].map(([path, label], i) => (
