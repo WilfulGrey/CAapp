@@ -69,16 +69,24 @@
   @keyframes blaseRein{from{opacity:0;transform:translateY(16px) scale(.75)}to{opacity:1;transform:none}}
 
   /* ── Ansprache nach dem Scrollen: eine Frage, zwei Antworten, ein × ── */
-  .teaser{position:fixed;right:20px;bottom:90px;width:min(322px,calc(100vw - 40px));
+  /* Der Teaser ist Prias Sprechblase, kein Banner: schmal, mit einem Zipfel,
+     der auf ihr Gesicht zeigt. Die Blase ist 58 px breit und sitzt bündig
+     rechts — ihre Mitte liegt also 29 px vom rechten Rand, genau dorthin
+     zeigt der Zipfel. */
+  .teaser{position:fixed;right:20px;bottom:96px;width:min(300px,calc(100vw - 60px));
     background:var(--papier);border:1px solid rgba(40,34,28,.07);
-    border-radius:20px;border-bottom-right-radius:8px;box-shadow:var(--schatten-blase);
+    border-radius:20px;border-bottom-right-radius:6px;box-shadow:var(--schatten-blase);
     padding:15px 16px 14px;z-index:41;display:none}
+  .teaser::after{content:"";position:absolute;right:20px;bottom:-8px;width:16px;height:16px;
+    background:var(--papier);border-right:1px solid rgba(40,34,28,.07);
+    border-bottom:1px solid rgba(40,34,28,.07);border-bottom-right-radius:3px;
+    transform:rotate(45deg)}
   .teaser.on{display:block;animation:teaserRein .52s var(--feder) both}
   .teaser.weg{animation:teaserRaus .32s var(--weich) both}
   @keyframes teaserRein{from{opacity:0;transform:translateY(14px) scale(.92);filter:blur(5px)}
                         to{opacity:1;transform:none;filter:blur(0)}}
   @keyframes teaserRaus{to{opacity:0;transform:translateY(8px) scale(.96)}}
-  .teaser p{margin:0 0 12px;font-size:14px;line-height:1.5;letter-spacing:-.15px;padding-right:18px}
+  .teaser p{margin:0 0 12px;font-size:14.5px;line-height:1.52;letter-spacing:-.15px;padding-right:18px}
   .teaser .tchips{display:flex;gap:8px;flex-wrap:wrap}
   .tzu{position:absolute;top:9px;right:11px;width:22px;height:22px;border-radius:50%;border:0;
     background:transparent;color:#B3ADA4;font-size:14px;line-height:1;cursor:pointer;
@@ -286,7 +294,12 @@
     .chip{font-size:14px;padding:10px 16px}
     .eingabe input{font-size:16px}   /* unter 16 px zoomt iOS beim Fokus hinein */
     .blase{right:16px;bottom:calc(16px + env(safe-area-inset-bottom))}
-    .teaser{right:16px;bottom:calc(86px + env(safe-area-inset-bottom));width:calc(100vw - 32px)}
+    /* Gestern stand hier width:calc(100vw - 32px) — dadurch lief die
+       Sprechblase ueber die volle Breite und wirkte wie ein Banner der Seite
+       statt wie eine Aeusserung von Pria. */
+    .teaser{right:16px;bottom:calc(92px + env(safe-area-inset-bottom));
+      width:min(300px,calc(100vw - 56px))}
+    .teaser p{font-size:15.5px;line-height:1.5}
   }
   /* Solange der Chat offen ist, soll die Seite darunter nicht mitscrollen. */
   body.chat-offen{overflow:hidden}
@@ -492,13 +505,11 @@ const WISSEN=[
  {w:['kost','preis','teuer','euro','geld','bezahl','monat'],q:'Kostenseite',
   weiter:'Wenn Sie mögen, rechne ich Ihnen das konkret aus: <b>sechs kurze Fragen</b>, danach sehen Sie '+
          'Ihren Preis — und gleich die Pflegekräfte, die zu Ihrer Situation passen.',
-  a:'Sie zahlen an uns einen <b>festen Monatspreis</b> für die Betreuung — keine Vermittlungs'+
-    'gebühr, keine versteckten Posten. Das ist die Zahl, mit der Sie vergleichen können.<br><br>'+
-    'Was sie bestimmt: Pflegegrad, ob nachts Hilfe nötig ist und wie gut die Kraft Deutsch sprechen soll.'+
-    '<br><br>Liegt ein Pflegegrad vor, bekommen Sie <b>Pflegegeld</b> von der Kasse — das können Sie dafür '+
-    'einsetzen, dazu kommt der Steuervorteil. Wie viel das bei Ihnen ausmacht, zeige ich Ihnen in der Berechnung.'+
-    '<br><br>Dazu kommen An- und Abreise (je 125 €), Kost und Logis im Haushalt und in Juli/August ein '+
-    'Sommerzuschlag. Mehr nicht — ich sage Ihnen das lieber vorher als hinterher.'},
+  // Kurz halten (Martin, 21.08.): ein fester Monatspreis, und das Angebot,
+  // ihn auszurechnen. Alles Weitere — Pflegegeld, An-/Abreise, Zuschlaege —
+  // steht im Angebot und kommt auf Nachfrage, nicht als Vorabvortrag.
+  a:'Sie zahlen an uns einen <b>festen Monatspreis</b> für die Betreuung — keine Vermittlungsgebühr, '+
+    'keine versteckten Posten. Wie hoch er ist, hängt ganz von Ihrer Situation ab.'},
  {w:['legal','recht','anmeld','schwarz','sozialver','a1','mindestlohn','illegal'],q:'Über uns',
   a:'Ja — und zwar ohne Grauzone. Die Betreuungskräfte sind <b>bei uns fest angestellt</b>. '+
     'Wir schicken Ihnen niemanden, den Sie dann selbst beschäftigen müssen: Anmeldung, Sozialversicherung, '+
@@ -943,7 +954,10 @@ function zustand(){
   return {modus, offeneFrage:offeneFrage?offeneFrage.k:null, schritt, antworten:Object.assign({},antwort)};
 }
 async function priaFragen(text){
-  const ctl=new AbortController(), zeit=setTimeout(()=>ctl.abort(),20000);
+  // 45 statt 20 s: Opus 5 mit dem grossen Systemprompt braucht ueber Mobilfunk
+  // regelmaessig mehr als 20 — und jeder Abbruch wirft den Chat zurueck auf die
+  // Stichwortsuche, was der Kunde als schlechtere Antwort sieht (21.08.).
+  const ctl=new AbortController(), zeit=setTimeout(()=>ctl.abort(),45000);
   try{
     const res=await fetch(PRIA_API,{method:'POST',signal:ctl.signal,
       headers:{'content-type':'application/json'},
