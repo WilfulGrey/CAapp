@@ -1407,6 +1407,24 @@ zarezerwowane do hot-fix'ów prod, nie codzienna ścieżka).
 beta na każdy push do tego brancha. `main` istnieje historycznie ale
 jest stary — **nie ruszamy**.
 
+### Staging i prod = ten sam commit, inne środowisko
+
+**Kod jest ZAWSZE identyczny.** Oba sloty (staging i prod, CAapp i
+kostenrechner) auto-deployują z trunku `integration/mamamia-onboarding`.
+Jeden merge = oba środowiska, w tym samym momencie. Nie ma "wypchnięcia
+osobno na staging" — nie istnieje taki krok i nie próbuj go wykonać.
+Zweryfikowane 2026-08-21 na PR #488: build bajt w bajt identyczny na
+`kostenrechner-staging.onrender.com` i `kostenrechner.primundus.de`.
+
+**Różni się WYŁĄCZNIE środowisko** — i tak ma zostać: osobny projekt
+Supabase, osobny tenant mamamia, osobne sekrety. Gdyby były wspólne, każdy
+test na stagingu pisałby do prawdziwych danych klientów.
+
+⚠️ **Zmienne środowiskowe NIE wędrują między serwisami.** Nowy env var
+(np. `ANTHROPIC_API_KEY` dla Prii) trzeba ustawić w **każdym** serwisie
+Render osobno — staging i prod. Objaw pominięcia: feature działa na jednym
+URL-u, a na drugim zwraca 503/500, choć kod jest ten sam.
+
 ### Branch protection na `integration/mamamia-onboarding`
 
 Skonfigurowane via `gh api repos/WilfulGrey/CAapp/branches/.../protection`
