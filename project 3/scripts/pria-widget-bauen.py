@@ -39,7 +39,12 @@ def bauen(html: str) -> str:
     # ── Kulisse raus ────────────────────────────────────────────────
     css = re.sub(r'  /\* ── angedeutete Website.*?(?=  /\* ── Einstieg)', '', css, flags=re.S)
     assert '.karte{' not in css, 'Demo-CSS nicht sauber entfernt'
-    rumpf = re.sub(r'<div class="site">.*?</div>\s*(?=<div class="teaser")', '', rumpf, flags=re.S)
+    # Fester Marker statt eines Element-Namens: die Kulisse endet dort, wo
+    # der Kommentar steht. Frueher zielte das auf `<div class="teaser">` —
+    # als daraus die Pille wurde, brach der Erzeuger.
+    marke = '<!-- WIDGET AB HIER'
+    assert marke in rumpf, 'Marker fehlt in pria.html'
+    rumpf = rumpf[rumpf.index(marke):]
     assert 'PRIMUNDUS' not in rumpf, 'Demo-Markup nicht sauber entfernt'
 
     # ── Seitenweite Regeln, die drinnen nichts verloren haben ───────
@@ -75,6 +80,9 @@ def bauen(html: str) -> str:
     # Dokument, wäre er unsichtbar formatiert.
     js = js.replace('document.body.appendChild(klon);', 'W.appendChild(klon);')
     assert 'document.getElementById' not in js
+    # `SEITE.` ist der bewusste Weg zur echten Seite (Kostenrechner-Karten) —
+    # er darf NICHT in den Schatten umgelenkt werden.
+    assert 'SEITE.querySelectorAll' in js, 'SEITE-Alias fehlt — Auftrittsregel findet die Karten nicht'
     assert 'document.body.classList' in js, 'Seiten-Sperre darf NICHT umgelenkt werden'
 
     def js_text(t: str) -> str:

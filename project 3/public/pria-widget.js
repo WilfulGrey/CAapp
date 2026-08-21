@@ -41,41 +41,40 @@
     '  .blase{position:fixed;right:20px;bottom:calc(20px + var(--leiste,0px));width:58px;height:58px;padding:0;border-radius:50%;\n'+
     '    background:var(--papier);border:1px solid rgba(40,34,28,.08);box-shadow:var(--schatten-blase);\n'+
     '    cursor:pointer;z-index:40;display:block;\n'+
-    '    transition:transform .32s var(--feder), box-shadow .32s var(--weich);\n'+
-    '    animation:blaseRein .62s var(--feder) both 1.1s}\n'+
+    '    /* Kein `animation ... both` mehr: dessen letztes Bild ueberschrieb jede\n'+
+    '       spaetere Regel, `.blase.weg` blieb wirkungslos (fiel nur nicht auf,\n'+
+    '       weil das offene Panel die Blase ohnehin verdeckt). Der Auftritt ist\n'+
+    '       jetzt derselbe Uebergang, der auch das Wegblenden macht — die Blase\n'+
+    '       startet klein und unsichtbar und faehrt heraus, sobald sie darf. */\n'+
+    '    transition:transform .42s var(--feder), opacity .3s var(--weich), box-shadow .32s var(--weich)}\n'+
     '  .blase:hover{transform:translateY(-3px) scale(1.03)}\n'+
     '  .blase:active{transform:scale(.94)}\n'+
-    '  .blase.weg{transform:scale(.7);opacity:0;pointer-events:none;\n'+
-    '    transition:transform .3s var(--weich),opacity .2s linear}\n'+
+    '  .blase.weg,.blase.schlummert{transform:scale(.7);opacity:0;pointer-events:none}\n'+
     '  .blase .mark{width:100%;height:100%;border-radius:50%;overflow:hidden;display:block}\n'+
     '  .punkt{position:absolute;right:1px;bottom:1px;width:14px;height:14px;border-radius:50%;\n'+
     '    background:#2FC46E;border:2.5px solid var(--papier);box-shadow:0 1px 2px rgba(40,34,28,.2)}\n'+
-    '  @keyframes blaseRein{from{opacity:0;transform:translateY(16px) scale(.75)}to{opacity:1;transform:none}}\n'+
     '\n'+
-    '  /* ── Ansprache nach dem Scrollen: eine Frage, zwei Antworten, ein × ── */\n'+
-    '  /* Der Teaser ist Prias Sprechblase, kein Banner: schmal, mit einem Zipfel,\n'+
-    '     der auf ihr Gesicht zeigt. Die Blase ist 58 px breit und sitzt bündig\n'+
-    '     rechts — ihre Mitte liegt also 29 px vom rechten Rand, genau dorthin\n'+
-    '     zeigt der Zipfel. */\n'+
-    '  .teaser{position:fixed;right:20px;bottom:calc(96px + var(--leiste,0px));width:min(300px,calc(100vw - 60px));\n'+
-    '    background:var(--papier);border:1px solid rgba(40,34,28,.07);\n'+
-    '    border-radius:20px;border-bottom-right-radius:6px;box-shadow:var(--schatten-blase);\n'+
-    '    padding:15px 16px 14px;z-index:41;display:none}\n'+
-    '  .teaser::after{content:"";position:absolute;right:20px;bottom:-8px;width:16px;height:16px;\n'+
-    '    background:var(--papier);border-right:1px solid rgba(40,34,28,.07);\n'+
-    '    border-bottom:1px solid rgba(40,34,28,.07);border-bottom-right-radius:3px;\n'+
-    '    transform:rotate(45deg)}\n'+
-    '  .teaser.on{display:block;animation:teaserRein .52s var(--feder) both}\n'+
-    '  .teaser.weg{animation:teaserRaus .32s var(--weich) both}\n'+
-    '  @keyframes teaserRein{from{opacity:0;transform:translateY(14px) scale(.92);filter:blur(5px)}\n'+
-    '                        to{opacity:1;transform:none;filter:blur(0)}}\n'+
-    '  @keyframes teaserRaus{to{opacity:0;transform:translateY(8px) scale(.96)}}\n'+
-    '  .teaser p{margin:0 0 12px;font-size:14.5px;line-height:1.52;letter-spacing:-.15px;padding-right:18px}\n'+
-    '  .teaser .tchips{display:flex;gap:8px;flex-wrap:wrap}\n'+
-    '  .tzu{position:absolute;top:9px;right:11px;width:22px;height:22px;border-radius:50%;border:0;\n'+
-    '    background:transparent;color:#B3ADA4;font-size:14px;line-height:1;cursor:pointer;\n'+
-    '    transition:background .18s var(--weich),color .18s var(--weich)}\n'+
-    '  .tzu:hover{background:var(--bg);color:var(--ink-weich)}\n'+
+    '  /* ── Ansprache beim Scrollen: eine Pille auf Kopfhöhe ──────────────\n'+
+    '     Vorbild bild.de (Martin, 21.08.): keine Sprechblase, die aufpoppt,\n'+
+    '     sondern ein flacher Streifen NEBEN dem Kopf, in dem eine Frage steht.\n'+
+    '     Scrollt der Leser weiter, steht die nächste drin. Der Kopf liegt\n'+
+    '     obenauf und überlappt das rechte Ende — deshalb `padding-right`,\n'+
+    '     damit kein Text darunter verschwindet. */\n'+
+    '  .pille{position:fixed;right:20px;bottom:calc(20px + var(--leiste,0px));\n'+
+    '    height:58px;display:none;align-items:center;z-index:39;\n'+
+    '    max-width:min(360px,calc(100vw - 40px));\n'+
+    '    padding:0 74px 0 17px;border-radius:29px;\n'+
+    '    background:var(--papier);border:1px solid rgba(231,111,99,.35);\n'+
+    '    box-shadow:var(--schatten-blase);cursor:pointer;text-align:left;\n'+
+    '    font:inherit;color:var(--ink);\n'+
+    '    transition:transform .42s var(--feder), opacity .3s var(--weich)}\n'+
+    '  .pille.on{display:flex}\n'+
+    '  .pille.schlummert{transform:translateX(14px) scale(.96);opacity:0;pointer-events:none}\n'+
+    '  .pille span{font-size:14px;font-weight:650;line-height:1.28;letter-spacing:-.2px;\n'+
+    '    display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;\n'+
+    '    transition:opacity .22s var(--weich)}\n'+
+    '  .pille.wechselt span{opacity:0}\n'+
+    '  .pille:active{transform:scale(.98)}\n'+
     '\n'+
     '  /* ── Panel ──────────────────────────────────────────── */\n'+
     '  .panel{position:fixed;right:24px;bottom:24px;width:404px;height:min(690px,84vh);\n'+
@@ -285,12 +284,11 @@
     '    .klein{font-size:12px}\n'+
     '    .eingabe input{font-size:16px}   /* unter 16 px zoomt iOS beim Fokus hinein */\n'+
     '    .blase{right:16px;bottom:calc(16px + var(--leiste,0px) + env(safe-area-inset-bottom))}\n'+
-    '    /* Gestern stand hier width:calc(100vw - 32px) — dadurch lief die\n'+
-    '       Sprechblase ueber die volle Breite und wirkte wie ein Banner der Seite\n'+
-    '       statt wie eine Aeusserung von Pria. */\n'+
-    '    .teaser{right:16px;bottom:calc(92px + var(--leiste,0px) + env(safe-area-inset-bottom));\n'+
-    '      width:min(300px,calc(100vw - 56px))}\n'+
-    '    .teaser p{font-size:15.5px;line-height:1.5}\n'+
+    '    /* Die Pille laeuft bis kurz vor den linken Rand — auf dem Handy ist\n'+
+    '       Platz knapp, und zwei Zeilen Frage brauchen ihn. */\n'+
+    '    .pille{right:16px;bottom:calc(16px + var(--leiste,0px) + env(safe-area-inset-bottom));\n'+
+    '      max-width:calc(100vw - 32px)}\n'+
+    '    .pille span{font-size:14.5px}\n'+
     '  }\n'+
     '  /* Solange der Chat offen ist, soll die Seite darunter nicht mitscrollen. */';
   W.appendChild(stil);
@@ -302,15 +300,8 @@
   document.head.appendChild(aussen);
 
   var huelle = document.createElement('div');
-  huelle.innerHTML = '<div class="teaser" id="teaser">\n'+
-    '  <button class="tzu" id="tzu" aria-label="Hinweis schließen">✕</button>\n'+
-    '  <p>Darf ich Ihnen zeigen, was eine 24-Stunden-Betreuung <b>bei Ihnen</b> kosten würde?\n'+
-    '     Das dauert zwei Minuten.</p>\n'+
-    '  <div class="tchips">\n'+
-    '    <button class="chip stark" id="tja">Ja, gern</button>\n'+
-    '    <button class="chip soft" id="tnein">Andere Frage</button>\n'+
-    '  </div>\n'+
-    '</div>\n'+
+  huelle.innerHTML = '<!-- WIDGET AB HIER — alles darueber ist die angedeutete Website -->\n'+
+    '<button class="pille" id="pille" aria-label="Frage an Pria stellen"><span id="pillentext"></span></button>\n'+
     '\n'+
     '<button class="blase" id="blase" aria-label="Beratung öffnen">\n'+
     '  <span class="mark"></span><span class="punkt"></span>\n'+
@@ -346,7 +337,11 @@ const ruhig=matchMedia('(prefers-reduced-motion: reduce)').matches;
 const thread=W.getElementById('thread'),chips=W.getElementById('chips'),prog=W.getElementById('prog');
 const pause=ms=>new Promise(r=>setTimeout(r,ms));
 const tipp=(m=8)=>navigator.vibrate&&navigator.vibrate(m);
-let modus='beraten', schritt=0, offeneFrage=null, gestartet=false;
+let modus='beraten', offeneFrage=null, gestartet=false;
+// Wie weit ist der Kunde? Nicht mitzaehlen, sondern am Zustand ablesen —
+// so bleibt es auch nach Nachtraegen und Rueckfragen richtig.
+let kontaktOffen=false, uebergeben=false;
+const frageNummer=s=>s?FLOW.indexOf(s)+1:0;
 
 /* ─── Bausteine ───────────────────────────────────────────────────── */
 function avatar(src,mitBlinzeln,lebendig){
@@ -596,7 +591,7 @@ async function sozialAntwort(s){
   if(offeneFrage){
     const o=offeneFrage;
     await pause(ruhig?0:300);
-    await sagen('Wir waren hier: <b>'+o.q+'</b>','Frage '+(schritt+1)+' von '+FLOW.length);
+    await sagen('Wir waren hier: <b>'+o.q+'</b>','Frage '+frageNummer(o)+' von '+FLOW.length);
     return setChips(o.o.map(([v,l])=>({t:l,f:b=>waehle(o,v,l,b)})));
   }
   beraterChips();
@@ -676,9 +671,43 @@ const FLOW=[
 ];
 const antwort={};
 
+/* Wo stehen wir? Nicht mitzaehlen, sondern nachsehen: die erste Frage,
+   die noch keine Antwort hat. Sonst faengt der Lauf nach jeder Rueckfrage
+   wieder bei eins an, obwohl alles laengst notiert ist. */
+function naechsteOffene(){ return FLOW.find(f=>antwort[f.k]===undefined) || null; }
+function fortschritt(){
+  const da=FLOW.filter(f=>antwort[f.k]!==undefined).length;
+  prog.style.width=Math.round(da/FLOW.length*100)+'%';
+  return da;
+}
+
 async function starteFunnel(grund,chip,echo){
-  tipp(); modus='fragen'; schritt=0; offeneFrage=null;
+  tipp(); modus='fragen'; offeneFrage=null;
   protokoll('system','Fragenlauf gestartet',{ereignis:'funnel',grund});
+
+  /* Schon alles beantwortet? Dann NICHT von vorn (Martin, 21.08.): das war
+     der aergerlichste Fehler — Pria wusste, dass die Angaben stehen, und
+     fragte sie trotzdem noch einmal ab. Je nachdem, wie weit der Kunde ist,
+     fuehrt sie stattdessen dorthin, wo es weitergeht. */
+  if(uebergeben){
+    if(echo!==false) await flug(chip, echo || 'Angebot');
+    await sagen('Ihr <b>Kundenportal</b> ist schon offen — dort stehen Ihr Preis und die Pflegekräfte. '+
+                'Den Link haben Sie zusätzlich per E-Mail.');
+    return beraterChips();
+  }
+  if(kontaktOffen){
+    if(echo!==false) await flug(chip, echo || 'Angebot');
+    await sagen('Ihre Angaben habe ich alle beisammen — es fehlen nur noch <b>Ihre Kontaktdaten</b> '+
+                'im Feld oben, dann sehen Sie Preis und Pflegekräfte sofort.');
+    runter();
+    return;
+  }
+  if(!naechsteOffene()){
+    if(echo!==false) await flug(chip, echo || 'Angebot');
+    await sagen('Ihre <b>sechs Angaben</b> stehen schon — dann rechne ich Ihnen das jetzt aus.');
+    fortschritt();
+    return matching();
+  }
   // echo===false: der Kunde hat es schon selbst geschrieben („rechnet mir das
   // mal durch") — dann kein zweites Etikett in seinem Namen.
   if(echo!==false) await flug(chip, echo || (grund==='preis'?'Preis berechnen':'Pflegekräfte ansehen'));
@@ -687,20 +716,25 @@ async function starteFunnel(grund,chip,echo){
   // Kurz halten (Martin, 21.08.): einmal auf die Situation eingehen, dann das
   // Angebot. Was danach passiert, sieht der Kunde ohnehin — es vorher zu
   // erklären ist eine Blase zu viel.
-  await sagen(grund==='preis'
-    ? 'Sehr gern — das hängt ganz von Ihrer Situation ab. <b>Sechs kurze Fragen</b>, dann haben Sie Ihren Preis. Ich fange einfach an.'
-    : 'Sehr gern — wer zu Ihnen passt, hängt von Ihrer Situation ab. <b>Sechs kurze Fragen</b>, dann zeige ich sie Ihnen. Ich fange einfach an.');
+  // Teilweise beantwortet (etwa nach einem Nachtrag): dort weitermachen,
+  // nicht bei eins.
+  const schonDa=FLOW.filter(f=>antwort[f.k]!==undefined).length;
+  await sagen(schonDa
+    ? 'Sehr gern. <b>' + (FLOW.length-schonDa) + ' kurze Fragen</b> fehlen noch, den Rest habe ich schon.'
+    : (grund==='preis'
+      ? 'Sehr gern — das hängt ganz von Ihrer Situation ab. <b>Sechs kurze Fragen</b>, dann haben Sie Ihren Preis. Ich fange einfach an.'
+      : 'Sehr gern — wer zu Ihnen passt, hängt von Ihrer Situation ab. <b>Sechs kurze Fragen</b>, dann zeige ich sie Ihnen. Ich fange einfach an.'));
+  fortschritt();   // schon Beantwortetes soll man am Balken sehen
   naechste();
 }
 async function naechste(){
-  if(schritt<FLOW.length){
-    // Kurz durchatmen zwischen Reaktion und nächster Frage — sonst prasselt es.
-    await pause(ruhig?0:520);
-    const s=FLOW[schritt];
-    await sagen(s.q,'Frage '+(schritt+1)+' von '+FLOW.length+(s.hinweis?'<br>'+s.hinweis:''));
-    offeneFrage=s;
-    setChips(s.o.map(([v,l])=>({t:l,f:b=>waehle(s,v,l,b)})));
-  } else matching();
+  const s=naechsteOffene();
+  if(!s) return matching();
+  // Kurz durchatmen zwischen Reaktion und nächster Frage — sonst prasselt es.
+  await pause(ruhig?0:520);
+  await sagen(s.q,'Frage '+(FLOW.indexOf(s)+1)+' von '+FLOW.length+(s.hinweis?'<br>'+s.hinweis:''));
+  offeneFrage=s;
+  setChips(s.o.map(([v,l])=>({t:l,f:b=>waehle(s,v,l,b)})));
 }
 /* Anschluss an die offene Frage — angekündigt, nicht heimlich übersprungen. */
 async function weiterFrage(){
@@ -721,7 +755,7 @@ async function waehle(s,v,l,chip,ausText){
   const t=(s.r||{})[v]||(s.r||{})['_'];
   if(t) await sagen(t, ausText?'Notiert: '+l:'');
   else if(ausText) await sagen('Notiert: <b>'+l+'</b>');
-  schritt++;prog.style.width=Math.round(schritt/(FLOW.length+1)*100)+'%';
+  fortschritt();
   naechste();
 }
 async function matching(){
@@ -785,6 +819,7 @@ function kontakt(){
    '<button class="go" id="abs" disabled>Angebot &amp; Pflegekräfte ansehen</button>'+
    '<p class="klein">Kostenlos · unverbindlich · kein Vertrag vor Ihrer Auswahl</p></div>';
   thread.appendChild(r);runter();
+  kontaktOffen=true;
 
   /* Der Knopf bleibt gesperrt, bis alle drei Felder etwas hergeben. Vorher
      liess er sich drücken und tat nichts — das ist genau der tote Knopf,
@@ -805,6 +840,7 @@ function kontakt(){
   go.onclick=async()=>{
     tipp(12);
     // DIE Marke im Verlauf: alles davor ist „vor Lead", alles danach „nach Lead".
+    kontaktOffen=false; uebergeben=true;
     protokoll('system','Kontaktdaten abgeschickt',{ereignis:'lead',antworten:Object.assign({},antwort)});
     spuelen();
     bub('Meine Daten stehen drin ✔',true);
@@ -913,10 +949,10 @@ async function uebernehmen(s,v,label){
   antwort[s.k]=v;
   await sagen((schonDa?'Danke, gut dass Sie das sagen — ich ändere das: ':'Das notiere ich gleich mit: ')+
               '<b>'+(s.kurz||s.q)+': '+label+'</b>');
-  if(offeneFrage && offeneFrage.k===s.k){ schritt++; prog.style.width=Math.round(schritt/(FLOW.length+1)*100)+'%'; offeneFrage=null; return naechste(); }
+  if(offeneFrage && offeneFrage.k===s.k){ fortschritt(); offeneFrage=null; return naechste(); }
   if(offeneFrage){
     await pause(ruhig?0:380);
-    await sagen('Und weiter bei <b>'+offeneFrage.q+'</b>','Frage '+(schritt+1)+' von '+FLOW.length);
+    await sagen('Und weiter bei <b>'+offeneFrage.q+'</b>','Frage '+frageNummer(offeneFrage)+' von '+FLOW.length);
     const o=offeneFrage;
     return setChips(o.o.map(([w,l])=>({t:l,f:b=>waehle(o,w,l,b)})));
   }
@@ -943,7 +979,10 @@ let untertitel='KI-gestützte Assistentin', ohneModell=false;
 const verlauf=[];
 
 function zustand(){
-  return {modus, offeneFrage:offeneFrage?offeneFrage.k:null, schritt, antworten:Object.assign({},antwort)};
+  return {modus, offeneFrage:offeneFrage?offeneFrage.k:null,
+    schritt:FLOW.filter(f=>antwort[f.k]!==undefined).length,
+    kontaktdatenOffen:kontaktOffen, schonUebergeben:uebergeben,
+    antworten:Object.assign({},antwort)};
 }
 async function priaFragen(text){
   // 45 statt 20 s: Opus 5 mit dem grossen Systemprompt braucht ueber Mobilfunk
@@ -1143,89 +1182,39 @@ W.getElementById('frei').addEventListener('keydown',e=>{if(e.key==='Enter'){cons
 
 /* ─── Öffnen, Schließen, Ansprache ────────────────────────────────── */
 const blase=W.getElementById('blase'), panel=W.getElementById('panel'),
-      teaser=W.getElementById('teaser');
-let teaserTimer=null, teaserGezeigt=false;
+      pille=W.getElementById('pille'), pillentext=W.getElementById('pillentext');
+// Pria schlummert, bis der Kunde am Formular vorbei ist (siehe unten).
+let darfZeigen=false;
 
-function zeigeTeaser(){
-  if(teaserGezeigt||panel.classList.contains('on')) return;
-  teaserGezeigt=true; teaser.classList.add('on');
-  // Nach einer Weile zieht sie sich von selbst zurück — wer nicht antwortet,
-  // will nicht angesprochen werden.
-  teaserTimer=setTimeout(versteckeTeaser,15000);
-}
-function versteckeTeaser(){
-  clearTimeout(teaserTimer);
-  if(!teaser.classList.contains('on')) return;
-  teaser.classList.add('weg');
-  setTimeout(()=>teaser.classList.remove('on','weg'),340);
-}
-/* Erst ansprechen, wenn jemand wirklich liest: eine Bildschirmhöhe
-   gescrollt, und nur ein einziges Mal. */
-addEventListener('scroll',()=>{
-  if(teaserGezeigt) return;
-  const scrollbar=document.documentElement.scrollHeight-innerHeight;
-  if(scrollY > Math.min(innerHeight*0.85, scrollbar*0.45)) zeigeTeaser();
-},{passive:true});
-
-/* ─── Fremde Leisten am unteren Rand ────────────────────────────────
-   Auf der echten Seite liegt unten der Cookie-Hinweis — und der gehoert
-   obenauf, nicht Pria. Statt uns darueberzuschieben, ruecken wir so weit
-   nach oben, wie die Leiste hoch ist. Erkannt wird sie ueber den Punkt
-   unten rechts: was dort liegt und fest positioniert ist, ist die Leiste.
-   Verschwindet sie, rutscht Pria von selbst zurueck. */
-const wurzelEl = (typeof W !== 'undefined' && W.host) ? W.host : document.body;
-function leisteHoehe(){
-  const punkte = document.elementsFromPoint
-    ? document.elementsFromPoint(Math.round(innerWidth - 40), innerHeight - 6) : [];
-  for(const e of punkte){
-    if(e === wurzelEl || wurzelEl.contains(e)) continue;
-    const st = getComputedStyle(e);
-    if(st.position !== 'fixed' && st.position !== 'sticky') continue;
-    const r = e.getBoundingClientRect();
-    // Eine Leiste, kein Vollbild-Overlay und kein Zierstreifen.
-    if(r.height >= 36 && r.height < innerHeight * 0.5) return Math.round(r.height + 10);
+/* ─── Die Pille: eine Frage auf Kopfhöhe ────────────────────────────
+   Vorbild bild.de: kein Aufpoppen, sondern ein ruhiger Streifen neben
+   dem Kopf. Beim Weiterscrollen steht die nächste Frage drin — so
+   merkt man, dass da jemand mitliest, ohne dass etwas im Weg ist. */
+let frageNr=-1;
+function pilleSetzen(i){
+  if(i===frageNr) return;
+  const text=SCHNELLFRAGEN[i%SCHNELLFRAGEN.length];
+  if(frageNr<0){                       // erster Auftritt: ohne Wechselblende
+    pillentext.textContent=text; frageNr=i; pille.classList.add('on');
+    return;
   }
-  return 0;
+  frageNr=i;
+  pille.classList.add('wechselt');
+  setTimeout(()=>{ pillentext.textContent=text; pille.classList.remove('wechselt'); }, ruhig?0:220);
 }
-let leisteJetzt = -1;
-function leistePruefen(){
-  if(panel.classList.contains('on')) return;      // offen deckt Pria ohnehin alles
-  const h = leisteHoehe();
-  if(h === leisteJetzt) return;
-  leisteJetzt = h;
-  wurzelEl.style.setProperty('--leiste', h + 'px');
+/* Wie weit ist der Leser? Alle rund anderthalb Bildschirmhöhen die
+   nächste Frage — dicht genug, um aufzufallen, weit genug, um nicht
+   zu flackern. */
+function pillePruefen(){
+  if(!darfZeigen||panel.classList.contains('on')) return;
+  pilleSetzen(Math.floor(scrollY/(innerHeight*1.5)));
 }
+addEventListener('scroll',pillePruefen,{passive:true});
 
-/* ─── Handy: Tastatur, Systemleisten, Seite dahinter ────────────────
-   Auf dem Handy schrumpft iOS beim Tippen NICHT die Seite, sondern schiebt
-   sie hoch — 100dvh bleibt 100dvh und das Eingabefeld verschwindet hinter
-   der Tastatur. visualViewport meldet, was wirklich sichtbar ist; danach
-   richten wir das Panel aus. Auf dem Desktop bleibt alles unberührt. */
-const vv = window.visualViewport;
-function handyLayout(){
-  if(!panel.classList.contains('on')) return;
-  const ausCss=()=>{ panel.style.height=''; panel.style.bottom=''; panel.style.transform=''; };
-  if(!vv || innerWidth>640) return ausCss();
-  // NUR eingreifen, wenn die Tastatur wirklich Platz wegnimmt. Vorher hat der
-  // Handler die Höhe immer gesetzt — und damit auch dann, wenn visualViewport
-  // etwas anderes meldet als das, was das CSS ohnehin richtig macht. Alles
-  // unter 120 px Differenz ist Adressleiste oder Messrauschen, keine Tastatur.
-  const verdeckt = innerHeight - vv.height - vv.offsetTop;
-  if(verdeckt < 120) return ausCss();
-  // Die Höhe gewinnt nur, wenn die Unterkante losgelassen wird — sonst zieht
-  // bottom:0 das Panel wieder auf volle Länge.
-  panel.style.bottom = 'auto';
-  panel.style.height = vv.height + 'px';
-  panel.style.transform = 'translateY(' + Math.round(vv.offsetTop) + 'px)';
-  runter();
-}
-if(vv){ vv.addEventListener('resize',handyLayout); vv.addEventListener('scroll',handyLayout); }
-addEventListener('orientationchange',()=>setTimeout(handyLayout,260));
-// Die Öffnungsanimation überschreibt sonst jede Inline-Höhe (fill: both).
-panel.addEventListener('animationend',()=>{ panel.classList.add('fertig'); handyLayout(); });
+function versteckePille(){ pille.classList.remove('on'); }
 
 async function oeffne(start){
-  tipp(); versteckeTeaser();
+  tipp(); versteckePille();
   blase.classList.add('weg'); panel.classList.add('on');
   document.body.classList.add('chat-offen');
   // Auch ohne Animation (reduzierte Bewegung) muss die Höhe stimmen.
@@ -1248,10 +1237,50 @@ if(window.MutationObserver) new MutationObserver(()=>{
   window.__leisteTimer=setTimeout(leistePruefen,220);
 }).observe(document.body,{childList:true,subtree:false});
 
+/* ─── Auftritt: erst nach dem Formular ──────────────────────────────
+   Genau die Regel, die der WhatsApp-Knopf vorher hatte (Martin, 08.07.):
+   Solange eine Kostenrechner-Karte im Bild ist, stoert ein schwebender
+   Knopf nur den Weiter-Knopf darunter. Erst wenn der Kunde daran vorbei
+   gescrollt ist, meldet sich Pria.
+   Gibt es keine solche Karte — etwa auf der Prototyp-Seite — genuegt eine
+   Bildschirmhoehe Scrollen. */
+blase.classList.add('schlummert');
+pille.classList.add('schlummert');
+function zeigen(an){
+  if(an===darfZeigen) return;
+  darfZeigen=an;
+  blase.classList.toggle('schlummert',!an);
+  pille.classList.toggle('schlummert',!an);
+  if(an) pillePruefen(); else versteckePille();
+}
+/* SEITE statt document: im Widget lenkt der Erzeuger jedes
+   `document.querySelector*` in den Shadow-DOM um — die Kostenrechner-Karten
+   liegen aber in der SEITE. */
+const SEITE=document;
+const karten=SEITE.querySelectorAll('[data-calculator-card], #calculator-form');
+const imBild=new Set();
+if(karten.length && window.IntersectionObserver){
+  const beobachter=new IntersectionObserver(eintraege=>{
+    for(const e of eintraege){ e.isIntersecting?imBild.add(e.target):imBild.delete(e.target); }
+    pruefeAuftritt();
+  },{threshold:0});
+  karten.forEach(k=>beobachter.observe(k));
+}
+/* ZWEI Bedingungen, und beide muessen erfuellt sein:
+     1. Es wurde ueberhaupt gescrollt — das ist die Regel, um die es geht.
+     2. Keine Kostenrechner-Karte steht im Bild (dieselbe Ruecksicht, die
+        der WhatsApp-Knopf hatte: sonst liegt der Knopf auf dem Weiter-Knopf).
+   Die zweite allein hat nicht getragen: `IntersectionObserver` meldet in
+   Hintergrund-Tabs nichts, und "keine Meldung" sah aus wie "keine Karte im
+   Bild" — Pria stand dann sofort da, ohne dass jemand gescrollt hatte. */
+function pruefeAuftritt(){
+  zeigen(scrollY > Math.min(innerHeight*0.6, 420) && imBild.size===0);
+}
+addEventListener('scroll',pruefeAuftritt,{passive:true});
+pruefeAuftritt();
+
 blase.onclick=()=>oeffne();
-W.getElementById('tja').onclick=()=>oeffne('preis');
-W.getElementById('tnein').onclick=()=>oeffne();
-W.getElementById('tzu').onclick=e=>{e.stopPropagation();versteckeTeaser();};
+pille.onclick=async()=>{ const f=pillentext.textContent; await oeffne(); frage(f); };
 W.getElementById('zu').onclick=()=>{
   tipp();
   panel.classList.remove('on','fertig');
@@ -1263,6 +1292,5 @@ W.getElementById('zu').onclick=()=>{
 /* Avatare setzen: in der Blase begrüßt sie, im Kopf ist sie ruhig. */
 W.querySelector('.bar .mark').innerHTML=avatar(null,true,true);
 W.querySelector('.blase .mark').innerHTML=avatar(null,true,true);
-W.querySelector('.teaser').insertAdjacentHTML('afterbegin','');
 
 })();

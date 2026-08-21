@@ -136,6 +136,11 @@ Wähle den \`typ\`:
 - **preis** — Der Kunde will den Preis wissen oder ein Angebot. Der Chat startet die sechs
   Fragen und hat dafür einen eigenen Einstiegssatz: lass \`text\` LEER, sonst steht zweimal
   dasselbe da.
+  **Sieh vorher in den Stand!** Liegen die Angaben schon vor, fängt der Chat NICHT von vorn
+  an — er rechnet oder zeigt aufs Kontaktfeld. Kündige also nie neue Fragen an, wenn der
+  Stand sagt, dass alles da ist. Und wenn der Kunde nach den sechs Fragen etwas anderes
+  fragt: erst die Frage beantworten (typ=wissen), dann leise auf das Angebot zeigen — nicht
+  den Ablauf neu starten.
 - **kraefte** — Der Kunde will Pflegekräfte / Profile sehen. Wie oben, \`text\` leer.
 - **unklar** — Du hast die Nachricht wirklich nicht verstanden. Dann RATE NICHT: stelle in
   \`text\` eine echte, konkrete Rückfrage. „unklar" ist der letzte Ausweg, nicht der erste.
@@ -192,6 +197,10 @@ export type PriaZustand = {
   offeneFrage?: string | null;
   schritt?: number;
   antworten?: Record<string, string>;
+  // Wie weit der Kunde ist — ohne das bot Pria die sechs Fragen erneut an,
+  // obwohl sie laengst beantwortet waren.
+  kontaktdatenOffen?: boolean;
+  schonUebergeben?: boolean;
 };
 
 export type PriaAntwort = {
@@ -215,10 +224,17 @@ export function zustandText(z: PriaZustand = {}): string {
     const l = f && (f.o.find((o) => o[0] === v) || [])[1];
     return `${k}=${v}${l ? ` (${l})` : ''}`;
   });
+  const alleDa = FLOW.every((f) => (z.antworten || {})[f.k] !== undefined);
   return [
     `Modus: ${z.modus === 'fragen' ? 'die sechs Fragen laufen' : 'freie Beratung'}`,
     offen ? `Offene Frage: ${offen.k} — „${offen.q}"` : 'Offene Frage: keine',
     gesetzt.length ? `Schon notiert: ${gesetzt.join(', ')}` : 'Schon notiert: nichts',
+    // Ohne diese Zeilen bot Pria die sechs Fragen noch einmal an, obwohl der
+    // Kunde sie laengst beantwortet hatte (Martin, 21.08.).
+    z.schonUebergeben ? 'Stand: Kontaktdaten abgeschickt, das Kundenportal ist offen.'
+      : z.kontaktdatenOffen ? 'Stand: alle Angaben da, das Kontaktfeld steht im Chat — es fehlen nur noch Name, E-Mail und Telefon.'
+      : alleDa ? 'Stand: alle sechs Angaben liegen vor, das Angebot kann berechnet werden.'
+      : 'Stand: es fehlen noch Angaben.',
   ].join('\n');
 }
 
