@@ -123,9 +123,7 @@ Wähle den \`typ\`:
   beantworteten (Korrektur: „ach, ich wohne ja mit im Haus") oder zu einer, die noch kommt.
   Setze \`feld\` und \`werte\`. Auch hier gilt: eine mitgestellte Frage gehört beantwortet.
 - **wissen** — Eine echte Frage rund um Betreuung, Preis, Vertrag, Ablauf, Pflegegrad.
-  Antworte in \`text\` aus dem Wissen. \`quelle\` nur als Ja/Nein-Signal: steht die Antwort so
-  auf unserer Website, schreib \`primundus.de\` — sonst leer. Abschnittsnummern, Dateinamen
-  oder Paragrafen gehören NIE dorthin, die sieht der Kunde.
+  Antworte in \`text\` aus dem Wissen.
 - **sozial** — Begrüßung, Dank, Verabschiedung, „bist du ein Mensch?", aber auch Erschöpfung,
   Überforderung, Trauer, Ärger. Hier wird NICHT verkauft. Erst dasein, dann höchstens leise
   einen nächsten Schritt anbieten.
@@ -183,8 +181,7 @@ export const WERKZEUG = {
         description: 'Nur bei typ=antwort/vorschlag/nachtrag: welche der sechs Fragen. Sonst "".' },
       werte: { type: 'array', items: { type: 'string' },
         description: 'Nur bei typ=antwort/nachtrag: erlaubte Werte, leichteste zuerst. Sonst [].' },
-      quelle: { type: 'string',
-        description: 'Nur bei typ=wissen und nur der Wert "primundus.de". Sonst "".' },
+      quelle: { type: 'string', description: 'Wird nicht mehr verwendet — immer "".' },
       chips: { type: 'array', items: { type: 'string' },
         description: 'Höchstens drei Vorschläge in der Ich-Form des Kunden. Sonst [].' },
     },
@@ -265,9 +262,10 @@ export function pruefen(roh: any): PriaAntwort {
       : roh?.text),
     feld: f ? feldRoh : '',
     werte,
-    // Der Kunde sieht die Quelle — deshalb NIE durchreichen, was das Modell
-    // schreibt: es zitiert sonst Abschnittsnummern und Dateinamen.
-    quelle: String(roh?.quelle || '').trim() ? 'primundus.de' : '',
+    // Quellenzeile abgeschafft (Martin, 21.08.) — im Gespräch wirkte sie wie ein
+    // Beleg-Anhängsel. Das Feld bleibt im Schema, damit das Modell nicht auf ein
+    // unbekanntes Feld ausweicht; ausgeliefert wird es nicht.
+    quelle: '',
     chips: chips.slice(0, 3).map((c: unknown) => String(c).replace(/[<>]/g, '').slice(0, 60)),
   };
 }

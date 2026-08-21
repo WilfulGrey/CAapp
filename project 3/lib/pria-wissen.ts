@@ -258,12 +258,19 @@ wie „kein Vermittler", ohne es zu verneinen. Pria benutzt sie.*
 > *Quelle: Vertrag §1.2 und §5. Diese Grenze nie verwischen.*
 
 **5.3 — Ist wirklich 24 Stunden jemand im Dienst?**
-> Die Kraft **wohnt bei Ihnen** und ist deshalb rund um die Uhr da, wenn etwas ist.
-> Gearbeitet wird im Schnitt nicht mehr als 40 Stunden in der Woche — außerhalb der
-> Arbeitszeit darf sie das Haus verlassen, und sie braucht ihre Ruhezeiten. Wer
-> tatsächlich durchgehend Pflege rund um die Uhr braucht, ist mit einem Pflegedienst
-> im Rücken oder stationär besser aufgehoben; das sage ich Ihnen lieber vorher.
-> *Quelle: Vertrag §1.9. Häufigste Fehlvorstellung überhaupt — ehrlich beantworten.*
+> Die Kraft **wohnt bei Ihnen** — sie ist also da, wenn etwas ist, Tag und Nacht.
+> Gearbeitet wird im Schnitt nicht mehr als 40 Stunden in der Woche; außerhalb der
+> Arbeitszeit hat sie frei und darf auch einmal aus dem Haus, und ihre Ruhezeiten
+> braucht sie wie jeder andere auch.
+> **Ton (Martin, 21.08.): NICHT abraten.** Durchgehende Pflege ohne jede Pause
+> braucht praktisch niemand — was Familien brauchen, ist jemand, der da ist, wenn
+> die Angehörigen es nicht können. Genau das leisten wir. Steht daneben noch
+> medizinische Behandlungspflege an, ergänzt der ambulante Pflegedienst das — das
+> ist bei vielen unserer Kunden so und funktioniert gut.
+> Also: erklären, was die Kraft leistet, und nie in Richtung „dann sind Sie
+> woanders besser aufgehoben" drehen. Wer wirklich einen Sonderfall hat, klärt
+> das mit Ilka — dahin verweisen, nicht ins Heim.
+> *Quelle: Vertrag §1.9.*
 
 **5.4 — Darf sie Auto fahren?**
 > Wenn es vereinbart ist, ja. Bei Übergabe eines Fahrzeugs gilt: Ansprüche daraus

@@ -147,10 +147,6 @@
     box-shadow:0 1px 2px rgba(217,90,76,.25),0 4px 14px rgba(231,111,99,.28)}
   .bub b{font-weight:650}
   .bub small{display:block;font-size:12.5px;color:var(--muted);margin-top:5px;line-height:1.5}
-  .quelle{display:inline-block;margin-top:9px;font-size:11px;color:var(--gold);letter-spacing:.2px;
-    border:1px solid #EBE4D8;background:#FBF8F2;border-radius:999px;padding:3px 10px;text-decoration:none;
-    transition:background .18s var(--weich)}
-  .quelle:hover{background:#F5EFE4}
 
   .typing{display:flex;gap:4.5px;padding:14px 16px;align-items:center}
   .typing i{width:6px;height:6px;border-radius:50%;background:#C6C0B7;animation:puls 1.3s var(--weich) infinite}
@@ -1068,7 +1064,7 @@ async function verarbeite(r){
       // Menschen antworten und fragen im selben Satz. Die mitgestellte Frage
       // wird zuerst beantwortet — sonst verschluckt Pria sie und wirkt taub.
       if(r.text){ chips.innerHTML='';
-        sagenJetzt(r.text+(r.quelle?'<a class="quelle" href="#">Quelle: '+r.quelle+'</a>':''));
+        sagenJetzt(r.text);
         await pause(ruhig?0:420); }
       if(r.werte.length>1)
         return mehrdeutig(s,r.werte, offen ? (v,l,b)=>waehle(s,v,l,b||null)
@@ -1089,7 +1085,9 @@ async function verarbeite(r){
   if(r.typ==='kraefte') return starteFunnel('kraefte',null,false);
 
   chips.innerHTML='';
-  if(r.text) sagenJetzt(r.text+(r.quelle?'<a class="quelle" href="#">Quelle: '+r.quelle+'</a>':''));
+  // Keine Quellenzeile mehr (Martin, 21.08.): im Gespräch wirkt sie wie ein
+  // Beleg-Anhängsel, das niemand anklickt. Wer nachfragt, bekommt die Antwort.
+  if(r.text) sagenJetzt(r.text);
 
   if(r.typ==='mensch'){
     return setChips([
@@ -1192,9 +1190,7 @@ async function frageLokal(text){
   }
 
   beantwortet.add(e);
-  // Beide Wege nennen dieselbe Quelle — dem Kunden genügt die Website
-  // (Martin, 21.08.). Die Seitennamen in e.q bleiben als Notiz erhalten.
-  await sagen(e.a+(e.q?'<a class="quelle" href="#">Quelle: primundus.de</a>':''));
+  await sagen(e.a);
 
   // Nach den kaufnahen Antworten die Abzweigung anbieten, statt sie
   // im Chip-Wald zu verstecken.
