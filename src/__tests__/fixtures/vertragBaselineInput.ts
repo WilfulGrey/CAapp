@@ -27,7 +27,7 @@ export const BASELINE_INPUT: VertragInput = {
   vertragsbeginn: '24.08.2026',
   voraussAbreise: '13.10.2026',
   tagessatz: 'EUR 123,00',
-  // dl celowo pominięty → defaulty 'Kamila Bilska-Wabik' / 'Vitanas Group'
+  // dl celowo pominięty → defaulty 'Karolina Jakubowska' / 'Geschäftsführerin'
 };
 
 export const BASELINE_OPTS: VertragHtmlOptions = {

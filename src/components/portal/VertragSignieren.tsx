@@ -31,7 +31,7 @@ const DUMMY: VertragsDaten = {
   vertragsbeginn: '19.05.2026',
   voraussAbreise: '19.07.2026',
   tagessatz: 'EUR 95,00',
-  dl: { name: 'Kamila Bilska-Wabik', rolle: 'Vitanas Group' }, // signaturImg → echter Scan später
+  dl: { name: 'Karolina Jakubowska', rolle: 'Geschäftsführerin' }, // signaturImg → echter Scan später
 };
 
 // Statische §§ — Wortlaut 1:1 dem Mustervertrag (dist/primundus-mustervertrag.pdf)
@@ -153,7 +153,7 @@ const PARAGRAPHEN_2: { titel: string; punkte: Punkt[] }[] = [
     titel: '§ 8 Widerrufsrecht',
     punkte: [
       {
-        text: 'Dem AG steht das Recht zu, diesen Vertrag ohne Angabe von Gründen innerhalb von 14 Tagen in Textform zu widerrufen. Die Widerrufsfrist beginnt mit Unterzeichnung dieses Vertrages. Widerruf an: Primundus Deutschland (VITANAS CARE LTD HOME SK), ul. Poznańska 21/48, 00-685 Warszawa.',
+        text: 'Dem AG steht das Recht zu, diesen Vertrag ohne Angabe von Gründen innerhalb von 14 Tagen in Textform zu widerrufen. Die Widerrufsfrist beginnt mit Unterzeichnung dieses Vertrages. Widerruf an: PRIMUNDUS Sp. z o.o., Poznańska 21/48, 00-685 Warschau, Polen.',
       },
       {
         text: 'Im Falle eines wirksamen Widerrufs sind die beiderseits empfangenen Leistungen zurückzugewähren. Der AG ist verpflichtet, dem DL Wertersatz zu leisten (z. B. entstandene Reisekosten, pauschal EUR 125,00).',
@@ -438,9 +438,9 @@ export const VertragSignieren: FC<{
 
           <div className="rounded-xl border border-gray-200 bg-[#FAF8F4] px-4 py-3 mb-2 print:break-inside-avoid">
             <p className="text-[11px] font-bold tracking-wider text-gray-500 mb-1">DIENSTLEISTER (DL)</p>
-            <p className="text-[15px] font-bold text-gray-900">PRIMUNDUS Deutschland</p>
-            <p className="text-[12px] text-gray-600">VITANAS CARE LTD HOME SK · ul. Poznańska 21/48, 00-685 Warszawa</p>
-            <p className="text-[12px] text-gray-600">NIP: 7011301447 · REGON: 544074862</p>
+            <p className="text-[15px] font-bold text-gray-900">PRIMUNDUS Sp. z o.o.</p>
+            <p className="text-[12px] text-gray-600">Poznańska 21/48, 00-685 Warschau, Polen</p>
+            <p className="text-[12px] text-gray-600">KRS: 0001259402 · NIP: 7011326714</p>
           </div>
           <p className="text-center text-[12px] text-gray-500">im Folgenden <strong>Dienstleister (DL oder PRIMUNDUS)</strong> genannt.</p>
         </div>
@@ -519,7 +519,7 @@ export const VertragSignieren: FC<{
                   <span className="text-2xl text-[#1f3a8a]" style={{ fontFamily: '"Snell Roundhand","Segoe Script","Brush Script MT",cursive' }}>{daten.dl.name}</span>
                 )}
               </div>
-              <div className="border-t border-gray-400 pt-1 text-[11px] text-gray-500">i. A. {daten.dl.name}, {daten.dl.rolle} · Warszawa, {daten.datum}</div>
+              <div className="border-t border-gray-400 pt-1 text-[11px] text-gray-500">i. A. {daten.dl.name}, {daten.dl.rolle} · Warschau, {daten.datum}</div>
             </div>
           </div>
 
