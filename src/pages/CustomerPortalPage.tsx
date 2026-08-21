@@ -1418,6 +1418,11 @@ const CustomerPortalPage: FC = () => {
       // ohne Info"). Quelle ist dasselbe nurse-Objekt wie in der Portal-Karte,
       // damit die Box in Mail = Portal denselben Inhalt zeigt.
       caregiver_age: targetApp?.nurse?.age,
+      // Rohwert UND Wort — das nurse-Objekt haelt beides nebeneinander
+      // (language.bucket + language.level). Der Rohwert erlaubt es dem
+      // Mailversand, spaeter frisch zu beschriften statt einen alten
+      // Text zu zeigen (Vorfall 19.08.: "Deutsch A2-B1" in Nachfassmails).
+      caregiver_germany_skill: targetApp?.nurse?.language?.bucket,
       caregiver_german_level: targetApp?.nurse?.language?.level,
       caregiver_einsatz_count: targetApp?.nurse?.history?.assignments,
       caregiver_years_experience: targetApp?.nurse?.experienceYears,
@@ -3750,7 +3755,7 @@ const CustomerPortalPage: FC = () => {
             <div className="flex items-center gap-4">
               <div className="relative flex-shrink-0">
                 <img
-                  src="/ilka.webp"
+                  src="/ilka-wysocki-2026.webp"
                   alt="Ilka Wysocki"
                   className="w-[72px] h-[72px] rounded-2xl object-cover object-top"
                   style={{border:'1.5px solid #F0C4B4'}}

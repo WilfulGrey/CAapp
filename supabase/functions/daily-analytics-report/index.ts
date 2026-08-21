@@ -21,6 +21,7 @@ import {
   fetchAgentNotes,
   fetchBookedCustomers,
   fetchDailyStats,
+  fetchAdsSpend,
   fetchPeriodStats,
   fetchTotalLeads, fetchMailHealth } from "./queries.ts";
 import { buildReportEmail } from "./template.ts";
@@ -128,7 +129,7 @@ Deno.serve(async (req: Request) => {
   try {
     const yesterday = berlinDayRange(daysAgo);
 
-    const [yesterdayStats, periodStats, prevPeriodStats, totalLeads, booked, mailHealth, agentNotes] = await Promise.all([
+    const [yesterdayStats, periodStats, prevPeriodStats, totalLeads, booked, mailHealth, agentNotes, adsSpend] = await Promise.all([
       fetchDailyStats(supabase, yesterday.start, yesterday.end),
       fetchPeriodStats(supabase, PERIOD_DAYS_BACK),
       // Die 7 Tage VOR der Vergleichsperiode — Basis für den Trend-Pfeil.
@@ -137,6 +138,8 @@ Deno.serve(async (req: Request) => {
       fetchBookedCustomers(supabase),
       fetchMailHealth(supabase),
       fetchAgentNotes(supabase, yesterday.start),
+      // Ads-Kosten (fail-soft: null → Block entfällt, Mail geht trotzdem raus)
+      fetchAdsSpend(supabase, PERIOD_DAYS_BACK, daysAgo),
     ]);
 
     const smtp = await getSmtpConfig(supabase);
@@ -154,6 +157,7 @@ Deno.serve(async (req: Request) => {
       mailHealth,
       prevPeriod: prevPeriodStats,
       agentNotes,
+      adsSpend,
     });
 
     if (dryRun) {

@@ -117,7 +117,7 @@ export const AngebotsFeedback: FC<{
             className="flex-1 sm:flex-none flex items-center gap-3 rounded-2xl pl-2 pr-3 py-2 text-left shadow-lg transition-transform active:scale-[0.98]"
             style={{ background: '#FFFFFF', border: '1px solid #D4D4D8' }}
           >
-            <img src="/ilka.webp" alt="" className="w-11 h-11 rounded-full object-cover object-top flex-shrink-0 border border-[#E9E9EB]" />
+            <img src="/ilka-wysocki-2026.webp" alt="" className="w-11 h-11 rounded-full object-cover object-top flex-shrink-0 border border-[#E9E9EB]" />
             <span className="min-w-0">
               <span className="block text-[14px] font-semibold leading-tight" style={{ color: '#18181B' }}>
                 Was sagen Sie zum Angebot?
@@ -147,7 +147,7 @@ export const AngebotsFeedback: FC<{
          style={{ animation: 'slideSheet 0.25s cubic-bezier(0.32,0.72,0,1)' }}>
       <div className="rounded-2xl px-5 py-4 shadow-2xl" style={{ background: '#FFFFFF', border: '1px solid #D4D4D8' }}>
         <div className="flex items-start gap-3 mb-3">
-          <img src="/ilka.webp" alt="" className="w-10 h-10 rounded-full object-cover object-top flex-shrink-0 border border-[#E9E9EB]" />
+          <img src="/ilka-wysocki-2026.webp" alt="" className="w-10 h-10 rounded-full object-cover object-top flex-shrink-0 border border-[#E9E9EB]" />
           <p className="text-[12.5px] leading-tight flex-1 pt-1" style={{ color: '#8B7355' }}>
             Ilka Wysocki · Ihre Beraterin
           </p>

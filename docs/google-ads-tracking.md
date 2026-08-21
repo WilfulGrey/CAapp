@@ -83,13 +83,22 @@ an den Sofort-Redirect. Nach dem Merge ist mit einem SPRUNG der
 gemeldeten Ads-Conversions zu rechnen (Mess-Artefakt, kein echter
 Anstieg — bei Vergleichen berücksichtigen).
 
-## Schritt 3 — Offline-Import qualifizierter Leads (AUTOMATISIERT seit 14.08.)
+## Schritt 3 — Offline-Import qualifizierter Leads (AUTOMATISIERT; seit 19.08. via Data Manager API)
+
+> **Transport-Wechsel 19.08.:** Google sperrt `uploadClickConversions` für
+> neue Integrationen (CUSTOMER_NOT_ALLOWLISTED_FOR_THIS_FEATURE) — Upload
+> läuft jetzt über `datamanager.googleapis.com/v1/events:ingest` mit
+> EIGENEM OAuth-Scope (`auth/datamanager`; Vault:
+> `google_oauth_refresh_token_dm`) und aktivierter Data Manager API im
+> Cloud-Projekt 345198555489. Feld-Mapping: gclid→adIdentifiers.gclid,
+> order_id→transactionId, Wert→conversionValue/currency; Consent
+> request-level GRANTED (Cookie-Banner-gedeckt).
 
 Läuft ohne manuelles Zutun: Edge Function
 `supabase/functions/upload-offline-conversions` (Cron täglich 06:20 UTC,
 Migration `20260814121000`) lädt das jeweils ERSTE `patient_data_saved`
 jedes Leads mit Klick-ID (gclid > wbraid > gbraid) per
-`uploadClickConversions` in die Conversion-Aktion
+Data-Manager-API (`events:ingest`) in die Conversion-Aktion
 **„Qualifizierter Lead (Patientendaten)"**
 (`customers/9240286999/conversionActions/7720728390`, type UPLOAD_CLICKS,
 category QUALIFIED_LEAD, ONE_PER_CLICK, 90-Tage-Fenster — angelegt
@@ -113,6 +122,16 @@ category QUALIFIED_LEAD, ONE_PER_CLICK, 90-Tage-Fenster — angelegt
   Fehlen die Einträge (Staging), antwortet die Function 200 `{skipped}`.
 - Manueller Lauf / Probelauf:
   `curl -X POST -H "Authorization: Bearer <service_role_key>" -H "Content-Type: application/json" -d '{"dryRun":true}' https://ycdwtrklpoqprabtwahi.supabase.co/functions/v1/upload-offline-conversions`
+
+## Morgen-Mail (daily-analytics-report)
+
+Seit 16.08. enthält der 8:00-Report einen Block „Google Ads — Kosten":
+Spend, Kosten je Lead und je Patientenprofil (gestern + 7 Tage, blended
+— Spend ÷ alle echten Leads). Quelle: `fetchAdsSpend` in
+`daily-analytics-report/queries.ts` via `_shared/googleAdsAuth.ts`
+(Vault-Secrets). Fail-soft: ohne Ads-Zugriff entfällt nur der Block,
+die Mail kommt trotzdem. Kunden-CAC bewusst nicht in der Mail
+(Martin 16.08.) — steht im Memory/Bericht.
 
 ## Messdefinitionen (für Auswertungen)
 

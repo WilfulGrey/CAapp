@@ -13,6 +13,10 @@ import { appendJobParam, reminderBookedCancel } from "./followupJobs.ts";
 // Anrede-Namen sauber schreiben (Versalien → „Ruppert") — Kopie aus lib/email.ts,
 // weil Edge Functions nicht aus lib/ importieren können. Siehe names.ts.
 import { capitalizeName as capitalize } from "./names.ts";
+// Nachtruhe-Fenster — Kopie von lib/quiet-hours.ts (Edge Fns koennen nicht aus
+// lib/ importieren); Aenderungen immer in BEIDEN Dateien.
+import { sendezeitIso } from "./quietHours.ts";
+import { deutschStufe } from "./deutschStufe.ts";
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
@@ -201,7 +205,15 @@ function buildEmailWrapper(lead: Lead, siteUrl: string, content: string): string
 }
  
 function buildIlkaSig(siteUrl: string): string {
-  const ilkaUrl = `${siteUrl}/images/ilka-wysocki_pm-mallorca.webp`;
+  // Ilkas Foto kommt aus primundus.de statt vom Kostenrechner (20.08.):
+  // Beide Dienste deployen unabhaengig voneinander. Nach dem Foto-Wechsel
+  // (#481) war die neue Datei auf primundus.de sofort da, der
+  // Kostenrechner-Build haing >45 Min in Renders Warteschlange — in dieser
+  // Zeit verlinkte JEDE Mail ein 404 (eine Kundenmail um 07:50 war
+  // betroffen). Die Mail-Funktion deployt manuell und ist damit IMMER
+  // schneller als der Kostenrechner; Bilder gehoeren deshalb an die
+  // Adresse, die unabhaengig davon steht.
+  const ilkaUrl = "https://primundus.de/images/ilka-wysocki-2026.webp";
   const testUrl = `${siteUrl}/images/primundus_testsieger-2021.webp`;
   const mediaBase = `${siteUrl}/images/media`;
   return `
@@ -1393,6 +1405,9 @@ interface ReminderMeta {
   caregiver_years_experience?: number | null;
   caregiver_einsatz_count?: number | null;
   caregiver_age?: number | null;
+  // Rohwert aus mamamia (level_0…level_4) — QUELLE, hat Vorrang.
+  caregiver_germany_skill?: string | null;
+  // Vom Erzeuger abgeleitetes Wort — Rückfall für Altzeilen ohne Rohwert.
   caregiver_german_level?: string | null;
   caregiver_photo_url?: string | null;
   caregiver_about_text?: string | null;
@@ -1473,8 +1488,9 @@ function buildReminderHtml(
   const ageSuffix = meta.caregiver_age && meta.caregiver_age > 0
     ? `<span style="font-weight:400;color:#71717A;">, ${meta.caregiver_age}</span>`
     : "";
-  const deutschLine = meta.caregiver_german_level
-    ? `<p style="margin:0;font-size:15px;color:#71717A;">Deutsch ${meta.caregiver_german_level}</p>`
+  const deutschWort = deutschStufe(meta.caregiver_germany_skill, meta.caregiver_german_level);
+  const deutschLine = deutschWort
+    ? `<p style="margin:0;font-size:15px;color:#71717A;">Deutsch ${deutschWort}</p>`
     : "";
 
   // Nur Inline-CID nutzen — der presigned S3-URL ist nach 30 Min meist tot,
@@ -1486,13 +1502,22 @@ function buildReminderHtml(
 
   const profilFooter = `<div style="border-top:1px solid #ECE7DF;margin:14px 0 0;padding-top:14px;"><a href="${portalUrl}" target="_blank" style="color:#8B7355;text-decoration:none;font-weight:700;font-size:15px;">${firstName}s Profil ansehen &rarr;</a></div>`;
 
+  // Abstand Foto→Text als EIGENE Spalte, nicht als padding-right an der
+  // Foto-Zelle: mehrere Mail-Renderer verwerfen padding an einer <td>, die
+  // zugleich eine feste width traegt — dann klebt der Name am Bild (Martin
+  // 18.08. mit Screenshot: "viel zu eng name und bild", gemessener Abstand
+  // ~1 px statt 16). In Chrome war das NICHT reproduzierbar, das Padding
+  // greift dort; die leere Spalte kommt ganz ohne padding-Unterstuetzung aus
+  // und ist damit unabhaengig vom Client. Text mittig statt oben, sonst
+  // haengen zwei kurze Zeilen an der Oberkante eines 76-px-Fotos.
   const kachel = `
     <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="margin:0 0 22px 0;border:1px solid #ECE7DF;border-radius:14px;background:#ffffff;overflow:hidden;">
       <tr><td style="padding:18px 20px;">
         <table width="100%" cellpadding="0" cellspacing="0" role="presentation">
           <tr>
-            <td style="vertical-align:top;width:76px;padding-right:16px;">${photoHtml}</td>
-            <td style="vertical-align:top;">
+            <td width="76" style="vertical-align:middle;width:76px;">${photoHtml}</td>
+            <td width="18" style="width:18px;font-size:0;line-height:0;">&nbsp;</td>
+            <td style="vertical-align:middle;">
               <p style="margin:0 0 3px;font-size:18px;font-weight:700;color:#18181B;line-height:1.3;">${cgName}${ageSuffix}</p>
               ${deutschLine}
             </td>
@@ -1609,7 +1634,8 @@ Primundus Deutschland | www.primundus.de
   }
 
   const agePart = meta.caregiver_age && meta.caregiver_age > 0 ? `, ${meta.caregiver_age}` : "";
-  const deutschPart = meta.caregiver_german_level ? ` · Deutsch ${meta.caregiver_german_level}` : "";
+  const deutschStufeText = deutschStufe(meta.caregiver_germany_skill, meta.caregiver_german_level);
+  const deutschPart = deutschStufeText ? ` · Deutsch ${deutschStufeText}` : "";
   const stufe = reminderTierLabel(meta.caregiver_einsatz_count, meta.caregiver_years_experience);
   const factsParts: string[] = [];
   if (meta.caregiver_years_experience && meta.caregiver_years_experience > 0) {
@@ -1743,7 +1769,10 @@ async function scheduleFollowUp(
   emailType: string,
   delayMinutes: number
 ): Promise<void> {
-  const scheduledFor = new Date(Date.now() + delayMinutes * 60 * 1000).toISOString();
+  // Nachtruhe (Martin, 19.08.): Nudges/Nachfaesse rechnen relativ (+4 h,
+  // +28 h, +48 h ...) und landeten dadurch regelmaessig mitten in der Nacht.
+  // Faellig zwischen 21:00 und 08:00 Berliner Zeit ⇒ 8:00 morgens.
+  const scheduledFor = sendezeitIso(new Date(Date.now() + delayMinutes * 60 * 1000));
  
   await supabase
     .from("scheduled_emails")

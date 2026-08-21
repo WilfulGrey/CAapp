@@ -56,7 +56,7 @@ export function HelpDialog({ open, onOpenChange }: HelpDialogProps) {
           <div className="flex items-center gap-3 mb-5">
             <div className="relative w-12 h-12 rounded-full overflow-hidden flex-shrink-0">
               <Image
-                src="/images/ilka-wysocki_pm-mallorca.webp"
+                src="/images/ilka-wysocki-2026.webp"
                 alt="Ilka Wysocki"
                 width={48}
                 height={48}

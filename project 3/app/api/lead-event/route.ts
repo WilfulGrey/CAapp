@@ -13,6 +13,7 @@ import {
 } from '@/lib/email';
 import { buildVertragAttachmentPdf, formatSignedAtBerlin } from '@/lib/vertrag';
 import { appendJobParam } from '@/lib/portal-url';
+import { sendezeitIso } from '@/lib/quiet-hours';
 import { createHash } from 'crypto';
 
 // Bridge endpoint: the CA-App portal reports customer milestones back to the
@@ -489,6 +490,9 @@ async function scheduleReactionReminder(
     caregiver_years_experience: caregiver.yearsExperience ?? null,
     caregiver_einsatz_count: caregiver.einsatzCount ?? null,
     caregiver_age: caregiver.age ?? null,
+    // Rohwert mitschleifen, damit der Versand frisch beschriften kann
+    // (Schnappschuss-Falle wie Registry-Bug #34).
+    caregiver_germany_skill: (metadata as Record<string, unknown>).caregiver_germany_skill ?? null,
     caregiver_german_level: caregiver.germanLevel ?? null,
     caregiver_photo_url: caregiver.photoUrl ?? null,
     caregiver_about_text: caregiver.aboutText ?? null,
@@ -503,7 +507,11 @@ async function scheduleReactionReminder(
     : REMINDER_DELAYS_APPLICATION_MIN;
 
   for (const { emailType, delay } of tiers) {
-    const scheduledFor = new Date(Date.now() + delay * 60 * 1000).toISOString();
+    // Nachtruhe (Martin, 19.08.): faellt die Erinnerung zwischen 21:00 und
+    // 08:00 Berliner Zeit, wird sie auf 8:00 morgens geschoben. Der
+    // 12-Stunden-Tier war der groesste Nacht-Sender (72 Mails in 30 Tagen),
+    // weil eine Bewerbung am fruehen Nachmittag zwangslaeufig nachts erinnert.
+    const scheduledFor = sendezeitIso(new Date(Date.now() + delay * 60 * 1000));
     try {
       await supabaseAdmin.from('scheduled_emails').insert({
         lead_id: leadId,

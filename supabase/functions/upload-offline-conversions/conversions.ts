@@ -17,15 +17,18 @@ export interface QualifiedLeadCandidate {
   value: number | null;
 }
 
-export interface ClickConversionPayload {
-  conversionAction: string;
-  conversionDateTime: string;
-  orderId: string;
-  gclid?: string;
-  wbraid?: string;
-  gbraid?: string;
+// Data-Manager-API-Event (events:ingest) — seit 19.08.2026. Der klassische
+// uploadClickConversions ist für NEUE Integrationen gesperrt
+// (CUSTOMER_NOT_ALLOWLISTED_FOR_THIS_FEATURE, Google-Plattform-Umstellung).
+export interface DmEvent {
+  destinationReferences: string[];
+  eventTimestamp: string; // RFC 3339
+  /** Pflicht trotz "Optional" im Schema (REQUIRED_FIELD_MISSING ohne). */
+  eventSource: "WEB";
+  transactionId: string;  // = lead_id (Dedup)
+  adIdentifiers: { gclid?: string; wbraid?: string; gbraid?: string };
   conversionValue?: number;
-  currencyCode?: string;
+  currency?: string;
 }
 
 export type ClickIdType = "gclid" | "wbraid" | "gbraid";
@@ -39,16 +42,11 @@ export function pickClickId(
   return null;
 }
 
-// Google verlangt "yyyy-MM-dd HH:mm:ss+HH:MM". Wir liefern UTC mit
-// explizitem +00:00 — Google rechnet selbst in die Konto-Zeitzone um.
-export function formatConversionDateTime(iso: string): string {
+// Data Manager will RFC 3339 (UTC mit Z).
+export function formatRfc3339(iso: string): string {
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) throw new Error(`invalid timestamp: ${iso}`);
-  const p = (n: number, len = 2) => String(n).padStart(len, "0");
-  return (
-    `${d.getUTCFullYear()}-${p(d.getUTCMonth() + 1)}-${p(d.getUTCDate())} ` +
-    `${p(d.getUTCHours())}:${p(d.getUTCMinutes())}:${p(d.getUTCSeconds())}+00:00`
-  );
+  return d.toISOString().replace(/\.\d{3}Z$/, "Z");
 }
 
 // Klicks müssen bei Google „angekommen" sein, bevor die Conversion dazu
@@ -59,23 +57,24 @@ export function isOldEnough(conversionAtIso: string, nowMs: number, minAgeHours 
   return Number.isFinite(t) && nowMs - t >= minAgeHours * 3_600_000;
 }
 
-export function buildClickConversion(
+export function buildDmEvent(
   c: QualifiedLeadCandidate,
-  conversionAction: string,
-): ClickConversionPayload | null {
+  destinationReference: string,
+): DmEvent | null {
   const click = pickClickId(c);
   if (!click) return null;
-  const payload: ClickConversionPayload = {
-    conversionAction,
-    conversionDateTime: formatConversionDateTime(c.conversionAt),
-    orderId: c.leadId,
-    [click.type]: click.id,
+  const event: DmEvent = {
+    destinationReferences: [destinationReference],
+    eventTimestamp: formatRfc3339(c.conversionAt),
+    eventSource: "WEB",
+    transactionId: c.leadId,
+    adIdentifiers: { [click.type]: click.id },
   };
   if (typeof c.value === "number" && Number.isFinite(c.value) && c.value > 0) {
-    payload.conversionValue = c.value;
-    payload.currencyCode = "EUR";
+    event.conversionValue = c.value;
+    event.currency = "EUR";
   }
-  return payload;
+  return event;
 }
 
 // bruttopreis aus leads.kalkulation (jsonb) ziehen — fail-soft.
@@ -85,53 +84,8 @@ export function extractValue(kalkulation: unknown): number | null {
   return typeof v === "number" && Number.isFinite(v) && v > 0 ? v : null;
 }
 
-// Partial-Failure-Klassifikation: permanente Fehler werden in
-// offline_conversion_uploads als 'permanent_failure' festgeschrieben
-// (kein Endlos-Retry), alles andere bleibt unmarkiert → Retry beim
-// nächsten Lauf. Konservativ: unbekannt = retriable.
-const PERMANENT_CODES = new Set([
-  "CLICK_NOT_FOUND",
-  "EXPIRED_CLICK",
-  "EXPIRED_EVENT",
-  "CONVERSION_PRECEDES_CLICK",
-  "CONVERSION_PRECEDES_EVENT",
-  "UNPARSEABLE_GCLID",
-  "INVALID_CONVERSION_ACTION",
-  "INVALID_CONVERSION_ACTION_TYPE",
-  "GBRAID_WBRAID_BOTH_SET",
-  "VALUE_MUST_BE_UNSET",
-  "ORDER_ID_NOT_PERMITTED_FOR_EXTERNALLY_ATTRIBUTED_CONVERSION_ACTION",
-  "DUPLICATE_ORDER_ID",
-]);
-
-export function classifyFailure(conversionUploadError: string | undefined): "permanent" | "retriable" {
-  if (conversionUploadError && PERMANENT_CODES.has(conversionUploadError)) return "permanent";
-  return "retriable";
-}
-
-// GoogleAdsFailure aus partialFailureError → Map Index → Fehler.
-// Shape: details[].errors[] mit errorCode.conversionUploadError und
-// location.fieldPathElements[{fieldName:"conversions", index}].
-export function parsePartialFailures(
-  partialFailureError: unknown,
-): Map<number, { code: string; message: string }> {
-  const out = new Map<number, { code: string; message: string }>();
-  if (!partialFailureError || typeof partialFailureError !== "object") return out;
-  const details = (partialFailureError as Record<string, unknown>).details;
-  if (!Array.isArray(details)) return out;
-  for (const d of details) {
-    const errors = (d as Record<string, unknown>)?.errors;
-    if (!Array.isArray(errors)) continue;
-    for (const e of errors) {
-      const rec = e as Record<string, any>;
-      const idx = (rec?.location?.fieldPathElements ?? []).find(
-        (p: Record<string, unknown>) => p?.fieldName === "conversions" && typeof p?.index === "number",
-      )?.index;
-      if (typeof idx !== "number") continue;
-      const codeObj = rec?.errorCode ?? {};
-      const code = String(Object.values(codeObj)[0] ?? "UNKNOWN");
-      out.set(idx, { code, message: String(rec?.message ?? "") });
-    }
-  }
-  return out;
-}
+// Data Manager ist fast-fail pro REQUEST: HTTP 400 = Datenproblem im Batch
+// (→ Einzel-Isolierung im Handler), 401/403/5xx = transient (Retry nächster
+// Lauf). Eine per-Zeile-Klassifikation wie beim alten Endpoint gibt es
+// synchron nicht mehr; asynchrone Verarbeitungs-Diagnostik liefert Google
+// separat (Ads-UI/Diagnostics).
