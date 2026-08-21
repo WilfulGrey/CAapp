@@ -12,7 +12,9 @@
  */
 import { useEffect, useState } from 'react';
 import { Card } from '@/components/ui/card';
-import { Loader2, MessageSquare, User, Bot, CircleCheck as CheckCircle2, Info } from 'lucide-react';
+import Link from 'next/link';
+import { Loader2, MessageSquare, User, Bot, CircleCheck as CheckCircle2, Info,
+  Mail, Phone, ExternalLink } from 'lucide-react';
 
 type Kopf = {
   sid: string; beginn: string; ende: string; nachrichten: number;
@@ -22,6 +24,22 @@ type Zeile = {
   id: string; rolle: string; text: string; ereignis: string | null;
   meta: any; zeit: string; lead_id: string | null;
 };
+/* Die Kontaktdaten stehen nicht im Protokoll — sie gehoeren zum Lead. Die
+   Leseroute holt sie dazu, damit man nicht zwischen zwei Seiten springt. */
+type Lead = {
+  id: string; name: string; email: string; telefon: string | null; angelegt: string;
+  mamamiaKunde: number | null; mamamiaJob: number | null;
+  bruttopreis: number | null; eigenanteil: number | null;
+  angaben: Record<string, any> | null; portalUrl: string | null;
+};
+
+const ANGABE: Record<string, string> = {
+  betreuung_fuer: 'Personen', weitere_personen: 'Weitere im Haushalt',
+  pflegegrad: 'Pflegegrad', mobilitaet: 'Mobilität',
+  nachteinsaetze: 'Nachts', deutschkenntnisse: 'Deutsch',
+};
+const euro = (n: number | null) =>
+  n == null ? '—' : n.toLocaleString('de-DE', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 });
 
 const zeit = (s: string) =>
   new Date(s).toLocaleString('de-DE', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
@@ -35,6 +53,7 @@ export default function GespraechePage() {
   const [liste, setListe] = useState<Kopf[]>([]);
   const [gewaehlt, setGewaehlt] = useState<string | null>(null);
   const [verlauf, setVerlauf] = useState<Zeile[]>([]);
+  const [lead, setLead] = useState<Lead | null>(null);
   const [laedt, setLaedt] = useState(true);
   const [fehler, setFehler] = useState<string | null>(null);
 
@@ -48,10 +67,10 @@ export default function GespraechePage() {
 
   useEffect(() => {
     if (!gewaehlt) return;
-    setVerlauf([]);
+    setVerlauf([]); setLead(null);
     fetch(`/api/admin/pria-gespraeche?sid=${encodeURIComponent(gewaehlt)}`)
       .then((r) => r.json())
-      .then((d) => setVerlauf(d.zeilen ?? []))
+      .then((d) => { setVerlauf(d.zeilen ?? []); setLead(d.lead ?? null); })
       .catch(() => {});
   }, [gewaehlt]);
 
@@ -124,6 +143,56 @@ export default function GespraechePage() {
                 Links ein Gespräch wählen.
               </div>
             )}
+            {lead && (
+              <div className="mb-5 -mx-5 -mt-5 px-5 py-4 bg-emerald-50/70 border-b border-emerald-200">
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div>
+                    <div className="font-semibold text-gray-900">{lead.name || '(kein Name)'}</div>
+                    <div className="text-sm text-gray-600 mt-1 flex flex-wrap gap-x-4 gap-y-1">
+                      <a href={`mailto:${lead.email}`} className="inline-flex items-center gap-1.5 hover:underline">
+                        <Mail className="w-3.5 h-3.5" /> {lead.email}
+                      </a>
+                      {lead.telefon && (
+                        <a href={`tel:${lead.telefon}`} className="inline-flex items-center gap-1.5 hover:underline">
+                          <Phone className="w-3.5 h-3.5" /> {lead.telefon}
+                        </a>
+                      )}
+                    </div>
+                  </div>
+                  <div className="text-right text-sm">
+                    <div className="text-gray-900 font-semibold tabular-nums">{euro(lead.bruttopreis)}</div>
+                    <div className="text-gray-500 text-xs">Eigenanteil {euro(lead.eigenanteil)}</div>
+                  </div>
+                </div>
+
+                {lead.angaben && (
+                  <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-xs text-gray-600">
+                    {Object.entries(ANGABE).map(([k, label]) =>
+                      lead.angaben?.[k] == null ? null : (
+                        <span key={k}><span className="text-gray-400">{label}:</span> {String(lead.angaben[k])}</span>
+                      ))}
+                  </div>
+                )}
+
+                <div className="mt-3 flex flex-wrap items-center gap-4 text-xs">
+                  <Link href={`/admin/leads/${lead.id}`} className="inline-flex items-center gap-1 text-emerald-800 font-semibold hover:underline">
+                    Lead öffnen <ExternalLink className="w-3 h-3" />
+                  </Link>
+                  {lead.portalUrl && (
+                    <a href={lead.portalUrl} target="_blank" rel="noopener noreferrer"
+                       className="inline-flex items-center gap-1 text-emerald-800 hover:underline">
+                      Kundenportal <ExternalLink className="w-3 h-3" />
+                    </a>
+                  )}
+                  <span className="text-gray-500">
+                    {lead.mamamiaKunde
+                      ? <>in mamamia: Kunde {lead.mamamiaKunde}{lead.mamamiaJob ? `, Job ${lead.mamamiaJob}` : ''}</>
+                      : <span className="text-amber-700">noch nicht in mamamia angelegt</span>}
+                  </span>
+                </div>
+              </div>
+            )}
+
             {gewaehlt && verlauf.length === 0 && (
               <div className="flex justify-center py-10"><Loader2 className="w-5 h-5 animate-spin text-gray-400" /></div>
             )}

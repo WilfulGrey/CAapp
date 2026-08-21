@@ -35,7 +35,37 @@ export async function GET(request: NextRequest) {
       .eq('sid', sid)
       .order('zeit', { ascending: true });
     if (error) return NextResponse.json({ fehler: error.message }, { status: 500 });
-    return NextResponse.json({ sid, zeilen: data ?? [] });
+
+    /* Die Kontaktdaten stehen bewusst NICHT im Protokoll — sie gehoeren zum
+       Lead, nicht in eine Mitschrift. Fuer die Ansicht werden sie dazugeholt,
+       damit man nicht zwischen zwei Seiten springen muss. */
+    const leadId = (data ?? []).find((z: any) => z.lead_id)?.lead_id ?? null;
+    let lead: any = null;
+    if (leadId) {
+      // `any`, weil ohne generierte Datenbank-Typen sonst GenericStringError
+      // herauskommt und jeder Feldzugriff ein Typfehler ist.
+      const { data: l } = await (db as any)
+        .from('leads')
+        .select('id, anrede_text, vorname, nachname, email, telefon, created_at, ' +
+                'mamamia_customer_id, mamamia_job_offer_id, kalkulation, token')
+        .eq('id', leadId)
+        .maybeSingle();
+      if (l) {
+        const k = (l as any).kalkulation || {};
+        lead = {
+          id: l.id,
+          name: [l.anrede_text, l.vorname, l.nachname].filter(Boolean).join(' '),
+          email: l.email, telefon: l.telefon, angelegt: l.created_at,
+          mamamiaKunde: l.mamamia_customer_id, mamamiaJob: l.mamamia_job_offer_id,
+          bruttopreis: k.bruttopreis ?? null, eigenanteil: k.eigenanteil ?? null,
+          angaben: k.formularDaten ?? null,
+          portalUrl: l.token && process.env.NEXT_PUBLIC_PORTAL_URL
+            ? `${process.env.NEXT_PUBLIC_PORTAL_URL.replace(/\/$/, '')}/?token=${encodeURIComponent(l.token)}`
+            : null,
+        };
+      }
+    }
+    return NextResponse.json({ sid, zeilen: data ?? [], lead });
   }
 
   // ── Die Liste ────────────────────────────────────────────────────
