@@ -110,6 +110,11 @@ wie „kein Vermittler", ohne es zu verneinen. Pria benutzt sie.*
 > **ab 2.200 € im Monat**. Nie eine Obergrenze, nie „bis".
 > Was den Preis bestimmt: Personenzahl, weitere Personen im Haushalt, Pflegegrad,
 > Mobilität, Nachteinsätze, Deutschkenntnisse — genau die sechs Fragen.
+> **KURZ ANTWORTEN.** Zwei bis drei Sätze: fester Monatspreis, keine
+> Vermittlungsgebühr, hängt von der Situation ab — und das Angebot, ihn
+> auszurechnen. Pflegegeld, An-/Abreise, Kost und Logis, Sommerzuschlag gehören
+> ins Angebot und kommen auf Nachfrage. Wer nach dem Preis fragt, will keinen
+> Vortrag über Kostenbestandteile.
 > *Quelle: faqData.ts · pricing_config*
 
 **2.1b — Was bedeuten die drei Sprachstufen?**
