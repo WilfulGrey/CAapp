@@ -330,7 +330,7 @@ export function getEingangsbestaetigungEmailTemplate(
                 <table cellpadding="0" cellspacing="0" role="presentation">
                   <tr>
                     <td style="padding-right: 12px; vertical-align: top;">
-                      <img src="${baseUrl}/images/ilka-wysocki_pm-mallorca.webp" alt="Ilka Wysocki" width="60" style="display: block; width: 60px; height: auto; border-radius: 8px;" />
+                      <img src="${baseUrl}/images/ilka-wysocki-2026.webp" alt="Ilka Wysocki" width="60" style="display: block; width: 60px; height: auto; border-radius: 8px;" />
                     </td>
                     <td style="vertical-align: middle;">
                       <p style="margin: 0 0 2px 0; font-size: 15px; font-weight: 700; color: #3D2B1F; white-space: nowrap; text-align: left;">Ilka Wysocki</p>
@@ -653,7 +653,7 @@ export function getAngebotsEmailTemplate(
                 <table cellpadding="0" cellspacing="0" role="presentation">
                   <tr>
                     <td style="padding-right: 12px; vertical-align: top;">
-                      <img src="${baseUrl}/images/ilka-wysocki_pm-mallorca.webp" alt="Ilka Wysocki" width="60"
+                      <img src="${baseUrl}/images/ilka-wysocki-2026.webp" alt="Ilka Wysocki" width="60"
                         style="display: block; width: 60px; height: auto; border-radius: 8px;" />
                     </td>
                     <td style="vertical-align: middle;">
@@ -1283,7 +1283,7 @@ export function getVertragEmailTemplate(
                 <table cellpadding="0" cellspacing="0" role="presentation">
                   <tr>
                     <td style="padding-right: 12px; vertical-align: top;">
-                      <img src="${baseUrl}/images/ilka-wysocki_pm-mallorca.webp" alt="Ilka Wysocki" width="60" style="display: block; width: 60px; height: auto; border-radius: 8px;" />
+                      <img src="${baseUrl}/images/ilka-wysocki-2026.webp" alt="Ilka Wysocki" width="60" style="display: block; width: 60px; height: auto; border-radius: 8px;" />
                     </td>
                     <td style="vertical-align: middle;">
                       <p style="margin: 0 0 2px 0; font-size: 15px; font-weight: 700; color: #3D2B1F; white-space: nowrap; text-align: left;">Ilka Wysocki</p>
@@ -1611,7 +1611,7 @@ function caregiverIlkaSig(baseUrl: string): string {
                 <table cellpadding="0" cellspacing="0" role="presentation">
                   <tr>
                     <td style="padding-right:12px;vertical-align:top;">
-                      <img src="${baseUrl}/images/ilka-wysocki_pm-mallorca.webp" alt="Ilka Wysocki" width="60" style="display:block;width:60px;height:auto;border-radius:8px;" />
+                      <img src="${baseUrl}/images/ilka-wysocki-2026.webp" alt="Ilka Wysocki" width="60" style="display:block;width:60px;height:auto;border-radius:8px;" />
                     </td>
                     <td style="vertical-align:middle;">
                       <p style="margin:0 0 2px;font-size:15px;font-weight:700;color:#3D2B1F;white-space:nowrap;">Ilka Wysocki</p>
@@ -1917,7 +1917,7 @@ export function getPatientDataSavedEmailTemplate(
                 <table cellpadding="0" cellspacing="0" role="presentation">
                   <tr>
                     <td style="padding-right:12px;vertical-align:top;">
-                      <img src="${baseUrl}/images/ilka-wysocki_pm-mallorca.webp" alt="Ilka Wysocki" width="60" style="display:block;width:60px;height:auto;border-radius:8px;" />
+                      <img src="${baseUrl}/images/ilka-wysocki-2026.webp" alt="Ilka Wysocki" width="60" style="display:block;width:60px;height:auto;border-radius:8px;" />
                     </td>
                     <td style="vertical-align:middle;">
                       <p style="margin:0 0 2px;font-size:15px;font-weight:700;color:#3D2B1F;white-space:nowrap;">Ilka Wysocki</p>
@@ -2321,7 +2321,7 @@ export function getApplicationReceivedEmailTemplate(
   if (offer?.arrivalFee != null) detailRows.push(detailRow('Anreisekosten', '', `${fmtEuro(offer.arrivalFee)}&nbsp;€`));
   if (offer?.departureFee != null) detailRows.push(detailRow('Abreisekosten', '', `${fmtEuro(offer.departureFee)}&nbsp;€`));
   if (showSummer) detailRows.push(detailRow('Sommerzuschlag', 'Juli &amp; August', '6,67&nbsp;€&nbsp;/&nbsp;Tag'));
-  detailRows.push(detailRow('Feiertagszuschlag', 'an gesetzlichen Feiertagen', 'doppelter Tagessatz'));
+  detailRows.push(detailRow('Feiertagszuschlag', 'an ausgewählten Feiertagen', 'doppelter Tagessatz'));
   detailRows.push(detailRow('Kündigungsfrist', '', 'täglich'));
 
   const konditionen = hasConditions ? `
@@ -2410,7 +2410,7 @@ export function getApplicationReceivedEmailTemplate(
 
   // ── Plaintext ─────────────────────────────────────────────────────────────
   const condPlain = hasConditions ? `KONDITIONEN
-${salary > 0 ? `Tagessatz: ${fmtEuro(tagessatz)} € / Tag (inkl. Steuern & Sozialabgaben)\nMonatssatz: ${fmtEuro(salary)} € / Monat${zuschuesse > 0 ? ` — rechn. Eigenanteil ca. ${fmtEuro(eigenanteil)} €` : ''}\n` : ''}${anreiseDatum ? `Anreisedatum: ${anreiseDatum}\n` : ''}${abreiseDatum ? `Abreisedatum (voraussichtlich): ${abreiseDatum}\n` : ''}${offer?.arrivalFee != null ? `Anreisekosten: ${fmtEuro(offer.arrivalFee)} €\n` : ''}${offer?.departureFee != null ? `Abreisekosten: ${fmtEuro(offer.departureFee)} €\n` : ''}${showSummer ? 'Sommerzuschlag (Juli & August): 6,67 € / Tag\n' : ''}Feiertagszuschlag (an gesetzlichen Feiertagen): doppelter Tagessatz
+${salary > 0 ? `Tagessatz: ${fmtEuro(tagessatz)} € / Tag (inkl. Steuern & Sozialabgaben)\nMonatssatz: ${fmtEuro(salary)} € / Monat${zuschuesse > 0 ? ` — rechn. Eigenanteil ca. ${fmtEuro(eigenanteil)} €` : ''}\n` : ''}${anreiseDatum ? `Anreisedatum: ${anreiseDatum}\n` : ''}${abreiseDatum ? `Abreisedatum (voraussichtlich): ${abreiseDatum}\n` : ''}${offer?.arrivalFee != null ? `Anreisekosten: ${fmtEuro(offer.arrivalFee)} €\n` : ''}${offer?.departureFee != null ? `Abreisekosten: ${fmtEuro(offer.departureFee)} €\n` : ''}${showSummer ? 'Sommerzuschlag (Juli & August): 6,67 € / Tag\n' : ''}Feiertagszuschlag (an ausgewählten Feiertagen): doppelter Tagessatz
 Kündigungsfrist: täglich
 Mustervertrag: https://kundenportal.primundus.de/primundus-mustervertrag.pdf
 
@@ -2489,7 +2489,7 @@ export function getTokenRegenerationEmailTemplate(
                 <table cellpadding="0" cellspacing="0" role="presentation">
                   <tr>
                     <td style="padding-right: 12px; vertical-align: top;">
-                      <img src="${baseUrl}/images/ilka-wysocki_pm-mallorca.webp" alt="Ilka Wysocki" width="60" style="display: block; width: 60px; height: auto; border-radius: 8px;" />
+                      <img src="${baseUrl}/images/ilka-wysocki-2026.webp" alt="Ilka Wysocki" width="60" style="display: block; width: 60px; height: auto; border-radius: 8px;" />
                     </td>
                     <td style="vertical-align: middle;">
                       <p style="margin: 0 0 2px 0; font-size: 15px; font-weight: 700; color: #3D2B1F; white-space: nowrap; text-align: left;">Ilka Wysocki</p>

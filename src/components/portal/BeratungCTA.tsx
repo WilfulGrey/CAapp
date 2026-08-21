@@ -20,7 +20,7 @@ export const BeratungCTA: FC<{
       <p className="text-[17px] font-bold text-[#3D2B1F] leading-tight mb-3">{headline}</p>
       <div className="flex items-center gap-3 mb-3">
         <img
-          src="/ilka.webp"
+          src="/ilka-wysocki-2026.webp"
           alt="Ilka Wysocki"
           className="w-14 h-14 rounded-full object-cover object-top flex-shrink-0 border border-[#E9E9EB]"
         />

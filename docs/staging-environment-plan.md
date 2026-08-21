@@ -134,6 +134,13 @@ User-action items (Claude nie ma uprawnień):
 5. **Render nowe services** (przez Render Dashboard, nie blueprint — żeby nie ruszać żywego prod blueprintu):
    - `caapp-staging` (Static, root: repo root, branch: `main`, auto-deploy ON)
    - `kostenrechner-staging` (Web, root: `project 3/`, branch: `main`, auto-deploy ON)
+
+   > **⚠️ NIEAKTUALNE (zweryfikowane 2026-08-21):** oba sloty staging deployują
+   > dziś z **trunku** (`integration/mamamia-onboarding`), nie z `main`. `main`
+   > stoi od 2026-05-21 (746 commitów w tyle). Dowód: merge PR #488 pojawił się
+   > na staging i na prodzie **jednocześnie**, bajt w bajt identyczny build.
+   > Nie planuj pracy wg tej listy — patrz CLAUDE.md §"Staging i prod = ten sam
+   > commit".
    - Env vars: skopiować klucze z prod, **wartości** → staging Supabase URL/keys + staging Mamamia secrets
 
 ### 3. Refactor: hardcoded → env-driven

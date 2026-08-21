@@ -33,6 +33,8 @@ Allow: /
 User-agent: *
 Allow: /
 Disallow: /api/
+# Interne Testseite für den Beratungs-Chat — nirgends verlinkt, nicht für Besucher.
+Disallow: /pria.html
 
 Sitemap: ${baseUrl}/sitemap.xml
 `;

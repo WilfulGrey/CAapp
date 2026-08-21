@@ -1418,6 +1418,11 @@ const CustomerPortalPage: FC = () => {
       // ohne Info"). Quelle ist dasselbe nurse-Objekt wie in der Portal-Karte,
       // damit die Box in Mail = Portal denselben Inhalt zeigt.
       caregiver_age: targetApp?.nurse?.age,
+      // Rohwert UND Wort — das nurse-Objekt haelt beides nebeneinander
+      // (language.bucket + language.level). Der Rohwert erlaubt es dem
+      // Mailversand, spaeter frisch zu beschriften statt einen alten
+      // Text zu zeigen (Vorfall 19.08.: "Deutsch A2-B1" in Nachfassmails).
+      caregiver_germany_skill: targetApp?.nurse?.language?.bucket,
       caregiver_german_level: targetApp?.nurse?.language?.level,
       caregiver_einsatz_count: targetApp?.nurse?.history?.assignments,
       caregiver_years_experience: targetApp?.nurse?.experienceYears,
@@ -3701,7 +3706,7 @@ const CustomerPortalPage: FC = () => {
             { q: 'Was passiert, wenn die Pflegekraft ausfällt?', a: 'Primundus kümmert sich umgehend um eine qualifizierte Vertretung. Ihr persönlicher Ansprechpartner informiert Sie proaktiv und begleitet die Übergabe.' },
             { q: 'Wie werden Reisekosten abgerechnet?', a: 'Die Reisekosten betragen pauschal 125 € pro Strecke — also je einmal bei der Anreise und bei der Abreise. Weitere versteckte Reisekosten gibt es nicht.' },
             { q: 'Ist das legal?', a: 'Ja, vollständig. Die Pflegekräfte sind sozialversicherungspflichtig bei uns angestellt und werden von uns nach Deutschland entsandt. Für jeden Einsatz liegt eine offizielle A1-Bescheinigung vor — der Nachweis der Sozialversicherungspflicht im Herkunftsland.' },
-            { q: 'Mit wem wird der Vertrag geschlossen?', a: 'Der Betreuungsvertrag wird mit unserer Muttergesellschaft, der Vitanas Group, geschlossen — einem der größten und erfahrensten Pflegeunternehmen Deutschlands.' },
+            { q: 'Mit wem wird der Vertrag geschlossen?', a: 'Der Betreuungsvertrag wird mit der PRIMUNDUS Sp. z o.o. geschlossen — der Gesellschaft hinter Primundus Deutschland und Ihrem Vertragspartner für die gesamte Betreuung. Die Pflegekräfte sind bei uns sozialversicherungspflichtig angestellt und werden offiziell nach Deutschland entsandt.' },
             { q: 'Welche Kosten entstehen insgesamt?', a: 'Es gibt vier Kostenpunkte: Die monatlichen Betreuungskosten laut Ihrem Angebot. Anreise und Abreise pauschal je 125 €. Kost und Logis, die Sie der Pflegekraft frei zur Verfügung stellen. Fällt der Einsatz in einen Sommermonat (Juli oder August), kommen 200 €/Monat (bzw. 6,67 €/Tag) Sommerzuschlag hinzu. An folgenden Feiertagen wird der doppelte Tagessatz berechnet: Karfreitag, Ostersonntag, Ostermontag, 1. Mai, Heiligabend, 1. + 2. Weihnachtstag, Silvester und Neujahr. Darüber hinaus gibt es keinerlei versteckte Kosten.' },
             /* Sachleistungs-Frage (Martin, 13.08.): kommt in Beratungen
                regelmäßig. Fachlich: 24h-Betreuung im Entsendemodell ist
@@ -3750,7 +3755,7 @@ const CustomerPortalPage: FC = () => {
             <div className="flex items-center gap-4">
               <div className="relative flex-shrink-0">
                 <img
-                  src="/ilka.webp"
+                  src="/ilka-wysocki-2026.webp"
                   alt="Ilka Wysocki"
                   className="w-[72px] h-[72px] rounded-2xl object-cover object-top"
                   style={{border:'1.5px solid #F0C4B4'}}

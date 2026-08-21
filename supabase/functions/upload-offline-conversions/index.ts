@@ -21,19 +21,18 @@
 
 import { createClient } from "npm:@supabase/supabase-js@2.57.4";
 import {
-  buildClickConversion,
-  classifyFailure,
+  buildDmEvent,
   extractValue,
   isOldEnough,
-  parsePartialFailures,
   pickClickId,
   type QualifiedLeadCandidate,
 } from "./conversions.ts";
 import {
+  DESTINATION_REFERENCE,
   fetchAccessToken,
-  QUALIFIED_LEAD_ACTION,
+  ingestEvents,
+  QUALIFIED_LEAD_ACTION_ID,
   readSecrets,
-  uploadClickConversions,
 } from "./googleAds.ts";
 
 const LOOKBACK_DAYS = 90; // Klick-Fenster der Conversion-Aktion
@@ -90,6 +89,10 @@ Deno.serve(async (req: Request) => {
   if (!secrets) {
     console.log("upload-offline-conversions: Google-Secrets fehlen (Env+Vault) — skip (Staging?)");
     return json(200, { skipped: "google secrets not configured" });
+  }
+  if (!secrets.dmRefreshToken) {
+    console.log("upload-offline-conversions: Data-Manager-Token fehlt (Vault google_oauth_refresh_token_dm) — skip");
+    return json(200, { skipped: "datamanager token not configured" });
   }
   const sinceIso = new Date(Date.now() - LOOKBACK_DAYS * 86_400_000).toISOString();
 
@@ -163,65 +166,99 @@ Deno.serve(async (req: Request) => {
     });
   }
 
-  // 4) Upload (eine Batch reicht — Volumen ~Dutzende, Limit 2000)
-  const payloads = candidates.map((c) => buildClickConversion(c, QUALIFIED_LEAD_ACTION)!);
+  // 4) Upload via Data Manager API (events:ingest, seit 19.08. — der alte
+  // uploadClickConversions ist für neue Integrationen gesperrt). Fast-fail:
+  // erst der ganze Batch; wirft ein Datenproblem HTTP 400, isolieren wir
+  // per Einzel-Ingest, damit EIN kaputter Datensatz nicht alle blockiert.
+  const conversionAction = `customers/9240286999/conversionActions/${QUALIFIED_LEAD_ACTION_ID}`;
+  const dmEvents = candidates.map((c) => buildDmEvent(c, DESTINATION_REFERENCE)!);
   const accessToken = await fetchAccessToken(secrets);
-  let resp;
-  try {
-    resp = await uploadClickConversions(accessToken, secrets, payloads);
-  } catch (e) {
-    // Request-Level-Fehler: nichts markieren, nächster Lauf versucht erneut.
-    console.error("upload-offline-conversions:", e instanceof Error ? e.message : String(e));
-    return json(502, { error: "upload failed, will retry next run" });
-  }
 
-  const failures = parsePartialFailures(resp.partialFailureError);
   const rows: Array<Record<string, unknown>> = [];
   let uploaded = 0;
   let permanent = 0;
   let retriable = 0;
-  candidates.forEach((c, i) => {
-    const failure = failures.get(i);
-    const click = pickClickId(c)!;
-    if (!failure) {
-      uploaded++;
-      rows.push({
-        lead_id: c.leadId,
-        conversion_action: QUALIFIED_LEAD_ACTION,
-        click_id: click.id,
-        click_id_type: click.type,
-        conversion_at: c.conversionAt,
-        status: "uploaded",
-      });
-    } else if (classifyFailure(failure.code) === "permanent") {
-      permanent++;
-      rows.push({
-        lead_id: c.leadId,
-        conversion_action: QUALIFIED_LEAD_ACTION,
-        click_id: click.id,
-        click_id_type: click.type,
-        conversion_at: c.conversionAt,
-        status: "permanent_failure",
-        detail: `${failure.code}: ${failure.message}`.slice(0, 500),
-      });
-    } else {
-      retriable++;
-      console.warn(`retriable failure lead=${c.leadId}: ${failure.code} ${failure.message}`);
-    }
-  });
 
+  const markUploaded = (c: QualifiedLeadCandidate, requestId?: string) => {
+    uploaded++;
+    const click = pickClickId(c)!;
+    rows.push({
+      lead_id: c.leadId,
+      conversion_action: conversionAction,
+      click_id: click.id,
+      click_id_type: click.type,
+      conversion_at: c.conversionAt,
+      status: "uploaded",
+      detail: requestId ? `dm requestId ${requestId}` : null,
+    });
+  };
+  const markPermanent = (c: QualifiedLeadCandidate, detail: string) => {
+    permanent++;
+    const click = pickClickId(c)!;
+    rows.push({
+      lead_id: c.leadId,
+      conversion_action: conversionAction,
+      click_id: click.id,
+      click_id_type: click.type,
+      conversion_at: c.conversionAt,
+      status: "permanent_failure",
+      detail: detail.slice(0, 500),
+    });
+  };
+
+  let batch;
+  try {
+    batch = await ingestEvents(accessToken, dmEvents);
+  } catch (e) {
+    console.error("upload-offline-conversions ingest:", e instanceof Error ? e.message : String(e));
+    return json(502, { error: "ingest failed, will retry next run" });
+  }
+
+  if (batch.ok) {
+    candidates.forEach((c) => markUploaded(c, batch.requestId));
+  } else if (batch.status === 400) {
+    // Datenproblem im Batch → Einzel-Isolierung (Volumen ist klein).
+    console.warn("Batch-Ingest 400 — isoliere per Einzel-Event:", batch.body.slice(0, 300));
+    for (let i = 0; i < candidates.length; i++) {
+      try {
+        const single = await ingestEvents(accessToken, [dmEvents[i]]);
+        if (single.ok) markUploaded(candidates[i], single.requestId);
+        else if (single.status === 400) markPermanent(candidates[i], `HTTP 400: ${single.body}`);
+        else {
+          retriable++;
+          console.warn(`retriable lead=${candidates[i].leadId}: HTTP ${single.status}`);
+        }
+      } catch (e) {
+        retriable++;
+        console.warn(`retriable lead=${candidates[i].leadId}:`, e instanceof Error ? e.message : String(e));
+      }
+    }
+  } else {
+    // Auth/Quota/5xx — kompletter Lauf retriable, nichts markieren.
+    console.error(`Batch-Ingest HTTP ${batch.status}: ${batch.body.slice(0, 300)}`);
+    return json(502, { error: `ingest HTTP ${batch.status}, will retry next run` });
+  }
+
+  let persisted = 0;
+  let persistError: string | null = null;
   if (rows.length > 0) {
     const { error: insErr } = await supabase
       .from("offline_conversion_uploads")
       .upsert(rows, { onConflict: "lead_id" });
     if (insErr) {
-      // Upload war erfolgreich, nur das Festschreiben scheiterte — nächster
-      // Lauf lädt erneut hoch, Google dedupliziert über orderId. Laut loggen.
+      // Upload war ggf. erfolgreich, nur das Festschreiben scheiterte —
+      // nächster Lauf lädt erneut, Google dedupliziert über transactionId.
+      // LAUT machen (steht auch im Response-Summary, nicht nur im Log).
+      persistError = insErr.message;
       console.error("upload-offline-conversions: Statusschreiben fehlgeschlagen:", insErr.message);
+    } else {
+      persisted = rows.length;
     }
   }
 
   const summary = {
+    persisted,
+    persistError,
     candidates: candidates.length,
     uploaded,
     permanentFailures: permanent,

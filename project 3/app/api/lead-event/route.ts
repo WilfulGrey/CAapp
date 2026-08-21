@@ -13,6 +13,7 @@ import {
 } from '@/lib/email';
 import { buildVertragAttachmentPdf, formatSignedAtBerlin } from '@/lib/vertrag';
 import { appendJobParam } from '@/lib/portal-url';
+import { sendezeitIso } from '@/lib/quiet-hours';
 import { createHash } from 'crypto';
 
 // Bridge endpoint: the CA-App portal reports customer milestones back to the
@@ -100,7 +101,7 @@ const TEAM_NOTIFY_RECIPIENT = 'info@primundus.de';
 // im Code (lib/vertrag.ts); ohne Version würden alte Verträge nach einer
 // Textänderung mit NEUEM Wortlaut re-rendern. Bump NUR mit bewusster
 // Textänderung (alten Text dann als eingefrorene Version behalten).
-const CONTRACT_VERSION = 'v1.1';
+const CONTRACT_VERSION = 'v1.2';
 // Zusätzliche BCC-Empfänger NUR für die Accept-/Buchungs-Team-Mail
 // (application_accepted_internal). Andere Team-Notifications behalten den
 // Default-BCC (SMTP_BCC = info@primundus.de,info@mamamia.app). Kommasepariert.
@@ -322,7 +323,7 @@ async function getOrCreateCanonicalContract(
     attachment = await buildVertragAttachmentPdf(snapshot as any, {
       signaturName,
       signedAt: (signedAtIso ? formatSignedAtBerlin(signedAtIso) : undefined) ?? legacyLabel ?? undefined,
-      auditNote: 'Vertragsversion v1.1',
+      auditNote: 'Vertragsversion v1.2',
     });
   } catch (e) {
     console.error('buildVertragAttachmentPdf failed:', e instanceof Error ? e.message : String(e));
@@ -476,6 +477,11 @@ async function scheduleReactionReminder(
   caregiver: CaregiverDisplay,
   caregiverId: number | string | undefined,
   jobOfferId: number | null,
+  // Rohwert der Deutsch-Stufe aus der Event-Metadata. Muss durchgereicht
+  // werden: das `metadata` des Requests ist in dieser Funktion nicht in
+  // Reichweite — der Griff danach traf die lokale Konstante unten und
+  // damit sich selbst (ReferenceError zur Laufzeit, Build-Stopp).
+  germanySkillRoh: unknown,
 ): Promise<void> {
   // Pflegekraft-Snapshot für den Mail-Build beim Versand. Photo-URL ist
   // eine presigned S3-URL mit 30 Min Gültigkeit — beim 1h/4h/12h-Reminder
@@ -489,6 +495,9 @@ async function scheduleReactionReminder(
     caregiver_years_experience: caregiver.yearsExperience ?? null,
     caregiver_einsatz_count: caregiver.einsatzCount ?? null,
     caregiver_age: caregiver.age ?? null,
+    // Rohwert mitschleifen, damit der Versand frisch beschriften kann
+    // (Schnappschuss-Falle wie Registry-Bug #34).
+    caregiver_germany_skill: germanySkillRoh ?? null,
     caregiver_german_level: caregiver.germanLevel ?? null,
     caregiver_photo_url: caregiver.photoUrl ?? null,
     caregiver_about_text: caregiver.aboutText ?? null,
@@ -503,7 +512,11 @@ async function scheduleReactionReminder(
     : REMINDER_DELAYS_APPLICATION_MIN;
 
   for (const { emailType, delay } of tiers) {
-    const scheduledFor = new Date(Date.now() + delay * 60 * 1000).toISOString();
+    // Nachtruhe (Martin, 19.08.): faellt die Erinnerung zwischen 21:00 und
+    // 08:00 Berliner Zeit, wird sie auf 8:00 morgens geschoben. Der
+    // 12-Stunden-Tier war der groesste Nacht-Sender (72 Mails in 30 Tagen),
+    // weil eine Bewerbung am fruehen Nachmittag zwangslaeufig nachts erinnert.
+    const scheduledFor = sendezeitIso(new Date(Date.now() + delay * 60 * 1000));
     try {
       await supabaseAdmin.from('scheduled_emails').insert({
         lead_id: leadId,
@@ -1132,6 +1145,9 @@ async function handlePost(request: NextRequest) {
                   caregiver,
                   caregiverIdRaw,
                   mamamiaJobOfferId,
+                  metadata && typeof metadata === 'object'
+                    ? (metadata as Record<string, unknown>).caregiver_germany_skill ?? null
+                    : null,
                 );
               }
             })

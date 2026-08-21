@@ -1,44 +1,39 @@
-// Google Ads REST v23 — minimaler Client für den Offline-Conversion-Upload.
-// Kein SDK: Token-Refresh + ein Upload-Call, mehr braucht der Job nicht.
+// Google Data Manager API — Transport für den Offline-Conversion-Upload.
+//
+// Seit 19.08.2026: `events:ingest` (datamanager.googleapis.com) statt
+// ConversionUploadService.UploadClickConversions — der alte Endpoint ist für
+// neue Integrationen gesperrt (CUSTOMER_NOT_ALLOWLISTED_FOR_THIS_FEATURE;
+// vier Cron-Läufe 15.–19.08. scheiterten so unsichtbar als „retriable").
+// Eigener OAuth-Scope https://www.googleapis.com/auth/datamanager → eigener
+// Refresh-Token (Vault: google_oauth_refresh_token_dm, via RPC
+// get_google_ads_secrets.dmRefreshToken; Migration 20260819120000).
 
-import type { ClickConversionPayload } from "./conversions.ts";
+import type { DmEvent } from "./conversions.ts";
 
 export interface GoogleAdsSecrets {
-  developerToken: string;
   clientId: string;
   clientSecret: string;
-  refreshToken: string;
+  /** Scope datamanager — NUR für events:ingest. Leer = Upload skippt. */
+  dmRefreshToken: string;
 }
 
-// Kunden-IDs Primundus (Kundenkonto + Verwaltungskonto). Per Env
-// überschreibbar (Staging/Test), Default = Prod-Realität.
 export const CUSTOMER_ID = Deno.env.get("GOOGLE_ADS_CUSTOMER_ID") ?? "9240286999";
 export const LOGIN_CUSTOMER_ID = Deno.env.get("GOOGLE_ADS_LOGIN_CUSTOMER_ID") ?? "6512570737";
 
-// Conversion-Aktion „Qualifizierter Lead (Patientendaten)" — angelegt
-// 14.08.2026 via API (type UPLOAD_CLICKS, category QUALIFIED_LEAD,
-// secondary). Siehe docs/google-ads-tracking.md.
-export const QUALIFIED_LEAD_ACTION = Deno.env.get("GOOGLE_ADS_QUALIFIED_LEAD_ACTION") ??
-  `customers/${CUSTOMER_ID}/conversionActions/7720728390`;
+// Conversion-Aktion „Qualifizierter Lead (Patientendaten)" — als
+// productDestinationId braucht Data Manager NUR die numerische ID.
+export const QUALIFIED_LEAD_ACTION_ID = Deno.env.get("GOOGLE_ADS_QUALIFIED_LEAD_ACTION_ID") ?? "7720728390";
+export const DESTINATION_REFERENCE = "qualified_lead";
 
-// Secrets: Env zuerst (falls jemand sie doch als Function-Secrets setzt),
-// sonst Supabase Vault via RPC get_google_ads_secrets (Migration
-// 20260814122000). Hintergrund: das CLI-Token darf auf diesem Projekt
-// keine Function-Env-Secrets setzen (403) — der Vault ist der Weg, den
-// auch get_smtp_config nutzt. Fehlen beide Quellen → null (Function
-// skippt inert, z. B. Staging).
 export async function readSecrets(
   supabase: { rpc: (fn: string) => PromiseLike<{ data: unknown; error: { message: string } | null }> },
 ): Promise<GoogleAdsSecrets | null> {
   const fromEnv: GoogleAdsSecrets = {
-    developerToken: Deno.env.get("GOOGLE_ADS_DEVELOPER_TOKEN") ?? "",
     clientId: Deno.env.get("GOOGLE_OAUTH_CLIENT_ID") ?? "",
     clientSecret: Deno.env.get("GOOGLE_OAUTH_CLIENT_SECRET") ?? "",
-    refreshToken: Deno.env.get("GOOGLE_OAUTH_REFRESH_TOKEN") ?? "",
+    dmRefreshToken: Deno.env.get("GOOGLE_OAUTH_REFRESH_TOKEN_DM") ?? "",
   };
-  if (fromEnv.developerToken && fromEnv.clientId && fromEnv.clientSecret && fromEnv.refreshToken) {
-    return fromEnv;
-  }
+  if (fromEnv.clientId && fromEnv.clientSecret && fromEnv.dmRefreshToken) return fromEnv;
 
   const { data, error } = await supabase.rpc("get_google_ads_secrets");
   if (error) {
@@ -47,13 +42,12 @@ export async function readSecrets(
   }
   const v = (data ?? {}) as Record<string, unknown>;
   const s: GoogleAdsSecrets = {
-    developerToken: typeof v.developerToken === "string" ? v.developerToken : "",
     clientId: typeof v.clientId === "string" ? v.clientId : "",
     clientSecret: typeof v.clientSecret === "string" ? v.clientSecret : "",
-    refreshToken: typeof v.refreshToken === "string" ? v.refreshToken : "",
+    dmRefreshToken: typeof v.dmRefreshToken === "string" ? v.dmRefreshToken : "",
   };
-  if (!s.developerToken || !s.clientId || !s.clientSecret || !s.refreshToken) return null;
-  return s;
+  if (!s.clientId || !s.clientSecret) return null;
+  return s; // dmRefreshToken darf leer sein → Handler skippt mit klarer Meldung
 }
 
 export async function fetchAccessToken(s: GoogleAdsSecrets): Promise<string> {
@@ -63,7 +57,7 @@ export async function fetchAccessToken(s: GoogleAdsSecrets): Promise<string> {
     body: new URLSearchParams({
       client_id: s.clientId,
       client_secret: s.clientSecret,
-      refresh_token: s.refreshToken,
+      refresh_token: s.dmRefreshToken,
       grant_type: "refresh_token",
     }),
   });
@@ -75,33 +69,44 @@ export async function fetchAccessToken(s: GoogleAdsSecrets): Promise<string> {
   return data.access_token;
 }
 
-export interface UploadResponse {
-  results?: Array<Record<string, unknown>>;
-  partialFailureError?: unknown;
+export interface IngestResult {
+  ok: boolean;
+  status: number;
+  requestId?: string;
+  body: string;
 }
 
-export async function uploadClickConversions(
+// Fast-fail-Semantik: EIN fehlerhaftes Event lässt den ganzen Request mit
+// HTTP 400 scheitern — der Handler isoliert dann per Einzel-Ingest.
+export async function ingestEvents(
   accessToken: string,
-  s: GoogleAdsSecrets,
-  conversions: ClickConversionPayload[],
-): Promise<UploadResponse> {
-  const resp = await fetch(
-    `https://googleads.googleapis.com/v23/customers/${CUSTOMER_ID}:uploadClickConversions`,
-    {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${accessToken}`,
-        "developer-token": s.developerToken,
-        "login-customer-id": LOGIN_CUSTOMER_ID,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ conversions, partialFailure: true }),
+  events: DmEvent[],
+  validateOnly = false,
+): Promise<IngestResult> {
+  const resp = await fetch("https://datamanager.googleapis.com/v1/events:ingest", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      "Content-Type": "application/json",
     },
-  );
-  if (!resp.ok) {
-    // Request-Level-Fehler (Auth, Quota, …) — kompletter Lauf retriable,
-    // NICHTS wird als hochgeladen markiert.
-    throw new Error(`uploadClickConversions failed: HTTP ${resp.status} ${(await resp.text()).slice(0, 300)}`);
-  }
-  return await resp.json();
+    body: JSON.stringify({
+      validateOnly,
+      destinations: [{
+        reference: DESTINATION_REFERENCE,
+        operatingAccount: { accountType: "GOOGLE_ADS", accountId: CUSTOMER_ID },
+        loginAccount: { accountType: "GOOGLE_ADS", accountId: LOGIN_CUSTOMER_ID },
+        productDestinationId: QUALIFIED_LEAD_ACTION_ID,
+      }],
+      // Einwilligung kommt vom Cookie-Banner des Kostenrechners; ohne sie
+      // entsteht gar kein gclid-Lead (Erfassung ist consent-gated).
+      consent: { adUserData: "CONSENT_GRANTED", adPersonalization: "CONSENT_GRANTED" },
+      events,
+    }),
+  });
+  const body = (await resp.text()).slice(0, 1000);
+  let requestId: string | undefined;
+  try {
+    requestId = JSON.parse(body)?.requestId;
+  } catch { /* body kein JSON — egal */ }
+  return { ok: resp.ok, status: resp.status, requestId, body };
 }

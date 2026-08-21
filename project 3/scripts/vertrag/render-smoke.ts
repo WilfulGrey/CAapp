@@ -41,7 +41,7 @@ const CASES: Array<{ name: string; daten: VertragInput; opts: VertragHtmlOptions
       voraussAbreise: '13.10.2026',
       tagessatz: 'EUR 123,00',
     },
-    opts: { signaturName: 'Grzegorz Brzęczyszczykiewicz', signedAt: '05.08.2026 um 14:30 Uhr', auditNote: 'Vertragsversion v1.1' },
+    opts: { signaturName: 'Grzegorz Brzęczyszczykiewicz', signedAt: '05.08.2026 um 14:30 Uhr', auditNote: 'Vertragsversion v1.2' },
     mustContain: ['Grzegorz Brzęczyszczykiewicz', 'EUR 123,00', '24.08.2026', '13.10.2026', 'Königsallee 42a', '05.08.2026 um 14:30 Uhr'],
   },
   {

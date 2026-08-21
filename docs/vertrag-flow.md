@@ -136,7 +136,11 @@ zmianą treści. **Zamrożenie starej wersji = bajty kanonów w buckecie** (buck
 `upsert:false`), NIE martwy kod — repo trzyma wyłącznie AKTUALNĄ treść. Historia wersji:
 **v1.0** (do 2026-08-12) = § 1 z 10 punktami; **v1.1** (od 2026-08-12, Registry #32) =
 § 1 z 9 punktami — usunięty pkt 10 (telefon z rozmowami do kraju opiekunki + internet,
-decyzja Michała). Mustervertrag (`public/primundus-mustervertrag.pdf` + kopia na
+decyzja Michała); **v1.2** (od 2026-08-21, Registry #37) = § 4 pkt 8 z enumeratywną listą
+Feiertagów (Karfreitag, Ostersonntag, Ostermontag, 1. Mai, Heiligabend, 1.+2. Weihnachtstag,
+Silvester, Neujahrstag) zamiast „an gesetzlichen Feiertagen" — wyrównanie z tym, co pricing
+portalu (`holidaysForYear`) i FAQ faktycznie liczą/pokazują (lista ≠ święta ustawowe w obie
+strony). Mustervertrag (`public/primundus-mustervertrag.pdf` + kopia na
 primundus.de) generowany z renderera: `scripts/vertrag/render-muster.ts` (pusty input,
 blok auditBanner odfiltrowany).
 

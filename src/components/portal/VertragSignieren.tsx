@@ -31,7 +31,7 @@ const DUMMY: VertragsDaten = {
   vertragsbeginn: '19.05.2026',
   voraussAbreise: '19.07.2026',
   tagessatz: 'EUR 95,00',
-  dl: { name: 'Kamila Bilska-Wabik', rolle: 'Vitanas Group' }, // signaturImg → echter Scan später
+  dl: { name: 'Karolina Jakubowska', rolle: 'Geschäftsführerin' }, // signaturImg → echter Scan später
 };
 
 // Statische §§ — Wortlaut 1:1 dem Mustervertrag (dist/primundus-mustervertrag.pdf)
@@ -84,7 +84,7 @@ const PARAGRAPHEN: { titel: string; punkte: Punkt[] }[] = [
         text: 'Die wöchentliche durchschnittliche Arbeitszeit darf 40 Stunden nicht überschreiten. Außerhalb der Arbeitszeit steht es der Betreuungsperson frei, den Leistungsort zu verlassen.',
       },
       // § 1 pkt 10 (telefon/internet dla opiekunki) usunięty 2026-08-12 —
-      // Vertragsversion v1.1; trzymać w sync z project 3/lib/vertrag-content.ts.
+      // Vertragsversion v1.2; trzymać w sync z project 3/lib/vertrag-content.ts.
     ],
   },
   {
@@ -153,7 +153,7 @@ const PARAGRAPHEN_2: { titel: string; punkte: Punkt[] }[] = [
     titel: '§ 8 Widerrufsrecht',
     punkte: [
       {
-        text: 'Dem AG steht das Recht zu, diesen Vertrag ohne Angabe von Gründen innerhalb von 14 Tagen in Textform zu widerrufen. Die Widerrufsfrist beginnt mit Unterzeichnung dieses Vertrages. Widerruf an: Primundus Deutschland (VITANAS CARE LTD HOME SK), ul. Poznańska 21/48, 00-685 Warszawa.',
+        text: 'Dem AG steht das Recht zu, diesen Vertrag ohne Angabe von Gründen innerhalb von 14 Tagen in Textform zu widerrufen. Die Widerrufsfrist beginnt mit Unterzeichnung dieses Vertrages. Widerruf an: PRIMUNDUS Sp. z o.o., Poznańska 21/48, 00-685 Warschau, Polen.',
       },
       {
         text: 'Im Falle eines wirksamen Widerrufs sind die beiderseits empfangenen Leistungen zurückzugewähren. Der AG ist verpflichtet, dem DL Wertersatz zu leisten (z. B. entstandene Reisekosten, pauschal EUR 125,00).',
@@ -438,9 +438,9 @@ export const VertragSignieren: FC<{
 
           <div className="rounded-xl border border-gray-200 bg-[#FAF8F4] px-4 py-3 mb-2 print:break-inside-avoid">
             <p className="text-[11px] font-bold tracking-wider text-gray-500 mb-1">DIENSTLEISTER (DL)</p>
-            <p className="text-[15px] font-bold text-gray-900">PRIMUNDUS Deutschland</p>
-            <p className="text-[12px] text-gray-600">VITANAS CARE LTD HOME SK · ul. Poznańska 21/48, 00-685 Warszawa</p>
-            <p className="text-[12px] text-gray-600">NIP: 7011301447 · REGON: 544074862</p>
+            <p className="text-[15px] font-bold text-gray-900">PRIMUNDUS Sp. z o.o.</p>
+            <p className="text-[12px] text-gray-600">Poznańska 21/48, 00-685 Warschau, Polen</p>
+            <p className="text-[12px] text-gray-600">KRS: 0001259402 · NIP: 7011326714</p>
           </div>
           <p className="text-center text-[12px] text-gray-500">im Folgenden <strong>Dienstleister (DL oder PRIMUNDUS)</strong> genannt.</p>
         </div>
@@ -479,7 +479,7 @@ export const VertragSignieren: FC<{
               <li className="flex gap-2"><span className="text-gray-400">5.</span><span className="text-justify">Sollten sich die Betreuungsbedürfnisse der zu betreuenden Person ändern, behält sich der DL das Recht zur Anpassung des Honorars vor.</span></li>
               <li className="flex gap-2"><span className="text-gray-400">6.</span><span className="text-justify">Im Falle einer Arbeitsunfähigkeit der Betreuungsperson wird für die Zeit der Verhinderung kein Honorar berechnet.</span></li>
               <li className="flex gap-2"><span className="text-gray-400">7.</span><span className="text-justify">Der Anreisetag und der Abreisetag werden als volle Dienstleistungstage berechnet. Bei einem Personalwechsel wird der volle Tagessatz für beide Betreuungspersonen berechnet.</span></li>
-              <li className="flex gap-2"><span className="text-gray-400">8.</span><span className="text-justify">An gesetzlichen Feiertagen wird der doppelte Tagessatz berechnet.</span></li>
+              <li className="flex gap-2"><span className="text-gray-400">8.</span><span className="text-justify">Ausgewählte Feiertage (Karfreitag, Ostersonntag, Ostermontag, 1. Mai, Heiligabend, 1. und 2. Weihnachtstag, Silvester und Neujahrstag) werden mit einem doppelten Tagessatz berechnet.</span></li>
               <li className="flex gap-2"><span className="text-gray-400">9.</span><span className="text-justify">In den Sommermonaten Juli und August wird ein Sommerzuschlag von 6,67 € pro Tag berechnet.</span></li>
               <li className="flex gap-2"><span className="text-gray-400">10.</span><span className="text-justify">Nach der aktuellen Gesetzeslage ist auf die Dienstleistungen des DL keine gesetzliche Mehrwertsteuer zu entrichten.</span></li>
               <li className="flex gap-2"><span className="text-gray-400">11.</span><span className="text-justify">Bei Zahlungsverzug hat der DL das Recht, Dritte mit der Rechnungsabwicklung zu beauftragen und Verzugszinsen in Höhe von 5 Prozent p. a. über dem jeweiligen Basiszinssatz zu berechnen.</span></li>
@@ -519,7 +519,7 @@ export const VertragSignieren: FC<{
                   <span className="text-2xl text-[#1f3a8a]" style={{ fontFamily: '"Snell Roundhand","Segoe Script","Brush Script MT",cursive' }}>{daten.dl.name}</span>
                 )}
               </div>
-              <div className="border-t border-gray-400 pt-1 text-[11px] text-gray-500">i. A. {daten.dl.name}, {daten.dl.rolle} · Warszawa, {daten.datum}</div>
+              <div className="border-t border-gray-400 pt-1 text-[11px] text-gray-500">i. A. {daten.dl.name}, {daten.dl.rolle} · Warschau, {daten.datum}</div>
             </div>
           </div>
 
@@ -533,7 +533,7 @@ export const VertragSignieren: FC<{
                   : ` Sie erhalten umgehend eine Kopie des unterschriebenen Vertrags per E-Mail an ${daten.ag.email}.`}
               </p>
               <p className="text-[11px] text-green-600/80 mt-2">
-                Audit: einfache elektronische Signatur · Zeitstempel + IP protokolliert · Vertragsversion v1.1
+                Audit: einfache elektronische Signatur · Zeitstempel + IP protokolliert · Vertragsversion v1.2
               </p>
               {onSigned && !embedded && !readOnly && (
                 <button onClick={() => onSigned(name)}

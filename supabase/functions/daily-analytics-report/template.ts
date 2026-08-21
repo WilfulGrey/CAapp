@@ -57,8 +57,23 @@ export function buildReportEmail(opts: {
   mailHealth?: { failed24h: number; overduePending: number; samples: Array<{ type: string; error: string }> };
   prevPeriod?: PeriodStats;   // die 7 Tage VOR der Vergleichsperiode (Trend)
   agentNotes?: { notes: Array<{ source: string; note: string }>; error?: string };
+  /** Google-Ads-Kosten (SEA, 16.08.) — null/undefined = Block entfällt (fail-soft). */
+  adsSpend?: { yesterday: number; period: number; periodDays: number } | null;
 }): { subject: string; html: string; text: string } {
-  const { yesterday, period, yesterdayLabel, periodLabel, totalLeads, bookedCustomers, totalBookings, siteUrl, mailHealth, prevPeriod, agentNotes } = opts;
+  const { yesterday, period, yesterdayLabel, periodLabel, totalLeads, bookedCustomers, totalBookings, siteUrl, mailHealth, prevPeriod, agentNotes, adsSpend } = opts;
+
+  // Ads-Kosten je Stufe (auf Martins Wunsch 16.08.: Spend, €/Lead,
+  // €/Patientenprofil — bewusst OHNE Kunden-Stufe). Blended: Spend ÷ ALLE
+  // Leads (auch organische) — Kanal-genau wird es erst mit gclid-Historie.
+  const euro = (n: number) => `${n.toFixed(2).replace(".", ",")} €`;
+  const perPiece = (spend: number, count: number) => (count > 0 ? euro(spend / count) : "—");
+  const adsRows = adsSpend
+    ? [
+      { label: "Ads-Kosten", g: euro(adsSpend.yesterday), p: euro(adsSpend.period) },
+      { label: "Kosten je Lead (blended)", g: perPiece(adsSpend.yesterday, yesterday.wizardCompleted), p: perPiece(adsSpend.period, period.sums.wizardCompleted) },
+      { label: "Kosten je Patientenprofil", g: perPiece(adsSpend.yesterday, yesterday.patientDataSaved), p: perPiece(adsSpend.period, period.sums.patientDataSaved) },
+    ]
+    : [];
 
   const mailAlarm = mailHealth && (mailHealth.failed24h > 0 || mailHealth.overduePending > 0);
 
@@ -269,6 +284,23 @@ ${mailAlarmHtml}
           <tbody>${convRowsHtml}</tbody>
         </table>
 
+        ${adsSpend ? `<p style="margin:24px 0 8px;font-size:14px;font-weight:700;color:#3D2B1F;">Google Ads — Kosten</p>
+        <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="border:1px solid #e8ddd0;border-radius:8px;overflow:hidden;background:#fff;">
+          <thead><tr>
+            <th style="padding:8px 12px;background:#5C4A32;color:#fff;text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:0.04em;">Metrik</th>
+            <th style="padding:8px 12px;background:#5C4A32;color:#fff;text-align:right;font-size:11px;text-transform:uppercase;letter-spacing:0.04em;">Gestern</th>
+            <th style="padding:8px 12px;background:#5C4A32;color:#fff;text-align:right;font-size:11px;text-transform:uppercase;letter-spacing:0.04em;">${adsSpend.periodDays} Tage</th>
+          </tr></thead>
+          <tbody>${adsRows.map((r, i) => `<tr style="background:${i % 2 ? "#faf7f2" : "#fff"};">
+            <td style="padding:8px 12px;font-size:13px;color:#3D2B1F;">${r.label}</td>
+            <td style="padding:8px 12px;font-size:13px;color:#3D2B1F;text-align:right;font-weight:600;">${r.g}</td>
+            <td style="padding:8px 12px;font-size:13px;color:#555;text-align:right;">${r.p}</td>
+          </tr>`).join("")}</tbody>
+        </table>
+        <p style="margin:6px 0 0;font-size:11px;color:#9a8a73;line-height:1.5;">
+          Blended: Ads-Kosten ÷ alle echten Leads/Profile (auch organische). Kampagnen-genaue Kosten je Stufe folgen, sobald genug Klick-ID-Historie da ist.
+        </p>` : ""}
+
         <p style="margin:24px 0 8px;font-size:14px;font-weight:700;color:#3D2B1F;">Wizard-Funnel (Sessions pro Step, Gestern)</p>
         <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="border:1px solid #e8ddd0;border-radius:8px;overflow:hidden;background:#fff;">
           <tbody>${funnelHtml}${completionBridgeHtml}</tbody>
@@ -328,7 +360,10 @@ ${rows.map((r) => `${r.label.padEnd(50)} ${String(fmtInt(r.today)).padStart(6)} 
 CONVERSION-RATEN
 ${convRows.map((r) => `  ${r.label.padEnd(50)} ${r.today.padStart(6)}   Ø ${fmtPct(r.avg).padStart(6)}`).join("\n")}
 
-WIZARD-FUNNEL (Gestern)
+${adsSpend ? `GOOGLE ADS — KOSTEN (blended)
+${adsRows.map((r) => `  ${r.label.padEnd(30)} ${r.g.padStart(10)}   ${adsSpend.periodDays}T ${r.p.padStart(10)}`).join("\n")}
+
+` : ""}WIZARD-FUNNEL (Gestern)
 ${Array.from({ length: TOTAL_STEPS }, (_, i) => i + 1).map((s) => {
   const v = yesterday.funnelStepViewed[s] ?? 0;
   const next = s === TOTAL_STEPS

@@ -215,7 +215,13 @@ export async function fetchDailyStats(
 // Zeitraum gebaut (nicht avg der Tages-Rates), damit kleine Tage mit
 // wenig Traffic die Rate nicht verzerren.
 export interface PeriodStat { avg: number; top: number; topDate: string }
+export interface PeriodSums {
+  wizardCompleted: number;
+  patientDataSaved: number;
+}
 export interface PeriodStats {
+  /** Perioden-SUMMEN (nicht Ø) — für Kosten-je-Stück-Rechnungen (Ads). */
+  sums: PeriodSums;
   visitors: PeriodStat;
   wizardStarted: PeriodStat;
   wizardCompleted: PeriodStat;
@@ -276,6 +282,7 @@ export async function fetchPeriodStats(
   const bookingsSum = sumOf((s) => s.bookings);
 
   return {
+    sums: { wizardCompleted: wizardCompletedSum, patientDataSaved: patientDataSavedSum },
     visitors: aggregate((s) => s.visitors),
     wizardStarted: aggregate((s) => s.wizardStarted),
     wizardCompleted: aggregate((s) => s.wizardCompleted),
@@ -411,4 +418,54 @@ export async function fetchAgentNotes(supabase: SupabaseClient, sinceIso: string
     .limit(20);
   if (error) return { notes: [], error: error.message };
   return { notes: (data ?? []).map((r: { source?: string; note?: string }) => ({ source: String(r.source || "?"), note: String(r.note || "") })) };
+}
+
+// ─── Google-Ads-Kosten (SEA, 16.08.) ───────────────────────────────────────
+// Spend gestern + Perioden-Summe fürs Kosten-je-Stück im Report. Fail-soft:
+// jeder Fehler (fehlende Vault-Secrets auf Staging, API-Ausfall) → null,
+// die Mail geht IMMER raus — dann ohne Ads-Block.
+
+import {
+  adsSearch,
+  fetchAdsAccessToken,
+  getGoogleAdsSecrets,
+} from "../_shared/googleAdsAuth.ts";
+
+export interface AdsSpend {
+  yesterday: number; // € am Report-Tag (Berlin-Kalendertag = Konto-Zeitzone)
+  period: number;    // € Summe der letzten `periodDays` Tage bis gestern
+  periodDays: number;
+}
+
+export async function fetchAdsSpend(
+  supabase: SupabaseClient,
+  periodDays: number,
+  daysAgo = 1,
+): Promise<AdsSpend | null> {
+  try {
+    const secrets = await getGoogleAdsSecrets(supabase);
+    if (!secrets) {
+      console.log("fetchAdsSpend: keine Google-Secrets (Staging?) — Ads-Block entfällt");
+      return null;
+    }
+    const endIso = berlinDayRange(daysAgo).iso;
+    const startIso = berlinDayRange(daysAgo + periodDays - 1).iso;
+    const token = await fetchAdsAccessToken(secrets);
+    const rows = await adsSearch(
+      token,
+      secrets,
+      `SELECT segments.date, metrics.cost_micros FROM campaign WHERE segments.date BETWEEN '${startIso}' AND '${endIso}'`,
+    );
+    let period = 0;
+    let yesterday = 0;
+    for (const r of rows) {
+      const cost = Number((r as any)?.metrics?.costMicros ?? 0) / 1e6;
+      period += cost;
+      if ((r as any)?.segments?.date === endIso) yesterday += cost;
+    }
+    return { yesterday, period, periodDays };
+  } catch (e) {
+    console.error("fetchAdsSpend:", e instanceof Error ? e.message : String(e));
+    return null;
+  }
 }

@@ -135,7 +135,7 @@ export default function KalkulationPage() {
           <div className="flex items-center justify-between px-6 py-4 border-b-2 border-[#B5A184]">
             <Image src="/images/primundus_logo_header.webp" alt="Primundus" width={160} height={45} className="h-8 w-auto object-contain" />
             <div className="flex items-center gap-3">
-              <Image src="/images/ilka-wysocki_pm-mallorca.webp" alt="Ilka Wysocki" width={34} height={34} className="w-9 h-9 rounded-full object-cover object-top border border-[#F0997B] hidden sm:block flex-shrink-0" />
+              <Image src="/images/ilka-wysocki-2026.webp" alt="Ilka Wysocki" width={34} height={34} className="w-9 h-9 rounded-full object-cover object-top border border-[#F0997B] hidden sm:block flex-shrink-0" />
               <div className="flex flex-col items-end">
                 <a href="tel:+4989200000830" className="flex items-center gap-1 text-[#8B6914] text-sm font-semibold">
                   <Phone className="w-3 h-3" /> 089 200 000 830
@@ -320,7 +320,7 @@ export default function KalkulationPage() {
         {/* ILKA BOX */}
         <div className="bg-[#FFF8F6] rounded-2xl border border-[#F0C4B4] overflow-hidden shadow-sm mb-3">
           <div className="flex gap-4 p-5 items-start">
-            <Image src="/images/ilka-wysocki_pm-mallorca.webp" alt="Ilka Wysocki" width={56} height={56} className="w-14 h-14 rounded-full object-cover object-top border-2 border-[#F0997B] flex-shrink-0" />
+            <Image src="/images/ilka-wysocki-2026.webp" alt="Ilka Wysocki" width={56} height={56} className="w-14 h-14 rounded-full object-cover object-top border-2 border-[#F0997B] flex-shrink-0" />
             <div>
               <div className="text-sm font-bold text-[#2D1F0F]">Ilka Wysocki</div>
               <div className="text-xs text-gray-400 mb-2">Ihre persönliche Beraterin · Mo–So, 8:00–20:00 Uhr</div>
