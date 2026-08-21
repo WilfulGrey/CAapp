@@ -60,6 +60,9 @@ export function isOldEnough(conversionAtIso: string, nowMs: number, minAgeHours 
 export function buildDmEvent(
   c: QualifiedLeadCandidate,
   destinationReference: string,
+  // Dedup-Schlüssel bei Google; Buchungen nutzen ein Präfix, damit sie nie
+  // mit der Qualified-Lead-Conversion desselben Leads kollidieren.
+  transactionId: string = c.leadId,
 ): DmEvent | null {
   const click = pickClickId(c);
   if (!click) return null;
@@ -67,7 +70,7 @@ export function buildDmEvent(
     destinationReferences: [destinationReference],
     eventTimestamp: formatRfc3339(c.conversionAt),
     eventSource: "WEB",
-    transactionId: c.leadId,
+    transactionId,
     adIdentifiers: { [click.type]: click.id },
   };
   if (typeof c.value === "number" && Number.isFinite(c.value) && c.value > 0) {
