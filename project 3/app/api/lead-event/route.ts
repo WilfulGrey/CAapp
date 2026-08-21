@@ -477,6 +477,11 @@ async function scheduleReactionReminder(
   caregiver: CaregiverDisplay,
   caregiverId: number | string | undefined,
   jobOfferId: number | null,
+  // Rohwert der Deutsch-Stufe aus der Event-Metadata. Muss durchgereicht
+  // werden: das `metadata` des Requests ist in dieser Funktion nicht in
+  // Reichweite — der Griff danach traf die lokale Konstante unten und
+  // damit sich selbst (ReferenceError zur Laufzeit, Build-Stopp).
+  germanySkillRoh: unknown,
 ): Promise<void> {
   // Pflegekraft-Snapshot für den Mail-Build beim Versand. Photo-URL ist
   // eine presigned S3-URL mit 30 Min Gültigkeit — beim 1h/4h/12h-Reminder
@@ -492,7 +497,7 @@ async function scheduleReactionReminder(
     caregiver_age: caregiver.age ?? null,
     // Rohwert mitschleifen, damit der Versand frisch beschriften kann
     // (Schnappschuss-Falle wie Registry-Bug #34).
-    caregiver_germany_skill: (metadata as Record<string, unknown>).caregiver_germany_skill ?? null,
+    caregiver_germany_skill: germanySkillRoh ?? null,
     caregiver_german_level: caregiver.germanLevel ?? null,
     caregiver_photo_url: caregiver.photoUrl ?? null,
     caregiver_about_text: caregiver.aboutText ?? null,
@@ -1140,6 +1145,9 @@ async function handlePost(request: NextRequest) {
                   caregiver,
                   caregiverIdRaw,
                   mamamiaJobOfferId,
+                  metadata && typeof metadata === 'object'
+                    ? (metadata as Record<string, unknown>).caregiver_germany_skill ?? null
+                    : null,
                 );
               }
             })
