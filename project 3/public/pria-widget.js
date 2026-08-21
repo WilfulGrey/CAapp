@@ -38,8 +38,13 @@
     '  button{font:inherit;color:inherit}\n'+
     '\n'+
     '  /* ── Einstieg: nur ein Icon, so groß wie der WhatsApp-Knopf (58 px) ── */\n'+
-    '  .blase{position:fixed;right:20px;bottom:calc(20px + var(--leiste,0px));width:58px;height:58px;padding:0;border-radius:50%;\n'+
-    '    background:var(--papier);border:1px solid rgba(40,34,28,.08);box-shadow:var(--schatten-blase);\n'+
+    '  /* Auf hellen Seiten verschwand die weisse Blase im Hintergrund (Martin,\n'+
+    '     21.08.). Jetzt sitzt Pria in einem Korallring — die Hausfarbe hebt sie\n'+
+    '     vom Papier ab und sagt zugleich, wer da winkt. Der weisse Spalt dazwischen\n'+
+    '     trennt Gesicht und Ring, sonst verschwimmen Haare und Rand. */\n'+
+    '  .blase{position:fixed;right:20px;bottom:calc(20px + var(--leiste,0px));width:60px;height:60px;padding:3px;border-radius:50%;\n'+
+    '    background:linear-gradient(170deg,var(--coral-hell),var(--coral-tief));border:0;\n'+
+    '    box-shadow:0 0 0 2.5px var(--papier), var(--schatten-blase);\n'+
     '    cursor:pointer;z-index:40;display:block;\n'+
     '    /* Kein `animation ... both` mehr: dessen letztes Bild ueberschrieb jede\n'+
     '       spaetere Regel, `.blase.weg` blieb wirkungslos (fiel nur nicht auf,\n'+
@@ -438,6 +443,19 @@ function flug(chip,text){
 }
 /* Vorrat an Schnellfragen. Beantwortetes verschwindet, das Nächste rückt nach —
    niemand soll zweimal dieselbe Frage angeboten bekommen. */
+/* Was in der Pille steht, entscheidet, ob jemand den Chat ueberhaupt oeffnet.
+   Deshalb eine eigene, kurze Liste — nicht die Chip-Fragen von unten (die
+   duerfen breiter streuen). Reihenfolge nach Zugkraft (Martin, 21.08.):
+   erst der Preis, dann die Dringlichkeit, dann unser Alleinstellungsmerkmal,
+   danach die zwei grossen Einwaende. Formuliert, wie ein Angehoeriger denkt —
+   nicht wie eine FAQ-Ueberschrift. */
+const PILLENFRAGEN=[
+  'Was kostet das bei uns?',
+  'Wie schnell kann jemand da sein?',
+  'Kann ich die Pflegekraft vorher sehen?',
+  'Ist das legal — mit Anmeldung und allem?',
+  'Was passiert, wenn die Kraft krank wird?'
+];
 const SCHNELLFRAGEN=[
   'Was kostet das?',
   'Ist das legal?',
@@ -1242,7 +1260,7 @@ let darfZeigen=false;
 let frageNr=-1;
 function pilleSetzen(i){
   if(i===frageNr) return;
-  const text=SCHNELLFRAGEN[i%SCHNELLFRAGEN.length];
+  const text=PILLENFRAGEN[i%PILLENFRAGEN.length];
   if(frageNr<0){                       // erster Auftritt: ohne Wechselblende
     pillentext.textContent=text; frageNr=i; pille.classList.add('on');
     return;
