@@ -325,7 +325,11 @@ export default function HomePage() {
       <FAQSection />
       <FinalCTA />
       <Footer />
-      <WhatsAppFloat />
+      {/* Pria ersetzt den WhatsApp-Knopf, sie steht in derselben Ecke.
+          Zwei schwebende Knöpfe nebeneinander sind eine Zumutung — und
+          WhatsApp bleibt IM Chat erreichbar, sobald jemand einen Menschen
+          möchte. Ohne den Schalter ändert sich hier nichts. */}
+      {process.env.NEXT_PUBLIC_PRIA_SICHTBAR !== '1' && <WhatsAppFloat />}
     </div>
   );
 }

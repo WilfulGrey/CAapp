@@ -136,14 +136,20 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
             wird also beim BUILD gelesen, nicht bei der Anfrage. Render stellt
             die Variablen des Dienstes im Build bereit, das passt; aber ein
             Umlegen des Schalters wirkt erst nach einem Redeploy (den Render
-            beim Ändern einer Variable ohnehin auslöst). Kein NEXT_PUBLIC_:
-            der Wert gehört nicht ins Browser-Bundle. */}
+            beim Ändern einer Variable ohnehin auslöst).
+
+            NEXT_PUBLIC_, weil derselbe Schalter auch in `app/page.tsx`
+            gebraucht wird — und das ist eine Client-Komponente, die einen
+            serverseitigen Wert nicht sehen kann. Dort entscheidet er, ob der
+            WhatsApp-Knopf noch erscheint: Pria ERSETZT ihn, zwei schwebende
+            Knöpfe in derselben Ecke will niemand. Ein Feature-Schalter ist
+            kein Geheimnis, im Browser-Bundle richtet er keinen Schaden an. */}
         {/* Bewusst ein schlichtes <script defer> statt next/script: bei
             lazyOnload haengt Next das Tag erst im Browser ein, im
             ausgelieferten HTML steht dann nichts — nicht pruefbar und nicht
             vorhersagbar. So steht es in der Seite, laedt nach dem Parsen und
             blockiert nichts. */}
-        {process.env.PRIA_SICHTBAR === '1' && (
+        {process.env.NEXT_PUBLIC_PRIA_SICHTBAR === '1' && (
           <script src="/pria-widget.js" defer />
         )}
       </body>
