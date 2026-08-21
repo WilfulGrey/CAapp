@@ -125,6 +125,27 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
           </CalculatorProvider>
         </AnalyticsProvider>
         <CookieConsent />
+        {/* Pria — Beratungs-Chat, ein Schalter je Umgebung.
+
+            Staging und Prod bauen DENSELBEN Commit (siehe CLAUDE.md), sie
+            unterscheiden sich nur in der Umgebung. Genau da sitzt der
+            Schalter: `PRIA_SICHTBAR=1` im jeweiligen Render-Service. Fehlt
+            er, wird das Widget nicht einmal geladen.
+
+            ACHTUNG — die Seiten hier sind statisch vorgerendert, `process.env`
+            wird also beim BUILD gelesen, nicht bei der Anfrage. Render stellt
+            die Variablen des Dienstes im Build bereit, das passt; aber ein
+            Umlegen des Schalters wirkt erst nach einem Redeploy (den Render
+            beim Ändern einer Variable ohnehin auslöst). Kein NEXT_PUBLIC_:
+            der Wert gehört nicht ins Browser-Bundle. */}
+        {/* Bewusst ein schlichtes <script defer> statt next/script: bei
+            lazyOnload haengt Next das Tag erst im Browser ein, im
+            ausgelieferten HTML steht dann nichts — nicht pruefbar und nicht
+            vorhersagbar. So steht es in der Seite, laedt nach dem Parsen und
+            blockiert nichts. */}
+        {process.env.PRIA_SICHTBAR === '1' && (
+          <script src="/pria-widget.js" defer />
+        )}
       </body>
     </html>
   );
