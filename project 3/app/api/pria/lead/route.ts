@@ -13,6 +13,11 @@
 import { createClient } from '@supabase/supabase-js';
 import { NextResponse } from 'next/server';
 import { berechnePreis } from '@/lib/calculation';
+// Direkt im Prozess, nicht per HTTP zu sich selbst: der Selbstaufruf lief
+// lokal, scheiterte auf Render aber zuverlaessig (die Herkunft aus
+// `request.url` zeigt dort nicht dorthin, wo der Prozess erreichbar ist).
+// So bleibt es EIN Lead-Pfad, ohne Netz dazwischen.
+import { POST as angebotAnfordern } from '@/app/api/angebot-anfordern/route';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -82,9 +87,8 @@ export async function POST(request: Request) {
   try {
     const kalkulation = await berechnePreis(formularDaten as any);
 
-    // Derselbe Endpunkt wie beim Formular — ein Lead-Pfad, nicht zwei.
-    const eigen = new URL(request.url).origin;
-    const res = await fetch(`${eigen}/api/angebot-anfordern`, {
+    // Derselbe Handler wie beim Formular — ein Lead-Pfad, nicht zwei.
+    const res = await angebotAnfordern(new Request('http://intern/api/angebot-anfordern', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -95,8 +99,7 @@ export async function POST(request: Request) {
         acceptPrivacy: true,
         quelle: 'pria-chat',
       }),
-      signal: AbortSignal.timeout(30_000),
-    });
+    }) as any, undefined as any);   // withMem reicht (req, ctx) durch
 
     const daten = await res.json().catch(() => ({}));
     if (!res.ok) {
