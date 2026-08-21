@@ -68,6 +68,9 @@ const ALLOWED_EVENTS = [
   // wäre zu grob. NON_DEDUPED, weil die Antwort zweimal kommt (Tap, dann
   // Detail) und sich bei einem späteren Besuch ändern darf.
   'angebots_feedback',
+  // Rueckmeldung von der Bewertungs-Seite (/feedback aus der Bewertungs-Mail).
+  // Erster Tap und spaeteres Detail sind zwei Eintraege — wie angebots_feedback.
+  'bewertungs_feedback',
   // Alarm-Policy (2026-07-21): Buchung unterschrieben, aber Mamamia-Sync
   // unvollständig (z.B. Bewerbung von der Agentur zurückgezogen ⇒
   // StoreConfirmation dauerhaft abgelehnt). Gesendet vom
@@ -83,6 +86,9 @@ const TEAM_NOTIFY_EVENTS = [
   // Netz, falls der Kunde abbricht) und die endgültige Antwort normal —
   // sonst kämen zwei Mails pro Kunde.
   'angebots_feedback',
+  // Rueckmeldung von der Bewertungs-Seite (/feedback aus der Bewertungs-Mail).
+  // Erster Tap und spaeteres Detail sind zwei Eintraege — wie angebots_feedback.
+  'bewertungs_feedback',
   'caregiver_invited',
   'caregiver_interest_shown',
   'application_received',
@@ -120,6 +126,7 @@ const NON_DEDUPED_EVENTS = new Set([
   'offer_updated',               // Preis kann mehrfach angepasst werden
   'acceptance_sync_alarm',       // jeder Alarm-Versuch wird aufgezeichnet
   'angebots_feedback',           // Tap + Detail = zwei Einträge; darf sich später ändern
+  'bewertungs_feedback',         // Tap + Detail = zwei Einträge (Bewertungs-Seite)
 ]);
 // Customer-facing Mails (an die Lead-Email) je Event. Trigger sind die neuen
 // Caregiver-Lifecycle-Events; das eigentliche Hooking aus Mamamia kommt
@@ -975,9 +982,13 @@ async function handlePost(request: NextRequest) {
         passt_nicht: 'Passt nicht',
         spaeter: 'Vielleicht später',
         loslegen: 'Interessant',
+        // Bewertungs-Seite (/feedback): War Preis + Pflegekräfte vorab hilfreich?
+        hilfreich: 'Hilfreich',
+        teils: 'Teilweise hilfreich',
+        nein: 'Nicht hilfreich',
       };
       const additionalData: Record<string, unknown> | undefined =
-        event === 'angebots_feedback' && metadata && typeof metadata === 'object'
+        (event === 'angebots_feedback' || event === 'bewertungs_feedback') && metadata && typeof metadata === 'object'
           ? {
               feedbackText: [
                 FEEDBACK_ANTWORT[String((metadata as Record<string, unknown>).feedback_answer)]
