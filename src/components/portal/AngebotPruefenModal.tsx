@@ -78,7 +78,7 @@ export function buildVertragsDaten(
     vertragsbeginn: offer.anreisedatum,
     voraussAbreise: offer.abreisedatum,
     tagessatz: `EUR ${tagessatz},00`,
-    dl: { name: 'Kamila Bilska-Wabik', rolle: 'Vitanas Group' },
+    dl: { name: 'Karolina Jakubowska', rolle: 'Geschäftsführerin' },
   };
 }
 
