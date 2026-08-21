@@ -13,6 +13,10 @@ import { appendJobParam, reminderBookedCancel } from "./followupJobs.ts";
 // Anrede-Namen sauber schreiben (Versalien → „Ruppert") — Kopie aus lib/email.ts,
 // weil Edge Functions nicht aus lib/ importieren können. Siehe names.ts.
 import { capitalizeName as capitalize } from "./names.ts";
+// Nachtruhe-Fenster — Kopie von lib/quiet-hours.ts (Edge Fns koennen nicht aus
+// lib/ importieren); Aenderungen immer in BEIDEN Dateien.
+import { sendezeitIso } from "./quietHours.ts";
+import { deutschStufe } from "./deutschStufe.ts";
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
@@ -201,7 +205,15 @@ function buildEmailWrapper(lead: Lead, siteUrl: string, content: string): string
 }
  
 function buildIlkaSig(siteUrl: string): string {
-  const ilkaUrl = `${siteUrl}/images/ilka-wysocki_pm-mallorca.webp`;
+  // Ilkas Foto kommt aus primundus.de statt vom Kostenrechner (20.08.):
+  // Beide Dienste deployen unabhaengig voneinander. Nach dem Foto-Wechsel
+  // (#481) war die neue Datei auf primundus.de sofort da, der
+  // Kostenrechner-Build haing >45 Min in Renders Warteschlange — in dieser
+  // Zeit verlinkte JEDE Mail ein 404 (eine Kundenmail um 07:50 war
+  // betroffen). Die Mail-Funktion deployt manuell und ist damit IMMER
+  // schneller als der Kostenrechner; Bilder gehoeren deshalb an die
+  // Adresse, die unabhaengig davon steht.
+  const ilkaUrl = "https://primundus.de/images/ilka-wysocki-2026.webp";
   const testUrl = `${siteUrl}/images/primundus_testsieger-2021.webp`;
   const mediaBase = `${siteUrl}/images/media`;
   return `
@@ -489,13 +501,13 @@ function withMailMark(url: string, m: string): string {
   return url.includes("?") ? `${url}&m=${m}` : `${url}?m=${m}`;
 }
 
-// Bestpreis-PS — kurzer Reinforcer für Nurture-Mails (Eingangsbestätigung,
-// Nachfass_1). Bewusst NICHT in Nachfass_2/_3, die als minimale persönliche
-// Nachfrage gestaltet sind. Claim abgesichert ("vergleichbare Leistung").
-const BESTPREIS_PS_TEXT =
-  "P.S. Kennen Sie schon die Primundus-Bestpreis-Garantie? Als Direktanbieter ohne Vermittler-Provision bieten wir faire Preise — finden Sie bei vergleichbarer Leistung ein günstigeres Angebot, unterbieten wir es.";
-function bestpreisPsHtml(): string {
-  return `<p style="font-size:13px;line-height:1.65;color:#777;margin:18px 0 0;border-top:1px solid #f0ebe4;padding-top:14px;"><strong style="color:#5C4A32;">P.S.</strong> Kennen Sie schon die <strong style="color:#2D1F0F;">Primundus-Bestpreis-Garantie?</strong> Als Direktanbieter ohne Vermittler-Provision bieten wir faire Preise — finden Sie bei vergleichbarer Leistung ein günstigeres Angebot, unterbieten wir es.</p>`;
+// Portal-PS — kurzer Reinforcer für Nurture-Mails (Nachfass_1). Bewusst
+// NICHT in Nachfass_2/_3, die als minimale persönliche Nachfrage gestaltet
+// sind. (Die frühere Bestpreis-Garantie ist seit 14.08. überall entfernt.)
+const PORTAL_PS_TEXT =
+  "P.S. In Ihrem Kundenportal sehen Sie jederzeit Ihren Preis und passende Betreuungskräfte — Sie entscheiden in Ruhe, ohne weiteren Kontakt.";
+function portalPsHtml(): string {
+  return `<p style="font-size:13px;line-height:1.65;color:#777;margin:18px 0 0;border-top:1px solid #f0ebe4;padding-top:14px;"><strong style="color:#5C4A32;">P.S.</strong> In Ihrem <strong style="color:#2D1F0F;">Kundenportal</strong> sehen Sie jederzeit Ihren Preis und passende Betreuungskräfte — Sie entscheiden in Ruhe, ohne weiteren Kontakt.</p>`;
 }
 
 function buildNachfass1Html(lead: Lead, siteUrl: string, portalBase: string, milestone: LeadMilestone): string {
@@ -509,7 +521,7 @@ function buildNachfass1Html(lead: Lead, siteUrl: string, portalBase: string, mil
     <p style="font-size:15px;line-height:1.75;color:#444;margin-bottom:14px;">${v.body}</p>
 
     ${nachfassCtaButton(portalUrl, v.cta)}
-    ${bestpreisPsHtml()}
+    ${portalPsHtml()}
     ${buildIlkaSig(siteUrl)}`;
 
   return buildEmailWrapper(lead, siteUrl, content);
@@ -528,7 +540,7 @@ ${plain(v.body)}
 
 ${v.cta.replace(/ →$/, "")}: ${portalUrl}
 
-${BESTPREIS_PS_TEXT}
+${PORTAL_PS_TEXT}
 
 Mit freundlichen Grüßen
 Ilka Wysocki
@@ -1393,6 +1405,9 @@ interface ReminderMeta {
   caregiver_years_experience?: number | null;
   caregiver_einsatz_count?: number | null;
   caregiver_age?: number | null;
+  // Rohwert aus mamamia (level_0…level_4) — QUELLE, hat Vorrang.
+  caregiver_germany_skill?: string | null;
+  // Vom Erzeuger abgeleitetes Wort — Rückfall für Altzeilen ohne Rohwert.
   caregiver_german_level?: string | null;
   caregiver_photo_url?: string | null;
   caregiver_about_text?: string | null;
@@ -1473,8 +1488,9 @@ function buildReminderHtml(
   const ageSuffix = meta.caregiver_age && meta.caregiver_age > 0
     ? `<span style="font-weight:400;color:#71717A;">, ${meta.caregiver_age}</span>`
     : "";
-  const deutschLine = meta.caregiver_german_level
-    ? `<p style="margin:0;font-size:15px;color:#71717A;">Deutsch ${meta.caregiver_german_level}</p>`
+  const deutschWort = deutschStufe(meta.caregiver_germany_skill, meta.caregiver_german_level);
+  const deutschLine = deutschWort
+    ? `<p style="margin:0;font-size:15px;color:#71717A;">Deutsch ${deutschWort}</p>`
     : "";
 
   // Nur Inline-CID nutzen — der presigned S3-URL ist nach 30 Min meist tot,
@@ -1618,7 +1634,8 @@ Primundus Deutschland | www.primundus.de
   }
 
   const agePart = meta.caregiver_age && meta.caregiver_age > 0 ? `, ${meta.caregiver_age}` : "";
-  const deutschPart = meta.caregiver_german_level ? ` · Deutsch ${meta.caregiver_german_level}` : "";
+  const deutschStufeText = deutschStufe(meta.caregiver_germany_skill, meta.caregiver_german_level);
+  const deutschPart = deutschStufeText ? ` · Deutsch ${deutschStufeText}` : "";
   const stufe = reminderTierLabel(meta.caregiver_einsatz_count, meta.caregiver_years_experience);
   const factsParts: string[] = [];
   if (meta.caregiver_years_experience && meta.caregiver_years_experience > 0) {
@@ -1650,12 +1667,11 @@ Primundus Deutschland | www.primundus.de
 }
 
 // ─────────────────────────────────────────────────────────────────────────
-// "Warum Primundus?" — Trust- + Bestpreis-Mail. Eigenständige Nurture-Mail,
+// "Warum Primundus?" — Trust-Mail (USP-Liste). Eigenständige Nurture-Mail,
 // ~48h nach der Eingangsbestätigung (Vergleichsphase: der Kunde checkt
 // gerade andere Anbieter). Cancelt sich, sobald der Lead beauftragt oder
-// nicht interessiert ist. Argument: Direktanbieter ohne Vermittler-
-// Provision → Bestpreis-Garantie. Claim bewusst abgesichert ("bei
-// vergleichbarer Qualifikation und Leistung").
+// nicht interessiert ist. Argument: die vier Kern-USPs (Kräfte vorab
+// sehen, keine Bindung, keine Vermittlungsgebühr, fester Ansprechpartner).
 // ─────────────────────────────────────────────────────────────────────────
 export function buildWarumPrimundusHtml(lead: Lead, portalUrl: string, siteUrl: string): string {
   const greeting = buildHalloAnrede(lead.anrede_text || null, lead.nachname || "", lead.vorname || "");
@@ -1752,7 +1768,10 @@ async function scheduleFollowUp(
   emailType: string,
   delayMinutes: number
 ): Promise<void> {
-  const scheduledFor = new Date(Date.now() + delayMinutes * 60 * 1000).toISOString();
+  // Nachtruhe (Martin, 19.08.): Nudges/Nachfaesse rechnen relativ (+4 h,
+  // +28 h, +48 h ...) und landeten dadurch regelmaessig mitten in der Nacht.
+  // Faellig zwischen 21:00 und 08:00 Berliner Zeit ⇒ 8:00 morgens.
+  const scheduledFor = sendezeitIso(new Date(Date.now() + delayMinutes * 60 * 1000));
  
   await supabase
     .from("scheduled_emails")
@@ -2268,7 +2287,7 @@ Deno.serve(async (req: Request) => {
           // reminderInline-Variable).
           (scheduledEmail as any).__reminderInline = inline;
         } else if (scheduledEmail.email_type === "warum_primundus") {
-          // Trust- + Bestpreis-Mail (~48h nach Eingangsbestätigung).
+          // Trust-Mail (~48h nach Eingangsbestätigung).
           // Abbruch wenn Lead beauftragt/nicht interessiert — sonst raus.
           // Bewusst KEIN Abbruch bei caregiver_invited: solange noch nicht
           // gebucht ist, hilft das Preis-Argument weiterhin.
@@ -2288,7 +2307,7 @@ Deno.serve(async (req: Request) => {
           const portalUrl = (portalBase && (lead as Lead).token)
             ? buildPortalUrl(portalBase, (lead as Lead).token)
             : smtpConfig.siteUrl;
-          subject = "Kennen Sie die Primundus-Bestpreis-Garantie?";
+          subject = "Vier Dinge, die Primundus anders macht";
           html = buildWarumPrimundusHtml(lead as Lead, portalUrl, smtpConfig.siteUrl);
           text = buildWarumPrimundusText(lead as Lead, portalUrl);
           eventTypeSent = "email_warum_primundus_sent";
@@ -2382,7 +2401,7 @@ Deno.serve(async (req: Request) => {
           //   0h    Eingangsbestätigung
           //   +4h   profil_nudge_1  (das Warum: ohne Profil keine Bewerbungen)
           //   +28h  profil_nudge_2  ("Soll ich Ihnen beim Ausfüllen helfen?")
-          //   +48h  warum_primundus (Trust/Bestpreis)
+          //   +48h  warum_primundus (Trust/USPs)
           //   +72h  nachfass_2      (kurze persönliche Nachfrage)
           //   +120h nachfass_3      (Break-up, mailto-Buttons)
           //   +7d   profil_nudge_3  (Reaktivierung: nützliche Infos, kein Druck)
