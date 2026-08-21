@@ -144,3 +144,27 @@ die Mail kommt trotzdem. Kunden-CAC bewusst nicht in der Mail
   ERFOLGREICHE Submits (vorher: Feuern beim Klick inkl.
   Validierungsfehlern, dazu ~50 % Redirect-Verlust). Zeitreihen-Bruch am
   Deploy-Datum dieses PRs einplanen.
+
+## Buchungs-Conversion „Kunde gebucht" (seit 21.08.2026)
+
+Zweite Offline-Conversion im selben Cron (Phase 3b/5 der Function):
+**erste** Zeile in `lead_application_acceptances` je Lead = ein gebuchter
+Neukunde. Fixer Wert **400 € (Monats-Bruttomarge)**, überschreibbar via
+Env `GOOGLE_ADS_BOOKING_VALUE_EUR`. Conversion-Aktion
+`conversionActions/7728914324` („Kunde gebucht (Buchung)", Kategorie
+CONVERTED_LEAD, **secondary**, ONE_PER_CLICK, 90d Klick-Fenster) —
+angelegt per API 21.08. Status-Tabelle: `offline_booking_uploads`
+(eigene Tabelle statt Spalte, weil `offline_conversion_uploads` den
+Lead als PRIMARY KEY führt und der laufende Code mit
+`onConflict('lead_id')` upsertet — Święta zasada nr 3). Dedup bei
+Google über `transactionId = booking-<lead_id>` (Präfix, damit die
+Buchung nie mit der Qualified-Lead-Conversion desselben Leads
+kollidiert). Folge-Einsätze desselben Leads (Multi-Job, Bug #25) lösen
+KEINE weitere Buchungs-Conversion aus — Neukunden-Signal, kein
+Umsatz-Tracker.
+
+Zweck: Sichtbarkeit „welche Kampagne/welches Keyword bringt BUCHER"
+im Ads-UI (Segment Conversion-Aktion) und Datenbasis für die spätere
+Umstellung auf wertbasiertes Bidding (nur mit expliziter Freigabe —
+secondary ändert am Bidding nichts). Leads vor der gclid-Erfassung
+(14.08.) zählen als `bookingWithoutClickId` und sind nie hochladbar.

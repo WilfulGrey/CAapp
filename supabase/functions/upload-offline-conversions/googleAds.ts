@@ -25,6 +25,25 @@ export const LOGIN_CUSTOMER_ID = Deno.env.get("GOOGLE_ADS_LOGIN_CUSTOMER_ID") ??
 export const QUALIFIED_LEAD_ACTION_ID = Deno.env.get("GOOGLE_ADS_QUALIFIED_LEAD_ACTION_ID") ?? "7720728390";
 export const DESTINATION_REFERENCE = "qualified_lead";
 
+// Conversion-Aktion „Kunde gebucht (Buchung)" — erste Zeile in
+// lead_application_acceptances je Lead, fixer Wert (Monats-Bruttomarge).
+// Secondary; beeinflusst Smart Bidding erst, wenn Martin sie primär schaltet.
+export const BOOKING_ACTION_ID = Deno.env.get("GOOGLE_ADS_BOOKING_ACTION_ID") ?? "7728914324";
+export const BOOKING_DESTINATION_REFERENCE = "booking";
+
+export interface DmDestination {
+  reference: string;
+  productDestinationId: string;
+}
+export const QUALIFIED_DESTINATION: DmDestination = {
+  reference: DESTINATION_REFERENCE,
+  productDestinationId: QUALIFIED_LEAD_ACTION_ID,
+};
+export const BOOKING_DESTINATION: DmDestination = {
+  reference: BOOKING_DESTINATION_REFERENCE,
+  productDestinationId: BOOKING_ACTION_ID,
+};
+
 export async function readSecrets(
   supabase: { rpc: (fn: string) => PromiseLike<{ data: unknown; error: { message: string } | null }> },
 ): Promise<GoogleAdsSecrets | null> {
@@ -82,6 +101,7 @@ export async function ingestEvents(
   accessToken: string,
   events: DmEvent[],
   validateOnly = false,
+  destination: DmDestination = QUALIFIED_DESTINATION,
 ): Promise<IngestResult> {
   const resp = await fetch("https://datamanager.googleapis.com/v1/events:ingest", {
     method: "POST",
@@ -92,10 +112,10 @@ export async function ingestEvents(
     body: JSON.stringify({
       validateOnly,
       destinations: [{
-        reference: DESTINATION_REFERENCE,
+        reference: destination.reference,
         operatingAccount: { accountType: "GOOGLE_ADS", accountId: CUSTOMER_ID },
         loginAccount: { accountType: "GOOGLE_ADS", accountId: LOGIN_CUSTOMER_ID },
-        productDestinationId: QUALIFIED_LEAD_ACTION_ID,
+        productDestinationId: destination.productDestinationId,
       }],
       // Einwilligung kommt vom Cookie-Banner des Kostenrechners; ohne sie
       // entsteht gar kein gclid-Lead (Erfassung ist consent-gated).

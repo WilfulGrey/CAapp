@@ -62,3 +62,11 @@ Deno.test("extractValue: bruttopreis fail-soft", () => {
   assertEquals(extractValue(null), null);
   assertEquals(extractValue("x"), null);
 });
+
+Deno.test("buildDmEvent: transactionId-Override + eigene Destination für Buchungen", () => {
+  const ev = buildDmEvent({ ...BASE, gclid: "GCLID9", value: 400 }, "booking", "booking-lead-9")!;
+  assertEquals(ev.transactionId, "booking-lead-9");
+  assertEquals(ev.destinationReferences, ["booking"]);
+  assertEquals(ev.conversionValue, 400);
+  assertEquals(ev.currency, "EUR");
+});
