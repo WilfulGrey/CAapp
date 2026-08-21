@@ -51,7 +51,9 @@ const dauer = (a: string, b: string) => {
 
 export default function GespraechePage() {
   const [liste, setListe] = useState<Kopf[]>([]);
-  const [gewaehlt, setGewaehlt] = useState<string | null>(null);
+  // Kommt jemand von der Lead-Seite (?sid=…), ist das Gespraech gleich offen.
+  const [gewaehlt, setGewaehlt] = useState<string | null>(
+    typeof window === 'undefined' ? null : new URLSearchParams(location.search).get('sid'));
   const [verlauf, setVerlauf] = useState<Zeile[]>([]);
   const [lead, setLead] = useState<Lead | null>(null);
   const [laedt, setLaedt] = useState(true);

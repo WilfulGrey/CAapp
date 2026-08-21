@@ -26,6 +26,21 @@ export async function GET(request: NextRequest) {
   if (!db) return NextResponse.json({ fehler: 'Supabase nicht konfiguriert.' }, { status: 503 });
 
   const sid = request.nextUrl.searchParams.get('sid');
+  const leadId = request.nextUrl.searchParams.get('leadId');
+
+  /* Der Rueckweg: von einem Lead zu seinem Gespraech. Die Lead-Seite fragt
+     hier nur, OB es eines gibt — und bekommt die sid zum Verlinken. */
+  if (leadId) {
+    const { data, error } = await db
+      .from('pria_gespraeche')
+      .select('sid, zeit')
+      .eq('lead_id', leadId)
+      .order('zeit', { ascending: true })
+      .limit(1);
+    if (error) return NextResponse.json({ fehler: error.message }, { status: 500 });
+    const treffer = (data ?? [])[0];
+    return NextResponse.json({ sid: treffer?.sid ?? null, beginn: treffer?.zeit ?? null });
+  }
 
   // ── Ein Gespräch am Stück ────────────────────────────────────────
   if (sid) {

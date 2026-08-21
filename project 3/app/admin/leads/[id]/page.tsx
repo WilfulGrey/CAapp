@@ -49,8 +49,21 @@ export default function LeadDetailPage() {
     | { kind: 'error'; message: string }
   >({ kind: 'idle' });
 
+  // Gab es ein Gespraech mit Pria? Die Lead-Seite fragt nur nach dem Ob und
+  // bekommt die sid zum Verlinken — das Gespraech selbst liegt hinter der
+  // Service-Role-Route, nicht im Browser-Client.
+  const [priaSid, setPriaSid] = useState<string | null>(null);
+
   useEffect(() => {
     loadLeadDetails();
+  }, [leadId]);
+
+  useEffect(() => {
+    if (!leadId) return;
+    fetch(`/api/admin/pria-gespraeche?leadId=${encodeURIComponent(String(leadId))}`)
+      .then((r) => r.json())
+      .then((d) => setPriaSid(d?.sid ?? null))
+      .catch(() => {});
   }, [leadId]);
 
   const loadLeadDetails = async () => {
@@ -1195,6 +1208,26 @@ export default function LeadDetailPage() {
         </div>
 
         <div className="space-y-6">
+          {priaSid && (
+            <Card className="p-5 bg-emerald-50 border-emerald-200">
+              <div className="flex items-start gap-3">
+                <MessageSquare className="w-5 h-5 text-emerald-700 shrink-0 mt-0.5" />
+                <div>
+                  <p className="font-semibold text-emerald-900">Dieser Lead kam aus dem Chat</p>
+                  <p className="text-sm text-emerald-800 mt-0.5">
+                    Pria hat das Gespräch mitgeschrieben — inklusive der Fragen vor der Kontaktaufnahme.
+                  </p>
+                  <a
+                    href={`/admin/gespraeche?sid=${encodeURIComponent(priaSid)}`}
+                    className="inline-flex items-center gap-1.5 mt-2 text-sm font-semibold text-emerald-800 hover:underline"
+                  >
+                    Gespräch ansehen →
+                  </a>
+                </div>
+              </div>
+            </Card>
+          )}
+
           <Card className="p-6">
             <h2 className="text-xl font-bold mb-4">Status</h2>
             <div className="space-y-4">
