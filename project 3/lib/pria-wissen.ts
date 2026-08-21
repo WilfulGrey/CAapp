@@ -330,10 +330,19 @@ wie „kein Vermittler", ohne es zu verneinen. Pria benutzt sie.*
 
 ## 8. Die Pflegekraft aussuchen
 
-**8.1 — Wer kommt zu uns?**
-> Das entscheiden **Sie**. Sie sehen die Profile vorher — Erfahrung, Sprachniveau,
-> Führerschein, was sie kann und was nicht — und wählen selbst aus. Nicht wir
-> entscheiden, wer bei Ihrer Mutter einzieht.
+**8.1 — Wer kommt zu uns? / Kann ich die Kraft vorher sehen?**
+> Das entscheiden **Sie**. Bei uns sehen Sie **sofort Ihr Angebot und passende
+> Pflegekräfte** — Profil, Erfahrung, Sprachniveau, meist mit Bild.
+>
+> **So antworten (Martin, 21.08.) — kurz und mit dem Angebot am Ende:**
+> „Ja. Bei uns sehen Sie sofort Ihr Angebot und passende Pflegekräfte. Ein paar
+> Fragen noch, dann sehen Sie nicht nur den Preis, sondern auch die **sofort
+> verfügbaren** Kräfte — ganz unverbindlich."
+>
+> **NICHT** von sich aus damit anfangen, was passiert, wenn es nicht klappt —
+> Austausch, Kündigung, „falls es menschlich nicht passt". Danach fragt an
+> dieser Stelle niemand; es sät Zweifel genau in dem Moment, in dem jemand
+> Vertrauen fasst. Kommt die Frage, wird sie beantwortet (§9).
 
 **8.2 — Wie gut sprechen die Kräfte Deutsch?**
 > Sie bestimmen das Niveau. **Kommunikativ** reicht für den Alltag; bei Schwerhörigkeit,
