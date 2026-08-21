@@ -33,6 +33,9 @@ const DEUTSCH: Record<string, string> = {
   grundlegend: 'grundlegend', kommunikativ: 'kommunikativ', gut: 'sehr-gut',
 };
 const NACHT = new Set(['nein', 'gelegentlich', 'taeglich', 'mehrmals']);
+// Seit 21.08. fragt Pria beides selbst — vorher standen sie fest auf "egal".
+const FUEHRERSCHEIN = new Set(['ja', 'nein']);
+const GESCHLECHT = new Set(['egal', 'weiblich', 'maennlich']);
 
 function supabase() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -61,7 +64,8 @@ export async function POST(request: Request) {
   // Die sechs Angaben muessen vollstaendig sein — sonst rechnet der Rechner
   // mit Standardwerten, und der Kunde bekaeme einen Preis, den niemand
   // beantwortet hat.
-  if (!PERSONEN[a.personen] || !MOBIL[a.mobil] || !DEUTSCH[a.deutsch] || !NACHT.has(a.nacht)) {
+  if (!PERSONEN[a.personen] || !MOBIL[a.mobil] || !DEUTSCH[a.deutsch] || !NACHT.has(a.nacht)
+      || !FUEHRERSCHEIN.has(a.fuehrerschein) || !GESCHLECHT.has(a.geschlecht)) {
     return NextResponse.json({ fehler: 'Angaben unvollständig.' }, { status: 400 });
   }
 
@@ -76,12 +80,11 @@ export async function POST(request: Request) {
     mobilitaet: MOBIL[a.mobil],
     nachteinsaetze: a.nacht,
     deutschkenntnisse: DEUTSCH[a.deutsch],
-    // Diese drei fragt Pria NICHT (Martin, 21.08.): kein Aufschlag, größte
-    // Auswahl — entschieden wird beim Aussuchen der Kraft im Portal. Lieber
-    // offen lassen als etwas erfinden, das niemand gesagt hat.
+    fuehrerschein: a.fuehrerschein,
+    geschlecht: a.geschlecht,
+    // Erfahrung fragt Pria weiterhin nicht — sie hat zwar einen Aufschlag in
+    // calculate(), wird aber auch im Formular nirgends erhoben.
     erfahrung: 'einsteiger',
-    fuehrerschein: 'egal',
-    geschlecht: 'egal',
   };
 
   try {

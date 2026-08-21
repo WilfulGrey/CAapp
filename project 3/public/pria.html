@@ -325,7 +325,7 @@
   <div class="abschnitt">
     <h2>In vier Schritten zur Betreuung</h2>
     <div class="karten">
-      <div class="karte"><span>1</span><b>Sie beschreiben die Situation</b><p>Sechs kurze Angaben genügen für Preis und Vorauswahl.</p></div>
+      <div class="karte"><span>1</span><b>Sie beschreiben die Situation</b><p>Acht kurze Angaben genügen für Preis und Vorauswahl.</p></div>
       <div class="karte"><span>2</span><b>Sie sehen Ihr Angebot</b><p>Fester Monatspreis, alles inklusive — sofort im Kundenportal.</p></div>
       <div class="karte"><span>3</span><b>Sie wählen die Kraft aus</b><p>Profile mit Erfahrung und Sprachniveau. Sie entscheiden.</p></div>
       <div class="karte"><span>4</span><b>Die Betreuung beginnt</b><p>In der Regel nach 7 bis 14 Tagen, täglich kündbar.</p></div>
@@ -336,7 +336,7 @@
     <b>Prototyp.</b> Es geht um die Blase unten rechts — die Website darunter ist nur angedeutet.
     Pria <b>ersetzt das Formular nicht</b>: Sie beantwortet Fragen aus unseren eigenen Inhalten.
     Erst wenn jemand den <b>Preis</b> oder <b>Pflegekräfte</b> sehen will, stellt sie die
-    <b>sechs preisrelevanten Fragen</b> und übergibt danach ins Kundenportal.<br><br>
+    <b>acht preisrelevanten Fragen</b> und übergibt danach ins Kundenportal.<br><br>
     Zum Ausprobieren: „Was kostet das?“ · „Ist das legal?“ · „Wie schnell geht das?“ ·
     „Was passiert im Urlaub?“ · und als Gegenprobe „Wie wird das Wetter morgen?“
   </div>
@@ -509,7 +509,7 @@ function beraterChips(){
 /* ─── Wissen aus unseren eigenen Inhalten ──────────────────────────── */
 const WISSEN=[
  {w:['kost','preis','teuer','euro','geld','bezahl','monat'],q:'Kostenseite',
-  weiter:'Wenn Sie mögen, rechne ich Ihnen das konkret aus: <b>sechs kurze Fragen</b>, danach sehen Sie '+
+  weiter:'Wenn Sie mögen, rechne ich Ihnen das konkret aus: <b>acht kurze Fragen</b>, danach sehen Sie '+
          'Ihren Preis — und gleich die Pflegekräfte, die zu Ihrer Situation passen.',
   // Kurz halten (Martin, 21.08.): ein fester Monatspreis, und das Angebot,
   // ihn auszurechnen. Alles Weitere — Pflegegeld, An-/Abreise, Zuschlaege —
@@ -537,7 +537,7 @@ const WISSEN=[
   a:'Ohne Pflegegrad können Sie trotzdem starten. Den Antrag stellen Sie parallel — er gilt <b>rückwirkend '+
     'ab Antragstellung</b>, Sie verlieren also kein Geld. Die Anleitung dafür bekommen Sie von uns.'},
  {w:['aussuchen','auswahl','profil','wer kommt','seh','foto','kennenlern','finde','finden','suche','suchen','wie komme ich','bekomme ich','wie funktioniert','ablauf','wie läuft'],q:'Kundenportal',
-  weiter:'Ich kann Ihnen die passenden Profile gleich zeigen — dafür brauche ich sechs kurze Angaben.',
+  weiter:'Ich kann Ihnen die passenden Profile gleich zeigen — dafür brauche ich acht kurze Angaben.',
   a:'Das ist der Unterschied zu den meisten: Sie <b>sehen die Kräfte vorher</b> — Profil, Erfahrung, '+
     'Sprachniveau — und suchen selbst aus. Nicht wir entscheiden, wer bei Ihrer Mutter einzieht.'},
  {w:['gebühr','provision','vermittlungs','versteck','zusatz'],q:'Kostenseite',
@@ -553,7 +553,7 @@ const WISSEN=[
   a:'Die Kraft braucht ein <b>eigenes, abschließbares Zimmer</b> und Verpflegung im Haushalt. Mehr nicht — '+
     'kein Umbau, keine Sonderausstattung.'},
  {w:['heim','pflegeheim','alternative','vergleich','besser'],q:'Vergleich',
-  weiter:'Soll ich Ihre Seite der Rechnung aufmachen? Sechs Fragen, dann steht Ihr Monatspreis — '+
+  weiter:'Soll ich Ihre Seite der Rechnung aufmachen? Acht Fragen, dann steht Ihr Monatspreis — '+
          'dann vergleichen Sie zwei echte Zahlen statt zwei Behauptungen.',
   a:'Im Heim teilt sich Ihre Mutter das Personal mit vielen anderen — und der Platz kostet trotzdem '+
     'jeden Monat einen hohen Betrag. Zuhause hat sie eine Person für sich, in ihrer Wohnung, mit ihrem '+
@@ -679,7 +679,9 @@ const FLOW=[
   r:{'1':'Danke, notiert.','2':'Für Ehepaare haben wir eigene Kräfte — das ist günstiger als zweimal einzeln.'}},
  {k:'haushalt',kurz:'Weitere Personen im Haushalt',vorschlag:'nein',warum:'Ich gehe erst einmal davon aus, dass niemand sonst im Haushalt lebt.',q:'Leben weitere Personen mit im Haushalt?',
   o:[['ja','Ja'],['nein','Nein']],
-  r:{ja:'Gut zu wissen — das sagen wir jeder Kraft vorher.',nein:'Alles klar.'}},
+  // „das sagen wir jeder Kraft vorher" war albern (Martin, 21.08.) —
+  // natürlich bekommt die Kraft alle Angaben. Also nur quittieren.
+  r:{ja:'Notiert.',nein:'Alles klar.'}},
  {k:'pflegegrad',kurz:'Pflegegrad',vorschlag:'0',warum:'Dann rechne ich ohne Pflegegrad — kommt später einer dazu, wird es nur günstiger.',q:'Gibt es schon einen Pflegegrad?',
   o:[['0','Kein Pflegegrad'],['1','Pflegegrad 1'],['2','Pflegegrad 2'],['3','Pflegegrad 3'],
      ['4','Pflegegrad 4'],['5','Pflegegrad 5'],['?','Weiß ich nicht']],
@@ -699,6 +701,21 @@ const FLOW=[
      ['taeglich','Jede Nacht, bis zu 1 Einsatz'],['mehrmals','Jede Nacht, mehrere Einsätze']],
   r:{nein:'Gut — das erleichtert die Suche spürbar.',
      '_':'Verstanden, das ist notiert.'}},
+ {k:'fuehrerschein',kurz:'Führerschein',vorschlag:'nein',
+  warum:'Die meisten kommen ohne aus — Einkäufe und Arztfahrten lassen sich fast immer anders lösen.',
+  q:'Soll die Pflegekraft Auto fahren können?',
+  hinweis:'Mit Führerschein ist die Auswahl kleiner und es kostet etwas mehr. '+
+          'Oft reicht ein Taxi oder Fahrdienst für die paar Fahrten im Monat.',
+  o:[['ja','Ja, unbedingt'],['nein','Nein / nicht unbedingt']],
+  r:{ja:'Verstanden — dann suche ich gezielt Kräfte mit Führerschein.',
+     nein:'Gut, damit haben Sie deutlich mehr Auswahl.'}},
+ {k:'geschlecht',kurz:'Geschlecht der Pflegekraft',vorschlag:'egal',
+  warum:'„Egal“ ist die häufigste Wahl und gibt Ihnen die größte Auswahl.',
+  q:'Wünschen Sie eine bestimmte Pflegekraft?',
+  hinweis:'Bei der Körperpflege ist vielen das gleiche Geschlecht wichtig — sagen Sie es ruhig.',
+  o:[['egal','Egal'],['weiblich','Weiblich'],['maennlich','Männlich']],
+  r:{egal:'Gut — damit haben Sie die größte Auswahl.',
+     '_':'Notiert, danach suche ich aus.'}},
  {k:'deutsch',kurz:'Deutschkenntnisse',vorschlag:'kommunikativ',warum:'„Kommunikativ“ reicht für den Alltag und ist die häufigste Wahl.',
   q:'Wie gut soll die Pflegekraft Deutsch sprechen?',
   // Was im Formular hinter dem i-Punkt steht, liefern wir gleich mit —
@@ -745,7 +762,7 @@ async function starteFunnel(grund,chip,echo){
   }
   if(!naechsteOffene()){
     if(echo!==false) await flug(chip, echo || 'Angebot');
-    await sagen('Ihre <b>sechs Angaben</b> stehen schon — dann rechne ich Ihnen das jetzt aus.');
+    await sagen('Ihre <b>Angaben</b> stehen schon — dann rechne ich Ihnen das jetzt aus.');
     fortschritt();
     return matching();
   }
@@ -763,8 +780,8 @@ async function starteFunnel(grund,chip,echo){
   await sagen(schonDa
     ? 'Sehr gern. <b>' + (FLOW.length-schonDa) + ' kurze Fragen</b> fehlen noch, den Rest habe ich schon.'
     : (grund==='preis'
-      ? 'Sehr gern — das hängt ganz von Ihrer Situation ab. <b>Sechs kurze Fragen</b>, dann haben Sie Ihren Preis. Ich fange einfach an.'
-      : 'Sehr gern — wer zu Ihnen passt, hängt von Ihrer Situation ab. <b>Sechs kurze Fragen</b>, dann zeige ich sie Ihnen. Ich fange einfach an.'));
+      ? 'Sehr gern — das hängt ganz von Ihrer Situation ab. <b>Acht kurze Fragen</b>, dann haben Sie Ihren Preis. Ich fange einfach an.'
+      : 'Sehr gern — wer zu Ihnen passt, hängt von Ihrer Situation ab. <b>Acht kurze Fragen</b>, dann zeige ich sie Ihnen. Ich fange einfach an.'));
   fortschritt();   // schon Beantwortetes soll man am Balken sehen
   naechste();
 }
@@ -885,7 +902,8 @@ function kontakt(){
     // DIE Marke im Verlauf: alles davor ist „vor Lead", alles danach „nach Lead".
     protokoll('system','Kontaktdaten abgeschickt',{ereignis:'lead',antworten:Object.assign({},antwort)});
     spuelen();
-    bub('Meine Daten stehen drin ✔',true);
+    // Kein Echo in seinem Namen: er hat die Felder ausgefüllt, das sieht er.
+    // Eine Blase "Meine Daten stehen drin" legt ihm Worte in den Mund.
     await sagen('Danke. Ich lege Ihren Zugang an und öffne Ihnen gleich Ihr <b>Kundenportal</b> — '+
                 'dort stehen Ihr Preis und die fünf Pflegekräfte.',
                 'Den Link schicke ich Ihnen zusätzlich per E-Mail, er ist 14 Tage gültig.');
@@ -968,6 +986,12 @@ const THEMEN=[
           ['kommunikativ',/kommunikativ|einfach|alltag/i],
           ['gut',/sehr gut|\bgut\b|flie(ß|ss)end/i]],
   grund:'Bei Sprache gehe ich lieber eine Stufe höher — das kostet etwas mehr, erspart aber Missverständnisse im Alltag.'},
+ {k:'fuehrerschein',
+  w:/f(ü|ue)hrerschein|auto fahren|fahren k(ö|oe)nnen|pkw|fahrdienst|taxi/i,
+  stufen:[['nein',/kein|nicht|nein|brauch(en|t) (wir )?nicht|taxi|fahrdienst/i],['ja',/./]]},
+ {k:'geschlecht',
+  w:/(m(ä|ae)nnlich|weiblich|frau als|mann als|lieber eine frau|lieber einen mann|geschlecht)/i,
+  stufen:[['egal',/egal|beides|spielt keine rolle/i],['weiblich',/weiblich|frau/i],['maennlich',/m(ä|ae)nnlich|mann/i]]},
  {k:'pflegegrad',
   w:/pflegegrad|grad\s*[0-5]/i,
   stufen:[['0',/kein/i],['1',/1|eins/],['2',/2|zwei/],['3',/3|drei/],['4',/4|vier/],['5',/5|f(ü|ue)nf/]]}
@@ -1168,7 +1192,7 @@ async function frageLokal(text){
   // Steht eine Frage offen und der Kunde weiß es nicht: Vorschlag statt Rückfrage.
   if(offeneFrage && offeneFrage.vorschlag && UNSICHER.test(text)) return vorschlagen(offeneFrage);
 
-  // Bezieht sich der Satz auf eine unserer sechs Angaben? Dann ist es eine
+  // Bezieht sich der Satz auf eine unserer Angaben? Dann ist es eine
   // Antwort oder ein Nachtrag — keine Wissensfrage.
   if(modus==='fragen'){
     const th=themaZu(text);

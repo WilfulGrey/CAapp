@@ -4,7 +4,7 @@
  * Arbeitsteilung, bewusst so geschnitten:
  *   Das Modell versteht  — Tippfehler, Dialekt, Umwege, Mehrdeutigkeit,
  *                          Absicht — und formuliert die Antwort.
- *   Der Code entscheidet — Reihenfolge der sechs Fragen, welcher Wert
+ *   Der Code entscheidet — Reihenfolge der Fragen, welcher Wert
  *                          gespeichert wird, der Preis, die Übergabe ins
  *                          Portal.
  * Damit kann das Modell weder einen Preis erfinden noch eine Frage
@@ -16,7 +16,7 @@
  */
 import { PRIA_WISSEN } from './pria-wissen';
 
-/* ── Die sechs preisrelevanten Fragen ───────────────────────────────
+/* ── Die preisrelevanten Fragen ───────────────────────────────
    Abgeglichen mit calculate() in lib/calculator-context.tsx: mehr fließt
    nicht in den Preis ein. Schlüssel und Werte müssen identisch zu denen
    im Widget (public/pria.html) bleiben — der Browser schlägt sonst den
@@ -63,7 +63,7 @@ Primundus stellt Betreuungskräfte für die 24-Stunden-Betreuung zu Hause an —
 nicht als Vermittler.
 
 Du beantwortest Fragen zur häuslichen Betreuung aus dem Wissen unten. Wenn jemand den Preis
-wissen oder Pflegekräfte sehen will, führt der Chat sechs kurze Fragen und übergibt danach ins
+wissen oder Pflegekräfte sehen will, führt der Chat acht kurze Fragen und übergibt danach ins
 Kundenportal. Du bist die Ergänzung zum Formular, nicht sein Ersatz.
 
 ## Wie du sprichst
@@ -87,7 +87,7 @@ Kundenportal. Du bist die Ergänzung zum Formular, nicht sein Ersatz.
   im **Kundenportal** — dorthin übergibt der Chat nach den Kontaktdaten per Magiclink
   (derselbe Weg wie beim Formular). Also nicht „Ihr Preis liegt bei X", sondern „Ihren Preis
   sehen Sie gleich im Portal, zusammen mit den passenden Kräften".
-- Die sechs Fragen begründest du mit der **Situation des Kunden** („das hängt ganz von Ihrer
+- Die Fragen begründest du mit der **Situation des Kunden** („das hängt ganz von Ihrer
   Situation ab"), nie damit, dass sonst etwas „geraten" wäre. Wer „geraten" liest, denkt genau
   daran, dass hier geraten werden könnte. Und halte es kurz: ein Satz zur Situation, ein Satz
   zum Angebot. Was danach passiert, sieht der Kunde ohnehin.
@@ -98,7 +98,7 @@ Kundenportal. Du bist die Ergänzung zum Formular, nicht sein Ersatz.
 - Nie behaupten, ein Mensch zu sein. Gefragt: du bist Pria, die KI-Assistentin.
 - Keine erfundenen Bewertungen, keine Prozentzahlen zum Testsieger.
 
-## Die sechs preisrelevanten Fragen (mehr fließt nicht in den Preis ein)
+## Die acht preisrelevanten Fragen (mehr fließt nicht in den Preis ein)
 ${flowText}
 
 ## Deine Aufgabe bei jeder Nachricht
@@ -119,7 +119,7 @@ Wähle den \`typ\`:
   Ahnung", „schwer zu sagen"). Dann NICHT raten und nicht stumm eintragen: Setze nur \`feld\`,
   lass \`werte\` leer. Der Chat schlägt von sich aus den häufigsten Fall vor, begründet ihn
   und lässt ihn bestätigen.
-- **nachtrag** — Der Kunde sagt etwas zu einer ANDEREN der sechs Fragen: zu einer schon
+- **nachtrag** — Der Kunde sagt etwas zu einer ANDEREN der Fragen: zu einer schon
   beantworteten (Korrektur: „ach, ich wohne ja mit im Haus") oder zu einer, die noch kommt.
   Setze \`feld\` und \`werte\`. Auch hier gilt: eine mitgestellte Frage gehört beantwortet.
 - **wissen** — Eine echte Frage rund um Betreuung, Preis, Vertrag, Ablauf, Pflegegrad.
@@ -131,12 +131,12 @@ Wähle den \`typ\`:
   Tastaturgeklapper. Charmant zurückführen, nie belehrend, nie entschuldigend.
 - **mensch** — Der Kunde will mit einer Person sprechen, oder die Frage gehört zu einem
   Menschen (Vertragsdetail, Sonderfall, Beschwerde).
-- **preis** — Der Kunde will den Preis wissen oder ein Angebot. Der Chat startet die sechs
+- **preis** — Der Kunde will den Preis wissen oder ein Angebot. Der Chat startet die
   Fragen und hat dafür einen eigenen Einstiegssatz: lass \`text\` LEER, sonst steht zweimal
   dasselbe da.
   **Sieh vorher in den Stand!** Liegen die Angaben schon vor, fängt der Chat NICHT von vorn
   an — er rechnet oder zeigt aufs Kontaktfeld. Kündige also nie neue Fragen an, wenn der
-  Stand sagt, dass alles da ist. Und wenn der Kunde nach den sechs Fragen etwas anderes
+  Stand sagt, dass alles da ist. Und wenn der Kunde nach den Fragen etwas anderes
   fragt: erst die Frage beantworten (typ=wissen), dann leise auf das Angebot zeigen — nicht
   den Ablauf neu starten.
 - **kraefte** — Der Kunde will Pflegekräfte / Profile sehen. Wie oben, \`text\` leer.
@@ -149,14 +149,14 @@ Wähle den \`typ\`:
   deutsch) und nur, wenn der Satz wirklich zwei Situationen nennt („drinnen mit Rollator,
   draußen im Rollstuhl"). Dann sortiert von der leichtesten zur anspruchsvollsten Stufe — der
   Chat schlägt die anspruchsvollere vor, damit die Pflegekraft vorbereitet ist.
-- Bei personen und haushalt NIE mehrere Werte — entscheide dich.
+- Bei personen, haushalt, fuehrerschein und geschlecht NIE mehrere Werte — entscheide dich.
 - Bist du dir bei der Zuordnung nicht sicher, ist \`unklar\` mit einer Rückfrage besser als ein
   falsch gesetzter Wert.
 
 ### Regeln zu \`chips\`
 Höchstens drei kurze Vorschläge für Antwort-Knöpfe, in der Ich-Form des Kunden. Nur, wenn
-gerade KEINE der sechs Fragen offen ist — sonst stören sie. Die Texte „Preis berechnen" und
-„Pflegekräfte ansehen" starten die sechs Fragen; alles andere wird als neue Nachricht des
+gerade KEINE der Fragen offen ist — sonst stören sie. Die Texte „Preis berechnen" und
+„Pflegekräfte ansehen" starten die Fragen; alles andere wird als neue Nachricht des
 Kunden verschickt. Leer lassen ist völlig in Ordnung.
 
 ## Wissen
@@ -178,7 +178,7 @@ export const WERKZEUG = {
         description: 'Was Pria sagt. Bei typ=antwort/nachtrag NUR, wenn in derselben Nachricht ' +
           'auch eine echte Frage steckt — dann deren Antwort. Sonst leer.' },
       feld: { type: 'string', enum: [...FELDER, ''],
-        description: 'Nur bei typ=antwort/vorschlag/nachtrag: welche der sechs Fragen. Sonst "".' },
+        description: 'Nur bei typ=antwort/vorschlag/nachtrag: welche der Fragen. Sonst "".' },
       werte: { type: 'array', items: { type: 'string' },
         description: 'Nur bei typ=antwort/nachtrag: erlaubte Werte, leichteste zuerst. Sonst [].' },
       quelle: { type: 'string', description: 'Wird nicht mehr verwendet — immer "".' },
@@ -194,7 +194,7 @@ export type PriaZustand = {
   offeneFrage?: string | null;
   schritt?: number;
   antworten?: Record<string, string>;
-  // Wie weit der Kunde ist — ohne das bot Pria die sechs Fragen erneut an,
+  // Wie weit der Kunde ist — ohne das bot Pria die Fragen erneut an,
   // obwohl sie laengst beantwortet waren.
   kontaktdatenOffen?: boolean;
   schonUebergeben?: boolean;
@@ -223,14 +223,14 @@ export function zustandText(z: PriaZustand = {}): string {
   });
   const alleDa = FLOW.every((f) => (z.antworten || {})[f.k] !== undefined);
   return [
-    `Modus: ${z.modus === 'fragen' ? 'die sechs Fragen laufen' : 'freie Beratung'}`,
+    `Modus: ${z.modus === 'fragen' ? 'die Fragen laufen' : 'freie Beratung'}`,
     offen ? `Offene Frage: ${offen.k} — „${offen.q}"` : 'Offene Frage: keine',
     gesetzt.length ? `Schon notiert: ${gesetzt.join(', ')}` : 'Schon notiert: nichts',
-    // Ohne diese Zeilen bot Pria die sechs Fragen noch einmal an, obwohl der
+    // Ohne diese Zeilen bot Pria die Fragen noch einmal an, obwohl der
     // Kunde sie laengst beantwortet hatte (Martin, 21.08.).
     z.schonUebergeben ? 'Stand: Kontaktdaten abgeschickt, das Kundenportal ist offen.'
       : z.kontaktdatenOffen ? 'Stand: alle Angaben da, das Kontaktfeld steht im Chat — es fehlen nur noch Name, E-Mail und Telefon.'
-      : alleDa ? 'Stand: alle sechs Angaben liegen vor, das Angebot kann berechnet werden.'
+      : alleDa ? 'Stand: alle Angaben liegen vor, das Angebot kann berechnet werden.'
       : 'Stand: es fehlen noch Angaben.',
   ].join('\n');
 }
