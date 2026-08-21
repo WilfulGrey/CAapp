@@ -7,6 +7,15 @@ const WA_TEXT = encodeURIComponent("Hallo Frau Wysocki, ich habe eine Rückfrage
 const WA_URL = `https://wa.me/${WA_NUMBER}?text=${WA_TEXT}`;
 
 export function WhatsAppFloat() {
+  // Pria steht in derselben Ecke und ersetzt diesen Knopf — zwei schwebende
+  // Knöpfe nebeneinander sind eine Zumutung. Das Attribut setzt der Lader im
+  // Layout, bevor gezeichnet wird. WhatsApp bleibt erreichbar: als Link in
+  // den Kontaktblöcken und IM Chat, sobald jemand einen Menschen möchte.
+  const [priaDa, setPriaDa] = useState(false);
+  useEffect(() => {
+    setPriaDa(document.documentElement.getAttribute('data-pria') === '1');
+  }, []);
+
   const [tooltipPhase, setTooltipPhase] = useState<0 | 1 | 2>(0);
   const [fadingOut, setFadingOut] = useState(false);
   // Hide the float while the calculator form is on screen — it sits over
@@ -41,6 +50,7 @@ export function WhatsAppFloat() {
     return () => observer.disconnect();
   }, []);
 
+  if (priaDa) return null;
   if (formVisible) return null;
 
   return (

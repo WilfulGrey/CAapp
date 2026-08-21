@@ -125,33 +125,31 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
           </CalculatorProvider>
         </AnalyticsProvider>
         <CookieConsent />
-        {/* Pria — Beratungs-Chat, ein Schalter je Umgebung.
+        {/* Pria — Beratungs-Chat, vorerst nur auf Staging.
 
-            Staging und Prod bauen DENSELBEN Commit (siehe CLAUDE.md), sie
-            unterscheiden sich nur in der Umgebung. Genau da sitzt der
-            Schalter: `PRIA_SICHTBAR=1` im jeweiligen Render-Service. Fehlt
-            er, wird das Widget nicht einmal geladen.
+            KEINE Umgebungsvariable: Staging und Prod bauen denselben Commit,
+            und eine Variable haette jemand in Render pflegen muessen. Die
+            Seite kann selbst sehen, wo sie laeuft — das ist ehrlicher und
+            kostet niemanden einen Handgriff.
 
-            ACHTUNG — die Seiten hier sind statisch vorgerendert, `process.env`
-            wird also beim BUILD gelesen, nicht bei der Anfrage. Render stellt
-            die Variablen des Dienstes im Build bereit, das passt; aber ein
-            Umlegen des Schalters wirkt erst nach einem Redeploy (den Render
-            beim Ändern einer Variable ohnehin auslöst).
+            Der Lader ist absichtlich winzig und laeuft VOR dem Zeichnen: auf
+            Prod wird die 240-KB-Datei so gar nicht erst geladen, und das
+            data-pria am <html> ist da, bevor der WhatsApp-Knopf sich
+            entscheidet (er blendet sich dann aus, siehe WhatsAppFloat).
 
-            NEXT_PUBLIC_, weil derselbe Schalter auch in `app/page.tsx`
-            gebraucht wird — und das ist eine Client-Komponente, die einen
-            serverseitigen Wert nicht sehen kann. Dort entscheidet er, ob der
-            WhatsApp-Knopf noch erscheint: Pria ERSETZT ihn, zwei schwebende
-            Knöpfe in derselben Ecke will niemand. Ein Feature-Schalter ist
-            kein Geheimnis, im Browser-Bundle richtet er keinen Schaden an. */}
-        {/* Bewusst ein schlichtes <script defer> statt next/script: bei
-            lazyOnload haengt Next das Tag erst im Browser ein, im
-            ausgelieferten HTML steht dann nichts — nicht pruefbar und nicht
-            vorhersagbar. So steht es in der Seite, laedt nach dem Parsen und
-            blockiert nichts. */}
-        {process.env.NEXT_PUBLIC_PRIA_SICHTBAR === '1' && (
-          <script src="/pria-widget.js" defer />
-        )}
+            Wenn Pria auf Prod soll: diese Liste um kostenrechner.primundus.de
+            erweitern — bewusst eine Code-Aenderung mit PR, kein stiller
+            Schalter irgendwo im Dashboard. */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html:
+              "(function(){var h=location.hostname;" +
+              "if(h!=='kostenrechner-staging.onrender.com'&&h!=='localhost'&&h!=='127.0.0.1')return;" +
+              "document.documentElement.setAttribute('data-pria','1');" +
+              "var s=document.createElement('script');s.src='/pria-widget.js';s.defer=true;" +
+              "document.head.appendChild(s);})();",
+          }}
+        />
       </body>
     </html>
   );
