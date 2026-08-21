@@ -172,7 +172,7 @@ async function handleGet(
     const attachment = await buildVertragAttachmentPdf(vertragsDaten, {
       signaturName,
       signedAt,
-      auditNote: 'Vertragsversion v1.1',
+      auditNote: 'Vertragsversion v1.2',
     });
 
     // Wenn der Fallback HTML statt PDF geliefert hat (Chrome-Render fail),

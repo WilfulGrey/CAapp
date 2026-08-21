@@ -33,5 +33,5 @@ export const BASELINE_INPUT: VertragInput = {
 export const BASELINE_OPTS: VertragHtmlOptions = {
   signaturName: 'Grzegorz Brzęczyszczykiewicz',
   signedAt: '05.08.2026 um 14:30 Uhr',
-  auditNote: 'Vertragsversion v1.1',
+  auditNote: 'Vertragsversion v1.2',
 };
