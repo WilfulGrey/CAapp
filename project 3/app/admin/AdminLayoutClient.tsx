@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { LayoutDashboard, Users, Euro, Gift, LogOut, ChartBar as BarChart3 } from 'lucide-react';
+import { LayoutDashboard, Users, Euro, Gift, LogOut, ChartBar as BarChart3, MessageSquare } from 'lucide-react';
 
 export default function AdminLayoutClient({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
@@ -11,6 +11,7 @@ export default function AdminLayoutClient({ children }: { children: React.ReactN
   const navItems = [
     { href: '/admin', label: 'Dashboard', icon: LayoutDashboard },
     { href: '/admin/leads', label: 'Leads', icon: Users },
+    { href: '/admin/gespraeche', label: 'Gespräche', icon: MessageSquare },
     { href: '/admin/analytics', label: 'Analytics', icon: BarChart3 },
     { href: '/admin/preise', label: 'Preise', icon: Euro },
     { href: '/admin/zuschuesse', label: 'Zuschüsse', icon: Gift },
