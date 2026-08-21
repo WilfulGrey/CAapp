@@ -1227,32 +1227,6 @@ async function oeffne(start){
   await sagen('Fragen Sie mich alles rund um die häusliche Betreuung.');
   beraterChips();
 }
-// Der Hinweis kann spaeter erscheinen (Consent-Skript laedt nach) und wieder
-// verschwinden — beides mitbekommen, ohne dauernd zu messen.
-leistePruefen();
-addEventListener('resize',leistePruefen,{passive:true});
-setTimeout(leistePruefen,1200); setTimeout(leistePruefen,3000);
-if(window.MutationObserver) new MutationObserver(()=>{
-  clearTimeout(window.__leisteTimer);
-  window.__leisteTimer=setTimeout(leistePruefen,220);
-}).observe(document.body,{childList:true,subtree:false});
-
-/* ─── Auftritt: erst nach dem Formular ──────────────────────────────
-   Genau die Regel, die der WhatsApp-Knopf vorher hatte (Martin, 08.07.):
-   Solange eine Kostenrechner-Karte im Bild ist, stoert ein schwebender
-   Knopf nur den Weiter-Knopf darunter. Erst wenn der Kunde daran vorbei
-   gescrollt ist, meldet sich Pria.
-   Gibt es keine solche Karte — etwa auf der Prototyp-Seite — genuegt eine
-   Bildschirmhoehe Scrollen. */
-blase.classList.add('schlummert');
-pille.classList.add('schlummert');
-function zeigen(an){
-  if(an===darfZeigen) return;
-  darfZeigen=an;
-  blase.classList.toggle('schlummert',!an);
-  pille.classList.toggle('schlummert',!an);
-  if(an) pillePruefen(); else versteckePille();
-}
 /* ─── Fremde Leisten am unteren Rand ────────────────────────────────
    Auf der echten Seite liegt unten der Cookie-Hinweis — und der gehoert
    obenauf, nicht Pria. Statt uns darueberzuschieben, ruecken wir so weit
@@ -1282,6 +1256,32 @@ function leistePruefen(){
   wurzelEl.style.setProperty('--leiste', h + 'px');
 }
 
+// Der Hinweis kann spaeter erscheinen (Consent-Skript laedt nach) und wieder
+// verschwinden — beides mitbekommen, ohne dauernd zu messen.
+leistePruefen();
+addEventListener('resize',leistePruefen,{passive:true});
+setTimeout(leistePruefen,1200); setTimeout(leistePruefen,3000);
+if(window.MutationObserver) new MutationObserver(()=>{
+  clearTimeout(window.__leisteTimer);
+  window.__leisteTimer=setTimeout(leistePruefen,220);
+}).observe(document.body,{childList:true,subtree:false});
+
+/* ─── Auftritt: erst nach dem Formular ──────────────────────────────
+   Genau die Regel, die der WhatsApp-Knopf vorher hatte (Martin, 08.07.):
+   Solange eine Kostenrechner-Karte im Bild ist, stoert ein schwebender
+   Knopf nur den Weiter-Knopf darunter. Erst wenn der Kunde daran vorbei
+   gescrollt ist, meldet sich Pria.
+   Gibt es keine solche Karte — etwa auf der Prototyp-Seite — genuegt eine
+   Bildschirmhoehe Scrollen. */
+blase.classList.add('schlummert');
+pille.classList.add('schlummert');
+function zeigen(an){
+  if(an===darfZeigen) return;
+  darfZeigen=an;
+  blase.classList.toggle('schlummert',!an);
+  pille.classList.toggle('schlummert',!an);
+  if(an) pillePruefen(); else versteckePille();
+}
 /* SEITE statt document: im Widget lenkt der Erzeuger jedes
    `document.querySelector*` in den Shadow-DOM um — die Kostenrechner-Karten
    liegen aber in der SEITE. */
