@@ -14,6 +14,7 @@ const NOINDEX_PATHS = [
   '/result',
   '/step-2',
   '/abmelden',
+  '/feedback',
 ];
 
 const nextConfig = {
