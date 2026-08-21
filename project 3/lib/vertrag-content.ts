@@ -38,7 +38,7 @@ export interface VertragInput {
 export interface VertragHtmlOptions {
   signaturName: string;
   signedAt?: string; // menschenlesbarer Zeitstempel, z.B. "05.06.2026 um 14:30 Uhr"
-  auditNote?: string; // z.B. "IP 1.2.3.4 · Vertragsversion v1.1"
+  auditNote?: string; // z.B. "IP 1.2.3.4 · Vertragsversion v1.2"
 }
 
 // ─── Punkte aus dem Mustervertrag (1:1 verbatim) ────────────────────────
@@ -170,7 +170,11 @@ export function paragraph4(tagessatz: string): Paragraph {
         text: 'Der Anreisetag und der Abreisetag werden als volle Dienstleistungstage berechnet. Bei einem Personalwechsel wird der volle Tagessatz für beide Betreuungspersonen berechnet.',
       },
       {
-        text: 'An gesetzlichen Feiertagen wird der doppelte Tagessatz berechnet.',
+        // 2026-08-21 na decyzję Michała — Vertragsversion v1.2: enumeratywna
+        // lista Feiertagów zamiast „gesetzliche" (zgodna z holidaysForYear /
+        // FAQ portalu). Umowy podpisane pod v1.1 zostają bez zmian (kanony
+        // w buckecie).
+        text: 'Ausgewählte Feiertage (Karfreitag, Ostersonntag, Ostermontag, 1. Mai, Heiligabend, 1. und 2. Weihnachtstag, Silvester und Neujahrstag) werden mit einem doppelten Tagessatz berechnet.',
       },
       {
         text: 'In den Sommermonaten Juli und August wird ein Sommerzuschlag von 6,67 € pro Tag berechnet.',
@@ -729,7 +733,7 @@ export function buildVertragHtml(daten: VertragInput, opts: VertragHtmlOptions):
   //  Seite 1: Header + Datum + "Dienstleistungsvertrag" + Vertragsparteien
   //  Seite 2: § 1 (9 Punkte, v1.1 — pkt „Telefon/Internet" usunięty 2026-08-12) + § 2 Anfang
   //  Seite 3: § 2 Rest + § 3 (7 Punkte)
-  //  Seite 4: § 4 (12 Punkte)
+  //  Seite 4: § 4 (12 Punkte, v1.2 — pkt 8 z enumeratywną listą Feiertagów od 2026-08-21)
   //  Seite 5: § 5 + § 6 + § 7
   //  Seite 6: § 8 + § 9 + § 10 + Unterschriften
   //  Seite 7: Anlage 1 (DSGVO)

@@ -84,7 +84,7 @@ const PARAGRAPHEN: { titel: string; punkte: Punkt[] }[] = [
         text: 'Die wöchentliche durchschnittliche Arbeitszeit darf 40 Stunden nicht überschreiten. Außerhalb der Arbeitszeit steht es der Betreuungsperson frei, den Leistungsort zu verlassen.',
       },
       // § 1 pkt 10 (telefon/internet dla opiekunki) usunięty 2026-08-12 —
-      // Vertragsversion v1.1; trzymać w sync z project 3/lib/vertrag-content.ts.
+      // Vertragsversion v1.2; trzymać w sync z project 3/lib/vertrag-content.ts.
     ],
   },
   {
@@ -479,7 +479,7 @@ export const VertragSignieren: FC<{
               <li className="flex gap-2"><span className="text-gray-400">5.</span><span className="text-justify">Sollten sich die Betreuungsbedürfnisse der zu betreuenden Person ändern, behält sich der DL das Recht zur Anpassung des Honorars vor.</span></li>
               <li className="flex gap-2"><span className="text-gray-400">6.</span><span className="text-justify">Im Falle einer Arbeitsunfähigkeit der Betreuungsperson wird für die Zeit der Verhinderung kein Honorar berechnet.</span></li>
               <li className="flex gap-2"><span className="text-gray-400">7.</span><span className="text-justify">Der Anreisetag und der Abreisetag werden als volle Dienstleistungstage berechnet. Bei einem Personalwechsel wird der volle Tagessatz für beide Betreuungspersonen berechnet.</span></li>
-              <li className="flex gap-2"><span className="text-gray-400">8.</span><span className="text-justify">An gesetzlichen Feiertagen wird der doppelte Tagessatz berechnet.</span></li>
+              <li className="flex gap-2"><span className="text-gray-400">8.</span><span className="text-justify">Ausgewählte Feiertage (Karfreitag, Ostersonntag, Ostermontag, 1. Mai, Heiligabend, 1. und 2. Weihnachtstag, Silvester und Neujahrstag) werden mit einem doppelten Tagessatz berechnet.</span></li>
               <li className="flex gap-2"><span className="text-gray-400">9.</span><span className="text-justify">In den Sommermonaten Juli und August wird ein Sommerzuschlag von 6,67 € pro Tag berechnet.</span></li>
               <li className="flex gap-2"><span className="text-gray-400">10.</span><span className="text-justify">Nach der aktuellen Gesetzeslage ist auf die Dienstleistungen des DL keine gesetzliche Mehrwertsteuer zu entrichten.</span></li>
               <li className="flex gap-2"><span className="text-gray-400">11.</span><span className="text-justify">Bei Zahlungsverzug hat der DL das Recht, Dritte mit der Rechnungsabwicklung zu beauftragen und Verzugszinsen in Höhe von 5 Prozent p. a. über dem jeweiligen Basiszinssatz zu berechnen.</span></li>
@@ -533,7 +533,7 @@ export const VertragSignieren: FC<{
                   : ` Sie erhalten umgehend eine Kopie des unterschriebenen Vertrags per E-Mail an ${daten.ag.email}.`}
               </p>
               <p className="text-[11px] text-green-600/80 mt-2">
-                Audit: einfache elektronische Signatur · Zeitstempel + IP protokolliert · Vertragsversion v1.1
+                Audit: einfache elektronische Signatur · Zeitstempel + IP protokolliert · Vertragsversion v1.2
               </p>
               {onSigned && !embedded && !readOnly && (
                 <button onClick={() => onSigned(name)}
