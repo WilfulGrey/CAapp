@@ -1253,6 +1253,35 @@ function zeigen(an){
   pille.classList.toggle('schlummert',!an);
   if(an) pillePruefen(); else versteckePille();
 }
+/* ─── Fremde Leisten am unteren Rand ────────────────────────────────
+   Auf der echten Seite liegt unten der Cookie-Hinweis — und der gehoert
+   obenauf, nicht Pria. Statt uns darueberzuschieben, ruecken wir so weit
+   nach oben, wie die Leiste hoch ist. Erkannt wird sie ueber den Punkt
+   unten rechts: was dort liegt und fest positioniert ist, ist die Leiste.
+   Verschwindet sie, rutscht Pria von selbst zurueck. */
+const wurzelEl = (typeof W !== 'undefined' && W.host) ? W.host : document.body;
+function leisteHoehe(){
+  const punkte = document.elementsFromPoint
+    ? document.elementsFromPoint(Math.round(innerWidth - 40), innerHeight - 6) : [];
+  for(const e of punkte){
+    if(e === wurzelEl || wurzelEl.contains(e)) continue;
+    const st = getComputedStyle(e);
+    if(st.position !== 'fixed' && st.position !== 'sticky') continue;
+    const r = e.getBoundingClientRect();
+    // Eine Leiste, kein Vollbild-Overlay und kein Zierstreifen.
+    if(r.height >= 36 && r.height < innerHeight * 0.5) return Math.round(r.height + 10);
+  }
+  return 0;
+}
+let leisteJetzt = -1;
+function leistePruefen(){
+  if(panel.classList.contains('on')) return;      // offen deckt Pria ohnehin alles
+  const h = leisteHoehe();
+  if(h === leisteJetzt) return;
+  leisteJetzt = h;
+  wurzelEl.style.setProperty('--leiste', h + 'px');
+}
+
 /* SEITE statt document: im Widget lenkt der Erzeuger jedes
    `document.querySelector*` in den Shadow-DOM um — die Kostenrechner-Karten
    liegen aber in der SEITE. */
