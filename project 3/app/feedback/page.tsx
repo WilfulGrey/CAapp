@@ -15,7 +15,7 @@ import { useEffect, useState } from 'react';
 // zustande kommt (Martins Wortlaut, 19.08.2026).
 //
 // Nach „hilfreich" bieten wir den Google-Bewertungslink an, nach „teils"
-// oder „nein" ein Freitextfeld an Ilka. Entscheidung Martin, 19.08.2026,
+// oder „nein" ein Freitextfeld an Marta. Entscheidung Martin, 19.08.2026,
 // bewusst und im Wissen darum, dass Google das Vorschalten einer Frage in
 // seinen Bewertungsrichtlinien untersagt. Wer nach „teils"/„nein" trotzdem
 // öffentlich schreiben will, findet den Weg über die Fußzeile — das kostet
@@ -110,12 +110,12 @@ export default function FeedbackSeite() {
                       boxShadow: '0 8px 30px rgba(61,43,31,0.08), 0 2px 6px rgba(61,43,31,0.04)',
                       padding: '30px 38px 34px' }}>
 
-          {/* Ilka gross und ohne Rahmen: Es soll aussehen, als schaue sie
+          {/* Marta gross und ohne Rahmen: Es soll aussehen, als schaue sie
               einen an — nicht wie ein Profilbildchen in einem Formular.
               Das Siegel steht klein daneben, ohne die Zeile zu beherrschen. */}
           <div style={{ display: 'flex', alignItems: 'flex-start',
                         justifyContent: 'space-between', gap: 18, marginBottom: 22 }}>
-            <img src="/images/ilka-wysocki-2026.webp" alt="Ilka Wysocki"
+            <img src="/images/marta-kapcio.jpg" alt="Marta Kapcio"
                  style={{ width: 92, height: 92, borderRadius: 16, objectFit: 'cover',
                           objectPosition: 'center', flexShrink: 0 }} />
             <img src="/images/primundus_testsieger-2021.webp"
@@ -212,7 +212,7 @@ export default function FeedbackSeite() {
                          background: text.trim() ? FARBE.akzent : FARBE.randStark,
                          boxShadow: text.trim() ? '0 2px 8px rgba(139,115,85,0.28)' : 'none',
                          color: '#fff', cursor: sendet ? 'default' : 'pointer' }}>
-                {sendet ? 'Wird gesendet …' : 'An Ilka senden'}
+                {sendet ? 'Wird gesendet …' : 'An Marta senden'}
               </button>
               <button onClick={() => setGesendet(true)}
                 style={{ width: '100%', marginTop: 8, fontSize: 14.5, padding: '9px',
@@ -260,7 +260,7 @@ export default function FeedbackSeite() {
             <p style={{ fontFamily: SERIF, fontSize: 17, color: FARBE.text,
                         margin: '24px 0 0', paddingTop: 18,
                         borderTop: `1px solid ${FARBE.rand}` }}>
-              Ilka Wysocki
+              Marta Kapcio
               <span style={{ display: 'block', fontSize: 13.5, color: FARBE.leise,
                              marginTop: 2, fontFamily: 'inherit' }}>Primundus</span>
             </p>
@@ -289,7 +289,7 @@ export default function FeedbackSeite() {
         <p style={{ fontSize: 13, lineHeight: 1.6, color: FARBE.leise,
                     margin: '16px 0 0' }}>
           Sie erreichen mich jederzeit direkt:{' '}
-          <a href="mailto:ilka@primundus.de" style={{ color: FARBE.akzent }}>ilka@primundus.de</a>
+          <a href="mailto:info@primundus.de" style={{ color: FARBE.akzent }}>info@primundus.de</a>
           {GOOGLE_REVIEW_URL && (
             <>
               {' · '}

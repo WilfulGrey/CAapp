@@ -33,14 +33,14 @@ export function Header() {
           </Link>
 
           <div className="flex items-center gap-3 md:gap-4">
-            {/* Desktop: Phone with Ilka's Image */}
+            {/* Desktop: Phone with Marta's Image */}
             <a
               href="tel:+4989200000830"
               className="hidden md:flex items-center gap-2.5 pl-1.5 pr-4 py-1.5 rounded-lg bg-[#F8F7F5] hover:bg-[#8B7355] hover:text-white transition-all duration-200 group"
             >
               <Image
-                src="/images/ilka-wysocki-2026.webp"
-                alt="Ilka Wysocki"
+                src="/images/marta-kapcio.jpg"
+                alt="Marta Kapcio"
                 width={40}
                 height={40}
                 className="rounded-full w-10 h-10 object-cover"
@@ -48,7 +48,7 @@ export function Header() {
               />
               <Phone className="w-4 h-4 text-[#8B7355] group-hover:text-white transition-colors" />
               <div className="flex flex-col">
-                <span className="text-xs text-gray-500 group-hover:text-white/80 leading-tight">Ilka Wysocki</span>
+                <span className="text-xs text-gray-500 group-hover:text-white/80 leading-tight">Marta Kapcio</span>
                 <span className="text-sm font-semibold text-[#3D2B1F] group-hover:text-white leading-tight">089 200 000 830</span>
               </div>
             </a>

@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import type { FC } from 'react';
 import { X } from 'lucide-react';
 
-// Rückmeldung zum Angebot — als schwebende Frage von Ilka, unten rechts.
+// Rückmeldung zum Angebot — als schwebende Frage von Marta, unten rechts.
 //
 // Warum überhaupt: Ob ein Kunde noch im Rennen ist, erfahren wir sonst gar
 // nicht oder erst spät und geraten. Er selbst weiß es in dem Moment, in dem er
@@ -10,7 +10,7 @@ import { X } from 'lucide-react';
 //
 // Warum schwebend statt im Fluss (Martin, 12.08.): Als Kasten unter dem
 // Formular saß die Frage ~3000 px weit unten — gesehen hat sie fast niemand.
-// Und mit Ilkas Gesicht ist es keine Umfrage mehr, sondern ein Mensch, der
+// Und mit Martas Gesicht ist es keine Umfrage mehr, sondern ein Mensch, der
 // fragt; das beantwortet man eher.
 //
 // Wortlaut: Martins eigener (Passt nicht / Vielleicht später / Interessant).
@@ -50,7 +50,7 @@ export const AngebotsFeedback: FC<{
 }> = ({ onAnswer, onGoToForm, onDismiss }) => {
   const [answer, setAnswer] = useState<FeedbackAnswer | null>(null);
   const [done, setDone] = useState(false);
-  // Erst zusammengeklappt: nur Ilka + ein Satz. Wer sofort ein Formular ins
+  // Erst zusammengeklappt: nur Marta + ein Satz. Wer sofort ein Formular ins
   // Bild geschoben bekommt, klickt es weg, ohne es gelesen zu haben.
   const [offen, setOffen] = useState(false);
 
@@ -117,13 +117,13 @@ export const AngebotsFeedback: FC<{
             className="flex-1 sm:flex-none flex items-center gap-3 rounded-2xl pl-2 pr-3 py-2 text-left shadow-lg transition-transform active:scale-[0.98]"
             style={{ background: '#FFFFFF', border: '1px solid #D4D4D8' }}
           >
-            <img src="/ilka-wysocki-2026.webp" alt="" className="w-11 h-11 rounded-full object-cover object-top flex-shrink-0 border border-[#E9E9EB]" />
+            <img src="/marta-kapcio.jpg" alt="" className="w-11 h-11 rounded-full object-cover object-top flex-shrink-0 border border-[#E9E9EB]" />
             <span className="min-w-0">
               <span className="block text-[14px] font-semibold leading-tight" style={{ color: '#18181B' }}>
                 Was sagen Sie zum Angebot?
               </span>
               <span className="block text-[12.5px] leading-tight mt-0.5" style={{ color: '#8B7355' }}>
-                Ilka · kurze Antwort hilft
+                Marta · kurze Antwort hilft
               </span>
             </span>
           </button>
@@ -147,9 +147,9 @@ export const AngebotsFeedback: FC<{
          style={{ animation: 'slideSheet 0.25s cubic-bezier(0.32,0.72,0,1)' }}>
       <div className="rounded-2xl px-5 py-4 shadow-2xl" style={{ background: '#FFFFFF', border: '1px solid #D4D4D8' }}>
         <div className="flex items-start gap-3 mb-3">
-          <img src="/ilka-wysocki-2026.webp" alt="" className="w-10 h-10 rounded-full object-cover object-top flex-shrink-0 border border-[#E9E9EB]" />
+          <img src="/marta-kapcio.jpg" alt="" className="w-10 h-10 rounded-full object-cover object-top flex-shrink-0 border border-[#E9E9EB]" />
           <p className="text-[12.5px] leading-tight flex-1 pt-1" style={{ color: '#8B7355' }}>
-            Ilka Wysocki · Ihre Beraterin
+            Marta Kapcio · Ihre Beraterin
           </p>
           <button
             type="button"
@@ -251,7 +251,7 @@ export const AngebotsFeedback: FC<{
         Was sagen Sie zu unserem Angebot?
       </p>
       {/* Nimmt die Sorge, dass daraus ein Fragebogen wird — das ist die
-          eigentliche Hemmschwelle beim ersten Tap. Und es spricht ILKA:
+          eigentliche Hemmschwelle beim ersten Tap. Und es spricht MARTA:
           neben ihrem Gesicht klang „Eine Antwort genügt" wie ein Automat
           (Martin, 12.08.: „nicht menschlich verständlich"). */}
       <p className="text-[15px] mb-4" style={{ color: '#71717A' }}>Eine kurze Antwort hilft mir weiter.</p>

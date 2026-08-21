@@ -75,7 +75,7 @@ async function getSmtpConfig(
   };
 }
  
-const FEMALE_NAMES_SET = new Set(["aaliya","abby","ada","adela","adelheid","adeline","adriana","agata","agatha","agnes","aiko","aila","aileen","aimee","aisha","alana","alba","aleksandra","alexa","alexandra","alexia","alexis","alice","alicia","alina","alissa","aliyah","alke","allie","allison","alma","almut","alona","alva","alwine","amalia","amanda","amara","amaya","amelia","amelie","ami","amira","amy","ana","anastasia","andrea","andreja","angela","angelika","angelina","anita","anja","anna","annalena","anne","annegret","annelies","annelore","annette","anni","annika","antje","antonia","anuschka","aoife","arabell","ariadne","ariane","astrid","aurora","ava","babette","barbara","beatrice","beatrix","belen","bella","bente","berit","bernadette","bettina","bianca","birgit","birgitt","birgitta","birgitte","borbala","brigitta","brigitte","britt","brittany","bruna","brunhilde","camila","camilla","cara","carina","carla","carlotta","caro","carola","carolina","caroline","catharina","catharine","catrina","cecile","cecilia","charlotte","chiara","chloe","christel","christiane","christina","christine","claudia","claudine","constanze","corinna","cornelia","dagmar","dana","daniela","daria","deborah","diana","dina","dominique","dorothea","edda","edith","elena","eleonora","eliane","elisa","elisabeth","elizabeth","elke","ella","ellen","elsa","elsbeth","else","elvira","emilia","emma","erika","erna","ernestine","eva","eveline","evelyn","fatima","felicitas","filippa","fiona","franziska","frauke","frederike","frieda","gabriela","gabriele","gabi","gaby","gerda","gertrud","gisela","greta","gudrun","hanna","hannah","hannelore","heidemarie","heidi","heike","helene","helga","henriette","hildegard","hildegarde","hilke","hilde","ida","ilka","ilona","ilse","imke","ines","ingeborg","ingrid","irina","iris","irmgard","irmtraud","isabel","isabelle","isadora","jacqueline","jana","janet","janna","jasmin","jennifer","jessica","jette","johanna","jolanta","josefine","josephine","julia","juliane","justine","karin","karla","katharina","katharine","kathrin","katja","katrin","katrina","katrine","klara","klaudia","klarissa","kordula","kristin","kristina","lara","larissa","laura","lea","leah","lena","leonie","leonora","lieselotte","lilli","lillian","lilly","lina","linda","lisa","lisbeth","lore","lori","lotte","lotta","louisa","louise","lucia","luisa","luise","luzie","lydia","magdalena","maja","malin","mara","margarita","margareta","margarethe","margit","margot","marianna","marie","marielle","marina","marita","marlene","marta","martina","mary","mathilde","maud","melanie","melinda","melissa","merle","mia","michelle","mira","miriam","mirja","monika","nadine","natalia","natalie","nathalie","nele","nicola","nicole","nina","nora","natascha","odette","olivia","ottilie","patrizia","paula","pauline","petra","pia","renate","ronja","rosa","rosalie","roswitha","ruth","sabrina","sandra","sara","sarah","silke","silvia","simona","simone","sina","sofia","sonja","sophie","stefanie","stella","stephanie","susanne","sybille","sylvia","tamara","tanja","tatjana","teresa","theresa","theres","tina","ulrike","ursula","uta","veronika","victoria","viola","virginia","walburga","waltraud","wanda","wiebke","wilhelmine","xenia","yvonne","zoe"]);
+const FEMALE_NAMES_SET = new Set(["aaliya","abby","ada","adela","adelheid","adeline","adriana","agata","agatha","agnes","aiko","aila","aileen","aimee","aisha","alana","alba","aleksandra","alexa","alexandra","alexia","alexis","alice","alicia","alina","alissa","aliyah","alke","allie","allison","alma","almut","alona","alva","alwine","amalia","amanda","amara","amaya","amelia","amelie","ami","amira","amy","ana","anastasia","andrea","andreja","angela","angelika","angelina","anita","anja","anna","annalena","anne","annegret","annelies","annelore","annette","anni","annika","antje","antonia","anuschka","aoife","arabell","ariadne","ariane","astrid","aurora","ava","babette","barbara","beatrice","beatrix","belen","bella","bente","berit","bernadette","bettina","bianca","birgit","birgitt","birgitta","birgitte","borbala","brigitta","brigitte","britt","brittany","bruna","brunhilde","camila","camilla","cara","carina","carla","carlotta","caro","carola","carolina","caroline","catharina","catharine","catrina","cecile","cecilia","charlotte","chiara","chloe","christel","christiane","christina","christine","claudia","claudine","constanze","corinna","cornelia","dagmar","dana","daniela","daria","deborah","diana","dina","dominique","dorothea","edda","edith","elena","eleonora","eliane","elisa","elisabeth","elizabeth","elke","ella","ellen","elsa","elsbeth","else","elvira","emilia","emma","erika","erna","ernestine","eva","eveline","evelyn","fatima","felicitas","filippa","fiona","franziska","frauke","frederike","frieda","gabriela","gabriele","gabi","gaby","gerda","gertrud","gisela","greta","gudrun","hanna","hannah","hannelore","heidemarie","heidi","heike","helene","helga","henriette","hildegard","hildegarde","hilke","hilde","ida","marta","ilona","ilse","imke","ines","ingeborg","ingrid","irina","iris","irmgard","irmtraud","isabel","isabelle","isadora","jacqueline","jana","janet","janna","jasmin","jennifer","jessica","jette","johanna","jolanta","josefine","josephine","julia","juliane","justine","karin","karla","katharina","katharine","kathrin","katja","katrin","katrina","katrine","klara","klaudia","klarissa","kordula","kristin","kristina","lara","larissa","laura","lea","leah","lena","leonie","leonora","lieselotte","lilli","lillian","lilly","lina","linda","lisa","lisbeth","lore","lori","lotte","lotta","louisa","louise","lucia","luisa","luise","luzie","lydia","magdalena","maja","malin","mara","margarita","margareta","margarethe","margit","margot","marianna","marie","marielle","marina","marita","marlene","marta","martina","mary","mathilde","maud","melanie","melinda","melissa","merle","mia","michelle","mira","miriam","mirja","monika","nadine","natalia","natalie","nathalie","nele","nicola","nicole","nina","nora","natascha","odette","olivia","ottilie","patrizia","paula","pauline","petra","pia","renate","ronja","rosa","rosalie","roswitha","ruth","sabrina","sandra","sara","sarah","silke","silvia","simona","simone","sina","sofia","sonja","sophie","stefanie","stella","stephanie","susanne","sybille","sylvia","tamara","tanja","tatjana","teresa","theresa","theres","tina","ulrike","ursula","uta","veronika","victoria","viola","virginia","walburga","waltraud","wanda","wiebke","wilhelmine","xenia","yvonne","zoe"]);
 const MALE_NAMES_SET = new Set(["aaron","adam","alexander","alfred","alois","andre","andreas","axel","bastian","benedikt","benjamin","bernd","bo","burkhard","carsten","christian","christoph","claus","clemens","cornelius","damian","daniel","david","dieter","dietmar","dirk","dominik","edgar","elias","emilio","eric","erik","ernst","eugen","fabian","felix","finn","florian","frank","franz","frederik","gabriel","georg","gerhard","gottfried","guido","gunnar","hans","harry","hartmut","heinz","helge","helmut","henning","henrik","herbert","heiko","holger","horst","hubert","hugo","jakob","jan","jens","joachim","joe","joel","joerg","johannes","jonas","jonathan","jochen","kai","karl","kilian","Klaus","kevin","konrad","kristian","lars","leo","leon","leopold","lorenz","lothar","lucas","lukas","manfred","marco","markus","martin","matthias","max","maximilian","michael","mike","moritz","nikolaj","nikolaus","nils","norbert","oliver","oscar","oskar","otto","patrice","patrick","paul","peter","philipp","ralf","reinhard","richard","robert","rolf","sebastian","simon","stefan","steffen","stephan","steven","sven","thomas","thorsten","tillman","tim","tobias","tom","torsten","ulrich","uwe","valentin","victor","volker","werner","willi","will","wolf","wolfram","xaver"]);
  
 
@@ -204,8 +204,8 @@ function buildEmailWrapper(lead: Lead, siteUrl: string, content: string): string
 </html>`;
 }
  
-function buildIlkaSig(siteUrl: string): string {
-  // Ilkas Foto kommt aus primundus.de statt vom Kostenrechner (20.08.):
+function buildMartaSig(siteUrl: string): string {
+  // Martas Foto kommt aus primundus.de statt vom Kostenrechner (20.08.):
   // Beide Dienste deployen unabhaengig voneinander. Nach dem Foto-Wechsel
   // (#481) war die neue Datei auf primundus.de sofort da, der
   // Kostenrechner-Build haing >45 Min in Renders Warteschlange — in dieser
@@ -213,11 +213,11 @@ function buildIlkaSig(siteUrl: string): string {
   // betroffen). Die Mail-Funktion deployt manuell und ist damit IMMER
   // schneller als der Kostenrechner; Bilder gehoeren deshalb an die
   // Adresse, die unabhaengig davon steht.
-  const ilkaUrl = "https://primundus.de/images/ilka-wysocki-2026.webp";
+  const martaUrl = "https://primundus.de/images/marta-kapcio.jpg";
   const testUrl = `${siteUrl}/images/primundus_testsieger-2021.webp`;
   const mediaBase = `${siteUrl}/images/media`;
   return `
-    <p style="font-size:16px;line-height:1.7;color:#555;margin-top:24px;margin-bottom:16px;">Mit freundlichen Grüßen<br><strong style="color:#3D2B1F;">Ilka Wysocki</strong></p>
+    <p style="font-size:16px;line-height:1.7;color:#555;margin-top:24px;margin-bottom:16px;">Mit freundlichen Grüßen<br><strong style="color:#3D2B1F;">Marta Kapcio</strong></p>
     <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="margin:0 0 24px 0;border:1px solid #e8ddd0;border-radius:12px;overflow:hidden;">
       <tr>
         <td style="padding:18px 20px 16px;background:#ffffff;">
@@ -227,10 +227,10 @@ function buildIlkaSig(siteUrl: string): string {
                 <table cellpadding="0" cellspacing="0" role="presentation">
                   <tr>
                     <td style="padding-right:12px;vertical-align:top;">
-                      <img src="${ilkaUrl}" alt="Ilka Wysocki" width="60" style="display:block;width:60px;height:auto;border-radius:8px;" />
+                      <img src="${martaUrl}" alt="Marta Kapcio" width="60" style="display:block;width:60px;height:auto;border-radius:8px;" />
                     </td>
                     <td style="vertical-align:middle;">
-                      <p style="margin:0 0 2px;font-size:15px;font-weight:700;color:#3D2B1F;white-space:nowrap;">Ilka Wysocki</p>
+                      <p style="margin:0 0 2px;font-size:15px;font-weight:700;color:#3D2B1F;white-space:nowrap;">Marta Kapcio</p>
                       <p style="margin:0 0 2px;font-size:13px;color:#555;white-space:nowrap;">Pflegeberaterin</p>
                       <p style="margin:0;font-size:12px;color:#9a8a73;white-space:nowrap;">Mo – So, 8 – 20 Uhr</p>
                     </td>
@@ -362,7 +362,7 @@ function buildAngebotsEmailHtml(lead: Lead, siteUrl: string): string {
       Für Sie bleibt alles <strong>unverbindlich</strong>, bis Sie sich für eine passende Betreuungskraft entscheiden und diese anreist.
     </div>
  
-    ${buildIlkaSig(siteUrl)}`;
+    ${buildMartaSig(siteUrl)}`;
  
   return buildEmailWrapper(lead, siteUrl, content);
 }
@@ -380,7 +380,7 @@ ${kalkulationUrl}
 Für Sie bleibt alles unverbindlich, bis Sie sich für eine passende Betreuungskraft entscheiden und diese anreist.
  
 Mit freundlichen Grüßen
-Ilka Wysocki
+Marta Kapcio
  
 ---
 ✓ Keine Vertragsbindung · ✓ Tagesgenaue Abrechnung · ✓ Kosten erst bei Anreise
@@ -522,7 +522,7 @@ function buildNachfass1Html(lead: Lead, siteUrl: string, portalBase: string, mil
 
     ${nachfassCtaButton(portalUrl, v.cta)}
     ${portalPsHtml()}
-    ${buildIlkaSig(siteUrl)}`;
+    ${buildMartaSig(siteUrl)}`;
 
   return buildEmailWrapper(lead, siteUrl, content);
 }
@@ -543,7 +543,7 @@ ${v.cta.replace(/ →$/, "")}: ${portalUrl}
 ${PORTAL_PS_TEXT}
 
 Mit freundlichen Grüßen
-Ilka Wysocki
+Marta Kapcio
 
 ---
 ✓ Keine Vertragsbindung · ✓ Tagesgenaue Abrechnung · ✓ Kosten erst bei Anreise
@@ -569,7 +569,7 @@ export function buildProfilNudge1Html(lead: Lead, siteUrl: string, portalBase: s
     ${buildHeimVergleichBoxHtml(lead)}
     ${bulletproofButton(portalUrl, "Pflegesituation beschreiben&nbsp;&nbsp;&rarr;", "#2A9D5C")}
     <p style="font-size:13px;line-height:1.6;color:#888;margin:18px 0 0;">PS: Klappt im Portal etwas nicht, oder möchten Sie das lieber persönlich klären? Sie erreichen mich unter <a href="tel:+4989200000830" style="color:#8B7355;text-decoration:none;">089&nbsp;200&nbsp;000&nbsp;830</a> oder per <a href="https://wa.me/4989200000830" style="color:#8B7355;text-decoration:none;">WhatsApp</a>.</p>
-    ${buildIlkaSig(siteUrl)}`;
+    ${buildMartaSig(siteUrl)}`;
   return buildEmailWrapper(lead, siteUrl, content);
 }
 
@@ -589,7 +589,7 @@ Pflegesituation beschreiben: ${portalUrl}
 PS: Klappt im Portal etwas nicht, oder möchten Sie das lieber persönlich klären? Sie erreichen mich unter 089 200 000 830 oder per WhatsApp (https://wa.me/4989200000830).
 
 Mit freundlichen Grüßen
-Ilka Wysocki
+Marta Kapcio
 
 ---
 Primundus Deutschland | +49 89 200 000 830 | www.primundus.de`;
@@ -605,7 +605,7 @@ function buildProfilNudge2Html(lead: Lead, siteUrl: string, portalBase: string):
     <p style="font-size:15px;line-height:1.75;color:#444;margin-bottom:14px;">Oder Sie erledigen es direkt selbst: einmal klicken, Angaben vervollständigen, Bewerbungen erhalten. Kostenfrei und unverbindlich.</p>
     ${bulletproofButton(portalUrl, "Angaben vervollständigen&nbsp;&nbsp;&rarr;", "#2A9D5C")}
     <p style="font-size:13px;line-height:1.6;color:#888;margin:18px 0 0;">PS: Klappt im Portal etwas nicht, oder möchten Sie das lieber persönlich klären? Sie erreichen mich unter <a href="tel:+4989200000830" style="color:#8B7355;text-decoration:none;">089&nbsp;200&nbsp;000&nbsp;830</a> oder per <a href="https://wa.me/4989200000830" style="color:#8B7355;text-decoration:none;">WhatsApp</a>.</p>
-    ${buildIlkaSig(siteUrl)}`;
+    ${buildMartaSig(siteUrl)}`;
   return buildEmailWrapper(lead, siteUrl, content);
 }
 
@@ -625,7 +625,7 @@ Angaben vervollständigen: ${portalUrl}
 PS: Klappt im Portal etwas nicht, oder möchten Sie das lieber persönlich klären? Sie erreichen mich unter 089 200 000 830 oder per WhatsApp (https://wa.me/4989200000830).
 
 Mit freundlichen Grüßen
-Ilka Wysocki
+Marta Kapcio
 
 ---
 Primundus Deutschland | +49 89 200 000 830 | www.primundus.de`;
@@ -643,7 +643,7 @@ function buildProfilNudge3Html(lead: Lead, siteUrl: string, portalBase: string):
     ${bulletproofButton(portalUrl, "Angaben vervollständigen&nbsp;&nbsp;&rarr;", "#2A9D5C")}
     <p style="font-size:15px;line-height:1.75;color:#444;margin:16px 0 0;">Antworten Sie einfach auf diese E-Mail &ndash; oder rufen Sie mich an: <a href="tel:+4989200000830" style="color:#8B7355;text-decoration:none;font-weight:600;">089&nbsp;200&nbsp;000&nbsp;830</a>, gern auch per <a href="https://wa.me/4989200000830" style="color:#8B7355;text-decoration:none;font-weight:600;">WhatsApp</a>.</p>
     <p style="font-size:13px;line-height:1.6;color:#888;margin:18px 0 0;">PS: Klappt im Portal etwas nicht, oder möchten Sie das lieber persönlich klären? Sie erreichen mich unter <a href="tel:+4989200000830" style="color:#8B7355;text-decoration:none;">089&nbsp;200&nbsp;000&nbsp;830</a> oder per <a href="https://wa.me/4989200000830" style="color:#8B7355;text-decoration:none;">WhatsApp</a>.</p>
-    ${buildIlkaSig(siteUrl)}`;
+    ${buildMartaSig(siteUrl)}`;
   return buildEmailWrapper(lead, siteUrl, content);
 }
 
@@ -663,7 +663,7 @@ Antworten Sie einfach auf diese E-Mail — oder rufen Sie mich an: 089 200 000 8
 PS: Klappt im Portal etwas nicht, oder möchten Sie das lieber persönlich klären? Sie erreichen mich unter 089 200 000 830 oder per WhatsApp (https://wa.me/4989200000830).
 
 Mit freundlichen Grüßen
-Ilka Wysocki
+Marta Kapcio
 
 ---
 Primundus Deutschland | +49 89 200 000 830 | www.primundus.de`;
@@ -678,7 +678,7 @@ function buildReaktivierungWechselHtml(lead: Lead, siteUrl: string, portalBase: 
     <p style="font-size:15px;line-height:1.75;color:#444;margin-bottom:14px;">vielleicht haben Sie längst eine Betreuung gefunden &ndash; dann wünsche ich Ihnen alles Gute damit. Ich melde mich, weil bei vielen Familien nach einiger Zeit ein <strong>Wechsel der Pflegekraft</strong> ansteht. Falls das auch bei Ihnen der Fall ist: Gerne zeigen wir Ihnen unverbindlich, welche Pflegekräfte gerade verfügbar wären &ndash; damit Sie besser vergleichen können und die beste Lösung für Ihre Betreuungssituation finden. Ein Vertrag entsteht erst, wenn Sie wirklich jemanden gefunden haben.</p>
     ${bulletproofButton(portalUrl, "Aktuelle Pflegekräfte ansehen&nbsp;&nbsp;&rarr;", "#2A9D5C")}
     <p style="font-size:13px;line-height:1.6;color:#888;margin:18px 0 0;">PS: Klappt im Portal etwas nicht, oder möchten Sie das lieber persönlich klären? Sie erreichen mich unter <a href="tel:+4989200000830" style="color:#8B7355;text-decoration:none;">089&nbsp;200&nbsp;000&nbsp;830</a> oder per <a href="https://wa.me/4989200000830" style="color:#8B7355;text-decoration:none;">WhatsApp</a>.</p>
-    ${buildIlkaSig(siteUrl)}`;
+    ${buildMartaSig(siteUrl)}`;
   return buildEmailWrapper(lead, siteUrl, content);
 }
 
@@ -694,7 +694,7 @@ Aktuelle Pflegekräfte ansehen: ${portalUrl}
 PS: Klappt im Portal etwas nicht, oder möchten Sie das lieber persönlich klären? Sie erreichen mich unter 089 200 000 830 oder per WhatsApp (https://wa.me/4989200000830).
 
 Mit freundlichen Grüßen
-Ilka Wysocki
+Marta Kapcio
 
 ---
 Primundus Deutschland | +49 89 200 000 830 | www.primundus.de`;
@@ -716,7 +716,7 @@ function buildNeuePflegekraefteHtml(lead: Lead, siteUrl: string, portalBase: str
 
     <p style="font-size:15px;line-height:1.75;color:#444;margin:24px 0 18px;">Bei Fragen bin ich gerne für Sie da – telefonisch, per WhatsApp oder als Antwort auf diese E-Mail.</p>
 
-    ${buildIlkaSig(siteUrl)}`;
+    ${buildMartaSig(siteUrl)}`;
   return buildEmailWrapper(lead, siteUrl, content);
 }
 
@@ -732,7 +732,7 @@ ${portalUrl}
 Bei Fragen bin ich gerne für Sie da – telefonisch, per WhatsApp oder als Antwort auf diese E-Mail.
 
 Mit freundlichen Grüßen
-Ilka Wysocki
+Marta Kapcio
 
 ---
 Primundus Deutschland | +49 89 200 000 830 | www.primundus.de`;
@@ -757,7 +757,7 @@ function buildNachfass2Html(lead: Lead, siteUrl: string, portalBase: string, mil
       Schreiben Sie kurz per <a href="https://wa.me/4989200000830" style="color:#25D366;text-decoration:none;font-weight:600;white-space:nowrap;">WhatsApp</a> oder rufen Sie an: <a href="tel:+4989200000830" style="color:#3D2B1F;text-decoration:none;font-weight:600;white-space:nowrap;">+49 89 200 000 830</a>
     </p>
 
-    ${buildIlkaSig(siteUrl)}`;
+    ${buildMartaSig(siteUrl)}`;
 
   return buildEmailWrapper(lead, siteUrl, content);
 }
@@ -776,7 +776,7 @@ Schreiben Sie kurz per WhatsApp: https://wa.me/4989200000830
 Oder rufen Sie an: +49 89 200 000 830
 
 Mit freundlichen Grüßen
-Ilka Wysocki
+Marta Kapcio
 
 ---
 Primundus Deutschland | +49 89 200 000 830 | www.primundus.de`;
@@ -789,9 +789,9 @@ Primundus Deutschland | +49 89 200 000 830 | www.primundus.de`;
 function buildNachfass3Html(lead: Lead, siteUrl: string): string {
   const halloAnrede = buildHalloAnrede(lead.anrede_text || null, lead.nachname || "", lead.vorname || "");
   const leadRef = lead.email || lead.id;
-  const mailtoYes = `mailto:info@primundus.de?subject=${encodeURIComponent(`Habe noch Interesse — ${leadRef}`)}&body=${encodeURIComponent(`Hallo Ilka,\n\nich habe noch Interesse, bitte melden Sie sich bei mir.\n\n${halloAnrede.replace(/^Hallo /, '')}`)}`;
-  const mailtoLater = `mailto:info@primundus.de?subject=${encodeURIComponent(`Aktuell nicht — vielleicht später — ${leadRef}`)}&body=${encodeURIComponent(`Hallo Ilka,\n\naktuell brauche ich noch keine Pflegekraft, vielleicht später.\n\n${halloAnrede.replace(/^Hallo /, '')}`)}`;
-  const mailtoNo = `mailto:info@primundus.de?subject=${encodeURIComponent(`Doch nicht relevant — ${leadRef}`)}&body=${encodeURIComponent(`Hallo Ilka,\n\nes hat sich erledigt, das Thema ist für mich nicht mehr relevant.\n\n${halloAnrede.replace(/^Hallo /, '')}`)}`;
+  const mailtoYes = `mailto:info@primundus.de?subject=${encodeURIComponent(`Habe noch Interesse — ${leadRef}`)}&body=${encodeURIComponent(`Hallo Marta,\n\nich habe noch Interesse, bitte melden Sie sich bei mir.\n\n${halloAnrede.replace(/^Hallo /, '')}`)}`;
+  const mailtoLater = `mailto:info@primundus.de?subject=${encodeURIComponent(`Aktuell nicht — vielleicht später — ${leadRef}`)}&body=${encodeURIComponent(`Hallo Marta,\n\naktuell brauche ich noch keine Pflegekraft, vielleicht später.\n\n${halloAnrede.replace(/^Hallo /, '')}`)}`;
+  const mailtoNo = `mailto:info@primundus.de?subject=${encodeURIComponent(`Doch nicht relevant — ${leadRef}`)}&body=${encodeURIComponent(`Hallo Marta,\n\nes hat sich erledigt, das Thema ist für mich nicht mehr relevant.\n\n${halloAnrede.replace(/^Hallo /, '')}`)}`;
 
   const content = `
     <p style="font-size:15px;line-height:1.75;color:#444;margin-bottom:14px;">${halloAnrede},</p>
@@ -807,7 +807,7 @@ function buildNachfass3Html(lead: Lead, siteUrl: string): string {
 
     <p style="font-size:13px;line-height:1.6;color:#888;margin:22px 0 0;font-style:italic;">Falls wir nichts hören, melden wir uns nicht mehr — wir wollen Sie nicht stören.</p>
 
-    ${buildIlkaSig(siteUrl)}`;
+    ${buildMartaSig(siteUrl)}`;
 
   return buildEmailWrapper(lead, siteUrl, content);
 }
@@ -836,7 +836,7 @@ Oder rufen Sie an: +49 89 200 000 830
 Falls wir nichts hören, melden wir uns nicht mehr — wir wollen Sie nicht stören.
 
 Mit freundlichen Grüßen
-Ilka Wysocki
+Marta Kapcio
 
 ---
 Primundus Deutschland | +49 89 200 000 830 | www.primundus.de`;
@@ -1031,7 +1031,7 @@ export function buildEingangsbestaetigungHtml(lead: Lead, siteUrl: string, porta
 
     <p style="font-size:15px;line-height:1.75;color:#444;margin:30px 0 18px;">Wenn Sie Fragen haben oder Unterstützung möchten — rufen Sie mich an, schreiben Sie mir per WhatsApp oder antworten Sie einfach auf diese E-Mail. Ich bin gerne für Sie da.</p>
 
-    ${buildIlkaSig(siteUrl)}`;
+    ${buildMartaSig(siteUrl)}`;
 
   return buildEmailWrapper(lead, siteUrl, content);
 }
@@ -1113,7 +1113,7 @@ ${anf.join("\n")}
 Wenn Sie Fragen haben oder Unterstützung möchten — rufen Sie mich an, schreiben Sie mir per WhatsApp oder antworten Sie einfach auf diese E-Mail. Ich bin gerne für Sie da.
 
 Mit freundlichen Grüßen
-Ilka Wysocki
+Marta Kapcio
 
 ---
 Primundus Deutschland | 24h-Pflege und Betreuung
@@ -1562,13 +1562,13 @@ function buildReminderHtml(
   // Interest behält den dezenten Soft-Out unter dem CTA. Application
   // braucht ihn nicht mehr — der "passt nicht?"-Hinweis steckt jetzt
   // direkt in middleHtml ("an- oder ablehnen / auf diese Mail antworten").
-  // Ilka als Rettungsanker in ALLEN Mails (Martin, 20.07.): Portal ist der
+  // Marta als Rettungsanker in ALLEN Mails (Martin, 20.07.): Portal ist der
   // Hauptweg, der PS-Hinweis der persönliche Fallback.
   const softOut = `<p style="font-size:13px;line-height:1.6;color:#888;margin:18px 0 0;">PS: Klappt im Portal etwas nicht, oder möchten Sie das lieber persönlich klären? Sie erreichen mich unter <a href="tel:+4989200000830" style="color:#8B7355;text-decoration:none;">089&nbsp;200&nbsp;000&nbsp;830</a> oder per <a href="https://wa.me/4989200000830" style="color:#8B7355;text-decoration:none;">WhatsApp</a>.</p>`;
 
   // Aufbau wie eine persönliche Nachricht: Begrüßung → kurze Situation →
   // kompakte Pflegekraft-Box (mit "Profil ansehen"-Button) → freundliche
-  // Bitte → Ilka-Signatur (enthält WhatsApp + Telefon).
+  // Bitte → Marta-Signatur (enthält WhatsApp + Telefon).
   // application: kein extra CTA-Button (der Button steckt in der Box).
   // interest: behält seinen CTA-Button + Soft-Out.
   const ctaButton = variant === "application" ? "" : bulletproofButton(portalUrl, ctaText);
@@ -1579,7 +1579,7 @@ function buildReminderHtml(
     ${middleHtml}
     ${ctaButton}
     ${softOut}
-    ${buildIlkaSig(siteUrl)}`;
+    ${buildMartaSig(siteUrl)}`;
 
   return buildEmailWrapper(lead, siteUrl, content);
 }
@@ -1607,7 +1607,7 @@ Profil ansehen und einladen: ${portalUrl}
 PS: Klappt im Portal etwas nicht, oder möchten Sie das lieber persönlich klären? Sie erreichen mich unter 089 200 000 830 oder per WhatsApp (https://wa.me/4989200000830).
 
 Mit freundlichen Grüßen
-Ilka Wysocki — Pflegeberaterin
+Marta Kapcio — Pflegeberaterin
 Tel: 089 200 000 830  ·  WhatsApp: https://wa.me/4989200000830
 
 Primundus Deutschland | www.primundus.de
@@ -1659,7 +1659,7 @@ ${firstName}s Profil ansehen: ${portalUrl}
 PS: Klappt im Portal etwas nicht, oder möchten Sie das lieber persönlich klären? Sie erreichen mich unter 089 200 000 830 oder per WhatsApp (https://wa.me/4989200000830).
 
 Mit freundlichen Grüßen
-Ilka Wysocki — Pflegeberaterin
+Marta Kapcio — Pflegeberaterin
 Tel: 089 200 000 830  ·  WhatsApp: https://wa.me/4989200000830
 
 Primundus Deutschland | www.primundus.de
@@ -1708,7 +1708,7 @@ export function buildWarumPrimundusHtml(lead: Lead, portalUrl: string, siteUrl: 
     ${buildHeimVergleichBoxHtml(lead)}
     ${bulletproofButton(portalUrl, "Pflegekräfte im Portal ansehen →")}
     <p style="font-size:14px;line-height:1.65;color:#555;margin:0 0 4px;">Fragen zum Preis oder zur Betreuung? Rufen Sie mich gerne <a href="tel:+4989200000830" style="color:#0066CC;text-decoration:none;white-space:nowrap;">direkt an</a> oder schreiben Sie per <a href="https://wa.me/4989200000830" style="color:#25D366;text-decoration:none;font-weight:600;white-space:nowrap;">WhatsApp</a> &mdash; oder antworten Sie einfach auf diese E-Mail.</p>
-    ${buildIlkaSig(siteUrl)}`;
+    ${buildMartaSig(siteUrl)}`;
 
   return buildEmailWrapper(lead, siteUrl, content);
 }
@@ -1729,7 +1729,7 @@ ${buildHeimVergleichText(lead)}Pflegekräfte im Portal ansehen: ${portalUrl}
 Fragen zum Preis oder zur Betreuung? Rufen Sie mich gerne direkt an (089 200 000 830) oder schreiben Sie per WhatsApp (wa.me/4989200000830) — oder antworten Sie einfach auf diese E-Mail.
 
 Mit freundlichen Grüßen
-Ilka Wysocki — Pflegeberaterin
+Marta Kapcio — Pflegeberaterin
 Tel: 089 200 000 830  ·  WhatsApp: https://wa.me/4989200000830
 
 Primundus Deutschland | www.primundus.de

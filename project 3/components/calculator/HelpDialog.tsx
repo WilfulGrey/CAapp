@@ -56,15 +56,15 @@ export function HelpDialog({ open, onOpenChange }: HelpDialogProps) {
           <div className="flex items-center gap-3 mb-5">
             <div className="relative w-12 h-12 rounded-full overflow-hidden flex-shrink-0">
               <Image
-                src="/images/ilka-wysocki-2026.webp"
-                alt="Ilka Wysocki"
+                src="/images/marta-kapcio.jpg"
+                alt="Marta Kapcio"
                 width={48}
                 height={48}
                 className="object-cover object-top w-full h-full"
               />
             </div>
             <div className="flex-1 text-left">
-              <p className="font-semibold text-[#1a1a1a] text-sm">Ilka Wysocki</p>
+              <p className="font-semibold text-[#1a1a1a] text-sm">Marta Kapcio</p>
               <p className="text-[#666666] text-xs mb-1">Ihre persönliche Beraterin</p>
               <div className="flex items-center gap-3">
                 <a
