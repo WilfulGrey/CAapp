@@ -13,8 +13,46 @@ const inter = Inter({ subsets: ['latin'] });
 // og:title/og:description/og:url komplett (WhatsApp-/Facebook-Previews ohne
 // Text, SEO-Audit 2026-08-14). Fallback-Domain war primundus.de (Apex) —
 // korrigiert auf die eigene Subdomain.
+/* Soll die Tastatur das Layout-Fenster verkleinern? Vorerst nur ausserhalb
+   von Prod.
+
+   Ohne `interactive-widget=resizes-content` steht Safari auf `resizes-visual`:
+   bei offener Tastatur bleibt das Layout-Fenster gross (auf Martins iPhone
+   714 px), sichtbar sind aber nur 377 — und in den 337 px Differenz laesst
+   iOS den Nutzer herumschieben. Alles `position:fixed` lebt in den 714 px,
+   wandert beim Schieben mit und hinkt jeder JS-Nachfuehrung hinterher. Genau
+   das sah nach kaputtem Chat aus, unabhaengig davon, wie gut nachgefuehrt
+   wird.
+
+   Warum die Entscheidung HIER faellt und nicht im Hostname-Gatter unten:
+   Safari liest das Attribut beim PARSEN der Seite. Ein spaeteres Umschreiben
+   bleibt wirkungslos — am 22.08. gemessen (Attribut sagte `resizes-content`,
+   waehrend iH 714 und die sichtbare Hoehe 377 war) und wieder verworfen, auch
+   ueber `next/script` mit `beforeInteractive`, das trotzdem im Body landet.
+
+   Und warum es trotzdem ohne Prod geht: Staging und Prod sind zwei Render-
+   Dienste mit je eigener Umgebung, die denselben Commit SEPARAT bauen. Was
+   hier zur Bauzeit gelesen wird, darf sich also unterscheiden — die
+   Canonical-URLs der beiden Seiten zeigen das. Kein dynamisches Rendern,
+   keine neue Variable: die Seiten bleiben statisch.
+
+   Auf Prod einschalten heisst: diese Bedingung durch `true` ersetzen.
+   Sichtbare Folge dort waeren die `fixed bottom-0`-Leisten in Step-2, Result
+   und Kalkulation, die beim Tippen ueber der Tastatur staenden statt
+   dahinter. */
+const SEITE = process.env.NEXT_PUBLIC_SITE_URL || 'https://kostenrechner.primundus.de';
+// Bewusst gegen die Prod-Domain gepruft, nicht auf „staging" im Namen: eine
+// neue Testumgebung soll die Verbesserung automatisch bekommen, und nur die
+// eine bekannte Adresse bleibt aussen vor.
+const IST_PROD = SEITE.includes('kostenrechner.primundus.de');
+
 export const metadata: Metadata = {
-  metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL || 'https://kostenrechner.primundus.de'),
+  viewport: {
+    width: 'device-width',
+    initialScale: 1,
+    ...(IST_PROD ? {} : { interactiveWidget: 'resizes-content' as const }),
+  },
+  metadataBase: new URL(SEITE),
   title: 'PRIMUNDUS - 24-Stunden-Pflege Kostenrechner',
   description: 'Berechnen Sie in nur 2 Minuten die Kosten für 24-Stunden-Pflege. Vom Testsieger mit Preisgarantie.',
   alternates: {
