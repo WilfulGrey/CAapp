@@ -779,10 +779,10 @@ async function starteFunnel(grund,chip,echo){
   // nicht bei eins.
   const schonDa=FLOW.filter(f=>antwort[f.k]!==undefined).length;
   await sagen(schonDa
-    ? 'Sehr gern. <b>' + (FLOW.length-schonDa) + ' kurze Fragen</b> fehlen noch, den Rest habe ich schon.'
+    ? '<b>' + (FLOW.length-schonDa) + ' kurze Fragen</b> fehlen noch, den Rest habe ich schon.'
     : (grund==='preis'
-      ? 'Sehr gern — das hängt ganz von Ihrer Situation ab. <b>Acht kurze Fragen</b>, dann haben Sie Ihren Preis. Ich fange einfach an.'
-      : 'Sehr gern — wer zu Ihnen passt, hängt von Ihrer Situation ab. <b>Acht kurze Fragen</b>, dann zeige ich sie Ihnen. Ich fange einfach an.'));
+      ? 'Das hängt ganz von Ihrer Situation ab. <b>Acht kurze Fragen</b>, dann haben Sie Ihren Preis — ich fange einfach an.'
+      : 'Wer zu Ihnen passt, hängt von Ihrer Situation ab. <b>Acht kurze Fragen</b>, dann zeige ich sie Ihnen — ich fange einfach an.'));
   fortschritt();   // schon Beantwortetes soll man am Balken sehen
   naechste();
 }
@@ -1353,10 +1353,62 @@ addEventListener('scroll',pillePruefen,{passive:true});
 
 function versteckePille(){ pille.classList.remove('on'); }
 
+/* ─── Handy: Seite festhalten und Tastatur ausgleichen ──────────────
+   Zwei Dinge, die auf dem iPhone schiefgingen (Martin, 22.08.): Beim Tippen
+   sprang das Panel, und die Seite dahinter liess sich scrollen.
+
+   Ursache 1: `overflow:hidden` am body reicht auf iOS nicht. Verlaesslich ist
+   `position:fixed` mit gemerkter Scrollposition — danach kann nichts mehr
+   wegrutschen, und die Tastatur verkleinert nur noch das sichtbare Fenster.
+   Nur auf dem Handy: auf dem Desktop schwebt ein kleines Panel, dort waere
+   das Festhalten der ganzen Seite eine Zumutung.
+
+   Ursache 2: `handyLayout` wurde aufgerufen, war aber nirgends definiert —
+   bei jedem Oeffnen flog ein ReferenceError. Hier ist sie wieder. */
+let gemerkterScroll = 0, seiteFest = false;
+function seiteSperren(an){
+  const b = document.body;
+  if(an){
+    b.classList.add('chat-offen');
+    if(innerWidth > 640 || seiteFest) return;
+    gemerkterScroll = window.scrollY || document.documentElement.scrollTop || 0;
+    b.style.position='fixed'; b.style.top=(-gemerkterScroll)+'px';
+    b.style.left='0'; b.style.right='0'; b.style.width='100%';
+    seiteFest = true;
+  }else{
+    b.classList.remove('chat-offen');
+    if(!seiteFest) return;
+    b.style.position=''; b.style.top=''; b.style.left=''; b.style.right=''; b.style.width='';
+    window.scrollTo(0, gemerkterScroll);
+    seiteFest = false;
+  }
+}
+
+const vv = window.visualViewport;
+function handyLayout(){
+  if(!panel.classList.contains('on')) return;
+  const ausCss=()=>{ panel.style.height=''; panel.style.bottom=''; panel.style.transform=''; };
+  if(!vv || innerWidth>640) return ausCss();
+  // Nur eingreifen, wenn die Tastatur wirklich Platz wegnimmt. Alles unter
+  // 120 px ist Adressleiste oder Messrauschen.
+  const verdeckt = innerHeight - vv.height - vv.offsetTop;
+  if(verdeckt < 120) return ausCss();
+  panel.style.bottom = 'auto';
+  panel.style.height = vv.height + 'px';
+  // Mit festgehaltener Seite ist der Versatz normalerweise 0; bleibt doch
+  // einer uebrig, wird er ausgeglichen.
+  const versatz = Math.round(vv.offsetTop);
+  panel.style.transform = versatz ? 'translateY('+versatz+'px)' : '';
+  runter();
+}
+if(vv){ vv.addEventListener('resize',handyLayout); vv.addEventListener('scroll',handyLayout); }
+addEventListener('orientationchange',()=>setTimeout(handyLayout,260));
+panel.addEventListener('animationend',()=>{ panel.classList.add('fertig'); handyLayout(); });
+
 async function oeffne(start){
   tipp(); versteckePille();
   blase.classList.add('weg'); panel.classList.add('on');
-  document.body.classList.add('chat-offen');
+  seiteSperren(true);
   // Auch ohne Animation (reduzierte Bewegung) muss die Höhe stimmen.
   setTimeout(()=>{ panel.classList.add('fertig'); handyLayout(); }, 700);
   if(gestartet) return; gestartet=true;
@@ -1454,7 +1506,7 @@ W.getElementById('zu').onclick=()=>{
   tipp();
   panel.classList.remove('on','fertig');
   panel.style.height=''; panel.style.bottom=''; panel.style.transform='';
-  document.body.classList.remove('chat-offen');
+  seiteSperren(false);
   blase.classList.remove('weg');
 };
 
