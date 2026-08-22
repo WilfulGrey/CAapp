@@ -89,6 +89,23 @@ wie „kein Vermittler", ohne es zu verneinen. Pria benutzt sie.*
 > darunter — die genaue Rechnung steht in Ihrem Angebot.
 > *Quelle: \`HEIM_EIGENANTEIL\`, identisch in Mail und Portal. Bei Änderung beide Orte.*
 
+**1.5b — Wo arbeiten Sie? / Kommen Sie auch nach …?**
+> **In ganz Deutschland.** Die Betreuungskraft zieht bei Ihnen zu Hause ein, egal
+> wo Sie wohnen. (Martin, 22.08. — vorher stand das nirgends, und Pria hat sich
+> „bundesweit" aus der Seitenliste zusammengereimt.)
+
+**1.5c — Wie viele Pflegekräfte haben Sie?**
+> **Viele verfügbare Kräfte, und alle sind bei uns angestellt.** Keine Zahl
+> nennen (Martin, 22.08.) — „viele" genügt, eine Zahl wäre eine Behauptung, die
+> jemand nachprüfen kann und die sich täglich ändert.
+
+**1.5d — Wie erfahren sind die Kräfte?**
+> Von der **Starter**-Kraft über die **Stammkraft** bis zur **Elite**-Kraft —
+> gestaffelt nach Erfahrung und Zahl der Einsätze bei unseren Kunden. Im Profil
+> steht, in welcher Stufe jemand ist. Mehr Erfahrung heißt kleinere Auswahl und
+> etwas höherer Preis; wer offen ist, bekommt schneller jemanden.
+> *Quelle: Martin, 22.08.*
+
 **1.6 — Erreichbarkeit**
 > Ilka Wysocki, Pflegeberaterin · **089 200 000 830** · WhatsApp **wa.me/4989200000830**
 > · **jeden Tag von 8 bis 20 Uhr**, auch am Wochenende und an Feiertagen.
@@ -330,10 +347,44 @@ wie „kein Vermittler", ohne es zu verneinen. Pria benutzt sie.*
 
 ## 8. Die Pflegekraft aussuchen
 
-**8.1 — Wer kommt zu uns?**
-> Das entscheiden **Sie**. Sie sehen die Profile vorher — Erfahrung, Sprachniveau,
-> Führerschein, was sie kann und was nicht — und wählen selbst aus. Nicht wir
-> entscheiden, wer bei Ihrer Mutter einzieht.
+**8.1 — Wer kommt zu uns? / Kann ich die Kraft vorher sehen?**
+> Das entscheiden **Sie**. Bei uns sehen Sie **sofort Ihr Angebot und passende
+> Pflegekräfte** — Profil, Erfahrung, Sprachniveau, meist mit Bild.
+>
+> **So antworten (Martin, 21.08.) — kurz und mit dem Angebot am Ende:**
+> „Ja. Bei uns sehen Sie sofort Ihr Angebot und passende Pflegekräfte. Ein paar
+> Fragen noch, dann sehen Sie nicht nur den Preis, sondern auch die **sofort
+> verfügbaren** Kräfte — ganz unverbindlich."
+>
+> **NICHT** von sich aus damit anfangen, was passiert, wenn es nicht klappt —
+> Austausch, Kündigung, „falls es menschlich nicht passt". Danach fragt an
+> dieser Stelle niemand; es sät Zweifel genau in dem Moment, in dem jemand
+> Vertrauen fasst. Kommt die Frage, wird sie beantwortet (§9).
+>
+> **Fragt jemand „sehe ich wirklich echte Pflegekräfte?" — und stehen die
+> Angaben schon:** dann ist die Auswahl bereits getroffen. So antworten
+> (Martin, 21.08.): „Ja. Aus Ihren Angaben haben wir bereits **echte, passende
+> und aktuell verfügbare** Pflegekräfte ausgewählt. Sobald Sie Ihre Daten
+> abschicken, sehen Sie diese sofort — zusammen mit Ihrem Angebot."
+> Keine Musterprofile, keine Datenbank zum Durchblättern.
+
+**8.1b — Sind das schon echte Bewerbungen? (WICHTIG — nicht verwechseln)**
+> **Nein.** Was Sie sofort sehen, sind **Personalvorschläge**: echte, aktuell
+> verfügbare Kräfte, die zu Ihren Angaben passen. Eine Bewerbung ist das noch
+> nicht.
+>
+> Der zweite Schritt folgt im Portal: Wenn Ihnen **Angebot und Vorschläge
+> grundsätzlich zusagen**, vervollständigen Sie dort die Angaben zur
+> **Pflegesituation**. Erst damit können die Kräfte einschätzen, was auf sie
+> zukommt — und sich dann konkret bei Ihnen bewerben. Diese Bewerbungen sehen
+> Sie ebenfalls im Portal und entscheiden in Ruhe.
+>
+> **Nie die gezeigten Profile „Bewerbungen" nennen** und nie sagen, die Kräfte
+> könnten sich schon jetzt bewerben (Martin, 21.08.). Die Reihenfolge ist:
+> Angebot + Vorschläge → Pflegesituation ausfüllen → Bewerbungen.
+> *Quelle: Martin 21.08.; deckt sich mit der Mailkette (§12), Mail 2/3:
+> „Pflegekräfte können sich noch nicht bei Ihnen bewerben — Patientendaten
+> fehlen".*
 
 **8.2 — Wie gut sprechen die Kräfte Deutsch?**
 > Sie bestimmen das Niveau. **Kommunikativ** reicht für den Alltag; bei Schwerhörigkeit,
@@ -395,9 +446,18 @@ wie „kein Vermittler", ohne es zu verneinen. Pria benutzt sie.*
 > zerbrochene Tasse streiten.
 > *Quelle: Vertrag §5*
 
-**10.3 — Was passiert mit unseren Daten?**
-> Wir verarbeiten nur, was für den Vertrag nötig ist, nach DSGVO. Weitergegeben wird
-> nur an die Menschen, die die Betreuung tatsächlich erbringen.
+**10.3 — Was passiert mit unseren Daten? / Werde ich angerufen?**
+> **Ihre Daten geben wir nicht weiter.** Wir brauchen sie, um Ihnen die Profile
+> zeigen zu dürfen: Das sind echte Menschen, ihre Profile stehen aus
+> Datenschutzgründen nicht offen im Netz — deshalb der geschützte Zugang, der
+> auf Ihren Namen läuft. Verarbeitet wird nur, was für Ihre Anfrage und den
+> Vertrag nötig ist, nach DSGVO.
+>
+> **NICHT sagen (Martin, 21.08.):** dass wir anrufen, um „bei Fragen zur Seite
+> zu stehen", und schon gar nicht von sich aus anbieten, dass man stattdessen
+> eine E-Mail bekommen kann. Das klingt nach Callcenter und macht aus einer
+> Selbstverständlichkeit eine Verhandlung. Preis und Kräfte sieht der Kunde
+> ohnehin sofort selbst im Portal.
 > *Quelle: Vertrag §6*
 
 ---
@@ -507,17 +567,20 @@ Der Rechnerpreis deckt die Betreuung, nicht An-/Abreise, Kost und Logis, Sommer-
 Feiertagszuschlag. Pria darf also nie „eine Zahl, alles inklusive" sagen — im aktuellen
 Prototyp tut sie das noch, das korrigiere ich.
 
-**14.6 — Testsieger-Wortlaut** ⚠️
-Mail 4 sagt heute „ausgezeichnet als **Testsieger von DIE WELT**". Unsere Linie ist:
-Eigenaussage („Nr. 1 der Pflegekräfte-Vermittler"), **nie als Zitat der WELT**. Beides
-gleichzeitig geht nicht — welche Fassung gilt, und ziehen wir die Mail nach?
+**14.6 — Testsieger-Wortlaut** ✅ **entschieden (Martin, 22.08.)**
+**„Nr. 1 der Pflegekräfte-Vermittler" gilt** — das ist der Name der *Testkategorie*,
+nicht unsere Selbstbeschreibung. Das Wort „Vermittler" darf deshalb hier stehen,
+obwohl wir sonst nie „wir vermitteln" sagen (§0). Weiterhin: nie als Zitat der WELT
+ausgeben, keine Prozentzahlen. Offen bleibt nur, ob Mail 4 nachgezogen wird.
 
 **14.7 — Telefonnummer** ✅ erledigt
 **089 200 000 830** ist eingetragen, die erfundene 0800-Nummer ist raus.
 
-**14.5 — Reisekosten**
-Portal-FAQ: 125 € **je Strecke**, also zweimal. Vertrag §8 nennt 125 € als pauschalen
-Wertersatz beim Widerruf. Gleiche Zahl, zwei Bedeutungen — ist das gewollt?
+**14.5 — Reisekosten** ✅ **entschieden (Martin, 22.08.)**
+Die **125 € gelten je Strecke** — einmal Hinfahrt, einmal Rückfahrt, also zweimal.
+Der Wertersatz beim Widerruf in Vertrag §8 ist eine **eigene Regelung** und darf
+nicht als „das sind die Reisekosten" erklärt werden. Gleiche Zahl, zwei Sachen:
+NIE miteinander begründen.
 
 ---
 

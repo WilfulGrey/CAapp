@@ -513,7 +513,34 @@ const SCHNELLFRAGEN=[
   'Braucht sie ein eigenes Zimmer?'
 ];
 const beantwortet=new Set();
+/* Springt zum Kontaktfeld und setzt den Fokus in die erste Luecke. Der Kunde
+   hatte die Karte oben im Verlauf und musste selbst danach suchen. */
+function zumKontakt(){
+  const knopf=document.getElementById('abs');
+  if(!knopf) return false;
+  const karte=knopf.closest('.row')||knopf.closest('.card');
+  if(karte) karte.scrollIntoView({behavior:ruhig?'auto':'smooth',block:'center'});
+  const leer=['kname','kmail','ktel'].map(i=>document.getElementById(i)).find(f=>f&&!f.value.trim());
+  if(leer) setTimeout(()=>leer.focus(),ruhig?0:420);
+  return true;
+}
+
 function beraterChips(){
+  /* Stehen alle Angaben und fehlen nur die Kontaktdaten, ist alles andere
+     Ablenkung (Martin, 21.08.): keine Wissensfragen, kein „Preis berechnen" —
+     der Preis ist ja gerechnet. Nur der eine Weg, und der Hinweis, dass es
+     auch getippt geht. */
+  if(kontaktOffen){
+    return setChips([
+      {t:'Meine Daten eintragen',stil:'stark',f:()=>{chips.innerHTML='';zumKontakt();}},
+      {t:'Lieber hier im Chat',stil:'soft',f:async()=>{
+        chips.innerHTML='';
+        await sagen('Gern — schreiben Sie mir einfach <b>Name, E-Mail und Telefon</b> in einer Zeile. '+
+                    'Ich trage es dann oben für Sie ein.');
+        document.getElementById('frei').focus();
+      }}
+    ]);
+  }
   const offen=SCHNELLFRAGEN
     .filter(q=>{const e=suche(q);return !e||!beantwortet.has(e);})
     .slice(0,3)
@@ -729,8 +756,9 @@ const FLOW=[
      nein:'Gut, damit haben Sie deutlich mehr Auswahl.'}},
  {k:'geschlecht',kurz:'Geschlecht der Pflegekraft',vorschlag:'egal',
   warum:'„Egal“ ist die häufigste Wahl und gibt Ihnen die größte Auswahl.',
-  q:'Wünschen Sie eine bestimmte Pflegekraft?',
-  hinweis:'Bei der Körperpflege ist vielen das gleiche Geschlecht wichtig — sagen Sie es ruhig.',
+  q:'Haben Sie beim Geschlecht der Pflegekraft einen Wunsch?',
+  hinweis:'Bei der Körperpflege ist vielen das gleiche Geschlecht wichtig. Muss beim Aufstehen '+
+          'oder Umsetzen kräftig geholfen werden, sind männliche Betreuer oft die bessere Wahl.',
   o:[['egal','Egal'],['weiblich','Weiblich'],['maennlich','Männlich']],
   r:{egal:'Gut — damit haben Sie die größte Auswahl.',
      '_':'Notiert, danach suche ich aus.'}},
@@ -796,10 +824,10 @@ async function starteFunnel(grund,chip,echo){
   // nicht bei eins.
   const schonDa=FLOW.filter(f=>antwort[f.k]!==undefined).length;
   await sagen(schonDa
-    ? 'Sehr gern. <b>' + (FLOW.length-schonDa) + ' kurze Fragen</b> fehlen noch, den Rest habe ich schon.'
+    ? '<b>' + (FLOW.length-schonDa) + ' kurze Fragen</b> fehlen noch, den Rest habe ich schon.'
     : (grund==='preis'
-      ? 'Sehr gern — das hängt ganz von Ihrer Situation ab. <b>Acht kurze Fragen</b>, dann haben Sie Ihren Preis. Ich fange einfach an.'
-      : 'Sehr gern — wer zu Ihnen passt, hängt von Ihrer Situation ab. <b>Acht kurze Fragen</b>, dann zeige ich sie Ihnen. Ich fange einfach an.'));
+      ? 'Das hängt ganz von Ihrer Situation ab. <b>Acht kurze Fragen</b>, dann haben Sie Ihren Preis — ich fange einfach an.'
+      : 'Wer zu Ihnen passt, hängt von Ihrer Situation ab. <b>Acht kurze Fragen</b>, dann zeige ich sie Ihnen — ich fange einfach an.'));
   fortschritt();   // schon Beantwortetes soll man am Balken sehen
   naechste();
 }
@@ -901,6 +929,16 @@ function kontakt(){
      liess er sich drücken und tat nichts — das ist genau der tote Knopf,
      den es nicht geben darf. Absichtlich milde geprüft: wir wollen niemanden
      wegen eines Formats aussperren, nur offensichtlich Leeres abfangen. */
+  // Zweiter Weg, gleich angeboten: viele tippen lieber, als in ein Formular
+  // zu greifen — besonders auf dem Handy.
+  setChips([
+    {t:'Lieber hier im Chat eingeben',stil:'soft',f:async()=>{
+      chips.innerHTML='';
+      await sagen('Gern — <b>Name, E-Mail und Telefon</b> in einer Zeile genügt. Ich trage es oben ein.');
+      document.getElementById('frei').focus();
+    }}
+  ]);
+
   const felder=['kname','kmail','ktel'].map(id=>document.getElementById(id));
   const go=document.getElementById('abs');
   const gueltig=()=>{
@@ -1152,6 +1190,41 @@ async function verarbeite(r){
     return vorschlagen(offeneFrage);
   }
   // Kein Modelltext davor: der kuratierte Einstieg sagt dasselbe, nur besser.
+  /* Kontaktdaten aus dem Chat: der Kunde tippt sie, statt oben ins Feld zu
+     greifen. Wir tragen ein, was erkannt wurde, und lassen bestaetigen —
+     automatisch abschicken waere bei personenbezogenen Daten uebergriffig. */
+  if(r.typ==='kontakt' && kontaktOffen){
+    chips.innerHTML='';
+    const felder={kname:r.kontaktName, kmail:r.kontaktMail, ktel:r.kontaktTelefon};
+    let gesetzt=0;
+    for(const [id,wert] of Object.entries(felder)){
+      const f=document.getElementById(id);
+      if(f && wert){ f.value=wert; f.dispatchEvent(new Event('input')); gesetzt++; }
+    }
+    const knopf=document.getElementById('abs');
+    if(!gesetzt){
+      await sagen(r.text||'Das habe ich nicht herauslesen können — schreiben Sie mir bitte '+
+                  '<b>Name, E-Mail und Telefon</b>, dann trage ich es ein.');
+      return beraterChips();
+    }
+    zumKontakt();
+    if(knopf && !knopf.disabled){
+      await sagen('Ich habe es oben eingetragen:<br><b>'+
+        [r.kontaktName,r.kontaktMail,r.kontaktTelefon].filter(Boolean).join('</b> · <b>')+'</b>');
+      return setChips([
+        {t:'Passt — Angebot ansehen',stil:'stark',f:()=>{chips.innerHTML='';knopf.click();}},
+        {t:'Ich ändere es oben',stil:'soft',f:()=>{chips.innerHTML='';zumKontakt();}}
+      ]);
+    }
+    // Etwas fehlt noch — sagen, was.
+    const fehlt=[['kname','Ihr Name'],['kmail','Ihre E-Mail'],['ktel','Ihre Telefonnummer']]
+      .filter(([id])=>{const f=document.getElementById(id);return !f||!f.value.trim();})
+      .map(([,l])=>l);
+    await sagen('Danke, das habe ich oben eingetragen. Es fehlt noch <b>'+
+                fehlt.join('</b> und <b>')+'</b>.');
+    return beraterChips();
+  }
+
   if(r.typ==='preis')   return starteFunnel('preis',null,false);
   if(r.typ==='kraefte') return starteFunnel('kraefte',null,false);
 
@@ -1325,10 +1398,62 @@ addEventListener('scroll',pillePruefen,{passive:true});
 
 function versteckePille(){ pille.classList.remove('on'); }
 
+/* ─── Handy: Seite festhalten und Tastatur ausgleichen ──────────────
+   Zwei Dinge, die auf dem iPhone schiefgingen (Martin, 22.08.): Beim Tippen
+   sprang das Panel, und die Seite dahinter liess sich scrollen.
+
+   Ursache 1: `overflow:hidden` am body reicht auf iOS nicht. Verlaesslich ist
+   `position:fixed` mit gemerkter Scrollposition — danach kann nichts mehr
+   wegrutschen, und die Tastatur verkleinert nur noch das sichtbare Fenster.
+   Nur auf dem Handy: auf dem Desktop schwebt ein kleines Panel, dort waere
+   das Festhalten der ganzen Seite eine Zumutung.
+
+   Ursache 2: `handyLayout` wurde aufgerufen, war aber nirgends definiert —
+   bei jedem Oeffnen flog ein ReferenceError. Hier ist sie wieder. */
+let gemerkterScroll = 0, seiteFest = false;
+function seiteSperren(an){
+  const b = document.body;
+  if(an){
+    b.classList.add('chat-offen');
+    if(innerWidth > 640 || seiteFest) return;
+    gemerkterScroll = window.scrollY || document.documentElement.scrollTop || 0;
+    b.style.position='fixed'; b.style.top=(-gemerkterScroll)+'px';
+    b.style.left='0'; b.style.right='0'; b.style.width='100%';
+    seiteFest = true;
+  }else{
+    b.classList.remove('chat-offen');
+    if(!seiteFest) return;
+    b.style.position=''; b.style.top=''; b.style.left=''; b.style.right=''; b.style.width='';
+    window.scrollTo(0, gemerkterScroll);
+    seiteFest = false;
+  }
+}
+
+const vv = window.visualViewport;
+function handyLayout(){
+  if(!panel.classList.contains('on')) return;
+  const ausCss=()=>{ panel.style.height=''; panel.style.bottom=''; panel.style.transform=''; };
+  if(!vv || innerWidth>640) return ausCss();
+  // Nur eingreifen, wenn die Tastatur wirklich Platz wegnimmt. Alles unter
+  // 120 px ist Adressleiste oder Messrauschen.
+  const verdeckt = innerHeight - vv.height - vv.offsetTop;
+  if(verdeckt < 120) return ausCss();
+  panel.style.bottom = 'auto';
+  panel.style.height = vv.height + 'px';
+  // Mit festgehaltener Seite ist der Versatz normalerweise 0; bleibt doch
+  // einer uebrig, wird er ausgeglichen.
+  const versatz = Math.round(vv.offsetTop);
+  panel.style.transform = versatz ? 'translateY('+versatz+'px)' : '';
+  runter();
+}
+if(vv){ vv.addEventListener('resize',handyLayout); vv.addEventListener('scroll',handyLayout); }
+addEventListener('orientationchange',()=>setTimeout(handyLayout,260));
+panel.addEventListener('animationend',()=>{ panel.classList.add('fertig'); handyLayout(); });
+
 async function oeffne(start){
   tipp(); versteckePille();
   blase.classList.add('weg'); panel.classList.add('on');
-  document.body.classList.add('chat-offen');
+  seiteSperren(true);
   // Auch ohne Animation (reduzierte Bewegung) muss die Höhe stimmen.
   setTimeout(()=>{ panel.classList.add('fertig'); handyLayout(); }, 700);
   if(gestartet) return; gestartet=true;
@@ -1426,7 +1551,7 @@ document.getElementById('zu').onclick=()=>{
   tipp();
   panel.classList.remove('on','fertig');
   panel.style.height=''; panel.style.bottom=''; panel.style.transform='';
-  document.body.classList.remove('chat-offen');
+  seiteSperren(false);
   blase.classList.remove('weg');
 };
 
