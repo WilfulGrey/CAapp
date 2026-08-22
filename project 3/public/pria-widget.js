@@ -889,18 +889,27 @@ function rueckruf(){
   if(rueckrufOffen) return;
   rueckrufOffen=true;
   chips.innerHTML='';
+  // Vorbelegen, was schon dasteht: wer die Kontaktdaten oben ausgefüllt
+  // hat, soll sie nicht zweimal tippen.
+  const oben=id=>{const f=W.getElementById(id);return f?f.value.trim():'';};
+  /* Die E-Mail ist freiwillig — für einen Anruf braucht sie niemand. Sie
+     entscheidet aber darüber, ob aus der Bitte ein Lead werden kann: die
+     Lead-Tabelle führt die Adresse als Identität, und erfinden kommt nicht
+     in Frage. Steht oben schon eine, wird nicht noch einmal gefragt. */
+  const habenMail=oben('kmail');
   const r=document.createElement('div');r.className='row';
   r.innerHTML='<div class="mini">'+avatar(null,true)+'</div><div class="card">'+
    '<p class="klein" style="margin:0 0 10px">Wie erreicht Marta Sie am besten?</p>'+
    '<input class="feld" id="rname" placeholder="Ihr Name" autocomplete="name">'+
    '<input class="feld" id="rtel" type="tel" inputmode="tel" placeholder="Ihre Telefonnummer" autocomplete="tel">'+
+   (habenMail?'':'<input class="feld" id="rmail" type="email" inputmode="email" '+
+     'placeholder="E-Mail (freiwillig)" autocomplete="email">')+
    '<button class="go" id="rgo" disabled>Rückruf anfordern</button>'+
-   '<p class="klein">Erreichbar täglich von 8 bis 20 Uhr · kostenlos und unverbindlich</p></div>';
+   '<p class="klein">'+
+   (habenMail?'':'Für den Anruf genügen Name und Nummer. Die E-Mail nur, wenn Sie Ihre '+
+     'Unterlagen zusätzlich schriftlich möchten.<br>')+
+   'Erreichbar täglich von 8 bis 20 Uhr · kostenlos und unverbindlich</p></div>';
   thread.appendChild(r);runter();
-
-  // Vorbelegen, was schon dasteht: wer die Kontaktdaten oben ausgefüllt
-  // hat, soll sie nicht zweimal tippen.
-  const oben=id=>{const f=W.getElementById(id);return f?f.value.trim():'';};
   const rn=W.getElementById('rname'), rt=W.getElementById('rtel');
   rn.value=oben('kname'); rt.value=oben('ktel');
 
@@ -915,13 +924,15 @@ function rueckruf(){
   go.onclick=async()=>{
     go.disabled=true; go.textContent='Wird weitergegeben …';
     const name=rn.value.trim(), tel=rt.value.trim();
+    const rmail=W.getElementById('rmail');
+    const mail=habenMail || (rmail?rmail.value.trim():'');
     // Womit der Anruf anfangen kann: die letzte Frage des Kunden.
     const letzte=[...verlauf].reverse().find(z=>z.rolle==='kunde');
     let ok=false;
     try{
       const res=await fetch('/api/pria/rueckruf',{method:'POST',
         headers:{'content-type':'application/json'},
-        body:JSON.stringify({sid:SID,name,telefon:tel,
+        body:JSON.stringify({sid:SID,name,telefon:tel,email:mail,
           anlass:letzte?letzte.text:'',antworten:Object.assign({},antwort)})});
       ok=res.ok;
     }catch(e){ ok=false; }
@@ -1521,10 +1532,19 @@ function handyLayout(){
   if(!panel.classList.contains('on')) return;
   const ausCss=()=>{ panel.style.height=''; panel.style.bottom=''; panel.style.transform=''; };
   if(!vv || innerWidth>640) return ausCss();
-  // Nur eingreifen, wenn die Tastatur wirklich Platz wegnimmt. Alles unter
-  // 120 px ist Adressleiste oder Messrauschen.
-  const verdeckt = innerHeight - vv.height - vv.offsetTop;
-  if(verdeckt < 120) return ausCss();
+  /* Nur eingreifen, wenn die Tastatur wirklich Platz wegnimmt. Alles unter
+     120 px ist Adressleiste oder Messrauschen.
+
+     Hier stand bis 22.08. `- vv.offsetTop` mit drin, und das war der Fehler,
+     über den Martin gestolpert ist: offsetTop ist nicht zusätzliche
+     Verdeckung, sondern wie weit iOS das sichtbare Fenster nach unten
+     geschoben hat, um das fokussierte Feld freizulegen. Beides voneinander
+     abzuziehen ließ die Tastatur rechnerisch verschwinden — genau dann, wenn
+     sie am weitesten offen war. Die Bedingung schlug fehl, das Panel behielt
+     seine volle Layout-Höhe, und die Eingabezeile stand plötzlich als
+     loser Block irgendwo im Bild, während sich der Rest wegschieben ließ. */
+  const tastatur = innerHeight - vv.height;
+  if(tastatur < 120) return ausCss();
   panel.style.bottom = 'auto';
   panel.style.height = vv.height + 'px';
   // Mit festgehaltener Seite ist der Versatz normalerweise 0; bleibt doch
@@ -1534,6 +1554,12 @@ function handyLayout(){
   runter();
 }
 if(vv){ vv.addEventListener('resize',handyLayout); vv.addEventListener('scroll',handyLayout); }
+/* Sicherheitsnetz: iOS meldet den Tastatur-Resize nicht immer sofort, und
+   beim Wechsel zwischen zwei Feldern gar nicht. Fokus und Unschärfe sind das
+   verlässlichere Signal — zweimal nachfassen kostet nichts. */
+['focusin','focusout'].forEach(e=>addEventListener(e,()=>{
+  handyLayout(); setTimeout(handyLayout,120); setTimeout(handyLayout,340);
+}));
 addEventListener('orientationchange',()=>setTimeout(handyLayout,260));
 panel.addEventListener('animationend',()=>{ panel.classList.add('fertig'); handyLayout(); });
 

@@ -18,6 +18,7 @@
 import { createClient } from '@supabase/supabase-js';
 import { NextResponse } from 'next/server';
 import { sendEmail } from '@/lib/email';
+import { findOrCreateLead, logEvent } from '@/lib/lead-management';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -25,6 +26,12 @@ export const dynamic = 'force-dynamic';
 // Dieselbe Adresse, an die auch die Lead-Benachrichtigungen gehen
 // (app/api/lead-event/route.ts) — ein Postfach, nicht zwei.
 const EMPFAENGER = 'info@primundus.de';
+
+// Wortgleich zu app/api/angebot-anfordern — die Einwilligung, die der Kunde
+// mit dem Absenden erteilt, muss überall dieselbe sein (DSGVO Art. 7 Abs. 1).
+const PRIVACY_CONSENT_VERSION = '2026-02';
+const PRIVACY_CONSENT_TEXT =
+  'Ich akzeptiere die Datenschutzerklärung und bin damit einverstanden, dass Primundus meine Daten zur Bearbeitung meiner Anfrage verarbeitet.';
 
 function supabase() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -47,6 +54,9 @@ export async function POST(request: Request) {
   const name = String(body?.name || '').trim().slice(0, 120);
   const telefon = String(body?.telefon || '').trim().slice(0, 60);
   const sid = String(body?.sid || '').replace(/[^\w-]/g, '').slice(0, 40);
+  // Freiwillig. Ohne sie bleibt es bei Mail und Protokoll — die Lead-Tabelle
+  // führt die Adresse als Identität, und eine zu erfinden verbietet sich.
+  const email = String(body?.email || '').trim().slice(0, 200);
   // Was der Kunde vorher wissen wollte — der Anruf beginnt sonst bei null.
   const anlass = String(body?.anlass || '').trim().slice(0, 500);
   // Die bereits beantworteten Fragen, damit Marta nicht alles neu erfragt.
@@ -57,6 +67,60 @@ export async function POST(request: Request) {
   if (name.length < 2 || telefon.replace(/\D/g, '').length < 7) {
     return NextResponse.json({ fehler: 'Name oder Telefonnummer fehlt.' }, { status: 400 });
   }
+
+  const mailOk = /^[^\s@]+@[^\s@]+\.[a-zA-Z]{2,}$/.test(email);
+  const db = supabase();
+
+  /* Der Rückruf soll nicht nur im Postfach landen, sondern dort sichtbar
+     werden, wo das Team ohnehin arbeitet — am Lead. Drei Fälle:
+
+       a) Das Gespräch hat schon einen Lead  → nur vermerken.
+       b) Noch keiner, aber eine E-Mail liegt vor → Lead anlegen.
+       c) Weder noch → Mail und Protokoll müssen reichen; das steht dann
+          auch so in der Team-Mail, damit niemand vergeblich sucht.
+
+     Alles hier ist fail-soft: die Rückrufbitte selbst darf an einem
+     stolpernden Lead nicht scheitern. */
+  let leadId: string | null = null;
+  if (db && sid) {
+    const { data } = await db.from('pria_gespraeche')
+      .select('lead_id').eq('sid', sid).not('lead_id', 'is', null).limit(1);
+    leadId = (data as any)?.[0]?.lead_id ?? null;
+  }
+
+  let leadNeu = false;
+  if (!leadId && mailOk) {
+    try {
+      const { lead, isNew } = await findOrCreateLead(email, 'info_requested', {
+        vorname: name, telefon,
+      });
+      leadId = lead.id;
+      leadNeu = isNew;
+      if (isNew) {
+        await logEvent(lead.id, 'privacy_consent', {
+          accepted: true,
+          version: PRIVACY_CONSENT_VERSION,
+          text: PRIVACY_CONSENT_TEXT,
+          source: 'pria-rueckruf',
+        }).catch(() => {});
+      }
+      if (db && sid) {
+        await db.from('pria_gespraeche').update({ lead_id: leadId }).eq('sid', sid);
+      }
+    } catch (e: any) {
+      console.warn('[pria] Rückruf-Lead nicht angelegt:', e?.message);
+    }
+  }
+
+  if (leadId) {
+    await logEvent(leadId, 'rueckruf_erbeten', {
+      name, telefon, anlass: anlass || null, antworten, sid: sid || null,
+    }).catch((e: any) => console.warn('[pria] Rückruf-Ereignis nicht vermerkt:', e?.message));
+  }
+
+  const leadZeile = leadId
+    ? `Lead: ${leadId}${leadNeu ? ' (neu aus dem Rückruf angelegt)' : ''}`
+    : 'Kein Lead — es lag keine E-Mail vor. Diese Mail ist die einzige Spur.';
 
   const angaben = Object.entries(antworten)
     .filter(([, v]) => v != null && String(v).trim() !== '')
@@ -75,7 +139,9 @@ export async function POST(request: Request) {
     `Zeit:     ${zeit}`,
     ...(anlass ? ['', `Es ging um: ${anlass}`] : []),
     ...(angaben.length ? ['', 'Im Chat schon beantwortet:', ...angaben.map((a) => `  · ${a}`)] : []),
-    ...(sid ? ['', `Gespräch: ${sid}`] : []),
+    '',
+    leadZeile,
+    ...(sid ? [`Gespräch: ${sid}`] : []),
     '',
     'Pria hat zugesagt, dass sich jemand meldet — täglich zwischen 8 und 20 Uhr.',
   ];
@@ -97,7 +163,8 @@ export async function POST(request: Request) {
         ? `<p style="margin:14px 0 4px;color:#777">Im Chat schon beantwortet:</p><ul style="margin:0;padding-left:20px">` +
           angaben.map((a) => `<li>${esc(a)}</li>`).join('') + `</ul>`
         : '') +
-      (sid ? `<p style="margin:14px 0 0;color:#999;font-size:13px">Gespräch: ${esc(sid)}</p>` : '') +
+      `<p style="margin:14px 0 0;color:${leadId ? '#999' : '#B45309'};font-size:13px">${esc(leadZeile)}</p>` +
+      (sid ? `<p style="margin:2px 0 0;color:#999;font-size:13px">Gespräch: ${esc(sid)}</p>` : '') +
       `<p style="margin:16px 0 0;color:#777;font-size:13px">Pria hat zugesagt, dass sich jemand meldet — ` +
       `täglich zwischen 8 und 20 Uhr.</p></div>`,
   };
@@ -112,14 +179,13 @@ export async function POST(request: Request) {
   }
 
   // Ab hier ist die Bitte zugestellt. Das Protokoll ist nur noch Beiwerk.
-  const db = supabase();
   if (db && sid) {
     const { error } = await db.from('pria_gespraeche').insert({
       sid,
       rolle: 'system',
       text: `Rückruf erbeten — ${name}, ${telefon}`,
       ereignis: 'rueckruf',
-      meta: { name, telefon, anlass: anlass || null, antworten },
+      meta: { name, telefon, anlass: anlass || null, antworten, leadId, leadNeu },
       zeit: new Date().toISOString(),
     });
     if (error) console.warn('[pria] Rückruf nicht protokolliert:', error.message);

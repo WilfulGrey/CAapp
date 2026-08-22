@@ -1208,6 +1208,47 @@ export default function LeadDetailPage() {
         </div>
 
         <div className="space-y-6">
+          {/* Wartet hier jemand auf einen Anruf, gehoert das nach oben und
+              nicht in die Ereignisliste — mit der Nummer als Wahl-Link, damit
+              man sie nicht abtippt. Der juengste Eintrag zaehlt: wer zweimal
+              bittet, wartet immer noch. */}
+          {(() => {
+            const bitten = events.filter((e: any) => e.event_type === 'rueckruf_erbeten');
+            if (!bitten.length) return null;
+            const r = bitten[0].metadata || {};
+            const wann = bitten[0].created_at
+              ? new Date(bitten[0].created_at).toLocaleString('de-DE',
+                  { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })
+              : null;
+            return (
+              <Card className="p-5 bg-amber-50 border-amber-300">
+                <div className="flex items-start gap-3">
+                  <Phone className="w-5 h-5 text-amber-700 shrink-0 mt-0.5" />
+                  <div className="min-w-0">
+                    <p className="font-semibold text-amber-900">
+                      Dieser Kunde hat um einen Rückruf gebeten
+                      {bitten.length > 1 && <> · {bitten.length}×</>}
+                    </p>
+                    <p className="text-sm text-amber-900 mt-1">
+                      {r.name || '—'}
+                      {r.telefon && (
+                        <> · <a href={`tel:${String(r.telefon).replace(/[^\d+]/g, '')}`}
+                               className="font-semibold hover:underline">{r.telefon}</a></>
+                      )}
+                      {wann && <span className="text-amber-700"> · {wann}</span>}
+                    </p>
+                    {r.anlass && (
+                      <p className="text-sm text-amber-800 mt-1">Es ging um: „{r.anlass}"</p>
+                    )}
+                    <p className="text-xs text-amber-800 mt-2">
+                      Pria hat zugesagt, dass sich jemand meldet — täglich zwischen 8 und 20 Uhr.
+                    </p>
+                  </div>
+                </div>
+              </Card>
+            );
+          })()}
+
           {priaSid && (
             <Card className="p-5 bg-emerald-50 border-emerald-200">
               <div className="flex items-start gap-3">
@@ -1636,6 +1677,7 @@ export default function LeadDetailPage() {
                     token_regenerated: { label: 'Portal-Link erneuert', color: 'bg-blue-400' },
                     folge_einsatz_detected: { label: 'Folge-Einsatz erkannt (neuer Mamamia-Job)', color: 'bg-[#E76F63]' },
                     angebots_feedback: { label: 'Rückmeldung zum Angebot', color: 'bg-[#8B7355]' },
+                    rueckruf_erbeten: { label: '📞 Rückruf erbeten (aus dem Chat)', color: 'bg-amber-500' },
                   };
                   const cfg = eventLabels[event.event_type] ?? { label: event.event_type.replace(/_/g, ' '), color: 'bg-[#5C4A32]' };
                   // Seed-Events (Multi-Job-Erstscan, notify=false) haben NIE
