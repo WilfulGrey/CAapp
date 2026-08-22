@@ -36,6 +36,10 @@ export const FLOW = [
   { k: 'nacht', q: 'Ist nachts Hilfe nötig?',
     o: [['nein', 'Nein, nachts keine Hilfe nötig'], ['gelegentlich', 'Gelegentlich, nicht jede Nacht'],
         ['taeglich', 'Jede Nacht, bis zu 1 Einsatz'], ['mehrmals', 'Jede Nacht, mehrere Einsätze']] },
+  { k: 'fuehrerschein', q: 'Soll die Pflegekraft Auto fahren können?',
+    o: [['ja', 'Ja, unbedingt'], ['nein', 'Nein / nicht unbedingt']] },
+  { k: 'geschlecht', q: 'Haben Sie beim Geschlecht der Pflegekraft einen Wunsch?',
+    o: [['egal', 'Egal'], ['weiblich', 'Weiblich'], ['maennlich', 'Männlich']] },
   { k: 'deutsch', q: 'Wie gut soll die Pflegekraft Deutsch sprechen?',
     o: [['grundlegend', 'Grundlegend'], ['kommunikativ', 'Kommunikativ'], ['gut', 'Gut']] },
 ] as const;
@@ -126,6 +130,19 @@ Wähle den \`typ\`:
   Nachricht, beantworte sie in \`text\` — der Chat gibt sie aus, bevor er den Wert bestätigt.
   Eine mitgestellte Frage zu übergehen ist der schlimmste Fehler, den du machen kannst.
   Steckt keine Frage darin, lass \`text\` leer.
+
+  ⚠️ **Steht eine Frage offen und beantwortet die Nachricht sie — auch nebenbei, auch
+  genervt, auch mit einem Seitenhieb — dann ist der typ \`antwort\`.** Nicht \`wissen\`,
+  nicht \`sozial\`. Bestaetigst du nur, was du verstanden hast, wird der Wert NICHT
+  gespeichert, und der Chat stellt dieselbe Frage unmittelbar noch einmal. Genau das
+  ist am 22.08. passiert: „ich möchte als geschlecht eine frau" → du hast bestaetigt,
+  gespeichert wurde nichts, und die Frage kam sofort wieder.
+
+  ⚠️ **Du erzaehlst NIE, was gespeichert ist.** Kein „das ist notiert", kein „Ihre
+  Angaben sind vollstaendig", keine Aufzaehlung des Stands, keine Ankuendigung, was
+  als Naechstes kommt. Der Chat fuehrt Buch und bestaetigt selbst — sagst du es,
+  sagst du es womoeglich falsch. Und entschuldige dich nicht fuer dein eigenes
+  Verhalten; korrigier es einfach.
 - **vorschlag** — Der Kunde weiß die Antwort auf die offene Frage ehrlich nicht („keine
   Ahnung", „schwer zu sagen"). Dann NICHT raten und nicht stumm eintragen: Setze nur \`feld\`,
   lass \`werte\` leer. Der Chat schlägt von sich aus den häufigsten Fall vor, begründet ihn
