@@ -711,8 +711,9 @@ const FLOW=[
      nein:'Gut, damit haben Sie deutlich mehr Auswahl.'}},
  {k:'geschlecht',kurz:'Geschlecht der Pflegekraft',vorschlag:'egal',
   warum:'„Egal“ ist die häufigste Wahl und gibt Ihnen die größte Auswahl.',
-  q:'Wünschen Sie eine bestimmte Pflegekraft?',
-  hinweis:'Bei der Körperpflege ist vielen das gleiche Geschlecht wichtig — sagen Sie es ruhig.',
+  q:'Haben Sie beim Geschlecht der Pflegekraft einen Wunsch?',
+  hinweis:'Bei der Körperpflege ist vielen das gleiche Geschlecht wichtig. Muss beim Aufstehen '+
+          'oder Umsetzen kräftig geholfen werden, sind männliche Betreuer oft die bessere Wahl.',
   o:[['egal','Egal'],['weiblich','Weiblich'],['maennlich','Männlich']],
   r:{egal:'Gut — damit haben Sie die größte Auswahl.',
      '_':'Notiert, danach suche ich aus.'}},
