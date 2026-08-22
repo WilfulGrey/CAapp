@@ -17,6 +17,16 @@ import { capitalizeName as capitalize } from "./names.ts";
 // lib/ importieren); Aenderungen immer in BEIDEN Dateien.
 import { sendezeitIso } from "./quietHours.ts";
 import { deutschStufe } from "./deutschStufe.ts";
+import {
+  BEWERTUNG_CAP,
+  BEWERTUNG_CC,
+  BEWERTUNG_STICHTAG,
+  BEWERTUNG_TAGE,
+  bewertungAusschlussgrund,
+  getBewertungsanfrageTemplate,
+  imBewertungsfenster,
+  type BewertungsLead,
+} from "./bewertung.ts";
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
@@ -1210,7 +1220,8 @@ async function sendEmailSmtp(
   html: string,
   text: string,
   attachments?: { filename: string; content: Uint8Array; contentType: string; cid?: string }[],
-  skipBcc: boolean = false
+  skipBcc: boolean = false,
+  cc?: string
 ): Promise<{ success: boolean; error?: string }> {
   try {
     const transport = nodemailer.createTransport({
@@ -1251,6 +1262,7 @@ async function sendEmailSmtp(
       text,
       html,
       ...(!skipBcc && bccAddr ? { bcc: bccAddr } : {}),
+      ...(cc ? { cc } : {}),
     };
 
     if (attachments && attachments.length > 0) {
@@ -1789,6 +1801,87 @@ async function scheduleFollowUp(
   });
 }
  
+
+// ── Bewertungsanfrage-Runde (Tag 7 nach Anfrage) ─────────────────────────────
+// Läuft in jedem Cron-Durchgang im Vormittagsfenster; wählt dynamisch statt
+// über eingeplante Zeilen (kein Backfill nötig, Stichtag begrenzt den Start).
+// Dedupe über die nach dem Versand eingefügte scheduled_emails-Zeile.
+async function runBewertungsRunde(
+  supabase: any,
+  smtpConfig: SmtpConfig,
+): Promise<Record<string, unknown>> {
+  const jetzt = new Date();
+  if (!imBewertungsfenster(jetzt)) return { skipped: "fenster" };
+
+  const cutoff = new Date(jetzt.getTime() - BEWERTUNG_TAGE * 86400000).toISOString();
+  const { data: kandidaten, error } = await supabase
+    .from("leads")
+    .select("id, vorname, nachname, anrede_text, token, email, status, created_at")
+    .gte("created_at", BEWERTUNG_STICHTAG)
+    .lte("created_at", cutoff)
+    .order("created_at", { ascending: true })
+    .limit(200);
+  if (error) return { error: String(error.message ?? error) };
+  if (!kandidaten || kandidaten.length === 0) return { gesendet: 0 };
+
+  const ids = kandidaten.map((k: BewertungsLead) => k.id);
+  const { data: schon } = await supabase
+    .from("scheduled_emails")
+    .select("lead_id")
+    .eq("email_type", "bewertungsanfrage")
+    .in("lead_id", ids);
+  const schonSet = new Set((schon ?? []).map((r: { lead_id: string }) => r.lead_id));
+
+  const { data: pend } = await supabase
+    .from("scheduled_emails")
+    .select("lead_id, email_type")
+    .eq("status", "pending")
+    .in("lead_id", ids);
+  const pendMap = new Map<string, string[]>();
+  for (const r of pend ?? []) {
+    const a = pendMap.get(r.lead_id) ?? [];
+    a.push(r.email_type);
+    pendMap.set(r.lead_id, a);
+  }
+
+  let gesendet = 0;
+  const uebersprungen: Record<string, number> = {};
+  const zaehle = (g: string) => { uebersprungen[g] = (uebersprungen[g] ?? 0) + 1; };
+
+  for (const lead of kandidaten as BewertungsLead[]) {
+    if (schonSet.has(lead.id)) continue;
+    if (gesendet >= BEWERTUNG_CAP) { zaehle("cap_naechster_lauf"); continue; }
+    const grund = bewertungAusschlussgrund(lead, pendMap.get(lead.id) ?? [], jetzt);
+    if (grund) { zaehle(grund); continue; }
+
+    const tpl = getBewertungsanfrageTemplate(lead, smtpConfig.siteUrl.replace(/\/$/, ""));
+    const r = await sendEmailSmtp(
+      smtpConfig, lead.email!, tpl.subject, tpl.html, tpl.text,
+      undefined, false, BEWERTUNG_CC,
+    );
+    if (r.success) {
+      gesendet++;
+      const nowIso = new Date().toISOString();
+      await supabase.from("scheduled_emails").insert({
+        lead_id: lead.id,
+        email_type: "bewertungsanfrage",
+        recipient_email: lead.email,
+        scheduled_for: nowIso,
+        status: "sent",
+        sent_at: nowIso,
+      });
+      await supabase.from("lead_events").insert({
+        lead_id: lead.id,
+        event_type: "email_bewertungsanfrage_sent",
+        metadata: { to: lead.email, cc: BEWERTUNG_CC, ausloeser: "tag7" },
+      });
+    } else {
+      zaehle("versand_fehler");
+    }
+  }
+  return { gesendet, uebersprungen };
+}
+
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { status: 200, headers: corsHeaders });
@@ -1860,6 +1953,10 @@ Deno.serve(async (req: Request) => {
     }
     // ── Ende DEMO-MODUS ───────────────────────────────────────────────────────
 
+    // Bewertungsanfragen (Tag 7) — unabhängig von der pending-Queue, damit
+    // die Runde auch bei leerer Queue läuft.
+    const bewertungen = await runBewertungsRunde(supabase, smtpConfig);
+
     const { data: pendingEmails, error: fetchError } = await supabase
       .from("scheduled_emails")
       .select("*")
@@ -1873,7 +1970,7 @@ Deno.serve(async (req: Request) => {
  
     if (!pendingEmails || pendingEmails.length === 0) {
       return new Response(
-        JSON.stringify({ message: "No pending emails to send", processed: 0 }),
+        JSON.stringify({ message: "No pending emails to send", processed: 0, bewertungen }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
@@ -2472,6 +2569,7 @@ Deno.serve(async (req: Request) => {
       JSON.stringify({
         message: `Processed ${results.length} emails`,
         processed: results.length,
+        bewertungen,
         success: successCount,
         failed: failCount,
         flagged: flaggedCount,
