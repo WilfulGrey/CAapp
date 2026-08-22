@@ -1530,7 +1530,8 @@ function seiteSperren(an){
 const vv = window.visualViewport;
 function handyLayout(){
   if(!panel.classList.contains('on')) return;
-  const ausCss=()=>{ panel.style.height=''; panel.style.bottom=''; panel.style.transform=''; };
+  const ausCss=()=>{ panel.style.height=''; panel.style.bottom=''; panel.style.top='';
+                     panel.style.transform=''; };
   if(!vv || innerWidth>640) return ausCss();
   /* Nur eingreifen, wenn die Tastatur wirklich Platz wegnimmt. Alles unter
      120 px ist Adressleiste oder Messrauschen.
@@ -1545,21 +1546,77 @@ function handyLayout(){
      loser Block irgendwo im Bild, während sich der Rest wegschieben ließ. */
   const tastatur = innerHeight - vv.height;
   if(tastatur < 120) return ausCss();
+  /* Ueber `top`, nicht ueber `transform`.
+
+     Der Unterschied ist auf iOS keine Geschmacksfrage: Safari laesst bei
+     offener Tastatur das Layout-Fenster unveraendert und schiebt nur das
+     sichtbare Fenster darueber hin und her (`interactive-widget` steht auf
+     dem Standard `resizes-visual`). Ein `position:fixed`-Element haengt am
+     Layout-Fenster und wandert dabei aus dem Bild. Ein transformiertes
+     fixed-Element wird zusaetzlich auf eine eigene Compositing-Ebene
+     gehoben, die WebKit waehrend der Tastatur-Animation nachweislich nicht
+     zuverlaessig nachfuehrt — im Video vom 22.08. trieb das Panel als
+     loser weisser Block ueber der Seite. `top` wird dagegen im normalen
+     Layout aufgeloest. */
   panel.style.bottom = 'auto';
-  panel.style.height = vv.height + 'px';
-  // Mit festgehaltener Seite ist der Versatz normalerweise 0; bleibt doch
-  // einer uebrig, wird er ausgeglichen.
-  const versatz = Math.round(vv.offsetTop);
-  panel.style.transform = versatz ? 'translateY('+versatz+'px)' : '';
+  panel.style.top = Math.round(vv.offsetTop) + 'px';
+  panel.style.height = Math.round(vv.height) + 'px';
+  panel.style.transform = '';
   runter();
+}
+
+/* Waehrend getippt wird, jeden Frame nachziehen.
+
+   Die Ereignisse allein genuegen nicht: `visualViewport.scroll` feuert
+   waehrend des Schiebens gedrosselt und waehrend der Tastatur-Animation
+   teils gar nicht — genau in den Momenten, in denen das Panel verrutscht.
+   Ein rAF-Takt kostet nur, solange ein Feld im Chat den Fokus hat, und
+   endet mit dem Fokus. Verglichen wird vorher, damit nicht jeder Frame
+   ein Style-Schreiben ausloest. */
+let taktLaeuft = false, letzterStand = '';
+function takt(){
+  if(!taktLaeuft) return;
+  if(vv){
+    const stand = Math.round(vv.offsetTop)+'/'+Math.round(vv.height);
+    if(stand !== letzterStand){ letzterStand = stand; handyLayout(); }
+  }
+  requestAnimationFrame(takt);
+}
+function taktAn(an){
+  if(an === taktLaeuft) return;
+  taktLaeuft = an; letzterStand = '';
+  if(an) requestAnimationFrame(takt); else handyLayout();
 }
 if(vv){ vv.addEventListener('resize',handyLayout); vv.addEventListener('scroll',handyLayout); }
 /* Sicherheitsnetz: iOS meldet den Tastatur-Resize nicht immer sofort, und
    beim Wechsel zwischen zwei Feldern gar nicht. Fokus und Unschärfe sind das
    verlässlichere Signal — zweimal nachfassen kostet nichts. */
-['focusin','focusout'].forEach(e=>addEventListener(e,()=>{
-  handyLayout(); setTimeout(handyLayout,120); setTimeout(handyLayout,340);
-}));
+/* `composedPath()[0]` statt `e.target`: als Widget liegt der Chat in einem
+   Shadow-Root, und ein am Fenster abgefangenes Ereignis nennt dort nur das
+   Wirtselement, nicht das Feld darin. `panel.contains(e.target)` waere
+   immer falsch gewesen — der Takt haette im echten Widget nie angefangen,
+   waehrend er auf der Testseite lief. Genau die Sorte Unterschied, die
+   erst auf dem Geraet auffaellt. */
+const imChat = e => {
+  const ziel = e.composedPath ? e.composedPath()[0] : e.target;
+  return !!ziel && panel.contains(ziel);
+};
+addEventListener('focusin',e=>{
+  // Ein Fokus im Kostenrechner dahinter geht das Panel nichts an.
+  if(imChat(e)){ handyLayout(); taktAn(true); }
+});
+addEventListener('focusout',e=>{
+  if(!imChat(e)) return;
+  // Kurz weiterlaufen: beim Wechsel zwischen zwei Feldern kommt der
+  // naechste focusin erst nach dem focusout, und die Tastatur bleibt offen.
+  // activeElement ueber die Wurzel — im Shadow-Root nennt `document` nur
+  // den Wirt.
+  setTimeout(()=>{
+    const wurzel = panel.getRootNode();
+    const a = (wurzel && wurzel.activeElement) || null;
+    if(!a || !panel.contains(a)) taktAn(false);
+  }, 80);
+});
 addEventListener('orientationchange',()=>setTimeout(handyLayout,260));
 panel.addEventListener('animationend',()=>{ panel.classList.add('fertig'); handyLayout(); });
 
@@ -1667,7 +1724,11 @@ pille.onclick=async()=>{ const f=pillentext.textContent; await oeffne(); frage(f
 W.getElementById('zu').onclick=()=>{
   tipp();
   panel.classList.remove('on','fertig');
-  panel.style.height=''; panel.style.bottom=''; panel.style.transform='';
+  // Auch `top` zuruecksetzen — sonst behaelt das Panel beim naechsten
+  // Oeffnen den Versatz der letzten Tastatur.
+  panel.style.height=''; panel.style.bottom=''; panel.style.top='';
+  panel.style.transform='';
+  taktAn(false);
   seiteSperren(false);
   blase.classList.remove('weg');
 };
