@@ -48,7 +48,7 @@ export const FELDER = FLOW.map((f) => f.k);
 export const STUFIG = ['pflegegrad', 'mobil', 'nacht', 'deutsch'];
 
 export const TYPEN = ['antwort', 'vorschlag', 'nachtrag', 'wissen', 'sozial',
-                      'abwegig', 'mensch', 'preis', 'kraefte', 'unklar'] as const;
+                      'abwegig', 'mensch', 'preis', 'kraefte', 'kontakt', 'unklar'] as const;
 export type Typ = (typeof TYPEN)[number];
 
 const flowText = FLOW.map((f, i) =>
@@ -137,6 +137,11 @@ Wähle den \`typ\`:
   einen nächsten Schritt anbieten.
 - **abwegig** — Erkennbar nichts mit Betreuung zu tun (Wetter, Fußball, Aktien) oder reines
   Tastaturgeklapper. Charmant zurückführen, nie belehrend, nie entschuldigend.
+- **kontakt** — Der Kunde tippt seine Kontaktdaten in den Chat, statt das Feld oben
+  auszufüllen („Erika Mustermann, erika@web.de, 0176 1234567" — oder verteilt über
+  mehrere Nachrichten). Trag heraus, was du findest, in \`kontaktName\`,
+  \`kontaktMail\` und \`kontaktTelefon\`; was fehlt, bleibt leer. Der Chat setzt es
+  oben ein und lässt bestätigen. Nur wenn das Kontaktfeld offen ist (siehe Zustand).
 - **mensch** — Der Kunde will mit einer Person sprechen, oder die Frage gehört zu einem
   Menschen (Vertragsdetail, Sonderfall, Beschwerde).
 - **preis** — Der Kunde will den Preis wissen oder ein Angebot. Der Chat startet die
@@ -190,10 +195,14 @@ export const WERKZEUG = {
       werte: { type: 'array', items: { type: 'string' },
         description: 'Nur bei typ=antwort/nachtrag: erlaubte Werte, leichteste zuerst. Sonst [].' },
       quelle: { type: 'string', description: 'Wird nicht mehr verwendet — immer "".' },
+      kontaktName: { type: 'string', description: 'Nur bei typ=kontakt: erkannter Name. Sonst "".' },
+      kontaktMail: { type: 'string', description: 'Nur bei typ=kontakt: erkannte E-Mail. Sonst "".' },
+      kontaktTelefon: { type: 'string', description: 'Nur bei typ=kontakt: erkannte Nummer. Sonst "".' },
       chips: { type: 'array', items: { type: 'string' },
         description: 'Höchstens drei Vorschläge in der Ich-Form des Kunden. Sonst [].' },
     },
-    required: ['typ', 'text', 'feld', 'werte', 'quelle', 'chips'],
+    required: ['typ', 'text', 'feld', 'werte', 'quelle', 'chips',
+               'kontaktName', 'kontaktMail', 'kontaktTelefon'],
   },
 };
 
@@ -210,6 +219,7 @@ export type PriaZustand = {
 
 export type PriaAntwort = {
   typ: Typ; text: string; feld: string; werte: string[]; quelle: string; chips: string[];
+  kontaktName: string; kontaktMail: string; kontaktTelefon: string;
 };
 
 /** Nur die Auszeichnung durchlassen, die die Sprechblase versteht. Das Modell
@@ -275,5 +285,10 @@ export function pruefen(roh: any): PriaAntwort {
     // unbekanntes Feld ausweicht; ausgeliefert wird es nicht.
     quelle: '',
     chips: chips.slice(0, 3).map((c: unknown) => String(c).replace(/[<>]/g, '').slice(0, 60)),
+    // Kontaktdaten aus dem Chat statt aus dem Feld — nur saeubern, nicht
+    // pruefen: die Pruefung macht der Chat, wenn er sie eintraegt.
+    kontaktName: String(roh?.kontaktName || '').replace(/[<>]/g, '').slice(0, 120),
+    kontaktMail: String(roh?.kontaktMail || '').replace(/[<>\s]/g, '').slice(0, 200),
+    kontaktTelefon: String(roh?.kontaktTelefon || '').replace(/[^\d +()\/-]/g, '').slice(0, 60),
   };
 }

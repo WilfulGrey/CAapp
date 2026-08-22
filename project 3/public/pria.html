@@ -513,7 +513,34 @@ const SCHNELLFRAGEN=[
   'Braucht sie ein eigenes Zimmer?'
 ];
 const beantwortet=new Set();
+/* Springt zum Kontaktfeld und setzt den Fokus in die erste Luecke. Der Kunde
+   hatte die Karte oben im Verlauf und musste selbst danach suchen. */
+function zumKontakt(){
+  const knopf=document.getElementById('abs');
+  if(!knopf) return false;
+  const karte=knopf.closest('.row')||knopf.closest('.card');
+  if(karte) karte.scrollIntoView({behavior:ruhig?'auto':'smooth',block:'center'});
+  const leer=['kname','kmail','ktel'].map(i=>document.getElementById(i)).find(f=>f&&!f.value.trim());
+  if(leer) setTimeout(()=>leer.focus(),ruhig?0:420);
+  return true;
+}
+
 function beraterChips(){
+  /* Stehen alle Angaben und fehlen nur die Kontaktdaten, ist alles andere
+     Ablenkung (Martin, 21.08.): keine Wissensfragen, kein „Preis berechnen" —
+     der Preis ist ja gerechnet. Nur der eine Weg, und der Hinweis, dass es
+     auch getippt geht. */
+  if(kontaktOffen){
+    return setChips([
+      {t:'Meine Daten eintragen',stil:'stark',f:()=>{chips.innerHTML='';zumKontakt();}},
+      {t:'Lieber hier im Chat',stil:'soft',f:async()=>{
+        chips.innerHTML='';
+        await sagen('Gern — schreiben Sie mir einfach <b>Name, E-Mail und Telefon</b> in einer Zeile. '+
+                    'Ich trage es dann oben für Sie ein.');
+        document.getElementById('frei').focus();
+      }}
+    ]);
+  }
   const offen=SCHNELLFRAGEN
     .filter(q=>{const e=suche(q);return !e||!beantwortet.has(e);})
     .slice(0,3)
@@ -901,6 +928,16 @@ function kontakt(){
      liess er sich drücken und tat nichts — das ist genau der tote Knopf,
      den es nicht geben darf. Absichtlich milde geprüft: wir wollen niemanden
      wegen eines Formats aussperren, nur offensichtlich Leeres abfangen. */
+  // Zweiter Weg, gleich angeboten: viele tippen lieber, als in ein Formular
+  // zu greifen — besonders auf dem Handy.
+  setChips([
+    {t:'Lieber hier im Chat eingeben',stil:'soft',f:async()=>{
+      chips.innerHTML='';
+      await sagen('Gern — <b>Name, E-Mail und Telefon</b> in einer Zeile genügt. Ich trage es oben ein.');
+      document.getElementById('frei').focus();
+    }}
+  ]);
+
   const felder=['kname','kmail','ktel'].map(id=>document.getElementById(id));
   const go=document.getElementById('abs');
   const gueltig=()=>{
@@ -1152,6 +1189,41 @@ async function verarbeite(r){
     return vorschlagen(offeneFrage);
   }
   // Kein Modelltext davor: der kuratierte Einstieg sagt dasselbe, nur besser.
+  /* Kontaktdaten aus dem Chat: der Kunde tippt sie, statt oben ins Feld zu
+     greifen. Wir tragen ein, was erkannt wurde, und lassen bestaetigen —
+     automatisch abschicken waere bei personenbezogenen Daten uebergriffig. */
+  if(r.typ==='kontakt' && kontaktOffen){
+    chips.innerHTML='';
+    const felder={kname:r.kontaktName, kmail:r.kontaktMail, ktel:r.kontaktTelefon};
+    let gesetzt=0;
+    for(const [id,wert] of Object.entries(felder)){
+      const f=document.getElementById(id);
+      if(f && wert){ f.value=wert; f.dispatchEvent(new Event('input')); gesetzt++; }
+    }
+    const knopf=document.getElementById('abs');
+    if(!gesetzt){
+      await sagen(r.text||'Das habe ich nicht herauslesen können — schreiben Sie mir bitte '+
+                  '<b>Name, E-Mail und Telefon</b>, dann trage ich es ein.');
+      return beraterChips();
+    }
+    zumKontakt();
+    if(knopf && !knopf.disabled){
+      await sagen('Ich habe es oben eingetragen:<br><b>'+
+        [r.kontaktName,r.kontaktMail,r.kontaktTelefon].filter(Boolean).join('</b> · <b>')+'</b>');
+      return setChips([
+        {t:'Passt — Angebot ansehen',stil:'stark',f:()=>{chips.innerHTML='';knopf.click();}},
+        {t:'Ich ändere es oben',stil:'soft',f:()=>{chips.innerHTML='';zumKontakt();}}
+      ]);
+    }
+    // Etwas fehlt noch — sagen, was.
+    const fehlt=[['kname','Ihr Name'],['kmail','Ihre E-Mail'],['ktel','Ihre Telefonnummer']]
+      .filter(([id])=>{const f=document.getElementById(id);return !f||!f.value.trim();})
+      .map(([,l])=>l);
+    await sagen('Danke, das habe ich oben eingetragen. Es fehlt noch <b>'+
+                fehlt.join('</b> und <b>')+'</b>.');
+    return beraterChips();
+  }
+
   if(r.typ==='preis')   return starteFunnel('preis',null,false);
   if(r.typ==='kraefte') return starteFunnel('kraefte',null,false);
 
