@@ -1161,7 +1161,25 @@ function modellChips(liste){
   });
 }
 
-async function verarbeite(r){
+async function verarbeite(r,kundentext){
+  /* Sicherheitsnetz gegen den Fehler vom 22.08.: Das Modell hat die Antwort
+     nur BESTAETIGT statt sie als Antwort zu liefern — gespeichert wurde
+     nichts, und der Chat stellte dieselbe Frage sofort noch einmal.
+     Steht eine Frage offen und findet die Stichwortpruefung im Satz des
+     Kunden genau einen gueltigen Wert dafuer, gilt der. Lieber der
+     schlichte Treffer als eine Schleife. */
+  if(offeneFrage && kundentext && ['wissen','sozial','unklar','abwegig'].includes(r.typ)){
+    const th=THEMEN.find(t=>t.k===offeneFrage.k);
+    const treffer=th?stufenTreffer(th,kundentext):[];
+    if(treffer.length===1){
+      const s=offeneFrage, v=treffer[0];
+      const label=(s.o.find(x=>x[0]===v)||[,v])[1];
+      chips.innerHTML='';
+      if(r.text) sagenJetzt(r.text);
+      return waehle(s,v,label,null,true);
+    }
+  }
+
   if(r.text) verlauf.push({rolle:'pria',text:r.text});
 
   // Antwort auf die offene Frage oder Nachtrag zu einer anderen —
@@ -1257,7 +1275,7 @@ async function frage(text,chip){
     try{
       const r=await priaFragen(text);
       t.remove(); llmFehler=0;
-      return verarbeite(r);
+      return verarbeite(r,text);
     }catch(e){
       t.remove(); llmFehler++;
       if(llmFehler>=2){
