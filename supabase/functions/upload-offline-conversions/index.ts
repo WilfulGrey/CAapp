@@ -6,7 +6,7 @@
 //   1. „Qualifizierter Lead" — erstes patient_data_saved je Lead
 //      (Aktion 7720728390, Status: offline_conversion_uploads)
 //   2. „Kunde gebucht" — ERSTE lead_application_acceptances-Zeile je Lead,
-//      fixer Wert 400 € = Monats-Bruttomarge (Aktion 7728914324, Status:
+//      fixer Wert 250 € (Aktion 7728914324, Status:
 //      offline_booking_uploads; seit 21.08.2026 — Ziel: wertbasiertes
 //      Bidding auf Bucher statt Profil-Ausfüller)
 // Lead trägt gclid/wbraid/gbraid aus PR #444. Doku: docs/google-ads-tracking.md.
@@ -43,8 +43,9 @@ import {
 
 const LOOKBACK_DAYS = 90; // Klick-Fenster der Conversion-Aktionen
 const MIN_AGE_HOURS = 6; // Klick muss bei Google verarbeitet sein
-// „Kunde gebucht": fixer Conversion-Wert = Monats-Bruttomarge je Kunde.
-const BOOKING_VALUE_EUR = Number(Deno.env.get("GOOGLE_ADS_BOOKING_VALUE_EUR") ?? "400");
+// „Kunde gebucht": fixer Conversion-Wert je Buchung — 250 € (Martins
+// berechneter Maximalwert, 22.08.; vorher kurz 400).
+const BOOKING_VALUE_EUR = Number(Deno.env.get("GOOGLE_ADS_BOOKING_VALUE_EUR") ?? "250");
 
 function json(status: number, body: Record<string, unknown>): Response {
   return new Response(JSON.stringify(body), {

@@ -149,7 +149,7 @@ die Mail kommt trotzdem. Kunden-CAC bewusst nicht in der Mail
 
 Zweite Offline-Conversion im selben Cron (Phase 3b/5 der Function):
 **erste** Zeile in `lead_application_acceptances` je Lead = ein gebuchter
-Neukunde. Fixer Wert **400 € (Monats-Bruttomarge)**, überschreibbar via
+Neukunde. Fixer Wert **250 € (Martins berechneter Maximalwert je Buchung, 22.08.; initial kurz 400 €)**, überschreibbar via
 Env `GOOGLE_ADS_BOOKING_VALUE_EUR`. Conversion-Aktion
 `conversionActions/7728914324` („Kunde gebucht (Buchung)", Kategorie
 CONVERTED_LEAD, **secondary**, ONE_PER_CLICK, 90d Klick-Fenster) —
