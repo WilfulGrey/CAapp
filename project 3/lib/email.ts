@@ -2757,6 +2757,9 @@ export async function buildCustomerCaregiverMailWithInlinePhoto(
 // Aufbau bewusst identisch zu den uebrigen Kundenmails (mail-templates/):
 // gleicher Kopf mit Logo und Testsieger-Block, gleicher gruener CTA-Knopf,
 // gleicher Fuss. Ein eigenes Layout fiel sofort als Fremdkoerper auf.
+// SYNC-HINWEIS: Kopie dieses Templates lebt in
+// supabase/functions/send-scheduled-emails/bewertung.ts (Cron-Versand).
+// Layout-Änderungen immer an beiden Stellen nachziehen.
 export function getBewertungsanfrageTemplate(
   lead: Lead,
   feedbackBaseUrl: string,
