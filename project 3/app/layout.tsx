@@ -139,13 +139,35 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
 
             Wenn Pria auf Prod soll: diese Liste um kostenrechner.primundus.de
             erweitern — bewusst eine Code-Aenderung mit PR, kein stiller
-            Schalter irgendwo im Dashboard. */}
+            Schalter irgendwo im Dashboard.
+
+            Am selben Gatter haengt seit 22.08. `interactive-widget=
+            resizes-content`. Ohne das laesst Safari bei offener Tastatur das
+            Layout-Fenster unveraendert und schiebt nur die sichtbare Flaeche
+            darueber — `position:fixed` haengt am Layout-Fenster und wandert
+            aus dem Bild (Prias Panel trieb dadurch als loser Block ueber der
+            Seite). Mit `resizes-content` schrumpft das Layout-Fenster mit,
+            und `inset:0` passt von allein.
+
+            Es gilt fuer JEDE Seite, nicht nur fuer den Chat. Sichtbar wird
+            das an den `fixed bottom-0`-Leisten in Step-2, Result und
+            Kalkulation: die stehen beim Tippen kuenftig ueber der Tastatur
+            statt dahinter. Vermutlich eine Verbesserung — aber nichts, was
+            waehrend der laufenden CRO-Messung ungeprueft auf Prod gehoert.
+            Deshalb erst hier. */}
         <script
           dangerouslySetInnerHTML={{
             __html:
               "(function(){var h=location.hostname;" +
               "if(h!=='kostenrechner-staging.onrender.com'&&h!=='localhost'&&h!=='127.0.0.1')return;" +
               "document.documentElement.setAttribute('data-pria','1');" +
+              // Nur hier, nicht auf Prod: die Tastatur soll das Layout-Fenster
+              // verkleinern statt nur die sichtbare Flaeche zu verschieben.
+              // Das betrifft die GANZE Seite, nicht nur den Chat — deshalb
+              // erst auf Staging ansehen. Siehe Kommentar unten.
+              "var v=document.querySelector('meta[name=viewport]');" +
+              "if(v&&v.content.indexOf('interactive-widget')<0)" +
+              "v.content+=',interactive-widget=resizes-content';" +
               "var s=document.createElement('script');s.src='/pria-widget.js';s.defer=true;" +
               "document.head.appendChild(s);})();",
           }}
