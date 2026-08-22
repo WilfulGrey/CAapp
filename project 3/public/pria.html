@@ -503,12 +503,30 @@ function flug(chip,text){
     ziel.style.visibility='hidden';
     const nach=ziel.getBoundingClientRect();
     const sx=nach.width/von.width, sy=nach.height/von.height;
+    /* Notausgang (22.08.): Bis hierher haing die GANZE Unterhaltung an
+       `onfinish`. Feuert das nicht, loest dieses Promise nie auf — und
+       weil `starteFunnel` darauf wartet, steht der Chat fuer immer still:
+       keine Frage, keine Chips, nichts. Genau das hat Martin gesehen, als
+       er nach dem Rueckruf doch ein Angebot wollte.
+
+       Und es gibt reichlich Gruende, warum es nicht feuert: eine
+       Zeitleiste, die nicht laeuft (Tab im Hintergrund, Seite gerade nicht
+       gezeichnet), iOS waehrend der Tastatur-Animation, ungueltige Werte,
+       wenn eine der beiden Boxen keine Groesse hat. Eine Verzierung darf
+       das Gespraech nicht aufhalten — deshalb loest jetzt zusaetzlich ein
+       Wecker, und wer zuerst kommt, gewinnt. */
+    let erledigt=false;
+    const schluss=()=>{
+      if(erledigt) return; erledigt=true;
+      klon.remove(); ziel.style.visibility=''; res();
+    };
     klon.animate([
       {transform:'none',borderRadius:'999px',opacity:1},
       {transform:`translate(${nach.left-von.left}px,${nach.top-von.top}px) scale(${sx},${sy})`,
        borderRadius:'20px',opacity:1}
     ],{duration:380,easing:'cubic-bezier(.22,1,.36,1)',fill:'forwards'})
-    .onfinish=()=>{klon.remove();ziel.style.visibility='';res();};
+    .onfinish=schluss;
+    setTimeout(schluss,900);
   });
 }
 /* Vorrat an Schnellfragen. Beantwortetes verschwindet, das Nächste rückt nach —
@@ -1060,6 +1078,9 @@ function rueckruf(){
     }
 
     go.textContent='✓ Rückruf ist notiert';
+    // Sperre wieder loesen: wer spaeter eine zweite Nummer nachreichen will,
+    // soll den Knopf nicht tot vorfinden.
+    rueckrufOffen=false;
     protokoll('system','Rückruf erbeten — '+name+', '+tel,{ereignis:'rueckruf'});
     spuelen();
     await sagen('Ist notiert — <b>Marta ruft Sie an</b> unter '+tel+'. '+
@@ -1095,9 +1116,15 @@ function rueckruf(){
     ]);
   };
 
-  setChips([{t:'Doch lieber weiterschreiben',stil:'soft',f:()=>{
-    rueckrufOffen=false; r.remove();
-    return offeneFrage?weiterFrage():beraterChips();}}]);
+  /* Zwei Auswege, nicht einer (Martin, 22.08.): Wer die Karte offen hat
+     und es sich anders ueberlegt, wollte bisher nur „weiterschreiben"
+     koennen — der Weg zum Angebot fehlte ganz. */
+  const weg=()=>{ rueckrufOffen=false; r.remove(); };
+  setChips([
+    {t:'Doch lieber Preis berechnen',stil:'stark',f:b=>{weg();return starteFunnel('preis',b);}},
+    {t:'Doch lieber weiterschreiben',stil:'soft',f:()=>{
+      weg(); return offeneFrage?weiterFrage():beraterChips();}}
+  ]);
 }
 
 function kontakt(){
