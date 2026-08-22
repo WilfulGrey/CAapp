@@ -603,7 +603,10 @@ const SOZIAL=[
  {w:/wie geht('?s| es dir| es ihnen)/i,
   a:()=>'Danke der Nachfrage — mir geht es immer gut, das ist der Vorteil an mir. 🙂 Wichtiger ist, wie es bei Ihnen gerade läuft.'},
  {w:/bist du (ein )?(mensch|echt|roboter|computer|ki|bot)|wer bist du|bin ich bei einem menschen/i,
-  a:()=>'Ich bin Pria, die KI-Assistentin von Primundus — also kein Mensch. Wenn Sie lieber mit einem sprechen möchten, verbinde ich Sie sofort mit Ilka und ihrem Team.'},
+  a:()=>'Nein — ich bin Pria, die KI-Assistentin von Primundus. Ich beantworte Ihre Fragen '+
+        'und rechne Ihnen aus, was eine Betreuung <b>bei Ihnen</b> kostet — mit passenden '+
+        'Pflegekräften, die gerade verfügbar sind. Möchten Sie lieber mit einem Menschen '+
+        'sprechen, verbinde ich Sie mit Ilka und ihrem Team.'},
  // Erschöpfung und Trauer: hier wird nicht verkauft.
  // Bewusst großzügig: zwischen „schaffe" und „nicht mehr" stehen im echten
  // Satz meist noch drei Wörter („ich schaffe das alles nicht mehr").
@@ -1442,7 +1445,10 @@ async function oeffne(start){
   // Kurz halten: Der KI-Hinweis steht in der Kopfzeile, nicht im Gespräch.
   await sagen('Guten Tag! Ich bin <b>Pria</b> von Primundus. 👋');
   if(start==='preis') return starteFunnel('preis',null,'Ja, gern');
-  await sagen('Fragen Sie mich alles rund um die häusliche Betreuung.');
+  // Nicht nur „fragen Sie mich" (Martin, 22.08.) — was sie KANN, gehört in den
+  // zweiten Satz, sonst wirkt sie wie ein Auskunftsschalter.
+  await sagen('Ich beantworte Ihre Fragen zur häuslichen Betreuung — und rechne Ihnen aus, '+
+              'was sie <b>bei Ihnen</b> kostet, samt passender Pflegekräfte, die gerade verfügbar sind.');
   beraterChips();
 }
 /* ─── Fremde Leisten am unteren Rand ────────────────────────────────
