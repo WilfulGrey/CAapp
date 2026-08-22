@@ -351,6 +351,24 @@ wie „kein Vermittler", ohne es zu verneinen. Pria benutzt sie.*
 > abschicken, sehen Sie diese sofort — zusammen mit Ihrem Angebot."
 > Keine Musterprofile, keine Datenbank zum Durchblättern.
 
+**8.1b — Sind das schon echte Bewerbungen? (WICHTIG — nicht verwechseln)**
+> **Nein.** Was Sie sofort sehen, sind **Personalvorschläge**: echte, aktuell
+> verfügbare Kräfte, die zu Ihren Angaben passen. Eine Bewerbung ist das noch
+> nicht.
+>
+> Der zweite Schritt folgt im Portal: Wenn Ihnen **Angebot und Vorschläge
+> grundsätzlich zusagen**, vervollständigen Sie dort die Angaben zur
+> **Pflegesituation**. Erst damit können die Kräfte einschätzen, was auf sie
+> zukommt — und sich dann konkret bei Ihnen bewerben. Diese Bewerbungen sehen
+> Sie ebenfalls im Portal und entscheiden in Ruhe.
+>
+> **Nie die gezeigten Profile „Bewerbungen" nennen** und nie sagen, die Kräfte
+> könnten sich schon jetzt bewerben (Martin, 21.08.). Die Reihenfolge ist:
+> Angebot + Vorschläge → Pflegesituation ausfüllen → Bewerbungen.
+> *Quelle: Martin 21.08.; deckt sich mit der Mailkette (§12), Mail 2/3:
+> „Pflegekräfte können sich noch nicht bei Ihnen bewerben — Patientendaten
+> fehlen".*
+
 **8.2 — Wie gut sprechen die Kräfte Deutsch?**
 > Sie bestimmen das Niveau. **Kommunikativ** reicht für den Alltag; bei Schwerhörigkeit,
 > Demenz oder viel Gesprächsbedarf empfehle ich **Gut** — kostet etwas mehr, spart
