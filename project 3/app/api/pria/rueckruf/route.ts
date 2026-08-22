@@ -191,6 +191,14 @@ export async function POST(request: Request) {
     if (error) console.warn('[pria] Rückruf nicht protokolliert:', error.message);
   }
 
-  console.log(`[pria] Rückruf ${name} / ${telefon} aus Gespräch ${sid || '—'}`);
-  return NextResponse.json({ ok: true });
+  console.log(`[pria] Rückruf ${name} / ${telefon} aus Gespräch ${sid || '—'} · ${leadZeile}`);
+  /* `lead` ist eine Quittung, keine Zierde: ohne sie liesse sich von aussen
+     nicht unterscheiden, ob nur die Mail rausging oder auch ein Lead
+     entstanden ist — die Lead-Schritte sind fail-soft und melden sich sonst
+     nur ins Log. Die id kommt mit, wie sie auch /api/pria/lead zurückgibt. */
+  return NextResponse.json({
+    ok: true,
+    lead: leadId ? (leadNeu ? 'neu' : 'vorhanden') : 'keiner',
+    leadId: leadId ?? null,
+  });
 }
