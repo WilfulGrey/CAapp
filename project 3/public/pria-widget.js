@@ -525,9 +525,14 @@ function beraterChips(){
     .filter(q=>{const e=suche(q);return !e||!beantwortet.has(e);})
     .slice(0,3)
     .map(q=>({t:q,f:b=>frage(q,b)}));
-  setChips([...offen,
+  /* Die zwei Wege zuerst, die Wissensfragen danach (Martin, 22.08.).
+     Vorher standen sie hinten — beim Umbruch in mehrere Reihen ging das
+     noch, in der einreihigen Tipp-Ansicht rutschten sie aus dem Bild und
+     man sah nur noch die Fragen. */
+  setChips([
     {t:'Preis berechnen',stil:'stark',f:b=>starteFunnel('preis',b)},
-    {t:'Pflegekräfte ansehen',stil:'stark',f:b=>starteFunnel('kraefte',b)}
+    {t:'Pflegekräfte ansehen',stil:'stark',f:b=>starteFunnel('kraefte',b)},
+    ...offen
   ]);
 }
 
@@ -901,6 +906,42 @@ async function uebergabe(){
   W.getElementById('u1').innerHTML='<span class="ring">✓</span>Kundenportal geöffnet';
   protokoll('system','Übergabe ins Kundenportal',{ereignis:'portal_handoff'});
   spuelen();
+}
+
+/* ─── Diagnose ────────────────────────────────────────────────────
+   Sichtbar nur mit ?priadebug=1 in der Adresse.
+
+   Warum das hier steht: das Verhalten der Tastatur auf dem iPhone laesst
+   sich am Schreibtisch nicht nachstellen, und aus Screenshots allein habe
+   ich mehrfach falsch geschlossen. Diese Zahlen sagen in einem Bild, was
+   Sache ist — welches Fenster wie gross ist, wo das Panel steht, ob die
+   Seite wirklich festgehalten wird und ob Safari `resizes-content` kennt.
+
+   Bewusst ausserhalb des Shadow-Roots (document.body): so misst die
+   Anzeige unabhaengig vom Chat und wandert mit, falls der Chat wandert.
+   `document.head.querySelector` statt `document.querySelector` — letzteres
+   lenkt der Widget-Bauer in den Shadow-Root um. */
+if(/[?&]priadebug=1/.test(location.search)){
+  const box = document.createElement('div');
+  box.style.cssText = 'position:fixed;left:0;top:0;z-index:2147483647;'+
+    'background:rgba(0,0,0,.84);color:#5f5;font:11px/1.35 ui-monospace,Menlo,monospace;'+
+    'padding:5px 7px;white-space:pre;pointer-events:none;max-width:100vw';
+  document.body.appendChild(box);
+  const meta = document.head.querySelector('meta[name=viewport]');
+  const modern = !!meta && meta.content.indexOf('resizes-content') >= 0;
+  const zeig = () => {
+    const r = panel.getBoundingClientRect();
+    const b = getComputedStyle(document.body);
+    box.textContent =
+      'iH '+innerHeight+'  vv '+(vv?Math.round(vv.height):'—')+
+        '  off '+(vv?Math.round(vv.offsetTop):'—')+'  sY '+Math.round(scrollY)+'\n'+
+      'panel  top '+Math.round(r.top)+'  h '+Math.round(r.height)+
+        '   inline top:'+(panel.style.top||'—')+' h:'+(panel.style.height||'—')+'\n'+
+      'body '+b.position+' top:'+b.top+'   takt '+(taktLaeuft?'an':'aus')+
+        '   vp '+(modern?'resizes-content':'STANDARD');
+    requestAnimationFrame(zeig);
+  };
+  requestAnimationFrame(zeig);
 }
 
 /* ─── Rückruf ─────────────────────────────────────────────────────
