@@ -280,6 +280,31 @@
     '    .bub small{font-size:12px}\n'+
     '    /* Chips dürfen dem Verlauf nicht den halben Schirm wegnehmen. */\n'+
     '    .chips{max-height:min(30dvh,196px);padding:12px 12px 3px}\n'+
+    '\n'+
+    '    /* Der Verlauf ist der Chat — er darf nie ganz verschwinden.\n'+
+    '\n'+
+    '       `flex:1` heisst `flex:1 1 0%`, die Basis ist also null: bei knappem\n'+
+    '       Platz gab der Verlauf alles ab, waehrend die Chips ihre 196 px\n'+
+    '       behielten (`dvh` schrumpft nicht mit der Tastatur). Mit offener\n'+
+    '       Tastatur sah man dadurch einen leeren grauen Streifen, darunter drei\n'+
+    '       Reihen Knoepfe und die Eingabezeile — kein Chat, ein Formularfetzen.\n'+
+    '       Eine Mindesthoehe dreht die Rangfolge um: erst das Gespraech, dann\n'+
+    '       die Vorschlaege. */\n'+
+    '    .thread{min-height:112px}\n'+
+    '\n'+
+    '    /* Und waehrend getippt wird, zaehlt das Geschriebene. Die Vorschlaege\n'+
+    '       weichen auf eine seitlich schiebbare Reihe aus, statt drei Reihen zu\n'+
+    '       umbrechen — das gibt dem Gespraech rund 150 px zurueck, ohne dass\n'+
+    '       ein Knopf verloren geht. */\n'+
+    '    .panel.tippt .chips{flex-wrap:nowrap;overflow-x:auto;overflow-y:hidden;\n'+
+    '      max-height:none;padding:10px 12px;scrollbar-width:none;\n'+
+    '      -webkit-overflow-scrolling:touch;\n'+
+    '      /* Als eigener Streifen lesbar, sonst stoesst die letzte Sprechblase\n'+
+    '         ohne Absatz an die Knoepfe. */\n'+
+    '      border-top:1px solid var(--line);background:var(--papier)}\n'+
+    '    .panel.tippt .thread{padding-bottom:14px}\n'+
+    '    .panel.tippt .chips::-webkit-scrollbar{display:none}\n'+
+    '    .panel.tippt .chip{flex:0 0 auto}\n'+
     '    .chip{font-size:14px;padding:10px 16px}\n'+
     '    .mensch p{font-size:15px}\n'+
     '    .klein{font-size:12px}\n'+
@@ -1585,7 +1610,13 @@ function takt(){
 function taktAn(an){
   if(an === taktLaeuft) return;
   taktLaeuft = an; letzterStand = '';
+  /* Die Klasse steuert nur das Aussehen (siehe .panel.tippt im CSS, dort
+     bewusst nur im Handy-Block): beim Tippen weichen die Vorschlaege auf
+     eine Reihe aus, damit das Gespraech sichtbar bleibt. */
+  panel.classList.toggle('tippt', an);
   if(an) requestAnimationFrame(takt); else handyLayout();
+  // Nach dem Umbau ans Ende — sonst haengt die letzte Blase ueber dem Rand.
+  runter();
 }
 if(vv){ vv.addEventListener('resize',handyLayout); vv.addEventListener('scroll',handyLayout); }
 /* Sicherheitsnetz: iOS meldet den Tastatur-Resize nicht immer sofort, und
@@ -1723,7 +1754,7 @@ blase.onclick=()=>oeffne();
 pille.onclick=async()=>{ const f=pillentext.textContent; await oeffne(); frage(f); };
 W.getElementById('zu').onclick=()=>{
   tipp();
-  panel.classList.remove('on','fertig');
+  panel.classList.remove('on','fertig','tippt');
   // Auch `top` zuruecksetzen — sonst behaelt das Panel beim naechsten
   // Oeffnen den Versatz der letzten Tastatur.
   panel.style.height=''; panel.style.bottom=''; panel.style.top='';
