@@ -14,11 +14,12 @@ import { useEffect, useState } from 'react';
 import { Card } from '@/components/ui/card';
 import Link from 'next/link';
 import { Loader2, MessageSquare, User, Bot, CircleCheck as CheckCircle2, Info,
-  Mail, Phone, ExternalLink } from 'lucide-react';
+  Mail, Phone, ExternalLink, PhoneCall } from 'lucide-react';
 
 type Kopf = {
   sid: string; beginn: string; ende: string; nachrichten: number;
   ersteFrage: string | null; lead: boolean; leadId: string | null;
+  rueckruf: boolean;
 };
 type Zeile = {
   id: string; rolle: string; text: string; ereignis: string | null;
@@ -122,11 +123,18 @@ export default function GespraechePage() {
               >
                 <div className="flex items-center justify-between gap-2">
                   <span className="text-xs text-gray-500 tabular-nums">{zeit(g.beginn)}</span>
-                  {g.lead && (
-                    <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-full px-2 py-0.5">
-                      <CheckCircle2 className="w-3 h-3" /> Lead
-                    </span>
-                  )}
+                  <span className="flex items-center gap-1.5">
+                    {g.rueckruf && (
+                      <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-amber-800 bg-amber-50 border border-amber-300 rounded-full px-2 py-0.5">
+                        <PhoneCall className="w-3 h-3" /> Rückruf
+                      </span>
+                    )}
+                    {g.lead && (
+                      <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-full px-2 py-0.5">
+                        <CheckCircle2 className="w-3 h-3" /> Lead
+                      </span>
+                    )}
+                  </span>
                 </div>
                 <div className="text-sm text-gray-900 mt-1 line-clamp-2">
                   {g.ersteFrage || <span className="text-gray-400">— nur geklickt, nichts geschrieben</span>}
@@ -209,6 +217,33 @@ export default function GespraechePage() {
                       {z.lead_id && <> · Lead <code className="text-[10px]">{z.lead_id.slice(0, 8)}</code></>}
                     </span>
                     <div className="h-px flex-1 bg-emerald-300" />
+                  </div>
+                );
+              }
+              // Eine Rueckrufbitte ist ein Wendepunkt wie der Lead: ab hier
+              // wartet ein Mensch auf einen Anruf. Nummer und Name stehen in
+              // meta, damit man nicht ins Postfach wechseln muss.
+              if (z.ereignis === 'rueckruf') {
+                const m = z.meta || {};
+                return (
+                  <div key={z.id} className="my-5 rounded-xl border border-amber-300 bg-amber-50/70 px-4 py-3">
+                    <div className="flex items-center gap-2 text-xs font-semibold text-amber-900">
+                      <PhoneCall className="w-3.5 h-3.5" /> Rückruf erbeten
+                      <span className="font-normal text-amber-700">· {zeit(z.zeit)}</span>
+                    </div>
+                    <div className="mt-1.5 text-sm text-gray-900">
+                      {m.name || '—'}
+                      {m.telefon && (
+                        <> · <a href={`tel:${String(m.telefon).replace(/[^\d+]/g, '')}`}
+                               className="font-semibold hover:underline">{m.telefon}</a></>
+                      )}
+                    </div>
+                    {m.anlass && (
+                      <div className="mt-1 text-xs text-amber-900/80">Es ging um: „{m.anlass}"</div>
+                    )}
+                    <div className="mt-1.5 text-[11px] text-amber-800">
+                      Ist per Mail an info@primundus.de gegangen.
+                    </div>
                   </div>
                 );
               }

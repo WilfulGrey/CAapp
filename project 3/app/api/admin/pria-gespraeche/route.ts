@@ -98,7 +98,8 @@ export async function GET(request: NextRequest) {
     let g = proSid.get(z.sid);
     if (!g) {
       g = { sid: z.sid, beginn: z.zeit, ende: z.zeit, nachrichten: 0,
-            ersteFrage: null as string | null, lead: false, leadId: null as string | null };
+            ersteFrage: null as string | null, lead: false, leadId: null as string | null,
+            rueckruf: false };
       proSid.set(z.sid, g);
     }
     // Absteigend sortiert: das zuletzt Gesehene ist das Frueheste.
@@ -107,6 +108,9 @@ export async function GET(request: NextRequest) {
     if (z.rolle === 'kunde' || z.rolle === 'pria') g.nachrichten++;
     if (z.rolle === 'kunde' && z.text) g.ersteFrage = z.text.slice(0, 120);
     if (z.ereignis === 'lead') g.lead = true;
+    // Eine Rueckrufbitte ist der Grund, ein Gespraech zuerst zu oeffnen —
+    // dort wartet jemand auf einen Anruf.
+    if (z.ereignis === 'rueckruf') g.rueckruf = true;
     if (z.lead_id) g.leadId = z.lead_id;
   }
 
