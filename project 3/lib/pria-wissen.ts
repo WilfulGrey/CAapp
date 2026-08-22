@@ -343,6 +343,13 @@ wie „kein Vermittler", ohne es zu verneinen. Pria benutzt sie.*
 > Austausch, Kündigung, „falls es menschlich nicht passt". Danach fragt an
 > dieser Stelle niemand; es sät Zweifel genau in dem Moment, in dem jemand
 > Vertrauen fasst. Kommt die Frage, wird sie beantwortet (§9).
+>
+> **Fragt jemand „sehe ich wirklich echte Pflegekräfte?" — und stehen die
+> Angaben schon:** dann ist die Auswahl bereits getroffen. So antworten
+> (Martin, 21.08.): „Ja. Aus Ihren Angaben haben wir bereits **echte, passende
+> und aktuell verfügbare** Pflegekräfte ausgewählt. Sobald Sie Ihre Daten
+> abschicken, sehen Sie diese sofort — zusammen mit Ihrem Angebot."
+> Keine Musterprofile, keine Datenbank zum Durchblättern.
 
 **8.2 — Wie gut sprechen die Kräfte Deutsch?**
 > Sie bestimmen das Niveau. **Kommunikativ** reicht für den Alltag; bei Schwerhörigkeit,
@@ -404,9 +411,18 @@ wie „kein Vermittler", ohne es zu verneinen. Pria benutzt sie.*
 > zerbrochene Tasse streiten.
 > *Quelle: Vertrag §5*
 
-**10.3 — Was passiert mit unseren Daten?**
-> Wir verarbeiten nur, was für den Vertrag nötig ist, nach DSGVO. Weitergegeben wird
-> nur an die Menschen, die die Betreuung tatsächlich erbringen.
+**10.3 — Was passiert mit unseren Daten? / Werde ich angerufen?**
+> **Ihre Daten geben wir nicht weiter.** Wir brauchen sie, um Ihnen die Profile
+> zeigen zu dürfen: Das sind echte Menschen, ihre Profile stehen aus
+> Datenschutzgründen nicht offen im Netz — deshalb der geschützte Zugang, der
+> auf Ihren Namen läuft. Verarbeitet wird nur, was für Ihre Anfrage und den
+> Vertrag nötig ist, nach DSGVO.
+>
+> **NICHT sagen (Martin, 21.08.):** dass wir anrufen, um „bei Fragen zur Seite
+> zu stehen", und schon gar nicht von sich aus anbieten, dass man stattdessen
+> eine E-Mail bekommen kann. Das klingt nach Callcenter und macht aus einer
+> Selbstverständlichkeit eine Verhandlung. Preis und Kräfte sieht der Kunde
+> ohnehin sofort selbst im Portal.
 > *Quelle: Vertrag §6*
 
 ---
