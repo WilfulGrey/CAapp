@@ -89,6 +89,23 @@ wie „kein Vermittler", ohne es zu verneinen. Pria benutzt sie.*
 > darunter — die genaue Rechnung steht in Ihrem Angebot.
 > *Quelle: \`HEIM_EIGENANTEIL\`, identisch in Mail und Portal. Bei Änderung beide Orte.*
 
+**1.5b — Wo arbeiten Sie? / Kommen Sie auch nach …?**
+> **In ganz Deutschland.** Die Betreuungskraft zieht bei Ihnen zu Hause ein, egal
+> wo Sie wohnen. (Martin, 22.08. — vorher stand das nirgends, und Pria hat sich
+> „bundesweit" aus der Seitenliste zusammengereimt.)
+
+**1.5c — Wie viele Pflegekräfte haben Sie?**
+> **Viele verfügbare Kräfte, und alle sind bei uns angestellt.** Keine Zahl
+> nennen (Martin, 22.08.) — „viele" genügt, eine Zahl wäre eine Behauptung, die
+> jemand nachprüfen kann und die sich täglich ändert.
+
+**1.5d — Wie erfahren sind die Kräfte?**
+> Von der **Starter**-Kraft über die **Stammkraft** bis zur **Elite**-Kraft —
+> gestaffelt nach Erfahrung und Zahl der Einsätze bei unseren Kunden. Im Profil
+> steht, in welcher Stufe jemand ist. Mehr Erfahrung heißt kleinere Auswahl und
+> etwas höherer Preis; wer offen ist, bekommt schneller jemanden.
+> *Quelle: Martin, 22.08.*
+
 **1.6 — Erreichbarkeit**
 > Ilka Wysocki, Pflegeberaterin · **089 200 000 830** · WhatsApp **wa.me/4989200000830**
 > · **jeden Tag von 8 bis 20 Uhr**, auch am Wochenende und an Feiertagen.
@@ -550,17 +567,20 @@ Der Rechnerpreis deckt die Betreuung, nicht An-/Abreise, Kost und Logis, Sommer-
 Feiertagszuschlag. Pria darf also nie „eine Zahl, alles inklusive" sagen — im aktuellen
 Prototyp tut sie das noch, das korrigiere ich.
 
-**14.6 — Testsieger-Wortlaut** ⚠️
-Mail 4 sagt heute „ausgezeichnet als **Testsieger von DIE WELT**". Unsere Linie ist:
-Eigenaussage („Nr. 1 der Pflegekräfte-Vermittler"), **nie als Zitat der WELT**. Beides
-gleichzeitig geht nicht — welche Fassung gilt, und ziehen wir die Mail nach?
+**14.6 — Testsieger-Wortlaut** ✅ **entschieden (Martin, 22.08.)**
+**„Nr. 1 der Pflegekräfte-Vermittler" gilt** — das ist der Name der *Testkategorie*,
+nicht unsere Selbstbeschreibung. Das Wort „Vermittler" darf deshalb hier stehen,
+obwohl wir sonst nie „wir vermitteln" sagen (§0). Weiterhin: nie als Zitat der WELT
+ausgeben, keine Prozentzahlen. Offen bleibt nur, ob Mail 4 nachgezogen wird.
 
 **14.7 — Telefonnummer** ✅ erledigt
 **089 200 000 830** ist eingetragen, die erfundene 0800-Nummer ist raus.
 
-**14.5 — Reisekosten**
-Portal-FAQ: 125 € **je Strecke**, also zweimal. Vertrag §8 nennt 125 € als pauschalen
-Wertersatz beim Widerruf. Gleiche Zahl, zwei Bedeutungen — ist das gewollt?
+**14.5 — Reisekosten** ✅ **entschieden (Martin, 22.08.)**
+Die **125 € gelten je Strecke** — einmal Hinfahrt, einmal Rückfahrt, also zweimal.
+Der Wertersatz beim Widerruf in Vertrag §8 ist eine **eigene Regelung** und darf
+nicht als „das sind die Reisekosten" erklärt werden. Gleiche Zahl, zwei Sachen:
+NIE miteinander begründen.
 
 ---
 

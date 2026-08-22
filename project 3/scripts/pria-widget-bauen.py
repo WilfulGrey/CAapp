@@ -83,7 +83,11 @@ def bauen(html: str) -> str:
     # `SEITE.` ist der bewusste Weg zur echten Seite (Kostenrechner-Karten) —
     # er darf NICHT in den Schatten umgelenkt werden.
     assert 'SEITE.querySelectorAll' in js, 'SEITE-Alias fehlt — Auftrittsregel findet die Karten nicht'
-    assert 'document.body.classList' in js, 'Seiten-Sperre darf NICHT umgelenkt werden'
+    # Die Seiten-Sperre muss am echten Dokument haengen bleiben, nicht im
+    # Schatten landen. Sie greift inzwischen ueber `const b = document.body`
+    # zu, deshalb wird auf `document.body` geprueft und nicht mehr auf den
+    # frueheren Wortlaut `document.body.classList`.
+    assert 'document.body' in js, 'Seiten-Sperre darf NICHT umgelenkt werden'
 
     def js_text(t: str) -> str:
         """Text → JS-String-Literal. Zeilenweise verkettet, damit die erzeugte
