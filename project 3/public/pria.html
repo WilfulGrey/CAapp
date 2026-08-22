@@ -785,7 +785,7 @@ function fortschritt(){
   return da;
 }
 
-async function starteFunnel(grund,chip,echo){
+async function starteFunnel(grund,chip,echo,einleitung){
   tipp(); modus='fragen'; offeneFrage=null;
   protokoll('system','Fragenlauf gestartet',{ereignis:'funnel',grund});
 
@@ -822,12 +822,20 @@ async function starteFunnel(grund,chip,echo){
   // erklären ist eine Blase zu viel.
   // Teilweise beantwortet (etwa nach einem Nachtrag): dort weitermachen,
   // nicht bei eins.
+  /* Der erste Satz kommt vom Modell, wenn der Kunde etwas geschrieben hat — nur
+     so geht Pria auf SEINE Worte ein, statt immer denselben Satz zu sagen
+     (Martin, 22.08.: „Kunde will Angebot, und wir sagen, das hängt von seiner
+     Situation ab"). Die Mechanik dahinter ist unsere und bleibt fest. */
   const schonDa=FLOW.filter(f=>antwort[f.k]!==undefined).length;
-  await sagen(schonDa
+  const mechanik = schonDa
     ? '<b>' + (FLOW.length-schonDa) + ' kurze Fragen</b> fehlen noch, den Rest habe ich schon.'
     : (grund==='preis'
-      ? 'Das hängt ganz von Ihrer Situation ab. <b>Acht kurze Fragen</b>, dann haben Sie Ihren Preis — ich fange einfach an.'
-      : 'Wer zu Ihnen passt, hängt von Ihrer Situation ab. <b>Acht kurze Fragen</b>, dann zeige ich sie Ihnen — ich fange einfach an.'));
+        ? '<b>Acht kurze Fragen</b>, dann haben Sie Ihren Preis — ich fange einfach an.'
+        : '<b>Acht kurze Fragen</b>, dann zeige ich Ihnen die passenden Kräfte — ich fange einfach an.');
+  const vorspann = einleitung ? einleitung.trim().replace(/<br>\s*$/,'')
+    : (schonDa ? '' : (grund==='preis' ? 'Das hängt ganz von Ihrer Situation ab.'
+                                       : 'Wer zu Ihnen passt, hängt von Ihrer Situation ab.'));
+  await sagen((vorspann ? vorspann + ' ' : '') + mechanik);
   fortschritt();   // schon Beantwortetes soll man am Balken sehen
   naechste();
 }
@@ -1243,8 +1251,8 @@ async function verarbeite(r,kundentext){
     return beraterChips();
   }
 
-  if(r.typ==='preis')   return starteFunnel('preis',null,false);
-  if(r.typ==='kraefte') return starteFunnel('kraefte',null,false);
+  if(r.typ==='preis')   return starteFunnel('preis',null,false,r.text);
+  if(r.typ==='kraefte') return starteFunnel('kraefte',null,false,r.text);
 
   chips.innerHTML='';
   // Keine Quellenzeile mehr (Martin, 21.08.): im Gespräch wirkt sie wie ein
