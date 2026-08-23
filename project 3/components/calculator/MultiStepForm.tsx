@@ -157,7 +157,29 @@ export function MultiStepForm({ mode = 'inline' }: MultiStepFormProps = {}) {
   // contact form users engage / drop off.
   const { trackFieldFocus, trackFieldBlur, trackFormSubmit } = useFormTracking('kontaktformular');
 
-  const dailyBase = useMemo(() => 71 + (new Date().getDate() % 8), []);
+  /* Die Tagesformel darf NICHT beim Rendern laufen.
+
+     Bis 23.08.2026 stand hier `useMemo(() => 71 + (new Date().getDate() % 8))`.
+     useMemo laeuft WAEHREND des Renderns — auf dem Server wie im Browser. Die
+     Startseite wird statisch vorgerendert, ihr HTML traegt also den Tag des
+     letzten Deploys, waehrend der Browser mit heute rechnet. Ab dem Tag danach
+     standen an derselben Stelle zwei verschiedene Zahlen.
+
+     Die Folge war kein Schoenheitsfehler: React meldete #425 („Text content
+     does not match server-rendered HTML"), daraus wurden #418 und #423 — und
+     #423 heisst „the entire root will switch to client rendering". React warf
+     bei JEDEM Aufruf die fertig gelieferte Seite weg und baute sie im Browser
+     neu auf. Auf Prod in Safari UND Chrome nachgewiesen.
+
+     Beim Drift weiter unten war die Falle bekannt („ERST NACH MOUNT"), bei der
+     Basis darunter nicht. Also derselbe Weg: im Render ein fester Wert, den
+     Server und Browser gleich berechnen, das echte Datum erst im Effekt. Der
+     Nachzug faellt nicht auf — der Zaehler bewegt sich ohnehin von selbst. */
+  const TAGESBASIS_SSR = 75;   // Mitte von 71..78
+  const [dailyBase, setDailyBase] = useState(TAGESBASIS_SSR);
+  useEffect(() => {
+    setDailyBase(71 + (new Date().getDate() % 8));
+  }, []);
 
   function getMatchingCount(): number {
     let count = dailyBase;
@@ -238,7 +260,7 @@ export function MultiStepForm({ mode = 'inline' }: MultiStepFormProps = {}) {
     };
     rafId = requestAnimationFrame(frame);
     return () => cancelAnimationFrame(rafId);
-  }, [currentStep, drift, state.patientCount, state.householdOthers, state.pflegegrad, state.mobility, state.nightCare, state.germanLevel, state.driving, state.gender]);
+  }, [dailyBase, currentStep, drift, state.patientCount, state.householdOthers, state.pflegegrad, state.mobility, state.nightCare, state.germanLevel, state.driving, state.gender]);
   const [formData, setFormData] = useState({
     name: '',
     email: '',
