@@ -292,13 +292,34 @@ export function MultiStepForm({ mode = 'inline' }: MultiStepFormProps = {}) {
   // nowhere. A per-instance ref always targets the visible form.
   const formRef = useRef<HTMLDivElement>(null);
 
+  /* „Gesehen" heisst: der Schritt war wirklich auf dem Schirm.
+
+     Bis 23.08.2026 feuerte step_view beim MOUNTEN der Komponente. Das war
+     richtig, solange der Fragebogen inline auf der Seite stand (CRO 15.08.:
+     „Wizard wirklich gesehen" messbar machen, auch wenn die Antwort-Buttons
+     unter der Falz liegen). Seit dem 16.08. steckt er im CTA-Modus hinter
+     einem Knopf — die Komponente mountet trotzdem bei JEDEM Seitenaufruf,
+     auch wenn das Fenster nie aufgeht.
+
+     Damit mass „Wizard gestartet" in Wahrheit „Seite geladen" (mal
+     Cookie-Zustimmung), und der Trichter zeigte bei Schritt 1 einen Abbruch
+     von 69,9 % — 156 gesehen, 47 abgeschlossen. Dieser Absprung existiert
+     nicht: es sind die Leute, die den Wizard nie geoeffnet haben. Wer ihn
+     oeffnet, geht 47 → 47 → 44 durch. An diesem Phantom laesst sich endlos
+     optimieren, ohne dass sich etwas bewegt.
+
+     Im CTA-Modus zaehlt deshalb erst das offene Fenster. Inline bleibt es
+     beim Mounten — dort ist der Schritt ja tatsaechlich zu sehen. */
+  const wizardSichtbar = mode !== 'cta' || fullscreen;
+
   useEffect(() => {
+    if (!wizardSichtbar) return;
     analytics.trackEvent('wizard', 'step_view', {
       step: currentStep,
       step_name: getStepId(currentStep),
     });
     stepStartRef.current = Date.now();
-  }, [currentStep]);
+  }, [currentStep, wizardSichtbar]);
 
   // CRO 15.08.: Das Cookie-Banner lädt die Seite nicht mehr neu. Der
   // step_view des aktuellen Steps ist vor der Einwilligung am Consent-Gate
@@ -307,7 +328,7 @@ export function MultiStepForm({ mode = 'inline' }: MultiStepFormProps = {}) {
   const consentReplayedRef = useRef(false);
   useEffect(() => {
     const unsubscribe = cookieConsent.subscribe((consent) => {
-      if (consent.analytics && !consentReplayedRef.current) {
+      if (consent.analytics && !consentReplayedRef.current && wizardSichtbar) {
         consentReplayedRef.current = true;
         analytics.trackEvent('wizard', 'step_view', {
           step: currentStep,
@@ -319,7 +340,7 @@ export function MultiStepForm({ mode = 'inline' }: MultiStepFormProps = {}) {
     return unsubscribe;
     // currentStep bewusst als Dep: der Replay soll den Step melden, der beim
     // Klick auf „Akzeptieren" wirklich sichtbar ist.
-  }, [currentStep]);
+  }, [currentStep, wizardSichtbar]);
 
   // CRO 15.08.: „Wizard wirklich gesehen" messbar machen. step_view feuert
   // beim Mounten — auch wenn die Antwort-Buttons unter der Falz liegen
