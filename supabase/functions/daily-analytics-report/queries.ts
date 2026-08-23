@@ -43,6 +43,9 @@ export interface DailyStats {
   sourceReferral: number;
   // Funnel: Anzahl unique sessions, die step N gesehen haben (1..10)
   funnelStepViewed: Record<number, number>;
+  /** Sessions je CTA, die den Wizard geöffnet haben (wizard_opened.source).
+   *  Die Kennung wurde seit dem 18.08. aufgezeichnet, aber nirgends gezeigt. */
+  wizardOpenedBySource: Record<string, number>;
 }
 
 /**
@@ -135,8 +138,20 @@ export async function fetchDailyStats(
   const startedSessions = new Set<string>();
   const funnelStepViewed: Record<number, number> = {};
   const stepViewSessions: Record<number, Set<string>> = {};
+  /* Welcher CTA den Wizard geöffnet hat. Sieben Knöpfe auf der Rechner-Seite
+     (hero_cta, ablauf, voraussetzungen, leistungen, vergleich, final_cta,
+     hilfe_dialog) plus der Direkteinstieg vom Apex per ?start=1&src=apex-*.
+     Gezählt werden SESSIONS, nicht Klicks: wer zweimal öffnet, ist ein
+     Interessent, nicht zwei. */
+  const openedSessions: Record<string, Set<string>> = {};
   for (const e of events ?? []) {
     const ev = e as any;
+    if (ev.event_name === "wizard_opened") {
+      const quelle = typeof ev.event_data?.source === "string" && ev.event_data.source
+        ? String(ev.event_data.source).slice(0, 40)
+        : "unbekannt";
+      (openedSessions[quelle] ??= new Set()).add(ev.session_id);
+    }
     if (ev.event_name === "step_view") {
       startedSessions.add(ev.session_id);
       const step: unknown = ev.event_data?.step;
@@ -152,6 +167,10 @@ export async function fetchDailyStats(
     funnelStepViewed[n] = stepViewSessions[n]?.size ?? 0;
   }
   const wizardStarted = startedSessions.size;
+  const wizardOpenedBySource: Record<string, number> = {};
+  for (const [quelle, sessions] of Object.entries(openedSessions)) {
+    wizardOpenedBySource[quelle] = sessions.size;
+  }
 
   // 3) Wizard abgeschlossen = Leads angelegt im Zeitraum.
   // Test-Leads (m.kepinski+test*@mamamia.app, *example.com, etc.)
@@ -204,6 +223,7 @@ export async function fetchDailyStats(
     sourceDirect,
     sourceReferral,
     funnelStepViewed,
+    wizardOpenedBySource,
   };
 }
 
