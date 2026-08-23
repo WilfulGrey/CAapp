@@ -188,6 +188,47 @@ export function buildReportEmail(opts: {
   // nicht existierenden Step+1 — das ist genau der Übergang, der vorher
   // unsichtbar war ("15 Kontaktformular-Views → 2 echte Leads" sah aus
   // wie ein Bug, ist aber der entscheidende letzte Drop im Funnel).
+  /* CTA-Herkunft: welcher Knopf den Wizard geöffnet hat.
+
+     Die Kennung steckt seit dem 18.08. in wizard_opened.source — aufgezeichnet,
+     aber nie gezeigt. Sieben CTAs liegen auf der Rechner-Seite, drei Einstiege
+     kommen vom Apex (?start=1&src=apex-*). Getrennt ausgewiesen, weil sich
+     sonst Website-Verkehr und Direkteinstieg in einer Zahl vermischen.
+
+     Klartext statt Schlüssel: „voraussetzungen" sagt im Report wenig. */
+  const CTA_NAMEN: Record<string, string> = {
+    hero_cta: "Hero-Button (oben)",
+    ablauf: "Abschnitt „So läuft es“",
+    voraussetzungen: "Abschnitt „Voraussetzungen“",
+    leistungen: "Abschnitt „Leistungen“",
+    vergleich: "Abschnitt „Vergleich“",
+    final_cta: "Abschluss-CTA (unten)",
+    hilfe_dialog: "Hilfe-Dialog",
+    "apex-startseite": "primundus.de — Startseite",
+    "apex-components": "primundus.de — Bausteine",
+    "apex-usp": "primundus.de — USP-Block",
+    extern: "Direkteinstieg (ohne Kennung)",
+    unbekannt: "ohne Kennung",
+  };
+  const ctaEintraege = Object.entries(yesterday.wizardOpenedBySource ?? {})
+    .sort((a, b) => b[1] - a[1]);
+  const ctaGesamt = ctaEintraege.reduce((s, [, n]) => s + n, 0);
+  const vomApex = ctaEintraege
+    .filter(([q]) => q.startsWith("apex-"))
+    .reduce((s, [, n]) => s + n, 0);
+  const ctaHtml = ctaEintraege.map(([quelle, anzahl], idx) => `
+    <tr style="background:${idx % 2 ? "#fdfbf7" : "#fff"};">
+      <td style="padding:7px 12px;font-size:12px;color:#3D2B1F;border-bottom:1px solid #f0e8dc;">
+        ${CTA_NAMEN[quelle] ?? quelle}
+      </td>
+      <td align="right" style="padding:7px 12px;font-size:12px;font-weight:700;color:#3D2B1F;border-bottom:1px solid #f0e8dc;">
+        ${anzahl}
+      </td>
+      <td align="right" style="padding:7px 12px;font-size:11px;color:#9a8a73;border-bottom:1px solid #f0e8dc;">
+        ${ctaGesamt ? Math.round((anzahl / ctaGesamt) * 100) : 0}&thinsp;%
+      </td>
+    </tr>`).join("");
+
   const funnelHtml = Array.from({ length: TOTAL_STEPS }, (_, i) => i + 1).map((step) => {
     const viewed = yesterday.funnelStepViewed[step] ?? 0;
     const isLastStep = step === TOTAL_STEPS;
@@ -310,6 +351,17 @@ ${mailAlarmHtml}
           Die letzten zwei Zeilen zählen tatsächlich gespeicherte Leads in der DB (Quelle: <code>leads.created_at</code>).
           Der Sprung &bdquo;Step 9 → echte Leads&ldquo; ist der eigentliche letzte Drop — wer das Kontaktformular sieht, aber nicht abschickt, fällt hier raus.
         </p>
+
+        ${ctaEintraege.length ? `
+        <p style="margin:24px 0 8px;font-size:14px;font-weight:700;color:#3D2B1F;">Welcher CTA öffnet den Wizard? (Gestern)</p>
+        <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="border:1px solid #e8ddd0;border-radius:8px;overflow:hidden;background:#fff;">
+          <tbody>${ctaHtml}</tbody>
+        </table>
+        <p style="margin:6px 0 0;font-size:11px;color:#9a8a73;line-height:1.5;">
+          Unique Sessions je Knopf (Quelle: <code>analytics_events.wizard_opened.source</code>).
+          Davon vom Apex: <strong>${vomApex}</strong> von ${ctaGesamt} — der Rest sind CTAs auf der Rechner-Seite selbst.
+          Wer zweimal öffnet, zählt einmal.
+        </p>` : ""}
 
         <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="margin-top:24px;">
           <tr>
