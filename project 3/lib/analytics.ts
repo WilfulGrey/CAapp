@@ -1,10 +1,45 @@
-import { createClient } from '@supabase/supabase-js';
 import { cookieConsent } from './cookie-consent';
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
-
-const supabase = createClient(supabaseUrl, supabaseAnonKey);
+/*
+ * Geschrieben wird ueber die EIGENE Domain, nicht direkt nach Supabase.
+ *
+ * Bis 23.08.2026 lief jeder dieser neun Schreibzugriffe als Anfrage an eine
+ * fremde Herkunft (…supabase.co). Bei Safari-Nutzern kam davon nichts an:
+ *
+ *   Fetch API cannot load https://<ref>.supabase.co/rest/v1/analytics_sessions
+ *   ?select=id due to access control checks.
+ *
+ * Vor Supabase haengt Cloudflare und setzt zur Bot-Erkennung einen Cookie
+ * auf supabase.co; Safari blockiert Cross-Site-Cookies, Cloudflare weist ab,
+ * und die Absage traegt keine CORS-Kopfzeilen. Der Server ist in Ordnung —
+ * die OPTIONS-Vorabfrage antwortet mit 200 und `allow-origin: *`, und in
+ * Chrome tritt der Fehler nicht auf. Es lag ausschliesslich am Weg.
+ *
+ * Folge war ein Totalausfall fuer alle iPhones, iPads und Safari-Macs:
+ * schon die Session entstand nicht, damit blieb `sessionDbId` leer, und
+ * jedes Event landete in einer Warteschlange, die nie geleert wurde.
+ *
+ * Ueber /api/analytics/collect ist es dieselbe Herkunft — kein CORS, kein
+ * fremder Cookie, keine Bot-Pruefung dazwischen. Nebenbei verschwindet
+ * damit der zweite Supabase-Client im Browser („Multiple GoTrueClient
+ * instances detected"), denn dieses Modul braucht gar keinen mehr.
+ */
+async function senden(nutzlast: Record<string, unknown>): Promise<any | null> {
+  try {
+    const res = await fetch('/api/analytics/collect', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(nutzlast),
+      // Ueberlebt eine Navigation, die mitten im Senden passiert.
+      keepalive: true,
+    });
+    if (!res.ok) return null;
+    return await res.json().catch(() => null);
+  } catch {
+    // Messung darf nie etwas kaputtmachen.
+    return null;
+  }
+}
 
 interface SessionData {
   sessionId: string;
@@ -71,8 +106,19 @@ class Analytics {
     if (typeof window === 'undefined') return;
 
     this.sessionId = this.getOrCreateSessionId();
-    this.fingerprint = await this.generateFingerprint();
     this.rememberAdParams();
+
+    /* Der Fingerprint stand bis 23.08. VOR dem ersten Datenbank-Aufruf —
+       ohne try/catch und mit `await`. Ein Beiwerk konnte damit die gesamte
+       Messung aufhalten: wirft oder haengt `crypto.subtle`, kommt es nie
+       zur Session und danach zu gar nichts mehr. Jetzt ist er abgesichert
+       und darf ausfallen, ohne den Rest mitzunehmen. */
+    try {
+      this.fingerprint = await this.generateFingerprint();
+    } catch (error) {
+      console.warn('[Analytics] Fingerprint übersprungen:', error);
+      this.fingerprint = 'unavailable';
+    }
 
     const sessionData = this.collectSessionData();
     await this.createOrUpdateSession(sessionData);
@@ -194,47 +240,15 @@ class Analytics {
   }
 
   private async createOrUpdateSession(data: SessionData) {
-    try {
-      const { data: existingSession } = await supabase
-        .from('analytics_sessions')
-        .select('id')
-        .eq('session_id', data.sessionId)
-        .maybeSingle();
-
-      if (existingSession) {
-        this.sessionDbId = existingSession.id;
-        await supabase
-          .from('analytics_sessions')
-          .update({ last_activity: new Date().toISOString() })
-          .eq('id', existingSession.id);
-      } else {
-        const { data: newSession } = await supabase
-          .from('analytics_sessions')
-          .insert({
-            session_id: data.sessionId,
-            fingerprint: data.fingerprint,
-            user_agent: data.userAgent,
-            referrer: data.referrer,
-            landing_page: data.landingPage,
-            utm_source: data.utmSource,
-            utm_medium: data.utmMedium,
-            utm_campaign: data.utmCampaign,
-            device_type: data.deviceType,
-            browser: data.browser,
-            os: data.os,
-          })
-          .select('id')
-          .single();
-
-        if (newSession) {
-          this.sessionDbId = newSession.id;
-        }
-      }
-      // Session id is ready — replay anything queued before now.
-      if (this.sessionDbId) this.flushPendingEvents();
-    } catch (error) {
-      console.error('Analytics session error:', error);
+    // Anlegen und Auffrischen entscheidet jetzt der Server (siehe `senden`);
+    // zurueck kommt die Zeilen-Id, an der alles Weitere haengt.
+    const antwort = await senden({ kind: 'session', data });
+    this.sessionDbId = antwort?.id ?? null;
+    if (!this.sessionDbId) {
+      console.warn('[Analytics] Keine Session-Id erhalten — Events werden gepuffert.');
     }
+    // Id steht — nachholen, was vorher in die Warteschlange ging.
+    if (this.sessionDbId) this.flushPendingEvents();
   }
 
   private setupPageViewTracking() {
@@ -265,35 +279,24 @@ class Analytics {
       ? Math.round((Date.now() - this.pageViewStartTime) / 1000)
       : 0;
 
-    if (this.lastPageView && timeOnPreviousPage > 0) {
-      await supabase
-        .from('analytics_page_views')
-        .update({ time_on_page: timeOnPreviousPage })
-        .eq('session_id', this.sessionDbId)
-        .eq('page_path', this.lastPageView)
-        .order('created_at', { ascending: false })
-        .limit(1);
-    }
-
     const currentPath = pagePath || window.location.pathname;
     const currentTitle = pageTitle || document.title;
 
-    try {
-      await supabase.from('analytics_page_views').insert({
-        session_id: this.sessionDbId,
-        page_path: currentPath,
-        page_title: currentTitle,
-        referrer_path: this.lastPageView,
-        viewed_at: new Date().toISOString(),
-      });
+    // Ein Aufruf statt zwei: die Verweildauer der vorherigen Seite traegt
+    // der Server nach, bevor er die neue anlegt.
+    await senden({
+      kind: 'page_view',
+      sessionId: this.sessionDbId,
+      pagePath: currentPath,
+      pageTitle: currentTitle,
+      previousPath: this.lastPageView,
+      timeOnPrevious: timeOnPreviousPage,
+    });
 
-      this.lastPageView = currentPath;
-      this.pageViewStartTime = Date.now();
-      // Neue Seite -> Scroll-Schwellen neu zaehlen (SPA-Navigation).
-      this.scrollDepthsFired.clear();
-    } catch (error) {
-      console.error('Analytics page view error:', error);
-    }
+    this.lastPageView = currentPath;
+    this.pageViewStartTime = Date.now();
+    // Neue Seite -> Scroll-Schwellen neu zaehlen (SPA-Navigation).
+    this.scrollDepthsFired.clear();
   }
 
   async trackEvent(eventType: string, eventName: string, eventData?: any) {
@@ -309,17 +312,14 @@ class Analytics {
       return;
     }
 
-    try {
-      await supabase.from('analytics_events').insert({
-        session_id: this.sessionDbId,
-        event_type: eventType,
-        event_name: eventName,
-        event_data: eventData || {},
-        page_path: window.location.pathname,
-      });
-    } catch (error) {
-      console.error('Analytics event error:', error);
-    }
+    await senden({
+      kind: 'event',
+      sessionId: this.sessionDbId,
+      eventType,
+      eventName,
+      eventData: eventData || {},
+      pagePath: window.location.pathname,
+    });
   }
 
   async trackFormInteraction(
@@ -348,13 +348,14 @@ class Analytics {
     }
 
     try {
-      await supabase.from('analytics_form_interactions').insert({
-        session_id: this.sessionDbId,
-        form_name: formName,
-        field_name: fieldName,
-        interaction_type: interactionType,
-        field_value: fieldValue,
-        time_spent: timeSpent,
+      await senden({
+        kind: 'form_interaction',
+        sessionId: this.sessionDbId,
+        formName,
+        fieldName,
+        interactionType,
+        fieldValue,
+        timeSpent,
       });
     } catch (error) {
       console.error('Analytics form interaction error:', error);
@@ -385,18 +386,19 @@ class Analytics {
         sessionDbId: this.sessionDbId
       });
 
-      const { data, error } = await supabase.from('analytics_conversions').insert({
-        session_id: this.sessionDbId,
-        lead_id: leadId,
-        conversion_type: conversionType,
-        conversion_value: conversionValue,
-        form_data: formData || {},
+      const antwort = await senden({
+        kind: 'conversion',
+        sessionId: this.sessionDbId,
+        leadId,
+        conversionType,
+        conversionValue,
+        formData: formData || {},
       });
 
-      if (error) {
-        console.error('[Analytics] Conversion tracking error:', error);
-      } else {
+      if (antwort?.ok) {
         console.log('[Analytics] Conversion tracked successfully');
+      } else {
+        console.error('[Analytics] Conversion tracking error');
       }
     } catch (error) {
       console.error('[Analytics] Conversion error:', error);
@@ -491,13 +493,7 @@ class Analytics {
     if (!this.sessionDbId) return;
     const params = this.collectAdParamsFromUrl();
     if (Object.keys(params).length === 0) return;
-    const { error } = await supabase
-      .from('analytics_sessions')
-      .update(params)
-      .eq('id', this.sessionDbId);
-    if (error) {
-      console.error('Analytics ad-param update error:', error.message);
-    }
+    await senden({ kind: 'ad_params', sessionId: this.sessionDbId, params });
   }
 
   // Für den Lead-Submit: alles, was wir in dieser Session an Ad-Parametern
