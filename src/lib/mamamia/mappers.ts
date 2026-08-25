@@ -678,9 +678,36 @@ export function pickFinalConfirmedJob(
   sessionJobOfferId: number | null | undefined,
 ): MamamiaCustomerJobOffer | null {
   if (!Array.isArray(jobs)) return null;
-  const confirmed = jobs.filter(
-    (j) => typeof j?.final_confirmation?.caregiver?.id === 'number',
-  );
+  /* IDs ueber die GraphQL-Grenze nie per JS-Typ pruefen (Fall Cisar,
+     25.08.2026). Hier stand `typeof … === 'number'` und die Job-Zuordnung
+     unten ein striktes `===`. Liefert mamamia eine ID als Zeichenkette,
+     fiel beides lautlos durch — und der Kunde sah fuer einen laengst
+     besetzten Einsatz weiter „waehlen Sie eine Pflegekraft".
+     Besonders tueckisch: die Einsatz-UEBERSICHT zeigte denselben Job
+     korrekt als „Gebucht · Celina M.", weil sie ueber
+     `deriveLeadJobStatus` nur `final_confirmation?.id` prueft und den
+     Namen aus `final_confirmation.caregiver` liest. Zwei Ansichten,
+     dieselbe Quelle, verschiedene Urteile. */
+  const zahl = (v: unknown): number | null => {
+    const n = typeof v === 'string' ? Number(v) : v;
+    return typeof n === 'number' && Number.isFinite(n) ? n : null;
+  };
+  /* Erkannt wird eine Bestaetigung, deren Kraft IDENTIFIZIERBAR ist —
+     ueber die ID oder wenigstens den Namen. Die Uebersicht kommt mit dem
+     Namen allein aus (`caregiverName` liest first_name/last_name); fehlt
+     die ID, sagte die Uebersicht „Gebucht · Celina M." und die Detail-
+     ansicht null. Fuer den Gebucht-Bildschirm genuegt der Name: das Profil
+     wird ohnehin nachgeladen, und der Platzhalter-Name ist vorgesehen.
+     Eine Bestaetigung GANZ ohne Kraft zaehlt weiterhin nicht — kein
+     halber Gebucht-Zustand. */
+  const kraft = (j: MamamiaCustomerJobOffer | null | undefined) => {
+    const c = j?.final_confirmation?.caregiver;
+    if (!c) return false;
+    if (zahl((c as { id?: unknown }).id) !== null) return true;
+    const name = `${c.first_name ?? ''} ${c.last_name ?? ''}`.trim();
+    return name.length > 0;
+  };
+  const confirmed = jobs.filter(kraft);
   if (confirmed.length === 0) return null;
   // Multi-Job (Opcja B, Dachs 8899): STRENG auf den Session-Job scoped —
   // die Bestätigung eines ANDEREN (alten) Jobs darf den aktiven Job nicht
@@ -688,7 +715,8 @@ export function pickFinalConfirmedJob(
   // Fallback auf confirmed[0] NUR wenn die Session keinen Job kennt
   // (alte Session-JWTs / Proxy-Übergangsversion — fail-soft wie bisher).
   if (sessionJobOfferId != null) {
-    return confirmed.find((j) => j.id === sessionJobOfferId) ?? null;
+    const ziel = zahl(sessionJobOfferId);
+    return confirmed.find((j) => zahl(j.id) === ziel) ?? null;
   }
   return confirmed[0];
 }
@@ -711,12 +739,26 @@ export function synthesizeAcceptedApplicationFromFinalConfirmation(
 ): UIApplication | null {
   const fc = job.final_confirmation;
   const cg = fc?.caregiver;
-  if (!fc || typeof cg?.id !== 'number') return null;
+  if (!fc || !cg) return null;
   const fallbackName = `${cg.first_name ?? ''} ${cg.last_name ?? ''}`.trim();
+  /* Dieselbe Lockerung wie in pickFinalConfirmedJob (Fall Cisar, 25.08.):
+     hier stand `typeof cg?.id !== 'number'`. Eine als Zeichenkette
+     gelieferte ID — oder eine Bestaetigung, die nur Namen fuehrt — liess
+     den Aufbau scheitern, und der Gebucht-Bildschirm blieb aus, obwohl die
+     Erkennung eine Stufe darueber schon durch war.
+     `caregiverId` ist nachgelagert ohnehin optional; ohne ID wird das
+     Profil nicht nachgeladen und der Name aus der Bestaetigung angezeigt
+     (dafuer ist `fallbackName` da). */
+  const kraftId = (() => {
+    const v = (cg as { id?: unknown }).id;
+    const n = typeof v === 'string' ? Number(v) : v;
+    return typeof n === 'number' && Number.isFinite(n) ? n : null;
+  })();
+  if (kraftId === null && !fallbackName) return null;
   const base = synthesizeAcceptedApplicationFromSnapshot(
     {
       application_id: fc.id,
-      caregiver_id: cg.id,
+      caregiver_id: kraftId,
       accepted_at: fc.final_confirmed_at ?? '',
       contract_snapshot: null,
     },
