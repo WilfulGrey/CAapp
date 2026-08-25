@@ -795,6 +795,18 @@ export function synthesizeAcceptedApplicationFromFinalConfirmation(
  *  Pfad 3 nicht (keine Doppel-Synthese). Synthetische Apps werden jeden Lauf
  *  verworfen + frisch abgeleitet, damit die Platzhalter-Karte aufs volle
  *  Profil upgradet, sobald getCaregiver lädt. */
+/** ID aus einer GraphQL-Antwort in eine Zahl ueberfuehren.
+ *  Fall Cisar (25.08.2026): An DREI Stellen wurde per `typeof === 'number'`
+ *  geprueft. Zwei davon waren am 25.08. schon entschaerft, die dritte hier
+ *  in applyAcceptedOverlay nicht — und genau sie entschied darueber, ob die
+ *  Annahme ueberhaupt gebaut wird. Die Diagnose-Leiste zeigte
+ *  `confirmedJob=33981` (erkannt!) und `acceptedApp=null` (nicht gebaut).
+ *  Deshalb jetzt EIN Helfer fuer alle Vergleiche. */
+export function idAlsZahl(v: unknown): number | null {
+  const n = typeof v === 'string' ? Number(v) : v;
+  return typeof n === 'number' && Number.isFinite(n) ? n : null;
+}
+
 export function applyAcceptedOverlay(
   prev: UIApplication[],
   args: {
@@ -838,7 +850,8 @@ export function applyAcceptedOverlay(
     const additions: UIApplication[] = [];
     for (const row of acceptances?.rows ?? []) {
       if (presentIds.has(row.application_id)) continue;
-      if (typeof fcCaregiverId !== 'number' || fcCaregiverId !== row.caregiver_id) continue;
+      const fcId = idAlsZahl(fcCaregiverId);
+      if (fcId === null || fcId !== idAlsZahl(row.caregiver_id)) continue;
       const profile = row.caregiver_id === firstAcceptedCaregiverId ? caregiverProfile : null;
       additions.push({
         ...synthesizeAcceptedApplicationFromSnapshot(row, profile ?? null, opts),
@@ -849,16 +862,19 @@ export function applyAcceptedOverlay(
   }
 
   // ── Pfad 3: Mamamia-final_confirmation ohne Portal-Annahme ──
-  const cgId = confirmedJob?.final_confirmation?.caregiver?.id;
-  if (!confirmedJob || typeof cgId !== 'number') return base;
+  const cgId = idAlsZahl(confirmedJob?.final_confirmation?.caregiver?.id);
+  const cgName = `${confirmedJob?.final_confirmation?.caregiver?.first_name ?? ''} `
+    + `${confirmedJob?.final_confirmation?.caregiver?.last_name ?? ''}`;
+  // Wie in pickFinalConfirmedJob: identifizierbar ueber ID ODER Namen.
+  if (!confirmedJob || (cgId === null && !cgName.trim())) return base;
   // Schon eine accepted-App da (z. B. optimistisches Update nach Annahme im
   // Portal, bevor der Acceptance-Refetch durch ist) → keine Doppel-Synthese.
   if (base.some((a) => a.status === 'accepted')) return base;
   // Liefert Mamamia die Bewerbung derselben Pflegekraft (noch) in
   // listApplications, patchen wir sie statt eine Doppel-Karte zu bauen.
-  if (base.some((a) => a.nurse.caregiverId === cgId)) {
+  if (cgId !== null && base.some((a) => idAlsZahl(a.nurse.caregiverId) === cgId)) {
     return base.map((a) =>
-      a.nurse.caregiverId === cgId ? { ...a, status: 'accepted' as const } : a,
+      idAlsZahl(a.nurse.caregiverId) === cgId ? { ...a, status: 'accepted' as const } : a,
     );
   }
   const profile = cgId === firstAcceptedCaregiverId ? caregiverProfile : null;
