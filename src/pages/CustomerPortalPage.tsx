@@ -141,6 +141,13 @@ const TOKEN_PARAM =
   typeof window !== 'undefined'
     ? new URLSearchParams(window.location.search).get('token')
     : null;
+// Diagnose-Leiste auch auf Prod einschaltbar (?debug=1) — siehe Kommentar
+// an der Leiste selbst. Bewusst ein URL-Parameter und keine Bauzeit-
+// Variable: gebraucht wird sie genau dort, wo nicht gebaut wird.
+const DEBUG_PARAM =
+  typeof window !== 'undefined'
+    ? new URLSearchParams(window.location.search).get('debug') === '1'
+    : false;
 // Sprungziel aus Mail-CTAs (z. B. goto=bewerbungen aus der Bewerbungs-Mail):
 // nach dem Laden der Mamamia-Daten scrollt das Portal zur Ziel-Sektion,
 // statt den Kunden oben auf der Startansicht abzusetzen.
@@ -4166,7 +4173,17 @@ const CustomerPortalPage: FC = () => {
     </div>
     </div>
 
-    {import.meta.env.VITE_DEBUG === '1' && (
+    {/* Diagnose-Leiste.
+        Bis 25.08.2026 hing sie an VITE_DEBUG — einer BAUZEIT-Variablen, die
+        auf Prod nie gesetzt ist. Genau dort braucht man sie aber: Im Fall
+        Cisar zeigte die Einsatzuebersicht „Gebucht · Celina M.", die
+        Detailansicht desselben Einsatzes das normale Matching. Ohne Blick
+        auf den Stand, den das Portal WIRKLICH sieht, blieb nur Raten — und
+        der Umweg ueber den Netzwerk-Tab war fuer den Alltag zu fummelig.
+        Jetzt zusaetzlich per `?debug=1` einschaltbar, samt der Kette, die
+        ueber „gebucht" entscheidet. Zeigt ausschliesslich Daten DIESES
+        token-geschuetzten Kunden, keine fremden. */}
+    {(import.meta.env.VITE_DEBUG === '1' || DEBUG_PARAM) && (
       <div className="fixed bottom-0 inset-x-0 bg-black/85 text-white text-[11px] font-mono px-3 py-2 z-[100] overflow-x-auto whitespace-nowrap">
         <span className="text-emerald-400">Mamamia</span>
         {' '}ready={String(mmReady)}
@@ -4181,6 +4198,22 @@ const CustomerPortalPage: FC = () => {
             {' · '}arrival={jobOfferArrivalDisplay(mmJobOffer) ?? '…'}
           </>
         )}
+        {/* Die Gebucht-Kette, Glied fuer Glied — hier bricht sie sichtbar. */}
+        <span className="text-amber-300">
+          {' · jobs='}{mmCustomer?.job_offers?.length ?? '—'}
+          {' · fc='}
+          {(mmCustomer?.job_offers ?? [])
+            .map((j) => {
+              const fc = j?.final_confirmation as
+                { caregiver?: { id?: unknown; first_name?: string } | null } | null | undefined;
+              if (!fc) return `${j?.id ?? '?'}:null`;
+              return `${j?.id ?? '?'}:${fc.caregiver?.first_name ?? 'ohneKraft'}#${
+                fc.caregiver?.id ?? '-'}`;
+            })
+            .join(',') || '—'}
+          {' · confirmedJob='}{mamamiaConfirmedJob?.id ?? 'null'}
+          {' · acceptedApp='}{acceptedApp ? acceptedApp.status : 'null'}
+        </span>
       </div>
     )}
     {debugOverlay}
