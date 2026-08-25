@@ -4207,8 +4207,13 @@ const CustomerPortalPage: FC = () => {
               const fc = j?.final_confirmation as
                 { caregiver?: { id?: unknown; first_name?: string } | null } | null | undefined;
               if (!fc) return `${j?.id ?? '?'}:null`;
-              return `${j?.id ?? '?'}:${fc.caregiver?.first_name ?? 'ohneKraft'}#${
-                fc.caregiver?.id ?? '-'}`;
+              /* Typ mit ausgeben: `#38202` und `#"38202"` sehen sonst gleich
+                 aus, entscheiden aber ueber jeden ID-Vergleich (Fall Cisar). */
+              const cid = fc.caregiver?.id;
+              const gezeigt = cid === undefined || cid === null
+                ? '-'
+                : (typeof cid === 'string' ? `"${cid}"` : String(cid));
+              return `${j?.id ?? '?'}:${fc.caregiver?.first_name ?? 'ohneKraft'}#${gezeigt}`;
             })
             .join(',') || '—'}
           {' · confirmedJob='}{mamamiaConfirmedJob?.id ?? 'null'}
