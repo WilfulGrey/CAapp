@@ -852,13 +852,24 @@ export function applyAcceptedOverlay(
       if (presentIds.has(row.application_id)) continue;
       const fcId = idAlsZahl(fcCaregiverId);
       if (fcId === null || fcId !== idAlsZahl(row.caregiver_id)) continue;
-      const profile = row.caregiver_id === firstAcceptedCaregiverId ? caregiverProfile : null;
+      const profile = idAlsZahl(row.caregiver_id) === idAlsZahl(firstAcceptedCaregiverId)
+        ? caregiverProfile
+        : null;
       additions.push({
         ...synthesizeAcceptedApplicationFromSnapshot(row, profile ?? null, opts),
         synthetic: true,
       });
     }
-    return [...patched, ...additions];
+    // NUR zurueckkehren, wenn der Portal-Pfad fuer DIESEN Einsatz auch
+    // wirklich etwas ergeben hat. Sonst gehoert die Annahme zu einem
+    // ANDEREN Einsatz des Leads (Rows sind lead-weit, das Gatter oben hat
+    // sie zu Recht abgewiesen) — dann muss Pfad 3 unten noch laufen, sonst
+    // bleibt eine agentur-seitige Annahme auf dem aktuellen Einsatz
+    // unsichtbar. Fall Cisar, 25.08.2026: Felicja/Juli-Einsatz blockierte
+    // Celina/September-Einsatz, acceptedApp blieb null.
+    const traegtDiesenEinsatz = additions.length > 0
+      || patched.some((a) => a.status === 'accepted');
+    if (traegtDiesenEinsatz) return [...patched, ...additions];
   }
 
   // ── Pfad 3: Mamamia-final_confirmation ohne Portal-Annahme ──
@@ -877,7 +888,7 @@ export function applyAcceptedOverlay(
       idAlsZahl(a.nurse.caregiverId) === cgId ? { ...a, status: 'accepted' as const } : a,
     );
   }
-  const profile = cgId === firstAcceptedCaregiverId ? caregiverProfile : null;
+  const profile = cgId !== null && cgId === idAlsZahl(firstAcceptedCaregiverId) ? caregiverProfile : null;
   const synthetic = synthesizeAcceptedApplicationFromFinalConfirmation(confirmedJob, profile, opts);
   return synthetic ? [...base, { ...synthetic, synthetic: true }] : base;
 }

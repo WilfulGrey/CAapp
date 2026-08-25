@@ -111,3 +111,78 @@ describe('Cisar 33981 — die Annahme muss auch gebaut werden', () => {
     expect(r.some((a) => a.status === 'accepted')).toBe(true);
   });
 });
+
+// ── Mehrere Einsaetze: alte Annahme darf die neue nicht verdecken ────────
+// Fall Cisar, 25.08.2026. Der Lead hat drei Einsaetze. Im Juli nahm die
+// Kundin Felicja ueber das Portal an (acceptance-Row 4098). Im August nahm
+// die Agentur im SA-Portal Celina fuer den September-Einsatz an. Weil
+// acceptance-Rows LEAD-weit sind, betrat Felicjas Row den Portal-Zweig,
+// wurde vom Mehr-Einsatz-Gatter zu Recht abgewiesen — und der Zweig kehrte
+// zurueck, bevor Pfad 3 Celina bauen konnte. Ergebnis: acceptedApp = null.
+describe('applyAcceptedOverlay — Annahme aus einem anderen Einsatz', () => {
+  const celinaBestaetigt = {
+    id: 33981,
+    final_confirmation: {
+      caregiver: { id: 38202, first_name: 'Celina', last_name: 'M.' },
+    },
+  } as any;
+
+  const felicjaRow = {
+    application_id: 4098,
+    caregiver_id: 8678,
+    accepted_at: '2026-07-27T09:59:02.612207+00:00',
+    contract_snapshot: { datum: '27.07.2026', tagessatz: 'EUR 95,00' },
+  } as any;
+
+  const opts = { nowIso: '2026-08-25T18:00:00.000Z', nowYear: 2026 };
+
+  it('baut die Agentur-Annahme des aktiven Einsatzes trotz alter Row', () => {
+    const out = applyAcceptedOverlay([], {
+      acceptances: { application_ids: [4098], rows: [felicjaRow] },
+      confirmedJob: celinaBestaetigt,
+      caregiverProfile: null,
+      firstAcceptedCaregiverId: 38202,
+      opts,
+    });
+    const angenommen = out.filter((a) => a.status === 'accepted');
+    expect(angenommen).toHaveLength(1);
+    expect(angenommen[0].nurse.name).toContain('Celina');
+    // Felicja darf NICHT als zweite Karte auftauchen.
+    expect(out.some((a) => String(a.nurse.name).includes('Felicja'))).toBe(false);
+  });
+
+  it('laesst die Portal-Annahme gewinnen, wenn sie zum Einsatz gehoert', () => {
+    const felicjaBestaetigt = {
+      id: 32591,
+      final_confirmation: {
+        caregiver: { id: 8678, first_name: 'Felicja', last_name: 'K.' },
+      },
+    } as any;
+    const out = applyAcceptedOverlay([], {
+      acceptances: { application_ids: [4098], rows: [felicjaRow] },
+      confirmedJob: felicjaBestaetigt,
+      caregiverProfile: null,
+      firstAcceptedCaregiverId: 8678,
+      opts,
+    });
+    expect(out.filter((a) => a.status === 'accepted')).toHaveLength(1);
+    // Aus dem contract_snapshot gebaut, nicht aus der final_confirmation.
+    expect(out[0].synthetic).toBe(true);
+  });
+
+  it('erzeugt keine Doppelkarte, wenn beide Wege dieselbe Kraft meinen', () => {
+    const out = applyAcceptedOverlay([], {
+      acceptances: { application_ids: [4098], rows: [felicjaRow] },
+      confirmedJob: {
+        id: 32591,
+        final_confirmation: {
+          caregiver: { id: 8678, first_name: 'Felicja', last_name: 'K.' },
+        },
+      } as any,
+      caregiverProfile: null,
+      firstAcceptedCaregiverId: 8678,
+      opts,
+    });
+    expect(out.filter((a) => a.status === 'accepted')).toHaveLength(1);
+  });
+});
