@@ -168,3 +168,19 @@ im Ads-UI (Segment Conversion-Aktion) und Datenbasis für die spätere
 Umstellung auf wertbasiertes Bidding (nur mit expliziter Freigabe —
 secondary ändert am Bidding nichts). Leads vor der gclid-Erfassung
 (14.08.) zählen als `bookingWithoutClickId` und sind nie hochladbar.
+
+## Enhanced Conversions (seit 25.08.2026)
+
+Der `angebot_erfolgreich`-Push enthält zusätzlich `user_email`
+(Klartext im dataLayer, nur im Browser). Im GTM-Container überträgt die
+Variable „Nutzerdaten – E-Mail" (User-Provided Data, manuelle Konfiguration
+→ E-Mail = {{dlv - user_email}}) sie an den Google-Ads-Conversion-Tag
+(„Nutzerbereitgestellte Daten einbeziehen"). Google normalisiert und
+SHA256-hasht VOR dem Versand — Klartext verlässt den Browser nicht.
+Zweck: Conversions, deren Klick-Zuordnung an Browser-Schutz scheitert
+(ITP/Safari), werden über den E-Mail-Hash gematcht (~+5–10 % erfasste
+Conversions laut Google). Ads-seitig muss am Conversion-Ziel „DE – Angebot
+angefordert" der Schalter „Erweiterte Conversions" aktiv sein (UI-only,
+Methode: Google Tag Manager). DSGVO-Hinweis: Übertragung gehashter
+E-Mail an Google — sauber wird das erst mit Consent Mode v2
+(offenes Projekt, siehe SEA-Audit 20.08.).

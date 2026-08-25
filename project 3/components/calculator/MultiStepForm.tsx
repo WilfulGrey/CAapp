@@ -695,6 +695,10 @@ export function MultiStepForm({ mode = 'inline' }: MultiStepFormProps = {}) {
             pflegegrad: state.pflegegrad,
             care_start_timing: state.careStartTiming,
             conversion_value: kalkulation.bruttopreis,
+            // Enhanced Conversions (Martin 25.08.): GTM-Variable „Nutzerdaten"
+            // normalisiert + SHA256-hasht die E-Mail, bevor sie an Google geht —
+            // Klartext verlässt den Browser nicht (docs/google-ads-tracking.md).
+            user_email: formData.email,
             eventCallback: goToPortal,
             eventTimeout: 700,
           });
