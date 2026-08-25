@@ -725,11 +725,17 @@ const CustomerPortalPage: FC = () => {
   // Wenn Mamamia die akzeptierte Application aus listApplications entfernt
   // (kommt vor sobald die Bewerbung dort als abgeschlossen markiert wird),
   // brauchen wir die volle Pflegekraft-Daten getrennt zu laden, um eine
-  // synthetische Application zu rekonstruieren. Wir nehmen den ersten Row
-  // (in der Praxis gibt's pro Lead genau eine Annahme). Fallback: die per
-  // final_confirmation bestätigte Pflegekraft (agentur-seitige Annahme).
-  const firstAcceptedCaregiverId = acceptedApplications?.rows[0]?.caregiver_id
-    ?? mamamiaConfirmedJob?.final_confirmation?.caregiver?.id
+  // synthetische Application zu rekonstruieren.
+  //
+  // Die Kraft des AKTIVEN Einsatzes hat Vorrang: acceptance-Rows sind
+  // LEAD-weit, und bei mehreren Einsaetzen ist rows[0] womoeglich eine
+  // alte Buchung. Traegt der Session-Job eine final_confirmation, ist
+  // deren Pflegekraft per Definition die richtige (Fall Cisar,
+  // 25.08.2026: rows[0] war Felicja vom Juli-Einsatz, gebucht war aber
+  // Celina im September). Ohne Confirmation — etwa im ~10-s-Fenster
+  // direkt nach einer Portal-Annahme — bleibt rows[0] der Fallback.
+  const firstAcceptedCaregiverId = mamamiaConfirmedJob?.final_confirmation?.caregiver?.id
+    ?? acceptedApplications?.rows[0]?.caregiver_id
     ?? null;
   const { data: acceptedCaregiverProfile } = useCaregiver(firstAcceptedCaregiverId);
 
@@ -4217,6 +4223,16 @@ const CustomerPortalPage: FC = () => {
             })
             .join(',') || '—'}
           {' · confirmedJob='}{mamamiaConfirmedJob?.id ?? 'null'}
+          {/* Der Tuersteher vor Pfad 3: ist `acceptedApplications` null —
+              etwa weil listAcceptedApplications fehlschlaegt —, laeuft der
+              Overlay-Effekt gar nicht erst an, und die Agentur-Annahme wird
+              nie gebaut. Genau dieses Glied fehlte in der Leiste, als der
+              Fall Cisar untersucht wurde. */}
+          {' · accApps='}
+          {acceptedApplications
+            ? `${acceptedApplications.application_ids?.length ?? '?'}`
+            : 'NULL'}
+          {' · apps='}{applications.length}
           {' · acceptedApp='}{acceptedApp ? acceptedApp.status : 'null'}
         </span>
       </div>
