@@ -276,8 +276,6 @@
     '    /* Auf dem Handy liest sich alles eine Spur größer besser, und die Blasen\n'+
     '       dürfen breiter werden — 80 % von 375 px ist unnötig schmal. */\n'+
     '    .thread{padding:16px 14px 10px;gap:11px}\n'+
-    '    /* Hero-Ränder folgen dem Handy-Padding des Threads (volle Breite). */\n'+
-    '    .lphero{margin:-16px -14px auto}\n'+
     '    .bub{max-width:84%;font-size:15.5px}\n'+
     '    .bub small{font-size:12px}\n'+
     '    /* Chips dürfen dem Verlauf nicht den halben Schirm wegnehmen. */\n'+
@@ -331,72 +329,101 @@
     '     betrifft nur gleichrangige Selektoren. Öffnet sich die Tastatur,\n'+
     '     überschreiben die Inline-Styles aus handyLayout() das hier ohnehin. */\n'+
     '  .panel.voll{top:var(--pria-oben,0px);right:0;bottom:var(--pria-unten,0px);left:0;\n'+
-    '    width:auto;height:auto;max-height:none;margin:0 auto;max-width:none;\n'+
-    '    border-radius:0;border:0;box-shadow:none;transform-origin:bottom center}\n'+
-    '  @media(min-width:641px){\n'+
-    '    /* Breite Schirme: Säule auf der Bühne der Seite. */\n'+
-    '    .panel.voll{max-width:620px;border-radius:22px 22px 0 0;\n'+
-    '      border:1px solid rgba(40,34,28,.07);border-bottom:0;\n'+
-    '      box-shadow:var(--schatten-panel)}\n'+
-    '  }\n'+
+    '    width:auto;height:auto;max-height:none;margin:0 auto;max-width:660px;\n'+
+    '    border-radius:0;border:0;box-shadow:none;background:transparent;\n'+
+    '    transform-origin:bottom center}\n'+
     '  .panel.voll .zu{display:none}\n'+
-    '  /* Keine eigene Kopfleiste: der Hero liegt IM Verlauf (siehe .lphero) —\n'+
-    '     eine zweite Vorstellung im Panel wäre genau das Zusammengewürfelte,\n'+
-    '     das Martin moniert hat (26.08.). Der Fortschrittsbalken (.prog)\n'+
-    '     bleibt als oberste Linie des Panels. */\n'+
+    '  /* Keine eigene Kopfleiste, kein eigener Panel-Kasten: nach Martins\n'+
+    '     Mockup (26.08. abends) liegt ALLES als warme Karten direkt auf dem\n'+
+    '     Creme-Grund der Seite — Hero-Karte, Fortschrittszeile, Frage-Karte,\n'+
+    '     Antwort-Karten. Serif kommt von der Seite (--pria-serif). */\n'+
     '  .panel.voll .bar{display:none}\n'+
-    '  /* Hero als ERSTES Element des Verlaufs: beim Ankommen präsent, scrollt\n'+
-    '     aber mit dem Gespräch weg — der Chat behält die volle Höhe (Martin,\n'+
-    '     26.08.: „Pria muss mitscrollen, nicht fix sein — wegen Platz").\n'+
-    '     Linksbündig, der persönliche Text steht OBEN beim Bild (Martin) —\n'+
-    '     eine Begrüßungsblase darunter gäbe es doppelt, deshalb beginnt der\n'+
-    '     Chat direkt mit Frage 1. Negative Ränder spannen den Hero über das\n'+
-    '     Thread-Padding auf volle Breite. */\n'+
-    '  /* margin-bottom:auto drückt im Flex-Verlauf alles Folgende nach unten:\n'+
-    '     die Frage sitzt bei den Antwort-Chips (EINE Einheit), die Luft liegt\n'+
-    '     harmonisch in der Mitte statt als Loch zwischen Frage und Antwort.\n'+
-    '     Wächst das Gespräch über die Höhe hinaus, wird das auto zu 0 und der\n'+
-    '     Verlauf scrollt normal. */\n'+
-    '  .lphero{margin:-18px -15px auto;padding:20px 18px 15px;text-align:left;\n'+
-    '    background:radial-gradient(150% 120% at 18% 0%,#FBEEE9 0%,#F8F2EC 58%,var(--bg) 100%);\n'+
-    '    border-bottom:1px solid var(--line-zart)}\n'+
-    '  /* Kopfzeile wie in den Mails (Martin, 26.08.): Pria links, Siegel\n'+
-    '     rechts, darunter der persönliche Text. Das Siegel ist der klickbare\n'+
-    '     Beleg zur Original-Veröffentlichung — die frühere eigene\n'+
-    '     Siegel-Textzeile unten entfällt, der Claim steht in der Rolle. */\n'+
-    '  .lphero .oben{display:flex;align-items:center;gap:11px;margin-bottom:13px}\n'+
+    '  .panel.voll .prog{display:none}   /* eigene Fortschrittszeile .vprog unten */\n'+
+    '  .panel.voll .thread{background:transparent;padding:12px 16px 8px}\n'+
+    '  /* ── Hero-Karte: beim Ankommen präsent, scrollt mit dem Gespräch weg\n'+
+    '     (margin-bottom:auto hält den Rest unten bei den Antworten, solange\n'+
+    '     der Verlauf kürzer als die Fläche ist). */\n'+
+    '  .lphero{margin:2px 0 auto;padding:20px 19px 22px;text-align:left;border-radius:26px;\n'+
+    '    background:linear-gradient(155deg,#FAF1E3 0%,#F7ECD9 100%);\n'+
+    '    box-shadow:0 1px 2px rgba(120,90,40,.05),0 16px 44px rgba(120,90,40,.10)}\n'+
+    '  .lphero .oben{display:flex;align-items:flex-start;gap:13px;margin-bottom:16px}\n'+
     '  .lphero .kopfbild{position:relative;flex-shrink:0}\n'+
-    '  .lphero .kopfbild img{width:58px;height:58px;border-radius:50%;object-fit:cover;display:block;\n'+
-    '    box-shadow:0 0 0 3px var(--papier),0 1px 2px rgba(40,34,28,.08),0 10px 26px rgba(217,90,76,.28)}\n'+
-    '  .lphero .kopfbild i{position:absolute;right:1px;bottom:1px;width:12px;height:12px;\n'+
-    '    border-radius:50%;background:#2FC46E;border:2px solid var(--papier)}\n'+
-    '  .lphero .werblock{flex:1;min-width:0}\n'+
-    '  .lphero .wer{font-size:16.5px;color:var(--ink);margin:0 0 2px;font-weight:700;letter-spacing:-.2px}\n'+
-    '  /* „Ihre KI-Assistentin …" ausgeschrieben in der Rolle = die\n'+
-    '     KI-Kennzeichnung selbst (Martin, 26.08.) — das frühere Badge entfällt. */\n'+
-    '  .lphero .rolle{margin:0;font-size:12.5px;line-height:1.35;color:var(--ink-weich)}\n'+
-    '  .lphero .rolle b{color:var(--ink)}\n'+
+    '  .lphero .kopfbild img{width:74px;height:74px;border-radius:50%;object-fit:cover;display:block;\n'+
+    '    box-shadow:0 0 0 4px #fff,0 2px 4px rgba(120,90,40,.10),0 12px 30px rgba(120,90,40,.16)}\n'+
+    '  .lphero .kopfbild i{position:absolute;right:3px;bottom:3px;width:13px;height:13px;\n'+
+    '    border-radius:50%;background:#2FC46E;border:2.5px solid #fff}\n'+
+    '  .lphero .werblock{flex:1;min-width:0;padding-top:3px}\n'+
+    '  .lphero .wer{margin:0 0 3px;font-family:var(--pria-serif,Georgia,serif);\n'+
+    '    font-size:19px;font-weight:700;color:#3A342A;letter-spacing:-.2px;line-height:1.15}\n'+
+    '  .lphero .rolle{margin:0 0 6px;font-size:13px;line-height:1.3;color:#8A7E6C}\n'+
+    '  .lphero .lorbeer{margin:0;display:flex;align-items:center;gap:6px;\n'+
+    '    font-size:12.5px;font-weight:650;color:#9C854E;line-height:1.25}\n'+
+    '  .lphero .lorbeer svg{flex-shrink:0}\n'+
     '  .lphero .siegelecke{flex-shrink:0;display:block}\n'+
-    '  .lphero .siegelecke img{height:68px;width:auto;display:block;\n'+
-    '    filter:drop-shadow(0 2px 6px rgba(40,34,28,.18))}\n'+
-    '  /* „Sie benötigen eine 24-Stunden-Pflege?" ist DIE zentrale Zeile der\n'+
-    '     Seite (Martin, 26.08.) — groß und hervorgehoben; der restliche Text\n'+
-    '     bleibt normal. */\n'+
-    '  .lphero .anfrage{margin:0 0 4px;font-size:20px;line-height:1.22;color:var(--ink);\n'+
-    '    font-weight:750;letter-spacing:-.4px}\n'+
-    '  .lphero .anrede{margin:0;font-size:14.5px;line-height:1.5;color:var(--ink)}\n'+
+    '  .lphero .siegelecke img{height:92px;width:auto;display:block;border-radius:6px;\n'+
+    '    filter:drop-shadow(0 3px 8px rgba(120,90,40,.22))}\n'+
+    '  .lphero .anfrage{margin:0 0 8px;font-family:var(--pria-serif,Georgia,serif);\n'+
+    '    font-size:26px;line-height:1.18;color:#33302C;font-weight:700;letter-spacing:-.3px}\n'+
+    '  .lphero .anrede{margin:0;font-size:15px;line-height:1.5;color:#6E655A}\n'+
+    '  .lphero .anrede b{color:#3A342A}\n'+
+    '  /* ── Fortschrittszeile: Balken · „x von 8" · Balken ── */\n'+
+    '  .vprog{display:none;align-items:center;gap:12px;margin:14px 4px 4px;\n'+
+    '    font-size:13.5px;color:#8A7E6C;letter-spacing:.2px}\n'+
+    '  .panel.voll .vprog{display:flex}\n'+
+    '  .vprog i{flex:1;height:4px;border-radius:2px;background:rgba(156,133,78,.20);\n'+
+    '    overflow:hidden;display:block}\n'+
+    '  .vprog i b{display:block;height:100%;width:0;background:#9C854E;border-radius:2px;\n'+
+    '    transition:width .45s var(--weich)}\n'+
+    '  /* ── Frage als Karte (nur Voll-Chat): Icon-Kreis + Serif-Frage ── */\n'+
+    '  .panel.voll .row.zfrage{margin-top:2px}\n'+
+    '  .panel.voll .row.zfrage .mini{display:none}\n'+
+    '  /* Grid statt Flex: der Hinweis (small, z. B. Sprachstufen bei Frage 8)\n'+
+    '     muss UNTER der Frage stehen, in derselben Textspalte neben dem Icon. */\n'+
+    '  .panel.voll .row.zfrage .bub{background:#fff;border:0;border-radius:20px;\n'+
+    '    box-shadow:0 10px 30px rgba(120,90,40,.09);max-width:100%;width:100%;\n'+
+    '    padding:17px 18px;display:grid;grid-template-columns:44px 1fr;\n'+
+    '    align-items:center;column-gap:14px;\n'+
+    '    font-family:var(--pria-serif,Georgia,serif);font-size:19.5px;font-weight:600;\n'+
+    '    line-height:1.28;color:#33302C;letter-spacing:-.2px}\n'+
+    '  .panel.voll .row.zfrage .bub::before{content:"?";grid-row:1 / span 2;\n'+
+    '    width:44px;height:44px;border-radius:50%;background:#F4EBDB;color:#9C854E;\n'+
+    '    text-align:center;font:600 21px/44px var(--pria-serif,Georgia,serif)}\n'+
+    '  .panel.voll .row.zfrage .bub small{grid-column:2;\n'+
+    '    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;\n'+
+    '    font-weight:400;letter-spacing:0}\n'+
+    '  /* ── Antworten als große Karten mit Pfeil ── */\n'+
+    '  /* nowrap: die Grundregel der Chips wrappt — mit column entstünden\n'+
+    '     sonst SPALTEN, sobald die Liste höher als max-height wird. */\n'+
+    '  .panel.voll .chips{background:transparent;flex-direction:column;flex-wrap:nowrap;\n'+
+    '    align-items:stretch;gap:9px;padding:10px 16px 4px;\n'+
+    '    max-height:min(46dvh,390px);overflow-y:auto}\n'+
+    '  .panel.voll .chips .chip{display:flex;align-items:center;background:#fff;border:0;\n'+
+    '    border-radius:18px;box-shadow:0 6px 20px rgba(120,90,40,.08);\n'+
+    '    padding:15px 42px 15px 17px;font-size:15.5px;font-weight:600;color:#3A342A;\n'+
+    '    text-align:left;position:relative}\n'+
+    '  .panel.voll .chips .chip::after{content:"›";position:absolute;right:17px;top:50%;\n'+
+    '    transform:translateY(-50%);color:var(--coral-tief);font-size:22px;font-weight:600;line-height:1}\n'+
+    '  .panel.voll .chips .chip:hover{background:#FFFDF9}\n'+
+    '  /* CTA-Chips (stark) bleiben Coral — sie sind der eine Knopf, der zählt. */\n'+
+    '  .panel.voll .chips .chip.stark{background:linear-gradient(180deg,var(--coral-hell),var(--coral-tief));\n'+
+    '    color:#fff}\n'+
+    '  .panel.voll .chips .chip.stark::after{color:#fff}\n'+
+    '  /* ── Eingabe auf dem Creme-Grund ── */\n'+
+    '  .panel.voll .unten{background:transparent;border-top:0}\n'+
+    '  .panel.voll .eingabe input{background:#fff;border:0;\n'+
+    '    box-shadow:0 4px 16px rgba(120,90,40,.08)}\n'+
     '  @media(min-width:641px){\n'+
-    '    .lphero{padding:24px 22px 18px}\n'+
-    '    .lphero .kopfbild img{width:66px;height:66px}\n'+
-    '    .lphero .anfrage{font-size:23px}\n'+
-    '    .lphero .anrede{font-size:15px}\n'+
-    '    .lphero .siegelecke img{height:78px}\n'+
+    '    .lphero{padding:26px 24px 26px}\n'+
+    '    .lphero .anfrage{font-size:30px}\n'+
+    '    .lphero .anrede{font-size:16px}\n'+
+    '    .lphero .siegelecke img{height:106px}\n'+
+    '    .panel.voll .row.zfrage .bub{font-size:21px}\n'+
     '  }\n'+
-    '  /* KI-Kennzeichnung bleibt trotzdem IM Chat verankert (AI Act, Pflicht):\n'+
+    '  /* KI-Kennzeichnung bleibt IM Chat verankert (AI Act, Pflicht):\n'+
     '     eine stille Zeile unter der Eingabe — sichtbar auch, wenn die Tastatur\n'+
-    '     den Hero der Seite verdeckt. */\n'+
+    '     den Hero verdeckt. */\n'+
     '  .voll-ki{display:none;text-align:center;font-size:10px;letter-spacing:.2px;\n'+
-    '    color:var(--muted);padding:3px 10px 5px}\n'+
+    '    color:#A39781;padding:3px 10px 5px}\n'+
     '  .panel.voll .voll-ki{display:block}\n'+
     '  /* Solange der Chat offen ist, soll die Seite darunter nicht mitscrollen. */';
   W.appendChild(stil);
@@ -936,7 +963,13 @@ async function naechste(){
   if(!s) return matching();
   // Kurz durchatmen zwischen Reaktion und nächster Frage — sonst prasselt es.
   await pause(ruhig?0:520);
-  await sagen(s.q,'Frage '+(FLOW.indexOf(s)+1)+' von '+FLOW.length+(s.hinweis?'<br>'+s.hinweis:''));
+  // Voll-Chat: die Fortschrittszeile (.vprog) zählt bereits „x von 8" —
+  // im small steht dann nur noch der Hinweis. Das Widget behält beides.
+  const nr=FLOW.indexOf(s)+1;
+  vprogStand(nr);
+  await sagen(s.q, VOLL ? (s.hinweis||'') : 'Frage '+nr+' von '+FLOW.length+(s.hinweis?'<br>'+s.hinweis:''));
+  // Frage als Karte (nur .panel.voll gestaltet .zfrage — Widget unberührt).
+  const fz=thread.querySelector('.row:last-child'); if(fz) fz.classList.add('zfrage');
   offeneFrage=s;
   setChips(s.o.map(([v,l])=>({t:l,f:b=>waehle(s,v,l,b)})));
 }
@@ -963,6 +996,7 @@ async function waehle(s,v,l,chip,ausText){
   naechste();
 }
 async function matching(){
+  vprogStand('fertig');
   W.getElementById('status').textContent='sucht passende Kräfte …';
   const r=document.createElement('div');r.className='row';
   r.innerHTML='<div class="mini">'+avatar(PRIA.denk)+'</div><div class="card">'+
@@ -1851,25 +1885,47 @@ panel.addEventListener('animationend',()=>{ panel.classList.add('fertig'); handy
    KI-Badge (Kennzeichnungspflicht), Ergebnis-Zeile, Siegel mit Beleg-Link
    (der Auszeichnungs-Claim braucht die Original-Veröffentlichung). */
 function lpHero(){
-  /* Wortlaut des persönlichen Texts von Martin (26.08.) — er steht OBEN
-     beim Bild, linksbündig; der Chat wiederholt ihn NICHT (keine
-     Begrüßungsblase), sonst stünde er doppelt da. */
+  /* Aufbau und Wortlaute nach Martins Mockup (26.08. abends): Porträt
+     links, Siegel rechts, „Ihre digitale Pflegeberaterin", Lorbeer-Zeile
+     „6-facher Preis-Leistungssieger", Serif-Headline, kompakte Zusage.
+     Die KI-Kennzeichnung trägt die stille Zeile unter der Eingabe. */
+  const lorbeer='<svg width="17" height="17" viewBox="0 0 24 24" fill="none" '+
+    'stroke="#9C854E" stroke-width="1.7" stroke-linecap="round" aria-hidden="true">'+
+    '<path d="M7 3.5c-2.4 3.4-2.4 9 .8 12.5M17 3.5c2.4 3.4 2.4 9-.8 12.5"/>'+
+    '<path d="M5.2 8.2c1.3.4 2.4.1 3-.9M18.8 8.2c-1.3.4-2.4.1-3-.9M4.8 12.2c1.4.4 2.5 0 3.1-1M19.2 12.2c-1.4.4-2.5 0-3.1-1M6.6 15.8c1.3.5 2.4.2 3-.7M17.4 15.8c-1.3.5-2.4.2-3-.7"/></svg>';
   const h=document.createElement('div');h.className='lphero';
   h.innerHTML=
     '<div class="oben">'+
-      '<span class="kopfbild"><img src="/images/pria-portrait.jpg" alt="Pria — KI-gestützte Assistentin von Primundus"><i></i></span>'+
+      '<span class="kopfbild"><img src="/images/pria-portrait.jpg" alt="Pria — digitale Pflegeberaterin von Primundus (KI-gestützt)"><i></i></span>'+
       '<div class="werblock">'+
         '<p class="wer">Pria von Primundus</p>'+
-        '<p class="rolle">Ihre KI-Assistentin beim <b>6-fachen Preis-Leistungssieger</b></p>'+
+        '<p class="rolle">Ihre digitale Pflegeberaterin</p>'+
+        '<p class="lorbeer">'+lorbeer+'<span>6-facher <span style="white-space:nowrap">Preis-Leistungssieger</span></span></p>'+
       '</div>'+
       '<a class="siegelecke" href="/downloads/die-welt-service-champions-2021.pdf" target="_blank" rel="noopener" '+
         'aria-label="6× Testsieger bei DIE WELT — Original-Veröffentlichung als PDF öffnen">'+
         '<img src="/images/primundus_testsieger-2021.webp" alt="Siegel: 6× Testsieger bei DIE WELT — Nr. 1 der Pflegekräfte-Vermittler"></a>'+
     '</div>'+
     '<p class="anfrage">Sie benötigen eine <span style="white-space:nowrap">24-Stunden-Pflege?</span></p>'+
-    '<p class="anrede">Ich berechne Ihre <b>Kosten</b> und zeige Ihnen gleich '+
-      '<b>passende Pflegekräfte</b> — acht kurze Fragen, ich fange einfach an.</p>';
+    '<p class="anrede">In <b>8 kurzen Fragen</b> berechne ich Ihre Kosten und zeige '+
+      'passende Pflegekräfte.</p>';
   thread.appendChild(h);
+  /* Fortschrittszeile unter der Hero-Karte: Balken · „x von 8" · Balken.
+     naechste()/matching() halten sie über vprogSetzen() aktuell. */
+  const p=document.createElement('div');p.className='vprog';
+  p.innerHTML='<i><b id="vfill"></b></i><span id="vtext">1 von '+FLOW.length+'</span><i></i>';
+  thread.appendChild(p);
+}
+/* Fortschritt der Voll-Chat-Zeile: nr = aktuelle Frage (1-basiert) oder
+   'fertig'. Ohne Voll-Modus existieren die Elemente nicht — dann still.
+   thread.querySelector bleibt vom Widget-Erzeuger unangetastet (er lenkt
+   nur document.* um). */
+function vprogStand(nr){
+  const fill=thread.querySelector('#vfill'), text=thread.querySelector('#vtext');
+  if(!fill||!text) return;
+  if(nr==='fertig'){ fill.style.width='100%'; text.textContent='Geschafft'; return; }
+  fill.style.width=Math.round(((nr-1)/FLOW.length)*100)+'%';
+  text.textContent=nr+' von '+FLOW.length;
 }
 
 async function oeffne(start){
@@ -2010,6 +2066,13 @@ W.querySelector('.blase .mark').innerHTML=avatar(null,true,true);
 if(VOLL){
   panel.classList.add('voll');
   blase.classList.add('weg');
+  // Das Panel ist im Voll-Modus durchsichtig (Karten auf dem Creme-Grund):
+  // der Lade-Fallback der Seite muss deshalb verschwinden, sobald der Chat
+  // steht. NUR per Attribut + CSS der Seite — den React-DOM anfassen
+  // (remove()) löste einen harten Hydration-Fehler aus, dessen
+  // Recovery-Rerender Widget-Wurzel UND data-Attribute wegräumte
+  // (26.08.: Chat bootete scheinbar grundlos nicht mehr).
+  document.documentElement.setAttribute('data-pria-laeuft','1');
   // Hero als erstes Element des Verlaufs — VOR dem Öffnen, damit er beim
   // ersten Bild schon steht und nichts nachspringt.
   lpHero();
