@@ -114,7 +114,7 @@
     '    background:linear-gradient(90deg,var(--coral-tief),var(--coral-hell));\n'+
     '    box-shadow:0 0 8px rgba(231,111,99,.5);transition:width .62s var(--feder)}\n'+
     '\n'+
-    '  .thread{flex:1;overflow-y:auto;overscroll-behavior:contain;padding:18px 15px 8px;background:var(--bg);\n'+
+    '  .thread{flex:1;overflow-y:auto;overflow-x:hidden;overscroll-behavior:contain;padding:18px 15px 8px;background:var(--bg);\n'+
     '    display:flex;flex-direction:column;gap:10px;scroll-behavior:smooth}\n'+
     '  .thread::-webkit-scrollbar{width:6px}\n'+
     '  .thread::-webkit-scrollbar-thumb{background:rgba(40,34,28,.14);border-radius:3px}\n'+
@@ -276,6 +276,8 @@
     '    /* Auf dem Handy liest sich alles eine Spur größer besser, und die Blasen\n'+
     '       dürfen breiter werden — 80 % von 375 px ist unnötig schmal. */\n'+
     '    .thread{padding:16px 14px 10px;gap:11px}\n'+
+    '    /* Hero-Ränder folgen dem Handy-Padding des Threads (volle Breite). */\n'+
+    '    .lphero{margin:-16px -14px 12px}\n'+
     '    .bub{max-width:84%;font-size:15.5px}\n'+
     '    .bub small{font-size:12px}\n'+
     '    /* Chips dürfen dem Verlauf nicht den halben Schirm wegnehmen. */\n'+
@@ -328,16 +330,67 @@
     '     Spezifität gegen dessen .panel — die Reihenfolge-Falle von oben\n'+
     '     betrifft nur gleichrangige Selektoren. Öffnet sich die Tastatur,\n'+
     '     überschreiben die Inline-Styles aus handyLayout() das hier ohnehin. */\n'+
-    '  .panel.voll{top:var(--pria-oben,0px);right:8px;bottom:var(--pria-unten,0px);left:8px;\n'+
-    '    width:auto;height:auto;max-height:none;margin:0 auto;max-width:620px;\n'+
-    '    border-radius:22px 22px 0 0;border:1px solid rgba(40,34,28,.07);border-bottom:0;\n'+
-    '    box-shadow:var(--schatten-panel);transform-origin:bottom center}\n'+
+    '  .panel.voll{top:var(--pria-oben,0px);right:0;bottom:var(--pria-unten,0px);left:0;\n'+
+    '    width:auto;height:auto;max-height:none;margin:0 auto;max-width:none;\n'+
+    '    border-radius:0;border:0;box-shadow:none;transform-origin:bottom center}\n'+
+    '  @media(min-width:641px){\n'+
+    '    /* Breite Schirme: Säule auf der Bühne der Seite. */\n'+
+    '    .panel.voll{max-width:620px;border-radius:22px 22px 0 0;\n'+
+    '      border:1px solid rgba(40,34,28,.07);border-bottom:0;\n'+
+    '      box-shadow:var(--schatten-panel)}\n'+
+    '  }\n'+
     '  .panel.voll .zu{display:none}\n'+
-    '  /* Keine eigene Kopfleiste: die SEITE stellt Pria vor (Hero mit Porträt,\n'+
-    '     Gruß und KI-Badge) — eine zweite Vorstellung im Panel wäre genau das\n'+
-    '     Zusammengewürfelte, das Martin moniert hat (26.08.). Der Fortschritts-\n'+
-    '     balken (.prog) bleibt als oberste Linie des Panels. */\n'+
+    '  /* Keine eigene Kopfleiste: der Hero liegt IM Verlauf (siehe .lphero) —\n'+
+    '     eine zweite Vorstellung im Panel wäre genau das Zusammengewürfelte,\n'+
+    '     das Martin moniert hat (26.08.). Der Fortschrittsbalken (.prog)\n'+
+    '     bleibt als oberste Linie des Panels. */\n'+
     '  .panel.voll .bar{display:none}\n'+
+    '  /* Hero als ERSTES Element des Verlaufs: beim Ankommen präsent, scrollt\n'+
+    '     aber mit dem Gespräch weg — der Chat behält die volle Höhe (Martin,\n'+
+    '     26.08.: „Pria muss mitscrollen, nicht fix sein — wegen Platz").\n'+
+    '     Linksbündig, der persönliche Text steht OBEN beim Bild (Martin) —\n'+
+    '     eine Begrüßungsblase darunter gäbe es doppelt, deshalb beginnt der\n'+
+    '     Chat direkt mit Frage 1. Negative Ränder spannen den Hero über das\n'+
+    '     Thread-Padding auf volle Breite. */\n'+
+    '  .lphero{margin:-18px -15px 12px;padding:20px 18px 15px;text-align:left;\n'+
+    '    background:radial-gradient(150% 120% at 18% 0%,#FBEEE9 0%,#F8F2EC 58%,var(--bg) 100%);\n'+
+    '    border-bottom:1px solid var(--line-zart)}\n'+
+    '  /* Kopfzeile wie in den Mails (Martin, 26.08.): Pria links, Siegel\n'+
+    '     rechts, darunter der persönliche Text. Das Siegel ist der klickbare\n'+
+    '     Beleg zur Original-Veröffentlichung — die frühere eigene\n'+
+    '     Siegel-Textzeile unten entfällt, der Claim steht in der Rolle. */\n'+
+    '  .lphero .oben{display:flex;align-items:center;gap:11px;margin-bottom:10px}\n'+
+    '  .lphero .kopfbild{position:relative;flex-shrink:0}\n'+
+    '  .lphero .kopfbild img{width:58px;height:58px;border-radius:50%;object-fit:cover;display:block;\n'+
+    '    box-shadow:0 0 0 3px var(--papier),0 1px 2px rgba(40,34,28,.08),0 10px 26px rgba(217,90,76,.28)}\n'+
+    '  .lphero .kopfbild i{position:absolute;right:1px;bottom:1px;width:12px;height:12px;\n'+
+    '    border-radius:50%;background:#2FC46E;border:2px solid var(--papier)}\n'+
+    '  .lphero .werblock{flex:1;min-width:0}\n'+
+    '  .lphero .wer{font-size:16.5px;color:var(--ink);margin:0 0 2px;font-weight:700;letter-spacing:-.2px}\n'+
+    '  /* „Ihre KI-Assistentin …" ausgeschrieben in der Rolle = die\n'+
+    '     KI-Kennzeichnung selbst (Martin, 26.08.) — das frühere Badge entfällt. */\n'+
+    '  .lphero .rolle{margin:0;font-size:12.5px;line-height:1.35;color:var(--ink-weich)}\n'+
+    '  .lphero .rolle b{color:var(--ink)}\n'+
+    '  .lphero .siegelecke{flex-shrink:0;display:block}\n'+
+    '  .lphero .siegelecke img{height:68px;width:auto;display:block;\n'+
+    '    filter:drop-shadow(0 2px 6px rgba(40,34,28,.18))}\n'+
+    '  /* Die Anrede ist die Botschaft der Seite: größer als die Chat-Blasen\n'+
+    '     (15.5 px) und hervorgehoben (Martin, 26.08.). */\n'+
+    '  .lphero .anrede{margin:0;font-size:17.5px;line-height:1.42;color:var(--ink);\n'+
+    '    font-weight:500;letter-spacing:-.2px}\n'+
+    '  .lphero .anrede b{font-weight:750}\n'+
+    '  /* Die Fragen tragen das Gespräch — im Voll-Chat stehen sie in derselben\n'+
+    '     Größe wie die Anrede (Martin, 26.08.), die Zusatzzeile „Frage x von 8"\n'+
+    '     bleibt klein. Nur .panel.voll: das schwebende Widget bleibt, wie es ist. */\n'+
+    '  .panel.voll .bub.frage{font-size:17.5px;font-weight:650;line-height:1.38;\n'+
+    '    letter-spacing:-.2px}\n'+
+    '  @media(min-width:641px){\n'+
+    '    .lphero{padding:24px 22px 18px}\n'+
+    '    .lphero .kopfbild img{width:66px;height:66px}\n'+
+    '    .lphero .anrede{font-size:19px}\n'+
+    '    .lphero .siegelecke img{height:78px}\n'+
+    '    .panel.voll .bub.frage{font-size:19px}\n'+
+    '  }\n'+
     '  /* KI-Kennzeichnung bleibt trotzdem IM Chat verankert (AI Act, Pflicht):\n'+
     '     eine stille Zeile unter der Eingabe — sichtbar auch, wenn die Tastatur\n'+
     '     den Hero der Seite verdeckt. */\n'+
@@ -883,6 +936,9 @@ async function naechste(){
   // Kurz durchatmen zwischen Reaktion und nächster Frage — sonst prasselt es.
   await pause(ruhig?0:520);
   await sagen(s.q,'Frage '+(FLOW.indexOf(s)+1)+' von '+FLOW.length+(s.hinweis?'<br>'+s.hinweis:''));
+  // Frage-Blasen markieren: im Voll-Chat stellt CSS sie größer (.bub.frage
+  // greift nur unter .panel.voll — das schwebende Widget bleibt unberührt).
+  const fb=thread.querySelector('.row:last-child .bub'); if(fb) fb.classList.add('frage');
   offeneFrage=s;
   setChips(s.o.map(([v,l])=>({t:l,f:b=>waehle(s,v,l,b)})));
 }
@@ -1791,6 +1847,33 @@ addEventListener('focusout',e=>{
 addEventListener('orientationchange',()=>setTimeout(handyLayout,260));
 panel.addEventListener('animationend',()=>{ panel.classList.add('fertig'); handyLayout(); });
 
+/* Hero des Voll-Chats — ERSTES Element im Verlauf, nicht über ihm: beim
+   Ankommen präsent, scrollt aber mit dem Gespräch nach oben weg, sodass
+   der Chat die volle Höhe behält (Martin, 26.08.). Porträt, Name mit
+   KI-Badge (Kennzeichnungspflicht), Ergebnis-Zeile, Siegel mit Beleg-Link
+   (der Auszeichnungs-Claim braucht die Original-Veröffentlichung). */
+function lpHero(){
+  /* Wortlaut des persönlichen Texts von Martin (26.08.) — er steht OBEN
+     beim Bild, linksbündig; der Chat wiederholt ihn NICHT (keine
+     Begrüßungsblase), sonst stünde er doppelt da. */
+  const h=document.createElement('div');h.className='lphero';
+  h.innerHTML=
+    '<div class="oben">'+
+      '<span class="kopfbild"><img src="/images/pria-portrait.jpg" alt="Pria — KI-gestützte Assistentin von Primundus"><i></i></span>'+
+      '<div class="werblock">'+
+        '<p class="wer">Pria von Primundus</p>'+
+        '<p class="rolle">Ihre KI-Assistentin beim <b>6-fachen Preis-Leistungssieger</b></p>'+
+      '</div>'+
+      '<a class="siegelecke" href="/downloads/die-welt-service-champions-2021.pdf" target="_blank" rel="noopener" '+
+        'aria-label="6× Testsieger bei DIE WELT — Original-Veröffentlichung als PDF öffnen">'+
+        '<img src="/images/primundus_testsieger-2021.webp" alt="Siegel: 6× Testsieger bei DIE WELT — Nr. 1 der Pflegekräfte-Vermittler"></a>'+
+    '</div>'+
+    '<p class="anrede">Sie benötigen eine 24-Stunden-Pflege? Ich berechne Ihre <b>Kosten</b> '+
+      'und zeige Ihnen gleich <b>passende Pflegekräfte</b> — acht kurze Fragen, '+
+      'ich fange einfach an.</p>';
+  thread.appendChild(h);
+}
+
 async function oeffne(start){
   tipp(); versteckePille();
   blase.classList.add('weg'); panel.classList.add('on');
@@ -1799,17 +1882,15 @@ async function oeffne(start){
   setTimeout(()=>{ panel.classList.add('fertig'); handyLayout(); }, 700);
   if(gestartet) return; gestartet=true;
   if(start==='lp'){
-    /* Landingpage /beratung: der Hero der Seite hat Pria schon vorgestellt
-       und gegrüßt — hier keine zweite Begrüßung, sondern direkt ins Tun
-       (CRO 26.08.). Wortlaut nach der Preisansprache-Linie (Martin, 21.08.):
-       das Angebot ist die Antwort, keine Spanne, kein Zögern. */
-    await pause(260);
-    // Kompakt: auf dem Handy müssen diese Blase UND Frage 1 ohne Scrollen
-    // ins Panel passen — sonst beginnt die Seite mit einem angeschnittenen
-    // Satz.
-    return starteFunnel('preis',null,false,
-      'Ich rechne Ihnen Ihren <b>Monatspreis</b> aus und zeige Ihnen gleich '+
-      '<b>passende Pflegekräfte</b>.');
+    /* Landingpage /beratung: der Hero im Verlauf trägt Martins
+       persönlichen Text bereits — eine Begrüßungsblase davor stünde
+       doppelt da (Martin, 26.08.). Deshalb direkt Frage 1; „ich fange
+       einfach an" hat der Hero gerade zugesagt. */
+    modus='fragen'; offeneFrage=null;
+    protokoll('system','Fragenlauf gestartet',{ereignis:'funnel',grund:'preis'});
+    await pause(300);
+    fortschritt();
+    return naechste();
   }
   await pause(340);
   // Kurz halten: Der KI-Hinweis steht in der Kopfzeile, nicht im Gespräch.
@@ -1931,9 +2012,12 @@ W.querySelector('.blase .mark').innerHTML=avatar(null,true,true);
 if(VOLL){
   panel.classList.add('voll');
   blase.classList.add('weg');
+  // Hero als erstes Element des Verlaufs — VOR dem Öffnen, damit er beim
+  // ersten Bild schon steht und nichts nachspringt.
+  lpHero();
   // KI-Kennzeichnung im Chat selbst (die Kopfleiste des Panels ist im
-  // Voll-Modus aus — der Hero der Seite trägt Badge und Porträt, aber bei
-  // offener Tastatur ist er verdeckt; diese Zeile bleibt immer im Bild).
+  // Voll-Modus aus — der Hero trägt das Badge, scrollt aber mit dem
+  // Gespräch weg; diese Zeile bleibt immer im Bild).
   const ki=document.createElement('div');ki.className='voll-ki';
   ki.textContent='Pria ist eine KI-gestützte Assistentin von Primundus';
   W.querySelector('.unten').appendChild(ki);
