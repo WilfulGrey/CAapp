@@ -367,20 +367,23 @@
     '    border-radius:50%;background:#2FC46E;border:2px solid var(--papier)}\n'+
     '  .lphero .werblock{flex:1;min-width:0}\n'+
     '  .lphero .wer{font-size:16.5px;color:var(--ink);margin:0 0 2px;font-weight:700;letter-spacing:-.2px}\n'+
-    '  .lphero .ki{display:inline-block;margin-left:7px;padding:2px 6px 1px;border-radius:5px;\n'+
-    '    border:1px solid #DACFC0;background:rgba(255,255,255,.8);font-size:8.5px;font-weight:800;\n'+
-    '    letter-spacing:1px;color:var(--gold);vertical-align:2px}\n'+
+    '  /* „Ihre KI-Assistentin …" ausgeschrieben in der Rolle = die\n'+
+    '     KI-Kennzeichnung selbst (Martin, 26.08.) — das frühere Badge entfällt. */\n'+
     '  .lphero .rolle{margin:0;font-size:12.5px;line-height:1.35;color:var(--ink-weich)}\n'+
     '  .lphero .rolle b{color:var(--ink)}\n'+
     '  .lphero .siegelecke{flex-shrink:0;display:block}\n'+
-    '  .lphero .siegelecke img{height:52px;width:auto;display:block;\n'+
+    '  .lphero .siegelecke img{height:68px;width:auto;display:block;\n'+
     '    filter:drop-shadow(0 2px 6px rgba(40,34,28,.18))}\n'+
-    '  .lphero .anrede{margin:0;font-size:14.5px;line-height:1.5;color:var(--ink)}\n'+
+    '  /* Die Anrede ist die Botschaft der Seite: größer als die Chat-Blasen\n'+
+    '     (15.5 px) und hervorgehoben (Martin, 26.08.). */\n'+
+    '  .lphero .anrede{margin:0;font-size:17.5px;line-height:1.42;color:var(--ink);\n'+
+    '    font-weight:500;letter-spacing:-.2px}\n'+
+    '  .lphero .anrede b{font-weight:750}\n'+
     '  @media(min-width:641px){\n'+
     '    .lphero{padding:24px 22px 18px}\n'+
     '    .lphero .kopfbild img{width:66px;height:66px}\n'+
-    '    .lphero .anrede{font-size:15px}\n'+
-    '    .lphero .siegelecke img{height:58px}\n'+
+    '    .lphero .anrede{font-size:19px}\n'+
+    '    .lphero .siegelecke img{height:78px}\n'+
     '  }\n'+
     '  /* KI-Kennzeichnung bleibt trotzdem IM Chat verankert (AI Act, Pflicht):\n'+
     '     eine stille Zeile unter der Eingabe — sichtbar auch, wenn die Tastatur\n'+
@@ -1849,8 +1852,8 @@ function lpHero(){
     '<div class="oben">'+
       '<span class="kopfbild"><img src="/images/pria-portrait.jpg" alt="Pria — KI-gestützte Assistentin von Primundus"><i></i></span>'+
       '<div class="werblock">'+
-        '<p class="wer">Ich bin Pria<span class="ki">KI-ASSISTENTIN</span></p>'+
-        '<p class="rolle">Ihre Assistentin beim <b>6-fachen Preis-Leistungssieger</b></p>'+
+        '<p class="wer">Pria von Primundus</p>'+
+        '<p class="rolle">Ihre KI-Assistentin beim <b>6-fachen Preis-Leistungssieger</b></p>'+
       '</div>'+
       '<a class="siegelecke" href="/downloads/die-welt-service-champions-2021.pdf" target="_blank" rel="noopener" '+
         'aria-label="6× Testsieger bei DIE WELT — Original-Veröffentlichung als PDF öffnen">'+
