@@ -371,29 +371,32 @@
   .lphero{margin:-18px -15px 12px;padding:20px 18px 15px;text-align:left;
     background:radial-gradient(150% 120% at 18% 0%,#FBEEE9 0%,#F8F2EC 58%,var(--bg) 100%);
     border-bottom:1px solid var(--line-zart)}
-  .lphero .oben{display:flex;align-items:center;gap:12px;margin-bottom:9px}
+  /* Kopfzeile wie in den Mails (Martin, 26.08.): Pria links, Siegel
+     rechts, darunter der persönliche Text. Das Siegel ist der klickbare
+     Beleg zur Original-Veröffentlichung — die frühere eigene
+     Siegel-Textzeile unten entfällt, der Claim steht in der Rolle. */
+  .lphero .oben{display:flex;align-items:center;gap:11px;margin-bottom:10px}
   .lphero .kopfbild{position:relative;flex-shrink:0}
-  .lphero .kopfbild img{width:60px;height:60px;border-radius:50%;object-fit:cover;display:block;
+  .lphero .kopfbild img{width:58px;height:58px;border-radius:50%;object-fit:cover;display:block;
     box-shadow:0 0 0 3px var(--papier),0 1px 2px rgba(40,34,28,.08),0 10px 26px rgba(217,90,76,.28)}
   .lphero .kopfbild i{position:absolute;right:1px;bottom:1px;width:12px;height:12px;
     border-radius:50%;background:#2FC46E;border:2px solid var(--papier)}
+  .lphero .werblock{flex:1;min-width:0}
   .lphero .wer{font-size:16.5px;color:var(--ink);margin:0 0 2px;font-weight:700;letter-spacing:-.2px}
   .lphero .ki{display:inline-block;margin-left:7px;padding:2px 6px 1px;border-radius:5px;
     border:1px solid #DACFC0;background:rgba(255,255,255,.8);font-size:8.5px;font-weight:800;
     letter-spacing:1px;color:var(--gold);vertical-align:2px}
-  .lphero .rolle{margin:0;font-size:13px;line-height:1.35;color:var(--ink-weich)}
+  .lphero .rolle{margin:0;font-size:12.5px;line-height:1.35;color:var(--ink-weich)}
   .lphero .rolle b{color:var(--ink)}
-  .lphero .anrede{margin:0 0 11px;font-size:14.5px;line-height:1.5;color:var(--ink)}
-  .lphero .siegel{display:inline-flex;align-items:center;gap:9px;text-decoration:none;text-align:left}
-  .lphero .siegel img{height:36px;width:auto;display:block}
-  .lphero .siegel b{display:block;font-size:12.5px;color:#3D2B1F;line-height:1.25}
-  .lphero .siegel u{display:block;font-size:11px;color:var(--ink-weich);text-decoration:none;
-    border-bottom:1px solid #D9CFC2;padding-bottom:1px;width:fit-content}
+  .lphero .siegelecke{flex-shrink:0;display:block}
+  .lphero .siegelecke img{height:52px;width:auto;display:block;
+    filter:drop-shadow(0 2px 6px rgba(40,34,28,.18))}
+  .lphero .anrede{margin:0;font-size:14.5px;line-height:1.5;color:var(--ink)}
   @media(min-width:641px){
     .lphero{padding:24px 22px 18px}
-    .lphero .kopfbild img{width:68px;height:68px}
+    .lphero .kopfbild img{width:66px;height:66px}
     .lphero .anrede{font-size:15px}
-    .lphero .siegel img{height:40px}
+    .lphero .siegelecke img{height:58px}
   }
   /* KI-Kennzeichnung bleibt trotzdem IM Chat verankert (AI Act, Pflicht):
      eine stille Zeile unter der Eingabe — sichtbar auch, wenn die Tastatur
@@ -1890,18 +1893,17 @@ function lpHero(){
   h.innerHTML=
     '<div class="oben">'+
       '<span class="kopfbild"><img src="/images/pria-portrait.jpg" alt="Pria — KI-gestützte Assistentin von Primundus"><i></i></span>'+
-      '<div>'+
+      '<div class="werblock">'+
         '<p class="wer">Ich bin Pria<span class="ki">KI-ASSISTENTIN</span></p>'+
         '<p class="rolle">Ihre Assistentin beim <b>6-fachen Preis-Leistungssieger</b></p>'+
       '</div>'+
+      '<a class="siegelecke" href="/downloads/die-welt-service-champions-2021.pdf" target="_blank" rel="noopener" '+
+        'aria-label="6× Testsieger bei DIE WELT — Original-Veröffentlichung als PDF öffnen">'+
+        '<img src="/images/primundus_testsieger-2021.webp" alt="Siegel: 6× Testsieger bei DIE WELT — Nr. 1 der Pflegekräfte-Vermittler"></a>'+
     '</div>'+
     '<p class="anrede">Sie benötigen eine 24-Stunden-Pflege? Ich berechne Ihre <b>Kosten</b> '+
       'und zeige Ihnen gleich <b>passende Pflegekräfte</b> — acht kurze Fragen, '+
-      'ich fange einfach an.</p>'+
-    '<a class="siegel" href="/downloads/die-welt-service-champions-2021.pdf" target="_blank" rel="noopener" '+
-      'aria-label="6× Testsieger — Original-Veröffentlichung der Service-Studie als PDF öffnen">'+
-      '<img src="/images/primundus_testsieger-2021.webp" alt="Testsieger-Siegel DIE WELT Service-Champions">'+
-      '<span><b>6× Testsieger bei DIE WELT</b><u>Nr. 1 der Pflegekräfte-Vermittler</u></span></a>';
+      'ich fange einfach an.</p>';
   thread.appendChild(h);
 }
 
