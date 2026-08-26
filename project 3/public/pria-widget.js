@@ -349,7 +349,7 @@
     '  .lphero{margin:2px 0 auto;padding:19px 18px 20px;text-align:left;border-radius:22px;\n'+
     '    background:var(--papier);border:1px solid var(--line-zart);\n'+
     '    box-shadow:0 1px 2px rgba(40,34,28,.04),0 12px 34px rgba(40,34,28,.08)}\n'+
-    '  .lphero .oben{display:flex;align-items:flex-start;gap:13px;margin-bottom:14px}\n'+
+    '  .lphero .oben{display:flex;align-items:center;gap:13px;margin-bottom:10px}\n'+
     '  .lphero .kopfbild{position:relative;flex-shrink:0}\n'+
     '  .lphero .kopfbild img{width:72px;height:72px;border-radius:50%;object-fit:cover;display:block;\n'+
     '    box-shadow:0 0 0 3px var(--papier),0 1px 2px rgba(40,34,28,.08),0 10px 26px rgba(217,90,76,.25)}\n'+
@@ -359,8 +359,10 @@
     '  .lphero .wer{margin:0 0 2px;font-size:17.5px;font-weight:800;color:#3D3D3D;\n'+
     '    letter-spacing:-.3px;line-height:1.15}\n'+
     '  .lphero .rolle{margin:0 0 6px;font-size:13px;line-height:1.3;color:#8A8279}\n'+
-    '  .lphero .lorbeer{margin:0;display:flex;align-items:center;gap:6px;\n'+
-    '    font-size:12.5px;font-weight:700;color:var(--gold);line-height:1.25}\n'+
+    '  /* Volle Breite unter dem Pria/Siegel-Block (Martin, 26.08.) — nicht\n'+
+    '     mehr in der schmalen Mittelspalte, wo die Zeile zweizeilig brach. */\n'+
+    '  .lphero .lorbeer{margin:0 0 12px;display:flex;align-items:center;gap:7px;\n'+
+    '    font-size:13.5px;font-weight:700;color:var(--gold);line-height:1.25}\n'+
     '  .lphero .lorbeer svg{flex-shrink:0}\n'+
     '  .lphero .siegelecke{flex-shrink:0;display:block}\n'+
     '  .lphero .siegelecke img{height:88px;width:auto;display:block;border-radius:5px;\n'+
@@ -388,9 +390,12 @@
     '    padding:16px 17px;display:grid;grid-template-columns:42px 1fr;\n'+
     '    align-items:center;column-gap:13px;\n'+
     '    font-size:18px;font-weight:750;line-height:1.28;color:#3D3D3D;letter-spacing:-.3px}\n'+
-    '  .panel.voll .row.zfrage .bub::before{content:"?";grid-row:1 / span 2;\n'+
-    '    width:42px;height:42px;border-radius:50%;background:#FDF0ED;color:var(--coral-tief);\n'+
-    '    text-align:center;font-size:20px;font-weight:800;line-height:42px}\n'+
+    '  /* Themen-Icon der Frage (Haus, Mond, Auto …) — setzt naechste() als\n'+
+    '     .fic-Element; wirkt persönlicher als ein generisches „?". */\n'+
+    '  .panel.voll .row.zfrage .bub .fic{grid-row:1 / span 2;display:flex;align-items:center;\n'+
+    '    justify-content:center;width:42px;height:42px;border-radius:50%;\n'+
+    '    background:#FDF0ED;color:var(--coral-tief)}\n'+
+    '  .panel.voll .row.zfrage .bub .fic svg{display:block}\n'+
     '  .panel.voll .row.zfrage .bub small{grid-column:2;font-weight:400;letter-spacing:0}\n'+
     '  /* ── Antworten als große Karten mit Pfeil ── */\n'+
     '  /* nowrap: die Grundregel der Chips wrappt — mit column entstünden\n'+
@@ -406,6 +411,17 @@
     '  .panel.voll .chips .chip::after{content:"›";position:absolute;right:17px;top:50%;\n'+
     '    transform:translateY(-50%);color:var(--coral-tief);font-size:22px;font-weight:600;line-height:1}\n'+
     '  .panel.voll .chips .chip:hover{background:#FDF7F5;border-color:rgba(231,111,99,.35)}\n'+
+    '  .panel.voll .chips .chip:active{transform:scale(.985)}\n'+
+    '  /* Hinweiszeile aus dem Mockup: nimmt die Sorge, dass hinter der Auswahl\n'+
+    '     ein Formular lauert. Verschwindet nach der letzten Frage\n'+
+    '     (vprogStand(\'fertig\') setzt .voll-fertig ans Panel). */\n'+
+    '  .voll-hinweis{display:none;align-items:center;justify-content:center;gap:6px;\n'+
+    '    padding:7px 14px 2px;font-size:11.5px;color:var(--muted)}\n'+
+    '  .voll-hinweis i{display:inline-flex;width:15px;height:15px;border-radius:50%;\n'+
+    '    border:1.2px solid currentColor;align-items:center;justify-content:center;\n'+
+    '    font-style:normal;font-size:10px;font-weight:700;flex-shrink:0}\n'+
+    '  .panel.voll .voll-hinweis{display:flex}\n'+
+    '  .panel.voll.voll-fertig .voll-hinweis{display:none}\n'+
     '  /* CTA-Chips (stark) bleiben Coral — sie sind der eine Knopf, der zählt. */\n'+
     '  .panel.voll .chips .chip.stark{background:linear-gradient(180deg,var(--coral-hell),var(--coral-tief));\n'+
     '    color:#fff;border:0}\n'+
@@ -970,8 +986,20 @@ async function naechste(){
   const nr=FLOW.indexOf(s)+1;
   vprogStand(nr);
   await sagen(s.q, VOLL ? (s.hinweis||'') : 'Frage '+nr+' von '+FLOW.length+(s.hinweis?'<br>'+s.hinweis:''));
-  // Frage als Karte (nur .panel.voll gestaltet .zfrage — Widget unberührt).
-  const fz=thread.querySelector('.row:last-child'); if(fz) fz.classList.add('zfrage');
+  // Frage als Karte (nur .panel.voll gestaltet .zfrage — Widget unberührt),
+  // mit dem Themen-Icon der Frage im Medaillon.
+  const fz=thread.querySelector('.row:last-child');
+  if(fz){
+    fz.classList.add('zfrage');
+    if(VOLL){
+      const b=fz.querySelector('.bub');
+      if(b && !b.querySelector('.fic')){
+        const ic=document.createElement('span');ic.className='fic';
+        ic.innerHTML=FRAGE_ICONS[s.k]||'<b style="font-size:20px">?</b>';
+        b.prepend(ic);
+      }
+    }
+  }
   offeneFrage=s;
   setChips(s.o.map(([v,l])=>({t:l,f:b=>waehle(s,v,l,b)})));
 }
@@ -1902,15 +1930,15 @@ function lpHero(){
       '<div class="werblock">'+
         '<p class="wer">Pria von Primundus</p>'+
         '<p class="rolle">Ihre digitale Pflegeberaterin</p>'+
-        '<p class="lorbeer">'+lorbeer+'<span>6-facher <span style="white-space:nowrap">Preis-Leistungssieger</span></span></p>'+
       '</div>'+
       '<a class="siegelecke" href="/downloads/die-welt-service-champions-2021.pdf" target="_blank" rel="noopener" '+
         'aria-label="6× Testsieger bei DIE WELT — Original-Veröffentlichung als PDF öffnen">'+
         '<img src="/images/primundus_testsieger-2021.webp" alt="Siegel: 6× Testsieger bei DIE WELT — Nr. 1 der Pflegekräfte-Vermittler"></a>'+
     '</div>'+
+    '<p class="lorbeer">'+lorbeer+'<span>6-facher <span style="white-space:nowrap">Preis-Leistungssieger</span></span></p>'+
     '<p class="anfrage">Sie benötigen eine <span style="white-space:nowrap">24-Stunden-Pflege?</span></p>'+
-    '<p class="anrede">In <b>8 kurzen Fragen</b> berechne ich Ihre Kosten und zeige '+
-      'passende Pflegekräfte.</p>';
+    '<p class="anrede">In 8 kurzen Fragen berechne ich Ihre <b>Kosten</b> und zeige '+
+      '<b>passende Pflegekräfte</b>.</p>';
   thread.appendChild(h);
   /* Fortschrittszeile unter der Hero-Karte: Balken · „x von 8" · Balken.
      naechste()/matching() halten sie über vprogSetzen() aktuell. */
@@ -1925,10 +1953,23 @@ function lpHero(){
 function vprogStand(nr){
   const fill=thread.querySelector('#vfill'), text=thread.querySelector('#vtext');
   if(!fill||!text) return;
-  if(nr==='fertig'){ fill.style.width='100%'; text.textContent='Geschafft'; return; }
+  if(nr==='fertig'){ fill.style.width='100%'; text.textContent='Geschafft';
+    panel.classList.add('voll-fertig'); return; }
   fill.style.width=Math.round(((nr-1)/FLOW.length)*100)+'%';
   text.textContent=nr+' von '+FLOW.length;
 }
+/* Themen-Icons der Fragen (nur Voll-Chat sichtbar): einfache Linien-SVGs
+   in der Akzentfarbe des Medaillons — je FLOW-Schlüssel eines. */
+const FRAGE_ICONS={
+ personen:'<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="9" cy="8" r="3.2"/><path d="M3.5 19c.6-3.2 2.8-5 5.5-5s4.9 1.8 5.5 5"/><circle cx="17" cy="9" r="2.6"/><path d="M14.8 18.6c.5-2.6 2-4 4.2-4 .5 0 1 .1 1.5.3"/></svg>',
+ haushalt:'<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 11 12 4l8.5 7"/><path d="M6 9.8V19h12V9.8"/><path d="M10 19v-5h4v5"/></svg>',
+ pflegegrad:'<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3.5 19 6v5.2c0 4.5-2.9 7.5-7 9.3-4.1-1.8-7-4.8-7-9.3V6z"/><path d="M12 8.5v6M9 11.5h6"/></svg>',
+ mobil:'<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="13" cy="4.8" r="1.9"/><path d="M13 7.5v6.5M13 10h-4l-2 4M13 14l2.5 5.5M13 14l-3.5 5.5M17.5 8.5V19"/></svg>',
+ nacht:'<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M19.5 14.5A8 8 0 0 1 9.5 4.5a8 8 0 1 0 10 10z"/></svg>',
+ deutsch:'<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6.5A2.5 2.5 0 0 1 6.5 4h11A2.5 2.5 0 0 1 20 6.5v7a2.5 2.5 0 0 1-2.5 2.5H12l-4.5 4v-4h-1A2.5 2.5 0 0 1 4 13.5z"/><path d="M8.5 9h7M8.5 12h4.5"/></svg>',
+ fuehrerschein:'<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 13.5 6.8 8.6A2 2 0 0 1 8.7 7.2h6.6a2 2 0 0 1 1.9 1.4L19 13.5"/><path d="M4.5 13.5h15V17a1 1 0 0 1-1 1H5.5a1 1 0 0 1-1-1z"/><circle cx="7.8" cy="15.7" r=".9" fill="currentColor"/><circle cx="16.2" cy="15.7" r=".9" fill="currentColor"/></svg>',
+ geschlecht:'<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="9" cy="14" r="4"/><path d="M12 11 17.5 5.5M17.5 5.5h-4M17.5 5.5v4"/></svg>'
+};
 
 async function oeffne(start){
   tipp(); versteckePille();
@@ -2081,9 +2122,14 @@ if(VOLL){
   // KI-Kennzeichnung im Chat selbst (die Kopfleiste des Panels ist im
   // Voll-Modus aus — der Hero trägt das Badge, scrollt aber mit dem
   // Gespräch weg; diese Zeile bleibt immer im Bild).
+  // Hinweiszeile aus Martins Mockup zwischen Antworten und Eingabe.
+  const hz=document.createElement('div');hz.className='voll-hinweis';
+  hz.innerHTML='<i>i</i>Nach Ihrer Auswahl geht es direkt zur nächsten Frage.';
+  const unten=W.querySelector('.unten');
+  unten.insertBefore(hz, unten.querySelector('.eingabe'));
   const ki=document.createElement('div');ki.className='voll-ki';
   ki.textContent='Pria ist eine KI-gestützte Assistentin von Primundus';
-  W.querySelector('.unten').appendChild(ki);
+  unten.appendChild(ki);
   protokoll('system','Voll-Chat (Landingpage) geöffnet',{ereignis:'lp'});
   oeffne('lp');
 }
