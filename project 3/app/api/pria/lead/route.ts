@@ -57,6 +57,10 @@ export async function POST(request: Request) {
   const telefon = String(body?.telefon || '').trim().slice(0, 60);
   const sid = String(body?.sid || '').replace(/[^\w-]/g, '').slice(0, 40);
   const a = body?.antworten || {};
+  // Google-Klick-IDs (gclid/wbraid/gbraid) für den Offline-Conversion-Import:
+  // nur durchreichen — die Allowlist + Längenprüfung sitzt im
+  // angebot-anfordern-Handler, hier wäre sie eine zweite Wahrheit.
+  const adParams = body?.adParams && typeof body.adParams === 'object' ? body.adParams : undefined;
 
   if (name.length < 2 || !/^[^\s@]+@[^\s@]+\.[a-zA-Z]{2,}$/.test(email)) {
     return NextResponse.json({ fehler: 'Name oder E-Mail fehlt.' }, { status: 400 });
@@ -100,6 +104,7 @@ export async function POST(request: Request) {
         telefon,
         kalkulation: { ...kalkulation, formularDaten },
         acceptPrivacy: true,
+        adParams,
         quelle: 'pria-chat',
       }),
     }) as any, undefined as any);   // withMem reicht (req, ctx) durch
@@ -120,7 +125,14 @@ export async function POST(request: Request) {
     }
 
     console.log(`[pria] Lead ${daten.leadId} aus Gespräch ${sid}`);
-    return NextResponse.json({ leadId: daten.leadId ?? null, portalUrl: daten.portalUrl ?? null });
+    // bruttopreis: der Chat braucht ihn als conversion_value für den
+    // dataLayer-Push angebot_erfolgreich (Schnittstellen-Vertrag mit SEA) —
+    // gezeigt wird er dem Kunden weiterhin erst im Portal.
+    return NextResponse.json({
+      leadId: daten.leadId ?? null,
+      portalUrl: daten.portalUrl ?? null,
+      bruttopreis: typeof kalkulation?.bruttopreis === 'number' ? kalkulation.bruttopreis : null,
+    });
   } catch (e: any) {
     console.warn('[pria] Lead-Route:', e?.message);
     return NextResponse.json({ fehler: 'Angebot konnte nicht angelegt werden.' }, { status: 502 });

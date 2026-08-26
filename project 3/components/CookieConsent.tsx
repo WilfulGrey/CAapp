@@ -70,7 +70,10 @@ export function CookieConsent() {
           Handy-Bildschirms) und damit genau über der ersten Wizard-Frage;
           12 % aller Taps der Seite gingen ans Banner. Jetzt: 2-Zeilen-Text,
           Buttons in einer Reihe, „Nur notwendige" gleichwertig sichtbar. */}
-      <div className="fixed bottom-0 left-0 right-0 z-50 bg-white border-t border-gray-200 shadow-2xl">
+      {/* id: /beratung hebt den Banner per CSS über den Voll-Chat (z-50 des
+          Panels läge sonst darüber, und auf dem Handy wäre der Consent nie
+          erreichbar — keine Einwilligung, keine Analytics-Events). */}
+      <div id="cookie-consent" className="fixed bottom-0 left-0 right-0 z-50 bg-white border-t border-gray-200 shadow-2xl">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-2">
           <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4">
             <div className="flex-1 min-w-0 flex items-start gap-2.5">
