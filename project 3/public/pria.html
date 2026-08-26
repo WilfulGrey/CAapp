@@ -344,17 +344,22 @@
      Spezifität gegen dessen .panel — die Reihenfolge-Falle von oben
      betrifft nur gleichrangige Selektoren. Öffnet sich die Tastatur,
      überschreiben die Inline-Styles aus handyLayout() das hier ohnehin. */
-  .panel.voll{top:var(--pria-oben,0px);right:0;bottom:var(--pria-unten,0px);left:0;
+  .panel.voll{top:var(--pria-oben,0px);right:8px;bottom:var(--pria-unten,0px);left:8px;
     width:auto;height:auto;max-height:none;margin:0 auto;max-width:620px;
-    border-radius:0;border:0;box-shadow:none;transform-origin:bottom center}
-  @media(min-width:641px){
-    /* Auf dem Desktop als Säule auf der Bühne, nicht als Vollbild-Fläche. */
-    .panel.voll{border-radius:24px 24px 0 0;border:1px solid rgba(40,34,28,.07);
-      border-bottom:0;box-shadow:var(--schatten-panel)}
-  }
+    border-radius:22px 22px 0 0;border:1px solid rgba(40,34,28,.07);border-bottom:0;
+    box-shadow:var(--schatten-panel);transform-origin:bottom center}
   .panel.voll .zu{display:none}
-  /* Notch und Statusleiste übernimmt die Kopfzeile der Seite. */
-  .panel.voll .bar{padding-top:15px}
+  /* Keine eigene Kopfleiste: die SEITE stellt Pria vor (Hero mit Porträt,
+     Gruß und KI-Badge) — eine zweite Vorstellung im Panel wäre genau das
+     Zusammengewürfelte, das Martin moniert hat (26.08.). Der Fortschritts-
+     balken (.prog) bleibt als oberste Linie des Panels. */
+  .panel.voll .bar{display:none}
+  /* KI-Kennzeichnung bleibt trotzdem IM Chat verankert (AI Act, Pflicht):
+     eine stille Zeile unter der Eingabe — sichtbar auch, wenn die Tastatur
+     den Hero der Seite verdeckt. */
+  .voll-ki{display:none;text-align:center;font-size:10px;letter-spacing:.2px;
+    color:var(--muted);padding:3px 10px 5px}
+  .panel.voll .voll-ki{display:block}
   /* Solange der Chat offen ist, soll die Seite darunter nicht mitscrollen. */
   body.chat-offen{overflow:hidden}
 </style>
@@ -1838,18 +1843,22 @@ async function oeffne(start){
   // Auch ohne Animation (reduzierte Bewegung) muss die Höhe stimmen.
   setTimeout(()=>{ panel.classList.add('fertig'); handyLayout(); }, 700);
   if(gestartet) return; gestartet=true;
+  if(start==='lp'){
+    /* Landingpage /beratung: der Hero der Seite hat Pria schon vorgestellt
+       und gegrüßt — hier keine zweite Begrüßung, sondern direkt ins Tun
+       (CRO 26.08.). Wortlaut nach der Preisansprache-Linie (Martin, 21.08.):
+       das Angebot ist die Antwort, keine Spanne, kein Zögern. */
+    await pause(260);
+    // Kompakt: auf dem Handy müssen diese Blase UND Frage 1 ohne Scrollen
+    // ins Panel passen — sonst beginnt die Seite mit einem angeschnittenen
+    // Satz.
+    return starteFunnel('preis',null,false,
+      'Ich rechne Ihnen Ihren <b>Monatspreis</b> aus und zeige Ihnen gleich '+
+      '<b>passende Pflegekräfte</b>.');
+  }
   await pause(340);
   // Kurz halten: Der KI-Hinweis steht in der Kopfzeile, nicht im Gespräch.
   await sagen('Guten Tag! Ich bin <b>Pria</b> von Primundus. 👋');
-  if(start==='lp'){
-    /* Landingpage /beratung: der Besucher kam über eine Anzeige für Preis
-       und Angebot — direkt hinein, ohne Umweg über „fragen Sie mich".
-       Wortlaut nach der Preisansprache-Linie (Martin, 21.08.): das Angebot
-       ist die Antwort, keine Spanne, kein Zögern. */
-    return starteFunnel('preis',null,false,
-      'Ich rechne Ihnen hier Ihren <b>Monatspreis</b> aus und stelle Ihnen gleich '+
-      '<b>passende Pflegekräfte</b> vor, die aktuell verfügbar sind.');
-  }
   if(start==='preis') return starteFunnel('preis',null,'Ja, gern');
   // Nicht nur „fragen Sie mich" (Martin, 22.08.) — was sie KANN, gehört in den
   // zweiten Satz, sonst wirkt sie wie ein Auskunftsschalter.
@@ -1967,6 +1976,12 @@ document.querySelector('.blase .mark').innerHTML=avatar(null,true,true);
 if(VOLL){
   panel.classList.add('voll');
   blase.classList.add('weg');
+  // KI-Kennzeichnung im Chat selbst (die Kopfleiste des Panels ist im
+  // Voll-Modus aus — der Hero der Seite trägt Badge und Porträt, aber bei
+  // offener Tastatur ist er verdeckt; diese Zeile bleibt immer im Bild).
+  const ki=document.createElement('div');ki.className='voll-ki';
+  ki.textContent='Pria ist eine KI-gestützte Assistentin von Primundus';
+  document.querySelector('.unten').appendChild(ki);
   protokoll('system','Voll-Chat (Landingpage) geöffnet',{ereignis:'lp'});
   oeffne('lp');
 }
