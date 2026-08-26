@@ -379,11 +379,17 @@
     '  .lphero .anrede{margin:0;font-size:17.5px;line-height:1.42;color:var(--ink);\n'+
     '    font-weight:500;letter-spacing:-.2px}\n'+
     '  .lphero .anrede b{font-weight:750}\n'+
+    '  /* Die Fragen tragen das Gespräch — im Voll-Chat stehen sie in derselben\n'+
+    '     Größe wie die Anrede (Martin, 26.08.), die Zusatzzeile „Frage x von 8"\n'+
+    '     bleibt klein. Nur .panel.voll: das schwebende Widget bleibt, wie es ist. */\n'+
+    '  .panel.voll .bub.frage{font-size:17.5px;font-weight:650;line-height:1.38;\n'+
+    '    letter-spacing:-.2px}\n'+
     '  @media(min-width:641px){\n'+
     '    .lphero{padding:24px 22px 18px}\n'+
     '    .lphero .kopfbild img{width:66px;height:66px}\n'+
     '    .lphero .anrede{font-size:19px}\n'+
     '    .lphero .siegelecke img{height:78px}\n'+
+    '    .panel.voll .bub.frage{font-size:19px}\n'+
     '  }\n'+
     '  /* KI-Kennzeichnung bleibt trotzdem IM Chat verankert (AI Act, Pflicht):\n'+
     '     eine stille Zeile unter der Eingabe — sichtbar auch, wenn die Tastatur\n'+
@@ -930,6 +936,9 @@ async function naechste(){
   // Kurz durchatmen zwischen Reaktion und nächster Frage — sonst prasselt es.
   await pause(ruhig?0:520);
   await sagen(s.q,'Frage '+(FLOW.indexOf(s)+1)+' von '+FLOW.length+(s.hinweis?'<br>'+s.hinweis:''));
+  // Frage-Blasen markieren: im Voll-Chat stellt CSS sie größer (.bub.frage
+  // greift nur unter .panel.voll — das schwebende Widget bleibt unberührt).
+  const fb=thread.querySelector('.row:last-child .bub'); if(fb) fb.classList.add('frage');
   offeneFrage=s;
   setChips(s.o.map(([v,l])=>({t:l,f:b=>waehle(s,v,l,b)})));
 }
