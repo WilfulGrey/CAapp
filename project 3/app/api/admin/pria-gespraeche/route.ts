@@ -10,6 +10,7 @@
  */
 import { createClient } from '@supabase/supabase-js';
 import { NextRequest, NextResponse } from 'next/server';
+import { PORTAL_BASIS } from '@/lib/portal-url';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -74,8 +75,8 @@ export async function GET(request: NextRequest) {
           mamamiaKunde: l.mamamia_customer_id, mamamiaJob: l.mamamia_job_offer_id,
           bruttopreis: k.bruttopreis ?? null, eigenanteil: k.eigenanteil ?? null,
           angaben: k.formularDaten ?? null,
-          portalUrl: l.token && process.env.NEXT_PUBLIC_PORTAL_URL
-            ? `${process.env.NEXT_PUBLIC_PORTAL_URL.replace(/\/$/, '')}/?token=${encodeURIComponent(l.token)}`
+          portalUrl: l.token && PORTAL_BASIS
+            ? `${PORTAL_BASIS}/?token=${encodeURIComponent(l.token)}`
             : null,
         };
       }

@@ -6,6 +6,7 @@ import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { createClient } from '@supabase/supabase-js';
 import { Loader as Loader2, ArrowLeft, Mail, Phone, Calendar, MapPin, FileText, Clock, Download, CreditCard as Edit, Save, X, RefreshCw, User, BellOff, CircleCheck as CheckCircle, MessageSquare, Copy, Check } from 'lucide-react';
+import { PORTAL_BASIS } from '@/lib/portal-url';
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -1331,7 +1332,7 @@ export default function LeadDetailPage() {
               )}
               {lead.token && (() => {
                 const portalBase =
-                  process.env.NEXT_PUBLIC_PORTAL_URL ?? 'https://kundenportal.primundus.de';
+                  PORTAL_BASIS;
                 const portalUrl = `${portalBase}/?token=${encodeURIComponent(lead.token)}`;
                 const copy = async (
                   text: string,

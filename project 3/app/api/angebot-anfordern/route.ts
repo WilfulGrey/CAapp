@@ -306,7 +306,7 @@ async function handlePost(request: NextRequest) {
     // URL the result page redirects to (and that the Eingangsbestätigung
     // email also embeds). Both are non-secret — token is single-customer
     // scoped and gated by token_expires_at on the receiving side.
-    const portalBase = process.env.NEXT_PUBLIC_PORTAL_URL ?? '';
+    const portalBase = PORTAL_BASIS;
     const portalUrl = portalBase && lead.token
       ? `${portalBase.replace(/\/$/, '')}/?token=${encodeURIComponent(lead.token)}`
       : null;
@@ -390,4 +390,5 @@ async function handleSendAngebotsEmailOnly(leadId: string) {
 
 // ─── Telemetria RAM (diagnoza OOM — plan 2026-08-09; format: [req] …) ───
 import { withMem } from '@/lib/memlog';
+import { PORTAL_BASIS } from '@/lib/portal-url';
 export const POST = withMem('angebot-anfordern', handlePost);

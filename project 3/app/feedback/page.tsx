@@ -23,10 +23,24 @@ import { useEffect, useState } from 'react';
 
 type Antwort = 'hilfreich' | 'teils' | 'nein';
 
+// Bewertungsziele stehen BEWUSST hart im Code und nicht in einer
+// Umgebungsvariable.
+//
+// Vorher hingen beide an NEXT_PUBLIC_*. In Render war keine davon gesetzt,
+// also war jede leer, beide Knoepfe verschwanden — und die Seite zeigte
+// ein Dankeschoen voellig ohne Handlung. Genau an der Stelle, an der die
+// Bewertungsmail den Kunden gerade um eine Bewertung gebeten hat. Der
+// Ausfall war lautlos: keine Fehlermeldung, nur eine Seite, die fertig
+// aussah. Gemeldet 26.08.2026, bestand seit dem Start des Funnels.
+//
+// NEXT_PUBLIC_* darf weiterhin ueberschreiben (z. B. fuer Staging), aber
+// nie mehr der einzige Weg zu einer Adresse sein.
+// Geprueft 26.08.2026: /evaluate/… antwortet 200 (Trustpilot-Schreibseite).
+const TRUSTPILOT_REVIEW_URL = process.env.NEXT_PUBLIC_TRUSTPILOT_REVIEW_URL
+  || 'https://de.trustpilot.com/evaluate/primundus.de';
+// TODO Google: Martin muss sagen, WELCHES der drei Google-Profile die
+// Bewertungen sammeln soll. Bis dahin traegt Trustpilot den Funnel allein.
 const GOOGLE_REVIEW_URL = process.env.NEXT_PUBLIC_GOOGLE_REVIEW_URL || '';
-// Trustpilot-Profil existiert noch nicht (Stand 19.08.2026). Sobald die URL
-// gesetzt ist, erscheint der zweite Knopf von selbst — ohne Code-Aenderung.
-const TRUSTPILOT_REVIEW_URL = process.env.NEXT_PUBLIC_TRUSTPILOT_REVIEW_URL || '';
 
 const FARBE = {
   grund: '#F4F1EC',
@@ -115,9 +129,13 @@ export default function FeedbackSeite() {
               Das Siegel steht klein daneben, ohne die Zeile zu beherrschen. */}
           <div style={{ display: 'flex', alignItems: 'flex-start',
                         justifyContent: 'space-between', gap: 18, marginBottom: 22 }}>
+            {/* Die Quelle ist 320x480 (Hochformat). In ein Quadrat mit
+                objectFit:'cover' gezwungen und mittig beschnitten faellt der
+                Kopf oben heraus (gemeldet 26.08.2026). Ein Hochformat-Rahmen
+                plus Beschnitt nach oben zeigt Gesicht und Schultern ganz. */}
             <img src="/images/marta-kapcio.jpg" alt="Marta Kapcio"
-                 style={{ width: 92, height: 92, borderRadius: 16, objectFit: 'cover',
-                          objectPosition: 'center', flexShrink: 0 }} />
+                 style={{ width: 96, height: 122, borderRadius: 16, objectFit: 'cover',
+                          objectPosition: '50% 14%', flexShrink: 0 }} />
             <img src="/images/primundus_testsieger-2021.webp"
                  alt="Testsieger — Service-Studie DIE WELT und ServiceValue 2021"
                  style={{ height: 72, width: 'auto', flexShrink: 0, opacity: 0.9 }} />
@@ -160,7 +178,9 @@ export default function FeedbackSeite() {
                 Vielen Dank!
               </h1>
               <p style={{ fontSize: 17, lineHeight: 1.6, color: FARBE.leise, margin: '0 0 24px' }}>
-                Mögen Sie uns kurz bei Google oder Trustpilot bewerten?
+                {GOOGLE_REVIEW_URL
+                  ? 'Mögen Sie uns kurz bei Google oder Trustpilot bewerten? '
+                  : 'Mögen Sie uns kurz bei Trustpilot bewerten? '}
                 Damit helfen Sie uns und anderen Familien bei ihrer Suche.
               </p>
               {GOOGLE_REVIEW_URL && (
@@ -173,21 +193,22 @@ export default function FeedbackSeite() {
                   Bei Google bewerten
                 </a>
               )}
-              {TRUSTPILOT_REVIEW_URL && (
-                <a href={TRUSTPILOT_REVIEW_URL} target="_blank" rel="noopener noreferrer"
-                   onClick={() => melden('hilfreich', 'Trustpilot-Bewertung geöffnet')}
-                   style={{ display: 'block', textAlign: 'center', fontSize: 17, fontWeight: 600,
-                            padding: '17px 22px', borderRadius: 13, background: '#fff',
-                            border: `1px solid ${FARBE.randStark}`,
-                            color: FARBE.text, textDecoration: 'none' }}>
-                  Bei Trustpilot bewerten
-                </a>
-              )}
-              {!GOOGLE_REVIEW_URL && !TRUSTPILOT_REVIEW_URL && (
-                <p style={{ fontSize: 15, color: FARBE.leise, margin: 0 }}>
-                  Ihre Rückmeldung ist bei uns angekommen.
-                </p>
-              )}
+              {/* Ohne Google-Adresse traegt Trustpilot die Hauptrolle und
+                  bekommt die Akzentfarbe — sonst stuende hier ein blasser
+                  Zweitknopf ganz allein. */}
+              <a href={TRUSTPILOT_REVIEW_URL} target="_blank" rel="noopener noreferrer"
+                 onClick={() => melden('hilfreich', 'Trustpilot-Bewertung geöffnet')}
+                 style={GOOGLE_REVIEW_URL
+                   ? { display: 'block', textAlign: 'center', fontSize: 17, fontWeight: 600,
+                       padding: '17px 22px', borderRadius: 13, background: '#fff',
+                       border: `1px solid ${FARBE.randStark}`,
+                       color: FARBE.text, textDecoration: 'none' }
+                   : { display: 'block', textAlign: 'center', fontSize: 17.5, fontWeight: 700,
+                       padding: '18px 22px', borderRadius: 13, background: FARBE.akzent,
+                       boxShadow: '0 2px 8px rgba(139,115,85,0.28)',
+                       color: '#fff', textDecoration: 'none' }}>
+                Bei Trustpilot bewerten
+              </a>
             </>
           )}
 

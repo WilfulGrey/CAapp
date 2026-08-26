@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button';
 import Image from 'next/image';
 import { identifyClarity } from '@/lib/clarity';
 import { usableNamePart } from '@/lib/calculation';
+import { PORTAL_BASIS } from '@/lib/portal-url';
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -105,7 +106,7 @@ export default function KalkulationPage() {
   // somehow opens this page before the angebot-anfordern flow ran — in
   // practice every kalkulation/[leadId] visit comes after that step.
   const handleStartBetreuung = () => {
-    const portalBase = process.env.NEXT_PUBLIC_PORTAL_URL ?? '';
+    const portalBase = PORTAL_BASIS;
     const token = (lead as { token?: string | null } | null)?.token ?? null;
     if (!portalBase || !token) {
       console.warn('Portal handoff unavailable — missing NEXT_PUBLIC_PORTAL_URL or lead.token');

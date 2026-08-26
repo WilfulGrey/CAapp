@@ -12,7 +12,7 @@ import {
   type OfferInfo,
 } from '@/lib/email';
 import { buildVertragAttachmentPdf, formatSignedAtBerlin } from '@/lib/vertrag';
-import { appendJobParam } from '@/lib/portal-url';
+import { appendJobParam, PORTAL_BASIS } from '@/lib/portal-url';
 import { sendezeitIso } from '@/lib/quiet-hours';
 import { createHash } from 'crypto';
 
@@ -419,7 +419,7 @@ function extractOffer(metadata: any): OfferInfo | undefined {
 }
 
 function buildPortalUrl(lead: { token?: string | null }): string {
-  const portalBase = process.env.NEXT_PUBLIC_PORTAL_URL || '';
+  const portalBase = PORTAL_BASIS;
   if (!portalBase || !lead.token) return '';
   return `${portalBase.replace(/\/$/, '')}/?token=${encodeURIComponent(lead.token)}`;
 }
