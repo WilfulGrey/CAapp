@@ -965,9 +965,9 @@ export function buildEingangsbestaetigungHtml(lead: Lead, siteUrl: string, porta
   // ── "So geht es weiter" — 3 Schritte ──────────────────────────────────────
   const stepRow = (n: string, title: string, desc: string, last = false) => `
       <tr>
-        <td style="vertical-align:top;width:34px;padding:0 12px ${last ? "0" : "14px"} 0;">
+        <td style="vertical-align:top;width:38px;padding:0 12px ${last ? "0" : "14px"} 0;">
           <table cellpadding="0" cellspacing="0" role="presentation"><tr>
-            <td width="26" height="26" align="center" valign="middle" bgcolor="#8B7355" style="background-color:#8B7355;border-radius:50%;color:#ffffff;font-size:13px;font-weight:700;line-height:26px;text-align:center;">${n}</td>
+            <td width="26" height="26" align="center" valign="middle" bgcolor="#8B7355" style="background-color:#8B7355;width:26px;min-width:26px;max-width:26px;height:26px;border-radius:13px;padding:0;mso-line-height-rule:exactly;color:#ffffff;font-size:13px;font-weight:700;line-height:26px;text-align:center;">${n}</td>
           </tr></table>
         </td>
         <td style="vertical-align:top;padding:0 0 ${last ? "0" : "14px"} 0;">
@@ -1688,12 +1688,16 @@ Primundus Deutschland | www.primundus.de
 export function buildWarumPrimundusHtml(lead: Lead, portalUrl: string, siteUrl: string): string {
   const greeting = buildHalloAnrede(lead.anrede_text || null, lead.nachname || "", lead.vorname || "");
 
+  // Runde Marke: Maße gehoeren ins CSS, nicht nur in width=/height=.
+  // Mail-Clients werfen die Attribute weg und rechnen den Innenabstand
+  // der Spalte mit — aus dem Kreis wird sonst ein Ei (26.08.2026:
+  // gemessen 11,8 x 22 px). Pixel-Radius statt 50%, Spalte breit genug.
   const usp = (title: string, desc: string) => `
     <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="margin:0 0 12px;">
       <tr>
-        <td style="vertical-align:top;width:30px;padding:2px 12px 0 0;">
+        <td style="vertical-align:top;width:34px;padding:2px 12px 0 0;">
           <table cellpadding="0" cellspacing="0" role="presentation"><tr>
-            <td width="22" height="22" align="center" valign="middle" bgcolor="#2A9D5C" style="background-color:#2A9D5C;border-radius:50%;color:#ffffff;font-size:13px;font-weight:700;line-height:22px;text-align:center;">&#10003;</td>
+            <td width="22" height="22" align="center" valign="middle" bgcolor="#2A9D5C" style="background-color:#2A9D5C;width:22px;min-width:22px;max-width:22px;height:22px;border-radius:11px;padding:0;mso-line-height-rule:exactly;color:#ffffff;font-size:13px;font-weight:700;line-height:22px;text-align:center;">&#10003;</td>
           </tr></table>
         </td>
         <td style="vertical-align:top;">

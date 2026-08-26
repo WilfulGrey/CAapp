@@ -1476,9 +1476,9 @@ function bulletproofButton(url: string, label: string, bgColor: string = '#2A9D5
 function buildStepsList(steps: { title: string; desc: string }[]): string {
   const rows = steps.map((s, i) => `
     <tr>
-      <td style="vertical-align:top;width:34px;padding:0 12px 14px 0;">
+      <td style="vertical-align:top;width:38px;padding:0 12px 14px 0;">
         <table cellpadding="0" cellspacing="0" role="presentation"><tr>
-          <td width="26" height="26" align="center" valign="middle" bgcolor="#8B7355" style="background-color:#8B7355;border-radius:50%;color:#ffffff;font-size:13px;font-weight:700;line-height:26px;text-align:center;">${i + 1}</td>
+          <td width="26" height="26" align="center" valign="middle" bgcolor="#8B7355" style="background-color:#8B7355;width:26px;min-width:26px;max-width:26px;height:26px;border-radius:13px;padding:0;mso-line-height-rule:exactly;color:#ffffff;font-size:13px;font-weight:700;line-height:26px;text-align:center;">${i + 1}</td>
         </tr></table>
       </td>
       <td style="vertical-align:top;padding:0 0 14px 0;">
@@ -2190,9 +2190,9 @@ export function getCaregiverInterestEmailTemplate(
 
   const stepRow = (n: string, title: string, desc: string, last = false) => `
       <tr>
-        <td style="vertical-align:top;width:34px;padding:0 12px ${last ? '0' : '14px'} 0;">
+        <td style="vertical-align:top;width:38px;padding:0 12px ${last ? '0' : '14px'} 0;">
           <table cellpadding="0" cellspacing="0" role="presentation"><tr>
-            <td width="26" height="26" align="center" valign="middle" bgcolor="#8B7355" style="background-color:#8B7355;border-radius:50%;color:#ffffff;font-size:13px;font-weight:700;line-height:26px;text-align:center;">${n}</td>
+            <td width="26" height="26" align="center" valign="middle" bgcolor="#8B7355" style="background-color:#8B7355;width:26px;min-width:26px;max-width:26px;height:26px;border-radius:13px;padding:0;mso-line-height-rule:exactly;color:#ffffff;font-size:13px;font-weight:700;line-height:26px;text-align:center;">${n}</td>
           </tr></table>
         </td>
         <td style="vertical-align:top;padding:0 0 ${last ? '0' : '14px'} 0;">
@@ -2368,9 +2368,9 @@ export function getApplicationReceivedEmailTemplate(
 
   const stepRow = (n: string, title: string, desc: string, last = false) => `
       <tr>
-        <td style="vertical-align:top;width:34px;padding:0 12px ${last ? '0' : '14px'} 0;">
+        <td style="vertical-align:top;width:38px;padding:0 12px ${last ? '0' : '14px'} 0;">
           <table cellpadding="0" cellspacing="0" role="presentation"><tr>
-            <td width="26" height="26" align="center" valign="middle" bgcolor="#8B7355" style="background-color:#8B7355;border-radius:50%;color:#ffffff;font-size:13px;font-weight:700;line-height:26px;text-align:center;">${n}</td>
+            <td width="26" height="26" align="center" valign="middle" bgcolor="#8B7355" style="background-color:#8B7355;width:26px;min-width:26px;max-width:26px;height:26px;border-radius:13px;padding:0;mso-line-height-rule:exactly;color:#ffffff;font-size:13px;font-weight:700;line-height:26px;text-align:center;">${n}</td>
           </tr></table>
         </td>
         <td style="vertical-align:top;padding:0 0 ${last ? '0' : '14px'} 0;">
