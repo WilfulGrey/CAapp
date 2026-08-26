@@ -132,7 +132,7 @@ export function getBewertungsanfrageTemplate(
                    style="display:block;width:36px;height:auto;" />
             </td>
             <td style="text-align:left;padding-left:8px;">
-              <p style="margin:0 0 1px 0;font-size:10px;font-weight:700;color:#3D2B1F;white-space:nowrap;">Testsieger</p>
+              <p style="margin:0 0 1px 0;font-size:10px;font-weight:700;color:#3D2B1F;white-space:nowrap;">6× Testsieger</p>
               <p style="margin:0 0 1px 0;font-size:10px;color:#B5A184;white-space:nowrap;font-weight:600;">DIE WELT</p>
               <p style="margin:0;font-size:9px;color:#aaa;white-space:nowrap;">Preis &amp; Qualit&auml;t</p>
             </td>
