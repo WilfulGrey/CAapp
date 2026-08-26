@@ -407,6 +407,9 @@ CA app → Mamamia:
 | `project 3/app/api/kalkulation-berechnen/route.ts` | Server-side pricing calculation z `pricing_config` |
 | `project 3/lib/email-template.ts` | Eingangsbestätigung HTML + plain text |
 | `project 3/lib/pdf-generator.ts` | Angebots PDF dla follow-up email (15min delay) |
+| `project 3/public/pria.html` | Pria-Chat — JEDYNE źródło (CSS+markup+JS). `scripts/pria-widget-bauen.py` generuje z niego `public/pria-widget.js` (Shadow-DOM-Widget, NIE edytować ręcznie). Zawiera też tryb Voll-Chat (`data-pria-voll`) + dataLayer-Push `angebot_erfolgreich` po lead-sukcesie |
+| `project 3/app/beratung/page.tsx` | Chat-Landingpage (SEA-Test „Chat-Test"): USP-header (6× Testsieger + Siegel) + Voll-Chat. Host-gated (staging/localhost → 404 na prod), `noindex`. Messkette: docs/google-ads-tracking.md §„Chat-Landingpage" |
+| `project 3/app/api/pria/lead/route.ts` | Chat → Lead: liczy cenę, woła handler `angebot-anfordern` **in-process** (jeden lead-path), forwarduje `adParams`, zwraca `{leadId, portalUrl, bruttopreis}` |
 
 ### Edge Functions (`supabase/functions/`)
 

@@ -13,6 +13,7 @@ Bidding auf Leads statt Klicks optimiert.
 | Klick-IDs auf `leads` (`gclid/wbraid/gbraid`) | `angebot-anfordern/route.ts` (allowlist + best-effort Update) | Bug #33 |
 | dataLayer-Event `angebot_erfolgreich` (lead_id, conversion_value, pflegegrad, care_start_timing) | `MultiStepForm.tsx` nach Server-Erfolg | seit jeher |
 | GTM-sicherer Redirect (`eventCallback` + `eventTimeout 700` + Safety 900 ms) | `MultiStepForm.tsx` | Bug #33 |
+| Chat-LP `/beratung`: gleicher Push + Klick-IDs (Details unten) | `public/pria.html` (Kontakt-Block) + `app/beratung/page.tsx` | seit 26.08. |
 | Submit-Tracking redirect-fest (sendBeacon → `/api/analytics/critical-event`) | `lib/analytics.ts` + neue API-Route | Bug #33 |
 | GTM-Container `GTM-59V6N7RC` + GA4 `G-W2QEQ18EE7` | `app/layout.tsx` | seit jeher |
 
@@ -184,3 +185,31 @@ angefordert" der Schalter „Erweiterte Conversions" aktiv sein (UI-only,
 Methode: Google Tag Manager). DSGVO-Hinweis: Übertragung gehashter
 E-Mail an Google — sauber wird das erst mit Consent Mode v2
 (offenes Projekt, siehe SEA-Audit 20.08.).
+
+## Chat-Landingpage `/beratung` (seit 26.08.2026, Staging-gated)
+
+Voll-Chat-Variante des Kostenrechners für den SEA-Test „Chat-Test"
+(Schnittstellen-Vertrag Pria ↔ SEA vom 26.08.). Messkette bewusst
+identisch zum Formular:
+
+- **Lead-Pfad:** Chat → `/api/pria/lead` → ruft den
+  `angebot-anfordern`-Handler **im Prozess** auf (EIN Lead-Pfad).
+  `adParams` (gclid/wbraid/gbraid aus `_prim_ad_params` bzw. der URL)
+  werden seit 26.08. durchgereicht — damit greifen beide
+  Offline-Conversion-Uploads auch für Chat-Leads.
+- **Push:** `angebot_erfolgreich` mit `lead_id`, `conversion_value`
+  (bruttopreis, kommt seit 26.08. aus der `/api/pria/lead`-Antwort),
+  `user_email` (Enhanced Conversions) und `pflegegrad`.
+  `care_start_timing` fehlt — Pria fragt es nicht (GTM-Variable bleibt
+  bei Chat-Leads leer, betrifft keinen Tag-Trigger).
+- **Redirect:** kein `eventCallback`-Warten nötig — zwischen Push und
+  `location.assign` liegen Übergabe-Animation + Marta-Karte (≥3 s),
+  mehr Tag-Zeit als im Formular. Wächter gegen Doppel-Navigation
+  (Chip + Auto-Timer) ist drin.
+- **Varianten-Marker:** `analytics_sessions.landing_page = '/beratung'`
+  (Session entsteht wie auf jeder Seite über `lib/analytics.ts`).
+- **Gate:** Route liefert außerhalb von
+  `kostenrechner-staging.onrender.com`/localhost ein 404
+  (`app/beratung/page.tsx`, ERLAUBTE_HOSTS) — Prod-Schaltung ist ein
+  bewusster PR nach Messketten-Abnahme durch SEA. `noindex` bleibt auch
+  danach (Kampagnen-Seite).
