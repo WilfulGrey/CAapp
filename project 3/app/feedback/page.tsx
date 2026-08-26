@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type CSSProperties, type MouseEvent } from 'react';
 
 // Rückmeldungs-Seite nach dem Angebot (/feedback?token=...).
 //
@@ -38,9 +38,13 @@ type Antwort = 'hilfreich' | 'teils' | 'nein';
 // Geprueft 26.08.2026: /evaluate/… antwortet 200 (Trustpilot-Schreibseite).
 const TRUSTPILOT_REVIEW_URL = process.env.NEXT_PUBLIC_TRUSTPILOT_REVIEW_URL
   || 'https://de.trustpilot.com/evaluate/primundus.de';
-// TODO Google: Martin muss sagen, WELCHES der drei Google-Profile die
-// Bewertungen sammeln soll. Bis dahin traegt Trustpilot den Funnel allein.
-const GOOGLE_REVIEW_URL = process.env.NEXT_PUBLIC_GOOGLE_REVIEW_URL || '';
+// Kurzlink aus dem Google-Unternehmensprofil ("Mehr Rezensionen erhalten",
+// Martin 26.08.2026). Geprueft: 200, leitet auf den Rezensions-Dialog des
+// Eintrags. Google gibt diese Adresse nur dem eingeloggten Profil-Inhaber
+// oder per kostenpflichtigem Places-Schluessel heraus — sie laesst sich
+// nicht nachschlagen, deshalb steht sie hier fest.
+const GOOGLE_REVIEW_URL = process.env.NEXT_PUBLIC_GOOGLE_REVIEW_URL
+  || 'https://g.page/r/Cc3Eo4E9lrdtEBI/review';
 
 const FARBE = {
   grund: '#F4F1EC',
@@ -53,6 +57,48 @@ const FARBE = {
   akzentDunkel: '#6B5444',
   gut: '#22A06B',
 } as const;
+
+// Die beiden Zeichen als SVG — keine Fremd-Ressource, kein Nachladen.
+function GoogleG() {
+  return (
+    <svg width="19" height="19" viewBox="0 0 48 48" aria-hidden="true" style={{ flexShrink: 0 }}>
+      <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/>
+      <path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/>
+      <path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/>
+      <path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/>
+    </svg>
+  );
+}
+
+function TrustpilotStern() {
+  return (
+    <svg width="19" height="19" viewBox="0 0 24 24" aria-hidden="true" style={{ flexShrink: 0 }}>
+      <path fill="#00B67A" d="M12 1.6l3.1 7.05 7.65.62-5.8 5.02 1.75 7.48L12 17.83 5.3 21.77l1.75-7.48-5.8-5.02 7.65-.62z"/>
+    </svg>
+  );
+}
+
+// Ein Stil fuer beide: gleiches Gewicht, gleiche Groesse. Die Farbe kommt
+// aus dem Zeichen, nicht aus der Flaeche — sonst kaempfen Google-Blau,
+// Trustpilot-Gruen und das Primundus-Gold gegeneinander.
+const KNOPF: CSSProperties = {
+  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 11,
+  fontSize: 16.5, fontWeight: 600, padding: '16px 22px', borderRadius: 12,
+  background: '#fff', border: '1px solid #DCDCE0', color: '#18181B',
+  textDecoration: 'none', boxShadow: '0 1px 2px rgba(24,24,27,0.05)',
+  transition: 'box-shadow .15s, border-color .15s, transform .15s',
+};
+
+const anheben = (e: MouseEvent<HTMLAnchorElement>) => {
+  e.currentTarget.style.boxShadow = '0 4px 14px rgba(24,24,27,0.10)';
+  e.currentTarget.style.borderColor = '#C4C4CA';
+  e.currentTarget.style.transform = 'translateY(-1px)';
+};
+const ablegen = (e: MouseEvent<HTMLAnchorElement>) => {
+  e.currentTarget.style.boxShadow = '0 1px 2px rgba(24,24,27,0.05)';
+  e.currentTarget.style.borderColor = '#DCDCE0';
+  e.currentTarget.style.transform = 'none';
+};
 
 const SERIF = "ui-serif, Georgia, 'Times New Roman', serif";
 
@@ -183,32 +229,25 @@ export default function FeedbackSeite() {
                   : 'Mögen Sie uns kurz bei Trustpilot bewerten? '}
                 Damit helfen Sie uns und anderen Familien bei ihrer Suche.
               </p>
-              {GOOGLE_REVIEW_URL && (
+              {/* Marken-Knoepfe statt zweier gleicher Farbbalken: das
+                  Google-G und der Trustpilot-Stern sagen auf einen Blick,
+                  wo man landet — das ist der eigentliche Grund zu klicken.
+                  Heller Grund, feiner Rand, Farbe kommt allein aus den
+                  Zeichen. (Martin, 26.08.2026: nicht in diesem Braun.) */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                 <a href={GOOGLE_REVIEW_URL} target="_blank" rel="noopener noreferrer"
                    onClick={() => melden('hilfreich', 'Google-Bewertung geöffnet')}
-                   style={{ display: 'block', textAlign: 'center', fontSize: 17.5, fontWeight: 700,
-                            padding: '18px 22px', borderRadius: 13, background: FARBE.akzent,
-                            boxShadow: '0 2px 8px rgba(139,115,85,0.28)',
-                            color: '#fff', textDecoration: 'none', marginBottom: 11 }}>
-                  Bei Google bewerten
+                   style={KNOPF} onMouseOver={anheben} onMouseOut={ablegen}>
+                  <GoogleG />
+                  <span>Bei Google bewerten</span>
                 </a>
-              )}
-              {/* Ohne Google-Adresse traegt Trustpilot die Hauptrolle und
-                  bekommt die Akzentfarbe — sonst stuende hier ein blasser
-                  Zweitknopf ganz allein. */}
-              <a href={TRUSTPILOT_REVIEW_URL} target="_blank" rel="noopener noreferrer"
-                 onClick={() => melden('hilfreich', 'Trustpilot-Bewertung geöffnet')}
-                 style={GOOGLE_REVIEW_URL
-                   ? { display: 'block', textAlign: 'center', fontSize: 17, fontWeight: 600,
-                       padding: '17px 22px', borderRadius: 13, background: '#fff',
-                       border: `1px solid ${FARBE.randStark}`,
-                       color: FARBE.text, textDecoration: 'none' }
-                   : { display: 'block', textAlign: 'center', fontSize: 17.5, fontWeight: 700,
-                       padding: '18px 22px', borderRadius: 13, background: FARBE.akzent,
-                       boxShadow: '0 2px 8px rgba(139,115,85,0.28)',
-                       color: '#fff', textDecoration: 'none' }}>
-                Bei Trustpilot bewerten
-              </a>
+                <a href={TRUSTPILOT_REVIEW_URL} target="_blank" rel="noopener noreferrer"
+                   onClick={() => melden('hilfreich', 'Trustpilot-Bewertung geöffnet')}
+                   style={KNOPF} onMouseOver={anheben} onMouseOut={ablegen}>
+                  <TrustpilotStern />
+                  <span>Bei Trustpilot bewerten</span>
+                </a>
+              </div>
             </>
           )}
 
@@ -311,7 +350,11 @@ export default function FeedbackSeite() {
                     margin: '16px 0 0' }}>
           Sie erreichen mich jederzeit direkt:{' '}
           <a href="mailto:info@primundus.de" style={{ color: FARBE.akzent }}>info@primundus.de</a>
-          {GOOGLE_REVIEW_URL && (
+          {/* Auf dem Danke-Bildschirm stehen schon zwei grosse Knoepfe —
+              dieser kleine Fussnoten-Link waere dort nur eine dritte
+              Google-Wiederholung. Ueberall sonst bleibt er der oeffentliche
+              Weg (auch fuer Unzufriedene — kein Filtern von Bewertungen). */}
+          {GOOGLE_REVIEW_URL && antwort !== 'hilfreich' && (
             <>
               {' · '}
               <a href={GOOGLE_REVIEW_URL} target="_blank" rel="noopener noreferrer"
