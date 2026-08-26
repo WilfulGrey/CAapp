@@ -4,14 +4,6 @@ import { notFound } from 'next/navigation';
 import Image from 'next/image';
 import { Phone } from 'lucide-react';
 
-// Serif der Landingpage (Martins Mockup 26.08.): bewusst System-Serif
-// statt next/font/google — der Font-Download zur Buildzeit brach hier das
-// SSR-Streaming (Seite kam ohne Body-Skripte an, der Chat bootete nie).
-// Georgia liegt auf iOS/macOS/Windows/Android vor und trägt den Look.
-// Die Seite reicht den Stack als --pria-serif an das Shadow-DOM weiter —
-// Custom Properties durchqueren die Shadow-Grenze.
-const SERIF = "Georgia,'Times New Roman',serif";
-
 /*
  * /beratung — der Kostenrechner als Voll-Chat (Landingpage-Variante für den
  * SEA-Test „Chat-Test").
@@ -65,7 +57,7 @@ export default function BeratungPage() {
       className="min-h-[100dvh]"
       style={{
         background:
-          'radial-gradient(130% 70% at 50% 0%, #FAF2E6 0%, #F8EEDF 52%, #F5EAD8 100%)',
+          'linear-gradient(180deg, #FFFFFF 0%, #F8F7F5 34%, #F4F2EF 100%)',
       }}
     >
       {/* Chat-Geometrie: Panel-Oberkante = Kopfhöhe, Unterkante lässt den
@@ -77,7 +69,7 @@ export default function BeratungPage() {
       <style
         dangerouslySetInnerHTML={{
           __html:
-            `:root{--pria-oben:52px;--pria-unten:24px;--pria-serif:${SERIF}}` +
+            ':root{--pria-oben:52px;--pria-unten:24px}' +
             '@media(min-width:641px){:root{--pria-oben:60px}}' +
             'body{overflow:hidden}' +
             // Chat läuft → Lade-Fallback ausblenden. Per Attribut+CSS statt
@@ -112,11 +104,10 @@ export default function BeratungPage() {
         }}
       />
 
-      {/* ── Kopf: Logo + Telefon auf dem Creme-Grund (Mockup 26.08.) ── */}
-      <header className="fixed inset-x-0 top-0 z-[60] h-[52px] bg-[#FAF2E6]/85 backdrop-blur-md min-[641px]:h-[60px]">
+      {/* ── Kopf: weiß mit feiner Linie — exakt die Sprache des
+          Haupt-Headers (CI; Martin, 26.08.). ── */}
+      <header className="fixed inset-x-0 top-0 z-[60] h-[52px] border-b border-[#E5E3DF] bg-white/95 backdrop-blur-lg shadow-sm min-[641px]:h-[60px]">
         <div className="mx-auto flex h-full max-w-[1100px] items-center justify-between gap-3 px-4 min-[641px]:px-6">
-          {/* multiply: der weiße Bildgrund des Logos verschwindet auf dem
-              Creme-Grund, die Goldtöne bleiben. */}
           <Image
             src="/images/primundus_logo_header.webp"
             alt="Primundus Logo"
@@ -124,15 +115,14 @@ export default function BeratungPage() {
             height={106}
             sizes="(max-width: 640px) 168px, 200px"
             className="h-[26px] w-auto min-[641px]:h-8"
-            style={{ mixBlendMode: 'multiply' }}
             priority
           />
           <a
             href="tel:+4989200000830"
-            className="flex h-10 w-10 flex-none items-center justify-center rounded-[14px] bg-white text-[#E76F63] shadow-[0_4px_14px_rgba(120,90,40,.12)] transition-colors hover:text-[#D65E52] min-[900px]:hidden"
+            className="flex h-9 w-9 flex-none items-center justify-center rounded-full bg-[#E76F63] text-white transition-colors hover:bg-[#D65E52] min-[900px]:hidden"
             aria-label="Anrufen: 089 200 000 830"
           >
-            <Phone className="h-[19px] w-[19px]" />
+            <Phone className="h-[18px] w-[18px]" />
           </a>
           <a
             href="tel:+4989200000830"
@@ -176,10 +166,10 @@ export default function BeratungPage() {
       </main>
 
       {/* ── Streifen unter dem Chat: Pflichtlinks, immer erreichbar ── */}
-      <footer className="fixed inset-x-0 bottom-0 z-[60] flex h-[24px] items-center justify-center gap-4 text-[11px] text-[#A08F73]">
-        <a href="/impressum" className="hover:text-[#6E655A]">Impressum</a>
+      <footer className="fixed inset-x-0 bottom-0 z-[60] flex h-[24px] items-center justify-center gap-4 text-[11px] text-[#8A8279]">
+        <a href="/impressum" className="hover:text-[#5A5A5A]">Impressum</a>
         <span aria-hidden="true">·</span>
-        <a href="/datenschutz" className="hover:text-[#6E655A]">Datenschutz</a>
+        <a href="/datenschutz" className="hover:text-[#5A5A5A]">Datenschutz</a>
       </footer>
     </div>
   );

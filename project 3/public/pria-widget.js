@@ -336,88 +336,90 @@
     '  /* Keine eigene Kopfleiste, kein eigener Panel-Kasten: nach Martins\n'+
     '     Mockup (26.08. abends) liegt ALLES als warme Karten direkt auf dem\n'+
     '     Creme-Grund der Seite — Hero-Karte, Fortschrittszeile, Frage-Karte,\n'+
-    '     Antwort-Karten. Serif kommt von der Seite (--pria-serif). */\n'+
+    '     Antwort-Karten — Typo und Palette in der CI des Kostenrechners. */\n'+
     '  .panel.voll .bar{display:none}\n'+
     '  .panel.voll .prog{display:none}   /* eigene Fortschrittszeile .vprog unten */\n'+
     '  .panel.voll .thread{background:transparent;padding:12px 16px 8px}\n'+
     '  /* ── Hero-Karte: beim Ankommen präsent, scrollt mit dem Gespräch weg\n'+
     '     (margin-bottom:auto hält den Rest unten bei den Antworten, solange\n'+
-    '     der Verlauf kürzer als die Fläche ist). */\n'+
-    '  .lphero{margin:2px 0 auto;padding:20px 19px 22px;text-align:left;border-radius:26px;\n'+
-    '    background:linear-gradient(155deg,#FAF1E3 0%,#F7ECD9 100%);\n'+
-    '    box-shadow:0 1px 2px rgba(120,90,40,.05),0 16px 44px rgba(120,90,40,.10)}\n'+
-    '  .lphero .oben{display:flex;align-items:flex-start;gap:13px;margin-bottom:16px}\n'+
+    '     der Verlauf kürzer als die Fläche ist). Farben und Schrift = CI des\n'+
+    '     Kostenrechners (Martin, 26.08.: Mockup war die Layout-IDEE, Typo und\n'+
+    '     Palette bleiben unsere): Inter/System-Sans, weiße Karten,\n'+
+    '     Coral-Akzente, Gold-Braun #8B7355 nur als Trust-Akzent. */\n'+
+    '  .lphero{margin:2px 0 auto;padding:19px 18px 20px;text-align:left;border-radius:22px;\n'+
+    '    background:var(--papier);border:1px solid var(--line-zart);\n'+
+    '    box-shadow:0 1px 2px rgba(40,34,28,.04),0 12px 34px rgba(40,34,28,.08)}\n'+
+    '  .lphero .oben{display:flex;align-items:flex-start;gap:13px;margin-bottom:14px}\n'+
     '  .lphero .kopfbild{position:relative;flex-shrink:0}\n'+
-    '  .lphero .kopfbild img{width:74px;height:74px;border-radius:50%;object-fit:cover;display:block;\n'+
-    '    box-shadow:0 0 0 4px #fff,0 2px 4px rgba(120,90,40,.10),0 12px 30px rgba(120,90,40,.16)}\n'+
+    '  .lphero .kopfbild img{width:72px;height:72px;border-radius:50%;object-fit:cover;display:block;\n'+
+    '    box-shadow:0 0 0 3px var(--papier),0 1px 2px rgba(40,34,28,.08),0 10px 26px rgba(217,90,76,.25)}\n'+
     '  .lphero .kopfbild i{position:absolute;right:3px;bottom:3px;width:13px;height:13px;\n'+
     '    border-radius:50%;background:#2FC46E;border:2.5px solid #fff}\n'+
-    '  .lphero .werblock{flex:1;min-width:0;padding-top:3px}\n'+
-    '  .lphero .wer{margin:0 0 3px;font-family:var(--pria-serif,Georgia,serif);\n'+
-    '    font-size:19px;font-weight:700;color:#3A342A;letter-spacing:-.2px;line-height:1.15}\n'+
-    '  .lphero .rolle{margin:0 0 6px;font-size:13px;line-height:1.3;color:#8A7E6C}\n'+
+    '  .lphero .werblock{flex:1;min-width:0;padding-top:2px}\n'+
+    '  .lphero .wer{margin:0 0 2px;font-size:17.5px;font-weight:800;color:#3D3D3D;\n'+
+    '    letter-spacing:-.3px;line-height:1.15}\n'+
+    '  .lphero .rolle{margin:0 0 6px;font-size:13px;line-height:1.3;color:#8A8279}\n'+
     '  .lphero .lorbeer{margin:0;display:flex;align-items:center;gap:6px;\n'+
-    '    font-size:12.5px;font-weight:650;color:#9C854E;line-height:1.25}\n'+
+    '    font-size:12.5px;font-weight:700;color:var(--gold);line-height:1.25}\n'+
     '  .lphero .lorbeer svg{flex-shrink:0}\n'+
     '  .lphero .siegelecke{flex-shrink:0;display:block}\n'+
-    '  .lphero .siegelecke img{height:92px;width:auto;display:block;border-radius:6px;\n'+
-    '    filter:drop-shadow(0 3px 8px rgba(120,90,40,.22))}\n'+
-    '  .lphero .anfrage{margin:0 0 8px;font-family:var(--pria-serif,Georgia,serif);\n'+
-    '    font-size:26px;line-height:1.18;color:#33302C;font-weight:700;letter-spacing:-.3px}\n'+
-    '  .lphero .anrede{margin:0;font-size:15px;line-height:1.5;color:#6E655A}\n'+
-    '  .lphero .anrede b{color:#3A342A}\n'+
+    '  .lphero .siegelecke img{height:88px;width:auto;display:block;border-radius:5px;\n'+
+    '    filter:drop-shadow(0 2px 7px rgba(40,34,28,.20))}\n'+
+    '  .lphero .anfrage{margin:0 0 7px;font-size:23px;line-height:1.15;color:#3D3D3D;\n'+
+    '    font-weight:800;letter-spacing:-.5px}\n'+
+    '  .lphero .anrede{margin:0;font-size:15px;line-height:1.5;color:#5A5A5A}\n'+
+    '  .lphero .anrede b{color:#3D3D3D}\n'+
     '  /* ── Fortschrittszeile: Balken · „x von 8" · Balken ── */\n'+
     '  .vprog{display:none;align-items:center;gap:12px;margin:14px 4px 4px;\n'+
-    '    font-size:13.5px;color:#8A7E6C;letter-spacing:.2px}\n'+
+    '    font-size:13px;font-weight:600;color:var(--muted);letter-spacing:.2px}\n'+
     '  .panel.voll .vprog{display:flex}\n'+
-    '  .vprog i{flex:1;height:4px;border-radius:2px;background:rgba(156,133,78,.20);\n'+
+    '  .vprog i{flex:1;height:4px;border-radius:2px;background:rgba(40,34,28,.08);\n'+
     '    overflow:hidden;display:block}\n'+
-    '  .vprog i b{display:block;height:100%;width:0;background:#9C854E;border-radius:2px;\n'+
+    '  .vprog i b{display:block;height:100%;width:0;border-radius:2px;\n'+
+    '    background:linear-gradient(90deg,var(--coral-tief),var(--coral-hell));\n'+
     '    transition:width .45s var(--weich)}\n'+
-    '  /* ── Frage als Karte (nur Voll-Chat): Icon-Kreis + Serif-Frage ── */\n'+
+    '  /* ── Frage als Karte (nur Voll-Chat): Icon-Kreis + Frage ── */\n'+
     '  .panel.voll .row.zfrage{margin-top:2px}\n'+
     '  .panel.voll .row.zfrage .mini{display:none}\n'+
     '  /* Grid statt Flex: der Hinweis (small, z. B. Sprachstufen bei Frage 8)\n'+
     '     muss UNTER der Frage stehen, in derselben Textspalte neben dem Icon. */\n'+
-    '  .panel.voll .row.zfrage .bub{background:#fff;border:0;border-radius:20px;\n'+
-    '    box-shadow:0 10px 30px rgba(120,90,40,.09);max-width:100%;width:100%;\n'+
-    '    padding:17px 18px;display:grid;grid-template-columns:44px 1fr;\n'+
-    '    align-items:center;column-gap:14px;\n'+
-    '    font-family:var(--pria-serif,Georgia,serif);font-size:19.5px;font-weight:600;\n'+
-    '    line-height:1.28;color:#33302C;letter-spacing:-.2px}\n'+
+    '  .panel.voll .row.zfrage .bub{background:var(--papier);border:1px solid var(--line-zart);\n'+
+    '    border-radius:18px;box-shadow:0 6px 22px rgba(40,34,28,.07);max-width:100%;width:100%;\n'+
+    '    padding:16px 17px;display:grid;grid-template-columns:42px 1fr;\n'+
+    '    align-items:center;column-gap:13px;\n'+
+    '    font-size:18px;font-weight:750;line-height:1.28;color:#3D3D3D;letter-spacing:-.3px}\n'+
     '  .panel.voll .row.zfrage .bub::before{content:"?";grid-row:1 / span 2;\n'+
-    '    width:44px;height:44px;border-radius:50%;background:#F4EBDB;color:#9C854E;\n'+
-    '    text-align:center;font:600 21px/44px var(--pria-serif,Georgia,serif)}\n'+
-    '  .panel.voll .row.zfrage .bub small{grid-column:2;\n'+
-    '    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;\n'+
-    '    font-weight:400;letter-spacing:0}\n'+
+    '    width:42px;height:42px;border-radius:50%;background:#FDF0ED;color:var(--coral-tief);\n'+
+    '    text-align:center;font-size:20px;font-weight:800;line-height:42px}\n'+
+    '  .panel.voll .row.zfrage .bub small{grid-column:2;font-weight:400;letter-spacing:0}\n'+
     '  /* ── Antworten als große Karten mit Pfeil ── */\n'+
     '  /* nowrap: die Grundregel der Chips wrappt — mit column entstünden\n'+
     '     sonst SPALTEN, sobald die Liste höher als max-height wird. */\n'+
     '  .panel.voll .chips{background:transparent;flex-direction:column;flex-wrap:nowrap;\n'+
     '    align-items:stretch;gap:9px;padding:10px 16px 4px;\n'+
     '    max-height:min(46dvh,390px);overflow-y:auto}\n'+
-    '  .panel.voll .chips .chip{display:flex;align-items:center;background:#fff;border:0;\n'+
-    '    border-radius:18px;box-shadow:0 6px 20px rgba(120,90,40,.08);\n'+
-    '    padding:15px 42px 15px 17px;font-size:15.5px;font-weight:600;color:#3A342A;\n'+
+    '  .panel.voll .chips .chip{display:flex;align-items:center;background:var(--papier);\n'+
+    '    border:1px solid var(--line-zart);border-radius:16px;\n'+
+    '    box-shadow:0 4px 16px rgba(40,34,28,.06);\n'+
+    '    padding:14px 42px 14px 16px;font-size:15.5px;font-weight:650;color:#3D3D3D;\n'+
     '    text-align:left;position:relative}\n'+
     '  .panel.voll .chips .chip::after{content:"›";position:absolute;right:17px;top:50%;\n'+
     '    transform:translateY(-50%);color:var(--coral-tief);font-size:22px;font-weight:600;line-height:1}\n'+
-    '  .panel.voll .chips .chip:hover{background:#FFFDF9}\n'+
+    '  .panel.voll .chips .chip:hover{background:#FDF7F5;border-color:rgba(231,111,99,.35)}\n'+
     '  /* CTA-Chips (stark) bleiben Coral — sie sind der eine Knopf, der zählt. */\n'+
     '  .panel.voll .chips .chip.stark{background:linear-gradient(180deg,var(--coral-hell),var(--coral-tief));\n'+
-    '    color:#fff}\n'+
+    '    color:#fff;border:0}\n'+
     '  .panel.voll .chips .chip.stark::after{color:#fff}\n'+
-    '  /* ── Eingabe auf dem Creme-Grund ── */\n'+
+    '  /* ── Eingabe auf der Bühne ── */\n'+
     '  .panel.voll .unten{background:transparent;border-top:0}\n'+
-    '  .panel.voll .eingabe input{background:#fff;border:0;\n'+
-    '    box-shadow:0 4px 16px rgba(120,90,40,.08)}\n'+
+    '  .panel.voll .eingabe input{background:var(--papier);border:1px solid var(--line);\n'+
+    '    box-shadow:0 3px 12px rgba(40,34,28,.06)}\n'+
     '  @media(min-width:641px){\n'+
-    '    .lphero{padding:26px 24px 26px}\n'+
-    '    .lphero .anfrage{font-size:30px}\n'+
+    '    .lphero{padding:24px 22px 24px}\n'+
+    '    .lphero .anfrage{font-size:27px}\n'+
     '    .lphero .anrede{font-size:16px}\n'+
-    '    .lphero .siegelecke img{height:106px}\n'+
-    '    .panel.voll .row.zfrage .bub{font-size:21px}\n'+
+    '    .lphero .siegelecke img{height:100px}\n'+
+    '    .panel.voll .row.zfrage .bub{font-size:19.5px}\n'+
     '  }\n'+
     '  /* KI-Kennzeichnung bleibt IM Chat verankert (AI Act, Pflicht):\n'+
     '     eine stille Zeile unter der Eingabe — sichtbar auch, wenn die Tastatur\n'+
