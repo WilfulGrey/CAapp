@@ -8,17 +8,17 @@ import { Phone } from 'lucide-react';
  * /beratung — der Kostenrechner als Voll-Chat (Landingpage-Variante für den
  * SEA-Test „Chat-Test").
  *
- * Die Seite präsentiert nur die Kern-USP — 6× Testsieger mit dem Siegel und
- * das Sofortangebot — alles Weitere macht der Chat: Pria stellt die acht
- * Fragen, der Abschluss läuft über /api/pria/lead → /api/angebot-anfordern
- * (EIN Lead-Pfad, wie beim Formular), samt demselben dataLayer-Push
- * `angebot_erfolgreich` (siehe public/pria.html, Abschnitt Kontakt).
+ * Aufbau als EINE komponierte Seite (CRO-Umbau 26.08., Martin: „nicht
+ * zusammengewürfelt — die Assistentin holt den Kunden direkt ab"):
+ * Kopf (Logo + Telefon) → Hero mit Prias Porträt, Gruß, Ergebnis-Zeile und
+ * Testsieger-Beleg → der Chat dockt als Karte darunter an (public/pria.html,
+ * Voll-Modus ohne eigene Kopfleiste) und beginnt direkt mit dem Angebot.
  *
- * Varianten-Marker für die Auswertung: analytics_sessions.landing_page
- * ist hier `/beratung` — mehr braucht die SEA-Session nicht (Schnittstellen-
- * Vertrag vom 26.08.: Klick→Lead, Profil-Quote, Kosten/Profil je Variante).
- *
- * Die Hauptseite bleibt unberührt; ihr Wizard ist die Kontrollvariante.
+ * Messkette: Abschluss über /api/pria/lead → /api/angebot-anfordern (EIN
+ * Lead-Pfad wie das Formular) samt dataLayer-Push `angebot_erfolgreich`
+ * (siehe public/pria.html, Kontakt-Block). Varianten-Marker für SEA:
+ * analytics_sessions.landing_page='/beratung'. Details:
+ * docs/google-ads-tracking.md §„Chat-Landingpage /beratung".
  */
 
 // Erst Staging, dann Prod (Schnittstellen-Vertrag mit SEA, 26.08.):
@@ -52,19 +52,23 @@ export default function BeratungPage() {
   if (!ERLAUBTE_HOSTS.has(host)) notFound();
 
   return (
-    <div className="min-h-[100dvh] bg-[#F3F0EC]">
-      {/* Kopfhöhe als Variable: der Chat (public/pria.html, .panel.voll)
-          hängt sein Panel exakt darunter und lässt unten den Streifen für
-          Impressum/Datenschutz frei. Custom Properties durchqueren die
-          Shadow-Grenze des Widgets — deshalb reicht :root. */}
+    <div
+      className="min-h-[100dvh]"
+      style={{
+        background:
+          'radial-gradient(120% 60% at 50% 0%, #FBEEE9 0%, #F7F2EB 46%, #F3F0EC 100%)',
+      }}
+    >
+      {/* Chat-Geometrie: --pria-oben (Unterkante des Heros, misst das
+          Skript unten) und --pria-unten (Pflichtlinks-Streifen). Custom
+          Properties durchqueren die Shadow-Grenze des Widgets — :root
+          reicht. body scrollt nie: die Seite IST der Chat; bewusst hier
+          statt nur über body.chat-offen, das auf dieser Route das
+          Hydration-Rennen verliert (React setzt die body-className zurück). */}
       <style
         dangerouslySetInnerHTML={{
           __html:
-            ':root{--pria-oben:60px;--pria-unten:24px}' +
-            '@media(min-width:641px){:root{--pria-oben:76px}}' +
-            // Die Seite IST der Chat — sie scrollt nie. Bewusst hier statt
-            // nur über body.chat-offen: die Klasse verliert auf dieser Route
-            // das Hydration-Rennen (React setzt className des body zurück).
+            ':root{--pria-oben:212px;--pria-unten:24px}' +
             'body{overflow:hidden}' +
             // Cookie-Banner über den Voll-Chat (Panel z-50): sonst ist er
             // auf dem Handy verdeckt und die Einwilligung — und damit jedes
@@ -94,58 +98,24 @@ export default function BeratungPage() {
         }}
       />
 
-      {/* ── Kopf: Logo · Siegel · Telefon — die Kern-USP, sonst nichts ── */}
-      <header className="fixed inset-x-0 top-0 z-[60] h-[60px] border-b border-[#E5E3DF] bg-white/95 backdrop-blur-lg shadow-sm min-[641px]:h-[76px]">
+      {/* ── Kopf: nur Logo + Telefon — ruhig, alles Weitere sagt der Hero ── */}
+      <header className="fixed inset-x-0 top-0 z-[60] h-[52px] border-b border-[#EDE7DE] bg-white/85 backdrop-blur-lg min-[641px]:h-[60px]">
         <div className="mx-auto flex h-full max-w-[1100px] items-center justify-between gap-3 px-4 min-[641px]:px-6">
           <Image
             src="/images/primundus_logo_header.webp"
             alt="Primundus Logo"
             width={600}
             height={106}
-            sizes="(max-width: 640px) 148px, 210px"
-            className="h-6 w-auto min-[641px]:h-9"
+            sizes="(max-width: 640px) 168px, 200px"
+            className="h-6.5 h-[26px] w-auto min-[641px]:h-8"
             priority
           />
-
-          {/* Siegel + Wortlaut wie in TestsiegerSection (Formulierungslinie
-              14.08.: „Nr. 1 der Pflegekräfte-Vermittler" ist der wörtliche
-              Siegel-Claim — nur deshalb darf „Vermittler" hier stehen).
-              Klick öffnet die Original-Veröffentlichung, wie überall. */}
-          <a
-            href="/downloads/die-welt-service-champions-2021.pdf"
-            target="_blank"
-            rel="noopener"
-            className="flex min-w-0 items-center gap-2.5 min-[641px]:gap-3"
-            aria-label="6× Testsieger — Original-Veröffentlichung der Service-Studie als PDF öffnen"
-          >
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src="/images/primundus_testsieger-2021.webp"
-              alt="Testsieger-Siegel DIE WELT Service-Champions"
-              className="h-11 w-auto min-[641px]:h-14"
-            />
-            <span className="min-w-0 leading-tight">
-              <span className="block text-[13px] font-bold text-[#3D2B1F] min-[641px]:text-[15px]">
-                6× Testsieger bei DIE WELT
-              </span>
-              <span className="block truncate text-[11px] text-[#8A8279] min-[641px]:text-[12.5px]">
-                Nr. 1 der Pflegekräfte-Vermittler
-                <span className="hidden min-[900px]:inline">
-                  {' '}
-                  — Service-Studie von DIE WELT und ServiceValue
-                </span>
-              </span>
-            </span>
-          </a>
-
-          {/* Telefon wie im Haupt-Header: mobil nur das Icon, ab 900px mit
-              Marta und Nummer — wer lieber anruft, soll nicht suchen. */}
           <a
             href="tel:+4989200000830"
-            className="flex h-10 w-10 flex-none items-center justify-center rounded-full bg-[#E76F63] text-white transition-colors hover:bg-[#D65E52] min-[900px]:hidden"
+            className="flex h-9 w-9 flex-none items-center justify-center rounded-full bg-[#E76F63] text-white transition-colors hover:bg-[#D65E52] min-[900px]:hidden"
             aria-label="Anrufen: 089 200 000 830"
           >
-            <Phone className="h-5 w-5" />
+            <Phone className="h-[18px] w-[18px]" />
           </a>
           <a
             href="tel:+4989200000830"
@@ -154,16 +124,16 @@ export default function BeratungPage() {
             <Image
               src="/images/marta-kapcio.jpg"
               alt="Marta Kapcio"
-              width={40}
-              height={40}
-              className="h-10 w-10 rounded-full object-cover"
+              width={36}
+              height={36}
+              className="h-9 w-9 rounded-full object-cover"
               style={{ objectPosition: '50% 20%' }}
             />
             <span className="flex flex-col">
-              <span className="text-xs leading-tight text-gray-500 group-hover:text-white/80">
+              <span className="text-[11px] leading-tight text-gray-500 group-hover:text-white/80">
                 Marta Kapcio
               </span>
-              <span className="text-sm font-semibold leading-tight text-[#3D2B1F] group-hover:text-white">
+              <span className="text-[13px] font-semibold leading-tight text-[#3D2B1F] group-hover:text-white">
                 089 200 000 830
               </span>
             </span>
@@ -171,18 +141,84 @@ export default function BeratungPage() {
         </div>
       </header>
 
-      {/* ── Bühne: der Chat legt sich als .panel.voll hierüber ── */}
-      <main
-        className="flex flex-col items-center justify-center gap-3 px-6 text-center"
-        style={{
-          paddingTop: 'calc(var(--pria-oben) + 48px)',
-          minHeight: 'calc(100dvh - var(--pria-unten))',
-        }}
+      {/* ── Hero: Pria holt ab — Porträt, Gruß, Ergebnis, Beleg ── */}
+      <section
+        id="lp-hero"
+        className="mx-auto flex max-w-[620px] flex-col items-center px-6 pb-2.5 pt-[62px] text-center min-[641px]:pb-4 min-[641px]:pt-[82px]"
       >
-        {/* Sichtbar nur, solange das Widget lädt — oder wenn es scheitert.
-            Kein stiller Ausfall: der Weg zum klassischen Rechner steht da. */}
-        <p className="text-[15px] text-[#8A8279]">Ihre Beratung wird geladen …</p>
-        <a href="/" className="text-[14px] font-semibold text-[#8B7355] underline underline-offset-2">
+        <div className="relative mb-1.5 min-[641px]:mb-2">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src="/images/pria-portrait.jpg"
+            alt="Pria — KI-gestützte Assistentin von Primundus"
+            className="h-[64px] w-[64px] rounded-full object-cover shadow-[0_0_0_3px_#fff,0_1px_2px_rgba(40,34,28,.08),0_12px_30px_rgba(217,90,76,.30)] min-[641px]:h-[86px] min-[641px]:w-[86px]"
+          />
+          <span
+            className="absolute bottom-0.5 right-0.5 h-3.5 w-3.5 rounded-full border-2 border-white bg-[#2FC46E]"
+            aria-hidden="true"
+          />
+        </div>
+
+        {/* KI-Kennzeichnung (AI Act): fest unter der Kopfzeile, Badge am
+            Namen — dieselbe Pflicht, die vorher die Panel-Kopfleiste trug. */}
+        <p className="mb-1 text-[13.5px] text-[#5C5751] min-[641px]:mb-1.5 min-[641px]:text-[14px]">
+          Guten Tag, ich bin <b className="font-bold text-[#33302C]">Pria</b>
+          <span className="ml-2 inline-block rounded-[5px] border border-[#DACFC0] bg-white/80 px-1.5 pb-px pt-0.5 align-[2px] text-[9px] font-extrabold tracking-[1px] text-[#8B7355]">
+            KI-ASSISTENTIN
+          </span>
+        </p>
+
+        <h1 className="mb-2 text-[20.5px] font-bold leading-[1.18] tracking-[-0.4px] text-[#33302C] min-[641px]:mb-2.5 min-[641px]:text-[27px]">
+          Ihr Preis &amp; passende Pflegekräfte —{' '}
+          <span className="text-[#D95A4C]">in wenigen Minuten.</span>
+        </h1>
+
+        {/* Siegel + Wortlaut der Formulierungslinie 14.08. („Nr. 1 der
+            Pflegekräfte-Vermittler" ist der wörtliche Siegel-Claim). Klick
+            öffnet die Original-Veröffentlichung — der Auszeichnungs-Claim
+            braucht den Beleg (content-checkliste). */}
+        <a
+          href="/downloads/die-welt-service-champions-2021.pdf"
+          target="_blank"
+          rel="noopener"
+          className="flex items-center gap-2.5"
+          aria-label="6× Testsieger — Original-Veröffentlichung der Service-Studie als PDF öffnen"
+        >
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src="/images/primundus_testsieger-2021.webp"
+            alt="Testsieger-Siegel DIE WELT Service-Champions"
+            className="h-9 w-auto min-[641px]:h-11"
+          />
+          <span className="text-left leading-tight">
+            <span className="block text-[13px] font-bold text-[#3D2B1F] min-[641px]:text-[14px]">
+              6× Testsieger bei DIE WELT
+            </span>
+            <span className="block text-[11.5px] text-[#8A8279] underline decoration-[#D9CFC2] underline-offset-2 min-[641px]:text-[12px]">
+              Nr. 1 der Pflegekräfte-Vermittler
+            </span>
+          </span>
+        </a>
+      </section>
+
+      {/* Panel-Oberkante = Hero-Unterkante, gemessen statt geraten: die
+          Hero-Höhe hängt von Textumbruch und Schriftladung ab. Läuft beim
+          Parsen (vor dem ersten Paint), bei resize und nach den Fonts. */}
+      <script
+        dangerouslySetInnerHTML={{
+          __html:
+            "(function(){var setze=function(){var h=document.getElementById('lp-hero');" +
+            "if(!h)return;document.documentElement.style.setProperty('--pria-oben'," +
+            "Math.ceil(h.getBoundingClientRect().bottom+4)+'px');};" +
+            "setze();addEventListener('resize',setze);addEventListener('load',setze);" +
+            "if(document.fonts&&document.fonts.ready)document.fonts.ready.then(setze);})();",
+        }}
+      />
+
+      {/* ── Unter dem Panel: sichtbar nur beim Laden oder wenn JS fehlt ── */}
+      <main className="mx-auto flex max-w-[620px] flex-col items-center gap-2 px-6 pt-10 text-center">
+        <p className="text-[14px] text-[#8A8279]">Ihre Beratung wird geladen …</p>
+        <a href="/" className="text-[13.5px] font-semibold text-[#8B7355] underline underline-offset-2">
           Zum klassischen Kostenrechner
         </a>
         <noscript>
@@ -195,7 +231,7 @@ export default function BeratungPage() {
       </main>
 
       {/* ── Streifen unter dem Chat: Pflichtlinks, immer erreichbar ── */}
-      <footer className="fixed inset-x-0 bottom-0 z-[60] flex h-[24px] items-center justify-center gap-4 bg-[#F3F0EC] text-[11px] text-[#8A8279]">
+      <footer className="fixed inset-x-0 bottom-0 z-[60] flex h-[24px] items-center justify-center gap-4 text-[11px] text-[#8A8279]">
         <a href="/impressum" className="hover:text-[#5A5A5A]">Impressum</a>
         <span aria-hidden="true">·</span>
         <a href="/datenschutz" className="hover:text-[#5A5A5A]">Datenschutz</a>
