@@ -349,7 +349,7 @@
     '  .lphero{margin:2px 0 auto;padding:19px 18px 20px;text-align:left;border-radius:22px;\n'+
     '    background:var(--papier);border:1px solid var(--line-zart);\n'+
     '    box-shadow:0 1px 2px rgba(40,34,28,.04),0 12px 34px rgba(40,34,28,.08)}\n'+
-    '  .lphero .oben{display:flex;align-items:flex-start;gap:13px;margin-bottom:14px}\n'+
+    '  .lphero .oben{display:flex;align-items:center;gap:13px;margin-bottom:10px}\n'+
     '  .lphero .kopfbild{position:relative;flex-shrink:0}\n'+
     '  .lphero .kopfbild img{width:72px;height:72px;border-radius:50%;object-fit:cover;display:block;\n'+
     '    box-shadow:0 0 0 3px var(--papier),0 1px 2px rgba(40,34,28,.08),0 10px 26px rgba(217,90,76,.25)}\n'+
@@ -359,8 +359,10 @@
     '  .lphero .wer{margin:0 0 2px;font-size:17.5px;font-weight:800;color:#3D3D3D;\n'+
     '    letter-spacing:-.3px;line-height:1.15}\n'+
     '  .lphero .rolle{margin:0 0 6px;font-size:13px;line-height:1.3;color:#8A8279}\n'+
-    '  .lphero .lorbeer{margin:0;display:flex;align-items:center;gap:6px;\n'+
-    '    font-size:12.5px;font-weight:700;color:var(--gold);line-height:1.25}\n'+
+    '  /* Volle Breite unter dem Pria/Siegel-Block (Martin, 26.08.) — nicht\n'+
+    '     mehr in der schmalen Mittelspalte, wo die Zeile zweizeilig brach. */\n'+
+    '  .lphero .lorbeer{margin:0 0 12px;display:flex;align-items:center;gap:7px;\n'+
+    '    font-size:13.5px;font-weight:700;color:var(--gold);line-height:1.25}\n'+
     '  .lphero .lorbeer svg{flex-shrink:0}\n'+
     '  .lphero .siegelecke{flex-shrink:0;display:block}\n'+
     '  .lphero .siegelecke img{height:88px;width:auto;display:block;border-radius:5px;\n'+
@@ -1928,12 +1930,12 @@ function lpHero(){
       '<div class="werblock">'+
         '<p class="wer">Pria von Primundus</p>'+
         '<p class="rolle">Ihre digitale Pflegeberaterin</p>'+
-        '<p class="lorbeer">'+lorbeer+'<span>6-facher <span style="white-space:nowrap">Preis-Leistungssieger</span></span></p>'+
       '</div>'+
       '<a class="siegelecke" href="/downloads/die-welt-service-champions-2021.pdf" target="_blank" rel="noopener" '+
         'aria-label="6× Testsieger bei DIE WELT — Original-Veröffentlichung als PDF öffnen">'+
         '<img src="/images/primundus_testsieger-2021.webp" alt="Siegel: 6× Testsieger bei DIE WELT — Nr. 1 der Pflegekräfte-Vermittler"></a>'+
     '</div>'+
+    '<p class="lorbeer">'+lorbeer+'<span>6-facher <span style="white-space:nowrap">Preis-Leistungssieger</span></span></p>'+
     '<p class="anfrage">Sie benötigen eine <span style="white-space:nowrap">24-Stunden-Pflege?</span></p>'+
     '<p class="anrede">In 8 kurzen Fragen berechne ich Ihre <b>Kosten</b> und zeige '+
       '<b>passende Pflegekräfte</b>.</p>';
