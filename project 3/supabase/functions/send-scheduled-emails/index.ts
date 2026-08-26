@@ -179,7 +179,7 @@ function buildEmailWrapper(lead: Lead, siteUrl: string, content: string): string
                         <img src="${testUrl}" alt="Testsieger DIE WELT" width="36" style="display:block;width:36px;height:auto;" />
                       </td>
                       <td style="text-align:left;padding-left:8px;">
-                        <p style="margin:0 0 1px 0;font-size:10px;font-weight:700;color:#3D2B1F;white-space:nowrap;">Testsieger</p>
+                        <p style="margin:0 0 1px 0;font-size:10px;font-weight:700;color:#3D2B1F;white-space:nowrap;">6× Testsieger</p>
                         <p style="margin:0 0 1px 0;font-size:10px;color:#B5A184;white-space:nowrap;font-weight:600;">DIE WELT</p>
                         <p style="margin:0;font-size:9px;color:#aaa;white-space:nowrap;">Preis &amp; Qualit&auml;t</p>
                       </td>
@@ -260,7 +260,7 @@ function buildMartaSig(siteUrl: string): string {
                   <tr>
                     <td style="padding:8px 10px;background:#ffffff;text-align:center;vertical-align:top;">
                       <img src="${testUrl}" alt="Testsieger DIE WELT" width="64" style="display:block;width:64px;height:auto;margin:0 auto 5px;" />
-                      <p style="margin:0 0 1px;font-size:11px;font-weight:700;color:#3D2B1F;white-space:nowrap;">Testsieger <span style="color:#B5A184;">DIE WELT</span></p>
+                      <p style="margin:0 0 1px;font-size:11px;font-weight:700;color:#3D2B1F;white-space:nowrap;">6× Testsieger <span style="color:#B5A184;">DIE WELT</span></p>
                       <p style="margin:0;font-size:10px;color:#888;line-height:1.4;">Preis, Qualität &amp;<br>Kundenservice</p>
                     </td>
                   </tr>
@@ -955,8 +955,8 @@ export function buildEingangsbestaetigungHtml(lead: Lead, siteUrl: string, porta
       </tr>
       <tr>
         <td colspan="2" style="padding:16px 24px 20px;border-top:1px solid #ebe2d2;">
-          <p style="margin:0 0 6px;${psLabel}color:#B8860B;">Testsieger</p>
-          <p style="margin:0;font-size:14px;line-height:1.65;color:#2D1F0F;"><strong>Testsieger &ndash; DIE&nbsp;WELT</strong> mit über 20&nbsp;Jahren Erfahrung und 60.000 Betreuungseinsätzen.</p>
+          <p style="margin:0 0 6px;${psLabel}color:#B8860B;">6× Testsieger</p>
+          <p style="margin:0;font-size:14px;line-height:1.65;color:#2D1F0F;"><strong>6× Testsieger &ndash; DIE&nbsp;WELT</strong> mit über 20&nbsp;Jahren Erfahrung und 60.000 Betreuungseinsätzen.</p>
         </td>
       </tr>
     </table>
@@ -1072,7 +1072,7 @@ Ihre Konditionen:
   ✓ Keine Vermittlungsgebühren
 Kosten entstehen erst, wenn Ihre Pflegekraft vor Ort ist.
 
-Testsieger – DIE WELT mit über 20 Jahren Erfahrung und 60.000 Betreuungseinsätzen.
+6× Testsieger – DIE WELT mit über 20 Jahren Erfahrung und 60.000 Betreuungseinsätzen.
 
 ${buildHeimVergleichText(lead)}
 
@@ -1711,7 +1711,7 @@ export function buildWarumPrimundusHtml(lead: Lead, portalUrl: string, siteUrl: 
     usp("Sie wissen vorher, wer ins Haus kommt.", "Tausende bewährte Pflegekräfte in unserem Bestand &mdash; Sie sehen vorab, wer die Betreuung übernehmen möchte, und entscheiden in Ruhe.") +
     usp("Sie binden sich nicht.", "Kein Vertrag vor Auswahl, täglich kündbar, tagesgenaue Abrechnung &mdash; Kosten erst ab Anreise der Pflegekraft.") +
     usp("Sie zahlen nie zu viel.", "Keine Vermittlungsgebühren &mdash; als Direktanbieter sparen wir die Vermittler-Provision: Die Pflegekraft verdient mehr, und Sie zahlen trotzdem weniger.") +
-    usp("Sie sind nie allein.", "Persönlicher Ansprechpartner 7 Tage die Woche &mdash; mit der Erfahrung aus über 60.000 Einsätzen, ausgezeichnet als Testsieger von DIE WELT.");
+    usp("Sie sind nie allein.", "Persönlicher Ansprechpartner 7 Tage die Woche &mdash; mit der Erfahrung aus über 60.000 Einsätzen, ausgezeichnet als 6× Testsieger von DIE WELT.");
 
   const content = `
     <p style="font-size:15px;line-height:1.75;color:#444;margin-bottom:14px;">${greeting},</p>
@@ -1734,7 +1734,7 @@ Sie vergleichen gerade Anbieter für die 24-Stunden-Betreuung? Dann zählt am En
 ✓ Sie wissen vorher, wer ins Haus kommt. Tausende bewährte Pflegekräfte in unserem Bestand — Sie sehen vorab, wer die Betreuung übernehmen möchte, und entscheiden in Ruhe.
 ✓ Sie binden sich nicht. Kein Vertrag vor Auswahl, täglich kündbar, tagesgenaue Abrechnung — Kosten erst ab Anreise der Pflegekraft.
 ✓ Sie zahlen nie zu viel. Keine Vermittlungsgebühren — als Direktanbieter sparen wir die Vermittler-Provision: Die Pflegekraft verdient mehr, und Sie zahlen trotzdem weniger.
-✓ Sie sind nie allein. Persönlicher Ansprechpartner 7 Tage die Woche — mit der Erfahrung aus über 60.000 Einsätzen, ausgezeichnet als Testsieger von DIE WELT.
+✓ Sie sind nie allein. Persönlicher Ansprechpartner 7 Tage die Woche — mit der Erfahrung aus über 60.000 Einsätzen, ausgezeichnet als 6× Testsieger von DIE WELT.
 
 ${buildHeimVergleichText(lead)}Pflegekräfte im Portal ansehen: ${portalUrl}
 

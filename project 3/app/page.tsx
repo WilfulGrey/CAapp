@@ -138,7 +138,7 @@ export default function HomePage() {
                 {/* Auf dem Desktop groesser (Martin 16.08.): 14px standen
                     dort unter einer 44px-H1 wie eine Fussnote. */}
                 <span className="mb-2.5 block text-[14px] font-semibold uppercase tracking-[0.07em] text-[#E76F63] lg:mb-3 lg:text-[18px] lg:tracking-[0.06em]">
-                  24-Stunden-Pflege vom Testsieger
+                  24-Stunden-Pflege vom 6× Testsieger
                 </span>
                 <span className="block text-[33px] font-bold leading-[1.1] sm:text-[40px] lg:text-[44px] xl:text-[50px]">
                   Ihre Eltern müssen nicht ins Heim.
