@@ -374,7 +374,9 @@
     '  /* ── Fortschrittszeile: Balken · „x von 8" · Balken ── */\n'+
     '  .vprog{display:none;align-items:center;gap:12px;margin:14px 4px 4px;\n'+
     '    font-size:13px;font-weight:600;color:var(--muted);letter-spacing:.2px}\n'+
-    '  .panel.voll .vprog{display:flex}\n'+
+    '  /* Erst sichtbar, wenn der Fragenlauf läuft (.voll-funnel via\n'+
+    '     vprogStand) — der offene Einstieg zeigt Wissensfragen, kein „1 von 8". */\n'+
+    '  .panel.voll.voll-funnel .vprog{display:flex}\n'+
     '  .vprog i{flex:1;height:4px;border-radius:2px;background:rgba(40,34,28,.08);\n'+
     '    overflow:hidden;display:block}\n'+
     '  .vprog i b{display:block;height:100%;width:0;border-radius:2px;\n'+
@@ -420,7 +422,7 @@
     '  .voll-hinweis i{display:inline-flex;width:15px;height:15px;border-radius:50%;\n'+
     '    border:1.2px solid currentColor;align-items:center;justify-content:center;\n'+
     '    font-style:normal;font-size:10px;font-weight:700;flex-shrink:0}\n'+
-    '  .panel.voll .voll-hinweis{display:flex}\n'+
+    '  .panel.voll.voll-funnel .voll-hinweis{display:flex}\n'+
     '  .panel.voll.voll-fertig .voll-hinweis{display:none}\n'+
     '  /* CTA-Chips (stark) bleiben Coral — sie sind der eine Knopf, der zählt. */\n'+
     '  .panel.voll .chips .chip.stark{background:linear-gradient(180deg,var(--coral-hell),var(--coral-tief));\n'+
@@ -1955,6 +1957,9 @@ function vprogStand(nr){
   if(!fill||!text) return;
   if(nr==='fertig'){ fill.style.width='100%'; text.textContent='Geschafft';
     panel.classList.add('voll-fertig'); return; }
+  // Erst ab dem Fragenlauf sichtbar — beim offenen Einstieg wäre
+  // „1 von 8" neben Wissensfragen irreführend.
+  panel.classList.add('voll-funnel');
   fill.style.width=Math.round(((nr-1)/FLOW.length)*100)+'%';
   text.textContent=nr+' von '+FLOW.length;
 }
@@ -1979,15 +1984,16 @@ async function oeffne(start){
   setTimeout(()=>{ panel.classList.add('fertig'); handyLayout(); }, 700);
   if(gestartet) return; gestartet=true;
   if(start==='lp'){
-    /* Landingpage /beratung: der Hero im Verlauf trägt Martins
-       persönlichen Text bereits — eine Begrüßungsblase davor stünde
-       doppelt da (Martin, 26.08.). Deshalb direkt Frage 1; „ich fange
-       einfach an" hat der Hero gerade zugesagt. */
-    modus='fragen'; offeneFrage=null;
-    protokoll('system','Fragenlauf gestartet',{ereignis:'funnel',grund:'preis'});
+    /* Landingpage /beratung: OFFENER Einstieg (Martin, 26.08. nachts) —
+       nicht direkt ins Formular, sondern erst die Wahl anbieten: die
+       häufigsten Fragen plus die beiden starken Wege (Preis berechnen /
+       Pflegekräfte ansehen). Wer mit Preis-Absicht kommt, ist mit einem
+       Klick im Fragenlauf; wer erst eine Sorge loswerden will, springt
+       nicht ab. Fortschrittszeile und Auswahl-Hinweis erscheinen erst
+       mit dem Fragenlauf (vprogStand setzt .voll-funnel). */
     await pause(300);
-    fortschritt();
-    return naechste();
+    await sagen('Stellen Sie mir gern jede Frage — oder wir starten direkt mit Ihrem <b>Angebot</b>:');
+    return beraterChips();
   }
   await pause(340);
   // Kurz halten: Der KI-Hinweis steht in der Kopfzeile, nicht im Gespräch.
