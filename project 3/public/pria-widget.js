@@ -374,22 +374,18 @@
     '  .lphero .siegelecke{flex-shrink:0;display:block}\n'+
     '  .lphero .siegelecke img{height:68px;width:auto;display:block;\n'+
     '    filter:drop-shadow(0 2px 6px rgba(40,34,28,.18))}\n'+
-    '  /* Die Anrede ist die Botschaft der Seite: größer als die Chat-Blasen\n'+
-    '     (15.5 px) und hervorgehoben (Martin, 26.08.). */\n'+
-    '  .lphero .anrede{margin:0;font-size:17.5px;line-height:1.42;color:var(--ink);\n'+
-    '    font-weight:500;letter-spacing:-.2px}\n'+
-    '  .lphero .anrede b{font-weight:750}\n'+
-    '  /* Die Fragen tragen das Gespräch — im Voll-Chat stehen sie in derselben\n'+
-    '     Größe wie die Anrede (Martin, 26.08.), die Zusatzzeile „Frage x von 8"\n'+
-    '     bleibt klein. Nur .panel.voll: das schwebende Widget bleibt, wie es ist. */\n'+
-    '  .panel.voll .bub.frage{font-size:17.5px;font-weight:650;line-height:1.38;\n'+
-    '    letter-spacing:-.2px}\n'+
+    '  /* „Sie benötigen eine 24-Stunden-Pflege?" ist DIE zentrale Zeile der\n'+
+    '     Seite (Martin, 26.08.) — groß und hervorgehoben; der restliche Text\n'+
+    '     bleibt normal. */\n'+
+    '  .lphero .anfrage{margin:0 0 4px;font-size:20px;line-height:1.22;color:var(--ink);\n'+
+    '    font-weight:750;letter-spacing:-.4px}\n'+
+    '  .lphero .anrede{margin:0;font-size:14.5px;line-height:1.5;color:var(--ink)}\n'+
     '  @media(min-width:641px){\n'+
     '    .lphero{padding:24px 22px 18px}\n'+
     '    .lphero .kopfbild img{width:66px;height:66px}\n'+
-    '    .lphero .anrede{font-size:19px}\n'+
+    '    .lphero .anfrage{font-size:23px}\n'+
+    '    .lphero .anrede{font-size:15px}\n'+
     '    .lphero .siegelecke img{height:78px}\n'+
-    '    .panel.voll .bub.frage{font-size:19px}\n'+
     '  }\n'+
     '  /* KI-Kennzeichnung bleibt trotzdem IM Chat verankert (AI Act, Pflicht):\n'+
     '     eine stille Zeile unter der Eingabe — sichtbar auch, wenn die Tastatur\n'+
@@ -936,9 +932,6 @@ async function naechste(){
   // Kurz durchatmen zwischen Reaktion und nächster Frage — sonst prasselt es.
   await pause(ruhig?0:520);
   await sagen(s.q,'Frage '+(FLOW.indexOf(s)+1)+' von '+FLOW.length+(s.hinweis?'<br>'+s.hinweis:''));
-  // Frage-Blasen markieren: im Voll-Chat stellt CSS sie größer (.bub.frage
-  // greift nur unter .panel.voll — das schwebende Widget bleibt unberührt).
-  const fb=thread.querySelector('.row:last-child .bub'); if(fb) fb.classList.add('frage');
   offeneFrage=s;
   setChips(s.o.map(([v,l])=>({t:l,f:b=>waehle(s,v,l,b)})));
 }
@@ -1868,9 +1861,9 @@ function lpHero(){
         'aria-label="6× Testsieger bei DIE WELT — Original-Veröffentlichung als PDF öffnen">'+
         '<img src="/images/primundus_testsieger-2021.webp" alt="Siegel: 6× Testsieger bei DIE WELT — Nr. 1 der Pflegekräfte-Vermittler"></a>'+
     '</div>'+
-    '<p class="anrede">Sie benötigen eine 24-Stunden-Pflege? Ich berechne Ihre <b>Kosten</b> '+
-      'und zeige Ihnen gleich <b>passende Pflegekräfte</b> — acht kurze Fragen, '+
-      'ich fange einfach an.</p>';
+    '<p class="anfrage">Sie benötigen eine 24-Stunden-Pflege?</p>'+
+    '<p class="anrede">Ich berechne Ihre <b>Kosten</b> und zeige Ihnen gleich '+
+      '<b>passende Pflegekräfte</b> — acht kurze Fragen, ich fange einfach an.</p>';
   thread.appendChild(h);
 }
 
