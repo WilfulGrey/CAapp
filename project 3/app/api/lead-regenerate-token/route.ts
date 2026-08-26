@@ -145,7 +145,7 @@ async function handlePost(request: NextRequest) {
   }
 
   const shouldSendEmail = source !== 'admin-silent' && Boolean(lead.email);
-  const portalBase = process.env.NEXT_PUBLIC_PORTAL_URL ?? 'https://kundenportal.primundus.de';
+  const portalBase = PORTAL_BASIS;
   const portalUrl = `${portalBase.replace(/\/$/, '')}/?token=${encodeURIComponent(newToken)}`;
 
   // Audit row first so dedupe works even if the email errors mid-flight.
@@ -198,4 +198,5 @@ function maskEmail(email: string | null | undefined): string {
 
 // ─── Telemetria RAM (diagnoza OOM — plan 2026-08-09; format: [req] …) ───
 import { withMem } from '@/lib/memlog';
+import { PORTAL_BASIS } from '@/lib/portal-url';
 export const POST = withMem('lead-regenerate-token', handlePost);

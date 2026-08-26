@@ -1,6 +1,7 @@
 import { Lead } from './lead-management';
 import { Kalkulation, detectGenderFromName, usableNamePart as cleanNamePart } from './calculation';
 import { getEmailLayout } from './email-template';
+import { PORTAL_BASIS } from './portal-url';
 
 // Eigennamen sauber großschreiben: jedes Wort + jeden Bindestrich-Teil
 // kapitalisieren. Namens-Partikel (von, van, de, zu, …) bleiben klein —
@@ -463,7 +464,7 @@ export function getEingangsbestaetigungEmailTemplate(
       // The link is reusable for the full 14-day token_expires_at window;
       // CA app never flips token_used to true, so the customer can come
       // back to the same URL multiple times.
-      const portalBase = process.env.NEXT_PUBLIC_PORTAL_URL ?? '';
+      const portalBase = PORTAL_BASIS;
       if (!portalBase || !lead.token) return '';
       const portalUrl = `${portalBase.replace(/\/$/, '')}/?token=${encodeURIComponent(lead.token)}`;
       return `
@@ -513,7 +514,7 @@ WIE GEHT ES WEITER?
 
 Unser Team prüft Ihre Anfrage und meldet sich in Kürze mit einem passenden Angebot bei Ihnen.
 ${(() => {
-  const portalBase = process.env.NEXT_PUBLIC_PORTAL_URL ?? '';
+  const portalBase = PORTAL_BASIS;
   if (!portalBase || !lead.token) return '';
   const portalUrl = `${portalBase.replace(/\/$/, '')}/?token=${encodeURIComponent(lead.token)}`;
   return `
@@ -942,7 +943,7 @@ export function getTeamNotificationTemplate(
 
   // Portal-Deeplink für Status, bei denen das Team direkt ins Kundenportal
   // einsteigen soll (Patientenprofil ansehen, Pflegekraft-Vorschau, etc.).
-  const portalBase = process.env.NEXT_PUBLIC_PORTAL_URL ?? '';
+  const portalBase = PORTAL_BASIS;
   // Bei Bewerbungs-Status direkt zur Bewerbungs-Sektion springen (goto),
   // statt den Klicker oben auf der Portal-Startansicht abzusetzen.
   const gotoSuffix = status === 'application_received' ? '&goto=bewerbungen' : '';

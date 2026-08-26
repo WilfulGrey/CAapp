@@ -47,7 +47,7 @@ async function handleGet(
       // Mirror of the production /api/pdf/kalkulation route: same magic-link
       // handoff into CA app, falling back to "#" when env / token missing.
       vertragsLink: (() => {
-        const portalBase = process.env.NEXT_PUBLIC_PORTAL_URL ?? '';
+        const portalBase = PORTAL_BASIS;
         if (!portalBase || !lead.token) return '#';
         return `${portalBase.replace(/\/$/, '')}/?token=${encodeURIComponent(lead.token)}`;
       })(),
@@ -77,4 +77,5 @@ async function handleGet(
 
 // ─── Telemetria RAM (diagnoza OOM — plan 2026-08-09; format: [req] …) ───
 import { withMem } from '@/lib/memlog';
+import { PORTAL_BASIS } from '@/lib/portal-url';
 export const GET = withMem('preview-kalkulation', handleGet);
