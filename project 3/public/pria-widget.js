@@ -277,7 +277,7 @@
     '       dürfen breiter werden — 80 % von 375 px ist unnötig schmal. */\n'+
     '    .thread{padding:16px 14px 10px;gap:11px}\n'+
     '    /* Hero-Ränder folgen dem Handy-Padding des Threads (volle Breite). */\n'+
-    '    .lphero{margin:-16px -14px 12px}\n'+
+    '    .lphero{margin:-16px -14px auto}\n'+
     '    .bub{max-width:84%;font-size:15.5px}\n'+
     '    .bub small{font-size:12px}\n'+
     '    /* Chips dürfen dem Verlauf nicht den halben Schirm wegnehmen. */\n'+
@@ -352,14 +352,19 @@
     '     eine Begrüßungsblase darunter gäbe es doppelt, deshalb beginnt der\n'+
     '     Chat direkt mit Frage 1. Negative Ränder spannen den Hero über das\n'+
     '     Thread-Padding auf volle Breite. */\n'+
-    '  .lphero{margin:-18px -15px 12px;padding:20px 18px 15px;text-align:left;\n'+
+    '  /* margin-bottom:auto drückt im Flex-Verlauf alles Folgende nach unten:\n'+
+    '     die Frage sitzt bei den Antwort-Chips (EINE Einheit), die Luft liegt\n'+
+    '     harmonisch in der Mitte statt als Loch zwischen Frage und Antwort.\n'+
+    '     Wächst das Gespräch über die Höhe hinaus, wird das auto zu 0 und der\n'+
+    '     Verlauf scrollt normal. */\n'+
+    '  .lphero{margin:-18px -15px auto;padding:20px 18px 15px;text-align:left;\n'+
     '    background:radial-gradient(150% 120% at 18% 0%,#FBEEE9 0%,#F8F2EC 58%,var(--bg) 100%);\n'+
     '    border-bottom:1px solid var(--line-zart)}\n'+
     '  /* Kopfzeile wie in den Mails (Martin, 26.08.): Pria links, Siegel\n'+
     '     rechts, darunter der persönliche Text. Das Siegel ist der klickbare\n'+
     '     Beleg zur Original-Veröffentlichung — die frühere eigene\n'+
     '     Siegel-Textzeile unten entfällt, der Claim steht in der Rolle. */\n'+
-    '  .lphero .oben{display:flex;align-items:center;gap:11px;margin-bottom:10px}\n'+
+    '  .lphero .oben{display:flex;align-items:center;gap:11px;margin-bottom:13px}\n'+
     '  .lphero .kopfbild{position:relative;flex-shrink:0}\n'+
     '  .lphero .kopfbild img{width:58px;height:58px;border-radius:50%;object-fit:cover;display:block;\n'+
     '    box-shadow:0 0 0 3px var(--papier),0 1px 2px rgba(40,34,28,.08),0 10px 26px rgba(217,90,76,.28)}\n'+
@@ -1861,7 +1866,7 @@ function lpHero(){
         'aria-label="6× Testsieger bei DIE WELT — Original-Veröffentlichung als PDF öffnen">'+
         '<img src="/images/primundus_testsieger-2021.webp" alt="Siegel: 6× Testsieger bei DIE WELT — Nr. 1 der Pflegekräfte-Vermittler"></a>'+
     '</div>'+
-    '<p class="anfrage">Sie benötigen eine 24-Stunden-Pflege?</p>'+
+    '<p class="anfrage">Sie benötigen eine <span style="white-space:nowrap">24-Stunden-Pflege?</span></p>'+
     '<p class="anrede">Ich berechne Ihre <b>Kosten</b> und zeige Ihnen gleich '+
       '<b>passende Pflegekräfte</b> — acht kurze Fragen, ich fange einfach an.</p>';
   thread.appendChild(h);
