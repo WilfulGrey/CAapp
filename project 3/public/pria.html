@@ -896,19 +896,37 @@ const CHARMANT=[
   'Sie testen mich, oder? 🙂 Nur zu — und wenn eine echte Frage kommt, bin ich sofort da.'
 ];
 let abwegig=0;
+/* „Für wen suchen Sie?" — die Antworten starten den Fragenlauf und
+   beantworten Frage 1 gleich mit: Mutter/Vater = eine Person, Eltern =
+   Ehepaar (Martins Linie, 27.08.: keine unpassenden Auswahl-Reste unter
+   der Rückführung). „Für jemand anderen" trägt bewusst NICHTS ein und
+   stellt die Personen-Frage regulär. */
+function fuerWenChips(){
+  const s=FLOW[0];
+  const start=(chip,v,label)=>{
+    modus='fragen'; offeneFrage=null;
+    protokoll('system','Fragenlauf gestartet',{ereignis:'funnel',grund:'preis'});
+    waehle(s,v,label,chip);
+  };
+  return [
+    {t:'Für meine Mutter',f:b=>start(b,'1','Für meine Mutter')},
+    {t:'Für meinen Vater',f:b=>start(b,'1','Für meinen Vater')},
+    {t:'Für meine Eltern',f:b=>start(b,'2','Für meine Eltern')},
+    {t:'Für jemand anderen',stil:'soft',f:b=>starteFunnel('preis',b,'Für jemand anderen')}
+  ];
+}
 async function zurueckfuehren(){
   await sagen(CHARMANT[Math.min(abwegig,CHARMANT.length-1)]);
   abwegig++;
   await pause(ruhig?0:380);
   await sagen(offeneFrage
     ? 'Wollen wir da weitermachen, wo wir waren? Meine Frage war: <b>'+offeneFrage.q+'</b>'
-    : 'Wenn Sie schon hier sind: Soll ich Ihnen zeigen, was eine Betreuung <b>bei Ihnen</b> kosten würde? Das dauert zwei Minuten.');
+    : 'Wenn Sie schon hier sind: Für wen suchen Sie denn? Dann berechne ich Ihnen gleich die <b>Kosten</b>.');
   if(offeneFrage){
     const s=offeneFrage;
     return setChips(s.o.map(([v,l])=>({t:l,f:x=>waehle(s,v,l,x)})));
   }
-  setChips([{t:'Ja, Preis berechnen',stil:'stark',f:b=>starteFunnel('preis',b)},
-            {t:'Ich habe eine andere Frage',stil:'soft',f:()=>{document.getElementById('frei').focus();beraterChips();}}]);
+  setChips(fuerWenChips());
 }
 
 /* ─── Fragen: NUR was in den Preis einfließt ───────────────────────
@@ -1699,6 +1717,10 @@ async function verarbeite(r,kundentext){
   }
   // Läuft der Fragenlauf, hat die offene Frage Vorrang vor allen Vorschlägen.
   if(modus==='fragen'&&offeneFrage){ await pause(ruhig?0:340); return weiterFrage(); }
+  // Abwegig ohne offene Frage: der Modelltext führt aufs „Für wen?" zurück
+  // (Leitplanke in lib/pria.ts) — darunter gehören die passenden Antworten,
+  // nicht die generischen Modell-Chips (Martin, 27.08.).
+  if(r.typ==='abwegig') return setChips(fuerWenChips());
   if(r.chips&&r.chips.length) return setChips(modellChips(r.chips));
   beraterChips();
 }
