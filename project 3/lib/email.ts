@@ -932,6 +932,19 @@ export function getTeamNotificationTemplate(
     return item?.antwort || 'Nicht angegeben';
   };
 
+  /* Über welche Seite kam die Anfrage? Der Mail sieht man sonst nicht an, ob
+     jemand das Formular ausgefüllt oder mit Pria gechattet hat — und genau das
+     ist während des Landingpage-Tests die Frage. `quelle` beschreibt den
+     AKTUELLEN Request, `lead.source` die erste Anfrage des Kunden (bei
+     Folgemails steht nur noch die zweite zur Verfügung). */
+  const HERKUNFT: Record<string, string> = {
+    'pria-chat': 'Chat mit Pria · /sofortangebot',
+    'rechner': 'Kostenrechner-Formular · Startseite',
+    'kostenrechner-result': 'Kostenrechner-Formular · Startseite',
+  };
+  const quelleRoh = String(additionalData?.quelle ?? (lead as any).source ?? '').trim();
+  const herkunft = HERKUNFT[quelleRoh] ?? (quelleRoh || 'unbekannt');
+
   const betreuungFuer = getLabel('betreuung_fuer');
   const pflegegrad = getAntwort('pflegegrad');
   const weiterePersonen = getLabel('weitere_personen');
@@ -1146,6 +1159,7 @@ export function getTeamNotificationTemplate(
             <tr><td><strong>E-Mail</strong></td><td>${lead.email}</td></tr>
             <tr><td><strong>Telefon</strong></td><td>${lead.telefon || 'N/A'}</td></tr>
             <tr><td><strong>Status</strong></td><td>${lead.status}</td></tr>
+            <tr><td><strong>Kam über</strong></td><td>${herkunft}</td></tr>
           </table>
 
           <div class="section-title">Pflegesituation & Anforderungen</div>
@@ -1207,6 +1221,7 @@ Name: ${[lead.anrede_text, capitalize(lead.vorname || ''), capitalize(lead.nachn
 E-Mail: ${lead.email}
 Telefon: ${lead.telefon || 'N/A'}
 Status: ${lead.status}
+Kam über: ${herkunft}
 
 === PFLEGESITUATION & ANFORDERUNGEN ===
 Betreuung für: ${betreuungFuer}

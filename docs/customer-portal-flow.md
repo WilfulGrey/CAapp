@@ -202,11 +202,20 @@ Content-Type: application/json
    - email już istnieje → `isUpgrade=true`, nowy token
    - nowy email → `isNew=true`, status `angebot_requested`
    - generuje `token` (32 znaki, **14 dni TTL**)
+   - **`source`** = `body.quelle || 'rechner'` (27.08.2026). Formularz nic nie
+     wysyła ⇒ `'rechner'`; czat Prii na `/sofortangebot` wysyła `'pria-chat'`
+     (`app/api/pria/lead/route.ts`). Ustawiane TYLKO przy pierwszym insercie —
+     wracający lead zachowuje swoje pierwotne źródło.
 4. **Fire-and-forget** (klient na nie nie czeka):
    - Eingangsbestätigung przez Ionos SMTP
    - `scheduleAngebotsEmail` → POST do edge function `schedule-email`
      z `delay_minutes: 15` (PDF z ofertą)
-   - `info@primundus.de` notification
+   - `info@primundus.de` notification — wiersz **„Kam über"** w sekcji
+     Kontaktdaten pokazuje, z której strony przyszło zapytanie
+     (`getTeamNotificationTemplate(lead, status, { quelle })`; bez `quelle`
+     fallback na `lead.source`, więc maile o późniejszych statusach też
+     pokazują pochodzenie). Powód: podczas testu landing page zespół musi
+     widzieć w mailu, czy klient wypełnił formularz, czy rozmawiał z Prią.
 5. Build `portalUrl = ${NEXT_PUBLIC_PORTAL_URL}/?token=<lead.token>`
 
 ### Response
