@@ -54,7 +54,7 @@ export const metadata: Metadata = {
   },
   metadataBase: new URL(SEITE),
   title: 'PRIMUNDUS - 24-Stunden-Pflege Kostenrechner',
-  description: 'Berechnen Sie in nur 2 Minuten die Kosten für 24-Stunden-Pflege. Vom 6× Testsieger mit Preisgarantie.',
+  description: 'Berechnen Sie in nur 2 Minuten die Kosten für 24-Stunden-Pflege. Vom 6× in Folge ausgezeichneten Testsieger mit Preisgarantie.',
   alternates: {
     canonical: '/',
   },
@@ -64,7 +64,7 @@ export const metadata: Metadata = {
     url: '/',
     siteName: 'PRIMUNDUS',
     title: 'PRIMUNDUS - 24-Stunden-Pflege Kostenrechner',
-    description: 'Berechnen Sie in nur 2 Minuten die Kosten für 24-Stunden-Pflege. Vom 6× Testsieger mit Preisgarantie.',
+    description: 'Berechnen Sie in nur 2 Minuten die Kosten für 24-Stunden-Pflege. Vom 6× in Folge ausgezeichneten Testsieger mit Preisgarantie.',
     images: [
       {
         url: '/images/primundus_logo_header.webp',
@@ -74,7 +74,7 @@ export const metadata: Metadata = {
   twitter: {
     card: 'summary_large_image',
     title: 'PRIMUNDUS - 24-Stunden-Pflege Kostenrechner',
-    description: 'Berechnen Sie in nur 2 Minuten die Kosten für 24-Stunden-Pflege. Vom 6× Testsieger mit Preisgarantie.',
+    description: 'Berechnen Sie in nur 2 Minuten die Kosten für 24-Stunden-Pflege. Vom 6× in Folge ausgezeichneten Testsieger mit Preisgarantie.',
     images: [
       {
         url: '/images/primundus_logo_header.webp',

@@ -97,7 +97,7 @@ export default function HomePage() {
             <a
               href="#testsieger"
               className="absolute bottom-[4%] left-[4%] z-10 block w-[18%] min-w-[62px] max-w-[150px]"
-              aria-label="6× Testsieger DIE WELT — zur Original-Veröffentlichung"
+              aria-label="Testsieger DIE WELT, 6× in Folge — zur Original-Veröffentlichung"
             >
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
@@ -138,7 +138,7 @@ export default function HomePage() {
                 {/* Auf dem Desktop groesser (Martin 16.08.): 14px standen
                     dort unter einer 44px-H1 wie eine Fussnote. */}
                 <span className="mb-2.5 block text-[14px] font-semibold uppercase tracking-[0.07em] text-[#E76F63] lg:mb-3 lg:text-[18px] lg:tracking-[0.06em]">
-                  24-Stunden-Pflege vom 6× Testsieger
+                  24-Stunden-Pflege vom Testsieger – 6× in Folge
                 </span>
                 <span className="block text-[33px] font-bold leading-[1.1] sm:text-[40px] lg:text-[44px] xl:text-[50px]">
                   Ihre Eltern müssen nicht ins Heim.
@@ -263,7 +263,7 @@ export default function HomePage() {
 
             <div className="bg-white border-2 border-[#D4A843] rounded-2xl p-8 relative">
               <div className="absolute top-[-14px] left-1/2 -translate-x-1/2 bg-[#D4A843] text-white px-6 py-1.5 rounded-full text-sm font-bold uppercase tracking-wide whitespace-nowrap shadow-md z-10">
-                ★ 6× Testsieger
+                ★ Testsieger · 6× in Folge
               </div>
 
               <div className="flex items-center gap-8 mt-4">
@@ -279,7 +279,7 @@ export default function HomePage() {
                     2026-08-14 abgestimmt) — Eigenaussage statt Zitat. */}
                 <div className="flex-1">
                   <h3 className="text-[22px] font-bold text-[#3D3D3D] mb-2">
-                    6× Testsieger bei DIE WELT
+                    Testsieger bei DIE WELT – 6× in Folge
                   </h3>
 
                   <p className="text-[14px] text-[#8A8279] mb-4">

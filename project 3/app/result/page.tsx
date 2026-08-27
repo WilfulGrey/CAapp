@@ -497,7 +497,7 @@ export default function ResultPage() {
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" />
                 </svg>
               </div>
-              <p className="text-[15px] text-[#3D3D3D] font-semibold text-left">20+ Jahre Erfahrung & 6× Testsieger</p>
+              <p className="text-[15px] text-[#3D3D3D] font-semibold text-left">20+ Jahre Erfahrung & Testsieger 6× in Folge</p>
             </div>
           </div>
         </div>

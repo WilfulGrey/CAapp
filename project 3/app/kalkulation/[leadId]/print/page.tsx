@@ -138,7 +138,7 @@ export default function KalkulationPrintPage() {
             <div style={{ display: 'flex', alignItems: 'center', gap: '5pt', paddingRight: '10pt', borderRight: '1pt solid #f0ebe4' }}>
               <Image src="/images/primundus_testsieger-2021.webp" alt="Testsieger" width={28} height={28} style={{ height: '22pt', width: 'auto' }} />
               <div style={{ fontSize: '7pt', lineHeight: 1.4 }}>
-                <div style={{ fontWeight: 700, color: '#3D2B1F' }}>6× Testsieger</div>
+                <div style={{ fontWeight: 700, color: '#3D2B1F' }}>Testsieger · 6× in Folge</div>
                 <div style={{ color: '#B5A184', fontWeight: 600 }}>DIE WELT</div>
                 <div style={{ color: '#aaa' }}>Preis &amp; Qualität</div>
               </div>
@@ -245,7 +245,7 @@ export default function KalkulationPrintPage() {
           <div style={{ display: 'flex', gap: '10pt', alignItems: 'flex-start', padding: '8pt 12pt', borderTop: '1pt solid #f0ece5', background: '#fff' }}>
             <Image src="/images/primundus_testsieger-2021.webp" alt="Testsieger" width={52} height={52} style={{ height: '40pt', width: 'auto', border: '1pt solid #e8d9a0', borderRadius: '3pt', flexShrink: 0 }} />
             <div>
-              <div style={{ fontSize: '10pt', fontWeight: 700, color: '#2D1F0F', marginBottom: '3pt' }}>6× Testsieger bei DIE WELT</div>
+              <div style={{ fontSize: '10pt', fontWeight: 700, color: '#2D1F0F', marginBottom: '3pt' }}>Testsieger bei DIE WELT – 6× in Folge</div>
               <div style={{ fontSize: '8.5pt', color: '#555', lineHeight: 1.5 }}>Nr. 1 der Pflegekräfte-Vermittler (DIE WELT/ServiceValue) – die beste Kombination aus Preis, Qualität und Kundenservice.</div>
             </div>
           </div>
