@@ -856,6 +856,15 @@ let abwegig=0;
    Ehepaar (Martins Linie, 27.08.: keine unpassenden Auswahl-Reste unter
    der Rückführung). „Für jemand anderen" trägt bewusst NICHTS ein und
    stellt die Personen-Frage regulär. */
+/* Erkennt, dass es gerade um „für wen suchen Sie?" geht — im Modelltext
+   oder in den Chips, die das Modell vorschlägt. Beides führt zu EINER
+   Antwort: der geprüften Liste aus fuerWenChips(). */
+const FUERWEN_FRAGE=/f(ü|ue)r wen (suchen|ist|brauchen|ben(ö|oe)tigen|w(ä|ae)re)|wen m(ö|oe)chten sie|um wen geht/i;
+const FUERWEN_PERSON=/\b(mutter|vater|eltern|mama|papa|oma|opa|gro(ß|ss)(mutter|vater)|(ehe)?partner(in)?|(ehe)?mann|(ehe)?frau|schwieger\w*)\b/i;
+function fuerWenGemeint(text,chips){
+  if(text && FUERWEN_FRAGE.test(text)) return true;
+  return Array.isArray(chips) && chips.some(c=>FUERWEN_PERSON.test(String(c)));
+}
 function fuerWenChips(){
   const s=FLOW[0];
   const start=(chip,v,label)=>{
@@ -1518,6 +1527,21 @@ async function uebernehmen(s,v,label){
     const o=offeneFrage;
     return setChips(o.o.map(([w,l])=>({t:l,f:b=>waehle(o,w,l,b)})));
   }
+  /* HARTE REGEL (Martin, 27.08.): Wer eine Preisfrage beantwortet hat, hat
+     den Fragenlauf begonnen — auch wenn er vorher nie „Preis berechnen"
+     gedrückt hat. Dann geht es zur NÄCHSTEN Frage, niemals zurück ins
+     Menü. Vorher landete genau dieser Fall („Eltern" im offenen Einstieg)
+     bei beraterChips: der Kunde hatte gerade Frage 1 beantwortet und
+     bekam wieder die Auswahl statt Frage 2.
+     naechste() rechnet von selbst, wenn nichts mehr offen ist. */
+  if(!uebergeben && !kontaktOffen){
+    if(modus!=='fragen'){
+      modus='fragen';
+      protokoll('system','Fragenlauf gestartet',{ereignis:'funnel',grund:'preis'});
+    }
+    fortschritt();
+    return naechste();
+  }
   beraterChips();
 }
 
@@ -1676,6 +1700,13 @@ async function verarbeite(r,kundentext){
   // (Leitplanke in lib/pria.ts) — darunter gehören die passenden Antworten,
   // nicht die generischen Modell-Chips (Martin, 27.08.).
   if(r.typ==='abwegig') return setChips(fuerWenChips());
+  /* Personen-Auswahl gehört dem CODE, nicht dem Modellermessen: sobald es
+     um „für wen suchen Sie?" geht — egal ob nach einer Begrüßung, einer
+     Wissensfrage oder etwas Abwegigem — setzen wir die vollständige,
+     geprüfte Liste. Das Modell hatte „Eltern" weggelassen und stattdessen
+     „Preis berechnen" dazwischengemischt (Martin, 27.08.). */
+  if(!offeneFrage && antwort.personen===undefined && fuerWenGemeint(r.text,r.chips))
+    return setChips(fuerWenChips());
   if(r.chips&&r.chips.length) return setChips(modellChips(r.chips));
   beraterChips();
 }
