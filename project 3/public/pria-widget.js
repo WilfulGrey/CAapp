@@ -991,7 +991,9 @@ async function starteFunnel(grund,chip,echo,einleitung){
         ? '<b>Acht kurze Fragen</b>, dann haben Sie Ihren Preis — ich fange einfach an.'
         : '<b>Acht kurze Fragen</b>, dann zeige ich Ihnen die passenden Kräfte — ich fange einfach an.');
   const vorspann = einleitung ? einleitung.trim().replace(/<br>\s*$/,'')
-    : (schonDa ? '' : (grund==='preis' ? 'Das hängt ganz von Ihrer Situation ab.'
+    // „Das hängt ganz von Ihrer Situation ab" las sich, als hinge die
+    // BERECHNUNG von etwas ab — der Preis tut es (Martin, 27.08.).
+    : (schonDa ? '' : (grund==='preis' ? 'Gerne. Der Preis hängt von Ihrer Situation ab.'
                                        : 'Wer zu Ihnen passt, hängt von Ihrer Situation ab.'));
   await sagen((vorspann ? vorspann + ' ' : '') + mechanik);
   fortschritt();   // schon Beantwortetes soll man am Balken sehen
