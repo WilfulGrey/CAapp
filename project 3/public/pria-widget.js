@@ -340,13 +340,13 @@
     '  .panel.voll .bar{display:none}\n'+
     '  .panel.voll .prog{display:none}   /* „Frage x von 8" steht in jeder Frage-Karte */\n'+
     '  .panel.voll .thread{background:transparent;padding:12px 16px 8px}\n'+
-    '  /* ── Hero-Karte: beim Ankommen präsent, scrollt mit dem Gespräch weg\n'+
-    '     (margin-bottom:auto hält den Rest unten bei den Antworten, solange\n'+
-    '     der Verlauf kürzer als die Fläche ist). Farben und Schrift = CI des\n'+
-    '     Kostenrechners (Martin, 26.08.: Mockup war die Layout-IDEE, Typo und\n'+
-    '     Palette bleiben unsere): Inter/System-Sans, weiße Karten,\n'+
+    '  /* ── Hero-Karte: beim Ankommen präsent, scrollt mit dem Gespräch weg.\n'+
+    '     Das Gespräch fließt DIREKT darunter (Martin, 27.08.: das frühere\n'+
+    '     margin-bottom:auto ließ bei kurzem Verlauf ein Loch in der Mitte —\n'+
+    '     die Luft liegt jetzt unten, wo sie niemanden stört). Farben und\n'+
+    '     Schrift = CI des Kostenrechners: Inter/System-Sans, weiße Karten,\n'+
     '     Coral-Akzente, Gold-Braun #8B7355 nur als Trust-Akzent. */\n'+
-    '  .lphero{margin:2px 0 auto;padding:19px 18px 20px;text-align:left;border-radius:22px;\n'+
+    '  .lphero{margin:2px 0 12px;padding:19px 18px 20px;text-align:left;border-radius:22px;\n'+
     '    background:var(--papier);border:1px solid var(--line-zart);\n'+
     '    box-shadow:0 1px 2px rgba(40,34,28,.04),0 12px 34px rgba(40,34,28,.08)}\n'+
     '  .lphero .oben{display:flex;align-items:center;gap:13px;margin-bottom:10px}\n'+
