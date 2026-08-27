@@ -38,7 +38,7 @@ const ERLAUBTE_HOSTS = new Set([
 export const metadata: Metadata = {
   title: 'Ihr Sofortangebot im Chat — PRIMUNDUS 24-Stunden-Pflege',
   description:
-    'Im Chat zum Sofortpreis: acht kurze Fragen, dann sehen Sie Ihren Monatspreis und passende Pflegekräfte — vom 6× Testsieger.',
+    'Im Chat zum Sofortpreis: acht kurze Fragen, dann sehen Sie Ihren Monatspreis und passende Pflegekräfte — vom Testsieger, 6× in Folge.',
   // Testvariante: nie in den Index, auch nicht nach dem Prod-Schalter —
   // die Seite existiert nur für die Kampagne (noindex laut Vertrag).
   robots: { index: false, follow: false },

@@ -693,8 +693,8 @@ function addPage4(doc: jsPDF, leadData?: LeadData, vertragsToken?: string) {
       text: 'Primundus ist kein Vermittler. Unsere Pflegekraefte sind direkt bei uns angestellt. Wir\nbilden sie aus und fuehren einen 6-Punkte-Qualitaetscheck durch.',
     },
     {
-      titel: '6× Testsieger & Service-Champion',
-      text: 'Ausgezeichnet als 6× Testsieger durch DIE WELT und als Service-Champion. 4,98 von 5\nSternen auf ProvenExpert.',
+      titel: 'Testsieger & Service-Champion – 6× in Folge',
+      text: '6× in Folge als Testsieger durch DIE WELT und als Service-Champion ausgezeichnet. 4,98 von 5\nSternen auf ProvenExpert.',
     },
     {
       titel: '20+ Jahre Erfahrung - 10.000+ Einsaetze',
