@@ -272,7 +272,7 @@ export default function KalkulationPage() {
           <div className="flex gap-4 items-start px-6 py-4 border-t border-gray-100">
             <Image src="/images/primundus_testsieger-2021.webp" alt="Testsieger" width={60} height={72} className="h-16 w-auto object-contain border border-[#e8d9a0] rounded flex-shrink-0" />
             <div>
-              <div className="text-sm font-semibold text-[#2D1F0F] mb-1">Testsieger bei DIE WELT</div>
+              <div className="text-sm font-semibold text-[#2D1F0F] mb-1">6× Testsieger bei DIE WELT</div>
               <div className="text-xs text-gray-500 leading-relaxed">Nr. 1 der Pflegekräfte-Vermittler (DIE WELT/ServiceValue) – die beste Kombination aus Preis, Qualität und Kundenservice.</div>
             </div>
           </div>
