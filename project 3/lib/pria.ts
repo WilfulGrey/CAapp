@@ -250,6 +250,39 @@ Wähle den \`typ\`:
 - Bist du dir bei der Zuordnung nicht sicher, ist \`unklar\` mit einer Rückfrage besser als ein
   falsch gesetzter Wert.
 
+### Nimm ALLES mit, was in der Nachricht steht (\`felder\`)
+Menschen erzählen ihre Lage in einem Satz, nicht in acht Antworten: „Meine Eltern, beide
+Pflegegrad 3, nachts wird's schwierig" enthält drei Angaben. Trag **jede davon** in
+\`felder\` ein — je ein Eintrag mit \`feld\` und \`werte\`, dieselben Regeln wie unten.
+Der Chat trägt sie zusammen ein, bestätigt sie in einem Satz und fragt nur noch, was
+wirklich fehlt. Das ist der Unterschied zwischen einem Gespräch und einem Formular:
+**Frag nie nach etwas, das der Kunde dir gerade gesagt hat.**
+
+- Es zählt, was der Kunde **über seine Lage** sagt — auch beiläufig, auch in einer
+  Nebenbemerkung, auch wenn gerade eine andere Frage offen war.
+- Bist du bei einer der Angaben unsicher, lass **sie** weg (nicht die ganze Nachricht) —
+  der Chat fragt danach.
+- \`felder\` darf leer sein, wenn nichts drinsteht. Steht nur eine Angabe drin, gehört
+  sie trotzdem hinein (zusätzlich zu \`feld\`/\`werte\`).
+
+### Wer betreut wird, sagt die Personenzahl mit
+Der Chat fragt zum Einstieg, für wen gesucht wird. Sagt die Antwort eindeutig, wie viele
+Menschen betreut werden, ist das eine **Antwort auf \`personen\`** (\`typ = antwort\` bzw.
+\`nachtrag\`, \`feld = "personen"\`) — nicht bloß Small Talk, nicht \`preis\`, nicht \`wissen\`.
+Der Kunde soll die Frage „Wie viele Personen benötigen Pflege?" nicht noch einmal
+vorgelegt bekommen, wenn er sie gerade beantwortet hat.
+
+- **Eine Person** → \`werte: ["1"]\`: Mutter, Vater, Oma, Opa, Schwiegermutter/-vater,
+  Tante, Onkel, Ehepartner/in, Nachbarin, Freund — und ebenso „für mich selbst".
+- **Zwei Personen** → \`werte: ["2"]\`: Eltern, Großeltern, Schwiegereltern, „beide",
+  „Mutter und Vater", „Oma und Opa", Ehepaar.
+- **Nicht eindeutig** → NICHT raten: „für meine Familie", „für zu Hause", „für uns",
+  „für jemanden aus der Verwandtschaft". Dann nur freundlich reagieren; der Chat stellt
+  die Frage nach der Personenzahl selbst.
+
+Drei oder mehr Pflegebedürftige sieht der Preis nicht vor — nenne dann keinen Wert,
+sondern sag ehrlich, dass wir das persönlich klären (\`typ = mensch\`).
+
 ### Regeln zu \`chips\`
 Höchstens drei kurze Vorschläge für Antwort-Knöpfe, in der Ich-Form des Kunden. Nur, wenn
 gerade KEINE der Fragen offen ist — sonst stören sie. Die Texte „Preis berechnen" und
@@ -275,9 +308,24 @@ export const WERKZEUG = {
         description: 'Was Pria sagt. Bei typ=antwort/nachtrag NUR, wenn in derselben Nachricht ' +
           'auch eine echte Frage steckt — dann deren Antwort. Sonst leer.' },
       feld: { type: 'string', enum: [...FELDER, ''],
-        description: 'Nur bei typ=antwort/vorschlag/nachtrag: welche der Fragen. Sonst "".' },
+        description: 'Nur bei typ=antwort/vorschlag/nachtrag: welche der Fragen. Sonst "". ' +
+          'Bei mehreren Angaben in einer Nachricht: die wichtigste hier, ALLE in felder.' },
       werte: { type: 'array', items: { type: 'string' },
         description: 'Nur bei typ=antwort/nachtrag: erlaubte Werte, leichteste zuerst. Sonst [].' },
+      felder: {
+        type: 'array',
+        description: 'ALLE Angaben, die in der Nachricht stecken — auch mehrere auf einmal ' +
+          '("meine Eltern, beide Pflegegrad 3, nachts unruhig" = drei Einträge). Der Chat ' +
+          'trägt sie zusammen ein und fragt nur noch, was fehlt. Leer, wenn nichts drinsteht.',
+        items: {
+          type: 'object',
+          properties: {
+            feld: { type: 'string', enum: [...FELDER] },
+            werte: { type: 'array', items: { type: 'string' } },
+          },
+          required: ['feld', 'werte'],
+        },
+      },
       quelle: { type: 'string', description: 'Wird nicht mehr verwendet — immer "".' },
       kontaktName: { type: 'string', description: 'Nur bei typ=kontakt: erkannter Name. Sonst "".' },
       kontaktMail: { type: 'string', description: 'Nur bei typ=kontakt: erkannte E-Mail. Sonst "".' },
@@ -285,7 +333,7 @@ export const WERKZEUG = {
       chips: { type: 'array', items: { type: 'string' },
         description: 'Höchstens drei Vorschläge in der Ich-Form des Kunden. Sonst [].' },
     },
-    required: ['typ', 'text', 'feld', 'werte', 'quelle', 'chips',
+    required: ['typ', 'text', 'feld', 'werte', 'felder', 'quelle', 'chips',
                'kontaktName', 'kontaktMail', 'kontaktTelefon'],
   },
 };
@@ -302,7 +350,10 @@ export type PriaZustand = {
 };
 
 export type PriaAntwort = {
-  typ: Typ; text: string; feld: string; werte: string[]; quelle: string; chips: string[];
+  typ: Typ; text: string; feld: string; werte: string[];
+  /** Alle Angaben der Nachricht — der Chat trägt sie zusammen ein. */
+  felder: { feld: string; werte: string[] }[];
+  quelle: string; chips: string[];
   kontaktName: string; kontaktMail: string; kontaktTelefon: string;
 };
 
@@ -352,8 +403,26 @@ export function pruefen(roh: any): PriaAntwort {
   // Bei ungestuften Feldern zählt nur die letzte Nennung — die aktuellste.
   if (werte.length > 1 && !STUFIG.includes(feldRoh)) werte = [werte[werte.length - 1]];
 
+  /* Mehrere Angaben aus EINER Nachricht („meine Eltern, beide Pflegegrad 3,
+     nachts unruhig"). Jede einzeln gegen den FLOW geprüft — das Modell darf
+     verstehen, aber keinen Wert setzen, den es sich ausgedacht hat. Das
+     Einzelfeld oben bleibt gefüllt (ältere Pfade lesen es weiter). */
+  const rohFelder: any[] = Array.isArray(roh?.felder) ? roh.felder : [];
+  const felder: { feld: string; werte: string[] }[] = [];
+  for (const e of [...rohFelder, { feld: feldRoh, werte }]) {
+    const k = String(e?.feld || '');
+    const ff = FLOW.find((x) => x.k === k);
+    if (!ff || felder.some((x) => x.feld === k)) continue;   // unbekannt oder schon drin
+    let w: string[] = Array.isArray(e?.werte) ? e.werte.map(String) : [];
+    w = w.filter((v) => ff.o.some((o) => o[0] === v));
+    if (w.length > 1 && !STUFIG.includes(k)) w = [w[w.length - 1]];
+    if (w.length) felder.push({ feld: k, werte: w });
+  }
+
   let typ = (TYPEN as readonly string[]).includes(typRoh) ? (typRoh as Typ) : 'unklar';
-  if ((typ === 'antwort' || typ === 'nachtrag') && !werte.length) typ = 'unklar';
+  // Eine Angabe reicht: liefert das Modell nur `felder`, ist es trotzdem eine
+  // Antwort — sonst fiele die reichere Nachricht auf „unklar" zurück.
+  if ((typ === 'antwort' || typ === 'nachtrag') && !werte.length && !felder.length) typ = 'unklar';
   if (typ === 'vorschlag' && !f) typ = 'unklar';
 
   const chips = Array.isArray(roh?.chips) ? roh.chips : [];
@@ -362,8 +431,9 @@ export function pruefen(roh: any): PriaAntwort {
     text: saeubern(typ === 'unklar' && typRoh !== 'unklar'
       ? 'Da bin ich mir nicht sicher, ob ich Sie richtig verstanden habe — sagen Sie es mir bitte noch einmal anders?'
       : roh?.text),
-    feld: f ? feldRoh : '',
-    werte,
+    feld: f ? feldRoh : (felder[0]?.feld || ''),
+    werte: werte.length ? werte : (felder[0]?.werte || []),
+    felder,
     // Quellenzeile abgeschafft (Martin, 21.08.) — im Gespräch wirkte sie wie ein
     // Beleg-Anhängsel. Das Feld bleibt im Schema, damit das Modell nicht auf ein
     // unbekanntes Feld ausweicht; ausgeliefert wird es nicht.
