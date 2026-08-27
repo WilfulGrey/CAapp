@@ -403,15 +403,17 @@
     '  /* nowrap: die Grundregel der Chips wrappt — mit column entstünden\n'+
     '     sonst SPALTEN, sobald die Liste höher als max-height wird. */\n'+
     '  .panel.voll .chips{background:transparent;flex-direction:column;flex-wrap:nowrap;\n'+
-    '    align-items:stretch;gap:9px;padding:10px 16px 4px;\n'+
-    '    max-height:min(46dvh,390px);overflow-y:auto}\n'+
+    '    align-items:stretch;gap:6px;padding:8px 16px 3px;\n'+
+    '    max-height:min(44dvh,360px);overflow-y:auto}\n'+
+    '  /* Kompakt (Martin, 27.08.: „die Auswahlfelder sind zu groß") — fünf\n'+
+    '     Karten müssen neben Hero und Blase Platz lassen. */\n'+
     '  .panel.voll .chips .chip{display:flex;align-items:center;background:var(--papier);\n'+
-    '    border:1px solid var(--line-zart);border-radius:16px;\n'+
-    '    box-shadow:0 4px 16px rgba(40,34,28,.06);\n'+
-    '    padding:14px 42px 14px 16px;font-size:15.5px;font-weight:650;color:#3D3D3D;\n'+
-    '    text-align:left;position:relative}\n'+
-    '  .panel.voll .chips .chip::after{content:"›";position:absolute;right:17px;top:50%;\n'+
-    '    transform:translateY(-50%);color:var(--coral-tief);font-size:22px;font-weight:600;line-height:1}\n'+
+    '    border:1px solid var(--line-zart);border-radius:13px;\n'+
+    '    box-shadow:0 3px 12px rgba(40,34,28,.05);\n'+
+    '    padding:10px 36px 10px 14px;font-size:14.5px;font-weight:650;color:#3D3D3D;\n'+
+    '    text-align:left;position:relative;min-height:0}\n'+
+    '  .panel.voll .chips .chip::after{content:"›";position:absolute;right:15px;top:50%;\n'+
+    '    transform:translateY(-50%);color:var(--coral-tief);font-size:19px;font-weight:600;line-height:1}\n'+
     '  .panel.voll .chips .chip:hover{background:#FDF7F5;border-color:rgba(231,111,99,.35)}\n'+
     '  .panel.voll .chips .chip:active{transform:scale(.985)}\n'+
     '  /* Hinweiszeile aus dem Mockup: nimmt die Sorge, dass hinter der Auswahl\n'+
