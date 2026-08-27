@@ -383,6 +383,11 @@
     '  .panel.voll .row.me .bub{background:#FDF0ED;color:var(--coral-tief);\n'+
     '    border:1px solid rgba(231,111,99,.26);box-shadow:none;font-weight:650;\n'+
     '    border-radius:14px;padding:8px 13px;font-size:14px}\n'+
+    '  /* Status-Karten (Berechnung, Übergabe) in Verlaufs-Typo und -Geometrie —\n'+
+    '     die kleinere .anim-Schrift stach heraus (Martin, 27.08.). */\n'+
+    '  .panel.voll .card{max-width:94%;border-radius:14px;box-shadow:none;\n'+
+    '    border:1px solid var(--line-zart)}\n'+
+    '  .panel.voll .anim{font-size:14.5px}\n'+
     '  /* ── Frage als Karte (nur Voll-Chat): Icon-Kreis + Frage ── */\n'+
     '  .panel.voll .row.zfrage{margin-top:4px}\n'+
     '  .panel.voll .row.zfrage .mini{display:none}\n'+
@@ -1046,17 +1051,22 @@ async function waehle(s,v,l,chip,ausText){
 async function matching(){
   vprogStand('fertig');
   W.getElementById('status').textContent='sucht passende Kräfte …';
+  /* Erzähllogik (Martin, 27.08.): es werden VIELE geprüft und 5 GEFUNDEN.
+     Vorher zählte die Zahl im „werden geprüft"-Satz auf 5 herunter —
+     das las sich, als würden nur 5 geprüft. Jetzt bleibt die Prüfzeile
+     bei 142 und wird beim Abhaken zur Fund-Zeile. */
   const r=document.createElement('div');r.className='row';
   r.innerHTML='<div class="mini">'+avatar(PRIA.denk)+'</div><div class="card">'+
     '<div class="anim" id="a0"><span class="ring"></span>Ihr Angebot wird berechnet</div>'+
-    '<div class="anim" id="a1"><span class="ring"></span><span id="zahl">142</span> Pflegekräfte werden geprüft</div>'+
-    '<div class="anim" id="a2"><span class="ring"></span>Fertig</div></div>';
+    '<div class="anim" id="a1"><span class="ring"></span><span id="prueftext"><b>142</b> Pflegekräfte werden geprüft</span></div>'+
+    '<div class="anim" id="a2"><span class="ring"></span>Ihr Sofortangebot steht</div></div>';
   thread.appendChild(r);runter();
   const setz=(i,c)=>W.getElementById('a'+i).className='anim '+c;
   const ok=i=>{setz(i,'ok');W.querySelector('#a'+i+' .ring').textContent='✓';};
   setz(0,'on');await pause(1400);ok(0);setz(1,'on');
-  let n=142;const iv=setInterval(()=>{n-=Math.ceil((n-5)/12);if(n<=5){n=5;clearInterval(iv);}W.getElementById('zahl').textContent=n;},110);
-  await pause(2500);clearInterval(iv);W.getElementById('zahl').textContent='5';ok(1);setz(2,'on');
+  await pause(2300);
+  ok(1);W.getElementById('prueftext').innerHTML='<b>5 passende</b> Pflegekräfte gefunden';
+  setz(2,'on');
   await pause(800);ok(2);tipp([10,40,10]);
   W.getElementById('status').textContent=untertitel;
   prog.style.width='100%';
