@@ -1157,6 +1157,57 @@ function deuten(s,text){
     if(re.test(String(text))) return {v,satz};
   return null;
 }
+
+/* ─── Die Antwort steht schon in den Optionen ───────────────────────
+   Martin (27.08.): „nicht unbedingt" auf „Soll die Pflegekraft Auto
+   fahren können?" ist klar zu verstehen — es steht wörtlich im Knopf
+   („Nein / nicht unbedingt"). Statt für jeden Fall Stichwörter zu
+   pflegen, vergleichen wir mit den Optionstexten selbst: Das gilt für
+   alle acht Fragen und für jede Option, die je dazukommt.
+   Ein Treffer hier ist SICHER (keine Rückfrage) — anders als eine
+   Deutung, die bestätigt werden will. */
+const norm=t=>String(t).toLowerCase()
+  .replace(/[.,;:!?„“"'()]/g,' ')
+  .replace(/ä/g,'ae').replace(/ö/g,'oe').replace(/ü/g,'ue').replace(/ß/g,'ss')
+  .replace(/\s+/g,' ').trim();
+/* Generische Zustimmung/Ablehnung — deckt „nö", „passt schon", „brauchen
+   wir nicht" ab, ohne Frageliste. Nur bei Ja/Nein-Fragen verwendet. */
+const JA_WORT=/^(ja|jo|jup|jep|klar|gern|gerne|bitte|unbedingt|auf jeden fall|genau|richtig|stimmt|sicher|wichtig|waere gut|waere schoen|ja bitte|ja gern)\b/;
+const NEIN_WORT=/^(nein|ne|noe|nee|nicht|kein|keine|nicht noetig|nicht unbedingt|brauchen wir nicht|braucht es nicht|unnoetig|eher nicht|lieber nicht|nein danke|passt so)\b|\b(nicht noetig|nicht unbedingt|brauchen wir nicht|kein bedarf)\b/;
+/* Verneinung erkennen — ENTSCHEIDEND vor jedem Teilstring-Vergleich:
+   „nicht unbedingt" enthält „unbedingt" und landete sonst bei „Ja,
+   unbedingt". Genau umgekehrt gemeint. */
+const VERNEINT=/(^|\s)(nicht|kein|keine|keinen|nein|ne|noe|nee|ohne|nie|niemals|unnoetig)(\s|$)/;
+function ausOptionen(s,text){
+  const t=norm(text);
+  if(!t) return null;
+  const tNein=VERNEINT.test(' '+t+' ');
+  /* Der Text steckt in einem Optionstext (oder umgekehrt) — aber nur, wenn
+     beide dieselbe Richtung haben (verneint / nicht verneint), und der
+     LÄNGSTE Treffer gewinnt: „jede nacht mehrere einsätze" passt auf
+     „Jede Nacht, bis zu 1 Einsatz" (kurzer Teil) UND auf „Jede Nacht,
+     mehrere Einsätze" — gemeint ist offensichtlich das Längere. */
+  let bester=null, beste=0;
+  for(const [v,l] of s.o){
+    for(const teil of String(l).split(/[\/,–—]| oder /)){
+      const p=norm(teil);
+      if(p.length<3) continue;
+      if(VERNEINT.test(' '+p+' ')!==tNein) continue;
+      let treffer=0;
+      if(t===p) treffer=p.length+100;                       // exakt schlägt alles
+      else if(t.length>=4 && (t.includes(p)||p.includes(t))) treffer=Math.min(p.length,t.length);
+      if(treffer>beste){ beste=treffer; bester=v; }
+    }
+  }
+  if(bester) return bester;
+  // 2. Ja/Nein-Fragen: generische Zustimmung/Ablehnung.
+  const werte=s.o.map(([v])=>v);
+  if(werte.length===2 && werte.includes('ja') && werte.includes('nein')){
+    if(NEIN_WORT.test(t)) return 'nein';
+    if(JA_WORT.test(t)) return 'ja';
+  }
+  return null;
+}
 /* Wie oft haben wir bei dieser Frage schon nachgehakt? Zweimal derselbe
    Satz ist der Moment, in dem der Chat dumm wirkt (Martin, 27.08.). */
 const nachgefragt={};
@@ -1775,6 +1826,18 @@ async function verarbeite(r,kundentext){
      Steht eine Frage offen und findet die Stichwortpruefung im Satz des
      Kunden genau einen gueltigen Wert dafuer, gilt der. Lieber der
      schlichte Treffer als eine Schleife. */
+  /* Sicherheitsnetz NUR gegen ein „unklar" des Modells: steht die Antwort
+     wörtlich in den Optionen, entscheidet der Code. Bei wissen/sozial/
+     abwegig hat das Modell BEWUSST entschieden — dort nicht dazwischen-
+     funken (Martin, 27.08.: „wenn komplett was anderes, dann gehst du
+     kurz darauf ein und lenkst charmant auf die Frage zurück"). */
+  if(offeneFrage && kundentext && r.typ==='unklar'){
+    const sicher=ausOptionen(offeneFrage,kundentext);
+    if(sicher){
+      const s=offeneFrage, l=(s.o.find(x=>x[0]===sicher)||[,sicher])[1];
+      return waehle(s,sicher,l,null,true);
+    }
+  }
   if(offeneFrage && kundentext && ['wissen','sozial','unklar','abwegig'].includes(r.typ)){
     const th=THEMEN.find(t=>t.k===offeneFrage.k);
     const treffer=th?stufenTreffer(th,kundentext):[];
@@ -1938,6 +2001,17 @@ async function frageLokal(text){
   // Steht eine Frage offen und der Kunde weiß es nicht: Vorschlag statt Rückfrage.
   if(offeneFrage && offeneFrage.vorschlag && UNSICHER.test(text)) return vorschlagen(offeneFrage);
 
+  /* Die Antwort steht wörtlich in den Optionen („nicht unbedingt" →
+     „Nein / nicht unbedingt")? Dann ist sie eindeutig — vor jeder
+     Wissenssuche eintragen (Martin, 27.08.). */
+  if(offeneFrage){
+    const sicher=ausOptionen(offeneFrage,text);
+    if(sicher){
+      const s=offeneFrage, l=(s.o.find(x=>x[0]===sicher)||[,sicher])[1];
+      return waehle(s,sicher,l,null,true);
+    }
+  }
+
   // Bezieht sich der Satz auf eine unserer Angaben? Dann ist es eine
   // Antwort oder ein Nachtrag — keine Wissensfrage.
   if(modus==='fragen'){
@@ -1972,7 +2046,8 @@ async function frageLokal(text){
      eine verständliche Antwort (Martin, 27.08.). Also erst DEUTEN und
      gezielt nachfragen, statt statisch dieselbe Floskel zu wiederholen. */
   if(!e && offeneFrage){
-    const s=offeneFrage, d=deuten(s,text);
+    const s=offeneFrage;
+    const d=deuten(s,text);
     if(d){
       const label=(s.o.find(x=>x[0]===d.v)||[,d.v])[1];
       await sagen('Verstehe ich Sie richtig — '+d.satz+'?');
