@@ -31,7 +31,7 @@ const WURZEL = join(__dirname, '..', '..', '..', 'project 3');
  * verschwand). Stattdessen am Schlüssel schneiden und je Stück die erste
  * Optionsliste bis zum schliessenden `]]` lesen.
  */
-function flowAus(block: string, stil: 'html' | 'ts'): Array<{ k: string; werte: string[] }> {
+function flowAus(block: string, stil: 'html' | 'ts'): Array<{ k: string; q: string; werte: string[] }> {
   const schluessel = stil === 'html' ? /\{k:'(\w+)'/g : /\{ k: '(\w+)'/g;
   const treffer = Array.from(block.matchAll(schluessel));
   return treffer
@@ -39,7 +39,9 @@ function flowAus(block: string, stil: 'html' | 'ts'): Array<{ k: string; werte: 
       const stueck = block.slice(t.index!, i + 1 < treffer.length ? treffer[i + 1].index! : block.length);
       const liste = /o:\s*\[([\s\S]*?)\]\s*\]/.exec(stueck);
       const werte = liste ? Array.from(liste[1].matchAll(/\['([^']+)'/g)).map((m) => m[1]) : [];
-      return { k: t[1], werte };
+      // Der Fragetext selbst — für die Prüfung, dass es wirklich Fragen sind.
+      const frage = /\bq:\s*'([^']+)'/.exec(stueck);
+      return { k: t[1], q: frage ? frage[1] : '', werte };
     })
     .filter((f) => f.werte.length > 0);
 }
@@ -78,4 +80,24 @@ describe('Pria — Widget und Sprachdienst kennen denselben Fragenkatalog', () =
       expect(gegenstueck!.werte, `Werte von ${feld.k} weichen ab`).toEqual(feld.werte);
     }
   });
+
+  /*
+   * Jede der acht ist eine FRAGE — kein Formular-Titel.
+   *
+   * Martin, 27.08.: „Warum stellst du manchmal keine Fragen, sondern
+   * ‚Mobilität der zu betreuenden Person‘ … ohne Frage?" Genau das stand
+   * dort: eine Überschrift aus der Formularwelt, mitten im Gespräch. Im
+   * Chat spricht ein Mensch — der stellt Fragen.
+   */
+  for (const [name, katalog] of [['Widget', imWidget], ['Sprachdienst', imDienst]] as const) {
+    it(`${name}: jede Frage ist als Frage formuliert`, () => {
+      const ohneFragezeichen = katalog
+        .filter((f) => !f.q.trim().endsWith('?'))
+        .map((f) => `${f.k}: „${f.q}"`);
+      expect(
+        ohneFragezeichen,
+        `Kein Fragezeichen — im Chat klingt das wie ein Formularfeld:\n${ohneFragezeichen.join('\n')}`,
+      ).toEqual([]);
+    });
+  }
 });
