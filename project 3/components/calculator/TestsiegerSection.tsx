@@ -20,11 +20,11 @@ export function TestsiegerSection() {
               target="_blank"
               rel="noopener"
               className="w-40 h-40 mx-auto lg:mx-0 mb-5 lg:mb-0 flex items-center justify-center flex-shrink-0"
-              aria-label="Original-Veröffentlichung Service-Champions 2021 als PDF öffnen"
+              aria-label="Original-Veröffentlichung Service-Champions als PDF öffnen"
             >
               <img
                 src="/images/primundus_testsieger-2021.webp"
-                alt="Testsieger 2021"
+                alt="Testsieger DIE WELT"
                 className="w-40 h-40 object-contain"
               />
             </a>
