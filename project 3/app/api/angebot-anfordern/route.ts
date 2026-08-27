@@ -110,6 +110,7 @@ async function handlePost(request: NextRequest) {
       kalkulation,
       acceptPrivacy,
       adParams,
+      quelle,
     }: {
       vorname?: string;
       email: string;
@@ -118,6 +119,10 @@ async function handlePost(request: NextRequest) {
       kalkulation: Kalkulation;
       acceptPrivacy?: boolean;
       adParams?: Record<string, unknown>;
+      /* Welche Seite hat die Anfrage geschickt. Das Formular sendet nichts
+         (⇒ 'rechner'), der Pria-Chat sendet 'pria-chat'. Landet auf dem Lead
+         und in der Team-Mail — sonst sieht niemand, welche Variante gewinnt. */
+      quelle?: string;
     } = body;
 
     // Google-Klick-IDs für den späteren Offline-Conversion-Import
@@ -190,6 +195,7 @@ async function handlePost(request: NextRequest) {
         telefon,
         care_start_timing: careStartTiming,
         kalkulation,
+        quelle,
       }
     );
 
@@ -287,7 +293,7 @@ async function handlePost(request: NextRequest) {
     // nach Versand der Eingangsbestätigung gestartet.
 
     if (shouldSendMails) {
-      const teamEmail = getTeamNotificationTemplate(lead, 'angebot_requested');
+      const teamEmail = getTeamNotificationTemplate(lead, 'angebot_requested', { quelle });
       sendEmail('info@primundus.de', teamEmail)
         .then(async (r) => {
           if (r.success) {

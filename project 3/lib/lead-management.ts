@@ -53,6 +53,10 @@ export async function findOrCreateLead(
     telefon?: string;
     care_start_timing?: string;
     kalkulation?: Kalkulation;
+    /* Über welche Seite kam die Anfrage ('rechner' = Kostenrechner-Formular,
+       'pria-chat' = Voll-Chat auf /sofortangebot). Steht nur beim ERSTEN
+       Anlegen; ein wiederkehrender Lead behält seine ursprüngliche Quelle. */
+    quelle?: string;
   }
 ): Promise<{ lead: Lead; isNew: boolean; isUpgrade: boolean; kalkulationChanged: boolean }> {
   const { data: existingLeads } = await supabase
@@ -155,7 +159,7 @@ export async function findOrCreateLead(
       const newLeadData: any = {
         email,
         status: targetStatus,
-        source: 'rechner',
+        source: data?.quelle || 'rechner',
       };
 
       if (data?.vorname) newLeadData.vorname = data.vorname;
@@ -198,7 +202,7 @@ export async function findOrCreateLead(
   const newLeadData: any = {
     email,
     status: targetStatus,
-    source: 'rechner',
+    source: data?.quelle || 'rechner',
   };
 
   if (data?.vorname) newLeadData.vorname = data.vorname;
