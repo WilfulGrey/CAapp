@@ -452,12 +452,6 @@
     '    .lphero .siegelecke img{height:100px}\n'+
     '    .panel.voll .row.zfrage .bub{font-size:18.5px}\n'+
     '  }\n'+
-    '  /* KI-Kennzeichnung bleibt IM Chat verankert (AI Act, Pflicht):\n'+
-    '     eine stille Zeile unter der Eingabe — sichtbar auch, wenn die Tastatur\n'+
-    '     den Hero verdeckt. */\n'+
-    '  .voll-ki{display:none;text-align:center;font-size:10px;letter-spacing:.2px;\n'+
-    '    color:#A39781;padding:3px 10px 5px}\n'+
-    '  .panel.voll .voll-ki{display:block}\n'+
     '  /* Solange der Chat offen ist, soll die Seite darunter nicht mitscrollen. */';
   W.appendChild(stil);
 
@@ -2148,13 +2142,12 @@ if(VOLL){
   // Voll-Modus aus — der Hero trägt das Badge, scrollt aber mit dem
   // Gespräch weg; diese Zeile bleibt immer im Bild).
   // Hinweiszeile aus Martins Mockup zwischen Antworten und Eingabe.
+  // Die frühere KI-Zeile unter der Eingabe ist raus (Martin, 27.08.:
+  // „haben wir oben doch schon beschrieben" — die Rolle im Hero).
   const hz=document.createElement('div');hz.className='voll-hinweis';
   hz.innerHTML='<i>i</i>Nach Ihrer Auswahl geht es direkt zur nächsten Frage.';
   const unten=W.querySelector('.unten');
   unten.insertBefore(hz, unten.querySelector('.eingabe'));
-  const ki=document.createElement('div');ki.className='voll-ki';
-  ki.textContent='Pria ist eine KI-gestützte Assistentin von Primundus';
-  unten.appendChild(ki);
   protokoll('system','Voll-Chat (Landingpage) geöffnet',{ereignis:'lp'});
   oeffne('lp');
 }
