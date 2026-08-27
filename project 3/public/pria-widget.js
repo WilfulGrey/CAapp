@@ -208,6 +208,13 @@
     '  .unten{flex-shrink:0;background:var(--papier);border-top:1px solid var(--line-zart);\n'+
     '    padding-bottom:env(safe-area-inset-bottom)}\n'+
     '  .chips{display:flex;flex-wrap:wrap;gap:8px;padding:13px 13px 3px;max-height:36vh;overflow-y:auto}\n'+
+    '  /* Antwortoptionen einer Frage stehen UNTEREINANDER (Martin, 27.08.:\n'+
+    '     „die Felder werden untereinander angezeigt, wenn ich wähle kommen die\n'+
+    '     nochmal horizontal"). Nebeneinander werden lange Optionen wie\n'+
+    '     „Gelegentlich, nicht jede Nacht" abgeschnitten — man sieht nicht,\n'+
+    '     was man wählt. Freie Vorschläge (Wissensfragen) fließen weiter. */\n'+
+    '  .chips.antworten{flex-direction:column;flex-wrap:nowrap;align-items:stretch}\n'+
+    '  .chips.antworten .chip{text-align:left}\n'+
     '  .chips::-webkit-scrollbar{width:5px}\n'+
     '  .chips::-webkit-scrollbar-thumb{background:rgba(40,34,28,.12);border-radius:3px}\n'+
     '  /* max-width: ohne das schiesst ein langer Chip aus dem Panel heraus —\n'+
@@ -582,8 +589,9 @@ function sagen(html,extra){
     setTimeout(()=>{t.remove();bub(html+(extra?'<small>'+extra+'</small>':''));res();},
       ruhig?120:Math.min(2500,780+html.length*13));});
 }
-function setChips(liste){
+function setChips(liste,alsAntworten){
   chips.innerHTML='';
+  chips.classList.toggle('antworten',!!alsAntworten);
   liste.forEach((c,i)=>{const b=document.createElement('button');
     b.className='chip'+(c.stil?' '+c.stil:'');b.textContent=c.t;
     b.style.animationDelay=(i*70)+'ms';b.onclick=()=>c.f(b);chips.appendChild(b);});
@@ -1084,7 +1092,7 @@ async function naechste(){
     }
   }
   offeneFrage=s;
-  setChips(s.o.map(([v,l])=>({t:l,f:b=>waehle(s,v,l,b)})));
+  setChips(s.o.map(([v,l])=>({t:l,f:b=>waehle(s,v,l,b)})),true);
   // Die Antwortliste lässt das Sheet wachsen und verdeckte die frisch
   // getippte Frage-Karte (Martin, 27.08.) — nach dem Layout-Tick ans
   // Ende nachziehen.
@@ -1164,7 +1172,7 @@ function optionenAnbieten(zusatz){
   const chipsListe=s.o.map(([v,l])=>({t:l,f:b=>waehle(s,v,l,b)}));
   if(s.vorschlag) chipsListe.push({t:'Ich weiß es nicht',stil:'soft',f:()=>vorschlagen(s)});
   for(const z of (zusatz||[])) chipsListe.push(z);
-  return setChips(chipsListe);
+  return setChips(chipsListe,true);
 }
 async function waehle(s,v,l,chip,ausText){
   tipp(); offeneFrage=null;
@@ -1680,7 +1688,7 @@ async function weiterNachAngabe(){
     await pause(ruhig?0:380);
     await sagen('Und weiter bei <b>'+offeneFrage.q+'</b>','Frage '+frageNummer(offeneFrage)+' von '+FLOW.length);
     const o=offeneFrage;
-    return setChips(o.o.map(([w,l])=>({t:l,f:b=>waehle(o,w,l,b)})));
+    return setChips(o.o.map(([w,l])=>({t:l,f:b=>waehle(o,w,l,b)})),true);
   }
   /* HARTE REGEL: Wer eine Preisfrage beantwortet hat, ist im Fragenlauf —
      auch ohne vorher „Preis berechnen" gedrückt zu haben. Dann kommt die
@@ -1971,7 +1979,7 @@ async function frageLokal(text){
       return setChips([
         {t:'Ja, genau',stil:'stark',f:b=>waehle(s,d.v,label,b)},
         ...s.o.filter(([v])=>v!==d.v).map(([v,l])=>({t:l,f:b=>waehle(s,v,l,b)}))
-      ]);
+      ],true);
     }
     /* Nichts zu deuten: beim ERSTEN Mal nachfragen, beim zweiten Mal nicht
        denselben Satz wiederholen (das war der zweite Ärger), sondern den
