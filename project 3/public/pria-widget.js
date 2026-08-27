@@ -512,7 +512,12 @@ let kontaktOffen=false, uebergeben=false;
    Bewusst HIER deklariert, nicht bei ueberholt(): `let` wird nicht
    gehoistet — eine spätere Deklaration hätte den alten TDZ-Fehler zurückgeholt. */
 let kundeAktiv=false;
-const frageNummer=s=>s?FLOW.indexOf(s)+1:0;
+/* Wievielte Frage ist das FÜR DEN KUNDEN? Nicht die Position im Katalog,
+   sondern sein Fortschritt (Martin, 27.08.): Wer in einem Satz drei
+   Angaben gemacht hat, ist bei Frage 4 — auch wenn die nächste offene
+   Frage weiter vorn steht. Die Frage selbst zählt nicht mit, falls sie
+   schon einen Wert trägt (Korrektur eines früheren Werts). */
+const frageNummer=s=>s?FLOW.filter(f=>f.k!==s.k&&antwort[f.k]!==undefined).length+1:0;
 
 /* ─── Bausteine ───────────────────────────────────────────────────── */
 function avatar(src,mitBlinzeln,lebendig){
@@ -1064,7 +1069,7 @@ async function naechste(){
   // Fortschrittszeile oben zählt zusätzlich, wird aber erst NACH dem
   // Rendern der Karte gestellt: vorher stand „4 von 8" schon da, während
   // die Frage noch tippte — das las sich wie ein Start mittendrin.
-  const nr=FLOW.indexOf(s)+1;
+  const nr=frageNummer(s);
   await sagen(s.q, 'Frage '+nr+' von '+FLOW.length+(s.hinweis?'<br>'+s.hinweis:''));
   vprogStand(nr);
   // Frage als Karte (nur .panel.voll gestaltet .zfrage — Widget unberührt),
