@@ -900,7 +900,12 @@ const FLOW=[
      ['4','Pflegegrad 4'],['5','Pflegegrad 5'],['?','Weiß ich nicht']],
   r:{'0':'Kein Problem — Sie können sofort starten und den Antrag parallel stellen. Er gilt rückwirkend ab Antragstellung.',
      '?':'Das klären wir gemeinsam, dafür müssen Sie jetzt nichts nachschlagen. Ich rechne erst einmal ohne.',
-     '_':'Danke — dafür bekommen Sie Pflegegeld von der Kasse, das Sie für die Betreuung einsetzen '+
+     // Pflegegeld gibt es erst ab Grad 2 — Grad 1 bekommt die neutrale
+     // Fassung ohne Leistungs-Behauptung.
+     '1':'Danke, ist notiert — welche Leistungen der Kasse Ihnen zustehen, zeige ich Ihnen gleich beim Angebot.',
+     // Wortlaut Martin (27.08.): „dafür bekommen Sie" klang nach
+     // Gegenleistung fürs Antworten.
+     '_':'Danke — dann erhalten Sie u. a. Pflegegeld von der Kasse, das Sie für die Betreuung einsetzen '+
         'können. Wie viel das bei Ihnen ausmacht, berechne ich Ihnen gleich beim Angebot.'}},
  {k:'mobil',kurz:'Mobilität',vorschlag:'rollator',warum:'„Mit Rollator“ trifft es bei den meisten ganz gut — nehmen wir das als Ausgangspunkt.',q:'Mobilität der zu betreuenden Person',
   o:[['mobil','Mobil – geht selbstständig'],['rollator','Mit Rollator'],
@@ -1983,7 +1988,7 @@ function lpHero(){
         'aria-label="6× Testsieger bei DIE WELT — Original-Veröffentlichung als PDF öffnen">'+
         '<img src="/images/primundus_testsieger-2021.webp" alt="Siegel: 6× Testsieger bei DIE WELT — Nr. 1 der Pflegekräfte-Vermittler"></a>'+
     '</div>'+
-    '<p class="lorbeer">'+lorbeer+'<span>6-facher <span style="white-space:nowrap">Preis-Leistungssieger</span></span></p>'+
+    '<p class="lorbeer">'+lorbeer+'<span>6-facher <span style="white-space:nowrap">Preis-Leistungssieger</span> in Folge</span></p>'+
     '<p class="anfrage">Sie benötigen eine <span style="white-space:nowrap">24-Stunden-Pflege?</span></p>'+
     '<p class="anrede">In 8 kurzen Fragen berechne ich Ihre <b>Kosten</b> und zeige '+
       '<b>passende Pflegekräfte</b>.</p>';
