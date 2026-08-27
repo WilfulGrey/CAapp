@@ -382,20 +382,32 @@
     '  .vprog i b{display:block;height:100%;width:0;border-radius:2px;\n'+
     '    background:linear-gradient(90deg,var(--coral-tief),var(--coral-hell));\n'+
     '    transition:width .45s var(--weich)}\n'+
+    '  /* ── Ruhe im Verlauf (Martin, 27.08.): EIN System statt vier Optiken.\n'+
+    '     Der Dialog wird dezent — keine Avatar-Wiederholung (Pria steht im\n'+
+    '     Hero), Blasen flach und einheitlich rund, Nutzer-Echos als leichte\n'+
+    '     helle Marken statt Coral-Knöpfe. Die Bühne gehört Frage und\n'+
+    '     Antworten, beide in identischer Geometrie (Radius 14). */\n'+
+    '  .panel.voll .thread{gap:8px}\n'+
+    '  .panel.voll .row .mini{display:none}\n'+
+    '  .panel.voll .bub{max-width:94%;border-radius:14px;box-shadow:none;\n'+
+    '    padding:11px 14px}\n'+
+    '  .panel.voll .row.me .bub{background:#FDF0ED;color:var(--coral-tief);\n'+
+    '    border:1px solid rgba(231,111,99,.26);box-shadow:none;font-weight:650;\n'+
+    '    border-radius:14px;padding:8px 13px;font-size:14px}\n'+
     '  /* ── Frage als Karte (nur Voll-Chat): Icon-Kreis + Frage ── */\n'+
-    '  .panel.voll .row.zfrage{margin-top:2px}\n'+
+    '  .panel.voll .row.zfrage{margin-top:4px}\n'+
     '  .panel.voll .row.zfrage .mini{display:none}\n'+
     '  /* Grid statt Flex: der Hinweis (small, z. B. Sprachstufen bei Frage 8)\n'+
     '     muss UNTER der Frage stehen, in derselben Textspalte neben dem Icon. */\n'+
     '  .panel.voll .row.zfrage .bub{background:var(--papier);border:1px solid var(--line-zart);\n'+
-    '    border-radius:18px;box-shadow:0 6px 22px rgba(40,34,28,.07);max-width:100%;width:100%;\n'+
-    '    padding:16px 17px;display:grid;grid-template-columns:42px 1fr;\n'+
-    '    align-items:center;column-gap:13px;\n'+
-    '    font-size:18px;font-weight:750;line-height:1.28;color:#3D3D3D;letter-spacing:-.3px}\n'+
+    '    border-radius:14px;box-shadow:0 4px 16px rgba(40,34,28,.06);max-width:100%;width:100%;\n'+
+    '    padding:14px 15px;display:grid;grid-template-columns:38px 1fr;\n'+
+    '    align-items:center;column-gap:12px;\n'+
+    '    font-size:17px;font-weight:750;line-height:1.28;color:#3D3D3D;letter-spacing:-.3px}\n'+
     '  /* Themen-Icon der Frage (Haus, Mond, Auto …) — setzt naechste() als\n'+
     '     .fic-Element; wirkt persönlicher als ein generisches „?". */\n'+
     '  .panel.voll .row.zfrage .bub .fic{grid-row:1 / span 2;display:flex;align-items:center;\n'+
-    '    justify-content:center;width:42px;height:42px;border-radius:50%;\n'+
+    '    justify-content:center;width:38px;height:38px;border-radius:50%;\n'+
     '    background:#FDF0ED;color:var(--coral-tief)}\n'+
     '  .panel.voll .row.zfrage .bub .fic svg{display:block}\n'+
     '  .panel.voll .row.zfrage .bub small{grid-column:2;font-weight:400;letter-spacing:0}\n'+
@@ -408,7 +420,7 @@
     '  /* Kompakt (Martin, 27.08.: „die Auswahlfelder sind zu groß") — fünf\n'+
     '     Karten müssen neben Hero und Blase Platz lassen. */\n'+
     '  .panel.voll .chips .chip{display:flex;align-items:center;background:var(--papier);\n'+
-    '    border:1px solid var(--line-zart);border-radius:13px;\n'+
+    '    border:1px solid var(--line-zart);border-radius:14px;\n'+
     '    box-shadow:0 3px 12px rgba(40,34,28,.05);\n'+
     '    padding:10px 36px 10px 14px;font-size:14.5px;font-weight:650;color:#3D3D3D;\n'+
     '    text-align:left;position:relative;min-height:0}\n'+
@@ -439,7 +451,7 @@
     '    .lphero .anfrage{font-size:27px}\n'+
     '    .lphero .anrede{font-size:16px}\n'+
     '    .lphero .siegelecke img{height:100px}\n'+
-    '    .panel.voll .row.zfrage .bub{font-size:19.5px}\n'+
+    '    .panel.voll .row.zfrage .bub{font-size:18.5px}\n'+
     '  }\n'+
     '  /* KI-Kennzeichnung bleibt IM Chat verankert (AI Act, Pflicht):\n'+
     '     eine stille Zeile unter der Eingabe — sichtbar auch, wenn die Tastatur\n'+
