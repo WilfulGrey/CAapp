@@ -97,12 +97,12 @@ export default function HomePage() {
             <a
               href="#testsieger"
               className="absolute bottom-[4%] left-[4%] z-10 block w-[18%] min-w-[62px] max-w-[150px]"
-              aria-label="Testsieger DIE WELT 2021 — zur Original-Veröffentlichung"
+              aria-label="6× Testsieger DIE WELT — zur Original-Veröffentlichung"
             >
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 src="/images/primundus_testsieger-2021.webp"
-                alt="Testsieger DIE WELT Service-Champions 2021"
+                alt="Testsieger DIE WELT Service-Champions"
                 className="block h-auto w-full drop-shadow-[0_2px_10px_rgba(0,0,0,0.25)]"
               />
             </a>
@@ -270,7 +270,7 @@ export default function HomePage() {
                 <div className="w-40 h-40 flex items-center justify-center flex-shrink-0">
                   <img
                     src="/images/primundus_testsieger-2021.webp"
-                    alt="Testsieger 2021"
+                    alt="Testsieger DIE WELT"
                     className="w-40 h-40 object-contain"
                   />
                 </div>

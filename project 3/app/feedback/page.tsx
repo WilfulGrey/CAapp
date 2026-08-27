@@ -183,7 +183,7 @@ export default function FeedbackSeite() {
                  style={{ width: 96, height: 122, borderRadius: 16, objectFit: 'cover',
                           objectPosition: '50% 14%', flexShrink: 0 }} />
             <img src="/images/primundus_testsieger-2021.webp"
-                 alt="Testsieger — Service-Studie DIE WELT und ServiceValue 2021"
+                 alt="Testsieger — Service-Studie DIE WELT und ServiceValue"
                  style={{ height: 72, width: 'auto', flexShrink: 0, opacity: 0.9 }} />
           </div>
 
