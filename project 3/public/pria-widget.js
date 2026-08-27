@@ -442,8 +442,13 @@
     '  .panel.voll .chips .chip.stark{background:linear-gradient(180deg,var(--coral-hell),var(--coral-tief));\n'+
     '    color:#fff;border:0}\n'+
     '  .panel.voll .chips .chip.stark::after{color:#fff}\n'+
-    '  /* ── Eingabe auf der Bühne ── */\n'+
-    '  .panel.voll .unten{background:transparent;border-top:0}\n'+
+    '  /* ── Antwortbereich als eigenes „Sheet" (Martin, 27.08.: „man sieht\n'+
+    '     nicht, wo der Chat aufhört und der Fragenbereich anfängt"): getönte\n'+
+    '     Fläche mit Trennkante, runden Schultern und Schatten nach oben —\n'+
+    '     der Verlauf endet sichtbar, die Auswahl beginnt sichtbar. */\n'+
+    '  .panel.voll .unten{background:#F3F0EB;border-top:1px solid var(--line-zart);\n'+
+    '    border-radius:20px 20px 0 0;box-shadow:0 -8px 22px rgba(40,34,28,.06);\n'+
+    '    padding-top:4px}\n'+
     '  .panel.voll .eingabe input{background:var(--papier);border:1px solid var(--line);\n'+
     '    box-shadow:0 3px 12px rgba(40,34,28,.06)}\n'+
     '  @media(min-width:641px){\n'+
@@ -997,11 +1002,13 @@ async function naechste(){
   if(!s) return matching();
   // Kurz durchatmen zwischen Reaktion und nächster Frage — sonst prasselt es.
   await pause(ruhig?0:520);
-  // Voll-Chat: die Fortschrittszeile (.vprog) zählt bereits „x von 8" —
-  // im small steht dann nur noch der Hinweis. Das Widget behält beides.
+  // „Frage x von 8" steht in JEDER Frage-Karte (Martin, 27.08.) — die
+  // Fortschrittszeile oben zählt zusätzlich, wird aber erst NACH dem
+  // Rendern der Karte gestellt: vorher stand „4 von 8" schon da, während
+  // die Frage noch tippte — das las sich wie ein Start mittendrin.
   const nr=FLOW.indexOf(s)+1;
+  await sagen(s.q, 'Frage '+nr+' von '+FLOW.length+(s.hinweis?'<br>'+s.hinweis:''));
   vprogStand(nr);
-  await sagen(s.q, VOLL ? (s.hinweis||'') : 'Frage '+nr+' von '+FLOW.length+(s.hinweis?'<br>'+s.hinweis:''));
   // Frage als Karte (nur .panel.voll gestaltet .zfrage — Widget unberührt),
   // mit dem Themen-Icon der Frage im Medaillon.
   const fz=thread.querySelector('.row:last-child');
