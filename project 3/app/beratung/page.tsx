@@ -22,13 +22,14 @@ import { Phone } from 'lucide-react';
  * docs/google-ads-tracking.md §„Chat-Landingpage /beratung".
  */
 
-// Erst Staging, dann Prod (Schnittstellen-Vertrag mit SEA, 26.08.):
-// dieselbe Doktrin wie der Pria-Lader in app/layout.tsx — die Seite sieht
-// selbst, wo sie läuft, kein Schalter im Dashboard. Auf Prod schalten =
-// 'kostenrechner.primundus.de' ergänzen, ein PR. Bis dahin gibt es die
-// Route auf Prod schlicht nicht (404), damit vor der Messketten-Abnahme
-// und dem SEA-Startsignal kein Ad-Klick hier landen kann.
+// Hostname-Gate, dieselbe Doktrin wie der Pria-Lader in app/layout.tsx:
+// die Seite sieht selbst, wo sie läuft, kein Schalter im Dashboard.
+// PROD ist seit 27.08. freigeschaltet (Martins Test-Freigabe) — die Route
+// bleibt unverlinkt und dauerhaft noindex; Ads-Traffic entsteht erst,
+// wenn die SEA-Session nach ihrer Messketten-Abnahme die Test-Kampagne
+// startet (Schnittstellen-Vertrag 26.08.).
 const ERLAUBTE_HOSTS = new Set([
+  'kostenrechner.primundus.de',
   'kostenrechner-staging.onrender.com',
   'localhost',
   '127.0.0.1',
