@@ -263,7 +263,7 @@ export default function HomePage() {
 
             <div className="bg-white border-2 border-[#D4A843] rounded-2xl p-8 relative">
               <div className="absolute top-[-14px] left-1/2 -translate-x-1/2 bg-[#D4A843] text-white px-6 py-1.5 rounded-full text-sm font-bold uppercase tracking-wide whitespace-nowrap shadow-md z-10">
-                ★ Testsieger
+                ★ 6× Testsieger
               </div>
 
               <div className="flex items-center gap-8 mt-4">
@@ -279,7 +279,7 @@ export default function HomePage() {
                     2026-08-14 abgestimmt) — Eigenaussage statt Zitat. */}
                 <div className="flex-1">
                   <h3 className="text-[22px] font-bold text-[#3D3D3D] mb-2">
-                    Testsieger bei DIE WELT
+                    6× Testsieger bei DIE WELT
                   </h3>
 
                   <p className="text-[14px] text-[#8A8279] mb-4">

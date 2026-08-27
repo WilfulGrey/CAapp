@@ -17,7 +17,7 @@ export function CareServicesSection() {
   const benefits = [
     {
       icon: Award,
-      text: 'Testsieger DIE WELT',
+      text: '6× Testsieger DIE WELT',
       description: 'Mehrfach ausgezeichnet'
     },
     {
