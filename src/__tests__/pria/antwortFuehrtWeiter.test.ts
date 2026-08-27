@@ -70,6 +70,29 @@ describe('Pria — eine beantwortete Frage führt weiter, nicht zurück ins Men�
       }
     });
 
+    it(`${datei}: eine offene Frage behält immer ihre Antwortmöglichkeiten`, () => {
+      const quelle = readFileSync(join(WURZEL, datei), 'utf8');
+
+      /* Der Fall vom 27.08.: Kunde antwortet „ich" auf „Leben weitere
+         Personen mit im Haushalt?". Der Chat verstand es nicht — und nahm
+         ihm die Ja/Nein-Knöpfe weg. Übrig blieben „Preis und Pflegekräfte
+         ansehen" & Co.: der Kunde stand vor seiner eigenen Frage ohne
+         Antwortmöglichkeit. */
+      const anbieten = funktionsKoerper(quelle, 'optionenAnbieten');
+      expect(anbieten, 'optionenAnbieten() setzt die Optionen der offenen Frage nicht').toMatch(/s\.o\.map/);
+
+      // Der Wissens-Fallback darf bei offener Frage nicht mit der
+      // Ausweich-Floskel enden, sondern muss die Antworten dalassen.
+      const lokal = funktionsKoerper(quelle, 'frageLokal');
+      const floskel = lokal.indexOf('nicht aus dem Stand beantworten');
+      const rettung = lokal.indexOf('optionenAnbieten(');
+      expect(rettung, 'frageLokal() bietet die offenen Optionen nirgends an').toBeGreaterThan(-1);
+      expect(
+        rettung,
+        'Die Ausweich-Floskel kommt vor der Rettung — bei offener Frage verliert der Kunde seine Antworten',
+      ).toBeLessThan(floskel);
+    });
+
     it(`${datei}: mehrere Angaben aus einer Nachricht werden zusammen eingetragen`, () => {
       const quelle = readFileSync(join(WURZEL, datei), 'utf8');
       // Der Bot darf verstehen, was in einem Satz steckt („meine Eltern,
