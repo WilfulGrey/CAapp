@@ -1142,6 +1142,62 @@ async function weiterFrage(){
   await sagen('Dann machen wir da weiter, wo wir waren: <b>'+offeneFrage.q+'</b>');
   return optionenAnbieten();
 }
+/* ─── Kurze Antworten im Kontext der offenen Frage deuten ───────────
+   Martin (27.08.): „die Antwort ist doch verständlich — warum fragen wir
+   statisch nach und wiederholen dasselbe, statt zu verstehen, dass ‚ich'
+   die Antwort darauf ist, und dann nachzufragen, ob Sie mit im Haushalt
+   leben?" Genau das: eine Vermutung äußern und bestätigen lassen. Der
+   Wert wird NICHT still gesetzt — bestätigt wird per Klick.
+   Das ist der Rückfallweg ohne Sprachdienst; mit Modell macht dieses die
+   Deutung (Regel im Prompt). */
+const DEUTUNG={
+  haushalt:[
+    [/^\s*(ich|wir|ich selbst|nur ich|auch ich)\b|\bich (wohne|lebe|bin) (mit|da|dort|hier)/i,
+     'ja','Sie selbst leben mit im Haushalt'],
+    [/\b(mein|meine|unser|unsere)\s+(mann|frau|partner|partnerin|tochter|sohn|kind|kinder|schwester|bruder|enkel|familie|eltern)/i,
+     'ja','es lebt noch jemand mit im Haushalt'],
+    [/\b(niemand|keiner|allein|alleine|nur sie|nur er|ganz allein)\b/i,
+     'nein','die zu betreuende Person lebt allein'],
+  ],
+  nacht:[
+    [/\b(nie|nichts|nix|schl(ä|ae)ft durch|durchschlafen|ruhig)\b/i,'nein','nachts ist keine Hilfe nötig'],
+    [/\b(manchmal|selten|ab und zu|hin und wieder|gelegentlich)\b/i,'gelegentlich','nachts ist gelegentlich Hilfe nötig'],
+    [/\b(immer|jede nacht|t(ä|ae)glich|st(ä|ae)ndig|oft|(ö|oe)fter|mehrmals|mehrfach)\b/i,'mehrmals','nachts ist regelmäßig mehrfach Hilfe nötig'],
+    [/\b(toilette|wc|windel|umlagern|unruhig|aufsteh)/i,'taeglich','nachts ist jede Nacht Hilfe nötig'],
+  ],
+  mobil:[
+    [/\b(l(ä|ae)uft|geht|selbst(st(ä|ae)ndig)?|allein|mobil|noch fit|treppen)\b/i,'mobil','die Person geht noch selbstständig'],
+    [/\b(rollator|gehhilfe|gehwagen|stock)\b/i,'rollator','ein Rollator ist im Einsatz'],
+    [/\b(rollstuhl|rolli|sitzt im)\b/i,'rollstuhl','ein Rollstuhl ist nötig'],
+    [/\b(liegt|bett|bettl(ä|ae)gerig|steht nicht|kann nicht aufstehen)\b/i,'bett','die Person ist bettlägerig'],
+  ],
+  fuehrerschein:[
+    [/\b(ja|gern|w(ä|ae)re gut|einkauf|arzt|fahren|auto|termine)\b/i,'ja','die Pflegekraft soll Auto fahren können'],
+    [/\b(nein|nicht n(ö|oe)tig|brauchen wir nicht|kein auto|taxi|zu fu(ß|ss))\b/i,'nein','ein Führerschein ist nicht nötig'],
+  ],
+  geschlecht:[
+    [/\b(egal|beides|spielt keine rolle|unwichtig)\b/i,'egal','das Geschlecht ist Ihnen egal'],
+    [/\b(frau|weiblich|dame|lieber eine)\b/i,'weiblich','Sie möchten lieber eine Frau'],
+    [/\b(mann|m(ä|ae)nnlich|herr|lieber einen)\b/i,'maennlich','Sie möchten lieber einen Mann'],
+  ],
+  deutsch:[
+    [/\b(wenig|kaum|paar w(ö|oe)rter|grundlagen|einfach reicht|nicht so wichtig)\b/i,'grundlegend','einfache Verständigung reicht Ihnen'],
+    [/\b(unterhalten|reden|sprechen k(ö|oe)nnen|verstehen|alltag)\b/i,'kommunikativ','die Kraft soll sich im Alltag unterhalten können'],
+    [/\b(sehr gut|flie(ß|ss)end|perfekt|richtig gut|wichtig)\b/i,'gut','gutes Deutsch ist Ihnen wichtig'],
+  ],
+  personen:[
+    [/^\s*(ich|mich|f(ü|ue)r mich)\b/i,'1','Sie suchen die Betreuung für sich selbst'],
+  ],
+};
+function deuten(s,text){
+  for(const [re,v,satz] of (DEUTUNG[s.k]||[]))
+    if(re.test(String(text))) return {v,satz};
+  return null;
+}
+/* Wie oft haben wir bei dieser Frage schon nachgehakt? Zweimal derselbe
+   Satz ist der Moment, in dem der Chat dumm wirkt (Martin, 27.08.). */
+const nachgefragt={};
+
 /* HARTE REGEL (Martin, 27.08.): Solange eine Frage offen ist, MÜSSEN ihre
    Antworten anklickbar bleiben. Der Bug: Sobald etwas nicht verstanden
    wurde, verschwanden die Ja/Nein-Knöpfe und übrig blieben „Preis und
@@ -1948,14 +2004,33 @@ async function frageLokal(text){
   // verlieren gegen normale Sprache.)
   if(!e && (ABWEGIG.test(text) || kauderwelsch(text))) return zurueckfuehren();
 
-  /* Steht eine Frage offen, wollte der Kunde mit hoher Wahrscheinlichkeit
-     ANTWORTEN — „ich" auf „Leben weitere Personen mit im Haushalt?" ist
-     keine Wissensfrage. Dann keine Ausweich-Floskel und vor allem nicht
-     die Antworten wegnehmen (Martin, 27.08.), sondern kurz nachfragen und
-     die Optionen dalassen. */
+  /* Steht eine Frage offen, wollte der Kunde ANTWORTEN — „ich" auf „Leben
+     weitere Personen mit im Haushalt?" ist keine Wissensfrage, sondern
+     eine verständliche Antwort (Martin, 27.08.). Also erst DEUTEN und
+     gezielt nachfragen, statt statisch dieselbe Floskel zu wiederholen. */
   if(!e && offeneFrage){
-    await sagen('Das habe ich nicht sicher verstanden — meinen Sie eine dieser Antworten '+
-                'auf <b>'+offeneFrage.q+'</b>?');
+    const s=offeneFrage, d=deuten(s,text);
+    if(d){
+      const label=(s.o.find(x=>x[0]===d.v)||[,d.v])[1];
+      await sagen('Verstehe ich Sie richtig — '+d.satz+'?');
+      return setChips([
+        {t:'Ja, genau',stil:'stark',f:b=>waehle(s,d.v,label,b)},
+        ...s.o.filter(([v])=>v!==d.v).map(([v,l])=>({t:l,f:b=>waehle(s,v,l,b)}))
+      ]);
+    }
+    /* Nichts zu deuten: beim ERSTEN Mal nachfragen, beim zweiten Mal nicht
+       denselben Satz wiederholen (das war der zweite Ärger), sondern den
+       Vorschlag anbieten bzw. um einen Tipp bitten. */
+    nachgefragt[s.k]=(nachgefragt[s.k]||0)+1;
+    if(nachgefragt[s.k]===1){
+      await sagen('Das habe ich nicht sicher verstanden — meinen Sie eine dieser Antworten '+
+                  'auf <b>'+s.q+'</b>?');
+    }else if(s.vorschlag){
+      return vorschlagen(s);
+    }else{
+      await sagen('Ich komme da gerade nicht mit — tippen Sie einfach auf die Antwort, '+
+                  'die am ehesten passt. Alles andere klären wir später in Ruhe.');
+    }
     return optionenAnbieten([
       {t:'Ich meinte etwas anderes',stil:'soft',f:()=>{chips.innerHTML='';document.getElementById('frei').focus();}}
     ]);
