@@ -687,7 +687,11 @@ function beraterChips(){
   }
   const offen=SCHNELLFRAGEN
     .filter(q=>{const e=suche(q);return !e||!beantwortet.has(e);})
-    .slice(0,3)
+    /* Voll-Chat: „Was kostet das?" doppelt den Preis-Knopf direkt darüber,
+       und fünf Karten sprengten den iPhone-Schirm (Martin, 27.08.) —
+       dort zwei Wissensfragen statt drei. */
+    .filter(q=>!VOLL || !/was kostet/i.test(q))
+    .slice(0, VOLL?2:3)
     .map(q=>({t:q,f:b=>frage(q,b)}));
   /* Die zwei Wege zuerst, die Wissensfragen danach (Martin, 22.08.).
      Vorher standen sie hinten — beim Umbruch in mehrere Reihen ging das
