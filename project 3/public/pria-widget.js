@@ -923,10 +923,7 @@ async function zurueckfuehren(){
   await sagen(offeneFrage
     ? 'Wollen wir da weitermachen, wo wir waren? Meine Frage war: <b>'+offeneFrage.q+'</b>'
     : 'Wenn Sie schon hier sind: Für wen suchen Sie denn? Dann berechne ich Ihnen gleich die <b>Kosten</b>.');
-  if(offeneFrage){
-    const s=offeneFrage;
-    return setChips(s.o.map(([v,l])=>({t:l,f:x=>waehle(s,v,l,x)})));
-  }
+  if(offeneFrage) return optionenAnbieten();
   setChips(fuerWenChips());
 }
 
@@ -1098,8 +1095,20 @@ async function weiterFrage(){
   chips.innerHTML='';
   if(!offeneFrage) return beraterChips();
   await sagen('Dann machen wir da weiter, wo wir waren: <b>'+offeneFrage.q+'</b>');
+  return optionenAnbieten();
+}
+/* HARTE REGEL (Martin, 27.08.): Solange eine Frage offen ist, MÜSSEN ihre
+   Antworten anklickbar bleiben. Der Bug: Sobald etwas nicht verstanden
+   wurde, verschwanden die Ja/Nein-Knöpfe und übrig blieben „Preis und
+   Pflegekräfte ansehen" & Co. — der Kunde stand vor seiner eigenen Frage
+   ohne Antwortmöglichkeit. Diese Funktion ist die eine Stelle dafür. */
+function optionenAnbieten(zusatz){
+  if(!offeneFrage) return beraterChips();
   const s=offeneFrage;
-  setChips(s.o.map(([v,l])=>({t:l,f:b=>waehle(s,v,l,b)})));
+  const chipsListe=s.o.map(([v,l])=>({t:l,f:b=>waehle(s,v,l,b)}));
+  if(s.vorschlag) chipsListe.push({t:'Ich weiß es nicht',stil:'soft',f:()=>vorschlagen(s)});
+  for(const z of (zusatz||[])) chipsListe.push(z);
+  return setChips(chipsListe);
 }
 async function waehle(s,v,l,chip,ausText){
   tipp(); offeneFrage=null;
@@ -1803,8 +1812,16 @@ async function verarbeite(r,kundentext){
       {t:'Doch lieber weiterfragen',stil:'soft',f:()=>offeneFrage?weiterFrage():beraterChips()}
     ]);
   }
-  // Läuft der Fragenlauf, hat die offene Frage Vorrang vor allen Vorschlägen.
-  if(modus==='fragen'&&offeneFrage){ await pause(ruhig?0:340); return weiterFrage(); }
+  /* Läuft der Fragenlauf, hat die offene Frage Vorrang vor allen Vorschlägen.
+     ABER: Hat das Modell selbst schon nachgefragt („Meinen Sie, dass Sie
+     mit im Haushalt leben?"), wäre „Dann machen wir da weiter, wo wir
+     waren" eine Floskel darüber — der Kunde hat gerade eine echte Frage
+     bekommen. Dann nur die Antworten anbieten (Martin, 27.08.). */
+  if(modus==='fragen'&&offeneFrage){
+    await pause(ruhig?0:340);
+    if(r.text && r.text.trim()) return optionenAnbieten();
+    return weiterFrage();
+  }
   // Abwegig ohne offene Frage: der Modelltext führt aufs „Für wen?" zurück
   // (Leitplanke in lib/pria.ts) — darunter gehören die passenden Antworten,
   // nicht die generischen Modell-Chips (Martin, 27.08.).
@@ -1886,6 +1903,19 @@ async function frageLokal(text){
   // verlieren gegen normale Sprache.)
   if(!e && (ABWEGIG.test(text) || kauderwelsch(text))) return zurueckfuehren();
 
+  /* Steht eine Frage offen, wollte der Kunde mit hoher Wahrscheinlichkeit
+     ANTWORTEN — „ich" auf „Leben weitere Personen mit im Haushalt?" ist
+     keine Wissensfrage. Dann keine Ausweich-Floskel und vor allem nicht
+     die Antworten wegnehmen (Martin, 27.08.), sondern kurz nachfragen und
+     die Optionen dalassen. */
+  if(!e && offeneFrage){
+    await sagen('Das habe ich nicht sicher verstanden — meinen Sie eine dieser Antworten '+
+                'auf <b>'+offeneFrage.q+'</b>?');
+    return optionenAnbieten([
+      {t:'Ich meinte etwas anderes',stil:'soft',f:()=>{chips.innerHTML='';W.getElementById('frei').focus();}}
+    ]);
+  }
+
   // Nichts gefunden, aber es geht um Betreuung: nicht raten, nachfragen.
   if(!e){
     await sagen('Das kann ich Ihnen nicht aus dem Stand beantworten — und lieber frage ich nach, '+
@@ -1901,10 +1931,7 @@ async function frageLokal(text){
       }},
       {t:'Ich formuliere es anders',stil:'soft',f:()=>{chips.innerHTML='';W.getElementById('frei').focus();}}
     ];
-    if(offeneFrage && offeneFrage.vorschlag)
-      wege.unshift({t:'Ich weiß es nicht — schlagen Sie etwas vor',stil:'soft',f:()=>vorschlagen(offeneFrage)});
-    if(offeneFrage) wege.push({t:'Einfach weitermachen',stil:'soft',f:()=>weiterFrage()});
-    return setChips(wege);
+    return setChips(wege);   // offene Frage ist oben abgefangen
   }
 
   beantwortet.add(e);
