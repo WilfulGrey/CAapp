@@ -338,7 +338,7 @@
     '     Creme-Grund der Seite — Hero-Karte, Fortschrittszeile, Frage-Karte,\n'+
     '     Antwort-Karten — Typo und Palette in der CI des Kostenrechners. */\n'+
     '  .panel.voll .bar{display:none}\n'+
-    '  .panel.voll .prog{display:none}   /* eigene Fortschrittszeile .vprog unten */\n'+
+    '  .panel.voll .prog{display:none}   /* „Frage x von 8" steht in jeder Frage-Karte */\n'+
     '  .panel.voll .thread{background:transparent;padding:12px 16px 8px}\n'+
     '  /* ── Hero-Karte: beim Ankommen präsent, scrollt mit dem Gespräch weg\n'+
     '     (margin-bottom:auto hält den Rest unten bei den Antworten, solange\n'+
@@ -371,17 +371,6 @@
     '    font-weight:800;letter-spacing:-.5px}\n'+
     '  .lphero .anrede{margin:0;font-size:15px;line-height:1.5;color:#5A5A5A}\n'+
     '  .lphero .anrede b{color:#3D3D3D}\n'+
-    '  /* ── Fortschrittszeile: Balken · „x von 8" · Balken ── */\n'+
-    '  .vprog{display:none;align-items:center;gap:12px;margin:14px 4px 4px;\n'+
-    '    font-size:13px;font-weight:600;color:var(--muted);letter-spacing:.2px}\n'+
-    '  /* Erst sichtbar, wenn der Fragenlauf läuft (.voll-funnel via\n'+
-    '     vprogStand) — der offene Einstieg zeigt Wissensfragen, kein „1 von 8". */\n'+
-    '  .panel.voll.voll-funnel .vprog{display:flex}\n'+
-    '  .vprog i{flex:1;height:4px;border-radius:2px;background:rgba(40,34,28,.08);\n'+
-    '    overflow:hidden;display:block}\n'+
-    '  .vprog i b{display:block;height:100%;width:0;border-radius:2px;\n'+
-    '    background:linear-gradient(90deg,var(--coral-tief),var(--coral-hell));\n'+
-    '    transition:width .45s var(--weich)}\n'+
     '  /* ── Ruhe im Verlauf (Martin, 27.08.): EIN System statt vier Optiken.\n'+
     '     Der Dialog wird dezent — keine Avatar-Wiederholung (Pria steht im\n'+
     '     Hero), Blasen flach und einheitlich rund, Nutzer-Echos als leichte\n'+
@@ -1027,6 +1016,10 @@ async function naechste(){
   }
   offeneFrage=s;
   setChips(s.o.map(([v,l])=>({t:l,f:b=>waehle(s,v,l,b)})));
+  // Die Antwortliste lässt das Sheet wachsen und verdeckte die frisch
+  // getippte Frage-Karte (Martin, 27.08.) — nach dem Layout-Tick ans
+  // Ende nachziehen.
+  setTimeout(runter,80);
 }
 /* Anschluss an die offene Frage — angekündigt, nicht heimlich übersprungen. */
 async function weiterFrage(){
@@ -1965,26 +1958,15 @@ function lpHero(){
     '<p class="anrede">In 8 kurzen Fragen berechne ich Ihre <b>Kosten</b> und zeige '+
       '<b>passende Pflegekräfte</b>.</p>';
   thread.appendChild(h);
-  /* Fortschrittszeile unter der Hero-Karte: Balken · „x von 8" · Balken.
-     naechste()/matching() halten sie über vprogSetzen() aktuell. */
-  const p=document.createElement('div');p.className='vprog';
-  p.innerHTML='<i><b id="vfill"></b></i><span id="vtext">1 von '+FLOW.length+'</span><i></i>';
-  thread.appendChild(p);
 }
-/* Fortschritt der Voll-Chat-Zeile: nr = aktuelle Frage (1-basiert) oder
-   'fertig'. Ohne Voll-Modus existieren die Elemente nicht — dann still.
-   thread.querySelector bleibt vom Widget-Erzeuger unangetastet (er lenkt
-   nur document.* um). */
+/* Phasen-Marker des Voll-Chats: nr = Frage (1-basiert) oder 'fertig'.
+   Die separate Fortschrittszeile ist raus (Martin, 27.08.: sie hing im
+   Verlauf bei den ALTEN Nachrichten und wirkte wie ein Start mittendrin —
+   „Frage x von 8" in jeder Karte reicht). Übrig bleiben die Klassen, an
+   denen die Hinweiszeile hängt. */
 function vprogStand(nr){
-  const fill=thread.querySelector('#vfill'), text=thread.querySelector('#vtext');
-  if(!fill||!text) return;
-  if(nr==='fertig'){ fill.style.width='100%'; text.textContent='Geschafft';
-    panel.classList.add('voll-fertig'); return; }
-  // Erst ab dem Fragenlauf sichtbar — beim offenen Einstieg wäre
-  // „1 von 8" neben Wissensfragen irreführend.
+  if(nr==='fertig'){ panel.classList.add('voll-fertig'); return; }
   panel.classList.add('voll-funnel');
-  fill.style.width=Math.round(((nr-1)/FLOW.length)*100)+'%';
-  text.textContent=nr+' von '+FLOW.length;
 }
 /* Themen-Icons der Fragen (nur Voll-Chat sichtbar): einfache Linien-SVGs
    in der Akzentfarbe des Medaillons — je FLOW-Schlüssel eines. */
