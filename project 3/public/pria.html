@@ -929,7 +929,12 @@ const FLOW=[
      ['4','Pflegegrad 4'],['5','Pflegegrad 5'],['?','Weiß ich nicht']],
   r:{'0':'Kein Problem — Sie können sofort starten und den Antrag parallel stellen. Er gilt rückwirkend ab Antragstellung.',
      '?':'Das klären wir gemeinsam, dafür müssen Sie jetzt nichts nachschlagen. Ich rechne erst einmal ohne.',
-     '_':'Danke — dafür bekommen Sie Pflegegeld von der Kasse, das Sie für die Betreuung einsetzen '+
+     // Pflegegeld gibt es erst ab Grad 2 — Grad 1 bekommt die neutrale
+     // Fassung ohne Leistungs-Behauptung.
+     '1':'Danke, ist notiert — welche Leistungen der Kasse Ihnen zustehen, zeige ich Ihnen gleich beim Angebot.',
+     // Wortlaut Martin (27.08.): „dafür bekommen Sie" klang nach
+     // Gegenleistung fürs Antworten.
+     '_':'Danke — dann erhalten Sie u. a. Pflegegeld von der Kasse, das Sie für die Betreuung einsetzen '+
         'können. Wie viel das bei Ihnen ausmacht, berechne ich Ihnen gleich beim Angebot.'}},
  {k:'mobil',kurz:'Mobilität',vorschlag:'rollator',warum:'„Mit Rollator“ trifft es bei den meisten ganz gut — nehmen wir das als Ausgangspunkt.',q:'Mobilität der zu betreuenden Person',
   o:[['mobil','Mobil – geht selbstständig'],['rollator','Mit Rollator'],
