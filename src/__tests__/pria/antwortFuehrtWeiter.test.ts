@@ -40,29 +40,46 @@ function funktionsKoerper(quelle: string, name: string): string {
 
 describe('Pria — eine beantwortete Frage führt weiter, nicht zurück ins Menü', () => {
   for (const datei of DATEIEN) {
-    it(`${datei}: uebernehmen() geht in den Fragenlauf, statt Chips anzubieten`, () => {
+    it(`${datei}: nach einer Angabe geht es zur nächsten Frage, nicht ins Menü`, () => {
       const quelle = readFileSync(join(WURZEL, datei), 'utf8');
-      const koerper = funktionsKoerper(quelle, 'uebernehmen');
 
-      // Der Weiterlauf muss drin sein …
-      expect(koerper, 'uebernehmen() ruft nirgends naechste()').toContain('naechste()');
+      // Der Weiterlauf liegt an EINER Stelle — sonst läuft er wieder pro
+      // Pfad auseinander (genau so entstand der Bug vom 27.08.).
+      const weiter = funktionsKoerper(quelle, 'weiterNachAngabe');
+      expect(weiter, 'weiterNachAngabe() führt nicht in den Fragenlauf').toContain('naechste()');
 
-      // … und zwar auch dann, wenn noch KEINE Frage offen ist. Genau diese
-      // Lücke war der Bug: der Fall fiel vorher auf beraterChips() zurück.
-      const nachDenOffenenFaellen = koerper.slice(koerper.lastIndexOf('if(offeneFrage'));
+      // Ohne offene Frage MUSS es trotzdem weitergehen: das war die Lücke.
+      const ohneOffeneFrage = weiter.slice(weiter.lastIndexOf('if(offeneFrage'));
       expect(
-        nachDenOffenenFaellen,
-        'Ohne offene Frage endet uebernehmen() nicht im Fragenlauf — der Kunde landet wieder im Menü',
+        ohneOffeneFrage,
+        'Ohne offene Frage endet der Weg nicht im Fragenlauf — der Kunde landet wieder im Menü',
       ).toContain('naechste()');
-
-      // beraterChips darf nur noch der Ausweg für „Lead schon übergeben /
-      // Kontaktkarte offen" sein — nicht der Normalfall.
-      if (nachDenOffenenFaellen.includes('beraterChips()')) {
+      if (ohneOffeneFrage.includes('beraterChips()')) {
         expect(
-          nachDenOffenenFaellen,
+          ohneOffeneFrage,
           'beraterChips() ohne Guard: der Normalfall darf nicht im Menü enden',
         ).toMatch(/uebergeben[\s\S]*kontaktOffen/);
       }
+
+      // …und beide Übernahme-Pfade müssen dort landen.
+      for (const fn of ['uebernehmen', 'mehrfachUebernehmen']) {
+        expect(
+          funktionsKoerper(quelle, fn),
+          `${fn}() geht nicht über weiterNachAngabe() — der Weiterlauf läuft wieder auseinander`,
+        ).toContain('weiterNachAngabe()');
+      }
+    });
+
+    it(`${datei}: mehrere Angaben aus einer Nachricht werden zusammen eingetragen`, () => {
+      const quelle = readFileSync(join(WURZEL, datei), 'utf8');
+      // Der Bot darf verstehen, was in einem Satz steckt („meine Eltern,
+      // beide Pflegegrad 3, nachts unruhig") — sonst fragt er nach dem,
+      // was der Kunde gerade gesagt hat.
+      expect(quelle, 'Mehrfach-Übernahme fehlt').toContain('mehrfachUebernehmen(');
+      expect(
+        quelle,
+        'verarbeite() reicht die Felder-Liste des Modells nicht durch',
+      ).toMatch(/r\.felder/);
     });
 
     it(`${datei}: die Für-wen-Auswahl kommt vollständig aus dem Code`, () => {

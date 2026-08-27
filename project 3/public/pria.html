@@ -552,6 +552,11 @@ let modus='beraten', offeneFrage=null, gestartet=false;
 // Wie weit ist der Kunde? Nicht mitzaehlen, sondern am Zustand ablesen —
 // so bleibt es auch nach Nachtraegen und Rueckfragen richtig.
 let kontaktOffen=false, uebergeben=false;
+/* Sobald der Kunde selbst etwas ausgelöst hat, hört die Einleitung auf zu
+   reden (Martin, 27.08.: Begrüßungssätze fielen mitten in seine Antwort).
+   Bewusst HIER deklariert, nicht bei ueberholt(): `let` wird nicht
+   gehoistet — eine spätere Deklaration hätte den alten TDZ-Fehler zurückgeholt. */
+let kundeAktiv=false;
 const frageNummer=s=>s?FLOW.indexOf(s)+1:0;
 
 /* ─── Bausteine ───────────────────────────────────────────────────── */
@@ -910,19 +915,46 @@ function fuerWenGemeint(text,chips){
   if(text && FUERWEN_FRAGE.test(text)) return true;
   return Array.isArray(chips) && chips.some(c=>FUERWEN_PERSON.test(String(c)));
 }
-function fuerWenChips(){
+/* Wie viele Menschen steckt eine Formulierung? Dieselbe Ableitung wie im
+   Prompt — hier, damit auch die Chips des Modells den richtigen Wert
+   setzen, egal wie es sie genannt hat. Zweierfälle zuerst: „Mutter und
+   Vater" ist zwei, obwohl „Mutter" darin steht. */
+const PERSONENZAHL=[
+  [/ehepaar|zu zweit|\bbeide\b|\b(gro(ß|ss)|schwieger)?eltern\b|(mutter|mama)\s*(und|&|,|\+)\s*(vater|papa)|(vater|papa)\s*(und|&|,|\+)\s*(mutter|mama)|oma\s*(und|&|,|\+)\s*opa|zwei (personen|pflege)/i,'2'],
+  [/\b(mutter|vater|mama|papa|oma|opa|gro(ß|ss)(mutter|vater)|tante|onkel|schwiegermutter|schwiegervater|(ehe)?partner(in)?|(ehe)?mann|(ehe)?frau|nachbarin|nachbar|freundin|freund)\b|mich selbst|f(ü|ue)r mich\b/i,'1'],
+];
+function personenZahl(text){
+  for(const [re,v] of PERSONENZAHL) if(re.test(String(text))) return v;
+  return null;
+}
+function personenStart(chip,v,label){
   const s=FLOW[0];
-  const start=(chip,v,label)=>{
-    modus='fragen'; offeneFrage=null;
-    protokoll('system','Fragenlauf gestartet',{ereignis:'funnel',grund:'preis'});
-    waehle(s,v,label,chip);
-  };
-  return [
-    {t:'Für meine Mutter',f:b=>start(b,'1','Für meine Mutter')},
-    {t:'Für meinen Vater',f:b=>start(b,'1','Für meinen Vater')},
-    {t:'Für meine Eltern',f:b=>start(b,'2','Für meine Eltern')},
-    {t:'Für jemand anderen',stil:'soft',f:b=>starteFunnel('preis',b,'Für jemand anderen')}
+  modus='fragen'; offeneFrage=null;
+  protokoll('system','Fragenlauf gestartet',{ereignis:'funnel',grund:'preis'});
+  waehle(s,v,label,chip);
+}
+/* Der Wortlaut darf vom Modell kommen, die Vollständigkeit sichert der Code:
+   fehlt einer der drei Fälle (das Modell ließ „Eltern" weg), wird er ergänzt.
+   So bleibt der Bot frei zu formulieren, ohne dass eine Auswahl fehlt. */
+function fuerWenChips(modellVorschlaege){
+  const aus=[]; const abgedeckt=new Set();
+  for(const t of (modellVorschlaege||[])){
+    const v=personenZahl(t);
+    if(!v) continue;                       // „Preis berechnen" u. Ä. gehört nicht hierher
+    const art=v==='2'?'zwei':(/vater|papa|opa|onkel|mann\b/i.test(t)?'vater':'mutter');
+    if(abgedeckt.has(art)) continue;
+    abgedeckt.add(art);
+    aus.push({t,f:b=>personenStart(b,v,t)});
+  }
+  const standard=[
+    ['mutter','Für meine Mutter','1'],
+    ['vater','Für meinen Vater','1'],
+    ['zwei','Für meine Eltern','2'],
   ];
+  for(const [art,t,v] of standard)
+    if(!abgedeckt.has(art)) aus.push({t,f:b=>personenStart(b,v,t)});
+  aus.push({t:'Für jemand anderen',stil:'soft',f:b=>starteFunnel('preis',b,'Für jemand anderen')});
+  return aus;
 }
 async function zurueckfuehren(){
   await sagen(CHARMANT[Math.min(abwegig,CHARMANT.length-1)]);
@@ -1482,9 +1514,15 @@ const THEMEN=[
  {k:'haushalt',
   w:/wohn|lebt? (mit|bei)|mit im haus|im selben haus|haushalt|tochter|sohn|enkel|ehemann|ehefrau|(ehe)?partner|schwester|bruder|allein/i,
   stufen:[['nein',/allein|niemand|keiner|sonst keine/i],['ja',/./]]},
+ /* Wer betreut wird, sagt die Personenzahl mit (Martin, 27.08.) — dieselbe
+    Ableitung wie im Prompt, hier für den Fall, dass der Sprachdienst
+    ausfällt. Passen BEIDE Stufen („meine Mutter und mein Vater"), fragt
+    der Chat kurz nach, statt zu raten. */
  {k:'personen',
-  w:/ehepaar|zu zweit|beide eltern|vater und mutter|zwei (personen|pflege)/i,
-  stufen:[['2',/./]]},
+  w:/ehepaar|zu zweit|beide|eltern|mutter|vater|mama|papa|oma|opa|gro(ß|ss)(mutter|vater)|tante|onkel|(ehe)?partner|zwei (personen|pflege)|mich selbst|f(ü|ue)r mich/i,
+  stufen:[['1',/\b(mutter|vater|mama|papa|oma|opa|gro(ß|ss)(mutter|vater)|tante|onkel|schwiegermutter|schwiegervater|(ehe)?partner(in)?|nachbarin|nachbar)\b|mich selbst|f(ü|ue)r mich\b/i],
+          ['2',/ehepaar|zu zweit|\bbeide\b|\b(gro(ß|ss)|schwieger)?eltern\b|(mutter|mama)\s*(und|&|,)\s*(vater|papa)|(vater|papa)\s*(und|&|,)\s*(mutter|mama)|oma\s*(und|&|,)\s*opa|zwei (personen|pflege)/i]],
+  grund:'Ich trage zwei pflegebedürftige Personen ein — sagen Sie einfach Bescheid, wenn es doch nur eine ist.'},
  // Mobilität und Nacht: mehrere Treffer sind der Normalfall („drinnen …, draußen …").
  // Dann schlägt Pria die anspruchsvollere Stufe vor — damit die Pflegekraft
  // vorbereitet ist und nicht vor Ort überrascht wird.
@@ -1559,26 +1597,70 @@ async function nachtragen(th,text){
   return uebernehmen(s,v,label);
 }
 /** Wert für eine Frage setzen, bestätigen und dort weitermachen, wo wir waren. */
-async function uebernehmen(s,v,label){
+/* Wie die Notiz klingt (Martin, 27.08.): „Personen: Für meine Eltern" war
+   Formularsprache — der Mensch sagt „Ich notiere: 2 Personen." Für die
+   Felder mit unhandlichen Optionstexten steht die kurze Fassung hier. */
+const NOTIZ={
+  personen:{'1':'1 pflegebedürftige Person','2':'2 pflegebedürftige Personen'},
+  haushalt:{ja:'weitere Personen im Haushalt',nein:'niemand sonst im Haushalt'},
+  pflegegrad:{'0':'noch kein Pflegegrad','1':'Pflegegrad 1','2':'Pflegegrad 2',
+              '3':'Pflegegrad 3','4':'Pflegegrad 4','5':'Pflegegrad 5','?':'Pflegegrad noch offen'},
+  mobil:{mobil:'geht selbstständig',rollator:'mit Rollator',
+         rollstuhl:'im Rollstuhl',bett:'bettlägerig'},
+  nacht:{nein:'nachts keine Hilfe nötig',gelegentlich:'nachts gelegentlich Hilfe',
+         taeglich:'jede Nacht Hilfe',mehrmals:'jede Nacht mehrfach Hilfe'},
+  fuehrerschein:{ja:'mit Führerschein',nein:'Führerschein nicht nötig'},
+  geschlecht:{egal:'Geschlecht egal',weiblich:'weibliche Pflegekraft',maennlich:'männliche Pflegekraft'},
+  deutsch:{grundlegend:'Deutsch grundlegend',kommunikativ:'Deutsch kommunikativ',gut:'Deutsch gut'},
+};
+function notizText(s,v,label){
+  const k=(NOTIZ[s.k]||{})[v];
+  return k || ((s.kurz||s.q)+': '+label);
+}
+/* Mehrere Angaben aus EINER Nachricht (Martin, 27.08.: „mehr Freiheit für
+   den Bot"). Das Modell liefert alles, was im Satz steckt; der Code trägt
+   es ein, bestätigt es in EINEM Satz und geht zur nächsten OFFENEN Frage —
+   niemals zu einer, die der Kunde gerade beantwortet hat. */
+async function mehrfachUebernehmen(liste){
   chips.innerHTML='';
-  const schonDa=antwort[s.k]!==undefined;
-  antwort[s.k]=v;
-  await sagen((schonDa?'Danke, gut dass Sie das sagen — ich ändere das: ':'Das notiere ich gleich mit: ')+
-              '<b>'+(s.kurz||s.q)+': '+label+'</b>');
-  if(offeneFrage && offeneFrage.k===s.k){ fortschritt(); offeneFrage=null; return naechste(); }
+  kundeAktiv=true;
+  const gesetzt=[]; let unklar=null;
+  for(const e of liste){
+    const s=FLOW.find(f=>f.k===e.feld);
+    if(!s || !e.werte || !e.werte.length) continue;
+    // Mehrdeutig (gestuftes Feld, zwei Situationen) — nach den eindeutigen klären.
+    if(e.werte.length>1){ if(!unklar) unklar={s,werte:e.werte}; continue; }
+    const v=e.werte[0], label=(s.o.find(x=>x[0]===v)||[,v])[1];
+    const geaendert=antwort[s.k]!==undefined && antwort[s.k]!==v;
+    antwort[s.k]=v;
+    gesetzt.push({s,v,label,geaendert});
+    if(offeneFrage && offeneFrage.k===s.k) offeneFrage=null;
+  }
+  if(gesetzt.length===1){
+    const g=gesetzt[0];
+    await sagen((g.geaendert?'Danke, gut dass Sie das sagen — ich ändere das auf ':'Ich notiere: ')+
+                '<b>'+notizText(g.s,g.v,g.label)+'</b>');
+  }else if(gesetzt.length>1){
+    // Ein Satz für alles — acht Quittungen hintereinander wären Formular-Ping-Pong.
+    await sagen('Ich notiere: '+gesetzt.map(g=>'<b>'+notizText(g.s,g.v,g.label)+'</b>').join(' · '));
+  }
+  fortschritt();
+  if(unklar) return mehrdeutig(unklar.s,unklar.werte,(v,l)=>uebernehmen(unklar.s,v,l));
+  return weiterNachAngabe();
+}
+/* Wohin nach einer Übernahme — EINE Stelle, damit der Weiterlauf nicht
+   wieder pro Pfad auseinanderläuft (Bug 27.08.). */
+async function weiterNachAngabe(){
   if(offeneFrage){
     await pause(ruhig?0:380);
     await sagen('Und weiter bei <b>'+offeneFrage.q+'</b>','Frage '+frageNummer(offeneFrage)+' von '+FLOW.length);
     const o=offeneFrage;
     return setChips(o.o.map(([w,l])=>({t:l,f:b=>waehle(o,w,l,b)})));
   }
-  /* HARTE REGEL (Martin, 27.08.): Wer eine Preisfrage beantwortet hat, hat
-     den Fragenlauf begonnen — auch wenn er vorher nie „Preis berechnen"
-     gedrückt hat. Dann geht es zur NÄCHSTEN Frage, niemals zurück ins
-     Menü. Vorher landete genau dieser Fall („Eltern" im offenen Einstieg)
-     bei beraterChips: der Kunde hatte gerade Frage 1 beantwortet und
-     bekam wieder die Auswahl statt Frage 2.
-     naechste() rechnet von selbst, wenn nichts mehr offen ist. */
+  /* HARTE REGEL: Wer eine Preisfrage beantwortet hat, ist im Fragenlauf —
+     auch ohne vorher „Preis berechnen" gedrückt zu haben. Dann kommt die
+     nächste Frage, nie das Menü. naechste() rechnet von selbst, wenn
+     nichts mehr offen ist. */
   if(!uebergeben && !kontaktOffen){
     if(modus!=='fragen'){
       modus='fragen';
@@ -1588,6 +1670,17 @@ async function uebernehmen(s,v,label){
     return naechste();
   }
   beraterChips();
+}
+async function uebernehmen(s,v,label){
+  chips.innerHTML='';
+  kundeAktiv=true;
+  const schonDa=antwort[s.k]!==undefined;
+  antwort[s.k]=v;
+  await sagen((schonDa?'Danke, gut dass Sie das sagen — ich ändere das auf ':'Ich notiere: ')+
+              '<b>'+notizText(s,v,label)+'</b>');
+  if(offeneFrage && offeneFrage.k===s.k){ offeneFrage=null; }
+  fortschritt();
+  return weiterNachAngabe();
 }
 
 /* ─── Freitext: erst verstehen, dann antworten ──────────────────────
@@ -1665,20 +1758,31 @@ async function verarbeite(r,kundentext){
 
   // Antwort auf die offene Frage oder Nachtrag zu einer anderen —
   // in beiden Fällen setzt der Code den Wert, nicht das Modell.
-  if((r.typ==='antwort'||r.typ==='nachtrag') && r.feld){
-    const s=FLOW.find(f=>f.k===r.feld);
-    if(s && r.werte.length){
-      const offen = offeneFrage && offeneFrage.k===s.k;
+  if((r.typ==='antwort'||r.typ==='nachtrag') && (r.feld || (r.felder&&r.felder.length))){
+    // Alles, was in der Nachricht steckt — das Einzelfeld ist darin enthalten
+    // (der Server legt es hinein), ältere Antworten ohne `felder` ebenso.
+    const alle = (r.felder && r.felder.length)
+      ? r.felder
+      : (r.feld && r.werte.length ? [{feld:r.feld,werte:r.werte}] : []);
+    const gueltig = alle.filter(e=>FLOW.some(f=>f.k===e.feld) && e.werte && e.werte.length);
+    if(gueltig.length){
       // Menschen antworten und fragen im selben Satz. Die mitgestellte Frage
       // wird zuerst beantwortet — sonst verschluckt Pria sie und wirkt taub.
       if(r.text){ chips.innerHTML='';
         sagenJetzt(r.text);
         await pause(ruhig?0:420); }
-      if(r.werte.length>1)
-        return mehrdeutig(s,r.werte, offen ? (v,l,b)=>waehle(s,v,l,b||null)
+      // Genau EINE Angabe zur offenen Frage: der eingespielte Weg mit
+      // Reaktionssatz („Gute Wahl, das reicht für den Alltag").
+      if(gueltig.length===1){
+        const s=FLOW.find(f=>f.k===gueltig[0].feld), werte=gueltig[0].werte;
+        const offen = offeneFrage && offeneFrage.k===s.k;
+        if(werte.length>1)
+          return mehrdeutig(s,werte, offen ? (v,l,b)=>waehle(s,v,l,b||null)
                                            : (v,l)=>uebernehmen(s,v,l));
-      const v=r.werte[0], label=(s.o.find(x=>x[0]===v)||[,v])[1];
-      return offen ? waehle(s,v,label,null,true) : uebernehmen(s,v,label);
+        const v=werte[0], label=(s.o.find(x=>x[0]===v)||[,v])[1];
+        return offen ? waehle(s,v,label,null,true) : uebernehmen(s,v,label);
+      }
+      return mehrfachUebernehmen(gueltig);
     }
   }
   // „Weiß ich nicht" ist eine ehrliche Antwort, kein Missverständnis: Pria
@@ -1744,14 +1848,14 @@ async function verarbeite(r,kundentext){
   // Abwegig ohne offene Frage: der Modelltext führt aufs „Für wen?" zurück
   // (Leitplanke in lib/pria.ts) — darunter gehören die passenden Antworten,
   // nicht die generischen Modell-Chips (Martin, 27.08.).
-  if(r.typ==='abwegig') return setChips(fuerWenChips());
+  if(r.typ==='abwegig') return setChips(fuerWenChips(r.chips));
   /* Personen-Auswahl gehört dem CODE, nicht dem Modellermessen: sobald es
      um „für wen suchen Sie?" geht — egal ob nach einer Begrüßung, einer
      Wissensfrage oder etwas Abwegigem — setzen wir die vollständige,
      geprüfte Liste. Das Modell hatte „Eltern" weggelassen und stattdessen
      „Preis berechnen" dazwischengemischt (Martin, 27.08.). */
   if(!offeneFrage && antwort.personen===undefined && fuerWenGemeint(r.text,r.chips))
-    return setChips(fuerWenChips());
+    return setChips(fuerWenChips(r.chips));
   if(r.chips&&r.chips.length) return setChips(modellChips(r.chips));
   beraterChips();
 }
@@ -2092,6 +2196,11 @@ const FRAGE_ICONS={
  geschlecht:'<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="9" cy="14" r="4"/><path d="M12 11 17.5 5.5M17.5 5.5h-4M17.5 5.5v4"/></svg>'
 };
 
+/* Der Kunde war schneller als die Einleitung (Martin, 27.08.): Wer sofort
+   „Eltern" tippt, bekam die Begrüßungssätze MITTEN in die Übernahme
+   geschoben — Pria redete an ihm vorbei. Sobald der Fragenlauf begonnen
+   hat oder eine Frage offen ist, bricht der Einstieg still ab. */
+const ueberholt=()=>kundeAktiv||modus==='fragen'||!!offeneFrage||kontaktOffen||uebergeben;
 async function oeffne(start){
   tipp(); versteckePille();
   blase.classList.add('weg'); panel.classList.add('on');
@@ -2108,13 +2217,17 @@ async function oeffne(start){
        nicht ab. Fortschrittszeile und Auswahl-Hinweis erscheinen erst
        mit dem Fragenlauf (vprogStand setzt .voll-funnel). */
     await pause(300);
+    if(ueberholt()) return;
     await sagen('Stellen Sie mir gern jede Frage — oder wir starten direkt mit Ihrem <b>Angebot</b>:');
+    if(ueberholt()) return;
     return beraterChips();
   }
   await pause(340);
+  if(ueberholt()) return;
   // Kurz halten: Der KI-Hinweis steht in der Kopfzeile, nicht im Gespräch.
   await sagen('Guten Tag! Ich bin <b>Pria</b> von Primundus. 👋');
   if(start==='preis') return starteFunnel('preis',null,'Ja, gern');
+  if(ueberholt()) return;
   // Nicht nur „fragen Sie mich" (Martin, 22.08.) — was sie KANN, gehört in den
   // zweiten Satz, sonst wirkt sie wie ein Auskunftsschalter.
   await sagen('Ich beantworte Ihre Fragen zur häuslichen Betreuung — und rechne Ihnen aus, '+
