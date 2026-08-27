@@ -30,7 +30,7 @@ export const FLOW = [
   { k: 'pflegegrad', q: 'Gibt es schon einen Pflegegrad?',
     o: [['0', 'Kein Pflegegrad'], ['1', 'Pflegegrad 1'], ['2', 'Pflegegrad 2'],
         ['3', 'Pflegegrad 3'], ['4', 'Pflegegrad 4'], ['5', 'Pflegegrad 5'], ['?', 'Weiß ich nicht']] },
-  { k: 'mobil', q: 'Mobilität der zu betreuenden Person',
+  { k: 'mobil', q: 'Wie mobil ist die Person, die betreut wird?',
     o: [['mobil', 'Mobil – geht selbstständig'], ['rollator', 'Mit Rollator'],
         ['rollstuhl', 'Auf Rollstuhl angewiesen'], ['bett', 'Bettlägerig']] },
   { k: 'nacht', q: 'Ist nachts Hilfe nötig?',
