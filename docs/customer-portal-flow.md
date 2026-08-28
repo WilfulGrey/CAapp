@@ -218,8 +218,12 @@ Content-Type: application/json
      widzieć w mailu, czy klient wypełnił formularz, czy rozmawiał z Prią.
    Ten sam `source` napędza blok *Über welche Seite kam der Lead?* w porannym
    raporcie (`supabase/functions/daily-analytics-report`, pole `leadsBySource`):
-   wiersz na źródło z wartościami wczoraj / 7 dni / udział; blok znika, gdy w
-   okresie nie ma leadów. To INNY wymiar niż `wizardOpenedBySource` w tym samym
+   od 28.08.2026 jako WYKRES slupkowy zamiast tabeli (decyzja Marcina: tabele
+   z maila wylatuja). Obok niego dwa dalsze wykresy: *Leads je Tag* z podzialem
+   na leady z wypelnionym profilem i bez (`fetchLeadCohorts` - grupowanie po
+   dniu PRZYJSCIA leada, nie po dniu wypelnienia profilu; ostatnie dwa slupki
+   moga jeszcze urosnac) oraz conversion dzien po dniu. Blok trzech wariantow
+   testu znika, gdy zadna ze stron czatu nie miala ruchu. To INNY wymiar niż `wizardOpenedBySource` w tym samym
    raporcie: tamto to PRZYCISK otwierający wizard, to jest STRONA, z której
    przyszło zapytanie.
 5. Build `portalUrl = ${NEXT_PUBLIC_PORTAL_URL}/?token=<lead.token>`
