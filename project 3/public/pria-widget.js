@@ -1527,7 +1527,11 @@ function kontakt(){
       const res=await fetch('/api/pria/lead',{method:'POST',
         headers:{'content-type':'application/json'},
         body:JSON.stringify({sid:SID,name:felder[0].value.trim(),email:felder[1].value.trim(),
-          telefon:felder[2].value.trim(),antworten:Object.assign({},antwort),adParams:adParams})});
+          telefon:felder[2].value.trim(),antworten:Object.assign({},antwort),adParams:adParams,
+          // Von welcher Seite kam die Anfrage (Martin, 27.08.): der Chat läuft
+          // als Voll-Seite auf /sofortangebot und als schwebende Beraterin auf
+          // /kosten-berechnen — im Lead soll man das unterscheiden können.
+          herkunft:(location.pathname||'/')})});
       const d=await res.json().catch(()=>({}));
       if(!res.ok) throw new Error(d.fehler||('HTTP '+res.status));
       portalUrl=d.portalUrl||null; leadId=d.leadId||null;

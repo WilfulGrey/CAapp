@@ -53,6 +53,8 @@ export interface DailyStats {
    *  Quelle bis dahin hart gesetzt wurde — ältere Zeiträume zeigen deshalb
    *  keinen echten Split. */
   leadsBySource: Record<string, number>;
+  /** Besucher je Landingpage — trennt die Test-Varianten (siehe oben). */
+  besucherJeSeite: Record<string, number>;
 }
 
 /**
@@ -115,7 +117,7 @@ export async function fetchDailyStats(
   // 1) Sessions (Besucher) + Devices + Quellen
   const { data: sessions, error: sErr } = await supabase
     .from("analytics_sessions")
-    .select("id, device_type, referrer")
+    .select("id, device_type, referrer, landing_page")
     .gte("started_at", start)
     .lt("started_at", end);
   if (sErr) throw new Error(`analytics_sessions: ${sErr.message}`);
@@ -123,6 +125,12 @@ export async function fetchDailyStats(
   const visitors = sessions?.length ?? 0;
   let deviceMobile = 0, deviceDesktop = 0, deviceTablet = 0;
   let sourceDirect = 0, sourceReferral = 0;
+  /* Besucher je Landingpage — die drei Test-Varianten (Martin, 27.08.):
+     "/" = Formular ohne Chat, "/kosten-berechnen" = Formular + Pria-Float,
+     "/sofortangebot" = Voll-Chat. Ohne diese Zeile sieht der Report zwar
+     die Leads je Variante, aber nicht, wie viele Besucher dafür nötig
+     waren — und genau das ist der Vergleich. */
+  const besucherJeSeite: Record<string, number> = {};
   for (const s of sessions ?? []) {
     const dev = (s as any).device_type;
     if (dev === "mobile") deviceMobile++;
@@ -131,6 +139,8 @@ export async function fetchDailyStats(
     const ref = (s as any).referrer;
     if (!ref || ref === "") sourceDirect++;
     else sourceReferral++;
+    const seite = String((s as any).landing_page ?? "").trim() || "/";
+    besucherJeSeite[seite] = (besucherJeSeite[seite] ?? 0) + 1;
   }
 
   // 2) Wizard-Events (step_view) für den Funnel + Wizard-Started
@@ -240,6 +250,7 @@ export async function fetchDailyStats(
     funnelStepViewed,
     wizardOpenedBySource,
     leadsBySource,
+    besucherJeSeite,
   };
 }
 
@@ -275,6 +286,7 @@ export interface PeriodStats {
   convBookingApp: number;
   /** Echte Leads je Herkunfts-Seite, aufsummiert über den Zeitraum. */
   leadsBySource: Record<string, number>;         // bookings / applicationReceived
+  besucherJeSeite: Record<string, number>;       // Besucher je Landingpage (Test-Varianten)
   // Tageskennzahl der einzelnen 7 Tage — für Mini-Sparkline/Debug.
   days: { label: string; stats: DailyStats }[];
 }
@@ -320,9 +332,13 @@ export async function fetchPeriodStats(
   const bookingsSum = sumOf((s) => s.bookings);
 
   const leadsBySourceSum: Record<string, number> = {};
+  const besucherJeSeiteSum: Record<string, number> = {};
   for (const d of perDay) {
     for (const [quelle, n] of Object.entries(d.stats.leadsBySource ?? {})) {
       leadsBySourceSum[quelle] = (leadsBySourceSum[quelle] ?? 0) + n;
+    }
+    for (const [seite, n] of Object.entries(d.stats.besucherJeSeite ?? {})) {
+      besucherJeSeiteSum[seite] = (besucherJeSeiteSum[seite] ?? 0) + n;
     }
   }
 
@@ -342,6 +358,7 @@ export async function fetchPeriodStats(
     convAppInvite: rate(applicationReceivedSum, caregiverInvitedSum),
     convBookingApp: rate(bookingsSum, applicationReceivedSum),
     leadsBySource: leadsBySourceSum,
+    besucherJeSeite: besucherJeSeiteSum,
     days: perDay,
   };
 }
@@ -514,4 +531,82 @@ export async function fetchAdsSpend(
     console.error("fetchAdsSpend:", e instanceof Error ? e.message : String(e));
     return null;
   }
+}
+
+/* ── Lead-Kohorten je Tag ──────────────────────────────────────────────
+   Für das gestapelte Balkendiagramm (Martin 28.08.): „von DEN Leads dieses
+   Tages haben so viele später ein Patientenprofil gefüllt".
+
+   Wichtig und der Grund für eine eigene Abfrage: `patientDataSaved` in
+   DailyStats zählt die EREIGNISSE eines Tages — ein Lead von Montag, der
+   am Mittwoch sein Profil füllt, landet dort im Mittwoch. Für die Frage
+   „wie gut war der Montag?" ist das die falsche Zuordnung. Hier wird
+   deshalb nach ANLAGE-Tag des Leads gruppiert und geprüft, ob dieser Lead
+   IRGENDWANN ein Profil gefüllt hat.
+
+   Reife-Vorbehalt: die jüngsten ein bis zwei Tage können nur noch wachsen —
+   wer gestern Abend kam, füllt sein Profil vielleicht heute. Die Balken der
+   letzten Tage sind also Mindestwerte, nie Endstände. */
+export interface LeadKohorte {
+  /** TT.MM. — Anzeigelabel */
+  label: string;
+  /** YYYY-MM-DD (Berlin) */
+  iso: string;
+  leads: number;
+  mitProfil: number;
+}
+
+export async function fetchLeadCohorts(
+  supabase: SupabaseClient,
+  daysBack: number,
+): Promise<LeadKohorte[]> {
+  const aeltester = berlinDayRange(daysBack);
+  const juengster = berlinDayRange(1);
+
+  const { data: leads, error: lErr } = await supabase
+    .from("leads")
+    .select("id, email, vorname, nachname, created_at")
+    .gte("created_at", aeltester.start)
+    .lt("created_at", juengster.end);
+  if (lErr) throw new Error(`leads (Kohorten): ${lErr.message}`);
+
+  const echte = (leads ?? []).filter(isRealLead);
+  const ids = echte.map((l: any) => l.id);
+
+  // Profile ohne Zeitfenster: das Ereignis darf beliebig viel später liegen.
+  const mitProfil = new Set<string>();
+  for (let i = 0; i < ids.length; i += 200) {
+    const teil = ids.slice(i, i + 200);
+    if (teil.length === 0) break;
+    const { data: ev, error: eErr } = await supabase
+      .from("lead_events")
+      .select("lead_id")
+      .eq("event_type", "patient_data_saved")
+      .in("lead_id", teil);
+    if (eErr) throw new Error(`lead_events (Kohorten): ${eErr.message}`);
+    for (const e of ev ?? []) mitProfil.add((e as any).lead_id);
+  }
+
+  // Gerüst über alle Tage, damit leere Tage als Lücke sichtbar bleiben
+  // statt aus dem Diagramm zu verschwinden.
+  const tage: LeadKohorte[] = [];
+  const nachIso = new Map<string, LeadKohorte>();
+  for (let i = daysBack; i >= 1; i--) {
+    const r = berlinDayRange(i);
+    const k: LeadKohorte = { label: r.label.slice(0, 6), iso: r.iso, leads: 0, mitProfil: 0 };
+    tage.push(k);
+    nachIso.set(r.iso, k);
+  }
+  for (const l of echte) {
+    // Berlin-Tag des Leads — Intl statt Handrechnung, damit die Sommer-/
+    // Winterzeit-Grenze genauso fällt wie in berlinDayRange().
+    const iso = new Intl.DateTimeFormat("en-CA", {
+      timeZone: "Europe/Berlin", year: "numeric", month: "2-digit", day: "2-digit",
+    }).format(new Date((l as any).created_at));
+    const k = nachIso.get(iso);
+    if (!k) continue;
+    k.leads++;
+    if (mitProfil.has((l as any).id)) k.mitProfil++;
+  }
+  return tage;
 }

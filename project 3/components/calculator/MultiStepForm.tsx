@@ -637,6 +637,13 @@ export function MultiStepForm({ mode = 'inline' }: MultiStepFormProps = {}) {
           telefon: formData.phone,
           careStartTiming: state.careStartTiming,
           adParams: analytics.getAdParams(),
+          // Von welcher Seite kam die Anfrage (Martin, 27.08.): „/" ist die
+          // normale Startseite, „/kosten-berechnen" die Test-Variante mit
+          // schwebender Beraterin. Landet in leads.source.
+          quelle:
+            typeof window !== 'undefined' && window.location.pathname !== '/'
+              ? `rechner:${window.location.pathname.replace(/^\//, '')}`
+              : 'rechner',
           kalkulation: {
             ...kalkulation,
             formularDaten,

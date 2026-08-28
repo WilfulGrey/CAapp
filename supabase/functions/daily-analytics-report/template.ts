@@ -9,7 +9,7 @@
 // zeigt das aktuelle Plateau. Conversion-% als Tabelle, weil absolute
 // Zahlen wenig aussagen wenn Traffic schwankt.
 
-import type { DailyStats, PeriodStats } from "./queries.ts";
+import type { DailyStats, LeadKohorte, PeriodStats } from "./queries.ts";
 
 // Spiegelt MultiStepForm.getStepId() — 9 Schritte (Betreuungsbeginn /
 // care_start_timing wurde aus dem Funnel entfernt, Kontaktformular ist
@@ -59,8 +59,12 @@ export function buildReportEmail(opts: {
   agentNotes?: { notes: Array<{ source: string; note: string }>; error?: string };
   /** Google-Ads-Kosten (SEA, 16.08.) — null/undefined = Block entfällt (fail-soft). */
   adsSpend?: { yesterday: number; period: number; periodDays: number } | null;
+  /** Leads je Anlage-Tag inkl. „hat später ein Profil gefüllt" — für das
+   *  gestapelte Balkendiagramm. Fehlt sie, entfällt das Diagramm. */
+  leadKohorten?: LeadKohorte[];
 }): { subject: string; html: string; text: string } {
   const { yesterday, period, yesterdayLabel, periodLabel, totalLeads, bookedCustomers, totalBookings, siteUrl, mailHealth, prevPeriod, agentNotes, adsSpend } = opts;
+  const leadKohorten = opts.leadKohorten ?? [];
 
   // Ads-Kosten je Stufe (auf Martins Wunsch 16.08.: Spend, €/Lead,
   // €/Patientenprofil — bewusst OHNE Kunden-Stufe). Blended: Spend ÷ ALLE
@@ -235,10 +239,18 @@ export function buildReportEmail(opts: {
      muss. Leads von vor dem 27.08.2026 tragen alle 'rechner' (die Quelle wurde
      bis dahin hart gesetzt), der 7-Tage-Wert ist also erst ab dem 03.09.
      vollständig aussagekräftig. */
+  /* Kanal UND Seite (Martin, 27.08.) — die drei Test-Varianten sollen sich
+     hier unterscheiden lassen:
+       A  /                 Formular ohne Chat   (Kontrolle)
+       B  /kosten-berechnen Formular + Pria-Float
+       C  /sofortangebot    Pria als ganze Seite */
   const QUELL_NAMEN: Record<string, string> = {
-    rechner: "Kostenrechner — Formular",
-    "kostenrechner-result": "Kostenrechner — Formular",
-    "pria-chat": "Chat mit Pria — /sofortangebot",
+    rechner: "A · Formular (Startseite)",
+    "kostenrechner-result": "A · Formular (Startseite)",
+    "rechner:kosten-berechnen": "B · Formular (Seite mit Pria)",
+    "chat:kosten-berechnen": "B · Pria-Float (Seite mit Formular)",
+    "chat:sofortangebot": "C · Pria Voll-Chat",
+    "pria-chat": "C · Pria Voll-Chat",
     unbekannt: "ohne Kennung",
   };
   const quellGestern = yesterday.leadsBySource ?? {};
@@ -247,6 +259,51 @@ export function buildReportEmail(opts: {
     .sort((a, b) => (quellPeriode[b] ?? 0) - (quellPeriode[a] ?? 0));
   const quellGesternGesamt = Object.values(quellGestern).reduce((s, n) => s + n, 0);
   const quellPeriodeGesamt = Object.values(quellPeriode).reduce((s, n) => s + n, 0);
+  /* ── Die drei Test-Varianten nebeneinander (Martin, 27.08.) ──────────
+     Besucher je Landingpage aus analytics_sessions, Leads je Herkunft aus
+     leads.source — daraus die Quote, die den Test entscheidet. Der Block
+     erscheint nur, solange eine der Chat-Varianten überhaupt Besuch hatte;
+     sonst steht er als leere Tabelle im Weg. */
+  const VARIANTEN: Array<{ seite: string; name: string; quellen: string[] }> = [
+    { seite: "/", name: "A · Startseite (Formular)", quellen: ["rechner", "kostenrechner-result"] },
+    { seite: "/kosten-berechnen", name: "B · Formular + Pria-Float",
+      quellen: ["rechner:kosten-berechnen", "chat:kosten-berechnen"] },
+    { seite: "/sofortangebot", name: "C · Pria Voll-Chat",
+      quellen: ["chat:sofortangebot", "pria-chat"] },
+  ];
+  const besucherGestern = yesterday.besucherJeSeite ?? {};
+  const besucherPeriode = period.besucherJeSeite ?? {};
+  const chatBesuch = (besucherPeriode["/sofortangebot"] ?? 0) + (besucherPeriode["/kosten-berechnen"] ?? 0);
+  const variantenHtml = chatBesuch === 0 ? "" : `
+        <p style="margin:16px 0 6px;font-size:12px;font-weight:700;color:#3D2B1F;">
+          Chat-Test — die drei Varianten (7 Tage)
+        </p>
+        <table width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;background:#fff;border:1px solid #f0e8dc;border-radius:6px;">
+          <tr style="background:#faf6ef;">
+            <td style="padding:6px 12px;font-size:11px;color:#9a8a73;">Variante</td>
+            <td align="right" style="padding:6px 12px;font-size:11px;color:#9a8a73;">Besucher</td>
+            <td align="right" style="padding:6px 12px;font-size:11px;color:#9a8a73;">Leads</td>
+            <td align="right" style="padding:6px 12px;font-size:11px;color:#9a8a73;">Quote</td>
+          </tr>
+          ${VARIANTEN.map((v, idx) => {
+            const bes = besucherPeriode[v.seite] ?? 0;
+            const leads = v.quellen.reduce((s, q) => s + (quellPeriode[q] ?? 0), 0);
+            const quote = bes > 0 ? ((leads / bes) * 100).toFixed(1) : "—";
+            const gesternBes = besucherGestern[v.seite] ?? 0;
+            return `<tr style="background:${idx % 2 ? "#fdfbf7" : "#fff"};">
+              <td style="padding:7px 12px;font-size:12px;color:#3D2B1F;border-bottom:1px solid #f0e8dc;">${v.name}</td>
+              <td align="right" style="padding:7px 12px;font-size:12px;color:#5C4A32;border-bottom:1px solid #f0e8dc;">${bes}<span style="color:#9a8a73;font-size:11px;"> (gestern ${gesternBes})</span></td>
+              <td align="right" style="padding:7px 12px;font-size:12px;font-weight:700;color:#3D2B1F;border-bottom:1px solid #f0e8dc;">${leads}</td>
+              <td align="right" style="padding:7px 12px;font-size:12px;color:#3D2B1F;border-bottom:1px solid #f0e8dc;">${quote}${bes > 0 ? "&thinsp;%" : ""}</td>
+            </tr>`;
+          }).join("")}
+        </table>
+        <p style="margin:6px 0 0;font-size:11px;color:#9a8a73;line-height:1.5;">
+          Gleiche Anzeigen, gleiches Budget, unterschiedlicher Weg zum Angebot.
+          Entscheidend ist die Quote (Leads je Besucher) — nicht die absolute Zahl,
+          die vom Budget je Kampagne abhängt.
+        </p>`;
+
   const quellHtml = quellKeys.map((quelle, idx) => {
     const g = quellGestern[quelle] ?? 0;
     const w = quellPeriode[quelle] ?? 0;
@@ -314,189 +371,232 @@ export function buildReportEmail(opts: {
   const devTotal = yesterday.deviceMobile + yesterday.deviceDesktop + yesterday.deviceTablet || 1;
   const srcTotal = yesterday.sourceDirect + yesterday.sourceReferral || 1;
 
+  /* ═══════════════════════════════════════════════════════════════════
+     Diagramm-Mail (28.08.2026). Martins Ansage: „lieber mehr charts …
+     die tabellen können erstmal raus." Der frühere Trichter „Besuch →
+     Profil" ist bewusst NICHT zurückgekommen: seit dem Chat mischt er
+     zwei Wege — Chat-Besucher durchlaufen keine Wizard-Schritte, die
+     Stufe „Wizard gestartet" wäre für sie systematisch leer.
+
+     E-MAIL-REGELN, die alles bestimmen: kein JavaScript, kein SVG, keine
+     Web-Fonts, kein Flex/Grid — Outlook rendert mit der Word-Engine,
+     Gmail entfernt <style>-Blöcke. Deshalb verschachtelte Tabellen,
+     Inline-Styles und Balken als eingefärbte Zellen mit Pixel-Höhe. */
+  const FARBE = {
+    grund: "#FAF7F0", karte: "#FFFFFF", rand: "#E8DDD0",
+    tinte: "#2D1F0F", text: "#5C4A32", leise: "#9A8A73",
+    balken: "#8A6D3F", balkenLeise: "#D9CBB4",
+    gut: "#2F7D5B", warn: "#B45309", schlecht: "#B91C1C",
+  };
+  const zahl = (n: number, k = 0) => n.toFixed(k).replace(".", ",");
+
+  const kachel = (wert: string, titel: string, fuss: string, farbe: string) => `
+    <td width="33%" valign="top" style="padding:0 4px;">
+      <table width="100%" cellpadding="0" cellspacing="0" role="presentation"
+             style="background:${FARBE.karte};border:1px solid ${FARBE.rand};border-radius:10px;">
+        <tr><td style="padding:14px 14px 12px;">
+          <p style="margin:0;font-size:11px;letter-spacing:0.06em;text-transform:uppercase;color:${FARBE.leise};font-weight:600;">${titel}</p>
+          <p style="margin:6px 0 0;font-size:30px;line-height:1.1;font-weight:700;color:${farbe};">${wert}</p>
+          <p style="margin:5px 0 0;font-size:12px;color:${FARBE.text};">${fuss}</p>
+        </td></tr>
+      </table>
+    </td>`;
+
+  const pfeilVgl = (ist: number, soll: number) =>
+    soll <= 0 ? "" : ist >= soll * 1.1 ? ` <span style="color:${FARBE.gut};">▲</span>`
+      : ist <= soll * 0.9 ? ` <span style="color:${FARBE.schlecht};">▼</span>`
+        : ` <span style="color:${FARBE.leise};">▬</span>`;
+
+  const kostenProProfilY = adsSpend && yesterday.patientDataSaved > 0
+    ? adsSpend.yesterday / yesterday.patientDataSaved : null;
+  const kostenProProfilP = adsSpend && period.sums.patientDataSaved > 0
+    ? adsSpend.period / period.sums.patientDataSaved : null;
+  /* 20 € je Patientenprofil ist Martins Zielgröße, 35 € die Schmerzgrenze. */
+  const kostenFarbe = kostenProProfilY === null ? FARBE.leise
+    : kostenProProfilY <= 20 ? FARBE.gut : kostenProProfilY <= 35 ? FARBE.warn : FARBE.schlecht;
+
+  const kachelnHtml = `
+    <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="margin:0 0 16px;">
+      <tr>
+        ${kachel(String(leadsY), "Leads gestern", `Ø ${zahl(leadsAvg, 1)} in 7 Tagen${pfeilVgl(leadsY, leadsAvg)}`,
+          leadsY >= leadsAvg ? FARBE.gut : FARBE.schlecht)}
+        ${kachel(kostenProProfilY === null ? "—" : `${zahl(kostenProProfilY, 0)} €`, "je Patientenprofil",
+          kostenProProfilP === null ? "kein Vergleich" : `Ø ${zahl(kostenProProfilP, 0)} € · Ziel 20 €`, kostenFarbe)}
+        ${kachel(String(yesterday.patientDataSaved), "Profile gestern",
+          `Ø ${zahl(period.patientDataSaved.avg, 1)}${pfeilVgl(yesterday.patientDataSaved, period.patientDataSaved.avg)}`,
+          yesterday.patientDataSaved >= period.patientDataSaved.avg ? FARBE.gut : FARBE.schlecht)}
+      </tr>
+    </table>`;
+
+  const diagrammKarte = (titel: string, legende: string, inhalt: string, fuss: string) => `
+    <table width="100%" cellpadding="0" cellspacing="0" role="presentation"
+           style="background:${FARBE.karte};border:1px solid ${FARBE.rand};border-radius:12px;margin:0 0 16px;">
+      <tr><td style="padding:16px 16px 12px;">
+        <p style="margin:0 0 2px;font-size:14px;font-weight:700;color:${FARBE.tinte};">${titel}</p>
+        <p style="margin:0 0 14px;font-size:11px;color:${FARBE.leise};line-height:1.5;">${legende}</p>
+        ${inhalt}
+        ${fuss ? `<p style="margin:10px 0 0;font-size:11px;color:${FARBE.leise};line-height:1.5;">${fuss}</p>` : ""}
+      </td></tr>
+    </table>`;
+
+  const liegenderBalken = (name: string, breite: number, wert: string) => `
+      <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="margin:0 0 9px;">
+        <tr>
+          <td width="42%" style="font-size:12px;color:${FARBE.text};padding-right:10px;">${name}</td>
+          <td width="40%">
+            <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="background:${FARBE.grund};border-radius:4px;">
+              <tr><td width="${Math.max(2, breite)}%" style="background:${FARBE.balken};height:13px;border-radius:4px;font-size:0;line-height:0;">&nbsp;</td><td>&nbsp;</td></tr>
+            </table>
+          </td>
+          <td width="18%" align="right" style="font-size:12px;font-weight:700;color:${FARBE.tinte};padding-left:10px;">${wert}</td>
+        </tr>
+      </table>`;
+
+  // ── Diagramm 1: Leads je Tag, eingefärbt nach Patientenprofil ──────
+  const kohorteMax = Math.max(1, ...leadKohorten.map((k) => k.leads));
+  const kohorteLeads = leadKohorten.reduce((s, k) => s + k.leads, 0);
+  const kohorteProfile = leadKohorten.reduce((s, k) => s + k.mitProfil, 0);
+  const chartLeads = leadKohorten.length === 0 ? "" : diagrammKarte(
+    "Leads je Tag",
+    `<span style="display:inline-block;width:9px;height:9px;background:${FARBE.balken};border-radius:2px;"></span> mit Patientenprofil` +
+    `&nbsp;&nbsp;<span style="display:inline-block;width:9px;height:9px;background:${FARBE.balkenLeise};border-radius:2px;"></span> ohne`,
+    `<table width="100%" cellpadding="0" cellspacing="0" role="presentation"><tr>${
+      leadKohorten.map((k, i) => {
+        const hGes = k.leads > 0 ? Math.max(3, Math.round((k.leads / kohorteMax) * 84)) : 2;
+        const hOben = k.leads > 0 ? Math.round((k.mitProfil / k.leads) * hGes) : 0;
+        const letzter = i === leadKohorten.length - 1;
+        return `
+      <td align="center" valign="bottom" style="padding:0 2px;">
+        <p style="margin:0 0 3px;font-size:10px;line-height:1.2;color:${letzter ? FARBE.tinte : FARBE.leise};font-weight:${letzter ? "700" : "400"};">${k.leads || ""}</p>
+        ${hOben > 0 ? `<div style="height:${hOben}px;background:${FARBE.balken};border-radius:3px 3px 0 0;font-size:0;line-height:0;">&nbsp;</div>` : ""}
+        <div style="height:${Math.max(0, hGes - hOben)}px;background:${FARBE.balkenLeise};border-radius:${hOben > 0 ? "0 0 3px 3px" : "3px"};font-size:0;line-height:0;">&nbsp;</div>
+        <p style="margin:4px 0 0;font-size:9px;line-height:1.2;color:${FARBE.leise};">${k.label.slice(0, 5)}</p>
+      </td>`;
+      }).join("")
+    }</tr></table>`,
+    `${kohorteProfile} von ${kohorteLeads} Leads haben ein Profil gefüllt — ${kohorteLeads > 0 ? Math.round((kohorteProfile / kohorteLeads) * 100) : 0}&thinsp;%. ` +
+    `Zugeordnet nach dem Tag, an dem der Lead kam (nicht dem Tag des Profils). Die letzten zwei Balken können noch wachsen.`,
+  );
+
+  // ── Diagramm 2: Conversion Besucher → Lead je Tag ──────────────────
+  const tage14 = [...(prevPeriod?.days ?? [])].reverse().concat([...period.days].reverse());
+  const convTage = tage14.map((d) => ({
+    label: d.label.slice(0, 5),
+    quote: d.stats.visitors > 0 ? (d.stats.wizardCompleted / d.stats.visitors) * 100 : 0,
+  }));
+  const mitQuote = convTage.filter((c) => c.quote > 0).length;
+  const convSchnitt = mitQuote > 0 ? convTage.reduce((s, c) => s + c.quote, 0) / mitQuote : 0;
+  const convMax = Math.max(1, ...convTage.map((c) => c.quote));
+  const chartConv = convTage.length === 0 ? "" : diagrammKarte(
+    "Conversion je Tag &mdash; Besucher, die zu einem Lead werden",
+    `Kräftig = über dem Schnitt der ${convTage.length} Tage (${zahl(convSchnitt, 1)}&thinsp;%), blass = darunter`,
+    `<table width="100%" cellpadding="0" cellspacing="0" role="presentation"><tr>${
+      convTage.map((c, i) => {
+        const h = Math.max(3, Math.round((c.quote / convMax) * 72));
+        const letzter = i === convTage.length - 1;
+        return `
+      <td align="center" valign="bottom" style="padding:0 2px;">
+        <p style="margin:0 0 3px;font-size:9px;line-height:1.2;color:${letzter ? FARBE.tinte : FARBE.leise};font-weight:${letzter ? "700" : "400"};">${c.quote > 0 ? zahl(c.quote, 0) : ""}</p>
+        <div style="height:${h}px;background:${letzter ? FARBE.tinte : c.quote >= convSchnitt ? FARBE.balken : FARBE.balkenLeise};border-radius:3px 3px 0 0;font-size:0;line-height:0;">&nbsp;</div>
+        <p style="margin:4px 0 0;font-size:9px;line-height:1.2;color:${FARBE.leise};">${c.label}</p>
+      </td>`;
+      }).join("")
+    }</tr></table>`,
+    "Anteil der Besucher, die ein Angebot anfordern. Zahlen in Prozent.",
+  );
+
+  /* ── Diagramm 3: die drei Test-Varianten ────────────────────────────
+     Datengrundlage von der Pria-Session (PR #584): Besucher je Landingpage
+     aus analytics_sessions, Leads je Herkunft aus leads.source. Hier als
+     Balken statt als Tabelle — der Vergleich, um den es geht, ist die
+     QUOTE, deshalb bestimmt sie die Balkenlänge. */
+  const varianten = VARIANTEN.map((v) => {
+    const besucher = besucherPeriode[v.seite] ?? 0;
+    const leads = v.quellen.reduce((s, q) => s + (quellPeriode[q] ?? 0), 0);
+    return { name: v.name, besucher, leads, quote: besucher > 0 ? (leads / besucher) * 100 : 0 };
+  });
+  const quoteMax = Math.max(1, ...varianten.map((v) => v.quote));
+  const chartVarianten = chatBesuch === 0 ? "" : diagrammKarte(
+    "Chat-Test &mdash; die drei Varianten",
+    `Balkenlänge = Anteil der Besucher, die zum Lead werden · ${periodLabel}`,
+    varianten.map((v) =>
+      liegenderBalken(v.name, Math.round((v.quote / quoteMax) * 100),
+        `${v.besucher > 0 ? zahl(v.quote, 1) + "&thinsp;%" : "—"} <span style="font-weight:400;color:${FARBE.leise};">${v.leads}/${v.besucher}</span>`)
+    ).join(""),
+    "Leads je Besucher. Solange eine Variante unter rund 100 Besuchern liegt, ist ihre Quote Zufall — nicht danach steuern.",
+  );
+
+  // ── Ads als Kachelzeile statt Tabelle ──────────────────────────────
+  const adsHtml = !adsSpend ? "" : `
+    <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="margin:0 0 16px;">
+      <tr>
+        ${kachel(euro(adsSpend.yesterday), "Ads gestern", `${euro(adsSpend.period)} in ${adsSpend.periodDays} Tagen`, FARBE.tinte)}
+        ${kachel(perPiece(adsSpend.yesterday, leadsY), "je Lead", `Ø ${perPiece(adsSpend.period, period.sums.wizardCompleted)}`, FARBE.tinte)}
+        ${kachel(perPiece(adsSpend.yesterday, yesterday.patientDataSaved), "je Profil", `Ø ${perPiece(adsSpend.period, period.sums.patientDataSaved)}`, kostenFarbe)}
+      </tr>
+    </table>`;
+
   const html = `<!DOCTYPE html>
 <html lang="de">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Primundus Daily Report — ${yesterdayLabel}</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Primundus Daily</title>
 </head>
-<body style="margin:0;padding:0;background:#f4f4f4;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;color:#333;">
-${mailAlarmHtml}
-  <div style="background:#f4f4f4;padding:24px 0;">
-    <div style="max-width:720px;margin:0 auto;background:#fff;border-radius:8px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.08);">
-
-      <div style="background:#fff;padding:24px 32px;border-bottom:1px solid #f0ebe4;">
-        <table width="100%" cellpadding="0" cellspacing="0" role="presentation"><tr>
-          <td style="vertical-align:middle;">
-            <img src="${siteUrl}/images/Primundus-Logo_V6.png" alt="Primundus" style="max-width:140px;height:auto;display:block;" />
-          </td>
-          <td style="vertical-align:middle;text-align:right;">
-            <p style="margin:0;font-size:11px;font-weight:600;letter-spacing:0.06em;text-transform:uppercase;color:#9a8a73;">Daily Report</p>
-            <p style="margin:2px 0 0;font-size:13px;font-weight:700;color:#3D2B1F;">${yesterdayLabel}</p>
-          </td>
-        </tr></table>
-      </div>
-
-      <div style="padding:24px 32px;">
-        ${fazitHtml}
-        <p style="margin:0 0 4px;font-size:15px;color:#555;">📊 Übersicht für <strong style="color:#2D1F0F;">${yesterdayLabel}</strong></p>
-        <p style="margin:0 0 18px;font-size:12px;color:#9a8a73;">Vergleich: ${periodLabel} (Ø + Top-Tag)</p>
-
-        <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="border:1px solid #e8ddd0;border-radius:8px;overflow:hidden;background:#fff;">
-          <thead><tr>
-            <th style="padding:8px 12px;background:#5C4A32;color:#fff;text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:0.04em;">Metrik</th>
-            <th style="padding:8px 12px;background:#5C4A32;color:#fff;text-align:right;font-size:11px;text-transform:uppercase;letter-spacing:0.04em;">Gestern</th>
-            <th style="padding:8px 12px;background:#5C4A32;color:#fff;text-align:right;font-size:11px;text-transform:uppercase;letter-spacing:0.04em;">7-T-Ø</th>
-            <th style="padding:8px 12px;background:#5C4A32;color:#fff;text-align:right;font-size:11px;text-transform:uppercase;letter-spacing:0.04em;">Top (Tag)</th>
-          </tr></thead>
-          <tbody>${rowsHtml}</tbody>
-        </table>
-
-        <p style="margin:24px 0 8px;font-size:14px;font-weight:700;color:#3D2B1F;">Conversion-Raten</p>
-        <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="border:1px solid #e8ddd0;border-radius:8px;overflow:hidden;background:#fff;">
-          <thead><tr>
-            <th style="padding:8px 12px;background:#5C4A32;color:#fff;text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:0.04em;">Stufe</th>
-            <th style="padding:8px 12px;background:#5C4A32;color:#fff;text-align:right;font-size:11px;text-transform:uppercase;letter-spacing:0.04em;">Gestern</th>
-            <th style="padding:8px 12px;background:#5C4A32;color:#fff;text-align:right;font-size:11px;text-transform:uppercase;letter-spacing:0.04em;">7-T-Ø</th>
-          </tr></thead>
-          <tbody>${convRowsHtml}</tbody>
-        </table>
-
-        ${adsSpend ? `<p style="margin:24px 0 8px;font-size:14px;font-weight:700;color:#3D2B1F;">Google Ads — Kosten</p>
-        <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="border:1px solid #e8ddd0;border-radius:8px;overflow:hidden;background:#fff;">
-          <thead><tr>
-            <th style="padding:8px 12px;background:#5C4A32;color:#fff;text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:0.04em;">Metrik</th>
-            <th style="padding:8px 12px;background:#5C4A32;color:#fff;text-align:right;font-size:11px;text-transform:uppercase;letter-spacing:0.04em;">Gestern</th>
-            <th style="padding:8px 12px;background:#5C4A32;color:#fff;text-align:right;font-size:11px;text-transform:uppercase;letter-spacing:0.04em;">${adsSpend.periodDays} Tage</th>
-          </tr></thead>
-          <tbody>${adsRows.map((r, i) => `<tr style="background:${i % 2 ? "#faf7f2" : "#fff"};">
-            <td style="padding:8px 12px;font-size:13px;color:#3D2B1F;">${r.label}</td>
-            <td style="padding:8px 12px;font-size:13px;color:#3D2B1F;text-align:right;font-weight:600;">${r.g}</td>
-            <td style="padding:8px 12px;font-size:13px;color:#555;text-align:right;">${r.p}</td>
-          </tr>`).join("")}</tbody>
-        </table>
-        <p style="margin:6px 0 0;font-size:11px;color:#9a8a73;line-height:1.5;">
-          Blended: Ads-Kosten ÷ alle echten Leads/Profile (auch organische). Kampagnen-genaue Kosten je Stufe folgen, sobald genug Klick-ID-Historie da ist.
-        </p>` : ""}
-
-        <p style="margin:24px 0 8px;font-size:14px;font-weight:700;color:#3D2B1F;">Wizard-Funnel (Sessions pro Step, Gestern)</p>
-        <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="border:1px solid #e8ddd0;border-radius:8px;overflow:hidden;background:#fff;">
-          <tbody>${funnelHtml}${completionBridgeHtml}</tbody>
-        </table>
-        <p style="margin:6px 0 0;font-size:11px;color:#9a8a73;line-height:1.5;">
-          Steps 1–9 zählen <em>unique Sessions</em>, die den Step gesehen haben (Quelle: <code>analytics_events.step_view</code>, inkl. Tests).
-          Die letzten zwei Zeilen zählen tatsächlich gespeicherte Leads in der DB (Quelle: <code>leads.created_at</code>).
-          Der Sprung &bdquo;Step 9 → echte Leads&ldquo; ist der eigentliche letzte Drop — wer das Kontaktformular sieht, aber nicht abschickt, fällt hier raus.
-        </p>
-
-        ${ctaEintraege.length ? `
-        <p style="margin:24px 0 8px;font-size:14px;font-weight:700;color:#3D2B1F;">Welcher CTA öffnet den Wizard? (Gestern)</p>
-        <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="border:1px solid #e8ddd0;border-radius:8px;overflow:hidden;background:#fff;">
-          <tbody>${ctaHtml}</tbody>
-        </table>
-        <p style="margin:6px 0 0;font-size:11px;color:#9a8a73;line-height:1.5;">
-          Unique Sessions je Knopf (Quelle: <code>analytics_events.wizard_opened.source</code>).
-          Davon vom Apex: <strong>${vomApex}</strong> von ${ctaGesamt} — der Rest sind CTAs auf der Rechner-Seite selbst.
-          Wer zweimal öffnet, zählt einmal.
-        </p>` : ""}
-
-        ${quellKeys.length ? `
-        <p style="margin:24px 0 8px;font-size:14px;font-weight:700;color:#3D2B1F;">Über welche Seite kam der Lead?</p>
-        <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="border:1px solid #e8ddd0;border-radius:8px;overflow:hidden;background:#fff;">
-          <thead><tr style="background:#f7f2ea;">
-            <th align="left" style="padding:7px 12px;font-size:11px;color:#5C4A32;font-weight:600;">Seite</th>
-            <th align="right" style="padding:7px 12px;font-size:11px;color:#5C4A32;font-weight:600;">Gestern</th>
-            <th align="right" style="padding:7px 12px;font-size:11px;color:#5C4A32;font-weight:600;">7 Tage</th>
-            <th align="right" style="padding:7px 12px;font-size:11px;color:#5C4A32;font-weight:600;">Anteil</th>
-          </tr></thead>
-          <tbody>${quellHtml}</tbody>
-        </table>
-        <p style="margin:6px 0 0;font-size:11px;color:#9a8a73;line-height:1.5;">
-          Echte Leads je Herkunfts-Seite (Quelle: <code>leads.source</code>), Tests herausgefiltert.
-          Gestern insgesamt <strong>${quellGesternGesamt}</strong>, über sieben Tage ${quellPeriodeGesamt}.
-          Die Kennung wird seit dem 27.08.2026 gesetzt — ältere Leads tragen alle
-          &bdquo;Formular&ldquo;, der 7-Tage-Wert ist deshalb erst ab dem 03.09. vollständig.
-        </p>` : ""}
-
-        <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="margin-top:24px;">
-          <tr>
-            <td style="width:50%;padding-right:8px;vertical-align:top;">
-              <p style="margin:0 0 6px;font-size:13px;font-weight:700;color:#3D2B1F;">Geräte (Gestern)</p>
-              <p style="margin:0;font-size:12px;color:#555;line-height:1.8;">
-                📱 Mobile: <strong>${yesterday.deviceMobile}</strong> (${Math.round(yesterday.deviceMobile/devTotal*100)}%)<br>
-                🖥️ Desktop: <strong>${yesterday.deviceDesktop}</strong> (${Math.round(yesterday.deviceDesktop/devTotal*100)}%)<br>
-                📱 Tablet: <strong>${yesterday.deviceTablet}</strong> (${Math.round(yesterday.deviceTablet/devTotal*100)}%)
-              </p>
-            </td>
-            <td style="width:50%;padding-left:8px;vertical-align:top;">
-              <p style="margin:0 0 6px;font-size:13px;font-weight:700;color:#3D2B1F;">Quellen (Gestern)</p>
-              <p style="margin:0;font-size:12px;color:#555;line-height:1.8;">
-                ↪️ Direct: <strong>${yesterday.sourceDirect}</strong> (${Math.round(yesterday.sourceDirect/srcTotal*100)}%)<br>
-                🔗 Referral/Suche: <strong>${yesterday.sourceReferral}</strong> (${Math.round(yesterday.sourceReferral/srcTotal*100)}%)
-              </p>
-            </td>
-          </tr>
-        </table>
-
-        <div style="margin-top:24px;padding:14px 16px;background:#FAF7F0;border-left:3px solid #B5A184;border-radius:0 6px 6px 0;font-size:13px;color:#5C4A32;line-height:1.8;">
-          <strong>📊 Echte Leads im System (lifetime, ohne Tests):</strong> ${totalLeads}<br>
-          <strong>🎉 Gebuchte Kunden (lifetime, distinct):</strong> ${bookedCustomers} <span style="color:#9a8a73;font-weight:400;">(${totalBookings} Buchungs-Vorgänge total)</span>
-        </div>
-        ${notesHtml}
-      </div>
-
-      <div style="background:#f8f9fa;padding:18px 32px;border-top:1px solid #e0e0e0;text-align:center;">
-        <p style="margin:0;font-size:11px;color:#9a8a73;">
-          Automatischer Tagesreport · <a href="${siteUrl}/api/analytics/stats" style="color:#8B7355;text-decoration:none;">Live-Stats</a><br>
-          Berlin-Tagesgrenzen (00:00 – 23:59) · gesendet jeden Morgen
-        </p>
-      </div>
-
-    </div>
-  </div>
+<body style="margin:0;padding:0;background:${FARBE.grund};">
+  <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="background:${FARBE.grund};">
+    <tr><td align="center" style="padding:22px 12px 40px;">
+      <table width="600" cellpadding="0" cellspacing="0" role="presentation" style="width:600px;max-width:100%;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">
+        <tr><td style="padding:0 0 18px;">
+          <table width="100%" cellpadding="0" cellspacing="0" role="presentation"><tr>
+            <td><img src="${siteUrl}/images/Primundus-Logo_V6.png" alt="Primundus" width="120" style="width:120px;max-width:120px;height:auto;display:block;border:0;" /></td>
+            <td align="right" style="font-size:12px;color:${FARBE.leise};">Tagesbericht · ${yesterdayLabel}</td>
+          </tr></table>
+        </td></tr>
+        <tr><td>
+          ${mailAlarmHtml}
+          ${fazitHtml}
+          ${kachelnHtml}
+          ${chartLeads}
+          ${chartConv}
+          ${chartVarianten}
+          ${adsHtml}
+          ${notesHtml}
+          <p style="margin:20px 0 0;text-align:center;">
+            <a href="${siteUrl}/admin/leads" style="display:inline-block;background:${FARBE.balken};color:#fff;padding:11px 22px;text-decoration:none;border-radius:8px;font-size:13px;font-weight:600;">Leads im Admin öffnen</a>
+          </p>
+          <p style="margin:14px 0 0;text-align:center;font-size:11px;color:${FARBE.leise};line-height:1.6;">
+            ${totalLeads} Leads insgesamt · ${bookedCustomers} Kunden gebucht · ${totalBookings} Buchungen<br>
+            Testanfragen sind überall herausgefiltert.
+          </p>
+        </td></tr>
+      </table>
+    </td></tr>
+  </table>
 </body>
 </html>`;
 
-  const text = `Primundus Daily Report — ${yesterdayLabel}
-${verdict.emoji} ${verdict.wort} · Trend ${trend.pfeil} — ${trend.text}
-${fazitPunkte.join("\n")}
-(Vergleich: ${periodLabel} Ø + Top-Tag)
+  const text = `Primundus Daily — ${yesterdayLabel}
 
-${rows.map((r) => `${r.label.padEnd(50)} ${String(fmtInt(r.today)).padStart(6)}   Ø ${fmtAvg(r.avg).padStart(5)}   Top ${fmtInt(r.top).padStart(4)} (${r.topDate.slice(0, 5)})`).join("\n")}
+${verdict.emoji} ${verdict.wort} · Trend ${trend.pfeil} ${trend.text}
+${fazitPunkte.map((p) => "  " + p.replace(/<[^>]+>/g, "")).join("\n")}
 
-CONVERSION-RATEN
-${convRows.map((r) => `  ${r.label.padEnd(50)} ${r.today.padStart(6)}   Ø ${fmtPct(r.avg).padStart(6)}`).join("\n")}
+GESTERN
+  Besucher                 ${yesterday.visitors}
+  Leads                    ${leadsY}  (Ø ${zahl(leadsAvg, 1)})
+  Patientenprofile         ${yesterday.patientDataSaved}  (Ø ${zahl(period.patientDataSaved.avg, 1)})
+${adsSpend ? `  Ads-Kosten               ${euro(adsSpend.yesterday)}
+  je Lead                  ${perPiece(adsSpend.yesterday, leadsY)}
+  je Patientenprofil       ${perPiece(adsSpend.yesterday, yesterday.patientDataSaved)}` : ""}
 
-${adsSpend ? `GOOGLE ADS — KOSTEN (blended)
-${adsRows.map((r) => `  ${r.label.padEnd(30)} ${r.g.padStart(10)}   ${adsSpend.periodDays}T ${r.p.padStart(10)}`).join("\n")}
+LEADS JE TAG (mit Profil / gesamt)
+${leadKohorten.map((k) => `  ${k.label}  ${String(k.mitProfil).padStart(2)} / ${String(k.leads).padStart(2)}`).join("\n")}
 
-` : ""}WIZARD-FUNNEL (Gestern)
-${Array.from({ length: TOTAL_STEPS }, (_, i) => i + 1).map((s) => {
-  const v = yesterday.funnelStepViewed[s] ?? 0;
-  const next = s === TOTAL_STEPS
-    ? yesterday.wizardCompletedIncludingTests
-    : (yesterday.funnelStepViewed[s + 1] ?? 0);
-  const drop = v > 0 ? ` (drop ${((Math.max(0, v - next) / v) * 100).toFixed(0)}%)` : "";
-  return `  ${s}. ${STEP_NAMES[s].padEnd(34)} ${String(v).padStart(4)}${drop}`;
-}).join("\n")}
-  → Lead in DB (alle, inkl. Tests)        ${String(yesterday.wizardCompletedIncludingTests).padStart(4)}
-  → Echte Leads (ohne Tests)              ${String(yesterday.wizardCompleted).padStart(4)}
+CHAT-TEST (Leads / Besucher, ${periodLabel})
+${chatBesuch === 0 ? "  noch kein Besuch auf den Chat-Varianten" : varianten.map((v) => `  ${v.name.padEnd(32)} ${v.leads}/${v.besucher}  ${v.besucher > 0 ? zahl(v.quote, 1) + " %" : "—"}`).join("\n")}
 
-GERÄTE (Gestern)
-  Mobile:  ${yesterday.deviceMobile}
-  Desktop: ${yesterday.deviceDesktop}
-  Tablet:  ${yesterday.deviceTablet}
-
-QUELLEN (Gestern)
-  Direct:           ${yesterday.sourceDirect}
-  Referral/Suche:   ${yesterday.sourceReferral}
-
-Gesamt Leads im System:    ${totalLeads}
-Gebuchte Kunden (lifetime): ${bookedCustomers} (${totalBookings} Buchungs-Vorgänge)
-
-NOTIZEN DER AGENTEN
-${(agentNotes?.notes ?? []).length > 0 ? (agentNotes!.notes).map((x) => `  [${x.source}] ${x.note}`).join("\n") : "  (keine)"}${agentNotes?.error ? `\n  Notizen nicht lesbar: ${agentNotes.error}` : ""}
+${agentNotes?.notes?.length ? "NOTIZEN DER AGENTEN\n" + agentNotes.notes.map((n) => `  [${n.source}] ${n.note}`).join("\n") : ""}
+Admin: ${siteUrl}/admin/leads
 `;
 
   return { subject, html, text };
