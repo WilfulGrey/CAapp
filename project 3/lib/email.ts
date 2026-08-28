@@ -358,8 +358,13 @@ export function getEingangsbestaetigungEmailTemplate(
                   <tr>
                     <td style="padding: 8px 10px; background: #ffffff; text-align: center; vertical-align: top;">
                       <img src="${baseUrl}/images/primundus_testsieger-2021.webp" alt="Testsieger DIE WELT" width="64" style="display: block; width: 64px; height: auto; margin: 0 auto 5px auto;" />
-                      <p style="margin: 0 0 1px 0; font-size: 11px; font-weight: 700; color: #3D2B1F; white-space: nowrap; text-align: center;">Testsieger <span style="color: #B5A184;">DIE WELT</span></p>
-                      <p style="margin: 0 0 2px 0; font-size: 10px; font-weight: 700; color: #B5A184; white-space: nowrap; text-align: center;">6× in Folge</p>
+                      <!-- Siegel bewusst KOMPAKT: "6× Testsieger" statt "Testsieger" +
+                           eigener Zeile "6× in Folge". Der Block sitzt neben dem Logo in
+                           der Kopfzeile und hat wenig Platz — vier Zeilen wirkten
+                           gedraengt und liessen "Testsieger" ohne die Zahl stehen
+                           (Martin 28.08.2026). Im FLIESSTEXT, wo eine ganze Zeile zur
+                           Verfuegung steht, bleibt "6× in Folge" erwuenscht. -->
+                      <p style="margin: 0 0 1px 0; font-size: 11px; font-weight: 700; color: #3D2B1F; white-space: nowrap; text-align: center;">6× Testsieger <span style="color: #B5A184;">DIE WELT</span></p>
                       <p style="margin: 0; font-size: 10px; color: #888; line-height: 1.4; text-align: center;">Preis, Qualität &amp;<br>Kundenservice</p>
                     </td>
                   </tr>
@@ -685,8 +690,7 @@ export function getAngebotsEmailTemplate(
                   <tr>
                     <td style="padding: 8px 10px; background: #ffffff; text-align: center; vertical-align: top;">
                       <img src="${baseUrl}/images/primundus_testsieger-2021.webp" alt="Testsieger DIE WELT" width="64" style="display: block; width: 64px; height: auto; margin: 0 auto 5px auto;" />
-                      <p style="margin: 0 0 1px 0; font-size: 11px; font-weight: 700; color: #3D2B1F; white-space: nowrap; text-align: center;">Testsieger <span style="color: #B5A184;">DIE WELT</span></p>
-                      <p style="margin: 0 0 2px 0; font-size: 10px; font-weight: 700; color: #B5A184; white-space: nowrap; text-align: center;">6× in Folge</p>
+                      <p style="margin: 0 0 1px 0; font-size: 11px; font-weight: 700; color: #3D2B1F; white-space: nowrap; text-align: center;">6× Testsieger <span style="color: #B5A184;">DIE WELT</span></p>
                       <p style="margin: 0; font-size: 10px; color: #888; line-height: 1.4; text-align: center;">Preis, Qualität &amp;<br>Kundenservice</p>
                     </td>
                   </tr>
@@ -1328,8 +1332,7 @@ export function getVertragEmailTemplate(
                   <tr>
                     <td style="padding: 8px 10px; background: #ffffff; text-align: center; vertical-align: top;">
                       <img src="${baseUrl}/images/primundus_testsieger-2021.webp" alt="Testsieger DIE WELT" width="64" style="display: block; width: 64px; height: auto; margin: 0 auto 5px auto;" />
-                      <p style="margin: 0 0 1px 0; font-size: 11px; font-weight: 700; color: #3D2B1F; white-space: nowrap; text-align: center;">Testsieger <span style="color: #B5A184;">DIE WELT</span></p>
-                      <p style="margin: 0 0 2px 0; font-size: 10px; font-weight: 700; color: #B5A184; white-space: nowrap; text-align: center;">6× in Folge</p>
+                      <p style="margin: 0 0 1px 0; font-size: 11px; font-weight: 700; color: #3D2B1F; white-space: nowrap; text-align: center;">6× Testsieger <span style="color: #B5A184;">DIE WELT</span></p>
                       <p style="margin: 0; font-size: 10px; color: #888; line-height: 1.4; text-align: center;">Preis, Qualität &amp;<br>Kundenservice</p>
                     </td>
                   </tr>
@@ -1652,8 +1655,7 @@ function caregiverMartaSig(baseUrl: string): string {
                 <table cellpadding="0" cellspacing="0" role="presentation" style="border:1px solid #e8ddd0;border-radius:8px;overflow:hidden;margin-left:auto;">
                   <tr><td style="padding:8px 10px;background:#ffffff;text-align:center;vertical-align:top;">
                     <img src="${baseUrl}/images/primundus_testsieger-2021.webp" alt="Testsieger DIE WELT" width="64" style="display:block;width:64px;height:auto;margin:0 auto 5px;" />
-                    <p style="margin:0 0 1px;font-size:11px;font-weight:700;color:#3D2B1F;white-space:nowrap;">Testsieger <span style="color:#B5A184;">DIE WELT</span></p>
-                    <p style="margin:0 0 2px;font-size:10px;font-weight:700;color:#B5A184;white-space:nowrap;">6× in Folge</p>
+                    <p style="margin:0 0 1px;font-size:11px;font-weight:700;color:#3D2B1F;white-space:nowrap;">6× Testsieger <span style="color:#B5A184;">DIE WELT</span></p>
                     <p style="margin:0;font-size:10px;color:#888;line-height:1.4;">Preis, Qualität &amp;<br>Kundenservice</p>
                   </td></tr>
                 </table>
@@ -1719,9 +1721,8 @@ function caregiverMailShell(baseUrl: string, leadEmail: string, content: string,
                   <img src="${baseUrl}/images/primundus_testsieger-2021.webp" alt="Testsieger DIE WELT" width="36" style="display:block;width:36px;height:auto;" />
                 </td>
                 <td style="text-align:left;padding-left:8px;">
-                  <p style="margin:0 0 1px;font-size:10px;font-weight:700;color:#3D2B1F;white-space:nowrap;">Testsieger</p>
+                  <p style="margin:0 0 1px;font-size:10px;font-weight:700;color:#3D2B1F;white-space:nowrap;">6× Testsieger</p>
                   <p style="margin:0 0 1px;font-size:10px;color:#B5A184;white-space:nowrap;font-weight:600;">DIE WELT</p>
-                  <p style="margin:0 0 1px;font-size:9px;font-weight:700;color:#B5A184;white-space:nowrap;">6× in Folge</p>
                   <p style="margin:0;font-size:9px;color:#aaa;white-space:nowrap;">Preis &amp; Qualit&auml;t</p>
                 </td>
               </tr></table>
@@ -1960,8 +1961,7 @@ export function getPatientDataSavedEmailTemplate(
                 <table cellpadding="0" cellspacing="0" role="presentation" style="border:1px solid #e8ddd0;border-radius:8px;overflow:hidden;margin-left:auto;">
                   <tr><td style="padding:8px 10px;background:#ffffff;text-align:center;vertical-align:top;">
                     <img src="${baseUrl}/images/primundus_testsieger-2021.webp" alt="Testsieger DIE WELT" width="64" style="display:block;width:64px;height:auto;margin:0 auto 5px;" />
-                    <p style="margin:0 0 1px;font-size:11px;font-weight:700;color:#3D2B1F;white-space:nowrap;">Testsieger <span style="color:#B5A184;">DIE WELT</span></p>
-                    <p style="margin:0 0 2px;font-size:10px;font-weight:700;color:#B5A184;white-space:nowrap;">6× in Folge</p>
+                    <p style="margin:0 0 1px;font-size:11px;font-weight:700;color:#3D2B1F;white-space:nowrap;">6× Testsieger <span style="color:#B5A184;">DIE WELT</span></p>
                     <p style="margin:0;font-size:10px;color:#888;line-height:1.4;">Preis, Qualität &amp;<br>Kundenservice</p>
                   </td></tr>
                 </table>
@@ -2023,9 +2023,8 @@ export function getPatientDataSavedEmailTemplate(
                   <img src="${baseUrl}/images/primundus_testsieger-2021.webp" alt="Testsieger DIE WELT" width="36" style="display:block;width:36px;height:auto;" />
                 </td>
                 <td style="text-align:left;padding-left:8px;">
-                  <p style="margin:0 0 1px;font-size:10px;font-weight:700;color:#3D2B1F;white-space:nowrap;">Testsieger</p>
+                  <p style="margin:0 0 1px;font-size:10px;font-weight:700;color:#3D2B1F;white-space:nowrap;">6× Testsieger</p>
                   <p style="margin:0 0 1px;font-size:10px;color:#B5A184;white-space:nowrap;font-weight:600;">DIE WELT</p>
-                  <p style="margin:0 0 1px;font-size:9px;font-weight:700;color:#B5A184;white-space:nowrap;">6× in Folge</p>
                   <p style="margin:0;font-size:9px;color:#aaa;white-space:nowrap;">Preis &amp; Qualit&auml;t</p>
                 </td>
               </tr></table>
@@ -2827,9 +2826,8 @@ export function getBewertungsanfrageTemplate(
                    style="display:block;width:36px;height:auto;" />
             </td>
             <td style="text-align:left;padding-left:8px;">
-              <p style="margin:0 0 1px 0;font-size:10px;font-weight:700;color:#3D2B1F;white-space:nowrap;">Testsieger</p>
+              <p style="margin:0 0 1px 0;font-size:10px;font-weight:700;color:#3D2B1F;white-space:nowrap;">6× Testsieger</p>
               <p style="margin:0 0 1px 0;font-size:10px;color:#B5A184;white-space:nowrap;font-weight:600;">DIE WELT</p>
-              <p style="margin:0 0 1px;font-size:9px;font-weight:700;color:#B5A184;white-space:nowrap;">6× in Folge</p>
               <p style="margin:0;font-size:9px;color:#aaa;white-space:nowrap;">Preis &amp; Qualit&auml;t</p>
             </td>
           </tr></table>
