@@ -66,6 +66,16 @@ const AD_PARAM_KEYS = ['gclid', 'wbraid', 'gbraid', 'utm_term', 'utm_content'] a
 type AdParams = Partial<Record<(typeof AD_PARAM_KEYS)[number], string>>;
 const AD_PARAMS_KEY = '_prim_ad_params';
 
+/** Pfad der ausgelieferten Test-Variante (siehe middleware.ts). */
+export function variantenSeite(): string {
+  if (typeof document === 'undefined') return '/';
+  const echt = window.location.pathname;
+  // Nur auf der Startseite greift die Weiche — Unterseiten bleiben sie selbst.
+  if (echt !== '/') return echt;
+  const v = /(?:^|;\s*)pm_variante=([ABC])(?:;|$)/.exec(document.cookie || '');
+  return v ? ({ A: '/', B: '/kosten-berechnen', C: '/sofortangebot' } as Record<string, string>)[v[1]] : echt;
+}
+
 export interface CriticalSubmitInput {
   step: number;
   stepName: string;
@@ -200,7 +210,14 @@ class Analytics {
       fingerprint: this.fingerprint!,
       userAgent: ua,
       referrer: document.referrer || 'direct',
-      landingPage: window.location.pathname,
+      /* Welche Variante der Besucher gesehen hat — NICHT die Adresse.
+         Die Weiche in middleware.ts liefert A/B/C alle unter „/" aus
+         (Rewrite, damit Google dieselbe Landingpage sieht wie in der
+         Anzeige). window.location.pathname wäre deshalb für alle drei „/"
+         und der Test nicht auswertbar. Das Cookie `pm_variante` trägt die
+         Wahrheit; ohne Cookie (Direktaufruf einer Unterseite) bleibt es
+         beim echten Pfad. */
+      landingPage: variantenSeite(),
       utmSource: urlParams.get('utm_source') || undefined,
       utmMedium: urlParams.get('utm_medium') || undefined,
       utmCampaign: urlParams.get('utm_campaign') || undefined,

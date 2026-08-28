@@ -20,6 +20,38 @@ function istAngemeldet(request: NextRequest): boolean {
   return request.cookies.get('admin_auth')?.value === ADMIN_PASSWORD;
 }
 
+/* ── Der Dreier-Split auf der Startseite ────────────────────────────────
+ *
+ * Warum hier und nicht als drei Ads-Kampagnen (SEA-Session, 28.08.):
+ * Drei Kampagnen auf DIESELBEN Keywords konkurrieren im eigenen Konto —
+ * Google lässt pro Suchanfrage nur EINE Anzeige zu und wählt nach
+ * Anzeigenrang. Die Zuteilung folgte damit genau der Größe, die wir messen
+ * wollten (zirkulär): 65 von 89 Keywords lagen doppelt, die Kosten-Kampagne
+ * fiel von 198 auf 12 Impressionen/Tag. Deshalb EINE Kampagne auf „/" und
+ * die Drittelung hier, per Zufall.
+ *
+ * Serverseitig, vor dem ersten Rendern: Würde erst A erscheinen und dann
+ * auf C umspringen, wäre der Test verdorben und die Absprungrate künstlich
+ * hoch. Rewrite statt Redirect — die Adresse bleibt „/", damit Google
+ * dieselbe Landingpage sieht wie in der Anzeige.
+ */
+const VARIANTEN = ['A', 'B', 'C'] as const;
+type Variante = (typeof VARIANTEN)[number];
+/** Welche Route jede Variante ausliefert (die Adresse bleibt „/"). */
+const VARIANTEN_ZIEL: Record<Variante, string> = {
+  A: '/',                  // Startseite wie bisher, ohne Pria (Kontrolle)
+  B: '/kosten-berechnen',  // dieselbe Seite + Pria als schwebender Knopf
+  C: '/sofortangebot',     // Pria als ganze Seite
+};
+/* Crawler bekommen IMMER A. Sonst sähe Google unter derselben Adresse
+   wechselnde Inhalte — das ist Cloaking, und ein indexierter Voll-Chat
+   statt der Startseite wäre ein SEO-Schaden, den kein Test wert ist. */
+const BOT = /bot|crawl|spider|slurp|bingpreview|facebookexternalhit|embedly|quora link preview|showyoubot|outbrain|pinterest|whatsapp|flipboard|tumblr|bitlybot|skypeuripreview|nuzzel|discord|google-inspectiontool|lighthouse|chrome-lighthouse|gtmetrix|pagespeed|ahrefs|semrush|mj12|dotbot|petalbot|applebot|duckduckbot|yandex|baidu|sogou|exabot|ia_archiver|headlesschrome/i;
+
+function würfeln(): Variante {
+  return VARIANTEN[Math.floor(Math.random() * VARIANTEN.length)];
+}
+
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
@@ -56,10 +88,48 @@ export function middleware(request: NextRequest) {
     }
   }
 
+  /* ── Startseite: A/B/C zu je einem Drittel ──────────────────────── */
+  if (pathname === '/') {
+    const ua = request.headers.get('user-agent') || '';
+    if (BOT.test(ua)) return NextResponse.next();          // Crawler → immer A
+
+    const vorhanden = request.cookies.get('pm_variante')?.value;
+    const variante: Variante = (VARIANTEN as readonly string[]).includes(vorhanden || '')
+      ? (vorhanden as Variante)
+      : würfeln();
+
+    const ziel = VARIANTEN_ZIEL[variante];
+    /* Der Header sagt der Zielseite, dass sie gerade als „/" ausgeliefert
+       wird. Wichtig fürs SEO: /kosten-berechnen und /sofortangebot tragen
+       für sich genommen `noindex` (sie sollen nicht doppelt im Index
+       stehen) — unter „/" darf dieses noindex NICHT mitkommen, sonst
+       verschwindet die wichtigste Seite aus Google, falls ein Crawler
+       durch die Bot-Erkennung rutscht. */
+    const kopf = new Headers(request.headers);
+    kopf.set('x-pm-variante', variante);
+    const antwort = ziel === '/'
+      ? NextResponse.next({ request: { headers: kopf } })
+      : NextResponse.rewrite(new URL(ziel, request.url), { request: { headers: kopf } });
+
+    /* Wiedererkennung: Derselbe Besucher muss beim Wiederkommen dieselbe
+       Variante sehen — sonst stimmt die Zuordnung im Lead nicht mehr
+       (er startet in C und schickt das Formular in A ab). 90 Tage, weil
+       Google Klicks so lange einer Anzeige zurechnet. */
+    if (vorhanden !== variante) {
+      antwort.cookies.set('pm_variante', variante, {
+        maxAge: 60 * 60 * 24 * 90,
+        path: '/',
+        sameSite: 'lax',
+      });
+    }
+    return antwort;
+  }
+
   return NextResponse.next();
 }
 
 export const config = {
   // /_next/image wymaga JAWNEGO wpisu (Next domyślnie omija _next w matcherach).
-  matcher: ['/admin/:path*', '/api/admin/:path*', '/_next/image'],
+  // '/' → die Varianten-Weiche (A/B/C, siehe oben).
+  matcher: ['/', '/admin/:path*', '/api/admin/:path*', '/_next/image'],
 };

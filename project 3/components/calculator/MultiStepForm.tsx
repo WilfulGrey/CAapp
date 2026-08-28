@@ -4,7 +4,7 @@ import { useState, useEffect, useRef, useMemo } from "react";
 import { useCalculator, formatEuro } from "@/lib/calculator-context";
 import { CircleCheck as CheckCircle2, Phone } from "lucide-react";
 import Image from "next/image";
-import { analytics } from "@/lib/analytics";
+import { analytics, variantenSeite } from "@/lib/analytics";
 import { cookieConsent } from "@/lib/cookie-consent";
 import { scrollToCalculator, isCalculatorAligned, OPEN_CALCULATOR_EVENT } from "@/lib/scroll-to-calculator";
 import { useFormTracking } from "@/hooks/use-form-tracking";
@@ -637,13 +637,13 @@ export function MultiStepForm({ mode = 'inline' }: MultiStepFormProps = {}) {
           telefon: formData.phone,
           careStartTiming: state.careStartTiming,
           adParams: analytics.getAdParams(),
-          // Von welcher Seite kam die Anfrage (Martin, 27.08.): „/" ist die
-          // normale Startseite, „/kosten-berechnen" die Test-Variante mit
-          // schwebender Beraterin. Landet in leads.source.
-          quelle:
-            typeof window !== 'undefined' && window.location.pathname !== '/'
-              ? `rechner:${window.location.pathname.replace(/^\//, '')}`
-              : 'rechner',
+          // Von welcher Seite kam die Anfrage (Martin, 27.08.). Die
+          // Varianten-Weiche liefert alle drei unter „/" aus, deshalb zählt
+          // die Variante aus dem Cookie — nicht der Pfad (analytics.ts).
+          quelle: (() => {
+            const seite = variantenSeite();
+            return seite === '/' ? 'rechner' : `rechner:${seite.replace(/^\//, '')}`;
+          })(),
           kalkulation: {
             ...kalkulation,
             formularDaten,
