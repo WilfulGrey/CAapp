@@ -744,10 +744,13 @@ function beraterChips(){
   }
   const offen=SCHNELLFRAGEN
     .filter(q=>{const e=suche(q);return !e||!beantwortet.has(e);})
-    /* Voll-Chat: „Was kostet das?" doppelt den Preis-Knopf direkt darüber,
-       und fünf Karten sprengten den iPhone-Schirm (Martin, 27.08.) —
-       dort zwei Wissensfragen statt drei. */
-    .filter(q=>!VOLL || !/was kostet/i.test(q))
+    /* „Was kostet das?" steht direkt über dem Knopf „Preis berechnen" —
+       dieselbe Absicht, zweimal angeboten. Das gilt in JEDEM Modus, nicht
+       nur im Voll-Chat (Martin, 27.08.: „ich dachte das ist der gleiche
+       Code" — war es, aber ich hatte den Filter an den Modus gehängt).
+       Die ANZAHL bleibt modusabhängig: im Voll-Chat stehen die Antworten
+       als Karten untereinander, dort sprengen drei den iPhone-Schirm. */
+    .filter(q=>!/was kostet/i.test(q))
     .slice(0, VOLL?2:3)
     .map(q=>({t:q,f:b=>frage(q,b)}));
   /* Die zwei Wege zuerst, die Wissensfragen danach (Martin, 22.08.).
