@@ -229,6 +229,44 @@ export function buildReportEmail(opts: {
       </td>
     </tr>`).join("");
 
+  /* Über welche SEITE kam der Lead (leads.source)? Andere Frage als der CTA
+     oben: dort geht es um den Knopf, hier um Formular vs. Voll-Chat. Zeigt den
+     Landingpage-Test im Alltag — ohne dass jemand eine Auswertung anstoßen
+     muss. Leads von vor dem 27.08.2026 tragen alle 'rechner' (die Quelle wurde
+     bis dahin hart gesetzt), der 7-Tage-Wert ist also erst ab dem 03.09.
+     vollständig aussagekräftig. */
+  const QUELL_NAMEN: Record<string, string> = {
+    rechner: "Kostenrechner — Formular",
+    "kostenrechner-result": "Kostenrechner — Formular",
+    "pria-chat": "Chat mit Pria — /sofortangebot",
+    unbekannt: "ohne Kennung",
+  };
+  const quellGestern = yesterday.leadsBySource ?? {};
+  const quellPeriode = period.leadsBySource ?? {};
+  const quellKeys = Array.from(new Set([...Object.keys(quellGestern), ...Object.keys(quellPeriode)]))
+    .sort((a, b) => (quellPeriode[b] ?? 0) - (quellPeriode[a] ?? 0));
+  const quellGesternGesamt = Object.values(quellGestern).reduce((s, n) => s + n, 0);
+  const quellPeriodeGesamt = Object.values(quellPeriode).reduce((s, n) => s + n, 0);
+  const quellHtml = quellKeys.map((quelle, idx) => {
+    const g = quellGestern[quelle] ?? 0;
+    const w = quellPeriode[quelle] ?? 0;
+    return `
+    <tr style="background:${idx % 2 ? "#fdfbf7" : "#fff"};">
+      <td style="padding:7px 12px;font-size:12px;color:#3D2B1F;border-bottom:1px solid #f0e8dc;">
+        ${QUELL_NAMEN[quelle] ?? quelle}
+      </td>
+      <td align="right" style="padding:7px 12px;font-size:12px;font-weight:700;color:#3D2B1F;border-bottom:1px solid #f0e8dc;">
+        ${g}
+      </td>
+      <td align="right" style="padding:7px 12px;font-size:12px;color:#5C4A32;border-bottom:1px solid #f0e8dc;">
+        ${w}
+      </td>
+      <td align="right" style="padding:7px 12px;font-size:11px;color:#9a8a73;border-bottom:1px solid #f0e8dc;">
+        ${quellPeriodeGesamt ? Math.round((w / quellPeriodeGesamt) * 100) : 0}&thinsp;%
+      </td>
+    </tr>`;
+  }).join("");
+
   const funnelHtml = Array.from({ length: TOTAL_STEPS }, (_, i) => i + 1).map((step) => {
     const viewed = yesterday.funnelStepViewed[step] ?? 0;
     const isLastStep = step === TOTAL_STEPS;
@@ -361,6 +399,24 @@ ${mailAlarmHtml}
           Unique Sessions je Knopf (Quelle: <code>analytics_events.wizard_opened.source</code>).
           Davon vom Apex: <strong>${vomApex}</strong> von ${ctaGesamt} — der Rest sind CTAs auf der Rechner-Seite selbst.
           Wer zweimal öffnet, zählt einmal.
+        </p>` : ""}
+
+        ${quellKeys.length ? `
+        <p style="margin:24px 0 8px;font-size:14px;font-weight:700;color:#3D2B1F;">Über welche Seite kam der Lead?</p>
+        <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="border:1px solid #e8ddd0;border-radius:8px;overflow:hidden;background:#fff;">
+          <thead><tr style="background:#f7f2ea;">
+            <th align="left" style="padding:7px 12px;font-size:11px;color:#5C4A32;font-weight:600;">Seite</th>
+            <th align="right" style="padding:7px 12px;font-size:11px;color:#5C4A32;font-weight:600;">Gestern</th>
+            <th align="right" style="padding:7px 12px;font-size:11px;color:#5C4A32;font-weight:600;">7 Tage</th>
+            <th align="right" style="padding:7px 12px;font-size:11px;color:#5C4A32;font-weight:600;">Anteil</th>
+          </tr></thead>
+          <tbody>${quellHtml}</tbody>
+        </table>
+        <p style="margin:6px 0 0;font-size:11px;color:#9a8a73;line-height:1.5;">
+          Echte Leads je Herkunfts-Seite (Quelle: <code>leads.source</code>), Tests herausgefiltert.
+          Gestern insgesamt <strong>${quellGesternGesamt}</strong>, über sieben Tage ${quellPeriodeGesamt}.
+          Die Kennung wird seit dem 27.08.2026 gesetzt — ältere Leads tragen alle
+          &bdquo;Formular&ldquo;, der 7-Tage-Wert ist deshalb erst ab dem 03.09. vollständig.
         </p>` : ""}
 
         <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="margin-top:24px;">
