@@ -36,7 +36,13 @@ export function TestsiegerSection() {
                 eigene Aussage — deshalb ohne Anführungszeichen/Kursiv. */}
             <div className="flex-1">
               <h3 className="text-[22px] font-bold text-[#3D3D3D] mb-2">
-                Testsieger bei DIE WELT – 6× in Folge
+                {/* Nur "6× Testsieger": die Pille ueber dem Kasten
+                traegt bereits "Testsieger · 6× in Folge", und die
+                Zeile darunter nennt DIE WELT und ServiceValue.
+                Dreimal dasselbe untereinander liest sich wie ein
+                Aufkleber (Martin 28.08.2026: "im Kasten mach
+                6x Testsieger, damit sich das nicht doppelt"). */}
+                6× Testsieger
               </h3>
 
               <p className="text-[16px] text-[#8A8279] mb-4">

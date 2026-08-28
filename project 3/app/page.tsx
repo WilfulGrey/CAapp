@@ -138,7 +138,13 @@ export default function HomePage() {
                 {/* Auf dem Desktop groesser (Martin 16.08.): 14px standen
                     dort unter einer 44px-H1 wie eine Fussnote. */}
                 <span className="mb-2.5 block text-[14px] font-semibold uppercase tracking-[0.07em] text-[#E76F63] lg:mb-3 lg:text-[18px] lg:tracking-[0.06em]">
-                  24-Stunden-Pflege vom Testsieger – 6× in Folge
+                  {/* KEINE Zahl im Hero (Martin 28.08.2026: "hier im Hero
+                      nie diese 6x schreiben"). "– 6× in Folge" brach die
+                      Zeile auf dem Desktop um und drueckte "IN FOLGE" allein
+                      in Zeile zwei. Der Vertrauensanker sitzt ohnehin im
+                      Siegel auf dem Foto daneben; die Zahl gehoert dorthin,
+                      wo sie ein Argument stuetzt, nicht in die Ueberschrift. */}
+                  24-Stunden-Pflege vom Testsieger
                 </span>
                 <span className="block text-[33px] font-bold leading-[1.1] sm:text-[40px] lg:text-[44px] xl:text-[50px]">
                   Ihre Eltern müssen nicht ins Heim.
@@ -279,7 +285,13 @@ export default function HomePage() {
                     2026-08-14 abgestimmt) — Eigenaussage statt Zitat. */}
                 <div className="flex-1">
                   <h3 className="text-[22px] font-bold text-[#3D3D3D] mb-2">
-                    Testsieger bei DIE WELT – 6× in Folge
+                    {/* Nur "6× Testsieger": die Pille ueber dem Kasten
+                    traegt bereits "Testsieger · 6× in Folge", und die
+                    Zeile darunter nennt DIE WELT und ServiceValue.
+                    Dreimal dasselbe untereinander liest sich wie ein
+                    Aufkleber (Martin 28.08.2026: "im Kasten mach
+                    6x Testsieger, damit sich das nicht doppelt"). */}
+                    6× Testsieger
                   </h3>
 
                   <p className="text-[14px] text-[#8A8279] mb-4">
