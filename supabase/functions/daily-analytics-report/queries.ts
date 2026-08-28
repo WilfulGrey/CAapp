@@ -53,6 +53,8 @@ export interface DailyStats {
    *  Quelle bis dahin hart gesetzt wurde — ältere Zeiträume zeigen deshalb
    *  keinen echten Split. */
   leadsBySource: Record<string, number>;
+  /** Besucher je Landingpage — trennt die Test-Varianten (siehe oben). */
+  besucherJeSeite: Record<string, number>;
 }
 
 /**
@@ -115,7 +117,7 @@ export async function fetchDailyStats(
   // 1) Sessions (Besucher) + Devices + Quellen
   const { data: sessions, error: sErr } = await supabase
     .from("analytics_sessions")
-    .select("id, device_type, referrer")
+    .select("id, device_type, referrer, landing_page")
     .gte("started_at", start)
     .lt("started_at", end);
   if (sErr) throw new Error(`analytics_sessions: ${sErr.message}`);
@@ -123,6 +125,12 @@ export async function fetchDailyStats(
   const visitors = sessions?.length ?? 0;
   let deviceMobile = 0, deviceDesktop = 0, deviceTablet = 0;
   let sourceDirect = 0, sourceReferral = 0;
+  /* Besucher je Landingpage — die drei Test-Varianten (Martin, 27.08.):
+     "/" = Formular ohne Chat, "/kosten-berechnen" = Formular + Pria-Float,
+     "/sofortangebot" = Voll-Chat. Ohne diese Zeile sieht der Report zwar
+     die Leads je Variante, aber nicht, wie viele Besucher dafür nötig
+     waren — und genau das ist der Vergleich. */
+  const besucherJeSeite: Record<string, number> = {};
   for (const s of sessions ?? []) {
     const dev = (s as any).device_type;
     if (dev === "mobile") deviceMobile++;
@@ -131,6 +139,8 @@ export async function fetchDailyStats(
     const ref = (s as any).referrer;
     if (!ref || ref === "") sourceDirect++;
     else sourceReferral++;
+    const seite = String((s as any).landing_page ?? "").trim() || "/";
+    besucherJeSeite[seite] = (besucherJeSeite[seite] ?? 0) + 1;
   }
 
   // 2) Wizard-Events (step_view) für den Funnel + Wizard-Started
@@ -240,6 +250,7 @@ export async function fetchDailyStats(
     funnelStepViewed,
     wizardOpenedBySource,
     leadsBySource,
+    besucherJeSeite,
   };
 }
 
@@ -275,6 +286,7 @@ export interface PeriodStats {
   convBookingApp: number;
   /** Echte Leads je Herkunfts-Seite, aufsummiert über den Zeitraum. */
   leadsBySource: Record<string, number>;         // bookings / applicationReceived
+  besucherJeSeite: Record<string, number>;       // Besucher je Landingpage (Test-Varianten)
   // Tageskennzahl der einzelnen 7 Tage — für Mini-Sparkline/Debug.
   days: { label: string; stats: DailyStats }[];
 }
@@ -320,9 +332,13 @@ export async function fetchPeriodStats(
   const bookingsSum = sumOf((s) => s.bookings);
 
   const leadsBySourceSum: Record<string, number> = {};
+  const besucherJeSeiteSum: Record<string, number> = {};
   for (const d of perDay) {
     for (const [quelle, n] of Object.entries(d.stats.leadsBySource ?? {})) {
       leadsBySourceSum[quelle] = (leadsBySourceSum[quelle] ?? 0) + n;
+    }
+    for (const [seite, n] of Object.entries(d.stats.besucherJeSeite ?? {})) {
+      besucherJeSeiteSum[seite] = (besucherJeSeiteSum[seite] ?? 0) + n;
     }
   }
 
@@ -342,6 +358,7 @@ export async function fetchPeriodStats(
     convAppInvite: rate(applicationReceivedSum, caregiverInvitedSum),
     convBookingApp: rate(bookingsSum, applicationReceivedSum),
     leadsBySource: leadsBySourceSum,
+    besucherJeSeite: besucherJeSeiteSum,
     days: perDay,
   };
 }
