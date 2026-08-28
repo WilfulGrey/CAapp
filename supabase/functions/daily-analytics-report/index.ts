@@ -21,6 +21,7 @@ import {
   fetchAgentNotes,
   fetchBookedCustomers,
   fetchDailyStats,
+  fetchLeadCohorts,
   fetchAdsSpend,
   fetchPeriodStats,
   fetchTotalLeads, fetchMailHealth } from "./queries.ts";
@@ -129,7 +130,8 @@ Deno.serve(async (req: Request) => {
   try {
     const yesterday = berlinDayRange(daysAgo);
 
-    const [yesterdayStats, periodStats, prevPeriodStats, totalLeads, booked, mailHealth, agentNotes, adsSpend] = await Promise.all([
+    const CHART_DAYS_BACK = 14;
+    const [yesterdayStats, periodStats, prevPeriodStats, totalLeads, booked, mailHealth, agentNotes, adsSpend, leadKohorten] = await Promise.all([
       fetchDailyStats(supabase, yesterday.start, yesterday.end),
       fetchPeriodStats(supabase, PERIOD_DAYS_BACK),
       // Die 7 Tage VOR der Vergleichsperiode — Basis für den Trend-Pfeil.
@@ -140,12 +142,19 @@ Deno.serve(async (req: Request) => {
       fetchAgentNotes(supabase, yesterday.start),
       // Ads-Kosten (fail-soft: null → Block entfällt, Mail geht trotzdem raus)
       fetchAdsSpend(supabase, PERIOD_DAYS_BACK, daysAgo),
+      /* Kohorten fürs gestapelte Balkendiagramm. Fail-soft: der Report darf
+         nicht ausfallen, weil ein Diagramm keine Daten bekommt. */
+      fetchLeadCohorts(supabase, CHART_DAYS_BACK).catch((e) => {
+        console.error("Lead-Kohorten nicht lesbar:", e instanceof Error ? e.message : String(e));
+        return [];
+      }),
     ]);
 
     const smtp = await getSmtpConfig(supabase);
     const recipients = parseRecipients(Deno.env.get("DAILY_REPORT_RECIPIENTS"));
 
     const { subject, html, text } = buildReportEmail({
+      leadKohorten,
       yesterday: yesterdayStats,
       period: periodStats,
       yesterdayLabel: yesterday.label,
