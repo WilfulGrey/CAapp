@@ -46,6 +46,13 @@ export interface DailyStats {
   /** Sessions je CTA, die den Wizard geöffnet haben (wizard_opened.source).
    *  Die Kennung wurde seit dem 18.08. aufgezeichnet, aber nirgends gezeigt. */
   wizardOpenedBySource: Record<string, number>;
+  /** Echte Leads je Herkunfts-SEITE (`leads.source`): 'rechner' = Formular
+   *  auf dem Kostenrechner, 'pria-chat' = Voll-Chat auf /sofortangebot.
+   *  Andere Dimension als wizardOpenedBySource (das ist der KNOPF, dies ist
+   *  die SEITE). Leads vor dem 27.08.2026 tragen alle 'rechner', weil die
+   *  Quelle bis dahin hart gesetzt wurde — ältere Zeiträume zeigen deshalb
+   *  keinen echten Split. */
+  leadsBySource: Record<string, number>;
 }
 
 /**
@@ -178,12 +185,20 @@ export async function fetchDailyStats(
   // echten Conversion-Zahlen nicht verfälscht.
   const { data: leadsInPeriod, error: lErr } = await supabase
     .from("leads")
-    .select("id, email, vorname, nachname")
+    .select("id, email, vorname, nachname, source")
     .gte("created_at", start)
     .lt("created_at", end);
   if (lErr) throw new Error(`leads: ${lErr.message}`);
   const wizardCompletedIncludingTests = leadsInPeriod?.length ?? 0;
-  const wizardCompleted = (leadsInPeriod ?? []).filter(isRealLead).length;
+  const echteLeads = (leadsInPeriod ?? []).filter(isRealLead);
+  const wizardCompleted = echteLeads.length;
+
+  // Herkunft NUR aus echten Leads — sonst färben Test-Anfragen den Split.
+  const leadsBySource: Record<string, number> = {};
+  for (const l of echteLeads) {
+    const quelle = String((l as any).source ?? "").trim() || "unbekannt";
+    leadsBySource[quelle] = (leadsBySource[quelle] ?? 0) + 1;
+  }
 
   // 4) Lead-Events pro Typ
   const { data: leadEvents, error: leErr } = await supabase
@@ -224,6 +239,7 @@ export async function fetchDailyStats(
     sourceReferral,
     funnelStepViewed,
     wizardOpenedBySource,
+    leadsBySource,
   };
 }
 
@@ -256,7 +272,9 @@ export interface PeriodStats {
   convProfilLead: number;         // patientDataSaved / wizardCompleted
   convInviteProfil: number;       // caregiverInvited / patientDataSaved
   convAppInvite: number;          // applicationReceived / caregiverInvited
-  convBookingApp: number;         // bookings / applicationReceived
+  convBookingApp: number;
+  /** Echte Leads je Herkunfts-Seite, aufsummiert über den Zeitraum. */
+  leadsBySource: Record<string, number>;         // bookings / applicationReceived
   // Tageskennzahl der einzelnen 7 Tage — für Mini-Sparkline/Debug.
   days: { label: string; stats: DailyStats }[];
 }
@@ -301,6 +319,13 @@ export async function fetchPeriodStats(
   const applicationReceivedSum = sumOf((s) => s.applicationReceived);
   const bookingsSum = sumOf((s) => s.bookings);
 
+  const leadsBySourceSum: Record<string, number> = {};
+  for (const d of perDay) {
+    for (const [quelle, n] of Object.entries(d.stats.leadsBySource ?? {})) {
+      leadsBySourceSum[quelle] = (leadsBySourceSum[quelle] ?? 0) + n;
+    }
+  }
+
   return {
     sums: { wizardCompleted: wizardCompletedSum, patientDataSaved: patientDataSavedSum },
     visitors: aggregate((s) => s.visitors),
@@ -316,6 +341,7 @@ export async function fetchPeriodStats(
     convInviteProfil: rate(caregiverInvitedSum, patientDataSavedSum),
     convAppInvite: rate(applicationReceivedSum, caregiverInvitedSum),
     convBookingApp: rate(bookingsSum, applicationReceivedSum),
+    leadsBySource: leadsBySourceSum,
     days: perDay,
   };
 }

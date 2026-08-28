@@ -216,6 +216,12 @@ Content-Type: application/json
      fallback na `lead.source`, więc maile o późniejszych statusach też
      pokazują pochodzenie). Powód: podczas testu landing page zespół musi
      widzieć w mailu, czy klient wypełnił formularz, czy rozmawiał z Prią.
+   Ten sam `source` napędza blok *Über welche Seite kam der Lead?* w porannym
+   raporcie (`supabase/functions/daily-analytics-report`, pole `leadsBySource`):
+   wiersz na źródło z wartościami wczoraj / 7 dni / udział; blok znika, gdy w
+   okresie nie ma leadów. To INNY wymiar niż `wizardOpenedBySource` w tym samym
+   raporcie: tamto to PRZYCISK otwierający wizard, to jest STRONA, z której
+   przyszło zapytanie.
 5. Build `portalUrl = ${NEXT_PUBLIC_PORTAL_URL}/?token=<lead.token>`
 
 ### Response
