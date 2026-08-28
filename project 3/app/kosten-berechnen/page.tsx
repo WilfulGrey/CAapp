@@ -28,14 +28,20 @@ const ERLAUBTE_HOSTS = new Set([
   '127.0.0.1',
 ]);
 
-export const metadata: Metadata = {
-  title: 'PRIMUNDUS - 24-Stunden-Pflege Kostenrechner',
-  description:
-    'Berechnen Sie in nur 2 Minuten die Kosten für 24-Stunden-Pflege. Vom 6× Testsieger mit Preisgarantie.',
-  // Test-Variante: gehört nie in den Index (sonst doppelter Inhalt zu „/").
-  robots: { index: false, follow: false },
-  alternates: { canonical: '/' },
-};
+/* Als „/" ausgeliefert (Varianten-Weiche in middleware.ts) verhält sich
+   die Seite wie die Startseite: indexierbar, canonical „/". Direkt
+   aufgerufen bleibt sie `noindex` — sonst stünde derselbe Inhalt doppelt
+   im Index. Deshalb generateMetadata statt statischer metadata. */
+export async function generateMetadata(): Promise<Metadata> {
+  const alsStartseite = headers().get('x-pm-variante') !== null;
+  return {
+    title: 'PRIMUNDUS - 24-Stunden-Pflege Kostenrechner',
+    description:
+      'Berechnen Sie in nur 2 Minuten die Kosten für 24-Stunden-Pflege. Vom 6× Testsieger mit Preisgarantie.',
+    robots: alsStartseite ? { index: true, follow: true } : { index: false, follow: false },
+    alternates: { canonical: '/' },
+  };
+}
 
 export const dynamic = 'force-dynamic';
 

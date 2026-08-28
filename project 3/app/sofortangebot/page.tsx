@@ -35,15 +35,20 @@ const ERLAUBTE_HOSTS = new Set([
   '127.0.0.1',
 ]);
 
-export const metadata: Metadata = {
-  title: 'Ihr Sofortangebot im Chat — PRIMUNDUS 24-Stunden-Pflege',
-  description:
-    'Im Chat zum Sofortpreis: acht kurze Fragen, dann sehen Sie Ihren Monatspreis und passende Pflegekräfte — vom Testsieger, 6× in Folge.',
-  // Testvariante: nie in den Index, auch nicht nach dem Prod-Schalter —
-  // die Seite existiert nur für die Kampagne (noindex laut Vertrag).
-  robots: { index: false, follow: false },
-  alternates: { canonical: '/sofortangebot' },
-};
+/* Als „/" ausgeliefert (Varianten-Weiche in middleware.ts) verhält sich
+   die Seite wie die Startseite: indexierbar, canonical „/". Direkt
+   aufgerufen bleibt sie `noindex` — sonst stünde derselbe Inhalt doppelt
+   im Index. Deshalb generateMetadata statt statischer metadata. */
+export async function generateMetadata(): Promise<Metadata> {
+  const alsStartseite = headers().get('x-pm-variante') !== null;
+  return {
+    title: 'Ihr Sofortangebot im Chat — PRIMUNDUS 24-Stunden-Pflege',
+    description:
+      'Im Chat zum Sofortpreis: acht kurze Fragen, dann sehen Sie Ihren Monatspreis und passende Pflegekräfte — vom Testsieger, 6× in Folge.',
+    robots: alsStartseite ? { index: true, follow: true } : { index: false, follow: false },
+    alternates: { canonical: '/' },
+  };
+}
 
 // headers() macht die Route ohnehin dynamisch; explizit, damit niemand
 // später über einen Static-Export-Fehler stolpert.

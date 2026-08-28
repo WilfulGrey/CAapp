@@ -551,6 +551,15 @@ const ruhig=matchMedia('(prefers-reduced-motion: reduce)').matches;
    bevor dieses Skript läuft. Dann ist der Chat die Seite — sofort offen,
    ohne Blase, Pille und ✕ (Panel-Lage: .panel.voll im Stylesheet). */
 const VOLL=document.documentElement.hasAttribute('data-pria-voll');
+/* Welche Test-Variante der Besucher sieht. Die Weiche (middleware.ts)
+   liefert A/B/C alle unter „/" aus — der Pfad allein sagt also nichts.
+   Dasselbe Vorgehen wie in lib/analytics.ts. */
+function variantenSeite(){
+  const echt=location.pathname||'/';
+  if(echt!=='/') return echt;
+  const v=/(?:^|;\s*)pm_variante=([ABC])(?:;|$)/.exec(document.cookie||'');
+  return v ? ({A:'/',B:'/kosten-berechnen',C:'/sofortangebot'})[v[1]] : echt;
+}
 
 const thread=document.getElementById('thread'),chips=document.getElementById('chips'),prog=document.getElementById('prog');
 const pause=ms=>new Promise(r=>setTimeout(r,ms));
@@ -1579,7 +1588,7 @@ function kontakt(){
           // Von welcher Seite kam die Anfrage (Martin, 27.08.): der Chat läuft
           // als Voll-Seite auf /sofortangebot und als schwebende Beraterin auf
           // /kosten-berechnen — im Lead soll man das unterscheiden können.
-          herkunft:(location.pathname||'/')})});
+          herkunft:variantenSeite()})});
       const d=await res.json().catch(()=>({}));
       if(!res.ok) throw new Error(d.fehler||('HTTP '+res.status));
       portalUrl=d.portalUrl||null; leadId=d.leadId||null;
