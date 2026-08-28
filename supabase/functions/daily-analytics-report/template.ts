@@ -235,10 +235,18 @@ export function buildReportEmail(opts: {
      muss. Leads von vor dem 27.08.2026 tragen alle 'rechner' (die Quelle wurde
      bis dahin hart gesetzt), der 7-Tage-Wert ist also erst ab dem 03.09.
      vollständig aussagekräftig. */
+  /* Kanal UND Seite (Martin, 27.08.) — die drei Test-Varianten sollen sich
+     hier unterscheiden lassen:
+       A  /                 Formular ohne Chat   (Kontrolle)
+       B  /kosten-berechnen Formular + Pria-Float
+       C  /sofortangebot    Pria als ganze Seite */
   const QUELL_NAMEN: Record<string, string> = {
-    rechner: "Kostenrechner — Formular",
-    "kostenrechner-result": "Kostenrechner — Formular",
-    "pria-chat": "Chat mit Pria — /sofortangebot",
+    rechner: "A · Formular (Startseite)",
+    "kostenrechner-result": "A · Formular (Startseite)",
+    "rechner:kosten-berechnen": "B · Formular (Seite mit Pria)",
+    "chat:kosten-berechnen": "B · Pria-Float (Seite mit Formular)",
+    "chat:sofortangebot": "C · Pria Voll-Chat",
+    "pria-chat": "C · Pria Voll-Chat",
     unbekannt: "ohne Kennung",
   };
   const quellGestern = yesterday.leadsBySource ?? {};
@@ -247,6 +255,51 @@ export function buildReportEmail(opts: {
     .sort((a, b) => (quellPeriode[b] ?? 0) - (quellPeriode[a] ?? 0));
   const quellGesternGesamt = Object.values(quellGestern).reduce((s, n) => s + n, 0);
   const quellPeriodeGesamt = Object.values(quellPeriode).reduce((s, n) => s + n, 0);
+  /* ── Die drei Test-Varianten nebeneinander (Martin, 27.08.) ──────────
+     Besucher je Landingpage aus analytics_sessions, Leads je Herkunft aus
+     leads.source — daraus die Quote, die den Test entscheidet. Der Block
+     erscheint nur, solange eine der Chat-Varianten überhaupt Besuch hatte;
+     sonst steht er als leere Tabelle im Weg. */
+  const VARIANTEN: Array<{ seite: string; name: string; quellen: string[] }> = [
+    { seite: "/", name: "A · Startseite (Formular)", quellen: ["rechner", "kostenrechner-result"] },
+    { seite: "/kosten-berechnen", name: "B · Formular + Pria-Float",
+      quellen: ["rechner:kosten-berechnen", "chat:kosten-berechnen"] },
+    { seite: "/sofortangebot", name: "C · Pria Voll-Chat",
+      quellen: ["chat:sofortangebot", "pria-chat"] },
+  ];
+  const besucherGestern = yesterday.besucherJeSeite ?? {};
+  const besucherPeriode = period.besucherJeSeite ?? {};
+  const chatBesuch = (besucherPeriode["/sofortangebot"] ?? 0) + (besucherPeriode["/kosten-berechnen"] ?? 0);
+  const variantenHtml = chatBesuch === 0 ? "" : `
+        <p style="margin:16px 0 6px;font-size:12px;font-weight:700;color:#3D2B1F;">
+          Chat-Test — die drei Varianten (7 Tage)
+        </p>
+        <table width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;background:#fff;border:1px solid #f0e8dc;border-radius:6px;">
+          <tr style="background:#faf6ef;">
+            <td style="padding:6px 12px;font-size:11px;color:#9a8a73;">Variante</td>
+            <td align="right" style="padding:6px 12px;font-size:11px;color:#9a8a73;">Besucher</td>
+            <td align="right" style="padding:6px 12px;font-size:11px;color:#9a8a73;">Leads</td>
+            <td align="right" style="padding:6px 12px;font-size:11px;color:#9a8a73;">Quote</td>
+          </tr>
+          ${VARIANTEN.map((v, idx) => {
+            const bes = besucherPeriode[v.seite] ?? 0;
+            const leads = v.quellen.reduce((s, q) => s + (quellPeriode[q] ?? 0), 0);
+            const quote = bes > 0 ? ((leads / bes) * 100).toFixed(1) : "—";
+            const gesternBes = besucherGestern[v.seite] ?? 0;
+            return `<tr style="background:${idx % 2 ? "#fdfbf7" : "#fff"};">
+              <td style="padding:7px 12px;font-size:12px;color:#3D2B1F;border-bottom:1px solid #f0e8dc;">${v.name}</td>
+              <td align="right" style="padding:7px 12px;font-size:12px;color:#5C4A32;border-bottom:1px solid #f0e8dc;">${bes}<span style="color:#9a8a73;font-size:11px;"> (gestern ${gesternBes})</span></td>
+              <td align="right" style="padding:7px 12px;font-size:12px;font-weight:700;color:#3D2B1F;border-bottom:1px solid #f0e8dc;">${leads}</td>
+              <td align="right" style="padding:7px 12px;font-size:12px;color:#3D2B1F;border-bottom:1px solid #f0e8dc;">${quote}${bes > 0 ? "&thinsp;%" : ""}</td>
+            </tr>`;
+          }).join("")}
+        </table>
+        <p style="margin:6px 0 0;font-size:11px;color:#9a8a73;line-height:1.5;">
+          Gleiche Anzeigen, gleiches Budget, unterschiedlicher Weg zum Angebot.
+          Entscheidend ist die Quote (Leads je Besucher) — nicht die absolute Zahl,
+          die vom Budget je Kampagne abhängt.
+        </p>`;
+
   const quellHtml = quellKeys.map((quelle, idx) => {
     const g = quellGestern[quelle] ?? 0;
     const w = quellPeriode[quelle] ?? 0;
@@ -412,6 +465,7 @@ ${mailAlarmHtml}
           </tr></thead>
           <tbody>${quellHtml}</tbody>
         </table>
+        ${variantenHtml}
         <p style="margin:6px 0 0;font-size:11px;color:#9a8a73;line-height:1.5;">
           Echte Leads je Herkunfts-Seite (Quelle: <code>leads.source</code>), Tests herausgefiltert.
           Gestern insgesamt <strong>${quellGesternGesamt}</strong>, über sieben Tage ${quellPeriodeGesamt}.

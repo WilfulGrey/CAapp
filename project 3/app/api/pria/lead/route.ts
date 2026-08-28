@@ -61,6 +61,12 @@ export async function POST(request: Request) {
   // nur durchreichen — die Allowlist + Längenprüfung sitzt im
   // angebot-anfordern-Handler, hier wäre sie eine zweite Wahrheit.
   const adParams = body?.adParams && typeof body.adParams === 'object' ? body.adParams : undefined;
+  /* Kanal UND Seite (Martin, 27.08.): `leads.source` trug bisher für jeden
+     Weg dasselbe. Jetzt „chat:sofortangebot" bzw. „chat:kosten-berechnen" —
+     der Morgen-Report gruppiert danach. Streng gefiltert, der Wert kommt
+     aus dem Browser. */
+  const seite = String(body?.herkunft || '').replace(/[^a-z0-9/_-]/gi, '').slice(0, 40).replace(/^\//, '');
+  const quelle = seite ? `chat:${seite}` : 'pria-chat';
 
   if (name.length < 2 || !/^[^\s@]+@[^\s@]+\.[a-zA-Z]{2,}$/.test(email)) {
     return NextResponse.json({ fehler: 'Name oder E-Mail fehlt.' }, { status: 400 });
@@ -105,7 +111,7 @@ export async function POST(request: Request) {
         kalkulation: { ...kalkulation, formularDaten },
         acceptPrivacy: true,
         adParams,
-        quelle: 'pria-chat',
+        quelle,
       }),
     }) as any, undefined as any);   // withMem reicht (req, ctx) durch
 
