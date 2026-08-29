@@ -2167,7 +2167,14 @@ function pilleSetzen(i){
    zu flackern. */
 function pillePruefen(){
   if(!darfZeigen||panel.classList.contains('on')) return;
-  pilleSetzen(Math.floor(scrollY/(innerHeight*1.5)));
+  /* Erst der Kopf, dann die Fragen (Martin, 29.08.). Am Anker steht nur
+     Pria da; die erste Frage kommt nach einer halben Bildschirmhoehe
+     weiterlesen. Gezaehlt wird AB dem Anker, damit die erste Pille auch
+     wirklich die erste Frage zeigt und nicht irgendeine aus der Mitte. */
+  const seitAnker = anker ? scrollY - ankerY : scrollY;
+  if(anker && seitAnker < innerHeight*0.5) return;
+  const basis = anker ? seitAnker - innerHeight*0.5 : scrollY;
+  pilleSetzen(Math.floor(Math.max(0,basis)/(innerHeight*1.5)));
 }
 addEventListener('scroll',pillePruefen,{passive:true});
 
@@ -2453,33 +2460,56 @@ function zeigen(an){
   if(an) pillePruefen(); else versteckePille();
 }
 /* SEITE statt document: im Widget lenkt der Erzeuger jedes
-   `document.querySelector*` in den Shadow-DOM um — die Kostenrechner-Karten
-   liegen aber in der SEITE. */
+   `document.querySelector*` in den Shadow-DOM um — die Abschnitte der
+   Seite liegen aber in der SEITE. */
 const SEITE=document;
-const karten=SEITE.querySelectorAll('[data-calculator-card], #calculator-form');
-const imBild=new Set();
-if(karten.length && window.IntersectionObserver){
-  const beobachter=new IntersectionObserver(eintraege=>{
-    for(const e of eintraege){ e.isIntersecting?imBild.add(e.target):imBild.delete(e.target); }
-    pruefeAuftritt();
+/* ANKER: „So funktioniert's" (#ablauf, components/calculator/HowItWorks.tsx).
+   Martin, 29.08.: „ab: So funktionierts würde ich den kopf zeigen und mit
+   scrollen dann die fragen rein."
+
+   Vorher hing der Auftritt am Kostenrechner-Formular („keine Karte im
+   Bild") — eine Regel aus der Zeit des LANGEN Formulars, die Pria bis weit
+   unten zurueckhielt. Ein Abschnitt ist der bessere Anker als eine
+   Pixel-Schwelle: er sitzt auf Handy und Desktop an derselben Stelle im
+   Lesefluss, egal wie hoch der Hero gerade ist.
+
+   Fehlt der Abschnitt (Prototyp-Seiten, Voll-Chat), gilt die alte Regel:
+   eine gute halbe Bildschirmhoehe Scrollen. */
+const anker=SEITE.getElementById('ablauf');
+let ankerErreicht=false, ankerY=0;
+if(anker && window.IntersectionObserver){
+  const ankerBeobachter=new IntersectionObserver(eintraege=>{
+    for(const e of eintraege){
+      if(!e.isIntersecting) continue;
+      ankerErreicht=true;
+      ankerY=scrollY;              // ab hier zaehlt „und dann weiter scrollen"
+      ankerBeobachter.disconnect();
+      pruefeAuftritt();
+    }
   },{threshold:0});
-  karten.forEach(k=>beobachter.observe(k));
+  ankerBeobachter.observe(anker);
 }
-/* ZWEI Bedingungen, und beide muessen erfuellt sein:
-     1. Es wurde ueberhaupt gescrollt — das ist die Regel, um die es geht.
-     2. Keine Kostenrechner-Karte steht im Bild (dieselbe Ruecksicht, die
-        der WhatsApp-Knopf hatte: sonst liegt der Knopf auf dem Weiter-Knopf).
-   Die zweite allein hat nicht getragen: `IntersectionObserver` meldet in
-   Hintergrund-Tabs nichts, und "keine Meldung" sah aus wie "keine Karte im
-   Bild" — Pria stand dann sofort da, ohne dass jemand gescrollt hatte. */
 function pruefeAuftritt(){
-  zeigen(scrollY > Math.min(innerHeight*0.6, 420) && imBild.size===0);
+  zeigen(anker ? ankerErreicht : scrollY > Math.min(innerHeight*0.6, 420));
 }
 addEventListener('scroll',pruefeAuftritt,{passive:true});
 pruefeAuftritt();
 
-blase.onclick=()=>oeffne();
-pille.onclick=async()=>{ const f=pillentext.textContent; await oeffne(); frage(f); };
+/* Womit steigen die Leute ein? (Martin, 29.08.: „ob er Pria den Kopf
+   anklickt oder eine Frage, die da steht, damit wir wissen, welche Frage
+   die Interessenten triggert.") Die Route legt alles ausser
+   rolle/text/ereignis in `meta` ab — `via` und `frage` landen also von
+   selbst dort und sind auswertbar. */
+blase.onclick=()=>{
+  protokoll('system','Chat geöffnet — über den Kopf',{ereignis:'chat_geoeffnet',via:'kopf'});
+  oeffne();
+};
+pille.onclick=async()=>{
+  const f=pillentext.textContent;
+  protokoll('system','Chat geöffnet — über die Frage: '+f,
+            {ereignis:'chat_geoeffnet',via:'frage',frage:f});
+  await oeffne(); frage(f);
+};
 W.getElementById('zu').onclick=()=>{
   tipp();
   panel.classList.remove('on','fertig','tippt');
