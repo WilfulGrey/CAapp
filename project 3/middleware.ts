@@ -35,13 +35,18 @@ function istAngemeldet(request: NextRequest): boolean {
  * hoch. Rewrite statt Redirect — die Adresse bleibt „/", damit Google
  * dieselbe Landingpage sieht wie in der Anzeige.
  */
-const VARIANTEN = ['A', 'B', 'C'] as const;
+/* C (Voll-Chat) ist seit 29.08. RAUS: 13 Besucher ohne einen einzigen Lead,
+   während A auf 7,4 % und B auf 13,3 % kam. Martin: „ist mir alles zu
+   instabil für so einen test". Die Route /sofortangebot bleibt bestehen
+   und direkt erreichbar — sie wird nur nicht mehr zugelost. Wer noch ein
+   C-Cookie trägt, wird beim nächsten Aufruf neu gewürfelt (A oder B),
+   weil 'C' nicht mehr in VARIANTEN steht. */
+const VARIANTEN = ['A', 'B'] as const;
 type Variante = (typeof VARIANTEN)[number];
 /** Welche Route jede Variante ausliefert (die Adresse bleibt „/"). */
 const VARIANTEN_ZIEL: Record<Variante, string> = {
   A: '/',                  // Startseite wie bisher, ohne Pria (Kontrolle)
   B: '/kosten-berechnen',  // dieselbe Seite + Pria als schwebender Knopf
-  C: '/sofortangebot',     // Pria als ganze Seite
 };
 /* Crawler bekommen IMMER A. Sonst sähe Google unter derselben Adresse
    wechselnde Inhalte — das ist Cloaking, und ein indexierter Voll-Chat
