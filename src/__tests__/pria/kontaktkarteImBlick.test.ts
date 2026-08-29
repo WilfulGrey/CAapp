@@ -110,6 +110,21 @@ describe('Pria — das fokussierte Feld bleibt im Bild', () => {
     expect(z).toContain('if(fokus)');
   });
 
+  it('bietet neben den Feldern keinen zweiten Weg an', () => {
+    // Martin, 29.08.: „warum bieten wir überhaupt die Kontaktdaten im Chat
+    // einzutragen — ist doch unnötig". Die drei Felder stehen jetzt direkt
+    // über der Eingabezeile; ein Chip daneben führt vom Ziel weg und war der
+    // längere Weg: erst tippen, dann vom Modell auslesen lassen, dann
+    // bestätigen.
+    expect(html, 'das Angebot „hier im Chat" ist zurück').not.toMatch(/hier im Chat/);
+    const k = rumpf(html, 'function kontakt()');
+    expect(k, 'die Karte bietet wieder Chips an').toContain('setChips([])');
+    // Die Fähigkeit bleibt aber: wer seine Daten trotzdem tippt, wird
+    // verstanden. Nur hingeschickt wird niemand mehr.
+    expect(html, 'ein getippter Kontakt wird nicht mehr verstanden')
+      .toContain("r.typ==='kontakt'");
+  });
+
   it('korrigiert die Sicht ohne Animation', () => {
     // `.thread` steht auf `scroll-behavior:smooth`. Schön für eine neu
     // eintreffende Blase — verheerend für diese Korrektur, die bei offener

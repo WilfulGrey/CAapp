@@ -807,19 +807,12 @@ function zumKontakt(fokus){
 function beraterChips(){
   /* Stehen alle Angaben und fehlen nur die Kontaktdaten, ist alles andere
      Ablenkung (Martin, 21.08.): keine Wissensfragen, kein „Preis berechnen" —
-     der Preis ist ja gerechnet. Nur der eine Weg, und der Hinweis, dass es
-     auch getippt geht. */
-  if(kontaktOffen){
+     der Preis ist ja gerechnet. EIN Weg, nicht zwei: das Angebot, die Daten
+     stattdessen zu tippen, ist am 29.08. gefallen (siehe `kontakt()`). */
+  if(kontaktOffen)
     return setChips([
-      {t:'Meine Daten eintragen',stil:'stark',f:()=>{chips.innerHTML='';zumKontakt(true);}},
-      {t:'Lieber hier im Chat',stil:'soft',f:async()=>{
-        chips.innerHTML='';
-        await sagen('Gern — schreiben Sie mir einfach <b>Name, E-Mail und Telefon</b> in einer Zeile. '+
-                    'Ich trage es dann für Sie ein.');
-        document.getElementById('frei').focus();
-      }}
+      {t:'Meine Daten eintragen',stil:'stark',f:()=>{chips.innerHTML='';zumKontakt(true);}}
     ]);
-  }
   const offen=SCHNELLFRAGEN
     .filter(q=>{const e=suche(q);return !e||!beantwortet.has(e);})
     /* „Was kostet das?" steht direkt über dem Knopf „Preis berechnen" —
@@ -1594,15 +1587,16 @@ function kontakt(){
      liess er sich drücken und tat nichts — das ist genau der tote Knopf,
      den es nicht geben darf. Absichtlich milde geprüft: wir wollen niemanden
      wegen eines Formats aussperren, nur offensichtlich Leeres abfangen. */
-  // Zweiter Weg, gleich angeboten: viele tippen lieber, als in ein Formular
-  // zu greifen — besonders auf dem Handy.
-  setChips([
-    {t:'Lieber hier im Chat eingeben',stil:'soft',f:async()=>{
-      chips.innerHTML='';
-      await sagen('Gern — <b>Name, E-Mail und Telefon</b> in einer Zeile genügt. Ich trage es für Sie ein.');
-      document.getElementById('frei').focus();
-    }}
-  ]);
+  /* Kein zweiter Weg mehr (Martin, 29.08.: „warum bieten wir überhaupt die
+     Kontaktdaten im Chat einzutragen — ist doch unnötig"). Die drei Felder
+     stehen jetzt direkt über der Eingabezeile; ein Angebot, dasselbe
+     stattdessen zu tippen, ist eine Abzweigung neben dem Ziel — und war der
+     laengere, fehleranfaelligere Weg: erst tippen, dann vom Modell auslesen
+     lassen, dann bestaetigen. Wer trotzdem tippt, wird weiter verstanden
+     (typ=kontakt bleibt) — angeboten wird es nicht.
+     Alte Vorschlaege muessen trotzdem weg, sonst stehen Wissensfragen unter
+     dem Formular. */
+  setChips([]);
 
   const felder=['kname','kmail','ktel'].map(id=>document.getElementById(id));
   const go=document.getElementById('abs');
@@ -2032,8 +2026,11 @@ async function verarbeite(r,kundentext){
     }
     const knopf=document.getElementById('abs');
     if(!gesetzt){
-      await sagen(r.text||'Das habe ich nicht herauslesen können — schreiben Sie mir bitte '+
-                  '<b>Name, E-Mail und Telefon</b>, dann trage ich es ein.');
+      /* Nicht noch einmal tippen lassen: die Felder stehen direkt über der
+         Eingabezeile, und beim zweiten Versuch scheitert das Auslesen
+         erfahrungsgemäß aus demselben Grund wie beim ersten. */
+      await sagen(r.text||'Das habe ich nicht sicher herauslesen können — tragen Sie '+
+                  '<b>Name, E-Mail und Telefon</b> bitte direkt in die Felder darüber ein.');
       return beraterChips();
     }
     zumKontakt();
