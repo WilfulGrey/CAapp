@@ -613,7 +613,7 @@ const puffer=[];
    wird nach dem ersten Fehlschlag nicht weiter geschickt — sonst feuert das
    Widget alle 1,5 s ins Leere. Der eigentliche Platz dafür sind die
    lead_events; bis dahin schluckt es der Chat still. */
-let protokollAus=false;
+let protokollAus=false, fehlschlaege=0;
 function protokoll(rolle,text,extra){
   const rein=String(text||'').replace(/<[^>]*>/g,' ').replace(/\s+/g,' ').trim();
   if(!rein && !(extra&&extra.ereignis)) return;
@@ -622,13 +622,42 @@ function protokoll(rolle,text,extra){
 function spuelen(beimGehen){
   if(protokollAus){ puffer.length=0; return; }
   if(!puffer.length) return;
-  const koerper=JSON.stringify({sid:SID,zeilen:puffer.splice(0,puffer.length)});
-  if(beimGehen&&navigator.sendBeacon)
-    return navigator.sendBeacon('/api/pria/protokoll',new Blob([koerper],{type:'application/json'}));
-  fetch('/api/pria/protokoll',{method:'POST',headers:{'content-type':'application/json'},body:koerper})
-    .then(r=>{ if(r.status===404||r.status===405) protokollAus=true; })
-    .catch(()=>{ protokollAus=true; });
+  const zeilen=puffer.splice(0,puffer.length);
+  const koerper=JSON.stringify({sid:SID,zeilen});
+  /* Abgeschickt ist nicht angekommen. Vorher war eine Zeile in dem Moment
+     verloren, in dem sie den Puffer verliess — und ausgerechnet die
+     wichtigste, die Lead-Marke, entsteht im selben Atemzug wie der Sprung
+     ins Kundenportal. Ein dabei abgeschnittener fetch nahm sie mit: im
+     Admin stand dann ein Gespraech ohne Marke, obwohl der Lead laengst da
+     war (Martin, 29.08.: „das ist doch ein Lead, warum ist er nicht
+     gekennzeichnet"). Also zurueck in den Puffer; der naechste Takt nimmt
+     sie wieder mit. */
+  const zurueck=()=>{
+    if(puffer.length>400) return;      // Notbremse gegen unbegrenztes Wachsen
+    for(let i=zeilen.length-1;i>=0;i--) puffer.unshift(zeilen[i]);
+  };
+  if(beimGehen&&navigator.sendBeacon){
+    if(!navigator.sendBeacon('/api/pria/protokoll',new Blob([koerper],{type:'application/json'}))) zurueck();
+    return;
+  }
+  /* `keepalive`: die Anfrage ueberlebt den Seitenwechsel. Genau dafuer gibt es
+     das Flag — ohne es bricht der Browser sie beim Verlassen der Seite ab,
+     und der Chat verlaesst die Seite direkt nach der Lead-Marke. */
+  fetch('/api/pria/protokoll',{method:'POST',headers:{'content-type':'application/json'},
+                               body:koerper,keepalive:true})
+    .then(r=>{
+      // Route fehlt (im Kostenrechner gab es sie eine Zeit lang nicht): still
+      // bleiben, statt alle 1,5 s ins Leere zu feuern.
+      if(r.status===404||r.status===405){ protokollAus=true; return; }
+      if(!r.ok){ zurueck(); aufgebenNach(); return; }
+      fehlschlaege=0;
+    })
+    .catch(()=>{ zurueck(); aufgebenNach(); });
 }
+/* Erst nach mehreren Versuchen aufgeben. Ein einzelner Netzhaenger — Tunnel,
+   Funkloch, Wechsel von WLAN auf Mobilfunk — war bisher genug, um den Rest
+   des Gespraechs stillschweigend wegzuwerfen. */
+function aufgebenNach(){ if(++fehlschlaege>=5) protokollAus=true; }
 setInterval(spuelen,1500);
 addEventListener('pagehide',()=>spuelen(true));
 
