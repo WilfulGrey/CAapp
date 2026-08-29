@@ -11,6 +11,7 @@
 import { createClient } from '@supabase/supabase-js';
 import { NextRequest, NextResponse } from 'next/server';
 import { PORTAL_BASIS } from '@/lib/portal-url';
+import { fasseGespraecheZusammen } from '@/lib/pria-gespraeche';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -94,29 +95,7 @@ export async function GET(request: NextRequest) {
     .limit(4000);
   if (error) return NextResponse.json({ fehler: error.message }, { status: 500 });
 
-  const proSid = new Map<string, any>();
-  for (const z of data ?? []) {
-    let g = proSid.get(z.sid);
-    if (!g) {
-      g = { sid: z.sid, beginn: z.zeit, ende: z.zeit, nachrichten: 0,
-            ersteFrage: null as string | null, lead: false, leadId: null as string | null,
-            rueckruf: false };
-      proSid.set(z.sid, g);
-    }
-    // Absteigend sortiert: das zuletzt Gesehene ist das Frueheste.
-    g.beginn = z.zeit;
-    if (z.zeit > g.ende) g.ende = z.zeit;
-    if (z.rolle === 'kunde' || z.rolle === 'pria') g.nachrichten++;
-    if (z.rolle === 'kunde' && z.text) g.ersteFrage = z.text.slice(0, 120);
-    if (z.ereignis === 'lead') g.lead = true;
-    // Eine Rueckrufbitte ist der Grund, ein Gespraech zuerst zu oeffnen —
-    // dort wartet jemand auf einen Anruf.
-    if (z.ereignis === 'rueckruf') g.rueckruf = true;
-    if (z.lead_id) g.leadId = z.lead_id;
-  }
-
-  // Array.from statt Spread: das Projekt kompiliert auf ein Ziel ohne
-  // downlevelIteration, dort ist der Spread eines Iterators ein Typfehler.
-  const liste = Array.from(proSid.values()).sort((a, b) => (a.ende < b.ende ? 1 : -1));
-  return NextResponse.json({ gespraeche: liste });
+  // Die Zusammenfassung liegt in lib/pria-gespraeche.ts — dort steht auch,
+  // warum eine `lead_id` ohne 'lead'-Ereignis trotzdem ein Lead ist.
+  return NextResponse.json({ gespraeche: fasseGespraecheZusammen((data ?? []) as any) });
 }
