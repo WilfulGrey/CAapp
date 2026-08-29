@@ -316,6 +316,12 @@
     '    .mensch p{font-size:15px}\n'+
     '    .klein{font-size:12px}\n'+
     '    .eingabe input{font-size:16px}   /* unter 16 px zoomt iOS beim Fokus hinein */\n'+
+    '    /* Dieselbe Regel fuer die Felder IN den Karten (Kontakt, Rueckruf) — sie\n'+
+    '       fehlte, und die standen auf 15 px. Safari zoomte beim Antippen in die\n'+
+    '       Seite hinein; das Panel haengt aber am Layout-Fenster, das sichtbare\n'+
+    '       ist danach schmaler. Ergebnis: ✕ und Sendeknopf ausserhalb des Bildes,\n'+
+    '       das ganze Panel wirkte verrutscht (Martin, 29.08.). */\n'+
+    '    .feld{font-size:16px}\n'+
     '    .blase{right:16px;bottom:calc(16px + var(--leiste,0px) + env(safe-area-inset-bottom))}\n'+
     '    /* Die Pille laeuft bis kurz vor den linken Rand — auf dem Handy ist\n'+
     '       Platz knapp, und zwei Zeilen Frage brauchen ihn. */\n'+
@@ -542,7 +548,54 @@ function avatar(src,mitBlinzeln,lebendig){
          (lebendig?'<img class="denk" src="'+PRIA.denk+'" alt="">':'')+
          '<img class="zu" src="'+PRIA.zu+'" alt=""></span>';
 }
-function runter(){thread.scrollTop=thread.scrollHeight;}
+/* Ein Element im Verlauf in Sicht bringen — ueber `thread.scrollTop`, nicht
+   ueber `scrollIntoView()`: das wuerde auch die Seite dahinter verschieben. */
+function sicht(el,anDenAnfang){
+  const f=el.getBoundingClientRect(), t=thread.getBoundingClientRect();
+  let weg=0;
+  if(anDenAnfang||f.top<t.top+8)  weg=f.top-t.top-12;
+  else if(f.bottom>t.bottom-8)    weg=f.bottom-t.bottom+16;
+  if(!weg) return;
+  /* SOFORT, nicht weich. `.thread` steht auf `scroll-behavior:smooth` — schoen
+     fuer eine neu eintreffende Blase, verheerend hier: diese Korrektur laeuft
+     bei offener Tastatur in JEDEM Frame (`takt()` → `handyLayout()` →
+     `runter()`), und jede Zuweisung startet eine neue Animation. Der Verlauf
+     kaeme nie zur Ruhe — genau das sah aus wie „alles springt hoch"
+     (Martin, 29.08.). Eine Korrektur unter dem Daumen darf nicht animiert
+     sein; sie soll gar nicht auffallen. */
+  const vorher=thread.style.scrollBehavior;
+  thread.style.scrollBehavior='auto';
+  thread.scrollTop+=weg;
+  thread.style.scrollBehavior=vorher;
+}
+/* Die zuletzt geoeffnete Karte mit Eingabefeldern (Kontakt, Rueckruf).
+   Solange sie offen ist, bleibt sie das LETZTE Element im Verlauf: das
+   Gespraech laeuft darueber weiter, das Formular steht direkt ueber der
+   Eingabezeile. Vorher schob jede weitere Blase die Karte nach oben aus dem
+   Bild — Pria antwortete „Ich habe es eingetragen" und schob damit genau die
+   Felder weg, die gemeint waren (Martin, 29.08.). */
+let formKarte=null;
+function einfuegen(el){
+  if(formKarte&&formKarte.parentNode===thread) thread.insertBefore(el,formKarte);
+  else thread.appendChild(el);
+}
+/* Ans Ende des Verlaufs — mit zwei Ausnahmen.
+
+   1. Steht der Fokus in einem Feld IM Verlauf, zieht der Sprung ans Ende
+      genau das Feld unter dem Daumen weg. Auf dem Handy passiert das
+      staendig: `handyLayout()` laeuft bei offener Tastatur in JEDEM Frame
+      (siehe `takt()`) und ruft `runter()`. Martin hat am 29.08. blind in
+      ein Feld getippt, das nicht mehr im Bild stand.
+   2. Ist eine Karte mit Feldern offen, zaehlt ihr ANFANG: darueber steht
+      die letzte Antwort, darunter die Felder. Das absolute Ende zeigte nur
+      noch das Kleingedruckte unter dem Knopf. */
+function runter(){
+  const wurzel=thread.getRootNode(), aktiv=(wurzel&&wurzel.activeElement)||null;
+  if(aktiv&&thread.contains(aktiv)&&(aktiv.tagName==='INPUT'||aktiv.tagName==='TEXTAREA'))
+    return sicht(aktiv);
+  if(formKarte&&formKarte.parentNode===thread) return sicht(formKarte,true);
+  thread.scrollTop=thread.scrollHeight;
+}
 
 /* ─── Gesprächsprotokoll ────────────────────────────────────────────
    Jede Sprechblase wandert in eine Datei auf dem Server, zusammen mit
@@ -582,7 +635,7 @@ addEventListener('pagehide',()=>spuelen(true));
 function bub(html,mir){
   const r=document.createElement('div');r.className='row'+(mir?' me':'');
   r.innerHTML=(mir?'':'<div class="mini">'+avatar(null,true)+'</div>')+'<div class="bub">'+html+'</div>';
-  thread.appendChild(r);runter();
+  einfuegen(r);runter();
   protokoll(mir?'kunde':'pria',html);
   return r;
 }
@@ -591,7 +644,7 @@ function tippt(){
   // Während sie „tippt", schaut sie kurz zur Seite — dasselbe Gesicht,
   // anderer Frame. Das ist der Unterschied zwischen Avatar und Standbild.
   r.innerHTML='<div class="mini">'+avatar(PRIA.denk)+'</div><div class="bub typing"><i></i><i></i><i></i></div>';
-  thread.appendChild(r);runter();return r;
+  einfuegen(r);runter();return r;
 }
 function sagen(html,extra){
   return new Promise(res=>{const t=tippt();
@@ -678,15 +731,31 @@ const SCHNELLFRAGEN=[
   'Braucht sie ein eigenes Zimmer?'
 ];
 const beantwortet=new Set();
-/* Springt zum Kontaktfeld und setzt den Fokus in die erste Luecke. Der Kunde
-   hatte die Karte oben im Verlauf und musste selbst danach suchen. */
-function zumKontakt(){
+/* Bringt die Kontaktkarte in den Blick — und setzt den Fokus NUR, wenn der
+   Kunde selbst danach gegriffen hat.
+
+   Hier standen bis 29.08. ein `scrollIntoView({block:'center'})` und ein
+   `focus()` nach 420 ms. Beides ging auf dem Handy schief:
+
+   * Die Karte hing mitten im Verlauf. `scrollIntoView` zentrierte sie, der
+     naechste Tastatur-Takt zog den Verlauf per `runter()` sofort wieder ans
+     Ende — das Feld war weg, getippt wurde blind.
+   * Der verzoegerte Fokus stahl die Eingabe aus der Nachrichtenzeile, in
+     die der Kunde gerade getippt hatte. Und ein `focus()` im Timer oeffnet
+     auf iOS die Tastatur oft gar nicht: dort zaehlt nur der direkte
+     Gestenkontext.
+
+   Die Karte ist jetzt immer das letzte Element (siehe `einfuegen`), also
+   genuegt `runter()`. */
+function zumKontakt(fokus){
   const knopf=W.getElementById('abs');
   if(!knopf) return false;
-  const karte=knopf.closest('.row')||knopf.closest('.card');
-  if(karte) karte.scrollIntoView({behavior:ruhig?'auto':'smooth',block:'center'});
-  const leer=['kname','kmail','ktel'].map(i=>W.getElementById(i)).find(f=>f&&!f.value.trim());
-  if(leer) setTimeout(()=>leer.focus(),ruhig?0:420);
+  runter();
+  if(fokus){
+    const felder=['kname','kmail','ktel'].map(i=>W.getElementById(i));
+    const ziel=felder.find(f=>f&&!f.value.trim())||felder[0];
+    if(ziel) ziel.focus();
+  }
   return true;
 }
 
@@ -697,11 +766,11 @@ function beraterChips(){
      auch getippt geht. */
   if(kontaktOffen){
     return setChips([
-      {t:'Meine Daten eintragen',stil:'stark',f:()=>{chips.innerHTML='';zumKontakt();}},
+      {t:'Meine Daten eintragen',stil:'stark',f:()=>{chips.innerHTML='';zumKontakt(true);}},
       {t:'Lieber hier im Chat',stil:'soft',f:async()=>{
         chips.innerHTML='';
         await sagen('Gern — schreiben Sie mir einfach <b>Name, E-Mail und Telefon</b> in einer Zeile. '+
-                    'Ich trage es dann oben für Sie ein.');
+                    'Ich trage es dann für Sie ein.');
         W.getElementById('frei').focus();
       }}
     ]);
@@ -1263,7 +1332,7 @@ async function matching(){
     '<div class="anim" id="a0"><span class="ring"></span>Ihr Angebot wird berechnet</div>'+
     '<div class="anim" id="a1"><span class="ring"></span><span id="prueftext"><b>142</b> Pflegekräfte werden geprüft</span></div>'+
     '<div class="anim" id="a2"><span class="ring"></span>Ihr Sofortangebot steht</div></div>';
-  thread.appendChild(r);runter();
+  einfuegen(r);runter();
   const setz=(i,c)=>W.getElementById('a'+i).className='anim '+c;
   const ok=i=>{setz(i,'ok');W.querySelector('#a'+i+' .ring').textContent='✓';};
   setz(0,'on');await pause(1400);ok(0);setz(1,'on');
@@ -1292,7 +1361,7 @@ async function uebergabe(){
     '<div class="anim on" id="u0"><span class="ring"></span>Ihr geschützter Zugang wird erstellt</div>'+
     '<div class="anim" id="u1"><span class="ring"></span>Kundenportal öffnet sich in <b id="uz">3</b> …</div>'+
     '</div>';
-  thread.appendChild(r);runter();
+  einfuegen(r);runter();
   await pause(ruhig?0:700);
   W.getElementById('u0').className='anim ok';
   W.querySelector('#u0 .ring').textContent='✓';
@@ -1374,7 +1443,7 @@ function rueckruf(){
    (habenMail?'':'Für den Anruf genügen Name und Nummer. Die E-Mail nur, wenn Sie Ihre '+
      'Unterlagen zusätzlich schriftlich möchten.<br>')+
    'Erreichbar täglich von 8 bis 20 Uhr · kostenlos und unverbindlich</p></div>';
-  thread.appendChild(r);runter();
+  thread.appendChild(r);formKarte=r;runter();
   const rn=W.getElementById('rname'), rt=W.getElementById('rtel');
   rn.value=oben('kname'); rt.value=oben('ktel');
 
@@ -1405,7 +1474,7 @@ function rueckruf(){
     if(!ok){
       // Ehrlich bleiben: lieber die Nummer nennen, als einen Anruf zusagen,
       // der nirgends angekommen ist.
-      go.textContent='Rückruf anfordern'; go.disabled=false; rueckrufOffen=false;
+      go.textContent='Rückruf anfordern'; go.disabled=false; rueckrufOffen=false; formKarte=null;
       await sagen('Das hat gerade nicht geklappt — und ich sage Ihnen lieber Bescheid, '+
                   'als einen Anruf zu versprechen, der nicht ankommt.',
                   'Am schnellsten erreichen Sie uns direkt: <b>089 200 000 830</b>, '+
@@ -1416,7 +1485,7 @@ function rueckruf(){
     go.textContent='✓ Rückruf ist notiert';
     // Sperre wieder loesen: wer spaeter eine zweite Nummer nachreichen will,
     // soll den Knopf nicht tot vorfinden.
-    rueckrufOffen=false;
+    rueckrufOffen=false; formKarte=null;
     protokoll('system','Rückruf erbeten — '+name+', '+tel,{ereignis:'rueckruf'});
     spuelen();
     await sagen('Ist notiert — <b>Marta ruft Sie an</b> unter '+tel+'. '+
@@ -1455,7 +1524,7 @@ function rueckruf(){
   /* Zwei Auswege, nicht einer (Martin, 22.08.): Wer die Karte offen hat
      und es sich anders ueberlegt, wollte bisher nur „weiterschreiben"
      koennen — der Weg zum Angebot fehlte ganz. */
-  const weg=()=>{ rueckrufOffen=false; r.remove(); };
+  const weg=()=>{ rueckrufOffen=false; formKarte=null; r.remove(); };
   setChips([
     {t:'Doch lieber Preis berechnen',stil:'stark',f:b=>{weg();return starteFunnel('preis',b);}},
     {t:'Doch lieber weiterschreiben',stil:'soft',f:()=>{
@@ -1473,7 +1542,7 @@ function kontakt(){
    '<input class="feld" id="ktel" type="tel" inputmode="tel" placeholder="Telefon" autocomplete="tel">'+
    '<button class="go" id="abs" disabled>Angebot &amp; Pflegekräfte ansehen</button>'+
    '<p class="klein">Kostenlos · unverbindlich · kein Vertrag vor Ihrer Auswahl</p></div>';
-  thread.appendChild(r);runter();
+  thread.appendChild(r);formKarte=r;runter();
   kontaktOffen=true;
 
   /* Der Knopf bleibt gesperrt, bis alle drei Felder etwas hergeben. Vorher
@@ -1485,7 +1554,7 @@ function kontakt(){
   setChips([
     {t:'Lieber hier im Chat eingeben',stil:'soft',f:async()=>{
       chips.innerHTML='';
-      await sagen('Gern — <b>Name, E-Mail und Telefon</b> in einer Zeile genügt. Ich trage es oben ein.');
+      await sagen('Gern — <b>Name, E-Mail und Telefon</b> in einer Zeile genügt. Ich trage es für Sie ein.');
       W.getElementById('frei').focus();
     }}
   ]);
@@ -1505,7 +1574,7 @@ function kontakt(){
   go.onclick=async()=>{
     tipp(12);
     go.disabled=true;
-    kontaktOffen=false; uebergeben=true;
+    kontaktOffen=false; uebergeben=true; formKarte=null;
     // DIE Marke im Verlauf: alles davor ist „vor Lead", alles danach „nach Lead".
     protokoll('system','Kontaktdaten abgeschickt',{ereignis:'lead',antworten:Object.assign({},antwort)});
     spuelen();
@@ -1558,7 +1627,7 @@ function kontakt(){
          muss wissen, dass sie angekommen sind — oder eben nicht. */
       await sagen('Da ist beim Anlegen etwas schiefgegangen — Ihre Angaben sind bei uns, aber der '+
                   'Zugang steht noch nicht. Marta meldet sich bei Ihnen. Wenn es eilt: <b>089 200 000 830</b>.');
-      return setChips([{t:'Nochmal versuchen',stil:'stark',f:()=>{go.disabled=false;kontaktOffen=true;uebergeben=false;runter();}}]);
+      return setChips([{t:'Nochmal versuchen',stil:'stark',f:()=>{go.disabled=false;kontaktOffen=true;uebergeben=false;formKarte=go.closest('.row');runter();}}]);
     }
 
     /* Conversion melden — Schnittstellen-Vertrag mit SEA (26.08.): derselbe
@@ -1589,7 +1658,7 @@ function kontakt(){
     m.innerHTML='<div class="mini">'+avatar(null,true)+'</div><div class="card" style="padding:0;border:0;box-shadow:none;background:transparent">'+
       '<div class="mensch"><img src="'+MARTA+'" alt=""><p><b>Ab hier übernimmt ein Mensch.</b> Marta Kapcio sieht sich Ihre '+
       'Angaben persönlich an und meldet sich bei Ihnen — täglich zwischen 8 und 20 Uhr. Wenn es eilt: <b>089 200 000 830</b>.</p></div></div>';
-    thread.appendChild(m);runter();
+    einfuegen(m);runter();
 
     if(portalUrl){
       setChips([{t:'→ Ihr Kundenportal öffnen',stil:'stark',f:goToPortal}]);
@@ -1924,18 +1993,18 @@ async function verarbeite(r,kundentext){
     }
     zumKontakt();
     if(knopf && !knopf.disabled){
-      await sagen('Ich habe es oben eingetragen:<br><b>'+
+      await sagen('Ich habe es eingetragen:<br><b>'+
         [r.kontaktName,r.kontaktMail,r.kontaktTelefon].filter(Boolean).join('</b> · <b>')+'</b>');
       return setChips([
         {t:'Passt — Angebot ansehen',stil:'stark',f:()=>{chips.innerHTML='';knopf.click();}},
-        {t:'Ich ändere es oben',stil:'soft',f:()=>{chips.innerHTML='';zumKontakt();}}
+        {t:'Ich ändere es selbst',stil:'soft',f:()=>{chips.innerHTML='';zumKontakt(true);}}
       ]);
     }
     // Etwas fehlt noch — sagen, was.
     const fehlt=[['kname','Ihr Name'],['kmail','Ihre E-Mail'],['ktel','Ihre Telefonnummer']]
       .filter(([id])=>{const f=W.getElementById(id);return !f||!f.value.trim();})
       .map(([,l])=>l);
-    await sagen('Danke, das habe ich oben eingetragen. Es fehlt noch <b>'+
+    await sagen('Danke, das habe ich eingetragen. Es fehlt noch <b>'+
                 fehlt.join('</b> und <b>')+'</b>.');
     return beraterChips();
   }

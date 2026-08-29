@@ -80,9 +80,14 @@ def bauen(html: str) -> str:
     # Dokument, wäre er unsichtbar formatiert.
     js = js.replace('document.body.appendChild(klon);', 'W.appendChild(klon);')
     assert 'document.getElementById' not in js
-    # `SEITE.` ist der bewusste Weg zur echten Seite (Kostenrechner-Karten) —
-    # er darf NICHT in den Schatten umgelenkt werden.
-    assert 'SEITE.querySelectorAll' in js, 'SEITE-Alias fehlt — Auftrittsregel findet die Karten nicht'
+    # `SEITE.` ist der bewusste Weg zur echten Seite — er darf NICHT in den
+    # Schatten umgelenkt werden. Frueher stand hier `SEITE.querySelectorAll`
+    # fest verdrahtet; seit die Auftrittsregel am Abschnitt „So funktioniert's"
+    # haengt (29.08.), greift sie ueber `SEITE.getElementById`. Geprueft wird
+    # deshalb der Alias selbst, nicht eine einzelne Zugriffsart.
+    assert 'const SEITE=document;' in js, 'SEITE-Alias fehlt'
+    assert 'SEITE.getElementById' in js or 'SEITE.querySelectorAll' in js, \
+        'Kein Zugriff auf die echte Seite — die Auftrittsregel findet ihren Anker nicht'
     # Die Seiten-Sperre muss am echten Dokument haengen bleiben, nicht im
     # Schatten landen. Sie greift inzwischen ueber `const b = document.body`
     # zu, deshalb wird auf `document.body` geprueft und nicht mehr auf den
