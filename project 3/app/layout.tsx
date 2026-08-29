@@ -172,8 +172,11 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
 
             Der Lader ist absichtlich winzig und laeuft VOR dem Zeichnen: auf
             Prod wird die 240-KB-Datei so gar nicht erst geladen, und das
-            data-pria am <html> ist da, bevor der WhatsApp-Knopf sich
-            entscheidet (er blendet sich dann aus, siehe WhatsAppFloat).
+            data-pria am <html> ist da, bevor gezeichnet wird.
+            (Der WhatsApp-Knopf, der sich hier frueher ausblendete, ist am
+            29.08. ganz entfallen — er blitzte beim Laden kurz auf, weil er
+            VOR der Hydration gezeichnet wurde. WhatsApp bleibt als Link in
+            den Kontaktbloecken und im Chat.)
 
             Wenn Pria auf Prod soll: diese Liste um kostenrechner.primundus.de
             erweitern — bewusst eine Code-Aenderung mit PR, kein stiller
