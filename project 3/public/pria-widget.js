@@ -2171,9 +2171,9 @@ function pillePruefen(){
      Pria da; die erste Frage kommt nach einer halben Bildschirmhoehe
      weiterlesen. Gezaehlt wird AB dem Anker, damit die erste Pille auch
      wirklich die erste Frage zeigt und nicht irgendeine aus der Mitte. */
-  const seitAnker = anker ? scrollY - ankerY : scrollY;
-  if(anker && seitAnker < innerHeight*0.5) return;
-  const basis = anker ? seitAnker - innerHeight*0.5 : scrollY;
+  const abKopf = anker ? scrollY + innerHeight*0.9 - ankerOben() : scrollY;
+  if(anker && abKopf < innerHeight*0.5) return;
+  const basis = anker ? abKopf - innerHeight*0.5 : scrollY;
   pilleSetzen(Math.floor(Math.max(0,basis)/(innerHeight*1.5)));
 }
 addEventListener('scroll',pillePruefen,{passive:true});
@@ -2476,21 +2476,21 @@ const SEITE=document;
    Fehlt der Abschnitt (Prototyp-Seiten, Voll-Chat), gilt die alte Regel:
    eine gute halbe Bildschirmhoehe Scrollen. */
 const anker=SEITE.getElementById('ablauf');
-let ankerErreicht=false, ankerY=0;
-if(anker && window.IntersectionObserver){
-  const ankerBeobachter=new IntersectionObserver(eintraege=>{
-    for(const e of eintraege){
-      if(!e.isIntersecting) continue;
-      ankerErreicht=true;
-      ankerY=scrollY;              // ab hier zaehlt „und dann weiter scrollen"
-      ankerBeobachter.disconnect();
-      pruefeAuftritt();
-    }
-  },{threshold:0});
-  ankerBeobachter.observe(anker);
+/* Absolute Lage des Ankers im Dokument. Bei jedem Aufruf neu gemessen:
+   Bilder laden nach und der Rechner waechst beim Ausfuellen — eine einmal
+   gemerkte Zahl waere nach zwei Schritten falsch. */
+function ankerOben(){
+  return anker ? anker.getBoundingClientRect().top + scrollY : 0;
 }
+/* ZWEI-WEGE-Regel (Martin, 29.08.): Pria kommt, sobald der Abschnitt ins
+   Bild rueckt — und geht wieder, wenn der Leser darueber zurueckscrollt.
+   Die erste Fassung merkte sich nur „schon mal erreicht" und schaltete den
+   Beobachter danach ab. Wer nach oben zurueckscrollte, hatte die
+   Frage-Pille im Hero liegen, quer ueber dem CTA-Knopf — auf dem Handy
+   genau auf dem Knopf, um den es geht. */
 function pruefeAuftritt(){
-  zeigen(anker ? ankerErreicht : scrollY > Math.min(innerHeight*0.6, 420));
+  if(!anker){ zeigen(scrollY > Math.min(innerHeight*0.6, 420)); return; }
+  zeigen(scrollY + innerHeight*0.9 > ankerOben());
 }
 addEventListener('scroll',pruefeAuftritt,{passive:true});
 pruefeAuftritt();

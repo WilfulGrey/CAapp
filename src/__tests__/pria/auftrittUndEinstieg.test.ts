@@ -36,13 +36,25 @@ describe('Pria — Auftritt', () => {
   it('behält eine Regel für Seiten ohne diesen Abschnitt', () => {
     // Ohne Rückfall stünde Pria auf Prototyp-Seiten entweder sofort oder nie da.
     expect(widget, 'Rückfall auf die Scroll-Schwelle fehlt')
-      .toMatch(/anker\s*\?\s*ankerErreicht\s*:\s*scrollY\s*>/);
+      .toMatch(/if\(!anker\)\{\s*zeigen\(scrollY\s*>/);
+  });
+
+  it('verschwindet wieder, wenn man über den Abschnitt zurückscrollt', () => {
+    /* Der eigentliche Fehler vom 29.08.: Die erste Fassung merkte sich nur
+       „Anker schon mal erreicht" und schaltete den Beobachter ab. Wer nach
+       oben zurückscrollte, hatte die Frage-Pille im Hero liegen — auf dem
+       Handy quer über dem CTA-Knopf. Deshalb darf es KEINEN Merker geben,
+       der einmal gesetzt für immer gilt. */
+    expect(widget, 'Einmal-Merker ist zurück — Pria bliebe beim Hochscrollen oben stehen')
+      .not.toMatch(/ankerErreicht/);
+    expect(widget, 'Der Auftritt wird nicht laufend an der Scroll-Position geprüft')
+      .toMatch(/zeigen\(scrollY\s*\+\s*innerHeight\s*\*\s*0\.9\s*>\s*ankerOben\(\)\)/);
   });
 
   it('zeigt erst den Kopf und dann die Fragen', () => {
     // Am Anker nur Pria; die erste Frage kommt nach etwas Weiterlesen.
     expect(widget, 'Die Fragen erscheinen sofort mit dem Kopf statt danach')
-      .toMatch(/seitAnker\s*<\s*innerHeight\s*\*\s*0\.5/);
+      .toMatch(/abKopf\s*<\s*innerHeight\s*\*\s*0\.5/);
   });
 });
 

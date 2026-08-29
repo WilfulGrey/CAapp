@@ -16,7 +16,6 @@ import { WhatIs24hCare } from "@/components/calculator/WhatIs24hCare";
 import { RequirementsSection } from "@/components/calculator/RequirementsSection";
 import { KeyBenefitsBar } from "@/components/calculator/KeyBenefitsBar";
 import { PersonalContact } from "@/components/calculator/PersonalContact";
-import { WhatsAppFloat } from "@/components/calculator/WhatsAppFloat";
 import { homePageGraph, jsonLdString } from "@/lib/seo-schema";
 
 export default function HomePage() {
@@ -337,7 +336,6 @@ export default function HomePage() {
       <FAQSection />
       <FinalCTA />
       <Footer />
-      <WhatsAppFloat />
     </div>
   );
 }
