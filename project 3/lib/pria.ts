@@ -217,11 +217,14 @@ Wähle den \`typ\`:
   einmal abgebogen wurde, klingt der zweite Satz deutlich anders als der erste.
 
   Den Weg zurück zum Angebot hängt der Chat selbst an — häng ihn nicht auch noch an.
-- **kontakt** — Der Kunde tippt seine Kontaktdaten in den Chat, statt das Feld oben
-  auszufüllen („Erika Mustermann, erika@web.de, 0176 1234567" — oder verteilt über
-  mehrere Nachrichten). Trag heraus, was du findest, in \`kontaktName\`,
+- **kontakt** — Der Kunde tippt seine Kontaktdaten in den Chat, statt die Felder in
+  der Karte auszufüllen („Erika Mustermann, erika@web.de, 0176 1234567" — oder
+  verteilt über mehrere Nachrichten). Trag heraus, was du findest, in \`kontaktName\`,
   \`kontaktMail\` und \`kontaktTelefon\`; was fehlt, bleibt leer. Der Chat setzt es
-  oben ein und lässt bestätigen. Nur wenn das Kontaktfeld offen ist (siehe Zustand).
+  in die Felder ein und lässt bestätigen. Nur wenn das Kontaktfeld offen ist (siehe
+  Zustand). BIETE diesen Weg nie von dir aus an: die Felder stehen direkt über der
+  Eingabezeile — wer stattdessen tippt, wird verstanden, aber hingeschickt wird
+  niemand.
 - **mensch** — Der Kunde will mit einer Person sprechen, oder die Frage gehört zu einem
   Menschen (Vertragsdetail, Sonderfall, Beschwerde).
 - **preis** — Der Kunde will den Preis wissen oder ein Angebot.
