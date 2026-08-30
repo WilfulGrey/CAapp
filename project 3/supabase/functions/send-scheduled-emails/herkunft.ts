@@ -23,6 +23,13 @@ export const PORTAL_QUELLEN: Record<string, string> = {
 
 export const PORTAL_PREFIX = "portal:";
 
+/* Betreff. Der Standard-Betreff ("Ihr Angebot zur 24-Stunden-Betreuung")
+ * setzt voraus, dass der Empfaenger weiss, wofuer er ein Angebot bekommt.
+ * Der eingekaufte Lead weiss das nicht — deshalb nennt der Betreff hier
+ * gleich mit, was ihn erwartet (Wortlaut Martin 30.08.). */
+export const PORTAL_BETREFF =
+  "Ihr Angebot für die 24-Stunden-Betreuung – inkl. passender Pflegekräfte";
+
 /** Anzeigename des Portals, oder null fuer eigene/unbekannte Quellen. */
 export function portalHerkunft(source?: string | null): string | null {
   if (!source || typeof source !== "string") return null;
@@ -37,11 +44,11 @@ export function portalHerkunft(source?: string | null): string | null {
  * Die Zahl steht hier bewusst — sie stuetzt an dieser Stelle ein Argument
  * (anders als im Hero, wo sie laut Martin nicht hingehoert). */
 export function portalIntroHtml(portal: string): string {
-  return `vielen Dank für Ihre Anfrage nach einer 24-Stunden-Betreuung über <strong style="color:#2D1F0F;">${portal}</strong>. Darauf müssen Sie bei uns nicht warten: Als <strong style="color:#2D1F0F;">6× in Folge ausgezeichneter Testsieger</strong> bei DIE WELT erhalten Sie Ihr persönliches Angebot sofort — mit festem Preis, ohne Vermittlungsgebühr und mit den Pflegekräften, die für Sie verfügbar sind, direkt zum Einsehen.`;
+  return `Sie haben über <strong style="color:#2D1F0F;">${portal}</strong> eine Betreuung zu Hause angefragt. Ihre Anfrage wurde an uns, Primundus, weitergeleitet.`;
 }
 
 export function portalIntroText(portal: string): string {
-  return `vielen Dank für Ihre Anfrage nach einer 24-Stunden-Betreuung über ${portal}. Darauf müssen Sie bei uns nicht warten: Als 6× in Folge ausgezeichneter Testsieger bei DIE WELT erhalten Sie Ihr persönliches Angebot sofort — mit festem Preis, ohne Vermittlungsgebühr und mit den Pflegekräften, die für Sie verfügbar sind, direkt zum Einsehen.`;
+  return `Sie haben über ${portal} eine Betreuung zu Hause angefragt. Ihre Anfrage wurde an uns, Primundus, weitergeleitet.`;
 }
 
 /* Hinweis ueber der Angaben-Tabelle. Bei eingekauften Leads stammt nur ein
@@ -68,23 +75,20 @@ export function portalAngabenHinweisText(portal: string): string {
  * auf ihn wartet (Martin 30.08.: "ein bisschen erklaerungsbeduerftiger,
  * wenn Du uns nicht kennst").
  *
- * Deshalb hier ein zweiter, frueherer Einstieg. Er beantwortet die drei
- * Fragen, die ein Kaltkontakt an dieser Stelle hat: Was ist das? Was sehe
- * ich dort? Was kostet es mich? Die dritte ist die wichtigste — wer uns
- * nicht kennt, rechnet mit Anmeldung, Formular und einem Vertreter am
- * Telefon.
- *
- * Der Button hinter der Preisbox bleibt: einer fuer die, die sofort
- * klicken, einer fuer die, die erst das Preisargument lesen.
+ * Wortlaut von Martin (30.08.). "Wir koennen Ihnen direkt etwas Konkretes
+ * zeigen" ist der Bruch zur ueblichen Antwort auf eine Portal-Anfrage:
+ * die anderen Anbieter melden sich und fragen nach. Der Button hinter der
+ * Preisbox bleibt — einer fuer die, die sofort klicken, einer fuer die,
+ * die erst das Preisargument lesen.
  */
 export function portalVorschauHtml(ctaUrl: string): string {
   return `
-    <p style="font-size:15px;line-height:1.75;color:#444;margin:0 0 16px;">Ihr Angebot ist bereits berechnet und die Pflegekräfte, die für Sie infrage kommen, sind hinterlegt — <strong style="color:#2D1F0F;">Sie müssen dafür nichts ausfüllen und sich nirgends anmelden.</strong> Ein Klick genügt, und Sie sehen beides.</p>
+    <p style="font-size:15px;line-height:1.75;color:#444;margin:0 0 16px;">Wir können Ihnen direkt etwas Konkretes zeigen:<br />Ihr <strong style="color:#2D1F0F;">persönliches Angebot ist bereits berechnet</strong> – und passende Pflegekräfte, die für Ihre Betreuung infrage kommen, können Sie ebenfalls direkt ansehen.</p>
     <!--[if mso]><table role="presentation" cellpadding="0" cellspacing="0" border="0" align="center"><tr><td><![endif]-->
     <table role="presentation" cellpadding="0" cellspacing="0" border="0" align="center" style="margin:0 auto 28px;border-collapse:separate;">
       <tr>
         <td align="center" bgcolor="#2A9D5C" style="background-color:#2A9D5C;background-image:linear-gradient(180deg,#34B36C 0%,#2A9D5C 100%);border-radius:10px;padding:17px 44px;box-shadow:0 2px 6px rgba(42,157,92,0.25);">
-          <a href="${ctaUrl}" target="_blank" style="color:#ffffff;text-decoration:none;font-weight:600;font-size:16px;letter-spacing:0.01em;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;line-height:1.4;">Angebot &amp; Pflegekräfte jetzt ansehen&nbsp;&nbsp;→</a>
+          <a href="${ctaUrl}" target="_blank" style="color:#ffffff;text-decoration:none;font-weight:600;font-size:16px;letter-spacing:0.01em;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;line-height:1.4;">Angebot &amp; passende Pflegekräfte ansehen&nbsp;&nbsp;→</a>
         </td>
       </tr>
     </table>
@@ -92,7 +96,7 @@ export function portalVorschauHtml(ctaUrl: string): string {
 }
 
 export function portalVorschauText(ctaUrl: string): string {
-  return `Ihr Angebot ist bereits berechnet und die Pflegekräfte, die für Sie infrage kommen, sind hinterlegt — Sie müssen dafür nichts ausfüllen und sich nirgends anmelden. Ein Klick genügt, und Sie sehen beides.
+  return `Wir können Ihnen direkt etwas Konkretes zeigen: Ihr persönliches Angebot ist bereits berechnet – und passende Pflegekräfte, die für Ihre Betreuung infrage kommen, können Sie ebenfalls direkt ansehen.
 
-Angebot & Pflegekräfte jetzt ansehen: ${ctaUrl}`;
+Angebot & passende Pflegekräfte ansehen: ${ctaUrl}`;
 }

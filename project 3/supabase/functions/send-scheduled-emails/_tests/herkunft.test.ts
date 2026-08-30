@@ -6,6 +6,7 @@ import {
   portalIntroText,
   portalVorschauHtml,
   portalVorschauText,
+  PORTAL_BETREFF,
 } from "../herkunft.ts";
 
 Deno.test("eigene Quellen liefern keine Portal-Herkunft", () => {
@@ -35,28 +36,38 @@ Deno.test("unbekanntes Portal faellt auf die normale Mail zurueck", () => {
   assertEquals(portalHerkunft("portal:"), null);
 });
 
-Deno.test("Intro nennt Portal, Sofort-Versprechen und den Beleg", () => {
+Deno.test("Intro erklaert die Herkunft, statt fuer etwas zu danken", () => {
   const html = portalIntroHtml("Pflegehilfe.org");
   assertStringIncludes(html, "Pflegehilfe.org");
-  assertStringIncludes(html, "sofort");
-  assertStringIncludes(html, "6× in Folge");
-  assertStringIncludes(html, "ohne Vermittlungsgebühr");
+  assertStringIncludes(html, "weitergeleitet");
+  assertStringIncludes(html, "Primundus");
+  // Der Kunde hat bei UNS nichts angefragt — kein Dank fuer eine Anfrage,
+  // die es aus seiner Sicht nie gab.
+  assertEquals(/vielen Dank für Ihre Anfrage/i.test(html), false);
 });
 
 /* Primundus beschaeftigt die Kraefte selbst — "wir vermitteln" darf in
- * Kundentexten nicht vorkommen. "ohne Vermittlungsgebuehr" ist der
- * abgesegnete USP-Wortlaut und deshalb erlaubt. */
-Deno.test("Intro behauptet keine Vermittlung", () => {
-  for (const t of [portalIntroHtml("Pflegehilfe.org"), portalIntroText("Pflegehilfe.org")]) {
-    assertEquals(/wir vermitteln/i.test(t), false);
-  }
+ * Kundentexten nicht vorkommen. */
+Deno.test("Texte behaupten keine Vermittlung", () => {
+  const alle = [
+    portalIntroHtml("Pflegehilfe.org"),
+    portalIntroText("Pflegehilfe.org"),
+    portalVorschauHtml("https://x.example/t"),
+    portalVorschauText("https://x.example/t"),
+  ];
+  for (const t of alle) assertEquals(/wir vermitteln/i.test(t), false);
 });
 
 Deno.test("Textfassung traegt dieselbe Aussage ohne Markup", () => {
   const text = portalIntroText("Pflegebund.eu");
   assertStringIncludes(text, "Pflegebund.eu");
-  assertStringIncludes(text, "6× in Folge");
+  assertStringIncludes(text, "weitergeleitet");
   assertEquals(text.includes("<strong"), false);
+});
+
+Deno.test("Betreff sagt dem Kaltkontakt, was ihn erwartet", () => {
+  assertStringIncludes(PORTAL_BETREFF, "Angebot");
+  assertStringIncludes(PORTAL_BETREFF, "Pflegekräfte");
 });
 
 Deno.test("Angaben-Hinweis sagt, dass wir Luecken angenommen haben", () => {
@@ -68,13 +79,13 @@ Deno.test("Angaben-Hinweis sagt, dass wir Luecken angenommen haben", () => {
 /* Kaltkontakt: der Einstiegs-CTA muss die drei Fragen beantworten, die
  * jemand hat, der uns nicht kennt — was ist das, was sehe ich, was kostet
  * es mich. Vor allem die letzte: er rechnet mit Anmeldung und Vertreter. */
-Deno.test("Einstiegs-CTA nimmt dem Kaltkontakt die Huerde", () => {
+Deno.test("Einstiegs-CTA zeigt sofort etwas Konkretes", () => {
   const html = portalVorschauHtml("https://kundenportal.primundus.de/x?token=abc");
-  assertStringIncludes(html, "nichts ausfüllen");
-  assertStringIncludes(html, "nirgends anmelden");
+  assertStringIncludes(html, "bereits berechnet");
   assertStringIncludes(html, "Pflegekräfte");
   assertStringIncludes(html, "https://kundenportal.primundus.de/x?token=abc");
 });
+
 
 Deno.test("Einstiegs-CTA auch in der Textfassung, mit Link", () => {
   const t = portalVorschauText("https://kundenportal.primundus.de/x?token=abc");

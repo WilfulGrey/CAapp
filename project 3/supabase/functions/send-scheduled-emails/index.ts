@@ -35,6 +35,7 @@ import {
   portalAngabenHinweisText,
   portalVorschauHtml,
   portalVorschauText,
+  PORTAL_BETREFF,
 } from "./herkunft.ts";
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -1125,7 +1126,9 @@ ${buildHeimVergleichText(lead)}
 `
     : "";
 
-  const headerLine = isResubmit
+  const headerLine = portalHerkunft(lead.source)
+    ? PORTAL_BETREFF
+    : isResubmit
     ? "Ihr aktualisiertes Angebot zur 24-Stunden-Betreuung – Primundus"
     : "Ihr Angebot zur 24-Stunden-Betreuung – Primundus";
 
@@ -2245,7 +2248,12 @@ Deno.serve(async (req: Request) => {
           // Re-Submit-Check: hat der Kunde schon mal eine Eingangsbest\u00e4tigung
           // bekommen? Falls ja \u2192 angepasste Wording-Variante.
           const isResubmit = await hasPreviousEingangsbestaetigungSent(supabase, scheduledEmail.lead_id);
-          subject = isResubmit
+          /* Eingekaufter Lead: eigener Betreff. Der Standard setzt voraus,
+             dass der Empfaenger weiss, wofuer er ein Angebot bekommt — der
+             Kaltkontakt weiss das nicht. Herkunft schlaegt Resubmit. */
+          subject = portalHerkunft((lead as Lead).source)
+            ? PORTAL_BETREFF
+            : isResubmit
             ? "Ihr aktualisiertes Angebot zur 24-Stunden-Betreuung \u2013 Primundus"
             : "Ihr Angebot zur 24-Stunden-Betreuung \u2013 Primundus";
           html = buildEingangsbestaetigungHtml(lead as Lead, smtpConfig.siteUrl, portalBase, isResubmit);
