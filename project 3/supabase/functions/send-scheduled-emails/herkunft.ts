@@ -55,8 +55,27 @@ export function portalIntroText(portal: string): string {
 
 /* Website-CTA-Farbe (#E76F63) statt des gruenen Standard-Buttons: der
  * Empfaenger kennt uns nicht und landet gleich auf der Seite — die Mail
- * soll aussehen wie das, was ihn dort erwartet (Martin 30.08.). */
-const CTA_ROT = "#E76F63";
+ * soll aussehen wie das, was ihn dort erwartet (Martin 30.08.).
+ *
+ * Gilt fuer BEIDE Buttons der Mail. Zwei Farben in einer Mail lesen sich
+ * als zwei verschiedene Angebote ("oben in der Farbe und unten in einer
+ * anderen geht nicht", Martin 30.08.) — deshalb faerbt index.ts auch den
+ * Button hinter der Preisbox hiermit ein, sobald es ein Portal-Lead ist. */
+export const PORTAL_CTA_FARBE = "#E76F63";
+
+/** Der Button, einmal gebaut — beide Stellen der Mail nutzen ihn. */
+export function portalCtaButtonHtml(ctaUrl: string, beschriftung: string, margin: string): string {
+  return `
+    <!--[if mso]><table role="presentation" cellpadding="0" cellspacing="0" border="0" align="center"><tr><td><![endif]-->
+    <table role="presentation" cellpadding="0" cellspacing="0" border="0" align="center" style="margin:${margin};border-collapse:separate;">
+      <tr>
+        <td align="center" bgcolor="${PORTAL_CTA_FARBE}" style="background-color:${PORTAL_CTA_FARBE};border-radius:12px;padding:18px 44px;box-shadow:0 4px 14px rgba(231,111,99,0.32);">
+          <a href="${ctaUrl}" target="_blank" style="color:#ffffff;text-decoration:none;font-weight:700;font-size:17px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;line-height:1.4;">${beschriftung}&nbsp;&nbsp;→</a>
+        </td>
+      </tr>
+    </table>
+    <!--[if mso]></td></tr></table><![endif]-->`;
+}
 
 /* Die Plakette von der Startseite, nur in E-Mail-Technik: fuenf Gesichter
  * und die Aussage daneben. Sie ist der Grund, warum jemand klickt, der uns
@@ -74,7 +93,7 @@ function avatarZellen(siteUrl: string): string {
   return [1, 2, 3, 4, 5]
     .map(
       (i) =>
-        `<td style="padding:0 2px;"><img src="${siteUrl}/images/caregivers/pk-${i}.jpg" width="30" height="30" alt="" style="display:block;width:30px;height:30px;border-radius:15px;border:2px solid #ffffff;" /></td>`,
+        `<td style="padding:0 1px;"><img src="${siteUrl}/images/caregivers/pk-${i}.jpg" width="24" height="24" alt="" style="display:block;width:24px;height:24px;border-radius:12px;border:2px solid #ffffff;" /></td>`,
     )
     .join("");
 }
@@ -83,12 +102,12 @@ export function portalKraeftePlaketteHtml(siteUrl: string, ctaUrl: string): stri
   return `
     <table role="presentation" cellpadding="0" cellspacing="0" border="0" align="center" style="margin:0 auto 30px;border-collapse:separate;">
       <tr>
-        <td align="center" bgcolor="#F0F7F1" style="background-color:#F0F7F1;border:1px solid #A8D5B0;border-radius:26px;padding:8px 18px;">
+        <td align="center" bgcolor="#F0F7F1" style="background-color:#F0F7F1;border:1px solid #A8D5B0;border-radius:20px;padding:5px 14px;">
           <a href="${ctaUrl}" target="_blank" style="text-decoration:none;color:#3A6B42;">
             <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="border-collapse:separate;">
               <tr>
                 ${avatarZellen(siteUrl)}
-                <td style="padding:0 0 0 10px;font-size:14px;color:#3A6B42;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;white-space:nowrap;"><strong style="color:#2D1F0F;">5 passende Pflegekräfte</strong> für Sie&nbsp;&nbsp;→</td>
+                <td style="padding:0 0 0 8px;font-size:12px;color:#3A6B42;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;white-space:nowrap;"><strong style="color:#2D1F0F;">5 passende Pflegekräfte</strong> für Sie&nbsp;&nbsp;→</td>
               </tr>
             </table>
           </a>
@@ -105,15 +124,7 @@ export function portalVorschauHtml(siteUrl: string, ctaUrl: string): string {
     ${p(`Auf Basis Ihrer Angaben haben wir Ihr <strong style="color:#2D1F0F;">persönliches Angebot bereits berechnet</strong>. Preis und Konditionen finden Sie direkt in dieser E-Mail.`)}
     ${p(`Bei Primundus geht es aber um mehr als nur den Preis: Sie können verfügbare Pflegekräfte direkt einsehen, vergleichen und Ihre Wunsch-Pflegekraft selbst auswählen – ohne sich vorher vertraglich zu binden.`)}
     ${p(`So wissen Sie von Anfang an, was die Betreuung kostet und wer für Sie infrage kommt.`)}
-    <!--[if mso]><table role="presentation" cellpadding="0" cellspacing="0" border="0" align="center"><tr><td><![endif]-->
-    <table role="presentation" cellpadding="0" cellspacing="0" border="0" align="center" style="margin:22px auto 14px;border-collapse:separate;">
-      <tr>
-        <td align="center" bgcolor="${CTA_ROT}" style="background-color:${CTA_ROT};border-radius:12px;padding:18px 44px;box-shadow:0 4px 14px rgba(231,111,99,0.32);">
-          <a href="${ctaUrl}" target="_blank" style="color:#ffffff;text-decoration:none;font-weight:700;font-size:17px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;line-height:1.4;">Angebot &amp; passende Pflegekräfte ansehen&nbsp;&nbsp;→</a>
-        </td>
-      </tr>
-    </table>
-    <!--[if mso]></td></tr></table><![endif]-->
+    ${portalCtaButtonHtml(ctaUrl, "Angebot &amp; passende Pflegekräfte ansehen", "22px auto 14px")}
     ${portalKraeftePlaketteHtml(siteUrl, ctaUrl)}`;
 }
 

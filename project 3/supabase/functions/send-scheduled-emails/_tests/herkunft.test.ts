@@ -7,6 +7,7 @@ import {
   portalVorschauHtml,
   portalVorschauText,
   portalKraeftePlaketteHtml,
+  portalCtaButtonHtml,
   PORTAL_BETREFF,
 } from "../herkunft.ts";
 
@@ -115,4 +116,22 @@ Deno.test("Textfassung traegt dieselben Aussagen ohne Markup", () => {
 Deno.test("Betreff sagt dem Kaltkontakt, was ihn erwartet", () => {
   assertStringIncludes(PORTAL_BETREFF, "Angebot");
   assertStringIncludes(PORTAL_BETREFF, "Pflegekräfte");
+});
+
+/* Beide Buttons der Mail kommen aus derselben Funktion — zwei Farben in
+ * einer Mail lesen sich als zwei verschiedene Angebote. */
+Deno.test("Button-Bauer traegt immer die Website-Farbe", () => {
+  const oben = portalCtaButtonHtml(CTA, "Angebot ansehen", "22px auto 14px");
+  const unten = portalCtaButtonHtml(CTA, "Angebot ansehen", "8px auto 30px");
+  for (const b of [oben, unten]) {
+    assertStringIncludes(b, "#E76F63");
+    assertEquals(b.includes("#2A9D5C"), false);
+  }
+});
+
+/* Dezent wie auf der Startseite: 24px-Gesichter, 12px-Text. */
+Deno.test("Plakette bleibt klein", () => {
+  const html = portalKraeftePlaketteHtml(SITE, CTA);
+  assertStringIncludes(html, "width:24px");
+  assertStringIncludes(html, "font-size:12px");
 });

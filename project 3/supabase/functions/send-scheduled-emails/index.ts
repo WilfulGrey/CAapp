@@ -35,6 +35,7 @@ import {
   portalAngabenHinweisText,
   portalVorschauHtml,
   portalVorschauText,
+  portalCtaButtonHtml,
   PORTAL_BETREFF,
 } from "./herkunft.ts";
 const corsHeaders = {
@@ -918,6 +919,11 @@ async function hasPreviousEingangsbestaetigungSent(supabase: any, leadId: string
 
 export function buildEingangsbestaetigungHtml(lead: Lead, siteUrl: string, portalBase: string, isResubmit: boolean = false): string {
   const greeting = buildEingangsGreeting(lead);
+  /* Eingekaufter Lead: der Kunde hat NICHT bei uns angefragt, sondern beim
+     Portal — und wartet dort gerade auf mehrere Anbieter. Kopf, Betreff und
+     beide Buttons haengen daran. Herkunft schlaegt Resubmit: ein
+     eingekaufter Lead ist per Definition der erste Kontakt. */
+  const herkunft = portalHerkunft(lead.source);
   const fd = (lead.kalkulation as any)?.formularDaten || {};
   const careStartTiming = (lead as any).care_start_timing || "";
 
@@ -1009,7 +1015,13 @@ export function buildEingangsbestaetigungHtml(lead: Lead, siteUrl: string, porta
     </table>`;
 
   // ── CTA-Button (Gradient + Schatten, mit Outlook-Fallback) ────────────────
-  const cta = `
+  /* Portal-Lead: derselbe Button wie oben. Zwei Farben in einer Mail
+     lesen sich als zwei verschiedene Angebote (Martin 30.08.). Fuer alle
+     anderen Leads bleibt der eingefuehrte gruene Button unangetastet —
+     die Kette laeuft und ist gemessen. */
+  const cta = herkunft
+    ? portalCtaButtonHtml(ctaUrl, "Angebot &amp; passende Pflegekräfte ansehen", "8px auto 30px")
+    : `
     <!--[if mso]><table role="presentation" cellpadding="0" cellspacing="0" border="0" align="center"><tr><td><![endif]-->
     <table role="presentation" cellpadding="0" cellspacing="0" border="0" align="center" style="margin:8px auto 30px;border-collapse:separate;">
       <tr>
@@ -1046,13 +1058,6 @@ export function buildEingangsbestaetigungHtml(lead: Lead, siteUrl: string, porta
       <tr><td style="padding:12px 20px;background:#FAF8F4;border-bottom:1px solid #ebe2d2;"><p style="margin:0;${psLabel}">Anforderungen an die Pflegekraft</p></td></tr>
       <tr><td style="padding:14px 20px 16px;"><table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="font-size:14px;color:#555;line-height:1.7;">${section2}</table></td></tr>
     </table>`;
-
-  /* Eingekaufter Lead: der Kunde hat NICHT bei uns angefragt, sondern beim
-     Portal — und wartet dort gerade auf mehrere Anbieter. Der erste Satz
-     muss deshalb den Bezug zu SEINER Anfrage herstellen, sonst liest sich
-     die Mail wie Kaltwerbung. Herkunft schlaegt Resubmit: ein eingekaufter
-     Lead ist per Definition der erste Kontakt. */
-  const herkunft = portalHerkunft(lead.source);
 
   const introParagraph = herkunft
     ? portalIntroHtml(herkunft)
