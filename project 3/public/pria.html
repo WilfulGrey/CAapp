@@ -2314,11 +2314,19 @@ function pillePruefen(){
   const abKopf = anker ? scrollY + innerHeight*0.9 - ankerOben() : scrollY;
   if(anker && abKopf < innerHeight*0.5) return;
   const basis = anker ? abKopf - innerHeight*0.5 : scrollY;
-  pilleSetzen(Math.floor(Math.max(0,basis)/(innerHeight*1.5)));
+  /* Eine Bildschirmhoehe je Frage. Vorher 1,5 — da wechselte sie bei
+     normalem Lesen kaum sichtbar (Martin, 30.08.: „wenn ich scrolle,
+     aendern sich die fragen nicht"). */
+  pilleSetzen(Math.floor(Math.max(0,basis)/innerHeight));
 }
 addEventListener('scroll',pillePruefen,{passive:true});
 
-function versteckePille(){ pille.classList.remove('on'); }
+function versteckePille(){
+  pille.classList.remove('on');
+  /* Zaehler zuruecksetzen: sonst steigt pilleSetzen beim Wiederkommen mit
+     demselben Index frueh aus und die Pille bliebe unsichtbar. */
+  frageNr=-1;
+}
 
 /* ─── Handy: Seite festhalten und Tastatur ausgleichen ──────────────
    Zwei Dinge, die auf dem iPhone schiefgingen (Martin, 22.08.): Beim Tippen
@@ -2615,12 +2623,28 @@ const SEITE=document;
 
    Fehlt der Abschnitt (Prototyp-Seiten, Voll-Chat), gilt die alte Regel:
    eine gute halbe Bildschirmhoehe Scrollen. */
-const anker=SEITE.getElementById('ablauf');
+/* Die Seite rendert den Abschnitt ZWEIMAL — einmal in `lg:hidden` fuers
+   Handy, einmal in `hidden lg:block` fuer den Desktop — und beide tragen
+   dieselbe id. `getElementById` liefert die ERSTE, und das ist auf dem
+   Desktop die unsichtbare mit Hoehe 0 an Position 0. Folge (Martin, 30.08.,
+   Screenshot): Pria stand sofort im Hero, weil „Anker erreicht" ab dem
+   ersten Pixel galt. Auf dem Handy fiel es nicht auf, weil dort zufaellig
+   die sichtbare zuerst kommt.
+   Deshalb: die SICHTBARE nehmen, und bei jedem Aufruf neu — beim Drehen
+   des Geraets wechselt sie. */
+const ANKER_ID='ablauf';
+function ankerEl(){
+  const alle=SEITE.querySelectorAll('#'+ANKER_ID);
+  for(const e of alle){ if(e.getBoundingClientRect().height>0) return e; }
+  return alle[0]||null;
+}
+const anker=ankerEl();
 /* Absolute Lage des Ankers im Dokument. Bei jedem Aufruf neu gemessen:
    Bilder laden nach und der Rechner waechst beim Ausfuellen — eine einmal
    gemerkte Zahl waere nach zwei Schritten falsch. */
 function ankerOben(){
-  return anker ? anker.getBoundingClientRect().top + scrollY : 0;
+  const e=ankerEl();
+  return e ? e.getBoundingClientRect().top + scrollY : 0;
 }
 /* ZWEI-WEGE-Regel (Martin, 29.08.): Pria kommt, sobald der Abschnitt ins
    Bild rueckt — und geht wieder, wenn der Leser darueber zurueckscrollt.
