@@ -27,6 +27,13 @@ import {
   imBewertungsfenster,
   type BewertungsLead,
 } from "./bewertung.ts";
+import {
+  portalHerkunft,
+  portalIntroHtml,
+  portalIntroText,
+  portalAngabenHinweisHtml,
+  portalAngabenHinweisText,
+} from "./herkunft.ts";
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
@@ -52,6 +59,9 @@ interface Lead {
   kalkulation: any;
   token: string;
   status: string;
+  /* Herkunft des Leads: "rechner" (Formular), "pria-chat" oder
+     "portal:<domain>" fuer eingekaufte Leads (siehe portalHerkunft). */
+  source?: string | null;
 }
  
 interface SmtpConfig {
@@ -1034,9 +1044,26 @@ export function buildEingangsbestaetigungHtml(lead: Lead, siteUrl: string, porta
       <tr><td style="padding:14px 20px 16px;"><table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="font-size:14px;color:#555;line-height:1.7;">${section2}</table></td></tr>
     </table>`;
 
-  const introParagraph = isResubmit
+  /* Eingekaufter Lead: der Kunde hat NICHT bei uns angefragt, sondern beim
+     Portal — und wartet dort gerade auf mehrere Anbieter. Der erste Satz
+     muss deshalb den Bezug zu SEINER Anfrage herstellen, sonst liest sich
+     die Mail wie Kaltwerbung. Herkunft schlaegt Resubmit: ein eingekaufter
+     Lead ist per Definition der erste Kontakt. */
+  const herkunft = portalHerkunft(lead.source);
+
+  const introParagraph = herkunft
+    ? portalIntroHtml(herkunft)
+    : isResubmit
     ? `vielen Dank für Ihre erneute Anfrage. Wir haben Ihre aktualisierten Angaben übernommen und Ihr <strong style="color:#2D1F0F;">Angebot für die 24-Stunden-Betreuung zu Hause</strong> entsprechend angepasst. Im Kundenportal warten bereits Pflegekräfte, die zu Ihrem Bedarf passen.`
     : `vielen Dank für Ihre Anfrage. Auf Basis Ihrer Angaben haben wir Ihr <strong style="color:#2D1F0F;">Angebot für die 24-Stunden-Betreuung zu Hause</strong> erstellt. Im Kundenportal warten bereits Pflegekräfte, die zu Ihrem Bedarf passen.`;
+
+  /* Bei eingekauften Leads sind nicht alle Angaben vom Kunden: was das
+     Portal nicht liefert, nehmen wir bewusst zum teureren Wert an (lieber
+     ein Preis, der faellt, als einer, der steigt). Das gehoert ueber die
+     Tabelle geschrieben — sonst wundert sich der Kunde, woher wir Dinge
+     wissen, die er nie gesagt hat. Gleichzeitig der beste Grund, das
+     Portal zu oeffnen. */
+  const angabenHinweis = herkunft ? portalAngabenHinweisHtml(herkunft) : "";
 
   const content = `
     <p style="font-size:15px;line-height:1.75;color:#444;margin-bottom:14px;">${greeting},</p>
@@ -1047,6 +1074,8 @@ export function buildEingangsbestaetigungHtml(lead: Lead, siteUrl: string, porta
     ${cta}
 
     ${stepsTable}
+
+    ${angabenHinweis}
 
     ${angabenTable}
 
@@ -1095,9 +1124,15 @@ ${buildHeimVergleichText(lead)}
     ? "Ihr aktualisiertes Angebot zur 24-Stunden-Betreuung – Primundus"
     : "Ihr Angebot zur 24-Stunden-Betreuung – Primundus";
 
-  const introPlain = isResubmit
+  const herkunftPlain = portalHerkunft(lead.source);
+
+  const introPlain = herkunftPlain
+    ? portalIntroText(herkunftPlain)
+    : isResubmit
     ? "vielen Dank für Ihre erneute Anfrage. Wir haben Ihre aktualisierten Angaben übernommen und Ihr Angebot für die 24-Stunden-Betreuung zu Hause entsprechend angepasst. Im Kundenportal warten bereits Pflegekräfte, die zu Ihrem Bedarf passen."
     : "vielen Dank für Ihre Anfrage. Auf Basis Ihrer Angaben haben wir Ihr Angebot für die 24-Stunden-Betreuung zu Hause erstellt. Im Kundenportal warten bereits Pflegekräfte, die zu Ihrem Bedarf passen.";
+
+  const angabenHinweisPlain = herkunftPlain ? portalAngabenHinweisText(herkunftPlain) + "\n\n" : "";
 
   // Sektion 2 (Anforderungen an die Pflegekraft) — null-Werte ausblenden.
   const anf: string[] = [`Deutschkenntnisse: ${eingangsLabel("deutschkenntnisse", fd.deutschkenntnisse)}`];
@@ -1121,7 +1156,7 @@ SO GEHT ES WEITER
 
 PFLEGESITUATION & ANFORDERUNGEN
 
-Betreuung für: ${eingangsLabel("betreuung_fuer", fd.betreuung_fuer)}
+${angabenHinweisPlain}Betreuung für: ${eingangsLabel("betreuung_fuer", fd.betreuung_fuer)}
 Pflegegrad: ${fd.pflegegrad ? `Pflegegrad ${fd.pflegegrad}` : "Nicht angegeben"}
 Weitere Personen im Haushalt: ${eingangsLabel("weitere_personen", fd.weitere_personen)}
 Mobilität: ${eingangsLabel("mobilitaet", fd.mobilitaet)}
