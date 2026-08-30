@@ -33,6 +33,8 @@ import {
   portalIntroText,
   portalAngabenHinweisHtml,
   portalAngabenHinweisText,
+  portalVorschauHtml,
+  portalVorschauText,
 } from "./herkunft.ts";
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -1064,10 +1066,13 @@ export function buildEingangsbestaetigungHtml(lead: Lead, siteUrl: string, porta
      wissen, die er nie gesagt hat. Gleichzeitig der beste Grund, das
      Portal zu oeffnen. */
   const angabenHinweis = herkunft ? portalAngabenHinweisHtml(herkunft) : "";
+  const vorschauBlock = herkunft ? portalVorschauHtml(ctaUrl) : "";
 
   const content = `
     <p style="font-size:15px;line-height:1.75;color:#444;margin-bottom:14px;">${greeting},</p>
     <p style="font-size:15px;line-height:1.75;color:#444;margin-bottom:24px;">${introParagraph}</p>
+
+    ${vorschauBlock}
 
     ${priceStage}
 
@@ -1133,6 +1138,7 @@ ${buildHeimVergleichText(lead)}
     : "vielen Dank für Ihre Anfrage. Auf Basis Ihrer Angaben haben wir Ihr Angebot für die 24-Stunden-Betreuung zu Hause erstellt. Im Kundenportal warten bereits Pflegekräfte, die zu Ihrem Bedarf passen.";
 
   const angabenHinweisPlain = herkunftPlain ? portalAngabenHinweisText(herkunftPlain) + "\n\n" : "";
+  const vorschauPlain = herkunftPlain ? portalVorschauText(ctaUrl) + "\n\n" : "";
 
   // Sektion 2 (Anforderungen an die Pflegekraft) — null-Werte ausblenden.
   const anf: string[] = [`Deutschkenntnisse: ${eingangsLabel("deutschkenntnisse", fd.deutschkenntnisse)}`];
@@ -1146,7 +1152,7 @@ ${greeting},
 
 ${introPlain}
 
-${priceLine}Angebot & Pflegekräfte ansehen: ${ctaUrl}
+${vorschauPlain}${priceLine}Angebot & Pflegekräfte ansehen: ${ctaUrl}
 
 SO GEHT ES WEITER
 

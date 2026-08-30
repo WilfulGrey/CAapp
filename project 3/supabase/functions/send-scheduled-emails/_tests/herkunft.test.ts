@@ -4,6 +4,8 @@ import {
   portalHerkunft,
   portalIntroHtml,
   portalIntroText,
+  portalVorschauHtml,
+  portalVorschauText,
 } from "../herkunft.ts";
 
 Deno.test("eigene Quellen liefern keine Portal-Herkunft", () => {
@@ -61,4 +63,21 @@ Deno.test("Angaben-Hinweis sagt, dass wir Luecken angenommen haben", () => {
   const h = portalAngabenHinweisHtml("Pflegehilfe.org");
   assertStringIncludes(h, "angenommen");
   assertStringIncludes(h, "korrigieren");
+});
+
+/* Kaltkontakt: der Einstiegs-CTA muss die drei Fragen beantworten, die
+ * jemand hat, der uns nicht kennt — was ist das, was sehe ich, was kostet
+ * es mich. Vor allem die letzte: er rechnet mit Anmeldung und Vertreter. */
+Deno.test("Einstiegs-CTA nimmt dem Kaltkontakt die Huerde", () => {
+  const html = portalVorschauHtml("https://kundenportal.primundus.de/x?token=abc");
+  assertStringIncludes(html, "nichts ausfüllen");
+  assertStringIncludes(html, "nirgends anmelden");
+  assertStringIncludes(html, "Pflegekräfte");
+  assertStringIncludes(html, "https://kundenportal.primundus.de/x?token=abc");
+});
+
+Deno.test("Einstiegs-CTA auch in der Textfassung, mit Link", () => {
+  const t = portalVorschauText("https://kundenportal.primundus.de/x?token=abc");
+  assertStringIncludes(t, "https://kundenportal.primundus.de/x?token=abc");
+  assertEquals(t.includes("<a "), false);
 });

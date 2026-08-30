@@ -57,3 +57,42 @@ export function portalAngabenHinweisHtml(portal: string): string {
 export function portalAngabenHinweisText(portal: string): string {
   return `Diese Angaben haben wir aus Ihrer Anfrage bei ${portal} übernommen und dort, wo uns etwas fehlte, vorsichtig angenommen. Im Kundenportal können Sie alles in einer Minute korrigieren — der Preis passt sich sofort an.`;
 }
+
+/* ─── Einstiegs-CTA fuer Kaltkontakte ────────────────────────────────────
+ *
+ * Der normale Empfaenger kommt aus unserem Kostenrechner: er kennt die
+ * Seite, hat den Preis schon gesehen und weiss, was ein Klick bringt. Der
+ * eingekaufte Lead kennt uns NICHT — fuer ihn ist die Mail der erste
+ * Kontakt ueberhaupt. Der bestehende Button steht erst hinter der
+ * Preisbox; bis dahin weiss dieser Leser gar nicht, dass etwas Fertiges
+ * auf ihn wartet (Martin 30.08.: "ein bisschen erklaerungsbeduerftiger,
+ * wenn Du uns nicht kennst").
+ *
+ * Deshalb hier ein zweiter, frueherer Einstieg. Er beantwortet die drei
+ * Fragen, die ein Kaltkontakt an dieser Stelle hat: Was ist das? Was sehe
+ * ich dort? Was kostet es mich? Die dritte ist die wichtigste — wer uns
+ * nicht kennt, rechnet mit Anmeldung, Formular und einem Vertreter am
+ * Telefon.
+ *
+ * Der Button hinter der Preisbox bleibt: einer fuer die, die sofort
+ * klicken, einer fuer die, die erst das Preisargument lesen.
+ */
+export function portalVorschauHtml(ctaUrl: string): string {
+  return `
+    <p style="font-size:15px;line-height:1.75;color:#444;margin:0 0 16px;">Ihr Angebot ist bereits berechnet und die Pflegekräfte, die für Sie infrage kommen, sind hinterlegt — <strong style="color:#2D1F0F;">Sie müssen dafür nichts ausfüllen und sich nirgends anmelden.</strong> Ein Klick genügt, und Sie sehen beides.</p>
+    <!--[if mso]><table role="presentation" cellpadding="0" cellspacing="0" border="0" align="center"><tr><td><![endif]-->
+    <table role="presentation" cellpadding="0" cellspacing="0" border="0" align="center" style="margin:0 auto 28px;border-collapse:separate;">
+      <tr>
+        <td align="center" bgcolor="#2A9D5C" style="background-color:#2A9D5C;background-image:linear-gradient(180deg,#34B36C 0%,#2A9D5C 100%);border-radius:10px;padding:17px 44px;box-shadow:0 2px 6px rgba(42,157,92,0.25);">
+          <a href="${ctaUrl}" target="_blank" style="color:#ffffff;text-decoration:none;font-weight:600;font-size:16px;letter-spacing:0.01em;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;line-height:1.4;">Angebot &amp; Pflegekräfte jetzt ansehen&nbsp;&nbsp;→</a>
+        </td>
+      </tr>
+    </table>
+    <!--[if mso]></td></tr></table><![endif]-->`;
+}
+
+export function portalVorschauText(ctaUrl: string): string {
+  return `Ihr Angebot ist bereits berechnet und die Pflegekräfte, die für Sie infrage kommen, sind hinterlegt — Sie müssen dafür nichts ausfüllen und sich nirgends anmelden. Ein Klick genügt, und Sie sehen beides.
+
+Angebot & Pflegekräfte jetzt ansehen: ${ctaUrl}`;
+}
