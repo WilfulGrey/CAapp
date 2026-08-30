@@ -28,9 +28,22 @@ const widget = readFileSync(join(WURZEL, 'public/pria-widget.js'), 'utf8');
 describe('Pria — Auftritt', () => {
   it('hängt am Abschnitt „So funktioniert\'s" (#ablauf), nicht mehr am Formular', () => {
     expect(widget, 'Anker #ablauf fehlt — Pria startet wieder nach Pixeln')
-      .toMatch(/getElementById\(\s*['"]ablauf['"]\s*\)/);
+      .toMatch(/ANKER_ID\s*=\s*['"]ablauf['"]/);
     expect(widget, 'Die alte Formular-Bremse ist zurück: der Auftritt darf nicht an den Kostenrechner-Karten hängen')
       .not.toMatch(/imBild\.size\s*===\s*0/);
+  });
+
+  it('nimmt die SICHTBARE Sektion, nicht einfach die erste', () => {
+    /* Die Seite rendert „So funktioniert's" zweimal — `lg:hidden` fürs Handy,
+       `hidden lg:block` für den Desktop — beide mit derselben id. `getElementById`
+       liefert die erste; auf dem Desktop ist das die unsichtbare mit Höhe 0 an
+       Position 0. Pria stand dadurch sofort im Hero (Martin, 30.08.). Auf dem
+       Handy fiel es nicht auf, weil dort zufällig die sichtbare zuerst kommt —
+       genau die Sorte Fehler, die man auf einem Gerät nie sieht. */
+    expect(widget, 'getElementById ist zurück — auf dem Desktop trifft es die unsichtbare Sektion')
+      .not.toMatch(/getElementById\(\s*['"]ablauf['"]\s*\)/);
+    expect(widget, 'Es wird nicht auf Sichtbarkeit geprüft')
+      .toMatch(/getBoundingClientRect\(\)\.height\s*>\s*0/);
   });
 
   it('behält eine Regel für Seiten ohne diesen Abschnitt', () => {
