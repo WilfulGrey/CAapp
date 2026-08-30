@@ -1409,14 +1409,34 @@ async function matching(){
   await pause(800);ok(2);tipp([10,40,10]);
   document.getElementById('status').textContent=untertitel;
   prog.style.width='100%';
-  await sagen('Fertig. Ihr Preis ist berechnet — und ich habe <b>5 verfügbare Pflegekräfte</b> gefunden, '+
-              'die zu Ihrer Situation passen.');
-  await pause(ruhig?0:420);
-  // Begründung für die Kontaktdaten: die Profile sind echte Menschen. Das ist der
-  // ehrliche Datenschutz-Grund — und der überzeugendere.
-  await sagen('Die Profile echter Pflegekräfte dürfen wir nicht offen im Netz zeigen. Ich richte Ihnen '+
-              'deshalb einen <b>geschützten Zugang</b> ein — dafür brauche ich nur Ihre Kontaktdaten.',
-              'Sie sehen Preis und Pflegekräfte sofort, eine Kopie schicke ich zusätzlich per E-Mail. 100 % kostenfrei und unverbindlich.');
+  /* Zwei Abschlüsse, weil die Protokolle einen klaren Abbruchpunkt zeigen:
+     von zwölf Sitzungen, die den Fragenlauf durchhatten, brachen elf auf der
+     Kontaktabfrage ab (27.-29.08.). Der alte Text sagte erst „Fertig, Ihr Preis
+     ist berechnet" und nahm den Preis im nächsten Satz wieder weg — samt
+     Begründung, die die Schranke erst recht sichtbar machte. Das Formular des
+     Kostenrechners verlangt DIESELBEN drei Pflichtfelder, fragt aber nur nach
+     der Lieferadresse („Wohin dürfen wir Ihr Angebot senden?") und konvertiert
+     deutlich besser. Der Float übernimmt diese Rahmung; der Voll-Chat behält
+     den alten Wortlaut, bis die Seite wieder Verkehr bekommt (Martin, 30.08.:
+     „die voll bleibt erstmal raus") — sonst vermischen sich die Messungen. */
+  if(VOLL){
+    await sagen('Fertig. Ihr Preis ist berechnet — und ich habe <b>5 verfügbare Pflegekräfte</b> gefunden, '+
+                'die zu Ihrer Situation passen.');
+    await pause(ruhig?0:420);
+    // Begründung für die Kontaktdaten: die Profile sind echte Menschen. Das ist der
+    // ehrliche Datenschutz-Grund — und der überzeugendere.
+    await sagen('Die Profile echter Pflegekräfte dürfen wir nicht offen im Netz zeigen. Ich richte Ihnen '+
+                'deshalb einen <b>geschützten Zugang</b> ein — dafür brauche ich nur Ihre Kontaktdaten.',
+                'Sie sehen Preis und Pflegekräfte sofort, eine Kopie schicke ich zusätzlich per E-Mail. 100 % kostenfrei und unverbindlich.');
+  } else {
+    // Die Häkchen-Animation darüber endet bereits mit „Ihr Sofortangebot steht" —
+    // die gute Nachricht ist gesagt. Hier nur noch, WAS gefunden wurde, und die
+    // Lieferfrage. Kein Preis-Versprechen, das der nächste Satz zurücknimmt.
+    await sagen('<b>5 passende Pflegekräfte</b> habe ich für Sie gefunden.');
+    await pause(ruhig?0:420);
+    await sagen('Wohin darf ich Ihr Angebot schicken?',
+                'Preis und Profile sehen Sie direkt im Anschluss — die E-Mail ist nur Ihre Kopie zum Nachlesen. Kostenlos, unverbindlich, kein Vertrag vor Ihrer Auswahl.');
+  }
   kontakt();
 }
 /* Übergabe ins Kundenportal — sichtbarer Countdown statt Seitensprung,
