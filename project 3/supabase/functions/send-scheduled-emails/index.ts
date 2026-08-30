@@ -1067,7 +1067,7 @@ export function buildEingangsbestaetigungHtml(lead: Lead, siteUrl: string, porta
      wissen, die er nie gesagt hat. Gleichzeitig der beste Grund, das
      Portal zu oeffnen. */
   const angabenHinweis = herkunft ? portalAngabenHinweisHtml(herkunft) : "";
-  const vorschauBlock = herkunft ? portalVorschauHtml(ctaUrl) : "";
+  const vorschauBlock = herkunft ? portalVorschauHtml(siteUrl, ctaUrl) : "";
 
   const content = `
     <p style="font-size:15px;line-height:1.75;color:#444;margin-bottom:14px;">${greeting},</p>
