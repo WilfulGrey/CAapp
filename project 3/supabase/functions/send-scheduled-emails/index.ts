@@ -961,8 +961,13 @@ export function buildEingangsbestaetigungHtml(lead: Lead, siteUrl: string, porta
       </tr>
       <tr>
         <td colspan="2" style="padding:16px 24px 20px;border-top:1px solid #ebe2d2;">
-          <p style="margin:0 0 6px;${psLabel}color:#B8860B;">Testsieger · 6× in Folge</p>
-          <p style="margin:0;font-size:14px;line-height:1.65;color:#2D1F0F;"><strong>Testsieger &ndash; DIE&nbsp;WELT, 6× in Folge</strong> mit über 20&nbsp;Jahren Erfahrung und 60.000 Betreuungseinsätzen.</p>
+          <!-- Wie im Siegel: die ZAHL steht oben bei "Testsieger", "in Folge"
+               kommt nur einmal darunter. Vorher trugen Etikett und Satz beides
+               doppelt ("Testsieger · 6× in Folge" / "Testsieger – DIE WELT,
+               6× in Folge") — direkt untereinander gelesen ein Stottern
+               (Martin 28.08.2026). -->
+          <p style="margin:0 0 6px;${psLabel}color:#B8860B;">6× Testsieger</p>
+          <p style="margin:0;font-size:14px;line-height:1.65;color:#2D1F0F;"><strong>DIE&nbsp;WELT &ndash; 6× in Folge</strong>, mit über 20&nbsp;Jahren Erfahrung und 60.000 Betreuungseinsätzen.</p>
         </td>
       </tr>
     </table>
@@ -1078,7 +1083,8 @@ Ihre Konditionen:
   ✓ Keine Vermittlungsgebühren
 Kosten entstehen erst, wenn Ihre Pflegekraft vor Ort ist.
 
-Testsieger – DIE WELT, 6× in Folge, mit über 20 Jahren Erfahrung und 60.000 Betreuungseinsätzen.
+6× Testsieger
+DIE WELT – 6× in Folge, mit über 20 Jahren Erfahrung und 60.000 Betreuungseinsätzen.
 
 ${buildHeimVergleichText(lead)}
 
