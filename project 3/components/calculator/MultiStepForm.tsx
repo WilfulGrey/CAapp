@@ -945,8 +945,26 @@ export function MultiStepForm({ mode = 'inline' }: MultiStepFormProps = {}) {
         </button>
         {/* Zaehler zentriert unter dem Button (Martin 16.08.) — er gehoert
             zum Button, nicht zur linksbuendigen Textspalte darueber. */}
+        {/* Die Plakette ist klickbar und fuehrt dorthin, wohin der Knopf
+            darueber ohnehin fuehrt. Grund (Clarity, 29.08.): Sie war reiner
+            Text — und wurde trotzdem angetippt, 17 Sitzungen in drei Tagen
+            endeten mit einem toten Klick. Kein Wunder: Der Knopf verspricht
+            „Pflegekraefte ansehen", die Gesichter zeigen sie, also zielt der
+            Finger auf die Gesichter. Im Formular steht dieselbe Plakette
+            oben weiter — ab Schritt 2 als „X Pflegekraefte passen zu Ihrer
+            Suche". Der Klick fuehrt also nicht weg vom Versprechen, sondern
+            mitten hinein. Eigene Kennung `hero_badge`, damit wir sehen,
+            wie viele diesen Weg nehmen statt den Knopf. */}
         <div className="mt-3 flex justify-center">
-          <div className="inline-flex items-center gap-2 rounded-full border border-[#A8D5B0] bg-[#F0F7F1] py-1 pl-1.5 pr-3">
+          <button
+            type="button"
+            onClick={() => {
+              analytics.trackEvent('wizard', 'wizard_opened', { source: 'hero_badge' });
+              setWarmupAudience('direct');
+              setFullscreen(true);
+            }}
+            aria-label={`${displayCount} Pflegekräfte sofort verfügbar — jetzt passende ansehen`}
+            className="inline-flex items-center gap-2 rounded-full border border-[#A8D5B0] bg-[#F0F7F1] py-1 pl-1.5 pr-3 transition-all duration-200 hover:border-[#7FBF8C] hover:bg-[#E7F3E9] active:scale-[0.98] cursor-pointer">
             <div className="flex">
               {['/images/caregivers/pk-1.jpg','/images/caregivers/pk-2.jpg','/images/caregivers/pk-3.jpg','/images/caregivers/pk-4.jpg'].map((src,i)=>(
                 <span key={src} className={`relative h-6 w-6 flex-shrink-0 overflow-hidden rounded-full border-2 border-white ${i>0?'-ml-2':''}`}>
@@ -958,7 +976,10 @@ export function MultiStepForm({ mode = 'inline' }: MultiStepFormProps = {}) {
             <span className="text-[12px] text-[#3A6B42]">
               <span className="font-bold tabular-nums">{displayCount}</span> Pflegekräfte sofort verfügbar
             </span>
-          </div>
+            {/* Der Pfeil sagt, dass hier etwas passiert — sonst sieht die
+                Plakette aus wie ein Etikett und der Klick bleibt Zufall. */}
+            <span aria-hidden="true" className="text-[#3A6B42] text-[13px] leading-none">→</span>
+          </button>
         </div>
         {/* Die drei Punkte, die kein Wettbewerber so setzen kann (Martin
             16.08.). "Keine Vermittlungsgebuehr" stand seit dem 16.08. in
