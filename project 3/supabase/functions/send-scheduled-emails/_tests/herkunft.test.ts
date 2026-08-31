@@ -8,6 +8,7 @@ import {
   portalVorschauText,
   portalKraeftePlaketteHtml,
   portalCtaButtonHtml,
+  portalAngabenHinweisText,
   PORTAL_BETREFF,
 } from "../herkunft.ts";
 
@@ -134,4 +135,17 @@ Deno.test("Plakette bleibt klein", () => {
   const html = portalKraeftePlaketteHtml(SITE, CTA);
   assertStringIncludes(html, "width:24px");
   assertStringIncludes(html, "font-size:12px");
+});
+
+/* Hat das Portal alles geliefert, waere der Annahme-Hinweis falsch — er
+ * saet Zweifel an Angaben, die stimmen. */
+Deno.test("Hinweis nennt Annahmen nur, wenn welche noetig waren", () => {
+  const mitAnnahme = portalAngabenHinweisText("Pflegehilfe.org", true);
+  const ohne = portalAngabenHinweisText("Pflegehilfe.org", false);
+  assertStringIncludes(mitAnnahme, "vorsichtig angenommen");
+  assertEquals(ohne.includes("angenommen"), false);
+  for (const t of [mitAnnahme, ohne]) {
+    assertStringIncludes(t, "Pflegehilfe.org");
+    assertStringIncludes(t, "korrigieren");
+  }
 });

@@ -138,16 +138,22 @@ So wissen Sie von Anfang an, was die Betreuung kostet und wer für Sie infrage k
 Angebot & passende Pflegekräfte ansehen: ${ctaUrl}`;
 }
 
-/* Hinweis ueber der Angaben-Tabelle. Bei eingekauften Leads stammt nur ein
- * Teil der Angaben vom Kunden — was das Portal nicht liefert, nehmen wir
- * zum teureren Wert an (lieber ein Preis, der faellt, als einer, der
- * steigt). Das muss dastehen: sonst wundert sich der Kunde, woher wir
- * Dinge wissen, die er nie gesagt hat. Zugleich der beste Grund, das
- * Portal zu oeffnen. */
-export function portalAngabenHinweisHtml(portal: string): string {
-  return `<p style="font-size:14px;line-height:1.7;color:#666;margin:0 0 10px;">Diese Angaben haben wir aus Ihrer Anfrage bei ${portal} übernommen und dort, wo uns etwas fehlte, vorsichtig angenommen. Im Kundenportal können Sie alles in einer Minute korrigieren — der Preis passt sich sofort an.</p>`;
+/* Hinweis ueber der Angaben-Tabelle — in zwei Faerbungen.
+ *
+ * Hat das Portal alles geliefert (bei Pflegehilfe der Normalfall: 9 von 9
+ * Feldern), waere "wo uns etwas fehlte, haben wir angenommen" falsch und
+ * saet Zweifel an Angaben, die stimmen. Dann nur die Herkunft nennen.
+ *
+ * Mussten wir Luecken fuellen, MUSS es dastehen: sonst wundert sich der
+ * Kunde, woher wir Dinge wissen, die er nie gesagt hat. Zugleich der beste
+ * Grund, das Portal zu oeffnen — was wir angenommen haben, war bewusst der
+ * teurere Wert, eine Korrektur senkt also den Preis. */
+export function portalAngabenHinweisHtml(portal: string, angenommen = true): string {
+  return `<p style="font-size:14px;line-height:1.7;color:#666;margin:0 0 10px;">${portalAngabenHinweisText(portal, angenommen)}</p>`;
 }
 
-export function portalAngabenHinweisText(portal: string): string {
-  return `Diese Angaben haben wir aus Ihrer Anfrage bei ${portal} übernommen und dort, wo uns etwas fehlte, vorsichtig angenommen. Im Kundenportal können Sie alles in einer Minute korrigieren — der Preis passt sich sofort an.`;
+export function portalAngabenHinweisText(portal: string, angenommen = true): string {
+  return angenommen
+    ? `Diese Angaben haben wir aus Ihrer Anfrage bei ${portal} übernommen und dort, wo uns etwas fehlte, vorsichtig angenommen. Im Kundenportal können Sie alles in einer Minute korrigieren — der Preis passt sich sofort an.`
+    : `Diese Angaben haben wir aus Ihrer Anfrage bei ${portal} übernommen. Stimmt etwas nicht, können Sie es im Kundenportal in einer Minute korrigieren — der Preis passt sich sofort an.`;
 }

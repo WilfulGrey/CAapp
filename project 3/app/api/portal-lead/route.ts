@@ -16,6 +16,7 @@ import { findOrCreateLead, logEvent } from '@/lib/lead-management';
 import { berechnePreis, parseCustomerName } from '@/lib/calculation';
 import { ergaenzeAngaben, PortalAngaben, PreisZeile } from '@/lib/portal-lead';
 import { scheduleEmail, flushScheduledEmails } from '@/lib/lead-mails';
+import { darfAngeschriebenWerden } from '@/lib/portal-schutz';
 import { sendEmail, getTeamNotificationTemplate } from '@/lib/email';
 
 /* Muss zur Allowlist in send-scheduled-emails/herkunft.ts passen. Steht
@@ -81,6 +82,19 @@ export async function POST(request: NextRequest) {
     );
   }
 
+  /* Schutzregeln VOR allem anderen: kein Lead, kein Preis, keine Mail.
+   * Ein "Keine Interesse" oder eine halbjahresalte Anfrage darf nicht
+   * einmal als Datensatz entstehen — sonst faellt sie beim naechsten Lauf
+   * wieder jemandem in die Haende. */
+  const schutz = darfAngeschriebenWerden(
+    { status: body?.status, erstellt_am: body?.erstellt_am },
+    new Date(),
+  );
+  if (!schutz.ok) {
+    console.log(`Portal-Lead abgelehnt (${portal}): ${schutz.grund}`);
+    return NextResponse.json({ ok: false, uebersprungen: true, grund: schutz.grund }, { status: 200 });
+  }
+
   try {
     const supabase = supabaseClient();
 
@@ -97,6 +111,10 @@ export async function POST(request: NextRequest) {
     );
 
     const kalkulation = await berechnePreis(daten);
+    /* Welche Felder WIR gesetzt haben, reist mit der Kalkulation: die Mail
+       entscheidet daran, ob sie den Annahme-Hinweis zeigt. Leere Liste =
+       das Portal hat alles geliefert. */
+    (kalkulation as any).angenommene_felder = angenommen;
 
     const { vorname, nachname, anrede } = parseCustomerName(name);
 

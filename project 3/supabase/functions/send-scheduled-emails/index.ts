@@ -1071,7 +1071,12 @@ export function buildEingangsbestaetigungHtml(lead: Lead, siteUrl: string, porta
      Tabelle geschrieben — sonst wundert sich der Kunde, woher wir Dinge
      wissen, die er nie gesagt hat. Gleichzeitig der beste Grund, das
      Portal zu oeffnen. */
-  const angabenHinweis = herkunft ? portalAngabenHinweisHtml(herkunft) : "";
+  /* Welche Felder WIR gesetzt haben, legt api/portal-lead in der
+     Kalkulation ab. Fehlt die Liste (Altbestand), nehmen wir den
+     vorsichtigeren Text an: lieber zu viel Transparenz als zu wenig. */
+  const angenommeneFelder = (lead.kalkulation as any)?.angenommene_felder;
+  const wurdeAngenommen = !Array.isArray(angenommeneFelder) || angenommeneFelder.length > 0;
+  const angabenHinweis = herkunft ? portalAngabenHinweisHtml(herkunft, wurdeAngenommen) : "";
   const vorschauBlock = herkunft ? portalVorschauHtml(siteUrl, ctaUrl) : "";
 
   const content = `
@@ -1145,7 +1150,9 @@ ${buildHeimVergleichText(lead)}
     ? "vielen Dank für Ihre erneute Anfrage. Wir haben Ihre aktualisierten Angaben übernommen und Ihr Angebot für die 24-Stunden-Betreuung zu Hause entsprechend angepasst. Im Kundenportal warten bereits Pflegekräfte, die zu Ihrem Bedarf passen."
     : "vielen Dank für Ihre Anfrage. Auf Basis Ihrer Angaben haben wir Ihr Angebot für die 24-Stunden-Betreuung zu Hause erstellt. Im Kundenportal warten bereits Pflegekräfte, die zu Ihrem Bedarf passen.";
 
-  const angabenHinweisPlain = herkunftPlain ? portalAngabenHinweisText(herkunftPlain) + "\n\n" : "";
+  const angenommeneFelderPlain = (lead.kalkulation as any)?.angenommene_felder;
+  const wurdeAngenommenPlain = !Array.isArray(angenommeneFelderPlain) || angenommeneFelderPlain.length > 0;
+  const angabenHinweisPlain = herkunftPlain ? portalAngabenHinweisText(herkunftPlain, wurdeAngenommenPlain) + "\n\n" : "";
   const vorschauPlain = herkunftPlain ? portalVorschauText(ctaUrl) + "\n\n" : "";
 
   // Sektion 2 (Anforderungen an die Pflegekraft) — null-Werte ausblenden.
