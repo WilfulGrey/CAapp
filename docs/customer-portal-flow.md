@@ -252,6 +252,65 @@ ląduje w CAapp z tokenem w URL.
 E-mail z linkiem leci równolegle (Eingangsbestätigung), ale **nie jest drogą
 przejścia** — klient nie czeka na maila.
 
+### Empfehlung w Eingangsbestätigung (Bug #39, 2026-08-31)
+
+Angebotsmail pokazuje **konkretną gematchowaną opiekunkę** zamiast zdania „w
+portalu czekają opiekunki". Kod:
+[empfehlung.ts](../project%203/supabase/functions/send-scheduled-emails/empfehlung.ts).
+
+Ścieżka danych — **wyłącznie istniejące edge fns tego samego projektu**, zero
+nowego klienta mamamii i zero agency-credentials w mailerze:
+
+```
+send-scheduled-emails (email_type=eingangsbestaetigung)
+  → POST /functions/v1/onboard-to-mamamia { token }     # idempotent
+      ↳ cache-hit gdy lead ma już mamamia_job_offer_id
+      ↳ inaczej StoreCustomer + StoreJobOffer (jak przy pierwszym wejściu
+        do portalu — TYLKO wcześniej; patrz przełącznik niżej)
+      → { customer_id, job_offer_id, session_token }
+  → POST /functions/v1/mamamia-proxy  X-Session-Token: <jwt>
+      { action: "listMatchings", variables: { limit: 200 } }
+  → waehleFuenf(...)   # ta sama piątka co portal (patrz niżej)
+  → POST /functions/v1/mamamia-proxy  { action: "getCaregiver", id }
+      # smoking / driving_license / nationality — nie ma ich w liście matchingów
+```
+
+**Kolejność MUSI być identyczna z portalem.** `waehleFuenf` kopiuje trzy
+rzeczy z `src/`: `rankComparator`
+([matchingsRanking.ts](../src/lib/mamamia/matchingsRanking.ts)), filtr języka +
+lejek wiek/badge z `effectiveMatched`
+([CustomerPortalPage.tsx](../src/pages/CustomerPortalPage.tsx)) ORAZ ostatni
+krok portalu — „najwięcej einsatzów na miejsce 1" (`bestIdx`). Bez tego
+ostatniego kroku mail pokazywał **inną** opiekunkę niż klik: `rankComparator`
+sortuje po STOPNIU badge (12+ = Elite) i rozstrzyga remis zdjęciem/płcią/wiekiem,
+więc 20 einsatzów bez zdjęcia ląduje za 13 einsatzami ze zdjęciem — a w portalu
+przed nimi.
+
+Deeplinki z maila (obsługa w `CustomerPortalPage.tsx`):
+
+| Param | Skąd | Co robi |
+|---|---|---|
+| `cg=<caregiver_id>` | przycisk „<Imię> kennenlernen" | otwiera modal profilu tej opiekunki (raz, ref-guard); nieznane id → nic się nie dzieje |
+| `goto=matches` | „Alle passenden Betreuungskräfte ansehen" | scroll do `#pflegekraefte` |
+
+Zachowanie brzegowe (Święta zasada nr 1 — nigdy pusty blok, nigdy zmyślona
+opiekunka):
+
+| Sytuacja | Mail |
+|---|---|
+| jest match | karta opiekunki + powody + `Weitere N` (dynamiczne, znika przy N=0) |
+| brak matchów / błąd mamamii / timeout | uczciwy tekst zastępczy, cena i reszta maila bez zmian |
+| lead kupiony (`portalHerkunft`) | sekcji nie ma wcale — portal-leady mają własną dramaturgię |
+| brak zdjęcia lub nieudany inline-fetch | kafelek z inicjałem (NIGDY surowy URL S3 — wygasa po ~30 min) |
+
+**Przełącznik `EMPFEHLUNG_ONBOARD=0`** wyłącza WYŁĄCZNIE serwerowe onboardowanie
+— wtedy empfehlung dostają tylko leady, które już mają `job_offer` (resubmity,
+osoby po wejściu do portalu). Domyślnie włączone. **Konsekwencja biznesowa do
+zaklepania z Michałem przed prod-deployem:** przy włączonym przełączniku KAŻDE
+zapytanie z kalkulatora zakłada klienta w mamamii (status `draft`) — także te,
+których przeglądarka nigdy nie dotrze do portalu. Dla ścieżki z kalkulatora to
+zmiana MOMENTU (redirect i tak onboarduje kilka sekund później), nie faktu.
+
 ---
 
 ## Wiersz `leads` po Stage A

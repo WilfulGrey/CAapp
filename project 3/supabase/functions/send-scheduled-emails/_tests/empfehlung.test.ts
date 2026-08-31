@@ -1,0 +1,330 @@
+import { assert, assertEquals, assertStringIncludes } from "@std/assert";
+import {
+  baueEmpfehlung,
+  empfehlungHtml,
+  empfehlungText,
+  holeEmpfehlung,
+  matchGruende,
+  stufenWort,
+  verfuegbarText,
+  waehleFuenf,
+  type CaregiverExtra,
+  type Matching,
+} from "../empfehlung.ts";
+
+const JETZT = new Date("2026-09-01T10:00:00Z");
+
+function cg(over: Partial<Matching["caregiver"]> & { id: number }): Matching {
+  return {
+    caregiver: {
+      first_name: "Maria",
+      gender: "female",
+      year_of_birth: 1972,
+      germany_skill: "level_2",
+      care_experience: "7",
+      available_from: "2026-09-14T00:00:00Z",
+      last_contact_at: "2026-08-30T00:00:00Z",
+      hp_total_jobs: 3,
+      avatar: { aws_url: "https://s3/foto.jpg" },
+      ...over,
+    },
+  };
+}
+
+// ── Auswahl der fünf ──────────────────────────────────────────────────────
+
+Deno.test("waehleFuenf: nie mehr als fünf — das Portal zeigt genau fünf", () => {
+  const viele = Array.from({ length: 12 }, (_, i) => cg({ id: i + 1 }));
+  assertEquals(waehleFuenf(viele, "kommunikativ", JETZT).length, 5);
+});
+
+Deno.test("waehleFuenf: Sprachwunsch filtert strikt auf die gewählte Stufe", () => {
+  const liste = [
+    cg({ id: 1, germany_skill: "level_2" }),
+    cg({ id: 2, germany_skill: "level_4" }), // teurer als bezahlt → raus
+    cg({ id: 3, germany_skill: "level_1" }), // schwächer → raus
+  ];
+  const ids = waehleFuenf(liste, "kommunikativ", JETZT).map((m) => m.caregiver.id);
+  assertEquals(ids, [1]);
+});
+
+Deno.test("waehleFuenf: unbekannte Deutschstufe fliegt NICHT raus", () => {
+  const liste = [cg({ id: 1, germany_skill: null })];
+  assertEquals(waehleFuenf(liste, "kommunikativ", JETZT).length, 1);
+});
+
+Deno.test("waehleFuenf: is_show=false wird ausgeblendet", () => {
+  const liste: Matching[] = [{ ...cg({ id: 1 }), is_show: false }, cg({ id: 2 })];
+  assertEquals(waehleFuenf(liste, null, JETZT).map((m) => m.caregiver.id), [2]);
+});
+
+Deno.test("waehleFuenf: Duplikate derselben Pflegekraft nur einmal", () => {
+  const liste = [cg({ id: 7 }), cg({ id: 7 }), cg({ id: 8 })];
+  assertEquals(waehleFuenf(liste, null, JETZT).length, 2);
+});
+
+Deno.test("waehleFuenf: über 60 kommt rein, wenn sonst keine fünf da sind", () => {
+  const liste = [cg({ id: 1, year_of_birth: 1950 }), cg({ id: 2 })];
+  const ids = waehleFuenf(liste, null, JETZT).map((m) => m.caregiver.id);
+  assertEquals(ids.length, 2);
+  assert(ids.includes(1), "Rückfall greift nicht — Liste wäre zu kurz");
+});
+
+Deno.test("waehleFuenf: über 60 fliegt raus, sobald fünf jüngere da sind", () => {
+  const liste = [
+    cg({ id: 99, year_of_birth: 1950 }),
+    ...Array.from({ length: 5 }, (_, i) => cg({ id: i + 1 })),
+  ];
+  const ids = waehleFuenf(liste, null, JETZT).map((m) => m.caregiver.id);
+  assertEquals(ids.includes(99), false);
+});
+
+// Der Fall, der Mail und Portal auseinanderlaufen ließe.
+Deno.test("waehleFuenf: Platz 1 ist die Kraft mit den meisten Einsätzen — wie im Portal", () => {
+  const liste = [
+    cg({ id: 1, hp_total_jobs: 13, avatar: { aws_url: "https://s3/a.jpg" } }),
+    cg({ id: 2, hp_total_jobs: 20, avatar: null }), // ohne Foto, aber erfahrener
+  ];
+  // rangVergleich allein setzte #1 nach vorn (Foto schlägt Gleichstand in der
+  // Stufe). Das Portal zieht danach die meisten Einsätze nach oben.
+  assertEquals(waehleFuenf(liste, null, JETZT)[0].caregiver.id, 2);
+});
+
+Deno.test("waehleFuenf: leere Eingabe → leeres Ergebnis, kein Absturz", () => {
+  assertEquals(waehleFuenf([], "kommunikativ", JETZT).length, 0);
+});
+
+// ── Matching-Gründe ───────────────────────────────────────────────────────
+
+Deno.test("matchGruende: nennt nur belegbare Merkmale, höchstens vier", () => {
+  const gruende = matchGruende(
+    cg({ id: 1, hp_total_jobs: 7, gender: "female", germany_skill: "level_2" }).caregiver,
+    { smoking: "no", driving_license: "yes" } as CaregiverExtra,
+    { deutschkenntnisse: "kommunikativ", geschlecht: "weiblich", fuehrerschein: "ja" },
+  );
+  assert(gruende.length <= 4, "mehr als vier Gründe");
+  assertStringIncludes(gruende.join(" | "), "Deutschkenntnisse entsprechen Ihrem Wunsch");
+  assertStringIncludes(gruende.join(" | "), "Weiblich");
+});
+
+Deno.test("matchGruende: kein Sprach-Grund, wenn die Stufe unbekannt ist", () => {
+  const gruende = matchGruende(
+    cg({ id: 1, germany_skill: null }).caregiver,
+    null,
+    { deutschkenntnisse: "kommunikativ" },
+  );
+  assertEquals(gruende.some((g) => g.includes("Deutschkenntnisse")), false);
+});
+
+Deno.test("matchGruende: kein Geschlechts-Grund bei Wunsch 'egal'", () => {
+  const gruende = matchGruende(cg({ id: 1 }).caregiver, null, { geschlecht: "egal" });
+  assertEquals(gruende.some((g) => g.includes("gewünscht")), false);
+});
+
+Deno.test("matchGruende: kein Führerschein-Grund ohne Kundenwunsch", () => {
+  const gruende = matchGruende(
+    cg({ id: 1 }).caregiver,
+    { driving_license: "yes" } as CaregiverExtra,
+    { fuehrerschein: "nein" },
+  );
+  assertEquals(gruende.some((g) => g.includes("Führerschein")), false);
+});
+
+Deno.test("matchGruende: Nichtraucherin nur bei ausdrücklichem 'no'", () => {
+  const ohne = matchGruende(cg({ id: 1 }).caregiver, { smoking: null } as CaregiverExtra, {});
+  assertEquals(ohne.some((g) => g.includes("Nichtraucher")), false);
+  const mit = matchGruende(cg({ id: 1 }).caregiver, { smoking: "no" } as CaregiverExtra, {});
+  assert(mit.some((g) => g.includes("Nichtraucherin")));
+});
+
+Deno.test("matchGruende: ohne Zusatzdaten bleiben die Gründe leer statt erfunden", () => {
+  const gruende = matchGruende(cg({ id: 1, hp_total_jobs: 0 }).caregiver, null, {});
+  assertEquals(gruende, []);
+});
+
+// ── Anzeige ───────────────────────────────────────────────────────────────
+
+Deno.test("verfuegbarText: Vergangenheit heißt 'sofort', fehlendes Datum heißt nichts", () => {
+  assertEquals(verfuegbarText("2026-08-01T00:00:00Z", JETZT), "sofort");
+  assertEquals(verfuegbarText("2026-09-14T00:00:00Z", JETZT), "14. September");
+  assertEquals(verfuegbarText(null, JETZT), null);
+  assertEquals(verfuegbarText("kaputt", JETZT), null);
+});
+
+Deno.test("stufenWort trifft die Schwellen des Portals", () => {
+  assertEquals(stufenWort(12), "Elite");
+  assertEquals(stufenWort(6), "Stammkraft");
+  assertEquals(stufenWort(2), "Bewährt");
+  assertEquals(stufenWort(1), "Bekannt");
+  assertEquals(stufenWort(0, 4), "Berufserfahren");
+  assertEquals(stufenWort(0, 0), "Neu dabei");
+});
+
+Deno.test("empfehlungHtml: Foto per CID, nie die ablaufende S3-URL", () => {
+  const { empfehlung } = baueEmpfehlung(cg({ id: 42 }), null, {}, 4, JETZT);
+  const html = empfehlungHtml(empfehlung, "foto@primundus.de", "https://p/?token=t&cg=42", "https://p/?token=t", 4);
+  assertStringIncludes(html, 'src="cid:foto@primundus.de"');
+  assertEquals(html.includes("s3/foto.jpg"), false);
+});
+
+Deno.test("empfehlungHtml: ohne Foto Initialen statt kaputtem Bild", () => {
+  const { empfehlung } = baueEmpfehlung(cg({ id: 42 }), null, {}, 4, JETZT);
+  const html = empfehlungHtml(empfehlung, null, "https://p", "https://p", 4);
+  assertEquals(html.includes("<img"), false);
+  assertStringIncludes(html, ">M</div>");
+});
+
+Deno.test("empfehlungHtml: 'Weitere N' ist dynamisch und verschwindet bei einer einzigen Kraft", () => {
+  const { empfehlung } = baueEmpfehlung(cg({ id: 42 }), null, {}, 4, JETZT);
+  const vier = empfehlungHtml(empfehlung, null, "https://p", "https://a", 4);
+  assertStringIncludes(vier, "Weitere 3 passende Betreuungskräfte");
+
+  const zwei = empfehlungHtml(empfehlung, null, "https://p", "https://a", 2);
+  assertStringIncludes(zwei, "Weitere 1 passende Betreuungskraft für Sie");
+
+  const eine = empfehlungHtml(empfehlung, null, "https://p", "https://a", 1);
+  assertEquals(eine.includes("Weitere"), false);
+  assertEquals(eine.includes("Alle passenden"), false);
+});
+
+Deno.test("empfehlungHtml: Button trägt den Vornamen und zeigt aufs Profil", () => {
+  const { empfehlung } = baueEmpfehlung(cg({ id: 42, first_name: "Grazyna" }), null, {}, 3, JETZT);
+  const html = empfehlungHtml(empfehlung, null, "https://portal/?token=t&cg=42", "https://portal/?token=t", 3);
+  assertStringIncludes(html, "Grazyna kennenlernen");
+  assertStringIncludes(html, 'href="https://portal/?token=t&cg=42"');
+});
+
+Deno.test("empfehlungHtml: kein Nachname in der Mail", () => {
+  const { empfehlung } = baueEmpfehlung(
+    cg({ id: 42, first_name: "Maria", last_name: "Kowalska" }), null, {}, 3, JETZT,
+  );
+  const html = empfehlungHtml(empfehlung, null, "https://p", "https://a", 3);
+  assertEquals(html.includes("Kowalska"), false);
+});
+
+Deno.test("empfehlungText: trägt dieselben Aussagen wie das HTML", () => {
+  const { empfehlung } = baueEmpfehlung(
+    cg({ id: 42, hp_total_jobs: 7 }),
+    { smoking: "no", nationality: { nationality: "Polish" } } as CaregiverExtra,
+    { deutschkenntnisse: "kommunikativ" },
+    4,
+    JETZT,
+  );
+  const txt = empfehlungText(empfehlung, "https://p", "https://a", 4);
+  assertStringIncludes(txt, "UNSERE EMPFEHLUNG FÜR SIE");
+  assertStringIncludes(txt, "Maria, 54 Jahre");
+  assertStringIncludes(txt, "Polen");
+  assertStringIncludes(txt, "Verfügbar ab 14. September");
+  assertStringIncludes(txt, "Weitere 3 passende Betreuungskräfte");
+});
+
+Deno.test("baueEmpfehlung: unplausibles Geburtsjahr → kein Alter statt Unsinn", () => {
+  const { empfehlung } = baueEmpfehlung(cg({ id: 1, year_of_birth: 2020 }), null, {}, 2, JETZT);
+  assertEquals(empfehlung.alter, null);
+});
+
+Deno.test("baueEmpfehlung: unbekannte Nationalität wird weggelassen, nicht geraten", () => {
+  const { empfehlung } = baueEmpfehlung(
+    cg({ id: 1 }), { nationality: { nationality: "Klingon" } } as CaregiverExtra, {}, 2, JETZT,
+  );
+  assertEquals(empfehlung.nationalitaet, null);
+});
+
+// ── Datenbeschaffung: jeder Ausfall endet in null, nie in einem Halbbild ──
+
+Deno.test("holeEmpfehlung: ohne Token sofort null", async () => {
+  const r = await holeEmpfehlung({
+    supabaseUrl: "https://s", key: "k", token: "", jobOfferId: null, formularDaten: {},
+    fetchFn: () => { throw new Error("darf nicht rufen"); },
+  });
+  assertEquals(r, null);
+});
+
+Deno.test("holeEmpfehlung: ohne job_offer und mit abgeschaltetem Onboarding → null, kein mamamia-Write", async () => {
+  let gerufen = false;
+  const r = await holeEmpfehlung({
+    supabaseUrl: "https://s", key: "k", token: "t", jobOfferId: null, formularDaten: {},
+    darfOnboarden: false,
+    fetchFn: () => { gerufen = true; throw new Error("nicht erwartet"); },
+  });
+  assertEquals(r, null);
+  assertEquals(gerufen, false, "Onboarding wurde trotz Schalter gerufen");
+});
+
+Deno.test("holeEmpfehlung: Onboarding-Fehler → null, Mail läuft weiter", async () => {
+  const r = await holeEmpfehlung({
+    supabaseUrl: "https://s", key: "k", token: "t", jobOfferId: 1, formularDaten: {},
+    fetchFn: () => Promise.resolve(new Response("boom", { status: 500 })),
+  });
+  assertEquals(r, null);
+});
+
+Deno.test("holeEmpfehlung: keine Matches → null (Ersatztext statt leerem Kasten)", async () => {
+  const r = await holeEmpfehlung({
+    supabaseUrl: "https://s", key: "k", token: "t", jobOfferId: 1, formularDaten: {},
+    fetchFn: (url) => {
+      const u = String(url);
+      if (u.includes("onboard")) {
+        return Promise.resolve(Response.json({ session_token: "jwt", job_offer_id: 1 }));
+      }
+      return Promise.resolve(Response.json({ data: { JobOfferMatchingsWithPagination: { data: [] } } }));
+    },
+  });
+  assertEquals(r, null);
+});
+
+Deno.test("holeEmpfehlung: Glücksfall — beste Kraft plus Gründe", async () => {
+  const rufe: string[] = [];
+  const r = await holeEmpfehlung({
+    supabaseUrl: "https://s", key: "k", token: "t", jobOfferId: 1, now: JETZT,
+    formularDaten: { deutschkenntnisse: "kommunikativ", geschlecht: "weiblich", fuehrerschein: "ja" },
+    fetchFn: (url, init) => {
+      const u = String(url);
+      if (u.includes("onboard")) {
+        rufe.push("onboard");
+        return Promise.resolve(Response.json({ session_token: "jwt", job_offer_id: 1 }));
+      }
+      const body = JSON.parse(String((init as RequestInit).body));
+      rufe.push(body.action);
+      if (body.action === "listMatchings") {
+        return Promise.resolve(Response.json({
+          data: {
+            JobOfferMatchingsWithPagination: {
+              data: [cg({ id: 5, hp_total_jobs: 4 }), cg({ id: 9, hp_total_jobs: 11 })],
+            },
+          },
+        }));
+      }
+      return Promise.resolve(Response.json({
+        data: { Caregiver: { smoking: "no", driving_license: "yes", nationality: { nationality: "Polish" } } },
+      }));
+    },
+  });
+  assert(r !== null);
+  assertEquals(r!.empfehlung.caregiverId, 9, "nicht die erfahrenste Kraft empfohlen");
+  assertEquals(r!.sichtbarGesamt, 2);
+  assertEquals(r!.empfehlung.nationalitaet, "Polen");
+  assert(r!.empfehlung.gruende.length >= 3);
+  assertEquals(rufe, ["onboard", "listMatchings", "getCaregiver"]);
+});
+
+Deno.test("holeEmpfehlung: getCaregiver-Ausfall kostet Gründe, nicht die Empfehlung", async () => {
+  const r = await holeEmpfehlung({
+    supabaseUrl: "https://s", key: "k", token: "t", jobOfferId: 1, now: JETZT,
+    formularDaten: { deutschkenntnisse: "kommunikativ" },
+    fetchFn: (url, init) => {
+      const u = String(url);
+      if (u.includes("onboard")) return Promise.resolve(Response.json({ session_token: "jwt" }));
+      const body = JSON.parse(String((init as RequestInit).body));
+      if (body.action === "listMatchings") {
+        return Promise.resolve(Response.json({
+          data: { JobOfferMatchingsWithPagination: { data: [cg({ id: 5 })] } },
+        }));
+      }
+      return Promise.resolve(new Response("nope", { status: 500 }));
+    },
+  });
+  assert(r !== null);
+  assertEquals(r!.empfehlung.caregiverId, 5);
+  assertStringIncludes(r!.empfehlung.gruende.join(" "), "Deutschkenntnisse");
+});

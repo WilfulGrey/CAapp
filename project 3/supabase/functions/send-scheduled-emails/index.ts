@@ -17,6 +17,18 @@ import { capitalizeName as capitalize } from "./names.ts";
 // lib/ importieren); Aenderungen immer in BEIDEN Dateien.
 import { sendezeitIso } from "./quietHours.ts";
 import { deutschStufe } from "./deutschStufe.ts";
+// Empfehlung fuer die Angebotsmail (Martin, 31.08.2026): echte gematchte
+// Pflegekraft statt der Behauptung "im Portal warten Pflegekraefte".
+// Reihenfolge + Trichter sind Kopien der Portal-Logik — siehe empfehlung.ts.
+import {
+  empfehlungHtml,
+  empfehlungText,
+  holeEmpfehlung,
+  keineEmpfehlungHtml,
+  keineEmpfehlungText,
+  stufenWort,
+  type EmpfehlungErgebnis,
+} from "./empfehlung.ts";
 import {
   BEWERTUNG_CAP,
   BEWERTUNG_CC,
@@ -172,6 +184,12 @@ function buildEmailWrapper(lead: Lead, siteUrl: string, content: string): string
       .email-content { padding: 30px 20px; }
       .price-stage-cell { display: block !important; width: 100% !important; padding: 18px 22px 16px !important; border-right: none !important; border-bottom: 1px solid #ebe2d2 !important; }
       .price-stage-cell:last-child { border-bottom: none !important; }
+      /* Empfehlungs-Karte: auf schmalen Schirmen Foto ueber den Text statt
+         einer gequetschten Zweispalter. Outlook ignoriert Media-Queries und
+         rendert weiter zweispaltig — dort sind 600 px fest, das passt. */
+      .empf-foto { display: block !important; width: 100% !important; padding: 22px 24px 0 24px !important; }
+      .empf-luecke { display: none !important; }
+      .empf-text { display: block !important; width: 100% !important; padding: 14px 24px 18px 24px !important; }
     }
   </style>
 </head>
@@ -917,13 +935,25 @@ async function hasPreviousEingangsbestaetigungSent(supabase: any, leadId: string
   return Array.isArray(data) && data.length > 0;
 }
 
-export function buildEingangsbestaetigungHtml(lead: Lead, siteUrl: string, portalBase: string, isResubmit: boolean = false): string {
+export function buildEingangsbestaetigungHtml(
+  lead: Lead,
+  siteUrl: string,
+  portalBase: string,
+  isResubmit: boolean = false,
+  /* Fertiger Empfehlungs-Block. undefined = gar keine Empfehlungs-Sektion
+     (Portal-Leads, Altaufrufe). null = Sektion mit Ersatztext, weil noch
+     keine Kraft feststeht. Die Mail funktioniert in allen drei Faellen. */
+  empfehlungBlock?: string | null,
+): string {
   const greeting = buildEingangsGreeting(lead);
   /* Eingekaufter Lead: der Kunde hat NICHT bei uns angefragt, sondern beim
      Portal — und wartet dort gerade auf mehrere Anbieter. Kopf, Betreff und
      beide Buttons haengen daran. Herkunft schlaegt Resubmit: ein
      eingekaufter Lead ist per Definition der erste Kontakt. */
   const herkunft = portalHerkunft(lead.source);
+  // Steht eine echte Pflegekraft in der Mail? Steuert Einleitung, Reihenfolge
+  // und ob der alte Sammel-CTA direkt unter dem Preis noch gebraucht wird.
+  const hatEmpfehlung = typeof empfehlungBlock === "string" && empfehlungBlock.length > 0;
   const fd = (lead.kalkulation as any)?.formularDaten || {};
   const careStartTiming = (lead as any).care_start_timing || "";
 
@@ -968,13 +998,22 @@ export function buildEingangsbestaetigungHtml(lead: Lead, siteUrl: string, porta
         </td>
       </tr>` : "";
 
-  const priceStage = `
-    <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="margin:0 0 28px;background:#FAF8F4;border-radius:10px;overflow:hidden;">
+  /* Aufgeteilt in ZWEI Panels (Martin, 31.08.): die Empfehlung soll direkt
+     nach den Preisen stehen, Konditionen und Testsieger danach. Optik,
+     Farben und Innenabstaende bleiben identisch — es ist dieselbe Buehne,
+     nur mit der Pflegekraft dazwischen. Ohne Empfehlung stehen beide
+     Panels wie bisher unmittelbar untereinander. */
+  const preisTabelle = priceRows ? `
+    <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="margin:0 0 ${hatEmpfehlung ? "28px" : "0"};background:#FAF8F4;border-radius:10px;overflow:hidden;">
       ${priceRows}
+    </table>` : "";
+
+  const konditionenTabelle = `
+    <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="margin:0 0 28px;background:#FAF8F4;border-radius:10px;overflow:hidden;">
       <tr>
-        <td colspan="2" style="padding:16px 24px 16px;${bruttopreis > 0 ? "border-top:1px solid #ebe2d2;" : ""}">
+        <td colspan="2" style="padding:16px 24px 16px;">
           <p style="margin:0 0 10px;${psLabel}color:#2A9D5C;">Ihre Konditionen</p>
-          ${["Täglich kündbar", "Tagesgenaue Abrechnung", "Kein Vertrag vor Auswahl nötig", "Keine Vermittlungsgebühren"].map((t) => `<p style="margin:0 0 6px;font-size:14px;line-height:1.6;color:#2D1F0F;"><span style="color:#2A9D5C;font-weight:700;">&#10003;</span>&nbsp;&nbsp;${t}</p>`).join("")}
+          ${["Täglich kündbar", "Tagesgenaue Abrechnung", "Pflegekraft vor Vertragsabschluss selbst auswählen", "Keine Vermittlungsgebühren"].map((t) => `<p style="margin:0 0 6px;font-size:14px;line-height:1.6;color:#2D1F0F;"><span style="color:#2A9D5C;font-weight:700;">&#10003;</span>&nbsp;&nbsp;${t}</p>`).join("")}
           <p style="margin:8px 0 0;font-size:13px;line-height:1.6;color:#666;">Kosten entstehen erst, wenn Ihre Pflegekraft vor Ort ist.</p>
         </td>
       </tr>
@@ -991,6 +1030,13 @@ export function buildEingangsbestaetigungHtml(lead: Lead, siteUrl: string, porta
       </tr>
     </table>
     ${buildHeimVergleichBoxHtml(lead)}`;
+
+  /* Empfehlungs-Sektion. Drei Zustaende, alle bewusst:
+       string  → echte Pflegekraft
+       null    → wir haben (noch) keine → ehrlicher Ersatztext
+       undefined → gar keine Sektion (Portal-Leads / Altaufrufe) */
+  const empfehlungSektion =
+    empfehlungBlock === undefined ? "" : (empfehlungBlock || keineEmpfehlungHtml());
 
   // ── "So geht es weiter" — 3 Schritte ──────────────────────────────────────
   const stepRow = (n: string, title: string, desc: string, last = false) => `
@@ -1062,8 +1108,8 @@ export function buildEingangsbestaetigungHtml(lead: Lead, siteUrl: string, porta
   const introParagraph = herkunft
     ? portalIntroHtml(herkunft)
     : isResubmit
-    ? `vielen Dank für Ihre erneute Anfrage. Wir haben Ihre aktualisierten Angaben übernommen und Ihr <strong style="color:#2D1F0F;">Angebot für die 24-Stunden-Betreuung zu Hause</strong> entsprechend angepasst. Im Kundenportal warten bereits Pflegekräfte, die zu Ihrem Bedarf passen.`
-    : `vielen Dank für Ihre Anfrage. Auf Basis Ihrer Angaben haben wir Ihr <strong style="color:#2D1F0F;">Angebot für die 24-Stunden-Betreuung zu Hause</strong> erstellt. Im Kundenportal warten bereits Pflegekräfte, die zu Ihrem Bedarf passen.`;
+    ? `vielen Dank für Ihre erneute Anfrage.<br><br>Wir haben Ihre aktualisierten Angaben übernommen, Ihr <strong style="color:#2D1F0F;">persönliches Angebot</strong> angepasst${hatEmpfehlung ? " &ndash; und passende Betreuungskräfte für Sie gefunden" : ""}.`
+    : `vielen Dank für Ihre Anfrage.<br><br>Auf Basis Ihrer Angaben haben wir Ihr <strong style="color:#2D1F0F;">persönliches Angebot</strong> erstellt${hatEmpfehlung ? " &ndash; und bereits passende Betreuungskräfte für Sie gefunden" : ""}.`;
 
   /* Bei eingekauften Leads sind nicht alle Angaben vom Kunden: was das
      Portal nicht liefert, nehmen wir bewusst zum teureren Wert an (lieber
@@ -1085,11 +1131,17 @@ export function buildEingangsbestaetigungHtml(lead: Lead, siteUrl: string, porta
 
     ${vorschauBlock}
 
-    ${priceStage}
+    ${preisTabelle}
 
-    ${cta}
+    ${empfehlungSektion}
+
+    ${konditionenTabelle}
+
+    ${hatEmpfehlung ? "" : cta}
 
     ${stepsTable}
+
+    ${hatEmpfehlung ? cta : ""}
 
     ${angabenHinweis}
 
@@ -1102,7 +1154,12 @@ export function buildEingangsbestaetigungHtml(lead: Lead, siteUrl: string, porta
   return buildEmailWrapper(lead, siteUrl, content);
 }
 
-function buildEingangsbestaetigungText(lead: Lead, portalBase: string, isResubmit: boolean = false): string {
+export function buildEingangsbestaetigungText(
+  lead: Lead,
+  portalBase: string,
+  isResubmit: boolean = false,
+  empfehlungAbschnitt?: string | null,
+): string {
   const greeting = buildEingangsGreeting(lead);
   const fd = (lead.kalkulation as any)?.formularDaten || {};
   const careStartTiming = (lead as any).care_start_timing || "";
@@ -1124,7 +1181,7 @@ zzgl. ca. 125 € Anreise- und Abreisekosten je Strecke sowie Kost und Logis.
 Ihre Konditionen:
   ✓ Täglich kündbar
   ✓ Tagesgenaue Abrechnung
-  ✓ Kein Vertrag vor Auswahl nötig
+  ✓ Pflegekraft vor Vertragsabschluss selbst auswählen
   ✓ Keine Vermittlungsgebühren
 Kosten entstehen erst, wenn Ihre Pflegekraft vor Ort ist.
 
@@ -1143,12 +1200,15 @@ ${buildHeimVergleichText(lead)}
     : "Ihr Angebot zur 24-Stunden-Betreuung – Primundus";
 
   const herkunftPlain = portalHerkunft(lead.source);
+  const hatEmpfehlungPlain = typeof empfehlungAbschnitt === "string" && empfehlungAbschnitt.length > 0;
+  const empfehlungPlain =
+    empfehlungAbschnitt === undefined ? "" : `${empfehlungAbschnitt || keineEmpfehlungText()}\n\n`;
 
   const introPlain = herkunftPlain
     ? portalIntroText(herkunftPlain)
     : isResubmit
-    ? "vielen Dank für Ihre erneute Anfrage. Wir haben Ihre aktualisierten Angaben übernommen und Ihr Angebot für die 24-Stunden-Betreuung zu Hause entsprechend angepasst. Im Kundenportal warten bereits Pflegekräfte, die zu Ihrem Bedarf passen."
-    : "vielen Dank für Ihre Anfrage. Auf Basis Ihrer Angaben haben wir Ihr Angebot für die 24-Stunden-Betreuung zu Hause erstellt. Im Kundenportal warten bereits Pflegekräfte, die zu Ihrem Bedarf passen.";
+    ? `vielen Dank für Ihre erneute Anfrage.\n\nWir haben Ihre aktualisierten Angaben übernommen, Ihr persönliches Angebot angepasst${hatEmpfehlungPlain ? " – und passende Betreuungskräfte für Sie gefunden" : ""}.`
+    : `vielen Dank für Ihre Anfrage.\n\nAuf Basis Ihrer Angaben haben wir Ihr persönliches Angebot erstellt${hatEmpfehlungPlain ? " – und bereits passende Betreuungskräfte für Sie gefunden" : ""}.`;
 
   const angenommeneFelderPlain = (lead.kalkulation as any)?.angenommene_felder;
   const wurdeAngenommenPlain = !Array.isArray(angenommeneFelderPlain) || angenommeneFelderPlain.length > 0;
@@ -1167,7 +1227,7 @@ ${greeting},
 
 ${introPlain}
 
-${vorschauPlain}${priceLine}Angebot & Pflegekräfte ansehen: ${ctaUrl}
+${vorschauPlain}${priceLine}${empfehlungPlain}Angebot & Pflegekräfte ansehen: ${ctaUrl}
 
 SO GEHT ES WEITER
 
@@ -1510,12 +1570,10 @@ function reminderCaregiverInitials(name: string): string {
 // Berufserfahren (Jahre>0) bzw. Neu dabei. Kein Medaillen-Badge mehr — die
 // Stufe steht als fettes Wort vor der Faktenzeile.
 function reminderTierLabel(einsatzCount?: number | null, yearsExperience?: number | null): string {
-  const jobs = einsatzCount ?? 0;
-  if (jobs >= 12) return "Elite";
-  if (jobs >= 6) return "Stammkraft";
-  if (jobs >= 2) return "Bewährt";
-  if (jobs >= 1) return "Bekannt";
-  return (yearsExperience ?? 0) > 0 ? "Berufserfahren" : "Neu dabei";
+  // Eine einzige Definition der Stufen-Woerter fuer die ganze Datei — die
+  // Schwellen leben in empfehlung.ts (stufenWort), damit Empfehlung und
+  // Reminder nicht auseinanderlaufen koennen.
+  return stufenWort(einsatzCount, yearsExperience);
 }
 
 // Faktenzeile wie im Portal/in lib/email.ts (caregiverFactsLine): Jahre
@@ -2268,8 +2326,56 @@ Deno.serve(async (req: Request) => {
             : isResubmit
             ? "Ihr aktualisiertes Angebot zur 24-Stunden-Betreuung \u2013 Primundus"
             : "Ihr Angebot zur 24-Stunden-Betreuung \u2013 Primundus";
-          html = buildEingangsbestaetigungHtml(lead as Lead, smtpConfig.siteUrl, portalBase, isResubmit);
-          text = buildEingangsbestaetigungText(lead as Lead, portalBase, isResubmit);
+
+          /* ── Empfehlung: echte gematchte Pflegekraft in die Mail ──────────
+             Eingekaufte Portal-Leads bleiben AUSSEN VOR (undefined): die haben
+             eine eigene Dramaturgie mit Vorschau-Block und Herkunfts-Hinweis,
+             da gehoert keine zweite Pflegekraft-Sektion hinein.
+             Alles hier ist best-effort — faellt es aus, bleibt es bei null und
+             die Mail zeigt den ehrlichen Ersatztext. Der Versand haengt an
+             keiner Stelle davon ab. */
+          let empfHtml: string | null | undefined = undefined;
+          let empfText: string | null | undefined = undefined;
+          if (!portalHerkunft((lead as Lead).source) && (lead as Lead).token) {
+            empfHtml = null;
+            empfText = null;
+            const tok = (lead as Lead).token as string;
+            const basisUrl = buildPortalUrl(portalBase, tok);
+            const erg: EmpfehlungErgebnis | null = await holeEmpfehlung({
+              supabaseUrl,
+              key: supabaseServiceKey,
+              token: tok,
+              jobOfferId: (lead as any).mamamia_job_offer_id ?? null,
+              formularDaten: ((lead as any).kalkulation?.formularDaten ?? {}),
+              // Serverseitiges Onboarding abschaltbar, ohne das Feature zu
+              // verlieren: EMPFEHLUNG_ONBOARD=0 → nur Leads mit bestehender
+              // job_offer bekommen eine Empfehlung.
+              darfOnboarden: Deno.env.get("EMPFEHLUNG_ONBOARD") !== "0",
+            });
+            if (erg) {
+              const inline = await fetchInlinePhotoDeno(erg.empfehlung.fotoUrl);
+              const profilUrl = withMailMark(`${basisUrl}&cg=${erg.empfehlung.caregiverId}`, "eb");
+              const alleUrl = withMailMark(buildPortalUrl(portalBase, tok, "matches"), "eb");
+              empfHtml = empfehlungHtml(
+                erg.empfehlung, inline?.cid ?? null, profilUrl, alleUrl, erg.sichtbarGesamt,
+              );
+              empfText = empfehlungText(erg.empfehlung, profilUrl, alleUrl, erg.sichtbarGesamt);
+              if (inline) (scheduledEmail as any).__reminderInline = inline;
+              await supabase.from("lead_events").insert({
+                lead_id: scheduledEmail.lead_id,
+                event_type: "empfehlung_in_angebotsmail",
+                metadata: {
+                  caregiver_id: erg.empfehlung.caregiverId,
+                  sichtbar_gesamt: erg.sichtbarGesamt,
+                  gruende: erg.empfehlung.gruende,
+                  foto: inline ? "inline" : "initialen",
+                },
+              });
+            }
+          }
+
+          html = buildEingangsbestaetigungHtml(lead as Lead, smtpConfig.siteUrl, portalBase, isResubmit, empfHtml);
+          text = buildEingangsbestaetigungText(lead as Lead, portalBase, isResubmit, empfText);
           eventTypeSent = "email_eingangsbestaetigung_sent";
           eventTypeFailed = "email_eingangsbestaetigung_failed";
         } else if (scheduledEmail.email_type === "nachfass_1") {
