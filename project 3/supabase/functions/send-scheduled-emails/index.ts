@@ -1108,15 +1108,15 @@ export function buildEingangsbestaetigungHtml(
   const introParagraph = herkunft
     ? portalIntroHtml(herkunft)
     : isResubmit
-    ? `vielen Dank für Ihre erneute Anfrage. Wir haben Ihre aktualisierten Angaben übernommen und Ihr <strong style="color:#2D1F0F;">persönliches Angebot für die 24-Stunden-Betreuung zu Hause</strong> entsprechend angepasst &ndash; mit allen Kosten, möglichen Fördermitteln und Ihrem rechnerischen Eigenanteil.${
+    ? `vielen Dank für Ihre erneute Anfrage. Wir haben Ihre Angaben übernommen und Ihr <strong style="color:#2D1F0F;">persönliches Angebot</strong> angepasst${
         hatEmpfehlung
-          ? ` Und wir haben passende Betreuungskräfte für Sie gefunden: <strong style="color:#2D1F0F;">Unsere Empfehlung sehen Sie direkt in dieser E-Mail.</strong>`
-          : ""
+          ? ` &ndash; und passende Betreuungskräfte für Sie gefunden.<br><span style="color:#8B7355;">Unsere Empfehlung sehen Sie direkt in dieser E-Mail.</span>`
+          : ` für die 24-Stunden-Betreuung zu Hause.`
       }`
-    : `vielen Dank für Ihre Anfrage. Auf Basis Ihrer Angaben haben wir Ihr <strong style="color:#2D1F0F;">persönliches Angebot für die 24-Stunden-Betreuung zu Hause</strong> erstellt &ndash; mit allen Kosten, möglichen Fördermitteln und Ihrem rechnerischen Eigenanteil. Alles unverbindlich, Sie entscheiden in Ruhe.${
+    : `vielen Dank für Ihre Anfrage. Auf Basis Ihrer Angaben haben wir Ihr <strong style="color:#2D1F0F;">persönliches Angebot</strong> erstellt${
         hatEmpfehlung
-          ? ` Und das Wichtigste: Wir haben bereits passende Betreuungskräfte für Sie gefunden. <strong style="color:#2D1F0F;">Unsere Empfehlung sehen Sie direkt in dieser E-Mail.</strong>`
-          : ""
+          ? ` &ndash; und bereits passende Betreuungskräfte für Sie gefunden.<br><span style="color:#8B7355;">Unsere Empfehlung sehen Sie direkt in dieser E-Mail.</span>`
+          : ` für die 24-Stunden-Betreuung zu Hause.`
       }`;
 
   /* Bei eingekauften Leads sind nicht alle Angaben vom Kunden: was das
@@ -1215,11 +1215,15 @@ ${buildHeimVergleichText(lead)}
   const introPlain = herkunftPlain
     ? portalIntroText(herkunftPlain)
     : isResubmit
-    ? `vielen Dank für Ihre erneute Anfrage. Wir haben Ihre aktualisierten Angaben übernommen und Ihr persönliches Angebot für die 24-Stunden-Betreuung zu Hause entsprechend angepasst – mit allen Kosten, möglichen Fördermitteln und Ihrem rechnerischen Eigenanteil.${
-        hatEmpfehlungPlain ? " Und wir haben passende Betreuungskräfte für Sie gefunden: Unsere Empfehlung sehen Sie direkt in dieser E-Mail." : ""
+    ? `vielen Dank für Ihre erneute Anfrage. Wir haben Ihre Angaben übernommen und Ihr persönliches Angebot angepasst${
+        hatEmpfehlungPlain
+          ? " – und passende Betreuungskräfte für Sie gefunden.\nUnsere Empfehlung sehen Sie direkt in dieser E-Mail."
+          : " für die 24-Stunden-Betreuung zu Hause."
       }`
-    : `vielen Dank für Ihre Anfrage. Auf Basis Ihrer Angaben haben wir Ihr persönliches Angebot für die 24-Stunden-Betreuung zu Hause erstellt – mit allen Kosten, möglichen Fördermitteln und Ihrem rechnerischen Eigenanteil. Alles unverbindlich, Sie entscheiden in Ruhe.${
-        hatEmpfehlungPlain ? " Und das Wichtigste: Wir haben bereits passende Betreuungskräfte für Sie gefunden. Unsere Empfehlung sehen Sie direkt in dieser E-Mail." : ""
+    : `vielen Dank für Ihre Anfrage. Auf Basis Ihrer Angaben haben wir Ihr persönliches Angebot erstellt${
+        hatEmpfehlungPlain
+          ? " – und bereits passende Betreuungskräfte für Sie gefunden.\nUnsere Empfehlung sehen Sie direkt in dieser E-Mail."
+          : " für die 24-Stunden-Betreuung zu Hause."
       }`;
 
   const angenommeneFelderPlain = (lead.kalkulation as any)?.angenommene_felder;

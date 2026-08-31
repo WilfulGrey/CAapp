@@ -272,14 +272,14 @@ send-scheduled-emails (email_type=eingangsbestaetigung)
       { action: "listMatchings", variables: { limit: 200 } }
   → waehleFuenf(...)   # ta sama piątka co portal (patrz niżej)
   → POST /functions/v1/mamamia-proxy  { action: "getCaregiver", id }
-      # smoking / driving_license / nationality — nie ma ich w liście matchingów
+      # smoking / driving_license — nie ma ich w liście matchingów
 ```
 
 **Wygląd karty = karta z portalu.** `empfehlungHtml` odwzorowuje
 `MatchCard` z `isRecommended` (src/components/portal/MatchCard.tsx): biała
 ramka `#8B7355` z nagłówkiem „Unsere Empfehlung für Sie", w środku szara karta
 `#F4F4F6`/`#D4D4D8` ze zdjęciem 64 px (radius 12), nazwą w formie `displayName`
-(„Maria K."), stopniem znajomości niemieckiego i linią faktów kopiowaną
+(„Maria K.") i stopniem znajomości niemieckiego, oraz linią faktów kopiowaną
 1:1 z `nurseFacts` — razem ze skrótem „J. Erfahrung" i przeliczeniem
 dni→tygodnie→miesiące→tygodnie. Ta okrężna droga jest zamierzona: prostsze
 liczenie dałoby INNĄ liczbę tygodni niż ta, którą klient przeczyta sekundę

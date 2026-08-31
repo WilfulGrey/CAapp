@@ -247,7 +247,7 @@ Deno.test("anzeigeName: ohne Nachname bleibt der Vorname allein stehen", () => {
 Deno.test("empfehlungText: trägt dieselben Aussagen wie das HTML", () => {
   const { empfehlung } = baueEmpfehlung(
     cg({ id: 42, hp_total_jobs: 7 }),
-    { smoking: "no", nationality: { nationality: "Polish" } } as CaregiverExtra,
+    { smoking: "no" } as CaregiverExtra,
     { deutschkenntnisse: "kommunikativ" },
     4,
     JETZT,
@@ -255,7 +255,6 @@ Deno.test("empfehlungText: trägt dieselben Aussagen wie das HTML", () => {
   const txt = empfehlungText(empfehlung, "https://p", "https://a", 4);
   assertStringIncludes(txt, "UNSERE EMPFEHLUNG FÜR SIE");
   assertStringIncludes(txt, "Maria, 54");
-  assertStringIncludes(txt, "Polen");
   assertStringIncludes(txt, "Verfügbar ab 14. September");
   assertStringIncludes(txt, "eine von vier Pflegekräften");
 });
@@ -265,11 +264,10 @@ Deno.test("baueEmpfehlung: unplausibles Geburtsjahr → kein Alter statt Unsinn"
   assertEquals(empfehlung.alter, null);
 });
 
-Deno.test("baueEmpfehlung: unbekannte Nationalität wird weggelassen, nicht geraten", () => {
-  const { empfehlung } = baueEmpfehlung(
-    cg({ id: 1 }), { nationality: { nationality: "Klingon" } } as CaregiverExtra, {}, 2, JETZT,
-  );
-  assertEquals(empfehlung.nationalitaet, null);
+Deno.test("empfehlungHtml: keine Herkunftszeile — steht auch im Portal nicht", () => {
+  const { empfehlung } = baueEmpfehlung(cg({ id: 1 }), null, {}, 3, JETZT);
+  const html = empfehlungHtml(empfehlung, null, "https://p", "https://a", 3);
+  assertEquals(/Polen|Polnisch|Nationalit/.test(html), false);
 });
 
 // ── Datenbeschaffung: jeder Ausfall endet in null, nie in einem Halbbild ──
@@ -338,14 +336,13 @@ Deno.test("holeEmpfehlung: Glücksfall — beste Kraft plus Gründe", async () =
         }));
       }
       return Promise.resolve(Response.json({
-        data: { Caregiver: { smoking: "no", driving_license: "yes", nationality: { nationality: "Polish" } } },
+        data: { Caregiver: { smoking: "no", driving_license: "yes" } },
       }));
     },
   });
   assert(r !== null);
   assertEquals(r!.empfehlung.caregiverId, 9, "nicht die erfahrenste Kraft empfohlen");
   assertEquals(r!.sichtbarGesamt, 2);
-  assertEquals(r!.empfehlung.nationalitaet, "Polen");
   assert(r!.empfehlung.gruende.length >= 3);
   assertEquals(rufe, ["onboard", "listMatchings", "getCaregiver"]);
 });

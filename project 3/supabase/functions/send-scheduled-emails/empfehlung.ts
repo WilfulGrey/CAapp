@@ -70,7 +70,6 @@ export interface Matching {
 export interface CaregiverExtra {
   smoking?: string | null;
   driving_license?: string | null;
-  nationality?: { nationality?: string | null } | null;
 }
 
 /** Kostenrechner-Antworten (lead.kalkulation.formularDaten). */
@@ -93,7 +92,6 @@ export interface Empfehlung {
   /** Die Faktenzeile der Portal-Karte, Wort für Wort. */
   fakten: string;
   alter: number | null;
-  nationalitaet: string | null;
   deutschWort: string | null;
   erfahrungJahre: number;
   einsaetze: number;
@@ -349,30 +347,6 @@ export function matchGruende(
   return gruende.slice(0, 4);
 }
 
-// ─── Nationalität — Kopie aus src/lib/mamamia/mappers.ts ─────────────────
-
-const NATIONALITAET_DE: Record<string, string> = {
-  Polish: "Polen",
-  Bulgarian: "Bulgarien",
-  Romanian: "Rumänien",
-  Slovak: "Slowakei",
-  Czech: "Tschechien",
-  Hungarian: "Ungarn",
-  Ukrainian: "Ukraine",
-  Lithuanian: "Litauen",
-  Latvian: "Lettland",
-  Estonian: "Estland",
-  Croatian: "Kroatien",
-  Slovenian: "Slowenien",
-};
-
-export function herkunftsland(nat: string | null | undefined): string | null {
-  const roh = (nat ?? "").trim();
-  if (!roh) return null;
-  // Unbekannte Nationalität lieber weglassen als falsch übersetzen.
-  return NATIONALITAET_DE[roh] ?? null;
-}
-
 // ─── Datum ───────────────────────────────────────────────────────────────
 
 const MONATE = [
@@ -414,7 +388,6 @@ export function baueEmpfehlung(
       anzeigeName: anzeigeName(cg.first_name ?? "", cg.last_name) || "Ihre Pflegekraft",
       fakten: portalFakten(cg),
       alter: alter && alter > 17 && alter < 100 ? alter : null,
-      nationalitaet: herkunftsland(extra?.nationality?.nationality),
       deutschWort: deutschWortAus(cg.germany_skill),
       erfahrungJahre: jahre,
       einsaetze,
@@ -636,10 +609,6 @@ export function empfehlungHtml(
     ? `<p style="margin:4px 0 0;font-size:16px;line-height:1.4;color:#71717A;">Deutsch ${e.deutschWort}</p>`
     : "";
 
-  const herkunftZeile = e.nationalitaet
-    ? `<p style="margin:4px 0 0;font-size:16px;line-height:1.4;color:#71717A;">${esc(e.nationalitaet)}</p>`
-    : "";
-
   // Fussleiste der Portal-Karte: dort sitzt der „Einladen"-Knopf, hier die
   // Verfuegbarkeit — die Zeile, die den Klick wertvoll macht.
   const fussLeiste = e.verfuegbarAb
@@ -699,7 +668,6 @@ export function empfehlungHtml(
                     <td class="empf-luecke" width="14" style="width:14px;font-size:0;line-height:0;">&nbsp;</td>
                     <td class="empf-text" style="vertical-align:middle;">
                       <p style="margin:0;font-size:17px;font-weight:700;line-height:1.35;color:#18181B;">${name}${alterTeil}</p>
-                      ${herkunftZeile}
                       ${deutschZeile}
                     </td>
                   </tr>
@@ -743,7 +711,6 @@ export function empfehlungText(
     "",
     `${e.anzeigeName}${e.alter ? `, ${e.alter}` : ""}`,
   ];
-  if (e.nationalitaet) zeilen.push(e.nationalitaet);
   if (e.deutschWort) zeilen.push(`Deutsch ${e.deutschWort}`);
   // Faktenzeile wie im Portal — die Entitäten wieder in Klartext.
   zeilen.push(`${e.stufe}: ${e.fakten.replaceAll("&middot;", "·")}`);
