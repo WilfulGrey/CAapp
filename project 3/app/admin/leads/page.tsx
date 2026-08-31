@@ -14,6 +14,7 @@ import {
 import { createClient } from '@supabase/supabase-js';
 import { Search, Loader as Loader2, Mail, Phone, Calendar, ExternalLink } from 'lucide-react';
 import Link from 'next/link';
+import { istEingekauft, quellenName } from '@/lib/portal-lead';
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -26,6 +27,11 @@ export default function LeadsPage() {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
+  /* Herkunft: 'all' | 'eigene' | ein source-Wert ("portal:pflegebund.eu").
+     Eingekaufte Leads sind eine eigene Welt — sie haben Geld gekostet, sie
+     sind zeitkritisch (die Portale liefern an bis zu drei Anbieter) und
+     ihre Abschlussquote entscheidet, ob sich die Quelle rechnet. */
+  const [quelleFilter, setQuelleFilter] = useState('all');
 
   useEffect(() => {
     loadLeads();
@@ -33,7 +39,7 @@ export default function LeadsPage() {
 
   useEffect(() => {
     filterLeads();
-  }, [searchTerm, statusFilter, leads]);
+  }, [searchTerm, statusFilter, quelleFilter, leads]);
 
   const loadLeads = async () => {
     try {
@@ -62,6 +68,12 @@ export default function LeadsPage() {
       filtered = filtered.filter((lead) => lead.status === statusFilter);
     }
 
+    if (quelleFilter === 'eigene') {
+      filtered = filtered.filter((lead) => !istEingekauft(lead.source));
+    } else if (quelleFilter !== 'all') {
+      filtered = filtered.filter((lead) => lead.source === quelleFilter);
+    }
+
     if (searchTerm) {
       const term = searchTerm.toLowerCase();
       filtered = filtered.filter(
@@ -74,6 +86,25 @@ export default function LeadsPage() {
 
     setFilteredLeads(filtered);
   };
+
+  /* Reiter entstehen aus den Daten, nicht aus einer Liste im Code: ein
+     neues Portal taucht automatisch auf, sobald der erste Lead da ist —
+     niemand muss daran denken, hier etwas nachzutragen. */
+  const quellen = Array.from(
+    new Set(leads.map((l) => l.source).filter((s: string) => istEingekauft(s))),
+  ).sort();
+
+  const zaehle = (pruefe: (l: any) => boolean) => leads.filter(pruefe).length;
+
+  const reiter: Array<{ key: string; label: string; anzahl: number }> = [
+    { key: 'all', label: 'Alle', anzahl: leads.length },
+    { key: 'eigene', label: 'Eigene Anfragen', anzahl: zaehle((l) => !istEingekauft(l.source)) },
+    ...quellen.map((q: string) => ({
+      key: q,
+      label: quellenName(q),
+      anzahl: zaehle((l) => l.source === q),
+    })),
+  ];
 
   const getStatusBadge = (status: string) => {
     const styles: Record<string, string> = {
@@ -120,6 +151,25 @@ export default function LeadsPage() {
       </div>
 
       <Card className="p-6">
+        <div className="mb-4 flex flex-wrap gap-2 border-b border-gray-200 pb-3">
+          {reiter.map((r) => (
+            <button
+              key={r.key}
+              onClick={() => setQuelleFilter(r.key)}
+              className={`rounded-full px-4 py-1.5 text-sm transition-colors ${
+                quelleFilter === r.key
+                  ? 'bg-[#E76F63] text-white font-semibold'
+                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+              }`}
+            >
+              {r.label}
+              <span className={`ml-2 tabular-nums ${quelleFilter === r.key ? 'text-white/80' : 'text-gray-400'}`}>
+                {r.anzahl}
+              </span>
+            </button>
+          ))}
+        </div>
+
         <div className="flex gap-4 mb-6">
           <div className="flex-1 relative">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
@@ -156,6 +206,9 @@ export default function LeadsPage() {
                   Status
                 </th>
                 <th className="text-left py-3 px-4 text-sm font-medium text-gray-600">
+                  Herkunft
+                </th>
+                <th className="text-left py-3 px-4 text-sm font-medium text-gray-600">
                   Eigenanteil
                 </th>
                 <th className="text-left py-3 px-4 text-sm font-medium text-gray-600">
@@ -169,7 +222,7 @@ export default function LeadsPage() {
             <tbody>
               {filteredLeads.length === 0 ? (
                 <tr>
-                  <td colSpan={5} className="text-center py-8 text-gray-500">
+                  <td colSpan={6} className="text-center py-8 text-gray-500">
                     Keine Leads gefunden
                   </td>
                 </tr>
@@ -210,6 +263,20 @@ export default function LeadsPage() {
                       </div>
                     </td>
                     <td className="py-3 px-4">{getStatusBadge(lead.status)}</td>
+                    <td className="py-3 px-4">
+                      {/* Eingekauft wird hervorgehoben: dieser Lead hat Geld
+                          gekostet und laeuft gegen die Uhr — das Portal hat
+                          ihn an bis zu drei Anbieter gegeben. */}
+                      <span
+                        className={`inline-block rounded-full px-2.5 py-1 text-xs ${
+                          istEingekauft(lead.source)
+                            ? 'bg-[#FDEDEB] text-[#B4483C] font-medium'
+                            : 'bg-gray-100 text-gray-600'
+                        }`}
+                      >
+                        {quellenName(lead.source)}
+                      </span>
+                    </td>
                     <td className="py-3 px-4">
                       {lead.kalkulation?.eigenanteil ? (
                         <span className="font-medium text-gray-900">

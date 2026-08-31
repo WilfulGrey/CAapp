@@ -97,3 +97,27 @@ export function ergaenzeAngaben(
 
   return { daten: daten as FormularDaten, angenommen };
 }
+
+/* ─── Herkunft im Admin ──────────────────────────────────────────────────
+ *
+ * leads.source ist "rechner" (Formular), "pria-chat" oder
+ * "portal:<domain>" fuer eingekaufte Leads. Die beiden Welten gehoeren
+ * getrennt betrachtet: eigene Anfragen kosten nichts und kommen von
+ * jemandem, der uns gesucht hat. Eingekaufte haben Geld gekostet, sind
+ * zeitkritisch (die Portale liefern an bis zu drei Anbieter) und ihre
+ * Abschlussquote entscheidet, ob sich die Quelle rechnet.
+ */
+
+export function istEingekauft(source?: string | null): boolean {
+  return typeof source === 'string' && source.toLowerCase().startsWith('portal:');
+}
+
+/** Anzeigename fuer den Reiter: "portal:pflegebund.eu" → "Pflegebund.eu". */
+export function quellenName(source?: string | null): string {
+  if (!source) return 'Kostenrechner';
+  if (!istEingekauft(source)) {
+    return source === 'pria-chat' ? 'Pria-Chat' : 'Kostenrechner';
+  }
+  const domain = source.slice('portal:'.length);
+  return domain.charAt(0).toUpperCase() + domain.slice(1);
+}
