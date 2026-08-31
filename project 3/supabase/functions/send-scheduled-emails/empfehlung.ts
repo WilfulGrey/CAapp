@@ -53,6 +53,8 @@ export interface MatchCaregiver {
   available_from?: string | null;
   last_contact_at?: string | null;
   hp_total_jobs?: number | null;
+  /** Durchschnittliche Einsatzdauer in TAGEN — Quelle der „Ø N Wochen"-Angabe. */
+  hp_avg_mission_days?: number | null;
   avatar?: { aws_url?: string | null } | null;
   avatar_retouched?: { aws_url?: string | null } | null;
   avatar_retouched_promo?: { aws_url?: string | null } | null;
@@ -83,8 +85,13 @@ export interface FormularDaten {
 
 export interface Empfehlung {
   caregiverId: number;
-  /** „Maria" — Vorname, wie im Portal. Nie der Nachname. */
+  /** „Maria" — für Anrede, Button und Fließtext. */
   vorname: string;
+  /** „Maria K." — exakt die Schreibweise der Portal-Karte (displayName).
+   *  Der ausgeschriebene Nachname verlässt das Portal nie. */
+  anzeigeName: string;
+  /** Die Faktenzeile der Portal-Karte, Wort für Wort. */
+  fakten: string;
   alter: number | null;
   nationalitaet: string | null;
   deutschWort: string | null;
@@ -404,6 +411,8 @@ export function baueEmpfehlung(
     empfehlung: {
       caregiverId: cg.id,
       vorname: (cg.first_name ?? "").trim() || "Ihre Pflegekraft",
+      anzeigeName: anzeigeName(cg.first_name ?? "", cg.last_name) || "Ihre Pflegekraft",
+      fakten: portalFakten(cg),
       alter: alter && alter > 17 && alter < 100 ? alter : null,
       nationalitaet: herkunftsland(extra?.nationality?.nationality),
       deutschWort: deutschWortAus(cg.germany_skill),
@@ -416,6 +425,53 @@ export function baueEmpfehlung(
     },
     sichtbarGesamt,
   };
+}
+
+/**
+ * „Maria K." — Vorname plus Initiale des Nachnamens. Kopie von
+ * `displayName` (src/components/portal/shared.ts): die Karte in der Mail und
+ * die Karte im Portal müssen dieselbe Person gleich benennen, sonst wirkt der
+ * Klick wie ein Wechsel. Der ausgeschriebene Nachname bleibt im Panel.
+ */
+export function anzeigeName(vorname: string, nachname?: string | null): string {
+  const v = (vorname ?? "").trim();
+  const n = (nachname ?? "").trim();
+  if (!v) return "";
+  return n ? `${v} ${n.charAt(0).toUpperCase()}.` : v;
+}
+
+/**
+ * Faktenzeile der Portal-Karte, Wort für Wort — Kopie von `nurseFacts`
+ * (src/components/portal/shared.ts) inklusive der Abkürzung „J. Erfahrung"
+ * und der Wochen-Rundung. Kein Text ohne Deckung: fehlen Zahlen, kommt
+ * derselbe ehrliche Ersatzsatz wie im Portal.
+ *
+ * Der Umweg Tage → Wochen → Monate → Wochen ist im Portal historisch
+ * (mapCaregiverToNurse rechnet in Monate, nurseFacts zurück in Wochen). Hier
+ * nachgebaut statt begradigt, weil eine sauberere Rechnung eine ANDERE Zahl
+ * ergeben könnte als die, die der Kunde eine Sekunde später im Portal liest.
+ */
+export function portalFakten(cg: MatchCaregiver): string {
+  const teile: string[] = [];
+  const jahre = erfahrungJahre(cg.care_experience);
+  if (jahre > 0) teile.push(`${jahre} J. Erfahrung`);
+
+  const einsaetze = cg.hp_total_jobs ?? 0;
+  if (einsaetze) {
+    teile.push(`${einsaetze} ${einsaetze === 1 ? "Einsatz" : "Einsätze"}`);
+    const wochenRoh = cg.hp_avg_mission_days
+      ? Number((Math.abs(cg.hp_avg_mission_days) / 7).toFixed(1))
+      : 0;
+    const monate = wochenRoh ? Number((wochenRoh / 4.3).toFixed(1)) : 0;
+    const wochen = Math.round(monate * 4.3);
+    if (wochen > 0) teile.push(`Ø ${wochen} ${wochen === 1 ? "Woche" : "Wochen"} pro Einsatz`);
+  }
+  return teile.length > 0 ? teile.join(" &middot; ") : "bereit für den ersten Einsatz";
+}
+
+/** Zahlwort für „eine von fünf". Über fünf kommt nie vor (TARGET_VISIBLE). */
+export function zahlwort(n: number): string {
+  return ["null", "eine", "zwei", "drei", "vier", "fünf"][n] ?? String(n);
 }
 
 /** Wie deutschStufe.ts, aber ohne Import-Zyklus — dieselbe Skala. */
@@ -565,79 +621,112 @@ export function empfehlungHtml(
   alleUrl: string,
   sichtbarGesamt: number,
 ): string {
-  const name = esc(e.vorname);
-  const alterTeil = e.alter ? `, ${e.alter} Jahre` : "";
+  const name = esc(e.anzeigeName);
+  const vorname = esc(e.vorname);
+  const alterTeil = e.alter
+    ? `<span style="font-weight:400;color:#71717A;">, ${e.alter}</span>`
+    : "";
 
+  // Foto 64 px, radius 12 — dieselben Masse wie die Portal-Karte.
   const foto = photoCid
-    ? `<img src="cid:${photoCid}" alt="${name}" width="104" style="display:block;width:104px;height:104px;border-radius:12px;object-fit:cover;" />`
-    : `<div style="width:104px;height:104px;border-radius:12px;background-color:#B5A184;color:#ffffff;font-size:36px;font-weight:700;line-height:104px;text-align:center;">${initialen(e.vorname)}</div>`;
+    ? `<img src="cid:${photoCid}" alt="${name}" width="64" style="display:block;width:64px;height:64px;border-radius:12px;object-fit:cover;" />`
+    : `<div style="width:64px;height:64px;border-radius:12px;background-color:#B5A184;color:#ffffff;font-size:22px;font-weight:700;line-height:64px;text-align:center;">${initialen(e.vorname)}</div>`;
 
-  const zeilen: string[] = [];
-  if (e.nationalitaet) zeilen.push(esc(e.nationalitaet));
-  if (e.deutschWort) zeilen.push(`Deutsch: ${e.deutschWort}`);
-  if (e.erfahrungJahre > 0) {
-    zeilen.push(`${e.erfahrungJahre} ${e.erfahrungJahre === 1 ? "Jahr" : "Jahre"} Betreuungserfahrung`);
-  }
-  const daten = zeilen
-    .map((z) => `<p style="margin:0 0 3px;font-size:14px;line-height:1.6;color:#555;">${z}</p>`)
-    .join("");
+  const deutschZeile = e.deutschWort
+    ? `<p style="margin:4px 0 0;font-size:16px;line-height:1.4;color:#71717A;">Deutsch ${e.deutschWort}</p>`
+    : "";
 
-  const verfuegbar = e.verfuegbarAb
-    ? `<p style="margin:8px 0 0;font-size:14px;line-height:1.6;color:#2A9D5C;font-weight:600;">${
-        e.verfuegbarAb === "sofort" ? "Sofort verfügbar" : `Verfügbar ab ${esc(e.verfuegbarAb)}`
-      }</p>`
+  const herkunftZeile = e.nationalitaet
+    ? `<p style="margin:4px 0 0;font-size:16px;line-height:1.4;color:#71717A;">${esc(e.nationalitaet)}</p>`
+    : "";
+
+  // Fussleiste der Portal-Karte: dort sitzt der „Einladen"-Knopf, hier die
+  // Verfuegbarkeit — die Zeile, die den Klick wertvoll macht.
+  const fussLeiste = e.verfuegbarAb
+    ? `
+          <tr>
+            <td style="padding:10px 16px;border-top:1px solid #E4E4E7;">
+              <p style="margin:0;font-size:14px;line-height:1.5;color:#22A06B;font-weight:700;">${
+                e.verfuegbarAb === "sofort" ? "Sofort verfügbar" : `Verfügbar ab ${esc(e.verfuegbarAb)}`
+              }</p>
+            </td>
+          </tr>`
     : "";
 
   const gruendeBlock = e.gruende.length > 0
     ? `
+          <table width="100%" cellpadding="0" cellspacing="0" role="presentation">
+            <tr><td style="padding:16px 4px 0;">
+              <p style="margin:0 0 10px;font-size:15px;line-height:1.5;color:#18181B;font-weight:700;">Warum ${vorname} zu Ihren Angaben passt:</p>
+              ${e.gruende.map((g) =>
+                `<p style="margin:0 0 7px;font-size:15px;line-height:1.6;color:#3F3F46;"><span style="color:#22A06B;font-weight:700;">&#10003;</span>&nbsp;&nbsp;${esc(g)}</p>`
+              ).join("")}
+            </td></tr>
+          </table>`
+    : "";
+
+  /* „eine von fünf" statt „weitere 3" (Martin, 31.08.): die Zahl, die zählt,
+     ist die Auswahl — nicht der Rest. Genau eine Kraft im Pool ⇒ der Satz
+     entfällt komplett, sonst stünde dort „eine von eins". */
+  const auswahlBlock = sichtbarGesamt > 1
+    ? `
       <tr>
-        <td colspan="3" style="padding:18px 24px 4px;border-top:1px solid #ebe2d2;">
-          <p style="margin:0 0 10px;font-size:14px;line-height:1.6;color:#2D1F0F;font-weight:600;">Warum ${name} zu Ihren Angaben passt:</p>
-          ${e.gruende.map((g) =>
-            `<p style="margin:0 0 6px;font-size:14px;line-height:1.6;color:#2D1F0F;"><span style="color:#2A9D5C;font-weight:700;">&#10003;</span>&nbsp;&nbsp;${esc(g)}</p>`
-          ).join("")}
+        <td style="padding:16px 4px 0;">
+          <p style="margin:0;font-size:15px;line-height:1.7;color:#3F3F46;">${vorname} ist eine von <strong style="color:#18181B;">${zahlwort(sichtbarGesamt)} Pflegekräften</strong>, die wir für Sie ausgewählt haben. Im Portal sehen Sie alle ${zahlwort(sichtbarGesamt)} mit Foto, Erfahrung und frühestem Anreisedatum &ndash; und entscheiden selbst, wen Sie kennenlernen möchten.</p>
+          <p style="margin:10px 0 0;"><a href="${alleUrl}" target="_blank" style="color:#8B7355;text-decoration:underline;font-size:15px;font-weight:700;">Alle passenden Betreuungskräfte ansehen &rarr;</a></p>
         </td>
       </tr>`
     : "";
 
-  // Der Hinweis auf die übrigen Kräfte verschwindet bei genau einem Match
-  // vollständig — „Weitere 0" wäre schlimmer als gar nichts.
-  const weitere = sichtbarGesamt - 1;
-  const weitereBlock = weitere > 0
-    ? `
-          <p style="margin:14px 0 0;font-size:14px;line-height:1.6;color:#555;text-align:center;">Weitere ${weitere} passende ${weitere === 1 ? "Betreuungskraft" : "Betreuungskräfte"} für Sie</p>
-          <p style="margin:4px 0 0;text-align:center;"><a href="${alleUrl}" target="_blank" style="color:#8B7355;text-decoration:underline;font-size:14px;font-weight:600;">Alle passenden Betreuungskräfte ansehen &rarr;</a></p>`
-    : "";
-
+  /* Aufbau 1:1 wie die empfohlene Karte im Portal (MatchCard mit
+     isRecommended): weisser Rahmen in Primundus-Braun, darin die Ueberschrift
+     „Unsere Empfehlung für Sie", darunter die graue Karte mit Foto, Name,
+     Deutschstufe und der Faktenzeile. Der Kunde soll nach dem Klick dieselbe
+     Karte wiedererkennen, nicht eine zweite Gestaltung derselben Person. */
   return `
-    <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="margin:0 0 28px;background:#FFFFFF;border:1px solid #ebe2d2;border-radius:10px;overflow:hidden;">
+    <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="margin:0 0 28px;background:#FFFFFF;border:1px solid #8B7355;border-radius:20px;">
       <tr>
-        <td colspan="3" style="padding:14px 24px 12px;background:#FAF8F4;border-bottom:1px solid #ebe2d2;">
-          <p style="margin:0;${LABEL}color:#8B7355;">Unsere Empfehlung für Sie</p>
-        </td>
-      </tr>
-      <tr>
-        <td class="empf-foto" style="padding:22px 0 18px 24px;width:104px;vertical-align:top;">${foto}</td>
-        <td class="empf-luecke" width="20" style="width:20px;font-size:0;line-height:0;">&nbsp;</td>
-        <td class="empf-text" style="padding:22px 24px 18px 0;vertical-align:top;">
-          <p style="margin:0 0 8px;font-size:22px;font-weight:700;color:#2D1F0F;line-height:1.25;">${name}<span style="font-size:15px;font-weight:400;color:#9a8a73;">${alterTeil}</span></p>
-          ${daten}
-          ${verfuegbar}
-        </td>
-      </tr>
-      ${gruendeBlock}
-      <tr>
-        <td colspan="3" style="padding:18px 24px 22px;">
-          <!--[if mso]><table role="presentation" cellpadding="0" cellspacing="0" border="0" align="center"><tr><td><![endif]-->
-          <table role="presentation" cellpadding="0" cellspacing="0" border="0" align="center" style="margin:0 auto;border-collapse:separate;">
+        <td style="padding:18px 16px 16px;">
+
+          <p style="margin:0 0 12px;font-size:16px;font-weight:700;line-height:1.4;color:#8B7355;">&#10022;&nbsp; Unsere Empfehlung für Sie</p>
+
+          <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="background:#F4F4F6;border:1px solid #D4D4D8;border-radius:16px;overflow:hidden;">
             <tr>
-              <td align="center" bgcolor="#2A9D5C" style="background-color:#2A9D5C;background-image:linear-gradient(180deg,#34B36C 0%,#2A9D5C 100%);border-radius:10px;padding:15px 38px;">
-                <a href="${profilUrl}" target="_blank" style="color:#ffffff;text-decoration:none;font-weight:600;font-size:16px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;line-height:1.4;">${name} kennenlernen&nbsp;&nbsp;&rarr;</a>
+              <td style="padding:16px 16px 14px;">
+                <table width="100%" cellpadding="0" cellspacing="0" role="presentation">
+                  <tr>
+                    <td class="empf-foto" width="64" style="width:64px;vertical-align:middle;">${foto}</td>
+                    <td class="empf-luecke" width="14" style="width:14px;font-size:0;line-height:0;">&nbsp;</td>
+                    <td class="empf-text" style="vertical-align:middle;">
+                      <p style="margin:0;font-size:17px;font-weight:700;line-height:1.35;color:#18181B;">${name}${alterTeil}</p>
+                      ${herkunftZeile}
+                      ${deutschZeile}
+                    </td>
+                  </tr>
+                </table>
+                <p style="margin:12px 0 0;font-size:16px;line-height:1.5;color:#71717A;"><span style="font-weight:700;color:#18181B;">${esc(e.stufe)}:</span> ${e.fakten}</p>
               </td>
             </tr>
+            ${fussLeiste}
           </table>
-          <!--[if mso]></td></tr></table><![endif]-->
-          ${weitereBlock}
+
+          ${gruendeBlock}
+
+          <table width="100%" cellpadding="0" cellspacing="0" role="presentation">
+            <tr><td style="padding:18px 0 0;">
+              <!--[if mso]><table role="presentation" cellpadding="0" cellspacing="0" border="0" align="center"><tr><td><![endif]-->
+              <table role="presentation" cellpadding="0" cellspacing="0" border="0" align="center" style="margin:0 auto;border-collapse:separate;">
+                <tr>
+                  <td align="center" bgcolor="#2A9D5C" style="background-color:#2A9D5C;background-image:linear-gradient(180deg,#34B36C 0%,#2A9D5C 100%);border-radius:10px;padding:15px 38px;">
+                    <a href="${profilUrl}" target="_blank" style="color:#ffffff;text-decoration:none;font-weight:600;font-size:16px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;line-height:1.4;">${vorname} kennenlernen&nbsp;&nbsp;&rarr;</a>
+                  </td>
+                </tr>
+              </table>
+              <!--[if mso]></td></tr></table><![endif]-->
+            </td></tr>
+            ${auswahlBlock}
+          </table>
+
         </td>
       </tr>
     </table>`;
@@ -649,12 +738,15 @@ export function empfehlungText(
   alleUrl: string,
   sichtbarGesamt: number,
 ): string {
-  const zeilen: string[] = [`UNSERE EMPFEHLUNG FÜR SIE`, ``, `${e.vorname}${e.alter ? `, ${e.alter} Jahre` : ""}`];
+  const zeilen: string[] = [
+    "UNSERE EMPFEHLUNG FÜR SIE",
+    "",
+    `${e.anzeigeName}${e.alter ? `, ${e.alter}` : ""}`,
+  ];
   if (e.nationalitaet) zeilen.push(e.nationalitaet);
-  if (e.deutschWort) zeilen.push(`Deutsch: ${e.deutschWort}`);
-  if (e.erfahrungJahre > 0) {
-    zeilen.push(`${e.erfahrungJahre} ${e.erfahrungJahre === 1 ? "Jahr" : "Jahre"} Betreuungserfahrung`);
-  }
+  if (e.deutschWort) zeilen.push(`Deutsch ${e.deutschWort}`);
+  // Faktenzeile wie im Portal — die Entitäten wieder in Klartext.
+  zeilen.push(`${e.stufe}: ${e.fakten.replaceAll("&middot;", "·")}`);
   if (e.verfuegbarAb) {
     zeilen.push(e.verfuegbarAb === "sofort" ? "Sofort verfügbar" : `Verfügbar ab ${e.verfuegbarAb}`);
   }
@@ -663,10 +755,11 @@ export function empfehlungText(
     for (const g of e.gruende) zeilen.push(`  ✓ ${g}`);
   }
   zeilen.push("", `${e.vorname} kennenlernen: ${profilUrl}`);
-  const weitere = sichtbarGesamt - 1;
-  if (weitere > 0) {
+  if (sichtbarGesamt > 1) {
+    const w = zahlwort(sichtbarGesamt);
     zeilen.push(
-      `Weitere ${weitere} passende ${weitere === 1 ? "Betreuungskraft" : "Betreuungskräfte"} für Sie.`,
+      "",
+      `${e.vorname} ist eine von ${w} Pflegekräften, die wir für Sie ausgewählt haben. Im Portal sehen Sie alle ${w} mit Foto, Erfahrung und frühestem Anreisedatum – und entscheiden selbst, wen Sie kennenlernen möchten.`,
       `Alle passenden Betreuungskräfte ansehen: ${alleUrl}`,
     );
   }

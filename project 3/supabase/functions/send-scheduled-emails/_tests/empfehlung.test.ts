@@ -4,7 +4,9 @@ import {
   empfehlungHtml,
   empfehlungText,
   holeEmpfehlung,
+  anzeigeName,
   matchGruende,
+  portalFakten,
   stufenWort,
   verfuegbarText,
   waehleFuenf,
@@ -174,17 +176,37 @@ Deno.test("empfehlungHtml: ohne Foto Initialen statt kaputtem Bild", () => {
   assertStringIncludes(html, ">M</div>");
 });
 
-Deno.test("empfehlungHtml: 'Weitere N' ist dynamisch und verschwindet bei einer einzigen Kraft", () => {
-  const { empfehlung } = baueEmpfehlung(cg({ id: 42 }), null, {}, 4, JETZT);
-  const vier = empfehlungHtml(empfehlung, null, "https://p", "https://a", 4);
-  assertStringIncludes(vier, "Weitere 3 passende Betreuungskräfte");
+Deno.test("empfehlungHtml: 'eine von fünf' nennt die Auswahl, nicht den Rest", () => {
+  const { empfehlung } = baueEmpfehlung(cg({ id: 42 }), null, {}, 5, JETZT);
+  const fuenf = empfehlungHtml(empfehlung, null, "https://p", "https://a", 5);
+  assertStringIncludes(fuenf, "Maria ist eine von <strong style=\"color:#18181B;\">fünf Pflegekräften</strong>");
+  assertStringIncludes(fuenf, "Im Portal sehen Sie alle fünf");
+  // Die alte Rest-Zählung darf nirgends mehr auftauchen.
+  assertEquals(fuenf.includes("Weitere"), false);
 
-  const zwei = empfehlungHtml(empfehlung, null, "https://p", "https://a", 2);
-  assertStringIncludes(zwei, "Weitere 1 passende Betreuungskraft für Sie");
+  const drei = empfehlungHtml(empfehlung, null, "https://p", "https://a", 3);
+  assertStringIncludes(drei, "eine von <strong style=\"color:#18181B;\">drei Pflegekräften</strong>");
 
+  // Genau eine Kraft: der Satz entfällt, sonst stünde dort "eine von eins".
   const eine = empfehlungHtml(empfehlung, null, "https://p", "https://a", 1);
-  assertEquals(eine.includes("Weitere"), false);
+  assertEquals(eine.includes("eine von"), false);
   assertEquals(eine.includes("Alle passenden"), false);
+});
+
+Deno.test("empfehlungHtml: Karte trägt die Portal-Optik und -Sprache", () => {
+  const { empfehlung } = baueEmpfehlung(
+    cg({ id: 42, first_name: "Maria", last_name: "Kowalska", hp_total_jobs: 9, hp_avg_mission_days: 84 }),
+    null, {}, 5, JETZT,
+  );
+  const html = empfehlungHtml(empfehlung, null, "https://p", "https://a", 5);
+  // Rahmenfarbe + Kartengrund wie MatchCard(isRecommended)
+  assertStringIncludes(html, "border:1px solid #8B7355");
+  assertStringIncludes(html, "background:#F4F4F6");
+  assertStringIncludes(html, "Unsere Empfehlung für Sie");
+  // Name in Portal-Schreibweise, Faktenzeile Wort für Wort
+  assertStringIncludes(html, "Maria K.");
+  assertStringIncludes(html, "Stammkraft:");
+  assertStringIncludes(html, "7 J. Erfahrung &middot; 9 Einsätze &middot; Ø 12 Wochen pro Einsatz");
 });
 
 Deno.test("empfehlungHtml: Button trägt den Vornamen und zeigt aufs Profil", () => {
@@ -194,12 +216,32 @@ Deno.test("empfehlungHtml: Button trägt den Vornamen und zeigt aufs Profil", ()
   assertStringIncludes(html, 'href="https://portal/?token=t&cg=42"');
 });
 
-Deno.test("empfehlungHtml: kein Nachname in der Mail", () => {
+Deno.test("empfehlungHtml: Initiale ja, ausgeschriebener Nachname nie", () => {
   const { empfehlung } = baueEmpfehlung(
     cg({ id: 42, first_name: "Maria", last_name: "Kowalska" }), null, {}, 3, JETZT,
   );
   const html = empfehlungHtml(empfehlung, null, "https://p", "https://a", 3);
+  assertStringIncludes(html, "Maria K.");
   assertEquals(html.includes("Kowalska"), false);
+});
+
+Deno.test("portalFakten: ohne Zahlen derselbe ehrliche Ersatzsatz wie im Portal", () => {
+  assertEquals(
+    portalFakten({ id: 1, care_experience: null, hp_total_jobs: 0 }),
+    "bereit für den ersten Einsatz",
+  );
+});
+
+Deno.test("portalFakten: ein Einsatz bleibt Einzahl", () => {
+  assertStringIncludes(
+    portalFakten({ id: 1, care_experience: "1", hp_total_jobs: 1, hp_avg_mission_days: 7 }),
+    "1 J. Erfahrung &middot; 1 Einsatz",
+  );
+});
+
+Deno.test("anzeigeName: ohne Nachname bleibt der Vorname allein stehen", () => {
+  assertEquals(anzeigeName("Maria", null), "Maria");
+  assertEquals(anzeigeName("Maria", "Kowalska"), "Maria K.");
 });
 
 Deno.test("empfehlungText: trägt dieselben Aussagen wie das HTML", () => {
@@ -212,10 +254,10 @@ Deno.test("empfehlungText: trägt dieselben Aussagen wie das HTML", () => {
   );
   const txt = empfehlungText(empfehlung, "https://p", "https://a", 4);
   assertStringIncludes(txt, "UNSERE EMPFEHLUNG FÜR SIE");
-  assertStringIncludes(txt, "Maria, 54 Jahre");
+  assertStringIncludes(txt, "Maria, 54");
   assertStringIncludes(txt, "Polen");
   assertStringIncludes(txt, "Verfügbar ab 14. September");
-  assertStringIncludes(txt, "Weitere 3 passende Betreuungskräfte");
+  assertStringIncludes(txt, "eine von vier Pflegekräften");
 });
 
 Deno.test("baueEmpfehlung: unplausibles Geburtsjahr → kein Alter statt Unsinn", () => {

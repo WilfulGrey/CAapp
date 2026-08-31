@@ -184,12 +184,12 @@ function buildEmailWrapper(lead: Lead, siteUrl: string, content: string): string
       .email-content { padding: 30px 20px; }
       .price-stage-cell { display: block !important; width: 100% !important; padding: 18px 22px 16px !important; border-right: none !important; border-bottom: 1px solid #ebe2d2 !important; }
       .price-stage-cell:last-child { border-bottom: none !important; }
-      /* Empfehlungs-Karte: auf schmalen Schirmen Foto ueber den Text statt
-         einer gequetschten Zweispalter. Outlook ignoriert Media-Queries und
-         rendert weiter zweispaltig — dort sind 600 px fest, das passt. */
-      .empf-foto { display: block !important; width: 100% !important; padding: 22px 24px 0 24px !important; }
-      .empf-luecke { display: none !important; }
-      .empf-text { display: block !important; width: 100% !important; padding: 14px 24px 18px 24px !important; }
+      /* Empfehlungs-Karte: Foto und Name bleiben AUCH auf dem Handy
+         nebeneinander — genau wie die Karte im Portal (MatchCard). 64 px Foto
+         plus Text passen bei 375 px bequem; ein Umbruch haette die Mail von
+         der Ansicht entfernt, die der Kunde eine Sekunde spaeter sieht.
+         Die Faktenzeile laeuft ohnehin ueber die volle Kartenbreite. */
+      .empf-foto { padding-left: 0 !important; }
     }
   </style>
 </head>
@@ -1108,8 +1108,16 @@ export function buildEingangsbestaetigungHtml(
   const introParagraph = herkunft
     ? portalIntroHtml(herkunft)
     : isResubmit
-    ? `vielen Dank für Ihre erneute Anfrage.<br><br>Wir haben Ihre aktualisierten Angaben übernommen, Ihr <strong style="color:#2D1F0F;">persönliches Angebot</strong> angepasst${hatEmpfehlung ? " &ndash; und passende Betreuungskräfte für Sie gefunden" : ""}.`
-    : `vielen Dank für Ihre Anfrage.<br><br>Auf Basis Ihrer Angaben haben wir Ihr <strong style="color:#2D1F0F;">persönliches Angebot</strong> erstellt${hatEmpfehlung ? " &ndash; und bereits passende Betreuungskräfte für Sie gefunden" : ""}.`;
+    ? `vielen Dank für Ihre erneute Anfrage. Wir haben Ihre aktualisierten Angaben übernommen und Ihr <strong style="color:#2D1F0F;">persönliches Angebot für die 24-Stunden-Betreuung zu Hause</strong> entsprechend angepasst &ndash; mit allen Kosten, möglichen Fördermitteln und Ihrem rechnerischen Eigenanteil.${
+        hatEmpfehlung
+          ? ` Und wir haben passende Betreuungskräfte für Sie gefunden: <strong style="color:#2D1F0F;">Unsere Empfehlung sehen Sie direkt in dieser E-Mail.</strong>`
+          : ""
+      }`
+    : `vielen Dank für Ihre Anfrage. Auf Basis Ihrer Angaben haben wir Ihr <strong style="color:#2D1F0F;">persönliches Angebot für die 24-Stunden-Betreuung zu Hause</strong> erstellt &ndash; mit allen Kosten, möglichen Fördermitteln und Ihrem rechnerischen Eigenanteil. Alles unverbindlich, Sie entscheiden in Ruhe.${
+        hatEmpfehlung
+          ? ` Und das Wichtigste: Wir haben bereits passende Betreuungskräfte für Sie gefunden. <strong style="color:#2D1F0F;">Unsere Empfehlung sehen Sie direkt in dieser E-Mail.</strong>`
+          : ""
+      }`;
 
   /* Bei eingekauften Leads sind nicht alle Angaben vom Kunden: was das
      Portal nicht liefert, nehmen wir bewusst zum teureren Wert an (lieber
@@ -1207,8 +1215,12 @@ ${buildHeimVergleichText(lead)}
   const introPlain = herkunftPlain
     ? portalIntroText(herkunftPlain)
     : isResubmit
-    ? `vielen Dank für Ihre erneute Anfrage.\n\nWir haben Ihre aktualisierten Angaben übernommen, Ihr persönliches Angebot angepasst${hatEmpfehlungPlain ? " – und passende Betreuungskräfte für Sie gefunden" : ""}.`
-    : `vielen Dank für Ihre Anfrage.\n\nAuf Basis Ihrer Angaben haben wir Ihr persönliches Angebot erstellt${hatEmpfehlungPlain ? " – und bereits passende Betreuungskräfte für Sie gefunden" : ""}.`;
+    ? `vielen Dank für Ihre erneute Anfrage. Wir haben Ihre aktualisierten Angaben übernommen und Ihr persönliches Angebot für die 24-Stunden-Betreuung zu Hause entsprechend angepasst – mit allen Kosten, möglichen Fördermitteln und Ihrem rechnerischen Eigenanteil.${
+        hatEmpfehlungPlain ? " Und wir haben passende Betreuungskräfte für Sie gefunden: Unsere Empfehlung sehen Sie direkt in dieser E-Mail." : ""
+      }`
+    : `vielen Dank für Ihre Anfrage. Auf Basis Ihrer Angaben haben wir Ihr persönliches Angebot für die 24-Stunden-Betreuung zu Hause erstellt – mit allen Kosten, möglichen Fördermitteln und Ihrem rechnerischen Eigenanteil. Alles unverbindlich, Sie entscheiden in Ruhe.${
+        hatEmpfehlungPlain ? " Und das Wichtigste: Wir haben bereits passende Betreuungskräfte für Sie gefunden. Unsere Empfehlung sehen Sie direkt in dieser E-Mail." : ""
+      }`;
 
   const angenommeneFelderPlain = (lead.kalkulation as any)?.angenommene_felder;
   const wurdeAngenommenPlain = !Array.isArray(angenommeneFelderPlain) || angenommeneFelderPlain.length > 0;

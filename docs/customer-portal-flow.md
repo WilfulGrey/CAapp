@@ -275,6 +275,17 @@ send-scheduled-emails (email_type=eingangsbestaetigung)
       # smoking / driving_license / nationality — nie ma ich w liście matchingów
 ```
 
+**Wygląd karty = karta z portalu.** `empfehlungHtml` odwzorowuje
+`MatchCard` z `isRecommended` (src/components/portal/MatchCard.tsx): biała
+ramka `#8B7355` z nagłówkiem „Unsere Empfehlung für Sie", w środku szara karta
+`#F4F4F6`/`#D4D4D8` ze zdjęciem 64 px (radius 12), nazwą w formie `displayName`
+(„Maria K."), stopniem znajomości niemieckiego i linią faktów kopiowaną
+1:1 z `nurseFacts` — razem ze skrótem „J. Erfahrung" i przeliczeniem
+dni→tygodnie→miesiące→tygodnie. Ta okrężna droga jest zamierzona: prostsze
+liczenie dałoby INNĄ liczbę tygodni niż ta, którą klient przeczyta sekundę
+później w portalu. Zdjęcie i nazwisko zostają obok siebie także na telefonie
+(jak w portalu) — bez łamania na dwie linie.
+
 **Kolejność MUSI być identyczna z portalem.** `waehleFuenf` kopiuje trzy
 rzeczy z `src/`: `rankComparator`
 ([matchingsRanking.ts](../src/lib/mamamia/matchingsRanking.ts)), filtr języka +
@@ -298,7 +309,7 @@ opiekunka):
 
 | Sytuacja | Mail |
 |---|---|
-| jest match | karta opiekunki + powody + `Weitere N` (dynamiczne, znika przy N=0) |
+| jest match | karta opiekunki + powody + zdanie „<Imię> ist eine von <N> Pflegekräften…" (liczebnik słownie, dynamiczny; znika przy N=1) |
 | brak matchów / błąd mamamii / timeout | uczciwy tekst zastępczy, cena i reszta maila bez zmian |
 | lead kupiony (`portalHerkunft`) | sekcji nie ma wcale — portal-leady mają własną dramaturgię |
 | brak zdjęcia lub nieudany inline-fetch | kafelek z inicjałem (NIGDY surowy URL S3 — wygasa po ~30 min) |
