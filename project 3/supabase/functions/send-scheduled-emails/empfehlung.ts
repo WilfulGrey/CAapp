@@ -70,6 +70,13 @@ export interface Matching {
 export interface CaregiverExtra {
   smoking?: string | null;
   driving_license?: string | null;
+  /** Vorstellungstext aus mamamia. Kann alt und kurz sein (≤200 Zeichen) —
+   *  das Portal laesst ihn dann von mamamia neu schreiben. Der Mailer tut
+   *  das NICHT: das waere ein LLM-Write aus einem Cron heraus. Ist nichts
+   *  Brauchbares da, baut `vorstellungstext` denselben Ersatzsatz wie das
+   *  Profil-Modal aus echten Feldern. */
+  about_de?: string | null;
+  motivation?: string | null;
 }
 
 /**
@@ -107,6 +114,12 @@ export interface Empfehlung {
   verfuegbarAb: string | null;
   fotoUrl: string | null;
   gruende: string[];
+  /** Sprachbalken 1–3 wie im Portal (GERMANY_SKILL_LEVELS.bars). */
+  deutschBalken: number;
+  /** „7 J. Erfahrung" — Wortlaut der Erfahrungs-Kachel im Profil-Modal. */
+  erfahrungKurz: string;
+  /** Anfang des Vorstellungstextes; laeuft in der Mail aus. */
+  vorstellung: string;
 }
 
 export interface EmpfehlungErgebnis {
@@ -445,6 +458,9 @@ export function baueEmpfehlung(
       verfuegbarAb: verfuegbarText(cg.available_from, now),
       fotoUrl: fotoUrl(cg),
       gruende: haken(cg, extra, fd, now),
+      deutschBalken: deutschBalken(cg.germany_skill),
+      erfahrungKurz: erfahrungKurz(cg),
+      vorstellung: vorstellungstext(cg, extra, (cg.first_name ?? "").trim() || "Sie"),
     },
     sichtbarGesamt,
   };
@@ -485,6 +501,92 @@ export function kundenFakten(cg: MatchCaregiver): string {
     teile.push(`${einsaetze} ${einsaetze === 1 ? "Primundus-Einsatz" : "Primundus-Einsätze"}`);
   }
   return teile.length > 0 ? teile.join(" &middot; ") : "bereit für den ersten Einsatz";
+}
+
+/** Sprachbalken 1–3 — Kopie von GERMANY_SKILL_LEVELS.bars (mappers.ts). */
+export function deutschBalken(skill: string | null | undefined): number {
+  const map: Record<string, number> = {
+    level_0: 1, level_1: 1, level_2: 2, level_3: 3, level_4: 3,
+  };
+  return map[(skill ?? "").trim()] ?? 0;
+}
+
+/** „7 J. Erfahrung" — Wortlaut der Erfahrungs-Kachel im Profil-Modal
+ *  (mapCaregiverToNurse: `${jahre} J. Erfahrung`, sonst „—"). */
+export function erfahrungKurz(cg: MatchCaregiver): string {
+  const jahre = erfahrungJahre(cg.care_experience);
+  return jahre > 0 ? `${jahre} J. Erfahrung` : "—";
+}
+
+/**
+ * Vorstellungstext wie im Profil-Modal („Über <Vorname>").
+ *
+ * Reihenfolge exakt wie dort: `about_de` → `motivation` → ein Satz aus
+ * echten Feldern. Nichts wird erfunden (Święta zasada nr 1) — und nichts
+ * wird nachgenerieren lassen: das Modal laesst mamamia alte Texte neu
+ * schreiben, das ist ein bezahlter LLM-Aufruf und hat in einem Cron nichts
+ * verloren.
+ */
+export function vorstellungstext(
+  cg: MatchCaregiver,
+  extra: CaregiverExtra | null,
+  vorname: string,
+): string {
+  const about = (extra?.about_de ?? "").trim();
+  if (about) return about;
+  const motivation = (extra?.motivation ?? "").trim();
+  if (motivation) return motivation;
+
+  const jahre = erfahrungJahre(cg.care_experience);
+  const wort = deutschWortAus(cg.germany_skill);
+  const niveau = wort === "Grund" ? "Grundniveau"
+    : wort === "Mittel" ? "mittlerem Niveau"
+    : wort === "Gut" ? "gutem Niveau"
+    : null;
+
+  const teile: string[] = [];
+  if (jahre > 0 && niveau) {
+    teile.push(`${vorname} verfügt über ${jahre} ${jahre === 1 ? "Jahr" : "Jahre"} Erfahrung in der 24-Stunden-Betreuung und spricht Deutsch auf ${niveau}.`);
+  } else if (jahre > 0) {
+    teile.push(`${vorname} verfügt über ${jahre} ${jahre === 1 ? "Jahr" : "Jahre"} Erfahrung in der 24-Stunden-Betreuung.`);
+  } else if (niveau) {
+    teile.push(`${vorname} spricht Deutsch auf ${niveau}.`);
+  }
+
+  const einsaetze = cg.hp_total_jobs ?? 0;
+  if (einsaetze > 0) {
+    teile.push(`Mit ${einsaetze} erfolgreich abgeschlossenen ${einsaetze === 1 ? "Einsatz" : "Einsätzen"} über Primundus bringt sie bewährte Praxiserfahrung mit.`);
+  }
+  return teile.join(" ");
+}
+
+/**
+ * Schneidet den Vorstellungstext an einer Wortgrenze und gibt ihn in zwei
+ * Stufen zurueck: klar lesbar, dann blasser. Das ist die Ausblendung nach
+ * unten — als ZWEI Textfarben statt als Verlauf-Overlay, weil Overlays
+ * (position:absolute) in Gmail und Outlook wegfallen und der Text dort dann
+ * hart abgeschnitten stuende. Zweifarbig funktioniert in jedem Client.
+ */
+export function textAusblenden(
+  text: string,
+  klarBis = 150,
+  blassBis = 260,
+): { klar: string; blass: string; gekuerzt: boolean } {
+  const t = (text ?? "").replace(/\s+/g, " ").trim();
+  if (t.length <= klarBis) return { klar: t, blass: "", gekuerzt: false };
+
+  const schnitt = (bis: number) => {
+    if (t.length <= bis) return t.length;
+    const raum = t.lastIndexOf(" ", bis);
+    return raum > bis * 0.6 ? raum : bis;
+  };
+  const a = schnitt(klarBis);
+  const b = schnitt(blassBis);
+  return {
+    klar: t.slice(0, a).trim(),
+    blass: t.slice(a, b).trim(),
+    gekuerzt: b < t.length,
+  };
 }
 
 /** Wie deutschStufe.ts, aber ohne Import-Zyklus — dieselbe Skala. */
@@ -588,6 +690,9 @@ export async function holeEmpfehlung(deps: HoleDeps): Promise<EmpfehlungErgebnis
     //    Schlägt das fehl, bleiben eben zwei Gründe statt vier.
     let extra: CaregiverExtra | null = null;
     try {
+      // Liefert neben driving_license auch about_de/motivation fuer die
+      // Vorstellung — dieselbe Abfrage, die das Portal beim Oeffnen des
+      // Profils macht. Ein Aufruf, kein zusaetzlicher.
       const cRes = await proxy("getCaregiver", { id: fuenf[0].caregiver.id }) as {
         data?: { Caregiver?: CaregiverExtra };
         Caregiver?: CaregiverExtra;
@@ -627,6 +732,9 @@ function initialen(name: string): string {
  *                  Initialen-Kachel. NIE die rohe S3-URL: die ist nach ~30 Min
  *                  tot und würde beim Kunden als kaputtes Bild ankommen.
  */
+/** Korallrot der Website- und Portal-CTAs (PrimaryCTA.tsx, MatchCard). */
+export const KORALLE = "#E76F63";
+
 export function empfehlungHtml(
   e: Empfehlung,
   photoCid: string | null,
@@ -636,29 +744,48 @@ export function empfehlungHtml(
 ): string {
   const name = esc(e.anzeigeName);
   const vorname = esc(e.vorname);
-  const alterTeil = e.alter
-    ? `<span style="font-weight:400;color:#71717A;">, ${e.alter}</span>`
-    : "";
 
-  // 88 px: groesser als die Portal-Kachel (64), weil das Foto hier das
-  // einzige Bild der Mail ist und traegt. Radius und Zuschnitt wie im Portal,
-  // damit dieselbe Person nach dem Klick gleich aussieht.
+  // Foto wie im Profil-Modal: 80 px, radius 16, weisser Rand.
   const foto = photoCid
-    ? `<img src="cid:${photoCid}" alt="${name}" width="88" height="88" style="display:block;width:88px;height:88px;border-radius:12px;object-fit:cover;" />`
-    : `<div style="width:88px;height:88px;border-radius:12px;background-color:#B5A184;color:#ffffff;font-size:30px;font-weight:700;line-height:88px;text-align:center;">${initialen(e.vorname)}</div>`;
+    ? `<img src="cid:${photoCid}" alt="${name}" width="80" height="80" style="display:block;width:80px;height:80px;border-radius:16px;object-fit:cover;border:2px solid #ffffff;" />`
+    : `<div style="width:80px;height:80px;border-radius:16px;background-color:#B5A184;color:#ffffff;font-size:28px;font-weight:700;line-height:80px;text-align:center;border:2px solid #ffffff;">${initialen(e.vorname)}</div>`;
 
-  const deutschZeile = e.deutschWort
-    ? `<p style="margin:6px 0 0;font-size:15px;line-height:1.5;color:#52525B;">Deutsch: ${e.deutschWort}</p>`
+  const alterChip = e.alter
+    ? `<span style="font-size:14px;font-weight:400;color:#A1A1AA;">&nbsp;&nbsp;${e.alter} J.</span>`
     : "";
+
+  const stufenChip = e.stufe
+    ? `<span style="display:inline-block;font-size:11px;font-weight:700;color:#8B7355;background:#F5F5F6;border:1px solid #E4E4E7;border-radius:999px;padding:3px 10px;">${esc(e.stufe)}</span>`
+    : "";
+
+  // Sprachbalken 1–3 wie im Profil-Modal, als Mini-Tabelle statt divs.
+  const balken = [1, 2, 3]
+    .map((i) => {
+      const an = i <= e.deutschBalken;
+      return `<td width="14" style="width:14px;padding-right:3px;"><div style="width:12px;height:6px;border-radius:3px;background:${an ? "#8B7355" : "#E4E4E7"};font-size:0;line-height:0;">&nbsp;</div></td>`;
+    })
+    .join("");
+
+  const kachel = (label: string, inhalt: string) => `
+                <td width="50%" style="width:50%;vertical-align:top;">
+                  <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="border:1px solid #D4D4D8;border-radius:12px;background:#ffffff;">
+                    <tr><td style="padding:10px 12px;">
+                      <p style="margin:0 0 4px;font-size:13px;line-height:1.4;color:#71717A;">${label}</p>
+                      ${inhalt}
+                    </td></tr>
+                  </table>
+                </td>`;
+
+  const deutschInhalt = e.deutschWort
+    ? `<table cellpadding="0" cellspacing="0" role="presentation"><tr>${balken}<td style="padding-left:5px;font-size:16px;font-weight:700;color:#18181B;">${e.deutschWort}</td></tr></table>`
+    : `<p style="margin:0;font-size:16px;font-weight:700;color:#18181B;">&mdash;</p>`;
 
   const verfuegbar = e.verfuegbarAb
-    ? `<p style="margin:14px 0 0;font-size:15px;line-height:1.5;color:#22A06B;font-weight:700;">${
+    ? `<p style="margin:16px 0 0;font-size:15px;line-height:1.5;color:#22A06B;font-weight:700;">${
         e.verfuegbarAb === "sofort" ? "Sofort verfügbar" : `Verfügbar ab ${esc(e.verfuegbarAb)}`
       }</p>`
     : "";
 
-  // Keine Ueberschrift ueber den Haken (Martin, 31.08.) — „Entspricht Ihrem
-  // Wunschprofil" ist selbst schon der erste Punkt.
   const hakenBlock = e.gruende.length > 0
     ? `<table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="margin:14px 0 0;">
         ${e.gruende.map((g) =>
@@ -667,60 +794,87 @@ export function empfehlungHtml(
       </table>`
     : "";
 
-  const zaehler = sichtbarGesamt > 0
-    ? `<p style="margin:0 0 4px;font-size:13px;line-height:1.5;color:#8B7355;">${sichtbarGesamt} ${sichtbarGesamt === 1 ? "Betreuungskraft" : "Betreuungskräfte"} für Sie verfügbar</p>`
+  /* „Über <Vorname>" wie im Profil-Modal — und hier laeuft die Vorschau aus:
+     erst klar, dann blass, dann Verlauf zu Weiss und der Knopf. Der Kunde
+     sieht, dass da noch mehr steht, ohne dass wir es behaupten muessten. */
+  const { klar, blass, gekuerzt } = textAusblenden(e.vorstellung);
+  const vorstellungBlock = klar
+    ? `
+          <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="margin:18px 0 0;">
+            <tr><td>
+              <p style="margin:0 0 8px;font-size:17px;font-weight:700;line-height:1.4;color:#18181B;">Über ${vorname}</p>
+              <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="border:1px solid #D4D4D8;border-radius:16px;background:#F5F5F6;">
+                <tr><td style="padding:14px 16px 0;">
+                  <p style="margin:0;font-size:16px;line-height:1.65;color:#18181B;">${esc(klar)}${
+                    blass ? ` <span style="color:#A9A9B0;">${esc(blass)}</span>` : ""
+                  }${gekuerzt ? `<span style="color:#D0D0D6;"> …</span>` : ""}</p>
+                </td></tr>
+                <tr><td height="34" style="height:34px;font-size:0;line-height:0;background-color:#F5F5F6;background-image:linear-gradient(180deg, rgba(245,245,246,0) 0%, #F5F5F6 100%);">&nbsp;</td></tr>
+              </table>
+            </td></tr>
+          </table>`
     : "";
 
-  // Der Sekundaerlink traegt die Zahl — dadurch versteht der Kunde ohne
-  // Erklaerabsatz, dass es weitere gibt. Bei genau einer Kraft entfaellt er.
+  const zaehler = sichtbarGesamt > 0
+    ? `<p style="margin:0 0 6px;font-size:13px;font-weight:600;line-height:1.5;color:${KORALLE};">${sichtbarGesamt} ${sichtbarGesamt === 1 ? "Betreuungskraft" : "Betreuungskräfte"} für Sie verfügbar</p>`
+    : "";
+
   const alleLink = sichtbarGesamt > 1
     ? `<p style="margin:12px 0 0;text-align:center;"><a href="${alleUrl}" target="_blank" style="color:#8B7355;text-decoration:underline;font-size:14px;font-weight:600;">Alle ${sichtbarGesamt} Betreuungskräfte ansehen &rarr;</a></p>`
     : "";
 
-  /* Flach statt Karte-in-Karte (Martin, 31.08.): keine graue Box, kein
-     zweiter Rahmen. Nur eine feine Trennlinie oben und unten, damit der
-     Block als eigener Abschnitt lesbar bleibt, ohne wie ein fremdes
-     Element in der Mail zu sitzen. */
   return `
-    <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="margin:0 0 26px;">
-      <tr>
-        <td style="padding:20px 0 22px;border-top:1px solid #ebe2d2;border-bottom:1px solid #ebe2d2;">
+    <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="margin:0 0 28px;">
+      <tr><td>
 
-          ${zaehler}
-          <p style="margin:0 0 16px;font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#9a8a73;">Unsere Empfehlung</p>
+        ${zaehler}
+        <p style="margin:0 0 14px;font-size:20px;font-weight:700;line-height:1.3;color:#2D1F0F;">Unsere Empfehlung</p>
 
-          <table width="100%" cellpadding="0" cellspacing="0" role="presentation">
-            <tr>
-              <td class="empf-foto" width="88" style="width:88px;vertical-align:top;">${foto}</td>
-              <td class="empf-luecke" width="18" style="width:18px;font-size:0;line-height:0;">&nbsp;</td>
-              <td class="empf-text" style="vertical-align:top;">
-                <p style="margin:0;font-size:19px;font-weight:700;line-height:1.3;color:#18181B;">${name}${alterTeil}</p>
-                ${deutschZeile}
-                <p style="margin:4px 0 0;font-size:15px;line-height:1.5;color:#52525B;">${e.fakten}</p>
-              </td>
-            </tr>
-          </table>
+        <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="border:1px solid #D4D4D8;border-radius:16px;background:#ffffff;">
+          <tr><td style="padding:20px;">
 
-          ${verfuegbar}
-          ${hakenBlock}
+            <table width="100%" cellpadding="0" cellspacing="0" role="presentation">
+              <tr>
+                <td class="empf-foto" width="80" style="width:80px;vertical-align:middle;">${foto}</td>
+                <td class="empf-luecke" width="16" style="width:16px;font-size:0;line-height:0;">&nbsp;</td>
+                <td class="empf-text" style="vertical-align:middle;">
+                  <p style="margin:0 0 6px;font-size:20px;font-weight:700;line-height:1.3;color:#18181B;">${name}${alterChip}</p>
+                  ${stufenChip}
+                </td>
+              </tr>
+            </table>
 
-          <table width="100%" cellpadding="0" cellspacing="0" role="presentation">
-            <tr><td style="padding:20px 0 0;" align="center">
-              <!--[if mso]><table role="presentation" cellpadding="0" cellspacing="0" border="0" align="center"><tr><td><![endif]-->
-              <table role="presentation" cellpadding="0" cellspacing="0" border="0" align="center" style="margin:0 auto;border-collapse:separate;">
-                <tr>
-                  <td align="center" bgcolor="#2A9D5C" style="background-color:#2A9D5C;background-image:linear-gradient(180deg,#34B36C 0%,#2A9D5C 100%);border-radius:10px;padding:14px 36px;">
-                    <a href="${profilUrl}" target="_blank" style="color:#ffffff;text-decoration:none;font-weight:600;font-size:16px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;line-height:1.4;">${vorname} ansehen&nbsp;&nbsp;&rarr;</a>
-                  </td>
-                </tr>
-              </table>
-              <!--[if mso]></td></tr></table><![endif]-->
-              ${alleLink}
-            </td></tr>
-          </table>
+            <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="margin:16px 0 0;">
+              <tr>
+                ${kachel("Erfahrung", `<p style="margin:0;font-size:16px;font-weight:700;color:#8B7355;">${esc(e.erfahrungKurz)}</p>`)}
+                <td width="10" style="width:10px;font-size:0;line-height:0;">&nbsp;</td>
+                ${kachel("Deutschkenntnisse", deutschInhalt)}
+              </tr>
+            </table>
 
-        </td>
-      </tr>
+            ${verfuegbar}
+            ${hakenBlock}
+            ${vorstellungBlock}
+
+            <table width="100%" cellpadding="0" cellspacing="0" role="presentation">
+              <tr><td style="padding:18px 0 0;" align="center">
+                <!--[if mso]><table role="presentation" cellpadding="0" cellspacing="0" border="0" align="center"><tr><td><![endif]-->
+                <table role="presentation" cellpadding="0" cellspacing="0" border="0" align="center" style="margin:0 auto;border-collapse:separate;">
+                  <tr>
+                    <td align="center" bgcolor="${KORALLE}" style="background-color:${KORALLE};border-radius:12px;padding:15px 40px;">
+                      <a href="${profilUrl}" target="_blank" style="color:#ffffff;text-decoration:none;font-weight:700;font-size:16px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;line-height:1.4;">${vorname} ansehen&nbsp;&nbsp;&rarr;</a>
+                    </td>
+                  </tr>
+                </table>
+                <!--[if mso]></td></tr></table><![endif]-->
+                ${alleLink}
+              </td></tr>
+            </table>
+
+          </td></tr>
+        </table>
+
+      </td></tr>
     </table>`;
 }
 
@@ -740,6 +894,10 @@ export function empfehlungText(
   zeilen.push("UNSERE EMPFEHLUNG", "", `${e.anzeigeName}${e.alter ? `, ${e.alter}` : ""}`);
   if (e.deutschWort) zeilen.push(`Deutsch: ${e.deutschWort}`);
   zeilen.push(e.fakten.replaceAll("&middot;", "·"));
+  if (e.vorstellung) {
+    const { klar, blass, gekuerzt } = textAusblenden(e.vorstellung);
+    zeilen.push("", `Über ${e.vorname}`, `${klar}${blass ? " " + blass : ""}${gekuerzt ? " …" : ""}`);
+  }
   if (e.verfuegbarAb) {
     zeilen.push("", e.verfuegbarAb === "sofort" ? "Sofort verfügbar" : `Verfügbar ab ${e.verfuegbarAb}`);
   }

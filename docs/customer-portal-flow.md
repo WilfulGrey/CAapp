@@ -272,24 +272,33 @@ send-scheduled-emails (email_type=eingangsbestaetigung)
       { action: "listMatchings", variables: { limit: 200 } }
   → waehleFuenf(...)   # ta sama piątka co portal (patrz niżej)
   → POST /functions/v1/mamamia-proxy  { action: "getCaregiver", id }
-      # driving_license — nie ma go w liście matchingów
+      # driving_license + about_de/motivation — nie ma ich w liście matchingów
 ```
 
-**Wygląd: płaska sekcja, nie karta.** Po feedbacku Martina (31.08.) blok jest
-celowo BEZ szarego pudełka i BEZ ramki w ramce — tylko cienka linia u góry i
-u dołu. Kolejność w środku: licznik „N Betreuungskräfte für Sie verfügbar" →
-etykieta „UNSERE EMPFEHLUNG" → zdjęcie 88 px (radius 12, jak w portalu) obok
-imienia w formie `displayName` („Maria K.") → „Deutsch: <stopień>" → linia
-faktów → dostępność → trzy haczyki → zielony CTA → dyskretny link „Alle N
-Betreuungskräfte ansehen". Zdjęcie i tekst zostają obok siebie także na
-telefonie (zmierzone przy 375 px: 88 px zdjęcie + 275 px tekst, bez poziomego
-scrolla).
+**Wygląd: wycinek strony szczegółów opiekunki.** Po feedbacku Martina
+(31.08., „profil jak strona szczegółów w portalu, potem wyszarzenie, potem
+przycisk") blok odwzorowuje `CustomerNurseModal`, nie kartę z listy: zdjęcie
+80 px (radius 16, biała obwódka) obok imienia w formie `displayName` i wieku
+„54 J.", chip ze stopniem, dwa kafelki obok siebie („Erfahrung" z wartością
+w `#8B7355` + „Deutschkenntnisse" z paskami 1–3 i słowem), dostępność, trzy
+haczyki, sekcja „Über <Imię>" w pudełku `#F5F5F6`/`#D4D4D8` — i tam tekst
+**wygasa**: pierwsze ~150 znaków w `#18181B`, kolejne ~110 w `#A9A9B0`, potem
+„…".
 
-**Linia faktów jest KLIENCKA, nie portalowa:** „7 Jahre Erfahrung ·
-9 Primundus-Einsätze". Bez stopnia („Stammkraft:") i bez średniej długości
-zlecenia („Ø 12 Wochen pro Einsatz") — jedno i drugie czyta się jak wyciąg
-z CRM-u (Martin: „Keine Informationen zeigen, die nach internem CRM oder
-Datenbank aussehen"). Funkcja: `kundenFakten`.
+Wygaszenie jest zrobione DWIEMA BARWAMI TEKSTU, nie nakładką z gradientem:
+`position:absolute` wypada w Gmailu i Outlooku, a tam tekst urywałby się
+twardo. Dwa odcienie działają w każdym kliencie; gradient pod tekstem jest
+tylko dodatkiem dla klientów, które go renderują. Funkcje: `textAusblenden`,
+`vorstellungstext`.
+
+`vorstellungstext` idzie tą samą ścieżką co modal: `about_de` → `motivation`
+→ zdanie z prawdziwych pól. **Bez regeneracji** — portal każe mamamii
+przepisać stary opis (płatny LLM), mailer tego nie robi; pusty tekst po
+prostu znika razem z sekcją.
+
+**CTA w kolorze koralowym `#E76F63`** — jak `PrimaryCTA.tsx` na stronie
+i „Einladen" w portalu. Dotyczy obu przycisków w mailu; zieleń zostaje
+wyłącznie dla haczyków i dostępności.
 
 **Trzy haczyki NIE są matchingiem.** Punkt 1 to zawsze „Entspricht Ihrem
 Wunschprofil". Punkty 2–3 podnoszą komunikacyjnie to, co klient sam wpisał

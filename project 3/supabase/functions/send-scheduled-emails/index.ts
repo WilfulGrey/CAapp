@@ -1071,8 +1071,8 @@ export function buildEingangsbestaetigungHtml(
     <!--[if mso]><table role="presentation" cellpadding="0" cellspacing="0" border="0" align="center"><tr><td><![endif]-->
     <table role="presentation" cellpadding="0" cellspacing="0" border="0" align="center" style="margin:8px auto 30px;border-collapse:separate;">
       <tr>
-        <td align="center" bgcolor="#2A9D5C" style="background-color:#2A9D5C;background-image:linear-gradient(180deg,#34B36C 0%,#2A9D5C 100%);border-radius:10px;padding:17px 44px;box-shadow:0 2px 6px rgba(42,157,92,0.25);">
-          <a href="${ctaUrl}" target="_blank" style="color:#ffffff;text-decoration:none;font-weight:600;font-size:16px;letter-spacing:0.01em;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;line-height:1.4;">Angebot &amp; Pflegekräfte ansehen&nbsp;&nbsp;→</a>
+        <td align="center" bgcolor="#E76F63" style="background-color:#E76F63;border-radius:12px;padding:17px 44px;box-shadow:0 2px 6px rgba(231,111,99,0.25);">
+          <a href="${ctaUrl}" target="_blank" style="color:#ffffff;text-decoration:none;font-weight:700;font-size:16px;letter-spacing:0.01em;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;line-height:1.4;">Angebot &amp; Betreuungskräfte ansehen&nbsp;&nbsp;→</a>
         </td>
       </tr>
     </table>

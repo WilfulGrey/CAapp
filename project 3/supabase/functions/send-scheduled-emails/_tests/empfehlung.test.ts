@@ -8,8 +8,11 @@ import {
   anzeigeName,
   haken,
   HAKEN_WUNSCHPROFIL,
+  KORALLE,
   kundenFakten,
   passtZumTermin,
+  textAusblenden,
+  vorstellungstext,
   stufenWort,
   verfuegbarText,
   waehleFuenf,
@@ -250,21 +253,44 @@ Deno.test("empfehlungHtml: keine Überschrift über den Haken", () => {
   assertEquals(/Warum .* zu Ihren Angaben passt|Passt besonders gut/.test(html), false);
 });
 
-Deno.test("empfehlungHtml: keine interne Kennzahl in der Faktenzeile", () => {
+Deno.test("empfehlungHtml: keine interne Kennzahl in der Darstellung", () => {
   const { empfehlung } = baueEmpfehlung(
     cg({ id: 42, hp_total_jobs: 9, hp_avg_mission_days: 84 }), null, {}, 5, JETZT,
   );
   const html = empfehlungHtml(empfehlung, null, "https://p", "https://a", 5);
-  assertStringIncludes(html, "7 Jahre Erfahrung &middot; 9 Primundus-Einsätze");
   assertEquals(html.includes("Ø"), false);
-  assertEquals(html.includes("Stammkraft:"), false);
+  assertEquals(html.includes("pro Einsatz"), false);
 });
 
-Deno.test("empfehlungHtml: flach — keine graue Box, kein zweiter Rahmen", () => {
+Deno.test("empfehlungHtml: zeigt die Bausteine der Profil-Detailseite", () => {
+  const { empfehlung } = baueEmpfehlung(
+    cg({ id: 42, first_name: "Maria", last_name: "Kowalska", hp_total_jobs: 9 }),
+    { about_de: "Maria betreut seit sieben Jahren ältere Menschen zu Hause und legt besonderen Wert auf einen ruhigen, verlässlichen Tagesablauf." },
+    {}, 5, JETZT,
+  );
+  const html = empfehlungHtml(empfehlung, null, "https://p", "https://a", 5);
+  assertStringIncludes(html, "Erfahrung");
+  assertStringIncludes(html, "Deutschkenntnisse");
+  assertStringIncludes(html, "7 J. Erfahrung");
+  assertStringIncludes(html, "Über Maria");
+  assertStringIncludes(html, "Stammkraft");
+});
+
+Deno.test("empfehlungHtml: CTA in Korallrot wie Website und Portal", () => {
   const { empfehlung } = baueEmpfehlung(cg({ id: 42 }), null, {}, 5, JETZT);
   const html = empfehlungHtml(empfehlung, null, "https://p", "https://a", 5);
-  assertEquals(html.includes("#F4F4F6"), false);
-  assertEquals(html.includes("border:1px solid #8B7355"), false);
+  assertEquals(KORALLE, "#E76F63");
+  assertStringIncludes(html, 'bgcolor="#E76F63"');
+  // Kein gruener Knopf mehr — gruen bleibt fuer Haken und Verfuegbarkeit.
+  assertEquals(html.includes("#2A9D5C"), false);
+});
+
+Deno.test("empfehlungHtml: langer Text laeuft aus statt hart abzubrechen", () => {
+  const lang = "Maria ".repeat(90);
+  const { empfehlung } = baueEmpfehlung(cg({ id: 42 }), { about_de: lang }, {}, 5, JETZT);
+  const html = empfehlungHtml(empfehlung, null, "https://p", "https://a", 5);
+  assertStringIncludes(html, "#A9A9B0");
+  assertStringIncludes(html, "…");
 });
 
 Deno.test("empfehlungHtml: Sprache und Schreibweise wie im Portal", () => {
@@ -274,7 +300,7 @@ Deno.test("empfehlungHtml: Sprache und Schreibweise wie im Portal", () => {
   const html = empfehlungHtml(empfehlung, null, "https://p", "https://a", 5);
   assertStringIncludes(html, "Unsere Empfehlung");
   assertStringIncludes(html, "Maria K.");
-  assertStringIncludes(html, "Deutsch: Mittel");
+  assertStringIncludes(html, "Mittel");
   assertStringIncludes(html, "Verfügbar ab 14. September");
 });
 
@@ -436,4 +462,44 @@ Deno.test("holeEmpfehlung: getCaregiver-Ausfall kostet Gründe, nicht die Empfeh
   assert(r !== null);
   assertEquals(r!.empfehlung.caregiverId, 5);
   assertStringIncludes(r!.empfehlung.gruende.join(" "), HAKEN_WUNSCHPROFIL);
+});
+
+
+// ── Vorstellungstext ──────────────────────────────────────────────────────
+
+Deno.test("vorstellungstext: about_de hat Vorrang, dann motivation", () => {
+  assertEquals(
+    vorstellungstext(cg({ id: 1 }).caregiver, { about_de: "Echt.", motivation: "Zweitrangig." }, "Maria"),
+    "Echt.",
+  );
+  assertEquals(
+    vorstellungstext(cg({ id: 1 }).caregiver, { about_de: "  ", motivation: "Zweitrangig." }, "Maria"),
+    "Zweitrangig.",
+  );
+});
+
+Deno.test("vorstellungstext: ohne Text ein Satz aus echten Feldern, nichts Erfundenes", () => {
+  const t = vorstellungstext(cg({ id: 1, hp_total_jobs: 9 }).caregiver, null, "Maria");
+  assertStringIncludes(t, "7 Jahre Erfahrung");
+  assertStringIncludes(t, "mittlerem Niveau");
+  assertStringIncludes(t, "9 erfolgreich abgeschlossenen Einsätzen");
+});
+
+Deno.test("vorstellungstext: ohne jede Zahl bleibt er leer statt zu behaupten", () => {
+  assertEquals(
+    vorstellungstext({ id: 1, care_experience: null, germany_skill: null, hp_total_jobs: 0 }, null, "Maria"),
+    "",
+  );
+});
+
+Deno.test("textAusblenden: kurzer Text bleibt ganz, langer laeuft in zwei Stufen aus", () => {
+  const kurz = textAusblenden("Ein kurzer Satz.");
+  assertEquals(kurz.gekuerzt, false);
+  assertEquals(kurz.blass, "");
+
+  const lang = textAusblenden("Wort ".repeat(120));
+  assertEquals(lang.gekuerzt, true);
+  assert(lang.klar.length > 0 && lang.blass.length > 0);
+  // An Wortgrenzen geschnitten — kein abgehacktes Wort am Ende.
+  assertEquals(lang.klar.endsWith("Wort"), true);
 });
