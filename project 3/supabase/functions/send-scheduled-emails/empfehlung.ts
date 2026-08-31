@@ -72,7 +72,11 @@ export interface CaregiverExtra {
   driving_license?: string | null;
 }
 
-/** Kostenrechner-Antworten (lead.kalkulation.formularDaten). */
+/**
+ * Was der Kunde im Kostenrechner angegeben hat. Quelle der drei Haken —
+ * NICHT die Eigenschaften der Pflegekraft (Martin, 31.08.: „Wir greifen
+ * lediglich die Angaben des Kunden kommunikativ wieder auf").
+ */
 export interface FormularDaten {
   deutschkenntnisse?: string | null;
   geschlecht?: string | null;
@@ -80,6 +84,9 @@ export interface FormularDaten {
   mobilitaet?: string | null;
   nachteinsaetze?: string | null;
   pflegegrad?: number | string | null;
+  betreuung_fuer?: string | null;
+  /** Aus der Lead-Spalte `care_start_timing`, nicht aus formularDaten. */
+  care_start_timing?: string | null;
 }
 
 export interface Empfehlung {
@@ -89,7 +96,8 @@ export interface Empfehlung {
   /** „Maria K." — exakt die Schreibweise der Portal-Karte (displayName).
    *  Der ausgeschriebene Nachname verlässt das Portal nie. */
   anzeigeName: string;
-  /** Die Faktenzeile der Portal-Karte, Wort für Wort. */
+  /** „7 Jahre Erfahrung · 9 Primundus-Einsätze" — ausgeschrieben, ohne
+   *  interne Kennzahlen. */
   fakten: string;
   alter: number | null;
   deutschWort: string | null;
@@ -284,67 +292,109 @@ export function empfehlungNachOben(fuenf: Matching[]): Matching[] {
     : fuenf;
 }
 
-// ─── Matching-Gründe ─────────────────────────────────────────────────────
-// NUR Merkmale, die aus echten Daten hervorgehen (Martin: keine erfundenen
-// Prozentzahlen). Jede Zeile ist eine Aussage über DIESE Pflegekraft gegen
-// DIESE Kundenangabe — nichts Allgemeines.
+// ─── Die drei Haken ──────────────────────────────────────────────────────
 //
-// BEWUSST NICHT DABEI, weil die Daten zum Sendezeitpunkt fehlen:
-//   • Demenz-Erfahrung — der Kostenrechner fragt Demenz nicht ab (erst der
-//     Patientenbogen im Portal). Ohne Kundenangabe kein Abgleich.
-//   • Nachteinsätze — mamamia liefert am Caregiver kein Nacht-Merkmal.
-//   • Mobilität/Rollator — `Caregiver.mobilities[].mobility` existiert, aber
-//     die Werte sind nicht verifiziert. Święta zasada 1.5: kein Enum raten.
-//     Nächster Kandidat, sobald die Werte einmal live geprüft sind.
+// KEIN zweites Matching zwischen Pflegekraft-Eigenschaften und Kundenangaben
+// (Martin, 31.08.). Punkt 1 steht immer, Punkt 2 und 3 greifen auf, was der
+// Kunde selbst im Kostenrechner angegeben hat — das ist der Beleg dafuer,
+// dass wir seine Anfrage gelesen haben, keine Behauptung ueber die Person.
+//
+// Reihenfolge: erst die besonderen Anforderungen aus der Anfrage (max. 2),
+// danach mit Standardangaben auffuellen. Nie mehr als drei.
+//
+// Die Standards sind an Daten gebunden und werden weggelassen, wenn der
+// Beleg fehlt (Święta zasada nr 1):
+//   • Termin  — nur, wenn available_from wirklich im Wunschfenster liegt
+//   • Deutsch — nur, wenn die Stufe bekannt ist UND exakt dem Wunsch entspricht
+//   • Fuehrerschein — nur, wenn der Kunde ihn wollte UND die Kraft einen hat
+//     (der einzige Grund, warum getCaregiver ueberhaupt noch gerufen wird)
 
-const GESCHLECHT_WUNSCH: Record<string, string> = {
-  weiblich: "female",
-  maennlich: "male",
-  männlich: "male",
+export const HAKEN_WUNSCHPROFIL = "Entspricht Ihrem Wunschprofil";
+
+/** Tage bis zum gewuenschten Start — Spiegel von OFFSET_DAYS in
+ *  onboard-to-mamamia/mappers.ts (computeArrivalDate). Aendert sich die
+ *  Tabelle dort, muss sie hier mit, sonst verspricht die Mail einen Termin,
+ *  den der Job gar nicht traegt. */
+const START_OFFSET_TAGE: Record<string, number> = {
+  sofort: 7,
+  "1-2-wochen": 10,
+  "2-4-wochen": 21,
+  "1-monat": 30,
+  unklar: 30,
+  "1-2-monate": 45,
+  spaeter: 60,
 };
 
-export function matchGruende(
+/** Besondere Anforderungen aus der Anfrage, wichtigste zuerst. */
+export function anforderungenAusAnfrage(fd: FormularDaten): string[] {
+  const treffer: string[] = [];
+  const mob = (fd.mobilitaet ?? "").toLowerCase().trim();
+  const nacht = (fd.nachteinsaetze ?? "").toLowerCase().trim();
+  const pflegegrad = Number(fd.pflegegrad);
+
+  if (mob === "bettlaegerig") treffer.push("Erfahrung mit bettlägerigen Patienten");
+  else if (mob === "rollstuhl") treffer.push("Erfahrung mit Rollstuhlpatienten");
+
+  if (nacht && nacht !== "nein") treffer.push("Erfahrung mit nächtlichen Einsätzen");
+
+  if ((fd.betreuung_fuer ?? "").toLowerCase().trim() === "ehepaar") {
+    treffer.push("Erfahrung in der Betreuung von Ehepaaren");
+  }
+
+  if (Number.isFinite(pflegegrad) && pflegegrad >= 4) {
+    treffer.push("Erfahrung bei hohem Pflegebedarf");
+  }
+
+  // Rollator erst hier: eingeschraenkte Mobilitaet ist der Normalfall und
+  // sagt weniger als die Punkte darueber.
+  if (mob === "rollator") treffer.push("Erfahrung mit eingeschränkter Mobilität");
+
+  return treffer;
+}
+
+/** Liegt `available_from` im Wunschfenster des Kunden? */
+export function passtZumTermin(
+  availableFrom: string | null | undefined,
+  careStartTiming: string | null | undefined,
+  now: Date,
+): boolean {
+  const tage = START_OFFSET_TAGE[(careStartTiming ?? "").toLowerCase().trim()];
+  if (tage === undefined) return false;
+  // Ohne Datum gilt die Kraft im Portal als sofort verfuegbar.
+  if (!availableFrom) return true;
+  const d = new Date(availableFrom);
+  if (!Number.isFinite(d.getTime())) return false;
+  return d.getTime() <= now.getTime() + tage * 86400000;
+}
+
+export function haken(
   cg: MatchCaregiver,
   extra: CaregiverExtra | null,
   fd: FormularDaten,
+  now: Date,
 ): string[] {
-  const gruende: string[] = [];
+  const liste: string[] = [HAKEN_WUNSCHPROFIL];
 
-  // 1. Sprache — preisrelevant und vom Kunden ausdrücklich gewählt.
-  //    Nur wenn die Stufe wirklich bekannt ist UND exakt passt; der Filter
-  //    lässt unbekannte Stufen durch, das ist noch kein Treffer.
-  const noetig = requiredGermanyLevelForWish(fd.deutschkenntnisse);
-  if (noetig && cg.germany_skill && cg.germany_skill === noetig) {
-    gruende.push("Deutschkenntnisse entsprechen Ihrem Wunsch");
+  for (const a of anforderungenAusAnfrage(fd).slice(0, 2)) liste.push(a);
+
+  if (liste.length < 3 && passtZumTermin(cg.available_from, fd.care_start_timing, now)) {
+    liste.push("Zum gewünschten Termin verfügbar");
   }
 
-  // 2. Geschlecht — nur wenn der Kunde eine Wahl getroffen hat („egal" nicht).
-  const gewuenscht = GESCHLECHT_WUNSCH[(fd.geschlecht ?? "").toLowerCase().trim()];
-  if (gewuenscht && cg.gender === gewuenscht) {
-    gruende.push(
-      gewuenscht === "female"
-        ? "Weiblich – wie von Ihnen gewünscht"
-        : "Männlich – wie von Ihnen gewünscht",
-    );
+  if (liste.length < 3) {
+    const noetig = requiredGermanyLevelForWish(fd.deutschkenntnisse);
+    if (noetig && cg.germany_skill === noetig) liste.push("Deutschkenntnisse wie gewünscht");
   }
 
-  // 3. Führerschein — nur wenn der Kunde ihn wollte.
-  if ((fd.fuehrerschein ?? "").toLowerCase().trim() === "ja" && extra?.driving_license === "yes") {
-    gruende.push("Führerschein vorhanden");
+  if (
+    liste.length < 3 &&
+    (fd.fuehrerschein ?? "").toLowerCase().trim() === "ja" &&
+    extra?.driving_license === "yes"
+  ) {
+    liste.push("Führerschein vorhanden");
   }
 
-  // 4. Erfahrung bei uns — die belastbarste Zahl, die wir haben.
-  const jobs = cg.hp_total_jobs ?? 0;
-  if (jobs >= 2) {
-    gruende.push(`Bereits ${jobs} Betreuungseinsätze über Primundus`);
-  }
-
-  // 5. Nichtraucherin — nur bei ausdrücklichem „no", nie aus fehlenden Daten.
-  if (extra?.smoking === "no") {
-    gruende.push(cg.gender === "male" ? "Nichtraucher" : "Nichtraucherin");
-  }
-
-  return gruende.slice(0, 4);
+  return liste.slice(0, 3);
 }
 
 // ─── Datum ───────────────────────────────────────────────────────────────
@@ -386,7 +436,7 @@ export function baueEmpfehlung(
       caregiverId: cg.id,
       vorname: (cg.first_name ?? "").trim() || "Ihre Pflegekraft",
       anzeigeName: anzeigeName(cg.first_name ?? "", cg.last_name) || "Ihre Pflegekraft",
-      fakten: portalFakten(cg),
+      fakten: kundenFakten(cg),
       alter: alter && alter > 17 && alter < 100 ? alter : null,
       deutschWort: deutschWortAus(cg.germany_skill),
       erfahrungJahre: jahre,
@@ -394,7 +444,7 @@ export function baueEmpfehlung(
       stufe: stufenWort(einsaetze, jahre),
       verfuegbarAb: verfuegbarText(cg.available_from, now),
       fotoUrl: fotoUrl(cg),
-      gruende: matchGruende(cg, extra, fd),
+      gruende: haken(cg, extra, fd, now),
     },
     sichtbarGesamt,
   };
@@ -414,37 +464,27 @@ export function anzeigeName(vorname: string, nachname?: string | null): string {
 }
 
 /**
- * Faktenzeile der Portal-Karte, Wort für Wort — Kopie von `nurseFacts`
- * (src/components/portal/shared.ts) inklusive der Abkürzung „J. Erfahrung"
- * und der Wochen-Rundung. Kein Text ohne Deckung: fehlen Zahlen, kommt
- * derselbe ehrliche Ersatzsatz wie im Portal.
+ * „7 Jahre Erfahrung · 9 Primundus-Einsätze".
  *
- * Der Umweg Tage → Wochen → Monate → Wochen ist im Portal historisch
- * (mapCaregiverToNurse rechnet in Monate, nurseFacts zurück in Wochen). Hier
- * nachgebaut statt begradigt, weil eine sauberere Rechnung eine ANDERE Zahl
- * ergeben könnte als die, die der Kunde eine Sekunde später im Portal liest.
+ * Bewusst NICHT die Portal-Kennzahlen (Martin, 31.08.: „Keine Informationen
+ * zeigen, die nach internem CRM oder Datenbank aussehen"). Draussen sind
+ * damit das Stufenwort („Stammkraft:") und die Durchschnittsdauer
+ * („Ø 12 Wochen pro Einsatz") — beides liest sich wie ein Auszug aus einem
+ * Verwaltungssystem. „J." ist zu „Jahre" ausgeschrieben, und die Einsaetze
+ * heissen jetzt „Primundus-Einsaetze", damit klar ist, wovon die Rede ist.
+ *
+ * Ohne Zahlen bleibt derselbe ehrliche Ersatzsatz wie im Portal.
  */
-export function portalFakten(cg: MatchCaregiver): string {
+export function kundenFakten(cg: MatchCaregiver): string {
   const teile: string[] = [];
   const jahre = erfahrungJahre(cg.care_experience);
-  if (jahre > 0) teile.push(`${jahre} J. Erfahrung`);
+  if (jahre > 0) teile.push(`${jahre} ${jahre === 1 ? "Jahr" : "Jahre"} Erfahrung`);
 
   const einsaetze = cg.hp_total_jobs ?? 0;
-  if (einsaetze) {
-    teile.push(`${einsaetze} ${einsaetze === 1 ? "Einsatz" : "Einsätze"}`);
-    const wochenRoh = cg.hp_avg_mission_days
-      ? Number((Math.abs(cg.hp_avg_mission_days) / 7).toFixed(1))
-      : 0;
-    const monate = wochenRoh ? Number((wochenRoh / 4.3).toFixed(1)) : 0;
-    const wochen = Math.round(monate * 4.3);
-    if (wochen > 0) teile.push(`Ø ${wochen} ${wochen === 1 ? "Woche" : "Wochen"} pro Einsatz`);
+  if (einsaetze > 0) {
+    teile.push(`${einsaetze} ${einsaetze === 1 ? "Primundus-Einsatz" : "Primundus-Einsätze"}`);
   }
   return teile.length > 0 ? teile.join(" &middot; ") : "bereit für den ersten Einsatz";
-}
-
-/** Zahlwort für „eine von fünf". Über fünf kommt nie vor (TARGET_VISIBLE). */
-export function zahlwort(n: number): string {
-  return ["null", "eine", "zwei", "drei", "vier", "fünf"][n] ?? String(n);
 }
 
 /** Wie deutschStufe.ts, aber ohne Import-Zyklus — dieselbe Skala. */
@@ -600,99 +640,83 @@ export function empfehlungHtml(
     ? `<span style="font-weight:400;color:#71717A;">, ${e.alter}</span>`
     : "";
 
-  // Foto 64 px, radius 12 — dieselben Masse wie die Portal-Karte.
+  // 88 px: groesser als die Portal-Kachel (64), weil das Foto hier das
+  // einzige Bild der Mail ist und traegt. Radius und Zuschnitt wie im Portal,
+  // damit dieselbe Person nach dem Klick gleich aussieht.
   const foto = photoCid
-    ? `<img src="cid:${photoCid}" alt="${name}" width="64" style="display:block;width:64px;height:64px;border-radius:12px;object-fit:cover;" />`
-    : `<div style="width:64px;height:64px;border-radius:12px;background-color:#B5A184;color:#ffffff;font-size:22px;font-weight:700;line-height:64px;text-align:center;">${initialen(e.vorname)}</div>`;
+    ? `<img src="cid:${photoCid}" alt="${name}" width="88" height="88" style="display:block;width:88px;height:88px;border-radius:12px;object-fit:cover;" />`
+    : `<div style="width:88px;height:88px;border-radius:12px;background-color:#B5A184;color:#ffffff;font-size:30px;font-weight:700;line-height:88px;text-align:center;">${initialen(e.vorname)}</div>`;
 
   const deutschZeile = e.deutschWort
-    ? `<p style="margin:4px 0 0;font-size:16px;line-height:1.4;color:#71717A;">Deutsch ${e.deutschWort}</p>`
+    ? `<p style="margin:6px 0 0;font-size:15px;line-height:1.5;color:#52525B;">Deutsch: ${e.deutschWort}</p>`
     : "";
 
-  // Fussleiste der Portal-Karte: dort sitzt der „Einladen"-Knopf, hier die
-  // Verfuegbarkeit — die Zeile, die den Klick wertvoll macht.
-  const fussLeiste = e.verfuegbarAb
-    ? `
-          <tr>
-            <td style="padding:10px 16px;border-top:1px solid #E4E4E7;">
-              <p style="margin:0;font-size:14px;line-height:1.5;color:#22A06B;font-weight:700;">${
-                e.verfuegbarAb === "sofort" ? "Sofort verfügbar" : `Verfügbar ab ${esc(e.verfuegbarAb)}`
-              }</p>
-            </td>
-          </tr>`
+  const verfuegbar = e.verfuegbarAb
+    ? `<p style="margin:14px 0 0;font-size:15px;line-height:1.5;color:#22A06B;font-weight:700;">${
+        e.verfuegbarAb === "sofort" ? "Sofort verfügbar" : `Verfügbar ab ${esc(e.verfuegbarAb)}`
+      }</p>`
     : "";
 
-  const gruendeBlock = e.gruende.length > 0
-    ? `
-          <table width="100%" cellpadding="0" cellspacing="0" role="presentation">
-            <tr><td style="padding:16px 4px 0;">
-              <p style="margin:0 0 10px;font-size:15px;line-height:1.5;color:#18181B;font-weight:700;">Warum ${vorname} zu Ihren Angaben passt:</p>
-              ${e.gruende.map((g) =>
-                `<p style="margin:0 0 7px;font-size:15px;line-height:1.6;color:#3F3F46;"><span style="color:#22A06B;font-weight:700;">&#10003;</span>&nbsp;&nbsp;${esc(g)}</p>`
-              ).join("")}
-            </td></tr>
-          </table>`
+  // Keine Ueberschrift ueber den Haken (Martin, 31.08.) — „Entspricht Ihrem
+  // Wunschprofil" ist selbst schon der erste Punkt.
+  const hakenBlock = e.gruende.length > 0
+    ? `<table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="margin:14px 0 0;">
+        ${e.gruende.map((g) =>
+          `<tr><td style="padding:0 0 7px;font-size:15px;line-height:1.5;color:#3F3F46;"><span style="color:#22A06B;font-weight:700;">&#10003;</span>&nbsp;&nbsp;${esc(g)}</td></tr>`
+        ).join("")}
+      </table>`
     : "";
 
-  /* „eine von fünf" statt „weitere 3" (Martin, 31.08.): die Zahl, die zählt,
-     ist die Auswahl — nicht der Rest. Genau eine Kraft im Pool ⇒ der Satz
-     entfällt komplett, sonst stünde dort „eine von eins". */
-  const auswahlBlock = sichtbarGesamt > 1
-    ? `
-      <tr>
-        <td style="padding:16px 4px 0;">
-          <p style="margin:0;font-size:15px;line-height:1.7;color:#3F3F46;">${vorname} ist eine von <strong style="color:#18181B;">${zahlwort(sichtbarGesamt)} Pflegekräften</strong>, die wir für Sie ausgewählt haben. Im Portal sehen Sie alle ${zahlwort(sichtbarGesamt)} mit Foto, Erfahrung und frühestem Anreisedatum &ndash; und entscheiden selbst, wen Sie kennenlernen möchten.</p>
-          <p style="margin:10px 0 0;"><a href="${alleUrl}" target="_blank" style="color:#8B7355;text-decoration:underline;font-size:15px;font-weight:700;">Alle passenden Betreuungskräfte ansehen &rarr;</a></p>
-        </td>
-      </tr>`
+  const zaehler = sichtbarGesamt > 0
+    ? `<p style="margin:0 0 4px;font-size:13px;line-height:1.5;color:#8B7355;">${sichtbarGesamt} ${sichtbarGesamt === 1 ? "Betreuungskraft" : "Betreuungskräfte"} für Sie verfügbar</p>`
     : "";
 
-  /* Aufbau 1:1 wie die empfohlene Karte im Portal (MatchCard mit
-     isRecommended): weisser Rahmen in Primundus-Braun, darin die Ueberschrift
-     „Unsere Empfehlung für Sie", darunter die graue Karte mit Foto, Name,
-     Deutschstufe und der Faktenzeile. Der Kunde soll nach dem Klick dieselbe
-     Karte wiedererkennen, nicht eine zweite Gestaltung derselben Person. */
+  // Der Sekundaerlink traegt die Zahl — dadurch versteht der Kunde ohne
+  // Erklaerabsatz, dass es weitere gibt. Bei genau einer Kraft entfaellt er.
+  const alleLink = sichtbarGesamt > 1
+    ? `<p style="margin:12px 0 0;text-align:center;"><a href="${alleUrl}" target="_blank" style="color:#8B7355;text-decoration:underline;font-size:14px;font-weight:600;">Alle ${sichtbarGesamt} Betreuungskräfte ansehen &rarr;</a></p>`
+    : "";
+
+  /* Flach statt Karte-in-Karte (Martin, 31.08.): keine graue Box, kein
+     zweiter Rahmen. Nur eine feine Trennlinie oben und unten, damit der
+     Block als eigener Abschnitt lesbar bleibt, ohne wie ein fremdes
+     Element in der Mail zu sitzen. */
   return `
-    <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="margin:0 0 28px;background:#FFFFFF;border:1px solid #8B7355;border-radius:20px;">
+    <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="margin:0 0 26px;">
       <tr>
-        <td style="padding:18px 16px 16px;">
+        <td style="padding:20px 0 22px;border-top:1px solid #ebe2d2;border-bottom:1px solid #ebe2d2;">
 
-          <p style="margin:0 0 12px;font-size:16px;font-weight:700;line-height:1.4;color:#8B7355;">&#10022;&nbsp; Unsere Empfehlung für Sie</p>
+          ${zaehler}
+          <p style="margin:0 0 16px;font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#9a8a73;">Unsere Empfehlung</p>
 
-          <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="background:#F4F4F6;border:1px solid #D4D4D8;border-radius:16px;overflow:hidden;">
+          <table width="100%" cellpadding="0" cellspacing="0" role="presentation">
             <tr>
-              <td style="padding:16px 16px 14px;">
-                <table width="100%" cellpadding="0" cellspacing="0" role="presentation">
-                  <tr>
-                    <td class="empf-foto" width="64" style="width:64px;vertical-align:middle;">${foto}</td>
-                    <td class="empf-luecke" width="14" style="width:14px;font-size:0;line-height:0;">&nbsp;</td>
-                    <td class="empf-text" style="vertical-align:middle;">
-                      <p style="margin:0;font-size:17px;font-weight:700;line-height:1.35;color:#18181B;">${name}${alterTeil}</p>
-                      ${deutschZeile}
-                    </td>
-                  </tr>
-                </table>
-                <p style="margin:12px 0 0;font-size:16px;line-height:1.5;color:#71717A;"><span style="font-weight:700;color:#18181B;">${esc(e.stufe)}:</span> ${e.fakten}</p>
+              <td class="empf-foto" width="88" style="width:88px;vertical-align:top;">${foto}</td>
+              <td class="empf-luecke" width="18" style="width:18px;font-size:0;line-height:0;">&nbsp;</td>
+              <td class="empf-text" style="vertical-align:top;">
+                <p style="margin:0;font-size:19px;font-weight:700;line-height:1.3;color:#18181B;">${name}${alterTeil}</p>
+                ${deutschZeile}
+                <p style="margin:4px 0 0;font-size:15px;line-height:1.5;color:#52525B;">${e.fakten}</p>
               </td>
             </tr>
-            ${fussLeiste}
           </table>
 
-          ${gruendeBlock}
+          ${verfuegbar}
+          ${hakenBlock}
 
           <table width="100%" cellpadding="0" cellspacing="0" role="presentation">
-            <tr><td style="padding:18px 0 0;">
+            <tr><td style="padding:20px 0 0;" align="center">
               <!--[if mso]><table role="presentation" cellpadding="0" cellspacing="0" border="0" align="center"><tr><td><![endif]-->
               <table role="presentation" cellpadding="0" cellspacing="0" border="0" align="center" style="margin:0 auto;border-collapse:separate;">
                 <tr>
-                  <td align="center" bgcolor="#2A9D5C" style="background-color:#2A9D5C;background-image:linear-gradient(180deg,#34B36C 0%,#2A9D5C 100%);border-radius:10px;padding:15px 38px;">
-                    <a href="${profilUrl}" target="_blank" style="color:#ffffff;text-decoration:none;font-weight:600;font-size:16px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;line-height:1.4;">${vorname} kennenlernen&nbsp;&nbsp;&rarr;</a>
+                  <td align="center" bgcolor="#2A9D5C" style="background-color:#2A9D5C;background-image:linear-gradient(180deg,#34B36C 0%,#2A9D5C 100%);border-radius:10px;padding:14px 36px;">
+                    <a href="${profilUrl}" target="_blank" style="color:#ffffff;text-decoration:none;font-weight:600;font-size:16px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;line-height:1.4;">${vorname} ansehen&nbsp;&nbsp;&rarr;</a>
                   </td>
                 </tr>
               </table>
               <!--[if mso]></td></tr></table><![endif]-->
+              ${alleLink}
             </td></tr>
-            ${auswahlBlock}
           </table>
 
         </td>
@@ -706,29 +730,26 @@ export function empfehlungText(
   alleUrl: string,
   sichtbarGesamt: number,
 ): string {
-  const zeilen: string[] = [
-    "UNSERE EMPFEHLUNG FÜR SIE",
-    "",
-    `${e.anzeigeName}${e.alter ? `, ${e.alter}` : ""}`,
-  ];
-  if (e.deutschWort) zeilen.push(`Deutsch ${e.deutschWort}`);
-  // Faktenzeile wie im Portal — die Entitäten wieder in Klartext.
-  zeilen.push(`${e.stufe}: ${e.fakten.replaceAll("&middot;", "·")}`);
+  const zeilen: string[] = [];
+  if (sichtbarGesamt > 0) {
+    zeilen.push(
+      `${sichtbarGesamt} ${sichtbarGesamt === 1 ? "Betreuungskraft" : "Betreuungskräfte"} für Sie verfügbar`,
+      "",
+    );
+  }
+  zeilen.push("UNSERE EMPFEHLUNG", "", `${e.anzeigeName}${e.alter ? `, ${e.alter}` : ""}`);
+  if (e.deutschWort) zeilen.push(`Deutsch: ${e.deutschWort}`);
+  zeilen.push(e.fakten.replaceAll("&middot;", "·"));
   if (e.verfuegbarAb) {
-    zeilen.push(e.verfuegbarAb === "sofort" ? "Sofort verfügbar" : `Verfügbar ab ${e.verfuegbarAb}`);
+    zeilen.push("", e.verfuegbarAb === "sofort" ? "Sofort verfügbar" : `Verfügbar ab ${e.verfuegbarAb}`);
   }
   if (e.gruende.length > 0) {
-    zeilen.push("", `Warum ${e.vorname} zu Ihren Angaben passt:`);
+    zeilen.push("");
     for (const g of e.gruende) zeilen.push(`  ✓ ${g}`);
   }
-  zeilen.push("", `${e.vorname} kennenlernen: ${profilUrl}`);
+  zeilen.push("", `${e.vorname} ansehen: ${profilUrl}`);
   if (sichtbarGesamt > 1) {
-    const w = zahlwort(sichtbarGesamt);
-    zeilen.push(
-      "",
-      `${e.vorname} ist eine von ${w} Pflegekräften, die wir für Sie ausgewählt haben. Im Portal sehen Sie alle ${w} mit Foto, Erfahrung und frühestem Anreisedatum – und entscheiden selbst, wen Sie kennenlernen möchten.`,
-      `Alle passenden Betreuungskräfte ansehen: ${alleUrl}`,
-    );
+    zeilen.push(`Alle ${sichtbarGesamt} Betreuungskräfte ansehen: ${alleUrl}`);
   }
   return zeilen.join("\n");
 }

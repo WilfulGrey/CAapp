@@ -4,9 +4,12 @@ import {
   empfehlungHtml,
   empfehlungText,
   holeEmpfehlung,
+  anforderungenAusAnfrage,
   anzeigeName,
-  matchGruende,
-  portalFakten,
+  haken,
+  HAKEN_WUNSCHPROFIL,
+  kundenFakten,
+  passtZumTermin,
   stufenWort,
   verfuegbarText,
   waehleFuenf,
@@ -96,52 +99,99 @@ Deno.test("waehleFuenf: leere Eingabe → leeres Ergebnis, kein Absturz", () => 
   assertEquals(waehleFuenf([], "kommunikativ", JETZT).length, 0);
 });
 
-// ── Matching-Gründe ───────────────────────────────────────────────────────
+// ── Die drei Haken ────────────────────────────────────────────────────────
 
-Deno.test("matchGruende: nennt nur belegbare Merkmale, höchstens vier", () => {
-  const gruende = matchGruende(
-    cg({ id: 1, hp_total_jobs: 7, gender: "female", germany_skill: "level_2" }).caregiver,
-    { smoking: "no", driving_license: "yes" } as CaregiverExtra,
-    { deutschkenntnisse: "kommunikativ", geschlecht: "weiblich", fuehrerschein: "ja" },
+Deno.test("haken: Punkt 1 steht immer, nie mehr als drei", () => {
+  const l = haken(cg({ id: 1 }).caregiver, null, {}, JETZT);
+  assertEquals(l[0], HAKEN_WUNSCHPROFIL);
+  assert(l.length <= 3);
+});
+
+Deno.test("haken: greift die Anforderungen aus der Anfrage auf", () => {
+  const l = haken(
+    cg({ id: 1 }).caregiver, null,
+    { mobilitaet: "rollstuhl", nachteinsaetze: "gelegentlich" },
+    JETZT,
   );
-  assert(gruende.length <= 4, "mehr als vier Gründe");
-  assertStringIncludes(gruende.join(" | "), "Deutschkenntnisse entsprechen Ihrem Wunsch");
-  assertStringIncludes(gruende.join(" | "), "Weiblich");
+  assertEquals(l, [
+    HAKEN_WUNSCHPROFIL,
+    "Erfahrung mit Rollstuhlpatienten",
+    "Erfahrung mit nächtlichen Einsätzen",
+  ]);
 });
 
-Deno.test("matchGruende: kein Sprach-Grund, wenn die Stufe unbekannt ist", () => {
-  const gruende = matchGruende(
-    cg({ id: 1, germany_skill: null }).caregiver,
-    null,
-    { deutschkenntnisse: "kommunikativ" },
+Deno.test("haken: höchstens zwei Punkte aus der Anfrage, dann ist Schluss", () => {
+  const l = haken(
+    cg({ id: 1 }).caregiver, null,
+    { mobilitaet: "bettlaegerig", nachteinsaetze: "taeglich", betreuung_fuer: "ehepaar", pflegegrad: 5 },
+    JETZT,
   );
-  assertEquals(gruende.some((g) => g.includes("Deutschkenntnisse")), false);
+  assertEquals(l.length, 3);
+  assertEquals(l.includes("Erfahrung in der Betreuung von Ehepaaren"), false);
 });
 
-Deno.test("matchGruende: kein Geschlechts-Grund bei Wunsch 'egal'", () => {
-  const gruende = matchGruende(cg({ id: 1 }).caregiver, null, { geschlecht: "egal" });
-  assertEquals(gruende.some((g) => g.includes("gewünscht")), false);
-});
-
-Deno.test("matchGruende: kein Führerschein-Grund ohne Kundenwunsch", () => {
-  const gruende = matchGruende(
-    cg({ id: 1 }).caregiver,
-    { driving_license: "yes" } as CaregiverExtra,
-    { fuehrerschein: "nein" },
+Deno.test("haken: ohne besondere Anforderungen füllen die Standards auf", () => {
+  const l = haken(
+    cg({ id: 1, germany_skill: "level_2" }).caregiver,
+    { driving_license: "yes" },
+    { deutschkenntnisse: "kommunikativ", fuehrerschein: "ja", care_start_timing: "2-4-wochen" },
+    JETZT,
   );
-  assertEquals(gruende.some((g) => g.includes("Führerschein")), false);
+  // Reihenfolge der Standards: Termin → Deutsch → Führerschein
+  assertEquals(l, [
+    HAKEN_WUNSCHPROFIL,
+    "Zum gewünschten Termin verfügbar",
+    "Deutschkenntnisse wie gewünscht",
+  ]);
 });
 
-Deno.test("matchGruende: Nichtraucherin nur bei ausdrücklichem 'no'", () => {
-  const ohne = matchGruende(cg({ id: 1 }).caregiver, { smoking: null } as CaregiverExtra, {});
-  assertEquals(ohne.some((g) => g.includes("Nichtraucher")), false);
-  const mit = matchGruende(cg({ id: 1 }).caregiver, { smoking: "no" } as CaregiverExtra, {});
-  assert(mit.some((g) => g.includes("Nichtraucherin")));
+Deno.test("haken: Führerschein nur, wenn der Kunde ihn wollte UND die Kraft einen hat", () => {
+  const ohneWunsch = haken(
+    cg({ id: 1 }).caregiver, { driving_license: "yes" }, { fuehrerschein: "nein" }, JETZT,
+  );
+  assertEquals(ohneWunsch.includes("Führerschein vorhanden"), false);
+
+  const ohneNachweis = haken(
+    cg({ id: 1, germany_skill: null, available_from: null }).caregiver,
+    { driving_license: null },
+    { fuehrerschein: "ja" },
+    JETZT,
+  );
+  assertEquals(ohneNachweis.includes("Führerschein vorhanden"), false);
 });
 
-Deno.test("matchGruende: ohne Zusatzdaten bleiben die Gründe leer statt erfunden", () => {
-  const gruende = matchGruende(cg({ id: 1, hp_total_jobs: 0 }).caregiver, null, {});
-  assertEquals(gruende, []);
+Deno.test("haken: kein Deutsch-Punkt, wenn die Stufe unbekannt ist", () => {
+  const l = haken(
+    cg({ id: 1, germany_skill: null, available_from: null }).caregiver,
+    null, { deutschkenntnisse: "kommunikativ" }, JETZT,
+  );
+  assertEquals(l.includes("Deutschkenntnisse wie gewünscht"), false);
+});
+
+Deno.test("haken: ohne jeden Beleg bleibt nur der erste Punkt stehen", () => {
+  const l = haken(cg({ id: 1, germany_skill: null, available_from: null }).caregiver, null, {}, JETZT);
+  assertEquals(l, [HAKEN_WUNSCHPROFIL]);
+});
+
+Deno.test("anforderungenAusAnfrage: bettlägerig schlägt Rollstuhl, Rollator kommt zuletzt", () => {
+  assertEquals(anforderungenAusAnfrage({ mobilitaet: "bettlaegerig" })[0], "Erfahrung mit bettlägerigen Patienten");
+  assertEquals(anforderungenAusAnfrage({ mobilitaet: "rollstuhl" })[0], "Erfahrung mit Rollstuhlpatienten");
+  const beides = anforderungenAusAnfrage({ mobilitaet: "rollator", nachteinsaetze: "mehrmals" });
+  assertEquals(beides[0], "Erfahrung mit nächtlichen Einsätzen");
+});
+
+Deno.test("anforderungenAusAnfrage: 'nein' bei Nachteinsätzen ist keine Anforderung", () => {
+  assertEquals(anforderungenAusAnfrage({ nachteinsaetze: "nein" }), []);
+});
+
+Deno.test("passtZumTermin: nur innerhalb des Wunschfensters", () => {
+  // 2-4-wochen = 21 Tage ab dem 01.09.
+  assertEquals(passtZumTermin("2026-09-14T00:00:00Z", "2-4-wochen", JETZT), true);
+  assertEquals(passtZumTermin("2026-11-01T00:00:00Z", "2-4-wochen", JETZT), false);
+  // Ohne Datum gilt die Kraft im Portal als sofort verfügbar.
+  assertEquals(passtZumTermin(null, "sofort", JETZT), true);
+  // Unbekannter Wunsch → kein Versprechen.
+  assertEquals(passtZumTermin("2026-09-02T00:00:00Z", null, JETZT), false);
 });
 
 // ── Anzeige ───────────────────────────────────────────────────────────────
@@ -176,43 +226,62 @@ Deno.test("empfehlungHtml: ohne Foto Initialen statt kaputtem Bild", () => {
   assertStringIncludes(html, ">M</div>");
 });
 
-Deno.test("empfehlungHtml: 'eine von fünf' nennt die Auswahl, nicht den Rest", () => {
+Deno.test("empfehlungHtml: Zähler oben und im Sekundärlink, beide dynamisch", () => {
   const { empfehlung } = baueEmpfehlung(cg({ id: 42 }), null, {}, 5, JETZT);
   const fuenf = empfehlungHtml(empfehlung, null, "https://p", "https://a", 5);
-  assertStringIncludes(fuenf, "Maria ist eine von <strong style=\"color:#18181B;\">fünf Pflegekräften</strong>");
-  assertStringIncludes(fuenf, "Im Portal sehen Sie alle fünf");
-  // Die alte Rest-Zählung darf nirgends mehr auftauchen.
+  assertStringIncludes(fuenf, "5 Betreuungskräfte für Sie verfügbar");
+  assertStringIncludes(fuenf, "Alle 5 Betreuungskräfte ansehen");
+  // Der lange Erklärabsatz ist ersatzlos raus.
+  assertEquals(fuenf.includes("ist eine von"), false);
   assertEquals(fuenf.includes("Weitere"), false);
 
-  const drei = empfehlungHtml(empfehlung, null, "https://p", "https://a", 3);
-  assertStringIncludes(drei, "eine von <strong style=\"color:#18181B;\">drei Pflegekräften</strong>");
-
-  // Genau eine Kraft: der Satz entfällt, sonst stünde dort "eine von eins".
+  // Genau eine Kraft: Einzahl oben, kein Sekundärlink.
   const eine = empfehlungHtml(empfehlung, null, "https://p", "https://a", 1);
-  assertEquals(eine.includes("eine von"), false);
-  assertEquals(eine.includes("Alle passenden"), false);
+  assertStringIncludes(eine, "1 Betreuungskraft für Sie verfügbar");
+  assertEquals(eine.includes("Alle 1"), false);
 });
 
-Deno.test("empfehlungHtml: Karte trägt die Portal-Optik und -Sprache", () => {
+Deno.test("empfehlungHtml: keine Überschrift über den Haken", () => {
   const { empfehlung } = baueEmpfehlung(
-    cg({ id: 42, first_name: "Maria", last_name: "Kowalska", hp_total_jobs: 9, hp_avg_mission_days: 84 }),
-    null, {}, 5, JETZT,
+    cg({ id: 42 }), null, { mobilitaet: "rollstuhl" }, 5, JETZT,
   );
   const html = empfehlungHtml(empfehlung, null, "https://p", "https://a", 5);
-  // Rahmenfarbe + Kartengrund wie MatchCard(isRecommended)
-  assertStringIncludes(html, "border:1px solid #8B7355");
-  assertStringIncludes(html, "background:#F4F4F6");
-  assertStringIncludes(html, "Unsere Empfehlung für Sie");
-  // Name in Portal-Schreibweise, Faktenzeile Wort für Wort
+  assertStringIncludes(html, HAKEN_WUNSCHPROFIL);
+  assertEquals(/Warum .* zu Ihren Angaben passt|Passt besonders gut/.test(html), false);
+});
+
+Deno.test("empfehlungHtml: keine interne Kennzahl in der Faktenzeile", () => {
+  const { empfehlung } = baueEmpfehlung(
+    cg({ id: 42, hp_total_jobs: 9, hp_avg_mission_days: 84 }), null, {}, 5, JETZT,
+  );
+  const html = empfehlungHtml(empfehlung, null, "https://p", "https://a", 5);
+  assertStringIncludes(html, "7 Jahre Erfahrung &middot; 9 Primundus-Einsätze");
+  assertEquals(html.includes("Ø"), false);
+  assertEquals(html.includes("Stammkraft:"), false);
+});
+
+Deno.test("empfehlungHtml: flach — keine graue Box, kein zweiter Rahmen", () => {
+  const { empfehlung } = baueEmpfehlung(cg({ id: 42 }), null, {}, 5, JETZT);
+  const html = empfehlungHtml(empfehlung, null, "https://p", "https://a", 5);
+  assertEquals(html.includes("#F4F4F6"), false);
+  assertEquals(html.includes("border:1px solid #8B7355"), false);
+});
+
+Deno.test("empfehlungHtml: Sprache und Schreibweise wie im Portal", () => {
+  const { empfehlung } = baueEmpfehlung(
+    cg({ id: 42, first_name: "Maria", last_name: "Kowalska", hp_total_jobs: 9 }), null, {}, 5, JETZT,
+  );
+  const html = empfehlungHtml(empfehlung, null, "https://p", "https://a", 5);
+  assertStringIncludes(html, "Unsere Empfehlung");
   assertStringIncludes(html, "Maria K.");
-  assertStringIncludes(html, "Stammkraft:");
-  assertStringIncludes(html, "7 J. Erfahrung &middot; 9 Einsätze &middot; Ø 12 Wochen pro Einsatz");
+  assertStringIncludes(html, "Deutsch: Mittel");
+  assertStringIncludes(html, "Verfügbar ab 14. September");
 });
 
 Deno.test("empfehlungHtml: Button trägt den Vornamen und zeigt aufs Profil", () => {
   const { empfehlung } = baueEmpfehlung(cg({ id: 42, first_name: "Grazyna" }), null, {}, 3, JETZT);
   const html = empfehlungHtml(empfehlung, null, "https://portal/?token=t&cg=42", "https://portal/?token=t", 3);
-  assertStringIncludes(html, "Grazyna kennenlernen");
+  assertStringIncludes(html, "Grazyna ansehen");
   assertStringIncludes(html, 'href="https://portal/?token=t&cg=42"');
 });
 
@@ -225,17 +294,17 @@ Deno.test("empfehlungHtml: Initiale ja, ausgeschriebener Nachname nie", () => {
   assertEquals(html.includes("Kowalska"), false);
 });
 
-Deno.test("portalFakten: ohne Zahlen derselbe ehrliche Ersatzsatz wie im Portal", () => {
+Deno.test("kundenFakten: ohne Zahlen ein ehrlicher Satz statt eines Strichs", () => {
   assertEquals(
-    portalFakten({ id: 1, care_experience: null, hp_total_jobs: 0 }),
+    kundenFakten({ id: 1, care_experience: null, hp_total_jobs: 0 }),
     "bereit für den ersten Einsatz",
   );
 });
 
-Deno.test("portalFakten: ein Einsatz bleibt Einzahl", () => {
-  assertStringIncludes(
-    portalFakten({ id: 1, care_experience: "1", hp_total_jobs: 1, hp_avg_mission_days: 7 }),
-    "1 J. Erfahrung &middot; 1 Einsatz",
+Deno.test("kundenFakten: Einzahl bleibt Einzahl", () => {
+  assertEquals(
+    kundenFakten({ id: 1, care_experience: "1", hp_total_jobs: 1 }),
+    "1 Jahr Erfahrung &middot; 1 Primundus-Einsatz",
   );
 });
 
@@ -253,10 +322,11 @@ Deno.test("empfehlungText: trägt dieselben Aussagen wie das HTML", () => {
     JETZT,
   );
   const txt = empfehlungText(empfehlung, "https://p", "https://a", 4);
-  assertStringIncludes(txt, "UNSERE EMPFEHLUNG FÜR SIE");
+  assertStringIncludes(txt, "4 Betreuungskräfte für Sie verfügbar");
   assertStringIncludes(txt, "Maria, 54");
   assertStringIncludes(txt, "Verfügbar ab 14. September");
-  assertStringIncludes(txt, "eine von vier Pflegekräften");
+  assertStringIncludes(txt, "UNSERE EMPFEHLUNG");
+  assertStringIncludes(txt, "Alle 4 Betreuungskräfte ansehen");
 });
 
 Deno.test("baueEmpfehlung: unplausibles Geburtsjahr → kein Alter statt Unsinn", () => {
@@ -343,7 +413,7 @@ Deno.test("holeEmpfehlung: Glücksfall — beste Kraft plus Gründe", async () =
   assert(r !== null);
   assertEquals(r!.empfehlung.caregiverId, 9, "nicht die erfahrenste Kraft empfohlen");
   assertEquals(r!.sichtbarGesamt, 2);
-  assert(r!.empfehlung.gruende.length >= 3);
+  assertEquals(r!.empfehlung.gruende.length, 3);
   assertEquals(rufe, ["onboard", "listMatchings", "getCaregiver"]);
 });
 
@@ -365,5 +435,5 @@ Deno.test("holeEmpfehlung: getCaregiver-Ausfall kostet Gründe, nicht die Empfeh
   });
   assert(r !== null);
   assertEquals(r!.empfehlung.caregiverId, 5);
-  assertStringIncludes(r!.empfehlung.gruende.join(" "), "Deutschkenntnisse");
+  assertStringIncludes(r!.empfehlung.gruende.join(" "), HAKEN_WUNSCHPROFIL);
 });

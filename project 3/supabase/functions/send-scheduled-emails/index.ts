@@ -1013,8 +1013,8 @@ export function buildEingangsbestaetigungHtml(
       <tr>
         <td colspan="2" style="padding:16px 24px 16px;">
           <p style="margin:0 0 10px;${psLabel}color:#2A9D5C;">Ihre Konditionen</p>
-          ${["Täglich kündbar", "Tagesgenaue Abrechnung", "Pflegekraft vor Vertragsabschluss selbst auswählen", "Keine Vermittlungsgebühren"].map((t) => `<p style="margin:0 0 6px;font-size:14px;line-height:1.6;color:#2D1F0F;"><span style="color:#2A9D5C;font-weight:700;">&#10003;</span>&nbsp;&nbsp;${t}</p>`).join("")}
-          <p style="margin:8px 0 0;font-size:13px;line-height:1.6;color:#666;">Kosten entstehen erst, wenn Ihre Pflegekraft vor Ort ist.</p>
+          ${["Täglich kündbar", "Tagesgenaue Abrechnung", "Betreuungskraft vor Vertragsabschluss selbst auswählen", "Keine Vermittlungsgebühren"].map((t) => `<p style="margin:0 0 6px;font-size:14px;line-height:1.6;color:#2D1F0F;"><span style="color:#2A9D5C;font-weight:700;">&#10003;</span>&nbsp;&nbsp;${t}</p>`).join("")}
+          <p style="margin:8px 0 0;font-size:13px;line-height:1.6;color:#666;">Kosten entstehen erst, wenn Ihre Betreuungskraft vor Ort ist.</p>
         </td>
       </tr>
       <tr>
@@ -1110,12 +1110,12 @@ export function buildEingangsbestaetigungHtml(
     : isResubmit
     ? `vielen Dank für Ihre erneute Anfrage. Wir haben Ihre Angaben übernommen und Ihr <strong style="color:#2D1F0F;">persönliches Angebot</strong> angepasst${
         hatEmpfehlung
-          ? ` &ndash; und passende Betreuungskräfte für Sie gefunden.<br><span style="color:#8B7355;">Unsere Empfehlung sehen Sie direkt in dieser E-Mail.</span>`
+          ? ` &ndash; und passende Betreuungskräfte für Sie gefunden.`
           : ` für die 24-Stunden-Betreuung zu Hause.`
       }`
     : `vielen Dank für Ihre Anfrage. Auf Basis Ihrer Angaben haben wir Ihr <strong style="color:#2D1F0F;">persönliches Angebot</strong> erstellt${
         hatEmpfehlung
-          ? ` &ndash; und bereits passende Betreuungskräfte für Sie gefunden.<br><span style="color:#8B7355;">Unsere Empfehlung sehen Sie direkt in dieser E-Mail.</span>`
+          ? ` &ndash; und bereits passende Betreuungskräfte für Sie gefunden.`
           : ` für die 24-Stunden-Betreuung zu Hause.`
       }`;
 
@@ -1186,20 +1186,22 @@ export function buildEingangsbestaetigungText(
 Monatssatz: ${fmt(bruttopreis)} / Monat — rechn. Eigenanteil ca. ${fmt(eigenanteil)}
 zzgl. ca. 125 € Anreise- und Abreisekosten je Strecke sowie Kost und Logis.
 
-Ihre Konditionen:
+`
+    : "";
+
+  const konditionenLine = `Ihre Konditionen:
   ✓ Täglich kündbar
   ✓ Tagesgenaue Abrechnung
-  ✓ Pflegekraft vor Vertragsabschluss selbst auswählen
+  ✓ Betreuungskraft vor Vertragsabschluss selbst auswählen
   ✓ Keine Vermittlungsgebühren
-Kosten entstehen erst, wenn Ihre Pflegekraft vor Ort ist.
+Kosten entstehen erst, wenn Ihre Betreuungskraft vor Ort ist.
 
 6× Testsieger
 DIE WELT – 6× in Folge, mit über 20 Jahren Erfahrung und 60.000 Betreuungseinsätzen.
 
 ${buildHeimVergleichText(lead)}
 
-`
-    : "";
+`;
 
   const headerLine = portalHerkunft(lead.source)
     ? PORTAL_BETREFF
@@ -1216,14 +1218,10 @@ ${buildHeimVergleichText(lead)}
     ? portalIntroText(herkunftPlain)
     : isResubmit
     ? `vielen Dank für Ihre erneute Anfrage. Wir haben Ihre Angaben übernommen und Ihr persönliches Angebot angepasst${
-        hatEmpfehlungPlain
-          ? " – und passende Betreuungskräfte für Sie gefunden.\nUnsere Empfehlung sehen Sie direkt in dieser E-Mail."
-          : " für die 24-Stunden-Betreuung zu Hause."
+        hatEmpfehlungPlain ? " – und passende Betreuungskräfte für Sie gefunden." : " für die 24-Stunden-Betreuung zu Hause."
       }`
     : `vielen Dank für Ihre Anfrage. Auf Basis Ihrer Angaben haben wir Ihr persönliches Angebot erstellt${
-        hatEmpfehlungPlain
-          ? " – und bereits passende Betreuungskräfte für Sie gefunden.\nUnsere Empfehlung sehen Sie direkt in dieser E-Mail."
-          : " für die 24-Stunden-Betreuung zu Hause."
+        hatEmpfehlungPlain ? " – und bereits passende Betreuungskräfte für Sie gefunden." : " für die 24-Stunden-Betreuung zu Hause."
       }`;
 
   const angenommeneFelderPlain = (lead.kalkulation as any)?.angenommene_felder;
@@ -1243,7 +1241,7 @@ ${greeting},
 
 ${introPlain}
 
-${vorschauPlain}${priceLine}${empfehlungPlain}Angebot & Pflegekräfte ansehen: ${ctaUrl}
+${vorschauPlain}${priceLine}${empfehlungPlain}${konditionenLine}Angebot & Pflegekräfte ansehen: ${ctaUrl}
 
 SO GEHT ES WEITER
 
@@ -2362,7 +2360,12 @@ Deno.serve(async (req: Request) => {
               key: supabaseServiceKey,
               token: tok,
               jobOfferId: (lead as any).mamamia_job_offer_id ?? null,
-              formularDaten: ((lead as any).kalkulation?.formularDaten ?? {}),
+              formularDaten: {
+                ...((lead as any).kalkulation?.formularDaten ?? {}),
+                // Steht als eigene Lead-Spalte, nicht in formularDaten —
+                // Quelle des Hakens „Zum gewünschten Termin verfügbar".
+                care_start_timing: (lead as any).care_start_timing ?? null,
+              },
               // Serverseitiges Onboarding abschaltbar, ohne das Feature zu
               // verlieren: EMPFEHLUNG_ONBOARD=0 → nur Leads mit bestehender
               // job_offer bekommen eine Empfehlung.

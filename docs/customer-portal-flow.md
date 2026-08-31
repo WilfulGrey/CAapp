@@ -272,19 +272,40 @@ send-scheduled-emails (email_type=eingangsbestaetigung)
       { action: "listMatchings", variables: { limit: 200 } }
   → waehleFuenf(...)   # ta sama piątka co portal (patrz niżej)
   → POST /functions/v1/mamamia-proxy  { action: "getCaregiver", id }
-      # smoking / driving_license — nie ma ich w liście matchingów
+      # driving_license — nie ma go w liście matchingów
 ```
 
-**Wygląd karty = karta z portalu.** `empfehlungHtml` odwzorowuje
-`MatchCard` z `isRecommended` (src/components/portal/MatchCard.tsx): biała
-ramka `#8B7355` z nagłówkiem „Unsere Empfehlung für Sie", w środku szara karta
-`#F4F4F6`/`#D4D4D8` ze zdjęciem 64 px (radius 12), nazwą w formie `displayName`
-(„Maria K.") i stopniem znajomości niemieckiego, oraz linią faktów kopiowaną
-1:1 z `nurseFacts` — razem ze skrótem „J. Erfahrung" i przeliczeniem
-dni→tygodnie→miesiące→tygodnie. Ta okrężna droga jest zamierzona: prostsze
-liczenie dałoby INNĄ liczbę tygodni niż ta, którą klient przeczyta sekundę
-później w portalu. Zdjęcie i nazwisko zostają obok siebie także na telefonie
-(jak w portalu) — bez łamania na dwie linie.
+**Wygląd: płaska sekcja, nie karta.** Po feedbacku Martina (31.08.) blok jest
+celowo BEZ szarego pudełka i BEZ ramki w ramce — tylko cienka linia u góry i
+u dołu. Kolejność w środku: licznik „N Betreuungskräfte für Sie verfügbar" →
+etykieta „UNSERE EMPFEHLUNG" → zdjęcie 88 px (radius 12, jak w portalu) obok
+imienia w formie `displayName` („Maria K.") → „Deutsch: <stopień>" → linia
+faktów → dostępność → trzy haczyki → zielony CTA → dyskretny link „Alle N
+Betreuungskräfte ansehen". Zdjęcie i tekst zostają obok siebie także na
+telefonie (zmierzone przy 375 px: 88 px zdjęcie + 275 px tekst, bez poziomego
+scrolla).
+
+**Linia faktów jest KLIENCKA, nie portalowa:** „7 Jahre Erfahrung ·
+9 Primundus-Einsätze". Bez stopnia („Stammkraft:") i bez średniej długości
+zlecenia („Ø 12 Wochen pro Einsatz") — jedno i drugie czyta się jak wyciąg
+z CRM-u (Martin: „Keine Informationen zeigen, die nach internem CRM oder
+Datenbank aussehen"). Funkcja: `kundenFakten`.
+
+**Trzy haczyki NIE są matchingiem.** Punkt 1 to zawsze „Entspricht Ihrem
+Wunschprofil". Punkty 2–3 podnoszą komunikacyjnie to, co klient sam wpisał
+w kalkulatorze (`anforderungenAusAnfrage`: bettlägerig → Rollstuhl →
+Nachteinsätze → Ehepaar → Pflegegrad ≥ 4 → Rollator), a gdy brakuje —
+uzupełniają standardami w kolejności: termin → niemiecki → prawo jazdy
+(`haken`). Każdy standard jest związany z danymi i znika bez dowodu:
+
+| Haczyk | Warunek |
+|---|---|
+| Zum gewünschten Termin verfügbar | `available_from` mieści się w oknie z `care_start_timing` (`START_OFFSET_TAGE` — lustro `OFFSET_DAYS` z onboard/mappers.ts) |
+| Deutschkenntnisse wie gewünscht | stopień znany ORAZ dokładnie równy życzeniu (sam filtr przepuszcza nieznane — to jeszcze nie trafienie) |
+| Führerschein vorhanden | klient chciał (`fuehrerschein='ja'`) ORAZ opiekunka ma (`getCaregiver.driving_license='yes'`) — jedyny powód, dla którego `getCaregiver` jest jeszcze wołane |
+
+Nagłówka nad haczykami nie ma („Warum … zu Ihren Angaben passt" usunięte) —
+pierwszy haczyk sam to mówi.
 
 **Kolejność MUSI być identyczna z portalem.** `waehleFuenf` kopiuje trzy
 rzeczy z `src/`: `rankComparator`
@@ -309,7 +330,7 @@ opiekunka):
 
 | Sytuacja | Mail |
 |---|---|
-| jest match | karta opiekunki + powody + zdanie „<Imię> ist eine von <N> Pflegekräften…" (liczebnik słownie, dynamiczny; znika przy N=1) |
+| jest match | sekcja z opiekunką + 3 haczyki + CTA; licznik N w nagłówku i w linku (przy N=1 link znika) |
 | brak matchów / błąd mamamii / timeout | uczciwy tekst zastępczy, cena i reszta maila bez zmian |
 | lead kupiony (`portalHerkunft`) | sekcji nie ma wcale — portal-leady mają własną dramaturgię |
 | brak zdjęcia lub nieudany inline-fetch | kafelek z inicjałem (NIGDY surowy URL S3 — wygasa po ~30 min) |
