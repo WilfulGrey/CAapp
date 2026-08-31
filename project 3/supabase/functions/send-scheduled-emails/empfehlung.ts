@@ -111,7 +111,6 @@ export interface Empfehlung {
   erfahrungJahre: number;
   einsaetze: number;
   stufe: string;
-  verfuegbarAb: string | null;
   fotoUrl: string | null;
   gruende: string[];
   /** Sprachbalken 1–3 wie im Portal (GERMANY_SKILL_LEVELS.bars). */
@@ -410,26 +409,6 @@ export function haken(
   return liste.slice(0, 3);
 }
 
-// ─── Datum ───────────────────────────────────────────────────────────────
-
-const MONATE = [
-  "Januar", "Februar", "März", "April", "Mai", "Juni",
-  "Juli", "August", "September", "Oktober", "November", "Dezember",
-];
-
-/**
- * „14. September" — oder „sofort", wenn das Datum in der Vergangenheit
- * liegt. Ohne Datum: null, dann entfällt die Zeile.
- */
-export function verfuegbarText(iso: string | null | undefined, now: Date): string | null {
-  if (!iso) return null;
-  const d = new Date(iso);
-  if (!Number.isFinite(d.getTime())) return null;
-  const heute = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-  if (d.getTime() <= heute.getTime()) return "sofort";
-  return `${d.getDate()}. ${MONATE[d.getMonth()]}`;
-}
-
 // ─── Zusammenbauen ───────────────────────────────────────────────────────
 
 export function baueEmpfehlung(
@@ -455,7 +434,6 @@ export function baueEmpfehlung(
       erfahrungJahre: jahre,
       einsaetze,
       stufe: stufenWort(einsaetze, jahre),
-      verfuegbarAb: verfuegbarText(cg.available_from, now),
       fotoUrl: fotoUrl(cg),
       gruende: haken(cg, extra, fd, now),
       deutschBalken: deutschBalken(cg.germany_skill),
@@ -780,12 +758,6 @@ export function empfehlungHtml(
     ? `<table cellpadding="0" cellspacing="0" role="presentation"><tr>${balken}<td style="padding-left:5px;font-size:16px;font-weight:700;color:#18181B;">${e.deutschWort}</td></tr></table>`
     : `<p style="margin:0;font-size:16px;font-weight:700;color:#18181B;">&mdash;</p>`;
 
-  const verfuegbar = e.verfuegbarAb
-    ? `<p style="margin:16px 0 0;font-size:15px;line-height:1.5;color:#22A06B;font-weight:700;">${
-        e.verfuegbarAb === "sofort" ? "Sofort verfügbar" : `Verfügbar ab ${esc(e.verfuegbarAb)}`
-      }</p>`
-    : "";
-
   const hakenBlock = e.gruende.length > 0
     ? `<table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="margin:14px 0 0;">
         ${e.gruende.map((g) =>
@@ -816,7 +788,7 @@ export function empfehlungHtml(
     : "";
 
   const zaehler = sichtbarGesamt > 0
-    ? `<p style="margin:0 0 6px;font-size:13px;font-weight:600;line-height:1.5;color:${KORALLE};">${sichtbarGesamt} ${sichtbarGesamt === 1 ? "Betreuungskraft" : "Betreuungskräfte"} für Sie verfügbar</p>`
+    ? `<p style="margin:0 0 2px;font-size:17px;font-weight:600;line-height:1.45;color:${KORALLE};">${sichtbarGesamt} ${sichtbarGesamt === 1 ? "Betreuungskraft" : "Betreuungskräfte"} für Sie verfügbar</p>`
     : "";
 
   const alleLink = sichtbarGesamt > 1
@@ -828,7 +800,7 @@ export function empfehlungHtml(
       <tr><td>
 
         ${zaehler}
-        <p style="margin:0 0 14px;font-size:20px;font-weight:700;line-height:1.3;color:#2D1F0F;">Unsere Empfehlung</p>
+        <p style="margin:0 0 14px;font-size:17px;font-weight:700;line-height:1.45;color:#2D1F0F;">Unsere Empfehlung</p>
 
         <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="border:1px solid #D4D4D8;border-radius:16px;background:#ffffff;">
           <tr><td style="padding:20px;">
@@ -852,7 +824,6 @@ export function empfehlungHtml(
               </tr>
             </table>
 
-            ${verfuegbar}
             ${hakenBlock}
             ${vorstellungBlock}
 
@@ -897,9 +868,6 @@ export function empfehlungText(
   if (e.vorstellung) {
     const { klar, blass, gekuerzt } = textAusblenden(e.vorstellung);
     zeilen.push("", `Über ${e.vorname}`, `${klar}${blass ? " " + blass : ""}${gekuerzt ? " …" : ""}`);
-  }
-  if (e.verfuegbarAb) {
-    zeilen.push("", e.verfuegbarAb === "sofort" ? "Sofort verfügbar" : `Verfügbar ab ${e.verfuegbarAb}`);
   }
   if (e.gruende.length > 0) {
     zeilen.push("");

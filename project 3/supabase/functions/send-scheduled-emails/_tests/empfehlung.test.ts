@@ -14,7 +14,6 @@ import {
   textAusblenden,
   vorstellungstext,
   stufenWort,
-  verfuegbarText,
   waehleFuenf,
   type CaregiverExtra,
   type Matching,
@@ -199,13 +198,6 @@ Deno.test("passtZumTermin: nur innerhalb des Wunschfensters", () => {
 
 // ── Anzeige ───────────────────────────────────────────────────────────────
 
-Deno.test("verfuegbarText: Vergangenheit heißt 'sofort', fehlendes Datum heißt nichts", () => {
-  assertEquals(verfuegbarText("2026-08-01T00:00:00Z", JETZT), "sofort");
-  assertEquals(verfuegbarText("2026-09-14T00:00:00Z", JETZT), "14. September");
-  assertEquals(verfuegbarText(null, JETZT), null);
-  assertEquals(verfuegbarText("kaputt", JETZT), null);
-});
-
 Deno.test("stufenWort trifft die Schwellen des Portals", () => {
   assertEquals(stufenWort(12), "Elite");
   assertEquals(stufenWort(6), "Stammkraft");
@@ -301,7 +293,6 @@ Deno.test("empfehlungHtml: Sprache und Schreibweise wie im Portal", () => {
   assertStringIncludes(html, "Unsere Empfehlung");
   assertStringIncludes(html, "Maria K.");
   assertStringIncludes(html, "Mittel");
-  assertStringIncludes(html, "Verfügbar ab 14. September");
 });
 
 Deno.test("empfehlungHtml: Button trägt den Vornamen und zeigt aufs Profil", () => {
@@ -350,7 +341,6 @@ Deno.test("empfehlungText: trägt dieselben Aussagen wie das HTML", () => {
   const txt = empfehlungText(empfehlung, "https://p", "https://a", 4);
   assertStringIncludes(txt, "4 Betreuungskräfte für Sie verfügbar");
   assertStringIncludes(txt, "Maria, 54");
-  assertStringIncludes(txt, "Verfügbar ab 14. September");
   assertStringIncludes(txt, "UNSERE EMPFEHLUNG");
   assertStringIncludes(txt, "Alle 4 Betreuungskräfte ansehen");
 });
@@ -502,4 +492,24 @@ Deno.test("textAusblenden: kurzer Text bleibt ganz, langer laeuft in zwei Stufen
   assert(lang.klar.length > 0 && lang.blass.length > 0);
   // An Wortgrenzen geschnitten — kein abgehacktes Wort am Ende.
   assertEquals(lang.klar.endsWith("Wort"), true);
+});
+
+Deno.test("empfehlungHtml: Verfügbarkeitszeile ist raus — sie stand doppelt", () => {
+  const { empfehlung } = baueEmpfehlung(cg({ id: 42 }), null, {}, 5, JETZT);
+  const html = empfehlungHtml(empfehlung, null, "https://p", "https://a", 5);
+  assertEquals(/Verfügbar ab|Sofort verfügbar/.test(html), false);
+  // Das Datum lebt weiter im Haken, wenn es zum Wunschtermin passt.
+  const mitTermin = baueEmpfehlung(
+    cg({ id: 42 }), null, { care_start_timing: "2-4-wochen" }, 5, JETZT,
+  ).empfehlung;
+  assert(mitTermin.gruende.includes("Zum gewünschten Termin verfügbar"));
+});
+
+Deno.test("empfehlungHtml: Zähler und Überschrift auf derselben Schriftgröße", () => {
+  const { empfehlung } = baueEmpfehlung(cg({ id: 42 }), null, {}, 5, JETZT);
+  const html = empfehlungHtml(empfehlung, null, "https://p", "https://a", 5);
+  const zaehler = html.match(/font-size:(\d+)px[^"]*"[^>]*>5 Betreuungskräfte/);
+  const kopf = html.match(/font-size:(\d+)px[^"]*"[^>]*>Unsere Empfehlung/);
+  assert(zaehler && kopf, "Zeilen nicht gefunden");
+  assertEquals(zaehler![1], kopf![1]);
 });

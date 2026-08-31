@@ -280,10 +280,15 @@ send-scheduled-emails (email_type=eingangsbestaetigung)
 przycisk") blok odwzorowuje `CustomerNurseModal`, nie kartę z listy: zdjęcie
 80 px (radius 16, biała obwódka) obok imienia w formie `displayName` i wieku
 „54 J.", chip ze stopniem, dwa kafelki obok siebie („Erfahrung" z wartością
-w `#8B7355` + „Deutschkenntnisse" z paskami 1–3 i słowem), dostępność, trzy
+w `#8B7355` + „Deutschkenntnisse" z paskami 1–3 i słowem), trzy
 haczyki, sekcja „Über <Imię>" w pudełku `#F5F5F6`/`#D4D4D8` — i tam tekst
 **wygasa**: pierwsze ~150 znaków w `#18181B`, kolejne ~110 w `#A9A9B0`, potem
 „…".
+
+Osobnej zielonej linii „Verfügbar ab …" NIE ma (Martin, 31.08.) — termin
+mówi już haczyk „Zum gewünschten Termin verfügbar", a dwa razy to samo
+zdanie obok siebie wyglądało na niedopatrzenie. Licznik i nagłówek stoją na
+tym samym stopniu pisma (17 px); rozróżnia je grubość i kolor, nie rozmiar.
 
 Wygaszenie jest zrobione DWIEMA BARWAMI TEKSTU, nie nakładką z gradientem:
 `position:absolute` wypada w Gmailu i Outlooku, a tam tekst urywałby się
