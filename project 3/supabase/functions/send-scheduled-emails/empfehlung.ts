@@ -810,8 +810,17 @@ export function empfehlungHtml(
                 <td class="empf-foto" width="80" style="width:80px;vertical-align:middle;">${foto}</td>
                 <td class="empf-luecke" width="16" style="width:16px;font-size:0;line-height:0;">&nbsp;</td>
                 <td class="empf-text" style="vertical-align:middle;">
-                  <p style="margin:0 0 6px;font-size:20px;font-weight:700;line-height:1.3;color:#18181B;">${name}${alterChip}</p>
-                  ${stufenChip}
+                  <table width="100%" cellpadding="0" cellspacing="0" role="presentation">
+                    <tr>
+                      <td style="vertical-align:middle;">
+                        <p style="margin:0 0 6px;font-size:20px;font-weight:700;line-height:1.3;color:#18181B;">${name}${alterChip}</p>
+                        ${stufenChip}
+                      </td>
+                      <td class="empf-profil" style="vertical-align:middle;text-align:right;white-space:nowrap;padding-left:10px;">
+                        <a class="profil-link" href="${profilUrl}" target="_blank" style="color:#8B7355;text-decoration:none;font-size:14px;font-weight:600;">Zum Profil&nbsp;&rsaquo;</a>
+                      </td>
+                    </tr>
+                  </table>
                 </td>
               </tr>
             </table>

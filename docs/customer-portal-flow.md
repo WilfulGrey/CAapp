@@ -285,6 +285,14 @@ haczyki, sekcja „Über <Imię>" w pudełku `#F5F5F6`/`#D4D4D8` — i tam tekst
 **wygasa**: pierwsze ~150 znaków w `#18181B`, kolejne ~110 w `#A9A9B0`, potem
 „…".
 
+Przy nazwisku, po prawej stronie wiersza, stoi tekstowy odnośnik
+**„Zum Profil ›"** — odpowiednik chevrona z `MatchCard`. W mailu sam symbol
+nie czyta się jako klikalny, dlatego jest przy nim cel. Prowadzi pod ten sam
+adres co duży przycisk (test pilnuje, żeby oba `href` były identyczne).
+Mouseover (`a.profil-link:hover` → koral + podkreślenie) siedzi w bazowym
+bloku `<style>`, **nie** w media-query — działa w Apple Mail, iOS Mail
+i webowym Gmailu; Outlook Desktop nie zna `:hover` i pokazuje link statycznie.
+
 Osobnej zielonej linii „Verfügbar ab …" NIE ma (Martin, 31.08.) — termin
 mówi już haczyk „Zum gewünschten Termin verfügbar", a dwa razy to samo
 zdanie obok siebie wyglądało na niedopatrzenie. Licznik i nagłówek stoją na

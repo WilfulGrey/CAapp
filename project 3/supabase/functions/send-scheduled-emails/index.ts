@@ -180,6 +180,11 @@ function buildEmailWrapper(lead: Lead, siteUrl: string, content: string): string
     .email-header { background: #ffffff; padding: 24px 40px 20px 40px; border-bottom: 1px solid #f0ebe4; }
     .email-content { padding: 40px 40px 32px; text-align: left; }
     .email-footer { background-color: #f8f9fa; padding: 30px; text-align: center; border-top: 1px solid #e0e0e0; }
+    /* Mouseover fuer den "Zum Profil"-Hinweis an der Empfehlung. Greift in
+       Apple Mail, iOS Mail und der Gmail-Weboberflaeche; Outlook Desktop
+       kennt kein :hover — dort bleibt der Link statisch, das ist in Ordnung.
+       Bewusst AUSSERHALB der Media-Query: Mauszeiger gibt es am Desktop. */
+    a.profil-link:hover { color: #E76F63 !important; text-decoration: underline !important; }
     @media only screen and (max-width: 600px) {
       .email-content { padding: 30px 20px; }
       .price-stage-cell { display: block !important; width: 100% !important; padding: 18px 22px 16px !important; border-right: none !important; border-bottom: 1px solid #ebe2d2 !important; }

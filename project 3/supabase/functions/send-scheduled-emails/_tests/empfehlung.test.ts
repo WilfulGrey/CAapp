@@ -513,3 +513,15 @@ Deno.test("empfehlungHtml: Zähler und Überschrift auf derselben Schriftgröße
   assert(zaehler && kopf, "Zeilen nicht gefunden");
   assertEquals(zaehler![1], kopf![1]);
 });
+
+Deno.test("empfehlungHtml: Profil-Link am Namen zeigt auf dieselbe Seite wie der Knopf", () => {
+  const { empfehlung } = baueEmpfehlung(cg({ id: 42 }), null, {}, 5, JETZT);
+  const html = empfehlungHtml(empfehlung, null, "https://portal/?token=t&cg=42", "https://a", 5);
+  assertStringIncludes(html, 'class="profil-link" href="https://portal/?token=t&cg=42"');
+  assertStringIncludes(html, "Zum Profil");
+  // Beide Wege fuehren zum selben Ziel — sonst landet der Kunde je nach
+  // Klick woanders.
+  const ziele = [...html.matchAll(/href="([^"]*cg=42[^"]*)"/g)].map((m) => m[1]);
+  assertEquals(new Set(ziele).size, 1);
+  assertEquals(ziele.length, 2);
+});
