@@ -286,8 +286,8 @@ haczyki, sekcja „Über <Imię>" w pudełku `#F5F5F6`/`#D4D4D8` — i tam tekst
 „…".
 
 **Kolejność bloków** (Martin, 31.08. — „harmonischer"): powitanie → cena →
-Konditionen → Testsieger → porównanie z domem opieki → **zdanie** „Wir haben
-bereits <liczebnik> passende Betreuungskräfte für Sie herausgesucht." →
+Konditionen → Testsieger → porównanie z domem opieki → **nagłówek** „<Liczebnik> passende
+Betreuungskräfte für Sie" (20 px, pogrubiony) →
 kasten z rekomendacją → „So geht es weiter" → CTA → podsumowanie zgłoszenia.
 Cena, Konditionen i Testsieger wróciły do JEDNEGO beżowego panelu — rozdzielone
 były tylko po to, żeby rekomendacja zmieściła się pomiędzy; teraz stoi pod nimi
@@ -296,7 +296,7 @@ punktem kulminacyjnym, nie przerywnikiem.
 
 Wstęp waży inaczej: nie „persönliches Angebot" jest pogrubione, tylko
 **„bereits passende Betreuungskräfte für Sie gefunden"** + wskazówka „Sie
-finden sie weiter unten in dieser E-Mail". Liczba stoi TYLKO w zdaniu nad
+finden sie weiter unten in dieser E-Mail". Liczba stoi TYLKO w nagłówku nad
 kastenem — pasek nagłówka nie powtarza jej już (test tego pilnuje).
 
 **Nagłówek siedzi W kasteczku, nie nad nim** (Martin, 31.08.: „die Empfehlung

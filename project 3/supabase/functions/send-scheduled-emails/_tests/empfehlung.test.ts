@@ -224,7 +224,7 @@ Deno.test("empfehlungHtml: ohne Foto Initialen statt kaputtem Bild", () => {
 Deno.test("empfehlungHtml: Zähler oben und im Sekundärlink, beide dynamisch", () => {
   const { empfehlung } = baueEmpfehlung(cg({ id: 42 }), null, {}, 5, JETZT);
   const fuenf = empfehlungHtml(empfehlung, null, "https://p", "https://a", 5);
-  assertStringIncludes(fuenf, "fünf passende Betreuungskräfte</strong> für Sie herausgesucht");
+  assertStringIncludes(fuenf, "Fünf passende Betreuungskräfte für Sie");
   assertStringIncludes(fuenf, "Alle 5 Betreuungskräfte ansehen");
   // Der lange Erklärabsatz ist ersatzlos raus.
   assertEquals(fuenf.includes("ist eine von"), false);
@@ -232,7 +232,7 @@ Deno.test("empfehlungHtml: Zähler oben und im Sekundärlink, beide dynamisch", 
 
   // Genau eine Kraft: Einzahl oben, kein Sekundärlink.
   const eine = empfehlungHtml(empfehlung, null, "https://p", "https://a", 1);
-  assertStringIncludes(eine, "eine passende Betreuungskraft</strong> für Sie herausgesucht");
+  assertStringIncludes(eine, "Eine passende Betreuungskraft für Sie");
   assertEquals(eine.includes("Alle 1"), false);
 });
 
@@ -339,7 +339,7 @@ Deno.test("empfehlungText: trägt dieselben Aussagen wie das HTML", () => {
     JETZT,
   );
   const txt = empfehlungText(empfehlung, "https://p", "https://a", 4);
-  assertStringIncludes(txt, "vier passende Betreuungskräfte für Sie herausgesucht");
+  assertStringIncludes(txt, "VIER PASSENDE BETREUUNGSKRÄFTE FÜR SIE");
   assertStringIncludes(txt, "Maria, 54");
   assertStringIncludes(txt, "UNSERE EMPFEHLUNG");
   assertStringIncludes(txt, "Alle 4 Betreuungskräfte ansehen");
@@ -510,11 +510,11 @@ Deno.test("empfehlungHtml: Überschrift und Zähler stehen IM Kasten, nicht dar�
   const html = empfehlungHtml(empfehlung, null, "https://p", "https://a", 5);
   const kastenAuf = html.indexOf("border:2px solid #8B7355");
   const kopf = html.indexOf("Unsere Empfehlung");
-  const satz = html.indexOf("herausgesucht");
+  const satz = html.indexOf("passende Betreuungskräfte für Sie");
   assert(kastenAuf >= 0, "Kasten fehlt");
   assert(kopf > kastenAuf, "Überschrift steht noch ausserhalb des Kastens");
   // Der Satz mit der Zahl gehoert bewusst DAVOR.
-  assert(satz < kastenAuf, "Satz steht nicht mehr ueber dem Kasten");
+  assert(satz < kastenAuf, "Überschrift steht nicht mehr ueber dem Kasten");
   // Die Zahl steht nur einmal — nicht noch einmal in der Kopfleiste.
   assertEquals((html.match(/verfügbar/g) ?? []).length, 0);
 });

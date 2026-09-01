@@ -567,9 +567,15 @@ export function textAusblenden(
   };
 }
 
-/** Zahlwort für den Satz über dem Kasten. Über fünf kommt nie vor. */
+/** Zahlwort für die Überschrift über dem Kasten. Über fünf kommt nie vor. */
 export function zahlwort(n: number): string {
   return ["null", "eine", "zwei", "drei", "vier", "fünf"][n] ?? String(n);
+}
+
+/** Dasselbe Wort am Satzanfang — dort wird es grossgeschrieben. */
+export function zahlwortGross(n: number): string {
+  const w = zahlwort(n);
+  return w.charAt(0).toUpperCase() + w.slice(1);
 }
 
 /** Wie deutschStufe.ts, aber ohne Import-Zyklus — dieselbe Skala. */
@@ -797,12 +803,17 @@ export function empfehlungHtml(
             <td style="padding:13px 20px;background:#FAF8F4;border-bottom:1px solid #EBE2D2;border-radius:15px 15px 0 0;font-size:12px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;color:${KORALLE};">Unsere Empfehlung</td>
           </tr>`;
 
-  /* Der Satz über dem Kasten (Martin, 31.08.: „ich würde schon darüber
-     schreiben, wir haben bereits fünf passende Pflegekräfte für Sie
-     rausgesucht"). Er sagt die Zahl — deshalb steht sie nicht mehr auch
-     noch in der Kopfleiste. */
+  /* Ueberschrift ueber dem Kasten (Martin, 31.08.: „das koennte eine
+     Ueberschrift sein, weil so sieht es nicht gut aus"). Als Fliesstext lief
+     der Satz ueber zwei Zeilen und hing lose ueber dem Kasten. „Wir haben
+     bereits … herausgesucht" faellt weg — das sagt schon die Einleitung der
+     Mail; die Ueberschrift traegt nur noch die Zahl. */
   const einleitungSatz = sichtbarGesamt > 0
-    ? `<p style="margin:0 0 14px;font-size:16px;line-height:1.7;color:#444;">Wir haben bereits <strong style="color:#2D1F0F;">${zahlwort(sichtbarGesamt)} passende ${sichtbarGesamt === 1 ? "Betreuungskraft" : "Betreuungskräfte"}</strong> für Sie herausgesucht.</p>`
+    ? `<p style="margin:0 0 14px;font-size:20px;font-weight:700;line-height:1.35;color:#2D1F0F;">${
+        sichtbarGesamt === 1
+          ? "Eine passende Betreuungskraft für Sie"
+          : `${zahlwortGross(sichtbarGesamt)} passende Betreuungskräfte für Sie`
+      }</p>`
     : "";
 
   const alleLink = sichtbarGesamt > 1
@@ -885,7 +896,9 @@ export function empfehlungText(
   const zeilen: string[] = [];
   if (sichtbarGesamt > 0) {
     zeilen.push(
-      `Wir haben bereits ${zahlwort(sichtbarGesamt)} passende ${sichtbarGesamt === 1 ? "Betreuungskraft" : "Betreuungskräfte"} für Sie herausgesucht.`,
+      (sichtbarGesamt === 1
+        ? "Eine passende Betreuungskraft für Sie"
+        : `${zahlwortGross(sichtbarGesamt)} passende Betreuungskräfte für Sie`).toUpperCase(),
       "",
     );
   }
