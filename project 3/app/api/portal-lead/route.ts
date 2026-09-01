@@ -14,16 +14,16 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { findOrCreateLead, logEvent } from '@/lib/lead-management';
 import { berechnePreis, parseCustomerName } from '@/lib/calculation';
-import { ergaenzeAngaben, PortalAngaben, PreisZeile } from '@/lib/portal-lead';
+import { ergaenzeAngaben, PORTALE, PortalAngaben, PreisZeile } from '@/lib/portal-lead';
 import { scheduleEmail, flushScheduledEmails } from '@/lib/lead-mails';
 import { darfAngeschriebenWerden } from '@/lib/portal-schutz';
 import { sendEmail, getTeamNotificationTemplate } from '@/lib/email';
 
-/* Muss zur Allowlist in send-scheduled-emails/herkunft.ts passen. Steht
- * hier ein zweites Mal, weil Edge Function (Deno) und Next-App keinen Code
- * teilen koennen — ein Portal, das nur hier steht, bekaeme die normale
- * Mail statt der Portal-Fassung. Beide Listen zusammen pflegen. */
-const ERLAUBTE_PORTALE = ['pflegehilfe.org', 'pflegebund.eu'];
+/* Muss zur Allowlist in send-scheduled-emails/herkunft.ts passen: Edge
+ * Function (Deno) und Next-App koennen keinen Code teilen, deshalb steht
+ * die Liste dort ein zweites Mal. Ein Portal, das nur hier steht, bekaeme
+ * die normale Mail statt der Portal-Fassung. Beide zusammen pflegen. */
+const ERLAUBTE_PORTALE: readonly string[] = PORTALE.map((p) => p.domain);
 
 function supabaseClient() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;

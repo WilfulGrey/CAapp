@@ -108,6 +108,26 @@ export function ergaenzeAngaben(
  * Abschlussquote entscheidet, ob sich die Quelle rechnet.
  */
 
+/* Die Portale, bei denen wir einkaufen — EINE Liste fuer alle, die sie
+ * brauchen: der Eingang (api/portal-lead) laesst nur diese zu, der
+ * Abholer holt genau diese Postfaecher, der Admin zeigt genau diese
+ * Reiter. Ein neues Portal steht damit an einer Stelle statt an dreien.
+ *
+ * (Die Edge Function hat eine eigene Liste in herkunft.ts — Deno und die
+ * Next-App koennen keinen Code teilen. Beide zusammen pflegen.)
+ *
+ * Der Anzeigename traegt hier die volle Domain: im Admin unterscheidet
+ * sie die Quellen eindeutig, und intern verlinkt nichts. In der KUNDEN-
+ * mail steht er ohne TLD (herkunft.ts) — dort machte Apple Mail einen
+ * Link daraus und schickte den Kunden zurueck zum Portal. */
+export const PORTALE = [
+  { domain: 'pflegehilfe.org', name: 'Pflegehilfe.org' },
+  { domain: 'pflegebund.eu', name: 'Pflegebund.eu' },
+] as const;
+
+/** Die source-Werte aller Portale — "portal:pflegehilfe.org", ... */
+export const PORTAL_QUELLEN = PORTALE.map((p) => `portal:${p.domain}`);
+
 export function istEingekauft(source?: string | null): boolean {
   return typeof source === 'string' && source.toLowerCase().startsWith('portal:');
 }
@@ -118,6 +138,11 @@ export function quellenName(source?: string | null): string {
   if (!istEingekauft(source)) {
     return source === 'pria-chat' ? 'Pria-Chat' : 'Kostenrechner';
   }
-  const domain = source.slice('portal:'.length);
+  const domain = source.slice('portal:'.length).toLowerCase();
+  const bekannt = PORTALE.find((p) => p.domain === domain);
+  if (bekannt) return bekannt.name;
+  /* Unbekanntes Portal: der Wert steht so in der Datenbank, also zeigen
+     wir ihn — lieber ein roher Domainname im Admin als ein Lead, der
+     unter keinem Reiter auftaucht. */
   return domain.charAt(0).toUpperCase() + domain.slice(1);
 }

@@ -38,16 +38,23 @@ import { simpleParser } from 'mailparser';
 /* Derselbe Parser, den auch der Testlauf und die Unit-Tests benutzen —
  * der Abholer bringt KEINE zweite Lesart der Portal-Mail mit. */
 import { parsePflegehilfe } from '../../lib/portal-parser';
+import { PORTALE } from '../../lib/portal-lead';
 
-/* Die Postfaecher. Schluessel ist die Portal-Domain, die der Endpunkt
- * erwartet (muss zu ERLAUBTE_PORTALE in api/portal-lead passen). Ein
- * Postfach ohne gesetztes Passwort wird uebersprungen, nicht erraten. */
 interface Postfach { portal: string; user?: string; pass?: string }
 
-const POSTFAECHER: Postfach[] = [
-  { portal: 'pflegehilfe.org', user: process.env.PFLEGEHILFE_USER, pass: process.env.PFLEGEHILFE_PASS },
-  { portal: 'pflegebund.eu',   user: process.env.PFLEGEBUND_USER,   pass: process.env.PFLEGEBUND_PASS },
-];
+/* Die Postfaecher — abgeleitet aus der zentralen Portal-Liste, damit ein
+ * neues Portal nicht an einer Stelle vergessen wird. Der Zugang kommt aus
+ * der Env, benannt nach dem Portal: pflegehilfe.org → PFLEGEHILFE_USER /
+ * PFLEGEHILFE_PASS. Ein Postfach ohne gesetztes Passwort wird
+ * uebersprungen, nicht erraten. */
+const POSTFAECHER: Postfach[] = PORTALE.map(({ domain }) => {
+  const praefix = domain.split('.')[0].toUpperCase();
+  return {
+    portal: domain,
+    user: process.env[`${praefix}_USER`],
+    pass: process.env[`${praefix}_PASS`],
+  };
+});
 
 const IMAP_HOST = process.env.PORTAL_IMAP_HOST || 'imap.ionos.de';
 const BASIS_URL = process.env.PORTAL_LEAD_URL;

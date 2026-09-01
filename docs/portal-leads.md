@@ -28,6 +28,11 @@ Portal-Mail  →  Postfach        →  Abholer (Worker, IMAP IDLE)
 Im Admin erscheint der Lead unter **Leads** mit eigenem Reiter je Portal
 und der Spalte *Herkunft* (rot hervorgehoben — er hat Geld gekostet).
 
+Die Portal-Reiter stehen dort **auch ohne Leads**, mit einer `0`. Das ist
+die Antwort auf „kommt da eigentlich was an?" — ein fehlender Reiter ließe
+offen, ob nichts ankam oder der Abholer steht. Gerade beim Scharfschalten
+die wichtigere Auskunft.
+
 ## Warum ein Worker und kein Cron
 
 Das Portal gibt dieselbe Anfrage an **bis zu drei Anbieter gleichzeitig**.
@@ -112,15 +117,28 @@ Verbindung zu.
 
 ## Neues Portal aufnehmen
 
-Vier Stellen, alle zusammen pflegen:
+**Drei Stellen**, alle zusammen pflegen:
 
-1. `send-scheduled-emails/herkunft.ts` — `PORTAL_QUELLEN`, Anzeigename **ohne TLD**
-2. `app/api/portal-lead/route.ts` — `ERLAUBTE_PORTALE`
-3. `scripts/portal/abholer.ts` — `POSTFAECHER`
-4. `render.yaml` — Zugangsdaten des neuen Postfachs
+1. `lib/portal-lead.ts` — `PORTALE`. Diese Liste speist Eingang, Abholer
+   und Admin-Reiter; dort genügt die eine Zeile.
+2. `send-scheduled-emails/herkunft.ts` — `PORTAL_QUELLEN`, Anzeigename
+   **ohne TLD**. Muss doppelt stehen, weil die Edge Function (Deno) keinen
+   Code mit der Next-App teilen kann. Fehlt das Portal hier, bekommt der
+   Kunde die normale Mail statt der Portal-Fassung.
+3. `render.yaml` — Zugangsdaten des neuen Postfachs. Die Namen leitet der
+   Abholer aus der Domain ab: `pflegehilfe.org` → `PFLEGEHILFE_USER` /
+   `PFLEGEHILFE_PASS`.
 
-Ein Portal, das nur an einer Stelle steht, bekommt die normale Mail statt
-der Portal-Fassung — oder wird gar nicht erst abgeholt.
+Nicht nachzutragen: der Reiter im Admin und die Allowlist des Eingangs —
+beide kommen aus `PORTALE`.
 
-Der Reiter im Admin muss **nicht** nachgetragen werden: er entsteht aus
-den vorhandenen Leads (`app/admin/leads/page.tsx`).
+## Prüfskripte
+
+Das Projekt hat keinen Testrunner; die Skripte laufen eigenständig:
+
+```bash
+cd "project 3" && deno run --allow-read --no-check scripts/pruef-portal-reiter.ts
+```
+
+`pruef-portal-parser.ts` (liest die Portal-Mail), `pruef-portal-defaults.ts`
+(füllt Lücken zum teureren Wert), `pruef-portal-reiter.ts` (Admin-Reiter).

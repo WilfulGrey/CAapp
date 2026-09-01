@@ -14,7 +14,7 @@ import {
 import { createClient } from '@supabase/supabase-js';
 import { Search, Loader as Loader2, Mail, Phone, Calendar, ExternalLink } from 'lucide-react';
 import Link from 'next/link';
-import { istEingekauft, quellenName } from '@/lib/portal-lead';
+import { istEingekauft, quellenName, PORTAL_QUELLEN } from '@/lib/portal-lead';
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -87,11 +87,19 @@ export default function LeadsPage() {
     setFilteredLeads(filtered);
   };
 
-  /* Reiter entstehen aus den Daten, nicht aus einer Liste im Code: ein
-     neues Portal taucht automatisch auf, sobald der erste Lead da ist —
-     niemand muss daran denken, hier etwas nachzutragen. */
+  /* Jedes Portal bekommt seinen Reiter, AUCH ohne Leads (Martin 01.09.):
+     ein leerer Reiter mit "0" ist die Antwort auf "kommt da eigentlich
+     was an?" — ein fehlender Reiter laesst offen, ob nichts ankam oder
+     der Abholer steht. Gerade beim Scharfschalten die wichtigere Auskunft.
+
+     Dazu kommt, was in den Daten steht, aber nicht in der Liste: ein
+     Lead aus einem inzwischen entfernten Portal soll nicht unsichtbar
+     unter "Alle" verschwinden. */
   const quellen = Array.from(
-    new Set(leads.map((l) => l.source).filter((s: string) => istEingekauft(s))),
+    new Set([
+      ...PORTAL_QUELLEN,
+      ...leads.map((l) => l.source).filter((s: string) => istEingekauft(s)),
+    ]),
   ).sort();
 
   const zaehle = (pruefe: (l: any) => boolean) => leads.filter(pruefe).length;
@@ -223,7 +231,23 @@ export default function LeadsPage() {
               {filteredLeads.length === 0 ? (
                 <tr>
                   <td colSpan={6} className="text-center py-8 text-gray-500">
-                    Keine Leads gefunden
+                    {/* Der leere Portal-Reiter ist der Normalfall, solange
+                        noch nichts eingekauft wurde — "Keine Leads gefunden"
+                        laesst dann offen, ob nichts ankam oder etwas kaputt
+                        ist. Deshalb hier sagen, worauf man wartet. */}
+                    {istEingekauft(quelleFilter) && !searchTerm && statusFilter === 'all' ? (
+                      <>
+                        <p className="font-medium text-gray-600">
+                          Noch keine Leads von {quellenName(quelleFilter)}
+                        </p>
+                        <p className="mt-1 text-sm">
+                          Eingekaufte Anfragen erscheinen hier wenige Sekunden,
+                          nachdem sie im Postfach eingehen.
+                        </p>
+                      </>
+                    ) : (
+                      'Keine Leads gefunden'
+                    )}
                   </td>
                 </tr>
               ) : (
