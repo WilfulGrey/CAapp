@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { resolveDeutschWishLevel } from '../../lib/mamamia/mappers';
+import { resolveDeutschWishLevel, germanySkillLabel } from '../../lib/mamamia/mappers';
 
 // Kunde 10508, 01.09.2026: Das Portal zeigte keine einzige Pflegekraft,
 // obwohl mamamia 921 Vorschläge lieferte. Grund: bei mamamia stand
@@ -41,5 +41,24 @@ describe('resolveDeutschWishLevel', () => {
     for (const l of ['level_1', 'level_2', 'level_3', 'level_4']) {
       expect(resolveDeutschWishLevel(l, 'grundlegend')).toBe(l);
     }
+  });
+});
+
+// Seit dem 10.08.2026 (Martin): „Gut" (level_3) ist die oberste vom Kunden
+// wählbare Stufe, „Sehr gut" (level_4) vergibt nur die Agentur. Vorher liefen
+// beide als „ab Gut" durch — bei einer level_4-Kraft stand damit eine zu
+// niedrige Stufe im Angebot.
+describe('germanySkillLabel — Gut und Sehr gut sind nicht dasselbe', () => {
+  it('trennt level_3 und level_4', () => {
+    expect(germanySkillLabel('level_3')).toBe('ab Gut');
+    expect(germanySkillLabel('level_4')).toBe('ab Sehr gut');
+  });
+
+  it('laesst die unteren Stufen unveraendert', () => {
+    expect(germanySkillLabel('level_0')).toBe('ab Grund');
+    expect(germanySkillLabel('level_1')).toBe('ab Grund');
+    expect(germanySkillLabel('level_2')).toBe('ab Mittel');
+    expect(germanySkillLabel('not_important')).toBe('Egal');
+    expect(germanySkillLabel(null)).toBe('');
   });
 });

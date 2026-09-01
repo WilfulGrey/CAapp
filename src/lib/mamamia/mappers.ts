@@ -1080,26 +1080,33 @@ function mamamiaHeightToForm(h: string | null | undefined): string {
   return h.endsWith('cm') ? h : `${h} cm`;
 }
 
-// Mamamia customer_caregiver_wish.germany_skill enum (verified prod 2026-04-28).
-// Reverse mapping na label do display w AngebotCard step 4 (read-only field).
-// % distribution z prod sweep:
-//   level_0  → "A1"          (1% active)
-//   level_1  → "A2"          (1% — calculator "grundlegend" od 2026-05-12)
-//   level_2  → "mind. A2"    (22% — calculator "kommunikativ" od 2026-05-12)
-//   level_3  → "mind. B1"    (50% — calculator NIE używa od 2026-05-12,
-//                             tylko manual panel pick przez agency)
-//   level_4  → "mind. C1"    (8% — calculator "sehr-gut")
-//   not_important → "Egal"
+// Mamamia customer_caregiver_wish.germany_skill — Anzeige des Wunsches in
+// AngebotCard Schritt 4 (nur lesend).
+//
+// ACHTUNG, die Zuordnung wurde am 10.08.2026 geaendert (Martin). Vorher war
+// level_3 agentur-intern und der Rechner vergab level_4; hier stand das noch
+// so dokumentiert und war damit irrefuehrend. Heute gilt:
+//
+//   level_0 / level_1  → "Grund"      (Rechner: "grundlegend")
+//   level_2            → "Mittel"     (Rechner: "kommunikativ")
+//   level_3            → "Gut"        (Rechner: oberste waehlbare Stufe;
+//                                      interner Schluessel dort "sehr-gut",
+//                                      Label aber "Gut" — nicht verwechseln)
+//   level_4            → "Sehr gut"   (vergibt NUR die Agentur, +Aufschlag)
+//   not_important      → "Egal"
 // Bug #13g: AngebotCard step 4 displayed hardcoded "mind. B1" — replace
 // with this helper to read real value from mmCustomer.
 export function germanySkillLabel(level: string | null | undefined): string {
   if (!level) return '';
-  // Portal nutzt die 3 Stufen Grund / Mittel / Gut. Mamamias level_0/1 fallen
-  // in „Grund", level_2 in „Mittel", level_3/4 in „Gut" (siehe mappers.ts
-  // GERMANY_SKILL_LEVELS). Hier als Mindestwunsch ausgedrückt.
+  // Als Mindestwunsch ausgedrückt. level_3 und level_4 sind seit dem
+  // 10.08.2026 NICHT mehr dasselbe: „Gut" ist die oberste vom Kunden
+  // wählbare Stufe, „Sehr gut" vergibt nur die Agentur (mit Aufschlag).
+  // Vorher liefen beide als „ab Gut" — bei einer level_4-Kraft stand damit
+  // eine zu niedrige Stufe im Angebot.
   if (level === 'level_0' || level === 'level_1') return 'ab Grund';
   if (level === 'level_2') return 'ab Mittel';
-  if (level === 'level_3' || level === 'level_4') return 'ab Gut';
+  if (level === 'level_3') return 'ab Gut';
+  if (level === 'level_4') return 'ab Sehr gut';
   if (level === 'not_important') return 'Egal';
   return '';
 }
