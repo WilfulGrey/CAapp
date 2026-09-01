@@ -146,3 +146,33 @@ export function quellenName(source?: string | null): string {
      unter keinem Reiter auftaucht. */
   return domain.charAt(0).toUpperCase() + domain.slice(1);
 }
+
+/* Die Reiter der Admin-Lead-Liste. Jedes Portal bekommt seinen Reiter,
+   AUCH ohne Leads (Martin 01.09.): ein leerer Reiter mit "0" ist die
+   Antwort auf "kommt da eigentlich was an?" — ein fehlender Reiter laesst
+   offen, ob nichts ankam oder der Abholer steht. Gerade beim
+   Scharfschalten die wichtigere Auskunft.
+
+   Dazu kommt, was in den Daten steht, aber nicht in der Liste: ein Lead
+   aus einem inzwischen entfernten Portal soll nicht unsichtbar unter
+   "Alle" verschwinden.
+
+   Lebt hier (nicht in der Seite), damit der Test dieselbe Funktion prueft,
+   die im Admin laeuft — nicht eine Kopie, die driften kann. */
+export function reiterFuer(
+  leads: Array<{ source?: string | null }>,
+): Array<{ key: string; label: string; anzahl: number }> {
+  const quellen = Array.from(
+    new Set([
+      ...PORTAL_QUELLEN,
+      ...leads.map((l) => l.source).filter((s): s is string => istEingekauft(s)),
+    ]),
+  ).sort();
+  const zaehle = (pruefe: (l: { source?: string | null }) => boolean) =>
+    leads.filter(pruefe).length;
+  return [
+    { key: 'all', label: 'Alle', anzahl: leads.length },
+    { key: 'eigene', label: 'Eigene Anfragen', anzahl: zaehle((l) => !istEingekauft(l.source)) },
+    ...quellen.map((q) => ({ key: q, label: quellenName(q), anzahl: zaehle((l) => l.source === q) })),
+  ];
+}

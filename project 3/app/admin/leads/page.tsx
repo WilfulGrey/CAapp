@@ -14,7 +14,7 @@ import {
 import { createClient } from '@supabase/supabase-js';
 import { Search, Loader as Loader2, Mail, Phone, Calendar, ExternalLink } from 'lucide-react';
 import Link from 'next/link';
-import { istEingekauft, quellenName, PORTAL_QUELLEN } from '@/lib/portal-lead';
+import { istEingekauft, quellenName, reiterFuer } from '@/lib/portal-lead';
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -87,32 +87,9 @@ export default function LeadsPage() {
     setFilteredLeads(filtered);
   };
 
-  /* Jedes Portal bekommt seinen Reiter, AUCH ohne Leads (Martin 01.09.):
-     ein leerer Reiter mit "0" ist die Antwort auf "kommt da eigentlich
-     was an?" — ein fehlender Reiter laesst offen, ob nichts ankam oder
-     der Abholer steht. Gerade beim Scharfschalten die wichtigere Auskunft.
-
-     Dazu kommt, was in den Daten steht, aber nicht in der Liste: ein
-     Lead aus einem inzwischen entfernten Portal soll nicht unsichtbar
-     unter "Alle" verschwinden. */
-  const quellen = Array.from(
-    new Set([
-      ...PORTAL_QUELLEN,
-      ...leads.map((l) => l.source).filter((s: string) => istEingekauft(s)),
-    ]),
-  ).sort();
-
-  const zaehle = (pruefe: (l: any) => boolean) => leads.filter(pruefe).length;
-
-  const reiter: Array<{ key: string; label: string; anzahl: number }> = [
-    { key: 'all', label: 'Alle', anzahl: leads.length },
-    { key: 'eigene', label: 'Eigene Anfragen', anzahl: zaehle((l) => !istEingekauft(l.source)) },
-    ...quellen.map((q: string) => ({
-      key: q,
-      label: quellenName(q),
-      anzahl: zaehle((l) => l.source === q),
-    })),
-  ];
+  /* Reiter-Logik lebt in lib/portal-lead.ts (reiterFuer) — dort testbar,
+     hier nur der Aufruf. */
+  const reiter = reiterFuer(leads);
 
   const getStatusBadge = (status: string) => {
     const styles: Record<string, string> = {

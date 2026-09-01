@@ -124,13 +124,18 @@ grüne Läufe pro Stunde, während derselbe bezahlte Lead nie durchgeht.
 Nicht nachzutragen: der Reiter im Admin und die Allowlist des Eingangs —
 beide kommen aus `PORTALE`.
 
-## Prüfskripte
+## Tests
 
-Das Projekt hat keinen Testrunner; die Skripte laufen eigenständig:
+Die Prüfungen laufen im root-vitest (Cross-App-Import der pure Module,
+Muster wie `portalUrl.test.ts`) und damit im **required CI-Check** vor
+jedem Merge — nicht mehr als eigenständige Deno-Skripte (die brachen den
+`next build` beider Kostenrechner-Slots, Registry #38):
 
 ```bash
-cd "project 3" && deno run --allow-read --no-check scripts/pruef-portal-reiter.ts
+npx vitest run src/__tests__/portalLead.test.ts src/__tests__/portalParser.test.ts
 ```
 
-`pruef-portal-parser.ts` (liest die Portal-Mail), `pruef-portal-defaults.ts`
-(füllt Lücken zum teureren Wert), `pruef-portal-reiter.ts` (Admin-Reiter).
+`portalParser.test.ts` (liest die Portal-Mail), `portalLead.test.ts`
+(Lücken zum teureren Wert füllen + Admin-Reiter via `reiterFuer` aus
+`lib/portal-lead.ts` — die Seite ruft dieselbe Funktion auf, der Test
+prüft keine Kopie).
