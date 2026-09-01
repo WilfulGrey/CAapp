@@ -9,26 +9,20 @@
  * Kundenversand laeuft unveraendert ueber kostenrechner@primundus.de
  * (SMTP-Konfiguration der Edge Function).
  *
- * TEMPO IST DER GANZE PUNKT. Das Portal gibt dieselbe Anfrage an bis zu
- * drei Anbieter gleichzeitig; wer zuerst antwortet, gewinnt. Deshalb
- * KEIN Abfrage-Takt, sondern IMAP IDLE: eine stehende Verbindung, ueber
- * die der Server die neue Mail von sich aus meldet. Zwischen Eingang und
- * unserer Kundenmail liegen damit Sekunden statt Minuten.
+ * Laeuft als Cron-Job jede Minute. Das Portal gibt dieselbe Anfrage an bis
+ * zu drei Anbieter, wer zuerst antwortet gewinnt — eine Minute Vorlauf
+ * faellt dabei nicht ins Gewicht, und ein Skript, das startet, arbeitet und
+ * endet, hat keine Verbindung, die wegbrechen kann.
  *
- * (Ein Render-Cron kaeme dafuer nicht in Frage: er startet je Lauf einen
- * frischen Container samt npm install — allein das dauert laenger als der
- * Vorsprung, um den es hier geht.)
+ * Ablauf je Lauf:
+ *   1. IMAP oeffnen, UNGELESENE Mails holen
+ *   2. Text durch den Parser (lib/portal-parser)
+ *   3. POST /api/portal-lead — dort entstehen Lead, Preis, Mail 1
+ *   4. Mail als gelesen markieren, damit sie nicht zweimal laeuft
  *
- * Ablauf:
- *   1. Verbindung je Postfach aufbauen und offen halten
- *   2. Bei "neue Mail" (und einmal beim Start): UNGELESENE holen
- *   3. Text durch den Parser (lib/portal-parser)
- *   4. POST /api/portal-lead — dort entstehen Lead, Preis, Mail 1
- *   5. Mail als gelesen markieren, damit sie nicht zweimal laeuft
- *
- * Schritt 5 passiert NUR nach einer verstandenen Antwort des Endpunkts.
- * Faellt der Dienst vorher aus, bleibt die Mail ungelesen und der naechste
- * Start holt sie erneut — lieber ein zweiter Versuch als ein verlorener
+ * Schritt 4 passiert NUR nach einer verstandenen Antwort des Endpunkts.
+ * Bricht der Lauf vorher ab, bleibt die Mail ungelesen und der naechste
+ * Lauf holt sie erneut — lieber ein zweiter Versuch als ein verlorener
  * Lead. Gegen die Dublette schuetzt findOrCreateLead ueber die E-Mail.
  */
 
@@ -65,11 +59,6 @@ const LEAD_KEY = process.env.PORTAL_LEAD_KEY;
  * macht, ohne dass jemand eine Kundenmail bekommt. */
 const TROCKEN = process.env.PORTAL_TROCKENLAUF === '1';
 
-/* Wiederanlauf nach Verbindungsverlust: erst schnell (der haeufigste Fall
- * ist ein kurzer Aussetzer), dann immer traeger, damit ein laenger totes
- * Postfach nicht im Sekundentakt gegen die Wand laeuft. */
-const START_WARTEZEIT_MS = 5_000;
-const MAX_WARTEZEIT_MS = 5 * 60_000;
 
 function log(...t: unknown[]) { console.log(new Date().toISOString(), ...t); }
 
@@ -128,126 +117,88 @@ async function verarbeite(portal: string, roh: string) {
 /* Die ungelesenen Mails EINES Postfachs abarbeiten. Wird beim Start
  * einmal gerufen (was ueber Nacht ankam) und danach bei jeder Meldung
  * des Servers. */
-async function arbeiteAb(portal: string, client: ImapFlow) {
-  /* Der Lock ist Pflicht, nicht Zierde: ImapFlow haelt die Verbindung von
-     sich aus im IDLE, und waehrend IDLE laeuft, nimmt sie keine Befehle
-     entgegen ("Connection not available"). getMailboxLock beendet das
-     IDLE, fuehrt unsere Befehle aus und laesst es danach wieder anlaufen. */
+/* Die ungelesenen Mails eines Postfachs abarbeiten.
+ *
+ * getMailboxLock statt mailboxOpen: es waehlt die INBOX und haelt sie fuer
+ * die Dauer unserer Befehle — die von ImapFlow empfohlene Form fuer eine
+ * Folge zusammengehoeriger Befehle. */
+async function arbeiteAb(portal: string, client: ImapFlow): Promise<number> {
+  /* Zaehlt die Mails, die NICHT verarbeitet werden konnten. Der Lauf endet
+     damit mit Exit-Code 1 — sonst zeigt Render lauter gruene Laeufe, waehrend
+     jede Minute derselbe bezahlte Lead liegen bleibt. */
+  let liegengeblieben = 0;
   const sperre = await client.getMailboxLock('INBOX');
   try {
-    await arbeiteMailsAb(portal, client);
+    /* search() liefert `false`, wenn die Mailbox die Suche ablehnt — das
+       ist kein "nichts da", sondern ein Fehler, den wir sehen wollen. */
+    const ungelesen = await client.search({ seen: false });
+    if (ungelesen === false) throw new Error('IMAP-Suche fehlgeschlagen');
+    if (!ungelesen.length) return 0;
+    log(`${portal}: ${ungelesen.length} neue Mail(s)`);
+
+    for (const uid of ungelesen) {
+      const nachricht = await client.fetchOne(uid, { source: true });
+      if (nachricht === false) {
+        // Mail zwischen Suche und Abruf verschwunden — kein Grund, den
+        // ganzen Durchgang abzubrechen.
+        log(`  – ${portal} #${uid} nicht mehr abrufbar`);
+        continue;
+      }
+      if (!nachricht.source) { log(`  – ${portal} #${uid} ohne Inhalt`); continue; }
+      const mail = await simpleParser(nachricht.source);
+      /* Manche Portale schicken nur HTML. Tags rausnehmen reicht: der
+         Parser sucht "Label: Wert" zeilenweise. */
+      const html = typeof mail.html === 'string' ? mail.html.replace(/<[^>]+>/g, ' ') : '';
+      const roh = mail.text || html;
+
+      let ergebnis;
+      try {
+        ergebnis = await verarbeite(portal, roh);
+      } catch (e: any) {
+        /* Absturz mitten im Durchgang: NICHT als gelesen markieren. Der
+           naechste Anlauf versucht es erneut. */
+        log(`  ✗ ${portal} #${uid} Fehler: ${e.message} — bleibt ungelesen`);
+        liegengeblieben++;
+        continue;
+      }
+
+      if (!ergebnis.ok) {
+        log(`  ✗ ${portal} #${uid} nicht verarbeitet: ${ergebnis.grund} — bleibt ungelesen`);
+        liegengeblieben++;
+        continue;
+      }
+
+      if (ergebnis.uebersprungen) log(`  – ${portal} #${uid} uebersprungen: ${ergebnis.grund}`);
+      else if (ergebnis.trocken)  log(`  · ${portal} #${uid} Trockenlauf, nichts angelegt`);
+      else log(`  ✓ ${portal} #${uid} Lead ${ergebnis.lead_id}` +
+               (ergebnis.angenommen?.length ? ` (angenommen: ${ergebnis.angenommen.join(', ')})` : ''));
+
+      // Erst jetzt — die Mail ist verarbeitet und darf nicht wiederkommen.
+      if (!TROCKEN) await client.messageFlagsAdd(uid, ['\\Seen'], { uid: true });
+    }
   } finally {
     sperre.release();
   }
+  return liegengeblieben;
 }
 
-async function arbeiteMailsAb(portal: string, client: ImapFlow) {
-  /* search() liefert `false`, wenn die Mailbox die Suche ablehnt — das
-     ist kein "nichts da", sondern ein Fehler, den wir sehen wollen. */
-  const ungelesen = await client.search({ seen: false });
-  if (ungelesen === false) throw new Error('IMAP-Suche fehlgeschlagen');
-  if (!ungelesen.length) return;
-  log(`${portal}: ${ungelesen.length} neue Mail(s)`);
+/* Ein Postfach einmal leeren: verbinden, abarbeiten, schliessen. */
+async function holeAb({ portal, user, pass }: Postfach): Promise<number> {
+  if (!user || !pass) { log(`${portal}: kein Zugang gesetzt — uebersprungen`); return 0; }
 
-  for (const uid of ungelesen) {
-    const nachricht = await client.fetchOne(uid, { source: true });
-    if (nachricht === false) {
-      // Mail zwischen Suche und Abruf verschwunden — kein Grund, den
-      // ganzen Durchgang abzubrechen.
-      log(`  – ${portal} #${uid} nicht mehr abrufbar`);
-      continue;
-    }
-    if (!nachricht.source) { log(`  – ${portal} #${uid} ohne Inhalt`); continue; }
-    const mail = await simpleParser(nachricht.source);
-    /* Manche Portale schicken nur HTML. Tags rausnehmen reicht: der
-       Parser sucht "Label: Wert" zeilenweise. */
-    const html = typeof mail.html === 'string' ? mail.html.replace(/<[^>]+>/g, ' ') : '';
-    const roh = mail.text || html;
+  const client = new ImapFlow({
+    host: IMAP_HOST, port: 993, secure: true,
+    auth: { user, pass }, logger: false,
+    /* Der Lauf dauert Sekunden und endet dann — ImapFlow braucht die
+       Verbindung nicht nebenbei im IDLE zu halten. */
+    disableAutoIdle: true,
+  });
 
-    let ergebnis;
-    try {
-      ergebnis = await verarbeite(portal, roh);
-    } catch (e: any) {
-      /* Absturz mitten im Durchgang: NICHT als gelesen markieren. Der
-         naechste Anlauf versucht es erneut. */
-      log(`  ✗ ${portal} #${uid} Fehler: ${e.message} — bleibt ungelesen`);
-      continue;
-    }
-
-    if (!ergebnis.ok) {
-      log(`  ✗ ${portal} #${uid} nicht verarbeitet: ${ergebnis.grund} — bleibt ungelesen`);
-      continue;
-    }
-
-    if (ergebnis.uebersprungen) log(`  – ${portal} #${uid} uebersprungen: ${ergebnis.grund}`);
-    else if (ergebnis.trocken)  log(`  · ${portal} #${uid} Trockenlauf, nichts angelegt`);
-    else log(`  ✓ ${portal} #${uid} Lead ${ergebnis.lead_id}` +
-             (ergebnis.angenommen?.length ? ` (angenommen: ${ergebnis.angenommen.join(', ')})` : ''));
-
-    // Erst jetzt — die Mail ist verarbeitet und darf nicht wiederkommen.
-    if (!TROCKEN) await client.messageFlagsAdd(uid, ['\\Seen'], { uid: true });
-  }
-}
-
-/* Ein Postfach dauerhaft beobachten.
- *
- * Die Verbindung kann jederzeit wegbrechen (Serverneustart, Timeout,
- * Netz). Das ist der Normalfall, kein Ausnahmefall: wir bauen sie mit
- * wachsendem Abstand neu auf, statt den Dienst sterben zu lassen — ein
- * totes Postfach heisst verlorene, bezahlte Leads. */
-async function beobachte({ portal, user, pass }: Postfach) {
-  if (!user || !pass) { log(`${portal}: kein Zugang gesetzt — nicht beobachtet`); return; }
-
-  let wartezeit = START_WARTEZEIT_MS;
-
-  for (;;) {
-    const client = new ImapFlow({
-      host: IMAP_HOST, port: 993, secure: true,
-      auth: { user, pass }, logger: false,
-      /* Standard sind 15 s, bis ImapFlow nach einem Befehl wieder ins IDLE
-         geht — in diesem Fenster meldet der Server nichts und eine Mail
-         bliebe bis zu 15 s liegen. Hier zaehlt jede Sekunde: das Portal
-         gibt dieselbe Anfrage an drei Anbieter. */
-      autoIdleDelay: 1_000,
-    });
-
-    try {
-      await client.connect();
-      await client.mailboxOpen('INBOX');   // SELECTED — Voraussetzung fuers Auto-IDLE
-      log(`${portal}: verbunden, wartet auf neue Mails`);
-      wartezeit = START_WARTEZEIT_MS;   // Verbindung stand — Abstand zuruecksetzen
-
-      /* Ein Durchgang laeuft nie zweimal gleichzeitig: trifft waehrend
-         der Verarbeitung eine weitere Mail ein, wird sie an den
-         laufenden Durchgang angehaengt statt parallel gestartet. */
-      let laeuft: Promise<void> = Promise.resolve();
-      const anstossen = () => {
-        laeuft = laeuft
-          .then(() => arbeiteAb(portal, client))
-          .catch((e) => log(`${portal}: Durchgang fehlgeschlagen: ${e.message}`));
-        return laeuft;
-      };
-
-      // Was ueber Nacht ankam, bevor wir auf Meldungen warten.
-      await anstossen();
-
-      client.on('exists', anstossen);
-
-      /* Kein eigenes client.idle(): ImapFlow haelt die Verbindung selbst
-         im IDLE und meldet neue Post als "exists". Wir warten hier nur
-         darauf, dass die Verbindung endet — dann greift der Wiederanlauf. */
-      await new Promise<never>((_, ende) => {
-        client.on('close', () => ende(new Error('Verbindung geschlossen')));
-        client.on('error', (e: any) => ende(e));
-      });
-    } catch (e: any) {
-      log(`${portal}: Verbindung verloren (${e.message}) — neuer Versuch in ${Math.round(wartezeit / 1000)}s`);
-    } finally {
-      try { await client.logout(); } catch { /* schon zu */ }
-    }
-
-    await new Promise((r) => setTimeout(r, wartezeit));
-    wartezeit = Math.min(wartezeit * 2, MAX_WARTEZEIT_MS);
+  await client.connect();
+  try {
+    return await arbeiteAb(portal, client);
+  } finally {
+    try { await client.logout(); } catch { /* schon zu */ }
   }
 }
 
@@ -261,21 +212,21 @@ async function main() {
 
   log(`Abholer startet${TROCKEN ? ' (TROCKENLAUF)' : ''} — Ziel ${BASIS_URL}`);
 
-  /* Jedes Postfach bekommt seine eigene Verbindung und seine eigene
-     Wiederanlauf-Schleife: faellt Pflegehilfe aus, laufen Pflegebund-Leads
-     weiter. Kein Promise.all — keine der Schleifen endet je regulaer. */
+  let fehler = 0;
   for (const postfach of POSTFAECHER) {
-    beobachte(postfach).catch((e) =>
-      log(`${postfach.portal}: endgueltig aufgegeben: ${e.message}`),
-    );
+    /* Ein kaputtes Postfach darf das andere nicht aufhalten: faellt
+       Pflegehilfe aus, sollen Pflegebund-Leads trotzdem laufen. */
+    try { fehler += await holeAb(postfach); }
+    catch (e: any) { fehler++; log(`${postfach.portal}: Postfach-Fehler: ${e.message}`); }
   }
 
-  /* Sauber schliessen, wenn Render den Dienst stoppt (Deploy, Neustart).
-     Was gerade in Arbeit ist, bleibt ungelesen und laeuft nach dem
-     Neustart erneut. */
-  for (const signal of ['SIGTERM', 'SIGINT'] as const) {
-    process.on(signal, () => { log(`${signal} — Abholer beendet sich`); process.exit(0); });
-  }
+  log('Abholer fertig');
+  /* Exit-Code, damit Render einen kaputten Lauf als fehlgeschlagen zeigt
+     statt ihn still zu schlucken — auch dann, wenn nur EINE Mail liegen
+     blieb: bei einem Takt von einer Minute waeren das sonst 60 verschluckte
+     Fehler pro Stunde, waehrend derselbe bezahlte Lead nie durchgeht.
+     Ungelesene Mails laufen im naechsten Lauf erneut. */
+  process.exit(fehler ? 1 : 0);
 }
 
 main().catch((e) => { log('Abholer abgebrochen:', e.message); process.exit(1); });
