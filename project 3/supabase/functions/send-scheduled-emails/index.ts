@@ -2015,9 +2015,40 @@ Deno.serve(async (req: Request) => {
       const ms = (demoBody.milestone || "none") as LeadMilestone;
       const pu = (portalBase && (lead as Lead).token) ? buildPortalUrl(portalBase, (lead as Lead).token) : site;
 
+      /* Empfehlung auch in der Vorschau — sonst zeigt der Demo-Modus die
+         Angebotsmail ohne den Kasten und man prueft etwas anderes als das,
+         was der Kunde bekommt. Derselbe Weg wie im Versand; fuer einen Lead,
+         der schon eine job_offer hat, ist der Onboard-Aufruf ein
+         Cache-Treffer und legt in mamamia nichts Neues an. */
+      let demoEmpfHtml: string | null | undefined = undefined;
+      let demoEmpfText: string | null | undefined = undefined;
+      let demoInline: { filename: string; content: Uint8Array; contentType: string; cid: string } | null = null;
+      if ((demoBody.items || []).some((i: any) => i?.email_type === "eingangsbestaetigung") && (lead as Lead).token) {
+        demoEmpfHtml = null;
+        demoEmpfText = null;
+        const erg = await holeEmpfehlung({
+          supabaseUrl,
+          key: supabaseServiceKey,
+          token: (lead as Lead).token as string,
+          jobOfferId: (lead as any).mamamia_job_offer_id ?? null,
+          formularDaten: {
+            ...((lead as any).kalkulation?.formularDaten ?? {}),
+            care_start_timing: (lead as any).care_start_timing ?? null,
+          },
+          darfOnboarden: Deno.env.get("EMPFEHLUNG_ONBOARD") !== "0",
+        });
+        if (erg) {
+          demoInline = await fetchInlinePhotoDeno(erg.empfehlung.fotoUrl);
+          const profilUrl = withMailMark(`${pu}&cg=${erg.empfehlung.caregiverId}`, "eb");
+          const alleUrl = withMailMark(buildPortalUrl(portalBase, (lead as Lead).token as string, "matches"), "eb");
+          demoEmpfHtml = empfehlungHtml(erg.empfehlung, demoInline?.cid ?? null, profilUrl, alleUrl, erg.sichtbarGesamt);
+          demoEmpfText = empfehlungText(erg.empfehlung, profilUrl, alleUrl, erg.sichtbarGesamt);
+        }
+      }
+
       const render = (t: string): { subject: string; html: string; text: string } => {
         switch (t) {
-          case "eingangsbestaetigung": return { subject: "Ihr persönliches Angebot zur 24-Stunden-Betreuung", html: buildEingangsbestaetigungHtml(lead as Lead, site, portalBase), text: buildEingangsbestaetigungText(lead as Lead, portalBase) };
+          case "eingangsbestaetigung": return { subject: "Ihr persönliches Angebot zur 24-Stunden-Betreuung", html: buildEingangsbestaetigungHtml(lead as Lead, site, portalBase, false, demoEmpfHtml), text: buildEingangsbestaetigungText(lead as Lead, portalBase, false, demoEmpfText) };
           case "profil_nudge_1": return { subject: "Pflegekräfte können sich noch nicht bei Ihnen bewerben", html: buildProfilNudge1Html(lead as Lead, site, portalBase), text: buildProfilNudge1Text(lead as Lead, site, portalBase) };
           case "profil_nudge_2": return { subject: "Profil unvollständig — Sie können noch keine Bewerbungen erhalten", html: buildProfilNudge2Html(lead as Lead, site, portalBase), text: buildProfilNudge2Text(lead as Lead, site, portalBase) };
           case "warum_primundus": return { subject: "Warum Familien sich für Primundus entscheiden", html: buildWarumPrimundusHtml(lead as Lead, withMailMark(pu, "wp"), site), text: buildWarumPrimundusText(lead as Lead, withMailMark(pu, "wp")) };
@@ -2039,7 +2070,8 @@ Deno.serve(async (req: Request) => {
           const subject = item.subjectPrefix ? `${item.subjectPrefix}${m.subject}` : m.subject;
           const html = b ? m.html.replace('<div class="email-content">', `${bannerHtml(b)}<div class="email-content">`) : m.html;
           const text = b ? `(${b})\n\n${m.text}` : m.text;
-          const r = await sendEmailSmtp(smtpConfig, to, subject, html, text, undefined, demoBody.skipBcc === true);
+          const anhang = item.email_type === "eingangsbestaetigung" && demoInline ? [demoInline] : undefined;
+          const r = await sendEmailSmtp(smtpConfig, to, subject, html, text, anhang, demoBody.skipBcc === true);
           results.push({ email_type: item.email_type, to, subject, ...r });
         } catch (e) {
           results.push({ email_type: item.email_type, success: false, error: String(e) });
