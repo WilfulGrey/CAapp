@@ -155,6 +155,19 @@ const GOTO_PARAM =
   typeof window !== 'undefined'
     ? new URLSearchParams(window.location.search).get('goto')
     : null;
+// Deeplink aus der Angebotsmail: `&cg=<caregiver_id>` öffnet direkt das Profil
+// der dort empfohlenen Pflegekraft ("Maria kennenlernen →"). Die Mail zeigt
+// dieselbe Frau, die hier oben in der Liste steht — der Klick soll sie auch
+// wirklich aufschlagen, nicht nur die Startansicht.
+// Unbekannte oder nicht mehr verfügbare ID: passiert einfach nichts, der Kunde
+// landet regulär im Portal. Keine Fehlermeldung für etwas, das er nicht
+// verursacht hat.
+const CG_PARAM = (() => {
+  if (typeof window === 'undefined') return null;
+  const raw = new URLSearchParams(window.location.search).get('cg');
+  if (!raw || !/^\d{1,10}$/.test(raw)) return null;
+  return Number(raw);
+})();
 // Link back to the real "Alle meine Einsätze" overview (?view=jobs) — only
 // meaningful once we arrived here scoped to a specific job via ?job=…
 const JOBS_OVERVIEW_HREF =
@@ -1151,6 +1164,33 @@ const CustomerPortalPage: FC = () => {
       document.getElementById('bewerbungen')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
     });
   }, [pendingApps.length]);
+
+  // Mail-Deeplink goto=matches ("Alle passenden Betreuungskräfte ansehen"):
+  // zur Vorschlagsliste scrollen, sobald sie steht.
+  const matchesScrolledRef = useRef(false);
+  useEffect(() => {
+    if (GOTO_PARAM !== 'matches' || matchesScrolledRef.current) return;
+    if (effectiveMatched.length === 0) return;
+    matchesScrolledRef.current = true;
+    requestAnimationFrame(() => {
+      document.getElementById('pflegekraefte')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
+  }, [effectiveMatched.length]);
+
+  // Mail-Deeplink cg=<id>: das Profil der empfohlenen Pflegekraft aufschlagen.
+  // Läuft EINMAL (ref-Guard), sobald die Matchings geladen sind — sonst würde
+  // jeder Refetch dem Kunden das Modal erneut vor die Nase setzen.
+  const cgOpenedRef = useRef(false);
+  useEffect(() => {
+    if (CG_PARAM === null || cgOpenedRef.current) return;
+    if (effectiveMatched.length === 0) return;
+    const idx = effectiveMatched.findIndex((m) => m.caregiverId === CG_PARAM);
+    // Nicht (mehr) in der Liste — z. B. inzwischen vergeben. Guard trotzdem
+    // setzen, sonst versucht es jeder Refetch erneut.
+    cgOpenedRef.current = true;
+    if (idx < 0) return;
+    openNurseFromMatch(effectiveMatched[idx].nurse, idx);
+  }, [effectiveMatched.length]);
   const doneApps = applications.filter((a) => a.status !== 'new');
   // Declined matches sind jetzt direkt in der Haupt-Matching-Liste am
   // Ende einsortiert (Status='declined', "Abgelehnt"-Pill + Undo im
@@ -3095,6 +3135,9 @@ const CustomerPortalPage: FC = () => {
             <>
               {hasAnyCard && (
                 <>
+                {/* Sprungziel für den Mail-Deeplink `goto=matches` ("Alle
+                    passenden Betreuungskräfte ansehen" in der Angebotsmail). */}
+                <div id="pflegekraefte" className="scroll-mt-4" />
                 {/* Der Erklärtext steht ÜBER dem Kasten auf Weiß (Martin,
                     11.08.), nicht darin: Er beschreibt, was im Kasten kommt —
                     innen wirkte er wie ein weiteres Element der Liste und
