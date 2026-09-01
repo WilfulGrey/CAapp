@@ -33,7 +33,7 @@ import {
   mapApplicationToUI,
   mapMatchingToNurse,
   mapCaregiverToNurse,
-  matchesGermanyWish,
+  resolveDeutschWishLevel,
   pickFinalConfirmedJob,
 } from '../lib/mamamia/mappers';
 import { mapPatientFormToUpdateCustomerInput, splitCustomerName } from '../lib/mamamia/patientFormMapper';
@@ -870,12 +870,32 @@ const CustomerPortalPage: FC = () => {
   // Wir filtern daher strikt auf den passenden Bucket — lieber 1-2 Karten
   // statt 3 mit falscher Preis-Erwartung. Wenn die Form das Feld nicht
   // enthält (alte Leads pre-2025), bleibt der Filter aus.
-  const deutschWish: string | null | undefined = (() => {
-    const k = lead?.kalkulation as Record<string, unknown> | null | undefined;
-    const fd = k?.formularDaten as Record<string, unknown> | null | undefined;
-    const v = fd?.deutschkenntnisse;
-    return typeof v === 'string' ? v : null;
-  })();
+  // Sprachwunsch — es gibt ZWEI Quellen, und nur eine ist massgeblich.
+  //
+  //   1. Der im Kostenrechner gewaehlte Wert, eingefroren im Lead.
+  //   2. customer_caregiver_wish.germany_skill bei mamamia — der LEBENDE
+  //      Stand, den die SA im Portal nachbessern kann.
+  //
+  // Gematcht wird bei mamamia nach (2). Filtert das Portal nach (1), pruefen
+  // wir Vorschlaege gegen einen Wunsch, nach dem gar nicht gesucht wurde.
+  // Laufen beide auseinander, bleibt die Liste leer, obwohl hunderte Kraefte
+  // anliegen — Fall Kunde 10508 (01.09.2026): mamamia level_3, Rechner
+  // "grundlegend", 921 Vorschlaege, davon 0 auf level_1. Der Kunde sah nichts.
+  //
+  // Deshalb gewinnt (2), solange dort eine echte Stufe steht. 'not_important'
+  // und leer heissen "kein Wunsch" → gar nicht filtern. (1) bleibt Rueckfall,
+  // solange mamamia noch nichts weiss.
+  // Zwei Quellen für den Sprachwunsch — die Auflösung steht als reine
+  // Funktion in mappers.ts (dort auch die Begründung und die Tests).
+  const deutschWishLevel: string | null = resolveDeutschWishLevel(
+    mmCustomer?.customer_caregiver_wish?.germany_skill ?? null,
+    (() => {
+      const k = lead?.kalkulation as Record<string, unknown> | null | undefined;
+      const fd = k?.formularDaten as Record<string, unknown> | null | undefined;
+      const v = fd?.deutschkenntnisse;
+      return typeof v === 'string' ? v : null;
+    })(),
+  );
 
   // Zähler des Matching-Trichters für das ?debug=1-Overlay. Anlass: die
   // Meldung „beim Ablehnen verschwinden mehrere Karten" (11.08.) liess sich
@@ -937,7 +957,11 @@ const CustomerPortalPage: FC = () => {
       // fälschlich rausfiltern. Bereits eingeladene (invitedIds) immer sichtbar.
       .filter(m => {
         if (invitedIds.has(m.caregiver.id)) return true;
-        return matchesGermanyWish(m.caregiver.germany_skill ?? null, deutschWish);
+        // Ohne Wunsch (null) oder ohne Angabe an der Kraft: durchlassen —
+        // lieber zeigen als auf fehlenden Daten wegfiltern.
+        if (!deutschWishLevel) return true;
+        const skill = m.caregiver.germany_skill ?? null;
+        return !skill || skill === deutschWishLevel;
       })
       .sort(rankComparator(now));
 

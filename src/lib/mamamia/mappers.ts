@@ -80,6 +80,32 @@ export function requiredGermanyLevelForWish(
   return null;
 }
 
+// Welche Deutsch-Stufe gilt für die Matching-Liste?
+//
+// Es gibt ZWEI Quellen, und nur eine ist maßgeblich:
+//
+//   1. `deutschkenntnisse` aus dem Kostenrechner — eingefroren im Lead.
+//   2. `customer_caregiver_wish.germany_skill` bei mamamia — der LEBENDE
+//      Stand, den die SA im Portal nachbessern kann.
+//
+// mamamia schlägt Kräfte nach (2) vor. Filtert das Portal nach (1), prüfen
+// wir die Vorschläge gegen einen Wunsch, nach dem gar nicht gesucht wurde.
+// Laufen beide auseinander, bleibt die Liste leer, obwohl hunderte Kräfte
+// anliegen — Kunde 10508 (01.09.2026): mamamia level_3, Rechner
+// "grundlegend", 921 Vorschläge, davon 0 auf level_1. Der Kunde sah nichts.
+//
+// Deshalb gewinnt (2), solange dort eine echte Stufe steht. 'not_important'
+// und 'level_0' heißen "kein Wunsch" → gar nicht filtern. (1) ist der
+// Rückfall, solange mamamia noch nichts weiß.
+export function resolveDeutschWishLevel(
+  mamamiaSkill: string | null | undefined,
+  kalkulationWunsch: string | null | undefined,
+): string | null {
+  if (mamamiaSkill === 'not_important' || mamamiaSkill === 'level_0') return null;
+  if (typeof mamamiaSkill === 'string' && /^level_[1-4]$/.test(mamamiaSkill)) return mamamiaSkill;
+  return requiredGermanyLevelForWish(kalkulationWunsch);
+}
+
 // Erfüllt die germany_skill einer Pflegekraft den Kostenrechner-Sprachwunsch?
 // STRIKT: exakt die Stufe des gewählten Tiers. Ein "kommunikativ"-Kunde soll
 // weder eine stärkere level_4-Kraft sehen (im Vertrag plötzlich +450 €/Mo)
