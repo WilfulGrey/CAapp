@@ -544,3 +544,25 @@ Deno.test("empfehlungHtml: Profil-Link am Namen zeigt auf dieselbe Seite wie der
   assertEquals(new Set(ziele).size, 1);
   assertEquals(ziele.length, 2);
 });
+
+Deno.test("empfehlungHtml: Einsaetze stehen hinter der Stufe", () => {
+  const { empfehlung } = baueEmpfehlung(
+    cg({ id: 42, hp_total_jobs: 13, care_experience: "13" }), null, {}, 5, JETZT,
+  );
+  const html = empfehlungHtml(empfehlung, null, "https://p", "https://a", 5);
+  assertStringIncludes(html, "Elite");
+  assertStringIncludes(html, "13 Einsätze über Primundus");
+  // Reihenfolge: erst die Stufe, dann die Zahl.
+  assert(html.indexOf("Elite") < html.indexOf("13 Einsätze über Primundus"));
+});
+
+Deno.test("empfehlungHtml: ein Einsatz bleibt Einzahl, null Einsaetze schweigen", () => {
+  const eins = baueEmpfehlung(cg({ id: 1, hp_total_jobs: 1 }), null, {}, 3, JETZT).empfehlung;
+  assertStringIncludes(empfehlungHtml(eins, null, "https://p", "https://a", 3), "1 Einsatz über Primundus");
+
+  const keins = baueEmpfehlung(cg({ id: 1, hp_total_jobs: 0 }), null, {}, 3, JETZT).empfehlung;
+  const html = empfehlungHtml(keins, null, "https://p", "https://a", 3);
+  assertEquals(/\d+ Eins(atz|ätze) über Primundus/.test(html), false);
+  // Die Stufe steht trotzdem da.
+  assertStringIncludes(html, "Berufserfahren");
+});
