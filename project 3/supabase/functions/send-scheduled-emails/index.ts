@@ -39,6 +39,17 @@ import {
   imBewertungsfenster,
   type BewertungsLead,
 } from "./bewertung.ts";
+import {
+  portalHerkunft,
+  portalIntroHtml,
+  portalIntroText,
+  portalAngabenHinweisHtml,
+  portalAngabenHinweisText,
+  portalVorschauHtml,
+  portalVorschauText,
+  portalCtaButtonHtml,
+  PORTAL_BETREFF,
+} from "./herkunft.ts";
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
@@ -64,6 +75,9 @@ interface Lead {
   kalkulation: any;
   token: string;
   status: string;
+  /* Herkunft des Leads: "rechner" (Formular), "pria-chat" oder
+     "portal:<domain>" fuer eingekaufte Leads (siehe portalHerkunft). */
+  source?: string | null;
 }
  
 interface SmtpConfig {
@@ -941,6 +955,7 @@ export function buildEingangsbestaetigungHtml(
      Portal — und wartet dort gerade auf mehrere Anbieter. Kopf, Betreff und
      beide Buttons haengen daran. Herkunft schlaegt Resubmit: ein
      eingekaufter Lead ist per Definition der erste Kontakt. */
+  const herkunft = portalHerkunft(lead.source);
   // Steht eine echte Pflegekraft in der Mail? Steuert Einleitung, Reihenfolge
   // und ob der alte Sammel-CTA direkt unter dem Preis noch gebraucht wird.
   const hatEmpfehlung = typeof empfehlungBlock === "string" && empfehlungBlock.length > 0;
@@ -1049,7 +1064,13 @@ export function buildEingangsbestaetigungHtml(
     </table>`;
 
   // ── CTA-Button (Gradient + Schatten, mit Outlook-Fallback) ────────────────
-  const cta = `
+  /* Portal-Lead: derselbe Button wie oben. Zwei Farben in einer Mail
+     lesen sich als zwei verschiedene Angebote (Martin 30.08.). Fuer alle
+     anderen Leads bleibt der eingefuehrte gruene Button unangetastet —
+     die Kette laeuft und ist gemessen. */
+  const cta = herkunft
+    ? portalCtaButtonHtml(ctaUrl, "Angebot &amp; passende Pflegekräfte ansehen", "8px auto 30px")
+    : `
     <!--[if mso]><table role="presentation" cellpadding="0" cellspacing="0" border="0" align="center"><tr><td><![endif]-->
     <table role="presentation" cellpadding="0" cellspacing="0" border="0" align="center" style="margin:8px auto 30px;border-collapse:separate;">
       <tr>
@@ -1087,7 +1108,12 @@ export function buildEingangsbestaetigungHtml(
       <tr><td style="padding:14px 20px 16px;"><table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="font-size:14px;color:#555;line-height:1.7;">${section2}</table></td></tr>
     </table>`;
 
-  const introParagraph = isResubmit
+  /* Herkunft schlaegt Resubmit UND Empfehlung: ein eingekaufter Lead ist
+     per Definition der erste Kontakt, und der Portal-Kopf traegt seinen
+     eigenen Hinweis auf die Kraefte (Plakette statt Fliesstext). */
+  const introParagraph = herkunft
+    ? portalIntroHtml(herkunft)
+    : isResubmit
     ? `vielen Dank für Ihre erneute Anfrage. Wir haben Ihre Angaben übernommen und Ihr persönliches Angebot angepasst${
         hatEmpfehlung
           ? ` &ndash; und <strong style="color:#2D1F0F;">passende Betreuungskräfte für Sie gefunden</strong>. Sie finden sie weiter unten in dieser E-Mail.`
@@ -1099,9 +1125,25 @@ export function buildEingangsbestaetigungHtml(
           : ` für die 24-Stunden-Betreuung zu Hause.`
       }`;
 
+  /* Bei eingekauften Leads sind nicht alle Angaben vom Kunden: was das
+     Portal nicht liefert, nehmen wir bewusst zum teureren Wert an (lieber
+     ein Preis, der faellt, als einer, der steigt). Das gehoert ueber die
+     Tabelle geschrieben — sonst wundert sich der Kunde, woher wir Dinge
+     wissen, die er nie gesagt hat. Gleichzeitig der beste Grund, das
+     Portal zu oeffnen. */
+  /* Welche Felder WIR gesetzt haben, legt api/portal-lead in der
+     Kalkulation ab. Fehlt die Liste (Altbestand), nehmen wir den
+     vorsichtigeren Text an: lieber zu viel Transparenz als zu wenig. */
+  const angenommeneFelder = (lead.kalkulation as any)?.angenommene_felder;
+  const wurdeAngenommen = !Array.isArray(angenommeneFelder) || angenommeneFelder.length > 0;
+  const angabenHinweis = herkunft ? portalAngabenHinweisHtml(herkunft, wurdeAngenommen) : "";
+  const vorschauBlock = herkunft ? portalVorschauHtml(siteUrl, ctaUrl) : "";
+
   const content = `
     <p style="font-size:15px;line-height:1.75;color:#444;margin-bottom:14px;">${greeting},</p>
     <p style="font-size:15px;line-height:1.75;color:#444;margin-bottom:24px;">${introParagraph}</p>
+
+    ${vorschauBlock}
 
     ${preisTabelle}
 
@@ -1114,6 +1156,8 @@ export function buildEingangsbestaetigungHtml(
     ${stepsTable}
 
     ${hatEmpfehlung ? cta : ""}
+
+    ${angabenHinweis}
 
     ${angabenTable}
 
@@ -1165,7 +1209,9 @@ ${buildHeimVergleichText(lead)}
 
 `;
 
-  const headerLine = isResubmit
+  const headerLine = portalHerkunft(lead.source)
+    ? PORTAL_BETREFF
+    : isResubmit
     ? "Ihr aktualisiertes Angebot zur 24-Stunden-Betreuung – Primundus"
     : "Ihr Angebot zur 24-Stunden-Betreuung – Primundus";
 
@@ -1173,13 +1219,23 @@ ${buildHeimVergleichText(lead)}
   const empfehlungPlain =
     empfehlungAbschnitt === undefined ? "" : `${empfehlungAbschnitt || keineEmpfehlungText()}\n\n`;
 
-  const introPlain = isResubmit
+  /* Wie in der HTML-Fassung: Herkunft schlaegt Resubmit und Empfehlung. */
+  const herkunftPlain = portalHerkunft(lead.source);
+
+  const introPlain = herkunftPlain
+    ? portalIntroText(herkunftPlain)
+    : isResubmit
     ? `vielen Dank für Ihre erneute Anfrage. Wir haben Ihre Angaben übernommen und Ihr persönliches Angebot angepasst${
         hatEmpfehlungPlain ? " – und passende Betreuungskräfte für Sie gefunden. Sie finden sie weiter unten in dieser E-Mail." : " für die 24-Stunden-Betreuung zu Hause."
       }`
     : `vielen Dank für Ihre Anfrage. Auf Basis Ihrer Angaben haben wir Ihr persönliches Angebot erstellt${
         hatEmpfehlungPlain ? " – und bereits passende Betreuungskräfte für Sie gefunden. Sie finden sie weiter unten in dieser E-Mail." : " für die 24-Stunden-Betreuung zu Hause."
       }`;
+
+  const angenommeneFelderPlain = (lead.kalkulation as any)?.angenommene_felder;
+  const wurdeAngenommenPlain = !Array.isArray(angenommeneFelderPlain) || angenommeneFelderPlain.length > 0;
+  const angabenHinweisPlain = herkunftPlain ? portalAngabenHinweisText(herkunftPlain, wurdeAngenommenPlain) + "\n\n" : "";
+  const vorschauPlain = herkunftPlain ? portalVorschauText(ctaUrl) + "\n\n" : "";
 
   // Sektion 2 (Anforderungen an die Pflegekraft) — null-Werte ausblenden.
   const anf: string[] = [`Deutschkenntnisse: ${eingangsLabel("deutschkenntnisse", fd.deutschkenntnisse)}`];
@@ -1193,7 +1249,7 @@ ${greeting},
 
 ${introPlain}
 
-${priceLine}${konditionenLine}${empfehlungPlain}Angebot & Betreuungskräfte ansehen: ${ctaUrl}
+${vorschauPlain}${priceLine}${konditionenLine}${empfehlungPlain}Angebot & Betreuungskräfte ansehen: ${ctaUrl}
 
 SO GEHT ES WEITER
 
@@ -1203,7 +1259,7 @@ SO GEHT ES WEITER
 
 PFLEGESITUATION & ANFORDERUNGEN
 
-Betreuung für: ${eingangsLabel("betreuung_fuer", fd.betreuung_fuer)}
+${angabenHinweisPlain}Betreuung für: ${eingangsLabel("betreuung_fuer", fd.betreuung_fuer)}
 Pflegegrad: ${fd.pflegegrad ? `Pflegegrad ${fd.pflegegrad}` : "Nicht angegeben"}
 Weitere Personen im Haushalt: ${eingangsLabel("weitere_personen", fd.weitere_personen)}
 Mobilität: ${eingangsLabel("mobilitaet", fd.mobilitaet)}
@@ -2316,7 +2372,12 @@ Deno.serve(async (req: Request) => {
           // Re-Submit-Check: hat der Kunde schon mal eine Eingangsbest\u00e4tigung
           // bekommen? Falls ja \u2192 angepasste Wording-Variante.
           const isResubmit = await hasPreviousEingangsbestaetigungSent(supabase, scheduledEmail.lead_id);
-          subject = isResubmit
+          /* Eingekaufter Lead: eigener Betreff. Der Standard setzt voraus,
+             dass der Empfaenger weiss, wofuer er ein Angebot bekommt — der
+             Kaltkontakt weiss das nicht. Herkunft schlaegt Resubmit. */
+          subject = portalHerkunft((lead as Lead).source)
+            ? PORTAL_BETREFF
+            : isResubmit
             ? "Ihr aktualisiertes Angebot zur 24-Stunden-Betreuung \u2013 Primundus"
             : "Ihr Angebot zur 24-Stunden-Betreuung \u2013 Primundus";
 

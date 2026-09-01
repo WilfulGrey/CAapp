@@ -132,3 +132,56 @@ services:
       # jest sampler [mem] (ext/ab) z instrumentation.ts.
       - key: NODE_OPTIONS
         value: "--max-old-space-size=384"
+
+  # ── 3. Portal-Abholer — Worker (IMAP IDLE) ────────────────────────────
+  # Holt eingekaufte Lead-Anfragen aus den Portal-Postfaechern und schiebt
+  # sie in dieselbe Strecke wie ein Kostenrechner-Lead (POST /api/portal-lead
+  # auf kostenrechner-beta).
+  #
+  # BEWUSST ein Worker und KEIN Cron: das Portal gibt dieselbe Anfrage an
+  # bis zu drei Anbieter, wer zuerst antwortet gewinnt. Der Worker haelt
+  # eine stehende IMAP-Verbindung (IDLE) — der Server meldet die Mail von
+  # sich aus, gemessen ~2 s bis zur fertigen Kundenmail. Ein Cron startet
+  # je Lauf einen frischen Container samt npm install; allein das dauert
+  # laenger als der Vorsprung, um den es hier geht.
+  #
+  # Die Postfaecher sind reine EINGAENGE. Von hier wird nie gesendet; die
+  # Kundenmail geht unveraendert ueber kostenrechner@primundus.de raus.
+  #
+  # Scharfschalten in zwei Schritten (siehe docs/portal-leads.md):
+  #   1. PORTAL_TROCKENLAUF=1 — liest und protokolliert, legt nichts an
+  #   2. Variable leeren, sobald der Parser auf echten Mails sauber liest
+  - type: worker
+    name: portal-abholer
+    runtime: node
+    plan: starter
+    branch: integration/mamamia-onboarding
+    rootDir: project 3
+    buildCommand: npm install
+    startCommand: npm run portal:abholen
+    autoDeploy: true
+    envVars:
+      # Ziel des POST — der Kostenrechner legt Lead, Preis und Mail 1 an.
+      - key: PORTAL_LEAD_URL
+        sync: false
+      # Derselbe Wert wie PORTAL_LEAD_KEY auf kostenrechner-beta. Ohne ihn
+      # antwortet der Endpunkt 503 und es passiert nichts.
+      - key: PORTAL_LEAD_KEY
+        sync: false
+      # Postfach je Portal. Fehlt eines, wird es uebersprungen statt geraten.
+      - key: PFLEGEHILFE_USER
+        sync: false
+      - key: PFLEGEHILFE_PASS
+        sync: false
+      - key: PFLEGEBUND_USER
+        sync: false
+      - key: PFLEGEBUND_PASS
+        sync: false
+      - key: PORTAL_IMAP_HOST
+        value: imap.ionos.de
+      # Erst-Inbetriebnahme: "1" liest und protokolliert, ohne Leads
+      # anzulegen oder Kundenmails auszuloesen. Nach der Sichtprobe leeren.
+      - key: PORTAL_TROCKENLAUF
+        value: "1"
+      - key: NODE_VERSION
+        value: "20"
