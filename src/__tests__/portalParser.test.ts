@@ -99,3 +99,22 @@ describe('parsePflegehilfe (Portal-Lead-Mail)', () => {
     expect(erg.angenommen).toEqual([]);
   });
 });
+
+describe('parsePflegehilfe — weitergeleitete Mail (Fwd)', () => {
+  /* Test Zauner 01.09. (prod uid 14): ein "Fwd:" setzt Zitat-Marker vor
+   * jede Zeile und streut Soft-Hyphens in die Labels — ohne Normalisierung
+   * las der Parser 0 Felder und fand keinen Einwilligungsnachweis. */
+  const fwd = mail
+    .split('\n')
+    .map((z) => `>  \t${z}`)
+    .join('\n')
+    .replace('Datenschutzerklärung', 'Datenschutz­erklärung');
+
+  it('Zitat-Marker + Soft-Hyphens: Einwilligung und Felder werden trotzdem gelesen', () => {
+    const f = parsePflegehilfe(fwd);
+    expect(f.einwilligung?.zeitpunkt).toBe('25. April 08:35');
+    expect(f.kontakt.email).toBe('elke.preis@freenet.de');
+    expect(f.angaben.pflegegrad).toBe(1);
+    expect(f.portal_lead_id).toBe('3196061');
+  });
+});

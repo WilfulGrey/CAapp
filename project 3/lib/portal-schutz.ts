@@ -67,3 +67,30 @@ export function darfAngeschriebenWerden(
 
   return { ok: true };
 }
+
+/* ─── Testphase: Kundenmails an das Team umleiten ────────────────────────
+ *
+ * Solange PORTAL_TESTPHASE=1 gesetzt ist (Render-Env des Kostenrechners;
+ * fuer die Edge Function als Supabase-Secret), gehen ALLE Kundenmails an
+ * Leads aus eingekauften Portal-Mails (source "portal:<domain>") nicht an
+ * den Kunden, sondern an das Team. Der Lead selbst traegt weiter die echte
+ * Adresse — umgeleitet wird erst beim VERSAND, nichts wird verfaelscht.
+ * Der Betreff nennt den eigentlichen Empfaenger, damit man beim Pruefen
+ * sieht, wem die Mail gegolten haette.
+ *
+ * ACHTUNG: die Edge Function send-scheduled-emails hat eine KOPIE dieser
+ * Logik (testphase.ts — Deno kann nicht aus lib/ importieren, gleiche Lage
+ * wie names.ts/appendJobParam). Aenderungen dort mitziehen. */
+export const TESTPHASE_EMPFAENGER = 'info@mamamia.app, martin@mamamia.app';
+
+export function testphaseUmleitung(
+  lead: { source?: string | null; email?: string | null },
+  flagWert: string | undefined,
+): { empfaenger: string; betreffPraefix: string } | null {
+  if (flagWert !== '1') return null;
+  if (!(lead.source ?? '').toLowerCase().startsWith('portal:')) return null;
+  return {
+    empfaenger: TESTPHASE_EMPFAENGER,
+    betreffPraefix: `[TESTPHASE → ${lead.email ?? '?'}] `,
+  };
+}

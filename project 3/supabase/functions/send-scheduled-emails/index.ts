@@ -17,6 +17,7 @@ import { capitalizeName as capitalize } from "./names.ts";
 // lib/ importieren); Aenderungen immer in BEIDEN Dateien.
 import { sendezeitIso } from "./quietHours.ts";
 import { deutschStufe } from "./deutschStufe.ts";
+import { testphaseUmleitung } from "./testphase.ts";
 // Empfehlung fuer die Angebotsmail (Martin, 31.08.2026): echte gematchte
 // Pflegekraft statt der Behauptung "im Portal warten Pflegekraefte".
 // Reihenfolge + Trichter sind Kopien der Portal-Logik — siehe empfehlung.ts.
@@ -1970,7 +1971,7 @@ async function runBewertungsRunde(
   const cutoff = new Date(jetzt.getTime() - BEWERTUNG_TAGE * 86400000).toISOString();
   const { data: kandidaten, error } = await supabase
     .from("leads")
-    .select("id, vorname, nachname, anrede_text, token, email, status, created_at")
+    .select("id, vorname, nachname, anrede_text, token, email, status, created_at, source")
     .gte("created_at", BEWERTUNG_STICHTAG)
     .lte("created_at", cutoff)
     .order("created_at", { ascending: true })
@@ -2009,8 +2010,13 @@ async function runBewertungsRunde(
     if (grund) { zaehle(grund); continue; }
 
     const tpl = getBewertungsanfrageTemplate(lead, smtpConfig.siteUrl.replace(/\/$/, ""));
+    // Testphase: Portal-Leads ans Team (Umleitung nur beim Versand).
+    const umleitungBew = testphaseUmleitung(lead, Deno.env.get("PORTAL_TESTPHASE"));
+    const bewEmpfaenger = umleitungBew?.empfaenger ?? lead.email!;
     const r = await sendEmailSmtp(
-      smtpConfig, lead.email!, tpl.subject, tpl.html, tpl.text,
+      smtpConfig, bewEmpfaenger,
+      umleitungBew ? umleitungBew.betreffPraefix + tpl.subject : tpl.subject,
+      tpl.html, tpl.text,
       undefined, false, BEWERTUNG_CC,
     );
     if (r.success) {
@@ -2019,7 +2025,7 @@ async function runBewertungsRunde(
       await supabase.from("scheduled_emails").insert({
         lead_id: lead.id,
         email_type: "bewertungsanfrage",
-        recipient_email: lead.email,
+        recipient_email: bewEmpfaenger,
         scheduled_for: nowIso,
         status: "sent",
         sent_at: nowIso,
@@ -2027,7 +2033,7 @@ async function runBewertungsRunde(
       await supabase.from("lead_events").insert({
         lead_id: lead.id,
         event_type: "email_bewertungsanfrage_sent",
-        metadata: { to: lead.email, cc: BEWERTUNG_CC, ausloeser: "tag7" },
+        metadata: { to: bewEmpfaenger, cc: BEWERTUNG_CC, ausloeser: "tag7" },
       });
     } else {
       zaehle("versand_fehler");
@@ -2232,6 +2238,13 @@ Deno.serve(async (req: Request) => {
         // an der Warteschlange vorbei (direkter SMTP-Versand), daher ist der Lead
         // hier ausnahmslos der richtige Adressat.
         const recipient = (lead.email ?? "").trim() || scheduledEmail.recipient_email;
+        /* Testphase (PORTAL_TESTPHASE=1): Kundenmails der Portal-Leads gehen
+           ans Team statt an den Kunden — Umleitung erst beim Versand, der
+           Lead behaelt die echte Adresse. Kopie-Logik: testphase.ts. */
+        const umleitung = testphaseUmleitung(
+          { source: (lead as Record<string, unknown>).source as string | null, email: recipient },
+          Deno.env.get("PORTAL_TESTPHASE"),
+        );
 
         let isBeauftragt = lead.status === "vertrag_abgeschlossen" || lead.status === "betreuung_beauftragt" || lead.order_confirmed === true;
         // Buchung erkennen: die MVP-Annahme (Kunde akzeptiert eine Pflegekraft
@@ -2717,7 +2730,9 @@ Deno.serve(async (req: Request) => {
           continue;
         }
 
-        const emailResult = await sendEmailSmtp(smtpConfig, recipient, subject, html, text, attachments);
+        const effektiverEmpfaenger = umleitung?.empfaenger ?? recipient;
+        const effektiverBetreff = umleitung ? umleitung.betreffPraefix + subject : subject;
+        const emailResult = await sendEmailSmtp(smtpConfig, effektiverEmpfaenger, effektiverBetreff, html, text, attachments);
 
         if (emailResult.success) {
           await supabase
@@ -2728,7 +2743,7 @@ Deno.serve(async (req: Request) => {
               updated_at: new Date().toISOString(),
               // Verlauf ehrlich halten: die Zeile soll die Adresse zeigen, an
               // die tatsächlich versendet wurde, nicht den Snapshot von damals.
-              recipient_email: recipient,
+              recipient_email: effektiverEmpfaenger,
             })
             .eq("id", scheduledEmail.id);
 

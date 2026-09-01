@@ -15,6 +15,7 @@ export interface EmailTemplate {
 }
 
 export interface BewertungsLead {
+  source?: string | null;
   id: string;
   vorname: string | null;
   nachname: string | null;

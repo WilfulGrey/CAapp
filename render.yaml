@@ -159,3 +159,9 @@ services:
       # ein value bei jedem Sync zurueck auf Trockenlauf setzen.
       - key: PORTAL_TROCKENLAUF
         sync: false
+      # Testphase: "1" = Kundenmails der Portal-Leads gehen ans Team
+      # (info@ + martin@mamamia.app) statt an den Kunden. Zusaetzlich als
+      # Supabase-Secret setzen (send-scheduled-emails liest die eigene Env).
+      # Nach der Testphase BEIDE leeren. Siehe docs/portal-leads.md.
+      - key: PORTAL_TESTPHASE
+        sync: false

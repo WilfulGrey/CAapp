@@ -76,8 +76,28 @@ pro Mail, wie viele Felder erkannt wurden. Eine Zeile `⚠ nicht zugeordnet`
 bedeutet: das Portal hat seine Vorlage geändert — erst den Parser
 nachziehen, nicht scharfschalten.
 
-**Schritt 2 — scharf.** `PORTAL_TROCKENLAUF` leeren. Ab dann bekommt jeder
-eingehende Lead automatisch Mail 1, ohne dass ein Mensch draufschaut.
+**Schritt 2 — Testphase (Mails ans Team).** `PORTAL_TESTPHASE=1` setzen —
+an ZWEI Stellen: Render-Env des Kostenrechners (+ Redeploy) UND als
+Supabase-Secret (`npx supabase secrets set PORTAL_TESTPHASE=1
+--project-ref <ref>` — die Edge Function send-scheduled-emails liest ihre
+eigene Env, ohne Redeploy wirksam). Ab dann läuft die Strecke SCHARF
+(Lead, Preis, Ereignisse), aber **jede Kundenmail eines Portal-Leads geht
+an `info@mamamia.app` + `martin@mamamia.app`** statt an den Kunden; der
+Betreff nennt den eigentlichen Empfänger (`[TESTPHASE → kunde@…]`). Der
+Lead behält die echte Adresse — umgeleitet wird nur der Versand
+(Kostenrechner-Leads sind nie betroffen). Logik: `lib/portal-schutz.ts`
+(`testphaseUmleitung`) + Kopie `send-scheduled-emails/testphase.ts`.
+
+**Schritt 3 — scharf.** `PORTAL_TROCKENLAUF` und `PORTAL_TESTPHASE`
+(beide Stellen!) leeren. Ab dann bekommt jeder eingehende Lead automatisch
+Mail 1, ohne dass ein Mensch draufschaut.
+
+**Weitergeleitete Mails** (jemand forwardet eine Portal-Mail ins
+Postfach): der Parser normalisiert Zitat-Marker (`> `) und Soft-Hyphens,
+liest also auch Forwards. Tabellen-Umbrüche des weiterleitenden
+Mailclients kann er nicht heilen — dann greifen die Annahme-Regeln und
+`⚠ nicht zugeordnet` im Log. Der verlässliche Test ist immer die
+Direktmail des Portals.
 
 ## Environment (Render-Dashboard des Kostenrechners)
 

@@ -14,6 +14,7 @@ import {
 import { buildVertragAttachmentPdf, formatSignedAtBerlin } from '@/lib/vertrag';
 import { appendJobParam, PORTAL_BASIS } from '@/lib/portal-url';
 import { sendezeitIso } from '@/lib/quiet-hours';
+import { testphaseUmleitung } from '@/lib/portal-schutz';
 import { createHash } from 'crypto';
 
 // Bridge endpoint: the CA-App portal reports customer milestones back to the
@@ -1075,7 +1076,9 @@ async function handlePost(request: NextRequest) {
         } else {
           const portalUrl = buildPortalUrl(lead as any);
           const template = getPatientDataSavedEmailTemplate(lead as any, portalUrl);
-          sendEmail((lead as any).email, template).catch((e) =>
+          // Testphase: Portal-Leads ans Team (Umleitung nur beim Versand).
+          const umlD = testphaseUmleitung(lead as any, process.env.PORTAL_TESTPHASE);
+          sendEmail(umlD?.empfaenger ?? (lead as any).email, umlD ? { ...template, subject: umlD.betreffPraefix + template.subject } : template).catch((e) =>
             console.error('customer mail send threw:', e instanceof Error ? e.message : String(e)),
           );
         }
@@ -1106,7 +1109,8 @@ async function handlePost(request: NextRequest) {
             },
             portalUrl,
           );
-          sendEmail((lead as any).email, template).catch((e) =>
+          const umlO = testphaseUmleitung(lead as any, process.env.PORTAL_TESTPHASE);
+          sendEmail(umlO?.empfaenger ?? (lead as any).email, umlO ? { ...template, subject: umlO.betreffPraefix + template.subject } : template).catch((e) =>
             console.error('customer mail send threw:', e instanceof Error ? e.message : String(e)),
           );
         }
@@ -1131,14 +1135,15 @@ async function handlePost(request: NextRequest) {
             portalUrl,
             offer,
           )
-            .then(({ template, attachments }) =>
+            .then(({ template, attachments }) => {
               // Mail C (Buchungsbestätigung): Vertrag-HTML zusätzlich anhängen.
-              sendEmail(
-                (lead as any).email,
-                template,
+              const umlC = testphaseUmleitung(lead as any, process.env.PORTAL_TESTPHASE);
+              return sendEmail(
+                umlC?.empfaenger ?? (lead as any).email,
+                umlC ? { ...template, subject: umlC.betreffPraefix + template.subject } : template,
                 contractAttachment ? [...(attachments ?? []), contractAttachment] : attachments,
-              ),
-            )
+              );
+            })
             .then((result) => {
               // Reaktions-Reminder schedulen — 1h nach Mail A/B, falls
               // der Kunde bis dahin keine Reaktion (positiv ODER negativ)
