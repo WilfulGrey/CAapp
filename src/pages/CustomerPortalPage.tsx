@@ -3057,6 +3057,12 @@ const CustomerPortalPage: FC = () => {
         {/* ── SECTION HEADER: Passende Pflegekräfte einladen — nur ohne
              offene Bewerbungen (mit Bewerbung ist die Matching-Liste eh
              ausgeblendet, der Kunde soll erst entscheiden). */}
+        {/* Das `id` ist zugleich das Sprungziel des Mail-Deeplinks
+             `goto=matches` ("Alle N Betreuungskräfte ansehen" in der
+             Angebotsmail) — die Ueberschrift steht ueber der Liste, also
+             genau da, wo der Kunde landen soll. Deshalb KEIN zweiter Anker
+             weiter unten: doppelte ids sind ungueltig, und getElementById
+             nimmt ohnehin den ersten. */}
         {!hasPending && (
           <div className="px-1 pt-2" id="pflegekraefte">
             <h2 className="text-[1.2rem] font-bold tracking-tight" style={{color:'#18181B'}}>Passende Pflegekräfte einladen</h2>
@@ -3135,9 +3141,6 @@ const CustomerPortalPage: FC = () => {
             <>
               {hasAnyCard && (
                 <>
-                {/* Sprungziel für den Mail-Deeplink `goto=matches` ("Alle
-                    passenden Betreuungskräfte ansehen" in der Angebotsmail). */}
-                <div id="pflegekraefte" className="scroll-mt-4" />
                 {/* Der Erklärtext steht ÜBER dem Kasten auf Weiß (Martin,
                     11.08.), nicht darin: Er beschreibt, was im Kasten kommt —
                     innen wirkte er wie ein weiteres Element der Liste und
