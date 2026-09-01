@@ -116,6 +116,28 @@ export async function POST(request: NextRequest) {
        das Portal hat alles geliefert. */
     (kalkulation as any).angenommene_felder = angenommen;
 
+    /* Details ohne Preisbezug → formularDaten (additiv; der Rechner sendet
+       diese Schlüssel nie). Von dort aus: Formular-Prefill
+       (prefillPatientFromLead), Mamamia-Onboarding (weight/dementia/
+       internet, Locations-Lookup über fd.plz) und JobOffer-Beschreibung
+       (fd.portal_details). Whitelist + String-Zwang: der Body kommt von
+       aussen. */
+    const d = (body?.details && typeof body.details === 'object' ? body.details : {}) as Record<string, unknown>;
+    const fdExtras: Record<string, string> = {};
+    const nimm = (ziel: string, wert: unknown, max = 2000) => {
+      if (typeof wert === 'string' && wert.trim()) fdExtras[ziel] = wert.trim().slice(0, max);
+    };
+    nimm('plz', body?.plz, 5);
+    nimm('ort', body?.ort, 80);
+    nimm('gewicht', d.gewicht, 10);
+    nimm('internet', d.internet, 4);
+    nimm('demenz', d.demenz, 2);
+    nimm('diagnosen', d.diagnosen, 500);
+    nimm('portal_details', d.block);
+    if (Object.keys(fdExtras).length) {
+      (kalkulation as any).formularDaten = { ...(kalkulation as any).formularDaten, ...fdExtras };
+    }
+
     const { vorname, nachname, anrede } = parseCustomerName(name);
 
     const { lead, isNew } = await findOrCreateLead(email, 'angebot_requested', {

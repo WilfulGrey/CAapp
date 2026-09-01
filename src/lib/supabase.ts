@@ -201,7 +201,28 @@ export interface PatientPrefill {
    *  Kostenrechner-User keinen Namen eingegeben hat (seit Kontaktformular-
    *  Umbau optional), bleibt das leer und das Portal verlangt es. */
   name?: string;
+  // ── Portal-Leads (Registry #43) — echte Angaben aus der Portal-CSV.
+  //    Rechner-Leads haben diese fd-Schlüssel nie; Felder bleiben absent.
+  gewicht?: string;
+  internet?: string;
+  diagnosen?: string;
+  plz?: string;
+  ort?: string;
 }
+
+/* Mamamia-Gewichts-Bucket → Formular-Label. Spiegel von
+ * mamamiaWeightToForm (src/lib/mamamia/mappers.ts) — bewusst lokal,
+ * damit supabase.ts nicht in die mamamia-Schicht importiert. Ränder per
+ * Bug #17b: unten "40-50", oben "> 100". */
+const GEWICHT_BUCKET_LABEL: Record<string, string> = {
+  '40-50': 'Unter 50 kg',
+  '51-60': '51-60 kg',
+  '61-70': '61-70 kg',
+  '71-80': '71-80 kg',
+  '81-90': '81-90 kg',
+  '91-100': '91-100 kg',
+  '> 100': 'Über 100 kg',
+};
 
 export function prefillPatientFromLead(lead: Lead): PatientPrefill {
   // Phone + Name live on the lead row directly (not in formularDaten), so
@@ -298,6 +319,12 @@ export function prefillPatientFromLead(lead: Lead): PatientPrefill {
     p2_pflegegrad:    isCouple ? pflegegradLabel : undefined,
     p2_mobilitaet:    isCouple ? mobilitaetLabel : undefined,
     p2_nacht:         isCouple ? nachtLabel : undefined,
+    // Portal-Leads: nur setzen, wenn das Portal es geliefert hat.
+    gewicht:          typeof fd.gewicht === 'string' ? GEWICHT_BUCKET_LABEL[fd.gewicht] : undefined,
+    internet:         fd.internet === 'ja' ? 'Ja' : fd.internet === 'nein' ? 'Nein' : undefined,
+    diagnosen:        typeof fd.diagnosen === 'string' && fd.diagnosen ? fd.diagnosen : undefined,
+    plz:              typeof fd.plz === 'string' && fd.plz ? fd.plz : undefined,
+    ort:              typeof fd.ort === 'string' && fd.ort ? fd.ort : undefined,
     wunschGeschlecht: geschl ? (geschlechtMap[geschl] ?? '') : undefined,
     phone,
     name,

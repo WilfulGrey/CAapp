@@ -38,6 +38,37 @@ export interface ParseErgebnis {
   budgetrahmen?: number;
   /** Felder, deren Wert wir nicht kannten — Hinweis auf Vorlagenwechsel. */
   unbekannt: string[];
+  /** Nicht-preisrelevante Angaben mit festem Zuhause weiter unten im Flow
+   *  (Formular-Prefill, Mamamia-Onboarding, JobOffer-Beschreibung). */
+  details?: PortalDetails;
+}
+
+export interface PortalDetails {
+  /** Mamamia-Gewichts-Bucket ("61-70", "> 100" …) aus "Körpergewicht: 70 kg". */
+  gewicht?: string;
+  /** "ja"/"nein" aus "Internetanschluss: Vorhanden / Nicht vorhanden". */
+  internet?: string;
+  /** Freitext aus "Krankheiten:" — Prefill fürs Diagnosen-Feld. */
+  diagnosen?: string;
+  /** "ja", wenn die Krankheiten Demenz nennen (Grad unbekannt — das
+   *  Formularfeld bleibt leer, aber Mamamia bekommt dementia=yes). */
+  demenz?: string;
+  /** Menschlicher Kontextblock für die JobOffer-Beschreibung: Beziehung,
+   *  Lebenssituation, Dauer, Zimmer, Erreichbarkeit … */
+  block?: string;
+}
+
+/* Mamamia speichert Gewicht als String-Bucket (Bug #13f/#17b — Ränder
+ * NICHT uniform: unten "40-50", oben "> 100" MIT Leerzeichen). */
+export function kgZuBucket(kg: number): string | undefined {
+  if (!Number.isFinite(kg) || kg <= 0) return undefined;
+  if (kg <= 50) return '40-50';
+  if (kg <= 60) return '51-60';
+  if (kg <= 70) return '61-70';
+  if (kg <= 80) return '71-80';
+  if (kg <= 90) return '81-90';
+  if (kg <= 100) return '91-100';
+  return '> 100';
 }
 
 /** "Label: Wert" aus dem Mailtext, erste Fundstelle gewinnt.
@@ -205,6 +236,36 @@ export function parsePflegehilfe(text: string): ParseErgebnis {
 
   const budget = feld(text, 'Budgetrahmen')?.match(/(\d[\d.]*)/)?.[1];
 
+  // ── Details ohne Preisbezug (Prefill / Onboarding / JobOffer) ──────────
+  const gewichtRoh = feld(text, 'Körpergewicht des Patienten');
+  const kg = gewichtRoh?.match(/(\d+)/)?.[1];
+  const internetRoh = feld(text, 'Internetanschluss');
+  const diagnosen = feld(text, 'Krankheiten') ?? undefined;
+
+  /* Kontextblock für die Agentur — nur Zeilen, die die Mail wirklich hat.
+   * Bewusst verbatim ("Vorhanden" statt geratener Enum — Zimmer sagt
+   * nicht, WELCHE Unterbringungsart; die wählt der Kunde im Formular). */
+  const blockZeilen: string[] = [];
+  for (const label of [
+    'Beziehung', 'Lebenssituation', 'Dauer', 'Zimmer für Betreuungskraft',
+    'Erreichbarkeit', 'Kundenservice durch Agentur',
+    'Körpergewicht des Patienten', 'Krankheiten',
+  ]) {
+    const w = feld(text, label);
+    if (w) blockZeilen.push(`${label}: ${w}`);
+  }
+
+  const details: PortalDetails = {};
+  const bucket = kg ? kgZuBucket(Number(kg)) : undefined;
+  if (bucket) details.gewicht = bucket;
+  if (internetRoh) {
+    if (/nicht vorhanden|nein|kein/i.test(internetRoh)) details.internet = 'nein';
+    else if (/vorhanden|ja/i.test(internetRoh)) details.internet = 'ja';
+  }
+  if (diagnosen) details.diagnosen = diagnosen;
+  if (diagnosen && /demenz/i.test(diagnosen)) details.demenz = 'ja';
+  if (blockZeilen.length) details.block = blockZeilen.join('\n');
+
   return {
     kontakt: {
       name: feld(text, 'Ansprechpartner') ?? '',
@@ -228,5 +289,6 @@ export function parsePflegehilfe(text: string): ParseErgebnis {
       : undefined,
     budgetrahmen: budget ? Number(budget.replace(/\./g, '')) : undefined,
     unbekannt,
+    details: Object.keys(details).length ? details : undefined,
   };
 }

@@ -762,3 +762,30 @@ Deno.test("buildCustomerInput: no locationId → location_id stays null (patient
   // No location_custom_text on customer top-level — patient form's PLZ+Ort
   // propagate via UpdateCustomer.
 });
+
+// ─── Portal-Leads (Registry #43): echte CSV-Angaben, nie Defaults ────────
+Deno.test("buildPatients: Portal-fd setzt weight + dementia (mit Beschreibung)", () => {
+  const [p1] = buildPatients({
+    pflegegrad: 3, mobilitaet: "mobil",
+    gewicht: "61-70", demenz: "ja", diagnosen: "Demenz",
+  } as never);
+  assertEquals(p1.weight, "61-70");
+  assertEquals(p1.dementia, "yes");
+  assertEquals(p1.dementia_description, "Demenz");
+});
+
+Deno.test("buildPatients: ohne Portal-fd bleiben weight/dementia unset (Bug #13)", () => {
+  const [p1] = buildPatients({ pflegegrad: 3, mobilitaet: "mobil" } as never);
+  assertEquals(p1.weight, undefined);
+  assertEquals(p1.dementia, undefined);
+});
+
+Deno.test("buildCustomerInput: fd.internet ja/nein → yes/no, absent → undefined", () => {
+  const basisFd = { deutschkenntnisse: "kommunikativ", pflegegrad: 3, mobilitaet: "mobil" };
+  const mkLead = (fd: Record<string, unknown>) => ({
+    email: "x@y.de", kalkulation: { bruttopreis: 3000, formularDaten: { ...basisFd, ...fd } },
+  }) as never;
+  assertEquals(buildCustomerInput(mkLead({ internet: "ja" })).internet, "yes");
+  assertEquals(buildCustomerInput(mkLead({ internet: "nein" })).internet, "no");
+  assertEquals(buildCustomerInput(mkLead({})).internet, undefined);
+});

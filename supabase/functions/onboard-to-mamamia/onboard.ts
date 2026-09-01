@@ -78,6 +78,7 @@ const STORE_CUSTOMER = /* GraphQL */ `
     $arrival_at: String,
     $visibility: String,
     $other_people_in_house: String,
+    $internet: String,
     $gender: String,
     $patients: [PatientInputType],
     $customer_caregiver_wish: CustomerCaregiverWishInputType
@@ -90,6 +91,7 @@ const STORE_CUSTOMER = /* GraphQL */ `
       arrival_at: $arrival_at,
       visibility: $visibility,
       other_people_in_house: $other_people_in_house,
+      internet: $internet,
       gender: $gender,
       patients: $patients,
       customer_caregiver_wish: $customer_caregiver_wish
@@ -341,6 +343,7 @@ export async function onboardLead(opts: OnboardOptions): Promise<OnboardResult &
 
   const mamamiaCustomerId = customerResp.StoreCustomer.id;
   const careBudget = lead.kalkulation?.bruttopreis ?? null;
+  const fd = lead.kalkulation?.formularDaten ?? {};
 
   // 7. StoreJobOffer — arrival_at must match Customer.arrival_at (set above)
   const arrivalAt = computeArrivalDate(lead.care_start_timing, nowISO);
@@ -356,7 +359,12 @@ export async function onboardLead(opts: OnboardOptions): Promise<OnboardResult &
       customer_id: mamamiaCustomerId,
       service_agency_id: loadPrimundusAgencyId(),
       title,
-      description: "Auto-created from Primundus kostenrechner",
+      // Portal-Leads (Registry #43): der Kontextblock aus der Portal-Mail
+      // (Beziehung, Lebenssituation, Dauer, Zimmer, Gewicht, Krankheiten …)
+      // — die Agentur sieht die Details ab der ersten Minute im Job.
+      description: typeof fd?.portal_details === "string" && fd.portal_details
+        ? `Auto-created from Primundus kostenrechner\n\n${fd.portal_details}`
+        : "Auto-created from Primundus kostenrechner",
       salary_offered: careBudget,
       salary_commission: 10,    // Primundus default commission, panel rejects 0 (300 → 10 wg decyzji 2026-05-11)
       visibility: "public",

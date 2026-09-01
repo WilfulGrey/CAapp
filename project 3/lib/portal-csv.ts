@@ -77,6 +77,12 @@ export function csvZuLeadZeile(kopf: string[], zeile: string[]): CsvLeadZeile {
   if (wert('SeniorCareLevel')) t.push(`Pflegegrad\t${wert('SeniorCareLevel')}`);
   if (wert('SeniorMobility')) t.push(`Mobilität\t${wert('SeniorMobility')}`);
   if (wert('RequestNumber')) t.push(`Anfragen-Nr. ${wert('RequestNumber')}`);
+  /* Senior-Spalten als Zeilen VOR dem Detailblock — dieselben Labels, die
+     der Parser (und der Kontextblock) ohnehin liest. */
+  if (wert('SeniorMedicalProcess')) t.push(`Krankheiten	${wert('SeniorMedicalProcess')}`);
+  if (wert('SeniorRelationship')) t.push(`Beziehung	${wert('SeniorRelationship')}`);
+  if (wert('SeniorLiveSituation')) t.push(`Lebenssituation	${wert('SeniorLiveSituation')}`);
+  if (wert('Availability')) t.push(`Erreichbarkeit	${wert('Availability')}`);
   if (wert('RequestDetail')) t.push(wert('RequestDetail'));
 
   const zusatz: Record<string, string> = {};

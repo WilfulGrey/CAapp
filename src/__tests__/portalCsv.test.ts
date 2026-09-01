@@ -82,6 +82,21 @@ describe('CSV → parsePflegehilfe (Zauner end-to-end)', () => {
   it('Einwilligung kommt bewusst NICHT aus der CSV (nur der Mailtext trägt sie)', () => {
     expect(r.einwilligung).toBeUndefined();
   });
+
+  it('details (Registry #43): Gewicht-Bucket, Internet, Diagnosen, Demenz-Flag', () => {
+    expect(r.details?.gewicht).toBe('61-70');        // 70 kg
+    expect(r.details?.internet).toBe('ja');          // Vorhanden
+    expect(r.details?.diagnosen).toBe('Demenz');
+    expect(r.details?.demenz).toBe('ja');
+  });
+
+  it('details.block: Kontext für die JobOffer-Beschreibung', () => {
+    expect(r.details?.block).toContain('Beziehung: Schwiegervater');
+    expect(r.details?.block).toContain('Lebenssituation: Lebt alleine');
+    expect(r.details?.block).toContain('Dauer: Unbefristet');
+    expect(r.details?.block).toContain('Zimmer für Betreuungskraft: Vorhanden');
+    expect(r.details?.block).toContain('Körpergewicht des Patienten: 70 kg');
+  });
 });
 
 describe('parsePflegehilfe — "Mobil ohne Hilfsmittel" auch im Mailtext', () => {
