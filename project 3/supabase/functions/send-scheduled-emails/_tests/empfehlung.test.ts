@@ -224,7 +224,7 @@ Deno.test("empfehlungHtml: ohne Foto Initialen statt kaputtem Bild", () => {
 Deno.test("empfehlungHtml: Zähler oben und im Sekundärlink, beide dynamisch", () => {
   const { empfehlung } = baueEmpfehlung(cg({ id: 42 }), null, {}, 5, JETZT);
   const fuenf = empfehlungHtml(empfehlung, null, "https://p", "https://a", 5);
-  assertStringIncludes(fuenf, "5 Betreuungskräfte für Sie verfügbar");
+  assertStringIncludes(fuenf, "5 Kräfte verfügbar");
   assertStringIncludes(fuenf, "Alle 5 Betreuungskräfte ansehen");
   // Der lange Erklärabsatz ist ersatzlos raus.
   assertEquals(fuenf.includes("ist eine von"), false);
@@ -232,7 +232,7 @@ Deno.test("empfehlungHtml: Zähler oben und im Sekundärlink, beide dynamisch", 
 
   // Genau eine Kraft: Einzahl oben, kein Sekundärlink.
   const eine = empfehlungHtml(empfehlung, null, "https://p", "https://a", 1);
-  assertStringIncludes(eine, "1 Betreuungskraft für Sie verfügbar");
+  assertStringIncludes(eine, "1 Kraft verfügbar");
   assertEquals(eine.includes("Alle 1"), false);
 });
 
@@ -505,13 +505,29 @@ Deno.test("empfehlungHtml: Verfügbarkeitszeile ist raus — sie stand doppelt",
   assert(mitTermin.gruende.includes("Zum gewünschten Termin verfügbar"));
 });
 
-Deno.test("empfehlungHtml: Zähler und Überschrift auf derselben Schriftgröße", () => {
+Deno.test("empfehlungHtml: Überschrift und Zähler stehen IM Kasten, nicht darüber", () => {
   const { empfehlung } = baueEmpfehlung(cg({ id: 42 }), null, {}, 5, JETZT);
   const html = empfehlungHtml(empfehlung, null, "https://p", "https://a", 5);
-  const zaehler = html.match(/font-size:(\d+)px[^"]*"[^>]*>5 Betreuungskräfte/);
-  const kopf = html.match(/font-size:(\d+)px[^"]*"[^>]*>Unsere Empfehlung/);
-  assert(zaehler && kopf, "Zeilen nicht gefunden");
-  assertEquals(zaehler![1], kopf![1]);
+  const kastenAuf = html.indexOf("border:2px solid #8B7355");
+  const kopf = html.indexOf("Unsere Empfehlung");
+  const zaehler = html.indexOf("5 Kräfte verfügbar");
+  assert(kastenAuf >= 0, "Kasten fehlt");
+  assert(kopf > kastenAuf, "Überschrift steht noch ausserhalb des Kastens");
+  assert(zaehler > kastenAuf, "Zähler steht noch ausserhalb des Kastens");
+});
+
+Deno.test("empfehlungHtml: keine Karte in der Karte", () => {
+  const { empfehlung } = baueEmpfehlung(
+    cg({ id: 42 }), { about_de: "Ein langer Vorstellungstext. ".repeat(12) }, {}, 5, JETZT,
+  );
+  const html = empfehlungHtml(empfehlung, null, "https://p", "https://a", 5);
+  // Genau EIN gerahmter Aussenkasten; die zwei Kacheln zaehlen nicht als Karte.
+  assertEquals((html.match(/border:2px solid #8B7355/g) ?? []).length, 1);
+  // Der "Ueber"-Abschnitt steht auf Weiss, nicht in einem grauen Kasten.
+  // (#F5F5F6 allein reicht als Probe nicht — die Stufen-Plakette nutzt
+  // denselben Ton als Pillen-Hintergrund; gesucht ist der KASTEN.)
+  assertEquals(/border-radius:16px;background:#F5F5F6/.test(html), false);
+  assertEquals(html.includes("Über Maria"), true);
 });
 
 Deno.test("empfehlungHtml: Profil-Link am Namen zeigt auf dieselbe Seite wie der Knopf", () => {

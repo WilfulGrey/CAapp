@@ -773,36 +773,50 @@ export function empfehlungHtml(
   const vorstellungBlock = klar
     ? `
           <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="margin:18px 0 0;">
-            <tr><td>
+            <tr><td style="padding-top:16px;border-top:1px solid #EFEAE2;">
               <p style="margin:0 0 8px;font-size:17px;font-weight:700;line-height:1.4;color:#18181B;">Über ${vorname}</p>
-              <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="border:1px solid #D4D4D8;border-radius:16px;background:#F5F5F6;">
-                <tr><td style="padding:14px 16px 0;">
-                  <p style="margin:0;font-size:16px;line-height:1.65;color:#18181B;">${esc(klar)}${
-                    blass ? ` <span style="color:#A9A9B0;">${esc(blass)}</span>` : ""
-                  }${gekuerzt ? `<span style="color:#D0D0D6;"> …</span>` : ""}</p>
-                </td></tr>
-                <tr><td height="34" style="height:34px;font-size:0;line-height:0;background-color:#F5F5F6;background-image:linear-gradient(180deg, rgba(245,245,246,0) 0%, #F5F5F6 100%);">&nbsp;</td></tr>
-              </table>
+              <p style="margin:0;font-size:16px;line-height:1.65;color:#18181B;">${esc(klar)}${
+                blass ? ` <span style="color:#A9A9B0;">${esc(blass)}</span>` : ""
+              }${gekuerzt ? `<span style="color:#D0D0D6;"> …</span>` : ""}</p>
             </td></tr>
           </table>`
     : "";
 
-  const zaehler = sichtbarGesamt > 0
-    ? `<p style="margin:0 0 2px;font-size:17px;font-weight:600;line-height:1.45;color:${KORALLE};">${sichtbarGesamt} ${sichtbarGesamt === 1 ? "Betreuungskraft" : "Betreuungskräfte"} für Sie verfügbar</p>`
+  /* Kopfleiste IM Kasten (Martin, 31.08.: „die Empfehlung müsste mehr im
+     Kasten stehen oder am Rand"). Vorher standen Zähler und Überschrift als
+     lose Zeilen darüber — sie gehörten optisch zum Fließtext und der Kasten
+     fing erst darunter an. Jetzt trägt der Kasten seine eigene Überschrift,
+     rechts die Anzahl. */
+  const zaehlerRechts = sichtbarGesamt > 0
+    ? `<td style="vertical-align:middle;text-align:right;white-space:nowrap;padding-left:12px;font-size:13px;font-weight:600;color:#8B7355;">${sichtbarGesamt} ${sichtbarGesamt === 1 ? "Kraft" : "Kräfte"} verfügbar</td>`
     : "";
+
+  const kopfleiste = `
+          <tr>
+            <td style="padding:13px 20px;background:#FAF8F4;border-bottom:1px solid #EBE2D2;border-radius:15px 15px 0 0;">
+              <table width="100%" cellpadding="0" cellspacing="0" role="presentation">
+                <tr>
+                  <td style="vertical-align:middle;font-size:12px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;color:${KORALLE};">Unsere Empfehlung</td>
+                  ${zaehlerRechts}
+                </tr>
+              </table>
+            </td>
+          </tr>`;
 
   const alleLink = sichtbarGesamt > 1
     ? `<p style="margin:12px 0 0;text-align:center;"><a href="${alleUrl}" target="_blank" style="color:#8B7355;text-decoration:underline;font-size:14px;font-weight:600;">Alle ${sichtbarGesamt} Betreuungskräfte ansehen &rarr;</a></p>`
     : "";
 
+  /* Mehr Luft davor und danach + kraeftigerer Rand in Primundus-Braun statt
+     Grau: der Block ging im Fliesstext unter (Martin). Zwei Pixel Rand und
+     die warme Kopfleiste heben ihn heraus, ohne eine zweite Karte im Kasten
+     zu bauen. */
   return `
-    <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="margin:0 0 28px;">
+    <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="margin:32px 0 32px;">
       <tr><td>
 
-        ${zaehler}
-        <p style="margin:0 0 14px;font-size:17px;font-weight:700;line-height:1.45;color:#2D1F0F;">Unsere Empfehlung</p>
-
-        <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="border:1px solid #D4D4D8;border-radius:16px;background:#ffffff;">
+        <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="border:2px solid #8B7355;border-radius:16px;background:#ffffff;">
+          ${kopfleiste}
           <tr><td style="padding:20px;">
 
             <table width="100%" cellpadding="0" cellspacing="0" role="presentation">

@@ -285,6 +285,20 @@ haczyki, sekcja „Über <Imię>" w pudełku `#F5F5F6`/`#D4D4D8` — i tam tekst
 **wygasa**: pierwsze ~150 znaków w `#18181B`, kolejne ~110 w `#A9A9B0`, potem
 „…".
 
+**Nagłówek siedzi W kasteczku, nie nad nim** (Martin, 31.08.: „die Empfehlung
+müsste mehr im Kasten stehen … der CG-Bereich geht im Text einfach mit
+unter"). Kasten ma ramkę **2 px `#8B7355`** (nie szarą) i własny pasek
+nagłówka na ciepłym `#FAF8F4`: po lewej „UNSERE EMPFEHLUNG" (koral,
+wersaliki), po prawej „N Kräfte verfügbar". Skrócone „Kräfte" jest celowe —
+pełne „Betreuungskräfte verfügbar" nie mieści się w pasku przy 375 px
+(zmierzone: 185 + 152 px w 379 px szerokości treści). Do tego 32 px odstępu
+nad i pod kastenem, żeby nie zlewał się z tekstem.
+
+Sekcja „Über <Imię>" NIE ma już własnego szarego pudełka — przy ramce
+zewnętrznej byłaby to karta w karcie, którą Martin odrzucił wcześniej. Tekst
+stoi na białym tle, oddziela go cienka linia; wygaszenie nadal robią dwie
+barwy tekstu.
+
 Przy nazwisku, po prawej stronie wiersza, stoi tekstowy odnośnik
 **„Zum Profil ›"** — odpowiednik chevrona z `MatchCard`. W mailu sam symbol
 nie czyta się jako klikalny, dlatego jest przy nim cel. Prowadzi pod ten sam
