@@ -252,6 +252,148 @@ ląduje w CAapp z tokenem w URL.
 E-mail z linkiem leci równolegle (Eingangsbestätigung), ale **nie jest drogą
 przejścia** — klient nie czeka na maila.
 
+### Empfehlung w Eingangsbestätigung (Bug #39, 2026-08-31)
+
+Angebotsmail pokazuje **konkretną gematchowaną opiekunkę** zamiast zdania „w
+portalu czekają opiekunki". Kod:
+[empfehlung.ts](../project%203/supabase/functions/send-scheduled-emails/empfehlung.ts).
+
+Ścieżka danych — **wyłącznie istniejące edge fns tego samego projektu**, zero
+nowego klienta mamamii i zero agency-credentials w mailerze:
+
+```
+send-scheduled-emails (email_type=eingangsbestaetigung)
+  → POST /functions/v1/onboard-to-mamamia { token }     # idempotent
+      ↳ cache-hit gdy lead ma już mamamia_job_offer_id
+      ↳ inaczej StoreCustomer + StoreJobOffer (jak przy pierwszym wejściu
+        do portalu — TYLKO wcześniej; patrz przełącznik niżej)
+      → { customer_id, job_offer_id, session_token }
+  → POST /functions/v1/mamamia-proxy  X-Session-Token: <jwt>
+      { action: "listMatchings", variables: { limit: 200 } }
+  → waehleFuenf(...)   # ta sama piątka co portal (patrz niżej)
+  → POST /functions/v1/mamamia-proxy  { action: "getCaregiver", id }
+      # driving_license + about_de/motivation — nie ma ich w liście matchingów
+```
+
+**Wygląd: wycinek strony szczegółów opiekunki.** Po feedbacku Martina
+(31.08., „profil jak strona szczegółów w portalu, potem wyszarzenie, potem
+przycisk") blok odwzorowuje `CustomerNurseModal`, nie kartę z listy: zdjęcie
+80 px (radius 16, biała obwódka) obok imienia w formie `displayName` i wieku
+„54 J.", chip ze stopniem, dwa kafelki obok siebie („Erfahrung" z wartością
+w `#8B7355` + „Deutschkenntnisse" z paskami 1–3 i słowem), trzy
+haczyki, sekcja „Über <Imię>" w pudełku `#F5F5F6`/`#D4D4D8` — i tam tekst
+**wygasa**: pierwsze ~150 znaków w `#18181B`, kolejne ~110 w `#A9A9B0`, potem
+„…".
+
+**Kolejność bloków** (Martin, 31.08. — „harmonischer"): powitanie → cena →
+Konditionen → Testsieger → porównanie z domem opieki → **nagłówek** „<N> passende
+Betreuungskräfte für Sie" (20 px, pogrubiony, liczba CYFRĄ — w nagłówku ma
+kłuć w oczy) →
+kasten z rekomendacją → „So geht es weiter" → CTA → podsumowanie zgłoszenia.
+Cena, Konditionen i Testsieger wróciły do JEDNEGO beżowego panelu — rozdzielone
+były tylko po to, żeby rekomendacja zmieściła się pomiędzy; teraz stoi pod nimi
+i trzy beżowe bloki znów tworzą całość, a biały kasten z brązową ramką jest
+punktem kulminacyjnym, nie przerywnikiem.
+
+Wstęp waży inaczej: nie „persönliches Angebot" jest pogrubione, tylko
+**„bereits passende Betreuungskräfte für Sie gefunden"** + wskazówka „Sie
+finden sie weiter unten in dieser E-Mail". Liczba stoi TYLKO w nagłówku nad
+kastenem — pasek nagłówka nie powtarza jej już (test tego pilnuje).
+
+**Nagłówek siedzi W kasteczku, nie nad nim** (Martin, 31.08.: „die Empfehlung
+müsste mehr im Kasten stehen … der CG-Bereich geht im Text einfach mit
+unter"). Kasten ma ramkę **2 px `#8B7355`** (nie szarą) i własny pasek
+nagłówka na ciepłym `#FAF8F4`: po lewej „UNSERE EMPFEHLUNG" (koral,
+wersaliki), po prawej „N Kräfte verfügbar". Skrócone „Kräfte" jest celowe —
+pełne „Betreuungskräfte verfügbar" nie mieści się w pasku przy 375 px
+(zmierzone: 185 + 152 px w 379 px szerokości treści). Do tego 32 px odstępu
+nad i pod kastenem, żeby nie zlewał się z tekstem.
+
+Sekcja „Über <Imię>" NIE ma już własnego szarego pudełka — przy ramce
+zewnętrznej byłaby to karta w karcie, którą Martin odrzucił wcześniej. Tekst
+stoi na białym tle, oddziela go cienka linia; wygaszenie nadal robią dwie
+barwy tekstu.
+
+Przy nazwisku, po prawej stronie wiersza, stoi tekstowy odnośnik
+**„Zum Profil ›"** — odpowiednik chevrona z `MatchCard`. W mailu sam symbol
+nie czyta się jako klikalny, dlatego jest przy nim cel. Prowadzi pod ten sam
+adres co duży przycisk (test pilnuje, żeby oba `href` były identyczne).
+Mouseover (`a.profil-link:hover` → koral + podkreślenie) siedzi w bazowym
+bloku `<style>`, **nie** w media-query — działa w Apple Mail, iOS Mail
+i webowym Gmailu; Outlook Desktop nie zna `:hover` i pokazuje link statycznie.
+
+Osobnej zielonej linii „Verfügbar ab …" NIE ma (Martin, 31.08.) — termin
+mówi już haczyk „Zum gewünschten Termin verfügbar", a dwa razy to samo
+zdanie obok siebie wyglądało na niedopatrzenie. Licznik i nagłówek stoją na
+tym samym stopniu pisma (17 px); rozróżnia je grubość i kolor, nie rozmiar.
+
+Wygaszenie jest zrobione DWIEMA BARWAMI TEKSTU, nie nakładką z gradientem:
+`position:absolute` wypada w Gmailu i Outlooku, a tam tekst urywałby się
+twardo. Dwa odcienie działają w każdym kliencie; gradient pod tekstem jest
+tylko dodatkiem dla klientów, które go renderują. Funkcje: `textAusblenden`,
+`vorstellungstext`.
+
+`vorstellungstext` idzie tą samą ścieżką co modal: `about_de` → `motivation`
+→ zdanie z prawdziwych pól. **Bez regeneracji** — portal każe mamamii
+przepisać stary opis (płatny LLM), mailer tego nie robi; pusty tekst po
+prostu znika razem z sekcją.
+
+**CTA w kolorze koralowym `#E76F63`** — jak `PrimaryCTA.tsx` na stronie
+i „Einladen" w portalu. Dotyczy obu przycisków w mailu; zieleń zostaje
+wyłącznie dla haczyków i dostępności.
+
+**Trzy haczyki NIE są matchingiem.** Punkt 1 to zawsze „Entspricht Ihrem
+Wunschprofil". Punkty 2–3 podnoszą komunikacyjnie to, co klient sam wpisał
+w kalkulatorze (`anforderungenAusAnfrage`: bettlägerig → Rollstuhl →
+Nachteinsätze → Ehepaar → Pflegegrad ≥ 4 → Rollator), a gdy brakuje —
+uzupełniają standardami w kolejności: termin → niemiecki → prawo jazdy
+(`haken`). Każdy standard jest związany z danymi i znika bez dowodu:
+
+| Haczyk | Warunek |
+|---|---|
+| Zum gewünschten Termin verfügbar | `available_from` mieści się w oknie z `care_start_timing` (`START_OFFSET_TAGE` — lustro `OFFSET_DAYS` z onboard/mappers.ts) |
+| Deutschkenntnisse wie gewünscht | stopień znany ORAZ dokładnie równy życzeniu (sam filtr przepuszcza nieznane — to jeszcze nie trafienie) |
+| Führerschein vorhanden | klient chciał (`fuehrerschein='ja'`) ORAZ opiekunka ma (`getCaregiver.driving_license='yes'`) — jedyny powód, dla którego `getCaregiver` jest jeszcze wołane |
+
+Nagłówka nad haczykami nie ma („Warum … zu Ihren Angaben passt" usunięte) —
+pierwszy haczyk sam to mówi.
+
+**Kolejność MUSI być identyczna z portalem.** `waehleFuenf` kopiuje trzy
+rzeczy z `src/`: `rankComparator`
+([matchingsRanking.ts](../src/lib/mamamia/matchingsRanking.ts)), filtr języka +
+lejek wiek/badge z `effectiveMatched`
+([CustomerPortalPage.tsx](../src/pages/CustomerPortalPage.tsx)) ORAZ ostatni
+krok portalu — „najwięcej einsatzów na miejsce 1" (`bestIdx`). Bez tego
+ostatniego kroku mail pokazywał **inną** opiekunkę niż klik: `rankComparator`
+sortuje po STOPNIU badge (12+ = Elite) i rozstrzyga remis zdjęciem/płcią/wiekiem,
+więc 20 einsatzów bez zdjęcia ląduje za 13 einsatzami ze zdjęciem — a w portalu
+przed nimi.
+
+Deeplinki z maila (obsługa w `CustomerPortalPage.tsx`):
+
+| Param | Skąd | Co robi |
+|---|---|---|
+| `cg=<caregiver_id>` | przycisk „<Imię> kennenlernen" | otwiera modal profilu tej opiekunki (raz, ref-guard); nieznane id → nic się nie dzieje |
+| `goto=matches` | „Alle passenden Betreuungskräfte ansehen" | scroll do `#pflegekraefte` |
+
+Zachowanie brzegowe (Święta zasada nr 1 — nigdy pusty blok, nigdy zmyślona
+opiekunka):
+
+| Sytuacja | Mail |
+|---|---|
+| jest match | sekcja z opiekunką + 3 haczyki + CTA; licznik N w nagłówku i w linku (przy N=1 link znika) |
+| brak matchów / błąd mamamii / timeout | uczciwy tekst zastępczy, cena i reszta maila bez zmian |
+| lead kupiony (`portalHerkunft`) | wyjątek wraca razem z PR #599 — na trunku leadów kupionych jeszcze nie ma |
+| brak zdjęcia lub nieudany inline-fetch | kafelek z inicjałem (NIGDY surowy URL S3 — wygasa po ~30 min) |
+
+**Przełącznik `EMPFEHLUNG_ONBOARD=0`** wyłącza WYŁĄCZNIE serwerowe onboardowanie
+— wtedy empfehlung dostają tylko leady, które już mają `job_offer` (resubmity,
+osoby po wejściu do portalu). Domyślnie włączone. **Konsekwencja biznesowa do
+zaklepania z Michałem przed prod-deployem:** przy włączonym przełączniku KAŻDE
+zapytanie z kalkulatora zakłada klienta w mamamii (status `draft`) — także te,
+których przeglądarka nigdy nie dotrze do portalu. Dla ścieżki z kalkulatora to
+zmiana MOMENTU (redirect i tak onboarduje kilka sekund później), nie faktu.
+
 ---
 
 ## Wiersz `leads` po Stage A
