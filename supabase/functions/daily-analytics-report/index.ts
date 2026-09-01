@@ -22,6 +22,7 @@ import {
   fetchBookedCustomers,
   fetchDailyStats,
   fetchLeadCohorts,
+  fetchBesucherKohorten,
   fetchAdsSpend,
   fetchPeriodStats,
   fetchTotalLeads, fetchMailHealth } from "./queries.ts";
@@ -131,7 +132,7 @@ Deno.serve(async (req: Request) => {
     const yesterday = berlinDayRange(daysAgo);
 
     const CHART_DAYS_BACK = 14;
-    const [yesterdayStats, periodStats, prevPeriodStats, totalLeads, booked, mailHealth, agentNotes, adsSpend, leadKohorten] = await Promise.all([
+    const [yesterdayStats, periodStats, prevPeriodStats, totalLeads, booked, mailHealth, agentNotes, adsSpend, leadKohorten, besucherKohorten] = await Promise.all([
       fetchDailyStats(supabase, yesterday.start, yesterday.end),
       fetchPeriodStats(supabase, PERIOD_DAYS_BACK),
       // Die 7 Tage VOR der Vergleichsperiode — Basis für den Trend-Pfeil.
@@ -148,6 +149,11 @@ Deno.serve(async (req: Request) => {
         console.error("Lead-Kohorten nicht lesbar:", e instanceof Error ? e.message : String(e));
         return [];
       }),
+      /* Besucher je Tag inkl. Ads-Anteil — gleiche Fail-soft-Regel. */
+      fetchBesucherKohorten(supabase, CHART_DAYS_BACK).catch((e) => {
+        console.error("Besucher-Kohorten nicht lesbar:", e instanceof Error ? e.message : String(e));
+        return [];
+      }),
     ]);
 
     const smtp = await getSmtpConfig(supabase);
@@ -155,6 +161,7 @@ Deno.serve(async (req: Request) => {
 
     const { subject, html, text } = buildReportEmail({
       leadKohorten,
+      besucherKohorten,
       yesterday: yesterdayStats,
       period: periodStats,
       yesterdayLabel: yesterday.label,

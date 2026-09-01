@@ -547,6 +547,16 @@ export async function fetchAdsSpend(
    Reife-Vorbehalt: die jüngsten ein bis zwei Tage können nur noch wachsen —
    wer gestern Abend kam, füllt sein Profil vielleicht heute. Die Balken der
    letzten Tage sind also Mindestwerte, nie Endstände. */
+export interface BesucherKohorte {
+  /** TT.MM. — Anzeigelabel */
+  label: string;
+  /** YYYY-MM-DD (Berlin) */
+  iso: string;
+  besucher: number;
+  /** davon über Anzeigen (utm_medium = 'cpc') */
+  ausAds: number;
+}
+
 export interface LeadKohorte {
   /** TT.MM. — Anzeigelabel */
   label: string;
@@ -554,6 +564,67 @@ export interface LeadKohorte {
   iso: string;
   leads: number;
   mitProfil: number;
+}
+
+/* Besucher je Tag, aufgeteilt nach Herkunft (Anzeigen vs. Rest).
+   Bewusst aus analytics_sessions: die Sitzung wird fuer JEDEN Besucher
+   angelegt, unabhaengig von der Cookie-Einwilligung — anders als die
+   Ereignisse in analytics_events, die nur einwilligende Besucher erfassen.
+   Diese Zahl ist also vollstaendig.
+
+   Interne Sitzungen (jemand aus dem Team war im /admin) fliegen ueber den
+   Fingerabdruck raus, gleiche Regel wie im SEA-Lauf. */
+export async function fetchBesucherKohorten(
+  supabase: SupabaseClient,
+  daysBack: number,
+): Promise<BesucherKohorte[]> {
+  const aeltester = berlinDayRange(daysBack);
+  const juengster = berlinDayRange(1);
+
+  /* Seitenweise lesen: 14 Tage Sitzungen liegen schon bei ~900 Zeilen, und
+     PostgREST liefert ohne range() hoechstens 1.000 — ohne Schleife wuerde
+     der Rest ab dem naechsten Wachstumsschritt STILL fehlen und das
+     Diagramm zu wenig Besucher zeigen. */
+  const SEITE = 1000;
+  const sitzungen: Array<Record<string, unknown>> = [];
+  for (let von = 0; ; von += SEITE) {
+    const { data, error } = await supabase
+      .from("analytics_sessions")
+      .select("fingerprint, landing_page, utm_medium, started_at")
+      .gte("started_at", aeltester.start)
+      .lt("started_at", juengster.end)
+      .range(von, von + SEITE - 1);
+    if (error) throw new Error(`analytics_sessions (Besucher-Kohorten): ${error.message}`);
+    const teil = data ?? [];
+    sitzungen.push(...teil);
+    if (teil.length < SEITE) break;
+  }
+  const intern = new Set(
+    sitzungen
+      .filter((s: any) => String(s.landing_page ?? "").startsWith("/admin"))
+      .map((s: any) => s.fingerprint)
+      .filter(Boolean),
+  );
+
+  const tage: BesucherKohorte[] = [];
+  const nachIso = new Map<string, BesucherKohorte>();
+  for (let i = daysBack; i >= 1; i--) {
+    const r = berlinDayRange(i);
+    const k: BesucherKohorte = { label: r.label.slice(0, 6), iso: r.iso, besucher: 0, ausAds: 0 };
+    tage.push(k);
+    nachIso.set(r.iso, k);
+  }
+  for (const s of sitzungen) {
+    if ((s as any).fingerprint && intern.has((s as any).fingerprint)) continue;
+    const iso = new Intl.DateTimeFormat("en-CA", {
+      timeZone: "Europe/Berlin", year: "numeric", month: "2-digit", day: "2-digit",
+    }).format(new Date((s as any).started_at));
+    const k = nachIso.get(iso);
+    if (!k) continue;
+    k.besucher++;
+    if ((s as any).utm_medium === "cpc") k.ausAds++;
+  }
+  return tage;
 }
 
 export async function fetchLeadCohorts(
