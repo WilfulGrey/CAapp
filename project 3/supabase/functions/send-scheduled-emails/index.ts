@@ -1137,7 +1137,9 @@ export function buildEingangsbestaetigungHtml(
   const angenommeneFelder = (lead.kalkulation as any)?.angenommene_felder;
   const wurdeAngenommen = !Array.isArray(angenommeneFelder) || angenommeneFelder.length > 0;
   const angabenHinweis = herkunft ? portalAngabenHinweisHtml(herkunft, wurdeAngenommen) : "";
-  const vorschauBlock = herkunft ? portalVorschauHtml(siteUrl, ctaUrl) : "";
+  /* Ohne echte Empfehlung traegt die Plakette den Kraefte-Hinweis; mit
+     Empfehlung uebernimmt das die Kraft selbst (siehe portalVorschauHtml). */
+  const vorschauBlock = herkunft ? portalVorschauHtml(siteUrl, ctaUrl, !hatEmpfehlung) : "";
 
   const content = `
     <p style="font-size:15px;line-height:1.75;color:#444;margin-bottom:14px;">${greeting},</p>
@@ -2382,9 +2384,11 @@ Deno.serve(async (req: Request) => {
             : "Ihr Angebot zur 24-Stunden-Betreuung \u2013 Primundus";
 
           /* ── Empfehlung: echte gematchte Pflegekraft in die Mail ──────────
-             Eingekaufte Portal-Leads bleiben AUSSEN VOR (undefined): die haben
-             eine eigene Dramaturgie mit Vorschau-Block und Herkunfts-Hinweis,
-             da gehoert keine zweite Pflegekraft-Sektion hinein.
+             Auch fuer eingekaufte Portal-Leads (Martin 01.09.): gerade der
+             Kaltkontakt, der beim Portal auf drei Anbieter wartet, entscheidet
+             an einem Gesicht mit Namen — nicht an einem Preis. Die generische
+             Fuenf-Gesichter-Plakette weicht dann automatisch (siehe
+             portalVorschauHtml), damit dieselbe Aussage nicht zweimal steht.
              Alles hier ist best-effort — faellt es aus, bleibt es bei null und
              die Mail zeigt den ehrlichen Ersatztext. Der Versand haengt an
              keiner Stelle davon ab. */

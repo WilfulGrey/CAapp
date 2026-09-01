@@ -121,7 +121,16 @@ export function portalKraeftePlaketteHtml(siteUrl: string, ctaUrl: string): stri
     </table>`;
 }
 
-export function portalVorschauHtml(siteUrl: string, ctaUrl: string): string {
+/* Der Kopf des Portal-Leads.
+ *
+ * `mitPlakette` steuert die Fuenf-Gesichter-Plakette: Sie behauptet
+ * "5 passende Pflegekraefte" mit anonymen Avataren. Steht weiter unten in
+ * derselben Mail eine ECHTE gematchte Kraft mit Namen, Foto und Gruenden,
+ * saehe der Kunde dieselbe Aussage zweimal — einmal als Versprechen, einmal
+ * als Beleg. Dann gewinnt der Beleg, und die Plakette entfaellt (Martin
+ * 01.09.). Ohne Empfehlung bleibt sie: dann ist sie das einzige Signal,
+ * dass hier Menschen und nicht nur ein Preis warten. */
+export function portalVorschauHtml(siteUrl: string, ctaUrl: string, mitPlakette = true): string {
   const p = (t: string) =>
     `<p style="font-size:15px;line-height:1.75;color:#444;margin:0 0 16px;">${t}</p>`;
 
@@ -130,7 +139,7 @@ export function portalVorschauHtml(siteUrl: string, ctaUrl: string): string {
     ${p(`Bei Primundus geht es aber um mehr als nur den Preis: Sie können <strong style="color:#2D1F0F;">verfügbare Pflegekräfte direkt einsehen</strong>, vergleichen und Ihre Wunsch-Pflegekraft selbst auswählen – ohne sich vorher vertraglich zu binden.`)}
     ${p(`So wissen Sie von Anfang an, was die Betreuung kostet und wer für Sie infrage kommt.`)}
     ${portalCtaButtonHtml(ctaUrl, "Angebot &amp; passende Pflegekräfte ansehen", "22px auto 14px")}
-    ${portalKraeftePlaketteHtml(siteUrl, ctaUrl)}`;
+    ${mitPlakette ? portalKraeftePlaketteHtml(siteUrl, ctaUrl) : ""}`;
 }
 
 export function portalVorschauText(ctaUrl: string): string {
