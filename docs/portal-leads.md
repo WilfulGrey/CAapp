@@ -7,14 +7,15 @@ alles wie immer — Preis, Token, Kundenportal, Mail 1.
 ## Der Weg einer Anfrage
 
 ```
-Portal-Mail  →  Postfach        →  Abholer (Cron, jede Minute)
-                pflegehilfe@       scripts/portal/abholer.ts
-                primundus.de            │
+Portal-Mail  →  Postfach        →  pg_cron (jede Minute, Supabase)
+                pflegehilfe@       POST /api/portal-abholen (Bearer)
+                primundus.de       app/api/portal-abholen/route.ts
+                                        │  ~1s IMAP-Poll
                                         ▼
                                    lib/portal-parser.ts
                                    liest "Label: Wert"
                                         │
-                                        ▼
+                                        ▼  (Loopback im selben Prozess)
                             POST /api/portal-lead   (x-portal-key)
                                         │
                     ┌───────────────────┼───────────────────┐
@@ -40,12 +41,19 @@ gegenüber einem Menschen, der die Mail liest und zurückruft, nicht ins
 Gewicht.
 
 Ein Lauf dauert rund **eine Sekunde**: verbinden, ungelesene Mails holen,
-verarbeiten, schließen. `buildCommand` läuft nur beim Deploy, nicht bei
-jedem Lauf.
+verarbeiten, schließen.
 
-Bewusst ein Cron und kein Dauerprozess: ein Skript, das startet, arbeitet
-und endet, hat keine Verbindung, die wegbrechen kann, und keinen Prozess,
-der still stirbt, ohne dass es jemand merkt.
+Getaktet wird von **pg_cron** (Migration
+`20260901120000_setup_portal_abholer_cron.sql`) — dieselbe Infra wie
+detect-caregiver-events und send-scheduled-emails, **kein eigener
+Render-Dienst** (Entscheidung Michał 01.09., Registry #39: „mamy już
+crony"). Der Lauf lebt als Route im ohnehin laufenden Kostenrechner:
+der Parser bleibt geteilt statt kopiert, und es gibt keinen zweiten
+bezahlten Dienst. Gegen die Eigenheiten des langlebigen Prozesses
+schützen ein Überlapp-Guard (ein Takt zugleich; ausgelassene Takte sind
+egal, die Mails bleiben liegen) und `socketTimeout: 30s` auf der
+IMAP-Verbindung (eine hängende Session heilt sich nicht mehr durch
+Prozessende).
 
 ## Die Postfächer sind Eingänge, keine Absender
 
@@ -58,29 +66,35 @@ Die Zugangsdaten liegen außerhalb des Repos und dienen nur dem Lesen.
 
 ## Scharfschalten
 
-**Schritt 1 — Trockenlauf.** Der Cron Job startet mit
-`PORTAL_TROCKENLAUF=1`: er liest, parst und protokolliert, legt aber
-keinen Lead an und löst keine Kundenmail aus. Die Mails bleiben ungelesen.
+**Schritt 1 — Trockenlauf.** `PORTAL_TROCKENLAUF=1` im Render-Dashboard
+des Kostenrechners setzen (+ Redeploy): die Route liest, parst und
+protokolliert, legt aber keinen Lead an und löst keine Kundenmail aus.
+Die Mails bleiben ungelesen.
 
-Im Log steht pro Mail, wie viele Felder erkannt wurden. Eine Zeile
-`⚠ nicht zugeordnet` bedeutet: das Portal hat seine Vorlage geändert —
-erst den Parser nachziehen, nicht scharfschalten.
+Im Log (Render-Logs des Kostenrechners, Präfix `[portal-abholer]`) steht
+pro Mail, wie viele Felder erkannt wurden. Eine Zeile `⚠ nicht zugeordnet`
+bedeutet: das Portal hat seine Vorlage geändert — erst den Parser
+nachziehen, nicht scharfschalten.
 
 **Schritt 2 — scharf.** `PORTAL_TROCKENLAUF` leeren. Ab dann bekommt jeder
 eingehende Lead automatisch Mail 1, ohne dass ein Mensch draufschaut.
 
-## Environment (Render, Dienst `portal-abholer`)
+## Environment (Render-Dashboard des Kostenrechners)
 
 | Variable | Zweck |
 |---|---|
-| `PORTAL_LEAD_URL` | Basis-URL des Kostenrechners (ohne `/api/...`) |
-| `PORTAL_LEAD_KEY` | derselbe Wert wie auf `kostenrechner-beta`; fehlt er dort, antwortet der Endpunkt 503 |
+| `PORTAL_LEAD_KEY` | Auth des Eingangs `/api/portal-lead`; fehlt er, antwortet der 503 |
 | `PFLEGEHILFE_USER` / `_PASS` | Postfach. Fehlt eines, wird das Portal übersprungen |
 | `PFLEGEBUND_USER` / `_PASS` | dito |
 | `PORTAL_IMAP_HOST` | `imap.ionos.de` |
 | `PORTAL_TROCKENLAUF` | `1` = nur lesen (siehe oben) |
+| `PORTAL_LEAD_URL` | optionaler Override des Loopback-Ziels; normal NICHT gesetzt |
 
-Der Dienst heißt `portal-abholer` und ist ein **Cron Job** (`* * * * *`).
+Der Takt kommt aus pg_cron: neues Vault-Secret `kostenrechner_url`
+(per Env verschieden) + bestehendes `supabase_service_role_key` als
+Bearer — die Route prüft ihn mit `timingSafeEqual`. Ohne Postfach-Zugänge
+antwortet sie `200 {verarbeitet: 0}` — auf Staging bewusst wirkungslos
+(Muster wie die Google-Secrets).
 
 ## Warum es so gebaut ist
 
@@ -103,9 +117,12 @@ im Ereignislog und entscheidet, ob die Mail den Annahme-Hinweis zeigt.
 laufen die übrigen weiter.
 
 **Jeder liegengebliebene Lead färbt den Lauf rot.** Nicht nur ein kaputtes
-Postfach, auch eine einzelne Mail, die nicht durchging, setzt den
-Exit-Code auf 1. Sonst zeigte Render bei einem Takt von einer Minute 60
-grüne Läufe pro Stunde, während derselbe bezahlte Lead nie durchgeht.
+Postfach, auch eine einzelne Mail, die nicht durchging, macht die Antwort
+zu **HTTP 500** mit `{liegengeblieben: N}`. Wichtig: pg_cron-„succeeded"
+heißt nur „HTTP gefeuert" (Registry #36), und `net._http_response`
+rotiert in Stunden — die Wahrheit steht in den **Render-Logs des
+Kostenrechners** (`[portal-abholer]`), und die unverarbeiteten Mails
+bleiben als ungelesen im Postfach sichtbar.
 
 ## Neues Portal aufnehmen
 
@@ -117,8 +134,9 @@ grüne Läufe pro Stunde, während derselbe bezahlte Lead nie durchgeht.
    **ohne TLD**. Muss doppelt stehen, weil die Edge Function (Deno) keinen
    Code mit der Next-App teilen kann. Fehlt das Portal hier, bekommt der
    Kunde die normale Mail statt der Portal-Fassung.
-3. `render.yaml` — Zugangsdaten des neuen Postfachs. Die Namen leitet der
-   Abholer aus der Domain ab: `pflegehilfe.org` → `PFLEGEHILFE_USER` /
+3. `render.yaml` (Block `kostenrechner-beta`) + Render-Dashboard —
+   Zugangsdaten des neuen Postfachs. Die Namen leitet die Abholer-Route
+   aus der Domain ab: `pflegehilfe.org` → `PFLEGEHILFE_USER` /
    `PFLEGEHILFE_PASS`.
 
 Nicht nachzutragen: der Reiter im Admin und die Allowlist des Eingangs —
