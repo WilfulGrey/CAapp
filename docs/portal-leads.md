@@ -107,6 +107,13 @@ und als Fallback für Mails ohne Anhang. Spalten ohne Zuhause bei uns
 (Krankheiten, Gewicht, Beziehung …) landen als `zusatz` im Ereignis
 `portal_lead_eingekauft` — append-only, nichts geht verloren.
 
+**Mamamia sofort (Registry #44).** Der Eingang onboardet den Lead
+UNMITTELBAR nach dem Anlegen zu Mamamia (gleicher Edge-Fn-Weg wie aus dem
+Browser, idempotent) — Kunde + Job stehen dort in derselben Minute wie der
+Lead, samt Details. Schlägt das fehl (MM down), bricht der Eingang NICHT
+ab: Mail 1 geht raus und der Lazy-Onboard beim ersten Portal-Besuch bleibt
+als Fallback.
+
 **Details fließen weiter (Registry #43).** Nicht-preisrelevante Angaben
 aus CSV/Mail haben feste Häuser: Gewicht (kg → Mamamia-Bucket), Internet,
 Krankheiten/Diagnosen und PLZ/Ort wandern in `formularDaten` → füllen das
