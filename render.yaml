@@ -133,17 +133,17 @@ services:
       - key: NODE_OPTIONS
         value: "--max-old-space-size=384"
 
-  # ── 3. Portal-Abholer — Worker (IMAP IDLE) ────────────────────────────
+  # ── 3. Portal-Abholer — Cron Job (jede Minute) ────────────────────────
   # Holt eingekaufte Lead-Anfragen aus den Portal-Postfaechern und schiebt
   # sie in dieselbe Strecke wie ein Kostenrechner-Lead (POST /api/portal-lead
   # auf kostenrechner-beta).
   #
-  # BEWUSST ein Worker und KEIN Cron: das Portal gibt dieselbe Anfrage an
-  # bis zu drei Anbieter, wer zuerst antwortet gewinnt. Der Worker haelt
-  # eine stehende IMAP-Verbindung (IDLE) — der Server meldet die Mail von
-  # sich aus, gemessen ~2 s bis zur fertigen Kundenmail. Ein Cron startet
-  # je Lauf einen frischen Container samt npm install; allein das dauert
-  # laenger als der Vorsprung, um den es hier geht.
+  # Jede Minute. Das Portal gibt dieselbe Anfrage an bis zu drei Anbieter,
+  # wer zuerst antwortet gewinnt — eine Minute faellt dabei nicht ins
+  # Gewicht. Ein Skript, das startet, arbeitet und endet, hat dafuer keine
+  # Verbindung, die wegbrechen kann, und keinen Prozess, der still stirbt.
+  # (buildCommand laeuft nur beim Deploy, nicht je Lauf; ein Lauf dauert
+  # ~1 s.)
   #
   # Die Postfaecher sind reine EINGAENGE. Von hier wird nie gesendet; die
   # Kundenmail geht unveraendert ueber kostenrechner@primundus.de raus.
@@ -151,15 +151,15 @@ services:
   # Scharfschalten in zwei Schritten (siehe docs/portal-leads.md):
   #   1. PORTAL_TROCKENLAUF=1 — liest und protokolliert, legt nichts an
   #   2. Variable leeren, sobald der Parser auf echten Mails sauber liest
-  - type: worker
+  - type: cron
     name: portal-abholer
     runtime: node
     plan: starter
     branch: integration/mamamia-onboarding
     rootDir: project 3
+    schedule: "* * * * *"
     buildCommand: npm install
     startCommand: npm run portal:abholen
-    autoDeploy: true
     envVars:
       # Ziel des POST — der Kostenrechner legt Lead, Preis und Mail 1 an.
       - key: PORTAL_LEAD_URL
