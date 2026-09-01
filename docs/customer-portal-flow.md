@@ -742,8 +742,25 @@ po stronie MM: query `CustomerToken(id)`.
 - **onboard czyta teraz `MAMAMIA_PANEL_URL`** (wcześniej tylko `mamamia-proxy`); bootstrap
   throw'uje gdy brak (Święta zasada nr 1).
 - **Best-effort** — awaria panelu jest łapana (`console.warn`) i NIE blokuje onboardu.
-  Wykonuje się tylko przy cache-miss. Kod:
-  [onboard.ts:pushCustomerToken](../supabase/functions/onboard-to-mamamia/onboard.ts).
+  Kod: [onboard.ts:pushCustomerToken](../supabase/functions/onboard-to-mamamia/onboard.ts).
+- **Kiedy się wykonuje** (Registry #44, od 2026-09-01) — przy cache-miss (tworzenie
+  klienta, jak dotąd) **ORAZ przy każdej rotacji tokenu**. Rotacja idzie wyłącznie
+  przez [`/api/lead-regenerate-token`](../project%203/app/api/lead-regenerate-token/route.ts)
+  (źródła `portal` / `admin-silent` / `admin-with-email`); route po zapisie nowego
+  tokenu strzela server-to-server `POST /functions/v1/onboard-to-mamamia`
+  z `{ token: <nowy>, mirror_token: true }` (Bearer = service-role, wzorzec
+  triggera `sync-acceptance`), a onboard w gałęzi cache-hit odświeża lustro.
+  - **Guard `lead.mamamia_customer_id`** — bez klienta w MM route NIE woła onboardu
+    (onboard nie linkuje, tylko TWORZY — inaczej każdy lead, którego przeglądarka
+    nigdy nie weszła do portalu, dostałby tu klienta `draft`).
+  - **Flaga `mirror_token` jest server-only** — przeglądarka jej nie wysyła, więc
+    zwykłe wejście do portalu nadal kosztuje **zero** wywołań panelu (push to 3
+    round-tripy: csrf → LoginAgency → mutacja, bez cache sesji).
+  - **Fire-and-forget** — jak mail w tej samej funkcji; klient nie czeka. Dowód
+    w logach: kostenrechner `[mirror-token] lead=… http=200`, edge fn
+    `[onboard] token mirrored for customer … stored=… sent=…` (prefiksy z
+    **odpowiedzi** MM — „brak błędu" nie dowodzi zapisu).
+  - Gałąź dedupe (60 s) nie rotuje tokenu ⇒ nie pushuje.
 
 #### ⑧ Sign session JWT + Set-Cookie
 

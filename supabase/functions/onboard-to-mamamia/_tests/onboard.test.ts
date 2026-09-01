@@ -322,6 +322,64 @@ Deno.test("onboardLead: cache hit — returns cached IDs without Mamamia calls",
   assertEquals(supa.updated.length, 0); // no write needed
 });
 
+// The counterpart of the test above: lead-regenerate-token rotated the token,
+// so the mirror on the Mamamia customer MUST be refreshed even though the
+// customer already exists. Without this the MM team keeps the token from the
+// first portal visit and their "open the customer's portal" link is dead.
+Deno.test("onboardLead: cache hit + mirrorToken → pushes the ROTATED token via UpdateCustomerToken", async () => {
+  _resetAgencyTokenCache();
+  const lead = makeLead({
+    token: "rotated-token",
+    mamamia_customer_id: 7566,
+    mamamia_job_offer_id: 16225,
+    mamamia_onboarded_at: "2026-04-20T00:00:00.000Z",
+  });
+  const supa = makeFakeSupabase([lead]);
+  // Empty ordered responses: any call to the agency API (= a second onboarding)
+  // would throw. Only the panel path may be used.
+  const mm = fakeMamamia([]);
+
+  const result = await onboardLead({
+    leadToken: "rotated-token",
+    mirrorToken: true,
+    secrets: SECRETS,
+    supabase: supa,
+    fetchFn: mm.fetch,
+    now: NOW,
+  });
+
+  const tokenReq = mm.requests.find((r) => r.query.includes("UpdateCustomerToken"));
+  if (!tokenReq) throw new Error("UpdateCustomerToken request not captured");
+  assertEquals(tokenReq.variables.id, 7566);
+  assertEquals(tokenReq.variables.token, "rotated-token");
+
+  // Cache hit stays a cache hit: same IDs, no customer re-created, no DB write.
+  assertEquals(result.customer_id, 7566);
+  assertEquals(result.job_offer_id, 16225);
+  assertEquals(supa.updated.length, 0);
+});
+
+Deno.test("onboardLead: cache hit + mirrorToken — panel down does not break portal entry", async () => {
+  _resetAgencyTokenCache();
+  const supa = makeFakeSupabase([makeLead({
+    mamamia_customer_id: 7566,
+    mamamia_job_offer_id: 16225,
+    mamamia_onboarded_at: "2026-04-20T00:00:00.000Z",
+  })]);
+  const mm = fakeMamamia([], { panelFails: true });
+
+  const result = await onboardLead({
+    leadToken: "valid-token",
+    mirrorToken: true,
+    secrets: SECRETS,
+    supabase: supa,
+    fetchFn: mm.fetch,
+    now: NOW,
+  });
+
+  assertEquals(result.customer_id, 7566);
+});
+
 // ─── Multi-Job (Variant A): job_id session scoping ───────────────────────
 
 const ONBOARDED = {

@@ -145,6 +145,32 @@ async function handlePost(request: NextRequest) {
     return jsonError(500, 'rotation_failed');
   }
 
+  // Den Token-Spiegel auf dem Mamamia-Kunden nachziehen (Gotcha #10): das
+  // MM-Team oeffnet das Kundenportal ueber diesen Token. Bisher wurde er nur
+  // beim ersten Portalbesuch gespiegelt, also zeigte MM nach JEDER Rotation
+  // auf einen toten Link. Die Agency-Credentials liegen ausschliesslich in den
+  // Edge Functions, deshalb der Server-zu-Server-Aufruf (Muster wie der
+  // sync-acceptance-Trigger in lead-event/route.ts).
+  //
+  // NUR wenn der Kunde in Mamamia schon existiert: onboard-to-mamamia LINKT
+  // nicht, es ERZEUGT — ohne diesen Guard bekaeme jeder Lead, dessen Browser
+  // nie im Portal war, hier einen Draft-Kunden.
+  //
+  // Fire-and-forget wie die Mail unten: der Kunde soll nach "Neuen Link
+  // senden" nicht ~3 s auf die Panel-Kette (csrf → LoginAgency → Mutation)
+  // warten. Ergebnis steht in den Render-Logs; der Push selbst wirft nie.
+  if (lead.mamamia_customer_id) {
+    fetch(`${supabaseUrl}/functions/v1/onboard-to-mamamia`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${supabaseServiceKey}` },
+      body: JSON.stringify({ token: newToken, mirror_token: true }),
+    })
+      .then((r) => console.log(`[mirror-token] lead=${lead.id} source=${source} http=${r.status}`))
+      .catch((e) =>
+        console.error(`[mirror-token] lead=${lead.id} failed:`, e instanceof Error ? e.message : String(e)),
+      );
+  }
+
   const shouldSendEmail = source !== 'admin-silent' && Boolean(lead.email);
   const portalBase = PORTAL_BASIS;
   const portalUrl = `${portalBase.replace(/\/$/, '')}/?token=${encodeURIComponent(newToken)}`;
