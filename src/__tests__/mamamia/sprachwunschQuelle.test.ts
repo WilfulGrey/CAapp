@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { resolveDeutschWishLevel, germanySkillLabel } from '../../lib/mamamia/mappers';
+import { resolveDeutschWishLevel, germanySkillLabel, requiredGermanyLevelForWish } from '../../lib/mamamia/mappers';
 
 // Kunde 10508, 01.09.2026: Das Portal zeigte keine einzige Pflegekraft,
 // obwohl mamamia 921 Vorschläge lieferte. Grund: bei mamamia stand
@@ -60,5 +60,27 @@ describe('germanySkillLabel — Gut und Sehr gut sind nicht dasselbe', () => {
     expect(germanySkillLabel('level_2')).toBe('ab Mittel');
     expect(germanySkillLabel('not_important')).toBe('Egal');
     expect(germanySkillLabel(null)).toBe('');
+  });
+});
+
+// „Sehr gut" (L4, +600 €) vergibt nur die Agentur im SA-Portal. Die
+// Angebots-Brücke schreibt dafür den eigenen Key 'sehr-gut-sa' in die
+// formularDaten. Kannte CAapp ihn nicht, entfiel der Sprachfilter komplett —
+// der teuerste Tier sah alle Stufen gemischt.
+describe('requiredGermanyLevelForWish — alle vier Tiers', () => {
+  it('bildet jeden Antwort-Key auf seine Stufe ab', () => {
+    expect(requiredGermanyLevelForWish('grundlegend')).toBe('level_1');
+    expect(requiredGermanyLevelForWish('kommunikativ')).toBe('level_2');
+    expect(requiredGermanyLevelForWish('sehr-gut')).toBe('level_3');   // Label „Gut"
+    expect(requiredGermanyLevelForWish('sehr-gut-sa')).toBe('level_4'); // Label „Sehr gut"
+  });
+
+  it('kennt keinen stillen Ausfall bei unbekanntem Wert', () => {
+    expect(requiredGermanyLevelForWish('quatsch')).toBeNull();
+    expect(requiredGermanyLevelForWish(null)).toBeNull();
+  });
+
+  it('greift auch ueber den Rueckfall der Wunsch-Aufloesung', () => {
+    expect(resolveDeutschWishLevel(null, 'sehr-gut-sa')).toBe('level_4');
   });
 });

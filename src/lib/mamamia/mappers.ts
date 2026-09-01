@@ -76,7 +76,15 @@ export function requiredGermanyLevelForWish(
   const v = (deutschkenntnisse ?? '').toLowerCase().trim();
   if (v === 'grundlegend') return 'level_1';
   if (v === 'kommunikativ') return 'level_2';
+  // „Gut" ist die oberste vom KUNDEN waehlbare Stufe. Der Antwort-Key im
+  // Rechner heisst historisch 'sehr-gut', das Label ist aber „Gut" (+450 €).
   if (v === 'sehr-gut' || v === 'sehr_gut' || v === 'gut') return 'level_3';
+  // „Sehr gut" (+600 €) vergibt NUR die Agentur im SA-Portal. Die
+  // Angebots-Bruecke schreibt dafuer den eigenen Key 'sehr-gut-sa' in die
+  // formularDaten (OfferFactorMapper::GERMAN_MAP, level_4). Ohne diese
+  // Zeile fiel er auf null und der Sprachfilter entfiel KOMPLETT — ein
+  // Kunde mit dem teuersten Tier sah alle Stufen gemischt.
+  if (v === 'sehr-gut-sa' || v === 'sehr_gut_sa') return 'level_4';
   return null;
 }
 
