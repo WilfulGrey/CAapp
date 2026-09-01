@@ -1008,15 +1008,13 @@ export function buildEingangsbestaetigungHtml(
      Farben und Innenabstaende bleiben identisch — es ist dieselbe Buehne,
      nur mit der Pflegekraft dazwischen. Ohne Empfehlung stehen beide
      Panels wie bisher unmittelbar untereinander. */
-  const preisTabelle = priceRows ? `
-    <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="margin:0 0 ${hatEmpfehlung ? "28px" : "0"};background:#FAF8F4;border-radius:10px;overflow:hidden;">
-      ${priceRows}
-    </table>` : "";
+  const preisTabelle = "";
 
   const konditionenTabelle = `
     <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="margin:0 0 28px;background:#FAF8F4;border-radius:10px;overflow:hidden;">
+      ${priceRows}
       <tr>
-        <td colspan="2" style="padding:16px 24px 16px;">
+        <td colspan="2" style="padding:16px 24px 16px;${bruttopreis > 0 ? "border-top:1px solid #ebe2d2;" : ""}">
           <p style="margin:0 0 10px;${psLabel}color:#2A9D5C;">Ihre Konditionen</p>
           ${["Täglich kündbar", "Tagesgenaue Abrechnung", "Betreuungskraft vor Vertragsabschluss selbst auswählen", "Keine Vermittlungsgebühren"].map((t) => `<p style="margin:0 0 6px;font-size:14px;line-height:1.6;color:#2D1F0F;"><span style="color:#2A9D5C;font-weight:700;">&#10003;</span>&nbsp;&nbsp;${t}</p>`).join("")}
           <p style="margin:8px 0 0;font-size:13px;line-height:1.6;color:#666;">Kosten entstehen erst, wenn Ihre Betreuungskraft vor Ort ist.</p>
@@ -1113,14 +1111,14 @@ export function buildEingangsbestaetigungHtml(
   const introParagraph = herkunft
     ? portalIntroHtml(herkunft)
     : isResubmit
-    ? `vielen Dank für Ihre erneute Anfrage. Wir haben Ihre Angaben übernommen und Ihr <strong style="color:#2D1F0F;">persönliches Angebot</strong> angepasst${
+    ? `vielen Dank für Ihre erneute Anfrage. Wir haben Ihre Angaben übernommen und Ihr persönliches Angebot angepasst${
         hatEmpfehlung
-          ? ` &ndash; und passende Betreuungskräfte für Sie gefunden.`
+          ? ` &ndash; und <strong style="color:#2D1F0F;">passende Betreuungskräfte für Sie gefunden</strong>. Sie finden sie weiter unten in dieser E-Mail.`
           : ` für die 24-Stunden-Betreuung zu Hause.`
       }`
-    : `vielen Dank für Ihre Anfrage. Auf Basis Ihrer Angaben haben wir Ihr <strong style="color:#2D1F0F;">persönliches Angebot</strong> erstellt${
+    : `vielen Dank für Ihre Anfrage. Auf Basis Ihrer Angaben haben wir Ihr persönliches Angebot erstellt${
         hatEmpfehlung
-          ? ` &ndash; und bereits passende Betreuungskräfte für Sie gefunden.`
+          ? ` &ndash; und <strong style="color:#2D1F0F;">bereits passende Betreuungskräfte für Sie gefunden</strong>. Sie finden sie weiter unten in dieser E-Mail.`
           : ` für die 24-Stunden-Betreuung zu Hause.`
       }`;
 
@@ -1146,9 +1144,9 @@ export function buildEingangsbestaetigungHtml(
 
     ${preisTabelle}
 
-    ${empfehlungSektion}
-
     ${konditionenTabelle}
+
+    ${empfehlungSektion}
 
     ${hatEmpfehlung ? "" : cta}
 
@@ -1223,10 +1221,10 @@ ${buildHeimVergleichText(lead)}
     ? portalIntroText(herkunftPlain)
     : isResubmit
     ? `vielen Dank für Ihre erneute Anfrage. Wir haben Ihre Angaben übernommen und Ihr persönliches Angebot angepasst${
-        hatEmpfehlungPlain ? " – und passende Betreuungskräfte für Sie gefunden." : " für die 24-Stunden-Betreuung zu Hause."
+        hatEmpfehlungPlain ? " – und passende Betreuungskräfte für Sie gefunden. Sie finden sie weiter unten in dieser E-Mail." : " für die 24-Stunden-Betreuung zu Hause."
       }`
     : `vielen Dank für Ihre Anfrage. Auf Basis Ihrer Angaben haben wir Ihr persönliches Angebot erstellt${
-        hatEmpfehlungPlain ? " – und bereits passende Betreuungskräfte für Sie gefunden." : " für die 24-Stunden-Betreuung zu Hause."
+        hatEmpfehlungPlain ? " – und bereits passende Betreuungskräfte für Sie gefunden. Sie finden sie weiter unten in dieser E-Mail." : " für die 24-Stunden-Betreuung zu Hause."
       }`;
 
   const angenommeneFelderPlain = (lead.kalkulation as any)?.angenommene_felder;
@@ -1246,7 +1244,7 @@ ${greeting},
 
 ${introPlain}
 
-${vorschauPlain}${priceLine}${empfehlungPlain}${konditionenLine}Angebot & Pflegekräfte ansehen: ${ctaUrl}
+${vorschauPlain}${priceLine}${konditionenLine}${empfehlungPlain}Angebot & Betreuungskräfte ansehen: ${ctaUrl}
 
 SO GEHT ES WEITER
 

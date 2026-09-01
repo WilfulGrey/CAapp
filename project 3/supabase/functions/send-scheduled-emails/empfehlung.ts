@@ -567,6 +567,11 @@ export function textAusblenden(
   };
 }
 
+/** Zahlwort für den Satz über dem Kasten. Über fünf kommt nie vor. */
+export function zahlwort(n: number): string {
+  return ["null", "eine", "zwei", "drei", "vier", "fünf"][n] ?? String(n);
+}
+
 /** Wie deutschStufe.ts, aber ohne Import-Zyklus — dieselbe Skala. */
 function deutschWortAus(skill: string | null | undefined): string | null {
   const map: Record<string, string> = {
@@ -787,21 +792,18 @@ export function empfehlungHtml(
      lose Zeilen darüber — sie gehörten optisch zum Fließtext und der Kasten
      fing erst darunter an. Jetzt trägt der Kasten seine eigene Überschrift,
      rechts die Anzahl. */
-  const zaehlerRechts = sichtbarGesamt > 0
-    ? `<td style="vertical-align:middle;text-align:right;white-space:nowrap;padding-left:12px;font-size:13px;font-weight:600;color:#8B7355;">${sichtbarGesamt} ${sichtbarGesamt === 1 ? "Kraft" : "Kräfte"} verfügbar</td>`
-    : "";
-
   const kopfleiste = `
           <tr>
-            <td style="padding:13px 20px;background:#FAF8F4;border-bottom:1px solid #EBE2D2;border-radius:15px 15px 0 0;">
-              <table width="100%" cellpadding="0" cellspacing="0" role="presentation">
-                <tr>
-                  <td style="vertical-align:middle;font-size:12px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;color:${KORALLE};">Unsere Empfehlung</td>
-                  ${zaehlerRechts}
-                </tr>
-              </table>
-            </td>
+            <td style="padding:13px 20px;background:#FAF8F4;border-bottom:1px solid #EBE2D2;border-radius:15px 15px 0 0;font-size:12px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;color:${KORALLE};">Unsere Empfehlung</td>
           </tr>`;
+
+  /* Der Satz über dem Kasten (Martin, 31.08.: „ich würde schon darüber
+     schreiben, wir haben bereits fünf passende Pflegekräfte für Sie
+     rausgesucht"). Er sagt die Zahl — deshalb steht sie nicht mehr auch
+     noch in der Kopfleiste. */
+  const einleitungSatz = sichtbarGesamt > 0
+    ? `<p style="margin:0 0 14px;font-size:16px;line-height:1.7;color:#444;">Wir haben bereits <strong style="color:#2D1F0F;">${zahlwort(sichtbarGesamt)} passende ${sichtbarGesamt === 1 ? "Betreuungskraft" : "Betreuungskräfte"}</strong> für Sie herausgesucht.</p>`
+    : "";
 
   const alleLink = sichtbarGesamt > 1
     ? `<p style="margin:12px 0 0;text-align:center;"><a href="${alleUrl}" target="_blank" style="color:#8B7355;text-decoration:underline;font-size:14px;font-weight:600;">Alle ${sichtbarGesamt} Betreuungskräfte ansehen &rarr;</a></p>`
@@ -814,6 +816,8 @@ export function empfehlungHtml(
   return `
     <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="margin:32px 0 32px;">
       <tr><td>
+
+        ${einleitungSatz}
 
         <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="border:2px solid #8B7355;border-radius:16px;background:#ffffff;">
           ${kopfleiste}
@@ -881,7 +885,7 @@ export function empfehlungText(
   const zeilen: string[] = [];
   if (sichtbarGesamt > 0) {
     zeilen.push(
-      `${sichtbarGesamt} ${sichtbarGesamt === 1 ? "Betreuungskraft" : "Betreuungskräfte"} für Sie verfügbar`,
+      `Wir haben bereits ${zahlwort(sichtbarGesamt)} passende ${sichtbarGesamt === 1 ? "Betreuungskraft" : "Betreuungskräfte"} für Sie herausgesucht.`,
       "",
     );
   }

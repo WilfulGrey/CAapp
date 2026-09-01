@@ -285,6 +285,20 @@ haczyki, sekcja „Über <Imię>" w pudełku `#F5F5F6`/`#D4D4D8` — i tam tekst
 **wygasa**: pierwsze ~150 znaków w `#18181B`, kolejne ~110 w `#A9A9B0`, potem
 „…".
 
+**Kolejność bloków** (Martin, 31.08. — „harmonischer"): powitanie → cena →
+Konditionen → Testsieger → porównanie z domem opieki → **zdanie** „Wir haben
+bereits <liczebnik> passende Betreuungskräfte für Sie herausgesucht." →
+kasten z rekomendacją → „So geht es weiter" → CTA → podsumowanie zgłoszenia.
+Cena, Konditionen i Testsieger wróciły do JEDNEGO beżowego panelu — rozdzielone
+były tylko po to, żeby rekomendacja zmieściła się pomiędzy; teraz stoi pod nimi
+i trzy beżowe bloki znów tworzą całość, a biały kasten z brązową ramką jest
+punktem kulminacyjnym, nie przerywnikiem.
+
+Wstęp waży inaczej: nie „persönliches Angebot" jest pogrubione, tylko
+**„bereits passende Betreuungskräfte für Sie gefunden"** + wskazówka „Sie
+finden sie weiter unten in dieser E-Mail". Liczba stoi TYLKO w zdaniu nad
+kastenem — pasek nagłówka nie powtarza jej już (test tego pilnuje).
+
 **Nagłówek siedzi W kasteczku, nie nad nim** (Martin, 31.08.: „die Empfehlung
 müsste mehr im Kasten stehen … der CG-Bereich geht im Text einfach mit
 unter"). Kasten ma ramkę **2 px `#8B7355`** (nie szarą) i własny pasek
