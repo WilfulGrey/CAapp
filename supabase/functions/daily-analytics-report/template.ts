@@ -9,7 +9,7 @@
 // zeigt das aktuelle Plateau. Conversion-% als Tabelle, weil absolute
 // Zahlen wenig aussagen wenn Traffic schwankt.
 
-import type { DailyStats, LeadKohorte, PeriodStats } from "./queries.ts";
+import type { BesucherKohorte, DailyStats, LeadKohorte, PeriodStats } from "./queries.ts";
 
 // Spiegelt MultiStepForm.getStepId() — 9 Schritte (Betreuungsbeginn /
 // care_start_timing wurde aus dem Funnel entfernt, Kontaktformular ist
@@ -62,9 +62,13 @@ export function buildReportEmail(opts: {
   /** Leads je Anlage-Tag inkl. „hat später ein Profil gefüllt" — für das
    *  gestapelte Balkendiagramm. Fehlt sie, entfällt das Diagramm. */
   leadKohorten?: LeadKohorte[];
+  /** Besucher je Tag inkl. Ads-Anteil — erstes Diagramm. Fehlt sie,
+   *  entfällt das Diagramm (fail-soft wie die Lead-Kohorten). */
+  besucherKohorten?: BesucherKohorte[];
 }): { subject: string; html: string; text: string } {
   const { yesterday, period, yesterdayLabel, periodLabel, totalLeads, bookedCustomers, totalBookings, siteUrl, mailHealth, prevPeriod, agentNotes, adsSpend } = opts;
   const leadKohorten = opts.leadKohorten ?? [];
+  const besucherKohorten = opts.besucherKohorten ?? [];
 
   // Ads-Kosten je Stufe (auf Martins Wunsch 16.08.: Spend, €/Lead,
   // €/Patientenprofil — bewusst OHNE Kunden-Stufe). Blended: Spend ÷ ALLE
@@ -233,96 +237,37 @@ export function buildReportEmail(opts: {
       </td>
     </tr>`).join("");
 
-  /* Über welche SEITE kam der Lead (leads.source)? Andere Frage als der CTA
-     oben: dort geht es um den Knopf, hier um Formular vs. Voll-Chat. Zeigt den
-     Landingpage-Test im Alltag — ohne dass jemand eine Auswertung anstoßen
-     muss. Leads von vor dem 27.08.2026 tragen alle 'rechner' (die Quelle wurde
-     bis dahin hart gesetzt), der 7-Tage-Wert ist also erst ab dem 03.09.
-     vollständig aussagekräftig. */
-  /* Kanal UND Seite (Martin, 27.08.) — die drei Test-Varianten sollen sich
-     hier unterscheiden lassen:
-       A  /                 Formular ohne Chat   (Kontrolle)
-       B  /kosten-berechnen Formular + Pria-Float
-       C  /sofortangebot    Pria als ganze Seite */
-  const QUELL_NAMEN: Record<string, string> = {
-    rechner: "A · Formular (Startseite)",
-    "kostenrechner-result": "A · Formular (Startseite)",
-    "rechner:kosten-berechnen": "B · Formular (Seite mit Pria)",
-    "chat:kosten-berechnen": "B · Pria-Float (Seite mit Formular)",
-    "chat:sofortangebot": "C · Pria Voll-Chat",
-    "pria-chat": "C · Pria Voll-Chat",
-    unbekannt: "ohne Kennung",
-  };
-  const quellGestern = yesterday.leadsBySource ?? {};
-  const quellPeriode = period.leadsBySource ?? {};
-  const quellKeys = Array.from(new Set([...Object.keys(quellGestern), ...Object.keys(quellPeriode)]))
-    .sort((a, b) => (quellPeriode[b] ?? 0) - (quellPeriode[a] ?? 0));
-  const quellGesternGesamt = Object.values(quellGestern).reduce((s, n) => s + n, 0);
-  const quellPeriodeGesamt = Object.values(quellPeriode).reduce((s, n) => s + n, 0);
-  /* ── Die drei Test-Varianten nebeneinander (Martin, 27.08.) ──────────
-     Besucher je Landingpage aus analytics_sessions, Leads je Herkunft aus
-     leads.source — daraus die Quote, die den Test entscheidet. Der Block
-     erscheint nur, solange eine der Chat-Varianten überhaupt Besuch hatte;
-     sonst steht er als leere Tabelle im Weg. */
-  const VARIANTEN: Array<{ seite: string; name: string; quellen: string[] }> = [
-    { seite: "/", name: "A · Startseite (Formular)", quellen: ["rechner", "kostenrechner-result"] },
-    { seite: "/kosten-berechnen", name: "B · Formular + Pria-Float",
-      quellen: ["rechner:kosten-berechnen", "chat:kosten-berechnen"] },
-    { seite: "/sofortangebot", name: "C · Pria Voll-Chat",
-      quellen: ["chat:sofortangebot", "pria-chat"] },
-  ];
-  const besucherGestern = yesterday.besucherJeSeite ?? {};
-  const besucherPeriode = period.besucherJeSeite ?? {};
-  const chatBesuch = (besucherPeriode["/sofortangebot"] ?? 0) + (besucherPeriode["/kosten-berechnen"] ?? 0);
-  const variantenHtml = chatBesuch === 0 ? "" : `
-        <p style="margin:16px 0 6px;font-size:12px;font-weight:700;color:#3D2B1F;">
-          Chat-Test — die drei Varianten (7 Tage)
-        </p>
-        <table width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;background:#fff;border:1px solid #f0e8dc;border-radius:6px;">
-          <tr style="background:#faf6ef;">
-            <td style="padding:6px 12px;font-size:11px;color:#9a8a73;">Variante</td>
-            <td align="right" style="padding:6px 12px;font-size:11px;color:#9a8a73;">Besucher</td>
-            <td align="right" style="padding:6px 12px;font-size:11px;color:#9a8a73;">Leads</td>
-            <td align="right" style="padding:6px 12px;font-size:11px;color:#9a8a73;">Quote</td>
-          </tr>
-          ${VARIANTEN.map((v, idx) => {
-            const bes = besucherPeriode[v.seite] ?? 0;
-            const leads = v.quellen.reduce((s, q) => s + (quellPeriode[q] ?? 0), 0);
-            const quote = bes > 0 ? ((leads / bes) * 100).toFixed(1) : "—";
-            const gesternBes = besucherGestern[v.seite] ?? 0;
-            return `<tr style="background:${idx % 2 ? "#fdfbf7" : "#fff"};">
-              <td style="padding:7px 12px;font-size:12px;color:#3D2B1F;border-bottom:1px solid #f0e8dc;">${v.name}</td>
-              <td align="right" style="padding:7px 12px;font-size:12px;color:#5C4A32;border-bottom:1px solid #f0e8dc;">${bes}<span style="color:#9a8a73;font-size:11px;"> (gestern ${gesternBes})</span></td>
-              <td align="right" style="padding:7px 12px;font-size:12px;font-weight:700;color:#3D2B1F;border-bottom:1px solid #f0e8dc;">${leads}</td>
-              <td align="right" style="padding:7px 12px;font-size:12px;color:#3D2B1F;border-bottom:1px solid #f0e8dc;">${quote}${bes > 0 ? "&thinsp;%" : ""}</td>
-            </tr>`;
-          }).join("")}
-        </table>
-        <p style="margin:6px 0 0;font-size:11px;color:#9a8a73;line-height:1.5;">
-          Gleiche Anzeigen, gleiches Budget, unterschiedlicher Weg zum Angebot.
-          Entscheidend ist die Quote (Leads je Besucher) — nicht die absolute Zahl,
-          die vom Budget je Kampagne abhängt.
-        </p>`;
+  /* Woher kam der Lead: über das Formular des Kostenrechners oder über den
+     Chat-Knopf? Beide sitzen auf DERSELBEN Seite — verglichen wird also der
+     Weg zum Angebot, nicht die Seite (Martin, 01.09.). Deshalb absolute
+     Zahlen und Anteile statt einer Quote je Besucher: der Nenner wäre für
+     beide Wege derselbe und würde nur Genauigkeit vortäuschen.
 
-  const quellHtml = quellKeys.map((quelle, idx) => {
-    const g = quellGestern[quelle] ?? 0;
-    const w = quellPeriode[quelle] ?? 0;
-    return `
-    <tr style="background:${idx % 2 ? "#fdfbf7" : "#fff"};">
-      <td style="padding:7px 12px;font-size:12px;color:#3D2B1F;border-bottom:1px solid #f0e8dc;">
-        ${QUELL_NAMEN[quelle] ?? quelle}
-      </td>
-      <td align="right" style="padding:7px 12px;font-size:12px;font-weight:700;color:#3D2B1F;border-bottom:1px solid #f0e8dc;">
-        ${g}
-      </td>
-      <td align="right" style="padding:7px 12px;font-size:12px;color:#5C4A32;border-bottom:1px solid #f0e8dc;">
-        ${w}
-      </td>
-      <td align="right" style="padding:7px 12px;font-size:11px;color:#9a8a73;border-bottom:1px solid #f0e8dc;">
-        ${quellPeriodeGesamt ? Math.round((w / quellPeriodeGesamt) * 100) : 0}&thinsp;%
-      </td>
-    </tr>`;
-  }).join("");
+     Die frühere Dreiteilung (A Startseite · B Formular+Float · C Voll-Chat)
+     ist raus — den Voll-Chat auf /sofortangebot gibt es nicht mehr, seine
+     Kampagne ist seit dem 28.08. pausiert. Mit ihr fielen die nie
+     ausgegebenen Blöcke QUELL_NAMEN/quellHtml/variantenHtml weg; sie wurden
+     seit dem Umbau auf Diagramme (PR #585) berechnet und verworfen.
+
+     Leads von vor dem 27.08.2026 tragen alle 'rechner' — die Quelle wurde
+     bis dahin hart gesetzt. Ältere Zeiträume zeigen den Chat daher als 0,
+     auch wenn es dort Gespräche gab. */
+  const istChatQuelle = (quelle: string) =>
+    quelle.startsWith("chat:") || quelle === "pria-chat";
+  const einstiegSumme = (quellen: Record<string, number>) => {
+    let chat = 0, formular = 0;
+    for (const [quelle, anzahl] of Object.entries(quellen)) {
+      if (istChatQuelle(quelle)) chat += anzahl;
+      else formular += anzahl;
+    }
+    return { chat, formular, gesamt: chat + formular };
+  };
+  const einstiegGestern = einstiegSumme(yesterday.leadsBySource ?? {});
+  const einstiegPeriode = einstiegSumme(period.leadsBySource ?? {});
+  const EINSTIEGE = [
+    { name: "Kostenrechner (Formular)", wert: einstiegPeriode.formular, gestern: einstiegGestern.formular },
+    { name: "Pria (Chat-Knopf)", wert: einstiegPeriode.chat, gestern: einstiegGestern.chat },
+  ];
 
   const funnelHtml = Array.from({ length: TOTAL_STEPS }, (_, i) => i + 1).map((step) => {
     const viewed = yesterday.funnelStepViewed[step] ?? 0;
@@ -452,24 +397,62 @@ export function buildReportEmail(opts: {
         </tr>
       </table>`;
 
+  /* ── Diagramm 0: Besucher je Tag, davon über Anzeigen ───────────────
+     Gleiche Bauart wie das Lead-Diagramm darunter: der Balken IST die
+     Besucherzahl, der ausgefüllte Teil wächst von UNTEN. So liest man beide
+     Diagramme mit derselben Bewegung.
+
+     Quelle ist analytics_sessions und damit vollständig — anders als alles,
+     was aus analytics_events kommt (das zählt nur einwilligende Besucher). */
+  const besMax = Math.max(1, ...besucherKohorten.map((k) => k.besucher));
+  const besGes = besucherKohorten.reduce((s, k) => s + k.besucher, 0);
+  const besAds = besucherKohorten.reduce((s, k) => s + k.ausAds, 0);
+  const chartBesucher = besucherKohorten.length === 0 ? "" : diagrammKarte(
+    "Besucher je Tag",
+    `<span style="display:inline-block;width:9px;height:9px;background:${FARBE.balken};border-radius:2px;"></span> über Anzeigen (unten)` +
+    `&nbsp;&nbsp;<span style="display:inline-block;width:9px;height:9px;background:${FARBE.balkenLeise};border-radius:2px;"></span> übrige`,
+    `<table width="100%" cellpadding="0" cellspacing="0" role="presentation"><tr>${
+      besucherKohorten.map((k, i) => {
+        const hGes = k.besucher > 0 ? Math.max(3, Math.round((k.besucher / besMax) * 84)) : 2;
+        const hAds = k.besucher > 0 ? Math.round((k.ausAds / k.besucher) * hGes) : 0;
+        const hRest = Math.max(0, hGes - hAds);
+        const letzter = i === besucherKohorten.length - 1;
+        return `
+      <td align="center" valign="bottom" style="padding:0 2px;">
+        <p style="margin:0 0 3px;font-size:10px;line-height:1.2;color:${letzter ? FARBE.tinte : FARBE.leise};font-weight:${letzter ? "700" : "400"};">${k.besucher || ""}</p>
+        ${hRest > 0 ? `<div style="height:${hRest}px;background:${FARBE.balkenLeise};border-radius:${hAds > 0 ? "3px 3px 0 0" : "3px"};font-size:0;line-height:0;">&nbsp;</div>` : ""}
+        ${hAds > 0 ? `<div style="height:${hAds}px;background:${FARBE.balken};border-radius:${hRest > 0 ? "0 0 3px 3px" : "3px"};font-size:0;line-height:0;">&nbsp;</div>` : ""}
+        <p style="margin:4px 0 0;font-size:9px;line-height:1.2;color:${FARBE.leise};">${k.label.slice(0, 5)}</p>
+      </td>`;
+      }).join("")
+    }</tr></table>`,
+    `${besAds} von ${besGes} Besuchern kamen über Anzeigen — ${besGes > 0 ? Math.round((besAds / besGes) * 100) : 0}&thinsp;%. ` +
+    `Gezählt werden alle Besucher, auch die ohne Cookie-Einwilligung.`,
+  );
+
   // ── Diagramm 1: Leads je Tag, eingefärbt nach Patientenprofil ──────
   const kohorteMax = Math.max(1, ...leadKohorten.map((k) => k.leads));
   const kohorteLeads = leadKohorten.reduce((s, k) => s + k.leads, 0);
   const kohorteProfile = leadKohorten.reduce((s, k) => s + k.mitProfil, 0);
   const chartLeads = leadKohorten.length === 0 ? "" : diagrammKarte(
     "Leads je Tag",
-    `<span style="display:inline-block;width:9px;height:9px;background:${FARBE.balken};border-radius:2px;"></span> mit Patientenprofil` +
+    `<span style="display:inline-block;width:9px;height:9px;background:${FARBE.balken};border-radius:2px;"></span> mit Patientenprofil (unten)` +
     `&nbsp;&nbsp;<span style="display:inline-block;width:9px;height:9px;background:${FARBE.balkenLeise};border-radius:2px;"></span> ohne`,
     `<table width="100%" cellpadding="0" cellspacing="0" role="presentation"><tr>${
       leadKohorten.map((k, i) => {
         const hGes = k.leads > 0 ? Math.max(3, Math.round((k.leads / kohorteMax) * 84)) : 2;
-        const hOben = k.leads > 0 ? Math.round((k.mitProfil / k.leads) * hGes) : 0;
+        /* Der Balken IST die Lead-Anzahl; der ausgefuellte Teil waechst von
+           UNTEN nach oben (Martin, 01.09.: "das fuellt sich von unten auf und
+           nicht von oben, das ist unlogisch"). In der Tabellen-Zelle heisst
+           das: erst der helle Rest zeichnen, dann darunter der dunkle Anteil. */
+        const hProfil = k.leads > 0 ? Math.round((k.mitProfil / k.leads) * hGes) : 0;
+        const hOhne = Math.max(0, hGes - hProfil);
         const letzter = i === leadKohorten.length - 1;
         return `
       <td align="center" valign="bottom" style="padding:0 2px;">
         <p style="margin:0 0 3px;font-size:10px;line-height:1.2;color:${letzter ? FARBE.tinte : FARBE.leise};font-weight:${letzter ? "700" : "400"};">${k.leads || ""}</p>
-        ${hOben > 0 ? `<div style="height:${hOben}px;background:${FARBE.balken};border-radius:3px 3px 0 0;font-size:0;line-height:0;">&nbsp;</div>` : ""}
-        <div style="height:${Math.max(0, hGes - hOben)}px;background:${FARBE.balkenLeise};border-radius:${hOben > 0 ? "0 0 3px 3px" : "3px"};font-size:0;line-height:0;">&nbsp;</div>
+        ${hOhne > 0 ? `<div style="height:${hOhne}px;background:${FARBE.balkenLeise};border-radius:${hProfil > 0 ? "3px 3px 0 0" : "3px"};font-size:0;line-height:0;">&nbsp;</div>` : ""}
+        ${hProfil > 0 ? `<div style="height:${hProfil}px;background:${FARBE.balken};border-radius:${hOhne > 0 ? "0 0 3px 3px" : "3px"};font-size:0;line-height:0;">&nbsp;</div>` : ""}
         <p style="margin:4px 0 0;font-size:9px;line-height:1.2;color:${FARBE.leise};">${k.label.slice(0, 5)}</p>
       </td>`;
       }).join("")
@@ -505,25 +488,21 @@ export function buildReportEmail(opts: {
     "Anteil der Besucher, die ein Angebot anfordern. Zahlen in Prozent.",
   );
 
-  /* ── Diagramm 3: die drei Test-Varianten ────────────────────────────
-     Datengrundlage von der Pria-Session (PR #584): Besucher je Landingpage
-     aus analytics_sessions, Leads je Herkunft aus leads.source. Hier als
-     Balken statt als Tabelle — der Vergleich, um den es geht, ist die
-     QUOTE, deshalb bestimmt sie die Balkenlänge. */
-  const varianten = VARIANTEN.map((v) => {
-    const besucher = besucherPeriode[v.seite] ?? 0;
-    const leads = v.quellen.reduce((s, q) => s + (quellPeriode[q] ?? 0), 0);
-    return { name: v.name, besucher, leads, quote: besucher > 0 ? (leads / besucher) * 100 : 0 };
-  });
-  const quoteMax = Math.max(1, ...varianten.map((v) => v.quote));
-  const chartVarianten = chatBesuch === 0 ? "" : diagrammKarte(
-    "Chat-Test &mdash; die drei Varianten",
-    `Balkenlänge = Anteil der Besucher, die zum Lead werden · ${periodLabel}`,
-    varianten.map((v) =>
-      liegenderBalken(v.name, Math.round((v.quote / quoteMax) * 100),
-        `${v.besucher > 0 ? zahl(v.quote, 1) + "&thinsp;%" : "—"} <span style="font-weight:400;color:${FARBE.leise};">${v.leads}/${v.besucher}</span>`)
+  /* ── Diagramm 3: Formular oder Chat? ────────────────────────────────
+     Balkenlänge = Anteil an allen Leads des Zeitraums. Keine Quote je
+     Besucher — siehe Begründung oben bei einstiegSumme. */
+  const chartEinstieg = einstiegPeriode.gesamt === 0 ? "" : diagrammKarte(
+    "Woher kamen die Leads",
+    `Balkenlänge = Anteil an allen Leads &middot; ${periodLabel}`,
+    EINSTIEGE.map((e) =>
+      liegenderBalken(
+        e.name,
+        Math.round((e.wert / Math.max(1, einstiegPeriode.gesamt)) * 100),
+        `${e.wert} <span style="font-weight:400;color:${FARBE.leise};">von ${einstiegPeriode.gesamt}` +
+        `${e.gestern > 0 ? ` &middot; gestern ${e.gestern}` : ""}</span>`,
+      )
     ).join(""),
-    "Leads je Besucher. Solange eine Variante unter rund 100 Besuchern liegt, ist ihre Quote Zufall — nicht danach steuern.",
+    "Beide Wege liegen auf derselben Seite — nur der Weg zum Angebot ist ein anderer.",
   );
 
   // ── Ads als Kachelzeile statt Tabelle ──────────────────────────────
@@ -557,9 +536,10 @@ export function buildReportEmail(opts: {
           ${mailAlarmHtml}
           ${fazitHtml}
           ${kachelnHtml}
+          ${chartBesucher}
           ${chartLeads}
           ${chartConv}
-          ${chartVarianten}
+          ${chartEinstieg}
           ${adsHtml}
           ${notesHtml}
           <p style="margin:20px 0 0;text-align:center;">
@@ -589,11 +569,14 @@ ${adsSpend ? `  Ads-Kosten               ${euro(adsSpend.yesterday)}
   je Lead                  ${perPiece(adsSpend.yesterday, leadsY)}
   je Patientenprofil       ${perPiece(adsSpend.yesterday, yesterday.patientDataSaved)}` : ""}
 
+BESUCHER JE TAG (über Anzeigen / gesamt)
+${besucherKohorten.map((k) => `  ${k.label}  ${String(k.ausAds).padStart(3)} / ${String(k.besucher).padStart(3)}`).join("\n")}
+
 LEADS JE TAG (mit Profil / gesamt)
 ${leadKohorten.map((k) => `  ${k.label}  ${String(k.mitProfil).padStart(2)} / ${String(k.leads).padStart(2)}`).join("\n")}
 
-CHAT-TEST (Leads / Besucher, ${periodLabel})
-${chatBesuch === 0 ? "  noch kein Besuch auf den Chat-Varianten" : varianten.map((v) => `  ${v.name.padEnd(32)} ${v.leads}/${v.besucher}  ${v.besucher > 0 ? zahl(v.quote, 1) + " %" : "—"}`).join("\n")}
+WOHER KAMEN DIE LEADS (${periodLabel})
+${einstiegPeriode.gesamt === 0 ? "  noch keine Leads im Zeitraum" : EINSTIEGE.map((e) => `  ${e.name.padEnd(28)} ${String(e.wert).padStart(3)} von ${einstiegPeriode.gesamt}`).join("\n")}
 
 ${agentNotes?.notes?.length ? "NOTIZEN DER AGENTEN\n" + agentNotes.notes.map((n) => `  [${n.source}] ${n.note}`).join("\n") : ""}
 Admin: ${siteUrl}/admin/leads
