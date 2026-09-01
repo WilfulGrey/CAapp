@@ -181,6 +181,40 @@ export async function POST(request: NextRequest) {
       version: null,
     }).catch((e) => console.error('privacy_consent log failed:', e));
 
+    /* Mamamia SOFORT, nicht erst beim Portal-Besuch (Entscheidung Michał
+       01.09., Registry #44): ein eingekaufter Lead ist bezahlt und traegt
+       ab #614/#615 vollstaendige Daten — Kunde + Job entstehen in MM in
+       derselben Minute, mit weight/dementia/internet und dem Kontextblock
+       in der JobOffer-Beschreibung. Der Aufruf ist der GLEICHE Edge-Fn-Weg
+       wie aus dem Browser (idempotent per Cache-Hit); Fehler brechen den
+       Eingang NICHT ab — dann greift der bisherige Lazy-Onboard beim
+       ersten Portal-Besuch als Fallback. VOR Mail 1, damit der
+       Empfehlungs-Pfad der Mail (Registry #39) einen bestehenden Kunden
+       vorfindet statt selbst zu onboarden. */
+    try {
+      const supaUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+      const anon = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+      if (supaUrl && anon && lead.token) {
+        const r = await fetch(`${supaUrl}/functions/v1/onboard-to-mamamia`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', apikey: anon, Authorization: `Bearer ${anon}` },
+          body: JSON.stringify({ token: lead.token }),
+          signal: AbortSignal.timeout(25_000),
+        });
+        const daten = await r.json().catch(() => ({}));
+        if (r.ok && daten?.customer_id) {
+          await logEvent(lead.id, 'mamamia_onboarded_at_ingest', {
+            customer_id: daten.customer_id,
+            job_offer_id: daten.job_offer_id ?? null,
+          }).catch(() => {});
+        } else {
+          console.error(`Portal-Lead: Sofort-Onboarding fehlgeschlagen (HTTP ${r.status}) — Lazy-Fallback bleibt`, daten?.error ?? '');
+        }
+      }
+    } catch (e) {
+      console.error('Portal-Lead: Sofort-Onboarding threw — Lazy-Fallback bleibt:', e instanceof Error ? e.message : String(e));
+    }
+
     // Mail 1 sofort (delay 0) — identischer Weg wie beim Kostenrechner.
     scheduleEmail(lead.id, email, 'eingangsbestaetigung', 0)
       .then(async (r) => {
