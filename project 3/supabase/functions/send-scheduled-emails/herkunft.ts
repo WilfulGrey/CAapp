@@ -15,10 +15,15 @@
  * stammt aus fremder Quelle (Mailparser eines Portals) und wird in HTML
  * gerendert. Ein unbekanntes Portal liefert null ⇒ der Kunde bekommt die
  * normale Mail, statt dass ungeprueftes Fremdtext in unsere Vorlage laeuft.
- * Neues Portal einkaufen = hier eine Zeile ergaenzen. */
+ *
+ * SCHLUESSEL ist die volle Domain (kommt aus source="portal:<domain>" und
+ * darf sich nie aendern), WERT der Name, den der Kunde liest — ohne TLD
+ * (Martin 31.08.): "Pflegehilfe.org" las sich fuer Apple Mail wie eine
+ * Domain und wurde ungefragt verlinkt, der Kunde landete beim Portal statt
+ * bei uns. Neues Portal einkaufen = hier eine Zeile ergaenzen, Name ohne TLD. */
 export const PORTAL_QUELLEN: Record<string, string> = {
-  "pflegehilfe.org": "Pflegehilfe.org",
-  "pflegebund.eu": "Pflegebund.eu",
+  "pflegehilfe.org": "Pflegehilfe",
+  "pflegebund.eu": "Pflegebund",
 };
 
 export const PORTAL_PREFIX = "portal:";
@@ -122,7 +127,7 @@ export function portalVorschauHtml(siteUrl: string, ctaUrl: string): string {
 
   return `
     ${p(`Auf Basis Ihrer Angaben haben wir Ihr <strong style="color:#2D1F0F;">persönliches Angebot bereits berechnet</strong>. Preis und Konditionen finden Sie direkt in dieser E-Mail.`)}
-    ${p(`Bei Primundus geht es aber um mehr als nur den Preis: Sie können verfügbare Pflegekräfte direkt einsehen, vergleichen und Ihre Wunsch-Pflegekraft selbst auswählen – ohne sich vorher vertraglich zu binden.`)}
+    ${p(`Bei Primundus geht es aber um mehr als nur den Preis: Sie können <strong style="color:#2D1F0F;">verfügbare Pflegekräfte direkt einsehen</strong>, vergleichen und Ihre Wunsch-Pflegekraft selbst auswählen – ohne sich vorher vertraglich zu binden.`)}
     ${p(`So wissen Sie von Anfang an, was die Betreuung kostet und wer für Sie infrage kommt.`)}
     ${portalCtaButtonHtml(ctaUrl, "Angebot &amp; passende Pflegekräfte ansehen", "22px auto 14px")}
     ${portalKraeftePlaketteHtml(siteUrl, ctaUrl)}`;

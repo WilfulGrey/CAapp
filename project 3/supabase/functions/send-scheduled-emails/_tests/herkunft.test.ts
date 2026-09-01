@@ -21,13 +21,13 @@ Deno.test("eigene Quellen liefern keine Portal-Herkunft", () => {
 });
 
 Deno.test("eingekaufter Lead: gepflegte Schreibweise statt Rohwert", () => {
-  assertEquals(portalHerkunft("portal:pflegehilfe.org"), "Pflegehilfe.org");
-  assertEquals(portalHerkunft("portal:pflegebund.eu"), "Pflegebund.eu");
+  assertEquals(portalHerkunft("portal:pflegehilfe.org"), "Pflegehilfe");
+  assertEquals(portalHerkunft("portal:pflegebund.eu"), "Pflegebund");
 });
 
 Deno.test("Gross-/Kleinschreibung und Leerzeichen aus dem Parser stoeren nicht", () => {
-  assertEquals(portalHerkunft("PORTAL:Pflegehilfe.ORG"), "Pflegehilfe.org");
-  assertEquals(portalHerkunft("portal: pflegehilfe.org "), "Pflegehilfe.org");
+  assertEquals(portalHerkunft("PORTAL:Pflegehilfe.ORG"), "Pflegehilfe");
+  assertEquals(portalHerkunft("portal: pflegehilfe.org "), "Pflegehilfe");
 });
 
 /* Der Kern der Allowlist: ein Portal, das wir nicht kennen (Tippfehler im
@@ -51,7 +51,7 @@ Deno.test("Betreff sagt dem Kaltkontakt, was ihn erwartet", () => {
 });
 
 Deno.test("Angaben-Hinweis sagt, dass wir Luecken angenommen haben", () => {
-  const h = portalAngabenHinweisHtml("Pflegehilfe.org");
+  const h = portalAngabenHinweisHtml("Pflegehilfe");
   assertStringIncludes(h, "angenommen");
   assertStringIncludes(h, "korrigieren");
 });
@@ -60,18 +60,37 @@ const SITE = "https://primundus.de";
 const CTA = "https://kundenportal.primundus.de/x?token=abc";
 
 Deno.test("Intro dankt fuer die Anfrage und nennt das Portal", () => {
-  const html = portalIntroHtml("Pflegehilfe.org");
-  assertStringIncludes(html, "Pflegehilfe.org");
+  const html = portalIntroHtml("Pflegehilfe");
+  assertStringIncludes(html, "Pflegehilfe");
   assertStringIncludes(html, "vielen Dank für Ihre Anfrage");
-  assertEquals(portalIntroText("Pflegebund.eu").includes("<strong"), false);
+  assertEquals(portalIntroText("Pflegebund").includes("<strong"), false);
 });
 
-/* Primundus beschaeftigt die Kraefte selbst — "wir vermitteln" darf in
- * Kundentexten nicht vorkommen. */
+/* Apple Mail verlinkt eine erkannte Domain von sich aus — der Kunde landet
+   dann beim Portal statt bei uns. Deshalb tragen die Anzeigenamen kein TLD:
+   ohne Endung gibt es nichts zu erkennen. Der Test haelt fest, dass in
+   KEINER Fassung der Mail eine Domain steht. */
+Deno.test("Portalname traegt kein TLD und wird nicht verlinkt", () => {
+  for (const name of ["Pflegehilfe", "Pflegebund"]) {
+    for (const html of [
+      portalIntroHtml(name),
+      portalAngabenHinweisHtml(name, true),
+      portalAngabenHinweisHtml(name, false),
+    ]) {
+      assertStringIncludes(html, name);
+      // Ausser den echten Portal-Links (href) darf keine Domain im Text stehen.
+      assertEquals(/\.(org|de|eu|com)\b/.test(html.replace(/https?:[^"\s]*/g, "")), false);
+      assertEquals(html.includes("<a "), false);
+    }
+  }
+  assertStringIncludes(portalIntroText("Pflegehilfe"), "Pflegehilfe");
+  assertStringIncludes(portalAngabenHinweisText("Pflegehilfe"), "Pflegehilfe");
+});
+
 Deno.test("Texte behaupten keine Vermittlung", () => {
   const alle = [
-    portalIntroHtml("Pflegehilfe.org"),
-    portalIntroText("Pflegehilfe.org"),
+    portalIntroHtml("Pflegehilfe"),
+    portalIntroText("Pflegehilfe"),
     portalVorschauHtml(SITE, CTA),
     portalVorschauText(CTA),
   ];
@@ -140,12 +159,12 @@ Deno.test("Plakette bleibt klein", () => {
 /* Hat das Portal alles geliefert, waere der Annahme-Hinweis falsch — er
  * saet Zweifel an Angaben, die stimmen. */
 Deno.test("Hinweis nennt Annahmen nur, wenn welche noetig waren", () => {
-  const mitAnnahme = portalAngabenHinweisText("Pflegehilfe.org", true);
-  const ohne = portalAngabenHinweisText("Pflegehilfe.org", false);
+  const mitAnnahme = portalAngabenHinweisText("Pflegehilfe", true);
+  const ohne = portalAngabenHinweisText("Pflegehilfe", false);
   assertStringIncludes(mitAnnahme, "vorsichtig angenommen");
   assertEquals(ohne.includes("angenommen"), false);
   for (const t of [mitAnnahme, ohne]) {
-    assertStringIncludes(t, "Pflegehilfe.org");
+    assertStringIncludes(t, "Pflegehilfe");
     assertStringIncludes(t, "korrigieren");
   }
 });
