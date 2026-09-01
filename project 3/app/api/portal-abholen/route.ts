@@ -137,6 +137,9 @@ async function verarbeite(
       angaben,
       care_start_timing: ergebnis.care_start_timing,
       portal_lead_id: ergebnis.portal_lead_id,
+      plz: kontakt.plz || undefined,
+      ort: kontakt.ort || undefined,
+      details: ergebnis.details,
       einwilligung,
       /* Das Alter pruefen die Schutzregeln im Endpunkt. Der Zeitpunkt der
          Einwilligung ist der belastbarste Datumswert der Mail. */

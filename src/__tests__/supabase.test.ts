@@ -338,3 +338,31 @@ describe('prefillPatientFromLead', () => {
     expect(prefillPatientFromLead(lead).mobilitaet).toBe('');
   });
 });
+
+describe('prefillPatientFromLead — Portal-Lead-Details (Registry #43)', () => {
+  const mkLead = (fd: Record<string, unknown>) =>
+    ({ kalkulation: { formularDaten: fd } }) as never;
+
+  it('Gewicht-Bucket → Formular-Label (inkl. Ränder per Bug #17b)', () => {
+    expect(prefillPatientFromLead(mkLead({ gewicht: '61-70' })).gewicht).toBe('61-70 kg');
+    expect(prefillPatientFromLead(mkLead({ gewicht: '40-50' })).gewicht).toBe('Unter 50 kg');
+    expect(prefillPatientFromLead(mkLead({ gewicht: '> 100' })).gewicht).toBe('Über 100 kg');
+  });
+
+  it('internet/diagnosen/plz/ort werden durchgereicht', () => {
+    const p = prefillPatientFromLead(mkLead({
+      internet: 'ja', diagnosen: 'Demenz', plz: '95703', ort: 'Plößberg',
+    }));
+    expect(p.internet).toBe('Ja');
+    expect(p.diagnosen).toBe('Demenz');
+    expect(p.plz).toBe('95703');
+    expect(p.ort).toBe('Plößberg');
+  });
+
+  it('Rechner-Leads (ohne die fd-Schlüssel) bekommen NICHTS davon', () => {
+    const p = prefillPatientFromLead(mkLead({ pflegegrad: 3 }));
+    expect(p.gewicht).toBeUndefined();
+    expect(p.internet).toBeUndefined();
+    expect(p.diagnosen).toBeUndefined();
+  });
+});

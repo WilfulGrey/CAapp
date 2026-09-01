@@ -107,6 +107,18 @@ und als Fallback für Mails ohne Anhang. Spalten ohne Zuhause bei uns
 (Krankheiten, Gewicht, Beziehung …) landen als `zusatz` im Ereignis
 `portal_lead_eingekauft` — append-only, nichts geht verloren.
 
+**Details fließen weiter (Registry #43).** Nicht-preisrelevante Angaben
+aus CSV/Mail haben feste Häuser: Gewicht (kg → Mamamia-Bucket), Internet,
+Krankheiten/Diagnosen und PLZ/Ort wandern in `formularDaten` → füllen das
+Patientenformular vor (`prefillPatientFromLead`) und gehen beim Onboarding
+mit (`patient.weight`, `patient.dementia` + Beschreibung,
+`customer.internet`, Locations-Lookup über `fd.plz`). Der menschliche
+Kontextblock (Beziehung, Lebenssituation, Dauer, Zimmer, Erreichbarkeit …)
+landet in der **JobOffer-Beschreibung** — die Agentur sieht ihn ab der
+ersten Minute. „Zimmer: Vorhanden" wird bewusst NICHT auf einen
+Unterbringungs-Enum geraten (welche Art, sagt es nicht) — das wählt der
+Kunde im Formular.
+
 **Weitergeleitete Mails** (jemand forwardet eine Portal-Mail ins
 Postfach): der Parser normalisiert Zitat-Marker (`> `) und Soft-Hyphens,
 liest also auch Forwards. Tabellen-Umbrüche des weiterleitenden

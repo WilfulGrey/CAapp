@@ -217,6 +217,19 @@ export function buildPatients(fd: FormularDaten): PatientInput[] {
   // fabricate; the form will fill it.
   if (typeof fd?.geburtsjahr === "number") first.year_of_birth = fd.geburtsjahr;
 
+  // Portal-Leads (Registry #43): die CSV des Portals liefert ECHTE Werte,
+  // die der Rechner nie erfragt — nur dann setzen, nie erfinden (kein
+  // Rückfall in die Bug-#13-Defaults). Gewicht kommt bereits als
+  // Mamamia-Bucket ("61-70", "> 100" — kgZuBucket im Kostenrechner).
+  if (typeof fd?.gewicht === "string" && fd.gewicht) first.weight = fd.gewicht;
+  if (fd?.demenz === "ja") {
+    first.dementia = "yes";
+    // Grad unbekannt — der Beschreibungstext trägt, was das Portal sagte.
+    const beschr = typeof fd?.diagnosen === "string" && fd.diagnosen ? fd.diagnosen : "Demenz";
+    first.dementia_description = beschr;
+    first.dementia_description_de = beschr;
+  }
+
   // ⚠ CORRECTNESS: a 2nd patient is added when Primundus reports
   // `betreuung_fuer === 'ehepaar'` (couple under care). The
   // `weitere_personen` flag is a different question — "are there
@@ -450,6 +463,10 @@ export function buildCustomerInput(
     arrival_at: arrivalAt,
     // Real formularDaten
     other_people_in_house: mapOtherPeopleInHouse(fd),
+    // Portal-Leads (Registry #43): echte Kundenangabe aus der Portal-CSV
+    // ("Internetanschluss: Vorhanden") — Rechner-Leads lassen das Feld
+    // weiter weg (Bug #13: keine Defaults).
+    internet: fd?.internet === "ja" ? "yes" : fd?.internet === "nein" ? "no" : undefined,
     gender: mapGender(fd) ?? "not_important",
     // Nested — patients carry only real care attrs; wish carries only
     // real preference enums (no auto-strings).
