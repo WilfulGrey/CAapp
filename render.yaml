@@ -133,39 +133,13 @@ services:
       - key: NODE_OPTIONS
         value: "--max-old-space-size=384"
 
-  # ── 3. Portal-Abholer — Cron Job (jede Minute) ────────────────────────
-  # Holt eingekaufte Lead-Anfragen aus den Portal-Postfaechern und schiebt
-  # sie in dieselbe Strecke wie ein Kostenrechner-Lead (POST /api/portal-lead
-  # auf kostenrechner-beta).
-  #
-  # Jede Minute. Das Portal gibt dieselbe Anfrage an bis zu drei Anbieter,
-  # wer zuerst antwortet gewinnt — eine Minute faellt dabei nicht ins
-  # Gewicht. Ein Skript, das startet, arbeitet und endet, hat dafuer keine
-  # Verbindung, die wegbrechen kann, und keinen Prozess, der still stirbt.
-  # (buildCommand laeuft nur beim Deploy, nicht je Lauf; ein Lauf dauert
-  # ~1 s.)
-  #
-  # Die Postfaecher sind reine EINGAENGE. Von hier wird nie gesendet; die
-  # Kundenmail geht unveraendert ueber kostenrechner@primundus.de raus.
-  #
-  # Scharfschalten in zwei Schritten (siehe docs/portal-leads.md):
-  #   1. PORTAL_TROCKENLAUF=1 — liest und protokolliert, legt nichts an
-  #   2. Variable leeren, sobald der Parser auf echten Mails sauber liest
-  - type: cron
-    name: portal-abholer
-    runtime: node
-    plan: starter
-    branch: integration/mamamia-onboarding
-    rootDir: project 3
-    schedule: "* * * * *"
-    buildCommand: npm install
-    startCommand: npm run portal:abholen
-    envVars:
-      # Ziel des POST — der Kostenrechner legt Lead, Preis und Mail 1 an.
-      - key: PORTAL_LEAD_URL
-        sync: false
-      # Derselbe Wert wie PORTAL_LEAD_KEY auf kostenrechner-beta. Ohne ihn
-      # antwortet der Endpunkt 503 und es passiert nichts.
+      # ── Portal-Abholer (pg_cron → POST /api/portal-abholen) ───────────
+      # Holt eingekaufte Lead-Anfragen aus den Portal-Postfaechern —
+      # KEIN eigener Render-Dienst mehr (Registry #39): pg_cron feuert
+      # jede Minute die Route, die Route macht den ~1s IMAP-Poll und
+      # postet intern auf /api/portal-lead. Details: docs/portal-leads.md.
+      # Auth des Eingangs /api/portal-lead. Ohne ihn antwortet der
+      # Endpunkt 503 und es passiert nichts.
       - key: PORTAL_LEAD_KEY
         sync: false
       # Postfach je Portal. Fehlt eines, wird es uebersprungen statt geraten.
@@ -181,7 +155,7 @@ services:
         value: imap.ionos.de
       # Erst-Inbetriebnahme: "1" liest und protokolliert, ohne Leads
       # anzulegen oder Kundenmails auszuloesen. Nach der Sichtprobe leeren.
+      # Bewusst sync:false (nicht value:"1") — der Blueprint-Sync wuerde
+      # ein value bei jedem Sync zurueck auf Trockenlauf setzen.
       - key: PORTAL_TROCKENLAUF
-        value: "1"
-      - key: NODE_VERSION
-        value: "20"
+        sync: false

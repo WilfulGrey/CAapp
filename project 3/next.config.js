@@ -58,8 +58,10 @@ const nextConfig = {
   // ładuje z node_modules w runtime (Render: npm install && next start).
   // puppeteer-core + @sparticuz/chromium: wpisy zostają do PR3 (rollback-
   // ready — git revert PR2 przywraca renderer chromium bez zmian configu).
+  // imapflow + mailparser (Portal-Abholer-Route): Node-net + dynamische
+  // requires (iconv-lite-Kodierungstabellen) — gleiche Klasse wie pdfkit.
   experimental: {
-    serverComponentsExternalPackages: ['puppeteer-core', '@sparticuz/chromium', 'pdfkit'],
+    serverComponentsExternalPackages: ['puppeteer-core', '@sparticuz/chromium', 'pdfkit', 'imapflow', 'mailparser'],
     // Telemetria pamięci (diagnoza OOM 512MB): instrumentation.ts rejestruje
     // sampler RSS/heap/ext + crash-monitor przy starcie procesu Node.
     instrumentationHook: true,
@@ -86,6 +88,8 @@ const nextConfig = {
         'puppeteer-core',
         '@sparticuz/chromium',
         'pdfkit',
+        'imapflow',
+        'mailparser',
       ];
     }
     return config;
