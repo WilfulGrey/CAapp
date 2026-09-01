@@ -97,6 +97,31 @@ Deno.test("Texte behaupten keine Vermittlung", () => {
   for (const t of alle) assertEquals(/wir vermitteln/i.test(t), false);
 });
 
+/* Die Fuenf-Gesichter-Plakette behauptet "5 passende Pflegekraefte" mit
+   anonymen Avataren. Steht in derselben Mail eine ECHTE gematchte Kraft mit
+   Namen und Gruenden, saehe der Kunde dieselbe Aussage zweimal — einmal als
+   Versprechen, einmal als Beleg. Dann gewinnt der Beleg. */
+Deno.test("Plakette weicht der echten Empfehlung", () => {
+  const mitPlakette = portalVorschauHtml(SITE, CTA, true);
+  const ohnePlakette = portalVorschauHtml(SITE, CTA, false);
+
+  assertStringIncludes(mitPlakette, "5 passende Pflegekräfte");
+  assertEquals(ohnePlakette.includes("5 passende Pflegekräfte"), false);
+  assertEquals(ohnePlakette.includes("caregivers/pk-1.jpg"), false);
+
+  // Der Rest des Kopfes bleibt in BEIDEN Faellen: Preis-Zusage, Auswahl-
+  // freiheit und der CTA tragen die Mail, nicht die Plakette.
+  for (const html of [mitPlakette, ohnePlakette]) {
+    assertStringIncludes(html, "bereits berechnet");
+    assertStringIncludes(html, "selbst auswählen");
+    assertStringIncludes(html, CTA);
+  }
+
+  // Default ist MIT — ohne Empfehlung ist die Plakette das einzige Signal,
+  // dass hier Menschen warten und nicht nur ein Preis.
+  assertEquals(portalVorschauHtml(SITE, CTA), mitPlakette);
+});
+
 Deno.test("Kopf traegt Preis, Auswahl und Unverbindlichkeit", () => {
   const html = portalVorschauHtml(SITE, CTA);
   assertStringIncludes(html, "bereits berechnet");
