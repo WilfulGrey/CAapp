@@ -76,8 +76,42 @@ export function requiredGermanyLevelForWish(
   const v = (deutschkenntnisse ?? '').toLowerCase().trim();
   if (v === 'grundlegend') return 'level_1';
   if (v === 'kommunikativ') return 'level_2';
+  // „Gut" ist die oberste vom KUNDEN waehlbare Stufe. Der Antwort-Key im
+  // Rechner heisst historisch 'sehr-gut', das Label ist aber „Gut" (+450 €).
   if (v === 'sehr-gut' || v === 'sehr_gut' || v === 'gut') return 'level_3';
+  // „Sehr gut" (+600 €) vergibt NUR die Agentur im SA-Portal. Die
+  // Angebots-Bruecke schreibt dafuer den eigenen Key 'sehr-gut-sa' in die
+  // formularDaten (OfferFactorMapper::GERMAN_MAP, level_4). Ohne diese
+  // Zeile fiel er auf null und der Sprachfilter entfiel KOMPLETT — ein
+  // Kunde mit dem teuersten Tier sah alle Stufen gemischt.
+  if (v === 'sehr-gut-sa' || v === 'sehr_gut_sa') return 'level_4';
   return null;
+}
+
+// Welche Deutsch-Stufe gilt für die Matching-Liste?
+//
+// Es gibt ZWEI Quellen, und nur eine ist maßgeblich:
+//
+//   1. `deutschkenntnisse` aus dem Kostenrechner — eingefroren im Lead.
+//   2. `customer_caregiver_wish.germany_skill` bei mamamia — der LEBENDE
+//      Stand, den die SA im Portal nachbessern kann.
+//
+// mamamia schlägt Kräfte nach (2) vor. Filtert das Portal nach (1), prüfen
+// wir die Vorschläge gegen einen Wunsch, nach dem gar nicht gesucht wurde.
+// Laufen beide auseinander, bleibt die Liste leer, obwohl hunderte Kräfte
+// anliegen — Kunde 10508 (01.09.2026): mamamia level_3, Rechner
+// "grundlegend", 921 Vorschläge, davon 0 auf level_1. Der Kunde sah nichts.
+//
+// Deshalb gewinnt (2), solange dort eine echte Stufe steht. 'not_important'
+// und 'level_0' heißen "kein Wunsch" → gar nicht filtern. (1) ist der
+// Rückfall, solange mamamia noch nichts weiß.
+export function resolveDeutschWishLevel(
+  mamamiaSkill: string | null | undefined,
+  kalkulationWunsch: string | null | undefined,
+): string | null {
+  if (mamamiaSkill === 'not_important' || mamamiaSkill === 'level_0') return null;
+  if (typeof mamamiaSkill === 'string' && /^level_[1-4]$/.test(mamamiaSkill)) return mamamiaSkill;
+  return requiredGermanyLevelForWish(kalkulationWunsch);
 }
 
 // Erfüllt die germany_skill einer Pflegekraft den Kostenrechner-Sprachwunsch?
@@ -1054,26 +1088,33 @@ function mamamiaHeightToForm(h: string | null | undefined): string {
   return h.endsWith('cm') ? h : `${h} cm`;
 }
 
-// Mamamia customer_caregiver_wish.germany_skill enum (verified prod 2026-04-28).
-// Reverse mapping na label do display w AngebotCard step 4 (read-only field).
-// % distribution z prod sweep:
-//   level_0  → "A1"          (1% active)
-//   level_1  → "A2"          (1% — calculator "grundlegend" od 2026-05-12)
-//   level_2  → "mind. A2"    (22% — calculator "kommunikativ" od 2026-05-12)
-//   level_3  → "mind. B1"    (50% — calculator NIE używa od 2026-05-12,
-//                             tylko manual panel pick przez agency)
-//   level_4  → "mind. C1"    (8% — calculator "sehr-gut")
-//   not_important → "Egal"
+// Mamamia customer_caregiver_wish.germany_skill — Anzeige des Wunsches in
+// AngebotCard Schritt 4 (nur lesend).
+//
+// ACHTUNG, die Zuordnung wurde am 10.08.2026 geaendert (Martin). Vorher war
+// level_3 agentur-intern und der Rechner vergab level_4; hier stand das noch
+// so dokumentiert und war damit irrefuehrend. Heute gilt:
+//
+//   level_0 / level_1  → "Grund"      (Rechner: "grundlegend")
+//   level_2            → "Mittel"     (Rechner: "kommunikativ")
+//   level_3            → "Gut"        (Rechner: oberste waehlbare Stufe;
+//                                      interner Schluessel dort "sehr-gut",
+//                                      Label aber "Gut" — nicht verwechseln)
+//   level_4            → "Sehr gut"   (vergibt NUR die Agentur, +Aufschlag)
+//   not_important      → "Egal"
 // Bug #13g: AngebotCard step 4 displayed hardcoded "mind. B1" — replace
 // with this helper to read real value from mmCustomer.
 export function germanySkillLabel(level: string | null | undefined): string {
   if (!level) return '';
-  // Portal nutzt die 3 Stufen Grund / Mittel / Gut. Mamamias level_0/1 fallen
-  // in „Grund", level_2 in „Mittel", level_3/4 in „Gut" (siehe mappers.ts
-  // GERMANY_SKILL_LEVELS). Hier als Mindestwunsch ausgedrückt.
+  // Als Mindestwunsch ausgedrückt. level_3 und level_4 sind seit dem
+  // 10.08.2026 NICHT mehr dasselbe: „Gut" ist die oberste vom Kunden
+  // wählbare Stufe, „Sehr gut" vergibt nur die Agentur (mit Aufschlag).
+  // Vorher liefen beide als „ab Gut" — bei einer level_4-Kraft stand damit
+  // eine zu niedrige Stufe im Angebot.
   if (level === 'level_0' || level === 'level_1') return 'ab Grund';
   if (level === 'level_2') return 'ab Mittel';
-  if (level === 'level_3' || level === 'level_4') return 'ab Gut';
+  if (level === 'level_3') return 'ab Gut';
+  if (level === 'level_4') return 'ab Sehr gut';
   if (level === 'not_important') return 'Egal';
   return '';
 }
