@@ -65,6 +65,21 @@ function zuordnen(
 }
 
 export function parsePflegehilfe(text: string): ParseErgebnis {
+  /* Weitergeleitete Mails lesbar machen (Test Zauner 01.09., prod uid 14):
+   * ein "Fwd:" verpackt jede Zeile in Zitat-Marker ("> \t...") und streut
+   * Soft-Hyphens in die Labels ("Datenschutz­erklärung") — beides
+   * unsichtbar, beides toedlich fuer den zeilenweisen "Label: Wert"-Blick
+   * (0 Felder, kein Einwilligungsnachweis). Direktmails aendert die
+   * Normalisierung nicht: Soft-Hyphens kommen dort nicht vor, und fuehrende
+   * Marker/Leerzeichen tragen nie Bedeutung. Tabellen-Umbrueche des
+   * weiterleitenden Mailclients (Label und Wert auf getrennten Zeilen)
+   * repariert das bewusst NICHT — dann greifen Annahme-Regeln + unbekannt. */
+  text = text
+    .replace(/\u00AD/g, '')
+    .split('\n')
+    .map((zeile) => zeile.replace(/^[>\s]+/, ''))
+    .join('\n');
+
   const unbekannt: string[] = [];
 
   /* Erfasst einen Wert; kann er nicht zugeordnet werden, wird er

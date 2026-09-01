@@ -7,6 +7,7 @@ import {
   getTeamNotificationTemplate,
   getAngebotsEmailTemplate,
 } from '@/lib/email';
+import { testphaseUmleitung } from '@/lib/portal-schutz';
 import { parseCustomerName } from '@/lib/calculation';
 import { scheduleEmail, flushScheduledEmails } from '@/lib/lead-mails';
 
@@ -304,7 +305,12 @@ async function handleSendAngebotsEmailOnly(leadId: string) {
     }
 
     const angebotsEmail = getAngebotsEmailTemplate(lead, lead.kalkulation);
-    const emailResult = await sendEmail(lead.email, angebotsEmail);
+    // Testphase: Portal-Leads ans Team (Umleitung nur beim Versand).
+    const umlA = testphaseUmleitung(lead, process.env.PORTAL_TESTPHASE);
+    const emailResult = await sendEmail(
+      umlA?.empfaenger ?? lead.email,
+      umlA ? { ...angebotsEmail, subject: umlA.betreffPraefix + angebotsEmail.subject } : angebotsEmail,
+    );
 
     if (emailResult.success) {
       await logEvent(lead.id, 'email_angebot_sent', {

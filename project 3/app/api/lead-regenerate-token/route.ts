@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { sendEmail, getTokenRegenerationEmailTemplate } from '@/lib/email';
+import { testphaseUmleitung } from '@/lib/portal-schutz';
 import { generateToken, getTokenExpiry } from '@/lib/calculation';
 
 // Token regeneration endpoint. Two distinct entry paths:
@@ -166,7 +167,10 @@ async function handlePost(request: NextRequest) {
 
   if (shouldSendEmail) {
     const leadWithNewToken = { ...lead, token: newToken };
-    sendEmail(lead.email, getTokenRegenerationEmailTemplate(leadWithNewToken, portalUrl)).catch(
+    // Testphase: Portal-Leads ans Team (Umleitung nur beim Versand).
+    const uml = testphaseUmleitung(lead, process.env.PORTAL_TESTPHASE);
+    const tpl = getTokenRegenerationEmailTemplate(leadWithNewToken, portalUrl);
+    sendEmail(uml?.empfaenger ?? lead.email, uml ? { ...tpl, subject: uml.betreffPraefix + tpl.subject } : tpl).catch(
       (e) => {
         console.error('token regen email failed:', e instanceof Error ? e.message : String(e));
       },
