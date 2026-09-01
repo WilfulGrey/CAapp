@@ -736,6 +736,13 @@ export function empfehlungHtml(
     ? `<span style="display:inline-block;font-size:11px;font-weight:700;color:#8B7355;background:#F5F5F6;border:1px solid #E4E4E7;border-radius:999px;padding:3px 10px;">${esc(e.stufe)}</span>`
     : "";
 
+  /* Einsaetze direkt hinter der Stufe. Bei 0 bleibt die Zeile weg — dort
+     heisst die Stufe ohnehin „Neu dabei" oder „Berufserfahren", und
+     „0 Einsätze" waere das Gegenteil eines Vertrauenssignals. */
+  const einsatzText = e.einsaetze > 0
+    ? `<span style="font-size:14px;color:#52525B;">&nbsp;&nbsp;${e.einsaetze} ${e.einsaetze === 1 ? "Einsatz" : "Einsätze"} über Primundus</span>`
+    : "";
+
   // Sprachbalken 1–3 wie im Profil-Modal, als Mini-Tabelle statt divs.
   const balken = [1, 2, 3]
     .map((i) => {
@@ -828,7 +835,7 @@ export function empfehlungHtml(
                     <tr>
                       <td style="vertical-align:middle;">
                         <p style="margin:0 0 6px;font-size:20px;font-weight:700;line-height:1.3;color:#18181B;">${name}${alterChip}</p>
-                        ${stufenChip}
+                        ${stufenChip}${einsatzText}
                       </td>
                       <td class="empf-profil" style="vertical-align:middle;text-align:right;white-space:nowrap;padding-left:10px;">
                         <a class="profil-link" href="${profilUrl}" target="_blank" style="color:#8B7355;text-decoration:none;font-size:14px;font-weight:600;">Zum Profil&nbsp;&rsaquo;</a>
@@ -887,7 +894,7 @@ export function empfehlungText(
   }
   zeilen.push("UNSERE EMPFEHLUNG", "", `${e.anzeigeName}${e.alter ? `, ${e.alter}` : ""}`);
   if (e.deutschWort) zeilen.push(`Deutsch: ${e.deutschWort}`);
-  zeilen.push(e.fakten.replaceAll("&middot;", "·"));
+  zeilen.push(`${e.stufe}: ${e.fakten.replaceAll("&middot;", "·")}`);
   if (e.vorstellung) {
     const { klar, blass, gekuerzt } = textAusblenden(e.vorstellung);
     zeilen.push("", `Über ${e.vorname}`, `${klar}${blass ? " " + blass : ""}${gekuerzt ? " …" : ""}`);
