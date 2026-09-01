@@ -133,28 +133,33 @@ services:
       - key: NODE_OPTIONS
         value: "--max-old-space-size=384"
 
-  # ── 3. Portal-Abholer — Cron Job ───────────────────────────────────────
+  # ── 3. Portal-Abholer — Worker (IMAP IDLE) ────────────────────────────
   # Holt eingekaufte Lead-Anfragen aus den Portal-Postfaechern und schiebt
   # sie in dieselbe Strecke wie ein Kostenrechner-Lead (POST /api/portal-lead
-  # auf kostenrechner-beta). Laeuft alle 10 Minuten: Pflegehilfe gibt eine
-  # Anfrage an bis zu drei Anbieter gleichzeitig — wer zuerst antwortet,
-  # gewinnt. Haeufiger lohnt nicht, die Portale liefern nicht im Sekundentakt.
+  # auf kostenrechner-beta).
+  #
+  # BEWUSST ein Worker und KEIN Cron: das Portal gibt dieselbe Anfrage an
+  # bis zu drei Anbieter, wer zuerst antwortet gewinnt. Der Worker haelt
+  # eine stehende IMAP-Verbindung (IDLE) — der Server meldet die Mail von
+  # sich aus, gemessen ~2 s bis zur fertigen Kundenmail. Ein Cron startet
+  # je Lauf einen frischen Container samt npm install; allein das dauert
+  # laenger als der Vorsprung, um den es hier geht.
   #
   # Die Postfaecher sind reine EINGAENGE. Von hier wird nie gesendet; die
   # Kundenmail geht unveraendert ueber kostenrechner@primundus.de raus.
   #
   # Scharfschalten in zwei Schritten (siehe docs/portal-leads.md):
   #   1. PORTAL_TROCKENLAUF=1 — liest und protokolliert, legt nichts an
-  #   2. Variable entfernen, sobald der Parser auf echten Mails sauber liest
-  - type: cron
+  #   2. Variable leeren, sobald der Parser auf echten Mails sauber liest
+  - type: worker
     name: portal-abholer
     runtime: node
     plan: starter
     branch: integration/mamamia-onboarding
     rootDir: project 3
-    schedule: "*/10 * * * *"
     buildCommand: npm install
     startCommand: npm run portal:abholen
+    autoDeploy: true
     envVars:
       # Ziel des POST — der Kostenrechner legt Lead, Preis und Mail 1 an.
       - key: PORTAL_LEAD_URL
