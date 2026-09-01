@@ -37,6 +37,17 @@ jobs:
       - name: Typecheck (src/)
         run: npx tsc --noEmit -p tsconfig.build.json
 
+      # project 3 wird sonst NIRGENDS vor dem Merge type-geprueft — der
+      # einzige Check war `next build` auf Render, also NACH dem Merge
+      # (Registry #38: Deno-Skripte in scripts/ brachen beide
+      # Kostenrechner-Slots, CI blieb gruen). Dieser Step ist derselbe
+      # Check, den Render faehrt, nur als required Gate vor dem Merge.
+      - name: Typecheck (project 3)
+        working-directory: project 3
+        run: |
+          npm ci
+          npx tsc --noEmit
+
   # ─── Edge Functions (Deno) ─────────────────────────────────────────────
   deno-onboard:
     name: deno tests (onboard-to-mamamia)
