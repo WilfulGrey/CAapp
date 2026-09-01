@@ -156,14 +156,20 @@ async function arbeiteAb(cfg: Konfig, portal: string, client: ImapFlow) {
   const sperre = await client.getMailboxLock('INBOX');
   try {
     /* search() liefert `false`, wenn die Mailbox die Suche ablehnt — das
-       ist kein "nichts da", sondern ein Fehler, den wir sehen wollen. */
-    const ungelesen = await client.search({ seen: false });
+       ist kein "nichts da", sondern ein Fehler, den wir sehen wollen.
+       {uid:true} ist PFLICHT: ohne sie liefert search SEQUENZ-Nummern,
+       waehrend messageFlagsAdd unten mit {uid:true} echte UIDs erwartet —
+       das \\Seen traf dann eine nicht existierende UID (no-op) und
+       DIESELBE Mail lief jede Minute erneut (Zauner-Test 01.09.: seq #1,
+       echte uid 14; beim Test auf frischer Mailbox fiel es nicht auf,
+       weil dort uid == seq). */
+    const ungelesen = await client.search({ seen: false }, { uid: true });
     if (ungelesen === false) throw new Error('IMAP-Suche fehlgeschlagen');
     if (!ungelesen.length) return { liegengeblieben, verarbeitet };
     log(`${portal}: ${ungelesen.length} neue Mail(s)`);
 
     for (const uid of ungelesen) {
-      const nachricht = await client.fetchOne(uid, { source: true });
+      const nachricht = await client.fetchOne(uid, { source: true }, { uid: true });
       if (nachricht === false) {
         // Mail zwischen Suche und Abruf verschwunden — kein Grund, den
         // ganzen Durchgang abzubrechen.

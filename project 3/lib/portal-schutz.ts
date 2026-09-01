@@ -40,6 +40,20 @@ export interface SchutzErgebnis {
   grund?: string;
 }
 
+/* Der Einwilligungs-Zeitstempel kommt vom Portal im DEUTSCHEN Format
+ * ("01.09.2026 11:05 Uhr" — so stand es in der ersten echten Mail, Zauner
+ * prod uid 14) — `new Date()` liest das nicht, und der Guard lehnte JEDE
+ * echte Portal-Mail als "Datum nicht lesbar" ab (der Testlauf schickte
+ * ISO und kaschierte das). Zeitzone bewusst grob (Serverzeit): bei einer
+ * 60-Tage-Grenze spielen zwei Stunden keine Rolle. */
+export function parseDatum(roh: string): Date {
+  const de = roh.trim().match(/^(\d{1,2})\.(\d{1,2})\.(\d{4})(?:[ T](\d{1,2}):(\d{2}))?(?:\s*Uhr)?$/i);
+  if (de) {
+    return new Date(Number(de[3]), Number(de[2]) - 1, Number(de[1]), Number(de[4] ?? 12), Number(de[5] ?? 0));
+  }
+  return new Date(roh);
+}
+
 export function darfAngeschriebenWerden(
   eingabe: SchutzEingabe,
   jetzt: Date,
@@ -51,7 +65,7 @@ export function darfAngeschriebenWerden(
 
   const roh = eingabe.erstellt_am;
   if (roh) {
-    const datum = roh instanceof Date ? roh : new Date(roh);
+    const datum = roh instanceof Date ? roh : parseDatum(roh);
     if (Number.isNaN(datum.getTime())) {
       // Unlesbares Datum ⇒ wir wissen das Alter nicht ⇒ nicht senden.
       return { ok: false, grund: `Datum nicht lesbar: ${String(roh)}` };
