@@ -12,8 +12,13 @@ Portal-Mail  →  Postfach        →  pg_cron (jede Minute, Supabase)
                 primundus.de       app/api/portal-abholen/route.ts
                                         │  ~1s IMAP-Poll
                                         ▼
+                              CSV-Anhang der Mail (ERSTE Quelle)
+                              lib/portal-csv.ts → synthetischer Text
+                                        │
+                                        ▼
                                    lib/portal-parser.ts
                                    liest "Label: Wert"
+                                   (Mailtext: Einwilligung + Fallback)
                                         │
                                         ▼  (Loopback im selben Prozess)
                             POST /api/portal-lead   (x-portal-key)
@@ -91,6 +96,16 @@ Lead behält die echte Adresse — umgeleitet wird nur der Versand
 **Schritt 3 — scharf.** `PORTAL_TROCKENLAUF` und `PORTAL_TESTPHASE`
 (beide Stellen!) leeren. Ab dann bekommt jeder eingehende Lead automatisch
 Mail 1, ohne dass ein Mensch draufschaut.
+
+**CSV zuerst.** Pflegehilfe hängt an jede Lead-Mail eine CSV mit dem
+VOLLEN Datensatz (Name, Telefon, Pflegegrad, Mobilität, Gewicht,
+Krankheiten …). Der Abholer liest sie als erste Quelle — aus der Zeile
+wird ein "Label: Wert"-Text synthetisiert und durch dasselbe
+`parsePflegehilfe` geschickt (EIN Mapper, ein `unbekannt[]`-Kanal). Der
+Mailtext bleibt für den **Einwilligungsnachweis** (der steht nur dort)
+und als Fallback für Mails ohne Anhang. Spalten ohne Zuhause bei uns
+(Krankheiten, Gewicht, Beziehung …) landen als `zusatz` im Ereignis
+`portal_lead_eingekauft` — append-only, nichts geht verloren.
 
 **Weitergeleitete Mails** (jemand forwardet eine Portal-Mail ins
 Postfach): der Parser normalisiert Zitat-Marker (`> `) und Soft-Hyphens,
