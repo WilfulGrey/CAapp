@@ -567,17 +567,6 @@ export function textAusblenden(
   };
 }
 
-/** Zahlwort für die Überschrift über dem Kasten. Über fünf kommt nie vor. */
-export function zahlwort(n: number): string {
-  return ["null", "eine", "zwei", "drei", "vier", "fünf"][n] ?? String(n);
-}
-
-/** Dasselbe Wort am Satzanfang — dort wird es grossgeschrieben. */
-export function zahlwortGross(n: number): string {
-  const w = zahlwort(n);
-  return w.charAt(0).toUpperCase() + w.slice(1);
-}
-
 /** Wie deutschStufe.ts, aber ohne Import-Zyklus — dieselbe Skala. */
 function deutschWortAus(skill: string | null | undefined): string | null {
   const map: Record<string, string> = {
@@ -809,11 +798,7 @@ export function empfehlungHtml(
      bereits … herausgesucht" faellt weg — das sagt schon die Einleitung der
      Mail; die Ueberschrift traegt nur noch die Zahl. */
   const einleitungSatz = sichtbarGesamt > 0
-    ? `<p style="margin:0 0 14px;font-size:20px;font-weight:700;line-height:1.35;color:#2D1F0F;">${
-        sichtbarGesamt === 1
-          ? "Eine passende Betreuungskraft für Sie"
-          : `${zahlwortGross(sichtbarGesamt)} passende Betreuungskräfte für Sie`
-      }</p>`
+    ? `<p style="margin:0 0 14px;font-size:20px;font-weight:700;line-height:1.35;color:#2D1F0F;">${sichtbarGesamt} passende ${sichtbarGesamt === 1 ? "Betreuungskraft" : "Betreuungskräfte"} für Sie</p>`
     : "";
 
   const alleLink = sichtbarGesamt > 1
@@ -896,9 +881,7 @@ export function empfehlungText(
   const zeilen: string[] = [];
   if (sichtbarGesamt > 0) {
     zeilen.push(
-      (sichtbarGesamt === 1
-        ? "Eine passende Betreuungskraft für Sie"
-        : `${zahlwortGross(sichtbarGesamt)} passende Betreuungskräfte für Sie`).toUpperCase(),
+      `${sichtbarGesamt} PASSENDE ${sichtbarGesamt === 1 ? "BETREUUNGSKRAFT" : "BETREUUNGSKRÄFTE"} FÜR SIE`,
       "",
     );
   }

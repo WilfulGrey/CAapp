@@ -286,8 +286,9 @@ haczyki, sekcja „Über <Imię>" w pudełku `#F5F5F6`/`#D4D4D8` — i tam tekst
 „…".
 
 **Kolejność bloków** (Martin, 31.08. — „harmonischer"): powitanie → cena →
-Konditionen → Testsieger → porównanie z domem opieki → **nagłówek** „<Liczebnik> passende
-Betreuungskräfte für Sie" (20 px, pogrubiony) →
+Konditionen → Testsieger → porównanie z domem opieki → **nagłówek** „<N> passende
+Betreuungskräfte für Sie" (20 px, pogrubiony, liczba CYFRĄ — w nagłówku ma
+kłuć w oczy) →
 kasten z rekomendacją → „So geht es weiter" → CTA → podsumowanie zgłoszenia.
 Cena, Konditionen i Testsieger wróciły do JEDNEGO beżowego panelu — rozdzielone
 były tylko po to, żeby rekomendacja zmieściła się pomiędzy; teraz stoi pod nimi
