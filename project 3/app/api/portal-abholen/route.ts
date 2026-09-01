@@ -40,6 +40,7 @@ import { simpleParser } from 'mailparser';
 /* Derselbe Parser, den auch der Testlauf und die Unit-Tests benutzen —
  * der Abholer bringt KEINE zweite Lesart der Portal-Mail mit. */
 import { parsePflegehilfe } from '@/lib/portal-parser';
+import { parseCsv, csvZuLeadZeile } from '@/lib/portal-csv';
 import { PORTALE } from '@/lib/portal-lead';
 
 export const runtime = 'nodejs';
@@ -90,9 +91,19 @@ function postfaecher(): Postfach[] {
 
 function log(...t: unknown[]) { console.log('[portal-abholer]', ...t); }
 
-async function verarbeite(cfg: Konfig, portal: string, roh: string) {
-  const ergebnis = parsePflegehilfe(roh);
-  const { kontakt, angaben, einwilligung, unbekannt } = ergebnis;
+async function verarbeite(
+  cfg: Konfig,
+  portal: string,
+  roh: string,
+  /* CSV-Anhang, falls vorhanden: synthetischer Text ist dann die
+     DATEN-Quelle; der Mailtext liefert weiterhin die Einwilligung
+     (die steht nur dort) und dient als Fallback. */
+  csv?: { text: string; zusatz: Record<string, string> },
+) {
+  const textErgebnis = parsePflegehilfe(roh);
+  const ergebnis = csv ? parsePflegehilfe(csv.text) : textErgebnis;
+  const { kontakt, angaben, unbekannt } = ergebnis;
+  const einwilligung = textErgebnis.einwilligung;
 
   /* Ohne Einwilligungsnachweis legt der Endpunkt nichts an — das hier
      abzufangen spart einen Aufruf und macht den Grund im Log sichtbar. */
@@ -130,6 +141,9 @@ async function verarbeite(cfg: Konfig, portal: string, roh: string) {
       /* Das Alter pruefen die Schutzregeln im Endpunkt. Der Zeitpunkt der
          Einwilligung ist der belastbarste Datumswert der Mail. */
       erstellt_am: einwilligung.zeitpunkt,
+      /* Spalten ohne Zuhause bei uns (Krankheiten, Gewicht, Beziehung …)
+         — landen append-only im Ereignislog, nichts geht verloren. */
+      zusatz: csv?.zusatz,
     }),
   });
 
@@ -183,9 +197,24 @@ async function arbeiteAb(cfg: Konfig, portal: string, client: ImapFlow) {
       const html = typeof mail.html === 'string' ? mail.html.replace(/<[^>]+>/g, ' ') : '';
       const roh = mail.text || html;
 
+      /* CSV-Anhang = volle Datenquelle (siehe lib/portal-csv.ts). Eine
+         unlesbare CSV bricht nichts — dann traegt der Mailtext allein. */
+      let csv: { text: string; zusatz: Record<string, string> } | undefined;
+      const csvAnhang = mail.attachments.find(
+        (a) => a.contentType === 'text/csv' || (a.filename ?? '').toLowerCase().endsWith('.csv'),
+      );
+      if (csvAnhang) {
+        try {
+          const zeilen = parseCsv(csvAnhang.content.toString('utf8'));
+          if (zeilen.length >= 2) csv = csvZuLeadZeile(zeilen[0], zeilen[1]);
+        } catch (e: any) {
+          log(`  ⚠ ${portal} #${uid} CSV-Anhang unlesbar (${e.message}) — nehme Mailtext`);
+        }
+      }
+
       let ergebnis;
       try {
-        ergebnis = await verarbeite(cfg, portal, roh);
+        ergebnis = await verarbeite(cfg, portal, roh, csv);
       } catch (e: any) {
         /* Absturz mitten im Durchgang: NICHT als gelesen markieren. Der
            naechste Anlauf versucht es erneut. */

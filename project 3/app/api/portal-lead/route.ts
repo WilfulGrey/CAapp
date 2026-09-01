@@ -132,11 +132,20 @@ export async function POST(request: NextRequest) {
      *  - woher der Lead kam und was er gekostet hat
      *  - WELCHE Angaben wir angenommen haben (der Kunde sieht sie in der
      *    Mail und koennte sie zu Recht hinterfragen) */
+    /* Der volle Portal-Datensatz (CSV-Spalten ohne Zuhause bei uns:
+       Krankheiten, Gewicht, Beziehung, Zimmer, Internet …) — append-only
+       archiviert, damit nichts verloren geht. Groessen-Kappe, weil der
+       Wert von aussen kommt. */
+    const zusatzRoh = body?.zusatz;
+    const zusatz = zusatzRoh && typeof zusatzRoh === 'object'
+      && JSON.stringify(zusatzRoh).length <= 6000 ? zusatzRoh : undefined;
+
     await logEvent(lead.id, 'portal_lead_eingekauft', {
       portal,
       einkaufspreis: body?.einkaufspreis ?? null,
       portal_lead_id: body?.portal_lead_id ?? null,
       angenommene_felder: angenommen,
+      ...(zusatz ? { zusatz } : {}),
       at: new Date().toISOString(),
     }).catch((e) => console.error('portal_lead_eingekauft log failed:', e));
 

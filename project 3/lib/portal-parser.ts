@@ -137,6 +137,9 @@ export function parsePflegehilfe(text: string): ParseErgebnis {
   const mobilitaet = map('Mobilität', [
     [/rollstuhl/i, 'rollstuhl'],
     [/bettl|immobil|liegend/i, 'bettlaegerig'],
+    /* VOR der hilfsmittel-Zeile: "Mobil ohne Hilfsmittel" (CSV Zauner)
+       enthaelt "hilfsmittel" und rutschte sonst in 'rollator'. */
+    [/ohne hilfsmittel/i, 'mobil'],
     [/rollator|hilfsmittel|gehhilfe|eingeschr/i, 'rollator'],
     [/mobil|selbstst|fit/i, 'mobil'],
   ]);
