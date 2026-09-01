@@ -56,6 +56,11 @@ export interface OnboardOptions {
    *  specific job. Omitted (every old token / magic-link without &job) → the
    *  lead's default job (lead.mamamia_job_offer_id) — 100% backward compatible. */
   jobId?: string;
+  /** Server-to-server only (lead-regenerate-token): refresh the portal-token
+   *  mirror on the Mamamia customer even on a cache hit. The browser never
+   *  sets it — a push costs 3 panel round-trips (csrf → LoginAgency →
+   *  mutation, no session cache) and must not run on every portal open. */
+  mirrorToken?: boolean;
   secrets: OnboardSecrets;
   supabase: SupabaseLike;
   fetchFn?: typeof fetch;
@@ -207,12 +212,18 @@ async function pushCustomerToken(args: {
       args.agencyEmail,
       args.agencyPassword,
     );
-    await panelMutateAsCustomer(
+    const res = await panelMutateAsCustomer<{ UpdateCustomerToken: { id: number; token: string | null } }>(
       { baseUrl: args.panelBaseUrl, fetchFn: args.fetchFn },
       session,
       UPDATE_CUSTOMER_TOKEN,
       { id: args.customerId, token: args.token },
       "UpdateCustomerToken",
+    );
+    // Log what Mamamia ECHOED BACK, not what we sent — that is the only proof
+    // the value landed. "No error" alone doesn't distinguish a stored token
+    // from a silently ignored one.
+    console.log(
+      `[onboard] token mirrored for customer ${args.customerId}: stored=${(res?.UpdateCustomerToken?.token ?? "").slice(0, 8)}… sent=${args.token.slice(0, 8)}…`,
     );
   } catch (e) {
     console.warn(
@@ -278,7 +289,7 @@ async function resolveScopedJobOfferId(
 // ─── Main flow ─────────────────────────────────────────────────────────────
 
 export async function onboardLead(opts: OnboardOptions): Promise<OnboardResult & { lead_id: string; email: string }> {
-  const { leadToken, jobId, secrets, supabase, fetchFn = globalThis.fetch, now = () => new Date() } = opts;
+  const { leadToken, jobId, mirrorToken, secrets, supabase, fetchFn = globalThis.fetch, now = () => new Date() } = opts;
 
   // 1. Lookup lead
   const lead = await supabase.fetchLead(leadToken);
@@ -296,6 +307,19 @@ export async function onboardLead(opts: OnboardOptions): Promise<OnboardResult &
 
   // 3. Cache hit?
   if (lead.mamamia_customer_id && lead.mamamia_job_offer_id) {
+    // Token rotated (lead-regenerate-token, any source) → refresh the mirror on
+    // the Mamamia customer, otherwise MM staff keep the token from the FIRST
+    // portal visit and their "open the customer's portal" link is dead.
+    if (mirrorToken) {
+      await pushCustomerToken({
+        panelBaseUrl: secrets.mamamiaPanelUrl,
+        agencyEmail: secrets.mamamiaAgencyEmail,
+        agencyPassword: secrets.mamamiaAgencyPassword,
+        customerId: lead.mamamia_customer_id,
+        token: leadToken,
+        fetchFn,
+      });
+    }
     return {
       customer_id: lead.mamamia_customer_id,
       job_offer_id: await resolveScopedJobOfferId(

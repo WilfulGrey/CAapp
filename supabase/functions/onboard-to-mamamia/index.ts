@@ -40,12 +40,17 @@ export async function handleRequest(req: Request, deps: HandlerDeps): Promise<Re
   // Body parsing
   let token: string | undefined;
   let jobId: string | undefined;
+  let mirrorToken = false;
   try {
     const body = await req.json();
     token = body?.token;
     // Multi-Job (Variant A): optional lead_jobs.id from ?job=... deep links.
     // Omitted (every old token / link without &job) → the lead's default job.
     jobId = typeof body?.job_id === "string" ? body.job_id : undefined;
+    // Set only by lead-regenerate-token after a rotation (server-to-server):
+    // re-push the portal token onto the Mamamia customer even on a cache hit.
+    // The browser omits it, so a normal portal open costs no panel calls.
+    mirrorToken = body?.mirror_token === true;
   } catch {
     return jsonError(400, "invalid json body", baseHeaders);
   }
@@ -60,6 +65,7 @@ export async function handleRequest(req: Request, deps: HandlerDeps): Promise<Re
     result = await onboardLead({
       leadToken: token,
       jobId,
+      mirrorToken,
       secrets: deps.secrets,
       supabase: deps.supabase,
       fetchFn: deps.fetchFn,

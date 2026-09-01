@@ -105,6 +105,70 @@ Deno.test("POST happy path returns 200 + sets session cookie + returns IDs", asy
   assertEquals(body.user_token, undefined, "agency token must not leak to browser");
 });
 
+// The `mirror_token` flag has to survive the whole way from the request body
+// into onboardLead — parsing it and forgetting to pass it on would ship a
+// feature that silently does nothing (lead-regenerate-token calls this).
+Deno.test("POST mirror_token=true reaches onboardLead (cache hit → panel push)", async () => {
+  _resetRateLimit();
+  _resetAgencyTokenCache();
+  const supa = makeFakeSupabase([makeLead({
+    token: "rotated",
+    mamamia_customer_id: 7566,
+    mamamia_job_offer_id: 16225,
+  })]);
+
+  const panelCalls: string[] = [];
+  const fetchFn: typeof fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+    const url = typeof input === "string" ? input : input instanceof URL ? input.href : (input as Request).url;
+    if (!url.includes("/backend/")) throw new Error(`agency API must not be called on cache hit: ${url}`);
+    panelCalls.push(url);
+    if (url.includes("/sanctum/csrf-cookie")) {
+      return new Response("", { status: 200, headers: { "set-cookie": "XSRF-TOKEN=t; Path=/" } });
+    }
+    const parsed = JSON.parse((init?.body ?? "{}") as string);
+    const data = url.endsWith("/graphql/auth")
+      ? { data: { LoginAgency: { id: 1, email: "x" } } }
+      : { data: { UpdateCustomerToken: { id: parsed.variables?.id, token: parsed.variables?.token } } };
+    return new Response(JSON.stringify(data), { status: 200, headers: { "set-cookie": "sess=1; Path=/" } });
+  }) as typeof fetch;
+
+  const res = await handleRequest(
+    new Request("https://fn/", {
+      method: "POST",
+      headers: { "content-type": "application/json", "x-forwarded-for": "9.9.9.9" },
+      body: JSON.stringify({ token: "rotated", mirror_token: true }),
+    }),
+    { secrets: SECRETS, supabase: supa, fetchFn },
+  );
+
+  assertEquals(res.status, 200);
+  assertEquals(panelCalls.length, 3); // csrf-cookie → LoginAgency → UpdateCustomerToken
+});
+
+Deno.test("POST without mirror_token: cache hit costs zero Mamamia calls", async () => {
+  _resetRateLimit();
+  _resetAgencyTokenCache();
+  const supa = makeFakeSupabase([makeLead({
+    token: "plain",
+    mamamia_customer_id: 7566,
+    mamamia_job_offer_id: 16225,
+  })]);
+  const fetchFn: typeof fetch = (async () => {
+    throw new Error("no Mamamia call expected on a plain portal open");
+  }) as typeof fetch;
+
+  const res = await handleRequest(
+    new Request("https://fn/", {
+      method: "POST",
+      headers: { "content-type": "application/json", "x-forwarded-for": "9.9.9.8" },
+      body: JSON.stringify({ token: "plain" }),
+    }),
+    { secrets: SECRETS, supabase: supa, fetchFn },
+  );
+
+  assertEquals(res.status, 200);
+});
+
 Deno.test("POST with invalid token returns 401 + no cookie", async () => {
   _resetRateLimit(); _resetAgencyTokenCache();
   const req = new Request("https://edge/fn/onboard-to-mamamia", {
