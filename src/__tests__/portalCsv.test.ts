@@ -90,6 +90,10 @@ describe('CSV → parsePflegehilfe (Zauner end-to-end)', () => {
     expect(r.details?.demenz).toBe('ja');
   });
 
+  it('Senior-Geschlecht: SeniorSex leer, aber "Schwiegervater" IST ein Mann (Registry #45)', () => {
+    expect(r.details?.patient_anrede).toBe('Herr');
+  });
+
   it('details.block: Kontext für die JobOffer-Beschreibung', () => {
     expect(r.details?.block).toContain('Beziehung: Schwiegervater');
     expect(r.details?.block).toContain('Lebenssituation: Lebt alleine');

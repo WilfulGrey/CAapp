@@ -200,7 +200,7 @@ export function mapToolIds(mobilityId: number): number[] {
   }
 }
 
-export function buildPatients(fd: FormularDaten): PatientInput[] {
+export function buildPatients(fd: FormularDaten, patientAnrede: string | null = null): PatientInput[] {
   const mobility = mapMobilityToId(fd);
   const liftId = mapLiftId(mobility);
   const nightOps = mapNightOperations(fd);
@@ -222,6 +222,12 @@ export function buildPatients(fd: FormularDaten): PatientInput[] {
   // Rückfall in die Bug-#13-Defaults). Gewicht kommt bereits als
   // Mamamia-Bucket ("61-70", "> 100" — kgZuBucket im Kostenrechner).
   if (typeof fd?.gewicht === "string" && fd.gewicht) first.weight = fd.gewicht;
+  // Geschlecht des Seniors — NUR wenn wirklich bekannt (Portal-Leads:
+  // SeniorSex/Beziehung → leads.patient_anrede). Rechner-Leads haben die
+  // Spalte nicht gefuellt ⇒ Feld bleibt weg (Bug #13: nichts erfinden).
+  const anredeNorm = (patientAnrede ?? "").trim().toLowerCase();
+  if (anredeNorm === "herr") first.gender = "male";
+  else if (anredeNorm === "frau") first.gender = "female";
   if (fd?.demenz === "ja") {
     first.dementia = "yes";
     // Grad unbekannt — der Beschreibungstext trägt, was das Portal sagte.
@@ -470,7 +476,7 @@ export function buildCustomerInput(
     gender: mapGender(fd) ?? "not_important",
     // Nested — patients carry only real care attrs; wish carries only
     // real preference enums (no auto-strings).
-    patients: buildPatients(fd),
+    patients: buildPatients(fd, lead.patient_anrede ?? null),
     customer_caregiver_wish: buildCaregiverWish(fd),
   };
 }

@@ -3,7 +3,7 @@ import { describe, it, expect } from 'vitest';
 // Kommentar in portalLead.test.ts. Fixture: eine echte (anonymisierte)
 // Pflegehilfe-Lead-Mail — der Parser muss die Kundendaten treffen, nicht
 // die des Portals, und den echten Pflegegrad, nicht den Filter "1-5".
-import { parsePflegehilfe } from '../../project 3/lib/portal-parser';
+import { parsePflegehilfe, anredeAusBeziehung } from '../../project 3/lib/portal-parser';
 import { ergaenzeAngaben } from '../../project 3/lib/portal-lead';
 
 const mail = `
@@ -97,6 +97,26 @@ describe('parsePflegehilfe (Portal-Lead-Mail)', () => {
   it('Zusammenspiel mit den Annahmen: vollständige Mail → nichts wird angenommen', () => {
     const erg = ergaenzeAngaben(r.angaben, []);
     expect(erg.angenommen).toEqual([]);
+  });
+});
+
+describe('anredeAusBeziehung (Registry #45)', () => {
+  it('eindeutig gegenderte Verwandtschaftswörter → Herr/Frau', () => {
+    expect(anredeAusBeziehung('Schwiegervater')).toBe('Herr');
+    expect(anredeAusBeziehung('Mutter')).toBe('Frau');
+    expect(anredeAusBeziehung('Großvater')).toBe('Herr');
+    expect(anredeAusBeziehung('Enkelin')).toBe('Frau');
+  });
+
+  it('neutrale/mehrdeutige Wörter → nichts (kein Raten)', () => {
+    expect(anredeAusBeziehung('Elternteil')).toBeUndefined();
+    expect(anredeAusBeziehung('Partner')).toBeUndefined();
+    expect(anredeAusBeziehung('')).toBeUndefined();
+    expect(anredeAusBeziehung(undefined)).toBeUndefined();
+  });
+
+  it('Fixture-Mail: "Beziehung Mutter" → patient_anrede Frau', () => {
+    expect(parsePflegehilfe(mail).details?.patient_anrede).toBe('Frau');
   });
 });
 

@@ -79,6 +79,9 @@ export function csvZuLeadZeile(kopf: string[], zeile: string[]): CsvLeadZeile {
   if (wert('RequestNumber')) t.push(`Anfragen-Nr. ${wert('RequestNumber')}`);
   /* Senior-Spalten als Zeilen VOR dem Detailblock — dieselben Labels, die
      der Parser (und der Kontextblock) ohnehin liest. */
+  if (wert('SeniorSex')) t.push(`Senior-Anrede	${wert('SeniorSex')}`);
+  if (wert('SeniorFirstName')) t.push(`Senior-Vorname	${wert('SeniorFirstName')}`);
+  if (wert('SeniorSurName')) t.push(`Senior-Nachname	${wert('SeniorSurName')}`);
   if (wert('SeniorMedicalProcess')) t.push(`Krankheiten	${wert('SeniorMedicalProcess')}`);
   if (wert('SeniorRelationship')) t.push(`Beziehung	${wert('SeniorRelationship')}`);
   if (wert('SeniorLiveSituation')) t.push(`Lebenssituation	${wert('SeniorLiveSituation')}`);

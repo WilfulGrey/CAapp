@@ -181,6 +181,26 @@ export async function POST(request: NextRequest) {
       version: null,
     }).catch((e) => console.error('privacy_consent log failed:', e));
 
+    /* Geschlecht/Name des SENIORS (Registry #45): aus SeniorSex bzw. dem
+       eindeutig gegenderten Beziehungswort ("Schwiegervater" IST ein Mann).
+       Auf die patient_*-Spalten des Leads — davon lebt resolvePatientSalutation
+       im Onboarding (patient.gender) und patientGenderKnown im Formular.
+       VOR dem Onboarding-Aufruf, damit der frisch geladene Lead sie traegt. */
+    const patientPatch: Record<string, string> = {};
+    if (typeof d.patient_anrede === 'string' && /^(Herr|Frau)$/.test(d.patient_anrede)) {
+      patientPatch.patient_anrede = d.patient_anrede;
+    }
+    if (typeof d.patient_vorname === 'string' && d.patient_vorname.trim()) {
+      patientPatch.patient_vorname = d.patient_vorname.trim().slice(0, 80);
+    }
+    if (typeof d.patient_nachname === 'string' && d.patient_nachname.trim()) {
+      patientPatch.patient_nachname = d.patient_nachname.trim().slice(0, 80);
+    }
+    if (Object.keys(patientPatch).length) {
+      const { error: patchErr } = await supabase.from('leads').update(patientPatch).eq('id', lead.id);
+      if (patchErr) console.error('Portal-Lead: patient_* Update fehlgeschlagen:', patchErr.message);
+    }
+
     /* Mamamia SOFORT, nicht erst beim Portal-Besuch (Entscheidung Michał
        01.09., Registry #44): ein eingekaufter Lead ist bezahlt und traegt
        ab #614/#615 vollstaendige Daten — Kunde + Job entstehen in MM in

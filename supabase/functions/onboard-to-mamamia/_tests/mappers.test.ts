@@ -789,3 +789,11 @@ Deno.test("buildCustomerInput: fd.internet ja/nein → yes/no, absent → undefi
   assertEquals(buildCustomerInput(mkLead({ internet: "nein" })).internet, "no");
   assertEquals(buildCustomerInput(mkLead({})).internet, undefined);
 });
+
+Deno.test("buildPatients: patient_anrede Herr/Frau → gender; brak → unset (Registry #45)", () => {
+  const fd = { pflegegrad: 3, mobilitaet: "mobil" } as never;
+  assertEquals(buildPatients(fd, "Herr")[0].gender, "male");
+  assertEquals(buildPatients(fd, "Frau")[0].gender, "female");
+  assertEquals(buildPatients(fd, null)[0].gender, undefined);
+  assertEquals(buildPatients(fd, "  ")[0].gender, undefined);
+});
