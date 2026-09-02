@@ -7,6 +7,7 @@ import { useEffect, useState, useRef } from "react";
 import Image from "next/image";
 import { berechnePreis } from "@/lib/calculation";
 import { analytics } from "@/lib/analytics";
+import { meldeAnfrage } from "@/lib/oaiq";
 
 export default function ResultPage() {
   const router = useRouter();
@@ -154,6 +155,12 @@ export default function ResultPage() {
 
           window.dataLayer = window.dataLayer || [];
           window.dataLayer.push({ event: "angebot_erfolgreich" });
+
+          // OpenAI Ads (ChatGPT-Werbung). Ohne Marketing-Einwilligung ist
+          // window.oaiq nicht da und der Aufruf tut nichts — das ist der
+          // Normalfall, kein Fehler. Bewusst NICHT der Eigenanteil als Wert,
+          // sondern die feste Staffelung; die Begruendung steht in lib/oaiq.ts.
+          meldeAnfrage(window.oaiq, data.leadId);
 
           await analytics.trackConversion(
             'angebot_requested',
