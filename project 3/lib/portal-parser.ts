@@ -56,6 +56,26 @@ export interface PortalDetails {
   /** Menschlicher Kontextblock für die JobOffer-Beschreibung: Beziehung,
    *  Lebenssituation, Dauer, Zimmer, Erreichbarkeit … */
   block?: string;
+  /** "Herr"/"Frau" — aus SeniorSex, sonst aus der Beziehung abgeleitet
+   *  (nur EINDEUTIG gegenderte Verwandtschaftswörter). */
+  patient_anrede?: string;
+  patient_vorname?: string;
+  patient_nachname?: string;
+}
+
+/* Verwandtschaftswörter tragen im Deutschen das Geschlecht IM WORT —
+ * "Schwiegervater" IST ein Mann (Sprachsemantik, kein Enum-Raten).
+ * Nur eindeutige Wörter; "Elternteil"/"Partner"/"Bekannte" ⇒ nichts. */
+const BEZIEHUNG_MAENNLICH = /\b(vater|schwiegervater|gro(?:ß|ss)vater|opa|ehemann|bruder|schwager|onkel|sohn|schwiegersohn|enkel)\b/i;
+const BEZIEHUNG_WEIBLICH = /\b(mutter|schwiegermutter|gro(?:ß|ss)mutter|oma|ehefrau|schwester|schw(?:ä|ae)gerin|tante|tochter|schwiegertochter|enkelin)\b/i;
+
+export function anredeAusBeziehung(beziehung: string | null | undefined): 'Herr' | 'Frau' | undefined {
+  if (!beziehung) return undefined;
+  // Weiblich zuerst: "Enkelin"/"Schwägerin" enthalten sonst das
+  // Männlich-Wort als Teilstring nicht (\b schützt), aber sicher ist sicher.
+  if (BEZIEHUNG_WEIBLICH.test(beziehung)) return 'Frau';
+  if (BEZIEHUNG_MAENNLICH.test(beziehung)) return 'Herr';
+  return undefined;
 }
 
 /* Mamamia speichert Gewicht als String-Bucket (Bug #13f/#17b — Ränder
@@ -256,6 +276,16 @@ export function parsePflegehilfe(text: string): ParseErgebnis {
   }
 
   const details: PortalDetails = {};
+  // Geschlecht des Seniors: Spalte zuerst, sonst das Beziehungs-Wort.
+  const seniorAnredeRoh = feld(text, 'Senior-Anrede');
+  const seniorAnrede = seniorAnredeRoh && /frau|weiblich|^w$/i.test(seniorAnredeRoh) ? 'Frau'
+    : seniorAnredeRoh && /herr|m(ä|ae)nnlich|^m$/i.test(seniorAnredeRoh) ? 'Herr'
+    : anredeAusBeziehung(feld(text, 'Beziehung'));
+  if (seniorAnrede) details.patient_anrede = seniorAnrede;
+  const seniorVorname = feld(text, 'Senior-Vorname');
+  const seniorNachname = feld(text, 'Senior-Nachname');
+  if (seniorVorname) details.patient_vorname = seniorVorname;
+  if (seniorNachname) details.patient_nachname = seniorNachname;
   const bucket = kg ? kgZuBucket(Number(kg)) : undefined;
   if (bucket) details.gewicht = bucket;
   if (internetRoh) {

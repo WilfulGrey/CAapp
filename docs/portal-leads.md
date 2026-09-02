@@ -126,6 +126,12 @@ ersten Minute. „Zimmer: Vorhanden" wird bewusst NICHT auf einen
 Unterbringungs-Enum geraten (welche Art, sagt es nicht) — das wählt der
 Kunde im Formular.
 
+**Geschlecht des Seniors (Registry #45).** `SeniorSex` aus der CSV, und
+fehlt die Spalte: das Beziehungswort — „Schwiegervater" IST ein Mann,
+„Mutter" IST eine Frau (nur eindeutige Wörter; „Elternteil"/„Partner" ⇒
+nichts). Landet als `leads.patient_anrede` (+ Senior-Name, wenn geliefert)
+→ `patient.gender` beim Onboarding und `patientGenderKnown` im Formular.
+
 **Weitergeleitete Mails** (jemand forwardet eine Portal-Mail ins
 Postfach): der Parser normalisiert Zitat-Marker (`> `) und Soft-Hyphens,
 liest also auch Forwards. Tabellen-Umbrüche des weiterleitenden
