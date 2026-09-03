@@ -24,6 +24,11 @@ const supabase = createClient(
 export default function LeadsPage() {
   const [leads, setLeads] = useState<any[]>([]);
   const [filteredLeads, setFilteredLeads] = useState<any[]>([]);
+  /* Postfach-Protokoll des Abholers (portal_mail_log, Registry #47):
+     Mails, die KEIN Lead wurden — offen/abgelehnt/uebersprungen/
+     altbestand. Sichtbar im jeweiligen Portal-Reiter, damit nichts still
+     scheitert. */
+  const [mailLog, setMailLog] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
@@ -54,6 +59,19 @@ export default function LeadsPage() {
       if (data) {
         setLeads(data);
       }
+
+      /* uid=0 ist der "Postfach leer"-Sentinel des Seeds; 'erledigt'
+         fehlt bewusst — diese Mails SIND die Leads in der Tabelle.
+         200 reichen als Sicht (PostgREST kappt ohnehin bei 1000). */
+      const { data: logZeilen } = await supabase
+        .from('portal_mail_log')
+        .select('postfach, uidvalidity, uid, status, grund, lead_id, updated_at')
+        .neq('status', 'erledigt')
+        .gt('uid', 0)
+        .order('updated_at', { ascending: false })
+        .limit(200);
+      setMailLog(logZeilen ?? []);
+
       setLoading(false);
     } catch (error) {
       console.error('Fehler beim Laden der Leads:', error);
@@ -98,6 +116,9 @@ export default function LeadsPage() {
       folge_einsatz: 'bg-blue-100 text-blue-800',
       vertrag_abgeschlossen: 'bg-green-100 text-green-800',
       nicht_interessiert: 'bg-gray-200 text-gray-600',
+      // Alarm-Rot: Portal-Mail, die kein echter Lead wurde (Registry #47)
+      // — hier muss ein Mensch ran.
+      manuell_pruefen: 'bg-red-100 text-red-800',
     };
     const labels: Record<string, string> = {
       info_requested: 'Info angefordert',
@@ -105,6 +126,28 @@ export default function LeadsPage() {
       folge_einsatz: 'Folge-Einsatz',
       vertrag_abgeschlossen: 'Vertrag abgeschlossen',
       nicht_interessiert: 'Nicht interessiert',
+      manuell_pruefen: 'Manuell prüfen',
+    };
+    return (
+      <span className={`px-2 py-1 rounded-full text-xs font-medium ${styles[status] || 'bg-gray-100 text-gray-800'}`}>
+        {labels[status] || status}
+      </span>
+    );
+  };
+
+  /* Badges des Postfach-Protokolls (portal_mail_log). */
+  const mailStatusBadge = (status: string) => {
+    const styles: Record<string, string> = {
+      offen: 'bg-amber-100 text-amber-800',
+      abgelehnt: 'bg-red-100 text-red-800',
+      uebersprungen: 'bg-gray-200 text-gray-600',
+      altbestand: 'bg-gray-100 text-gray-500',
+    };
+    const labels: Record<string, string> = {
+      offen: 'Offen — nächster Versuch in 1 Min.',
+      abgelehnt: 'Abgelehnt',
+      uebersprungen: 'Übersprungen',
+      altbestand: 'Altbestand',
     };
     return (
       <span className={`px-2 py-1 rounded-full text-xs font-medium ${styles[status] || 'bg-gray-100 text-gray-800'}`}>
@@ -176,6 +219,7 @@ export default function LeadsPage() {
               <SelectItem value="folge_einsatz">Folge-Einsatz</SelectItem>
               <SelectItem value="vertrag_abgeschlossen">Vertrag abgeschlossen</SelectItem>
               <SelectItem value="nicht_interessiert">Nicht interessiert</SelectItem>
+              <SelectItem value="manuell_pruefen">Manuell prüfen</SelectItem>
             </SelectContent>
           </Select>
         </div>
@@ -320,6 +364,69 @@ export default function LeadsPage() {
             </tbody>
           </table>
         </div>
+
+        {/* Postfach-Protokoll (Registry #47): jede Mail des aktiven
+            Portal-Postfachs, die KEIN Lead wurde — offen / abgelehnt /
+            uebersprungen / altbestand. Nichts scheitert still: was der
+            Abholer nicht anlegen konnte, steht hier. 'erledigt' fehlt
+            bewusst — diese Mails SIND die Leads in der Tabelle darüber. */}
+        {istEingekauft(quelleFilter) && (() => {
+          const postfach = quelleFilter.slice('portal:'.length);
+          const zeilen = mailLog.filter((z) => z.postfach === postfach);
+          return (
+            <div className="mt-8 border-t border-gray-200 pt-4">
+              <h2 className="text-sm font-semibold text-gray-700 mb-2">
+                Postfach {postfach} — Mails ohne Lead
+                <span className="ml-2 tabular-nums text-gray-400">{zeilen.length}</span>
+              </h2>
+              {zeilen.length === 0 ? (
+                <p className="text-sm text-gray-500">
+                  Alles verarbeitet — keine offenen, abgelehnten oder übersprungenen Mails.
+                </p>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full">
+                    <thead>
+                      <tr className="border-b">
+                        <th className="text-left py-2 px-4 text-sm font-medium text-gray-600">Mail</th>
+                        <th className="text-left py-2 px-4 text-sm font-medium text-gray-600">Status</th>
+                        <th className="text-left py-2 px-4 text-sm font-medium text-gray-600">Grund</th>
+                        <th className="text-left py-2 px-4 text-sm font-medium text-gray-600">Zuletzt</th>
+                        <th className="text-left py-2 px-4 text-sm font-medium text-gray-600"></th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {zeilen.map((z) => (
+                        <tr key={`${z.uidvalidity}-${z.uid}`} className="border-b hover:bg-gray-50">
+                          <td className="py-2 px-4 text-sm font-mono text-gray-600">#{z.uid}</td>
+                          <td className="py-2 px-4">{mailStatusBadge(z.status)}</td>
+                          <td className="py-2 px-4 text-sm text-gray-600">{z.grund || '—'}</td>
+                          <td className="py-2 px-4 text-sm text-gray-600">
+                            {new Date(z.updated_at).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' })}
+                            <span className="text-gray-400 ml-1">
+                              {new Date(z.updated_at).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })}
+                            </span>
+                          </td>
+                          <td className="py-2 px-4">
+                            {z.lead_id && (
+                              <Link
+                                href={`/admin/leads/${z.lead_id}`}
+                                className="text-[#5C4A32] hover:text-[#7D6850] text-sm font-medium inline-flex items-center gap-1"
+                              >
+                                Lead
+                                <ExternalLink className="w-3 h-3" />
+                              </Link>
+                            )}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          );
+        })()}
       </Card>
     </div>
   );
