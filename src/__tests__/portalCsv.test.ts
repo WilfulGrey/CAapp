@@ -121,8 +121,15 @@ describe('csvZeileBrauchbar (Registry #46 — handverstümmelte CSV)', () => {
     expect(csvZeileBrauchbar(kopf, zeilen[1])).toBe(false);
   });
 
+  it('auch der KOPF verklumpt zu 1 Feld (Realfall uid 28) → unbrauchbar', () => {
+    /* Live-Befund: parseCsv lieferte kopf=1 Feld UND zeile=1 Feld —
+       das Verhaeltnis 1>=1 bestand, die Spaltennamen fehlten trotzdem. */
+    const kopf = ['RequestNumber,Sex,AcademicDegree,Email,Phone'];
+    expect(csvZeileBrauchbar(kopf, ['1,Herr,,x@y.de,+49'])).toBe(false);
+  });
+
   it('normale Zeile (auch mit fehlenden hinteren Spalten) bleibt brauchbar', () => {
-    const kopf = new Array(32).fill('k');
+    const kopf = ['Email', ...new Array(31).fill('k')];
     expect(csvZeileBrauchbar(kopf, new Array(32).fill(''))).toBe(true);
     expect(csvZeileBrauchbar(kopf, new Array(16).fill(''))).toBe(true);
     expect(csvZeileBrauchbar(kopf, new Array(15).fill(''))).toBe(false);
