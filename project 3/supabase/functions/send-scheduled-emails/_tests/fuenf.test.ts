@@ -9,6 +9,8 @@ import {
   kundenFakten,
   kraefteWort,
   fuenfBetreff,
+  fotoImg,
+  fotoErsatz,
 } from "../empfehlung.ts";
 
 const JETZT = new Date("2026-09-03T10:00:00Z");
@@ -153,4 +155,30 @@ Deno.test("Sprachzeile: Label vor den Punkten, Wert dahinter, Verfuegbarkeit dan
   assert(iLabel > -1 && iBalken > iLabel, "Label muss VOR den Punkten stehen");
   assert(iWert > iBalken, "Wert muss NACH den Punkten stehen");
   assert(iTermin > iWert && iTermin < iFakten, "Verfuegbarkeit gehoert in die Sprachzeile, vor die Fakten");
+});
+
+// Outlook Desktop kennt kein object-fit: ein Hochformat wuerde dort auf ein
+// Quadrat gequetscht — und die Haelfte der Avatare IST Hochformat (gemessen
+// 03.09.2026). Deshalb bekommt Outlook das Bild proportional, alle anderen
+// den quadratischen Beschnitt. Eine Funktion fuer Empfehlungs-Karte UND Liste.
+Deno.test("fotoImg: Outlook proportional, alle anderen quadratisch beschnitten", () => {
+  const h = fotoImg("cid-1", "Anna K.", 56, 12);
+  const mso = h.slice(h.indexOf("[if mso]"), h.indexOf("<![endif]"));
+  assertStringIncludes(mso, 'width="56"');
+  assert(!mso.includes('height="56"'), "Outlook darf KEINE feste Hoehe bekommen");
+  assert(!mso.includes("object-fit"), "Outlook kennt object-fit nicht");
+  const rest = h.slice(h.indexOf("[if !mso]"));
+  assertStringIncludes(rest, 'height="56"');
+  assertStringIncludes(rest, "object-fit:cover");
+  assertStringIncludes(rest, "border-radius:12px");
+  assertStringIncludes(rest, "-ms-interpolation-mode:bicubic");
+  // Nie die rohe S3-URL — sie ist nach ~30 Min tot.
+  assert(!h.includes("http"), "kein externer Bildpfad");
+  assertEquals((h.match(/cid:cid-1/g) ?? []).length, 2, "beide Fassungen zeigen dasselbe Bild");
+});
+
+Deno.test("fotoImg: Liste und Empfehlungs-Karte benutzen dieselbe Funktion", () => {
+  const liste = fuenfListeHtml([e()], ["cid-1"], ["https://p/1"], "https://p/alle");
+  assertStringIncludes(liste, fotoImg("cid-1", "Anna K.", 56, 12));
+  assertStringIncludes(fuenfListeHtml([e()], [null], ["https://p/1"], "x"), fotoErsatz("Anna", 56, 12, 22));
 });
