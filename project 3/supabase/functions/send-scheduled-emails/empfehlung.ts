@@ -591,7 +591,12 @@ const TIMEOUT_MS = 12_000;
  * Holt die Empfehlung. Gibt `null` zurück, wenn irgendetwas nicht klappt —
  * der Aufrufer fällt dann auf den bisherigen Mailtext zurück.
  */
-export async function holeEmpfehlung(deps: HoleDeps): Promise<EmpfehlungErgebnis | null> {
+/** Session + Matches + Trichter — der gemeinsame Unterbau von holeEmpfehlung
+ *  (eine Kraft, Angebotsmail) und holeFuenf (alle fünf, Nudge-Mail). */
+async function holeMatchings(deps: HoleDeps): Promise<{
+  proxy: (action: string, variables: Record<string, unknown>) => Promise<unknown>;
+  fuenf: Matching[];
+} | null> {
   const f = deps.fetchFn ?? fetch;
   const now = deps.now ?? new Date();
   const darfOnboarden = deps.darfOnboarden !== false;
@@ -604,64 +609,74 @@ export async function holeEmpfehlung(deps: HoleDeps): Promise<EmpfehlungErgebnis
     "apikey": deps.key,
   };
 
-  try {
-    // ① Session besorgen. onboard-to-mamamia ist idempotent: hat der Lead
-    //    schon eine job_offer, ist das ein Cache-Treffer ohne mamamia-Write.
-    //    Ohne job_offer legt es Kunde + Job an — genau das, was sonst der
-    //    Browser Sekunden später tut. Deshalb der Schalter.
-    if (!deps.jobOfferId && !darfOnboarden) return null;
+  // ① Session besorgen. onboard-to-mamamia ist idempotent: hat der Lead
+  //    schon eine job_offer, ist das ein Cache-Treffer ohne mamamia-Write.
+  //    Ohne job_offer legt es Kunde + Job an — genau das, was sonst der
+  //    Browser Sekunden später tut. Deshalb der Schalter.
+  if (!deps.jobOfferId && !darfOnboarden) return null;
 
-    const onboardRes = await f(`${deps.supabaseUrl}/functions/v1/onboard-to-mamamia`, {
+  const onboardRes = await f(`${deps.supabaseUrl}/functions/v1/onboard-to-mamamia`, {
+    method: "POST",
+    headers: kopf,
+    body: JSON.stringify({ token: deps.token }),
+    signal: AbortSignal.timeout(TIMEOUT_MS),
+  });
+  if (!onboardRes.ok) {
+    console.warn(`[empfehlung] onboard HTTP ${onboardRes.status}`);
+    return null;
+  }
+  const onboard = await onboardRes.json() as { session_token?: string; job_offer_id?: number };
+  const sessionToken = onboard?.session_token;
+  if (!sessionToken) {
+    console.warn("[empfehlung] onboard ohne session_token");
+    return null;
+  }
+
+  const proxy = async (action: string, variables: Record<string, unknown>) => {
+    const res = await f(`${deps.supabaseUrl}/functions/v1/mamamia-proxy`, {
       method: "POST",
-      headers: kopf,
-      body: JSON.stringify({ token: deps.token }),
+      headers: { ...kopf, "X-Session-Token": sessionToken },
+      body: JSON.stringify({ action, variables }),
       signal: AbortSignal.timeout(TIMEOUT_MS),
     });
-    if (!onboardRes.ok) {
-      console.warn(`[empfehlung] onboard HTTP ${onboardRes.status}`);
-      return null;
-    }
-    const onboard = await onboardRes.json() as { session_token?: string; job_offer_id?: number };
-    const sessionToken = onboard?.session_token;
-    if (!sessionToken) {
-      console.warn("[empfehlung] onboard ohne session_token");
-      return null;
-    }
+    if (!res.ok) throw new Error(`${action} HTTP ${res.status}`);
+    return await res.json();
+  };
 
-    const proxy = async (action: string, variables: Record<string, unknown>) => {
-      const res = await f(`${deps.supabaseUrl}/functions/v1/mamamia-proxy`, {
-        method: "POST",
-        headers: { ...kopf, "X-Session-Token": sessionToken },
-        body: JSON.stringify({ action, variables }),
-        signal: AbortSignal.timeout(TIMEOUT_MS),
-      });
-      if (!res.ok) throw new Error(`${action} HTTP ${res.status}`);
-      return await res.json();
-    };
+  // ② Matches holen. limit=200 wie im Portal — kleinere Seiten haben dort
+  //    schon einmal 80 % der besten Kräfte verschluckt.
+  const mRes = await proxy("listMatchings", { limit: 200 }) as {
+    data?: { JobOfferMatchingsWithPagination?: { data?: Matching[] } };
+    JobOfferMatchingsWithPagination?: { data?: Matching[] };
+  };
+  const roh =
+    mRes?.data?.JobOfferMatchingsWithPagination?.data ??
+    mRes?.JobOfferMatchingsWithPagination?.data ??
+    [];
+  if (!Array.isArray(roh) || roh.length === 0) return null;
 
-    // ② Matches holen. limit=200 wie im Portal — kleinere Seiten haben dort
-    //    schon einmal 80 % der besten Kräfte verschluckt.
-    const mRes = await proxy("listMatchings", { limit: 200 }) as {
-      data?: { JobOfferMatchingsWithPagination?: { data?: Matching[] } };
-      JobOfferMatchingsWithPagination?: { data?: Matching[] };
-    };
-    const roh =
-      mRes?.data?.JobOfferMatchingsWithPagination?.data ??
-      mRes?.JobOfferMatchingsWithPagination?.data ??
-      [];
-    if (!Array.isArray(roh) || roh.length === 0) return null;
+  const fuenf = waehleFuenf(roh, deps.formularDaten.deutschkenntnisse, now);
+  if (fuenf.length === 0) return null;
+  return { proxy, fuenf };
+}
 
-    const fuenf = waehleFuenf(roh, deps.formularDaten.deutschkenntnisse, now);
-    if (fuenf.length === 0) return null;
+/**
+ * Holt die Empfehlung (EINE Kraft, Angebotsmail). Gibt `null` zurück, wenn
+ * irgendetwas nicht klappt — der Aufrufer fällt dann auf den bisherigen
+ * Mailtext zurück.
+ */
+export async function holeEmpfehlung(deps: HoleDeps): Promise<EmpfehlungErgebnis | null> {
+  const now = deps.now ?? new Date();
+  try {
+    const basis = await holeMatchings(deps);
+    if (!basis) return null;
+    const { proxy, fuenf } = basis;
 
     // ③ Zusatzfelder nur für die EINE empfohlene Kraft (Raucherin,
     //    Führerschein, Nationalität stehen nicht in der Matching-Liste).
     //    Schlägt das fehl, bleiben eben zwei Gründe statt vier.
     let extra: CaregiverExtra | null = null;
     try {
-      // Liefert neben driving_license auch about_de/motivation fuer die
-      // Vorstellung — dieselbe Abfrage, die das Portal beim Oeffnen des
-      // Profils macht. Ein Aufruf, kein zusaetzlicher.
       const cRes = await proxy("getCaregiver", { id: fuenf[0].caregiver.id }) as {
         data?: { Caregiver?: CaregiverExtra };
         Caregiver?: CaregiverExtra;
@@ -676,6 +691,57 @@ export async function holeEmpfehlung(deps: HoleDeps): Promise<EmpfehlungErgebnis
     console.warn("[empfehlung] nicht verfügbar:", e instanceof Error ? e.message : String(e));
     return null;
   }
+}
+
+export interface FuenfErgebnis {
+  /** Genau die Kräfte, die der Kunde im Portal oben sieht — gleiche Reihenfolge. */
+  fuenf: Empfehlung[];
+  sichtbarGesamt: number;
+}
+
+/**
+ * Alle (bis zu) fünf Kräfte für die Nudge-Mail (Martin, 03.09.2026: „bei der
+ * nächsten Mail, die ohne Patientenprofil rausgeht, alle 5 Pflegekräfte
+ * zeigen"). Kein getCaregiver je Zeile — die Liste zeigt nur, was die
+ * Matching-Liste ohnehin liefert. Fünf Zusatzaufrufe für Haken, die keiner
+ * sieht, wären reine Kosten (jeder mamamia-Aufruf 700–2500 ms).
+ */
+export async function holeFuenf(deps: HoleDeps): Promise<FuenfErgebnis | null> {
+  const now = deps.now ?? new Date();
+  try {
+    const basis = await holeMatchings(deps);
+    if (!basis) return null;
+    const { fuenf } = basis;
+    return {
+      fuenf: fuenf.map((m) => baueEmpfehlung(m, null, deps.formularDaten, fuenf.length, now).empfehlung),
+      sichtbarGesamt: fuenf.length,
+    };
+  } catch (e) {
+    console.warn("[fuenf] nicht verfügbar:", e instanceof Error ? e.message : String(e));
+    return null;
+  }
+}
+
+/** „fünf" für Betreff und Einleitung — Ziffern wirken in einer Anrede kalt. */
+export function zahlwort(n: number, gross = false): string {
+  const w = ["", "eine", "zwei", "drei", "vier", "fünf"][n] ?? String(n);
+  return gross ? w.charAt(0).toUpperCase() + w.slice(1) : w;
+}
+
+/**
+ * Welche Fotos passen noch in die Mail? Die S3-Originale wiegen 50–230 KB;
+ * fünf davon inline machen eine Mail, die Gmail abschneidet. Also je Foto
+ * und in Summe ein Budget — was nicht passt, bekommt die Initialen-Kachel.
+ * Reihenfolge = Reihenfolge der Liste: die oberen Kräfte bekommen zuerst
+ * ein Gesicht.
+ */
+export function fotoBudget(groessen: (number | null)[], jeMax = 120_000, gesamtMax = 400_000): boolean[] {
+  let summe = 0;
+  return groessen.map((g) => {
+    if (g == null || g <= 0 || g > jeMax || summe + g > gesamtMax) return false;
+    summe += g;
+    return true;
+  });
 }
 
 // ─── HTML ────────────────────────────────────────────────────────────────
@@ -923,4 +989,87 @@ export function keineEmpfehlungText(): string {
   return `PASSENDE BETREUUNGSKRÄFTE
 
 Wir prüfen gerade, welche Betreuungskräfte zu Ihrer Anfrage passen. Sobald Profile verfügbar sind, finden Sie diese in Ihrem Kundenportal – wir melden uns bei Ihnen.`;
+}
+
+// ─── Fünf-Liste (Nudge-Mail, +4 h) ───────────────────────────────────────
+// Eine Zeile je Kraft, nicht fünf große Karten: Foto 56 px, Name + Alter,
+// Stufen-Chip, Faktenzeile, Deutsch-Balken + Termin-Haken. Dieselben
+// Bausteine wie die Empfehlung, damit der Kunde die Kräfte im Portal
+// wiedererkennt. Tabellen + Inline-Styles — Outlook kennt kein Flex.
+
+function fuenfZeileHtml(e: Empfehlung, cid: string | null, profilUrl: string, erste: boolean): string {
+  const name = esc(e.anzeigeName);
+  const foto = cid
+    ? `<img src="cid:${cid}" alt="${name}" width="56" height="56" style="display:block;width:56px;height:56px;border-radius:12px;object-fit:cover;border:2px solid #ffffff;" />`
+    : `<div style="width:56px;height:56px;border-radius:12px;background-color:#B5A184;color:#ffffff;font-size:22px;font-weight:700;line-height:56px;text-align:center;border:2px solid #ffffff;">${initialen(e.vorname)}</div>`;
+  const alter = e.alter ? `<span style="font-size:13.5px;font-weight:400;color:#A1A1AA;">&nbsp;&nbsp;${e.alter} J.</span>` : "";
+  const chip = e.stufe
+    ? `&nbsp;&nbsp;<span style="display:inline-block;font-size:10.5px;font-weight:700;color:#8B7355;background:#F5F5F6;border:1px solid #E4E4E7;border-radius:999px;padding:2px 9px;vertical-align:middle;">${esc(e.stufe)}</span>`
+    : "";
+  const balken = [1, 2, 3]
+    .map((i) => `<td width="14" style="width:14px;padding-right:3px;"><div style="width:12px;height:6px;border-radius:3px;background:${i <= e.deutschBalken ? "#8B7355" : "#E4E4E7"};font-size:0;line-height:0;">&nbsp;</div></td>`)
+    .join("");
+  const deutsch = e.deutschWort
+    ? `<table cellpadding="0" cellspacing="0" role="presentation" style="display:inline-table;vertical-align:middle;"><tr>${balken}<td style="padding-left:4px;font-size:12.5px;color:#71717A;">Deutsch ${esc(e.deutschWort)}</td></tr></table>`
+    : "";
+  const termin = e.gruende.includes(HAKEN_VERFUEGBAR)
+    ? `<span style="font-size:12.5px;color:#71717A;">&nbsp;&nbsp;<span style="color:#22A06B;font-weight:700;">&#10003;</span>&nbsp;${esc(HAKEN_VERFUEGBAR)}</span>`
+    : "";
+  const oben = erste ? "0" : "12px";
+  return `
+          <tr>
+            <td width="56" style="width:56px;padding:${oben} 0 0;vertical-align:top;">${foto}</td>
+            <td width="14" style="width:14px;font-size:0;line-height:0;">&nbsp;</td>
+            <td style="padding:${oben} 0 0;vertical-align:top;${erste ? "" : "border-top:1px solid #EFE9E0;"}">
+              <p style="margin:0;font-size:15.5px;line-height:1.35;color:#18181B;"><a href="${profilUrl}" target="_blank" style="color:#18181B;text-decoration:none;font-weight:700;">${name}</a>${alter}${chip}</p>
+              <p style="margin:2px 0 0;font-size:13.5px;line-height:1.5;color:#52525B;">${esc(e.fakten)}</p>
+              <p style="margin:3px 0 0;font-size:12.5px;line-height:1.5;color:#71717A;">${deutsch}${termin}</p>
+            </td>
+          </tr>
+          <tr><td colspan="3" style="font-size:0;line-height:0;height:12px;">&nbsp;</td></tr>`;
+}
+
+/**
+ * @param cids  je Kraft die CID des eingebetteten Fotos oder null (Initialen).
+ *              Nie die rohe S3-URL — die ist nach ~30 Min tot.
+ */
+export function fuenfListeHtml(
+  fuenf: Empfehlung[],
+  cids: (string | null)[],
+  profilUrls: string[],
+  alleUrl: string,
+): string {
+  if (fuenf.length === 0) return "";
+  const n = fuenf.length;
+  const zeilen = fuenf.map((e, i) => fuenfZeileHtml(e, cids[i] ?? null, profilUrls[i] ?? alleUrl, i === 0)).join("");
+  return `
+    <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="margin:22px 0 24px;">
+      <tr><td>
+        <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="border:2px solid #8B7355;border-radius:16px;background:#ffffff;">
+          <tr>
+            <td style="padding:12px 18px;background:#FAF8F4;border-bottom:1px solid #EBE2D2;border-radius:15px 15px 0 0;">
+              <table width="100%" cellpadding="0" cellspacing="0" role="presentation"><tr>
+                <td style="font-size:12px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;color:${KORALLE};">Für Sie vorbereitet</td>
+                <td align="right" style="font-size:12.5px;color:#71717A;text-align:right;">${n} ${n === 1 ? "Kraft" : "Kräfte"} verfügbar</td>
+              </tr></table>
+            </td>
+          </tr>
+          <tr><td style="padding:18px 18px 6px;">
+            <table width="100%" cellpadding="0" cellspacing="0" role="presentation">${zeilen}
+            </table>
+          </td></tr>
+        </table>
+        <p style="margin:12px 0 0;text-align:center;"><a href="${alleUrl}" target="_blank" style="color:#8B7355;text-decoration:underline;font-size:14px;font-weight:600;">Alle ${n === 1 ? "Profile" : n + " Profile"} im Portal ansehen &rarr;</a></p>
+      </td></tr>
+    </table>`;
+}
+
+export function fuenfListeText(fuenf: Empfehlung[], profilUrls: string[], alleUrl: string): string {
+  if (fuenf.length === 0) return "";
+  const zeilen = fuenf.map((e, i) => {
+    const teile = [e.anzeigeName + (e.alter ? `, ${e.alter} J.` : ""), e.stufe, e.fakten,
+      e.deutschWort ? `Deutsch ${e.deutschWort}` : ""].filter(Boolean).join(" · ");
+    return `  ${i + 1}. ${teile}\n     Profil: ${profilUrls[i] ?? alleUrl}`;
+  }).join("\n");
+  return `FÜR SIE VORBEREITET (${fuenf.length})\n${zeilen}\n\nAlle Profile im Portal: ${alleUrl}`;
 }
