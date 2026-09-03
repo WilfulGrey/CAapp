@@ -1,7 +1,6 @@
 import { assertEquals, assertThrows } from "@std/assert";
 import {
   buildDmEvent,
-  extractValue,
   formatRfc3339,
   isOldEnough,
   pickClickId,
@@ -38,13 +37,13 @@ Deno.test("isOldEnough: 6h-Guard", () => {
 });
 
 Deno.test("buildDmEvent: gclid + transactionId + Wert nur wenn > 0", () => {
-  const withValue = buildDmEvent({ ...BASE, gclid: "GCLID1", value: 2850 }, "qualified_lead")!;
+  const withValue = buildDmEvent({ ...BASE, gclid: "GCLID1", value: 90 }, "qualified_lead")!;
   assertEquals(withValue.adIdentifiers, { gclid: "GCLID1" });
   assertEquals(withValue.transactionId, BASE.leadId);
   assertEquals(withValue.destinationReferences, ["qualified_lead"]);
   assertEquals(withValue.eventTimestamp, "2026-08-15T11:57:20Z");
   assertEquals(withValue.eventSource, "WEB");
-  assertEquals(withValue.conversionValue, 2850);
+  assertEquals(withValue.conversionValue, 90);
   assertEquals(withValue.currency, "EUR");
 
   const noValue = buildDmEvent({ ...BASE, wbraid: "WB1", value: 0 }, "qualified_lead")!;
@@ -55,18 +54,10 @@ Deno.test("buildDmEvent: gclid + transactionId + Wert nur wenn > 0", () => {
   assertEquals(buildDmEvent(BASE, "qualified_lead"), null);
 });
 
-Deno.test("extractValue: bruttopreis fail-soft", () => {
-  assertEquals(extractValue({ bruttopreis: 2750 }), 2750);
-  assertEquals(extractValue({ bruttopreis: 0 }), null);
-  assertEquals(extractValue({ bruttopreis: "2750" }), null);
-  assertEquals(extractValue(null), null);
-  assertEquals(extractValue("x"), null);
-});
-
 Deno.test("buildDmEvent: transactionId-Override + eigene Destination für Buchungen", () => {
-  const ev = buildDmEvent({ ...BASE, gclid: "GCLID9", value: 400 }, "booking", "booking-lead-9")!;
+  const ev = buildDmEvent({ ...BASE, gclid: "GCLID9", value: 250 }, "booking", "booking-lead-9")!;
   assertEquals(ev.transactionId, "booking-lead-9");
   assertEquals(ev.destinationReferences, ["booking"]);
-  assertEquals(ev.conversionValue, 400);
+  assertEquals(ev.conversionValue, 250);
   assertEquals(ev.currency, "EUR");
 });

@@ -109,7 +109,10 @@ category QUALIFIED_LEAD, ONE_PER_CLICK, 90-Tage-Fenster — angelegt
   („Alle Conversions"), beeinflusst Smart Bidding NICHT. Primär schalten
   ist eine bewusste Bidding-Entscheidung (Google Ads → Ziele), erst nach
   2–3 Wochen Datenlage.
-- Conversion-Wert = Monats-Bruttopreis aus `leads.kalkulation` (EUR),
+- Conversion-Wert = **fest 90 €** je Profil (Martins Staffelung: Profil 90, Buchung 250;
+  Env `GOOGLE_ADS_QUALIFIED_LEAD_VALUE_EUR`). Bis 03.09. ging der Monats-Bruttopreis
+  mit (~2.800 € je Profil) — heute folgenlos, weil Max. Conversions den Wert nicht
+  liest, aber ein grober Fehler beim Wechsel auf wertbasierte Gebote.
   Bestell-ID = `lead_id` (Google-seitige Dedup).
 - Status je Lead in `offline_conversion_uploads` (uploaded /
   permanent_failure mit Fehlercode); Leads ohne Zeile = offen, werden

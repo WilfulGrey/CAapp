@@ -13,7 +13,7 @@ export interface QualifiedLeadCandidate {
   gclid: string | null;
   wbraid: string | null;
   gbraid: string | null;
-  /** Monats-Bruttopreis aus leads.kalkulation (EUR) — optionaler Wert. */
+  /** Fester Stufenwert in EUR (Profil 90, Buchung 250) — null = ohne Wert. */
   value: number | null;
 }
 
@@ -78,13 +78,6 @@ export function buildDmEvent(
     event.currency = "EUR";
   }
   return event;
-}
-
-// bruttopreis aus leads.kalkulation (jsonb) ziehen — fail-soft.
-export function extractValue(kalkulation: unknown): number | null {
-  if (!kalkulation || typeof kalkulation !== "object") return null;
-  const v = (kalkulation as Record<string, unknown>).bruttopreis;
-  return typeof v === "number" && Number.isFinite(v) && v > 0 ? v : null;
 }
 
 // Data Manager ist fast-fail pro REQUEST: HTTP 400 = Datenproblem im Batch
