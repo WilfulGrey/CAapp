@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { nurseFacts } from '../components/portal/shared';
+import { nurseFacts, einsaetzeText } from '../components/portal/shared';
 
 // Faktenzeile der Pflegekraft-Karten. Vorher stand ohne `care_experience`
 // wörtlich „—" als einzige Qualifikationszeile, und ohne Einsätze blieb die
@@ -39,5 +39,13 @@ describe('nurseFacts', () => {
       expect(s).not.toMatch(/Ø|Woche|pro Einsatz/);
       expect(s).toBe('4 J. Erfahrung · 5 Einsätze über Primundus');
     }
+  });
+
+  // Derselbe Wortlaut speist auch das Pill im Profil-Modal („Letzte
+  // Einsätze") — dort stand bis 03.09. „14 Einsätze · Ø 12 Wo.".
+  it('einsaetzeText: Einzahl/Mehrzahl, immer „über Primundus", nie Ø', () => {
+    expect(einsaetzeText(1)).toBe('1 Einsatz über Primundus');
+    expect(einsaetzeText(14)).toBe('14 Einsätze über Primundus');
+    expect(einsaetzeText(0)).toBe('0 Einsätze über Primundus');
   });
 });

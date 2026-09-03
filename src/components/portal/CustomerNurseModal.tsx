@@ -3,7 +3,7 @@ import type { FC, MouseEvent as ReactMouseEvent } from 'react';
 import { Check, X, UserPlus, Heart, FileText, Download } from 'lucide-react';
 import type { Nurse } from '../../types';
 import type { Application } from './shared';
-import { nurseLevel, displayName, initials } from './shared';
+import { nurseLevel, displayName, initials, einsaetzeText } from './shared';
 
 // Erklärung der Stufe. Die Labels MÜSSEN mit `nurseLevel`
 // (components/portal/shared.ts) und den Schwellen in lib/mamamia/badge.ts
@@ -173,7 +173,6 @@ export const CustomerNurseModal: FC<{
   const inits = initials(nurse.name);
   const name = displayName(nurse.name);
   const bars = Array.from({ length: 3 }, (_, i) => i < nurse.language.bars);
-  const avgWo = nurse.history ? Math.round(nurse.history.avgDurationMonths * 4.3) : 0;
   const lvl = nurseLevel(nurse.experienceYears ?? 0, nurse.history?.assignments ?? 0);
   const p = nurse.profile;
   const dash = '—';
@@ -448,7 +447,8 @@ export const CustomerNurseModal: FC<{
                   {nurse.history && (
                     <span className="text-[13px] font-semibold px-2.5 py-0.5 rounded-full flex-shrink-0"
                       style={{ color: '#71717A', background: '#F5F5F6', border: '1px solid #D4D4D8' }}>
-                      {nurse.history.assignments} Einsätze · Ø {avgWo} Wo.
+                      {/* Gleicher Wortlaut wie die Karte, ohne Ø-Dauer (Martin, 03.09.). */}
+                      {einsaetzeText(nurse.history.assignments)}
                     </span>
                   )}
                 </div>
