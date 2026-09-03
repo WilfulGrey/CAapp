@@ -67,6 +67,25 @@ Währung muss dreistellig sein (`/^[A-Za-z]{3}$/`).
 Der Beispielschnipsel im Einrichtungsdialog zeigt `registration_completed` —
 das ist für uns falsch, wir erzeugen keine Registrierungen.
 
+## Textlängen: die Felder lügen
+
+Die Zähler am Feld zeigen 50 (Titel) und 100 (Beschreibung). Die Warnung
+„Der Anzeigentext wird in einigen Platzierungen möglicherweise abgeschnitten"
+kommt aber **weit früher**. Am 03.09.2026 im Anzeigenmanager ausgemessen:
+
+| Feld | Feldlimit | **ohne Warnung** |
+|---|---|---|
+| Titel | 50 | **≤ 24 Zeichen** (ab 25 Warnung) |
+| Beschreibung | 100 | **≤ 48 Zeichen** (ab 49 Warnung) |
+
+Es zählt die **Zeichenzahl, nicht die Breite** — 40 schmale „i" lösen die
+Warnung aus, 20 breite „W" nicht. Beide Felder werden unabhängig voneinander
+bewertet.
+
+Wer die Grenze überschreitet, verliert das Satzende in der ChatGPT-Antwort —
+und damit meistens genau die Aussage, wegen der die Anzeige geschrieben wurde.
+Praktisch heißt das: **die Pointe muss in die ersten 24 bzw. 48 Zeichen.**
+
 ## Warum 20 € und nicht der Eigenanteil
 
 `WERT_ANFRAGE_EUR = 20` folgt Martins fester Staffelung (Anfrage 20, Profil 90,
