@@ -55,7 +55,11 @@ export function parseCsv(text: string): string[][] {
  *  ⇒ Anhang gilt als unlesbar ⇒ der Aufrufer faellt auf den Mailtext
  *  zurueck (bestehender, getesteter Pfad). */
 export function csvZeileBrauchbar(kopf: string[], zeile: string[]): boolean {
-  return zeile.length >= Math.ceil(kopf.length / 2);
+  /* Runde 2 (uid 28, live): auch der KOPF kann zu einem Feld verklumpen —
+     dann besteht ein 1-Feld-Datensatz die Verhaeltnispruefung (1 >= 1).
+     Der belastbare Test ist semantisch: csvZuLeadZeile adressiert Spalten
+     PER NAME — ein Kopf ohne eigenstaendige 'Email'-Spalte traegt nichts. */
+  return kopf.includes('Email') && zeile.length >= Math.ceil(kopf.length / 2);
 }
 
 export interface CsvLeadZeile {
