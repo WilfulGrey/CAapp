@@ -40,6 +40,7 @@ import {
   imBewertungsfenster,
   type BewertungsLead,
 } from "./bewertung.ts";
+import { kundenEmpfaenger, ccListe } from "./empfaenger.ts";
 import {
   portalHerkunft,
   portalIntroHtml,
@@ -76,6 +77,8 @@ interface Lead {
   kalkulation: any;
   token: string;
   status: string;
+  /** Zweite Empfängeradresse (CC) für alle Kundenmails — siehe empfaenger.ts. */
+  email_cc?: string | null;
   /* Herkunft des Leads: "rechner" (Formular), "pria-chat" oder
      "portal:<domain>" fuer eingekaufte Leads (siehe portalHerkunft). */
   source?: string | null;
@@ -1971,7 +1974,7 @@ async function runBewertungsRunde(
   const cutoff = new Date(jetzt.getTime() - BEWERTUNG_TAGE * 86400000).toISOString();
   const { data: kandidaten, error } = await supabase
     .from("leads")
-    .select("id, vorname, nachname, anrede_text, token, email, status, created_at, source")
+    .select("id, vorname, nachname, anrede_text, token, email, email_cc, status, created_at, source")
     .gte("created_at", BEWERTUNG_STICHTAG)
     .lte("created_at", cutoff)
     .order("created_at", { ascending: true })
@@ -2017,7 +2020,8 @@ async function runBewertungsRunde(
       smtpConfig, bewEmpfaenger,
       umleitungBew ? umleitungBew.betreffPraefix + tpl.subject : tpl.subject,
       tpl.html, tpl.text,
-      undefined, false, BEWERTUNG_CC,
+      // Martins Kopie (BEWERTUNG_CC) plus die Kopie-Adresse des Kunden.
+      undefined, false, ccListe(BEWERTUNG_CC, umleitungBew ? null : kundenEmpfaenger(lead, bewEmpfaenger).cc),
     );
     if (r.success) {
       gesendet++;
@@ -2238,6 +2242,24 @@ Deno.serve(async (req: Request) => {
         // an der Warteschlange vorbei (direkter SMTP-Versand), daher ist der Lead
         // hier ausnahmslos der richtige Adressat.
         const recipient = (lead.email ?? "").trim() || scheduledEmail.recipient_email;
+        // Kopie-Adresse (leads.email_cc): jede Kundenmail geht zusätzlich als
+        // CC an sie — beide sehen einander (Martin, 03.09.2026). Sie ist
+        // KEIN Pflicht-Empfänger: sieht ihre Domain nach Tippfehler aus,
+        // fällt nur die Kopie weg, die Mail an den Kunden geht trotzdem.
+        let ccEmpfaenger = kundenEmpfaenger(lead as Lead, recipient).cc;
+        if (ccEmpfaenger) {
+          const ccCheck = detectEmailDomainTypo(ccEmpfaenger);
+          if (ccCheck.suspicious) {
+            await supabase.from("lead_events").insert({
+              lead_id: scheduledEmail.lead_id,
+              event_type: "email_cc_domain_flagged",
+              metadata: { cc: ccEmpfaenger, email_type: scheduledEmail.email_type,
+                suggestion: ccCheck.suggestion ?? null, reason: ccCheck.reason ?? null },
+            });
+            console.warn(`[cc-flag] Kopie-Adresse verworfen: ${ccEmpfaenger} (${ccCheck.reason})`);
+            ccEmpfaenger = undefined;
+          }
+        }
         /* Testphase (PORTAL_TESTPHASE=1): Kundenmails der Portal-Leads gehen
            ans Team statt an den Kunden — Umleitung erst beim Versand, der
            Lead behaelt die echte Adresse. Kopie-Logik: testphase.ts. */
@@ -2727,7 +2749,12 @@ Deno.serve(async (req: Request) => {
 
         const effektiverEmpfaenger = umleitung?.empfaenger ?? recipient;
         const effektiverBetreff = umleitung ? umleitung.betreffPraefix + subject : subject;
-        const emailResult = await sendEmailSmtp(smtpConfig, effektiverEmpfaenger, effektiverBetreff, html, text, attachments);
+        // Testphase-Umleitung ans Team: dann KEINE Kopie an die zweite
+        // Kundenadresse — sonst bekäme sie, was der Kunde selbst nicht bekommt.
+        const emailResult = await sendEmailSmtp(
+          smtpConfig, effektiverEmpfaenger, effektiverBetreff, html, text, attachments,
+          false, umleitung ? undefined : ccEmpfaenger,
+        );
 
         if (emailResult.success) {
           await supabase
@@ -2745,7 +2772,8 @@ Deno.serve(async (req: Request) => {
           await supabase.from("lead_events").insert({
             lead_id: scheduledEmail.lead_id,
             event_type: eventTypeSent,
-            metadata: { to: recipient, triggered_by: "scheduled_email" },
+            metadata: { to: recipient, triggered_by: "scheduled_email",
+              ...(ccEmpfaenger && !umleitung ? { cc: ccEmpfaenger } : {}) },
           });
  
           // Nachfass-Kette: startet jetzt nach der (gemergten) Eingangsbestätigung.

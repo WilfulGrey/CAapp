@@ -310,6 +310,8 @@ async function handleSendAngebotsEmailOnly(leadId: string) {
     const emailResult = await sendEmail(
       umlA?.empfaenger ?? lead.email,
       umlA ? { ...angebotsEmail, subject: umlA.betreffPraefix + angebotsEmail.subject } : angebotsEmail,
+      undefined,
+      umlA ? undefined : { cc: kundenEmpfaenger(lead).cc },
     );
 
     if (emailResult.success) {
@@ -342,4 +344,5 @@ async function handleSendAngebotsEmailOnly(leadId: string) {
 // ─── Telemetria RAM (diagnoza OOM — plan 2026-08-09; format: [req] …) ───
 import { withMem } from '@/lib/memlog';
 import { PORTAL_BASIS } from '@/lib/portal-url';
+import { kundenEmpfaenger } from '@/lib/empfaenger';
 export const POST = withMem('angebot-anfordern', handlePost);

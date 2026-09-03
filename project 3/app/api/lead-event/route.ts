@@ -16,6 +16,7 @@ import { appendJobParam, PORTAL_BASIS } from '@/lib/portal-url';
 import { sendezeitIso } from '@/lib/quiet-hours';
 import { testphaseUmleitung } from '@/lib/portal-schutz';
 import { createHash } from 'crypto';
+import { kundenEmpfaenger } from '@/lib/empfaenger';
 
 // Bridge endpoint: the CA-App portal reports customer milestones back to the
 // kostenrechner lead so the Nachfass emails can branch. Token-authenticated —
@@ -1078,7 +1079,8 @@ async function handlePost(request: NextRequest) {
           const template = getPatientDataSavedEmailTemplate(lead as any, portalUrl);
           // Testphase: Portal-Leads ans Team (Umleitung nur beim Versand).
           const umlD = testphaseUmleitung(lead as any, process.env.PORTAL_TESTPHASE);
-          sendEmail(umlD?.empfaenger ?? (lead as any).email, umlD ? { ...template, subject: umlD.betreffPraefix + template.subject } : template).catch((e) =>
+          sendEmail(umlD?.empfaenger ?? (lead as any).email, umlD ? { ...template, subject: umlD.betreffPraefix + template.subject } : template, undefined,
+            umlD ? undefined : { cc: kundenEmpfaenger(lead as any).cc }).catch((e) =>
             console.error('customer mail send threw:', e instanceof Error ? e.message : String(e)),
           );
         }
@@ -1110,7 +1112,8 @@ async function handlePost(request: NextRequest) {
             portalUrl,
           );
           const umlO = testphaseUmleitung(lead as any, process.env.PORTAL_TESTPHASE);
-          sendEmail(umlO?.empfaenger ?? (lead as any).email, umlO ? { ...template, subject: umlO.betreffPraefix + template.subject } : template).catch((e) =>
+          sendEmail(umlO?.empfaenger ?? (lead as any).email, umlO ? { ...template, subject: umlO.betreffPraefix + template.subject } : template, undefined,
+            umlO ? undefined : { cc: kundenEmpfaenger(lead as any).cc }).catch((e) =>
             console.error('customer mail send threw:', e instanceof Error ? e.message : String(e)),
           );
         }
@@ -1142,6 +1145,7 @@ async function handlePost(request: NextRequest) {
                 umlC?.empfaenger ?? (lead as any).email,
                 umlC ? { ...template, subject: umlC.betreffPraefix + template.subject } : template,
                 contractAttachment ? [...(attachments ?? []), contractAttachment] : attachments,
+                umlC ? undefined : { cc: kundenEmpfaenger(lead as any).cc },
               );
             })
             .then((result) => {

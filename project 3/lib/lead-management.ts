@@ -10,6 +10,8 @@ const supabase = createClient(
 export interface Lead {
   id: string;
   email: string;
+  /** Zweite Empfängeradresse (CC) für alle Kundenmails — lib/empfaenger.ts. */
+  email_cc?: string | null;
   vorname: string | null;
   nachname: string | null;
   anrede: string | null;
