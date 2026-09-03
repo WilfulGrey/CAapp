@@ -788,6 +788,41 @@ function initialen(name: string): string {
  *                  Initialen-Kachel. NIE die rohe S3-URL: die ist nach ~30 Min
  *                  tot und würde beim Kunden als kaputtes Bild ankommen.
  */
+/**
+ * Ein Foto für die Mail — EINE Stelle für die Empfehlungs-Karte und die
+ * Fünf-Liste, damit beide gleich eingebunden sind (Martin, 03.09.2026).
+ *
+ * Zwei Fassungen, weil Outlook Desktop (Word-Engine) `object-fit` NICHT
+ * kennt: dort würde ein Hochformat auf ein Quadrat gequetscht — und die
+ * Hälfte der Avatare IST Hochformat (gemessen 03.09.2026: 354×557,
+ * 864×1225, 670×950 neben 1024×1024). Ein gestauchtes Gesicht ist schlimmer
+ * als ein unbeschnittenes.
+ *
+ *   Outlook  → nur `width`, Höhe folgt dem Seitenverhältnis. Kein Beschnitt,
+ *              keine runden Ecken (kennt Outlook ohnehin nicht), aber nie
+ *              verzerrt.
+ *   Alle     → quadratischer Beschnitt mit runden Ecken wie im Portal.
+ *   anderen
+ *
+ * Das Muster `<!--[if !mso]><!--> … <!--<![endif]-->` ist der Standardweg
+ * dafür; Gmail, Apple Mail, iOS und Yahoo sehen den Inhalt als normales
+ * HTML. `border:0` und `-ms-interpolation-mode:bicubic` sind die üblichen
+ * Härtungen gegen Outlook-Ränder und grobes Skalieren.
+ *
+ * cid, nie die rohe S3-URL: die ist nach ~30 Min tot und käme beim Kunden
+ * als kaputtes Bild an.
+ */
+export function fotoImg(cid: string, alt: string, px: number, radius: number): string {
+  const gemeinsam = `src="cid:${cid}" alt="${alt}" width="${px}"`;
+  return `<!--[if mso]><img ${gemeinsam} style="display:block;border:0;" /><![endif]-->` +
+    `<!--[if !mso]><!--><img ${gemeinsam} height="${px}" style="display:block;width:${px}px;height:${px}px;border:2px solid #ffffff;border-radius:${radius}px;object-fit:cover;-ms-interpolation-mode:bicubic;outline:none;text-decoration:none;" /><!--<![endif]-->`;
+}
+
+/** Initialen-Kachel, wenn kein Foto vorliegt oder es zu schwer ist. */
+export function fotoErsatz(vorname: string, px: number, radius: number, schrift: number): string {
+  return `<div style="width:${px}px;height:${px}px;border-radius:${radius}px;background-color:#B5A184;color:#ffffff;font-size:${schrift}px;font-weight:700;line-height:${px}px;text-align:center;border:2px solid #ffffff;">${initialen(vorname)}</div>`;
+}
+
 /** Korallrot der Website- und Portal-CTAs (PrimaryCTA.tsx, MatchCard). */
 export const KORALLE = "#E76F63";
 
@@ -802,9 +837,7 @@ export function empfehlungHtml(
   const vorname = esc(e.vorname);
 
   // Foto wie im Profil-Modal: 80 px, radius 16, weisser Rand.
-  const foto = photoCid
-    ? `<img src="cid:${photoCid}" alt="${name}" width="80" height="80" style="display:block;width:80px;height:80px;border-radius:16px;object-fit:cover;border:2px solid #ffffff;" />`
-    : `<div style="width:80px;height:80px;border-radius:16px;background-color:#B5A184;color:#ffffff;font-size:28px;font-weight:700;line-height:80px;text-align:center;border:2px solid #ffffff;">${initialen(e.vorname)}</div>`;
+  const foto = photoCid ? fotoImg(photoCid, name, 80, 16) : fotoErsatz(e.vorname, 80, 16, 28);
 
   const alterChip = e.alter
     ? `<span style="font-size:14px;font-weight:400;color:#A1A1AA;">&nbsp;&nbsp;${e.alter} J.</span>`
@@ -1020,9 +1053,7 @@ Wir prüfen gerade, welche Betreuungskräfte zu Ihrer Anfrage passen. Sobald Pro
 
 function fuenfZeileHtml(e: Empfehlung, cid: string | null, profilUrl: string, erste: boolean): string {
   const name = esc(e.anzeigeName);
-  const foto = cid
-    ? `<img src="cid:${cid}" alt="${name}" width="56" height="56" style="display:block;width:56px;height:56px;border-radius:12px;object-fit:cover;border:2px solid #ffffff;" />`
-    : `<div style="width:56px;height:56px;border-radius:12px;background-color:#B5A184;color:#ffffff;font-size:22px;font-weight:700;line-height:56px;text-align:center;border:2px solid #ffffff;">${initialen(e.vorname)}</div>`;
+  const foto = cid ? fotoImg(cid, name, 56, 12) : fotoErsatz(e.vorname, 56, 12, 22);
   const alter = e.alter ? `<span style="font-size:13.5px;font-weight:400;color:#A1A1AA;">&nbsp;&nbsp;${e.alter} J.</span>` : "";
   const chip = e.stufe
     ? `&nbsp;&nbsp;<span style="display:inline-block;font-size:10.5px;font-weight:700;color:#8B7355;background:#F5F5F6;border:1px solid #E4E4E7;border-radius:999px;padding:2px 9px;vertical-align:middle;">${esc(e.stufe)}</span>`
