@@ -326,7 +326,7 @@ Deno.test("kundenFakten: ohne Zahlen ein ehrlicher Satz statt eines Strichs", ()
 Deno.test("kundenFakten: Einzahl bleibt Einzahl", () => {
   assertEquals(
     kundenFakten({ id: 1, care_experience: "1", hp_total_jobs: 1 }),
-    "1 Jahr Erfahrung &middot; 1 Primundus-Einsatz",
+    "1 Jahr Erfahrung · 1 Primundus-Einsatz",
   );
 });
 
