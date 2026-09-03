@@ -26,7 +26,6 @@
 import { createClient } from "npm:@supabase/supabase-js@2.57.4";
 import {
   buildDmEvent,
-  extractValue,
   isOldEnough,
   pickClickId,
   type QualifiedLeadCandidate,
@@ -43,8 +42,14 @@ import {
 
 const LOOKBACK_DAYS = 90; // Klick-Fenster der Conversion-Aktionen
 const MIN_AGE_HOURS = 6; // Klick muss bei Google verarbeitet sein
-// „Kunde gebucht": fixer Conversion-Wert je Buchung — 250 € (Martins
-// berechneter Maximalwert, 22.08.; vorher kurz 400).
+// Conversion-Werte sind FESTE Stufenwerte, keine Preise (Martins Staffelung,
+// 22.08. + 03.09.): Patientenprofil 90 €, Buchung 250 €. Bis zum 03.09. ging
+// beim Profil der volle Monats-Bruttopreis mit (~2.800 €/Profil, 74.000 € auf
+// 26 Uploads) — heute folgenlos, weil "Maximize Conversions" den Wert nicht
+// liest, aber ein grober Fehler, sobald jemand auf wertbasierte Gebote
+// umstellt. Beide Werte per Env überschreibbar, damit eine Anpassung kein
+// Deploy braucht.
+const QUALIFIED_LEAD_VALUE_EUR = Number(Deno.env.get("GOOGLE_ADS_QUALIFIED_LEAD_VALUE_EUR") ?? "90");
 const BOOKING_VALUE_EUR = Number(Deno.env.get("GOOGLE_ADS_BOOKING_VALUE_EUR") ?? "250");
 
 function json(status: number, body: Record<string, unknown>): Response {
@@ -133,7 +138,7 @@ Deno.serve(async (req: Request) => {
   for (let i = 0; i < ids.length; i += 100) {
     const { data: chunk, error: leadErr } = await supabase
       .from("leads")
-      .select("id, gclid, wbraid, gbraid, kalkulation")
+      .select("id, gclid, wbraid, gbraid")
       .in("id", ids.slice(i, i + 100));
     if (leadErr) return json(500, { error: `leads query: ${leadErr.message}` });
     leads.push(...(chunk ?? []));
@@ -151,7 +156,7 @@ Deno.serve(async (req: Request) => {
       gclid: l.gclid ?? null,
       wbraid: l.wbraid ?? null,
       gbraid: l.gbraid ?? null,
-      value: extractValue(l.kalkulation),
+      value: QUALIFIED_LEAD_VALUE_EUR,
     };
     if (!pickClickId(cand)) {
       noClickId++; // Organik/Direkt — kein Upload möglich, zählt nur fürs Log
