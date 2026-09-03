@@ -90,8 +90,12 @@ Deno.test("fuenfListeText: nummeriert, mit Profil-Link je Kraft", () => {
 });
 
 Deno.test("fotoBudget: je Foto und in Summe, obere zuerst", () => {
-  assertEquals(fotoBudget([50_000, 200_000, 100_000, 100_000, 100_000]), [true, false, true, true, true]);
-  assertEquals(fotoBudget([110_000, 110_000, 110_000, 110_000, 110_000]), [true, true, true, false, false]);
+  // Echte Avatar-Groessen (gemessen 03.09.2026): 45-180 KB als PNG. Alle
+  // fuenf muessen passen — die erste Fassung liess nur 120 KB je Bild zu,
+  // und der Kunde sah fuenf Initialen-Kacheln statt Gesichtern.
+  assertEquals(fotoBudget([150_000, 116_000, 177_000, 164_000, 45_000]), [true, true, true, true, true]);
+  assertEquals(fotoBudget([400_000, 50_000]), [false, true], "ein Ausreisser faellt heraus");
+  assertEquals(fotoBudget([290_000, 290_000, 290_000, 290_000, 290_000]), [true, true, true, true, false], "Summe begrenzt");
   assertEquals(fotoBudget([null, 0, 30_000]), [false, false, true]);
 });
 
@@ -134,4 +138,19 @@ Deno.test("Singular: eine Pflegekraft, nicht eine Pflegekraefte", () => {
   assertEquals(kraefteWort(5), "fünf Pflegekräfte");
   assertEquals(fuenfBetreff(1), "Eine Pflegekraft zur Auswahl – soll sie es sein?");
   assertEquals(fuenfBetreff(5), "Fünf Pflegekräfte zur Auswahl – wer soll es sein?");
+});
+
+// Reihenfolge der Sprachzeile wie im SA-Portal, Verfuegbarkeit daneben
+// (Martin, 03.09.2026): „Deutsch ●●● Gut  ✓ Ab sofort verfuegbar",
+// darunter erst Erfahrung und Einsaetze.
+Deno.test("Sprachzeile: Label vor den Punkten, Wert dahinter, Verfuegbarkeit daneben", () => {
+  const html = fuenfListeHtml([e()], [null], ["https://p/1"], "https://p/alle");
+  const iLabel = html.indexOf(">Deutsch<");
+  const iBalken = html.indexOf("border-radius:3px;background:#8B7355");
+  const iWert = html.indexOf(">Mittel<");
+  const iTermin = html.indexOf(HAKEN_VERFUEGBAR);
+  const iFakten = html.indexOf("5 Jahre Erfahrung");
+  assert(iLabel > -1 && iBalken > iLabel, "Label muss VOR den Punkten stehen");
+  assert(iWert > iBalken, "Wert muss NACH den Punkten stehen");
+  assert(iTermin > iWert && iTermin < iFakten, "Verfuegbarkeit gehoert in die Sprachzeile, vor die Fakten");
 });
