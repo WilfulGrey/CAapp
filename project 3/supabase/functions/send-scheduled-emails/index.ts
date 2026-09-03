@@ -28,8 +28,7 @@ import {
   keineEmpfehlungHtml,
   keineEmpfehlungText,
   stufenWort,
-  type EmpfehlungErgebnis,
-} from "./empfehlung.ts";
+  type EmpfehlungErgebnis, holeFuenf, fuenfListeHtml, fuenfListeText, kraefteWort, fuenfBetreff, fotoBudget } from "./empfehlung.ts";
 import {
   BEWERTUNG_CAP,
   BEWERTUNG_CC,
@@ -616,9 +615,35 @@ Primundus Deutschland | +49 89 200 000 830 | www.primundus.de`;
 // Einstieg = Dank + „Ihr Angebot haben Sie erhalten" (Kunde weiss, wo er steht),
 // dann der Schwenk auf die Pflegekraefte (passen + gerade verfuegbar, unverbindlich).
 // Kein „schwierig auszufuellen", kein „es eilt nicht", keine Verknappung.
-export function buildProfilNudge1Html(lead: Lead, siteUrl: string, portalBase: string): string {
+export function buildProfilNudge1Html(
+  lead: Lead, siteUrl: string, portalBase: string,
+  /* Fertige Fünf-Liste (fuenfListeHtml). null/undefined = Rückfall auf den
+     bisherigen Text — liefert mamamia gerade nichts, wird nichts behauptet. */
+  fuenfBlock?: string | null,
+  anzahl = 0,
+): string {
   const portalUrl = (portalBase && lead.token) ? withMailMark(buildPortalUrl(portalBase, lead.token), "pn1") : siteUrl;
   const halloAnrede = buildHalloAnrede(lead.anrede_text || null, lead.nachname || "", lead.vorname || "");
+  if (fuenfBlock) {
+    /* Variante mit Liste (Martin, 03.09.2026): erst die Menschen zeigen, dann
+       um die Entscheidung bitten. Das Profil ist die Gegenleistung dafür,
+       dass sich die gewählte Kraft bewerben kann — keine Schranke. Kein
+       „Keine Katze im Sack", keine „4–7 Werktage": neben echten Menschen mit
+       echten Terminen sind das Floskeln. */
+    const matchesUrl = (portalBase && lead.token) ? withMailMark(buildPortalUrl(portalBase, lead.token, "matches"), "pn1") : siteUrl;
+    const wort = kraefteWort(anzahl);
+    const content = `
+    <p style="font-size:15px;line-height:1.75;color:#444;margin-bottom:14px;">${halloAnrede},</p>
+    <p style="font-size:15px;line-height:1.75;color:#444;margin-bottom:14px;">Ihr Angebot haben Sie heute bekommen. Seitdem haben wir geschaut, wer zu Ihrer Situation passt und zum gewünschten Zeitpunkt frei ist &ndash; <strong>${wort} haben wir für Sie vorbereitet.</strong> ${anzahl === 1 ? "Haben Sie sich das Profil schon angesehen?" : "Haben Sie sich alle schon angesehen?"}</p>
+    ${fuenfBlock}
+    <p style="font-size:15px;line-height:1.75;color:#444;margin-bottom:14px;"><strong>Bitte teilen Sie uns Ihre Entscheidung mit:</strong> ${anzahl === 1 ? "Soll sich diese Pflegekraft bei Ihnen bewerben?" : "Welche dieser Pflegekräfte soll sich bei Ihnen bewerben?"} Damit sie das kann, braucht sie noch ein paar Angaben zur Pflegesituation &ndash; ein Teil ist aus dem Kostenrechner schon übernommen, der Rest dauert wenige Minuten.</p>
+    <p style="font-size:15px;line-height:1.75;color:#444;margin-bottom:14px;">Sobald das steht, sehen Sie im Portal, wer sich meldet, und entscheiden in Ruhe. <strong>Unverbindlich, und ohne Vertrag vor Ihrer Auswahl.</strong></p>
+    ${bulletproofButton(matchesUrl, "Pflegekraft auswählen&nbsp;&nbsp;&rarr;", "#E76F63")}
+    <p style="margin:10px 0 0;text-align:center;"><a href="${portalUrl}" target="_blank" style="color:#8B7355;text-decoration:underline;font-size:14px;font-weight:600;">Angaben zur Pflegesituation vervollständigen</a></p>
+    <p style="font-size:13px;line-height:1.6;color:#888;margin:18px 0 0;">PS: Klappt im Portal etwas nicht, oder möchten Sie das lieber persönlich klären? Sie erreichen mich unter <a href="tel:+4989200000830" style="color:#8B7355;text-decoration:none;">089&nbsp;200&nbsp;000&nbsp;830</a> oder per <a href="https://wa.me/4989200000830" style="color:#8B7355;text-decoration:none;">WhatsApp</a>.</p>
+    ${buildMartaSig(siteUrl)}`;
+    return buildEmailWrapper(lead, siteUrl, content);
+  }
   const content = `
     <p style="font-size:15px;line-height:1.75;color:#444;margin-bottom:14px;">${halloAnrede},</p>
     <p style="font-size:15px;line-height:1.75;color:#444;margin-bottom:14px;">Ihr Angebot haben Sie bereits &ndash; doch wichtiger als jedes Angebot ist die Frage: Wer wird Ihren Angehörigen betreuen? Bei uns sehen Sie genau das vorab. Sie lernen die Pflegekräfte mit Foto, Erfahrung und Anreisedatum kennen und entscheiden erst dann &ndash; bevor irgendein Vertrag geschlossen wird. Keine Katze im Sack.</p>
@@ -630,9 +655,35 @@ export function buildProfilNudge1Html(lead: Lead, siteUrl: string, portalBase: s
   return buildEmailWrapper(lead, siteUrl, content);
 }
 
-export function buildProfilNudge1Text(lead: Lead, siteUrl: string, portalBase: string): string {
+export function buildProfilNudge1Text(
+  lead: Lead, siteUrl: string, portalBase: string, fuenfBlock?: string | null, anzahl = 0,
+): string {
   const portalUrl = (portalBase && lead.token) ? withMailMark(buildPortalUrl(portalBase, lead.token), "pn1") : siteUrl;
   const halloAnrede = buildHalloAnrede(lead.anrede_text || null, lead.nachname || "", lead.vorname || "");
+  if (fuenfBlock) {
+    const matchesUrl = (portalBase && lead.token) ? withMailMark(buildPortalUrl(portalBase, lead.token, "matches"), "pn1") : siteUrl;
+    return `${halloAnrede},
+
+Ihr Angebot haben Sie heute bekommen. Seitdem haben wir geschaut, wer zu Ihrer Situation passt und zum gewünschten Zeitpunkt frei ist — ${kraefteWort(anzahl)} haben wir für Sie vorbereitet. ${anzahl === 1 ? "Haben Sie sich das Profil schon angesehen?" : "Haben Sie sich alle schon angesehen?"}
+
+${fuenfBlock}
+
+Bitte teilen Sie uns Ihre Entscheidung mit: ${anzahl === 1 ? "Soll sich diese Pflegekraft bei Ihnen bewerben?" : "Welche dieser Pflegekräfte soll sich bei Ihnen bewerben?"} Damit sie das kann, braucht sie noch ein paar Angaben zur Pflegesituation — ein Teil ist aus dem Kostenrechner schon übernommen, der Rest dauert wenige Minuten.
+
+Sobald das steht, sehen Sie im Portal, wer sich meldet, und entscheiden in Ruhe. Unverbindlich, und ohne Vertrag vor Ihrer Auswahl.
+
+Pflegekraft auswählen: ${matchesUrl}
+Angaben vervollständigen: ${portalUrl}
+
+PS: Klappt im Portal etwas nicht, oder möchten Sie das lieber persönlich klären? Sie erreichen mich unter 089 200 000 830 oder per WhatsApp (https://wa.me/4989200000830).
+
+Mit freundlichen Grüßen
+Marta Kapcio — Pflegeberaterin
+Tel: 089 200 000 830  ·  WhatsApp: https://wa.me/4989200000830
+
+Primundus Deutschland | www.primundus.de
+`;
+  }
   return `${halloAnrede},
 
 Ihr Angebot haben Sie bereits — doch wichtiger als jedes Angebot ist die Frage: Wer wird Ihren Angehörigen betreuen? Bei uns sehen Sie genau das vorab. Sie lernen die Pflegekräfte mit Foto, Erfahrung und Anreisedatum kennen und entscheiden erst dann — bevor irgendein Vertrag geschlossen wird. Keine Katze im Sack.
@@ -1543,6 +1594,44 @@ async function hasReactionForCaregiver(
   return Array.isArray(data) && data.length > 0;
 }
 
+/** Fünf-Liste für die Nudge-Mail — von Versand UND Testversand benutzt.
+ *  Ohne diesen gemeinsamen Weg rendert der Demo-Pfad etwas anderes als der
+ *  Kunde bekommt; genau das passierte am 03.09.2026 beim ersten Testversand
+ *  (alter Betreff in der Testmail, neue Mail beim Kunden). Schreibt NICHTS —
+ *  der lead_events-Eintrag bleibt beim Versand. */
+async function fuenfFuerNudge(
+  lead: Lead, portalBase: string, supabaseUrl: string, key: string, darfOnboarden: boolean,
+): Promise<{
+  html: string; text: string; anzahl: number; betreff: string;
+  anhaenge: { filename: string; content: Uint8Array; contentType: string; cid: string }[];
+  caregiverIds: number[];
+} | null> {
+  const tok = lead.token;
+  if (!tok) return null;
+  const erg = await holeFuenf({
+    supabaseUrl, key, token: tok,
+    jobOfferId: (lead as unknown as Record<string, unknown>).mamamia_job_offer_id as number ?? null,
+    formularDaten: (lead as unknown as Record<string, { formularDaten?: unknown }>).kalkulation?.formularDaten as never ?? {},
+    darfOnboarden,
+  });
+  if (!erg || erg.fuenf.length === 0) return null;
+  const basisUrl = buildPortalUrl(portalBase, tok);
+  // Fotos mit Budget: die oberen zuerst, was nicht passt → Initialen.
+  const roh = await Promise.all(erg.fuenf.map((e) => fetchInlinePhotoDeno(e.fotoUrl)));
+  const darf = fotoBudget(roh.map((r) => r?.content.length ?? null));
+  const inlines = roh.map((r, i) => (r && darf[i]) ? r : null);
+  const profilUrls = erg.fuenf.map((e) => withMailMark(`${basisUrl}&cg=${e.caregiverId}`, "pn1"));
+  const alleUrl = withMailMark(buildPortalUrl(portalBase, tok, "matches"), "pn1");
+  return {
+    html: fuenfListeHtml(erg.fuenf, inlines.map((r) => r?.cid ?? null), profilUrls, alleUrl),
+    text: fuenfListeText(erg.fuenf, profilUrls, alleUrl),
+    anzahl: erg.fuenf.length,
+    betreff: fuenfBetreff(erg.fuenf.length),
+    anhaenge: inlines.filter((r): r is NonNullable<typeof r> => r !== null),
+    caregiverIds: erg.fuenf.map((e) => e.caregiverId),
+  };
+}
+
 async function fetchInlinePhotoDeno(
   url: string | null | undefined,
 ): Promise<{ filename: string; content: Uint8Array; contentType: string; cid: string } | null> {
@@ -2088,6 +2177,17 @@ Deno.serve(async (req: Request) => {
          was der Kunde bekommt. Derselbe Weg wie im Versand; fuer einen Lead,
          der schon eine job_offer hat, ist der Onboard-Aufruf ein
          Cache-Treffer und legt in mamamia nichts Neues an. */
+      /* Der Testversand muss GENAU das rendern, was der Kunde bekommt.
+         Beim ersten Lauf am 03.09.2026 zeigte er die alte Mail 2, weil die
+         Fünf-Liste hier fehlte. Kein Onboarding aus einer Vorschau:
+         `onboard:true` im Body nur bewusst, sonst braucht der Test-Lead eine
+         bestehende job_offer (sonst greift der Rückfalltext). */
+      let demoFuenf: Awaited<ReturnType<typeof fuenfFuerNudge>> = null;
+      if ((demoBody.items || []).some((i: any) => i?.email_type === "profil_nudge_1")) {
+        demoFuenf = await fuenfFuerNudge(
+          lead as Lead, portalBase, supabaseUrl, supabaseServiceKey, demoBody.onboard === true,
+        );
+      }
       let demoEmpfHtml: string | null | undefined = undefined;
       let demoEmpfText: string | null | undefined = undefined;
       let demoInline: { filename: string; content: Uint8Array; contentType: string; cid: string } | null = null;
@@ -2117,7 +2217,7 @@ Deno.serve(async (req: Request) => {
       const render = (t: string): { subject: string; html: string; text: string } => {
         switch (t) {
           case "eingangsbestaetigung": return { subject: "Ihr persönliches Angebot zur 24-Stunden-Betreuung", html: buildEingangsbestaetigungHtml(lead as Lead, site, portalBase, false, demoEmpfHtml), text: buildEingangsbestaetigungText(lead as Lead, portalBase, false, demoEmpfText) };
-          case "profil_nudge_1": return { subject: "Pflegekräfte können sich noch nicht bei Ihnen bewerben", html: buildProfilNudge1Html(lead as Lead, site, portalBase), text: buildProfilNudge1Text(lead as Lead, site, portalBase) };
+          case "profil_nudge_1": return { subject: demoFuenf?.betreff ?? "Pflegekräfte können sich noch nicht bei Ihnen bewerben", html: buildProfilNudge1Html(lead as Lead, site, portalBase, demoFuenf?.html ?? null, demoFuenf?.anzahl ?? 0), text: buildProfilNudge1Text(lead as Lead, site, portalBase, demoFuenf?.text ?? null, demoFuenf?.anzahl ?? 0) };
           case "profil_nudge_2": return { subject: "Profil unvollständig — Sie können noch keine Bewerbungen erhalten", html: buildProfilNudge2Html(lead as Lead, site, portalBase), text: buildProfilNudge2Text(lead as Lead, site, portalBase) };
           case "warum_primundus": return { subject: "Warum Familien sich für Primundus entscheiden", html: buildWarumPrimundusHtml(lead as Lead, withMailMark(pu, "wp"), site), text: buildWarumPrimundusText(lead as Lead, withMailMark(pu, "wp")) };
           case "nachfass_2": return { subject: "Ihre Betreuung — kann ich Ihnen etwas abnehmen?", html: buildNachfass2Html(lead as Lead, site, portalBase, ms), text: buildNachfass2Text(lead as Lead, site, portalBase, ms) };
@@ -2138,9 +2238,19 @@ Deno.serve(async (req: Request) => {
           const subject = item.subjectPrefix ? `${item.subjectPrefix}${m.subject}` : m.subject;
           const html = b ? m.html.replace('<div class="email-content">', `${bannerHtml(b)}<div class="email-content">`) : m.html;
           const text = b ? `(${b})\n\n${m.text}` : m.text;
-          const anhang = item.email_type === "eingangsbestaetigung" && demoInline ? [demoInline] : undefined;
+          const anhang = item.email_type === "eingangsbestaetigung" && demoInline
+            ? [demoInline]
+            : item.email_type === "profil_nudge_1" && demoFuenf?.anhaenge.length
+            ? demoFuenf.anhaenge
+            : undefined;
           const r = await sendEmailSmtp(smtpConfig, to, subject, html, text, anhang, demoBody.skipBcc === true);
-          results.push({ email_type: item.email_type, to, subject, ...r });
+          results.push({
+            email_type: item.email_type, to, subject, ...r,
+            // Damit man an der Antwort sieht, ob die Liste drin war.
+            ...(item.email_type === "profil_nudge_1"
+              ? { fuenf: demoFuenf ? { anzahl: demoFuenf.anzahl, caregiver_ids: demoFuenf.caregiverIds, fotos_inline: demoFuenf.anhaenge.length } : null }
+              : {}),
+          });
         } catch (e) {
           results.push({ email_type: item.email_type, success: false, error: String(e) });
         }
@@ -2492,9 +2602,25 @@ Deno.serve(async (req: Request) => {
           eventTypeSent = "email_nachfass_3_sent";
           eventTypeFailed = "email_nachfass_3_failed";
         } else if (scheduledEmail.email_type === "profil_nudge_1") {
-          subject = "Pflegekräfte können sich noch nicht bei Ihnen bewerben";
-          html = buildProfilNudge1Html(lead as Lead, smtpConfig.siteUrl, portalBase);
-          text = buildProfilNudge1Text(lead as Lead, smtpConfig.siteUrl, portalBase);
+          /* Alle fünf Kräfte in die Mail (Martin, 03.09.2026). Vorbereitung
+             im gemeinsamen Helfer, damit der Testversand exakt dasselbe
+             rendert. Best-effort: fällt es aus, bleibt es beim bisherigen
+             Text und die Mail geht trotzdem. */
+          const teile = await fuenfFuerNudge(
+            lead as Lead, portalBase, supabaseUrl, supabaseServiceKey,
+            Deno.env.get("EMPFEHLUNG_ONBOARD") !== "0",
+          );
+          if (teile) {
+            if (teile.anhaenge.length) (scheduledEmail as any).__inlineAttachments = teile.anhaenge;
+            await supabase.from("lead_events").insert({
+              lead_id: scheduledEmail.lead_id,
+              event_type: "fuenf_in_nudge_mail",
+              metadata: { caregiver_ids: teile.caregiverIds, fotos_inline: teile.anhaenge.length },
+            });
+          }
+          subject = teile?.betreff ?? "Pflegekräfte können sich noch nicht bei Ihnen bewerben";
+          html = buildProfilNudge1Html(lead as Lead, smtpConfig.siteUrl, portalBase, teile?.html ?? null, teile?.anzahl ?? 0);
+          text = buildProfilNudge1Text(lead as Lead, smtpConfig.siteUrl, portalBase, teile?.text ?? null, teile?.anzahl ?? 0);
           eventTypeSent = "email_profil_nudge_1_sent";
           eventTypeFailed = "email_profil_nudge_1_failed";
         } else if (scheduledEmail.email_type === "profil_nudge_2") {
@@ -2714,6 +2840,11 @@ Deno.serve(async (req: Request) => {
             | null
             | undefined;
           if (reminderInline) attachments = [reminderInline];
+          // Fünf-Liste (profil_nudge_1): mehrere Inline-Fotos auf einmal.
+          const inlineListe = (scheduledEmail as any).__inlineAttachments as
+            | { filename: string; content: Uint8Array; contentType: string; cid: string }[]
+            | undefined;
+          if (inlineListe?.length) attachments = [...(attachments ?? []), ...inlineListe];
         }
 
         // Domain-Tippfehler-Schutz: offensichtlich vertippte Empfänger-Domains
