@@ -196,7 +196,8 @@ async function handlePost(request: NextRequest) {
     // Testphase: Portal-Leads ans Team (Umleitung nur beim Versand).
     const uml = testphaseUmleitung(lead, process.env.PORTAL_TESTPHASE);
     const tpl = getTokenRegenerationEmailTemplate(leadWithNewToken, portalUrl);
-    sendEmail(uml?.empfaenger ?? lead.email, uml ? { ...tpl, subject: uml.betreffPraefix + tpl.subject } : tpl).catch(
+    sendEmail(uml?.empfaenger ?? lead.email, uml ? { ...tpl, subject: uml.betreffPraefix + tpl.subject } : tpl, undefined,
+      uml ? undefined : { cc: kundenEmpfaenger(lead).cc }).catch(
       (e) => {
         console.error('token regen email failed:', e instanceof Error ? e.message : String(e));
       },
@@ -229,4 +230,5 @@ function maskEmail(email: string | null | undefined): string {
 // ─── Telemetria RAM (diagnoza OOM — plan 2026-08-09; format: [req] …) ───
 import { withMem } from '@/lib/memlog';
 import { PORTAL_BASIS } from '@/lib/portal-url';
+import { kundenEmpfaenger } from '@/lib/empfaenger';
 export const POST = withMem('lead-regenerate-token', handlePost);

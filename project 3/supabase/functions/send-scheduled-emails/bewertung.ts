@@ -22,6 +22,7 @@ export interface BewertungsLead {
   anrede_text: string | null;
   token: string | null;
   email: string | null;
+  email_cc?: string | null;
   status: string | null;
   created_at: string;
 }

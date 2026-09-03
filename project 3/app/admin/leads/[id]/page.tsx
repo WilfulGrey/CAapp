@@ -214,6 +214,7 @@ export default function LeadDetailPage() {
       anrede: lead.anrede || '',
       anrede_text: (lead as any).anrede_text || '',
       email: lead.email || '',
+      email_cc: (lead as any).email_cc || '',
       telefon: lead.telefon || '',
     });
     setIsEditingContact(true);
@@ -273,6 +274,8 @@ export default function LeadDetailPage() {
       const anrede_text = editedContact.anrede_text || null;
       const email = editedContact.email || null;
       const telefon = editedContact.telefon || null;
+      // Kopie-Adresse: leer = keine Kopie (null); nie in `email` hineinmischen.
+      const email_cc = (editedContact.email_cc || '').trim() || null;
 
       const { data, error } = await supabase.rpc('update_lead_contact', {
         lead_id: leadId,
@@ -284,10 +287,11 @@ export default function LeadDetailPage() {
 
       const emailChanged = email !== lead.email;
 
-      if (!error && (emailChanged || telefon !== lead.telefon)) {
+      const ccChanged = email_cc !== ((lead as any).email_cc || null);
+      if (!error && (emailChanged || ccChanged || telefon !== lead.telefon)) {
         await supabase
           .from('leads')
-          .update({ email, telefon })
+          .update({ email, telefon, email_cc })
           .eq('id', leadId);
       }
 
@@ -561,6 +565,24 @@ export default function LeadDetailPage() {
                     }
                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#5C4A32]"
                   />
+                </div>
+
+                <div>
+                  <label className="text-sm font-medium text-gray-700 block mb-1">
+                    E-Mail in Kopie <span className="text-gray-400 font-normal">(optional)</span>
+                  </label>
+                  <input
+                    type="email"
+                    value={editedContact.email_cc || ''}
+                    onChange={(e) =>
+                      setEditedContact({ ...editedContact, email_cc: e.target.value })
+                    }
+                    placeholder="z. B. Tochter oder Sohn"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#5C4A32]"
+                  />
+                  <p className="text-xs text-gray-500 mt-1">
+                    Bekommt jede Kundenmail als Kopie — beide Adressen sehen einander.
+                  </p>
                 </div>
 
                 <div>

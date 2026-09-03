@@ -39,6 +39,8 @@ export interface LeadKalkulation {
 export interface Lead {
   id: string;
   email: string;
+  /** Zweite Empfängeradresse (CC) — gepflegt im SA-Portal/Admin, nie Teil der Identität. */
+  email_cc?: string | null;
   vorname: string | null;
   nachname: string | null;
   anrede: string | null;

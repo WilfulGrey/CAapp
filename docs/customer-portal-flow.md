@@ -428,6 +428,7 @@ mamamia_jobs_checked_at timestamptz NULL      -- ostatnia sonda "czy Mamamia
 
 -- Google-Ads-Attribution (Bug #33, migracja 20260814090000)
 gclid                 text NULL               -- Google-Klick-ID z landing-URL
+email_cc              text NULL               -- Zweite Empfängeradresse (CC) für ALLE Kundenmails; Pflege im SA-Portal (Kontakt-Sync) + CAapp-Admin. Nie Teil der Identität (kein Dedupe, kein mamamia-Feld). lib/empfaenger.ts
 wbraid, gbraid        text NULL               -- iOS-Varianty klick-ID
 ```
 

@@ -2600,7 +2600,7 @@ export async function sendEmail(
   to: string | string[],
   template: EmailTemplate,
   attachments?: any[],
-  options?: { skipBcc?: boolean; extraBcc?: string }
+  options?: { skipBcc?: boolean; extraBcc?: string; cc?: string }
 ): Promise<{ success: boolean; error?: string }> {
   try {
     const nodemailer = await import('nodemailer');
@@ -2658,6 +2658,11 @@ export async function sendEmail(
 
     if (bccAddr) {
       mailOptions.bcc = bccAddr;
+    }
+    // Kopie an die zweite Kundenadresse (leads.email_cc, siehe lib/empfaenger.ts).
+    // Sichtbar für beide — bewusst CC, nicht BCC (Martin, 03.09.2026).
+    if (options?.cc) {
+      mailOptions.cc = options.cc;
     }
 
     if (attachments && attachments.length > 0) {
