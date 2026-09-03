@@ -128,12 +128,17 @@ export function nurseFacts(nurse: {
   const teile: string[] = [];
   if (nurse.experience && nurse.experience !== '—') teile.push(nurse.experience);
   if (nurse.history) {
-    // Einzahl korrekt: „1 Einsätze" und „Ø 1 Wochen" standen wörtlich so auf
-    // Prod (Martin, 13.08., Screenshot Ewelina S. — 1 Einsatz, 1 Woche).
+    // Einzahl korrekt: „1 Einsätze" stand wörtlich so auf Prod (Martin,
+    // 13.08., Screenshot Ewelina S.).
+    //
+    // KEINE Durchschnittsdauer mehr dahinter (Martin, 03.09.2026: „entferne
+    // dahinter die durchschnittliche Einsatzdauer, sondern da schreibst du nur
+    // x Einsätze über Primundus"). Die Zeile lautet damit: Stufe, Erfahrung,
+    // Einsätze — und „über Primundus" sagt, WESSEN Einsätze das sind. Das
+    // Ø war eine Zahl, die dem Kunden nichts sagte (und abgeschnitten als
+    // „Ø 1…" schon einmal für Irritation sorgte, 11.08.).
     const n = nurse.history.assignments;
-    teile.push(`${n} ${n === 1 ? 'Einsatz' : 'Einsätze'}`);
-    const wochen = Math.round(nurse.history.avgDurationMonths * 4.3);
-    teile.push(`Ø ${wochen} ${wochen === 1 ? 'Woche' : 'Wochen'} pro Einsatz`);
+    teile.push(`${n} ${n === 1 ? 'Einsatz' : 'Einsätze'} über Primundus`);
   }
   // Kein Versprechen, keine erfundene Qualifikation — nur, was der nächste
   // Schritt wäre. Verfügbarkeit steht separat als Chip auf der Karte.
