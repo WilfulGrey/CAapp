@@ -45,6 +45,17 @@ Im selben Reiter zeigt der Abschnitt **„Postfach … — Mails ohne Lead"**
 das Protokoll aller Mails, die KEIN Lead wurden (offen, abgelehnt,
 übersprungen, Altbestand) — nichts scheitert still.
 
+Die Seite aktualisiert sich **live** (Registry #48): Supabase Realtime
+streamt `postgres_changes` auf `leads` und `portal_mail_log` (Migration
+`20260903170000_realtime_admin_leads.sql` nimmt beide in die Publikation
+`supabase_realtime` auf) — schreibt der Abholer, springt die Liste ohne
+Reload um, und ein kurzer **Ding** (WebAudio, kein Asset) meldet jeden
+neuen Lead bzw. jede neue Mail; ein Ton pro Schwall. Der Ton kommt erst
+nach der ersten Interaktion mit der Seite (Autoplay-Regel der Browser).
+Der Punkt neben „Aktualisieren" zeigt den Kanal: grün = verbunden, grau =
+Verbindung weg (dann gilt der Knopf als Fallback; nach Rückkehr des
+Sockets und beim Sichtbarwerden der Karte lädt die Seite still nach).
+
 Die Portal-Reiter stehen dort **auch ohne Leads**, mit einer `0`. Das ist
 die Antwort auf „kommt da eigentlich was an?" — ein fehlender Reiter ließe
 offen, ob nichts ankam oder der Abholer steht. Gerade beim Scharfschalten
