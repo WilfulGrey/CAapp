@@ -745,13 +745,18 @@ export function fuenfBetreff(n: number): string {
 }
 
 /**
- * Welche Fotos passen noch in die Mail? Die S3-Originale wiegen 50–230 KB;
- * fünf davon inline machen eine Mail, die Gmail abschneidet. Also je Foto
- * und in Summe ein Budget — was nicht passt, bekommt die Initialen-Kachel.
- * Reihenfolge = Reihenfolge der Liste: die oberen Kräfte bekommen zuerst
- * ein Gesicht.
+ * Welche Fotos passen noch in die Mail? Ein Budget je Bild und in Summe —
+ * was nicht passt, bekommt die Initialen-Kachel; Reihenfolge = Reihenfolge
+ * der Liste, die oberen Kräfte bekommen zuerst ein Gesicht.
+ *
+ * Grenzen an den echten Daten gemessen (03.09.2026): die Avatare sind PNGs
+ * mit 45–180 KB. Die erste Fassung erlaubte 120 KB je Bild — damit fielen
+ * fast alle durch und der Kunde sah fünf Initialen-Kacheln statt Gesichter.
+ * Jetzt 300 KB je Bild und 1,2 MB in Summe: fünf Fotos passen, ein
+ * Ausreißer von mehreren MB fällt weiterhin heraus. Anhänge zählen nicht
+ * gegen Gmails 102-KB-Grenze — die gilt dem HTML-Körper.
  */
-export function fotoBudget(groessen: (number | null)[], jeMax = 120_000, gesamtMax = 400_000): boolean[] {
+export function fotoBudget(groessen: (number | null)[], jeMax = 300_000, gesamtMax = 1_200_000): boolean[] {
   let summe = 0;
   return groessen.map((g) => {
     if (g == null || g <= 0 || g > jeMax || summe + g > gesamtMax) return false;
@@ -1028,8 +1033,11 @@ function fuenfZeileHtml(e: Empfehlung, cid: string | null, profilUrl: string, er
   /* Deutsch steht DIREKT unter dem Namen — genau wie die Karte im Portal
      (MatchCard: Name, darunter „Deutsch <Stufe>", dann die Fakten). Der Kunde
      sieht Sekunden später dieselbe Anordnung im Portal (Martin, 03.09.2026). */
+  /* Reihenfolge wie im SA-Portal: Label, dann die Punkte, dann der
+     ausgeschriebene Wert — „Deutsch ●●● Gut" (Martin, 03.09.2026). Vorher
+     standen die Punkte vorn und „Deutsch Gut" dahinter. */
   const deutsch = e.deutschWort
-    ? `<table cellpadding="0" cellspacing="0" role="presentation" style="display:inline-table;vertical-align:middle;"><tr>${balken}<td style="padding-left:4px;font-size:13px;color:#71717A;">Deutsch ${esc(e.deutschWort)}</td></tr></table>`
+    ? `<table cellpadding="0" cellspacing="0" role="presentation" style="display:inline-table;vertical-align:middle;"><tr><td style="padding-right:6px;font-size:13px;color:#71717A;">Deutsch</td>${balken}<td style="padding-left:6px;font-size:13px;color:#71717A;">${esc(e.deutschWort)}</td></tr></table>`
     : "";
   const termin = e.gruende.includes(HAKEN_VERFUEGBAR)
     ? `<span style="font-size:12.5px;color:#71717A;">&nbsp;&nbsp;<span style="color:#22A06B;font-weight:700;">&#10003;</span>&nbsp;${esc(HAKEN_VERFUEGBAR)}</span>`
@@ -1056,8 +1064,8 @@ function fuenfZeileHtml(e: Empfehlung, cid: string | null, profilUrl: string, er
                 <td style="font-size:15.5px;line-height:1.35;color:#18181B;"><a class="profil-link" href="${profilUrl}" target="_blank" style="color:#18181B;text-decoration:none;font-weight:700;">${name}</a>${alter}${chip}</td>
                 <td align="right" style="text-align:right;vertical-align:top;white-space:nowrap;"><a class="profil-link" href="${profilUrl}" target="_blank" style="color:#8B7355;text-decoration:none;font-size:13px;font-weight:600;">Profil&nbsp;&rsaquo;</a></td>
               </tr></table>
-              <p style="margin:3px 0 0;line-height:1.5;">${deutsch}</p>
-              <p style="margin:3px 0 0;font-size:13.5px;line-height:1.5;color:#52525B;">${esc(e.fakten)}${termin}</p>
+              <p style="margin:3px 0 0;line-height:1.5;">${deutsch}${termin}</p>
+              <p style="margin:3px 0 0;font-size:13.5px;line-height:1.5;color:#52525B;">${esc(e.fakten)}</p>
             </td>
           </tr>
           <tr><td colspan="3" style="font-size:0;line-height:0;height:13px;">&nbsp;</td></tr>`;
