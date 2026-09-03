@@ -47,6 +47,17 @@ export function parseCsv(text: string): string[][] {
   return zeilen;
 }
 
+/** Sanity-Check vor der Nutzung einer CSV-Zeile: eine handverstuemmelte
+ *  Datei (Zauner-Test 03.09., uid 28: die GANZE Datenzeile in EIN Paar
+ *  Anfuehrungszeichen gewickelt) parst RFC-4180-korrekt zu EINEM Riesenfeld
+ *  — alle Spalten leer, keine Kundenadresse, ewige Ablehnung. Dabei stand
+ *  ALLES im Mailtext. Zeile mit weniger als der Haelfte der Kopfspalten
+ *  ⇒ Anhang gilt als unlesbar ⇒ der Aufrufer faellt auf den Mailtext
+ *  zurueck (bestehender, getesteter Pfad). */
+export function csvZeileBrauchbar(kopf: string[], zeile: string[]): boolean {
+  return zeile.length >= Math.ceil(kopf.length / 2);
+}
+
 export interface CsvLeadZeile {
   /** Synthetischer "Label: Wert"-Text fuer parsePflegehilfe. */
   text: string;
