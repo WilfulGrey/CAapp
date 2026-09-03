@@ -92,8 +92,6 @@ export interface FormularDaten {
   nachteinsaetze?: string | null;
   pflegegrad?: number | string | null;
   betreuung_fuer?: string | null;
-  /** Aus der Lead-Spalte `care_start_timing`, nicht aus formularDaten. */
-  care_start_timing?: string | null;
 }
 
 export interface Empfehlung {
@@ -314,28 +312,14 @@ export function empfehlungNachOben(fuenf: Matching[]): Matching[] {
 // Reihenfolge: erst die besonderen Anforderungen aus der Anfrage (max. 2),
 // danach mit Standardangaben auffuellen. Nie mehr als drei.
 //
-// Die Standards sind an Daten gebunden und werden weggelassen, wenn der
-// Beleg fehlt (Święta zasada nr 1):
-//   • Termin  — nur, wenn available_from wirklich im Wunschfenster liegt
+// Danach steht die Verfuegbarkeit („Ab sofort", siehe HAKEN_VERFUEGBAR).
+// Die restlichen Standards sind an Daten gebunden und werden weggelassen,
+// wenn der Beleg fehlt (Święta zasada nr 1):
 //   • Deutsch — nur, wenn die Stufe bekannt ist UND exakt dem Wunsch entspricht
 //   • Fuehrerschein — nur, wenn der Kunde ihn wollte UND die Kraft einen hat
 //     (der einzige Grund, warum getCaregiver ueberhaupt noch gerufen wird)
 
 export const HAKEN_WUNSCHPROFIL = "Entspricht Ihrem Wunschprofil";
-
-/** Tage bis zum gewuenschten Start — Spiegel von OFFSET_DAYS in
- *  onboard-to-mamamia/mappers.ts (computeArrivalDate). Aendert sich die
- *  Tabelle dort, muss sie hier mit, sonst verspricht die Mail einen Termin,
- *  den der Job gar nicht traegt. */
-const START_OFFSET_TAGE: Record<string, number> = {
-  sofort: 7,
-  "1-2-wochen": 10,
-  "2-4-wochen": 21,
-  "1-monat": 30,
-  unklar: 30,
-  "1-2-monate": 45,
-  spaeter: 60,
-};
 
 /** Besondere Anforderungen aus der Anfrage, wichtigste zuerst. */
 export function anforderungenAusAnfrage(fd: FormularDaten): string[] {
@@ -364,20 +348,21 @@ export function anforderungenAusAnfrage(fd: FormularDaten): string[] {
   return treffer;
 }
 
-/** Liegt `available_from` im Wunschfenster des Kunden? */
-export function passtZumTermin(
-  availableFrom: string | null | undefined,
-  careStartTiming: string | null | undefined,
-  now: Date,
-): boolean {
-  const tage = START_OFFSET_TAGE[(careStartTiming ?? "").toLowerCase().trim()];
-  if (tage === undefined) return false;
-  // Ohne Datum gilt die Kraft im Portal als sofort verfuegbar.
-  if (!availableFrom) return true;
-  const d = new Date(availableFrom);
-  if (!Number.isFinite(d.getTime())) return false;
-  return d.getTime() <= now.getTime() + tage * 86400000;
-}
+/* ─── Verfuegbarkeit ──────────────────────────────────────────────────────
+ *
+ * IMMER „Ab sofort verfügbar" — kein Datum, keine Ableitung aus
+ * `available_from` (Martin, 31.08.: „du sollst immer schreiben: Ab sofort
+ * verfügbar, weil die Daten im System nicht gepflegt sind"). Das Feld wird
+ * von den Kräften nicht aktuell gehalten; ein Datum daraus waere praeziser
+ * FORMULIERT, aber nicht praeziser GEMEINT — „Ab 10. September" nach einem
+ * vergessenen Eintrag verschiebt einen Start, den es gar nicht gibt.
+ *
+ * Deshalb ist auch die Wunschtermin-Pruefung (`passtZumTermin`) raus: sie
+ * las dasselbe ungepflegte Feld. Die Reihenfolge der fuenf Kraefte nutzt
+ * `available_from` weiter — dort spiegelt sie nur das Portal, sie behauptet
+ * dem Kunden gegenueber nichts.
+ */
+export const HAKEN_VERFUEGBAR = "Ab sofort verfügbar";
 
 export function haken(
   cg: MatchCaregiver,
@@ -386,12 +371,18 @@ export function haken(
   now: Date,
 ): string[] {
   const liste: string[] = [HAKEN_WUNSCHPROFIL];
+  const ausAnfrage = anforderungenAusAnfrage(fd).slice(0, 2);
 
-  for (const a of anforderungenAusAnfrage(fd).slice(0, 2)) liste.push(a);
+  /* Hat der Kunde nichts Besonderes angegeben, bleibt es bei zwei Haken:
+     passt zum Profil, ist ab sofort verfuegbar (Martin, 31.08.). Vorher
+     fuellten die Standards auf — und „Entspricht Ihrem Wunschprofil" direkt
+     ueber „Deutschkenntnisse wie gewuenscht" liest sich wie derselbe Satz
+     zweimal. */
+  if (ausAnfrage.length === 0) return [HAKEN_WUNSCHPROFIL, HAKEN_VERFUEGBAR];
 
-  if (liste.length < 3 && passtZumTermin(cg.available_from, fd.care_start_timing, now)) {
-    liste.push("Zum gewünschten Termin verfügbar");
-  }
+  for (const a of ausAnfrage) liste.push(a);
+
+  if (liste.length < 3) liste.push(HAKEN_VERFUEGBAR);
 
   if (liste.length < 3) {
     const noetig = requiredGermanyLevelForWish(fd.deutschkenntnisse);
@@ -736,11 +727,17 @@ export function empfehlungHtml(
     ? `<span style="display:inline-block;font-size:11px;font-weight:700;color:#8B7355;background:#F5F5F6;border:1px solid #E4E4E7;border-radius:999px;padding:3px 10px;">${esc(e.stufe)}</span>`
     : "";
 
-  /* Einsaetze direkt hinter der Stufe. Bei 0 bleibt die Zeile weg — dort
-     heisst die Stufe ohnehin „Neu dabei" oder „Berufserfahren", und
-     „0 Einsätze" waere das Gegenteil eines Vertrauenssignals. */
-  const einsatzText = e.einsaetze > 0
-    ? `<span style="font-size:14px;color:#52525B;">&nbsp;&nbsp;${e.einsaetze} ${e.einsaetze === 1 ? "Einsatz" : "Einsätze"} über Primundus</span>`
+  /* Einsaetze auf einer EIGENEN Zeile unter Stufe und „Zum Profil" (Martin,
+     31.08.: „das bricht komisch um mobil"). Neben der Stufe blieb auf dem
+     iPhone kein Platz — „über Primundus" rutschte allein in die naechste
+     Zeile und stand dort wie ein abgerissener Halbsatz. Ueber die volle
+     Breite der Textspalte bleibt „4 Einsätze über Primundus" zusammen.
+
+     Bei 0 bleibt die Zeile weg — dort heisst die Stufe ohnehin „Neu dabei"
+     oder „Berufserfahren", und „0 Einsätze" waere das Gegenteil eines
+     Vertrauenssignals. */
+  const einsatzZeile = e.einsaetze > 0
+    ? `<tr><td colspan="2" style="padding:6px 0 0;font-size:14px;line-height:1.4;color:#52525B;">${e.einsaetze} ${e.einsaetze === 1 ? "Einsatz" : "Einsätze"} über Primundus</td></tr>`
     : "";
 
   // Sprachbalken 1–3 wie im Profil-Modal, als Mini-Tabelle statt divs.
@@ -835,12 +832,13 @@ export function empfehlungHtml(
                     <tr>
                       <td style="vertical-align:middle;">
                         <p style="margin:0 0 6px;font-size:20px;font-weight:700;line-height:1.3;color:#18181B;">${name}${alterChip}</p>
-                        ${stufenChip}${einsatzText}
+                        ${stufenChip}
                       </td>
                       <td class="empf-profil" style="vertical-align:middle;text-align:right;white-space:nowrap;padding-left:10px;">
                         <a class="profil-link" href="${profilUrl}" target="_blank" style="color:#8B7355;text-decoration:none;font-size:14px;font-weight:600;">Zum Profil&nbsp;&rsaquo;</a>
                       </td>
                     </tr>
+                    ${einsatzZeile}
                   </table>
                 </td>
               </tr>

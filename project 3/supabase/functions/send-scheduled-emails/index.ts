@@ -2417,12 +2417,7 @@ Deno.serve(async (req: Request) => {
               key: supabaseServiceKey,
               token: tok,
               jobOfferId: (lead as any).mamamia_job_offer_id ?? null,
-              formularDaten: {
-                ...((lead as any).kalkulation?.formularDaten ?? {}),
-                // Steht als eigene Lead-Spalte, nicht in formularDaten —
-                // Quelle des Hakens „Zum gewünschten Termin verfügbar".
-                care_start_timing: (lead as any).care_start_timing ?? null,
-              },
+              formularDaten: (lead as any).kalkulation?.formularDaten ?? {},
               // Serverseitiges Onboarding abschaltbar, ohne das Feature zu
               // verlieren: EMPFEHLUNG_ONBOARD=0 → nur Leads mit bestehender
               // job_offer bekommen eine Empfehlung.
