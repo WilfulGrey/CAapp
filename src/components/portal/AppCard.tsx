@@ -3,6 +3,7 @@ import { ChevronDown, Mail } from 'lucide-react';
 import type { Nurse } from '../../types';
 import type { Application } from './shared';
 import { nurseLevel, nurseFacts, displayName, initials } from './shared';
+import { DeutschZeile } from './SprachBalken';
 
 export const AppCard: FC<{
   app: Application;
@@ -57,7 +58,7 @@ export const AppCard: FC<{
                 </p>
                 <ChevronDown className="w-4 h-4 -rotate-90 flex-shrink-0 text-zinc-400" />
               </div>
-              <p className="text-[16px] mt-1" style={{ color: '#71717A' }}>Deutsch {nurse.language.level}</p>
+              <p className="mt-1"><DeutschZeile nurse={nurse} /></p>
             </div>
           </div>
           {/* Fakten über die VOLLE Kartenbreite (wie MatchCard) — in der

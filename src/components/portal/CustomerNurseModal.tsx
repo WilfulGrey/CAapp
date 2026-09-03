@@ -4,6 +4,7 @@ import { Check, X, UserPlus, Heart, FileText, Download } from 'lucide-react';
 import type { Nurse } from '../../types';
 import type { Application } from './shared';
 import { nurseLevel, displayName, initials, einsaetzeText } from './shared';
+import { SprachBalken } from './SprachBalken';
 
 // Erklärung der Stufe. Die Labels MÜSSEN mit `nurseLevel`
 // (components/portal/shared.ts) und den Schwellen in lib/mamamia/badge.ts
@@ -340,9 +341,7 @@ export const CustomerNurseModal: FC<{
                     </button>
                   </div>
                   <div className="flex items-center gap-1.5">
-                    <div className="flex gap-0.5">
-                      {bars.map((f, i) => <div key={i} className={`w-3 h-1.5 rounded-full ${f ? 'bg-[#8B7355]' : 'bg-gray-200'}`} />)}
-                    </div>
+                    <SprachBalken balken={bars.filter(Boolean).length} gesamt={bars.length} />
                     <span className="text-[16px] font-bold" style={{ color: '#18181B' }}>{nurse.language.level}</span>
                   </div>
                 </div>

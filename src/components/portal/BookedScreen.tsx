@@ -4,6 +4,7 @@ import type { Application } from './shared';
 import { nurseLevel, nurseFacts, displayName, initials } from './shared';
 import { MonatsAufstellung } from './MonatsAufstellung';
 import { KOSTENRECHNER_URL } from '../../lib/leadEvents';
+import { DeutschZeile } from './SprachBalken';
 
 export const BookedScreen: FC<{
   app: Application;
@@ -103,7 +104,7 @@ export const BookedScreen: FC<{
             <p className="font-bold" style={{ color: '#18181B' }}>
               {name}{nurse.age ? <span className="font-normal" style={{ color: '#71717A' }}>, {nurse.age}</span> : null}
             </p>
-            <p className="text-sm" style={{ color: '#71717A' }}>Deutsch {nurse.language.level}</p>
+            <p><DeutschZeile nurse={nurse} klein /></p>
             <p className="text-sm mt-0.5" style={{ color: '#71717A' }}>
               {lvl.label && <span className="font-semibold" style={{ color: '#18181B' }}>{lvl.label}: </span>}
               {nurseFacts(nurse)}

@@ -4,6 +4,7 @@ import { Check, ChevronDown, Heart, Sparkles, UserPlus, X } from 'lucide-react';
 import type { Nurse } from '../../types';
 import type { NurseStatus } from './shared';
 import { nurseFacts, nurseLevel, displayName, initials } from './shared';
+import { DeutschZeile } from './SprachBalken';
 
 export const MatchCard: FC<{
   nurse: Nurse;
@@ -100,7 +101,11 @@ export const MatchCard: FC<{
         </div>
       )}
     <div
-      className={`group bg-[#F4F4F6] rounded-2xl border overflow-hidden transition-all ${
+      /* Weiss statt #F4F4F6 (Martin, 03.09.2026: „finde weiss besser"): die
+         Karten liegen in einem grauen Kasten (#F5F5F6) und hatten fast
+         denselben Ton — dadurch wirkten sie flach. Weiss hebt sie heraus,
+         genau wie die Karten in der Mail. shadow-sm wie in BookedScreen. */
+      className={`group bg-white shadow-sm rounded-2xl border overflow-hidden transition-all ${
         status === 'declined'
           ? 'opacity-40 border-gray-200'
           : status === 'invited'
@@ -139,7 +144,7 @@ export const MatchCard: FC<{
               <ChevronDown className="w-4 h-4 -rotate-90 flex-shrink-0 text-zinc-400 group-hover:text-zinc-700 transition-colors" />
             </div>
 
-            <p className="text-[16px] mt-1" style={{ color: '#71717A' }}>Deutsch {nurse.language.level}</p>
+            <p className="mt-1"><DeutschZeile nurse={nurse} /></p>
           </div>
         </div>
 

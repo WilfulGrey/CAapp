@@ -3,6 +3,7 @@ import type { FC } from 'react';
 import { Check, ChevronDown, UserPlus } from 'lucide-react';
 import type { Nurse } from '../../types';
 import { nurseFacts, nurseLevel, displayName, initials } from './shared';
+import { DeutschZeile } from './SprachBalken';
 
 export type InterestActionStatus = 'idle' | 'invited' | 'dismissed';
 
@@ -65,7 +66,8 @@ export const InterestCard: FC<{
   return (
     <div className="relative">
       <div
-        className={`group bg-[#F4F4F6] rounded-2xl border overflow-hidden transition-all ${
+        /* Weiss wie MatchCard (Martin, 03.09.2026). */
+        className={`group bg-white shadow-sm rounded-2xl border overflow-hidden transition-all ${
           exiting ? 'opacity-0 -translate-x-2 pointer-events-none' : ''
         } ${
           status === 'dismissed'
@@ -106,7 +108,7 @@ export const InterestCard: FC<{
               <ChevronDown className="w-4 h-4 -rotate-90 flex-shrink-0 text-zinc-400 group-hover:text-zinc-700 transition-colors" />
             </div>
 
-            <p className="text-[16px] mt-1" style={{ color: '#71717A' }}>Deutsch {nurse.language.level}</p>
+            <p className="mt-1"><DeutschZeile nurse={nurse} /></p>
           </div>
         </div>
 
