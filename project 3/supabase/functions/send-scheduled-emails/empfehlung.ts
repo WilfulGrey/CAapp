@@ -469,7 +469,10 @@ export function kundenFakten(cg: MatchCaregiver): string {
   if (einsaetze > 0) {
     teile.push(`${einsaetze} ${einsaetze === 1 ? "Primundus-Einsatz" : "Primundus-Einsätze"}`);
   }
-  return teile.length > 0 ? teile.join(" &middot; ") : "bereit für den ersten Einsatz";
+  // Echtes „·", keine HTML-Entität: der Wert wandert in HTML (dort durch
+  // esc(), das aus „&" ein „&amp;" macht — der Kunde las „&middot;") UND in
+  // die Nur-Text-Fassung. Ein Zeichen, das überall stimmt (Martin, 03.09.2026).
+  return teile.length > 0 ? teile.join(" · ") : "bereit für den ersten Einsatz";
 }
 
 /** Sprachbalken 1–3 — Kopie von GERMANY_SKILL_LEVELS.bars (mappers.ts). */
@@ -728,6 +731,19 @@ export function zahlwort(n: number, gross = false): string {
   return gross ? w.charAt(0).toUpperCase() + w.slice(1) : w;
 }
 
+/** „fünf Pflegekräfte" / „eine Pflegekraft" — mit der Zahl in einem Stück,
+ *  damit nicht „eine Pflegekräfte" entsteht (aufgefallen 03.09.2026). */
+export function kraefteWort(n: number, gross = false): string {
+  return `${zahlwort(n, gross)} ${n === 1 ? "Pflegekraft" : "Pflegekräfte"}`;
+}
+
+/** Betreff der Nudge-Mail — im Singular eine andere Frage. */
+export function fuenfBetreff(n: number): string {
+  return n === 1
+    ? "Eine Pflegekraft zur Auswahl – soll sie es sein?"
+    : `${kraefteWort(n, true)} zur Auswahl – wer soll es sein?`;
+}
+
 /**
  * Welche Fotos passen noch in die Mail? Die S3-Originale wiegen 50–230 KB;
  * fünf davon inline machen eine Mail, die Gmail abschneidet. Also je Foto
@@ -958,7 +974,7 @@ export function empfehlungText(
   }
   zeilen.push("UNSERE EMPFEHLUNG", "", `${e.anzeigeName}${e.alter ? `, ${e.alter}` : ""}`);
   if (e.deutschWort) zeilen.push(`Deutsch: ${e.deutschWort}`);
-  zeilen.push(`${e.stufe}: ${e.fakten.replaceAll("&middot;", "·")}`);
+  zeilen.push(`${e.stufe}: ${e.fakten}`);
   if (e.vorstellung) {
     const { klar, blass, gekuerzt } = textAusblenden(e.vorstellung);
     zeilen.push("", `Über ${e.vorname}`, `${klar}${blass ? " " + blass : ""}${gekuerzt ? " …" : ""}`);
@@ -1009,25 +1025,44 @@ function fuenfZeileHtml(e: Empfehlung, cid: string | null, profilUrl: string, er
   const balken = [1, 2, 3]
     .map((i) => `<td width="14" style="width:14px;padding-right:3px;"><div style="width:12px;height:6px;border-radius:3px;background:${i <= e.deutschBalken ? "#8B7355" : "#E4E4E7"};font-size:0;line-height:0;">&nbsp;</div></td>`)
     .join("");
+  /* Deutsch steht DIREKT unter dem Namen — genau wie die Karte im Portal
+     (MatchCard: Name, darunter „Deutsch <Stufe>", dann die Fakten). Der Kunde
+     sieht Sekunden später dieselbe Anordnung im Portal (Martin, 03.09.2026). */
   const deutsch = e.deutschWort
-    ? `<table cellpadding="0" cellspacing="0" role="presentation" style="display:inline-table;vertical-align:middle;"><tr>${balken}<td style="padding-left:4px;font-size:12.5px;color:#71717A;">Deutsch ${esc(e.deutschWort)}</td></tr></table>`
+    ? `<table cellpadding="0" cellspacing="0" role="presentation" style="display:inline-table;vertical-align:middle;"><tr>${balken}<td style="padding-left:4px;font-size:13px;color:#71717A;">Deutsch ${esc(e.deutschWort)}</td></tr></table>`
     : "";
   const termin = e.gruende.includes(HAKEN_VERFUEGBAR)
     ? `<span style="font-size:12.5px;color:#71717A;">&nbsp;&nbsp;<span style="color:#22A06B;font-weight:700;">&#10003;</span>&nbsp;${esc(HAKEN_VERFUEGBAR)}</span>`
     : "";
-  const oben = erste ? "0" : "12px";
-  return `
+  /* Trennlinie über die VOLLE Breite (Martin, 03.09.2026): sie lag vorher als
+     border-top nur auf der Textspalte und hörte neben dem Foto auf. Jetzt eine
+     eigene Zeile über alle drei Spalten. */
+  const linie = erste
+    ? ""
+    : `
+          <tr><td colspan="3" style="font-size:0;line-height:0;height:1px;background:#EFE9E0;">&nbsp;</td></tr>
+          <tr><td colspan="3" style="font-size:0;line-height:0;height:13px;">&nbsp;</td></tr>`;
+  /* Ein Ziel je Zeile, zwei Wege dorthin: der Name UND der Hinweis rechts.
+     Der Hinweis ist das Gegenstück zum Chevron der Portal-Karte — ein blosses
+     Symbol liest sich in einer Mail nicht als klickbar. Mouseover über
+     a.profil-link im Basis-Style des Wrappers (Apple Mail, iOS, Gmail-Web;
+     Outlook kennt kein :hover, dort bleibt es statisch). */
+  return `${linie}
           <tr>
-            <td width="56" style="width:56px;padding:${oben} 0 0;vertical-align:top;">${foto}</td>
+            <td width="56" style="width:56px;vertical-align:top;">${foto}</td>
             <td width="14" style="width:14px;font-size:0;line-height:0;">&nbsp;</td>
-            <td style="padding:${oben} 0 0;vertical-align:top;${erste ? "" : "border-top:1px solid #EFE9E0;"}">
-              <p style="margin:0;font-size:15.5px;line-height:1.35;color:#18181B;"><a href="${profilUrl}" target="_blank" style="color:#18181B;text-decoration:none;font-weight:700;">${name}</a>${alter}${chip}</p>
-              <p style="margin:2px 0 0;font-size:13.5px;line-height:1.5;color:#52525B;">${esc(e.fakten)}</p>
-              <p style="margin:3px 0 0;font-size:12.5px;line-height:1.5;color:#71717A;">${deutsch}${termin}</p>
+            <td style="vertical-align:top;">
+              <table width="100%" cellpadding="0" cellspacing="0" role="presentation"><tr>
+                <td style="font-size:15.5px;line-height:1.35;color:#18181B;"><a class="profil-link" href="${profilUrl}" target="_blank" style="color:#18181B;text-decoration:none;font-weight:700;">${name}</a>${alter}${chip}</td>
+                <td align="right" style="text-align:right;vertical-align:top;white-space:nowrap;"><a class="profil-link" href="${profilUrl}" target="_blank" style="color:#8B7355;text-decoration:none;font-size:13px;font-weight:600;">Profil&nbsp;&rsaquo;</a></td>
+              </tr></table>
+              <p style="margin:3px 0 0;line-height:1.5;">${deutsch}</p>
+              <p style="margin:3px 0 0;font-size:13.5px;line-height:1.5;color:#52525B;">${esc(e.fakten)}${termin}</p>
             </td>
           </tr>
-          <tr><td colspan="3" style="font-size:0;line-height:0;height:12px;">&nbsp;</td></tr>`;
+          <tr><td colspan="3" style="font-size:0;line-height:0;height:13px;">&nbsp;</td></tr>`;
 }
+
 
 /**
  * @param cids  je Kraft die CID des eingebetteten Fotos oder null (Initialen).

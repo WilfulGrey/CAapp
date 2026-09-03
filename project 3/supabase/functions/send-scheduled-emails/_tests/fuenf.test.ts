@@ -6,6 +6,9 @@ import { assert, assertEquals, assertStringIncludes } from "@std/assert";
 import {
   holeFuenf, fuenfListeHtml, fuenfListeText, fotoBudget, zahlwort,
   HAKEN_VERFUEGBAR, type Empfehlung,
+  kundenFakten,
+  kraefteWort,
+  fuenfBetreff,
 } from "../empfehlung.ts";
 
 const JETZT = new Date("2026-09-03T10:00:00Z");
@@ -95,4 +98,40 @@ Deno.test("fotoBudget: je Foto und in Summe, obere zuerst", () => {
 Deno.test("zahlwort: eins bis fünf als Wort, darüber Ziffer", () => {
   assertEquals(zahlwort(5), "fünf"); assertEquals(zahlwort(5, true), "Fünf");
   assertEquals(zahlwort(1), "eine"); assertEquals(zahlwort(7), "7");
+});
+
+// Der Kunde las „1 Jahr Erfahrung &middot; 3 Primundus-Einsätze" (Martin,
+// 03.09.2026): kundenFakten lieferte die HTML-Entität, und esc() machte aus
+// dem „&" ein „&amp;". Seitdem steht dort das echte Zeichen — in HTML UND in
+// der Nur-Text-Fassung.
+Deno.test("Fakten tragen das echte Mittelpunkt-Zeichen, nie eine HTML-Entitaet", () => {
+  const f = kundenFakten({ id: 1, care_experience: "4", hp_total_jobs: 9 } as never);
+  assertEquals(f, "4 Jahre Erfahrung · 9 Primundus-Einsätze");
+  const html = fuenfListeHtml([e({ fakten: f })], [null], ["https://p/1"], "https://p/alle");
+  assert(!html.includes("&middot;"), "Entität im HTML");
+  assert(!html.includes("&amp;"), "doppelt escaped");
+  assertStringIncludes(html, "4 Jahre Erfahrung · 9 Primundus-Einsätze");
+  assert(!fuenfListeText([e({ fakten: f })], ["https://p/1"], "x").includes("&middot;"), "Entität im Text");
+});
+
+// Reihenfolge wie die Portal-Karte: Name, darunter Deutsch, dann die Fakten.
+Deno.test("Zeile: Deutsch steht VOR den Fakten, Trennlinie über alle Spalten", () => {
+  const html = fuenfListeHtml([e(), e({ caregiverId: 2, anzeigeName: "Beata M." })],
+    [null, null], ["https://p/1", "https://p/2"], "https://p/alle");
+  assert(html.indexOf("Deutsch Mittel") < html.indexOf("5 Jahre Erfahrung"), "Deutsch muss über den Fakten stehen");
+  assertStringIncludes(html, 'colspan="3" style="font-size:0;line-height:0;height:1px;background:#EFE9E0;"');
+  // Profil-Hinweis je Zeile, mit der Hover-Klasse des Wrappers.
+  assertEquals((html.match(/class="profil-link"/g) ?? []).length, 4, "je Zeile Name + Hinweis");
+  assertStringIncludes(html, "Profil&nbsp;&rsaquo;");
+});
+
+// Bei nur einer Kraft stand „Eine Pflegekraefte zur Auswahl" und „eine
+// Pflegekraefte haben wir vorbereitet" (aufgefallen 03.09.2026 in der
+// Vorschau). Zahl und Wort gehoeren zusammen.
+Deno.test("Singular: eine Pflegekraft, nicht eine Pflegekraefte", () => {
+  assertEquals(kraefteWort(1), "eine Pflegekraft");
+  assertEquals(kraefteWort(1, true), "Eine Pflegekraft");
+  assertEquals(kraefteWort(5), "fünf Pflegekräfte");
+  assertEquals(fuenfBetreff(1), "Eine Pflegekraft zur Auswahl – soll sie es sein?");
+  assertEquals(fuenfBetreff(5), "Fünf Pflegekräfte zur Auswahl – wer soll es sein?");
 });

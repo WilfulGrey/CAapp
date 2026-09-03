@@ -28,7 +28,7 @@ import {
   keineEmpfehlungHtml,
   keineEmpfehlungText,
   stufenWort,
-  type EmpfehlungErgebnis, holeFuenf, fuenfListeHtml, fuenfListeText, zahlwort, fotoBudget } from "./empfehlung.ts";
+  type EmpfehlungErgebnis, holeFuenf, fuenfListeHtml, fuenfListeText, kraefteWort, fuenfBetreff, fotoBudget } from "./empfehlung.ts";
 import {
   BEWERTUNG_CAP,
   BEWERTUNG_CC,
@@ -631,12 +631,12 @@ export function buildProfilNudge1Html(
        „Keine Katze im Sack", keine „4–7 Werktage": neben echten Menschen mit
        echten Terminen sind das Floskeln. */
     const matchesUrl = (portalBase && lead.token) ? withMailMark(buildPortalUrl(portalBase, lead.token, "matches"), "pn1") : siteUrl;
-    const wort = zahlwort(anzahl);
+    const wort = kraefteWort(anzahl);
     const content = `
     <p style="font-size:15px;line-height:1.75;color:#444;margin-bottom:14px;">${halloAnrede},</p>
-    <p style="font-size:15px;line-height:1.75;color:#444;margin-bottom:14px;">Ihr Angebot haben Sie heute bekommen. Seitdem haben wir geschaut, wer zu Ihrer Situation passt und zum gewünschten Zeitpunkt frei ist &ndash; <strong>${wort} Pflegekräfte haben wir für Sie vorbereitet.</strong> Haben Sie sich alle schon angesehen?</p>
+    <p style="font-size:15px;line-height:1.75;color:#444;margin-bottom:14px;">Ihr Angebot haben Sie heute bekommen. Seitdem haben wir geschaut, wer zu Ihrer Situation passt und zum gewünschten Zeitpunkt frei ist &ndash; <strong>${wort} haben wir für Sie vorbereitet.</strong> ${anzahl === 1 ? "Haben Sie sich das Profil schon angesehen?" : "Haben Sie sich alle schon angesehen?"}</p>
     ${fuenfBlock}
-    <p style="font-size:15px;line-height:1.75;color:#444;margin-bottom:14px;"><strong>Bitte teilen Sie uns Ihre Entscheidung mit:</strong> Welche dieser Pflegekräfte soll sich bei Ihnen bewerben? Damit sie das kann, braucht sie noch ein paar Angaben zur Pflegesituation &ndash; ein Teil ist aus dem Kostenrechner schon übernommen, der Rest dauert wenige Minuten.</p>
+    <p style="font-size:15px;line-height:1.75;color:#444;margin-bottom:14px;"><strong>Bitte teilen Sie uns Ihre Entscheidung mit:</strong> ${anzahl === 1 ? "Soll sich diese Pflegekraft bei Ihnen bewerben?" : "Welche dieser Pflegekräfte soll sich bei Ihnen bewerben?"} Damit sie das kann, braucht sie noch ein paar Angaben zur Pflegesituation &ndash; ein Teil ist aus dem Kostenrechner schon übernommen, der Rest dauert wenige Minuten.</p>
     <p style="font-size:15px;line-height:1.75;color:#444;margin-bottom:14px;">Sobald das steht, sehen Sie im Portal, wer sich meldet, und entscheiden in Ruhe. <strong>Unverbindlich, und ohne Vertrag vor Ihrer Auswahl.</strong></p>
     ${bulletproofButton(matchesUrl, "Pflegekraft auswählen&nbsp;&nbsp;&rarr;", "#E76F63")}
     <p style="margin:10px 0 0;text-align:center;"><a href="${portalUrl}" target="_blank" style="color:#8B7355;text-decoration:underline;font-size:14px;font-weight:600;">Angaben zur Pflegesituation vervollständigen</a></p>
@@ -664,11 +664,11 @@ export function buildProfilNudge1Text(
     const matchesUrl = (portalBase && lead.token) ? withMailMark(buildPortalUrl(portalBase, lead.token, "matches"), "pn1") : siteUrl;
     return `${halloAnrede},
 
-Ihr Angebot haben Sie heute bekommen. Seitdem haben wir geschaut, wer zu Ihrer Situation passt und zum gewünschten Zeitpunkt frei ist — ${zahlwort(anzahl)} Pflegekräfte haben wir für Sie vorbereitet. Haben Sie sich alle schon angesehen?
+Ihr Angebot haben Sie heute bekommen. Seitdem haben wir geschaut, wer zu Ihrer Situation passt und zum gewünschten Zeitpunkt frei ist — ${kraefteWort(anzahl)} haben wir für Sie vorbereitet. ${anzahl === 1 ? "Haben Sie sich das Profil schon angesehen?" : "Haben Sie sich alle schon angesehen?"}
 
 ${fuenfBlock}
 
-Bitte teilen Sie uns Ihre Entscheidung mit: Welche dieser Pflegekräfte soll sich bei Ihnen bewerben? Damit sie das kann, braucht sie noch ein paar Angaben zur Pflegesituation — ein Teil ist aus dem Kostenrechner schon übernommen, der Rest dauert wenige Minuten.
+Bitte teilen Sie uns Ihre Entscheidung mit: ${anzahl === 1 ? "Soll sich diese Pflegekraft bei Ihnen bewerben?" : "Welche dieser Pflegekräfte soll sich bei Ihnen bewerben?"} Damit sie das kann, braucht sie noch ein paar Angaben zur Pflegesituation — ein Teil ist aus dem Kostenrechner schon übernommen, der Rest dauert wenige Minuten.
 
 Sobald das steht, sehen Sie im Portal, wer sich meldet, und entscheiden in Ruhe. Unverbindlich, und ohne Vertrag vor Ihrer Auswahl.
 
@@ -2582,7 +2582,7 @@ Deno.serve(async (req: Request) => {
             }
           }
           subject = fuenfHtml
-            ? `${zahlwort(fuenfAnzahl, true)} Pflegekräfte zur Auswahl – wer soll es sein?`
+            ? fuenfBetreff(fuenfAnzahl)
             : "Pflegekräfte können sich noch nicht bei Ihnen bewerben";
           html = buildProfilNudge1Html(lead as Lead, smtpConfig.siteUrl, portalBase, fuenfHtml, fuenfAnzahl);
           text = buildProfilNudge1Text(lead as Lead, smtpConfig.siteUrl, portalBase, fuenfText, fuenfAnzahl);
