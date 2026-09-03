@@ -40,7 +40,7 @@ import { simpleParser } from 'mailparser';
 /* Derselbe Parser, den auch der Testlauf und die Unit-Tests benutzen —
  * der Abholer bringt KEINE zweite Lesart der Portal-Mail mit. */
 import { parsePflegehilfe } from '@/lib/portal-parser';
-import { parseCsv, csvZuLeadZeile } from '@/lib/portal-csv';
+import { parseCsv, csvZuLeadZeile, csvZeileBrauchbar } from '@/lib/portal-csv';
 import { PORTALE } from '@/lib/portal-lead';
 
 export const runtime = 'nodejs';
@@ -209,7 +209,13 @@ async function arbeiteAb(cfg: Konfig, portal: string, client: ImapFlow) {
       if (csvAnhang) {
         try {
           const zeilen = parseCsv(csvAnhang.content.toString('utf8'));
-          if (zeilen.length >= 2) csv = csvZuLeadZeile(zeilen[0], zeilen[1]);
+          if (zeilen.length >= 2 && csvZeileBrauchbar(zeilen[0], zeilen[1])) {
+            csv = csvZuLeadZeile(zeilen[0], zeilen[1]);
+          } else if (zeilen.length >= 2) {
+            // Handverstuemmelte CSV (Zeile zu 1 Feld verklumpt) — lieber der
+            // vollstaendige Mailtext als ein leerer Spaltensalat.
+            log(`  ⚠ ${portal} #${uid} CSV-Zeile unbrauchbar (${zeilen[1].length}/${zeilen[0].length} Spalten) — nehme Mailtext`);
+          }
         } catch (e: any) {
           log(`  ⚠ ${portal} #${uid} CSV-Anhang unlesbar (${e.message}) — nehme Mailtext`);
         }

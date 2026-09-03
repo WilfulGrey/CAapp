@@ -103,7 +103,10 @@ Krankheiten …). Der Abholer liest sie als erste Quelle — aus der Zeile
 wird ein "Label: Wert"-Text synthetisiert und durch dasselbe
 `parsePflegehilfe` geschickt (EIN Mapper, ein `unbekannt[]`-Kanal). Der
 Mailtext bleibt für den **Einwilligungsnachweis** (der steht nur dort)
-und als Fallback für Mails ohne Anhang. Spalten ohne Zuhause bei uns
+und als Fallback für Mails ohne Anhang — sowie für Mails mit
+handverstümmeltem Anhang: eine Datenzeile mit weniger als der Hälfte der
+Kopfspalten (z. B. die ganze Zeile in einem Anführungszeichenpaar, Registry
+#46) gilt als unlesbar, im Log steht `⚠ CSV-Zeile unbrauchbar`. Spalten ohne Zuhause bei uns
 (Krankheiten, Gewicht, Beziehung …) landen als `zusatz` im Ereignis
 `portal_lead_eingekauft` — append-only, nichts geht verloren.
 

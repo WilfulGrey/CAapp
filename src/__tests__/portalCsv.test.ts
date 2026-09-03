@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 // Cross-App-Import (pure Module, Muster wie portalUrl.test.ts).
-import { parseCsv, csvZuLeadZeile } from '../../project 3/lib/portal-csv';
+import { parseCsv, csvZuLeadZeile, csvZeileBrauchbar } from '../../project 3/lib/portal-csv';
 import { parsePflegehilfe } from '../../project 3/lib/portal-parser';
 
 /* Die ECHTE CSV aus der ersten Portal-Mail (Zauner, prod uid 14) —
@@ -107,5 +107,24 @@ describe('parsePflegehilfe — "Mobil ohne Hilfsmittel" auch im Mailtext', () =>
   it('rutscht nicht mehr in rollator', () => {
     expect(parsePflegehilfe('Mobilität\tMobil ohne Hilfsmittel').angaben.mobilitaet).toBe('mobil');
     expect(parsePflegehilfe('Mobilität\tMobil mit Hilfsmittel').angaben.mobilitaet).toBe('rollator');
+  });
+});
+
+
+describe('csvZeileBrauchbar (Registry #46 — handverstümmelte CSV)', () => {
+  it('die GANZE Zeile in einem Anführungszeichenpaar → 1 Feld → unbrauchbar', () => {
+    /* Test „Marcin Testerowany" 03.09. (uid 28): manuell editierte CSV,
+       Datenzeile komplett gequotet. RFC-4180-korrekt = EIN Riesenfeld. */
+    const kopf = 'A,B,C,D,E,F,G,H'.split(',');
+    const zeilen = parseCsv('A,B,C,D,E,F,G,H\n"1,Herr,,X,,DE,x@y.de,+49"');
+    expect(zeilen[1].length).toBe(1);
+    expect(csvZeileBrauchbar(kopf, zeilen[1])).toBe(false);
+  });
+
+  it('normale Zeile (auch mit fehlenden hinteren Spalten) bleibt brauchbar', () => {
+    const kopf = new Array(32).fill('k');
+    expect(csvZeileBrauchbar(kopf, new Array(32).fill(''))).toBe(true);
+    expect(csvZeileBrauchbar(kopf, new Array(16).fill(''))).toBe(true);
+    expect(csvZeileBrauchbar(kopf, new Array(15).fill(''))).toBe(false);
   });
 });
