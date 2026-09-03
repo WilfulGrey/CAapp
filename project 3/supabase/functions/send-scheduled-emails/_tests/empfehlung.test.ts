@@ -8,9 +8,9 @@ import {
   anzeigeName,
   haken,
   HAKEN_WUNSCHPROFIL,
+  HAKEN_VERFUEGBAR,
   KORALLE,
   kundenFakten,
-  passtZumTermin,
   textAusblenden,
   vorstellungstext,
   stufenWort,
@@ -132,19 +132,39 @@ Deno.test("haken: höchstens zwei Punkte aus der Anfrage, dann ist Schluss", () 
   assertEquals(l.includes("Erfahrung in der Betreuung von Ehepaaren"), false);
 });
 
-Deno.test("haken: ohne besondere Anforderungen füllen die Standards auf", () => {
+/* Ohne Anforderung aus der Anfrage bleiben es ZWEI Haken: passt zum Profil,
+   ist verfuegbar. Vorher fuellten Deutsch und Fuehrerschein auf — und
+   „Entspricht Ihrem Wunschprofil" ueber „Deutschkenntnisse wie gewuenscht"
+   las sich wie derselbe Satz zweimal (Martin, 31.08.). */
+Deno.test("haken: ohne besondere Anforderungen nur Profil + Verfügbarkeit", () => {
   const l = haken(
     cg({ id: 1, germany_skill: "level_2" }).caregiver,
     { driving_license: "yes" },
-    { deutschkenntnisse: "kommunikativ", fuehrerschein: "ja", care_start_timing: "2-4-wochen" },
+    { deutschkenntnisse: "kommunikativ", fuehrerschein: "ja" },
     JETZT,
   );
-  // Reihenfolge der Standards: Termin → Deutsch → Führerschein
-  assertEquals(l, [
-    HAKEN_WUNSCHPROFIL,
-    "Zum gewünschten Termin verfügbar",
-    "Deutschkenntnisse wie gewünscht",
-  ]);
+  assertEquals(l, [HAKEN_WUNSCHPROFIL, HAKEN_VERFUEGBAR]);
+});
+
+/* „Ab sofort" steht IMMER — unabhaengig von available_from, weil das Feld
+   nicht gepflegt wird (Martin, 31.08.). Weder ein spaeteres Datum noch ein
+   fehlendes darf den Haken veraendern. */
+Deno.test("haken: Verfügbarkeit ist unabhängig von available_from", () => {
+  for (const datum of [null, "2026-12-24T00:00:00Z", "unlesbar"]) {
+    const l = haken(
+      cg({ id: 1, available_from: datum }).caregiver,
+      null, { deutschkenntnisse: "kommunikativ" }, JETZT,
+    );
+    assertEquals(l, [HAKEN_WUNSCHPROFIL, HAKEN_VERFUEGBAR]);
+  }
+});
+
+Deno.test("haken: mit Anforderung füllt die Verfügbarkeit den dritten Platz", () => {
+  const l = haken(
+    cg({ id: 1, available_from: "2026-12-24T00:00:00Z" }).caregiver,
+    null, { mobilitaet: "rollstuhl" }, JETZT,
+  );
+  assertEquals(l, [HAKEN_WUNSCHPROFIL, "Erfahrung mit Rollstuhlpatienten", HAKEN_VERFUEGBAR]);
 });
 
 Deno.test("haken: Führerschein nur, wenn der Kunde ihn wollte UND die Kraft einen hat", () => {
@@ -170,11 +190,6 @@ Deno.test("haken: kein Deutsch-Punkt, wenn die Stufe unbekannt ist", () => {
   assertEquals(l.includes("Deutschkenntnisse wie gewünscht"), false);
 });
 
-Deno.test("haken: ohne jeden Beleg bleibt nur der erste Punkt stehen", () => {
-  const l = haken(cg({ id: 1, germany_skill: null, available_from: null }).caregiver, null, {}, JETZT);
-  assertEquals(l, [HAKEN_WUNSCHPROFIL]);
-});
-
 Deno.test("anforderungenAusAnfrage: bettlägerig schlägt Rollstuhl, Rollator kommt zuletzt", () => {
   assertEquals(anforderungenAusAnfrage({ mobilitaet: "bettlaegerig" })[0], "Erfahrung mit bettlägerigen Patienten");
   assertEquals(anforderungenAusAnfrage({ mobilitaet: "rollstuhl" })[0], "Erfahrung mit Rollstuhlpatienten");
@@ -184,16 +199,6 @@ Deno.test("anforderungenAusAnfrage: bettlägerig schlägt Rollstuhl, Rollator ko
 
 Deno.test("anforderungenAusAnfrage: 'nein' bei Nachteinsätzen ist keine Anforderung", () => {
   assertEquals(anforderungenAusAnfrage({ nachteinsaetze: "nein" }), []);
-});
-
-Deno.test("passtZumTermin: nur innerhalb des Wunschfensters", () => {
-  // 2-4-wochen = 21 Tage ab dem 01.09.
-  assertEquals(passtZumTermin("2026-09-14T00:00:00Z", "2-4-wochen", JETZT), true);
-  assertEquals(passtZumTermin("2026-11-01T00:00:00Z", "2-4-wochen", JETZT), false);
-  // Ohne Datum gilt die Kraft im Portal als sofort verfügbar.
-  assertEquals(passtZumTermin(null, "sofort", JETZT), true);
-  // Unbekannter Wunsch → kein Versprechen.
-  assertEquals(passtZumTermin("2026-09-02T00:00:00Z", null, JETZT), false);
 });
 
 // ── Anzeige ───────────────────────────────────────────────────────────────
@@ -429,7 +434,7 @@ Deno.test("holeEmpfehlung: Glücksfall — beste Kraft plus Gründe", async () =
   assert(r !== null);
   assertEquals(r!.empfehlung.caregiverId, 9, "nicht die erfahrenste Kraft empfohlen");
   assertEquals(r!.sichtbarGesamt, 2);
-  assertEquals(r!.empfehlung.gruende.length, 3);
+  assertEquals(r!.empfehlung.gruende, [HAKEN_WUNSCHPROFIL, HAKEN_VERFUEGBAR]);
   assertEquals(rufe, ["onboard", "listMatchings", "getCaregiver"]);
 });
 
@@ -494,15 +499,13 @@ Deno.test("textAusblenden: kurzer Text bleibt ganz, langer laeuft in zwei Stufen
   assertEquals(lang.klar.endsWith("Wort"), true);
 });
 
-Deno.test("empfehlungHtml: Verfügbarkeitszeile ist raus — sie stand doppelt", () => {
+Deno.test("empfehlungHtml: keine eigene Verfügbarkeitszeile — nur der Haken", () => {
   const { empfehlung } = baueEmpfehlung(cg({ id: 42 }), null, {}, 5, JETZT);
   const html = empfehlungHtml(empfehlung, null, "https://p", "https://a", 5);
-  assertEquals(/Verfügbar ab|Sofort verfügbar/.test(html), false);
-  // Das Datum lebt weiter im Haken, wenn es zum Wunschtermin passt.
-  const mitTermin = baueEmpfehlung(
-    cg({ id: 42 }), null, { care_start_timing: "2-4-wochen" }, 5, JETZT,
-  ).empfehlung;
-  assert(mitTermin.gruende.includes("Zum gewünschten Termin verfügbar"));
+  // Die gruene „Verfügbar ab …"-Zeile bleibt draussen (Martin, 31.08.).
+  assertEquals(/Verfügbar ab/.test(html), false);
+  // Die Aussage steht genau einmal — als Haken.
+  assertEquals((html.match(/Ab sofort verfügbar/g) ?? []).length, 1);
 });
 
 Deno.test("empfehlungHtml: Überschrift und Zähler stehen IM Kasten, nicht darüber", () => {
@@ -515,8 +518,10 @@ Deno.test("empfehlungHtml: Überschrift und Zähler stehen IM Kasten, nicht dar�
   assert(kopf > kastenAuf, "Überschrift steht noch ausserhalb des Kastens");
   // Der Satz mit der Zahl gehoert bewusst DAVOR.
   assert(satz < kastenAuf, "Überschrift steht nicht mehr ueber dem Kasten");
-  // Die Zahl steht nur einmal — nicht noch einmal in der Kopfleiste.
-  assertEquals((html.match(/verfügbar/g) ?? []).length, 0);
+  /* Die Zahl steht nur einmal — nicht noch einmal in der Kopfleiste als
+     „N Kräfte verfügbar". Das Wort „verfügbar" allein reicht als Probe
+     nicht mehr: es steht jetzt auch im Verfügbarkeits-Haken. */
+  assertEquals(/Kr(ä|ae)fte verfügbar/.test(html), false);
 });
 
 Deno.test("empfehlungHtml: keine Karte in der Karte", () => {
@@ -545,7 +550,7 @@ Deno.test("empfehlungHtml: Profil-Link am Namen zeigt auf dieselbe Seite wie der
   assertEquals(ziele.length, 2);
 });
 
-Deno.test("empfehlungHtml: Einsaetze stehen hinter der Stufe", () => {
+Deno.test("empfehlungHtml: Einsaetze stehen unter der Stufe, auf eigener Zeile", () => {
   const { empfehlung } = baueEmpfehlung(
     cg({ id: 42, hp_total_jobs: 13, care_experience: "13" }), null, {}, 5, JETZT,
   );
@@ -554,6 +559,11 @@ Deno.test("empfehlungHtml: Einsaetze stehen hinter der Stufe", () => {
   assertStringIncludes(html, "13 Einsätze über Primundus");
   // Reihenfolge: erst die Stufe, dann die Zahl.
   assert(html.indexOf("Elite") < html.indexOf("13 Einsätze über Primundus"));
+  /* Eigene Zeile ueber die volle Breite (colspan) statt neben der Stufe —
+     sonst bricht „über Primundus" auf dem iPhone allein um. Die Zahl steht
+     danach auch NICHT mehr in derselben Zelle wie „Zum Profil". */
+  assertStringIncludes(html, `colspan="2"`);
+  assert(html.indexOf("Zum Profil") < html.indexOf("13 Einsätze über Primundus"));
 });
 
 Deno.test("empfehlungHtml: ein Einsatz bleibt Einzahl, null Einsaetze schweigen", () => {
