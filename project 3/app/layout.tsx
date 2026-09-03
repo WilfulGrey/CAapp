@@ -53,8 +53,8 @@ export const metadata: Metadata = {
     ...(IST_PROD ? {} : { interactiveWidget: 'resizes-content' as const }),
   },
   metadataBase: new URL(SEITE),
-  title: 'PRIMUNDUS - 24-Stunden-Pflege Kostenrechner',
-  description: 'Berechnen Sie in nur 2 Minuten die Kosten für 24-Stunden-Pflege. Vom 6× in Folge ausgezeichneten Testsieger mit Preisgarantie.',
+  title: '24-Stunden-Pflege Kostenrechner — Kosten in 2 Minuten',
+  description: '24-Stunden-Pflege Kosten in 2 Minuten berechnen — Eigenanteil nach Pflegegrad inklusive aller Zuschüsse. Vom 6× in Folge ausgezeichneten Testsieger.',
   alternates: {
     canonical: '/',
   },
@@ -63,8 +63,8 @@ export const metadata: Metadata = {
     locale: 'de_DE',
     url: '/',
     siteName: 'PRIMUNDUS',
-    title: 'PRIMUNDUS - 24-Stunden-Pflege Kostenrechner',
-    description: 'Berechnen Sie in nur 2 Minuten die Kosten für 24-Stunden-Pflege. Vom 6× in Folge ausgezeichneten Testsieger mit Preisgarantie.',
+    title: '24-Stunden-Pflege Kostenrechner — Kosten in 2 Minuten',
+    description: '24-Stunden-Pflege Kosten in 2 Minuten berechnen — Eigenanteil nach Pflegegrad inklusive aller Zuschüsse. Vom 6× in Folge ausgezeichneten Testsieger.',
     images: [
       {
         url: '/images/primundus_logo_header.webp',
@@ -73,8 +73,8 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'PRIMUNDUS - 24-Stunden-Pflege Kostenrechner',
-    description: 'Berechnen Sie in nur 2 Minuten die Kosten für 24-Stunden-Pflege. Vom 6× in Folge ausgezeichneten Testsieger mit Preisgarantie.',
+    title: '24-Stunden-Pflege Kostenrechner — Kosten in 2 Minuten',
+    description: '24-Stunden-Pflege Kosten in 2 Minuten berechnen — Eigenanteil nach Pflegegrad inklusive aller Zuschüsse. Vom 6× in Folge ausgezeichneten Testsieger.',
     images: [
       {
         url: '/images/primundus_logo_header.webp',
