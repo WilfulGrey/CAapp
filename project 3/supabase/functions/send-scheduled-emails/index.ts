@@ -1594,6 +1594,44 @@ async function hasReactionForCaregiver(
   return Array.isArray(data) && data.length > 0;
 }
 
+/** Fünf-Liste für die Nudge-Mail — von Versand UND Testversand benutzt.
+ *  Ohne diesen gemeinsamen Weg rendert der Demo-Pfad etwas anderes als der
+ *  Kunde bekommt; genau das passierte am 03.09.2026 beim ersten Testversand
+ *  (alter Betreff in der Testmail, neue Mail beim Kunden). Schreibt NICHTS —
+ *  der lead_events-Eintrag bleibt beim Versand. */
+async function fuenfFuerNudge(
+  lead: Lead, portalBase: string, supabaseUrl: string, key: string, darfOnboarden: boolean,
+): Promise<{
+  html: string; text: string; anzahl: number; betreff: string;
+  anhaenge: { filename: string; content: Uint8Array; contentType: string; cid: string }[];
+  caregiverIds: number[];
+} | null> {
+  const tok = lead.token;
+  if (!tok) return null;
+  const erg = await holeFuenf({
+    supabaseUrl, key, token: tok,
+    jobOfferId: (lead as unknown as Record<string, unknown>).mamamia_job_offer_id as number ?? null,
+    formularDaten: (lead as unknown as Record<string, { formularDaten?: unknown }>).kalkulation?.formularDaten as never ?? {},
+    darfOnboarden,
+  });
+  if (!erg || erg.fuenf.length === 0) return null;
+  const basisUrl = buildPortalUrl(portalBase, tok);
+  // Fotos mit Budget: die oberen zuerst, was nicht passt → Initialen.
+  const roh = await Promise.all(erg.fuenf.map((e) => fetchInlinePhotoDeno(e.fotoUrl)));
+  const darf = fotoBudget(roh.map((r) => r?.content.length ?? null));
+  const inlines = roh.map((r, i) => (r && darf[i]) ? r : null);
+  const profilUrls = erg.fuenf.map((e) => withMailMark(`${basisUrl}&cg=${e.caregiverId}`, "pn1"));
+  const alleUrl = withMailMark(buildPortalUrl(portalBase, tok, "matches"), "pn1");
+  return {
+    html: fuenfListeHtml(erg.fuenf, inlines.map((r) => r?.cid ?? null), profilUrls, alleUrl),
+    text: fuenfListeText(erg.fuenf, profilUrls, alleUrl),
+    anzahl: erg.fuenf.length,
+    betreff: fuenfBetreff(erg.fuenf.length),
+    anhaenge: inlines.filter((r): r is NonNullable<typeof r> => r !== null),
+    caregiverIds: erg.fuenf.map((e) => e.caregiverId),
+  };
+}
+
 async function fetchInlinePhotoDeno(
   url: string | null | undefined,
 ): Promise<{ filename: string; content: Uint8Array; contentType: string; cid: string } | null> {
@@ -2139,6 +2177,17 @@ Deno.serve(async (req: Request) => {
          was der Kunde bekommt. Derselbe Weg wie im Versand; fuer einen Lead,
          der schon eine job_offer hat, ist der Onboard-Aufruf ein
          Cache-Treffer und legt in mamamia nichts Neues an. */
+      /* Der Testversand muss GENAU das rendern, was der Kunde bekommt.
+         Beim ersten Lauf am 03.09.2026 zeigte er die alte Mail 2, weil die
+         Fünf-Liste hier fehlte. Kein Onboarding aus einer Vorschau:
+         `onboard:true` im Body nur bewusst, sonst braucht der Test-Lead eine
+         bestehende job_offer (sonst greift der Rückfalltext). */
+      let demoFuenf: Awaited<ReturnType<typeof fuenfFuerNudge>> = null;
+      if ((demoBody.items || []).some((i: any) => i?.email_type === "profil_nudge_1")) {
+        demoFuenf = await fuenfFuerNudge(
+          lead as Lead, portalBase, supabaseUrl, supabaseServiceKey, demoBody.onboard === true,
+        );
+      }
       let demoEmpfHtml: string | null | undefined = undefined;
       let demoEmpfText: string | null | undefined = undefined;
       let demoInline: { filename: string; content: Uint8Array; contentType: string; cid: string } | null = null;
@@ -2168,7 +2217,7 @@ Deno.serve(async (req: Request) => {
       const render = (t: string): { subject: string; html: string; text: string } => {
         switch (t) {
           case "eingangsbestaetigung": return { subject: "Ihr persönliches Angebot zur 24-Stunden-Betreuung", html: buildEingangsbestaetigungHtml(lead as Lead, site, portalBase, false, demoEmpfHtml), text: buildEingangsbestaetigungText(lead as Lead, portalBase, false, demoEmpfText) };
-          case "profil_nudge_1": return { subject: "Pflegekräfte können sich noch nicht bei Ihnen bewerben", html: buildProfilNudge1Html(lead as Lead, site, portalBase), text: buildProfilNudge1Text(lead as Lead, site, portalBase) };
+          case "profil_nudge_1": return { subject: demoFuenf?.betreff ?? "Pflegekräfte können sich noch nicht bei Ihnen bewerben", html: buildProfilNudge1Html(lead as Lead, site, portalBase, demoFuenf?.html ?? null, demoFuenf?.anzahl ?? 0), text: buildProfilNudge1Text(lead as Lead, site, portalBase, demoFuenf?.text ?? null, demoFuenf?.anzahl ?? 0) };
           case "profil_nudge_2": return { subject: "Profil unvollständig — Sie können noch keine Bewerbungen erhalten", html: buildProfilNudge2Html(lead as Lead, site, portalBase), text: buildProfilNudge2Text(lead as Lead, site, portalBase) };
           case "warum_primundus": return { subject: "Warum Familien sich für Primundus entscheiden", html: buildWarumPrimundusHtml(lead as Lead, withMailMark(pu, "wp"), site), text: buildWarumPrimundusText(lead as Lead, withMailMark(pu, "wp")) };
           case "nachfass_2": return { subject: "Ihre Betreuung — kann ich Ihnen etwas abnehmen?", html: buildNachfass2Html(lead as Lead, site, portalBase, ms), text: buildNachfass2Text(lead as Lead, site, portalBase, ms) };
@@ -2189,9 +2238,19 @@ Deno.serve(async (req: Request) => {
           const subject = item.subjectPrefix ? `${item.subjectPrefix}${m.subject}` : m.subject;
           const html = b ? m.html.replace('<div class="email-content">', `${bannerHtml(b)}<div class="email-content">`) : m.html;
           const text = b ? `(${b})\n\n${m.text}` : m.text;
-          const anhang = item.email_type === "eingangsbestaetigung" && demoInline ? [demoInline] : undefined;
+          const anhang = item.email_type === "eingangsbestaetigung" && demoInline
+            ? [demoInline]
+            : item.email_type === "profil_nudge_1" && demoFuenf?.anhaenge.length
+            ? demoFuenf.anhaenge
+            : undefined;
           const r = await sendEmailSmtp(smtpConfig, to, subject, html, text, anhang, demoBody.skipBcc === true);
-          results.push({ email_type: item.email_type, to, subject, ...r });
+          results.push({
+            email_type: item.email_type, to, subject, ...r,
+            // Damit man an der Antwort sieht, ob die Liste drin war.
+            ...(item.email_type === "profil_nudge_1"
+              ? { fuenf: demoFuenf ? { anzahl: demoFuenf.anzahl, caregiver_ids: demoFuenf.caregiverIds, fotos_inline: demoFuenf.anhaenge.length } : null }
+              : {}),
+          });
         } catch (e) {
           results.push({ email_type: item.email_type, success: false, error: String(e) });
         }
@@ -2543,49 +2602,25 @@ Deno.serve(async (req: Request) => {
           eventTypeSent = "email_nachfass_3_sent";
           eventTypeFailed = "email_nachfass_3_failed";
         } else if (scheduledEmail.email_type === "profil_nudge_1") {
-          /* Alle fünf Kräfte in die Mail (Martin, 03.09.2026) — derselbe
-             Unterbau wie die Empfehlung der Angebotsmail (holeMatchings), nur
-             ohne getCaregiver je Zeile. Best-effort: fällt es aus, bleibt es
-             beim bisherigen Text und die Mail geht trotzdem. */
-          let fuenfHtml: string | null = null;
-          let fuenfText: string | null = null;
-          let fuenfAnzahl = 0;
-          if ((lead as Lead).token) {
-            const tok = (lead as Lead).token as string;
-            const basisUrl = buildPortalUrl(portalBase, tok);
-            const ergF = await holeFuenf({
-              supabaseUrl,
-              key: supabaseServiceKey,
-              token: tok,
-              jobOfferId: (lead as any).mamamia_job_offer_id ?? null,
-              formularDaten: (lead as any).kalkulation?.formularDaten ?? {},
-              darfOnboarden: Deno.env.get("EMPFEHLUNG_ONBOARD") !== "0",
+          /* Alle fünf Kräfte in die Mail (Martin, 03.09.2026). Vorbereitung
+             im gemeinsamen Helfer, damit der Testversand exakt dasselbe
+             rendert. Best-effort: fällt es aus, bleibt es beim bisherigen
+             Text und die Mail geht trotzdem. */
+          const teile = await fuenfFuerNudge(
+            lead as Lead, portalBase, supabaseUrl, supabaseServiceKey,
+            Deno.env.get("EMPFEHLUNG_ONBOARD") !== "0",
+          );
+          if (teile) {
+            if (teile.anhaenge.length) (scheduledEmail as any).__inlineAttachments = teile.anhaenge;
+            await supabase.from("lead_events").insert({
+              lead_id: scheduledEmail.lead_id,
+              event_type: "fuenf_in_nudge_mail",
+              metadata: { caregiver_ids: teile.caregiverIds, fotos_inline: teile.anhaenge.length },
             });
-            if (ergF && ergF.fuenf.length > 0) {
-              // Fotos mit Budget: die oberen zuerst, was nicht passt → Initialen.
-              const roh = await Promise.all(ergF.fuenf.map((e) => fetchInlinePhotoDeno(e.fotoUrl)));
-              const darf = fotoBudget(roh.map((r) => r?.content.length ?? null));
-              const inlines = roh.map((r, i) => (r && darf[i]) ? r : null);
-              const cids = inlines.map((r) => r?.cid ?? null);
-              const profilUrls = ergF.fuenf.map((e) => withMailMark(`${basisUrl}&cg=${e.caregiverId}`, "pn1"));
-              const alleUrl = withMailMark(buildPortalUrl(portalBase, tok, "matches"), "pn1");
-              fuenfHtml = fuenfListeHtml(ergF.fuenf, cids, profilUrls, alleUrl);
-              fuenfText = fuenfListeText(ergF.fuenf, profilUrls, alleUrl);
-              fuenfAnzahl = ergF.fuenf.length;
-              const anhaenge = inlines.filter((r): r is NonNullable<typeof r> => r !== null);
-              if (anhaenge.length) (scheduledEmail as any).__inlineAttachments = anhaenge;
-              await supabase.from("lead_events").insert({
-                lead_id: scheduledEmail.lead_id,
-                event_type: "fuenf_in_nudge_mail",
-                metadata: { caregiver_ids: ergF.fuenf.map((e) => e.caregiverId), fotos_inline: anhaenge.length },
-              });
-            }
           }
-          subject = fuenfHtml
-            ? fuenfBetreff(fuenfAnzahl)
-            : "Pflegekräfte können sich noch nicht bei Ihnen bewerben";
-          html = buildProfilNudge1Html(lead as Lead, smtpConfig.siteUrl, portalBase, fuenfHtml, fuenfAnzahl);
-          text = buildProfilNudge1Text(lead as Lead, smtpConfig.siteUrl, portalBase, fuenfText, fuenfAnzahl);
+          subject = teile?.betreff ?? "Pflegekräfte können sich noch nicht bei Ihnen bewerben";
+          html = buildProfilNudge1Html(lead as Lead, smtpConfig.siteUrl, portalBase, teile?.html ?? null, teile?.anzahl ?? 0);
+          text = buildProfilNudge1Text(lead as Lead, smtpConfig.siteUrl, portalBase, teile?.text ?? null, teile?.anzahl ?? 0);
           eventTypeSent = "email_profil_nudge_1_sent";
           eventTypeFailed = "email_profil_nudge_1_failed";
         } else if (scheduledEmail.email_type === "profil_nudge_2") {
