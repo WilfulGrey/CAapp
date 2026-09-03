@@ -83,9 +83,11 @@ export async function POST(request: NextRequest) {
   }
 
   /* Schutzregeln VOR allem anderen: kein Lead, kein Preis, keine Mail.
-   * Ein "Keine Interesse" oder eine halbjahresalte Anfrage darf nicht
-   * einmal als Datensatz entstehen — sonst faellt sie beim naechsten Lauf
-   * wieder jemandem in die Haende. */
+   * Ein "Keine Interesse" oder eine halbjahresalte Anfrage darf HIER nicht
+   * als Datensatz entstehen. Sichtbar wird sie trotzdem (Entscheidung
+   * Michał 03.09., Registry #47): der ABHOLER legt fuer uebersprungene
+   * Mails einen Shell-Lead 'manuell_pruefen' an — Anschauen ja,
+   * automatische Strecke (Preis, Mail 1, Onboarding) nein. */
   const schutz = darfAngeschriebenWerden(
     { status: body?.status, erstellt_am: body?.erstellt_am },
     new Date(),

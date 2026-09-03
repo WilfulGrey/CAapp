@@ -10,7 +10,11 @@ alles wie immer — Preis, Token, Kundenportal, Mail 1.
 Portal-Mail  →  Postfach        →  pg_cron (jede Minute, Supabase)
                 pflegehilfe@       POST /api/portal-abholen (Bearer)
                 primundus.de       app/api/portal-abholen/route.ts
-                                        │  ~1s IMAP-Poll
+                                        │  ~1s IMAP-Poll (READ-ONLY)
+                                        ▼
+                              UID-Abgleich mit portal_mail_log:
+                              nur UIDs ohne Eintrag oder 'offen'
+                                        │
                                         ▼
                               CSV-Anhang der Mail (ERSTE Quelle)
                               lib/portal-csv.ts → synthetischer Text
@@ -28,10 +32,18 @@ Portal-Mail  →  Postfach        →  pg_cron (jede Minute, Supabase)
               Schutzregeln         berechnePreis      scheduleEmail
               portal-schutz.ts     + Annahmen         Mail 1, sofort
                                    portal-lead.ts
+                                        │
+                                        ▼
+                              Ausgang → portal_mail_log
+                              erledigt / uebersprungen /
+                              abgelehnt / offen  (Registry #47)
 ```
 
 Im Admin erscheint der Lead unter **Leads** mit eigenem Reiter je Portal
 und der Spalte *Herkunft* (rot hervorgehoben — er hat Geld gekostet).
+Im selben Reiter zeigt der Abschnitt **„Postfach … — Mails ohne Lead"**
+das Protokoll aller Mails, die KEIN Lead wurden (offen, abgelehnt,
+übersprungen, Altbestand) — nichts scheitert still.
 
 Die Portal-Reiter stehen dort **auch ohne Leads**, mit einer `0`. Das ist
 die Antwort auf „kommt da eigentlich was an?" — ein fehlender Reiter ließe
@@ -45,8 +57,8 @@ Wer zuerst antwortet, gewinnt — deshalb der enge Takt. Eine Minute fällt
 gegenüber einem Menschen, der die Mail liest und zurückruft, nicht ins
 Gewicht.
 
-Ein Lauf dauert rund **eine Sekunde**: verbinden, ungelesene Mails holen,
-verarbeiten, schließen.
+Ein Lauf dauert rund **eine Sekunde**: verbinden, UIDs gegen
+`portal_mail_log` abgleichen, Neues verarbeiten, schließen.
 
 Getaktet wird von **pg_cron** (Migration
 `20260901120000_setup_portal_abholer_cron.sql`) — dieselbe Infra wie
@@ -72,9 +84,10 @@ Die Zugangsdaten liegen außerhalb des Repos und dienen nur dem Lesen.
 ## Scharfschalten
 
 **Schritt 1 — Trockenlauf.** `PORTAL_TROCKENLAUF=1` im Render-Dashboard
-des Kostenrechners setzen (+ Redeploy): die Route liest, parst und
-protokolliert, legt aber keinen Lead an und löst keine Kundenmail aus.
-Die Mails bleiben ungelesen.
+des Kostenrechners setzen (+ Redeploy): die Route liest, parst und loggt
+in die Konsole, legt aber keinen Lead an, löst keine Kundenmail aus und
+schreibt NICHTS in `portal_mail_log` (auch keinen Seed — der passiert
+beim Scharfschalten).
 
 Im Log (Render-Logs des Kostenrechners, Präfix `[portal-abholer]`) steht
 pro Mail, wie viele Felder erkannt wurden. Eine Zeile `⚠ nicht zugeordnet`
@@ -161,15 +174,41 @@ antwortet sie `200 {verarbeitet: 0}` — auf Staging bewusst wirkungslos
 
 ## Warum es so gebaut ist
 
-**Ungelesen = unerledigt.** Eine Mail wird erst nach einer verstandenen
-Antwort des Endpunkts als gelesen markiert. Bricht der Lauf vorher ab,
-holt der nächste sie eine Minute später erneut — lieber ein zweiter Versuch als ein
-verlorener Lead, der bezahlt ist. Gegen Dubletten schützt
-`findOrCreateLead` über die E-Mail-Adresse.
+**Nicht im Protokoll = unerledigt (Registry #47).** Das Gedächtnis des
+Abholers ist die Tabelle **`portal_mail_log`** (eine Zeile je
+`postfach, uidvalidity, uid`), nicht mehr die `\Seen`-Flagge. `\Seen` war
+Zustand, den wir uns mit Menschen teilten: zweimal (02.–03.09.) hat ein
+offener Webmail-Client Mails als gelesen markiert und der Cron sah sie
+nie. Jetzt ist das Postfach für uns **READ-ONLY** — der Abholer schreibt
+keine Flags (fetchOne holt per `BODY.PEEK`). **Jeder darf im Postfach
+lesen, sortieren, aufräumen** — am Abholer ändert das nichts.
 
-**Ein bewusstes Überspringen ist erledigt.** Der Endpunkt antwortet auch
-bei „zu alt" oder „Status nicht ansprechbar" mit 200 und
-`uebersprungen: true`. Diese Mail darf weg — sie kommt nicht wieder.
+Die Status:
+
+| Status | Bedeutung |
+|---|---|
+| `erledigt` | Lead angelegt (`lead_id` gesetzt) |
+| `uebersprungen` | Schutzregel (zu alt, Status nicht ansprechbar) — `grund`; im Admin als Shell-Lead/Event sichtbar |
+| `abgelehnt` | deterministisch (keine Einwilligung, keine Kundenadresse, HTTP 400): **dauerhaft, kein Retry** — im Admin als Shell-Lead `manuell_pruefen` |
+| `offen` | transient (5xx, Netz): nächster Takt versucht erneut — nur dieser Status färbt den Lauf rot |
+| `altbestand` | beim Erstlauf eines (postfach, uidvalidity)-Paars vorgefunden, nie verarbeitet (Seed, Muster Bug #25; `uid=0` = Sentinel „Postfach war leer") |
+
+Eine Mail von Hand erneut anstoßen (z. B. nach einem Parser-Fix):
+
+```sql
+update portal_mail_log set status = 'offen', updated_at = now()
+ where postfach = 'pflegehilfe.org' and uid = 28;
+```
+
+**Keine Mail scheitert still (Entscheidung Michał 03.09.).** Jede Mail,
+die kein echter Lead wurde — `abgelehnt` wie `uebersprungen` — wird im
+Admin sichtbar: als Event auf dem bestehenden Lead derselben Adresse,
+sonst als Shell-Lead mit Status **`manuell_pruefen`** (rot). Betreff,
+Grund und ein Textauszug stehen im Ereignis (`portal_mail_fehler` /
+`portal_mail_uebersprungen`). Dazu listet der Portal-Reiter im Admin den
+Abschnitt „Postfach — Mails ohne Lead" direkt aus `portal_mail_log`.
+Jede Mail hat Geld gekostet — ein stiller Verlust ist teurer als ein
+roter Eintrag zu viel.
 
 **Der Parser lässt weg, was er nicht versteht.** Dann greift die Annahme
 aus `portal-lead.ts` mit dem *teureren* Wert: lieber ein Preis, der nach
@@ -179,13 +218,15 @@ im Ereignislog und entscheidet, ob die Mail den Annahme-Hinweis zeigt.
 **Ein Portal darf das andere nicht aufhalten.** Fällt ein Postfach aus,
 laufen die übrigen weiter.
 
-**Jeder liegengebliebene Lead färbt den Lauf rot.** Nicht nur ein kaputtes
-Postfach, auch eine einzelne Mail, die nicht durchging, macht die Antwort
-zu **HTTP 500** mit `{liegengeblieben: N}`. Wichtig: pg_cron-„succeeded"
+**Nur `offen` färbt den Lauf rot.** Eine transient gescheiterte Mail
+macht die Antwort zu **HTTP 500** mit `{liegengeblieben: N}` — der
+nächste Takt versucht sie erneut. Dauerhaft `abgelehnt`e Mails tun das
+NICHT mehr: früher hielt eine einzige kaputte Mail den Lauf **jede Minute
+für immer** auf 500 (Registry #46) — jetzt steht sie im Admin und im
+Protokoll, und der Lauf wird wieder grün. Wichtig: pg_cron-„succeeded"
 heißt nur „HTTP gefeuert" (Registry #36), und `net._http_response`
 rotiert in Stunden — die Wahrheit steht in den **Render-Logs des
-Kostenrechners** (`[portal-abholer]`), und die unverarbeiteten Mails
-bleiben als ungelesen im Postfach sichtbar.
+Kostenrechners** (`[portal-abholer]`) und in `portal_mail_log`.
 
 ## Neues Portal aufnehmen
 
@@ -213,10 +254,11 @@ jedem Merge — nicht mehr als eigenständige Deno-Skripte (die brachen den
 `next build` beider Kostenrechner-Slots, Registry #38):
 
 ```bash
-npx vitest run src/__tests__/portalLead.test.ts src/__tests__/portalParser.test.ts
+npx vitest run src/__tests__/portalLead.test.ts src/__tests__/portalParser.test.ts src/__tests__/portalMailLog.test.ts
 ```
 
 `portalParser.test.ts` (liest die Portal-Mail), `portalLead.test.ts`
 (Lücken zum teureren Wert füllen + Admin-Reiter via `reiterFuer` aus
 `lib/portal-lead.ts` — die Seite ruft dieselbe Funktion auf, der Test
-prüft keine Kopie).
+prüft keine Kopie), `portalMailLog.test.ts` (welche UIDs ein Lauf
+anfasst: `zuVerarbeiten` aus `lib/portal-mail-log.ts`).

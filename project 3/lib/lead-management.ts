@@ -69,6 +69,12 @@ export async function findOrCreateLead(
 
   const statusOrder = {
     info_requested: 1,
+    // Shell-Lead des Portal-Abholers (Registry #47): eine Mail, die kein
+    // echter Lead wurde (abgelehnt/uebersprungen), sichtbar im Admin.
+    // Level 1: ein echter Submit derselben Adresse STUFT HOCH statt zu
+    // duplizieren — ohne Eintrag hier fiele der Lead durch alle Zweige
+    // (siehe folge_einsatz unten).
+    manuell_pruefen: 1,
     angebot_requested: 2,
     // Follow-up-Einsatz (Bug #25): detect-Discovery setzt diesen Status, wenn
     // Mamamia einen NEUEN geplanten Job für den Kunden eröffnet hat. Level 2
