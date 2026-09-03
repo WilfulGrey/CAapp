@@ -21,6 +21,43 @@ const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 );
 
+/* „Dzyń" für neue Leads/Portal-Mails (Registry #48): zwei kurze Sinus-Töne
+   (A5 → E6) rein aus WebAudio — kein Asset. Browser-Autoplay: der
+   AudioContext startet suspended, bis der erste Klick/Tastendruck ihn
+   freischaltet; bis dahin bleibt der Ding stumm, die Tabelle aktualisiert
+   sich trotzdem. Modul-Ebene ist SSR-sicher: hier steht nur `null`,
+   `new AudioContext()` läuft erst in Handlern. */
+let audioCtx: AudioContext | null = null;
+
+function audioFreischalten() {
+  try {
+    audioCtx ??= new AudioContext();
+    if (audioCtx.state === 'suspended') void audioCtx.resume();
+  } catch { /* kein WebAudio — der Ding ist nice-to-have */ }
+}
+
+function ding() {
+  try {
+    audioFreischalten();
+    if (!audioCtx || audioCtx.state !== 'running') return;
+    const ctx = audioCtx;
+    const t0 = ctx.currentTime;
+    [880, 1318.5].forEach((freq, i) => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = 'sine';
+      osc.frequency.value = freq;
+      const start = t0 + i * 0.12;
+      gain.gain.setValueAtTime(0, start);
+      gain.gain.linearRampToValueAtTime(0.18, start + 0.01);
+      gain.gain.exponentialRampToValueAtTime(0.0001, start + 0.25);
+      osc.connect(gain).connect(ctx.destination);
+      osc.start(start);
+      osc.stop(start + 0.3);
+    });
+  } catch { /* still scheitern */ }
+}
+
 export default function LeadsPage() {
   const [leads, setLeads] = useState<any[]>([]);
   const [filteredLeads, setFilteredLeads] = useState<any[]>([]);
@@ -29,6 +66,9 @@ export default function LeadsPage() {
      altbestand. Sichtbar im jeweiligen Portal-Reiter, damit nichts still
      scheitert. */
   const [mailLog, setMailLog] = useState<any[]>([]);
+  // Realtime-Kanal verbunden? Grauer Punkt = Verbindung down — sonst sähe
+  // ein toter Socket aus wie „nichts Neues" (die stille Panne aus #47).
+  const [live, setLive] = useState(false);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
@@ -42,13 +82,66 @@ export default function LeadsPage() {
     loadLeads();
   }, []);
 
+  /* Live-Kanal (Registry #48): postgres_changes auf leads + portal_mail_log.
+     Abholer und Routen schreiben in die DB, die DB stösst die offene Karte
+     an — kein Timer, kein eigener Push-Server. Ein Refetch pro Schwall
+     (800 ms Debounce: die erledigte Portal-Mail schreibt Log-Zeile UND Lead
+     binnen einer Sekunde), ein Ding pro Schwall (3 s Sperre, leading edge —
+     der Ton soll sofort kommen). Rejoin nach Netzabriss macht realtime-js
+     selbst (Backoff); jedes SUBSCRIBED holt Verpasstes still nach.
+
+     BEWUSST kein Import von REALTIME_SUBSCRIBE_STATES: supabase-js 2.99
+     re-exportiert das Enum nur in den Typdeklarationen, im ESM-Runtime-
+     Bundle ist es `undefined` — Typecheck grün, Browser kaputt. Deshalb
+     `status: string` (kontravariante Erweiterung des Enum-Parameters). */
+  useEffect(() => {
+    let refetchTimer: ReturnType<typeof setTimeout> | undefined;
+    let letzterDing = 0;
+
+    const aenderung = (payload: { eventType: string }) => {
+      if (payload.eventType === 'INSERT' && Date.now() - letzterDing > 3000) {
+        letzterDing = Date.now();
+        ding();
+      }
+      clearTimeout(refetchTimer);
+      refetchTimer = setTimeout(() => loadLeads(true), 800);
+    };
+
+    const channel = supabase
+      .channel('admin-leads')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'leads' }, aenderung)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'portal_mail_log' }, aenderung)
+      .subscribe((status: string) => {
+        console.log('[admin-live]', status);
+        setLive(status === 'SUBSCRIBED');
+        if (status === 'SUBSCRIBED') loadLeads(true);
+      });
+
+    /* Laptop-Deckel zu = Socket tot, Timer eingefroren. Beim Sichtbarwerden
+       einmal still nachladen, bevor der Heartbeat den Rejoin schafft. */
+    const sichtbar = () => { if (document.visibilityState === 'visible') loadLeads(true); };
+    document.addEventListener('visibilitychange', sichtbar);
+    window.addEventListener('pointerdown', audioFreischalten, { once: true });
+    window.addEventListener('keydown', audioFreischalten, { once: true });
+
+    return () => {
+      clearTimeout(refetchTimer);
+      document.removeEventListener('visibilitychange', sichtbar);
+      window.removeEventListener('pointerdown', audioFreischalten);
+      window.removeEventListener('keydown', audioFreischalten);
+      void supabase.removeChannel(channel);
+    };
+  }, []);
+
   useEffect(() => {
     filterLeads();
   }, [searchTerm, statusFilter, quelleFilter, leads]);
 
-  const loadLeads = async () => {
+  /* still=true: Nachladen aus dem Live-Kanal — ohne Spinner, sonst blinkt
+     bei jeder Änderung die ganze Seite weg. */
+  const loadLeads = async (still = false) => {
     try {
-      setLoading(true);
+      if (!still) setLoading(true);
       // lead_jobs(count) via FK-Embedding: liefert pro Lead die Anzahl
       // Mamamia-Einsätze OHNE N+1 (Badge „N Einsätze" bei Multi-Job-Kunden).
       const { data } = await supabase
@@ -173,9 +266,16 @@ export default function LeadsPage() {
             Verwalten Sie alle Interessenten ({filteredLeads.length} von {leads.length})
           </p>
         </div>
-        <Button onClick={loadLeads} variant="outline">
-          Aktualisieren
-        </Button>
+        <div className="flex items-center gap-3">
+          <span className="flex items-center gap-1.5 text-xs text-gray-500">
+            <span className={`inline-block w-2 h-2 rounded-full ${live ? 'bg-green-500' : 'bg-gray-300'}`} />
+            {live ? 'Live' : 'Verbinde …'}
+          </span>
+          {/* onClick={loadLeads} würde das MouseEvent als `still` übergeben. */}
+          <Button onClick={() => loadLeads()} variant="outline">
+            Aktualisieren
+          </Button>
+        </div>
       </div>
 
       <Card className="p-6">
