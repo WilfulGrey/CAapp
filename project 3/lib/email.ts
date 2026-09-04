@@ -287,7 +287,7 @@ export function getEingangsbestaetigungEmailTemplate(
     deutschkenntnisse: { 'grundlegend': 'Grundlegend', 'kommunikativ': 'Kommunikativ', 'sehr-gut': 'Gut' },
     fuehrerschein: { 'ja': 'Ja', 'nein': 'Nein / nicht unbedingt' },
     geschlecht: { 'egal': 'Egal', 'weiblich': 'Weiblich', 'maennlich': 'Männlich' },
-    erfahrung: { 'keine': 'Keine Anforderung', 'wuenschenswert': 'Wünschenswert', 'zwingend': 'Zwingend erforderlich' },
+    erfahrung: { 'einsteiger': 'Einsteiger', 'erfahren': 'Erfahren', 'sehr-erfahren': 'Sehr erfahren' },
     weitere_personen: { 'ja': 'Ja', 'nein': 'Nein' },
     care_start_timing: { 'sofort': 'Sofort (4–7 Werktage)', '2-4-wochen': 'In 2–4 Wochen', '1-2-monate': 'In 1–2 Monaten', 'unklar': 'Ich informiere mich nur' },
   };
