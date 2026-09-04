@@ -97,8 +97,17 @@ export function kgZuBucket(kg: number): string | undefined {
  * "Bedarf" die Zeile "Bedarfsort: 39615 ..." und "Mobil" die Zeile
  * "Mobilität: ...". Das Label muss an einer Wortgrenze enden. */
 function feld(text: string, label: string): string | null {
-  const esc = label.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  const m = text.match(new RegExp(`^[ \\t]*${esc}(?![\\wäöüßÄÖÜ])[ \\t]*:?[ \\t]*(.+)$`, 'im'));
+  /* Direktmails des Portals sind HTML-only; mailparser macht daraus Text
+   * und bricht bei ~80 Zeichen um, Tabellenzellen klebt er mit 3+ Leer-
+   * zeichen aneinander (prod uid 40 Trageser, 04.09.: "Uhr   Zustimmung zur
+   * \nKontaktweitergabe: 04.09.2026 …" ⇒ Label ueber zwei Zeilen, Zeile
+   * beginnt mitten in der Zelle). Deshalb: Leerzeichen im Label = beliebiger
+   * Whitespace (auch Umbruch), Label darf auch hinter einer Zellgrenze
+   * stehen, Wert endet an der naechsten Zellgrenze oder am Zeilenende.
+   * ponytail: 3 Leerzeichen als Zellgrenze — Freitext mit 3 Spaces wird
+   * abgeschnitten; erst dann auf echtes html-to-text umbauen. */
+  const esc = label.replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/ /g, '\\s+');
+  const m = text.match(new RegExp(`(?:^[ \\t]*|[ \\t]{3,})${esc}(?![\\wäöüßÄÖÜ])[ \\t]*:?[ \\t]*(.+?)(?=[ \\t]{3,}|$)`, 'im'));
   const wert = m?.[1]?.trim();
   return wert && wert.length > 0 ? wert : null;
 }

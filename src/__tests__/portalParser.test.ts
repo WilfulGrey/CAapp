@@ -141,6 +141,31 @@ describe('parsePflegehilfe — weitergeleitete Mail (Fwd)', () => {
   });
 });
 
+describe('parsePflegehilfe — Direktmail HTML-only, von mailparser umgebrochen (Registry #51)', () => {
+  /* Prod uid 40 (Trageser, 04.09.): die erste echte Direktmail des Portals
+   * hat keinen text/plain-Teil. mailparser erzeugt Text aus dem HTML, klebt
+   * Tabellenzellen mit 3 Leerzeichen zusammen und bricht bei ~80 Zeichen um —
+   * das Label "Zustimmung zur Kontaktweitergabe" stand ueber zwei Zeilen,
+   * der Parser fand keine Einwilligung, der Lead wurde abgelehnt. Muster
+   * 1:1 aus dem HTML der Mail Epple (uid 36) reproduziert. */
+  const umgebrochen = mail.replace(
+    /Datenschutz\nZustimmung zur Datenschutzerklärung: 23\. April 19:59\nZustimmung zur Kontaktweitergabe: 25\. April 08:35/,
+    'Datenschutz\n\n   Zustimmung zur Datenschutz\u00ADerklärung: 03.09.2026 13:49 Uhr   Zustimmung zur\n' +
+      'Kontaktweitergabe: 03.09.2026 13:59 Uhr   Das Beratungsgespräch wurde\n' +
+      'am 03.09.2026 13:59 Uhr von Bayan Alokla geführt',
+  );
+
+  it('Label ueber zwei Zeilen + Zellgrenzen: Einwilligung wird gelesen, Wert endet an der Zellgrenze', () => {
+    expect(umgebrochen).not.toBe(mail);
+    const f = parsePflegehilfe(umgebrochen);
+    expect(f.einwilligung?.zeitpunkt).toBe('03.09.2026 13:59 Uhr');
+    expect(f.einwilligung?.text).toContain('Datenschutzerklärung bestätigt am 03.09.2026 13:49 Uhr');
+    expect(f.kontakt.email).toBe('elke.preis@freenet.de');
+    expect(f.angaben.pflegegrad).toBe(1);
+    expect(f.unbekannt).toEqual([]);
+  });
+});
+
 describe('Pflegehilfe-Vokabeln aus dem Fall Epple (Registry #49)', () => {
   /* Die Portal-Mail kennt kein Mass fuer Nachteinsaetze („Erforderlich") und
    * schreibt Erfahrung als „Langjaehrig" — beides lief in `unbekannt[]` und
