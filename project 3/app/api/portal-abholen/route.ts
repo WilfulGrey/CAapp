@@ -551,9 +551,15 @@ const API_FENSTER_TAGE = 7;
 /* Portale, deren letzter Abruf scheiterte — nur dann wird der Sentinel nach
  * einem guten Abruf wieder auf 'erledigt' gesetzt. Sonst schriebe jeder
  * Takt eine Zeile, und der Admin (Realtime auf portal_api_log) laedt
- * jede Minute die ganze Lead-Liste neu. Modulzustand: nach einem Neustart
- * kostet es genau einen ueberfluessigen Schreibvorgang. */
+ * jede Minute die ganze Lead-Liste neu.
+ *
+ * Modulzustand ueberlebt keinen Neustart: faellt der Prozess ZWISCHEN
+ * Fehler und Heilung (Deploy nach Token-Rotation, 04.09. live gesehen),
+ * stuende der Sentinel fuer immer auf 'offen', obwohl das API laengst
+ * antwortet. Deshalb prueft der ERSTE gute Abruf je Prozess den Sentinel
+ * einmal in der Tabelle (ein SELECT je Prozessleben, nicht je Takt). */
 const apiZuletztFehler = new Set<string>();
+const sentinelGeprueft = new Set<string>();
 
 type ApiAusgang = { status: 'erledigt' | 'uebersprungen' | 'abgelehnt' | 'offen'; grund?: string; leadId?: string };
 
@@ -618,9 +624,18 @@ async function holeApiAb(cfg: Konfig, portal: string, db: SupabaseClient) {
 
   const zeilen = await apiExport(token, erstlauf ? undefined : new Date(Date.now() - API_FENSTER_TAGE * 86_400_000));
   // GET ok ⇒ Sentinel wieder gruen, falls er nach einem Ausfall auf 'offen' stand.
-  if (!trocken && (apiZuletztFehler.has(portal) || erstlauf)) {
-    await schreibeApiLog(db, portal, API_SENTINEL, { status: 'erledigt', grund: `Abruf ok (${zeilen.length} Zeilen)` });
-    apiZuletztFehler.delete(portal);
+  if (!trocken) {
+    let heilen = apiZuletztFehler.has(portal) || erstlauf;
+    if (!heilen && !sentinelGeprueft.has(portal)) {
+      const { data: s } = await db
+        .from('portal_api_log').select('status').eq('portal', portal).eq('extern_id', API_SENTINEL).maybeSingle();
+      heilen = s?.status === 'offen';
+    }
+    sentinelGeprueft.add(portal);
+    if (heilen) {
+      await schreibeApiLog(db, portal, API_SENTINEL, { status: 'erledigt', grund: `Abruf ok (${zeilen.length} Zeilen)` });
+      apiZuletztFehler.delete(portal);
+    }
   }
 
   const ergebnisse = zeilen
