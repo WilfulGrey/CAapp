@@ -220,6 +220,10 @@ async function registriereFehlmail(
           grund: grund ?? '',
           // Kappe wie beim zusatz-Archiv (Registry #42): Inhalt kommt von aussen.
           auszug: (roh || '').slice(0, 500),
+          /* Abgelehnte Mails komplett aufheben (Michał 04.09., Trageser uid 40:
+             die Mail war nach dem Lauf aus dem Postfach verschwunden, unser
+             500-Zeichen-Auszug war die einzige Kopie — ohne Kundendaten). */
+          ...(art === 'abgelehnt' ? { volltext: roh || '' } : {}),
           at: new Date().toISOString(),
         },
       });
@@ -448,7 +452,7 @@ async function arbeiteAb(cfg: Konfig, portal: string, client: ImapFlow, db: Supa
         const ergebnis = await verarbeite(cfg, portal, roh, csv);
         if (!ergebnis.ok) {
           if (ergebnis.dauerhaft) {
-            const leadId = await registriereFehlmail(db, portal, uid, mail, roh, 'abgelehnt', ergebnis.grund, ergebnis.email, ergebnis.name);
+            const leadId = await registriereFehlmail(db, portal, uid, mail, csv ? `${roh}\n\n--- CSV ---\n${csv.text}` : roh, 'abgelehnt', ergebnis.grund, ergebnis.email, ergebnis.name);
             ausgang = { status: 'abgelehnt', grund: ergebnis.grund, leadId };
           } else {
             ausgang = { status: 'offen', grund: ergebnis.grund };
