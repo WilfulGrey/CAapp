@@ -2,6 +2,7 @@ import { Lead } from './lead-management';
 import { Kalkulation, detectGenderFromName, usableNamePart as cleanNamePart } from './calculation';
 import { getEmailLayout } from './email-template';
 import { PORTAL_BASIS } from './portal-url';
+import { quelleBetreff } from './lead-quelle';
 
 // Eigennamen sauber großschreiben: jedes Wort + jeden Bindestrich-Teil
 // kapitalisieren. Namens-Partikel (von, van, de, zu, …) bleiben klein —
@@ -917,7 +918,7 @@ export function getTeamNotificationTemplate(
   };
 
   const emoji = statusEmojis[status as keyof typeof statusEmojis] || '📋';
-  const text = statusText[status as keyof typeof statusText] || 'Lead-Update';
+  let text = statusText[status as keyof typeof statusText] || 'Lead-Update';
 
   const kalkulation = lead.kalkulation as any;
   const eigenanteil = kalkulation?.eigenanteil
@@ -948,6 +949,12 @@ export function getTeamNotificationTemplate(
   };
   const quelleRoh = String(additionalData?.quelle ?? (lead as any).source ?? '').trim();
   const herkunft = HERKUNFT[quelleRoh] ?? (quelleRoh || 'unbekannt');
+  /* Herkunft in den Betreff (Martin, 03.09.2026): „Neuer Lead – Pflegehilfe.org"
+     statt „… Angebot angefordert". Gilt nur für den neuen Lead; bei
+     unbekannter Quelle bleibt der alte Betreff. `text` steht auch in der
+     Überschrift und in der Textfassung — alle drei ändern sich zusammen. */
+  const betreffZusatz = status === 'angebot_requested' ? quelleBetreff(quelleRoh) : null;
+  if (betreffZusatz) text = `Neuer Lead – ${betreffZusatz}`;
 
   const betreuungFuer = getLabel('betreuung_fuer');
   const pflegegrad = getAntwort('pflegegrad');
