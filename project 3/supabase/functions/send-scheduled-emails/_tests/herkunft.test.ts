@@ -23,6 +23,8 @@ Deno.test("eigene Quellen liefern keine Portal-Herkunft", () => {
 Deno.test("eingekaufter Lead: gepflegte Schreibweise statt Rohwert", () => {
   assertEquals(portalHerkunft("portal:pflegehilfe.org"), "Pflegehilfe");
   assertEquals(portalHerkunft("portal:pflegebund.eu"), "Pflegebund");
+  // API-Portal (Registry #50) — ohne TLD, sonst verlinkt Apple Mail.
+  assertEquals(portalHerkunft("portal:pflege-helfer24.de"), "Pflege-Helfer24");
 });
 
 Deno.test("Gross-/Kleinschreibung und Leerzeichen aus dem Parser stoeren nicht", () => {

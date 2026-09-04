@@ -13,10 +13,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { findOrCreateLead, logEvent } from '@/lib/lead-management';
-import { berechnePreis, parseCustomerName } from '@/lib/calculation';
+import { berechnePreis, parseCustomerName, generateToken, getTokenExpiry } from '@/lib/calculation';
 import { ergaenzeAngaben, PORTALE, PortalAngaben, PreisZeile } from '@/lib/portal-lead';
 import { scheduleEmail, flushScheduledEmails } from '@/lib/lead-mails';
-import { darfAngeschriebenWerden } from '@/lib/portal-schutz';
+import { darfAngeschriebenWerden, HOECHSTALTER_TAGE } from '@/lib/portal-schutz';
 import { sendEmail, getTeamNotificationTemplate } from '@/lib/email';
 
 /* Muss zur Allowlist in send-scheduled-emails/herkunft.ts passen: Edge
@@ -100,6 +100,49 @@ export async function POST(request: NextRequest) {
   try {
     const supabase = supabaseClient();
 
+    /* ─── Bestandskunden-Guard (Registry #50) ───────────────────────────
+     * findOrCreateLead dedupliziert per E-Mail, kennt aber nur die Status
+     * seiner statusOrder: fuer 'nicht_interessiert', 'betreuung_beauftragt'
+     * oder Unbekanntes fallen ALLE Vergleiche durch ⇒ neuer Lead + Mail 1
+     * + Onboarding an jemanden, der uns "kein Interesse" gesagt hat.
+     * Deshalb VOR dem Anlegen: nur bekannte, offene Status duerfen weiter
+     * (deny-by-default, wie ANSPRECHBARE_STATUS). Alles andere wird als
+     * uebersprungen gemeldet — der Abholer haengt das Ereignis an genau
+     * diesen Lead, der bezahlte Lead bleibt sichtbar.
+     *
+     * ilike statt eq: "Max.Mustermann@web.de" vs. gespeichertes
+     * "max.mustermann@web.de" wuerde sonst den ganzen Guard umgehen. Ab
+     * hier gilt die GESPEICHERTE Adresse als Identitaet. */
+    const { data: bestand } = await supabase
+      .from('leads')
+      .select('id, email, status, kalkulation, token, token_expires_at')
+      .ilike('email', email.replace(/[%_\\]/g, '\\$&'))
+      .order('created_at', { ascending: false })
+      .limit(1);
+    const vorhanden = bestand?.[0] as
+      | { id: string; email: string; status: string; kalkulation: any; token: string | null; token_expires_at: string | null }
+      | undefined;
+    const OFFENE_STATUS = ['info_requested', 'manuell_pruefen', 'angebot_requested', 'folge_einsatz'];
+    if (vorhanden && !OFFENE_STATUS.includes(vorhanden.status)) {
+      console.log(`Portal-Lead uebersprungen (${portal}): Bestandskunde ${vorhanden.status} (${vorhanden.email})`);
+      return NextResponse.json(
+        { ok: false, uebersprungen: true, grund: `Bestandskunde (${vorhanden.status}) — keine Mail 1` },
+        { status: 200 },
+      );
+    }
+    const kundenEmail = vorhanden?.email || email;
+
+    /* Hat der Kunde seine Antworten SELBST gegeben (Kostenrechner, oder ein
+       Portal, das alles lieferte: angenommene_felder leer), duerfen unsere
+       Annahmen sie nicht ueberschreiben — sonst sieht er im Portal einen
+       hoeheren Preis als den, den er kennt ("Ein Preis, der steigt, ist ein
+       Vertrauensschaden", portal-lead.ts). Dann bleibt die Kalkulation
+       stehen; nur die Portal-Details (PLZ, Gewicht …) kommen dazu. */
+    const echteAntworten = !!vorhanden
+      && vorhanden.status !== 'manuell_pruefen'
+      && !!vorhanden.kalkulation
+      && !(Array.isArray(vorhanden.kalkulation?.angenommene_felder) && vorhanden.kalkulation.angenommene_felder.length > 0);
+
     // Preistabelle EINMAL laden — die Wahl des teuersten Werts je fehlender
     // Kategorie gehoert in die Daten, nicht in den Code.
     const { data: preisZeilen } = await supabase
@@ -142,15 +185,68 @@ export async function POST(request: NextRequest) {
 
     const { vorname, nachname, anrede } = parseCustomerName(name);
 
-    const { lead, isNew } = await findOrCreateLead(email, 'angebot_requested', {
+    const { lead, isNew, isUpgrade } = await findOrCreateLead(kundenEmail, 'angebot_requested', {
       vorname: vorname || (nachname ? '' : name),
       nachname: nachname || undefined,
       anrede: anrede || undefined,
       telefon: telefon || undefined,
-      care_start_timing: body?.care_start_timing || undefined,
-      kalkulation,
+      care_start_timing: echteAntworten ? undefined : (body?.care_start_timing || undefined),
+      kalkulation: echteAntworten ? undefined : kalkulation,
       quelle: `portal:${portal}`,
     });
+
+    /* Kalkulation blieb stehen ⇒ die Portal-Details muessen trotzdem
+       ankommen: sie leben NUR in formularDaten, und das Onboarding gleich
+       unten liest sie von dort (PLZ → Location, Gewicht, Demenz, Kontext).
+       angenommene_felder: [] ⇒ Mail 1 sagt "uebernommen", nicht "vorsichtig
+       angenommen" — angenommen wurde ja nichts. */
+    if (echteAntworten) {
+      const alt = (lead.kalkulation ?? {}) as Record<string, unknown>;
+      const neu = {
+        ...alt,
+        formularDaten: { ...((alt.formularDaten as Record<string, unknown>) ?? {}), ...fdExtras },
+        angenommene_felder: [],
+      };
+      const { error: kalkErr } = await supabase.from('leads').update({ kalkulation: neu }).eq('id', lead.id);
+      if (kalkErr) console.error('Portal-Lead: Kalkulation-Ergaenzung fehlgeschlagen:', kalkErr.message);
+      else lead.kalkulation = neu;
+    }
+
+    /* Duplikat (Lead war schon angebot_requested/folge_einsatz): keine
+       zweite Mail 1 — der Kunde hat sie, und eine zweite trueg den Namen
+       des ERSTEN Portals und ggf. einen anderen Preis (Registry #47).
+       Ausnahme: die letzte Mail 1 ist aelter als die Einwilligungs-Grenze
+       (60 Tage) oder ging nie raus ⇒ der Kunde fragt wirklich neu (und
+       bekommt gerade Antworten von zwei Wettbewerbern) ⇒ Token erneuern,
+       wenn abgelaufen, und Mail 1 wie bei einer neuen Anfrage (Re-Submit-
+       Wortlaut waehlt send-scheduled-emails anhand der lead_events). */
+    let mail1 = isNew || isUpgrade;
+    let duplikatGrund: string | undefined;
+    if (!mail1) {
+      const cutoff = new Date(Date.now() - HOECHSTALTER_TAGE * 86_400_000).toISOString();
+      const { data: letzte } = await supabase
+        .from('lead_events')
+        .select('id')
+        .eq('lead_id', lead.id)
+        .eq('event_type', 'email_eingangsbestaetigung_sent')
+        .gte('created_at', cutoff)
+        .limit(1);
+      if (letzte && letzte.length > 0) {
+        duplikatGrund = 'Lead bereits vorhanden — keine Mail 1';
+      } else {
+        mail1 = true;
+        if (!lead.token || !lead.token_expires_at || new Date(lead.token_expires_at) < new Date()) {
+          const token = generateToken();
+          const token_expires_at = getTokenExpiry().toISOString();
+          const { error: tokErr } = await supabase
+            .from('leads')
+            .update({ token, token_expires_at, token_used: false })
+            .eq('id', lead.id);
+          if (tokErr) console.error('Portal-Lead: Token-Erneuerung fehlgeschlagen:', tokErr.message);
+          else { lead.token = token; lead.token_expires_at = token_expires_at; }
+        }
+      }
+    }
 
     /* Zwei getrennte Nachweise, beide append-only:
      *  - woher der Lead kam und was er gekostet hat
@@ -238,18 +334,23 @@ export async function POST(request: NextRequest) {
     }
 
     // Mail 1 sofort (delay 0) — identischer Weg wie beim Kostenrechner.
-    scheduleEmail(lead.id, email, 'eingangsbestaetigung', 0)
-      .then(async (r) => {
-        if (r.success) {
-          await logEvent(lead.id, 'email_eingangsbestaetigung_scheduled', { to: email, token: lead.token });
-          flushScheduledEmails();
-        } else {
-          console.error('Portal-Lead: Mail nicht geplant:', r.error);
-          await logEvent(lead.id, 'email_eingangsbestaetigung_schedule_failed', { to: email, error: r.error });
-        }
-      })
-      .catch((e) => console.error('schedule threw:', e));
+    if (mail1) {
+      scheduleEmail(lead.id, kundenEmail, 'eingangsbestaetigung', 0)
+        .then(async (r) => {
+          if (r.success) {
+            await logEvent(lead.id, 'email_eingangsbestaetigung_scheduled', { to: kundenEmail, token: lead.token });
+            flushScheduledEmails();
+          } else {
+            console.error('Portal-Lead: Mail nicht geplant:', r.error);
+            await logEvent(lead.id, 'email_eingangsbestaetigung_schedule_failed', { to: kundenEmail, error: r.error });
+          }
+        })
+        .catch((e) => console.error('schedule threw:', e));
+    } else {
+      console.log(`Portal-Lead Duplikat (${portal}): ${kundenEmail} — ${duplikatGrund}`);
+    }
 
+    // Team-Mail in JEDEM Zweig: der Lead hat Geld gekostet, das Team soll es sehen.
     const teamEmail = getTeamNotificationTemplate(lead, 'angebot_requested', { quelle: `portal:${portal}` });
     sendEmail('info@primundus.de', teamEmail).catch((e) => console.error('Team-Mail:', e));
 
@@ -257,6 +358,7 @@ export async function POST(request: NextRequest) {
       ok: true,
       lead_id: lead.id,
       neu: isNew,
+      ...(duplikatGrund ? { duplikat: true, grund: duplikatGrund } : {}),
       angenommene_felder: angenommen,
       eigenanteil: kalkulation.eigenanteil,
     });

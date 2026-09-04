@@ -24,6 +24,7 @@
 export const PORTAL_QUELLEN: Record<string, string> = {
   "pflegehilfe.org": "Pflegehilfe",
   "pflegebund.eu": "Pflegebund",
+  "pflege-helfer24.de": "Pflege-Helfer24",
 };
 
 export const PORTAL_PREFIX = "portal:";

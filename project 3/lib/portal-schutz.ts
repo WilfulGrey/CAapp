@@ -21,11 +21,13 @@
  *  Rechtsprechung zur Aktualitaet einer Werbeeinwilligung. */
 export const HOECHSTALTER_TAGE = 60;
 
-/* Status-Werte aus dem Lead-Point-Export. Bewusst eine ALLOWLIST: ein
- * unbekannter neuer Status bedeutet "nicht anschreiben", nicht
- * "wahrscheinlich schon ok". Leads ohne Status (z. B. die frische
- * Pflegehilfe-Mail) sind erlaubt — dort gibt es keine Vorgeschichte. */
-export const ANSPRECHBARE_STATUS = ['neu', 'versendet', 'kunde ruft zurück', 'kunde ruft zurueck'];
+/* Status-Werte aus dem Lead-Point-Export (Pflegebund) und der Partner-API
+ * (pflege-helfer24: "Aktiv" — Storniert / Stornierung ausstehend heisst
+ * "nicht anschreiben"). Bewusst eine ALLOWLIST: ein unbekannter neuer
+ * Status bedeutet "nicht anschreiben", nicht "wahrscheinlich schon ok".
+ * Leads ohne Status (z. B. die frische Pflegehilfe-Mail) sind erlaubt —
+ * dort gibt es keine Vorgeschichte. */
+export const ANSPRECHBARE_STATUS = ['neu', 'versendet', 'kunde ruft zurück', 'kunde ruft zurueck', 'aktiv'];
 
 export interface SchutzEingabe {
   /** Status beim Portal, falls der Export einen liefert. */
@@ -82,15 +84,29 @@ export function darfAngeschriebenWerden(
   return { ok: true };
 }
 
+/* ─── Portal-Flags: "1" = alle Portale, sonst Liste von Domains ──────────
+ *
+ * PORTAL_TESTPHASE und PORTAL_TROCKENLAUF galten bis 04.09. fuer ALLE
+ * eingekauften Portale auf einmal. Seit pflege-helfer24 dazukam, waehrend
+ * Pflegehilfe schon scharf laeuft, muss ein Portal allein in die Testphase
+ * koennen: Wert "pflege-helfer24.de" (Komma-Liste moeglich). "1" bleibt
+ * das alte "alle" — nichts Bestehendes aendert sich. */
+export function flagGiltFuer(flagWert: string | undefined, domain: string): boolean {
+  const wert = (flagWert ?? '').trim();
+  if (!wert) return false;
+  if (wert === '1') return true;
+  return wert.split(',').map((s) => s.trim().toLowerCase()).includes(domain.trim().toLowerCase());
+}
+
 /* ─── Testphase: Kundenmails an das Team umleiten ────────────────────────
  *
- * Solange PORTAL_TESTPHASE=1 gesetzt ist (Render-Env des Kostenrechners;
- * fuer die Edge Function als Supabase-Secret), gehen ALLE Kundenmails an
- * Leads aus eingekauften Portal-Mails (source "portal:<domain>") nicht an
- * den Kunden, sondern an das Team. Der Lead selbst traegt weiter die echte
- * Adresse — umgeleitet wird erst beim VERSAND, nichts wird verfaelscht.
- * Der Betreff nennt den eigentlichen Empfaenger, damit man beim Pruefen
- * sieht, wem die Mail gegolten haette.
+ * Solange PORTAL_TESTPHASE fuer das Portal gilt (Render-Env des
+ * Kostenrechners; fuer die Edge Function als Supabase-Secret), gehen ALLE
+ * Kundenmails an Leads aus diesem Portal (source "portal:<domain>") nicht
+ * an den Kunden, sondern an das Team. Der Lead selbst traegt weiter die
+ * echte Adresse — umgeleitet wird erst beim VERSAND, nichts wird
+ * verfaelscht. Der Betreff nennt den eigentlichen Empfaenger, damit man
+ * beim Pruefen sieht, wem die Mail gegolten haette.
  *
  * ACHTUNG: die Edge Function send-scheduled-emails hat eine KOPIE dieser
  * Logik (testphase.ts — Deno kann nicht aus lib/ importieren, gleiche Lage
@@ -101,8 +117,9 @@ export function testphaseUmleitung(
   lead: { source?: string | null; email?: string | null },
   flagWert: string | undefined,
 ): { empfaenger: string; betreffPraefix: string } | null {
-  if (flagWert !== '1') return null;
-  if (!(lead.source ?? '').toLowerCase().startsWith('portal:')) return null;
+  const source = (lead.source ?? '').toLowerCase();
+  if (!source.startsWith('portal:')) return null;
+  if (!flagGiltFuer(flagWert, source.slice('portal:'.length))) return null;
   return {
     empfaenger: TESTPHASE_EMPFAENGER,
     betreffPraefix: `[TESTPHASE → ${lead.email ?? '?'}] `,
