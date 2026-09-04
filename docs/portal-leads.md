@@ -198,17 +198,15 @@ Mailclients kann er nicht heilen — dann greifen die Annahme-Regeln und
 `⚠ nicht zugeordnet` im Log. Der verlässliche Test ist immer die
 Direktmail des Portals.
 
-**Direktmails sind HTML-only** (Registry #51, prod uid 40 Trageser 04.09.):
-mailparser erzeugt den Text aus dem HTML, klebt Tabellenzellen mit drei
-Leerzeichen zusammen und bricht bei ~80 Zeichen um — ein Label kann so
-über zwei Zeilen stehen („Zustimmung zur⏎Kontaktweitergabe: …"). `feld()`
-liest deshalb Label-Leerzeichen als beliebigen Whitespace, akzeptiert
-ein Label auch hinter einer Zellgrenze und schneidet den Wert an der
-nächsten Zellgrenze ab (sonst hinge „Das Beratungsgespräch wurde" am
-Datum und `parseDatum` läse nichts). Vorher: erste echte Direktmail
-abgelehnt mit „kein Einwilligungsnachweis", obwohl 7 Felder gelesen
-wurden — alle Mails davor waren Apple-Mail-Forwards (mit text/plain)
-oder Martins Klartext-Tests.
+**Direktmails des Portals** (Registry #51, prod uid 40/45/46, 04.09.): der
+text/plain-Teil von Pflegehilfe trägt HTML-Reste (`&#228;`, `<br/>`) und
+stellt beide Zustimmungen samt Beratungsgespräch in EINE Zeile, nur durch
+Leerzeichen getrennt. Der Parser dekodiert Entities/`<br>` in der
+Normalisierung und liest den Einwilligungs-Zeitstempel als DATUM hinter dem
+Label (`zeitstempel()`, Fallback auf zeilenweises `feld()`); Label-Leerzeichen
+gelten als beliebiger Whitespace. Vorher: alle drei Direktmails abgelehnt
+mit „kein Einwilligungsnachweis" — alle Mails davor waren Apple-Mail-Forwards
+oder Martins Klartext-Tests, die Direktform war nie durch den Parser gelaufen.
 
 ## API-Portal: pflege-helfer24.de (Registry #50)
 
