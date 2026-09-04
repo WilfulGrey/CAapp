@@ -257,22 +257,32 @@ async function verarbeite(
   portal: string,
   roh: string,
   /* CSV-Anhang, falls vorhanden: synthetischer Text ist dann die
-     DATEN-Quelle; der Mailtext liefert weiterhin die Einwilligung
-     (die steht nur dort) und dient als Fallback. */
+     DATEN-Quelle; der Mailtext liefert den Einwilligungs-Zeitstempel
+     (der steht nur dort, wenn ueberhaupt) und dient als Fallback. */
   csv?: { text: string; zusatz: Record<string, string> },
+  /** Datum der Mail — Zeitpunkt der Lieferung, wenn die Mail keinen
+      Einwilligungs-Zeitstempel traegt. */
+  mailDatum?: Date,
 ): Promise<PostErgebnis> {
   const textErgebnis = parsePflegehilfe(roh);
   const ergebnis = csv ? parsePflegehilfe(csv.text) : textErgebnis;
   const { kontakt, angaben, unbekannt } = ergebnis;
-  const einwilligung = textErgebnis.einwilligung;
 
-  /* Ohne Einwilligungsnachweis legt der Endpunkt nichts an — das hier
-     abzufangen spart einen Aufruf und macht den Grund im Log sichtbar.
-     dauerhaft: die Mail wird davon nie besser — abgelehnt, kein Retry
-     (frueher hielt genau so eine Mail den Lauf ewig auf 500, Registry #46). */
-  if (!einwilligung?.text || !einwilligung?.zeitpunkt) {
-    return { ok: false as const, dauerhaft: true, grund: 'kein Einwilligungsnachweis in der Mail', email: kontakt.email || undefined, name: kontakt.name || undefined };
-  }
+  /* Die Einwilligung ist KEIN Gate mehr (Entscheidung Michał 04.09., nach
+     drei abgelehnten echten Direktmails, Registry #51): ein bezahlter Lead
+     wird nie wegen eines nicht gefundenen Zeitstempels weggeworfen. Findet
+     der Parser den Stempel des Portals, bezeugen wir ihn; sonst bezeugen wir,
+     was wir wissen — Lieferung per Mail vom Portal, Datum der Mail — wie bei
+     der Partner-API (lib/portal-helfer24.ts). */
+  const lieferDatum = (mailDatum ?? new Date()).toISOString();
+  const einwilligung = textErgebnis.einwilligung ?? {
+    text:
+      `Lead per Mail von Verbund Pflegehilfe (${portal}) geliefert am ${lieferDatum}` +
+      (ergebnis.portal_lead_id ? ` (Anfragen-Nr. ${ergebnis.portal_lead_id})` : '') +
+      '; Kundeneinwilligung liegt gemäß Partnervereinbarung beim Portal (Zeitstempel in der Mail nicht gefunden).',
+    zeitpunkt: lieferDatum,
+  };
+
   if (!kontakt.email) {
     return { ok: false as const, dauerhaft: true, grund: 'keine Kundenadresse gefunden', name: kontakt.name || undefined };
   }
@@ -449,7 +459,7 @@ async function arbeiteAb(cfg: Konfig, portal: string, client: ImapFlow, db: Supa
 
       let ausgang: Ausgang;
       try {
-        const ergebnis = await verarbeite(cfg, portal, roh, csv);
+        const ergebnis = await verarbeite(cfg, portal, roh, csv, mail.date);
         if (!ergebnis.ok) {
           if (ergebnis.dauerhaft) {
             const leadId = await registriereFehlmail(db, portal, uid, mail, csv ? `${roh}\n\n--- CSV ---\n${csv.text}` : roh, 'abgelehnt', ergebnis.grund, ergebnis.email, ergebnis.name);

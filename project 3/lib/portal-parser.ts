@@ -97,19 +97,26 @@ export function kgZuBucket(kg: number): string | undefined {
  * "Bedarf" die Zeile "Bedarfsort: 39615 ..." und "Mobil" die Zeile
  * "Mobilität: ...". Das Label muss an einer Wortgrenze enden. */
 function feld(text: string, label: string): string | null {
-  /* Direktmails des Portals sind HTML-only; mailparser macht daraus Text
-   * und bricht bei ~80 Zeichen um, Tabellenzellen klebt er mit 3+ Leer-
-   * zeichen aneinander (prod uid 40 Trageser, 04.09.: "Uhr   Zustimmung zur
-   * \nKontaktweitergabe: 04.09.2026 …" ⇒ Label ueber zwei Zeilen, Zeile
-   * beginnt mitten in der Zelle). Deshalb: Leerzeichen im Label = beliebiger
-   * Whitespace (auch Umbruch), Label darf auch hinter einer Zellgrenze
-   * stehen, Wert endet an der naechsten Zellgrenze oder am Zeilenende.
-   * ponytail: 3 Leerzeichen als Zellgrenze — Freitext mit 3 Spaces wird
-   * abgeschnitten; erst dann auf echtes html-to-text umbauen. */
+  /* Leerzeichen im Label = beliebiger Whitespace: Direktmails koennen ein
+   * Label ueber einen Umbruch ziehen (mailparser-Text aus HTML). */
   const esc = label.replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/ /g, '\\s+');
-  const m = text.match(new RegExp(`(?:^[ \\t]*|[ \\t]{3,})${esc}(?![\\wäöüßÄÖÜ])[ \\t]*:?[ \\t]*(.+?)(?=[ \\t]{3,}|$)`, 'im'));
+  const m = text.match(new RegExp(`^[ \\t]*${esc}(?![\\wäöüßÄÖÜ])[ \\t]*:?[ \\t]*(.+)$`, 'im'));
   const wert = m?.[1]?.trim();
   return wert && wert.length > 0 ? wert : null;
+}
+
+/* Zeitstempel einer Zustimmung. Das Portal stampft ihn deutsch
+ * („04.09.2026 11:02 Uhr", Registry #41) und stellt in Direktmails beide
+ * Zustimmungen samt Beratungsgespraech in EINE Zeile (prod uid 45 Berg,
+ * 04.09.: „…erklärung: 04.09.2026 10:59 Uhr Zustimmung zur Kontaktweitergabe:
+ * 04.09.2026 11:02 Uhr Das Beratungsgespräch wurde …") — zeilenweises
+ * "Label: Wert" findet das zweite Label nicht und liest beim ersten Muell.
+ * Der Wert IST das Datum; alles danach gehoert zum naechsten Feld.
+ * Fallback auf feld() fuer andere Datumsformen (Fixture „25. April 08:35"). */
+function zeitstempel(text: string, label: string): string | null {
+  const esc = label.replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/ /g, '\\s+');
+  const m = text.match(new RegExp(`${esc}\\s*:?\\s*(\\d{1,2}\\.\\d{1,2}\\.\\d{4}(?:\\s+\\d{1,2}:\\d{2})?(?:\\s*Uhr)?)`, 'i'));
+  return m?.[1] ?? feld(text, label);
 }
 
 /** Wert gegen eine Tabelle pruefen — Treffer per enthaltenem Stichwort. */
@@ -136,6 +143,11 @@ export function parsePflegehilfe(text: string): ParseErgebnis {
    * repariert das bewusst NICHT — dann greifen Annahme-Regeln + unbekannt. */
   text = text
     .replace(/\u00AD/g, '')
+    /* Direktmails: der text/plain-Teil des Portals traegt HTML-Reste
+       („Langj&#228;hrig", „110 kg\r<br/>") — dekodieren, sonst landen echte
+       Werte in unbekannt[] (prod uid 45/46, 04.09.). */
+    .replace(/<br\s*\/?>/gi, '\n')
+    .replace(/&#(\d+);/g, (_, n) => String.fromCharCode(Number(n)))
     .split('\n')
     .map((zeile) => zeile.replace(/^[>\s]+/, ''))
     .join('\n');
@@ -270,8 +282,8 @@ export function parsePflegehilfe(text: string): ParseErgebnis {
   /* Der Einwilligungsnachweis, den wir protokollieren: das Portal hat die
    * Kontaktweitergabe an uns dokumentiert. Unser eigener Checkbox-Text
    * waere hier eine Faelschung (siehe api/portal-lead). */
-  const weitergabe = feld(text, 'Zustimmung zur Kontaktweitergabe');
-  const datenschutz = feld(text, 'Zustimmung zur Datenschutzerklärung');
+  const weitergabe = zeitstempel(text, 'Zustimmung zur Kontaktweitergabe');
+  const datenschutz = zeitstempel(text, 'Zustimmung zur Datenschutzerklärung');
 
   const budget = feld(text, 'Budgetrahmen')?.match(/(\d[\d.]*)/)?.[1];
 

@@ -141,28 +141,36 @@ describe('parsePflegehilfe — weitergeleitete Mail (Fwd)', () => {
   });
 });
 
-describe('parsePflegehilfe — Direktmail HTML-only, von mailparser umgebrochen (Registry #51)', () => {
-  /* Prod uid 40 (Trageser, 04.09.): die erste echte Direktmail des Portals
-   * hat keinen text/plain-Teil. mailparser erzeugt Text aus dem HTML, klebt
-   * Tabellenzellen mit 3 Leerzeichen zusammen und bricht bei ~80 Zeichen um —
-   * das Label "Zustimmung zur Kontaktweitergabe" stand ueber zwei Zeilen,
-   * der Parser fand keine Einwilligung, der Lead wurde abgelehnt. Muster
-   * 1:1 aus dem HTML der Mail Epple (uid 36) reproduziert. */
-  const umgebrochen = mail.replace(
+describe('parsePflegehilfe — Direktmail des Portals: Zustimmungen in EINER Zeile (Registry #51)', () => {
+  /* Prod uid 40/45/46 (Trageser, Berg, Wagner, 04.09.): die Direktmail von
+   * Pflegehilfe stellt beide Zustimmungen und das Beratungsgespräch in eine
+   * Zeile, nur durch Leerzeichen getrennt, mit Soft-Hyphen im Label. Der
+   * zeilenweise "Label: Wert"-Blick fand „Kontaktweitergabe" nicht und
+   * lehnte den Lead ab („kein Einwilligungsnachweis"). Zeile verbatim aus
+   * uid 45, Beraternamen ersetzt. */
+  const direkt = mail.replace(
     /Datenschutz\nZustimmung zur Datenschutzerklärung: 23\. April 19:59\nZustimmung zur Kontaktweitergabe: 25\. April 08:35/,
-    'Datenschutz\n\n   Zustimmung zur Datenschutz\u00ADerklärung: 03.09.2026 13:49 Uhr   Zustimmung zur\n' +
-      'Kontaktweitergabe: 03.09.2026 13:59 Uhr   Das Beratungsgespräch wurde\n' +
-      'am 03.09.2026 13:59 Uhr von Bayan Alokla geführt',
+    '*Datenschutz*\n\nZustimmung zur Datenschutz\u00ADerklärung: 04.09.2026 10:59 Uhr Zustimmung zur Kontaktweitergabe: 04.09.2026 11:02 Uhr Das Beratungsgespräch wurde  am 04.09.2026 11:02 Uhr   von Max Muster  geführt. ',
   );
 
-  it('Label ueber zwei Zeilen + Zellgrenzen: Einwilligung wird gelesen, Wert endet an der Zellgrenze', () => {
-    expect(umgebrochen).not.toBe(mail);
-    const f = parsePflegehilfe(umgebrochen);
-    expect(f.einwilligung?.zeitpunkt).toBe('03.09.2026 13:59 Uhr');
-    expect(f.einwilligung?.text).toContain('Datenschutzerklärung bestätigt am 03.09.2026 13:49 Uhr');
+  it('Einwilligung = das Datum hinter dem Label, nicht der Rest der Zeile', () => {
+    expect(direkt).not.toBe(mail);
+    const f = parsePflegehilfe(direkt);
+    expect(f.einwilligung?.zeitpunkt).toBe('04.09.2026 11:02 Uhr');
+    expect(f.einwilligung?.text).toContain('Datenschutzerklärung bestätigt am 04.09.2026 10:59 Uhr');
     expect(f.kontakt.email).toBe('elke.preis@freenet.de');
-    expect(f.angaben.pflegegrad).toBe(1);
     expect(f.unbekannt).toEqual([]);
+  });
+
+  it('HTML-Reste im text/plain des Portals (&#228;, <br/>) werden dekodiert', () => {
+    const f = parsePflegehilfe(mail.replace('Pflegeerfahrung: Grundkenntnisse', 'Pflegeerfahrung: Langj&#228;hrig\r<br/>'));
+    expect(f.angaben.erfahrung).toBe('sehr-erfahren');
+    expect(f.unbekannt).toEqual([]);
+  });
+
+  it('Label ueber einen Zeilenumbruch (mailparser-Text aus HTML) wird trotzdem gelesen', () => {
+    const f = parsePflegehilfe(mail.replace('Zustimmung zur Kontaktweitergabe:', 'Zustimmung zur\nKontaktweitergabe:'));
+    expect(f.einwilligung?.zeitpunkt).toBe('25. April 08:35');
   });
 });
 
