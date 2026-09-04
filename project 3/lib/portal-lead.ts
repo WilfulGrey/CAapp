@@ -136,7 +136,9 @@ export function istEingekauft(source?: string | null): boolean {
 export function quellenName(source?: string | null): string {
   if (!source) return 'Kostenrechner';
   if (!istEingekauft(source)) {
-    return source === 'pria-chat' ? 'Pria-Chat' : 'Kostenrechner';
+    if (source === 'pria-chat' || source.startsWith('chat:')) return 'Pria-Chat';
+    if (source.startsWith('website:')) return 'Primundus.de';
+    return 'Kostenrechner';
   }
   const domain = source.slice('portal:'.length).toLowerCase();
   const bekannt = PORTALE.find((p) => p.domain === domain);

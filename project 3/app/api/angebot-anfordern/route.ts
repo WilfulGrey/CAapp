@@ -10,6 +10,7 @@ import {
 import { testphaseUmleitung } from '@/lib/portal-schutz';
 import { parseCustomerName } from '@/lib/calculation';
 import { scheduleEmail, flushScheduledEmails } from '@/lib/lead-mails';
+import { quelleBereinigen } from '@/lib/lead-quelle';
 
 function getSupabaseClient() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -51,6 +52,7 @@ async function handlePost(request: NextRequest) {
       acceptPrivacy,
       adParams,
       quelle,
+      websitePfad,
     }: {
       vorname?: string;
       email: string;
@@ -63,7 +65,13 @@ async function handlePost(request: NextRequest) {
          (⇒ 'rechner'), der Pria-Chat sendet 'pria-chat'. Landet auf dem Lead
          und in der Team-Mail — sonst sieht niemand, welche Variante gewinnt. */
       quelle?: string;
+      /* Pfad der verweisenden Website-Seite (nur bei quelle website:…). */
+      websitePfad?: string | null;
     } = body;
+    /* Der Client schickt die Quelle, der Server entscheidet, was gültig ist —
+       sonst landet beliebiger Text in leads.source (Martin, 04.09.2026). */
+    const quelleSicher = quelleBereinigen(quelle) ?? 'rechner';
+    const websitePfadSicher = typeof websitePfad === 'string' && /^\/[a-z0-9\-\/]{0,80}$/i.test(websitePfad) ? websitePfad : null;
 
     // Google-Klick-IDs für den späteren Offline-Conversion-Import
     // (docs/google-ads-tracking.md). Strikt allowlisted + gekappt — der
@@ -135,7 +143,7 @@ async function handlePost(request: NextRequest) {
         telefon,
         care_start_timing: careStartTiming,
         kalkulation,
-        quelle,
+        quelle: quelleSicher,
       }
     );
 
@@ -233,7 +241,7 @@ async function handlePost(request: NextRequest) {
     // nach Versand der Eingangsbestätigung gestartet.
 
     if (shouldSendMails) {
-      const teamEmail = getTeamNotificationTemplate(lead, 'angebot_requested', { quelle });
+      const teamEmail = getTeamNotificationTemplate(lead, 'angebot_requested', { quelle: quelleSicher, websitePfad: websitePfadSicher });
       sendEmail('info@primundus.de', teamEmail)
         .then(async (r) => {
           if (r.success) {

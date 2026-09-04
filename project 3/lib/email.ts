@@ -2,7 +2,7 @@ import { Lead } from './lead-management';
 import { Kalkulation, detectGenderFromName, usableNamePart as cleanNamePart } from './calculation';
 import { getEmailLayout } from './email-template';
 import { PORTAL_BASIS } from './portal-url';
-import { quelleBetreff } from './lead-quelle';
+import { quelleBetreff, websiteHerkunftLabel } from './lead-quelle';
 
 // Eigennamen sauber großschreiben: jedes Wort + jeden Bindestrich-Teil
 // kapitalisieren. Namens-Partikel (von, van, de, zu, …) bleiben klein —
@@ -944,11 +944,21 @@ export function getTeamNotificationTemplate(
      Folgemails steht nur noch die zweite zur Verfügung). */
   const HERKUNFT: Record<string, string> = {
     'pria-chat': 'Chat mit Pria · /sofortangebot',
+    'chat:sofortangebot': 'Chat mit Pria · /sofortangebot',
+    'chat:kosten-berechnen': 'Chat mit Pria · /kosten-berechnen',
     'rechner': 'Kostenrechner-Formular · Startseite',
+    'rechner:kosten-berechnen': 'Kostenrechner-Formular · /kosten-berechnen',
+    'rechner:sofortangebot': 'Kostenrechner-Formular · /sofortangebot',
     'kostenrechner-result': 'Kostenrechner-Formular · Startseite',
   };
   const quelleRoh = String(additionalData?.quelle ?? (lead as any).source ?? '').trim();
-  const herkunft = HERKUNFT[quelleRoh] ?? (quelleRoh || 'unbekannt');
+  /* Lesbar statt Rohwert (Martin, 04.09.2026: „Die genaue Unterseite kann
+     dann in der Mail stehen"): Website mit Unterseite, Portale mit Namen. */
+  const herkunft = quelleRoh.startsWith('website:')
+    ? websiteHerkunftLabel(quelleRoh, (additionalData as any)?.websitePfad)
+    : quelleRoh.startsWith('portal:')
+      ? `Portal ${quelleRoh.slice('portal:'.length).charAt(0).toUpperCase()}${quelleRoh.slice('portal:'.length + 1)}`
+      : (HERKUNFT[quelleRoh] ?? (quelleRoh || 'unbekannt'));
   /* Herkunft in den Betreff (Martin, 03.09.2026): „Neuer Lead – Pflegehilfe.org"
      statt „… Angebot angefordert". Gilt nur für den neuen Lead; bei
      unbekannter Quelle bleibt der alte Betreff. `text` steht auch in der

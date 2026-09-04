@@ -4,7 +4,7 @@ import { useState, useEffect, useRef, useMemo } from "react";
 import { useCalculator, formatEuro } from "@/lib/calculator-context";
 import { CircleCheck as CheckCircle2, Phone } from "lucide-react";
 import Image from "next/image";
-import { analytics, variantenSeite } from "@/lib/analytics";
+import { analytics, variantenSeite, websiteHerkunft } from "@/lib/analytics";
 import { cookieConsent } from "@/lib/cookie-consent";
 import { scrollToCalculator, isCalculatorAligned, OPEN_CALCULATOR_EVENT } from "@/lib/scroll-to-calculator";
 import { useFormTracking } from "@/hooks/use-form-tracking";
@@ -641,9 +641,14 @@ export function MultiStepForm({ mode = 'inline' }: MultiStepFormProps = {}) {
           // Varianten-Weiche liefert alle drei unter „/" aus, deshalb zählt
           // die Variante aus dem Cookie — nicht der Pfad (analytics.ts).
           quelle: (() => {
+            // Von primundus.de gekommen? Dann zählt die Website als Quelle
+            // (Martin, 04.09.: Betreff „Primundus.de", Unterseite in der Mail).
+            const web = websiteHerkunft();
+            if (web) return `website:${web.src}`;
             const seite = variantenSeite();
             return seite === '/' ? 'rechner' : `rechner:${seite.replace(/^\//, '')}`;
           })(),
+          websitePfad: websiteHerkunft()?.pfad ?? null,
           kalkulation: {
             ...kalkulation,
             formularDaten,
