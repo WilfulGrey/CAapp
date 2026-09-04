@@ -2,7 +2,7 @@ import { Lead } from './lead-management';
 import { Kalkulation, detectGenderFromName, usableNamePart as cleanNamePart } from './calculation';
 import { getEmailLayout } from './email-template';
 import { PORTAL_BASIS } from './portal-url';
-import { quelleBetreff } from './lead-quelle';
+import { quelleBetreff, websiteHerkunftLabel } from './lead-quelle';
 
 // Eigennamen sauber großschreiben: jedes Wort + jeden Bindestrich-Teil
 // kapitalisieren. Namens-Partikel (von, van, de, zu, …) bleiben klein —
@@ -948,7 +948,9 @@ export function getTeamNotificationTemplate(
     'kostenrechner-result': 'Kostenrechner-Formular · Startseite',
   };
   const quelleRoh = String(additionalData?.quelle ?? (lead as any).source ?? '').trim();
-  const herkunft = HERKUNFT[quelleRoh] ?? (quelleRoh || 'unbekannt');
+  const herkunft = quelleRoh.startsWith('website:')
+    ? websiteHerkunftLabel(quelleRoh, (additionalData as any)?.websitePfad)
+    : (HERKUNFT[quelleRoh] ?? (quelleRoh || 'unbekannt'));
   /* Herkunft in den Betreff (Martin, 03.09.2026): „Neuer Lead – Pflegehilfe.org"
      statt „… Angebot angefordert". Gilt nur für den neuen Lead; bei
      unbekannter Quelle bleibt der alte Betreff. `text` steht auch in der
