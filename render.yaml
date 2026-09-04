@@ -153,14 +153,24 @@ services:
         sync: false
       - key: PORTAL_IMAP_HOST
         value: imap.ionos.de
-      # Erst-Inbetriebnahme: "1" liest und protokolliert, ohne Leads
-      # anzulegen oder Kundenmails auszuloesen. Nach der Sichtprobe leeren.
-      # Bewusst sync:false (nicht value:"1") — der Blueprint-Sync wuerde
-      # ein value bei jedem Sync zurueck auf Trockenlauf setzen.
+      # API-Portal pflege-helfer24.de (Partner-API statt Postfach): Token aus
+      # dem Partner-Portal → "API-Integration". Fehlt er, wird das Portal
+      # uebersprungen. ACHTUNG: die API ist EINE gemeinsame Quelle — auf
+      # Staging nur waehrend eines Tests setzen, danach entfernen (sonst
+      # verarbeiten beide Umgebungen dieselben bezahlten Leads).
+      - key: PFLEGEHELFER24_API_TOKEN
+        sync: false
+      # Erst-Inbetriebnahme: liest und protokolliert, ohne Leads anzulegen
+      # oder Kundenmails auszuloesen. "1" = alle Portale, oder Domain-Liste
+      # ("pflege-helfer24.de") fuer EIN Portal, waehrend die anderen scharf
+      # laufen. Nach der Sichtprobe leeren. Bewusst sync:false (nicht
+      # value:"1") — der Blueprint-Sync wuerde ein value bei jedem Sync
+      # zurueck auf Trockenlauf setzen.
       - key: PORTAL_TROCKENLAUF
         sync: false
-      # Testphase: "1" = Kundenmails der Portal-Leads gehen ans Team
-      # (info@ + martin@mamamia.app) statt an den Kunden. Zusaetzlich als
+      # Testphase: Kundenmails der Portal-Leads gehen ans Team (info@ +
+      # martin@mamamia.app) statt an den Kunden. "1" = alle Portale, oder
+      # Domain-Liste ("pflege-helfer24.de") fuer EIN Portal. Zusaetzlich als
       # Supabase-Secret setzen (send-scheduled-emails liest die eigene Env).
       # Nach der Testphase BEIDE leeren. Siehe docs/portal-leads.md.
       - key: PORTAL_TESTPHASE

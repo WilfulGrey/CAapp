@@ -1,42 +1,51 @@
-# Eingekaufte Leads (Pflegehilfe, Pflegebund)
+# Eingekaufte Leads (Pflegehilfe, Pflegebund, Pflege-Helfer24)
 
 Zweiter Weg in dieselbe Strecke: nicht der Kunde füllt den Kostenrechner
 aus, sondern wir kaufen seine Anfrage bei einem Portal. Ab dem Lead läuft
 alles wie immer — Preis, Token, Kundenportal, Mail 1.
 
+Zwei Lieferwege, EIN Eingang: Pflegehilfe/Pflegebund schicken Mails in
+ein Postfach; pflege-helfer24.de liefert über eine **Partner-API** (kein
+Postfach). Beide enden im selben `POST /api/portal-lead`.
+
 ## Der Weg einer Anfrage
 
 ```
-Portal-Mail  →  Postfach        →  pg_cron (jede Minute, Supabase)
-                pflegehilfe@       POST /api/portal-abholen (Bearer)
-                primundus.de       app/api/portal-abholen/route.ts
-                                        │  ~1s IMAP-Poll (READ-ONLY)
-                                        ▼
-                              UID-Abgleich mit portal_mail_log:
-                              nur UIDs ohne Eintrag oder 'offen'
-                                        │
-                                        ▼
-                              CSV-Anhang der Mail (ERSTE Quelle)
-                              lib/portal-csv.ts → synthetischer Text
-                                        │
-                                        ▼
-                                   lib/portal-parser.ts
-                                   liest "Label: Wert"
-                                   (Mailtext: Einwilligung + Fallback)
-                                        │
-                                        ▼  (Loopback im selben Prozess)
-                            POST /api/portal-lead   (x-portal-key)
-                                        │
-                    ┌───────────────────┼───────────────────┐
-                    ▼                   ▼                   ▼
-              Schutzregeln         berechnePreis      scheduleEmail
-              portal-schutz.ts     + Annahmen         Mail 1, sofort
-                                   portal-lead.ts
-                                        │
-                                        ▼
-                              Ausgang → portal_mail_log
-                              erledigt / uebersprungen /
-                              abgelehnt / offen  (Registry #47)
+                         pg_cron (jede Minute, Supabase)
+                         POST /api/portal-abholen (Bearer)
+                         app/api/portal-abholen/route.ts
+                     ┌───────────────┴────────────────┐
+  Portal-Mail        ▼                                ▼   pflege-helfer24.de
+  → Postfach   ~1s IMAP-Poll (READ-ONLY)     GET api_export (Bearer-Token,
+  pflegehilfe@       │                       Timeout 15s, Fenster 7 Tage)
+  primundus.de       ▼                                │
+           UID-Abgleich portal_mail_log      Abgleich portal_api_log
+           nur UIDs ohne Eintrag / 'offen'   (portal, Lead-UUID); Erstlauf:
+                     │                       alles von VOR heute = altbestand
+                     ▼                                │
+           CSV-Anhang (ERSTE Quelle)                  ▼
+           lib/portal-csv.ts → Text          lib/portal-helfer24.ts
+                     │                       Spalten per NAME, exakte
+                     ▼                       Auswahlwerte → Body
+           lib/portal-parser.ts                       │
+           "Label: Wert" (+ Einwilligung)             │
+                     └───────────────┬────────────────┘
+                                     ▼  (Loopback im selben Prozess)
+                         POST /api/portal-lead   (x-portal-key)
+                                     │
+             ┌───────────────────────┼───────────────────────┐
+             ▼                       ▼                       ▼
+     Bestandskunden-Guard       Schutzregeln            berechnePreis
+     (Registry #50)             portal-schutz.ts        + Annahmen
+     kein Lead, keine Mail 1                            portal-lead.ts
+     für nicht_interessiert,                                 │
+     vertrag_abgeschlossen …                                 ▼
+                                                    scheduleEmail Mail 1
+                                                    (nicht bei Duplikat)
+                                     │
+                                     ▼
+                 Ausgang → portal_mail_log / portal_api_log
+                 erledigt / uebersprungen / abgelehnt / offen
 ```
 
 Im Admin erscheint der Lead unter **Leads** mit eigenem Reiter je Portal
@@ -94,7 +103,8 @@ Die Zugangsdaten liegen außerhalb des Repos und dienen nur dem Lesen.
 
 ## Scharfschalten
 
-**Schritt 1 — Trockenlauf.** `PORTAL_TROCKENLAUF=1` im Render-Dashboard
+**Schritt 1 — Trockenlauf.** `PORTAL_TROCKENLAUF=1` (alle) bzw.
+`PORTAL_TROCKENLAUF=<domain>` (nur dieses Portal) im Render-Dashboard
 des Kostenrechners setzen (+ Redeploy): die Route liest, parst und loggt
 in die Konsole, legt aber keinen Lead an, löst keine Kundenmail aus und
 schreibt NICHTS in `portal_mail_log` (auch keinen Seed — der passiert
@@ -105,11 +115,14 @@ pro Mail, wie viele Felder erkannt wurden. Eine Zeile `⚠ nicht zugeordnet`
 bedeutet: das Portal hat seine Vorlage geändert — erst den Parser
 nachziehen, nicht scharfschalten.
 
-**Schritt 2 — Testphase (Mails ans Team).** `PORTAL_TESTPHASE=1` setzen —
+**Schritt 2 — Testphase (Mails ans Team).** `PORTAL_TESTPHASE` setzen —
 an ZWEI Stellen: Render-Env des Kostenrechners (+ Redeploy) UND als
-Supabase-Secret (`npx supabase secrets set PORTAL_TESTPHASE=1
+Supabase-Secret (`npx supabase secrets set PORTAL_TESTPHASE=<wert>
 --project-ref <ref>` — die Edge Function send-scheduled-emails liest ihre
-eigene Env, ohne Redeploy wirksam). Ab dann läuft die Strecke SCHARF
+eigene Env, ohne Redeploy wirksam). Wert `1` = alle Portale; **Domain-Liste**
+(`pflege-helfer24.de`) = nur dieses Portal, die anderen laufen scharf
+weiter (Registry #50 — so ging Pflege-Helfer24 in die Testphase, während
+Pflegehilfe schon live war). Ab dann läuft die Strecke SCHARF
 (Lead, Preis, Ereignisse), aber **jede Kundenmail eines Portal-Leads geht
 an `info@mamamia.app` + `martin@mamamia.app`** statt an den Kunden; der
 Betreff nennt den eigentlichen Empfänger (`[TESTPHASE → kunde@…]`). Der
@@ -120,6 +133,25 @@ Lead behält die echte Adresse — umgeleitet wird nur der Versand
 **Schritt 3 — scharf.** `PORTAL_TROCKENLAUF` und `PORTAL_TESTPHASE`
 (beide Stellen!) leeren. Ab dann bekommt jeder eingehende Lead automatisch
 Mail 1, ohne dass ein Mensch draufschaut.
+
+**Bestandskunden bekommen keine zweite Mail 1 (Registry #50).** Der
+Eingang prüft VOR dem Anlegen, ob die Adresse schon einen Lead hat
+(case-insensitiv). Nur offene, bekannte Status (`info_requested`,
+`manuell_pruefen`, `angebot_requested`, `folge_einsatz`) laufen weiter —
+`nicht_interessiert`, `vertrag_abgeschlossen`, `betreuung_beauftragt` und
+alles Unbekannte werden als `uebersprungen` gemeldet und hängen als
+Ereignis am bestehenden Lead (sichtbar, keine Mail, kein Onboarding). Ein
+Lead, der schon `angebot_requested` ist (dieselbe Anfrage über ein zweites
+Portal gekauft), bekommt **keine zweite Mail 1** — sie trüge den Namen des
+ersten Portals und ggf. einen anderen Preis; im Protokoll steht `erledigt`
+mit Grund „Lead bereits vorhanden — keine Mail 1", im Admin sichtbar.
+Ausnahme: liegt die letzte Mail 1 länger als 60 Tage zurück (oder ging
+nie raus), fragt der Kunde wirklich neu — dann Token erneuern, Mail 1 wie
+bei einer neuen Anfrage. Hat der Kunde seine Antworten selbst gegeben
+(Kostenrechner), überschreiben unsere Annahmen sie NICHT; nur die
+Portal-Details (PLZ, Gewicht, Demenz …) kommen dazu. Die Team-Mail geht in
+jedem Fall. Ein hochgestufter Lead (`info_requested` → Portal) wechselt
+die `source` auf das Portal — er ist ab jetzt eingekauft.
 
 **CSV zuerst.** Pflegehilfe hängt an jede Lead-Mail eine CSV mit dem
 VOLLEN Datensatz (Name, Telefon, Pflegegrad, Mobilität, Gewicht,
@@ -166,6 +198,53 @@ Mailclients kann er nicht heilen — dann greifen die Annahme-Regeln und
 `⚠ nicht zugeordnet` im Log. Der verlässliche Test ist immer die
 Direktmail des Portals.
 
+## API-Portal: pflege-helfer24.de (Registry #50)
+
+Kein Postfach — der Abholer holt im selben Takt (nach den Postfächern)
+`GET https://pflege-helfer24.de/partner_portal/leads/api_export` mit
+`Authorization: Bearer <PFLEGEHELFER24_API_TOKEN>` (Token im Partner-Portal
+→ „API-Integration"; Doku hinter dem Partner-Login:
+`https://pflege-helfer24.de/partner_portal/api/docs`).
+
+- Antwort `{ headers, data }` — Spalten IMMER per **Name** (Spalten, die
+  für alle Zeilen leer wären, fehlen; `"N/A"` = kein Wert). Mapper:
+  `lib/portal-helfer24.ts`, Auswahlfelder als **exakte** Werte (geschlossene
+  Listen laut Feld-Referenz); fremde Werte → `⚠ nicht zugeordnet` im Log
+  und Annahme, bewusst nicht abgebildete (z. B. „Nachtschichten: Ja" — sagt
+  nicht wie oft) → still Annahme.
+- Startdatum ab 6 Monaten → `care_start_timing = spaeter` (unser
+  Legacy-Wert: Portal „zu einem späteren Zeitpunkt", Mamamia +60 Tage).
+- Einwilligung: die API liefert keine — laut Nutzungsbedingungen liegt
+  sie beim Portal; wir protokollieren die Lieferung (Lead-ID, Leadtyp,
+  Liefer Datum) als Nachweis, `zeitpunkt` = Liefer Datum (Entscheidung
+  Michał 04.09.).
+- Gedächtnis: **`portal_api_log`** (PK `portal, extern_id` = Lead-UUID),
+  Statusse wie `portal_mail_log`. **Erstlauf** (Tabelle leer für das
+  Portal): alle Leads holen, die von **vor heute** (Berlin) als
+  `altbestand` registrieren — in EINEM Insert mit dem Sentinel
+  `__seed__` — und nur die von heute verarbeiten („pomijaj starsze niż z
+  dzisiaj"). Danach Fenster **7 Tage** (`?timestamp`): was während eines
+  Ausfalls kam, holt sich der nächste Lauf selbst; `offen`-Zeilen älter
+  als 7 Tage kommen NICHT mehr zurück (Badge im Admin sagt das).
+- Ein GET-Fehler (401 Token rotiert, 429, Timeout) färbt den Lauf **nicht**
+  rot — nichts liegt, und einen Dauer-500 sieht niemand (Registry #36/#46).
+  Sichtbar wird er über die Sentinel-Zeile `__api__` (`offen` mit HTTP-
+  Grund; `erledigt` nach dem nächsten guten Abruf) im Admin-Abschnitt
+  „API pflege-helfer24.de — Leads ohne Lead".
+- Status `Aktiv` ist ansprechbar; `Storniert` / `Stornierung *` →
+  `uebersprungen` (terminal). Produkt ≠ `24h-Pflege` → `uebersprungen`.
+- Storno-API (`POST …/cancellation_requests`) bewusst NICHT angebunden.
+- **Die API ist EINE gemeinsame Quelle.** Anders als ein Postfach, das nur
+  eine Umgebung liest, sehen Staging und Prod dieselben bezahlten Leads:
+  den Token auf Staging nur für einen Test setzen und danach entfernen.
+
+Einen Lead von Hand erneut anstoßen:
+
+```sql
+update portal_api_log set status = 'offen', updated_at = now()
+ where portal = 'pflege-helfer24.de' and extern_id = '<Lead-UUID>';
+```
+
 ## Environment (Render-Dashboard des Kostenrechners)
 
 | Variable | Zweck |
@@ -173,8 +252,10 @@ Direktmail des Portals.
 | `PORTAL_LEAD_KEY` | Auth des Eingangs `/api/portal-lead`; fehlt er, antwortet der 503 |
 | `PFLEGEHILFE_USER` / `_PASS` | Postfach. Fehlt eines, wird das Portal übersprungen |
 | `PFLEGEBUND_USER` / `_PASS` | dito |
+| `PFLEGEHELFER24_API_TOKEN` | Partner-API pflege-helfer24.de. Fehlt er, wird das Portal übersprungen. **Staging: nur zum Test, danach entfernen** |
 | `PORTAL_IMAP_HOST` | `imap.ionos.de` |
-| `PORTAL_TROCKENLAUF` | `1` = nur lesen (siehe oben) |
+| `PORTAL_TROCKENLAUF` | `1` = alle Portale nur lesen, **oder Domain-Liste** (`pflege-helfer24.de`) für ein Portal allein |
+| `PORTAL_TESTPHASE` | `1` = alle Portale, **oder Domain-Liste** — Kundenmails dieses Portals ans Team (auch als Supabase-Secret!) |
 | `PORTAL_LEAD_URL` | optionaler Override des Loopback-Ziels; normal NICHT gesetzt |
 
 Der Takt kommt aus pg_cron: neues Vault-Secret `kostenrechner_url`
@@ -243,16 +324,18 @@ Kostenrechners** (`[portal-abholer]`) und in `portal_mail_log`.
 
 **Drei Stellen**, alle zusammen pflegen:
 
-1. `lib/portal-lead.ts` — `PORTALE`. Diese Liste speist Eingang, Abholer
-   und Admin-Reiter; dort genügt die eine Zeile.
+1. `lib/portal-lead.ts` — `PORTALE` mit `abholung: 'imap' | 'api'`. Diese
+   Liste speist Eingang, Abholer und Admin-Reiter; dort genügt die eine
+   Zeile. (Ein zweites API-Portal bräuchte zusätzlich einen eigenen Mapper
+   wie `portal-helfer24.ts` und einen Token-Namen in `holeApiAb`.)
 2. `send-scheduled-emails/herkunft.ts` — `PORTAL_QUELLEN`, Anzeigename
    **ohne TLD**. Muss doppelt stehen, weil die Edge Function (Deno) keinen
    Code mit der Next-App teilen kann. Fehlt das Portal hier, bekommt der
    Kunde die normale Mail statt der Portal-Fassung.
 3. `render.yaml` (Block `kostenrechner-beta`) + Render-Dashboard —
-   Zugangsdaten des neuen Postfachs. Die Namen leitet die Abholer-Route
-   aus der Domain ab: `pflegehilfe.org` → `PFLEGEHILFE_USER` /
-   `PFLEGEHILFE_PASS`.
+   Zugangsdaten des neuen Postfachs (bzw. API-Token). Die Postfach-Namen
+   leitet die Abholer-Route aus der Domain ab: `pflegehilfe.org` →
+   `PFLEGEHILFE_USER` / `PFLEGEHILFE_PASS`.
 
 Nicht nachzutragen: der Reiter im Admin und die Allowlist des Eingangs —
 beide kommen aus `PORTALE`.
@@ -265,10 +348,12 @@ jedem Merge — nicht mehr als eigenständige Deno-Skripte (die brachen den
 `next build` beider Kostenrechner-Slots, Registry #38):
 
 ```bash
-npx vitest run src/__tests__/portalLead.test.ts src/__tests__/portalParser.test.ts src/__tests__/portalMailLog.test.ts
+npx vitest run src/__tests__/portalLead.test.ts src/__tests__/portalParser.test.ts src/__tests__/portalMailLog.test.ts src/__tests__/portalHelfer24.test.ts src/__tests__/portalSchutz.test.ts
 ```
 
-`portalParser.test.ts` (liest die Portal-Mail), `portalLead.test.ts`
+`portalHelfer24.test.ts` (API-Zeile → Body: Spalten per Name, exakte
+Auswahlwerte, `spaeter`, falsches Produkt, Einwilligung), `portalSchutz.test.ts`
+(Testphase per Domain, `Aktiv`), `portalParser.test.ts` (liest die Portal-Mail), `portalLead.test.ts`
 (Lücken zum teureren Wert füllen + Admin-Reiter via `reiterFuer` aus
 `lib/portal-lead.ts` — die Seite ruft dieselbe Funktion auf, der Test
 prüft keine Kopie), `portalMailLog.test.ts` (welche UIDs ein Lauf

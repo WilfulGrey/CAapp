@@ -82,9 +82,15 @@ export function ergaenzeAngaben(
    * aber Pflegegeld und Entlastungsbudget — unterm Strich sinkt der
    * Eigenanteil, den der Kunde in der Mail sieht. Ohne Angabe deshalb 0:
    * keine Zuschuesse, hoechster Eigenanteil, und die Mail schreibt
-   * "Nicht angegeben" statt einer erfundenen Zahl. */
-  const grad = Number(teil.pflegegrad);
-  if (Number.isFinite(grad) && grad > 0) {
+   * "Nicht angegeben" statt einer erfundenen Zahl.
+   *
+   * Ein EXPLIZITES 0 ("Keinen", pflege-helfer24) ist eine Kundenangabe und
+   * gehoert NICHT in `angenommen` — sonst behauptet Mail 1 "vorsichtig
+   * angenommen" bei etwas, das der Kunde selbst gesagt hat (Klasse
+   * Registry #13e: 0 ist falsy). */
+  const roh = teil.pflegegrad as unknown;
+  const grad = roh === undefined || roh === null || roh === '' ? NaN : Number(roh);
+  if (Number.isFinite(grad) && grad >= 0) {
     daten.pflegegrad = grad;
   } else {
     daten.pflegegrad = 0;
@@ -119,11 +125,18 @@ export function ergaenzeAngaben(
  * Der Anzeigename traegt hier die volle Domain: im Admin unterscheidet
  * sie die Quellen eindeutig, und intern verlinkt nichts. In der KUNDEN-
  * mail steht er ohne TLD (herkunft.ts) — dort machte Apple Mail einen
- * Link daraus und schickte den Kunden zurueck zum Portal. */
+ * Link daraus und schickte den Kunden zurueck zum Portal.
+ *
+ * `abholung` sagt dem Abholer, WOHER die Leads kommen: 'imap' = Postfach
+ * (Zugang <PRAEFIX>_USER/_PASS), 'api' = Partner-API des Portals
+ * (lib/portal-helfer24.ts, Token PFLEGEHELFER24_API_TOKEN). */
 export const PORTALE = [
-  { domain: 'pflegehilfe.org', name: 'Pflegehilfe.org' },
-  { domain: 'pflegebund.eu', name: 'Pflegebund.eu' },
+  { domain: 'pflegehilfe.org', name: 'Pflegehilfe.org', abholung: 'imap' },
+  { domain: 'pflegebund.eu', name: 'Pflegebund.eu', abholung: 'imap' },
+  { domain: 'pflege-helfer24.de', name: 'Pflege-Helfer24.de', abholung: 'api' },
 ] as const;
+
+export type PortalAbholung = (typeof PORTALE)[number]['abholung'];
 
 /** Die source-Werte aller Portale — "portal:pflegehilfe.org", ... */
 export const PORTAL_QUELLEN = PORTALE.map((p) => `portal:${p.domain}`);

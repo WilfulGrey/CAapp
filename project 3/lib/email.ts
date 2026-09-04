@@ -289,7 +289,7 @@ export function getEingangsbestaetigungEmailTemplate(
     geschlecht: { 'egal': 'Egal', 'weiblich': 'Weiblich', 'maennlich': 'Männlich' },
     erfahrung: { 'einsteiger': 'Einsteiger', 'erfahren': 'Erfahren', 'sehr-erfahren': 'Sehr erfahren' },
     weitere_personen: { 'ja': 'Ja', 'nein': 'Nein' },
-    care_start_timing: { 'sofort': 'Sofort (4–7 Werktage)', '2-4-wochen': 'In 2–4 Wochen', '1-2-monate': 'In 1–2 Monaten', 'unklar': 'Ich informiere mich nur' },
+    care_start_timing: { 'sofort': 'Sofort (4–7 Werktage)', '2-4-wochen': 'In 2–4 Wochen', '1-2-monate': 'In 1–2 Monaten', 'spaeter': 'Zu einem späteren Zeitpunkt', 'unklar': 'Ich informiere mich nur' },
   };
 
   const lbl = (key: string, val: string) => LABELS[key]?.[val] || val || 'Nicht angegeben';

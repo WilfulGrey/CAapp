@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 // Cross-App-Import (pure Modul, Muster wie portalUrl.test.ts). Die Edge
 // Function send-scheduled-emails hat eine KOPIE dieser Logik
 // (testphase.ts) mit eigenem Deno-Test — Aenderungen synchron halten.
-import { testphaseUmleitung, TESTPHASE_EMPFAENGER, darfAngeschriebenWerden, parseDatum } from '../../project 3/lib/portal-schutz';
+import { testphaseUmleitung, TESTPHASE_EMPFAENGER, darfAngeschriebenWerden, parseDatum, flagGiltFuer } from '../../project 3/lib/portal-schutz';
 
 describe('testphaseUmleitung (Kundenmails der Portal-Leads ans Team)', () => {
   const portalLead = { source: 'portal:pflegehilfe.org', email: 'kunde@example.org' };
@@ -32,6 +32,33 @@ describe('testphaseUmleitung (Kundenmails der Portal-Leads ans Team)', () => {
     expect(testphaseUmleitung({ source: 'portal:pflegebund.eu' }, '1')?.betreffPraefix).toBe(
       '[TESTPHASE → ?] ',
     );
+  });
+
+  /* Registry #50: Testphase fuer EIN Portal, waehrend die anderen scharf
+     laufen — Flagwert ist eine Domain-Liste; "1" bleibt "alle". */
+  it('Domain-Liste: nur das genannte Portal wird umgeleitet', () => {
+    const helfer = { source: 'portal:pflege-helfer24.de', email: 'k@x.de' };
+    expect(testphaseUmleitung(helfer, 'pflege-helfer24.de')).not.toBeNull();
+    expect(testphaseUmleitung(portalLead, 'pflege-helfer24.de')).toBeNull();
+    expect(testphaseUmleitung(portalLead, 'pflege-helfer24.de, pflegehilfe.org')).not.toBeNull();
+    expect(testphaseUmleitung(helfer, '1')).not.toBeNull();
+  });
+
+  it('flagGiltFuer: leer/fehlt → nie; "1" → immer; Liste case-insensitiv', () => {
+    expect(flagGiltFuer(undefined, 'pflegehilfe.org')).toBe(false);
+    expect(flagGiltFuer('', 'pflegehilfe.org')).toBe(false);
+    expect(flagGiltFuer('1', 'irgendwas.de')).toBe(true);
+    expect(flagGiltFuer('Pflege-Helfer24.de', 'pflege-helfer24.de')).toBe(true);
+    expect(flagGiltFuer('pflegehilfe.org', 'pflegebund.eu')).toBe(false);
+  });
+});
+
+describe('ANSPRECHBARE_STATUS — Status der Partner-API (pflege-helfer24)', () => {
+  const jetzt = new Date(2026, 8, 4, 12, 0);
+  it('"Aktiv" darf, "Storniert" / "Stornierung ausstehend" nicht', () => {
+    expect(darfAngeschriebenWerden({ status: 'Aktiv', erstellt_am: '04.09.2026' }, jetzt).ok).toBe(true);
+    expect(darfAngeschriebenWerden({ status: 'Storniert', erstellt_am: '04.09.2026' }, jetzt).ok).toBe(false);
+    expect(darfAngeschriebenWerden({ status: 'Stornierung ausstehend', erstellt_am: '04.09.2026' }, jetzt).ok).toBe(false);
   });
 });
 

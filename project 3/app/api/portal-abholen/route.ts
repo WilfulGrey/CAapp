@@ -53,6 +53,8 @@ import { parsePflegehilfe } from '@/lib/portal-parser';
 import { parseCsv, csvZuLeadZeile, csvZeileBrauchbar } from '@/lib/portal-csv';
 import { PORTALE } from '@/lib/portal-lead';
 import { zuVerarbeiten, SEED_SENTINEL_UID, type LogZeile } from '@/lib/portal-mail-log';
+import { flagGiltFuer } from '@/lib/portal-schutz';
+import { apiZeilen, helfer24ZuLeadBody, heuteBerlin, HELFER24_EXPORT_URL, type Helfer24Ergebnis } from '@/lib/portal-helfer24';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -63,7 +65,9 @@ interface Konfig {
   imapHost: string;
   basisUrl: string;
   leadKey?: string;
-  trocken: boolean;
+  /** Trockenlauf je Portal: PORTAL_TROCKENLAUF = "1" (alle) oder Domain-Liste. */
+  trocken: (portal: string) => boolean;
+  trockenWert: string;
 }
 
 /* Alles pro Anfrage frisch aus der Env — kein Modul-Zustand, der einen
@@ -81,7 +85,8 @@ function konfig(): Konfig {
        in die Datenbank (auch keinen Seed — der passiert beim
        Scharfschalten). Fuer den ersten Tag: man sieht, was der Parser aus
        echten Mails macht, ohne dass jemand eine Kundenmail bekommt. */
-    trocken: process.env.PORTAL_TROCKENLAUF === '1',
+    trocken: (portal) => flagGiltFuer(process.env.PORTAL_TROCKENLAUF, portal),
+    trockenWert: process.env.PORTAL_TROCKENLAUF ?? '',
   };
 }
 
@@ -91,7 +96,7 @@ function konfig(): Konfig {
  * PFLEGEHILFE_PASS. Ein Postfach ohne gesetztes Passwort wird
  * uebersprungen, nicht erraten. */
 function postfaecher(): Postfach[] {
-  return PORTALE.map(({ domain }) => {
+  return PORTALE.filter((p) => p.abholung === 'imap').map(({ domain }) => {
     const praefix = domain.split('.')[0].toUpperCase();
     return {
       portal: domain,
@@ -170,8 +175,8 @@ async function schreibeLog(db: SupabaseClient, postfach: string, uidvalidity: nu
 async function registriereFehlmail(
   db: SupabaseClient,
   portal: string,
-  uid: number,
-  mail: ParsedMail,
+  uid: number | string,
+  mail: Pick<ParsedMail, 'subject' | 'from'>,
   roh: string,
   art: 'abgelehnt' | 'uebersprungen',
   grund?: string,
@@ -227,6 +232,22 @@ async function registriereFehlmail(
   }
 }
 
+/* Ergebnis eines Eingangs-Versuchs — eine Form fuer Mail- und API-Weg. */
+interface PostErgebnis {
+  ok: boolean;
+  /** Fehler: true = deterministisch (kein Retry), false = transient. */
+  dauerhaft?: boolean;
+  grund?: string;
+  email?: string;
+  name?: string;
+  uebersprungen?: boolean;
+  trocken?: boolean;
+  lead_id?: string;
+  angenommen?: string[];
+  /** Grund, wenn der Eingang ein Duplikat meldete (Lead existiert, keine Mail 1). */
+  duplikat?: string;
+}
+
 async function verarbeite(
   cfg: Konfig,
   portal: string,
@@ -235,7 +256,7 @@ async function verarbeite(
      DATEN-Quelle; der Mailtext liefert weiterhin die Einwilligung
      (die steht nur dort) und dient als Fallback. */
   csv?: { text: string; zusatz: Record<string, string> },
-) {
+): Promise<PostErgebnis> {
   const textErgebnis = parsePflegehilfe(roh);
   const ergebnis = csv ? parsePflegehilfe(csv.text) : textErgebnis;
   const { kontakt, angaben, unbekannt } = ergebnis;
@@ -259,15 +280,12 @@ async function verarbeite(
     log(`  ⚠ nicht zugeordnet (${portal}): ${unbekannt.join(' | ')}`);
   }
 
-  if (cfg.trocken) {
+  if (cfg.trocken(portal)) {
     log(`  [trocken] ${kontakt.email} — ${Object.keys(angaben).length} Felder gelesen`);
     return { ok: true as const, trocken: true };
   }
 
-  const antwort = await fetch(`${cfg.basisUrl}/api/portal-lead`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'x-portal-key': cfg.leadKey as string },
-    body: JSON.stringify({
+  return posteLead(cfg, {
       portal,
       name: kontakt.name,
       email: kontakt.email,
@@ -285,7 +303,17 @@ async function verarbeite(
       /* Spalten ohne Zuhause bei uns (Krankheiten, Gewicht, Beziehung …)
          — landen append-only im Ereignislog, nichts geht verloren. */
       zusatz: csv?.zusatz,
-    }),
+    }, kontakt.email, kontakt.name || undefined);
+}
+
+/* Der Weg in den Eingang — EINER fuer Mail- und API-Portale, damit die
+ * Klassifizierung der Antwort (dauerhaft / transient / uebersprungen /
+ * Duplikat) nicht zweimal existiert. */
+async function posteLead(cfg: Konfig, body: Record<string, unknown>, email: string, name?: string): Promise<PostErgebnis> {
+  const antwort = await fetch(`${cfg.basisUrl}/api/portal-lead`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'x-portal-key': cfg.leadKey as string },
+    body: JSON.stringify(body),
   });
 
   const daten = await antwort.json().catch(() => ({}));
@@ -298,17 +326,24 @@ async function verarbeite(
       ok: false as const,
       dauerhaft: antwort.status === 400,
       grund: `HTTP ${antwort.status}: ${daten?.error ?? ''}`,
-      email: kontakt.email,
-      name: kontakt.name || undefined,
+      email,
+      name,
     };
   }
   /* Der Endpunkt antwortet auch beim bewussten Ueberspringen mit 200
-     (zu alt, Status nicht ansprechbar). Das ist ERLEDIGT, nicht Fehler —
-     aber seit 03.09. im Admin sichtbar (Shell-Lead/Event). */
+     (zu alt, Status nicht ansprechbar, Bestandskunde). Das ist ERLEDIGT,
+     nicht Fehler — aber seit 03.09. im Admin sichtbar (Shell-Lead/Event). */
   if (daten?.uebersprungen) {
-    return { ok: true as const, uebersprungen: true, grund: daten.grund, email: kontakt.email, name: kontakt.name || undefined };
+    return { ok: true as const, uebersprungen: true, grund: daten.grund, email, name };
   }
-  return { ok: true as const, lead_id: daten?.lead_id, angenommen: daten?.angenommene_felder ?? [] };
+  /* Duplikat: Lead existiert, keine Mail 1 (Registry #50). Kein Fehler,
+     kein Shell-Lead — der Grund wandert ins Protokoll. */
+  return {
+    ok: true as const,
+    lead_id: daten?.lead_id,
+    angenommen: daten?.angenommene_felder ?? [],
+    duplikat: daten?.duplikat === true ? String(daten?.grund ?? 'Duplikat') : undefined,
+  };
 }
 
 /* Die neuen Mails eines Postfachs abarbeiten — neu heisst: ohne Eintrag
@@ -354,7 +389,7 @@ async function arbeiteAb(cfg: Konfig, portal: string, client: ImapFlow, db: Supa
          Historie erneut Mail 1. Der Sentinel (uid=0) markiert auch ein
          LEERES Postfach als initialisiert — ohne ihn wuerde die erste
          echte Mail im naechsten Takt als altbestand verschluckt. */
-      if (cfg.trocken) {
+      if (cfg.trocken(portal)) {
         log(`${portal}: [trocken] Erstlauf — ${alle.length} Mail(s) wuerden als altbestand registriert`);
         return { liegengeblieben, verarbeitet, abgelehnt };
       }
@@ -426,8 +461,9 @@ async function arbeiteAb(cfg: Konfig, portal: string, client: ImapFlow, db: Supa
           verarbeitet++;
           continue;
         } else {
-          ausgang = { status: 'erledigt', leadId: ergebnis.lead_id };
+          ausgang = { status: 'erledigt', leadId: ergebnis.lead_id, grund: ergebnis.duplikat };
           log(`  ✓ ${portal} #${uid} Lead ${ergebnis.lead_id}` +
+              (ergebnis.duplikat ? ` (${ergebnis.duplikat})` : '') +
               (ergebnis.angenommen?.length ? ` (angenommen: ${ergebnis.angenommen.join(', ')})` : ''));
         }
       } catch (e: any) {
@@ -488,6 +524,195 @@ async function holeAb(cfg: Konfig, { portal, user, pass }: Postfach, db: Supabas
   }
 }
 
+/* ─── API-Portale (pflege-helfer24.de) ──────────────────────────────────
+ *
+ * Gleiche Strecke, anderer Eingang: statt Postfach ein GET auf die
+ * Partner-API. Gedaechtnis ist portal_api_log (portal, extern_id) — die
+ * Lead-UUID der API passt nicht in den bigint-Schluessel von
+ * portal_mail_log. Statusse und Bedeutung wie dort.
+ *
+ * Erstlauf (kein Eintrag fuer das Portal): ALLE Leads holen und die von
+ * VOR heute (Berlin) als altbestand registrieren — in EINEM Insert mit
+ * dem Sentinel '__seed__', damit ein Absturz mittendrin beim naechsten
+ * Takt nicht die halbe Historie als "neu" durchlaesst. Entscheidung
+ * Michał 04.09.: "pomijaj wszystkie starsze leady niż z dzisiaj". Was
+ * heute geliefert wurde, laeuft sofort normal durch.
+ *
+ * Danach: Fenster 7 Tage (?timestamp) — ein Lead, der waehrend eines
+ * Ausfalls kam, holt sich der Lauf danach selbst. Aeltere kommen nur bei
+ * einer Aenderung (Rechnung, Status) wieder und laufen dann durch die
+ * Schutzregeln (60-Tage-Grenze) wie jeder andere.
+ *
+ * Ein GET-Fehler (401 Token rotiert, 429, Timeout) faerbt den Lauf NICHT
+ * rot — nichts liegt, sichtbar wird er ueber den __api__-Sentinel. */
+const API_SENTINEL = '__api__';
+const SEED_SENTINEL = '__seed__';
+const API_FENSTER_TAGE = 7;
+/* Portale, deren letzter Abruf scheiterte — nur dann wird der Sentinel nach
+ * einem guten Abruf wieder auf 'erledigt' gesetzt. Sonst schriebe jeder
+ * Takt eine Zeile, und der Admin (Realtime auf portal_api_log) laedt
+ * jede Minute die ganze Lead-Liste neu. Modulzustand: nach einem Neustart
+ * kostet es genau einen ueberfluessigen Schreibvorgang. */
+const apiZuletztFehler = new Set<string>();
+
+type ApiAusgang = { status: 'erledigt' | 'uebersprungen' | 'abgelehnt' | 'offen'; grund?: string; leadId?: string };
+
+async function schreibeApiLog(db: SupabaseClient, portal: string, externId: string, ausgang: ApiAusgang) {
+  const { error } = await db.from('portal_api_log').upsert({
+    portal,
+    extern_id: externId,
+    status: ausgang.status,
+    grund: ausgang.grund ?? null,
+    lead_id: ausgang.leadId ?? null,
+    updated_at: new Date().toISOString(),
+  }, { onConflict: 'portal,extern_id' });
+  if (error) throw new Error(`portal_api_log schreiben (${externId} → ${ausgang.status}): ${error.message}`);
+}
+
+async function apiExport(token: string, seit?: Date): Promise<Record<string, string>[]> {
+  const url = seit ? `${HELFER24_EXPORT_URL}?timestamp=${Math.floor(seit.getTime() / 1000)}` : HELFER24_EXPORT_URL;
+  const r = await fetch(url, {
+    headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' },
+    /* Ohne Timeout hielte ein haengendes API `laeuft` fuer immer — und
+       damit auch alle Mail-Portale (die IMAP-Seite hat socketTimeout). */
+    signal: AbortSignal.timeout(15_000),
+  });
+  if (!r.ok) throw new Error(`HTTP ${r.status}`);
+  return apiZeilen(await r.json());
+}
+
+/* Protokoll-Status der IDs in der Hand — in Bloecken, weil `in.(…)` in der
+ * URL landet (PostgREST/Gateway kappen bei ~8 KB). */
+async function apiLogStatus(db: SupabaseClient, portal: string, ids: string[]): Promise<Map<string, string>> {
+  const status = new Map<string, string>();
+  for (let i = 0; i < ids.length; i += 100) {
+    const { data, error } = await db
+      .from('portal_api_log')
+      .select('extern_id, status')
+      .eq('portal', portal)
+      .in('extern_id', ids.slice(i, i + 100));
+    if (error) throw new Error(`portal_api_log lesen: ${error.message}`);
+    for (const z of data ?? []) status.set(z.extern_id, z.status);
+  }
+  return status;
+}
+
+async function holeApiAb(cfg: Konfig, portal: string, db: SupabaseClient) {
+  let liegengeblieben = 0;
+  let verarbeitet = 0;
+  let abgelehnt = 0;
+  const leer = { liegengeblieben, verarbeitet, abgelehnt };
+
+  // ponytail: ein API-Portal, ein Token-Name — bei einem zweiten API-Portal wird daraus eine Ableitung wie bei postfaecher().
+  const token = process.env.PFLEGEHELFER24_API_TOKEN;
+  if (!token) {
+    log(`${portal}: kein Zugang gesetzt — uebersprungen`);
+    return leer;
+  }
+  const trocken = cfg.trocken(portal);
+
+  const { data: schonMal, error: leseErr } = await db
+    .from('portal_api_log').select('extern_id').eq('portal', portal).limit(1);
+  if (leseErr) throw new Error(`portal_api_log lesen: ${leseErr.message}`);
+  const erstlauf = !schonMal || schonMal.length === 0;
+
+  const zeilen = await apiExport(token, erstlauf ? undefined : new Date(Date.now() - API_FENSTER_TAGE * 86_400_000));
+  // GET ok ⇒ Sentinel wieder gruen, falls er nach einem Ausfall auf 'offen' stand.
+  if (!trocken && (apiZuletztFehler.has(portal) || erstlauf)) {
+    await schreibeApiLog(db, portal, API_SENTINEL, { status: 'erledigt', grund: `Abruf ok (${zeilen.length} Zeilen)` });
+    apiZuletztFehler.delete(portal);
+  }
+
+  const ergebnisse = zeilen
+    .map((z) => helfer24ZuLeadBody(z))
+    .filter((e): e is Helfer24Ergebnis => {
+      if (e) return true;
+      log(`  ⚠ ${portal}: Zeile ohne "Lead ID" — uebersprungen`);
+      return false;
+    });
+
+  let kandidaten = ergebnisse;
+  if (erstlauf) {
+    const heute = heuteBerlin();
+    const alt = ergebnisse.filter((e) => !e.lieferTag || e.lieferTag < heute);
+    kandidaten = ergebnisse.filter((e) => e.lieferTag && e.lieferTag >= heute);
+    if (trocken) {
+      log(`${portal}: [trocken] Erstlauf — ${alt.length} Lead(s) wuerden als altbestand registriert, ${kandidaten.length} von heute wuerden laufen`);
+    } else {
+      const bestand = [
+        { portal, extern_id: SEED_SENTINEL, status: 'altbestand', grund: 'Inbetriebnahme' },
+        ...alt.map((e) => ({ portal, extern_id: e.extern_id, status: 'altbestand', grund: `vor Inbetriebnahme (Liefer Datum ${e.lieferTag ?? '?'})` })),
+      ];
+      // ponytail: ein Insert reicht — Hunderte Zeilen, keine Tausende.
+      const { error } = await db.from('portal_api_log').insert(bestand);
+      if (error) throw new Error(`Seed fehlgeschlagen: ${error.message}`);
+      log(`${portal}: Erstlauf — ${alt.length} Lead(s) von vor heute als altbestand registriert, ${kandidaten.length} von heute laufen`);
+    }
+  }
+
+  const status = trocken ? new Map<string, string>() : await apiLogStatus(db, portal, kandidaten.map((e) => e.extern_id));
+  const offene = kandidaten.filter((e) => { const s = status.get(e.extern_id); return s === undefined || s === 'offen'; });
+  if (!offene.length) return { liegengeblieben, verarbeitet, abgelehnt };
+  log(`${portal}: ${offene.length} Lead(s) zu verarbeiten (${zeilen.length} in der Antwort)`);
+
+  for (const e of offene) {
+    const kennung = e.extern_id;
+    const kontakt = { email: String(e.body.email ?? ''), name: String(e.body.name ?? '') || undefined };
+    const pseudoMail = { subject: `Lead ${kennung}` } as Pick<ParsedMail, 'subject' | 'from'>;
+    const auszug = JSON.stringify(e.body.zusatz ?? {});
+    if (e.unbekannt.length) log(`  ⚠ nicht zugeordnet (${portal}): ${e.unbekannt.join(' | ')}`);
+
+    let ausgang: ApiAusgang;
+    try {
+      if (e.uebersprungen) {
+        if (trocken) { log(`  · ${portal} ${kennung} Trockenlauf — wuerde uebersprungen: ${e.uebersprungen}`); verarbeitet++; continue; }
+        const leadId = await registriereFehlmail(db, portal, kennung, pseudoMail, auszug, 'uebersprungen', e.uebersprungen, kontakt.email || undefined, kontakt.name);
+        ausgang = { status: 'uebersprungen', grund: e.uebersprungen, leadId };
+      } else if (trocken) {
+        log(`  [trocken] ${portal} ${kennung} ${kontakt.email} — ${Object.keys(e.body.angaben as object).length} Felder gelesen`);
+        verarbeitet++;
+        continue;
+      } else {
+        const ergebnis = await posteLead(cfg, e.body, kontakt.email, kontakt.name);
+        if (!ergebnis.ok) {
+          if (ergebnis.dauerhaft) {
+            const leadId = await registriereFehlmail(db, portal, kennung, pseudoMail, auszug, 'abgelehnt', ergebnis.grund, ergebnis.email, ergebnis.name);
+            ausgang = { status: 'abgelehnt', grund: ergebnis.grund, leadId };
+          } else {
+            ausgang = { status: 'offen', grund: ergebnis.grund };
+          }
+        } else if (ergebnis.uebersprungen) {
+          const leadId = await registriereFehlmail(db, portal, kennung, pseudoMail, auszug, 'uebersprungen', ergebnis.grund, ergebnis.email, ergebnis.name);
+          ausgang = { status: 'uebersprungen', grund: ergebnis.grund, leadId };
+        } else {
+          ausgang = { status: 'erledigt', leadId: ergebnis.lead_id, grund: ergebnis.duplikat };
+          log(`  ✓ ${portal} ${kennung} Lead ${ergebnis.lead_id}` +
+              (ergebnis.duplikat ? ` (${ergebnis.duplikat})` : '') +
+              (ergebnis.angenommen?.length ? ` (angenommen: ${ergebnis.angenommen.join(', ')})` : ''));
+        }
+      }
+    } catch (err: any) {
+      ausgang = { status: 'offen', grund: err.message };
+    }
+
+    if (ausgang.status === 'offen') log(`  ✗ ${portal} ${kennung} offen: ${ausgang.grund} — naechster Takt versucht erneut`);
+    if (ausgang.status === 'abgelehnt') log(`  ✗ ${portal} ${kennung} abgelehnt: ${ausgang.grund}${ausgang.leadId ? ` — im Admin als ${ausgang.leadId}` : ''}`);
+    if (ausgang.status === 'uebersprungen') log(`  – ${portal} ${kennung} uebersprungen: ${ausgang.grund}`);
+
+    try {
+      await schreibeApiLog(db, portal, kennung, ausgang);
+    } catch (err: any) {
+      log(`  ✗ ${portal} ${kennung} PROTOKOLL-SCHREIBFEHLER nach '${ausgang.status}': ${err.message}`);
+      liegengeblieben++;
+      continue;
+    }
+    if (ausgang.status === 'offen') liegengeblieben++;
+    else if (ausgang.status === 'abgelehnt') abgelehnt++;
+    else verarbeitet++;
+  }
+  return { liegengeblieben, verarbeitet, abgelehnt };
+}
+
 /* Nur ein Durchgang zugleich: pg_cron feuert jede Minute, und ein
  * haengender IMAP-Server soll keine Laeufe stapeln. Ein uebersprungener
  * Takt ist egal — die Mails stehen nicht im Protokoll und laufen im
@@ -508,7 +733,7 @@ export async function POST(request: NextRequest) {
   }
 
   const cfg = konfig();
-  if (!cfg.leadKey && !cfg.trocken) {
+  if (!cfg.leadKey && !PORTALE.every((p) => cfg.trocken(p.domain))) {
     return NextResponse.json({ error: 'PORTAL_LEAD_KEY fehlt' }, { status: 503 });
   }
 
@@ -542,6 +767,25 @@ export async function POST(request: NextRequest) {
         log(`${postfach.portal}: Postfach-Fehler: ${e.message}`);
       }
     }
+    /* API-Portale NACH den Postfaechern: ein haengendes Fremd-API darf die
+       Mail-Portale nicht verzoegern (der GET hat zusaetzlich ein Timeout,
+       damit `laeuft` nie haengen bleibt). */
+    for (const { domain } of PORTALE.filter((p) => p.abholung === 'api')) {
+      try {
+        const r = await holeApiAb(cfg, domain, db);
+        liegengeblieben += r.liegengeblieben;
+        verarbeitet += r.verarbeitet;
+        abgelehnt += r.abgelehnt;
+      } catch (e: any) {
+        /* Bewusst NICHT liegengeblieben (Registry #36/#46): nichts "liegt",
+           die Leads bleiben im 7-Tage-Fenster; ein Dauer-500 jede Minute
+           sieht niemand. Sichtbar wird der Ausfall ueber den __api__-
+           Sentinel in portal_api_log (Admin: "Offen"). */
+        log(`${domain}: API-Fehler: ${e.message}`);
+        apiZuletztFehler.add(domain);
+        await schreibeApiLog(db, domain, API_SENTINEL, { status: 'offen', grund: `API-Abruf: ${e.message}` }).catch(() => {});
+      }
+    }
   } finally {
     laeuft = false;
   }
@@ -550,7 +794,7 @@ export async function POST(request: NextRequest) {
      60 verschluckte Fehler pro Stunde, waehrend derselbe bezahlte Lead nie
      durchgeht. Offene Mails laufen im naechsten Takt erneut; dauerhaft
      abgelehnte NICHT — sie stehen im Admin und im Protokoll. */
-  const zusammenfassung = { ok: liegengeblieben === 0, trocken: cfg.trocken, verarbeitet, abgelehnt, liegengeblieben };
+  const zusammenfassung = { ok: liegengeblieben === 0, trocken: cfg.trockenWert, verarbeitet, abgelehnt, liegengeblieben };
   if (liegengeblieben) log('Lauf mit Fehlern:', JSON.stringify(zusammenfassung));
   return NextResponse.json(zusammenfassung, { status: liegengeblieben ? 500 : 200 });
 }

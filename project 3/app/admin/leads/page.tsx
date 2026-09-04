@@ -14,7 +14,7 @@ import {
 import { createClient } from '@supabase/supabase-js';
 import { Search, Loader as Loader2, Mail, Phone, Calendar, ExternalLink } from 'lucide-react';
 import Link from 'next/link';
-import { istEingekauft, quellenName, reiterFuer } from '@/lib/portal-lead';
+import { istEingekauft, quellenName, reiterFuer, PORTALE } from '@/lib/portal-lead';
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -61,11 +61,16 @@ function ding() {
 export default function LeadsPage() {
   const [leads, setLeads] = useState<any[]>([]);
   const [filteredLeads, setFilteredLeads] = useState<any[]>([]);
-  /* Postfach-Protokoll des Abholers (portal_mail_log, Registry #47):
-     Mails, die KEIN Lead wurden — offen/abgelehnt/uebersprungen/
-     altbestand. Sichtbar im jeweiligen Portal-Reiter, damit nichts still
+  /* Protokoll des Abholers (portal_mail_log fuer Postfaecher, Registry
+     #47; portal_api_log fuer API-Portale, Registry #50): alles, was KEIN
+     Lead wurde — offen/abgelehnt/uebersprungen/altbestand — plus erledigte
+     Duplikate (grund gesetzt, keine Mail 1). Beide Quellen auf EINE Form
+     gebracht; sichtbar im jeweiligen Portal-Reiter, damit nichts still
      scheitert. */
-  const [mailLog, setMailLog] = useState<any[]>([]);
+  const [mailLog, setMailLog] = useState<Array<{
+    postfach: string; uidvalidity?: number; kennung: string; status: string;
+    grund: string | null; lead_id: string | null; updated_at: string;
+  }>>([]);
   // Realtime-Kanal verbunden? Grauer Punkt = Verbindung down — sonst sähe
   // ein toter Socket aus wie „nichts Neues" (die stille Panne aus #47).
   const [live, setLive] = useState(false);
@@ -111,6 +116,7 @@ export default function LeadsPage() {
       .channel('admin-leads')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'leads' }, aenderung)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'portal_mail_log' }, aenderung)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'portal_api_log' }, aenderung)
       .subscribe((status: string) => {
         console.log('[admin-live]', status);
         setLive(status === 'SUBSCRIBED');
@@ -153,17 +159,34 @@ export default function LeadsPage() {
         setLeads(data);
       }
 
-      /* uid=0 ist der "Postfach leer"-Sentinel des Seeds; 'erledigt'
-         fehlt bewusst — diese Mails SIND die Leads in der Tabelle.
-         200 reichen als Sicht (PostgREST kappt ohnehin bei 1000). */
-      const { data: logZeilen } = await supabase
-        .from('portal_mail_log')
-        .select('postfach, uidvalidity, uid, status, grund, lead_id, updated_at')
-        .neq('status', 'erledigt')
-        .gt('uid', 0)
-        .order('updated_at', { ascending: false })
-        .limit(200);
-      setMailLog(logZeilen ?? []);
+      /* uid=0 ist der "Postfach leer"-Sentinel des Seeds; 'erledigt' OHNE
+         grund fehlt bewusst — diese Mails SIND die Leads in der Tabelle.
+         'erledigt' MIT grund = Duplikat ohne Mail 1: der bezahlte Lead
+         haengt an einem bestehenden (evtl. Rechner-)Lead und waere sonst
+         unter keinem Portal-Reiter zu finden. 200 reichen als Sicht. */
+      const [{ data: mailZeilen }, { data: apiZeilen }] = await Promise.all([
+        supabase
+          .from('portal_mail_log')
+          .select('postfach, uidvalidity, uid, status, grund, lead_id, updated_at')
+          .or('status.neq.erledigt,grund.not.is.null')
+          .gt('uid', 0)
+          .order('updated_at', { ascending: false })
+          .limit(200),
+        supabase
+          .from('portal_api_log')
+          .select('portal, extern_id, status, grund, lead_id, updated_at')
+          .or('status.neq.erledigt,grund.not.is.null')
+          .neq('extern_id', '__seed__')
+          .order('updated_at', { ascending: false })
+          .limit(200),
+      ]);
+      setMailLog([
+        ...(mailZeilen ?? []).map((z: any) => ({ ...z, kennung: `#${z.uid}` })),
+        ...(apiZeilen ?? []).map((z: any) => ({
+          postfach: z.portal, kennung: z.extern_id, status: z.status,
+          grund: z.grund, lead_id: z.lead_id, updated_at: z.updated_at,
+        })),
+      ]);
 
       setLoading(false);
     } catch (error) {
@@ -228,19 +251,21 @@ export default function LeadsPage() {
     );
   };
 
-  /* Badges des Postfach-Protokolls (portal_mail_log). */
-  const mailStatusBadge = (status: string) => {
+  /* Badges des Abholer-Protokolls (portal_mail_log / portal_api_log). */
+  const mailStatusBadge = (status: string, api = false) => {
     const styles: Record<string, string> = {
       offen: 'bg-amber-100 text-amber-800',
       abgelehnt: 'bg-red-100 text-red-800',
       uebersprungen: 'bg-gray-200 text-gray-600',
       altbestand: 'bg-gray-100 text-gray-500',
+      erledigt: 'bg-green-100 text-green-800',
     };
     const labels: Record<string, string> = {
-      offen: 'Offen — nächster Versuch in 1 Min.',
+      offen: api ? 'Offen — nächster Versuch, solange im 7-Tage-Fenster' : 'Offen — nächster Versuch in 1 Min.',
       abgelehnt: 'Abgelehnt',
       uebersprungen: 'Übersprungen',
-      altbestand: 'Altbestand',
+      altbestand: api ? 'Vor Inbetriebnahme — übersprungen' : 'Altbestand',
+      erledigt: 'Erledigt — Duplikat, keine Mail 1',
     };
     return (
       <span className={`px-2 py-1 rounded-full text-xs font-medium ${styles[status] || 'bg-gray-100 text-gray-800'}`}>
@@ -363,7 +388,7 @@ export default function LeadsPage() {
                         </p>
                         <p className="mt-1 text-sm">
                           Eingekaufte Anfragen erscheinen hier wenige Sekunden,
-                          nachdem sie im Postfach eingehen.
+                          nachdem sie im Postfach bzw. in der Partner-API eingehen.
                         </p>
                       </>
                     ) : (
@@ -472,23 +497,24 @@ export default function LeadsPage() {
             bewusst — diese Mails SIND die Leads in der Tabelle darüber. */}
         {istEingekauft(quelleFilter) && (() => {
           const postfach = quelleFilter.slice('portal:'.length);
+          const api = PORTALE.find((p) => p.domain === postfach)?.abholung === 'api';
           const zeilen = mailLog.filter((z) => z.postfach === postfach);
           return (
             <div className="mt-8 border-t border-gray-200 pt-4">
               <h2 className="text-sm font-semibold text-gray-700 mb-2">
-                Postfach {postfach} — Mails ohne Lead
+                {api ? `API ${postfach} — Leads ohne Lead` : `Postfach ${postfach} — Mails ohne Lead`}
                 <span className="ml-2 tabular-nums text-gray-400">{zeilen.length}</span>
               </h2>
               {zeilen.length === 0 ? (
                 <p className="text-sm text-gray-500">
-                  Alles verarbeitet — keine offenen, abgelehnten oder übersprungenen Mails.
+                  Alles verarbeitet — nichts Offenes, Abgelehntes oder Übersprungenes.
                 </p>
               ) : (
                 <div className="overflow-x-auto">
                   <table className="w-full">
                     <thead>
                       <tr className="border-b">
-                        <th className="text-left py-2 px-4 text-sm font-medium text-gray-600">Mail</th>
+                        <th className="text-left py-2 px-4 text-sm font-medium text-gray-600">{api ? 'Kennung' : 'Mail'}</th>
                         <th className="text-left py-2 px-4 text-sm font-medium text-gray-600">Status</th>
                         <th className="text-left py-2 px-4 text-sm font-medium text-gray-600">Grund</th>
                         <th className="text-left py-2 px-4 text-sm font-medium text-gray-600">Zuletzt</th>
@@ -497,9 +523,9 @@ export default function LeadsPage() {
                     </thead>
                     <tbody>
                       {zeilen.map((z) => (
-                        <tr key={`${z.uidvalidity}-${z.uid}`} className="border-b hover:bg-gray-50">
-                          <td className="py-2 px-4 text-sm font-mono text-gray-600">#{z.uid}</td>
-                          <td className="py-2 px-4">{mailStatusBadge(z.status)}</td>
+                        <tr key={`${z.postfach}-${z.uidvalidity ?? 'api'}-${z.kennung}`} className="border-b hover:bg-gray-50">
+                          <td className="py-2 px-4 text-sm font-mono text-gray-600 break-all">{z.kennung}</td>
+                          <td className="py-2 px-4">{mailStatusBadge(z.status, api)}</td>
                           <td className="py-2 px-4 text-sm text-gray-600">{z.grund || '—'}</td>
                           <td className="py-2 px-4 text-sm text-gray-600">
                             {new Date(z.updated_at).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' })}

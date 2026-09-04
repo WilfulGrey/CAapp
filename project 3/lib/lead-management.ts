@@ -131,6 +131,13 @@ export async function findOrCreateLead(
       if (data?.telefon) updates.telefon = data.telefon;
       if (data?.care_start_timing) updates.care_start_timing = data.care_start_timing;
       if (data?.kalkulation) updates.kalkulation = data.kalkulation;
+      /* Ein eingekaufter Lead IST ab jetzt eingekauft (Registry #50): ohne
+         source-Wechsel bekaeme ein hochgestufter info_requested-Lead die
+         Mail 1 ohne Portal-Kopf und stuende unter keinem Portal-Reiter.
+         Rechner-Submits ('rechner'/'pria-chat') aendern die Herkunft nicht. */
+      if (typeof data?.quelle === 'string' && data.quelle.startsWith('portal:')) {
+        updates.source = data.quelle;
+      }
 
       if (targetStatus === 'angebot_requested') {
         updates.token = generateToken();

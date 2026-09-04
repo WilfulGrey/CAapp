@@ -65,6 +65,21 @@ describe('ergaenzeAngaben (Defaults für eingekaufte Leads)', () => {
     const leerstring = ergaenzeAngaben({ mobilitaet: '  ' as never }, tabelle);
     expect(leerstring.daten.mobilitaet).toBe('bettlaegerig');
   });
+
+  /* Registry #50: "Keinen" (pflege-helfer24) ist eine Kundenangabe — 0 ist
+     nicht "fehlt". Vorher lief es ueber `grad > 0` in `angenommen` und Mail
+     1 behauptete "vorsichtig angenommen" (Klasse #13e: 0 ist falsy). */
+  it('explizites Pflegegrad 0 ("Keinen") ist Kundenangabe, nicht Annahme', () => {
+    const keinen = ergaenzeAngaben({ pflegegrad: 0 }, tabelle);
+    expect(keinen.daten.pflegegrad).toBe(0);
+    expect(keinen.angenommen).not.toContain('pflegegrad');
+  });
+
+  it('Pflegegrad als String (manueller curl) wird gelesen; leer/undefined bleibt Annahme', () => {
+    expect(ergaenzeAngaben({ pflegegrad: '3' as never }, tabelle).daten.pflegegrad).toBe(3);
+    expect(ergaenzeAngaben({ pflegegrad: '' as never }, tabelle).angenommen).toContain('pflegegrad');
+    expect(ergaenzeAngaben({}, tabelle).angenommen).toContain('pflegegrad');
+  });
 });
 
 describe('reiterFuer (Admin-Lead-Liste)', () => {
@@ -73,10 +88,11 @@ describe('reiterFuer (Admin-Lead-Liste)', () => {
     expect(leer.map((r) => r.label)).toEqual([
       'Alle',
       'Eigene Anfragen',
+      'Pflege-Helfer24.de',
       'Pflegebund.eu',
       'Pflegehilfe.org',
     ]);
-    expect(leer.map((r) => r.anzahl)).toEqual([0, 0, 0, 0]);
+    expect(leer.map((r) => r.anzahl)).toEqual([0, 0, 0, 0, 0]);
   });
 
   it('nur eigene Leads: Portal-Reiter bleiben sichtbar, aber leer', () => {
@@ -84,7 +100,7 @@ describe('reiterFuer (Admin-Lead-Liste)', () => {
     expect(eigene.find((r) => r.key === 'eigene')?.anzahl).toBe(2);
     expect(
       eigene.filter((r) => r.key.startsWith('portal:')).map((r) => r.anzahl),
-    ).toEqual([0, 0]);
+    ).toEqual([0, 0, 0]);
   });
 
   it('gemischt: jeder Lead zählt genau einmal, Summe = Alle', () => {
