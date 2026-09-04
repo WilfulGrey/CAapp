@@ -196,11 +196,16 @@ export function parsePflegehilfe(text: string): ParseErgebnis {
   ]);
   if (mobilitaet) angaben.mobilitaet = mobilitaet;
 
+  /* Pflegehilfe kennt kein Mass, nur „Erforderlich" (Registry #49, Fall
+   * Epple): bewusst als taeglich (1×) gelesen — Entscheidung Michał 04.09.
+   * Die Zeile steht ZULETZT, damit „Nicht erforderlich" (nein) und
+   * „gelegentlich erforderlich" vorher greifen. */
   const nachteinsaetze = map('Nächtliche Einsätze', [
     [/nicht erforderlich|nein|keine/i, 'nein'],
     [/mehrmals|mehrfach/i, 'mehrmals'],
     [/t.glich|jede nacht|1x|einmal/i, 'taeglich'],
     [/gelegentlich|selten|manchmal/i, 'gelegentlich'],
+    [/erforderlich|ja|ben.tigt/i, 'taeglich'],
   ]);
   if (nachteinsaetze) angaben.nachteinsaetze = nachteinsaetze;
 
@@ -216,10 +221,15 @@ export function parsePflegehilfe(text: string): ParseErgebnis {
   ]);
   if (deutschkenntnisse) angaben.deutschkenntnisse = deutschkenntnisse;
 
+  /* Kanonische Stufen des Rechners (calculator-context.ts `Experience`,
+   * pricing_config): einsteiger / erfahren / sehr-erfahren. Die fruehere
+   * Tabelle emittierte zwingend/wuenschenswert/keine — ein Vokabular, das
+   * nur noch eine Legacy-Label-Map in email.ts kannte (Registry #49).
+   * „sehr erfahren" enthaelt „erfahren" — die hoechste Stufe zuerst. */
   const erfahrung = map('Pflegeerfahrung', [
-    [/zwingend|examiniert|fachkraft|ausgebildet/i, 'zwingend'],
-    [/grund|erfahren|w.nschenswert|vorhanden/i, 'wuenschenswert'],
-    [/keine|egal|nicht erforderlich/i, 'keine'],
+    [/langj.hrig|sehr erfahren|mehrj.hrig|examiniert|fachkraft|ausgebildet|zwingend/i, 'sehr-erfahren'],
+    [/erfahren|vorhanden|w.nschenswert/i, 'erfahren'],
+    [/grund|keine|egal|nicht erforderlich|einsteiger/i, 'einsteiger'],
   ]);
   if (erfahrung) angaben.erfahrung = erfahrung;
 

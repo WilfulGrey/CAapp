@@ -81,7 +81,9 @@ describe('parsePflegehilfe (Portal-Lead-Mail)', () => {
     expect(r.angaben.mobilitaet).toBe('rollator');
     expect(r.angaben.nachteinsaetze).toBe('nein');
     expect(r.angaben.deutschkenntnisse).toBe('sehr-gut');
-    expect(r.angaben.erfahrung).toBe('wuenschenswert');
+    // „Grundkenntnisse" = Einsteiger-Stufe des Rechners (Registry #49; vorher
+    // das Legacy-Vokabular 'wuenschenswert', das pricing_config nie kannte).
+    expect(r.angaben.erfahrung).toBe('einsteiger');
     expect(r.angaben.fuehrerschein).toBe('nein');
     expect(r.angaben.geschlecht).toBe('weiblich');
     expect(r.care_start_timing).toBe('sofort');
@@ -136,5 +138,37 @@ describe('parsePflegehilfe — weitergeleitete Mail (Fwd)', () => {
     expect(f.kontakt.email).toBe('elke.preis@freenet.de');
     expect(f.angaben.pflegegrad).toBe(1);
     expect(f.portal_lead_id).toBe('3196061');
+  });
+});
+
+describe('Pflegehilfe-Vokabeln aus dem Fall Epple (Registry #49)', () => {
+  /* Die Portal-Mail kennt kein Mass fuer Nachteinsaetze („Erforderlich") und
+   * schreibt Erfahrung als „Langjaehrig" — beides lief in `unbekannt[]` und
+   * die Annahme griff zum teuersten Wert. Entscheidung Michał 04.09.:
+   * Erforderlich = taeglich (1×). Erfahrung auf den kanonischen Stufen des
+   * Rechners (einsteiger / erfahren / sehr-erfahren). */
+  const variante = (nacht: string, erfahrung: string) =>
+    parsePflegehilfe(
+      mail
+        .replace('Nächtliche Einsätze: Nicht erforderlich', `Nächtliche Einsätze: ${nacht}`)
+        .replace('Pflegeerfahrung: Grundkenntnisse', `Pflegeerfahrung: ${erfahrung}`),
+    );
+
+  it('„Erforderlich" → taeglich, „Langjährig" → sehr-erfahren — nichts bleibt unverstanden', () => {
+    const r = variante('Erforderlich', 'Langjährig');
+    expect(r.angaben.nachteinsaetze).toBe('taeglich');
+    expect(r.angaben.erfahrung).toBe('sehr-erfahren');
+    expect(r.unbekannt).toEqual([]);
+  });
+
+  it('„Nicht erforderlich" bleibt nein, „Gelegentlich erforderlich" bleibt gelegentlich', () => {
+    expect(variante('Nicht erforderlich', 'Grundkenntnisse').angaben.nachteinsaetze).toBe('nein');
+    expect(variante('Gelegentlich erforderlich', 'Grundkenntnisse').angaben.nachteinsaetze).toBe('gelegentlich');
+  });
+
+  it('Erfahrungsstufen: Erfahren → erfahren, Keine → einsteiger, examiniert → sehr-erfahren', () => {
+    expect(variante('Nein', 'Erfahren').angaben.erfahrung).toBe('erfahren');
+    expect(variante('Nein', 'Keine').angaben.erfahrung).toBe('einsteiger');
+    expect(variante('Nein', 'Examinierte Fachkraft').angaben.erfahrung).toBe('sehr-erfahren');
   });
 });

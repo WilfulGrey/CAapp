@@ -64,7 +64,7 @@ describe('CSV → parsePflegehilfe (Zauner end-to-end)', () => {
     expect(r.angaben.weitere_personen).toBe('nein');
     expect(r.angaben.nachteinsaetze).toBe('nein');
     expect(r.angaben.deutschkenntnisse).toBe('sehr-gut');
-    expect(r.angaben.erfahrung).toBe('wuenschenswert');
+    expect(r.angaben.erfahrung).toBe('einsteiger'); // Registry #49: kanonische Stufe
     expect(r.angaben.fuehrerschein).toBe('ja');
     expect(r.angaben.geschlecht).toBe('weiblich');
     expect(r.care_start_timing).toBe('2-4-wochen');
