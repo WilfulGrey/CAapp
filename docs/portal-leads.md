@@ -229,8 +229,13 @@ Kein Postfach — der Abholer holt im selben Takt (nach den Postfächern)
 - Ein GET-Fehler (401 Token rotiert, 429, Timeout) färbt den Lauf **nicht**
   rot — nichts liegt, und einen Dauer-500 sieht niemand (Registry #36/#46).
   Sichtbar wird er über die Sentinel-Zeile `__api__` (`offen` mit HTTP-
-  Grund; `erledigt` nach dem nächsten guten Abruf) im Admin-Abschnitt
-  „API pflege-helfer24.de — Leads ohne Lead".
+  Grund; `erledigt` nach dem nächsten guten Abruf — auch nach einem
+  Neustart des Prozesses, der erste gute Abruf prüft den Sentinel einmal)
+  im Admin-Abschnitt „API pflege-helfer24.de — Leads ohne Lead".
+- **Token rotieren = Render-Env ändern UND redeployen.** Eine Env-Änderung
+  allein erreicht den laufenden Prozess nicht (Registry #50, 04.09.: nach
+  der Rotation lief der alte Token weiter → `HTTP 401` jede Minute, bis
+  zum manuellen Deploy).
 - Status `Aktiv` ist ansprechbar; `Storniert` / `Stornierung *` →
   `uebersprungen` (terminal). Produkt ≠ `24h-Pflege` → `uebersprungen`.
 - Storno-API (`POST …/cancellation_requests`) bewusst NICHT angebunden.
