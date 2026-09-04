@@ -6,6 +6,7 @@ import { AnalyticsProvider } from '@/components/AnalyticsProvider';
 import { CookieConsent } from '@/components/CookieConsent';
 import Script from 'next/script';
 import { organizationGraph, jsonLdString } from '@/lib/seo-schema';
+import { OAIQ_PIXEL_ID } from '@/lib/oaiq';
 
 const inter = Inter({ subsets: ['latin'] });
 
@@ -143,6 +144,58 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
   window.addEventListener('cookie-consent-changed', function(e) {
     if (e.detail && e.detail.analytics) {
       loadGoogleAnalytics();
+    }
+  });
+})();
+            `,
+          }}
+        />
+        {/* OpenAI-Ads-Pixel (Werbung in ChatGPT).
+
+            Haengt am Schalter „Marketing" des Cookie-Banners — der existierte
+            seit jeher, hat aber bis heute nichts geladen. Anders als bei GA4
+            wird das SDK NICHT bei fehlender Einwilligung geladen und dann
+            stummgeschaltet, sondern gar nicht erst geholt: es setzt beim Start
+            eigene Kennungen (Cookie + localStorage), und die entstehen sonst
+            schon vor der Entscheidung des Besuchers.
+
+            Widerruf ist deshalb der einzige Fall, in dem das SDK trotzdem im
+            Speicher liegt. Dann kann es nicht mehr entladen werden — es bekommt
+            `consent:false` und stellt das Senden ein.
+
+            `debug` bleibt aus. Der Einrichtungsdialog von OpenAI liefert den
+            Schnipsel mit `debug:true`, das schreibt in der Konsole jedes
+            Ereignis mit. */}
+        <Script
+          id="oaiq-consent"
+          strategy="afterInteractive"
+          dangerouslySetInnerHTML={{
+            __html: `
+(function() {
+  function ladeOaiq() {
+    if (window.oaiqGeladen) return;
+    window.oaiqGeladen = true;
+
+    !function(w,d,s,u){if(w.oaiq)return;var q=function(){q.q.push(arguments)};q.q=[];w.oaiq=q;var j=d.createElement(s);j.async=1;j.src=u;var f=d.getElementsByTagName(s)[0];f.parentNode.insertBefore(j,f)}(window,document,"script","https://bzrcdn.openai.com/sdk/oaiq.min.js");
+
+    window.oaiq('init', { pixelId: '${OAIQ_PIXEL_ID}', debug: false });
+    window.oaiq('consent', true);
+  }
+
+  try {
+    var gespeichert = localStorage.getItem('primundus_cookie_consent');
+    if (gespeichert) {
+      var daten = JSON.parse(gespeichert);
+      if (daten && daten.consent && daten.consent.marketing) ladeOaiq();
+    }
+  } catch(e) {}
+
+  window.addEventListener('cookie-consent-changed', function(e) {
+    var erlaubt = !!(e.detail && e.detail.marketing);
+    if (erlaubt) {
+      ladeOaiq();
+    } else if (window.oaiqGeladen && window.oaiq) {
+      window.oaiq('consent', false);
     }
   });
 })();

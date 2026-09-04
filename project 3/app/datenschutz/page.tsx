@@ -150,7 +150,7 @@ export default function DatenschutzPage() {
             <ul className="list-disc pl-6 mb-4 space-y-2 text-gray-700">
               <li>Technisch notwendige Cookies für die Funktionalität der Website</li>
               <li>Analyse-Cookies zur Verbesserung unseres Angebots (Google Analytics)</li>
-              <li>Conversion-Tracking für Werbezwecke (Google Ads)</li>
+              <li>Conversion-Tracking für Werbezwecke (Google Ads, OpenAI Ads)</li>
             </ul>
             <p className="text-gray-700 leading-relaxed mb-4">
               Sie können Ihre Cookie-Einstellungen jederzeit in Ihrem Browser anpassen.
@@ -168,11 +168,27 @@ export default function DatenschutzPage() {
               Gesundheitsdaten an Google &ndash; ausschließlich die Klick-Kennung, den Zeitpunkt,
               den Angebotswert sowie eine interne Vorgangsnummer.
             </p>
-            <p className="text-gray-700 leading-relaxed">
+            <p className="text-gray-700 leading-relaxed mb-4">
               Rechtsgrundlage ist Ihre Einwilligung (Art. 6 Abs. 1 lit. a DSGVO), die Sie
               jederzeit mit Wirkung für die Zukunft über die Cookie-Einstellungen widerrufen
               können. Anbieter: Google Ireland Limited, Gordon House, Barrow Street, Dublin 4,
               Irland.
+            </p>
+            <p className="text-gray-700 leading-relaxed mb-4">
+              <strong>OpenAI Ads Conversion-Tracking:</strong>{' '}
+              Wir schalten Anzeigen innerhalb von ChatGPT. Nur wenn Sie im Cookie-Banner der
+              Kategorie &bdquo;Marketing&ldquo; zugestimmt haben, laden wir dafür ein
+              Mess-Skript von OpenAI (&bdquo;Pixel&ldquo;). Es vergibt eine zufällige Kennung,
+              die in Ihrem Browser gespeichert wird, und meldet an OpenAI, wenn Sie den
+              Kostenrechner abgeschlossen haben. Übermittelt werden dabei ausschließlich diese
+              Kennung, der Zeitpunkt, ein pauschaler Anfragewert sowie eine interne
+              Vorgangsnummer &ndash; <strong>keine</strong> Namen, Kontaktdaten,
+              Gesundheitsangaben oder Ergebnisse Ihrer Berechnung. Ohne Ihre Einwilligung wird
+              das Skript gar nicht erst geladen; widerrufen Sie sie, stellt es die Übermittlung
+              ein. Rechtsgrundlage ist Ihre Einwilligung (Art. 6 Abs. 1 lit. a DSGVO).
+              Anbieter: OpenAI Ireland Limited, 1st Floor, The Liffey Trust Centre,
+              117&ndash;126 Sheriff Street Upper, Dublin 1, D01 YC43, Irland. Eine Übermittlung
+              in die USA an OpenAI OpCo, LLC ist dabei nicht ausgeschlossen.
             </p>
           </section>
 

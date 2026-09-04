@@ -1030,6 +1030,9 @@ Suites:
   (token → review → accept; decline path)
 - `src/__tests__/portalUrl.test.ts` — `appendJobParam` (cross-import z
   `project 3/lib/portal-url.ts`)
+- `src/__tests__/oaiq.test.ts` — OpenAI-Ads-Pixel: `meldeAnfrage`, nazwa
+  zdarzenia `lead_created` i staly `WERT_ANFRAGE_EUR=20` (cross-import
+  z `project 3/lib/oaiq.ts`; dokumentacja: docs/openai-ads-tracking.md)
 - `src/__tests__/portalLead.test.ts` + `portalParser.test.ts` — eingekaufte
   Portal-Leads: defaults `ergaenzeAngaben`, admin-Reitery `reiterFuer`,
   parser maila Pflegehilfe (Registry #38 — dawne skrypty Deno w
@@ -1037,7 +1040,7 @@ Suites:
 
 Cross-app importy z `project 3/` w root-vitest są dozwolone WYŁĄCZNIE dla
 pure modułów (zero importów Next/supabase; type-importy OK). Aktualna
-lista: `portal-url.ts`, `portal-lead.ts`, `portal-parser.ts`.
+lista: `portal-url.ts`, `portal-lead.ts`, `portal-parser.ts`, `oaiq.ts`.
 
 ### Edge Functions (Deno)
 
