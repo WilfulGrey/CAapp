@@ -314,7 +314,10 @@ die kein echter Lead wurde — `abgelehnt` wie `uebersprungen` — wird im
 Admin sichtbar: als Event auf dem bestehenden Lead derselben Adresse,
 sonst als Shell-Lead mit Status **`manuell_pruefen`** (rot). Betreff,
 Grund und ein Textauszug stehen im Ereignis (`portal_mail_fehler` /
-`portal_mail_uebersprungen`). Dazu listet der Portal-Reiter im Admin den
+`portal_mail_uebersprungen`); bei **abgelehnten** Mails zusätzlich der
+komplette Mailtext (+ CSV-Zeilen) als `metadata.volltext` — die Mail kann
+nach dem Lauf aus dem Postfach verschwunden sein (Trageser 04.09.), dann
+ist das Ereignis die einzige Kopie. Dazu listet der Portal-Reiter im Admin den
 Abschnitt „Postfach — Mails ohne Lead" direkt aus `portal_mail_log`.
 Jede Mail hat Geld gekostet — ein stiller Verlust ist teurer als ein
 roter Eintrag zu viel.
