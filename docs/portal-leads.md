@@ -208,6 +208,13 @@ gelten als beliebiger Whitespace. Vorher: alle drei Direktmails abgelehnt
 mit „kein Einwilligungsnachweis" — alle Mails davor waren Apple-Mail-Forwards
 oder Martins Klartext-Tests, die Direktform war nie durch den Parser gelaufen.
 
+**Die Einwilligung ist kein Gate** (Entscheidung Michał 04.09.): der
+Abholer lehnt keine Mail mehr ab, weil der Zeitstempel fehlt. Findet der
+Parser den Stempel des Portals, wird er bezeugt; sonst steht im Nachweis,
+was wir wissen — Lieferung per Mail vom Portal, Datum der Mail (Anfragen-Nr.,
+wenn gelesen) — wie bei der Partner-API. `erstellt_am` = dieser Zeitpunkt,
+die 60-Tage-Schutzregel greift weiter.
+
 ## API-Portal: pflege-helfer24.de (Registry #50)
 
 Kein Postfach — der Abholer holt im selben Takt (nach den Postfächern)
@@ -296,7 +303,7 @@ Die Status:
 |---|---|
 | `erledigt` | Lead angelegt (`lead_id` gesetzt) |
 | `uebersprungen` | Schutzregel (zu alt, Status nicht ansprechbar) — `grund`; im Admin als Shell-Lead/Event sichtbar |
-| `abgelehnt` | deterministisch (keine Einwilligung, keine Kundenadresse, HTTP 400): **dauerhaft, kein Retry** — im Admin als Shell-Lead `manuell_pruefen` |
+| `abgelehnt` | deterministisch (keine Kundenadresse, HTTP 400): **dauerhaft, kein Retry** — im Admin als Shell-Lead `manuell_pruefen`. Eine fehlende Einwilligung ist seit 04.09. KEIN Ablehnungsgrund mehr (s. „Direktmails des Portals") |
 | `offen` | transient (5xx, Netz): nächster Takt versucht erneut — nur dieser Status färbt den Lauf rot |
 | `altbestand` | beim Erstlauf eines (postfach, uidvalidity)-Paars vorgefunden, nie verarbeitet (Seed, Muster Bug #25; `uid=0` = Sentinel „Postfach war leer") |
 
