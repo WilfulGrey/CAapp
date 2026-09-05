@@ -202,11 +202,25 @@ export default function LeadsPage() {
   };
 
 
-  /* Grundmenge der aktuellen Ansicht — Reiter, Zähler und Liste rechnen alle
-     hierauf, damit die Zahlen zueinander passen. */
-  const sichtbareLeads = leads.filter((l) =>
-    testAnsicht === 'alle' ? true : testAnsicht === 'tests' ? !!l.ist_test : !l.ist_test,
-  );
+  /* Zwei Filter liegen uebereinander: Herkunft (Reiter oben) und Test-Ansicht
+     (Echte/Alle/Tests darunter).
+
+     Jede Anzeige zaehlt die JEWEILS ANDERE Auswahl mit (Martin, 05.09.2026:
+     „ich kann noch nicht bei Pflegehilfe elf Leads anzeigen und darunter
+     fuenfhundert"):
+       - die Herkunfts-Reiter zaehlen innerhalb der gewaehlten Test-Ansicht,
+       - Echte/Alle/Tests zaehlen innerhalb des gewaehlten Reiters.
+     Jede Zahl beantwortet damit „wie viele bekomme ich, wenn ich HIER klicke
+     und den anderen Filter so lasse". */
+  const passtZurTestAnsicht = (l: any) =>
+    testAnsicht === 'alle' ? true : testAnsicht === 'tests' ? !!l.ist_test : !l.ist_test;
+  const passtZurQuelle = (l: any) =>
+    quelleFilter === 'all' ? true
+      : quelleFilter === 'eigene' ? !istEingekauft(l.source)
+      : l.source === quelleFilter;
+
+  const imReiter = leads.filter(passtZurQuelle);
+  const sichtbareLeads = leads.filter((l) => passtZurTestAnsicht(l) && passtZurQuelle(l));
 
   /**
    * Lead als Test kennzeichnen — oder die Kennzeichnung zuruecknehmen.
@@ -244,12 +258,6 @@ export default function LeadsPage() {
       filtered = filtered.filter((lead) => lead.status === statusFilter);
     }
 
-    if (quelleFilter === 'eigene') {
-      filtered = filtered.filter((lead) => !istEingekauft(lead.source));
-    } else if (quelleFilter !== 'all') {
-      filtered = filtered.filter((lead) => lead.source === quelleFilter);
-    }
-
     if (searchTerm) {
       const term = searchTerm.toLowerCase();
       filtered = filtered.filter(
@@ -265,7 +273,7 @@ export default function LeadsPage() {
 
   /* Reiter-Logik lebt in lib/portal-lead.ts (reiterFuer) — dort testbar,
      hier nur der Aufruf. */
-  const reiter = reiterFuer(sichtbareLeads);
+  const reiter = reiterFuer(leads.filter(passtZurTestAnsicht));
 
   const getStatusBadge = (status: string) => {
     const styles: Record<string, string> = {
@@ -380,9 +388,9 @@ export default function LeadsPage() {
               Aufräumen, „Alle" zum Vergleichen. */}
           <div className="flex shrink-0 items-center rounded-lg border border-gray-200 bg-white p-0.5">
             {([
-              { key: 'echte', label: 'Echte', anzahl: leads.length - testAnzahl },
-              { key: 'alle', label: 'Alle', anzahl: leads.length },
-              { key: 'tests', label: 'Tests', anzahl: testAnzahl },
+              { key: 'echte', label: 'Echte', anzahl: imReiter.filter((l) => !l.ist_test).length },
+              { key: 'alle', label: 'Alle', anzahl: imReiter.length },
+              { key: 'tests', label: 'Tests', anzahl: imReiter.filter((l) => l.ist_test).length },
             ] as const).map((a) => (
               <button
                 key={a.key}
@@ -555,14 +563,17 @@ export default function LeadsPage() {
                           title={lead.ist_test
                             ? 'Kennzeichnung zurücknehmen — der Lead zählt wieder mit'
                             : 'Als Testlead kennzeichnen — verschwindet aus Liste und Statistik'}
-                          className={`text-xs font-medium transition-colors disabled:opacity-50 ${
+                          /* Als KNOPF erkennbar (Martin, 05.09.2026: „wie kann ich einen Lead
+                             als Testlead manuell markieren?" — das nackte Wort „Test" las sich
+                             wie eine Beschriftung, nicht wie eine Aktion). */
+                          className={`shrink-0 whitespace-nowrap rounded-md border px-2.5 py-1 text-xs font-medium transition-colors disabled:opacity-50 ${
                             lead.ist_test
-                              ? 'text-[#5C4A32] hover:text-[#7D6850]'
-                              : 'text-gray-400 hover:text-gray-700'
+                              ? 'border-[#C4B59B] bg-[#F5EFE6] text-[#5C4A32] hover:bg-[#EDE4D6]'
+                              : 'border-gray-200 bg-white text-gray-500 hover:border-gray-300 hover:text-gray-800'
                           }`}
-                        >
-                          {markiere === lead.id ? '…' : lead.ist_test ? 'Kein Test' : 'Test'}
-                        </button>
+                          >
+                            {markiere === lead.id ? '…' : lead.ist_test ? '↩ Kein Test' : 'Als Test'}
+                          </button>
                         <Link
                           href={`/admin/leads/${lead.id}`}
                           className="text-[#5C4A32] hover:text-[#7D6850] text-sm font-medium inline-flex items-center gap-1"
