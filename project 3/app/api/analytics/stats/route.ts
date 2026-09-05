@@ -179,11 +179,19 @@ async function handleGet(request: NextRequest) {
       );
     }
 
-    // Exclude test traffic. Lead with "test" in vorname/nachname/email →
-    // drop the entire session footprint (sessions, page_views, conversions,
-    // wizard events, form interactions). Test leads are unavoidable on a
-    // public form (team QA + curious users); without this they inflate the
-    // funnel.
+    /* Testverkehr raus. Bis 05.09.2026 wurde dafuer der NAME geraten
+       ("test" in vorname/nachname/email). Das traf zwar die meisten, uebersah
+       aber alles ohne das Wort (E2E-Laeufe auf @example.com) und haette
+       irgendwann einen echten Kunden namens Testorf erwischt.
+    
+       Jetzt entscheidet das ausdrueckliche Kennzeichen `leads.ist_test`, das im
+       Admin gesetzt und zurueckgenommen werden kann (Martin, 05.09.2026:
+       markieren und ausblenden statt loeschen). Die bisher per Heuristik
+       erkannten Leads wurden einmalig gekennzeichnet — die Zahlen aendern sich
+       dadurch nicht, die Regel ist nur nicht mehr geraten.
+    
+       Getroffen wird die ganze Sitzung: Seitenaufrufe, Conversions,
+       Wizard-Schritte, Formularfelder. Sonst blieben Haelften im Trichter. */
     let testSessionIds = new Set<string>();
     const conversionLeadIds = Array.from(new Set(
       conversions.map(c => c.lead_id).filter((id: any): id is string => Boolean(id))
@@ -195,7 +203,7 @@ async function handleGet(request: NextRequest) {
           .from('leads')
           .select('id')
           .in('id', chunk)
-          .or('vorname.ilike.%test%,nachname.ilike.%test%,email.ilike.%test%')
+          .eq('ist_test', true)
           .range(from, to),
       );
       const testLeadIdSet = new Set((testLeadRows ?? []).map(l => l.id));

@@ -82,6 +82,11 @@ export default function LeadsPage() {
      sind zeitkritisch (die Portale liefern an bis zu drei Anbieter) und
      ihre Abschlussquote entscheidet, ob sich die Quelle rechnet. */
   const [quelleFilter, setQuelleFilter] = useState('all');
+  /* Testleads (Martin, 05.09.2026: „kann ich die auch manuell als test markieren
+     und somit ausblenden und vielleicht filter zum einblenden?"). Standard: aus
+     — die Liste soll den echten Zulauf zeigen. */
+  const [testsZeigen, setTestsZeigen] = useState(false);
+  const [markiere, setMarkiere] = useState<string | null>(null);
 
   useEffect(() => {
     loadLeads();
@@ -141,7 +146,7 @@ export default function LeadsPage() {
 
   useEffect(() => {
     filterLeads();
-  }, [searchTerm, statusFilter, quelleFilter, leads]);
+  }, [searchTerm, statusFilter, quelleFilter, testsZeigen, leads]);
 
   /* still=true: Nachladen aus dem Live-Kanal — ohne Spinner, sonst blinkt
      bei jeder Änderung die ganze Seite weg. */
@@ -195,8 +200,41 @@ export default function LeadsPage() {
     }
   };
 
+  /**
+   * Lead als Test kennzeichnen — oder die Kennzeichnung zuruecknehmen.
+   *
+   * Server-seitig (Service-Key), nicht aus dem Browser heraus: der oeffentliche
+   * Anon-Key liegt im Bundle, Schreibrechte gehoeren nicht dorthin. Die Zeile
+   * wird sofort lokal umgestellt, damit die Liste nicht wartet; scheitert der
+   * Server, wird zurueckgedreht und gesagt warum.
+   */
+  const testKennzeichnen = async (lead: any, ist_test: boolean) => {
+    setMarkiere(lead.id);
+    const vorher = leads;
+    setLeads((l) => l.map((x) => (x.id === lead.id ? { ...x, ist_test } : x)));
+    try {
+      const res = await fetch(`/api/admin/leads/${lead.id}/test`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ist_test }),
+      });
+      if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error || `HTTP ${res.status}`);
+    } catch (e) {
+      setLeads(vorher);
+      alert('Konnte nicht gespeichert werden: ' + (e instanceof Error ? e.message : String(e)));
+    } finally {
+      setMarkiere(null);
+    }
+  };
+
+  const testAnzahl = leads.filter((l) => l.ist_test).length;
+
   const filterLeads = () => {
     let filtered = [...leads];
+
+    if (!testsZeigen) {
+      filtered = filtered.filter((lead) => !lead.ist_test);
+    }
 
     if (statusFilter !== 'all') {
       filtered = filtered.filter((lead) => lead.status === statusFilter);
@@ -333,6 +371,21 @@ export default function LeadsPage() {
               className="pl-10"
             />
           </div>
+          {testAnzahl > 0 && (
+            <button
+              type="button"
+              onClick={() => setTestsZeigen((v) => !v)}
+              title={testsZeigen ? 'Testleads wieder ausblenden' : 'Als Test gekennzeichnete Leads einblenden'}
+              className={`shrink-0 rounded-lg border px-3 text-sm font-medium transition-colors ${
+                testsZeigen
+                  ? 'border-[#5C4A32] bg-[#5C4A32] text-white'
+                  : 'border-gray-200 bg-white text-gray-600 hover:border-gray-300'
+              }`}
+            >
+              Testleads
+              <span className={`ml-2 tabular-nums ${testsZeigen ? 'text-white/80' : 'text-gray-400'}`}>{testAnzahl}</span>
+            </button>
+          )}
           <Select value={statusFilter} onValueChange={setStatusFilter}>
             <SelectTrigger className="w-[200px]">
               <SelectValue placeholder="Status filtern" />
@@ -475,13 +528,33 @@ export default function LeadsPage() {
                       </div>
                     </td>
                     <td className="py-3 px-4">
-                      <Link
-                        href={`/admin/leads/${lead.id}`}
-                        className="text-[#5C4A32] hover:text-[#7D6850] text-sm font-medium inline-flex items-center gap-1"
-                      >
-                        Details
-                        <ExternalLink className="w-3 h-3" />
-                      </Link>
+                      <div className="flex items-center justify-end gap-3">
+                        {/* Kennzeichnen statt löschen (Martin, 05.09.2026): der Lead bleibt,
+                            verschwindet aber aus Liste, Statistik und Berichten — und kommt
+                            mit demselben Knopf zurück. */}
+                        <button
+                          type="button"
+                          disabled={markiere === lead.id}
+                          onClick={() => testKennzeichnen(lead, !lead.ist_test)}
+                          title={lead.ist_test
+                            ? 'Kennzeichnung zurücknehmen — der Lead zählt wieder mit'
+                            : 'Als Testlead kennzeichnen — verschwindet aus Liste und Statistik'}
+                          className={`text-xs font-medium transition-colors disabled:opacity-50 ${
+                            lead.ist_test
+                              ? 'text-[#5C4A32] hover:text-[#7D6850]'
+                              : 'text-gray-400 hover:text-gray-700'
+                          }`}
+                        >
+                          {markiere === lead.id ? '…' : lead.ist_test ? 'Kein Test' : 'Test'}
+                        </button>
+                        <Link
+                          href={`/admin/leads/${lead.id}`}
+                          className="text-[#5C4A32] hover:text-[#7D6850] text-sm font-medium inline-flex items-center gap-1"
+                        >
+                          Details
+                          <ExternalLink className="w-3 h-3" />
+                        </Link>
+                      </div>
                     </td>
                   </tr>
                 ))
