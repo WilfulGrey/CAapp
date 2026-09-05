@@ -82,10 +82,11 @@ export default function LeadsPage() {
      sind zeitkritisch (die Portale liefern an bis zu drei Anbieter) und
      ihre Abschlussquote entscheidet, ob sich die Quelle rechnet. */
   const [quelleFilter, setQuelleFilter] = useState('all');
-  /* Testleads (Martin, 05.09.2026: „kann ich die auch manuell als test markieren
-     und somit ausblenden und vielleicht filter zum einblenden?"). Standard: aus
-     — die Liste soll den echten Zulauf zeigen. */
-  const [testsZeigen, setTestsZeigen] = useState(false);
+  /* Testleads (Martin, 05.09.2026: „der filter muss alle 3 optionen haben:
+     alle, echte, tests"). Standard „echte" — die Liste soll den echten Zulauf
+     zeigen. Die Auswahl wirkt auf ALLES: Herkunfts-Reiter, Zähler und Liste,
+     sonst stehen in den Reitern Zahlen, die die Liste nicht hergibt. */
+  const [testAnsicht, setTestAnsicht] = useState<'echte' | 'alle' | 'tests'>('echte');
   const [markiere, setMarkiere] = useState<string | null>(null);
 
   useEffect(() => {
@@ -146,7 +147,7 @@ export default function LeadsPage() {
 
   useEffect(() => {
     filterLeads();
-  }, [searchTerm, statusFilter, quelleFilter, testsZeigen, leads]);
+  }, [searchTerm, statusFilter, quelleFilter, testAnsicht, leads]);
 
   /* still=true: Nachladen aus dem Live-Kanal — ohne Spinner, sonst blinkt
      bei jeder Änderung die ganze Seite weg. */
@@ -200,6 +201,13 @@ export default function LeadsPage() {
     }
   };
 
+
+  /* Grundmenge der aktuellen Ansicht — Reiter, Zähler und Liste rechnen alle
+     hierauf, damit die Zahlen zueinander passen. */
+  const sichtbareLeads = leads.filter((l) =>
+    testAnsicht === 'alle' ? true : testAnsicht === 'tests' ? !!l.ist_test : !l.ist_test,
+  );
+
   /**
    * Lead als Test kennzeichnen — oder die Kennzeichnung zuruecknehmen.
    *
@@ -230,11 +238,7 @@ export default function LeadsPage() {
   const testAnzahl = leads.filter((l) => l.ist_test).length;
 
   const filterLeads = () => {
-    let filtered = [...leads];
-
-    if (!testsZeigen) {
-      filtered = filtered.filter((lead) => !lead.ist_test);
-    }
+    let filtered = [...sichtbareLeads];
 
     if (statusFilter !== 'all') {
       filtered = filtered.filter((lead) => lead.status === statusFilter);
@@ -261,7 +265,7 @@ export default function LeadsPage() {
 
   /* Reiter-Logik lebt in lib/portal-lead.ts (reiterFuer) — dort testbar,
      hier nur der Aufruf. */
-  const reiter = reiterFuer(leads);
+  const reiter = reiterFuer(sichtbareLeads);
 
   const getStatusBadge = (status: string) => {
     const styles: Record<string, string> = {
@@ -326,7 +330,7 @@ export default function LeadsPage() {
         <div>
           <h1 className="text-3xl font-bold text-gray-900">Leads</h1>
           <p className="text-gray-600 mt-1">
-            Verwalten Sie alle Interessenten ({filteredLeads.length} von {leads.length})
+            Verwalten Sie alle Interessenten ({filteredLeads.length} von {sichtbareLeads.length})
           </p>
         </div>
         <div className="flex items-center gap-3">
@@ -371,21 +375,33 @@ export default function LeadsPage() {
               className="pl-10"
             />
           </div>
-          {testAnzahl > 0 && (
-            <button
-              type="button"
-              onClick={() => setTestsZeigen((v) => !v)}
-              title={testsZeigen ? 'Testleads wieder ausblenden' : 'Als Test gekennzeichnete Leads einblenden'}
-              className={`shrink-0 rounded-lg border px-3 text-sm font-medium transition-colors ${
-                testsZeigen
-                  ? 'border-[#5C4A32] bg-[#5C4A32] text-white'
-                  : 'border-gray-200 bg-white text-gray-600 hover:border-gray-300'
-              }`}
-            >
-              Testleads
-              <span className={`ml-2 tabular-nums ${testsZeigen ? 'text-white/80' : 'text-gray-400'}`}>{testAnzahl}</span>
-            </button>
-          )}
+          {/* Drei Ansichten statt an/aus (Martin, 05.09.2026: „der filter muss alle 3
+              optionen haben: alle, echte, tests"). „Echte" ist der Alltag, „Tests" zum
+              Aufräumen, „Alle" zum Vergleichen. */}
+          <div className="flex shrink-0 items-center rounded-lg border border-gray-200 bg-white p-0.5">
+            {([
+              { key: 'echte', label: 'Echte', anzahl: leads.length - testAnzahl },
+              { key: 'alle', label: 'Alle', anzahl: leads.length },
+              { key: 'tests', label: 'Tests', anzahl: testAnzahl },
+            ] as const).map((a) => (
+              <button
+                key={a.key}
+                type="button"
+                onClick={() => setTestAnsicht(a.key)}
+                aria-pressed={testAnsicht === a.key}
+                className={`rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
+                  testAnsicht === a.key
+                    ? 'bg-[#5C4A32] text-white'
+                    : 'text-gray-600 hover:bg-gray-50'
+                }`}
+              >
+                {a.label}
+                <span className={`ml-1.5 tabular-nums ${testAnsicht === a.key ? 'text-white/75' : 'text-gray-400'}`}>
+                  {a.anzahl}
+                </span>
+              </button>
+            ))}
+          </div>
           <Select value={statusFilter} onValueChange={setStatusFilter}>
             <SelectTrigger className="w-[200px]">
               <SelectValue placeholder="Status filtern" />
