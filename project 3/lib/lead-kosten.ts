@@ -36,28 +36,37 @@ export const istEingekauft = (source?: string | null) =>
   String(source ?? '').toLowerCase().startsWith('portal:');
 
 /**
- * Lesbarer Name je Quelle — und zwar EINDEUTIG.
+ * Quellen zusammenfassen, die dasselbe bedeuten.
  *
- * Martin, 06.09.2026: „kostenrechner ist 2 mal". `rechner` und
- * `rechner:kosten-berechnen` sind zwei verschiedene Landingpages, hiessen aber
- * beide „Kostenrechner" — zwei Zeilen mit demselben Namen sind schlimmer als
- * ein sperriger Name. Die Seite wird jetzt mitgenannt.
+ * `rechner` und `rechner:kosten-berechnen` sind nur die beiden Fassungen des
+ * laufenden A/B-Tests — dieselbe Seite unter derselben Adresse. Fuer die
+ * Kostenbetrachtung sind sie EIN Kanal (Martin, 06.09.2026: „die a/B varianten
+ * musst du nicht trennen"). Der Test selbst wird woanders ausgewertet, dort
+ * zaehlt die Quote, nicht die Stueckzahl.
+ *
+ * Portale werden NICHT zusammengefasst — sie einzeln bewerten zu koennen war
+ * der Anlass fuer die Seite.
  */
-export function quellenName(source: string): string {
-  if (istEingekauft(source)) {
-    const d = source.slice('portal:'.length);
+export function quellenSchluessel(source?: string | null): string {
+  const s = String(source ?? '').trim();
+  if (!s) return 'unbekannt';
+  if (istEingekauft(s)) return s.toLowerCase();
+  if (s === 'rechner' || s.startsWith('rechner:')) return 'rechner';
+  if (s === 'pria-chat' || s.startsWith('chat:')) return 'chat';
+  if (s.startsWith('website:')) return 'website';
+  return s;
+}
+
+/** Lesbarer Name je zusammengefasster Quelle. */
+export function quellenName(schluessel: string): string {
+  if (istEingekauft(schluessel)) {
+    const d = schluessel.slice('portal:'.length);
     return d.charAt(0).toUpperCase() + d.slice(1);
   }
-  const seite = (s: string) => {
-    const p = s.split(':')[1] ?? '';
-    return p ? ` · /${p}` : ' · Startseite';
-  };
-  if (source === 'pria-chat') return 'Pria-Chat · /sofortangebot';
-  if (source.startsWith('chat:')) return `Pria-Chat${seite(source)}`;
-  if (source.startsWith('website:')) return 'Primundus.de';
-  if (source === 'rechner') return 'Kostenrechner · Startseite';
-  if (source.startsWith('rechner:')) return `Kostenrechner${seite(source)}`;
-  return source || 'unbekannt';
+  if (schluessel === 'chat') return 'Pria-Chat';
+  if (schluessel === 'website') return 'Primundus.de';
+  if (schluessel === 'rechner') return 'Kostenrechner';
+  return schluessel || 'unbekannt';
 }
 
 const teile = (zaehler: number, nenner: number) => (nenner > 0 ? zaehler / nenner : null);
@@ -79,7 +88,7 @@ export function quellenAuswertung(
   const echte = leads.filter((l) => !l.ist_test);
   const gruppen = new Map<string, { leads: number; profile: number }>();
   for (const l of echte) {
-    const key = String(l.source ?? '').trim() || 'unbekannt';
+    const key = quellenSchluessel(l.source);
     const g = gruppen.get(key) ?? { leads: 0, profile: 0 };
     g.leads++;
     if (profileJeLeadId.has(l.id)) g.profile++;
