@@ -357,9 +357,15 @@ export function buildReportEmail(opts: {
           kachel(euro(gesamtKostenY), "Kosten gestern",
             leadsY > 0 ? `${perPiece(gesamtKostenY, leadsY)} je Lead über alles` : "keine Leads",
             FARBE.tinte)}
-        ${kachel(String(yesterday.patientDataSaved), "Profile gestern",
-          `Ø ${zahl(period.patientDataSaved.avg, 1)}${pfeilVgl(yesterday.patientDataSaved, period.patientDataSaved.avg)}`,
-          yesterday.patientDataSaved >= period.patientDataSaved.avg ? FARBE.gut : FARBE.schlecht)}
+        ${/* Statt des Tagesschnitts die KOSTEN je Profil (Martin, 06.09.2026: „es
+              fehlt hier noch die kosten je Profil … mach das im 3. kasten einfach
+              statt der 1,7"). Ueber alles gerechnet — die Aufteilung nach Bereich
+              steht in den Gruppen darunter. */
+          kachel(String(yesterday.patientDataSaved), "Profile gestern",
+            yesterday.patientDataSaved > 0
+              ? `${perPiece(gesamtKostenY, yesterday.patientDataSaved)} je Profil über alles`
+              : "kein Profil",
+            yesterday.patientDataSaved >= period.patientDataSaved.avg ? FARBE.gut : FARBE.schlecht)}
       </tr>
     </table>`;
 
