@@ -18,7 +18,8 @@ import type { DailyStats, PeriodStats } from "../queries.ts";
 
 const tag = (over: Partial<DailyStats> = {}): DailyStats => ({
   visitors: 50, wizardStarted: 10, wizardCompleted: 5, wizardCompletedIncludingTests: 5,
-  leadsEigene: 5, leadsEingekauft: 0,
+  leadsEigene: 5, leadsEingekauft: 0, profileEigene: 1, profileEingekauft: 0,
+  kostenEingekauft: 0, portaleOhnePreis: [],
   patientDataSaved: 1, caregiverInvited: 0, interestShown: 0, applicationReceived: 0,
   bookings: 0, deviceMobile: 40, deviceDesktop: 8, deviceTablet: 2,
   sourceDirect: 10, sourceReferral: 40, funnelStepViewed: {}, wizardOpenedBySource: {},
@@ -26,7 +27,7 @@ const tag = (over: Partial<DailyStats> = {}): DailyStats => ({
 });
 const stat = (avg: number) => ({ avg, top: avg, topDate: "31.08." });
 const periode = (leadsBySource: Record<string, number>): PeriodStats => ({
-  sums: { wizardCompleted: 33, leadsEigene: 30, leadsEingekauft: 3, patientDataSaved: 12 },
+  sums: { wizardCompleted: 33, leadsEigene: 30, leadsEingekauft: 3, patientDataSaved: 12, profileEigene: 11, profileEingekauft: 1, kostenEingekauft: 111 },
   tage: 7,
   visitors: stat(60), wizardStarted: stat(10), wizardCompleted: stat(5),
   patientDataSaved: stat(1.7), caregiverInvited: stat(0), interestShown: stat(0),
@@ -190,7 +191,47 @@ Deno.test("Kosten je Lead rechnen mit den EIGENEN Leads", () => {
     yesterday: tag({ wizardCompleted: 10, leadsEigene: 4, leadsEingekauft: 6 }),
     adsSpend: { yesterday: 80, period: 560, periodDays: 7 },
   }).html;
-  assertStringIncludes(html, "je eigenem Lead");
-  assertStringIncludes(html, "20,00 €"); // 80 / 4 eigene, nicht 80 / 10 = 8,00 €
-  assert(!html.includes("8,00 €"), "darf NICHT durch alle Leads teilen");
+  /* Genau die Kachel pruefen, nicht das ganze Dokument: „8,00 €" (80 ÷ 10)
+     steht seit der Kostenkarte legitim als Gesamtwert in der Mail. Die
+     ADS-Kachel muss trotzdem durch die EIGENEN Leads teilen. */
+  // In der Kachel steht die Beschriftung VOR dem Wert.
+  const kachel = html.match(/je eigenem Lead[\s\S]{0,300}?([0-9.]*[0-9],[0-9]{2} €)/);
+  assert(kachel, 'Kachel „je eigenem Lead“ fehlt');
+  assertEquals(kachel![1], "20,00 €"); // 80 ÷ 4 eigene, nicht 80 ÷ 10
+});
+
+/* Kosten nach Bereich (Martin, 05.09.2026): Werbung erzeugt nur eigene Leads,
+   Einkauf nur eingekaufte. Beides getrennt zu rechnen ist der ganze Punkt. */
+Deno.test("Kosten nach Bereich: eigene und eingekaufte getrennt je Lead und je Profil", () => {
+  const html = bauen({
+    yesterday: tag({
+      wizardCompleted: 9, leadsEigene: 4, leadsEingekauft: 5,
+      patientDataSaved: 3, profileEigene: 2, profileEingekauft: 1,
+      kostenEingekauft: 185, portaleOhnePreis: [],
+    }),
+    adsSpend: { yesterday: 80, period: 560, periodDays: 7 },
+  }).html;
+  assertStringIncludes(html, "Kosten nach Bereich");
+  assertStringIncludes(html, "Eigene Leads (Werbung)");
+  assertStringIncludes(html, "Eingekaufte Leads (Portale)");
+  // Werbung 80 € auf 4 eigene Leads = 20 €, auf 2 Profile = 40 €.
+  assertStringIncludes(html, "20,00 €");
+  assertStringIncludes(html, "40,00 €");
+  // Einkauf 185 € (5 × 37) auf 5 Leads = 37 €, auf 1 Profil = 185 €.
+  assertStringIncludes(html, "37,00 €");
+  assertStringIncludes(html, "185,00 €");
+  // Gesamt 265 € auf 9 Leads.
+  assertStringIncludes(html, "265,00 €");
+  // Die Preise stehen als Fussnote dran, damit die Rechnung nachvollziehbar ist.
+  assertStringIncludes(html, "pflegehilfe.org 37,00 €");
+  assertStringIncludes(html, "pflege-helfer24.de 50,00 €");
+});
+
+Deno.test("fehlender Portalpreis wird gemeldet statt still mit 0 gerechnet", () => {
+  const html = bauen({
+    yesterday: tag({ wizardCompleted: 3, leadsEigene: 1, leadsEingekauft: 2, kostenEingekauft: 37, portaleOhnePreis: ["pflegebund.eu"] }),
+    adsSpend: { yesterday: 20, period: 140, periodDays: 7 },
+  }).html;
+  assertStringIncludes(html, "Ohne hinterlegten Preis");
+  assertStringIncludes(html, "pflegebund.eu");
 });

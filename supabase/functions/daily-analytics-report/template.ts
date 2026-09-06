@@ -9,6 +9,7 @@
 // zeigt das aktuelle Plateau. Conversion-% als Tabelle, weil absolute
 // Zahlen wenig aussagen wenn Traffic schwankt.
 
+import { PORTAL_PREISE } from "./queries.ts";
 import type { BesucherKohorte, DailyStats, LeadKohorte, PeriodStats } from "./queries.ts";
 
 // Spiegelt MultiStepForm.getStepId() — 9 Schritte (Betreuungsbeginn /
@@ -88,6 +89,9 @@ export function buildReportEmail(opts: {
      die eigenen. `?? 0` fuer Berichte aus der Zeit vor dem Feld. */
   const eigeneY = yesterday.leadsEigene ?? leadsY;
   const eingekauftY = yesterday.leadsEingekauft ?? 0;
+  const profileEigeneY = yesterday.profileEigene ?? yesterday.patientDataSaved;
+  const profileEingekauftY = yesterday.profileEingekauft ?? 0;
+  const einkaufY = yesterday.kostenEingekauft ?? 0;
   const leadsAvg = period.wizardCompleted.avg;
   const verdict = leadsY >= Math.max(leadsAvg * 1.25, leadsAvg + 1)
     ? { emoji: "✅", wort: "Guter Tag" }
@@ -496,6 +500,61 @@ export function buildReportEmail(opts: {
       </tr>
     </table>`;
 
+  /* Kosten nach Bereich (Martin, 05.09.2026: „du musst die preise kennen fuer
+     die eingekauften leads, damit wir die gesamtkosten auf eigene und
+     eingekauft teilen und auch je lead aufteilen — natuerlich auch je profil").
+     Preise stehen in PORTAL_PREISE (queries.ts), netto.
+
+     Getrennt zu rechnen ist der ganze Punkt: Werbung erzeugt nur eigene Leads,
+     Einkauf nur eingekaufte. Eine gemeinsame Zahl verwischt beides. */
+  const werbungY = adsSpend?.yesterday ?? 0;
+  const werbungP = adsSpend?.period ?? 0;
+  const einkaufP = period.sums.kostenEingekauft ?? 0;
+  const eigeneP = period.sums.leadsEigene ?? 0;
+  const eingekauftP = period.sums.leadsEingekauft ?? 0;
+  const profEigeneP = period.sums.profileEigene ?? 0;
+  const profEingekauftP = period.sums.profileEingekauft ?? 0;
+
+  const spalte = (
+    titel: string, kosten: number, leads: number, profile: number,
+    kostenP: number, leadsP: number, profileP: number,
+  ) => `
+      <td width="50%" style="width:50%;vertical-align:top;padding:0 6px;">
+        <table width="100%" cellpadding="0" cellspacing="0" role="presentation"
+               style="background:${FARBE.karte};border:1px solid ${FARBE.rand};border-radius:10px;">
+          <tr><td style="padding:12px 14px;">
+            <p style="margin:0 0 8px;font-size:12px;font-weight:700;color:${FARBE.tinte};">${titel}</p>
+            <p style="margin:0 0 2px;font-size:19px;font-weight:700;color:${FARBE.tinte};">${euro(kosten)}</p>
+            <p style="margin:0 0 10px;font-size:11px;color:${FARBE.leise};">Ø ${euro(kostenP / Math.max(1, period.tage))} · ${euro(kostenP)} in ${period.tage} Tagen</p>
+            <p style="margin:0;font-size:12px;color:${FARBE.tinte};">
+              ${leads} Lead${leads === 1 ? "" : "s"} · <strong>${perPiece(kosten, leads)}</strong> je Lead
+              <span style="color:${FARBE.leise};">(Ø ${perPiece(kostenP, leadsP)})</span>
+            </p>
+            <p style="margin:4px 0 0;font-size:12px;color:${FARBE.tinte};">
+              ${profile} Profil${profile === 1 ? "" : "e"} · <strong>${perPiece(kosten, profile)}</strong> je Profil
+              <span style="color:${FARBE.leise};">(Ø ${perPiece(kostenP, profileP)})</span>
+            </p>
+          </td></tr>
+        </table>
+      </td>`;
+
+  const fehlendePreise = yesterday.portaleOhnePreis ?? [];
+  const kostenHtml = (werbungY + einkaufY) <= 0 ? "" : `
+    <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="margin:0 0 16px;">
+      <tr><td style="padding:0 0 8px;">
+        <p style="margin:0;font-size:14px;font-weight:700;color:${FARBE.tinte};">Kosten nach Bereich</p>
+        <p style="margin:2px 0 0;font-size:11px;color:${FARBE.leise};">
+          Gestern ${euro(werbungY + einkaufY)} gesamt · ${perPiece(werbungY + einkaufY, leadsY)} je Lead über alles.
+          Einkaufspreise netto: ${Object.entries(PORTAL_PREISE).map(([d, pr]) => `${d} ${euro(Number(pr))}`).join(" · ")}.
+        </p>
+        ${fehlendePreise.length === 0 ? "" : `<p style="margin:6px 0 0;font-size:11px;color:${FARBE.schlecht};">Ohne hinterlegten Preis, daher mit 0 € gerechnet: ${fehlendePreise.join(", ")}.</p>`}
+      </td></tr>
+      <tr>
+        ${spalte("Eigene Leads (Werbung)", werbungY, eigeneY, profileEigeneY, werbungP, eigeneP, profEigeneP)}
+        ${spalte("Eingekaufte Leads (Portale)", einkaufY, eingekauftY, profileEingekauftY, einkaufP, eingekauftP, profEingekauftP)}
+      </tr>
+    </table>`;
+
   const html = `<!DOCTYPE html>
 <html lang="de">
 <head>
@@ -522,6 +581,7 @@ export function buildReportEmail(opts: {
           ${chartConv}
           ${chartEinstieg}
           ${adsHtml}
+          ${kostenHtml}
           ${notesHtml}
           <p style="margin:20px 0 0;text-align:center;">
             <a href="${siteUrl}/admin/leads" style="display:inline-block;background:${FARBE.balken};color:#fff;padding:11px 22px;text-decoration:none;border-radius:8px;font-size:13px;font-weight:600;">Leads im Admin öffnen</a>
