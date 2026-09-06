@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { quellenAuswertung, gruppenSumme, PORTAL_PREISE } from '../lead-kosten';
+import { quellenAuswertung, gruppenSumme, quellenName, PORTAL_PREISE } from '../lead-kosten';
 
 /*
  * Kosten je Quelle (Martin, 06.09.2026). Der Sinn der Trennung: eine eingekaufte
@@ -53,5 +53,20 @@ describe('Kosten je Quelle', () => {
   it('kennt die vereinbarten Preise', () => {
     expect(PORTAL_PREISE['pflegehilfe.org']).toBe(37);
     expect(PORTAL_PREISE['pflege-helfer24.de']).toBe(50);
+  });
+});
+
+describe('Quellennamen', () => {
+  it('unterscheidet die Landingpages statt sie gleich zu nennen', () => {
+    // Martin, 06.09.2026: „kostenrechner ist 2 mal" — zwei Zeilen, ein Name.
+    expect(quellenName('rechner')).toBe('Kostenrechner · Startseite');
+    expect(quellenName('rechner:kosten-berechnen')).toBe('Kostenrechner · /kosten-berechnen');
+    expect(quellenName('rechner')).not.toBe(quellenName('rechner:kosten-berechnen'));
+  });
+
+  it('gibt jeder Quelle einen eigenen Namen', () => {
+    const namen = ['rechner', 'rechner:kosten-berechnen', 'chat:kosten-berechnen', 'pria-chat',
+      'website:apex-components', 'portal:pflegehilfe.org', 'portal:pflege-helfer24.de'].map(quellenName);
+    expect(new Set(namen).size).toBe(namen.length);
   });
 });
