@@ -35,14 +35,28 @@ export type QuellenZeile = {
 export const istEingekauft = (source?: string | null) =>
   String(source ?? '').toLowerCase().startsWith('portal:');
 
+/**
+ * Lesbarer Name je Quelle — und zwar EINDEUTIG.
+ *
+ * Martin, 06.09.2026: „kostenrechner ist 2 mal". `rechner` und
+ * `rechner:kosten-berechnen` sind zwei verschiedene Landingpages, hiessen aber
+ * beide „Kostenrechner" — zwei Zeilen mit demselben Namen sind schlimmer als
+ * ein sperriger Name. Die Seite wird jetzt mitgenannt.
+ */
 export function quellenName(source: string): string {
   if (istEingekauft(source)) {
     const d = source.slice('portal:'.length);
     return d.charAt(0).toUpperCase() + d.slice(1);
   }
-  if (source === 'pria-chat' || source.startsWith('chat:')) return 'Pria-Chat';
+  const seite = (s: string) => {
+    const p = s.split(':')[1] ?? '';
+    return p ? ` · /${p}` : ' · Startseite';
+  };
+  if (source === 'pria-chat') return 'Pria-Chat · /sofortangebot';
+  if (source.startsWith('chat:')) return `Pria-Chat${seite(source)}`;
   if (source.startsWith('website:')) return 'Primundus.de';
-  if (source === 'rechner' || source.startsWith('rechner:')) return 'Kostenrechner';
+  if (source === 'rechner') return 'Kostenrechner · Startseite';
+  if (source.startsWith('rechner:')) return `Kostenrechner${seite(source)}`;
   return source || 'unbekannt';
 }
 
