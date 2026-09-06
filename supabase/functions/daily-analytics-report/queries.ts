@@ -31,6 +31,10 @@ export interface DailyStats {
    *  als Brücke zwischen "Step 9 viewed" und "echte Leads" gebraucht,
    *  damit der Test-Split sichtbar ist und 15 → 2 nicht magisch wirkt. */
   wizardCompletedIncludingTests: number;
+  /** Davon selbst erzeugt (Formular/Chat) — die Zahl, an der Werbung gemessen wird. */
+  leadsEigene: number;
+  /** Davon eingekauft (`source` = "portal:…"). */
+  leadsEingekauft: number;
   patientDataSaved: number;    // lead_events.patient_data_saved
   caregiverInvited: number;    // lead_events.caregiver_invited
   interestShown: number;       // lead_events.caregiver_interest_shown
@@ -195,13 +199,30 @@ export async function fetchDailyStats(
   // echten Conversion-Zahlen nicht verfälscht.
   const { data: leadsInPeriod, error: lErr } = await supabase
     .from("leads")
-    .select("id, email, vorname, nachname, source")
+    .select("id, email, vorname, nachname, source, ist_test")
     .gte("created_at", start)
     .lt("created_at", end);
   if (lErr) throw new Error(`leads: ${lErr.message}`);
   const wizardCompletedIncludingTests = leadsInPeriod?.length ?? 0;
-  const echteLeads = (leadsInPeriod ?? []).filter(isRealLead);
+  /* Testleads: seit 05.09.2026 entscheidet das ausdrueckliche Kennzeichen
+     `leads.ist_test` (im Admin setzbar und zuruecknehmbar). isRealLead() bleibt
+     als Netz fuer Altbestand ohne Kennzeichen — es RAET am Namen und uebersah
+     damit z. B. E2E-Laeufe ohne das Wort "test". */
+  const echteLeads = (leadsInPeriod ?? []).filter((l) => !(l as { ist_test?: boolean }).ist_test && isRealLead(l));
   const wizardCompleted = echteLeads.length;
+
+  /* Eingekaufte Leads getrennt ausweisen (Martin, 05.09.2026: „wir kaufen ja
+     leads ein, daher muessen wir die eingekauften trennen … wir muessen fuer
+     unsere zahlen wissen, wie viele von uns und wie viele eingekaufte").
+
+     Eingekauft = `source` beginnt mit "portal:" (pflegehilfe.org, pflegebund.eu).
+     Der Unterschied ist nicht kosmetisch: Werbeausgaben erzeugen ausschliesslich
+     EIGENE Leads. Wer die eingekauften mitzaehlt, rechnet sich die Kosten je
+     Lead zu guenstig. */
+  const istEingekauft = (l: unknown) =>
+    String((l as { source?: string | null }).source ?? "").toLowerCase().startsWith("portal:");
+  const leadsEingekauft = echteLeads.filter(istEingekauft).length;
+  const leadsEigene = wizardCompleted - leadsEingekauft;
 
   // Herkunft NUR aus echten Leads — sonst färben Test-Anfragen den Split.
   const leadsBySource: Record<string, number> = {};
@@ -237,6 +258,8 @@ export async function fetchDailyStats(
     wizardStarted,
     wizardCompleted,
     wizardCompletedIncludingTests,
+    leadsEigene,
+    leadsEingekauft,
     patientDataSaved,
     caregiverInvited,
     interestShown,
@@ -264,11 +287,17 @@ export async function fetchDailyStats(
 export interface PeriodStat { avg: number; top: number; topDate: string }
 export interface PeriodSums {
   wizardCompleted: number;
+  /** Davon selbst erzeugt — Bezugsgroesse fuer Kosten je Lead. */
+  leadsEigene: number;
+  /** Davon eingekauft (portal:…). */
+  leadsEingekauft: number;
   patientDataSaved: number;
 }
 export interface PeriodStats {
   /** Perioden-SUMMEN (nicht Ø) — für Kosten-je-Stück-Rechnungen (Ads). */
   sums: PeriodSums;
+  /** Wie viele Tage die Periode umfasst — fuer Ø aus Summen. */
+  tage: number;
   visitors: PeriodStat;
   wizardStarted: PeriodStat;
   wizardCompleted: PeriodStat;
@@ -326,6 +355,8 @@ export async function fetchPeriodStats(
 
   const visitorsSum = sumOf((s) => s.visitors);
   const wizardCompletedSum = sumOf((s) => s.wizardCompleted);
+  const leadsEigeneSum = sumOf((s) => s.leadsEigene ?? 0);
+  const leadsEingekauftSum = sumOf((s) => s.leadsEingekauft ?? 0);
   const patientDataSavedSum = sumOf((s) => s.patientDataSaved);
   const caregiverInvitedSum = sumOf((s) => s.caregiverInvited);
   const applicationReceivedSum = sumOf((s) => s.applicationReceived);
@@ -343,7 +374,8 @@ export async function fetchPeriodStats(
   }
 
   return {
-    sums: { wizardCompleted: wizardCompletedSum, patientDataSaved: patientDataSavedSum },
+    sums: { wizardCompleted: wizardCompletedSum, leadsEigene: leadsEigeneSum, leadsEingekauft: leadsEingekauftSum, patientDataSaved: patientDataSavedSum },
+    tage: perDay.length,
     visitors: aggregate((s) => s.visitors),
     wizardStarted: aggregate((s) => s.wizardStarted),
     wizardCompleted: aggregate((s) => s.wizardCompleted),

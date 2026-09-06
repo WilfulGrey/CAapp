@@ -18,6 +18,7 @@ import type { DailyStats, PeriodStats } from "../queries.ts";
 
 const tag = (over: Partial<DailyStats> = {}): DailyStats => ({
   visitors: 50, wizardStarted: 10, wizardCompleted: 5, wizardCompletedIncludingTests: 5,
+  leadsEigene: 5, leadsEingekauft: 0,
   patientDataSaved: 1, caregiverInvited: 0, interestShown: 0, applicationReceived: 0,
   bookings: 0, deviceMobile: 40, deviceDesktop: 8, deviceTablet: 2,
   sourceDirect: 10, sourceReferral: 40, funnelStepViewed: {}, wizardOpenedBySource: {},
@@ -25,7 +26,8 @@ const tag = (over: Partial<DailyStats> = {}): DailyStats => ({
 });
 const stat = (avg: number) => ({ avg, top: avg, topDate: "31.08." });
 const periode = (leadsBySource: Record<string, number>): PeriodStats => ({
-  sums: { wizardCompleted: 33, patientDataSaved: 12 },
+  sums: { wizardCompleted: 33, leadsEigene: 30, leadsEingekauft: 3, patientDataSaved: 12 },
+  tage: 7,
   visitors: stat(60), wizardStarted: stat(10), wizardCompleted: stat(5),
   patientDataSaved: stat(1.7), caregiverInvited: stat(0), interestShown: stat(0),
   applicationReceived: stat(0), bookings: stat(0),
@@ -162,4 +164,33 @@ Deno.test("Besucher je Tag — ohne Daten entfällt das Diagramm", () => {
   assertStringIncludes(mit.html, "Besucher je Tag");
   const ohne = bauen({});
   assert(!ohne.html.includes("Besucher je Tag"), "leeres Diagramm steht im Weg");
+});
+
+/* Eingekaufte Leads getrennt ausweisen (Martin, 05.09.2026: „wir kaufen ja leads
+   ein … wir muessen fuer unsere zahlen wissen, wie viele von uns und wie viele
+   eingekaufte"). */
+Deno.test("Bericht trennt eigene von eingekauften Leads", () => {
+  const html = bauen({ yesterday: tag({ wizardCompleted: 7, leadsEigene: 4, leadsEingekauft: 3 }) }).html;
+  // Leads-Kachel: statt des 7-Tage-Schnitts steht dort die Aufteilung.
+  assertStringIncludes(html, "4 eigene");
+  assertStringIncludes(html, "3 eingekauft");
+  // Und im Tagesfazit im Klartext.
+  assertStringIncludes(html, "davon 4 eigene, 3 eingekauft");
+});
+
+Deno.test("ohne eingekaufte Leads bleibt das Fazit schlank", () => {
+  const html = bauen({ yesterday: tag({ wizardCompleted: 5, leadsEigene: 5, leadsEingekauft: 0 }) }).html;
+  assert(!html.includes("eingekauft</"), "kein Zusatz im Fazit, wenn nichts eingekauft wurde");
+});
+
+Deno.test("Kosten je Lead rechnen mit den EIGENEN Leads", () => {
+  /* Werbung erzeugt keine Portal-Leads. Wuerde die Rechnung sie mitzaehlen,
+     saehen die Kosten je Lead guenstiger aus, als sie sind. */
+  const html = bauen({
+    yesterday: tag({ wizardCompleted: 10, leadsEigene: 4, leadsEingekauft: 6 }),
+    adsSpend: { yesterday: 80, period: 560, periodDays: 7 },
+  }).html;
+  assertStringIncludes(html, "je eigenem Lead");
+  assertStringIncludes(html, "20,00 €"); // 80 / 4 eigene, nicht 80 / 10 = 8,00 €
+  assert(!html.includes("8,00 €"), "darf NICHT durch alle Leads teilen");
 });
