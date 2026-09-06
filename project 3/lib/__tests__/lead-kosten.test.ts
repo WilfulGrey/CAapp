@@ -33,7 +33,7 @@ describe('Kosten je Quelle', () => {
   it('verteilt das Werbebudget nur auf die eigenen Quellen', () => {
     const { zeilen } = quellenAuswertung(leads, profile, 300);
     const rechner = zeilen.find((z) => z.key === 'rechner')!;
-    const chat = zeilen.find((z) => z.key === 'chat:kosten-berechnen')!;
+    const chat = zeilen.find((z) => z.key === 'chat')!;
     // 3 eigene Leads → 100 € je Lead; die eingekauften bekommen nichts davon.
     expect(rechner.kosten).toBe(200);
     expect(chat.kosten).toBe(100);
@@ -57,16 +57,37 @@ describe('Kosten je Quelle', () => {
 });
 
 describe('Quellennamen', () => {
-  it('unterscheidet die Landingpages statt sie gleich zu nennen', () => {
-    // Martin, 06.09.2026: „kostenrechner ist 2 mal" — zwei Zeilen, ein Name.
-    expect(quellenName('rechner')).toBe('Kostenrechner · Startseite');
-    expect(quellenName('rechner:kosten-berechnen')).toBe('Kostenrechner · /kosten-berechnen');
-    expect(quellenName('rechner')).not.toBe(quellenName('rechner:kosten-berechnen'));
+  it('fasst die A/B-Fassungen des Rechners zu EINER Quelle zusammen', () => {
+    // Martin, 06.09.2026: „die a/B varianten musst du nicht trennen".
+    const { zeilen } = quellenAuswertung(
+      [
+        { id: '1', source: 'rechner' },
+        { id: '2', source: 'rechner:kosten-berechnen' },
+        { id: '3', source: 'rechner:sofortangebot' },
+      ],
+      new Set(), 300,
+    );
+    expect(zeilen).toHaveLength(1);
+    expect(zeilen[0].name).toBe('Kostenrechner');
+    expect(zeilen[0].leads).toBe(3);
+  });
+
+  it('fasst Chat-Fassungen zusammen, Portale aber NICHT', () => {
+    const { zeilen } = quellenAuswertung(
+      [
+        { id: '1', source: 'chat:kosten-berechnen' },
+        { id: '2', source: 'pria-chat' },
+        { id: '3', source: 'portal:pflegehilfe.org' },
+        { id: '4', source: 'portal:pflege-helfer24.de' },
+      ],
+      new Set(), 0,
+    );
+    const namen = zeilen.map((z) => z.name).sort();
+    expect(namen).toEqual(['Pflege-helfer24.de', 'Pflegehilfe.org', 'Pria-Chat']);
   });
 
   it('gibt jeder Quelle einen eigenen Namen', () => {
-    const namen = ['rechner', 'rechner:kosten-berechnen', 'chat:kosten-berechnen', 'pria-chat',
-      'website:apex-components', 'portal:pflegehilfe.org', 'portal:pflege-helfer24.de'].map(quellenName);
+    const namen = ['rechner', 'chat', 'website', 'portal:pflegehilfe.org', 'portal:pflege-helfer24.de'].map(quellenName);
     expect(new Set(namen).size).toBe(namen.length);
   });
 });
