@@ -92,6 +92,7 @@ export function buildReportEmail(opts: {
   const profileEigeneY = yesterday.profileEigene ?? yesterday.patientDataSaved;
   const profileEingekauftY = yesterday.profileEingekauft ?? 0;
   const einkaufY = yesterday.kostenEingekauft ?? 0;
+  const gesamtKostenY = (adsSpend?.yesterday ?? 0) + einkaufY;
   const leadsAvg = period.wizardCompleted.avg;
   const verdict = leadsY >= Math.max(leadsAvg * 1.25, leadsAvg + 1)
     ? { emoji: "✅", wort: "Guter Tag" }
@@ -348,8 +349,14 @@ export function buildReportEmail(opts: {
             ? `${eigeneY} eigene · ${eingekauftY} eingekauft`
             : `Ø ${zahl(leadsAvg, 1)} in 7 Tagen${pfeilVgl(leadsY, leadsAvg)}`,
           leadsY >= leadsAvg ? FARBE.gut : FARBE.schlecht)}
-        ${kachel(kostenProProfilY === null ? "—" : `${zahl(kostenProProfilY, 0)} €`, "je Patientenprofil",
-          kostenProProfilP === null ? "kein Vergleich" : `Ø ${zahl(kostenProProfilP, 0)} € · Ziel 20 €`, kostenFarbe)}
+        ${/* Gesamtkosten ueber beide Bereiche. „Je Profil" steht bewusst NICHT mehr
+              hier, sondern je Gruppe: die alte Kachel teilte die WERBEkosten durch
+              ALLE Profile (auch die aus eingekauften Leads) und war damit zu guenstig
+              (Martin, 05.09.2026: „warum habe ich dort 25,47 und 38,20 euro je
+              profil"). */
+          kachel(euro(gesamtKostenY), "Kosten gestern",
+            leadsY > 0 ? `${perPiece(gesamtKostenY, leadsY)} je Lead über alles` : "keine Leads",
+            FARBE.tinte)}
         ${kachel(String(yesterday.patientDataSaved), "Profile gestern",
           `Ø ${zahl(period.patientDataSaved.avg, 1)}${pfeilVgl(yesterday.patientDataSaved, period.patientDataSaved.avg)}`,
           yesterday.patientDataSaved >= period.patientDataSaved.avg ? FARBE.gut : FARBE.schlecht)}
@@ -488,25 +495,14 @@ export function buildReportEmail(opts: {
     "Beide Wege liegen auf derselben Seite — nur der Weg zum Angebot ist ein anderer.",
   );
 
-  // ── Ads als Kachelzeile statt Tabelle ──────────────────────────────
-  const adsHtml = !adsSpend ? "" : `
-    <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="margin:0 0 16px;">
-      <tr>
-        ${kachel(euro(adsSpend.yesterday), "Ads gestern", `${euro(adsSpend.period)} in ${adsSpend.periodDays} Tagen`, FARBE.tinte)}
-        ${/* Werbung erzeugt keine eingekauften Portal-Leads. Wer sie mitzaehlt,
-              rechnet sich die Kosten je Lead zu guenstig (Martin, 05.09.2026). */
-            kachel(perPiece(adsSpend.yesterday, eigeneY), "je eigenem Lead", `Ø ${perPiece(adsSpend.period, period.sums.leadsEigene)}`, FARBE.tinte)}
-        ${kachel(perPiece(adsSpend.yesterday, yesterday.patientDataSaved), "je Profil", `Ø ${perPiece(adsSpend.period, period.sums.patientDataSaved)}`, kostenFarbe)}
-      </tr>
-    </table>`;
+  /* Zwei Gruppen mit jeweils DENSELBEN drei Kacheln (Martin, 05.09.2026:
+     „mach das gleiche auch mit diesen 3 kaesten fuer eingekauft, dann haben wir
+     einen besseren vergleich"). Vorher standen dieselben Zahlen zweimal da —
+     einmal als Kachelzeile, einmal als Spalte.
 
-  /* Kosten nach Bereich (Martin, 05.09.2026: „du musst die preise kennen fuer
-     die eingekauften leads, damit wir die gesamtkosten auf eigene und
-     eingekauft teilen und auch je lead aufteilen — natuerlich auch je profil").
-     Preise stehen in PORTAL_PREISE (queries.ts), netto.
-
-     Getrennt zu rechnen ist der ganze Punkt: Werbung erzeugt nur eigene Leads,
-     Einkauf nur eingekaufte. Eine gemeinsame Zahl verwischt beides. */
+     Jede Zahl bleibt in ihrer Gruppe: Werbung erzeugt nur eigene Leads, Einkauf
+     nur eingekaufte. Ein „je Profil" ueber alles gaebe es nicht ehrlich,
+     deshalb steht es NUR je Gruppe. */
   const werbungY = adsSpend?.yesterday ?? 0;
   const werbungP = adsSpend?.period ?? 0;
   const einkaufP = period.sums.kostenEingekauft ?? 0;
@@ -515,45 +511,40 @@ export function buildReportEmail(opts: {
   const profEigeneP = period.sums.profileEigene ?? 0;
   const profEingekauftP = period.sums.profileEingekauft ?? 0;
 
-  const spalte = (
-    titel: string, kosten: number, leads: number, profile: number,
-    kostenP: number, leadsP: number, profileP: number,
-  ) => `
-      <td width="50%" style="width:50%;vertical-align:top;padding:0 6px;">
-        <table width="100%" cellpadding="0" cellspacing="0" role="presentation"
-               style="background:${FARBE.karte};border:1px solid ${FARBE.rand};border-radius:10px;">
-          <tr><td style="padding:12px 14px;">
-            <p style="margin:0 0 8px;font-size:12px;font-weight:700;color:${FARBE.tinte};">${titel}</p>
-            <p style="margin:0 0 2px;font-size:19px;font-weight:700;color:${FARBE.tinte};">${euro(kosten)}</p>
-            <p style="margin:0 0 10px;font-size:11px;color:${FARBE.leise};">Ø ${euro(kostenP / Math.max(1, period.tage))} · ${euro(kostenP)} in ${period.tage} Tagen</p>
-            <p style="margin:0;font-size:12px;color:${FARBE.tinte};">
-              ${leads} Lead${leads === 1 ? "" : "s"} · <strong>${perPiece(kosten, leads)}</strong> je Lead
-              <span style="color:${FARBE.leise};">(Ø ${perPiece(kostenP, leadsP)})</span>
-            </p>
-            <p style="margin:4px 0 0;font-size:12px;color:${FARBE.tinte};">
-              ${profile} Profil${profile === 1 ? "" : "e"} · <strong>${perPiece(kosten, profile)}</strong> je Profil
-              <span style="color:${FARBE.leise};">(Ø ${perPiece(kostenP, profileP)})</span>
-            </p>
-          </td></tr>
-        </table>
-      </td>`;
+  const ueberschrift = (titel: string, unterzeile: string) => `
+    <p style="margin:22px 0 2px;font-size:15px;font-weight:700;color:${FARBE.tinte};">${titel}</p>
+    <p style="margin:0 0 10px;font-size:11.5px;color:${FARBE.leise};line-height:1.5;">${unterzeile}</p>`;
 
-  const fehlendePreise = yesterday.portaleOhnePreis ?? [];
-  const kostenHtml = (werbungY + einkaufY) <= 0 ? "" : `
-    <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="margin:0 0 16px;">
-      <tr><td style="padding:0 0 8px;">
-        <p style="margin:0;font-size:14px;font-weight:700;color:${FARBE.tinte};">Kosten nach Bereich</p>
-        <p style="margin:2px 0 0;font-size:11px;color:${FARBE.leise};">
-          Gestern ${euro(werbungY + einkaufY)} gesamt · ${perPiece(werbungY + einkaufY, leadsY)} je Lead über alles.
-          Einkaufspreise netto: ${Object.entries(PORTAL_PREISE).map(([d, pr]) => `${d} ${euro(Number(pr))}`).join(" · ")}.
-        </p>
-        ${fehlendePreise.length === 0 ? "" : `<p style="margin:6px 0 0;font-size:11px;color:${FARBE.schlecht};">Ohne hinterlegten Preis, daher mit 0 € gerechnet: ${fehlendePreise.join(", ")}.</p>`}
-      </td></tr>
+  const gruppe = (
+    titel: string, unterzeile: string,
+    kosten: number, kostenP: number, kostenTitel: string,
+    leads: number, leadsP: number, profile: number, profileP: number,
+  ) => `
+    ${ueberschrift(titel, unterzeile)}
+    <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="margin:0 0 4px;">
       <tr>
-        ${spalte("Eigene Leads (Werbung)", werbungY, eigeneY, profileEigeneY, werbungP, eigeneP, profEigeneP)}
-        ${spalte("Eingekaufte Leads (Portale)", einkaufY, eingekauftY, profileEingekauftY, einkaufP, eingekauftP, profEingekauftP)}
+        ${kachel(euro(kosten), kostenTitel, `${euro(kostenP)} in ${period.tage} Tagen`, FARBE.tinte)}
+        ${kachel(perPiece(kosten, leads), "je Lead", `${leads} Lead${leads === 1 ? "" : "s"} · Ø ${perPiece(kostenP, leadsP)}`, FARBE.tinte)}
+        ${kachel(perPiece(kosten, profile), "je Profil", `${profile} Profil${profile === 1 ? "" : "e"} · Ø ${perPiece(kostenP, profileP)}`, FARBE.tinte)}
       </tr>
     </table>`;
+
+  const fehlendePreise = yesterday.portaleOhnePreis ?? [];
+  const preisFussnote = `Einkaufspreise netto: ${Object.entries(PORTAL_PREISE).map(([d, pr]) => `${d} ${euro(Number(pr))}`).join(" · ")}.`
+    + (fehlendePreise.length === 0 ? "" : ` <span style="color:${FARBE.schlecht};">Ohne hinterlegten Preis, daher mit 0 € gerechnet: ${fehlendePreise.join(", ")}.</span>`);
+
+  const gruppeEigene = werbungY + werbungP <= 0 ? "" : gruppe(
+    "Eigene Leads (Werbung)",
+    "Was die Anzeigen gekostet haben — und was daraus geworden ist. Die Diagramme darunter zeigen denselben Weg im Verlauf.",
+    werbungY, werbungP, "Ads gestern",
+    eigeneY, eigeneP, profileEigeneY, profEigeneP,
+  );
+  const gruppeEingekauft = einkaufY + einkaufP <= 0 ? "" : gruppe(
+    "Eingekaufte Leads (Portale)",
+    preisFussnote,
+    einkaufY, einkaufP, "Einkauf gestern",
+    eingekauftY, eingekauftP, profileEingekauftY, profEingekauftP,
+  );
 
   const html = `<!DOCTYPE html>
 <html lang="de">
@@ -576,12 +567,12 @@ export function buildReportEmail(opts: {
           ${mailAlarmHtml}
           ${fazitHtml}
           ${kachelnHtml}
+          ${gruppeEigene}
           ${chartBesucher}
           ${chartLeads}
           ${chartConv}
           ${chartEinstieg}
-          ${adsHtml}
-          ${kostenHtml}
+          ${gruppeEingekauft}
           ${notesHtml}
           <p style="margin:20px 0 0;text-align:center;">
             <a href="${siteUrl}/admin/leads" style="display:inline-block;background:${FARBE.balken};color:#fff;padding:11px 22px;text-decoration:none;border-radius:8px;font-size:13px;font-weight:600;">Leads im Admin öffnen</a>

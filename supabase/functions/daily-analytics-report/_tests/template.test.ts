@@ -191,12 +191,13 @@ Deno.test("Kosten je Lead rechnen mit den EIGENEN Leads", () => {
     yesterday: tag({ wizardCompleted: 10, leadsEigene: 4, leadsEingekauft: 6 }),
     adsSpend: { yesterday: 80, period: 560, periodDays: 7 },
   }).html;
-  /* Genau die Kachel pruefen, nicht das ganze Dokument: „8,00 €" (80 ÷ 10)
-     steht seit der Kostenkarte legitim als Gesamtwert in der Mail. Die
-     ADS-Kachel muss trotzdem durch die EIGENEN Leads teilen. */
+  /* Genau in der Gruppe „Eigene Leads" pruefen, nicht im ganzen Dokument:
+     „8,00 €" (80 ÷ 10) steht legitim als Gesamtwert in der Summenzeile. Die
+     Gruppen-Kachel muss trotzdem durch die EIGENEN Leads teilen. */
+  const gruppe = html.slice(html.indexOf("Eigene Leads (Werbung)"));
   // In der Kachel steht die Beschriftung VOR dem Wert.
-  const kachel = html.match(/je eigenem Lead[\s\S]{0,300}?([0-9.]*[0-9],[0-9]{2} €)/);
-  assert(kachel, 'Kachel „je eigenem Lead“ fehlt');
+  const kachel = gruppe.match(/>je Lead<[\s\S]{0,400}?([0-9.]*[0-9],[0-9]{2} €)/);
+  assert(kachel, 'Kachel „je Lead“ in der eigenen Gruppe fehlt');
   assertEquals(kachel![1], "20,00 €"); // 80 ÷ 4 eigene, nicht 80 ÷ 10
 });
 
@@ -211,7 +212,6 @@ Deno.test("Kosten nach Bereich: eigene und eingekaufte getrennt je Lead und je P
     }),
     adsSpend: { yesterday: 80, period: 560, periodDays: 7 },
   }).html;
-  assertStringIncludes(html, "Kosten nach Bereich");
   assertStringIncludes(html, "Eigene Leads (Werbung)");
   assertStringIncludes(html, "Eingekaufte Leads (Portale)");
   // Werbung 80 € auf 4 eigene Leads = 20 €, auf 2 Profile = 40 €.
@@ -220,7 +220,7 @@ Deno.test("Kosten nach Bereich: eigene und eingekaufte getrennt je Lead und je P
   // Einkauf 185 € (5 × 37) auf 5 Leads = 37 €, auf 1 Profil = 185 €.
   assertStringIncludes(html, "37,00 €");
   assertStringIncludes(html, "185,00 €");
-  // Gesamt 265 € auf 9 Leads.
+  // Gesamt 265 € steht in der Summenzeile.
   assertStringIncludes(html, "265,00 €");
   // Die Preise stehen als Fussnote dran, damit die Rechnung nachvollziehbar ist.
   assertStringIncludes(html, "pflegehilfe.org 37,00 €");
@@ -234,4 +234,29 @@ Deno.test("fehlender Portalpreis wird gemeldet statt still mit 0 gerechnet", () 
   }).html;
   assertStringIncludes(html, "Ohne hinterlegten Preis");
   assertStringIncludes(html, "pflegebund.eu");
+});
+
+/* Aufraeumen (Martin, 05.09.2026: „das mit eigene lead und ads ist doppelt —
+   der dreierkasten reicht … je Profil haben wir auch schon oben"). */
+Deno.test("keine doppelten Kosten-Kacheln mehr", () => {
+  const html = bauen({
+    yesterday: tag({ wizardCompleted: 9, leadsEigene: 4, leadsEingekauft: 5, patientDataSaved: 3, profileEigene: 2, profileEingekauft: 1, kostenEingekauft: 185 }),
+    adsSpend: { yesterday: 80, period: 560, periodDays: 7 },
+  }).html;
+  // „je Lead" und „je Profil" genau einmal je Gruppe — nicht doppelt.
+  assertEquals((html.match(/>je Lead</g) ?? []).length, 2);
+  assertEquals((html.match(/>je Profil</g) ?? []).length, 2);
+  // Die alte Kachel „je Patientenprofil" (Werbung ÷ ALLE Profile) ist weg.
+  assert(!html.includes("je Patientenprofil"), "alte Kachel darf nicht mehr da sein");
+});
+
+Deno.test("je Profil rechnet je Gruppe, nicht ueber alle Profile", () => {
+  /* Der Fehler, den Martin gesehen hat: 76,40 € ÷ 3 Profile = 25,47 €, obwohl
+     nur 2 Profile aus eigenen Leads stammen (→ 38,20 €). */
+  const html = bauen({
+    yesterday: tag({ wizardCompleted: 9, leadsEigene: 4, leadsEingekauft: 5, patientDataSaved: 3, profileEigene: 2, profileEingekauft: 1, kostenEingekauft: 185 }),
+    adsSpend: { yesterday: 76.4, period: 512.3, periodDays: 7 },
+  }).html;
+  assertStringIncludes(html, "38,20 €");
+  assert(!html.includes("25,47 €"), "darf NICHT durch alle Profile teilen");
 });
