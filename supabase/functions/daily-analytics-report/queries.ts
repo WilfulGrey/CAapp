@@ -671,13 +671,26 @@ export async function fetchAdsSpend(
    Reife-Vorbehalt: die jüngsten ein bis zwei Tage können nur noch wachsen —
    wer gestern Abend kam, füllt sein Profil vielleicht heute. Die Balken der
    letzten Tage sind also Mindestwerte, nie Endstände. */
+/**
+ * Kam die Sitzung über eine Anzeige?
+ *
+ * Zwei Wege, weil Google Ads beide benutzt: die manuelle UTM-Kennzeichnung
+ * (`utm_medium=cpc`) und das automatische Tagging, das nur eine Klick-ID setzt
+ * (`gclid`, bei iOS/Web-to-App `wbraid`/`gbraid`). Wer nur auf „cpc" prüft,
+ * zählt Klick-ID-Besucher zu den organischen.
+ */
+export function istAusAds(s: Record<string, unknown>): boolean {
+  if (String(s.utm_medium ?? "") === "cpc") return true;
+  return ["gclid", "wbraid", "gbraid"].some((k) => String(s[k] ?? "").trim() !== "");
+}
+
 export interface BesucherKohorte {
   /** TT.MM. — Anzeigelabel */
   label: string;
   /** YYYY-MM-DD (Berlin) */
   iso: string;
   besucher: number;
-  /** davon über Anzeigen (utm_medium = 'cpc') */
+  /** davon über Anzeigen (utm_medium = 'cpc' ODER Google-Klick-ID) */
   ausAds: number;
 }
 
@@ -714,7 +727,7 @@ export async function fetchBesucherKohorten(
   for (let von = 0; ; von += SEITE) {
     const { data, error } = await supabase
       .from("analytics_sessions")
-      .select("fingerprint, landing_page, utm_medium, started_at")
+      .select("fingerprint, landing_page, utm_medium, gclid, wbraid, gbraid, started_at")
       .gte("started_at", aeltester.start)
       .lt("started_at", juengster.end)
       .range(von, von + SEITE - 1);
@@ -746,7 +759,12 @@ export async function fetchBesucherKohorten(
     const k = nachIso.get(iso);
     if (!k) continue;
     k.besucher++;
-    if ((s as any).utm_medium === "cpc") k.ausAds++;
+    /* Anzeige erkannt an utm_medium=cpc ODER an einer Google-Klick-ID
+         (gclid/wbraid/gbraid). Das automatische Tagging von Google Ads setzt
+         die Klick-ID, aber nicht zwingend utm_medium — gemessen am 06.09.2026
+         kamen so 9 von 728 Ads-Sitzungen ohne „cpc" an und galten faelschlich
+         als organisch. */
+      if (istAusAds(s as Record<string, unknown>)) k.ausAds++;
   }
   return tage;
 }
