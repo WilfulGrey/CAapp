@@ -260,3 +260,17 @@ Deno.test("je Profil rechnet je Gruppe, nicht ueber alle Profile", () => {
   assertStringIncludes(html, "38,20 €");
   assert(!html.includes("25,47 €"), "darf NICHT durch alle Profile teilen");
 });
+
+/* Martin, 06.09.2026: „es fehlt hier noch die kosten je Profil … mach das im
+   3. kasten einfach statt der 1,7". */
+Deno.test("Profile-Kachel zeigt die Kosten je Profil statt des Tagesschnitts", () => {
+  const html = bauen({
+    yesterday: tag({ wizardCompleted: 9, leadsEigene: 4, leadsEingekauft: 5, patientDataSaved: 3, profileEigene: 2, profileEingekauft: 1, kostenEingekauft: 185 }),
+    adsSpend: { yesterday: 76.4, period: 512.3, periodDays: 7 },
+  }).html;
+  // 261,40 € ÷ 3 Profile = 87,13 €.
+  assertStringIncludes(html, "87,13 € je Profil über alles");
+  const kachel = html.match(/>Profile gestern<[\s\S]{0,400}?<p[^>]*>([^<]+)<\/p>[\s\S]{0,200}?<p[^>]*>([^<]+)<\/p>/);
+  assert(kachel, "Profile-Kachel fehlt");
+  assert(!kachel![2].includes("Ø"), "kein Tagesschnitt mehr in der Fusszeile");
+});

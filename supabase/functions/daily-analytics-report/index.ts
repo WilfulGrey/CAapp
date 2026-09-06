@@ -176,6 +176,17 @@ Deno.serve(async (req: Request) => {
       adsSpend,
     });
 
+    /* Werbeausgaben des Vortags mitschreiben (Martin, 06.09.2026): der Bericht
+       holt die Zahl ohnehin bei Google. Gespeichert steht sie jeder Auswertung
+       mit freiem Zeitraum sofort zur Verfuegung, ohne erneuten API-Umweg.
+       Fehlschlaege bleiben still — ein Bericht darf daran nicht scheitern. */
+    if (adsSpend && Number.isFinite(adsSpend.yesterday)) {
+      const { error } = await supabase
+        .from("ads_kosten_tag")
+        .upsert({ tag: yesterday.iso, kosten_netto: adsSpend.yesterday, aktualisiert_at: new Date().toISOString() }, { onConflict: "tag" });
+      if (error) console.log("ads_kosten_tag konnte nicht geschrieben werden:", error.message);
+    }
+
     if (dryRun) {
       return new Response(
         JSON.stringify({ ok: true, dryRun: true, date: yesterday.iso, subject, html }),
