@@ -766,6 +766,47 @@ po stronie MM: query `CustomerToken(id)`.
     **odpowiedzi** MM — „brak błędu" nie dowodzi zapisu).
   - Gałąź dedupe (60 s) nie rotuje tokenu ⇒ nie pushuje.
 
+#### ⑦b Admin-Resync — `{ lead_id, resync }` (Registry #55, server-only)
+
+Zweiter privilegierter Body neben `mirror_token`. Der Kostenrechner-Admin korrigiert
+Kalkulator-Angaben eines Leads (Fall Rapp: Portal-Annahme „Ehepaar", tatsächlich eine
+Person); da Onboard bei `mamamia_customer_id` short-circuited, muss die Korrektur
+explizit nach Mamamia.
+
+```http
+POST /functions/v1/onboard-to-mamamia
+Authorization: Bearer <SUPABASE_SERVICE_ROLE_KEY>          # Pflicht — sonst 401
+
+{ "lead_id": "<uuid>", "resync": { "felder": ["betreuung_fuer", "pflegegrad"], "budget": 2900 } }
+```
+
+- **Adressierung per `lead_id`, ohne Expiry-Filter** (`fetchLeadById`) — die Korrektur
+  alter Leads darf den Kundenlink nicht töten. Lead ohne `mamamia_customer_id` ⇒ 400
+  `not-onboarded` (kein Onboard — der Pfad ERZEUGT nie).
+- **Diff-driven:** `felder` ⊆ `RESYNC_FELDER` (`betreuung_fuer, pflegegrad, mobilitaet,
+  nachteinsaetze, weitere_personen, deutschkenntnisse, fuehrerschein, geschlecht`);
+  Werte kommen aus `lead.kalkulation.formularDaten` (der Aufrufer hat sie vorher
+  geschrieben). Nur diese Felder gehen nach MM — Patientenbogen-Eingaben des Kunden und
+  Agentur-Werte (z. B. `germany_skill=level_4`) bleiben.
+- **Mechanik** ([onboard.ts:resyncCustomerFromLead](../supabase/functions/onboard-to-mamamia/onboard.ts)):
+  Read `Customer{ patients{id care_level mobility_id lift_id night_operations tools{id}}
+  equipments{id} customer_caregiver_wish{…alle 25 Keys…} }` → Stubs `{id, tool_ids}` +
+  `equipment_ids` (Wipe-Schutz) → `betreuung_fuer` ändert die LISTE (Ziel 1: auf den
+  Patienten mit der kleinsten id kürzen — `patients[]` ist REPLACE per id, der einzige
+  Löschweg; Ziel 2: Klon des GELESENEN p1 ohne id, danach zweiter Pass mit der neuen
+  id, gotcha #4) → Per-Patient-Felder auf alle Stubs → Wish = kompletter Read ohne
+  `id/customer_id/customer` und ohne nulls + nur der geänderte Key → `budget` ⇒
+  `care_budget` + `monthly_salary`. Variablen nur bei `!== undefined` setzen (`null`
+  würde gesendet). `pflegegrad` 0 ⇒ `care_level: null` („Keine").
+- **Antworten:** 200 `{ customer_id, job_offer_id, resync: { patients_before,
+  patients_after, removed_ids, felder } }` · 400 Kontrakt/nicht onboarded · 404 Lead
+  unbekannt · 409 `{ error, patient_ids }` (>2 Patienten in MM + Per-Patient-Feld —
+  Agentur hat von Hand ergänzt) · 502 `resync failed: <MM-Klartext>`. **Kein**
+  Session-JWT, kein Cookie.
+- Live belegt (beta 2026-09-07): 2→1 und 1→2 auf Customer 9989; Mutation ohne
+  Contract-Args auf dem gebuchten 8394 lässt `customer_contract` und Confirmation
+  unangetastet, 2→1 dort akzeptiert.
+
 #### ⑧ Sign session JWT + Set-Cookie
 
 [index.ts:71-90](../supabase/functions/onboard-to-mamamia/index.ts:71):
@@ -1053,6 +1094,11 @@ Edge Fn   ←─── Sanctum session cookie (agency login) ──────�
   żeby logi Mamamii rozróżniały akcje portalu od akcji ludzi.
 - `SUPABASE_SERVICE_ROLE_KEY` ZAWSZE server-side. Używany w
   `onboard-to-mamamia` do bypass RLS przy lookup leada po tokenie.
+- **Privilegierte Onboard-Bodies nur hinter service_role** (`_shared/serviceRoleAuth.ts`,
+  Registry #55): `mirror_token` (Token-Spiegel), `lead_id`/`resync` (Admin-Korrektur nach
+  MM). Gate aus dem Header VOR dem Rate-Limit; Anon-Bearer ⇒ 401 vor jedem MM-Call.
+  Der JWT-Zweig prüft nur den Claim — die Signatur prüft das Gateway (`verify_jwt`),
+  deshalb nie `--no-verify-jwt` für onboard-to-mamamia.
 - Cookie `session` musi mieć `SameSite=None; Secure; HttpOnly` — bez tego
   cross-domain (caapp-beta ↔ supabase.co) cichaczem nie wysyła.
 - `mamamia-proxy` waliduje **ownership** każdej operacji
