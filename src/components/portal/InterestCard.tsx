@@ -32,7 +32,9 @@ export const InterestCard: FC<{
   globalInviteLocked?: boolean;
   /** Pflegesituation fehlt noch (siehe MatchCard). */
   profilFehlt?: boolean;
-}> = ({ nurse, status, onNurseClick, onInvite, onInviteConfirm, onDismiss, exiting, globalInviteLocked, profilFehlt }) => {
+  /** Tipp auf die Stufen-Plakette: Profil mit geöffneter Erklärung (07.09.). */
+  onStufeClick?: () => void;
+}> = ({ nurse, status, onNurseClick, onInvite, onInviteConfirm, onDismiss, exiting, globalInviteLocked, profilFehlt, onStufeClick }) => {
   const [invitePhase, setInvitePhase] = useState<'idle' | 'sending' | 'done'>('idle');
   const [dismissPhase, setDismissPhase] = useState<'idle' | 'sending'>('idle');
   const inits = initials(nurse.name);
@@ -120,7 +122,12 @@ export const InterestCard: FC<{
             („· im / Schnitt 12 Wochen"). */}
         <p className="text-[16px] mt-3" style={{ color: '#71717A' }}>
           {(() => { const lvl = nurseLevel(nurse.experienceYears ?? 0, nurse.history?.assignments ?? 0); return lvl.label ? (
-            <span className="font-semibold" style={{ color: '#18181B' }}>{lvl.label}: </span>
+            <span
+              role={onStufeClick ? 'button' : undefined}
+              onClick={onStufeClick ? (e) => { e.stopPropagation(); onStufeClick(); } : undefined}
+              className={`font-semibold ${onStufeClick ? 'underline decoration-dotted underline-offset-4 cursor-pointer' : ''}`}
+              style={{ color: '#18181B' }}
+            >{lvl.label}: </span>
           ) : null; })()}
           {nurseFacts(nurse)}
         </p>

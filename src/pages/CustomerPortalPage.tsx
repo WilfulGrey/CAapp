@@ -507,6 +507,8 @@ const CustomerPortalPage: FC = () => {
   // Resolved status per caregiver is derived in `nurseStatusById` (useMemo).
   const [statusOverrides, setStatusOverrides] = useState<Map<number, NurseStatus>>(new Map());
   const [selectedNurse, setSelectedNurse] = useState<Nurse | null>(null);
+  // Profil mit sofort geöffneter Stufen-Erklärung (Tipp auf die Plakette in der Karte).
+  const [nurseModalStufe, setNurseModalStufe] = useState(false);
   // Tracking: kam der gerade geöffnete Profil-Modal aus einer Interest-Card?
   // Wenn ja, zeigt das Modal oben den "Hat Interesse signalisiert"-Hinweis-
   // Block. State wird beim Modal-Close zurückgesetzt.
@@ -3140,6 +3142,11 @@ const CustomerPortalPage: FC = () => {
                     setSelectedNurse(nurse);
                     setSelectedFromInterestId(i.caregiver_id);
                   }}
+                  onStufeClick={() => {
+                    setNurseModalStufe(true);
+                    setSelectedNurse(nurse);
+                    setSelectedFromInterestId(i.caregiver_id);
+                  }}
                   onInvite={() => canInviteNurse(0)}
                   onInviteConfirm={() => confirmInviteInterest(i.caregiver_id, label)}
                   onDismiss={() => confirmDismissInterest(i.caregiver_id)}
@@ -3292,6 +3299,7 @@ const CustomerPortalPage: FC = () => {
                             status={status}
                             isRecommended={isRecommended}
                             onNurseClick={() => openNurseFromMatch(nurse, i)}
+                            onStufeClick={() => { setNurseModalStufe(true); openNurseFromMatch(nurse, i); }}
                             onInvite={() => canInviteNurse(i)}
                             onInviteConfirm={() => confirmInviteNurse(i, displayName(nurse.name))}
                             onUndoDecline={status === 'declined' ? () => undoDeclinedMatch(i) : undefined}
@@ -4128,7 +4136,8 @@ const CustomerPortalPage: FC = () => {
             && aboutRegen.forId === fullCaregiver.id
             && aboutRegen.loading
           }
-          onClose={() => { setSelectedNurse(null); setNurseModalApp(null); setNurseMatchIdx(null); setSelectedFromInterestId(null); }}
+          initialLevelInfo={nurseModalStufe}
+          onClose={() => { setSelectedNurse(null); setNurseModalApp(null); setNurseMatchIdx(null); setSelectedFromInterestId(null); setNurseModalStufe(false); }}
           app={nurseModalApp ?? undefined}
           onReview={() => { setSelectedNurse(null); setSelectedApp(nurseModalApp); setNurseModalApp(null); setSelectedFromInterestId(null); }}
           onDecline={() => { setDeclineConfirmApp(nurseModalApp); setSelectedNurse(null); setNurseModalApp(null); setSelectedFromInterestId(null); }}
