@@ -334,7 +334,10 @@ blueprint — to zarezerwowane dla Admin role.
 `SUPABASE_SERVICE_ROLE_KEY`, `MAMAMIA_ENDPOINT`, `MAMAMIA_AUTH_ENDPOINT`,
 `MAMAMIA_AGENCY_EMAIL`, `MAMAMIA_AGENCY_PASSWORD`, **`KOSTENRECHNER_URL`** (prod
 `https://kostenrechner.primundus.de`, staging `https://kostenrechner-staging.onrender.com`).
-Brak = funkcja nie bootuje (`requireEnv`, CLAUDE.md Registry #52). Sprawdzenie:
+Brak = funkcja nie bootuje (`requireEnv`, CLAUDE.md Registry #52). `onboard-to-mamamia`
+i `mamamia-proxy` wymagają dodatkowo `MAMAMIA_AGENCY_ID` (prod `3`, staging `18`) i
+`MAMAMIA_PANEL_URL`. Konto agencyjne = dedykowane `kundenportal@primundus.de` (oba
+tenanty, osobne hasła; Registry #53) — nigdy konto osobiste. Sprawdzenie:
 `npx supabase secrets list --project-ref <REF>`.
 
 **Local manual deploy** (NIE rób tego dla prod — patrz CLAUDE.md §"Emergency hotfix"):
