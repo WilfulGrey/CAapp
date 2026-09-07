@@ -1098,8 +1098,33 @@ export function buildEingangsbestaetigungHtml(
   const empfehlungSektion =
     empfehlungBlock === undefined ? "" : (empfehlungBlock || keineEmpfehlungHtml());
 
+  /* Knopf in Schritt 1 (Martin, 07.09.): Die Mail zeigt Preis und
+     Pflegekräfte — aber ohne vervollständigte Pflegesituation kann sich im
+     Portal niemand bewerben und „Einladen" bleibt gesperrt. Deshalb ist
+     Schritt 1 der Liste nicht nur Text, sondern trägt den grünen Knopf der
+     Profil-Nudges. Klick-Quelle „eb-schritt", damit portal_reopened die
+     Rückkehr aus genau diesem Knopf zählt. Nur für eigene Leads (Sektion
+     vorhanden); Portal-Leads bekommen keinen Knopf. */
+  const schrittUrl = portalUrl ? withMailMark(portalUrl, "eb-schritt") : ctaUrl;
+  const schrittKnopf = empfehlungBlock === undefined ? "" :
+    `<div style="margin:12px 0 4px;">${bulletproofButton(schrittUrl, "Pflegesituation vervollständigen&nbsp;&nbsp;&rarr;", "#2A9D5C")}</div>`;
+
   // ── "So geht es weiter" — 3 Schritte ──────────────────────────────────────
-  const stepRow = (n: string, title: string, desc: string, last = false) => `
+  /* aktiv = der Schritt, der als Nächstes ansteht (Martin, 07.09.): grüner
+     Kasten, grüne Ziffer, größerer Titel — die übrigen Schritte bleiben ruhig. */
+  const stepRow = (n: string, title: string, desc: string, last = false, aktiv = false) => aktiv ? `
+      <tr>
+        <td bgcolor="#EEF7F1" style="background-color:#EEF7F1;vertical-align:top;width:38px;padding:16px 12px 16px 16px;border-radius:14px 0 0 14px;">
+          <table cellpadding="0" cellspacing="0" role="presentation"><tr>
+            <td width="26" height="26" align="center" valign="middle" bgcolor="#2A9D5C" style="background-color:#2A9D5C;width:26px;min-width:26px;max-width:26px;height:26px;border-radius:13px;padding:0;mso-line-height-rule:exactly;color:#ffffff;font-size:13px;font-weight:700;line-height:26px;">${n}</td>
+          </tr></table>
+        </td>
+        <td bgcolor="#EEF7F1" style="background-color:#EEF7F1;vertical-align:top;padding:16px 16px 16px 0;border-radius:0 14px 14px 0;">
+          <p style="margin:0 0 4px;font-size:17px;font-weight:700;color:#1F6B41;line-height:1.35;">${title}</p>
+          <p style="margin:0;font-size:14px;line-height:1.6;color:#3A3A3A;">${desc}</p>
+        </td>
+      </tr>
+      <tr><td colspan="2" style="height:14px;line-height:14px;font-size:0;padding:0;">&nbsp;</td></tr>` : `
       <tr>
         <td style="vertical-align:top;width:38px;padding:0 12px ${last ? "0" : "14px"} 0;">
           <table cellpadding="0" cellspacing="0" role="presentation"><tr>
@@ -1113,10 +1138,10 @@ export function buildEingangsbestaetigungHtml(
       </tr>`;
 
   const stepsTable = `
-    <p style="font-size:15px;line-height:1.75;color:#2D1F0F;margin:0 0 16px;"><strong>So geht es weiter:</strong></p>
+    <p style="margin:0 0 14px;font-size:20px;font-weight:700;line-height:1.35;color:#2D1F0F;">So geht es weiter</p>
     <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="margin:0 0 26px;">
-      ${stepRow("1", "Pflegesituation beschreiben", "Ein Teil ist aus dem Kostenrechner schon übernommen. Danach sehen Sie sofort, welche Pflegekräfte passen und verfügbar sind.")}
-      ${stepRow("2", "Bewerbungen erhalten & Pflegekräfte einladen", "Passende Pflegekräfte bewerben sich bei Ihnen — mit Profil, Erfahrung und Anreisedatum. In der Zwischenzeit können Sie Wunschkandidatinnen gezielt einladen.")}
+      ${stepRow("1", "Pflegesituation vervollständigen — 2 Minuten", `Ein Teil ist aus dem Kostenrechner schon übernommen. Erst danach können sich die Pflegekräfte bei Ihnen bewerben.${schrittKnopf}`, false, true)}
+      ${stepRow("2", "Pflegekräfte einladen & Bewerbungen erhalten", "Sobald Ihre Pflegesituation vervollständigt ist, laden Sie Ihre Wunschkandidatinnen ein — passende Pflegekräfte bewerben sich dann mit Profil, Erfahrung und Anreisedatum.")}
       ${stepRow("3", "Auswählen und starten", "Sie entscheiden, wir übernehmen den Rest. Ihre Wunsch-Pflegekraft kann die Betreuung bereits in 4–7 Werktagen übernehmen.", true)}
     </table>`;
 
@@ -1210,11 +1235,12 @@ export function buildEingangsbestaetigungHtml(
 
     ${empfehlungSektion}
 
+    ${/* Mit Empfehlung gibt es KEINEN dritten Knopf mehr (Martin, 07.09.): der
+        Kasten hat „<Vorname> ansehen" + „Alle 5 ansehen", Schritt 1 den grünen
+        Knopf. Ohne Empfehlung bleibt der Angebots-Knopf vor den Schritten. */ ""}
     ${hatEmpfehlung ? "" : cta}
 
     ${stepsTable}
-
-    ${hatEmpfehlung ? cta : ""}
 
     ${angabenHinweis}
 
@@ -1239,6 +1265,8 @@ export function buildEingangsbestaetigungText(
 
   const portalUrl = (portalBase && lead.token) ? buildPortalUrl(portalBase, lead.token) : "";
   const ctaUrl = portalUrl || "https://primundus.de";
+  const schrittLinkPlain = empfehlungAbschnitt === undefined ? "" :
+    `\n   Jetzt vervollständigen: ${portalUrl ? withMailMark(portalUrl, "eb-schritt") : ctaUrl}`;
 
   const kalk = lead.kalkulation || {};
   const bruttopreis = kalk.bruttopreis || 0;
@@ -1312,8 +1340,8 @@ ${vorschauPlain}${priceLine}${konditionenLine}${empfehlungPlain}Angebot & Betreu
 
 SO GEHT ES WEITER
 
-1. Pflegesituation beschreiben — ein Teil ist aus dem Kostenrechner schon übernommen. Danach sehen Sie sofort, welche Pflegekräfte passen und verfügbar sind.
-2. Bewerbungen erhalten & Pflegekräfte einladen — passende Pflegekräfte bewerben sich bei Ihnen, mit Profil, Erfahrung und Anreisedatum. In der Zwischenzeit können Sie Wunschkandidatinnen gezielt einladen.
+1. Pflegesituation vervollständigen (2 Minuten) — ein Teil ist aus dem Kostenrechner schon übernommen. Erst danach können sich die Pflegekräfte bei Ihnen bewerben.${schrittLinkPlain}
+2. Pflegekräfte einladen & Bewerbungen erhalten — sobald Ihre Pflegesituation vervollständigt ist, laden Sie Ihre Wunschkandidatinnen ein; passende Pflegekräfte bewerben sich dann mit Profil, Erfahrung und Anreisedatum.
 3. Auswählen und starten — Sie entscheiden, wir übernehmen den Rest. Ihre Wunsch-Pflegekraft kann die Betreuung bereits in 4–7 Werktagen übernehmen.
 
 PFLEGESITUATION & ANFORDERUNGEN
