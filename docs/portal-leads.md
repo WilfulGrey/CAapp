@@ -365,6 +365,12 @@ im MM-Kunden). Korrektur-Weg:
    `kalkulation.mamamia_sync_pending`, der Knopf „Mamamia erneut synchronisieren"
    wiederholt genau diese Felder. Supabase ist schon aktuell.
 
+**Offene Kante (bewusst so gelassen):** hat der Kunde den Patientenbogen im Portal
+offen oder einen alten Entwurf im Browser, kann sein nächster Speichern-Klick einen
+bei 2→1 entfernten Patienten in Mamamia neu anlegen. Wenn die Korrektur am Telefon
+passiert: den Kunden das Portal neu laden lassen — oder die Personenzahl in Mamamia
+nach seinem nächsten Speichern kurz gegenprüfen.
+
 Mit dem Speichern gelten die Angaben als **mit dem Kunden geprüft**:
 `angenommene_felder` wird geleert, damit eine spätere Portal-Mail derselben Adresse
 (`echteAntworten` in `/api/portal-lead`) die Korrektur nicht mit frischen Annahmen

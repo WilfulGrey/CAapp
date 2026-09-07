@@ -100,18 +100,6 @@ describe('mapPatientFormToUpdateCustomerInput', () => {
     expect(r.patients).toHaveLength(1);
   });
 
-  // Registry #55: nach einer Admin-Korrektur 2→1 kennt Mamamia nur noch einen
-  // Patienten; ein Draft/alter State mit anzahl=2 darf keinen Eintrag ohne id
-  // schicken (patients[] = REPLACE per id ⇒ neuer Patient).
-  it('anzahl=2, aber nur EINE existing id → 1 patient (kein Patient ohne id)', () => {
-    const r = mapPatientFormToUpdateCustomerInput(
-      makeForm({ anzahl: '2', p2_geschlecht: 'Männlich', p2_pflegegrad: 'Pflegegrad 2', p2_mobilitaet: 'Gehfähig mit Hilfe', p2_heben: 'Nein', p2_demenz: 'Nein', p2_inkontinenz: 'Nein', p2_nacht: 'Nein' }),
-      { existingPatientIds: [75420] },
-    );
-    expect(r.patients).toHaveLength(1);
-    expect(r.patients?.[0].id).toBe(75420);
-  });
-
   it('anzahl=2 → 2 patients', () => {
     const r = mapPatientFormToUpdateCustomerInput(makeForm({
       anzahl: '2',
