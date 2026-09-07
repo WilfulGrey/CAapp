@@ -59,6 +59,9 @@ function makeLead(overrides: Partial<Lead> = {}): Lead {
 interface FakeSupabase {
   leads: Map<string, Lead>;
   updated: Array<{ id: string; patch: Partial<Lead> }>;
+  claims: string[];
+  // Registry #54 — wynik claimu; undefined = fake bez claimOnboarding (stare zachowanie)
+  claimOnboarding?: (leadId: string, staleBefore: string) => Promise<boolean>;
   fetchLead(token: string): Lead | null;
   updateLead(id: string, patch: Partial<Lead>): void;
   fetchLeadJob(jobId: string, leadId: string): Promise<{ mamamia_job_offer_id: number } | null>;
@@ -67,12 +70,24 @@ interface FakeSupabase {
 
 interface FakeLeadJob { id: string; lead_id: string; mamamia_job_offer_id: number; status?: string; }
 
-function makeFakeSupabase(initialLeads: Lead[] = [], leadJobs: FakeLeadJob[] = []): FakeSupabase {
+function makeFakeSupabase(
+  initialLeads: Lead[] = [],
+  leadJobs: FakeLeadJob[] = [],
+  opts: { claim?: boolean } = {},
+): FakeSupabase {
   const leads = new Map(initialLeads.map((l) => [l.token ?? "", l]));
   const updated: FakeSupabase["updated"] = [];
+  const claims: string[] = [];
   return {
     leads,
     updated,
+    claims,
+    ...(opts.claim === undefined ? {} : {
+      claimOnboarding(leadId: string) {
+        claims.push(leadId);
+        return Promise.resolve(opts.claim as boolean);
+      },
+    }),
     fetchLead(token) {
       return leads.get(token) ?? null;
     },
@@ -150,7 +165,7 @@ const SECRETS = {
   supabaseServiceKey: "service-role",
   mamamiaEndpoint: "https://beta.mamamia.app/graphql",
   mamamiaAuthEndpoint: "https://beta.mamamia.app/graphql/auth",
-  mamamiaAgencyEmail: "primundus+portal@mamamia.app",
+  mamamiaAgencyEmail: "primundus+portal@example.com",
   mamamiaAgencyPassword: "pw",
   sessionJwtSecret: "a".repeat(40),
   mamamiaPanelUrl: "https://beta.mamamia.app/backend",
@@ -677,4 +692,226 @@ Deno.test("onboardLead: panel token push failure is best-effort — onboard stil
   assertEquals(supa.updated[0].patch.mamamia_customer_id, 7566);
   // No token mutation reached Mamamia (panel was down).
   assertEquals(mm.requests.some((r) => r.query.includes("UpdateCustomerToken")), false);
+});
+
+// ─── Registry #54: claim onboardingu (wyścig przeglądarka ↔ Empfehlungs-Mail) ─
+
+Deno.test("onboardLead (#54): claim granted → normal onboard, claim called once for the lead", async () => {
+  _resetAgencyTokenCache();
+  const lead = makeLead();
+  const supa = makeFakeSupabase([lead], [], { claim: true });
+  const mm = fakeMamamia([
+    { data: { LoginAgency: { id: 1, name: "P", email: "x", token: "t" } } },
+    { data: { StoreCustomer: { id: 7566, customer_id: "ts-18-7566", status: "draft" } } },
+    { data: { StoreJobOffer: { id: 16225, job_offer_id: "ts-18-7566-1", title: "t", status: "search" } } },
+  ]);
+  const result = await onboardLead({ leadToken: "valid-token", secrets: SECRETS, supabase: supa, fetchFn: mm.fetch, now: NOW });
+  assertEquals(result.customer_id, 7566);
+  assertEquals(supa.claims, [lead.id]);
+});
+
+Deno.test("onboardLead (#54): claim denied → waits for the concurrent onboard, returns ITS ids, zero Mamamia calls", async () => {
+  _resetAgencyTokenCache();
+  const lead = makeLead();
+  const supa = makeFakeSupabase([lead], [], { claim: false });
+  const mm = fakeMamamia([]); // any call would throw "unexpected call"
+  let polls = 0;
+  const result = await onboardLead({
+    leadToken: "valid-token", secrets: SECRETS, supabase: supa, fetchFn: mm.fetch, now: NOW,
+    sleep: () => {
+      // Zwycięzca (druga instancja) kończy po 3 s — symulujemy zapis do leads.
+      if (++polls === 3) Object.assign(lead, { mamamia_customer_id: 9001, mamamia_job_offer_id: 9002 });
+      return Promise.resolve();
+    },
+  });
+  assertEquals(result.customer_id, 9001);
+  assertEquals(result.job_offer_id, 9002);
+  assertEquals(mm.requests.length, 0);
+  assertEquals(supa.updated.length, 0); // nie zapisuje nic — cudzy wynik
+});
+
+Deno.test("onboardLead (#54): claim denied + winner never finishes → 'onboarding in progress' (no second customer)", async () => {
+  _resetAgencyTokenCache();
+  const lead = makeLead();
+  const supa = makeFakeSupabase([lead], [], { claim: false });
+  const mm = fakeMamamia([]);
+  await assertRejects(
+    () => onboardLead({ leadToken: "valid-token", secrets: SECRETS, supabase: supa, fetchFn: mm.fetch, now: NOW, sleep: () => Promise.resolve() }),
+    Error,
+    "onboarding in progress",
+  );
+  assertEquals(mm.requests.length, 0);
+});
+
+Deno.test("onboardLead (#54): StoreCustomer error → claim released (mamamia_onboarding_started_at=null) so a refresh can retry", async () => {
+  _resetAgencyTokenCache();
+  const lead = makeLead();
+  const supa = makeFakeSupabase([lead], [], { claim: true });
+  const mm = fakeMamamia([
+    { data: { LoginAgency: { id: 1, name: "P", email: "x", token: "t" } } },
+    { errors: [{ message: "validation" }] },
+  ]);
+  await assertRejects(
+    () => onboardLead({ leadToken: "valid-token", secrets: SECRETS, supabase: supa, fetchFn: mm.fetch, now: NOW }),
+    Error,
+    "validation",
+  );
+  assertEquals(supa.updated, [{ id: lead.id, patch: { mamamia_onboarding_started_at: null } }]);
+});
+
+// ─── Admin-Resync (Registry #55) ─────────────────────────────────────────────
+// Sequenz des Fake: LoginAgency → ResyncCustomer(read) → UpdateCustomer
+// [→ read → UpdateCustomer beim 1→2]. requests[] fängt die variables.
+
+import { resyncCustomerFromLead, ResyncConflictError } from "../onboard.ts";
+
+const LOGIN = { data: { LoginAgency: { id: 8190, name: "Primundus", email: "x", token: "agency-jwt" } } };
+const UPDATED = { data: { UpdateCustomer: { id: 10670, customer_id: "pr-10670" } } };
+const P1 = { id: 75420, care_level: 1, mobility_id: 3, lift_id: 2, night_operations: "up_to_1_time", tools: [{ id: 2 }] };
+const P2 = { id: 75421, care_level: 1, mobility_id: 3, lift_id: 2, night_operations: "up_to_1_time", tools: [] as Array<{ id: number }> };
+const WISH_FULL = {
+  is_open_for_all: false, gender: "female", germany_skill: "level_4", alternative_germany_skill: null,
+  driving_license: "not_important", driving_license_gearbox: "manual", smoking: null, shopping: "yes",
+  shopping_be_done: null, tasks: null, other_wishes: "Katze im Haus", night_operations: null,
+};
+const readOf = (patients: unknown[], wish: unknown = WISH_FULL) =>
+  ({ data: { Customer: { id: 10670, equipments: [{ id: 1 }, { id: 2 }], patients, customer_caregiver_wish: wish } } });
+
+function resyncLead(fd: Record<string, unknown>) {
+  return makeLead({
+    id: "lead-rapp",
+    mamamia_customer_id: 10670,
+    mamamia_job_offer_id: 36297,
+    kalkulation: { bruttopreis: 3350, eigenanteil: 3016, formularDaten: fd },
+  });
+}
+
+Deno.test("resync (#55, a): 2→1 — Patient mit kleinster id bleibt als Stub, tools/equipments zurück, kein Wish/Budget", async () => {
+  _resetAgencyTokenCache();
+  // Read liefert absichtlich in falscher Reihenfolge — sortiert wird nach id.
+  const mm = fakeMamamia([LOGIN, readOf([P2, P1]), UPDATED]);
+  const r = await resyncCustomerFromLead({
+    lead: resyncLead({ betreuung_fuer: "1-person", pflegegrad: 1 }),
+    felder: ["betreuung_fuer"], secrets: SECRETS, fetchFn: mm.fetch,
+  });
+  assertEquals(r, { patients_before: 2, patients_after: 1, removed_ids: [75421], felder: ["betreuung_fuer"] });
+  assertEquals(mm.requests.length, 3);
+  const v = mm.requests[2].variables;
+  assertEquals(v.id, 10670);
+  assertEquals(v.patients, [{ id: 75420, tool_ids: [2] }]);
+  assertEquals(v.equipment_ids, [1, 2]);
+  assertEquals("customer_caregiver_wish" in v, false);
+  assertEquals("care_budget" in v, false);
+  assertEquals("other_people_in_house" in v, false);
+});
+
+Deno.test("resync (#55, d2): pflegegrad 0 ⇒ care_level null („Keine“) auf jedem Stub", async () => {
+  _resetAgencyTokenCache();
+  const mm = fakeMamamia([LOGIN, readOf([P1, P2]), UPDATED]);
+  await resyncCustomerFromLead({
+    lead: resyncLead({ betreuung_fuer: "ehepaar", pflegegrad: 0 }),
+    felder: ["pflegegrad"], secrets: SECRETS, fetchFn: mm.fetch,
+  });
+  const v = mm.requests[2].variables;
+  assertEquals(v.patients, [{ id: 75420, tool_ids: [2], care_level: null }, { id: 75421, tool_ids: [], care_level: null }]);
+});
+
+Deno.test("resync (#55, b): 1→2 — Klon des GELESENEN p1 ohne id, dann zweiter Pass mit neuer id", async () => {
+  _resetAgencyTokenCache();
+  const NEW = { id: 75499, care_level: 1, mobility_id: 3, lift_id: 2, night_operations: null, tools: [{ id: 2 }] };
+  const mm = fakeMamamia([LOGIN, readOf([P1]), UPDATED, readOf([P1, NEW]), UPDATED]);
+  const r = await resyncCustomerFromLead({
+    // fd absichtlich mit anderem Pflegegrad — der Klon kommt aus MM, nicht aus fd
+    lead: resyncLead({ betreuung_fuer: "ehepaar", pflegegrad: 4 }),
+    felder: ["betreuung_fuer"], secrets: SECRETS, fetchFn: mm.fetch,
+  });
+  assertEquals(r.patients_before, 1);
+  assertEquals(r.patients_after, 2);
+  assertEquals(mm.requests.length, 5);
+  const pass1 = mm.requests[2].variables.patients as unknown[];
+  assertEquals(pass1, [
+    { id: 75420, tool_ids: [2] },
+    { tool_ids: [2], care_level: 1, mobility_id: 3, lift_id: 2, night_operations: "up_to_1_time" },
+  ]);
+  const pass2 = mm.requests[4].variables;
+  assertEquals(pass2.patients, [
+    { id: 75420, tool_ids: [2] },
+    { tool_ids: [2], care_level: 1, mobility_id: 3, lift_id: 2, night_operations: "up_to_1_time", id: 75499 },
+  ]);
+  assertEquals(pass2.equipment_ids, [1, 2]);
+});
+
+Deno.test("resync (#55, c): deutschkenntnisse — Wish komplett zurück (ohne nulls/id), nur germany_skill überlagert; Patienten nur Stubs", async () => {
+  _resetAgencyTokenCache();
+  const mm = fakeMamamia([LOGIN, readOf([P1], { id: 10542, customer_id: 10670, ...WISH_FULL }), UPDATED]);
+  await resyncCustomerFromLead({
+    lead: resyncLead({ deutschkenntnisse: "kommunikativ" }),
+    felder: ["deutschkenntnisse"], secrets: SECRETS, fetchFn: mm.fetch,
+  });
+  const v = mm.requests[2].variables;
+  assertEquals(v.customer_caregiver_wish, {
+    is_open_for_all: false, gender: "female", germany_skill: "level_2",
+    driving_license: "not_important", driving_license_gearbox: "manual", shopping: "yes", other_wishes: "Katze im Haus",
+  });
+  assertEquals(v.patients, [{ id: 75420, tool_ids: [2] }]);
+});
+
+Deno.test("resync (#55, d): angefordertes Feld ohne fd-Wert ⇒ throw VOR jedem Mamamia-Call", async () => {
+  _resetAgencyTokenCache();
+  const mm = fakeMamamia([]);
+  await assertRejects(
+    () => resyncCustomerFromLead({ lead: resyncLead({ betreuung_fuer: "1-person" }), felder: ["pflegegrad"], secrets: SECRETS, fetchFn: mm.fetch }),
+    Error, "pflegegrad",
+  );
+  await assertRejects(
+    () => resyncCustomerFromLead({ lead: resyncLead({ mobilitaet: "" }), felder: ["mobilitaet"], secrets: SECRETS, fetchFn: mm.fetch }),
+    Error, "mobilitaet fehlt",
+  );
+  await assertRejects(
+    () => resyncCustomerFromLead({ lead: resyncLead({ deutschkenntnisse: "sehr-gut-sa" }), felder: ["deutschkenntnisse"], secrets: SECRETS, fetchFn: mm.fetch }),
+    Error, "mapGermanySkill",
+  );
+  assertEquals(mm.requests.length, 0);
+});
+
+Deno.test("resync (#55, g): 3 Patienten in MM + Per-Patient-Feld ⇒ ResyncConflictError mit ids; Wish-Feld passiert", async () => {
+  _resetAgencyTokenCache();
+  const P3 = { ...P2, id: 75422 };
+  const mm = fakeMamamia([LOGIN, readOf([P1, P2, P3])]);
+  await assertRejects(
+    () => resyncCustomerFromLead({ lead: resyncLead({ pflegegrad: 2 }), felder: ["pflegegrad"], secrets: SECRETS, fetchFn: mm.fetch }),
+    ResyncConflictError, "75420, 75421, 75422",
+  );
+  _resetAgencyTokenCache();
+  const mm2 = fakeMamamia([LOGIN, readOf([P1, P2, P3]), UPDATED]);
+  await resyncCustomerFromLead({ lead: resyncLead({ geschlecht: "egal" }), felder: ["geschlecht"], secrets: SECRETS, fetchFn: mm2.fetch });
+  const v = mm2.requests[2].variables;
+  assertEquals((v.patients as unknown[]).length, 3);
+  assertEquals((v.customer_caregiver_wish as Record<string, unknown>).gender, "not_important");
+});
+
+Deno.test("resync (#55, i): felder=[] + budget — Stubs + equipments + care_budget/monthly_salary, sonst nichts", async () => {
+  _resetAgencyTokenCache();
+  const mm = fakeMamamia([LOGIN, readOf([P1, P2]), UPDATED]);
+  await resyncCustomerFromLead({ lead: resyncLead({}), felder: [], budget: 2900, secrets: SECRETS, fetchFn: mm.fetch });
+  const v = mm.requests[2].variables;
+  assertEquals(v, {
+    id: 10670,
+    patients: [{ id: 75420, tool_ids: [2] }, { id: 75421, tool_ids: [] }],
+    equipment_ids: [1, 2],
+    care_budget: 2900,
+    monthly_salary: 2900,
+  });
+});
+
+Deno.test("resync (#55): mobilitaet + weitere_personen — tool_ids frisch aus mobility (#13b), other_people_in_house", async () => {
+  _resetAgencyTokenCache();
+  const mm = fakeMamamia([LOGIN, readOf([P1]), UPDATED]);
+  await resyncCustomerFromLead({
+    lead: resyncLead({ mobilitaet: "bettlaegerig", weitere_personen: "ja" }),
+    felder: ["mobilitaet", "weitere_personen"], secrets: SECRETS, fetchFn: mm.fetch,
+  });
+  const v = mm.requests[2].variables;
+  assertEquals(v.patients, [{ id: 75420, tool_ids: [4, 6], mobility_id: 5, lift_id: 1 }]);
+  assertEquals(v.other_people_in_house, "yes");
 });

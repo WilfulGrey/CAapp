@@ -349,18 +349,26 @@ CA app → Mamamia:
   `https://backend.beta.mamamia.app/graphql` — forward-going dev env
   z newer schema. Dostępny dla porównań schema (jak Bug #16) jeśli
   potrzeba zdebugować rozjazdy.
-- **Panel UI (agency):** `https://backend.prod.mamamia.app/...` (preprod
-  panel). Beta panel pod `https://backend.beta.mamamia.app/...`.
+- **Panel UI (agency):** preprod `https://portal.mamamia.app/backend`, beta
+  `https://beta.mamamia.app/backend` — osobny host per tenant, NIE derywowalny
+  z GraphQL API (Bug #17); sekret `MAMAMIA_PANEL_URL`.
 - **Auth:** agency token refreshed via `MAMAMIA_AGENCY_EMAIL` /
   `MAMAMIA_AGENCY_PASSWORD` — ZAWSZE server-side. Nigdy nie wystawiać
   agency credentials do browsera. Każdy tenant (beta vs preprod) ma
-  **osobne credentials** — agency w beta to inny user niż w preprod.
+  **osobne credentials** (osobne hasło), ale od 2026-09-07 jest to na OBU
+  **dedykowane konto portalu `kundenportal@primundus.de`** (Registry #53) —
+  NIE konto człowieka z zespołu. Powód: logi Mamamii muszą rozróżniać „zrobił
+  to portal" od „zrobił to użytkownik". Ta sama para email/hasło obsługuje
+  agency `/graphql/auth` (Bearer) i panel Sanctum. Nigdy nie wpisywać tu
+  konta osobistego — rotacja sekretów: §"Supabase secrets".
 - **Customer ID space:** numeric `Customer.id` + readable `customer_id`
   string. Per-tenant osobne auto-incrementy — `Customer.id=8420` w
   preprod to inny customer niż `Customer.id=8420` w beta. Patrz §"Naming
   convention" wyżej + Bug #15 (ServiceAgency ID per-tenant).
-- **ServiceAgency ID (Primundus):** preprod=`3`, beta=`18`. Hardcoded
-  per env w `supabase/functions/onboard-to-mamamia/onboard.ts:PRIMUNDUS_AGENCY_ID`.
+- **ServiceAgency ID (Primundus):** preprod=`3`, beta=`18`. Sekret per env
+  `MAMAMIA_AGENCY_ID` (czytany w `onboard-to-mamamia/onboard.ts:loadPrimundusAgencyId`,
+  brak/nie-liczba = throw). Konto agencyjne MUSI należeć do tej agencji —
+  pre-flight: `{ ServiceAgency { id name } }` po LoginAgency.
 
 ---
 
@@ -414,6 +422,9 @@ CA app → Mamamia:
 | `project 3/app/api/portal-abholen/route.ts` | Abholer eingekaufter Leads (pg_cron co minutę): IMAP-Postfächer (Pflegehilfe/Pflegebund, `portal_mail_log`) **i** Partner-API pflege-helfer24.de (`holeApiAb`, `portal_api_log`); loopback `POST /api/portal-lead`. Flagi `PORTAL_TROCKENLAUF`/`PORTAL_TESTPHASE` per portal (`1` lub lista domen) |
 | `project 3/lib/portal-helfer24.ts` | Mapper Partner-API pflege-helfer24.de: `{headers,data}` → body dla `/api/portal-lead` (kolumny po NAZWIE, dokładne wartości Auswahl, `spaeter`, Einwilligung z Liefer Datum). Pure, test w root-vitest |
 | `project 3/lib/portal-lead.ts` | Rejestr `PORTALE` (domain, name, `abholung: imap\|api`) — źródło zakładek admina i allowlisty eingangu; `ergaenzeAngaben` (Annahmen teurer Wert) |
+| `project 3/app/api/admin/leads/[id]/angaben/route.ts` | Admin-Korrektur der Kundenangaben (Registry #55): Diff → optional `berechnePreis` → leads-Update → Mamamia-Sync (`onboard-to-mamamia { lead_id, resync }`, `mamamia_sync_pending` bei Fehler) → `offer_updated` via Loopback. Body B `{ resync: true }` = Retry |
+| `project 3/lib/angaben-diff.ts` | Pure: `FD_KEYS`, `RESYNC_FELDER` (Spiegel der Edge Fn), `ERLAUBT` (`satisfies` an die Kalkulator-Typen), `diffAngaben` (norm-Vergleich, Validierung NUR geänderter Keys), `mamamiaFelder`. Test: `src/__tests__/angabenDiff.test.ts` |
+| `project 3/lib/angaben-labels.ts` | Pure: `LABELS` (aus email.ts herausgezogen), `FELD_NAMEN`, `angabenLabel` (pflegegrad 0 ⇒ „Kein Pflegegrad") — Mails, Admin-Route und -Seite teilen die Wörter |
 
 ### Edge Functions (`supabase/functions/`)
 
@@ -424,8 +435,9 @@ CA app → Mamamia:
 | `_shared/mamamiaClient.ts` | Mamamia GraphQL client (agency token refresh, runGraphQL) |
 | `_shared/mamamiaPanelClient.ts` | Panel-specific endpoints (StoreRequest dla inviteCaregiver) |
 | `_shared/rateLimit.ts` | In-memory rate limit per IP |
-| `onboard-to-mamamia/index.ts` | HTTP handler — token + verify + onboard or cache hit |
-| `onboard-to-mamamia/onboard.ts` | StoreCustomer + StoreJobOffer + Locations(search) flow |
+| `_shared/serviceRoleAuth.ts` | `isServiceRoleBearer(authorization, serviceKey)` — Gate für server-to-server-Bodies (`mirror_token`, `lead_id`/`resync`) in onboard-to-mamamia; Key-Vergleich ODER JWT-Claim (verlässt sich auf Gateway-`verify_jwt`). Registry #55 |
+| `onboard-to-mamamia/index.ts` | HTTP handler — token + verify + onboard or cache hit; server-only Gałąź `{ lead_id, resync }` (Registry #55) |
+| `onboard-to-mamamia/onboard.ts` | StoreCustomer + StoreJobOffer + Locations(search) flow; `resyncCustomerFromLead` (Admin-Resync, diff-driven, Registry #55) |
 | `onboard-to-mamamia/mappers.ts` | **formularDaten → Mamamia input** (`buildCustomerInput`, `buildPatients`, `buildCaregiverWish`, `mapNightOperations`, `mapMobilityToId`, etc.) |
 | `onboard-to-mamamia/types.ts` | `FormularDaten`, `Lead`, `CustomerInput`, `CaregiverWishInput` |
 | `sync-acceptance/index.ts` | **Server-to-server only** (Bearer = SERVICE_ROLE_KEY) — sekwencja akceptu po podpisie (gotcha #12), triggerowana przez bridge |
@@ -774,6 +786,14 @@ skip_confirm dla starych bundli, stemple `mamamia_*`): [docs/vertrag-flow.md](do
   i portal-akcept — sondy 2026-08-05, Bug #26) i służy tylko jako fallback.
   Dedupe per (job, caregiver) po evencie w lead_events.
 
+- **Zweiter server-only Body seit Registry #55: `{ lead_id, resync: { felder, budget? } }`** —
+  Admin-Korrektur der Kalkulator-Angaben nach Mamamia (diff-driven, nur die geänderten
+  Felder; `patients[]`-REPLACE als einziger Löschweg). Beide Flags (`mirror_token`,
+  `resync`/`lead_id`) verlangen `Authorization: Bearer <service_role>`
+  (`_shared/serviceRoleAuth.ts`), sonst 401 — der Browser kann sie nicht auslösen.
+  Antworten 200/400/401/404/409/500/502, kein Session-JWT. Details: Registry #55,
+  [docs/customer-portal-flow.md](docs/customer-portal-flow.md) §„Admin-Resync".
+
 ### 11. Opis opiekunki (`about_de`) — bierzemy z Mamamii, nie generujemy u siebie
 
 Portal pokazuje **surowy `Caregiver.about_de` z Mamamii** (już NIE generujemy bio
@@ -840,6 +860,32 @@ połknięta jako `seeded`, klientka nie dostała maila). Zasady:
   „(Seed — keine Mail versendet)" przy `metadata.seeded=true`.
 
 ---
+
+### 14. Onboard ma atomowy claim — dwa równoległe wołania to był DUPLIKAT klienta
+
+`onboard-to-mamamia` jest wołany dla tego samego leada z DWÓCH stron w tej samej
+sekundzie: przeglądarka (redirect z kalkulatora → portal) i `send-scheduled-emails`
+(blok „Unsere Empfehlung” w Mail 1 potrzebuje `job_offer_id`, Registry #39). Do
+Registry #54 `onboardLead` sprawdzał `mamamia_customer_id` i szedł całą ścieżką
+(LoginAgency → StoreCustomer → StoreJobOffer → panel push → dopiero zapis) — oba
+wołania widziały pustą kolumnę i zakładały DWÓCH klientów (prod 2026-09-07:
+10693 + 10694, MM nie ma delete; formularz zapisany na jednym, lead wskazywał
+drugiego). Latentne, bo ciepła instancja kończy w 2–3 s i mail trafia w cache-hit;
+zimny start po redeployu (~10 s) otwierał okno.
+
+- **Claim = jeden UPDATE** (`index.ts:claimOnboarding`): `set
+  mamamia_onboarding_started_at=now() where id=$1 and mamamia_customer_id is null
+  and (claim is null or claim < now()-2min)` + `select id` — atomowy w Postgresie.
+  Zwycięzca tworzy klienta; **przegrany polluje `fetchLead` co 1 s do 25 s** i
+  zwraca cudzy wynik jak cache-hit (log `joined concurrent onboard`). Timeout ⇒
+  `onboarding in progress` (500 → refresh). Błąd zwycięzcy ⇒ claim zwalniany
+  (`null`), żeby refresh nie czekał 2 min.
+- Kolumna `leads.mamamia_onboarding_started_at` (migracja 20260907160000, nullable).
+  `SupabaseLike.claimOnboarding` jest opcjonalne — fake bez niego = stare
+  zachowanie; testy `(#54)` w `onboard.test.ts`.
+- **Reguła:** każdy nowy wołający onboardu (route, cron, mail) NIE potrzebuje
+  własnego „poll zamiast onboardu” — claim to załatwia; ale zimny start onboardu
+  wciąż trwa ~10 s, więc nie zakładaj, że „przeglądarka zawsze wygrywa”.
 
 ## Field mapping reference
 
@@ -979,6 +1025,9 @@ Wszystkie z 2026-04 → 2026-05. Lista ma być wyczerpana — jak coś znów
 | 23 | **Kill-switch dla hinweisu rekrutera** (2026-07-31, Michał: „wyłącz/ukryj wyświetlanie tego dodatkowego tekstu na razie u klientów — mamy jeszcze kilku rekruterów którzy uzupełnili błędnie"). Po włączeniu verbatim (#22) okazało się, że część rekruterów wpisuje w `application.message` treści nieprzeznaczone dla klienta. | supabase/functions/mamamia-proxy/actions.ts (`applicationMessageEnabled` + strip w `listApplications`), _tests/actions.test.ts | Gate **server-side, DEFAULT WYŁĄCZONY**: proxy usuwa `message` z odpowiedzi, więc tekst **nie dociera do przeglądarki** (nie jest tylko ukryty CSS-em — istotne, bo chodzi o treści wrażliwe). Front bez zmian: brak pola ⇒ box „Hinweis der Agentur" po prostu się nie renderuje. **Włączenie z powrotem** (gdy teksty rekruterów będą czyste): `npx supabase secrets set SHOW_APPLICATION_MESSAGE=1 --project-ref <ref>` — działa bez redeployu (cold start czyta env); wyłączenie: `secrets unset`. Zweryfikowane live na prodzie: aplikacja 11049 miała `message` (567 zn.) → po deployu `has_message_key: false`, reszta pól nietknięta. **AKTUALNY STAN: ZNÓW WŁĄCZONY** (2026-09-03, prod + staging) — zgłoszenie Michała, że klient 9917 (Jan-Frederik, app 12524) nie widzi „PK will ihren Hund mitnehmen". Próbka 8 najnowszych leadów z Bewerbungami w momencie włączania: 5 z 6 tekstów czyste i przydatne (Verlängerung, eigenes Auto, Termin PK, prośba o rozmowę z rodziną); jeden brudny — app 12334 (klient Thorsten Strerath 10457) niesie back-office notatkę `pr-10457-1 / PK Jan Adamus / SK / DLV: 2800€ / RK: 250€`. Michał świadomie zaakceptował: „tam nie ma kwoty netto dla opiekunki więc jest ok" — DLV/RK nie są wynagrodzeniem PK, więc ekspozycja jest dopuszczalna. **Nie budujemy filtra ani redakcji** (Registry #22 wyciął to na wyraźne polecenie) — jakość treści zostaje po stronie rekruterów w MM. Wyłączenie w razie potrzeby: `npx supabase secrets unset SHOW_APPLICATION_MESSAGE --project-ref <ref>` (sekundy, bez deployu). |
 | 24 | **Kundenportal: nieudane rozwiązanie Einsatzort było po cichu połykane** (2026-08-03, prod, klient Christa Wimmer 9962). Austriacki kod pocztowy „4866 Unterach am Attersee" — `searchLocations` (Mamamia Locations = tylko DE) nie zwraca trafienia → `location_id` puste, ALE save się udaje (location_custom_text) i feuerujemy `patient_data_saved` → mail „Patientenprofil ausgefüllt / Pflegekräfte können sich bewerben". Klient zostaje jednak `draft` (gate aktywacji wymaga `location_id`) → brak zaproszeń/publikacji. Pusty `catch {}` + „proceed anyway" udawały sukces. | src/pages/CustomerPortalPage.tsx (onSaveToMamamia: detekcja `locationUnresolved` + toast + event `patient_form_location_unresolved` + flaga `location_unresolved` na patient_data_saved), src/lib/leadEvents.ts (LeadEvent + LeadEventMetadata: plz/ort/location_unresolved), project 3/app/api/lead-event/route.ts (ALLOWED_EVENTS + supresja Mail D gdy location_unresolved) | Zamiast cichego „fertig": (1) klient widzi toast „Ort konnte nicht übernommen werden — wir kümmern uns darum"; (2) event `patient_form_location_unresolved` (z PLZ+Ort) odróżnia „wpisane, nierozwiązywalne" od „puste"; (3) mylący mail „Pflegekräfte können sich bewerben" NIE leci (flaga). Dane pacjenta nadal zapisywane. **Otwarte:** to NIE aktywuje Christy — Mamamia (prawdopodobnie) nie ma ortów AT; pytanie kierunkowe „czy Primundus obsługuje Austrię?" do Marcina/Michała. |
 | 25 | **Follow-up joby: Bewerbungi na nowych jobach nie mailowały, zamknięte leady nie wracały do obiegu, maile bez kontekstu joba, admin ślepy na multi-job** (2026-08-04; dowód prod lead 9239 Elke Zwolan: job 33415 `geplant` od 29.07, Bewerbung Agnieszki J. 03.08 zapisana `seeded:true` ⇒ zero maili — pierwsza Bewerbung KAŻDEGO follow-up joba była połykana przez warunek notify „historia lub default-job"). Systemowo: fetchActiveLeads pomijał leady z wygasłym tokenem/zamkniętym statusem (typowy klient follow-up ma oba), Mail C dedupe lead-wide (druga buchung = brak maila), remindery kasowane lead-wide przez `isBeauftragt`, linki w mailach bez `&job=`, admin bez `lead_jobs`. | supabase/functions/detect-caregiver-events/{index.ts,_tests/handler.test.ts}, migracja 20260804090000 (leads.mamamia_jobs_checked_at + RLS anon-SELECT lead_jobs), project 3: lib/lead-management.ts (`statusOrder.folge_einsatz=2`), lib/portal-url.ts (NEW), app/api/lead-event/route.ts (deeplink + dedupe per application_id), supabase/functions/send-scheduled-emails/{index.ts,followupJobs.ts NEW,_tests/} , app/admin/leads/{page,[id]/page}.tsx, src/pages/CustomerPortalPage.tsx (accept-metadata `mamamia_job_offer_id`), src/__tests__/{portalUrl.test.ts NEW,integration/portal.test.tsx}, .github/workflows/test.yml (job deno-send-scheduled) | Decyzje Michała: status **`folge_einsatz`** (dziedziczenie stanu z MM przez discovery, ZERO auto-przedłużania tokenu — self-service regen), Mail C dla KAŻDEGO bookingu („możemy mieć i 8 jobów rocznie"), deeplink = „klucz do mieszkania, pokój = job". Mechanika: notify += `liveStatus==='geplant'`; cap 3 maile/job/run z drip (nadwyżka BEZ eventu — nic nie ginie); discovery co 6h/50 leadów; per-(job,cg) `acceptedJk`; job-aware reminder-cancel. Szczegóły: gotcha #13. E2e staging przed prod-deployem; seeded-event 9239 re-fire tylko za osobnym OK Michała. |
+| 55 | **Admin-Korrektur der Kundenangaben erreichte Mamamia nie — 2 Patienten trotz „eine Person"** (2026-09-07, Fall Rapp `51cbae84` / MM 10670: Portal-Mail ohne „Anzahl Pflegebedürftige" ⇒ `ergaenzeAngaben` nahm den teureren Wert `ehepaar` ⇒ Onboard legte 2 Patienten an; Kunde ruft an: nur die Mutter. Onboard short-circuited bei `mamamia_customer_id` ⇒ jede spätere Korrektur (auch das SA-Portal-`offer_updated` um 09:10) blieb Supabase-only). **PR-1 (Edge):** server-only Pfad `POST onboard-to-mamamia { lead_id, resync: { felder, budget? } }` hinter service_role; PR-2 (Admin-Route + Portal-Front) folgt. | `_shared/serviceRoleAuth.ts` (NEU), `onboard-to-mamamia/{onboard.ts,index.ts}`, `_tests/{onboard,handler}.test.ts` (+14) | **Diff-driven**: nur die geänderten Kalkulator-Felder gehen nach MM (`RESYNC_FELDER` = betreuung_fuer/pflegegrad/mobilitaet/nachteinsaetze/weitere_personen/deutschkenntnisse/fuehrerschein/geschlecht) — sonst würden Patientenbogen-Eingaben und Agentur-Werte (`germany_skill=level_4`) zurückgesetzt. Mechanik (alles live auf beta belegt, Customer 9989 + gebuchter 8394): `patients[]` ist REPLACE per id = **einziger Löschweg** (keine DeletePatient-Mutation) ⇒ 2→1 = Stubs `{id, tool_ids}` auf den Patienten mit der KLEINSTEN id kürzen + `equipment_ids` zurück (gotcha #3/#13b); 1→2 = Klon des GELESENEN p1 (nicht aus fd) ohne id + zweiter Pass mit der neuen id (gotcha #4); Per-Patient-Felder auf ALLE Stubs (Kalkulator kennt eine Person); Wish = kompletter Read (alle 25 Keys von `CaregiverWishInput`, ohne id/customer_id/customer, ohne nulls) + nur der geänderte Key; `budget` ⇒ `care_budget`+`monthly_salary`; `variables` per `if (x !== undefined)` — **`null` würde gesendet und z. B. care_budget nullen** (`mamamiaClient.ts:39`). Präsenz-Check vor den still defaultenden Mappern (`pflegegrad` 0 = „Keine" MUSS passieren). >2 Patienten + Per-Patient-Feld ⇒ 409 mit `patient_ids`. Adressierung per `lead_id` OHNE Expiry-Filter (`fetchLeadById`) — die Korrektur alter Leads darf den Kundenlink nicht töten. **Gate:** `isServiceRoleBearer` (Key-Vergleich ODER JWT-Claim `role=service_role`; der JWT-Zweig verlässt sich auf Gateway-`verify_jwt` — **nie `--no-verify-jwt` für onboard**) aus dem Header VOR dem Rate-Limit (Render-Egress-IP teilt sich den 5/min-Bucket mit dem Portal-Abholer); `resync`/`lead_id`/`mirror_token` ohne service_role ⇒ 401. `sync-acceptance`/`upload-offline-conversions` behalten ihre lokalen Kopien von `jwtRole`/`timingSafeEqual` (bei nächster Berührung auf den Helper umstellen). Sonden beta: Mutation ohne Contract-Args lässt `customer_contract` auf einem gebuchten Kunden unangetastet; 2→1 auf einem Kunden MIT Confirmation wird von MM akzeptiert (Confirmation bleibt). **PR-2 (Kostenrechner + Portal):** Route `POST /api/admin/leads/[id]/angaben` (Cookie-Gate + Service-Key) — Body A `{ angaben, neuBerechnen, kundenMail }`: Diff ZUERST (`lib/angaben-diff.ts`, pure; `care_start_timing` gegen die SPALTE `leads.care_start_timing`, nie gegen fd — Kalkulator/Portale schreiben es nie in fd), **Validierung nur der geänderten Keys** (in echten fd stehen Werte außerhalb des Kanons: Rechner-Leads ohne `erfahrung`, SA-Portal `sehr-gut-sa`, alter Admin-Select `1-2-wochen`; Validierung des ganzen Bodys hätte für die Mehrheit der Leads 400 ergeben), `pflegegrad` Integer 0–5 ohne Koerzierung (`Number('')===0` wäre ein Phantom-„Keine"), `''` = „nicht angegeben" (Rechner-Konvention, Key bleibt); optional `berechnePreis`; `angenommene_felder=[]` (Admin-Save = „mit dem Kunden geprüft" — sonst überschreibt die nächste Portal-Mail derselben Adresse via `echteAntworten` die Korrektur); ERSTER leads-Update vor Mamamia; MM-Sync diff-driven mit Union `pending.felder ∪ changed`, Budget bei Neuberechnung IMMER (heilt den Drift MM 3400 vs Supabase 3350); **jedes non-2xx ⇒ `kalkulation.mamamia_sync_pending` (letzte nicht angekommene Absicht, nie verloren), nur 2xx löscht**; Body B `{ resync: true }` = Retry aus pending; Event `offer_updated` über den Bridge-Loopback (`notify` nur bei Neuberechnung + Preisänderung + Häkchen; Mail geht auch bei MM-Fehler — Supabase-Preis ist die Kundenwahrheit). Admin-Seite: `defaultData` raus (Editor liest NUR `kalkulation.formularDaten` + Spalte), jeder Select rendert einen Wert außerhalb des Kanons als Extra-Option, „Speichern"/„Neu berechnen & speichern" + Häkschen + Statuszeile + Retry-Knopf; Legacy-Leads ohne fd nicht bearbeitbar. **Portal-Front bewusst NICHT angefasst** (Entscheidung Michał 2026-09-07: „potenziell gefährlich und kompliziert“) — eine Änderung an der Formular-/Draft-Logik des Kunden-Portals wiegt schwerer als der Fehler, den sie verhindert. **Offene Kante, die daraus folgt:** hat ein Kunde den Patientenbogen offen bzw. einen localStorage-Draft mit `anzahl=2` (Key `patient_<token>`), kann sein nächster Save nach einer Admin-Korrektur 2→1 einen Patienten OHNE id schicken ⇒ Mamamia legt den gelöschten Patienten neu an (`AngebotCard.tsx:pick()` liest den Draft VOR Mamamia; `patientFormMapper.ts:763` baut Patient 2 bei `ids[1]===undefined` ohne id). Gegenmittel ohne Code: Korrektur mit dem Kunden am Telefon abschließen (er lädt das Portal neu ⇒ der Draft wird von Mamamia überschrieben), oder die Personenzahl nach dem nächsten Kunden-Save im Admin gegenprüfen. Nicht in diesem PR: `PATCH /api/leads/[leadId]` ohne Auth/Whitelist (0 Aufrufer) + anon UPDATE-RLS auf `leads` (Sicherheitsbefund); `arrival_at`/`JobOffer.salary_offered` in MM bleiben; `recalculate-all-leads.mjs:214` überschreibt die ganze `kalkulation` (verliert pending); `fd.pflegegrad ? … : 'Nicht angegeben'` zeigt 0 als „Nicht angegeben" (Mail 1, pre-existing). |
+| 54 | **Dwóch klientów w Mamamii z jednego leada — wyścig przeglądarka ↔ Empfehlungs-Mail** (2026-09-07, prod, lead testowy Michała `960aecce`: customer 10693 z formularzem pacjenta + pusty 10694 w leadzie, oba lustra tokenu o 13:37:24Z). `onboardLead` bez locka: obie strony widziały `mamamia_customer_id=null`. Uaktywnione zimnym startem po redeployu (#53) — 22 leady wcześniej tego dnia bez duplikatu. Wskazane w rundzie 5 krytyka planu #53 (Zauner #44 = ta sama klasa). | migracja 20260907160000 (`leads.mamamia_onboarding_started_at`), `onboard-to-mamamia/{onboard.ts,index.ts,types.ts}`, `_tests/onboard.test.ts` (+4) | Atomowy claim jednym UPDATE-em z warunkiem; przegrany czeka (poll 1 s × 25) i zwraca wynik zwycięzcy; błąd zwycięzcy zwalnia claim. Gotcha #14. Deploy: migracja PRZED kodem (nullable, Święta zasada 3). |
+| 53 | **Portal logował się do Mamamii kontem człowieka — logi MM nie rozróżniały „portal" od „użytkownik"** (2026-09-07, zlecenie Michała). Rotacja na dedykowane konto `kundenportal@primundus.de` (oba tenanty, osobne hasła) — **zero zmian w kodzie**: credentiale żyją wyłącznie w sekretach Supabase, czytane przez 4 fn (proxy, onboard, sync-acceptance, detect); Render/CI/kostenrechner/skrypty nic nie czytają, nikt nie porównuje e-maila, `leads.mamamia_user_token` pisany i nigdy nieczytany. | Supabase secrets (staging + prod), CLAUDE.md (§Mamamia auth, §Supabase secrets, §Environment switch checklist), ONBOARDING.md, docs/customer-portal-flow.md, `onboard-to-mamamia/_tests/{onboard,mamamiaClient,mamamiaPanelClient}.test.ts` (prawdziwy stary adres → `example.com`) | Lekcje z 6 rund krytyka planu: (1) **`secrets set` = natychmiastowy cut-over** (bez redeployu; rollback = `secrets set` starych wartości, też bez deployu) — pre-flight PRZED: LoginAgency + `{ ServiceAgency { id name } }` dla NOWEGO i STAREGO konta na obu tenantach (18/3), inaczej klasa Bug #15 z zasięgiem „cały portal"; (2) hasło przez `--env-file` w apostrofach (dotenv ucina na `#`), kontrola `secrets list`.value == sha256 wartości; (3) dowody: `getCustomer`/`listMatchings` = tylko Bearer-login; ownership/permissions = StoreRequest (invite, job MUSI być `active` — inaczej `cat=authorization` jak Bug #17) + UpdateCustomerToken (mirror; HTTP 200 NIE jest dowodem, `pushCustomerToken` połyka błędy — dowód = log `[onboard] token mirrored … stored==sent`, błąd = `pushCustomerToken failed`); twardy dowód agencji = `StoreJobOffer(service_agency_id)` z cache-miss onboardu na OBU env; (4) **świeży lead z rechnera onboarduje się SAM** przez Empfehlungs-Mail (#39/#44) w sekundach, a `onboardLead` nie ma locka → jawny onboard równolegle = DUPLIKAT klienta w MM (bez delete): po POST leada poll `mamamia_customer_id` ≤60 s, onboard tylko gdy null; (5) logi edge fn: Management API `logs.all` z Bearer PAT **wymaga `iso_timestamp_start/end`** (bez okna pusto), tabela `function_logs`; błędy detect = `threw:`/`login failed`/`retry failed`. Wszystko poza pełnym kwadransem (detect `*/15`). Stare konto zostaje ważne do czasu, aż prod przeżyje cache-miss onboard, invite i cykl detect. |
 | 52 | **Akcept klienta nie wpadał do Mamamii — zła E-Mail w formularzu umowy blokowała CAŁĄ sekwencję, alarm retry-chain martwy, ręczny booking teamu nigdy nie adoptowany** (2026-09-05 Stein `62903792`/app 12629 „`catarina-stein@t-online.de@t-online.de`"; 2026-09-01 Kopka `52dc3e9d`/app 12388 „`Michael.kopka @ Freenet.de`" — 2 z 27 akceptów w 60 dni). Łańcuch pięciu ogniw: (1) `AngebotPruefenModal` nie sprawdzał FORMATU e-maila (KP tylko „niepusty", LE/AG nic); (2) krok 1 syncu (UpdateCustomer z `patient_contracts`/`invoice_contract`/`customer_contacts`) rzucał na walidacji MM PRZED StoreConfirmation — kosmetyka blokowała booking; (3) `isPermanentMamamiaError` tylko wokół StoreConfirmation ⇒ błąd kroku 1 = „transient": bridge tylko logował 502, cron mielił co 15 min do 30 dni (Kopka ~570 prób), jeden alarm z tekstem „transienter Fehler"; (4) alarm retry-chain (T+2 min) nigdy nie działał na prodzie — `Deno.env.get("KOSTENRECHNER_URL")!` = cichy `undefined` (sekretu nie było na prodzie), crash `reading 'replace'` dopiero w fazie alarmu; detect miał soft-fallback na prod-URL, dlatego cron-alarm szedł; (5) Guard A (adopcja) też za krokiem 1 ⇒ Kopka: team zabookował ręcznie w SA-Portal (fc 4715), nasz wiersz dalej unconfirmed, PDF nigdy w MM. Obie Bewerbungen Stein odrzucone 05.09 18:34 w PANELU („CA A.", nie portal — brak `application_rejected`; nie auto-reject — prod DRY-RUN). | `_shared/acceptanceSync.ts` (`cleanEmail`, `droppedEmailFields`, `isValidationError`, `runSequence` + `postContactAlarm`), `_shared/env.ts` (NEW `requireEnv`), `sync-acceptance/index.ts` + `detect-caregiver-events/index.ts` (bootstrap fail-fast), `project 3/app/api/lead-event/route.ts` (event `acceptance_contact_alarm`), `src/components/portal/{AngebotPruefenModal.tsx,shared.ts}` (`isEmail`), testy deno +10 / vitest +3, docs/vertrag-flow.md | **A:** e-mail spoza `/^[^\s@]+@[^\s@]+\.[^\s@]+$/` → `null` (dla `patient_contracts`/`invoice_contract` udowodnione: pusty LE-prefill leci jako null w każdym udanym syncu; **sonda beta 2026-09-07 na Customer 8394 / App 1469:** `customer_contacts[{email:null}]` → 200, `StoreConfirmation(contract_contact.email:null)` → 200 (non-binding Confirmation 752, job nietknięty); `.kp@example.de`, `kp@example..de`, `kp@example.de.` i `Michael.kopka @ Freenet.de` → `extensions.validation` w OBU mutacjach — **fixture e2e „regex-pass / MM-reject” = `.kp@example.de`**; beta ≠ dowód prod, prod-dowód = pierwszy prod-sync z `customer_updated=true` przy KP null), NIGDY „poprawiony" adres (zasada 1.5), i NIGDY po cichu: `contact_fields_dropped` + `dropped_values` → team-mail. **B:** krok 1 w try/catch — permanent **WYŁĄCZNIE** `graphqlErrors[].extensions.validation` (kształt Stein/Kopka); HTTP, `Unauthenticated.`, GraphQL-ISE, `category` ⇒ throw = transient jak dotąd; krok 2 bez zmian. Permanent ⇒ `customer_update_error`, sekwencja idzie do StoreConfirmation/adopcji. **C:** żółty `acceptance_contact_alarm` z JEDNEGO miejsca (`finally` po całej sekwencji, `AbortSignal.timeout(5s)`, pomijany gdy `confirm_error.permanent` — czerwony już niesie błąd), bridge dedupuje po `lead_events`+`application_id`, mail PRZED insertem (#47), BEZ stempla `mamamia_sync_alerted_at` (wspólny stempel wyciszyłby czerwony alarm). **D:** `requireEnv()` dla 7 sekretów obu fn, soft-fallback z detect wycięty; sekret `KOSTENRECHNER_URL` per env (prod = `https://kostenrechner.primundus.de`, staging = `https://kostenrechner-staging.onrender.com`). **E:** front: `isEmail()` (lustro `cleanEmail`), KP musi być poprawny, LE/AG pusty-lub-poprawny, hint po `onBlur`, „Weiter" zablokowane; wymagalność bez zmian (decyzja Michała). **Reguły:** kontakt-rows to kosmetyka, booking nie — nigdy nie stawiać StoreConfirmation za krokiem, który może paść na walidacji; `Deno.env.get(...)!` = cichy undefined niewidoczny w testach DI → `requireEnv`; regex ≠ walidator MM (adres przechodzący regex, odrzucony przez MM: w AG przy agGleich=false = żółty alarm, booking idzie; w LE/KP = także StoreConfirmation → czerwony T+0); wiersz akceptu dla ODRZUCONEJ aplikacji się USUWA, nie blokuje (Guard A adoptuje po `caregiver_id` — stary wiersz zaadoptowałby nową confirmation i wysłał stary PDF); sonda na becie ≠ dowód prod (Bug #16). **Poza PR-em (pre-existing, „Otwarte" w vertrag-flow):** pętla crona przy permanentnym confirm-error (30 dni, krok 1 nadpisuje panel co 15 min — projekt adoption-only), invalidacja cache tokena po `Unauthenticated`, guard statusu Bewerbung przed StoreConfirmation, unit-testy bridge'a. |
 | 51 | **Erste echte Direktmail von Pflegehilfe abgelehnt: „kein Einwilligungsnachweis" trotz 7 gelesener Felder** (2026-09-04, prod uid 40 Andreas Trageser, Michał: „nie mam tego maila na skrzynce?? jak to możliwe?"). Direktmails des Portals sind HTML-only; mailparser erzeugt Text aus HTML, klebt Tabellenzellen mit 3 Leerzeichen zusammen und bricht bei ~80 Zeichen um — das Label „Zustimmung zur Kontaktweitergabe" stand über zwei Zeilen, `feld()` (Anker `^`, Wert bis Zeilenende) fand es nicht. Alle Mails davor waren Apple-Mail-Forwards (eigener text/plain-Teil) oder Martins Klartext-Tests — die Direktform war nie durch den Parser gelaufen. Zweiter Befund, NICHT unser Code: die Mail (und uid 37–39) verschwand <60 s nach Zustellung aus dem Ionos-Postfach (keine IMAP-Schreiboperation im Code; Papierkorb/Spam leer) — Trageser wurde nur gesehen, weil Zustellung und Cron-Tick zusammenfielen; Verdacht Mail.app-Regel/POP-Abruf auf Michałs Seite. | project 3/lib/portal-parser.ts (`feld`), src/__tests__/portalParser.test.ts (+1, Muster 1:1 aus HTML der Mail Epple reproduziert), docs/portal-leads.md | **Zwei Anläufe.** #640 (Theorie aus simuliertem HTML→Text: Label über zwei Zeilen, Zellgrenzen `[ \t]{3,}`) — FALSCH; das echte Muster zeigte erst `metadata.volltext` von uid 45 Berg (#641): der text/plain-Teil des Portals stellt „Datenschutz…: 04.09.2026 10:59 Uhr Zustimmung zur Kontaktweitergabe: 04.09.2026 11:02 Uhr Das Beratungsgespräch wurde …" in EINE Zeile mit EINFACHEN Leerzeichen und trägt HTML-Reste (`&#228;`, `<br/>`). Fix #642: `zeitstempel()` liest den Wert als DATUM hinter dem Label (Fallback `feld()`), Normalisierung dekodiert `&#NNN;`/`<br>`; Label-Leerzeichen = `\s+`; Zellgrenzen-Heuristik aus #640 wieder raus. Test = Zeile verbatim aus uid 45. **Regel:** Parser-Theorien nur gegen den ECHTEN Mailtext bauen (dafür gibt es jetzt `volltext`), nie gegen simulierte Konvertierung. **Und das Gate ist weg** (Michał: „wypierdol mi ten warunek ze zgodami w ogóle"): fehlt der Stempel, bezeugt der Abholer Lieferung per Mail + Mail-Datum (Muster Partner-API) — `kein Einwilligungsnachweis` existiert als Ablehnungsgrund nicht mehr; der Endpunkt-Check (Pflichtfeld text+zeitpunkt) bleibt als Schema-Wächter, weil der Abholer immer liefert. Lead Trageser bleibt Shell `manuell_pruefen` (Mail weg, Daten nur im Anfragen-Manager Pflegehilfe). **Folge-PR #641 (Michał: „zapisuj pełną treść odrzuconych maili"):** `registriereFehlmail` legt bei `abgelehnt` zusätzlich `metadata.volltext` (Mailtext + CSV-Zeilen) ins Event — die einzige Kopie, wenn die Mail danach aus dem Postfach verschwindet. **Regel:** Parser-Fixtures müssen die DIREKTFORM des Portals abdecken (HTML-only, durch mailparser gejagt), nicht nur Forwards/Klartext; und ein Postfach, in dem fremde Clients löschen, ist für einen 60-s-Cron eine Lotterie — Lösch-Regel abschalten oder Abholer auf Zustellung (Ionos-Weiterleitung an eigenes Postfach) umstellen. |
 | 50 | **Drugi dostawca leadów pflege-helfer24.de przez Partner-API + Bestandskunden-Guard + Testphase per portal** (2026-09-04, zlecenie Michała; plan po 3 rundach krytyka). API: jeden endpoint `GET /partner_portal/leads/api_export[?timestamp]` → `{headers,data}` — **kolumny po NAZWIE** (puste kolumny znikają z odpowiedzi), `"N/A"` = brak, klucz `Lead ID` (UUID); brak pola Einwilligung (decyzja Michała: zgoda w Nutzungsbedingungen portalu → protokołujemy dostawę z `zeitpunkt` = Liefer Datum). Abholer dostał gałąź `holeApiAb` w TYM SAMYM minutowym takcie (po skrzynkach; GET z `AbortSignal.timeout(15s)` — bez niego zawieszony fremd-API trzymałby `laeuft` i blokował też Pflegehilfe). Pamięć = nowa tabela `portal_api_log` (PK `portal, extern_id` — UUID nie wchodzi w bigint-PK `portal_mail_log`; migracja 20260904120000). Erstlauf: JEDEN insert sentinela `__seed__` + wszystkie leady z Liefer Datum < heute (Berlin) jako `altbestand` („pomijaj starsze niż z dzisiaj"); potem okno 7 dni. GET-Fehler NIE koloruje biegu na 500 (nic nie leży; Dauer-500 nikt nie ogląda — #36/#46) — widoczny przez sentinel `__api__` (`offen` z HTTP-grundem) w sekcji admina. Mapper `lib/portal-helfer24.ts`: dokładne wartości Auswahl (listy zamknięte), `Nachtschichten: Ja` ŚWIADOMIE nieustawione (nie mówi ile razy → Annahme jawnie „angenommen"), Startdatum ≥ 6 Monate → **`spaeter`** (nasz legacy-wert; NIE `unklar` = „Ich informiere mich nur", NIE puste = portal „ab sofort"/MM +7d) + etykieta w `EINGANGS_LABELS`. **Krytyk wykrył trzy stare dziury, naprawione przy okazji (dotyczą też Pflegehilfe):** (a) `findOrCreateLead` nie zna `nicht_interessiert`/`betreuung_beauftragt` → `undefined` w porównaniach → NOWY wiersz + Mail 1 + onboard do kogoś, kto powiedział „kein Interesse" — fix: **Bestandskunden-Guard** w `/api/portal-lead` (pre-select `ilike` po mailu, deny-by-default: dalej tylko `info_requested/manuell_pruefen/angebot_requested/folge_einsatz`, reszta `uebersprungen` z eventem na istniejącym leadzie); (b) duplikat (`angebot_requested`) dostawał DRUGĄ Mail 1 z nazwą PIERWSZEGO portalu i nadpisaną kalkulacją (prawdziwe odpowiedzi klienta → nasze Annahmen, wyższy preis) — fix: kalkulacja klienta zostaje (tylko `formularDaten` += portal-extras, `angenommene_felder: []`), **bez Mail 1** (chyba że ostatnia >60 d lub nigdy → rotacja tokenu + Mail 1), log `erledigt` z grundem, admin pokazuje `erledigt`+grund; (c) upgrade `info_requested`→portal zostawiał `source='rechner'` → Mail 1 bez portal-Kopf, lead pod żadną zakładką — fix: 1 linia w `lead-management.ts`. (d) `ergaenzeAngaben`: `pflegegrad: 0` („Keinen") wpadał w `angenommen` (klasa #13e, `grad > 0`). **Testphase/Trockenlauf per portal:** `PORTAL_TESTPHASE`/`PORTAL_TROCKENLAUF` przyjmują `1` (wszystkie, jak dotąd) LUB listę domen — `flagGiltFuer` w `portal-schutz.ts` + kopia `testphase.ts` (Deno); prod w chwili zmiany miał OBIE flagi puste (Pflegehilfe scharf), więc globalna flaga przekierowałaby jej maile. **Reguły:** API to JEDNO wspólne źródło (staging z tokenem przetwarza prawdziwe leady równolegle z prodem — token na stagingu tylko na czas testu); mapowanie Auswahl = dokładne wartości, nie regex-raten; `findOrCreateLead` NIE jest guardem statusów — statusy spoza `statusOrder` przelatują wszystkie gałęzie. |
@@ -1046,7 +1095,8 @@ Suites:
 
 Cross-app importy z `project 3/` w root-vitest są dozwolone WYŁĄCZNIE dla
 pure modułów (zero importów Next/supabase; type-importy OK). Aktualna
-lista: `portal-url.ts`, `portal-lead.ts`, `portal-parser.ts`.
+lista: `portal-url.ts`, `portal-lead.ts`, `portal-parser.ts`, `angaben-diff.ts`,
+`angaben-labels.ts` (Registry #55).
 
 ### Edge Functions (Deno)
 
@@ -1208,8 +1258,16 @@ npx supabase secrets unset KEY --project-ref ycdwtrklpoqprabtwahi
 ```
 
 Podstawowe secrets (NIGDY nie commitować):
-- `MAMAMIA_AGENCY_EMAIL` / `MAMAMIA_AGENCY_PASSWORD`
-- `MAMAMIA_AUTH_ENDPOINT` / `MAMAMIA_ENDPOINT`
+- `MAMAMIA_AGENCY_EMAIL` / `MAMAMIA_AGENCY_PASSWORD` — dedykowane konto
+  `kundenportal@primundus.de` na obu tenantach (Registry #53). **`secrets set`
+  działa NATYCHMIAST, bez redeployu** (workery są recyklowane) — to ono jest
+  cut-overem, a `secrets set` starych wartości = natychmiastowy rollback (bez
+  deployu). Hasło przez `--env-file` (plik `chmod 600`, wartość w apostrofach —
+  CLI parsuje `dotenv`, nieotoczony `#` ucina wartość), NIE w linii komend.
+  Kontrola bez hasła: kolumna `value` w `secrets list` = sha256 wartości.
+- `MAMAMIA_AUTH_ENDPOINT` / `MAMAMIA_ENDPOINT` / `MAMAMIA_PANEL_URL` (per tenant)
+- `MAMAMIA_AGENCY_ID` — ServiceAgency Primundus per tenant (prod `3`, staging `18`);
+  wymagany przez `onboard-to-mamamia` (throw bez niego)
 - `KOSTENRECHNER_URL` — bridge dla `sync-acceptance` + `detect-caregiver-events`
   (alarmy, eventy, render-fallback PDF); **per env**: prod
   `https://kostenrechner.primundus.de`, staging `https://kostenrechner-staging.onrender.com`.
@@ -1217,8 +1275,8 @@ Podstawowe secrets (NIGDY nie commitować):
 - `SESSION_JWT_SECRET`
 - `OPENAI_API_KEY` (jeśli używamy)
 - Google-Ads-Zugänge für `upload-offline-conversions` liegen **im Supabase
-  VAULT** (nicht als Function-Env — das CLI-Token darf `secrets set` auf
-  diesem Projekt nicht, 403): `google_ads_developer_token`,
+  VAULT** (nicht als Function-Env — das CI-Token darf `secrets set` auf
+  diesem Projekt nicht, 403; das per-user eingeloggte CLI darf es — Stand 09/2026): `google_ads_developer_token`,
   `google_oauth_client_id`, `google_oauth_client_secret`,
   `google_oauth_refresh_token`. Zugriff via RPC `get_google_ads_secrets()`
   (Migration 20260814122000, service_role-only — Muster wie
@@ -1670,6 +1728,16 @@ FROM leads WHERE token = '...';
 
 ## Anti-patterns (NIE rób tak)
 
+- ❌ Kalkulator-Felder eines Leads (Supabase) ändern, ohne den Mamamia-Kunden
+  nachzuziehen — der Kunde in MM läuft still auseinander (Fall Rapp, Registry #55).
+  Server-seitig: `POST onboard-to-mamamia { lead_id, resync: { felder } }` (service_role).
+- ❌ `null` als Wert in GraphQL-`variables` „um ein Feld nicht zu setzen" —
+  `JSON.stringify` lässt nur `undefined` weg; `null` wird gesendet und nullt das
+  Feld (z. B. `care_budget`). Variablen per `if (x !== undefined) vars.x = x` bauen.
+- ❌ Ganze Patientenliste aus `formularDaten` neu bauen und per `UpdateCustomer`
+  schicken, „damit MM aktuell ist" — `patients[]` ist REPLACE per id, gesendete
+  Scalars überschreiben die Patientenbogen-Eingaben des Kunden. Nur geänderte
+  Felder, Rest als Stubs `{id, tool_ids}`.
 - ❌ Dodawanie nowych `$variables` do `UPDATE_CUSTOMER` mutation **bez
   weryfikacji że Mamamia przyjmuje** te pola na input. Pierwsza próba
   Bug #9 zabiła wszystkie updateCustomer w produkcji.
@@ -1698,7 +1766,7 @@ FROM leads WHERE token = '...';
   twoja "jutrzejsza" data wygaśnie nim się zorientujesz.
 - ❌ Założenia o lokalnej TZ w testach formatowania dat. CI runuje UTC.
   Pin `TZ` w workflow albo użyj UTC-relative assertions.
-- ❌ Hardcoded Mamamia IDs (`PRIMUNDUS_AGENCY_ID`, `location_id`-y,
+- ❌ Hardcoded Mamamia IDs (agency id — dziś sekret `MAMAMIA_AGENCY_ID`, `location_id`-y,
   etc.) bez znacznika środowiska. IDs są **per-tenant** — beta i prod
   to oddzielne bazy z osobnymi auto-increment'ami. Przy switch'u env
   zweryfikuj IDs live query'em (`{ ServiceAgency { id name } }` itp.),
@@ -1722,15 +1790,14 @@ npx supabase secrets list --project-ref <SUPA_REF>
 ### 2. Set new secrets
 
 ```bash
-npx supabase secrets set \
-  MAMAMIA_ENDPOINT="https://<new-endpoint>/graphql" \
-  MAMAMIA_AUTH_ENDPOINT="https://<new-endpoint>/graphql/auth" \
-  MAMAMIA_AGENCY_EMAIL="..." \
-  MAMAMIA_AGENCY_PASSWORD="..." \
-  --project-ref <SUPA_REF>
+# hasło NIE w linii komend — plik chmod 600, wartość w apostrofach (dotenv-parser CLI)
+npx supabase secrets set --env-file <plik> --project-ref <SUPA_REF>
+# plik: MAMAMIA_ENDPOINT, MAMAMIA_AUTH_ENDPOINT, MAMAMIA_PANEL_URL,
+#       MAMAMIA_AGENCY_ID, MAMAMIA_AGENCY_EMAIL, MAMAMIA_AGENCY_PASSWORD='…'
 ```
 
-Verify że digesty się zmieniły.
+Verify że digesty się zmieniły (`secrets list`.value == sha256 wartości).
+Uwaga: sekrety działają NATYCHMIAST — krok 3 (redeploy) tylko czyści cache tokenu.
 
 ### 3. Redeploy both Edge Functions (cold-start = fresh secrets)
 
@@ -1774,7 +1841,7 @@ TOKEN="<extracted>"
 curl -sS -X POST "$NEW_GRAPHQL_ENDPOINT" \
   -H "Authorization: Bearer $TOKEN" \
   -d '{"query":"{ ServiceAgency { id name } }"}'
-# → porównaj z PRIMUNDUS_AGENCY_ID w supabase/functions/onboard-to-mamamia/onboard.ts
+# → porównaj z sekretem MAMAMIA_AGENCY_ID (czyta go onboard.ts:loadPrimundusAgencyId)
 ```
 
 Jeśli ID się różni — update kodu + redeploy. Patrz Bug #15.
