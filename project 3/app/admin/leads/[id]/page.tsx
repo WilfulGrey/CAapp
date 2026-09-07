@@ -1697,6 +1697,7 @@ export default function LeadDetailPage() {
                     application_accepted_internal: { label: 'Pflegekraft gebucht (Mail C)', color: 'bg-green-700' },
                     offer_updated: { label: 'Angebot angepasst', color: 'bg-amber-500' },
                     acceptance_sync_alarm: { label: '🚨 Mamamia-Sync-Alarm (Team-Mail)', color: 'bg-red-600' },
+                    acceptance_contact_alarm: { label: '⚠️ Kontaktdaten nicht in Mamamia (Team-Mail)', color: 'bg-amber-500' },
                     token_regenerated: { label: 'Portal-Link erneuert', color: 'bg-blue-400' },
                     folge_einsatz_detected: { label: 'Folge-Einsatz erkannt (neuer Mamamia-Job)', color: 'bg-[#E76F63]' },
                     angebots_feedback: { label: 'Rückmeldung zum Angebot', color: 'bg-[#8B7355]' },

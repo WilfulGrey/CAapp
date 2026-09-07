@@ -105,6 +105,21 @@ export interface AcceptanceSyncResult {
    * (schon bestätigt / skipConfirm / Adoption) oder gelungen ist.
    */
   confirm_error?: { message: string; permanent: boolean };
+  /**
+   * Schritt 1 (UpdateCustomer mit den Kontakt-Rows) von Mamamia DETERMINISTISCH
+   * abgelehnt (Validation). Die Buchung darf daran nicht hängen — Sequenz läuft
+   * mit StoreConfirmation weiter, die Rows fehlen im Panel (Registry #52).
+   */
+  customer_update_error?: string;
+  /**
+   * cleanEmail() hat eine NICHT-leere Eingabe des Kunden verworfen (Format
+   * unbrauchbar) — die Row geht ohne E-Mail nach Mamamia. Kein stiller
+   * Fallback (Święta zasada 1): das Team bekommt den Contact-Alarm mit dem
+   * Rohwert. Bei agGleich stammt die AG-Mail aus LE ⇒ nur 'le.email'.
+   */
+  contact_fields_dropped?: Array<"le.email" | "ag.email" | "kp.email">;
+  /** Rohwerte zu contact_fields_dropped (fürs Team lesbar, ohne DB-Blick). */
+  dropped_values?: Record<string, string>;
 }
 
 // ─── GraphQL ────────────────────────────────────────────────────────────────
@@ -241,6 +256,44 @@ function clean(s: unknown): string | null {
   return t || null;
 }
 
+// E-Mail nur, wenn sie das grobe Format hat — sonst null. Registry #52: eine
+// Kundin tippte „x@t-online.de@t-online.de", UpdateCustomer fiel durch und
+// blockierte fünf Tage lang die StoreConfirmation. `email: null` ist für
+// patient_contracts/invoice_contract live bewiesen (LE-Prefill ist leer ⇒ null
+// läuft in jedem erfolgreichen Sync); für customer_contacts (KP) per Sonde.
+// Kein Raten einer „korrigierten" Adresse (Święta zasada 1.5) — lieber leer als
+// erfunden; und NIE still: droppedEmailFields() meldet es dem Team. Regex ist
+// ein Spiegel von isEmail() in src/components/portal/shared.ts — bewusst
+// liberal (IDN, +, Großschreibung); der Laravel-Validator von Mamamia ist
+// strenger, dafür fängt Schritt 1 (customer_update_error) den Rest.
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+export function cleanEmail(s: unknown): string | null {
+  const t = clean(s);
+  return t && EMAIL_RE.test(t) ? t : null;
+}
+
+// Welche E-Mail-Felder des Formulars cleanEmail() verworfen hat (nicht-leer,
+// aber unbrauchbar). Bei agGleich (le === null) nimmt buildCustomerContract die
+// LE-Daten für AG — dann ist es EIN Formularfeld, gemeldet als 'le.email'.
+export function droppedEmailFields(row: AcceptanceRow): {
+  fields: Array<"le.email" | "ag.email" | "kp.email">;
+  values: Record<string, string>;
+} {
+  const fields: Array<"le.email" | "ag.email" | "kp.email"> = [];
+  const values: Record<string, string> = {};
+  const check = (key: "le.email" | "ag.email" | "kp.email", raw: unknown) => {
+    const t = clean(raw);
+    if (t && !cleanEmail(t)) {
+      fields.push(key);
+      values[key] = t.slice(0, 120);
+    }
+  };
+  check("le.email", row.contract_patient?.email);
+  if (!isAgGleich(row)) check("ag.email", (row.contract_snapshot?.ag as Record<string, unknown> | undefined)?.email);
+  check("kp.email", row.contract_contact?.email);
+  return { fields, values };
+}
+
 function sal(s: unknown): string | null {
   return SALUTATION_TOKEN[String(s ?? "").trim()] ?? null;
 }
@@ -271,7 +324,7 @@ export function mapContractPatient(de: Record<string, unknown> | null): Record<s
     zip_code: zip,
     city,
     phone: clean(de.telefon),
-    email: clean(de.email),
+    email: cleanEmail(de.email),
   };
 }
 
@@ -282,7 +335,7 @@ export function mapContractContact(de: Record<string, unknown> | null): Record<s
     first_name: clean(de.vorname),
     last_name: clean(de.nachname),
     phone: clean(de.telefon),
-    email: clean(de.email),
+    email: cleanEmail(de.email),
   };
 }
 
@@ -331,7 +384,7 @@ export function buildCustomerContract(row: AcceptanceRow): Record<string, unknow
     zip_code: zip,
     city,
     phone: clean(ag.telefon),
-    email: clean(ag.email),
+    email: cleanEmail(ag.email),
   };
 }
 
@@ -420,6 +473,17 @@ function isPermanentMamamiaError(e: unknown): boolean {
   return !!(e as { graphqlErrors?: unknown } | null)?.graphqlErrors;
 }
 
+// Schritt 1 (Kontakt-Rows) klassifiziert ENGER als StoreConfirmation: permanent
+// NUR bei Laravel-Validation (`extensions.validation` — exakt die Form der Fälle
+// Stein/Kopka, Registry #52). Alles andere (HTTP, `Unauthenticated.`, GraphQL
+// „Internal server error") wirft wie bisher ⇒ Retry. Positive Struktur-Regel,
+// keine „alles außer X"-Heuristik und kein `extensions.category` (dafür gibt es
+// im Repo nur einen einzigen Beleg).
+export function isValidationError(e: unknown): boolean {
+  const errs = (e as { graphqlErrors?: Array<{ extensions?: Record<string, unknown> }> } | null)?.graphqlErrors;
+  return Array.isArray(errs) && errs.some((x) => x?.extensions?.validation != null);
+}
+
 // Kurze interne Retries NUR für transiente Confirm-Fehler — "jakieś retry
 // przez 5 minut i potem od razu alarm" (Michał 2026-07-21). Muss ins
 // 25s-Timeout der Bridge passen: 3 Versuche, Pausen 2s + 4s.
@@ -431,9 +495,7 @@ const defaultSleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms))
 // ─── Hauptsequenz ──────────────────────────────────────────────────────────
 
 export async function syncAcceptance(opts: AcceptanceSyncOpts): Promise<AcceptanceSyncResult> {
-  const { lead, row, secrets, supabase, getAgencyToken } = opts;
-  const fetchFn = opts.fetchFn ?? globalThis.fetch;
-  const sleep = opts.sleepFn ?? defaultSleep;
+  const { row } = opts;
   const result: AcceptanceSyncResult = {
     customer_updated: false,
     confirmed: !!row.mamamia_confirmed_at,
@@ -441,12 +503,65 @@ export async function syncAcceptance(opts: AcceptanceSyncOpts): Promise<Acceptan
     pdf_uploaded: !!row.mamamia_pdf_uploaded_at,
     deferred: [],
   };
+  // Contact-Alarm NACH der ganzen Sequenz (Registry #52): nicht zwischen
+  // Schritt 1 und der Buchung (25-s-Budget der Bridge, SMTP-Wartezeit), aber
+  // auch nicht verschluckt, wenn die PDF-Phase wirft — deshalb `finally`.
+  try {
+    await runSequence(opts, result);
+  } finally {
+    if ((result.customer_update_error || result.contact_fields_dropped?.length) && result.confirm_error?.permanent !== true) {
+      await postContactAlarm(opts, result);
+    }
+  }
+  return result;
+}
+
+// Team-Mail „Kontaktdaten nicht übernommen" über die Bridge (Event
+// acceptance_contact_alarm, dedupe pro application_id dort). Bewusst OHNE den
+// Stempel mamamia_sync_alerted_at — der gehört dem roten Buchungs-Alarm; ein
+// gemeinsamer Stempel würde ihn stumm schalten. Fehler hier ändern das Ergebnis
+// nicht (nur Log); beim nächsten Durchlauf (Chain/Cron) kommt der POST erneut.
+async function postContactAlarm(opts: AcceptanceSyncOpts, result: AcceptanceSyncResult): Promise<void> {
+  const { lead, row, secrets } = opts;
+  const fetchFn = opts.fetchFn ?? globalThis.fetch;
+  if (!lead.token) {
+    console.error(`acceptance-sync: contact-alarm unmöglich, lead ohne token (lead=${row.lead_id}, app=${row.application_id})`);
+    return;
+  }
+  try {
+    const res = await fetchFn(`${secrets.kostenrechnerUrl.replace(/\/$/, "")}/api/lead-event`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        token: lead.token,
+        event: "acceptance_contact_alarm",
+        metadata: {
+          application_id: row.application_id,
+          caregiver_id: row.caregiver_id,
+          error: result.customer_update_error ?? null,
+          dropped: result.contact_fields_dropped ?? [],
+          dropped_values: result.dropped_values ?? {},
+          confirmed: result.confirmed,
+        },
+      }),
+      signal: AbortSignal.timeout(5000),
+    });
+    if (!res.ok) console.error(`acceptance-sync: contact-alarm POST HTTP ${res.status} (lead=${row.lead_id}, app=${row.application_id})`);
+  } catch (e) {
+    console.error(`acceptance-sync: contact-alarm POST failed (lead=${row.lead_id}, app=${row.application_id}):`, (e as Error).message);
+  }
+}
+
+async function runSequence(opts: AcceptanceSyncOpts, result: AcceptanceSyncResult): Promise<void> {
+  const { lead, row, secrets, supabase, getAgencyToken } = opts;
+  const fetchFn = opts.fetchFn ?? globalThis.fetch;
+  const sleep = opts.sleepFn ?? defaultSleep;
 
   if (!lead.mamamia_customer_id) {
     result.deferred.push("no mamamia_customer_id on lead");
-    return result;
+    return;
   }
-  if (result.confirmed && result.pdf_uploaded) return result; // nichts zu tun
+  if (result.confirmed && result.pdf_uploaded) return; // nichts zu tun
 
   const agencyToken = await getAgencyToken();
 
@@ -472,12 +587,21 @@ export async function syncAcceptance(opts: AcceptanceSyncOpts): Promise<Acceptan
   // LE → patient_contracts[patient_contact] (+ location_id-Übernahme aus dem
   // bestehenden Contract, denn Mamamia ERSETZT die Liste beim Schreiben),
   // AG → invoice_contract[contract_contact], KP → customer_contacts[].
-  // Idempotent (gleiche Daten ⇒ gleicher Zustand) → läuft auch im Retry
-  // erneut, kein eigener Stempel nötig.
+  // Idempotent gegenüber UNSEREN Daten (gleiche Daten ⇒ gleicher Zustand) →
+  // läuft auch im Retry erneut, kein eigener Stempel nötig. Achtung: Mamamia
+  // ERSETZT die Listen — manuelle Panel-Korrekturen an diesen Rows werden bei
+  // jedem Durchlauf (Chain-Stufe, Cron bis zum PDF-Upload) überschrieben.
   const carriedLocationId = cust.Customer?.customer_contract?.location_id ?? null;
   const lePatient = mapContractPatient(row.contract_patient);
   const agContract = buildCustomerContract(row);
   const kpContact = mapContractContact(row.contract_contact);
+  const dropped = droppedEmailFields(row);
+  if (dropped.fields.length) {
+    result.contact_fields_dropped = dropped.fields;
+    result.dropped_values = dropped.values;
+    result.deferred.push(`contact: e-mail verworfen (${dropped.fields.join(", ")})`);
+    console.error(`acceptance-sync: unbrauchbare E-Mail verworfen (lead=${row.lead_id}, app=${row.application_id}): ${JSON.stringify(dropped.values)}`);
+  }
   // location_id per Row z JEJ własnego PLZ (metoda 1:1 jak główna lokalizacja
   // klienta) — AG mieszka niekoniecznie pod adresem opieki. Fallback dla LE:
   // location_id przeniesione z istniejącego contractu (zapis patient formy).
@@ -526,14 +650,28 @@ export async function syncAcceptance(opts: AcceptanceSyncOpts): Promise<Acceptan
     if (kpContact) {
       variables.customer_contacts = [{ is_same_as_first_patient: false, ...kpContact }];
     }
-    await mamamiaRequest({
-      endpoint: secrets.mamamiaEndpoint,
-      token: agencyToken,
-      query: UPDATE_CUSTOMER_CONTRACT,
-      variables,
-      fetchFn,
-    });
-    result.customer_updated = true;
+    try {
+      await mamamiaRequest({
+        endpoint: secrets.mamamiaEndpoint,
+        token: agencyToken,
+        query: UPDATE_CUSTOMER_CONTRACT,
+        variables,
+        fetchFn,
+      });
+      result.customer_updated = true;
+    } catch (e) {
+      // Alles außer Laravel-Validation ⇒ throw wie bisher (Retry-Chain/Cron
+      // wiederholen die ganze Sequenz). Validation ⇒ die Kontakt-Rows sind
+      // Kosmetik, die BUCHUNG nicht: weiter zu StoreConfirmation / Adoption,
+      // Fehler im Ergebnis + Log + Contact-Alarm (Registry #52 — fünf Tage
+      // Dauer-Retry an einer Tipp-E-Mail, Kundin ohne Confirmation; Kopka:
+      // manuelle SA-Portal-Buchung nie adoptiert, PDF nie hochgeladen).
+      if (!isValidationError(e)) throw e;
+      const msg = (e as Error).message.slice(0, 300);
+      console.error(`acceptance-sync: UpdateCustomer PERMANENT abgelehnt, Sequenz läuft weiter (lead=${row.lead_id}, app=${row.application_id}): ${msg}`);
+      result.customer_update_error = msg;
+      result.deferred.push(`customer_update: permanent — ${msg}`);
+    }
   }
 
   // ── 2. StoreConfirmation (Akzept) — mit Guards ──
@@ -590,7 +728,7 @@ export async function syncAcceptance(opts: AcceptanceSyncOpts): Promise<Acceptan
           `confirm: ${confErr.permanent ? "PERMANENT" : "transient"} error — ${confErr.message}`,
         );
         // Ohne Confirm kein PDF (Sequenz 2 vor 3+4) — Cron/Alarm übernehmen.
-        return result;
+        return;
       }
       result.confirmed = true;
       result.confirmation_id = conf!.StoreConfirmation?.id ?? null;
@@ -619,7 +757,7 @@ export async function syncAcceptance(opts: AcceptanceSyncOpts): Promise<Acceptan
       && finalConfirmations.some((fc) => fc.id === confirmationId);
     if (!processed) {
       result.deferred.push("pdf: confirmation not processed yet (final_confirmation missing)");
-      return result;
+      return;
     }
 
     let bytes: Uint8Array | null = null;
@@ -641,20 +779,20 @@ export async function syncAcceptance(opts: AcceptanceSyncOpts): Promise<Acceptan
       source = "render";
       if (!lead.token) {
         result.deferred.push("pdf: no canonical file and lead token missing");
-        return result;
+        return;
       }
       const pdfUrl = `${secrets.kostenrechnerUrl.replace(/\/$/, "")}/api/contract-pdf/${lead.id}?token=${encodeURIComponent(lead.token)}`;
       const pdfRes = await fetchFn(pdfUrl);
       if (!pdfRes.ok) {
         result.deferred.push(`pdf: contract-pdf HTTP ${pdfRes.status}`);
-        return result;
+        return;
       }
       bytes = new Uint8Array(await pdfRes.arrayBuffer());
       // Magic-Byte-Gate: der HTML-Fallback des Renderers darf NIE als
       // "Dienstleistungsvertrag-signiert.pdf" in Mamamia landen.
       if (!isPdfBytes(bytes)) {
         result.deferred.push("pdf: render returned non-PDF (HTML fallback?) — retry later");
-        return result;
+        return;
       }
     }
 
@@ -664,12 +802,12 @@ export async function syncAcceptance(opts: AcceptanceSyncOpts): Promise<Acceptan
       const sha = await sha256Hex(bytes);
       if (sha !== row.pdf_sha256) {
         result.deferred.push("pdf: storage bytes do not match pdf_sha256 — not uploading");
-        return result;
+        return;
       }
     }
     if (!bytes) {
       result.deferred.push("pdf: no bytes available");
-      return result;
+      return;
     }
 
     const fileToken = await storeFileAsAgency(
@@ -692,7 +830,7 @@ export async function syncAcceptance(opts: AcceptanceSyncOpts): Promise<Acceptan
       : row.application_id;
     if (uploadApplicationId == null) {
       result.deferred.push("pdf: adoption row without original application_id on confirmation — cannot attach file");
-      return result;
+      return;
     }
     await mamamiaRequest({
       endpoint: secrets.mamamiaEndpoint,
@@ -710,5 +848,5 @@ export async function syncAcceptance(opts: AcceptanceSyncOpts): Promise<Acceptan
     await supabase.stampPdfUploaded(row.lead_id, row.application_id, await sha256Hex(bytes));
   }
 
-  return result;
+  return;
 }

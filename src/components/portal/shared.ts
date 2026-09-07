@@ -284,3 +284,7 @@ export interface PatientForm {
 // Seit Rückrollung 14.06.2026 fragt Step 5 nur noch das Startdatum ab —
 // Label entsprechend geändert.
 export const STEP_LABELS = ['Zur Person', 'Pflegebedarf', 'Einsatzort & Start', 'Wünsche & Aufgaben'];
+
+// Grobes E-Mail-Format (ein @, Domain mit Punkt, keine Leerzeichen). Spiegel von
+// cleanEmail() in supabase/functions/_shared/acceptanceSync.ts — Registry #52.
+export const isEmail = (v: string): boolean => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v.trim());

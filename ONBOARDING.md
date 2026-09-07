@@ -329,6 +329,14 @@ blueprint — to zarezerwowane dla Admin role.
 
 **Prod:** manual — `supabase functions deploy <name> --project-ref ycdwtrklpoqprabtwahi` (push do trunka NIE ruszy prod Supabase; ruszy tylko prod **front** na Render). Skill `/deploy-prod` usunięty 2026-07-03.
 
+**Sekrety edge fn są per env i NIE wędrują między projektami.** `sync-acceptance` i
+`detect-caregiver-events` startują tylko, gdy istnieje komplet: `SUPABASE_URL`,
+`SUPABASE_SERVICE_ROLE_KEY`, `MAMAMIA_ENDPOINT`, `MAMAMIA_AUTH_ENDPOINT`,
+`MAMAMIA_AGENCY_EMAIL`, `MAMAMIA_AGENCY_PASSWORD`, **`KOSTENRECHNER_URL`** (prod
+`https://kostenrechner.primundus.de`, staging `https://kostenrechner-staging.onrender.com`).
+Brak = funkcja nie bootuje (`requireEnv`, CLAUDE.md Registry #52). Sprawdzenie:
+`npx supabase secrets list --project-ref <REF>`.
+
 **Local manual deploy** (NIE rób tego dla prod — patrz CLAUDE.md §"Emergency hotfix"):
 
 ```bash
