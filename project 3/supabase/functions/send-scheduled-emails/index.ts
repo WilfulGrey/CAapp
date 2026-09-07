@@ -1110,7 +1110,21 @@ export function buildEingangsbestaetigungHtml(
     `<div style="margin:12px 0 4px;">${bulletproofButton(schrittUrl, "Pflegesituation vervollständigen&nbsp;&nbsp;&rarr;", "#2A9D5C")}</div>`;
 
   // ── "So geht es weiter" — 3 Schritte ──────────────────────────────────────
-  const stepRow = (n: string, title: string, desc: string, last = false) => `
+  /* aktiv = der Schritt, der als Nächstes ansteht (Martin, 07.09.): grüner
+     Kasten, grüne Ziffer, größerer Titel — die übrigen Schritte bleiben ruhig. */
+  const stepRow = (n: string, title: string, desc: string, last = false, aktiv = false) => aktiv ? `
+      <tr>
+        <td bgcolor="#EEF7F1" style="background-color:#EEF7F1;vertical-align:top;width:38px;padding:16px 12px 16px 16px;border-radius:14px 0 0 14px;">
+          <table cellpadding="0" cellspacing="0" role="presentation"><tr>
+            <td width="26" height="26" align="center" valign="middle" bgcolor="#2A9D5C" style="background-color:#2A9D5C;width:26px;min-width:26px;max-width:26px;height:26px;border-radius:13px;padding:0;mso-line-height-rule:exactly;color:#ffffff;font-size:13px;font-weight:700;line-height:26px;">${n}</td>
+          </tr></table>
+        </td>
+        <td bgcolor="#EEF7F1" style="background-color:#EEF7F1;vertical-align:top;padding:16px 16px 16px 0;border-radius:0 14px 14px 0;">
+          <p style="margin:0 0 4px;font-size:17px;font-weight:700;color:#1F6B41;line-height:1.35;">${title}</p>
+          <p style="margin:0;font-size:14px;line-height:1.6;color:#3A3A3A;">${desc}</p>
+        </td>
+      </tr>
+      <tr><td colspan="2" style="height:14px;line-height:14px;font-size:0;padding:0;">&nbsp;</td></tr>` : `
       <tr>
         <td style="vertical-align:top;width:38px;padding:0 12px ${last ? "0" : "14px"} 0;">
           <table cellpadding="0" cellspacing="0" role="presentation"><tr>
@@ -1124,9 +1138,9 @@ export function buildEingangsbestaetigungHtml(
       </tr>`;
 
   const stepsTable = `
-    <p style="font-size:15px;line-height:1.75;color:#2D1F0F;margin:0 0 16px;"><strong>So geht es weiter:</strong></p>
+    <p style="margin:0 0 14px;font-size:20px;font-weight:700;line-height:1.35;color:#2D1F0F;">So geht es weiter</p>
     <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="margin:0 0 26px;">
-      ${stepRow("1", "Pflegesituation vervollständigen — 2 Minuten", `Ein Teil ist aus dem Kostenrechner schon übernommen. Erst danach können sich die Pflegekräfte bei Ihnen bewerben.${schrittKnopf}`)}
+      ${stepRow("1", "Pflegesituation vervollständigen — 2 Minuten", `Ein Teil ist aus dem Kostenrechner schon übernommen. Erst danach können sich die Pflegekräfte bei Ihnen bewerben.${schrittKnopf}`, false, true)}
       ${stepRow("2", "Pflegekräfte einladen & Bewerbungen erhalten", "Sobald Ihre Pflegesituation vervollständigt ist, laden Sie Ihre Wunschkandidatinnen ein — passende Pflegekräfte bewerben sich dann mit Profil, Erfahrung und Anreisedatum.")}
       ${stepRow("3", "Auswählen und starten", "Sie entscheiden, wir übernehmen den Rest. Ihre Wunsch-Pflegekraft kann die Betreuung bereits in 4–7 Werktagen übernehmen.", true)}
     </table>`;
