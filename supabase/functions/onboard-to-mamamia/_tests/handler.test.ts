@@ -40,8 +40,17 @@ function makeFakeSupabase(leads: Lead[] = []) {
     updateLead(id: string, patch: Partial<Lead>) {
       for (const [, lead] of m) if (lead.id === id) Object.assign(lead, patch);
     },
+    // Registry #55 — per id, ohne Expiry-Filter (wie der echte Adapter).
+    fetchLeadById(id: string) {
+      for (const [, lead] of m) if (lead.id === id) return Promise.resolve(lead);
+      return Promise.resolve(null);
+    },
   };
 }
+
+// JWT-Form des service_role-Bearers (zweiter Gate-Zweig): Payload-Decode
+// ohne Signatur — die prüft in prod das Gateway (verify_jwt).
+const SERVICE_JWT = `x.${btoa(JSON.stringify({ role: "service_role" })).replace(/=+$/, "")}.y`;
 
 const SECRETS = {
   supabaseUrl: "https://test.supabase.co",
@@ -135,7 +144,8 @@ Deno.test("POST mirror_token=true reaches onboardLead (cache hit → panel push)
   const res = await handleRequest(
     new Request("https://fn/", {
       method: "POST",
-      headers: { "content-type": "application/json", "x-forwarded-for": "9.9.9.9" },
+      // mirror_token ist ein privilegiertes Flag — nur mit service_role (Registry #55)
+      headers: { "content-type": "application/json", "x-forwarded-for": "9.9.9.9", authorization: "Bearer srv" },
       body: JSON.stringify({ token: "rotated", mirror_token: true }),
     }),
     { secrets: SECRETS, supabase: supa, fetchFn },
@@ -232,4 +242,109 @@ Deno.test("Rate limit: 6th request from same IP returns 429", async () => {
   // 6th should be rate-limited
   const res6 = await handleRequest(makeReq(), deps);
   assertEquals(res6.status, 429);
+});
+
+// ─── Admin-Resync (Registry #55) — Gate + Gałąź lead_id ─────────────────────
+
+const ONBOARDED_LEAD = () => makeLead({
+  id: "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb",
+  token: "t1",
+  mamamia_customer_id: 10670,
+  mamamia_job_offer_id: 36297,
+  kalkulation: { bruttopreis: 3350, eigenanteil: 3016, formularDaten: { betreuung_fuer: "1-person", pflegegrad: 1, mobilitaet: "rollator", nachteinsaetze: "gelegentlich", deutschkenntnisse: "sehr-gut" } },
+});
+
+const NO_MM: typeof fetch = (() => { throw new Error("Mamamia must not be called"); }) as typeof fetch;
+
+function resyncReq(body: unknown, authorization?: string) {
+  return new Request("https://fn/", {
+    method: "POST",
+    headers: { "content-type": "application/json", "x-forwarded-for": "7.7.7.7", ...(authorization ? { authorization } : {}) },
+    body: JSON.stringify(body),
+  });
+}
+
+Deno.test("resync (#55): Anon-Bearer ⇒ 401 und NULL Mamamia-Calls", async () => {
+  _resetRateLimit(); _resetAgencyTokenCache();
+  const res = await handleRequest(
+    resyncReq({ lead_id: "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb", resync: { felder: ["betreuung_fuer"] } }, "Bearer anon-key"),
+    { secrets: SECRETS, supabase: makeFakeSupabase([ONBOARDED_LEAD()]), fetchFn: NO_MM },
+  );
+  assertEquals(res.status, 401);
+});
+
+Deno.test("resync (#55): mirror_token ohne service_role ⇒ 401 (Browser kann den Spiegel nicht auslösen)", async () => {
+  _resetRateLimit(); _resetAgencyTokenCache();
+  const res = await handleRequest(
+    resyncReq({ token: "t1", mirror_token: true }),
+    { secrets: SECRETS, supabase: makeFakeSupabase([ONBOARDED_LEAD()]), fetchFn: NO_MM },
+  );
+  assertEquals(res.status, 401);
+});
+
+Deno.test("resync (#55): Lead ohne mamamia_customer_id ⇒ 400 not-onboarded (kein Onboard, kein MM-Call)", async () => {
+  _resetRateLimit(); _resetAgencyTokenCache();
+  const res = await handleRequest(
+    resyncReq({ lead_id: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa", resync: { felder: ["pflegegrad"] } }, "Bearer srv"),
+    { secrets: SECRETS, supabase: makeFakeSupabase([makeLead()]), fetchFn: NO_MM },
+  );
+  assertEquals(res.status, 400);
+  assertEquals((await res.json()).error, "not-onboarded");
+});
+
+Deno.test("resync (#55): felder leer ohne budget ⇒ 400; unbekanntes Feld ⇒ 400", async () => {
+  _resetRateLimit(); _resetAgencyTokenCache();
+  const deps = { secrets: SECRETS, supabase: makeFakeSupabase([ONBOARDED_LEAD()]), fetchFn: NO_MM };
+  const r1 = await handleRequest(resyncReq({ lead_id: "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb", resync: { felder: [] } }, "Bearer srv"), deps);
+  assertEquals(r1.status, 400);
+  const r2 = await handleRequest(resyncReq({ lead_id: "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb", resync: { felder: ["erfahrung"] } }, "Bearer srv"), deps);
+  assertEquals(r2.status, 400);
+});
+
+Deno.test("resync (#55): service_role als JWT-Claim passiert das Gate; Rate-Limit wird übersprungen", async () => {
+  _resetRateLimit(); _resetAgencyTokenCache();
+  // 5 Anon-Calls vom selben IP füllen den Bucket …
+  for (let i = 0; i < 5; i++) {
+    await handleRequest(resyncReq({ token: "nonexistent" }), { secrets: SECRETS, supabase: makeFakeSupabase(), fetchFn: okMamamia() });
+  }
+  // … der service_role-Caller (JWT-Form) kommt trotzdem durch — bis zur
+  // Kontraktprüfung (Lead unbekannt ⇒ 404), nicht 429 und nicht 401.
+  const res = await handleRequest(
+    resyncReq({ lead_id: "unknown", resync: { felder: ["pflegegrad"] } }, `Bearer ${SERVICE_JWT}`),
+    { secrets: SECRETS, supabase: makeFakeSupabase([]), fetchFn: NO_MM },
+  );
+  assertEquals(res.status, 404);
+});
+
+Deno.test("resync (#55): happy path 2→1 — 200 mit resync-Ergebnis, KEIN Session-Cookie", async () => {
+  _resetRateLimit(); _resetAgencyTokenCache();
+  const responses = [
+    { data: { LoginAgency: { id: 1, name: "P", email: "x", token: "agency-jwt" } } },
+    { data: { Customer: { id: 10670, equipments: [{ id: 1 }], patients: [
+      { id: 75421, care_level: 1, mobility_id: 3, lift_id: 2, night_operations: "up_to_1_time", tools: [] },
+      { id: 75420, care_level: 1, mobility_id: 3, lift_id: 2, night_operations: "up_to_1_time", tools: [{ id: 2 }] },
+    ], customer_caregiver_wish: { gender: "female" } } } },
+    { data: { UpdateCustomer: { id: 10670, customer_id: "pr-10670" } } },
+  ];
+  let i = 0;
+  const bodies: Array<Record<string, unknown>> = [];
+  const fetchFn: typeof fetch = (async (_u: RequestInfo | URL, init?: RequestInit) => {
+    bodies.push(JSON.parse((init?.body ?? "{}") as string));
+    return new Response(JSON.stringify(responses[i++] ?? {}), { status: 200 });
+  }) as typeof fetch;
+  const res = await handleRequest(
+    resyncReq({ lead_id: "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb", resync: { felder: ["betreuung_fuer"] } }, "Bearer srv"),
+    { secrets: SECRETS, supabase: makeFakeSupabase([ONBOARDED_LEAD()]), fetchFn },
+  );
+  assertEquals(res.status, 200);
+  assertEquals(res.headers.get("set-cookie"), null);
+  const body = await res.json();
+  assertEquals(body.customer_id, 10670);
+  assertEquals(body.resync.patients_before, 2);
+  assertEquals(body.resync.patients_after, 1);
+  assertEquals(body.resync.removed_ids, [75421]);
+  // Mutation: nur der Patient mit der KLEINSTEN id bleibt, tools preserved
+  const mut = bodies[2].variables as Record<string, unknown>;
+  assertEquals(mut.patients, [{ id: 75420, tool_ids: [2] }]);
+  assertEquals(mut.equipment_ids, [1]);
 });
