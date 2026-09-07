@@ -29,7 +29,7 @@ Deno.test("loginAgency: returns token on success", async () => {
         LoginAgency: {
           id: 8190,
           name: "Primundus",
-          email: "primundus+portal@mamamia.app",
+          email: "primundus+portal@example.com",
           token: "32649|abc",
         },
       },
@@ -38,7 +38,7 @@ Deno.test("loginAgency: returns token on success", async () => {
 
   const result = await loginAgency({
     authEndpoint: "https://beta.example/graphql/auth",
-    email: "primundus+portal@mamamia.app",
+    email: "primundus+portal@example.com",
     password: "pw",
     fetchFn,
   });
