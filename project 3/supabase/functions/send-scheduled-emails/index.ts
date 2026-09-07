@@ -1098,6 +1098,25 @@ export function buildEingangsbestaetigungHtml(
   const empfehlungSektion =
     empfehlungBlock === undefined ? "" : (empfehlungBlock || keineEmpfehlungHtml());
 
+  /* „Ihr nächster Schritt" (Martin, 07.09.): Die Mail zeigt Preis und
+     Pflegekräfte — aber ohne vervollständigte Pflegesituation kann sich
+     im Portal niemand bewerben und „Einladen" bleibt gesperrt. Der Streifen
+     nennt diesen einen Schritt direkt unter der Empfehlung, mit demselben
+     grünen Knopf wie die Profil-Nudges. Nur für eigene Leads (Sektion
+     vorhanden); Portal-Leads bekommen ihn nicht. Klick-Quelle „eb-schritt",
+     damit portal_reopened die Rückkehr aus genau diesem Knopf zählt. */
+  const schrittUrl = portalUrl ? withMailMark(portalUrl, "eb-schritt") : ctaUrl;
+  const naechsterSchritt = empfehlungBlock === undefined ? "" : `
+    <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="margin:0 0 26px;border:1px solid #EBE2D2;border-radius:15px;background:#FAF8F4;">
+      <tr>
+        <td style="padding:18px 22px 20px;">
+          <p style="margin:0 0 6px;font-size:12px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;color:#2A9D5C;">Ihr nächster Schritt &ndash; 2 Minuten</p>
+          <p style="margin:0 0 14px;font-size:15px;line-height:1.7;color:#2D1F0F;">Vervollständigen Sie kurz Ihre Pflegesituation &ndash; <strong>erst dann können sich die Pflegekräfte bei Ihnen bewerben.</strong> Ein Teil ist aus dem Kostenrechner schon übernommen.</p>
+          ${bulletproofButton(schrittUrl, "Pflegesituation vervollständigen&nbsp;&nbsp;&rarr;", "#2A9D5C")}
+        </td>
+      </tr>
+    </table>`;
+
   // ── "So geht es weiter" — 3 Schritte ──────────────────────────────────────
   const stepRow = (n: string, title: string, desc: string, last = false) => `
       <tr>
@@ -1115,8 +1134,8 @@ export function buildEingangsbestaetigungHtml(
   const stepsTable = `
     <p style="font-size:15px;line-height:1.75;color:#2D1F0F;margin:0 0 16px;"><strong>So geht es weiter:</strong></p>
     <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="margin:0 0 26px;">
-      ${stepRow("1", "Pflegesituation beschreiben", "Ein Teil ist aus dem Kostenrechner schon übernommen. Danach sehen Sie sofort, welche Pflegekräfte passen und verfügbar sind.")}
-      ${stepRow("2", "Bewerbungen erhalten & Pflegekräfte einladen", "Passende Pflegekräfte bewerben sich bei Ihnen — mit Profil, Erfahrung und Anreisedatum. In der Zwischenzeit können Sie Wunschkandidatinnen gezielt einladen.")}
+      ${stepRow("1", "Pflegesituation vervollständigen — 2 Minuten", "Ein Teil ist aus dem Kostenrechner schon übernommen. Erst danach können sich die Pflegekräfte bei Ihnen bewerben.")}
+      ${stepRow("2", "Pflegekräfte einladen & Bewerbungen erhalten", "Sobald Ihre Pflegesituation vervollständigt ist, laden Sie Ihre Wunschkandidatinnen ein — passende Pflegekräfte bewerben sich dann mit Profil, Erfahrung und Anreisedatum.")}
       ${stepRow("3", "Auswählen und starten", "Sie entscheiden, wir übernehmen den Rest. Ihre Wunsch-Pflegekraft kann die Betreuung bereits in 4–7 Werktagen übernehmen.", true)}
     </table>`;
 
@@ -1210,6 +1229,8 @@ export function buildEingangsbestaetigungHtml(
 
     ${empfehlungSektion}
 
+    ${naechsterSchritt}
+
     ${hatEmpfehlung ? "" : cta}
 
     ${stepsTable}
@@ -1239,6 +1260,8 @@ export function buildEingangsbestaetigungText(
 
   const portalUrl = (portalBase && lead.token) ? buildPortalUrl(portalBase, lead.token) : "";
   const ctaUrl = portalUrl || "https://primundus.de";
+  const naechsterSchrittPlain = empfehlungAbschnitt === undefined ? "" :
+    `IHR NÄCHSTER SCHRITT — 2 MINUTEN\nVervollständigen Sie kurz Ihre Pflegesituation — erst dann können sich die Pflegekräfte bei Ihnen bewerben. Ein Teil ist aus dem Kostenrechner schon übernommen.\nPflegesituation vervollständigen: ${portalUrl ? withMailMark(portalUrl, "eb-schritt") : ctaUrl}\n\n`;
 
   const kalk = lead.kalkulation || {};
   const bruttopreis = kalk.bruttopreis || 0;
@@ -1308,12 +1331,12 @@ ${greeting},
 
 ${introPlain}
 
-${vorschauPlain}${priceLine}${konditionenLine}${empfehlungPlain}Angebot & Betreuungskräfte ansehen: ${ctaUrl}
+${vorschauPlain}${priceLine}${konditionenLine}${empfehlungPlain}${naechsterSchrittPlain}Angebot & Betreuungskräfte ansehen: ${ctaUrl}
 
 SO GEHT ES WEITER
 
-1. Pflegesituation beschreiben — ein Teil ist aus dem Kostenrechner schon übernommen. Danach sehen Sie sofort, welche Pflegekräfte passen und verfügbar sind.
-2. Bewerbungen erhalten & Pflegekräfte einladen — passende Pflegekräfte bewerben sich bei Ihnen, mit Profil, Erfahrung und Anreisedatum. In der Zwischenzeit können Sie Wunschkandidatinnen gezielt einladen.
+1. Pflegesituation vervollständigen (2 Minuten) — ein Teil ist aus dem Kostenrechner schon übernommen. Erst danach können sich die Pflegekräfte bei Ihnen bewerben.
+2. Pflegekräfte einladen & Bewerbungen erhalten — sobald Ihre Pflegesituation vervollständigt ist, laden Sie Ihre Wunschkandidatinnen ein; passende Pflegekräfte bewerben sich dann mit Profil, Erfahrung und Anreisedatum.
 3. Auswählen und starten — Sie entscheiden, wir übernehmen den Rest. Ihre Wunsch-Pflegekraft kann die Betreuung bereits in 4–7 Werktagen übernehmen.
 
 PFLEGESITUATION & ANFORDERUNGEN
