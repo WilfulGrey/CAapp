@@ -143,6 +143,20 @@ function makeRealSupabase(url: string, serviceKey: string): SupabaseLike {
       const { error } = await client.from("leads").update(patch).eq("id", id);
       if (error) throw new Error(`supabase update: ${error.message}`);
     },
+    // Registry #54 — jeden UPDATE z warunkiem = atomowy claim (Postgres
+    // re-ewaluuje WHERE po zwolnieniu row-locka; drugi równoległy UPDATE
+    // trafia 0 wierszy). `.select("id")` zwraca zaktualizowane wiersze.
+    async claimOnboarding(leadId: string, staleBefore: string) {
+      const { data, error } = await client
+        .from("leads")
+        .update({ mamamia_onboarding_started_at: new Date().toISOString() })
+        .eq("id", leadId)
+        .is("mamamia_customer_id", null)
+        .or(`mamamia_onboarding_started_at.is.null,mamamia_onboarding_started_at.lt.${staleBefore}`)
+        .select("id");
+      if (error) throw new Error(`supabase claimOnboarding: ${error.message}`);
+      return (data?.length ?? 0) > 0;
+    },
     async fetchLeadJob(jobId: string, leadId: string) {
       // The lead_id filter IS the ownership check — a job_id belonging to
       // another lead returns null (→ caller falls back to the lead's default).

@@ -267,6 +267,9 @@ send-scheduled-emails (email_type=eingangsbestaetigung)
       ↳ cache-hit gdy lead ma już mamamia_job_offer_id
       ↳ inaczej StoreCustomer + StoreJobOffer (jak przy pierwszym wejściu
         do portalu — TYLKO wcześniej; patrz przełącznik niżej)
+      ↳ RÓWNOLEGLE z przeglądarką (redirect z kalkulatora): atomowy claim
+        `leads.mamamia_onboarding_started_at` — przegrany czeka na wynik
+        zwycięzcy zamiast tworzyć drugiego klienta (CLAUDE.md gotcha #14, #54)
       → { customer_id, job_offer_id, session_token }
   → POST /functions/v1/mamamia-proxy  X-Session-Token: <jwt>
       { action: "listMatchings", variables: { limit: 200 } }
