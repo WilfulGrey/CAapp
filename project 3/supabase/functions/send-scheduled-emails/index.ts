@@ -1235,11 +1235,12 @@ export function buildEingangsbestaetigungHtml(
 
     ${empfehlungSektion}
 
+    ${/* Mit Empfehlung gibt es KEINEN dritten Knopf mehr (Martin, 07.09.): der
+        Kasten hat „<Vorname> ansehen" + „Alle 5 ansehen", Schritt 1 den grünen
+        Knopf. Ohne Empfehlung bleibt der Angebots-Knopf vor den Schritten. */ ""}
     ${hatEmpfehlung ? "" : cta}
 
     ${stepsTable}
-
-    ${hatEmpfehlung ? cta : ""}
 
     ${angabenHinweis}
 
