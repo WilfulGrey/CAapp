@@ -3,6 +3,7 @@ import { Kalkulation, detectGenderFromName, usableNamePart as cleanNamePart } fr
 import { getEmailLayout } from './email-template';
 import { PORTAL_BASIS } from './portal-url';
 import { quelleBetreff, websiteHerkunftLabel } from './lead-quelle';
+import { LABELS } from './angaben-labels';
 
 // Eigennamen sauber großschreiben: jedes Wort + jeden Bindestrich-Teil
 // kapitalisieren. Namens-Partikel (von, van, de, zu, …) bleiben klein —
@@ -280,17 +281,8 @@ export function getEingangsbestaetigungEmailTemplate(
 
   const fd = (kalkulation as any)?.formularDaten || {};
 
-  const LABELS: Record<string, Record<string, string>> = {
-    betreuung_fuer: { '1-person': '1 Person', 'ehepaar': '2 Personen' },
-    mobilitaet: { 'mobil': 'Mobil', 'rollator': 'Eingeschränkt – Rollator', 'rollstuhl': 'Rollstuhl', 'bettlaegerig': 'Bettlägerig' },
-    nachteinsaetze: { 'nein': 'Nein', 'gelegentlich': 'Gelegentlich', 'taeglich': 'Täglich (1×)', 'mehrmals': 'Mehrmals nachts' },
-    deutschkenntnisse: { 'grundlegend': 'Grundlegend', 'kommunikativ': 'Kommunikativ', 'sehr-gut': 'Gut' },
-    fuehrerschein: { 'ja': 'Ja', 'nein': 'Nein / nicht unbedingt' },
-    geschlecht: { 'egal': 'Egal', 'weiblich': 'Weiblich', 'maennlich': 'Männlich' },
-    erfahrung: { 'einsteiger': 'Einsteiger', 'erfahren': 'Erfahren', 'sehr-erfahren': 'Sehr erfahren' },
-    weitere_personen: { 'ja': 'Ja', 'nein': 'Nein' },
-    care_start_timing: { 'sofort': 'Sofort (4–7 Werktage)', '2-4-wochen': 'In 2–4 Wochen', '1-2-monate': 'In 1–2 Monaten', 'spaeter': 'Zu einem späteren Zeitpunkt', 'unklar': 'Ich informiere mich nur' },
-  };
+  // LABELS leben seit Registry #55 in ./angaben-labels (pure Modul, Admin-Route
+  // und Root-vitest teilen sie) — hier nur importiert.
 
   const lbl = (key: string, val: string) => LABELS[key]?.[val] || val || 'Nicht angegeben';
 
