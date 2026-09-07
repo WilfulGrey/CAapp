@@ -418,6 +418,12 @@ token_expires_at      now() + 14 days
 token_used            false
 care_start_timing     sofort | 2-4-wochen | 1-2-monate | unklar
 kalkulation           jsonb                   -- całe `kalkulation` z body API
+                                              --   klucze poza wynikiem berechnePreis:
+                                              --   formularDaten (9 klucze kalkulatora + Portal-Extras),
+                                              --   angenommene_felder[] (Portal-Annahmen, #50; Admin-Save leert sie, #55),
+                                              --   mamamia_sync_pending{felder,budget?,error,http?,at} (#55)
+                                              -- Schreiber: angebot-anfordern, portal-lead, SA-Portal (offer_updated),
+                                              --   /api/admin/leads/[id]/angaben (#55). care_start_timing ist SPALTE, nie fd.
 
 -- mamamia onboarding cache (wypełnione przez onboard-to-mamamia)
 mamamia_customer_id   integer  NULL

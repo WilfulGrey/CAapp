@@ -345,6 +345,31 @@ heißt nur „HTTP gefeuert" (Registry #36), und `net._http_response`
 rotiert in Stunden — die Wahrheit steht in den **Render-Logs des
 Kostenrechners** (`[portal-abholer]`) und in `portal_mail_log`.
 
+## Kunde sagt: „Die Angaben stimmen nicht" (Registry #55)
+
+Die Annahmen aus `portal-lead.ts` (teurerer Wert, wenn das Portal nichts geliefert
+hat) landen als `angenommene_felder` in der Kalkulation — und als echte Patienten
+in Mamamia (Fall Rapp: „Ehepaar" angenommen, es ist eine Person ⇒ zwei Patienten
+im MM-Kunden). Korrektur-Weg:
+
+1. `/admin/leads/<id>` → „Eingaben des Kunden" → **Bearbeiten** — Felder ändern.
+2. **Speichern** (Preis bleibt) oder **Neu berechnen & speichern** (neuer Preis;
+   Häkchen „Kunden per E-Mail … informieren" schickt „Aktualisiertes Angebot",
+   nur wenn sich der Preis wirklich ändert).
+3. Die Statuszeile sagt, was in Mamamia passiert ist („2 → 1 Patient", Budget).
+   Nach Mamamia gehen NUR die geänderten Felder (Personenzahl, Pflegegrad,
+   Mobilität, Nacht, weitere Personen, Wunsch-Sprache/-Führerschein/-Geschlecht,
+   Budget bei Neuberechnung) — der Patientenbogen des Kunden und Agentur-Werte
+   bleiben. Betreuungsbeginn und Erfahrung gehen nicht nach Mamamia.
+4. Rot ⇒ Mamamia hat nicht mitgezogen; der Lead trägt
+   `kalkulation.mamamia_sync_pending`, der Knopf „Mamamia erneut synchronisieren"
+   wiederholt genau diese Felder. Supabase ist schon aktuell.
+
+Mit dem Speichern gelten die Angaben als **mit dem Kunden geprüft**:
+`angenommene_felder` wird geleert, damit eine spätere Portal-Mail derselben Adresse
+(`echteAntworten` in `/api/portal-lead`) die Korrektur nicht mit frischen Annahmen
+überschreibt.
+
 ## Neues Portal aufnehmen
 
 **Drei Stellen**, alle zusammen pflegen:

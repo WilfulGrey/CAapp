@@ -53,6 +53,20 @@ export interface Kalkulation {
   pflegegeld?: number;
   taxBenefit?: number;
   pflegegradUsed?: string;
+  // Portal-Leads (Registry #50): Felder, die `ergaenzeAngaben` mit dem
+  // teureren Wert angenommen hat. Leer/fehlend = echte Kundenantworten.
+  // Der Admin-Save (Registry #55) leert die Liste — Angaben gelten als geprüft.
+  angenommene_felder?: string[];
+  // Registry #55: letzte NICHT in Mamamia angekommene Admin-Korrektur.
+  // Gesetzt bei jedem non-2xx des Resync, gelöscht nur bei 2xx; der Admin
+  // wiederholt per „Mamamia erneut synchronisieren". Union beim nächsten Save.
+  mamamia_sync_pending?: {
+    felder: string[];
+    budget?: number;
+    error: string;
+    http?: number;
+    at: string;
+  };
 }
 
 export async function berechnePreis(formularDaten: FormularDaten): Promise<Kalkulation> {

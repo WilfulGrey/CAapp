@@ -759,8 +759,14 @@ export function mapPatientFormToUpdateCustomerInput(
     ),
   ];
 
-  // Patient 2 when "anzahl=2".
-  if (form.anzahl === '2') {
+  // Patient 2 when "anzahl=2". Bezpiecznik (Registry #55): kennt Mamamia
+  // genau EINEN Patienten, bauen wir keinen zweiten — ein Eintrag ohne id
+  // legte in Mamamia einen neuen Patienten an (patients[] = REPLACE per id),
+  // typisch nach einer Admin-Korrektur 2→1 bei noch offener Portal-Karte.
+  // ids.length === 0 (mmCustomer noch nicht geladen) bleibt wie bisher.
+  if (form.anzahl === '2' && ids.length === 1) {
+    console.warn('patientFormMapper: anzahl=2, aber Mamamia kennt nur einen Patienten — Patient 2 wird nicht angelegt');
+  } else if (form.anzahl === '2') {
     patients.push(buildPatient(
       form.p2_geschlecht,
       form.p2_geburtsjahr,

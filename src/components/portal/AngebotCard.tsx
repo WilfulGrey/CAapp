@@ -174,7 +174,13 @@ export const AngebotCard: FC<{
     }
   }, [triggerOpenPatient]);
   const [patient, setPatient] = useState<PatientForm>({
-    anzahl: (pick('anzahl') as '1' | '2' | '') || '1',
+    // anzahl NIE aus dem localStorage-Draft (Registry #55): das Feld ist im UI
+    // read-only, die Personenzahl ändert der Berater im Admin. Ein Draft mit
+    // '2' hätte nach einer Admin-Korrektur 2→1 beim nächsten Save einen
+    // Patienten ohne id geschickt = Patient 2 in Mamamia wiedergeboren.
+    // Beim ersten Render ist mmCustomer null ⇒ Lead-Prefill (fd) greift; der
+    // mm-rehydrate unten setzt anzahl aus Mamamia, sobald der Kunde da ist.
+    anzahl: (mmPrefill.anzahl ?? (prefill as { anzahl?: '1' | '2' }).anzahl) || '1',
     geschlecht: pick('geschlecht'), geburtsjahr: pick('geburtsjahr'),
     pflegegrad: pick('pflegegrad'), gewicht: pick('gewicht'), groesse: pick('groesse'),
     mobilitaet: pick('mobilitaet') || 'Rollstuhlfähig',
@@ -250,11 +256,18 @@ export const AngebotCard: FC<{
   useEffect(() => {
     if (!mmCustomer) return;
     if (mmMergedFor.current === mmCustomer.id) return;
+    const fresh = mapMamamiaCustomerToPatientForm(mmCustomer);
+    // anzahl IMMER aus Mamamia (Registry #55) — auch wenn der Kunde schon
+    // tippt: das Feld ist read-only, Mamamia ist die einzige Wahrheit.
+    // fresh.anzahl ist undefined ohne Patienten in MM ⇒ nichts anfassen.
+    if (fresh.anzahl) {
+      const a = fresh.anzahl;
+      setPatient(prev => (prev.anzahl === a ? prev : { ...prev, anzahl: a }));
+    }
     if (userDirty.current) {
       mmMergedFor.current = mmCustomer.id;
       return;
     }
-    const fresh = mapMamamiaCustomerToPatientForm(mmCustomer);
     mmMergedFor.current = mmCustomer.id;
     setPatient(prev => {
       const next = { ...prev };
