@@ -71,6 +71,9 @@ export const CustomerNurseModal: FC<{
    *  resolves, then either the AI text (success) or the Mamamia fallback
    *  (failure / null). */
   aboutLoading?: boolean;
+  /** Stufen-Erklärung sofort geöffnet, wenn der Kunde auf der Karte die
+   *  Plakette (Elite, Stammkraft, Bewährt) getippt hat (07.09.). */
+  initialLevelInfo?: boolean;
   onClose: () => void;
   app?: Application;
   onReview?: () => void;
@@ -89,10 +92,10 @@ export const CustomerNurseModal: FC<{
    *  Heart-Icon), der erklärt, dass eine Einladung ihre offizielle
    *  Bewerbung ermöglicht. */
   hasInterest?: boolean;
-}> = ({ nurse, profileLoading = false, aboutLoading = false, onClose, app, onReview, onDecline, onUndo, onInvite, onDeclineMatch, onChat, isInvited = false, hasInterest = false }) => {
+}> = ({ nurse, profileLoading = false, aboutLoading = false, initialLevelInfo = false, onClose, app, onReview, onDecline, onUndo, onInvite, onDeclineMatch, onChat, isInvited = false, hasInterest = false }) => {
   const [invited, setInvited] = useState(isInvited);
   const [invitePhaseModal, setInvitePhaseModal] = useState<'idle' | 'sending' | 'done'>('idle');
-  const [showLevelInfo, setShowLevelInfo] = useState(false);
+  const [showLevelInfo, setShowLevelInfo] = useState(initialLevelInfo);
   const [showLanguageInfo, setShowLanguageInfo] = useState(false);
   const [refDownloading, setRefDownloading] = useState(false);
 

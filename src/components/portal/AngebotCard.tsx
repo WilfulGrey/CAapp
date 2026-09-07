@@ -824,7 +824,7 @@ export const AngebotCard: FC<{
                 >
                   <div className="w-6 h-6 rounded-full bg-[#8B7355] text-white text-xs font-bold flex items-center justify-center flex-shrink-0">1</div>
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-semibold text-[#8B7355]">Pflegesituation beschreiben</p>
+                    <p className="text-sm font-semibold text-[#8B7355]">Pflegesituation vervollständigen</p>
                     <p className="text-xs text-gray-500">Angaben zur Person & zum Haushalt</p>
                   </div>
                   <ChevronDown className="w-4 h-4 text-[#8B7355] -rotate-90 flex-shrink-0" />

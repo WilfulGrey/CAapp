@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useRef, FC } from 'react';
-import { Check, Bell, Phone, AlertCircle, AlertTriangle, ChevronDown, X, ArrowLeft, ArrowRight, Heart } from 'lucide-react';
+import { Check, Bell, Phone, AlertCircle, ChevronDown, X, ArrowLeft, ArrowRight, Heart } from 'lucide-react';
 import { Nurse } from '../types';
 import { displayName } from '../components/portal/shared';
 import {
@@ -507,6 +507,8 @@ const CustomerPortalPage: FC = () => {
   // Resolved status per caregiver is derived in `nurseStatusById` (useMemo).
   const [statusOverrides, setStatusOverrides] = useState<Map<number, NurseStatus>>(new Map());
   const [selectedNurse, setSelectedNurse] = useState<Nurse | null>(null);
+  // Profil mit sofort geöffneter Stufen-Erklärung (Tipp auf die Plakette in der Karte).
+  const [nurseModalStufe, setNurseModalStufe] = useState(false);
   // Tracking: kam der gerade geöffnete Profil-Modal aus einer Interest-Card?
   // Wenn ja, zeigt das Modal oben den "Hat Interesse signalisiert"-Hinweis-
   // Block. State wird beim Modal-Close zurückgesetzt.
@@ -539,7 +541,6 @@ const CustomerPortalPage: FC = () => {
   // Karte explizit — Profile-Card direkt geöffnet, damit man den Wizard
   // visuell testen kann.
   const [patientSaved, setPatientSaved] = useState(IS_PREVIEW_ANY && !IS_PREVIEW_PATIENT);
-  const [showPatientReminder, setShowPatientReminder] = useState(false);
   const [triggerOpenPatient, setTriggerOpenPatient] = useState(IS_PREVIEW_PATIENT);
 
   // Rückmeldung zum Angebot: einmal beantwortet oder weggeklickt, ist Ruhe —
@@ -1718,12 +1719,23 @@ const CustomerPortalPage: FC = () => {
     setUndoErrorOpen(true);
   };
 
+  /* Ein Weg zum Formular für alle Knöpfe (Mail-Streifen, Schritt 1,
+     „Profil anlegen & einladen", Hinweis über den Karten): aufklappen,
+     Stepper öffnen, hinscrollen. */
+  const zurPflegesituation = () => {
+    setPatientExpandedManual(true);
+    setTriggerOpenPatient(true);
+    document.getElementById('patientendaten')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  };
+
   const canInviteNurse = (_idx: number): boolean => {
     // Strict gate: no invitations until patient profile is complete.
     // Without it, the caregiver can't prepare a meaningful application
     // and we get back-and-forth queries that frustrate both sides.
     if (!patientSaved) {
-      setShowPatientReminder(true);
+      // Kein wegklickbarer Hinweis mehr (Clarity 07.09.: Kunden tippten den
+      // Hinweis weg und weiter auf Karten) — direkt zum Formular.
+      zurPflegesituation();
       return false;
     }
     // Serialize concurrent invite clicks. Backend gate is per-request
@@ -2388,8 +2400,8 @@ const CustomerPortalPage: FC = () => {
           // (Martin, 12.08.): Im Ausgangszustand steht der Kunde vor der
           // Frage, ob er sich mit dem Weiterklicken schon bindet — nicht vor
           // einer Zahlungsfrage.
-          { text: 'Kein Vertrag vor Auswahl nötig' },
-          { text: 'Keine Vermittlungsgebühren' },
+          { text: 'Erst auswählen, dann buchen' },
+          { text: 'Keine Vermittlungsgebühr' },
         ];
         return (
         <div style={{background:'#FFFFFF', borderBottom:'1px solid #E9E9EB'}}>
@@ -2433,6 +2445,11 @@ const CustomerPortalPage: FC = () => {
                   <p className="text-[15px] mt-2.5 leading-relaxed" style={{color:'#71717A'}}>
                     Monatlich inkl. Steuern, Gebühren und Sozialabgaben.
                   </p>
+                  {/* Tagespreis direkt am Monatspreis (Martin, 07.09.: Portal
+                      wie die Angebotsmail) — vorher nur im Aufklapper. */}
+                  <p className="text-[15px] mt-1 leading-relaxed" style={{color:'#18181B'}}>
+                    Entspricht <span className="font-semibold tabular-nums">{formatEuro(tagessatz)} / Tag</span> — tagesgenau abgerechnet.
+                  </p>
 
                   {/* Konditionen stehen OFFEN unter dem Preis (Martin, 11.08.):
                       Sie sind das Verkaufsargument — hinter einem Toggle
@@ -2448,7 +2465,7 @@ const CustomerPortalPage: FC = () => {
                   <div className="mt-5 pt-5 space-y-3" style={{borderTop:'1px solid #E9E9EB'}}>
                     {items.map((item, i) => (
                       <div key={i} className="flex items-center gap-2.5">
-                        <Check className="w-4 h-4 flex-shrink-0" strokeWidth={3} style={{color:'#8B7355'}} />
+                        <Check className="w-4 h-4 flex-shrink-0" strokeWidth={3} style={{color:'#2A9D5C'}} />
                         <span className="text-[15px]" style={{color:'#18181B'}}>{item.text}</span>
                       </div>
                     ))}
@@ -2460,6 +2477,27 @@ const CustomerPortalPage: FC = () => {
                       Statistik-Spalten): echtes Welt-Siegel + EIN Fließsatz —
                       Wortlaut von Martin. Die ausführlichen Kacheln bleiben
                       unten im Kontakt-Block. */}
+                  {/* Pflegeheim-Vergleich sichtbar am Preis (Martin, 07.09.):
+                      dieselbe Rechnung wie im Aufklapper „Was bleibt für Sie
+                      übrig" (aus dem angezeigten Brutto, nur Posten mit
+                      in_kalkulation) — hier als ein Satz. Nur wenn wir
+                      wirklich günstiger sind. */}
+                  {(() => {
+                    const posten = (lead?.kalkulation?.['zuschüsse']?.items ?? [])
+                      .filter(z => z.in_kalkulation && z.betrag_monatlich > 0);
+                    if (posten.length === 0) return null;
+                    const eigen = Math.max(0, brutto - posten.reduce((a, z) => a + z.betrag_monatlich, 0));
+                    const guenstiger = 3364 - eigen;
+                    if (guenstiger <= 0) return null;
+                    return (
+                      <div className="mt-4 rounded-xl px-4 py-3" style={{background:'#EEF7F1', border:'1px solid #CFE8D8'}}>
+                        <p className="text-[14px] leading-relaxed" style={{color:'#1F6B41'}}>
+                          <span className="font-semibold">Zuhause statt Pflegeheim:</span> Ihr Eigenanteil liegt bei {formatEuro(eigen)} — im Pflegeheim wären es im ersten Jahr durchschnittlich 3.364 €. <span className="font-semibold">{formatEuro(guenstiger)} weniger im Monat.</span>
+                          <span className="block mt-1 text-[12px]" style={{color:'#4C7A5F'}}>Quelle: vdek-Auswertung, Stand 1. Juli 2026.</span>
+                        </p>
+                      </div>
+                    );
+                  })()}
                   <div className="mt-4 pt-4 flex items-center gap-3" style={{borderTop:'1px solid #E9E9EB'}}>
                     <img src="/badge-testsieger.webp" alt="Testsieger Die Welt" className="h-11 w-auto flex-shrink-0 object-contain" />
                     <p className="text-[15px] leading-snug" style={{color:'#52525B'}}>
@@ -2892,9 +2930,9 @@ const CustomerPortalPage: FC = () => {
               subtitle:
                 // "beschrieben" — dasselbe Verb wie über dem Formular, im
                 // Text über den Pflegekräften und in der Schritt-Liste
-                // ("Pflegesituation beschreiben"). "vervollständigt" klang
+                // ("Pflegesituation vervollständigen"). "vervollständigt" klang
                 // nach einem zweiten, anderen Schritt (Übergabe 11.08.).
-                'Hier finden Sie Ihre Betreuungskosten inklusive aller Gebühren und passende Pflegekräfte, die verfügbar sind. Sobald Sie die Pflegesituation beschrieben haben, können sich diese ganz unverbindlich bei Ihnen bewerben.',
+                'Hier finden Sie Ihre Betreuungskosten inklusive aller Gebühren und passende Pflegekräfte, die verfügbar sind. Sobald Sie die Pflegesituation vervollständigt haben, können sich diese ganz unverbindlich bei Ihnen bewerben.',
               // Kein Pill hier: Der Einleitungssatz darüber sagt bereits, was
               // den Kunden erwartet. In den anderen Zuständen trägt die Zeile
               // echten Status („1 Bewerbung aktiv") — dort bleibt sie.
@@ -2955,6 +2993,30 @@ const CustomerPortalPage: FC = () => {
 
       {/* ── SECTION: Ihr Angebot (collapsible) ── */}
       {!patientSaved && angebotSection}
+      {/* „Ihr nächster Schritt" direkt unter den Kosten (Martin, 07.09.):
+          dieselbe grüne Schritt-1-Box wie in der Angebotsmail. Ersetzt den
+          bisherigen Weg „Preis → Karten → irgendwo unten das Formular". */}
+      {!patientSaved && (
+        <div style={{background:'#FFFFFF'}}>
+          <div className="max-w-3xl mx-auto px-4 pb-5">
+            <div className="rounded-2xl px-5 py-5" style={{background:'#EEF7F1'}}>
+              <div className="flex items-center gap-3">
+                <div className="w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0 font-bold text-white text-[14px]" style={{background:'#2A9D5C'}}>1</div>
+                <p className="text-[17px] font-bold leading-snug" style={{color:'#1F6B41'}}>Pflegesituation vervollständigen — 2 Minuten</p>
+              </div>
+              <p className="text-[15px] leading-relaxed mt-2.5" style={{color:'#3A3A3A'}}>Ein Teil ist aus dem Kostenrechner schon übernommen. Erst danach können sich die Pflegekräfte bei Ihnen bewerben.</p>
+              <button
+                type="button"
+                onClick={zurPflegesituation}
+                className="mt-4 w-full rounded-xl py-3.5 text-[16px] font-bold text-white active:scale-[0.99] transition-transform"
+                style={{background:'#2A9D5C'}}
+              >
+                Pflegesituation vervollständigen →
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
 
       <div className="max-w-3xl mx-auto px-4 pt-1 pb-6 space-y-4" style={{background:'#FFFFFF'}}>
@@ -3072,10 +3134,16 @@ const CustomerPortalPage: FC = () => {
               const label = displayName(nurse.name);
               return (
                 <InterestCard
+                  profilFehlt={!patientSaved}
                   key={`interest-${i.id}`}
                   nurse={nurse}
                   status={status}
                   onNurseClick={() => {
+                    setSelectedNurse(nurse);
+                    setSelectedFromInterestId(i.caregiver_id);
+                  }}
+                  onStufeClick={() => {
+                    setNurseModalStufe(true);
                     setSelectedNurse(nurse);
                     setSelectedFromInterestId(i.caregiver_id);
                   }}
@@ -3192,7 +3260,7 @@ const CustomerPortalPage: FC = () => {
                       <button type="button" className="font-semibold underline underline-offset-2"
                         style={{color:'#8B7355'}}
                         onClick={() => { document.getElementById('patientendaten')?.scrollIntoView({ behavior: 'smooth', block: 'start' }); }}>
-                        Pflegesituation beschreiben ↓
+                        Pflegesituation vervollständigen ↓
                       </button>
                     </>
                   )}
@@ -3225,11 +3293,13 @@ const CustomerPortalPage: FC = () => {
                         const isRecommended = idx === recIdx;
                         return (
                           <MatchCard
+                            profilFehlt={!patientSaved}
                             key={`m-${i}`}
                             nurse={nurse}
                             status={status}
                             isRecommended={isRecommended}
                             onNurseClick={() => openNurseFromMatch(nurse, i)}
+                            onStufeClick={() => { setNurseModalStufe(true); openNurseFromMatch(nurse, i); }}
                             onInvite={() => canInviteNurse(i)}
                             onInviteConfirm={() => confirmInviteNurse(i, displayName(nurse.name))}
                             onUndoDecline={status === 'declined' ? () => undoDeclinedMatch(i) : undefined}
@@ -3444,7 +3514,7 @@ const CustomerPortalPage: FC = () => {
                 (Fortschrittsbalken, 4 Schritte). */}
             {!patientSaved && (
               <p className="text-[16px] leading-relaxed mt-3 mb-4" style={{color:'#18181B'}}>
-                Sobald Sie die Pflegesituation beschrieben haben, erhalten Sie
+                Sobald Sie die Pflegesituation vervollständigt haben, erhalten Sie
                 ganz unverbindlich Bewerbungen und sehen, welche Pflegekräfte
                 die Betreuung übernehmen können.
               </p>
@@ -3712,46 +3782,53 @@ const CustomerPortalPage: FC = () => {
       {patientSaved && angebotSection}
 
       <div className="max-w-3xl mx-auto px-4 pt-1 pb-6 space-y-4" style={{background:'#FFFFFF'}}>
-        {/* ── SECTION HEADER: So funktioniert's ── */}
+        {/* ── SECTION: So geht es weiter (Martin, 07.09.) — dieselben drei
+             Schritte und derselbe Wortlaut wie in der Angebotsmail; der
+             anstehende Schritt ist grün und trägt den Knopf, erledigte
+             Schritte tragen den Haken. ── */}
         <div className="px-1 pt-3">
-          <h2 className="text-[1.2rem] font-bold tracking-tight" style={{color:'#18181B'}}>So funktioniert's</h2>
-          <p className="text-[15px] mt-2" style={{color:'#71717A'}}>Von der ersten Anfrage bis zur laufenden Betreuung.</p>
+          <h2 className="text-[1.2rem] font-bold tracking-tight" style={{color:'#18181B'}}>So geht es weiter</h2>
         </div>
-        <div className="rounded-2xl overflow-hidden border" style={{background:'#F4F4F6', borderColor:'#D4D4D8'}}>
-          {[
-            // „vieles ist schon vorausgefüllt" war falsch (Martin, 12.08.):
-            // Aus dem Kostenrechner kommen anzahl, pflegegrad, mobilität,
-            // nachteinsätze, haushalt und das gewünschte Geschlecht — von
-            // zwölf Pflichtfeldern also vier. Jetzt ohne Mengenangabe.
-            { n: 1, title: 'Pflegesituation beschreiben', desc: 'Ein paar Angaben, die aus dem Kostenrechner sind schon übernommen. Dann sehen Sie sofort, welche Pflegekräfte passen und verfügbar sind. Unverbindlich.', cta: !patientSaved, done: patientSaved },
-            { n: 2, title: 'Bewerbungen erhalten & Pflegekräfte einladen', desc: 'Geeignete Pflegekräfte bewerben sich bei Ihnen. In der Zwischenzeit können Sie Wunschkandidatinnen gezielt einladen.', cta: false, done: hasPending },
-            { n: 3, title: 'Vertrag abschließen', desc: 'Sie wählen Ihre Favoritin aus und bestätigen das Angebot — den Rest übernehmen wir.', cta: false, done: false },
-            { n: 4, title: 'Laufende Betreuung', desc: 'Die Pflegekraft ist da. Ihr persönlicher Ansprechpartner begleitet Sie während des gesamten Einsatzes.', cta: false, done: false },
-          ].map((s, i, arr) => (
-            <div key={s.n} className={`flex items-start gap-4 px-5 py-4 ${i < arr.length - 1 ? 'border-b' : ''}`} style={{borderColor:'#E9E9EB'}}>
-              {s.done ? (
-                <div className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5" style={{background:'#E3F7EF'}}>
-                  <Check className="w-4 h-4" strokeWidth={3} style={{color:'#22A06B'}} />
-                </div>
-              ) : (
-                <div className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 font-bold text-white mt-0.5" style={{background:'#8B7355', fontSize:'15px'}}>{s.n}</div>
-              )}
-              <div>
-                <p className="text-[15px] font-semibold" style={{color: s.done ? '#9CA3AF' : '#18181B'}}>{s.title}</p>
-                <p className="text-[15px] mt-0.5 leading-relaxed" style={{color: s.done ? '#B5B5B5' : '#71717A'}}>{s.desc}</p>
-                {s.cta && (
-                  <button
-                    onClick={() => { setPatientExpandedManual(true); setTriggerOpenPatient(true); document.getElementById('patientendaten')?.scrollIntoView({ behavior: 'smooth', block: 'start' }); }}
-                    className="mt-1.5 text-[13px] font-semibold flex items-center gap-1 transition-colors"
-                    style={{color:'#8B7355'}}
-                  >
-                    Jetzt ausfüllen ↑
-                  </button>
+        {(() => {
+          const schritte = [
+            { n: 1, title: 'Pflegesituation vervollständigen — 2 Minuten', desc: 'Ein Teil ist aus dem Kostenrechner schon übernommen. Erst danach können sich die Pflegekräfte bei Ihnen bewerben.', done: patientSaved },
+            { n: 2, title: 'Pflegekräfte einladen & Bewerbungen erhalten', desc: 'Sobald Ihre Pflegesituation vervollständigt ist, laden Sie Ihre Wunschkandidatinnen ein — passende Pflegekräfte bewerben sich dann mit Profil, Erfahrung und Anreisedatum.', done: hasPending },
+            { n: 3, title: 'Auswählen und starten', desc: 'Sie entscheiden, wir übernehmen den Rest. Ihre Wunsch-Pflegekraft kann die Betreuung bereits in 4–7 Werktagen übernehmen.', done: false },
+          ];
+          const aktiv = schritte.findIndex(st => !st.done);
+          return (
+          <div className="rounded-2xl overflow-hidden border" style={{background:'#F4F4F6', borderColor:'#D4D4D8'}}>
+            {schritte.map((st, i, arr) => {
+              const istAktiv = i === aktiv;
+              return (
+              <div key={st.n} className={`flex items-start gap-4 px-5 py-4 ${i < arr.length - 1 ? 'border-b' : ''}`} style={{borderColor:'#E9E9EB', background: istAktiv ? '#EEF7F1' : undefined}}>
+                {st.done ? (
+                  <div className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5" style={{background:'#E3F7EF'}}>
+                    <Check className="w-4 h-4" strokeWidth={3} style={{color:'#22A06B'}} />
+                  </div>
+                ) : (
+                  <div className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 font-bold text-white mt-0.5" style={{background: istAktiv ? '#2A9D5C' : '#8B7355', fontSize:'15px'}}>{st.n}</div>
                 )}
+                <div className="flex-1 min-w-0">
+                  <p className={istAktiv ? 'text-[16px] font-bold' : 'text-[15px] font-semibold'} style={{color: st.done ? '#9CA3AF' : istAktiv ? '#1F6B41' : '#18181B'}}>{st.title}</p>
+                  <p className="text-[15px] mt-0.5 leading-relaxed" style={{color: st.done ? '#B5B5B5' : istAktiv ? '#3A3A3A' : '#71717A'}}>{st.desc}</p>
+                  {istAktiv && st.n === 1 && (
+                    <button
+                      type="button"
+                      onClick={zurPflegesituation}
+                      className="mt-3 w-full rounded-xl py-3 text-[15px] font-bold text-white active:scale-[0.99] transition-transform"
+                      style={{background:'#2A9D5C'}}
+                    >
+                      Pflegesituation vervollständigen →
+                    </button>
+                  )}
+                </div>
               </div>
-            </div>
-          ))}
-        </div>
+              );
+            })}
+          </div>
+          );
+        })()}
 
         {/* ── SECTION HEADER: Häufige Fragen ── */}
         <div className="px-1 pt-3">
@@ -3792,7 +3869,7 @@ const CustomerPortalPage: FC = () => {
                 </div>
               ),
             },
-            { q: 'Was bedeutet „Einladen"?', a: 'Wenn Ihnen eine Pflegekraft gefällt, laden Sie sie ein, sich bei Ihnen zu bewerben. Dafür müssen Sie nur kurz die Pflegesituation beschreiben — damit wir Ihnen passende, verfügbare Pflegekräfte zeigen können. Alles unverbindlich; ein Vertrag entsteht erst, wenn Sie ein konkretes Angebot annehmen.' },
+            { q: 'Was bedeutet „Einladen"?', a: 'Wenn Ihnen eine Pflegekraft gefällt, laden Sie sie ein, sich bei Ihnen zu bewerben. Dafür müssen Sie nur kurz die Pflegesituation vervollständigen — damit wir Ihnen passende, verfügbare Pflegekräfte zeigen können. Alles unverbindlich; ein Vertrag entsteht erst, wenn Sie ein konkretes Angebot annehmen.' },
             { q: 'Gehe ich mit dem Einladen einen Vertrag ein?', a: 'Nein — das Einladen und Anschauen von Profilen ist vollständig unverbindlich. Ein Vertrag kommt erst zustande, wenn Sie ein konkretes Angebot ausdrücklich annehmen.' },
             { q: 'Kann ich jederzeit kündigen?', a: 'Ja, täglich kündbar — ohne Mindestlaufzeit und ohne Angabe von Gründen. Kosten entstehen ausschließlich für Tage, an denen die Pflegekraft tatsächlich vor Ort ist.' },
             { q: 'Wie funktioniert die Abrechnung?', a: 'Tagesgenau: Sie zahlen nur für geleistete Betreuungstage. Die Rechnung für den laufenden Monat wird jeweils zur Monatsmitte erstellt — transparent, nachvollziehbar, ohne versteckte Posten.' },
@@ -4059,7 +4136,8 @@ const CustomerPortalPage: FC = () => {
             && aboutRegen.forId === fullCaregiver.id
             && aboutRegen.loading
           }
-          onClose={() => { setSelectedNurse(null); setNurseModalApp(null); setNurseMatchIdx(null); setSelectedFromInterestId(null); }}
+          initialLevelInfo={nurseModalStufe}
+          onClose={() => { setSelectedNurse(null); setNurseModalApp(null); setNurseMatchIdx(null); setSelectedFromInterestId(null); setNurseModalStufe(false); }}
           app={nurseModalApp ?? undefined}
           onReview={() => { setSelectedNurse(null); setSelectedApp(nurseModalApp); setNurseModalApp(null); setSelectedFromInterestId(null); }}
           onDecline={() => { setDeclineConfirmApp(nurseModalApp); setSelectedNurse(null); setNurseModalApp(null); setSelectedFromInterestId(null); }}
@@ -4168,50 +4246,6 @@ const CustomerPortalPage: FC = () => {
       {/* Contact Popup */}
       {showContactPopup && <ContactPopup onClose={() => setShowContactPopup(false)} />}
 
-      {/* Patient Reminder Popup */}
-      {showPatientReminder && (
-        <>
-          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[70]" onClick={() => setShowPatientReminder(false)} style={{ animation: 'fadeIn 0.2s ease-out' }} />
-          <div className="fixed inset-0 z-[70] flex items-end sm:items-center justify-center sm:p-4 pointer-events-none" style={{ animation: 'fadeIn 0.2s ease-out' }}>
-            <div className="bg-white w-full sm:max-w-md rounded-t-3xl sm:rounded-2xl pointer-events-auto shadow-2xl px-5 pt-5 pb-8 sm:pb-6 space-y-4" style={{ animation: 'slideSheet 0.3s cubic-bezier(0.32,0.72,0,1)' }}
-              onClick={e => e.stopPropagation()}>
-              <div className="flex justify-center mb-1 sm:hidden">
-                <div className="w-10 h-1 rounded-full bg-gray-200" />
-              </div>
-              <div className="flex items-start gap-3">
-                <div className="w-10 h-10 rounded-xl bg-amber-50 flex items-center justify-center flex-shrink-0">
-                  <AlertTriangle className="w-5 h-5" style={{color:'#D97706'}} />
-                </div>
-                <div>
-                  <p className="text-base font-bold text-gray-900">Nur ein kurzer Schritt: die Pflegesituation</p>
-                  <p className="text-sm text-gray-600 mt-1 leading-relaxed">
-                    Das meiste ist schon vorausgefüllt (ca. 2 Min.). Dann sehen Sie sofort, welche Pflegekräfte zu Ihnen passen und verfügbar sind — ganz unverbindlich.
-                  </p>
-                </div>
-              </div>
-              <div className="flex flex-col gap-2 pt-1">
-                <button
-                  onClick={() => {
-                    setShowPatientReminder(false);
-                    setPatientExpandedManual(true);
-                    setTriggerOpenPatient(true);
-                    document.getElementById('patientendaten')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                  }}
-                  className="w-full bg-[#E76F63] text-white font-bold py-3.5 rounded-2xl text-sm hover:bg-[#D65E52] shadow-sm transition-colors"
-                >
-                  Pflegesituation beschreiben
-                </button>
-                <button
-                  onClick={() => setShowPatientReminder(false)}
-                  className="w-full text-gray-500 font-semibold py-2.5 text-sm"
-                >
-                  Später
-                </button>
-              </div>
-            </div>
-          </div>
-        </>
-      )}
 
       {/* Decline Confirm Modal */}
       {declineConfirmApp && (
