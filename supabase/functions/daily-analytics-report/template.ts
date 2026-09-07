@@ -9,6 +9,7 @@
 // zeigt das aktuelle Plateau. Conversion-% als Tabelle, weil absolute
 // Zahlen wenig aussagen wenn Traffic schwankt.
 
+import { PORTAL_PREISE } from "./queries.ts";
 import type { BesucherKohorte, DailyStats, LeadKohorte, PeriodStats } from "./queries.ts";
 
 // Spiegelt MultiStepForm.getStepId() — 9 Schritte (Betreuungsbeginn /
@@ -75,13 +76,6 @@ export function buildReportEmail(opts: {
   // Leads (auch organische) — Kanal-genau wird es erst mit gclid-Historie.
   const euro = (n: number) => `${n.toFixed(2).replace(".", ",")} €`;
   const perPiece = (spend: number, count: number) => (count > 0 ? euro(spend / count) : "—");
-  const adsRows = adsSpend
-    ? [
-      { label: "Ads-Kosten", g: euro(adsSpend.yesterday), p: euro(adsSpend.period) },
-      { label: "Kosten je Lead (blended)", g: perPiece(adsSpend.yesterday, yesterday.wizardCompleted), p: perPiece(adsSpend.period, period.sums.wizardCompleted) },
-      { label: "Kosten je Patientenprofil", g: perPiece(adsSpend.yesterday, yesterday.patientDataSaved), p: perPiece(adsSpend.period, period.sums.patientDataSaved) },
-    ]
-    : [];
 
   const mailAlarm = mailHealth && (mailHealth.failed24h > 0 || mailHealth.overduePending > 0);
 
@@ -90,6 +84,15 @@ export function buildReportEmail(opts: {
   // Tabellen. Maßstab: echte Leads gestern vs. 7-Tage-Schnitt; Trend:
   // 7-Tage-Schnitt vs. die 7 Tage davor.
   const leadsY = yesterday.wizardCompleted;
+  /* Aufteilung (Martin, 05.09.2026): eingekaufte Portal-Leads sind fremder
+     Zulauf. Fuer die eigene Leistung und fuer die Kosten je Lead zaehlen nur
+     die eigenen. `?? 0` fuer Berichte aus der Zeit vor dem Feld. */
+  const eigeneY = yesterday.leadsEigene ?? leadsY;
+  const eingekauftY = yesterday.leadsEingekauft ?? 0;
+  const profileEigeneY = yesterday.profileEigene ?? yesterday.patientDataSaved;
+  const profileEingekauftY = yesterday.profileEingekauft ?? 0;
+  const einkaufY = yesterday.kostenEingekauft ?? 0;
+  const gesamtKostenY = (adsSpend?.yesterday ?? 0) + einkaufY;
   const leadsAvg = period.wizardCompleted.avg;
   const verdict = leadsY >= Math.max(leadsAvg * 1.25, leadsAvg + 1)
     ? { emoji: "✅", wort: "Guter Tag" }
@@ -107,7 +110,8 @@ export function buildReportEmail(opts: {
         : { pfeil: "→", text: `stabil (Ø ${leadsAvg.toFixed(1)} vs. ${prevAvg.toFixed(1)} Leads/Tag Vorwoche)` };
   const profilQuoteY = leadsY > 0 ? (yesterday.patientDataSaved / leadsY) * 100 : 0;
   const fazitPunkte: string[] = [
-    `${leadsY >= leadsAvg ? "✅" : "⚠️"} ${leadsY} neue Leads (7-T-Ø ${leadsAvg.toFixed(1)})`,
+    `${leadsY >= leadsAvg ? "✅" : "⚠️"} ${leadsY} neue Leads (7-T-Ø ${leadsAvg.toFixed(1)})`
+      + `${(yesterday.leadsEingekauft ?? 0) > 0 ? ` — davon ${yesterday.leadsEigene ?? 0} eigene, ${yesterday.leadsEingekauft} eingekauft` : ""}`,
     `${yesterday.patientDataSaved > 0 ? "✅" : "⚠️"} ${yesterday.patientDataSaved} Patientenprofil(e) ausgefüllt${leadsY > 0 ? ` — ${profilQuoteY.toFixed(0)} % der neuen Leads (Ø ${period.convProfilLead.toFixed(0)} %)` : ""}`,
     `${yesterday.visitors >= period.visitors.avg ? "✅" : "⚠️"} ${yesterday.visitors} Besucher (Ø ${period.visitors.avg.toFixed(0)})`,
   ];
@@ -141,35 +145,12 @@ export function buildReportEmail(opts: {
     : '';
 
   // Absolutwerte-Tabelle: Gestern · 7-T-Ø · Top (Datum)
-  const rows: Array<{ label: string; today: number; avg: number; top: number; topDate: string }> = [
-    { label: "Besucher (unique Sessions)",                     today: yesterday.visitors,            avg: period.visitors.avg,            top: period.visitors.top,            topDate: period.visitors.topDate },
-    { label: "Wizard gestartet",                               today: yesterday.wizardStarted,       avg: period.wizardStarted.avg,       top: period.wizardStarted.top,       topDate: period.wizardStarted.topDate },
-    { label: "Wizard abgeschlossen (echte Leads, ohne Tests)", today: yesterday.wizardCompleted,     avg: period.wizardCompleted.avg,     top: period.wizardCompleted.top,     topDate: period.wizardCompleted.topDate },
-    { label: "Patientenprofil ausgefüllt",                     today: yesterday.patientDataSaved,    avg: period.patientDataSaved.avg,    top: period.patientDataSaved.top,    topDate: period.patientDataSaved.topDate },
-    { label: "Pflegekräfte eingeladen",                        today: yesterday.caregiverInvited,    avg: period.caregiverInvited.avg,    top: period.caregiverInvited.top,    topDate: period.caregiverInvited.topDate },
-    { label: "Pflegekräfte mit Interesse",                     today: yesterday.interestShown,       avg: period.interestShown.avg,       top: period.interestShown.top,       topDate: period.interestShown.topDate },
-    { label: "Bewerbungen erhalten",                           today: yesterday.applicationReceived, avg: period.applicationReceived.avg, top: period.applicationReceived.top, topDate: period.applicationReceived.topDate },
-    { label: "Buchungen",                                      today: yesterday.bookings,            avg: period.bookings.avg,            top: period.bookings.top,            topDate: period.bookings.topDate },
-  ];
-
-  const rowsHtml = rows.map((r, i) => {
-    const isLast = i === rows.length - 1;
-    const border = isLast ? "" : "border-bottom:1px solid #f0ebe4;";
-    // Gestern-vs-Avg Indikator: ↑ über dem Ø, ↓ darunter, → ähnlich (±10%).
-    let arrow = "";
-    if (r.avg > 0) {
-      const ratio = r.today / r.avg;
-      if (ratio >= 1.1) arrow = `<span style="font-size:11px;color:#2D6A4F;margin-left:6px;">↑</span>`;
-      else if (ratio <= 0.9) arrow = `<span style="font-size:11px;color:#B71C1C;margin-left:6px;">↓</span>`;
-      else arrow = `<span style="font-size:11px;color:#9CA3AF;margin-left:6px;">→</span>`;
-    }
-    return `<tr>
-      <td style="padding:10px 12px;${border}color:#3D3D3D;font-size:13px;width:48%;">${r.label}</td>
-      <td style="padding:10px 12px;${border}color:#3D3D3D;font-size:14px;font-weight:700;text-align:right;width:18%;">${fmtInt(r.today)}${arrow}</td>
-      <td style="padding:10px 12px;${border}color:#666;font-size:13px;text-align:right;width:14%;">${fmtAvg(r.avg)}</td>
-      <td style="padding:10px 12px;${border}color:#666;font-size:13px;text-align:right;width:20%;"><strong style="color:#3D2B1F;">${fmtInt(r.top)}</strong> <span style="color:#9CA3AF;font-size:11px;">${r.topDate.slice(0, 5)}</span></td>
-    </tr>`;
-  }).join("");
+  /* Hier standen eine Kennzahlen-Tabelle (rows/rowsHtml) und darueber adsRows.
+     Beide wurden NIE in die Mail eingebaut — die Darstellung laeuft ueber
+     Kacheln und Diagramme. Entfernt am 05.09.2026, nachdem eine Ergaenzung dort
+     spurlos verschwand: toter Code, der aussieht wie lebender, kostet genau
+     einmal eine Fehlersuche. Die Aufteilung eigen/eingekauft steht jetzt in der
+     Leads-Kachel, in der Ads-Kachel und im Tagesfazit. */
 
   // Conversion-Raten-Tabelle: Gestern (Tages-Rate) vs 7-T-Ø (Periode-Rate)
   const convRows: Array<{ label: string; today: string; avg: number }> = [
@@ -363,13 +344,28 @@ export function buildReportEmail(opts: {
   const kachelnHtml = `
     <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="margin:0 0 16px;">
       <tr>
-        ${kachel(String(leadsY), "Leads gestern", `Ø ${zahl(leadsAvg, 1)} in 7 Tagen${pfeilVgl(leadsY, leadsAvg)}`,
+        ${kachel(String(leadsY), "Leads gestern",
+          eingekauftY > 0
+            ? `${eigeneY} eigene · ${eingekauftY} eingekauft`
+            : `Ø ${zahl(leadsAvg, 1)} in 7 Tagen${pfeilVgl(leadsY, leadsAvg)}`,
           leadsY >= leadsAvg ? FARBE.gut : FARBE.schlecht)}
-        ${kachel(kostenProProfilY === null ? "—" : `${zahl(kostenProProfilY, 0)} €`, "je Patientenprofil",
-          kostenProProfilP === null ? "kein Vergleich" : `Ø ${zahl(kostenProProfilP, 0)} € · Ziel 20 €`, kostenFarbe)}
-        ${kachel(String(yesterday.patientDataSaved), "Profile gestern",
-          `Ø ${zahl(period.patientDataSaved.avg, 1)}${pfeilVgl(yesterday.patientDataSaved, period.patientDataSaved.avg)}`,
-          yesterday.patientDataSaved >= period.patientDataSaved.avg ? FARBE.gut : FARBE.schlecht)}
+        ${/* Gesamtkosten ueber beide Bereiche. „Je Profil" steht bewusst NICHT mehr
+              hier, sondern je Gruppe: die alte Kachel teilte die WERBEkosten durch
+              ALLE Profile (auch die aus eingekauften Leads) und war damit zu guenstig
+              (Martin, 05.09.2026: „warum habe ich dort 25,47 und 38,20 euro je
+              profil"). */
+          kachel(euro(gesamtKostenY), "Kosten gestern",
+            leadsY > 0 ? `${perPiece(gesamtKostenY, leadsY)} je Lead über alles` : "keine Leads",
+            FARBE.tinte)}
+        ${/* Statt des Tagesschnitts die KOSTEN je Profil (Martin, 06.09.2026: „es
+              fehlt hier noch die kosten je Profil … mach das im 3. kasten einfach
+              statt der 1,7"). Ueber alles gerechnet — die Aufteilung nach Bereich
+              steht in den Gruppen darunter. */
+          kachel(String(yesterday.patientDataSaved), "Profile gestern",
+            yesterday.patientDataSaved > 0
+              ? `${perPiece(gesamtKostenY, yesterday.patientDataSaved)} je Profil über alles`
+              : "kein Profil",
+            yesterday.patientDataSaved >= period.patientDataSaved.avg ? FARBE.gut : FARBE.schlecht)}
       </tr>
     </table>`;
 
@@ -505,15 +501,56 @@ export function buildReportEmail(opts: {
     "Beide Wege liegen auf derselben Seite — nur der Weg zum Angebot ist ein anderer.",
   );
 
-  // ── Ads als Kachelzeile statt Tabelle ──────────────────────────────
-  const adsHtml = !adsSpend ? "" : `
-    <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="margin:0 0 16px;">
+  /* Zwei Gruppen mit jeweils DENSELBEN drei Kacheln (Martin, 05.09.2026:
+     „mach das gleiche auch mit diesen 3 kaesten fuer eingekauft, dann haben wir
+     einen besseren vergleich"). Vorher standen dieselben Zahlen zweimal da —
+     einmal als Kachelzeile, einmal als Spalte.
+
+     Jede Zahl bleibt in ihrer Gruppe: Werbung erzeugt nur eigene Leads, Einkauf
+     nur eingekaufte. Ein „je Profil" ueber alles gaebe es nicht ehrlich,
+     deshalb steht es NUR je Gruppe. */
+  const werbungY = adsSpend?.yesterday ?? 0;
+  const werbungP = adsSpend?.period ?? 0;
+  const einkaufP = period.sums.kostenEingekauft ?? 0;
+  const eigeneP = period.sums.leadsEigene ?? 0;
+  const eingekauftP = period.sums.leadsEingekauft ?? 0;
+  const profEigeneP = period.sums.profileEigene ?? 0;
+  const profEingekauftP = period.sums.profileEingekauft ?? 0;
+
+  const ueberschrift = (titel: string, unterzeile: string) => `
+    <p style="margin:22px 0 2px;font-size:15px;font-weight:700;color:${FARBE.tinte};">${titel}</p>
+    <p style="margin:0 0 10px;font-size:11.5px;color:${FARBE.leise};line-height:1.5;">${unterzeile}</p>`;
+
+  const gruppe = (
+    titel: string, unterzeile: string,
+    kosten: number, kostenP: number, kostenTitel: string,
+    leads: number, leadsP: number, profile: number, profileP: number,
+  ) => `
+    ${ueberschrift(titel, unterzeile)}
+    <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="margin:0 0 4px;">
       <tr>
-        ${kachel(euro(adsSpend.yesterday), "Ads gestern", `${euro(adsSpend.period)} in ${adsSpend.periodDays} Tagen`, FARBE.tinte)}
-        ${kachel(perPiece(adsSpend.yesterday, leadsY), "je Lead", `Ø ${perPiece(adsSpend.period, period.sums.wizardCompleted)}`, FARBE.tinte)}
-        ${kachel(perPiece(adsSpend.yesterday, yesterday.patientDataSaved), "je Profil", `Ø ${perPiece(adsSpend.period, period.sums.patientDataSaved)}`, kostenFarbe)}
+        ${kachel(euro(kosten), kostenTitel, `${euro(kostenP)} in ${period.tage} Tagen`, FARBE.tinte)}
+        ${kachel(perPiece(kosten, leads), "je Lead", `${leads} Lead${leads === 1 ? "" : "s"} · Ø ${perPiece(kostenP, leadsP)}`, FARBE.tinte)}
+        ${kachel(perPiece(kosten, profile), "je Profil", `${profile} Profil${profile === 1 ? "" : "e"} · Ø ${perPiece(kostenP, profileP)}`, FARBE.tinte)}
       </tr>
     </table>`;
+
+  const fehlendePreise = yesterday.portaleOhnePreis ?? [];
+  const preisFussnote = `Einkaufspreise netto: ${Object.entries(PORTAL_PREISE).map(([d, pr]) => `${d} ${euro(Number(pr))}`).join(" · ")}.`
+    + (fehlendePreise.length === 0 ? "" : ` <span style="color:${FARBE.schlecht};">Ohne hinterlegten Preis, daher mit 0 € gerechnet: ${fehlendePreise.join(", ")}.</span>`);
+
+  const gruppeEigene = werbungY + werbungP <= 0 ? "" : gruppe(
+    "Eigene Leads (Werbung)",
+    "Was die Anzeigen gekostet haben — und was daraus geworden ist. Die Diagramme darunter zeigen denselben Weg im Verlauf.",
+    werbungY, werbungP, "Ads gestern",
+    eigeneY, eigeneP, profileEigeneY, profEigeneP,
+  );
+  const gruppeEingekauft = einkaufY + einkaufP <= 0 ? "" : gruppe(
+    "Eingekaufte Leads (Portale)",
+    preisFussnote,
+    einkaufY, einkaufP, "Einkauf gestern",
+    eingekauftY, eingekauftP, profileEingekauftY, profEingekauftP,
+  );
 
   const html = `<!DOCTYPE html>
 <html lang="de">
@@ -536,11 +573,12 @@ export function buildReportEmail(opts: {
           ${mailAlarmHtml}
           ${fazitHtml}
           ${kachelnHtml}
+          ${gruppeEigene}
           ${chartBesucher}
           ${chartLeads}
           ${chartConv}
           ${chartEinstieg}
-          ${adsHtml}
+          ${gruppeEingekauft}
           ${notesHtml}
           <p style="margin:20px 0 0;text-align:center;">
             <a href="${siteUrl}/admin/leads" style="display:inline-block;background:${FARBE.balken};color:#fff;padding:11px 22px;text-decoration:none;border-radius:8px;font-size:13px;font-weight:600;">Leads im Admin öffnen</a>
@@ -566,7 +604,7 @@ GESTERN
   Leads                    ${leadsY}  (Ø ${zahl(leadsAvg, 1)})
   Patientenprofile         ${yesterday.patientDataSaved}  (Ø ${zahl(period.patientDataSaved.avg, 1)})
 ${adsSpend ? `  Ads-Kosten               ${euro(adsSpend.yesterday)}
-  je Lead                  ${perPiece(adsSpend.yesterday, leadsY)}
+  je eigenem Lead          ${perPiece(adsSpend.yesterday, eigeneY)}
   je Patientenprofil       ${perPiece(adsSpend.yesterday, yesterday.patientDataSaved)}` : ""}
 
 BESUCHER JE TAG (über Anzeigen / gesamt)

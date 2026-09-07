@@ -82,6 +82,12 @@ export default function LeadsPage() {
      sind zeitkritisch (die Portale liefern an bis zu drei Anbieter) und
      ihre Abschlussquote entscheidet, ob sich die Quelle rechnet. */
   const [quelleFilter, setQuelleFilter] = useState('all');
+  /* Testleads (Martin, 05.09.2026: „der filter muss alle 3 optionen haben:
+     alle, echte, tests"). Standard „echte" — die Liste soll den echten Zulauf
+     zeigen. Die Auswahl wirkt auf ALLES: Herkunfts-Reiter, Zähler und Liste,
+     sonst stehen in den Reitern Zahlen, die die Liste nicht hergibt. */
+  const [testAnsicht, setTestAnsicht] = useState<'echte' | 'alle' | 'tests'>('echte');
+  const [markiere, setMarkiere] = useState<string | null>(null);
 
   useEffect(() => {
     loadLeads();
@@ -141,7 +147,7 @@ export default function LeadsPage() {
 
   useEffect(() => {
     filterLeads();
-  }, [searchTerm, statusFilter, quelleFilter, leads]);
+  }, [searchTerm, statusFilter, quelleFilter, testAnsicht, leads]);
 
   /* still=true: Nachladen aus dem Live-Kanal — ohne Spinner, sonst blinkt
      bei jeder Änderung die ganze Seite weg. */
@@ -195,17 +201,61 @@ export default function LeadsPage() {
     }
   };
 
+
+  /* Zwei Filter liegen uebereinander: Herkunft (Reiter oben) und Test-Ansicht
+     (Echte/Alle/Tests darunter).
+
+     Jede Anzeige zaehlt die JEWEILS ANDERE Auswahl mit (Martin, 05.09.2026:
+     „ich kann noch nicht bei Pflegehilfe elf Leads anzeigen und darunter
+     fuenfhundert"):
+       - die Herkunfts-Reiter zaehlen innerhalb der gewaehlten Test-Ansicht,
+       - Echte/Alle/Tests zaehlen innerhalb des gewaehlten Reiters.
+     Jede Zahl beantwortet damit „wie viele bekomme ich, wenn ich HIER klicke
+     und den anderen Filter so lasse". */
+  const passtZurTestAnsicht = (l: any) =>
+    testAnsicht === 'alle' ? true : testAnsicht === 'tests' ? !!l.ist_test : !l.ist_test;
+  const passtZurQuelle = (l: any) =>
+    quelleFilter === 'all' ? true
+      : quelleFilter === 'eigene' ? !istEingekauft(l.source)
+      : l.source === quelleFilter;
+
+  const imReiter = leads.filter(passtZurQuelle);
+  const sichtbareLeads = leads.filter((l) => passtZurTestAnsicht(l) && passtZurQuelle(l));
+
+  /**
+   * Lead als Test kennzeichnen — oder die Kennzeichnung zuruecknehmen.
+   *
+   * Server-seitig (Service-Key), nicht aus dem Browser heraus: der oeffentliche
+   * Anon-Key liegt im Bundle, Schreibrechte gehoeren nicht dorthin. Die Zeile
+   * wird sofort lokal umgestellt, damit die Liste nicht wartet; scheitert der
+   * Server, wird zurueckgedreht und gesagt warum.
+   */
+  const testKennzeichnen = async (lead: any, ist_test: boolean) => {
+    setMarkiere(lead.id);
+    const vorher = leads;
+    setLeads((l) => l.map((x) => (x.id === lead.id ? { ...x, ist_test } : x)));
+    try {
+      const res = await fetch(`/api/admin/leads/${lead.id}/test`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ist_test }),
+      });
+      if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error || `HTTP ${res.status}`);
+    } catch (e) {
+      setLeads(vorher);
+      alert('Konnte nicht gespeichert werden: ' + (e instanceof Error ? e.message : String(e)));
+    } finally {
+      setMarkiere(null);
+    }
+  };
+
+  const testAnzahl = leads.filter((l) => l.ist_test).length;
+
   const filterLeads = () => {
-    let filtered = [...leads];
+    let filtered = [...sichtbareLeads];
 
     if (statusFilter !== 'all') {
       filtered = filtered.filter((lead) => lead.status === statusFilter);
-    }
-
-    if (quelleFilter === 'eigene') {
-      filtered = filtered.filter((lead) => !istEingekauft(lead.source));
-    } else if (quelleFilter !== 'all') {
-      filtered = filtered.filter((lead) => lead.source === quelleFilter);
     }
 
     if (searchTerm) {
@@ -223,7 +273,7 @@ export default function LeadsPage() {
 
   /* Reiter-Logik lebt in lib/portal-lead.ts (reiterFuer) — dort testbar,
      hier nur der Aufruf. */
-  const reiter = reiterFuer(leads);
+  const reiter = reiterFuer(leads.filter(passtZurTestAnsicht));
 
   const getStatusBadge = (status: string) => {
     const styles: Record<string, string> = {
@@ -288,7 +338,7 @@ export default function LeadsPage() {
         <div>
           <h1 className="text-3xl font-bold text-gray-900">Leads</h1>
           <p className="text-gray-600 mt-1">
-            Verwalten Sie alle Interessenten ({filteredLeads.length} von {leads.length})
+            Verwalten Sie alle Interessenten ({filteredLeads.length} von {sichtbareLeads.length})
           </p>
         </div>
         <div className="flex items-center gap-3">
@@ -332,6 +382,33 @@ export default function LeadsPage() {
               onChange={(e) => setSearchTerm(e.target.value)}
               className="pl-10"
             />
+          </div>
+          {/* Drei Ansichten statt an/aus (Martin, 05.09.2026: „der filter muss alle 3
+              optionen haben: alle, echte, tests"). „Echte" ist der Alltag, „Tests" zum
+              Aufräumen, „Alle" zum Vergleichen. */}
+          <div className="flex shrink-0 items-center rounded-lg border border-gray-200 bg-white p-0.5">
+            {([
+              { key: 'echte', label: 'Echte', anzahl: imReiter.filter((l) => !l.ist_test).length },
+              { key: 'alle', label: 'Alle', anzahl: imReiter.length },
+              { key: 'tests', label: 'Tests', anzahl: imReiter.filter((l) => l.ist_test).length },
+            ] as const).map((a) => (
+              <button
+                key={a.key}
+                type="button"
+                onClick={() => setTestAnsicht(a.key)}
+                aria-pressed={testAnsicht === a.key}
+                className={`rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
+                  testAnsicht === a.key
+                    ? 'bg-[#5C4A32] text-white'
+                    : 'text-gray-600 hover:bg-gray-50'
+                }`}
+              >
+                {a.label}
+                <span className={`ml-1.5 tabular-nums ${testAnsicht === a.key ? 'text-white/75' : 'text-gray-400'}`}>
+                  {a.anzahl}
+                </span>
+              </button>
+            ))}
           </div>
           <Select value={statusFilter} onValueChange={setStatusFilter}>
             <SelectTrigger className="w-[200px]">
@@ -475,13 +552,36 @@ export default function LeadsPage() {
                       </div>
                     </td>
                     <td className="py-3 px-4">
-                      <Link
-                        href={`/admin/leads/${lead.id}`}
-                        className="text-[#5C4A32] hover:text-[#7D6850] text-sm font-medium inline-flex items-center gap-1"
-                      >
-                        Details
-                        <ExternalLink className="w-3 h-3" />
-                      </Link>
+                      <div className="flex items-center justify-end gap-3">
+                        {/* Kennzeichnen statt löschen (Martin, 05.09.2026): der Lead bleibt,
+                            verschwindet aber aus Liste, Statistik und Berichten — und kommt
+                            mit demselben Knopf zurück. */}
+                        <button
+                          type="button"
+                          disabled={markiere === lead.id}
+                          onClick={() => testKennzeichnen(lead, !lead.ist_test)}
+                          title={lead.ist_test
+                            ? 'Kennzeichnung zurücknehmen — der Lead zählt wieder mit'
+                            : 'Als Testlead kennzeichnen — verschwindet aus Liste und Statistik'}
+                          /* Als KNOPF erkennbar (Martin, 05.09.2026: „wie kann ich einen Lead
+                             als Testlead manuell markieren?" — das nackte Wort „Test" las sich
+                             wie eine Beschriftung, nicht wie eine Aktion). */
+                          className={`shrink-0 whitespace-nowrap rounded-md border px-2.5 py-1 text-xs font-medium transition-colors disabled:opacity-50 ${
+                            lead.ist_test
+                              ? 'border-[#C4B59B] bg-[#F5EFE6] text-[#5C4A32] hover:bg-[#EDE4D6]'
+                              : 'border-gray-200 bg-white text-gray-500 hover:border-gray-300 hover:text-gray-800'
+                          }`}
+                          >
+                            {markiere === lead.id ? '…' : lead.ist_test ? '↩ Kein Test' : 'Als Test'}
+                          </button>
+                        <Link
+                          href={`/admin/leads/${lead.id}`}
+                          className="text-[#5C4A32] hover:text-[#7D6850] text-sm font-medium inline-flex items-center gap-1"
+                        >
+                          Details
+                          <ExternalLink className="w-3 h-3" />
+                        </Link>
+                      </div>
                     </td>
                   </tr>
                 ))

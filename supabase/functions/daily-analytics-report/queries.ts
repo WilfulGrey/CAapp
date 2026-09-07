@@ -8,6 +8,25 @@ import { type SupabaseClient } from "npm:@supabase/supabase-js@2.57.4";
 // Wendet sich auf vorname / nachname / email an, damit interne QA-Submits
 // (z.B. m.kepinski+test...@mamamia.app, *example.com, *mailinator.com) nicht
 // die echten Conversion-Zahlen verfälschen.
+/**
+ * Einkaufspreis je Portal, NETTO in Euro (Martin, 05.09.2026).
+ *
+ * Eine Stelle — hier aendern genuegt. Portale ohne Eintrag werden gezaehlt,
+ * kosten in der Rechnung aber 0 und tauchen in `portaleOhnePreis` auf, damit
+ * ein fehlender Preis auffaellt statt die Kosten still zu druecken.
+ */
+export const PORTAL_PREISE: Record<string, number> = {
+  "pflegehilfe.org": 37,
+  "pflege-helfer24.de": 50,
+};
+
+/** "portal:pflegehilfe.org" → 37 (0, wenn der Preis fehlt). */
+export function portalPreis(source: string | null | undefined): number {
+  const s = String(source ?? "").toLowerCase();
+  if (!s.startsWith("portal:")) return 0;
+  return PORTAL_PREISE[s.slice("portal:".length)] ?? 0;
+}
+
 export function isRealLead(lead: { vorname?: string | null; nachname?: string | null; email?: string | null } | null | undefined): boolean {
   if (!lead) return false;
   const v = (lead.vorname ?? "").toLowerCase();
@@ -31,6 +50,18 @@ export interface DailyStats {
    *  als Brücke zwischen "Step 9 viewed" und "echte Leads" gebraucht,
    *  damit der Test-Split sichtbar ist und 15 → 2 nicht magisch wirkt. */
   wizardCompletedIncludingTests: number;
+  /** Davon selbst erzeugt (Formular/Chat) — die Zahl, an der Werbung gemessen wird. */
+  leadsEigene: number;
+  /** Davon eingekauft (`source` = "portal:…"). */
+  leadsEingekauft: number;
+  /** Patientenprofile aus eigenen Leads. */
+  profileEigene: number;
+  /** Patientenprofile aus eingekauften Leads. */
+  profileEingekauft: number;
+  /** Einkaufskosten des Tages, netto in Euro (Summe der Portalpreise). */
+  kostenEingekauft: number;
+  /** Portale ohne hinterlegten Preis — Hinweis statt stiller Null. */
+  portaleOhnePreis: string[];
   patientDataSaved: number;    // lead_events.patient_data_saved
   caregiverInvited: number;    // lead_events.caregiver_invited
   interestShown: number;       // lead_events.caregiver_interest_shown
@@ -195,13 +226,30 @@ export async function fetchDailyStats(
   // echten Conversion-Zahlen nicht verfälscht.
   const { data: leadsInPeriod, error: lErr } = await supabase
     .from("leads")
-    .select("id, email, vorname, nachname, source")
+    .select("id, email, vorname, nachname, source, ist_test")
     .gte("created_at", start)
     .lt("created_at", end);
   if (lErr) throw new Error(`leads: ${lErr.message}`);
   const wizardCompletedIncludingTests = leadsInPeriod?.length ?? 0;
-  const echteLeads = (leadsInPeriod ?? []).filter(isRealLead);
+  /* Testleads: seit 05.09.2026 entscheidet das ausdrueckliche Kennzeichen
+     `leads.ist_test` (im Admin setzbar und zuruecknehmbar). isRealLead() bleibt
+     als Netz fuer Altbestand ohne Kennzeichen — es RAET am Namen und uebersah
+     damit z. B. E2E-Laeufe ohne das Wort "test". */
+  const echteLeads = (leadsInPeriod ?? []).filter((l) => !(l as { ist_test?: boolean }).ist_test && isRealLead(l));
   const wizardCompleted = echteLeads.length;
+
+  /* Eingekaufte Leads getrennt ausweisen (Martin, 05.09.2026: „wir kaufen ja
+     leads ein, daher muessen wir die eingekauften trennen … wir muessen fuer
+     unsere zahlen wissen, wie viele von uns und wie viele eingekaufte").
+
+     Eingekauft = `source` beginnt mit "portal:" (pflegehilfe.org, pflegebund.eu).
+     Der Unterschied ist nicht kosmetisch: Werbeausgaben erzeugen ausschliesslich
+     EIGENE Leads. Wer die eingekauften mitzaehlt, rechnet sich die Kosten je
+     Lead zu guenstig. */
+  const istEingekauft = (l: unknown) =>
+    String((l as { source?: string | null }).source ?? "").toLowerCase().startsWith("portal:");
+  const leadsEingekauft = echteLeads.filter(istEingekauft).length;
+  const leadsEigene = wizardCompleted - leadsEingekauft;
 
   // Herkunft NUR aus echten Leads — sonst färben Test-Anfragen den Split.
   const leadsBySource: Record<string, number> = {};
@@ -213,10 +261,55 @@ export async function fetchDailyStats(
   // 4) Lead-Events pro Typ
   const { data: leadEvents, error: leErr } = await supabase
     .from("lead_events")
-    .select("event_type")
+    .select("event_type, lead_id")
     .gte("created_at", start)
     .lt("created_at", end);
   if (leErr) throw new Error(`lead_events: ${leErr.message}`);
+
+  /* Profile nach Herkunft trennen (Martin, 05.09.2026: „natuerlich auch je
+     profil — auf diese beiden bereiche"). Ein Profil-Ereignis kann zu einem
+     Lead von FRUEHER gehoeren, deshalb werden die Quellen zu den Ereignis-Leads
+     nachgeschlagen statt aus den Leads des Tages abgeleitet. */
+  const profilLeadIds = Array.from(new Set(
+    (leadEvents ?? [])
+      .filter((le) => (le as { event_type?: string }).event_type === "patient_data_saved")
+      .map((le) => (le as { lead_id?: string | null }).lead_id)
+      .filter((id): id is string => Boolean(id)),
+  ));
+  let profileEigene = 0;
+  let profileEingekauft = 0;
+  if (profilLeadIds.length > 0) {
+    const { data: profilLeads } = await supabase
+      .from("leads")
+      .select("id, source")
+      .in("id", profilLeadIds);
+    const quelleJeLead = new Map<string, string>(
+      (profilLeads ?? []).map((l) => [
+        String((l as { id: string }).id),
+        String((l as { source?: string | null }).source ?? ""),
+      ]),
+    );
+    for (const le of leadEvents ?? []) {
+      if ((le as { event_type?: string }).event_type !== "patient_data_saved") continue;
+      const id = (le as { lead_id?: string | null }).lead_id;
+      const quelle = id ? (quelleJeLead.get(String(id)) ?? "") : "";
+      if (quelle.toLowerCase().startsWith("portal:")) profileEingekauft++;
+      else profileEigene++;
+    }
+  }
+
+  /* Einkaufskosten des Tages: Preis je eingekauftem Lead, summiert. Portale
+     ohne hinterlegten Preis landen in `portaleOhnePreis` — ein fehlender Preis
+     soll auffallen, nicht die Kosten still druecken. */
+  let kostenEingekauft = 0;
+  const portaleOhnePreis = new Set<string>();
+  for (const l of echteLeads) {
+    const quelle = String((l as { source?: string | null }).source ?? "");
+    if (!quelle.toLowerCase().startsWith("portal:")) continue;
+    const preis = portalPreis(quelle);
+    if (preis > 0) kostenEingekauft += preis;
+    else portaleOhnePreis.add(quelle.slice("portal:".length));
+  }
 
   let patientDataSaved = 0;
   let caregiverInvited = 0;
@@ -237,6 +330,12 @@ export async function fetchDailyStats(
     wizardStarted,
     wizardCompleted,
     wizardCompletedIncludingTests,
+    leadsEigene,
+    leadsEingekauft,
+    profileEigene,
+    profileEingekauft,
+    kostenEingekauft,
+    portaleOhnePreis: [...portaleOhnePreis],
     patientDataSaved,
     caregiverInvited,
     interestShown,
@@ -264,11 +363,22 @@ export async function fetchDailyStats(
 export interface PeriodStat { avg: number; top: number; topDate: string }
 export interface PeriodSums {
   wizardCompleted: number;
+  /** Davon selbst erzeugt — Bezugsgroesse fuer Kosten je Lead. */
+  leadsEigene: number;
+  /** Davon eingekauft (portal:…). */
+  leadsEingekauft: number;
   patientDataSaved: number;
+  /** Profile aus eigenen bzw. eingekauften Leads. */
+  profileEigene: number;
+  profileEingekauft: number;
+  /** Einkaufskosten der Periode, netto in Euro. */
+  kostenEingekauft: number;
 }
 export interface PeriodStats {
   /** Perioden-SUMMEN (nicht Ø) — für Kosten-je-Stück-Rechnungen (Ads). */
   sums: PeriodSums;
+  /** Wie viele Tage die Periode umfasst — fuer Ø aus Summen. */
+  tage: number;
   visitors: PeriodStat;
   wizardStarted: PeriodStat;
   wizardCompleted: PeriodStat;
@@ -326,6 +436,11 @@ export async function fetchPeriodStats(
 
   const visitorsSum = sumOf((s) => s.visitors);
   const wizardCompletedSum = sumOf((s) => s.wizardCompleted);
+  const leadsEigeneSum = sumOf((s) => s.leadsEigene ?? 0);
+  const leadsEingekauftSum = sumOf((s) => s.leadsEingekauft ?? 0);
+  const profileEigeneSum = sumOf((s) => s.profileEigene ?? 0);
+  const profileEingekauftSum = sumOf((s) => s.profileEingekauft ?? 0);
+  const kostenEingekauftSum = sumOf((s) => s.kostenEingekauft ?? 0);
   const patientDataSavedSum = sumOf((s) => s.patientDataSaved);
   const caregiverInvitedSum = sumOf((s) => s.caregiverInvited);
   const applicationReceivedSum = sumOf((s) => s.applicationReceived);
@@ -343,7 +458,16 @@ export async function fetchPeriodStats(
   }
 
   return {
-    sums: { wizardCompleted: wizardCompletedSum, patientDataSaved: patientDataSavedSum },
+    sums: {
+      wizardCompleted: wizardCompletedSum,
+      leadsEigene: leadsEigeneSum,
+      leadsEingekauft: leadsEingekauftSum,
+      patientDataSaved: patientDataSavedSum,
+      profileEigene: profileEigeneSum,
+      profileEingekauft: profileEingekauftSum,
+      kostenEingekauft: kostenEingekauftSum,
+    },
+    tage: perDay.length,
     visitors: aggregate((s) => s.visitors),
     wizardStarted: aggregate((s) => s.wizardStarted),
     wizardCompleted: aggregate((s) => s.wizardCompleted),
@@ -547,13 +671,26 @@ export async function fetchAdsSpend(
    Reife-Vorbehalt: die jüngsten ein bis zwei Tage können nur noch wachsen —
    wer gestern Abend kam, füllt sein Profil vielleicht heute. Die Balken der
    letzten Tage sind also Mindestwerte, nie Endstände. */
+/**
+ * Kam die Sitzung über eine Anzeige?
+ *
+ * Zwei Wege, weil Google Ads beide benutzt: die manuelle UTM-Kennzeichnung
+ * (`utm_medium=cpc`) und das automatische Tagging, das nur eine Klick-ID setzt
+ * (`gclid`, bei iOS/Web-to-App `wbraid`/`gbraid`). Wer nur auf „cpc" prüft,
+ * zählt Klick-ID-Besucher zu den organischen.
+ */
+export function istAusAds(s: Record<string, unknown>): boolean {
+  if (String(s.utm_medium ?? "") === "cpc") return true;
+  return ["gclid", "wbraid", "gbraid"].some((k) => String(s[k] ?? "").trim() !== "");
+}
+
 export interface BesucherKohorte {
   /** TT.MM. — Anzeigelabel */
   label: string;
   /** YYYY-MM-DD (Berlin) */
   iso: string;
   besucher: number;
-  /** davon über Anzeigen (utm_medium = 'cpc') */
+  /** davon über Anzeigen (utm_medium = 'cpc' ODER Google-Klick-ID) */
   ausAds: number;
 }
 
@@ -590,7 +727,7 @@ export async function fetchBesucherKohorten(
   for (let von = 0; ; von += SEITE) {
     const { data, error } = await supabase
       .from("analytics_sessions")
-      .select("fingerprint, landing_page, utm_medium, started_at")
+      .select("fingerprint, landing_page, utm_medium, gclid, wbraid, gbraid, started_at")
       .gte("started_at", aeltester.start)
       .lt("started_at", juengster.end)
       .range(von, von + SEITE - 1);
@@ -622,7 +759,12 @@ export async function fetchBesucherKohorten(
     const k = nachIso.get(iso);
     if (!k) continue;
     k.besucher++;
-    if ((s as any).utm_medium === "cpc") k.ausAds++;
+    /* Anzeige erkannt an utm_medium=cpc ODER an einer Google-Klick-ID
+         (gclid/wbraid/gbraid). Das automatische Tagging von Google Ads setzt
+         die Klick-ID, aber nicht zwingend utm_medium — gemessen am 06.09.2026
+         kamen so 9 von 728 Ads-Sitzungen ohne „cpc" an und galten faelschlich
+         als organisch. */
+      if (istAusAds(s as Record<string, unknown>)) k.ausAds++;
   }
   return tage;
 }

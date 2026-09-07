@@ -18,6 +18,8 @@ import type { DailyStats, PeriodStats } from "../queries.ts";
 
 const tag = (over: Partial<DailyStats> = {}): DailyStats => ({
   visitors: 50, wizardStarted: 10, wizardCompleted: 5, wizardCompletedIncludingTests: 5,
+  leadsEigene: 5, leadsEingekauft: 0, profileEigene: 1, profileEingekauft: 0,
+  kostenEingekauft: 0, portaleOhnePreis: [],
   patientDataSaved: 1, caregiverInvited: 0, interestShown: 0, applicationReceived: 0,
   bookings: 0, deviceMobile: 40, deviceDesktop: 8, deviceTablet: 2,
   sourceDirect: 10, sourceReferral: 40, funnelStepViewed: {}, wizardOpenedBySource: {},
@@ -25,7 +27,8 @@ const tag = (over: Partial<DailyStats> = {}): DailyStats => ({
 });
 const stat = (avg: number) => ({ avg, top: avg, topDate: "31.08." });
 const periode = (leadsBySource: Record<string, number>): PeriodStats => ({
-  sums: { wizardCompleted: 33, patientDataSaved: 12 },
+  sums: { wizardCompleted: 33, leadsEigene: 30, leadsEingekauft: 3, patientDataSaved: 12, profileEigene: 11, profileEingekauft: 1, kostenEingekauft: 111 },
+  tage: 7,
   visitors: stat(60), wizardStarted: stat(10), wizardCompleted: stat(5),
   patientDataSaved: stat(1.7), caregiverInvited: stat(0), interestShown: stat(0),
   applicationReceived: stat(0), bookings: stat(0),
@@ -162,4 +165,112 @@ Deno.test("Besucher je Tag — ohne Daten entfällt das Diagramm", () => {
   assertStringIncludes(mit.html, "Besucher je Tag");
   const ohne = bauen({});
   assert(!ohne.html.includes("Besucher je Tag"), "leeres Diagramm steht im Weg");
+});
+
+/* Eingekaufte Leads getrennt ausweisen (Martin, 05.09.2026: „wir kaufen ja leads
+   ein … wir muessen fuer unsere zahlen wissen, wie viele von uns und wie viele
+   eingekaufte"). */
+Deno.test("Bericht trennt eigene von eingekauften Leads", () => {
+  const html = bauen({ yesterday: tag({ wizardCompleted: 7, leadsEigene: 4, leadsEingekauft: 3 }) }).html;
+  // Leads-Kachel: statt des 7-Tage-Schnitts steht dort die Aufteilung.
+  assertStringIncludes(html, "4 eigene");
+  assertStringIncludes(html, "3 eingekauft");
+  // Und im Tagesfazit im Klartext.
+  assertStringIncludes(html, "davon 4 eigene, 3 eingekauft");
+});
+
+Deno.test("ohne eingekaufte Leads bleibt das Fazit schlank", () => {
+  const html = bauen({ yesterday: tag({ wizardCompleted: 5, leadsEigene: 5, leadsEingekauft: 0 }) }).html;
+  assert(!html.includes("eingekauft</"), "kein Zusatz im Fazit, wenn nichts eingekauft wurde");
+});
+
+Deno.test("Kosten je Lead rechnen mit den EIGENEN Leads", () => {
+  /* Werbung erzeugt keine Portal-Leads. Wuerde die Rechnung sie mitzaehlen,
+     saehen die Kosten je Lead guenstiger aus, als sie sind. */
+  const html = bauen({
+    yesterday: tag({ wizardCompleted: 10, leadsEigene: 4, leadsEingekauft: 6 }),
+    adsSpend: { yesterday: 80, period: 560, periodDays: 7 },
+  }).html;
+  /* Genau in der Gruppe „Eigene Leads" pruefen, nicht im ganzen Dokument:
+     „8,00 €" (80 ÷ 10) steht legitim als Gesamtwert in der Summenzeile. Die
+     Gruppen-Kachel muss trotzdem durch die EIGENEN Leads teilen. */
+  const gruppe = html.slice(html.indexOf("Eigene Leads (Werbung)"));
+  // In der Kachel steht die Beschriftung VOR dem Wert.
+  const kachel = gruppe.match(/>je Lead<[\s\S]{0,400}?([0-9.]*[0-9],[0-9]{2} €)/);
+  assert(kachel, 'Kachel „je Lead“ in der eigenen Gruppe fehlt');
+  assertEquals(kachel![1], "20,00 €"); // 80 ÷ 4 eigene, nicht 80 ÷ 10
+});
+
+/* Kosten nach Bereich (Martin, 05.09.2026): Werbung erzeugt nur eigene Leads,
+   Einkauf nur eingekaufte. Beides getrennt zu rechnen ist der ganze Punkt. */
+Deno.test("Kosten nach Bereich: eigene und eingekaufte getrennt je Lead und je Profil", () => {
+  const html = bauen({
+    yesterday: tag({
+      wizardCompleted: 9, leadsEigene: 4, leadsEingekauft: 5,
+      patientDataSaved: 3, profileEigene: 2, profileEingekauft: 1,
+      kostenEingekauft: 185, portaleOhnePreis: [],
+    }),
+    adsSpend: { yesterday: 80, period: 560, periodDays: 7 },
+  }).html;
+  assertStringIncludes(html, "Eigene Leads (Werbung)");
+  assertStringIncludes(html, "Eingekaufte Leads (Portale)");
+  // Werbung 80 € auf 4 eigene Leads = 20 €, auf 2 Profile = 40 €.
+  assertStringIncludes(html, "20,00 €");
+  assertStringIncludes(html, "40,00 €");
+  // Einkauf 185 € (5 × 37) auf 5 Leads = 37 €, auf 1 Profil = 185 €.
+  assertStringIncludes(html, "37,00 €");
+  assertStringIncludes(html, "185,00 €");
+  // Gesamt 265 € steht in der Summenzeile.
+  assertStringIncludes(html, "265,00 €");
+  // Die Preise stehen als Fussnote dran, damit die Rechnung nachvollziehbar ist.
+  assertStringIncludes(html, "pflegehilfe.org 37,00 €");
+  assertStringIncludes(html, "pflege-helfer24.de 50,00 €");
+});
+
+Deno.test("fehlender Portalpreis wird gemeldet statt still mit 0 gerechnet", () => {
+  const html = bauen({
+    yesterday: tag({ wizardCompleted: 3, leadsEigene: 1, leadsEingekauft: 2, kostenEingekauft: 37, portaleOhnePreis: ["pflegebund.eu"] }),
+    adsSpend: { yesterday: 20, period: 140, periodDays: 7 },
+  }).html;
+  assertStringIncludes(html, "Ohne hinterlegten Preis");
+  assertStringIncludes(html, "pflegebund.eu");
+});
+
+/* Aufraeumen (Martin, 05.09.2026: „das mit eigene lead und ads ist doppelt —
+   der dreierkasten reicht … je Profil haben wir auch schon oben"). */
+Deno.test("keine doppelten Kosten-Kacheln mehr", () => {
+  const html = bauen({
+    yesterday: tag({ wizardCompleted: 9, leadsEigene: 4, leadsEingekauft: 5, patientDataSaved: 3, profileEigene: 2, profileEingekauft: 1, kostenEingekauft: 185 }),
+    adsSpend: { yesterday: 80, period: 560, periodDays: 7 },
+  }).html;
+  // „je Lead" und „je Profil" genau einmal je Gruppe — nicht doppelt.
+  assertEquals((html.match(/>je Lead</g) ?? []).length, 2);
+  assertEquals((html.match(/>je Profil</g) ?? []).length, 2);
+  // Die alte Kachel „je Patientenprofil" (Werbung ÷ ALLE Profile) ist weg.
+  assert(!html.includes("je Patientenprofil"), "alte Kachel darf nicht mehr da sein");
+});
+
+Deno.test("je Profil rechnet je Gruppe, nicht ueber alle Profile", () => {
+  /* Der Fehler, den Martin gesehen hat: 76,40 € ÷ 3 Profile = 25,47 €, obwohl
+     nur 2 Profile aus eigenen Leads stammen (→ 38,20 €). */
+  const html = bauen({
+    yesterday: tag({ wizardCompleted: 9, leadsEigene: 4, leadsEingekauft: 5, patientDataSaved: 3, profileEigene: 2, profileEingekauft: 1, kostenEingekauft: 185 }),
+    adsSpend: { yesterday: 76.4, period: 512.3, periodDays: 7 },
+  }).html;
+  assertStringIncludes(html, "38,20 €");
+  assert(!html.includes("25,47 €"), "darf NICHT durch alle Profile teilen");
+});
+
+/* Martin, 06.09.2026: „es fehlt hier noch die kosten je Profil … mach das im
+   3. kasten einfach statt der 1,7". */
+Deno.test("Profile-Kachel zeigt die Kosten je Profil statt des Tagesschnitts", () => {
+  const html = bauen({
+    yesterday: tag({ wizardCompleted: 9, leadsEigene: 4, leadsEingekauft: 5, patientDataSaved: 3, profileEigene: 2, profileEingekauft: 1, kostenEingekauft: 185 }),
+    adsSpend: { yesterday: 76.4, period: 512.3, periodDays: 7 },
+  }).html;
+  // 261,40 € ÷ 3 Profile = 87,13 €.
+  assertStringIncludes(html, "87,13 € je Profil über alles");
+  const kachel = html.match(/>Profile gestern<[\s\S]{0,400}?<p[^>]*>([^<]+)<\/p>[\s\S]{0,200}?<p[^>]*>([^<]+)<\/p>/);
+  assert(kachel, "Profile-Kachel fehlt");
+  assert(!kachel![2].includes("Ø"), "kein Tagesschnitt mehr in der Fusszeile");
 });
