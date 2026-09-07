@@ -1,12 +1,26 @@
 // Supabase Edge Function: onboard-to-mamamia
 // POST /functions/v1/onboard-to-mamamia  body: { token: string }
 // → 200 + Set-Cookie: session=... (HttpOnly) + body: { customer_id, job_offer_id }
+//
+// Server-to-server (Bearer = service_role) zusätzlich:
+//   { token, mirror_token: true }            → Token-Spiegel auf den MM-Kunden (Registry #44)
+//   { lead_id, resync: { felder, budget? } } → Admin-Korrektur nach Mamamia (Registry #55),
+//                                              kein Session-JWT, kein Cookie.
 
 import { createClient } from "npm:@supabase/supabase-js@2.57.4";
-import { onboardLead, sessionPayloadFromResult, type OnboardSecrets, type SupabaseLike } from "./onboard.ts";
+import {
+  onboardLead,
+  RESYNC_FELDER,
+  ResyncConflictError,
+  resyncCustomerFromLead,
+  sessionPayloadFromResult,
+  type OnboardSecrets,
+  type SupabaseLike,
+} from "./onboard.ts";
 import { createSessionToken, sessionCookieHeader } from "../_shared/session.ts";
 import { corsHeaders } from "../_shared/cors.ts";
 import { isRateLimited } from "../_shared/rateLimit.ts";
+import { isServiceRoleBearer } from "../_shared/serviceRoleAuth.ts";
 
 // ─── Handler dependencies (for DI in tests) ────────────────────────────────
 
@@ -31,9 +45,15 @@ export async function handleRequest(req: Request, deps: HandlerDeps): Promise<Re
     return jsonError(405, "method not allowed", baseHeaders);
   }
 
+  // Service-role-Caller (Kostenrechner-Server: regen-Route, Admin-Resync,
+  // Empfehlungs-Cron) kommen alle vom selben Render-Egress-IP und würden sich
+  // den 5/min-Bucket mit dem Portal-Abholer teilen ⇒ für sie kein Rate-Limit.
+  // Aus dem HEADER berechnet, bevor der Body geparst ist.
+  const isServiceRole = isServiceRoleBearer(req.headers.get("authorization"), deps.secrets.supabaseServiceKey);
+
   // Rate limit — onboard is rare (per-lead first visit), 5/min enough
   const ip = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "unknown";
-  if (isRateLimited(ip, { bucketKey: "onboard", max: 5 })) {
+  if (!isServiceRole && isRateLimited(ip, { bucketKey: "onboard", max: 5 })) {
     return jsonError(429, "too many requests", baseHeaders);
   }
 
@@ -41,6 +61,9 @@ export async function handleRequest(req: Request, deps: HandlerDeps): Promise<Re
   let token: string | undefined;
   let jobId: string | undefined;
   let mirrorToken = false;
+  let leadId: string | undefined;
+  let resync: unknown;
+  let privileged = false;
   try {
     const body = await req.json();
     token = body?.token;
@@ -51,8 +74,22 @@ export async function handleRequest(req: Request, deps: HandlerDeps): Promise<Re
     // re-push the portal token onto the Mamamia customer even on a cache hit.
     // The browser omits it, so a normal portal open costs no panel calls.
     mirrorToken = body?.mirror_token === true;
+    // Registry #55 — Admin-Resync adressiert per lead_id (nie per Token).
+    leadId = typeof body?.lead_id === "string" ? body.lead_id : undefined;
+    resync = body?.resync;
+    privileged = mirrorToken || body?.lead_id !== undefined || body?.resync !== undefined;
   } catch {
     return jsonError(400, "invalid json body", baseHeaders);
+  }
+
+  // Privilegierte Flags nur hinter service_role — VOR jedem Mamamia-Call.
+  // Der Browser (Anon-Key) kann weder den Spiegel noch den Resync auslösen.
+  if (privileged && !isServiceRole) {
+    return jsonError(401, "service role required", baseHeaders);
+  }
+
+  if (leadId !== undefined) {
+    return handleResync(leadId, resync, deps, baseHeaders);
   }
 
   if (!token || typeof token !== "string") {
@@ -124,6 +161,69 @@ function jsonError(status: number, message: string, extraHeaders: Record<string,
   });
 }
 
+function json(status: number, body: unknown, extraHeaders: Record<string, string>): Response {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { ...extraHeaders, "Content-Type": "application/json" },
+  });
+}
+
+// ─── Admin-Resync (Registry #55) ───────────────────────────────────────────
+// Body { lead_id, resync: { felder: RESYNC_FELD[], budget?: number } } — nur
+// service_role (Gate oben). Antworten: 200 { customer_id, job_offer_id, resync }
+// · 400 Kontrakt/nicht onboarded · 404 Lead unbekannt · 409 >2 Patienten
+// (patient_ids) · 500 Adapter ohne fetchLeadById · 502 Mamamia-Klartext (der
+// Aufrufer ist der Admin-Server, der Fehler soll dort rot stehen).
+async function handleResync(
+  leadId: string,
+  resyncRaw: unknown,
+  deps: HandlerDeps,
+  baseHeaders: Record<string, string>,
+): Promise<Response> {
+  const r = (resyncRaw && typeof resyncRaw === "object" ? resyncRaw : {}) as { felder?: unknown; budget?: unknown };
+  const felder = Array.isArray(r.felder) ? r.felder : null;
+  const allowed = new Set<string>(RESYNC_FELDER);
+  if (!felder || !felder.every((f) => typeof f === "string" && allowed.has(f))) {
+    return jsonError(400, `resync.felder must be a subset of ${RESYNC_FELDER.join("|")}`, baseHeaders);
+  }
+  const budget = r.budget;
+  if (budget !== undefined && !(typeof budget === "number" && Number.isFinite(budget) && budget > 0)) {
+    return jsonError(400, "resync.budget must be a positive number", baseHeaders);
+  }
+  if (felder.length === 0 && budget === undefined) {
+    return jsonError(400, "resync: nothing to sync (felder empty, no budget)", baseHeaders);
+  }
+  if (!deps.supabase.fetchLeadById) {
+    return jsonError(500, "fetchLeadById not available in this adapter", baseHeaders);
+  }
+  const lead = await deps.supabase.fetchLeadById(leadId);
+  if (!lead) return jsonError(404, "lead not found", baseHeaders);
+  if (!lead.mamamia_customer_id || !lead.mamamia_job_offer_id) {
+    return jsonError(400, "not-onboarded", baseHeaders);
+  }
+  try {
+    const result = await resyncCustomerFromLead({
+      lead,
+      felder: felder as string[],
+      budget: budget as number | undefined,
+      secrets: deps.secrets,
+      fetchFn: deps.fetchFn,
+    });
+    return json(200, {
+      customer_id: lead.mamamia_customer_id,
+      job_offer_id: lead.mamamia_job_offer_id,
+      resync: result,
+    }, baseHeaders);
+  } catch (e) {
+    if (e instanceof ResyncConflictError) {
+      return json(409, { error: e.message, patient_ids: e.patientIds }, baseHeaders);
+    }
+    const msg = (e as Error).message;
+    console.error(`[onboard] resync failed lead=${leadId}:`, msg, (e as Error).stack);
+    return jsonError(502, `resync failed: ${msg}`, baseHeaders);
+  }
+}
+
 // ─── Real Supabase adapter (used in prod, not in tests) ────────────────────
 
 function makeRealSupabase(url: string, serviceKey: string): SupabaseLike {
@@ -142,6 +242,13 @@ function makeRealSupabase(url: string, serviceKey: string): SupabaseLike {
     async updateLead(id: string, patch: Record<string, unknown>) {
       const { error } = await client.from("leads").update(patch).eq("id", id);
       if (error) throw new Error(`supabase update: ${error.message}`);
+    },
+    // Registry #55 — per id, bewusst OHNE Expiry-Filter (Admin-Korrektur
+    // alter Leads; nur hinter der service_role-Bramka erreichbar).
+    async fetchLeadById(id: string) {
+      const { data, error } = await client.from("leads").select("*").eq("id", id).maybeSingle();
+      if (error) throw new Error(`supabase fetchLeadById: ${error.message}`);
+      return data;
     },
     // Registry #54 — jeden UPDATE z warunkiem = atomowy claim (Postgres
     // re-ewaluuje WHERE po zwolnieniu row-locka; drugi równoległy UPDATE

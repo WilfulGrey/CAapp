@@ -5,6 +5,15 @@ import {
   buildJobOfferTitle,
   computeArrivalDate,
   extractPlzFromLead,
+  mapCareLevel,
+  mapDrivingLicense,
+  mapGender,
+  mapGermanySkill,
+  mapLiftId,
+  mapMobilityToId,
+  mapNightOperations,
+  mapOtherPeopleInHouse,
+  mapToolIds,
 } from "./mappers.ts";
 import { getOrRefreshAgencyToken, mamamiaRequest } from "../_shared/mamamiaClient.ts";
 import { loginAsAgency, panelMutateAsCustomer } from "../_shared/mamamiaPanelClient.ts";
@@ -36,6 +45,11 @@ export interface SupabaseLike {
   // właśnie to robi (czekamy na jego wynik zamiast zakładać drugiego klienta).
   // Optional: fake bez tej metody = stare zachowanie (bez claimu).
   claimOnboarding?(leadId: string, staleBefore: string): Promise<boolean>;
+  // Registry #55 — Admin-Resync adressiert den Lead per id, NICHT per Token:
+  // die Korrektur alter Leads (Token 14 Tage) darf den Kundenlink nicht
+  // töten. Bewusst OHNE token_expires_at-Filter. Nur hinter der
+  // service_role-Bramka in index.ts erreichbar. Optional: alte Fakes.
+  fetchLeadById?(id: string): Promise<Lead | null>;
 }
 
 // Claim starszy niż to = padnięty proces (edge fn ubita w trakcie) → wolno przejąć.
@@ -517,4 +531,281 @@ export function sessionPayloadFromResult(
     lead_id: result.lead_id,
     email: result.email,
   };
+}
+
+// ─── Admin-Resync (Registry #55) ─────────────────────────────────────────────
+// Der Kostenrechner-Admin korrigiert Kalkulator-Angaben eines Leads (Fall
+// Rapp: „Ehepaar“ war eine Portal-Annahme, es ist EINE Person). Supabase ist
+// dann die Wahrheit, der Mamamia-Kunde (cache-hit, nie wieder angefasst) läuft
+// auseinander. Dieser Pfad schreibt NUR die Felder nach Mamamia, die der Admin
+// tatsächlich geändert hat (`felder`) — alles andere (Patientenbogen des
+// Kunden, Agentur-Einstellungen wie germany_skill=level_4, Wish-Freitexte)
+// bleibt unangetastet. Mamamia-Semantik, auf die hier alles aufbaut:
+//   • patients[] ist REPLACE per id — fehlende id = Patient gelöscht (der
+//     einzige Löschweg, es gibt keine DeletePatient-Mutation); Scalars eines
+//     Stubs {id, …} werden gemergt (gesendet = überschrieben, weggelassen =
+//     bleibt). tool_ids MÜSSEN je Stub zurück (gotcha #13b), equipment_ids
+//     ebenfalls (omitted ⇒ Wipe, gotcha #3).
+//   • customer_caregiver_wish ist REPLACE pro Objekt ⇒ gelesenen Wish komplett
+//     zurückreichen (ohne id/customer_id/customer, ohne null-Werte) und nur
+//     den geänderten Key überlagern.
+//   • Nicht gesendete Mutation-Args lassen den Rest unangetastet (live belegt:
+//     mamamia-proxy updateJobDescription, Customer 8506); `variables` werden
+//     daher per `if (x !== undefined)` gebaut — ein `null` würde gesendet und
+//     z. B. care_budget nullen (JSON.stringify lässt nur undefined weg).
+//   • Neue Patienten ohne id verlieren still Scalars (gotcha #4) ⇒ nach einem
+//     1→2 zweiter Pass mit der neuen id.
+
+export const RESYNC_FELDER = [
+  "betreuung_fuer",
+  "pflegegrad",
+  "mobilitaet",
+  "nachteinsaetze",
+  "weitere_personen",
+  "deutschkenntnisse",
+  "fuehrerschein",
+  "geschlecht",
+] as const;
+export type ResyncFeld = typeof RESYNC_FELDER[number];
+
+// Felder, die Patienten-Rows anfassen. Bei >2 Patienten in MM (von der
+// Agentur per Hand ergänzt) verweigern wir — wir überschreiben keinen Dritten
+// blind und kürzen keine Liste, die wir nicht kennen.
+const PER_PATIENT_FELDER: ReadonlySet<string> = new Set([
+  "betreuung_fuer", "pflegegrad", "mobilitaet", "nachteinsaetze",
+]);
+
+export class ResyncConflictError extends Error {
+  patientIds: number[];
+  constructor(patientIds: number[]) {
+    super(`Mamamia-Kunde hat ${patientIds.length} Patienten (${patientIds.join(", ")}) — Personenzahl/Patientenfelder nur im MM-Panel ändern`);
+    this.name = "ResyncConflictError";
+    this.patientIds = patientIds;
+  }
+}
+
+export interface ResyncResult {
+  patients_before: number;
+  patients_after: number;
+  removed_ids: number[];
+  felder: string[];
+}
+
+interface ResyncPatientRow {
+  id: number;
+  care_level: number | null;
+  mobility_id: number | null;
+  lift_id: number | null;
+  night_operations: string | null;
+  tools: Array<{ id: number }> | null;
+}
+
+interface ResyncReadData {
+  Customer: {
+    id: number;
+    equipments: Array<{ id: number }> | null;
+    patients: ResyncPatientRow[] | null;
+    customer_caregiver_wish: Record<string, unknown> | null;
+  } | null;
+}
+
+// Alle Keys von CaregiverWishInput (types.ts) — der Wish ist REPLACE pro
+// Objekt, ein nicht gelesener Key wäre nach dem Zurückreichen weg.
+const RESYNC_READ = /* GraphQL */ `
+  query ResyncCustomer($id: Int!) {
+    Customer(id: $id) {
+      id
+      equipments { id }
+      patients { id care_level mobility_id lift_id night_operations tools { id } }
+      customer_caregiver_wish {
+        is_open_for_all gender germany_skill alternative_germany_skill
+        driving_license driving_license_gearbox smoking shopping
+        shopping_be_done shopping_be_done_de shopping_be_done_en shopping_be_done_pl
+        tasks tasks_de tasks_en tasks_pl
+        night_operations night_operations_de night_operations_en night_operations_pl
+        other_wishes other_wishes_de other_wishes_en other_wishes_pl
+      }
+    }
+  }
+`;
+
+// Alle Variablen nullable ohne Default — nicht gesetzte werden nicht
+// mitgesendet und lassen das Feld in Mamamia unangetastet.
+const RESYNC_CUSTOMER = /* GraphQL */ `
+  mutation ResyncCustomer(
+    $id: Int
+    $patients: [PatientInputType]
+    $equipment_ids: [Int]
+    $other_people_in_house: String
+    $customer_caregiver_wish: CustomerCaregiverWishInputType
+    $care_budget: Float
+    $monthly_salary: Float
+  ) {
+    UpdateCustomer(
+      id: $id
+      patients: $patients
+      equipment_ids: $equipment_ids
+      other_people_in_house: $other_people_in_house
+      customer_caregiver_wish: $customer_caregiver_wish
+      care_budget: $care_budget
+      monthly_salary: $monthly_salary
+    ) { id customer_id }
+  }
+`;
+
+type PatientStub = Record<string, unknown> & { id?: number; tool_ids: number[] };
+
+function toolIdsOf(p: ResyncPatientRow): number[] {
+  return (p.tools ?? []).map((t) => t.id);
+}
+
+export async function resyncCustomerFromLead(args: {
+  lead: Lead;
+  felder: readonly string[];
+  budget?: number;
+  secrets: OnboardSecrets;
+  fetchFn?: typeof fetch;
+}): Promise<ResyncResult> {
+  const { lead, felder, budget, secrets, fetchFn = globalThis.fetch } = args;
+  const customerId = lead.mamamia_customer_id;
+  if (!customerId) throw new Error("lead not onboarded (no mamamia_customer_id)");
+  const fd = lead.kalkulation?.formularDaten;
+  if (!fd) throw new Error("lead has no kalkulation.formularDaten");
+  const has = (k: ResyncFeld) => felder.includes(k);
+
+  // Präsenz-Check VOR den Mappern — die defaulten still (mobility 1, care 2,
+  // night 'no', other_people 'no'); ein fehlender Wert darf nicht als
+  // „Korrektur“ nach Mamamia laufen (Święta zasada 1). pflegegrad 0 = „Keine“
+  // ist ein gültiger Wert und MUSS passieren.
+  for (const k of ["betreuung_fuer", "mobilitaet", "nachteinsaetze", "weitere_personen"] as const) {
+    if (has(k) && (fd[k] == null || fd[k] === "")) {
+      throw new Error(`formularDaten.${k} fehlt — Resync verweigert (kein Soft-Default)`);
+    }
+  }
+  if (has("pflegegrad")) {
+    const v = fd.pflegegrad;
+    if (!(typeof v === "number" && Number.isInteger(v) && v >= 0 && v <= 5)) {
+      throw new Error(`formularDaten.pflegegrad ungültig (${JSON.stringify(v)}) — Resync verweigert`);
+    }
+  }
+  if (has("deutschkenntnisse")) mapGermanySkill(fd); // wirft bei unbekanntem Wert (z. B. sehr-gut-sa)
+
+  const agencyToken = await getOrRefreshAgencyToken({
+    authEndpoint: secrets.mamamiaAuthEndpoint,
+    email: secrets.mamamiaAgencyEmail,
+    password: secrets.mamamiaAgencyPassword,
+    fetchFn,
+  });
+  const read = async () => {
+    const data = await mamamiaRequest<ResyncReadData>({
+      endpoint: secrets.mamamiaEndpoint,
+      token: agencyToken,
+      query: RESYNC_READ,
+      variables: { id: customerId },
+      fetchFn,
+    });
+    const patients = [...(data.Customer?.patients ?? [])].sort((a, b) => a.id - b.id);
+    return { data, patients };
+  };
+  const first = await read();
+  const existing = first.patients;
+  const equipmentIds = (first.data.Customer?.equipments ?? []).map((e) => e.id);
+
+  if (existing.length > 2 && felder.some((k) => PER_PATIENT_FELDER.has(k))) {
+    throw new ResyncConflictError(existing.map((p) => p.id));
+  }
+
+  // (a) Stubs aus dem Read — Liste unverändert, tools preserved.
+  let patients: PatientStub[] = existing.map((p) => ({ id: p.id, tool_ids: toolIdsOf(p) }));
+  let removed: number[] = [];
+  let clone: PatientStub | null = null;
+
+  // (b) betreuung_fuer ändert die LISTE.
+  if (has("betreuung_fuer")) {
+    const target = fd.betreuung_fuer === "ehepaar" ? 2 : 1;
+    if (target === 1 && patients.length > 1) {
+      removed = patients.slice(1).map((p) => p.id as number);
+      patients = patients.slice(0, 1);
+    } else if (target === 2 && patients.length === 1) {
+      // Klon des GELESENEN Patienten 1 (nicht aus fd — der Kunde kann p1 im
+      // Patientenbogen längst geändert haben). Nulls weglassen: für einen
+      // neuen Patienten ist „nicht gesetzt“ dasselbe wie null.
+      const p1 = existing[0];
+      clone = { tool_ids: toolIdsOf(p1) };
+      if (p1.care_level != null) clone.care_level = p1.care_level;
+      if (p1.mobility_id != null) clone.mobility_id = p1.mobility_id;
+      if (p1.lift_id != null) clone.lift_id = p1.lift_id;
+      if (p1.night_operations != null) clone.night_operations = p1.night_operations;
+      patients.push(clone);
+    } else if (patients.length === 0) {
+      throw new Error("Mamamia-Kunde hat keine Patienten — Personenzahl nicht korrigierbar");
+    }
+  }
+
+  // (c) Per-Patient-Felder auf JEDES Element der Liste aus (b).
+  // ponytail: Kalkulator kennt EINE Person, p2 erbt — wie Onboard.
+  const applyPerPatient = (p: PatientStub): PatientStub => {
+    if (has("pflegegrad")) p.care_level = mapCareLevel(fd);
+    if (has("mobilitaet")) {
+      const m = mapMobilityToId(fd);
+      p.mobility_id = m;
+      p.lift_id = mapLiftId(m);
+      p.tool_ids = mapToolIds(m);
+    }
+    if (has("nachteinsaetze")) p.night_operations = mapNightOperations(fd);
+    return p;
+  };
+  patients = patients.map(applyPerPatient);
+
+  const vars: Record<string, unknown> = { id: customerId, patients, equipment_ids: equipmentIds };
+  if (has("weitere_personen")) vars.other_people_in_house = mapOtherPeopleInHouse(fd);
+  if (has("deutschkenntnisse") || has("fuehrerschein") || has("geschlecht")) {
+    const wish: Record<string, unknown> = {};
+    for (const [k, v] of Object.entries(first.data.Customer?.customer_caregiver_wish ?? {})) {
+      if (v != null && k !== "id" && k !== "customer_id" && k !== "customer") wish[k] = v;
+    }
+    if (has("deutschkenntnisse")) wish.germany_skill = mapGermanySkill(fd);
+    if (has("fuehrerschein")) wish.driving_license = mapDrivingLicense(fd);
+    if (has("geschlecht")) wish.gender = mapGender(fd) ?? "not_important";
+    vars.customer_caregiver_wish = wish;
+  }
+  if (budget !== undefined) {
+    vars.care_budget = budget;
+    vars.monthly_salary = budget;
+  }
+
+  const mutate = (variables: Record<string, unknown>) =>
+    mamamiaRequest<{ UpdateCustomer: { id: number } }>({
+      endpoint: secrets.mamamiaEndpoint,
+      token: agencyToken,
+      query: RESYNC_CUSTOMER,
+      variables,
+      fetchFn,
+    });
+  await mutate(vars);
+
+  let after = patients.length;
+  if (clone) {
+    // Zweiter Pass (gotcha #4): der neue Patient hat jetzt eine id — Scalars
+    // erneut mit id senden, sonst fehlen night_operations & Co. still.
+    const now = (await read()).patients;
+    after = now.length;
+    const known = new Set(existing.map((p) => p.id));
+    const fresh = now.find((p) => !known.has(p.id));
+    if (fresh) {
+      const pass2: PatientStub[] = now.map((p) =>
+        known.has(p.id)
+          ? { id: p.id, tool_ids: toolIdsOf(p) }
+          : applyPerPatient({ ...clone, id: p.id, tool_ids: clone!.tool_ids })
+      );
+      await mutate({ id: customerId, patients: pass2, equipment_ids: equipmentIds });
+    } else {
+      console.warn(`[onboard] resync customer=${customerId}: zweiter Patient nach Mutation nicht sichtbar (patients=${now.length})`);
+    }
+  }
+
+  console.log(
+    `[onboard] resync customer=${customerId} felder=${felder.join(",")} patients ${existing.length}→${after} removed=${removed.join(",") || "-"} budget=${budget ?? "-"}`,
+  );
+  return { patients_before: existing.length, patients_after: after, removed_ids: removed, felder: [...felder] };
 }
