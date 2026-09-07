@@ -12,6 +12,7 @@ export const KOSTENRECHNER_URL =
 
 export type LeadEvent =
   | 'portal_opened'
+  | 'portal_reopened'             // JEDES Öffnen (auch aus Mails) — Server dedupliziert es nicht; reine Messung (07.09.2026)
   | 'patient_data_saved'
   | 'caregiver_invited'
   | 'caregiver_declined'           // customer hat eine Pflegekraft abgelehnt (matching ODER interest)
@@ -45,6 +46,9 @@ export interface LeadEventMetadata {
   // portal_opened: Quell-Markierung aus dem Mail-Link (?m=pn1|pn2|pn3|wp) —
   // ordnet den Portal-Besuch der auslösenden Nachfass-Mail zu (14.08.).
   mail_source?: string;
+  // portal_reopened: Referrer-Host (z. B. mail.google.com) — belegt Rückkehr aus
+  // einer Mail, wenn kein ?m= im Link steckt. Ohne Referrer (iOS-Mail) fehlt es.
+  referrer?: string;
   // patient_form_step: erreichter Schritt (0-basiert); patient_form_save_failed: Fehlertext.
   step?: number;
   error?: string;

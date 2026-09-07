@@ -36,6 +36,9 @@ const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
 
 const ALLOWED_EVENTS = [
   'portal_opened',
+  // Jedes Öffnen des Portals (auch aus Mails) — nicht dedupliziert, keine Mail,
+  // kein Nachfass-Zweig. Misst die Rückkehr über Mail-Links (07.09.2026).
+  'portal_reopened',
   'patient_data_saved',
   // Patientenbogen-Diagnose (2026-07-08): Schritt erreicht + Save-Fehler —
   // reine Analyse-Events, KEINE Team-Mail/Nachfass-Verzweigung.
@@ -128,6 +131,7 @@ const ACCEPT_TEAM_NOTIFY_EXTRA_BCC =
 // (falls eine Mail dranhängt) eine Mail. Mehrere Pflegekräfte können Interesse
 // zeigen, mehrere Bewerbungen können auf einen Lead landen.
 const NON_DEDUPED_EVENTS = new Set([
+  'portal_reopened',             // jedes Öffnen zählt — Mail-Rückkehrer messen (07.09.2026)
   'caregiver_invited',
   'caregiver_interest_shown',
   'caregiver_declined',

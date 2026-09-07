@@ -59,6 +59,17 @@ describe('reportLeadEvent', () => {
     expect(bodyOf(1).metadata).toEqual({ caregiver_id: 200, caregiver_name: 'B' });
   });
 
+  it('sends portal_reopened with mail_source and referrer once per session (server does not dedupe it)', () => {
+    reportLeadEvent('tok-1', 'portal_reopened', { mail_source: 'pn1', referrer: 'mail.google.com' });
+    reportLeadEvent('tok-1', 'portal_reopened', { mail_source: 'pn1', referrer: 'mail.google.com' }); // re-render
+    expect(calls()).toHaveLength(1);
+    expect(bodyOf(0)).toEqual({
+      token: 'tok-1',
+      event: 'portal_reopened',
+      metadata: { mail_source: 'pn1', referrer: 'mail.google.com' },
+    });
+  });
+
   it('omits the metadata field when no metadata is given', () => {
     reportLeadEvent('tok-1', 'portal_opened');
     expect(bodyOf(0)).not.toHaveProperty('metadata');
