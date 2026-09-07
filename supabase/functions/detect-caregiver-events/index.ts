@@ -27,6 +27,7 @@ import {
   type AcceptanceRow,
   syncAcceptance,
 } from "../_shared/acceptanceSync.ts";
+import { requireEnv } from "../_shared/env.ts";
 import {
   type ApplicationNode,
   type CaregiverNode,
@@ -1677,14 +1678,17 @@ function extractCaregiverId(metadata: unknown): number | null {
 // ─── Deno.serve bootstrap ──────────────────────────────────────────────────
 
 if (import.meta.main) {
+  // Fail-fast statt Soft-Fallback (Święta zasada 1, Registry #52): der alte
+  // Default auf die Prod-URL hätte auf Staging Alarme an die falsche Bridge
+  // geschickt; fehlt ein Secret, soll die Function beim Boot laut sterben.
   const secrets: DetectSecrets = {
-    supabaseUrl: Deno.env.get("SUPABASE_URL")!,
-    supabaseServiceKey: Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
-    mamamiaEndpoint: Deno.env.get("MAMAMIA_ENDPOINT")!,
-    mamamiaAuthEndpoint: Deno.env.get("MAMAMIA_AUTH_ENDPOINT")!,
-    mamamiaAgencyEmail: Deno.env.get("MAMAMIA_AGENCY_EMAIL")!,
-    mamamiaAgencyPassword: Deno.env.get("MAMAMIA_AGENCY_PASSWORD")!,
-    kostenrechnerUrl: Deno.env.get("KOSTENRECHNER_URL") ?? "https://kostenrechner.primundus.de",
+    supabaseUrl: requireEnv("SUPABASE_URL"),
+    supabaseServiceKey: requireEnv("SUPABASE_SERVICE_ROLE_KEY"),
+    mamamiaEndpoint: requireEnv("MAMAMIA_ENDPOINT"),
+    mamamiaAuthEndpoint: requireEnv("MAMAMIA_AUTH_ENDPOINT"),
+    mamamiaAgencyEmail: requireEnv("MAMAMIA_AGENCY_EMAIL"),
+    mamamiaAgencyPassword: requireEnv("MAMAMIA_AGENCY_PASSWORD"),
+    kostenrechnerUrl: requireEnv("KOSTENRECHNER_URL"),
   };
 
   const deps: HandlerDeps = {

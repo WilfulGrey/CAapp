@@ -8,7 +8,7 @@ import { Check, Info, X } from 'lucide-react';
 const FEIERTAGE_LIST = 'Karfreitag, Ostersonntag, Ostermontag, 1. Mai, Heiligabend, 1. + 2. Weihnachtstag, Silvester, Neujahr';
 import type { Nurse } from '../../types';
 import type { Application } from './shared';
-import { displayName, initials, nurseLevel, nurseFacts } from './shared';
+import { displayName, initials, nurseLevel, nurseFacts, isEmail } from './shared';
 import { VertragSignieren, type VertragsDaten } from './VertragSignieren';
 import {
   parseDeDate,
@@ -187,9 +187,17 @@ export const AngebotPruefenModal: FC<{
   // Seite 1 (Daten) ist vollständig → weiter zum Vertrag erlaubt. Auftraggeber-
   // Name nur dann Pflicht, wenn er abweichend vom Leistungsempfänger ist.
   const agComplete = agGleich || (agVorname.trim() !== '' && agNachname.trim() !== '');
+  // E-Mails: leer ODER gültig (Registry #52 — „x@t-online.de@t-online.de" ging
+  // durch, Mamamia lehnte den Vertrag-Sync ab). KP-Mail ist Pflicht.
+  const emailOk = (v: string) => v.trim() === '' || isEmail(v);
   const canProceed = vorname.trim() !== '' && nachname.trim() !== '' && strasse.trim() !== '' && einsatzort.trim() !== ''
     && agComplete
-    && kpVorname.trim() !== '' && kpNachname.trim() !== '' && kpTelefon.trim() !== '' && kpEmail.trim() !== '';
+    && kpVorname.trim() !== '' && kpNachname.trim() !== '' && kpTelefon.trim() !== '' && isEmail(kpEmail)
+    && emailOk(email) && (agGleich || emailOk(agEmail));
+  // Hinweis erst nach Verlassen des Feldes — nicht schon bei „max@" mitten im Tippen.
+  const [emailTouched, setEmailTouched] = useState<Record<string, boolean>>({});
+  const touch = (k: string) => () => setEmailTouched((t) => ({ ...t, [k]: true }));
+  const emailHint = (k: string, v: string) => emailTouched[k] && !emailOk(v) && <p className="mt-1 text-xs text-red-600">Bitte eine gültige E-Mail-Adresse eingeben.</p>;
 
   const tagessatz = Math.round(offer.monatlicheKosten / 30);
 
@@ -415,7 +423,8 @@ export const AngebotPruefenModal: FC<{
                       </div>
                       <div>
                         <label className={labelCls}>E-Mail</label>
-                        <input value={email} onChange={e => setEmail(e.target.value)} placeholder="Bitte eingeben" className={inputCls} />
+                        <input value={email} onChange={e => setEmail(e.target.value)} onBlur={touch('email')} placeholder="Bitte eingeben" type="email" className={inputCls} />
+                        {emailHint('email', email)}
                       </div>
                     </div>
                   </div>
@@ -465,7 +474,8 @@ export const AngebotPruefenModal: FC<{
                         </div>
                         <div>
                           <label className={labelCls}>E-Mail</label>
-                          <input value={agEmail} onChange={e => setAgEmail(e.target.value)} placeholder="Bitte eingeben" className={inputCls} />
+                          <input value={agEmail} onChange={e => setAgEmail(e.target.value)} onBlur={touch('agEmail')} placeholder="Bitte eingeben" type="email" className={inputCls} />
+                        {emailHint('agEmail', agEmail)}
                         </div>
                       </div>
                     </div>
@@ -499,7 +509,8 @@ export const AngebotPruefenModal: FC<{
                       </div>
                       <div>
                         <label className={labelCls}>E-Mail *</label>
-                        <input value={kpEmail} onChange={e => setKpEmail(e.target.value)} placeholder="Bitte eingeben" className={inputCls} />
+                        <input value={kpEmail} onChange={e => setKpEmail(e.target.value)} onBlur={touch('kpEmail')} placeholder="Bitte eingeben" type="email" className={inputCls} />
+                        {emailHint('kpEmail', kpEmail)}
                       </div>
                     </div>
                   </div>

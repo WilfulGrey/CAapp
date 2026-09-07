@@ -38,6 +38,14 @@ Edge sync-acceptance → _shared/acceptanceSync.ts (współdzielony z cronem):
                        NIGDY singular customer_contract (pierwszy wiersz plurala
                        = patient_contact ⇒ AG lądowałby w slocie pacjenta).
                        + preserve equipments + non-empty patients-stuby
+                       **BEST-EFFORT od Registry #52 (2026-09-07):** Laravel-
+                       Validation (`extensions.validation`, np. zła E-Mail) NIE
+                       blokuje bookingu — `result.customer_update_error`, sekwencja
+                       idzie do kroku 2 / adopcji; każdy inny błąd = throw (retry).
+                       E-Mail spoza formatu → `null` + `contact_fields_dropped`
+                       (nigdy po cichu). Krok 1 re-runuje się w każdej stufie/
+                       cronie do uploadu PDF i NADPISUJE ręczne edycje tych rows
+                       w panelu (MM REPLACES listy).
   2. StoreConfirmation — akcept aplikacji (contract_patient/contract_contact,
                        mapowanie niemieckie→Mamamia SERVER-SIDE: SALUTATION
                        enum Mr./Mrs. [Fall Diesmann], split einsatzort)
@@ -97,6 +105,7 @@ audit-row w `lead_events`).
 | j.w., ale proces edge zginął zanim chain skończył | próg **5 min** od akceptu (niezależny bezpiecznik) | cron → ten sam POST (source `cron`); błąd maila ⇒ 502 ⇒ re-alarm za 15 min |
 | Confirm OK, **tylko PDF-upload** niedomknięty | po **24h** (archiwum, zero ryzyka klienta — bramka final_confirmation potrzebuje z natury drugiego przebiegu; chain zwykle domyka go w ≤2 min) | cron, ten sam kanał |
 | Wiersz naprawiony w tym samym przebiegu crona / stufie chaina | **bez alarmu** (alarm ocenia stan PO retry, nie sprzed) | — |
+| Krok 1 (kontakt-rows) odrzucony przez walidację MM LUB e-mail z formularza wyrzucony (`contact_fields_dropped`) — booking NIE dotknięty (Registry #52) | po CAŁEJ sekwencji (`finally` w `syncAcceptance`, timeout 5 s), pomijany gdy confirm permanent (czerwony już niesie błąd) | edge → POST **`acceptance_contact_alarm`** (ŻÓŁTY team-mail „Kontaktdaten nicht in Mamamia übernommen" + rohwerte); bridge dedupuje po `lead_events`+`application_id`, mail PRZED insertem; **bez** stempla `mamamia_sync_alerted_at` |
 
 Stałe: `RETRY_DELAYS_MS = [15s, 30s, 60s]` (`sync-acceptance/index.ts`);
 `ACCEPTANCE_CONFIRM_ALERT_AFTER_MS = 5 min`, `ACCEPTANCE_PDF_ALERT_AFTER_MS = 24h`
@@ -168,6 +177,19 @@ Next.js i wywalał kontener Render (512 MB) OOM-em. Kluczowe fakty:
 
 ## Otwarte (świadomie poza — wymagałoby zmian we froncie, tylko za osobnym OK Michała)
 
+- **Pętla crona przy PERMANENTNYM błędzie StoreConfirmation** (pre-existing, Registry #52):
+  wiersz z `signatur` i `confirmed IS NULL` jest retryowany co 15 min przez 30 dni, a krok 1
+  nadpisuje przy tym kontakt-rows klienta w panelu. Prosty „skip" psuje adopcję po ręcznym
+  bookingu teamu (Kopka) i re-alarm — właściwy projekt: tryb **adoption-only** (tylko read
+  `final_confirmation` → stamp → PDF; bez kroku 1 i bez StoreConfirmation) + stop TYLKO po
+  `extensions.validation` i TYLKO po udanym alarmie; do tego guard statusu Bewerbung przed
+  StoreConfirmation (co robi MM przy `rejected`? — brak dowodu; dziś: wiersz akceptu dla
+  odrzuconej aplikacji się USUWA).
+- **Cache tokena agencji** (`mamamiaClient.ts`) nie jest invalidowany po `Unauthenticated`.
+- Czerwony template alarmu nie rozróżnia „walidacja" od „Bewerbung zurückgezogen"
+  (flaga `validation` w `confirm_error` — propagacja w 3 miejscach).
+- `acceptance_sync_alarm` jest NON_DEDUPED i autoryzowany tokenem klienta (spam-wektor).
+
 - Utrwalanie checkboxów zgód + Ort podpisu (kolumny `consent_read/consent_widerruf/signed_ort`
   czekają puste — przeglądarka je dziś wyrzuca).
 - Dyskretne pola AG w metadata (dziś composed w snapshot → split heurystyczny nazwiska).
@@ -176,8 +198,11 @@ Next.js i wywalał kontener Render (512 MB) OOM-em. Kluczowe fakty:
 ## Sekrety / env
 
 - `sync-acceptance` (edge): `SUPABASE_URL/SERVICE_ROLE_KEY`, `MAMAMIA_ENDPOINT/AUTH_ENDPOINT/
-  AGENCY_EMAIL/AGENCY_PASSWORD`, `KOSTENRECHNER_URL` — wszystkie istnieją już per-env
-  (te same co detect-caregiver-events). Auth wywołania: `Authorization: Bearer <SERVICE_ROLE_KEY>`
+  AGENCY_EMAIL/AGENCY_PASSWORD`, `KOSTENRECHNER_URL` — te same co detect-caregiver-events.
+  **`KOSTENRECHNER_URL` brakował na prodzie do 09/2026** (Registry #52: retry-chain-alarm
+  umierał na `undefined.replace`); od tego czasu bootstrap obu fn robi `requireEnv()` —
+  brak sekretu = funkcja nie startuje. Wartość per env: prod `https://kostenrechner.primundus.de`,
+  staging `https://kostenrechner-staging.onrender.com`. Auth wywołania: `Authorization: Bearer <SERVICE_ROLE_KEY>`
   (constant-time compare) — WYŁĄCZNIE server-to-server (bridge/cron), nigdy z przeglądarki.
 - CI deployuje `sync-acceptance` na staging (pętla w `test.yml`); prod manualnie
   (`supabase functions deploy sync-acceptance --project-ref ycdwtrklpoqprabtwahi`).

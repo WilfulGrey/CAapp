@@ -79,6 +79,15 @@ const ALLOWED_EVENTS = [
   // detect-caregiver-events-Cron; TEAM-MAIL-ONLY — nie in
   // GET_PUBLIC_EVENT_TYPES, keine Kundenmail. Audit-Row in lead_events.
   'acceptance_sync_alarm',
+  // Registry #52: Schritt 1 des Syncs (Kontakt-Rows LE/AG/KP) von Mamamia per
+  // Validation abgelehnt ODER eine unbrauchbare E-Mail verworfen — die Buchung
+  // läuft trotzdem, aber im Panel fehlen Kontaktdaten. Gelber Team-Hinweis,
+  // gesendet aus _shared/acceptanceSync.ts (Bridge-T+0, Retry-Chain, Cron —
+  // ein Ort). Dedupe HIER pro application_id über lead_events, Mail VOR dem
+  // Insert (Registry #47: sonst frisst ein fehlgeschlagener Mailversand den
+  // Alarm für immer). Kein Stempel mamamia_sync_alerted_at (gehört dem roten
+  // Buchungs-Alarm). TEAM-MAIL-ONLY.
+  'acceptance_contact_alarm',
 ];
 const TEAM_NOTIFY_EVENTS = [
   'patient_data_saved',
@@ -169,6 +178,61 @@ interface AcceptanceAlarmInfo {
   error?: string | null;
   age_minutes?: number | null;
   source: 'bridge' | 'cron' | 'sync-retry' | string;
+}
+
+interface ContactAlarmInfo {
+  application_id: number | string;
+  caregiver_id?: number | string | null;
+  error?: string | null;
+  dropped: string[];
+  dropped_values: Record<string, string>;
+  confirmed: boolean;
+}
+
+// Gelber Hinweis (Registry #52): Buchung steht (oder läuft), aber die
+// Kontakt-Rows aus dem Vertragsformular sind NICHT in Mamamia gelandet.
+function buildAcceptanceContactAlarmTemplate(lead: any, info: ContactAlarmInfo): EmailTemplate {
+  const kunde = [lead.vorname, lead.nachname].filter(Boolean).join(' ') || lead.email || lead.id;
+  const subject = `⚠️ Kontaktdaten nicht in Mamamia übernommen — ${kunde} (Bewerbung ${info.application_id})`;
+  const feld: Record<string, string> = { 'le.email': 'E-Mail Leistungsempfänger', 'ag.email': 'E-Mail Auftraggeber', 'kp.email': 'E-Mail Kontaktperson' };
+  const lage = 'Der Kunde hat die Buchung im Portal abgeschlossen. Die Buchung selbst (Confirmation) ist davon NICHT betroffen'
+    + (info.confirmed ? ' und in Mamamia bestätigt.' : ' — sie wird separat synchronisiert.')
+    + ' Aber: die drei Personen aus dem Vertragsformular (Leistungsempfänger / Auftraggeber / Kontaktperson) konnten nicht oder nicht vollständig in den Mamamia-Kunden geschrieben werden.';
+  const ursache = info.error
+    ? `Mamamia hat den Schreibvorgang der Kontaktdaten abgelehnt: ${info.error}`
+    : `Vom Kunden eingegebene E-Mail-Adressen waren unbrauchbar und wurden NICHT übertragen: ${info.dropped.map((d) => feld[d] ?? d).join(', ')}.`;
+  const daten: Array<[string, string]> = [
+    ['Kunde', String(kunde)],
+    ['E-Mail (Lead)', String(lead.email ?? '—')],
+    ['Telefon', String(lead.telefon ?? '—')],
+    ['Lead-ID', String(lead.id)],
+    ['Bewerbung (application_id)', String(info.application_id)],
+    ['Pflegekraft', info.caregiver_id != null ? `ID ${info.caregiver_id}` : '—'],
+    ...info.dropped.map((d): [string, string] => [`Verworfen: ${feld[d] ?? d}`, info.dropped_values[d] ?? '—']),
+    ['Mamamia-Fehler', info.error || '—'],
+  ];
+  const schritte = [
+    'SA-Portal → Kunde öffnen: Vertrags-/Rechnungsperson und Kontaktperson prüfen.',
+    'Fehlende Felder (v.a. E-Mail) aus der Buchungs-Team-Mail manuell nachtragen.',
+  ];
+  const text = [subject, '', lage, '', ursache, '', 'Daten:', ...daten.map(([k, v]) => `- ${k}: ${v}`), '', 'Bitte prüfen:', ...schritte.map((s, i) => `${i + 1}. ${s}`)].join('\n');
+  const html = `
+    <div style="font-family: Arial, sans-serif; max-width: 640px; margin: 0 auto;">
+      <div style="background-color: #d97706; color: white; padding: 16px 20px; border-radius: 8px 8px 0 0;">
+        <h2 style="margin: 0; font-size: 18px;">${subject}</h2>
+      </div>
+      <div style="border: 2px solid #d97706; border-top: none; border-radius: 0 0 8px 8px; padding: 20px;">
+        <p style="margin-top: 0;"><strong>${lage}</strong></p>
+        <p>${ursache}</p>
+        <table style="border-collapse: collapse; width: 100%; font-size: 14px;">
+          ${daten.map(([k, v]) => `<tr><td style="padding: 4px 8px; border: 1px solid #e5e7eb; background: #f9fafb; white-space: nowrap;">${k}</td><td style="padding: 4px 8px; border: 1px solid #e5e7eb;">${v}</td></tr>`).join('')}
+        </table>
+        <p style="margin-bottom: 4px;"><strong>Bitte prüfen:</strong></p>
+        <ol style="margin-top: 4px;">${schritte.map((s) => `<li>${s}</li>`).join('')}</ol>
+      </div>
+    </div>
+  `;
+  return { subject, html, text };
 }
 
 function buildAcceptanceSyncAlarmTemplate(lead: any, info: AcceptanceAlarmInfo): EmailTemplate {
@@ -861,6 +925,51 @@ async function handlePost(request: NextRequest) {
       } else {
         console.warn('application_accepted_internal: missing/invalid application_id in metadata');
       }
+    }
+
+    // ⚠️ Contact-Alarm (Registry #52) — eigener Zweig VOR dem generischen
+    // Dedupe/Insert: dedupe pro application_id, Mail VOR dem Insert
+    // (Mail-Fehler ⇒ 502 ohne Row ⇒ nächster Sync-Durchlauf POSTet erneut).
+    if (event === 'acceptance_contact_alarm') {
+      const m = (metadata ?? {}) as Record<string, unknown>;
+      const appId = m.application_id != null ? String(m.application_id) : null;
+      if (!appId) {
+        return NextResponse.json({ error: 'application_id required' }, { status: 400, headers: corsHeaders });
+      }
+      const { data: existing } = await supabase
+        .from('lead_events')
+        .select('id')
+        .eq('lead_id', lead.id)
+        .eq('event_type', event)
+        .eq('metadata->>application_id', appId)
+        .limit(1);
+      if (existing && existing.length > 0) {
+        return NextResponse.json({ ok: true, deduped: true }, { headers: corsHeaders });
+      }
+      const info: ContactAlarmInfo = {
+        application_id: appId,
+        caregiver_id: (m.caregiver_id as number | string | null | undefined) ?? null,
+        error: typeof m.error === 'string' ? m.error : null,
+        dropped: Array.isArray(m.dropped) ? (m.dropped as unknown[]).map(String) : [],
+        dropped_values: m.dropped_values && typeof m.dropped_values === 'object' ? (m.dropped_values as Record<string, string>) : {},
+        confirmed: m.confirmed === true,
+      };
+      const mail = await sendEmail(TEAM_NOTIFY_RECIPIENT, buildAcceptanceContactAlarmTemplate(lead, info), undefined, {
+        extraBcc: ACCEPT_TEAM_NOTIFY_EXTRA_BCC,
+      });
+      if (!mail.success) {
+        console.error(`contact alarm mail failed (lead=${lead.id}, app=${appId}):`, mail.error);
+        return NextResponse.json(
+          { error: `alarm mail failed: ${(mail.error ?? 'unknown').slice(0, 300)}` },
+          { status: 502, headers: corsHeaders },
+        );
+      }
+      await supabase.from('lead_events').insert({
+        lead_id: lead.id,
+        event_type: event,
+        metadata: { source: 'acceptance-sync', ...m, application_id: appId },
+      });
+      return NextResponse.json({ ok: true }, { headers: corsHeaders });
     }
 
     // Dedupe rule per event:

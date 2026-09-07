@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { nurseFacts, einsaetzeText } from '../components/portal/shared';
+import { nurseFacts, einsaetzeText, isEmail } from '../components/portal/shared';
 
 // Faktenzeile der Pflegekraft-Karten. Vorher stand ohne `care_experience`
 // wörtlich „—" als einzige Qualifikationszeile, und ohne Einsätze blieb die
@@ -47,5 +47,14 @@ describe('nurseFacts', () => {
     expect(einsaetzeText(1)).toBe('1 Einsatz über Primundus');
     expect(einsaetzeText(14)).toBe('14 Einsätze über Primundus');
     expect(einsaetzeText(0)).toBe('0 Einsätze über Primundus');
+  });
+});
+
+describe('isEmail (Registry #52)', () => {
+  it('lehnt Doppel-Domain und Leerzeichen ab, nimmt normale Adressen', () => {
+    expect(isEmail('catarina-stein@t-online.de@t-online.de')).toBe(false);
+    expect(isEmail('a b@x.de')).toBe(false);
+    expect(isEmail('nur-text')).toBe(false);
+    expect(isEmail(' ok@example.de ')).toBe(true);
   });
 });

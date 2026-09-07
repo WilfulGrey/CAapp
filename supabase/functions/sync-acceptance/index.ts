@@ -18,6 +18,7 @@
 
 import { createClient } from "npm:@supabase/supabase-js@2.57.4";
 import { getOrRefreshAgencyToken } from "../_shared/mamamiaClient.ts";
+import { requireEnv } from "../_shared/env.ts";
 import {
   type AcceptanceLead,
   type AcceptanceRow,
@@ -330,14 +331,16 @@ export function makeRealStore(url: string, serviceKey: string): SyncStore {
 }
 
 if (import.meta.main) {
+  // Fail-fast (Registry #52): KOSTENRECHNER_URL fehlte auf prod, `!` lieferte
+  // still undefined und die Retry-Chain-Alarmphase starb an `.replace`.
   const secrets: SyncSecrets = {
-    supabaseUrl: Deno.env.get("SUPABASE_URL")!,
-    supabaseServiceKey: Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
-    mamamiaEndpoint: Deno.env.get("MAMAMIA_ENDPOINT")!,
-    mamamiaAuthEndpoint: Deno.env.get("MAMAMIA_AUTH_ENDPOINT")!,
-    mamamiaAgencyEmail: Deno.env.get("MAMAMIA_AGENCY_EMAIL")!,
-    mamamiaAgencyPassword: Deno.env.get("MAMAMIA_AGENCY_PASSWORD")!,
-    kostenrechnerUrl: Deno.env.get("KOSTENRECHNER_URL")!,
+    supabaseUrl: requireEnv("SUPABASE_URL"),
+    supabaseServiceKey: requireEnv("SUPABASE_SERVICE_ROLE_KEY"),
+    mamamiaEndpoint: requireEnv("MAMAMIA_ENDPOINT"),
+    mamamiaAuthEndpoint: requireEnv("MAMAMIA_AUTH_ENDPOINT"),
+    mamamiaAgencyEmail: requireEnv("MAMAMIA_AGENCY_EMAIL"),
+    mamamiaAgencyPassword: requireEnv("MAMAMIA_AGENCY_PASSWORD"),
+    kostenrechnerUrl: requireEnv("KOSTENRECHNER_URL"),
   };
   const deps: HandlerDeps = {
     secrets,

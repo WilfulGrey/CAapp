@@ -10,6 +10,8 @@ import {
   isAgGleich,
   isPdfBytes,
   mapContractContact,
+  droppedEmailFields,
+  isValidationError,
   mapContractPatient,
   splitEinsatzort,
   syncAcceptance,
@@ -74,6 +76,11 @@ interface FakeNet {
   //   "graphql" = GraphQL-Fehler (⇒ permanent), "http500" = HTTP 500 (⇒ transient).
   // confirmFailTimes = wie viele Versuche fehlschlagen (undefined ⇒ alle).
   confirmFailMode?: "graphql" | "http500";
+  // UpdateCustomerContract (Schritt 1): "graphql" = Laravel-Validation (⇒ permanent,
+  // Sequenz läuft weiter), "graphql-plain" = GraphQL-Fehler OHNE extensions.validation
+  // (⇒ throw), "http500" (⇒ throw). ucFailSequence: pro Aufruf ein Modus (Chain-Tests).
+  ucFailMode?: "graphql" | "graphql-plain" | "http500";
+  ucFailSequence?: Array<"ok" | "graphql" | "graphql-plain" | "http500">;
   confirmFailTimes?: number;
   // Bridge-Route /api/lead-event — Alarm-POSTs des Crons (Body gesammelt).
   bridgePosts: Array<Record<string, unknown>>;
@@ -156,6 +163,19 @@ function makeNet(opts: Partial<FakeNet> = {}): FakeNet {
       }
       if (q.includes("UpdateCustomerContract")) {
         net.ops.push({ op: "UpdateCustomerContract", variables: v });
+        const ucMode = net.ucFailSequence?.length ? net.ucFailSequence.shift() : net.ucFailMode;
+        if (ucMode === "graphql-plain") {
+          return new Response(JSON.stringify({ errors: [{ message: "Unauthenticated." }] }), { status: 200 });
+        }
+        if (ucMode === "graphql") {
+          return new Response(JSON.stringify({
+            errors: [{
+              message: "validation",
+              extensions: { validation: { "invoice_contract.email": ["Das Feld invoice contract.email muss eine gültige E-Mail-Adresse sein."] } },
+            }],
+          }), { status: 200 });
+        }
+        if (ucMode === "http500") return new Response("oops", { status: 500 });
         return new Response(JSON.stringify({ data: { UpdateCustomer: { id: 7777, customer_id: "ts-3-7777" } } }), { status: 200 });
       }
       if (q.includes("StoreConfirmation")) {
@@ -559,6 +579,163 @@ Deno.test("sync: StoreConfirmation GraphQL-Fehler ⇒ permanent, KEIN Retry, kei
   assertEquals(r.customer_updated, true);
 });
 
+// ─── Registry #52: Kontakt-Rows dürfen die Buchung nicht blockieren ────────
+
+const contactPosts = (net: FakeNet) => net.bridgePosts.filter((p) => p.event === "acceptance_contact_alarm");
+
+Deno.test("cleanEmail: Doppel-Domain / Leerzeichen ⇒ null, sonst getrimmt; droppedEmailFields meldet nur nicht-leere Rohwerte", () => {
+  const p = mapContractPatient({ vorname: "Elsa", email: "catarina-stein@t-online.de@t-online.de", telefon: "0176" })!;
+  assertEquals(p.email, null);
+  assertEquals(p.first_name, "Elsa");
+  assertEquals(mapContractContact({ email: " ok@example.de " })!.email, "ok@example.de");
+  assertEquals(mapContractContact({ email: "Michael.kopka @ Freenet.de" })!.email, null);
+  // leer ⇒ null, aber NICHT "dropped" (LE-Prefill ist bewusst leer)
+  const none = droppedEmailFields(makeRow({ contract_patient: { ...makeRow().contract_patient, email: "" } }));
+  assertEquals(none.fields, []);
+  // KP unbrauchbar ⇒ kp.email + Rohwert
+  const kp = droppedEmailFields(makeRow({ contract_contact: { ...makeRow().contract_contact, email: "Michael.kopka @ Freenet.de" } }));
+  assertEquals(kp.fields, ["kp.email"]);
+  assertEquals(kp.values["kp.email"], "Michael.kopka @ Freenet.de");
+  // agGleich (le=null): AG nimmt LE-Mail ⇒ EIN Formularfeld ⇒ nur le.email
+  const row = makeRow({ contract_patient: { ...makeRow().contract_patient, email: "x@y.de@y.de" } });
+  row.contract_snapshot = { ...row.contract_snapshot, le: null, ag: { ...(row.contract_snapshot!.ag as Record<string, unknown>), email: "x@y.de@y.de" } };
+  assertEquals(droppedEmailFields(row).fields, ["le.email"]);
+  // separater AG mit eigener schlechter Mail ⇒ ag.email
+  const ag = makeRow();
+  ag.contract_snapshot = { ...ag.contract_snapshot, ag: { ...(ag.contract_snapshot!.ag as Record<string, unknown>), email: "kp@example..de@x" } };
+  assertEquals(droppedEmailFields(ag).fields, ["ag.email"]);
+});
+
+Deno.test("isValidationError: nur extensions.validation zählt — Unauthenticated./ISE/HTTP nicht", () => {
+  const mk = (errors: unknown) => Object.assign(new Error("x"), { graphqlErrors: errors });
+  assertEquals(isValidationError(mk([{ message: "validation", extensions: { validation: { a: ["b"] } } }])), true);
+  assertEquals(isValidationError(mk([{ message: "Unauthenticated." }])), false);
+  assertEquals(isValidationError(mk([{ message: "Internal server error", extensions: { category: "internal" } }])), false);
+  assertEquals(isValidationError(new Error("HTTP 500")), false);
+});
+
+Deno.test("sync: UpdateCustomer Validation ⇒ StoreConfirmation läuft trotzdem, customer_update_error, EIN Contact-Alarm-POST, kein Throw", async () => {
+  const net = makeNet({ ucFailMode: "graphql" });
+  const stamps = makeStamps();
+  const r = await syncAcceptance({
+    lead: LEAD, row: makeRow(), secrets: SECRETS,
+    supabase: stamps.supabase, getAgencyToken: agencyToken, fetchFn: net.fetch,
+  });
+  assertEquals(r.customer_updated, false);
+  assertStringIncludes(r.customer_update_error ?? "", "email");
+  assertEquals(net.ops.filter((o) => o.op === "StoreConfirmation").length, 1);
+  assertEquals(r.confirmed, true);
+  assertEquals(stamps.calls[0], { kind: "confirmed", confirmationId: 555 });
+  // Contact-Alarm: genau ein POST, NACH der Sequenz (nicht zwischen Schritt 1 und 2)
+  const posts = contactPosts(net);
+  assertEquals(posts.length, 1);
+  const post = posts[0] as { token: string; metadata: Record<string, unknown> };
+  assertEquals(post.token, "tok-abc");
+  assertEquals(post.metadata.application_id, 9001);
+  assertStringIncludes(String(post.metadata.error), "email");
+  assertEquals(post.metadata.confirmed, true);
+  // kein roter Alarm, kein Stempel-Kanal
+  assertEquals(net.bridgePosts.filter((p) => p.event === "acceptance_sync_alarm").length, 0);
+});
+
+Deno.test("sync: UpdateCustomer GraphQL-Fehler OHNE validation (Unauthenticated.) ⇒ Throw, KEIN StoreConfirmation, kein Contact-Alarm", async () => {
+  const net = makeNet({ ucFailMode: "graphql-plain" });
+  let threw = "";
+  try {
+    await syncAcceptance({
+      lead: LEAD, row: makeRow(), secrets: SECRETS,
+      supabase: makeStamps().supabase, getAgencyToken: agencyToken, fetchFn: net.fetch,
+    });
+  } catch (e) { threw = (e as Error).message; }
+  assertStringIncludes(threw, "Unauthenticated");
+  assertEquals(net.ops.some((o) => o.op === "StoreConfirmation"), false);
+  assertEquals(contactPosts(net).length, 0);
+});
+
+Deno.test("sync: UpdateCustomer transient (HTTP 500) ⇒ Throw wie bisher (Retry wiederholt die Sequenz), KEIN StoreConfirmation", async () => {
+  const net = makeNet({ ucFailMode: "http500" });
+  let threw = "";
+  try {
+    await syncAcceptance({
+      lead: LEAD, row: makeRow(), secrets: SECRETS,
+      supabase: makeStamps().supabase, getAgencyToken: agencyToken, fetchFn: net.fetch,
+    });
+  } catch (e) { threw = (e as Error).message; }
+  assertStringIncludes(threw, "HTTP 500");
+  assertEquals(net.ops.some((o) => o.op === "StoreConfirmation"), false);
+  assertEquals(contactPosts(net).length, 0);
+});
+
+Deno.test("sync: Fall Kopka — UC Validation + final_confirmation der Pflegekraft ⇒ Adoption, Stempel, Upload mit application_id der Row", async () => {
+  const net = makeNet({
+    ucFailMode: "graphql",
+    finalConfirmations: [{ id: 4715, application_id: 9001, caregiver: { id: 501 } }],
+    storageBody: new TextEncoder().encode("%PDF-1.7 canon"),
+  });
+  const stamps = makeStamps();
+  const r = await syncAcceptance({
+    lead: LEAD, row: makeRow(), secrets: SECRETS,
+    supabase: stamps.supabase, getAgencyToken: agencyToken, fetchFn: net.fetch,
+  });
+  assertEquals(r.customer_updated, false);
+  assertEquals(net.ops.some((o) => o.op === "StoreConfirmation"), false); // adoptiert, nie gedoppelt
+  assertEquals(r.confirmed, true);
+  assertEquals(r.confirmation_id, 4715);
+  assertEquals(r.pdf_uploaded, true);
+  const upl = net.ops.find((o) => o.op === "UpdateConfirmation")!.variables;
+  assertEquals(upl.id, 4715);
+  assertEquals(upl.application_id, 9001);
+  assertEquals(contactPosts(net).length, 1);
+});
+
+Deno.test("sync: unbrauchbare KP-Mail + UC OK ⇒ contact_fields_dropped=['kp.email'], Row ohne email, Contact-Alarm mit Rohwert", async () => {
+  const net = makeNet();
+  const r = await syncAcceptance({
+    lead: LEAD, row: makeRow({ contract_contact: { ...makeRow().contract_contact, email: "Michael.kopka @ Freenet.de" } }), secrets: SECRETS,
+    supabase: makeStamps().supabase, getAgencyToken: agencyToken, fetchFn: net.fetch,
+  });
+  assertEquals(r.customer_updated, true);
+  assertEquals(r.contact_fields_dropped, ["kp.email"]);
+  const uc = net.ops.find((o) => o.op === "UpdateCustomerContract")!.variables as { customer_contacts: Array<Record<string, unknown>> };
+  assertEquals(uc.customer_contacts[0].email, null);
+  const posts = contactPosts(net);
+  assertEquals(posts.length, 1);
+  const meta = (posts[0] as { metadata: Record<string, unknown> }).metadata;
+  assertEquals(meta.dropped, ["kp.email"]);
+  assertEquals((meta.dropped_values as Record<string, string>)["kp.email"], "Michael.kopka @ Freenet.de");
+  assertEquals(meta.error, null);
+});
+
+Deno.test("sync: Contact-Alarm-POST scheitert (Bridge 502 / Netz) ⇒ Ergebnis unverändert, kein Throw", async () => {
+  const net = makeNet({ ucFailMode: "graphql", bridgeStatus: 502 });
+  const r = await syncAcceptance({
+    lead: LEAD, row: makeRow(), secrets: SECRETS,
+    supabase: makeStamps().supabase, getAgencyToken: agencyToken, fetchFn: net.fetch,
+  });
+  assertEquals(r.confirmed, true);
+  assertEquals(contactPosts(net).length, 1);
+  // Lead ohne Token ⇒ kein POST-Versuch, nur Log
+  const net2 = makeNet({ ucFailMode: "graphql" });
+  const r2 = await syncAcceptance({
+    lead: { ...LEAD, token: null }, row: makeRow(), secrets: SECRETS,
+    supabase: makeStamps().supabase, getAgencyToken: agencyToken, fetchFn: net2.fetch,
+  });
+  assertEquals(r2.confirmed, true);
+  assertEquals(contactPosts(net2).length, 0);
+});
+
+Deno.test("sync: UC Validation + StoreConfirmation PERMANENT ⇒ roter Alarm-Pfad (confirm_error), KEIN gelber Doppel-POST", async () => {
+  const net = makeNet({ ucFailMode: "graphql", confirmFailMode: "graphql" });
+  const r = await syncAcceptance({
+    lead: LEAD, row: makeRow(), secrets: SECRETS,
+    supabase: makeStamps().supabase, getAgencyToken: agencyToken, fetchFn: net.fetch,
+    sleepFn: () => Promise.resolve(),
+  });
+  assertEquals(r.confirm_error?.permanent, true);
+  assertEquals(r.customer_update_error != null, true);
+  assertEquals(contactPosts(net).length, 0);
+});
+
 Deno.test("sync: StoreConfirmation transient (HTTP 500) ⇒ 3 Versuche mit Backoff, permanent=false", async () => {
   const net = makeNet({ confirmFailMode: "http500" }); // alle Versuche scheitern
   const stamps = makeStamps();
@@ -858,6 +1035,48 @@ Deno.test("sync-acceptance: permanenter Confirm-Fehler ⇒ KEINE Retry-Chain (Br
 });
 
 // ─── Hintergrund-Retry-Chain (15/30/60 s) ──────────────────────────────────
+
+Deno.test("retry-chain (Registry #52): Erstversuch HTTP 500 in Schritt 1, Stufe +15s Validation ⇒ confirmed + genau EIN Contact-Alarm-POST", async () => {
+  // Erstversuch (Bridge) warf VOR dem Contact-Alarm — die Chain muss ihn nachholen.
+  const net = makeNet({ ucFailSequence: ["http500", "graphql", "graphql", "graphql"] });
+  let threw = false;
+  try {
+    await syncAcceptance({ lead: LEAD, row: makeRow(), secrets: SECRETS, supabase: makeStamps().supabase, getAgencyToken: agencyToken, fetchFn: net.fetch });
+  } catch { threw = true; }
+  assertEquals(threw, true);
+  assertEquals(net.bridgePosts.length, 0);
+  // Chain: Stufe +15s ⇒ Validation ⇒ Buchung geht durch, POST kommt (dedupe macht die Bridge).
+  const row = makeRow();
+  // Store spiegelt den Stempel (wie die echte DB) — sonst würde jede Stufe erneut confirmen.
+  const store: SyncStore = { ...makeStore(row), stampConfirmed: (_l, _a, id) => { row.mamamia_confirmed_at = "2026-09-07T10:00:00Z"; row.mamamia_confirmation_id = id; return Promise.resolve(); } };
+  await runRetryChain(
+    { secrets: SYNC_FN_SECRETS, store, fetchFn: net.fetch, getAgencyToken: agencyToken, sleepFn: () => Promise.resolve() },
+    "lead-1", 9001, false,
+  );
+  const posts = net.bridgePosts.filter((p) => p.event === "acceptance_contact_alarm");
+  assertEquals(posts.length >= 1, true); // jede Stufe POSTet, die Bridge dedupet pro application_id
+  assertEquals(net.ops.filter((o) => o.op === "StoreConfirmation").length, 1);
+  assertEquals(net.bridgePosts.filter((p) => p.event === "acceptance_sync_alarm").length, 0);
+});
+
+Deno.test("sync-acceptance handler (Registry #52): customer_update_error ändert weder complete noch retries_scheduled", async () => {
+  const net = makeNet({ ucFailMode: "graphql" }); // Confirm OK, PDF wartet ⇒ Chain wie immer
+  let scheduledCount = 0;
+  const res = await syncHandler(
+    new Request("https://edge/sync-acceptance", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${SYNC_FN_SECRETS.supabaseServiceKey}` },
+      body: JSON.stringify({ lead_id: "lead-1", application_id: 9001 }),
+    }),
+    { secrets: SYNC_FN_SECRETS, store: makeStore(makeRow()), fetchFn: net.fetch, getAgencyToken: agencyToken, runRetriesFn: () => { scheduledCount += 1; return Promise.resolve(); } },
+  );
+  assertEquals(res.status, 200);
+  const body = await res.json();
+  assertEquals(body.confirmed, true);
+  assertStringIncludes(body.customer_update_error, "email");
+  assertEquals(body.retries_scheduled, true);
+  assertEquals(scheduledCount, 1);
+});
 
 Deno.test("retry-chain: PDF dopięty w pierwszej stufie ⇒ stop, bez alarmu", async () => {
   // Zwischen Erstversuch und +15s hat Mamamia die Confirmation verarbeitet.
