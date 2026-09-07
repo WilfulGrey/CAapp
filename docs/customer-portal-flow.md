@@ -1045,7 +1045,9 @@ Edge Fn   ←─── Sanctum session cookie (agency login) ──────�
 
 **Krytyczne:**
 - `MAMAMIA_AGENCY_EMAIL` / `MAMAMIA_AGENCY_PASSWORD` / agency-jwt ZAWSZE
-  server-side (env w Supabase secrets). NIGDY w przeglądarce.
+  server-side (env w Supabase secrets). NIGDY w przeglądarce. Konto = dedykowane
+  `kundenportal@primundus.de` na obu tenantach (od 2026-09-07, CLAUDE.md Registry #53),
+  żeby logi Mamamii rozróżniały akcje portalu od akcji ludzi.
 - `SUPABASE_SERVICE_ROLE_KEY` ZAWSZE server-side. Używany w
   `onboard-to-mamamia` do bypass RLS przy lookup leada po tokenie.
 - Cookie `session` musi mieć `SameSite=None; Secure; HttpOnly` — bez tego

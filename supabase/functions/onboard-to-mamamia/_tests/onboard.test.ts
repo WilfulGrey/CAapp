@@ -150,7 +150,7 @@ const SECRETS = {
   supabaseServiceKey: "service-role",
   mamamiaEndpoint: "https://beta.mamamia.app/graphql",
   mamamiaAuthEndpoint: "https://beta.mamamia.app/graphql/auth",
-  mamamiaAgencyEmail: "primundus+portal@mamamia.app",
+  mamamiaAgencyEmail: "primundus+portal@example.com",
   mamamiaAgencyPassword: "pw",
   sessionJwtSecret: "a".repeat(40),
   mamamiaPanelUrl: "https://beta.mamamia.app/backend",

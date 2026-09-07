@@ -88,7 +88,7 @@ Deno.test("loginAsAgency: csrf-cookie → LoginAgency, returns logged-in panel s
     // 2. LoginAgency response — Laravel rotates session+xsrf
     {
       status: 200,
-      bodyJson: { data: { LoginAgency: { id: 8190, email: "primundus+portal@mamamia.app" } } },
+      bodyJson: { data: { LoginAgency: { id: 8190, email: "primundus+portal@example.com" } } },
       setCookies: [
         "XSRF-TOKEN=token-2%3D%3D; path=/",
         "mamamia_beta_session=sess-2-logged-in; httponly; path=/",
@@ -98,7 +98,7 @@ Deno.test("loginAsAgency: csrf-cookie → LoginAgency, returns logged-in panel s
 
   const session = await loginAsAgency(
     { baseUrl: BASE, fetchFn },
-    "primundus+portal@mamamia.app",
+    "primundus+portal@example.com",
     "secret-pass",
   );
 
@@ -117,7 +117,7 @@ Deno.test("loginAsAgency: csrf-cookie → LoginAgency, returns logged-in panel s
   assertStringIncludes(calls[1].headers["Cookie"] ?? "", "mamamia_beta_session=sess-1");
   const loginBody = JSON.parse(calls[1].body!);
   assertEquals(loginBody.operationName, "LoginAgency");
-  assertEquals(loginBody.variables.email, "primundus+portal@mamamia.app");
+  assertEquals(loginBody.variables.email, "primundus+portal@example.com");
 });
 
 Deno.test("loginAsAgency: propagates GraphQL errors", async () => {
