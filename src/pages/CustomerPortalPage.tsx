@@ -467,6 +467,17 @@ const CustomerPortalPage: FC = () => {
         // damit wird messbar, welche Mail den Besuch gebracht hat.
         const mailSource = new URLSearchParams(window.location.search).get('m');
         reportLeadEvent(l.token, 'portal_opened', mailSource ? { mail_source: mailSource } : undefined);
+        // Jedes Öffnen zählen: portal_opened wird serverseitig auf das ERSTE
+        // Öffnen dedupliziert (Handoff nach dem Wizard), deshalb waren
+        // Rückkehrer aus den Mails unsichtbar — Clarity 07.09.2026 zeigte
+        // Gmail/t-online/freenet als Referrer, die DB 0 Treffer. Kein
+        // Nachfass-Zweig, keine Mail: reine Messung.
+        let referrerHost = '';
+        try { referrerHost = document.referrer ? new URL(document.referrer).host : ''; } catch { /* kein Referrer */ }
+        reportLeadEvent(l.token, 'portal_reopened', {
+          ...(mailSource ? { mail_source: mailSource } : {}),
+          ...(referrerHost ? { referrer: referrerHost } : {}),
+        });
         // Stitch this portal session to the customer's earlier
         // kostenrechner session in Clarity. The kalkulation page does the
         // matching identify on its side. Idempotent + retries until the

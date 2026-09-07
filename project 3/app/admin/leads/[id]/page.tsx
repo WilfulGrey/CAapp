@@ -1687,6 +1687,7 @@ export default function LeadDetailPage() {
                     // event_type-Fallback, „application received" sah aus wie
                     // Datenmüll und niemand wusste, ob eine Mail rausging):
                     portal_opened: { label: 'Portal geöffnet', color: 'bg-blue-500' },
+                    portal_reopened: { label: 'Portal erneut geöffnet', color: 'bg-blue-300' },
                     patient_data_saved: { label: 'Patientendaten gespeichert', color: 'bg-green-600' },
                     caregiver_invited: { label: 'Pflegekraft eingeladen', color: 'bg-[#8B7355]' },
                     caregiver_interest_shown: { label: 'Pflegekraft-Interesse (Mail A)', color: 'bg-[#8B7355]' },
