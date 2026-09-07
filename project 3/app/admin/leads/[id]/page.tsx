@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { createClient } from '@supabase/supabase-js';
 import { Loader as Loader2, ArrowLeft, Mail, Phone, Calendar, MapPin, FileText, Clock, Download, CreditCard as Edit, Save, X, RefreshCw, User, BellOff, CircleCheck as CheckCircle, MessageSquare, Copy, Check } from 'lucide-react';
 import { PORTAL_BASIS } from '@/lib/portal-url';
+import { LABELS, FD_LABEL_KEYS } from '@/lib/angaben-labels';
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -31,6 +32,17 @@ export default function LeadDetailPage() {
   const [editedData, setEditedData] = useState<any>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [isRecalculating, setIsRecalculating] = useState(false);
+  // Admin-Korrektur der Angaben (Registry #55): Häkchen für die Kundenmail
+  // (greift nur bei Neuberechnung mit Preisänderung) + Ergebnis des letzten
+  // Speicherns (Mamamia-Sync, Mail) für die Statuszeile.
+  const [kundenMail, setKundenMail] = useState(true);
+  const [angabenStatus, setAngabenStatus] = useState<{
+    mamamia: { status: 'ok' | 'skipped' | 'error'; message: string; patient_ids?: number[] };
+    mail?: 'angestossen' | 'skipped' | 'error';
+    unveraendert?: boolean;
+    fehler?: string;
+  } | null>(null);
+  const [isResyncing, setIsResyncing] = useState(false);
   const [isEditingContact, setIsEditingContact] = useState(false);
   const [editedContact, setEditedContact] = useState<any>(null);
   const [adminNotes, setAdminNotes] = useState('');
@@ -117,21 +129,18 @@ export default function LeadDetailPage() {
     }
   };
 
+  // Editor liest NUR kalkulation.formularDaten (kein Fallback aus der
+  // aufschluesselung, keine Default-Werte): der Diff in der Route vergleicht
+  // gegen genau diese Quelle — jeder eingemischte Default wäre eine
+  // Phantom-Änderung. care_start_timing ist die SPALTE, nicht fd.
   const handleEditStart = () => {
-    const formularDaten = getFormularDatenDisplay();
-    const defaultData = {
-      care_start_timing: 'sofort',
-      betreuung_fuer: '1-person',
-      pflegegrad: 0,
-      weitere_personen: 'nein',
-      mobilitaet: 'mobil',
-      nachteinsaetze: 'nein',
-      deutschkenntnisse: 'grundlegend',
-      erfahrung: 'einsteiger',
-      fuehrerschein: 'egal',
-      geschlecht: 'egal',
-    };
-    setEditedData({ ...defaultData, ...formularDaten });
+    const fd = lead?.kalkulation?.formularDaten;
+    if (!fd) return;
+    const data: Record<string, unknown> = {};
+    for (const k of FD_LABEL_KEYS) data[k] = fd[k] ?? '';
+    data.care_start_timing = lead.care_start_timing ?? '';
+    setEditedData(data);
+    setAngabenStatus(null);
     setIsEditMode(true);
   };
 
@@ -140,66 +149,60 @@ export default function LeadDetailPage() {
     setEditedData(null);
   };
 
-  const handleRecalculate = async () => {
+  // Speichern (ohne Neuberechnung) / Neu berechnen & speichern — beides über
+  // die Admin-Route: Diff, optional berechnePreis, leads-Update, Mamamia-Sync
+  // (diff-driven), Event/Mail. Kein Browser-Write auf leads.kalkulation mehr.
+  const handleSaveAngaben = async (neuBerechnen: boolean) => {
     if (!editedData) return;
-
-    setIsRecalculating(true);
+    if (neuBerechnen) setIsRecalculating(true); else setIsSaving(true);
     try {
-      const response = await fetch('/api/kalkulation-berechnen', {
+      const res = await fetch(`/api/admin/leads/${leadId}/angaben`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ formularDaten: editedData }),
+        body: JSON.stringify({ angaben: editedData, neuBerechnen, kundenMail }),
       });
-
-      if (response.ok) {
-        const kalkulation = await response.json();
-        const updatedKalkulation = {
-          ...kalkulation,
-          formularDaten: editedData,
-        };
-
-        const { error } = await supabase
-          .from('leads')
-          .update({ kalkulation: updatedKalkulation })
-          .eq('id', leadId);
-
-        if (!error) {
-          await loadLeadDetails();
-          setIsEditMode(false);
-          setEditedData(null);
-        }
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        const detail = Array.isArray(body?.fehler) ? ` — ${body.fehler.join('; ')}` : '';
+        setAngabenStatus({ mamamia: { status: 'error', message: '' }, fehler: `${body?.error ?? `HTTP ${res.status}`}${detail}` });
+        return;
       }
+      if (body.unveraendert) {
+        setAngabenStatus({ mamamia: { status: 'skipped', message: 'Keine Änderung' }, unveraendert: true });
+        setIsEditMode(false);
+        setEditedData(null);
+        return;
+      }
+      setAngabenStatus({ mamamia: body.mamamia, mail: body.mail });
+      await loadLeadDetails();
+      setIsEditMode(false);
+      setEditedData(null);
     } catch (error) {
-      console.error('Fehler bei Neuberechnung:', error);
+      setAngabenStatus({ mamamia: { status: 'error', message: '' }, fehler: error instanceof Error ? error.message : String(error) });
     } finally {
       setIsRecalculating(false);
+      setIsSaving(false);
     }
   };
 
-  const handleSaveChanges = async () => {
-    if (!editedData) return;
-
-    setIsSaving(true);
+  // Retry des Mamamia-Syncs aus kalkulation.mamamia_sync_pending (Body B).
+  const handleResyncRetry = async () => {
+    setIsResyncing(true);
     try {
-      const updatedKalkulation = {
-        ...lead.kalkulation,
-        formularDaten: editedData,
-      };
-
-      const { error } = await supabase
-        .from('leads')
-        .update({ kalkulation: updatedKalkulation })
-        .eq('id', leadId);
-
-      if (!error) {
-        await loadLeadDetails();
-        setIsEditMode(false);
-        setEditedData(null);
+      const res = await fetch(`/api/admin/leads/${leadId}/angaben`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ resync: true }),
+      });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setAngabenStatus({ mamamia: { status: 'error', message: '' }, fehler: body?.error ?? `HTTP ${res.status}` });
+        return;
       }
-    } catch (error) {
-      console.error('Fehler beim Speichern:', error);
+      setAngabenStatus({ mamamia: body.mamamia });
+      await loadLeadDetails();
     } finally {
-      setIsSaving(false);
+      setIsResyncing(false);
     }
   };
 
@@ -438,6 +441,29 @@ export default function LeadDetailPage() {
   };
 
   const formularDaten = getFormularDatenDisplay();
+
+  // Select für den Editor: rendert den aktuell gespeicherten Wert als
+  // Extra-Option, wenn er außerhalb des Kanons liegt (sehr-gut-sa aus dem
+  // SA-Portal, 1-2-wochen aus dem alten Select) — ein kontrollierter Select
+  // mit unbekanntem value zeigt sonst die erste Option, und der nächste Save
+  // erzeugte einen Phantom-Diff. `leer` = Option „— nicht angegeben —" ('').
+  // pflegegrad ist eine Zahl (0 = Kein Pflegegrad).
+  const angabenSelect = (field: string, options: Array<[string, string]>, leer = false) => {
+    const raw = editedData?.[field];
+    const value = raw == null ? '' : String(raw);
+    const known = options.some(([v]) => v === value) || (leer && value === '');
+    return (
+      <select
+        value={value}
+        onChange={(e) => setEditedData({ ...editedData, [field]: field === 'pflegegrad' ? parseInt(e.target.value, 10) : e.target.value })}
+        className="w-full px-3 py-2 border rounded-md"
+      >
+        {leer && <option value="">— nicht angegeben —</option>}
+        {!known && <option value={value}>{value} (gespeicherter Wert)</option>}
+        {options.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+      </select>
+    );
+  };
 
   return (
     <div className="space-y-6">
@@ -822,30 +848,49 @@ export default function LeadDetailPage() {
                   <div className="flex justify-between items-center mb-4">
                     <h2 className="text-xl font-bold">Eingaben des Kunden</h2>
                     {!isEditMode ? (
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={handleEditStart}
-                        className="flex items-center gap-2"
-                      >
-                        <Edit className="w-4 h-4" />
-                        Bearbeiten
-                      </Button>
+                      lead.kalkulation?.formularDaten ? (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={handleEditStart}
+                          className="flex items-center gap-2"
+                        >
+                          <Edit className="w-4 h-4" />
+                          Bearbeiten
+                        </Button>
+                      ) : (
+                        <span className="text-xs text-gray-500">Legacy-Lead ohne formularDaten — nicht bearbeitbar</span>
+                      )
                     ) : (
-                      <div className="flex gap-2">
+                      <div className="flex flex-wrap items-center gap-2 justify-end">
+                        <label className="flex items-center gap-1 text-xs text-gray-600 mr-2">
+                          <input type="checkbox" checked={kundenMail} onChange={(e) => setKundenMail(e.target.checked)} />
+                          Kunden per E-Mail über den neuen Preis informieren
+                        </label>
                         <Button
                           variant="outline"
                           size="sm"
                           onClick={handleEditCancel}
+                          disabled={isSaving || isRecalculating}
                           className="flex items-center gap-2"
                         >
                           <X className="w-4 h-4" />
                           Abbrechen
                         </Button>
                         <Button
+                          variant="outline"
                           size="sm"
-                          onClick={handleRecalculate}
-                          disabled={isRecalculating}
+                          onClick={() => handleSaveAngaben(false)}
+                          disabled={isSaving || isRecalculating}
+                          className="flex items-center gap-2"
+                        >
+                          {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+                          Speichern
+                        </Button>
+                        <Button
+                          size="sm"
+                          onClick={() => handleSaveAngaben(true)}
+                          disabled={isSaving || isRecalculating}
                           className="flex items-center gap-2 bg-[#5C4A32] hover:bg-[#4A3A28]"
                         >
                           {isRecalculating ? (
@@ -853,7 +898,7 @@ export default function LeadDetailPage() {
                           ) : (
                             <RefreshCw className="w-4 h-4" />
                           )}
-                          Neu berechnen
+                          Neu berechnen &amp; speichern
                         </Button>
                       </div>
                     )}
@@ -862,41 +907,19 @@ export default function LeadDetailPage() {
                     <div>
                       <p className="text-sm text-gray-600 mb-1">Ab wann wird eine Betreuung benötigt?</p>
                       {isEditMode ? (
-                        <select
-                          value={editedData?.care_start_timing || 'sofort'}
-                          onChange={(e) =>
-                            setEditedData({ ...editedData, care_start_timing: e.target.value })
-                          }
-                          className="w-full px-3 py-2 border rounded-md"
-                        >
-                          <option value="sofort">So schnell wie möglich</option>
-                          <option value="1-2-wochen">In 1-2 Wochen</option>
-                          <option value="1-monat">In ca. 1 Monat</option>
-                          <option value="spaeter">Später / noch unklar</option>
-                        </select>
+                        angabenSelect('care_start_timing', [['sofort', 'Sofort (4–7 Werktage)'], ['2-4-wochen', 'In 2–4 Wochen'], ['1-2-monate', 'In 1–2 Monaten'], ['unklar', 'Ich informiere mich nur']], true)
                       ) : (
                         <p className="font-medium">
-                          {formularDaten.care_start_timing === 'sofort' ? 'So schnell wie möglich' :
-                           formularDaten.care_start_timing === '1-2-wochen' ? 'In 1-2 Wochen' :
-                           formularDaten.care_start_timing === '1-monat' ? 'In ca. 1 Monat' :
-                           formularDaten.care_start_timing === 'spaeter' ? 'Später / noch unklar' :
-                           'So schnell wie möglich'}
+                          {lead.care_start_timing
+                            ? (LABELS.care_start_timing[lead.care_start_timing] ?? lead.care_start_timing)
+                            : '—'}
                         </p>
                       )}
                     </div>
                     <div>
                       <p className="text-sm text-gray-600 mb-1">Betreuung für</p>
                       {isEditMode ? (
-                        <select
-                          value={editedData?.betreuung_fuer || '1-person'}
-                          onChange={(e) =>
-                            setEditedData({ ...editedData, betreuung_fuer: e.target.value })
-                          }
-                          className="w-full px-3 py-2 border rounded-md"
-                        >
-                          <option value="1-person">1 Person</option>
-                          <option value="ehepaar">Ehepaar</option>
-                        </select>
+                        angabenSelect('betreuung_fuer', [['1-person', '1 Person'], ['ehepaar', 'Ehepaar']])
                       ) : (
                         <p className="font-medium">
                           {formularDaten.betreuung_fuer === '1-person' ? '1 Person' : 'Ehepaar'}
@@ -906,20 +929,7 @@ export default function LeadDetailPage() {
                     <div>
                       <p className="text-sm text-gray-600 mb-1">Pflegegrad</p>
                       {isEditMode ? (
-                        <select
-                          value={editedData?.pflegegrad || 0}
-                          onChange={(e) =>
-                            setEditedData({ ...editedData, pflegegrad: parseInt(e.target.value) })
-                          }
-                          className="w-full px-3 py-2 border rounded-md"
-                        >
-                          <option value="0">Kein Pflegegrad</option>
-                          <option value="1">Pflegegrad 1</option>
-                          <option value="2">Pflegegrad 2</option>
-                          <option value="3">Pflegegrad 3</option>
-                          <option value="4">Pflegegrad 4</option>
-                          <option value="5">Pflegegrad 5</option>
-                        </select>
+                        angabenSelect('pflegegrad', [['0', 'Kein Pflegegrad'], ['1', 'Pflegegrad 1'], ['2', 'Pflegegrad 2'], ['3', 'Pflegegrad 3'], ['4', 'Pflegegrad 4'], ['5', 'Pflegegrad 5']])
                       ) : (
                         <p className="font-medium">Pflegegrad {formularDaten.pflegegrad}</p>
                       )}
@@ -927,16 +937,7 @@ export default function LeadDetailPage() {
                     <div>
                       <p className="text-sm text-gray-600 mb-1">Weitere Personen im Haushalt</p>
                       {isEditMode ? (
-                        <select
-                          value={editedData?.weitere_personen || 'nein'}
-                          onChange={(e) =>
-                            setEditedData({ ...editedData, weitere_personen: e.target.value })
-                          }
-                          className="w-full px-3 py-2 border rounded-md"
-                        >
-                          <option value="nein">Nein</option>
-                          <option value="ja">Ja</option>
-                        </select>
+                        angabenSelect('weitere_personen', [['nein', 'Nein'], ['ja', 'Ja']])
                       ) : (
                         <p className="font-medium">
                           {formularDaten.weitere_personen === 'ja' ? 'Ja' : 'Nein'}
@@ -946,18 +947,7 @@ export default function LeadDetailPage() {
                     <div>
                       <p className="text-sm text-gray-600 mb-1">Mobilität</p>
                       {isEditMode ? (
-                        <select
-                          value={editedData?.mobilitaet || 'mobil'}
-                          onChange={(e) =>
-                            setEditedData({ ...editedData, mobilitaet: e.target.value })
-                          }
-                          className="w-full px-3 py-2 border rounded-md"
-                        >
-                          <option value="mobil">Mobil</option>
-                          <option value="rollator">Rollator</option>
-                          <option value="rollstuhl">Rollstuhl</option>
-                          <option value="bettlaegerig">Bettlägerig</option>
-                        </select>
+                        angabenSelect('mobilitaet', [['mobil', 'Mobil'], ['rollator', 'Rollator'], ['rollstuhl', 'Rollstuhl'], ['bettlaegerig', 'Bettlägerig']])
                       ) : (
                         <p className="font-medium capitalize">{formularDaten.mobilitaet}</p>
                       )}
@@ -965,18 +955,7 @@ export default function LeadDetailPage() {
                     <div>
                       <p className="text-sm text-gray-600 mb-1">Nachteinsätze</p>
                       {isEditMode ? (
-                        <select
-                          value={editedData?.nachteinsaetze || 'nein'}
-                          onChange={(e) =>
-                            setEditedData({ ...editedData, nachteinsaetze: e.target.value })
-                          }
-                          className="w-full px-3 py-2 border rounded-md"
-                        >
-                          <option value="nein">Nein</option>
-                          <option value="gelegentlich">Gelegentlich</option>
-                          <option value="taeglich">Täglich</option>
-                          <option value="mehrmals">Mehrmals</option>
-                        </select>
+                        angabenSelect('nachteinsaetze', [['nein', 'Nein'], ['gelegentlich', 'Gelegentlich'], ['taeglich', 'Täglich'], ['mehrmals', 'Mehrmals']])
                       ) : (
                         <p className="font-medium capitalize">{formularDaten?.nachteinsaetze || 'Nein'}</p>
                       )}
@@ -984,20 +963,7 @@ export default function LeadDetailPage() {
                     <div>
                       <p className="text-sm text-gray-600 mb-1">Deutschkenntnisse</p>
                       {isEditMode ? (
-                        <select
-                          value={editedData?.deutschkenntnisse || 'grundlegend'}
-                          onChange={(e) =>
-                            setEditedData({
-                              ...editedData,
-                              deutschkenntnisse: e.target.value,
-                            })
-                          }
-                          className="w-full px-3 py-2 border rounded-md"
-                        >
-                          <option value="grundlegend">Grundlegend</option>
-                          <option value="kommunikativ">Kommunikativ</option>
-                          <option value="sehr-gut">Fortgeschritten</option>
-                        </select>
+                        angabenSelect('deutschkenntnisse', [['grundlegend', 'Grundlegend'], ['kommunikativ', 'Kommunikativ'], ['sehr-gut', 'Gut']])
                       ) : (
                         <p className="font-medium capitalize">
                           {formularDaten?.deutschkenntnisse?.replace('-', ' ') || 'Grundlegend'}
@@ -1007,17 +973,7 @@ export default function LeadDetailPage() {
                     <div>
                       <p className="text-sm text-gray-600 mb-1">Erfahrung</p>
                       {isEditMode ? (
-                        <select
-                          value={editedData?.erfahrung || 'einsteiger'}
-                          onChange={(e) =>
-                            setEditedData({ ...editedData, erfahrung: e.target.value })
-                          }
-                          className="w-full px-3 py-2 border rounded-md"
-                        >
-                          <option value="einsteiger">Einsteiger</option>
-                          <option value="erfahren">Erfahren</option>
-                          <option value="sehr-erfahren">Sehr erfahren</option>
-                        </select>
+                        angabenSelect('erfahrung', [['einsteiger', 'Einsteiger'], ['erfahren', 'Erfahren'], ['sehr-erfahren', 'Sehr erfahren']], true)
                       ) : (
                         <p className="font-medium capitalize">
                           {formularDaten?.erfahrung?.replace('-', ' ') || 'Einsteiger'}
@@ -1027,17 +983,7 @@ export default function LeadDetailPage() {
                     <div>
                       <p className="text-sm text-gray-600 mb-1">Führerschein</p>
                       {isEditMode ? (
-                        <select
-                          value={editedData?.fuehrerschein || 'egal'}
-                          onChange={(e) =>
-                            setEditedData({ ...editedData, fuehrerschein: e.target.value })
-                          }
-                          className="w-full px-3 py-2 border rounded-md"
-                        >
-                          <option value="egal">Egal</option>
-                          <option value="ja">Ja</option>
-                          <option value="nein">Nein</option>
-                        </select>
+                        angabenSelect('fuehrerschein', [['egal', 'Egal'], ['ja', 'Ja'], ['nein', 'Nein']], true)
                       ) : (
                         <p className="font-medium capitalize">
                           {formularDaten?.fuehrerschein === 'egal' ? 'Egal' : formularDaten?.fuehrerschein === 'ja' ? 'Ja' : formularDaten?.fuehrerschein === 'nein' ? 'Nein' : 'Egal'}
@@ -1047,17 +993,7 @@ export default function LeadDetailPage() {
                     <div>
                       <p className="text-sm text-gray-600 mb-1">Geschlecht Betreuungskraft</p>
                       {isEditMode ? (
-                        <select
-                          value={editedData?.geschlecht || 'egal'}
-                          onChange={(e) =>
-                            setEditedData({ ...editedData, geschlecht: e.target.value })
-                          }
-                          className="w-full px-3 py-2 border rounded-md"
-                        >
-                          <option value="egal">Egal</option>
-                          <option value="weiblich">Weiblich</option>
-                          <option value="maennlich">Männlich</option>
-                        </select>
+                        angabenSelect('geschlecht', [['egal', 'Egal'], ['weiblich', 'Weiblich'], ['maennlich', 'Männlich']], true)
                       ) : (
                         <p className="font-medium capitalize">
                           {formularDaten?.geschlecht === 'egal' ? 'Egal' : formularDaten?.geschlecht === 'weiblich' ? 'Weiblich' : formularDaten?.geschlecht === 'maennlich' ? 'Männlich' : 'Egal'}
@@ -1066,11 +1002,53 @@ export default function LeadDetailPage() {
                     </div>
                   </div>
                   {isEditMode && (
-                    <div className="mt-4 p-3 bg-blue-50 rounded-md">
-                      <p className="text-sm text-blue-800">
-                        💡 Klicken Sie auf "Neu berechnen", um die Kalkulation mit den geänderten
-                        Daten zu aktualisieren.
+                    <div className="mt-4 p-3 bg-blue-50 rounded-md text-sm text-blue-800 space-y-1">
+                      <p>
+                        <strong>Speichern</strong> übernimmt die Angaben ohne neuen Preis; <strong>Neu berechnen &amp; speichern</strong>
+                        {' '}rechnet die Kalkulation neu (Kundenmail „Aktualisiertes Angebot" nur bei Preisänderung und gesetztem Häkchen).
                       </p>
+                      <p>
+                        Nach Mamamia gehen nur die geänderten Felder: Personenzahl, Pflegegrad, Mobilität, Nachteinsätze
+                        (gelten dort für beide Personen), weitere Personen, Wunsch-Sprache/-Führerschein/-Geschlecht,
+                        Budget bei Neuberechnung. Nicht nach Mamamia: Betreuungsbeginn, Erfahrung.
+                      </p>
+                    </div>
+                  )}
+                  {angabenStatus && (
+                    <div className={`mt-4 p-3 rounded-md text-sm ${
+                      angabenStatus.fehler || angabenStatus.mamamia.status === 'error' ? 'bg-red-50 text-red-800'
+                        : angabenStatus.mamamia.status === 'ok' ? 'bg-green-50 text-green-800'
+                        : 'bg-gray-50 text-gray-700'}`}>
+                      {angabenStatus.fehler ? (
+                        <p>❌ {angabenStatus.fehler}</p>
+                      ) : angabenStatus.unveraendert ? (
+                        <p>Keine Änderung — nichts gespeichert.</p>
+                      ) : (
+                        <>
+                          <p>
+                            Mamamia: {angabenStatus.mamamia.status === 'ok' ? '✅' : angabenStatus.mamamia.status === 'error' ? '❌' : '—'}{' '}
+                            {angabenStatus.mamamia.message}
+                            {angabenStatus.mamamia.patient_ids?.length ? ` — Patienten ${angabenStatus.mamamia.patient_ids.join(', ')} im MM-Panel reduzieren` : ''}
+                          </p>
+                          {angabenStatus.mail && (
+                            <p>
+                              Kundenmail: {angabenStatus.mail === 'angestossen' ? 'angestoßen' : angabenStatus.mail === 'error' ? 'Fehler (siehe Server-Log)' : 'nicht gesendet'}
+                            </p>
+                          )}
+                        </>
+                      )}
+                    </div>
+                  )}
+                  {lead.kalkulation?.mamamia_sync_pending && (
+                    <div className="mt-3 p-3 rounded-md bg-amber-50 text-amber-900 text-sm flex flex-wrap items-center justify-between gap-2">
+                      <span>
+                        ⚠️ Mamamia-Sync ausstehend ({lead.kalkulation.mamamia_sync_pending.felder.join(', ') || 'Budget'}):
+                        {' '}{lead.kalkulation.mamamia_sync_pending.error}
+                      </span>
+                      <Button size="sm" variant="outline" onClick={handleResyncRetry} disabled={isResyncing} className="flex items-center gap-2">
+                        {isResyncing ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
+                        Mamamia erneut synchronisieren
+                      </Button>
                     </div>
                   )}
                 </Card>

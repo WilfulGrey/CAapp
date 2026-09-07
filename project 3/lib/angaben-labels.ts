@@ -3,6 +3,13 @@
 // Admin-Route wie die Mails dieselben Wörter benutzen. Historisch lebte LABELS
 // lokal in email.ts:getEingangsbestaetigungEmailTemplate (Registry #55).
 
+// Die 9 fd-Keys (Spiegel von angaben-diff.FD_KEYS — hier, damit die Admin-Seite
+// nur ein Modul importiert).
+export const FD_LABEL_KEYS = [
+  'betreuung_fuer', 'pflegegrad', 'weitere_personen', 'mobilitaet', 'nachteinsaetze',
+  'deutschkenntnisse', 'erfahrung', 'fuehrerschein', 'geschlecht',
+] as const;
+
 export const LABELS: Record<string, Record<string, string>> = {
   betreuung_fuer: { '1-person': '1 Person', 'ehepaar': '2 Personen' },
   mobilitaet: { 'mobil': 'Mobil', 'rollator': 'Eingeschränkt – Rollator', 'rollstuhl': 'Rollstuhl', 'bettlaegerig': 'Bettlägerig' },
