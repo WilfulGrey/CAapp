@@ -37,7 +37,10 @@ export const MatchCard: FC<{
    *  all pass the gate. Local invitePhase='sending' on this card already
    *  hides the button — this prop covers the OTHER cards. */
   globalInviteLocked?: boolean;
-}> = ({ nurse, status, onNurseClick, onInvite, onInviteConfirm, onUndoDecline, hasInterestOrigin, isRecommended, globalInviteLocked }) => {
+  /** Pflegesituation fehlt noch: Der Knopf heißt dann „Profil anlegen &
+   *  einladen“ und führt über die Sperre direkt zum Formular (07.09.). */
+  profilFehlt?: boolean;
+}> = ({ nurse, status, onNurseClick, onInvite, onInviteConfirm, onUndoDecline, hasInterestOrigin, isRecommended, globalInviteLocked, profilFehlt }) => {
   const [invitePhase, setInvitePhase] = useState<'idle' | 'sending' | 'done'>('idle');
   const inits = initials(nurse.name);
   const name = displayName(nurse.name);
@@ -105,7 +108,10 @@ export const MatchCard: FC<{
          Karten liegen in einem grauen Kasten (#F5F5F6) und hatten fast
          denselben Ton — dadurch wirkten sie flach. Weiss hebt sie heraus,
          genau wie die Karten in der Mail. shadow-sm wie in BookedScreen. */
-      className={`group bg-white shadow-sm rounded-2xl border overflow-hidden transition-all ${
+      /* Ganze Karte öffnet das Profil (Clarity 07.09.: 15,5 % tote Klicks auf
+         Name, Plaketten und Faktenzeile). Knöpfe stoppen die Weitergabe. */
+      onClick={onNurseClick}
+      className={`group bg-white shadow-sm rounded-2xl border overflow-hidden transition-all cursor-pointer ${
         status === 'declined'
           ? 'opacity-40 border-gray-200'
           : status === 'invited'
@@ -113,7 +119,7 @@ export const MatchCard: FC<{
           : 'border-zinc-300 hover:border-zinc-500'
       }`}
     >
-      <div className="px-4 pt-4 pb-3 cursor-pointer active:bg-gray-50" onClick={onNurseClick}>
+      <div className="px-4 pt-4 pb-3 active:bg-gray-50">
         <div className="flex items-center gap-3.5">
           <div className="flex-shrink-0">
             {nurse.image ? (
@@ -214,7 +220,7 @@ export const MatchCard: FC<{
             className="flex items-center gap-1.5 text-xs font-bold bg-[#E76F63] text-white px-4 py-1.5 rounded-full hover:bg-[#D65E52] transition-colors active:scale-95 shadow-sm"
           >
             <UserPlus className="w-3.5 h-3.5" />
-            Einladen
+            {profilFehlt ? 'Profil anlegen & einladen' : 'Einladen'}
           </button>
         )}
       </div>

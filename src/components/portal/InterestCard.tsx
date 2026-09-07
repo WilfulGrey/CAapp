@@ -30,7 +30,9 @@ export const InterestCard: FC<{
    *  render Einladen disabled so concurrent clicks can't race the
    *  rate-limit gate (the active card still shows its own spinner). */
   globalInviteLocked?: boolean;
-}> = ({ nurse, status, onNurseClick, onInvite, onInviteConfirm, onDismiss, exiting, globalInviteLocked }) => {
+  /** Pflegesituation fehlt noch (siehe MatchCard). */
+  profilFehlt?: boolean;
+}> = ({ nurse, status, onNurseClick, onInvite, onInviteConfirm, onDismiss, exiting, globalInviteLocked, profilFehlt }) => {
   const [invitePhase, setInvitePhase] = useState<'idle' | 'sending' | 'done'>('idle');
   const [dismissPhase, setDismissPhase] = useState<'idle' | 'sending'>('idle');
   const inits = initials(nurse.name);
@@ -67,7 +69,8 @@ export const InterestCard: FC<{
     <div className="relative">
       <div
         /* Weiss wie MatchCard (Martin, 03.09.2026). */
-        className={`group bg-white shadow-sm rounded-2xl border overflow-hidden transition-all ${
+        onClick={onNurseClick}
+        className={`group bg-white shadow-sm rounded-2xl border overflow-hidden transition-all cursor-pointer ${
           exiting ? 'opacity-0 -translate-x-2 pointer-events-none' : ''
         } ${
           status === 'dismissed'
@@ -77,7 +80,7 @@ export const InterestCard: FC<{
             : 'border-zinc-300 hover:border-zinc-500'
         }`}
       >
-      <div className="px-4 pt-4 pb-3 cursor-pointer active:bg-gray-50" onClick={onNurseClick}>
+      <div className="px-4 pt-4 pb-3 active:bg-gray-50">
         <div className="flex items-center gap-3.5">
           <div className="flex-shrink-0">
             {nurse.image ? (
@@ -172,7 +175,7 @@ export const InterestCard: FC<{
                   className="flex items-center gap-1.5 text-xs font-bold bg-[#E76F63] text-white px-4 py-1.5 rounded-full hover:bg-[#D65E52] transition-colors active:scale-95 shadow-sm"
                 >
                   <UserPlus className="w-3.5 h-3.5" />
-                  Einladen
+                  {profilFehlt ? 'Profil anlegen & einladen' : 'Einladen'}
                 </button>
               )}
             </>
