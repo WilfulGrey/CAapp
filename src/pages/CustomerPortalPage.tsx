@@ -2964,9 +2964,46 @@ const CustomerPortalPage: FC = () => {
                   Button. Alle drei waren Kopien dessen, was die Abschnitte
                   darunter ohnehin tragen (Abschnitt „Pflegesituation" hat
                   einen eigenen Karten-Kopf mit genau diesem Aufruf). */}
-              <p className="text-[16px] leading-relaxed mb-5" style={{color:'#71717A'}}>
+              <p className="text-[16px] leading-relaxed mb-4" style={{color:'#71717A'}}>
                 {heroCopy.subtitle}
               </p>
+
+              {/* Vertrauen im Kopf (Martin, 07.09.: „sehr nüchtern, ohne
+                  Vertrauenselemente"): Siegel mit drei Fakten, Presse-Logos
+                  und die Beraterin mit den zwei kurzen Wegen — dieselben
+                  Elemente wie im Kopf der Angebotsmail. Kein neues
+                  Gestaltungsmittel: Siegel, Logos und Marta-Karte gibt es
+                  weiter unten schon; hier stehen sie dort, wo der Kunde
+                  entscheidet, ob er weiterliest. */}
+              <div className="flex items-center gap-3 mb-3">
+                <img src="/badge-testsieger.webp" alt="Testsieger Die Welt" className="h-12 w-auto flex-shrink-0 object-contain" />
+                <p className="text-[14px] leading-snug" style={{color:'#52525B'}}>
+                  <span className="font-semibold" style={{color:'#18181B'}}>6× Testsieger DIE&nbsp;WELT</span><br/>
+                  20 Jahre Erfahrung · 60.000+ Einsätze · eigene, fest angestellte Pflegekräfte
+                </p>
+              </div>
+              <div className="flex items-center gap-4 mb-4 pl-0.5">
+                <span className="text-[11px] font-semibold uppercase tracking-wider flex-shrink-0" style={{color:'#A1A1AA'}}>Bekannt aus</span>
+                {[
+                  { src: '/media-welt.webp', alt: 'Die Welt' },
+                  { src: '/media-faz.webp', alt: 'FAZ' },
+                  { src: '/media-ard.webp', alt: 'ARD' },
+                  { src: '/media-sat1.webp', alt: 'SAT.1' },
+                ].map(logo => (
+                  <img key={logo.src} src={logo.src} alt={logo.alt} className="h-4 w-auto object-contain opacity-60 grayscale" />
+                ))}
+              </div>
+              <div className="flex items-start gap-3 rounded-2xl px-3.5 py-3 mb-2" style={{background:'#FAF8F4', border:'1px solid #EBE2D2'}}>
+                <img src="/marta-kapcio.jpg" alt="Marta Kapcio" className="w-12 h-12 rounded-full object-cover object-top flex-shrink-0 border border-[#E9E9EB]" />
+                <div className="flex-1 min-w-0">
+                  <p className="text-[15px] font-semibold leading-tight" style={{color:'#3D2B1F'}}>Marta Kapcio, Ihre persönliche Beraterin</p>
+                  <p className="text-[13px] mt-0.5" style={{color:'#8B7355'}}>Mo–Sa 8–18 Uhr · begleitet Sie bis zum Start der Betreuung</p>
+                  <div className="flex gap-2 mt-2">
+                    <a href="tel:+4989200000830" className="text-[13px] font-semibold px-3 py-1.5 rounded-full border" style={{color:'#8B7355', borderColor:'#C5B49A', background:'#FFFFFF'}}>Anrufen</a>
+                    <a href="https://wa.me/4989200000830" target="_blank" rel="noopener noreferrer" className="text-[13px] font-semibold px-3 py-1.5 rounded-full text-white" style={{background:'#25D366'}}>WhatsApp</a>
+                  </div>
+                </div>
+              </div>
 
               {/* Trust-Zeile: ohne Fläche und Rahmen im schlanken Hero — als
                   Pill wirkte sie wie der Primärbutton und war ein
@@ -3167,7 +3204,7 @@ const CustomerPortalPage: FC = () => {
              weiter unten: doppelte ids sind ungueltig, und getElementById
              nimmt ohnehin den ersten. */}
         {!hasPending && (
-          <div className="px-1 pt-2" id="pflegekraefte">
+          <div className="px-1 pt-2" id="pflegekraefte" style={{scrollMarginTop:96}}>
             <h2 className="text-[1.2rem] font-bold tracking-tight" style={{color:'#18181B'}}>Passende Pflegekräfte einladen</h2>
           </div>
         )}
@@ -3468,7 +3505,7 @@ const CustomerPortalPage: FC = () => {
           // offen — nach dem Speichern ist es Referenz und fällt auf den
           // ruhigen Rahmen zurück.
           return (
-          <div id="patientendaten" className="px-1 pt-2">
+          <div id="patientendaten" className="px-1 pt-2 scroll-mt-24">
             <button
               type="button"
               className="w-full flex items-center justify-between text-left"
