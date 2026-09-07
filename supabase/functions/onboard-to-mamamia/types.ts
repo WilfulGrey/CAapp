@@ -72,6 +72,8 @@ export interface Lead {
   mamamia_job_offer_id: number | null;
   mamamia_user_token: string | null;
   mamamia_onboarded_at: string | null;
+  // Registry #54 — claim onboardingu (patrz onboard.ts). Optional: stare fixtury.
+  mamamia_onboarding_started_at?: string | null;
 }
 
 // Mamamia PatientInputType (introspected from beta GraphQL on 2026-04-28

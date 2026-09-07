@@ -59,6 +59,9 @@ function makeLead(overrides: Partial<Lead> = {}): Lead {
 interface FakeSupabase {
   leads: Map<string, Lead>;
   updated: Array<{ id: string; patch: Partial<Lead> }>;
+  claims: string[];
+  // Registry #54 — wynik claimu; undefined = fake bez claimOnboarding (stare zachowanie)
+  claimOnboarding?: (leadId: string, staleBefore: string) => Promise<boolean>;
   fetchLead(token: string): Lead | null;
   updateLead(id: string, patch: Partial<Lead>): void;
   fetchLeadJob(jobId: string, leadId: string): Promise<{ mamamia_job_offer_id: number } | null>;
@@ -67,12 +70,24 @@ interface FakeSupabase {
 
 interface FakeLeadJob { id: string; lead_id: string; mamamia_job_offer_id: number; status?: string; }
 
-function makeFakeSupabase(initialLeads: Lead[] = [], leadJobs: FakeLeadJob[] = []): FakeSupabase {
+function makeFakeSupabase(
+  initialLeads: Lead[] = [],
+  leadJobs: FakeLeadJob[] = [],
+  opts: { claim?: boolean } = {},
+): FakeSupabase {
   const leads = new Map(initialLeads.map((l) => [l.token ?? "", l]));
   const updated: FakeSupabase["updated"] = [];
+  const claims: string[] = [];
   return {
     leads,
     updated,
+    claims,
+    ...(opts.claim === undefined ? {} : {
+      claimOnboarding(leadId: string) {
+        claims.push(leadId);
+        return Promise.resolve(opts.claim as boolean);
+      },
+    }),
     fetchLead(token) {
       return leads.get(token) ?? null;
     },
@@ -677,4 +692,69 @@ Deno.test("onboardLead: panel token push failure is best-effort — onboard stil
   assertEquals(supa.updated[0].patch.mamamia_customer_id, 7566);
   // No token mutation reached Mamamia (panel was down).
   assertEquals(mm.requests.some((r) => r.query.includes("UpdateCustomerToken")), false);
+});
+
+// ─── Registry #54: claim onboardingu (wyścig przeglądarka ↔ Empfehlungs-Mail) ─
+
+Deno.test("onboardLead (#54): claim granted → normal onboard, claim called once for the lead", async () => {
+  _resetAgencyTokenCache();
+  const lead = makeLead();
+  const supa = makeFakeSupabase([lead], [], { claim: true });
+  const mm = fakeMamamia([
+    { data: { LoginAgency: { id: 1, name: "P", email: "x", token: "t" } } },
+    { data: { StoreCustomer: { id: 7566, customer_id: "ts-18-7566", status: "draft" } } },
+    { data: { StoreJobOffer: { id: 16225, job_offer_id: "ts-18-7566-1", title: "t", status: "search" } } },
+  ]);
+  const result = await onboardLead({ leadToken: "valid-token", secrets: SECRETS, supabase: supa, fetchFn: mm.fetch, now: NOW });
+  assertEquals(result.customer_id, 7566);
+  assertEquals(supa.claims, [lead.id]);
+});
+
+Deno.test("onboardLead (#54): claim denied → waits for the concurrent onboard, returns ITS ids, zero Mamamia calls", async () => {
+  _resetAgencyTokenCache();
+  const lead = makeLead();
+  const supa = makeFakeSupabase([lead], [], { claim: false });
+  const mm = fakeMamamia([]); // any call would throw "unexpected call"
+  let polls = 0;
+  const result = await onboardLead({
+    leadToken: "valid-token", secrets: SECRETS, supabase: supa, fetchFn: mm.fetch, now: NOW,
+    sleep: () => {
+      // Zwycięzca (druga instancja) kończy po 3 s — symulujemy zapis do leads.
+      if (++polls === 3) Object.assign(lead, { mamamia_customer_id: 9001, mamamia_job_offer_id: 9002 });
+      return Promise.resolve();
+    },
+  });
+  assertEquals(result.customer_id, 9001);
+  assertEquals(result.job_offer_id, 9002);
+  assertEquals(mm.requests.length, 0);
+  assertEquals(supa.updated.length, 0); // nie zapisuje nic — cudzy wynik
+});
+
+Deno.test("onboardLead (#54): claim denied + winner never finishes → 'onboarding in progress' (no second customer)", async () => {
+  _resetAgencyTokenCache();
+  const lead = makeLead();
+  const supa = makeFakeSupabase([lead], [], { claim: false });
+  const mm = fakeMamamia([]);
+  await assertRejects(
+    () => onboardLead({ leadToken: "valid-token", secrets: SECRETS, supabase: supa, fetchFn: mm.fetch, now: NOW, sleep: () => Promise.resolve() }),
+    Error,
+    "onboarding in progress",
+  );
+  assertEquals(mm.requests.length, 0);
+});
+
+Deno.test("onboardLead (#54): StoreCustomer error → claim released (mamamia_onboarding_started_at=null) so a refresh can retry", async () => {
+  _resetAgencyTokenCache();
+  const lead = makeLead();
+  const supa = makeFakeSupabase([lead], [], { claim: true });
+  const mm = fakeMamamia([
+    { data: { LoginAgency: { id: 1, name: "P", email: "x", token: "t" } } },
+    { errors: [{ message: "validation" }] },
+  ]);
+  await assertRejects(
+    () => onboardLead({ leadToken: "valid-token", secrets: SECRETS, supabase: supa, fetchFn: mm.fetch, now: NOW }),
+    Error,
+    "validation",
+  );
+  assertEquals(supa.updated, [{ id: lead.id, patch: { mamamia_onboarding_started_at: null } }]);
 });

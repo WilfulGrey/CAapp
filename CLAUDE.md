@@ -841,6 +841,32 @@ połknięta jako `seeded`, klientka nie dostała maila). Zasady:
 
 ---
 
+### 14. Onboard ma atomowy claim — dwa równoległe wołania to był DUPLIKAT klienta
+
+`onboard-to-mamamia` jest wołany dla tego samego leada z DWÓCH stron w tej samej
+sekundzie: przeglądarka (redirect z kalkulatora → portal) i `send-scheduled-emails`
+(blok „Unsere Empfehlung” w Mail 1 potrzebuje `job_offer_id`, Registry #39). Do
+Registry #54 `onboardLead` sprawdzał `mamamia_customer_id` i szedł całą ścieżką
+(LoginAgency → StoreCustomer → StoreJobOffer → panel push → dopiero zapis) — oba
+wołania widziały pustą kolumnę i zakładały DWÓCH klientów (prod 2026-09-07:
+10693 + 10694, MM nie ma delete; formularz zapisany na jednym, lead wskazywał
+drugiego). Latentne, bo ciepła instancja kończy w 2–3 s i mail trafia w cache-hit;
+zimny start po redeployu (~10 s) otwierał okno.
+
+- **Claim = jeden UPDATE** (`index.ts:claimOnboarding`): `set
+  mamamia_onboarding_started_at=now() where id=$1 and mamamia_customer_id is null
+  and (claim is null or claim < now()-2min)` + `select id` — atomowy w Postgresie.
+  Zwycięzca tworzy klienta; **przegrany polluje `fetchLead` co 1 s do 25 s** i
+  zwraca cudzy wynik jak cache-hit (log `joined concurrent onboard`). Timeout ⇒
+  `onboarding in progress` (500 → refresh). Błąd zwycięzcy ⇒ claim zwalniany
+  (`null`), żeby refresh nie czekał 2 min.
+- Kolumna `leads.mamamia_onboarding_started_at` (migracja 20260907160000, nullable).
+  `SupabaseLike.claimOnboarding` jest opcjonalne — fake bez niego = stare
+  zachowanie; testy `(#54)` w `onboard.test.ts`.
+- **Reguła:** każdy nowy wołający onboardu (route, cron, mail) NIE potrzebuje
+  własnego „poll zamiast onboardu” — claim to załatwia; ale zimny start onboardu
+  wciąż trwa ~10 s, więc nie zakładaj, że „przeglądarka zawsze wygrywa”.
+
 ## Field mapping reference
 
 To jest source-of-truth co gdzie jest collected i jak mapowane przez

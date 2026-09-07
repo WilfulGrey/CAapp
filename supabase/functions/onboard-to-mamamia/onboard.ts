@@ -30,7 +30,20 @@ export interface SupabaseLike {
   fetchNewestPlannedJob?(
     leadId: string,
   ): Promise<{ mamamia_job_offer_id: number } | null>;
+  // Registry #54 — atomowy claim: JEDEN UPDATE `... where id=$1 and
+  // mamamia_customer_id is null and (mamamia_onboarding_started_at is null or
+  // < staleBefore)`. true = ten wołający tworzy klienta; false = ktoś inny
+  // właśnie to robi (czekamy na jego wynik zamiast zakładać drugiego klienta).
+  // Optional: fake bez tej metody = stare zachowanie (bez claimu).
+  claimOnboarding?(leadId: string, staleBefore: string): Promise<boolean>;
 }
+
+// Claim starszy niż to = padnięty proces (edge fn ubita w trakcie) → wolno przejąć.
+const CLAIM_STALE_MS = 2 * 60 * 1000;
+// Czekanie na cudzy onboard: onboard trwa 2–10 s (LoginAgency + Locations +
+// StoreCustomer + StoreJobOffer + panel push), 25 s to komfortowy margines.
+const WAIT_POLL_MS = 1000;
+const WAIT_MAX_POLLS = 25;
 
 // ─── Secrets bundle ─────────────────────────────────────────────────────────
 
@@ -65,6 +78,8 @@ export interface OnboardOptions {
   supabase: SupabaseLike;
   fetchFn?: typeof fetch;
   now?: () => Date;
+  /** Test hook — czekanie na cudzy onboard (Registry #54). */
+  sleep?: (ms: number) => Promise<void>;
 }
 
 // ─── GraphQL mutations ─────────────────────────────────────────────────────
@@ -289,7 +304,10 @@ async function resolveScopedJobOfferId(
 // ─── Main flow ─────────────────────────────────────────────────────────────
 
 export async function onboardLead(opts: OnboardOptions): Promise<OnboardResult & { lead_id: string; email: string }> {
-  const { leadToken, jobId, mirrorToken, secrets, supabase, fetchFn = globalThis.fetch, now = () => new Date() } = opts;
+  const {
+    leadToken, jobId, mirrorToken, secrets, supabase, fetchFn = globalThis.fetch, now = () => new Date(),
+    sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms)),
+  } = opts;
 
   // 1. Lookup lead
   const lead = await supabase.fetchLead(leadToken);
@@ -329,6 +347,67 @@ export async function onboardLead(opts: OnboardOptions): Promise<OnboardResult &
       email: lead.email,
     };
   }
+
+  // 3b. Claim (Registry #54): przeglądarka (redirect z kalkulatora) i
+  //     send-scheduled-emails (Empfehlungs-Mail) wołają onboard w tej samej
+  //     sekundzie; bez claimu oba robią cache-miss → DWÓCH klientów w MM
+  //     (prod 2026-09-07: 10693 + 10694, MM nie ma delete). Przegrany czeka
+  //     na wynik zwycięzcy i zwraca go jak cache-hit.
+  if (supabase.claimOnboarding) {
+    const staleBefore = new Date(now().getTime() - CLAIM_STALE_MS).toISOString();
+    const claimed = await supabase.claimOnboarding(lead.id, staleBefore);
+    if (!claimed) {
+      const done = await waitForOnboarded(supabase, leadToken, sleep);
+      if (!done) throw new Error("onboarding in progress");
+      console.log(`[onboard] lead ${lead.id}: joined concurrent onboard → customer ${done.mamamia_customer_id}`);
+      return {
+        customer_id: done.mamamia_customer_id,
+        job_offer_id: await resolveScopedJobOfferId(
+          supabase, done.id, done.mamamia_job_offer_id, jobId,
+        ),
+        lead_id: done.id,
+        email: done.email,
+      };
+    }
+  }
+
+  try {
+    return await createCustomerAndJob({ lead, leadToken, jobId, secrets, supabase, fetchFn, now });
+  } catch (e) {
+    // Błąd → zwolnij claim, żeby odświeżenie strony mogło spróbować od razu
+    // (inaczej 2 min blokady z "onboarding in progress").
+    if (supabase.claimOnboarding) {
+      try { await supabase.updateLead(lead.id, { mamamia_onboarding_started_at: null }); } catch { /* best-effort */ }
+    }
+    throw e;
+  }
+}
+
+async function waitForOnboarded(
+  supabase: SupabaseLike,
+  leadToken: string,
+  sleep: (ms: number) => Promise<void>,
+): Promise<(Lead & { mamamia_customer_id: number; mamamia_job_offer_id: number }) | null> {
+  for (let i = 0; i < WAIT_MAX_POLLS; i++) {
+    await sleep(WAIT_POLL_MS);
+    const l = await supabase.fetchLead(leadToken);
+    if (l?.mamamia_customer_id && l.mamamia_job_offer_id) {
+      return l as Lead & { mamamia_customer_id: number; mamamia_job_offer_id: number };
+    }
+  }
+  return null;
+}
+
+async function createCustomerAndJob(args: {
+  lead: Lead;
+  leadToken: string;
+  jobId?: string;
+  secrets: OnboardSecrets;
+  supabase: SupabaseLike;
+  fetchFn: typeof fetch;
+  now: () => Date;
+}): Promise<OnboardResult & { lead_id: string; email: string }> {
+  const { lead, leadToken, jobId, secrets, supabase, fetchFn, now } = args;
 
   // 4. Login as agency (cached)
   const agencyToken = await getOrRefreshAgencyToken({
