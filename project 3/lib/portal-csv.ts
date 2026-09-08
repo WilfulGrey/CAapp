@@ -20,6 +20,11 @@
  *  Zeilenumbrueche INNERHALB eines Felds (RequestDetail ist mehrzeilig).
  *  Genau das, woran ein split('\n') scheitern wuerde. */
 export function parseCsv(text: string): string[][] {
+  /* BOM: die Pflegehilfe-Datei beginnt mit U+FEFF (EF BB BF) und Buffer.toString('utf8')
+     behaelt ihn — Spalte 0 hiesse sonst "<U+FEFF>RequestNumber" und wert('RequestNumber')
+     griffe ins Leere (Registry #57). Signatur, kein Inhalt — Dekodierung, kein Fallback.
+     Bewusst HIER statt im Abholer, damit der Unit-Test den Prod-String abdeckt. */
+  text = text.replace(/^\uFEFF/, '');
   const zeilen: string[][] = [];
   let feld = '';
   let zeile: string[] = [];

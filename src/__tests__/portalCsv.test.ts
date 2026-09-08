@@ -6,8 +6,9 @@ import { parsePflegehilfe } from '../../project 3/lib/portal-parser';
 /* Die ECHTE CSV aus der ersten Portal-Mail (Zauner, prod uid 14) —
  * verbatim, inkl. mehrzeiligem, gequotetem RequestDetail. Genau dieser
  * Anhang bewies, dass der Mailtext (zumal weitergeleitet) die schlechtere
- * Quelle ist: dort fehlten Name, Telefon, Pflegegrad und Mobilität. */
-const zaunerCsv = `RequestNumber,Sex,AcademicDegree,FirstName,SurName,AddressLine1,ZipCode,City,CountryIso2,Email,PhoneType,Phone,Availability,SeniorSex,SeniorAcademicDegree,SeniorFirstName,SeniorSurName,SeniorRelationship,SeniorLiveSituation,SeniorCareLevel,SeniorMobility,SeniorAge,SeniorMedicalProcess,RequestZipCode,RequestRegion,RequestCountryIso2,RequestDetail,ProductName,EmployeeFirstName,EmployeeSurName,FinishedDateTime,CreateDateTime
+ * Quelle ist: dort fehlten Name, Telefon, Pflegegrad und Mobilität.
+ * Die echte Datei beginnt mit BOM U+FEFF (EF BB BF) — Registry #57. */
+const zaunerCsv = '\uFEFF' + `RequestNumber,Sex,AcademicDegree,FirstName,SurName,AddressLine1,ZipCode,City,CountryIso2,Email,PhoneType,Phone,Availability,SeniorSex,SeniorAcademicDegree,SeniorFirstName,SeniorSurName,SeniorRelationship,SeniorLiveSituation,SeniorCareLevel,SeniorMobility,SeniorAge,SeniorMedicalProcess,RequestZipCode,RequestRegion,RequestCountryIso2,RequestDetail,ProductName,EmployeeFirstName,EmployeeSurName,FinishedDateTime,CreateDateTime
 13535387,Herr,,Michael,Zauner,,,,DE,family.zauner@gmail.com,Mobile,+49 17641239037,Ganztägig telefonisch gut erreichbar,,,,,Schwiegervater,Lebt alleine,Pflegegrad 3,Mobil ohne Hilfsmittel,,Demenz,95703,Plößberg,DE,"Auftraggeber/Kontaktperson: Angehörige/Betreuer
 Budgetrahmen: 2900€ bis 3500€
 Dauer: Unbefristet
@@ -34,6 +35,10 @@ describe('parseCsv (RFC 4180)', () => {
     expect(zeilen).toHaveLength(2); // Kopf + eine Datenzeile
     expect(zeilen[1][0]).toBe('13535387');
     expect(zeilen[1][26]).toContain('Bedarf: In Wochen'); // RequestDetail komplett
+  });
+
+  it('UTF-8-BOM am Dateianfang wird abgestreift (Registry #57)', () => {
+    expect(parseCsv('\uFEFF' + 'a,b')[0][0]).toBe('a');
   });
 
   it('escapte Anführungszeichen ("")', () => {

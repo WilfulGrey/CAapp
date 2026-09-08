@@ -458,6 +458,7 @@ async function arbeiteAb(cfg: Konfig, portal: string, client: ImapFlow, db: Supa
           const zeilen2 = parseCsv(csvAnhang.content.toString('utf8'));
           if (zeilen2.length >= 2 && csvZeileBrauchbar(zeilen2[0], zeilen2[1])) {
             csv = csvZuLeadZeile(zeilen2[0], zeilen2[1]);
+            if (!csv.zusatz.RequestNumber) log(`  ⚠ ${portal} #${uid} CSV ohne RequestNumber — portal_lead_id fehlt`);
           } else if (zeilen2.length >= 2) {
             // Handverstuemmelte CSV (Zeile zu 1 Feld verklumpt) — lieber der
             // vollstaendige Mailtext als ein leerer Spaltensalat.
