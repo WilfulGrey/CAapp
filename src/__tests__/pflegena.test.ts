@@ -34,20 +34,26 @@ const kopf: MailKopf = {
   text: ANFRAGE,
 };
 
-/* So sieht die Werkzeug-Antwort für diese Mail aus: sechs Felder stehen im
- * Text, drei nicht. Nächteinsätze, Pflegegrad und — trotz "Führerschein
- * egal" — nichts Erfundenes: "egal" IST ein Kanonwert, also wird es gelesen. */
+/* Die Werkzeug-Antwort für diese Mail — VERBATIM aus einem echten Lauf gegen
+ * claude-sonnet-5 (08.09.2026, 537 Tokens rein / 520 raus), nicht ausgedacht.
+ *
+ * Bemerkenswert und beabsichtigt: `mobilitaet` fehlt. Der Text sagt nur etwas
+ * über den TRANSFER ("Hebetechnik erforderlich, falls Transfer Bett/Rollstuhl,
+ * er kann kurz stehen") — und nicht, wie der Patient sich fortbewegt. Genau
+ * das verlangt die Regel im SYSTEM-Prompt; "Rollstuhl" daraus abzuleiten wäre
+ * ein erfundenes Mapping (heilige Regel 1.5). Die Lücke füllt später
+ * ergaenzeAngaben sichtbar als Annahme. */
 const gelesen = {
   ist_anfrage: true,
   mehrere_anfragen: false,
   nachtrag: false,
   betreuung_fuer: '1-person',      // sie ist NICHT pflegebedürftig
   weitere_personen: 'ja',          // ...lebt aber im Haushalt und hilft mit
-  mobilitaet: 'rollator',          // "er kann kurz stehen" — nicht bettlägerig
   deutschkenntnisse: 'kommunikativ', // "wenigstens mittlere"
   erfahrung: 'erfahren',           // "eine liebe erfahrene Betreuerin"
   fuehrerschein: 'egal',
   geschlecht: 'weiblich',          // "Betreuerin"
+  mobilitaet: null,                // der Text sagt nichts über die Fortbewegung
   nachteinsaetze: null,            // steht nicht im Text
   pflegegrad: null,                // steht nicht im Text
   care_start_timing: null,
@@ -73,7 +79,6 @@ describe('pruefeAnfrage — echte Anfrage Walde', () => {
     expect(r.body.angaben).toEqual({
       betreuung_fuer: '1-person',
       weitere_personen: 'ja',
-      mobilitaet: 'rollator',
       deutschkenntnisse: 'kommunikativ',
       erfahrung: 'erfahren',
       fuehrerschein: 'egal',
@@ -82,18 +87,19 @@ describe('pruefeAnfrage — echte Anfrage Walde', () => {
     /* Die Lücken sind ABWESEND, nicht null: erst ergaenzeAngaben füllt sie
        (mit dem teureren Wert) und schreibt sie nach angenommene_felder.
        Käme hier null an, würde die Kalkulation es als Angabe lesen. */
+    expect(r.body.angaben).not.toHaveProperty('mobilitaet');
     expect(r.body.angaben).not.toHaveProperty('nachteinsaetze');
     expect(r.body.angaben).not.toHaveProperty('pflegegrad');
     expect(r.unbekannt).toEqual([]);
     expect(r.hinweise).toEqual([]);
   });
 
-  it('„Hebetechnik erforderlich" verschiebt die Mobilität nicht', () => {
-    // Der Satz beschreibt den Transfer, nicht die Gehfähigkeit. Er gehört in
-    // den Kontext — die Ableitung „Heben ⇒ bettlägerig" wäre ein erfundenes
-    // Mapping und würde den Preis um 100 € heben.
+  it('„Hebetechnik erforderlich" wird nicht zu einer Mobilitätsstufe', () => {
+    // Beobachtet im Live-Lauf: das Modell lässt mobilitaet leer, statt aus
+    // „Transfer Bett/Rollstuhl" eine Stufe zu erfinden. Der Satz gehört in
+    // den Kontext — dort steht er auch.
     const r = ausgabe();
-    expect(r.ok && r.body.angaben.mobilitaet).toBe('rollator');
+    expect(r.ok && r.body.angaben.mobilitaet).toBeUndefined();
     expect(r.ok && r.body.details.block).toMatch(/Hebetechnik/);
   });
 
