@@ -182,7 +182,7 @@ export const InterestCard: FC<{
                   className="flex items-center gap-1.5 text-xs font-bold bg-[#E76F63] text-white px-4 py-1.5 rounded-full hover:bg-[#D65E52] transition-colors active:scale-95 shadow-sm"
                 >
                   <UserPlus className="w-3.5 h-3.5" />
-                  {profilFehlt ? 'Profil anlegen & einladen' : 'Einladen'}
+                  {profilFehlt ? 'Profil vervollständigen & einladen' : 'Einladen'}
                 </button>
               )}
             </>

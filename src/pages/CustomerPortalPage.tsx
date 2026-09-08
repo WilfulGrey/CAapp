@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useRef, FC } from 'react';
-import { Check, Bell, Phone, AlertCircle, ChevronDown, X, ArrowLeft, ArrowRight, Heart } from 'lucide-react';
+import { Check, Bell, Phone, AlertCircle, AlertTriangle, ChevronDown, X, ArrowLeft, ArrowRight, Heart } from 'lucide-react';
 import { Nurse } from '../types';
 import { displayName } from '../components/portal/shared';
 import {
@@ -1720,7 +1720,7 @@ const CustomerPortalPage: FC = () => {
   };
 
   /* Ein Weg zum Formular für alle Knöpfe (Mail-Streifen, Schritt 1,
-     „Profil anlegen & einladen", Hinweis über den Karten): aufklappen,
+     „Profil vervollständigen & einladen", Hinweis über den Karten): aufklappen,
      Stepper öffnen, hinscrollen. */
   const zurPflegesituation = () => {
     setPatientExpandedManual(true);
@@ -2402,6 +2402,8 @@ const CustomerPortalPage: FC = () => {
           // einer Zahlungsfrage.
           { text: 'Erst auswählen, dann buchen' },
           { text: 'Keine Vermittlungsgebühr' },
+          // Martin, 08.09.: beantwortet die Sorge, ob man schon zahlt.
+          { text: 'Kosten erst, wenn die Pflegekraft da ist' },
         ];
         return (
         <div style={{background:'#FFFFFF', borderBottom:'1px solid #E9E9EB'}}>
@@ -2443,12 +2445,7 @@ const CustomerPortalPage: FC = () => {
                 <div className="rounded-2xl border px-5 py-5" style={{background:'#F4F4F6', borderColor:'#D4D4D8'}}>
                   <p className="text-[2.5rem] font-bold leading-none tracking-tight tabular-nums" style={{color:'#18181B'}}>{formatEuro(brutto)}</p>
                   <p className="text-[15px] mt-2.5 leading-relaxed" style={{color:'#71717A'}}>
-                    Monatlich inkl. Steuern, Gebühren und Sozialabgaben.
-                  </p>
-                  {/* Tagespreis direkt am Monatspreis (Martin, 07.09.: Portal
-                      wie die Angebotsmail) — vorher nur im Aufklapper. */}
-                  <p className="text-[15px] mt-1 leading-relaxed" style={{color:'#18181B'}}>
-                    Entspricht <span className="font-semibold tabular-nums">{formatEuro(tagessatz)} / Tag</span> — tagesgenau abgerechnet.
+                    Monatlich inkl. Steuern, Gebühren und Sozialabgaben. Zzgl. Kost und Logis sowie Reisekosten (125 € pro Fahrt).
                   </p>
 
                   {/* Konditionen stehen OFFEN unter dem Preis (Martin, 11.08.):
@@ -2477,6 +2474,12 @@ const CustomerPortalPage: FC = () => {
                       Statistik-Spalten): echtes Welt-Siegel + EIN Fließsatz —
                       Wortlaut von Martin. Die ausführlichen Kacheln bleiben
                       unten im Kontakt-Block. */}
+                  <div className="mt-4 pt-4 flex items-center gap-3" style={{borderTop:'1px solid #E9E9EB'}}>
+                    <img src="/badge-testsieger.webp" alt="Testsieger Die Welt" className="h-11 w-auto flex-shrink-0 object-contain" />
+                    <p className="text-[15px] leading-snug" style={{color:'#52525B'}}>
+                      <span className="font-semibold" style={{color:'#18181B'}}>6× Testsieger DIE&nbsp;WELT</span><br/>20&nbsp;Jahre Erfahrung · 60.000+ Einsätze
+                    </p>
+                  </div>
                   {/* Pflegeheim-Vergleich sichtbar am Preis (Martin, 07.09.):
                       dieselbe Rechnung wie im Aufklapper „Was bleibt für Sie
                       übrig" (aus dem angezeigten Brutto, nur Posten mit
@@ -2492,18 +2495,12 @@ const CustomerPortalPage: FC = () => {
                     return (
                       <div className="mt-4 rounded-xl px-4 py-3" style={{background:'#EEF7F1', border:'1px solid #CFE8D8'}}>
                         <p className="text-[14px] leading-relaxed" style={{color:'#1F6B41'}}>
-                          <span className="font-semibold">Zuhause statt Pflegeheim:</span> Ihr Eigenanteil liegt bei {formatEuro(eigen)} — im Pflegeheim wären es im ersten Jahr durchschnittlich 3.364 €. <span className="font-semibold">{formatEuro(guenstiger)} weniger im Monat.</span>
+                          <span className="font-semibold">Zuhause statt Pflegeheim:</span> Im Pflegeheim zahlen Sie im ersten Jahr durchschnittlich 3.364 € im Monat selbst. Zuhause mit Primundus sind es nach Zuschüssen etwa {formatEuro(eigen)} — <span className="font-semibold">rund {formatEuro(guenstiger)} weniger im Monat.</span>
                           <span className="block mt-1 text-[12px]" style={{color:'#4C7A5F'}}>Quelle: vdek-Auswertung, Stand 1. Juli 2026.</span>
                         </p>
                       </div>
                     );
                   })()}
-                  <div className="mt-4 pt-4 flex items-center gap-3" style={{borderTop:'1px solid #E9E9EB'}}>
-                    <img src="/badge-testsieger.webp" alt="Testsieger Die Welt" className="h-11 w-auto flex-shrink-0 object-contain" />
-                    <p className="text-[15px] leading-snug" style={{color:'#52525B'}}>
-                      <span className="font-semibold" style={{color:'#18181B'}}>Testsieger – DIE&nbsp;WELT</span> mit über 20&nbsp;Jahren Erfahrung und 60.000 Betreuungseinsätzen
-                    </p>
-                  </div>
 
                   {/* Der Toggle sitzt IM Kasten (Martin, 11.08.) — er gehört
                       zum Angebot, nicht daneben. */}
@@ -2932,7 +2929,7 @@ const CustomerPortalPage: FC = () => {
                 // Text über den Pflegekräften und in der Schritt-Liste
                 // ("Pflegesituation vervollständigen"). "vervollständigt" klang
                 // nach einem zweiten, anderen Schritt (Übergabe 11.08.).
-                'Preis, Konditionen und passende Pflegekräfte — alles unverbindlich.',
+                'Preis, Konditionen und passende Pflegekräfte auf einen Blick.',
               // Kein Pill hier: Der Einleitungssatz darüber sagt bereits, was
               // den Kunden erwartet. In den anderen Zuständen trägt die Zeile
               // echten Status („1 Bewerbung aktiv") — dort bleibt sie.
@@ -2966,31 +2963,17 @@ const CustomerPortalPage: FC = () => {
                   einen eigenen Karten-Kopf mit genau diesem Aufruf). */}
               <p className="text-[16px] leading-relaxed mb-4" style={{color:'#71717A'}}>
                 {heroCopy.subtitle}
+                {/* „Als Nächstes" im selben Absatz, unterstrichen (Martin, 08.09.) —
+                    nur im Ausgangszustand. */}
+                {heroCopy.steps === 'initial' && (
+                  <> <span className="font-semibold underline underline-offset-4" style={{color:'#18181B'}}>Als Nächstes:</span> Kurz die Pflegesituation vervollständigen, Pflegekräfte einladen und Bewerbungen erhalten — alles unverbindlich.</>
+                )}
               </p>
 
-              {/* Vertrauen im Kopf, kompakt (Martin, 07.09., zweiter Anlauf —
-                  die erste Fassung mit Absatz, Logo-Reihe und Berater-Kasten
-                  war „ganz schlimm": zu viel vor dem Preis). Jetzt zwei
-                  schlanke Zeilen: Siegel mit zwei Fakten, Marta als Signatur.
-                  Presse-Logos bleiben im Fuß. */}
-              <div className="flex items-center gap-3 mb-3">
-                <img src="/badge-testsieger.webp" alt="Testsieger Die Welt" className="h-10 w-auto flex-shrink-0 object-contain" />
-                <p className="text-[14px] leading-snug" style={{color:'#52525B'}}>
-                  <span className="font-semibold" style={{color:'#18181B'}}>6× Testsieger DIE&nbsp;WELT</span><br/>
-                  20 Jahre Erfahrung · 60.000+ Einsätze
-                </p>
-              </div>
-              <div className="flex items-center gap-3 mb-1">
-                <img src="/marta-kapcio.jpg" alt="Marta Kapcio" className="w-9 h-9 rounded-full object-cover object-top flex-shrink-0 border border-[#E9E9EB]" />
-                <p className="text-[14px] leading-snug" style={{color:'#52525B'}}>
-                  <span className="font-semibold" style={{color:'#18181B'}}>Marta Kapcio</span>, Ihre persönliche Beraterin<br/>
-                  <a href="tel:+4989200000830" className="font-semibold" style={{color:'#8B7355'}}>Anrufen</a>
-                  <span style={{color:'#A1A1AA'}}> · </span>
-                  <a href="https://wa.me/4989200000830" target="_blank" rel="noopener noreferrer" className="font-semibold" style={{color:'#8B7355'}}>WhatsApp</a>
-                  <span style={{color:'#A1A1AA'}}> · Mo–Sa 8–18 Uhr</span>
-                </p>
-              </div>
-
+              {/* Vertrauen steht seit 08.09. in der Kosten-Karte (Siegel-Zeile),
+                  nicht mehr im Kopf (Martin: zwei Anläufe im Kopf wirkten
+                  unruhig). Der Kopf trägt nur Begrüßung, Titel und den Satz
+                  mit den drei Schritten. */}
               {/* Trust-Zeile: ohne Fläche und Rahmen im schlanken Hero — als
                   Pill wirkte sie wie der Primärbutton und war ein
                   Fehlklick-Magnet, der nichts tut. */}
@@ -3016,30 +2999,6 @@ const CustomerPortalPage: FC = () => {
 
       {/* ── SECTION: Ihr Angebot (collapsible) ── */}
       {!patientSaved && angebotSection}
-      {/* „Ihr nächster Schritt" direkt unter den Kosten (Martin, 07.09.):
-          dieselbe grüne Schritt-1-Box wie in der Angebotsmail. Ersetzt den
-          bisherigen Weg „Preis → Karten → irgendwo unten das Formular". */}
-      {!patientSaved && (
-        <div style={{background:'#FFFFFF'}}>
-          <div className="max-w-3xl mx-auto px-4 pb-5">
-            <div className="rounded-2xl px-5 py-5" style={{background:'#EEF7F1'}}>
-              <div className="flex items-center gap-3">
-                <div className="w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0 font-bold text-white text-[14px]" style={{background:'#2A9D5C'}}>1</div>
-                <p className="text-[17px] font-bold leading-snug" style={{color:'#1F6B41'}}>Pflegesituation vervollständigen — 2 Minuten</p>
-              </div>
-              <p className="text-[15px] leading-relaxed mt-2.5" style={{color:'#3A3A3A'}}>Ein Teil ist aus dem Kostenrechner schon übernommen. Erst danach können sich die Pflegekräfte bei Ihnen bewerben.</p>
-              <button
-                type="button"
-                onClick={zurPflegesituation}
-                className="mt-4 w-full rounded-xl py-3.5 text-[16px] font-bold text-white active:scale-[0.99] transition-transform"
-                style={{background:'#2A9D5C'}}
-              >
-                Pflegesituation vervollständigen →
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
 
 
       <div className="max-w-3xl mx-auto px-4 pt-1 pb-6 space-y-4" style={{background:'#FFFFFF'}}>
@@ -3271,23 +3230,28 @@ const CustomerPortalPage: FC = () => {
                     11.08.), nicht darin: Er beschreibt, was im Kasten kommt —
                     innen wirkte er wie ein weiteres Element der Liste und
                     schob die erste Pflegekraft nach unten. */}
+                {/* Der eine Schritt, markant und positiv (Martin, 08.09.): steht
+                    nur hier über den Pflegekräften, nicht mehr zusätzlich unter
+                    den Kosten. Kein „Kostenrechner", kein „erst danach" —
+                    Erwartung statt Schranke. */}
                 {!patientSaved && (
-                <p className="text-[16px] leading-relaxed px-1 mb-3" style={{color:'#18181B'}}>
-                  {(
-                    // Kein Schloss, keine Schritt-Nummer: Seit dem Umbau am
-                    // 11.08. steht die Pflegesituation UNTER den
-                    // Pflegekräften — der alte Text („nach Schritt 2", Pfeil
-                    // nach oben) zeigte ins Leere. Formuliert als
-                    // Gegenleistung, nicht als Schranke.
-                    <>Diese Pflegekräfte passen zu Ihrer Anfrage und sind im gewünschten Zeitraum frei. Damit sie sich bei Ihnen bewerben können, brauchen sie noch ein paar Angaben zur Pflegesituation. {' '}
-                      <button type="button" className="font-semibold underline underline-offset-2"
-                        style={{color:'#8B7355'}}
-                        onClick={() => { document.getElementById('patientendaten')?.scrollIntoView({ behavior: 'smooth', block: 'start' }); }}>
-                        Pflegesituation vervollständigen ↓
-                      </button>
-                    </>
-                  )}
-                </p>
+                <div className="rounded-2xl px-5 py-5 mb-4" style={{background:'#FAF8F4', border:'1px solid #EBE2D2'}}>
+                  <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0" style={{background:'#FDF1E2'}}>
+                      <AlertTriangle className="w-4 h-4" style={{color:'#D97706'}} />
+                    </div>
+                    <p className="text-[17px] font-bold leading-snug" style={{color:'#3D2B1F'}}>Noch 2 Minuten bis zum Einladen</p>
+                  </div>
+                  <p className="text-[15px] leading-relaxed mt-2.5" style={{color:'#3A3A3A'}}>Vervollständigen Sie kurz Ihre Pflegesituation — dann können Sie diese Pflegekräfte einladen und erhalten unverbindliche Bewerbungen mit Foto, Erfahrung und Anreisedatum. Vieles ist schon ausgefüllt.</p>
+                  <button
+                    type="button"
+                    onClick={zurPflegesituation}
+                    className="mt-4 w-full rounded-xl py-3.5 text-[16px] font-bold text-white active:scale-[0.99] transition-transform"
+                    style={{background:'#2A9D5C'}}
+                  >
+                    Jetzt vervollständigen →
+                  </button>
+                </div>
                 )}
                 <div
                   className="rounded-3xl px-3 py-4 border"
@@ -3814,7 +3778,7 @@ const CustomerPortalPage: FC = () => {
         </div>
         {(() => {
           const schritte = [
-            { n: 1, title: 'Pflegesituation vervollständigen — 2 Minuten', desc: 'Ein Teil ist aus dem Kostenrechner schon übernommen. Erst danach können sich die Pflegekräfte bei Ihnen bewerben.', done: patientSaved },
+            { n: 1, title: 'Pflegesituation vervollständigen — 2 Minuten', desc: 'Vieles ist schon ausgefüllt. Danach laden Sie Ihre Wunsch-Pflegekräfte ein und erhalten Bewerbungen.', done: patientSaved },
             { n: 2, title: 'Pflegekräfte einladen & Bewerbungen erhalten', desc: 'Sobald Ihre Pflegesituation vervollständigt ist, laden Sie Ihre Wunschkandidatinnen ein — passende Pflegekräfte bewerben sich dann mit Profil, Erfahrung und Anreisedatum.', done: hasPending },
             { n: 3, title: 'Auswählen und starten', desc: 'Sie entscheiden, wir übernehmen den Rest. Ihre Wunsch-Pflegekraft kann die Betreuung bereits in 4–7 Werktagen übernehmen.', done: false },
           ];

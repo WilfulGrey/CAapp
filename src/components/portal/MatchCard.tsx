@@ -37,7 +37,7 @@ export const MatchCard: FC<{
    *  all pass the gate. Local invitePhase='sending' on this card already
    *  hides the button — this prop covers the OTHER cards. */
   globalInviteLocked?: boolean;
-  /** Pflegesituation fehlt noch: Der Knopf heißt dann „Profil anlegen &
+  /** Pflegesituation fehlt noch: Der Knopf heißt dann „Profil vervollständigen &
    *  einladen“ und führt über die Sperre direkt zum Formular (07.09.). */
   profilFehlt?: boolean;
   /** Tipp auf die Stufen-Plakette: Profil mit geöffneter Erklärung (07.09.,
@@ -228,7 +228,7 @@ export const MatchCard: FC<{
             className="flex items-center gap-1.5 text-xs font-bold bg-[#E76F63] text-white px-4 py-1.5 rounded-full hover:bg-[#D65E52] transition-colors active:scale-95 shadow-sm"
           >
             <UserPlus className="w-3.5 h-3.5" />
-            {profilFehlt ? 'Profil anlegen & einladen' : 'Einladen'}
+            {profilFehlt ? 'Profil vervollständigen & einladen' : 'Einladen'}
           </button>
         )}
       </div>
