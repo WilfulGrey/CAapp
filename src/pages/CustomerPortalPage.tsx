@@ -2402,6 +2402,8 @@ const CustomerPortalPage: FC = () => {
           // einer Zahlungsfrage.
           { text: 'Erst auswählen, dann buchen' },
           { text: 'Keine Vermittlungsgebühr' },
+          // Martin, 08.09.: beantwortet die Sorge, ob man schon zahlt.
+          { text: 'Kosten erst, wenn die Pflegekraft da ist' },
         ];
         return (
         <div style={{background:'#FFFFFF', borderBottom:'1px solid #E9E9EB'}}>
@@ -2445,10 +2447,10 @@ const CustomerPortalPage: FC = () => {
                   <p className="text-[15px] mt-2.5 leading-relaxed" style={{color:'#71717A'}}>
                     Monatlich inkl. Steuern, Gebühren und Sozialabgaben.
                   </p>
-                  {/* Tagespreis direkt am Monatspreis (Martin, 07.09.: Portal
-                      wie die Angebotsmail) — vorher nur im Aufklapper. */}
-                  <p className="text-[15px] mt-1 leading-relaxed" style={{color:'#18181B'}}>
-                    Entspricht <span className="font-semibold tabular-nums">{formatEuro(tagessatz)} / Tag</span> — tagesgenau abgerechnet.
+                  {/* Statt Tagessatz (Martin, 08.09.): was zusätzlich anfällt,
+                      damit der Monatspreis nicht als alles-inklusive gelesen wird. */}
+                  <p className="text-[14px] mt-1.5 leading-relaxed" style={{color:'#71717A'}}>
+                    Zzgl. Kost und Logis sowie Reisekosten (125 € pro Fahrt).
                   </p>
 
                   {/* Konditionen stehen OFFEN unter dem Preis (Martin, 11.08.):
@@ -2492,7 +2494,7 @@ const CustomerPortalPage: FC = () => {
                     return (
                       <div className="mt-4 rounded-xl px-4 py-3" style={{background:'#EEF7F1', border:'1px solid #CFE8D8'}}>
                         <p className="text-[14px] leading-relaxed" style={{color:'#1F6B41'}}>
-                          <span className="font-semibold">Zuhause statt Pflegeheim:</span> Ihr Eigenanteil liegt bei {formatEuro(eigen)} — im Pflegeheim wären es im ersten Jahr durchschnittlich 3.364 €. <span className="font-semibold">{formatEuro(guenstiger)} weniger im Monat.</span>
+                          <span className="font-semibold">Zuhause statt Pflegeheim:</span> Im Pflegeheim zahlen Sie im ersten Jahr durchschnittlich 3.364 € im Monat selbst. Zuhause mit Primundus sind es nach Zuschüssen etwa {formatEuro(eigen)} — <span className="font-semibold">rund {formatEuro(guenstiger)} weniger im Monat.</span>
                           <span className="block mt-1 text-[12px]" style={{color:'#4C7A5F'}}>Quelle: vdek-Auswertung, Stand 1. Juli 2026.</span>
                         </p>
                       </div>
@@ -2501,7 +2503,7 @@ const CustomerPortalPage: FC = () => {
                   <div className="mt-4 pt-4 flex items-center gap-3" style={{borderTop:'1px solid #E9E9EB'}}>
                     <img src="/badge-testsieger.webp" alt="Testsieger Die Welt" className="h-11 w-auto flex-shrink-0 object-contain" />
                     <p className="text-[15px] leading-snug" style={{color:'#52525B'}}>
-                      <span className="font-semibold" style={{color:'#18181B'}}>Testsieger – DIE&nbsp;WELT</span> mit über 20&nbsp;Jahren Erfahrung und 60.000 Betreuungseinsätzen
+                      <span className="font-semibold" style={{color:'#18181B'}}>6× Testsieger DIE&nbsp;WELT</span> · 20&nbsp;Jahre Erfahrung · 60.000+ Einsätze
                     </p>
                   </div>
 
@@ -2932,7 +2934,7 @@ const CustomerPortalPage: FC = () => {
                 // Text über den Pflegekräften und in der Schritt-Liste
                 // ("Pflegesituation vervollständigen"). "vervollständigt" klang
                 // nach einem zweiten, anderen Schritt (Übergabe 11.08.).
-                'Preis, Konditionen und passende Pflegekräfte — alles unverbindlich.',
+                'Preis, Konditionen und passende Pflegekräfte auf einen Blick. Kurz die Pflegesituation vervollständigen, Pflegekräfte einladen und Bewerbungen erhalten — alles unverbindlich.',
               // Kein Pill hier: Der Einleitungssatz darüber sagt bereits, was
               // den Kunden erwartet. In den anderen Zuständen trägt die Zeile
               // echten Status („1 Bewerbung aktiv") — dort bleibt sie.
@@ -2968,29 +2970,10 @@ const CustomerPortalPage: FC = () => {
                 {heroCopy.subtitle}
               </p>
 
-              {/* Vertrauen im Kopf, kompakt (Martin, 07.09., zweiter Anlauf —
-                  die erste Fassung mit Absatz, Logo-Reihe und Berater-Kasten
-                  war „ganz schlimm": zu viel vor dem Preis). Jetzt zwei
-                  schlanke Zeilen: Siegel mit zwei Fakten, Marta als Signatur.
-                  Presse-Logos bleiben im Fuß. */}
-              <div className="flex items-center gap-3 mb-3">
-                <img src="/badge-testsieger.webp" alt="Testsieger Die Welt" className="h-10 w-auto flex-shrink-0 object-contain" />
-                <p className="text-[14px] leading-snug" style={{color:'#52525B'}}>
-                  <span className="font-semibold" style={{color:'#18181B'}}>6× Testsieger DIE&nbsp;WELT</span><br/>
-                  20 Jahre Erfahrung · 60.000+ Einsätze
-                </p>
-              </div>
-              <div className="flex items-center gap-3 mb-1">
-                <img src="/marta-kapcio.jpg" alt="Marta Kapcio" className="w-9 h-9 rounded-full object-cover object-top flex-shrink-0 border border-[#E9E9EB]" />
-                <p className="text-[14px] leading-snug" style={{color:'#52525B'}}>
-                  <span className="font-semibold" style={{color:'#18181B'}}>Marta Kapcio</span>, Ihre persönliche Beraterin<br/>
-                  <a href="tel:+4989200000830" className="font-semibold" style={{color:'#8B7355'}}>Anrufen</a>
-                  <span style={{color:'#A1A1AA'}}> · </span>
-                  <a href="https://wa.me/4989200000830" target="_blank" rel="noopener noreferrer" className="font-semibold" style={{color:'#8B7355'}}>WhatsApp</a>
-                  <span style={{color:'#A1A1AA'}}> · Mo–Sa 8–18 Uhr</span>
-                </p>
-              </div>
-
+              {/* Vertrauen steht seit 08.09. in der Kosten-Karte (Siegel-Zeile),
+                  nicht mehr im Kopf (Martin: zwei Anläufe im Kopf wirkten
+                  unruhig). Der Kopf trägt nur Begrüßung, Titel und den Satz
+                  mit den drei Schritten. */}
               {/* Trust-Zeile: ohne Fläche und Rahmen im schlanken Hero — als
                   Pill wirkte sie wie der Primärbutton und war ein
                   Fehlklick-Magnet, der nichts tut. */}
