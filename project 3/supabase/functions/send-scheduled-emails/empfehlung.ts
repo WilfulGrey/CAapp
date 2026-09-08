@@ -109,6 +109,8 @@ export interface Empfehlung {
   erfahrungJahre: number;
   einsaetze: number;
   stufe: string;
+  /** Kurzaussage zur Stufe — eine Zeile neben dem Chip. */
+  stufeZusatz: string;
   fotoUrl: string | null;
   gruende: string[];
   /** Sprachbalken 1–3 wie im Portal (GERMANY_SKILL_LEVELS.bars). */
@@ -142,6 +144,28 @@ export function badgeTier(score: number): 0 | 1 | 2 | 3 | 4 {
 /** Mindest-Score, den der Trichter bevorzugt (Tier ≥ 2 = „Bewährt"). */
 export const MIN_BADGE_SCORE = 2;
 
+/**
+ * Kurzaussage zur Stufe — steht als eine Zeile neben dem Stufen-Chip in der
+ * Empfehlung (Martin, 08.09.2026: „mach es in eine Zeile bzw. in einen Badge").
+ *
+ * Warum so kurz: Der Satz stand vorher im Vorstellungstext („bringt sie
+ * bewährte Praxiserfahrung mit") — und zwar WORTGLEICH bei 2 wie bei 20
+ * Einsätzen. Die Stufe darüber unterschied, der Satz darunter nicht. Jetzt
+ * folgt er der Leiter. Länge ist bewusst knapp gehalten, damit die Zeile auf
+ * einem 320-px-Display neben dem Chip nicht zerfällt.
+ */
+export function stufenZusatz(einsaetze?: number | null, jahre?: number | null): string {
+  switch (stufenWort(einsaetze, jahre)) {
+    case "Elite": return "unsere erfahrensten Kräfte";
+    case "Stammkraft": return "regelmäßig im Einsatz";
+    case "Bewährt": return "mehrfach bestätigt";
+    case "Bekannt": return "wir kennen ihre Arbeit";
+    // Ohne Einsatz über uns trägt die Zahl nichts — dort steht, was zutrifft:
+    // dass wir jede Kraft vorher persönlich sehen (FAQ/Pria, Vertrag §5).
+    default: return "persönlich geprüft";
+  }
+}
+
 /** Das Wort vor der Faktenzeile — wortgleich zu Portal, SA-Portal und Mails. */
 export function stufenWort(einsaetze?: number | null, jahre?: number | null): string {
   const jobs = einsaetze ?? 0;
@@ -149,7 +173,7 @@ export function stufenWort(einsaetze?: number | null, jahre?: number | null): st
   if (jobs >= 6) return "Stammkraft";
   if (jobs >= 2) return "Bewährt";
   if (jobs >= 1) return "Bekannt";
-  return (jahre ?? 0) > 0 ? "Berufserfahren" : "Neu dabei";
+  return (jahre ?? 0) > 0 ? "Berufserfahren" : "Neu bei Primundus";
 }
 
 export function erfahrungJahre(careExperience: string | null | undefined): number {
@@ -425,6 +449,7 @@ export function baueEmpfehlung(
       erfahrungJahre: jahre,
       einsaetze,
       stufe: stufenWort(einsaetze, jahre),
+      stufeZusatz: stufenZusatz(einsaetze, jahre),
       fotoUrl: fotoUrl(cg),
       gruende: haken(cg, extra, fd, now),
       deutschBalken: deutschBalken(cg.germany_skill),
@@ -525,10 +550,11 @@ export function vorstellungstext(
     teile.push(`${vorname} spricht Deutsch auf ${niveau}.`);
   }
 
-  const einsaetze = cg.hp_total_jobs ?? 0;
-  if (einsaetze > 0) {
-    teile.push(`Mit ${einsaetze} erfolgreich abgeschlossenen ${einsaetze === 1 ? "Einsatz" : "Einsätzen"} über Primundus bringt sie bewährte Praxiserfahrung mit.`);
-  }
+  // Der Satz „Mit N erfolgreich abgeschlossenen Einsätzen … bringt sie
+  // bewährte Praxiserfahrung mit" stand hier bis 08.09.2026 — wortgleich bei
+  // 2 wie bei 20 Einsätzen. Die Aussage zur Stufe steht jetzt differenziert
+  // neben dem Chip (stufenZusatz), die Zahl in der Zeile darunter; ein
+  // dritter Ort dafuer waere Wiederholung.
   return teile.join(" ");
 }
 
@@ -843,9 +869,6 @@ export function empfehlungHtml(
     ? `<span style="font-size:14px;font-weight:400;color:#A1A1AA;">&nbsp;&nbsp;${e.alter} J.</span>`
     : "";
 
-  const stufenChip = e.stufe
-    ? `<span style="display:inline-block;font-size:11px;font-weight:700;color:#8B7355;background:#F5F5F6;border:1px solid #E4E4E7;border-radius:999px;padding:3px 10px;">${esc(e.stufe)}</span>`
-    : "";
 
   /* Einsaetze auf einer EIGENEN Zeile unter Stufe und „Zum Profil" (Martin,
      31.08.: „das bricht komisch um mobil"). Neben der Stufe blieb auf dem
@@ -853,7 +876,7 @@ export function empfehlungHtml(
      Zeile und stand dort wie ein abgerissener Halbsatz. Ueber die volle
      Breite der Textspalte bleibt „4 Einsätze über Primundus" zusammen.
 
-     Bei 0 bleibt die Zeile weg — dort heisst die Stufe ohnehin „Neu dabei"
+     Bei 0 bleibt die Zeile weg — dort heisst die Stufe ohnehin „Neu bei Primundus"
      oder „Berufserfahren", und „0 Einsätze" waere das Gegenteil eines
      Vertrauenssignals. */
   const einsatzZeile = e.einsaetze > 0
@@ -867,6 +890,54 @@ export function empfehlungHtml(
       return `<td width="14" style="width:14px;padding-right:3px;"><div style="width:12px;height:6px;border-radius:3px;background:${an ? "#8B7355" : "#E4E4E7"};font-size:0;line-height:0;">&nbsp;</div></td>`;
     })
     .join("");
+
+  /* EINE Zeile fuer die Erfahrung: Stufe, Anzahl, Aussage. Vorher stand die
+     Stufe als Chip neben dem Namen UND noch einmal in dieser Zeile, dazu die
+     Einsatzzahl als dritte Zeile — dreimal dieselbe Sache (Martin, 08.09.2026:
+     „warum doppelt, statt den 14 Einsätze in das Badge"). Jetzt traegt die
+     Pille das Wort, dahinter stehen Zahl und Aussage.
+     Sie steht ueber die volle Kartenbreite, nicht in der Namensspalte: dort
+     teilt sie sich den Platz mit Foto und „Zum Profil" und zerfiel auf 320 px
+     in drei Zeilen (gemessen). */
+  /* Zahl ODER Aussage — nicht beides. Gemessen am 08.09.2026: Pille plus
+     „14 Einsätze über Primundus · unsere erfahrensten Kräfte" braucht mehr
+     Platz, als ein Handy hergibt (zwei Zeilen bei 320, 375 und 414 px; erst
+     ab Desktop-Breite eine). Wo eine Einsatzzahl da ist, traegt sie die Zeile
+     allein — sie IST der Beleg. Die Deutung dazu steht im Portal, einen Klick
+     weiter. Wo keine Zahl da ist, traegt die Aussage die Zeile. */
+  /* „über Primundus" faellt hier weg — anders als im Portal, wo die Karte
+     zwischen fremden Angeboten stehen kann. In DIESER Mail ist der Absender
+     eindeutig (Logo im Kopf, „Unsere Empfehlung" ueber der Karte), und die
+     zwei Woerter kosteten genau den Platz, der die Zeile neben dem Foto in
+     zwei Zeilen riss (gemessen 08.09.2026: 200 px Spaltenbreite gegen 252 px
+     Bedarf). */
+  const zahlUndAussage = e.einsaetze > 0
+    ? `${e.einsaetze} ${e.einsaetze === 1 ? "Einsatz" : "Einsätze"}`
+    : e.stufeZusatz;
+  /* Die Stufe ist das Vertrauenssignal der Karte — sie stand als blasse graue
+     Pille da und ging neben Name und Foto unter (Martin, 08.09.2026: „das muss
+     doch prominenter sein"). Jetzt gefuellt in Primundus-Braun mit weisser
+     Schrift, die Zahl daneben in Textfarbe statt Grau.
+     Outlook rendert `border-radius` nicht — dort wird aus der Pille ein
+     gefuelltes Rechteck. Der Hintergrund selbst kommt an, das Signal bleibt. */
+  /* Direkt unter dem Foto-/Namensblock, ueber die VOLLE Kartenbreite.
+     In der Namensspalte selbst geht es nicht: dort teilt sie sich den Platz
+     mit dem 80-px-Foto und „Zum Profil" und hat auf einem 375-px-Handy noch
+     ~130 px — gemessen 08.09.2026 drei Zeilen, auf 320 px vier plus seitlicher
+     Ueberlauf. Ueber die volle Breite steht sie ab 375 px auf einer Zeile.
+     Outlook rendert `border-radius` nicht — dort wird aus der Pille ein
+     gefuelltes Rechteck. Der Hintergrund kommt an, das Signal bleibt. */
+  /* Buendig unter dem Namen, neben dem Bild (Martin, 08.09.2026) — als eigene
+     Zeile der inneren Tabelle (colspan), damit sie sich den Platz NICHT mit
+     „Zum Profil" teilt. Pille und Text als inline-block statt als zweite
+     Tabelle: eine verschachtelte Tabelle zwang die Karte auf 320 px um 53 px
+     ueber den Rand (gemessen). So bleibt der Umbruch dem Text ueberlassen,
+     die Pille selbst bricht dank nowrap nie auf („Neu bei Primundus"). */
+  const stufenZeile = e.stufe
+    ? `<tr><td colspan="2" style="padding:8px 0 0;font-size:15px;font-weight:600;line-height:1.6;color:#18181B;">
+        <span style="display:inline-block;font-size:12px;font-weight:700;letter-spacing:.03em;color:#ffffff;background:#8B7355;border-radius:999px;padding:4px 12px;white-space:nowrap;vertical-align:middle;">${esc(e.stufe)}</span><span style="vertical-align:middle;">&nbsp;&nbsp;${esc(zahlUndAussage)}</span>
+      </td></tr>`
+    : "";
 
   const kachel = (label: string, inhalt: string) => `
                 <td width="50%" style="width:50%;vertical-align:top;">
@@ -951,14 +1022,13 @@ export function empfehlungHtml(
                   <table width="100%" cellpadding="0" cellspacing="0" role="presentation">
                     <tr>
                       <td style="vertical-align:middle;">
-                        <p style="margin:0 0 6px;font-size:20px;font-weight:700;line-height:1.3;color:#18181B;">${name}${alterChip}</p>
-                        ${stufenChip}
+                        <p style="margin:0;font-size:20px;font-weight:700;line-height:1.3;color:#18181B;">${name}${alterChip}</p>
                       </td>
                       <td class="empf-profil" style="vertical-align:middle;text-align:right;white-space:nowrap;padding-left:10px;">
                         <a class="profil-link" href="${profilUrl}" target="_blank" style="color:#8B7355;text-decoration:none;font-size:14px;font-weight:600;">Zum Profil&nbsp;&rsaquo;</a>
                       </td>
                     </tr>
-                    ${einsatzZeile}
+                    ${stufenZeile}
                   </table>
                 </td>
               </tr>
@@ -1055,8 +1125,11 @@ function fuenfZeileHtml(e: Empfehlung, cid: string | null, profilUrl: string, er
   const name = esc(e.anzeigeName);
   const foto = cid ? fotoImg(cid, name, 56, 12) : fotoErsatz(e.vorname, 56, 12, 22);
   const alter = e.alter ? `<span style="font-size:13.5px;font-weight:400;color:#A1A1AA;">&nbsp;&nbsp;${e.alter} J.</span>` : "";
+  /* Gefuellte Pille wie in der grossen Empfehlung — eine Stufe sieht in der
+     ganzen Mail gleich aus (Martin, 08.09.2026). Etwas kleiner, weil sie hier
+     in der Zeile hinter dem Namen sitzt und fuenfmal untereinander steht. */
   const chip = e.stufe
-    ? `&nbsp;&nbsp;<span style="display:inline-block;font-size:10.5px;font-weight:700;color:#8B7355;background:#F5F5F6;border:1px solid #E4E4E7;border-radius:999px;padding:2px 9px;vertical-align:middle;">${esc(e.stufe)}</span>`
+    ? `&nbsp;&nbsp;<span style="display:inline-block;font-size:10.5px;font-weight:700;letter-spacing:.03em;color:#ffffff;background:#8B7355;border-radius:999px;padding:3px 10px;white-space:nowrap;vertical-align:middle;">${esc(e.stufe)}</span>`
     : "";
   const balken = [1, 2, 3]
     .map((i) => `<td width="14" style="width:14px;padding-right:3px;"><div style="width:12px;height:6px;border-radius:3px;background:${i <= e.deutschBalken ? "#8B7355" : "#E4E4E7"};font-size:0;line-height:0;">&nbsp;</div></td>`)

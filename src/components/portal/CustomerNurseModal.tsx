@@ -3,7 +3,7 @@ import type { FC, MouseEvent as ReactMouseEvent } from 'react';
 import { Check, X, UserPlus, Heart, FileText, Download } from 'lucide-react';
 import type { Nurse } from '../../types';
 import type { Application } from './shared';
-import { nurseLevel, displayName, initials, einsaetzeText } from './shared';
+import { nurseLevel, displayName, initials, einsaetzeText, badgeErklaerung } from './shared';
 import { SprachBalken } from './SprachBalken';
 
 // Erklärung der Stufe. Die Labels MÜSSEN mit `nurseLevel`
@@ -178,6 +178,9 @@ export const CustomerNurseModal: FC<{
   const name = displayName(nurse.name);
   const bars = Array.from({ length: 3 }, (_, i) => i < nurse.language.bars);
   const lvl = nurseLevel(nurse.experienceYears ?? 0, nurse.history?.assignments ?? 0);
+  // Erklaerung zur Stufe — steht sichtbar im Profil (nicht mehr nur im
+  // Popup hinter dem Chip). Wortlaut + Schwellen in shared.ts.
+  const stufeErklaerung = badgeErklaerung(nurse.experienceYears ?? 0, nurse.history?.assignments ?? 0);
   const p = nurse.profile;
   const dash = '—';
   const yesNo = (v: boolean | undefined): string => v == null ? dash : v ? 'Ja' : 'Nein';
@@ -350,6 +353,39 @@ export const CustomerNurseModal: FC<{
                 </div>
               </div>
             </div>
+            {/* Erfahrungsstufe im Klartext. Der Chip oben nennt nur das Wort;
+                warum GENAU diese Kraft es traegt, stand bisher ausschliesslich
+                im Popup hinter dem Chip — also fuer die meisten Kunden
+                unsichtbar (Martin, 08.09.2026). Die Leiter aller Stufen bleibt
+                im Popup, hier steht der Fall dieser Pflegekraft. */}
+            {lvl.label && (
+              <div className="px-5 pt-3">
+                <div className="rounded-xl border px-4 py-3" style={{ background: '#FFFFFF', borderColor: '#D4D4D8' }}>
+                  {/* Reihenfolge (Martin, 08.09.2026): erst die Ueberschrift,
+                      dann das Ergebnis, dann die Begruendung. Die Ueberschrift
+                      BENENNT nur — sie erklaert die Stufe nicht schon vorweg,
+                      das macht der Text darunter. Deshalb ist sie fuer alle
+                      Stufen dieselbe; das Stufenwort traegt das Gewicht. */}
+                  <p className="text-[16px] font-bold" style={{ color: '#18181B' }}>
+                    Unsere Erfahrungsstufen
+                  </p>
+                  <p className="text-[22px] font-bold leading-tight mt-0.5 mb-1.5" style={{ color: '#8B7355' }}>
+                    {lvl.label}
+                  </p>
+                  <p className="text-[15px] leading-relaxed" style={{ color: '#71717A' }}>
+                    {stufeErklaerung}
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => setShowLevelInfo(true)}
+                    className="mt-2 text-[13px] font-bold hover:underline"
+                    style={{ color: '#8B7355' }}
+                  >
+                    Alle Stufen ansehen →
+                  </button>
+                </div>
+              </div>
+            )}
             {/* "Hat Interesse"-Hinweis — nur wenn die Pflegekraft in Mamamia
                 proaktiv Interesse signalisiert hat (z.B. via Like). Erklärt
                 kurz, dass eine Einladung die offizielle Bewerbung ermöglicht. */}

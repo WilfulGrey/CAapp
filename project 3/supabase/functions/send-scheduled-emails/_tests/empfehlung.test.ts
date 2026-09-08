@@ -14,6 +14,7 @@ import {
   textAusblenden,
   vorstellungstext,
   stufenWort,
+  stufenZusatz,
   waehleFuenf,
   type CaregiverExtra,
   type Matching,
@@ -209,7 +210,7 @@ Deno.test("stufenWort trifft die Schwellen des Portals", () => {
   assertEquals(stufenWort(2), "Bewährt");
   assertEquals(stufenWort(1), "Bekannt");
   assertEquals(stufenWort(0, 4), "Berufserfahren");
-  assertEquals(stufenWort(0, 0), "Neu dabei");
+  assertEquals(stufenWort(0, 0), "Neu bei Primundus");
 });
 
 Deno.test("empfehlungHtml: Foto per CID, nie die ablaufende S3-URL", () => {
@@ -477,7 +478,29 @@ Deno.test("vorstellungstext: ohne Text ein Satz aus echten Feldern, nichts Erfun
   const t = vorstellungstext(cg({ id: 1, hp_total_jobs: 9 }).caregiver, null, "Maria");
   assertStringIncludes(t, "7 Jahre Erfahrung");
   assertStringIncludes(t, "mittlerem Niveau");
-  assertStringIncludes(t, "9 erfolgreich abgeschlossenen Einsätzen");
+  // Die Einsatzzahl steht hier NICHT mehr (08.09.2026): Der Satz war fuer jede
+  // Kraft wortgleich — bei 2 wie bei 20 Einsaetzen „bewaehrte Praxiserfahrung".
+  // Die Aussage zur Stufe steht jetzt differenziert neben dem Chip
+  // (stufenZusatz), die Zahl in der Zeile darunter.
+  assertEquals(t.includes("erfolgreich abgeschlossenen"), false);
+});
+
+Deno.test("stufenZusatz: jede Stufe sagt etwas anderes, kein Satz doppelt", () => {
+  const faelle: Array<[number, number, string]> = [
+    [14, 6, "unsere erfahrensten Kräfte"],
+    [8, 5, "regelmäßig im Einsatz"],
+    [3, 4, "mehrfach bestätigt"],
+    [1, 3, "wir kennen ihre Arbeit"],
+    [0, 9, "persönlich geprüft"],
+    [0, 0, "persönlich geprüft"],
+  ];
+  for (const [jobs, jahre, erwartet] of faelle) {
+    assertEquals(stufenZusatz(jobs, jahre), erwartet);
+  }
+  // Die vier Stufen MIT Einsaetzen muessen sich unterscheiden — sonst traegt
+  // die Leiter im Kopf der Karte nichts.
+  const mitEinsaetzen = [14, 8, 3, 1].map((n) => stufenZusatz(n, 5));
+  assertEquals(new Set(mitEinsaetzen).size, 4);
 });
 
 Deno.test("vorstellungstext: ohne jede Zahl bleibt er leer statt zu behaupten", () => {
@@ -556,23 +579,37 @@ Deno.test("empfehlungHtml: Einsaetze stehen unter der Stufe, auf eigener Zeile",
   );
   const html = empfehlungHtml(empfehlung, null, "https://p", "https://a", 5);
   assertStringIncludes(html, "Elite");
-  assertStringIncludes(html, "13 Einsätze über Primundus");
+  assertStringIncludes(html, "13 Einsätze");
   // Reihenfolge: erst die Stufe, dann die Zahl.
-  assert(html.indexOf("Elite") < html.indexOf("13 Einsätze über Primundus"));
-  /* Eigene Zeile ueber die volle Breite (colspan) statt neben der Stufe —
-     sonst bricht „über Primundus" auf dem iPhone allein um. Die Zahl steht
-     danach auch NICHT mehr in derselben Zelle wie „Zum Profil". */
-  assertStringIncludes(html, `colspan="2"`);
-  assert(html.indexOf("Zum Profil") < html.indexOf("13 Einsätze über Primundus"));
+  assert(html.indexOf("Elite") < html.indexOf("13 Einsätze"));
+  /* „über Primundus" steht in der Mail NICHT mehr hinter der Zahl: neben dem
+     Foto sind ~200 px Spaltenbreite, mit Suffix braucht die Zeile ~252 px und
+     bricht um (gemessen 08.09.2026). Der Absender ist in der Mail ohnehin
+     eindeutig; im Portal bleibt der volle Wortlaut. */
+  assertEquals(html.includes("über Primundus"), false);
+  /* Stufe, Zahl und Aussage stehen in EINER Zeile — seit 08.09.2026 nicht
+     mehr dreifach verteilt (Chip am Namen, Zahl darunter, Aussage nochmal).
+     Das Stufenwort darf deshalb nur EINMAL im Kopfbereich vorkommen. */
+  const bisKacheln = html.slice(0, html.indexOf("Deutschkenntnisse"));
+  assertEquals(bisKacheln.split("Elite").length - 1, 1);
+  /* Die Zeile steht unter dem Namen (Martin, 08.09.2026: „das passt doch
+     unter den Namen") — also VOR „Zum Profil" im Markup, in derselben Spalte
+     wie der Name. */
+  assert(html.indexOf("Elite") < html.indexOf("13 Einsätze"));
+  // Mit Einsatzzahl traegt die Zahl die Zeile allein: Zahl UND Aussage passen
+  // auf dem Handy nicht nebeneinander (gemessen 320/375/414 px).
+  assertEquals(html.includes("unsere erfahrensten Kräfte"), false);
+  // Die Stufe ist gefuellt, nicht blass — sie ist das Signal der Karte.
+  assertStringIncludes(html, "background:#8B7355");
 });
 
 Deno.test("empfehlungHtml: ein Einsatz bleibt Einzahl, null Einsaetze schweigen", () => {
   const eins = baueEmpfehlung(cg({ id: 1, hp_total_jobs: 1 }), null, {}, 3, JETZT).empfehlung;
-  assertStringIncludes(empfehlungHtml(eins, null, "https://p", "https://a", 3), "1 Einsatz über Primundus");
+  assertStringIncludes(empfehlungHtml(eins, null, "https://p", "https://a", 3), "1 Einsatz");
 
   const keins = baueEmpfehlung(cg({ id: 1, hp_total_jobs: 0 }), null, {}, 3, JETZT).empfehlung;
   const html = empfehlungHtml(keins, null, "https://p", "https://a", 3);
-  assertEquals(/\d+ Eins(atz|ätze) über Primundus/.test(html), false);
+  assertEquals(/\d+ Eins(atz|ätze)/.test(html), false);
   // Die Stufe steht trotzdem da.
   assertStringIncludes(html, "Berufserfahren");
 });

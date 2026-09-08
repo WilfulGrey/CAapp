@@ -1584,14 +1584,26 @@ function caregiverInitials(name: string): string {
 // das Ersatzwort. Kein Medaillen-Badge mehr — die Stufe steht als fettes Wort
 // vor der Faktenzeile (Martin, 11.08.: „viel moderner und klarer").
 //   Elite ≥12 · Stammkraft ≥6 · Bewährt ≥2 · Bekannt ≥1
-//   0 Einsätze: Jahre>0 → „Berufserfahren", sonst „Neu dabei".
+//   0 Einsätze: Jahre>0 → „Berufserfahren", sonst „Neu bei Primundus".
+/* Die Stufe als gefuellte Pille — gleiche Optik wie in der Empfehlung der
+ * Mail-Funktion (empfehlung.ts) und im Kundenportal. Sie stand hier als
+ * fettes Wort mit Doppelpunkt („Bewährt: 12 Jahre …") und ging neben Foto und
+ * Namen unter (Martin, 08.09.2026: „das muss doch prominenter sein").
+ * Outlook rendert `border-radius` nicht — dort wird ein gefuelltes Rechteck
+ * daraus; der Hintergrund kommt an, das Signal bleibt. */
+function stufenBadge(wort: string): string {
+  return `<span style="display:inline-block;font-size:12px;font-weight:700;letter-spacing:.03em;`
+    + `color:#ffffff;background:#8B7355;border-radius:999px;padding:4px 12px;`
+    + `white-space:nowrap;vertical-align:middle;">${wort}</span>`;
+}
+
 function caregiverTierLabel(einsatzCount?: number, yearsExperience?: number): string {
   const jobs = einsatzCount ?? 0;
   if (jobs >= 12) return 'Elite';
   if (jobs >= 6) return 'Stammkraft';
   if (jobs >= 2) return 'Bewährt';
   if (jobs >= 1) return 'Bekannt';
-  return (yearsExperience ?? 0) > 0 ? 'Berufserfahren' : 'Neu dabei';
+  return (yearsExperience ?? 0) > 0 ? 'Berufserfahren' : 'Neu bei Primundus';
 }
 
 // Faktenzeile wie im Portal (`nurseFacts`): Jahre Erfahrung · Einsätze. Die
@@ -1789,7 +1801,7 @@ function caregiverKachelHtml(cg: CaregiverDisplay, portalUrl: string): string {
   // Stufe als fettes Wort vor der Faktenzeile (kein Medaillen-Badge mehr) —
   // exakt wie die Portal-Karte: „Bewährt: 12 Jahre Erfahrung · 3 Einsätze".
   const tier = caregiverTierLabel(cg.einsatzCount, cg.yearsExperience);
-  const factsHtml = `<p style="margin:16px 0 0;font-size:15px;line-height:1.5;color:#71717A;"><span style="font-weight:700;color:#18181B;">${tier}:</span> ${caregiverFactsLine(cg)}</p>`;
+  const factsHtml = `<p style="margin:16px 0 0;font-size:15px;line-height:1.6;color:#71717A;">${stufenBadge(tier)}<span style="vertical-align:middle;">&nbsp;&nbsp;${caregiverFactsLine(cg)}</span></p>`;
 
   return `
     <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="margin:0 0 26px;border:1px solid #ECE7DF;border-radius:14px;background:#ffffff;overflow:hidden;">
@@ -1832,7 +1844,7 @@ function buildCaregiverEventEmail(opts: {
 
   // Stufe + Fakten wortgleich zum Portal (caregiverTierLabel/caregiverFactsLine).
   const tier = caregiverTierLabel(cg.einsatzCount, cg.yearsExperience);
-  const factsHtml = `<p style="margin:16px 0 0;font-size:15px;line-height:1.5;color:#71717A;"><span style="font-weight:700;color:#18181B;">${tier}:</span> ${caregiverFactsLine(cg)}</p>`;
+  const factsHtml = `<p style="margin:16px 0 0;font-size:15px;line-height:1.6;color:#71717A;">${stufenBadge(tier)}<span style="vertical-align:middle;">&nbsp;&nbsp;${caregiverFactsLine(cg)}</span></p>`;
   const ageSuffix = cg.age ? `<span style="font-weight:400;color:#71717A;">, ${cg.age}</span>` : '';
   const deutschLine = cg.germanLevel
     ? `<p style="margin:0;font-size:15px;color:#71717A;">Deutsch ${cg.germanLevel}</p>`

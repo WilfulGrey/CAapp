@@ -98,9 +98,9 @@ describe('nurseLevel — Labels folgen den Schwellen', () => {
   it('ohne Einsatz: Ersatz-Wort statt Leere — je nachdem, ob Jahre da sind', () => {
     // Keine fünfte Stufe der Leiter, sondern eine andere Achse: Die Stufen
     // messen Einsätze BEI UNS, „Berufserfahren" spricht über die (selbst
-    // ausgewiesenen) Jahre davor, „Neu dabei" behauptet gar nichts.
+    // ausgewiesenen) Jahre davor, „Neu bei Primundus" behauptet gar nichts.
     expect(nurseLevel(20, 0).label).toBe('Berufserfahren');
     expect(nurseLevel(1, 0).label).toBe('Berufserfahren');
-    expect(nurseLevel(0, 0).label).toBe('Neu dabei');
+    expect(nurseLevel(0, 0).label).toBe('Neu bei Primundus');
   });
 });

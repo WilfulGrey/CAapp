@@ -107,17 +107,75 @@ export function nurseLevel(experienceYears: number, assignments: number): {
     //   Jahre > 0 → „Berufserfahren": Erfahrung ja, nur woanders gesammelt.
     //     Die Jahre sind Selbstauskunft (care_experience) — das Wort behauptet
     //     nichts Neues, es steht vor genau der Zahl, die eh auf der Karte steht.
-    //   Jahre = 0 → „Neu dabei": ehrlich statt leerem Strich.
+    //   Jahre = 0 → „Neu bei Primundus". Hiess bis 08.09.2026 „Neu dabei" —
+    //     das las sich wie „unerfahren", obwohl die Kraft zehn Jahre Pflege
+    //     hinter sich haben kann und nur die JAHRE fehlen (Martin). Das neue
+    //     Wort sagt genau das, was zutrifft: neu bei UNS.
     default: return experienceYears > 0
-      ? { label: 'Berufserfahren', emoji: '', cls: '' }
-      : { label: 'Neu dabei',      emoji: '', cls: '' };
+      ? { label: 'Berufserfahren',    emoji: '', cls: '' }
+      : { label: 'Neu bei Primundus', emoji: '', cls: '' };
+  }
+}
+
+// Erklärung der Erfahrungsstufe für GENAU diese Pflegekraft — sichtbar im
+// Profil, nicht mehr nur im Popup hinter dem Chip (Martin, 08.09.2026: „nicht
+// nur die Badges darstellen, sondern direkt eine schöne Erklärung warum").
+//
+// Regeln für den Wortlaut:
+//   • Nur was zählbar ist: die Zahl abgeschlossener Einsätze über uns und die
+//     selbst angegebenen Berufsjahre. Keine Aussage über Pflegequalität —
+//     die Stufe misst Häufigkeit, nicht Können (siehe nurseLevel).
+//   • Nie „vermitteln": Primundus beschäftigt die Kräfte selbst.
+//   • Dieselben Schwellen wie nurseLevel, damit Wort und Erklärung nicht
+//     auseinanderlaufen — deshalb wird hier auf dessen Label geschaltet.
+export function badgeErklaerung(
+  experienceYears: number,
+  assignments: number,
+): string {
+  const n = assignments;
+  // Wortlaut von Martin (08.09.2026) — woertlich uebernommen, nicht
+  // umformuliert. Leitlinie dahinter: hochwertig und vertrauenswuerdig,
+  // und die Stufen muessen sich sauber voneinander unterscheiden. Meine
+  // eigenen Fassungen davor waren entweder werblich („ein fester Stamm ist
+  // gewachsen") oder zu knapp; beides ist raus.
+  //
+  // Die Aussage „nach ueber 20 Jahren wissen wir, worauf wir achten" steht
+  // BEWUSST nicht mehr hier: Sie gehoert als Primundus-Vertrauensargument an
+  // eine zentrale Stelle, nicht in das Profil jeder einzelnen Kraft (Martin).
+  const jahre = `${experienceYears} ${experienceYears === 1 ? 'Jahr' : 'Jahre'}`;
+
+  switch (nurseLevel(experienceYears, assignments).label) {
+    case 'Elite':
+      return `Bereits ${einsaetzeText(n)} erfolgreich abgeschlossen. Eine unserer erfahrensten `
+        + 'und zuverlässigsten Betreuungskräfte – mehrfach von Familien bestätigt und immer '
+        + 'wieder für neue Einsätze verfügbar.';
+    case 'Stammkraft':
+      return `${einsaetzeText(n)} erfolgreich abgeschlossen. Eine bewährte Betreuungskraft, `
+        + 'die regelmäßig mit uns arbeitet und von Familien immer wieder gerne eingesetzt wird.';
+    case 'Bewährt':
+      return `${einsaetzeText(n)} erfolgreich abgeschlossen. Ihre Arbeit hat sich in mehreren `
+        + 'Familien bewährt – wir kennen ihre Stärken und ihre Arbeitsweise aus eigener Erfahrung.';
+    case 'Bekannt':
+      return `${einsaetzeText(n)} erfolgreich abgeschlossen. Wir haben bereits praktische `
+        + 'Erfahrung mit ihrer Arbeit und kennen sie nicht nur aus Bewerbung und Gespräch.';
+    case 'Berufserfahren':
+      // Jahre sind Selbstauskunft (care_experience) — die Zahl steht dynamisch
+      // hier, weil genau sie den Unterschied zu „Neu bei Primundus" macht.
+      return `Noch kein Einsatz über Primundus, aber bereits ${jahre} Erfahrung in der `
+        + 'Betreuung. Vor dem ersten Einsatz prüfen und sprechen wir jede Betreuungskraft persönlich.';
+    default:
+      // Kein Einsatz UND keine Jahre. Achtung: 0 Jahre heisst hier oft
+      // „nicht angegeben", nicht „keine Erfahrung" — deshalb faellt hier
+      // JEDE Aussage ueber ihre Erfahrung weg, statt sie zu verneinen.
+      return 'Noch kein Einsatz über Primundus. Die Betreuungskraft wurde von uns persönlich '
+        + 'kennengelernt und geprüft, bevor wir sie einer Familie vorstellen.';
   }
 }
 
 // Faktenzeile der Karte (nach dem fetten Label). Zentral, weil MatchCard und
 // InterestCard sie bisher identisch dupliziert haben — und beide dieselben
 // Löcher hatten: ohne `care_experience` stand dort wörtlich „—" als einzige
-// Qualifikation, und ohne Einsätze fehlte nach „Neu dabei" jeder Inhalt.
+// Qualifikation, und ohne Einsätze fehlte nach „Neu bei Primundus" jeder Inhalt.
 // Leere Teile werden gefiltert statt als Strich gerendert; ist NICHTS da,
 // füllt ein kurzer, ehrlicher Satz die Zeile (Martin, 13.08.: „kurzen Text,
 // weil Erfahrungsinfo eh fehlt").
