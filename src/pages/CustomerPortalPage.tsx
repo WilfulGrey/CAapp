@@ -1720,7 +1720,7 @@ const CustomerPortalPage: FC = () => {
   };
 
   /* Ein Weg zum Formular für alle Knöpfe (Mail-Streifen, Schritt 1,
-     „Profil anlegen & einladen", Hinweis über den Karten): aufklappen,
+     „Profil vervollständigen & einladen", Hinweis über den Karten): aufklappen,
      Stepper öffnen, hinscrollen. */
   const zurPflegesituation = () => {
     setPatientExpandedManual(true);

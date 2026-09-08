@@ -37,7 +37,7 @@ export const MatchCard: FC<{
    *  all pass the gate. Local invitePhase='sending' on this card already
    *  hides the button — this prop covers the OTHER cards. */
   globalInviteLocked?: boolean;
-  /** Pflegesituation fehlt noch: Der Knopf heißt dann „Profil anlegen &
+  /** Pflegesituation fehlt noch: Der Knopf heißt dann „Profil vervollständigen &
    *  einladen“ und führt über die Sperre direkt zum Formular (07.09.). */
   profilFehlt?: boolean;
   /** Tipp auf die Stufen-Plakette: Profil mit geöffneter Erklärung (07.09.,
