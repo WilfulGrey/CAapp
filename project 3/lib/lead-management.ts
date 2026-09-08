@@ -17,6 +17,8 @@ export interface Lead {
   anrede: string | null;
   anrede_text: string | null;
   telefon: string | null;
+  /** Zweite Nummer (Portal-Leads: Festnetz + Mobil) — nur bei uns, Registry #56. */
+  telefon_2?: string | null;
   status: 'info_requested' | 'angebot_requested' | 'vertrag_abgeschlossen';
   token: string | null;
   token_expires_at: string | null;

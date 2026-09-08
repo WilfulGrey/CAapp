@@ -67,6 +67,9 @@ export async function POST(request: NextRequest) {
 
   const name = String(body?.name ?? '').trim();
   const telefon = String(body?.telefon ?? '').trim();
+  /* Zweite Nummer (Festnetz + Mobil aus der Portal-Mail, Registry #56) —
+     eigene Spalte, nie Teil der Lead-Identitaet. */
+  const telefon2 = String(body?.telefon_2 ?? '').trim();
 
   /* Einwilligungsnachweis. Der Kunde hat BEIM PORTAL eingewilligt, nicht
    * bei uns — unser eigener Checkbox-Text waere hier eine Faelschung des
@@ -297,6 +300,15 @@ export async function POST(request: NextRequest) {
     if (Object.keys(patientPatch).length) {
       const { error: patchErr } = await supabase.from('leads').update(patientPatch).eq('id', lead.id);
       if (patchErr) console.error('Portal-Lead: patient_* Update fehlgeschlagen:', patchErr.message);
+    }
+
+    /* telefon_2 als EIGENES best-effort Update, nicht im patientPatch: fehlt
+       die Spalte noch (Migration laeuft nach), darf das patient_* nicht mit
+       reissen. Setzt nur, loescht nie (wie telefon in findOrCreateLead) —
+       leeren geht ueber den Admin. */
+    if (telefon2) {
+      const { error: t2Err } = await supabase.from('leads').update({ telefon_2: telefon2 }).eq('id', lead.id);
+      if (t2Err) console.error('Portal-Lead: telefon_2 Update fehlgeschlagen:', t2Err.message);
     }
 
     /* Mamamia SOFORT, nicht erst beim Portal-Besuch (Entscheidung Michał

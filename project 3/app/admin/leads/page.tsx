@@ -264,7 +264,8 @@ export default function LeadsPage() {
         (lead) =>
           lead.email?.toLowerCase().includes(term) ||
           lead.vorname?.toLowerCase().includes(term) ||
-          lead.telefon?.includes(term)
+          lead.telefon?.includes(term) ||
+          lead.telefon_2?.includes(term)
       );
     }
 
@@ -489,6 +490,12 @@ export default function LeadsPage() {
                           <div className="flex items-center gap-2 text-sm text-gray-600">
                             <Phone className="w-3 h-3" />
                             {lead.telefon}
+                          </div>
+                        )}
+                        {lead.telefon_2 && (
+                          <div className="flex items-center gap-2 text-sm text-gray-600">
+                            <Phone className="w-3 h-3" />
+                            {lead.telefon_2}
                           </div>
                         )}
                         {/* Mamamia-Verknüpfung (read-only): zeigt auf einen Blick,

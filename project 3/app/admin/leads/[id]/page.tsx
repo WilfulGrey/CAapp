@@ -219,6 +219,7 @@ export default function LeadDetailPage() {
       email: lead.email || '',
       email_cc: (lead as any).email_cc || '',
       telefon: lead.telefon || '',
+      telefon_2: lead.telefon_2 || '',
     });
     setIsEditingContact(true);
   };
@@ -279,6 +280,8 @@ export default function LeadDetailPage() {
       const telefon = editedContact.telefon || null;
       // Kopie-Adresse: leer = keine Kopie (null); nie in `email` hineinmischen.
       const email_cc = (editedContact.email_cc || '').trim() || null;
+      // Zweite Nummer (Registry #56): leer = null — der einzige Weg, sie zu loeschen.
+      const telefon_2 = (editedContact.telefon_2 || '').trim() || null;
 
       const { data, error } = await supabase.rpc('update_lead_contact', {
         lead_id: leadId,
@@ -291,10 +294,11 @@ export default function LeadDetailPage() {
       const emailChanged = email !== lead.email;
 
       const ccChanged = email_cc !== ((lead as any).email_cc || null);
-      if (!error && (emailChanged || ccChanged || telefon !== lead.telefon)) {
+      const t2Changed = telefon_2 !== (lead.telefon_2 || null);
+      if (!error && (emailChanged || ccChanged || t2Changed || telefon !== lead.telefon)) {
         await supabase
           .from('leads')
-          .update({ email, telefon, email_cc })
+          .update({ email, telefon, email_cc, telefon_2 })
           .eq('id', leadId);
       }
 
@@ -625,6 +629,20 @@ export default function LeadDetailPage() {
                   />
                 </div>
 
+                <div>
+                  <label className="text-sm font-medium text-gray-700 block mb-1">
+                    Telefon 2
+                  </label>
+                  <input
+                    type="tel"
+                    value={editedContact.telefon_2 || ''}
+                    onChange={(e) =>
+                      setEditedContact({ ...editedContact, telefon_2: e.target.value })
+                    }
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#5C4A32]"
+                  />
+                </div>
+
                 <div className="flex gap-2 pt-2">
                   <Button
                     onClick={handleSaveContact}
@@ -705,6 +723,15 @@ export default function LeadDetailPage() {
                     <div>
                       <p className="text-sm text-gray-600">Telefon</p>
                       <p className="font-medium">{lead.telefon}</p>
+                    </div>
+                  </div>
+                )}
+                {lead.telefon_2 && (
+                  <div className="flex items-center gap-3">
+                    <Phone className="w-5 h-5 text-gray-400" />
+                    <div>
+                      <p className="text-sm text-gray-600">Telefon 2</p>
+                      <p className="font-medium">{lead.telefon_2}</p>
                     </div>
                   </div>
                 )}

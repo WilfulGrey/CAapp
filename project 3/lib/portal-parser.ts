@@ -353,3 +353,61 @@ export function parsePflegehilfe(text: string): ParseErgebnis {
     details: Object.keys(details).length ? details : undefined,
   };
 }
+
+/* ─── Telefonnummern aus dem HTML-Teil ──────────────────────────────────
+ *
+ * Nur der HTML-Teil der Pflegehilfe-Mail traegt Festnetz UND Mobil
+ * (`<b>Festnetz:</b>` / `<b>Mobil:</b>` + `<a href="tel:…" title="Telefon">`,
+ * prod uid 71 Steinbeck, 07.09.). Der text/plain-Teil hat an der Stelle nur
+ * "( tel: )", die CSV EINE Phone-Spalte (+ PhoneType). Zweite Nummern gingen
+ * bis Registry #56 verloren.
+ *
+ * Gelesen wird NUR der Abschnitt „Kontaktinformationen des Interessenten“
+ * bis zum ersten „Informationen zu…“ (zum Senior / zu den Senioren): die
+ * Hotline des Portals (tel:004961312652011) steht im Footer und traegt
+ * DASSELBE title="Telefon" — ein Filter ueber das Attribut griffe sie mit.
+ * Fehlt einer der Marker ⇒ [] (lieber nichts als die Hotline). Stuende ein
+ * „Informationen zu…“-Satz einmal INNERHALB des Kontaktblocks, endete der
+ * Abschnitt still frueher — der Test auf genau 2 Nummern aus uid 71 haelt das. */
+
+const cyfry = (s: string) => s.replace(/\D/g, '');
+
+export function telefoneAusHtml(html: string): string[] {
+  /* Soft-Hyphen in der Ueberschrift („Kontakt&shy;informationen“) — mail.html
+     ist roh, Entity, numerisch oder U+00AD moeglich. Leerzeichen als \s+ wie
+     in feld(): das Template darf die Ueberschrift umbrechen. */
+  const SHY = '(?:&shy;|&#173;|\\u00AD)?';
+  const start = html.search(new RegExp(`Kontakt${SHY}informationen\\s+des\\s+Interessenten`));
+  if (start < 0) return [];
+  const rest = html.slice(start);
+  const ende = rest.search(new RegExp(`Informa${SHY}tionen\\s+zu`));
+  if (ende < 0) return [];
+  const out: string[] = [];
+  /* Array.from statt for…of ueber den Iterator: project 3 kompiliert mit
+     target es5 ohne downlevelIteration (TS2802). */
+  for (const n of Array.from(rest.slice(0, ende).matchAll(/href="tel:([^"]+)"/g), (m) => m[1].trim())) {
+    if (cyfry(n) && !out.some((o) => cyfry(o) === cyfry(n))) out.push(n);
+  }
+  return out;
+}
+
+/* Letzte 9 Ziffern: „+49 176…“ (CSV) und „0176…“ (HTML) sind dieselbe Nummer.
+   Kuerzere Nummern werden ganz verglichen — bekannte Grenze, fuer DE unrealistisch. */
+const gleicheNummer = (a: string, b: string) => cyfry(a).slice(-9) === cyfry(b).slice(-9);
+
+/** Welche Nummer wird `telefon`, welche `telefon_2`.
+ *  CSV-Phone gewinnt, WENN vorhanden — eine leere Phone-Spalte erzeugt in
+ *  csvZuLeadZeile keine Mobil-Zeile, der CSV-Parse liefert dann '' und die
+ *  einzige echte Nummer landete sonst in telefon_2. Danach die erste
+ *  HTML-Nummer (Direktmail ohne CSV: text/plain hat keine), zuletzt der
+ *  Text-Parse (heutiges Verhalten). telefon_2 = erste HTML-Nummer, die nicht
+ *  dieselbe ist. */
+export function waehleTelefone(
+  csvTelefon: string | undefined,
+  textTelefon: string,
+  htmlNummern: string[],
+): { telefon: string; telefon_2?: string } {
+  const telefon = csvTelefon || htmlNummern[0] || textTelefon;
+  const telefon_2 = telefon ? htmlNummern.find((n) => !gleicheNummer(n, telefon)) : undefined;
+  return { telefon, telefon_2 };
+}
