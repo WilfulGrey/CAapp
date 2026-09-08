@@ -154,8 +154,8 @@ jedem Fall. Ein hochgestufter Lead (`info_requested` → Portal) wechselt
 die `source` auf das Portal — er ist ab jetzt eingekauft.
 
 **CSV zuerst.** Pflegehilfe hängt an jede Lead-Mail eine CSV mit dem
-VOLLEN Datensatz (Name, Telefon, Pflegegrad, Mobilität, Gewicht,
-Krankheiten …). Der Abholer liest sie als erste Quelle — aus der Zeile
+vollen Datensatz (Name, EIN Telefon + `PhoneType`, Pflegegrad, Mobilität,
+Gewicht, Krankheiten …). Der Abholer liest sie als erste Quelle — aus der Zeile
 wird ein "Label: Wert"-Text synthetisiert und durch dasselbe
 `parsePflegehilfe` geschickt (EIN Mapper, ein `unbekannt[]`-Kanal). Der
 Mailtext bleibt für den **Einwilligungsnachweis** (der steht nur dort)
@@ -396,6 +396,47 @@ Mit dem Speichern gelten die Angaben als **mit dem Kunden geprüft**:
 Nicht nachzutragen: der Reiter im Admin und die Allowlist des Eingangs —
 beide kommen aus `PORTALE`.
 
+## Zweite Telefonnummer (`leads.telefon_2`, Registry #56)
+
+Etwa jede fünfte Pflegehilfe-Anfrage trägt ZWEI Nummern (Festnetz + Mobil,
+manchmal zwei Mobil). Sie stehen **nur im HTML-Teil** der Mail: im Block
+„Kontakt&shy;informationen des Interessenten“ als `<b>Festnetz:</b>` /
+`<b>Mobil:</b>` mit `<a href="tel:…" title="Telefon">`. Der text/plain-Teil
+hat an der Stelle nur `( tel: )`, die CSV eine einzige `Phone`-Spalte —
+bis 09/2026 ging die zweite Nummer verloren (Abholer las nur `mail.text`,
+Peek auf der Prod-Box am 07.09.: uid 71 Steinbeck, uid 66 Urban).
+
+`lib/portal-parser.ts:telefoneAusHtml(html)` liest die `tel:`-Links
+**nur zwischen** dieser Überschrift und dem ersten „Informationen zu…“
+(zum Senior / zu den Senioren): die Hotline des Portals
+(`tel:004961312652011`) steht im Footer und trägt DASSELBE
+`title="Telefon"` — ein Filter über das Attribut griffe sie mit. Fehlt
+einer der beiden Marker ⇒ `[]` (lieber nichts als die Hotline).
+Reklamations-Mails haben keinen Kontaktblock ⇒ `[]` ⇒ Verhalten wie bisher.
+
+`waehleTelefone(csvTelefon, textTelefon, htmlNummern)` entscheidet, was
+`telefon` und was `telefon_2` wird — EINE Stelle, unit-getestet:
+`telefon` = CSV-Phone, wenn vorhanden (leere Phone-Spalte ⇒ kein
+`Mobil`-Label im synthetischen Text ⇒ `''`), sonst erste HTML-Nummer
+(Direktmail ohne CSV — bisher blieb `telefon` dort leer), sonst der
+Text-Parse; `telefon_2` = erste HTML-Nummer, die nicht dieselbe ist
+(Vergleich auf den letzten 9 Ziffern: `+49 176…` == `0176…`). Folge:
+CSV-Mail ⇒ `telefon` = CSV-`Phone`, `telefon_2` = die andere; Direktmail
+⇒ `telefon` = erster `tel:`-Link (meist Festnetz), `telefon_2` = Mobil.
+Auf dem Duplikat-Pfad überschreibt `findOrCreateLead` `telefon`, wenn
+nicht leer — CSV-Mails taten das schon, Direktmails tun es jetzt auch
+(ein Re-Run per `status='offen'` überschreibt eine Admin-Korrektur).
+
+Der Eingang (`/api/portal-lead`) schreibt `telefon_2` als **eigenes**
+best-effort Update nach dem `patient_*`-Patch — fehlt die Spalte noch
+(Migration läuft nach), darf das `patient_*` nicht mitreißen. Der Eingang
+**setzt nur, löscht nie** (wie `telefon` in `findOrCreateLead`); leeren
+geht über den Admin (Kontaktformular, Feld „Telefon 2“, leer ⇒ `null`).
+Sichtbar in `/admin/leads` (Liste + Suche) und im Lead-Detail. mamamia
+kennt EINE Nummer (`Customer.phone`) — `telefon_2` bleibt bei uns; die
+Partner-API pflege-helfer24 liefert nur eine `Telefon`-Spalte, dort
+ändert sich nichts.
+
 ## Tests
 
 Die Prüfungen laufen im root-vitest (Cross-App-Import der pure Module,
@@ -409,7 +450,7 @@ npx vitest run src/__tests__/portalLead.test.ts src/__tests__/portalParser.test.
 
 `portalHelfer24.test.ts` (API-Zeile → Body: Spalten per Name, exakte
 Auswahlwerte, `spaeter`, falsches Produkt, Einwilligung), `portalSchutz.test.ts`
-(Testphase per Domain, `Aktiv`), `portalParser.test.ts` (liest die Portal-Mail), `portalLead.test.ts`
+(Testphase per Domain, `Aktiv`), `portalParser.test.ts` (liest die Portal-Mail; `telefoneAusHtml` gegen VERBATIM-Fragmente aus prod uid 71 — beide Nummern, nie die Hotline, ohne Ende-Marker `[]`; `waehleTelefone` — CSV ohne Phone darf die einzige Nummer nicht nach `telefon_2` schieben), `portalLead.test.ts`
 (Lücken zum teureren Wert füllen + Admin-Reiter via `reiterFuer` aus
 `lib/portal-lead.ts` — die Seite ruft dieselbe Funktion auf, der Test
 prüft keine Kopie), `portalMailLog.test.ts` (welche UIDs ein Lauf

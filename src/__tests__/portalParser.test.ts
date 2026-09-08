@@ -3,7 +3,7 @@ import { describe, it, expect } from 'vitest';
 // Kommentar in portalLead.test.ts. Fixture: eine echte (anonymisierte)
 // Pflegehilfe-Lead-Mail — der Parser muss die Kundendaten treffen, nicht
 // die des Portals, und den echten Pflegegrad, nicht den Filter "1-5".
-import { parsePflegehilfe, anredeAusBeziehung } from '../../project 3/lib/portal-parser';
+import { parsePflegehilfe, anredeAusBeziehung, telefoneAusHtml, waehleTelefone } from '../../project 3/lib/portal-parser';
 import { ergaenzeAngaben } from '../../project 3/lib/portal-lead';
 
 const mail = `
@@ -203,5 +203,48 @@ describe('Pflegehilfe-Vokabeln aus dem Fall Epple (Registry #49)', () => {
     expect(variante('Nein', 'Erfahren').angaben.erfahrung).toBe('erfahren');
     expect(variante('Nein', 'Keine').angaben.erfahrung).toBe('einsteiger');
     expect(variante('Nein', 'Examinierte Fachkraft').angaben.erfahrung).toBe('sehr-erfahren');
+  });
+});
+
+/* HTML-Teil der Direktmail — VERBATIM-Fragmente aus prod uid 71 (Steinbeck,
+ * 07.09.2026): Ueberschrift mit &shy;, Festnetz + Mobil als tel:-Links, das
+ * Ende „Informationen zum Senior“ und die Hotline des Portals im Footer, die
+ * DASSELBE title="Telefon" traegt. Nicht abtippen — sonst beweist der Test
+ * nichts ueber das echte Template. */
+const htmlUid71 = `<td style="font-family: Arial, Helvetica, Tahoma, sans-serif; font-size: 18px; line-height:23px; color: #4c8ba5; text-align:left; padding-top:3px;"><b>Kontakt&shy;informationen des Interessenten</b></td>
+<td style="font-family: Arial, Helvetica, Tahoma, sans-serif; font-size: 14px; line-height:19px; color: #48453b; text-align:left;"><b>Festnetz:</b></td>
+<td style="font-family: Arial, Helvetica, Tahoma, sans-serif; font-size: 14px; line-height:19px; color: #48453b; text-align:left;"><a style="color:#4c8ba5; text-decoration:none;" href="tel:+49 878192447" title="Telefon" target="_blank">+49 878192447</a></td>
+<td style="font-family: Arial, Helvetica, Tahoma, sans-serif; font-size: 14px; line-height:19px; color: #48453b; text-align:left;"><b>Mobil:</b></td>
+<td style="font-family: Arial, Helvetica, Tahoma, sans-serif; font-size: 14px; line-height:19px; color: #48453b; text-align:left;"><a style="color:#4c8ba5; text-decoration:none;" href="tel:+49 15207607612" title="Telefon" target="_blank">+49 15207607612</a></td>
+<td style="font-family: Arial, Helvetica, Tahoma, sans-serif; font-size: 14px; line-height:19px; color: #48453b; text-align:left;"><b>E-Mail-Adresse:</b></td>
+<td style="text-align:left; color:#98c44c; font-size: 20px; line-height: 25px; font-family: Arial, Helvetica, Tahoma, sans-serif; padding:0px 25px 15px 25px; background-color:#ffffff;"><b>Informationen zum Senior</b></td>
+<td style="font-family: Arial, Helvetica, Tahoma, sans-serif; font-size: 14px; line-height:19px; color: #48453b; text-align:left; padding-top:15px;"><nobr><a style="color:#48453b; text-decoration:none;" href="tel:004961312652011" title="Telefon" target="_blank"><b>06131/26 52 011</b></a></nobr></td>`;
+
+describe('telefoneAusHtml — Festnetz + Mobil nur im HTML-Teil (Registry #56)', () => {
+  it('liest beide Kundennummern, NICHT die Hotline aus dem Footer', () => {
+    expect(telefoneAusHtml(htmlUid71)).toEqual(['+49 878192447', '+49 15207607612']);
+  });
+
+  it('ohne Ende-Marker lieber nichts als die Hotline', () => {
+    const ohneEnde = htmlUid71.replace('Informationen zum Senior', 'Details');
+    expect(telefoneAusHtml(ohneEnde)).toEqual([]);
+  });
+
+  it('Mail ohne Kontaktblock (Reklamation) ⇒ []', () => {
+    expect(telefoneAusHtml('<p>Reklamation eingereicht</p><a href="tel:004961312652011">Hotline</a>')).toEqual([]);
+  });
+});
+
+describe('waehleTelefone — welche Nummer wird telefon, welche telefon_2', () => {
+  it('CSV-Phone gewinnt; die andere HTML-Nummer wird telefon_2 (Formate egal)', () => {
+    expect(waehleTelefone('+49 15207607612', '', ['0878192447', '+49 15207607612']))
+      .toEqual({ telefon: '+49 15207607612', telefon_2: '0878192447' });
+  });
+
+  it('CSV ohne Phone: erste HTML-Nummer wird telefon, NICHT telefon_2', () => {
+    expect(waehleTelefone(undefined, '', ['+49 878192447', '+49 15207607612']))
+      .toEqual({ telefon: '+49 878192447', telefon_2: '+49 15207607612' });
+    expect(waehleTelefone(undefined, '', ['+49 878192447'])).toEqual({ telefon: '+49 878192447', telefon_2: undefined });
+    expect(waehleTelefone(undefined, '+49 1', [])).toEqual({ telefon: '+49 1', telefon_2: undefined });
   });
 });

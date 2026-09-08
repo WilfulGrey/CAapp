@@ -49,7 +49,7 @@ import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 
 /* Derselbe Parser, den auch der Testlauf und die Unit-Tests benutzen —
  * der Abholer bringt KEINE zweite Lesart der Portal-Mail mit. */
-import { parsePflegehilfe } from '@/lib/portal-parser';
+import { parsePflegehilfe, telefoneAusHtml, waehleTelefone } from '@/lib/portal-parser';
 import { parseCsv, csvZuLeadZeile, csvZeileBrauchbar } from '@/lib/portal-csv';
 import { PORTALE } from '@/lib/portal-lead';
 import { zuVerarbeiten, SEED_SENTINEL_UID, type LogZeile } from '@/lib/portal-mail-log';
@@ -263,6 +263,8 @@ async function verarbeite(
   /** Datum der Mail — Zeitpunkt der Lieferung, wenn die Mail keinen
       Einwilligungs-Zeitstempel traegt. */
   mailDatum?: Date,
+  /** Kundennummern aus dem HTML-Teil (Festnetz + Mobil) — lib/portal-parser.ts. */
+  telefone: string[] = [],
 ): Promise<PostErgebnis> {
   const textErgebnis = parsePflegehilfe(roh);
   const ergebnis = csv ? parsePflegehilfe(csv.text) : textErgebnis;
@@ -299,11 +301,18 @@ async function verarbeite(
     return { ok: true as const, trocken: true };
   }
 
+  /* Eine Wahrheit fuer telefon/telefon_2 (Registry #56): CSV-Nummer, sonst
+     HTML, sonst Text-Parse; die zweite HTML-Nummer wird telefon_2. */
+  const { telefon, telefon_2 } = waehleTelefone(
+    csv ? kontakt.telefon : undefined, textErgebnis.kontakt.telefon, telefone,
+  );
+
   return posteLead(cfg, {
       portal,
       name: kontakt.name,
       email: kontakt.email,
-      telefon: kontakt.telefon,
+      telefon,
+      telefon_2,
       angaben,
       care_start_timing: ergebnis.care_start_timing,
       portal_lead_id: ergebnis.portal_lead_id,
@@ -435,6 +444,8 @@ async function arbeiteAb(cfg: Konfig, portal: string, client: ImapFlow, db: Supa
          Parser sucht "Label: Wert" zeilenweise. */
       const html = typeof mail.html === 'string' ? mail.html.replace(/<[^>]+>/g, ' ') : '';
       const roh = mail.text || html;
+      /* Festnetz + Mobil stehen NUR im HTML-Teil (Registry #56). */
+      const telefone = typeof mail.html === 'string' ? telefoneAusHtml(mail.html) : [];
 
       /* CSV-Anhang = volle Datenquelle (siehe lib/portal-csv.ts). Eine
          unlesbare CSV bricht nichts — dann traegt der Mailtext allein. */
@@ -459,7 +470,7 @@ async function arbeiteAb(cfg: Konfig, portal: string, client: ImapFlow, db: Supa
 
       let ausgang: Ausgang;
       try {
-        const ergebnis = await verarbeite(cfg, portal, roh, csv, mail.date);
+        const ergebnis = await verarbeite(cfg, portal, roh, csv, mail.date, telefone);
         if (!ergebnis.ok) {
           if (ergebnis.dauerhaft) {
             const leadId = await registriereFehlmail(db, portal, uid, mail, csv ? `${roh}\n\n--- CSV ---\n${csv.text}` : roh, 'abgelehnt', ergebnis.grund, ergebnis.email, ergebnis.name);

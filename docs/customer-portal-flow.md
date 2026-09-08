@@ -438,6 +438,7 @@ mamamia_jobs_checked_at timestamptz NULL      -- ostatnia sonda "czy Mamamia
 -- Google-Ads-Attribution (Bug #33, migracja 20260814090000)
 gclid                 text NULL               -- Google-Klick-ID z landing-URL
 email_cc              text NULL               -- Zweite Empfängeradresse (CC) für ALLE Kundenmails; Pflege im SA-Portal (Kontakt-Sync) + CAapp-Admin. Nie Teil der Identität (kein Dedupe, kein mamamia-Feld). lib/empfaenger.ts
+telefon_2             text NULL               -- Zweite Telefonnummer (Portal-Leads: Festnetz+Mobil aus dem HTML-Teil der Pflegehilfe-Mail, Registry #56). Nur bei uns (Admin Kostenrechner) — mamamia kennt EINE Nummer. Eingang setzt, löscht nie; leeren = Admin. docs/portal-leads.md
 wbraid, gbraid        text NULL               -- iOS-Varianty klick-ID
 ```
 
