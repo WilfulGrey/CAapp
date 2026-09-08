@@ -157,7 +157,7 @@ die `source` auf das Portal — er ist ab jetzt eingekauft.
 vollen Datensatz (Name, EIN Telefon + `PhoneType`, Pflegegrad, Mobilität,
 Gewicht, Krankheiten …). Der Abholer liest sie als erste Quelle — aus der Zeile
 wird ein "Label: Wert"-Text synthetisiert und durch dasselbe
-`parsePflegehilfe` geschickt (EIN Mapper, ein `unbekannt[]`-Kanal). Der
+`parsePflegehilfe` geschickt (EIN Mapper, ein `unbekannt[]`-Kanal). Die Datei beginnt mit einem UTF-8-BOM (U+FEFF); `parseCsv` streift ihn ab — sonst trüge die erste Spalte den BOM im Namen, `RequestNumber` würde nicht gefunden und die Anfragen-Nr. (`portal_lead_id`) ginge verloren; im Log steht dann `⚠ CSV ohne RequestNumber` (Registry #57). Der
 Mailtext bleibt für den **Einwilligungsnachweis** (der steht nur dort)
 und als Fallback für Mails ohne Anhang — sowie für Mails mit
 handverstümmeltem Anhang: eine Datenzeile mit weniger als der Hälfte der
