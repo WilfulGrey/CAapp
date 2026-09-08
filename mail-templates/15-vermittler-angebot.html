@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <title>Primundus 24h-Pflege</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; line-height: 1.6; color: #333333; background-color: #f4f4f4; }
+    .email-wrapper { width: 100%; background-color: #f4f4f4; padding: 20px 0; }
+    .email-container { max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+    .email-header { background: #ffffff; padding: 24px 40px 20px 40px; border-bottom: 1px solid #f0ebe4; }
+    .email-content { padding: 40px 40px 32px; text-align: left; }
+    .email-footer { background-color: #f8f9fa; padding: 30px; text-align: center; border-top: 1px solid #e0e0e0; }
+    /* Mouseover fuer den "Zum Profil"-Hinweis an der Empfehlung. Greift in
+       Apple Mail, iOS Mail und der Gmail-Weboberflaeche; Outlook Desktop
+       kennt kein :hover — dort bleibt der Link statisch, das ist in Ordnung.
+       Bewusst AUSSERHALB der Media-Query: Mauszeiger gibt es am Desktop. */
+    a.profil-link:hover { color: #E76F63 !important; text-decoration: underline !important; }
+    @media only screen and (max-width: 600px) {
+      .email-content { padding: 30px 20px; }
+      .price-stage-cell { display: block !important; width: 100% !important; padding: 18px 22px 16px !important; border-right: none !important; border-bottom: 1px solid #ebe2d2 !important; }
+      .price-stage-cell:last-child { border-bottom: none !important; }
+      /* Empfehlungs-Karte: Foto und Name bleiben AUCH auf dem Handy
+         nebeneinander — genau wie die Karte im Portal (MatchCard). 64 px Foto
+         plus Text passen bei 375 px bequem; ein Umbruch haette die Mail von
+         der Ansicht entfernt, die der Kunde eine Sekunde spaeter sieht.
+         Die Faktenzeile laeuft ohnehin ueber die volle Kartenbreite. */
+      .empf-foto { padding-left: 0 !important; }
+    }
+  </style>
+</head>
+<body>
+  <div class="email-wrapper">
+    <table width="100%" cellpadding="0" cellspacing="0" role="presentation">
+      <tr><td align="center">
+        <div class="email-container">
+          <div class="email-header">
+            <table width="100%" cellpadding="0" cellspacing="0" role="presentation">
+              <tr>
+                <td style="vertical-align:middle;">
+                  <img src="https://kostenrechner.primundus.de/images/Primundus-Logo_V6.png" alt="Primundus Logo" width="160" style="display:block;width:160px;max-width:160px;height:auto;" />
+                </td>
+                <td style="vertical-align:middle;text-align:right;">
+                  <table cellpadding="0" cellspacing="0" role="presentation" style="margin-left:auto;">
+                    <tr>
+                      <td style="text-align:center;vertical-align:middle;padding-right:8px;border-right:1px solid #f0ebe4;">
+                        <img src="https://kostenrechner.primundus.de/images/primundus_testsieger-2021.webp" alt="Testsieger DIE WELT" width="36" style="display:block;width:36px;height:auto;" />
+                      </td>
+                      <td style="text-align:left;padding-left:8px;">
+                        <!-- Siegel bewusst KOMPAKT: "6× Testsieger" statt "Testsieger" +
+                             eigener Zeile "6× in Folge". Der Block sitzt neben dem Logo in
+                             der Kopfzeile und hat wenig Platz — vier Zeilen wirkten
+                             gedraengt und liessen "Testsieger" ohne die Zahl stehen
+                             (Martin 28.08.2026). Im FLIESSTEXT, wo eine ganze Zeile zur
+                             Verfuegung steht, bleibt "6× in Folge" erwuenscht. -->
+                        <p style="margin:0 0 1px 0;font-size:10px;font-weight:700;color:#3D2B1F;white-space:nowrap;">6× Testsieger</p>
+                        <p style="margin:0 0 1px 0;font-size:10px;color:#B5A184;white-space:nowrap;font-weight:600;">DIE WELT</p>
+                        <p style="margin:0;font-size:9px;color:#aaa;white-space:nowrap;">Preis &amp; Qualit&auml;t</p>
+                      </td>
+                    </tr>
+                  </table>
+                </td>
+              </tr>
+            </table>
+          </div>
+          <div class="email-content">
+    <p style="font-size:15px;line-height:1.75;color:#444;margin-bottom:16px;">Hallo Herr Wilde,</p>
+    <p style="font-size:15px;line-height:1.75;color:#444;margin-bottom:16px;">vielen Dank für Ihre Anfrage für die Betreuung von <strong style="color:#2D1F0F;">Familie Schmidt</strong>. Anbei unser Angebot &ndash; und eine Betreuungskraft, die zu den Angaben passt und im gewünschten Zeitraum verfügbar ist.</p>
+    
+    <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="margin:0 0 26px;background:#FAF8F4;border-radius:10px;overflow:hidden;">
+      <tr>
+        <td class="price-stage-cell" style="width:50%;padding:22px 24px 18px;border-right:1px solid #ebe2d2;vertical-align:top;">
+          <p style="margin:0 0 8px;font-size:11px;font-weight:700;color:#9a8a73;letter-spacing:.08em;text-transform:uppercase;">Tagessatz</p>
+          <p style="margin:0 0 4px;font-size:26px;font-weight:700;color:#2D1F0F;line-height:1.15;">88&nbsp;€<span style="font-size:14px;font-weight:500;color:#9a8a73;"> / Tag</span></p>
+          <p style="margin:0;font-size:12px;color:#9a8a73;line-height:1.5;">inkl. Steuern &amp; Sozialabgaben</p>
+        </td>
+        <td class="price-stage-cell" style="width:50%;padding:22px 24px 18px;vertical-align:top;">
+          <p style="margin:0 0 8px;font-size:11px;font-weight:700;color:#9a8a73;letter-spacing:.08em;text-transform:uppercase;">Monatssatz</p>
+          <p style="margin:0 0 4px;font-size:26px;font-weight:700;color:#2D1F0F;line-height:1.15;">2.650&nbsp;€<span style="font-size:14px;font-weight:500;color:#9a8a73;"> / Monat</span></p>
+          <p style="margin:0;font-size:12px;color:#9a8a73;line-height:1.5;">zzgl. Kost &amp; Logis</p>
+        </td>
+      </tr>
+      <tr><td colspan="2" style="padding:14px 24px 16px;border-top:1px solid #ebe2d2;">
+        <p style="margin:0;font-size:13px;line-height:1.7;color:#666;">zzgl. ca. 125&nbsp;€ Anreise- und Abreisekosten je Strecke.</p>
+      </td></tr>
+      <tr><td colspan="2" style="padding:14px 24px 16px;border-top:1px solid #ebe2d2;background:#F3EFE7;">
+        <p style="margin:0 0 4px;font-size:11px;font-weight:700;color:#9a8a73;letter-spacing:.08em;text-transform:uppercase;color:#8B7355;">Ihre Provision</p>
+        <p style="margin:0;font-size:14px;line-height:1.7;color:#2D1F0F;">Ihre Provision von <strong>10&nbsp;€/Tag</strong> kommt auf den Preis. Familie Schmidt zahlt damit <strong>98&nbsp;€/Tag</strong>.</p>
+      </td></tr>
+      <tr><td colspan="2" style="padding:16px 24px 20px;border-top:1px solid #ebe2d2;">
+        <p style="margin:0 0 10px;font-size:11px;font-weight:700;color:#9a8a73;letter-spacing:.08em;text-transform:uppercase;color:#2A9D5C;">Konditionen</p>
+        <p style="margin:0 0 6px;font-size:14px;line-height:1.6;color:#2D1F0F;"><span style="color:#2A9D5C;font-weight:700;">&#10003;</span>&nbsp;&nbsp;Täglich kündbar</p><p style="margin:0 0 6px;font-size:14px;line-height:1.6;color:#2D1F0F;"><span style="color:#2A9D5C;font-weight:700;">&#10003;</span>&nbsp;&nbsp;Tagesgenaue Abrechnung</p>
+        <p style="margin:8px 0 0;font-size:13px;line-height:1.6;color:#666;">Kosten entstehen erst, wenn die Betreuungskraft vor Ort ist.</p>
+      </td></tr>
+    </table>
+    
+    <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="margin:26px 0 26px;">
+      <tr><td>
+        <p style="margin:0 0 14px;font-size:17px;font-weight:700;line-height:1.35;color:#2D1F0F;">Eine passende Betreuungskraft</p>
+        <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="border:2px solid #8B7355;border-radius:16px;background:#ffffff;">
+          <tr><td style="padding:13px 20px;background:#FAF8F4;border-bottom:1px solid #EBE2D2;border-radius:15px 15px 0 0;font-size:12px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;color:#E76F63;">Unsere Empfehlung</td></tr>
+          <tr><td style="padding:20px;">
+            <table width="100%" cellpadding="0" cellspacing="0" role="presentation"><tr>
+              <td width="80" style="width:80px;vertical-align:middle;"><img src="data:image/jpeg;base64,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" alt="Maria K." width="80" height="80" style="display:block;width:80px;height:80px;border-radius:16px;object-fit:cover;border:2px solid #ffffff;" /></td>
+              <td width="16" style="width:16px;font-size:0;line-height:0;">&nbsp;</td>
+              <td style="vertical-align:middle;">
+                <p style="margin:0 0 6px;font-size:20px;font-weight:700;line-height:1.3;color:#18181B;">Maria K.<span style="font-size:14px;font-weight:400;color:#A1A1AA;">&nbsp;&nbsp;54 J.</span></p>
+                <span style="display:inline-block;font-size:11px;font-weight:700;color:#8B7355;background:#F5F5F6;border:1px solid #E4E4E7;border-radius:999px;padding:3px 10px;">Elite</span><span style="font-size:14px;color:#52525B;">&nbsp;&nbsp;13 Einsätze über Primundus</span>
+              </td>
+            </tr></table>
+            <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="margin:16px 0 0;"><tr>
+              <td width="50%" style="width:50%;vertical-align:top;"><table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="border:1px solid #D4D4D8;border-radius:12px;background:#ffffff;"><tr><td style="padding:10px 12px;"><p style="margin:0 0 4px;font-size:13px;line-height:1.4;color:#71717A;">Erfahrung</p><p style="margin:0;font-size:16px;font-weight:700;color:#8B7355;">13 J. Erfahrung</p></td></tr></table></td>
+              <td width="10" style="width:10px;font-size:0;line-height:0;">&nbsp;</td>
+              <td width="50%" style="width:50%;vertical-align:top;"><table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="border:1px solid #D4D4D8;border-radius:12px;background:#ffffff;"><tr><td style="padding:10px 12px;"><p style="margin:0 0 4px;font-size:13px;line-height:1.4;color:#71717A;">Deutschkenntnisse</p><table cellpadding="0" cellspacing="0" role="presentation"><tr><td width="14" style="width:14px;padding-right:3px;"><div style="width:12px;height:6px;border-radius:3px;background:#8B7355;font-size:0;line-height:0;">&nbsp;</div></td><td width="14" style="width:14px;padding-right:3px;"><div style="width:12px;height:6px;border-radius:3px;background:#8B7355;font-size:0;line-height:0;">&nbsp;</div></td><td width="14" style="width:14px;padding-right:3px;"><div style="width:12px;height:6px;border-radius:3px;background:#8B7355;font-size:0;line-height:0;">&nbsp;</div></td><td style="padding-left:5px;font-size:16px;font-weight:700;color:#18181B;">Gut</td></tr></table></td></tr></table></td>
+            </tr></table>
+            <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="margin:14px 0 0;"><tr><td style="padding:0 0 7px;font-size:15px;line-height:1.5;color:#3F3F46;"><span style="color:#22A06B;font-weight:700;">&#10003;</span>&nbsp;&nbsp;Entspricht dem angefragten Profil</td></tr><tr><td style="padding:0 0 7px;font-size:15px;line-height:1.5;color:#3F3F46;"><span style="color:#22A06B;font-weight:700;">&#10003;</span>&nbsp;&nbsp;Erfahrung mit Rollstuhlpatienten</td></tr><tr><td style="padding:0 0 7px;font-size:15px;line-height:1.5;color:#3F3F46;"><span style="color:#22A06B;font-weight:700;">&#10003;</span>&nbsp;&nbsp;Erfahrung mit nächtlichen Einsätzen</td></tr></table>
+            <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="margin:18px 0 0;"><tr><td style="padding-top:16px;border-top:1px solid #EFEAE2;"><p style="margin:0 0 8px;font-size:17px;font-weight:700;line-height:1.4;color:#18181B;">Über Maria</p><p style="margin:0;font-size:16px;line-height:1.65;color:#18181B;">Maria betreut seit dreizehn Jahren ältere Menschen zu Hause. Ihr ist ein ruhiger, verlässlicher Tagesablauf wichtig – feste Zeiten für Mahlzeiten, Medikamente und gemeinsame Spaziergänge.</p></td></tr></table>
+          </td></tr>
+        </table>
+      </td></tr>
+    </table>
+    <p style="font-size:15px;line-height:1.75;color:#444;margin-bottom:16px;">Weitere passende Betreuungskräfte sende ich Ihnen in den nächsten Stunden.</p>
+    <p style="font-size:15px;line-height:1.75;color:#444;margin-bottom:16px;">Melden Sie sich einfach bei mir, wenn wir die Vermittlung anstoßen sollen. Ein kurzes Wort genügt, den Rest übernehmen wir.</p>
+    Mit freundlichen Grüßen<br><strong style="color:#3D2B1F;">Marta Kapcio</strong></p>
+    <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="margin:0 0 24px 0;border:1px solid #e8ddd0;border-radius:12px;overflow:hidden;">
+      <tr>
+        <td style="padding:18px 20px 16px;background:#ffffff;">
+          <table width="100%" cellpadding="0" cellspacing="0" role="presentation">
+            <tr>
+              <td style="vertical-align:top;">
+                <table cellpadding="0" cellspacing="0" role="presentation">
+                  <tr>
+                    <td style="padding-right:12px;vertical-align:top;">
+                      <img src="https://primundus.de/images/marta-kapcio.jpg" alt="Marta Kapcio" width="60" style="display:block;width:60px;height:auto;border-radius:8px;" />
+                    </td>
+                    <td style="vertical-align:middle;">
+                      <p style="margin:0 0 2px;font-size:15px;font-weight:700;color:#3D2B1F;white-space:nowrap;">Marta Kapcio</p>
+                      <p style="margin:0 0 2px;font-size:13px;color:#555;white-space:nowrap;">Pflegeberaterin</p>
+                      <p style="margin:0;font-size:12px;color:#9a8a73;white-space:nowrap;">Mo – So, 8 – 20 Uhr</p>
+                    </td>
+                  </tr>
+                </table>
+                <table cellpadding="0" cellspacing="0" role="presentation" style="margin-top:12px;">
+                  <tr><td style="padding-bottom:6px;">
+                    <a href="tel:+4989200000830" style="display:inline-block;background-color:#f0ebe4;border-radius:20px;padding:8px 16px;text-decoration:none;font-size:13px;font-weight:500;color:#3D2B1F;white-space:nowrap;">&#9990; 089 200 000 830</a>
+                  </td></tr>
+                  <tr><td>
+                    <a href="https://wa.me/4989200000830" style="display:inline-block;background-color:#25D366;border-radius:20px;padding:8px 16px;text-decoration:none;font-size:13px;font-weight:600;color:#ffffff;white-space:nowrap;">WhatsApp schreiben</a>
+                  </td></tr>
+                </table>
+              </td>
+              <td style="vertical-align:top;text-align:right;">
+                <table cellpadding="0" cellspacing="0" role="presentation" style="border:1px solid #e8ddd0;border-radius:8px;overflow:hidden;margin-left:auto;">
+                  <tr>
+                    <td style="padding:8px 10px;background:#ffffff;text-align:center;vertical-align:top;">
+                      <img src="https://kostenrechner.primundus.de/images/primundus_testsieger-2021.webp" alt="Testsieger DIE WELT" width="64" style="display:block;width:64px;height:auto;margin:0 auto 5px;" />
+                      <p style="margin:0 0 1px;font-size:11px;font-weight:700;color:#3D2B1F;white-space:nowrap;">6× Testsieger <span style="color:#B5A184;">DIE WELT</span></p>
+                      <p style="margin:0;font-size:10px;color:#888;line-height:1.4;">Preis, Qualität &amp;<br>Kundenservice</p>
+                    </td>
+                  </tr>
+                </table>
+              </td>
+            </tr>
+          </table>
+        </td>
+      </tr>
+      <tr>
+        <td style="background:#f9f6f2;border-top:1px solid #e8ddd0;">
+          <table width="100%" cellpadding="0" cellspacing="0" role="presentation">
+            <tr>
+              <td style="padding:12px 0;text-align:center;width:33%;border-right:1px solid #e8ddd0;">
+                <p style="margin:0;font-size:12px;color:#555;line-height:1.4;">Über 20 Jahre<br>Erfahrung</p>
+              </td>
+              <td style="padding:12px 0;text-align:center;width:33%;border-right:1px solid #e8ddd0;">
+                <p style="margin:0;font-size:12px;color:#555;line-height:1.4;">60.000+<br>betreute Einsätze</p>
+              </td>
+              <td style="padding:12px 0;text-align:center;width:33%;">
+                <p style="margin:0;font-size:12px;color:#555;line-height:1.4;">Persönlicher<br>Ansprechpartner,<br>7&nbsp;Tage/Woche</p>
+              </td>
+            </tr>
+          </table>
+        </td>
+      </tr>
+      <tr>
+        <td style="background:#ffffff;border-top:1px solid #e8ddd0;padding:12px 16px;">
+          <table width="100%" cellpadding="0" cellspacing="0" role="presentation"><tr>
+            <td style="text-align:center;vertical-align:middle;padding:0 4px;"><img src="https://kostenrechner.primundus.de/images/media/die-welt.webp" alt="DIE WELT" height="14" style="display:inline-block;height:14px;width:auto;opacity:0.4;filter:grayscale(100%);" /></td>
+            <td style="text-align:center;vertical-align:middle;padding:0 4px;"><img src="https://kostenrechner.primundus.de/images/media/frankfurter-allgemeine.webp" alt="FAZ" height="14" style="display:inline-block;height:14px;width:auto;opacity:0.4;filter:grayscale(100%);" /></td>
+            <td style="text-align:center;vertical-align:middle;padding:0 4px;"><img src="https://kostenrechner.primundus.de/images/media/ard.webp" alt="ARD" height="14" style="display:inline-block;height:14px;width:auto;opacity:0.4;filter:grayscale(100%);" /></td>
+            <td style="text-align:center;vertical-align:middle;padding:0 4px;"><img src="https://kostenrechner.primundus.de/images/media/ndr.webp" alt="NDR" height="14" style="display:inline-block;height:14px;width:auto;opacity:0.4;filter:grayscale(100%);" /></td>
+            <td style="text-align:center;vertical-align:middle;padding:0 4px;"><img src="https://kostenrechner.primundus.de/images/media/sat1.webp" alt="SAT.1" height="14" style="display:inline-block;height:14px;width:auto;opacity:0.4;filter:grayscale(100%);" /></td>
+            <td style="text-align:center;vertical-align:middle;padding:0 4px;"><img src="https://kostenrechner.primundus.de/images/media/bild-der-frau.webp" alt="Bild der Frau" height="14" style="display:inline-block;height:14px;width:auto;opacity:0.4;filter:grayscale(100%);" /></td>
+          </tr></table>
+        </td>
+      </tr>
+    </table>
+          <div class="email-footer">
+            <div style="font-weight:600;font-size:15px;color:#3D2B1F;margin-bottom:6px;">PRIMUNDUS Sp. z o.o.</div>
+            <div style="font-size:13px;color:#666;line-height:1.8;">
+              Poznańska 21/48, 00-685 Warschau, Polen<br>KRS 0001259402 &middot; NIP 7011326714<br>
+              <a href="tel:+4989200000830" style="color:#0066CC;text-decoration:none;">+49 89 200 000 830</a> |
+              <a href="mailto:info@primundus.de" style="color:#0066CC;text-decoration:none;">info@primundus.de</a><br>
+              <a href="https://primundus.de" style="color:#0066CC;text-decoration:none;">www.primundus.de</a>
+            </div>
+            <div style="font-size:12px;color:#999;margin-top:16px;line-height:1.5;">
+              Diese E-Mail wurde versendet an: vermittler@example.de<br>
+              PRIMUNDUS Sp. z o.o. &middot; Poznańska 21/48, 00-685 Warschau<br><br>
+              Sie erhalten diese E-Mail als Antwort auf Ihre Anfrage.<br><a href="https://kostenrechner.primundus.de/abmelden?token=BASIS" style="color:#999;text-decoration:underline;">Keine E-Mails mehr erhalten</a>
+            </div>
+          </div>
+        </div>
+      </td></tr>
+    </table>
+  </div>
+</body>
+</html>

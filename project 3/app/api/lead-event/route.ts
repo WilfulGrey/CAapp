@@ -1146,7 +1146,18 @@ async function handlePost(request: NextRequest) {
     // loggen wir und überspringen die Mail — der lead_event wird trotzdem
     // aufgezeichnet.
     // Im Team-Only-Resend-Modus wird die Kunden-Mail komplett übersprungen.
-    if (!teamOnlyResend && !silent && CUSTOMER_MAIL_EVENTS.has(event)) {
+    /* Vermittler-Lead: lead.email ist die Adresse eines Geschaeftspartners.
+       Mail A/B/C/D und offer_updated sind an den betreuten Kunden
+       geschrieben und tragen Links ins Kundenportal — sie duerfen dorthin
+       nicht. Der eine Ort reicht: scheduleReactionReminder haengt im
+       .then() dieser Versendung, also entfallen mit der Mail auch alle
+       fuenf Reaktions-Reminder. Team-Mails laufen weiter — wir wollen jede
+       Bewerbung sehen. */
+    const istVermittlerLead = Boolean((lead as any)?.vermittler);
+    if (istVermittlerLead && CUSTOMER_MAIL_EVENTS.has(event)) {
+      console.log(`[lead-event] ${event}: Vermittler-Lead ${lead.id} — keine Kundenmail, kein Reminder`);
+    }
+    if (!teamOnlyResend && !silent && !istVermittlerLead && CUSTOMER_MAIL_EVENTS.has(event)) {
       // patient_data_saved ist deduped (NON_DEDUPED_EVENTS enthält nur die
       // Caregiver-Events) — Mail nur beim ersten Speichern verschicken,
       // sonst spammen wir den Kunden bei jedem Patientendaten-Update.

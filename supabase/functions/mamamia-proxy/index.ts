@@ -307,11 +307,16 @@ function makeRealSupabase(url: string, serviceKey: string): ProxySupabase {
     async scheduleNeuePflegekraefteMail(leadId) {
       const { data: lead } = await client
         .from("leads")
-        .select("email")
+        .select("email, vermittler")
         .eq("id", leadId)
         .maybeSingle();
       const email = (lead as { email?: string } | null)?.email;
       if (!email) return;
+      /* Vermittler-Lead: der Portal-Token ist in mamamia gespiegelt, das
+         Team kann dort also "Pflegekraft einladen" druecken. Die Mail
+         danach ("neue Pflegekraefte fuer Sie") ist an einen Endkunden
+         geschrieben und ginge an den Geschaeftspartner. */
+      if ((lead as { vermittler?: string | null } | null)?.vermittler) return;
       // Vorhandene pending Mail desselben Typs canceln → reschedule auf 24h ab
       // JETZT (= 24h ab der letzten Einladung).
       await client

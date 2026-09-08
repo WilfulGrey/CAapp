@@ -154,12 +154,32 @@ export function ergaenzeAngaben(
  * (Zugang <PRAEFIX>_USER/_PASS), 'api' = Partner-API des Portals
  * (lib/portal-helfer24.ts, Token PFLEGEHELFER24_API_TOKEN). */
 export const PORTALE = [
-  { domain: 'pflegehilfe.org', name: 'Pflegehilfe.org', abholung: 'imap' },
-  { domain: 'pflegebund.eu', name: 'Pflegebund.eu', abholung: 'imap' },
-  { domain: 'pflege-helfer24.de', name: 'Pflege-Helfer24.de', abholung: 'api' },
+  { domain: 'pflegehilfe.org', name: 'Pflegehilfe.org', abholung: 'imap', art: 'portal' },
+  { domain: 'pflegebund.eu', name: 'Pflegebund.eu', abholung: 'imap', art: 'portal' },
+  { domain: 'pflege-helfer24.de', name: 'Pflege-Helfer24.de', abholung: 'api', art: 'portal' },
+  /* Vermittler statt Portal: Pflegena kauft keine Anfrage bei uns ein, es
+     schickt eine Anfrage FUER seinen Kunden und schlaegt seine Provision
+     auf unseren Preis. `art` steuert drei Dinge auf einmal — LLM-Parser
+     statt Label-Parser, kein E-Mail-Dedupe, eigene Mailvorlage —, weil sie
+     alle dasselbe bedeuten: der Empfaenger ist ein Geschaeftspartner, kein
+     Endkunde. Die `source` bleibt "portal:<domain>", damit Admin-Reiter,
+     Testphase-Umleitung und Kostenreport unveraendert weiterlaufen; die
+     Unterscheidung im Betrieb traegt leads.vermittler. */
+  { domain: 'pflegena.de', name: 'Pflegena.de', abholung: 'imap', art: 'vermittler',
+    provisionProTag: 10 },
 ] as const;
 
 export type PortalAbholung = (typeof PORTALE)[number]['abholung'];
+export type PortalEintrag = (typeof PORTALE)[number];
+
+/** Ein Eintrag mit art:'vermittler' — traegt garantiert provisionProTag. */
+export type VermittlerEintrag = Extract<PortalEintrag, { art: 'vermittler' }>;
+
+/** Der Eintrag, wenn die Domain ein Vermittler ist — sonst undefined. */
+export function vermittlerFuer(domain?: string | null): VermittlerEintrag | undefined {
+  const d = String(domain ?? '').trim().toLowerCase();
+  return PORTALE.find((p): p is VermittlerEintrag => p.domain === d && p.art === 'vermittler');
+}
 
 /** Die source-Werte aller Portale — "portal:pflegehilfe.org", ... */
 export const PORTAL_QUELLEN = PORTALE.map((p) => `portal:${p.domain}`);

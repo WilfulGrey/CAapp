@@ -164,6 +164,17 @@ services:
       # oder Kundenmails auszuloesen. "1" = alle Portale, oder Domain-Liste
       # ("pflege-helfer24.de") fuer EIN Portal, waehrend die anderen scharf
       # laufen. Nach der Sichtprobe leeren. Bewusst sync:false (nicht
+      # Vermittler Pflegena: dasselbe Namensschema (Domain → Praefix), aber
+      # der Inhalt ist Prosa und wird von einem Modell gelesen.
+      - key: PFLEGENA_USER
+        sync: false
+      - key: PFLEGENA_PASS
+        sync: false
+      # Liest die Vermittler-Anfragen (dasselbe Konto wie Pria). Fehlt der
+      # Schluessel, bleiben die Mails 'offen' und werden erneut versucht —
+      # es wird nichts geraten.
+      - key: ANTHROPIC_API_KEY
+        sync: false
       # value:"1") — der Blueprint-Sync wuerde ein value bei jedem Sync
       # zurueck auf Trockenlauf setzen.
       - key: PORTAL_TROCKENLAUF

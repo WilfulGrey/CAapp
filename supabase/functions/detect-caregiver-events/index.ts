@@ -66,6 +66,10 @@ export interface LeadRow {
   email: string | null;
   mamamia_customer_id: number | null;
   mamamia_job_offer_id: number | null;
+  /** Gesetzt = Vermittler-Lead. Der Scan laeuft weiter (Ereignisse,
+   *  lead_jobs-Spiegel, Admin-Karte), aber nichts, was fuer einen
+   *  Endkunden gedacht ist, darf ihn treffen. */
+  vermittler?: string | null;
 }
 
 export interface EventRow {
@@ -1138,6 +1142,12 @@ async function autoRejectStaleApplications(
   jk: (job: number, cg: number) => string,
 ): Promise<number> {
   const { secrets } = deps;
+  /* Vermittler-Lead: die 72-Stunden-Uhr misst, ob DER KUNDE im Portal
+     reagiert hat. Fuer diesen Lead gibt es kein Portal — der Partner
+     bekommt die Kraefte per Mail und antwortet Marta. Ein automatisches
+     Ablehnen wuerde also eine Bewerbung wegwerfen, auf die niemand
+     reagieren KONNTE, waehrend die Vermittlung gerade laeuft. */
+  if (lead.vermittler) return 0;
   const live = autoRejectIsLive();
 
   // Per-(job, caregiver) age anchor + reaction set. Legacy NULL-job events map
@@ -1416,7 +1426,7 @@ function makeRealSupabase(url: string, serviceKey: string): DetectSupabase {
     async fetchLead(id: string) {
       const { data, error } = await client
         .from("leads")
-        .select("id, token, email, mamamia_customer_id, mamamia_job_offer_id")
+        .select("id, token, email, mamamia_customer_id, mamamia_job_offer_id, vermittler")
         .eq("id", id)
         .maybeSingle();
       if (error) throw new Error(`supabase fetchLead: ${error.message}`);
@@ -1434,7 +1444,7 @@ function makeRealSupabase(url: string, serviceKey: string): DetectSupabase {
       // weil folge_einsatz kein CLOSED_STATUS ist).
       const { data, error } = await client
         .from("leads")
-        .select("id, token, email, mamamia_customer_id, mamamia_job_offer_id")
+        .select("id, token, email, mamamia_customer_id, mamamia_job_offer_id, vermittler")
         .not("mamamia_job_offer_id", "is", null)
         .not("token", "is", null)
         .or(`and(token_expires_at.gt.${new Date().toISOString()},status.not.in.(vertrag_abgeschlossen,betreuung_beauftragt,nicht_interessiert)),status.eq.folge_einsatz`);
@@ -1451,7 +1461,7 @@ function makeRealSupabase(url: string, serviceKey: string): DetectSupabase {
       const cutoff = new Date(Date.now() - recheckHours * 3600_000).toISOString();
       const { data, error } = await client
         .from("leads")
-        .select("id, token, email, mamamia_customer_id, mamamia_job_offer_id, status")
+        .select("id, token, email, mamamia_customer_id, mamamia_job_offer_id, status, vermittler")
         .not("mamamia_customer_id", "is", null)
         .not("mamamia_job_offer_id", "is", null)
         .not("token", "is", null)

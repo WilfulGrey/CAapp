@@ -14,8 +14,10 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { findOrCreateLead, logEvent } from '@/lib/lead-management';
 import { berechnePreis, parseCustomerName, generateToken, getTokenExpiry } from '@/lib/calculation';
-import { ergaenzeAngaben, PORTALE, PortalAngaben, PreisZeile } from '@/lib/portal-lead';
+import { ergaenzeAngaben, PORTALE, vermittlerFuer, PortalAngaben, PreisZeile } from '@/lib/portal-lead';
 import { scheduleEmail, flushScheduledEmails } from '@/lib/lead-mails';
+import { sendezeitIso } from '@/lib/quiet-hours';
+import { betreffAntwort, VERMITTLER_MAILS } from '@/lib/pflegena';
 import { darfAngeschriebenWerden, HOECHSTALTER_TAGE } from '@/lib/portal-schutz';
 import { sendEmail, getTeamNotificationTemplate } from '@/lib/email';
 
@@ -33,6 +35,55 @@ function supabaseClient() {
     || (anonKey && anonKey.length > 10 ? anonKey : null);
   if (!url || !key) throw new Error('Missing Supabase configuration');
   return createClient(url, key, { auth: { persistSession: false, autoRefreshToken: false } });
+}
+
+/* Die zwei Mails an den Vermittler in die Warteschlange legen.
+ *
+ * IDEMPOTENT by design: die Funktion schaut nach, welche Zeile schon da
+ * ist, und legt nur die fehlende an. Damit ist der Wiederanlauf nach einem
+ * abgebrochenen Lauf derselbe Code wie der Erstlauf — und ein Lead kann
+ * nicht mit halber Warteschlange liegenbleiben (die Mail waere fuer immer
+ * weg, weil das Abholer-Protokoll die Mail als 'erledigt' fuehrt).
+ *
+ * Direkter Insert statt scheduleEmail(): dessen Union kennt nur zwei Typen
+ * und der Weg fuehrt ueber die Edge Function schedule-email — eine vierte
+ * Funktion, die man bei jedem Prod-Deploy von Hand mitnehmen muesste.
+ * scheduled_emails.email_type ist blankes text ohne CHECK.
+ */
+const KRAEFTE_VERZUG_MIN = 120;
+
+async function sorgeFuerVermittlerMails(
+  supabase: ReturnType<typeof supabaseClient>,
+  leadId: string,
+  empfaenger: string,
+  metadata: Record<string, unknown>,
+): Promise<{ angelegt: string[] }> {
+  const { data: vorhanden } = await supabase
+    .from('scheduled_emails')
+    .select('email_type')
+    .eq('lead_id', leadId)
+    .in('email_type', VERMITTLER_MAILS as unknown as string[]);
+  const da = new Set((vorhanden ?? []).map((z: any) => z.email_type));
+
+  const jetzt = new Date();
+  const zeilen = VERMITTLER_MAILS.filter((t) => !da.has(t)).map((t) => ({
+    lead_id: leadId,
+    email_type: t,
+    recipient_email: empfaenger,
+    /* Mail 1 sofort: sie ist die Antwort auf die Mail des Partners, und wer
+       zuerst antwortet, gewinnt. Mail 2 nach zwei Stunden — durch die
+       Nachtruhe geschickt, damit "+2 h" um 20:30 nicht 22:30 heisst. */
+    scheduled_for: t === 'vermittler_angebot'
+      ? jetzt.toISOString()
+      : sendezeitIso(new Date(jetzt.getTime() + KRAEFTE_VERZUG_MIN * 60_000)),
+    status: 'pending',
+    metadata,
+  }));
+  if (!zeilen.length) return { angelegt: [] };
+
+  const { error } = await supabase.from('scheduled_emails').insert(zeilen);
+  if (error) throw new Error(`Vermittler-Mails nicht geplant: ${error.message}`);
+  return { angelegt: zeilen.map((z) => z.email_type) };
 }
 
 export async function POST(request: NextRequest) {
@@ -59,6 +110,13 @@ export async function POST(request: NextRequest) {
       { status: 400 },
     );
   }
+
+  /* Vermittler statt eingekauftem Portal: die Mail kommt von einem Partner,
+     der fuer SEINEN Kunden anfragt. Ab hier weicht der Weg an fuenf Stellen
+     ab — Bestandskunden-Guard, Dedupe, Lead-Anlage, Duplikat-Logik und
+     Mailversand. Alles andere (Preis, Details, Onboarding, Team-Mail) ist
+     identisch. */
+  const vermittler = vermittlerFuer(portal);
 
   const email = String(body?.email ?? '').trim();
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
@@ -116,7 +174,14 @@ export async function POST(request: NextRequest) {
      * ilike statt eq: "Max.Mustermann@web.de" vs. gespeichertes
      * "max.mustermann@web.de" wuerde sonst den ganzen Guard umgehen. Ab
      * hier gilt die GESPEICHERTE Adresse als Identitaet. */
-    const { data: bestand } = await supabase
+    /* Beim VERMITTLER uebersprungen: seine Adresse steht auf jedem seiner
+       Leads. Der Guard wuerde ab der zweiten Anfrage den Bestand seines
+       eigenen ersten Leads finden — und jede weitere Anfrage entweder als
+       Duplikat verschlucken oder am falschen Lead festmachen. Was der Guard
+       verhindern soll (Mail an jemanden, der "kein Interesse" gesagt hat),
+       gibt es hier nicht: der Empfaenger ist ein Geschaeftspartner, der uns
+       gerade geschrieben hat. */
+    const { data: bestand } = vermittler ? { data: null } : await supabase
       .from('leads')
       .select('id, email, status, kalkulation, token, token_expires_at')
       .ilike('email', email.replace(/[%_\\]/g, '\\$&'))
@@ -141,7 +206,7 @@ export async function POST(request: NextRequest) {
        hoeheren Preis als den, den er kennt ("Ein Preis, der steigt, ist ein
        Vertrauensschaden", portal-lead.ts). Dann bleibt die Kalkulation
        stehen; nur die Portal-Details (PLZ, Gewicht …) kommen dazu. */
-    const echteAntworten = !!vorhanden
+    const echteAntworten = !vermittler && !!vorhanden
       && vorhanden.status !== 'manuell_pruefen'
       && !!vorhanden.kalkulation
       && !(Array.isArray(vorhanden.kalkulation?.angenommene_felder) && vorhanden.kalkulation.angenommene_felder.length > 0);
@@ -188,7 +253,67 @@ export async function POST(request: NextRequest) {
 
     const { vorname, nachname, anrede } = parseCustomerName(name);
 
-    const { lead, isNew, isUpgrade } = await findOrCreateLead(kundenEmail, 'angebot_requested', {
+    /* ─── Lead-Anlage ──────────────────────────────────────────────────
+     *
+     * findOrCreateLead dedupliziert per E-Mail. Beim Vermittler traegt
+     * JEDE Anfrage dieselbe Absenderadresse — ab der zweiten faende die
+     * Funktion den bestehenden Lead, saehe eine Mail 1 juenger als 60 Tage
+     * und verschluckte die Anfrage als Duplikat. Jede Anfrage ist hier ein
+     * eigener Lead; gegen doppelte Verarbeitung schuetzt stattdessen die
+     * Message-ID (quelle_nachricht_id, unique).
+     *
+     * Die Feldliste ist an findOrCreateLead abgeglichen — token_used und
+     * anrede_text fehlen sonst still (leadGreeting liest sie), und das
+     * Ereignis angebot_requested gaebe es im Verlauf nicht. */
+    let lead: any;
+    let isNew = true;
+    let isUpgrade = false;
+    let schonDa = false;
+
+    if (vermittler) {
+      const token = generateToken();
+      const neu = {
+        email: kundenEmail,
+        status: 'angebot_requested',
+        source: `portal:${portal}`,
+        vermittler: vermittler.domain,
+        quelle_nachricht_id: typeof body?.message_id === 'string' && body.message_id.trim()
+          ? body.message_id.trim().slice(0, 400) : null,
+        token,
+        token_expires_at: getTokenExpiry().toISOString(),
+        token_used: false,
+        kalkulation,
+        vorname: vorname || (nachname ? '' : name),
+        nachname: nachname || null,
+        anrede: anrede || null,
+        anrede_text: anrede || null,
+        telefon: telefon || null,
+        care_start_timing: body?.care_start_timing || null,
+      };
+      const { data, error } = await supabase.from('leads').insert(neu).select('*').single();
+      if (error) {
+        /* 23505 = dieselbe Message-ID war schon da. Der vorige Lauf hat den
+           Lead angelegt und ist danach abgebrochen — wir holen ihn und
+           lassen sorgeFuerVermittlerMails die fehlenden Mails nachziehen.
+           Ohne das waere die Anfrage fuer immer stumm: das Abholer-
+           Protokoll fuehrt sie dann als 'erledigt'. */
+        if ((error as any).code !== '23505' || !neu.quelle_nachricht_id) {
+          throw new Error(`Vermittler-Lead nicht angelegt: ${error.message}`);
+        }
+        const { data: alt } = await supabase.from('leads').select('*')
+          .eq('quelle_nachricht_id', neu.quelle_nachricht_id).limit(1);
+        lead = (alt as any[])?.[0];
+        if (!lead) throw new Error('Vermittler-Lead: Konflikt ohne auffindbaren Lead');
+        isNew = false;
+        schonDa = true;
+        console.log(`Vermittler-Lead (${portal}): Message-ID bereits bekannt — Lead ${lead.id}, Mails werden geprueft`);
+      } else {
+        lead = data;
+        await logEvent(lead.id, 'angebot_requested', { quelle: `portal:${portal}`, vermittler: vermittler.domain })
+          .catch((e) => console.error('angebot_requested log failed:', e));
+      }
+    } else {
+    const { lead: gefunden, isNew: neuAngelegt, isUpgrade: hochgestuft } = await findOrCreateLead(kundenEmail, 'angebot_requested', {
       vorname: vorname || (nachname ? '' : name),
       nachname: nachname || undefined,
       anrede: anrede || undefined,
@@ -197,6 +322,8 @@ export async function POST(request: NextRequest) {
       kalkulation: echteAntworten ? undefined : kalkulation,
       quelle: `portal:${portal}`,
     });
+    lead = gefunden; isNew = neuAngelegt; isUpgrade = hochgestuft;
+    }
 
     /* Kalkulation blieb stehen ⇒ die Portal-Details muessen trotzdem
        ankommen: sie leben NUR in formularDaten, und das Onboarding gleich
@@ -225,7 +352,11 @@ export async function POST(request: NextRequest) {
        Wortlaut waehlt send-scheduled-emails anhand der lead_events). */
     let mail1 = isNew || isUpgrade;
     let duplikatGrund: string | undefined;
-    if (!mail1) {
+    /* Beim Vermittler entfaellt die ganze Duplikat-Logik: jede Anfrage ist
+       eine eigene, und ob eine Mail schon rausging, entscheidet nicht das
+       Alter der letzten Mail 1, sondern ob die Warteschlangen-Zeile
+       existiert (sorgeFuerVermittlerMails). */
+    if (!mail1 && !vermittler) {
       const cutoff = new Date(Date.now() - HOECHSTALTER_TAGE * 86_400_000).toISOString();
       const { data: letzte } = await supabase
         .from('lead_events')
@@ -346,7 +477,42 @@ export async function POST(request: NextRequest) {
     }
 
     // Mail 1 sofort (delay 0) — identischer Weg wie beim Kostenrechner.
-    if (mail1) {
+    if (vermittler) {
+      /* Zwei Mails: Angebot sofort, fuenf Kraefte nach zwei Stunden. Die
+         Metadaten reisen in der Zeile mit — die Edge Function baut daraus
+         Betreff ("Re: ..."), Thread-Kopf und Provisionsblock, ohne die
+         Vermittler-Konfiguration der Next-App zu kennen. */
+      const metadata = {
+        vermittler: vermittler.domain,
+        provision_pro_tag: vermittler.provisionProTag,
+        kunde_label: [fdExtras.patient_vorname, fdExtras.patient_nachname].filter(Boolean).join(' ')
+          || (typeof d.patient_nachname === 'string' ? d.patient_nachname : '') || null,
+        /* Fertiger Antwort-Betreff, nicht der Originalbetreff: betreffAntwort
+           lebt in lib/ und ist aus der Deno-Funktion nicht importierbar. Ihn
+           hier zu berechnen erspart eine dritte Kopie derselben Regex
+           (Muster names.ts / appendJobParam — dort war die Kopie unvermeidbar,
+           hier ist sie es nicht). */
+        betreff_antwort: betreffAntwort(typeof body?.betreff === 'string' ? body.betreff : null).slice(0, 300),
+        message_id: lead.quelle_nachricht_id ?? null,
+      };
+      try {
+        const { angelegt } = await sorgeFuerVermittlerMails(supabase, lead.id, kundenEmail, metadata);
+        if (angelegt.length) {
+          await logEvent(lead.id, 'vermittler_mails_geplant', { to: kundenEmail, typen: angelegt })
+            .catch(() => {});
+          flushScheduledEmails();
+        } else {
+          console.log(`Vermittler-Lead (${portal}): Mails standen bereits in der Warteschlange`);
+        }
+      } catch (e: any) {
+        /* Laut scheitern: ohne Warteschlange bekommt der Partner nie eine
+           Antwort, und der Abholer wuerde die Mail als erledigt abhaken.
+           HTTP 500 ⇒ der naechste Takt versucht es erneut (der Lead ist
+           dank Message-ID idempotent). */
+        console.error('Vermittler-Lead: Mails nicht geplant:', e?.message ?? e);
+        return NextResponse.json({ error: 'Vermittler-Mails konnten nicht geplant werden' }, { status: 500 });
+      }
+    } else if (mail1) {
       scheduleEmail(lead.id, kundenEmail, 'eingangsbestaetigung', 0)
         .then(async (r) => {
           if (r.success) {
@@ -364,6 +530,27 @@ export async function POST(request: NextRequest) {
 
     // Team-Mail in JEDEM Zweig: der Lead hat Geld gekostet, das Team soll es sehen.
     const teamEmail = getTeamNotificationTemplate(lead, 'angebot_requested', { quelle: `portal:${portal}` });
+    /* Beim Vermittler traegt der Lead die Kontaktdaten des PARTNERS — wer
+       betreut werden soll und wie viel vom Preis auf unseren Annahmen steht,
+       stuende sonst nirgends. Das ist die einzige Stelle, an der das Team den
+       an den Partner geschickten Preis mit seiner Herkunft sieht (die Mail an
+       den Partner nennt die Annahmen bewusst nicht, Entscheidung 08.09.). */
+    if (vermittler) {
+      const label = [fdExtras.patient_vorname, fdExtras.patient_nachname].filter(Boolean).join(' ');
+      const zeilen = [
+        `Vermittler: ${vermittler.name} (Provision ${vermittler.provisionProTag} €/Tag)`,
+        label ? `Kunde des Vermittlers: ${label}` : 'Kunde des Vermittlers: nicht genannt',
+        angenommen.length
+          ? `ANGENOMMEN (nicht in der Anfrage genannt, teurerer Wert): ${angenommen.join(', ')}`
+          : 'Alle Angaben aus der Anfrage gelesen.',
+        ...(Array.isArray(body?.hinweise) ? body.hinweise.map((h: unknown) => `Hinweis: ${String(h)}`) : []),
+      ];
+      teamEmail.subject = `${teamEmail.subject} — ${label || 'Vermittler-Anfrage'}`;
+      teamEmail.text = `${zeilen.join('\n')}\n\n${teamEmail.text}`;
+      teamEmail.html = `<pre style="font-family:ui-monospace,Menlo,monospace;white-space:pre-wrap;font-size:13px;margin:0 0 16px;">${
+        zeilen.join('\n').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+      }</pre>${teamEmail.html}`;
+    }
     sendEmail('info@primundus.de', teamEmail).catch((e) => console.error('Team-Mail:', e));
 
     return NextResponse.json({
@@ -371,6 +558,10 @@ export async function POST(request: NextRequest) {
       lead_id: lead.id,
       neu: isNew,
       ...(duplikatGrund ? { duplikat: true, grund: duplikatGrund } : {}),
+      /* Wiederanlauf nach abgebrochenem Lauf: der Lead war schon da, die
+         fehlenden Mails wurden eben nachgezogen. Fuer den Abholer ist das
+         'erledigt' — und diesmal stimmt es auch. */
+      ...(schonDa ? { duplikat: true, grund: 'Anfrage bereits verarbeitet — Mails geprueft' } : {}),
       angenommene_felder: angenommen,
       eigenanteil: kalkulation.eigenanteil,
     });

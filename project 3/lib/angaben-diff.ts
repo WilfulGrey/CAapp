@@ -66,7 +66,9 @@ export function norm(v: unknown): string {
   return String(v);
 }
 
-function zulaessig(key: AngabenKey, v: unknown): boolean {
+/** Ein einzelner Angaben-Wert im Kanon? Auch vom Pflegena-Parser benutzt,
+ *  damit es EINE Wahrheit ueber gueltige Werte gibt. */
+export function zulaessig(key: AngabenKey, v: unknown): boolean {
   if (key === 'pflegegrad') {
     // Integer 0..5, KEINE Koerzierung (Number('') wäre 0 = Phantom-„Keine").
     return typeof v === 'number' && Number.isInteger(v) && v >= 0 && v <= 5;
