@@ -233,6 +233,14 @@ export function getEmailLayout({ content, preheader, siteUrl }: EmailLayoutProps
         border-radius: 0;
       }
 
+      /* Kopfzeile: 40 px Rand links/rechts liessen auf dem Handy nur ~291 px
+         fuer Logo (160) + Siegel-Block (~142) — die beiden klebten aneinander
+         (Martin 08.09., Zugangslink-Mail auf dem iPhone). Gleicher Rand wie
+         im Inhalt, dann sitzt das Siegel wieder mit Abstand rechts. */
+      .email-header {
+        padding: 20px 20px 16px 20px;
+      }
+
       .email-content {
         padding: 30px 20px;
       }
@@ -264,7 +272,7 @@ export function getEmailLayout({ content, preheader, siteUrl }: EmailLayoutProps
               <table width="100%" cellpadding="0" cellspacing="0" role="presentation">
                 <tr>
                   <td style="vertical-align: middle;">
-                    <img src="${baseUrl}/images/Primundus-Logo_V6.png" alt="Primundus Logo" style="max-width: 160px; height: auto; display: block;" />
+                    <img src="${baseUrl}/images/Primundus-Logo_V6.png" alt="Primundus Logo" width="160" style="display: block; width: 160px; max-width: 160px; height: auto;" />
                   </td>
                   <td style="vertical-align: middle; text-align: right;">
                     <table cellpadding="0" cellspacing="0" role="presentation" style="margin-left: auto;">
