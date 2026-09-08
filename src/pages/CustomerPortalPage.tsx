@@ -2929,7 +2929,7 @@ const CustomerPortalPage: FC = () => {
                 // Text über den Pflegekräften und in der Schritt-Liste
                 // ("Pflegesituation vervollständigen"). "vervollständigt" klang
                 // nach einem zweiten, anderen Schritt (Übergabe 11.08.).
-                'Preis, Konditionen und passende Pflegekräfte auf einen Blick. Kurz die Pflegesituation vervollständigen, Pflegekräfte einladen und Bewerbungen erhalten — alles unverbindlich.',
+                'Preis, Konditionen und passende Pflegekräfte auf einen Blick.',
               // Kein Pill hier: Der Einleitungssatz darüber sagt bereits, was
               // den Kunden erwartet. In den anderen Zuständen trägt die Zeile
               // echten Status („1 Bewerbung aktiv") — dort bleibt sie.
@@ -2964,6 +2964,13 @@ const CustomerPortalPage: FC = () => {
               <p className="text-[16px] leading-relaxed mb-4" style={{color:'#71717A'}}>
                 {heroCopy.subtitle}
               </p>
+              {/* „Als Nächstes" unterstrichen (Martin, 08.09.): die drei Schritte
+                  als Erwartung, nicht als Anleitung — nur im Ausgangszustand. */}
+              {heroCopy.steps === 'initial' && (
+                <p className="text-[16px] leading-relaxed -mt-2 mb-4" style={{color:'#71717A'}}>
+                  <span className="font-semibold underline underline-offset-4" style={{color:'#18181B'}}>Als Nächstes:</span> Kurz die Pflegesituation vervollständigen, Pflegekräfte einladen und Bewerbungen erhalten — alles unverbindlich.
+                </p>
+              )}
 
               {/* Vertrauen steht seit 08.09. in der Kosten-Karte (Siegel-Zeile),
                   nicht mehr im Kopf (Martin: zwei Anläufe im Kopf wirkten
