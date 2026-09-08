@@ -3235,7 +3235,7 @@ const CustomerPortalPage: FC = () => {
                     <div className="w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0 font-bold text-white text-[14px]" style={{background:'#2A9D5C'}}>1</div>
                     <p className="text-[17px] font-bold leading-snug" style={{color:'#1F6B41'}}>Pflegesituation vervollständigen — 2 Minuten</p>
                   </div>
-                  <p className="text-[15px] leading-relaxed mt-2.5" style={{color:'#3A3A3A'}}>Vieles ist schon ausgefüllt. Mit ein paar Angaben zu Ihrem Angehörigen laden Sie danach Ihre Wunsch-Pflegekräfte ein und erhalten Bewerbungen — mit Foto, Erfahrung und Anreisedatum.</p>
+                  <p className="text-[15px] leading-relaxed mt-2.5" style={{color:'#3A3A3A'}}>Vervollständigen Sie kurz Ihre Pflegesituation — dann können Sie diese Pflegekräfte einladen und erhalten unverbindliche Bewerbungen mit Foto, Erfahrung und Anreisedatum. Vieles ist schon ausgefüllt.</p>
                   <button
                     type="button"
                     onClick={zurPflegesituation}
