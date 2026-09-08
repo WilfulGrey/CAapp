@@ -16,6 +16,7 @@
  */
 
 import type { FormularDaten } from './calculation';
+import { ERLAUBT } from './angaben-diff';
 
 /** Was ein Portal liefern KANN — alles optional. */
 export type PortalAngaben = Partial<FormularDaten>;
@@ -56,10 +57,32 @@ export function ergaenzeAngaben(
 ): ErgaenzungsErgebnis {
   const angenommen: string[] = [];
 
+  /* Nur Werte, die im Kalkulator ueberhaupt WAEHLBAR sind.
+   *
+   * pricing_config ist keine Whitelist: `deutschkenntnisse` hat dort die
+   * Zeile `sehr-gut-sa` (600 EUR, aktiv) — den L4-Wert, den ausschliesslich
+   * das SA-Portal setzt und den kein Formular anbietet (Registry #30).
+   * Als teuerste Zeile gewinnt sie ungefiltert JEDE Annahme. Folgen:
+   *   - der Preis steigt um 150 EUR gegenueber dem waehlbaren `sehr-gut`;
+   *   - mapGermanySkill (onboard-to-mamamia/mappers.ts) kennt den Wert
+   *     nicht und WIRFT — beim Erst-Onboarding faellt der Mamamia-Kunde
+   *     damit aus, und der Admin-Resync (Registry #55) bricht ab.
+   * Der Kanon steht in ERLAUBT (angaben-diff.ts), nicht in der Preistabelle.
+   *
+   * Gleichstand (bei `erfahrung` sind auf prod alle Stufen 0 EUR) wird nach
+   * antwort_key aufgeloest: sonst haengt das Ergebnis an der Zeilenfolge des
+   * selects und `angenommene_felder` saehe bei jedem Lauf anders aus. */
   const teuerster = (kategorie: string): string | null => {
-    const zeilen = preistabelle.filter((z) => z.kategorie === kategorie);
+    const waehlbar = (ERLAUBT as Record<string, readonly string[]>)[kategorie];
+    const zeilen = preistabelle.filter(
+      (z) => z.kategorie === kategorie
+        && (!waehlbar || (waehlbar.includes(z.antwort_key) && z.antwort_key !== '')),
+    );
     if (zeilen.length === 0) return null;
-    return zeilen.reduce((a, b) => (b.aufschlag_euro > a.aufschlag_euro ? b : a)).antwort_key;
+    return zeilen.reduce((a, b) => {
+      if (b.aufschlag_euro !== a.aufschlag_euro) return b.aufschlag_euro > a.aufschlag_euro ? b : a;
+      return b.antwort_key < a.antwort_key ? b : a;
+    }).antwort_key;
   };
 
   const daten: any = {};
