@@ -2963,14 +2963,12 @@ const CustomerPortalPage: FC = () => {
                   einen eigenen Karten-Kopf mit genau diesem Aufruf). */}
               <p className="text-[16px] leading-relaxed mb-4" style={{color:'#71717A'}}>
                 {heroCopy.subtitle}
+                {/* „Als Nächstes" im selben Absatz, unterstrichen (Martin, 08.09.) —
+                    nur im Ausgangszustand. */}
+                {heroCopy.steps === 'initial' && (
+                  <> <span className="font-semibold underline underline-offset-4" style={{color:'#18181B'}}>Als Nächstes:</span> Kurz die Pflegesituation vervollständigen, Pflegekräfte einladen und Bewerbungen erhalten — alles unverbindlich.</>
+                )}
               </p>
-              {/* „Als Nächstes" unterstrichen (Martin, 08.09.): die drei Schritte
-                  als Erwartung, nicht als Anleitung — nur im Ausgangszustand. */}
-              {heroCopy.steps === 'initial' && (
-                <p className="text-[16px] leading-relaxed -mt-2 mb-4" style={{color:'#71717A'}}>
-                  <span className="font-semibold underline underline-offset-4" style={{color:'#18181B'}}>Als Nächstes:</span> Kurz die Pflegesituation vervollständigen, Pflegekräfte einladen und Bewerbungen erhalten — alles unverbindlich.
-                </p>
-              )}
 
               {/* Vertrauen steht seit 08.09. in der Kosten-Karte (Siegel-Zeile),
                   nicht mehr im Kopf (Martin: zwei Anläufe im Kopf wirkten
