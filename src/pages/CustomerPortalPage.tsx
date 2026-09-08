@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useRef, FC } from 'react';
-import { Check, Bell, Phone, AlertCircle, ChevronDown, X, ArrowLeft, ArrowRight, Heart } from 'lucide-react';
+import { Check, Bell, Phone, AlertCircle, AlertTriangle, ChevronDown, X, ArrowLeft, ArrowRight, Heart } from 'lucide-react';
 import { Nurse } from '../types';
 import { displayName } from '../components/portal/shared';
 import {
@@ -3230,10 +3230,12 @@ const CustomerPortalPage: FC = () => {
                     den Kosten. Kein „Kostenrechner", kein „erst danach" —
                     Erwartung statt Schranke. */}
                 {!patientSaved && (
-                <div className="rounded-2xl px-5 py-5 mb-4" style={{background:'#EEF7F1'}}>
+                <div className="rounded-2xl px-5 py-5 mb-4" style={{background:'#FAF8F4', border:'1px solid #EBE2D2'}}>
                   <div className="flex items-center gap-3">
-                    <div className="w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0 font-bold text-white text-[14px]" style={{background:'#2A9D5C'}}>1</div>
-                    <p className="text-[17px] font-bold leading-snug" style={{color:'#1F6B41'}}>Pflegesituation vervollständigen — 2 Minuten</p>
+                    <div className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0" style={{background:'#FDF1E2'}}>
+                      <AlertTriangle className="w-4 h-4" style={{color:'#D97706'}} />
+                    </div>
+                    <p className="text-[17px] font-bold leading-snug" style={{color:'#3D2B1F'}}>Noch 2 Minuten bis zum Einladen</p>
                   </div>
                   <p className="text-[15px] leading-relaxed mt-2.5" style={{color:'#3A3A3A'}}>Vervollständigen Sie kurz Ihre Pflegesituation — dann können Sie diese Pflegekräfte einladen und erhalten unverbindliche Bewerbungen mit Foto, Erfahrung und Anreisedatum. Vieles ist schon ausgefüllt.</p>
                   <button
