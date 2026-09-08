@@ -30,7 +30,7 @@ function cg(over: Record<string, unknown>) {
 function e(over: Partial<Empfehlung> = {}): Empfehlung {
   return {
     caregiverId: 1, vorname: "Anna", anzeigeName: "Anna K.", fakten: "5 Jahre Erfahrung · 3 Primundus-Einsätze",
-    alter: 51, deutschWort: "Mittel", erfahrungJahre: 5, einsaetze: 3, stufe: "Bewährt", fotoUrl: "https://s3/x.jpg",
+    alter: 51, deutschWort: "Mittel", erfahrungJahre: 5, einsaetze: 3, stufe: "Bewährt", stufeZusatz: "mehrfach bestätigt", fotoUrl: "https://s3/x.jpg",
     gruende: [HAKEN_VERFUEGBAR], deutschBalken: 2, erfahrungKurz: "5 J. Erfahrung", vorstellung: "",
     ...over,
   };

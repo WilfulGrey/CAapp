@@ -1714,7 +1714,7 @@ function reminderCaregiverInitials(name: string): string {
 // Erfahrungsstufe — WORTGLEICH zu Portal/SA-Portal und zu lib/email.ts
 // (caregiverTierLabel). Basis: nur UNSERE Einsätze (caregiver_einsatz_count =
 // hp_total_jobs). Elite ≥12 / Stammkraft ≥6 / Bewährt ≥2 / Bekannt ≥1 / sonst
-// Berufserfahren (Jahre>0) bzw. Neu dabei. Kein Medaillen-Badge mehr — die
+// Berufserfahren (Jahre>0) bzw. Neu bei Primundus. Kein Medaillen-Badge mehr — die
 // Stufe steht als fettes Wort vor der Faktenzeile.
 function reminderTierLabel(einsatzCount?: number | null, yearsExperience?: number | null): string {
   // Eine einzige Definition der Stufen-Woerter fuer die ganze Datei — die
