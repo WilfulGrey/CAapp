@@ -160,15 +160,14 @@ services:
       # verarbeiten beide Umgebungen dieselben bezahlten Leads).
       - key: PFLEGEHELFER24_API_TOKEN
         sync: false
-      # Erst-Inbetriebnahme: liest und protokolliert, ohne Leads anzulegen
-      # oder Kundenmails auszuloesen. "1" = alle Portale, oder Domain-Liste
-      # ("pflege-helfer24.de") fuer EIN Portal, waehrend die anderen scharf
-      # laufen. Nach der Sichtprobe leeren. Bewusst sync:false (nicht
       # Vermittler Pflegena schreibt an die HAUPTADRESSE der Firma, nicht an
       # ein eigenes Postfach: hier liegen auch Kundenpost, BCC-Kopien unserer
       # Mails und Team-Benachrichtigungen. Der Abholer fragt den Server
       # deshalb nur nach Post von @pflegena.com und fasst den Rest nie an.
-      # Aus derselben Adresse geht auch die Antwort raus (SES-Identity!).
+      # Aus derselben Adresse geht auch die Antwort raus — ueber IONOS-SMTP
+      # (Vault-Profil vermittler_smtp_*), nicht ueber SES: der SPF-Eintrag
+      # der Domain autorisiert Ionos. Das Passwort steht deshalb an ZWEI
+      # Stellen: hier (IMAP, Lesen) und im Vault (SMTP, Senden).
       - key: INFO_USER
         sync: false
       - key: INFO_PASS
@@ -178,6 +177,10 @@ services:
       # es wird nichts geraten.
       - key: ANTHROPIC_API_KEY
         sync: false
+      # Erst-Inbetriebnahme: liest und protokolliert, ohne Leads anzulegen
+      # oder Kundenmails auszuloesen. "1" = alle Portale, oder Domain-Liste
+      # ("pflege-helfer24.de") fuer EIN Portal, waehrend die anderen scharf
+      # laufen. Nach der Sichtprobe leeren. Bewusst sync:false (nicht
       # value:"1") — der Blueprint-Sync wuerde ein value bei jedem Sync
       # zurueck auf Trockenlauf setzen.
       - key: PORTAL_TROCKENLAUF
