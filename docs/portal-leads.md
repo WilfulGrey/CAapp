@@ -504,6 +504,7 @@ Speicher.
 | `PORTAL_IMAP_HOST` | `imap.ionos.de` |
 | `PORTAL_TROCKENLAUF` | `1` = alle Portale nur lesen, **oder Domain-Liste** (`pflege-helfer24.de`) für ein Portal allein |
 | `PORTAL_TESTPHASE` | `1` = alle Portale, **oder Domain-Liste** — Kundenmails dieses Portals ans Team (auch als Supabase-Secret!) |
+| `PORTAL_TESTPHASE_EMPFAENGER` | Ziel der Umleitung. Leer = Team (`info@` + `martin@mamamia.app`); eine einzelne Adresse für einen gezielten Durchlauf. Auch als Supabase-Secret |
 | `PORTAL_LEAD_URL` | optionaler Override des Loopback-Ziels; normal NICHT gesetzt |
 
 Der Takt kommt aus pg_cron: neues Vault-Secret `kostenrechner_url`

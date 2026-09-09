@@ -1202,7 +1202,7 @@ async function handlePost(request: NextRequest) {
           const portalUrl = buildPortalUrl(lead as any);
           const template = getPatientDataSavedEmailTemplate(lead as any, portalUrl);
           // Testphase: Portal-Leads ans Team (Umleitung nur beim Versand).
-          const umlD = testphaseUmleitung(lead as any, process.env.PORTAL_TESTPHASE);
+          const umlD = testphaseUmleitung(lead as any, process.env.PORTAL_TESTPHASE, process.env.PORTAL_TESTPHASE_EMPFAENGER);
           sendEmail(umlD?.empfaenger ?? (lead as any).email, umlD ? { ...template, subject: umlD.betreffPraefix + template.subject } : template, undefined,
             umlD ? undefined : { cc: kundenEmpfaenger(lead as any).cc }).catch((e) =>
             console.error('customer mail send threw:', e instanceof Error ? e.message : String(e)),
@@ -1235,7 +1235,7 @@ async function handlePost(request: NextRequest) {
             },
             portalUrl,
           );
-          const umlO = testphaseUmleitung(lead as any, process.env.PORTAL_TESTPHASE);
+          const umlO = testphaseUmleitung(lead as any, process.env.PORTAL_TESTPHASE, process.env.PORTAL_TESTPHASE_EMPFAENGER);
           sendEmail(umlO?.empfaenger ?? (lead as any).email, umlO ? { ...template, subject: umlO.betreffPraefix + template.subject } : template, undefined,
             umlO ? undefined : { cc: kundenEmpfaenger(lead as any).cc }).catch((e) =>
             console.error('customer mail send threw:', e instanceof Error ? e.message : String(e)),
@@ -1264,7 +1264,7 @@ async function handlePost(request: NextRequest) {
           )
             .then(({ template, attachments }) => {
               // Mail C (Buchungsbestätigung): Vertrag-HTML zusätzlich anhängen.
-              const umlC = testphaseUmleitung(lead as any, process.env.PORTAL_TESTPHASE);
+              const umlC = testphaseUmleitung(lead as any, process.env.PORTAL_TESTPHASE, process.env.PORTAL_TESTPHASE_EMPFAENGER);
               return sendEmail(
                 umlC?.empfaenger ?? (lead as any).email,
                 umlC ? { ...template, subject: umlC.betreffPraefix + template.subject } : template,

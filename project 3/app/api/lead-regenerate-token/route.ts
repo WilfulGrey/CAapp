@@ -204,7 +204,7 @@ async function handlePost(request: NextRequest) {
   if (shouldSendEmail) {
     const leadWithNewToken = { ...lead, token: newToken };
     // Testphase: Portal-Leads ans Team (Umleitung nur beim Versand).
-    const uml = testphaseUmleitung(lead, process.env.PORTAL_TESTPHASE);
+    const uml = testphaseUmleitung(lead, process.env.PORTAL_TESTPHASE, process.env.PORTAL_TESTPHASE_EMPFAENGER);
     const tpl = getTokenRegenerationEmailTemplate(leadWithNewToken, portalUrl);
     sendEmail(uml?.empfaenger ?? lead.email, uml ? { ...tpl, subject: uml.betreffPraefix + tpl.subject } : tpl, undefined,
       uml ? undefined : { cc: kundenEmpfaenger(lead).cc }).catch(

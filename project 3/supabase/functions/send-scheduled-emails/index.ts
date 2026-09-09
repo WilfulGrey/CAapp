@@ -2188,7 +2188,7 @@ async function runBewertungsRunde(
 
     const tpl = getBewertungsanfrageTemplate(lead, smtpConfig.siteUrl.replace(/\/$/, ""));
     // Testphase: Portal-Leads ans Team (Umleitung nur beim Versand).
-    const umleitungBew = testphaseUmleitung(lead, Deno.env.get("PORTAL_TESTPHASE"));
+    const umleitungBew = testphaseUmleitung(lead, Deno.env.get("PORTAL_TESTPHASE"), Deno.env.get("PORTAL_TESTPHASE_EMPFAENGER"));
     const bewEmpfaenger = umleitungBew?.empfaenger ?? lead.email!;
     const r = await sendEmailSmtp(
       smtpConfig, bewEmpfaenger,
@@ -2533,6 +2533,7 @@ Deno.serve(async (req: Request) => {
         const umleitung = testphaseUmleitung(
           { source: (lead as Record<string, unknown>).source as string | null, email: recipient },
           Deno.env.get("PORTAL_TESTPHASE"),
+          Deno.env.get("PORTAL_TESTPHASE_EMPFAENGER"),
         );
 
         let isBeauftragt = lead.status === "vertrag_abgeschlossen" || lead.status === "betreuung_beauftragt" || lead.order_confirmed === true;

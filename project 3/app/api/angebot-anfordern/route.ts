@@ -314,7 +314,7 @@ async function handleSendAngebotsEmailOnly(leadId: string) {
 
     const angebotsEmail = getAngebotsEmailTemplate(lead, lead.kalkulation);
     // Testphase: Portal-Leads ans Team (Umleitung nur beim Versand).
-    const umlA = testphaseUmleitung(lead, process.env.PORTAL_TESTPHASE);
+    const umlA = testphaseUmleitung(lead, process.env.PORTAL_TESTPHASE, process.env.PORTAL_TESTPHASE_EMPFAENGER);
     const emailResult = await sendEmail(
       umlA?.empfaenger ?? lead.email,
       umlA ? { ...angebotsEmail, subject: umlA.betreffPraefix + angebotsEmail.subject } : angebotsEmail,

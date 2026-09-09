@@ -189,3 +189,8 @@ services:
       # Nach der Testphase BEIDE leeren. Siehe docs/portal-leads.md.
       - key: PORTAL_TESTPHASE
         sync: false
+      # Ziel der Testphase-Umleitung. Leer = Team-Postfach
+      # (info@ + martin@mamamia.app). Eine einzelne Adresse eintragen, wenn
+      # ein Durchlauf geprueft wird, ohne die halbe Firma zu beteiligen.
+      - key: PORTAL_TESTPHASE_EMPFAENGER
+        sync: false
