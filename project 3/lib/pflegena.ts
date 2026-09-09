@@ -111,7 +111,9 @@ Deutschkenntnisse: "grundlegend" (einfache Verstaendigung), "kommunikativ" (mitt
 
 pflegegrad: nur eine Zahl, die im Text steht. "kein Pflegegrad" ist 0. Nicht erwaehnt ist null — NICHT 0.
 
-plz: nur uebernehmen, wenn eine fuenfstellige Zahl im Text steht. Aus einem Ortsnamen keine PLZ herleiten.
+Der BETREFF ist eine vollwertige Quelle, oft die einzige: Pflegena schreibt dort Name, Ort und Termin hinein — "Neue Stelle ab sofort Brunhilde Weber 79780 Stuehlingen", "EILT Abloesekraft ab 09.09.2026 Hedwig Jordan, 79761 Waldshut". Lies ihn wie den Fliesstext.
+
+plz: nur uebernehmen, wenn eine fuenfstellige Zahl in Betreff oder Text steht. Aus einem Ortsnamen keine PLZ herleiten.
 
 provision_pro_tag: die Zahl, die der Vermittler auf unseren Preis aufschlaegt ("+ 10 Pflegena" ist 10). Steht keine da: null.
 
@@ -219,8 +221,11 @@ export function pruefeAnfrage(
   let plz: string | undefined;
   const plzRoh = text(roh.plz, 5);
   if (plzRoh) {
-    if (/^\d{5}$/.test(plzRoh) && new RegExp(`(?<!\\d)${plzRoh}(?!\\d)`).test(mail.text)) plz = plzRoh;
-    else hinweise.push(`PLZ "${plzRoh}" steht nicht im Mailtext — verworfen`);
+    /* Beleg in Betreff ODER Text — bei Pflegena steht die PLZ regelmaessig
+       NUR im Betreff ("... Brunhilde Weber 79780 Stuehlingen"). */
+    const beleg = `${mail.betreff ?? ''}\n${mail.text}`;
+    if (/^\d{5}$/.test(plzRoh) && new RegExp(`(?<!\\d)${plzRoh}(?!\\d)`).test(beleg)) plz = plzRoh;
+    else hinweise.push(`PLZ "${plzRoh}" steht weder im Betreff noch im Mailtext — verworfen`);
   }
 
   /* Provision: die Konfiguration entscheidet, nie das Modell. Eine

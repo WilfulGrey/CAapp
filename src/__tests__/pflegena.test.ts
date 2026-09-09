@@ -192,7 +192,7 @@ describe('pruefeAnfrage — PLZ und Provision', () => {
     // Betreuungskräfte der Partner zu sehen bekommt.
     const r = ausgabe({ plz: '34117' });
     expect(r.ok && r.body.plz).toBeUndefined();
-    expect(r.ok && (r as any).hinweise[0]).toMatch(/steht nicht im Mailtext/);
+    expect(r.ok && (r as any).hinweise[0]).toMatch(/steht weder im Betreff noch im Mailtext/);
   });
 
   it('PLZ mit Beleg wird übernommen', () => {
@@ -248,5 +248,34 @@ describe('VERMITTLER_MAILS', () => {
        send-scheduled-emails nach genau diesem Typ scharfschaltet. */
     expect([...VERMITTLER_MAILS]).not.toContain('eingangsbestaetigung');
     expect([...VERMITTLER_MAILS]).not.toContain('angebot');
+  });
+});
+
+describe('Betreff ist eine vollwertige Quelle', () => {
+  /* Echte Betreffs aus dem Postfach (09.09.): Pflegena schreibt Name, Ort
+     und Termin dorthin, der Fliesstext wiederholt sie nicht. Ein Beleg-Check
+     nur gegen den Text hätte die PLZ jedes zweiten Auftrags verworfen. */
+  const mitBetreff = {
+    ...kopf,
+    betreff: 'Neue Stelle ab sofort Brunhilde Weber 79780 Stühlingen',
+    text: 'Guten Tag,\n\nEhepaar, gute Deutschkenntnisse gewünscht.\n\nBernd Walde',
+  };
+
+  it('PLZ nur im Betreff zählt als Beleg', () => {
+    const r = pruefeAnfrage({ ...gelesen, plz: '79780', ort: 'Stühlingen' }, mitBetreff, 10);
+    expect(r.ok && r.body.plz).toBe('79780');
+    expect(r.ok && (r as any).hinweise).toEqual([]);
+  });
+
+  it('PLZ, die nirgends steht, fliegt weiterhin raus', () => {
+    const r = pruefeAnfrage({ ...gelesen, plz: '10115' }, mitBetreff, 10);
+    expect(r.ok && r.body.plz).toBeUndefined();
+    expect(r.ok && (r as any).hinweise[0]).toMatch(/weder im Betreff noch im Mailtext/);
+  });
+
+  it('WERKZEUG bietet dem Modell ein Feld für den Kundennamen an', () => {
+    // Der Nachname steht im Betreff — ohne dieses Feld gäbe es im Panel und
+    // in der Mail nur „Ihren Kunden".
+    expect(WERKZEUG.input_schema.properties).toHaveProperty('kunde_nachname');
   });
 });

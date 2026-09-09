@@ -278,7 +278,7 @@ type ModellErgebnis =
   | { ok: true; roh: any }
   | { ok: false; dauerhaft: boolean; grund: string };
 
-async function frageModell(text: string): Promise<ModellErgebnis> {
+async function frageModell(betreff: string, text: string): Promise<ModellErgebnis> {
   const key = process.env.ANTHROPIC_API_KEY;
   /* Fehlender Schluessel ist ein Konfigurationsfehler, kein Urteil ueber
      diese Mail — sonst waere die Anfrage nach einer Key-Rotation dauerhaft
@@ -383,7 +383,7 @@ async function verarbeiteVermittler(
     return { ok: true, lead_id: treffer, duplikat: 'Antwort im Thread — kein neues Angebot' };
   }
 
-  const antwort = await frageModell(roh);
+  const antwort = await frageModell(mail.subject ?? '', roh);
   if (!antwort.ok) return { ok: false, dauerhaft: antwort.dauerhaft, grund: antwort.grund, email: absender };
 
   const kopf: MailKopf = {
