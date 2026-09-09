@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 /* Cross-App-Import (pures Modul, Muster wie portalHelfer24.test.ts): der
  * Vermittler-Parser lebt im Kostenrechner und wird hier im root-vitest
  * geprüft, weil project 3 keinen eigenen Runner hat. */
-import { pruefeAnfrage, betreffAntwort, WERKZEUG, VERMITTLER_MAILS, type MailKopf, modellNachricht} from '../../project 3/lib/pflegena';
+import { pruefeAnfrage, betreffAntwort, WERKZEUG, VERMITTLER_MAILS, type MailKopf, modellNachricht, waehleDokumente, modellBloecke, DOK_MAX_BYTES_GESAMT} from '../../project 3/lib/pflegena';
 
 /* Echte Anfrage von Pflegena (Bernd Walde), wie sie im Postfach liegt.
  * Sie ist der Grund, warum hier ein Modell statt eines Regelparsers steht:
@@ -309,5 +309,187 @@ describe('modellNachricht: der Betreff kommt wirklich mit', () => {
     const n = modellNachricht(lang, 'Text');
     expect(n).toContain('A'.repeat(400));
     expect(n).not.toContain('A'.repeat(401));
+  });
+});
+
+/* ─── Anhänge ────────────────────────────────────────────────────────────
+ *
+ * Der Anlass steht in Registry #60: die erste echte Anfrage (09.09., uid
+ * 17318) trug ein dreiseitiges Kundenblatt, das der Abholer nie geöffnet
+ * hat — er suchte in den Anhängen nur nach ".csv". Pflegegrad, Mobilität
+ * und Nachteinsätze wurden geraten, obwohl alle drei im PDF standen.
+ *
+ * Die Anhang-Liste unten ist die ECHTE aus jener Mail (Logo der Signatur +
+ * Kundenblatt), nur der Dateiname des PDFs ist neutralisiert: der Original-
+ * name trägt Nachname und Wohnort einer echten Patientin, und die gehören
+ * nicht dauerhaft ins Repository. */
+describe('waehleDokumente', () => {
+  const logo = { contentType: 'image/jpeg', filename: 'image001.jpg', size: 16241, related: true };
+  const pdf = { contentType: 'application/pdf', filename: 'Kundenblatt.pdf', size: 764019 };
+
+  it('nimmt das PDF und lässt das Signatur-Logo still liegen', () => {
+    const { nehmen, hinweise } = waehleDokumente([logo, pdf]);
+    expect(nehmen).toEqual([{ index: 1, name: 'Kundenblatt.pdf' }]);
+    // Das Logo hängt in JEDER Mail — ein Hinweis dafür wäre nur Rauschen.
+    expect(hinweise).toEqual([]);
+  });
+
+  it('erkennt ein PDF auch an der Endung, wenn der Typ octet-stream ist', () => {
+    const { nehmen } = waehleDokumente([
+      { contentType: 'application/octet-stream', filename: 'Profil.PDF', size: 1000 },
+    ]);
+    expect(nehmen).toHaveLength(1);
+  });
+
+  it('meldet fremde Dateitypen, statt sie stumm zu verschlucken', () => {
+    const { nehmen, hinweise } = waehleDokumente([
+      { contentType: 'application/msword', filename: 'Bogen.doc', size: 4000 },
+    ]);
+    expect(nehmen).toEqual([]);
+    expect(hinweise[0]).toContain('Bogen.doc');
+    expect(hinweise[0]).toContain('application/msword');
+  });
+
+  it('hält die Gesamtgrenze ein und sagt, was liegen blieb', () => {
+    const gross = { contentType: 'application/pdf', filename: 'gross.pdf', size: DOK_MAX_BYTES_GESAMT };
+    const { nehmen, hinweise } = waehleDokumente([gross, { ...pdf, filename: 'zweites.pdf' }]);
+    expect(nehmen.map((n) => n.name)).toEqual(['gross.pdf']);
+    expect(hinweise.join(' ')).toContain('zweites.pdf');
+  });
+
+  it('vergibt einen Namen, wenn der Anhang keinen trägt', () => {
+    const { nehmen } = waehleDokumente([{ contentType: 'application/pdf', size: 10 }]);
+    expect(nehmen[0].name).toBe('Anhang 1');
+  });
+});
+
+describe('modellBloecke', () => {
+  const dok = { name: 'Kundenblatt.pdf', daten: 'JVBERi0xLjc=' };
+
+  it('ohne Anhang genau ein Textblock — Wort für Wort wie bisher', () => {
+    const bloecke = modellBloecke('Betreff', 'Text');
+    expect(bloecke).toHaveLength(1);
+    expect(bloecke[0]).toEqual({ type: 'text', text: modellNachricht('Betreff', 'Text') });
+  });
+
+  it('Dokument zuerst, Text zuletzt', () => {
+    const bloecke = modellBloecke('Betreff', 'Text', [dok]);
+    expect(bloecke[0].type).toBe('document');
+    expect(bloecke[bloecke.length - 1].type).toBe('text');
+  });
+
+  it('reicht die Bytes unverändert durch', () => {
+    const b = modellBloecke('B', 'T', [dok])[0] as any;
+    expect(b.source).toEqual({ type: 'base64', media_type: 'application/pdf', data: 'JVBERi0xLjc=' });
+  });
+
+  /* Diese Zusicherung ist die eigentliche Absicherung: ein unbekanntes Feld
+     im Dokumentblock beantwortet die API mit HTTP 400, und 400 heißt im
+     Abholer "diese Mail nie wieder". */
+  it('der Dokumentblock trägt NICHTS außer type und source', () => {
+    const b = modellBloecke('B', 'T', [dok])[0];
+    expect(Object.keys(b).sort()).toEqual(['source', 'type']);
+  });
+
+  it('nennt die Dateinamen im Textblock', () => {
+    const bloecke = modellBloecke('B', 'T', [dok]);
+    const text = (bloecke[bloecke.length - 1] as any).text;
+    expect(text).toContain('<anhaenge>');
+    expect(text).toContain('Kundenblatt.pdf');
+  });
+});
+
+/* ─── Was aus dem Anhang kommt ───────────────────────────────────────────
+ *
+ * Die Werte hier sind KANARIENVÖGEL: alles, was in Betreff oder Mailtext
+ * ebenfalls vorkommt, taugt nicht als Nachweis, dass das Dokument gelesen
+ * wurde. Bei der echten Mail wiederholte Outlook den Betreff als erste
+ * Textzeile — eine Zusicherung auf PLZ oder Nachname wäre grün geworden,
+ * ohne dass je ein PDF geöffnet wurde.
+ *
+ * Personenbezug neutralisiert: Straße, Nachname und Geburtsjahr stammen
+ * nicht aus dem echten Dokument (Registry #60). Die PLZ bleibt echt, weil
+ * genau sie geprüft wird. */
+describe('Angaben aus dem Anhang', () => {
+  const mitAnhang = (betreff: string | null, anhaenge: number): MailKopf => ({
+    von: 'info@pflegena.com',
+    vonName: '',
+    betreff,
+    messageId: '<x@pflegena.com>',
+    datum: new Date('2026-09-09T06:25:00.000Z'),
+    anhaenge,
+    text: 'Guten Tag, siehe Anhang. Freundliche Grüße',
+  });
+  const roh = (extra: Record<string, unknown>) => ({ ...gelesen, ...extra });
+
+  it('PLZ aus dem Anhang gilt, wenn der Betreff keine nennt', () => {
+    const r = pruefeAnfrage(roh({ plz: '79780', ort: 'Stühlingen' }), mitAnhang('Neue Stelle ab sofort', 1), 10);
+    expect(r.ok && r.body.plz).toBe('79780');
+    expect(r.ok && r.hinweise.join(' ')).toContain('aus dem Anhang');
+  });
+
+  /* Der Betreff ist die einzige unabhängige, von einem Menschen geschriebene
+     Quelle für den Einsatzort — das PDF können wir nicht gegenlesen. */
+  it('bei Widerspruch gewinnt der Betreff, nicht der Anhang', () => {
+    const r = pruefeAnfrage(
+      roh({ plz: '10115', ort: 'Berlin' }),
+      mitAnhang('Neue Stelle 79780 Stühlingen', 1),
+      10,
+    );
+    expect(r.ok && r.body.plz).toBe('79780');
+    expect(r.ok && r.hinweise.join(' ')).toContain('weicht vom Betreff');
+  });
+
+  it('ohne mitgeschicktes Dokument zählt eine "Anhang"-PLZ gar nicht', () => {
+    // Sonst könnte das Modell sich die Tür selbst öffnen.
+    const r = pruefeAnfrage(roh({ plz: '79780', ort: 'Stühlingen' }), mitAnhang('Neue Stelle', 0), 10);
+    expect(r.ok && r.body.plz).toBeUndefined();
+    expect(r.ok && r.hinweise.join(' ')).toContain('verworfen');
+  });
+
+  it('Gewicht kommt in Kilogramm und geht als Mamamia-Stufe raus', () => {
+    const r = pruefeAnfrage(roh({ gewicht_kg: 50 }), mitAnhang('x', 1), 10);
+    expect(r.ok && r.body.details.gewicht).toBe('40-50');
+  });
+
+  it('Geburtsjahr nur als plausible Jahreszahl', () => {
+    expect(pruefeAnfrage(roh({ geburtsjahr: 1943 }), mitAnhang('x', 1), 10).ok
+      && pruefeAnfrage(roh({ geburtsjahr: 1943 }), mitAnhang('x', 1), 10).body.details.geburtsjahr).toBe('1943');
+    const unsinn = pruefeAnfrage(roh({ geburtsjahr: 83 }), mitAnhang('x', 1), 10);
+    expect(unsinn.ok && unsinn.body.details.geburtsjahr).toBeUndefined();
+  });
+
+  it('Geschlecht der betreuten Person genau als Herr/Frau', () => {
+    const r = pruefeAnfrage(roh({ patient_geschlecht: 'Frau' }), mitAnhang('x', 1), 10);
+    expect(r.ok && r.body.details.patient_anrede).toBe('Frau');
+    const falsch = pruefeAnfrage(roh({ patient_geschlecht: 'weiblich' }), mitAnhang('x', 1), 10);
+    expect(falsch.ok && falsch.body.details.patient_anrede).toBeUndefined();
+  });
+
+  /* "nein" darf NICHT gesetzt werden: der Eingang schneidet diesen Schlüssel
+     auf zwei Zeichen ("ne"), und der Mamamia-Mapper vergleicht auf "ja". */
+  it('Demenz nur bei ja', () => {
+    expect(pruefeAnfrage(roh({ demenz: 'ja' }), mitAnhang('x', 1), 10).ok
+      && pruefeAnfrage(roh({ demenz: 'ja' }), mitAnhang('x', 1), 10).body.details.demenz).toBe('ja');
+    const nein = pruefeAnfrage(roh({ demenz: 'nein' }), mitAnhang('x', 1), 10);
+    expect(nein.ok && nein.body.details.demenz).toBeUndefined();
+  });
+
+  it('Straße aus der Adresszeile, ohne PLZ und Ort', () => {
+    const r = pruefeAnfrage(
+      roh({ einsatzort_adresse: 'Musterweg 4, 79780 Stühlingen', plz: '79780', ort: 'Stühlingen' }),
+      mitAnhang('Neue Stelle 79780', 1),
+      10,
+    );
+    expect(r.ok && r.body.details.patient_strasse).toBe('Musterweg 4');
+  });
+
+  /* Erkrankungen erreichen Mamamia beim Onboarding nur als Demenz-Beschreibung.
+     Damit die Agentur sie überhaupt sieht, müssen sie in den Block, der als
+     JobOffer-Beschreibung im Panel steht. */
+  it('Diagnosen landen im Block für die Agentur', () => {
+    const r = pruefeAnfrage(roh({ diagnosen: 'Parkinson seit 20 Jahren' }), mitAnhang('x', 1), 10);
+    expect(r.ok && r.body.details.diagnosen).toBe('Parkinson seit 20 Jahren');
+    expect(r.ok && r.body.details.block).toContain('Parkinson seit 20 Jahren');
   });
 });

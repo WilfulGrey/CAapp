@@ -51,9 +51,22 @@ export interface ErgaenzungsErgebnis {
  * Fuellt die Luecken. Rein und ohne DB, damit nachvollziehbar bleibt,
  * welcher Wert warum gewaehlt wurde.
  */
+/** In welche Richtung eine Luecke gefuellt wird.
+ *
+ * `teuer` ist die Regel fuer eingekaufte Portal-Leads (siehe Kopf dieser
+ * Datei) und bleibt der Standard. `guenstig` gilt fuer Vermittler:
+ * die Begruendung "ein Preis, der spaeter faellt, ist eine gute Nachricht"
+ * setzt voraus, dass der Kunde im Portal korrigieren kann — ein Vermittler
+ * hat kein Portal, der Preis faellt also nie und der Partner erfaehrt den
+ * Grund nie. Bewusst in Kauf genommen (Michał, 09.09.): zu tief ist leiser
+ * als zu hoch, weil niemand einen guenstigen Preis reklamiert. Was
+ * angenommen wurde, steht weiterhin in `angenommen` und in der Team-Mail. */
+export type Richtung = 'teuer' | 'guenstig';
+
 export function ergaenzeAngaben(
   teil: PortalAngaben,
   preistabelle: PreisZeile[],
+  richtung: Richtung = 'teuer',
 ): ErgaenzungsErgebnis {
   const angenommen: string[] = [];
 
@@ -72,7 +85,7 @@ export function ergaenzeAngaben(
    * Gleichstand (bei `erfahrung` sind auf prod alle Stufen 0 EUR) wird nach
    * antwort_key aufgeloest: sonst haengt das Ergebnis an der Zeilenfolge des
    * selects und `angenommene_felder` saehe bei jedem Lauf anders aus. */
-  const teuerster = (kategorie: string): string | null => {
+  const randwert = (kategorie: string): string | null => {
     const waehlbar = (ERLAUBT as Record<string, readonly string[]>)[kategorie];
     const zeilen = preistabelle.filter(
       (z) => z.kategorie === kategorie
@@ -80,7 +93,12 @@ export function ergaenzeAngaben(
     );
     if (zeilen.length === 0) return null;
     return zeilen.reduce((a, b) => {
-      if (b.aufschlag_euro !== a.aufschlag_euro) return b.aufschlag_euro > a.aufschlag_euro ? b : a;
+      if (b.aufschlag_euro !== a.aufschlag_euro) {
+        const nimmB = richtung === 'teuer'
+          ? b.aufschlag_euro > a.aufschlag_euro
+          : b.aufschlag_euro < a.aufschlag_euro;
+        return nimmB ? b : a;
+      }
       return b.antwort_key < a.antwort_key ? b : a;
     }).antwort_key;
   };
@@ -93,15 +111,16 @@ export function ergaenzeAngaben(
       daten[feld] = vorhanden;
       continue;
     }
-    const gewaehlt = teuerster(feld);
+    const gewaehlt = randwert(feld);
     if (gewaehlt) {
       daten[feld] = gewaehlt;
       angenommen.push(feld);
     }
   }
 
-  /* Pflegegrad ist der einzige Wert, bei dem "teuerster Aufschlag" die
-   * FALSCHE Richtung waere: ein hoeherer Grad kostet zwar mehr, bringt
+  /* Pflegegrad steht ausserhalb der Richtung (beide Richtungen liefen hier
+   * auf 0 hinaus: bis auf Grad 5 kostet keiner etwas). Er ist der einzige
+   * Wert, bei dem "teuerster Aufschlag" die FALSCHE Richtung waere: ein hoeherer Grad kostet zwar mehr, bringt
    * aber Pflegegeld und Entlastungsbudget — unterm Strich sinkt der
    * Eigenanteil, den der Kunde in der Mail sieht. Ohne Angabe deshalb 0:
    * keine Zuschuesse, hoechster Eigenanteil, und die Mail schreibt

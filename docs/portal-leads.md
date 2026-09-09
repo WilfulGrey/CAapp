@@ -323,8 +323,22 @@ Deshalb bekommt das Modell Betreff und Text als getrennte Blöcke, und der
 PLZ-Beleg zählt in **beiden**. Ein Check nur gegen den Fließtext hätte die
 PLZ jeder zweiten Anfrage verworfen.
 
-**Prosa statt Formular.** Es gibt kein „Label: Wert", keine CSV, keinen
-Anhang — nur einen Brief:
+**Die Daten stehen im ANHANG, der Brief ist das Anschreiben.** Bis zum
+09.09.2026 stand hier das Gegenteil („keine CSV, keinen Anhang — nur einen
+Brief"). Das war falsch und hat 60 Angaben pro Anfrage gekostet: die erste
+echte Mail (uid 17318) trug ein dreiseitiges Kundenblatt, der Abholer sah
+davon nichts, weil er in `mail.attachments` nur nach `.csv` sucht. Pflegegrad,
+Mobilität und Nachteinsätze wurden geraten — alle drei standen im PDF
+(Registry #60).
+
+Das PDF ist ein aus Word gedrucktes Dokument, dessen Text als Vektorpfade
+vorliegt: `pdftotext` liefert daraus **drei Bytes**. Lesen kann es nur ein
+Modell mit Augen — deshalb geht es als `document`-Block mit an denselben
+Aufruf, und wir rastern nichts selbst (auf 512 MB wäre das die Klasse
+Registry #27/#29).
+
+**Prosa statt Formular — im Brief.** Dort gibt es kein „Label: Wert" und
+keine CSV:
 
 > „wenigstens mittlere Deutschkenntnisse sind gewünscht, Tagessatz IHR
 > PREISANGEBOT + 10 Pflegena = ?? € plus Reisekosten … ein liebes Ehepaar,
@@ -474,6 +488,44 @@ erneut versucht.
 Im **Trockenlauf** merkt sich der Prozess die schon gelesenen UIDs im
 Speicher: das Protokoll bleibt dort unberührt, und ohne dieses Gedächtnis
 liefe dieselbe Mail in jedem Takt erneut durchs Modell.
+
+### Anhänge und die Richtung der Annahmen
+
+**Was ans Modell geht:** PDFs (Typ `application/pdf` ODER Dateiname auf
+`.pdf` — Absender verschicken PDFs als `octet-stream`), zusammen höchstens
+6 MB. Inline-Bilder aus dem HTML (`related`) fliegen still raus, das ist das
+Pflegena-Logo in jeder Signatur. Fremde Dateitypen und übersprungene
+Anhänge stehen als `hinweis` in der Team-Mail — so sieht man nach ein paar
+Wochen, was der Partner wirklich schickt, statt es zu vermuten.
+
+**Ein Anhang macht eine Mail nie schlechter.** Scheitert der Aufruf MIT
+Dokument — 400, Zeitüberschreitung, abgeschnittene Antwort —, wird genau
+einmal ohne Dokument gefragt; erst dieses Ergebnis wird bewertet. Und
+`max_tokens` steht bei 8000, nicht bei 1000: das Denken des Modells zählt in
+dieses Budget, eine abgeschnittene Antwort hat keinen `tool_use`-Block und
+sähe aus wie ein vorübergehender Fehler — fünf bezahlte Wiederholungen und
+dann abgelehnt.
+
+**PLZ:** steht sie in Betreff oder Text, gilt sie wie bisher. Steht sie NUR
+im Anhang, entscheidet der Abgleich mit dem Betreff — Pflegena setzt PLZ und
+Ort per Konvention dorthin, und das ist die einzige unabhängige, von einem
+Menschen geschriebene Quelle, die wir haben (das PDF können wir nicht
+gegenlesen). Widerspruch ⇒ der Betreff gilt, die Abweichung steht in der
+Team-Mail. Ein Selbst-Abgleich („steht die PLZ in der Adresszeile, die
+dasselbe Modell geschrieben hat?") prüfte nur, ob das Modell sich selbst
+widerspricht — dagegen käme jede Büro-, Tochter- oder Klinikadresse durch.
+Die Straße landet in `leads.patient_street` (Admin); nach Mamamia geht vom
+Einsatzort ausschliesslich die PLZ.
+
+**Lücken werden beim Vermittler GÜNSTIG gefüllt**, nicht teuer wie bei den
+eingekauften Portalen (`ergaenzeAngaben`, Parameter `richtung`). Die alte
+Regel begründet sich damit, dass der Kunde im Portal korrigiert und der
+Preis dann fällt — ein Vermittler hat kein Portal. Bewusst in Kauf genommen
+(Michał, 09.09.): zu tief ist leiser als zu hoch, weil niemand einen
+günstigen Preis reklamiert. **Zu beachten:** ohne Angabe zum Deutsch heisst
+günstig `grundlegend`, und die Kräfteauswahl vergleicht die Stufe auf
+GLEICHHEIT — Mail 2 zeigt dann nur Kräfte der untersten Stufe. Was
+angenommen wurde, steht deshalb in der Team-Mail.
 
 ### Bekannte Kanten
 
