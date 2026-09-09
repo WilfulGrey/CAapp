@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 /* Cross-App-Import (pures Modul, Muster wie portalHelfer24.test.ts): der
  * Vermittler-Parser lebt im Kostenrechner und wird hier im root-vitest
  * geprüft, weil project 3 keinen eigenen Runner hat. */
-import { pruefeAnfrage, betreffAntwort, WERKZEUG, VERMITTLER_MAILS, type MailKopf } from '../../project 3/lib/pflegena';
+import { pruefeAnfrage, betreffAntwort, WERKZEUG, VERMITTLER_MAILS, type MailKopf, modellNachricht} from '../../project 3/lib/pflegena';
 
 /* Echte Anfrage von Pflegena (Bernd Walde), wie sie im Postfach liegt.
  * Sie ist der Grund, warum hier ein Modell statt eines Regelparsers steht:
@@ -277,5 +277,37 @@ describe('Betreff ist eine vollwertige Quelle', () => {
     // Der Nachname steht im Betreff — ohne dieses Feld gäbe es im Panel und
     // in der Mail nur „Ihren Kunden".
     expect(WERKZEUG.input_schema.properties).toHaveProperty('kunde_nachname');
+  });
+});
+
+/* Regression: die Route nahm den Betreff entgegen und baute den Request
+   trotzdem nur aus dem Fliesstext. Auf einer echten Mail fiel es nicht auf,
+   weil Outlook den Betreff als erste Textzeile wiederholt — bei jedem
+   anderen Client waeren Name, PLZ und Termin verschwunden. */
+describe('modellNachricht: der Betreff kommt wirklich mit', () => {
+  const betreff = 'Neue Stelle ab sofort Brunhilde Weber 79780 Stuehlingen wohnt alleine, bitte kein Mann';
+
+  it('stellt Betreff UND Anfrage als getrennte Bloecke zu', () => {
+    const n = modellNachricht(betreff, 'Guten Tag, wenigstens mittlere Deutschkenntnisse.');
+    expect(n).toContain('<betreff>');
+    expect(n).toContain(betreff);
+    expect(n).toContain('<anfrage>');
+    expect(n).toContain('wenigstens mittlere Deutschkenntnisse');
+    expect(n.indexOf('<betreff>')).toBeLessThan(n.indexOf('<anfrage>'));
+  });
+
+  it('traegt die PLZ auch dann, wenn nur der Betreff sie nennt', () => {
+    expect(modellNachricht(betreff, 'Guten Tag, haben Sie Vorschlaege?')).toContain('79780');
+  });
+
+  it('vertraegt fehlenden Betreff', () => {
+    expect(modellNachricht(null, 'Text')).toContain('<betreff>\n\n</betreff>');
+  });
+
+  it('kappt einen ausufernden Betreff bei 400 Zeichen', () => {
+    const lang = 'A'.repeat(900);
+    const n = modellNachricht(lang, 'Text');
+    expect(n).toContain('A'.repeat(400));
+    expect(n).not.toContain('A'.repeat(401));
   });
 });

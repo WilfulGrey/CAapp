@@ -53,7 +53,7 @@ import { parsePflegehilfe, telefoneAusHtml, waehleTelefone } from '@/lib/portal-
 import { parseCsv, csvZuLeadZeile, csvZeileBrauchbar } from '@/lib/portal-csv';
 import { PORTALE, vermittlerFuer, postfachPraefix } from '@/lib/portal-lead';
 import { zuVerarbeiten, SEED_SENTINEL_UID, versucheFuer, MAX_VERSUCHE, type LogZeile } from '@/lib/portal-mail-log';
-import { pruefeAnfrage, SYSTEM as PFLEGENA_SYSTEM, WERKZEUG as PFLEGENA_WERKZEUG, type MailKopf } from '@/lib/pflegena';
+import { modellNachricht, pruefeAnfrage, SYSTEM as PFLEGENA_SYSTEM, WERKZEUG as PFLEGENA_WERKZEUG, type MailKopf } from '@/lib/pflegena';
 import { flagGiltFuer } from '@/lib/portal-schutz';
 import { sendEmail } from '@/lib/email';
 import { apiZeilen, helfer24ZuLeadBody, heuteBerlin, HELFER24_EXPORT_URL, type Helfer24Ergebnis } from '@/lib/portal-helfer24';
@@ -295,7 +295,7 @@ async function frageModell(betreff: string, text: string): Promise<ModellErgebni
         model: MODELL,
         max_tokens: 1000,
         system: [{ type: 'text', text: PFLEGENA_SYSTEM, cache_control: { type: 'ephemeral' } }],
-        messages: [{ role: 'user', content: `<anfrage>\n${text.slice(0, 20000)}\n</anfrage>` }],
+        messages: [{ role: 'user', content: modellNachricht(betreff, text) }],
         tools: [PFLEGENA_WERKZEUG],
         tool_choice: { type: 'tool', name: PFLEGENA_WERKZEUG.name },
       }),
