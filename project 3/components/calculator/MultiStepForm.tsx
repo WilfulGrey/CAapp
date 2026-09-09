@@ -9,6 +9,7 @@ import { cookieConsent } from "@/lib/cookie-consent";
 import { scrollToCalculator, isCalculatorAligned, OPEN_CALCULATOR_EVENT } from "@/lib/scroll-to-calculator";
 import { useFormTracking } from "@/hooks/use-form-tracking";
 import { naechsterDrift, naechsterAbstandMs } from "@/lib/counter-drift";
+import { kraefteVorschauAktiv, kraftZeile, parseVorschau, wuenscheAusAntworten, type VorschauKraft } from "@/lib/kraefte-vorschau";
 
 // ─── Matching Animation Component ────────────────────────────────────────────
 // Läuft zwischen letzter Frage (Step 8) und Kontaktformular (Step 9). 3 Schritte
@@ -152,6 +153,36 @@ export function MultiStepForm({ mode = 'inline' }: MultiStepFormProps = {}) {
   // Matching-Animation zwischen Step 8 (letzte Frage) und Step 9 (Kontakt).
   // Wenn aktiv, blendet das Step-Rendering aus und zeigt nur die Animation.
   const [showMatching, setShowMatching] = useState(false);
+  // Kräfte-Vorschau vor der Kontaktschranke (Registry #61, docs/kraefte-vorschau.md):
+  // hinter `?kraefte=1`, bis Martin sie abgenommen hat. kraefteVorschau: null =
+  // noch nicht geladen, [] = Function hatte nichts — dann bleibt der alte Kasten.
+  // Der Schalter steht zusätzlich in einem Ref, damit die Tracking-Effekte ihn
+  // lesen können, ohne dass er in ihren Dependency-Listen ein zweites step_view
+  // auslöst.
+  const [vorschauAktiv, setVorschauAktiv] = useState(false);
+  const vorschauAktivRef = useRef(false);
+  const [kraefteVorschau, setKraefteVorschau] = useState<VorschauKraft[] | null>(null);
+  useEffect(() => {
+    try {
+      const an = kraefteVorschauAktiv(window.location.search, window.sessionStorage);
+      vorschauAktivRef.current = an;
+      setVorschauAktiv(an);
+    } catch { /* sessionStorage gesperrt — Vorschau bleibt aus */ }
+  }, []);
+  const ladeKraefteVorschau = () => {
+    if (!vorschauAktivRef.current) return;
+    const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+    if (!url || !key) { setKraefteVorschau([]); return; }
+    fetch(`${url}/functions/v1/kraefte-vorschau`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', apikey: key, Authorization: `Bearer ${key}` },
+      body: JSON.stringify(wuenscheAusAntworten(state)),
+    })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((j) => setKraefteVorschau(parseVorschau(j)))
+      .catch(() => setKraefteVorschau([]));
+  };
   // Field-level tracking for the contact step (step 10) — populates
   // analytics_form_interactions so the dashboard can show where in the
   // contact form users engage / drop off.
@@ -317,6 +348,7 @@ export function MultiStepForm({ mode = 'inline' }: MultiStepFormProps = {}) {
     analytics.trackEvent('wizard', 'step_view', {
       step: currentStep,
       step_name: getStepId(currentStep),
+      kraefte_vorschau: vorschauAktivRef.current,
     });
     stepStartRef.current = Date.now();
   }, [currentStep, wizardSichtbar]);
@@ -334,6 +366,7 @@ export function MultiStepForm({ mode = 'inline' }: MultiStepFormProps = {}) {
           step: currentStep,
           step_name: getStepId(currentStep),
           replayed_after_consent: true,
+          kraefte_vorschau: vorschauAktivRef.current,
         });
       }
     });
@@ -467,6 +500,7 @@ export function MultiStepForm({ mode = 'inline' }: MultiStepFormProps = {}) {
         step_name: getStepId(currentStep),
         answer: overrideAnswer !== undefined ? overrideAnswer : getCurrentAnswer(currentStep),
         time_on_step_seconds: timeOnStep,
+        kraefte_vorschau: vorschauAktivRef.current,
       });
     }
 
@@ -474,6 +508,7 @@ export function MultiStepForm({ mode = 'inline' }: MultiStepFormProps = {}) {
       // Letzte Frage (Step 8) → Kontaktformular (Step 9): vorher die Matching-
       // Animation einblenden. Step-Wechsel erst nach onComplete der Animation.
       if (currentStep === totalSteps - 1) {
+        ladeKraefteVorschau();
         setShowMatching(true);
         return;
       }
@@ -1350,40 +1385,74 @@ export function MultiStepForm({ mode = 'inline' }: MultiStepFormProps = {}) {
                   06.06.2026). Begründung im validateForm()-Kommentar. */}
               {currentStep === 9 && (
                 <div className="space-y-3">
-                  {/* V7 (Martin, 2026-07-08): Der Preiskasten ist die 1:1-Kopie
-                      des GROSSEN Betreuungskosten-Kastens der Portal-Angebots-
-                      seite (CustomerPortalPage ~2175): Tagespreis groß links,
-                      „inkl. Steuern…" rechts daneben, Zzgl.-Zeile unten. NUR
-                      die Zahl ist verpixelt (Dummy! Die echte Kalkulation
-                      läuft erst nach dem Absenden serverseitig und darf hier
-                      nie im Quelltext stehen). */}
-                  <div className="flex items-center gap-3 rounded-2xl border border-[#C4E3CB] bg-[#F0F7F1] px-5 py-4 mb-1">
-                    <div className="flex flex-shrink-0">
-                      {/* Echte Pflegekräfte aus dem eigenen Bestand (leicht verpixelt
-                          = gesperrte Vorschau). Plain <img>: kein next/image-Optimizer nötig. */}
-                      {[
-                        '/images/caregivers/pk-1.jpg',
-                        '/images/caregivers/pk-2.jpg',
-                        '/images/caregivers/pk-3.jpg',
-                        '/images/caregivers/pk-4.jpg',
-                        '/images/caregivers/pk-5.jpg',
-                      ].map((src, i) => (
-                        <span key={src} className={`relative w-9 h-9 rounded-full overflow-hidden border-2 border-white flex-shrink-0 ${i > 0 ? '-ml-2.5' : ''}`}>
-                          {/* eslint-disable-next-line @next/next/no-img-element */}
-                          <img src={src} alt="" className="absolute inset-0 w-full h-full object-cover" loading="lazy" />
-                        </span>
-                      ))}
+                  {vorschauAktiv && kraefteVorschau && kraefteVorschau.length > 0 ? (
+                    /* Kräfte-Vorschau (Registry #61): echte, bald verfügbare
+                       Kräfte VOR den Kontaktfeldern. Preis bleibt verdeckt —
+                       er entsteht erst serverseitig nach dem Absenden. */
+                    <div className="mb-1">
+                      <p className="text-[16px] font-bold text-[#3D3D3D]">
+                        {kraefteVorschau.length === 1 ? 'Diese Pflegekraft passt' : `Diese ${kraefteVorschau.length} Pflegekräfte passen`} zu Ihren Angaben
+                      </p>
+                      <p className="text-[12.5px] text-[#8B8B8B] mt-0.5 mb-3">Aktuell verfügbar. Preis und Anreisedatum sehen Sie sofort nach Ihren Kontaktdaten.</p>
+                      <div className="space-y-2">
+                        {kraefteVorschau.map((k) => (
+                          <div key={k.id} className="flex items-center gap-3 rounded-2xl border border-[#C4E3CB] bg-[#F0F7F1] px-3.5 py-3">
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img src={k.fotoUrl} alt="" className="w-14 h-14 rounded-xl object-cover flex-shrink-0" loading="lazy" />
+                            <div className="min-w-0 flex-1">
+                              <p className="text-[15px] font-semibold text-[#3D3D3D] leading-snug">
+                                {k.vorname}{k.alter ? <span className="font-normal text-[#8B8B8B]">, {k.alter}</span> : null}
+                              </p>
+                              <p className="text-[12.5px] text-[#2F5A38] mt-0.5 leading-snug">
+                                <span className="font-semibold">{k.stufe}</span>{kraftZeile(k) ? ` · ${kraftZeile(k)}` : ''}
+                              </p>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                      <div className="pt-4">
+                        <p className="text-[16px] font-bold text-[#3D3D3D]">Preis anzeigen &amp; Kontaktdaten eingeben</p>
+                        <p className="text-[12.5px] text-[#8B8B8B] mt-0.5">Ihr genauer Monatspreis und die Verfügbarkeit dieser Pflegekräfte erscheinen sofort.</p>
+                      </div>
                     </div>
-                    <p className="text-[14px] leading-snug text-[#2F5A38]"><span className="font-semibold">5 passende Pflegekräfte</span> für Sie gefunden</p>
-                  </div>
-                  {/* CRO 15.08.: Preisspanne steht im HERO (app/page.tsx),
-                      nicht hier — auf diesem Schritt sagen wir „Ihr Angebot
-                      ist fertig", eine generische Spanne daneben wirkte
-                      widersprüchlich (Martins Einwand 15.08.). */}
-                  <div className="pt-1">
-                    <p className="text-[16px] font-bold text-[#3D3D3D]">Wohin dürfen wir Ihr Angebot senden?</p>
-                    <p className="text-[12.5px] text-[#8B8B8B] mt-0.5">Ihr genauer Preis &amp; 5 passende Pflegekräfte werden sofort sichtbar.</p>
-                  </div>
+                  ) : (
+                    <>
+                      {/* V7 (Martin, 2026-07-08): Der Preiskasten ist die 1:1-Kopie
+                          des GROSSEN Betreuungskosten-Kastens der Portal-Angebots-
+                          seite (CustomerPortalPage ~2175): Tagespreis groß links,
+                          „inkl. Steuern…" rechts daneben, Zzgl.-Zeile unten. NUR
+                          die Zahl ist verpixelt (Dummy! Die echte Kalkulation
+                          läuft erst nach dem Absenden serverseitig und darf hier
+                          nie im Quelltext stehen). */}
+                      <div className="flex items-center gap-3 rounded-2xl border border-[#C4E3CB] bg-[#F0F7F1] px-5 py-4 mb-1">
+                        <div className="flex flex-shrink-0">
+                          {/* Echte Pflegekräfte aus dem eigenen Bestand (leicht verpixelt
+                              = gesperrte Vorschau). Plain <img>: kein next/image-Optimizer nötig. */}
+                          {[
+                            '/images/caregivers/pk-1.jpg',
+                            '/images/caregivers/pk-2.jpg',
+                            '/images/caregivers/pk-3.jpg',
+                            '/images/caregivers/pk-4.jpg',
+                            '/images/caregivers/pk-5.jpg',
+                          ].map((src, i) => (
+                            <span key={src} className={`relative w-9 h-9 rounded-full overflow-hidden border-2 border-white flex-shrink-0 ${i > 0 ? '-ml-2.5' : ''}`}>
+                              {/* eslint-disable-next-line @next/next/no-img-element */}
+                              <img src={src} alt="" className="absolute inset-0 w-full h-full object-cover" loading="lazy" />
+                            </span>
+                          ))}
+                        </div>
+                        <p className="text-[14px] leading-snug text-[#2F5A38]"><span className="font-semibold">5 passende Pflegekräfte</span> für Sie gefunden</p>
+                      </div>
+                      {/* CRO 15.08.: Preisspanne steht im HERO (app/page.tsx),
+                          nicht hier — auf diesem Schritt sagen wir „Ihr Angebot
+                          ist fertig", eine generische Spanne daneben wirkte
+                          widersprüchlich (Martins Einwand 15.08.). */}
+                      <div className="pt-1">
+                        <p className="text-[16px] font-bold text-[#3D3D3D]">Wohin dürfen wir Ihr Angebot senden?</p>
+                        <p className="text-[12.5px] text-[#8B8B8B] mt-0.5">Ihr genauer Preis &amp; 5 passende Pflegekräfte werden sofort sichtbar.</p>
+                      </div>
+                    </>
+                  )}
                   <div>
                     <input
                       type="text"
@@ -1474,7 +1543,7 @@ export function MultiStepForm({ mode = 'inline' }: MultiStepFormProps = {}) {
                       <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
                     </div>
                   ) : (
-                    <span>Angebot & Pflegekräfte anzeigen →</span>
+                    <span>{vorschauAktiv && kraefteVorschau && kraefteVorschau.length > 0 ? 'Preis & Pflegekräfte anzeigen →' : 'Angebot & Pflegekräfte anzeigen →'}</span>
                   )}
                 </button>
                 <p className="text-center text-xs text-[#8B8B8B] leading-snug">
