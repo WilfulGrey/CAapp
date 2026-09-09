@@ -21,14 +21,22 @@ const CORS = {
   "Access-Control-Allow-Headers": "authorization, apikey, content-type",
 };
 
+// Serverseitige Filter wie im alten Lead-Point-Pipeline (caregiver-filtering-
+// pipeline.md): nur Kräfte mit Kontakt in den letzten KONTAKT_TAGE Tagen,
+// retuschiertem Foto und HP-Zuordnung — aus ~22.000 Registrierungen werden so
+// einige Hundert echte Kandidatinnen. `hp_caregiver_id` MUSS in der Auswahl
+// stehen, sonst liefert mamamia hp_total_jobs für alle als 0.
 const LISTE_QUERY = /* GraphQL */ `
-  query KraefteVorschau($limit: Int, $page: Int) {
-    CaregiversWithPagination(limit: $limit, page: $page) {
+  query KraefteVorschau($limit: Int, $page: Int, $cutoff: String!) {
+    CaregiversWithPagination(
+      limit: $limit, page: $page,
+      filters: { last_contact: $cutoff, has_retouched_avatar: true, min_hp_jobs: 1 }
+    ) {
       last_page
       total
       data {
         id first_name gender year_of_birth germany_skill care_experience
-        available_from last_contact_at hp_total_jobs driving_license
+        available_from last_contact_at hp_caregiver_id hp_total_jobs driving_license
         caregiver_status { is_blocked }
         avatar_retouched_promo { aws_url }
         avatar_retouched { aws_url }
@@ -43,6 +51,12 @@ const LISTE_QUERY = /* GraphQL */ `
 // alle Seiten (Deckel 8 × 400), einmal je 10 Minuten.
 const LISTE_LIMIT = 400;
 const MAX_SEITEN = 8;
+const KONTAKT_TAGE = 60;
+
+/** Stichtag für den last_contact-Filter, YYYY-MM-DD. */
+export function stichtag(now: Date = new Date(), tage: number = KONTAKT_TAGE): string {
+  return new Date(now.getTime() - tage * 24 * 3600 * 1000).toISOString().slice(0, 10);
+}
 const CACHE_MS = 10 * 60 * 1000;
 let cache: { at: number; kraefte: RohKraft[] } | null = null;
 
@@ -60,7 +74,7 @@ export async function ladeKraefte(fetchFn: typeof fetch = fetch): Promise<RohKra
       endpoint: Deno.env.get("MAMAMIA_ENDPOINT")!,
       token,
       query: LISTE_QUERY,
-      variables: { limit: LISTE_LIMIT, page },
+      variables: { limit: LISTE_LIMIT, page, cutoff: stichtag() },
       fetchFn,
     });
   // Seite 1 verrät die Seitenzahl, der Rest kommt parallel — zwei Umläufe
@@ -81,7 +95,7 @@ export async function ladeKraefte(fetchFn: typeof fetch = fetch): Promise<RohKra
 let poolGesamt: number | null = null;
 
 const EINZEL_QUERY = /* GraphQL */ `
-  query KraftEinzeln($id: Int!) { Caregiver(id: $id) { id hp_total_jobs } }
+  query KraftEinzeln($id: Int!) { Caregiver(id: $id) { id hp_caregiver_id hp_total_jobs } }
 `;
 
 /**
@@ -100,7 +114,7 @@ export async function stichprobeEinsaetze(
     fetchFn,
   });
   const kandidaten = alle
-    .filter((k) => !k.caregiver_status?.is_blocked && (parseInt(k.care_experience ?? "", 10) || 0) >= 10)
+    .filter((k) => !k.caregiver_status?.is_blocked)
     .slice(0, 4);
   return Promise.all(kandidaten.map(async (k) => {
     try {

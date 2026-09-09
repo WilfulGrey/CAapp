@@ -34,6 +34,8 @@ export interface RohKraft {
   available_from?: string | null;
   last_contact_at?: string | null;
   hp_total_jobs?: number | null;
+  /** Ohne dieses Feld in der Abfrage bleibt hp_total_jobs bei mamamia 0 (HP-Relation lädt nicht). */
+  hp_caregiver_id?: number | null;
   driving_license?: string | null;
   caregiver_status?: { is_blocked?: boolean | null } | null;
   avatar_retouched_promo?: { aws_url?: string | null } | null;

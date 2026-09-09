@@ -1,3 +1,4 @@
+import { stichtag } from "../index.ts";
 import { assertEquals } from "@std/assert";
 import { anonymisiere, passtZuWuenschen, type RohKraft, waehleVorschau } from "../vorschau.ts";
 import { handleRequest } from "../index.ts";
@@ -68,4 +69,9 @@ Deno.test("Handler: Wünsche werden gelesen und angewendet", async () => {
   const j = await res.json();
   assertEquals(j.kraefte.map((k: { vorname: string }) => k.vorname), ["Piotr"]);
   assertEquals(j.gesamt, 2);
+});
+
+Deno.test("Stichtag: 60 Tage zurück, ISO-Datum", () => {
+  assertEquals(stichtag(new Date("2026-09-09T22:00:00Z")), "2026-07-11");
+  assertEquals(stichtag(new Date("2026-03-01T00:00:00Z"), 30), "2026-01-30");
 });
