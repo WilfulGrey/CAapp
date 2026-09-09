@@ -2402,8 +2402,6 @@ const CustomerPortalPage: FC = () => {
           // einer Zahlungsfrage.
           { text: 'Erst auswählen, dann buchen' },
           { text: 'Keine Vermittlungsgebühr' },
-          // Martin, 08.09.: beantwortet die Sorge, ob man schon zahlt.
-          { text: 'Kosten erst, wenn die Pflegekraft da ist' },
         ];
         return (
         <div style={{background:'#FFFFFF', borderBottom:'1px solid #E9E9EB'}}>
@@ -2466,6 +2464,14 @@ const CustomerPortalPage: FC = () => {
                         <span className="text-[15px]" style={{color:'#18181B'}}>{item.text}</span>
                       </div>
                     ))}
+                    {/* Kein fünfter Haken (Martin, 09.09.): Die Häkchen sind
+                        Konditionen des Angebots. „Kosten erst, wenn die
+                        Pflegekraft da ist" beantwortet die Sorge, ob man
+                        schon zahlt — das ist eine Erklärung, kein Punkt der
+                        Liste, und steht deshalb als schlichte Zeile darunter. */}
+                    <p className="text-[15px] leading-relaxed" style={{color:'#71717A'}}>
+                      Kosten erst, wenn die Pflegekraft da ist.
+                    </p>
                   </div>
 
                   {/* Beweis-Zeile direkt am Preis (Martin, 13.08.): die vier
