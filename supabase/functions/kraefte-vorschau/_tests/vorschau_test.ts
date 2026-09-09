@@ -26,19 +26,22 @@ Deno.test("Filter: Deutsch-Wunsch, Geschlecht, Führerschein, Sperre", () => {
   assertEquals(passtZuWuenschen(kraft({ id: 7, gender: "male" }), { deutsch: null, geschlecht: "egal", fuehrerschein: "nein" }), true);
 });
 
-Deno.test("Auswahl: drei Kräfte, bald verfügbar und mit Werbefoto zuerst, nie ohne Foto", () => {
+Deno.test("Auswahl: bald verfügbar zuerst, darin Stufe vor Erfahrung vor Werbefoto, nie ohne Foto", () => {
   const alle = [
     kraft({ id: 1, hp_total_jobs: 1, available_from: "2026-09-15" }),
     kraft({ id: 2, hp_total_jobs: 12, available_from: "2026-09-12" }),
-    kraft({ id: 3, hp_total_jobs: 8, available_from: "2027-03-01" }),          // zu spät
-    kraft({ id: 4, hp_total_jobs: 8, avatar_retouched_promo: null }),           // nur retuschiert → Topf 2
-    kraft({ id: 5, hp_total_jobs: 8, available_from: null }),                  // Verfügbarkeit unbekannt → Topf 3
+    kraft({ id: 3, hp_total_jobs: 8, available_from: "2027-03-01" }),                      // zu spät → nie
+    kraft({ id: 4, hp_total_jobs: 8, avatar_retouched_promo: null }),                       // Stammkraft, nur retuschiert
+    kraft({ id: 5, hp_total_jobs: 8, available_from: null }),                              // Verfügbarkeit unbekannt → Topf 2
     kraft({ id: 6, hp_total_jobs: 20, avatar_retouched_promo: null, avatar_retouched: null }), // kein Foto → nie
+    kraft({ id: 7, hp_total_jobs: 0, care_experience: "9", available_from: "2026-09-16" }),   // neu, aber 9 Jahre
+    kraft({ id: 8, hp_total_jobs: 0, care_experience: "0", available_from: "2026-09-10" }),   // neu, 0 Jahre
   ];
   const v = waehleVorschau(alle, { deutsch: "kommunikativ", geschlecht: "egal", fuehrerschein: "nein" }, JETZT);
-  assertEquals(v.map((k) => k.id), [2, 1, 4]);
+  assertEquals(v.map((k) => k.id), [2, 4, 1], "Elite, dann Stammkraft trotz fehlendem Werbefoto, dann Bekannt");
   assertEquals(v[0].stufe, "Elite");
-  assertEquals(v[0].fotoUrl, promo.aws_url);
+  const nurNeue = waehleVorschau(alle.filter((k) => (k.hp_total_jobs ?? 0) === 0), { deutsch: null, geschlecht: "egal", fuehrerschein: "nein" }, JETZT);
+  assertEquals(nurNeue.map((k) => k.id), [7, 8], "ohne Einsätze zählt die Berufserfahrung");
 });
 
 Deno.test("Anonymisierung: nur Vorname, Alter, Stufe, Erfahrung, Deutsch, Foto, Datum", () => {

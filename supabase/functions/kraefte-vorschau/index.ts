@@ -22,8 +22,9 @@ const CORS = {
 };
 
 const LISTE_QUERY = /* GraphQL */ `
-  query KraefteVorschau($limit: Int) {
-    CaregiversWithPagination(limit: $limit) {
+  query KraefteVorschau($limit: Int, $page: Int) {
+    CaregiversWithPagination(limit: $limit, page: $page) {
+      last_page
       data {
         id first_name gender year_of_birth germany_skill care_experience
         available_from last_contact_at hp_total_jobs driving_license
@@ -35,7 +36,12 @@ const LISTE_QUERY = /* GraphQL */ `
   }
 `;
 
+// Die Liste ist seitenweise (Laravel-Paginator: limit/page, last_page). Der
+// erste Wurf las nur Seite 1 mit 400 Kräften — das waren die NEUESTEN, alle
+// mit 0 Einsätzen; die Stammkräfte standen auf den Seiten dahinter. Deshalb
+// alle Seiten (Deckel 8 × 400), einmal je 10 Minuten.
 const LISTE_LIMIT = 400;
+const MAX_SEITEN = 8;
 const CACHE_MS = 10 * 60 * 1000;
 let cache: { at: number; kraefte: RohKraft[] } | null = null;
 
@@ -47,16 +53,42 @@ export async function ladeKraefte(fetchFn: typeof fetch = fetch): Promise<RohKra
     password: Deno.env.get("MAMAMIA_AGENCY_PASSWORD")!,
     fetchFn,
   });
-  const data = await mamamiaRequest<{ CaregiversWithPagination?: { data?: RohKraft[] } }>({
-    endpoint: Deno.env.get("MAMAMIA_ENDPOINT")!,
-    token,
-    query: LISTE_QUERY,
-    variables: { limit: LISTE_LIMIT },
-    fetchFn,
-  });
-  const kraefte = data?.CaregiversWithPagination?.data ?? [];
+  type Seite = { CaregiversWithPagination?: { data?: RohKraft[]; last_page?: number } };
+  const ladeSeite = (page: number) =>
+    mamamiaRequest<Seite>({
+      endpoint: Deno.env.get("MAMAMIA_ENDPOINT")!,
+      token,
+      query: LISTE_QUERY,
+      variables: { limit: LISTE_LIMIT, page },
+      fetchFn,
+    });
+  // Seite 1 verrät die Seitenzahl, der Rest kommt parallel — zwei Umläufe
+  // statt acht (jeder mamamia-Aufruf kostet 0,7–2,5 s, und der Kunde wartet
+  // gerade auf der Matching-Animation).
+  const erste = await ladeSeite(1);
+  const letzte = Math.min(erste?.CaregiversWithPagination?.last_page ?? 1, MAX_SEITEN);
+  const weitere = await Promise.all(
+    Array.from({ length: Math.max(0, letzte - 1) }, (_, i) => ladeSeite(i + 2)),
+  );
+  const kraefte = [erste, ...weitere].flatMap((s) => s?.CaregiversWithPagination?.data ?? []);
   cache = { at: Date.now(), kraefte };
   return kraefte;
+}
+
+/** Nur Zählwerte, keine Personendaten — zum Prüfen des Pools. */
+export function statistik(alle: RohKraft[], now: Date = new Date()) {
+  const bis = now.getTime() + 60 * 24 * 3600 * 1000;
+  const bald = (iso?: string | null) => !!iso && Number.isFinite(new Date(iso).getTime()) && new Date(iso).getTime() <= bis;
+  return {
+    gesamt: alle.length,
+    gesperrt: alle.filter((k) => k.caregiver_status?.is_blocked).length,
+    mitEinsaetzen: alle.filter((k) => (k.hp_total_jobs ?? 0) > 0).length,
+    mitErfahrung: alle.filter((k) => (parseInt(k.care_experience ?? "", 10) || 0) > 0).length,
+    promoFoto: alle.filter((k) => k.avatar_retouched_promo?.aws_url).length,
+    retuschiertesFoto: alle.filter((k) => k.avatar_retouched?.aws_url).length,
+    verfuegbar60: alle.filter((k) => bald(k.available_from)).length,
+    ohneDatum: alle.filter((k) => !k.available_from).length,
+  };
 }
 
 export function _resetCache() { cache = null; }
@@ -75,6 +107,9 @@ export async function handleRequest(req: Request, lade: () => Promise<RohKraft[]
   const w = wuenscheAus(body);
   try {
     const alle = await lade();
+    if (body && typeof body === "object" && (body as { stats?: unknown }).stats === true) {
+      return Response.json(statistik(alle), { headers: CORS });
+    }
     const kraefte = waehleVorschau(alle, w);
     return Response.json({ kraefte, gesamt: alle.length }, { headers: CORS });
   } catch (e) {
