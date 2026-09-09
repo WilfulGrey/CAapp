@@ -19,11 +19,9 @@ export const MONAT_NAMES_DE = [
   'Juli', 'August', 'September', 'Oktober', 'November', 'Dezember',
 ];
 
-// Sommerzuschlag: 200 € pro voller Sommer-Monat (Juli / August), anteilig
-// 200/30 €/Tag wenn der Monat nur teilweise im Einsatz-Zeitraum liegt.
-const SOMMER_MONTHS = new Set([6, 7]); // Juli=6, August=7 (0-indexed)
-const SOMMER_PER_MONTH = 200;
-const SOMMER_PER_DAY = SOMMER_PER_MONTH / 30;
+// Sommerzuschlag entfaellt seit 09.09.2026 (Martin: „ueberall rausnehmen") —
+// Juli und August kosten wie jeder andere Monat. Vorher: 200 € pro vollem
+// Sommermonat, anteilig 6,67 €/Tag. Die Feiertagsregel bleibt unveraendert.
 
 // Osterdatum nach Anonymous Gregorian Algorithm (Meeus/Jones/Butcher).
 function easterSunday(year: number): Date {
@@ -73,7 +71,6 @@ export interface SummaryRow {
 // - Erster Monat: Tage ab Anreise bis Monatsende + Anreisekosten
 // - Mittlere Monate: volle Tage
 // - Letzter Monat: Tage bis Abreise + Abreisekosten
-// - Sommerzuschlag (Juli/August): voller Monat = 200 €, anteilig sonst
 // - Feiertagszuschlag: pro deutschem Feiertag im Einsatz × feiertagszuschlag €/Tag
 // Wenn ein Datum nicht parsbar → leeres Array (UI rendert dann nichts statt
 // hardcoded Mock-Daten zu zeigen).
@@ -123,18 +120,6 @@ export function buildMonthlyBreakdown(
       betrag += abreisekosten;
     }
 
-    // Sommerzuschlag (Juli / August)
-    if (SOMMER_MONTHS.has(cursorMonth)) {
-      const isFullSummerMonth = tage === daysInMonth;
-      const sommer = isFullSummerMonth
-        ? SOMMER_PER_MONTH
-        : Math.round(SOMMER_PER_DAY * tage);
-      details.push(isFullSummerMonth
-        ? `+ ${sommer} € Sommerzuschlag`
-        : `+ ${sommer} € Sommerzuschlag (${tage} ${tage === 1 ? 'Tag' : 'Tage'})`);
-      betrag += sommer;
-    }
-
     // Feiertagszuschlag — pro Feiertag im aktuellen Monat (nur wenn ein
     // Zuschlag konfiguriert ist).
     if (feiertagszuschlag > 0) {
@@ -166,22 +151,11 @@ export function buildMonthlyBreakdown(
 // Prüft ob ein Einsatz-Zeitraum tatsächlich Sommer-Monate (Juli/August)
 // berührt und welche Feiertage reinfallen — für die konditionale Footnote.
 export function computeZuschlagRelevance(anreiseStr: string, abreiseStr: string): {
-  hasSummer: boolean;
   relevantHolidayNames: string[];
 } {
   const start = parseDeDate(anreiseStr);
   const end = parseDeDate(abreiseStr);
-  if (!start || !end || end < start) return { hasSummer: false, relevantHolidayNames: [] };
-
-  let hasSummer = false;
-  let y = start.getFullYear();
-  let m = start.getMonth();
-  for (let i = 0; i < 24; i++) {
-    if (SOMMER_MONTHS.has(m)) hasSummer = true;
-    if (y === end.getFullYear() && m === end.getMonth()) break;
-    m += 1;
-    if (m > 11) { m = 0; y += 1; }
-  }
+  if (!start || !end || end < start) return { relevantHolidayNames: [] };
 
   const all: { name: string; date: Date }[] = [];
   for (let yr = start.getFullYear(); yr <= end.getFullYear(); yr++) {
@@ -195,5 +169,5 @@ export function computeZuschlagRelevance(anreiseStr: string, abreiseStr: string)
       relevantHolidayNames.push(h.name);
     }
   }
-  return { hasSummer, relevantHolidayNames };
+  return { relevantHolidayNames };
 }

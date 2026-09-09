@@ -2451,7 +2451,7 @@ const CustomerPortalPage: FC = () => {
                   {/* Konditionen stehen OFFEN unter dem Preis (Martin, 11.08.):
                       Sie sind das Verkaufsargument — hinter einem Toggle
                       erreichen sie niemanden. Die Zahlen (Reisekosten, Kost &
-                      Logis, Sommerzuschlag) sind umgekehrt Nachschlagewerk und
+                      Logis) sind umgekehrt Nachschlagewerk und
                       liegen im Aufklapper.
 
                       Einspaltig, nicht im 2er-Raster: Auf 375 px bleiben pro
@@ -2579,7 +2579,6 @@ const CustomerPortalPage: FC = () => {
                     { label: 'Entspricht', value: `${formatEuro(tagessatz)} / Tag`, note: 'tagesgenau abgerechnet' },
                     { label: 'Reisekosten', value: '125 € pro Strecke', note: '' },
                     { label: 'Kost & Logis', value: 'stellt der Haushalt', note: '' },
-                    { label: 'Sommerzuschlag', value: '6,67 € / Tag', note: 'Juli + August' },
                   ].map((row, i) => (
                     <div key={i} className="flex items-baseline justify-between gap-4">
                       <span className="text-[15px] flex-shrink-0" style={{color:'#71717A'}}>{row.label}</span>
@@ -3865,7 +3864,7 @@ const CustomerPortalPage: FC = () => {
             { q: 'Wie werden Reisekosten abgerechnet?', a: 'Die Reisekosten betragen pauschal 125 € pro Strecke — also je einmal bei der Anreise und bei der Abreise. Weitere versteckte Reisekosten gibt es nicht.' },
             { q: 'Ist das legal?', a: 'Ja, vollständig. Die Pflegekräfte sind sozialversicherungspflichtig bei uns angestellt und werden von uns nach Deutschland entsandt. Für jeden Einsatz liegt eine offizielle A1-Bescheinigung vor — der Nachweis der Sozialversicherungspflicht im Herkunftsland.' },
             { q: 'Mit wem wird der Vertrag geschlossen?', a: 'Der Betreuungsvertrag wird mit der PRIMUNDUS Sp. z o.o. geschlossen — der Gesellschaft hinter Primundus Deutschland und Ihrem Vertragspartner für die gesamte Betreuung. Die Pflegekräfte sind bei uns sozialversicherungspflichtig angestellt und werden offiziell nach Deutschland entsandt.' },
-            { q: 'Welche Kosten entstehen insgesamt?', a: 'Es gibt vier Kostenpunkte: Die monatlichen Betreuungskosten laut Ihrem Angebot. Anreise und Abreise pauschal je 125 €. Kost und Logis, die Sie der Pflegekraft frei zur Verfügung stellen. Fällt der Einsatz in einen Sommermonat (Juli oder August), kommen 200 €/Monat (bzw. 6,67 €/Tag) Sommerzuschlag hinzu. An folgenden Feiertagen wird der doppelte Tagessatz berechnet: Karfreitag, Ostersonntag, Ostermontag, 1. Mai, Heiligabend, 1. + 2. Weihnachtstag, Silvester und Neujahr. Darüber hinaus gibt es keinerlei versteckte Kosten.' },
+            { q: 'Welche Kosten entstehen insgesamt?', a: 'Es gibt drei Kostenpunkte: Die monatlichen Betreuungskosten laut Ihrem Angebot. Anreise und Abreise pauschal je 125 €. Kost und Logis, die Sie der Pflegekraft frei zur Verfügung stellen. An folgenden Feiertagen wird der doppelte Tagessatz berechnet: Karfreitag, Ostersonntag, Ostermontag, 1. Mai, Heiligabend, 1. + 2. Weihnachtstag, Silvester und Neujahr. Darüber hinaus gibt es keinerlei versteckte Kosten.' },
             /* Sachleistungs-Frage (Martin, 13.08.): kommt in Beratungen
                regelmäßig. Fachlich: 24h-Betreuung im Entsendemodell ist
                KEINE ambulante Pflegesachleistung (§ 36 SGB XI, zugelassenen
@@ -4131,10 +4130,18 @@ const CustomerPortalPage: FC = () => {
           onChat={CHAT_ENABLED && nurseModalApp ? () => { const n = enrichedSelectedNurse; setSelectedNurse(null); setNurseModalApp(null); setNurseMatchIdx(null); setSelectedFromInterestId(null); setChatNurse(n); } : undefined}
           hasInterest={selectedFromInterestId !== null && enrichedSelectedNurse.caregiverId === selectedFromInterestId}
           onUndo={() => { if (nurseModalApp) undoApp(nurseModalApp.id); setNurseModalApp(null); }}
+          /* Eingeladen wird an der PFLEGEKRAFT festgemacht, nicht daran, WIE
+             das Profil geoeffnet wurde. Vorher haengte es an `nurseMatchIdx`
+             — den setzt aber nur der Weg ueber eine Matching-Karte. Aus einer
+             Interesse-Karte und aus den aus Events rekonstruierten Eintraegen
+             (beide `matchIdx: -1`, siehe MatchCardDone) blieb der Index null,
+             also stand im Profil wieder „Einladen", obwohl die Karte daneben
+             „Einladung gesendet" zeigte (Martin, 09.09.2026, prod). */
           isInvited={
-            nurseMatchIdx !== null
-            && effectiveMatched[nurseMatchIdx] !== undefined
-            && nurseStatusById.get(effectiveMatched[nurseMatchIdx].caregiverId) === 'invited'
+            enrichedSelectedNurse.caregiverId !== undefined
+            && (invitedSet.has(enrichedSelectedNurse.caregiverId)
+              || statusOverrides.get(enrichedSelectedNurse.caregiverId) === 'invited'
+              || interestStatusOverrides.get(enrichedSelectedNurse.caregiverId) === 'invited')
           }
           onInvite={
             nurseMatchIdx !== null

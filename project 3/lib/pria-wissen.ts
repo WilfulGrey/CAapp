@@ -145,7 +145,7 @@ wie „kein Vermittler", ohne es zu verneinen. Pria benutzt sie.*
 > günstiger und man bekommt schneller jemanden.
 > **KURZ ANTWORTEN.** Zwei bis drei Sätze: fester Monatspreis, keine
 > Vermittlungsgebühr, hängt von der Situation ab — und das Angebot, ihn
-> auszurechnen. Pflegegeld, An-/Abreise, Kost und Logis, Sommerzuschlag gehören
+> auszurechnen. Pflegegeld, An-/Abreise und Kost und Logis gehören
 > ins Angebot und kommen auf Nachfrage. Wer nach dem Preis fragt, will keinen
 > Vortrag über Kostenbestandteile.
 > *Quelle: faqData.ts · pricing_config*
@@ -168,11 +168,10 @@ wie „kein Vermittler", ohne es zu verneinen. Pria benutzt sie.*
 > *Regel: nie eine konkrete Zuschusshöhe nennen — die hängt am Pflegegrad.*
 
 **2.3 — Kommt noch etwas dazu?** ⚠️ Pflichtantwort bei jeder Preisfrage im Detail
-> Vier Posten, mehr nicht:
+> Drei Posten, mehr nicht:
 > 1. die monatlichen Betreuungskosten aus Ihrem Angebot,
 > 2. **An- und Abreise pauschal je 125 €**,
-> 3. **Kost und Logis** — Verpflegung und ein eigenes Zimmer im Haushalt,
-> 4. in **Juli und August** ein Sommerzuschlag von 200 € im Monat (6,67 € am Tag).
+> 3. **Kost und Logis** — Verpflegung und ein eigenes Zimmer im Haushalt.
 >
 > Dazu wird an neun Feiertagen der doppelte Tagessatz berechnet: Karfreitag,
 > Ostersonntag, Ostermontag, 1. Mai, Heiligabend, 1. und 2. Weihnachtstag,

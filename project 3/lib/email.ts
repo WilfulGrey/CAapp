@@ -2308,20 +2308,6 @@ function formatGermanDate(iso?: string | null): string | null {
   if (!m) return null;
   return `${Number(m[3])}. ${MONTHS_DE[Number(m[2]) - 1]} ${m[1]}`;
 }
-// Berührt der Einsatzzeitraum die Sommermonate Juli/August? (Monatsweise von
-// Anreise bis Abreise prüfen.) Nur wenn beide Daten vorliegen.
-function rangeTouchesSummer(arr?: string | null, dep?: string | null): boolean {
-  const a = /^(\d{4})-(\d{2})/.exec(arr ?? '');
-  const b = /^(\d{4})-(\d{2})/.exec(dep ?? '');
-  if (!a || !b) return false;
-  let y = Number(a[1]); let mo = Number(a[2]);
-  const ey = Number(b[1]); const em = Number(b[2]);
-  while (y < ey || (y === ey && mo <= em)) {
-    if (mo === 7 || mo === 8) return true;
-    mo += 1; if (mo > 12) { mo = 1; y += 1; }
-  }
-  return false;
-}
 
 // Mail 12 (Mail B — Bewerbung). Eigenständiges Layout mit Konditionen-Bühne
 // (Tagessatz/Monatssatz + Detail-Tabelle aus der konkreten Mamamia-Bewerbung).
@@ -2349,7 +2335,6 @@ export function getApplicationReceivedEmailTemplate(
   const eigenanteil = salary > 0 ? Math.max(0, salary - zuschuesse) : 0;
   const anreiseDatum = formatGermanDate(offer?.arrivalAt);
   const abreiseDatum = formatGermanDate(offer?.departureAt);
-  const showSummer = rangeTouchesSummer(offer?.arrivalAt, offer?.departureAt);
   const hasConditions = salary > 0 || !!anreiseDatum || !!abreiseDatum;
 
   // Detail-Zeilen (nur befüllte zeigen).
@@ -2363,7 +2348,6 @@ export function getApplicationReceivedEmailTemplate(
   if (abreiseDatum) detailRows.push(detailRow('Abreisedatum (voraussichtlich)', '', abreiseDatum));
   if (offer?.arrivalFee != null) detailRows.push(detailRow('Anreisekosten', '', `${fmtEuro(offer.arrivalFee)}&nbsp;€`));
   if (offer?.departureFee != null) detailRows.push(detailRow('Abreisekosten', '', `${fmtEuro(offer.departureFee)}&nbsp;€`));
-  if (showSummer) detailRows.push(detailRow('Sommerzuschlag', 'Juli &amp; August', '6,67&nbsp;€&nbsp;/&nbsp;Tag'));
   detailRows.push(detailRow('Feiertagszuschlag', 'an ausgewählten Feiertagen', 'doppelter Tagessatz'));
   detailRows.push(detailRow('Kündigungsfrist', '', 'täglich'));
 
@@ -2453,7 +2437,7 @@ export function getApplicationReceivedEmailTemplate(
 
   // ── Plaintext ─────────────────────────────────────────────────────────────
   const condPlain = hasConditions ? `KONDITIONEN
-${salary > 0 ? `Tagessatz: ${fmtEuro(tagessatz)} € / Tag (inkl. Steuern & Sozialabgaben)\nMonatssatz: ${fmtEuro(salary)} € / Monat${zuschuesse > 0 ? ` — rechn. Eigenanteil ca. ${fmtEuro(eigenanteil)} €` : ''}\n` : ''}${anreiseDatum ? `Anreisedatum: ${anreiseDatum}\n` : ''}${abreiseDatum ? `Abreisedatum (voraussichtlich): ${abreiseDatum}\n` : ''}${offer?.arrivalFee != null ? `Anreisekosten: ${fmtEuro(offer.arrivalFee)} €\n` : ''}${offer?.departureFee != null ? `Abreisekosten: ${fmtEuro(offer.departureFee)} €\n` : ''}${showSummer ? 'Sommerzuschlag (Juli & August): 6,67 € / Tag\n' : ''}Feiertagszuschlag (an ausgewählten Feiertagen): doppelter Tagessatz
+${salary > 0 ? `Tagessatz: ${fmtEuro(tagessatz)} € / Tag (inkl. Steuern & Sozialabgaben)\nMonatssatz: ${fmtEuro(salary)} € / Monat${zuschuesse > 0 ? ` — rechn. Eigenanteil ca. ${fmtEuro(eigenanteil)} €` : ''}\n` : ''}${anreiseDatum ? `Anreisedatum: ${anreiseDatum}\n` : ''}${abreiseDatum ? `Abreisedatum (voraussichtlich): ${abreiseDatum}\n` : ''}${offer?.arrivalFee != null ? `Anreisekosten: ${fmtEuro(offer.arrivalFee)} €\n` : ''}${offer?.departureFee != null ? `Abreisekosten: ${fmtEuro(offer.departureFee)} €\n` : ''}Feiertagszuschlag (an ausgewählten Feiertagen): doppelter Tagessatz
 Kündigungsfrist: täglich
 Mustervertrag: https://kundenportal.primundus.de/primundus-mustervertrag.pdf
 

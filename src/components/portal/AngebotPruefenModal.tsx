@@ -92,21 +92,18 @@ export function buildVertragsDaten(
 // damit der Sommer-/Feiertag-Hinweis nur dann erscheint, wenn er für
 // diesen konkreten Einsatz relevant ist.
 function computeZuschlagRelevance(anreiseStr: string, abreiseStr: string): {
-  hasSummer: boolean;
   relevantHolidayNames: string[];
 } {
   const start = parseDeDate(anreiseStr);
   const end = parseDeDate(abreiseStr);
-  if (!start || !end || end < start) return { hasSummer: false, relevantHolidayNames: [] };
+  if (!start || !end || end < start) return { relevantHolidayNames: [] };
 
-  let hasSummer = false;
   let y = start.getFullYear();
   let m = start.getMonth();
   for (let i = 0; i < 24; i++) {
     // Juli=6, August=7 — inline statt SOMMER_MONTHS-Konstante, weil die
     // Logik außer hier nirgendwo gebraucht wird (innerhalb der Lib
     // gekapselt).
-    if (m === 6 || m === 7) hasSummer = true;
     if (y === end.getFullYear() && m === end.getMonth()) break;
     m += 1;
     if (m > 11) { m = 0; y += 1; }
@@ -126,7 +123,7 @@ function computeZuschlagRelevance(anreiseStr: string, abreiseStr: string): {
       relevantHolidayNames.push(h.name);
     }
   }
-  return { hasSummer, relevantHolidayNames };
+  return { relevantHolidayNames };
 }
 
 export const AngebotPruefenModal: FC<{
@@ -205,7 +202,7 @@ export const AngebotPruefenModal: FC<{
   // Logik, identisch zur read-only Präsentation im gebuchten Portal).
   const vertragsDaten = buildVertragsDaten(formData, offer);
   // Monatliche Aufstellung dynamisch aus Anreise-/Abreisedatum berechnen.
-  // Inklusive Sommerzuschlag (Juli/August) + Feiertagszuschläge (Karfreitag,
+  // Inklusive Feiertagszuschläge (Karfreitag,
   // Ostersonntag, Ostermontag, 1. Mai, Heiligabend, 1./2. Weihnachtstag,
   // Silvester, Neujahr). Feiertagszuschlag = tagessatz (doppelter
   // Tagessatz an Feiertagen — Policy, nicht offer.feiertagszuschlag aus
@@ -334,7 +331,6 @@ export const AngebotPruefenModal: FC<{
                       { label: 'Anreisekosten', value: `${offer.anreisekosten} €` },
                       { label: 'Abreisekosten', value: `${offer.abreisekosten} €` },
                       { label: 'Reisetage', value: 'Voller Tagessatz' },
-                      { label: 'Sommerzuschlag', value: '6,67 €/Tag (Juli + Aug.)' },
                       // Feiertagszuschlag wird separat unten gerendert (mit
                       // Info-Icon zum Aufklappen der Feiertagsliste).
                       { label: 'Kündigungsfrist', value: 'Täglich' },
@@ -344,10 +340,11 @@ export const AngebotPruefenModal: FC<{
                           <span className={`text-sm flex-shrink-0 ${row.label === 'Kündigungsfrist' ? 'font-semibold text-green-800' : 'text-gray-500'}`}>{row.label}</span>
                           <span className={`text-sm text-right ${row.label === 'Kündigungsfrist' ? 'font-bold text-green-700' : row.bold ? 'font-bold text-gray-900' : 'font-semibold text-gray-700'}`}>{row.label === 'Kündigungsfrist' ? '✓ Täglich kündbar' : row.value}</span>
                         </div>
-                        {/* Feiertagszuschlag-Block direkt nach Sommerzuschlag
-                            einhängen, damit die Vertragskonditionen-Tabelle
-                            in der natürlichen Reihenfolge bleibt. */}
-                        {row.label === 'Sommerzuschlag' && (
+                        {/* Feiertagszuschlag-Block haengt seit 09.09.2026 an
+                            „Reisetage" — vorher am Sommerzuschlag, den es
+                            nicht mehr gibt. Ohne das Umhaengen waere der
+                            Block samt Feiertagsliste stumm verschwunden. */}
+                        {row.label === 'Reisetage' && (
                           <>
                             <div className="flex items-center justify-between px-4 py-2.5 bg-white border-t border-gray-100">
                               <span className="text-sm text-gray-500">Feiertagszuschlag</span>

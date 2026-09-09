@@ -10,7 +10,6 @@
 //   • Tagessatz × Anzahl Tage pro Monat
 //   • Erster Monat: Anreisekosten (i.d.R. 125 €)
 //   • Letzter Monat: Abreisekosten (i.d.R. 125 €)
-//   • Sommerzuschlag Juli/August: 200 € pro vollem Monat, anteilig sonst
 //   • Feiertagszuschlag (= doppelter Tagessatz extra) an deutschen
 //     Feiertagen: Karfreitag, Ostersonntag, Ostermontag, 1. Mai,
 //     Heiligabend, 1. + 2. Weihnachtstag, Silvester, Neujahr
@@ -20,11 +19,9 @@ const MONAT_NAMES_DE = [
   'Juli', 'August', 'September', 'Oktober', 'November', 'Dezember',
 ];
 
-// Sommerzuschlag: 200 € pro voller Sommer-Monat (Juli / August), anteilig
-// 200/30 €/Tag wenn der Monat nur teilweise im Einsatz-Zeitraum liegt.
-const SOMMER_MONTHS = new Set([6, 7]); // Juli=6, August=7 (0-indexed)
-const SOMMER_PER_MONTH = 200;
-const SOMMER_PER_DAY = SOMMER_PER_MONTH / 30;
+// Sommerzuschlag entfaellt seit 09.09.2026 (Martin: „ueberall rausnehmen") —
+// Juli und August kosten wie jeder andere Monat. Vorher: 200 € pro vollem
+// Sommermonat, anteilig 6,67 €/Tag. Die Feiertagsregel bleibt unveraendert.
 
 /**
  * Parse DE-Datum "12.06.2026" → Date. Tag/Monat/Jahr-Format, falls Format
@@ -91,7 +88,6 @@ export interface SummaryRow {
  *   - Erster Monat: Tage ab Anreise bis Monatsende + Anreisekosten
  *   - Mittlere Monate: volle Tage
  *   - Letzter Monat: Tage bis Abreise + Abreisekosten
- *   - Sommerzuschlag (Juli/August): voller Monat = 200 €, anteilig sonst
  *   - Feiertagszuschlag: pro deutschem Feiertag im Einsatz × feiertagszuschlag €/Tag
  *
  * Wenn Anreise/Abreise nicht parsbar oder Reihenfolge falsch → leeres Array
@@ -143,18 +139,6 @@ export function buildMonthlyBreakdown(
     if (isLastMonth && abreisekosten > 0) {
       details.push(`+ ${abreisekosten} € Abreise`);
       betrag += abreisekosten;
-    }
-
-    // Sommerzuschlag (Juli / August)
-    if (SOMMER_MONTHS.has(cursorMonth)) {
-      const isFullSummerMonth = tage === daysInMonth;
-      const sommer = isFullSummerMonth
-        ? SOMMER_PER_MONTH
-        : Math.round(SOMMER_PER_DAY * tage);
-      details.push(isFullSummerMonth
-        ? `+ ${sommer} € Sommerzuschlag`
-        : `+ ${sommer} € Sommerzuschlag (${tage} ${tage === 1 ? 'Tag' : 'Tage'})`);
-      betrag += sommer;
     }
 
     // Feiertagszuschlag — pro Feiertag im aktuellen Monat (nur wenn ein

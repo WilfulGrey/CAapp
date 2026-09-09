@@ -48,9 +48,6 @@ export const MonatsAufstellung: FC<{ offer: OfferDetails; title?: string }> = ({
       </div>
       <p className="text-[12px] text-gray-400 mt-2.5 leading-relaxed">
         An- und Abreisetage werden mit vollem Tagessatz berechnet.
-        {zuschlag.hasSummer && (
-          <> Im Juli und August fällt ein Sommerzuschlag von 6,67 €/Tag (200 €/Monat) an.</>
-        )}
         {zuschlag.relevantHolidayNames.length > 0 && (
           <> An {zuschlag.relevantHolidayNames.join(', ')} wird der doppelte Tagessatz berechnet.</>
         )}
