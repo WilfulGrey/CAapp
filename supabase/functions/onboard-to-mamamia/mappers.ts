@@ -480,3 +480,82 @@ export function buildCustomerInput(
     customer_caregiver_wish: buildCaregiverWish(fd),
   };
 }
+
+/* ─── Detailfelder aus dem Vermittler-Anhang (Registry #60) ──────────────
+ *
+ * Diese Angaben stehen im Kundenblatt, das Pflegena mitschickt, und haben
+ * KEINEN Preisbezug — sie gehen nach Mamamia, damit die Agentur beim
+ * Auswaehlen der Kraft dasselbe weiss wie der Vermittler.
+ *
+ * ⚠️ Die Zuordnungen sind ABGESCHRIEBEN aus
+ * `src/lib/mamamia/patientFormMapper.ts` (yesNoToApi, incontinenceToApi,
+ * accommodationToApi, petsToApi, wishSmokingToApi, Getriebe) — dort schreibt
+ * der Patientenbogen dieselben Felder ueber dieselbe Mutation. Das Modul ist
+ * ein Vite-Modul und aus Deno nicht importierbar, deshalb zwei Kopien wie
+ * bei RESYNC_FELDER. Aenderungen dort bitte hier nachziehen; erfunden wird
+ * hier nichts (Heilige Regel 1.5).
+ *
+ * `day_care_facility: "yes"` ohne Beschreibung ist auf prod belegt
+ * (Sonde 09.09.2026, Customer 10731 → HTTP 200). */
+export interface DetailPatch {
+  /** Felder auf dem Customer selbst. */
+  customer: Record<string, unknown>;
+  /** Felder, die auf JEDEN Patienten-Stub gehoeren. */
+  patient: Record<string, unknown>;
+  /** Felder im customer_caregiver_wish. */
+  wish: Record<string, unknown>;
+}
+
+export function detailFelderNachMamamia(fd: Record<string, unknown> | undefined): DetailPatch {
+  const leer: DetailPatch = { customer: {}, patient: {}, wish: {} };
+  if (!fd) return leer;
+  const s = (k: string): string => (typeof fd[k] === "string" ? (fd[k] as string) : "");
+
+  // Groesse kommt bereits als Mamamia-Bucket ("161-170") aus cmZuBucket.
+  if (s("groesse")) leer.patient.height = s("groesse");
+
+  switch (s("inkontinenz")) {
+    case "nein":
+      Object.assign(leer.patient, { incontinence: false, incontinence_feces: false, incontinence_urine: false });
+      break;
+    case "harn":
+      Object.assign(leer.patient, { incontinence: true, incontinence_urine: true, incontinence_feces: false });
+      break;
+    case "stuhl":
+      Object.assign(leer.patient, { incontinence: true, incontinence_feces: true, incontinence_urine: false });
+      break;
+    case "beides":
+      Object.assign(leer.patient, { incontinence: true, incontinence_feces: true, incontinence_urine: true });
+      break;
+  }
+
+  const tiere = s("tiere");
+  if (tiere) {
+    const aus = { pets: "yes", is_pet_dog: false, is_pet_cat: false, is_pet_other: false };
+    if (tiere === "keine") Object.assign(leer.customer, { ...aus, pets: "no" });
+    else if (tiere === "hund") Object.assign(leer.customer, { ...aus, is_pet_dog: true });
+    else if (tiere === "katze") Object.assign(leer.customer, { ...aus, is_pet_cat: true });
+    else if (tiere === "andere") Object.assign(leer.customer, { ...aus, is_pet_other: true });
+  }
+
+  const wohn = s("wohnungstyp");
+  if (wohn === "einfamilienhaus") leer.customer.accommodation = "single_family_house";
+  else if (wohn === "wohnung") leer.customer.accommodation = "apartment";
+  else if (wohn === "andere") leer.customer.accommodation = "other";
+
+  // "Darf die Betreuungskraft rauchen?" — Ja ist auf prod fast immer
+  // "yes_outside" (5169 zu 142), so macht es auch der Patientenbogen.
+  if (s("rauchen") === "ja") leer.wish.smoking = "yes_outside";
+  else if (s("rauchen") === "nein") leer.wish.smoking = "no";
+
+  if (s("getriebe") === "schaltung") leer.wish.driving_license_gearbox = "manual";
+  else if (s("getriebe") === "automatik") leer.wish.driving_license_gearbox = "automatic";
+
+  if (s("pflegedienst") === "ja") leer.customer.day_care_facility = "yes";
+  else if (s("pflegedienst") === "nein") leer.customer.day_care_facility = "no";
+
+  if (s("familie_nahe") === "ja") leer.customer.has_family_near_by = "yes";
+  else if (s("familie_nahe") === "nein") leer.customer.has_family_near_by = "no";
+
+  return leer;
+}

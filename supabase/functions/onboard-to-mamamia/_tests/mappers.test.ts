@@ -21,6 +21,7 @@ import {
   resolvePatientFirstName,
   resolvePatientLastName,
   resolvePatientSalutation,
+  detailFelderNachMamamia,
 } from "../mappers.ts";
 import type { FormularDaten, Lead } from "../types.ts";
 
@@ -796,4 +797,53 @@ Deno.test("buildPatients: patient_anrede Herr/Frau → gender; brak → unset (R
   assertEquals(buildPatients(fd, "Frau")[0].gender, "female");
   assertEquals(buildPatients(fd, null)[0].gender, undefined);
   assertEquals(buildPatients(fd, "  ")[0].gender, undefined);
+});
+
+/* ─── Detailfelder aus dem Vermittler-Anhang (Registry #60) ────────────── */
+
+Deno.test("detailFelderNachMamamia: leeres fd ergibt leeren Patch", () => {
+  const p = detailFelderNachMamamia(undefined);
+  assertEquals(p, { customer: {}, patient: {}, wish: {} });
+  assertEquals(detailFelderNachMamamia({}), { customer: {}, patient: {}, wish: {} });
+});
+
+Deno.test("detailFelderNachMamamia: Inkontinenz in die drei Mamamia-Flags", () => {
+  assertEquals(detailFelderNachMamamia({ inkontinenz: "harn" }).patient,
+    { incontinence: true, incontinence_urine: true, incontinence_feces: false });
+  assertEquals(detailFelderNachMamamia({ inkontinenz: "beides" }).patient,
+    { incontinence: true, incontinence_feces: true, incontinence_urine: true });
+  // "nein" ist eine ANGABE, kein Nichts — der Anhang hat geantwortet.
+  assertEquals(detailFelderNachMamamia({ inkontinenz: "nein" }).patient,
+    { incontinence: false, incontinence_feces: false, incontinence_urine: false });
+});
+
+Deno.test("detailFelderNachMamamia: Tiere setzen pets UND die Einzelflags", () => {
+  const hund = detailFelderNachMamamia({ tiere: "hund" }).customer;
+  assertEquals(hund, { pets: "yes", is_pet_dog: true, is_pet_cat: false, is_pet_other: false });
+  const keine = detailFelderNachMamamia({ tiere: "keine" }).customer;
+  assertEquals(keine, { pets: "no", is_pet_dog: false, is_pet_cat: false, is_pet_other: false });
+});
+
+Deno.test("detailFelderNachMamamia: Wohnung, Pflegedienst, Familie", () => {
+  assertEquals(detailFelderNachMamamia({ wohnungstyp: "einfamilienhaus" }).customer.accommodation, "single_family_house");
+  assertEquals(detailFelderNachMamamia({ wohnungstyp: "wohnung" }).customer.accommodation, "apartment");
+  assertEquals(detailFelderNachMamamia({ pflegedienst: "ja" }).customer.day_care_facility, "yes");
+  assertEquals(detailFelderNachMamamia({ familie_nahe: "nein" }).customer.has_family_near_by, "no");
+});
+
+Deno.test("detailFelderNachMamamia: Rauchen und Getriebe gehen in den Wunsch", () => {
+  // "Ja" ist auf prod fast immer yes_outside — so macht es der Patientenbogen.
+  assertEquals(detailFelderNachMamamia({ rauchen: "ja" }).wish.smoking, "yes_outside");
+  assertEquals(detailFelderNachMamamia({ rauchen: "nein" }).wish.smoking, "no");
+  assertEquals(detailFelderNachMamamia({ getriebe: "schaltung" }).wish.driving_license_gearbox, "manual");
+  assertEquals(detailFelderNachMamamia({ getriebe: "automatik" }).wish.driving_license_gearbox, "automatic");
+});
+
+Deno.test("detailFelderNachMamamia: Groesse kommt fertig als Bucket", () => {
+  assertEquals(detailFelderNachMamamia({ groesse: "161-170" }).patient.height, "161-170");
+});
+
+Deno.test("detailFelderNachMamamia: Unfug wird nicht gesetzt", () => {
+  const p = detailFelderNachMamamia({ tiere: "Papagei", wohnungstyp: "Burg", getriebe: "Rakete" });
+  assertEquals(p, { customer: {}, patient: {}, wish: {} });
 });

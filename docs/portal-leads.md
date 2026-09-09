@@ -557,6 +557,38 @@ und nicht der Betreff abgeschrieben.
   lautet „bei Widerspruch gilt der Anhang", das Modell folgt hier aber
   meistens dem Fließtext. Wer den Fall trifft, sieht ihn am `hinweis`.
 
+### Was aus dem Anhang nach Mamamia geht
+
+Preisrelevant sind nur die neun Kalkulator-Felder. Der Rest des Kundenblatts
+geht trotzdem hinüber, damit die Agentur beim Auswählen der Kraft dasselbe
+weiß wie der Vermittler:
+
+| aus dem Dokument | in Mamamia |
+|---|---|
+| Größe (cm) | `patient.height` (Bucket) |
+| Inkontinenz | `incontinence` + `_urine` + `_feces` |
+| Haustiere | `pets` + `is_pet_dog/cat/other` |
+| Wohnungstyp | `accommodation` |
+| Rauchen erlaubt | `wish.smoking` |
+| Getriebe | `wish.driving_license_gearbox` |
+| Pflegedienst | `day_care_facility` |
+| Familie in der Nähe | `has_family_near_by` |
+
+**Der Weg ist der des Patientenbogens, nicht der der Kundenanlage.**
+`StoreCustomer` kennt diese Felder nicht — `UpdateCustomer` schon, denn dort
+schreibt sie der Kunde selbst, wenn er den Bogen ausfüllt. Deshalb gehen sie
+NACH dem Onboarding als `resync: { felder: [], details: true }` hinterher
+(server-only, service_role). Eigene Flagge statt Eintrag in `RESYNC_FELDER`:
+das sind keine Kalkulator-Angaben, es gibt nichts zu diffen — sie stehen im
+Dokument oder eben nicht.
+
+Die Enum-Zuordnungen sind aus `src/lib/mamamia/patientFormMapper.ts`
+**abgeschrieben**, nicht erfunden (Heilige Regel 1.5). Zweite Kopie wie bei
+`RESYNC_FELDER`, mit Sync-Hinweis an beiden Stellen.
+
+Schlägt der Nachlauf fehl, steht der Kunde trotzdem und die Mails gehen raus
+— die Angaben fehlen dann in Mamamia, der Grund steht im Log.
+
 ### Bekannte Kanten
 
 - Der mamamia-Kunde trägt die Kontaktdaten des **Vermittlers** (`Customer` =

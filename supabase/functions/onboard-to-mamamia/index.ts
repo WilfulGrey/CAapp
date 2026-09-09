@@ -180,7 +180,8 @@ async function handleResync(
   deps: HandlerDeps,
   baseHeaders: Record<string, string>,
 ): Promise<Response> {
-  const r = (resyncRaw && typeof resyncRaw === "object" ? resyncRaw : {}) as { felder?: unknown; budget?: unknown };
+  const r = (resyncRaw && typeof resyncRaw === "object" ? resyncRaw : {}) as
+    { felder?: unknown; budget?: unknown; details?: unknown };
   const felder = Array.isArray(r.felder) ? r.felder : null;
   const allowed = new Set<string>(RESYNC_FELDER);
   if (!felder || !felder.every((f) => typeof f === "string" && allowed.has(f))) {
@@ -190,8 +191,15 @@ async function handleResync(
   if (budget !== undefined && !(typeof budget === "number" && Number.isFinite(budget) && budget > 0)) {
     return jsonError(400, "resync.budget must be a positive number", baseHeaders);
   }
-  if (felder.length === 0 && budget === undefined) {
-    return jsonError(400, "resync: nothing to sync (felder empty, no budget)", baseHeaders);
+  /* Detailfelder (Registry #60) sind keine Kalkulator-Angaben und werden
+     nicht gediffed — sie stehen im Anhang oder eben nicht. Deshalb ein
+     eigenes Flag statt eines Eintrags in RESYNC_FELDER. */
+  const details = r.details === true;
+  if (r.details !== undefined && typeof r.details !== "boolean") {
+    return jsonError(400, "resync.details must be a boolean", baseHeaders);
+  }
+  if (felder.length === 0 && budget === undefined && !details) {
+    return jsonError(400, "resync: nothing to sync (felder empty, no budget, no details)", baseHeaders);
   }
   if (!deps.supabase.fetchLeadById) {
     return jsonError(500, "fetchLeadById not available in this adapter", baseHeaders);
@@ -208,6 +216,7 @@ async function handleResync(
       budget: budget as number | undefined,
       secrets: deps.secrets,
       fetchFn: deps.fetchFn,
+      details,
     });
     return json(200, {
       customer_id: lead.mamamia_customer_id,
