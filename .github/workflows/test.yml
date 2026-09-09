@@ -63,6 +63,20 @@ jobs:
         working-directory: supabase/functions/onboard-to-mamamia
         run: deno task test
 
+  deno-kraefte-vorschau:
+    name: deno tests (kraefte-vorschau)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: "v2.x"
+
+      - name: Run kraefte-vorschau tests
+        working-directory: supabase/functions/kraefte-vorschau
+        run: deno task test
+
   deno-proxy:
     name: deno tests (mamamia-proxy)
     runs-on: ubuntu-latest
@@ -244,7 +258,7 @@ jobs:
             echo "::error::SUPABASE_STAGING_REF secret not set — cannot deploy edge fns to staging."
             exit 1
           fi
-          for fn in mamamia-proxy onboard-to-mamamia detect-caregiver-events daily-analytics-report sync-acceptance; do
+          for fn in mamamia-proxy onboard-to-mamamia detect-caregiver-events daily-analytics-report sync-acceptance kraefte-vorschau; do
             echo "::group::Deploying $fn → staging ($STAGING_REF)"
             supabase functions deploy "$fn" --project-ref "$STAGING_REF"
             echo "::endgroup::"
