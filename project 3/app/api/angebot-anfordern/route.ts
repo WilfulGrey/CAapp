@@ -77,9 +77,13 @@ async function handlePost(request: NextRequest) {
     // (docs/google-ads-tracking.md). Strikt allowlisted + gekappt — der
     // Client schickt sessionStorage-Inhalt, hier entscheidet der Server,
     // was den Lead erreicht.
-    const clickIds: { gclid?: string; wbraid?: string; gbraid?: string } = {};
+    // Dazu seit 09.09.2026 die UTM-Werte der Sitzung (utm_source …): die
+    // ChatGPT-Anzeigen (OpenAI Ads) bringen keine Klick-ID mit, nur UTM —
+    // ohne diese Spalten wären Google- und ChatGPT-Leads nicht trennbar
+    // (Migration 20260909110000, docs/openai-ads-tracking.md).
+    const clickIds: Partial<Record<(typeof HERKUNFT_KEYS)[number], string>> = {};
     if (adParams && typeof adParams === 'object') {
-      for (const key of ['gclid', 'wbraid', 'gbraid'] as const) {
+      for (const key of HERKUNFT_KEYS) {
         const value = adParams[key];
         if (typeof value === 'string' && value.trim() && value.length <= 200) {
           clickIds[key] = value.trim();
@@ -147,10 +151,11 @@ async function handlePost(request: NextRequest) {
       }
     );
 
-    // Klick-IDs als SEPARATES best-effort Update (nicht im Insert/Update von
-    // findOrCreateLead): Lead-Erstellung darf NIE an fehlenden Spalten
-    // scheitern, falls Migration 20260814090000 noch nicht appliziert ist.
-    // Re-Submit mit neuer Klick-ID überschreibt — letzter Klick gewinnt.
+    // Klick-IDs + UTM als SEPARATES best-effort Update (nicht im Insert/Update
+    // von findOrCreateLead): Lead-Erstellung darf NIE an fehlenden Spalten
+    // scheitern, falls Migration 20260814090000 / 20260909110000 noch nicht
+    // appliziert ist. Re-Submit mit neuer Klick-ID überschreibt — letzter
+    // Klick gewinnt.
     if (Object.keys(clickIds).length > 0) {
       try {
         const { error: clickIdError } = await supabase
@@ -353,4 +358,12 @@ async function handleSendAngebotsEmailOnly(leadId: string) {
 import { withMem } from '@/lib/memlog';
 import { PORTAL_BASIS } from '@/lib/portal-url';
 import { kundenEmpfaenger } from '@/lib/empfaenger';
+
+/* Was vom Client-`adParams` (sessionStorage `_prim_ad_params`) den Lead
+   erreichen darf: Google-Klick-IDs für den Offline-Import und die fünf
+   UTM-Werte für die Kanal-Attribution. Alles andere wird verworfen. */
+const HERKUNFT_KEYS = [
+  'gclid', 'wbraid', 'gbraid',
+  'utm_source', 'utm_medium', 'utm_campaign', 'utm_content', 'utm_term',
+] as const;
 export const POST = withMem('angebot-anfordern', handlePost);

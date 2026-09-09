@@ -55,14 +55,19 @@ interface SessionData {
   os: string;
 }
 
-// Kampagnen-Parameter, die Google Ads (UTM-Suffix + Auto-Tagging) an die
-// Landing-URL hängt. utm_source/medium/campaign stehen direkt auf dem
-// Session-Insert (Spalten existieren seit jeher); die hier gelisteten
-// werden per best-effort Update nachgetragen (Bug #33 — fail-soft, damit
-// Sessions auch dann entstehen, wenn die Migration noch nicht appliziert
-// ist) und in sessionStorage gemerkt, damit der Angebot-Submit die
-// Klick-IDs Minuten später noch an den Lead hängen kann.
-const AD_PARAM_KEYS = ['gclid', 'wbraid', 'gbraid', 'utm_term', 'utm_content'] as const;
+// Kampagnen-Parameter, die Google Ads (UTM-Suffix + Auto-Tagging) oder die
+// ChatGPT-Anzeigen (OpenAI Ads, nur UTM, keine Klick-ID) an die Landing-URL
+// hängen. utm_source/medium/campaign stehen direkt auf dem Session-Insert
+// (Spalten existieren seit jeher); die hier gelisteten werden per
+// best-effort Update nachgetragen (Bug #33 — fail-soft, damit Sessions auch
+// dann entstehen, wenn die Migration noch nicht appliziert ist) und in
+// sessionStorage gemerkt, damit der Angebot-Submit Klick-IDs UND Kanal
+// (utm_source …) Minuten später noch an den Lead hängen kann — erst damit
+// lassen sich Leads je Kanal (Google / ChatGPT / organisch) auswerten.
+const AD_PARAM_KEYS = [
+  'gclid', 'wbraid', 'gbraid',
+  'utm_source', 'utm_medium', 'utm_campaign', 'utm_term', 'utm_content',
+] as const;
 type AdParams = Partial<Record<(typeof AD_PARAM_KEYS)[number], string>>;
 const AD_PARAMS_KEY = '_prim_ad_params';
 

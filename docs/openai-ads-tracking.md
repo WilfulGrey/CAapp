@@ -4,13 +4,22 @@ Stand: 02.09.2026. Schwesterdokument zu [google-ads-tracking.md](google-ads-trac
 
 ## Was läuft
 
-Anzeigen laufen im **OpenAI Anzeigenmanager (Beta)**, Konto „Primundus
-Deutschland" (`adacct_6a9684a2460881929cf18c4f7133dc57`). Ziel ist
-`kostenrechner.primundus.de` — nicht der Apex. Der Apex hat **kein** Pixel.
+Anzeigen laufen im **OpenAI Anzeigenmanager (Beta)**, Werbekonto
+„PRIMUNDUS Sp. z o.o." (`adacct_6a9acf3a5c608199897366e0c6878409`, Login
+ads@primundus.de, angelegt 04.09.2026). Ziel ist `kostenrechner.primundus.de`
+— nicht der Apex. Der Apex hat **kein** Pixel, leitet aber Besucher mit
+`utm_source=chatgpt` per 307 in den Rechner weiter (primundus.de,
+`next.config.js`), falls eine Anzeige doch auf die Startseite zeigt.
+
+> Stillgelegt am 09.09.2026: das zweite Werbekonto
+> `adacct_6a9684a2460881929cf18c4f7133dc57` („PRIMUNDUS Sp. z o.o", Login
+> martin@wyzzi.net, Kampagne auf den Apex, Land Deutschland und deshalb nicht
+> verifizierbar). Dessen Pixel `6BMzErvmnYg7ibnpXriwfU` stand bis dahin im
+> Code — Ereignisse davor liefen ins falsche Konto.
 
 | | |
 |---|---|
-| Pixel-ID | `6BMzErvmnYg7ibnpXriwfU` |
+| Pixel-ID | `8xPJTVXAKBvkNquUUUvoXE` („Kostenrechner Pixel") |
 | SDK | `https://bzrcdn.openai.com/sdk/oaiq.min.js` |
 | Lader | `project 3/app/layout.tsx`, Script-ID `oaiq-consent` |
 | Ereignis | `project 3/lib/oaiq.ts` → `meldeAnfrage()` |
@@ -96,6 +105,23 @@ Analytik schreibt ihn mit) und liegt bei 2.000–3.000 €. Als Conversion-Wert
 würde er dem Gebotssystem erzählen, ein teurer Pflegefall sei uns mehr wert als
 ein günstiger. Ist er nicht: die Marge entsteht später, nicht am Formular. Ein
 Test in `oaiq.test.ts` nagelt den Wert fest.
+
+## Kanal-Attribution am Lead (seit 09.09.2026)
+
+Google-Leads erkennt man an `leads.gclid/wbraid/gbraid`. ChatGPT-Klicks bringen
+keine Klick-ID mit, nur die UTM-Werte, die die Anzeigengruppe anhängt
+(`utm_source=chatgpt&utm_medium=cpc&utm_campaign=24h_pflege&utm_content={ad_id}&utm_term={ad_group_id}`).
+Deshalb merkt sich `lib/analytics.ts` seit dem 09.09. neben den Klick-IDs auch
+`utm_source/medium/campaign` in `sessionStorage` (`_prim_ad_params`), und
+`angebot-anfordern/route.ts` schreibt alle fünf UTM-Werte per best-effort
+Update auf den Lead (Migration `20260909110000_leads_utm_herkunft.sql`,
+nullable Spalten `leads.utm_*`).
+
+Auswertung: `leads.utm_source = 'chatgpt'` = ChatGPT-Lead, `gclid/wbraid/gbraid`
+= Google-Lead, Rest = organisch/direkt. Sitzungen je Kanal stehen wie bisher in
+`analytics_sessions.utm_source`. Skript für den Vergleich beider Kanäle:
+`.claude/skills/sea-lauf/scripts/kanal_vergleich.py` (Ausgaben, Klicks,
+Sitzungen, Leads, Profile, Kosten je Lead).
 
 ## Was noch offen ist
 
