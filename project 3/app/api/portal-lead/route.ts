@@ -258,6 +258,17 @@ export async function POST(request: NextRequest) {
     nimm('diagnosen', d.diagnosen, 500);
     nimm('portal_details', d.block);
     nimmZahl('geburtsjahr', d.geburtsjahr, 1900, new Date().getFullYear());
+    /* Detailfelder aus dem Anhang. Sie beeinflussen KEINEN Preis — sie
+       gehen nach Mamamia, damit die Agentur beim Auswaehlen der Kraft
+       dasselbe weiss wie der Vermittler (Registry #60). */
+    nimm('groesse', d.groesse, 10);
+    nimm('inkontinenz', d.inkontinenz, 10);
+    nimm('tiere', d.tiere, 10);
+    nimm('wohnungstyp', d.wohnungstyp, 20);
+    nimm('rauchen', d.rauchen, 4);
+    nimm('getriebe', d.getriebe, 10);
+    nimm('pflegedienst', d.pflegedienst, 4);
+    nimm('familie_nahe', d.familie_nahe, 4);
     /* Name des betreuten Haushalts: steht in den patient_*-Spalten, wurde
        aber nie nach fd durchgelassen — und genau von dort lesen die
        Team-Mail und `kunde_label` (weiter unten). Deshalb stand dort
@@ -501,6 +512,32 @@ export async function POST(request: NextRequest) {
             customer_id: daten.customer_id,
             job_offer_id: daten.job_offer_id ?? null,
           }).catch(() => {});
+
+          /* Die preisfreien Detailfelder aus dem Anhang gehen NACH dem
+             Anlegen hinterher (Registry #60): StoreCustomer kennt sie nicht,
+             UpdateCustomer schon — es ist dieselbe Mutation, ueber die der
+             Patientenbogen sie schreibt. Nur beim Vermittler, denn nur dort
+             liefert ein Dokument sie.
+             Best effort: schlaegt es fehl, steht der Kunde trotzdem — die
+             Angaben fehlen dann in Mamamia, aber der Lead und die Mails
+             laufen. Der Grund steht im Log. */
+          const dienst = process.env.SUPABASE_SERVICE_ROLE_KEY;
+          if (vermittler && dienst) {
+            try {
+              const rd = await fetch(`${supaUrl}/functions/v1/onboard-to-mamamia`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', apikey: anon, Authorization: `Bearer ${dienst}` },
+                body: JSON.stringify({ lead_id: lead.id, resync: { felder: [], details: true } }),
+                signal: AbortSignal.timeout(25_000),
+              });
+              if (!rd.ok) {
+                const f = await rd.text().catch(() => '');
+                console.error(`Portal-Lead: Detailfelder nach Mamamia fehlgeschlagen (HTTP ${rd.status})`, f.slice(0, 200));
+              }
+            } catch (e) {
+              console.error('Portal-Lead: Detailfelder threw:', e instanceof Error ? e.message : String(e));
+            }
+          }
         } else {
           console.error(`Portal-Lead: Sofort-Onboarding fehlgeschlagen (HTTP ${r.status}) — Lazy-Fallback bleibt`, daten?.error ?? '');
         }

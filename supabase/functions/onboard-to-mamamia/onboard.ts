@@ -14,6 +14,7 @@ import {
   mapNightOperations,
   mapOtherPeopleInHouse,
   mapToolIds,
+  detailFelderNachMamamia,
 } from "./mappers.ts";
 import { getOrRefreshAgencyToken, mamamiaRequest } from "../_shared/mamamiaClient.ts";
 import { loginAsAgency, panelMutateAsCustomer } from "../_shared/mamamiaPanelClient.ts";
@@ -640,6 +641,16 @@ const RESYNC_CUSTOMER = /* GraphQL */ `
     $customer_caregiver_wish: CustomerCaregiverWishInputType
     $care_budget: Float
     $monthly_salary: Float
+    # Detailfelder aus dem Vermittler-Anhang (Registry #60). Sie stehen
+    # laengst in der Mutation des Patientenbogens (mamamia-proxy) — hier
+    # fehlten sie nur, weil dieser schmale Pfad sie nie brauchte.
+    $pets: String
+    $is_pet_dog: Boolean
+    $is_pet_cat: Boolean
+    $is_pet_other: Boolean
+    $accommodation: String
+    $day_care_facility: String
+    $has_family_near_by: String
   ) {
     UpdateCustomer(
       id: $id
@@ -649,6 +660,13 @@ const RESYNC_CUSTOMER = /* GraphQL */ `
       customer_caregiver_wish: $customer_caregiver_wish
       care_budget: $care_budget
       monthly_salary: $monthly_salary
+      pets: $pets
+      is_pet_dog: $is_pet_dog
+      is_pet_cat: $is_pet_cat
+      is_pet_other: $is_pet_other
+      accommodation: $accommodation
+      day_care_facility: $day_care_facility
+      has_family_near_by: $has_family_near_by
     ) { id customer_id }
   }
 `;
@@ -663,10 +681,16 @@ export async function resyncCustomerFromLead(args: {
   lead: Lead;
   felder: readonly string[];
   budget?: number;
+  /** Zusaetzlich die preisfreien Detailfelder aus dem Anhang mitschicken
+   *  (Groesse, Inkontinenz, Tiere, Wohnung, Rauchen, Getriebe,
+   *  Pflegedienst, Familie in der Naehe) — Registry #60. Unabhaengig von
+   *  `felder`: das sind keine Kalkulator-Angaben und werden nicht gediffed,
+   *  sie stehen einfach im Dokument oder eben nicht. */
+  details?: boolean;
   secrets: OnboardSecrets;
   fetchFn?: typeof fetch;
 }): Promise<ResyncResult> {
-  const { lead, felder, budget, secrets, fetchFn = globalThis.fetch } = args;
+  const { lead, felder, budget, details, secrets, fetchFn = globalThis.fetch } = args;
   const customerId = lead.mamamia_customer_id;
   if (!customerId) throw new Error("lead not onboarded (no mamamia_customer_id)");
   const fd = lead.kalkulation?.formularDaten;
@@ -755,11 +779,18 @@ export async function resyncCustomerFromLead(args: {
     if (has("nachteinsaetze")) p.night_operations = mapNightOperations(fd);
     return p;
   };
-  patients = patients.map(applyPerPatient);
+  const detail = details
+    ? detailFelderNachMamamia(fd as unknown as Record<string, unknown>)
+    : { customer: {}, patient: {}, wish: {} };
+  /* Die Detailfelder gelten fuer JEDEN Patienten-Stub — der Kalkulator
+     kennt eine Person, und beim Ehepaar hat das Dokument keine getrennten
+     Angaben. Dieselbe Regel wie bei den Per-Patient-Feldern oben. */
+  patients = patients.map((p) => ({ ...applyPerPatient(p), ...detail.patient }));
 
   const vars: Record<string, unknown> = { id: customerId, patients, equipment_ids: equipmentIds };
+  Object.assign(vars, detail.customer);
   if (has("weitere_personen")) vars.other_people_in_house = mapOtherPeopleInHouse(fd);
-  if (has("deutschkenntnisse") || has("fuehrerschein") || has("geschlecht")) {
+  if (has("deutschkenntnisse") || has("fuehrerschein") || has("geschlecht") || Object.keys(detail.wish).length) {
     const wish: Record<string, unknown> = {};
     for (const [k, v] of Object.entries(first.data.Customer?.customer_caregiver_wish ?? {})) {
       if (v != null && k !== "id" && k !== "customer_id" && k !== "customer") wish[k] = v;
@@ -767,6 +798,7 @@ export async function resyncCustomerFromLead(args: {
     if (has("deutschkenntnisse")) wish.germany_skill = mapGermanySkill(fd);
     if (has("fuehrerschein")) wish.driving_license = mapDrivingLicense(fd);
     if (has("geschlecht")) wish.gender = mapGender(fd) ?? "not_important";
+    Object.assign(wish, detail.wish);
     vars.customer_caregiver_wish = wish;
   }
   if (budget !== undefined) {

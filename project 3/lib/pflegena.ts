@@ -19,7 +19,7 @@
  */
 
 import { ERLAUBT, zulaessig, type AngabenKey } from './angaben-diff';
-import { kgZuBucket } from './portal-parser';
+import { cmZuBucket, kgZuBucket } from './portal-parser';
 
 /* Die neun Felder, die eine Anfrage tragen kann. `care_start_timing` ist
  * KEIN fd-Key (es ist die Spalte leads.care_start_timing), wandert aber
@@ -114,6 +114,44 @@ export const WERKZEUG = {
           + '"Frau" oder "Herr".',
       },
       internet: { type: ['string', 'null'], enum: ['ja', 'nein', null] },
+      groesse_cm: {
+        type: ['integer', 'null'],
+        description: 'Koerpergroesse der betreuten Person in Zentimetern, als Zahl.',
+      },
+      inkontinenz: {
+        type: ['string', 'null'],
+        enum: ['nein', 'harn', 'stuhl', 'beides', null],
+        description: 'Inkontinenz der betreuten Person. "harn" = Harninkontinenz, "stuhl" = Stuhlinkontinenz.',
+      },
+      tiere: {
+        type: ['string', 'null'],
+        enum: ['keine', 'hund', 'katze', 'andere', null],
+        description: 'Haustiere im Haushalt.',
+      },
+      wohnungstyp: {
+        type: ['string', 'null'],
+        enum: ['einfamilienhaus', 'wohnung', 'andere', null],
+      },
+      rauchen_erlaubt: {
+        type: ['string', 'null'],
+        enum: ['ja', 'nein', null],
+        description: 'Darf die Betreuungskraft rauchen? "ja" auch dann, wenn nur draussen erlaubt.',
+      },
+      getriebe: {
+        type: ['string', 'null'],
+        enum: ['schaltung', 'automatik', null],
+        description: 'Getriebe des Autos, das die Betreuungskraft fahren soll.',
+      },
+      pflegedienst: {
+        type: ['string', 'null'],
+        enum: ['ja', 'nein', null],
+        description: 'Kommt zusaetzlich ein ambulanter Pflegedienst?',
+      },
+      familie_nahe: {
+        type: ['string', 'null'],
+        enum: ['ja', 'nein', null],
+        description: 'Wohnen Angehoerige in der Naehe?',
+      },
       demenz: {
         type: ['string', 'null'],
         enum: ['ja', 'nein', null],
@@ -477,6 +515,27 @@ export function pruefeAnfrage(
     details.patient_anrede = roh.patient_geschlecht;
   }
   if (roh.internet === 'ja' || roh.internet === 'nein') details.internet = roh.internet;
+  if (typeof roh.groesse_cm === 'number') {
+    const b = cmZuBucket(roh.groesse_cm);
+    if (b) details.groesse = b;
+  }
+  /* Geschlossene Listen, 1:1 wie im Schema — was das Modell daneben
+     erfindet, faellt hier durch und landet nirgends. Die Uebersetzung nach
+     Mamamia macht der Onboard-Mapper, nicht dieses Modul. */
+  const auswahl: Record<string, readonly string[]> = {
+    inkontinenz: ['nein', 'harn', 'stuhl', 'beides'],
+    tiere: ['keine', 'hund', 'katze', 'andere'],
+    wohnungstyp: ['einfamilienhaus', 'wohnung', 'andere'],
+    rauchen: ['ja', 'nein'],
+    getriebe: ['schaltung', 'automatik'],
+    pflegedienst: ['ja', 'nein'],
+    familie_nahe: ['ja', 'nein'],
+  };
+  for (const [ziel, erlaubt] of Object.entries(auswahl)) {
+    // rauchen_erlaubt heisst im Schema anders als im Detail-Schluessel.
+    const wert = ziel === 'rauchen' ? roh.rauchen_erlaubt : (roh as any)[ziel];
+    if (typeof wert === 'string' && erlaubt.includes(wert)) details[ziel] = wert;
+  }
   if (roh.demenz === 'ja') details.demenz = 'ja';
   const diagnosen = text(roh.diagnosen, 500);
   if (diagnosen) details.diagnosen = diagnosen;

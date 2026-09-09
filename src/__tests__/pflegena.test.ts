@@ -573,3 +573,55 @@ describe('eine echte Antwort mit Anhang', () => {
     expect(gelesen.pflegegrad).toBeNull();
   });
 });
+
+/* Die acht preisfreien Detailfelder aus dem Kundenblatt. Sie kosten nichts
+   und aendern keine Kalkulation — sie gehen nach Mamamia, damit die Agentur
+   beim Auswaehlen der Kraft dasselbe weiss wie der Vermittler (#60). */
+describe('Detailfelder aus dem Anhang', () => {
+  const kopf: MailKopf = {
+    von: 'info@pflegena.com', vonName: '', betreff: 'Neue Stelle',
+    messageId: '<y@pflegena.com>', datum: new Date('2026-09-09T06:25:00.000Z'),
+    anhaenge: 1, text: 'siehe Anhang',
+  };
+  const lies = (extra: Record<string, unknown>) => {
+    const r = pruefeAnfrage({ ...gelesen, ...extra }, kopf, 10);
+    return r.ok ? r.body.details : {};
+  };
+
+  it('Größe kommt in Zentimetern und geht als Mamamia-Stufe raus', () => {
+    expect(lies({ groesse_cm: 165 }).groesse).toBe('161-170');
+    // Die Ränder sind bei Mamamia NICHT gleichförmig (Bug #17b).
+    expect(lies({ groesse_cm: 145 }).groesse).toBe('140-150');
+    expect(lies({ groesse_cm: 195 }).groesse).toBe('190+');
+  });
+
+  it('nimmt die geschlossenen Listen an', () => {
+    expect(lies({ inkontinenz: 'harn' }).inkontinenz).toBe('harn');
+    expect(lies({ tiere: 'keine' }).tiere).toBe('keine');
+    expect(lies({ wohnungstyp: 'einfamilienhaus' }).wohnungstyp).toBe('einfamilienhaus');
+    expect(lies({ rauchen_erlaubt: 'ja' }).rauchen).toBe('ja');
+    expect(lies({ getriebe: 'schaltung' }).getriebe).toBe('schaltung');
+    expect(lies({ pflegedienst: 'ja' }).pflegedienst).toBe('ja');
+    expect(lies({ familie_nahe: 'nein' }).familie_nahe).toBe('nein');
+  });
+
+  it('verwirft, was neben der Liste steht', () => {
+    expect(lies({ tiere: 'Papagei' }).tiere).toBeUndefined();
+    expect(lies({ getriebe: 'Rakete' }).getriebe).toBeUndefined();
+    expect(lies({ groesse_cm: 0 }).groesse).toBeUndefined();
+  });
+
+  /* Genau die Werte, die im PDF der ersten echten Anfrage stehen. */
+  it('das Kundenblatt Weber, wie es wirklich gelesen wurde', () => {
+    const d = lies({
+      groesse_cm: 165, inkontinenz: 'harn', tiere: 'keine',
+      wohnungstyp: 'einfamilienhaus', rauchen_erlaubt: 'ja',
+      getriebe: 'schaltung', pflegedienst: 'ja', familie_nahe: 'ja',
+    });
+    expect(d).toMatchObject({
+      groesse: '161-170', inkontinenz: 'harn', tiere: 'keine',
+      wohnungstyp: 'einfamilienhaus', rauchen: 'ja',
+      getriebe: 'schaltung', pflegedienst: 'ja', familie_nahe: 'ja',
+    });
+  });
+});

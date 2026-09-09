@@ -91,6 +91,20 @@ export function kgZuBucket(kg: number): string | undefined {
   return '> 100';
 }
 
+/* Groesse als Mamamia-Bucket. Raender wie beim Gewicht NICHT uniform
+ * (Bug #17b): unten "140-150", oben "190+" OHNE Leerzeichen — beim Gewicht
+ * steht oben "> 100" MIT. Nicht vereinheitlichen, das ist Mamamias
+ * historische Schreibweise. */
+export function cmZuBucket(cm: number): string | undefined {
+  if (!Number.isFinite(cm) || cm <= 0) return undefined;
+  if (cm <= 150) return '140-150';
+  if (cm <= 160) return '151-160';
+  if (cm <= 170) return '161-170';
+  if (cm <= 180) return '171-180';
+  if (cm <= 190) return '181-190';
+  return '190+';
+}
+
 /** "Label: Wert" aus dem Mailtext, erste Fundstelle gewinnt.
  *
  * Der Lookahead ist keine Feinheit, sondern noetig: ohne ihn findet
