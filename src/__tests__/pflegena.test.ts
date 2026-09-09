@@ -26,10 +26,10 @@ Bernd Walde
 Seniorenbetreuung Pflegena`;
 
 const kopf: MailKopf = {
-  von: 'b.walde@pflegena.de',
+  von: 'b.walde@pflegena.com',
   vonName: 'Bernd Walde',
   betreff: 'Anfrage Ehepaar',
-  messageId: '<abc-123@pflegena.de>',
+  messageId: '<abc-123@pflegena.com>',
   datum: new Date('2026-09-08T09:00:00.000Z'),
   text: ANFRAGE,
 };
@@ -116,14 +116,14 @@ describe('pruefeAnfrage — echte Anfrage Walde', () => {
   it('Einwilligung wird bezeugt, nicht erfunden', () => {
     const r = ausgabe();
     expect(r.ok && r.body.einwilligung.text).toMatch(/liegt beim Vermittler/);
-    expect(r.ok && r.body.einwilligung.text).toContain('b.walde@pflegena.de');
+    expect(r.ok && r.body.einwilligung.text).toContain('b.walde@pflegena.com');
     expect(r.ok && r.body.einwilligung.zeitpunkt).toBe('2026-09-08T09:00:00.000Z');
   });
 
   it('Absendername bleibt der Vermittler, nicht der Kunde', () => {
     const r = pruefeAnfrage({ ...gelesen, kunde_nachname: 'Schmidt' }, kopf, 10);
     expect(r.ok && r.body.name).toBe('Bernd Walde');
-    expect(r.ok && r.body.email).toBe('b.walde@pflegena.de');
+    expect(r.ok && r.body.email).toBe('b.walde@pflegena.com');
   });
 });
 

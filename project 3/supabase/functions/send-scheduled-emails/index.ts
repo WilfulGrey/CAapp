@@ -1476,7 +1476,15 @@ async function sendEmailSmtp(
      Options-Objekts: `cc` ist heute der letzte Parameter und wird an einer
      Stelle positionsweise durchgereicht (`undefined, false, ccListe(...)`)
      — ein Umbau auf ein Objekt haette genau dort das CC verloren. */
-  opts?: { inReplyTo?: string | null; references?: string | string[] | null },
+  opts?: {
+    inReplyTo?: string | null;
+    references?: string | string[] | null;
+    /* Absender-Override. Der Vermittler schreibt an info@primundus.de und
+       bekommt die Antwort AUS dieser Adresse — sonst traegt sie einen
+       anderen Absender als die, die er angeschrieben hat, und liest sich
+       wie neue Post. Muss in SES als Identity verifiziert sein. */
+    from?: string | null;
+  },
 ): Promise<{ success: boolean; error?: string }> {
   try {
     const transport = nodemailer.createTransport({
@@ -1507,7 +1515,7 @@ async function sendEmailSmtp(
     const bccAddr = bccRaw.trim();
 
     const mailOptions: any = {
-      from: `"${smtpConfig.fromName}" <${smtpConfig.from}>`,
+      from: `"${smtpConfig.fromName}" <${opts?.from || smtpConfig.from}>`,
       to,
       subject,
       // Reply-To auf ein überwachtes Team-Postfach — die Reminder bitten den
@@ -2295,7 +2303,7 @@ Deno.serve(async (req: Request) => {
          metadata). So sieht man Provisionsblock und Liste, ohne eine
          Anfrage anlegen zu muessen. */
       const demoTypen = (demoBody.items || []).map((i: any) => i?.email_type);
-      const demoMeta = { kunde_label: "Familie Muster", provision_pro_tag: 10, betreff_antwort: "Re: Ihre Anfrage" };
+      const demoMeta = { kunde_label: "Familie Muster", provision_pro_tag: 10, betreff_antwort: "Re: Ihre Anfrage", antwort_von: "info@primundus.de" };
       let demoVermittlerEmpf: EmpfehlungErgebnis | null = null;
       let demoVermittlerFuenf: Awaited<ReturnType<typeof kraefteFuerVermittler>> = null;
       if (demoTypen.includes("vermittler_angebot") && (lead as Lead).token) {
@@ -2361,7 +2369,13 @@ Deno.serve(async (req: Request) => {
             : item.email_type === "vermittler_kraefte" && demoVermittlerFuenf?.anhaenge.length
             ? demoVermittlerFuenf.anhaenge
             : undefined;
-          const r = await sendEmailSmtp(smtpConfig, to, subject, html, text, anhang, demoBody.skipBcc === true);
+          /* Vermittler-Vorschau nimmt denselben Absender wie die echte Mail —
+             so beweist der Testversand nebenbei, dass SES die Identity
+             akzeptiert (sonst faellt es erst beim ersten echten Partner auf). */
+          const r = await sendEmailSmtp(
+            smtpConfig, to, subject, html, text, anhang, demoBody.skipBcc === true, undefined,
+            item.email_type?.startsWith("vermittler_") ? { from: demoMeta.antwort_von } : undefined,
+          );
           results.push({
             email_type: item.email_type, to, subject, ...r,
             // Damit man an der Antwort sieht, ob die Liste drin war.
@@ -3080,10 +3094,18 @@ Deno.serve(async (req: Request) => {
         const threadId = scheduledEmail.email_type.startsWith("vermittler_")
           ? ((scheduledEmail.metadata ?? {}) as Record<string, any>).message_id ?? null
           : null;
+        const vermittlerMeta = scheduledEmail.email_type.startsWith("vermittler_")
+          ? ((scheduledEmail.metadata ?? {}) as Record<string, any>)
+          : null;
         const emailResult = await sendEmailSmtp(
           smtpConfig, effektiverEmpfaenger, effektiverBetreff, html, text, attachments,
           false, umleitung ? undefined : ccEmpfaenger,
-          threadId ? { inReplyTo: threadId, references: threadId } : undefined,
+          vermittlerMeta
+            ? {
+              ...(threadId ? { inReplyTo: threadId, references: threadId } : {}),
+              from: (vermittlerMeta.antwort_von as string) || null,
+            }
+            : undefined,
         );
 
         if (emailResult.success) {

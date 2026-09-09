@@ -92,14 +92,21 @@ egal, die Mails bleiben liegen) und `socketTimeout: 30s` auf der
 IMAP-Verbindung (eine hängende Session heilt sich nicht mehr durch
 Prozessende).
 
-## Die Postfächer sind Eingänge, keine Absender
+## Die Portal-Postfächer sind Eingänge, keine Absender
 
-Jedes Portal bekommt eine eigene Adresse. **Die Adresse ist die
-Quellenangabe** — was dort ankommt, kommt von diesem Portal.
+Jedes eingekaufte Portal bekommt eine **eigene** Adresse. Dort ist die
+**Adresse die Quellenangabe** — was ankommt, kommt von diesem Portal, und
+der Abholer darf getrost jede Mail darin ansehen.
 
 Von diesen Postfächern wird **nie gesendet**. Jede Kundenmail geht über
 `kostenrechner@primundus.de` (SMTP-Konfiguration der Edge Function).
 Die Zugangsdaten liegen außerhalb des Repos und dienen nur dem Lesen.
+
+**Für den Vermittler gilt beides NICHT** (Abschnitt „Vermittler: Pflegena"):
+er schreibt an `info@primundus.de` — die Hauptadresse der Firma, in der auch
+Kundenpost, die BCC-Kopien unserer eigenen Mails und Team-Benachrichtigungen
+liegen. Dort ist die Quelle der **Absender**, nicht das Postfach, und aus
+genau dieser Adresse geht die Antwort auch wieder raus.
 
 ## Scharfschalten
 
@@ -276,6 +283,38 @@ Empfänger jeder Mail ist damit ein Geschäftspartner, kein Endkunde — und
 die ganze Kundenwelt (Portal, Magic-Link, Nachfass-Kette, Bewertung) hat
 in seinem Postfach nichts verloren.
 
+### Geteiltes Postfach, Quelle ist der Absender
+
+Pflegena schreibt an **`info@primundus.de`** — kein eigenes Postfach,
+sondern die Hauptadresse der Firma. Dort liegen auch: Antworten von Kunden,
+die **BCC-Kopien jeder Mail, die wir selbst verschicken** (`SMTP_BCC`), und
+sämtliche Team-Benachrichtigungen. Zwei Folgen:
+
+1. **Die Quelle ist der Absender, nicht das Postfach.** Der Abholer fragt
+   den IMAP-Server nur nach Post von `@pflegena.com` (`SEARCH FROM`) und
+   sieht den Rest nie. Das ist nicht bloß Höflichkeit: ohne den Filter
+   würde der Erstlauf JEDE Mail des Postfachs als `altbestand` ins
+   Protokoll schreiben — bei einem Portal sind das Dutzende, hier
+   Zehntausende in einem Insert.
+2. **Ein zweiter Riegel im Code.** `SEARCH FROM` prüft den rohen
+   Kopfzeilentext, also auch den Anzeigenamen; eine fremde Mail mit
+   „pflegena.com" im Namen käme durch. Nach dem Parsen wird deshalb die
+   Absenderdomain noch einmal geprüft — passt sie nicht, wird die Mail als
+   `erledigt` abgehakt (kein Shell-Lead, kein Modellaufruf, nie wieder
+   angefasst).
+
+Registry-Schlüssel bleibt die Absenderdomain (`portal_mail_log.postfach =
+'pflegena.com'`), nicht das Postfach — die Protokollzeilen gehören zur
+Quelle, und die UIDs stammen ohnehin aus einer einzigen INBOX.
+
+**Offene Kante:** `info@primundus.de` ist eine Postfach, in dem Menschen
+arbeiten. Verschiebt jemand eine Pflegena-Mail in einen Unterordner, bevor
+der Minuten-Cron sie gesehen hat, ist die Anfrage weg und niemand erfährt
+davon. Wenn das passiert: Ionos-Regel „Absender `@pflegena.com` → Ordner"
+einrichten und den Abholer auf diesen Ordner zeigen lassen — dann fällt der
+Wettlauf weg (bewusst noch nicht gebaut, ein Element weniger außerhalb des
+Repos).
+
 **Prosa statt Formular.** Es gibt kein „Label: Wert", keine CSV, keinen
 Anhang — nur einen Brief:
 
@@ -294,14 +333,14 @@ nach `angenommene_felder`. Werte außerhalb des Kanons (`ERLAUBT` in
 
 ### `source` bleibt `portal:`, unterschieden wird per Spalte
 
-`leads.source` ist `portal:pflegena.de` — damit funktionieren Admin-Reiter,
+`leads.source` ist `portal:pflegena.com` — damit funktionieren Admin-Reiter,
 Herkunft-Badge, die Sektion „Postfach — Mails ohne Lead", die
 `PORTAL_TESTPHASE`-Umleitung und der Kostenreport **unverändert**.
 Unterschieden wird über die neue Spalte **`leads.vermittler`**
-(`'pflegena.de'`). Sie ist der Schalter für die fünf Bremsen und braucht auf
+(`'pflegena.com'`). Sie ist der Schalter für die fünf Bremsen und braucht auf
 der Deno-Seite keine Kopie der Portal-Liste: `if (lead.vermittler)`.
 
-`PORTAL_PREISE` trägt `pflegena.de: 0` in **beiden** Kopien
+`PORTAL_PREISE` trägt `pflegena.com: 0` in **beiden** Kopien
 (`lib/lead-kosten.ts`, `daily-analytics-report/queries.ts`) — die Anfrage
 kostet nichts, die Provision fällt erst mit dem Auftrag an. Im Tagesreport
 entscheidet seit dieser Änderung *Preis bekannt?* statt *Preis > 0*, sonst
@@ -337,6 +376,18 @@ wäre hier teurer als beim Portal.
 |---|---|---|
 | `vermittler_angebot` | sofort | Tagessatz, Monatssatz, Anreise, **Provisionsblock** („Ihre Provision von 10 €/Tag kommt auf den Preis. Familie Schmidt zahlt damit 98 €/Tag"), Konditionen, eine passende Kraft |
 | `vermittler_kraefte` | +2 h (durch `sendezeitIso`) | die verfügbaren Kräfte als Liste, ohne Preiswiederholung |
+
+**Absender ist `info@primundus.de`** — die Adresse, an die der Partner
+geschrieben hat. Eine Antwort aus `kostenrechner@primundus.de` trüge einen
+anderen Absender als die angeschriebene Adresse und läse sich in seinem
+Postfach wie neue Post. Der Wert reist in `scheduled_emails.metadata`
+(`antwort_von`), weil die Edge Function die Vermittler-Konfiguration der
+Next-App nicht importieren kann; `sendEmailSmtp` nimmt ihn als
+Absender-Override. **Amazon SES muss diese Identity kennen** (AWS → SES →
+Verified identities: entweder `info@primundus.de` oder die ganze Domain
+`primundus.de`) — sonst lehnt SES die Mail ab. Der Testversand im
+DEMO-Modus nimmt denselben Absender und beweist das nebenbei.
+`Reply-To` bleibt `info@primundus.de` wie überall.
 
 Betreff ist `Re: <Originalbetreff>`, dazu `In-Reply-To`/`References` —
 `sendEmailSmtp` hat dafür einen neunten Parameter bekommen (bewusst
@@ -425,7 +476,7 @@ liefe dieselbe Mail in jedem Takt erneut durchs Modell.
 | `PFLEGEHILFE_USER` / `_PASS` | Postfach. Fehlt eines, wird das Portal übersprungen |
 | `PFLEGEBUND_USER` / `_PASS` | dito |
 | `PFLEGEHELFER24_API_TOKEN` | Partner-API pflege-helfer24.de. Fehlt er, wird das Portal übersprungen. **Staging: nur zum Test, danach entfernen** |
-| `PFLEGENA_USER` / `_PASS` | Postfach des Vermittlers. Dasselbe Namensschema (Domain → Präfix) |
+| `INFO_USER` / `INFO_PASS` | Zugang zu `info@primundus.de` — GETEILTES Postfach, nicht dem Vermittler allein. Registry-Feld `postfach: 'INFO'` |
 | `ANTHROPIC_API_KEY` | Liest die Vermittler-Anfragen (dasselbe Konto wie Pria). Fehlt er, bleiben die Mails `offen` |
 | `PFLEGENA_MODELL` | optionaler Override, Default `claude-sonnet-5` |
 | `PORTAL_IMAP_HOST` | `imap.ionos.de` |

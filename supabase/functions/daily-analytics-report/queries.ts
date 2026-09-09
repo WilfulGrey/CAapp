@@ -21,7 +21,7 @@ export const PORTAL_PREISE: Record<string, number> = {
   // Vermittler: die Anfrage kostet nichts, die Provision faellt erst mit dem
   // Auftrag an. Der Eintrag MUSS existieren — sonst landet Pflegena taeglich
   // in `portaleOhnePreis` und der Report meldet einen Fehler, den es nicht gibt.
-  "pflegena.de": 0,
+  "pflegena.com": 0,
 };
 
 /** Kennen wir den Einkaufspreis dieses Portals? 0 zaehlt als bekannt. */

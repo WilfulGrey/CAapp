@@ -14,7 +14,7 @@ export const PORTAL_PREISE: Record<string, number> = {
   // Vermittler: die Anfrage selbst kostet nichts, die Provision (10 EUR/Tag)
   // faellt erst mit dem Auftrag an. 0 ist hier eine Aussage, kein Platzhalter
   // — deshalb steht der Schluessel drin und fehlt nicht.
-  'pflegena.de': 0,
+  'pflegena.com': 0,
 };
 
 export type Lead = { id: string; source?: string | null; ist_test?: boolean | null };

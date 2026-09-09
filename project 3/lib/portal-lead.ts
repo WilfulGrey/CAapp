@@ -164,9 +164,23 @@ export const PORTALE = [
      alle dasselbe bedeuten: der Empfaenger ist ein Geschaeftspartner, kein
      Endkunde. Die `source` bleibt "portal:<domain>", damit Admin-Reiter,
      Testphase-Umleitung und Kostenreport unveraendert weiterlaufen; die
-     Unterscheidung im Betrieb traegt leads.vermittler. */
-  { domain: 'pflegena.de', name: 'Pflegena.de', abholung: 'imap', art: 'vermittler',
-    provisionProTag: 10 },
+     Unterscheidung im Betrieb traegt leads.vermittler.
+
+     ACHTUNG, hier gilt die Grundregel der Portale NICHT: bei Pflegehilfe
+     & Co. IST das Postfach die Quellenangabe (eine Adresse je Portal, dort
+     kommt nur deren Post an). Der Vermittler schreibt an `info@primundus.de`
+     — die Hauptadresse der Firma, in der auch Kundenantworten, BCC-Kopien
+     unserer eigenen Mails und Team-Benachrichtigungen liegen. Die Quelle ist
+     deshalb der ABSENDER (`domain`), das Postfach nur der Ort, an dem wir
+     nachsehen (`postfach` → INFO_USER/INFO_PASS). */
+  { domain: 'pflegena.com', name: 'Pflegena.com', abholung: 'imap', art: 'vermittler',
+    provisionProTag: 10,
+    postfach: 'INFO',
+    /* Antwort kommt aus DEM Postfach, an das geschrieben wurde — sonst
+       traegt unsere Antwort einen anderen Absender als die Adresse, die der
+       Partner angeschrieben hat, und liest sich wie neue Post statt wie eine
+       Antwort. Muss in Amazon SES als Identity verifiziert sein. */
+    antwortVon: 'info@primundus.de' },
 ] as const;
 
 export type PortalAbholung = (typeof PORTALE)[number]['abholung'];
@@ -183,6 +197,13 @@ export function vermittlerFuer(domain?: string | null): VermittlerEintrag | unde
 
 /** Die source-Werte aller Portale — "portal:pflegehilfe.org", ... */
 export const PORTAL_QUELLEN = PORTALE.map((p) => `portal:${p.domain}`);
+
+/** Env-Praefix des Postfachs, in dem die Mails dieser Quelle liegen.
+ *  Default: aus der Domain abgeleitet (pflegehilfe.org → PFLEGEHILFE) —
+ *  ein Vermittler zeigt mit `postfach` auf ein GETEILTES Postfach. */
+export function postfachPraefix(p: PortalEintrag): string {
+  return ('postfach' in p && p.postfach) || p.domain.split('.')[0].toUpperCase();
+}
 
 export function istEingekauft(source?: string | null): boolean {
   return typeof source === 'string' && source.toLowerCase().startsWith('portal:');

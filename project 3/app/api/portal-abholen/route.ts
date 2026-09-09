@@ -51,7 +51,7 @@ import { createClient, type SupabaseClient } from '@supabase/supabase-js';
  * der Abholer bringt KEINE zweite Lesart der Portal-Mail mit. */
 import { parsePflegehilfe, telefoneAusHtml, waehleTelefone } from '@/lib/portal-parser';
 import { parseCsv, csvZuLeadZeile, csvZeileBrauchbar } from '@/lib/portal-csv';
-import { PORTALE, vermittlerFuer } from '@/lib/portal-lead';
+import { PORTALE, vermittlerFuer, postfachPraefix } from '@/lib/portal-lead';
 import { zuVerarbeiten, SEED_SENTINEL_UID, versucheFuer, MAX_VERSUCHE, type LogZeile } from '@/lib/portal-mail-log';
 import { pruefeAnfrage, SYSTEM as PFLEGENA_SYSTEM, WERKZEUG as PFLEGENA_WERKZEUG, type MailKopf } from '@/lib/pflegena';
 import { flagGiltFuer } from '@/lib/portal-schutz';
@@ -98,10 +98,10 @@ function konfig(): Konfig {
  * PFLEGEHILFE_PASS. Ein Postfach ohne gesetztes Passwort wird
  * uebersprungen, nicht erraten. */
 function postfaecher(art: 'portal' | 'vermittler'): Postfach[] {
-  return PORTALE.filter((p) => p.abholung === 'imap' && p.art === art).map(({ domain }) => {
-    const praefix = domain.split('.')[0].toUpperCase();
+  return PORTALE.filter((p) => p.abholung === 'imap' && p.art === art).map((p) => {
+    const praefix = postfachPraefix(p);
     return {
-      portal: domain,
+      portal: p.domain,
       user: process.env[`${praefix}_USER`],
       pass: process.env[`${praefix}_PASS`],
     };
@@ -357,6 +357,17 @@ async function verarbeiteVermittler(
   const absender = String(von?.address ?? '').trim().toLowerCase();
   if (!absender) return { ok: false, dauerhaft: true, grund: 'Mail ohne Absenderadresse' };
 
+  /* Zweiter Riegel hinter der Server-Suche. IMAP SEARCH FROM prueft den
+     ROHEN Kopfzeilentext, also auch den Anzeigenamen — eine fremde Mail mit
+     "pflegena.com" im Namen kaeme durch. In einem Postfach, das nur uns
+     gehoert, waere das egal; in `info@primundus.de` liegt die Post der
+     Kunden. Kein Shell-Lead, kein Modellaufruf: angesehen, als nicht unsere
+     erkannt, nie wieder anfassen. */
+  if (!absender.endsWith(`@${portal}`)) {
+    log(`  – ${portal}: Absender ${absender} gehoert nicht zur Quelle — uebergangen`);
+    return { ok: true, duplikat: `fremder Absender (${absender})` };
+  }
+
   const treffer = await threadTreffer(db, mail);
   if (treffer) {
     await logEventAufLead(db, treffer, 'vermittler_antwort', {
@@ -365,7 +376,11 @@ async function verarbeiteVermittler(
       auszug: roh.slice(0, 500),
     });
     log(`  ${portal}: Antwort im Thread → Ereignis auf Lead ${treffer}, kein Modellaufruf`);
-    return { ok: true, lead_id: treffer, uebersprungen: true, grund: 'Antwort im Thread — kein neues Angebot' };
+    /* BEWUSST nicht `uebersprungen`: dieser Zweig laeuft in arbeiteAb durch
+       registriereFehlmail und legte einen Shell-Lead an — bei einem
+       Vermittler fuer JEDE Antwort im Thread einen. Das Ereignis haengt
+       schon am richtigen Lead; hier zaehlt nur, dass die Mail erledigt ist. */
+    return { ok: true, lead_id: treffer, duplikat: 'Antwort im Thread — kein neues Angebot' };
   }
 
   const antwort = await frageModell(roh);
@@ -603,9 +618,20 @@ async function arbeiteAb(cfg: Konfig, portal: string, client: ImapFlow, db: Supa
        {uid:true} ist PFLICHT (Registry #41: search lieferte sonst
        SEQUENZ-Nummern und \Seen traf eine fremde UID). Leeres Postfach:
        Suche ueberspringen, manche Server moegen 1:* auf 0 Mails nicht. */
+    /* Ein Portal-Postfach gehoert uns allein — dort ist jede Mail unsere.
+       Das Vermittler-Postfach ist die HAUPTADRESSE der Firma: Kundenpost,
+       BCC-Kopien unserer eigenen Mails, Team-Benachrichtigungen. Deshalb
+       fragt der Server hier nur nach Post des Absenders (IMAP SEARCH FROM)
+       — nicht nur, damit wir Fremdes nicht anfassen, sondern weil der
+       Erstlauf sonst JEDE Mail des Postfachs als `altbestand` ins Protokoll
+       schreiben wuerde (bei den Portalen sind das Dutzende, hier Zehn-
+       tausende in EINEM Insert). */
     const alle = mb && typeof mb === 'object' && mb.exists === 0
       ? []
-      : await client.search({ uid: '1:*' }, { uid: true });
+      : await client.search(
+        vermittler ? { from: vermittler.domain } : { uid: '1:*' },
+        { uid: true },
+      );
     if (alle === false) throw new Error('IMAP-Suche fehlgeschlagen');
 
     const zeilen = await alleLogZeilen(db, portal, uidvalidity);
@@ -623,7 +649,9 @@ async function arbeiteAb(cfg: Konfig, portal: string, client: ImapFlow, db: Supa
       const bestand = alle.length
         ? alle.map((uid) => ({ postfach: portal, uidvalidity, uid, status: 'altbestand', grund: 'beim Erstlauf vorgefunden' }))
         : [{ postfach: portal, uidvalidity, uid: SEED_SENTINEL_UID, status: 'altbestand', grund: 'postfach leer initialisiert' }];
-      // ponytail: ein Insert reicht — die Postfaecher halten Dutzende Mails; ab ~5k braeuchte es Chunks.
+      /* ponytail: ein Insert reicht — beim Portal haelt das Postfach Dutzende
+         Mails, beim Vermittler begrenzt der Absenderfilter oben die Menge auf
+         seine eigene Post. Ab ~5k Zeilen braeuchte es Chunks. */
       const { error } = await db.from('portal_mail_log').insert(bestand);
       if (error) throw new Error(`Seed fehlgeschlagen: ${error.message}`);
       log(`${portal}: Erstlauf — ${alle.length} Mail(s) als altbestand registriert (uidvalidity ${uidvalidity})`);

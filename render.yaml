@@ -164,11 +164,14 @@ services:
       # oder Kundenmails auszuloesen. "1" = alle Portale, oder Domain-Liste
       # ("pflege-helfer24.de") fuer EIN Portal, waehrend die anderen scharf
       # laufen. Nach der Sichtprobe leeren. Bewusst sync:false (nicht
-      # Vermittler Pflegena: dasselbe Namensschema (Domain → Praefix), aber
-      # der Inhalt ist Prosa und wird von einem Modell gelesen.
-      - key: PFLEGENA_USER
+      # Vermittler Pflegena schreibt an die HAUPTADRESSE der Firma, nicht an
+      # ein eigenes Postfach: hier liegen auch Kundenpost, BCC-Kopien unserer
+      # Mails und Team-Benachrichtigungen. Der Abholer fragt den Server
+      # deshalb nur nach Post von @pflegena.com und fasst den Rest nie an.
+      # Aus derselben Adresse geht auch die Antwort raus (SES-Identity!).
+      - key: INFO_USER
         sync: false
-      - key: PFLEGENA_PASS
+      - key: INFO_PASS
         sync: false
       # Liest die Vermittler-Anfragen (dasselbe Konto wie Pria). Fehlt der
       # Schluessel, bleiben die Mails 'offen' und werden erneut versucht —

@@ -485,6 +485,10 @@ export async function POST(request: NextRequest) {
       const metadata = {
         vermittler: vermittler.domain,
         provision_pro_tag: vermittler.provisionProTag,
+        /* Absender der Antwort — die Adresse, an die der Partner geschrieben
+           hat. Reist in der Zeile mit, weil die Edge Function die
+           Vermittler-Konfiguration der Next-App nicht importieren kann. */
+        antwort_von: vermittler.antwortVon,
         kunde_label: [fdExtras.patient_vorname, fdExtras.patient_nachname].filter(Boolean).join(' ')
           || (typeof d.patient_nachname === 'string' ? d.patient_nachname : '') || null,
         /* Fertiger Antwort-Betreff, nicht der Originalbetreff: betreffAntwort

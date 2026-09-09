@@ -254,7 +254,7 @@ export function pruefeAnfrage(
     unbekannt,
     hinweise,
     body: {
-      portal: 'pflegena.de',
+      portal: 'pflegena.com',
       // Der Anzeigename des Absenders; die Anrede baut die Route daraus mit
       // parseCustomerName — aus einem Vornamen ein Geschlecht zu erraten ist
       // nicht Sache des Modells.

@@ -5,7 +5,7 @@ import { describe, it, expect } from 'vitest';
 // root-vitest, weil project 3 keinen Testrunner hat und die früheren
 // Deno-Prüfskripte in scripts/ den `next build` gebrochen haben
 // (Registry #38): CI-required statt nie-laufender Standalone-Skripte.
-import { ergaenzeAngaben, reiterFuer, vermittlerFuer } from '../../project 3/lib/portal-lead';
+import { ergaenzeAngaben, reiterFuer, vermittlerFuer, postfachPraefix, PORTALE } from '../../project 3/lib/portal-lead';
 
 /* pricing_config — ECHTE Zeilen von prod (Abzug 08.09.2026), nicht erfunden.
  *
@@ -106,8 +106,8 @@ describe('reiterFuer (Admin-Lead-Liste)', () => {
       'Pflegebund.eu',
       'Pflegehilfe.org',
       // Der Vermittler steht unter denselben Reitern: seine source ist
-      // "portal:pflegena.de", nur leads.vermittler unterscheidet ihn.
-      'Pflegena.de',
+      // "portal:pflegena.com", nur leads.vermittler unterscheidet ihn.
+      'Pflegena.com',
     ]);
     expect(leer.map((r) => r.anzahl)).toEqual([0, 0, 0, 0, 0, 0]);
   });
@@ -184,10 +184,33 @@ describe('vermittlerFuer', () => {
   it('erkennt den Vermittler, nicht die eingekauften Portale', () => {
     // Pflegena teilt sich die source ("portal:…") mit den eingekauften
     // Portalen — unterschieden wird über art bzw. leads.vermittler.
-    expect(vermittlerFuer('pflegena.de')?.provisionProTag).toBe(10);
-    expect(vermittlerFuer('PFLEGENA.DE')?.domain).toBe('pflegena.de');
+    expect(vermittlerFuer('pflegena.com')?.provisionProTag).toBe(10);
+    expect(vermittlerFuer('PFLEGENA.COM')?.domain).toBe('pflegena.com');
     expect(vermittlerFuer('pflegehilfe.org')).toBeUndefined();
     expect(vermittlerFuer('')).toBeUndefined();
     expect(vermittlerFuer(null)).toBeUndefined();
+  });
+});
+
+describe('postfachPraefix (wo die Mails liegen)', () => {
+  it('Portale leiten den Zugang aus ihrer Domain ab', () => {
+    // Ein eingekauftes Portal hat ein EIGENES Postfach — die Adresse ist
+    // dort zugleich die Quellenangabe.
+    const p = PORTALE.find((x) => x.domain === 'pflegehilfe.org')!;
+    expect(postfachPraefix(p)).toBe('PFLEGEHILFE');
+  });
+
+  it('der Vermittler zeigt auf ein geteiltes Postfach, nicht auf seine Domain', () => {
+    /* Pflegena schreibt an info@primundus.de — dort liegen auch Kundenpost
+       und die BCC-Kopien unserer eigenen Mails. Würde der Zugang aus der
+       Domain abgeleitet, suchte der Abholer ein Postfach PFLEGENA_*, das es
+       nicht gibt, und übersprünge die Quelle stillschweigend. */
+    const v = vermittlerFuer('pflegena.com')!;
+    expect(postfachPraefix(v)).toBe('INFO');
+    expect(postfachPraefix(v)).not.toBe('PFLEGENA');
+  });
+
+  it('die Antwort geht aus der Adresse raus, an die geschrieben wurde', () => {
+    expect(vermittlerFuer('pflegena.com')?.antwortVon).toBe('info@primundus.de');
   });
 });
