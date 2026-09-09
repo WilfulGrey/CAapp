@@ -149,6 +149,8 @@ Mobilitaet bezeichnet, wie sich der Patient BEWEGT:
 - "mobil" geht selbststaendig, "rollator" braucht ein Gehhilfsmittel,
 - "rollstuhl" ist auf den Rollstuhl angewiesen, "bettlaegerig" verlaesst das Bett nicht.
 Saetze ueber HEBEN, TRANSFER oder Hebetechnik sagen nichts ueber die Mobilitaetsstufe — sie gehoeren nach kontext. "Er kann kurz stehen, die Ehefrau hilft beim Transfer" ist kein bettlaegeriger Patient.
+Werden MEHRERE Hilfsmittel genannt ("Stock, Gehwagen oder Rollstuhl"), zaehlt, wie sich die Person UEBLICHERWEISE fortbewegt: wer geht — und sei es am Stock oder am Rollator — ist "rollator", auch wenn fuer Ausfluege ein Rollstuhl mitgenommen wird. "rollstuhl" ist nur, wer NICHT mehr gehen kann.
+Steht ausdruecklich, dass Hebetechnik NICHT noetig ist oder die Person sich selbst umsetzt, dann ist sie weder "rollstuhl" noch "bettlaegerig": aus diesen beiden Stufen leiten wir "Heben erforderlich" ab, und das waere dann das Gegenteil dessen, was das Dokument sagt.
 
 Deutschkenntnisse: "grundlegend" (einfache Verstaendigung), "kommunikativ" (mittlere Kenntnisse, Alltagsgespraeche), "sehr-gut" (fliessend). "wenigstens mittlere Deutschkenntnisse" ist "kommunikativ".
 

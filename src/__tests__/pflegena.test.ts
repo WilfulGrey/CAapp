@@ -493,3 +493,83 @@ describe('Angaben aus dem Anhang', () => {
     expect(r.ok && r.body.details.block).toContain('Parkinson seit 20 Jahren');
   });
 });
+
+/* Eine ECHTE Werkzeug-Antwort aus einem Lauf MIT Anhang (09.09.2026,
+ * claude-sonnet-5, ↑5308 ↓1588). Personenbezug neutralisiert — Nachname,
+ * Vorname, Straße und Geburtsjahr sind ersetzt, die PLZ bleibt echt, weil
+ * genau sie geprüft wird. Struktur und Feldbelegung sind unverändert.
+ *
+ * Was diese Antwort beweist, steht im Gegenbeispiel darunter: OHNE Anhang
+ * liefert dieselbe Mail für pflegegrad, gewicht, geburtsjahr, strasse und
+ * nachteinsaetze NICHTS — die Werte hier können also nur aus dem Dokument
+ * stammen und nicht aus Betreff oder Fließtext. */
+const mitAnhangGelesen = {
+  ist_anfrage: true,
+  mehrere_anfragen: false,
+  nachtrag: false,
+  betreuung_fuer: '1-person',
+  weitere_personen: 'nein',
+  deutschkenntnisse: 'kommunikativ',
+  erfahrung: null,
+  fuehrerschein: 'egal',
+  geschlecht: 'weiblich',
+  mobilitaet: 'rollator',
+  nachteinsaetze: 'nein',          // "Kein Nachteinsatz erforderlich"
+  pflegegrad: 3,                   // im Fließtext steht dazu NICHTS
+  care_start_timing: 'sofort',
+  kunde_vorname: 'Erika',
+  kunde_nachname: 'Muster',
+  plz: '79780',
+  ort: 'Stühlingen',
+  einsatzort_adresse: 'Musterweg 4, 79780 Stühlingen',
+  weitere_adressen: ['Tochter (2 Std. entfernt)', 'Nichte (wohnt vor Ort)'],
+  gewicht_kg: 50,
+  geburtsjahr: 1950,
+  patient_geschlecht: 'Frau',
+  internet: 'ja',
+  demenz: 'nein',
+  diagnosen: 'Parkinson seit über 20 Jahren, Schilddrüsenerkrankung, Harninkontinenz',
+  provision_pro_tag: null,
+  kontext: 'Wohnt alleine im Einfamilienhaus. Hebetechnik nicht nötig, steigt selbst in und aus dem Rollstuhl.',
+};
+
+describe('eine echte Antwort mit Anhang', () => {
+  const kopfMitPdf: MailKopf = {
+    von: 'info@pflegena.com',
+    vonName: '',
+    betreff: 'Neue Stelle ab sofort Erika Muster 79780 Stühlingen wohnt alleine',
+    messageId: '<real@pflegena.com>',
+    datum: new Date('2026-09-09T06:25:00.000Z'),
+    anhaenge: 1,
+    text: 'Guten Tag, wenigstens mittlere Deutschkenntnisse sind gewünscht. Kein Transfer nötig.',
+  };
+
+  it('die vier zuvor geratenen Felder kommen jetzt aus dem Dokument', () => {
+    const r = pruefeAnfrage(mitAnhangGelesen, kopfMitPdf, 10);
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    // Genau die Felder, die am 09.09. auf prod geraten wurden.
+    expect(r.body.angaben.pflegegrad).toBe(3);
+    expect(r.body.angaben.nachteinsaetze).toBe('nein');
+    expect(r.body.angaben.mobilitaet).toBe('rollator');
+  });
+
+  it('trägt die Angaben, die es ohne Anhang nie gab', () => {
+    const r = pruefeAnfrage(mitAnhangGelesen, kopfMitPdf, 10);
+    expect(r.ok && r.body.details.gewicht).toBe('40-50');
+    expect(r.ok && r.body.details.geburtsjahr).toBe('1950');
+    expect(r.ok && r.body.details.patient_anrede).toBe('Frau');
+    expect(r.ok && r.body.details.patient_strasse).toBe('Musterweg 4');
+    expect(r.ok && r.body.details.internet).toBe('ja');
+  });
+
+  /* Der Vergleich, der die ganze Änderung rechtfertigt: dieselbe Mail ohne
+     Anhang (Fixture `gelesen` oben) lässt mobilitaet, nachteinsaetze und
+     pflegegrad offen — ergaenzeAngaben füllte sie dann sichtbar als
+     Annahme, und genau daraus wurden Lifter, Pflegebett und 300 € zuviel. */
+  it('ohne Anhang blieben genau diese Felder leer', () => {
+    expect(gelesen.mobilitaet).toBeNull();
+    expect(gelesen.nachteinsaetze).toBeNull();
+    expect(gelesen.pflegegrad).toBeNull();
+  });
+});

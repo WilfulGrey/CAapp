@@ -527,6 +527,36 @@ günstig `grundlegend`, und die Kräfteauswahl vergleicht die Stufe auf
 GLEICHHEIT — Mail 2 zeigt dann nur Kräfte der untersten Stufe. Was
 angenommen wurde, steht deshalb in der Team-Mail.
 
+**Gemessen am 09.09. auf der echten Mail** (uid 17318, drei Läufe je
+Variante). Beweiskraft hat nur, was AUSSCHLIESSLICH im PDF steht — Betreff
+und Fließtext tragen Nachname, PLZ, Ort und „kein Transfer" ohnehin:
+
+| | mit Anhang | ohne Anhang |
+|---|---|---|
+| Pflegegrad | **3** | — |
+| Nachteinsätze | **nein** | — |
+| Gewicht | 50 kg → `40-50` | — |
+| Jahrgang | 1943 | — |
+| Straße | „Obere Rappenhalde 4" | — |
+
+Ein Lauf mit ABSICHTLICH geleertem Betreff („Anfrage") und Text („siehe
+Anhang") lieferte dieselben Werte — das Dokument wird also wirklich gelesen
+und nicht der Betreff abgeschrieben.
+
+**Zwei Felder sind nicht stabil, und das gehört gewusst:**
+
+- `mobilitaet` schwankt zwischen `rollator` und `rollstuhl` (3 von 5 Läufen
+  `rollator`). Das Dokument nennt „Stock, Gehwagen oder Rollstuhl" und sagt
+  im selben Absatz, dass Hebetechnik nicht nötig ist. Der Unterschied kostet
+  100 € und entscheidet in mamamia über `lift_id` und die Hilfsmittel — bei
+  `rollstuhl` leitet der Mapper „Heben erforderlich" ab, also das Gegenteil
+  des Dokuments. Der Prompt sagt inzwischen ausdrücklich, dass „geht, sei es
+  am Stock" `rollator` ist; ganz stabil ist es damit nicht.
+- `deutschkenntnisse`: das PDF verlangt „Gute Deutschkenntnisse", der
+  Fließtext „wenigstens mittlere" — 450 € gegen 250 €. Die Regel im Prompt
+  lautet „bei Widerspruch gilt der Anhang", das Modell folgt hier aber
+  meistens dem Fließtext. Wer den Fall trifft, sieht ihn am `hinweis`.
+
 ### Bekannte Kanten
 
 - Der mamamia-Kunde trägt die Kontaktdaten des **Vermittlers** (`Customer` =
