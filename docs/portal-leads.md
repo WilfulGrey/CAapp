@@ -315,6 +315,14 @@ einrichten und den Abholer auf diesen Ordner zeigen lassen — dann fällt der
 Wettlauf weg (bewusst noch nicht gebaut, ein Element weniger außerhalb des
 Repos).
 
+**Der Betreff ist eine vollwertige Quelle.** Aus dem echten Postfach
+(09.09.): „Neue Stelle ab sofort **Brunhilde Weber 79780 Stühlingen**",
+„EILT Ablösekraft ab **09.09.2026 Hedwig Jordan, 79761 Waldshut**". Name,
+Ort und Termin stehen dort — der Fließtext wiederholt sie oft nicht.
+Deshalb bekommt das Modell Betreff und Text als getrennte Blöcke, und der
+PLZ-Beleg zählt in **beiden**. Ein Check nur gegen den Fließtext hätte die
+PLZ jeder zweiten Anfrage verworfen.
+
 **Prosa statt Formular.** Es gibt kein „Label: Wert", keine CSV, keinen
 Anhang — nur einen Brief:
 
@@ -478,6 +486,15 @@ liefe dieselbe Mail in jedem Takt erneut durchs Modell.
   E-Mail nicht erkennbar — im Admin nach `patient_nachname` suchen.
 - Ein menschlicher Forward derselben Anfrage hat eine NEUE Message-ID. Der
   Thread-Vorcheck fängt ihn nur, wenn der Client `References` mitschickt.
+- **Pflegena schickt dieselbe Person erneut**, wenn sich etwas ändert: im
+  Postfach steht „Brunhilde Weber 79780 Stühlingen" am 02.09. („Neue Stelle
+  07.09. oder früher") **und** am 09.09. („Neue Stelle ab sofort") — zwei
+  Mails, zwei Message-IDs, kein gemeinsamer Thread. Daraus werden zwei Leads
+  und zwei Angebote. Ob das stört, zeigt der Betrieb: es kann auch schlicht
+  eine neue Anfrage sein, weil sich der Termin verschoben hat.
+- Die Mails sind **groß** (1–6 MB, Anhänge). Ein Mail pro Takt hält den
+  Speicher im Rahmen — `simpleParser` puffert die ganze Nachricht, und der
+  Kostenrechner läuft auf 512 MB (Registry #27/#29).
 - Pflegena steht bewusst **nicht** in `herkunft.ts` `PORTAL_QUELLEN`: der
   Vermittler bekommt nie eine `eingangsbestaetigung`, und ein Test hält
   fest, dass seine Mailtypen diesen Wert nicht enthalten.
