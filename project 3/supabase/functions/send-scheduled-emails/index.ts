@@ -2346,6 +2346,7 @@ Deno.serve(async (req: Request) => {
           case "vermittler_angebot": {
             const d = {
               anrede: demoAnrede, kundeLabel: demoMeta.kunde_label,
+              signatur: buildMartaSig(site),
               bruttopreis: Number((lead as any).kalkulation?.bruttopreis ?? 0),
               provisionProTag: demoMeta.provision_pro_tag,
               empfehlung: demoVermittlerEmpf?.empfehlung ?? null,
@@ -2357,6 +2358,7 @@ Deno.serve(async (req: Request) => {
           case "vermittler_kraefte": {
             const d = {
               anrede: demoAnrede, kundeLabel: demoMeta.kunde_label,
+              signatur: buildMartaSig(site),
               fuenf: demoVermittlerFuenf?.fuenf ?? [], cids: demoVermittlerFuenf?.cids ?? [],
             };
             return { subject: demoMeta.betreff_antwort, html: buildEmailWrapper(lead as Lead, site, vermittlerKraefteHtml(d), VERMITTLER_FUSSNOTE), text: vermittlerKraefteText(d) };
@@ -2773,6 +2775,10 @@ Deno.serve(async (req: Request) => {
           }
           const daten = {
             anrede: `${buildEingangsGreeting(lead as Lead)},`,
+            /* Dieselbe Grussformel, Beraterinnen-Karte und Vertrauensleiste wie
+               in jeder Kundenmail — ohne sie stand die Vermittler-Mail ohne
+               Absenderin, ohne Telefonnummer und ohne Siegel da. */
+            signatur: buildMartaSig(smtpConfig.siteUrl),
             kundeLabel: (meta.kunde_label as string) || null,
             bruttopreis: Number(kalk.bruttopreis ?? 0),
             provisionProTag: Number(meta.provision_pro_tag ?? 0),
@@ -2814,6 +2820,10 @@ Deno.serve(async (req: Request) => {
           if (teile.anhaenge.length) (scheduledEmail as any).__inlineAttachments = teile.anhaenge;
           const daten = {
             anrede: `${buildEingangsGreeting(lead as Lead)},`,
+            /* Dieselbe Grussformel, Beraterinnen-Karte und Vertrauensleiste wie
+               in jeder Kundenmail — ohne sie stand die Vermittler-Mail ohne
+               Absenderin, ohne Telefonnummer und ohne Siegel da. */
+            signatur: buildMartaSig(smtpConfig.siteUrl),
             kundeLabel: (meta.kunde_label as string) || null,
             fuenf: teile.fuenf, cids: teile.cids,
           };

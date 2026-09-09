@@ -268,7 +268,18 @@ export async function POST(request: NextRequest) {
       (kalkulation as any).formularDaten = { ...(kalkulation as any).formularDaten, ...fdExtras };
     }
 
-    const { vorname, nachname, anrede } = parseCustomerName(name);
+    let { vorname, nachname, anrede } = parseCustomerName(name);
+    /* Faellt der Anzeigename aus (Pflegena verschickt ohne), kommt der
+       Ansprechpartner aus dem Registereintrag. Sonst gruesst die Mail den
+       Geschaeftspartner mit blossem "Guten Tag", waehrend jede Kundenmail
+       den Namen kennt. Der Header hat Vorrang — er ist die frischere
+       Quelle, falls dort doch jemand steht. */
+    const fest = vermittler && 'ansprechpartner' in vermittler ? vermittler.ansprechpartner : undefined;
+    if (fest && !nachname) {
+      vorname = vorname || fest.vorname;
+      nachname = fest.nachname;
+      anrede = anrede || fest.anrede;
+    }
 
     /* ─── Lead-Anlage ──────────────────────────────────────────────────
      *

@@ -202,6 +202,13 @@ export const PORTALE = [
      bewusst KEINE zweite Kopie der Adresse, die davon abweichen koennte. */
   { domain: 'pflegena.com', name: 'Pflegena.com', abholung: 'imap', art: 'vermittler',
     provisionProTag: 10,
+    /* Der Mensch auf der anderen Seite. Er steht NICHT im From-Header —
+       Pflegena verschickt ohne Anzeigenamen —, sondern nur unter dem
+       Fliesstext. Ihn dort vom Modell suchen zu lassen hiesse, ueber die
+       Identitaet einer Person zu raten; ein fester Geschaeftspartner
+       gehoert in die Konfiguration, wie die Provision auch. Ohne diesen
+       Eintrag begruesste die Mail mit blossem "Guten Tag". */
+    ansprechpartner: { anrede: 'Herr', vorname: 'Bernd', nachname: 'Walde' },
     postfach: 'INFO' },
 ] as const;
 

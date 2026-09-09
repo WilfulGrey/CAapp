@@ -27,8 +27,16 @@ function kraft(over: Partial<Empfehlung> = {}): Empfehlung {
   };
 }
 
+/* Steht fuer buildMartaSig() aus index.ts — die echte Signatur kann hier
+   nicht importiert werden (index.ts startet beim Import einen Server). Was
+   zaehlt, ist dass der Block ueberhaupt DURCHGEREICHT wird: genau das
+   fehlte, weshalb die Vermittler-Mail ohne Grussformel, ohne
+   Ansprechpartnerin und ohne Siegel beim Partner ankam. */
+const SIG = '<div id="marta-sig">Mit freundlichen Gruessen — Marta Kapcio</div>';
+
 const basis = {
   anrede: "Guten Tag Herr Wilde,",
+  signatur: SIG,
   kundeLabel: "Familie Schmidt",
   bruttopreis: 2650,
   provisionProTag: 10,
@@ -64,7 +72,7 @@ Deno.test("Mail 1: Provisionsblock nennt beide Zahlen und den Kunden", () => {
 
 Deno.test("Mail 1: kein Portal, kein Token, keine Kunden-Konditionen", () => {
   const html = vermittlerAngebotHtml(basis) + vermittlerKraefteHtml({
-    anrede: basis.anrede, kundeLabel: basis.kundeLabel, fuenf: [kraft()], cids: [null],
+    anrede: basis.anrede, signatur: SIG, kundeLabel: basis.kundeLabel, fuenf: [kraft()], cids: [null],
   });
   // Der Token des Leads öffnet das Kundenportal (Patientenbogen,
   // Bewerbungen, Vertragsunterschrift). Er darf in dieser Mail nirgends
@@ -119,13 +127,13 @@ Deno.test("ohne Kundennamen wird umschrieben — im richtigen Fall", () => {
   assertStringIncludes(html, "Ihr Kunde zahlt damit");
   assert(!html.includes("von <strong style=\"color:#2D1F0F;\">Ihren Kunden"));
 
-  const liste = vermittlerKraefteHtml({ anrede: "x", kundeLabel: null, fuenf: [kraft()], cids: [null] });
+  const liste = vermittlerKraefteHtml({ anrede: "x", signatur: SIG, kundeLabel: null, fuenf: [kraft()], cids: [null] });
   assertStringIncludes(liste, "für Ihren Kunden verfügbar");   // Akkusativ
   assertStringIncludes(liste, "Sie Ihrem Kunden vorstellen");  // Dativ
 });
 
 Deno.test("Mail 2: Liste nennt die tatsächliche Anzahl, ohne fünf zu versprechen", () => {
-  const drei = { anrede: basis.anrede, kundeLabel: "Familie Schmidt", fuenf: [kraft(), kraft({ vorname: "Marzena", anzeigeName: "Marzena T." }), kraft({ vorname: "Halina", anzeigeName: "Halina W." })], cids: [null, null, null] };
+  const drei = { anrede: basis.anrede, signatur: SIG, kundeLabel: "Familie Schmidt", fuenf: [kraft(), kraft({ vorname: "Marzena", anzeigeName: "Marzena T." }), kraft({ vorname: "Halina", anzeigeName: "Halina W." })], cids: [null, null, null] };
   const html = vermittlerKraefteHtml(drei);
   // Zwei Stunden nach Mail 1 wird neu gerechnet — es können weniger sein.
   assertStringIncludes(html, "drei Betreuungskräfte");
@@ -136,7 +144,7 @@ Deno.test("Mail 2: Liste nennt die tatsächliche Anzahl, ohne fünf zu versprech
 });
 
 Deno.test("Mail 2: eine einzige Kraft wird grammatisch richtig angekündigt", () => {
-  const eine = { anrede: basis.anrede, kundeLabel: null, fuenf: [kraft()], cids: [null] };
+  const eine = { anrede: basis.anrede, signatur: SIG, kundeLabel: null, fuenf: [kraft()], cids: [null] };
   const html = vermittlerKraefteHtml(eine);
   assertStringIncludes(html, "eine Betreuungskraft");
   assertStringIncludes(html, "verfügbar ist");
@@ -149,7 +157,7 @@ Deno.test("Textfassung trägt dieselben Zahlen wie das HTML", () => {
   assertStringIncludes(text, "2.650 € / Monat");
   assertStringIncludes(text, "98 €/Tag");
   assert(!text.includes("token="));
-  assertStringIncludes(vermittlerKraefteText({ anrede: "x", kundeLabel: null, fuenf: [kraft()], cids: [null] }), "Maria K.");
+  assertStringIncludes(vermittlerKraefteText({ anrede: "x", signatur: SIG, kundeLabel: null, fuenf: [kraft()], cids: [null] }), "Maria K.");
 });
 
 Deno.test("Fremdtext wird escaped (Name und Vorstellung kommen von aussen)", () => {
@@ -167,7 +175,7 @@ Deno.test("Stufe sieht in beiden Mails gleich aus — gefüllte Pille (#667)", (
   const gefuellt = "background:#8B7355;border-radius:999px";
   assertStringIncludes(vermittlerAngebotHtml(basis), gefuellt);
   assertStringIncludes(
-    vermittlerKraefteHtml({ anrede: "x", kundeLabel: null, fuenf: [kraft()], cids: [null] }),
+    vermittlerKraefteHtml({ anrede: "x", signatur: SIG, kundeLabel: null, fuenf: [kraft()], cids: [null] }),
     gefuellt,
   );
 });
@@ -179,4 +187,30 @@ Deno.test("ohne Einsätze trägt die Kurzaussage der Stufe die Zeile", () => {
   const html = vermittlerAngebotHtml({ ...basis, empfehlung: neu });
   assertStringIncludes(html, "Neu bei Primundus");
   assert(!html.includes("0 Einsätze"));
+});
+
+Deno.test("Mail 1 traegt die Signatur mit Ansprechpartnerin", () => {
+  const html = vermittlerAngebotHtml(basis);
+  assertStringIncludes(html, "marta-sig");
+  // ...und zwar ganz unten, nach dem Angebot.
+  assert(html.indexOf("marta-sig") > html.indexOf("Tagessatz"));
+});
+
+Deno.test("Mail 2 traegt die Signatur ebenfalls", () => {
+  const html = vermittlerKraefteHtml({
+    anrede: basis.anrede, signatur: SIG, kundeLabel: "Familie Schmidt",
+    fuenf: [kraft()], cids: [null],
+  });
+  assertStringIncludes(html, "marta-sig");
+});
+
+Deno.test("die Textfassungen gruessen mit Namen und Durchwahl", () => {
+  for (const t of [
+    vermittlerAngebotText(basis),
+    vermittlerKraefteText({ anrede: basis.anrede, signatur: SIG, kundeLabel: null, fuenf: [kraft()], cids: [null] }),
+  ]) {
+    assertStringIncludes(t, "Mit freundlichen Grüßen");
+    assertStringIncludes(t, "Marta Kapcio");
+    assertStringIncludes(t, "089 200 000 830");
+  }
 });
