@@ -25,6 +25,7 @@ const LISTE_QUERY = /* GraphQL */ `
   query KraefteVorschau($limit: Int, $page: Int) {
     CaregiversWithPagination(limit: $limit, page: $page) {
       last_page
+      total
       data {
         id first_name gender year_of_birth germany_skill care_experience
         available_from last_contact_at hp_total_jobs driving_license
@@ -53,7 +54,7 @@ export async function ladeKraefte(fetchFn: typeof fetch = fetch): Promise<RohKra
     password: Deno.env.get("MAMAMIA_AGENCY_PASSWORD")!,
     fetchFn,
   });
-  type Seite = { CaregiversWithPagination?: { data?: RohKraft[]; last_page?: number } };
+  type Seite = { CaregiversWithPagination?: { data?: RohKraft[]; last_page?: number; total?: number } };
   const ladeSeite = (page: number) =>
     mamamiaRequest<Seite>({
       endpoint: Deno.env.get("MAMAMIA_ENDPOINT")!,
@@ -71,8 +72,50 @@ export async function ladeKraefte(fetchFn: typeof fetch = fetch): Promise<RohKra
     Array.from({ length: Math.max(0, letzte - 1) }, (_, i) => ladeSeite(i + 2)),
   );
   const kraefte = [erste, ...weitere].flatMap((s) => s?.CaregiversWithPagination?.data ?? []);
+  poolGesamt = erste?.CaregiversWithPagination?.total ?? null;
   cache = { at: Date.now(), kraefte };
   return kraefte;
+}
+
+/** Größe des ganzen Pools laut Paginator (nur für die Statistik). */
+let poolGesamt: number | null = null;
+
+const EINZEL_QUERY = /* GraphQL */ `
+  query KraftEinzeln($id: Int!) { Caregiver(id: $id) { id hp_total_jobs } }
+`;
+
+/**
+ * Stichprobe für die Statistik: liefert die Einzelabfrage `Caregiver(id)` für
+ * dieselbe Kraft eine andere Einsatzzahl als die Liste? (Verdacht: der
+ * Listen-Resolver füllt hp_total_jobs nicht.) Nur ids und Zählwerte.
+ */
+export async function stichprobeEinsaetze(
+  alle: RohKraft[],
+  fetchFn: typeof fetch = fetch,
+): Promise<Array<{ id: number; liste: number; einzeln: number | null }>> {
+  const token = await getOrRefreshAgencyToken({
+    authEndpoint: Deno.env.get("MAMAMIA_AUTH_ENDPOINT")!,
+    email: Deno.env.get("MAMAMIA_AGENCY_EMAIL")!,
+    password: Deno.env.get("MAMAMIA_AGENCY_PASSWORD")!,
+    fetchFn,
+  });
+  const kandidaten = alle
+    .filter((k) => !k.caregiver_status?.is_blocked && (parseInt(k.care_experience ?? "", 10) || 0) >= 10)
+    .slice(0, 4);
+  return Promise.all(kandidaten.map(async (k) => {
+    try {
+      const d = await mamamiaRequest<{ Caregiver?: { hp_total_jobs?: number | null } }>({
+        endpoint: Deno.env.get("MAMAMIA_ENDPOINT")!,
+        token,
+        query: EINZEL_QUERY,
+        variables: { id: k.id },
+        fetchFn,
+      });
+      return { id: k.id, liste: k.hp_total_jobs ?? 0, einzeln: d?.Caregiver?.hp_total_jobs ?? null };
+    } catch {
+      return { id: k.id, liste: k.hp_total_jobs ?? 0, einzeln: null };
+    }
+  }));
 }
 
 /** Nur Zählwerte, keine Personendaten — zum Prüfen des Pools. */
@@ -81,6 +124,7 @@ export function statistik(alle: RohKraft[], now: Date = new Date()) {
   const bald = (iso?: string | null) => !!iso && Number.isFinite(new Date(iso).getTime()) && new Date(iso).getTime() <= bis;
   return {
     gesamt: alle.length,
+    poolGesamt,
     gesperrt: alle.filter((k) => k.caregiver_status?.is_blocked).length,
     mitEinsaetzen: alle.filter((k) => (k.hp_total_jobs ?? 0) > 0).length,
     mitErfahrung: alle.filter((k) => (parseInt(k.care_experience ?? "", 10) || 0) > 0).length,
@@ -99,7 +143,11 @@ function wuenscheAus(body: unknown): Wuensche {
   return { deutsch: s(b.deutsch), geschlecht: s(b.geschlecht), fuehrerschein: s(b.fuehrerschein) };
 }
 
-export async function handleRequest(req: Request, lade: () => Promise<RohKraft[]> = ladeKraefte): Promise<Response> {
+export async function handleRequest(
+  req: Request,
+  lade: () => Promise<RohKraft[]> = ladeKraefte,
+  stichprobe_: (alle: RohKraft[]) => Promise<unknown> = stichprobeEinsaetze,
+): Promise<Response> {
   if (req.method === "OPTIONS") return new Response(null, { status: 204, headers: CORS });
   if (req.method !== "POST") return new Response("POST only", { status: 405, headers: CORS });
   let body: unknown = null;
@@ -108,7 +156,8 @@ export async function handleRequest(req: Request, lade: () => Promise<RohKraft[]
   try {
     const alle = await lade();
     if (body && typeof body === "object" && (body as { stats?: unknown }).stats === true) {
-      return Response.json(statistik(alle), { headers: CORS });
+      const stichprobe = await stichprobe_(alle);
+      return Response.json({ ...statistik(alle), stichprobe }, { headers: CORS });
     }
     const kraefte = waehleVorschau(alle, w);
     return Response.json({ kraefte, gesamt: alle.length }, { headers: CORS });
