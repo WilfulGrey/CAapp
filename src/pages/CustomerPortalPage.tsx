@@ -3175,11 +3175,38 @@ const CustomerPortalPage: FC = () => {
         {/* Mamamia-Matchings vorübergehend nicht erreichbar / noch am Laden →
             ruhiger Lade-Zustand STATT einer leeren "keine Pflegekräfte"-Seite.
             Auto-Retry (useEffect oben) lädt im Hintergrund nach. */}
+        {/* D5 (Clarity 07.09.: CLS 0,92 auf der Portalseite): Der Ladezustand
+            hat jetzt die Form und Höhe der späteren Karten (drei Platzhalter
+            wie MatchCard: Foto 64 px, Name, Meta, Faktenzeile, Fußzeile).
+            Vorher stand hier ein ~150 px hoher Kasten, den drei bis fünf
+            Karten à ~230 px ersetzten — alles darunter sprang beim Laden nach
+            unten. Jetzt bleibt die Seite beim Eintreffen der Daten ruhig. */}
         {!hasPending && matchingsLoadingOrError && (
-          <div className="rounded-3xl px-5 py-8 border text-center" style={{ background: '#F5F5F6', borderColor: '#D4D4D8' }}>
-            <div className="inline-block w-6 h-6 rounded-full border-2 animate-spin mb-3" style={{ borderColor: '#C4B49A', borderTopColor: 'transparent' }} />
-            <p className="text-[15px] font-semibold mb-1" style={{ color: '#18181B' }}>Wir laden Ihre Pflegekräfte …</p>
-            <p className="text-[14px] leading-relaxed" style={{ color: '#71717A' }}>Einen Moment bitte — gleich sehen Sie Ihre persönlichen Vorschläge.</p>
+          <div aria-busy="true" aria-live="polite">
+            <p className="text-[15px] font-semibold mb-3 flex items-center gap-2" style={{ color: '#18181B' }}>
+              <span className="inline-block w-4 h-4 rounded-full border-2 animate-spin" style={{ borderColor: '#C4B49A', borderTopColor: 'transparent' }} />
+              Wir laden Ihre Pflegekräfte …
+            </p>
+            <div className="space-y-3">
+              {[0, 1, 2].map((i) => (
+                <div key={i} className="bg-white shadow-sm rounded-2xl border border-zinc-200 overflow-hidden animate-pulse">
+                  <div className="px-4 pt-4 pb-3">
+                    <div className="flex items-center gap-3.5">
+                      <div className="w-16 h-16 rounded-xl flex-shrink-0" style={{ background: '#E4E4E7' }} />
+                      <div className="flex-1 min-w-0">
+                        <div className="h-4 rounded w-2/3" style={{ background: '#E4E4E7' }} />
+                        <div className="h-3 rounded w-1/2 mt-2.5" style={{ background: '#ECECEE' }} />
+                      </div>
+                    </div>
+                    <div className="h-3.5 rounded w-full mt-4" style={{ background: '#ECECEE' }} />
+                    <div className="h-3.5 rounded w-4/5 mt-2" style={{ background: '#ECECEE' }} />
+                  </div>
+                  <div className="border-t border-gray-100 px-4 py-2.5 flex items-center justify-end">
+                    <div className="h-7 w-28 rounded-full" style={{ background: '#ECECEE' }} />
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
         )}
 
