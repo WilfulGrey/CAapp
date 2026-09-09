@@ -64,6 +64,7 @@ import { DeclineConfirmModal } from '../components/portal/DeclineConfirmModal';
 import { InviteRateLimitModal } from '../components/portal/InviteRateLimitModal';
 import { AngebotPruefenModal, buildVertragsDaten } from '../components/portal/AngebotPruefenModal';
 import { CustomerNurseModal } from '../components/portal/CustomerNurseModal';
+import { zeigtSommerzuschlag } from '../components/portal/konditionen';
 import { PflegekraftChat } from '../components/portal/PflegekraftChat';
 
 // ─── Dev-Only Preview-Mode (NICHT für Production) ──────────────────────────
@@ -2402,8 +2403,6 @@ const CustomerPortalPage: FC = () => {
           // einer Zahlungsfrage.
           { text: 'Erst auswählen, dann buchen' },
           { text: 'Keine Vermittlungsgebühr' },
-          // Martin, 08.09.: beantwortet die Sorge, ob man schon zahlt.
-          { text: 'Kosten erst, wenn die Pflegekraft da ist' },
         ];
         return (
         <div style={{background:'#FFFFFF', borderBottom:'1px solid #E9E9EB'}}>
@@ -2466,6 +2465,14 @@ const CustomerPortalPage: FC = () => {
                         <span className="text-[15px]" style={{color:'#18181B'}}>{item.text}</span>
                       </div>
                     ))}
+                    {/* Kein fünfter Haken (Martin, 09.09.): Die Häkchen sind
+                        Konditionen des Angebots. „Kosten erst, wenn die
+                        Pflegekraft da ist" beantwortet die Sorge, ob man
+                        schon zahlt — das ist eine Erklärung, kein Punkt der
+                        Liste, und steht deshalb als schlichte Zeile darunter. */}
+                    <p className="text-[15px] leading-relaxed" style={{color:'#71717A'}}>
+                      Kosten erst, wenn die Pflegekraft da ist.
+                    </p>
                   </div>
 
                   {/* Beweis-Zeile direkt am Preis (Martin, 13.08.): die vier
@@ -2579,7 +2586,13 @@ const CustomerPortalPage: FC = () => {
                     { label: 'Entspricht', value: `${formatEuro(tagessatz)} / Tag`, note: 'tagesgenau abgerechnet' },
                     { label: 'Reisekosten', value: '125 € pro Strecke', note: '' },
                     { label: 'Kost & Logis', value: 'stellt der Haushalt', note: '' },
-                    { label: 'Sommerzuschlag', value: '6,67 € / Tag', note: 'Juli + August' },
+                    /* Sommerzuschlag nur in der Saison zeigen (Martin, 09.09.2026):
+                       Diese Uebersicht kennt keinen Einsatzzeitraum, und im
+                       September einen Zuschlag fuer Juli/August aufzulisten
+                       verwirrt. Berechnet und im Vertrag steht er unveraendert. */
+                    ...(zeigtSommerzuschlag()
+                      ? [{ label: 'Sommerzuschlag', value: '6,67 € / Tag', note: 'Juli + August' }]
+                      : []),
                   ].map((row, i) => (
                     <div key={i} className="flex items-baseline justify-between gap-4">
                       <span className="text-[15px] flex-shrink-0" style={{color:'#71717A'}}>{row.label}</span>
@@ -4131,10 +4144,18 @@ const CustomerPortalPage: FC = () => {
           onChat={CHAT_ENABLED && nurseModalApp ? () => { const n = enrichedSelectedNurse; setSelectedNurse(null); setNurseModalApp(null); setNurseMatchIdx(null); setSelectedFromInterestId(null); setChatNurse(n); } : undefined}
           hasInterest={selectedFromInterestId !== null && enrichedSelectedNurse.caregiverId === selectedFromInterestId}
           onUndo={() => { if (nurseModalApp) undoApp(nurseModalApp.id); setNurseModalApp(null); }}
+          /* Eingeladen wird an der PFLEGEKRAFT festgemacht, nicht daran, WIE
+             das Profil geoeffnet wurde. Vorher haengte es an `nurseMatchIdx`
+             — den setzt aber nur der Weg ueber eine Matching-Karte. Aus einer
+             Interesse-Karte und aus den aus Events rekonstruierten Eintraegen
+             (beide `matchIdx: -1`, siehe MatchCardDone) blieb der Index null,
+             also stand im Profil wieder „Einladen", obwohl die Karte daneben
+             „Einladung gesendet" zeigte (Martin, 09.09.2026, prod). */
           isInvited={
-            nurseMatchIdx !== null
-            && effectiveMatched[nurseMatchIdx] !== undefined
-            && nurseStatusById.get(effectiveMatched[nurseMatchIdx].caregiverId) === 'invited'
+            enrichedSelectedNurse.caregiverId !== undefined
+            && (invitedSet.has(enrichedSelectedNurse.caregiverId)
+              || statusOverrides.get(enrichedSelectedNurse.caregiverId) === 'invited'
+              || interestStatusOverrides.get(enrichedSelectedNurse.caregiverId) === 'invited')
           }
           onInvite={
             nurseMatchIdx !== null

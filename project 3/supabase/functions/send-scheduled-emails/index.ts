@@ -12,7 +12,7 @@ import { Buffer } from "node:buffer";
 import { appendJobParam, reminderBookedCancel } from "./followupJobs.ts";
 // Anrede-Namen sauber schreiben (Versalien → „Ruppert") — Kopie aus lib/email.ts,
 // weil Edge Functions nicht aus lib/ importieren können. Siehe names.ts.
-import { capitalizeName as capitalize } from "./names.ts";
+import { buildLeadRef, capitalizeName as capitalize, cleanNamePart } from "./names.ts";
 // Nachtruhe-Fenster — Kopie von lib/quiet-hours.ts (Edge Fns koennen nicht aus
 // lib/ importieren); Aenderungen immer in BEIDEN Dateien.
 import { sendezeitIso } from "./quietHours.ts";
@@ -160,18 +160,6 @@ const FEMALE_NAMES_SET = new Set(["aaliya","abby","ada","adela","adelheid","adel
 const MALE_NAMES_SET = new Set(["aaron","adam","alexander","alfred","alois","andre","andreas","axel","bastian","benedikt","benjamin","bernd","bo","burkhard","carsten","christian","christoph","claus","clemens","cornelius","damian","daniel","david","dieter","dietmar","dirk","dominik","edgar","elias","emilio","eric","erik","ernst","eugen","fabian","felix","finn","florian","frank","franz","frederik","gabriel","georg","gerhard","gottfried","guido","gunnar","hans","harry","hartmut","heinz","helge","helmut","henning","henrik","herbert","heiko","holger","horst","hubert","hugo","jakob","jan","jens","joachim","joe","joel","joerg","johannes","jonas","jonathan","jochen","kai","karl","kilian","Klaus","kevin","konrad","kristian","lars","leo","leon","leopold","lorenz","lothar","lucas","lukas","manfred","marco","markus","martin","matthias","max","maximilian","michael","mike","moritz","nikolaj","nikolaus","nils","norbert","oliver","oscar","oskar","otto","patrice","patrick","paul","peter","philipp","ralf","reinhard","richard","robert","rolf","sebastian","simon","stefan","steffen","stephan","steven","sven","thomas","thorsten","tillman","tim","tobias","tom","torsten","ulrich","uwe","valentin","victor","volker","werner","willi","will","wolf","wolfram","xaver"]);
  
 
-
-// A name part is only usable in a greeting if it looks like a real name:
-// at least one letter and no leftover bracketed notes like "(Sohn)". Guards
-// against legacy/garbage data so we never greet "Hallo Herr (Sohn),".
-function cleanNamePart(part?: string | null): string {
-  if (!part) return "";
-  const trimmed = part.trim();
-  if (/[([{)\]}]/.test(trimmed)) return "";            // bracketed note, e.g. "(Sohn)"
-  if (!/[A-Za-zÀ-ÿ]/.test(trimmed)) return "";          // no letters at all
-  if (trimmed.replace(/\.$/, "").length < 2) return ""; // bare initial, e.g. "M" / "M."
-  return trimmed;
-}
 
 function detectGenderFromName(vorname: string): "Frau" | "Herr" | "Familie" | null {
   if (!vorname?.trim()) return null;
@@ -942,7 +930,7 @@ Primundus Deutschland | +49 89 200 000 830 | www.primundus.de`;
 // kann). Bewusst SEHR kurz — nicht überreden, nur Status abklopfen.
 function buildNachfass3Html(lead: Lead, siteUrl: string): string {
   const halloAnrede = buildHalloAnrede(lead.anrede_text || null, lead.nachname || "", lead.vorname || "");
-  const leadRef = lead.email || lead.id;
+  const leadRef = buildLeadRef(lead);
   const mailtoYes = `mailto:info@primundus.de?subject=${encodeURIComponent(`Habe noch Interesse — ${leadRef}`)}&body=${encodeURIComponent(`Hallo Marta,\n\nich habe noch Interesse, bitte melden Sie sich bei mir.\n\n${halloAnrede.replace(/^Hallo /, '')}`)}`;
   const mailtoLater = `mailto:info@primundus.de?subject=${encodeURIComponent(`Aktuell nicht — vielleicht später — ${leadRef}`)}&body=${encodeURIComponent(`Hallo Marta,\n\naktuell brauche ich noch keine Pflegekraft, vielleicht später.\n\n${halloAnrede.replace(/^Hallo /, '')}`)}`;
   const mailtoNo = `mailto:info@primundus.de?subject=${encodeURIComponent(`Doch nicht relevant — ${leadRef}`)}&body=${encodeURIComponent(`Hallo Marta,\n\nes hat sich erledigt, das Thema ist für mich nicht mehr relevant.\n\n${halloAnrede.replace(/^Hallo /, '')}`)}`;
@@ -968,7 +956,7 @@ function buildNachfass3Html(lead: Lead, siteUrl: string): string {
 
 function buildNachfass3Text(lead: Lead, _siteUrl: string): string {
   const halloAnrede = buildHalloAnrede(lead.anrede_text || null, lead.nachname || "", lead.vorname || "");
-  const leadRef = lead.email || lead.id;
+  const leadRef = buildLeadRef(lead);
   return `${halloAnrede},
 
 ein letzter Versuch von meiner Seite — wie schaut's bei Ihnen aus?

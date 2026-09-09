@@ -25,6 +25,28 @@ const SOMMER_MONTHS = new Set([6, 7]); // Juli=6, August=7 (0-indexed)
 const SOMMER_PER_MONTH = 200;
 const SOMMER_PER_DAY = SOMMER_PER_MONTH / 30;
 
+/*
+ * Zeigen wir den Sommerzuschlag gerade an? (Martin, 09.09.2026)
+ *
+ * Berechnet wird er unveraendert nur fuer Juli und August — daran aendert sich
+ * nichts, und im Vertrag (§ 4) sowie in der FAQ steht er dauerhaft. Es geht
+ * allein um die allgemeine Kosten-Uebersicht im Portal: Im September einem
+ * Kunden „Sommerzuschlag" vorzurechnen, verwirrt, weil in seinem Zeitraum gar
+ * kein Sommer mehr liegt. Ab Mai reichen Angebote wieder in den Juli hinein,
+ * dann gehoert die Zeile zurueck.
+ *
+ * Wo ein KONKRETER Einsatzzeitraum bekannt ist (Angebot pruefen, Monats-
+ * aufstellung, Angebotsmail), entscheidet weiterhin der Zeitraum selbst —
+ * nicht dieses Fenster.
+ */
+const SOMMER_ANZEIGE_VON = 4; // Mai (0-indexiert)
+const SOMMER_ANZEIGE_BIS = 7; // August
+
+export function zeigtSommerzuschlag(heute: Date = new Date()): boolean {
+  const m = heute.getMonth();
+  return m >= SOMMER_ANZEIGE_VON && m <= SOMMER_ANZEIGE_BIS;
+}
+
 // Osterdatum nach Anonymous Gregorian Algorithm (Meeus/Jones/Butcher).
 function easterSunday(year: number): Date {
   const a = year % 19;
