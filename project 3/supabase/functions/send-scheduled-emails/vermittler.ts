@@ -65,6 +65,13 @@ export function vermittlerPreis(bruttopreis: number, provisionProTag: number): V
 const eur = (n: number) => n.toLocaleString("de-DE");
 
 export interface AngebotDaten {
+  /** Grussformel, Beraterinnen-Karte, Vertrauensleiste und Presselogos —
+   *  fertiges HTML aus buildMartaSig(). Wird HEREINGEREICHT, weil index.ts
+   *  `Deno.serve` auf oberster Ebene hat und deshalb nicht importierbar ist.
+   *  Ohne diesen Block sah die Vermittler-Mail neben jeder Kundenmail
+   *  unfertig aus: kein "Mit freundlichen Gruessen", keine Ansprechpartnerin,
+   *  keine Telefonnummer, keine Siegel. */
+  signatur: string;
   /** "Hallo Herr Walde," — index.ts baut die Anrede aus dem Lead. */
   anrede: string;
   /** "Familie Schmidt" oder null, wenn die Anfrage keinen Namen nannte. */
@@ -210,6 +217,7 @@ export function vermittlerAngebotHtml(d: AngebotDaten): string {
        zur Verfuegung, waere "weitere folgen" ein Versprechen ins Blaue. */
     weitere ? p("Weitere passende Betreuungskräfte sende ich Ihnen in den nächsten Stunden.") : "",
     p("Melden Sie sich einfach bei mir, wenn wir die Vermittlung anstoßen sollen. Ein kurzes Wort genügt, den Rest übernehmen wir."),
+    d.signatur,
   ].filter(Boolean).join("\n");
 }
 
@@ -241,6 +249,7 @@ export function vermittlerAngebotText(d: AngebotDaten): string {
     zeilen.push("", "Weitere passende Betreuungskräfte sende ich Ihnen in den nächsten Stunden.");
   }
   zeilen.push("", "Melden Sie sich einfach bei mir, wenn wir die Vermittlung anstoßen sollen.");
+  zeilen.push("", VERMITTLER_GRUSS_TEXT);
   return zeilen.join("\n");
 }
 
@@ -272,11 +281,24 @@ function kraftZeile(e: Empfehlung, cid: string | null, letzte: boolean): string 
 }
 
 export interface KraefteDaten {
+  /** Wie oben: fertige Signatur aus buildMartaSig(). */
+  signatur: string;
   anrede: string;
   kundeLabel: string | null;
   fuenf: Empfehlung[];
   cids: (string | null)[];
 }
+
+/* Grussformel der Textfassung. Die HTML-Fassung bekommt die vollstaendige
+ * Karte ueber `signatur`; im reinen Text bleiben Name, Rolle und die zwei
+ * Wege, auf denen der Partner uns erreicht. */
+export const VERMITTLER_GRUSS_TEXT = [
+  "Mit freundlichen Grüßen",
+  "Marta Kapcio — Pflegeberaterin",
+  "Tel: 089 200 000 830  ·  WhatsApp: https://wa.me/4989200000830",
+  "",
+  "Primundus Deutschland | www.primundus.de",
+].join("\n");
 
 /** Mail 2: die verfuegbaren Kraefte, ohne Links und ohne Preiswiederholung. */
 export function vermittlerKraefteHtml(d: KraefteDaten): string {
@@ -292,7 +314,8 @@ export function vermittlerKraefteHtml(d: KraefteDaten): string {
       ${d.fuenf.map((e, i) => kraftZeile(e, d.cids[i] ?? null, i === n - 1)).join("")}
     </table>`,
     p(`Sagen Sie mir kurz Bescheid, welche Betreuungskraft Sie ${kunde(d.kundeLabel, "dat")} vorstellen möchten &ndash; dann stoßen wir die Vermittlung an. Die Konditionen aus meiner ersten Mail gelten unverändert.`),
-  ].join("\n");
+    d.signatur,
+  ].filter(Boolean).join("\n");
 }
 
 export function vermittlerKraefteText(d: KraefteDaten): string {
@@ -310,8 +333,25 @@ export function vermittlerKraefteText(d: KraefteDaten): string {
     "",
     "Sagen Sie mir kurz Bescheid, welche Betreuungskraft Sie vorstellen möchten – dann",
     "stoßen wir die Vermittlung an. Die Konditionen aus meiner ersten Mail gelten unverändert.",
+    "",
+    VERMITTLER_GRUSS_TEXT,
   ].join("\n");
 }
+
+/* Absender der Vermittler-Mails: die POLNISCHE Gesellschaft.
+ *
+ * Diese beiden Mails gehen von unserer polnischen Seite an einen deutschen
+ * Geschaeftspartner — dort gehoert das vollstaendige Impressum mit Anschrift,
+ * KRS und NIP hin. Die Mails an ENDKUNDEN bleiben unveraendert bei
+ * "Primundus Deutschland" (Entscheidung Michał, 09.09.); der Wrapper hat das
+ * als Vorgabe, hier steht bewusst nur die Abweichung. */
+export const VERMITTLER_ABSENDER = {
+  name: "PRIMUNDUS Sp. z o.o.",
+  /** Zeilen ueber Telefon/Mail/Web im Fuss. */
+  zeilen: "Poznańska 21/48, 00-685 Warschau, Polen<br>KRS 0001259402 &middot; NIP 7011326714",
+  /** Die kleine Zeile unter "versendet an". */
+  kurz: "PRIMUNDUS Sp. z o.o. &middot; Poznańska 21/48, 00-685 Warschau",
+};
 
 /** Fusszeile dieser Mails — OHNE Abmelde-Link (der trüge den Portal-Token). */
 export const VERMITTLER_FUSSNOTE = "Sie erhalten diese E-Mail als Antwort auf Ihre Anfrage.";
