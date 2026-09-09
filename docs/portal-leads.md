@@ -377,17 +377,31 @@ wäre hier teurer als beim Portal.
 | `vermittler_angebot` | sofort | Tagessatz, Monatssatz, Anreise, **Provisionsblock** („Ihre Provision von 10 €/Tag kommt auf den Preis. Familie Schmidt zahlt damit 98 €/Tag"), Konditionen, eine passende Kraft |
 | `vermittler_kraefte` | +2 h (durch `sendezeitIso`) | die verfügbaren Kräfte als Liste, ohne Preiswiederholung |
 
-**Absender ist `info@primundus.de`** — die Adresse, an die der Partner
-geschrieben hat. Eine Antwort aus `kostenrechner@primundus.de` trüge einen
-anderen Absender als die angeschriebene Adresse und läse sich in seinem
-Postfach wie neue Post. Der Wert reist in `scheduled_emails.metadata`
-(`antwort_von`), weil die Edge Function die Vermittler-Konfiguration der
-Next-App nicht importieren kann; `sendEmailSmtp` nimmt ihn als
-Absender-Override. **Amazon SES muss diese Identity kennen** (AWS → SES →
-Verified identities: entweder `info@primundus.de` oder die ganze Domain
-`primundus.de`) — sonst lehnt SES die Mail ab. Der Testversand im
-DEMO-Modus nimmt denselben Absender und beweist das nebenbei.
+**Die Antwort geht über das Postfach raus, das wir auch lesen** — Ionos-SMTP
+von `info@primundus.de`, nicht über das SES-Konto der Kundenpost. Zwei
+Gründe, beide nachgeprüft:
+
+- Der SPF-Eintrag der Domain lautet `v=spf1 include:_spf-eu.ionos.com ~all`
+  und autorisiert damit **Ionos**, nicht SES. Die Kundenpost aus SES läuft
+  heute mit SPF-Softfail — ohne DMARC-Record akzeptieren Empfänger das, und
+  empirisch kommt sie an. Für eine Antwort an einen Geschäftspartner, dessen
+  Filter wir nicht kennen, ist ein sauberer SPF aber das billigere Los.
+- Aus derselben Adresse zu antworten, an die geschrieben wurde, ist für den
+  Partner eine Antwort. Ein anderer Absender liest sich wie neue Post.
+
+Technisch: ein **zweites SMTP-Profil im Supabase-Vault**
+(`vermittler_smtp_host/_port/_user/_pass/_from`, RPC
+`get_vermittler_smtp_config`), das die Edge Function nur dann lädt, wenn
+eine `vermittler_*`-Zeile fällig ist. **Ohne Rückfall auf das Kundenkonto:**
+fehlt Zugang oder Absender, scheitert der Versand laut (Zeile `failed` +
+Ops-Alarm), statt die Antwort still mit fremdem Absender rauszuschicken.
+Der DEMO-Versand nimmt dasselbe Profil und prüft den Zugang damit nebenbei.
 `Reply-To` bleibt `info@primundus.de` wie überall.
+
+Preis dieser Entscheidung, bewusst getragen: das Passwort von
+`info@primundus.de` liegt an **zwei** Stellen — Render (`INFO_PASS`, fürs
+Lesen per IMAP) und Supabase-Vault (`vermittler_smtp_pass`, fürs Senden).
+Bei einer Rotation beide anfassen.
 
 Betreff ist `Re: <Originalbetreff>`, dazu `In-Reply-To`/`References` —
 `sendEmailSmtp` hat dafür einen neunten Parameter bekommen (bewusst
@@ -476,9 +490,17 @@ liefe dieselbe Mail in jedem Takt erneut durchs Modell.
 | `PFLEGEHILFE_USER` / `_PASS` | Postfach. Fehlt eines, wird das Portal übersprungen |
 | `PFLEGEBUND_USER` / `_PASS` | dito |
 | `PFLEGEHELFER24_API_TOKEN` | Partner-API pflege-helfer24.de. Fehlt er, wird das Portal übersprungen. **Staging: nur zum Test, danach entfernen** |
-| `INFO_USER` / `INFO_PASS` | Zugang zu `info@primundus.de` — GETEILTES Postfach, nicht dem Vermittler allein. Registry-Feld `postfach: 'INFO'` |
+| `INFO_USER` / `INFO_PASS` | Zugang zu `info@primundus.de` — GETEILTES Postfach, nicht dem Vermittler allein. Registry-Feld `postfach: 'INFO'`. Nur fürs **Lesen** (IMAP) |
 | `ANTHROPIC_API_KEY` | Liest die Vermittler-Anfragen (dasselbe Konto wie Pria). Fehlt er, bleiben die Mails `offen` |
 | `PFLEGENA_MODELL` | optionaler Override, Default `claude-sonnet-5` |
+
+Zum **Senden** kommt der Zugang nicht aus Render, sondern aus dem
+Supabase-Vault (Edge Function): `vermittler_smtp_user`, `_pass`, `_from`
+(Pflicht — ohne sie scheitert der Versand laut) sowie optional `_host`
+(Default `smtp.ionos.de`), `_port` (587), `_from_name`. Setzen per
+Management-API-SQL (`vault.create_secret` / `vault.update_secret`), NICHT
+über eine Migration und NICHT über `supabase secrets` — das ist ein anderer
+Speicher.
 | `PORTAL_IMAP_HOST` | `imap.ionos.de` |
 | `PORTAL_TROCKENLAUF` | `1` = alle Portale nur lesen, **oder Domain-Liste** (`pflege-helfer24.de`) für ein Portal allein |
 | `PORTAL_TESTPHASE` | `1` = alle Portale, **oder Domain-Liste** — Kundenmails dieses Portals ans Team (auch als Supabase-Secret!) |

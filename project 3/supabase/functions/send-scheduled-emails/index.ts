@@ -123,6 +123,39 @@ async function getSmtpConfig(
   };
 }
  
+/* Absender der Vermittler-Mails: das Postfach, an das der Partner schreibt
+ * (Ionos), nicht das SES-Konto der Kundenpost. Eigenes Vault-Profil.
+ *
+ * Faellt hart aus, wenn Zugang oder Absender fehlen — ein Rueckfall auf die
+ * Kundenkonfiguration wuerde die Antwort mit einem fremden Absender
+ * verschicken, und zwar unbemerkt. Lieber bleibt die Zeile `failed` stehen
+ * und der Ops-Alarm meldet sich. */
+async function getVermittlerSmtpConfig(
+  // Wie getSmtpConfig: der Client ist hier untypisiert, weil die RPC-Namen
+  // nicht im generierten Schema stehen.
+  supabase: any,
+  siteUrl: string,
+): Promise<SmtpConfig> {
+  const { data, error } = await supabase.rpc("get_vermittler_smtp_config");
+  if (error) throw new Error(`Vermittler-SMTP nicht lesbar: ${error.message}`);
+  const fehlend = ["user", "pass", "from"].filter((k) => !String(data?.[k] ?? "").trim());
+  if (fehlend.length) {
+    throw new Error(
+      `Vermittler-SMTP unvollstaendig (${fehlend.join(", ")}) — Vault-Secrets `
+      + "vermittler_smtp_user/_pass/_from setzen. KEIN Rueckfall auf das Kundenkonto.",
+    );
+  }
+  return {
+    host: data.host || "smtp.ionos.de",
+    port: parseInt(data.port || "587"),
+    user: data.user,
+    pass: data.pass,
+    from: data.from,
+    fromName: data.fromName || "Primundus 24h-Pflege",
+    siteUrl,
+  };
+}
+
 const FEMALE_NAMES_SET = new Set(["aaliya","abby","ada","adela","adelheid","adeline","adriana","agata","agatha","agnes","aiko","aila","aileen","aimee","aisha","alana","alba","aleksandra","alexa","alexandra","alexia","alexis","alice","alicia","alina","alissa","aliyah","alke","allie","allison","alma","almut","alona","alva","alwine","amalia","amanda","amara","amaya","amelia","amelie","ami","amira","amy","ana","anastasia","andrea","andreja","angela","angelika","angelina","anita","anja","anna","annalena","anne","annegret","annelies","annelore","annette","anni","annika","antje","antonia","anuschka","aoife","arabell","ariadne","ariane","astrid","aurora","ava","babette","barbara","beatrice","beatrix","belen","bella","bente","berit","bernadette","bettina","bianca","birgit","birgitt","birgitta","birgitte","borbala","brigitta","brigitte","britt","brittany","bruna","brunhilde","camila","camilla","cara","carina","carla","carlotta","caro","carola","carolina","caroline","catharina","catharine","catrina","cecile","cecilia","charlotte","chiara","chloe","christel","christiane","christina","christine","claudia","claudine","constanze","corinna","cornelia","dagmar","dana","daniela","daria","deborah","diana","dina","dominique","dorothea","edda","edith","elena","eleonora","eliane","elisa","elisabeth","elizabeth","elke","ella","ellen","elsa","elsbeth","else","elvira","emilia","emma","erika","erna","ernestine","eva","eveline","evelyn","fatima","felicitas","filippa","fiona","franziska","frauke","frederike","frieda","gabriela","gabriele","gabi","gaby","gerda","gertrud","gisela","greta","gudrun","hanna","hannah","hannelore","heidemarie","heidi","heike","helene","helga","henriette","hildegard","hildegarde","hilke","hilde","ida","marta","ilona","ilse","imke","ines","ingeborg","ingrid","irina","iris","irmgard","irmtraud","isabel","isabelle","isadora","jacqueline","jana","janet","janna","jasmin","jennifer","jessica","jette","johanna","jolanta","josefine","josephine","julia","juliane","justine","karin","karla","katharina","katharine","kathrin","katja","katrin","katrina","katrine","klara","klaudia","klarissa","kordula","kristin","kristina","lara","larissa","laura","lea","leah","lena","leonie","leonora","lieselotte","lilli","lillian","lilly","lina","linda","lisa","lisbeth","lore","lori","lotte","lotta","louisa","louise","lucia","luisa","luise","luzie","lydia","magdalena","maja","malin","mara","margarita","margareta","margarethe","margit","margot","marianna","marie","marielle","marina","marita","marlene","marta","martina","mary","mathilde","maud","melanie","melinda","melissa","merle","mia","michelle","mira","miriam","mirja","monika","nadine","natalia","natalie","nathalie","nele","nicola","nicole","nina","nora","natascha","odette","olivia","ottilie","patrizia","paula","pauline","petra","pia","renate","ronja","rosa","rosalie","roswitha","ruth","sabrina","sandra","sara","sarah","silke","silvia","simona","simone","sina","sofia","sonja","sophie","stefanie","stella","stephanie","susanne","sybille","sylvia","tamara","tanja","tatjana","teresa","theresa","theres","tina","ulrike","ursula","uta","veronika","victoria","viola","virginia","walburga","waltraud","wanda","wiebke","wilhelmine","xenia","yvonne","zoe"]);
 const MALE_NAMES_SET = new Set(["aaron","adam","alexander","alfred","alois","andre","andreas","axel","bastian","benedikt","benjamin","bernd","bo","burkhard","carsten","christian","christoph","claus","clemens","cornelius","damian","daniel","david","dieter","dietmar","dirk","dominik","edgar","elias","emilio","eric","erik","ernst","eugen","fabian","felix","finn","florian","frank","franz","frederik","gabriel","georg","gerhard","gottfried","guido","gunnar","hans","harry","hartmut","heinz","helge","helmut","henning","henrik","herbert","heiko","holger","horst","hubert","hugo","jakob","jan","jens","joachim","joe","joel","joerg","johannes","jonas","jonathan","jochen","kai","karl","kilian","Klaus","kevin","konrad","kristian","lars","leo","leon","leopold","lorenz","lothar","lucas","lukas","manfred","marco","markus","martin","matthias","max","maximilian","michael","mike","moritz","nikolaj","nikolaus","nils","norbert","oliver","oscar","oskar","otto","patrice","patrick","paul","peter","philipp","ralf","reinhard","richard","robert","rolf","sebastian","simon","stefan","steffen","stephan","steven","sven","thomas","thorsten","tillman","tim","tobias","tom","torsten","ulrich","uwe","valentin","victor","volker","werner","willi","will","wolf","wolfram","xaver"]);
  
@@ -1476,15 +1509,7 @@ async function sendEmailSmtp(
      Options-Objekts: `cc` ist heute der letzte Parameter und wird an einer
      Stelle positionsweise durchgereicht (`undefined, false, ccListe(...)`)
      — ein Umbau auf ein Objekt haette genau dort das CC verloren. */
-  opts?: {
-    inReplyTo?: string | null;
-    references?: string | string[] | null;
-    /* Absender-Override. Der Vermittler schreibt an info@primundus.de und
-       bekommt die Antwort AUS dieser Adresse — sonst traegt sie einen
-       anderen Absender als die, die er angeschrieben hat, und liest sich
-       wie neue Post. Muss in SES als Identity verifiziert sein. */
-    from?: string | null;
-  },
+  opts?: { inReplyTo?: string | null; references?: string | string[] | null },
 ): Promise<{ success: boolean; error?: string }> {
   try {
     const transport = nodemailer.createTransport({
@@ -1515,7 +1540,7 @@ async function sendEmailSmtp(
     const bccAddr = bccRaw.trim();
 
     const mailOptions: any = {
-      from: `"${smtpConfig.fromName}" <${opts?.from || smtpConfig.from}>`,
+      from: `"${smtpConfig.fromName}" <${smtpConfig.from}>`,
       to,
       subject,
       // Reply-To auf ein überwachtes Team-Postfach — die Reminder bitten den
@@ -2303,7 +2328,7 @@ Deno.serve(async (req: Request) => {
          metadata). So sieht man Provisionsblock und Liste, ohne eine
          Anfrage anlegen zu muessen. */
       const demoTypen = (demoBody.items || []).map((i: any) => i?.email_type);
-      const demoMeta = { kunde_label: "Familie Muster", provision_pro_tag: 10, betreff_antwort: "Re: Ihre Anfrage", antwort_von: "info@primundus.de" };
+      const demoMeta = { kunde_label: "Familie Muster", provision_pro_tag: 10, betreff_antwort: "Re: Ihre Anfrage" };
       let demoVermittlerEmpf: EmpfehlungErgebnis | null = null;
       let demoVermittlerFuenf: Awaited<ReturnType<typeof kraefteFuerVermittler>> = null;
       if (demoTypen.includes("vermittler_angebot") && (lead as Lead).token) {
@@ -2369,13 +2394,13 @@ Deno.serve(async (req: Request) => {
             : item.email_type === "vermittler_kraefte" && demoVermittlerFuenf?.anhaenge.length
             ? demoVermittlerFuenf.anhaenge
             : undefined;
-          /* Vermittler-Vorschau nimmt denselben Absender wie die echte Mail —
-             so beweist der Testversand nebenbei, dass SES die Identity
-             akzeptiert (sonst faellt es erst beim ersten echten Partner auf). */
-          const r = await sendEmailSmtp(
-            smtpConfig, to, subject, html, text, anhang, demoBody.skipBcc === true, undefined,
-            item.email_type?.startsWith("vermittler_") ? { from: demoMeta.antwort_von } : undefined,
-          );
+          /* Vermittler-Vorschau nimmt dasselbe Postfach wie die echte Mail —
+             so prueft der Testversand nebenbei den Ionos-Zugang, statt ihn
+             erst beim ersten echten Partner zu entdecken. */
+          const demoConfig = item.email_type?.startsWith("vermittler_")
+            ? await getVermittlerSmtpConfig(supabase, smtpConfig.siteUrl)
+            : smtpConfig;
+          const r = await sendEmailSmtp(demoConfig, to, subject, html, text, anhang, demoBody.skipBcc === true);
           results.push({
             email_type: item.email_type, to, subject, ...r,
             // Damit man an der Antwort sieht, ob die Liste drin war.
@@ -3094,18 +3119,16 @@ Deno.serve(async (req: Request) => {
         const threadId = scheduledEmail.email_type.startsWith("vermittler_")
           ? ((scheduledEmail.metadata ?? {}) as Record<string, any>).message_id ?? null
           : null;
-        const vermittlerMeta = scheduledEmail.email_type.startsWith("vermittler_")
-          ? ((scheduledEmail.metadata ?? {}) as Record<string, any>)
-          : null;
+        /* Vermittler-Mails gehen ueber das Ionos-Postfach info@primundus.de,
+           alles andere ueber das SES-Konto. Erst hier geladen, damit ein
+           Takt ohne Vermittler-Mail keinen zusaetzlichen RPC kostet. */
+        const versandConfig = scheduledEmail.email_type.startsWith("vermittler_")
+          ? await getVermittlerSmtpConfig(supabase, smtpConfig.siteUrl)
+          : smtpConfig;
         const emailResult = await sendEmailSmtp(
-          smtpConfig, effektiverEmpfaenger, effektiverBetreff, html, text, attachments,
+          versandConfig, effektiverEmpfaenger, effektiverBetreff, html, text, attachments,
           false, umleitung ? undefined : ccEmpfaenger,
-          vermittlerMeta
-            ? {
-              ...(threadId ? { inReplyTo: threadId, references: threadId } : {}),
-              from: (vermittlerMeta.antwort_von as string) || null,
-            }
-            : undefined,
+          threadId ? { inReplyTo: threadId, references: threadId } : undefined,
         );
 
         if (emailResult.success) {

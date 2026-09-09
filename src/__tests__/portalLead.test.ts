@@ -210,7 +210,10 @@ describe('postfachPraefix (wo die Mails liegen)', () => {
     expect(postfachPraefix(v)).not.toBe('PFLEGENA');
   });
 
-  it('die Antwort geht aus der Adresse raus, an die geschrieben wurde', () => {
-    expect(vermittlerFuer('pflegena.com')?.antwortVon).toBe('info@primundus.de');
+  it('der Absender der Antwort steht NICHT im Registry', () => {
+    /* Er lebt im Vault-Profil (vermittler_smtp_from), zusammen mit Zugang und
+       Host — eine zweite Kopie hier koennte davon abweichen, und die
+       Abweichung faellt niemandem auf. */
+    expect(vermittlerFuer('pflegena.com')).not.toHaveProperty('antwortVon');
   });
 });

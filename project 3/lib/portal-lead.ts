@@ -172,15 +172,18 @@ export const PORTALE = [
      — die Hauptadresse der Firma, in der auch Kundenantworten, BCC-Kopien
      unserer eigenen Mails und Team-Benachrichtigungen liegen. Die Quelle ist
      deshalb der ABSENDER (`domain`), das Postfach nur der Ort, an dem wir
-     nachsehen (`postfach` → INFO_USER/INFO_PASS). */
+     nachsehen (`postfach` → INFO_USER/INFO_PASS).
+
+     Die ANTWORT geht aus demselben Postfach raus, ueber dessen eigenen
+     Ionos-SMTP — nicht ueber das SES-Konto der Kundenpost: der SPF-Eintrag
+     der Domain autorisiert Ionos, und eine Antwort aus der angeschriebenen
+     Adresse ist fuer den Partner eine Antwort statt neuer Post. Zugang und
+     Absender stehen als eigenes Profil im Supabase-Vault
+     (`vermittler_smtp_*`, RPC `get_vermittler_smtp_config`) — hier steht
+     bewusst KEINE zweite Kopie der Adresse, die davon abweichen koennte. */
   { domain: 'pflegena.com', name: 'Pflegena.com', abholung: 'imap', art: 'vermittler',
     provisionProTag: 10,
-    postfach: 'INFO',
-    /* Antwort kommt aus DEM Postfach, an das geschrieben wurde — sonst
-       traegt unsere Antwort einen anderen Absender als die Adresse, die der
-       Partner angeschrieben hat, und liest sich wie neue Post statt wie eine
-       Antwort. Muss in Amazon SES als Identity verifiziert sein. */
-    antwortVon: 'info@primundus.de' },
+    postfach: 'INFO' },
 ] as const;
 
 export type PortalAbholung = (typeof PORTALE)[number]['abholung'];
