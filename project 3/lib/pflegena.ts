@@ -119,6 +119,25 @@ provision_pro_tag: die Zahl, die der Vermittler auf unseren Preis aufschlaegt ("
 
 kontext: die Situation in den Worten der Mail. Keine Erfindungen, keine Zusammenfassung der Preisfelder.`;
 
+/* Die Nachricht, die das Modell zu sehen bekommt.
+ *
+ * HIER und nicht in der Route, weil genau das schon einmal schiefging: die
+ * Route nahm den Betreff als Parameter entgegen und baute den Request
+ * trotzdem nur aus dem Fliesstext. Der SYSTEM-Prompt oben verlangt den
+ * Betreff, der PLZ-Beleg unten akzeptiert ihn — nur ankommen tat er nie.
+ * Aufgefallen ist es erst an einer echten Mail, und auch dort nur deshalb
+ * NICHT als Schaden, weil Outlook den Betreff als erste Zeile des Textes
+ * wiederholt. Als pure Funktion kann ein Test festhalten, dass beide
+ * Bloecke drinstehen.
+ *
+ * Betreff gekappt: er ist eine Kopfzeile, keine Nutzlast — 400 Zeichen
+ * fassen auch die langen ("Neue Stelle ab sofort <Name> <PLZ> <Ort> wohnt
+ * alleine, bitte kein Mann"). */
+export function modellNachricht(betreff: string | null | undefined, text: string): string {
+  const kopf = (betreff ?? '').trim().slice(0, 400);
+  return `<betreff>\n${kopf}\n</betreff>\n\n<anfrage>\n${text.slice(0, 20000)}\n</anfrage>`;
+}
+
 /* Die zwei Mails, die eine Vermittler-Anfrage ausloest. Bewusst HIER und
  * nicht in der Route: so kann der Test festhalten, was die Liste enthaelt —
  * und vor allem, was nicht. Stuende 'eingangsbestaetigung' darin, bekaeme
