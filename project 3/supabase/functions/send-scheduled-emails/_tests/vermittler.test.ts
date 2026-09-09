@@ -10,7 +10,7 @@ import {
   vermittlerPreis,
   vermittlerAngebotHtml, vermittlerAngebotText,
   vermittlerKraefteHtml, vermittlerKraefteText,
-  VERMITTLER_FUSSNOTE, ANREISE_HINWEIS,
+  VERMITTLER_FUSSNOTE, ANREISE_HINWEIS, VERMITTLER_ABSENDER,
 } from "../vermittler.ts";
 import type { Empfehlung } from "../empfehlung.ts";
 
@@ -213,4 +213,18 @@ Deno.test("die Textfassungen gruessen mit Namen und Durchwahl", () => {
     assertStringIncludes(t, "Marta Kapcio");
     assertStringIncludes(t, "089 200 000 830");
   }
+});
+
+/* Die beiden Vermittler-Mails gehen von der POLNISCHEN Gesellschaft an einen
+   deutschen Geschaeftspartner — dort gehoert das vollstaendige Impressum hin.
+   Die Kundenmails bleiben bei "Primundus Deutschland" (Entscheidung Michał,
+   09.09.); der Wrapper hat das als Vorgabe, abweichen tut nur diese Strecke. */
+Deno.test("Vermittler-Absender traegt das polnische Impressum", () => {
+  assertStringIncludes(VERMITTLER_ABSENDER.name, "Sp. z o.o.");
+  assertStringIncludes(VERMITTLER_ABSENDER.zeilen, "KRS 0001259402");
+  assertStringIncludes(VERMITTLER_ABSENDER.zeilen, "NIP 7011326714");
+  assertStringIncludes(VERMITTLER_ABSENDER.zeilen, "Warschau");
+  assertStringIncludes(VERMITTLER_ABSENDER.kurz, "Poznańska 21/48");
+  // Keine Spur der deutschen Marke — sonst stuenden beide im Fuss.
+  assert(!VERMITTLER_ABSENDER.name.includes("Deutschland"));
 });

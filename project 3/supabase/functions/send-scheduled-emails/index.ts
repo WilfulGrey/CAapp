@@ -32,6 +32,7 @@ import {
 import {
   vermittlerAngebotHtml, vermittlerAngebotText,
   vermittlerKraefteHtml, vermittlerKraefteText,
+  VERMITTLER_ABSENDER,
   VERMITTLER_FUSSNOTE,
 } from "./vermittler.ts";
 import {
@@ -199,7 +200,22 @@ function buildHalloAnrede(anrede: string | null, nachname: string, vorname: stri
    Kunden-Satz ("weil Sie eine Kalkulation ... angefordert haben") — fuer
    einen Vermittler waere er schlicht falsch, und der Abmelde-Link darunter
    truege seinen Portal-Token nach draussen. */
-function buildEmailWrapper(lead: Lead, siteUrl: string, content: string, fussnote?: string): string {
+/* Absender im Fuss. Vorgabe ist die deutsche Marke — so bleibt jede
+   Kundenmail unveraendert; abweichen tun nur die Vermittler-Mails, die von
+   der polnischen Gesellschaft an einen Geschaeftspartner gehen. */
+const ABSENDER_DE = {
+  name: "Primundus Deutschland",
+  zeilen: "24h-Pflege und Betreuung zu Hause",
+  kurz: "Primundus Deutschland",
+};
+
+function buildEmailWrapper(
+  lead: Lead,
+  siteUrl: string,
+  content: string,
+  fussnote?: string,
+  absender: { name: string; zeilen: string; kurz: string } = ABSENDER_DE,
+): string {
   const logoUrl = `${siteUrl}/images/Primundus-Logo_V6.png`;
   const testUrl = `${siteUrl}/images/primundus_testsieger-2021.webp`;
   return `<!DOCTYPE html>
@@ -273,16 +289,16 @@ function buildEmailWrapper(lead: Lead, siteUrl: string, content: string, fussnot
             ${content}
           </div>
           <div class="email-footer">
-            <div style="font-weight:600;font-size:15px;color:#3D2B1F;margin-bottom:6px;">Primundus Deutschland</div>
+            <div style="font-weight:600;font-size:15px;color:#3D2B1F;margin-bottom:6px;">${absender.name}</div>
             <div style="font-size:13px;color:#666;line-height:1.8;">
-              24h-Pflege und Betreuung zu Hause<br>
+              ${absender.zeilen}<br>
               <a href="tel:+4989200000830" style="color:#0066CC;text-decoration:none;">+49 89 200 000 830</a> |
               <a href="mailto:info@primundus.de" style="color:#0066CC;text-decoration:none;">info@primundus.de</a><br>
               <a href="https://primundus.de" style="color:#0066CC;text-decoration:none;">www.primundus.de</a>
             </div>
             <div style="font-size:12px;color:#999;margin-top:16px;line-height:1.5;">
               Diese E-Mail wurde versendet an: ${lead.email}<br>
-              Primundus Deutschland<br><br>
+              ${absender.kurz}<br><br>
               ${fussnote ?? `Sie erhalten diese E-Mail, weil Sie eine Kalkulation auf primundus.de angefordert haben.${lead.token ? `<br><a href="${siteUrl.replace(/\/$/, "")}/abmelden?token=${encodeURIComponent(lead.token)}" style="color:#999;text-decoration:underline;">Keine E-Mails mehr erhalten</a>` : ""}`}
             </div>
           </div>
@@ -2353,7 +2369,7 @@ Deno.serve(async (req: Request) => {
               sichtbarGesamt: demoVermittlerEmpf?.sichtbarGesamt ?? 0,
               fotoCid: demoInline?.cid ?? null,
             };
-            return { subject: demoMeta.betreff_antwort, html: buildEmailWrapper(lead as Lead, site, vermittlerAngebotHtml(d), VERMITTLER_FUSSNOTE), text: vermittlerAngebotText(d) };
+            return { subject: demoMeta.betreff_antwort, html: buildEmailWrapper(lead as Lead, site, vermittlerAngebotHtml(d), VERMITTLER_FUSSNOTE, VERMITTLER_ABSENDER), text: vermittlerAngebotText(d) };
           }
           case "vermittler_kraefte": {
             const d = {
@@ -2361,7 +2377,7 @@ Deno.serve(async (req: Request) => {
               signatur: buildMartaSig(site),
               fuenf: demoVermittlerFuenf?.fuenf ?? [], cids: demoVermittlerFuenf?.cids ?? [],
             };
-            return { subject: demoMeta.betreff_antwort, html: buildEmailWrapper(lead as Lead, site, vermittlerKraefteHtml(d), VERMITTLER_FUSSNOTE), text: vermittlerKraefteText(d) };
+            return { subject: demoMeta.betreff_antwort, html: buildEmailWrapper(lead as Lead, site, vermittlerKraefteHtml(d), VERMITTLER_FUSSNOTE, VERMITTLER_ABSENDER), text: vermittlerKraefteText(d) };
           }
           default: return { subject: `Unbekannt: ${t}`, html: `<p>Unbekannter Typ ${t}</p>`, text: `Unbekannter Typ ${t}` };
         }
@@ -2785,7 +2801,7 @@ Deno.serve(async (req: Request) => {
             empfehlung, sichtbarGesamt, fotoCid,
           };
           subject = (meta.betreff_antwort as string) || "Re: Ihre Anfrage";
-          html = buildEmailWrapper(lead as Lead, smtpConfig.siteUrl, vermittlerAngebotHtml(daten), VERMITTLER_FUSSNOTE);
+          html = buildEmailWrapper(lead as Lead, smtpConfig.siteUrl, vermittlerAngebotHtml(daten), VERMITTLER_FUSSNOTE, VERMITTLER_ABSENDER);
           text = vermittlerAngebotText(daten);
           eventTypeSent = "email_vermittler_angebot_sent";
           eventTypeFailed = "email_vermittler_angebot_failed";
@@ -2828,7 +2844,7 @@ Deno.serve(async (req: Request) => {
             fuenf: teile.fuenf, cids: teile.cids,
           };
           subject = (meta.betreff_antwort as string) || "Re: Ihre Anfrage";
-          html = buildEmailWrapper(lead as Lead, smtpConfig.siteUrl, vermittlerKraefteHtml(daten), VERMITTLER_FUSSNOTE);
+          html = buildEmailWrapper(lead as Lead, smtpConfig.siteUrl, vermittlerKraefteHtml(daten), VERMITTLER_FUSSNOTE, VERMITTLER_ABSENDER);
           text = vermittlerKraefteText(daten);
           eventTypeSent = "email_vermittler_kraefte_sent";
           eventTypeFailed = "email_vermittler_kraefte_failed";

@@ -338,5 +338,20 @@ export function vermittlerKraefteText(d: KraefteDaten): string {
   ].join("\n");
 }
 
+/* Absender der Vermittler-Mails: die POLNISCHE Gesellschaft.
+ *
+ * Diese beiden Mails gehen von unserer polnischen Seite an einen deutschen
+ * Geschaeftspartner — dort gehoert das vollstaendige Impressum mit Anschrift,
+ * KRS und NIP hin. Die Mails an ENDKUNDEN bleiben unveraendert bei
+ * "Primundus Deutschland" (Entscheidung Michał, 09.09.); der Wrapper hat das
+ * als Vorgabe, hier steht bewusst nur die Abweichung. */
+export const VERMITTLER_ABSENDER = {
+  name: "PRIMUNDUS Sp. z o.o.",
+  /** Zeilen ueber Telefon/Mail/Web im Fuss. */
+  zeilen: "Poznańska 21/48, 00-685 Warschau, Polen<br>KRS 0001259402 &middot; NIP 7011326714",
+  /** Die kleine Zeile unter "versendet an". */
+  kurz: "PRIMUNDUS Sp. z o.o. &middot; Poznańska 21/48, 00-685 Warschau",
+};
+
 /** Fusszeile dieser Mails — OHNE Abmelde-Link (der trüge den Portal-Token). */
 export const VERMITTLER_FUSSNOTE = "Sie erhalten diese E-Mail als Antwort auf Ihre Anfrage.";
