@@ -17,7 +17,22 @@ export const SEED_SENTINEL_UID = 0;
 export interface LogZeile {
   uid: number;
   status: string;
+  /** Wie oft diese Mail schon transient gescheitert ist. Nur der Vermittler
+   *  wertet den Zähler aus — dort kostet jeder Versuch einen LLM-Aufruf. */
+  versuche?: number | null;
 }
+
+/** Bisherige Fehlversuche einer UID (0, wenn unbekannt). */
+export function versucheFuer(uid: number, zeilen: LogZeile[]): number {
+  const z = zeilen.find((x) => x.uid === uid);
+  const n = Number(z?.versuche ?? 0);
+  return Number.isFinite(n) && n > 0 ? n : 0;
+}
+
+/** Ab hier gibt der Abholer eine Mail auf, statt sie im Minutentakt erneut
+ *  durch ein kostenpflichtiges Modell zu schicken. Der Verlust ist sichtbar
+ *  (Status 'abgelehnt' + Team-Mail), nicht still. */
+export const MAX_VERSUCHE = 5;
 
 /** UIDs, die dieser Lauf verarbeiten soll: nicht protokolliert ODER
  *  'offen' (transienter Fehler, Retry). Jeder andere Status — auch ein

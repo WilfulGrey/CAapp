@@ -5,7 +5,7 @@ import { describe, it, expect } from 'vitest';
 // root-vitest, weil project 3 keinen Testrunner hat und die früheren
 // Deno-Prüfskripte in scripts/ den `next build` gebrochen haben
 // (Registry #38): CI-required statt nie-laufender Standalone-Skripte.
-import { ergaenzeAngaben, reiterFuer } from '../../project 3/lib/portal-lead';
+import { ergaenzeAngaben, reiterFuer, vermittlerFuer, postfachPraefix, PORTALE } from '../../project 3/lib/portal-lead';
 
 /* pricing_config — ECHTE Zeilen von prod (Abzug 08.09.2026), nicht erfunden.
  *
@@ -105,8 +105,11 @@ describe('reiterFuer (Admin-Lead-Liste)', () => {
       'Pflege-Helfer24.de',
       'Pflegebund.eu',
       'Pflegehilfe.org',
+      // Der Vermittler steht unter denselben Reitern: seine source ist
+      // "portal:pflegena.com", nur leads.vermittler unterscheidet ihn.
+      'Pflegena.com',
     ]);
-    expect(leer.map((r) => r.anzahl)).toEqual([0, 0, 0, 0, 0]);
+    expect(leer.map((r) => r.anzahl)).toEqual([0, 0, 0, 0, 0, 0]);
   });
 
   it('nur eigene Leads: Portal-Reiter bleiben sichtbar, aber leer', () => {
@@ -114,7 +117,7 @@ describe('reiterFuer (Admin-Lead-Liste)', () => {
     expect(eigene.find((r) => r.key === 'eigene')?.anzahl).toBe(2);
     expect(
       eigene.filter((r) => r.key.startsWith('portal:')).map((r) => r.anzahl),
-    ).toEqual([0, 0, 0]);
+    ).toEqual([0, 0, 0, 0]);
   });
 
   it('gemischt: jeder Lead zählt genau einmal, Summe = Alle', () => {
@@ -174,5 +177,43 @@ describe('teuerster nimmt nur waehlbare Werte (Registry #58)', () => {
     // 'basis'/'grundpreis' stehen nicht in ERLAUBT — die Funktion darf daran
     // nicht ersticken, sie wird dafuer nur nie gefragt.
     expect(() => ergaenzeAngaben({}, [{ kategorie: 'basis', antwort_key: 'grundpreis', aufschlag_euro: 2150 }])).not.toThrow();
+  });
+});
+
+describe('vermittlerFuer', () => {
+  it('erkennt den Vermittler, nicht die eingekauften Portale', () => {
+    // Pflegena teilt sich die source ("portal:…") mit den eingekauften
+    // Portalen — unterschieden wird über art bzw. leads.vermittler.
+    expect(vermittlerFuer('pflegena.com')?.provisionProTag).toBe(10);
+    expect(vermittlerFuer('PFLEGENA.COM')?.domain).toBe('pflegena.com');
+    expect(vermittlerFuer('pflegehilfe.org')).toBeUndefined();
+    expect(vermittlerFuer('')).toBeUndefined();
+    expect(vermittlerFuer(null)).toBeUndefined();
+  });
+});
+
+describe('postfachPraefix (wo die Mails liegen)', () => {
+  it('Portale leiten den Zugang aus ihrer Domain ab', () => {
+    // Ein eingekauftes Portal hat ein EIGENES Postfach — die Adresse ist
+    // dort zugleich die Quellenangabe.
+    const p = PORTALE.find((x) => x.domain === 'pflegehilfe.org')!;
+    expect(postfachPraefix(p)).toBe('PFLEGEHILFE');
+  });
+
+  it('der Vermittler zeigt auf ein geteiltes Postfach, nicht auf seine Domain', () => {
+    /* Pflegena schreibt an info@primundus.de — dort liegen auch Kundenpost
+       und die BCC-Kopien unserer eigenen Mails. Würde der Zugang aus der
+       Domain abgeleitet, suchte der Abholer ein Postfach PFLEGENA_*, das es
+       nicht gibt, und übersprünge die Quelle stillschweigend. */
+    const v = vermittlerFuer('pflegena.com')!;
+    expect(postfachPraefix(v)).toBe('INFO');
+    expect(postfachPraefix(v)).not.toBe('PFLEGENA');
+  });
+
+  it('der Absender der Antwort steht NICHT im Registry', () => {
+    /* Er lebt im Vault-Profil (vermittler_smtp_from), zusammen mit Zugang und
+       Host — eine zweite Kopie hier koennte davon abweichen, und die
+       Abweichung faellt niemandem auf. */
+    expect(vermittlerFuer('pflegena.com')).not.toHaveProperty('antwortVon');
   });
 });

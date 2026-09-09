@@ -70,3 +70,19 @@ Deno.test("Template: Betreff, drei Antwort-Links mit Token, Anrede", () => {
 Deno.test("Stichtag ist der 14.08. (Martin: nur Neuanfragen)", () => {
   assertEquals(BEWERTUNG_STICHTAG, "2026-08-14");
 });
+
+Deno.test("Vermittler-Lead bekommt keine Bewertungsanfrage", () => {
+  /* Diese Runde laeuft AUSSERHALB der Warteschlange (index.ts ruft sie in
+     jedem Takt), die Bremse in lead-event sieht sie also nie. Ohne diese
+     Zeile bekaeme der Partner sieben Tage nach JEDER Anfrage eine Mail
+     "wie hilfreich war unsere Beratung?" — bei zwanzig Anfragen zwanzigmal. */
+  const jetzt = new Date("2026-09-20T10:00:00Z");
+  const basis = {
+    id: "l1", email: "b.walde@pflegena.com", token: "t",
+    vorname: "Bernd", nachname: "Walde", anrede_text: "Herr",
+    status: "angebot_requested", created_at: "2026-09-01T10:00:00Z",
+  };
+  assertEquals(bewertungAusschlussgrund({ ...basis, vermittler: "pflegena.com" }, [], jetzt), "vermittler");
+  // Gegenprobe: derselbe Lead ohne Vermittler-Kennzeichen laeuft durch.
+  assertEquals(bewertungAusschlussgrund(basis, [], jetzt), null);
+});

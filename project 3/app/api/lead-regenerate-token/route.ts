@@ -171,7 +171,17 @@ async function handlePost(request: NextRequest) {
       );
   }
 
-  const shouldSendEmail = source !== 'admin-silent' && Boolean(lead.email);
+  /* Vermittler-Lead: die Mail traegt den Magic-Link ins Kundenportal — mit
+     Patientenbogen, Bewerbungen und Vertragsunterschrift des Endkunden.
+     Der Partner darf ihn nicht bekommen. BEWUSST erst hier und nicht als
+     frueher return: Rotation und Token-Spiegel nach mamamia (Registry #44)
+     sollen weiterlaufen, damit das Team den Link im Panel behaelt. */
+  const shouldSendEmail = source !== 'admin-silent'
+    && !(lead as any).vermittler
+    && Boolean(lead.email);
+  if ((lead as any).vermittler) {
+    console.log(`[regen-token] Vermittler-Lead ${lead.id} — Token rotiert, aber keine Mail an den Partner`);
+  }
   const portalBase = PORTAL_BASIS;
   const portalUrl = `${portalBase.replace(/\/$/, '')}/?token=${encodeURIComponent(newToken)}`;
 
@@ -194,7 +204,7 @@ async function handlePost(request: NextRequest) {
   if (shouldSendEmail) {
     const leadWithNewToken = { ...lead, token: newToken };
     // Testphase: Portal-Leads ans Team (Umleitung nur beim Versand).
-    const uml = testphaseUmleitung(lead, process.env.PORTAL_TESTPHASE);
+    const uml = testphaseUmleitung(lead, process.env.PORTAL_TESTPHASE, process.env.PORTAL_TESTPHASE_EMPFAENGER);
     const tpl = getTokenRegenerationEmailTemplate(leadWithNewToken, portalUrl);
     sendEmail(uml?.empfaenger ?? lead.email, uml ? { ...tpl, subject: uml.betreffPraefix + tpl.subject } : tpl, undefined,
       uml ? undefined : { cc: kundenEmpfaenger(lead).cc }).catch(

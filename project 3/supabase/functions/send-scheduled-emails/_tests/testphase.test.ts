@@ -29,3 +29,17 @@ Deno.test("Domain-Liste: nur das genannte Portal wird umgeleitet, '1' bleibt all
   assertEquals(testphaseUmleitung(hilfe, "pflege-helfer24.de, pflegehilfe.org")?.empfaenger, TESTPHASE_EMPFAENGER);
   assertEquals(testphaseUmleitung(hilfe, "1")?.empfaenger, TESTPHASE_EMPFAENGER);
 });
+
+Deno.test("Testphase: Ziel ist ueberschreibbar (ein Durchlauf, eine Adresse)", () => {
+  const lead = { source: "portal:pflegena.com", email: "b.walde@pflegena.com" };
+  // Ohne Override bleibt das Team-Postfach.
+  assertEquals(testphaseUmleitung(lead, "pflegena.com")?.empfaenger, TESTPHASE_EMPFAENGER);
+  // Mit Override zielt der Lauf auf genau eine Adresse — sonst bekaeme die
+  // halbe Firma Testpost, nur weil jemand eine Quelle scharfschaltet.
+  assertEquals(
+    testphaseUmleitung(lead, "pflegena.com", "m.kepinski@mamamia.app")?.empfaenger,
+    "m.kepinski@mamamia.app",
+  );
+  // Leerer/blanker Wert zaehlt als nicht gesetzt.
+  assertEquals(testphaseUmleitung(lead, "pflegena.com", "   ")?.empfaenger, TESTPHASE_EMPFAENGER);
+});

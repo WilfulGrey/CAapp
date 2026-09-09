@@ -18,7 +18,18 @@ import { type SupabaseClient } from "npm:@supabase/supabase-js@2.57.4";
 export const PORTAL_PREISE: Record<string, number> = {
   "pflegehilfe.org": 37,
   "pflege-helfer24.de": 50,
+  // Vermittler: die Anfrage kostet nichts, die Provision faellt erst mit dem
+  // Auftrag an. Der Eintrag MUSS existieren — sonst landet Pflegena taeglich
+  // in `portaleOhnePreis` und der Report meldet einen Fehler, den es nicht gibt.
+  "pflegena.com": 0,
 };
+
+/** Kennen wir den Einkaufspreis dieses Portals? 0 zaehlt als bekannt. */
+export function portalPreisBekannt(source: string | null | undefined): boolean {
+  const s = String(source ?? "").toLowerCase();
+  if (!s.startsWith("portal:")) return false;
+  return s.slice("portal:".length) in PORTAL_PREISE;
+}
 
 /** "portal:pflegehilfe.org" → 37 (0, wenn der Preis fehlt). */
 export function portalPreis(source: string | null | undefined): number {
@@ -306,8 +317,10 @@ export async function fetchDailyStats(
   for (const l of echteLeads) {
     const quelle = String((l as { source?: string | null }).source ?? "");
     if (!quelle.toLowerCase().startsWith("portal:")) continue;
-    const preis = portalPreis(quelle);
-    if (preis > 0) kostenEingekauft += preis;
+    /* Nach BEKANNT unterscheiden, nicht nach `> 0`: ein Portal, dessen Preis
+       bewusst 0 ist (Vermittler), ist nicht dasselbe wie ein Portal, dessen
+       Preis wir vergessen haben einzutragen. */
+    if (portalPreisBekannt(quelle)) kostenEingekauft += portalPreis(quelle);
     else portaleOhnePreis.add(quelle.slice("portal:".length));
   }
 

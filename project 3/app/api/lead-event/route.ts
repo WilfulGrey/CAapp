@@ -1146,7 +1146,18 @@ async function handlePost(request: NextRequest) {
     // loggen wir und überspringen die Mail — der lead_event wird trotzdem
     // aufgezeichnet.
     // Im Team-Only-Resend-Modus wird die Kunden-Mail komplett übersprungen.
-    if (!teamOnlyResend && !silent && CUSTOMER_MAIL_EVENTS.has(event)) {
+    /* Vermittler-Lead: lead.email ist die Adresse eines Geschaeftspartners.
+       Mail A/B/C/D und offer_updated sind an den betreuten Kunden
+       geschrieben und tragen Links ins Kundenportal — sie duerfen dorthin
+       nicht. Der eine Ort reicht: scheduleReactionReminder haengt im
+       .then() dieser Versendung, also entfallen mit der Mail auch alle
+       fuenf Reaktions-Reminder. Team-Mails laufen weiter — wir wollen jede
+       Bewerbung sehen. */
+    const istVermittlerLead = Boolean((lead as any)?.vermittler);
+    if (istVermittlerLead && CUSTOMER_MAIL_EVENTS.has(event)) {
+      console.log(`[lead-event] ${event}: Vermittler-Lead ${lead.id} — keine Kundenmail, kein Reminder`);
+    }
+    if (!teamOnlyResend && !silent && !istVermittlerLead && CUSTOMER_MAIL_EVENTS.has(event)) {
       // patient_data_saved ist deduped (NON_DEDUPED_EVENTS enthält nur die
       // Caregiver-Events) — Mail nur beim ersten Speichern verschicken,
       // sonst spammen wir den Kunden bei jedem Patientendaten-Update.
@@ -1191,7 +1202,7 @@ async function handlePost(request: NextRequest) {
           const portalUrl = buildPortalUrl(lead as any);
           const template = getPatientDataSavedEmailTemplate(lead as any, portalUrl);
           // Testphase: Portal-Leads ans Team (Umleitung nur beim Versand).
-          const umlD = testphaseUmleitung(lead as any, process.env.PORTAL_TESTPHASE);
+          const umlD = testphaseUmleitung(lead as any, process.env.PORTAL_TESTPHASE, process.env.PORTAL_TESTPHASE_EMPFAENGER);
           sendEmail(umlD?.empfaenger ?? (lead as any).email, umlD ? { ...template, subject: umlD.betreffPraefix + template.subject } : template, undefined,
             umlD ? undefined : { cc: kundenEmpfaenger(lead as any).cc }).catch((e) =>
             console.error('customer mail send threw:', e instanceof Error ? e.message : String(e)),
@@ -1224,7 +1235,7 @@ async function handlePost(request: NextRequest) {
             },
             portalUrl,
           );
-          const umlO = testphaseUmleitung(lead as any, process.env.PORTAL_TESTPHASE);
+          const umlO = testphaseUmleitung(lead as any, process.env.PORTAL_TESTPHASE, process.env.PORTAL_TESTPHASE_EMPFAENGER);
           sendEmail(umlO?.empfaenger ?? (lead as any).email, umlO ? { ...template, subject: umlO.betreffPraefix + template.subject } : template, undefined,
             umlO ? undefined : { cc: kundenEmpfaenger(lead as any).cc }).catch((e) =>
             console.error('customer mail send threw:', e instanceof Error ? e.message : String(e)),
@@ -1253,7 +1264,7 @@ async function handlePost(request: NextRequest) {
           )
             .then(({ template, attachments }) => {
               // Mail C (Buchungsbestätigung): Vertrag-HTML zusätzlich anhängen.
-              const umlC = testphaseUmleitung(lead as any, process.env.PORTAL_TESTPHASE);
+              const umlC = testphaseUmleitung(lead as any, process.env.PORTAL_TESTPHASE, process.env.PORTAL_TESTPHASE_EMPFAENGER);
               return sendEmail(
                 umlC?.empfaenger ?? (lead as any).email,
                 umlC ? { ...template, subject: umlC.betreffPraefix + template.subject } : template,

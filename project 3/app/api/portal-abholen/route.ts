@@ -51,9 +51,11 @@ import { createClient, type SupabaseClient } from '@supabase/supabase-js';
  * der Abholer bringt KEINE zweite Lesart der Portal-Mail mit. */
 import { parsePflegehilfe, telefoneAusHtml, waehleTelefone } from '@/lib/portal-parser';
 import { parseCsv, csvZuLeadZeile, csvZeileBrauchbar } from '@/lib/portal-csv';
-import { PORTALE } from '@/lib/portal-lead';
-import { zuVerarbeiten, SEED_SENTINEL_UID, type LogZeile } from '@/lib/portal-mail-log';
+import { PORTALE, vermittlerFuer, postfachPraefix } from '@/lib/portal-lead';
+import { zuVerarbeiten, SEED_SENTINEL_UID, versucheFuer, MAX_VERSUCHE, type LogZeile } from '@/lib/portal-mail-log';
+import { pruefeAnfrage, SYSTEM as PFLEGENA_SYSTEM, WERKZEUG as PFLEGENA_WERKZEUG, type MailKopf } from '@/lib/pflegena';
 import { flagGiltFuer } from '@/lib/portal-schutz';
+import { sendEmail } from '@/lib/email';
 import { apiZeilen, helfer24ZuLeadBody, heuteBerlin, HELFER24_EXPORT_URL, type Helfer24Ergebnis } from '@/lib/portal-helfer24';
 
 export const runtime = 'nodejs';
@@ -95,11 +97,11 @@ function konfig(): Konfig {
  * der Env, benannt nach dem Portal: pflegehilfe.org → PFLEGEHILFE_USER /
  * PFLEGEHILFE_PASS. Ein Postfach ohne gesetztes Passwort wird
  * uebersprungen, nicht erraten. */
-function postfaecher(): Postfach[] {
-  return PORTALE.filter((p) => p.abholung === 'imap').map(({ domain }) => {
-    const praefix = domain.split('.')[0].toUpperCase();
+function postfaecher(art: 'portal' | 'vermittler'): Postfach[] {
+  return PORTALE.filter((p) => p.abholung === 'imap' && p.art === art).map((p) => {
+    const praefix = postfachPraefix(p);
     return {
-      portal: domain,
+      portal: p.domain,
       user: process.env[`${praefix}_USER`],
       pass: process.env[`${praefix}_PASS`],
     };
@@ -133,7 +135,7 @@ async function alleLogZeilen(db: SupabaseClient, postfach: string, uidvalidity: 
   for (let von = 0; ; von += 1000) {
     const { data, error } = await db
       .from('portal_mail_log')
-      .select('uid, status')
+      .select('uid, status, versuche')
       .eq('postfach', postfach)
       .eq('uidvalidity', uidvalidity)
       .order('uid', { ascending: true })
@@ -144,7 +146,13 @@ async function alleLogZeilen(db: SupabaseClient, postfach: string, uidvalidity: 
   }
 }
 
-type Ausgang = { status: 'erledigt' | 'uebersprungen' | 'abgelehnt' | 'offen'; grund?: string; leadId?: string };
+type Ausgang = {
+  status: 'erledigt' | 'uebersprungen' | 'abgelehnt' | 'offen';
+  grund?: string;
+  leadId?: string;
+  /** Nur der Vermittler-Zweig setzt das — siehe MAX_VERSUCHE. */
+  versuche?: number;
+};
 
 async function schreibeLog(db: SupabaseClient, postfach: string, uidvalidity: number, uid: number, ausgang: Ausgang) {
   /* Upsert, nicht insert: 'offen' → 'erledigt'/'abgelehnt' aktualisiert
@@ -156,6 +164,7 @@ async function schreibeLog(db: SupabaseClient, postfach: string, uidvalidity: nu
     status: ausgang.status,
     grund: ausgang.grund ?? null,
     lead_id: ausgang.leadId ?? null,
+    ...(ausgang.versuche === undefined ? {} : { versuche: ausgang.versuche }),
     updated_at: new Date().toISOString(),
   }, { onConflict: 'postfach,uidvalidity,uid' });
   if (error) throw new Error(`portal_mail_log schreiben (#${uid} → ${ausgang.status}): ${error.message}`);
@@ -188,13 +197,24 @@ async function registriereFehlmail(
        ohne Kundenadresse sammeln sich als Events auf EINEM Shell-Lead,
        statt die Liste zu fluten. Gewollt. */
     const adresse = email || mail.from?.value?.[0]?.address || `unbekannt@${portal}`;
-    const { data: vorhanden } = await db
-      .from('leads')
-      .select('id')
-      .eq('email', adresse)
-      .order('created_at', { ascending: false })
-      .limit(1);
-    let leadId: string | undefined = vorhanden?.[0]?.id;
+    const vermittler = vermittlerFuer(portal);
+    /* Beim Portal ist die Absenderadresse der PORTAL-Absender: Fehlmails
+       sammeln sich auf EINEM Shell-Lead statt die Liste zu fluten.
+       Beim VERMITTLER ist dieselbe Adresse die von JEDEM seiner echten
+       Leads — der Lookup wuerde eine Fehlmail zu Familie A an den Lead von
+       Familie B haengen. Dort also immer ein eigener Shell-Lead; die
+       Antworten im Thread faengt schon threadTreffer ab, es bleibt wenig
+       uebrig. */
+    let leadId: string | undefined;
+    if (!vermittler) {
+      const { data: vorhanden } = await db
+        .from('leads')
+        .select('id')
+        .eq('email', adresse)
+        .order('created_at', { ascending: false })
+        .limit(1);
+      leadId = vorhanden?.[0]?.id;
+    }
     if (!leadId) {
       const { data: neu, error } = await db
         .from('leads')
@@ -202,6 +222,7 @@ async function registriereFehlmail(
           email: adresse,
           status: 'manuell_pruefen',
           source: `portal:${portal}`,
+          ...(vermittler ? { vermittler: vermittler.domain } : {}),
           vorname: name || undefined,
         })
         .select('id')
@@ -234,6 +255,200 @@ async function registriereFehlmail(
     log(`  ⚠ ${portal} #${uid} Fehlmail nicht im Admin registriert: ${e.message}`);
     return undefined;
   }
+}
+
+/* ─── Vermittler: Prosa statt Formular ───────────────────────────────────
+ *
+ * Ein Portal liefert Felder, ein Vermittler schreibt einen Brief. Der
+ * Regelparser findet darin nichts (nicht einmal "E-Mail:"), deshalb liest
+ * ein Modell die Anfrage — und lib/pflegena.ts prueft, was zurueckkommt.
+ *
+ * Der Netzaufruf steht hier, das Fachliche dort (Muster Pria).
+ */
+
+const MODELL = process.env.PFLEGENA_MODELL || 'claude-sonnet-5';
+
+/* Trockenlauf schreibt NICHTS ins Protokoll — beim Portal ist das gratis,
+ * beim Vermittler waere es ein bezahlter Modellaufruf pro Minute und Mail.
+ * Nur fuer die Lebensdauer des Prozesses; ein Neustart darf ruhig einmal
+ * neu lesen. */
+const trockenGesehen = new Set<string>();
+
+type ModellErgebnis =
+  | { ok: true; roh: any }
+  | { ok: false; dauerhaft: boolean; grund: string };
+
+async function frageModell(betreff: string, text: string): Promise<ModellErgebnis> {
+  const key = process.env.ANTHROPIC_API_KEY;
+  /* Fehlender Schluessel ist ein Konfigurationsfehler, kein Urteil ueber
+     diese Mail — sonst waere die Anfrage nach einer Key-Rotation dauerhaft
+     abgelehnt (dieselbe Regel wie beim Eingang: "401 Key rotiert" ist
+     transient). */
+  if (!key) return { ok: false, dauerhaft: false, grund: 'ANTHROPIC_API_KEY fehlt' };
+
+  let res: Response;
+  try {
+    res = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: { 'x-api-key': key, 'anthropic-version': '2023-06-01', 'content-type': 'application/json' },
+      body: JSON.stringify({
+        model: MODELL,
+        max_tokens: 1000,
+        system: [{ type: 'text', text: PFLEGENA_SYSTEM, cache_control: { type: 'ephemeral' } }],
+        messages: [{ role: 'user', content: `<anfrage>\n${text.slice(0, 20000)}\n</anfrage>` }],
+        tools: [PFLEGENA_WERKZEUG],
+        tool_choice: { type: 'tool', name: PFLEGENA_WERKZEUG.name },
+      }),
+      signal: AbortSignal.timeout(30_000),
+    });
+  } catch (e: any) {
+    return { ok: false, dauerhaft: false, grund: `Modell nicht erreichbar: ${e?.message ?? e}` };
+  }
+
+  if (!res.ok) {
+    const rumpf = (await res.text().catch(() => '')).slice(0, 300);
+    /* Nur 400 ist ein Urteil ueber DIESE Mail (z.B. zu lang). Alles andere
+       — 401/403 Schluessel, 429 Limit, 5xx/529 Ueberlast — ist die Lage,
+       nicht der Inhalt. */
+    const dauerhaft = res.status === 400;
+    return { ok: false, dauerhaft, grund: `Modell HTTP ${res.status}: ${rumpf}` };
+  }
+
+  const daten: any = await res.json().catch(() => null);
+  const block = (daten?.content || []).find((b: any) => b.type === 'tool_use');
+  if (!block) return { ok: false, dauerhaft: false, grund: 'Modell hat kein Werkzeug aufgerufen' };
+  const u = daten.usage || {};
+  log(`  [modell] ↑${u.input_tokens} (cache ${u.cache_read_input_tokens || 0}) ↓${u.output_tokens}`);
+  return { ok: true, roh: block.input };
+}
+
+/* Antwort in einem Thread, den wir schon kennen?
+ *
+ * Der Vermittler schreibt in denselben Faden zurueck ("Danke", "ja, machen
+ * wir", Nachtraege). Ohne diese Pruefung liefe jede solche Mail durch das
+ * Modell und wuerde bestenfalls ein Shell-Lead. Mit ihr haengt sie als
+ * Ereignis am RICHTIGEN Lead — und kostet nichts. */
+async function threadTreffer(db: SupabaseClient, mail: ParsedMail): Promise<string | undefined> {
+  const ids = [
+    ...(typeof mail.inReplyTo === 'string' ? [mail.inReplyTo] : []),
+    ...(Array.isArray(mail.references) ? mail.references : (mail.references ? [mail.references] : [])),
+  ].map((x) => String(x).trim()).filter(Boolean);
+  if (!ids.length) return undefined;
+  const { data } = await db
+    .from('leads')
+    .select('id')
+    .in('quelle_nachricht_id', ids)
+    .order('created_at', { ascending: false })
+    .limit(1);
+  return (data as { id: string }[] | null)?.[0]?.id;
+}
+
+/* Eine Vermittler-Mail verarbeiten. Gibt PostErgebnis zurueck wie der
+ * Portal-Weg, damit arbeiteAb keinen zweiten Ausgang kennen muss. */
+async function verarbeiteVermittler(
+  cfg: Konfig,
+  portal: string,
+  provisionProTag: number,
+  mail: ParsedMail,
+  roh: string,
+  db: SupabaseClient,
+): Promise<PostErgebnis> {
+  const von = mail.from?.value?.[0];
+  const absender = String(von?.address ?? '').trim().toLowerCase();
+  if (!absender) return { ok: false, dauerhaft: true, grund: 'Mail ohne Absenderadresse' };
+
+  /* Zweiter Riegel hinter der Server-Suche. IMAP SEARCH FROM prueft den
+     ROHEN Kopfzeilentext, also auch den Anzeigenamen — eine fremde Mail mit
+     "pflegena.com" im Namen kaeme durch. In einem Postfach, das nur uns
+     gehoert, waere das egal; in `info@primundus.de` liegt die Post der
+     Kunden. Kein Shell-Lead, kein Modellaufruf: angesehen, als nicht unsere
+     erkannt, nie wieder anfassen. */
+  if (!absender.endsWith(`@${portal}`)) {
+    log(`  – ${portal}: Absender ${absender} gehoert nicht zur Quelle — uebergangen`);
+    return { ok: true, duplikat: `fremder Absender (${absender})` };
+  }
+
+  const treffer = await threadTreffer(db, mail);
+  if (treffer) {
+    await logEventAufLead(db, treffer, 'vermittler_antwort', {
+      betreff: mail.subject ?? null,
+      message_id: mail.messageId ?? null,
+      auszug: roh.slice(0, 500),
+    });
+    log(`  ${portal}: Antwort im Thread → Ereignis auf Lead ${treffer}, kein Modellaufruf`);
+    /* BEWUSST nicht `uebersprungen`: dieser Zweig laeuft in arbeiteAb durch
+       registriereFehlmail und legte einen Shell-Lead an — bei einem
+       Vermittler fuer JEDE Antwort im Thread einen. Das Ereignis haengt
+       schon am richtigen Lead; hier zaehlt nur, dass die Mail erledigt ist. */
+    return { ok: true, lead_id: treffer, duplikat: 'Antwort im Thread — kein neues Angebot' };
+  }
+
+  const antwort = await frageModell(mail.subject ?? '', roh);
+  if (!antwort.ok) return { ok: false, dauerhaft: antwort.dauerhaft, grund: antwort.grund, email: absender };
+
+  const kopf: MailKopf = {
+    von: absender,
+    vonName: von?.name ?? null,
+    betreff: mail.subject ?? null,
+    messageId: mail.messageId ?? null,
+    datum: mail.date ?? null,
+    text: roh,
+  };
+  const gelesen = pruefeAnfrage(antwort.roh, kopf, provisionProTag);
+  if (!gelesen.ok) return { ok: false, dauerhaft: true, grund: gelesen.grund, email: absender, name: von?.name };
+
+  /* Laut ins Log, damit ein Auseinanderlaufen von Prompt und pricing_config
+     auffaellt, statt still zur Annahme zu werden (Muster Portal-Parser). */
+  if (gelesen.unbekannt.length) log(`  ⚠ nicht zugeordnet (${portal}): ${gelesen.unbekannt.join(' | ')}`);
+  for (const h of gelesen.hinweise) log(`  ⚠ ${portal}: ${h}`);
+
+  if (cfg.trocken(portal)) {
+    log(`  [trocken] ${absender} — ${Object.keys(gelesen.body.angaben).length} Felder gelesen`);
+    return { ok: true, trocken: true };
+  }
+  return posteLead(cfg, { ...gelesen.body, hinweise: gelesen.hinweise }, absender, gelesen.body.name || undefined);
+}
+
+/* Ereignis auf einen bestehenden Lead — best effort, wie registriereFehlmail. */
+async function logEventAufLead(db: SupabaseClient, leadId: string, typ: string, metadata: Record<string, unknown>) {
+  const { error } = await db.from('lead_events').insert({ lead_id: leadId, event_type: typ, metadata });
+  if (error) log(`  ⚠ Ereignis ${typ} nicht geschrieben: ${error.message}`);
+}
+
+/* Eine Vermittler-Mail, die der Automat nicht beantwortet hat, dem Team
+ * zeigen — im Volltext, damit jemand von Hand antworten kann. Best-effort:
+ * scheitert der Versand, bleibt der Log-Status gueltig. */
+async function weiterleitenAnTeam(
+  portal: string,
+  uid: number | string,
+  mail: Pick<ParsedMail, 'subject' | 'from'>,
+  roh: string,
+  grund?: string,
+) {
+  const von = mail.from?.value?.[0];
+  const absender = von?.address ?? 'unbekannt';
+  const betreff = mail.subject ?? '(ohne Betreff)';
+  const text = [
+    `Eine Anfrage von ${portal} konnte nicht automatisch beantwortet werden.`,
+    ``,
+    `Grund:     ${grund ?? 'unbekannt'}`,
+    `Absender:  ${von?.name ? `${von.name} <${absender}>` : absender}`,
+    `Betreff:   ${betreff}`,
+    `Postfach:  ${portal} #${uid}`,
+    ``,
+    `Der Partner wartet auf eine Antwort in seinem Thread — bitte von Hand`,
+    `beantworten. Der volle Mailtext:`,
+    ``,
+    `----------------------------------------------------------------`,
+    roh,
+  ].join('\n');
+  await sendEmail('info@primundus.de', {
+    subject: `Vermittler-Anfrage unbeantwortet: ${betreff}`,
+    text,
+    html: `<pre style="font-family:ui-monospace,Menlo,monospace;white-space:pre-wrap;font-size:13px;">${
+      text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    }</pre>`,
+  }).catch((e) => log(`  ⚠ ${portal} #${uid} Weiterleitung an das Team fehlgeschlagen: ${e?.message ?? e}`));
 }
 
 /* Ergebnis eines Eingangs-Versuchs — eine Form fuer Mail- und API-Weg. */
@@ -376,6 +591,10 @@ async function posteLead(cfg: Konfig, body: Record<string, unknown>, email: stri
  * die Dauer unserer Befehle — die von ImapFlow empfohlene Form fuer eine
  * Folge zusammengehoeriger Befehle. */
 async function arbeiteAb(cfg: Konfig, portal: string, client: ImapFlow, db: SupabaseClient) {
+  /* Ein Vermittler-Postfach wird anders gelesen: Modell statt Regelparser,
+     hoechstens eine Mail je Takt (jede kostet Geld und Zeit) und ein
+     Versuchszaehler gegen die Endlosschleife. */
+  const vermittler = vermittlerFuer(portal);
   /* liegengeblieben zaehlt NUR transiente Fehler ('offen') — der Lauf
      antwortet damit HTTP 500, der naechste Takt versucht es erneut.
      Dauerhaft abgelehnte Mails bekommen einen eigenen Zaehler: sie sind
@@ -399,9 +618,20 @@ async function arbeiteAb(cfg: Konfig, portal: string, client: ImapFlow, db: Supa
        {uid:true} ist PFLICHT (Registry #41: search lieferte sonst
        SEQUENZ-Nummern und \Seen traf eine fremde UID). Leeres Postfach:
        Suche ueberspringen, manche Server moegen 1:* auf 0 Mails nicht. */
+    /* Ein Portal-Postfach gehoert uns allein — dort ist jede Mail unsere.
+       Das Vermittler-Postfach ist die HAUPTADRESSE der Firma: Kundenpost,
+       BCC-Kopien unserer eigenen Mails, Team-Benachrichtigungen. Deshalb
+       fragt der Server hier nur nach Post des Absenders (IMAP SEARCH FROM)
+       — nicht nur, damit wir Fremdes nicht anfassen, sondern weil der
+       Erstlauf sonst JEDE Mail des Postfachs als `altbestand` ins Protokoll
+       schreiben wuerde (bei den Portalen sind das Dutzende, hier Zehn-
+       tausende in EINEM Insert). */
     const alle = mb && typeof mb === 'object' && mb.exists === 0
       ? []
-      : await client.search({ uid: '1:*' }, { uid: true });
+      : await client.search(
+        vermittler ? { from: vermittler.domain } : { uid: '1:*' },
+        { uid: true },
+      );
     if (alle === false) throw new Error('IMAP-Suche fehlgeschlagen');
 
     const zeilen = await alleLogZeilen(db, portal, uidvalidity);
@@ -419,18 +649,40 @@ async function arbeiteAb(cfg: Konfig, portal: string, client: ImapFlow, db: Supa
       const bestand = alle.length
         ? alle.map((uid) => ({ postfach: portal, uidvalidity, uid, status: 'altbestand', grund: 'beim Erstlauf vorgefunden' }))
         : [{ postfach: portal, uidvalidity, uid: SEED_SENTINEL_UID, status: 'altbestand', grund: 'postfach leer initialisiert' }];
-      // ponytail: ein Insert reicht — die Postfaecher halten Dutzende Mails; ab ~5k braeuchte es Chunks.
+      /* ponytail: ein Insert reicht — beim Portal haelt das Postfach Dutzende
+         Mails, beim Vermittler begrenzt der Absenderfilter oben die Menge auf
+         seine eigene Post. Ab ~5k Zeilen braeuchte es Chunks. */
       const { error } = await db.from('portal_mail_log').insert(bestand);
       if (error) throw new Error(`Seed fehlgeschlagen: ${error.message}`);
       log(`${portal}: Erstlauf — ${alle.length} Mail(s) als altbestand registriert (uidvalidity ${uidvalidity})`);
       return { liegengeblieben, verarbeitet, abgelehnt };
     }
 
-    const offene = zuVerarbeiten(alle, zeilen);
+    const alleOffenen = zuVerarbeiten(alle, zeilen);
+    /* Beim Vermittler kostet jede Mail einen Modellaufruf (5-15 s) plus das
+       Onboarding im Eingang (bis 25 s). Zwei davon sprengen den Minutentakt,
+       und `laeuft` laesst den naechsten Takt dann ganz ausfallen — auch fuer
+       die bezahlten Portale. Eine pro Takt sind 60/h, weit ueber dem
+       Aufkommen eines Vermittlers. */
+    const offene = vermittler ? alleOffenen.slice(0, 1) : alleOffenen;
     if (!offene.length) return { liegengeblieben, verarbeitet, abgelehnt };
-    log(`${portal}: ${offene.length} Mail(s) zu verarbeiten (${alle.length} im Postfach)`);
+    log(`${portal}: ${offene.length} Mail(s) zu verarbeiten (${alleOffenen.length} offen, ${alle.length} im Postfach)`);
 
     for (const uid of offene) {
+      /* Trockenlauf schreibt nichts ins Protokoll, also kaeme dieselbe Mail
+         in JEDEM Takt wieder — beim Portal gratis, beim Vermittler ein
+         bezahlter Modellaufruf pro Minute. */
+      if (vermittler && cfg.trocken(portal) && trockenGesehen.has(`${portal}#${uid}`)) continue;
+      /* Aufgeben statt ewig bezahlen: eine Mail, die fuenfmal transient
+         gescheitert ist, wird abgelehnt — sichtbar im Admin und per
+         Team-Mail, nicht still. */
+      if (vermittler && versucheFuer(uid, zeilen) >= MAX_VERSUCHE) {
+        const grund = `nach ${MAX_VERSUCHE} Versuchen aufgegeben`;
+        log(`  – ${portal} #${uid} ${grund}`);
+        await schreibeLog(db, portal, uidvalidity, uid, { status: 'abgelehnt', grund });
+        abgelehnt++;
+        continue;
+      }
       const nachricht = await client.fetchOne(uid, { source: true }, { uid: true });
       if (nachricht === false) {
         // Mail zwischen Suche und Abruf verschwunden — kein Grund, den
@@ -471,11 +723,19 @@ async function arbeiteAb(cfg: Konfig, portal: string, client: ImapFlow, db: Supa
 
       let ausgang: Ausgang;
       try {
-        const ergebnis = await verarbeite(cfg, portal, roh, csv, mail.date, telefone);
+        const ergebnis = vermittler
+          ? await verarbeiteVermittler(cfg, portal, vermittler.provisionProTag, mail, roh, db)
+          : await verarbeite(cfg, portal, roh, csv, mail.date, telefone);
         if (!ergebnis.ok) {
           if (ergebnis.dauerhaft) {
             const leadId = await registriereFehlmail(db, portal, uid, mail, csv ? `${roh}\n\n--- CSV ---\n${csv.text}` : roh, 'abgelehnt', ergebnis.grund, ergebnis.email, ergebnis.name);
             ausgang = { status: 'abgelehnt', grund: ergebnis.grund, leadId };
+            /* Beim Portal reicht der Admin-Eintrag: der Kunde hat seine
+               Anfrage ohnehin an mehrere Anbieter gegeben. Ein Vermittler
+               wartet auf eine Antwort IN SEINEM THREAD — der haeufigste
+               stille Ausfall waere eine Anfrage, die das Modell faelschlich
+               nicht als solche erkennt. Deshalb geht sie an das Team. */
+            if (vermittler) await weiterleitenAnTeam(portal, uid, mail, roh, ergebnis.grund);
           } else {
             ausgang = { status: 'offen', grund: ergebnis.grund };
           }
@@ -484,6 +744,10 @@ async function arbeiteAb(cfg: Konfig, portal: string, client: ImapFlow, db: Supa
           ausgang = { status: 'uebersprungen', grund: ergebnis.grund, leadId };
         } else if (ergebnis.trocken) {
           log(`  · ${portal} #${uid} Trockenlauf, nichts angelegt`);
+          // Nur im Prozessgedaechtnis: das Protokoll bleibt im Trockenlauf
+          // unberuehrt, aber ein zweiter Modellaufruf fuer dieselbe Mail
+          // waere reine Verbrennung.
+          if (vermittler) trockenGesehen.add(`${portal}#${uid}`);
           verarbeitet++;
           continue;
         } else {
@@ -498,7 +762,14 @@ async function arbeiteAb(cfg: Konfig, portal: string, client: ImapFlow, db: Supa
         ausgang = { status: 'offen', grund: e.message };
       }
 
-      if (ausgang.status === 'offen') log(`  ✗ ${portal} #${uid} offen: ${ausgang.grund} — naechster Takt versucht erneut`);
+      /* Nur beim Vermittler mitzaehlen: bei den bezahlten Portalen wuerde
+         ein gemeinsamer Deckel eine fuenfminuetige Stoerung von
+         /api/portal-lead in einen dauerhaft abgelehnten Lead verwandeln. */
+      if (vermittler && ausgang.status === 'offen') {
+        ausgang.versuche = versucheFuer(uid, zeilen) + 1;
+      }
+
+      if (ausgang.status === 'offen') log(`  ✗ ${portal} #${uid} offen (Versuch ${ausgang.versuche ?? '?'}): ${ausgang.grund} — naechster Takt versucht erneut`);
       if (ausgang.status === 'abgelehnt') log(`  ✗ ${portal} #${uid} abgelehnt: ${ausgang.grund}${ausgang.leadId ? ` — im Admin als ${ausgang.leadId}` : ''}`);
       if (ausgang.status === 'uebersprungen') log(`  – ${portal} #${uid} uebersprungen: ${ausgang.grund}`);
 
@@ -541,6 +812,12 @@ async function holeAb(cfg: Konfig, { portal, user, pass }: Postfach, db: Supabas
        selbst aufgeben, sonst blockiert `laeuft` alle folgenden Takte. */
     socketTimeout: 30_000,
   });
+
+  /* Ohne Listener macht ImapFlow aus einem Verbindungsabbruch ein
+     uncaught 'error' — der Node-Prozess des Kostenrechners stirbt. Das
+     Fenster dafuer war bisher ~1 s je Mail; mit Modellaufruf und
+     Onboarding sind es bis zu 40 s. */
+  client.on('error', (e: any) => log(`${portal}: IMAP-Fehler: ${e?.message ?? e}`));
 
   await client.connect();
   try {
@@ -795,7 +1072,7 @@ export async function POST(request: NextRequest) {
   let verarbeitet = 0;
   let abgelehnt = 0;
   try {
-    for (const postfach of postfaecher()) {
+    for (const postfach of postfaecher('portal')) {
       /* Ein kaputtes Postfach darf das andere nicht aufhalten: faellt
          Pflegehilfe aus, sollen Pflegebund-Leads trotzdem laufen. */
       try {
@@ -825,6 +1102,21 @@ export async function POST(request: NextRequest) {
         log(`${domain}: API-Fehler: ${e.message}`);
         apiZuletztFehler.add(domain);
         await schreibeApiLog(db, domain, API_SENTINEL, { status: 'offen', grund: `API-Abruf: ${e.message}` }).catch(() => {});
+      }
+    }
+    /* Vermittler ZULETZT — nach den Postfaechern UND nach dem API-Portal.
+       Ein Modellaufruf plus Onboarding dauert bis zu 40 s; stuende er
+       vorne, verzoegerte er in jedem Takt die bezahlten, zeitkritischen
+       Quellen (das Portal gibt dieselbe Anfrage an bis zu drei Anbieter). */
+    for (const postfach of postfaecher('vermittler')) {
+      try {
+        const r = await holeAb(cfg, postfach, db);
+        liegengeblieben += r.liegengeblieben;
+        verarbeitet += r.verarbeitet;
+        abgelehnt += r.abgelehnt;
+      } catch (e: any) {
+        liegengeblieben++;
+        log(`${postfach.portal}: Postfach-Fehler: ${e.message}`);
       }
     }
   } finally {

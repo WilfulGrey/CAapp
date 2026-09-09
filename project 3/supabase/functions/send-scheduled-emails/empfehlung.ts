@@ -800,7 +800,10 @@ export function fotoBudget(groessen: (number | null)[], jeMax = 300_000, gesamtM
 const LABEL =
   "font-size:11px;font-weight:700;color:#9a8a73;letter-spacing:.08em;text-transform:uppercase;";
 
-function esc(s: string): string {
+/** HTML-Escape. Exportiert, weil die Vermittler-Vorlage dieselben
+ *  Fremdtexte rendert (Name, Vorstellung) und keine zweite Kopie
+ *  bekommen soll. */
+export function esc(s: string): string {
   return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 }
 

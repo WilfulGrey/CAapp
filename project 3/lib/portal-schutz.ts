@@ -116,12 +116,16 @@ export const TESTPHASE_EMPFAENGER = 'info@mamamia.app, martin@mamamia.app';
 export function testphaseUmleitung(
   lead: { source?: string | null; email?: string | null },
   flagWert: string | undefined,
+  /* Ziel der Umleitung. Default ist das Team-Postfach; ein Override laesst
+     einen einzelnen Durchlauf auf EINE Adresse zielen, ohne dass die halbe
+     Firma Testpost bekommt. Quelle: PORTAL_TESTPHASE_EMPFAENGER. */
+  empfaenger?: string | null,
 ): { empfaenger: string; betreffPraefix: string } | null {
   const source = (lead.source ?? '').toLowerCase();
   if (!source.startsWith('portal:')) return null;
   if (!flagGiltFuer(flagWert, source.slice('portal:'.length))) return null;
   return {
-    empfaenger: TESTPHASE_EMPFAENGER,
+    empfaenger: (empfaenger ?? '').trim() || TESTPHASE_EMPFAENGER,
     betreffPraefix: `[TESTPHASE → ${lead.email ?? '?'}] `,
   };
 }

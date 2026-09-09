@@ -160,6 +160,23 @@ services:
       # verarbeiten beide Umgebungen dieselben bezahlten Leads).
       - key: PFLEGEHELFER24_API_TOKEN
         sync: false
+      # Vermittler Pflegena schreibt an die HAUPTADRESSE der Firma, nicht an
+      # ein eigenes Postfach: hier liegen auch Kundenpost, BCC-Kopien unserer
+      # Mails und Team-Benachrichtigungen. Der Abholer fragt den Server
+      # deshalb nur nach Post von @pflegena.com und fasst den Rest nie an.
+      # Aus derselben Adresse geht auch die Antwort raus — ueber IONOS-SMTP
+      # (Vault-Profil vermittler_smtp_*), nicht ueber SES: der SPF-Eintrag
+      # der Domain autorisiert Ionos. Das Passwort steht deshalb an ZWEI
+      # Stellen: hier (IMAP, Lesen) und im Vault (SMTP, Senden).
+      - key: INFO_USER
+        sync: false
+      - key: INFO_PASS
+        sync: false
+      # Liest die Vermittler-Anfragen (dasselbe Konto wie Pria). Fehlt der
+      # Schluessel, bleiben die Mails 'offen' und werden erneut versucht —
+      # es wird nichts geraten.
+      - key: ANTHROPIC_API_KEY
+        sync: false
       # Erst-Inbetriebnahme: liest und protokolliert, ohne Leads anzulegen
       # oder Kundenmails auszuloesen. "1" = alle Portale, oder Domain-Liste
       # ("pflege-helfer24.de") fuer EIN Portal, waehrend die anderen scharf
@@ -174,4 +191,9 @@ services:
       # Supabase-Secret setzen (send-scheduled-emails liest die eigene Env).
       # Nach der Testphase BEIDE leeren. Siehe docs/portal-leads.md.
       - key: PORTAL_TESTPHASE
+        sync: false
+      # Ziel der Testphase-Umleitung. Leer = Team-Postfach
+      # (info@ + martin@mamamia.app). Eine einzelne Adresse eintragen, wenn
+      # ein Durchlauf geprueft wird, ohne die halbe Firma zu beteiligen.
+      - key: PORTAL_TESTPHASE_EMPFAENGER
         sync: false

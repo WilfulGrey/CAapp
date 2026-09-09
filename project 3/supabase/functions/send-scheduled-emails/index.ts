@@ -30,6 +30,11 @@ import {
   stufenWort,
   type EmpfehlungErgebnis, holeFuenf, fuenfListeHtml, fuenfListeText, kraefteWort, fuenfBetreff, fotoBudget } from "./empfehlung.ts";
 import {
+  vermittlerAngebotHtml, vermittlerAngebotText,
+  vermittlerKraefteHtml, vermittlerKraefteText,
+  VERMITTLER_FUSSNOTE,
+} from "./vermittler.ts";
+import {
   BEWERTUNG_CAP,
   BEWERTUNG_CC,
   BEWERTUNG_STICHTAG,
@@ -65,6 +70,10 @@ interface ScheduledEmail {
   recipient_email: string;
   scheduled_for: string;
   status: string;
+  /** Zeilen-eigene Nutzlast (Reminder-Payload, Vermittler-Kopfdaten).
+   *  Der Query liest select("*"), das Feld kam bisher nur per `as any`
+   *  durch — hier steht es einmal richtig. */
+  metadata?: Record<string, unknown> | null;
 }
  
 interface Lead {
@@ -114,6 +123,39 @@ async function getSmtpConfig(
   };
 }
  
+/* Absender der Vermittler-Mails: das Postfach, an das der Partner schreibt
+ * (Ionos), nicht das SES-Konto der Kundenpost. Eigenes Vault-Profil.
+ *
+ * Faellt hart aus, wenn Zugang oder Absender fehlen — ein Rueckfall auf die
+ * Kundenkonfiguration wuerde die Antwort mit einem fremden Absender
+ * verschicken, und zwar unbemerkt. Lieber bleibt die Zeile `failed` stehen
+ * und der Ops-Alarm meldet sich. */
+async function getVermittlerSmtpConfig(
+  // Wie getSmtpConfig: der Client ist hier untypisiert, weil die RPC-Namen
+  // nicht im generierten Schema stehen.
+  supabase: any,
+  siteUrl: string,
+): Promise<SmtpConfig> {
+  const { data, error } = await supabase.rpc("get_vermittler_smtp_config");
+  if (error) throw new Error(`Vermittler-SMTP nicht lesbar: ${error.message}`);
+  const fehlend = ["user", "pass", "from"].filter((k) => !String(data?.[k] ?? "").trim());
+  if (fehlend.length) {
+    throw new Error(
+      `Vermittler-SMTP unvollstaendig (${fehlend.join(", ")}) — Vault-Secrets `
+      + "vermittler_smtp_user/_pass/_from setzen. KEIN Rueckfall auf das Kundenkonto.",
+    );
+  }
+  return {
+    host: data.host || "smtp.ionos.de",
+    port: parseInt(data.port || "587"),
+    user: data.user,
+    pass: data.pass,
+    from: data.from,
+    fromName: data.fromName || "Primundus 24h-Pflege",
+    siteUrl,
+  };
+}
+
 const FEMALE_NAMES_SET = new Set(["aaliya","abby","ada","adela","adelheid","adeline","adriana","agata","agatha","agnes","aiko","aila","aileen","aimee","aisha","alana","alba","aleksandra","alexa","alexandra","alexia","alexis","alice","alicia","alina","alissa","aliyah","alke","allie","allison","alma","almut","alona","alva","alwine","amalia","amanda","amara","amaya","amelia","amelie","ami","amira","amy","ana","anastasia","andrea","andreja","angela","angelika","angelina","anita","anja","anna","annalena","anne","annegret","annelies","annelore","annette","anni","annika","antje","antonia","anuschka","aoife","arabell","ariadne","ariane","astrid","aurora","ava","babette","barbara","beatrice","beatrix","belen","bella","bente","berit","bernadette","bettina","bianca","birgit","birgitt","birgitta","birgitte","borbala","brigitta","brigitte","britt","brittany","bruna","brunhilde","camila","camilla","cara","carina","carla","carlotta","caro","carola","carolina","caroline","catharina","catharine","catrina","cecile","cecilia","charlotte","chiara","chloe","christel","christiane","christina","christine","claudia","claudine","constanze","corinna","cornelia","dagmar","dana","daniela","daria","deborah","diana","dina","dominique","dorothea","edda","edith","elena","eleonora","eliane","elisa","elisabeth","elizabeth","elke","ella","ellen","elsa","elsbeth","else","elvira","emilia","emma","erika","erna","ernestine","eva","eveline","evelyn","fatima","felicitas","filippa","fiona","franziska","frauke","frederike","frieda","gabriela","gabriele","gabi","gaby","gerda","gertrud","gisela","greta","gudrun","hanna","hannah","hannelore","heidemarie","heidi","heike","helene","helga","henriette","hildegard","hildegarde","hilke","hilde","ida","marta","ilona","ilse","imke","ines","ingeborg","ingrid","irina","iris","irmgard","irmtraud","isabel","isabelle","isadora","jacqueline","jana","janet","janna","jasmin","jennifer","jessica","jette","johanna","jolanta","josefine","josephine","julia","juliane","justine","karin","karla","katharina","katharine","kathrin","katja","katrin","katrina","katrine","klara","klaudia","klarissa","kordula","kristin","kristina","lara","larissa","laura","lea","leah","lena","leonie","leonora","lieselotte","lilli","lillian","lilly","lina","linda","lisa","lisbeth","lore","lori","lotte","lotta","louisa","louise","lucia","luisa","luise","luzie","lydia","magdalena","maja","malin","mara","margarita","margareta","margarethe","margit","margot","marianna","marie","marielle","marina","marita","marlene","marta","martina","mary","mathilde","maud","melanie","melinda","melissa","merle","mia","michelle","mira","miriam","mirja","monika","nadine","natalia","natalie","nathalie","nele","nicola","nicole","nina","nora","natascha","odette","olivia","ottilie","patrizia","paula","pauline","petra","pia","renate","ronja","rosa","rosalie","roswitha","ruth","sabrina","sandra","sara","sarah","silke","silvia","simona","simone","sina","sofia","sonja","sophie","stefanie","stella","stephanie","susanne","sybille","sylvia","tamara","tanja","tatjana","teresa","theresa","theres","tina","ulrike","ursula","uta","veronika","victoria","viola","virginia","walburga","waltraud","wanda","wiebke","wilhelmine","xenia","yvonne","zoe"]);
 const MALE_NAMES_SET = new Set(["aaron","adam","alexander","alfred","alois","andre","andreas","axel","bastian","benedikt","benjamin","bernd","bo","burkhard","carsten","christian","christoph","claus","clemens","cornelius","damian","daniel","david","dieter","dietmar","dirk","dominik","edgar","elias","emilio","eric","erik","ernst","eugen","fabian","felix","finn","florian","frank","franz","frederik","gabriel","georg","gerhard","gottfried","guido","gunnar","hans","harry","hartmut","heinz","helge","helmut","henning","henrik","herbert","heiko","holger","horst","hubert","hugo","jakob","jan","jens","joachim","joe","joel","joerg","johannes","jonas","jonathan","jochen","kai","karl","kilian","Klaus","kevin","konrad","kristian","lars","leo","leon","leopold","lorenz","lothar","lucas","lukas","manfred","marco","markus","martin","matthias","max","maximilian","michael","mike","moritz","nikolaj","nikolaus","nils","norbert","oliver","oscar","oskar","otto","patrice","patrick","paul","peter","philipp","ralf","reinhard","richard","robert","rolf","sebastian","simon","stefan","steffen","stephan","steven","sven","thomas","thorsten","tillman","tim","tobias","tom","torsten","ulrich","uwe","valentin","victor","volker","werner","willi","will","wolf","wolfram","xaver"]);
  
@@ -153,7 +195,11 @@ function buildHalloAnrede(anrede: string | null, nachname: string, vorname: stri
   return "Guten Tag";
 }
  
-function buildEmailWrapper(lead: Lead, siteUrl: string, content: string): string {
+/* `fussnote` ueberschreibt den letzten Satz der Fusszeile. Default ist der
+   Kunden-Satz ("weil Sie eine Kalkulation ... angefordert haben") — fuer
+   einen Vermittler waere er schlicht falsch, und der Abmelde-Link darunter
+   truege seinen Portal-Token nach draussen. */
+function buildEmailWrapper(lead: Lead, siteUrl: string, content: string, fussnote?: string): string {
   const logoUrl = `${siteUrl}/images/Primundus-Logo_V6.png`;
   const testUrl = `${siteUrl}/images/primundus_testsieger-2021.webp`;
   return `<!DOCTYPE html>
@@ -237,7 +283,7 @@ function buildEmailWrapper(lead: Lead, siteUrl: string, content: string): string
             <div style="font-size:12px;color:#999;margin-top:16px;line-height:1.5;">
               Diese E-Mail wurde versendet an: ${lead.email}<br>
               Primundus Deutschland<br><br>
-              Sie erhalten diese E-Mail, weil Sie eine Kalkulation auf primundus.de angefordert haben.${lead.token ? `<br><a href="${siteUrl.replace(/\/$/, "")}/abmelden?token=${encodeURIComponent(lead.token)}" style="color:#999;text-decoration:underline;">Keine E-Mails mehr erhalten</a>` : ""}
+              ${fussnote ?? `Sie erhalten diese E-Mail, weil Sie eine Kalkulation auf primundus.de angefordert haben.${lead.token ? `<br><a href="${siteUrl.replace(/\/$/, "")}/abmelden?token=${encodeURIComponent(lead.token)}" style="color:#999;text-decoration:underline;">Keine E-Mails mehr erhalten</a>` : ""}`}
             </div>
           </div>
         </div>
@@ -1446,7 +1492,12 @@ async function sendEmailSmtp(
   text: string,
   attachments?: { filename: string; content: Uint8Array; contentType: string; cid?: string }[],
   skipBcc: boolean = false,
-  cc?: string
+  cc?: string,
+  /* Threading. BEWUSST als neunter POSITIONS-Parameter statt eines
+     Options-Objekts: `cc` ist heute der letzte Parameter und wird an einer
+     Stelle positionsweise durchgereicht (`undefined, false, ccListe(...)`)
+     — ein Umbau auf ein Objekt haette genau dort das CC verloren. */
+  opts?: { inReplyTo?: string | null; references?: string | string[] | null },
 ): Promise<{ success: boolean; error?: string }> {
   try {
     const transport = nodemailer.createTransport({
@@ -1488,6 +1539,10 @@ async function sendEmailSmtp(
       html,
       ...(!skipBcc && bccAddr ? { bcc: bccAddr } : {}),
       ...(cc ? { cc } : {}),
+      /* nodemailer setzt daraus In-Reply-To und References — damit die
+         Antwort im Postfach des Vermittlers in SEINEM Faden landet. */
+      ...(opts?.inReplyTo ? { inReplyTo: opts.inReplyTo } : {}),
+      ...(opts?.references ? { references: opts.references } : {}),
     };
 
     if (attachments && attachments.length > 0) {
@@ -2081,7 +2136,7 @@ async function runBewertungsRunde(
   const cutoff = new Date(jetzt.getTime() - BEWERTUNG_TAGE * 86400000).toISOString();
   const { data: kandidaten, error } = await supabase
     .from("leads")
-    .select("id, vorname, nachname, anrede_text, token, email, email_cc, status, created_at, source")
+    .select("id, vorname, nachname, anrede_text, token, email, email_cc, status, created_at, source, vermittler")
     .gte("created_at", BEWERTUNG_STICHTAG)
     .lte("created_at", cutoff)
     .order("created_at", { ascending: true })
@@ -2121,7 +2176,7 @@ async function runBewertungsRunde(
 
     const tpl = getBewertungsanfrageTemplate(lead, smtpConfig.siteUrl.replace(/\/$/, ""));
     // Testphase: Portal-Leads ans Team (Umleitung nur beim Versand).
-    const umleitungBew = testphaseUmleitung(lead, Deno.env.get("PORTAL_TESTPHASE"));
+    const umleitungBew = testphaseUmleitung(lead, Deno.env.get("PORTAL_TESTPHASE"), Deno.env.get("PORTAL_TESTPHASE_EMPFAENGER"));
     const bewEmpfaenger = umleitungBew?.empfaenger ?? lead.email!;
     const r = await sendEmailSmtp(
       smtpConfig, bewEmpfaenger,
@@ -2151,6 +2206,30 @@ async function runBewertungsRunde(
     }
   }
   return { gesendet, uebersprungen };
+}
+
+/* Die fuenf Kraefte fuer die Vermittler-Mail: dieselben Daten wie beim
+ * Nudge, aber ohne Profil-Links (es gibt fuer den Partner kein Portal) und
+ * ohne Mail-Marker. Das Laden der Fotos bleibt hier, weil vermittler.ts
+ * keine Deno-Abhaengigkeit haben soll. */
+async function kraefteFuerVermittler(lead: Lead, supabaseUrl: string, key: string) {
+  const tok = lead.token;
+  if (!tok) return null;
+  const erg = await holeFuenf({
+    supabaseUrl, key, token: tok,
+    jobOfferId: (lead as any).mamamia_job_offer_id ?? null,
+    formularDaten: (lead as any).kalkulation?.formularDaten ?? {},
+    darfOnboarden: Deno.env.get("EMPFEHLUNG_ONBOARD") !== "0",
+  });
+  if (!erg || erg.fuenf.length === 0) return null;
+  const roh = await Promise.all(erg.fuenf.map((e) => fetchInlinePhotoDeno(e.fotoUrl)));
+  const erlaubt = fotoBudget(roh.map((r) => r?.content.byteLength ?? 0));
+  const inlines = roh.map((r, i) => (r && erlaubt[i] ? r : null));
+  return {
+    fuenf: erg.fuenf,
+    cids: inlines.map((r) => r?.cid ?? null),
+    anhaenge: inlines.filter(Boolean) as NonNullable<typeof inlines[number]>[],
+  };
 }
 
 Deno.serve(async (req: Request) => {
@@ -2232,6 +2311,28 @@ Deno.serve(async (req: Request) => {
         }
       }
 
+      /* Vermittler-Vorschau: dieselben Bausteine wie in der Warteschlange,
+         nur die Kopfdaten sind gesetzt (die Demo-Items tragen keine
+         metadata). So sieht man Provisionsblock und Liste, ohne eine
+         Anfrage anlegen zu muessen. */
+      const demoTypen = (demoBody.items || []).map((i: any) => i?.email_type);
+      const demoMeta = { kunde_label: "Familie Muster", provision_pro_tag: 10, betreff_antwort: "Re: Ihre Anfrage" };
+      let demoVermittlerEmpf: EmpfehlungErgebnis | null = null;
+      let demoVermittlerFuenf: Awaited<ReturnType<typeof kraefteFuerVermittler>> = null;
+      if (demoTypen.includes("vermittler_angebot") && (lead as Lead).token) {
+        demoVermittlerEmpf = await holeEmpfehlung({
+          supabaseUrl, key: supabaseServiceKey, token: (lead as Lead).token as string,
+          jobOfferId: (lead as any).mamamia_job_offer_id ?? null,
+          formularDaten: (lead as any).kalkulation?.formularDaten ?? {},
+          darfOnboarden: Deno.env.get("EMPFEHLUNG_ONBOARD") !== "0",
+        });
+        if (demoVermittlerEmpf) demoInline = await fetchInlinePhotoDeno(demoVermittlerEmpf.empfehlung.fotoUrl);
+      }
+      if (demoTypen.includes("vermittler_kraefte")) {
+        demoVermittlerFuenf = await kraefteFuerVermittler(lead as Lead, supabaseUrl, supabaseServiceKey);
+      }
+      const demoAnrede = `${buildEingangsGreeting(lead as Lead)},`;
+
       const render = (t: string): { subject: string; html: string; text: string } => {
         switch (t) {
           case "eingangsbestaetigung": return { subject: "Ihr persönliches Angebot zur 24-Stunden-Betreuung", html: buildEingangsbestaetigungHtml(lead as Lead, site, portalBase, false, demoEmpfHtml), text: buildEingangsbestaetigungText(lead as Lead, portalBase, false, demoEmpfText) };
@@ -2242,6 +2343,24 @@ Deno.serve(async (req: Request) => {
           case "nachfass_3": return { subject: "Eine letzte Frage — wie schaut's bei Ihnen aus?", html: buildNachfass3Html(lead as Lead, site), text: buildNachfass3Text(lead as Lead, site) };
           case "profil_nudge_3": return { subject: "Können wir Sie bei etwas unterstützen?", html: buildProfilNudge3Html(lead as Lead, site, portalBase), text: buildProfilNudge3Text(lead as Lead, site, portalBase) };
           case "reaktivierung_wechsel": return { subject: "Steht bei Ihnen ein Pflegekraft-Wechsel an?", html: buildReaktivierungWechselHtml(lead as Lead, site, portalBase), text: buildReaktivierungWechselText(lead as Lead, site, portalBase) };
+          case "vermittler_angebot": {
+            const d = {
+              anrede: demoAnrede, kundeLabel: demoMeta.kunde_label,
+              bruttopreis: Number((lead as any).kalkulation?.bruttopreis ?? 0),
+              provisionProTag: demoMeta.provision_pro_tag,
+              empfehlung: demoVermittlerEmpf?.empfehlung ?? null,
+              sichtbarGesamt: demoVermittlerEmpf?.sichtbarGesamt ?? 0,
+              fotoCid: demoInline?.cid ?? null,
+            };
+            return { subject: demoMeta.betreff_antwort, html: buildEmailWrapper(lead as Lead, site, vermittlerAngebotHtml(d), VERMITTLER_FUSSNOTE), text: vermittlerAngebotText(d) };
+          }
+          case "vermittler_kraefte": {
+            const d = {
+              anrede: demoAnrede, kundeLabel: demoMeta.kunde_label,
+              fuenf: demoVermittlerFuenf?.fuenf ?? [], cids: demoVermittlerFuenf?.cids ?? [],
+            };
+            return { subject: demoMeta.betreff_antwort, html: buildEmailWrapper(lead as Lead, site, vermittlerKraefteHtml(d), VERMITTLER_FUSSNOTE), text: vermittlerKraefteText(d) };
+          }
           default: return { subject: `Unbekannt: ${t}`, html: `<p>Unbekannter Typ ${t}</p>`, text: `Unbekannter Typ ${t}` };
         }
       };
@@ -2256,12 +2375,20 @@ Deno.serve(async (req: Request) => {
           const subject = item.subjectPrefix ? `${item.subjectPrefix}${m.subject}` : m.subject;
           const html = b ? m.html.replace('<div class="email-content">', `${bannerHtml(b)}<div class="email-content">`) : m.html;
           const text = b ? `(${b})\n\n${m.text}` : m.text;
-          const anhang = item.email_type === "eingangsbestaetigung" && demoInline
+          const anhang = (item.email_type === "eingangsbestaetigung" || item.email_type === "vermittler_angebot") && demoInline
             ? [demoInline]
             : item.email_type === "profil_nudge_1" && demoFuenf?.anhaenge.length
             ? demoFuenf.anhaenge
+            : item.email_type === "vermittler_kraefte" && demoVermittlerFuenf?.anhaenge.length
+            ? demoVermittlerFuenf.anhaenge
             : undefined;
-          const r = await sendEmailSmtp(smtpConfig, to, subject, html, text, anhang, demoBody.skipBcc === true);
+          /* Vermittler-Vorschau nimmt dasselbe Postfach wie die echte Mail —
+             so prueft der Testversand nebenbei den Ionos-Zugang, statt ihn
+             erst beim ersten echten Partner zu entdecken. */
+          const demoConfig = item.email_type?.startsWith("vermittler_")
+            ? await getVermittlerSmtpConfig(supabase, smtpConfig.siteUrl)
+            : smtpConfig;
+          const r = await sendEmailSmtp(demoConfig, to, subject, html, text, anhang, demoBody.skipBcc === true);
           results.push({
             email_type: item.email_type, to, subject, ...r,
             // Damit man an der Antwort sieht, ob die Liste drin war.
@@ -2394,6 +2521,7 @@ Deno.serve(async (req: Request) => {
         const umleitung = testphaseUmleitung(
           { source: (lead as Record<string, unknown>).source as string | null, email: recipient },
           Deno.env.get("PORTAL_TESTPHASE"),
+          Deno.env.get("PORTAL_TESTPHASE_EMPFAENGER"),
         );
 
         let isBeauftragt = lead.status === "vertrag_abgeschlossen" || lead.status === "betreuung_beauftragt" || lead.order_confirmed === true;
@@ -2619,6 +2747,81 @@ Deno.serve(async (req: Request) => {
           text = buildNachfass3Text(lead as Lead, smtpConfig.siteUrl);
           eventTypeSent = "email_nachfass_3_sent";
           eventTypeFailed = "email_nachfass_3_failed";
+        } else if (scheduledEmail.email_type === "vermittler_angebot") {
+          /* Mail 1 an den Vermittler: Preis, Provision, eine passende Kraft.
+             Kein Portal-Link, kein Abmelde-Link — der Token des Leads oeffnet
+             das Kundenportal und darf diese Mail nicht verlassen. */
+          const meta = (scheduledEmail.metadata ?? {}) as Record<string, any>;
+          const kalk = (lead as any).kalkulation ?? {};
+          let empfehlung = null as EmpfehlungErgebnis["empfehlung"] | null;
+          let sichtbarGesamt = 0;
+          let fotoCid: string | null = null;
+          const tokV = (lead as Lead).token;
+          if (tokV) {
+            const erg = await holeEmpfehlung({
+              supabaseUrl, key: supabaseServiceKey, token: tokV,
+              jobOfferId: (lead as any).mamamia_job_offer_id ?? null,
+              formularDaten: kalk.formularDaten ?? {},
+              darfOnboarden: Deno.env.get("EMPFEHLUNG_ONBOARD") !== "0",
+            });
+            if (erg) {
+              empfehlung = erg.empfehlung;
+              sichtbarGesamt = erg.sichtbarGesamt;
+              const inline = await fetchInlinePhotoDeno(erg.empfehlung.fotoUrl);
+              if (inline) { fotoCid = inline.cid; (scheduledEmail as any).__reminderInline = inline; }
+            }
+          }
+          const daten = {
+            anrede: `${buildEingangsGreeting(lead as Lead)},`,
+            kundeLabel: (meta.kunde_label as string) || null,
+            bruttopreis: Number(kalk.bruttopreis ?? 0),
+            provisionProTag: Number(meta.provision_pro_tag ?? 0),
+            empfehlung, sichtbarGesamt, fotoCid,
+          };
+          subject = (meta.betreff_antwort as string) || "Re: Ihre Anfrage";
+          html = buildEmailWrapper(lead as Lead, smtpConfig.siteUrl, vermittlerAngebotHtml(daten), VERMITTLER_FUSSNOTE);
+          text = vermittlerAngebotText(daten);
+          eventTypeSent = "email_vermittler_angebot_sent";
+          eventTypeFailed = "email_vermittler_angebot_failed";
+        } else if (scheduledEmail.email_type === "vermittler_kraefte") {
+          /* Mail 2: die Liste. Sie wird JETZT neu berechnet — zwei Stunden
+             nach Mail 1 kann eine Kraft gebucht sein. Ohne Kraefte gaebe es
+             nur eine leere Rahmung: dann lieber nicht senden (unten). */
+          const meta = (scheduledEmail.metadata ?? {}) as Record<string, any>;
+          const teile = await kraefteFuerVermittler(lead as Lead, supabaseUrl, supabaseServiceKey);
+          if (!teile) {
+            await supabase.from("scheduled_emails").update({
+              status: "cancelled", updated_at: new Date().toISOString(),
+              error_message: "keine verfuegbaren Betreuungskraefte",
+            }).eq("id", scheduledEmail.id);
+            await supabase.from("lead_events").insert({
+              lead_id: scheduledEmail.lead_id,
+              event_type: "vermittler_kraefte_entfallen",
+              metadata: { grund: "listMatchings lieferte keine Kraefte" },
+            });
+            /* Sichtbar statt still: der Partner wartet auf die angekuendigte
+               Liste, also muss ein Mensch davon erfahren. */
+            await sendEmailSmtp(
+              smtpConfig, Deno.env.get("OPS_ALERT_TO") ?? "info@primundus.de",
+              `Vermittler: keine Kraefte fuer Lead ${scheduledEmail.lead_id}`,
+              `<p>Die angekuendigte Liste konnte nicht verschickt werden — mamamia lieferte keine verfuegbaren Betreuungskraefte.</p>`,
+              "Die angekuendigte Liste konnte nicht verschickt werden — mamamia lieferte keine verfuegbaren Betreuungskraefte.",
+              undefined, true,
+            ).catch(() => {});
+            console.warn(`[vermittler] Lead ${scheduledEmail.lead_id}: keine Kraefte, Mail 2 entfaellt`);
+            continue;
+          }
+          if (teile.anhaenge.length) (scheduledEmail as any).__inlineAttachments = teile.anhaenge;
+          const daten = {
+            anrede: `${buildEingangsGreeting(lead as Lead)},`,
+            kundeLabel: (meta.kunde_label as string) || null,
+            fuenf: teile.fuenf, cids: teile.cids,
+          };
+          subject = (meta.betreff_antwort as string) || "Re: Ihre Anfrage";
+          html = buildEmailWrapper(lead as Lead, smtpConfig.siteUrl, vermittlerKraefteHtml(daten), VERMITTLER_FUSSNOTE);
+          text = vermittlerKraefteText(daten);
+          eventTypeSent = "email_vermittler_kraefte_sent";
+          eventTypeFailed = "email_vermittler_kraefte_failed";
         } else if (scheduledEmail.email_type === "profil_nudge_1") {
           /* Alle fünf Kräfte in die Mail (Martin, 03.09.2026). Vorbereitung
              im gemeinsamen Helfer, damit der Testversand exakt dasselbe
@@ -2900,9 +3103,21 @@ Deno.serve(async (req: Request) => {
         const effektiverBetreff = umleitung ? umleitung.betreffPraefix + subject : subject;
         // Testphase-Umleitung ans Team: dann KEINE Kopie an die zweite
         // Kundenadresse — sonst bekäme sie, was der Kunde selbst nicht bekommt.
+        /* Threading nur fuer die Vermittler-Mails: sie sind Antworten auf
+           eine konkrete Mail des Partners und sollen in seinem Faden landen. */
+        const threadId = scheduledEmail.email_type.startsWith("vermittler_")
+          ? ((scheduledEmail.metadata ?? {}) as Record<string, any>).message_id ?? null
+          : null;
+        /* Vermittler-Mails gehen ueber das Ionos-Postfach info@primundus.de,
+           alles andere ueber das SES-Konto. Erst hier geladen, damit ein
+           Takt ohne Vermittler-Mail keinen zusaetzlichen RPC kostet. */
+        const versandConfig = scheduledEmail.email_type.startsWith("vermittler_")
+          ? await getVermittlerSmtpConfig(supabase, smtpConfig.siteUrl)
+          : smtpConfig;
         const emailResult = await sendEmailSmtp(
-          smtpConfig, effektiverEmpfaenger, effektiverBetreff, html, text, attachments,
+          versandConfig, effektiverEmpfaenger, effektiverBetreff, html, text, attachments,
           false, umleitung ? undefined : ccEmpfaenger,
+          threadId ? { inReplyTo: threadId, references: threadId } : undefined,
         );
 
         if (emailResult.success) {

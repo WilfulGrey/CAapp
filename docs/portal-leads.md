@@ -1,4 +1,4 @@
-# Eingekaufte Leads (Pflegehilfe, Pflegebund, Pflege-Helfer24)
+# Eingekaufte Leads (Pflegehilfe, Pflegebund, Pflege-Helfer24) + Vermittler (Pflegena)
 
 Zweiter Weg in dieselbe Strecke: nicht der Kunde füllt den Kostenrechner
 aus, sondern wir kaufen seine Anfrage bei einem Portal. Ab dem Lead läuft
@@ -92,14 +92,21 @@ egal, die Mails bleiben liegen) und `socketTimeout: 30s` auf der
 IMAP-Verbindung (eine hängende Session heilt sich nicht mehr durch
 Prozessende).
 
-## Die Postfächer sind Eingänge, keine Absender
+## Die Portal-Postfächer sind Eingänge, keine Absender
 
-Jedes Portal bekommt eine eigene Adresse. **Die Adresse ist die
-Quellenangabe** — was dort ankommt, kommt von diesem Portal.
+Jedes eingekaufte Portal bekommt eine **eigene** Adresse. Dort ist die
+**Adresse die Quellenangabe** — was ankommt, kommt von diesem Portal, und
+der Abholer darf getrost jede Mail darin ansehen.
 
 Von diesen Postfächern wird **nie gesendet**. Jede Kundenmail geht über
 `kostenrechner@primundus.de` (SMTP-Konfiguration der Edge Function).
 Die Zugangsdaten liegen außerhalb des Repos und dienen nur dem Lesen.
+
+**Für den Vermittler gilt beides NICHT** (Abschnitt „Vermittler: Pflegena"):
+er schreibt an `info@primundus.de` — die Hauptadresse der Firma, in der auch
+Kundenpost, die BCC-Kopien unserer eigenen Mails und Team-Benachrichtigungen
+liegen. Dort ist die Quelle der **Absender**, nicht das Postfach, und aus
+genau dieser Adresse geht die Antwort auch wieder raus.
 
 ## Scharfschalten
 
@@ -267,6 +274,231 @@ update portal_api_log set status = 'offen', updated_at = now()
  where portal = 'pflege-helfer24.de' and extern_id = '<Lead-UUID>';
 ```
 
+## Vermittler: Pflegena (kein eingekaufter Lead)
+
+Pflegehilfe und Pflege-Helfer24 verkaufen uns die Anfrage eines KUNDEN.
+Pflegena ist etwas anderes: ein **Vermittler**, der für seinen Kunden bei
+uns anfragt und auf unseren Preis seine Provision schlägt (10 €/Tag). Der
+Empfänger jeder Mail ist damit ein Geschäftspartner, kein Endkunde — und
+die ganze Kundenwelt (Portal, Magic-Link, Nachfass-Kette, Bewertung) hat
+in seinem Postfach nichts verloren.
+
+### Geteiltes Postfach, Quelle ist der Absender
+
+Pflegena schreibt an **`info@primundus.de`** — kein eigenes Postfach,
+sondern die Hauptadresse der Firma. Dort liegen auch: Antworten von Kunden,
+die **BCC-Kopien jeder Mail, die wir selbst verschicken** (`SMTP_BCC`), und
+sämtliche Team-Benachrichtigungen. Zwei Folgen:
+
+1. **Die Quelle ist der Absender, nicht das Postfach.** Der Abholer fragt
+   den IMAP-Server nur nach Post von `@pflegena.com` (`SEARCH FROM`) und
+   sieht den Rest nie. Das ist nicht bloß Höflichkeit: ohne den Filter
+   würde der Erstlauf JEDE Mail des Postfachs als `altbestand` ins
+   Protokoll schreiben — bei einem Portal sind das Dutzende, hier
+   Zehntausende in einem Insert.
+2. **Ein zweiter Riegel im Code.** `SEARCH FROM` prüft den rohen
+   Kopfzeilentext, also auch den Anzeigenamen; eine fremde Mail mit
+   „pflegena.com" im Namen käme durch. Nach dem Parsen wird deshalb die
+   Absenderdomain noch einmal geprüft — passt sie nicht, wird die Mail als
+   `erledigt` abgehakt (kein Shell-Lead, kein Modellaufruf, nie wieder
+   angefasst).
+
+Registry-Schlüssel bleibt die Absenderdomain (`portal_mail_log.postfach =
+'pflegena.com'`), nicht das Postfach — die Protokollzeilen gehören zur
+Quelle, und die UIDs stammen ohnehin aus einer einzigen INBOX.
+
+**Offene Kante:** `info@primundus.de` ist eine Postfach, in dem Menschen
+arbeiten. Verschiebt jemand eine Pflegena-Mail in einen Unterordner, bevor
+der Minuten-Cron sie gesehen hat, ist die Anfrage weg und niemand erfährt
+davon. Wenn das passiert: Ionos-Regel „Absender `@pflegena.com` → Ordner"
+einrichten und den Abholer auf diesen Ordner zeigen lassen — dann fällt der
+Wettlauf weg (bewusst noch nicht gebaut, ein Element weniger außerhalb des
+Repos).
+
+**Der Betreff ist eine vollwertige Quelle.** Aus dem echten Postfach
+(09.09.): „Neue Stelle ab sofort **Brunhilde Weber 79780 Stühlingen**",
+„EILT Ablösekraft ab **09.09.2026 Hedwig Jordan, 79761 Waldshut**". Name,
+Ort und Termin stehen dort — der Fließtext wiederholt sie oft nicht.
+Deshalb bekommt das Modell Betreff und Text als getrennte Blöcke, und der
+PLZ-Beleg zählt in **beiden**. Ein Check nur gegen den Fließtext hätte die
+PLZ jeder zweiten Anfrage verworfen.
+
+**Prosa statt Formular.** Es gibt kein „Label: Wert", keine CSV, keinen
+Anhang — nur einen Brief:
+
+> „wenigstens mittlere Deutschkenntnisse sind gewünscht, Tagessatz IHR
+> PREISANGEBOT + 10 Pflegena = ?? € plus Reisekosten … ein liebes Ehepaar,
+> sie ist nicht pflegebedürftig, er ist aktuell sehr geschwächt,
+> Hebetechnik erforderlich, falls Transfer Bett/Rollstuhl"
+
+Dafür liest ein Modell (`lib/pflegena.ts`: Schema, Prompt, Prüfung — rein
+und ohne Schlüssel testbar; der Netzaufruf steht in der Abholer-Route,
+Muster Pria). Es ordnet den Text denselben neun Kalkulator-Feldern zu, die
+auch das Formular kennt. **Was nicht im Text steht, bleibt `null`** — die
+Lücke füllt danach `ergaenzeAngaben` mit dem teureren Wert und schreibt sie
+nach `angenommene_felder`. Werte außerhalb des Kanons (`ERLAUBT` in
+`lib/angaben-diff.ts`) werden verworfen und geloggt, nie gesetzt.
+
+### `source` bleibt `portal:`, unterschieden wird per Spalte
+
+`leads.source` ist `portal:pflegena.com` — damit funktionieren Admin-Reiter,
+Herkunft-Badge, die Sektion „Postfach — Mails ohne Lead", die
+`PORTAL_TESTPHASE`-Umleitung und der Kostenreport **unverändert**.
+Unterschieden wird über die neue Spalte **`leads.vermittler`**
+(`'pflegena.com'`). Sie ist der Schalter für die fünf Bremsen und braucht auf
+der Deno-Seite keine Kopie der Portal-Liste: `if (lead.vermittler)`.
+
+`PORTAL_PREISE` trägt `pflegena.com: 0` in **beiden** Kopien
+(`lib/lead-kosten.ts`, `daily-analytics-report/queries.ts`) — die Anfrage
+kostet nichts, die Provision fällt erst mit dem Auftrag an. Im Tagesreport
+entscheidet seit dieser Änderung *Preis bekannt?* statt *Preis > 0*, sonst
+meldete er täglich ein fehlendes Preisschild, das keins ist.
+
+### Jede Anfrage ist ein eigener Lead
+
+`findOrCreateLead` dedupliziert per E-Mail — bei einem Vermittler trägt
+**jede** Anfrage dieselbe Absenderadresse. Ab der zweiten fände die
+Funktion den bestehenden Lead, sähe eine Mail 1 jünger als 60 Tage und
+verschluckte die Anfrage als Duplikat. Deshalb legt der Eingang für
+Vermittler direkt an (Felder 1:1 an `findOrCreateLead` abgeglichen, inkl.
+`token_used`, `anrede_text` und dem Ereignis `angebot_requested`).
+
+Gegen Doppelverarbeitung schützt stattdessen **`leads.quelle_nachricht_id`**
+(die Message-ID der Mail, unique-partial). Fällt ein Lauf zwischen
+Lead-Anlage und Warteschlange aus, greift beim nächsten Takt `23505` — der
+Eingang holt den Lead und `sorgeFuerVermittlerMails` zieht genau die
+fehlende Zeile nach. Ohne diesen Schritt wäre die Anfrage für immer stumm:
+das Abholer-Protokoll führte sie als `erledigt`.
+
+**Antworten im Thread** (`In-Reply-To`/`References` treffen eine bekannte
+`quelle_nachricht_id`) werden vor dem Modell abgefangen: Ereignis
+`vermittler_antwort` am **richtigen** Lead, kein Modellaufruf, kein neuer
+Lead. Was übrig bleibt und trotzdem keine Anfrage ist, wird `abgelehnt`,
+landet als Shell-Lead im Admin **und** geht als Volltext an `info@` — der
+Partner wartet auf eine Antwort in seinem Faden, ein stiller Fehlschlag
+wäre hier teurer als beim Portal.
+
+### Zwei Mails, beide als Antwort im Thread
+
+| Typ | Wann | Inhalt |
+|---|---|---|
+| `vermittler_angebot` | sofort | Tagessatz, Monatssatz, Anreise, **Provisionsblock** („Ihre Provision von 10 €/Tag kommt auf den Preis. Familie Schmidt zahlt damit 98 €/Tag"), Konditionen, eine passende Kraft |
+| `vermittler_kraefte` | +2 h (durch `sendezeitIso`) | die verfügbaren Kräfte als Liste, ohne Preiswiederholung |
+
+**Die Antwort geht über das Postfach raus, das wir auch lesen** — Ionos-SMTP
+von `info@primundus.de`, nicht über das SES-Konto der Kundenpost. Zwei
+Gründe, beide nachgeprüft:
+
+- Der SPF-Eintrag der Domain lautet `v=spf1 include:_spf-eu.ionos.com ~all`
+  und autorisiert damit **Ionos**, nicht SES. Die Kundenpost aus SES läuft
+  heute mit SPF-Softfail — ohne DMARC-Record akzeptieren Empfänger das, und
+  empirisch kommt sie an. Für eine Antwort an einen Geschäftspartner, dessen
+  Filter wir nicht kennen, ist ein sauberer SPF aber das billigere Los.
+- Aus derselben Adresse zu antworten, an die geschrieben wurde, ist für den
+  Partner eine Antwort. Ein anderer Absender liest sich wie neue Post.
+
+Technisch: ein **zweites SMTP-Profil im Supabase-Vault**
+(`vermittler_smtp_host/_port/_user/_pass/_from`, RPC
+`get_vermittler_smtp_config`), das die Edge Function nur dann lädt, wenn
+eine `vermittler_*`-Zeile fällig ist. **Ohne Rückfall auf das Kundenkonto:**
+fehlt Zugang oder Absender, scheitert der Versand laut (Zeile `failed` +
+Ops-Alarm), statt die Antwort still mit fremdem Absender rauszuschicken.
+Der DEMO-Versand nimmt dasselbe Profil und prüft den Zugang damit nebenbei.
+`Reply-To` bleibt `info@primundus.de` wie überall.
+
+Preis dieser Entscheidung, bewusst getragen: das Passwort von
+`info@primundus.de` liegt an **zwei** Stellen — Render (`INFO_PASS`, fürs
+Lesen per IMAP) und Supabase-Vault (`vermittler_smtp_pass`, fürs Senden).
+Bei einer Rotation beide anfassen.
+
+Betreff ist `Re: <Originalbetreff>`, dazu `In-Reply-To`/`References` —
+`sendEmailSmtp` hat dafür einen neunten Parameter bekommen (bewusst
+positionell: `cc` wird an einer Stelle positionsweise durchgereicht, ein
+Options-Objekt hätte es dort verloren). Der fertige Antwort-Betreff reist in
+`scheduled_emails.metadata`, damit `betreffAntwort` nicht als dritte Kopie
+auf der Deno-Seite landet.
+
+**Was in diesen Mails NICHT stehen darf** (Test hält es fest):
+- **kein Token.** Der Abmelde-Link der Standard-Fußzeile trägt `lead.token`
+  — denselben Wert, mit dem `buildPortalUrl` das KUNDENPORTAL öffnet
+  (Patientenbogen, Bewerbungen, Vertragsunterschrift). Die Vermittler-Mails
+  bekommen deshalb eine eigene Fußnote ohne Link.
+- **keine Kunden-Konditionen.** „Keine Vermittlungsgebühren" und
+  „Direktanbieter ohne Vermittler" stehen an rund zehn Stellen im Repo —
+  neben einem Provisionsblock wären sie ein Widerspruch.
+- **keine Profil-Links**, kein CTA: es gibt für den Partner kein Portal.
+
+Liefert mamamia keine Kräfte, geht Mail 1 ohne Empfehlung raus (Preis und
+Provision tragen sie), und der Satz „weitere sende ich in den nächsten
+Stunden" erscheint gar nicht erst. Mail 2 wird dann **nicht** verschickt:
+Zeile `cancelled`, Ereignis `vermittler_kraefte_entfallen`, Mail ans Team.
+
+### Fünf Bremsen
+
+Der Lead sieht für alle Automatiken aus wie ein normaler Kunde — er hat
+Token, mamamia-Kunden und JobOffer. Fünf Stellen mussten das wissen:
+
+| Wo | Was sonst passiert wäre |
+|---|---|
+| `bewertung.ts` | sieben Tage nach JEDER Anfrage „wie hilfreich war unsere Beratung?" — die Runde läuft außerhalb der Warteschlange |
+| `detect-caregiver-events` (`autoRejectStaleApplications`) | nach 72 h ohne Portal-Reaktion automatisch abgelehnt; ein Portal gibt es hier nicht |
+| `mamamia-proxy` (`scheduleNeuePflegekraefteMail`) | „Pflegekraft einladen" im Panel (der Token ist dort gespiegelt) hätte eine Kundenmail ausgelöst |
+| `lead-event/route.ts` | Mail A/B/C/D, `offer_updated` und alle fünf Reaktions-Reminder |
+| `lead-regenerate-token` | „Neuen Link senden" hätte den Magic-Link an den Partner geschickt (Rotation und mamamia-Spiegel laufen weiter) |
+
+Team-Mails laufen überall weiter. Die Team-Mail des Eingangs nennt
+zusätzlich den Kunden des Vermittlers und **welche Angaben unsere Annahme
+sind** — die Mail an den Partner nennt sie bewusst nicht (Entscheidung
+Michał 08.09.), also ist das die einzige Stelle, an der jemand den Preis mit
+seiner Herkunft sieht.
+
+### Takt und Kosten
+
+Das Vermittler-Postfach wird **zuletzt** gelesen — nach den Postfächern und
+nach dem API-Portal — und **eine Mail pro Takt**. Ein Modellaufruf (5–15 s)
+plus Onboarding im Eingang (bis 25 s) sprengt sonst den Minutentakt, und
+`laeuft` ließe den nächsten Takt für alle Quellen ausfallen. 60 Mails/h
+liegen weit über dem Aufkommen.
+
+`portal_mail_log.versuche` zählt transiente Fehlschläge **nur** für
+Vermittler-Mails; ab 5 wird die Mail `abgelehnt` (plus Team-Mail), sonst
+liefe sie im Minutentakt für immer durch ein kostenpflichtiges Modell. Der
+gemeinsame Deckel wäre für die bezahlten Portale falsch: eine fünfminütige
+Störung von `/api/portal-lead` würde dort einen Lead vernichten.
+
+Fehlerklassen: `abgelehnt` nur bei einem Urteil über DIESE Mail (keine
+Anfrage, mehrere Anfragen, Nachtrag, nichts lesbar, HTTP 400). Alles andere
+— 401/403 (Schlüssel rotiert), 429, 5xx, Timeout — ist `offen` und wird
+erneut versucht.
+
+Im **Trockenlauf** merkt sich der Prozess die schon gelesenen UIDs im
+Speicher: das Protokoll bleibt dort unberührt, und ohne dieses Gedächtnis
+liefe dieselbe Mail in jedem Takt erneut durchs Modell.
+
+### Bekannte Kanten
+
+- Der mamamia-Kunde trägt die Kontaktdaten des **Vermittlers** (`Customer` =
+  Kontaktperson, nicht Patient). Unterschieden werden die Anfragen über
+  `leads.patient_*` und die erste Zeile des Kontextblocks
+  (`fd.portal_details` → JobOffer-Beschreibung): „Familie Schmidt, Kassel".
+- Kommt dieselbe Familie zusätzlich über unseren Kostenrechner, entstehen
+  zwei Leads mit zwei Preisen (einer mit, einer ohne Provision). Über die
+  E-Mail nicht erkennbar — im Admin nach `patient_nachname` suchen.
+- Ein menschlicher Forward derselben Anfrage hat eine NEUE Message-ID. Der
+  Thread-Vorcheck fängt ihn nur, wenn der Client `References` mitschickt.
+- **Pflegena schickt dieselbe Person erneut**, wenn sich etwas ändert: im
+  Postfach steht „Brunhilde Weber 79780 Stühlingen" am 02.09. („Neue Stelle
+  07.09. oder früher") **und** am 09.09. („Neue Stelle ab sofort") — zwei
+  Mails, zwei Message-IDs, kein gemeinsamer Thread. Daraus werden zwei Leads
+  und zwei Angebote. Ob das stört, zeigt der Betrieb: es kann auch schlicht
+  eine neue Anfrage sein, weil sich der Termin verschoben hat.
+- Die Mails sind **groß** (1–6 MB, Anhänge). Ein Mail pro Takt hält den
+  Speicher im Rahmen — `simpleParser` puffert die ganze Nachricht, und der
+  Kostenrechner läuft auf 512 MB (Registry #27/#29).
+- Pflegena steht bewusst **nicht** in `herkunft.ts` `PORTAL_QUELLEN`: der
+  Vermittler bekommt nie eine `eingangsbestaetigung`, und ein Test hält
+  fest, dass seine Mailtypen diesen Wert nicht enthalten.
+
 ## Environment (Render-Dashboard des Kostenrechners)
 
 | Variable | Zweck |
@@ -275,9 +507,21 @@ update portal_api_log set status = 'offen', updated_at = now()
 | `PFLEGEHILFE_USER` / `_PASS` | Postfach. Fehlt eines, wird das Portal übersprungen |
 | `PFLEGEBUND_USER` / `_PASS` | dito |
 | `PFLEGEHELFER24_API_TOKEN` | Partner-API pflege-helfer24.de. Fehlt er, wird das Portal übersprungen. **Staging: nur zum Test, danach entfernen** |
+| `INFO_USER` / `INFO_PASS` | Zugang zu `info@primundus.de` — GETEILTES Postfach, nicht dem Vermittler allein. Registry-Feld `postfach: 'INFO'`. Nur fürs **Lesen** (IMAP) |
+| `ANTHROPIC_API_KEY` | Liest die Vermittler-Anfragen (dasselbe Konto wie Pria). Fehlt er, bleiben die Mails `offen` |
+| `PFLEGENA_MODELL` | optionaler Override, Default `claude-sonnet-5` |
+
+Zum **Senden** kommt der Zugang nicht aus Render, sondern aus dem
+Supabase-Vault (Edge Function): `vermittler_smtp_user`, `_pass`, `_from`
+(Pflicht — ohne sie scheitert der Versand laut) sowie optional `_host`
+(Default `smtp.ionos.de`), `_port` (587), `_from_name`. Setzen per
+Management-API-SQL (`vault.create_secret` / `vault.update_secret`), NICHT
+über eine Migration und NICHT über `supabase secrets` — das ist ein anderer
+Speicher.
 | `PORTAL_IMAP_HOST` | `imap.ionos.de` |
 | `PORTAL_TROCKENLAUF` | `1` = alle Portale nur lesen, **oder Domain-Liste** (`pflege-helfer24.de`) für ein Portal allein |
 | `PORTAL_TESTPHASE` | `1` = alle Portale, **oder Domain-Liste** — Kundenmails dieses Portals ans Team (auch als Supabase-Secret!) |
+| `PORTAL_TESTPHASE_EMPFAENGER` | Ziel der Umleitung. Leer = Team (`info@` + `martin@mamamia.app`); eine einzelne Adresse für einen gezielten Durchlauf. Auch als Supabase-Secret |
 | `PORTAL_LEAD_URL` | optionaler Override des Loopback-Ziels; normal NICHT gesetzt |
 
 Der Takt kommt aus pg_cron: neues Vault-Secret `kostenrechner_url`
@@ -392,6 +636,9 @@ Mit dem Speichern gelten die Angaben als **mit dem Kunden geprüft**:
    Zugangsdaten des neuen Postfachs (bzw. API-Token). Die Postfach-Namen
    leitet die Abholer-Route aus der Domain ab: `pflegehilfe.org` →
    `PFLEGEHILFE_USER` / `PFLEGEHILFE_PASS`.
+4. Nur bei `art: 'vermittler'`: `PORTAL_PREISE` in **beiden** Kopien
+   (`lib/lead-kosten.ts`, `daily-analytics-report/queries.ts`) — auch mit
+   dem Wert 0, sonst meldet der Tagesreport ein fehlendes Preisschild.
 
 Nicht nachzutragen: der Reiter im Admin und die Allowlist des Eingangs —
 beide kommen aus `PORTALE`.
@@ -445,8 +692,13 @@ jedem Merge — nicht mehr als eigenständige Deno-Skripte (die brachen den
 `next build` beider Kostenrechner-Slots, Registry #38):
 
 ```bash
-npx vitest run src/__tests__/portalLead.test.ts src/__tests__/portalParser.test.ts src/__tests__/portalMailLog.test.ts src/__tests__/portalHelfer24.test.ts src/__tests__/portalSchutz.test.ts
+npx vitest run src/__tests__/portalLead.test.ts src/__tests__/portalParser.test.ts src/__tests__/portalMailLog.test.ts src/__tests__/portalHelfer24.test.ts src/__tests__/portalSchutz.test.ts src/__tests__/pflegena.test.ts
 ```
+
+Die Vermittler-Mails selbst prüft die Deno-Suite der Edge Function
+(`project 3/supabase/functions/send-scheduled-emails`: `vermittler.test.ts`
+für Preis, Provision, fehlende Links und den fehlenden Token;
+`bewertung.test.ts` für die Bremse).
 
 `portalHelfer24.test.ts` (API-Zeile → Body: Spalten per Name, exakte
 Auswahlwerte, `spaeter`, falsches Produkt, Einwilligung), `portalSchutz.test.ts`

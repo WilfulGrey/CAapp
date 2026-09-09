@@ -15,6 +15,8 @@ export interface EmailTemplate {
 }
 
 export interface BewertungsLead {
+  /** Gesetzt = der Lead gehoert einem Vermittler, nicht einem Endkunden. */
+  vermittler?: string | null;
   source?: string | null;
   id: string;
   vorname: string | null;
@@ -50,6 +52,13 @@ export function bewertungAusschlussgrund(
   jetzt: Date,
 ): string | null {
   if (!lead.email || !lead.token) return "kein_kontakt";
+  /* Der Lead eines Vermittlers traegt die Adresse eines Geschaeftspartners,
+     nicht die eines betreuten Kunden. "Wie hilfreich war unsere Beratung?"
+     ginge sieben Tage nach JEDER seiner Anfragen an ihn — bei zwanzig
+     Anfragen zwanzigmal. Diese Runde laeuft ausserhalb der Warteschlange
+     (index.ts ruft sie in jedem Takt), die Bremse in lead-event sieht sie
+     also nicht. */
+  if (lead.vermittler) return "vermittler";
   if (lead.created_at < BEWERTUNG_STICHTAG) return "vor_stichtag";
   const alterMs = jetzt.getTime() - new Date(lead.created_at).getTime();
   if (alterMs < BEWERTUNG_TAGE * 24 * 60 * 60 * 1000) return "zu_frisch";

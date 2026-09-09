@@ -154,15 +154,59 @@ export function ergaenzeAngaben(
  * (Zugang <PRAEFIX>_USER/_PASS), 'api' = Partner-API des Portals
  * (lib/portal-helfer24.ts, Token PFLEGEHELFER24_API_TOKEN). */
 export const PORTALE = [
-  { domain: 'pflegehilfe.org', name: 'Pflegehilfe.org', abholung: 'imap' },
-  { domain: 'pflegebund.eu', name: 'Pflegebund.eu', abholung: 'imap' },
-  { domain: 'pflege-helfer24.de', name: 'Pflege-Helfer24.de', abholung: 'api' },
+  { domain: 'pflegehilfe.org', name: 'Pflegehilfe.org', abholung: 'imap', art: 'portal' },
+  { domain: 'pflegebund.eu', name: 'Pflegebund.eu', abholung: 'imap', art: 'portal' },
+  { domain: 'pflege-helfer24.de', name: 'Pflege-Helfer24.de', abholung: 'api', art: 'portal' },
+  /* Vermittler statt Portal: Pflegena kauft keine Anfrage bei uns ein, es
+     schickt eine Anfrage FUER seinen Kunden und schlaegt seine Provision
+     auf unseren Preis. `art` steuert drei Dinge auf einmal — LLM-Parser
+     statt Label-Parser, kein E-Mail-Dedupe, eigene Mailvorlage —, weil sie
+     alle dasselbe bedeuten: der Empfaenger ist ein Geschaeftspartner, kein
+     Endkunde. Die `source` bleibt "portal:<domain>", damit Admin-Reiter,
+     Testphase-Umleitung und Kostenreport unveraendert weiterlaufen; die
+     Unterscheidung im Betrieb traegt leads.vermittler.
+
+     ACHTUNG, hier gilt die Grundregel der Portale NICHT: bei Pflegehilfe
+     & Co. IST das Postfach die Quellenangabe (eine Adresse je Portal, dort
+     kommt nur deren Post an). Der Vermittler schreibt an `info@primundus.de`
+     — die Hauptadresse der Firma, in der auch Kundenantworten, BCC-Kopien
+     unserer eigenen Mails und Team-Benachrichtigungen liegen. Die Quelle ist
+     deshalb der ABSENDER (`domain`), das Postfach nur der Ort, an dem wir
+     nachsehen (`postfach` → INFO_USER/INFO_PASS).
+
+     Die ANTWORT geht aus demselben Postfach raus, ueber dessen eigenen
+     Ionos-SMTP — nicht ueber das SES-Konto der Kundenpost: der SPF-Eintrag
+     der Domain autorisiert Ionos, und eine Antwort aus der angeschriebenen
+     Adresse ist fuer den Partner eine Antwort statt neuer Post. Zugang und
+     Absender stehen als eigenes Profil im Supabase-Vault
+     (`vermittler_smtp_*`, RPC `get_vermittler_smtp_config`) — hier steht
+     bewusst KEINE zweite Kopie der Adresse, die davon abweichen koennte. */
+  { domain: 'pflegena.com', name: 'Pflegena.com', abholung: 'imap', art: 'vermittler',
+    provisionProTag: 10,
+    postfach: 'INFO' },
 ] as const;
 
 export type PortalAbholung = (typeof PORTALE)[number]['abholung'];
+export type PortalEintrag = (typeof PORTALE)[number];
+
+/** Ein Eintrag mit art:'vermittler' — traegt garantiert provisionProTag. */
+export type VermittlerEintrag = Extract<PortalEintrag, { art: 'vermittler' }>;
+
+/** Der Eintrag, wenn die Domain ein Vermittler ist — sonst undefined. */
+export function vermittlerFuer(domain?: string | null): VermittlerEintrag | undefined {
+  const d = String(domain ?? '').trim().toLowerCase();
+  return PORTALE.find((p): p is VermittlerEintrag => p.domain === d && p.art === 'vermittler');
+}
 
 /** Die source-Werte aller Portale — "portal:pflegehilfe.org", ... */
 export const PORTAL_QUELLEN = PORTALE.map((p) => `portal:${p.domain}`);
+
+/** Env-Praefix des Postfachs, in dem die Mails dieser Quelle liegen.
+ *  Default: aus der Domain abgeleitet (pflegehilfe.org → PFLEGEHILFE) —
+ *  ein Vermittler zeigt mit `postfach` auf ein GETEILTES Postfach. */
+export function postfachPraefix(p: PortalEintrag): string {
+  return ('postfach' in p && p.postfach) || p.domain.split('.')[0].toUpperCase();
+}
 
 export function istEingekauft(source?: string | null): boolean {
   return typeof source === 'string' && source.toLowerCase().startsWith('portal:');
