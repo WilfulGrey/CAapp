@@ -221,6 +221,9 @@ export async function POST(request: NextRequest) {
     const { daten, angenommen } = ergaenzeAngaben(
       (body?.angaben ?? {}) as PortalAngaben,
       (preisZeilen ?? []) as PreisZeile[],
+      /* Beim Vermittler in die guenstige Richtung: er hat kein Portal, in
+         dem der Preis spaeter korrigiert wuerde (portal-lead.ts, Richtung). */
+      vermittler ? 'guenstig' : 'teuer',
     );
 
     const kalkulation = await berechnePreis(daten);
@@ -236,9 +239,16 @@ export async function POST(request: NextRequest) {
        (fd.portal_details). Whitelist + String-Zwang: der Body kommt von
        aussen. */
     const d = (body?.details && typeof body.details === 'object' ? body.details : {}) as Record<string, unknown>;
-    const fdExtras: Record<string, string> = {};
+    const fdExtras: Record<string, string | number> = {};
     const nimm = (ziel: string, wert: unknown, max = 2000) => {
       if (typeof wert === 'string' && wert.trim()) fdExtras[ziel] = wert.trim().slice(0, max);
+    };
+    /* Zwilling fuer Zahlen: buildPatients (onboard-to-mamamia/mappers.ts)
+       prueft `typeof fd.geburtsjahr === "number"` — ein String waere still
+       wirkungslos, das Feld verschwaende ohne eine Zeile im Log. */
+    const nimmZahl = (ziel: string, wert: unknown, min: number, max: number) => {
+      const n = Number(typeof wert === 'string' || typeof wert === 'number' ? wert : NaN);
+      if (Number.isInteger(n) && n >= min && n <= max) fdExtras[ziel] = n;
     };
     nimm('plz', body?.plz, 5);
     nimm('ort', body?.ort, 80);
@@ -247,6 +257,13 @@ export async function POST(request: NextRequest) {
     nimm('demenz', d.demenz, 2);
     nimm('diagnosen', d.diagnosen, 500);
     nimm('portal_details', d.block);
+    nimmZahl('geburtsjahr', d.geburtsjahr, 1900, new Date().getFullYear());
+    /* Name des betreuten Haushalts: steht in den patient_*-Spalten, wurde
+       aber nie nach fd durchgelassen — und genau von dort lesen die
+       Team-Mail und `kunde_label` (weiter unten). Deshalb stand dort
+       "nicht genannt", obwohl der Name bekannt war. */
+    nimm('patient_vorname', d.patient_vorname, 80);
+    nimm('patient_nachname', d.patient_nachname, 80);
     if (Object.keys(fdExtras).length) {
       (kalkulation as any).formularDaten = { ...(kalkulation as any).formularDaten, ...fdExtras };
     }
@@ -427,6 +444,11 @@ export async function POST(request: NextRequest) {
     }
     if (typeof d.patient_nachname === 'string' && d.patient_nachname.trim()) {
       patientPatch.patient_nachname = d.patient_nachname.trim().slice(0, 80);
+    }
+    /* Strasse nur fuer den Admin: nach Mamamia geht vom Einsatzort
+       ausschliesslich die PLZ (ueber den Locations-Lookup). */
+    if (typeof d.patient_strasse === 'string' && d.patient_strasse.trim()) {
+      patientPatch.patient_street = d.patient_strasse.trim().slice(0, 200);
     }
     if (Object.keys(patientPatch).length) {
       const { error: patchErr } = await supabase.from('leads').update(patientPatch).eq('id', lead.id);

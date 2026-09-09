@@ -53,7 +53,7 @@ import { parsePflegehilfe, telefoneAusHtml, waehleTelefone } from '@/lib/portal-
 import { parseCsv, csvZuLeadZeile, csvZeileBrauchbar } from '@/lib/portal-csv';
 import { PORTALE, vermittlerFuer, postfachPraefix } from '@/lib/portal-lead';
 import { zuVerarbeiten, SEED_SENTINEL_UID, versucheFuer, MAX_VERSUCHE, type LogZeile } from '@/lib/portal-mail-log';
-import { modellNachricht, pruefeAnfrage, SYSTEM as PFLEGENA_SYSTEM, WERKZEUG as PFLEGENA_WERKZEUG, type MailKopf } from '@/lib/pflegena';
+import { modellBloecke, pruefeAnfrage, waehleDokumente, SYSTEM as PFLEGENA_SYSTEM, WERKZEUG as PFLEGENA_WERKZEUG, type Dokument, type MailKopf } from '@/lib/pflegena';
 import { flagGiltFuer } from '@/lib/portal-schutz';
 import { sendEmail } from '@/lib/email';
 import { apiZeilen, helfer24ZuLeadBody, heuteBerlin, HELFER24_EXPORT_URL, type Helfer24Ergebnis } from '@/lib/portal-helfer24';
@@ -278,7 +278,11 @@ type ModellErgebnis =
   | { ok: true; roh: any }
   | { ok: false; dauerhaft: boolean; grund: string };
 
-async function frageModell(betreff: string, text: string): Promise<ModellErgebnis> {
+async function frageModell(
+  betreff: string,
+  text: string,
+  dokumente: readonly Dokument[] = [],
+): Promise<ModellErgebnis> {
   const key = process.env.ANTHROPIC_API_KEY;
   /* Fehlender Schluessel ist ein Konfigurationsfehler, kein Urteil ueber
      diese Mail — sonst waere die Anfrage nach einer Key-Rotation dauerhaft
@@ -293,9 +297,19 @@ async function frageModell(betreff: string, text: string): Promise<ModellErgebni
       headers: { 'x-api-key': key, 'anthropic-version': '2023-06-01', 'content-type': 'application/json' },
       body: JSON.stringify({
         model: MODELL,
-        max_tokens: 1000,
+        /* Nicht knapp bemessen: das Denken des Modells zaehlt in dieses
+           Budget hinein. Die erste echte Anfrage brauchte 678 Ausgabetoken
+           fuer eine Antwort, deren Inhalt rund 250 sind — mit Anhang und
+           mehr Feldern waeren 1000 sicher gerissen worden. Eine abgeschnittene
+           Antwort hat keinen tool_use-Block und sieht unten aus wie ein
+           voruebergehender Fehler: fuenf bezahlte Wiederholungen im
+           Minutentakt, dann abgelehnt. Bezahlt wird das Verbrauchte, nicht
+           die Grenze. */
+        max_tokens: 8000,
+        // Auslesen, nicht schlussfolgern.
+        output_config: { effort: 'low' },
         system: [{ type: 'text', text: PFLEGENA_SYSTEM, cache_control: { type: 'ephemeral' } }],
-        messages: [{ role: 'user', content: modellNachricht(betreff, text) }],
+        messages: [{ role: 'user', content: modellBloecke(betreff, text, dokumente) }],
         tools: [PFLEGENA_WERKZEUG],
         tool_choice: { type: 'tool', name: PFLEGENA_WERKZEUG.name },
       }),
@@ -316,7 +330,15 @@ async function frageModell(betreff: string, text: string): Promise<ModellErgebni
 
   const daten: any = await res.json().catch(() => null);
   const block = (daten?.content || []).find((b: any) => b.type === 'tool_use');
-  if (!block) return { ok: false, dauerhaft: false, grund: 'Modell hat kein Werkzeug aufgerufen' };
+  if (!block) {
+    /* Abgeschnitten ist etwas anderes als voruebergehend gestoert: es wieder
+       zu versuchen kostet dasselbe und endet gleich. Sagen, dass die Grenze
+       zu klein war, statt fuenfmal dagegenzulaufen. */
+    if (daten?.stop_reason === 'max_tokens') {
+      return { ok: false, dauerhaft: true, grund: 'Antwort des Modells abgeschnitten (max_tokens)' };
+    }
+    return { ok: false, dauerhaft: false, grund: 'Modell hat kein Werkzeug aufgerufen' };
+  }
   const u = daten.usage || {};
   log(`  [modell] ↑${u.input_tokens} (cache ${u.cache_read_input_tokens || 0}) ↓${u.output_tokens}`);
   return { ok: true, roh: block.input };
@@ -383,7 +405,34 @@ async function verarbeiteVermittler(
     return { ok: true, lead_id: treffer, duplikat: 'Antwort im Thread — kein neues Angebot' };
   }
 
-  const antwort = await frageModell(mail.subject ?? '', roh);
+  /* Die eigentlichen Daten liegen im Anhang, nicht im Brief (Registry #60).
+     Ausgepackt hat mailparser sie ohnehin schon — die Groesse kommt von dort
+     und nicht aus einer zweiten Server-Abfrage, denn die ganze Mail liegt zu
+     diesem Zeitpunkt bereits im Speicher. */
+  const koepfe = (mail.attachments ?? []).map((a) => ({
+    contentType: a.contentType,
+    filename: a.filename,
+    related: (a as any).related === true,
+    size: a.content?.length ?? a.size ?? 0,
+  }));
+  const wahl = waehleDokumente(koepfe);
+  const anhangHinweise = [...wahl.hinweise];
+  const dokumente: Dokument[] = wahl.nehmen.map((w) => ({
+    name: w.name,
+    daten: (mail.attachments as any[])[w.index].content.toString('base64'),
+  }));
+  if (dokumente.length) log(`  ${portal}: ${dokumente.length} Dokument(e) ans Modell — ${dokumente.map((d) => d.name).join(', ')}`);
+
+  let antwort = await frageModell(mail.subject ?? '', roh, dokumente);
+  /* Scheitert der Aufruf MIT Anhang, ist das ein Urteil ueber den Anhang —
+     zu gross, zu viele Seiten, kaputtes base64 —, nicht ueber die Anfrage.
+     Also genau einmal ohne. Damit gilt: ein Dokument macht eine Mail nie
+     schlechter als sie heute ohne waere. */
+  if (!antwort.ok && dokumente.length) {
+    log(`  ⚠ ${portal}: Modellaufruf mit Anhang gescheitert (${antwort.grund}) — zweiter Versuch ohne`);
+    anhangHinweise.push(`Anhang vom Modell nicht verarbeitet (${antwort.grund.slice(0, 120)}) — ohne Anhang gelesen`);
+    antwort = await frageModell(mail.subject ?? '', roh, []);
+  }
   if (!antwort.ok) return { ok: false, dauerhaft: antwort.dauerhaft, grund: antwort.grund, email: absender };
 
   const kopf: MailKopf = {
@@ -392,6 +441,10 @@ async function verarbeiteVermittler(
     betreff: mail.subject ?? null,
     messageId: mail.messageId ?? null,
     datum: mail.date ?? null,
+    /* Wieviele Dokumente das Modell WIRKLICH gesehen hat — ohne das koennte
+       eine "aus dem Anhang" gemeldete PLZ auch dann durchgehen, wenn wir
+       keinen Anhang geschickt haben. */
+    anhaenge: dokumente.length,
     text: roh,
   };
   const gelesen = pruefeAnfrage(antwort.roh, kopf, provisionProTag);
@@ -400,13 +453,17 @@ async function verarbeiteVermittler(
   /* Laut ins Log, damit ein Auseinanderlaufen von Prompt und pricing_config
      auffaellt, statt still zur Annahme zu werden (Muster Portal-Parser). */
   if (gelesen.unbekannt.length) log(`  ⚠ nicht zugeordnet (${portal}): ${gelesen.unbekannt.join(' | ')}`);
-  for (const h of gelesen.hinweise) log(`  ⚠ ${portal}: ${h}`);
+  for (const h of [...anhangHinweise, ...gelesen.hinweise]) log(`  ⚠ ${portal}: ${h}`);
+  /* Was das Modell gelesen hat, gehoert ins Log: sonst laesst sich nach
+     einem Lauf nicht mehr feststellen, ob der Anhang etwas beigetragen hat
+     oder ob alles aus dem Betreff stammte. */
+  log(`  [gelesen] ${JSON.stringify({ ...gelesen.body.angaben, plz: gelesen.body.plz, ort: gelesen.body.ort, details: gelesen.body.details })}`);
 
   if (cfg.trocken(portal)) {
     log(`  [trocken] ${absender} — ${Object.keys(gelesen.body.angaben).length} Felder gelesen`);
     return { ok: true, trocken: true };
   }
-  return posteLead(cfg, { ...gelesen.body, hinweise: gelesen.hinweise }, absender, gelesen.body.name || undefined);
+  return posteLead(cfg, { ...gelesen.body, hinweise: [...anhangHinweise, ...gelesen.hinweise] }, absender, gelesen.body.name || undefined);
 }
 
 /* Ereignis auf einen bestehenden Lead — best effort, wie registriereFehlmail. */
@@ -421,7 +478,7 @@ async function logEventAufLead(db: SupabaseClient, leadId: string, typ: string, 
 async function weiterleitenAnTeam(
   portal: string,
   uid: number | string,
-  mail: Pick<ParsedMail, 'subject' | 'from'>,
+  mail: Pick<ParsedMail, 'subject' | 'from' | 'attachments'>,
   roh: string,
   grund?: string,
 ) {
@@ -442,13 +499,30 @@ async function weiterleitenAnTeam(
     `----------------------------------------------------------------`,
     roh,
   ].join('\n');
+
+  /* Die Anhaenge MUESSEN mit. Bei Pflegena steht der Sachverhalt im Anhang
+     und nicht im Brief — ohne ihn bekaeme der Mensch, der die Anfrage von
+     Hand beantworten soll, vier Zeilen Prosa, waehrend das Kundenblatt
+     unauffindbar im Postfach liegt. */
+  const anhaenge = (mail.attachments ?? [])
+    .filter((a) => (a as any).related !== true && a.content)
+    .map((a) => ({
+      filename: a.filename ?? 'anhang',
+      content: a.content,
+      contentType: a.contentType,
+    }));
+
   await sendEmail('info@primundus.de', {
     subject: `Vermittler-Anfrage unbeantwortet: ${betreff}`,
-    text,
+    text: anhaenge.length ? `${text}\n\n(${anhaenge.length} Anhang/Anhaenge dieser Mail sind beigefuegt.)` : text,
     html: `<pre style="font-family:ui-monospace,Menlo,monospace;white-space:pre-wrap;font-size:13px;">${
       text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
     }</pre>`,
-  }).catch((e) => log(`  ⚠ ${portal} #${uid} Weiterleitung an das Team fehlgeschlagen: ${e?.message ?? e}`));
+  }, anhaenge.length ? anhaenge : undefined,
+    /* Kein Blindkopie-Verteiler: der Anhang traegt Gesundheitsdaten einer
+       fremden Person, die gehoeren nicht zusaetzlich nach info@mamamia.app. */
+    { skipBcc: true },
+  ).catch((e) => log(`  ⚠ ${portal} #${uid} Weiterleitung an das Team fehlgeschlagen: ${e?.message ?? e}`));
 }
 
 /* Ergebnis eines Eingangs-Versuchs — eine Form fuer Mail- und API-Weg. */

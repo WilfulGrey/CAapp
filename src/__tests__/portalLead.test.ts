@@ -173,6 +173,36 @@ describe('teuerster nimmt nur waehlbare Werte (Registry #58)', () => {
     expect(['einsteiger', 'erfahren', 'sehr-erfahren']).toContain(a);
   });
 
+  /* ─── Richtung ─────────────────────────────────────────────────────────
+   *
+   * Die Regel "im Zweifel teurer" begruendet sich damit, dass der Kunde im
+   * Portal korrigiert und der Preis dann FAELLT. Ein Vermittler hat kein
+   * Portal: der Preis faellt nie und der Partner erfaehrt den Grund nie.
+   * Deshalb fuer ihn die andere Richtung (Entscheidung Michał, 09.09.,
+   * Registry #60) — bewusst mit dem Risiko, zu tief zu liegen. */
+  it('Richtung guenstig nimmt bei jeder Kategorie den billigsten waehlbaren Wert', () => {
+    const g = ergaenzeAngaben({}, tabelle, 'guenstig');
+    expect(g.daten.deutschkenntnisse).toBe('grundlegend');   // 0 statt 450
+    expect(g.daten.nachteinsaetze).toBe('nein');             // 0 statt 300
+    expect(g.daten.betreuung_fuer).toBe('1-person');         // 0 statt 450
+    expect(g.daten.weitere_personen).toBe('nein');           // 0 statt 200
+    // Gemeldet wird die Annahme in beiden Richtungen gleich.
+    expect(g.angenommen).toContain('deutschkenntnisse');
+  });
+
+  it('Standard bleibt teuer — die eingekauften Portale aendern sich nicht', () => {
+    const t = ergaenzeAngaben({}, tabelle);
+    expect(t.daten.deutschkenntnisse).toBe('sehr-gut');
+    expect(t.daten.nachteinsaetze).toBe('mehrmals');
+    expect(ergaenzeAngaben({}, tabelle, 'teuer').daten).toEqual(t.daten);
+  });
+
+  it('gelieferte Werte bleiben auch guenstig unangetastet', () => {
+    const r = ergaenzeAngaben({ deutschkenntnisse: 'sehr-gut' } as never, tabelle, 'guenstig');
+    expect(r.daten.deutschkenntnisse).toBe('sehr-gut');
+    expect(r.angenommen).not.toContain('deutschkenntnisse');
+  });
+
   it('Kategorie ohne Kanon-Eintrag faellt auf den reinen Preisvergleich zurueck', () => {
     // 'basis'/'grundpreis' stehen nicht in ERLAUBT — die Funktion darf daran
     // nicht ersticken, sie wird dafuer nur nie gefragt.
