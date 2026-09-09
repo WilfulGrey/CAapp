@@ -62,6 +62,6 @@ describe('meldeAnfrage (OpenAI-Ads-Pixel)', () => {
       'currency',
       'type',
     ]);
-    expect(OAIQ_PIXEL_ID).toBe('6BMzErvmnYg7ibnpXriwfU');
+    expect(OAIQ_PIXEL_ID).toBe('8xPJTVXAKBvkNquUUUvoXE');
   });
 });

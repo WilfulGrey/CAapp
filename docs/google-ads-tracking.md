@@ -11,6 +11,7 @@ Bidding auf Leads statt Klicks optimiert.
 | `utm_source/medium/campaign` auf `analytics_sessions` | `lib/analytics.ts` (Insert) | seit jeher |
 | `utm_term/utm_content` + `gclid/wbraid/gbraid` auf `analytics_sessions` | `lib/analytics.ts` `persistAdParams()` (best-effort Update) | Bug #33 |
 | Klick-IDs auf `leads` (`gclid/wbraid/gbraid`) | `angebot-anfordern/route.ts` (allowlist + best-effort Update) | Bug #33 |
+| UTM-Werte auf `leads` (`utm_source/medium/campaign/content/term`, Kanal-Trennung Google/ChatGPT) | `lib/analytics.ts` (`AD_PARAM_KEYS`) + `angebot-anfordern/route.ts` (`HERKUNFT_KEYS`), Migration 20260909110000 | docs/openai-ads-tracking.md |
 | dataLayer-Event `angebot_erfolgreich` (lead_id, conversion_value, pflegegrad, care_start_timing) | `MultiStepForm.tsx` nach Server-Erfolg | seit jeher |
 | GTM-sicherer Redirect (`eventCallback` + `eventTimeout 700` + Safety 900 ms) | `MultiStepForm.tsx` | Bug #33 |
 | Chat-LP `/sofortangebot`: gleicher Push + Klick-IDs (Details unten) | `public/pria.html` (Kontakt-Block) + `app/sofortangebot/page.tsx` | seit 26.08. |

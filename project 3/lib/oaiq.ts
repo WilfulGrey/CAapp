@@ -28,8 +28,13 @@
  * kennt `event_id`, `custom_event_name` und `opt_out`.
  */
 
-/** Pixel aus dem Ads Manager, Konto „Primundus Deutschland". */
-export const OAIQ_PIXEL_ID = '6BMzErvmnYg7ibnpXriwfU';
+/**
+ * Pixel „Kostenrechner Pixel" aus dem Ads Manager, Werbekonto
+ * `adacct_6a9acf3a5c608199897366e0c6878409` (Login ads@primundus.de) — das
+ * Konto, in dem die Kampagne läuft. Der frühere Wert `6BMzErvmnYg7ibnpXriwfU`
+ * gehörte zum stillgelegten Konto unter martin@wyzzi.net (09.09.2026).
+ */
+export const OAIQ_PIXEL_ID = '8xPJTVXAKBvkNquUUUvoXE';
 
 /**
  * Wert einer Anfrage fuer die Gebotsoptimierung — Martins feste Staffelung
