@@ -29,6 +29,8 @@ export interface RohKraft {
   first_name?: string | null;
   gender?: string | null;
   year_of_birth?: number | null;
+  /** YYYY-MM-DD — genauer als year_of_birth, nicht bei allen gepflegt. */
+  birth_date?: string | null;
   germany_skill?: string | null;
   care_experience?: string | null;
   available_from?: string | null;
@@ -206,10 +208,20 @@ export function waehleVorschau(alle: RohKraft[], w: Wuensche, now: Date = new Da
   return gewaehlt.map((cg) => anonymisiere(cg, now));
 }
 
+/** Alter aus birth_date (taggenau), sonst aus year_of_birth; null, wenn beides fehlt. */
+export function alterAus(cg: Pick<RohKraft, "birth_date" | "year_of_birth">, now: Date): number | null {
+  const bd = cg.birth_date ? new Date(cg.birth_date) : null;
+  if (bd && Number.isFinite(bd.getTime())) {
+    const vorGeburtstag = now.getMonth() < bd.getMonth() || (now.getMonth() === bd.getMonth() && now.getDate() < bd.getDate());
+    return now.getFullYear() - bd.getFullYear() - (vorGeburtstag ? 1 : 0);
+  }
+  return cg.year_of_birth ? now.getFullYear() - cg.year_of_birth : null;
+}
+
 export function anonymisiere(cg: RohKraft, now: Date): VorschauKraft {
   const jahre = erfahrungJahre(cg.care_experience);
   const vorname = (cg.first_name ?? "").trim().split(/\s+/)[0] || "Pflegekraft";
-  const alter = cg.year_of_birth ? now.getFullYear() - cg.year_of_birth : null;
+  const alter = alterAus(cg, now);
   return {
     id: cg.id,
     vorname,

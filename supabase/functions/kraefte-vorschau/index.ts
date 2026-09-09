@@ -35,7 +35,7 @@ const LISTE_QUERY = /* GraphQL */ `
       last_page
       total
       data {
-        id first_name gender year_of_birth germany_skill care_experience
+        id first_name gender year_of_birth birth_date germany_skill care_experience
         available_from last_contact_at hp_caregiver_id hp_total_jobs driving_license
         caregiver_status { is_blocked }
         avatar_retouched_promo { aws_url }

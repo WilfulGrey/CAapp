@@ -1,6 +1,6 @@
 import { stichtag } from "../index.ts";
 import { assertEquals } from "@std/assert";
-import { anonymisiere, passtZuWuenschen, type RohKraft, waehleVorschau } from "../vorschau.ts";
+import { alterAus, anonymisiere, passtZuWuenschen, type RohKraft, waehleVorschau } from "../vorschau.ts";
 import { handleRequest } from "../index.ts";
 
 const JETZT = new Date("2026-09-09T12:00:00Z");
@@ -74,4 +74,12 @@ Deno.test("Handler: Wünsche werden gelesen und angewendet", async () => {
 Deno.test("Stichtag: 60 Tage zurück, ISO-Datum", () => {
   assertEquals(stichtag(new Date("2026-09-09T22:00:00Z")), "2026-07-11");
   assertEquals(stichtag(new Date("2026-03-01T00:00:00Z"), 30), "2026-01-30");
+});
+
+Deno.test("Alter: birth_date taggenau vor year_of_birth, sonst null", () => {
+  const now = new Date("2026-09-09T12:00:00Z");
+  assertEquals(alterAus({ birth_date: "1962-09-10", year_of_birth: 1962 }, now), 63, "Geburtstag morgen");
+  assertEquals(alterAus({ birth_date: "1962-09-09", year_of_birth: 1962 }, now), 64, "Geburtstag heute");
+  assertEquals(alterAus({ birth_date: null, year_of_birth: 1970 }, now), 56);
+  assertEquals(alterAus({ birth_date: "kaputt", year_of_birth: null }, now), null);
 });
