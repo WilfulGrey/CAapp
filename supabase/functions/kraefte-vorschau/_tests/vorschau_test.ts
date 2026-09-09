@@ -1,5 +1,6 @@
+import { stichtag } from "../index.ts";
 import { assertEquals } from "@std/assert";
-import { anonymisiere, passtZuWuenschen, type RohKraft, waehleVorschau } from "../vorschau.ts";
+import { alterAus, anonymisiere, passtZuWuenschen, type RohKraft, waehleVorschau } from "../vorschau.ts";
 import { handleRequest } from "../index.ts";
 
 const JETZT = new Date("2026-09-09T12:00:00Z");
@@ -26,19 +27,22 @@ Deno.test("Filter: Deutsch-Wunsch, Geschlecht, Führerschein, Sperre", () => {
   assertEquals(passtZuWuenschen(kraft({ id: 7, gender: "male" }), { deutsch: null, geschlecht: "egal", fuehrerschein: "nein" }), true);
 });
 
-Deno.test("Auswahl: drei Kräfte, bald verfügbar und mit Werbefoto zuerst, nie ohne Foto", () => {
+Deno.test("Auswahl: bald verfügbar zuerst, darin Stufe vor Erfahrung vor Werbefoto, nie ohne Foto", () => {
   const alle = [
     kraft({ id: 1, hp_total_jobs: 1, available_from: "2026-09-15" }),
     kraft({ id: 2, hp_total_jobs: 12, available_from: "2026-09-12" }),
-    kraft({ id: 3, hp_total_jobs: 8, available_from: "2027-03-01" }),          // zu spät
-    kraft({ id: 4, hp_total_jobs: 8, avatar_retouched_promo: null }),           // nur retuschiert → Topf 2
-    kraft({ id: 5, hp_total_jobs: 8, available_from: null }),                  // Verfügbarkeit unbekannt → Topf 3
+    kraft({ id: 3, hp_total_jobs: 8, available_from: "2027-03-01" }),                      // zu spät → nie
+    kraft({ id: 4, hp_total_jobs: 8, avatar_retouched_promo: null }),                       // Stammkraft, nur retuschiert
+    kraft({ id: 5, hp_total_jobs: 8, available_from: null }),                              // Verfügbarkeit unbekannt → Topf 2
     kraft({ id: 6, hp_total_jobs: 20, avatar_retouched_promo: null, avatar_retouched: null }), // kein Foto → nie
+    kraft({ id: 7, hp_total_jobs: 0, care_experience: "9", available_from: "2026-09-16" }),   // neu, aber 9 Jahre
+    kraft({ id: 8, hp_total_jobs: 0, care_experience: "0", available_from: "2026-09-10" }),   // neu, 0 Jahre
   ];
   const v = waehleVorschau(alle, { deutsch: "kommunikativ", geschlecht: "egal", fuehrerschein: "nein" }, JETZT);
-  assertEquals(v.map((k) => k.id), [2, 1, 4]);
+  assertEquals(v.map((k) => k.id), [2, 4, 1], "Elite, dann Stammkraft trotz fehlendem Werbefoto, dann Bekannt");
   assertEquals(v[0].stufe, "Elite");
-  assertEquals(v[0].fotoUrl, promo.aws_url);
+  const nurNeue = waehleVorschau(alle.filter((k) => (k.hp_total_jobs ?? 0) === 0), { deutsch: null, geschlecht: "egal", fuehrerschein: "nein" }, JETZT);
+  assertEquals(nurNeue.map((k) => k.id), [7, 8], "ohne Einsätze zählt die Berufserfahrung");
 });
 
 Deno.test("Anonymisierung: nur Vorname, Alter, Stufe, Erfahrung, Deutsch, Foto, Datum", () => {
@@ -65,4 +69,17 @@ Deno.test("Handler: Wünsche werden gelesen und angewendet", async () => {
   const j = await res.json();
   assertEquals(j.kraefte.map((k: { vorname: string }) => k.vorname), ["Piotr"]);
   assertEquals(j.gesamt, 2);
+});
+
+Deno.test("Stichtag: 60 Tage zurück, ISO-Datum", () => {
+  assertEquals(stichtag(new Date("2026-09-09T22:00:00Z")), "2026-07-11");
+  assertEquals(stichtag(new Date("2026-03-01T00:00:00Z"), 30), "2026-01-30");
+});
+
+Deno.test("Alter: birth_date taggenau vor year_of_birth, sonst null", () => {
+  const now = new Date("2026-09-09T12:00:00Z");
+  assertEquals(alterAus({ birth_date: "1962-09-10", year_of_birth: 1962 }, now), 63, "Geburtstag morgen");
+  assertEquals(alterAus({ birth_date: "1962-09-09", year_of_birth: 1962 }, now), 64, "Geburtstag heute");
+  assertEquals(alterAus({ birth_date: null, year_of_birth: 1970 }, now), 56);
+  assertEquals(alterAus({ birth_date: "kaputt", year_of_birth: null }, now), null);
 });
