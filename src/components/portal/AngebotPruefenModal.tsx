@@ -334,7 +334,14 @@ export const AngebotPruefenModal: FC<{
                       { label: 'Anreisekosten', value: `${offer.anreisekosten} €` },
                       { label: 'Abreisekosten', value: `${offer.abreisekosten} €` },
                       { label: 'Reisetage', value: 'Voller Tagessatz' },
-                      { label: 'Sommerzuschlag', value: '6,67 €/Tag (Juli + Aug.)' },
+                      /* Sommerzuschlag nur, wenn der Einsatzzeitraum wirklich in
+                         Juli/August reicht (Martin, 09.09.2026). Er stand hier
+                         fest in der Tabelle — auch bei einem Einsatz von
+                         September bis Dezember, wo er nie anfaellt. Berechnet
+                         wird er unveraendert, im Vertrag steht er weiterhin. */
+                      ...(zuschlagRelevance.hasSummer
+                        ? [{ label: 'Sommerzuschlag', value: '6,67 €/Tag (Juli + Aug.)' }]
+                        : []),
                       // Feiertagszuschlag wird separat unten gerendert (mit
                       // Info-Icon zum Aufklappen der Feiertagsliste).
                       { label: 'Kündigungsfrist', value: 'Täglich' },
@@ -344,10 +351,11 @@ export const AngebotPruefenModal: FC<{
                           <span className={`text-sm flex-shrink-0 ${row.label === 'Kündigungsfrist' ? 'font-semibold text-green-800' : 'text-gray-500'}`}>{row.label}</span>
                           <span className={`text-sm text-right ${row.label === 'Kündigungsfrist' ? 'font-bold text-green-700' : row.bold ? 'font-bold text-gray-900' : 'font-semibold text-gray-700'}`}>{row.label === 'Kündigungsfrist' ? '✓ Täglich kündbar' : row.value}</span>
                         </div>
-                        {/* Feiertagszuschlag-Block direkt nach Sommerzuschlag
-                            einhängen, damit die Vertragskonditionen-Tabelle
-                            in der natürlichen Reihenfolge bleibt. */}
-                        {row.label === 'Sommerzuschlag' && (
+                        {/* Feiertagszuschlag-Block haengt an „Reisetage",
+                            nicht mehr am Sommerzuschlag: den gibt es seit
+                            09.09.2026 nur noch in der Saison, und mit ihm waere
+                            sonst die ganze Feiertagsliste stumm verschwunden. */}
+                        {row.label === 'Reisetage' && (
                           <>
                             <div className="flex items-center justify-between px-4 py-2.5 bg-white border-t border-gray-100">
                               <span className="text-sm text-gray-500">Feiertagszuschlag</span>
