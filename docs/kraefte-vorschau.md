@@ -72,6 +72,15 @@ freischalten →". Deeplink `cg=` und Kartenwahl sind raus (Martin: „ich würd
 die auch nicht öffnen"). Texte in `lib/kraefte-vorschau.ts` (`kopfzeile`,
 `BRUECKE`, `KNOPF_VOR_KONTAKT`, `SCHRANKE`).
 
+**Runde 3b (10.09., Martin: „im Kundenportal zeigen wir doch 5"):** Die
+Zahl ist 5 wie im Portal (`PORTAL_ANZAHL`, gleiche Zahl wie `waehleFuenf`),
+nicht die Zahl der Karten: Animation zählt auf 5, Kopf „✓ 5 passende
+Pflegekräfte gefunden", dritte Animationszeile „3 davon sehen Sie gleich
+vorab", Brücke „Das sind 3 Ihrer 5 Pflegekräfte.", Knopf „Kontaktdaten
+eingeben & Angebot ansehen →" mit „Danach sofort: Ihr Monatspreis und alle 5
+Pflegekräfte im Portal", Absendeknopf „Angebot & Pflegekräfte anzeigen →" wie
+im normalen Rechner.
+
 **Datenschutz:** Die Karten stehen VOR jedem Lead auf einer öffentlichen
 Seite. Es verlassen nur Vorname, Alter, Stufe, Erfahrungsjahre, Deutsch-Wort,
 Foto-URL und Verfügbarkeitsdatum die Function. Fotos bevorzugt aus

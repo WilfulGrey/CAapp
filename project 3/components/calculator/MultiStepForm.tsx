@@ -9,7 +9,7 @@ import { cookieConsent } from "@/lib/cookie-consent";
 import { scrollToCalculator, isCalculatorAligned, OPEN_CALCULATOR_EVENT } from "@/lib/scroll-to-calculator";
 import { useFormTracking } from "@/hooks/use-form-tracking";
 import { naechsterDrift, naechsterAbstandMs } from "@/lib/counter-drift";
-import { BEREIT_TEXT_VORSCHAU, BRUECKE, deutschBalken, KNOPF_VOR_KONTAKT, kopfzeile, kraefteVorschauAktiv, kraftFakten, parseVorschau, SCHRANKE, wuenscheAusAntworten, type VorschauKraft } from "@/lib/kraefte-vorschau";
+import { bereitText, bruecke, deutschBalken, KNOPF_VOR_KONTAKT, kopfzeile, kraefteVorschauAktiv, kraftFakten, parseVorschau, SCHRANKE, wuenscheAusAntworten, type VorschauKraft } from "@/lib/kraefte-vorschau";
 import { meldeAnfrage } from "@/lib/oaiq";
 
 // ─── Matching Animation Component ────────────────────────────────────────────
@@ -18,7 +18,7 @@ import { meldeAnfrage } from "@/lib/oaiq";
 // E-Mail eingibt. Wurde im Mai 2026 versehentlich entfernt (Commit 281e4ef
 // argumentierte mit „Friction nach Submit", aber die Animation lief VOR dem
 // Submit) — hier 1:1 wiederbelebt.
-function MatchingAnimation({ onComplete, initialCount, zielAnzahl }: { onComplete: (finalCount: number) => void; initialCount: number; zielAnzahl?: () => number | null }) {
+function MatchingAnimation({ onComplete, initialCount, vorschauKarten }: { onComplete: (finalCount: number) => void; initialCount: number; vorschauKarten?: () => number | null }) {
   const [activeStep, setActiveStep] = useState(0);
   const [completedSteps, setCompletedSteps] = useState<number[]>([]);
   const [nurseCount, setNurseCount] = useState(initialCount);
@@ -29,7 +29,7 @@ function MatchingAnimation({ onComplete, initialCount, zielAnzahl }: { onComplet
   const ANIM_STEPS = [
     { label: 'Ihr persönliches Angebot wird erstellt', sub: 'Angebot & Pflegekräfte werden zusammengestellt', icon: '📋', duration: 3200 },
     { label: 'Passende Pflegekräfte werden gematcht', sub: '', icon: '👩‍⚕️', duration: 4500 },
-    { label: 'Alles bereit', sub: zielAnzahl?.() ? BEREIT_TEXT_VORSCHAU : 'Geben Sie Ihre Daten ein, um alles einzusehen', icon: '✓', duration: 1800 },
+    { label: 'Alles bereit', sub: vorschauKarten?.() ? bereitText(vorschauKarten()!) : 'Geben Sie Ihre Daten ein, um alles einzusehen', icon: '✓', duration: 1800 },
   ];
 
   useEffect(() => {
@@ -55,10 +55,10 @@ function MatchingAnimation({ onComplete, initialCount, zielAnzahl }: { onComplet
   useEffect(() => {
     if (activeStep !== 1) return;
     const iv = setInterval(() => {
-      // Vorschau-Modus (Registry #61, Runde 3): Ziel = Zahl der echten Karten,
-      // je Tick neu gelesen, weil die Function während der Animation antwortet.
-      // Sonst die 5 der gesperrten Ergebnis-Karte.
-      const target = zielAnzahl?.() || 5;
+      // Ziel 5 = die Zahl, die auch das Kundenportal zeigt (waehleFuenf).
+      // Auch im Vorschau-Modus: dort stehen 3 der 5 vorab auf Schritt 9
+      // (Martin, 10.09.: „im Kundenportal zeigen wir doch 5").
+      const target = 5;
       setNurseCount(prev => {
         const next = prev - Math.ceil((prev - target) / 14);
         if (next <= target) { clearInterval(iv); return target; }
@@ -986,7 +986,7 @@ export function MultiStepForm({ mode = 'inline' }: MultiStepFormProps = {}) {
       <div ref={formRef} id="calculator-form" className={outerClass}>
         <MatchingAnimation
           initialCount={getMatchingCount()}
-          zielAnzahl={() => (vorschauAktivRef.current && kraefteVorschauRef.current && kraefteVorschauRef.current.length > 0) ? kraefteVorschauRef.current.length : null}
+          vorschauKarten={() => (vorschauAktivRef.current && kraefteVorschauRef.current && kraefteVorschauRef.current.length > 0) ? kraefteVorschauRef.current.length : null}
           onComplete={() => {
             setShowMatching(false);
             setCurrentStep(totalSteps); // = Step 9 (Kontaktformular)
@@ -1118,10 +1118,10 @@ export function MultiStepForm({ mode = 'inline' }: MultiStepFormProps = {}) {
                   Ende der Animation, und kein „Angebot ist fertig", solange der
                   Kunde noch keinen Preis sieht. */}
               <p className="text-center text-base font-bold uppercase tracking-wide text-white mb-1.5">
-                {vorschauModus && kraefteVorschau ? kopfzeile(kraefteVorschau.length).titel : '✓ Ihr Angebot ist fertig'}
+                {vorschauModus ? kopfzeile().titel : '✓ Ihr Angebot ist fertig'}
               </p>
               <p className="text-center text-sm text-white/90">
-                {vorschauModus && kraefteVorschau ? kopfzeile(kraefteVorschau.length).text : 'Persönlich auf Ihre Angaben abgestimmt'}
+                {vorschauModus ? kopfzeile().text : 'Persönlich auf Ihre Angaben abgestimmt'}
               </p>
             </>
           ) : (
@@ -1481,7 +1481,7 @@ export function MultiStepForm({ mode = 'inline' }: MultiStepFormProps = {}) {
                         </div>
                       ) : (
                         <div className="pt-4">
-                          <p className="text-[14px] text-[#3D3D3D] leading-snug mb-3">{BRUECKE}</p>
+                          <p className="text-[14px] text-[#3D3D3D] leading-snug mb-3">{bruecke(kraefteVorschau.length)}</p>
                           <button
                             type="button"
                             onClick={oeffneKontakt}
