@@ -9,7 +9,7 @@ import { cookieConsent } from "@/lib/cookie-consent";
 import { scrollToCalculator, isCalculatorAligned, OPEN_CALCULATOR_EVENT } from "@/lib/scroll-to-calculator";
 import { useFormTracking } from "@/hooks/use-form-tracking";
 import { naechsterDrift, naechsterAbstandMs } from "@/lib/counter-drift";
-import { GANZ_SICHTBAR, hakenAusAntworten, kopfzeile, kraefteVorschauAktiv, kraftZeile, parseVorschau, SCHRANKE, VERLAUF, WARTE, wuenscheAusAntworten, type VorschauKraft } from "@/lib/kraefte-vorschau";
+import { deutschBalken, GANZ_SICHTBAR, kopfzeile, kraefteVorschauAktiv, kraftFakten, parseVorschau, SCHRANKE, VERLAUF, WARTE, wuenscheAusAntworten, type VorschauKraft } from "@/lib/kraefte-vorschau";
 import { meldeAnfrage } from "@/lib/oaiq";
 
 // ─── Matching Animation Component ────────────────────────────────────────────
@@ -1444,26 +1444,52 @@ export function MultiStepForm({ mode = 'inline' }: MultiStepFormProps = {}) {
                        entsteht erst serverseitig nach dem Absenden. */
                     <div className="mb-1">
                       {(() => {
-                        const Karte = ({ k }: { k: VorschauKraft }) => (
-                          <div className="bg-white shadow-sm rounded-2xl border border-zinc-300 overflow-hidden">
-                            {/* eslint-disable-next-line @next/next/no-img-element */}
-                            <img src={k.fotoUrl} alt="" className="w-full aspect-[4/3] object-cover object-top" loading="lazy" />
-                            <div className="px-4 pt-3 pb-4">
-                              <p className="text-[18px] font-semibold leading-snug text-[#18181B]">
-                                {k.vorname}{k.alter ? <span className="font-normal text-[#71717A]">, {k.alter}</span> : null}
-                              </p>
-                              {kraftZeile(k) ? <p className="text-[15px] text-[#71717A] mt-0.5">{kraftZeile(k)}</p> : null}
-                              <ul className="mt-2.5 space-y-1.5">
-                                {hakenAusAntworten(state, k).map((h) => (
-                                  <li key={h} className="flex items-start gap-2 text-[15px] text-[#3D3D3D]">
-                                    <svg className="w-4 h-4 mt-[3px] flex-shrink-0 text-[#22A06B]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={3}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>
-                                    <span>{h}</span>
-                                  </li>
-                                ))}
-                              </ul>
+                        /* Karte = Optik der Portal-Karte (MatchCard), unverändert seit
+                           Runde 2 (Martin, 10.09.: „warum veränderst du die Optik, das
+                           muss schon bleiben"): Foto 64 px links, Name und Alter, Chip
+                           „Match", Sprachbalken, Faktenzeile, „Ab sofort verfügbar". */
+                        const Karte = ({ k }: { k: VorschauKraft }) => {
+                          const balken = deutschBalken(k.deutschWort);
+                          return (
+                            <div className="bg-white shadow-sm rounded-2xl border border-zinc-300 overflow-hidden">
+                              <div className="px-4 pt-4 pb-4">
+                                <div className="flex items-center gap-3.5">
+                                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                                  <img src={k.fotoUrl} alt="" className="w-16 h-16 rounded-xl object-cover flex-shrink-0" loading="lazy" />
+                                  <div className="flex-1 min-w-0">
+                                    <div className="flex items-center justify-between gap-2">
+                                      <p className="text-[17px] font-semibold leading-snug text-[#18181B]">
+                                        {k.vorname}{k.alter ? <span className="font-normal text-[#71717A]">, {k.alter}</span> : null}
+                                      </p>
+                                      <span className="inline-flex items-center gap-1 flex-shrink-0 text-[11px] font-bold text-[#22A06B] bg-[#E3F7EF] border border-[#B8E8D4] px-2.5 py-0.5 rounded-full">
+                                        <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={3}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>
+                                        Match
+                                      </span>
+                                    </div>
+                                    {k.deutschWort ? (
+                                      <p className="mt-1 inline-flex items-center gap-1.5 text-[15px] text-[#71717A]">
+                                        Deutsch
+                                        {balken > 0 && (
+                                          <span className="inline-flex gap-0.5" aria-hidden="true">
+                                            {[0, 1, 2].map((i) => <span key={i} className={`w-3 h-1.5 rounded-full ${i < balken ? 'bg-[#8B7355]' : 'bg-gray-200'}`} />)}
+                                          </span>
+                                        )}
+                                        {k.deutschWort}
+                                      </p>
+                                    ) : null}
+                                  </div>
+                                </div>
+                                <p className="text-[15px] mt-3 text-[#71717A]">
+                                  {k.stufe ? <span className="font-semibold text-[#18181B]">{k.stufe}: </span> : null}{kraftFakten(k)}
+                                </p>
+                                <p className="mt-2 inline-flex items-center gap-1.5 text-[12px] font-semibold text-[#22A06B]">
+                                  <span className="w-2 h-2 rounded-full bg-[#22A06B]" aria-hidden="true" />
+                                  Ab sofort verfügbar
+                                </p>
+                              </div>
                             </div>
-                          </div>
-                        );
+                          );
+                        };
                         const ganz = kontaktOffen ? kraefteVorschau : kraefteVorschau.slice(0, GANZ_SICHTBAR);
                         const angeschnitten = kontaktOffen ? null : kraefteVorschau[GANZ_SICHTBAR] ?? null;
                         return (
@@ -1472,8 +1498,8 @@ export function MultiStepForm({ mode = 'inline' }: MultiStepFormProps = {}) {
                               {ganz.map((k) => <Karte key={k.id} k={k} />)}
                               {angeschnitten && (
                                 <div className="relative">
-                                  <div className="max-h-[190px] overflow-hidden rounded-2xl"><Karte k={angeschnitten} /></div>
-                                  <div className="absolute inset-x-0 bottom-0 h-[190px] bg-gradient-to-b from-white/0 via-white/85 to-white" aria-hidden="true" />
+                                  <div className="max-h-[120px] overflow-hidden rounded-2xl"><Karte k={angeschnitten} /></div>
+                                  <div className="absolute inset-x-0 bottom-0 h-[120px] bg-gradient-to-b from-white/0 via-white/85 to-white" aria-hidden="true" />
                                 </div>
                               )}
                             </div>
@@ -1483,7 +1509,7 @@ export function MultiStepForm({ mode = 'inline' }: MultiStepFormProps = {}) {
                                 <p className="text-[13px] text-[#5A5A5A] mt-0.5">{SCHRANKE.text}</p>
                               </div>
                             ) : (
-                              <div className={`relative text-center ${angeschnitten ? '-mt-14' : 'pt-4'}`}>
+                              <div className={`relative text-center ${angeschnitten ? '-mt-8' : 'pt-4'}`}>
                                 <p className="text-[17px] font-bold text-[#3D3D3D] leading-snug">{VERLAUF.weitere()}</p>
                                 <p className="text-[15px] text-[#3D3D3D] leading-snug">{VERLAUF.angebot}</p>
                                 <button

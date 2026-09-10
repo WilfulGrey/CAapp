@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { hakenAusAntworten, kopfzeile, kraefteVorschauAktiv, kraftZeile, parseVorschau, PORTAL_ANZAHL, SCHRANKE, VERLAUF, WARTE, wuenscheAusAntworten } from '../../project 3/lib/kraefte-vorschau';
+import { deutschBalken, hakenAusAntworten, kopfzeile, kraefteVorschauAktiv, kraftFakten, kraftZeile, parseVorschau, PORTAL_ANZAHL, SCHRANKE, VERLAUF, WARTE, wuenscheAusAntworten } from '../../project 3/lib/kraefte-vorschau';
 
 function speicher(): Pick<Storage, 'getItem' | 'setItem'> {
   const m = new Map<string, string>();
@@ -19,6 +19,13 @@ describe('Kräfte-Vorschau (Rechner)', () => {
   it('Wünsche: nur Deutsch, Geschlecht, Führerschein', () => {
     expect(wuenscheAusAntworten({ germanLevel: 'sehr-gut', gender: '', driving: 'ja' }))
       .toEqual({ deutsch: 'sehr-gut', geschlecht: null, fuehrerschein: 'ja' });
+  });
+
+  it('Portal-Optik der Karte: Faktenzeile und Sprachbalken', () => {
+    expect(kraftFakten({ erfahrungJahre: 12, einsaetze: 31 })).toBe('12 J. Erfahrung · 31 Einsätze über Primundus');
+    expect(kraftFakten({ erfahrungJahre: 0, einsaetze: 1 })).toBe('1 Einsatz über Primundus');
+    expect(kraftFakten({ erfahrungJahre: 0, einsaetze: 0 })).toBe('bereit für den ersten Einsatz');
+    expect([deutschBalken('Grund'), deutschBalken('Mittel'), deutschBalken('Gut'), deutschBalken(null)]).toEqual([1, 2, 3, 0]);
   });
 
   it('Zeile unter dem Namen: Deutsch klein, Jahre ausgeschrieben', () => {

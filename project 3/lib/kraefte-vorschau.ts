@@ -77,7 +77,29 @@ export function kopfzeile(gesamt: number = PORTAL_ANZAHL): string {
   return gesamt === 1 ? '1 passende Pflegekraft – sofort verfügbar' : `${gesamt} passende Pflegekräfte – sofort verfügbar`;
 }
 
-/** „Deutsch: gut · 10 Jahre Erfahrung" — die Zeile unter dem Namen. */
+/**
+ * Faktenzeile wie im Portal (`nurseFacts`): „12 J. Erfahrung · 31 Einsätze
+ * über Primundus" — die Karte behält die Optik der Portal-Karte (Martin,
+ * 10.09.: „warum veränderst du die Optik, das muss schon bleiben").
+ */
+export function kraftFakten(k: Pick<VorschauKraft, 'erfahrungJahre' | 'einsaetze'>): string {
+  const teile: string[] = [];
+  if (k.erfahrungJahre > 0) teile.push(`${k.erfahrungJahre} J. Erfahrung`);
+  if (k.einsaetze > 0) teile.push(k.einsaetze === 1 ? '1 Einsatz über Primundus' : `${k.einsaetze} Einsätze über Primundus`);
+  return teile.length > 0 ? teile.join(' · ') : 'bereit für den ersten Einsatz';
+}
+
+/** Sprachbalken wie im Portal (SprachBalken.tsx): Grund 1, Mittel 2, Gut 3. */
+export function deutschBalken(wort: string | null): number {
+  switch (wort) {
+    case 'Grund': return 1;
+    case 'Mittel': return 2;
+    case 'Gut': return 3;
+    default: return 0;
+  }
+}
+
+/** „Deutsch: gut · 10 Jahre Erfahrung" — Zeile aus Martins Aufbau (derzeit nicht auf der Karte, Optik bleibt Portal). */
 export function kraftZeile(k: Pick<VorschauKraft, 'deutschWort' | 'erfahrungJahre'>): string {
   const teile: string[] = [];
   if (k.deutschWort) teile.push(`Deutsch: ${k.deutschWort.toLowerCase()}`);

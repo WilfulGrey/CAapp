@@ -101,6 +101,15 @@ Einsätzen und „Ab sofort verfügbar". Texte in `lib/kraefte-vorschau.ts`
 (`WARTE`, `kopfzeile`, `kraftZeile`, `hakenAusAntworten`, `VERLAUF`,
 `SCHRANKE`).
 
+**Runde 5 (10.09., Martin: „warum veränderst du die Optik, das muss schon
+bleiben"):** Die Karte ist wieder die Portal-Karte aus Runde 2/3b (Foto 64 px
+links, Name, Chip „Match", Sprachbalken, Faktenzeile „Elite: 12 J. Erfahrung
+· 31 Einsätze über Primundus", „Ab sofort verfügbar"); die grossen 4:3-Fotos
+und die Häkchen aus Runde 4 sind raus. Der Aufbau drumherum (zwei Karten
+ganz, dritte im Verlauf, „+ 3 weitere …", Knopf, Hinweis, Schranke) bleibt.
+**Nicht gemergt ohne Martins Okay** — Vorschau lokal (Next-Dev-Server,
+Playwright gegen localhost).
+
 **Datenschutz:** Die Karten stehen VOR jedem Lead auf einer öffentlichen
 Seite. Es verlassen nur Vorname, Alter, Stufe, Erfahrungsjahre, Deutsch-Wort,
 Foto-URL und Verfügbarkeitsdatum die Function. Fotos bevorzugt aus
