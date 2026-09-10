@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { bereitText, bruecke, deutschBalken, KNOPF_VOR_KONTAKT, kopfzeile, kraefteVorschauAktiv, kraftFakten, parseVorschau, PORTAL_ANZAHL, SCHRANKE, wuenscheAusAntworten } from '../../project 3/lib/kraefte-vorschau';
+import { hakenAusAntworten, kopfzeile, kraefteVorschauAktiv, kraftZeile, parseVorschau, PORTAL_ANZAHL, SCHRANKE, VERLAUF, WARTE, wuenscheAusAntworten } from '../../project 3/lib/kraefte-vorschau';
 
 function speicher(): Pick<Storage, 'getItem' | 'setItem'> {
   const m = new Map<string, string>();
@@ -21,25 +21,32 @@ describe('Kräfte-Vorschau (Rechner)', () => {
       .toEqual({ deutsch: 'sehr-gut', geschlecht: null, fuehrerschein: 'ja' });
   });
 
-  it('Faktenzeile wie im Portal: Erfahrung und Einsätze, nie ein Datum', () => {
-    expect(kraftFakten({ erfahrungJahre: 7, einsaetze: 8 })).toBe('7 J. Erfahrung · 8 Einsätze über Primundus');
-    expect(kraftFakten({ erfahrungJahre: 0, einsaetze: 1 })).toBe('1 Einsatz über Primundus');
-    expect(kraftFakten({ erfahrungJahre: 0, einsaetze: 0 })).toBe('bereit für den ersten Einsatz');
+  it('Zeile unter dem Namen: Deutsch klein, Jahre ausgeschrieben', () => {
+    expect(kraftZeile({ deutschWort: 'Gut', erfahrungJahre: 10 })).toBe('Deutsch: gut · 10 Jahre Erfahrung');
+    expect(kraftZeile({ deutschWort: null, erfahrungJahre: 1 })).toBe('1 Jahr Erfahrung');
+    expect(kraftZeile({ deutschWort: 'Mittel', erfahrungJahre: 0 })).toBe('Deutsch: mittel');
   });
 
-  it('Sprachbalken: Grund 1, Mittel 2, Gut 3, sonst keine', () => {
-    expect([deutschBalken('Grund'), deutschBalken('Mittel'), deutschBalken('Gut'), deutschBalken(null), deutschBalken('x')]).toEqual([1, 2, 3, 0, 0]);
+  it('Häkchen: Wortlaut der Angebotsmail, höchstens zwei, Auffüllen mit Einsätzen und Verfügbarkeit', () => {
+    expect(hakenAusAntworten({ mobility: 'rollstuhl', nightCare: 'gelegentlich', driving: 'ja' }, { einsaetze: 12 }))
+      .toEqual(['Erfahrung mit Rollstuhlpatienten', 'Erfahrung mit nächtlichen Einsätzen']);
+    expect(hakenAusAntworten({ mobility: 'rollator', nightCare: 'nein' }, { einsaetze: 0 }))
+      .toEqual(['Erfahrung mit eingeschränkter Mobilität', 'Ab sofort verfügbar']);
+    expect(hakenAusAntworten({ mobility: 'mobil', nightCare: 'nein', driving: 'ja' }, { einsaetze: 1 }))
+      .toEqual(['Führerschein vorhanden', '1 Einsatz über Primundus']);
+    expect(hakenAusAntworten({}, { einsaetze: 0 })).toEqual(['Ab sofort verfügbar']);
   });
 
-  it('Roter Faden: 5 wie im Portal, 3 davon vorab, Knopf kündigt Kontaktdaten an', () => {
+  it('Martins Aufbau: Warte-Screen, Kopf, Verlauf, Schranke', () => {
     expect(PORTAL_ANZAHL).toBe(5);
-    expect(kopfzeile().titel).toBe('✓ 5 passende Pflegekräfte gefunden');
-    expect(bereitText(3)).toBe('3 davon sehen Sie gleich vorab');
-    expect(bruecke(3)).toBe('Das sind 3 Ihrer 5 Pflegekräfte.');
-    expect(bruecke(1)).toBe('Das ist 1 Ihrer 5 Pflegekräfte.');
-    expect(KNOPF_VOR_KONTAKT.text).toBe('Kontaktdaten eingeben & Angebot ansehen\u00A0→');
-    expect(KNOPF_VOR_KONTAKT.hinweis).toBe('Danach sofort: Ihr Monatspreis und alle 5 Pflegekräfte im Portal');
-    expect(SCHRANKE.knopf).toBe('Angebot & Pflegekräfte anzeigen →');
+    expect(WARTE.schritt1).toBe('Sofortangebot berechnet');
+    expect(WARTE.schritt2Fertig(5)).toBe('5 passende Pflegekräfte gefunden');
+    expect(kopfzeile()).toBe('5 passende Pflegekräfte – sofort verfügbar');
+    expect(VERLAUF.weitere()).toBe('+ 3 weitere passende Pflegekräfte');
+    expect(VERLAUF.angebot).toBe('und Ihr persönliches Sofortangebot');
+    expect(VERLAUF.knopf).toBe('Alle Pflegekräfte & Sofortangebot ansehen\u00A0→');
+    expect(VERLAUF.hinweis).toBe('Dafür benötigen wir nur noch Ihre Kontaktdaten.');
+    expect(SCHRANKE.knopf).toBe(VERLAUF.knopf);
   });
 
   it('parseVorschau lässt nur saubere Karten mit https-Foto durch, maximal drei', () => {
