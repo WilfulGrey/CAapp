@@ -190,9 +190,8 @@ export function MultiStepForm({ mode = 'inline' }: MultiStepFormProps = {}) {
     setKontaktOffen(true);
     analytics.trackEvent('wizard', 'kraefte_wahl', { aktion: 'button', kraft_id: null });
     setTimeout(() => {
-      const el = document.getElementById('kontakt-name');
-      el?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      el?.focus({ preventScroll: true });
+      document.getElementById('kontakt-schranke')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      document.getElementById('kontakt-name')?.focus({ preventScroll: true });
     }, 60);
   };
   const vorschauModus = vorschauAktiv && !!kraefteVorschau && kraefteVorschau.length > 0;
@@ -1132,11 +1131,11 @@ export function MultiStepForm({ mode = 'inline' }: MultiStepFormProps = {}) {
                   Ende der Animation, und kein „Angebot ist fertig", solange der
                   Kunde noch keinen Preis sieht. */}
               <p className="text-center text-base font-bold uppercase tracking-wide text-white mb-1.5">
-                {vorschauModus ? kopfzeile() : '✓ Ihr Angebot ist fertig'}
+                {vorschauModus ? (kontaktOffen ? SCHRANKE.kopf : kopfzeile()) : '✓ Ihr Angebot ist fertig'}
               </p>
-              {!vorschauModus && (
+              {(!vorschauModus || kontaktOffen) && (
                 <p className="text-center text-sm text-white/90">
-                  Persönlich auf Ihre Angaben abgestimmt
+                  {vorschauModus ? SCHRANKE.kopfText : 'Persönlich auf Ihre Angaben abgestimmt'}
                 </p>
               )}
             </>
@@ -1496,8 +1495,26 @@ export function MultiStepForm({ mode = 'inline' }: MultiStepFormProps = {}) {
                             </div>
                           );
                         };
-                        const ganz = kontaktOffen ? kraefteVorschau : kraefteVorschau.slice(0, GANZ_SICHTBAR);
-                        const angeschnitten = kontaktOffen ? null : kraefteVorschau[GANZ_SICHTBAR] ?? null;
+                        const ganz = kraefteVorschau.slice(0, GANZ_SICHTBAR);
+                        const angeschnitten = kraefteVorschau[GANZ_SICHTBAR] ?? null;
+                        if (kontaktOffen) {
+                          // Eigener Schritt (Martin, 10.09.): keine Karten mehr, nur die
+                          // Schranke; zurück geht es über den Link, nicht über „Zurück" unten.
+                          return (
+                            <div id="kontakt-schranke">
+                              <button
+                                type="button"
+                                onClick={() => { kontaktOffenRef.current = false; setKontaktOffen(false); }}
+                                className="inline-flex items-center gap-1 text-[13px] font-semibold text-[#708A95] hover:text-[#3D3D3D] mb-3"
+                              >
+                                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth={2.4} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" /></svg>
+                                {SCHRANKE.zurueck}
+                              </button>
+                              <p className="text-[16px] font-bold text-[#3D3D3D]">{SCHRANKE.titel}</p>
+                              <p className="text-[13px] text-[#5A5A5A] mt-0.5">{SCHRANKE.text}</p>
+                            </div>
+                          );
+                        }
                         return (
                           <>
                             <div className="space-y-3">
@@ -1509,12 +1526,7 @@ export function MultiStepForm({ mode = 'inline' }: MultiStepFormProps = {}) {
                                 </div>
                               )}
                             </div>
-                            {kontaktOffen ? (
-                              <div className="pt-5" id="kontakt-schranke">
-                                <p className="text-[16px] font-bold text-[#3D3D3D]">{SCHRANKE.titel}</p>
-                                <p className="text-[13px] text-[#5A5A5A] mt-0.5">{SCHRANKE.text}</p>
-                              </div>
-                            ) : (
+                            {(
                               <div className={`relative text-center ${angeschnitten ? '-mt-3' : 'pt-4'}`}>
                                 <p className="text-[17px] font-bold text-[#3D3D3D] leading-snug">{VERLAUF.weitere()}</p>
                                 <p className="text-[15px] text-[#3D3D3D] leading-snug">{VERLAUF.angebot}</p>

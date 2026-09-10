@@ -117,6 +117,12 @@ mittig zum Icon"):** Warte-Screen im Vorschau-Modus mit drei Schritten
 Zeile mittig zum Icon. Runde 4 (#689) wurde auf Martins Anweisung revertiert
 (#691); dieser Stand ersetzt sie erst nach seinem Okay.
 
+**Runde 7 (10.09., Martin nach dem lokalen Test: „ist super, aber sollte der
+letzte Schritt mit den Kontaktdaten nicht als eigener Schritt?"):** Nach dem
+Klick verschwinden die Karten; Kopf „Fast geschafft – Kontaktdaten eingeben,
+Ihr Portal öffnet sich sofort", Link „Zurück zu den Pflegekräften", Titel
+„Ihre Kontaktdaten", Satz, drei Felder, Absendeknopf.
+
 **Datenschutz:** Die Karten stehen VOR jedem Lead auf einer öffentlichen
 Seite. Es verlassen nur Vorname, Alter, Stufe, Erfahrungsjahre, Deutsch-Wort,
 Foto-URL und Verfügbarkeitsdatum die Function. Fotos bevorzugt aus

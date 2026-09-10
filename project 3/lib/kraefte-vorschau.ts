@@ -156,10 +156,18 @@ export const VERLAUF = {
   hinweis: 'Dafür benötigen wir nur noch Ihre Kontaktdaten.',
 };
 
-/** Die Kontaktschranke nach dem Klick. */
+/**
+ * Die Kontaktschranke — ein EIGENER Schritt nach dem Klick (Martin, 10.09.:
+ * „sollte der letzte Schritt mit den Kontaktdaten nicht als eigener
+ * Schritt?"): Kopfzeile wechselt, die Karten verschwinden, nur Titel, Satz,
+ * drei Felder und der Absendeknopf; ein Link führt zu den Kräften zurück.
+ */
 export const SCHRANKE = {
-  titel: 'Fast geschafft: Ihre Kontaktdaten',
+  kopf: 'Fast geschafft',
+  kopfText: 'Kontaktdaten eingeben – Ihr Portal öffnet sich sofort',
+  titel: 'Ihre Kontaktdaten',
   text: `Danach öffnet sich sofort Ihr Portal mit Sofortangebot und allen ${PORTAL_ANZAHL} Pflegekräften.`,
+  zurueck: 'Zurück zu den Pflegekräften',
   knopf: 'Alle Pflegekräfte & Sofortangebot ansehen\u00A0→',
 };
 

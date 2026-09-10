@@ -56,6 +56,8 @@ describe('Kräfte-Vorschau (Rechner)', () => {
     expect(VERLAUF.knopf).toBe('Alle Pflegekräfte & Sofortangebot ansehen\u00A0→');
     expect(VERLAUF.hinweis).toBe('Dafür benötigen wir nur noch Ihre Kontaktdaten.');
     expect(SCHRANKE.knopf).toBe(VERLAUF.knopf);
+    expect(SCHRANKE.kopf).toBe('Fast geschafft');
+    expect(SCHRANKE.zurueck).toBe('Zurück zu den Pflegekräften');
   });
 
   it('parseVorschau lässt nur saubere Karten mit https-Foto durch, maximal drei', () => {
