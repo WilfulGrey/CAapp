@@ -54,10 +54,37 @@ export function wuenscheAusAntworten(state: { germanLevel?: string | null; gende
 }
 
 /**
- * Faktenzeile wie im Portal (`nurseFacts`): „Stammkraft: 7 J. Erfahrung ·
- * 8 Einsätze über Primundus". Kein Datum mehr — `available_from` wird bei
- * mamamia nicht gepflegt und veraltet auf der Karte (Martin, 10.09.); die
- * Verfügbarkeit steht als fester Chip „Ab sofort verfügbar" daneben.
+ * Martins Aufbau vom 10.09. (Runde 4) — Screen 1 (Warten) und Screen 2
+ * (Ergebnis) als eine Geschichte: „5 passende Pflegekräfte – sofort
+ * verfügbar", zwei Profile ganz, das dritte läuft in einen Verlauf aus, im
+ * Verlauf „+ 3 weitere passende Pflegekräfte und Ihr persönliches
+ * Sofortangebot", dann der Knopf, dann „Dafür benötigen wir nur noch Ihre
+ * Kontaktdaten." Die Zahl 5 ist die Portal-Zahl (`waehleFuenf`).
+ */
+export const PORTAL_ANZAHL = 5;
+/** So viele Profile stehen ganz auf dem Ergebnis-Screen; das nächste läuft in den Verlauf. */
+export const GANZ_SICHTBAR = 2;
+
+export const WARTE = {
+  titel: 'Einen Moment bitte',
+  text: 'Wir erstellen Ihr Sofortangebot und suchen passende Pflegekräfte.',
+  schritt1: 'Sofortangebot berechnet',
+  schritt2Laeuft: 'Passende Pflegekräfte werden gesucht',
+  schritt2Fertig: (n: number) => (n === 1 ? '1 passende Pflegekraft gefunden' : `${n} passende Pflegekräfte gefunden`),
+  // Dritter Schritt (Martin, 10.09.: „nur 2 Punkte sieht komisch aus") — und er
+  // bereitet den Kopf „sofort verfügbar" vor.
+  schritt3: 'Verfügbarkeit geprüft',
+  schritt3Fertig: (n: number) => (n === 1 ? 'ab sofort verfügbar' : `alle ${n} ab sofort verfügbar`),
+};
+
+export function kopfzeile(gesamt: number = PORTAL_ANZAHL): string {
+  return gesamt === 1 ? '1 passende Pflegekraft – sofort verfügbar' : `${gesamt} passende Pflegekräfte – sofort verfügbar`;
+}
+
+/**
+ * Faktenzeile wie im Portal (`nurseFacts`): „12 J. Erfahrung · 31 Einsätze
+ * über Primundus" — die Karte behält die Optik der Portal-Karte (Martin,
+ * 10.09.: „warum veränderst du die Optik, das muss schon bleiben").
  */
 export function kraftFakten(k: Pick<VorschauKraft, 'erfahrungJahre' | 'einsaetze'>): string {
   const teile: string[] = [];
@@ -76,44 +103,86 @@ export function deutschBalken(wort: string | null): number {
   }
 }
 
+/** „Deutsch: gut · 10 Jahre Erfahrung" — Zeile aus Martins Aufbau (derzeit nicht auf der Karte, Optik bleibt Portal). */
+export function kraftZeile(k: Pick<VorschauKraft, 'deutschWort' | 'erfahrungJahre'>): string {
+  const teile: string[] = [];
+  if (k.deutschWort) teile.push(`Deutsch: ${k.deutschWort.toLowerCase()}`);
+  if (k.erfahrungJahre > 0) teile.push(k.erfahrungJahre === 1 ? '1 Jahr Erfahrung' : `${k.erfahrungJahre} Jahre Erfahrung`);
+  return teile.join(' · ');
+}
+
+/** Antworten aus dem Rechner, die auf den Karten als Häkchen aufgegriffen werden. */
+export interface HakenAntworten {
+  mobility?: string | null;
+  nightCare?: string | null;
+  patientCount?: string | null;
+  pflegegrad?: string | number | null;
+  driving?: string | null;
+}
+
 /**
- * Der rote Faden von Schritt 9 (Martin, 10.09.): EINE Zahl von der Animation
- * bis ins Portal. Das Portal zeigt fünf Vorschläge (`waehleFuenf` in
- * send-scheduled-emails/empfehlung.ts), also zählt die Animation auf 5, der
- * Kopf nennt 5, die Karten zeigen 3 davon vorab, und der Knopf sagt, dass als
- * Nächstes die Kontaktdaten kommen — danach Angebot und alle 5.
+ * Zwei Häkchen je Karte. Wortlaut = die Haken der Angebotsmail
+ * (`anforderungenAusAnfrage` in send-scheduled-emails/empfehlung.ts), damit
+ * Rechner und Mail dieselbe Sprache sprechen: Sie greifen die ANGABEN DES
+ * KUNDEN auf, sind kein zweites Matching. Einzige datengebundene Zeile ist
+ * der Führerschein (die Function filtert danach). Fehlen Angaben, füllen
+ * Verfügbarkeit und Einsätze auf.
  */
-export const PORTAL_ANZAHL = 5;
-
-export function kopfzeile(gesamt: number = PORTAL_ANZAHL): { titel: string; text: string } {
-  return {
-    titel: gesamt === 1 ? '✓ 1 passende Pflegekraft gefunden' : `✓ ${gesamt} passende Pflegekräfte gefunden`,
-    text: 'Ab sofort verfügbar, persönlich auf Ihre Angaben abgestimmt',
-  };
+export function hakenAusAntworten(a: HakenAntworten, k: Pick<VorschauKraft, 'einsaetze'>): string[] {
+  const t: string[] = [];
+  const mob = (a.mobility ?? '').toLowerCase();
+  const nacht = (a.nightCare ?? '').toLowerCase();
+  const grad = Number(a.pflegegrad);
+  if (mob === 'bettlaegerig') t.push('Erfahrung mit bettlägerigen Patienten');
+  else if (mob === 'rollstuhl') t.push('Erfahrung mit Rollstuhlpatienten');
+  if (nacht && nacht !== 'nein') t.push('Erfahrung mit nächtlichen Einsätzen');
+  if ((a.patientCount ?? '').toLowerCase() === 'ehepaar') t.push('Erfahrung in der Betreuung von Ehepaaren');
+  if (Number.isFinite(grad) && grad >= 4) t.push('Erfahrung bei hohem Pflegebedarf');
+  if (mob === 'rollator') t.push('Erfahrung mit eingeschränkter Mobilität');
+  if ((a.driving ?? '').toLowerCase() === 'ja') t.push('Führerschein vorhanden');
+  if (k.einsaetze > 0) t.push(k.einsaetze === 1 ? '1 Einsatz über Primundus' : `${k.einsaetze} Einsätze über Primundus`);
+  t.push('Ab sofort verfügbar');
+  return t.slice(0, 2);
 }
 
-/** Dritte Zeile der Warte-Animation im Vorschau-Modus: „3 davon sehen Sie gleich vorab". */
-export function bereitText(gezeigt: number): string {
-  return gezeigt === 1 ? '1 davon sehen Sie gleich vorab' : `${gezeigt} davon sehen Sie gleich vorab`;
-}
-
-/** Zwischen Karten und Knopf: warum genau diese Karten hier stehen. */
-export function bruecke(gezeigt: number, gesamt: number = PORTAL_ANZAHL): string {
-  return gezeigt === 1 ? `Das ist 1 Ihrer ${gesamt} Pflegekräfte.` : `Das sind ${gezeigt} Ihrer ${gesamt} Pflegekräfte.`;
-}
-
-/** Knopf unter den Karten, bevor die Felder offen sind — kündigt die Kontaktdaten an (Martins Wortlaut). */
-export const KNOPF_VOR_KONTAKT = {
-  // Geschütztes Leerzeichen vor dem Pfeil: auf 375 px brach der Pfeil allein in die zweite Zeile.
-  text: 'Kontaktdaten eingeben & Angebot ansehen\u00A0→',
-  hinweis: `Danach sofort: Ihr Monatspreis und alle ${PORTAL_ANZAHL} Pflegekräfte im Portal`,
+/** Der Verlauf unter den Profilen und der Knopf darin. */
+export const VERLAUF = {
+  weitere: (gesamt: number = PORTAL_ANZAHL, ganz: number = GANZ_SICHTBAR) => {
+    const n = Math.max(1, gesamt - ganz);
+    return n === 1 ? '+ 1 weitere passende Pflegekraft' : `+ ${n} weitere passende Pflegekräfte`;
+  },
+  angebot: 'und Ihr persönliches Sofortangebot',
+  knopf: 'Alle Pflegekräfte & Sofortangebot ansehen\u00A0→',
+  hinweis: 'Dafür benötigen wir nur noch Ihre Kontaktdaten.',
 };
 
-/** Die Kontaktschranke selbst; der Absendeknopf heißt wie im normalen Rechner. */
+/**
+ * Die Kontaktschranke — ein EIGENER Schritt nach dem Klick. Die Strecke
+ * erzählt EINE Geschichte (Martin, 10.09.: „mach vorher eine Prüfung, ob das
+ * alles perfekt passt"):
+ *   Warten:   „Sofortangebot berechnet" + „5 passende Pflegekräfte gefunden"
+ *   Ergebnis: „5 passende Pflegekräfte – sofort verfügbar", 3 Profile,
+ *             „+ 3 weitere … und Ihr persönliches Sofortangebot",
+ *             Knopf „Alle Pflegekräfte & Sofortangebot ansehen",
+ *             „Dafür benötigen wir nur noch Ihre Kontaktdaten."
+ *   Kontakt:  Kopf „✓ Ihr Sofortangebot ist fertig" (das Warten hat es
+ *             berechnet), Kasten mit den echten Fotos „5 passende
+ *             Pflegekräfte gefunden · sofort verfügbar" (das Ergebnis hat sie
+ *             gezeigt), Frage „Wohin dürfen wir Ihr Sofortangebot senden?"
+ *             wie im bewährten Rechner, Satz: sofort sichtbar + Kopie per
+ *             E-Mail (beides passiert wirklich), derselbe Knopf wie auf dem
+ *             Ergebnis-Screen.
+ * Kein „Portal", kein „Fast geschafft", kein „Nur noch …".
+ */
 export const SCHRANKE = {
-  titel: 'Fast geschafft: Ihre Kontaktdaten',
-  text: `Danach öffnet sich sofort Ihr Portal mit Angebot, Monatspreis und allen ${PORTAL_ANZAHL} Pflegekräften.`,
-  knopf: 'Angebot & Pflegekräfte anzeigen →',
+  kopf: '✓ Ihr Sofortangebot ist fertig',
+  kopfText: 'Persönlich auf Ihre Angaben abgestimmt',
+  gefunden: (gesamt: number = PORTAL_ANZAHL) => `${gesamt} passende Pflegekräfte gefunden`,
+  gefundenText: 'sofort verfügbar',
+  titel: 'Wohin dürfen wir Ihr Sofortangebot senden?',
+  text: `Ihr Sofortangebot und alle ${PORTAL_ANZAHL} Pflegekräfte werden sofort sichtbar – die Kopie schicken wir Ihnen per E-Mail.`,
+  zurueck: 'Zurück zu den Pflegekräften',
+  knopf: 'Alle Pflegekräfte & Sofortangebot ansehen\u00A0→',
 };
 
 /** Antwort der Function absichern — nur, was die Karte braucht, nie mehr. */
