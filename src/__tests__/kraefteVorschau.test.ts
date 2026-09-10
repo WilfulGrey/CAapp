@@ -37,7 +37,7 @@ describe('Kräfte-Vorschau (Rechner)', () => {
     expect(bereitText(3)).toBe('3 davon sehen Sie gleich vorab');
     expect(bruecke(3)).toBe('Das sind 3 Ihrer 5 Pflegekräfte.');
     expect(bruecke(1)).toBe('Das ist 1 Ihrer 5 Pflegekräfte.');
-    expect(KNOPF_VOR_KONTAKT.text).toBe('Kontaktdaten eingeben & Angebot ansehen →');
+    expect(KNOPF_VOR_KONTAKT.text).toBe('Kontaktdaten eingeben & Angebot ansehen\u00A0→');
     expect(KNOPF_VOR_KONTAKT.hinweis).toBe('Danach sofort: Ihr Monatspreis und alle 5 Pflegekräfte im Portal');
     expect(SCHRANKE.knopf).toBe('Angebot & Pflegekräfte anzeigen →');
   });
