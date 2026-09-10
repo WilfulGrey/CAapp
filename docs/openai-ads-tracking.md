@@ -123,6 +123,28 @@ Auswertung: `leads.utm_source = 'chatgpt'` = ChatGPT-Lead, `gclid/wbraid/gbraid`
 `.claude/skills/sea-lauf/scripts/kanal_vergleich.py` (Ausgaben, Klicks,
 Sitzungen, Leads, Profile, Kosten je Lead).
 
+## Wo `lead_created` gemeldet wird (seit 10.09.2026)
+
+An **drei** Stellen, immer erst nach erfolgreichem Anlegen des Leads und vor
+dem Redirect ins Portal:
+
+| Pfad | Stelle |
+|---|---|
+| Wizard (Kostenrechner) | `components/calculator/MultiStepForm.tsx`, direkt vor dem dataLayer-Push `angebot_erfolgreich` — `meldeAnfrage(window.oaiq, leadId)` |
+| Pria-Chat | `public/pria.html` (→ `pria-widget.js`), Inline-Aufruf mit denselben Werten wie `meldeAnfrage` — Name, Typ und Betrag dort synchron halten |
+| alte `/result`-Seite | `app/result/page.tsx` — historisch, der Wizard erreicht sie seit dem Direkt-Redirect nicht mehr |
+
+**Befund 10.09.2026 (Tages-Check):** Bis dahin stand der Aufruf NUR auf der
+`/result`-Seite. Ergebnis: eine Woche Kampagne, ~50 Klicks, Datenquelle
+„Kostenrechner Pixel" mit **0 Ereignissen** — das SDK sendet von sich aus nur
+`sdk_init`/`diagnostic`, keine Seitenaufrufe, und die drei Warnhinweise im
+Manager („Keine aktuellen Conversion-Ereignisse") waren die Folge. Der
+Redirect ist kein Problem: das SDK schickt mit `fetch keepalive` und
+`sendBeacon` bei `pagehide`.
+
+**Regel:** Jeder neue Lead-Pfad (Chat, Formular, Landingpage) meldet
+`lead_created` selbst — der Pixel sieht nichts automatisch.
+
 ## Was noch offen ist
 
 1. **Ziel der Kampagne steht auf „Klicks", nicht „Conversions".** Ohne
