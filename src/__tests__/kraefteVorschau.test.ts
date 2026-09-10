@@ -7,13 +7,14 @@ function speicher(): Pick<Storage, 'getItem' | 'setItem'> {
 }
 
 describe('Kräfte-Vorschau (Rechner)', () => {
-  it('Schalter: ?kraefte=1 schaltet ein und merkt sich das, ?kraefte=0 schaltet aus', () => {
+  it('Schalter: seit 10.09. für alle an; ?kraefte=0 schaltet aus und merkt sich das, ?kraefte=1 wieder ein', () => {
     const s = speicher();
-    expect(kraefteVorschauAktiv('?kraefte=1&start=1', s)).toBe(true);
     expect(kraefteVorschauAktiv('?start=1', s)).toBe(true);
+    expect(kraefteVorschauAktiv('', null)).toBe(true);
     expect(kraefteVorschauAktiv('?kraefte=0', s)).toBe(false);
     expect(kraefteVorschauAktiv('', s)).toBe(false);
-    expect(kraefteVorschauAktiv('', null)).toBe(false);
+    expect(kraefteVorschauAktiv('?kraefte=1&start=1', s)).toBe(true);
+    expect(kraefteVorschauAktiv('', s)).toBe(true);
   });
 
   it('Wünsche: nur Deutsch, Geschlecht, Führerschein', () => {

@@ -5,10 +5,9 @@
  * Wünsche gehen an die Edge Function, wie heißt die Zeile unter dem Namen.
  * Netz und React leben in MultiStepForm.tsx.
  *
- * SCHALTER: Die Vorschau ist bewusst hinter `?kraefte=1` versteckt, bis
- * Martin sie abgenommen hat — danach entscheidet der Split (analytics.ts)
- * darüber, wer sie sieht. Der Schalter wird in sessionStorage gemerkt, weil
- * die Variantenweiche die URL neu schreibt.
+ * SCHALTER: Bis zur Abnahme (10.09.2026, 21 Uhr) war die Vorschau hinter
+ * `?kraefte=1` versteckt; seitdem ist sie für alle an, `?kraefte=0` zeigt den
+ * alten Kasten. Kein Split (Martin) — verglichen wird vorher/nachher.
  */
 
 export interface VorschauKraft {
@@ -25,16 +24,22 @@ export interface VorschauKraft {
 
 export const VORSCHAU_KEY = 'prim_kraefte_vorschau';
 
-/** Liest den Schalter aus der URL (`?kraefte=1|0`) und merkt ihn sich. */
+/**
+ * Seit 10.09.2026 (Martin: „keinen Split – wir kennen die Zahlen und werden
+ * dann vergleichen") ist die Vorschau für ALLE an. `?kraefte=0` zeigt den
+ * alten Kasten (zum Vergleichen), `?kraefte=1` schaltet wieder ein; beides
+ * wird in sessionStorage gemerkt, weil die Variantenweiche die URL neu
+ * schreibt. Vergleich = vorher/nachher am Datum, nicht per Split.
+ */
 export function kraefteVorschauAktiv(search: string, storage: Pick<Storage, 'getItem' | 'setItem'> | null): boolean {
   const params = new URLSearchParams(search);
   const q = params.get('kraefte');
   try {
     if (q === '1') { storage?.setItem(VORSCHAU_KEY, '1'); return true; }
     if (q === '0') { storage?.setItem(VORSCHAU_KEY, '0'); return false; }
-    return storage?.getItem(VORSCHAU_KEY) === '1';
+    return storage?.getItem(VORSCHAU_KEY) !== '0';
   } catch {
-    return q === '1';
+    return q !== '0';
   }
 }
 
