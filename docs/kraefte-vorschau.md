@@ -40,10 +40,33 @@ das rohe Avatar.
 gesperrt, mit Einsätzen, Fotos, verfügbar ≤ 60 Tage) plus eine Stichprobe
 `Caregiver(id)` gegen die Liste — keine Personendaten.
 
+**Schritt 9 seit Runde 2 (10.09., Martins Feedback zur ersten Fassung):**
+Karten wie im Kundenportal (`MatchCard`): Foto 64 px, Name und Alter,
+Chip „✓ Match" oben rechts, Zeile „Deutsch ●●○ Mittel" mit Sprachbalken,
+Faktenzeile „Stufe: X J. Erfahrung · N Einsätze über Primundus", fester
+Chip „Ab sofort verfügbar" — **kein Datum**, `available_from` wird nicht
+gepflegt und veraltet. Jede Karte hat „Profil ansehen ›" und „Einladen";
+Karte, beide Knöpfe und der Knopf „Preis & Profile ansehen →" darunter öffnen
+erst die Kontaktfelder (vorher stand die Überschrift „Preis anzeigen &
+Kontaktdaten eingeben" über den Feldern — falsche Reihenfolge). Überschrift,
+Satz und Absendeknopf richten sich nach der Wahl (`kraftAktionTexte`):
+„Nikolina einladen" / „Profil von Nikolina ansehen" / „Preis & Profile
+ansehen". Die Wahl geht als `kraefte_wahl`-Ereignis, im Submit-Payload
+(`kraefte_aktion`, `kraefte_id`) und als Deeplink `&cg=<id>&goto=matches`
+ins Portal — das öffnet ihr Profil aber nur, wenn sie dort im Matching steht
+(Lücke für Stufe 2, siehe unten).
+
 **Datenschutz:** Die Karten stehen VOR jedem Lead auf einer öffentlichen
 Seite. Es verlassen nur Vorname, Alter, Stufe, Erfahrungsjahre, Deutsch-Wort,
 Foto-URL und Verfügbarkeitsdatum die Function. Fotos bevorzugt aus
 `avatar_retouched_promo` (Werbefreigabe).
+
+**Offene Lücke (Stufe 2):** Vorschau-Pool (Agenturliste mit Filtern) und
+Portal-Matching (mamamia je Job) sind zwei Auswahlen. „Einladen" auf einer
+Karte kann im Portal nur einlösen, wer dort auch steht. Nötig: Portal zeigt
+die per `cg=` gewählte Kraft über `getCaregiver(id)` auch außerhalb der
+Matchings (Modal + Einladen), oder mamamia liefert dieselbe Auswahl für
+beide (Michał).
 
 **Ausfall:** Function antwortet bei jedem Fehler mit HTTP 200 und leerer
 Liste; der Rechner zeigt dann seinen bisherigen Kasten. Der Warte-Screen
