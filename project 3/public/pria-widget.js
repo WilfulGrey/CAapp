@@ -1694,6 +1694,11 @@ function kontakt(){
         conversion_value:brutto,
         user_email:felder[1].value.trim(),
       });
+      /* OpenAI-Ads-Pixel (ChatGPT-Werbung): dieselbe Meldung wie meldeAnfrage()
+         in lib/oaiq.ts — Name, Typ und Wert (feste Staffelung: Anfrage 20)
+         dort synchron halten. Ohne Marketing-Einwilligung gibt es window.oaiq
+         nicht, dann passiert nichts. */
+      if(typeof window.oaiq==='function') window.oaiq('measure','lead_created',{type:'customer_action',amount:20,currency:'EUR'},{event_id:leadId});
     }
 
     await uebergabe();

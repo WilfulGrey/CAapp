@@ -10,6 +10,7 @@ import { scrollToCalculator, isCalculatorAligned, OPEN_CALCULATOR_EVENT } from "
 import { useFormTracking } from "@/hooks/use-form-tracking";
 import { naechsterDrift, naechsterAbstandMs } from "@/lib/counter-drift";
 import { kraefteVorschauAktiv, kraftZeile, parseVorschau, wuenscheAusAntworten, type VorschauKraft } from "@/lib/kraefte-vorschau";
+import { meldeAnfrage } from "@/lib/oaiq";
 
 // ─── Matching Animation Component ────────────────────────────────────────────
 // Läuft zwischen letzter Frage (Step 8) und Kontaktformular (Step 9). 3 Schritte
@@ -735,6 +736,14 @@ export function MultiStepForm({ mode = 'inline' }: MultiStepFormProps = {}) {
             redirected = true;
             window.location.assign(data.portalUrl);
           };
+          // OpenAI Ads (ChatGPT-Werbung): lead_created an den Pixel. Bis zum
+          // 10.09. stand dieser Aufruf nur auf der alten /result-Seite, die der
+          // Wizard seit dem Direkt-Redirect nie erreicht — der Pixel hatte in
+          // einer Woche Kampagne kein einziges Ereignis gesehen. Ohne
+          // Marketing-Einwilligung existiert window.oaiq nicht, dann passiert
+          // nichts. Das SDK sendet mit keepalive/sendBeacon, der Redirect
+          // gleich darunter reisst den Request nicht ab.
+          meldeAnfrage(window.oaiq, data.leadId);
           (window as any).dataLayer = (window as any).dataLayer || [];
           (window as any).dataLayer.push({
             event: 'angebot_erfolgreich',
