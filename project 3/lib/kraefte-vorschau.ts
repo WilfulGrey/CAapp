@@ -101,8 +101,16 @@ export function kraftAktionTexte(w: KraefteWahl | null): { titel: string; text: 
   if (w?.aktion === 'profil' && w.vorname) {
     return { titel: `Profil von ${w.vorname} ansehen`, text: `Dafür brauchen wir kurz Ihre Kontaktdaten. ${danach}`, knopf: 'Profil öffnen →' };
   }
-  return { titel: 'Preis & Profile ansehen', text: `Kurz Ihre Kontaktdaten — ${danach.charAt(0).toLowerCase()}${danach.slice(1)}`, knopf: 'Preis & Profile jetzt ansehen →' };
+  return { titel: 'Ihre Kontaktdaten', text: danach, knopf: 'Preis & Profile jetzt ansehen →' };
 }
+
+/**
+ * Knopf unter den Karten, bevor die Felder offen sind. Sagt dem Kunden schon
+ * hier, dass als Nächstes seine Kontaktdaten kommen (Martin, 10.09.: „nicht
+ * ‚Preis & Profile ansehen', sondern vorbereiten, dass Kontaktdaten erfragt
+ * werden") — Überraschung am nächsten Schritt kostet mehr als Ehrlichkeit hier.
+ */
+export const KNOPF_VOR_KONTAKT = { text: 'Kontaktdaten eingeben & Preis sehen →', hinweis: 'Nächster Schritt: Name, E-Mail und Telefon · danach sofort Preis & Profile' };
 
 /** Portal-URL um den Deeplink auf die gewählte Kraft ergänzen (öffnet dort ihr Profil, wenn sie im Matching steht). */
 export function portalUrlMitWahl(portalUrl: string, w: KraefteWahl | null): string {

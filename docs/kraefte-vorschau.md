@@ -46,7 +46,7 @@ Chip „✓ Match" oben rechts, Zeile „Deutsch ●●○ Mittel" mit Sprachbal
 Faktenzeile „Stufe: X J. Erfahrung · N Einsätze über Primundus", fester
 Chip „Ab sofort verfügbar" — **kein Datum**, `available_from` wird nicht
 gepflegt und veraltet. Jede Karte hat „Profil ansehen ›" und „Einladen";
-Karte, beide Knöpfe und der Knopf „Preis & Profile ansehen →" darunter öffnen
+Karte, beide Knöpfe und der Knopf „Kontaktdaten eingeben & Preis sehen →" darunter (Hinweis: „Nächster Schritt: Name, E-Mail und Telefon") öffnen
 erst die Kontaktfelder (vorher stand die Überschrift „Preis anzeigen &
 Kontaktdaten eingeben" über den Feldern — falsche Reihenfolge). Überschrift,
 Satz und Absendeknopf richten sich nach der Wahl (`kraftAktionTexte`):
