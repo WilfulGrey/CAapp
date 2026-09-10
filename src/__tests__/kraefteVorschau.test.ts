@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { deutschBalken, KNOPF_VOR_KONTAKT, kopfzeile, kraefteVorschauAktiv, kraftFakten, parseVorschau, SCHRANKE, wuenscheAusAntworten } from '../../project 3/lib/kraefte-vorschau';
+import { bereitText, bruecke, deutschBalken, KNOPF_VOR_KONTAKT, kopfzeile, kraefteVorschauAktiv, kraftFakten, parseVorschau, PORTAL_ANZAHL, SCHRANKE, wuenscheAusAntworten } from '../../project 3/lib/kraefte-vorschau';
 
 function speicher(): Pick<Storage, 'getItem' | 'setItem'> {
   const m = new Map<string, string>();
@@ -31,13 +31,15 @@ describe('Kräfte-Vorschau (Rechner)', () => {
     expect([deutschBalken('Grund'), deutschBalken('Mittel'), deutschBalken('Gut'), deutschBalken(null), deutschBalken('x')]).toEqual([1, 2, 3, 0, 0]);
   });
 
-  it('Roter Faden: Kopfzeile zählt die Karten, Schranke kündigt Kontaktdaten und Preis in dieser Reihenfolge an', () => {
-    expect(kopfzeile(3).titel).toBe('✓ 3 passende Pflegekräfte gefunden');
-    expect(kopfzeile(1).titel).toBe('✓ 1 passende Pflegekraft gefunden');
-    expect(KNOPF_VOR_KONTAKT.text).toBe('Preis & Profile freischalten →');
-    expect(KNOPF_VOR_KONTAKT.hinweis).toMatch(/^Nächster Schritt: Name, E-Mail und Telefon/);
-    expect(SCHRANKE.titel).toBe('Fast geschafft: Ihre Kontaktdaten');
-    expect(SCHRANKE.knopf).toBe('Jetzt freischalten →');
+  it('Roter Faden: 5 wie im Portal, 3 davon vorab, Knopf kündigt Kontaktdaten an', () => {
+    expect(PORTAL_ANZAHL).toBe(5);
+    expect(kopfzeile().titel).toBe('✓ 5 passende Pflegekräfte gefunden');
+    expect(bereitText(3)).toBe('3 davon sehen Sie gleich vorab');
+    expect(bruecke(3)).toBe('Das sind 3 Ihrer 5 Pflegekräfte.');
+    expect(bruecke(1)).toBe('Das ist 1 Ihrer 5 Pflegekräfte.');
+    expect(KNOPF_VOR_KONTAKT.text).toBe('Kontaktdaten eingeben & Angebot ansehen →');
+    expect(KNOPF_VOR_KONTAKT.hinweis).toBe('Danach sofort: Ihr Monatspreis und alle 5 Pflegekräfte im Portal');
+    expect(SCHRANKE.knopf).toBe('Angebot & Pflegekräfte anzeigen →');
   });
 
   it('parseVorschau lässt nur saubere Karten mit https-Foto durch, maximal drei', () => {

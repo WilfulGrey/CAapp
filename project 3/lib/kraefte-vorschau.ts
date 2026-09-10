@@ -77,33 +77,42 @@ export function deutschBalken(wort: string | null): number {
 }
 
 /**
- * Der rote Faden von Schritt 9 (Martin, 10.09.: „Wir sagen davor fünf, dann
- * drei; oben steht ‚Ihr Angebot ist fertig'; Profil ansehen und Einladen
- * gehen nicht; wozu zeigen wir die Kräfte?"). Eine Zahl von der Animation bis
- * zum Kopf, keine Aktion, die nichts auslöst, und ein Knopf, der sagt, was
- * die Kräfte mit dem nächsten Schritt zu tun haben.
+ * Der rote Faden von Schritt 9 (Martin, 10.09.): EINE Zahl von der Animation
+ * bis ins Portal. Das Portal zeigt fünf Vorschläge (`waehleFuenf` in
+ * send-scheduled-emails/empfehlung.ts), also zählt die Animation auf 5, der
+ * Kopf nennt 5, die Karten zeigen 3 davon vorab, und der Knopf sagt, dass als
+ * Nächstes die Kontaktdaten kommen — danach Angebot und alle 5.
  */
-export function kopfzeile(anzahl: number): { titel: string; text: string } {
+export const PORTAL_ANZAHL = 5;
+
+export function kopfzeile(gesamt: number = PORTAL_ANZAHL): { titel: string; text: string } {
   return {
-    titel: anzahl === 1 ? '✓ 1 passende Pflegekraft gefunden' : `✓ ${anzahl} passende Pflegekräfte gefunden`,
+    titel: gesamt === 1 ? '✓ 1 passende Pflegekraft gefunden' : `✓ ${gesamt} passende Pflegekräfte gefunden`,
     text: 'Ab sofort verfügbar, persönlich auf Ihre Angaben abgestimmt',
   };
 }
 
-/** Warte-Screen im Vorschau-Modus: der Zähler läuft auf die Zahl der Karten, nicht auf eine erfundene 5. */
-export const BEREIT_TEXT_VORSCHAU = 'Ihre Pflegekräfte sehen Sie gleich';
+/** Dritte Zeile der Warte-Animation im Vorschau-Modus: „3 davon sehen Sie gleich vorab". */
+export function bereitText(gezeigt: number): string {
+  return gezeigt === 1 ? '1 davon sehen Sie gleich vorab' : `${gezeigt} davon sehen Sie gleich vorab`;
+}
 
-/** Zwischen Karten und Knopf: warum die Kräfte hier stehen und was noch fehlt. */
-export const BRUECKE = 'Ihr Monatspreis und die vollständigen Profile stehen in Ihrem Portal.';
+/** Zwischen Karten und Knopf: warum genau diese Karten hier stehen. */
+export function bruecke(gezeigt: number, gesamt: number = PORTAL_ANZAHL): string {
+  return gezeigt === 1 ? `Das ist 1 Ihrer ${gesamt} Pflegekräfte.` : `Das sind ${gezeigt} Ihrer ${gesamt} Pflegekräfte.`;
+}
 
-/** Knopf unter den Karten, bevor die Felder offen sind — kündigt die Kontaktdaten an. */
-export const KNOPF_VOR_KONTAKT = { text: 'Preis & Profile freischalten →', hinweis: 'Nächster Schritt: Name, E-Mail und Telefon · Ihr Portal öffnet sich sofort' };
+/** Knopf unter den Karten, bevor die Felder offen sind — kündigt die Kontaktdaten an (Martins Wortlaut). */
+export const KNOPF_VOR_KONTAKT = {
+  text: 'Kontaktdaten eingeben & Angebot ansehen →',
+  hinweis: `Danach sofort: Ihr Monatspreis und alle ${PORTAL_ANZAHL} Pflegekräfte im Portal`,
+};
 
-/** Die Kontaktschranke selbst. */
+/** Die Kontaktschranke selbst; der Absendeknopf heißt wie im normalen Rechner. */
 export const SCHRANKE = {
   titel: 'Fast geschafft: Ihre Kontaktdaten',
-  text: 'Danach öffnet sich sofort Ihr Portal mit Monatspreis, Anreisedatum und den vollständigen Profilen.',
-  knopf: 'Jetzt freischalten →',
+  text: `Danach öffnet sich sofort Ihr Portal mit Angebot, Monatspreis und allen ${PORTAL_ANZAHL} Pflegekräften.`,
+  knopf: 'Angebot & Pflegekräfte anzeigen →',
 };
 
 /** Antwort der Function absichern — nur, was die Karte braucht, nie mehr. */
