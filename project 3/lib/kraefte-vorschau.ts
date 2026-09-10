@@ -53,17 +53,61 @@ export function wuenscheAusAntworten(state: { germanLevel?: string | null; gende
   };
 }
 
-/** „7 J. Erfahrung · Deutsch: Mittel · verfügbar ab 20.09." */
-export function kraftZeile(k: VorschauKraft, heute: Date = new Date()): string {
+/**
+ * Faktenzeile wie im Portal (`nurseFacts`): „Stammkraft: 7 J. Erfahrung ·
+ * 8 Einsätze über Primundus". Kein Datum mehr — `available_from` wird bei
+ * mamamia nicht gepflegt und veraltet auf der Karte (Martin, 10.09.); die
+ * Verfügbarkeit steht als fester Chip „Ab sofort verfügbar" daneben.
+ */
+export function kraftFakten(k: Pick<VorschauKraft, 'erfahrungJahre' | 'einsaetze'>): string {
   const teile: string[] = [];
   if (k.erfahrungJahre > 0) teile.push(`${k.erfahrungJahre} J. Erfahrung`);
-  if (k.deutschWort) teile.push(`Deutsch: ${k.deutschWort}`);
-  if (k.verfuegbarAb) {
-    const d = new Date(k.verfuegbarAb + 'T12:00:00');
-    if (d.getTime() <= heute.getTime()) teile.push('sofort verfügbar');
-    else teile.push(`verfügbar ab ${String(d.getDate()).padStart(2, '0')}.${String(d.getMonth() + 1).padStart(2, '0')}.`);
+  if (k.einsaetze > 0) teile.push(k.einsaetze === 1 ? '1 Einsatz über Primundus' : `${k.einsaetze} Einsätze über Primundus`);
+  return teile.length > 0 ? teile.join(' · ') : 'bereit für den ersten Einsatz';
+}
+
+/** Sprachbalken wie im Portal (SprachBalken.tsx): Grund 1, Mittel 2, Gut 3. */
+export function deutschBalken(wort: string | null): number {
+  switch (wort) {
+    case 'Grund': return 1;
+    case 'Mittel': return 2;
+    case 'Gut': return 3;
+    default: return 0;
   }
-  return teile.join(' · ');
+}
+
+/**
+ * Was der Kunde auf Schritt 9 angetippt hat, bevor die Kontaktfelder
+ * aufgehen: eine Karte (Profil / Einladen) oder der Knopf darunter. Wandert
+ * in die Messung und als `cg=`-Deeplink ins Portal.
+ */
+export interface KraefteWahl {
+  aktion: 'einladen' | 'profil' | 'button';
+  id?: number;
+  vorname?: string;
+}
+
+/**
+ * Überschrift, Satz und Knopftext der Kontaktschranke — je nachdem, was der
+ * Kunde angetippt hat. Reihenfolge stimmt jetzt: erst Kontaktdaten, dann
+ * Preis (Martin, 10.09.: „Preis anzeigen & Kontaktdaten eingeben ist doch
+ * falsche Reihenfolge").
+ */
+export function kraftAktionTexte(w: KraefteWahl | null): { titel: string; text: string; knopf: string } {
+  const danach = 'Danach öffnet sich Ihr Portal mit Monatspreis, Anreisedatum und den passenden Profilen.';
+  if (w?.aktion === 'einladen' && w.vorname) {
+    return { titel: `${w.vorname} einladen`, text: `Dafür brauchen wir kurz Ihre Kontaktdaten. ${danach}`, knopf: `${w.vorname} einladen →` };
+  }
+  if (w?.aktion === 'profil' && w.vorname) {
+    return { titel: `Profil von ${w.vorname} ansehen`, text: `Dafür brauchen wir kurz Ihre Kontaktdaten. ${danach}`, knopf: 'Profil öffnen →' };
+  }
+  return { titel: 'Preis & Profile ansehen', text: `Kurz Ihre Kontaktdaten — ${danach.charAt(0).toLowerCase()}${danach.slice(1)}`, knopf: 'Preis & Profile jetzt ansehen →' };
+}
+
+/** Portal-URL um den Deeplink auf die gewählte Kraft ergänzen (öffnet dort ihr Profil, wenn sie im Matching steht). */
+export function portalUrlMitWahl(portalUrl: string, w: KraefteWahl | null): string {
+  if (!w?.id) return portalUrl;
+  return `${portalUrl}${portalUrl.includes('?') ? '&' : '?'}cg=${w.id}&goto=matches`;
 }
 
 /** Antwort der Function absichern — nur, was die Karte braucht, nie mehr. */

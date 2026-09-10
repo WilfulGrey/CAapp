@@ -124,6 +124,8 @@ export interface CriticalSubmitInput {
   step: number;
   stepName: string;
   timeOnStepSeconds?: number;
+  /** Weitere Felder für event_data (z. B. Variante der Kräfte-Vorschau). */
+  extra?: Record<string, string | number | boolean | null>;
   conversion?: {
     leadId?: string;
     conversionType: string;
@@ -591,6 +593,7 @@ class Analytics {
           event_type: 'wizard',
           event_name: 'step_complete',
           event_data: {
+            ...(input.extra || {}),
             step: input.step,
             step_name: input.stepName,
             time_on_step_seconds: input.timeOnStepSeconds,

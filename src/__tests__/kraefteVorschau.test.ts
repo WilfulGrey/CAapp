@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { kraefteVorschauAktiv, kraftZeile, parseVorschau, wuenscheAusAntworten } from '../../project 3/lib/kraefte-vorschau';
+import { deutschBalken, kraefteVorschauAktiv, kraftAktionTexte, kraftFakten, parseVorschau, portalUrlMitWahl, wuenscheAusAntworten } from '../../project 3/lib/kraefte-vorschau';
 
 function speicher(): Pick<Storage, 'getItem' | 'setItem'> {
   const m = new Map<string, string>();
@@ -21,11 +21,31 @@ describe('Kräfte-Vorschau (Rechner)', () => {
       .toEqual({ deutsch: 'sehr-gut', geschlecht: null, fuehrerschein: 'ja' });
   });
 
-  it('Zeile unter dem Namen', () => {
-    const heute = new Date('2026-09-09T12:00:00');
-    const k = { id: 1, vorname: 'Anna', alter: 52, deutschWort: 'Mittel', erfahrungJahre: 7, einsaetze: 3, stufe: 'Bewährt', fotoUrl: 'https://x/a.jpg', verfuegbarAb: '2026-09-20' };
-    expect(kraftZeile(k, heute)).toBe('7 J. Erfahrung · Deutsch: Mittel · verfügbar ab 20.09.');
-    expect(kraftZeile({ ...k, verfuegbarAb: '2026-09-01', erfahrungJahre: 0, deutschWort: null }, heute)).toBe('sofort verfügbar');
+  it('Faktenzeile wie im Portal: Erfahrung und Einsätze, nie ein Datum', () => {
+    expect(kraftFakten({ erfahrungJahre: 7, einsaetze: 8 })).toBe('7 J. Erfahrung · 8 Einsätze über Primundus');
+    expect(kraftFakten({ erfahrungJahre: 0, einsaetze: 1 })).toBe('1 Einsatz über Primundus');
+    expect(kraftFakten({ erfahrungJahre: 0, einsaetze: 0 })).toBe('bereit für den ersten Einsatz');
+  });
+
+  it('Sprachbalken: Grund 1, Mittel 2, Gut 3, sonst keine', () => {
+    expect([deutschBalken('Grund'), deutschBalken('Mittel'), deutschBalken('Gut'), deutschBalken(null), deutschBalken('x')]).toEqual([1, 2, 3, 0, 0]);
+  });
+
+  it('Kontaktschranke: Texte je Wahl, Reihenfolge erst Kontakt, dann Preis', () => {
+    expect(kraftAktionTexte({ aktion: 'einladen', id: 5, vorname: 'Nikolina' })).toEqual({
+      titel: 'Nikolina einladen',
+      text: 'Dafür brauchen wir kurz Ihre Kontaktdaten. Danach öffnet sich Ihr Portal mit Monatspreis, Anreisedatum und den passenden Profilen.',
+      knopf: 'Nikolina einladen →',
+    });
+    expect(kraftAktionTexte({ aktion: 'profil', id: 5, vorname: 'Anna' }).titel).toBe('Profil von Anna ansehen');
+    expect(kraftAktionTexte({ aktion: 'button' }).knopf).toBe('Preis & Profile jetzt ansehen →');
+    expect(kraftAktionTexte(null).titel).toBe('Preis & Profile ansehen');
+  });
+
+  it('Portal-Deeplink nur mit gewählter Kraft', () => {
+    expect(portalUrlMitWahl('https://kundenportal.primundus.de/?token=abc', { aktion: 'einladen', id: 37158, vorname: 'Anna' })).toBe('https://kundenportal.primundus.de/?token=abc&cg=37158&goto=matches');
+    expect(portalUrlMitWahl('https://kundenportal.primundus.de/?token=abc', { aktion: 'button' })).toBe('https://kundenportal.primundus.de/?token=abc');
+    expect(portalUrlMitWahl('https://kundenportal.primundus.de/?token=abc', null)).toBe('https://kundenportal.primundus.de/?token=abc');
   });
 
   it('parseVorschau lässt nur saubere Karten mit https-Foto durch, maximal drei', () => {
