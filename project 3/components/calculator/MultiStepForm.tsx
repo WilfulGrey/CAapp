@@ -9,7 +9,7 @@ import { cookieConsent } from "@/lib/cookie-consent";
 import { scrollToCalculator, isCalculatorAligned, OPEN_CALCULATOR_EVENT } from "@/lib/scroll-to-calculator";
 import { useFormTracking } from "@/hooks/use-form-tracking";
 import { naechsterDrift, naechsterAbstandMs } from "@/lib/counter-drift";
-import { deutschBalken, GANZ_SICHTBAR, kopfzeile, kraefteVorschauAktiv, kraftFakten, parseVorschau, SCHRANKE, VERLAUF, WARTE, wuenscheAusAntworten, type VorschauKraft } from "@/lib/kraefte-vorschau";
+import { deutschBalken, GANZ_SICHTBAR, kopfzeile, kraefteVorschauAktiv, kraftFakten, parseVorschau, PORTAL_ANZAHL, SCHRANKE, VERLAUF, WARTE, wuenscheAusAntworten, type VorschauKraft } from "@/lib/kraefte-vorschau";
 import { meldeAnfrage } from "@/lib/oaiq";
 
 // ─── Matching Animation Component ────────────────────────────────────────────
@@ -1510,6 +1510,27 @@ export function MultiStepForm({ mode = 'inline' }: MultiStepFormProps = {}) {
                                 <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth={2.4} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" /></svg>
                                 {SCHRANKE.zurueck}
                               </button>
+                              {/* Die gefundenen Kräfte bleiben sichtbar (Martin: „vielleicht zeigen
+                                  wir oben auch die Bilder der gefundenen Pflegekräfte") — Kasten wie
+                                  der alte „5 passende Pflegekräfte"-Kasten, nur mit echten Fotos. */}
+                              <div className="flex items-center gap-3 rounded-2xl border border-[#C4E3CB] bg-[#F0F7F1] px-4 py-3 mb-4">
+                                <div className="flex flex-shrink-0">
+                                  {kraefteVorschau.map((k, i) => (
+                                    <span key={k.id} className={`relative w-10 h-10 rounded-full overflow-hidden border-2 border-white flex-shrink-0 ${i > 0 ? '-ml-2.5' : ''}`}>
+                                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                                      <img src={k.fotoUrl} alt="" className="absolute inset-0 w-full h-full object-cover" loading="lazy" />
+                                    </span>
+                                  ))}
+                                  {PORTAL_ANZAHL > kraefteVorschau.length && (
+                                    <span className="relative w-10 h-10 rounded-full border-2 border-white bg-[#22A06B] text-white text-[12px] font-bold flex items-center justify-center flex-shrink-0 -ml-2.5">
+                                      +{PORTAL_ANZAHL - kraefteVorschau.length}
+                                    </span>
+                                  )}
+                                </div>
+                                <p className="text-[14px] leading-snug text-[#2F5A38]">
+                                  <span className="font-semibold">{SCHRANKE.gefunden()}</span><br />{SCHRANKE.gefundenText}
+                                </p>
+                              </div>
                               <p className="text-[16px] font-bold text-[#3D3D3D]">{SCHRANKE.titel}</p>
                               <p className="text-[13px] text-[#5A5A5A] mt-0.5">{SCHRANKE.text}</p>
                             </div>

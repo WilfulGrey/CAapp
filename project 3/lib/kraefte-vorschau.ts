@@ -157,16 +157,19 @@ export const VERLAUF = {
 };
 
 /**
- * Die Kontaktschranke — ein EIGENER Schritt nach dem Klick (Martin, 10.09.:
- * „sollte der letzte Schritt mit den Kontaktdaten nicht als eigener
- * Schritt?"): Kopfzeile wechselt, die Karten verschwinden, nur Titel, Satz,
- * drei Felder und der Absendeknopf; ein Link führt zu den Kräften zurück.
+ * Die Kontaktschranke — ein EIGENER Schritt nach dem Klick (Martin, 10.09.):
+ * oben steht, was der Kunde bekommt („Sofortangebot & Pflegekräfte
+ * anzeigen"), kein „Portal", kein „Fast geschafft"; die Fotos der gefundenen
+ * Kräfte bleiben sichtbar; die Frage nach den Daten wie im alten Rechner
+ * („Wohin dürfen wir … senden?") mit dem Grund „Kopie per E-Mail".
  */
 export const SCHRANKE = {
-  kopf: 'Fast geschafft',
-  kopfText: 'Kontaktdaten eingeben – Ihr Portal öffnet sich sofort',
-  titel: 'Ihre Kontaktdaten',
-  text: `Danach öffnet sich sofort Ihr Portal mit Sofortangebot und allen ${PORTAL_ANZAHL} Pflegekräften.`,
+  kopf: 'Sofortangebot & Pflegekräfte anzeigen',
+  kopfText: 'Nur noch Name, E-Mail und Telefon',
+  gefunden: (gesamt: number = PORTAL_ANZAHL) => `${gesamt} passende Pflegekräfte gefunden`,
+  gefundenText: 'sofort verfügbar',
+  titel: 'Wohin dürfen wir Ihr Sofortangebot senden?',
+  text: `Sofortangebot und alle ${PORTAL_ANZAHL} Pflegekräfte sehen Sie direkt danach. Eine Kopie erhalten Sie per E-Mail.`,
   zurueck: 'Zurück zu den Pflegekräften',
   knopf: 'Alle Pflegekräfte & Sofortangebot ansehen\u00A0→',
 };

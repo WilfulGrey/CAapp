@@ -123,6 +123,16 @@ Klick verschwinden die Karten; Kopf „Fast geschafft – Kontaktdaten eingeben,
 Ihr Portal öffnet sich sofort", Link „Zurück zu den Pflegekräften", Titel
 „Ihre Kontaktdaten", Satz, drei Felder, Absendeknopf.
 
+**Runde 8 (10.09., Martin: „oben müsste stehen Sofortangebot anzeigen …
+Portal finde ich komisch … so wie vorher: damit wir Ihnen die Kopie per
+E-Mail zukommen lassen … vielleicht oben die Bilder der gefundenen
+Pflegekräfte"):** Kontakt-Schritt mit Kopf „Sofortangebot & Pflegekräfte
+anzeigen – Nur noch Name, E-Mail und Telefon", Kasten mit den echten Fotos
+(+2) „5 passende Pflegekräfte gefunden / sofort verfügbar", Frage „Wohin
+dürfen wir Ihr Sofortangebot senden?" mit „Sofortangebot und alle 5
+Pflegekräfte sehen Sie direkt danach. Eine Kopie erhalten Sie per E-Mail."
+Kein „Portal", kein „Fast geschafft".
+
 **Datenschutz:** Die Karten stehen VOR jedem Lead auf einer öffentlichen
 Seite. Es verlassen nur Vorname, Alter, Stufe, Erfahrungsjahre, Deutsch-Wort,
 Foto-URL und Verfügbarkeitsdatum die Function. Fotos bevorzugt aus
