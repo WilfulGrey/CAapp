@@ -81,26 +81,6 @@ eingeben & Angebot ansehen →" mit „Danach sofort: Ihr Monatspreis und alle 5
 Pflegekräfte im Portal", Absendeknopf „Angebot & Pflegekräfte anzeigen →" wie
 im normalen Rechner.
 
-**Runde 4 (10.09., Martins kompletter Aufbau):** Screen 1 (Warten): „Einen
-Moment bitte — Wir erstellen Ihr Sofortangebot und suchen passende
-Pflegekräfte." mit zwei Schritten „✓ Sofortangebot berechnet" und „✓ 5
-passende Pflegekräfte gefunden", dann automatisch weiter. Screen 2: Kopf „5
-passende Pflegekräfte – sofort verfügbar", darunter die Profile mit grossem
-Foto (4:3, oben beschnitten) als wichtigstem Element: „Urszula, 63",
-„Deutsch: gut · 10 Jahre Erfahrung", zwei Häkchen. Zwei Profile ganz, das
-dritte läuft nach unten in einen Verlauf aus; im Verlauf „+ 3 weitere
-passende Pflegekräfte / und Ihr persönliches Sofortangebot", Knopf „Alle
-Pflegekräfte & Sofortangebot ansehen →", darunter „Dafür benötigen wir nur
-noch Ihre Kontaktdaten." Nach dem Klick: alle drei Profile ganz, „Fast
-geschafft: Ihre Kontaktdaten", Felder, Absendeknopf mit demselben Wortlaut.
-**Häkchen** = Wortlaut der Angebotsmail (`anforderungenAusAnfrage`): sie
-greifen die Angaben des Kunden auf (Rollstuhl/bettlägerig/Rollator, Nacht,
-Ehepaar, Pflegegrad ≥ 4), sind kein zweites Matching; datengebunden ist nur
-„Führerschein vorhanden" (die Function filtert danach); Auffüllen mit
-Einsätzen und „Ab sofort verfügbar". Texte in `lib/kraefte-vorschau.ts`
-(`WARTE`, `kopfzeile`, `kraftZeile`, `hakenAusAntworten`, `VERLAUF`,
-`SCHRANKE`).
-
 **Datenschutz:** Die Karten stehen VOR jedem Lead auf einer öffentlichen
 Seite. Es verlassen nur Vorname, Alter, Stufe, Erfahrungsjahre, Deutsch-Wort,
 Foto-URL und Verfügbarkeitsdatum die Function. Fotos bevorzugt aus
