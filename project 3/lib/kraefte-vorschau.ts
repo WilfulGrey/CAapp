@@ -104,7 +104,8 @@ export function bruecke(gezeigt: number, gesamt: number = PORTAL_ANZAHL): string
 
 /** Knopf unter den Karten, bevor die Felder offen sind — kündigt die Kontaktdaten an (Martins Wortlaut). */
 export const KNOPF_VOR_KONTAKT = {
-  text: 'Kontaktdaten eingeben & Angebot ansehen →',
+  // Geschütztes Leerzeichen vor dem Pfeil: auf 375 px brach der Pfeil allein in die zweite Zeile.
+  text: 'Kontaktdaten eingeben & Angebot ansehen\u00A0→',
   hinweis: `Danach sofort: Ihr Monatspreis und alle ${PORTAL_ANZAHL} Pflegekräfte im Portal`,
 };
 

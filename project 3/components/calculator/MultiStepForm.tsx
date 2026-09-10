@@ -1485,7 +1485,7 @@ export function MultiStepForm({ mode = 'inline' }: MultiStepFormProps = {}) {
                           <button
                             type="button"
                             onClick={oeffneKontakt}
-                            className="w-full py-4 font-bold text-base rounded-xl bg-[#E76F63] hover:bg-[#D65E52] text-white shadow-lg hover:shadow-xl transition-all duration-200"
+                            className="w-full py-4 px-3 font-bold text-[15px] rounded-xl bg-[#E76F63] hover:bg-[#D65E52] text-white shadow-lg hover:shadow-xl transition-all duration-200"
                           >
                             {KNOPF_VOR_KONTAKT.text}
                           </button>
