@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { deutschBalken, KNOPF_VOR_KONTAKT, kraefteVorschauAktiv, kraftAktionTexte, kraftFakten, parseVorschau, portalUrlMitWahl, wuenscheAusAntworten } from '../../project 3/lib/kraefte-vorschau';
+import { deutschBalken, KNOPF_VOR_KONTAKT, kopfzeile, kraefteVorschauAktiv, kraftFakten, parseVorschau, SCHRANKE, wuenscheAusAntworten } from '../../project 3/lib/kraefte-vorschau';
 
 function speicher(): Pick<Storage, 'getItem' | 'setItem'> {
   const m = new Map<string, string>();
@@ -31,22 +31,13 @@ describe('Kräfte-Vorschau (Rechner)', () => {
     expect([deutschBalken('Grund'), deutschBalken('Mittel'), deutschBalken('Gut'), deutschBalken(null), deutschBalken('x')]).toEqual([1, 2, 3, 0, 0]);
   });
 
-  it('Kontaktschranke: Texte je Wahl, Reihenfolge erst Kontakt, dann Preis', () => {
-    expect(kraftAktionTexte({ aktion: 'einladen', id: 5, vorname: 'Nikolina' })).toEqual({
-      titel: 'Nikolina einladen',
-      text: 'Dafür brauchen wir kurz Ihre Kontaktdaten. Danach öffnet sich Ihr Portal mit Monatspreis, Anreisedatum und den passenden Profilen.',
-      knopf: 'Nikolina einladen →',
-    });
-    expect(kraftAktionTexte({ aktion: 'profil', id: 5, vorname: 'Anna' }).titel).toBe('Profil von Anna ansehen');
-    expect(kraftAktionTexte({ aktion: 'button' }).knopf).toBe('Preis & Profile jetzt ansehen →');
-    expect(kraftAktionTexte(null).titel).toBe('Ihre Kontaktdaten');
-    expect(KNOPF_VOR_KONTAKT.text).toBe('Kontaktdaten eingeben & Preis sehen →');
-  });
-
-  it('Portal-Deeplink nur mit gewählter Kraft', () => {
-    expect(portalUrlMitWahl('https://kundenportal.primundus.de/?token=abc', { aktion: 'einladen', id: 37158, vorname: 'Anna' })).toBe('https://kundenportal.primundus.de/?token=abc&cg=37158&goto=matches');
-    expect(portalUrlMitWahl('https://kundenportal.primundus.de/?token=abc', { aktion: 'button' })).toBe('https://kundenportal.primundus.de/?token=abc');
-    expect(portalUrlMitWahl('https://kundenportal.primundus.de/?token=abc', null)).toBe('https://kundenportal.primundus.de/?token=abc');
+  it('Roter Faden: Kopfzeile zählt die Karten, Schranke kündigt Kontaktdaten und Preis in dieser Reihenfolge an', () => {
+    expect(kopfzeile(3).titel).toBe('✓ 3 passende Pflegekräfte gefunden');
+    expect(kopfzeile(1).titel).toBe('✓ 1 passende Pflegekraft gefunden');
+    expect(KNOPF_VOR_KONTAKT.text).toBe('Preis & Profile freischalten →');
+    expect(KNOPF_VOR_KONTAKT.hinweis).toMatch(/^Nächster Schritt: Name, E-Mail und Telefon/);
+    expect(SCHRANKE.titel).toBe('Fast geschafft: Ihre Kontaktdaten');
+    expect(SCHRANKE.knopf).toBe('Jetzt freischalten →');
   });
 
   it('parseVorschau lässt nur saubere Karten mit https-Foto durch, maximal drei', () => {

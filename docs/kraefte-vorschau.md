@@ -56,6 +56,22 @@ ansehen". Die Wahl geht als `kraefte_wahl`-Ereignis, im Submit-Payload
 ins Portal — das öffnet ihr Profil aber nur, wenn sie dort im Matching steht
 (Lücke für Stufe 2, siehe unten).
 
+**Runde 3 (10.09., Martin: „da fehlt der rote Faden"):** Vorher widersprachen
+sich die Zahlen (Zähler 72, Animation zählt auf 5, dann drei Karten), der Kopf
+sagte „Ihr Angebot ist fertig" ohne Preis, die Karten boten „Profil ansehen"
+und „Einladen", die nichts auslösten, und der Knopf hatte mit den Kräften nichts
+zu tun. Jetzt: die Animation zählt im Vorschau-Modus auf die Zahl der Karten
+(`zielAnzahl`), die dritte Zeile sagt „Ihre Pflegekräfte sehen Sie gleich", der
+Kopf heißt „✓ 3 passende Pflegekräfte gefunden — Ab sofort verfügbar,
+persönlich auf Ihre Angaben abgestimmt", die Karten sind reiner Beleg (keine
+Aktionen), darunter die Brücke „Ihr Monatspreis und die vollständigen Profile
+stehen in Ihrem Portal." und der Knopf „Preis & Profile freischalten →" mit
+„Nächster Schritt: Name, E-Mail und Telefon · Ihr Portal öffnet sich sofort".
+Nach dem Klick: „Fast geschafft: Ihre Kontaktdaten" → Felder → „Jetzt
+freischalten →". Deeplink `cg=` und Kartenwahl sind raus (Martin: „ich würde
+die auch nicht öffnen"). Texte in `lib/kraefte-vorschau.ts` (`kopfzeile`,
+`BRUECKE`, `KNOPF_VOR_KONTAKT`, `SCHRANKE`).
+
 **Datenschutz:** Die Karten stehen VOR jedem Lead auf einer öffentlichen
 Seite. Es verlassen nur Vorname, Alter, Stufe, Erfahrungsjahre, Deutsch-Wort,
 Foto-URL und Verfügbarkeitsdatum die Function. Fotos bevorzugt aus

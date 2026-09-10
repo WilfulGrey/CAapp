@@ -9,7 +9,7 @@ import { cookieConsent } from "@/lib/cookie-consent";
 import { scrollToCalculator, isCalculatorAligned, OPEN_CALCULATOR_EVENT } from "@/lib/scroll-to-calculator";
 import { useFormTracking } from "@/hooks/use-form-tracking";
 import { naechsterDrift, naechsterAbstandMs } from "@/lib/counter-drift";
-import { deutschBalken, KNOPF_VOR_KONTAKT, kraefteVorschauAktiv, kraftAktionTexte, kraftFakten, parseVorschau, portalUrlMitWahl, wuenscheAusAntworten, type KraefteWahl, type VorschauKraft } from "@/lib/kraefte-vorschau";
+import { BEREIT_TEXT_VORSCHAU, BRUECKE, deutschBalken, KNOPF_VOR_KONTAKT, kopfzeile, kraefteVorschauAktiv, kraftFakten, parseVorschau, SCHRANKE, wuenscheAusAntworten, type VorschauKraft } from "@/lib/kraefte-vorschau";
 import { meldeAnfrage } from "@/lib/oaiq";
 
 // ─── Matching Animation Component ────────────────────────────────────────────
@@ -18,7 +18,7 @@ import { meldeAnfrage } from "@/lib/oaiq";
 // E-Mail eingibt. Wurde im Mai 2026 versehentlich entfernt (Commit 281e4ef
 // argumentierte mit „Friction nach Submit", aber die Animation lief VOR dem
 // Submit) — hier 1:1 wiederbelebt.
-function MatchingAnimation({ onComplete, initialCount }: { onComplete: (finalCount: number) => void; initialCount: number }) {
+function MatchingAnimation({ onComplete, initialCount, zielAnzahl }: { onComplete: (finalCount: number) => void; initialCount: number; zielAnzahl?: () => number | null }) {
   const [activeStep, setActiveStep] = useState(0);
   const [completedSteps, setCompletedSteps] = useState<number[]>([]);
   const [nurseCount, setNurseCount] = useState(initialCount);
@@ -29,7 +29,7 @@ function MatchingAnimation({ onComplete, initialCount }: { onComplete: (finalCou
   const ANIM_STEPS = [
     { label: 'Ihr persönliches Angebot wird erstellt', sub: 'Angebot & Pflegekräfte werden zusammengestellt', icon: '📋', duration: 3200 },
     { label: 'Passende Pflegekräfte werden gematcht', sub: '', icon: '👩‍⚕️', duration: 4500 },
-    { label: 'Alles bereit', sub: 'Geben Sie Ihre Daten ein, um alles einzusehen', icon: '✓', duration: 1800 },
+    { label: 'Alles bereit', sub: zielAnzahl?.() ? BEREIT_TEXT_VORSCHAU : 'Geben Sie Ihre Daten ein, um alles einzusehen', icon: '✓', duration: 1800 },
   ];
 
   useEffect(() => {
@@ -54,8 +54,11 @@ function MatchingAnimation({ onComplete, initialCount }: { onComplete: (finalCou
   // dort nachziehen.
   useEffect(() => {
     if (activeStep !== 1) return;
-    const target = 5;
     const iv = setInterval(() => {
+      // Vorschau-Modus (Registry #61, Runde 3): Ziel = Zahl der echten Karten,
+      // je Tick neu gelesen, weil die Function während der Animation antwortet.
+      // Sonst die 5 der gesperrten Ergebnis-Karte.
+      const target = zielAnzahl?.() || 5;
       setNurseCount(prev => {
         const next = prev - Math.ceil((prev - target) / 14);
         if (next <= target) { clearInterval(iv); return target; }
@@ -163,16 +166,15 @@ export function MultiStepForm({ mode = 'inline' }: MultiStepFormProps = {}) {
   const [vorschauAktiv, setVorschauAktiv] = useState(false);
   const vorschauAktivRef = useRef(false);
   const [kraefteVorschau, setKraefteVorschau] = useState<VorschauKraft[] | null>(null);
-  // Was der Kunde auf Schritt 9 angetippt hat (Karte oder Knopf). Erst dann
-  // gehen die Kontaktfelder auf (Martin, 10.09.: „Warum nicht Button und in
-  // den CG-Boxen ein Pfeil zum Profil oder Einladen?").
-  const [kraefteWahl, setKraefteWahl] = useState<KraefteWahl | null>(null);
-  const kraefteWahlRef = useRef<KraefteWahl | null>(null);
-  const waehleKraft = (w: KraefteWahl) => {
-    kraefteWahlRef.current = w;
-    setKraefteWahl(w);
-    analytics.trackEvent('wizard', 'kraefte_wahl', { aktion: w.aktion, kraft_id: w.id ?? null });
-    // Kontaktfelder erscheinen darunter — Blick und Cursor gleich dorthin.
+  // Schritt 9 im Vorschau-Modus: die Kontaktfelder öffnen sich erst nach dem
+  // Knopf „Preis & Profile freischalten" (Martin, 10.09.). Ref für Payload/Redirect.
+  const [kontaktOffen, setKontaktOffen] = useState(false);
+  const kontaktOffenRef = useRef(false);
+  const kraefteVorschauRef = useRef<VorschauKraft[] | null>(null);
+  const oeffneKontakt = () => {
+    kontaktOffenRef.current = true;
+    setKontaktOffen(true);
+    analytics.trackEvent('wizard', 'kraefte_wahl', { aktion: 'button', kraft_id: null });
     setTimeout(() => {
       const el = document.getElementById('kontakt-name');
       el?.scrollIntoView({ behavior: 'smooth', block: 'center' });
@@ -187,19 +189,20 @@ export function MultiStepForm({ mode = 'inline' }: MultiStepFormProps = {}) {
       setVorschauAktiv(an);
     } catch { /* sessionStorage gesperrt — Vorschau bleibt aus */ }
   }, []);
+  const setzeVorschau = (liste: VorschauKraft[]) => { kraefteVorschauRef.current = liste; setKraefteVorschau(liste); };
   const ladeKraefteVorschau = () => {
     if (!vorschauAktivRef.current) return;
     const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
     const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-    if (!url || !key) { setKraefteVorschau([]); return; }
+    if (!url || !key) { setzeVorschau([]); return; }
     fetch(`${url}/functions/v1/kraefte-vorschau`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', apikey: key, Authorization: `Bearer ${key}` },
       body: JSON.stringify(wuenscheAusAntworten(state)),
     })
       .then((r) => (r.ok ? r.json() : null))
-      .then((j) => setKraefteVorschau(parseVorschau(j)))
-      .catch(() => setKraefteVorschau([]));
+      .then((j) => setzeVorschau(parseVorschau(j)))
+      .catch(() => setzeVorschau([]));
   };
   // Field-level tracking for the contact step (step 10) — populates
   // analytics_form_interactions so the dashboard can show where in the
@@ -727,8 +730,7 @@ export function MultiStepForm({ mode = 'inline' }: MultiStepFormProps = {}) {
           timeOnStepSeconds: Math.round((Date.now() - stepStartRef.current) / 1000),
           extra: {
             kraefte_vorschau: vorschauAktivRef.current,
-            kraefte_aktion: kraefteWahlRef.current?.aktion ?? null,
-            kraefte_id: kraefteWahlRef.current?.id ?? null,
+            kraefte_aktion: kontaktOffenRef.current ? 'button' : null,
           },
           conversion: {
             leadId: data.leadId,
@@ -756,7 +758,7 @@ export function MultiStepForm({ mode = 'inline' }: MultiStepFormProps = {}) {
           const goToPortal = () => {
             if (redirected) return;
             redirected = true;
-            window.location.assign(portalUrlMitWahl(data.portalUrl, kraefteWahlRef.current));
+            window.location.assign(data.portalUrl);
           };
           // OpenAI Ads (ChatGPT-Werbung): lead_created an den Pixel. Bis zum
           // 10.09. stand dieser Aufruf nur auf der alten /result-Seite, die der
@@ -984,6 +986,7 @@ export function MultiStepForm({ mode = 'inline' }: MultiStepFormProps = {}) {
       <div ref={formRef} id="calculator-form" className={outerClass}>
         <MatchingAnimation
           initialCount={getMatchingCount()}
+          zielAnzahl={() => (vorschauAktivRef.current && kraefteVorschauRef.current && kraefteVorschauRef.current.length > 0) ? kraefteVorschauRef.current.length : null}
           onComplete={() => {
             setShowMatching(false);
             setCurrentStep(totalSteps); // = Step 9 (Kontaktformular)
@@ -1111,11 +1114,14 @@ export function MultiStepForm({ mode = 'inline' }: MultiStepFormProps = {}) {
             <>
               {/* Letzter Schritt: die Erfolgs-Botschaft wandert zentral in den
                   Header (Martin, 2026-07-08) — die grüne Pille darunter entfällt. */}
+              {/* Vorschau-Modus (Registry #61, Runde 3): dieselbe Zahl wie am
+                  Ende der Animation, und kein „Angebot ist fertig", solange der
+                  Kunde noch keinen Preis sieht. */}
               <p className="text-center text-base font-bold uppercase tracking-wide text-white mb-1.5">
-                ✓ Ihr Angebot ist fertig
+                {vorschauModus && kraefteVorschau ? kopfzeile(kraefteVorschau.length).titel : '✓ Ihr Angebot ist fertig'}
               </p>
               <p className="text-center text-sm text-white/90">
-                Persönlich auf Ihre Angaben abgestimmt
+                {vorschauModus && kraefteVorschau ? kopfzeile(kraefteVorschau.length).text : 'Persönlich auf Ihre Angaben abgestimmt'}
               </p>
             </>
           ) : (
@@ -1417,33 +1423,19 @@ export function MultiStepForm({ mode = 'inline' }: MultiStepFormProps = {}) {
               {currentStep === 9 && (
                 <div className="space-y-3">
                   {vorschauModus && kraefteVorschau ? (
-                    /* Kräfte-Vorschau (Registry #61, Runde 2 am 10.09.): Karten
-                       wie im Kundenportal (MatchCard) — Foto 64 px, Name, Match-
-                       Chip oben rechts, Sprachbalken, Faktenzeile, fester Chip
-                       „Ab sofort verfügbar" (kein Datum: available_from wird
-                       nicht gepflegt). Karte, „Profil ansehen" und „Einladen"
-                       öffnen die Kontaktfelder; ohne Wahl steht darunter nur der
-                       Knopf „Preis & Profile ansehen". Preis bleibt verdeckt —
-                       er entsteht erst serverseitig nach dem Absenden. */
+                    /* Kräfte-Vorschau (Registry #61), Runde 3 am 10.09.: EIN roter
+                       Faden. Animation zählt auf die Zahl der Karten, der Kopf nennt
+                       dieselbe Zahl, die Karten sind Beleg (Optik wie MatchCard, ohne
+                       Aktionen, die hier nichts auslösen), die Brücke sagt, was im
+                       Portal wartet, der Knopf kündigt die Kontaktdaten an. Preis
+                       bleibt verdeckt — er entsteht erst serverseitig nach dem Absenden. */
                     <div className="mb-1">
-                      <p className="text-[16px] font-bold text-[#3D3D3D]">
-                        {kraefteVorschau.length === 1 ? 'Diese Pflegekraft passt' : `Diese ${kraefteVorschau.length} Pflegekräfte passen`} zu Ihren Angaben
-                      </p>
-                      <p className="text-[12.5px] text-[#8B8B8B] mt-0.5 mb-3">Ab sofort verfügbar. Preis und Anreisedatum sehen Sie in Ihrem Portal.</p>
                       <div className="space-y-2.5">
                         {kraefteVorschau.map((k) => {
                           const balken = deutschBalken(k.deutschWort);
-                          const gewaehlt = kraefteWahl?.id === k.id;
                           return (
-                            <div
-                              key={k.id}
-                              role="button"
-                              tabIndex={0}
-                              onClick={() => waehleKraft({ aktion: 'profil', id: k.id, vorname: k.vorname })}
-                              onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); waehleKraft({ aktion: 'profil', id: k.id, vorname: k.vorname }); } }}
-                              className={`group bg-white shadow-sm rounded-2xl border overflow-hidden cursor-pointer transition-colors ${gewaehlt ? 'border-[#8B7355]' : 'border-zinc-300 hover:border-zinc-500'}`}
-                            >
-                              <div className="px-4 pt-4 pb-3">
+                            <div key={k.id} className="bg-white shadow-sm rounded-2xl border border-zinc-300 overflow-hidden">
+                              <div className="px-4 pt-4 pb-4">
                                 <div className="flex items-center gap-3.5">
                                   {/* eslint-disable-next-line @next/next/no-img-element */}
                                   <img src={k.fotoUrl} alt="" className="w-16 h-16 rounded-xl object-cover flex-shrink-0" loading="lazy" />
@@ -1478,43 +1470,26 @@ export function MultiStepForm({ mode = 'inline' }: MultiStepFormProps = {}) {
                                   Ab sofort verfügbar
                                 </p>
                               </div>
-                              <div className="border-t border-gray-100 px-4 py-2.5 flex items-center justify-between gap-3">
-                                <button
-                                  type="button"
-                                  onClick={(e) => { e.stopPropagation(); waehleKraft({ aktion: 'profil', id: k.id, vorname: k.vorname }); }}
-                                  className="inline-flex items-center gap-1 text-[13px] font-semibold text-[#8B7355] hover:underline"
-                                >
-                                  Profil ansehen
-                                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth={2.4} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" /></svg>
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={(e) => { e.stopPropagation(); waehleKraft({ aktion: 'einladen', id: k.id, vorname: k.vorname }); }}
-                                  className="inline-flex items-center gap-1.5 text-xs font-bold bg-[#E76F63] text-white px-4 py-1.5 rounded-full hover:bg-[#D65E52] transition-colors active:scale-95 shadow-sm"
-                                >
-                                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth={2.2} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M16 21v-2a4 4 0 00-4-4H6a4 4 0 00-4 4v2M9 11a4 4 0 100-8 4 4 0 000 8zM19 8v6M22 11h-6" /></svg>
-                                  Einladen
-                                </button>
-                              </div>
                             </div>
                           );
                         })}
                       </div>
-                      {kraefteWahl ? (
+                      {kontaktOffen ? (
                         <div className="pt-5" id="kontakt-schranke">
-                          <p className="text-[16px] font-bold text-[#3D3D3D]">{kraftAktionTexte(kraefteWahl).titel}</p>
-                          <p className="text-[12.5px] text-[#8B8B8B] mt-0.5">{kraftAktionTexte(kraefteWahl).text}</p>
+                          <p className="text-[16px] font-bold text-[#3D3D3D]">{SCHRANKE.titel}</p>
+                          <p className="text-[13px] text-[#5A5A5A] mt-0.5">{SCHRANKE.text}</p>
                         </div>
                       ) : (
                         <div className="pt-4">
+                          <p className="text-[14px] text-[#3D3D3D] leading-snug mb-3">{BRUECKE}</p>
                           <button
                             type="button"
-                            onClick={() => waehleKraft({ aktion: 'button' })}
+                            onClick={oeffneKontakt}
                             className="w-full py-4 font-bold text-base rounded-xl bg-[#E76F63] hover:bg-[#D65E52] text-white shadow-lg hover:shadow-xl transition-all duration-200"
                           >
                             {KNOPF_VOR_KONTAKT.text}
                           </button>
-                          <p className="text-center text-xs text-[#8B8B8B] leading-snug mt-2">{KNOPF_VOR_KONTAKT.hinweis}</p>
+                          <p className="text-center text-xs text-[#5A5A5A] leading-snug mt-2">{KNOPF_VOR_KONTAKT.hinweis}</p>
                         </div>
                       )}
                     </div>
@@ -1556,7 +1531,7 @@ export function MultiStepForm({ mode = 'inline' }: MultiStepFormProps = {}) {
                       </div>
                     </>
                   )}
-                  {(!vorschauModus || kraefteWahl) && (<>
+                  {(!vorschauModus || kontaktOffen) && (<>
                   <div>
                     <input
                       id="kontakt-name"
@@ -1626,7 +1601,7 @@ export function MultiStepForm({ mode = 'inline' }: MultiStepFormProps = {}) {
             nur Zurück, Step 10 zeigt den Submit-Button mit Hinweis. */}
         {(currentStep === totalSteps || currentStep > 1) && (
           <div className="px-3 sm:px-6 lg:px-8 pt-4 pb-5 bg-white">
-            {currentStep === totalSteps && (!vorschauModus || kraefteWahl) ? (
+            {currentStep === totalSteps && (!vorschauModus || kontaktOffen) ? (
               <div className="flex flex-col gap-2.5">
                 <button
                   onClick={() => handleNext()}
@@ -1649,7 +1624,7 @@ export function MultiStepForm({ mode = 'inline' }: MultiStepFormProps = {}) {
                       <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
                     </div>
                   ) : (
-                    <span>{vorschauModus ? kraftAktionTexte(kraefteWahl).knopf : 'Angebot & Pflegekräfte anzeigen →'}</span>
+                    <span>{vorschauModus ? SCHRANKE.knopf : 'Angebot & Pflegekräfte anzeigen →'}</span>
                   )}
                 </button>
                 <p className="text-center text-xs text-[#8B8B8B] leading-snug">

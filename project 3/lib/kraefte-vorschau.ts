@@ -77,46 +77,34 @@ export function deutschBalken(wort: string | null): number {
 }
 
 /**
- * Was der Kunde auf Schritt 9 angetippt hat, bevor die Kontaktfelder
- * aufgehen: eine Karte (Profil / Einladen) oder der Knopf darunter. Wandert
- * in die Messung und als `cg=`-Deeplink ins Portal.
+ * Der rote Faden von Schritt 9 (Martin, 10.09.: „Wir sagen davor fünf, dann
+ * drei; oben steht ‚Ihr Angebot ist fertig'; Profil ansehen und Einladen
+ * gehen nicht; wozu zeigen wir die Kräfte?"). Eine Zahl von der Animation bis
+ * zum Kopf, keine Aktion, die nichts auslöst, und ein Knopf, der sagt, was
+ * die Kräfte mit dem nächsten Schritt zu tun haben.
  */
-export interface KraefteWahl {
-  aktion: 'einladen' | 'profil' | 'button';
-  id?: number;
-  vorname?: string;
+export function kopfzeile(anzahl: number): { titel: string; text: string } {
+  return {
+    titel: anzahl === 1 ? '✓ 1 passende Pflegekraft gefunden' : `✓ ${anzahl} passende Pflegekräfte gefunden`,
+    text: 'Ab sofort verfügbar, persönlich auf Ihre Angaben abgestimmt',
+  };
 }
 
-/**
- * Überschrift, Satz und Knopftext der Kontaktschranke — je nachdem, was der
- * Kunde angetippt hat. Reihenfolge stimmt jetzt: erst Kontaktdaten, dann
- * Preis (Martin, 10.09.: „Preis anzeigen & Kontaktdaten eingeben ist doch
- * falsche Reihenfolge").
- */
-export function kraftAktionTexte(w: KraefteWahl | null): { titel: string; text: string; knopf: string } {
-  const danach = 'Danach öffnet sich Ihr Portal mit Monatspreis, Anreisedatum und den passenden Profilen.';
-  if (w?.aktion === 'einladen' && w.vorname) {
-    return { titel: `${w.vorname} einladen`, text: `Dafür brauchen wir kurz Ihre Kontaktdaten. ${danach}`, knopf: `${w.vorname} einladen →` };
-  }
-  if (w?.aktion === 'profil' && w.vorname) {
-    return { titel: `Profil von ${w.vorname} ansehen`, text: `Dafür brauchen wir kurz Ihre Kontaktdaten. ${danach}`, knopf: 'Profil öffnen →' };
-  }
-  return { titel: 'Ihre Kontaktdaten', text: danach, knopf: 'Preis & Profile jetzt ansehen →' };
-}
+/** Warte-Screen im Vorschau-Modus: der Zähler läuft auf die Zahl der Karten, nicht auf eine erfundene 5. */
+export const BEREIT_TEXT_VORSCHAU = 'Ihre Pflegekräfte sehen Sie gleich';
 
-/**
- * Knopf unter den Karten, bevor die Felder offen sind. Sagt dem Kunden schon
- * hier, dass als Nächstes seine Kontaktdaten kommen (Martin, 10.09.: „nicht
- * ‚Preis & Profile ansehen', sondern vorbereiten, dass Kontaktdaten erfragt
- * werden") — Überraschung am nächsten Schritt kostet mehr als Ehrlichkeit hier.
- */
-export const KNOPF_VOR_KONTAKT = { text: 'Kontaktdaten eingeben & Preis sehen →', hinweis: 'Nächster Schritt: Name, E-Mail und Telefon · danach sofort Preis & Profile' };
+/** Zwischen Karten und Knopf: warum die Kräfte hier stehen und was noch fehlt. */
+export const BRUECKE = 'Ihr Monatspreis und die vollständigen Profile stehen in Ihrem Portal.';
 
-/** Portal-URL um den Deeplink auf die gewählte Kraft ergänzen (öffnet dort ihr Profil, wenn sie im Matching steht). */
-export function portalUrlMitWahl(portalUrl: string, w: KraefteWahl | null): string {
-  if (!w?.id) return portalUrl;
-  return `${portalUrl}${portalUrl.includes('?') ? '&' : '?'}cg=${w.id}&goto=matches`;
-}
+/** Knopf unter den Karten, bevor die Felder offen sind — kündigt die Kontaktdaten an. */
+export const KNOPF_VOR_KONTAKT = { text: 'Preis & Profile freischalten →', hinweis: 'Nächster Schritt: Name, E-Mail und Telefon · Ihr Portal öffnet sich sofort' };
+
+/** Die Kontaktschranke selbst. */
+export const SCHRANKE = {
+  titel: 'Fast geschafft: Ihre Kontaktdaten',
+  text: 'Danach öffnet sich sofort Ihr Portal mit Monatspreis, Anreisedatum und den vollständigen Profilen.',
+  knopf: 'Jetzt freischalten →',
+};
 
 /** Antwort der Function absichern — nur, was die Karte braucht, nie mehr. */
 export function parseVorschau(json: unknown): VorschauKraft[] {
