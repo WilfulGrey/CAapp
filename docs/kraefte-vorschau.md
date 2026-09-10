@@ -143,6 +143,14 @@ Foto-Kasten „5 passende Pflegekräfte gefunden · sofort verfügbar", Frage
 E-Mail.", derselbe Knopf wie auf dem Ergebnis-Screen. Prüfregel: jede Zeile
 muss die vorige fortsetzen und etwas behaupten, das danach wirklich passiert.
 
+**Runde 10 (10.09., Martin vom iPhone: „zu lang, Button und Text darunter
+nicht sichtbar, Button nicht über 2 Zeilen, Zurück nicht nötig"):** Kopf
+einzeilig „5 passende Pflegekräfte" + „Sofort verfügbar, persönlich auf Ihre
+Angaben abgestimmt"; Karten kompakter (Foto 56 px, ohne Verfügbarkeits-Chip,
+der Kopf sagt es); Verlauf 76 px; eine Zeile „+ 3 weitere Pflegekräfte & Ihr
+Sofortangebot"; Knopf einzeilig „Sofortangebot & Pflegekräfte ansehen →"
+(auch als Absendeknopf); kein „Zurück" unter dem Ergebnis-Screen.
+
 **Datenschutz:** Die Karten stehen VOR jedem Lead auf einer öffentlichen
 Seite. Es verlassen nur Vorname, Alter, Stufe, Erfahrungsjahre, Deutsch-Wort,
 Foto-URL und Verfügbarkeitsdatum die Function. Fotos bevorzugt aus
