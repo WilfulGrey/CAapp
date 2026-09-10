@@ -157,19 +157,30 @@ export const VERLAUF = {
 };
 
 /**
- * Die Kontaktschranke — ein EIGENER Schritt nach dem Klick (Martin, 10.09.):
- * oben steht, was der Kunde bekommt („Sofortangebot & Pflegekräfte
- * anzeigen"), kein „Portal", kein „Fast geschafft"; die Fotos der gefundenen
- * Kräfte bleiben sichtbar; die Frage nach den Daten wie im alten Rechner
- * („Wohin dürfen wir … senden?") mit dem Grund „Kopie per E-Mail".
+ * Die Kontaktschranke — ein EIGENER Schritt nach dem Klick. Die Strecke
+ * erzählt EINE Geschichte (Martin, 10.09.: „mach vorher eine Prüfung, ob das
+ * alles perfekt passt"):
+ *   Warten:   „Sofortangebot berechnet" + „5 passende Pflegekräfte gefunden"
+ *   Ergebnis: „5 passende Pflegekräfte – sofort verfügbar", 3 Profile,
+ *             „+ 3 weitere … und Ihr persönliches Sofortangebot",
+ *             Knopf „Alle Pflegekräfte & Sofortangebot ansehen",
+ *             „Dafür benötigen wir nur noch Ihre Kontaktdaten."
+ *   Kontakt:  Kopf „✓ Ihr Sofortangebot ist fertig" (das Warten hat es
+ *             berechnet), Kasten mit den echten Fotos „5 passende
+ *             Pflegekräfte gefunden · sofort verfügbar" (das Ergebnis hat sie
+ *             gezeigt), Frage „Wohin dürfen wir Ihr Sofortangebot senden?"
+ *             wie im bewährten Rechner, Satz: sofort sichtbar + Kopie per
+ *             E-Mail (beides passiert wirklich), derselbe Knopf wie auf dem
+ *             Ergebnis-Screen.
+ * Kein „Portal", kein „Fast geschafft", kein „Nur noch …".
  */
 export const SCHRANKE = {
-  kopf: 'Sofortangebot & Pflegekräfte anzeigen',
-  kopfText: 'Nur noch Name, E-Mail und Telefon',
+  kopf: '✓ Ihr Sofortangebot ist fertig',
+  kopfText: 'Persönlich auf Ihre Angaben abgestimmt',
   gefunden: (gesamt: number = PORTAL_ANZAHL) => `${gesamt} passende Pflegekräfte gefunden`,
   gefundenText: 'sofort verfügbar',
   titel: 'Wohin dürfen wir Ihr Sofortangebot senden?',
-  text: `Sofortangebot und alle ${PORTAL_ANZAHL} Pflegekräfte sehen Sie direkt danach. Eine Kopie erhalten Sie per E-Mail.`,
+  text: `Ihr Sofortangebot und alle ${PORTAL_ANZAHL} Pflegekräfte werden sofort sichtbar – die Kopie schicken wir Ihnen per E-Mail.`,
   zurueck: 'Zurück zu den Pflegekräften',
   knopf: 'Alle Pflegekräfte & Sofortangebot ansehen\u00A0→',
 };

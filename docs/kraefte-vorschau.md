@@ -133,6 +133,16 @@ dürfen wir Ihr Sofortangebot senden?" mit „Sofortangebot und alle 5
 Pflegekräfte sehen Sie direkt danach. Eine Kopie erhalten Sie per E-Mail."
 Kein „Portal", kein „Fast geschafft".
 
+**Runde 9 (10.09., Martin: „oben anzeigen, unten senden, dazwischen ‚nur
+noch Name, E-Mail, Telefon' — das widerspricht sich; mach vorher eine
+Prüfung"):** Kontakt-Schritt = Kopf „✓ Ihr Sofortangebot ist fertig /
+Persönlich auf Ihre Angaben abgestimmt" (das Warten hat es berechnet),
+Foto-Kasten „5 passende Pflegekräfte gefunden · sofort verfügbar", Frage
+„Wohin dürfen wir Ihr Sofortangebot senden?" mit „Ihr Sofortangebot und alle
+5 Pflegekräfte werden sofort sichtbar – die Kopie schicken wir Ihnen per
+E-Mail.", derselbe Knopf wie auf dem Ergebnis-Screen. Prüfregel: jede Zeile
+muss die vorige fortsetzen und etwas behaupten, das danach wirklich passiert.
+
 **Datenschutz:** Die Karten stehen VOR jedem Lead auf einer öffentlichen
 Seite. Es verlassen nur Vorname, Alter, Stufe, Erfahrungsjahre, Deutsch-Wort,
 Foto-URL und Verfügbarkeitsdatum die Function. Fotos bevorzugt aus
