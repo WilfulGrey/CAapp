@@ -51,10 +51,10 @@ describe('Kräfte-Vorschau (Rechner)', () => {
     expect(WARTE.schritt2Fertig(5)).toBe('5 passende Pflegekräfte gefunden');
     expect(WARTE.schritt3).toBe('Verfügbarkeit geprüft');
     expect(WARTE.schritt3Fertig(5)).toBe('alle 5 ab sofort verfügbar');
-    expect(kopfzeile()).toBe('5 passende Pflegekräfte – sofort verfügbar');
-    expect(VERLAUF.weitere()).toBe('+ 3 weitere passende Pflegekräfte');
-    expect(VERLAUF.angebot).toBe('und Ihr persönliches Sofortangebot');
-    expect(VERLAUF.knopf).toBe('Alle Pflegekräfte & Sofortangebot ansehen\u00A0→');
+    expect(kopfzeile().titel).toBe('5 passende Pflegekräfte');
+    expect(kopfzeile().text).toBe('Sofort verfügbar, persönlich auf Ihre Angaben abgestimmt');
+    expect(VERLAUF.weitere()).toBe('+ 3 weitere Pflegekräfte & Ihr Sofortangebot');
+    expect(VERLAUF.knopf).toBe('Sofortangebot & Pflegekräfte ansehen\u00A0→');
     expect(VERLAUF.hinweis).toBe('Dafür benötigen wir nur noch Ihre Kontaktdaten.');
     expect(SCHRANKE.knopf).toBe(VERLAUF.knopf);
     expect(SCHRANKE.kopf).toBe('✓ Ihr Sofortangebot ist fertig');

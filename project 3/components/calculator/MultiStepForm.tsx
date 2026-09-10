@@ -1131,13 +1131,11 @@ export function MultiStepForm({ mode = 'inline' }: MultiStepFormProps = {}) {
                   Ende der Animation, und kein „Angebot ist fertig", solange der
                   Kunde noch keinen Preis sieht. */}
               <p className="text-center text-base font-bold uppercase tracking-wide text-white mb-1.5">
-                {vorschauModus ? (kontaktOffen ? SCHRANKE.kopf : kopfzeile()) : '✓ Ihr Angebot ist fertig'}
+                {vorschauModus ? (kontaktOffen ? SCHRANKE.kopf : kopfzeile().titel) : '✓ Ihr Angebot ist fertig'}
               </p>
-              {(!vorschauModus || kontaktOffen) && (
-                <p className="text-center text-sm text-white/90">
-                  {vorschauModus ? SCHRANKE.kopfText : 'Persönlich auf Ihre Angaben abgestimmt'}
-                </p>
-              )}
+              <p className="text-center text-sm text-white/90">
+                {vorschauModus ? (kontaktOffen ? SCHRANKE.kopfText : kopfzeile().text) : 'Persönlich auf Ihre Angaben abgestimmt'}
+              </p>
             </>
           ) : (
             <p className="text-center text-[15px] font-bold text-white">
@@ -1457,13 +1455,13 @@ export function MultiStepForm({ mode = 'inline' }: MultiStepFormProps = {}) {
                           const balken = deutschBalken(k.deutschWort);
                           return (
                             <div className="bg-white shadow-sm rounded-2xl border border-zinc-300 overflow-hidden">
-                              <div className="px-4 pt-4 pb-4">
-                                <div className="flex items-center gap-3.5">
+                              <div className="px-3.5 pt-3 pb-3">
+                                <div className="flex items-center gap-3">
                                   {/* eslint-disable-next-line @next/next/no-img-element */}
-                                  <img src={k.fotoUrl} alt="" className="w-16 h-16 rounded-xl object-cover flex-shrink-0" loading="lazy" />
+                                  <img src={k.fotoUrl} alt="" className="w-14 h-14 rounded-xl object-cover flex-shrink-0" loading="lazy" />
                                   <div className="flex-1 min-w-0">
                                     <div className="flex items-center justify-between gap-2">
-                                      <p className="text-[17px] font-semibold leading-snug text-[#18181B]">
+                                      <p className="text-[16px] font-semibold leading-snug text-[#18181B]">
                                         {k.vorname}{k.alter ? <span className="font-normal text-[#71717A]">, {k.alter}</span> : null}
                                       </p>
                                       <span className="inline-flex items-center gap-1 flex-shrink-0 text-[11px] font-bold text-[#22A06B] bg-[#E3F7EF] border border-[#B8E8D4] px-2.5 py-0.5 rounded-full">
@@ -1472,7 +1470,7 @@ export function MultiStepForm({ mode = 'inline' }: MultiStepFormProps = {}) {
                                       </span>
                                     </div>
                                     {k.deutschWort ? (
-                                      <p className="mt-1 inline-flex items-center gap-1.5 text-[15px] text-[#71717A]">
+                                      <p className="mt-0.5 inline-flex items-center gap-1.5 text-[14px] text-[#71717A]">
                                         Deutsch
                                         {balken > 0 && (
                                           <span className="inline-flex gap-0.5" aria-hidden="true">
@@ -1484,12 +1482,8 @@ export function MultiStepForm({ mode = 'inline' }: MultiStepFormProps = {}) {
                                     ) : null}
                                   </div>
                                 </div>
-                                <p className="text-[15px] mt-3 text-[#71717A]">
+                                <p className="text-[14px] mt-2 text-[#71717A]">
                                   {k.stufe ? <span className="font-semibold text-[#18181B]">{k.stufe}: </span> : null}{kraftFakten(k)}
-                                </p>
-                                <p className="mt-2 inline-flex items-center gap-1.5 text-[12px] font-semibold text-[#22A06B]">
-                                  <span className="w-2 h-2 rounded-full bg-[#22A06B]" aria-hidden="true" />
-                                  Ab sofort verfügbar
                                 </p>
                               </div>
                             </div>
@@ -1534,23 +1528,22 @@ export function MultiStepForm({ mode = 'inline' }: MultiStepFormProps = {}) {
                               {ganz.map((k) => <Karte key={k.id} k={k} />)}
                               {angeschnitten && (
                                 <div className="relative">
-                                  <div className="max-h-[104px] overflow-hidden rounded-2xl"><Karte k={angeschnitten} /></div>
-                                  <div className="absolute inset-x-0 bottom-0 h-[104px] bg-gradient-to-b from-white/10 via-white/90 to-white" aria-hidden="true" />
+                                  <div className="max-h-[76px] overflow-hidden rounded-2xl"><Karte k={angeschnitten} /></div>
+                                  <div className="absolute inset-x-0 bottom-0 h-[76px] bg-gradient-to-b from-white/10 via-white/90 to-white" aria-hidden="true" />
                                 </div>
                               )}
                             </div>
                             {(
                               <div className={`relative text-center ${angeschnitten ? '-mt-3' : 'pt-4'}`}>
-                                <p className="text-[17px] font-bold text-[#3D3D3D] leading-snug">{VERLAUF.weitere()}</p>
-                                <p className="text-[15px] text-[#3D3D3D] leading-snug">{VERLAUF.angebot}</p>
+                                <p className="text-[15px] font-bold text-[#3D3D3D] leading-snug">{VERLAUF.weitere()}</p>
                                 <button
                                   type="button"
                                   onClick={oeffneKontakt}
-                                  className="mt-4 w-full py-4 px-3 font-bold text-[15px] rounded-xl bg-[#E76F63] hover:bg-[#D65E52] text-white shadow-lg hover:shadow-xl transition-all duration-200"
+                                  className="mt-3 w-full py-3.5 px-2 font-bold text-[15px] whitespace-nowrap rounded-xl bg-[#E76F63] hover:bg-[#D65E52] text-white shadow-lg hover:shadow-xl transition-all duration-200"
                                 >
                                   {VERLAUF.knopf}
                                 </button>
-                                <p className="text-[13px] text-[#5A5A5A] leading-snug mt-2.5">{VERLAUF.hinweis}</p>
+                                <p className="text-[12px] text-[#5A5A5A] leading-snug mt-2">{VERLAUF.hinweis}</p>
                               </div>
                             )}
                           </>
@@ -1663,7 +1656,7 @@ export function MultiStepForm({ mode = 'inline' }: MultiStepFormProps = {}) {
         {/* Bottom-Button-Block: auf Step 1 komplett ausgeblendet (kein
             Zurück, Auto-Advance kümmert sich um Weiter), Steps 2-9 zeigen
             nur Zurück, Step 10 zeigt den Submit-Button mit Hinweis. */}
-        {(currentStep === totalSteps || currentStep > 1) && (
+        {currentStep > 1 && !(currentStep === totalSteps && vorschauModus && !kontaktOffen) && (
           <div className="px-3 sm:px-6 lg:px-8 pt-4 pb-5 bg-white">
             {currentStep === totalSteps && (!vorschauModus || kontaktOffen) ? (
               <div className="flex flex-col gap-2.5">
@@ -1688,7 +1681,7 @@ export function MultiStepForm({ mode = 'inline' }: MultiStepFormProps = {}) {
                       <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
                     </div>
                   ) : (
-                    <span>{vorschauModus ? SCHRANKE.knopf : 'Angebot & Pflegekräfte anzeigen →'}</span>
+                    <span className={vorschauModus ? 'whitespace-nowrap text-[15px]' : undefined}>{vorschauModus ? SCHRANKE.knopf : 'Angebot & Pflegekräfte anzeigen →'}</span>
                   )}
                 </button>
                 <p className="text-center text-xs text-[#8B8B8B] leading-snug">

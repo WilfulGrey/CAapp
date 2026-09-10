@@ -82,8 +82,16 @@ export const WARTE = {
   schritt3Fertig: (n: number) => (n === 1 ? 'ab sofort verfügbar' : `alle ${n} ab sofort verfügbar`),
 };
 
-export function kopfzeile(gesamt: number = PORTAL_ANZAHL): string {
-  return gesamt === 1 ? '1 passende Pflegekraft – sofort verfügbar' : `${gesamt} passende Pflegekräfte – sofort verfügbar`;
+/**
+ * Kopf des Ergebnis-Screens — eine Zeile Titel, „sofort verfügbar" als
+ * Unterzeile (Martin, 10.09. vom iPhone: „zu lang, Button nicht sichtbar";
+ * der zweizeilige Titel kostete eine ganze Zeile).
+ */
+export function kopfzeile(gesamt: number = PORTAL_ANZAHL): { titel: string; text: string } {
+  return {
+    titel: gesamt === 1 ? '1 passende Pflegekraft' : `${gesamt} passende Pflegekräfte`,
+    text: 'Sofort verfügbar, persönlich auf Ihre Angaben abgestimmt',
+  };
 }
 
 /**
@@ -152,12 +160,13 @@ export function hakenAusAntworten(a: HakenAntworten, k: Pick<VorschauKraft, 'ein
 
 /** Der Verlauf unter den Profilen und der Knopf darin. */
 export const VERLAUF = {
+  // Eine Zeile statt zwei (iPhone: der Knopf muss ohne Scrollen sichtbar sein).
   weitere: (gesamt: number = PORTAL_ANZAHL, ganz: number = GANZ_SICHTBAR) => {
     const n = Math.max(1, gesamt - ganz);
-    return n === 1 ? '+ 1 weitere passende Pflegekraft' : `+ ${n} weitere passende Pflegekräfte`;
+    return n === 1 ? '+ 1 weitere Pflegekraft & Ihr Sofortangebot' : `+ ${n} weitere Pflegekräfte & Ihr Sofortangebot`;
   },
-  angebot: 'und Ihr persönliches Sofortangebot',
-  knopf: 'Alle Pflegekräfte & Sofortangebot ansehen\u00A0→',
+  // Passt bei 375 px in eine Zeile (Martin: „Button nicht über 2 Zeilen").
+  knopf: 'Sofortangebot & Pflegekräfte ansehen\u00A0→',
   hinweis: 'Dafür benötigen wir nur noch Ihre Kontaktdaten.',
 };
 
@@ -186,7 +195,7 @@ export const SCHRANKE = {
   gefundenText: 'sofort verfügbar',
   titel: 'Wohin dürfen wir Ihr Sofortangebot senden?',
   text: `Ihr Sofortangebot und alle ${PORTAL_ANZAHL} Pflegekräfte werden sofort sichtbar – die Kopie schicken wir Ihnen per E-Mail.`,
-  knopf: 'Alle Pflegekräfte & Sofortangebot ansehen\u00A0→',
+  knopf: 'Sofortangebot & Pflegekräfte ansehen\u00A0→',
 };
 
 /** Antwort der Function absichern — nur, was die Karte braucht, nie mehr. */
