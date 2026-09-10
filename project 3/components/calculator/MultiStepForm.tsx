@@ -1498,8 +1498,8 @@ export function MultiStepForm({ mode = 'inline' }: MultiStepFormProps = {}) {
                               {ganz.map((k) => <Karte key={k.id} k={k} />)}
                               {angeschnitten && (
                                 <div className="relative">
-                                  <div className="max-h-[120px] overflow-hidden rounded-2xl"><Karte k={angeschnitten} /></div>
-                                  <div className="absolute inset-x-0 bottom-0 h-[120px] bg-gradient-to-b from-white/0 via-white/85 to-white" aria-hidden="true" />
+                                  <div className="max-h-[104px] overflow-hidden rounded-2xl"><Karte k={angeschnitten} /></div>
+                                  <div className="absolute inset-x-0 bottom-0 h-[104px] bg-gradient-to-b from-white/10 via-white/90 to-white" aria-hidden="true" />
                                 </div>
                               )}
                             </div>
@@ -1509,7 +1509,7 @@ export function MultiStepForm({ mode = 'inline' }: MultiStepFormProps = {}) {
                                 <p className="text-[13px] text-[#5A5A5A] mt-0.5">{SCHRANKE.text}</p>
                               </div>
                             ) : (
-                              <div className={`relative text-center ${angeschnitten ? '-mt-8' : 'pt-4'}`}>
+                              <div className={`relative text-center ${angeschnitten ? '-mt-3' : 'pt-4'}`}>
                                 <p className="text-[17px] font-bold text-[#3D3D3D] leading-snug">{VERLAUF.weitere()}</p>
                                 <p className="text-[15px] text-[#3D3D3D] leading-snug">{VERLAUF.angebot}</p>
                                 <button
