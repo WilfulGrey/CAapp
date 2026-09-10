@@ -12,8 +12,8 @@ wenn Stufe 1 die Abbruchquote senkt.
 |---|---|
 | Function | `supabase/functions/kraefte-vorschau` (Agentur-Login wie onboard-to-mamamia, `CaregiversWithPagination`, 10-Minuten-Cache, Auswahl in `vorschau.ts`) |
 | Rechner | `project 3/lib/kraefte-vorschau.ts` (Schalter, Wünsche, Kartenzeile, Absicherung) + `components/calculator/MultiStepForm.tsx` (Aufruf beim Wechsel 8 → Warte-Screen, Karten auf Schritt 9) |
-| Schalter | `?kraefte=1` schaltet ein und merkt sich das in sessionStorage; `?kraefte=0` aus. Ohne Schalter: alter Kasten. Freigabe durch Martin, danach Split in `lib/analytics.ts` |
-| Messung | `step_view`/`step_complete` (Schritt 9) tragen `kraefte_vorschau: true/false` → Abbruch auf Schritt 9 je Variante; Ziel: 44 % → 30 % |
+| Schalter | Seit 10.09.2026 (21 Uhr) für alle an. `?kraefte=0` zeigt den alten Kasten (sessionStorage), `?kraefte=1` schaltet wieder ein. **Kein Split** (Martin: „wir kennen die Zahlen und werden dann vergleichen") — Vergleich vorher/nachher am Datum |
+| Messung | `step_view`/`step_complete` (Schritt 9) tragen `kraefte_vorschau: true/false`; `kraefte_wahl` = Klick auf den Knopf. Vergleich: Abbruch Schritt 9, Sitzung→Lead und Profilquote **vor** dem 10.09. 21 Uhr (Baseline: Schritt 9 = 44 % Abbruch, Google Sitzung→Lead 6,6 %) gegen danach |
 
 **Pool (seit 09.09., zweiter Wurf):** `CaregiversWithPagination` ohne
 Filter liefert alle ~22.000 Registrierungen, neueste zuerst — der erste Wurf
@@ -135,7 +135,7 @@ Kein „Portal", kein „Fast geschafft".
 
 **Runde 9 (10.09., Martin: „oben anzeigen, unten senden, dazwischen ‚nur
 noch Name, E-Mail, Telefon' — das widerspricht sich; mach vorher eine
-Prüfung"):** Kontakt-Schritt = Kopf „✓ Ihr Sofortangebot ist fertig /
+Prüfung"):** Kontakt-Schritt (ohne Zurück-Link, Martin: „macht keinen Sinn") = Kopf „✓ Ihr Sofortangebot ist fertig /
 Persönlich auf Ihre Angaben abgestimmt" (das Warten hat es berechnet),
 Foto-Kasten „5 passende Pflegekräfte gefunden · sofort verfügbar", Frage
 „Wohin dürfen wir Ihr Sofortangebot senden?" mit „Ihr Sofortangebot und alle
