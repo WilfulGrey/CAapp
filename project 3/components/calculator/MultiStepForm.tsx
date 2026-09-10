@@ -125,7 +125,7 @@ function MatchingAnimation({ onComplete, initialCount, vorschau }: { onComplete:
                 <div className="flex-1 min-w-0 text-left">
                   <p className={`text-[15px] font-semibold leading-snug transition-colors duration-300 ${isDone ? 'text-[#3D3D3D]' : isActive ? 'text-[#3D3D3D]' : 'text-[#AFAFAF]'}`}>
                     {vorschau && i === 1 && isDone ? WARTE.schritt2Fertig(nurseCount) : s.label}
-                    {isDone && <span className="ml-2 text-xs font-normal text-[#22A06B]">✓ Fertig</span>}
+                    {isDone && <span className="ml-2 text-xs font-normal text-[#22A06B] whitespace-nowrap">✓ Fertig</span>}
                   </p>
                   {subText ? <p className="text-sm text-[#8B8B8B] mt-1">{subText}</p> : null}
                 </div>
