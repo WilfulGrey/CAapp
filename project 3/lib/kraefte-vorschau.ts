@@ -186,7 +186,6 @@ export const SCHRANKE = {
   gefundenText: 'sofort verfügbar',
   titel: 'Wohin dürfen wir Ihr Sofortangebot senden?',
   text: `Ihr Sofortangebot und alle ${PORTAL_ANZAHL} Pflegekräfte werden sofort sichtbar – die Kopie schicken wir Ihnen per E-Mail.`,
-  zurueck: 'Zurück zu den Pflegekräften',
   knopf: 'Alle Pflegekräfte & Sofortangebot ansehen\u00A0→',
 };
 

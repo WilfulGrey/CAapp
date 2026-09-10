@@ -61,7 +61,6 @@ describe('Kräfte-Vorschau (Rechner)', () => {
     expect(SCHRANKE.text).toBe('Ihr Sofortangebot und alle 5 Pflegekräfte werden sofort sichtbar – die Kopie schicken wir Ihnen per E-Mail.');
     expect(SCHRANKE.titel).toBe('Wohin dürfen wir Ihr Sofortangebot senden?');
     expect(SCHRANKE.gefunden()).toBe('5 passende Pflegekräfte gefunden');
-    expect(SCHRANKE.zurueck).toBe('Zurück zu den Pflegekräften');
   });
 
   it('parseVorschau lässt nur saubere Karten mit https-Foto durch, maximal drei', () => {

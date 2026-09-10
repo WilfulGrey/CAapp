@@ -135,7 +135,7 @@ Kein „Portal", kein „Fast geschafft".
 
 **Runde 9 (10.09., Martin: „oben anzeigen, unten senden, dazwischen ‚nur
 noch Name, E-Mail, Telefon' — das widerspricht sich; mach vorher eine
-Prüfung"):** Kontakt-Schritt = Kopf „✓ Ihr Sofortangebot ist fertig /
+Prüfung"):** Kontakt-Schritt (ohne Zurück-Link, Martin: „macht keinen Sinn") = Kopf „✓ Ihr Sofortangebot ist fertig /
 Persönlich auf Ihre Angaben abgestimmt" (das Warten hat es berechnet),
 Foto-Kasten „5 passende Pflegekräfte gefunden · sofort verfügbar", Frage
 „Wohin dürfen wir Ihr Sofortangebot senden?" mit „Ihr Sofortangebot und alle

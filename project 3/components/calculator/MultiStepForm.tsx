@@ -1499,17 +1499,9 @@ export function MultiStepForm({ mode = 'inline' }: MultiStepFormProps = {}) {
                         const angeschnitten = kraefteVorschau[GANZ_SICHTBAR] ?? null;
                         if (kontaktOffen) {
                           // Eigener Schritt (Martin, 10.09.): keine Karten mehr, nur die
-                          // Schranke; zurück geht es über den Link, nicht über „Zurück" unten.
+                          // Schranke. Kein Zurück-Link (Martin: „macht keinen Sinn").
                           return (
                             <div id="kontakt-schranke">
-                              <button
-                                type="button"
-                                onClick={() => { kontaktOffenRef.current = false; setKontaktOffen(false); }}
-                                className="inline-flex items-center gap-1 text-[13px] font-semibold text-[#708A95] hover:text-[#3D3D3D] mb-3"
-                              >
-                                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth={2.4} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" /></svg>
-                                {SCHRANKE.zurueck}
-                              </button>
                               {/* Die gefundenen Kräfte bleiben sichtbar (Martin: „vielleicht zeigen
                                   wir oben auch die Bilder der gefundenen Pflegekräfte") — Kasten wie
                                   der alte „5 passende Pflegekräfte"-Kasten, nur mit echten Fotos. */}
