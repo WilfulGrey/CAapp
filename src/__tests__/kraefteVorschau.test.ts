@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { deutschBalken, kraefteVorschauAktiv, kraftAktionTexte, kraftFakten, parseVorschau, portalUrlMitWahl, wuenscheAusAntworten } from '../../project 3/lib/kraefte-vorschau';
+import { deutschBalken, KNOPF_VOR_KONTAKT, kraefteVorschauAktiv, kraftAktionTexte, kraftFakten, parseVorschau, portalUrlMitWahl, wuenscheAusAntworten } from '../../project 3/lib/kraefte-vorschau';
 
 function speicher(): Pick<Storage, 'getItem' | 'setItem'> {
   const m = new Map<string, string>();
@@ -39,7 +39,8 @@ describe('Kräfte-Vorschau (Rechner)', () => {
     });
     expect(kraftAktionTexte({ aktion: 'profil', id: 5, vorname: 'Anna' }).titel).toBe('Profil von Anna ansehen');
     expect(kraftAktionTexte({ aktion: 'button' }).knopf).toBe('Preis & Profile jetzt ansehen →');
-    expect(kraftAktionTexte(null).titel).toBe('Preis & Profile ansehen');
+    expect(kraftAktionTexte(null).titel).toBe('Ihre Kontaktdaten');
+    expect(KNOPF_VOR_KONTAKT.text).toBe('Kontaktdaten eingeben & Preis sehen →');
   });
 
   it('Portal-Deeplink nur mit gewählter Kraft', () => {

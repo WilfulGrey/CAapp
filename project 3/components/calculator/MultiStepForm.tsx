@@ -9,7 +9,7 @@ import { cookieConsent } from "@/lib/cookie-consent";
 import { scrollToCalculator, isCalculatorAligned, OPEN_CALCULATOR_EVENT } from "@/lib/scroll-to-calculator";
 import { useFormTracking } from "@/hooks/use-form-tracking";
 import { naechsterDrift, naechsterAbstandMs } from "@/lib/counter-drift";
-import { deutschBalken, kraefteVorschauAktiv, kraftAktionTexte, kraftFakten, parseVorschau, portalUrlMitWahl, wuenscheAusAntworten, type KraefteWahl, type VorschauKraft } from "@/lib/kraefte-vorschau";
+import { deutschBalken, KNOPF_VOR_KONTAKT, kraefteVorschauAktiv, kraftAktionTexte, kraftFakten, parseVorschau, portalUrlMitWahl, wuenscheAusAntworten, type KraefteWahl, type VorschauKraft } from "@/lib/kraefte-vorschau";
 import { meldeAnfrage } from "@/lib/oaiq";
 
 // ─── Matching Animation Component ────────────────────────────────────────────
@@ -1512,9 +1512,9 @@ export function MultiStepForm({ mode = 'inline' }: MultiStepFormProps = {}) {
                             onClick={() => waehleKraft({ aktion: 'button' })}
                             className="w-full py-4 font-bold text-base rounded-xl bg-[#E76F63] hover:bg-[#D65E52] text-white shadow-lg hover:shadow-xl transition-all duration-200"
                           >
-                            Preis &amp; Profile ansehen →
+                            {KNOPF_VOR_KONTAKT.text}
                           </button>
-                          <p className="text-center text-xs text-[#8B8B8B] leading-snug mt-2">Öffnet sofort · unverbindlich · keine Werbeanrufe</p>
+                          <p className="text-center text-xs text-[#8B8B8B] leading-snug mt-2">{KNOPF_VOR_KONTAKT.hinweis}</p>
                         </div>
                       )}
                     </div>
