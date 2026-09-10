@@ -9,7 +9,7 @@ import { cookieConsent } from "@/lib/cookie-consent";
 import { scrollToCalculator, isCalculatorAligned, OPEN_CALCULATOR_EVENT } from "@/lib/scroll-to-calculator";
 import { useFormTracking } from "@/hooks/use-form-tracking";
 import { naechsterDrift, naechsterAbstandMs } from "@/lib/counter-drift";
-import { bereitText, bruecke, deutschBalken, KNOPF_VOR_KONTAKT, kopfzeile, kraefteVorschauAktiv, kraftFakten, parseVorschau, SCHRANKE, wuenscheAusAntworten, type VorschauKraft } from "@/lib/kraefte-vorschau";
+import { deutschBalken, GANZ_SICHTBAR, kopfzeile, kraefteVorschauAktiv, kraftFakten, parseVorschau, SCHRANKE, VERLAUF, WARTE, wuenscheAusAntworten, type VorschauKraft } from "@/lib/kraefte-vorschau";
 import { meldeAnfrage } from "@/lib/oaiq";
 
 // ─── Matching Animation Component ────────────────────────────────────────────
@@ -18,7 +18,7 @@ import { meldeAnfrage } from "@/lib/oaiq";
 // E-Mail eingibt. Wurde im Mai 2026 versehentlich entfernt (Commit 281e4ef
 // argumentierte mit „Friction nach Submit", aber die Animation lief VOR dem
 // Submit) — hier 1:1 wiederbelebt.
-function MatchingAnimation({ onComplete, initialCount, vorschauKarten }: { onComplete: (finalCount: number) => void; initialCount: number; vorschauKarten?: () => number | null }) {
+function MatchingAnimation({ onComplete, initialCount, vorschau }: { onComplete: (finalCount: number) => void; initialCount: number; vorschau?: boolean }) {
   const [activeStep, setActiveStep] = useState(0);
   const [completedSteps, setCompletedSteps] = useState<number[]>([]);
   const [nurseCount, setNurseCount] = useState(initialCount);
@@ -26,11 +26,20 @@ function MatchingAnimation({ onComplete, initialCount, vorschauKarten }: { onCom
   const onCompleteRef = useRef(onComplete);
   onCompleteRef.current = onComplete;
 
-  const ANIM_STEPS = [
-    { label: 'Ihr persönliches Angebot wird erstellt', sub: 'Angebot & Pflegekräfte werden zusammengestellt', icon: '📋', duration: 3200 },
-    { label: 'Passende Pflegekräfte werden gematcht', sub: '', icon: '👩‍⚕️', duration: 4500 },
-    { label: 'Alles bereit', sub: vorschauKarten?.() ? bereitText(vorschauKarten()!) : 'Geben Sie Ihre Daten ein, um alles einzusehen', icon: '✓', duration: 1800 },
-  ];
+  // Vorschau-Modus (Registry #61, Martins Aufbau 10.09.): zwei Schritte —
+  // „Sofortangebot berechnet" und „5 passende Pflegekräfte gefunden", dann
+  // automatisch weiter. Sonst die drei Schritte des normalen Rechners.
+  const ANIM_STEPS = vorschau
+    ? [
+        { label: WARTE.schritt1, sub: '', icon: '📋', duration: 3200 },
+        { label: WARTE.schritt2Laeuft, sub: '', icon: '👩‍⚕️', duration: 4500 },
+        { label: WARTE.schritt3, sub: '', icon: '✓', duration: 1800 },
+      ]
+    : [
+        { label: 'Ihr persönliches Angebot wird erstellt', sub: 'Angebot & Pflegekräfte werden zusammengestellt', icon: '📋', duration: 3200 },
+        { label: 'Passende Pflegekräfte werden gematcht', sub: '', icon: '👩‍⚕️', duration: 4500 },
+        { label: 'Alles bereit', sub: 'Geben Sie Ihre Daten ein, um alles einzusehen', icon: '✓', duration: 1800 },
+      ];
 
   useEffect(() => {
     let t: ReturnType<typeof setTimeout>;
@@ -71,8 +80,8 @@ function MatchingAnimation({ onComplete, initialCount, vorschauKarten }: { onCom
   return (
     <div className="bg-white rounded-2xl border-[1.5px] border-[#C0C0C0] overflow-hidden shadow-md">
       <div className="px-4 sm:px-8 py-5 border-b-2 border-[#E5E3DF]/50 bg-[#E76F63]">
-        <p className="text-base font-bold uppercase tracking-wide text-white mb-1.5">Einen Moment bitte</p>
-        <p className="text-sm text-white" style={{ opacity: 0.85 }}>Wir bereiten Ihr persönliches Angebot vor</p>
+        <p className="text-base font-bold uppercase tracking-wide text-white mb-1.5">{WARTE.titel}</p>
+        <p className="text-sm text-white" style={{ opacity: 0.85 }}>{vorschau ? WARTE.text : 'Wir bereiten Ihr persönliches Angebot vor'}</p>
       </div>
 
       {/* KEIN Fortschrittsbalken hier (Martin 17.08.: "mach die
@@ -87,9 +96,20 @@ function MatchingAnimation({ onComplete, initialCount, vorschauKarten }: { onCom
             const isDone = completedSteps.includes(i);
             const isActive = activeStep === i && !isDone;
             const isPending = activeStep < i;
+            // Zweite Zeile je Schritt — und ob es überhaupt eine gibt. Ohne
+            // zweite Zeile sitzt der Text mittig zum Icon (Martin, 10.09.:
+            // „Text nicht mittig zum Icon, wenn fertig"); ein leerer Absatz mit
+            // Abstand hatte ihn nach oben geschoben.
+            const subText: React.ReactNode = i === 1 && isActive
+              ? <><span className="font-bold text-[#22A06B] tabular-nums">{nurseCount}</span> Pflegekräfte werden geprüft…</>
+              : i === 1 && isDone && !vorschau
+              ? <><span className="font-bold text-[#22A06B]">{nurseCount}</span> passende Pflegekräfte gefunden</>
+              : vorschau && i === 2 && isDone
+              ? WARTE.schritt3Fertig(nurseCount)
+              : (isActive || isDone) && s.sub ? s.sub : null;
             return (
-              <div key={i} className={`flex items-start gap-4 transition-all duration-500 ${isPending ? 'opacity-25' : 'opacity-100'}`}>
-                <div className={`w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 transition-all duration-500 mt-0.5
+              <div key={i} className={`flex ${subText ? 'items-start' : 'items-center'} gap-4 transition-all duration-500 ${isPending ? 'opacity-25' : 'opacity-100'}`}>
+                <div className={`w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 transition-all duration-500 ${subText ? 'mt-0.5' : ''}
                   ${isDone ? 'bg-[#22A06B]' : isActive ? 'bg-white border-2 border-[#22A06B]' : 'bg-white border-2 border-[#E5E3DF]'}`}
                 >
                   {isDone ? (
@@ -104,16 +124,10 @@ function MatchingAnimation({ onComplete, initialCount, vorschauKarten }: { onCom
                 </div>
                 <div className="flex-1 min-w-0 text-left">
                   <p className={`text-[15px] font-semibold leading-snug transition-colors duration-300 ${isDone ? 'text-[#3D3D3D]' : isActive ? 'text-[#3D3D3D]' : 'text-[#AFAFAF]'}`}>
-                    {s.label}
+                    {vorschau && i === 1 && isDone ? WARTE.schritt2Fertig(nurseCount) : s.label}
                     {isDone && <span className="ml-2 text-xs font-normal text-[#22A06B]">✓ Fertig</span>}
                   </p>
-                  <p className="text-sm text-[#8B8B8B] mt-1">
-                    {i === 1 && isActive ? (
-                      <><span className="font-bold text-[#22A06B] tabular-nums">{nurseCount}</span> Pflegekräfte werden geprüft…</>
-                    ) : i === 1 && isDone ? (
-                      <><span className="font-bold text-[#22A06B]">{nurseCount}</span> passende Pflegekräfte gefunden</>
-                    ) : (isActive || isDone) ? s.sub : null}
-                  </p>
+                  {subText ? <p className="text-sm text-[#8B8B8B] mt-1">{subText}</p> : null}
                 </div>
               </div>
             );
@@ -986,7 +1000,7 @@ export function MultiStepForm({ mode = 'inline' }: MultiStepFormProps = {}) {
       <div ref={formRef} id="calculator-form" className={outerClass}>
         <MatchingAnimation
           initialCount={getMatchingCount()}
-          vorschauKarten={() => (vorschauAktivRef.current && kraefteVorschauRef.current && kraefteVorschauRef.current.length > 0) ? kraefteVorschauRef.current.length : null}
+          vorschau={vorschauAktivRef.current}
           onComplete={() => {
             setShowMatching(false);
             setCurrentStep(totalSteps); // = Step 9 (Kontaktformular)
@@ -1118,11 +1132,13 @@ export function MultiStepForm({ mode = 'inline' }: MultiStepFormProps = {}) {
                   Ende der Animation, und kein „Angebot ist fertig", solange der
                   Kunde noch keinen Preis sieht. */}
               <p className="text-center text-base font-bold uppercase tracking-wide text-white mb-1.5">
-                {vorschauModus ? kopfzeile().titel : '✓ Ihr Angebot ist fertig'}
+                {vorschauModus ? kopfzeile() : '✓ Ihr Angebot ist fertig'}
               </p>
-              <p className="text-center text-sm text-white/90">
-                {vorschauModus ? kopfzeile().text : 'Persönlich auf Ihre Angaben abgestimmt'}
-              </p>
+              {!vorschauModus && (
+                <p className="text-center text-sm text-white/90">
+                  Persönlich auf Ihre Angaben abgestimmt
+                </p>
+              )}
             </>
           ) : (
             <p className="text-center text-[15px] font-bold text-white">
@@ -1423,18 +1439,25 @@ export function MultiStepForm({ mode = 'inline' }: MultiStepFormProps = {}) {
               {currentStep === 9 && (
                 <div className="space-y-3">
                   {vorschauModus && kraefteVorschau ? (
-                    /* Kräfte-Vorschau (Registry #61), Runde 3 am 10.09.: EIN roter
-                       Faden. Animation zählt auf die Zahl der Karten, der Kopf nennt
-                       dieselbe Zahl, die Karten sind Beleg (Optik wie MatchCard, ohne
-                       Aktionen, die hier nichts auslösen), die Brücke sagt, was im
-                       Portal wartet, der Knopf kündigt die Kontaktdaten an. Preis
-                       bleibt verdeckt — er entsteht erst serverseitig nach dem Absenden. */
+                    /* Kräfte-Vorschau (Registry #61), Martins Aufbau vom 10.09.:
+                       Kopf „5 passende Pflegekräfte – sofort verfügbar", Profile
+                       mit grossem Foto als wichtigstem Element, zwei ganz, das
+                       dritte läuft in einen Verlauf aus; im Verlauf „+ 3 weitere
+                       passende Pflegekräfte und Ihr persönliches Sofortangebot",
+                       der Knopf und „Dafür benötigen wir nur noch Ihre
+                       Kontaktdaten." Die Häkchen greifen die Angaben des Kunden
+                       auf (Wortlaut der Angebotsmail). Preis bleibt verdeckt — er
+                       entsteht erst serverseitig nach dem Absenden. */
                     <div className="mb-1">
-                      <div className="space-y-2.5">
-                        {kraefteVorschau.map((k) => {
+                      {(() => {
+                        /* Karte = Optik der Portal-Karte (MatchCard), unverändert seit
+                           Runde 2 (Martin, 10.09.: „warum veränderst du die Optik, das
+                           muss schon bleiben"): Foto 64 px links, Name und Alter, Chip
+                           „Match", Sprachbalken, Faktenzeile, „Ab sofort verfügbar". */
+                        const Karte = ({ k }: { k: VorschauKraft }) => {
                           const balken = deutschBalken(k.deutschWort);
                           return (
-                            <div key={k.id} className="bg-white shadow-sm rounded-2xl border border-zinc-300 overflow-hidden">
+                            <div className="bg-white shadow-sm rounded-2xl border border-zinc-300 overflow-hidden">
                               <div className="px-4 pt-4 pb-4">
                                 <div className="flex items-center gap-3.5">
                                   {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -1472,26 +1495,42 @@ export function MultiStepForm({ mode = 'inline' }: MultiStepFormProps = {}) {
                               </div>
                             </div>
                           );
-                        })}
-                      </div>
-                      {kontaktOffen ? (
-                        <div className="pt-5" id="kontakt-schranke">
-                          <p className="text-[16px] font-bold text-[#3D3D3D]">{SCHRANKE.titel}</p>
-                          <p className="text-[13px] text-[#5A5A5A] mt-0.5">{SCHRANKE.text}</p>
-                        </div>
-                      ) : (
-                        <div className="pt-4">
-                          <p className="text-[14px] text-[#3D3D3D] leading-snug mb-3">{bruecke(kraefteVorschau.length)}</p>
-                          <button
-                            type="button"
-                            onClick={oeffneKontakt}
-                            className="w-full py-4 px-3 font-bold text-[15px] rounded-xl bg-[#E76F63] hover:bg-[#D65E52] text-white shadow-lg hover:shadow-xl transition-all duration-200"
-                          >
-                            {KNOPF_VOR_KONTAKT.text}
-                          </button>
-                          <p className="text-center text-xs text-[#5A5A5A] leading-snug mt-2">{KNOPF_VOR_KONTAKT.hinweis}</p>
-                        </div>
-                      )}
+                        };
+                        const ganz = kontaktOffen ? kraefteVorschau : kraefteVorschau.slice(0, GANZ_SICHTBAR);
+                        const angeschnitten = kontaktOffen ? null : kraefteVorschau[GANZ_SICHTBAR] ?? null;
+                        return (
+                          <>
+                            <div className="space-y-3">
+                              {ganz.map((k) => <Karte key={k.id} k={k} />)}
+                              {angeschnitten && (
+                                <div className="relative">
+                                  <div className="max-h-[104px] overflow-hidden rounded-2xl"><Karte k={angeschnitten} /></div>
+                                  <div className="absolute inset-x-0 bottom-0 h-[104px] bg-gradient-to-b from-white/10 via-white/90 to-white" aria-hidden="true" />
+                                </div>
+                              )}
+                            </div>
+                            {kontaktOffen ? (
+                              <div className="pt-5" id="kontakt-schranke">
+                                <p className="text-[16px] font-bold text-[#3D3D3D]">{SCHRANKE.titel}</p>
+                                <p className="text-[13px] text-[#5A5A5A] mt-0.5">{SCHRANKE.text}</p>
+                              </div>
+                            ) : (
+                              <div className={`relative text-center ${angeschnitten ? '-mt-3' : 'pt-4'}`}>
+                                <p className="text-[17px] font-bold text-[#3D3D3D] leading-snug">{VERLAUF.weitere()}</p>
+                                <p className="text-[15px] text-[#3D3D3D] leading-snug">{VERLAUF.angebot}</p>
+                                <button
+                                  type="button"
+                                  onClick={oeffneKontakt}
+                                  className="mt-4 w-full py-4 px-3 font-bold text-[15px] rounded-xl bg-[#E76F63] hover:bg-[#D65E52] text-white shadow-lg hover:shadow-xl transition-all duration-200"
+                                >
+                                  {VERLAUF.knopf}
+                                </button>
+                                <p className="text-[13px] text-[#5A5A5A] leading-snug mt-2.5">{VERLAUF.hinweis}</p>
+                              </div>
+                            )}
+                          </>
+                        );
+                      })()}
                     </div>
                   ) : (
                     <>
