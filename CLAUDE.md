@@ -405,6 +405,7 @@ CA app → Mamamia:
 | `src/lib/mamamia/patientFormMapper.ts` | **Form → Mamamia** mapping. `mapPatientFormToUpdateCustomerInput` — patient form save → UpdateCustomer payload |
 | `src/lib/mamamia/types.ts` | `MamamiaCustomer`, `MamamiaCaregiverFull`, etc. — server-side response shapes |
 | `src/lib/mamamia/hooks.ts` | React hooks (`useMamamiaCustomer`, `useMamamiaApplications`, etc.) |
+| `src/lib/posthog.ts` | PostHog im Portal: Start (vor dem Render, `src/main.tsx`), Ereignisse aus `reportLeadEvent`, Identifizieren mit Lead-ID. **Kein** eigener Einwilligungs-Abgleich — erbt den Merker des Rechners über `.primundus.de`. Regeln: `project 3/lib/posthog-regeln.ts`; Doku: [docs/posthog.md](docs/posthog.md) |
 
 ### Calculator (`project 3/`)
 
@@ -427,6 +428,8 @@ CA app → Mamamia:
 | `project 3/app/api/admin/leads/[id]/angaben/route.ts` | Admin-Korrektur der Kundenangaben (Registry #55): Diff → optional `berechnePreis` → leads-Update → Mamamia-Sync (`onboard-to-mamamia { lead_id, resync }`, `mamamia_sync_pending` bei Fehler) → `offer_updated` via Loopback. Body B `{ resync: true }` = Retry |
 | `project 3/lib/angaben-diff.ts` | Pure: `FD_KEYS`, `RESYNC_FELDER` (Spiegel der Edge Fn), `ERLAUBT` (`satisfies` an die Kalkulator-Typen), `diffAngaben` (norm-Vergleich, Validierung NUR geänderter Keys), `mamamiaFelder`. Test: `src/__tests__/angabenDiff.test.ts` |
 | `project 3/lib/angaben-labels.ts` | Pure: `LABELS` (aus email.ts herausgezogen), `FELD_NAMEN`, `angabenLabel` (pflegegrad 0 ⇒ „Kein Pflegegrad") — Mails, Admin-Route und -Seite teilen die Wörter |
+| `project 3/lib/posthog-regeln.ts` | **Alle PostHog-Regeln**, pure, von Rechner UND Portal importiert (einziger Laufzeit-Cross-Import `src/` → `project 3/`): Schlüssel, Prod-Hosts, `postHogKonfig` (EU-Proxy `/ingest`, `cookieless_mode: 'on_reject'` + `opt_out_capturing_by_default`, Merker als Cookie auf `.primundus.de`), Token-Filter `tokenAusText`/`tokenUeberall`, Positivliste `erlaubteEigenschaften`. Test: `src/__tests__/posthogRegeln.test.ts`; Doku: [docs/posthog.md](docs/posthog.md) |
+| `project 3/lib/posthog.ts` | PostHog im Rechner: Start, Abgleich mit `cookie-consent.ts` (opt_in/opt_out), `postHogErfassen`, `postHogIdentifizieren`. Proxy = Rewrites `/ingest/*` in `next.config.js` (+ `skipTrailingSlashRedirect` und eigene `/x/`→`/x`-Regel) |
 
 ### Edge Functions (`supabase/functions/`)
 
@@ -1108,7 +1111,10 @@ Suites:
 Cross-app importy z `project 3/` w root-vitest są dozwolone WYŁĄCZNIE dla
 pure modułów (zero importów Next/supabase; type-importy OK). Aktualna
 lista: `portal-url.ts`, `portal-lead.ts`, `portal-parser.ts`, `portal-csv.ts`, `angaben-diff.ts`,
-`angaben-labels.ts` (Registry #55), `oaiq.ts`, `pflegena.ts` (Registry #59).
+`angaben-labels.ts` (Registry #55), `oaiq.ts`, `pflegena.ts` (Registry #59),
+`posthog-regeln.ts`. **Ausnahme zur Laufzeit:** `posthog-regeln.ts` importiert
+das Portal auch im Build (`src/lib/posthog.ts`) — eine Regeldatei statt zwei
+Kopien, weil sie über Datenschutz entscheidet (Token, Gesundheitsdaten).
 
 ### Edge Functions (Deno)
 

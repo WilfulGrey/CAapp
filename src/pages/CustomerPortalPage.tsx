@@ -17,6 +17,7 @@ import { isAboutDeStale, regenerateGermanDescription } from '../lib/mamamia/care
 import { feedbackInRuhezeit, reportLeadEvent, fetchLeadEvents, KOSTENRECHNER_URL } from '../lib/leadEvents';
 import type { CaregiverSnapshot } from '../lib/leadEvents';
 import { identifyClarity } from '../lib/clarity';
+import { postHogIdentifizieren } from '../lib/posthog';
 import {
   useRejectApplication,
   useStoreConfirmation,
@@ -484,6 +485,8 @@ const CustomerPortalPage: FC = () => {
         // matching identify on its side. Idempotent + retries until the
         // GTM-loaded Clarity tag is ready.
         identifyClarity(l.token);
+        // PostHog: Lead-ID (nicht den Token!) — greift nur mit Zustimmung.
+        postHogIdentifizieren(l.id);
       }
       setLeadLoading(false);
     });

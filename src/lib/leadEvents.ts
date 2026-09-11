@@ -7,6 +7,8 @@
 // portal_opened / patient_data_saved; caregiver_invited is intentionally NOT
 // deduped on the server so each invite produces one team mail.
 
+import { postHogErfassen } from './posthog';
+
 export const KOSTENRECHNER_URL =
   import.meta.env.VITE_KOSTENRECHNER_URL || 'https://kostenrechner.primundus.de';
 
@@ -135,6 +137,9 @@ export function reportLeadEvent(
   const key = dedupeKey(token, event, metadata);
   if (sent.has(key)) return;
   sent.add(key);
+  // Auch an PostHog — nur Ereignisname plus Positivliste (Schritt, Mail-Quelle).
+  // Telefon, PLZ, Ort und Pflegekraft-Namen aus `metadata` kommen nie an.
+  postHogErfassen(event, metadata as Record<string, unknown> | undefined);
 
   const body: Record<string, unknown> = { token, event };
   if (metadata && Object.keys(metadata).length > 0) {

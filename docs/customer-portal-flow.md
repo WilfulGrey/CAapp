@@ -143,6 +143,12 @@ Next.js 13 SSR, deployowane na `kostenrechner-beta.onrender.com` z brancha
   der Landing-URL landen per best-effort Update auf `analytics_sessions`
   (utm_source/medium/campaign standen schon im Insert) + in sessionStorage
   `_prim_ad_params` für den Lead-Submit. Setup: [google-ads-tracking.md](google-ads-tracking.md).
+- **PostHog (seit 11.09.2026):** `trackEvent` und `trackCriticalSubmit`
+  reichen jedes Ereignis zusätzlich an PostHog weiter — VOR dem
+  Einwilligungs-Gate, weil PostHog ohne Zustimmung cookielos zählt; nur
+  Eigenschaften der Positivliste (keine `answer`). Das Portal leitet
+  `reportLeadEvent` weiter. Beides über den Proxy `/ingest` auf dem Rechner.
+  Details, Einwilligungs-Mechanik und Token-Schutz: [posthog.md](posthog.md).
 
 **Czego kalkulator NIE zbiera** (ważne — dlatego onboard wstrzykuje defaulty,
 a patient form w CAapp dopełnia później):

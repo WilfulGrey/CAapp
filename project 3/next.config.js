@@ -17,9 +17,38 @@ const NOINDEX_PATHS = [
   '/feedback',
 ];
 
+// PostHog-Proxy (EU). Der Browser schreibt NUR an die eigene Domain —
+// direkt an *.posthog.com blocken Werbeblocker und Safari lautlos (gleiche
+// Lehre wie Registry „analytics-nie-direkt-aus-dem-browser"). Das Kunden-
+// portal nutzt denselben Proxy (kundenportal → kostenrechner, gleiche
+// Hauptdomain). Reihenfolge laut PostHog-Doku: static und array zuerst.
+const POSTHOG_REWRITES = [
+  { source: '/ingest/static/:path*', destination: 'https://eu-assets.i.posthog.com/static/:path*' },
+  { source: '/ingest/array/:path*', destination: 'https://eu-assets.i.posthog.com/array/:path*' },
+  { source: '/ingest/:path*', destination: 'https://eu.i.posthog.com/:path*' },
+];
+
 const nextConfig = {
   eslint: {
     ignoreDuringBuilds: true,
+  },
+  // PostHogs Endpunkte enden auf „/" (`/e/`, `/flags/`) — Nexts eingebaute
+  // Weiterleitung `/x/` → `/x` würde die POSTs per 308 umlenken und die
+  // Erfassung brechen. Deshalb aus …
+  skipTrailingSlashRedirect: true,
+  async rewrites() {
+    return POSTHOG_REWRITES;
+  },
+  // … und für ALLE anderen Pfade als eigene Regel wieder an. Ohne sie gäbe
+  // es jede Seite doppelt (`/x` und `/x/`) — für SEO ein Duplikat.
+  async redirects() {
+    return [
+      {
+        source: '/:pfad((?!ingest(?:/|$)).+)/',
+        destination: '/:pfad',
+        permanent: true,
+      },
+    ];
   },
   async headers() {
     return [

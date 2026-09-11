@@ -1,3 +1,4 @@
+import { postHogErfassen, postHogIdentifizieren } from './posthog';
 import { cookieConsent } from './cookie-consent';
 
 /*
@@ -363,11 +364,22 @@ class Analytics {
   }
 
   async trackEvent(eventType: string, eventName: string, eventData?: any) {
+    // PostHog VOR dem Einwilligungs-Gate: PostHog zählt ohne Zustimmung
+    // cookielos (Entscheidung Martin 11.09.) und filtert die Eigenschaften
+    // selbst (Positivliste in posthog-regeln.ts — keine Antworten).
+    // Nachgeholte Ereignisse (`replayed_after_consent`) hat PostHog schon —
+    // es zählt ja auch ohne Zustimmung. Sonst stünde jeder Zustimmer doppelt da.
+    if (!eventData?.replayed_after_consent) postHogErfassen(eventName, eventData);
+    return this.eventInDb(eventType, eventName, eventData);
+  }
+
+  private async eventInDb(eventType: string, eventName: string, eventData?: any) {
     if (!this.sessionDbId) {
       // Fired before the analytics session finished initialising (e.g. the
       // wizard's step-1 step_view on mount). Queue it — flushPendingEvents()
       // replays it once the session id is available, instead of dropping it.
-      this.pendingEvents.push(() => this.trackEvent(eventType, eventName, eventData));
+      // Nur der DB-Teil wird nachgeholt; PostHog hat das Ereignis schon.
+      this.pendingEvents.push(() => this.eventInDb(eventType, eventName, eventData));
       return;
     }
     if (!this.hasAnalyticsConsent()) {
@@ -576,6 +588,18 @@ class Analytics {
   // Navigation garantiert; Fallback fetch(keepalive) für Browser ohne
   // sendBeacon. Insert passiert server-seitig in /api/analytics/critical-event.
   trackCriticalSubmit(input: CriticalSubmitInput) {
+    // PostHog zuerst und sofort (sendBeacon) — direkt danach folgt der
+    // Redirect ins Portal. Identifizieren nur mit Zustimmung (prüft
+    // postHogIdentifizieren selbst).
+    postHogErfassen(
+      'step_complete',
+      { step: input.step, step_name: input.stepName, time_on_step_seconds: input.timeOnStepSeconds },
+      true,
+    );
+    if (input.conversion) {
+      postHogIdentifizieren(input.conversion.leadId);
+      postHogErfassen(input.conversion.conversionType, {}, true);
+    }
     if (!this.sessionDbId) {
       console.warn('[Analytics] Cannot track critical submit: no session ID');
       return;
