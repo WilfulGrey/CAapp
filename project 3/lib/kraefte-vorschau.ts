@@ -25,11 +25,12 @@ export interface VorschauKraft {
 export const VORSCHAU_KEY = 'prim_kraefte_vorschau';
 
 /**
- * Seit 10.09.2026 (Martin: „keinen Split – wir kennen die Zahlen und werden
- * dann vergleichen") ist die Vorschau für ALLE an. `?kraefte=0` zeigt den
- * alten Kasten (zum Vergleichen), `?kraefte=1` schaltet wieder ein; beides
- * wird in sessionStorage gemerkt, weil die Variantenweiche die URL neu
- * schreibt. Vergleich = vorher/nachher am Datum, nicht per Split.
+ * Seit 11.09.2026 (Martin: Karten-Seite weg — nach den Fragen direkt der
+ * Kontakt-Schritt mit Siegel-Kopf und Fotokasten) ist die Karten-Seite für
+ * alle AUS. `?kraefte=1` zeigt sie weiter (zum Vergleichen), `?kraefte=0`
+ * schaltet sie wieder aus; beides wird in sessionStorage gemerkt, weil die
+ * Variantenweiche die URL neu schreibt. 10.09. 21:17 – 11.09. war sie für
+ * alle an; Vergleich vorher/nachher am Datum, nicht per Split.
  */
 export function kraefteVorschauAktiv(search: string, storage: Pick<Storage, 'getItem' | 'setItem'> | null): boolean {
   const params = new URLSearchParams(search);
@@ -37,9 +38,9 @@ export function kraefteVorschauAktiv(search: string, storage: Pick<Storage, 'get
   try {
     if (q === '1') { storage?.setItem(VORSCHAU_KEY, '1'); return true; }
     if (q === '0') { storage?.setItem(VORSCHAU_KEY, '0'); return false; }
-    return storage?.getItem(VORSCHAU_KEY) !== '0';
+    return storage?.getItem(VORSCHAU_KEY) === '1';
   } catch {
-    return q !== '0';
+    return q === '1';
   }
 }
 

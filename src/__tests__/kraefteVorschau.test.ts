@@ -7,10 +7,11 @@ function speicher(): Pick<Storage, 'getItem' | 'setItem'> {
 }
 
 describe('Kräfte-Vorschau (Rechner)', () => {
-  it('Schalter: seit 10.09. für alle an; ?kraefte=0 schaltet aus und merkt sich das, ?kraefte=1 wieder ein', () => {
+  it('Schalter: seit 11.09. aus; ?kraefte=1 schaltet ein und merkt sich das, ?kraefte=0 wieder aus', () => {
     const s = speicher();
-    expect(kraefteVorschauAktiv('?start=1', s)).toBe(true);
-    expect(kraefteVorschauAktiv('', null)).toBe(true);
+    // Seit 11.09.: standardmäßig AUS, nur mit ?kraefte=1.
+    expect(kraefteVorschauAktiv('?start=1', s)).toBe(false);
+    expect(kraefteVorschauAktiv('', null)).toBe(false);
     expect(kraefteVorschauAktiv('?kraefte=0', s)).toBe(false);
     expect(kraefteVorschauAktiv('', s)).toBe(false);
     expect(kraefteVorschauAktiv('?kraefte=1&start=1', s)).toBe(true);
