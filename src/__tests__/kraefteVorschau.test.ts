@@ -59,7 +59,8 @@ describe('Kräfte-Vorschau (Rechner)', () => {
     expect(VERLAUF.preis).toBe('Ihr persönlicher Preis ist ebenfalls berechnet.');
     expect(VERLAUF.knopf).toBe('Preis & alle 5 Pflegekräfte ansehen\u00A0→');
     expect(VERLAUF.hinweis).toBe('Dafür benötigen wir nur noch Ihre Kontaktdaten.');
-    expect(SCHRANKE.kopf).toBe('✓ Ihr Preis ist berechnet');
+    expect(SCHRANKE.kopf).toBe('Ihr Preis ist berechnet');
+    expect(SCHRANKE.auszeichnung).toBe('6× Preis-Leistungssieger');
     expect(SCHRANKE.text).toBe('Damit wir Preis und Profile für Sie speichern und zusenden können, brauchen wir kurz Ihre Kontaktdaten.');
     expect(SCHRANKE.telefonHinweis).toBe('Nur bei Rückfragen zum Angebot');
     expect(SCHRANKE.fussnote).toBe('Sofort sichtbar · kostenlos · unverbindlich');

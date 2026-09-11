@@ -194,7 +194,9 @@ export function MultiStepForm({ mode = 'inline' }: MultiStepFormProps = {}) {
     analytics.trackEvent('wizard', 'kraefte_wahl', { aktion: 'button', kraft_id: null });
     zaehle('cta_geklickt', 'vorschau');
     setTimeout(() => {
-      document.getElementById('kontakt-schranke')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      // Kontakt ist ein eigener Schritt (keine Karten mehr darüber): an den
+      // Kartenanfang, damit Kopf und Siegel sichtbar bleiben (11.09.).
+      document.querySelector('[data-calculator-card]')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
       document.getElementById('kontakt-name')?.focus({ preventScroll: true });
     }, 60);
   };
@@ -1077,11 +1079,28 @@ export function MultiStepForm({ mode = 'inline' }: MultiStepFormProps = {}) {
               {/* Vorschau-Modus (Registry #61, Runde 3): dieselbe Zahl wie am
                   Ende der Animation, und kein „Angebot ist fertig", solange der
                   Kunde noch keinen Preis sieht. */}
-              <p className="text-center text-base font-bold uppercase tracking-wide text-white mb-1.5">
-                {vorschauModus && !kontaktOffen ? kopfzeile().titel : SCHRANKE.kopf}
-              </p>
-              {vorschauModus && !kontaktOffen && (
-                <p className="text-center text-sm text-white/90">{kopfzeile().text}</p>
+              {vorschauModus && !kontaktOffen ? (
+                <>
+                  <p className="text-center text-base font-bold uppercase tracking-wide text-white mb-1.5">{kopfzeile().titel}</p>
+                  <p className="text-center text-sm text-white/90">{kopfzeile().text}</p>
+                </>
+              ) : (
+                // Kontakt-Schritt: Haken-Symbol + Titel, darunter die Auszeichnung,
+                // Siegel rechts (Martins Aufbau 11.09.). Gegen 390×664 in beiden
+                // Wegen geprüft: Knopf bleibt über der Falz.
+                <div className="flex items-center justify-between gap-3 px-1">
+                  <div>
+                    <p className="flex items-center gap-2 text-base font-bold uppercase tracking-wide text-white leading-tight">
+                      <span className="inline-flex w-[22px] h-[22px] items-center justify-center rounded-full bg-white flex-shrink-0" aria-hidden="true">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#1F8F5F" strokeWidth={3.2} strokeLinecap="round" strokeLinejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5" /></svg>
+                      </span>
+                      {SCHRANKE.kopf}
+                    </p>
+                    <p className="text-[14px] font-medium text-white/95 leading-snug mt-1 pl-[30px]">{SCHRANKE.auszeichnung}</p>
+                  </div>
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src="/images/primundus_testsieger-2021.webp" alt="Testsieger DIE WELT Service-Champions" className="h-[66px] w-auto rounded-[5px] shadow-[0_2px_8px_rgba(0,0,0,0.2)] flex-shrink-0" />
+                </div>
               )}
             </>
           ) : (

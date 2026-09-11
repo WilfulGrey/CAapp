@@ -189,11 +189,14 @@ export const VERLAUF = {
  * Kein „Portal", kein „Fast geschafft", kein „Nur noch …".
  */
 export const SCHRANKE = {
-  kopf: '✓ Ihr Preis ist berechnet',
+  kopf: 'Ihr Preis ist berechnet', // Haken als Symbol im Kopf, nicht als Textzeichen (Martin 11.09.: „zu billig")
   text: 'Damit wir Preis und Profile für Sie speichern und zusenden können, brauchen wir kurz Ihre Kontaktdaten.',
   telefonHinweis: 'Nur bei Rückfragen zum Angebot',
   knopf: KNOPF,
   fussnote: 'Sofort sichtbar · kostenlos · unverbindlich',
+  // Zeile unter „Ihr Preis ist berechnet", neben dem Siegel im grünen Kopf
+  // (Martin 11.09., Wortlaut von ihm).
+  auszeichnung: '6× Preis-Leistungssieger',
 };
 
 /** Antwort der Function absichern — nur, was die Karte braucht, nie mehr. */
