@@ -8,7 +8,9 @@ Auslöser:  Formular „Zugang anfordern“ auf primundus.de/partner-werden
 PERSONAL FÜR DIE 24-STUNDEN-BETREUUNG
 Ihr Zugang zu passenden Pflegekräften
 
-Vielen Dank, dass Sie Primundus als Partner nutzen möchten. Klicken Sie auf den Link, dann sind Sie in Ihrem Partnerbereich angemeldet. Ein Passwort brauchen Sie nicht.
+Guten Tag {{ANREDE}} {{NACHNAME}},
+
+vielen Dank, dass Sie Primundus als Partner nutzen möchten. Klicken Sie auf den Link, dann sind Sie in Ihrem Partnerbereich angemeldet. Ein Passwort brauchen Sie nicht.
 
 Partnerbereich öffnen:
 {{ZUGANGSLINK}}
