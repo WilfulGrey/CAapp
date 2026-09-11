@@ -327,9 +327,9 @@ export function getEingangsbestaetigungEmailTemplate(
                       <img src="${baseUrl}/images/marta-kapcio.jpg" alt="Marta Kapcio" width="60" style="display: block; width: 60px; height: auto; border-radius: 8px;" />
                     </td>
                     <td style="vertical-align: middle;">
-                      <p style="margin: 0 0 2px 0; font-size: 15px; font-weight: 700; color: #3D2B1F; white-space: nowrap; text-align: left;">Marta Kapcio</p>
-                      <p style="margin: 0 0 2px 0; font-size: 13px; color: #555; white-space: nowrap; text-align: left;">Pflegeberaterin</p>
-                      <p style="margin: 0; font-size: 12px; color: #9a8a73; white-space: nowrap; text-align: left;">Mo – So, 8 – 20 Uhr</p>
+                      <p style="margin: 0 0 2px 0; font-size: 15px; font-weight: 700; color: #3D2B1F; text-align: left;">Marta Kapcio</p>
+                      <p style="margin: 0 0 2px 0; font-size: 13px; color: #555; text-align: left;">Pflegeberaterin</p>
+                      <p style="margin: 0; font-size: 12px; color: #9a8a73; text-align: left;"><span style="white-space: nowrap;">Mo – So,</span> <span style="white-space: nowrap;">8 – 20 Uhr</span></p>
                     </td>
                   </tr>
                 </table>
@@ -346,19 +346,19 @@ export function getEingangsbestaetigungEmailTemplate(
                   </tr>
                 </table>
               </td>
-              <td style="vertical-align: top; text-align: right;">
+              <td style="vertical-align: top; text-align: right; padding-left: 10px;">
                 <table cellpadding="0" cellspacing="0" role="presentation" style="border: 1px solid #e8ddd0; border-radius: 8px; overflow: hidden; margin-left: auto;">
                   <tr>
-                    <td style="padding: 8px 10px; background: #ffffff; text-align: center; vertical-align: top;">
-                      <img src="${baseUrl}/images/primundus_testsieger-2021.webp" alt="Testsieger DIE WELT" width="64" style="display: block; width: 64px; height: auto; margin: 0 auto 5px auto;" />
+                    <td class="sig-siegel-innen" style="padding: 8px 10px; background: #ffffff; text-align: center; vertical-align: top;">
+                      <img class="sig-siegel-bild" src="${baseUrl}/images/primundus_testsieger-2021.webp" alt="Testsieger DIE WELT" width="64" style="display: block; width: 64px; height: auto; margin: 0 auto 5px auto;" />
                       <!-- Siegel bewusst KOMPAKT: "6× Testsieger" statt "Testsieger" +
                            eigener Zeile "6× in Folge". Der Block sitzt neben dem Logo in
                            der Kopfzeile und hat wenig Platz — vier Zeilen wirkten
                            gedraengt und liessen "Testsieger" ohne die Zahl stehen
                            (Martin 28.08.2026). Im FLIESSTEXT, wo eine ganze Zeile zur
                            Verfuegung steht, bleibt "6× in Folge" erwuenscht. -->
-                      <p style="margin: 0 0 1px 0; font-size: 11px; font-weight: 700; color: #3D2B1F; white-space: nowrap; text-align: center;">6× Testsieger <span style="color: #B5A184;">DIE WELT</span></p>
-                      <p style="margin: 0; font-size: 10px; color: #888; line-height: 1.4; text-align: center;">Preis, Qualität &amp;<br>Kundenservice</p>
+                      <p style="margin: 0 0 1px 0; font-size: 11px; font-weight: 700; color: #3D2B1F; text-align: center;"><span style="white-space: nowrap;">6× Testsieger</span> <span class="sig-siegel-welt" style="color: #B5A184; white-space: nowrap;">DIE WELT</span></p>
+                      <p style="margin: 0; font-size: 10px; color: #888; line-height: 1.4; text-align: center;"><span style="white-space: nowrap;">Preis, Qualität &amp;</span><br>Kundenservice</p>
                     </td>
                   </tr>
                 </table>
@@ -388,12 +388,12 @@ export function getEingangsbestaetigungEmailTemplate(
         <td style="background: #ffffff; border-top: 1px solid #e8ddd0; padding: 14px 16px;">
           <table width="100%" cellpadding="0" cellspacing="0" role="presentation">
             <tr>
-              <td style="text-align: center; vertical-align: middle; padding: 0 4px;"><img src="${baseUrl}/images/media/die-welt.webp" alt="DIE WELT" height="14" style="display: inline-block; height: 14px; width: auto; opacity: 0.4; filter: grayscale(100%);" /></td>
-              <td style="text-align: center; vertical-align: middle; padding: 0 4px;"><img src="${baseUrl}/images/media/frankfurter-allgemeine.webp" alt="Frankfurter Allgemeine" height="14" style="display: inline-block; height: 14px; width: auto; opacity: 0.4; filter: grayscale(100%);" /></td>
-              <td style="text-align: center; vertical-align: middle; padding: 0 4px;"><img src="${baseUrl}/images/media/ard.webp" alt="ARD" height="14" style="display: inline-block; height: 14px; width: auto; opacity: 0.4; filter: grayscale(100%);" /></td>
-              <td style="text-align: center; vertical-align: middle; padding: 0 4px;"><img src="${baseUrl}/images/media/ndr.webp" alt="NDR" height="14" style="display: inline-block; height: 14px; width: auto; opacity: 0.4; filter: grayscale(100%);" /></td>
-              <td style="text-align: center; vertical-align: middle; padding: 0 4px;"><img src="${baseUrl}/images/media/sat1.webp" alt="SAT.1" height="14" style="display: inline-block; height: 14px; width: auto; opacity: 0.4; filter: grayscale(100%);" /></td>
-              <td style="text-align: center; vertical-align: middle; padding: 0 4px;"><img src="${baseUrl}/images/media/bild-der-frau.webp" alt="Bild der Frau" height="14" style="display: inline-block; height: 14px; width: auto; opacity: 0.4; filter: grayscale(100%);" /></td>
+              <td style="text-align: center; vertical-align: middle; padding: 0 4px;"><img src="${baseUrl}/images/media/die-welt.webp" alt="DIE WELT" width="68" height="14" style="display: inline-block; width: 68px; max-width: 100%; height: auto; opacity: 0.4; filter: grayscale(100%);" /></td>
+              <td style="text-align: center; vertical-align: middle; padding: 0 4px;"><img src="${baseUrl}/images/media/frankfurter-allgemeine.webp" alt="Frankfurter Allgemeine" width="103" height="14" style="display: inline-block; width: 103px; max-width: 100%; height: auto; opacity: 0.4; filter: grayscale(100%);" /></td>
+              <td style="text-align: center; vertical-align: middle; padding: 0 4px;"><img src="${baseUrl}/images/media/ard.webp" alt="ARD" width="38" height="14" style="display: inline-block; width: 38px; max-width: 100%; height: auto; opacity: 0.4; filter: grayscale(100%);" /></td>
+              <td style="text-align: center; vertical-align: middle; padding: 0 4px;"><img src="${baseUrl}/images/media/ndr.webp" alt="NDR" width="21" height="14" style="display: inline-block; width: 21px; max-width: 100%; height: auto; opacity: 0.4; filter: grayscale(100%);" /></td>
+              <td style="text-align: center; vertical-align: middle; padding: 0 4px;"><img src="${baseUrl}/images/media/sat1.webp" alt="SAT.1" width="45" height="14" style="display: inline-block; width: 45px; max-width: 100%; height: auto; opacity: 0.4; filter: grayscale(100%);" /></td>
+              <td style="text-align: center; vertical-align: middle; padding: 0 4px;"><img src="${baseUrl}/images/media/bild-der-frau.webp" alt="Bild der Frau" width="12" height="14" style="display: inline-block; width: 12px; max-width: 100%; height: auto; opacity: 0.4; filter: grayscale(100%);" /></td>
             </tr>
           </table>
         </td>
@@ -657,9 +657,9 @@ export function getAngebotsEmailTemplate(
                         style="display: block; width: 60px; height: auto; border-radius: 8px;" />
                     </td>
                     <td style="vertical-align: middle;">
-                      <p style="margin: 0 0 2px 0; font-size: 15px; font-weight: 700; color: #3D2B1F; text-align: left; white-space: nowrap;">Marta Kapcio</p>
-                      <p style="margin: 0 0 2px 0; font-size: 13px; color: #555; text-align: left; white-space: nowrap;">Pflegeberaterin</p>
-                      <p style="margin: 0; font-size: 12px; color: #9a8a73; text-align: left; white-space: nowrap;">Mo – So, 8 – 20 Uhr</p>
+                      <p style="margin: 0 0 2px 0; font-size: 15px; font-weight: 700; color: #3D2B1F; text-align: left;">Marta Kapcio</p>
+                      <p style="margin: 0 0 2px 0; font-size: 13px; color: #555; text-align: left;">Pflegeberaterin</p>
+                      <p style="margin: 0; font-size: 12px; color: #9a8a73; text-align: left;"><span style="white-space: nowrap;">Mo – So,</span> <span style="white-space: nowrap;">8 – 20 Uhr</span></p>
                     </td>
                   </tr>
                 </table>
@@ -678,13 +678,13 @@ export function getAngebotsEmailTemplate(
                 </table>
               </td>
               <!-- Testsieger badge – rechts, kleiner -->
-              <td style="vertical-align: top; text-align: right;">
+              <td style="vertical-align: top; text-align: right; padding-left: 10px;">
                 <table cellpadding="0" cellspacing="0" role="presentation" style="border: 1px solid #e8ddd0; border-radius: 8px; overflow: hidden; margin-left: auto;">
                   <tr>
-                    <td style="padding: 8px 10px; background: #ffffff; text-align: center; vertical-align: top;">
-                      <img src="${baseUrl}/images/primundus_testsieger-2021.webp" alt="Testsieger DIE WELT" width="64" style="display: block; width: 64px; height: auto; margin: 0 auto 5px auto;" />
-                      <p style="margin: 0 0 1px 0; font-size: 11px; font-weight: 700; color: #3D2B1F; white-space: nowrap; text-align: center;">6× Testsieger <span style="color: #B5A184;">DIE WELT</span></p>
-                      <p style="margin: 0; font-size: 10px; color: #888; line-height: 1.4; text-align: center;">Preis, Qualität &amp;<br>Kundenservice</p>
+                    <td class="sig-siegel-innen" style="padding: 8px 10px; background: #ffffff; text-align: center; vertical-align: top;">
+                      <img class="sig-siegel-bild" src="${baseUrl}/images/primundus_testsieger-2021.webp" alt="Testsieger DIE WELT" width="64" style="display: block; width: 64px; height: auto; margin: 0 auto 5px auto;" />
+                      <p style="margin: 0 0 1px 0; font-size: 11px; font-weight: 700; color: #3D2B1F; text-align: center;"><span style="white-space: nowrap;">6× Testsieger</span> <span class="sig-siegel-welt" style="color: #B5A184; white-space: nowrap;">DIE WELT</span></p>
+                      <p style="margin: 0; font-size: 10px; color: #888; line-height: 1.4; text-align: center;"><span style="white-space: nowrap;">Preis, Qualität &amp;</span><br>Kundenservice</p>
                     </td>
                   </tr>
                 </table>
@@ -717,22 +717,22 @@ export function getAngebotsEmailTemplate(
           <table width="100%" cellpadding="0" cellspacing="0" role="presentation">
             <tr>
               <td style="text-align: center; vertical-align: middle; padding: 0 4px;">
-                <img src="${baseUrl}/images/media/die-welt.webp" alt="DIE WELT" height="14" style="display: inline-block; height: 14px; width: auto; opacity: 0.4; filter: grayscale(100%);" />
+                <img src="${baseUrl}/images/media/die-welt.webp" alt="DIE WELT" width="68" height="14" style="display: inline-block; width: 68px; max-width: 100%; height: auto; opacity: 0.4; filter: grayscale(100%);" />
               </td>
               <td style="text-align: center; vertical-align: middle; padding: 0 4px;">
-                <img src="${baseUrl}/images/media/frankfurter-allgemeine.webp" alt="Frankfurter Allgemeine" height="14" style="display: inline-block; height: 14px; width: auto; opacity: 0.4; filter: grayscale(100%);" />
+                <img src="${baseUrl}/images/media/frankfurter-allgemeine.webp" alt="Frankfurter Allgemeine" width="103" height="14" style="display: inline-block; width: 103px; max-width: 100%; height: auto; opacity: 0.4; filter: grayscale(100%);" />
               </td>
               <td style="text-align: center; vertical-align: middle; padding: 0 4px;">
-                <img src="${baseUrl}/images/media/ard.webp" alt="ARD" height="14" style="display: inline-block; height: 14px; width: auto; opacity: 0.4; filter: grayscale(100%);" />
+                <img src="${baseUrl}/images/media/ard.webp" alt="ARD" width="38" height="14" style="display: inline-block; width: 38px; max-width: 100%; height: auto; opacity: 0.4; filter: grayscale(100%);" />
               </td>
               <td style="text-align: center; vertical-align: middle; padding: 0 4px;">
-                <img src="${baseUrl}/images/media/ndr.webp" alt="NDR" height="14" style="display: inline-block; height: 14px; width: auto; opacity: 0.4; filter: grayscale(100%);" />
+                <img src="${baseUrl}/images/media/ndr.webp" alt="NDR" width="21" height="14" style="display: inline-block; width: 21px; max-width: 100%; height: auto; opacity: 0.4; filter: grayscale(100%);" />
               </td>
               <td style="text-align: center; vertical-align: middle; padding: 0 4px;">
-                <img src="${baseUrl}/images/media/sat1.webp" alt="SAT.1" height="14" style="display: inline-block; height: 14px; width: auto; opacity: 0.4; filter: grayscale(100%);" />
+                <img src="${baseUrl}/images/media/sat1.webp" alt="SAT.1" width="45" height="14" style="display: inline-block; width: 45px; max-width: 100%; height: auto; opacity: 0.4; filter: grayscale(100%);" />
               </td>
               <td style="text-align: center; vertical-align: middle; padding: 0 4px;">
-                <img src="${baseUrl}/images/media/bild-der-frau.webp" alt="Bild der Frau" height="14" style="display: inline-block; height: 14px; width: auto; opacity: 0.4; filter: grayscale(100%);" />
+                <img src="${baseUrl}/images/media/bild-der-frau.webp" alt="Bild der Frau" width="12" height="14" style="display: inline-block; width: 12px; max-width: 100%; height: auto; opacity: 0.4; filter: grayscale(100%);" />
               </td>
             </tr>
           </table>
@@ -1321,9 +1321,9 @@ export function getVertragEmailTemplate(
                       <img src="${baseUrl}/images/marta-kapcio.jpg" alt="Marta Kapcio" width="60" style="display: block; width: 60px; height: auto; border-radius: 8px;" />
                     </td>
                     <td style="vertical-align: middle;">
-                      <p style="margin: 0 0 2px 0; font-size: 15px; font-weight: 700; color: #3D2B1F; white-space: nowrap; text-align: left;">Marta Kapcio</p>
-                      <p style="margin: 0 0 2px 0; font-size: 13px; color: #555; white-space: nowrap; text-align: left;">Pflegeberaterin</p>
-                      <p style="margin: 0; font-size: 12px; color: #9a8a73; white-space: nowrap; text-align: left;">Mo – So, 8 – 20 Uhr</p>
+                      <p style="margin: 0 0 2px 0; font-size: 15px; font-weight: 700; color: #3D2B1F; text-align: left;">Marta Kapcio</p>
+                      <p style="margin: 0 0 2px 0; font-size: 13px; color: #555; text-align: left;">Pflegeberaterin</p>
+                      <p style="margin: 0; font-size: 12px; color: #9a8a73; text-align: left;"><span style="white-space: nowrap;">Mo – So,</span> <span style="white-space: nowrap;">8 – 20 Uhr</span></p>
                     </td>
                   </tr>
                 </table>
@@ -1340,13 +1340,13 @@ export function getVertragEmailTemplate(
                   </tr>
                 </table>
               </td>
-              <td style="vertical-align: top; text-align: right;">
+              <td style="vertical-align: top; text-align: right; padding-left: 10px;">
                 <table cellpadding="0" cellspacing="0" role="presentation" style="border: 1px solid #e8ddd0; border-radius: 8px; overflow: hidden; margin-left: auto;">
                   <tr>
-                    <td style="padding: 8px 10px; background: #ffffff; text-align: center; vertical-align: top;">
-                      <img src="${baseUrl}/images/primundus_testsieger-2021.webp" alt="Testsieger DIE WELT" width="64" style="display: block; width: 64px; height: auto; margin: 0 auto 5px auto;" />
-                      <p style="margin: 0 0 1px 0; font-size: 11px; font-weight: 700; color: #3D2B1F; white-space: nowrap; text-align: center;">6× Testsieger <span style="color: #B5A184;">DIE WELT</span></p>
-                      <p style="margin: 0; font-size: 10px; color: #888; line-height: 1.4; text-align: center;">Preis, Qualität &amp;<br>Kundenservice</p>
+                    <td class="sig-siegel-innen" style="padding: 8px 10px; background: #ffffff; text-align: center; vertical-align: top;">
+                      <img class="sig-siegel-bild" src="${baseUrl}/images/primundus_testsieger-2021.webp" alt="Testsieger DIE WELT" width="64" style="display: block; width: 64px; height: auto; margin: 0 auto 5px auto;" />
+                      <p style="margin: 0 0 1px 0; font-size: 11px; font-weight: 700; color: #3D2B1F; text-align: center;"><span style="white-space: nowrap;">6× Testsieger</span> <span class="sig-siegel-welt" style="color: #B5A184; white-space: nowrap;">DIE WELT</span></p>
+                      <p style="margin: 0; font-size: 10px; color: #888; line-height: 1.4; text-align: center;"><span style="white-space: nowrap;">Preis, Qualität &amp;</span><br>Kundenservice</p>
                     </td>
                   </tr>
                 </table>
@@ -1376,12 +1376,12 @@ export function getVertragEmailTemplate(
         <td style="background: #ffffff; border-top: 1px solid #e8ddd0; padding: 14px 16px;">
           <table width="100%" cellpadding="0" cellspacing="0" role="presentation">
             <tr>
-              <td style="text-align: center; vertical-align: middle; padding: 0 4px;"><img src="${baseUrl}/images/media/die-welt.webp" alt="DIE WELT" height="14" style="display: inline-block; height: 14px; width: auto; opacity: 0.4; filter: grayscale(100%);" /></td>
-              <td style="text-align: center; vertical-align: middle; padding: 0 4px;"><img src="${baseUrl}/images/media/frankfurter-allgemeine.webp" alt="Frankfurter Allgemeine" height="14" style="display: inline-block; height: 14px; width: auto; opacity: 0.4; filter: grayscale(100%);" /></td>
-              <td style="text-align: center; vertical-align: middle; padding: 0 4px;"><img src="${baseUrl}/images/media/ard.webp" alt="ARD" height="14" style="display: inline-block; height: 14px; width: auto; opacity: 0.4; filter: grayscale(100%);" /></td>
-              <td style="text-align: center; vertical-align: middle; padding: 0 4px;"><img src="${baseUrl}/images/media/ndr.webp" alt="NDR" height="14" style="display: inline-block; height: 14px; width: auto; opacity: 0.4; filter: grayscale(100%);" /></td>
-              <td style="text-align: center; vertical-align: middle; padding: 0 4px;"><img src="${baseUrl}/images/media/sat1.webp" alt="SAT.1" height="14" style="display: inline-block; height: 14px; width: auto; opacity: 0.4; filter: grayscale(100%);" /></td>
-              <td style="text-align: center; vertical-align: middle; padding: 0 4px;"><img src="${baseUrl}/images/media/bild-der-frau.webp" alt="Bild der Frau" height="14" style="display: inline-block; height: 14px; width: auto; opacity: 0.4; filter: grayscale(100%);" /></td>
+              <td style="text-align: center; vertical-align: middle; padding: 0 4px;"><img src="${baseUrl}/images/media/die-welt.webp" alt="DIE WELT" width="68" height="14" style="display: inline-block; width: 68px; max-width: 100%; height: auto; opacity: 0.4; filter: grayscale(100%);" /></td>
+              <td style="text-align: center; vertical-align: middle; padding: 0 4px;"><img src="${baseUrl}/images/media/frankfurter-allgemeine.webp" alt="Frankfurter Allgemeine" width="103" height="14" style="display: inline-block; width: 103px; max-width: 100%; height: auto; opacity: 0.4; filter: grayscale(100%);" /></td>
+              <td style="text-align: center; vertical-align: middle; padding: 0 4px;"><img src="${baseUrl}/images/media/ard.webp" alt="ARD" width="38" height="14" style="display: inline-block; width: 38px; max-width: 100%; height: auto; opacity: 0.4; filter: grayscale(100%);" /></td>
+              <td style="text-align: center; vertical-align: middle; padding: 0 4px;"><img src="${baseUrl}/images/media/ndr.webp" alt="NDR" width="21" height="14" style="display: inline-block; width: 21px; max-width: 100%; height: auto; opacity: 0.4; filter: grayscale(100%);" /></td>
+              <td style="text-align: center; vertical-align: middle; padding: 0 4px;"><img src="${baseUrl}/images/media/sat1.webp" alt="SAT.1" width="45" height="14" style="display: inline-block; width: 45px; max-width: 100%; height: auto; opacity: 0.4; filter: grayscale(100%);" /></td>
+              <td style="text-align: center; vertical-align: middle; padding: 0 4px;"><img src="${baseUrl}/images/media/bild-der-frau.webp" alt="Bild der Frau" width="12" height="14" style="display: inline-block; width: 12px; max-width: 100%; height: auto; opacity: 0.4; filter: grayscale(100%);" /></td>
             </tr>
           </table>
         </td>
@@ -1430,8 +1430,11 @@ export function getVertragEmailTemplate(
           <table width="100%" cellpadding="0" cellspacing="0">
             ${conditionsRows.map((row, i, arr) => {
               const isLast = i === arr.length - 1;
+              // Kein nowrap am Label (11.09.2026): "Sommermonate Juli & August"
+              // am Stück machte die Mail auf 360 px 30 px zu breit. Am Desktop
+              // hat die 44-%-Spalte Platz, dort bricht nichts um.
               return `<tr>
-                <td style="padding: 9px 12px 9px 0; ${isLast ? '' : 'border-bottom: 1px solid #f0ebe4;'} color: #888; font-size: 13px; width: 44%; white-space: nowrap;">${row.label}</td>
+                <td style="padding: 9px 12px 9px 0; ${isLast ? '' : 'border-bottom: 1px solid #f0ebe4;'} color: #888; font-size: 13px; width: 44%;">${row.label}</td>
                 <td style="padding: 9px 0; ${isLast ? '' : 'border-bottom: 1px solid #f0ebe4;'} color: #333; font-size: 13px; font-weight: 600;">${row.value}</td>
               </tr>`;
             }).join('')}
@@ -1646,6 +1649,11 @@ function customerGreeting(lead: Lead): string {
 // Marta-Signatur-Karte — zentral für alle Caregiver-Event-Mails (A/B/C) und
 // das neue Mail-11-Layout. Identisch zur Eingangsbestätigung, damit die
 // gesamte Mail-Reihe optisch zusammenpasst.
+// Handy (11.09.2026): Name/Zeiten dürfen umbrechen, das Siegel hat 10 px
+// festen Abstand und wird über .sig-siegel-* (Media-Query ≤480 px in der
+// jeweiligen Mail-Shell) schmaler — sonst war jede Mail auf 360–390 px
+// breiter als der Bildschirm. Gleiche Karte: Eingangsbestätigung, Angebot,
+// Vertrag, Pflegedaten, buildMartaSig (Edge Function) — immer ALLE ändern.
 function caregiverMartaSig(baseUrl: string): string {
   return `
     <p style="font-size:16px;line-height:1.7;color:#555;margin-top:24px;margin-bottom:16px;">Mit freundlichen Grüßen<br><strong style="color:#3D2B1F;">Marta Kapcio</strong></p>
@@ -1661,9 +1669,9 @@ function caregiverMartaSig(baseUrl: string): string {
                       <img src="${baseUrl}/images/marta-kapcio.jpg" alt="Marta Kapcio" width="60" style="display:block;width:60px;height:auto;border-radius:8px;" />
                     </td>
                     <td style="vertical-align:middle;">
-                      <p style="margin:0 0 2px;font-size:15px;font-weight:700;color:#3D2B1F;white-space:nowrap;">Marta Kapcio</p>
-                      <p style="margin:0 0 2px;font-size:13px;color:#555;white-space:nowrap;">Pflegeberaterin</p>
-                      <p style="margin:0;font-size:12px;color:#9a8a73;white-space:nowrap;">Mo – So, 8 – 20 Uhr</p>
+                      <p style="margin:0 0 2px;font-size:15px;font-weight:700;color:#3D2B1F;">Marta Kapcio</p>
+                      <p style="margin:0 0 2px;font-size:13px;color:#555;">Pflegeberaterin</p>
+                      <p style="margin:0;font-size:12px;color:#9a8a73;"><span style="white-space:nowrap;">Mo – So,</span> <span style="white-space:nowrap;">8 – 20 Uhr</span></p>
                     </td>
                   </tr>
                 </table>
@@ -1676,12 +1684,12 @@ function caregiverMartaSig(baseUrl: string): string {
                   </td></tr>
                 </table>
               </td>
-              <td style="vertical-align:top;text-align:right;">
+              <td style="vertical-align:top;text-align:right;padding-left:10px;">
                 <table cellpadding="0" cellspacing="0" role="presentation" style="border:1px solid #e8ddd0;border-radius:8px;overflow:hidden;margin-left:auto;">
-                  <tr><td style="padding:8px 10px;background:#ffffff;text-align:center;vertical-align:top;">
-                    <img src="${baseUrl}/images/primundus_testsieger-2021.webp" alt="Testsieger DIE WELT" width="64" style="display:block;width:64px;height:auto;margin:0 auto 5px;" />
-                    <p style="margin:0 0 1px;font-size:11px;font-weight:700;color:#3D2B1F;white-space:nowrap;">6× Testsieger <span style="color:#B5A184;">DIE WELT</span></p>
-                    <p style="margin:0;font-size:10px;color:#888;line-height:1.4;">Preis, Qualität &amp;<br>Kundenservice</p>
+                  <tr><td class="sig-siegel-innen" style="padding:8px 10px;background:#ffffff;text-align:center;vertical-align:top;">
+                    <img class="sig-siegel-bild" src="${baseUrl}/images/primundus_testsieger-2021.webp" alt="Testsieger DIE WELT" width="64" style="display:block;width:64px;height:auto;margin:0 auto 5px;" />
+                    <p style="margin:0 0 1px;font-size:11px;font-weight:700;color:#3D2B1F;"><span style="white-space:nowrap;">6× Testsieger</span> <span class="sig-siegel-welt" style="color:#B5A184;white-space:nowrap;">DIE WELT</span></p>
+                    <p style="margin:0;font-size:10px;color:#888;line-height:1.4;"><span style="white-space:nowrap;">Preis, Qualität &amp;</span><br>Kundenservice</p>
                   </td></tr>
                 </table>
               </td>
@@ -1729,13 +1737,23 @@ function caregiverMailShell(baseUrl: string, leadEmail: string, content: string,
       .cond-top-cell { display: block !important; width: 100% !important; padding: 18px 22px 16px !important; border-right: none !important; border-bottom: 1px solid #ebe2d2 !important; }
       .cond-top-cell:last-child { border-bottom: none !important; }
     }
+    /* Handy (11.09.2026): Kopfzeile mit 20 statt 40 px Rand (Logo + Siegel
+       brauchten sonst 363 px) und schmalere Siegel-Spalte in der Marta-Karte —
+       wie getEmailLayout / send-scheduled-emails. Grenze 480 px, damit ein
+       600 px breites Fenster exakt die Desktop-Optik behaelt. */
+    @media only screen and (max-width: 480px) {
+      .email-header { padding: 20px 20px 16px 20px !important; }
+      .sig-siegel-welt { display: block !important; }
+      .sig-siegel-bild { width: 48px !important; }
+      .sig-siegel-innen { padding: 6px 8px !important; }
+    }
   </style>
 </head>
 <body>
   <div style="width:100%;background-color:#f4f4f4;padding:20px 0;">
     <table width="100%" cellpadding="0" cellspacing="0" role="presentation"><tr><td align="center">
       <div style="max-width:600px;margin:0 auto;background-color:#ffffff;border-radius:8px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.1);">
-        <div style="background:#ffffff;padding:24px 40px 20px 40px;border-bottom:1px solid #f0ebe4;">
+        <div class="email-header" style="background:#ffffff;padding:24px 40px 20px 40px;border-bottom:1px solid #f0ebe4;">
           <table width="100%" cellpadding="0" cellspacing="0" role="presentation"><tr>
             <td style="vertical-align:middle;">
               <img src="${baseUrl}/images/Primundus-Logo_V6.png" alt="Primundus Logo" width="160" style="display:block;width:160px;max-width:160px;height:auto;" />
@@ -1967,9 +1985,9 @@ export function getPatientDataSavedEmailTemplate(
                       <img src="${baseUrl}/images/marta-kapcio.jpg" alt="Marta Kapcio" width="60" style="display:block;width:60px;height:auto;border-radius:8px;" />
                     </td>
                     <td style="vertical-align:middle;">
-                      <p style="margin:0 0 2px;font-size:15px;font-weight:700;color:#3D2B1F;white-space:nowrap;">Marta Kapcio</p>
-                      <p style="margin:0 0 2px;font-size:13px;color:#555;white-space:nowrap;">Pflegeberaterin</p>
-                      <p style="margin:0;font-size:12px;color:#9a8a73;white-space:nowrap;">Mo – So, 8 – 20 Uhr</p>
+                      <p style="margin:0 0 2px;font-size:15px;font-weight:700;color:#3D2B1F;">Marta Kapcio</p>
+                      <p style="margin:0 0 2px;font-size:13px;color:#555;">Pflegeberaterin</p>
+                      <p style="margin:0;font-size:12px;color:#9a8a73;"><span style="white-space:nowrap;">Mo – So,</span> <span style="white-space:nowrap;">8 – 20 Uhr</span></p>
                     </td>
                   </tr>
                 </table>
@@ -1982,12 +2000,12 @@ export function getPatientDataSavedEmailTemplate(
                   </td></tr>
                 </table>
               </td>
-              <td style="vertical-align:top;text-align:right;">
+              <td style="vertical-align:top;text-align:right;padding-left:10px;">
                 <table cellpadding="0" cellspacing="0" role="presentation" style="border:1px solid #e8ddd0;border-radius:8px;overflow:hidden;margin-left:auto;">
-                  <tr><td style="padding:8px 10px;background:#ffffff;text-align:center;vertical-align:top;">
-                    <img src="${baseUrl}/images/primundus_testsieger-2021.webp" alt="Testsieger DIE WELT" width="64" style="display:block;width:64px;height:auto;margin:0 auto 5px;" />
-                    <p style="margin:0 0 1px;font-size:11px;font-weight:700;color:#3D2B1F;white-space:nowrap;">6× Testsieger <span style="color:#B5A184;">DIE WELT</span></p>
-                    <p style="margin:0;font-size:10px;color:#888;line-height:1.4;">Preis, Qualität &amp;<br>Kundenservice</p>
+                  <tr><td class="sig-siegel-innen" style="padding:8px 10px;background:#ffffff;text-align:center;vertical-align:top;">
+                    <img class="sig-siegel-bild" src="${baseUrl}/images/primundus_testsieger-2021.webp" alt="Testsieger DIE WELT" width="64" style="display:block;width:64px;height:auto;margin:0 auto 5px;" />
+                    <p style="margin:0 0 1px;font-size:11px;font-weight:700;color:#3D2B1F;"><span style="white-space:nowrap;">6× Testsieger</span> <span class="sig-siegel-welt" style="color:#B5A184;white-space:nowrap;">DIE WELT</span></p>
+                    <p style="margin:0;font-size:10px;color:#888;line-height:1.4;"><span style="white-space:nowrap;">Preis, Qualität &amp;</span><br>Kundenservice</p>
                   </td></tr>
                 </table>
               </td>
@@ -2031,13 +2049,23 @@ export function getPatientDataSavedEmailTemplate(
       .cond-top-cell { display: block !important; width: 100% !important; padding: 18px 22px 16px !important; border-right: none !important; border-bottom: 1px solid #ebe2d2 !important; }
       .cond-top-cell:last-child { border-bottom: none !important; }
     }
+    /* Handy (11.09.2026): Kopfzeile mit 20 statt 40 px Rand (Logo + Siegel
+       brauchten sonst 363 px) und schmalere Siegel-Spalte in der Marta-Karte —
+       wie getEmailLayout / send-scheduled-emails. Grenze 480 px, damit ein
+       600 px breites Fenster exakt die Desktop-Optik behaelt. */
+    @media only screen and (max-width: 480px) {
+      .email-header { padding: 20px 20px 16px 20px !important; }
+      .sig-siegel-welt { display: block !important; }
+      .sig-siegel-bild { width: 48px !important; }
+      .sig-siegel-innen { padding: 6px 8px !important; }
+    }
   </style>
 </head>
 <body>
   <div style="width:100%;background-color:#f4f4f4;padding:20px 0;">
     <table width="100%" cellpadding="0" cellspacing="0" role="presentation"><tr><td align="center">
       <div style="max-width:600px;margin:0 auto;background-color:#ffffff;border-radius:8px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.1);">
-        <div style="background:#ffffff;padding:24px 40px 20px 40px;border-bottom:1px solid #f0ebe4;">
+        <div class="email-header" style="background:#ffffff;padding:24px 40px 20px 40px;border-bottom:1px solid #f0ebe4;">
           <table width="100%" cellpadding="0" cellspacing="0" role="presentation"><tr>
             <td style="vertical-align:middle;">
               <img src="${baseUrl}/images/Primundus-Logo_V6.png" alt="Primundus Logo" width="160" style="display:block;width:160px;max-width:160px;height:auto;" />
@@ -2539,9 +2567,9 @@ export function getTokenRegenerationEmailTemplate(
                       <img src="${baseUrl}/images/marta-kapcio.jpg" alt="Marta Kapcio" width="60" style="display: block; width: 60px; height: auto; border-radius: 8px;" />
                     </td>
                     <td style="vertical-align: middle;">
-                      <p style="margin: 0 0 2px 0; font-size: 15px; font-weight: 700; color: #3D2B1F; white-space: nowrap; text-align: left;">Marta Kapcio</p>
-                      <p style="margin: 0 0 2px 0; font-size: 13px; color: #555; white-space: nowrap; text-align: left;">Pflegeberaterin</p>
-                      <p style="margin: 0; font-size: 12px; color: #9a8a73; white-space: nowrap; text-align: left;">Mo – So, 8 – 20 Uhr</p>
+                      <p style="margin: 0 0 2px 0; font-size: 15px; font-weight: 700; color: #3D2B1F; text-align: left;">Marta Kapcio</p>
+                      <p style="margin: 0 0 2px 0; font-size: 13px; color: #555; text-align: left;">Pflegeberaterin</p>
+                      <p style="margin: 0; font-size: 12px; color: #9a8a73; text-align: left;"><span style="white-space: nowrap;">Mo – So,</span> <span style="white-space: nowrap;">8 – 20 Uhr</span></p>
                     </td>
                   </tr>
                 </table>
@@ -2837,6 +2865,7 @@ export function getBewertungsanfrageTemplate(
   .email-content { padding:36px 40px 32px; text-align:left; }
   .email-footer { background-color:#f8f9fa; padding:30px; text-align:center; border-top:1px solid #e0e0e0; }
   @media only screen and (max-width:600px) { .email-content { padding:28px 20px; } .email-header { padding:20px; } }
+  @media only screen and (max-width:480px) { .sig-pille { display:inline-block !important; padding:0 6px 6px 0 !important; } }
 </style></head>
 <body>
 <div class="email-wrapper">
@@ -2937,20 +2966,22 @@ export function getBewertungsanfrageTemplate(
               <p style="margin:0;font-size:12px;color:#9a8a73;white-space:nowrap;">Mo &ndash; So, 8 &ndash; 20 Uhr</p>
             </td>
           </tr></table>
+          <!-- Drei Pillen nebeneinander brauchen ~340 px; auf dem Handy (.sig-pille,
+               Media-Query oben) laufen sie in eine zweite Zeile statt aus der Mail. -->
           <table cellpadding="0" cellspacing="0" role="presentation" style="margin-top:12px;"><tr>
-            <td style="padding-right:6px;">
+            <td class="sig-pille" style="padding-right:6px;">
               <a href="tel:+4989200000830"
                  style="display:inline-block;background-color:#ffffff;border:1px solid #dcdcdc;
                         border-radius:16px;padding:6px 13px;text-decoration:none;font-size:12px;
                         font-weight:500;color:#777777;white-space:nowrap;font-family:${SANS};">&#9990; 089 200 000 830</a>
             </td>
-            <td style="padding-right:6px;">
+            <td class="sig-pille" style="padding-right:6px;">
               <a href="https://wa.me/4989200000830"
                  style="display:inline-block;background-color:#ffffff;border:1px solid #dcdcdc;
                         border-radius:16px;padding:6px 13px;text-decoration:none;font-size:12px;
                         font-weight:500;color:#777777;white-space:nowrap;font-family:${SANS};">WhatsApp</a>
             </td>
-            <td>
+            <td class="sig-pille">
               <a href="mailto:info@primundus.de"
                  style="display:inline-block;background-color:#ffffff;border:1px solid #dcdcdc;
                         border-radius:16px;padding:6px 13px;text-decoration:none;font-size:12px;
