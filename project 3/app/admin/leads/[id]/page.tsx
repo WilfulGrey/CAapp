@@ -1694,6 +1694,7 @@ export default function LeadDetailPage() {
                     portal_opened: { label: 'Portal geöffnet', color: 'bg-blue-500' },
                     portal_reopened: { label: 'Portal erneut geöffnet', color: 'bg-blue-300' },
                     patient_data_saved: { label: 'Patientendaten gespeichert', color: 'bg-green-600' },
+                    patient_form_location_unresolved: { label: 'Einsatzort unbekannt — nicht gespeichert', color: 'bg-red-600' },
                     caregiver_invited: { label: 'Pflegekraft eingeladen', color: 'bg-[#8B7355]' },
                     caregiver_interest_shown: { label: 'Pflegekraft-Interesse (Mail A)', color: 'bg-[#8B7355]' },
                     caregiver_declined: { label: 'Pflegekraft abgelehnt (Kunde)', color: 'bg-gray-400' },

@@ -10,6 +10,7 @@ import {
   TEST_LEAD_TOKEN,
   TEST_JOB_OFFER_ID,
   bridgeHandler,
+  proxyHandler,
 } from '../../../test/fixtures/mamamia-mocks';
 
 // Mock Supabase helpers — Supabase-js uses a fetch impl that doesn't route
@@ -35,6 +36,9 @@ import CustomerPortalPage from '../../pages/CustomerPortalPage';
 beforeAll(() => {
   window.URL.createObjectURL = vi.fn(() => 'blob:mock');
   window.scrollTo = vi.fn();
+  // jsdom kennt scrollIntoView nicht — das Formular scrollt beim Schrittwechsel
+  // und beim Sprung zum ersten fehlenden Feld dorthin.
+  Element.prototype.scrollIntoView = vi.fn();
   // jsdom has no IntersectionObserver for lucide-react / popup positioning
   if (!('IntersectionObserver' in window)) {
     (window as unknown as { IntersectionObserver: unknown }).IntersectionObserver = class {
@@ -230,5 +234,71 @@ describe('Portal integration: golden paths', () => {
     await waitFor(() => expect(inviteCaregiverId).toBe(sampleMatching.caregiver.id), {
       timeout: 5000,
     });
+  }, 15_000);
+
+  // ─── Path 3: Einsatzort-Wall (Registry #65) ─────────────────────────────
+
+  it('einsatzort wall: unauflösbare PLZ → kein updateCustomer, zurück auf Schritt 3', async () => {
+    // Der Fall Schwenke als Entwurf: PLZ 5-stellig UND Ort gefüllt, also kommt
+    // der Kunde durch das Formular bis „Speichern" — erst Mamamia sagt, dass es
+    // die PLZ nicht gibt (Default-Mock: searchLocations → []). Ohne location_id
+    // stempelt Mamamia einen Platzhalter und der Kunde sieht „Vollständig" für
+    // ein Profil, das nirgends steht; deshalb wird gar nicht gespeichert.
+    let updateCustomerCalls = 0;
+    // Achtung: defaultHandlers() enthält bereits einen proxyHandler und steht
+    // in server.use() zuerst — ein zweiter proxyHandler dahinter käme nie dran.
+    server.use(
+      ...defaultHandlers({
+        proxy: {
+          // Ohne offene Bewerbung rendert das Portal den Patientenbogen (sonst
+          // steht dort „Angebot prüfen").
+          listApplications: () => ({ JobOfferApplicationsWithPagination: { total: 0, data: [] } }),
+          updateCustomer: () => {
+            updateCustomerCalls += 1;
+            return { UpdateCustomer: { id: 9001, customer_id: 'ts-18-9001' } };
+          },
+        },
+      }),
+    );
+
+    localStorage.setItem(
+      `patient_${TEST_LEAD_TOKEN}`,
+      JSON.stringify({
+        _isDraft: true,
+        anzahl: '1', geschlecht: 'Weiblich',
+        mobilitaet: 'Rollatorfähig', heben: 'Nein', demenz: 'Nein', nacht: 'Nein',
+        plz: '50348', ort: 'Lüdinghausen',
+        wohnungstyp: 'Einfamilienhaus', urbanisierung: 'Dorf/Land', startDate: '2026-12-01',
+        wunschGeschlecht: 'Weiblich', fuehrerschein: 'Nein',
+      }),
+    );
+    setLocation(`?token=${TEST_LEAD_TOKEN}`);
+    const user = userEvent.setup();
+    render(<CustomerPortalPage />);
+
+    // Durch die vier Schritte — der Entwurf ist vollständig, also lässt jeder
+    // „Weiter" durch; der Einsatzort fällt erst beim Speichern auf.
+    for (let i = 0; i < 3; i++) {
+      const weiter = await screen.findByRole('button', { name: /^Weiter →$/ }, { timeout: 5000 });
+      await user.click(weiter);
+    }
+    const speichern = await screen.findByRole('button', { name: /^Speichern$/ }, { timeout: 5000 });
+    await user.click(speichern);
+
+    // Der Kunde bekommt den Satz zu sehen — und zwar auf Schritt 3, wo das Feld
+    // steht, nicht auf Schritt 4, wo er geklickt hat.
+    await waitFor(
+      () => expect(screen.getAllByText(/kennen wir keinen Einsatzort/).length).toBeGreaterThan(0),
+      { timeout: 5000 },
+    );
+    // Der Satz nennt die PLZ, um die es geht.
+    expect(screen.getAllByText(/50348/).length).toBeGreaterThan(0);
+    // Und wir stehen wieder auf Schritt 3, wo das Feld ist — nicht auf 4.
+    expect(screen.getByPlaceholderText('PLZ oder Ort eingeben')).toBeTruthy();
+    // Nichts ist nach Mamamia gegangen.
+    expect(updateCustomerCalls).toBe(0);
+    // Und der Entwurf ist nicht als „fertig" markiert worden.
+    expect(JSON.parse(localStorage.getItem(`patient_${TEST_LEAD_TOKEN}`) || '{}')._isDraft)
+      .not.toBe(false);
   }, 15_000);
 });

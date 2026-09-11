@@ -3574,29 +3574,61 @@ const CustomerPortalPage: FC = () => {
             // persisted by the gating write — if AI fails or never lands,
             // the customer profile still has a usable summary.
 
-            // Location lookup synchronous, ~500 ms typical. Required before
-            // building the patch so customer_contract carries the id.
+            // ── Einsatzort-Wall (Registry #65) ───────────────────────────
+            // Ohne `location_id` NICHT speichern. Mamamia stempelt bei einem
+            // unauflösbaren `location_custom_text` einen Platzhalter (prod:
+            // id 16480 für JEDE solche PLZ), kippt den Kunden auf
+            // `status='active'` und das Portal zeigt „Vollständig" für ein
+            // Profil, das nirgends steht — schlimmer als gar kein Speichern.
+            // Der Lookup steht als ERSTES im Handler, also hinterlässt ein
+            // Wurf hier nichts: kein Mamamia-Write, kein Snapshot in
+            // leads.patient_form, keine Mails. Die Arbeit des Kunden bleibt
+            // im localStorage-Entwurf.
             let locationId: number | undefined;
-            let locationUnresolved = false;
-            const plz = form.plz?.trim();
-            if (plz && /^\d{4,5}$/.test(plz)) {
+            let lookupDown = false;
+            const plz = form.plz?.trim() ?? '';
+            const ortEingabe = form.ort?.trim() ?? '';
+            if (/^\d{5}$/.test(plz)) {
               try {
                 const r = await callMamamia<{
                   LocationsWithPagination: {
-                    data: Array<{ id: number; zip_code: string; country_code: string }>;
+                    data: Array<{ id: number; location: string; zip_code: string; country_code: string }>;
                   };
-                }>('searchLocations', { search: plz, limit: 10, page: 1 });
-                const rows = r.LocationsWithPagination.data;
-                locationId = (rows.find(l => l.country_code === 'DE') ?? rows[0])?.id as number | undefined;
-              } catch {
-                // Lookup-Call selbst fehlgeschlagen → wie "nicht gefunden"
-                // behandeln (unten sichtbar gemeldet, NICHT mehr still).
+                  // limit 50, nicht 10: eine PLZ kann viele Ortsteile haben
+                  // ('04916' → 6 Zeilen), und die Wahl des Kunden muss auf die
+                  // Seite passen.
+                }>('searchLocations', { search: plz, limit: 50, page: 1 });
+                const de = r.LocationsWithPagination.data
+                  .filter(l => l.country_code === 'DE' && l.zip_code === plz);
+                // Exakte PLZ, nicht „erster Treffer": `search` matcht PRÄFIXE —
+                // '503' liefert 50321 Brühl (Sonde 11.09.2026). Unter den
+                // Ortsteilen derselben PLZ zuerst den, den der Kunde gewählt hat.
+                locationId = (de.find(l => l.location === ortEingabe) ?? de[0])?.id;
+              } catch (e) {
+                const raw = e instanceof Error ? e.message : String(e ?? '');
+                // Abgelaufene Sitzung ist KEIN Suchausfall. Diese Meldung ist die
+                // einzige Erkennung eines abgelaufenen Tokens mitten in der
+                // Sitzung; sie sitzt sonst im catch der Mutation weiter unten,
+                // den ein Wurf von HIER nicht erreicht (der try umschliesst nur
+                // die Mutation). Also hier melden und erst dann werfen.
+                if (/401|unauthorized|unauthenticated|token/i.test(raw)) {
+                  showToast('Ihr Zugangslink ist abgelaufen. Sie können sich gleich einen neuen Link zusenden lassen.');
+                  setSaveTokenExpired(true);
+                  throw e;
+                }
+                lookupDown = true;
               }
-              // Ort eingegeben, aber Mamamia kennt keinen passenden Einsatzort
-              // (z. B. österreichische PLZ — Mamamias Locations sind deutsch).
-              // location_id ist das Aktivierungs-Gate; ohne ihn bleibt der Kunde
-              // Entwurf → NICHT verschlucken, sondern unten melden (Kunde + Team).
-              locationUnresolved = locationId == null;
+            }
+            if (locationId == null) {
+              reportLeadEvent(
+                lead?.token,
+                'patient_form_location_unresolved',
+                { plz, ort: ortEingabe, ...(lookupDown ? { lookup_down: '1' } : {}) },
+                // Proxy-Ausfall: Zeile ja, Team-Mail nein — sonst schickt eine
+                // 20-Minuten-Störung eine Mail pro Speichern pro Kunde.
+                !lookupDown,
+              );
+              throw new Error(lookupDown ? 'EINSATZORT_LOOKUP' : 'EINSATZORT:' + plz);
             }
 
             const patch = mapPatientFormToUpdateCustomerInput(form, {
@@ -3666,32 +3698,6 @@ const CustomerPortalPage: FC = () => {
             if (startDateForLead) leadEventMeta.startDate = startDateForLead;
             if (vornameForLead) leadEventMeta.vorname = vornameForLead;
             if (nachnameForLead) leadEventMeta.nachname = nachnameForLead;
-            // Einsatzort nicht auflösbar (Ort eingegeben, aber kein Mamamia-
-            // Location-Treffer): NICHT als sauberen Erfolg ausgeben. Die
-            // Patientendaten sind gespeichert (bleiben), aber ohne location_id
-            // bleibt der Kunde in Mamamia Entwurf (keine Einladung/Veröffentlichung).
-            //  1) Kunde sichtbar informieren statt stillem "fertig".
-            //  2) Team-Ereignis loggen — unterscheidet "Ort eingegeben, nicht
-            //     auflösbar" von "leer gelassen" (Dashboard/Report).
-            //  3) Flag am patient_data_saved → der Kostenrechner unterdrückt die
-            //     irreführende "Pflegekräfte können sich bewerben"-Mail.
-            if (locationUnresolved) {
-              const ortLabel = [plz, form.ort?.trim()].filter(Boolean).join(' ');
-              // Deutsche PLZ sind IMMER 5-stellig; eine 4-stellige PLZ ist
-              // Österreich/Schweiz — dort vermittelt Primundus nicht. Dann eine
-              // ehrliche Absage statt „wir kümmern uns darum" (Marcin 03.08.:
-              // „wir bedienen kein Österreich — Info an Kunde wäre perfekt").
-              const outsideGermany = /^\d{4}$/.test(plz ?? '');
-              showToast(outsideGermany
-                ? `Wir vermitteln 24-Stunden-Betreuung aktuell ausschließlich innerhalb Deutschlands${ortLabel ? ` — für Ihren Ort „${ortLabel}"` : ''} können wir daher leider keine Pflegekraft anbieten. Bei Fragen melden Sie sich gern bei uns.`
-                : `Ihre Angaben sind gespeichert. Ihren Ort${ortLabel ? ` „${ortLabel}"` : ''} konnten wir aber nicht automatisch übernehmen — wir kümmern uns darum und melden uns bei Ihnen.`);
-              reportLeadEvent(lead?.token, 'patient_form_location_unresolved', {
-                plz: plz ?? '',
-                ort: form.ort?.trim() ?? '',
-                ...(outsideGermany ? { outside_germany: '1' } : {}),
-              });
-              leadEventMeta.location_unresolved = '1';
-            }
             reportLeadEvent(
               lead?.token,
               'patient_data_saved',

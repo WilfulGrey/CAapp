@@ -404,7 +404,9 @@ async function resolveLocationId(
   ctx: { endpoint: string; token: string; fetchFn: typeof fetch },
 ): Promise<number | null> {
   const z = String(zip ?? "").trim();
-  if (!/^\d{4,5}$/.test(z)) return null;
+  // Genau 5 Ziffern (Registry #65) — eine 4-stellige Angabe ist keine deutsche
+  // PLZ, und `search` würde sie als PRÄFIX behandeln.
+  if (!/^\d{5}$/.test(z)) return null;
   try {
     const res = await mamamiaRequest<{
       LocationsWithPagination: {
@@ -418,7 +420,10 @@ async function resolveLocationId(
       fetchFn: ctx.fetchFn,
     });
     const rows = res.LocationsWithPagination?.data ?? [];
-    return rows.find((l) => l.country_code === "DE")?.id ?? null;
+    // Exakte PLZ, nicht „erster DE-Treffer": `search` matcht PRÄFIXE (Sonde
+    // 11.09.2026: '503' → 50321 Brühl). Hier steht der Einsatzort auf einem
+    // UNTERSCHRIEBENEN Vertrag — eine fremde Stadt ist schlimmer als keine.
+    return rows.find((l) => l.country_code === "DE" && l.zip_code === z)?.id ?? null;
   } catch {
     return null;
   }

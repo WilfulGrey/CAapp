@@ -44,8 +44,9 @@ const ALLOWED_EVENTS = [
   // reine Analyse-Events, KEINE Team-Mail/Nachfass-Verzweigung.
   'patient_form_step',
   'patient_form_save_failed',
-  // Einsatzort eingegeben, aber nicht auf einen Mamamia-location_id auflösbar
-  // (z. B. österreichische PLZ) — Analyse-Event fürs Team, KEINE Mail.
+  // Einsatzort nicht auf einen Mamamia-location_id auflösbar — das Portal hat
+  // deshalb GAR NICHT gespeichert (Registry #65), der Kunde hängt fest. Mit
+  // Team-Mail, sonst erfährt es niemand.
   'patient_form_location_unresolved',
   'caregiver_invited',
   'caregiver_interest_shown',
@@ -107,6 +108,11 @@ const TEAM_NOTIFY_EVENTS = [
   'caregiver_interest_shown',
   'application_received',
   'application_accepted_internal',
+  // Der Kunde kann seinen Patientenbogen nicht abschliessen, weil Mamamia
+  // seine PLZ nicht kennt. Ohne diese Mail merkt es niemand — und die
+  // Nachfass-Kette schickt ihm weiter Erinnerungen an ein Profil, das das
+  // System nicht annimmt (Registry #65).
+  'patient_form_location_unresolved',
 ];
 // Events, die in der Team-Mail einen Pflegekraft-Namen anzeigen sollen.
 // Liest caregiver_name aus dem Event-Metadata und steckt ihn als
@@ -142,6 +148,10 @@ const NON_DEDUPED_EVENTS = new Set([
   'acceptance_sync_alarm',       // jeder Alarm-Versuch wird aufgezeichnet
   'angebots_feedback',           // Tap + Detail = zwei Einträge; darf sich später ändern
   'bewertungs_feedback',         // Tap + Detail = zwei Einträge (Bewertungs-Seite)
+  // Jede abgelehnte PLZ zählt: korrigiert der Kunde „50348" zu „50384" (auch
+  // falsch), wäre der zweite Versuch sonst stumm und das Team sähe für immer
+  // nur den ersten.
+  'patient_form_location_unresolved',
 ]);
 // Customer-facing Mails (an die Lead-Email) je Event. Trigger sind die neuen
 // Caregiver-Lifecycle-Events; das eigentliche Hooking aus Mamamia kommt
@@ -1129,7 +1139,19 @@ async function handlePost(request: NextRequest) {
                     ? (metadata as Record<string, unknown>).mamamia_accepted
                     : undefined,
                 }
-              : undefined);
+              : (event === 'patient_form_location_unresolved' && metadata && typeof metadata === 'object'
+                  ? {
+                      // Ohne diese Felder stünde in der Mail nur „Lead-Update" —
+                      // das Team braucht die PLZ, um anrufen zu können.
+                      PLZ: (metadata as Record<string, unknown>).plz || '(leer)',
+                      Ort: (metadata as Record<string, unknown>).ort || '(leer)',
+                      // Nur wenn zutreffend — sonst stünde in jeder Mail ein
+                      // „false", das niemand braucht.
+                      ...((metadata as Record<string, unknown>).lookup_down === '1'
+                        ? { Hinweis: 'Die Ortssuche war nicht erreichbar — evtl. eine Störung, nicht die PLZ.' }
+                        : {}),
+                    }
+                  : undefined));
       const teamTemplate = getTeamNotificationTemplate(lead as any, event, additionalData as any);
       // Nur die Accept-/Buchungs-Mail bekommt das erweiterte interne BCC.
       const teamMailOptions = event === 'application_accepted_internal'
