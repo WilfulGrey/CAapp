@@ -150,9 +150,12 @@ und `data {customer_action, 2000, EUR}`. **Keine Personendaten** — kein
 Grenze wie beim Google-Upload; das `user`-Objekt der API (E-Mail/Telefon
 SHA-256) bleibt eine Entscheidung mit Datenschutztext, nicht ein Default.
 
-Betrieb: Schlüssel = Supabase-Secret `OPENAI_ADS_CAPI_KEY` (Manager → Conversions
-→ Conversion-Schlüssel → „Neuen Schlüssel erstellen"; Staging hat keinen →
-Function antwortet `{skipped}`). Vertragstest ohne Speichern:
+Betrieb: Schlüssel aus dem Manager (Conversions → Conversion-Schlüssel →
+„Neuen Schlüssel erstellen", Name „Supabase openai-conversions", 11.09.2026)
+liegt im **Supabase Vault** als `openai_ads_capi_key` (RPC
+`get_openai_ads_secrets`, Migration `20260911130000`) — das CLI-Token darf
+keine Function-Secrets setzen (wie bei Google). Env `OPENAI_ADS_CAPI_KEY`
+hätte Vorrang. Staging hat keinen Eintrag → Function antwortet `{skipped}`. Vertragstest ohne Speichern:
 `{"validateOnly": true}`; nur zählen: `{"dryRun": true}`. 400/404/422 =
 `permanent_failure` mit Notiz, 401/403/429/5xx/Netz = nächster Lauf.
 Cron-Fenster 6 Tage (die API nimmt 7).

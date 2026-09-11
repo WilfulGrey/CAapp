@@ -12,7 +12,8 @@
 // Personendaten, nur Kennung, Zeitpunkt und fester Wert (20 €).
 //
 // Verhalten:
-//   - Ohne OPENAI_ADS_CAPI_KEY in der Env (Staging): 200 {skipped}.
+//   - Ohne Schlüssel (Env OPENAI_ADS_CAPI_KEY oder Vault openai_ads_capi_key
+//     über RPC get_openai_ads_secrets; Staging): 200 {skipped}.
 //   - Bereits gemeldete/permanent gescheiterte Leads stehen in
 //     openai_conversion_uploads und werden nie erneut versucht;
 //     retriable Fehler (Schlüssel, Limit, 5xx, Netz) bleiben unmarkiert.
@@ -83,13 +84,22 @@ Deno.serve(async (req: Request) => {
     // leerer Body ist ok (Cron schickt {})
   }
 
-  const apiKey = Deno.env.get("OPENAI_ADS_CAPI_KEY") ?? "";
+  const supabase = createClient(Deno.env.get("SUPABASE_URL")!, serviceKey);
+
+  // Schlüssel: Env zuerst, sonst Vault (RPC get_openai_ads_secrets, Migration
+  // 20260911130000) — das CLI-Token darf hier keine Function-Secrets setzen,
+  // gleiches Muster wie get_google_ads_secrets.
+  let apiKey = Deno.env.get("OPENAI_ADS_CAPI_KEY") ?? "";
   if (!apiKey) {
-    console.log("openai-conversions: OPENAI_ADS_CAPI_KEY fehlt — skip (Staging?)");
+    const { data, error } = await supabase.rpc("get_openai_ads_secrets");
+    if (error) console.log(`openai-conversions: Vault-RPC fehlgeschlagen: ${error.message}`);
+    const k = (data as { capiKey?: unknown } | null)?.capiKey;
+    if (typeof k === "string") apiKey = k;
+  }
+  if (!apiKey) {
+    console.log("openai-conversions: kein Conversion-Schlüssel (Env/Vault) — skip (Staging?)");
     return json(200, { skipped: "openai capi key not configured" });
   }
-
-  const supabase = createClient(Deno.env.get("SUPABASE_URL")!, serviceKey);
   const jetzt = Date.now();
   const sinceIso = new Date(jetzt - MAX_ALTER_TAGE * 86_400_000).toISOString();
 
