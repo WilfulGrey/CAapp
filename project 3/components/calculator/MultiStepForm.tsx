@@ -194,7 +194,9 @@ export function MultiStepForm({ mode = 'inline' }: MultiStepFormProps = {}) {
     analytics.trackEvent('wizard', 'kraefte_wahl', { aktion: 'button', kraft_id: null });
     zaehle('cta_geklickt', 'vorschau');
     setTimeout(() => {
-      document.getElementById('kontakt-schranke')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      // Kontakt ist ein eigener Schritt (keine Karten mehr darüber): an den
+      // Kartenanfang, damit Kopf und Siegel sichtbar bleiben (11.09.).
+      document.querySelector('[data-calculator-card]')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
       document.getElementById('kontakt-name')?.focus({ preventScroll: true });
     }, 60);
   };
@@ -1077,11 +1079,24 @@ export function MultiStepForm({ mode = 'inline' }: MultiStepFormProps = {}) {
               {/* Vorschau-Modus (Registry #61, Runde 3): dieselbe Zahl wie am
                   Ende der Animation, und kein „Angebot ist fertig", solange der
                   Kunde noch keinen Preis sieht. */}
-              <p className="text-center text-base font-bold uppercase tracking-wide text-white mb-1.5">
-                {vorschauModus && !kontaktOffen ? kopfzeile().titel : SCHRANKE.kopf}
-              </p>
-              {vorschauModus && !kontaktOffen && (
-                <p className="text-center text-sm text-white/90">{kopfzeile().text}</p>
+              {vorschauModus && !kontaktOffen ? (
+                <>
+                  <p className="text-center text-base font-bold uppercase tracking-wide text-white mb-1.5">{kopfzeile().titel}</p>
+                  <p className="text-center text-sm text-white/90">{kopfzeile().text}</p>
+                </>
+              ) : (
+                // Kontakt-Schritt: Siegel links im grünen Kopf (Martin 11.09.:
+                // „ich will das Siegel"). Drei Varianten gegen 390×664 geprüft:
+                // zentriert darüber schob den Knopf im Ersatzkasten unter die
+                // Falz, überlappend verdeckte es den Balken.
+                <div className="flex items-center gap-3.5 py-0.5">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src="/images/primundus_testsieger-2021.webp" alt="Testsieger DIE WELT Service-Champions" className="h-[74px] w-auto rounded-[5px] shadow-[0_2px_8px_rgba(0,0,0,0.2)] flex-shrink-0" />
+                  <div>
+                    <p className="text-base font-bold uppercase tracking-wide text-white leading-tight">{SCHRANKE.kopf}</p>
+                    <p className="text-[13px] font-medium text-white/95 leading-snug mt-1">{SCHRANKE.auszeichnung}</p>
+                  </div>
+                </div>
               )}
             </>
           ) : (
@@ -1445,14 +1460,6 @@ export function MultiStepForm({ mode = 'inline' }: MultiStepFormProps = {}) {
                               {/* Strecke v2 (11.09.): kein zweites „5 Pflegekräfte" und keine
                                   Frage mehr — die Kräfte standen einen Schritt vorher. Nur der
                                   Grund, warum wir die Daten brauchen. */}
-                              <div className="flex items-center gap-3 mb-3">
-                                {/* eslint-disable-next-line @next/next/no-img-element */}
-                                <img src="/images/primundus_testsieger-2021.webp" alt="Testsieger DIE WELT Service-Champions" className="w-11 h-11 object-contain flex-shrink-0" />
-                                <div className="leading-tight">
-                                  <p className="text-[14px] font-bold text-[#3D3D3D]">{SCHRANKE.testsiegerTitel}</p>
-                                  <p className="text-[12px] text-[#8A8279]">{SCHRANKE.testsiegerText}</p>
-                                </div>
-                              </div>
                               <p className="text-[15px] leading-snug text-[#3D3D3D]">{SCHRANKE.text}</p>
                             </div>
                           );
@@ -1518,15 +1525,7 @@ export function MultiStepForm({ mode = 'inline' }: MultiStepFormProps = {}) {
                           nicht hier — auf diesem Schritt sagen wir „Ihr Angebot
                           ist fertig", eine generische Spanne daneben wirkte
                           widersprüchlich (Martins Einwand 15.08.). */}
-                      <div className="pt-3">
-                        <div className="flex items-center gap-3 mb-3">
-                          {/* eslint-disable-next-line @next/next/no-img-element */}
-                          <img src="/images/primundus_testsieger-2021.webp" alt="Testsieger DIE WELT Service-Champions" className="w-11 h-11 object-contain flex-shrink-0" />
-                          <div className="leading-tight">
-                            <p className="text-[14px] font-bold text-[#3D3D3D]">{SCHRANKE.testsiegerTitel}</p>
-                            <p className="text-[12px] text-[#8A8279]">{SCHRANKE.testsiegerText}</p>
-                          </div>
-                        </div>
+                      <div className="pt-1">
                         <p className="text-[15px] leading-snug text-[#3D3D3D]">{SCHRANKE.text}</p>
                       </div>
                     </>

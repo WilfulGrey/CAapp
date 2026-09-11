@@ -194,11 +194,9 @@ export const SCHRANKE = {
   telefonHinweis: 'Nur bei Rückfragen zum Angebot',
   knopf: KNOPF,
   fussnote: 'Sofort sichtbar · kostenlos · unverbindlich',
-  // Vertrauenszeile direkt unter „Ihr Preis ist berechnet" (Martin 11.09.).
-  // Wortlaut = Siegel-Text (Testsieger-Formulierungslinie): kein
-  // „Preis-Leistung" am Testsieger — die Studie ist eine Service-Studie.
-  testsiegerTitel: '6× Testsieger DIE WELT',
-  testsiegerText: 'Nr. 1 der Pflegekräfte-Vermittler',
+  // Zeile unter „Ihr Preis ist berechnet", neben dem Siegel im grünen Kopf
+  // (Martin 11.09.); Wortlaut wie die Lorbeer-Zeile der Pria-Seite.
+  auszeichnung: '6-facher Preis-Leistungssieger in Folge',
 };
 
 /** Antwort der Function absichern — nur, was die Karte braucht, nie mehr. */
