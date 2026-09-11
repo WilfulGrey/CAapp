@@ -1110,7 +1110,7 @@ Suites:
 Cross-app importy z `project 3/` w root-vitest są dozwolone WYŁĄCZNIE dla
 pure modułów (zero importów Next/supabase; type-importy OK). Aktualna
 lista: `portal-url.ts`, `portal-lead.ts`, `portal-parser.ts`, `portal-csv.ts`, `angaben-diff.ts`,
-`angaben-labels.ts` (Registry #55), `oaiq.ts`, `pflegena.ts` (Registry #59), `zaehler.ts` (Registry #63).
+`angaben-labels.ts` (Registry #55), `oaiq.ts`, `pflegena.ts` (Registry #59), `zaehler.ts` (Registry #63), `telefon.ts` (Telefon im Kontakt-Schritt: nur Ziffern/+/Trennzeichen, 8–15 Ziffern; Server bleibt bei ≥6).
 
 ### Edge Functions (Deno)
 

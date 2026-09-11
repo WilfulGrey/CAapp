@@ -11,6 +11,9 @@ import { useFormTracking } from "@/hooks/use-form-tracking";
 import { deutschBalken, GANZ_SICHTBAR, kopfzeile, kraefteVorschauAktiv, kraftFakten, parseVorschau, PORTAL_ANZAHL, SCHRANKE, VERLAUF, WARTE, wuenscheAusAntworten, type VorschauKraft } from "@/lib/kraefte-vorschau";
 import { zaehle } from "@/lib/zaehler";
 import { meldeAnfrage } from "@/lib/oaiq";
+import { telefonBereinigen, telefonFehler, telefonGueltig } from "@/lib/telefon";
+
+const EMAIL_MUSTER = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 // ─── Matching Animation Component ────────────────────────────────────────────
 // Läuft zwischen letzter Frage (Step 8) und Kontaktformular (Step 9). 3 Schritte
@@ -546,10 +549,11 @@ export function MultiStepForm({ mode = 'inline' }: MultiStepFormProps = {}) {
       case 7: return Boolean(state.driving);
       case 8: return Boolean(state.gender);
       // Step 9 Kontaktformular: Name + E-Mail + Telefon alle drei Pflicht.
-      // Telefon-Plausibilität wird in validateForm() detailliert geprüft;
-      // hier reicht "nicht leer" für die Weiter-Button-Aktivierung.
-      // Telefon ist Pflicht (Rückrufe durch die Beratung; Server verlangt es ebenso).
-      case 9: return Boolean(formData.name.trim() && formData.email.trim() && formData.phone.trim());
+      // Knopf erst aktiv, wenn E-Mail und Telefon plausibel sind (Martin
+      // 11.09.: „Buchstaben eingeben und der Button ist sofort aktiv") —
+      // dieselbe Prüfung wie validateForm(), Hinweise erscheinen beim Verlassen
+      // des Feldes.
+      case 9: return Boolean(formData.name.trim() && EMAIL_MUSTER.test(formData.email.trim()) && telefonGueltig(formData.phone));
       default: return false;
     }
   };
@@ -573,19 +577,13 @@ export function MultiStepForm({ mode = 'inline' }: MultiStepFormProps = {}) {
     }
     if (!formData.email.trim()) {
       newErrors.email = 'Bitte geben Sie Ihre E-Mail-Adresse ein';
-    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
+    } else if (!EMAIL_MUSTER.test(formData.email.trim())) {
       newErrors.email = 'Bitte geben Sie eine gültige E-Mail-Adresse ein';
     }
-    // Telefon mild geprüft — alles mit ≥6 Ziffern akzeptieren. Lässt
-    // gängige DACH-Formate zu (+49 30 123456, 030/12345, 015123…) und
-    // lehnt klare Fehleingaben ("abc", "1") ab. Strengere Formate hätten
-    // False-Negatives produziert.
-    const phoneDigits = (formData.phone ?? '').replace(/\D/g, '');
-    if (!formData.phone.trim()) {
-      newErrors.phone = 'Bitte geben Sie Ihre Telefonnummer ein';
-    } else if (phoneDigits.length < 6) {
-      newErrors.phone = 'Bitte geben Sie eine gültige Telefonnummer ein';
-    }
+    // Telefon: 8–15 Ziffern, nur Ziffern/+/Trennzeichen (lib/telefon.ts,
+    // Maßstab 284 echte Anfragen). Der Server prüft weiter mild (≥6), damit
+    // Pria- und Portal-Wege nicht an der strengeren Regel scheitern.
+    newErrors.phone = telefonFehler(formData.phone ?? '');
 
     // Datenschutz-Einwilligung wurde durch Soft-Consent ersetzt (Hinweistext
     // unter dem CTA, das Absenden gilt als Zustimmung) — kein explizites
@@ -1547,7 +1545,12 @@ export function MultiStepForm({ mode = 'inline' }: MultiStepFormProps = {}) {
                         setErrors({ ...errors, email: '' });
                       }}
                       onFocus={() => trackFieldFocus('email')}
-                      onBlur={(e) => trackFieldBlur('email', e.target.value)}
+                      onBlur={(e) => {
+                        trackFieldBlur('email', e.target.value);
+                        if (e.target.value.trim() && !EMAIL_MUSTER.test(e.target.value.trim())) {
+                          setErrors((alt) => ({ ...alt, email: 'Bitte geben Sie eine gültige E-Mail-Adresse ein' }));
+                        }
+                      }}
                       className={`w-full px-4 py-3 text-base border-[1.5px] rounded-xl bg-white focus:outline-none focus:ring-1 focus:ring-[#8B7355]/40 focus:border-[#8B7355] ${
                         errors.email ? 'border-red-500' : 'border-[#CFC6B8]'
                       }`}
@@ -1561,12 +1564,17 @@ export function MultiStepForm({ mode = 'inline' }: MultiStepFormProps = {}) {
                     <input
                       type="tel"
                       value={formData.phone}
+                      inputMode="tel"
                       onChange={(e) => {
-                        setFormData({ ...formData, phone: e.target.value });
+                        setFormData({ ...formData, phone: telefonBereinigen(e.target.value) });
                         setErrors({ ...errors, phone: '' });
                       }}
                       onFocus={() => trackFieldFocus('phone')}
-                      onBlur={(e) => trackFieldBlur('phone', e.target.value)}
+                      onBlur={(e) => {
+                        trackFieldBlur('phone', e.target.value);
+                        // Hinweis erst nach dem Tippen, nie auf ein leeres Feld.
+                        if (e.target.value.trim()) setErrors((alt) => ({ ...alt, phone: telefonFehler(e.target.value) }));
+                      }}
                       className={`w-full px-4 py-3 text-base border-[1.5px] rounded-xl bg-white focus:outline-none focus:ring-1 focus:ring-[#8B7355]/40 focus:border-[#8B7355] ${
                         errors.phone ? 'border-red-500' : 'border-[#CFC6B8]'
                       }`}
