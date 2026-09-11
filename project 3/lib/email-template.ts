@@ -255,6 +255,17 @@ export function getEmailLayout({ content, preheader, siteUrl }: EmailLayoutProps
         padding: 14px 20px;
       }
     }
+
+    /* Marta-Signaturkarte auf dem Handy (11.09.2026): Siegel-Spalte schmaler
+       ("DIE WELT" eigene Zeile, Bild 48 px), sonst passt sie nicht neben Foto
+       + Name und die Mail wird breiter als der Bildschirm. Eigene Grenze
+       480 px: ein 600 px breites Fenster behaelt exakt die Desktop-Karte.
+       Gleiche Regeln in caregiverMailShell / send-scheduled-emails. */
+    @media only screen and (max-width: 480px) {
+      .sig-siegel-welt { display: block !important; }
+      .sig-siegel-bild { width: 48px !important; }
+      .sig-siegel-innen { padding: 6px 8px !important; }
+    }
   </style>
 </head>
 <body>

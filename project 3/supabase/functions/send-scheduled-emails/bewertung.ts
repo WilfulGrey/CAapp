@@ -124,6 +124,7 @@ export function getBewertungsanfrageTemplate(
   .email-content { padding:36px 40px 32px; text-align:left; }
   .email-footer { background-color:#f8f9fa; padding:30px; text-align:center; border-top:1px solid #e0e0e0; }
   @media only screen and (max-width:600px) { .email-content { padding:28px 20px; } .email-header { padding:20px; } }
+  @media only screen and (max-width:480px) { .sig-pille { display:inline-block !important; padding:0 6px 6px 0 !important; } }
 </style></head>
 <body>
 <div class="email-wrapper">
@@ -230,20 +231,22 @@ export function getBewertungsanfrageTemplate(
               <p style="margin:0;font-size:12px;color:#9a8a73;white-space:nowrap;">Mo &ndash; So, 8 &ndash; 20 Uhr</p>
             </td>
           </tr></table>
+          <!-- Drei Pillen nebeneinander brauchen ~340 px; auf dem Handy (.sig-pille,
+               Media-Query oben) laufen sie in eine zweite Zeile statt aus der Mail. -->
           <table cellpadding="0" cellspacing="0" role="presentation" style="margin-top:12px;"><tr>
-            <td style="padding-right:6px;">
+            <td class="sig-pille" style="padding-right:6px;">
               <a href="tel:+4989200000830"
                  style="display:inline-block;background-color:#ffffff;border:1px solid #dcdcdc;
                         border-radius:16px;padding:6px 13px;text-decoration:none;font-size:12px;
                         font-weight:500;color:#777777;white-space:nowrap;font-family:${SANS};">&#9990; 089 200 000 830</a>
             </td>
-            <td style="padding-right:6px;">
+            <td class="sig-pille" style="padding-right:6px;">
               <a href="https://wa.me/4989200000830"
                  style="display:inline-block;background-color:#ffffff;border:1px solid #dcdcdc;
                         border-radius:16px;padding:6px 13px;text-decoration:none;font-size:12px;
                         font-weight:500;color:#777777;white-space:nowrap;font-family:${SANS};">WhatsApp</a>
             </td>
-            <td>
+            <td class="sig-pille">
               <a href="mailto:info@primundus.de"
                  style="display:inline-block;background-color:#ffffff;border:1px solid #dcdcdc;
                         border-radius:16px;padding:6px 13px;text-decoration:none;font-size:12px;

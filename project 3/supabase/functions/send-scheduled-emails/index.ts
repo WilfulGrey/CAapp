@@ -249,6 +249,18 @@ function buildEmailWrapper(
          Die Faktenzeile laeuft ohnehin ueber die volle Kartenbreite. */
       .empf-foto { padding-left: 0 !important; }
     }
+    /* Handy (11.09.2026): Signatur-Karte (buildMartaSig) — "DIE WELT" in eine
+       eigene Zeile, Siegelbild kleiner, sonst passt die Siegel-Spalte nicht
+       neben Foto + Name. Kopfzeile mit 20 statt 40 px Rand wie in
+       lib/email-template.ts (Logo 160 + Siegel-Block brauchten mit 40 px
+       Rand 363 px). Eigene Grenze 480 statt 600 px: ein 600 px breites
+       Fenster behaelt exakt die Desktop-Optik. */
+    @media only screen and (max-width: 480px) {
+      .email-header { padding: 20px 20px 16px 20px !important; }
+      .sig-siegel-welt { display: block !important; }
+      .sig-siegel-bild { width: 48px !important; }
+      .sig-siegel-innen { padding: 6px 8px !important; }
+    }
   </style>
 </head>
 <body>
@@ -322,6 +334,13 @@ function buildMartaSig(siteUrl: string): string {
   const martaUrl = "https://primundus.de/images/marta-kapcio.jpg";
   const testUrl = `${siteUrl}/images/primundus_testsieger-2021.webp`;
   const mediaBase = `${siteUrl}/images/media`;
+  // Handy (11.09.2026): Die Karte war mit nowrap-Zeilen, Siegel-Spalte und
+  // Presselogo-Leiste mindestens 381 px breit — jede Mail lief auf 360–390 px
+  // Bildschirmen seitlich raus. Deshalb duerfen Name/Zeiten umbrechen (am
+  // Desktop ist Platz, dort bricht nichts), das Siegel bekommt einen festen
+  // Abstand und wird per .sig-siegel-* (Media-Query in buildEmailWrapper)
+  // schmaler, die Logos schrumpfen ueber max-width mit. Gleiche Karte in
+  // lib/email.ts — Aenderungen immer an ALLEN Kopien.
   return `
     <p style="font-size:16px;line-height:1.7;color:#555;margin-top:24px;margin-bottom:16px;">Mit freundlichen Grüßen<br><strong style="color:#3D2B1F;">Marta Kapcio</strong></p>
     <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="margin:0 0 24px 0;border:1px solid #e8ddd0;border-radius:12px;overflow:hidden;">
@@ -336,9 +355,9 @@ function buildMartaSig(siteUrl: string): string {
                       <img src="${martaUrl}" alt="Marta Kapcio" width="60" style="display:block;width:60px;height:auto;border-radius:8px;" />
                     </td>
                     <td style="vertical-align:middle;">
-                      <p style="margin:0 0 2px;font-size:15px;font-weight:700;color:#3D2B1F;white-space:nowrap;">Marta Kapcio</p>
-                      <p style="margin:0 0 2px;font-size:13px;color:#555;white-space:nowrap;">Pflegeberaterin</p>
-                      <p style="margin:0;font-size:12px;color:#9a8a73;white-space:nowrap;">Mo – So, 8 – 20 Uhr</p>
+                      <p style="margin:0 0 2px;font-size:15px;font-weight:700;color:#3D2B1F;">Marta Kapcio</p>
+                      <p style="margin:0 0 2px;font-size:13px;color:#555;">Pflegeberaterin</p>
+                      <p style="margin:0;font-size:12px;color:#9a8a73;"><span style="white-space:nowrap;">Mo – So,</span> <span style="white-space:nowrap;">8 – 20 Uhr</span></p>
                     </td>
                   </tr>
                 </table>
@@ -351,13 +370,13 @@ function buildMartaSig(siteUrl: string): string {
                   </td></tr>
                 </table>
               </td>
-              <td style="vertical-align:top;text-align:right;">
+              <td style="vertical-align:top;text-align:right;padding-left:10px;">
                 <table cellpadding="0" cellspacing="0" role="presentation" style="border:1px solid #e8ddd0;border-radius:8px;overflow:hidden;margin-left:auto;">
                   <tr>
-                    <td style="padding:8px 10px;background:#ffffff;text-align:center;vertical-align:top;">
-                      <img src="${testUrl}" alt="Testsieger DIE WELT" width="64" style="display:block;width:64px;height:auto;margin:0 auto 5px;" />
-                      <p style="margin:0 0 1px;font-size:11px;font-weight:700;color:#3D2B1F;white-space:nowrap;">6× Testsieger <span style="color:#B5A184;">DIE WELT</span></p>
-                      <p style="margin:0;font-size:10px;color:#888;line-height:1.4;">Preis, Qualität &amp;<br>Kundenservice</p>
+                    <td class="sig-siegel-innen" style="padding:8px 10px;background:#ffffff;text-align:center;vertical-align:top;">
+                      <img class="sig-siegel-bild" src="${testUrl}" alt="Testsieger DIE WELT" width="64" style="display:block;width:64px;height:auto;margin:0 auto 5px;" />
+                      <p style="margin:0 0 1px;font-size:11px;font-weight:700;color:#3D2B1F;"><span style="white-space:nowrap;">6× Testsieger</span> <span class="sig-siegel-welt" style="color:#B5A184;white-space:nowrap;">DIE WELT</span></p>
+                      <p style="margin:0;font-size:10px;color:#888;line-height:1.4;"><span style="white-space:nowrap;">Preis, Qualität &amp;</span><br>Kundenservice</p>
                     </td>
                   </tr>
                 </table>
@@ -386,12 +405,15 @@ function buildMartaSig(siteUrl: string): string {
       <tr>
         <td style="background:#ffffff;border-top:1px solid #e8ddd0;padding:12px 16px;">
           <table width="100%" cellpadding="0" cellspacing="0" role="presentation"><tr>
-            <td style="text-align:center;vertical-align:middle;padding:0 4px;"><img src="${mediaBase}/die-welt.webp" alt="DIE WELT" height="14" style="display:inline-block;height:14px;width:auto;opacity:0.4;filter:grayscale(100%);" /></td>
-            <td style="text-align:center;vertical-align:middle;padding:0 4px;"><img src="${mediaBase}/frankfurter-allgemeine.webp" alt="FAZ" height="14" style="display:inline-block;height:14px;width:auto;opacity:0.4;filter:grayscale(100%);" /></td>
-            <td style="text-align:center;vertical-align:middle;padding:0 4px;"><img src="${mediaBase}/ard.webp" alt="ARD" height="14" style="display:inline-block;height:14px;width:auto;opacity:0.4;filter:grayscale(100%);" /></td>
-            <td style="text-align:center;vertical-align:middle;padding:0 4px;"><img src="${mediaBase}/ndr.webp" alt="NDR" height="14" style="display:inline-block;height:14px;width:auto;opacity:0.4;filter:grayscale(100%);" /></td>
-            <td style="text-align:center;vertical-align:middle;padding:0 4px;"><img src="${mediaBase}/sat1.webp" alt="SAT.1" height="14" style="display:inline-block;height:14px;width:auto;opacity:0.4;filter:grayscale(100%);" /></td>
-            <td style="text-align:center;vertical-align:middle;padding:0 4px;"><img src="${mediaBase}/bild-der-frau.webp" alt="Bild der Frau" height="14" style="display:inline-block;height:14px;width:auto;opacity:0.4;filter:grayscale(100%);" /></td>
+            <!-- Feste Breite = Logo bei 14 px Hoehe; max-width laesst die Leiste
+                 auf schmalen Bildschirmen gleichmaessig schrumpfen (Outlook nimmt
+                 width/height-Attribute, max-width kennt es nicht — dort ist Platz). -->
+            <td style="text-align:center;vertical-align:middle;padding:0 4px;"><img src="${mediaBase}/die-welt.webp" alt="DIE WELT" width="68" height="14" style="display:inline-block;width:68px;max-width:100%;height:auto;opacity:0.4;filter:grayscale(100%);" /></td>
+            <td style="text-align:center;vertical-align:middle;padding:0 4px;"><img src="${mediaBase}/frankfurter-allgemeine.webp" alt="FAZ" width="103" height="14" style="display:inline-block;width:103px;max-width:100%;height:auto;opacity:0.4;filter:grayscale(100%);" /></td>
+            <td style="text-align:center;vertical-align:middle;padding:0 4px;"><img src="${mediaBase}/ard.webp" alt="ARD" width="38" height="14" style="display:inline-block;width:38px;max-width:100%;height:auto;opacity:0.4;filter:grayscale(100%);" /></td>
+            <td style="text-align:center;vertical-align:middle;padding:0 4px;"><img src="${mediaBase}/ndr.webp" alt="NDR" width="21" height="14" style="display:inline-block;width:21px;max-width:100%;height:auto;opacity:0.4;filter:grayscale(100%);" /></td>
+            <td style="text-align:center;vertical-align:middle;padding:0 4px;"><img src="${mediaBase}/sat1.webp" alt="SAT.1" width="45" height="14" style="display:inline-block;width:45px;max-width:100%;height:auto;opacity:0.4;filter:grayscale(100%);" /></td>
+            <td style="text-align:center;vertical-align:middle;padding:0 4px;"><img src="${mediaBase}/bild-der-frau.webp" alt="Bild der Frau" width="12" height="14" style="display:inline-block;width:12px;max-width:100%;height:auto;opacity:0.4;filter:grayscale(100%);" /></td>
           </tr></table>
         </td>
       </tr>
