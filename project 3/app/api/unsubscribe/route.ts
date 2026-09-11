@@ -61,9 +61,32 @@ async function unsubscribeByToken(token: unknown): Promise<{ ok: boolean; status
   return { ok: true, status: 200 };
 }
 
+// Partner-Akquise (Rundmail an Vermittler, send-partner-akquise): eigener
+// Token in partner_kontakte. Ein Klick stoppt die ganze Reihe. Angemeldete
+// Partner bleiben „angemeldet“ — für sie läuft ohnehin keine Akquise mehr.
+async function unsubscribePartner(p: unknown): Promise<{ ok: boolean; status: number }> {
+  if (typeof p !== 'string' || !/^[0-9a-f-]{36}$/i.test(p)) return { ok: false, status: 400 };
+  const supabase = getSupabaseClient();
+  await supabase
+    .from('partner_kontakte')
+    .update({ status: 'abgemeldet', status_seit: new Date().toISOString() })
+    .eq('abmelde_token', p)
+    .neq('status', 'angemeldet');
+  // Unbekannter Token → trotzdem 200 (kein Enumeration-Signal).
+  return { ok: true, status: 200 };
+}
+
 async function handlePost(request: NextRequest) {
   try {
-    const { token } = await request.json();
+    // One-Click aus dem Mailprogramm (RFC 8058) schickt den Token in der URL
+    // und als Body nur „List-Unsubscribe=One-Click“ — kein JSON.
+    const p = request.nextUrl.searchParams.get('p');
+    const body = p ? {} : await request.json().catch(() => ({}));
+    if (p || body.p) {
+      const r = await unsubscribePartner(p ?? body.p);
+      return NextResponse.json(r.ok ? { ok: true } : { error: 'Token fehlt' }, { status: r.status });
+    }
+    const { token } = body;
     const r = await unsubscribeByToken(token);
     return NextResponse.json(r.ok ? { ok: true } : { error: 'Token fehlt' }, { status: r.status });
   } catch (e) {
@@ -76,8 +99,9 @@ async function handlePost(request: NextRequest) {
 // Link-Aufruf. Liefert ok auch bei unbekanntem Token (kein Enumeration-Hinweis).
 async function handleGet(request: NextRequest) {
   try {
+    const p = request.nextUrl.searchParams.get('p');
     const token = request.nextUrl.searchParams.get('token');
-    const r = await unsubscribeByToken(token);
+    const r = p ? await unsubscribePartner(p) : await unsubscribeByToken(token);
     return NextResponse.json(r.ok ? { ok: true } : { error: 'Token fehlt' }, { status: r.status });
   } catch (e) {
     console.error('unsubscribe error:', e instanceof Error ? e.message : String(e));
