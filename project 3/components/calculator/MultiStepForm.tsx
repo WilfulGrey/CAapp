@@ -8,10 +8,12 @@ import { analytics, variantenSeite, websiteHerkunft } from "@/lib/analytics";
 import { cookieConsent } from "@/lib/cookie-consent";
 import { scrollToCalculator, isCalculatorAligned, OPEN_CALCULATOR_EVENT } from "@/lib/scroll-to-calculator";
 import { useFormTracking } from "@/hooks/use-form-tracking";
-import { naechsterDrift, naechsterAbstandMs } from "@/lib/counter-drift";
 import { deutschBalken, GANZ_SICHTBAR, kopfzeile, kraefteVorschauAktiv, kraftFakten, parseVorschau, PORTAL_ANZAHL, SCHRANKE, VERLAUF, WARTE, wuenscheAusAntworten, type VorschauKraft } from "@/lib/kraefte-vorschau";
 import { zaehle } from "@/lib/zaehler";
 import { meldeAnfrage } from "@/lib/oaiq";
+import { telefonBereinigen, telefonFehler, telefonGueltig } from "@/lib/telefon";
+
+const EMAIL_MUSTER = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 // ─── Matching Animation Component ────────────────────────────────────────────
 // Läuft zwischen letzter Frage (Step 8) und Kontaktformular (Step 9). 3 Schritte
@@ -27,9 +29,9 @@ function MatchingAnimation({ onComplete, initialCount, vorschau }: { onComplete:
   const onCompleteRef = useRef(onComplete);
   onCompleteRef.current = onComplete;
 
-  // Vorschau-Modus (Registry #61, Martins Aufbau 10.09.): zwei Schritte —
-  // „Sofortangebot berechnet" und „5 passende Pflegekräfte gefunden", dann
-  // automatisch weiter. Sonst die drei Schritte des normalen Rechners.
+  // Vorschau-Modus (Registry #61): drei Schritte aus WARTE („Preis
+  // berechnet", Suche, „Verfügbarkeit geprüft"), dann automatisch weiter.
+  // Sonst die drei Schritte des normalen Rechners.
   const ANIM_STEPS = vorschau
     ? [
         { label: WARTE.schritt1, sub: '', icon: '📋', duration: 3200 },
@@ -241,7 +243,11 @@ export function MultiStepForm({ mode = 'inline' }: MultiStepFormProps = {}) {
      Beim Drift weiter unten war die Falle bekannt („ERST NACH MOUNT"), bei der
      Basis darunter nicht. Also derselbe Weg: im Render ein fester Wert, den
      Server und Browser gleich berechnen, das echte Datum erst im Effekt. Der
-     Nachzug faellt nicht auf — der Zaehler bewegt sich ohnehin von selbst. */
+     Nachzug faellt nicht auf.
+     Seit 11.09.2026 (Strecke v2) ist die Zahl NUR noch der Startwert der
+     Warte-Animation, die auf 5 herunterzaehlt. Der Zaehler im Formular, der
+     mit Zufallsschwankung sprang (76 → 75 → 69 → 70 …), ist raus: eine Zahl,
+     die nach eingrenzenden Antworten steigt, sah gefaelscht aus. */
   const TAGESBASIS_SSR = 75;   // Mitte von 71..78
   const [dailyBase, setDailyBase] = useState(TAGESBASIS_SSR);
   useEffect(() => {
@@ -269,65 +275,6 @@ export function MultiStepForm({ mode = 'inline' }: MultiStepFormProps = {}) {
     return Math.max(12, count);
   }
 
-  const displayCountRef = useRef(dailyBase);
-  const [displayCount, setDisplayCount] = useState(dailyBase);
-
-  /**
-   * Leichte Eigenbewegung des Zaehlers — Schrittlogik und Grenzen liegen in
-   * `lib/counter-drift.ts` (dort steht auch, warum die Zahl lebendiger, aber
-   * nicht echter wird).
-   *
-   * Der Versatz ist bewusst eigener State und NICHT Teil von
-   * getMatchingCount(): so bleibt die Antwort-Logik pur, und beide Effekte
-   * laufen durch dieselbe Tween-Schleife — kein Ruckeln, wenn eine Antwort
-   * und ein Drift-Schritt zusammenfallen.
-   *
-   * ERST NACH MOUNT: der Server rendert Versatz 0, sonst Hydration-Mismatch.
-   */
-  const [drift, setDrift] = useState(0);
-
-  useEffect(() => {
-    // Wer Bewegung im System abgestellt hat, bekommt auch hier keine.
-    if (
-      typeof window === 'undefined' ||
-      window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
-    ) {
-      return;
-    }
-    let timer: ReturnType<typeof setTimeout>;
-    const tick = () => {
-      // Im unsichtbaren Tab NICHT weiterlaufen: requestAnimationFrame ruht
-      // dort, die Tweens wuerden sich aufstauen und beim Zurueckkommen alle
-      // auf einmal abfeuern. Der Schritt wird uebersprungen, nicht nachgeholt.
-      if (!document.hidden) {
-        setDrift((d) => naechsterDrift(d, Math.random()));
-      }
-      timer = setTimeout(tick, naechsterAbstandMs(Math.random()));
-    };
-    timer = setTimeout(tick, naechsterAbstandMs(Math.random()));
-    return () => clearTimeout(timer);
-  }, []);
-
-  useEffect(() => {
-    const target = Math.max(12, getMatchingCount() + drift);
-    const start = displayCountRef.current;
-    if (target === start) return;
-    let rafId: number;
-    // Die Drift laeuft langsamer als ein Antwort-Sprung: eine Antwort ist
-    // eine Reaktion auf den Klick und darf zackig sein, die Drift soll
-    // nebenbei passieren.
-    const duration = Math.abs(target - start) <= 1 ? 1400 : 600;
-    const startTime = performance.now();
-    const frame = (now: number) => {
-      const t = Math.min((now - startTime) / duration, 1);
-      const current = Math.round(start + (target - start) * t);
-      displayCountRef.current = current;
-      setDisplayCount(current);
-      if (t < 1) rafId = requestAnimationFrame(frame);
-    };
-    rafId = requestAnimationFrame(frame);
-    return () => cancelAnimationFrame(rafId);
-  }, [dailyBase, currentStep, drift, state.patientCount, state.householdOthers, state.pflegegrad, state.mobility, state.nightCare, state.germanLevel, state.driving, state.gender]);
   const [formData, setFormData] = useState({
     name: '',
     email: '',
@@ -602,10 +549,11 @@ export function MultiStepForm({ mode = 'inline' }: MultiStepFormProps = {}) {
       case 7: return Boolean(state.driving);
       case 8: return Boolean(state.gender);
       // Step 9 Kontaktformular: Name + E-Mail + Telefon alle drei Pflicht.
-      // Telefon-Plausibilität wird in validateForm() detailliert geprüft;
-      // hier reicht "nicht leer" für die Weiter-Button-Aktivierung.
-      // Telefon ist Pflicht (Rückrufe durch die Beratung; Server verlangt es ebenso).
-      case 9: return Boolean(formData.name.trim() && formData.email.trim() && formData.phone.trim());
+      // Knopf erst aktiv, wenn E-Mail und Telefon plausibel sind (Martin
+      // 11.09.: „Buchstaben eingeben und der Button ist sofort aktiv") —
+      // dieselbe Prüfung wie validateForm(), Hinweise erscheinen beim Verlassen
+      // des Feldes.
+      case 9: return Boolean(formData.name.trim() && EMAIL_MUSTER.test(formData.email.trim()) && telefonGueltig(formData.phone));
       default: return false;
     }
   };
@@ -629,19 +577,13 @@ export function MultiStepForm({ mode = 'inline' }: MultiStepFormProps = {}) {
     }
     if (!formData.email.trim()) {
       newErrors.email = 'Bitte geben Sie Ihre E-Mail-Adresse ein';
-    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
+    } else if (!EMAIL_MUSTER.test(formData.email.trim())) {
       newErrors.email = 'Bitte geben Sie eine gültige E-Mail-Adresse ein';
     }
-    // Telefon mild geprüft — alles mit ≥6 Ziffern akzeptieren. Lässt
-    // gängige DACH-Formate zu (+49 30 123456, 030/12345, 015123…) und
-    // lehnt klare Fehleingaben ("abc", "1") ab. Strengere Formate hätten
-    // False-Negatives produziert.
-    const phoneDigits = (formData.phone ?? '').replace(/\D/g, '');
-    if (!formData.phone.trim()) {
-      newErrors.phone = 'Bitte geben Sie Ihre Telefonnummer ein';
-    } else if (phoneDigits.length < 6) {
-      newErrors.phone = 'Bitte geben Sie eine gültige Telefonnummer ein';
-    }
+    // Telefon: 8–15 Ziffern, nur Ziffern/+/Trennzeichen (lib/telefon.ts,
+    // Maßstab 284 echte Anfragen). Der Server prüft weiter mild (≥6), damit
+    // Pria- und Portal-Wege nicht an der strengeren Regel scheitern.
+    newErrors.phone = telefonFehler(formData.phone ?? '');
 
     // Datenschutz-Einwilligung wurde durch Soft-Consent ersetzt (Hinweistext
     // unter dem CTA, das Absenden gilt als Zustimmung) — kein explizites
@@ -1033,7 +975,7 @@ export function MultiStepForm({ mode = 'inline' }: MultiStepFormProps = {}) {
           }}
           className="w-full rounded-xl bg-[#E76F63] px-4 py-[18px] text-[17px] font-bold text-white shadow-[0_4px_14px_rgba(231,111,99,0.32)] transition-all duration-200 hover:bg-[#D65E52]"
         >
-          Kosten &amp; Pflegekräfte ansehen →
+          Preis &amp; Pflegekräfte ansehen →
         </button>
         {/* Zaehler zentriert unter dem Button (Martin 16.08.) — er gehoert
             zum Button, nicht zur linksbuendigen Textspalte darueber. */}
@@ -1055,7 +997,7 @@ export function MultiStepForm({ mode = 'inline' }: MultiStepFormProps = {}) {
               setWarmupAudience('direct');
               setFullscreen(true);
             }}
-            aria-label={`${displayCount} Pflegekräfte sofort verfügbar — jetzt passende ansehen`}
+            aria-label="Passende Pflegekräfte sofort verfügbar — jetzt ansehen"
             className="inline-flex items-center gap-2 rounded-full border border-[#A8D5B0] bg-[#F0F7F1] py-1 pl-1.5 pr-3 transition-all duration-200 hover:border-[#7FBF8C] hover:bg-[#E7F3E9] active:scale-[0.98] cursor-pointer">
             <div className="flex">
               {['/images/caregivers/pk-1.jpg','/images/caregivers/pk-2.jpg','/images/caregivers/pk-3.jpg','/images/caregivers/pk-4.jpg'].map((src,i)=>(
@@ -1066,7 +1008,7 @@ export function MultiStepForm({ mode = 'inline' }: MultiStepFormProps = {}) {
               ))}
             </div>
             <span className="text-[12px] text-[#3A6B42]">
-              <span className="font-bold tabular-nums">{displayCount}</span> Pflegekräfte sofort verfügbar
+              Passende Pflegekräfte sofort verfügbar
             </span>
             {/* Der Pfeil sagt, dass hier etwas passiert — sonst sieht die
                 Plakette aus wie ein Etikett und der Klick bleibt Zufall. */}
@@ -1136,20 +1078,24 @@ export function MultiStepForm({ mode = 'inline' }: MultiStepFormProps = {}) {
                   Ende der Animation, und kein „Angebot ist fertig", solange der
                   Kunde noch keinen Preis sieht. */}
               <p className="text-center text-base font-bold uppercase tracking-wide text-white mb-1.5">
-                {vorschauModus ? (kontaktOffen ? SCHRANKE.kopf : kopfzeile().titel) : '✓ Ihr Angebot ist fertig'}
+                {vorschauModus && !kontaktOffen ? kopfzeile().titel : SCHRANKE.kopf}
               </p>
-              <p className="text-center text-sm text-white/90">
-                {vorschauModus ? (kontaktOffen ? SCHRANKE.kopfText : kopfzeile().text) : 'Persönlich auf Ihre Angaben abgestimmt'}
-              </p>
+              {vorschauModus && !kontaktOffen && (
+                <p className="text-center text-sm text-white/90">{kopfzeile().text}</p>
+              )}
             </>
           ) : (
             <p className="text-center text-[15px] font-bold text-white">
-              In 2 Minuten zu Ihrem Angebot
+              In 2 Minuten zu Ihrem Preis
             </p>
           )}
         </div>
 
-        {currentStep > 1 && (
+        {/* Balken ab der ersten echten Frage (Martin 11.09.: Schritt 1 ohne
+            Balken wirkte eng und anders als der Rest) — im eingebetteten
+            Hero-Kasten (nicht fullscreen) bleibt Schritt 1 ohne, damit die
+            Antworten über der Falz bleiben. */}
+        {(currentStep > 1 || (fullscreen && currentStep === 1)) && (
           <div className="px-3 sm:px-4 py-2 bg-[#F8F7F5]/50 border-b border-[#E5E3DF]/30">
             <div className="h-1.5 bg-[#E5E3DF] rounded-full overflow-hidden">
               <div
@@ -1163,27 +1109,22 @@ export function MultiStepForm({ mode = 'inline' }: MultiStepFormProps = {}) {
         {currentStep >= 1 && currentStep <= 8 && (
           <div className="flex justify-center pt-2 pb-0">
             <div className="inline-flex items-center gap-2 bg-[#F0F7F1] border border-[#A8D5B0] rounded-full pl-1.5 pr-3 py-1">
-              {currentStep === 1 ? (
-                <div className="flex">
-                  {[
-                    '/images/caregivers/pk-1.jpg',
-                    '/images/caregivers/pk-2.jpg',
-                    '/images/caregivers/pk-3.jpg',
-                    '/images/caregivers/pk-4.jpg',
-                  ].map((src, i) => (
-                    <span key={src} className={`relative w-6 h-6 rounded-full overflow-hidden border-2 border-white flex-shrink-0 ${i > 0 ? '-ml-2' : ''}`}>
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img src={src} alt="" className="absolute inset-0 w-full h-full object-cover" loading="lazy" />
-                    </span>
-                  ))}
-                </div>
-              ) : (
-                <span className="w-1.5 h-1.5 rounded-full bg-[#4CAF50] animate-pulse flex-shrink-0"></span>
-              )}
-              <span className="text-[12px] text-[#3A6B42]">
-                <span className="font-bold tabular-nums">{displayCount}</span>
-                {currentStep === 1 ? ' Pflegekräfte sofort verfügbar' : ' Pflegekräfte passen zu Ihrer Suche'}
-              </span>
+              {/* Eine Pille auf allen Fragen (Martin 11.09.: Schritt 1 mit
+                  Bildern, Schritt 2 ohne — wirkte wie zwei Hinweise). */}
+              <div className="flex">
+                {[
+                  '/images/caregivers/pk-1.jpg',
+                  '/images/caregivers/pk-2.jpg',
+                  '/images/caregivers/pk-3.jpg',
+                  '/images/caregivers/pk-4.jpg',
+                ].map((src, i) => (
+                  <span key={src} className={`relative w-6 h-6 rounded-full overflow-hidden border-2 border-white flex-shrink-0 ${i > 0 ? '-ml-2' : ''}`}>
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={src} alt="" className="absolute inset-0 w-full h-full object-cover" loading="lazy" />
+                  </span>
+                ))}
+              </div>
+              <span className="text-[12px] text-[#3A6B42]">Passende Pflegekräfte sofort verfügbar</span>
             </div>
           </div>
         )}
@@ -1191,7 +1132,7 @@ export function MultiStepForm({ mode = 'inline' }: MultiStepFormProps = {}) {
         {/* Step 9 zeigt die Headline „✅ Ihr Angebot ist fertig" jetzt direkt
             im Titel-Block (getStepTitle); separate Pill ist redundant. */}
 
-        <div id="calc-step-content" className="px-3 sm:px-6 lg:px-8 pt-3 pb-5">
+        <div id="calc-step-content" className={`px-3 sm:px-6 lg:px-8 pt-3 ${fullscreen && currentStep === 1 ? 'pb-8' : 'pb-5'}`}>
           <div className="w-full">
             {/* Step 9: kleine grüne „fertig"-Pill über dem Titel, dann die
                 Frage als reguläre Step-Headline + Erklärung als italic
@@ -1501,29 +1442,10 @@ export function MultiStepForm({ mode = 'inline' }: MultiStepFormProps = {}) {
                           // Schranke. Kein Zurück-Link (Martin: „macht keinen Sinn").
                           return (
                             <div id="kontakt-schranke">
-                              {/* Die gefundenen Kräfte bleiben sichtbar (Martin: „vielleicht zeigen
-                                  wir oben auch die Bilder der gefundenen Pflegekräfte") — Kasten wie
-                                  der alte „5 passende Pflegekräfte"-Kasten, nur mit echten Fotos. */}
-                              <div className="flex items-center gap-3 rounded-2xl border border-[#C4E3CB] bg-[#F0F7F1] px-4 py-3 mb-4">
-                                <div className="flex flex-shrink-0">
-                                  {kraefteVorschau.map((k, i) => (
-                                    <span key={k.id} className={`relative w-10 h-10 rounded-full overflow-hidden border-2 border-white flex-shrink-0 ${i > 0 ? '-ml-2.5' : ''}`}>
-                                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                                      <img src={k.fotoUrl} alt="" className="absolute inset-0 w-full h-full object-cover" loading="lazy" />
-                                    </span>
-                                  ))}
-                                  {PORTAL_ANZAHL > kraefteVorschau.length && (
-                                    <span className="relative w-10 h-10 rounded-full border-2 border-white bg-[#22A06B] text-white text-[12px] font-bold flex items-center justify-center flex-shrink-0 -ml-2.5">
-                                      +{PORTAL_ANZAHL - kraefteVorschau.length}
-                                    </span>
-                                  )}
-                                </div>
-                                <p className="text-[14px] leading-snug text-[#2F5A38]">
-                                  <span className="font-semibold">{SCHRANKE.gefunden()}</span><br />{SCHRANKE.gefundenText}
-                                </p>
-                              </div>
-                              <p className="text-[16px] font-bold text-[#3D3D3D]">{SCHRANKE.titel}</p>
-                              <p className="text-[13px] text-[#5A5A5A] mt-0.5">{SCHRANKE.text}</p>
+                              {/* Strecke v2 (11.09.): kein zweites „5 Pflegekräfte" und keine
+                                  Frage mehr — die Kräfte standen einen Schritt vorher. Nur der
+                                  Grund, warum wir die Daten brauchen. */}
+                              <p className="text-[15px] leading-snug text-[#3D3D3D]">{SCHRANKE.text}</p>
                             </div>
                           );
                         }
@@ -1541,6 +1463,7 @@ export function MultiStepForm({ mode = 'inline' }: MultiStepFormProps = {}) {
                             {(
                               <div className={`relative text-center ${angeschnitten ? '-mt-3' : 'pt-4'}`}>
                                 <p className="text-[15px] font-bold text-[#3D3D3D] leading-snug">{VERLAUF.weitere()}</p>
+                                <p className="text-[13px] text-[#5A5A5A] leading-snug mt-0.5">{VERLAUF.preis}</p>
                                 <button
                                   type="button"
                                   onClick={oeffneKontakt}
@@ -1588,8 +1511,7 @@ export function MultiStepForm({ mode = 'inline' }: MultiStepFormProps = {}) {
                           ist fertig", eine generische Spanne daneben wirkte
                           widersprüchlich (Martins Einwand 15.08.). */}
                       <div className="pt-1">
-                        <p className="text-[16px] font-bold text-[#3D3D3D]">Wohin dürfen wir Ihr Angebot senden?</p>
-                        <p className="text-[12.5px] text-[#8B8B8B] mt-0.5">Ihr genauer Preis &amp; 5 passende Pflegekräfte werden sofort sichtbar.</p>
+                        <p className="text-[15px] leading-snug text-[#3D3D3D]">{SCHRANKE.text}</p>
                       </div>
                     </>
                   )}
@@ -1623,7 +1545,12 @@ export function MultiStepForm({ mode = 'inline' }: MultiStepFormProps = {}) {
                         setErrors({ ...errors, email: '' });
                       }}
                       onFocus={() => trackFieldFocus('email')}
-                      onBlur={(e) => trackFieldBlur('email', e.target.value)}
+                      onBlur={(e) => {
+                        trackFieldBlur('email', e.target.value);
+                        if (e.target.value.trim() && !EMAIL_MUSTER.test(e.target.value.trim())) {
+                          setErrors((alt) => ({ ...alt, email: 'Bitte geben Sie eine gültige E-Mail-Adresse ein' }));
+                        }
+                      }}
                       className={`w-full px-4 py-3 text-base border-[1.5px] rounded-xl bg-white focus:outline-none focus:ring-1 focus:ring-[#8B7355]/40 focus:border-[#8B7355] ${
                         errors.email ? 'border-red-500' : 'border-[#CFC6B8]'
                       }`}
@@ -1637,19 +1564,26 @@ export function MultiStepForm({ mode = 'inline' }: MultiStepFormProps = {}) {
                     <input
                       type="tel"
                       value={formData.phone}
+                      inputMode="tel"
                       onChange={(e) => {
-                        setFormData({ ...formData, phone: e.target.value });
+                        setFormData({ ...formData, phone: telefonBereinigen(e.target.value) });
                         setErrors({ ...errors, phone: '' });
                       }}
                       onFocus={() => trackFieldFocus('phone')}
-                      onBlur={(e) => trackFieldBlur('phone', e.target.value)}
+                      onBlur={(e) => {
+                        trackFieldBlur('phone', e.target.value);
+                        // Hinweis erst nach dem Tippen, nie auf ein leeres Feld.
+                        if (e.target.value.trim()) setErrors((alt) => ({ ...alt, phone: telefonFehler(e.target.value) }));
+                      }}
                       className={`w-full px-4 py-3 text-base border-[1.5px] rounded-xl bg-white focus:outline-none focus:ring-1 focus:ring-[#8B7355]/40 focus:border-[#8B7355] ${
                         errors.phone ? 'border-red-500' : 'border-[#CFC6B8]'
                       }`}
                       placeholder="Telefonnummer"
                       autoComplete="tel"
                     />
-                    {errors.phone && <p className="text-[11px] text-red-500 mt-1 px-3">{errors.phone}</p>}
+                    {errors.phone
+                      ? <p className="text-[11px] text-red-500 mt-1 px-3">{errors.phone}</p>
+                      : <p className="text-[12px] text-[#8B8B8B] mt-1 px-3">{SCHRANKE.telefonHinweis}</p>}
                   </div>
                   </>)}
                 </div>
@@ -1662,7 +1596,9 @@ export function MultiStepForm({ mode = 'inline' }: MultiStepFormProps = {}) {
             Zurück, Auto-Advance kümmert sich um Weiter), Steps 2-9 zeigen
             nur Zurück, Step 10 zeigt den Submit-Button mit Hinweis. */}
         {currentStep > 1 && !(currentStep === totalSteps && vorschauModus && !kontaktOffen) && (
-          <div className="px-3 sm:px-6 lg:px-8 pt-4 pb-5 bg-white">
+          // Nur-Zurück-Zeile eng an die Antworten (Martin 11.09.: „zurück hat
+          // zu viel Luft"); der Absendeblock behält seinen Abstand.
+          <div className={`px-3 sm:px-6 lg:px-8 bg-white ${currentStep === totalSteps && (!vorschauModus || kontaktOffen) ? 'pt-4 pb-5' : 'pt-0 pb-3'}`}>
             {currentStep === totalSteps && (!vorschauModus || kontaktOffen) ? (
               <div className="flex flex-col gap-2.5">
                 <button
@@ -1686,11 +1622,11 @@ export function MultiStepForm({ mode = 'inline' }: MultiStepFormProps = {}) {
                       <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
                     </div>
                   ) : (
-                    <span className={vorschauModus ? 'whitespace-nowrap text-[15px]' : undefined}>{vorschauModus ? SCHRANKE.knopf : 'Angebot & Pflegekräfte anzeigen →'}</span>
+                    <span className={vorschauModus ? 'whitespace-nowrap text-[15px]' : undefined}>{vorschauModus ? SCHRANKE.knopf : 'Preis & Pflegekräfte ansehen →'}</span>
                   )}
                 </button>
                 <p className="text-center text-xs text-[#8B8B8B] leading-snug">
-                  Öffnet sofort · unverbindlich · keine Werbeanrufe<br />Mit dem Absenden stimmen Sie unserer{' '}
+                  {SCHRANKE.fussnote}<br />Mit dem Absenden stimmen Sie unserer{' '}
                   <a href="/datenschutz" target="_blank" className="text-[#8B7355] underline hover:text-[#A68968]">
                     Datenschutzerklärung
                   </a>{' '}zu.

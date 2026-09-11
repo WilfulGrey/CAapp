@@ -165,7 +165,7 @@ export default function HomePage() {
                   Button. Dunkelgrau + halbfett statt Koralle — Koralle wuerde
                   mit dem Button direkt darunter konkurrieren. */}
               <p className="mb-6 max-w-[520px] text-[16px] leading-relaxed text-[#5B5B5B] lg:text-[18px]">
-                Wir zeigen Ihnen sofort,{" "}
+                Sehen Sie in 2 Minuten,{" "}
                 <span className="font-semibold text-[#3D3D3D]">was es kostet</span> und{" "}
                 <span className="font-semibold text-[#3D3D3D]">welche Pflegekräfte verfügbar sind</span>{" "}
                 {/* Geschuetztes Leerzeichen: durch die fetten Anker verschob

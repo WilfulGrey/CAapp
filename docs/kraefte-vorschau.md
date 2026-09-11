@@ -151,6 +151,28 @@ der Kopf sagt es); Verlauf 76 px; eine Zeile „+ 3 weitere Pflegekräfte & Ihr
 Sofortangebot"; Knopf einzeilig „Sofortangebot & Pflegekräfte ansehen →"
 (auch als Absendeknopf); kein „Zurück" unter dem Ergebnis-Screen.
 
+**Strecke v2 (11.09., Martin: „Kommunikation passt nicht in die
+Gesamtstory mit Anzeigen, Page, Formular, Kundenportal"):** Ein Wort für das
+Ergebnis auf der ganzen Strecke: **„Preis"** (nicht „Kosten", nicht
+„Sofortangebot"). Landingpage-Knöpfe „Preis & Pflegekräfte ansehen",
+Kopfzeile „In 2 Minuten zu Ihrem Preis", Hero-Pill ohne Zahl („Passende
+Pflegekräfte sofort verfügbar" — die tagesabhängige Zahl samt
+`counter-drift.ts` ist weg; sie lebt nur noch als Startwert der
+Warte-Animation). Warten: „Wir berechnen Ihren Preis und suchen passende
+Pflegekräfte." / „Preis berechnet", sonst unverändert (inkl. „Verfügbarkeit
+geprüft", Martin). Vorschau: „+ 3 weitere passende Pflegekräfte", neue Zeile
+„Ihr persönlicher Preis ist ebenfalls berechnet.", Knopf „Preis & alle 5
+Pflegekräfte ansehen →". Kontakt-Schritt: Kopf „✓ Ihr Preis ist berechnet",
+ohne Foto-Kasten und ohne Frage, ein Satz „Damit wir Preis und Profile für
+Sie speichern und zusenden können, brauchen wir kurz Ihre Kontaktdaten.",
+unter dem Telefonfeld „Nur bei Rückfragen zum Angebot", derselbe Knopf, Fußzeile „Sofort
+sichtbar · kostenlos · unverbindlich". Kein Schrittzähler. Test hält fest:
+Knopf auf Vorschau und Kontakt identisch, ≤ 38 Zeichen, kein „Werbeanruf"
+und kein „Sofortangebot" in den Texten. Portal im selben PR: Hero ohne
+Untertitel, „Passende Pflegekräfte" mit Erklärung, was Einladen bedeutet,
+und über dem Patientenbogen „Jetzt konkrete Bewerbungen erhalten".
+Der Preis bleibt hinter den Kontaktdaten (Martin).
+
 **Zählung ohne Einwilligung (Registry #63, 11.09.):** `wizard_zaehler` zählt je
 Tag/Stunde/Variante die Schritt-Aufrufe 1–9, „cta_geklickt" und „abgeschickt"
 — anonym, ohne Cookie, Sitzungs-ID, IP oder User-Agent. Auswertung:
