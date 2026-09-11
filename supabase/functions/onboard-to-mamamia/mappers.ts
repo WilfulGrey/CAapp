@@ -357,33 +357,23 @@ export function buildCaregiverWish(fd: FormularDaten): CaregiverWishInput {
 //
 // Returns 5-digit PLZ string or null when no PLZ is available — caller
 // passes null to StoreCustomer (location_id stays null too).
+// Genau fünf Ziffern — kein Auffüllen (Registry #65). Bis dahin wurde eine
+// 4-stellige Angabe mit `padStart(5, "0")` zu einer deutschen PLZ gemacht:
+// aus dem österreichischen 6130 (Schwaz) wurde 06130 = Halle (Saale), und
+// StoreCustomer legte den Kunden still dort an. Aus einer Zahl lässt sich die
+// führende Null ohnehin nicht rekonstruieren (1067 Dresden vs. AT-1067), also
+// fällt auch der Zahl-Zweig weg — auf prod trägt kein einziger Lead die PLZ
+// als JSON-Zahl.
 function isPlzString(v: unknown): v is string {
-  return typeof v === "string" && /^\d{4,5}$/.test(v.trim());
-}
-function isPlzNumber(v: unknown): v is number {
-  return typeof v === "number" && v >= 1000 && v <= 99999;
+  return typeof v === "string" && /^\d{5}$/.test(v.trim());
 }
 
 export function extractPlzFromLead(lead: Lead): string | null {
-  if (isPlzString(lead.patient_zip)) {
-    return (lead.patient_zip as string).trim().padStart(5, "0");
-  }
+  if (isPlzString(lead.patient_zip)) return (lead.patient_zip as string).trim();
   const fd = lead.kalkulation?.formularDaten ?? {};
   for (const k of ["plz", "postleitzahl", "postal_code", "zip", "zip_code"]) {
     const v = fd[k];
-    if (isPlzString(v)) return v.trim().padStart(5, "0");
-    if (isPlzNumber(v)) return String(v).padStart(5, "0");
-  }
-  return null;
-}
-
-// Back-compat alias — kept so old call sites don't break, but new code
-// should use extractPlzFromLead which sees the stage-B patient_zip.
-export function extractPlzFromFormularDaten(fd: FormularDaten): string | null {
-  for (const k of ["plz", "postleitzahl", "postal_code", "zip", "zip_code"]) {
-    const v = fd?.[k];
-    if (isPlzString(v)) return v.trim().padStart(5, "0");
-    if (isPlzNumber(v)) return String(v).padStart(5, "0");
+    if (isPlzString(v)) return v.trim();
   }
   return null;
 }

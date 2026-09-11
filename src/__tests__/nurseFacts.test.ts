@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { nurseFacts, einsaetzeText, isEmail } from '../components/portal/shared';
+import { nurseFacts, einsaetzeText, isEmail, einsatzortHinweis } from '../components/portal/shared';
 
 // Faktenzeile der Pflegekraft-Karten. Vorher stand ohne `care_experience`
 // wörtlich „—" als einzige Qualifikationszeile, und ohne Einsätze blieb die
@@ -56,5 +56,54 @@ describe('isEmail (Registry #52)', () => {
     expect(isEmail('a b@x.de')).toBe(false);
     expect(isEmail('nur-text')).toBe(false);
     expect(isEmail(' ok@example.de ')).toBe(true);
+  });
+});
+
+describe('einsatzortHinweis (Registry #65)', () => {
+  const ok = { plz: '76229', ort: 'Karlsruhe', eingabe: '76229 Karlsruhe',
+               lookupFehler: false, keinTreffer: false, abgelehnt: false };
+
+  it('gewähltes Paar aus der Liste ist in Ordnung', () => {
+    expect(einsatzortHinweis(ok)).toBeNull();
+  });
+
+  it('Ausfall der Ortssuche schlägt alles andere', () => {
+    // Auch wenn die PLZ formal passt: erst sagen, dass wir gerade nicht suchen
+    // können — sonst behaupten wir „kennen wir nicht" ohne nachgesehen zu haben.
+    expect(einsatzortHinweis({ ...ok, lookupFehler: true, keinTreffer: true }))
+      .toMatch(/nicht erreichbar/);
+  });
+
+  it('getippter Ortsname ohne Auswahl verlangt die Liste, nicht die PLZ', () => {
+    // Fix vom 12.08.2026: das Feld zeigt „Karlsruhe", „bitte PLZ eingeben" wäre gelogen.
+    expect(einsatzortHinweis({ ...ok, plz: '', ort: 'Karlsruhe', eingabe: 'Karlsruhe' }))
+      .toMatch(/Vorschlagsliste/);
+  });
+
+  it('zu kurze Ziffernfolge verlangt 5 Stellen', () => {
+    expect(einsatzortHinweis({ ...ok, plz: '6130', ort: '', eingabe: '6130' }))
+      .toMatch(/5-stellige/);
+  });
+
+  it('Mamamia kennt die PLZ nicht → Satz über Deutschland, mit der PLZ darin', () => {
+    const m = einsatzortHinweis({ ...ok, plz: '50348', ort: '', eingabe: '50348', keinTreffer: true });
+    expect(m).toContain('50348');
+    expect(m).toMatch(/innerhalb Deutschlands/);
+  });
+
+  it('vom Save-Wall abgelehnte PLZ sagt dasselbe wie kein Treffer', () => {
+    // Draft/Prefill: PLZ 5-stellig UND ort gefüllt — ohne dieses Flag käme null
+    // und der Kunde stünde in der Schleife Speichern → Weiter → Speichern.
+    expect(einsatzortHinweis({ ...ok, plz: '50348', ort: 'Lüdinghausen', abgelehnt: true }))
+      .toMatch(/innerhalb Deutschlands/);
+  });
+
+  it('5-stellige PLZ ohne gewählten Ort verlangt die Liste', () => {
+    expect(einsatzortHinweis({ ...ok, ort: '', eingabe: '76229' }))
+      .toMatch(/Vorschlagsliste/);
+  });
+
+  it('abgelehnt gilt nur für die abgelehnte PLZ (Flag wird vom Aufrufer verglichen)', () => {
+    expect(einsatzortHinweis({ ...ok, abgelehnt: false })).toBeNull();
   });
 });

@@ -20,7 +20,7 @@ export type LeadEvent =
   | 'application_rejected'        // customer Bewerbung abgelehnt
   | 'patient_form_step'           // Patientenbogen: Schritt erreicht (metadata.step) — Abbruch-Analyse
   | 'patient_form_save_failed'    // Patientenbogen: Server-Save gescheitert (metadata.error)
-  | 'patient_form_location_unresolved' // Einsatzort eingegeben, aber kein Mamamia-location_id (z. B. AT-PLZ) — Team-Flag, keine Mail
+  | 'patient_form_location_unresolved' // Einsatzort nicht auf einen Mamamia-location_id auflösbar → Speichern abgelehnt (Registry #65); Team-Mail
   | 'angebots_feedback';          // Rückmeldung zum Angebot: ein Tap + optionales Detail
 
 // Mini-Snapshot der Nurse-Daten, die wir brauchen um eine declined-from-
@@ -74,15 +74,19 @@ export interface LeadEventMetadata {
   // 'matching' (oder undefined) wenn normal aus declineNurse.
   decline_origin?: 'interest' | 'matching';
   // patient_form_location_unresolved: die vom Kunden eingegebene PLZ + Ort,
-  // die sich nicht auf einen Mamamia-location_id auflösen ließen (z. B. AT).
+  // die sich nicht auf einen Mamamia-location_id auflösen ließen.
   plz?: string;
   ort?: string;
+  // patient_form_location_unresolved: gesetzt ('1'), wenn nicht Mamamia „kenne
+  // ich nicht" gesagt hat, sondern der Lookup selbst scheiterte (Proxy/Netz).
+  // Diese Variante geht mit notify=false raus — eine Störung ist Sache des
+  // Monitorings, nicht des Postfachs (Registry #65).
+  lookup_down?: string;
   // patient_data_saved: gesetzt ('1'), wenn der Einsatzort nicht aufgelöst
-  // werden konnte → Kostenrechner unterdrückt die "fertig"-Mail.
+  // werden konnte. Seit Registry #65 setzt das Portal die Flagge nicht mehr
+  // (ohne location_id wird gar nicht gespeichert); der Kostenrechner wertet
+  // sie weiter aus, weil ein vor dem Deploy geöffneter Tab sie noch schickt.
   location_unresolved?: string;
-  // patient_form_location_unresolved: gesetzt ('1') bei 4-stelliger PLZ
-  // (Österreich/Schweiz — nicht bedient) → Team weiß: nicht nachfassen.
-  outside_germany?: string;
   // angebots_feedback: die Antwort auf „Wie geht es bei Ihnen weiter?" und —
   // sofern der Kunde die Rückfrage nicht übersprungen hat — das Detail
   // (Grund bei „passt_nicht", Zeitpunkt bei „spaeter"). Das Detail kommt in
@@ -117,6 +121,14 @@ function dedupeKey(token: string, event: LeadEvent, metadata?: LeadEventMetadata
   // korrigiert, würde ebenfalls ignoriert.
   if (event === 'angebots_feedback') {
     return `${token}:${event}:${metadata?.feedback_answer ?? ''}:${metadata?.feedback_detail ?? ''}`;
+  }
+  // Einsatzort: PLZ UND die Störungs-Variante gehören in den Schlüssel. Ohne
+  // die PLZ bliebe eine Korrektur („50348" → „50384", auch falsch) stumm; ohne
+  // lookup_down würde ein Proxy-Ausfall (silent) den Schlüssel besetzen und die
+  // spätere ECHTE Ablehnung derselben PLZ schlucken — also genau die Mail, für
+  // die das Team-Ereignis existiert (Registry #65).
+  if (event === 'patient_form_location_unresolved') {
+    return `${token}:${event}:${metadata?.plz ?? ''}:${metadata?.lookup_down ?? ''}`;
   }
   return `${token}:${event}`;
 }

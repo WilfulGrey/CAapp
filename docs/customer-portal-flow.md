@@ -621,7 +621,19 @@ PLZ czytany z `lead.patient_zip` (zwykle null bo to stage-B) lub z
 `formularDaten.{plz, postleitzahl, postal_code, zip, zip_code}` (kostenrechner
 też nie wysyła). **W MVP zwykle PLZ = null** → `lookupLocationId` zwraca
 `null` → `location_id` w StoreCustomer pozostaje null; patient form save
-wypełni przez `UpdateCustomer.location_id` lub `location_custom_text`.
+wypełnia go przez `UpdateCustomer.location_id`.
+
+**Od Registry #65 (2026-09-11) `location_id` jest warunkiem zapisu formularza,
+nie alternatywą.** `onSaveToMamamia` rozwiązuje PLZ przez `searchLocations`
+i przy braku trafienia **rzuca przed zapisem** — do Mamamii nie idzie nic.
+Powód: bez `location_id` MM stempluje placeholder (prod: `location_id=16480`
+dla KAŻDEJ nierozwiązywalnej PLZ), przestawia klienta na `status='active'`,
+a portal pokazuje „Vollständig" dla profilu, którego panel nie widzi. Gałąź
+`location_custom_text` w `patientFormMapper` istnieje nadal, ale z portalu jest
+nieosiągalna. Dwie reguły przy rozwiązywaniu PLZ (wszędzie — portal, onboard,
+acceptanceSync): **dokładna `zip_code`**, bo `search` matchuje prefiksy
+(`'503'` → 50321 Brühl), i **`country_code === 'DE'`**, bo katalog MM jest
+wyłącznie niemiecki.
 
 #### ⑤ StoreCustomer (minimalny payload — Bug #13 refactor)
 

@@ -5,7 +5,6 @@ import {
   buildJobOfferTitle,
   buildPatients,
   computeArrivalDate,
-  extractPlzFromFormularDaten,
   extractPlzFromLead,
   mapCareLevel,
   mapDementia,
@@ -547,9 +546,25 @@ Deno.test("extractPlzFromLead: lead.patient_zip is preferred (Primundus stage-B 
   assertEquals(extractPlzFromLead(lead), "10115");
 });
 
-Deno.test("extractPlzFromLead: 4-digit zip on patient_zip is padded", () => {
-  const lead = makeLead({ patient_zip: "1067" });
-  assertEquals(extractPlzFromLead(lead), "01067");
+Deno.test("extractPlzFromLead: 4-stellige PLZ ⇒ null, NICHT aufgefüllt (#65)", () => {
+  // Bis Registry #65 wurde daraus "01067" (Halle/Saale) — aus dem
+  // österreichischen 6130 also still ein deutscher Einsatzort.
+  assertEquals(extractPlzFromLead(makeLead({ patient_zip: "1067" })), null);
+  assertEquals(extractPlzFromLead(makeLead({ patient_zip: "6130" })), null);
+});
+
+Deno.test("extractPlzFromLead: PLZ als JSON-Zahl wird ignoriert (#65)", () => {
+  // Eine Zahl kann die führende Null nicht tragen, ist also mehrdeutig.
+  // Auf prod trägt kein Lead die PLZ als Zahl.
+  const lead = makeLead({
+    patient_zip: null,
+    kalkulation: {
+      bruttopreis: 0,
+      eigenanteil: 0,
+      formularDaten: { ...makeFormularDaten(), plz: 80331 as unknown as string },
+    },
+  });
+  assertEquals(extractPlzFromLead(lead), null);
 });
 
 Deno.test("extractPlzFromLead: missing patient_zip falls back to formularDaten.plz", () => {
@@ -567,25 +582,6 @@ Deno.test("extractPlzFromLead: missing patient_zip falls back to formularDaten.p
 Deno.test("extractPlzFromLead: no PLZ anywhere → null", () => {
   const lead = makeLead({ patient_zip: null });
   assertEquals(extractPlzFromLead(lead), null);
-});
-
-// ─── extractPlzFromFormularDaten (legacy / fallback helper) ────────────────
-
-Deno.test("extractPlzFromFormularDaten: plz key (string)", () => {
-  assertEquals(extractPlzFromFormularDaten({ plz: "10115" } as FormularDaten), "10115");
-});
-
-Deno.test("extractPlzFromFormularDaten: postleitzahl key (number)", () => {
-  assertEquals(extractPlzFromFormularDaten({ postleitzahl: 80331 } as FormularDaten), "80331");
-});
-
-Deno.test("extractPlzFromFormularDaten: pads 4-digit PLZ to 5 (e.g. 1067 → 01067)", () => {
-  assertEquals(extractPlzFromFormularDaten({ plz: "1067" } as FormularDaten), "01067");
-});
-
-Deno.test("extractPlzFromFormularDaten: no PLZ → null", () => {
-  assertEquals(extractPlzFromFormularDaten({} as FormularDaten), null);
-  assertEquals(extractPlzFromFormularDaten({ plz: "abc" } as FormularDaten), null);
 });
 
 // ─── Patient identity helpers ──────────────────────────────────────────────

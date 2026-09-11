@@ -94,3 +94,30 @@ describe('reportLeadEvent', () => {
     expect(bodyOf(1).metadata).toEqual({ phone: '+49 89 222' });
   });
 });
+
+describe('patient_form_location_unresolved dedupe (Registry #65)', () => {
+  it('collapses the same PLZ twice in one session', () => {
+    reportLeadEvent('t', 'patient_form_location_unresolved', { plz: '50348', ort: '' });
+    reportLeadEvent('t', 'patient_form_location_unresolved', { plz: '50348', ort: '' });
+    expect(calls()).toHaveLength(1);
+  });
+
+  it('reports a corrected — still wrong — PLZ as its own event', () => {
+    // Ohne PLZ im Schlüssel bliebe die zweite Korrektur stumm und das Team
+    // sähe für immer nur den ersten Versuch.
+    reportLeadEvent('t', 'patient_form_location_unresolved', { plz: '50348', ort: '' });
+    reportLeadEvent('t', 'patient_form_location_unresolved', { plz: '50384', ort: '' });
+    expect(calls()).toHaveLength(2);
+    expect(bodyOf(1).metadata.plz).toBe('50384');
+  });
+
+  it('a proxy outage does not eat the later real rejection of the same PLZ', () => {
+    // Die stille lookup_down-Variante darf den Schlüssel nicht besetzen —
+    // sonst fehlt genau die Mail, für die das Team-Ereignis existiert.
+    reportLeadEvent('t', 'patient_form_location_unresolved', { plz: '50348', ort: '', lookup_down: '1' }, false);
+    reportLeadEvent('t', 'patient_form_location_unresolved', { plz: '50348', ort: '' }, true);
+    expect(calls()).toHaveLength(2);
+    expect(bodyOf(0).notify).toBe(false);
+    expect(bodyOf(1).notify).not.toBe(false);
+  });
+});

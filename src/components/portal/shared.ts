@@ -346,3 +346,59 @@ export const STEP_LABELS = ['Zur Person', 'Pflegebedarf', 'Einsatzort & Start', 
 // Grobes E-Mail-Format (ein @, Domain mit Punkt, keine Leerzeichen). Spiegel von
 // cleanEmail() in supabase/functions/_shared/acceptanceSync.ts — Registry #52.
 export const isEmail = (v: string): boolean => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v.trim());
+
+// ─── Einsatzort ────────────────────────────────────────────────────────────
+// Registry #65. Der Einsatzort zählt erst als angegeben, wenn Mamamia daraus
+// eine `location_id` machen kann — nur die trägt das Panel-Feld „Einsatzort"
+// (`customer_contract.location_id`, Bug #13l). Ohne sie stempelt Mamamia einen
+// Platzhalter (prod: id 16480 für JEDE unauflösbare PLZ), kippt den Kunden auf
+// `status='active'` und das Portal zeigt „Vollständig" für ein Profil, das
+// nirgends steht.
+//
+// Der einzige Weg zu einer `location_id` ist die Auswahl aus der
+// Vorschlagsliste: `ort` setzt ausschließlich `pickPlz` (bzw. der Prefill aus
+// Mamamia), und die Liste filtert `country_code === 'DE'`.
+export interface EinsatzortStand {
+  /** patient.plz */
+  plz: string;
+  /** patient.ort */
+  ort: string;
+  /** Roher Feldtext — unterscheidet „Ort getippt" von „PLZ getippt". */
+  eingabe: string;
+  /** Ortssuche nicht erreichbar (Debounce-catch ODER Save-Wall). */
+  lookupFehler: boolean;
+  /** 5-stellige PLZ, Mamamia antwortete mit []. */
+  keinTreffer: boolean;
+  /** Diese PLZ hat der Save-Wall bereits abgelehnt. */
+  abgelehnt: boolean;
+}
+
+const HAT_BUCHSTABEN = /[a-zA-ZäöüÄÖÜß]/;
+
+/**
+ * `null` = Einsatzort in Ordnung. Sonst der Satz, der beim Feld steht.
+ *
+ * Jede Zeile sagt, was wir BEOBACHTET haben — keine rät. Insbesondere fällt der
+ * Satz über Deutschland ausschließlich dann, wenn Mamamia wirklich „kenne ich
+ * nicht" geantwortet hat, nie aufgrund der Ziffernzahl: Mamamias Katalog ist
+ * DE-only, aus den Daten lässt sich „Österreich" nicht von „Tippfehler"
+ * unterscheiden (Święta zasada 1.5).
+ */
+export function einsatzortHinweis(s: EinsatzortStand): string | null {
+  if (s.lookupFehler) {
+    return 'Die Ortssuche ist gerade nicht erreichbar. Bitte versuchen Sie es in einem Moment noch einmal.';
+  }
+  const plz = s.plz.trim();
+  if (!/^\d{5}$/.test(plz)) {
+    // Wer den Ortsnamen tippt, hat ein sichtbar volles Feld — „bitte PLZ
+    // eingeben" wäre dort eine Falschaussage (Fix vom 12.08.2026).
+    return HAT_BUCHSTABEN.test(s.eingabe)
+      ? 'Bitte wählen Sie Ihren Ort aus der Vorschlagsliste — wir brauchen die Postleitzahl.'
+      : 'Bitte geben Sie eine 5-stellige Postleitzahl ein.';
+  }
+  if (s.keinTreffer || s.abgelehnt) {
+    return `Zu der Postleitzahl ${plz} kennen wir keinen Einsatzort. Wir vermitteln ausschließlich innerhalb Deutschlands — bitte prüfen Sie die PLZ. Liegt der Einsatzort außerhalb Deutschlands, können wir leider nicht vermitteln; melden Sie sich bei Fragen gern bei uns.`;
+  }
+  if (s.ort.trim() === '') return 'Bitte wählen Sie Ihren Ort aus der Vorschlagsliste.';
+  return null;
+}

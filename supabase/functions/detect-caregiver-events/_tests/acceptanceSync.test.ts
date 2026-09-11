@@ -89,6 +89,10 @@ interface FakeNet {
   noExistingContract?: boolean;
   // PLZ→location_id Katalog (AcceptanceSyncLocations); fehlende PLZ ⇒ [].
   locationHits?: Record<string, number>;
+  // Mamamia matcht `search` als PRÄFIX: eine unvollständige PLZ liefert echte
+  // Zeilen mit ANDERER zip_code. Damit lässt sich prüfen, dass wir sie
+  // verwerfen statt eine fremde Stadt auf den Vertrag zu schreiben (#65).
+  locationPraefixTreffer?: { id: number; zip_code: string };
   // Kanonischer PDF im Storage-Bucket; null/undefined ⇒ 404 (Fallback-Render).
   storageBody?: Uint8Array | string | null;
 }
@@ -135,12 +139,15 @@ function makeNet(opts: Partial<FakeNet> = {}): FakeNet {
       if (q.includes("AcceptanceSyncLocations")) {
         net.ops.push({ op: "AcceptanceSyncLocations", variables: v });
         const hit = net.locationHits?.[String(v.search)];
+        const praefix = net.locationPraefixTreffer;
         return new Response(JSON.stringify({
           data: {
             LocationsWithPagination: {
-              data: hit
-                ? [{ id: hit, location: "Fake", zip_code: v.search, country_code: "DE" }]
-                : [],
+              data: praefix
+                ? [{ id: praefix.id, location: "Fake", zip_code: praefix.zip_code, country_code: "DE" }]
+                : hit
+                  ? [{ id: hit, location: "Fake", zip_code: v.search, country_code: "DE" }]
+                  : [],
             },
           },
         }), { status: 200 });
@@ -554,6 +561,40 @@ Deno.test("sync: Katalog ohne Treffer ⇒ LE-Row fällt auf getragene location_i
   const pc = (uc.patient_contracts as Array<Record<string, unknown>>)[0];
   assertEquals(pc.location_id, 13035); // Carry aus bestehendem Contract (Patientenbogen)
   assertEquals("location_id" in (uc.invoice_contract as Record<string, unknown>), false);
+});
+
+Deno.test("sync: Präfix-Treffer mit anderer PLZ wird verworfen (#65)", async () => {
+  // `search: "80331"` liefert eine echte DE-Zeile — aber zu 80339. Vor
+  // Registry #65 stand diese fremde Stadt auf dem unterschriebenen Vertrag.
+  const net = makeNet({ locationPraefixTreffer: { id: 999, zip_code: "80339" } });
+  const stamps = makeStamps();
+  await syncAcceptance({
+    lead: LEAD, row: makeRow(), secrets: SECRETS,
+    supabase: stamps.supabase, getAgencyToken: agencyToken, fetchFn: net.fetch,
+  });
+  const uc = net.ops.find((o) => o.op === "UpdateCustomerContract")!.variables;
+  const pc = (uc.patient_contracts as Array<Record<string, unknown>>)[0];
+  assertEquals(pc.location_id, 13035); // Carry, nicht 999
+  assertEquals("location_id" in (uc.invoice_contract as Record<string, unknown>), false);
+});
+
+Deno.test("sync: 4-stellige PLZ wird gar nicht erst gesucht (#65)", async () => {
+  // Österreichischer Einsatzort: der Katalog wird für diese PLZ nie befragt.
+  const net = makeNet({ locationHits: { "6130": 777, "80333": 222 } });
+  const stamps = makeStamps();
+  const row = makeRow();
+  await syncAcceptance({
+    lead: LEAD,
+    row: { ...row, contract_patient: { ...row.contract_patient, einsatzort: "6130, Schwaz" } },
+    secrets: SECRETS,
+    supabase: stamps.supabase, getAgencyToken: agencyToken, fetchFn: net.fetch,
+  });
+  const gesucht = net.ops.filter((o) => o.op === "AcceptanceSyncLocations")
+    .map((o) => String((o.variables as Record<string, unknown>).search));
+  assertEquals(gesucht.includes("6130"), false);
+  const uc = net.ops.find((o) => o.op === "UpdateCustomerContract")!.variables;
+  const pc = (uc.patient_contracts as Array<Record<string, unknown>>)[0];
+  assertEquals(pc.location_id, 13035); // Carry statt geratenem 06130 = Halle
 });
 
 // ─── Confirm-Fehlerklassifikation + interne Retries (Alarm-Policy) ────────

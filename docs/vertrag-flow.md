@@ -23,7 +23,11 @@ Edge sync-acceptance → _shared/acceptanceSync.ts (współdzielony z cronem):
                          (location_id rozwiązywane z PLZ LE przez katalog
                          Locations — ta sama metoda co główna lokalizacja
                          klienta [Bug #13d]; fallback: carry z istniejącego
-                         contractu — MM REPLACES listę przy zapisie)
+                         contractu — MM REPLACES listę przy zapisie.
+                         Od Registry #65: tylko PLZ o DOKŁADNIE 5 cyfrach
+                         i wiersz o DOKŁADNIE tej `zip_code` — `search`
+                         matchuje prefiksy, więc „pierwszy trafiony DE"
+                         wpisywał obce miasto na PODPISANĄ umowę)
                        • AG → invoice_contract{contact_type:"contract_contact"}
                          (panel: „Person für den Vertrag/Rechnung"; agGleich ⇒
                          dyskretne pola LE, AG odrębny ⇒ split composed ag.name

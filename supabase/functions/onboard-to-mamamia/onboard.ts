@@ -159,9 +159,12 @@ async function lookupLocationId(args: {
       variables: { search: args.plz },
       fetchFn: args.fetchFn,
     });
-    // Prefer DE matches; otherwise take the first.
-    const de = r.Locations.find(l => l.country_code === "DE");
-    return (de ?? r.Locations[0])?.id ?? null;
+    // Exakte PLZ und DE — `search` matcht PRÄFIXE (Sonde 11.09.2026: '503'
+    // liefert 50321 Brühl, 50354 Hürth, …). „Erster Treffer" hiess also, dass
+    // eine unvollständige PLZ still eine fremde Stadt bekam; und ein
+    // nicht-deutscher Treffer wäre ohnehin kein Einsatzort für uns
+    // (Registry #65).
+    return r.Locations.find(l => l.country_code === "DE" && l.zip_code === args.plz)?.id ?? null;
   } catch (_) {
     // Lookup failure is non-fatal — fallback to custom_text.
     return null;

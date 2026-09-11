@@ -20,7 +20,7 @@ import { DateField, localTodayIso } from './DateField';
 import { callMamamia } from '../../lib/mamamia/client';
 import { reportLeadEvent } from '../../lib/leadEvents';
 import type { PatientForm } from './shared';
-import { STEP_LABELS } from './shared';
+import { STEP_LABELS, einsatzortHinweis } from './shared';
 import type { MamamiaCustomer } from '../../lib/mamamia/types';
 import { mapMamamiaCustomerToPatientForm, germanySkillLabel } from '../../lib/mamamia/mappers';
 
@@ -317,6 +317,20 @@ export const AngebotCard: FC<{
   const [plzSuggestions, setPlzSuggestions] = useState<Array<{ zip: string; city: string }>>([]);
   const [plzVerified, setPlzVerified] = useState(false);
   const plzLookupTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Laufende Nummer der Ortssuche: ein spät eintreffendes älteres Ergebnis darf
+  // weder die Liste noch (schlimmer) per Auto-Pick das Feld überschreiben.
+  const plzLookupSeq = useRef(0);
+  // Ortssuche nicht erreichbar (Debounce-catch ODER Save-Wall). Reine Meldung,
+  // KEINE Sperre: sonst hinge ein Kunde, der „76229 Karlsruhe" aus der Liste
+  // gewählt hat, an einem kurzen Proxy-Aussetzer fest. Der Wall prüft ohnehin
+  // bei jedem Speichern (Registry #65).
+  const [lookupFehler, setLookupFehler] = useState(false);
+  // 5-stellige PLZ, Mamamia antwortete mit [] — dann ist „aus der Liste wählen"
+  // eine Aufforderung ins Leere; das wissen wir schon im Debounce.
+  const [keinTreffer, setKeinTreffer] = useState(false);
+  // PLZ, die der Save-Wall abgelehnt hat. `null` (nicht ''), sonst gälte ein
+  // leeres Feld als abgelehnt.
+  const [abgelehntePlz, setAbgelehntePlz] = useState<string | null>(null);
 
   const pickPlz = (o: { zip: string; city: string }) => {
     updatePatient(p => ({ ...p, plz: o.zip, ort: o.city }));
@@ -333,47 +347,81 @@ export const AngebotCard: FC<{
   // Kunde `draft`).
   const [ortQuery, setOrtQuery] = useState('');
 
+  // Eigene Funktion, weil die Liste nicht nur beim Tippen gebraucht wird: seit
+  // die Auswahl aus ihr Pflicht ist (Registry #65), muss sie auch beim Fokus
+  // zurückkommen — `onBlur` räumt sie ab, und wer danebengeklickt hat, stünde
+  // sonst vor leerem Feld und der Aufforderung, aus einer Liste zu wählen.
+  const runLookup = async (q: string) => {
+    const digits = q.replace(/\D/g, '').slice(0, 5);
+    // Bei voller PLZ mit der PLZ suchen, nicht mit dem Rohtext: eine eingefügte
+    // Adresse („50321 Brühl") fände sonst nichts.
+    const term = digits.length === 5 ? digits : q.trim();
+    // Der Wächter sass bis Registry #65 VOR dem Timer. Er muss mit hier herein,
+    // sonst schickt ein Fokus ins leere Feld `search: ''` — der Proxy reicht
+    // den leeren String weiter und der Kunde bekäme die ersten Katalogeinträge
+    // als „Vorschläge".
+    if (term.length < 3) { setPlzSuggestions([]); return; }
+    const seq = ++plzLookupSeq.current;
+    // Ohne mamamia-Verbindung (lokale Vorschau) liefert der Lookup nichts —
+    // dort ein paar echte Orte, damit die Liste überhaupt beurteilbar ist.
+    // Greift NUR wenn `mamamiaEnabled` false ist, also nie im Betrieb.
+    if (!mamamiaEnabled) {
+      const demo = [
+        { zip: '25524', city: 'Itzehoe' }, { zip: '25541', city: 'Brunsbüttel' },
+        { zip: '25551', city: 'Hohenlockstedt' }, { zip: '25554', city: 'Wilster' },
+        { zip: '80331', city: 'München' }, { zip: '80333', city: 'München' },
+        { zip: '10115', city: 'Berlin' }, { zip: '20095', city: 'Hamburg' },
+      ].filter(o => o.zip.startsWith(term) || o.city.toLowerCase().startsWith(term.toLowerCase()));
+      setPlzSuggestions(demo.slice(0, 8));
+      return;
+    }
+    try {
+      const r = await callMamamia<{
+        LocationsWithPagination: { data: Array<{ id: number; location: string; zip_code: string; country_code: string }> };
+      }>('searchLocations', { search: term, limit: 12, page: 1 });
+      const seen = new Set<string>();
+      const opts = (r.LocationsWithPagination?.data ?? [])
+        .filter(l => l.country_code === 'DE' && l.location && l.zip_code)
+        .map(l => ({ zip: l.zip_code, city: l.location }))
+        .filter(o => { const k = `${o.zip} ${o.city}`; if (seen.has(k)) return false; seen.add(k); return true; })
+        .slice(0, 8);
+      // Vergleich VOR pickPlz — ein verspätetes Ergebnis darf das Feld nicht
+      // umschreiben, nicht nur die Liste.
+      if (seq !== plzLookupSeq.current) return;
+      // Beide Flaggen ZUWEISEN, nicht nur setzen: sonst könnte der Fokus-Pfad
+      // einen Zustand, den er selbst gesetzt hat, nie wieder aufheben.
+      setLookupFehler(false);
+      setKeinTreffer(digits.length === 5 && opts.length === 0);
+      // Auto-Pick nur, wenn der Kunde die blosse PLZ getippt hat. Bei
+      // „50321 Brühl" zeigen wir den Vorschlag, damit das Löschen einzelner
+      // Zeichen das Feld nicht sofort wieder zurückschnappen lässt.
+      if (digits.length === 5 && opts.length === 1 && !/[a-zA-ZäöüÄÖÜß]/.test(q)) { pickPlz(opts[0]); return; }
+      setPlzSuggestions(opts);
+    } catch {
+      if (seq !== plzLookupSeq.current) return;
+      // Bis Registry #65 wurde hier still die Liste geleert. Seit die Auswahl
+      // Pflicht ist, wäre Schweigen die Aufforderung, aus einer Liste zu
+      // wählen, die es nicht gibt (Święta zasada nr 1).
+      setPlzSuggestions([]);
+      setLookupFehler(true);
+    }
+  };
+
   const onOrtInput = (e: React.ChangeEvent<HTMLInputElement>) => {
     const q = e.target.value;
     setOrtQuery(q);
-    // Freitext bleibt gültig: Solange nichts gewählt wurde, hält das Formular
-    // die Rohangabe — der Mapper klärt die location_id beim Speichern erneut.
     const digits = q.replace(/\D/g, '').slice(0, 5);
-    updatePatient(p => ({ ...p, plz: digits, ort: /\d/.test(q) ? p.ort : q.trim() }));
+    // `ort` wird beim Tippen von Ziffern GELEERT (früher: alter Wert behalten).
+    // Nur so bedeutet „5-stellige PLZ und `ort` gefüllt" wirklich „aus der
+    // Vorschlagsliste gewählt (oder aus Mamamia vorbefüllt)" — sonst reichte
+    // „Karlsruhe" tippen, dann „50348", um mit einem erfundenen Paar
+    // durchzukommen (Registry #65).
+    updatePatient(p => ({ ...p, plz: digits, ort: /\d/.test(q) ? '' : q.trim() }));
     setPlzVerified(false);
+    setLookupFehler(false);
+    setKeinTreffer(false);
     if (plzLookupTimer.current) clearTimeout(plzLookupTimer.current);
-    const term = q.trim();
-    if (term.length < 3) { setPlzSuggestions([]); return; }
-    plzLookupTimer.current = setTimeout(async () => {
-      // Ohne mamamia-Verbindung (lokale Vorschau) liefert der Lookup nichts —
-      // dort ein paar echte Orte, damit die Liste überhaupt beurteilbar ist.
-      // Greift NUR wenn `mamamiaEnabled` false ist, also nie im Betrieb.
-      if (!mamamiaEnabled) {
-        const demo = [
-          { zip: '25524', city: 'Itzehoe' }, { zip: '25541', city: 'Brunsbüttel' },
-          { zip: '25551', city: 'Hohenlockstedt' }, { zip: '25554', city: 'Wilster' },
-          { zip: '80331', city: 'München' }, { zip: '80333', city: 'München' },
-          { zip: '10115', city: 'Berlin' }, { zip: '20095', city: 'Hamburg' },
-        ].filter(o => o.zip.startsWith(term) || o.city.toLowerCase().startsWith(term.toLowerCase()));
-        setPlzSuggestions(demo.slice(0, 8));
-        return;
-      }
-      try {
-        const r = await callMamamia<{
-          LocationsWithPagination: { data: Array<{ id: number; location: string; zip_code: string; country_code: string }> };
-        }>('searchLocations', { search: term, limit: 12, page: 1 });
-        const seen = new Set<string>();
-        const opts = (r.LocationsWithPagination?.data ?? [])
-          .filter(l => l.country_code === 'DE' && l.location && l.zip_code)
-          .map(l => ({ zip: l.zip_code, city: l.location }))
-          .filter(o => { const k = `${o.zip} ${o.city}`; if (seen.has(k)) return false; seen.add(k); return true; })
-          .slice(0, 8);
-        if (/^\d{5}$/.test(term) && opts.length === 1) { pickPlz(opts[0]); return; }
-        setPlzSuggestions(opts);
-      } catch {
-        setPlzSuggestions([]);
-      }
-    }, 300);
+    plzLookupTimer.current = setTimeout(() => { void runLookup(q); }, 300);
   };
 
   // Welche Pflichtfelder fehlen — statt nur „vollständig ja/nein".
@@ -393,16 +441,25 @@ export const AngebotCard: FC<{
     startDate: 'Voraussichtliches Startdatum',
   };
 
-  // Sonderfall Einsatzort: Wer den Ortsnamen tippt, ohne einen Vorschlag zu
-  // wählen, hat ein sichtbar ausgefülltes Feld — `plz` bleibt aber leer, weil
-  // die location_id an der PLZ hängt. „Bitte noch ausfüllen: Einsatzort" wäre
-  // dann eine Falschaussage. Geprüft am 12.08.: Feld zeigte „Hamburg", der
-  // Hinweis verlangte den Einsatzort.
-  const ortNurFreitext = !patient.plz && ortQuery.trim() !== '';
+  // Der angezeigte Feldtext — eine Quelle für `value`, `onFocus` und den
+  // Hinweis, damit die drei nicht auseinanderlaufen.
+  const einsatzortFeldWert =
+    ortQuery || (patient.plz || patient.ort ? `${patient.plz} ${patient.ort}`.trim() : '');
+
+  const einsatzortStand = {
+    plz: patient.plz,
+    ort: patient.ort,
+    eingabe: einsatzortFeldWert,
+    lookupFehler,
+    keinTreffer,
+    abgelehnt: abgelehntePlz !== null && patient.plz === abgelehntePlz,
+  };
+  const einsatzortFehler = einsatzortHinweis(einsatzortStand);
+
   const fieldLabel = (k: string): string =>
-    k === 'plz' && ortNurFreitext
-      ? 'Einsatzort — bitte aus der Vorschlagsliste wählen'
-      : FIELD_LABELS[k] ?? k;
+    // Der ganze Satz statt „Einsatzort", sonst überschreibt „Weiter" den
+    // Konkreten mit einem nichtssagenden „Bitte noch ausfüllen: Einsatzort".
+    k === 'plz' ? (einsatzortFehler ?? FIELD_LABELS[k] ?? k) : FIELD_LABELS[k] ?? k;
 
   const missingFields = (s: number): string[] => {
     const m: string[] = [];
@@ -420,7 +477,13 @@ export const AngebotCard: FC<{
     if (s === 2) {
       // `haushalt` ist read-only (kommt aus dem Angebot) — NIE prüfen, sonst
       // Deadlock bei fehlendem Wert.
-      (['plz','wohnungstyp','urbanisierung','startDate'] as const).forEach(k => { if (patient[k] === '') m.push(k); });
+      // Einsatzort: nicht „nicht leer", sondern „auflösbar" (Registry #65).
+      // `lookupFehler` bleibt hier bewusst AUSSEN vor — er ist eine Meldung,
+      // keine Sperre: er soll niemanden festhalten, der nichts falsch gemacht
+      // hat, und zu schützen gibt es nichts, weil der Save-Wall die PLZ bei
+      // jedem Speichern erneut prüft.
+      if (einsatzortHinweis({ ...einsatzortStand, lookupFehler: false }) !== null) m.push('plz');
+      (['wohnungstyp','urbanisierung','startDate'] as const).forEach(k => { if (patient[k] === '') m.push(k); });
     }
     if (s === 3) {
       (['wunschGeschlecht','fuehrerschein'] as const).forEach(k => { if (patient[k] === '') m.push(k); });
@@ -1139,19 +1202,26 @@ export const AngebotCard: FC<{
                   <div className="relative">
                     <label className={labelCls}>Einsatzort&nbsp;<span className="text-red-400">*</span></label>
                     <input
-                      value={ortQuery || (patient.plz || patient.ort ? `${patient.plz} ${patient.ort}`.trim() : '')}
+                      value={einsatzortFeldWert}
                       onChange={onOrtInput}
+                      // Liste zurückholen: `onBlur` räumt sie ab, und seit die
+                      // Auswahl Pflicht ist, gäbe es sonst keinen Weg zurück
+                      // (Registry #65).
+                      onFocus={() => { if (!plzVerified) void runLookup(einsatzortFeldWert); }}
                       onBlur={() => setTimeout(() => setPlzSuggestions([]), 150)}
                       autoComplete="off"
                       placeholder="PLZ oder Ort eingeben"
-                      className={inputCls + (showErrors ? req(patient.plz) : '') + (plzVerified ? ' pr-9' : '')}
+                      // Ohne data-invalid ist das Scrollen zum ersten Fehler ein
+                      // No-op — das Attribut kam bisher nur von ChipSelect.
+                      data-invalid={showErrors && einsatzortFehler ? '1' : undefined}
+                      className={inputCls + (showErrors && einsatzortFehler ? ' border-red-300 bg-red-50/40' : '') + (plzVerified ? ' pr-9' : '')}
                     />
                     {plzVerified && (
                       <Check className="absolute right-3 top-[46px] w-4 h-4 text-[#22A06B] pointer-events-none" strokeWidth={3} />
                     )}
-                    {showErrors && ortNurFreitext && (
+                    {showErrors && einsatzortFehler && (
                       <p className="text-[13px] mt-1.5" style={{ color: '#B91C1C' }}>
-                        Bitte wählen Sie Ihren Ort aus der Vorschlagsliste — wir brauchen die Postleitzahl.
+                        {einsatzortFehler}
                       </p>
                     )}
                     {plzSuggestions.length > 0 && (
@@ -1400,7 +1470,14 @@ export const AngebotCard: FC<{
                       }
                       // Kein `disabled` und kein stummes Nichts: benennen, was
                       // fehlt, und zum ersten dieser Felder springen.
-                      setStepError(`Bitte noch ausfüllen: ${miss.map(fieldLabel).join(', ')}`);
+                      // Fehlt NUR der Einsatzort, steht sein Hinweis für sich —
+                      // „Bitte noch ausfüllen:" vor einem ganzen Satz liest sich
+                      // wie ein Versehen.
+                      setStepError(
+                        miss.length === 1 && miss[0] === 'plz' && einsatzortFehler
+                          ? einsatzortFehler
+                          : `Bitte noch ausfüllen: ${miss.map(fieldLabel).join(', ')}`,
+                      );
                       // Zum ersten fehlenden Feld springen — es steht auf
                       // einem langen Schritt sonst außerhalb des Bildschirms.
                       // Nach dem Render, damit die roten Rahmen schon stehen.
@@ -1417,14 +1494,12 @@ export const AngebotCard: FC<{
                   <button
                     onClick={async () => {
                       if (!allComplete || isSaving) return;
-                      // Mark as final submission (not a draft) so reload
-                      // shows the green-checked "Vollständig" state.
-                      if (storageKey) {
-                        localStorage.setItem(
-                          storageKey,
-                          JSON.stringify({ ...patient, _isDraft: false }),
-                        );
-                      }
+                      // Hier stand bis Registry #65 ein `_isDraft:false` VOR dem
+                      // Speichern — nach einem abgelehnten Save las der Reload
+                      // „Vollständig", obwohl in Mamamia nichts steht. Ersatzlos
+                      // gestrichen: der Autosave-Effekt schreibt `_isDraft:!saved`
+                      // ohnehin bei jeder Änderung von `saved`, also false erst
+                      // nach Erfolg.
                       // ── Save flow ─────────────────────────────────────
                       // Previously we collapsed the form and flipped
                       // patientSaved BEFORE the Mamamia round-trip — the
@@ -1444,10 +1519,41 @@ export const AngebotCard: FC<{
                           onPatientSaved?.(true);
                           scrollPortalToTop();
                         } catch (err) {
-                          console.error('UpdateCustomer failed:', err);
                           // Parent already toasted; keep form open so the
                           // customer can retry without re-entering data.
                           setPatientOpen(true);
+                          const m = err instanceof Error ? err.message : '';
+                          if (!m.startsWith('EINSATZORT')) {
+                            console.error('UpdateCustomer failed:', err);
+                          } else {
+                            // Der Einsatzort steht auf Schritt 3, „Speichern"
+                            // auf Schritt 4 — ohne Rücksprung sieht der Kunde
+                            // gar nichts und klickt wieder (Registry #65).
+                            const lookupFehlerJetzt = m === 'EINSATZORT_LOOKUP';
+                            const abgelehntJetzt = m.startsWith('EINSATZORT:') && m.slice(11) === patient.plz;
+                            if (lookupFehlerJetzt) setLookupFehler(true);
+                            else if (abgelehntJetzt) setAbgelehntePlz(m.slice(11));
+                            setStep(2);
+                            // `einsatzortStand` aus dem Render ist hier VERALTET
+                            // (die Closure hält Werte von vor dem await, und die
+                            // Zeilen darüber wirken erst im nächsten Render).
+                            // Ohne das Überschreiben käme für einen Entwurf mit
+                            // 5-stelliger PLZ und gefülltem Ort `null` heraus,
+                            // `stepError` bliebe leer und `showErrors` false.
+                            setStepError(einsatzortHinweis({
+                              ...einsatzortStand,
+                              lookupFehler: lookupFehlerJetzt,
+                              abgelehnt: abgelehntJetzt,
+                            }) ?? '');
+                            // setTimeout statt rAF: nach einem await sind wir in
+                            // keinem diskreten Event, rAF kann dem Commit von
+                            // Schritt 3 zuvorkommen.
+                            setTimeout(() => {
+                              patientFormRef.current
+                                ?.querySelector('[data-invalid="1"]')
+                                ?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                            }, 0);
+                          }
                         } finally {
                           setIsSaving(false);
                         }

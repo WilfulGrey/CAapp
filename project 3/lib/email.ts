@@ -894,6 +894,7 @@ export function getTeamNotificationTemplate(
     application_received: '📨',
     application_accepted_internal: '🎉',
     angebots_feedback: '💬',
+    patient_form_location_unresolved: '📍',
     vertrag_abgeschlossen: '🟢',
   };
 
@@ -906,6 +907,7 @@ export function getTeamNotificationTemplate(
     application_received: 'Bewerbung an Kunden gesendet',
     application_accepted_internal: 'Neue Buchung – Kunde hat akzeptiert',
     angebots_feedback: 'Rückmeldung zum Angebot',
+    patient_form_location_unresolved: 'Einsatzort unbekannt – Kunde kommt nicht weiter',
     vertrag_abgeschlossen: 'Neuer Vertrag abgeschlossen!',
   };
 
@@ -1097,6 +1099,7 @@ export function getTeamNotificationTemplate(
   : status === 'caregiver_interest_shown'  ? '<strong>👀 Pflegekraft zeigt Interesse — Kunde hat Hinweis per E-Mail erhalten.</strong>'
   : status === 'application_received'      ? '<strong>📨 Bewerbung wurde an den Kunden gesendet — wartet auf Buchungsbestätigung.</strong>'
   : status === 'patient_data_saved'        ? '<strong>👀 Patientenprofil ist gefüllt — Lead ist warm.</strong>'
+  : status === 'patient_form_location_unresolved' ? '<strong>📞 Kunde anrufen und die PLZ klären — sein Patientenbogen wurde NICHT gespeichert. Liegt der Einsatzort ausserhalb Deutschlands: Status auf „nicht interessiert" setzen, sonst laufen die Nachfass-Mails weiter.</strong>'
   : '<strong>⏰ Keine Aktion erforderlich - Lead wurde automatisch im System erfasst</strong>';
   const actionHighlightText =
     status === 'application_accepted_internal' ? '🎉 Kunde hat akzeptiert — Vertragsdokumente vorbereiten und Kunden anrufen.'
@@ -1104,6 +1107,7 @@ export function getTeamNotificationTemplate(
   : status === 'caregiver_interest_shown'  ? '👀 Pflegekraft zeigt Interesse — Kunde hat Hinweis per E-Mail erhalten.'
   : status === 'application_received'      ? '📨 Bewerbung wurde an den Kunden gesendet — wartet auf Buchungsbestätigung.'
   : status === 'patient_data_saved'        ? '👀 Patientenprofil ist gefüllt — Lead ist warm.'
+  : status === 'patient_form_location_unresolved' ? '📞 Kunde anrufen und die PLZ klären — sein Patientenbogen wurde NICHT gespeichert. Liegt der Einsatzort ausserhalb Deutschlands: Status auf „nicht interessiert" setzen, sonst laufen die Nachfass-Mails weiter.'
   : '⏰ Keine Aktion erforderlich - Lead wurde automatisch im System erfasst';
 
   // Auto-Annahme-Status (Portal-Annahme → StoreConfirmation in mamamia,
