@@ -63,6 +63,20 @@ jobs:
         working-directory: supabase/functions/onboard-to-mamamia
         run: deno task test
 
+  deno-openai-conversions:
+    name: deno tests (openai-conversions)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: "v2.x"
+
+      - name: Run openai-conversions tests
+        working-directory: supabase/functions/openai-conversions
+        run: deno task test
+
   deno-kraefte-vorschau:
     name: deno tests (kraefte-vorschau)
     runs-on: ubuntu-latest

@@ -109,7 +109,10 @@ Test in `oaiq.test.ts` nagelt den Wert fest.
 ## Kanal-Attribution am Lead (seit 09.09.2026)
 
 Google-Leads erkennt man an `leads.gclid/wbraid/gbraid`. ChatGPT-Klicks bringen
-keine Klick-ID mit, nur die UTM-Werte, die die Anzeigengruppe anhängt
+seit dem 11.09.2026 nachweislich eine Klick-Kennung mit — OpenAI hängt
+`?oppref=…&olref=…` an jeden Anzeigenklick (GA4: 41 von 42 Landings; unsere
+`analytics_sessions.landing_page` speichert nur den Pfad, deshalb war das dort
+unsichtbar). Dazu die UTM-Werte, die die Anzeigengruppe anhängt
 (`utm_source=chatgpt&utm_medium=cpc&utm_campaign=24h_pflege&utm_content={ad_id}&utm_term={ad_group_id}`).
 Deshalb merkt sich `lib/analytics.ts` seit dem 09.09. neben den Klick-IDs auch
 `utm_source/medium/campaign` in `sessionStorage` (`_prim_ad_params`), und
@@ -122,6 +125,45 @@ Auswertung: `leads.utm_source = 'chatgpt'` = ChatGPT-Lead, `gclid/wbraid/gbraid`
 `analytics_sessions.utm_source`. Skript für den Vergleich beider Kanäle:
 `.claude/skills/sea-lauf/scripts/kanal_vergleich.py` (Ausgaben, Klicks,
 Sitzungen, Leads, Profile, Kosten je Lead).
+
+## Serverseitig: Conversions API über `oppref` (seit 11.09.2026)
+
+**Befund 11.09.:** 72 ChatGPT-Sitzungen, 0 Leads, 0 Conversions im Manager.
+Selbst wenn Leads kämen, sähe OpenAI sie fast nie: der Pixel lädt nur mit
+Marketing-Einwilligung (6 von 72 Sitzungen). Google hat für dasselbe Problem
+den Offline-Upload mit der gclid — OpenAI hat die **Conversions API**
+(`POST https://bzr.openai.com/v1/events?pid=<Pixel-ID>`, `Authorization:
+Bearer <Conversion-Schlüssel>`, Doku developers.openai.com/ads/conversions-api).
+
+Kette:
+
+| Schritt | Wo |
+|---|---|
+| `oppref` aus der Landing-URL merken (sessionStorage `_prim_ad_params`, wie gclid) | `project 3/lib/analytics.ts` (`AD_PARAM_KEYS`) |
+| … an den Lead schreiben (best-effort Update, Spalte `leads.oppref`) | `app/api/angebot-anfordern/route.ts` (`HERKUNFT_KEYS`), Migration `20260911123000` |
+| alle 15 Minuten `lead_created` je Lead mit `oppref` melden, Buchführung in `openai_conversion_uploads` | Edge Function `supabase/functions/openai-conversions` (pg_cron `openai-conversions`) |
+
+Das Ereignis trägt **nur** `id` (= lead_id, dedupliziert mit dem Pixel-`event_id`),
+`type: lead_created`, `timestamp_ms`, `oppref`, `source_url`, `action_source: web`
+und `data {customer_action, 2000, EUR}`. **Keine Personendaten** — kein
+`user`-Objekt, keine gehashte E-Mail, keine IP. Das ist bewusst dieselbe
+Grenze wie beim Google-Upload; das `user`-Objekt der API (E-Mail/Telefon
+SHA-256) bleibt eine Entscheidung mit Datenschutztext, nicht ein Default.
+
+Betrieb: Schlüssel = Supabase-Secret `OPENAI_ADS_CAPI_KEY` (Manager → Conversions
+→ Conversion-Schlüssel → „Neuen Schlüssel erstellen"; Staging hat keinen →
+Function antwortet `{skipped}`). Vertragstest ohne Speichern:
+`{"validateOnly": true}`; nur zählen: `{"dryRun": true}`. 400/404/422 =
+`permanent_failure` mit Notiz, 401/403/429/5xx/Netz = nächster Lauf.
+Cron-Fenster 6 Tage (die API nimmt 7).
+
+## Wert in der kleinsten Einheit (Cent)
+
+`amount` ist laut Conversions-API-Doku die **kleinste Einheit** („4200 =
+$42.00"), und das Pixel teilt sich die Datenform. Bis zum 11.09.2026 ging im
+Pixel `20` mit — OpenAI las 0,20 € je Anfrage. Seitdem `WERT_ANFRAGE_MINOR =
+2000` in `lib/oaiq.ts`, `public/pria.html` und `capi.ts` (Test nagelt alle drei
+auf 2000 fest).
 
 ## Wo `lead_created` gemeldet wird (seit 10.09.2026)
 
@@ -156,10 +198,11 @@ Redirect ist kein Problem: das SDK schickt mit `fetch keepalive` und
    Damit ist ChatGPT-Traffic in GA4 und der eigenen Analytik sauber getrennt —
    anders als der Google-Traffic, der jahrelang ohne UTM lief und in „google /
    organisch" verschwand.
-3. **Kein Rückkanal für Offline-Conversions.** Bei Google melden wir
-   qualifizierte Leads und Buchungen über `upload-offline-conversions` nach.
-   Ein Gegenstück für OpenAI gibt es noch nicht; `event_id = leadId` wandert
-   schon mit, damit ein späteres serverseitiges Nachmelden nicht doppelt zählt.
+3. **Rückkanal seit 11.09.2026 für die Anfrage** (`openai-conversions`, siehe
+   oben). Noch offen: qualifizierte Leads (Profil) und Buchungen wie bei
+   Google nachmelden — die API kennt dafür `custom`-Ereignisse mit
+   `custom_event_name`; erst sinnvoll, wenn die Kampagne auf Conversions
+   optimiert.
 4. **Apex** (`primundus.de`) hat kein Pixel. Ein Besucher, der von der Anzeige
    auf den Kostenrechner kommt und dann zum Apex wechselt, ist für OpenAI weg.
    Solange die Anzeigen nur auf den Rechner zeigen, ist das folgenlos.
