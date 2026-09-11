@@ -1445,6 +1445,14 @@ export function MultiStepForm({ mode = 'inline' }: MultiStepFormProps = {}) {
                               {/* Strecke v2 (11.09.): kein zweites „5 Pflegekräfte" und keine
                                   Frage mehr — die Kräfte standen einen Schritt vorher. Nur der
                                   Grund, warum wir die Daten brauchen. */}
+                              <div className="flex items-center gap-3 mb-3">
+                                {/* eslint-disable-next-line @next/next/no-img-element */}
+                                <img src="/images/primundus_testsieger-2021.webp" alt="Testsieger DIE WELT Service-Champions" className="w-11 h-11 object-contain flex-shrink-0" />
+                                <div className="leading-tight">
+                                  <p className="text-[14px] font-bold text-[#3D3D3D]">{SCHRANKE.testsiegerTitel}</p>
+                                  <p className="text-[12px] text-[#8A8279]">{SCHRANKE.testsiegerText}</p>
+                                </div>
+                              </div>
                               <p className="text-[15px] leading-snug text-[#3D3D3D]">{SCHRANKE.text}</p>
                             </div>
                           );
@@ -1510,7 +1518,15 @@ export function MultiStepForm({ mode = 'inline' }: MultiStepFormProps = {}) {
                           nicht hier — auf diesem Schritt sagen wir „Ihr Angebot
                           ist fertig", eine generische Spanne daneben wirkte
                           widersprüchlich (Martins Einwand 15.08.). */}
-                      <div className="pt-1">
+                      <div className="pt-3">
+                        <div className="flex items-center gap-3 mb-3">
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img src="/images/primundus_testsieger-2021.webp" alt="Testsieger DIE WELT Service-Champions" className="w-11 h-11 object-contain flex-shrink-0" />
+                          <div className="leading-tight">
+                            <p className="text-[14px] font-bold text-[#3D3D3D]">{SCHRANKE.testsiegerTitel}</p>
+                            <p className="text-[12px] text-[#8A8279]">{SCHRANKE.testsiegerText}</p>
+                          </div>
+                        </div>
                         <p className="text-[15px] leading-snug text-[#3D3D3D]">{SCHRANKE.text}</p>
                       </div>
                     </>
