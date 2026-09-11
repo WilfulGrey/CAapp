@@ -165,7 +165,7 @@ geprüft", Martin). Vorschau: „+ 3 weitere passende Pflegekräfte", neue Zeile
 Pflegekräfte ansehen →". Kontakt-Schritt: Kopf „✓ Ihr Preis ist berechnet",
 ohne Foto-Kasten und ohne Frage, ein Satz „Damit wir Preis und Profile für
 Sie speichern und zusenden können, brauchen wir kurz Ihre Kontaktdaten.",
-unter dem Telefonfeld „für Rückfragen", derselbe Knopf, Fußzeile „Sofort
+unter dem Telefonfeld „Nur bei Rückfragen zum Angebot", derselbe Knopf, Fußzeile „Sofort
 sichtbar · kostenlos · unverbindlich". Kein Schrittzähler. Test hält fest:
 Knopf auf Vorschau und Kontakt identisch, ≤ 38 Zeichen, kein „Werbeanruf"
 und kein „Sofortangebot" in den Texten. Portal im selben PR: Hero ohne

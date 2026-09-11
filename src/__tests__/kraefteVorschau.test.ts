@@ -61,7 +61,7 @@ describe('Kräfte-Vorschau (Rechner)', () => {
     expect(VERLAUF.hinweis).toBe('Dafür benötigen wir nur noch Ihre Kontaktdaten.');
     expect(SCHRANKE.kopf).toBe('✓ Ihr Preis ist berechnet');
     expect(SCHRANKE.text).toBe('Damit wir Preis und Profile für Sie speichern und zusenden können, brauchen wir kurz Ihre Kontaktdaten.');
-    expect(SCHRANKE.telefonHinweis).toBe('für Rückfragen');
+    expect(SCHRANKE.telefonHinweis).toBe('Nur bei Rückfragen zum Angebot');
     expect(SCHRANKE.fussnote).toBe('Sofort sichtbar · kostenlos · unverbindlich');
   });
 

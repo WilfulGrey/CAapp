@@ -191,7 +191,7 @@ export const VERLAUF = {
 export const SCHRANKE = {
   kopf: '✓ Ihr Preis ist berechnet',
   text: 'Damit wir Preis und Profile für Sie speichern und zusenden können, brauchen wir kurz Ihre Kontaktdaten.',
-  telefonHinweis: 'für Rückfragen',
+  telefonHinweis: 'Nur bei Rückfragen zum Angebot',
   knopf: KNOPF,
   fussnote: 'Sofort sichtbar · kostenlos · unverbindlich',
 };
