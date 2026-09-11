@@ -1,5 +1,5 @@
 /** @vitest-environment jsdom */
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, afterEach } from 'vitest';
 import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { server } from '../../../test/mocks/server';
@@ -230,5 +230,29 @@ describe('Portal integration: golden paths', () => {
     await waitFor(() => expect(inviteCaregiverId).toBe(sampleMatching.caregiver.id), {
       timeout: 5000,
     });
+  }, 15_000);
+});
+
+describe('Portal integration: Clarity-Nutzer-ID', () => {
+  // Der Token ist der Kontozugang (kundenportal…/?token=…) und darf nicht an
+  // Clarity gehen. Verknüpfung Rechner↔Portal läuft über die Lead-ID.
+  afterEach(() => {
+    delete (window as { clarity?: unknown }).clarity;
+  });
+
+  it('taggt Clarity mit lead.id, nie mit dem Token', async () => {
+    const clarity = vi.fn();
+    (window as { clarity?: unknown }).clarity = clarity;
+    server.use(...defaultHandlers({}));
+
+    setLocation(`?token=${TEST_LEAD_TOKEN}`);
+    render(<CustomerPortalPage />);
+
+    await waitFor(() => expect(clarity).toHaveBeenCalledWith('set', 'userId', defaultLead.id), {
+      timeout: 5000,
+    });
+    for (const call of clarity.mock.calls) {
+      expect(call).not.toContain(TEST_LEAD_TOKEN);
+    }
   }, 15_000);
 });

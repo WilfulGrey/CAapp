@@ -36,12 +36,12 @@ export default function KalkulationPage() {
   }, [params.leadId]);
 
   // Stitch this kostenrechner session to the upcoming kundenportal session
-  // in Clarity. Lead token is the shared identifier between both sites
-  // (already used for the magic-link portal handoff). Idempotent — fires
-  // once per token, retries until the GTM-loaded Clarity tag is ready.
+  // in Clarity. The lead ID is the shared identifier between both sites —
+  // never the token, that is the key to the customer account. Idempotent —
+  // fires once per ID, retries until the GTM-loaded Clarity tag is ready.
   useEffect(() => {
-    const t = (lead as { token?: string | null } | null)?.token;
-    if (t) identifyClarity(t);
+    const id = (lead as { id?: string | null } | null)?.id;
+    if (id) identifyClarity(id);
   }, [lead]);
 
   if (loading) {
@@ -117,7 +117,7 @@ export default function KalkulationPage() {
     // on cold mounts or fast clicks the tag might not have been ready yet.
     // Re-firing right before navigation gives us a second window to land
     // the userId on this session before it ends.
-    identifyClarity(token);
+    identifyClarity(lead.id);
     const portalUrl = `${portalBase.replace(/\/$/, '')}/?token=${encodeURIComponent(token)}`;
     window.location.assign(portalUrl);
   };
