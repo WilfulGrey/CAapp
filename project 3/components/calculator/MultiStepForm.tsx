@@ -10,6 +10,7 @@ import { scrollToCalculator, isCalculatorAligned, OPEN_CALCULATOR_EVENT } from "
 import { useFormTracking } from "@/hooks/use-form-tracking";
 import { naechsterDrift, naechsterAbstandMs } from "@/lib/counter-drift";
 import { deutschBalken, GANZ_SICHTBAR, kopfzeile, kraefteVorschauAktiv, kraftFakten, parseVorschau, PORTAL_ANZAHL, SCHRANKE, VERLAUF, WARTE, wuenscheAusAntworten, type VorschauKraft } from "@/lib/kraefte-vorschau";
+import { zaehle } from "@/lib/zaehler";
 import { meldeAnfrage } from "@/lib/oaiq";
 
 // ─── Matching Animation Component ────────────────────────────────────────────
@@ -189,6 +190,7 @@ export function MultiStepForm({ mode = 'inline' }: MultiStepFormProps = {}) {
     kontaktOffenRef.current = true;
     setKontaktOffen(true);
     analytics.trackEvent('wizard', 'kraefte_wahl', { aktion: 'button', kraft_id: null });
+    zaehle('cta_geklickt', 'vorschau');
     setTimeout(() => {
       document.getElementById('kontakt-schranke')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
       document.getElementById('kontakt-name')?.focus({ preventScroll: true });
@@ -384,6 +386,8 @@ export function MultiStepForm({ mode = 'inline' }: MultiStepFormProps = {}) {
       step_name: getStepId(currentStep),
       kraefte_vorschau: vorschauAktivRef.current,
     });
+    // Anonymer Zähler ohne Einwilligung (Registry #63): nur Schritt + Variante.
+    if (currentStep >= 1 && currentStep <= 9) zaehle(`schritt_${currentStep}` as `schritt_${1|2|3|4|5|6|7|8|9}`, vorschauAktivRef.current ? 'vorschau' : 'alt');
     stepStartRef.current = Date.now();
   }, [currentStep, wizardSichtbar]);
 
@@ -733,6 +737,7 @@ export function MultiStepForm({ mode = 'inline' }: MultiStepFormProps = {}) {
 
       if (data.success && data.leadId) {
         trackFormSubmit();
+        zaehle('abgeschickt', vorschauAktivRef.current ? 'vorschau' : 'alt');
         // step_complete(contact_form) + Conversion in EINEM Beacon — überlebt
         // den Redirect garantiert (Bug #33). Ersetzt die früheren racy
         // supabase-js-Inserts (analytics.trackConversion + step_complete aus
