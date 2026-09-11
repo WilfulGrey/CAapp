@@ -1093,7 +1093,11 @@ export function MultiStepForm({ mode = 'inline' }: MultiStepFormProps = {}) {
           )}
         </div>
 
-        {currentStep > 1 && (
+        {/* Balken ab der ersten echten Frage (Martin 11.09.: Schritt 1 ohne
+            Balken wirkte eng und anders als der Rest) — im eingebetteten
+            Hero-Kasten (nicht fullscreen) bleibt Schritt 1 ohne, damit die
+            Antworten über der Falz bleiben. */}
+        {(currentStep > 1 || (fullscreen && currentStep === 1)) && (
           <div className="px-3 sm:px-4 py-2 bg-[#F8F7F5]/50 border-b border-[#E5E3DF]/30">
             <div className="h-1.5 bg-[#E5E3DF] rounded-full overflow-hidden">
               <div
@@ -1107,26 +1111,22 @@ export function MultiStepForm({ mode = 'inline' }: MultiStepFormProps = {}) {
         {currentStep >= 1 && currentStep <= 8 && (
           <div className="flex justify-center pt-2 pb-0">
             <div className="inline-flex items-center gap-2 bg-[#F0F7F1] border border-[#A8D5B0] rounded-full pl-1.5 pr-3 py-1">
-              {currentStep === 1 ? (
-                <div className="flex">
-                  {[
-                    '/images/caregivers/pk-1.jpg',
-                    '/images/caregivers/pk-2.jpg',
-                    '/images/caregivers/pk-3.jpg',
-                    '/images/caregivers/pk-4.jpg',
-                  ].map((src, i) => (
-                    <span key={src} className={`relative w-6 h-6 rounded-full overflow-hidden border-2 border-white flex-shrink-0 ${i > 0 ? '-ml-2' : ''}`}>
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img src={src} alt="" className="absolute inset-0 w-full h-full object-cover" loading="lazy" />
-                    </span>
-                  ))}
-                </div>
-              ) : (
-                <span className="w-1.5 h-1.5 rounded-full bg-[#4CAF50] animate-pulse flex-shrink-0"></span>
-              )}
-              <span className="text-[12px] text-[#3A6B42]">
-                {currentStep === 1 ? 'Passende Pflegekräfte sofort verfügbar' : 'Passende Pflegekräfte verfügbar'}
-              </span>
+              {/* Eine Pille auf allen Fragen (Martin 11.09.: Schritt 1 mit
+                  Bildern, Schritt 2 ohne — wirkte wie zwei Hinweise). */}
+              <div className="flex">
+                {[
+                  '/images/caregivers/pk-1.jpg',
+                  '/images/caregivers/pk-2.jpg',
+                  '/images/caregivers/pk-3.jpg',
+                  '/images/caregivers/pk-4.jpg',
+                ].map((src, i) => (
+                  <span key={src} className={`relative w-6 h-6 rounded-full overflow-hidden border-2 border-white flex-shrink-0 ${i > 0 ? '-ml-2' : ''}`}>
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={src} alt="" className="absolute inset-0 w-full h-full object-cover" loading="lazy" />
+                  </span>
+                ))}
+              </div>
+              <span className="text-[12px] text-[#3A6B42]">Passende Pflegekräfte sofort verfügbar</span>
             </div>
           </div>
         )}
@@ -1134,7 +1134,7 @@ export function MultiStepForm({ mode = 'inline' }: MultiStepFormProps = {}) {
         {/* Step 9 zeigt die Headline „✅ Ihr Angebot ist fertig" jetzt direkt
             im Titel-Block (getStepTitle); separate Pill ist redundant. */}
 
-        <div id="calc-step-content" className="px-3 sm:px-6 lg:px-8 pt-3 pb-5">
+        <div id="calc-step-content" className={`px-3 sm:px-6 lg:px-8 pt-3 ${fullscreen && currentStep === 1 ? 'pb-8' : 'pb-5'}`}>
           <div className="w-full">
             {/* Step 9: kleine grüne „fertig"-Pill über dem Titel, dann die
                 Frage als reguläre Step-Headline + Erklärung als italic
@@ -1588,7 +1588,9 @@ export function MultiStepForm({ mode = 'inline' }: MultiStepFormProps = {}) {
             Zurück, Auto-Advance kümmert sich um Weiter), Steps 2-9 zeigen
             nur Zurück, Step 10 zeigt den Submit-Button mit Hinweis. */}
         {currentStep > 1 && !(currentStep === totalSteps && vorschauModus && !kontaktOffen) && (
-          <div className="px-3 sm:px-6 lg:px-8 pt-4 pb-5 bg-white">
+          // Nur-Zurück-Zeile eng an die Antworten (Martin 11.09.: „zurück hat
+          // zu viel Luft"); der Absendeblock behält seinen Abstand.
+          <div className={`px-3 sm:px-6 lg:px-8 bg-white ${currentStep === totalSteps && (!vorschauModus || kontaktOffen) ? 'pt-4 pb-5' : 'pt-0 pb-3'}`}>
             {currentStep === totalSteps && (!vorschauModus || kontaktOffen) ? (
               <div className="flex flex-col gap-2.5">
                 <button
