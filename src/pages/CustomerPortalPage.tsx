@@ -481,9 +481,9 @@ const CustomerPortalPage: FC = () => {
         });
         // Stitch this portal session to the customer's earlier
         // kostenrechner session in Clarity. The kalkulation page does the
-        // matching identify on its side. Idempotent + retries until the
-        // GTM-loaded Clarity tag is ready.
-        identifyClarity(l.token);
+        // matching identify on its side. Lead-ID, nie den Token (Kontozugang).
+        // Idempotent + retries until the GTM-loaded Clarity tag is ready.
+        identifyClarity(l.id);
       }
       setLeadLoading(false);
     });
