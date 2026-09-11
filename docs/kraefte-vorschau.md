@@ -173,6 +173,15 @@ Untertitel, „Passende Pflegekräfte" mit Erklärung, was Einladen bedeutet,
 und über dem Patientenbogen „Jetzt konkrete Bewerbungen erhalten".
 Der Preis bleibt hinter den Kontaktdaten (Martin).
 
+**Karten-Seite aus (11.09. nachmittags, Martin: „so sollte das doch sein" zum
+Kontakt-Schritt mit Fotokasten):** Nach den Fragen kommt für alle direkt der
+Kontakt-Schritt — grüner Kopf mit Haken-Symbol, „Ihr Preis ist berechnet",
+„6× Preis-Leistungssieger", WELT-Siegel rechts; darunter der Fotokasten „5
+passende Pflegekräfte für Sie gefunden". Die Karten-Seite (zwei Karten ganz,
+dritte im Verlauf) läuft nur noch mit `?kraefte=1`; ohne sie ruft der Rechner
+die Function gar nicht auf. Der Warte-Screen behält die drei WARTE-Schritte.
+Zähler-Variante ist damit für alle `alt` — Schnitt am Deploy-Zeitpunkt.
+
 **Zählung ohne Einwilligung (Registry #63, 11.09.):** `wizard_zaehler` zählt je
 Tag/Stunde/Variante die Schritt-Aufrufe 1–9, „cta_geklickt" und „abgeschickt"
 — anonym, ohne Cookie, Sitzungs-ID, IP oder User-Agent. Auswertung:

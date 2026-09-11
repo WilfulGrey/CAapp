@@ -21,6 +21,20 @@ const EMAIL_MUSTER = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 // E-Mail eingibt. Wurde im Mai 2026 versehentlich entfernt (Commit 281e4ef
 // argumentierte mit „Friction nach Submit", aber die Animation lief VOR dem
 // Submit) — hier 1:1 wiederbelebt.
+// Zeichen rechts in jeder Antwort: Pfeil, bei der gewählten Antwort ein
+// Haken. Farbregel (Martin 11.09.): Koralle nur für Knöpfe, Braun = „Ihre
+// Auswahl“, Rot nur für Fehler. Die Klasse `ist-gewaehlt` setzt btnClass.
+function AntwortZeichen() {
+  return (
+    <>
+      <svg className="w-5 h-5 flex-shrink-0 text-[#A8977F] group-[.ist-gewaehlt]:hidden" fill="none" stroke="currentColor" strokeWidth={2.2} viewBox="0 0 24 24" aria-hidden="true"><path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" /></svg>
+      <span className="hidden group-[.ist-gewaehlt]:inline-flex w-[22px] h-[22px] items-center justify-center rounded-full bg-[#8B7355] flex-shrink-0" aria-hidden="true">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth={3.2} strokeLinecap="round" strokeLinejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5" /></svg>
+      </span>
+    </>
+  );
+}
+
 function MatchingAnimation({ onComplete, initialCount, vorschau }: { onComplete: (finalCount: number) => void; initialCount: number; vorschau?: boolean }) {
   const [activeStep, setActiveStep] = useState(0);
   const [completedSteps, setCompletedSteps] = useState<number[]>([]);
@@ -853,11 +867,15 @@ export function MultiStepForm({ mode = 'inline' }: MultiStepFormProps = {}) {
   // Antwort-Buttons bewusst als BUTTONS erkennbar (Martin 13.08.: „gehen
   // noch ein bisschen unter" — Funnel: 59 % klicken die erste Frage nie an):
   // kräftigerer Rand, echter Schatten, mehr Höhe.
+  // Farben (Martin 11.09.): kein Koralle-Rahmen mehr beim Darüberfahren — er
+  // sah aus wie ein Fehler und blieb auf dem Handy nach dem Tippen an der
+  // nächsten Antwort hängen. Darüberfahren nur noch bei echter Maus
+  // (hover:hover), gewählt = Braun mit Haken (AntwortZeichen).
   const btnClass = (isSelected: boolean) =>
-    `w-full relative rounded-xl px-4 py-3.5 border-[1.5px] shadow-[0_2px_6px_rgba(61,61,61,0.10)] transition-all duration-200 text-left ${
+    `group w-full relative rounded-xl px-4 py-3.5 border-[1.5px] shadow-[0_2px_6px_rgba(61,61,61,0.10)] transition-all duration-200 text-left ${
       isSelected
-        ? 'border-[#8B7355] bg-[#8B7355]/5 ring-1 ring-[#8B7355]/20'
-        : 'border-[#CFC6B8] bg-white hover:border-[#E76F63] hover:shadow-[0_3px_10px_rgba(231,111,99,0.22)] hover:bg-[#FFFDFB]'
+        ? 'ist-gewaehlt border-[#8B7355] bg-[#8B7355]/5 ring-1 ring-[#8B7355]/20'
+        : 'border-[#CFC6B8] bg-white [@media(hover:hover)]:hover:border-[#A8977F] [@media(hover:hover)]:hover:bg-[#FAF8F4]'
     }`;
 
   // Fokus-Modus nach der ersten Frage: der Rest wird abgedunkelt, das
@@ -948,7 +966,9 @@ export function MultiStepForm({ mode = 'inline' }: MultiStepFormProps = {}) {
       <div ref={formRef} id="calculator-form" className={outerClass}>
         <MatchingAnimation
           initialCount={getMatchingCount()}
-          vorschau={vorschauAktivRef.current}
+          // Warte-Screen immer mit den drei Schritten aus WARTE („Preis
+          // berechnet“ …) — auch ohne Karten-Seite (Martin 11.09.: Warten bleibt).
+          vorschau
           onComplete={() => {
             setShowMatching(false);
             setCurrentStep(totalSteps); // = Step 9 (Kontaktformular)
@@ -1201,7 +1221,7 @@ export function MultiStepForm({ mode = 'inline' }: MultiStepFormProps = {}) {
                     >
                       <div className="flex items-center justify-between gap-3.5">
                         <span className="text-base font-semibold text-[#3D3D3D]">{label}</span>
-                        <svg className="w-5 h-5 flex-shrink-0 text-[#E76F63]" fill="none" stroke="currentColor" strokeWidth={2.2} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" /></svg>
+                        <AntwortZeichen />
                       </div>
                     </button>
                   ))}
@@ -1218,7 +1238,7 @@ export function MultiStepForm({ mode = 'inline' }: MultiStepFormProps = {}) {
                     >
                       <div className="flex items-center justify-between gap-3.5">
                         <span className="text-base font-semibold text-[#3D3D3D]">{label}</span>
-                        <svg className="w-5 h-5 flex-shrink-0 text-[#E76F63]" fill="none" stroke="currentColor" strokeWidth={2.2} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" /></svg>
+                        <AntwortZeichen />
                       </div>
                     </button>
                   ))}
@@ -1236,7 +1256,7 @@ export function MultiStepForm({ mode = 'inline' }: MultiStepFormProps = {}) {
                     >
                       <div className="flex items-center justify-between gap-3.5">
                         <span className="text-base font-semibold text-[#3D3D3D]">{label}</span>
-                        <svg className="w-5 h-5 flex-shrink-0 text-[#E76F63]" fill="none" stroke="currentColor" strokeWidth={2.2} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" /></svg>
+                        <AntwortZeichen />
                       </div>
                     </button>
                   ))}
@@ -1250,10 +1270,11 @@ export function MultiStepForm({ mode = 'inline' }: MultiStepFormProps = {}) {
                     <button
                       key={grad}
                       onClick={() => selectAndAdvance(grad, () => updateState({ pflegegrad: grad as any }))}
-                      className={`px-4 py-3 border rounded-lg transition-all duration-300 shadow-sm hover:shadow-md ${
+                      // Gleicher Rahmen wie die übrigen Antworten (Martin 11.09.).
+                      className={`px-4 py-3 border-[1.5px] rounded-xl transition-all duration-200 shadow-[0_2px_6px_rgba(61,61,61,0.10)] ${
                         state.pflegegrad === grad
-                          ? 'border-[#8B7355] bg-[#8B7355]/5 ring-1 ring-[#8B7355]/20 shadow-md'
-                          : 'border-[#E5E3DF] bg-white hover:bg-gray-50'
+                          ? 'border-[#8B7355] bg-[#8B7355]/5 ring-1 ring-[#8B7355]/20'
+                          : 'border-[#CFC6B8] bg-white [@media(hover:hover)]:hover:border-[#A8977F] [@media(hover:hover)]:hover:bg-[#FAF8F4]'
                       }`}
                     >
                       <span className={`text-lg font-bold ${state.pflegegrad === grad ? 'text-[#8B7355]' : 'text-[#3D3D3D]'}`}>
@@ -1280,7 +1301,7 @@ export function MultiStepForm({ mode = 'inline' }: MultiStepFormProps = {}) {
                     >
                       <div className="flex items-center justify-between gap-3.5">
                         <span className="text-base font-semibold text-[#3D3D3D]">{label}</span>
-                        <svg className="w-5 h-5 flex-shrink-0 text-[#E76F63]" fill="none" stroke="currentColor" strokeWidth={2.2} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" /></svg>
+                        <AntwortZeichen />
                       </div>
                     </button>
                   ))}
@@ -1303,7 +1324,7 @@ export function MultiStepForm({ mode = 'inline' }: MultiStepFormProps = {}) {
                     >
                       <div className="flex items-center justify-between gap-3.5">
                         <span className="text-base font-semibold text-[#3D3D3D]">{label}</span>
-                        <svg className="w-5 h-5 flex-shrink-0 text-[#E76F63]" fill="none" stroke="currentColor" strokeWidth={2.2} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" /></svg>
+                        <AntwortZeichen />
                       </div>
                     </button>
                   ))}
@@ -1325,7 +1346,7 @@ export function MultiStepForm({ mode = 'inline' }: MultiStepFormProps = {}) {
                       >
                         <div className="flex items-center justify-between gap-3.5">
                           <span className="text-base font-semibold text-[#3D3D3D]">{label}</span>
-                          <svg className="w-5 h-5 flex-shrink-0 text-[#E76F63]" fill="none" stroke="currentColor" strokeWidth={2.2} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" /></svg>
+                          <AntwortZeichen />
                         </div>
                       </button>
                       <div className="relative group flex-shrink-0">
@@ -1356,7 +1377,7 @@ export function MultiStepForm({ mode = 'inline' }: MultiStepFormProps = {}) {
                       >
                         <div className="flex items-center justify-between gap-3.5">
                           <span className="text-base font-semibold text-[#3D3D3D]">{label}</span>
-                          <svg className="w-5 h-5 flex-shrink-0 text-[#E76F63]" fill="none" stroke="currentColor" strokeWidth={2.2} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" /></svg>
+                          <AntwortZeichen />
                         </div>
                       </button>
                       <div className="relative group flex-shrink-0">
@@ -1388,7 +1409,7 @@ export function MultiStepForm({ mode = 'inline' }: MultiStepFormProps = {}) {
                     >
                       <div className="flex items-center justify-between gap-3.5">
                         <span className="text-base font-semibold text-[#3D3D3D]">{label}</span>
-                        <svg className="w-5 h-5 flex-shrink-0 text-[#E76F63]" fill="none" stroke="currentColor" strokeWidth={2.2} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" /></svg>
+                        <AntwortZeichen />
                       </div>
                     </button>
                   ))}
