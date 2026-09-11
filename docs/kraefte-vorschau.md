@@ -151,6 +151,13 @@ der Kopf sagt es); Verlauf 76 px; eine Zeile „+ 3 weitere Pflegekräfte & Ihr
 Sofortangebot"; Knopf einzeilig „Sofortangebot & Pflegekräfte ansehen →"
 (auch als Absendeknopf); kein „Zurück" unter dem Ergebnis-Screen.
 
+**Zählung ohne Einwilligung (Registry #63, 11.09.):** `wizard_zaehler` zählt je
+Tag/Stunde/Variante die Schritt-Aufrufe 1–9, „cta_geklickt" und „abgeschickt"
+— anonym, ohne Cookie, Sitzungs-ID, IP oder User-Agent. Auswertung:
+`.claude/skills/sea-lauf/scripts/zaehler.py [tage]` (Trichter je Tag und
+Variante, Abbruch je Schritt). Die Einwilligungs-Events bleiben daneben
+bestehen (dort gibt es Sitzungen und Leads).
+
 **Datenschutz:** Die Karten stehen VOR jedem Lead auf einer öffentlichen
 Seite. Es verlassen nur Vorname, Alter, Stufe, Erfahrungsjahre, Deutsch-Wort,
 Foto-URL und Verfügbarkeitsdatum die Function. Fotos bevorzugt aus
