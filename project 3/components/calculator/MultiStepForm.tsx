@@ -1085,17 +1085,21 @@ export function MultiStepForm({ mode = 'inline' }: MultiStepFormProps = {}) {
                   <p className="text-center text-sm text-white/90">{kopfzeile().text}</p>
                 </>
               ) : (
-                // Kontakt-Schritt: Siegel links im grünen Kopf (Martin 11.09.:
-                // „ich will das Siegel"). Drei Varianten gegen 390×664 geprüft:
-                // zentriert darüber schob den Knopf im Ersatzkasten unter die
-                // Falz, überlappend verdeckte es den Balken.
-                <div className="flex items-center gap-3.5 py-0.5">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src="/images/primundus_testsieger-2021.webp" alt="Testsieger DIE WELT Service-Champions" className="h-[74px] w-auto rounded-[5px] shadow-[0_2px_8px_rgba(0,0,0,0.2)] flex-shrink-0" />
+                // Kontakt-Schritt: Haken-Symbol + Titel, darunter die Auszeichnung,
+                // Siegel rechts (Martins Aufbau 11.09.). Gegen 390×664 in beiden
+                // Wegen geprüft: Knopf bleibt über der Falz.
+                <div className="flex items-center justify-between gap-3 px-1">
                   <div>
-                    <p className="text-base font-bold uppercase tracking-wide text-white leading-tight">{SCHRANKE.kopf}</p>
-                    <p className="text-[13px] font-medium text-white/95 leading-snug mt-1">{SCHRANKE.auszeichnung}</p>
+                    <p className="flex items-center gap-2 text-base font-bold uppercase tracking-wide text-white leading-tight">
+                      <span className="inline-flex w-[22px] h-[22px] items-center justify-center rounded-full bg-white flex-shrink-0" aria-hidden="true">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#1F8F5F" strokeWidth={3.2} strokeLinecap="round" strokeLinejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5" /></svg>
+                      </span>
+                      {SCHRANKE.kopf}
+                    </p>
+                    <p className="text-[14px] font-medium text-white/95 leading-snug mt-1 pl-[30px]">{SCHRANKE.auszeichnung}</p>
                   </div>
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src="/images/primundus_testsieger-2021.webp" alt="Testsieger DIE WELT Service-Champions" className="h-[66px] w-auto rounded-[5px] shadow-[0_2px_8px_rgba(0,0,0,0.2)] flex-shrink-0" />
                 </div>
               )}
             </>
