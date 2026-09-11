@@ -64,8 +64,13 @@ interface SessionData {
 // sessionStorage gemerkt, damit der Angebot-Submit Klick-IDs UND Kanal
 // (utm_source …) Minuten später noch an den Lead hängen kann — erst damit
 // lassen sich Leads je Kanal (Google / ChatGPT / organisch) auswerten.
+// `oppref` ist die Klick-Kennung der ChatGPT-Anzeigen (OpenAI hängt sie an
+// jeden Anzeigenklick, GA4 11.09.2026: 41 von 42 Landings). Sie geht wie die
+// gclid an den Lead und von dort serverseitig an die OpenAI Conversions API
+// (Edge Function openai-conversions) — der Browser-Pixel allein sieht nur
+// die ~6 % mit Marketing-Einwilligung.
 const AD_PARAM_KEYS = [
-  'gclid', 'wbraid', 'gbraid',
+  'gclid', 'wbraid', 'gbraid', 'oppref',
   'utm_source', 'utm_medium', 'utm_campaign', 'utm_term', 'utm_content',
 ] as const;
 type AdParams = Partial<Record<(typeof AD_PARAM_KEYS)[number], string>>;

@@ -48,6 +48,15 @@ export const OAIQ_PIXEL_ID = '8xPJTVXAKBvkNquUUUvoXE';
  */
 export const WERT_ANFRAGE_EUR = 20;
 
+/**
+ * Was tatsaechlich im `amount` steht: die KLEINSTE Einheit der Waehrung, also
+ * Cent. Die Conversions-API-Doku sagt es woertlich („4200 = $42.00"), und das
+ * Pixel teilt sich mit ihr die Datenform. Bis zum 11.09.2026 ging hier `20`
+ * mit — OpenAI las 0,20 € je Anfrage. Der Server-Weg (Edge Function
+ * openai-conversions, capi.ts) rechnet mit demselben Wert.
+ */
+export const WERT_ANFRAGE_MINOR = WERT_ANFRAGE_EUR * 100;
+
 /** Signatur des globalen `oaiq`, so wie das SDK sie bereitstellt. */
 export type OaiqFn = (
   befehl: string,
@@ -78,7 +87,7 @@ export function meldeAnfrage(oaiq: unknown, leadId?: string): boolean {
   (oaiq as OaiqFn)(
     'measure',
     'lead_created',
-    { type: 'customer_action', amount: WERT_ANFRAGE_EUR, currency: 'EUR' },
+    { type: 'customer_action', amount: WERT_ANFRAGE_MINOR, currency: 'EUR' },
     leadId ? { event_id: leadId } : undefined,
   );
 

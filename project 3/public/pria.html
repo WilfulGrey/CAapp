@@ -1743,7 +1743,7 @@ function kontakt(){
          in lib/oaiq.ts — Name, Typ und Wert (feste Staffelung: Anfrage 20)
          dort synchron halten. Ohne Marketing-Einwilligung gibt es window.oaiq
          nicht, dann passiert nichts. */
-      if(typeof window.oaiq==='function') window.oaiq('measure','lead_created',{type:'customer_action',amount:20,currency:'EUR'},{event_id:leadId});
+      if(typeof window.oaiq==='function') window.oaiq('measure','lead_created',{type:'customer_action',amount:2000,currency:'EUR'},{event_id:leadId}); // amount in Cent (Doku: 4200 = 42,00), synchron zu lib/oaiq.ts WERT_ANFRAGE_MINOR
     }
 
     await uebergabe();

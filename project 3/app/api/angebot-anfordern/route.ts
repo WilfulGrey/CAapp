@@ -360,10 +360,12 @@ import { PORTAL_BASIS } from '@/lib/portal-url';
 import { kundenEmpfaenger } from '@/lib/empfaenger';
 
 /* Was vom Client-`adParams` (sessionStorage `_prim_ad_params`) den Lead
-   erreichen darf: Google-Klick-IDs für den Offline-Import und die fünf
-   UTM-Werte für die Kanal-Attribution. Alles andere wird verworfen. */
+   erreichen darf: Google-Klick-IDs für den Offline-Import, die
+   ChatGPT-Klick-Kennung `oppref` für die OpenAI Conversions API (Migration
+   20260911123000) und die fünf UTM-Werte für die Kanal-Attribution. Alles
+   andere wird verworfen. */
 const HERKUNFT_KEYS = [
-  'gclid', 'wbraid', 'gbraid',
+  'gclid', 'wbraid', 'gbraid', 'oppref',
   'utm_source', 'utm_medium', 'utm_campaign', 'utm_content', 'utm_term',
 ] as const;
 export const POST = withMem('angebot-anfordern', handlePost);
