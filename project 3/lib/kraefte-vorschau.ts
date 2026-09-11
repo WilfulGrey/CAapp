@@ -65,6 +65,7 @@ export function wuenscheAusAntworten(state: { germanLevel?: string | null; gende
  * Verlauf „+ 3 weitere passende Pflegekräfte und Ihr persönliches
  * Sofortangebot", dann der Knopf, dann „Dafür benötigen wir nur noch Ihre
  * Kontaktdaten." Die Zahl 5 ist die Portal-Zahl (`waehleFuenf`).
+ * Strecke v2 (11.09.): „Sofortangebot" heißt jetzt „Preis", siehe VERLAUF/SCHRANKE.
  */
 export const PORTAL_ANZAHL = 5;
 /** So viele Profile stehen ganz auf dem Ergebnis-Screen; das nächste läuft in den Verlauf. */
@@ -72,8 +73,9 @@ export const GANZ_SICHTBAR = 2;
 
 export const WARTE = {
   titel: 'Einen Moment bitte',
-  text: 'Wir erstellen Ihr Sofortangebot und suchen passende Pflegekräfte.',
-  schritt1: 'Sofortangebot berechnet',
+  // Strecke v2 (Martin, 11.09.): das Ergebnis heißt überall „Preis".
+  text: 'Wir berechnen Ihren Preis und suchen passende Pflegekräfte.',
+  schritt1: 'Preis berechnet',
   schritt2Laeuft: 'Passende Pflegekräfte werden gesucht',
   schritt2Fertig: (n: number) => (n === 1 ? '1 passende Pflegekraft gefunden' : `${n} passende Pflegekräfte gefunden`),
   // Dritter Schritt (Martin, 10.09.: „nur 2 Punkte sieht komisch aus") — und er
@@ -158,44 +160,40 @@ export function hakenAusAntworten(a: HakenAntworten, k: Pick<VorschauKraft, 'ein
   return t.slice(0, 2);
 }
 
+/**
+ * Der Knopf auf Vorschau UND Kontakt — derselbe Text (Martin, 11.09.): der
+ * Kunde hat dieses Versprechen geklickt, der nächste Knopf löst es ein.
+ * Passt bei 375 px in eine Zeile (Martin: „Button nicht über 2 Zeilen").
+ */
+const KNOPF = `Preis & alle ${PORTAL_ANZAHL} Pflegekräfte ansehen\u00A0→`;
+
 /** Der Verlauf unter den Profilen und der Knopf darin. */
 export const VERLAUF = {
-  // Eine Zeile statt zwei (iPhone: der Knopf muss ohne Scrollen sichtbar sein).
   weitere: (gesamt: number = PORTAL_ANZAHL, ganz: number = GANZ_SICHTBAR) => {
     const n = Math.max(1, gesamt - ganz);
-    return n === 1 ? '+ 1 weitere Pflegekraft & Ihr Sofortangebot' : `+ ${n} weitere Pflegekräfte & Ihr Sofortangebot`;
+    return n === 1 ? '+ 1 weitere passende Pflegekraft' : `+ ${n} weitere passende Pflegekräfte`;
   },
-  // Passt bei 375 px in eine Zeile (Martin: „Button nicht über 2 Zeilen").
-  knopf: 'Sofortangebot & Pflegekräfte ansehen\u00A0→',
+  // Hinter der Schranke steht etwas, das es schon gibt (Strecke v2, 11.09.).
+  preis: 'Ihr persönlicher Preis ist ebenfalls berechnet.',
+  knopf: KNOPF,
   hinweis: 'Dafür benötigen wir nur noch Ihre Kontaktdaten.',
 };
 
 /**
- * Die Kontaktschranke — ein EIGENER Schritt nach dem Klick. Die Strecke
- * erzählt EINE Geschichte (Martin, 10.09.: „mach vorher eine Prüfung, ob das
- * alles perfekt passt"):
- *   Warten:   „Sofortangebot berechnet" + „5 passende Pflegekräfte gefunden"
- *   Ergebnis: „5 passende Pflegekräfte – sofort verfügbar", 3 Profile,
- *             „+ 3 weitere … und Ihr persönliches Sofortangebot",
- *             Knopf „Alle Pflegekräfte & Sofortangebot ansehen",
- *             „Dafür benötigen wir nur noch Ihre Kontaktdaten."
- *   Kontakt:  Kopf „✓ Ihr Sofortangebot ist fertig" (das Warten hat es
- *             berechnet), Kasten mit den echten Fotos „5 passende
- *             Pflegekräfte gefunden · sofort verfügbar" (das Ergebnis hat sie
- *             gezeigt), Frage „Wohin dürfen wir Ihr Sofortangebot senden?"
- *             wie im bewährten Rechner, Satz: sofort sichtbar + Kopie per
- *             E-Mail (beides passiert wirklich), derselbe Knopf wie auf dem
- *             Ergebnis-Screen.
+ * Die Kontaktschranke — ein EIGENER Schritt nach dem Klick. Strecke v2
+ * (Martin, 11.09., nach einem Vorschlag von ChatGPT): bewusst kurz. Kein
+ * zweites „5 Pflegekräfte" (standen einen Schritt vorher), keine Frage
+ * „Wohin dürfen wir …", kein „keine Werbeanrufe" (widersprach dem Pflichtfeld
+ * Telefon und der SEA-Leitlinie). Ein Satz sagt, wofür die Daten da sind;
+ * das Telefonfeld nennt seinen Grund. Derselbe Knopf wie auf dem Ergebnis.
  * Kein „Portal", kein „Fast geschafft", kein „Nur noch …".
  */
 export const SCHRANKE = {
-  kopf: '✓ Ihr Sofortangebot ist fertig',
-  kopfText: 'Persönlich auf Ihre Angaben abgestimmt',
-  gefunden: (gesamt: number = PORTAL_ANZAHL) => `${gesamt} passende Pflegekräfte gefunden`,
-  gefundenText: 'sofort verfügbar',
-  titel: 'Wohin dürfen wir Ihr Sofortangebot senden?',
-  text: `Ihr Sofortangebot und alle ${PORTAL_ANZAHL} Pflegekräfte werden sofort sichtbar – die Kopie schicken wir Ihnen per E-Mail.`,
-  knopf: 'Sofortangebot & Pflegekräfte ansehen\u00A0→',
+  kopf: '✓ Ihr Preis ist berechnet',
+  text: 'Damit wir Preis und Profile für Sie speichern und zusenden können, brauchen wir kurz Ihre Kontaktdaten.',
+  telefonHinweis: 'für Rückfragen',
+  knopf: KNOPF,
+  fussnote: 'Sofort sichtbar · kostenlos · unverbindlich',
 };
 
 /** Antwort der Function absichern — nur, was die Karte braucht, nie mehr. */

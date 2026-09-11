@@ -45,22 +45,37 @@ describe('Kräfte-Vorschau (Rechner)', () => {
     expect(hakenAusAntworten({}, { einsaetze: 0 })).toEqual(['Ab sofort verfügbar']);
   });
 
-  it('Martins Aufbau: Warte-Screen, Kopf, Verlauf, Schranke', () => {
+  it('Strecke v2 (11.09.): Warte-Screen, Kopf, Verlauf, Schranke', () => {
     expect(PORTAL_ANZAHL).toBe(5);
-    expect(WARTE.schritt1).toBe('Sofortangebot berechnet');
+    // Warte-Screen bleibt bis aufs Wort „Preis" (Martin: „das ist so richtig").
+    expect(WARTE.text).toBe('Wir berechnen Ihren Preis und suchen passende Pflegekräfte.');
+    expect(WARTE.schritt1).toBe('Preis berechnet');
     expect(WARTE.schritt2Fertig(5)).toBe('5 passende Pflegekräfte gefunden');
     expect(WARTE.schritt3).toBe('Verfügbarkeit geprüft');
     expect(WARTE.schritt3Fertig(5)).toBe('alle 5 ab sofort verfügbar');
     expect(kopfzeile().titel).toBe('5 passende Pflegekräfte');
     expect(kopfzeile().text).toBe('Sofort verfügbar, persönlich auf Ihre Angaben abgestimmt');
-    expect(VERLAUF.weitere()).toBe('+ 3 weitere Pflegekräfte & Ihr Sofortangebot');
-    expect(VERLAUF.knopf).toBe('Sofortangebot & Pflegekräfte ansehen\u00A0→');
+    expect(VERLAUF.weitere()).toBe('+ 3 weitere passende Pflegekräfte');
+    expect(VERLAUF.preis).toBe('Ihr persönlicher Preis ist ebenfalls berechnet.');
+    expect(VERLAUF.knopf).toBe('Preis & alle 5 Pflegekräfte ansehen\u00A0→');
     expect(VERLAUF.hinweis).toBe('Dafür benötigen wir nur noch Ihre Kontaktdaten.');
+    expect(SCHRANKE.kopf).toBe('✓ Ihr Preis ist berechnet');
+    expect(SCHRANKE.text).toBe('Damit wir Preis und Profile für Sie speichern und zusenden können, brauchen wir kurz Ihre Kontaktdaten.');
+    expect(SCHRANKE.telefonHinweis).toBe('für Rückfragen');
+    expect(SCHRANKE.fussnote).toBe('Sofort sichtbar · kostenlos · unverbindlich');
+  });
+
+  it('Vorschau und Kontakt tragen DENSELBEN Knopf, und er passt in eine Zeile', () => {
+    // Martin 11.09.: der Kunde hat dieses Versprechen geklickt, der nächste
+    // Knopf löst es ein. Und 10.09.: „Button nicht über 2 Zeilen".
     expect(SCHRANKE.knopf).toBe(VERLAUF.knopf);
-    expect(SCHRANKE.kopf).toBe('✓ Ihr Sofortangebot ist fertig');
-    expect(SCHRANKE.text).toBe('Ihr Sofortangebot und alle 5 Pflegekräfte werden sofort sichtbar – die Kopie schicken wir Ihnen per E-Mail.');
-    expect(SCHRANKE.titel).toBe('Wohin dürfen wir Ihr Sofortangebot senden?');
-    expect(SCHRANKE.gefunden()).toBe('5 passende Pflegekräfte gefunden');
+    expect(VERLAUF.knopf.length).toBeLessThanOrEqual(38);
+  });
+
+  it('niemand verspricht mehr „keine Werbeanrufe" oder nennt das Ergebnis „Sofortangebot"', () => {
+    const alles = JSON.stringify({ WARTE: { ...WARTE }, VERLAUF: { ...VERLAUF }, SCHRANKE, weitere: VERLAUF.weitere(), kopf: kopfzeile() });
+    expect(alles).not.toMatch(/Werbeanruf/i);
+    expect(alles).not.toMatch(/Sofortangebot/);
   });
 
   it('parseVorschau lässt nur saubere Karten mit https-Foto durch, maximal drei', () => {

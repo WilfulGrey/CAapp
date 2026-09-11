@@ -2937,12 +2937,12 @@ const CustomerPortalPage: FC = () => {
               // steht dort, wo gehandelt wird — als Einleitung über dem
               // Formular (Martin, 11.08.: erst Angebot und Pflegekräfte
               // zeigen, dann um die Pflegesituation bitten).
-              subtitle:
-                // "beschrieben" — dasselbe Verb wie über dem Formular, im
-                // Text über den Pflegekräften und in der Schritt-Liste
-                // ("Pflegesituation vervollständigen"). "vervollständigt" klang
-                // nach einem zweiten, anderen Schritt (Übergabe 11.08.).
-                'Preis, Konditionen und passende Pflegekräfte auf einen Blick.',
+              // Strecke v2 (Martin, 11.09.): keine Unterzeile im
+              // Ausgangszustand. Der nächste Schritt steht dort, wo gehandelt
+              // wird — als Block „Jetzt konkrete Bewerbungen erhalten" über dem
+              // Formular. Vorher stand hier „Preis, Konditionen … Als Nächstes:
+              // …" mit drei Aufgaben in einem Satz.
+              subtitle: '',
               // Kein Pill hier: Der Einleitungssatz darüber sagt bereits, was
               // den Kunden erwartet. In den anderen Zuständen trägt die Zeile
               // echten Status („1 Bewerbung aktiv") — dort bleibt sie.
@@ -2974,14 +2974,11 @@ const CustomerPortalPage: FC = () => {
                   Button. Alle drei waren Kopien dessen, was die Abschnitte
                   darunter ohnehin tragen (Abschnitt „Pflegesituation" hat
                   einen eigenen Karten-Kopf mit genau diesem Aufruf). */}
-              <p className="text-[16px] leading-relaxed mb-4" style={{color:'#71717A'}}>
-                {heroCopy.subtitle}
-                {/* „Als Nächstes" im selben Absatz, unterstrichen (Martin, 08.09.) —
-                    nur im Ausgangszustand. */}
-                {heroCopy.steps === 'initial' && (
-                  <> <span className="font-semibold underline underline-offset-4" style={{color:'#18181B'}}>Als Nächstes:</span> Kurz die Pflegesituation vervollständigen, Pflegekräfte einladen und Bewerbungen erhalten — alles unverbindlich.</>
-                )}
-              </p>
+              {heroCopy.subtitle && (
+                <p className="text-[16px] leading-relaxed mb-4" style={{color:'#71717A'}}>
+                  {heroCopy.subtitle}
+                </p>
+              )}
 
               {/* Vertrauen steht seit 08.09. in der Kosten-Karte (Siegel-Zeile),
                   nicht mehr im Kopf (Martin: zwei Anläufe im Kopf wirkten
@@ -3163,7 +3160,17 @@ const CustomerPortalPage: FC = () => {
              nimmt ohnehin den ersten. */}
         {!hasPending && (
           <div className="px-1 pt-2" id="pflegekraefte" style={{scrollMarginTop:96}}>
-            <h2 className="text-[1.2rem] font-bold tracking-tight" style={{color:'#18181B'}}>Passende Pflegekräfte einladen</h2>
+            <h2 className="text-[1.2rem] font-bold tracking-tight" style={{color:'#18181B'}}>Passende Pflegekräfte</h2>
+            {/* Strecke v2 (Martin, 11.09.: „bei den Pflegekräften steht ja
+                einladen — da muss man erklären, was das bedeutet"). Wortlaut
+                aus der FAQ „Was bedeutet Einladen?", gekürzt; in Clarity wurde
+                diese Frage öfter geklickt als der Knopf selbst. Keine feste
+                Zahl in der Überschrift: bereits eingeladene Kräfte zählen nicht
+                mit, es sind nicht immer fünf. */}
+            <p className="text-[15px] leading-relaxed mt-1" style={{color:'#52525B'}}>
+              Gefällt Ihnen eine Pflegekraft, laden Sie sie ein, sich bei Ihnen zu bewerben.
+              Das ist unverbindlich: Ein Vertrag entsteht erst, wenn Sie ein konkretes Angebot annehmen.
+            </p>
           </div>
         )}
 
@@ -3447,9 +3454,9 @@ const CustomerPortalPage: FC = () => {
         {/* Die Hervorhebung sitzt seit 13.08. am FORMULAR selbst (brauner
              Rand + Schatten in AngebotCard), nicht mehr als Rahmen um Kopf
              UND Formular: Auf dem Handy presste der Aussenrahmen Einleitung
-             und Formular aneinander (Martin: „zu eng"). Der Kopf mit
-             „Ohne diese Angaben keine Bewerbungen" traegt die Dringlichkeit
-             im Text weiter. Das div bleibt als neutraler Anker. */}
+             und Formular aneinander (Martin: „zu eng"). Die Dringlichkeit
+             traegt seit 11.09. der Block „Jetzt konkrete Bewerbungen
+             erhalten" darueber. Das div bleibt als neutraler Anker. */}
         <div>
         {!hasPending && (() => {
           // Unvollständig = IMMER offen (Martin, 13.08.): Solange die
@@ -3469,6 +3476,20 @@ const CustomerPortalPage: FC = () => {
           // ruhigen Rahmen zurück.
           return (
           <div id="patientendaten" className="px-1 pt-2 scroll-mt-24">
+            {/* Strecke v2 (Martin, 11.09.). Ersetzt „Als Nächstes: …" im Kopf,
+                „Ohne diese Angaben keine Bewerbungen möglich" und den Absatz
+                „Sobald Sie die Pflegesituation vervollständigt haben …" — alle
+                drei sagten dasselbe. Kein eigener Knopf: das Formular beginnt
+                direkt darunter, ein Sprung um drei Zentimeter wäre ein toter Klick. */}
+            {!patientSaved && (
+              <div className="mb-5">
+                <h2 className="text-[1.2rem] font-bold tracking-tight" style={{color:'#18181B'}}>Jetzt konkrete Bewerbungen erhalten</h2>
+                <p className="text-[16px] leading-relaxed mt-1" style={{color:'#18181B'}}>
+                  Wenn das Angebot passt, vervollständigen Sie die Pflegesituation, damit Sie
+                  Pflegekräfte einladen und Bewerbungen erhalten können.
+                </p>
+              </div>
+            )}
             <button
               type="button"
               className="w-full flex items-center justify-between text-left"
@@ -3487,13 +3508,6 @@ const CustomerPortalPage: FC = () => {
             >
               <div className="min-w-0">
                 <h2 className="text-[1.2rem] font-bold tracking-tight" style={{color:'#18181B'}}>Pflegesituation</h2>
-                {/* Sagt in fünf Wörtern, warum dieser Abschnitt anders ist
-                    als die darüber. */}
-                {!patientSaved && (
-                  <p className="text-[13px] font-semibold mt-0.5" style={{color:'#8B7355'}}>
-                    Ohne diese Angaben keine Bewerbungen möglich
-                  </p>
-                )}
               </div>
               <div className="flex items-center gap-2 flex-shrink-0">
                 {patientSaved ? (
@@ -3507,18 +3521,6 @@ const CustomerPortalPage: FC = () => {
               </div>
             </button>
 
-            {/* Einleitung „warum" (Martin, 11.08.) — seit 13.08. ohne den
-                Minuten-/Kostenrechner-Satz: Auf dem Handy stand der Text
-                gequetscht direkt auf dem Formular („zu eng"). Ein Satz plus
-                Luft; die Dauer erklaert sich im Formular von selbst
-                (Fortschrittsbalken, 4 Schritte). */}
-            {!patientSaved && (
-              <p className="text-[16px] leading-relaxed mt-3 mb-4" style={{color:'#18181B'}}>
-                Sobald Sie die Pflegesituation vervollständigt haben, erhalten Sie
-                ganz unverbindlich Bewerbungen und sehen, welche Pflegekräfte
-                die Betreuung übernehmen können.
-              </p>
-            )}
           </div>
           );
         })()}
