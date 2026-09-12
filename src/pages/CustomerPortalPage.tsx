@@ -2451,7 +2451,7 @@ const CustomerPortalPage: FC = () => {
                       Garantie-Seite des Rechners. */}
                   <div className="mt-4 flex items-center gap-3">
                     <a href="https://kostenrechner.primundus.de/bestpreisgarantie" target="_blank" rel="noopener noreferrer" aria-label="Primundus Bestpreisgarantie – mehr Infos" className="flex-shrink-0">
-                      <img src="/images/bestpreisgarantie-siegel.png" alt="Primundus Bestpreisgarantie – 6× Preis-Leistungssieger" width={900} height={296} className="h-12 w-auto" loading="lazy" />
+                      <img src="/images/bestpreisgarantie-siegel.png" alt="Primundus Bestpreisgarantie – 6× Preis-Leistungssieger" width={900} height={256} className="h-12 w-auto" loading="lazy" />
                     </a>
                     <a href="https://kostenrechner.primundus.de/bestpreisgarantie" target="_blank" rel="noopener noreferrer" className="text-[14px] font-semibold underline underline-offset-2 whitespace-nowrap" style={{color:'#1E5C3A'}}>Mehr Infos</a>
                   </div>

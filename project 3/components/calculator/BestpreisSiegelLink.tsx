@@ -28,7 +28,7 @@ export function BestpreisSiegelLink({ className }: { className?: string }) {
         src={GARANTIE.siegelSrc}
         alt={GARANTIE.siegelAlt}
         width={900}
-        height={296}
+        height={256}
         className="block h-auto w-full drop-shadow-[0_2px_10px_rgba(0,0,0,0.25)]"
       />
     </a>

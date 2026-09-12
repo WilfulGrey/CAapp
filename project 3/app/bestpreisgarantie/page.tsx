@@ -25,7 +25,7 @@ export default function BestpreisgarantiePage() {
         </Link>
 
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src={GARANTIE.siegelSrc} alt={GARANTIE.siegelAlt} width={900} height={296} className="h-[84px] w-auto mb-6" />
+        <img src={GARANTIE.siegelSrc} alt={GARANTIE.siegelAlt} width={900} height={256} className="h-[84px] w-auto mb-6" />
 
         <h1 className="text-[28px] md:text-[34px] font-bold leading-tight text-[#1a1a1a] mb-3">{GARANTIE.zusage}</h1>
         <p className="text-[17px] leading-relaxed text-[#3D3D3D] mb-8">{GARANTIE.warum}</p>
