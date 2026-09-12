@@ -424,7 +424,7 @@ async function getLeadMilestone(supabase: any, leadId: string): Promise<LeadMile
   return "none";
 }
 
-function buildAngebotsEmailHtml(lead: Lead, siteUrl: string): string {
+export function buildAngebotsEmailHtml(lead: Lead, siteUrl: string): string {
   const kalkulationUrl = `${siteUrl}/kalkulation/${lead.id}`;
   const anredeText = buildAnredeText(lead.anrede_text || null, lead.nachname || "", lead.vorname || "");
   const kalk = lead.kalkulation || {};
@@ -460,6 +460,16 @@ function buildAngebotsEmailHtml(lead: Lead, siteUrl: string): string {
       <span style="color:#2D6A4F;font-weight:600;">✓ Tagesgenaue Abrechnung</span>&ensp;&middot;&ensp;
       <span style="color:#2D6A4F;font-weight:600;">✓ Kosten erst bei Anreise</span>
     </div>
+
+    <!-- Bestpreisgarantie (Martin 12.09.2026): direkt unter dem Preis, dort vergleicht der Kunde. Bedingungen auf der Garantie-Seite. -->
+    <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="margin:0 0 18px;">
+      <tr>
+        <td style="background:#F4F8F5;border:1px solid #CFE6D8;border-radius:8px;padding:12px 14px;">
+          <div style="font-size:14px;line-height:1.6;color:#2D1F0F;"><strong style="color:#1E5C3A;">Bestpreisgarantie:</strong> Liegt ein vergleichbares Angebot unter unserem Preis, gehen wir verbindlich 100&nbsp;€ im Monat darunter.</div>
+          <div style="font-size:12px;line-height:1.6;color:#666;margin-top:4px;">Das können wir, weil unsere Pflegekräfte bei uns angestellt sind und keine Vermittlungsgebühr anfällt. <a href="${siteUrl}/bestpreisgarantie" style="color:#1E5C3A;font-weight:600;">Was heißt vergleichbar?</a></div>
+        </td>
+      </tr>
+    </table>
     <p style="font-size:15px;line-height:1.75;color:#444;margin-bottom:14px;">Im Angebot finden Sie alle Details zu Kosten, Konditionen und dem weiteren Ablauf.</p>
  
     ${bulletproofButton(kalkulationUrl, "Angebot jetzt ansehen →")}

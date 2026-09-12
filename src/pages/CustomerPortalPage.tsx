@@ -2604,6 +2604,19 @@ const CustomerPortalPage: FC = () => {
                   ))}
                 </div>
 
+                {/* Bestpreisgarantie (Martin 12.09.2026): direkt unter den Kosten,
+                    denn hier vergleicht der Kunde. Bedingungen auf der
+                    Garantie-Seite des Rechners, nicht als zweiter Kasten. */}
+                <div className="rounded-2xl border mt-3 px-5 py-4" style={{background:'#F4F8F5', borderColor:'#CFE6D8'}}>
+                  <p className="text-[15px] leading-snug" style={{color:'#18181B'}}>
+                    <span className="font-bold" style={{color:'#1E5C3A'}}>Bestpreisgarantie:</span> Liegt ein vergleichbares Angebot unter unserem Preis, gehen wir verbindlich 100&nbsp;€ im Monat darunter.
+                  </p>
+                  <p className="text-[13px] mt-1.5 leading-snug" style={{color:'#71717A'}}>
+                    Das können wir, weil unsere Pflegekräfte bei uns angestellt sind und keine Vermittlungsgebühr anfällt.{' '}
+                    <a href="https://kostenrechner.primundus.de/bestpreisgarantie" target="_blank" rel="noopener noreferrer" className="font-semibold underline underline-offset-2" style={{color:'#1E5C3A'}}>Was heißt vergleichbar?</a>
+                  </p>
+                </div>
+
                 {/* ── Was bleibt für Sie übrig ──────────────────────────────
                     Martin, 12.08.: Eigenanteil doch zeigen — aber HIER, nicht
                     am Hauptpreis. Die Regel vom 11.08. („wir nennen unseren

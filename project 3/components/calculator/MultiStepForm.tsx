@@ -1075,7 +1075,25 @@ export function MultiStepForm({ mode = 'inline' }: MultiStepFormProps = {}) {
               <span className="text-[16px] leading-snug text-[#3D3D3D]">{punkt}</span>
             </li>
           ))}
+          {/* 4. Punkt (Martin 12.09.): die Bestpreisgarantie als Wort, das
+              Pop-up erklärt sie — gleiche Schrift wie die drei anderen. */}
+          <li className="flex items-center gap-2.5">
+            <svg className="h-[18px] w-[18px] flex-shrink-0 text-[#E76F63]" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24" aria-hidden="true">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+            </svg>
+            <button
+              type="button"
+              onClick={(e) => { e.stopPropagation(); oeffneGarantie(); }}
+              className="text-[16px] leading-snug text-[#3D3D3D] underline underline-offset-[3px] decoration-[#3D3D3D]/50 hover:decoration-[#3D3D3D] text-left"
+              aria-haspopup="dialog"
+              aria-expanded={garantieOffen}
+            >
+              {GARANTIE.wort}
+            </button>
+          </li>
         </ul>
+        {/* Das Pop-up muss auch im Hero-Zweig im Baum stehen (eigener Return). */}
+        <BestpreisDialog open={garantieOffen} onOpenChange={setGarantieOffen} />
       </div>
     );
   }
