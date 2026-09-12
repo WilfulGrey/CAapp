@@ -105,6 +105,23 @@ export default function HomePage() {
                 className="block h-auto w-full drop-shadow-[0_2px_10px_rgba(0,0,0,0.25)]"
               />
             </a>
+            {/* Bestpreisgarantie-Siegel rechts im Foto (Martin 12.09.: „das ist
+                das Entscheidende — ich will das auf der Website sehen"),
+                Gegenstück zum WELT-Siegel links; führt zur Garantie-Seite. */}
+            <a
+              href="/bestpreisgarantie"
+              className="absolute bottom-[4%] right-[4%] z-10 block w-[36%] min-w-[140px] max-w-[250px]"
+              aria-label="Primundus Bestpreisgarantie — mehr Infos"
+            >
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src="/images/bestpreisgarantie-siegel.webp"
+                alt="Primundus Bestpreisgarantie – 6× Preis-Leistungssieger"
+                width={900}
+                height={296}
+                className="block h-auto w-full drop-shadow-[0_2px_10px_rgba(0,0,0,0.25)]"
+              />
+            </a>
           </div>
 
           {/* Weisser Grund auf dem Handy (Martin 16.08.): die Medialogos

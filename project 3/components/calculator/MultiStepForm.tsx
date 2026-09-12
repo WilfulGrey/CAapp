@@ -1075,20 +1075,24 @@ export function MultiStepForm({ mode = 'inline' }: MultiStepFormProps = {}) {
               <span className="text-[16px] leading-snug text-[#3D3D3D]">{punkt}</span>
             </li>
           ))}
-          {/* 4. Punkt (Martin 12.09.): sein Siegel, klickbar — das Pop-up
-              erklärt die Garantie. */}
-          <li className="pt-1">
-            <button
-              type="button"
-              onClick={(e) => { e.stopPropagation(); oeffneGarantie(); }}
-              className="block rounded-full focus:outline-none focus-visible:ring-2 focus-visible:ring-[#1F8F5F]/60"
-              aria-haspopup="dialog"
-              aria-expanded={garantieOffen}
-              aria-label="Bestpreisgarantie – was heißt vergleichbar?"
-            >
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={GARANTIE.siegelSrc} alt={GARANTIE.siegelAlt} width={900} height={296} className="h-[66px] w-auto" loading="lazy" />
-            </button>
+          {/* 4. Punkt (Martin 12.09.): Text wie die drei anderen, dazu ein
+              Textlink, der das Pop-up öffnet. Das Siegel selbst steht im Hero-Bild. */}
+          <li className="flex items-center gap-2.5">
+            <svg className="h-[18px] w-[18px] flex-shrink-0 text-[#E76F63]" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24" aria-hidden="true">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+            </svg>
+            <span className="text-[16px] leading-snug text-[#3D3D3D]">
+              {GARANTIE.wort}{' '}
+              <button
+                type="button"
+                onClick={(e) => { e.stopPropagation(); oeffneGarantie(); }}
+                className="font-semibold text-[#1E5C3A] underline underline-offset-[3px]"
+                aria-haspopup="dialog"
+                aria-expanded={garantieOffen}
+              >
+                Mehr Infos
+              </button>
+            </span>
           </li>
         </ul>
         {/* Das Pop-up muss auch im Hero-Zweig im Baum stehen (eigener Return). */}
@@ -1513,15 +1517,6 @@ export function MultiStepForm({ mode = 'inline' }: MultiStepFormProps = {}) {
                               {/* Strecke v2 (11.09.): kein zweites „5 Pflegekräfte" und keine
                                   Frage mehr — die Kräfte standen einen Schritt vorher. Nur der
                                   Grund, warum wir die Daten brauchen. */}
-                              {/* Bestpreisgarantie VOR dem Lead (Martin 12.09.): nur das Siegel und
-                                  „Mehr Infos", beides öffnet das Pop-up — kein Ausgang. */}
-                              <div className="mb-3 flex items-center gap-3">
-                                <button type="button" onClick={oeffneGarantie} aria-haspopup="dialog" aria-expanded={garantieOffen} aria-label="Bestpreisgarantie – mehr Infos" className="flex-shrink-0 rounded-full focus:outline-none focus-visible:ring-2 focus-visible:ring-[#1F8F5F]/60">
-                                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                                  <img src={GARANTIE.siegelSrc} alt={GARANTIE.siegelAlt} width={900} height={296} className="h-[48px] w-auto" />
-                                </button>
-                                <button type="button" onClick={oeffneGarantie} className="text-[14px] font-semibold text-[#1E5C3A] underline underline-offset-2">Mehr Infos</button>
-                              </div>
                               <p className="text-[19px] font-bold leading-snug text-[#1a1a1a]">{SCHRANKE.frage}</p>
                               <p className="text-[15px] leading-snug text-[#555] mt-1">{SCHRANKE.text}</p>
                             </div>
@@ -1589,16 +1584,7 @@ export function MultiStepForm({ mode = 'inline' }: MultiStepFormProps = {}) {
                           ist fertig", eine generische Spanne daneben wirkte
                           widersprüchlich (Martins Einwand 15.08.). */}
                       <div className="pt-1">
-                        {/* Bestpreisgarantie VOR dem Lead (Martin 12.09.): nur das Siegel und
-                                  „Mehr Infos", beides öffnet das Pop-up — kein Ausgang. */}
-                              <div className="mb-3 flex items-center gap-3">
-                                <button type="button" onClick={oeffneGarantie} aria-haspopup="dialog" aria-expanded={garantieOffen} aria-label="Bestpreisgarantie – mehr Infos" className="flex-shrink-0 rounded-full focus:outline-none focus-visible:ring-2 focus-visible:ring-[#1F8F5F]/60">
-                                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                                  <img src={GARANTIE.siegelSrc} alt={GARANTIE.siegelAlt} width={900} height={296} className="h-[48px] w-auto" />
-                                </button>
-                                <button type="button" onClick={oeffneGarantie} className="text-[14px] font-semibold text-[#1E5C3A] underline underline-offset-2">Mehr Infos</button>
-                              </div>
-                              <p className="text-[19px] font-bold leading-snug text-[#1a1a1a]">{SCHRANKE.frage}</p>
+                        <p className="text-[19px] font-bold leading-snug text-[#1a1a1a]">{SCHRANKE.frage}</p>
                               <p className="text-[15px] leading-snug text-[#555] mt-1">{SCHRANKE.text}</p>
                       </div>
                     </>
