@@ -1091,6 +1091,8 @@ export function buildEingangsbestaetigungHtml(
   // (buildHeimVergleichBoxHtml) direkt unter den Preisen, weil dort schon der
   // Eigenanteil steht. Bestpreis-Garantie ist RAUS (Martin, 14.08.: „scheint
   // nicht zu ziehen") — sie lud zum Anbietervergleich ein statt zum Nutzen.
+  // Seit 12.09.2026 wieder drin — als ruhige Zusage („nie mehr als für ein
+  // vergleichbares Angebot"), ein Satz unter den Preisen (garantieRow).
   const priceRows = bruttopreis > 0 ? `
       <tr>
         <td class="price-stage-cell" style="width:50%;padding:22px 24px 18px;border-right:1px solid #ebe2d2;vertical-align:top;">
@@ -1117,9 +1119,22 @@ export function buildEingangsbestaetigungHtml(
      Panels wie bisher unmittelbar untereinander. */
   const preisTabelle = "";
 
+  // Bestpreisgarantie (Martin 12.09.2026, Ersatz fuer die am 14.08. entfernte
+  // Fassung): EIN Satz direkt unter den Preisen, dort vergleicht der Kunde;
+  // die Bedingungen stehen auf /bestpreisgarantie, nicht in der Mail.
+  const garantieRow = bruttopreis > 0 ? `
+      <tr>
+        <td colspan="2" style="padding:14px 24px 16px;border-top:1px solid #ebe2d2;background:#F4F8F5;">
+          <table width="100%" cellpadding="0" cellspacing="0" role="presentation"><tr>
+            <td style="width:200px;padding-right:16px;vertical-align:middle;"><a href="${siteUrl}/bestpreisgarantie" style="text-decoration:none;"><img src="${siteUrl}/images/bestpreisgarantie-siegel.png" width="190" alt="Primundus Bestpreisgarantie – 6× Preis-Leistungssieger" style="display:block;width:190px;height:auto;border:0;"></a></td>
+            <td style="vertical-align:middle;"><p style="margin:0;font-size:14px;line-height:1.6;"><a href="${siteUrl}/bestpreisgarantie" style="color:#1E5C3A;font-weight:600;">Mehr Infos zur Bestpreisgarantie →</a></p></td>
+          </tr></table>
+        </td>
+      </tr>` : "";
+
   const konditionenTabelle = `
     <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="margin:0 0 28px;background:#FAF8F4;border-radius:10px;overflow:hidden;">
-      ${priceRows}
+      ${priceRows}${garantieRow}
       <tr>
         <td colspan="2" style="padding:16px 24px 16px;${bruttopreis > 0 ? "border-top:1px solid #ebe2d2;" : ""}">
           <p style="margin:0 0 10px;${psLabel}color:#2A9D5C;">Ihre Konditionen</p>
@@ -1332,7 +1347,10 @@ zzgl. ca. 125 € Anreise- und Abreisekosten je Strecke sowie Kost und Logis.
 `
     : "";
 
-  const konditionenLine = `Ihre Konditionen:
+  const garantieText = bruttopreis > 0 ? `Primundus Bestpreisgarantie – mehr Infos: https://kostenrechner.primundus.de/bestpreisgarantie
+
+` : "";
+  const konditionenLine = `${garantieText}Ihre Konditionen:
   ✓ Täglich kündbar
   ✓ Tagesgenaue Abrechnung
   ✓ Betreuungskraft vor Vertragsabschluss selbst auswählen

@@ -4,8 +4,9 @@ import Image from "next/image";
 import { Header } from "@/components/calculator/Header";
 import { TestimonialCard } from "@/components/calculator/TestimonialCard";
 import { HowItWorks } from "@/components/calculator/HowItWorks";
-import { BestpriceGuarantee } from "@/components/calculator/BestpriceGuarantee";
+import { BestpriceGuarantee, BestpreisKarte } from "@/components/calculator/BestpriceGuarantee";
 import { TestsiegerSection } from "@/components/calculator/TestsiegerSection";
+import { BestpreisSiegelLink } from "@/components/calculator/BestpreisSiegelLink";
 import { FAQSection } from "@/components/calculator/FAQSection";
 import { ComparisonSection } from "@/components/calculator/ComparisonSection";
 import { FinalCTA } from "@/components/calculator/FinalCTA";
@@ -105,6 +106,12 @@ export default function HomePage() {
                 className="block h-auto w-full drop-shadow-[0_2px_10px_rgba(0,0,0,0.25)]"
               />
             </a>
+            {/* Bestpreisgarantie-Siegel rechts im Foto (Martin 12.09.: „das ist
+                das Entscheidende — ich will das auf der Website sehen"),
+                Gegenstück zum WELT-Siegel links; führt zur Garantie-Seite. */}
+            {/* Bestpreisgarantie-Siegel links neben dem WELT-Siegel (Martin 12.09.),
+                unten bündig; öffnet das kompakte Pop-up. */}
+            <BestpreisSiegelLink className="absolute bottom-[4%] left-[25%] z-10 block w-[34%] min-w-[130px] max-w-[240px]" />
           </div>
 
           {/* Weisser Grund auf dem Handy (Martin 16.08.): die Medialogos
@@ -243,28 +250,9 @@ export default function HomePage() {
       <section className="hidden lg:block py-14 px-5 bg-white">
         <div className="max-w-[1280px] mx-auto">
           <div className="grid grid-cols-2 gap-8">
-            <div className="bg-gradient-to-br from-[#FAF8F5] to-[#F2EDE6] border-2 border-[#E5DFD6] rounded-2xl p-8 relative">
-              <div className="absolute top-[-14px] left-1/2 -translate-x-1/2 bg-[#5C9F6E] text-white px-6 py-1.5 rounded-full text-sm font-bold uppercase tracking-wide whitespace-nowrap shadow-md z-10">
-                ★ 100% Sorgenfrei
-              </div>
-
-              <div className="relative flex items-start gap-6 mt-4">
-                <div className="w-14 h-14 bg-[#708A95] rounded-2xl flex items-center justify-center flex-shrink-0">
-                  <svg className="w-7 h-7 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                    <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
-                  </svg>
-                </div>
-
-                <div className="flex-1">
-                  <h3 className="text-[22px] font-bold text-[#3D3D3D] mb-3">
-                   Überlassen Sie die Betreuung nicht dem Zufall.
-                  </h3>
-                  <p className="text-[15px] leading-relaxed text-[#5A5A5A]">
-                     Vertrauen Sie auf über 20 Jahre Erfahrung aus mehr als 60.000 Betreuungen – ohne Vermittlungsgebühr, täglich kündbar, taggenau abgerechnet. Kosten entstehen erst, wenn die Betreuungskraft tatsächlich bei Ihnen ist.
-                  </p>
-                </div>
-              </div>
-            </div>
+            {/* Linke Karte = Bestpreisgarantie (Martin 12.09.2026), dieselbe
+                Karte wie im mobilen Block — eine Quelle, kein Zweittext. */}
+            <BestpreisKarte kompakt />
 
             <div className="bg-white border-2 border-[#D4A843] rounded-2xl p-8 relative">
               <div className="absolute top-[-14px] left-1/2 -translate-x-1/2 bg-[#D4A843] text-white px-6 py-1.5 rounded-full text-sm font-bold uppercase tracking-wide whitespace-nowrap shadow-md z-10">

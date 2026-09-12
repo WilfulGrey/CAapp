@@ -8,7 +8,9 @@ import { analytics, variantenSeite, websiteHerkunft } from "@/lib/analytics";
 import { cookieConsent } from "@/lib/cookie-consent";
 import { scrollToCalculator, isCalculatorAligned, OPEN_CALCULATOR_EVENT } from "@/lib/scroll-to-calculator";
 import { useFormTracking } from "@/hooks/use-form-tracking";
-import { deutschBalken, GANZ_SICHTBAR, kopfzeile, kraefteVorschauAktiv, kraftFakten, parseVorschau, PORTAL_ANZAHL, SCHRANKE, VERLAUF, WARTE, wuenscheAusAntworten, type VorschauKraft } from "@/lib/kraefte-vorschau";
+import { deutschBalken, GANZ_SICHTBAR, GARANTIE, kopfzeile, kraefteVorschauAktiv, kraftFakten, parseVorschau, PORTAL_ANZAHL, SCHRANKE, VERLAUF, WARTE, wuenscheAusAntworten, type VorschauKraft } from "@/lib/kraefte-vorschau";
+import { BestpreisDialog } from "@/components/calculator/BestpreisDialog";
+import { GARANTIE_OEFFNEN_EVENT } from "@/components/calculator/BestpreisSiegelLink";
 import { zaehle } from "@/lib/zaehler";
 import { meldeAnfrage } from "@/lib/oaiq";
 import { telefonBereinigen, telefonFehler, telefonGueltig } from "@/lib/telefon";
@@ -200,6 +202,21 @@ export function MultiStepForm({ mode = 'inline' }: MultiStepFormProps = {}) {
   // Schritt 9 im Vorschau-Modus: die Kontaktfelder öffnen sich erst nach dem
   // Knopf „Preis & Profile freischalten" (Martin, 10.09.). Ref für Payload/Redirect.
   const [kontaktOffen, setKontaktOffen] = useState(false);
+  // Bestpreisgarantie: Pop-up aus dem grünen Kopf (Martin 12.09.). Öffnen
+  // zählt anonym (garantie_geoeffnet), damit wir sehen, wie viele es lesen.
+  const [garantieOffen, setGarantieOffen] = useState(false);
+  const oeffneGarantie = () => {
+    setGarantieOffen(true);
+    zaehle('garantie_geoeffnet', vorschauAktivRef.current ? 'vorschau' : 'alt');
+  };
+  // Das Siegel im Hero-Bild (app/page.tsx) liegt außerhalb dieses Wizards und
+  // öffnet das Pop-up über ein Fensterereignis (BestpreisSiegelLink).
+  useEffect(() => {
+    const h = () => oeffneGarantie();
+    window.addEventListener(GARANTIE_OEFFNEN_EVENT, h);
+    return () => window.removeEventListener(GARANTIE_OEFFNEN_EVENT, h);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   const kontaktOffenRef = useRef(false);
   const kraefteVorschauRef = useRef<VorschauKraft[] | null>(null);
   const oeffneKontakt = () => {
@@ -1067,7 +1084,28 @@ export function MultiStepForm({ mode = 'inline' }: MultiStepFormProps = {}) {
               <span className="text-[16px] leading-snug text-[#3D3D3D]">{punkt}</span>
             </li>
           ))}
+          {/* 4. Punkt (Martin 12.09.): Text wie die drei anderen, dazu ein
+              Textlink, der das Pop-up öffnet. Das Siegel selbst steht im Hero-Bild. */}
+          <li className="flex items-center gap-2.5">
+            <svg className="h-[18px] w-[18px] flex-shrink-0 text-[#E76F63]" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24" aria-hidden="true">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+            </svg>
+            <span className="text-[16px] leading-snug text-[#3D3D3D]">
+              {GARANTIE.wort}{' '}
+              <button
+                type="button"
+                onClick={(e) => { e.stopPropagation(); oeffneGarantie(); }}
+                className="font-semibold text-[#1E5C3A] underline underline-offset-[3px]"
+                aria-haspopup="dialog"
+                aria-expanded={garantieOffen}
+              >
+                Mehr Infos
+              </button>
+            </span>
+          </li>
         </ul>
+        {/* Das Pop-up muss auch im Hero-Zweig im Baum stehen (eigener Return). */}
+        <BestpreisDialog open={garantieOffen} onOpenChange={setGarantieOffen} />
       </div>
     );
   }
@@ -1129,6 +1167,9 @@ export function MultiStepForm({ mode = 'inline' }: MultiStepFormProps = {}) {
             </p>
           )}
         </div>
+
+        {/* Bestpreisgarantie — Pop-up aus dem Kopf des Kontakt-Schritts (Martin 12.09.). */}
+        <BestpreisDialog open={garantieOffen} onOpenChange={setGarantieOffen} />
 
         {/* Balken ab der ersten echten Frage (Martin 11.09.: Schritt 1 ohne
             Balken wirkte eng und anders als der Rest) — im eingebetteten

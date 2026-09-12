@@ -209,6 +209,49 @@ export const SCHRANKE = {
   auszeichnung: '6× Preis-Leistungssieger',
 };
 
+/**
+ * Bestpreisgarantie im Kontakt-Schritt (Martin, 12.09.2026). Kein Extrasatz:
+ * das Wort steht im grünen Kopf hinter der Auszeichnung als unterstrichener
+ * Link und öffnet das Pop-up. Die alte Garantie („unterbieten wir es", bis
+ * 18.08.) war nicht greifbar und hatte keine Bedingungen — diese hier ist
+ * ein bindendes Versprechen: 100 € im Monat unter einem VERGLEICHBAREN
+ * Angebot, und „vergleichbar" ist ausbuchstabiert, weil Portale mit
+ * Eigenanteilen nach Zuschuss werben („ab 1.350 €"). Martin: „Gehen wir mit
+ * reizt nicht — dann gehen wir noch hundert Euro drunter, das ist anfassbar."
+ * Wortlaut nur mit Martins Freigabe ändern; nie „vermitteln" (eigenes
+ * Personal), keine Prozentzahlen, keine erfundenen Zahlen.
+ */
+export const GARANTIE = {
+  wort: 'Bestpreisgarantie',
+  /** Unterzeile im Kopf: „6× Preis-Leistungssieger · mit [Bestpreisgarantie]" */
+  vorsatz: 'mit',
+  titel: 'Bestpreisgarantie',
+  beraterin: 'Marta Kapcio',
+  rolle: 'Ihre Beraterin',
+  fotoSrc: '/images/marta-kapcio.jpg',
+  /** Martins Siegel (12.09.): Pille mit Schild, „PRIMUNDUS / BESTPREISGARANTIE / 6× Preis-Leistungssieger". Seite = WebP, Mail = PNG. */
+  siegelSrc: '/images/bestpreisgarantie-siegel.webp',
+  siegelAlt: 'Primundus Bestpreisgarantie – 6× Preis-Leistungssieger',
+  // Martin 12.09.: „ganz klar und nicht so textlich" — zwei Sätze sichtbar,
+  // die Bedingungen zum Aufklappen. Ton: verbindlich, ruhig.
+  // Martin 12.09.: „kurz und knapp, was wir machen — erst wenn man's öffnet, mehr Infos".
+  // Variante A (Martin 12.09.: „so aggressiv wollen wir nicht sein"): kein
+  // Unterbieten, sondern die Zusage, nicht zu überzahlen — ruhig und bindend.
+  zusage: 'Bei uns zahlen Sie nie mehr als für ein vergleichbares Angebot.',
+  ablauf: 'Legen Sie uns das Angebot vor, wir passen unseren Preis an. Marta antwortet innerhalb eines Werktags.',
+  warum: 'Das können wir, weil unsere Pflegekräfte bei uns angestellt sind und keine Vermittlungsgebühr anfällt.',
+  aufklappen: 'Was heißt vergleichbar?',
+  // Martins Wortlaut (12.09.); Punkte 4 und 5 sind mein Vorschlag (Lockzahlen der Portale).
+  bedingungen: [
+    'Die gleiche Betreuungssituation und der gleiche Umfang',
+    'Legal angestelltes Personal mit A1-Bescheinigung',
+    'Vergleichbare Qualifikation: Sprache, Führerschein, Erfahrung',
+    'Gesamtpreis pro Monat, nicht der Eigenanteil nach Zuschüssen',
+    'Schriftliches Angebot, nicht älter als 14 Tage',
+  ],
+  schliessen: 'Verstanden',
+} as const;
+
 /** Antwort der Function absichern — nur, was die Karte braucht, nie mehr. */
 export function parseVorschau(json: unknown): VorschauKraft[] {
   const liste = (json && typeof json === 'object' && Array.isArray((json as { kraefte?: unknown }).kraefte))

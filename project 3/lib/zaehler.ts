@@ -17,6 +17,7 @@
 export const ZAEHLER_EREIGNISSE = [
   'schritt_1', 'schritt_2', 'schritt_3', 'schritt_4', 'schritt_5', 'schritt_6', 'schritt_7', 'schritt_8', 'schritt_9',
   'cta_geklickt', 'abgeschickt',
+  'garantie_geoeffnet', // Pop-up der Bestpreisgarantie im Kontakt-Schritt (12.09.2026)
 ] as const;
 export type ZaehlerEreignis = (typeof ZAEHLER_EREIGNISSE)[number];
 
