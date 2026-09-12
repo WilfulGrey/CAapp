@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 /* Cross-App-Import (pures Modul, Muster wie portalHelfer24.test.ts): der
  * Vermittler-Parser lebt im Kostenrechner und wird hier im root-vitest
  * geprüft, weil project 3 keinen eigenen Runner hat. */
-import { pruefeAnfrage, betreffAntwort, WERKZEUG, VERMITTLER_MAILS, type MailKopf, modellNachricht, waehleDokumente, modellBloecke, DOK_MAX_BYTES_GESAMT} from '../../project 3/lib/pflegena';
+import { pruefeAnfrage, betreffAntwort, WERKZEUG, VERMITTLER_MAILS, type MailKopf, modellNachricht, waehleDokumente, modellBloecke, DOK_MAX_BYTES_GESAMT, modellFehlerArt} from '../../project 3/lib/pflegena';
 
 /* Echte Anfrage von Pflegena (Bernd Walde), wie sie im Postfach liegt.
  * Sie ist der Grund, warum hier ein Modell statt eines Regelparsers steht:
@@ -623,5 +623,39 @@ describe('Detailfelder aus dem Anhang', () => {
       wohnungstyp: 'einfamilienhaus', rauchen: 'ja',
       getriebe: 'schaltung', pflegedienst: 'ja', familie_nahe: 'ja',
     });
+  });
+});
+
+/* Registry #61: eine Stoerung des Kontos hatte zwei echte Anfragen dauerhaft
+ * abgelehnt, weil "kein Guthaben" als HTTP 400 kommt — und 400 hiess bis
+ * dahin "diese Mail nie wieder". */
+describe('modellFehlerArt', () => {
+  /* Wortlaut 1:1 aus dem Prod-Protokoll vom 11.09.2026 (uid 17650/17695). */
+  const GUTHABEN =
+    '{"type":"error","error":{"type":"invalid_request_error","message":"Your credit balance is ' +
+    'too low to access the Anthropic API. Please go to Plans & Billing to upgrade or purchase ' +
+    'credits."},"request_id":"req_011CewnqWv1tfFcFXKFBRnWo"}';
+
+  it('leeres Guthaben ist die Lage, nicht die Mail', () => {
+    expect(modellFehlerArt(400, GUTHABEN)).toBe('guthaben');
+  });
+
+  it('auch als strukturierter billing_error (403)', () => {
+    expect(modellFehlerArt(403, '{"type":"error","error":{"type":"billing_error","message":"…"}}'))
+      .toBe('guthaben');
+  });
+
+  it('ein echtes 400 bleibt ein Urteil ueber diese Mail', () => {
+    /* Der Fall, fuer den die Regel gebaut wurde: ein unbekanntes Feld im
+       document-Block. Fuenfmal zu wiederholen kostet und endet gleich. */
+    expect(modellFehlerArt(400, '{"type":"error","error":{"type":"invalid_request_error",' +
+      '"message":"messages.0.content.0.document: Extra inputs are not permitted"}}'))
+      .toBe('dauerhaft');
+  });
+
+  it('Schluessel, Limit und Ueberlast bleiben voruebergehend', () => {
+    expect(modellFehlerArt(401, 'authentication_error')).toBe('transient');
+    expect(modellFehlerArt(429, 'rate_limit_error')).toBe('transient');
+    expect(modellFehlerArt(529, 'overloaded_error')).toBe('transient');
   });
 });

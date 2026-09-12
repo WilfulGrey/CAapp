@@ -485,6 +485,28 @@ Anfrage, mehrere Anfragen, Nachtrag, nichts lesbar, HTTP 400). Alles andere
 — 401/403 (Schlüssel rotiert), 429, 5xx, Timeout — ist `offen` und wird
 erneut versucht.
 
+**Ausnahme: leeres Guthaben** (Registry #61). Anthropic meldet ein
+erschöpftes Konto als HTTP **400** `invalid_request_error` mit dem Satz
+„Your credit balance is too low…" — nach der Regel oben also „diese Mail nie
+wieder". Genau das passierte am 11.09.2026 zwei echten Anfragen von Pflegena
+(uid 17650, 17695): Team-Mail, Shell-Lead, und die Antwort an den Partner
+musste anschließend von Hand aus dem Protokoll geholt werden.
+`modellFehlerArt` (`lib/pflegena.ts`) klassifiziert diesen Fall darum als
+eigenes Lager `guthaben`: `offen` **und ohne Zähler**, weil der Aufruf vor
+der Inferenz abgelehnt wird und nichts kostet. Der Deckel von 5 Versuchen
+verteidigt bezahlte Aufrufe — bei einer Störung, die Stunden dauert, hätte
+er die Mail nach fünf Minuten trotzdem verloren. Der zweite Anlauf ohne
+Anhang entfällt in diesem Fall ebenfalls (der Anhang war nicht das Problem).
+Das ist der **einzige** Fall, in dem wir den Fehlertext lesen statt die
+Struktur — es gibt kein anderes Signal; `billing_error` (403) wird als
+strukturierte Form derselben Sache mit erkannt.
+
+Preis dieser Entscheidung: solange das Guthaben fehlt, bleibt die Mail
+`offen`, der Lauf meldet HTTP 500 (`liegengeblieben`) und die Vermittler-
+Schlange steht — sie läuft von selbst wieder an, sobald das Konto gedeckt
+ist, aber es gibt **keine** Team-Mail mehr für diesen Fall. Ein Konto, das
+dauerhaft leer bleibt, fällt also nur in den Logs auf.
+
 Im **Trockenlauf** merkt sich der Prozess die schon gelesenen UIDs im
 Speicher: das Protokoll bleibt dort unberührt, und ohne dieses Gedächtnis
 liefe dieselbe Mail in jedem Takt erneut durchs Modell.
@@ -661,7 +683,7 @@ Die Status:
 |---|---|
 | `erledigt` | Lead angelegt (`lead_id` gesetzt) |
 | `uebersprungen` | Schutzregel (zu alt, Status nicht ansprechbar) — `grund`; im Admin als Shell-Lead/Event sichtbar |
-| `abgelehnt` | deterministisch (keine Kundenadresse, HTTP 400): **dauerhaft, kein Retry** — im Admin als Shell-Lead `manuell_pruefen`. Eine fehlende Einwilligung ist seit 04.09. KEIN Ablehnungsgrund mehr (s. „Direktmails des Portals") |
+| `abgelehnt` | deterministisch (keine Kundenadresse, HTTP 400 — außer leerem Guthaben, s. o.): **dauerhaft, kein Retry** — im Admin als Shell-Lead `manuell_pruefen`. Eine fehlende Einwilligung ist seit 04.09. KEIN Ablehnungsgrund mehr (s. „Direktmails des Portals") |
 | `offen` | transient (5xx, Netz): nächster Takt versucht erneut — nur dieser Status färbt den Lauf rot |
 | `altbestand` | beim Erstlauf eines (postfach, uidvalidity)-Paars vorgefunden, nie verarbeitet (Seed, Muster Bug #25; `uid=0` = Sentinel „Postfach war leer") |
 
