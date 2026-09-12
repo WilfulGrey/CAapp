@@ -1141,18 +1141,7 @@ export function MultiStepForm({ mode = 'inline' }: MultiStepFormProps = {}) {
                       </span>
                       {SCHRANKE.kopf}
                     </p>
-                    <p className="text-[14px] font-medium text-white/95 leading-snug mt-1 pl-[30px]">
-                      {SCHRANKE.auszeichnung} · {GARANTIE.vorsatz}{' '}
-                      <button
-                        type="button"
-                        onClick={oeffneGarantie}
-                        className="font-semibold underline underline-offset-[3px] decoration-white/80 hover:decoration-white focus:outline-none focus-visible:ring-2 focus-visible:ring-white/70 rounded-sm"
-                        aria-haspopup="dialog"
-                        aria-expanded={garantieOffen}
-                      >
-                        {GARANTIE.wort}
-                      </button>
-                    </p>
+                    <p className="text-[14px] font-medium text-white/95 leading-snug mt-1 pl-[30px]">{SCHRANKE.auszeichnung}</p>
                   </div>
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img src="/images/primundus_testsieger-2021.webp" alt="Testsieger DIE WELT Service-Champions" className="h-[66px] w-auto rounded-[5px] shadow-[0_2px_8px_rgba(0,0,0,0.2)] flex-shrink-0" />
@@ -1524,6 +1513,15 @@ export function MultiStepForm({ mode = 'inline' }: MultiStepFormProps = {}) {
                               {/* Strecke v2 (11.09.): kein zweites „5 Pflegekräfte" und keine
                                   Frage mehr — die Kräfte standen einen Schritt vorher. Nur der
                                   Grund, warum wir die Daten brauchen. */}
+                              {/* Bestpreisgarantie VOR dem Lead (Martin 12.09.): nur das Siegel und
+                                  „Mehr Infos", beides öffnet das Pop-up — kein Ausgang. */}
+                              <div className="mb-3 flex items-center gap-3">
+                                <button type="button" onClick={oeffneGarantie} aria-haspopup="dialog" aria-expanded={garantieOffen} aria-label="Bestpreisgarantie – mehr Infos" className="flex-shrink-0 rounded-full focus:outline-none focus-visible:ring-2 focus-visible:ring-[#1F8F5F]/60">
+                                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                                  <img src={GARANTIE.siegelSrc} alt={GARANTIE.siegelAlt} width={900} height={296} className="h-[48px] w-auto" />
+                                </button>
+                                <button type="button" onClick={oeffneGarantie} className="text-[14px] font-semibold text-[#1E5C3A] underline underline-offset-2">Mehr Infos</button>
+                              </div>
                               <p className="text-[19px] font-bold leading-snug text-[#1a1a1a]">{SCHRANKE.frage}</p>
                               <p className="text-[15px] leading-snug text-[#555] mt-1">{SCHRANKE.text}</p>
                             </div>
@@ -1591,7 +1589,16 @@ export function MultiStepForm({ mode = 'inline' }: MultiStepFormProps = {}) {
                           ist fertig", eine generische Spanne daneben wirkte
                           widersprüchlich (Martins Einwand 15.08.). */}
                       <div className="pt-1">
-                        <p className="text-[19px] font-bold leading-snug text-[#1a1a1a]">{SCHRANKE.frage}</p>
+                        {/* Bestpreisgarantie VOR dem Lead (Martin 12.09.): nur das Siegel und
+                                  „Mehr Infos", beides öffnet das Pop-up — kein Ausgang. */}
+                              <div className="mb-3 flex items-center gap-3">
+                                <button type="button" onClick={oeffneGarantie} aria-haspopup="dialog" aria-expanded={garantieOffen} aria-label="Bestpreisgarantie – mehr Infos" className="flex-shrink-0 rounded-full focus:outline-none focus-visible:ring-2 focus-visible:ring-[#1F8F5F]/60">
+                                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                                  <img src={GARANTIE.siegelSrc} alt={GARANTIE.siegelAlt} width={900} height={296} className="h-[48px] w-auto" />
+                                </button>
+                                <button type="button" onClick={oeffneGarantie} className="text-[14px] font-semibold text-[#1E5C3A] underline underline-offset-2">Mehr Infos</button>
+                              </div>
+                              <p className="text-[19px] font-bold leading-snug text-[#1a1a1a]">{SCHRANKE.frage}</p>
                               <p className="text-[15px] leading-snug text-[#555] mt-1">{SCHRANKE.text}</p>
                       </div>
                     </>

@@ -2446,6 +2446,15 @@ const CustomerPortalPage: FC = () => {
                   <p className="text-[15px] mt-2.5 leading-relaxed" style={{color:'#71717A'}}>
                     Monatlich inkl. Steuern, Gebühren und Sozialabgaben. Zzgl. Kost und Logis sowie Reisekosten (125 € pro Fahrt).
                   </p>
+                  {/* Bestpreisgarantie (Martin 12.09.): oben am Preis, nur das
+                      Siegel und ein Link — die Bedingungen stehen auf der
+                      Garantie-Seite des Rechners. */}
+                  <div className="mt-4 flex items-center gap-3">
+                    <a href="https://kostenrechner.primundus.de/bestpreisgarantie" target="_blank" rel="noopener noreferrer" aria-label="Primundus Bestpreisgarantie – mehr Infos" className="flex-shrink-0">
+                      <img src="/images/bestpreisgarantie-siegel.png" alt="Primundus Bestpreisgarantie – 6× Preis-Leistungssieger" width={900} height={296} className="h-12 w-auto" loading="lazy" />
+                    </a>
+                    <a href="https://kostenrechner.primundus.de/bestpreisgarantie" target="_blank" rel="noopener noreferrer" className="text-[14px] font-semibold underline underline-offset-2 whitespace-nowrap" style={{color:'#1E5C3A'}}>Mehr Infos</a>
+                  </div>
 
                   {/* Konditionen stehen OFFEN unter dem Preis (Martin, 11.08.):
                       Sie sind das Verkaufsargument — hinter einem Toggle
@@ -2604,16 +2613,6 @@ const CustomerPortalPage: FC = () => {
                   ))}
                 </div>
 
-                {/* Bestpreisgarantie (Martin 12.09.2026): direkt unter den Kosten,
-                    denn hier vergleicht der Kunde. Bedingungen auf der
-                    Garantie-Seite des Rechners, nicht als zweiter Kasten. */}
-                <div className="rounded-2xl border mt-3 px-5 py-4" style={{background:'#F4F8F5', borderColor:'#CFE6D8'}}>
-                  <img src="/images/bestpreisgarantie-siegel.png" alt="Primundus Bestpreisgarantie – 6× Preis-Leistungssieger" width={900} height={296} className="h-[56px] w-auto mb-2.5" loading="lazy" />
-                  <p className="text-[15px] leading-snug" style={{color:'#18181B'}}>
-                    Bei uns zahlen Sie nie mehr als für ein vergleichbares Angebot.{' '}
-                    <a href="https://kostenrechner.primundus.de/bestpreisgarantie" target="_blank" rel="noopener noreferrer" className="font-semibold underline underline-offset-2 whitespace-nowrap" style={{color:'#1E5C3A'}}>Was heißt vergleichbar?</a>
-                  </p>
-                </div>
 
                 {/* ── Was bleibt für Sie übrig ──────────────────────────────
                     Martin, 12.08.: Eigenanteil doch zeigen — aber HIER, nicht

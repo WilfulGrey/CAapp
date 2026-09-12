@@ -1126,8 +1126,8 @@ export function buildEingangsbestaetigungHtml(
       <tr>
         <td colspan="2" style="padding:14px 24px 16px;border-top:1px solid #ebe2d2;background:#F4F8F5;">
           <table width="100%" cellpadding="0" cellspacing="0" role="presentation"><tr>
-            <td style="width:190px;padding-right:16px;vertical-align:middle;"><img src="${siteUrl}/images/bestpreisgarantie-siegel.png" width="180" alt="Primundus Bestpreisgarantie – 6× Preis-Leistungssieger" style="display:block;width:180px;height:auto;border:0;"></td>
-            <td style="vertical-align:middle;"><p style="margin:0;font-size:14px;line-height:1.6;color:#2D1F0F;">Bei uns zahlen Sie nie mehr als für ein vergleichbares Angebot. <a href="${siteUrl}/bestpreisgarantie" style="color:#1E5C3A;font-weight:600;white-space:nowrap;">Was heißt vergleichbar?</a></p></td>
+            <td style="width:200px;padding-right:16px;vertical-align:middle;"><a href="${siteUrl}/bestpreisgarantie" style="text-decoration:none;"><img src="${siteUrl}/images/bestpreisgarantie-siegel.png" width="190" alt="Primundus Bestpreisgarantie – 6× Preis-Leistungssieger" style="display:block;width:190px;height:auto;border:0;"></a></td>
+            <td style="vertical-align:middle;"><p style="margin:0;font-size:14px;line-height:1.6;"><a href="${siteUrl}/bestpreisgarantie" style="color:#1E5C3A;font-weight:600;">Mehr Infos zur Bestpreisgarantie →</a></p></td>
           </tr></table>
         </td>
       </tr>` : "";
@@ -1347,7 +1347,7 @@ zzgl. ca. 125 € Anreise- und Abreisekosten je Strecke sowie Kost und Logis.
 `
     : "";
 
-  const garantieText = bruttopreis > 0 ? `Bestpreisgarantie: Bei uns zahlen Sie nie mehr als für ein vergleichbares Angebot.
+  const garantieText = bruttopreis > 0 ? `Primundus Bestpreisgarantie – mehr Infos: https://kostenrechner.primundus.de/bestpreisgarantie
 
 ` : "";
   const konditionenLine = `${garantieText}Ihre Konditionen:
