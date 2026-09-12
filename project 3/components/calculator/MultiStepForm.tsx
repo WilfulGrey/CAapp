@@ -8,7 +8,8 @@ import { analytics, variantenSeite, websiteHerkunft } from "@/lib/analytics";
 import { cookieConsent } from "@/lib/cookie-consent";
 import { scrollToCalculator, isCalculatorAligned, OPEN_CALCULATOR_EVENT } from "@/lib/scroll-to-calculator";
 import { useFormTracking } from "@/hooks/use-form-tracking";
-import { deutschBalken, GANZ_SICHTBAR, kopfzeile, kraefteVorschauAktiv, kraftFakten, parseVorschau, PORTAL_ANZAHL, SCHRANKE, VERLAUF, WARTE, wuenscheAusAntworten, type VorschauKraft } from "@/lib/kraefte-vorschau";
+import { deutschBalken, GANZ_SICHTBAR, GARANTIE, kopfzeile, kraefteVorschauAktiv, kraftFakten, parseVorschau, PORTAL_ANZAHL, SCHRANKE, VERLAUF, WARTE, wuenscheAusAntworten, type VorschauKraft } from "@/lib/kraefte-vorschau";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { zaehle } from "@/lib/zaehler";
 import { meldeAnfrage } from "@/lib/oaiq";
 import { telefonBereinigen, telefonFehler, telefonGueltig } from "@/lib/telefon";
@@ -200,6 +201,13 @@ export function MultiStepForm({ mode = 'inline' }: MultiStepFormProps = {}) {
   // Schritt 9 im Vorschau-Modus: die Kontaktfelder öffnen sich erst nach dem
   // Knopf „Preis & Profile freischalten" (Martin, 10.09.). Ref für Payload/Redirect.
   const [kontaktOffen, setKontaktOffen] = useState(false);
+  // Bestpreisgarantie: Pop-up aus dem grünen Kopf (Martin 12.09.). Öffnen
+  // zählt anonym (garantie_geoeffnet), damit wir sehen, wie viele es lesen.
+  const [garantieOffen, setGarantieOffen] = useState(false);
+  const oeffneGarantie = () => {
+    setGarantieOffen(true);
+    zaehle('garantie_geoeffnet', vorschauAktivRef.current ? 'vorschau' : 'alt');
+  };
   const kontaktOffenRef = useRef(false);
   const kraefteVorschauRef = useRef<VorschauKraft[] | null>(null);
   const oeffneKontakt = () => {
@@ -1116,7 +1124,18 @@ export function MultiStepForm({ mode = 'inline' }: MultiStepFormProps = {}) {
                       </span>
                       {SCHRANKE.kopf}
                     </p>
-                    <p className="text-[14px] font-medium text-white/95 leading-snug mt-1 pl-[30px]">{SCHRANKE.auszeichnung}</p>
+                    <p className="text-[14px] font-medium text-white/95 leading-snug mt-1 pl-[30px]">
+                      {SCHRANKE.auszeichnung} · {GARANTIE.vorsatz}{' '}
+                      <button
+                        type="button"
+                        onClick={oeffneGarantie}
+                        className="font-semibold underline underline-offset-[3px] decoration-white/80 hover:decoration-white focus:outline-none focus-visible:ring-2 focus-visible:ring-white/70 rounded-sm"
+                        aria-haspopup="dialog"
+                        aria-expanded={garantieOffen}
+                      >
+                        {GARANTIE.wort}
+                      </button>
+                    </p>
                   </div>
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img src="/images/primundus_testsieger-2021.webp" alt="Testsieger DIE WELT Service-Champions" className="h-[66px] w-auto rounded-[5px] shadow-[0_2px_8px_rgba(0,0,0,0.2)] flex-shrink-0" />
@@ -1129,6 +1148,38 @@ export function MultiStepForm({ mode = 'inline' }: MultiStepFormProps = {}) {
             </p>
           )}
         </div>
+
+        {/* Bestpreisgarantie — Pop-up aus dem Kopf des Kontakt-Schritts (Martin 12.09.). */}
+        <Dialog open={garantieOffen} onOpenChange={setGarantieOffen} modal={true}>
+          <DialogContent className="max-w-[440px] mx-auto bg-white rounded-3xl border-none shadow-2xl p-0 gap-0 max-h-[90vh] overflow-y-auto" aria-describedby={undefined}>
+            <DialogHeader className="px-7 pt-7 pb-3">
+              <DialogTitle className="text-[22px] font-bold text-[#1a1a1a] text-left leading-snug">{GARANTIE.titel}</DialogTitle>
+            </DialogHeader>
+            <div className="px-7 pb-7 space-y-4">
+              <p className="text-[15px] leading-relaxed text-[#1a1a1a] font-medium">{GARANTIE.versprechen}</p>
+              <div>
+                <p className="text-[13px] font-semibold uppercase tracking-wide text-[#6B6B6B] mb-2">{GARANTIE.bedingungenTitel}</p>
+                <ul className="space-y-2">
+                  {GARANTIE.bedingungen.map((b) => (
+                    <li key={b} className="flex items-start gap-2.5 text-[14px] leading-snug text-[#1a1a1a]">
+                      <span className="mt-[3px] inline-flex w-[18px] h-[18px] items-center justify-center rounded-full bg-[#E4F3EB] flex-shrink-0" aria-hidden="true">
+                        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#1F8F5F" strokeWidth={3.2} strokeLinecap="round" strokeLinejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5" /></svg>
+                      </span>
+                      <span>{b}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+              <div>
+                <p className="text-[13px] font-semibold uppercase tracking-wide text-[#6B6B6B] mb-1.5">{GARANTIE.warumTitel}</p>
+                <p className="text-[14px] leading-relaxed text-[#3D3D3D]">{GARANTIE.warum}</p>
+              </div>
+              <button type="button" onClick={() => setGarantieOffen(false)} className="w-full rounded-full bg-[#1F8F5F] text-white font-semibold text-[15px] py-3 hover:bg-[#1a7a51] transition-colors">
+                {GARANTIE.schliessen}
+              </button>
+            </div>
+          </DialogContent>
+        </Dialog>
 
         {/* Balken ab der ersten echten Frage (Martin 11.09.: Schritt 1 ohne
             Balken wirkte eng und anders als der Rest) — im eingebetteten

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { deutschBalken, hakenAusAntworten, kopfzeile, kraefteVorschauAktiv, kraftFakten, kraftZeile, parseVorschau, PORTAL_ANZAHL, SCHRANKE, VERLAUF, WARTE, wuenscheAusAntworten } from '../../project 3/lib/kraefte-vorschau';
+import { deutschBalken, GARANTIE, hakenAusAntworten, kopfzeile, kraefteVorschauAktiv, kraftFakten, kraftZeile, parseVorschau, PORTAL_ANZAHL, SCHRANKE, VERLAUF, WARTE, wuenscheAusAntworten } from '../../project 3/lib/kraefte-vorschau';
 
 function speicher(): Pick<Storage, 'getItem' | 'setItem'> {
   const m = new Map<string, string>();
@@ -67,6 +67,15 @@ describe('Kräfte-Vorschau (Rechner)', () => {
     // Martin 12.09.: nicht „senden" für den Preis (Sofortpreis wird gezeigt), nicht „brauchen wir", nicht „speichern".
     expect(SCHRANKE.frage + ' ' + SCHRANKE.text).not.toMatch(/senden|brauchen|speichern/);
     expect(SCHRANKE.telefonHinweis).toBe('Nur bei Rückfragen');
+    // Bestpreisgarantie (Martin 12.09.): greifbar (100 € im Monat), Bedingungen
+    // ausbuchstabiert, kein „vermitteln", keine Prozentzahl.
+    expect(GARANTIE.wort).toBe('Bestpreisgarantie');
+    expect(GARANTIE.versprechen).toContain('100 € im Monat');
+    expect(GARANTIE.versprechen).toContain('vergleichbar'.slice(0, 0) + 'günstiger');
+    expect(GARANTIE.bedingungen).toHaveLength(5);
+    expect(GARANTIE.bedingungen.join(' ')).toContain('Eigenanteil');
+    const garantieText = JSON.stringify(GARANTIE).toLowerCase();
+    expect(garantieText).not.toMatch(/vermitteln|%/);
     expect(SCHRANKE.fussnote).toBe('Sofort sichtbar · kostenlos · unverbindlich');
   });
 

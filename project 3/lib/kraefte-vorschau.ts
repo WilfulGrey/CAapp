@@ -209,6 +209,38 @@ export const SCHRANKE = {
   auszeichnung: '6× Preis-Leistungssieger',
 };
 
+/**
+ * Bestpreisgarantie im Kontakt-Schritt (Martin, 12.09.2026). Kein Extrasatz:
+ * das Wort steht im grünen Kopf hinter der Auszeichnung als unterstrichener
+ * Link und öffnet das Pop-up. Die alte Garantie („unterbieten wir es", bis
+ * 18.08.) war nicht greifbar und hatte keine Bedingungen — diese hier ist
+ * ein bindendes Versprechen: 100 € im Monat unter einem VERGLEICHBAREN
+ * Angebot, und „vergleichbar" ist ausbuchstabiert, weil Portale mit
+ * Eigenanteilen nach Zuschuss werben („ab 1.350 €"). Martin: „Gehen wir mit
+ * reizt nicht — dann gehen wir noch hundert Euro drunter, das ist anfassbar."
+ * Wortlaut nur mit Martins Freigabe ändern; nie „vermitteln" (eigenes
+ * Personal), keine Prozentzahlen, keine erfundenen Zahlen.
+ */
+export const GARANTIE = {
+  wort: 'Bestpreisgarantie',
+  /** Unterzeile im Kopf: „6× Preis-Leistungssieger · mit [Bestpreisgarantie]" */
+  vorsatz: 'mit',
+  unterbietungEur: 100,
+  titel: 'Unsere Bestpreisgarantie',
+  versprechen: 'Legen Sie uns ein schriftliches Angebot eines anderen Anbieters vor, das günstiger ist als Ihr Primundus-Preis, unterbieten wir es um 100 € im Monat.',
+  bedingungenTitel: 'Vergleichbar heißt',
+  bedingungen: [
+    '24-Stunden-Betreuung im Haushalt durch eine legal angestellte Pflegekraft (A1-Bescheinigung)',
+    'gleiche Deutsch-Stufe und Erfahrung',
+    'gleicher Umfang: Pflegegrad, Nachteinsätze, Haushalt',
+    'Gesamtpreis pro Monat inklusive Anreise und Nebenkosten, nicht der Eigenanteil nach Zuschüssen',
+    'Angebot nicht älter als 14 Tage, vor Vertragsabschluss',
+  ],
+  warumTitel: 'Warum wir das können',
+  warum: 'Unsere Pflegekräfte sind bei uns angestellt, es gibt keine Vermittlungsgebühr, und der Preis kommt bei der Pflegekraft an. So bekommen wir gute Kräfte, und Sie zahlen nicht für Zwischenhändler.',
+  schliessen: 'Verstanden',
+} as const;
+
 /** Antwort der Function absichern — nur, was die Karte braucht, nie mehr. */
 export function parseVorschau(json: unknown): VorschauKraft[] {
   const liste = (json && typeof json === 'object' && Array.isArray((json as { kraefte?: unknown }).kraefte))
