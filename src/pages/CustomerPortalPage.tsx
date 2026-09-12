@@ -2609,7 +2609,7 @@ const CustomerPortalPage: FC = () => {
                     Garantie-Seite des Rechners, nicht als zweiter Kasten. */}
                 <div className="rounded-2xl border mt-3 px-5 py-4" style={{background:'#F4F8F5', borderColor:'#CFE6D8'}}>
                   <p className="text-[15px] leading-snug" style={{color:'#18181B'}}>
-                    <span className="font-bold" style={{color:'#1E5C3A'}}>Bestpreisgarantie:</span> Wir unterbieten jedes vergleichbare Angebot um 100&nbsp;€ im Monat.{' '}
+                    <span className="font-bold" style={{color:'#1E5C3A'}}>Bestpreisgarantie:</span> Bei uns zahlen Sie nie mehr als für ein vergleichbares Angebot.{' '}
                     <a href="https://kostenrechner.primundus.de/bestpreisgarantie" target="_blank" rel="noopener noreferrer" className="font-semibold underline underline-offset-2 whitespace-nowrap" style={{color:'#1E5C3A'}}>Was heißt vergleichbar?</a>
                   </p>
                 </div>

@@ -225,7 +225,6 @@ export const GARANTIE = {
   wort: 'Bestpreisgarantie',
   /** Unterzeile im Kopf: „6× Preis-Leistungssieger · mit [Bestpreisgarantie]" */
   vorsatz: 'mit',
-  unterbietungEur: 100,
   titel: 'Bestpreisgarantie',
   beraterin: 'Marta Kapcio',
   rolle: 'Ihre Beraterin',
@@ -233,7 +232,10 @@ export const GARANTIE = {
   // Martin 12.09.: „ganz klar und nicht so textlich" — zwei Sätze sichtbar,
   // die Bedingungen zum Aufklappen. Ton: verbindlich, ruhig.
   // Martin 12.09.: „kurz und knapp, was wir machen — erst wenn man's öffnet, mehr Infos".
-  zusage: 'Wir unterbieten jedes vergleichbare Angebot um 100\u00A0€ im Monat.',
+  // Variante A (Martin 12.09.: „so aggressiv wollen wir nicht sein"): kein
+  // Unterbieten, sondern die Zusage, nicht zu überzahlen — ruhig und bindend.
+  zusage: 'Bei uns zahlen Sie nie mehr als für ein vergleichbares Angebot.',
+  ablauf: 'Legen Sie uns das Angebot vor, wir passen unseren Preis an. Marta antwortet innerhalb eines Werktags.',
   warum: 'Das können wir, weil unsere Pflegekräfte bei uns angestellt sind und keine Vermittlungsgebühr anfällt.',
   aufklappen: 'Was heißt vergleichbar?',
   // Martins Wortlaut (12.09.); Punkte 4 und 5 sind mein Vorschlag (Lockzahlen der Portale).

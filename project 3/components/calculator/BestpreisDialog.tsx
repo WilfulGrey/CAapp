@@ -38,6 +38,7 @@ export function BestpreisDialog({ open, onOpenChange }: { open: boolean; onOpenC
               {GARANTIE.aufklappen}
               <svg className="h-4 w-4 flex-shrink-0 text-[#6B6B6B] transition-transform group-open:rotate-180" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6" /></svg>
             </summary>
+            <p className="mt-3 text-[14px] leading-relaxed text-[#1a1a1a]">{GARANTIE.ablauf}</p>
             <ul className="mt-3 space-y-2">
               {GARANTIE.bedingungen.map((b) => (
                 <li key={b} className="flex items-start gap-2.5 text-[14px] leading-snug text-[#1a1a1a]">

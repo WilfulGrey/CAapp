@@ -1091,8 +1091,8 @@ export function buildEingangsbestaetigungHtml(
   // (buildHeimVergleichBoxHtml) direkt unter den Preisen, weil dort schon der
   // Eigenanteil steht. Bestpreis-Garantie ist RAUS (Martin, 14.08.: „scheint
   // nicht zu ziehen") — sie lud zum Anbietervergleich ein statt zum Nutzen.
-  // Seit 12.09.2026 wieder drin, aber greifbar (100 € unter jedem
-  // vergleichbaren Angebot) und als ein Satz unter den Preisen (garantieRow).
+  // Seit 12.09.2026 wieder drin — als ruhige Zusage („nie mehr als für ein
+  // vergleichbares Angebot"), ein Satz unter den Preisen (garantieRow).
   const priceRows = bruttopreis > 0 ? `
       <tr>
         <td class="price-stage-cell" style="width:50%;padding:22px 24px 18px;border-right:1px solid #ebe2d2;vertical-align:top;">
@@ -1125,7 +1125,7 @@ export function buildEingangsbestaetigungHtml(
   const garantieRow = bruttopreis > 0 ? `
       <tr>
         <td colspan="2" style="padding:14px 24px 16px;border-top:1px solid #ebe2d2;background:#F4F8F5;">
-          <p style="margin:0;font-size:14px;line-height:1.6;color:#2D1F0F;"><strong style="color:#1E5C3A;">Bestpreisgarantie:</strong> Wir unterbieten jedes vergleichbare Angebot um 100&nbsp;€ im Monat. <a href="${siteUrl}/bestpreisgarantie" style="color:#1E5C3A;font-weight:600;white-space:nowrap;">Was heißt vergleichbar?</a></p>
+          <p style="margin:0;font-size:14px;line-height:1.6;color:#2D1F0F;"><strong style="color:#1E5C3A;">Bestpreisgarantie:</strong> Bei uns zahlen Sie nie mehr als für ein vergleichbares Angebot. <a href="${siteUrl}/bestpreisgarantie" style="color:#1E5C3A;font-weight:600;white-space:nowrap;">Was heißt vergleichbar?</a></p>
         </td>
       </tr>` : "";
 
@@ -1344,7 +1344,7 @@ zzgl. ca. 125 € Anreise- und Abreisekosten je Strecke sowie Kost und Logis.
 `
     : "";
 
-  const garantieText = bruttopreis > 0 ? `Bestpreisgarantie: Wir unterbieten jedes vergleichbare Angebot um 100 € im Monat.
+  const garantieText = bruttopreis > 0 ? `Bestpreisgarantie: Bei uns zahlen Sie nie mehr als für ein vergleichbares Angebot.
 
 ` : "";
   const konditionenLine = `${garantieText}Ihre Konditionen:
