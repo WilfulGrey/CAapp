@@ -9,7 +9,7 @@ import { cookieConsent } from "@/lib/cookie-consent";
 import { scrollToCalculator, isCalculatorAligned, OPEN_CALCULATOR_EVENT } from "@/lib/scroll-to-calculator";
 import { useFormTracking } from "@/hooks/use-form-tracking";
 import { deutschBalken, GANZ_SICHTBAR, GARANTIE, kopfzeile, kraefteVorschauAktiv, kraftFakten, parseVorschau, PORTAL_ANZAHL, SCHRANKE, VERLAUF, WARTE, wuenscheAusAntworten, type VorschauKraft } from "@/lib/kraefte-vorschau";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { BestpreisDialog } from "@/components/calculator/BestpreisDialog";
 import { zaehle } from "@/lib/zaehler";
 import { meldeAnfrage } from "@/lib/oaiq";
 import { telefonBereinigen, telefonFehler, telefonGueltig } from "@/lib/telefon";
@@ -1150,37 +1150,7 @@ export function MultiStepForm({ mode = 'inline' }: MultiStepFormProps = {}) {
         </div>
 
         {/* Bestpreisgarantie — Pop-up aus dem Kopf des Kontakt-Schritts (Martin 12.09.). */}
-        <Dialog open={garantieOffen} onOpenChange={setGarantieOffen} modal={true}>
-          {/* Der Wizard ist selbst ein Fenster auf z-90 (Backdrop z-80) — das Pop-up muss darüber liegen. */}
-          <DialogContent className="z-[110] max-w-[440px] mx-auto bg-white rounded-3xl border-none shadow-2xl p-0 gap-0 max-h-[90vh] overflow-y-auto" overlayClassName="z-[100]" aria-describedby={undefined}>
-            <DialogHeader className="px-7 pt-7 pb-3">
-              <DialogTitle className="text-[22px] font-bold text-[#1a1a1a] text-left leading-snug">{GARANTIE.titel}</DialogTitle>
-            </DialogHeader>
-            <div className="px-7 pb-7 space-y-4">
-              <p className="text-[15px] leading-relaxed text-[#1a1a1a] font-medium">{GARANTIE.versprechen}</p>
-              <div>
-                <p className="text-[13px] font-semibold uppercase tracking-wide text-[#6B6B6B] mb-2">{GARANTIE.bedingungenTitel}</p>
-                <ul className="space-y-2">
-                  {GARANTIE.bedingungen.map((b) => (
-                    <li key={b} className="flex items-start gap-2.5 text-[14px] leading-snug text-[#1a1a1a]">
-                      <span className="mt-[3px] inline-flex w-[18px] h-[18px] items-center justify-center rounded-full bg-[#E4F3EB] flex-shrink-0" aria-hidden="true">
-                        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#1F8F5F" strokeWidth={3.2} strokeLinecap="round" strokeLinejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5" /></svg>
-                      </span>
-                      <span>{b}</span>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-              <div>
-                <p className="text-[13px] font-semibold uppercase tracking-wide text-[#6B6B6B] mb-1.5">{GARANTIE.warumTitel}</p>
-                <p className="text-[14px] leading-relaxed text-[#3D3D3D]">{GARANTIE.warum}</p>
-              </div>
-              <button type="button" onClick={() => setGarantieOffen(false)} className="w-full rounded-full bg-[#1F8F5F] text-white font-semibold text-[15px] py-3 hover:bg-[#1a7a51] transition-colors">
-                {GARANTIE.schliessen}
-              </button>
-            </div>
-          </DialogContent>
-        </Dialog>
+        <BestpreisDialog open={garantieOffen} onOpenChange={setGarantieOffen} />
 
         {/* Balken ab der ersten echten Frage (Martin 11.09.: Schritt 1 ohne
             Balken wirkte eng und anders als der Rest) — im eingebetteten

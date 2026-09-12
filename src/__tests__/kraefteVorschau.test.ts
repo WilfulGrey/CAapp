@@ -70,10 +70,16 @@ describe('Kräfte-Vorschau (Rechner)', () => {
     // Bestpreisgarantie (Martin 12.09.): greifbar (100 € im Monat), Bedingungen
     // ausbuchstabiert, kein „vermitteln", keine Prozentzahl.
     expect(GARANTIE.wort).toBe('Bestpreisgarantie');
-    expect(GARANTIE.versprechen).toContain('100 € im Monat');
-    expect(GARANTIE.versprechen).toContain('vergleichbar'.slice(0, 0) + 'günstiger');
+    expect(GARANTIE.stimme).toContain('100 € im Monat');
+    // verbindlich, nicht reißerisch (Martin 12.09.): Zusage statt Werbeton, kein Ausrufezeichen
+    expect(GARANTIE.stimme).toContain('sage ich Ihnen zu');
+    expect(GARANTIE.stimme).not.toMatch(/!/);
     expect(GARANTIE.bedingungen).toHaveLength(5);
+    expect(GARANTIE.bedingungen[0]).toBe('Die gleiche Betreuungssituation und der gleiche Umfang');
+    expect(GARANTIE.bedingungen[1]).toBe('Legal angestelltes Personal mit A1-Bescheinigung');
+    expect(GARANTIE.bedingungen[2]).toBe('Vergleichbare Qualifikation: Sprache, Führerschein, Erfahrung');
     expect(GARANTIE.bedingungen.join(' ')).toContain('Eigenanteil');
+    expect(GARANTIE.beraterin).toBe('Marta Kapcio');
     const garantieText = JSON.stringify(GARANTIE).toLowerCase();
     expect(garantieText).not.toMatch(/vermitteln|%/);
     expect(SCHRANKE.fussnote).toBe('Sofort sichtbar · kostenlos · unverbindlich');

@@ -227,18 +227,28 @@ export const GARANTIE = {
   vorsatz: 'mit',
   unterbietungEur: 100,
   titel: 'Unsere Bestpreisgarantie',
-  versprechen: 'Legen Sie uns ein schriftliches Angebot eines anderen Anbieters vor, das günstiger ist als Ihr Primundus-Preis, unterbieten wir es um 100 € im Monat.',
+  beraterin: 'Marta Kapcio',
+  rolle: 'Ihre Beraterin',
+  fotoSrc: '/images/marta-kapcio.jpg',
+  /** In Martas Stimme (Martin 12.09.: „mit Marta als Bild") — Inhalt identisch mit dem Versprechen. */
+  // Ton (Martin 12.09.): verbindlich, selbstsicher, fair — nicht reißerisch.
+  stimme: 'Vergleichen Sie uns in Ruhe. Liegt ein vergleichbares, schriftliches Angebot unter Ihrem Primundus-Preis, setzen wir unseren Preis 100 € im Monat darunter. Das sage ich Ihnen zu.',
   bedingungenTitel: 'Vergleichbar heißt',
+  // Martins Wortlaut (12.09.), die letzten beiden Punkte sind mein Vorschlag —
+  // sie fangen die Lockzahlen der Portale (Eigenanteil nach Zuschuss) ab.
   bedingungen: [
-    '24-Stunden-Betreuung im Haushalt durch eine legal angestellte Pflegekraft (A1-Bescheinigung)',
-    'gleiche Deutsch-Stufe und Erfahrung',
-    'gleicher Umfang: Pflegegrad, Nachteinsätze, Haushalt',
-    'Gesamtpreis pro Monat inklusive Anreise und Nebenkosten, nicht der Eigenanteil nach Zuschüssen',
-    'Angebot nicht älter als 14 Tage, vor Vertragsabschluss',
+    'Die gleiche Betreuungssituation und der gleiche Umfang',
+    'Legal angestelltes Personal mit A1-Bescheinigung',
+    'Vergleichbare Qualifikation: Sprache, Führerschein, Erfahrung',
+    'Gesamtpreis pro Monat, nicht der Eigenanteil nach Zuschüssen',
+    'Schriftliches Angebot, nicht älter als 14 Tage',
   ],
   warumTitel: 'Warum wir das können',
-  warum: 'Unsere Pflegekräfte sind bei uns angestellt, es gibt keine Vermittlungsgebühr, und der Preis kommt bei der Pflegekraft an. So bekommen wir gute Kräfte, und Sie zahlen nicht für Zwischenhändler.',
+  warum: 'Unsere Pflegekräfte sind bei uns angestellt, und es gibt keine Vermittlungsgebühr. Der Preis kommt bei der Pflegekraft an. Deshalb können wir diesen Vergleich zusagen.',
   schliessen: 'Verstanden',
+  frage: 'Fragen dazu beantwortet Marta persönlich:',
+  telefon: '089\u00A0200\u00A0000\u00A0830', // geschützte Leerzeichen: die Nummer bricht nicht um
+  telefonHref: 'tel:+4989200000830',
 } as const;
 
 /** Antwort der Function absichern — nur, was die Karte braucht, nie mehr. */
