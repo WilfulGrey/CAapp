@@ -226,16 +226,16 @@ export const GARANTIE = {
   /** Unterzeile im Kopf: „6× Preis-Leistungssieger · mit [Bestpreisgarantie]" */
   vorsatz: 'mit',
   unterbietungEur: 100,
-  titel: 'Unsere Bestpreisgarantie',
+  titel: 'Bestpreisgarantie',
   beraterin: 'Marta Kapcio',
   rolle: 'Ihre Beraterin',
   fotoSrc: '/images/marta-kapcio.jpg',
-  /** In Martas Stimme (Martin 12.09.: „mit Marta als Bild") — Inhalt identisch mit dem Versprechen. */
-  // Ton (Martin 12.09.): verbindlich, selbstsicher, fair — nicht reißerisch.
-  stimme: 'Vergleichen Sie uns in Ruhe. Liegt ein vergleichbares, schriftliches Angebot unter Ihrem Primundus-Preis, setzen wir unseren Preis 100 € im Monat darunter. Das sage ich Ihnen zu.',
-  bedingungenTitel: 'Vergleichbar heißt',
-  // Martins Wortlaut (12.09.), die letzten beiden Punkte sind mein Vorschlag —
-  // sie fangen die Lockzahlen der Portale (Eigenanteil nach Zuschuss) ab.
+  // Martin 12.09.: „ganz klar und nicht so textlich" — zwei Sätze sichtbar,
+  // die Bedingungen zum Aufklappen. Ton: verbindlich, ruhig.
+  zusage: 'Liegt ein vergleichbares Angebot unter unserem Preis, gehen wir verbindlich 100\u00A0€ im Monat darunter.',
+  warum: 'Das können wir, weil unsere Pflegekräfte bei uns angestellt sind und keine Vermittlungsgebühr anfällt.',
+  aufklappen: 'Was heißt vergleichbar?',
+  // Martins Wortlaut (12.09.); Punkte 4 und 5 sind mein Vorschlag (Lockzahlen der Portale).
   bedingungen: [
     'Die gleiche Betreuungssituation und der gleiche Umfang',
     'Legal angestelltes Personal mit A1-Bescheinigung',
@@ -243,12 +243,7 @@ export const GARANTIE = {
     'Gesamtpreis pro Monat, nicht der Eigenanteil nach Zuschüssen',
     'Schriftliches Angebot, nicht älter als 14 Tage',
   ],
-  warumTitel: 'Warum wir das können',
-  warum: 'Unsere Pflegekräfte sind bei uns angestellt, und es gibt keine Vermittlungsgebühr. Der Preis kommt bei der Pflegekraft an. Deshalb können wir diesen Vergleich zusagen.',
   schliessen: 'Verstanden',
-  frage: 'Fragen dazu beantwortet Marta persönlich:',
-  telefon: '089\u00A0200\u00A0000\u00A0830', // geschützte Leerzeichen: die Nummer bricht nicht um
-  telefonHref: 'tel:+4989200000830',
 } as const;
 
 /** Antwort der Function absichern — nur, was die Karte braucht, nie mehr. */

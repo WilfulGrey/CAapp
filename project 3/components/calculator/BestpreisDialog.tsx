@@ -1,46 +1,45 @@
 "use client";
 
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { GARANTIE } from "@/lib/kraefte-vorschau";
 
 /**
- * Pop-up der Bestpreisgarantie (Martin 12.09.2026: „mit Marta als Bild").
- * Ein Versprechen in Martas Stimme, die Bedingungen für „vergleichbar", das
- * Warum — und ein Weg zu ihr, falls Fragen bleiben. Texte liegen in
- * lib/kraefte-vorschau.ts (GARANTIE), damit Tests sie festhalten.
+ * Pop-up der Bestpreisgarantie (Martin 12.09.2026): Marta als Bild, zwei
+ * Sätze, die Bedingungen zum Aufklappen — „ganz klar und nicht so textlich".
+ * Ton verbindlich und ruhig. Texte in lib/kraefte-vorschau.ts (GARANTIE).
  * Der Wizard ist selbst ein Fenster auf z-90 (Backdrop z-80), deshalb z-110/z-100.
  */
 export function BestpreisDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (open: boolean) => void }) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange} modal={true}>
       <DialogContent
-        className="z-[110] max-w-[440px] mx-auto bg-white rounded-3xl border-none shadow-2xl p-0 gap-0 max-h-[92vh] overflow-y-auto"
+        className="z-[110] max-w-[420px] mx-auto bg-white rounded-3xl border-none shadow-2xl p-0 gap-0 max-h-[92vh] overflow-y-auto"
         overlayClassName="z-[100]"
         aria-describedby={undefined}
       >
-        <DialogHeader className="px-6 pt-6 pb-4 bg-[#F4F8F5] rounded-t-3xl">
-          <div className="flex items-center gap-4">
+        <div className="px-6 pt-7 pb-6">
+          <div className="flex items-center gap-4 mb-5">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               src={GARANTIE.fotoSrc}
               alt={GARANTIE.beraterin}
-              className="w-[68px] h-[68px] rounded-full object-cover border-[3px] border-white shadow-md flex-shrink-0"
+              className="w-[72px] h-[72px] rounded-full object-cover object-top border-[3px] border-white shadow-md flex-shrink-0"
             />
             <div className="text-left">
-              <DialogTitle className="text-[21px] font-bold text-[#1a1a1a] leading-tight">{GARANTIE.titel}</DialogTitle>
-              <p className="text-[13px] text-[#6B6B6B] mt-1">{GARANTIE.beraterin} · {GARANTIE.rolle}</p>
+              <DialogTitle className="text-[22px] font-bold text-[#1a1a1a] leading-tight">{GARANTIE.titel}</DialogTitle>
+              <p className="text-[13px] text-[#6B6B6B] mt-0.5">{GARANTIE.beraterin} · {GARANTIE.rolle}</p>
             </div>
           </div>
-        </DialogHeader>
 
-        <div className="px-6 pt-5 pb-6 space-y-5">
-          <blockquote className="relative pl-4 border-l-[3px] border-[#1F8F5F] text-[16px] leading-relaxed text-[#1a1a1a] font-medium">
-            „{GARANTIE.stimme}“
-          </blockquote>
+          <p className="text-[17px] leading-snug font-semibold text-[#1a1a1a]">{GARANTIE.zusage}</p>
+          <p className="text-[15px] leading-relaxed text-[#3D3D3D] mt-3">{GARANTIE.warum}</p>
 
-          <div>
-            <p className="text-[12px] font-semibold uppercase tracking-wide text-[#6B6B6B] mb-2">{GARANTIE.bedingungenTitel}</p>
-            <ul className="space-y-2">
+          <details className="group mt-4 rounded-2xl bg-[#F6F4F0] px-4 py-3">
+            <summary className="flex cursor-pointer list-none items-center justify-between text-[15px] font-semibold text-[#1a1a1a] [&::-webkit-details-marker]:hidden">
+              {GARANTIE.aufklappen}
+              <svg className="h-4 w-4 flex-shrink-0 text-[#6B6B6B] transition-transform group-open:rotate-180" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6" /></svg>
+            </summary>
+            <ul className="mt-3 space-y-2">
               {GARANTIE.bedingungen.map((b) => (
                 <li key={b} className="flex items-start gap-2.5 text-[14px] leading-snug text-[#1a1a1a]">
                   <span className="mt-[2px] inline-flex w-[18px] h-[18px] items-center justify-center rounded-full bg-[#E4F3EB] flex-shrink-0" aria-hidden="true">
@@ -50,24 +49,15 @@ export function BestpreisDialog({ open, onOpenChange }: { open: boolean; onOpenC
                 </li>
               ))}
             </ul>
-          </div>
-
-          <div>
-            <p className="text-[12px] font-semibold uppercase tracking-wide text-[#6B6B6B] mb-1.5">{GARANTIE.warumTitel}</p>
-            <p className="text-[14px] leading-relaxed text-[#3D3D3D]">{GARANTIE.warum}</p>
-          </div>
+          </details>
 
           <button
             type="button"
             onClick={() => onOpenChange(false)}
-            className="w-full rounded-full bg-[#1F8F5F] text-white font-semibold text-[15px] py-3 hover:bg-[#1a7a51] transition-colors"
+            className="mt-5 w-full rounded-full bg-[#1F8F5F] text-white font-semibold text-[15px] py-3 hover:bg-[#1a7a51] transition-colors"
           >
             {GARANTIE.schliessen}
           </button>
-          <p className="text-center text-[13px] text-[#6B6B6B]">
-            {GARANTIE.frage}{' '}
-            <a href={GARANTIE.telefonHref} className="font-semibold text-[#1F8F5F] underline underline-offset-2">{GARANTIE.telefon}</a>
-          </p>
         </div>
       </DialogContent>
     </Dialog>

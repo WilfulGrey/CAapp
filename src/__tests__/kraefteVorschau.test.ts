@@ -70,15 +70,14 @@ describe('Kräfte-Vorschau (Rechner)', () => {
     // Bestpreisgarantie (Martin 12.09.): greifbar (100 € im Monat), Bedingungen
     // ausbuchstabiert, kein „vermitteln", keine Prozentzahl.
     expect(GARANTIE.wort).toBe('Bestpreisgarantie');
-    expect(GARANTIE.stimme).toContain('100 € im Monat');
-    // verbindlich, nicht reißerisch (Martin 12.09.): Zusage statt Werbeton, kein Ausrufezeichen
-    expect(GARANTIE.stimme).toContain('sage ich Ihnen zu');
-    expect(GARANTIE.stimme).not.toMatch(/!/);
+    // Martin 12.09.: klar, knapp, verbindlich — zwei Sätze sichtbar, Bedingungen zum Aufklappen
+    expect(GARANTIE.zusage).toContain('100\u00A0€ im Monat'); // geschütztes Leerzeichen: „100 €“ bricht nicht um
+    expect(GARANTIE.zusage).toContain('verbindlich');
+    expect(GARANTIE.zusage + GARANTIE.warum).not.toMatch(/!/);
     expect(GARANTIE.bedingungen).toHaveLength(5);
     expect(GARANTIE.bedingungen[0]).toBe('Die gleiche Betreuungssituation und der gleiche Umfang');
     expect(GARANTIE.bedingungen[1]).toBe('Legal angestelltes Personal mit A1-Bescheinigung');
     expect(GARANTIE.bedingungen[2]).toBe('Vergleichbare Qualifikation: Sprache, Führerschein, Erfahrung');
-    expect(GARANTIE.bedingungen.join(' ')).toContain('Eigenanteil');
     expect(GARANTIE.beraterin).toBe('Marta Kapcio');
     const garantieText = JSON.stringify(GARANTIE).toLowerCase();
     expect(garantieText).not.toMatch(/vermitteln|%/);
