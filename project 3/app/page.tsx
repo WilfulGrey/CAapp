@@ -109,7 +109,9 @@ export default function HomePage() {
             {/* Bestpreisgarantie-Siegel rechts im Foto (Martin 12.09.: „das ist
                 das Entscheidende — ich will das auf der Website sehen"),
                 Gegenstück zum WELT-Siegel links; führt zur Garantie-Seite. */}
-            <BestpreisSiegelLink className="absolute bottom-[4%] right-[4%] z-10 block w-[36%] min-w-[140px] max-w-[250px]" />
+            {/* Bestpreisgarantie-Siegel links neben dem WELT-Siegel (Martin 12.09.),
+                unten bündig; öffnet das kompakte Pop-up. */}
+            <BestpreisSiegelLink className="absolute bottom-[4%] left-[25%] z-10 block w-[34%] min-w-[130px] max-w-[240px]" />
           </div>
 
           {/* Weisser Grund auf dem Handy (Martin 16.08.): die Medialogos
