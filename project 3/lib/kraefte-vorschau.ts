@@ -197,8 +197,11 @@ export const SCHRANKE = {
   // Datenschutz-Sorge, „brauchen wir" macht die Schranke ausdrücklich.
   // Erster voller Tag der Fassung davor: 9 von 10 Google-Besuchern brachen
   // hier ab (Zähler 11.09.), Baseline 44 %.
-  text: 'Im nächsten Schritt sehen Sie Ihren Preis. Die Kopie erhalten Sie per E-Mail.',
-  telefonHinweis: 'Nur bei Rückfragen zum Angebot',
+  // Martins Wortlaut (12.09.): Die Frage gibt dem Namensfeld einen Grund,
+  // „ausstellen" passt zu „Ihr Preis ist berechnet" — nichts wird gesendet.
+  frage: 'Für wen dürfen wir Ihre persönliche Preisberechnung ausstellen?',
+  text: 'Ihren Preis sehen Sie direkt im nächsten Schritt.',
+  telefonHinweis: 'Nur bei Rückfragen',
   knopf: KNOPF,
   fussnote: 'Sofort sichtbar · kostenlos · unverbindlich',
   // Zeile unter „Ihr Preis ist berechnet", neben dem Siegel im grünen Kopf
