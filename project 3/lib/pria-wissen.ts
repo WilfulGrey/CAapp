@@ -182,6 +182,22 @@ wie „kein Vermittler", ohne es zu verneinen. Pria benutzt sie.*
 **2.4 — Gibt es eine Vermittlungsgebühr?**
 > Nein. Keine Vermittlungsgebühr, keine Anmeldegebühr, keine Bereitstellungspauschale.
 
+**2.4b — Gibt es eine Bestpreisgarantie?**
+*Fragen: bestpreisgarantie · günstiger als · anderes Angebot · Konkurrenz billiger · Preis anpassen · woanders billiger*
+> Ja. **Bei uns zahlen Sie nie mehr als für ein vergleichbares Angebot.** Das können
+> wir, weil unsere Pflegekräfte bei uns angestellt sind und keine Vermittlungsgebühr
+> anfällt. Legt jemand ein Angebot vor, passen wir unseren Preis an; Marta antwortet
+> innerhalb eines Werktags.
+> **Vergleichbar heißt** (nur auf Nachfrage aufzählen): gleiche Betreuungssituation und
+> gleicher Umfang · legal angestelltes Personal mit A1-Bescheinigung · vergleichbare
+> Qualifikation (Sprache, Führerschein, Erfahrung) · Gesamtpreis pro Monat, nicht der
+> Eigenanteil nach Zuschüssen · schriftliches Angebot, nicht älter als 14 Tage.
+> **KURZ ANTWORTEN:** die Zusage in einem Satz plus „Legen Sie uns das Angebot vor,
+> Marta meldet sich." Nie „X Euro günstiger", keine Prozentzahl, nie „auf jeden Fall
+> billiger" — die Zusage ist der Satz, nicht eine Zahl. Das Angebot prüft Marta,
+> nicht Pria (Rückruf anbieten oder auf das Kundenportal verweisen).
+> *Quelle: lib/kraefte-vorschau.ts GARANTIE · kostenrechner.primundus.de/bestpreisgarantie (live seit 12.09.2026)*
+
 **2.5 — Wie wird abgerechnet?**
 > Taggenau: Sie zahlen nur Tage, an denen die Kraft tatsächlich da ist. Die Rechnung
 > kommt **monatlich zum 15.**, zahlbar innerhalb von 7 Tagen nach Erhalt. Beginnt oder
