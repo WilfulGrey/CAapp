@@ -424,7 +424,7 @@ async function getLeadMilestone(supabase: any, leadId: string): Promise<LeadMile
   return "none";
 }
 
-export function buildAngebotsEmailHtml(lead: Lead, siteUrl: string): string {
+function buildAngebotsEmailHtml(lead: Lead, siteUrl: string): string {
   const kalkulationUrl = `${siteUrl}/kalkulation/${lead.id}`;
   const anredeText = buildAnredeText(lead.anrede_text || null, lead.nachname || "", lead.vorname || "");
   const kalk = lead.kalkulation || {};
@@ -460,16 +460,6 @@ export function buildAngebotsEmailHtml(lead: Lead, siteUrl: string): string {
       <span style="color:#2D6A4F;font-weight:600;">✓ Tagesgenaue Abrechnung</span>&ensp;&middot;&ensp;
       <span style="color:#2D6A4F;font-weight:600;">✓ Kosten erst bei Anreise</span>
     </div>
-
-    <!-- Bestpreisgarantie (Martin 12.09.2026): direkt unter dem Preis, dort vergleicht der Kunde. Bedingungen auf der Garantie-Seite. -->
-    <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="margin:0 0 18px;">
-      <tr>
-        <td style="background:#F4F8F5;border:1px solid #CFE6D8;border-radius:8px;padding:12px 14px;">
-          <div style="font-size:14px;line-height:1.6;color:#2D1F0F;"><strong style="color:#1E5C3A;">Bestpreisgarantie:</strong> Liegt ein vergleichbares Angebot unter unserem Preis, gehen wir verbindlich 100&nbsp;€ im Monat darunter.</div>
-          <div style="font-size:12px;line-height:1.6;color:#666;margin-top:4px;">Das können wir, weil unsere Pflegekräfte bei uns angestellt sind und keine Vermittlungsgebühr anfällt. <a href="${siteUrl}/bestpreisgarantie" style="color:#1E5C3A;font-weight:600;">Was heißt vergleichbar?</a></div>
-        </td>
-      </tr>
-    </table>
     <p style="font-size:15px;line-height:1.75;color:#444;margin-bottom:14px;">Im Angebot finden Sie alle Details zu Kosten, Konditionen und dem weiteren Ablauf.</p>
  
     ${bulletproofButton(kalkulationUrl, "Angebot jetzt ansehen →")}
@@ -1101,6 +1091,8 @@ export function buildEingangsbestaetigungHtml(
   // (buildHeimVergleichBoxHtml) direkt unter den Preisen, weil dort schon der
   // Eigenanteil steht. Bestpreis-Garantie ist RAUS (Martin, 14.08.: „scheint
   // nicht zu ziehen") — sie lud zum Anbietervergleich ein statt zum Nutzen.
+  // Seit 12.09.2026 wieder drin, aber greifbar (100 € unter jedem
+  // vergleichbaren Angebot) und als ein Satz unter den Preisen (garantieRow).
   const priceRows = bruttopreis > 0 ? `
       <tr>
         <td class="price-stage-cell" style="width:50%;padding:22px 24px 18px;border-right:1px solid #ebe2d2;vertical-align:top;">
@@ -1127,9 +1119,19 @@ export function buildEingangsbestaetigungHtml(
      Panels wie bisher unmittelbar untereinander. */
   const preisTabelle = "";
 
+  // Bestpreisgarantie (Martin 12.09.2026, Ersatz fuer die am 14.08. entfernte
+  // Fassung): EIN Satz direkt unter den Preisen, dort vergleicht der Kunde;
+  // die Bedingungen stehen auf /bestpreisgarantie, nicht in der Mail.
+  const garantieRow = bruttopreis > 0 ? `
+      <tr>
+        <td colspan="2" style="padding:14px 24px 16px;border-top:1px solid #ebe2d2;background:#F4F8F5;">
+          <p style="margin:0;font-size:14px;line-height:1.6;color:#2D1F0F;"><strong style="color:#1E5C3A;">Bestpreisgarantie:</strong> Wir unterbieten jedes vergleichbare Angebot um 100&nbsp;€ im Monat. <a href="${siteUrl}/bestpreisgarantie" style="color:#1E5C3A;font-weight:600;white-space:nowrap;">Was heißt vergleichbar?</a></p>
+        </td>
+      </tr>` : "";
+
   const konditionenTabelle = `
     <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="margin:0 0 28px;background:#FAF8F4;border-radius:10px;overflow:hidden;">
-      ${priceRows}
+      ${priceRows}${garantieRow}
       <tr>
         <td colspan="2" style="padding:16px 24px 16px;${bruttopreis > 0 ? "border-top:1px solid #ebe2d2;" : ""}">
           <p style="margin:0 0 10px;${psLabel}color:#2A9D5C;">Ihre Konditionen</p>
@@ -1342,7 +1344,10 @@ zzgl. ca. 125 € Anreise- und Abreisekosten je Strecke sowie Kost und Logis.
 `
     : "";
 
-  const konditionenLine = `Ihre Konditionen:
+  const garantieText = bruttopreis > 0 ? `Bestpreisgarantie: Wir unterbieten jedes vergleichbare Angebot um 100 € im Monat.
+
+` : "";
+  const konditionenLine = `${garantieText}Ihre Konditionen:
   ✓ Täglich kündbar
   ✓ Tagesgenaue Abrechnung
   ✓ Betreuungskraft vor Vertragsabschluss selbst auswählen

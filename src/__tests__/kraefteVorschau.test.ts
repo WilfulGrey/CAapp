@@ -72,7 +72,7 @@ describe('Kräfte-Vorschau (Rechner)', () => {
     expect(GARANTIE.wort).toBe('Bestpreisgarantie');
     // Martin 12.09.: klar, knapp, verbindlich — zwei Sätze sichtbar, Bedingungen zum Aufklappen
     expect(GARANTIE.zusage).toContain('100\u00A0€ im Monat'); // geschütztes Leerzeichen: „100 €“ bricht nicht um
-    expect(GARANTIE.zusage).toContain('verbindlich');
+    expect(GARANTIE.zusage).toBe('Wir unterbieten jedes vergleichbare Angebot um 100\u00A0€ im Monat.');
     expect(GARANTIE.zusage + GARANTIE.warum).not.toMatch(/!/);
     expect(GARANTIE.bedingungen).toHaveLength(5);
     expect(GARANTIE.bedingungen[0]).toBe('Die gleiche Betreuungssituation und der gleiche Umfang');

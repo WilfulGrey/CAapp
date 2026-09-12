@@ -232,7 +232,8 @@ export const GARANTIE = {
   fotoSrc: '/images/marta-kapcio.jpg',
   // Martin 12.09.: „ganz klar und nicht so textlich" — zwei Sätze sichtbar,
   // die Bedingungen zum Aufklappen. Ton: verbindlich, ruhig.
-  zusage: 'Liegt ein vergleichbares Angebot unter unserem Preis, gehen wir verbindlich 100\u00A0€ im Monat darunter.',
+  // Martin 12.09.: „kurz und knapp, was wir machen — erst wenn man's öffnet, mehr Infos".
+  zusage: 'Wir unterbieten jedes vergleichbare Angebot um 100\u00A0€ im Monat.',
   warum: 'Das können wir, weil unsere Pflegekräfte bei uns angestellt sind und keine Vermittlungsgebühr anfällt.',
   aufklappen: 'Was heißt vergleichbar?',
   // Martins Wortlaut (12.09.); Punkte 4 und 5 sind mein Vorschlag (Lockzahlen der Portale).

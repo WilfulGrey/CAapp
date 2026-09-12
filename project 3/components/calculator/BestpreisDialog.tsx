@@ -31,8 +31,7 @@ export function BestpreisDialog({ open, onOpenChange }: { open: boolean; onOpenC
             </div>
           </div>
 
-          <p className="text-[17px] leading-snug font-semibold text-[#1a1a1a]">{GARANTIE.zusage}</p>
-          <p className="text-[15px] leading-relaxed text-[#3D3D3D] mt-3">{GARANTIE.warum}</p>
+          <p className="text-[18px] leading-snug font-semibold text-[#1a1a1a]">{GARANTIE.zusage}</p>
 
           <details className="group mt-4 rounded-2xl bg-[#F6F4F0] px-4 py-3">
             <summary className="flex cursor-pointer list-none items-center justify-between text-[15px] font-semibold text-[#1a1a1a] [&::-webkit-details-marker]:hidden">
@@ -49,6 +48,7 @@ export function BestpreisDialog({ open, onOpenChange }: { open: boolean; onOpenC
                 </li>
               ))}
             </ul>
+            <p className="mt-3 text-[14px] leading-relaxed text-[#3D3D3D]">{GARANTIE.warum}</p>
           </details>
 
           <button
