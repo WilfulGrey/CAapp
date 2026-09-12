@@ -1151,7 +1151,8 @@ export function MultiStepForm({ mode = 'inline' }: MultiStepFormProps = {}) {
 
         {/* Bestpreisgarantie — Pop-up aus dem Kopf des Kontakt-Schritts (Martin 12.09.). */}
         <Dialog open={garantieOffen} onOpenChange={setGarantieOffen} modal={true}>
-          <DialogContent className="max-w-[440px] mx-auto bg-white rounded-3xl border-none shadow-2xl p-0 gap-0 max-h-[90vh] overflow-y-auto" aria-describedby={undefined}>
+          {/* Der Wizard ist selbst ein Fenster auf z-90 (Backdrop z-80) — das Pop-up muss darüber liegen. */}
+          <DialogContent className="z-[110] max-w-[440px] mx-auto bg-white rounded-3xl border-none shadow-2xl p-0 gap-0 max-h-[90vh] overflow-y-auto" overlayClassName="z-[100]" aria-describedby={undefined}>
             <DialogHeader className="px-7 pt-7 pb-3">
               <DialogTitle className="text-[22px] font-bold text-[#1a1a1a] text-left leading-snug">{GARANTIE.titel}</DialogTitle>
             </DialogHeader>
