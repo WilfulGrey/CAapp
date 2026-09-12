@@ -10,6 +10,7 @@ import { scrollToCalculator, isCalculatorAligned, OPEN_CALCULATOR_EVENT } from "
 import { useFormTracking } from "@/hooks/use-form-tracking";
 import { deutschBalken, GANZ_SICHTBAR, GARANTIE, kopfzeile, kraefteVorschauAktiv, kraftFakten, parseVorschau, PORTAL_ANZAHL, SCHRANKE, VERLAUF, WARTE, wuenscheAusAntworten, type VorschauKraft } from "@/lib/kraefte-vorschau";
 import { BestpreisDialog } from "@/components/calculator/BestpreisDialog";
+import { GARANTIE_OEFFNEN_EVENT } from "@/components/calculator/BestpreisSiegelLink";
 import { zaehle } from "@/lib/zaehler";
 import { meldeAnfrage } from "@/lib/oaiq";
 import { telefonBereinigen, telefonFehler, telefonGueltig } from "@/lib/telefon";
@@ -208,6 +209,14 @@ export function MultiStepForm({ mode = 'inline' }: MultiStepFormProps = {}) {
     setGarantieOffen(true);
     zaehle('garantie_geoeffnet', vorschauAktivRef.current ? 'vorschau' : 'alt');
   };
+  // Das Siegel im Hero-Bild (app/page.tsx) liegt außerhalb dieses Wizards und
+  // öffnet das Pop-up über ein Fensterereignis (BestpreisSiegelLink).
+  useEffect(() => {
+    const h = () => oeffneGarantie();
+    window.addEventListener(GARANTIE_OEFFNEN_EVENT, h);
+    return () => window.removeEventListener(GARANTIE_OEFFNEN_EVENT, h);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   const kontaktOffenRef = useRef(false);
   const kraefteVorschauRef = useRef<VorschauKraft[] | null>(null);
   const oeffneKontakt = () => {
