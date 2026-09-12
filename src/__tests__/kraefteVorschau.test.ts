@@ -62,8 +62,11 @@ describe('Kräfte-Vorschau (Rechner)', () => {
     expect(VERLAUF.hinweis).toBe('Dafür benötigen wir nur noch Ihre Kontaktdaten.');
     expect(SCHRANKE.kopf).toBe('Ihr Preis ist berechnet');
     expect(SCHRANKE.auszeichnung).toBe('6× Preis-Leistungssieger');
-    expect(SCHRANKE.text).toBe('Damit wir Preis und Profile für Sie speichern und zusenden können, brauchen wir kurz Ihre Kontaktdaten.');
-    expect(SCHRANKE.telefonHinweis).toBe('Nur bei Rückfragen zum Angebot');
+    expect(SCHRANKE.frage).toBe('Für wen dürfen wir Ihre persönliche Preisberechnung ausstellen?');
+    expect(SCHRANKE.text).toBe('Ihren Preis sehen Sie direkt im nächsten Schritt.');
+    // Martin 12.09.: nicht „senden" für den Preis (Sofortpreis wird gezeigt), nicht „brauchen wir", nicht „speichern".
+    expect(SCHRANKE.frage + ' ' + SCHRANKE.text).not.toMatch(/senden|brauchen|speichern/);
+    expect(SCHRANKE.telefonHinweis).toBe('Nur bei Rückfragen');
     expect(SCHRANKE.fussnote).toBe('Sofort sichtbar · kostenlos · unverbindlich');
   });
 

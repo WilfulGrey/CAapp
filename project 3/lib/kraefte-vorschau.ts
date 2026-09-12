@@ -191,8 +191,17 @@ export const VERLAUF = {
  */
 export const SCHRANKE = {
   kopf: 'Ihr Preis ist berechnet', // Haken als Symbol im Kopf, nicht als Textzeichen (Martin 11.09.: „zu billig")
-  text: 'Damit wir Preis und Profile für Sie speichern und zusenden können, brauchen wir kurz Ihre Kontaktdaten.',
-  telefonHinweis: 'Nur bei Rückfragen zum Angebot',
+  // 12.09. (Martin): Der Satz beginnt mit dem, was der Kunde bekommt, nicht
+  // mit dem, was wir brauchen. „Senden" passt nicht zu „Sofortpreis" (der
+  // Preis wird gezeigt, nur die Kopie geht per Mail), „speichern" weckt
+  // Datenschutz-Sorge, „brauchen wir" macht die Schranke ausdrücklich.
+  // Erster voller Tag der Fassung davor: 9 von 10 Google-Besuchern brachen
+  // hier ab (Zähler 11.09.), Baseline 44 %.
+  // Martins Wortlaut (12.09.): Die Frage gibt dem Namensfeld einen Grund,
+  // „ausstellen" passt zu „Ihr Preis ist berechnet" — nichts wird gesendet.
+  frage: 'Für wen dürfen wir Ihre persönliche Preisberechnung ausstellen?',
+  text: 'Ihren Preis sehen Sie direkt im nächsten Schritt.',
+  telefonHinweis: 'Nur bei Rückfragen',
   knopf: KNOPF,
   fussnote: 'Sofort sichtbar · kostenlos · unverbindlich',
   // Zeile unter „Ihr Preis ist berechnet", neben dem Siegel im grünen Kopf

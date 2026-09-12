@@ -1485,7 +1485,8 @@ export function MultiStepForm({ mode = 'inline' }: MultiStepFormProps = {}) {
                               {/* Strecke v2 (11.09.): kein zweites „5 Pflegekräfte" und keine
                                   Frage mehr — die Kräfte standen einen Schritt vorher. Nur der
                                   Grund, warum wir die Daten brauchen. */}
-                              <p className="text-[15px] leading-snug text-[#3D3D3D]">{SCHRANKE.text}</p>
+                              <p className="text-[19px] font-bold leading-snug text-[#1a1a1a]">{SCHRANKE.frage}</p>
+                              <p className="text-[15px] leading-snug text-[#555] mt-1">{SCHRANKE.text}</p>
                             </div>
                           );
                         }
@@ -1551,7 +1552,8 @@ export function MultiStepForm({ mode = 'inline' }: MultiStepFormProps = {}) {
                           ist fertig", eine generische Spanne daneben wirkte
                           widersprüchlich (Martins Einwand 15.08.). */}
                       <div className="pt-1">
-                        <p className="text-[15px] leading-snug text-[#3D3D3D]">{SCHRANKE.text}</p>
+                        <p className="text-[19px] font-bold leading-snug text-[#1a1a1a]">{SCHRANKE.frage}</p>
+                              <p className="text-[15px] leading-snug text-[#555] mt-1">{SCHRANKE.text}</p>
                       </div>
                     </>
                   )}
