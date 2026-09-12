@@ -229,6 +229,9 @@ export const GARANTIE = {
   beraterin: 'Marta Kapcio',
   rolle: 'Ihre Beraterin',
   fotoSrc: '/images/marta-kapcio.jpg',
+  /** Martins Siegel (12.09.): Pille mit Schild, „PRIMUNDUS / BESTPREISGARANTIE / 6× Preis-Leistungssieger". Seite = WebP, Mail = PNG. */
+  siegelSrc: '/images/bestpreisgarantie-siegel.webp',
+  siegelAlt: 'Primundus Bestpreisgarantie – 6× Preis-Leistungssieger',
   // Martin 12.09.: „ganz klar und nicht so textlich" — zwei Sätze sichtbar,
   // die Bedingungen zum Aufklappen. Ton: verbindlich, ruhig.
   // Martin 12.09.: „kurz und knapp, was wir machen — erst wenn man's öffnet, mehr Infos".

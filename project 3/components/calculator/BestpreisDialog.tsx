@@ -26,8 +26,10 @@ export function BestpreisDialog({ open, onOpenChange }: { open: boolean; onOpenC
               className="w-[72px] h-[72px] rounded-full object-cover object-top border-[3px] border-white shadow-md flex-shrink-0"
             />
             <div className="text-left">
-              <DialogTitle className="text-[22px] font-bold text-[#1a1a1a] leading-tight">{GARANTIE.titel}</DialogTitle>
-              <p className="text-[13px] text-[#6B6B6B] mt-0.5">{GARANTIE.beraterin} · {GARANTIE.rolle}</p>
+              <DialogTitle className="sr-only">{GARANTIE.titel}</DialogTitle>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={GARANTIE.siegelSrc} alt={GARANTIE.siegelAlt} width={900} height={296} className="h-[62px] w-auto" />
+              <p className="text-[13px] text-[#6B6B6B] mt-1.5">{GARANTIE.beraterin} · {GARANTIE.rolle}</p>
             </div>
           </div>
 

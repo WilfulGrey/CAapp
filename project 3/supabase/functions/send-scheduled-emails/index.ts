@@ -1125,7 +1125,10 @@ export function buildEingangsbestaetigungHtml(
   const garantieRow = bruttopreis > 0 ? `
       <tr>
         <td colspan="2" style="padding:14px 24px 16px;border-top:1px solid #ebe2d2;background:#F4F8F5;">
-          <p style="margin:0;font-size:14px;line-height:1.6;color:#2D1F0F;"><strong style="color:#1E5C3A;">Bestpreisgarantie:</strong> Bei uns zahlen Sie nie mehr als für ein vergleichbares Angebot. <a href="${siteUrl}/bestpreisgarantie" style="color:#1E5C3A;font-weight:600;white-space:nowrap;">Was heißt vergleichbar?</a></p>
+          <table width="100%" cellpadding="0" cellspacing="0" role="presentation"><tr>
+            <td style="width:190px;padding-right:16px;vertical-align:middle;"><img src="${siteUrl}/images/bestpreisgarantie-siegel.png" width="180" alt="Primundus Bestpreisgarantie – 6× Preis-Leistungssieger" style="display:block;width:180px;height:auto;border:0;"></td>
+            <td style="vertical-align:middle;"><p style="margin:0;font-size:14px;line-height:1.6;color:#2D1F0F;">Bei uns zahlen Sie nie mehr als für ein vergleichbares Angebot. <a href="${siteUrl}/bestpreisgarantie" style="color:#1E5C3A;font-weight:600;white-space:nowrap;">Was heißt vergleichbar?</a></p></td>
+          </tr></table>
         </td>
       </tr>` : "";
 
