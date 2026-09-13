@@ -118,11 +118,9 @@ export function websiteHerkunft(): WebsiteHerkunft | null {
 /** Pfad der ausgelieferten Test-Variante (siehe middleware.ts). */
 export function variantenSeite(): string {
   if (typeof document === 'undefined') return '/';
-  const echt = window.location.pathname;
-  // Nur auf der Startseite greift die Weiche — Unterseiten bleiben sie selbst.
-  if (echt !== '/') return echt;
-  const v = /(?:^|;\s*)pm_variante=([ABC])(?:;|$)/.exec(document.cookie || '');
-  return v ? ({ A: '/', B: '/kosten-berechnen', C: '/sofortangebot' } as Record<string, string>)[v[1]] : echt;
+  /* Der A/B-Test mit Pria ist beendet (13.09.2026, Registry #67): keine
+     Ableitung aus einem Cookie mehr — die Adresse ist die Herkunft. */
+  return window.location.pathname;
 }
 
 export interface CriticalSubmitInput {
@@ -261,13 +259,8 @@ class Analytics {
       fingerprint: this.fingerprint!,
       userAgent: ua,
       referrer: document.referrer || 'direct',
-      /* Welche Variante der Besucher gesehen hat — NICHT die Adresse.
-         Die Weiche in middleware.ts liefert A/B/C alle unter „/" aus
-         (Rewrite, damit Google dieselbe Landingpage sieht wie in der
-         Anzeige). window.location.pathname wäre deshalb für alle drei „/"
-         und der Test nicht auswertbar. Das Cookie `pm_variante` trägt die
-         Wahrheit; ohne Cookie (Direktaufruf einer Unterseite) bleibt es
-         beim echten Pfad. */
+      /* Herkunft = Adresse der Seite (der Varianten-Test ist seit 13.09.2026
+         beendet, Registry #67). */
       landingPage: variantenSeite(),
       utmSource: urlParams.get('utm_source') || undefined,
       utmMedium: urlParams.get('utm_medium') || undefined,
