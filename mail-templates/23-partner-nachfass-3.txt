@@ -1,0 +1,42 @@
+Betreff:   Probieren Sie Primundus mit einem Kunden aus
+Preheader: Täglich kündbar, taggenau abgerechnet. Für Ihren ersten Kunden machen wir Ihnen Vorschläge, auch ohne Anmeldung.
+Absender:  Magdalena Gorska, PRIMUNDUS Sp. z o.o.
+Versand:   Tag 14 nach der Hauptmail, nur an Nicht-Angemeldete
+
+----------------------------------------------------------------------
+
+PFLEGEKRÄFTE FÜR VERMITTLER
+Testen Sie Primundus an einem Kunden
+Für Ihren ersten Kunden machen wir Ihnen passende Personalvorschläge, auch ohne Anmeldung.
+
+Guten Tag Herr Becker,
+
+unser Ziel: Sie finden gute Pflegekräfte schneller, besetzen Kunden leichter und schließen mehr Anfragen ab.
+
+Dabei bleiben Sie flexibel:
+✓ Täglich kündbar
+✓ Taggenaue Abrechnung
+✓ Über 20 Jahre Erfahrung
+✓ 6-facher Preis-Leistungs-Testsieger
+✓ Schneller und digitaler Vermittlungsprozess
+
+Ohne Anmeldung geht es auch: Senden Sie uns einen anonymisierten Fragebogen Ihres Kunden. Wir finden passende Pflegekräfte und unterbreiten Ihnen umgehend Vorschläge.
+
+So testen Sie Primundus an einem konkreten Kunden, bevor Sie sich anmelden.
+
+Partnerzugang anfordern:
+https://primundus.de/partner-werden?utm_source=mail&utm_campaign=partner-akquise&utm_content=nf3#anmeldung
+
+Oder Fragebogen anonym senden: {{KONTAKT_EMAIL}}
+
+Viele Grüße
+Magdalena Gorska
+Ansprechpartnerin für Vermittler
+Telefon: 089 200 000 831 · WhatsApp: https://wa.me/4989200000831
+
+----------------------------------------------------------------------
+PRIMUNDUS Sp. z o.o. · Personal für die 24-Stunden-Betreuung
+Poznańska 21/48, 00-685 Warschau, Polen · KRS 0001259402 · NIP 7011326714
+
+Sie erhalten diese E-Mail als Vermittler in der 24-Stunden-Betreuung.
+Kein Interesse? Antworten Sie mit „Abmelden“ oder melden Sie sich hier ab: {{ABMELDE_LINK}}
