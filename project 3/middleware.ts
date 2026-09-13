@@ -20,7 +20,7 @@ function istAngemeldet(request: NextRequest): boolean {
   return request.cookies.get('admin_auth')?.value === ADMIN_PASSWORD;
 }
 
-/* Der A/B-Test mit Pria (Float auf /kosten-berechnen) ist seit 13.09.2026
+/* Der A/B-Test mit Pria (Float auf der B-Seite) ist seit 13.09.2026
    beendet — Registry #67: A 500 Sitzungen / 25 Leads, B 421 / 24, der Chat
    selbst 1 Lead in drei Wochen. Die Weiche würfelt nicht mehr. */
 
@@ -62,7 +62,7 @@ export function middleware(request: NextRequest) {
 
   /* Startseite: kein Rewrite mehr. Ein altes `pm_variante`-Cookie wird
      gelöscht — sonst meldete variantenSeite() die Herkunft weiter als
-     „/kosten-berechnen", obwohl alle dieselbe Seite sehen. */
+     Variante B, obwohl alle dieselbe Seite sehen. */
   if (pathname === '/') {
     if (request.cookies.has('pm_variante')) {
       const antwort = NextResponse.next();
