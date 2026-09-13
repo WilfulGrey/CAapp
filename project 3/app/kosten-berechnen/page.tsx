@@ -4,7 +4,7 @@ import { notFound } from 'next/navigation';
 import HomePage from '../page';
 
 /*
- * /kosten-berechnen — Variante B des SEA-Tests „Chat" (Martin, 27.08.).
+ * /kosten-berechnen — war Variante B des SEA-Tests „Chat" (27.08.–13.09.2026).
  *
  * Dieselbe Startseite wie „/" (derselbe Wizard, dieselben Inhalte), nur mit
  * Pria als schwebender Beraterin unten rechts. Damit vergleicht der Test
@@ -51,24 +51,8 @@ export default function KostenBerechnenSeite() {
 
   return (
     <>
-      {/* Pria als schwebende Beraterin — derselbe Lader wie auf Staging,
-          nur ohne data-pria-voll: Blase unten rechts, Ansprache erst nach
-          dem Scrollen, nie über einer Rechner-Karte (Regel im Widget).
-          Läuft inline vor dem Zeichnen, damit der WhatsApp-Knopf sich
-          rechtzeitig ausblendet (er liest data-pria). */}
-      <script
-        dangerouslySetInnerHTML={{
-          __html:
-            "(function(){var d=document.documentElement;" +
-            "d.setAttribute('data-pria','1');" +
-            "var v=document.querySelector('meta[name=viewport]');" +
-            "if(v&&v.content.indexOf('interactive-widget')<0)" +
-            "v.content+=',interactive-widget=resizes-content';" +
-            "if(!document.querySelector('script[src=\"/pria-widget.js\"]')){" +
-            "var s=document.createElement('script');s.src='/pria-widget.js';s.defer=true;" +
-            "document.head.appendChild(s);}})();",
-        }}
-      />
+      {/* Seit 13.09.2026 ohne Pria (Test beendet, Registry #67) — die Route
+          bleibt nur als stabile Adresse bestehen, noindex, Inhalt = Startseite. */}
       <HomePage />
     </>
   );

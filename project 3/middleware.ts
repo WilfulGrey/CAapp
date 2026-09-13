@@ -20,42 +20,9 @@ function istAngemeldet(request: NextRequest): boolean {
   return request.cookies.get('admin_auth')?.value === ADMIN_PASSWORD;
 }
 
-/* ── Der Dreier-Split auf der Startseite ────────────────────────────────
- *
- * Warum hier und nicht als drei Ads-Kampagnen (SEA-Session, 28.08.):
- * Drei Kampagnen auf DIESELBEN Keywords konkurrieren im eigenen Konto —
- * Google lässt pro Suchanfrage nur EINE Anzeige zu und wählt nach
- * Anzeigenrang. Die Zuteilung folgte damit genau der Größe, die wir messen
- * wollten (zirkulär): 65 von 89 Keywords lagen doppelt, die Kosten-Kampagne
- * fiel von 198 auf 12 Impressionen/Tag. Deshalb EINE Kampagne auf „/" und
- * die Drittelung hier, per Zufall.
- *
- * Serverseitig, vor dem ersten Rendern: Würde erst A erscheinen und dann
- * auf C umspringen, wäre der Test verdorben und die Absprungrate künstlich
- * hoch. Rewrite statt Redirect — die Adresse bleibt „/", damit Google
- * dieselbe Landingpage sieht wie in der Anzeige.
- */
-/* C (Voll-Chat) ist seit 29.08. RAUS: 13 Besucher ohne einen einzigen Lead,
-   während A auf 7,4 % und B auf 13,3 % kam. Martin: „ist mir alles zu
-   instabil für so einen test". Die Route /sofortangebot bleibt bestehen
-   und direkt erreichbar — sie wird nur nicht mehr zugelost. Wer noch ein
-   C-Cookie trägt, wird beim nächsten Aufruf neu gewürfelt (A oder B),
-   weil 'C' nicht mehr in VARIANTEN steht. */
-const VARIANTEN = ['A', 'B'] as const;
-type Variante = (typeof VARIANTEN)[number];
-/** Welche Route jede Variante ausliefert (die Adresse bleibt „/"). */
-const VARIANTEN_ZIEL: Record<Variante, string> = {
-  A: '/',                  // Startseite wie bisher, ohne Pria (Kontrolle)
-  B: '/kosten-berechnen',  // dieselbe Seite + Pria als schwebender Knopf
-};
-/* Crawler bekommen IMMER A. Sonst sähe Google unter derselben Adresse
-   wechselnde Inhalte — das ist Cloaking, und ein indexierter Voll-Chat
-   statt der Startseite wäre ein SEO-Schaden, den kein Test wert ist. */
-const BOT = /bot|crawl|spider|slurp|bingpreview|facebookexternalhit|embedly|quora link preview|showyoubot|outbrain|pinterest|whatsapp|flipboard|tumblr|bitlybot|skypeuripreview|nuzzel|discord|google-inspectiontool|lighthouse|chrome-lighthouse|gtmetrix|pagespeed|ahrefs|semrush|mj12|dotbot|petalbot|applebot|duckduckbot|yandex|baidu|sogou|exabot|ia_archiver|headlesschrome/i;
-
-function würfeln(): Variante {
-  return VARIANTEN[Math.floor(Math.random() * VARIANTEN.length)];
-}
+/* Der A/B-Test mit Pria (Float auf /kosten-berechnen) ist seit 13.09.2026
+   beendet — Registry #67: A 500 Sitzungen / 25 Leads, B 421 / 24, der Chat
+   selbst 1 Lead in drei Wochen. Die Weiche würfelt nicht mehr. */
 
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
@@ -93,41 +60,16 @@ export function middleware(request: NextRequest) {
     }
   }
 
-  /* ── Startseite: A/B/C zu je einem Drittel ──────────────────────── */
+  /* Startseite: kein Rewrite mehr. Ein altes `pm_variante`-Cookie wird
+     gelöscht — sonst meldete variantenSeite() die Herkunft weiter als
+     „/kosten-berechnen", obwohl alle dieselbe Seite sehen. */
   if (pathname === '/') {
-    const ua = request.headers.get('user-agent') || '';
-    if (BOT.test(ua)) return NextResponse.next();          // Crawler → immer A
-
-    const vorhanden = request.cookies.get('pm_variante')?.value;
-    const variante: Variante = (VARIANTEN as readonly string[]).includes(vorhanden || '')
-      ? (vorhanden as Variante)
-      : würfeln();
-
-    const ziel = VARIANTEN_ZIEL[variante];
-    /* Der Header sagt der Zielseite, dass sie gerade als „/" ausgeliefert
-       wird. Wichtig fürs SEO: /kosten-berechnen und /sofortangebot tragen
-       für sich genommen `noindex` (sie sollen nicht doppelt im Index
-       stehen) — unter „/" darf dieses noindex NICHT mitkommen, sonst
-       verschwindet die wichtigste Seite aus Google, falls ein Crawler
-       durch die Bot-Erkennung rutscht. */
-    const kopf = new Headers(request.headers);
-    kopf.set('x-pm-variante', variante);
-    const antwort = ziel === '/'
-      ? NextResponse.next({ request: { headers: kopf } })
-      : NextResponse.rewrite(new URL(ziel, request.url), { request: { headers: kopf } });
-
-    /* Wiedererkennung: Derselbe Besucher muss beim Wiederkommen dieselbe
-       Variante sehen — sonst stimmt die Zuordnung im Lead nicht mehr
-       (er startet in C und schickt das Formular in A ab). 90 Tage, weil
-       Google Klicks so lange einer Anzeige zurechnet. */
-    if (vorhanden !== variante) {
-      antwort.cookies.set('pm_variante', variante, {
-        maxAge: 60 * 60 * 24 * 90,
-        path: '/',
-        sameSite: 'lax',
-      });
+    if (request.cookies.has('pm_variante')) {
+      const antwort = NextResponse.next();
+      antwort.cookies.delete('pm_variante');
+      return antwort;
     }
-    return antwort;
+    return NextResponse.next();
   }
 
   return NextResponse.next();
@@ -135,6 +77,6 @@ export function middleware(request: NextRequest) {
 
 export const config = {
   // /_next/image wymaga JAWNEGO wpisu (Next domyślnie omija _next w matcherach).
-  // '/' → die Varianten-Weiche (A/B/C, siehe oben).
+  // '/' → löscht nur noch das alte Varianten-Cookie (Test beendet 13.09.2026).
   matcher: ['/', '/admin/:path*', '/api/admin/:path*', '/_next/image'],
 };
