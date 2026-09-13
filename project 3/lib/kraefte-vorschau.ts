@@ -249,7 +249,10 @@ export const GARANTIE = {
     'Gesamtpreis pro Monat, nicht der Eigenanteil nach Zuschüssen',
     'Schriftliches Angebot, nicht älter als 14 Tage',
   ],
-  schliessen: 'Verstanden',
+  /** Knopf in Pop-up UND Seite, dieselben Worte wie der Hero-Knopf (Martin 13.09.:
+   *  „warum Verstanden statt Jetzt Preis berechnen?“). */
+  weiter: 'Preis & Pflegekräfte ansehen',
+  sprechen: 'Lieber sprechen? 089 200 000 830',
 } as const;
 
 /** Antwort der Function absichern — nur, was die Karte braucht, nie mehr. */

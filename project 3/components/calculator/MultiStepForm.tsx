@@ -209,6 +209,18 @@ export function MultiStepForm({ mode = 'inline' }: MultiStepFormProps = {}) {
     setGarantieOffen(true);
     zaehle('garantie_geoeffnet', vorschauAktivRef.current ? 'vorschau' : 'alt');
   };
+  // Knopf im Pop-up (Martin 13.09.: statt Verstanden in den Rechner): wie der
+  // Hero-Knopf, Wizard auf, Einstieg ohne Warm-up. Ist der Wizard schon offen,
+  // schließt er nur das Pop-up. Zählt anonym als garantie_weiter.
+  const weiterAusGarantie = () => {
+    setGarantieOffen(false);
+    zaehle('garantie_weiter', vorschauAktivRef.current ? 'vorschau' : 'alt');
+    if (!fullscreen) {
+      analytics.trackEvent('wizard', 'wizard_opened', { source: 'garantie_popup' });
+      setWarmupAudience('direct');
+      setFullscreen(true);
+    }
+  };
   // Das Siegel im Hero-Bild (app/page.tsx) liegt außerhalb dieses Wizards und
   // öffnet das Pop-up über ein Fensterereignis (BestpreisSiegelLink).
   useEffect(() => {
@@ -1105,7 +1117,7 @@ export function MultiStepForm({ mode = 'inline' }: MultiStepFormProps = {}) {
           </li>
         </ul>
         {/* Das Pop-up muss auch im Hero-Zweig im Baum stehen (eigener Return). */}
-        <BestpreisDialog open={garantieOffen} onOpenChange={setGarantieOffen} />
+        <BestpreisDialog open={garantieOffen} onOpenChange={setGarantieOffen} onWeiter={weiterAusGarantie} />
       </div>
     );
   }
@@ -1169,7 +1181,7 @@ export function MultiStepForm({ mode = 'inline' }: MultiStepFormProps = {}) {
         </div>
 
         {/* Bestpreisgarantie — Pop-up aus dem Kopf des Kontakt-Schritts (Martin 12.09.). */}
-        <BestpreisDialog open={garantieOffen} onOpenChange={setGarantieOffen} />
+        <BestpreisDialog open={garantieOffen} onOpenChange={setGarantieOffen} onWeiter={weiterAusGarantie} />
 
         {/* Balken ab der ersten echten Frage (Martin 11.09.: Schritt 1 ohne
             Balken wirkte eng und anders als der Rest) — im eingebetteten

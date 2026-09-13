@@ -7,10 +7,11 @@ import { GARANTIE } from "@/lib/kraefte-vorschau";
 /**
  * Pop-up der Bestpreisgarantie (Martin 12.09.2026): Marta als Bild, zwei
  * Sätze, die Bedingungen zum Aufklappen — „ganz klar und nicht so textlich".
- * Inhalt kommt aus BestpreisInhalt, derselbe wie auf /bestpreisgarantie.
+ * Inhalt kommt aus BestpreisInhalt, derselbe wie auf /bestpreisgarantie. Der Knopf
+ * führt in den Rechner (Martin 13.09.: statt Verstanden); schließen per ×, Esc, Klick daneben.
  * Der Wizard ist selbst ein Fenster auf z-90 (Backdrop z-80), deshalb z-110/z-100.
  */
-export function BestpreisDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (open: boolean) => void }) {
+export function BestpreisDialog({ open, onOpenChange, onWeiter }: { open: boolean; onOpenChange: (open: boolean) => void; onWeiter: () => void }) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange} modal={true}>
       <DialogContent
@@ -20,15 +21,7 @@ export function BestpreisDialog({ open, onOpenChange }: { open: boolean; onOpenC
       >
         <BestpreisInhalt
           titel={<DialogTitle className="text-[22px] font-bold text-[#1a1a1a] leading-tight">{GARANTIE.titel}</DialogTitle>}
-          fuss={
-            <button
-              type="button"
-              onClick={() => onOpenChange(false)}
-              className="mt-5 w-full rounded-full bg-[#1F8F5F] text-white font-semibold text-[15px] py-3 hover:bg-[#1a7a51] transition-colors"
-            >
-              {GARANTIE.schliessen}
-            </button>
-          }
+          onWeiter={onWeiter}
         />
       </DialogContent>
     </Dialog>
