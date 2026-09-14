@@ -14,7 +14,7 @@ export default function AdminLayoutClient({ children }: { children: React.ReactN
      Gespräche anzeigen und weitere zum aufklappen"). So bleibt die Leiste auch
      beim nächsten Menüpunkt in einer Zeile. */
   const hauptItems = [
-    { href: '/admin', label: 'Dashboard', icon: LayoutDashboard },
+    { href: '/admin', label: 'Wachstum', icon: LayoutDashboard },
     { href: '/admin/leads', label: 'Leads', icon: Users },
     { href: '/admin/gespraeche', label: 'Gespräche', icon: MessageSquare },
   ];
