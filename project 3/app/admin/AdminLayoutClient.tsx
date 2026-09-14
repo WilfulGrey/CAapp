@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
-import { LayoutDashboard, Users, Euro, Gift, LogOut, ChartBar as BarChart3, MessageSquare, Receipt, ExternalLink, ChevronDown } from 'lucide-react';
+import { LayoutDashboard, Users, Euro, Gift, LogOut, ChartBar as BarChart3, MessageSquare, Receipt, ExternalLink, ChevronDown, TrendingUp } from 'lucide-react';
 
 export default function AdminLayoutClient({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
@@ -14,11 +14,12 @@ export default function AdminLayoutClient({ children }: { children: React.ReactN
      Gespräche anzeigen und weitere zum aufklappen"). So bleibt die Leiste auch
      beim nächsten Menüpunkt in einer Zeile. */
   const hauptItems = [
-    { href: '/admin', label: 'Wachstum', icon: LayoutDashboard },
+    { href: '/admin', label: 'Dashboard', icon: LayoutDashboard },
     { href: '/admin/leads', label: 'Leads', icon: Users },
     { href: '/admin/gespraeche', label: 'Gespräche', icon: MessageSquare },
   ];
   const weitereItems = [
+    { href: '/admin/wachstum', label: 'Wachstum', icon: TrendingUp },
     { href: '/admin/analytics', label: 'Analytics', icon: BarChart3 },
     { href: '/admin/kosten', label: 'Kosten', icon: Receipt },
     { href: '/admin/preise', label: 'Preise', icon: Euro },

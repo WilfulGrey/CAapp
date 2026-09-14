@@ -1,21 +1,20 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import {
-  wachstum, berlinTag, wochenStart, tagPlus,
+  wachstum, potenzial, berlinTag, wochenStart, tagPlus,
   PROFIL_EREIGNISSE, EINSATZ_STATUS, WACHSTUM_START,
   type WLead, type WEreignis, type WEinsatz,
 } from '@/lib/wachstum';
 
 /**
- * Wachstum auf einen Blick: Kunden im Einsatz je Tag, Anfragen und fertige
- * Profile je Woche (Martin, 14.09.2026: „ich brauche das als Standardansicht
- * und zwar grafisch").
+ * Wachstum auf einen Blick: Potenzialentwicklung im laufenden Monat, Kunden im
+ * Einsatz je Tag, Anfragen und fertige Profile je Woche (Martin, 14.09.2026).
  *
  * Server-seitig mit dem Service-Key; an den Browser gehen nur Summen, keine
  * Namen oder Adressen.
  */
 
-const SEITE = 1000; // PostgREST liefert höchstens 1000 Zeilen je Abruf
+const SEITE = 1000; // PostgREST liefert höchstens 1000 Zeilen je Abruf; sortiert nach id, damit Seiten sich nicht überlappen
 
 async function alle<T>(abruf: (von: number, bis: number) => PromiseLike<{ data: T[] | null; error: { message: string } | null }>): Promise<T[]> {
   const zeilen: T[] = [];
@@ -48,18 +47,21 @@ export async function GET(request: NextRequest) {
   try {
     const [leads, ereignisse, einsaetze] = await Promise.all([
       alle<WLead>((a, b) => supabase.from('leads')
-        .select('id, source, ist_test, email, vorname, nachname, created_at')
-        .order('created_at', { ascending: true }).range(a, b)),
+        .select('id, source, status, ist_test, email, vorname, nachname, created_at')
+        .order('id').range(a, b)),
       alle<WEreignis>((a, b) => supabase.from('lead_events')
         .select('lead_id, event_type, created_at')
         .in('event_type', PROFIL_EREIGNISSE)
-        .order('created_at', { ascending: true }).range(a, b)),
+        .order('id').range(a, b)),
       alle<WEinsatz>((a, b) => supabase.from('lead_jobs')
         .select('lead_id, status, anreise, abreise')
-        .in('status', EINSATZ_STATUS)
-        .order('anreise', { ascending: true }).range(a, b)),
+        .in('status', [...EINSATZ_STATUS, 'geplant']) // geplant = offene Suche, fürs Potenzial
+        .order('id').range(a, b)),
     ]);
-    return NextResponse.json(wachstum({ leads, ereignisse, einsaetze, von, heute }), {
+    return NextResponse.json({
+      ...wachstum({ leads, ereignisse, einsaetze, von, heute }),
+      potenzial: potenzial({ leads, ereignisse, einsaetze, heute }),
+    }, {
       headers: { 'Cache-Control': 'no-store' },
     });
   } catch (e) {

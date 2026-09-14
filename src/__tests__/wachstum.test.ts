@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { wachstum, istEchterLead, berlinTag, wochenStart, type WLead, type WEreignis, type WEinsatz } from '../../project 3/lib/wachstum';
+import { wachstum, potenzial, istEchterLead, berlinTag, wochenStart, type WLead, type WEreignis, type WEinsatz } from '../../project 3/lib/wachstum';
 
 // Cross-App-Import (Ausnahme wie portal-url.ts): lib/wachstum.ts lebt im
 // Kostenrechner, ist aber ein pures Modul ohne Next-/Supabase-Imports — so
@@ -99,13 +99,60 @@ describe('Wachstum', () => {
     expect(w.wochen[0].neueKunden).toBe(0); // Kunde alt kam im August
     expect(w.wochen[1].neueKunden).toBe(1); // Kunde a am 10.09.
   });
+});
 
-  it('füllt die Kacheln rollierend bis heute', () => {
-    expect(w.kacheln).toEqual({
-      kundenHeute: 2, kundenVor30: 0, // 14.08.: Kunde alt kam erst am 20.08.
-      anfragen7Eigen: 1, anfragen7Gekauft: 0,
-      profile7Eigen: 0, profile7Gekauft: 0,
-      neueKunden30: 2,
-    });
+describe('Potenzialentwicklung im laufenden Monat', () => {
+  // heute = Mo 14.09.2026, Monatsende 30.09.
+  const leads: WLead[] = [
+    lead('bleibt', '2026-07-01T08:00:00Z'),
+    lead('geht', '2026-07-01T08:00:00Z'),
+    lead('wechsel', '2026-07-01T08:00:00Z'),
+    lead('neu', '2026-09-01T08:00:00Z'),
+    lead('sucht', '2026-09-05T08:00:00Z', { status: 'angebot_requested' }),
+    lead('ueberfaellig', '2026-08-25T08:00:00Z', { status: 'angebot_requested' }),
+    lead('zualt', '2026-08-01T08:00:00Z', { status: 'angebot_requested' }),
+    lead('ohneprofil', '2026-09-05T08:00:00Z', { status: 'angebot_requested' }),
+    lead('keininteresse', '2026-09-05T08:00:00Z', { status: 'nicht_interessiert' }),
+    lead('oktober', '2026-09-05T08:00:00Z', { status: 'angebot_requested' }),
+  ];
+  const profil = (id: string): WEreignis => ({ lead_id: id, event_type: 'patient_data_saved', created_at: '2026-09-06T09:00:00Z' });
+  const ereignisse = ['sucht', 'ueberfaellig', 'zualt', 'keininteresse', 'oktober', 'neu'].map(profil);
+  const einsaetze: WEinsatz[] = [
+    { lead_id: 'bleibt', status: 'gebucht', anreise: '2026-08-01', abreise: '2026-11-30' },
+    { lead_id: 'geht', status: 'gebucht', anreise: '2026-08-01', abreise: '2026-09-20' },           // endet ohne Nachfolge
+    { lead_id: 'wechsel', status: 'gebucht', anreise: '2026-08-01', abreise: '2026-09-18' },
+    { lead_id: 'wechsel', status: 'gebucht', anreise: '2026-09-18', abreise: '2026-11-15' },        // Wechsel ohne Lücke
+    { lead_id: 'neu', status: 'gebucht', anreise: '2026-09-22', abreise: '2026-11-22' },            // neuer Kunde
+    { lead_id: 'sucht', status: 'geplant', anreise: '2026-09-25', abreise: null },
+    { lead_id: 'ueberfaellig', status: 'geplant', anreise: '2026-09-05', abreise: null },          // 9 Tage überfällig → ab heute
+    { lead_id: 'zualt', status: 'geplant', anreise: '2026-08-20', abreise: null },                  // 25 Tage überfällig → raus
+    { lead_id: 'ohneprofil', status: 'geplant', anreise: '2026-09-20', abreise: null },            // kein Profil → raus
+    { lead_id: 'keininteresse', status: 'geplant', anreise: '2026-09-20', abreise: null },         // nicht interessiert → raus
+    { lead_id: 'oktober', status: 'geplant', anreise: '2026-10-05', abreise: null },               // Start nach Monatsende → raus
+    { lead_id: 'neu', status: 'geplant', anreise: '2026-09-22', abreise: null },                   // schon gebucht → nicht doppelt
+  ];
+  const p = potenzial({ leads, ereignisse, einsaetze, heute: '2026-09-14' });
+  const tag = (t: string) => p.tage.find((x) => x.tag === t)!;
+
+  it('rechnet den ganzen Monat, bis heute als Ist', () => {
+    expect(p.monatsEnde).toBe('2026-09-30');
+    expect(p.tage).toHaveLength(30);
+    expect(tag('2026-09-13')).toMatchObject({ fest: 3, potenzial: 0, vergangen: true });
+    expect(p.jetzt).toBe(3);
+  });
+
+  it('trennt neue Kunden von Wechseln und zählt Abgänge ohne Nachfolge', () => {
+    expect(p.anreisenNeu).toBe(1);
+    expect(p.anreisenWechsel).toBe(1);
+    expect(p.abgaenge).toBe(1);
+    expect(tag('2026-09-21').fest).toBe(2); // „geht“ ist weg, „neu“ noch nicht da
+    expect(p.festAmMonatsende).toBe(3);    // 3 + 1 neu − 1 Abgang
+  });
+
+  it('zählt als Potenzial nur Suchende mit fertigem Profil, Start bis Monatsende, höchstens 14 Tage überfällig', () => {
+    expect(p.inSuche).toBe(2);
+    expect(tag('2026-09-14').potenzial).toBe(1); // überfällig → ab heute
+    expect(tag('2026-09-24').potenzial).toBe(1);
+    expect(tag('2026-09-25').potenzial).toBe(2);
   });
 });

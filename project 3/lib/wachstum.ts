@@ -24,6 +24,7 @@
 export type WLead = {
   id: string;
   source?: string | null;
+  status?: string | null;
   ist_test?: boolean | null;
   email?: string | null;
   vorname?: string | null;
@@ -38,9 +39,6 @@ export const EINSATZ_STATUS = ['gebucht', 'abgeschlossen'];
 
 /** Ab hier gibt es Portal, Profile und Einsätze (Portal-Start 14.05.2026). */
 export const WACHSTUM_START = '2026-05-01';
-
-/** Zielmarke fertige Profile je Tag (Martin, 11.09.2026: 2–3 je Tag). */
-export const PROFIL_ZIEL_JE_TAG = 2;
 
 /** Gleiche Regeln wie isRealLead im Morgen-Report
  *  (supabase/functions/daily-analytics-report/queries.ts) plus ist_test. */
@@ -93,16 +91,7 @@ export type Woche = {
   neueKunden: number;
 };
 export type Tag = { tag: string; kunden: number };
-export type Kacheln = {
-  kundenHeute: number;
-  kundenVor30: number;
-  anfragen7Eigen: number;
-  anfragen7Gekauft: number;
-  profile7Eigen: number;
-  profile7Gekauft: number;
-  neueKunden30: number;
-};
-export type Wachstum = { von: string; heute: string; wochen: Woche[]; tage: Tag[]; kacheln: Kacheln };
+export type Wachstum = { von: string; heute: string; wochen: Woche[]; tage: Tag[] };
 
 export function wachstum(input: {
   leads: WLead[];
@@ -130,11 +119,9 @@ export function wachstum(input: {
   const woche = (t: string) => wochen.get(wochenStart(t));
 
   // Anfragen
-  const anfrageTag = new Map<string, string>();
   for (const l of input.leads) {
     if (!echt.has(l.id)) continue;
     const t = berlinTag(l.created_at);
-    anfrageTag.set(l.id, t);
     if (!imZeitraum(t)) continue;
     const w = woche(t);
     if (!w) continue;
@@ -149,10 +136,8 @@ export function wachstum(input: {
     const bisher = profilZeit.get(e.lead_id);
     if (!bisher || e.created_at < bisher) profilZeit.set(e.lead_id, e.created_at);
   }
-  const profilTag = new Map<string, string>();
   for (const [id, zeit] of Array.from(profilZeit)) {
     const t = berlinTag(zeit);
-    profilTag.set(id, t);
     if (!imZeitraum(t)) continue;
     const w = woche(t);
     if (!w) continue;
@@ -198,19 +183,121 @@ export function wachstum(input: {
     if (w) w.neueKunden++;
   }
 
-  // Kacheln: rollierend, heute eingeschlossen
-  const ab7 = tagPlus(heute, -6), ab30 = tagPlus(heute, -29);
-  const zaehle = (m: Map<string, string>, ab: string, gekauft: boolean) =>
-    Array.from(m).filter(([id, t]) => t >= ab && t <= heute && echt.get(id) === gekauft).length;
-  const kacheln: Kacheln = {
-    kundenHeute: kundenJeTag.get(bisZahl) ?? 0,
-    kundenVor30: kundenJeTag.get(bisZahl - 30) ?? 0,
-    anfragen7Eigen: zaehle(anfrageTag, ab7, false),
-    anfragen7Gekauft: zaehle(anfrageTag, ab7, true),
-    profile7Eigen: zaehle(profilTag, ab7, false),
-    profile7Gekauft: zaehle(profilTag, ab7, true),
-    neueKunden30: Array.from(ersterTag.values()).filter((z) => z >= tagZahl(ab30) && z <= bisZahl).length,
-  };
+  return { von, heute, wochen: Array.from(wochen.values()), tage };
+}
 
-  return { von, heute, wochen: Array.from(wochen.values()), tage, kacheln };
+/* ─── Potenzialentwicklung im laufenden Monat ─────────────────────────────
+ *
+ * Martin, 14.09.2026: „wie entwickelt sich das jetzt für den laufenden Monat?
+ * Wie viel haben wir jetzt im Einsatz? Wie viele reisen diesen Monat noch an?
+ * Wie viele reisen ab und wie viele haben wir in der Suche mit vollständigen
+ * Profilen für diesen Monat … fixe plus die neuen als Superchart."
+ *
+ * - fest: Kunden mit gebuchtem oder abgeschlossenem Einsatz an diesem Tag. Bis
+ *   heute ist das der Ist-Stand, danach die Buchungslage (geplante Abreise als
+ *   Ende). Eine Abreise ohne gebuchte Nachfolge senkt die Kurve — genau das soll
+ *   man sehen.
+ * - Potenzial: Kunden mit fertigem Profil und offener Suche (`lead_jobs`
+ *   Status `geplant`), gewünschter Start bis Monatsende, höchstens
+ *   SUCH_FENSTER_TAGE überfällig (dann ab heute gezählt), nicht „nicht
+ *   interessiert“ und in diesem Monat noch ohne Einsatz. Das ist die Obergrenze,
+ *   keine Erwartung.
+ */
+
+export const SUCH_FENSTER_TAGE = 14;
+
+export type PotenzialTag = { tag: string; fest: number; potenzial: number; vergangen: boolean };
+export type Potenzial = {
+  monat: string;
+  heute: string;
+  monatsEnde: string;
+  tage: PotenzialTag[];
+  jetzt: number;
+  anreisenNeu: number;
+  anreisenWechsel: number;
+  abgaenge: number;
+  festAmMonatsende: number;
+  inSuche: number;
+};
+
+export function potenzial(input: {
+  leads: WLead[];
+  ereignisse: WEreignis[];
+  einsaetze: WEinsatz[];
+  heute: string;
+}): Potenzial {
+  const { heute } = input;
+  const monat = heute.slice(0, 7);
+  const monatsAnfang = `${monat}-01`;
+  const monatsEnde = zahlTag(Date.UTC(Number(heute.slice(0, 4)), Number(heute.slice(5, 7)), 0) / 86400000);
+  const h = tagZahl(heute), me = tagZahl(monatsEnde), ma = tagZahl(monatsAnfang);
+
+  const echt = new Map<string, WLead>();
+  for (const l of input.leads) if (istEchterLead(l)) echt.set(l.id, l);
+
+  // Belegte Tage je Kunde aus gebuchten/abgeschlossenen Einsätzen — geplante Abreise zählt als Ende
+  const belegt = new Map<string, Set<number>>();
+  const anreisen: { lead: string; tag: number }[] = [];
+  for (const j of input.einsaetze) {
+    if (!j.lead_id || !echt.has(j.lead_id) || !j.anreise || !EINSATZ_STATUS.includes(String(j.status))) continue;
+    const a = tagZahl(j.anreise.slice(0, 10));
+    const b = j.abreise ? tagZahl(j.abreise.slice(0, 10)) : me;
+    if (b < a) continue;
+    const set = belegt.get(j.lead_id) ?? new Set<number>();
+    for (let z = a; z <= b; z++) set.add(z);
+    belegt.set(j.lead_id, set);
+    if (j.status === 'gebucht' && a > h && a <= me) anreisen.push({ lead: j.lead_id, tag: a });
+  }
+  const erster = new Map<string, number>(), letzter = new Map<string, number>();
+  for (const [id, set] of Array.from(belegt)) {
+    let min = Infinity, max = -Infinity;
+    for (const z of Array.from(set)) { if (z < min) min = z; if (z > max) max = z; }
+    erster.set(id, min); letzter.set(id, max);
+  }
+  const festAm = (z: number) => Array.from(belegt.values()).filter((s) => s.has(z)).length;
+
+  // Anreisen nach heute bis Monatsende: neu, wenn es der erste Einsatztag des Kunden ist
+  let anreisenNeu = 0, anreisenWechsel = 0;
+  for (const a of anreisen) {
+    if (erster.get(a.lead) === a.tag) anreisenNeu++;
+    else anreisenWechsel++;
+  }
+  // Abgänge: Kunden, deren letzter gebuchter Tag zwischen heute und dem Vortag des Monatsendes liegt
+  const abgaenge = Array.from(letzter.values()).filter((z) => z >= h && z < me).length;
+
+  // In der Suche mit fertigem Profil
+  const mitProfil = new Set<string>();
+  for (const e of input.ereignisse) if (e.lead_id && PROFIL_EREIGNISSE.includes(e.event_type)) mitProfil.add(e.lead_id);
+  const imMonatBelegt = (id: string) => {
+    const s = belegt.get(id);
+    if (!s) return false;
+    for (let z = h; z <= me; z++) if (s.has(z)) return true;
+    return false;
+  };
+  const suchStart = new Map<string, number>();
+  for (const j of input.einsaetze) {
+    if (j.status !== 'geplant' || !j.lead_id || !j.anreise) continue;
+    const l = echt.get(j.lead_id);
+    if (!l || l.status === 'nicht_interessiert' || !mitProfil.has(j.lead_id) || imMonatBelegt(j.lead_id)) continue;
+    const a = tagZahl(j.anreise.slice(0, 10));
+    if (a < h - SUCH_FENSTER_TAGE || a > me) continue;
+    const start = Math.max(a, h);
+    const bisher = suchStart.get(j.lead_id);
+    suchStart.set(j.lead_id, bisher === undefined ? start : Math.min(bisher, start));
+  }
+
+  const tage: PotenzialTag[] = [];
+  for (let z = ma; z <= me; z++) {
+    const vergangen = z < h;
+    const pot = vergangen ? 0 : Array.from(suchStart.values()).filter((s) => s <= z).length;
+    tage.push({ tag: zahlTag(z), fest: festAm(z), potenzial: pot, vergangen });
+  }
+
+  return {
+    monat, heute, monatsEnde, tage,
+    jetzt: festAm(h),
+    anreisenNeu, anreisenWechsel, abgaenge,
+    festAmMonatsende: festAm(me),
+    inSuche: suchStart.size,
+  };
 }
