@@ -1,12 +1,15 @@
 import type { ReactNode } from "react";
+import Link from "next/link";
 import { GARANTIE } from "@/lib/kraefte-vorschau";
 
 /**
  * Der EINE Inhalt der Bestpreisgarantie — Pop-up (BestpreisDialog) und Seite
  * (/bestpreisgarantie) zeigen ihn identisch aufgebaut (Martin 13.09.2026:
  * „das sollte ja schon gleich sein"). Kopf mit Marta, die Zusage, die
- * Aufklapp-Liste; nur die Überschrift (DialogTitle bzw. h1) und der Fuß
- * (Verstanden bzw. Weg in den Rechner) kommen von außen.
+ * Aufklapp-Liste und derselbe Knopf in den Rechner plus Telefon (Martin
+ * 13.09.: „warum Verstanden statt Jetzt Preis berechnen?“). Von außen kommen
+ * nur die Überschrift (DialogTitle bzw. h1) und wohin der Knopf führt: das
+ * Pop-up öffnet den Wizard (onWeiter), die Seite verlinkt ihn (weiterHref).
  * `gross` = die Seite: gleiche Reihenfolge, größere Schrift und Abstände
  * (Martin: „wenn es eine ganze Seite ist, kann das ja auch größer sein").
  * Texte aus lib/kraefte-vorschau.ts (GARANTIE).
@@ -15,13 +18,17 @@ export function BestpreisInhalt({
   titel,
   aufgeklappt = false,
   gross = false,
-  fuss,
+  onWeiter,
+  weiterHref,
 }: {
   titel: ReactNode;
   /** Seite: Bedingungen offen; Pop-up: zu, bis man klickt. */
   aufgeklappt?: boolean;
   gross?: boolean;
-  fuss: ReactNode;
+  /** Pop-up: schliesst sich und oeffnet den Wizard. */
+  onWeiter?: () => void;
+  /** Seite: Link in den Rechner. */
+  weiterHref?: string;
 }) {
   const k = gross
     ? {
@@ -38,6 +45,10 @@ export function BestpreisInhalt({
         punkt: "text-[17px] md:text-[18px]",
         haken: "w-[22px] h-[22px] mt-[2px]",
         hakenSvg: 13,
+        fuss: "mt-7 md:mt-8",
+        knopf: "px-4 sm:px-6 py-4 md:py-[18px] text-[16px] sm:text-[17px] md:text-[19px]",
+        pfeilKnopf: "hidden sm:block w-5 h-5",
+        tel: "mt-4 text-[16px] md:text-[18px]",
       }
     : {
         huelle: "px-6 pt-7 pb-6",
@@ -53,7 +64,21 @@ export function BestpreisInhalt({
         punkt: "text-[14px]",
         haken: "w-[18px] h-[18px] mt-[2px]",
         hakenSvg: 11,
+        fuss: "mt-5",
+        knopf: "px-4 py-3.5 text-[16px]",
+        pfeilKnopf: "w-4 h-4",
+        tel: "mt-3 text-[15px]",
       };
+
+  const knopfKlasse = `flex w-full items-center justify-center gap-2 whitespace-nowrap rounded-full bg-[#E76F63] hover:bg-[#D65E52] ${k.knopf} font-bold text-white shadow-md transition-colors`;
+  const knopfInhalt = (
+    <>
+      {GARANTIE.weiter}
+      <svg className={k.pfeilKnopf} fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 5l7 7-7 7" />
+      </svg>
+    </>
+  );
 
   return (
     <div className={k.huelle}>
@@ -97,7 +122,23 @@ export function BestpreisInhalt({
         <p className={`mt-3 ${k.text} leading-relaxed text-[#3D3D3D]`}>{GARANTIE.warum}</p>
       </details>
 
-      {fuss}
+      <div className={k.fuss}>
+        {onWeiter ? (
+          <button type="button" onClick={onWeiter} className={knopfKlasse}>
+            {knopfInhalt}
+          </button>
+        ) : (
+          <Link href={weiterHref ?? "/?start=1&src=garantie"} className={knopfKlasse}>
+            {knopfInhalt}
+          </Link>
+        )}
+        <a
+          href="tel:+4989200000830"
+          className={`${k.tel} flex w-full items-center justify-center gap-2 whitespace-nowrap font-semibold text-[#1a1a1a] hover:text-[#8B7355] transition-colors`}
+        >
+          {GARANTIE.sprechen}
+        </a>
+      </div>
     </div>
   );
 }
