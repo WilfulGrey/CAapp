@@ -169,7 +169,7 @@ export default function KalkulationPrintPage() {
 
         <div style={s.letter}>
           <p style={{ marginBottom: '6pt' }}>{greeting},</p>
-          <p style={{ marginBottom: '6pt' }}>vielen Dank für Ihre Anfrage. Gerne können wir die Betreuung übernehmen. Da unsere Betreuungskräfte direkt angestellt sind, kann die Betreuung bereits <strong>innerhalb von 4–7 Werktagen</strong> beginnen.</p>
+          <p style={{ marginBottom: '6pt' }}>vielen Dank für Ihre Anfrage. Gerne können wir die Betreuung übernehmen. Da unsere Betreuungskräfte direkt angestellt sind, ist eine Anreise bereits <strong>in 3 Tagen</strong> möglich.</p>
           <p style={{ marginBottom: '6pt' }}>Unser nachfolgendes Angebot ist auf Ihre individuelle Situation zugeschnitten.</p>
           <p>Ihre Marta Kapcio</p>
         </div>
@@ -258,7 +258,7 @@ export default function KalkulationPrintPage() {
             {[
               ['1', 'Beauftragung', 'Ihre Bestätigung genügt – wir klären offene Fragen und bereiten alles vor.'],
               ['2', 'Auswahl Ihrer Pflegekraft', 'Sie erhalten passende Profile mit Foto, Erfahrung und Verfügbarkeit. Sie entscheiden.'],
-              ['3', 'Anreise & Betreuungsbeginn', 'Wir organisieren Vertrag und Anreisetermin. Start in 4–7 Werktagen möglich.'],
+              ['3', 'Anreise & Betreuungsbeginn', 'Wir organisieren Vertrag und Anreisetermin. Anreise in 3 Tagen möglich.'],
               ['✓', 'Laufende Betreuung', 'Nach ca. 60 Tagen Wechsel der Betreuungskraft. Ihr Ansprechpartner begleitet Sie dauerhaft.'],
             ].map(([num, title, desc], i) => (
               <div key={i} style={{ ...s.step, marginBottom: i < 3 ? '8pt' : '0' }}>

@@ -37,7 +37,7 @@ export async function generateMetadata(): Promise<Metadata> {
   return {
     title: 'PRIMUNDUS - 24-Stunden-Pflege Kostenrechner',
     description:
-      'Berechnen Sie in nur 2 Minuten die Kosten für 24-Stunden-Pflege. Vom 6× Testsieger mit Preisgarantie.',
+      'Berechnen Sie in nur 2 Minuten die Kosten für 24-Stunden-Pflege. Vom 6× Testsieger mit Bestpreisgarantie.',
     robots: alsStartseite ? { index: true, follow: true } : { index: false, follow: false },
     alternates: { canonical: '/' },
   };

@@ -18,7 +18,7 @@ export const faqs: FAQItem[] = [
   },
   {
     question: "Wie schnell kann eine Betreuungskraft starten?",
-    answer: "In der Regel können wir innerhalb von 4–7 Werktagen eine passende Betreuungskraft vermitteln. Bei dringendem Bedarf auch schneller – sprechen Sie uns einfach an."
+    answer: "Eine Anreise ist schon in 3 Tagen möglich. Wann genau, richtet sich nach Ihrem Wunschtermin. Ist es dringend, rufen Sie uns an."
   },
   {
     question: "Was passiert, wenn die Betreuungskraft krank wird?",

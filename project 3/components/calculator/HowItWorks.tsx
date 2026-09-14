@@ -58,7 +58,7 @@ export function HowItWorks() {
               </p>
               <span className="inline-flex items-center gap-1.5 bg-[#E8F5E9] text-[#2E7D32] px-3 py-1.5 rounded-lg text-xs font-semibold">
                 <Check className="w-3.5 h-3.5" strokeWidth={2.5} />
-                Unverbindlich
+                Bewerbungen am selben Werktag
               </span>
             </div>
           </div>
@@ -83,7 +83,7 @@ export function HowItWorks() {
               </p>
               <span className="inline-flex items-center gap-1.5 bg-[#E8F5E9] text-[#2E7D32] px-3 py-1.5 rounded-lg text-xs font-semibold">
                 <Clock className="w-3.5 h-3.5" strokeWidth={2} />
-                Start in 4–7 Werktagen
+                Anreise in 3 Tagen möglich
               </span>
             </div>
           </div>
