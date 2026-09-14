@@ -25,7 +25,7 @@ Ohne Anmeldung geht es auch: Senden Sie uns einen anonymisierten Fragebogen Ihre
 So testen Sie Primundus an einem konkreten Kunden, bevor Sie sich anmelden.
 
 Partnerzugang anfordern:
-https://primundus.de/partner-werden?utm_source=mail&utm_campaign=partner-akquise&utm_content=nf3#anmeldung
+https://primundus.de/pflegekraefte-fuer-vermittler?utm_source=mail&utm_campaign=partner-akquise&utm_content=nf3#anmeldung
 
 Oder Fragebogen anonym senden: {{KONTAKT_EMAIL}}
 
