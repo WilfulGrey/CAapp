@@ -10,6 +10,10 @@ import nodemailer from "npm:nodemailer@6.9.10";
 import { Buffer } from "node:buffer";
 // Multi-Job-Helfer (Bug #25) — pure Funktionen, separat wegen Testbarkeit.
 import { appendJobParam, reminderBookedCancel } from "./followupJobs.ts";
+// Kunden-Meilenstein: Bewerbung eingegangen = Profil fertig (Registry #69).
+import { type LeadMilestone, MEILENSTEIN_EREIGNISSE, meilensteinAus } from "./meilenstein.ts";
+// Nachfass-Kette und Abschiedssatz (Registry #70).
+import { ABSCHIED_SATZ, GESTRICHENE_MAILS, KETTE_NACH_MAIL1 } from "./kette.ts";
 // Anrede-Namen sauber schreiben (Versalien → „Ruppert") — Kopie aus lib/email.ts,
 // weil Edge Functions nicht aus lib/ importieren können. Siehe names.ts.
 import { buildLeadRef, capitalizeName as capitalize, cleanNamePart } from "./names.ts";
@@ -408,20 +412,13 @@ function buildPortalUrl(portalBase: string, token: string, goto?: string): strin
   return goto ? `${base}&goto=${encodeURIComponent(goto)}` : base;
 }
 
-type LeadMilestone = "none" | "portal_opened" | "patient_data_saved" | "caregiver_invited";
-
 async function getLeadMilestone(supabase: any, leadId: string): Promise<LeadMilestone> {
   const { data } = await supabase
     .from("lead_events")
     .select("event_type")
     .eq("lead_id", leadId)
-    .in("event_type", ["portal_opened", "patient_data_saved", "caregiver_invited"]);
-  if (!data || data.length === 0) return "none";
-  const types = new Set(data.map((e: { event_type: string }) => e.event_type));
-  if (types.has("caregiver_invited")) return "caregiver_invited";
-  if (types.has("patient_data_saved")) return "patient_data_saved";
-  if (types.has("portal_opened")) return "portal_opened";
-  return "none";
+    .in("event_type", [...MEILENSTEIN_EREIGNISSE]);
+  return meilensteinAus((data ?? []).map((e: { event_type: string }) => e.event_type));
 }
 
 function buildAngebotsEmailHtml(lead: Lead, siteUrl: string): string {
@@ -497,7 +494,8 @@ Telefon: +49 89 200 000 830 | info@primundus.de | www.primundus.de`;
 // Nachfass-Inhalt je nach Lead-Meilenstein:
 //   none             → war noch nicht im Portal
 //   portal_opened    → war im Portal, aber Patientendaten fehlen (Hauptfall)
-//   patient_data_saved → Daten vollständig, aber noch keine Einladung
+//   patient_data_saved → Daten vollständig (selbst gespeichert oder schon eine
+//                        Bewerbung, Registry #69), aber noch keine Einladung
 // (caregiver_invited wird vorher abgebrochen, erreicht den Builder nicht.)
 function nachfassContent(milestone: LeadMilestone): { intro: string; body: string; cta: string } {
   if (milestone === "patient_data_saved") {
@@ -963,7 +961,7 @@ function buildNachfass3Html(lead: Lead, siteUrl: string): string {
       Schreiben Sie kurz per <a href="https://wa.me/4989200000830" style="color:#25D366;text-decoration:none;font-weight:600;white-space:nowrap;">WhatsApp</a> oder rufen Sie an: <a href="tel:+4989200000830" style="color:#3D2B1F;text-decoration:none;font-weight:600;white-space:nowrap;">+49 89 200 000 830</a>
     </p>
 
-    <p style="font-size:13px;line-height:1.6;color:#888;margin:22px 0 0;font-style:italic;">Falls wir nichts hören, melden wir uns nicht mehr — wir wollen Sie nicht stören.</p>
+    <p style="font-size:13px;line-height:1.6;color:#888;margin:22px 0 0;font-style:italic;">${ABSCHIED_SATZ}</p>
 
     ${buildMartaSig(siteUrl)}`;
 
@@ -991,7 +989,7 @@ mailto:info@primundus.de?subject=Doch nicht relevant — ${leadRef}
 Schreiben Sie kurz per WhatsApp: https://wa.me/4989200000830
 Oder rufen Sie an: +49 89 200 000 830
 
-Falls wir nichts hören, melden wir uns nicht mehr — wir wollen Sie nicht stören.
+${ABSCHIED_SATZ}
 
 Mit freundlichen Grüßen
 Marta Kapcio
@@ -2583,9 +2581,27 @@ Deno.serve(async (req: Request) => {
           scheduledEmail.email_type === "nachfass_2" ||
           scheduledEmail.email_type === "nachfass_3";
 
+        // Gestrichene Mail-Typen (kette.ts, Registry #70): nicht mehr
+        // eingeplant; was schon in der Warteschlange steht, verfaellt hier.
+        if (GESTRICHENE_MAILS.has(scheduledEmail.email_type)) {
+          await supabase
+            .from("scheduled_emails")
+            .update({ status: "cancelled", updated_at: new Date().toISOString() })
+            .eq("id", scheduledEmail.id);
+          await supabase.from("lead_events").insert({
+            lead_id: scheduledEmail.lead_id,
+            event_type: `email_${scheduledEmail.email_type}_cancelled`,
+            metadata: { reason: "gestrichen" },
+          });
+          results.push({ id: scheduledEmail.id, success: true });
+          continue;
+        }
+
         // Profil-Nudges (gegen Profil-Abbruch). Feuern nur solange das
         // Patientenprofil offen ist \u2014 bei patient_data_saved/eingeladen
-        // ist das Ziel erreicht und der Nudge cancelt sich selbst.
+        // ist das Ziel erreicht und der Nudge cancelt sich selbst. Eine
+        // Bewerbung z\u00e4hlt als fertiges Profil (Team-Profil aus dem
+        // SA-Portal, Registry #69, siehe meilenstein.ts).
         const isProfilNudge =
           scheduledEmail.email_type === "profil_nudge_1" ||
           scheduledEmail.email_type === "profil_nudge_2" ||
@@ -3186,27 +3202,15 @@ Deno.serve(async (req: Request) => {
  
           // Nachfass-Kette: startet jetzt nach der (gemergten) Eingangsbestätigung.
           // `angebot` bleibt für evtl. eingeplante Alt-Rows ebenfalls als Anker.
-          // Sequenz (Profil-Abbruch-optimiert, Stand 15.06.2026):
-          //   0h    Eingangsbestätigung
-          //   +4h   profil_nudge_1  (das Warum: ohne Profil keine Bewerbungen)
-          //   +28h  profil_nudge_2  ("Soll ich Ihnen beim Ausfüllen helfen?")
-          //   +48h  warum_primundus (Trust/USPs)
-          //   +72h  nachfass_2      (kurze persönliche Nachfrage)
-          //   +120h nachfass_3      (Break-up, mailto-Buttons)
-          //   +7d   profil_nudge_3  (Reaktivierung: nützliche Infos, kein Druck)
-          //   +49d  reaktivierung_wechsel (Wechsel-Fenster nach 6–8 Wochen)
-          // nachfass_1 wurde durch die zwei dedizierten Profil-Nudges
-          // ersetzt (war generisch + kollidierte zeitlich). Der nachfass_1-
-          // Handler bleibt für evtl. noch eingeplante Alt-Rows.
+          // Sequenz und Begründungen: kette.ts (profil_nudge_3 gestrichen,
+          // Registry #70). nachfass_1 wurde durch die zwei dedizierten
+          // Profil-Nudges ersetzt; der Handler bleibt für Alt-Rows.
           // Alle Profil-Nudges + Nachfässe canceln sich selbst, sobald das
           // Profil steht / gebucht / nicht interessiert (Skip-Logik oben).
           if (scheduledEmail.email_type === "eingangsbestaetigung" || scheduledEmail.email_type === "angebot") {
-            await scheduleFollowUp(supabase, lead as Lead, "profil_nudge_1", 4 * 60);
-            await scheduleFollowUp(supabase, lead as Lead, "profil_nudge_2", 28 * 60);
-            await scheduleFollowUp(supabase, lead as Lead, "warum_primundus", 48 * 60);
-            await scheduleFollowUp(supabase, lead as Lead, "nachfass_2", 72 * 60);
-            await scheduleFollowUp(supabase, lead as Lead, "profil_nudge_3", 7 * 24 * 60);
-            await scheduleFollowUp(supabase, lead as Lead, "reaktivierung_wechsel", 49 * 24 * 60);
+            for (const [typ, minuten] of KETTE_NACH_MAIL1) {
+              await scheduleFollowUp(supabase, lead as Lead, typ, minuten);
+            }
           } else if (scheduledEmail.email_type === "nachfass_2") {
             await scheduleFollowUp(supabase, lead as Lead, "nachfass_3", 48 * 60);
           }
