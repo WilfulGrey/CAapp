@@ -10,6 +10,8 @@ import nodemailer from "npm:nodemailer@6.9.10";
 import { Buffer } from "node:buffer";
 // Multi-Job-Helfer (Bug #25) — pure Funktionen, separat wegen Testbarkeit.
 import { appendJobParam, reminderBookedCancel } from "./followupJobs.ts";
+// Kunden-Meilenstein: Bewerbung eingegangen = Profil fertig (Registry #69).
+import { type LeadMilestone, MEILENSTEIN_EREIGNISSE, meilensteinAus } from "./meilenstein.ts";
 // Anrede-Namen sauber schreiben (Versalien → „Ruppert") — Kopie aus lib/email.ts,
 // weil Edge Functions nicht aus lib/ importieren können. Siehe names.ts.
 import { buildLeadRef, capitalizeName as capitalize, cleanNamePart } from "./names.ts";
@@ -408,20 +410,13 @@ function buildPortalUrl(portalBase: string, token: string, goto?: string): strin
   return goto ? `${base}&goto=${encodeURIComponent(goto)}` : base;
 }
 
-type LeadMilestone = "none" | "portal_opened" | "patient_data_saved" | "caregiver_invited";
-
 async function getLeadMilestone(supabase: any, leadId: string): Promise<LeadMilestone> {
   const { data } = await supabase
     .from("lead_events")
     .select("event_type")
     .eq("lead_id", leadId)
-    .in("event_type", ["portal_opened", "patient_data_saved", "caregiver_invited"]);
-  if (!data || data.length === 0) return "none";
-  const types = new Set(data.map((e: { event_type: string }) => e.event_type));
-  if (types.has("caregiver_invited")) return "caregiver_invited";
-  if (types.has("patient_data_saved")) return "patient_data_saved";
-  if (types.has("portal_opened")) return "portal_opened";
-  return "none";
+    .in("event_type", [...MEILENSTEIN_EREIGNISSE]);
+  return meilensteinAus((data ?? []).map((e: { event_type: string }) => e.event_type));
 }
 
 function buildAngebotsEmailHtml(lead: Lead, siteUrl: string): string {
@@ -497,7 +492,8 @@ Telefon: +49 89 200 000 830 | info@primundus.de | www.primundus.de`;
 // Nachfass-Inhalt je nach Lead-Meilenstein:
 //   none             → war noch nicht im Portal
 //   portal_opened    → war im Portal, aber Patientendaten fehlen (Hauptfall)
-//   patient_data_saved → Daten vollständig, aber noch keine Einladung
+//   patient_data_saved → Daten vollständig (selbst gespeichert oder schon eine
+//                        Bewerbung, Registry #69), aber noch keine Einladung
 // (caregiver_invited wird vorher abgebrochen, erreicht den Builder nicht.)
 function nachfassContent(milestone: LeadMilestone): { intro: string; body: string; cta: string } {
   if (milestone === "patient_data_saved") {
@@ -2585,7 +2581,9 @@ Deno.serve(async (req: Request) => {
 
         // Profil-Nudges (gegen Profil-Abbruch). Feuern nur solange das
         // Patientenprofil offen ist \u2014 bei patient_data_saved/eingeladen
-        // ist das Ziel erreicht und der Nudge cancelt sich selbst.
+        // ist das Ziel erreicht und der Nudge cancelt sich selbst. Eine
+        // Bewerbung z\u00e4hlt als fertiges Profil (Team-Profil aus dem
+        // SA-Portal, Registry #69, siehe meilenstein.ts).
         const isProfilNudge =
           scheduledEmail.email_type === "profil_nudge_1" ||
           scheduledEmail.email_type === "profil_nudge_2" ||
