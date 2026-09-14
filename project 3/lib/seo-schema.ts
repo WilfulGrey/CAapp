@@ -107,9 +107,9 @@ export function homePageGraph() {
         '@type': 'Service',
         '@id': SERVICE_ID,
         name: '24-Stunden-Pflege und häusliche Betreuung',
-        serviceType: 'Vermittlung von Betreuungskräften für die 24-Stunden-Pflege zu Hause',
+        serviceType: '24-Stunden-Betreuung zu Hause mit eigenen Betreuungskräften',
         description:
-          'Vermittlung geprüfter Betreuungskräfte für die Betreuung im eigenen Zuhause als Alternative zum Pflegeheim. Täglich kündbar, Betreuungsstart in der Regel innerhalb von 4–7 Werktagen.',
+          'Eigene, geprüfte Betreuungskräfte für die Betreuung im eigenen Zuhause als Alternative zum Pflegeheim. Täglich kündbar, Anreise in 3 Tagen möglich.',
         provider: { '@id': ORGANIZATION_ID },
         areaServed: { '@type': 'Country', name: 'Deutschland' },
         audience: {

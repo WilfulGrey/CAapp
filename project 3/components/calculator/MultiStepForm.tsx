@@ -1076,6 +1076,7 @@ export function MultiStepForm({ mode = 'inline' }: MultiStepFormProps = {}) {
             'Keine Vermittlungsgebühr',
             'Kein Vertrag vor Ihrer Auswahl',
             'Täglich kündbar, taggenau abgerechnet',
+            'Anreise in 3 Tagen möglich',
           ].map((punkt) => (
             <li key={punkt} className="flex items-center gap-2.5">
               <svg className="h-[18px] w-[18px] flex-shrink-0 text-[#E76F63]" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24" aria-hidden="true">
