@@ -26,3 +26,15 @@ export const GESTRICHENE_MAILS: ReadonlySet<string> = new Set(["profil_nudge_3"]
 
 /** Satz am Ende der Abschiedsmail. Ehrlich, weil die Wechsel-Mail nach 7 Wochen noch kommt. */
 export const ABSCHIED_SATZ = "Falls wir nichts hören, melden wir uns erst in einigen Wochen noch einmal.";
+
+/** Gründe der zwei Stopp-Knöpfe der Abschiedsmail — Spiegel von
+ *  project 3/lib/kein-interesse.ts (Edge Fn kann nicht aus lib/ importieren). */
+export type KeinInteresseGrund = "aktuell-nicht" | "nicht-relevant";
+
+/** Ziel der Knöpfe „Aktuell nicht" und „Doch nicht relevant" (Registry #72):
+ *  eine Seite im Kostenrechner, auf der der Kunde den Stopp bestätigt. Vorher
+ *  öffneten die Knöpfe nur eine Mail an info@, und bis jemand den Status setzte,
+ *  liefen die Mails weiter. */
+export function keinInteresseLink(siteUrl: string, token: string, grund: KeinInteresseGrund): string {
+  return `${siteUrl.replace(/\/$/, "")}/kein-interesse?token=${encodeURIComponent(token)}&grund=${grund}`;
+}

@@ -1,5 +1,5 @@
 import { assert, assertEquals } from '@std/assert';
-import { ABSCHIED_SATZ, GESTRICHENE_MAILS, KETTE_NACH_MAIL1 } from '../kette.ts';
+import { ABSCHIED_SATZ, GESTRICHENE_MAILS, KETTE_NACH_MAIL1, keinInteresseLink } from '../kette.ts';
 
 // Anlass (Martin, 14.09.2026): Die Abschiedsmail (nachfass_3) versprach
 // „Falls wir nichts hören, melden wir uns nicht mehr", zwei Tage später kam
@@ -30,4 +30,17 @@ Deno.test('Kette bleibt sonst unverändert, zeitlich aufsteigend', () => {
 Deno.test('Abschiedssatz verspricht keine Funkstille mehr', () => {
   assert(!ABSCHIED_SATZ.includes('nicht mehr'));
   assertEquals(ABSCHIED_SATZ, 'Falls wir nichts hören, melden wir uns erst in einigen Wochen noch einmal.');
+});
+
+// Registry #72: „Aktuell nicht" und „Doch nicht relevant" führen auf die
+// Bestätigungsseite im Kostenrechner statt in eine Mail an info@.
+Deno.test('Stopp-Knöpfe verlinken die Bestätigungsseite mit Token und Grund', () => {
+  assertEquals(
+    keinInteresseLink('https://kostenrechner.primundus.de', 'abc123XYZ', 'aktuell-nicht'),
+    'https://kostenrechner.primundus.de/kein-interesse?token=abc123XYZ&grund=aktuell-nicht',
+  );
+  assertEquals(
+    keinInteresseLink('https://kostenrechner.primundus.de/', 'a b&c', 'nicht-relevant'),
+    'https://kostenrechner.primundus.de/kein-interesse?token=a%20b%26c&grund=nicht-relevant',
+  );
 });

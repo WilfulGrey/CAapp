@@ -13,7 +13,7 @@ import { appendJobParam, reminderBookedCancel } from "./followupJobs.ts";
 // Kunden-Meilenstein: Bewerbung eingegangen = Profil fertig (Registry #69).
 import { type LeadMilestone, MEILENSTEIN_EREIGNISSE, meilensteinAus } from "./meilenstein.ts";
 // Nachfass-Kette und Abschiedssatz (Registry #70).
-import { ABSCHIED_SATZ, GESTRICHENE_MAILS, KETTE_NACH_MAIL1 } from "./kette.ts";
+import { ABSCHIED_SATZ, GESTRICHENE_MAILS, KETTE_NACH_MAIL1, keinInteresseLink } from "./kette.ts";
 // Anrede-Namen sauber schreiben (Versalien → „Ruppert") — Kopie aus lib/email.ts,
 // weil Edge Functions nicht aus lib/ importieren können. Siehe names.ts.
 import { buildLeadRef, capitalizeName as capitalize, cleanNamePart } from "./names.ts";
@@ -938,16 +938,22 @@ Marta Kapcio
 Primundus Deutschland | +49 89 200 000 830 | www.primundus.de`;
 }
 
-// Nachfass-3: "letzter Versuch" — Quick-Reaktion mit drei mailto-Buttons.
-// Antworten kommen als normale Mail an info@primundus.de mit
-// vordefiniertem Subject (inkl. Lead-ID damit das Team direkt zuordnen
-// kann). Bewusst SEHR kurz — nicht überreden, nur Status abklopfen.
+// Nachfass-3: "letzter Versuch" — Quick-Reaktion mit drei Knöpfen. „Ja, habe
+// Interesse" öffnet eine Mail an info@primundus.de (vordefiniertes Subject inkl.
+// Lead-Ref, damit das Team direkt zuordnen kann). „Aktuell nicht" und „Doch
+// nicht relevant" führen auf /kein-interesse im Kostenrechner: ein Klick zum
+// Bestätigen stoppt alle Mails (Registry #72). Ohne Token bleibt es beim mailto.
+// Bewusst SEHR kurz — nicht überreden, nur Status abklopfen.
 function buildNachfass3Html(lead: Lead, siteUrl: string): string {
   const halloAnrede = buildHalloAnrede(lead.anrede_text || null, lead.nachname || "", lead.vorname || "");
   const leadRef = buildLeadRef(lead);
   const mailtoYes = `mailto:info@primundus.de?subject=${encodeURIComponent(`Habe noch Interesse — ${leadRef}`)}&body=${encodeURIComponent(`Hallo Marta,\n\nich habe noch Interesse, bitte melden Sie sich bei mir.\n\n${halloAnrede.replace(/^Hallo /, '')}`)}`;
-  const mailtoLater = `mailto:info@primundus.de?subject=${encodeURIComponent(`Aktuell nicht — vielleicht später — ${leadRef}`)}&body=${encodeURIComponent(`Hallo Marta,\n\naktuell brauche ich noch keine Pflegekraft, vielleicht später.\n\n${halloAnrede.replace(/^Hallo /, '')}`)}`;
-  const mailtoNo = `mailto:info@primundus.de?subject=${encodeURIComponent(`Doch nicht relevant — ${leadRef}`)}&body=${encodeURIComponent(`Hallo Marta,\n\nes hat sich erledigt, das Thema ist für mich nicht mehr relevant.\n\n${halloAnrede.replace(/^Hallo /, '')}`)}`;
+  const mailtoLater = lead.token
+    ? keinInteresseLink(siteUrl, lead.token, "aktuell-nicht")
+    : `mailto:info@primundus.de?subject=${encodeURIComponent(`Aktuell nicht — vielleicht später — ${leadRef}`)}&body=${encodeURIComponent(`Hallo Marta,\n\naktuell brauche ich noch keine Pflegekraft, vielleicht später.\n\n${halloAnrede.replace(/^Hallo /, '')}`)}`;
+  const mailtoNo = lead.token
+    ? keinInteresseLink(siteUrl, lead.token, "nicht-relevant")
+    : `mailto:info@primundus.de?subject=${encodeURIComponent(`Doch nicht relevant — ${leadRef}`)}&body=${encodeURIComponent(`Hallo Marta,\n\nes hat sich erledigt, das Thema ist für mich nicht mehr relevant.\n\n${halloAnrede.replace(/^Hallo /, '')}`)}`;
 
   const content = `
     <p style="font-size:15px;line-height:1.75;color:#444;margin-bottom:14px;">${halloAnrede},</p>
@@ -968,9 +974,15 @@ function buildNachfass3Html(lead: Lead, siteUrl: string): string {
   return buildEmailWrapper(lead, siteUrl, content);
 }
 
-function buildNachfass3Text(lead: Lead, _siteUrl: string): string {
+function buildNachfass3Text(lead: Lead, siteUrl: string): string {
   const halloAnrede = buildHalloAnrede(lead.anrede_text || null, lead.nachname || "", lead.vorname || "");
   const leadRef = buildLeadRef(lead);
+  const linkLater = lead.token
+    ? keinInteresseLink(siteUrl, lead.token, "aktuell-nicht")
+    : `mailto:info@primundus.de?subject=Aktuell nicht — ${leadRef}`;
+  const linkNo = lead.token
+    ? keinInteresseLink(siteUrl, lead.token, "nicht-relevant")
+    : `mailto:info@primundus.de?subject=Doch nicht relevant — ${leadRef}`;
   return `${halloAnrede},
 
 ein letzter Versuch von meiner Seite — wie schaut's bei Ihnen aus?
@@ -981,10 +993,10 @@ Ja, habe Interesse — bitte melden:
 mailto:info@primundus.de?subject=Habe noch Interesse — ${leadRef}
 
 Aktuell nicht — vielleicht später:
-mailto:info@primundus.de?subject=Aktuell nicht — ${leadRef}
+${linkLater}
 
 Doch nicht relevant:
-mailto:info@primundus.de?subject=Doch nicht relevant — ${leadRef}
+${linkNo}
 
 Schreiben Sie kurz per WhatsApp: https://wa.me/4989200000830
 Oder rufen Sie an: +49 89 200 000 830

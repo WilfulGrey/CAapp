@@ -1709,6 +1709,7 @@ export default function LeadDetailPage() {
                     folge_einsatz_detected: { label: 'Folge-Einsatz erkannt (neuer Mamamia-Job)', color: 'bg-[#E76F63]' },
                     angebots_feedback: { label: 'Rückmeldung zum Angebot', color: 'bg-[#8B7355]' },
                     rueckruf_erbeten: { label: '📞 Rückruf erbeten (aus dem Chat)', color: 'bg-amber-500' },
+                    kunde_kein_interesse: { label: '🛑 Kunde: kein Interesse (Abschiedsmail)', color: 'bg-gray-600' },
                     // Postfach-Protokoll (Registry #47): Mail wurde kein
                     // echter Lead — Details (Betreff, Grund, Auszug) in
                     // den Metadaten.
