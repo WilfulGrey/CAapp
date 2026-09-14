@@ -80,6 +80,10 @@ describe('Kräfte-Vorschau (Rechner)', () => {
     expect(GARANTIE.bedingungen[1]).toBe('Legal angestelltes Personal mit A1-Bescheinigung');
     expect(GARANTIE.bedingungen[2]).toBe('Vergleichbare Qualifikation: Sprache, Führerschein, Erfahrung');
     expect(GARANTIE.beraterin).toBe('Marta Kapcio');
+    // Martin 13.09.: das Pop-up endet im nächsten Schritt, nicht in Verstanden,
+    // und mit denselben Worten wie der Hero-Knopf.
+    expect(GARANTIE.weiter).toBe('Preis & Pflegekräfte ansehen');
+    expect(JSON.stringify(GARANTIE)).not.toContain('Verstanden');
     const garantieText = JSON.stringify(GARANTIE).toLowerCase();
     expect(garantieText).not.toMatch(/vermitteln|%/);
     expect(SCHRANKE.fussnote).toBe('Sofort sichtbar · kostenlos · unverbindlich');
