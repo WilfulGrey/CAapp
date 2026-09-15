@@ -301,3 +301,203 @@ export function potenzial(input: {
     inSuche: suchStart.size,
   };
 }
+
+/* ─── Ergebnisrechnung je Monat ────────────────────────────────────────────
+ *
+ * Martin, 15.09.2026: „Wir wissen pro Kunde … die Provision (meist 550 Euro).
+ * Davon gehen ca. 50 Euro an variablen Kosten an die CG-Kosten und dann die
+ * Möglichkeit der manuellen Eingabe von Gemeinkosten pro Monat (Personal,
+ * Steuerberater, Marketing etc.), damit wir dann sehen, wo wir stehen."
+ *
+ * - Provision und variable Kosten gelten je Kunde und vollem Monat; gerechnet
+ *   wird je Einsatztag = Wert / 30 (wie der Tagessatz im Portal). Ein Kunde, der
+ *   einen ganzen 31-Tage-Monat da ist, bringt also 31/30 der Provision.
+ * - Einsatztage wie „Kunden im Einsatz“: je Kunde vereinigt. Im laufenden Monat
+ *   zählen die gebuchten Tage bis Monatsende mit (Abreise ohne Nachfolge senkt
+ *   die Zahl) — das ist die Hochrechnung, keine Prognose über neue Buchungen.
+ * - Werbung kommt automatisch: Google-Anzeigen (`ads_kosten_tag`, netto) und
+ *   eingekaufte Anfragen (Stückpreis je Portal, wie die Kosten-Seite). Google
+ *   wird im laufenden Monat auf den ganzen Monat hochgerechnet, eingekaufte
+ *   Anfragen zählen bis heute (der Einkauf läuft nicht gleichmäßig).
+ * - Gemeinkosten trägt Martin je Monat ein. Ein Monat ohne eigenen Eintrag
+ *   übernimmt den letzten früheren; vor dem ersten Eintrag gibt es keine.
+ */
+
+export const PROVISION_STANDARD = 550;
+export const VARIABEL_STANDARD = 50;
+export const MAX_POSTEN = 30;
+
+export type Posten = { posten: string; betrag: number };
+export type MonatsEinstellung = {
+  /** Erster Tag des Monats, "YYYY-MM-01". */
+  monat: string;
+  provision_je_kunde: number;
+  variabel_je_kunde: number;
+  gemeinkosten: Posten[];
+};
+export type AdsKostenTag = { tag: string; kosten_netto: number | string | null };
+export type ErgebnisMonat = {
+  /** "YYYY-MM" */
+  monat: string;
+  tageImMonat: number;
+  /** Laufender Monat: Einsatztage bis Monatsende gebucht, Google hochgerechnet. */
+  laufend: boolean;
+  einsatztage: number;
+  kundenSchnitt: number;
+  provisionJeKunde: number;
+  variabelJeKunde: number;
+  provision: number;
+  variabel: number;
+  deckungsbeitrag: number;
+  werbungGoogle: number;
+  werbungEingekauft: number;
+  werbung: number;
+  /** null: für diesen Monat gibt es (noch) keine Gemeinkosten. */
+  gemeinkosten: number | null;
+  posten: Posten[];
+  /** Woher Provision, variable Kosten und Gemeinkosten kommen. */
+  quelle: 'eigen' | 'uebernommen' | 'keine';
+  /** "YYYY-MM" des Monats, dessen Eintrag übernommen wurde. */
+  uebernommenAus: string | null;
+  /** Deckungsbeitrag − Werbung − Gemeinkosten (fehlende Gemeinkosten = 0). */
+  ergebnis: number;
+  /** Kunden im Schnitt, ab denen Werbung und Gemeinkosten gedeckt sind; null ohne Gemeinkosten. */
+  kostenGedecktAb: number | null;
+};
+
+const runden = (v: number) => Math.round(v * 100) / 100;
+const monatsEndeVon = (monat: string) => zahlTag(Date.UTC(Number(monat.slice(0, 4)), Number(monat.slice(5, 7)), 0) / 86400000);
+
+export function ergebnisJeMonat(input: {
+  leads: WLead[];
+  einsaetze: WEinsatz[];
+  adsKosten: AdsKostenTag[];
+  einstellungen: MonatsEinstellung[];
+  /** Stückpreis je Portal-Domain, netto (lib/lead-kosten.ts PORTAL_PREISE). */
+  portalPreise: Record<string, number>;
+  heute: string;
+  von?: string;
+}): ErgebnisMonat[] {
+  const { heute } = input;
+  const von = (input.von ?? WACHSTUM_START).slice(0, 7) + '-01';
+  const laufenderMonat = heute.slice(0, 7);
+  const ende = tagZahl(monatsEndeVon(laufenderMonat));
+
+  const echt = new Set<string>();
+  for (const l of input.leads) if (istEchterLead(l)) echt.add(l.id);
+
+  // Einsatztage je Kunde: bis heute der Ist-Stand, danach die Buchung bis Monatsende
+  const belegt = new Map<string, Set<number>>();
+  for (const j of input.einsaetze) {
+    if (!j.lead_id || !echt.has(j.lead_id) || !j.anreise || !EINSATZ_STATUS.includes(String(j.status))) continue;
+    const a = tagZahl(j.anreise.slice(0, 10));
+    const b = Math.min(j.abreise ? tagZahl(j.abreise.slice(0, 10)) : ende, ende);
+    if (b < a) continue;
+    const set = belegt.get(j.lead_id) ?? new Set<number>();
+    for (let z = a; z <= b; z++) set.add(z);
+    belegt.set(j.lead_id, set);
+  }
+  const tageJeMonat = new Map<string, number>();
+  for (const set of Array.from(belegt.values())) {
+    for (const z of Array.from(set)) {
+      const m = zahlTag(z).slice(0, 7);
+      tageJeMonat.set(m, (tageJeMonat.get(m) ?? 0) + 1);
+    }
+  }
+
+  // Google-Kosten je Monat; im laufenden Monat nur volle Tage (vor heute) für den Tagesschnitt
+  const google = new Map<string, { summe: number; tage: number }>();
+  for (const r of input.adsKosten) {
+    const t = String(r.tag).slice(0, 10);
+    const m = t.slice(0, 7);
+    if (m === laufenderMonat && t >= heute) continue;
+    const g = google.get(m) ?? { summe: 0, tage: 0 };
+    g.summe += Number(r.kosten_netto ?? 0);
+    g.tage++;
+    google.set(m, g);
+  }
+
+  // Eingekaufte Anfragen je Monat (wie die Kosten-Seite: alles außer Tests)
+  const eingekauft = new Map<string, number>();
+  for (const l of input.leads) {
+    if (l.ist_test || !istEingekauftQuelle(l.source)) continue;
+    const domain = String(l.source).slice('portal:'.length).toLowerCase();
+    const m = berlinTag(l.created_at).slice(0, 7);
+    eingekauft.set(m, (eingekauft.get(m) ?? 0) + (input.portalPreise[domain] ?? 0));
+  }
+
+  const eintraege = [...input.einstellungen]
+    .map((e) => ({ ...e, monat: String(e.monat).slice(0, 7) }))
+    .sort((a, b) => a.monat.localeCompare(b.monat));
+
+  const monate: ErgebnisMonat[] = [];
+  for (let m = von.slice(0, 7); m <= laufenderMonat; m = tagPlus(monatsEndeVon(m), 1).slice(0, 7)) {
+    const tageImMonat = Number(monatsEndeVon(m).slice(8, 10));
+    const laufend = m === laufenderMonat;
+    const eigen = eintraege.find((e) => e.monat === m);
+    const frueher = eigen ? undefined : eintraege.filter((e) => e.monat < m).pop();
+    const e = eigen ?? frueher;
+    const provisionJeKunde = e ? Number(e.provision_je_kunde) : PROVISION_STANDARD;
+    const variabelJeKunde = e ? Number(e.variabel_je_kunde) : VARIABEL_STANDARD;
+    const posten = e ? e.gemeinkosten.map((p) => ({ posten: p.posten, betrag: Number(p.betrag) })) : [];
+    const gemeinkosten = e ? runden(posten.reduce((s, p) => s + p.betrag, 0)) : null;
+
+    const einsatztage = tageJeMonat.get(m) ?? 0;
+    const provision = runden((einsatztage * provisionJeKunde) / 30);
+    const variabel = runden((einsatztage * variabelJeKunde) / 30);
+    const deckungsbeitrag = runden(provision - variabel);
+
+    const g = google.get(m);
+    const werbungGoogle = !g ? 0 : runden(laufend ? (g.summe / g.tage) * tageImMonat : g.summe);
+    const werbungEingekauft = runden(eingekauft.get(m) ?? 0);
+    const werbung = runden(werbungGoogle + werbungEingekauft);
+
+    const dbJeKundeImMonat = ((provisionJeKunde - variabelJeKunde) * tageImMonat) / 30;
+    monate.push({
+      monat: m, tageImMonat, laufend, einsatztage,
+      kundenSchnitt: Math.round((einsatztage / tageImMonat) * 10) / 10,
+      provisionJeKunde, variabelJeKunde, provision, variabel, deckungsbeitrag,
+      werbungGoogle, werbungEingekauft, werbung,
+      gemeinkosten, posten,
+      quelle: eigen ? 'eigen' : frueher ? 'uebernommen' : 'keine',
+      uebernommenAus: frueher ? frueher.monat : null,
+      ergebnis: runden(deckungsbeitrag - werbung - (gemeinkosten ?? 0)),
+      kostenGedecktAb: gemeinkosten === null || dbJeKundeImMonat <= 0
+        ? null
+        : Math.round(((werbung + gemeinkosten) / dbJeKundeImMonat) * 10) / 10,
+    });
+  }
+  return monate;
+}
+
+/** Prüft, was der Admin für einen Monat speichern will. Liefert den sauberen Datensatz oder einen Fehlertext. */
+export function pruefeMonatsEingabe(body: unknown): { ok: true; wert: MonatsEinstellung } | { ok: false; fehler: string } {
+  if (!body || typeof body !== 'object') return { ok: false, fehler: 'Kein Inhalt.' };
+  const b = body as Record<string, unknown>;
+  const monat = String(b.monat ?? '');
+  if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(monat)) return { ok: false, fehler: 'Monat fehlt oder ist ungültig (JJJJ-MM).' };
+  // Zahlen oder "1200", "1200,50", "1200.5" — "1.200" ist mehrdeutig (Tausenderpunkt?) und wird abgelehnt statt als 1,2 gelesen
+  const zahl = (v: unknown) => {
+    if (typeof v === 'number') return v;
+    const s = typeof v === 'string' ? v.trim() : '';
+    return /^\d+([.,]\d{1,2})?$/.test(s) ? Number(s.replace(',', '.')) : NaN;
+  };
+  const provision = zahl(b.provision_je_kunde);
+  const variabel = zahl(b.variabel_je_kunde);
+  if (!Number.isFinite(provision) || provision < 0 || provision > 100000) return { ok: false, fehler: 'Provision je Kunde muss eine Zahl ab 0 sein.' };
+  if (!Number.isFinite(variabel) || variabel < 0 || variabel > 100000) return { ok: false, fehler: 'Variable Kosten je Kunde müssen eine Zahl ab 0 sein.' };
+  if (!Array.isArray(b.gemeinkosten)) return { ok: false, fehler: 'Gemeinkosten fehlen.' };
+  if (b.gemeinkosten.length > MAX_POSTEN) return { ok: false, fehler: `Höchstens ${MAX_POSTEN} Posten je Monat.` };
+  const posten: Posten[] = [];
+  for (const p of b.gemeinkosten) {
+    const roh = (p as Record<string, unknown>)?.betrag;
+    const name = String((p as Record<string, unknown>)?.posten ?? '').trim().slice(0, 60);
+    // Zeile ohne Betrag zählt nicht (auch ein vorgeschlagener Posten, den Martin leer lässt)
+    if (roh === '' || roh === null || roh === undefined) continue;
+    const betrag = zahl(roh);
+    if (!name) return { ok: false, fehler: 'Jeder Posten mit Betrag braucht einen Namen.' };
+    if (!Number.isFinite(betrag) || betrag < 0 || betrag > 10000000) return { ok: false, fehler: `Betrag für „${name}“ muss eine Zahl ab 0 sein.` };
+    posten.push({ posten: name, betrag: runden(betrag) });
+  }
+  return { ok: true, wert: { monat: `${monat}-01`, provision_je_kunde: runden(provision), variabel_je_kunde: runden(variabel), gemeinkosten: posten } };
+}

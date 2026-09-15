@@ -1,5 +1,8 @@
 import { describe, it, expect } from 'vitest';
-import { wachstum, potenzial, istEchterLead, berlinTag, wochenStart, type WLead, type WEreignis, type WEinsatz } from '../../project 3/lib/wachstum';
+import {
+  wachstum, potenzial, ergebnisJeMonat, pruefeMonatsEingabe, istEchterLead, berlinTag, wochenStart,
+  type WLead, type WEreignis, type WEinsatz, type MonatsEinstellung,
+} from '../../project 3/lib/wachstum';
 
 // Cross-App-Import (Ausnahme wie portal-url.ts): lib/wachstum.ts lebt im
 // Kostenrechner, ist aber ein pures Modul ohne Next-/Supabase-Imports — so
@@ -154,5 +157,94 @@ describe('Potenzialentwicklung im laufenden Monat', () => {
     expect(tag('2026-09-14').potenzial).toBe(1); // überfällig → ab heute
     expect(tag('2026-09-24').potenzial).toBe(1);
     expect(tag('2026-09-25').potenzial).toBe(2);
+  });
+});
+
+describe('Ergebnis je Monat', () => {
+  // heute = Mo 14.09.2026
+  const leads: WLead[] = [
+    lead('k1', '2026-07-01T08:00:00Z'),
+    lead('k2', '2026-07-01T08:00:00Z'),
+    lead('k3', '2026-09-01T08:00:00Z'),
+    lead('k4', '2026-09-01T08:00:00Z'),
+    lead('p1', '2026-09-05T08:00:00Z', { source: 'portal:pflegehilfe.org' }),
+    lead('p2', '2026-08-20T08:00:00Z', { source: 'portal:pflege-helfer24.de' }),
+    lead('p3', '2026-09-06T08:00:00Z', { source: 'portal:pflegena.com' }),
+    lead('t', '2026-09-07T08:00:00Z', { source: 'portal:pflegehilfe.org', ist_test: true }),
+  ];
+  const einsaetze: WEinsatz[] = [
+    { lead_id: 'k1', status: 'gebucht', anreise: '2026-08-01', abreise: '2026-11-30' },       // ganzer August und September
+    { lead_id: 'k2', status: 'abgeschlossen', anreise: '2026-08-17', abreise: '2026-08-31' },
+    { lead_id: 'k2', status: 'gebucht', anreise: '2026-08-30', abreise: '2026-09-20' },       // Wechsel mit Überlappung
+    { lead_id: 'k3', status: 'gebucht', anreise: '2026-09-25', abreise: null },               // reist noch an, offen
+    { lead_id: 'k4', status: 'geplant', anreise: '2026-09-10', abreise: null },               // nur Suche: zählt nicht
+  ];
+  const adsKosten = [
+    { tag: '2026-08-10', kosten_netto: 100 }, { tag: '2026-08-11', kosten_netto: '200' },
+    { tag: '2026-09-01', kosten_netto: 50 }, { tag: '2026-09-02', kosten_netto: 70 },
+    { tag: '2026-09-14', kosten_netto: 999 },                                                 // heute, unvollständig
+  ];
+  const einstellungen: MonatsEinstellung[] = [
+    { monat: '2026-08-01', provision_je_kunde: 600, variabel_je_kunde: 60, gemeinkosten: [{ posten: 'Personal', betrag: 1000 }, { posten: 'Steuerberater', betrag: 200 }] },
+  ];
+  const portalPreise = { 'pflegehilfe.org': 37, 'pflege-helfer24.de': 50, 'pflegena.com': 0 };
+  const r = ergebnisJeMonat({ leads, einsaetze, adsKosten, einstellungen, portalPreise, heute: '2026-09-14' });
+  const monat = (m: string) => r.find((x) => x.monat === m)!;
+
+  it('legt jeden Monat seit Mai an, der laufende ist hochgerechnet', () => {
+    expect(r.map((x) => [x.monat, x.laufend])).toEqual([
+      ['2026-05', false], ['2026-06', false], ['2026-07', false], ['2026-08', false], ['2026-09', true],
+    ]);
+  });
+
+  it('rechnet Provision je Einsatztag, einen Kunden beim Wechsel nur einmal', () => {
+    const a = monat('2026-08');
+    expect(a.einsatztage).toBe(46);            // k1 31 Tage + k2 17.–31.08. (30./31.08. nicht doppelt)
+    expect(a.provision).toBe(920);            // 46 × 600 / 30
+    expect(a.variabel).toBe(92);
+    expect(a.deckungsbeitrag).toBe(828);
+    expect(a.kundenSchnitt).toBe(1.5);
+  });
+
+  it('zählt im laufenden Monat die gebuchten Tage bis Monatsende, geplante nicht', () => {
+    expect(monat('2026-09').einsatztage).toBe(56); // k1 30 + k2 1.–20.09. + k3 25.–30.09.
+  });
+
+  it('nimmt Werbung automatisch: Google hochgerechnet aus vollen Tagen, eingekaufte Anfragen zum Stückpreis', () => {
+    expect(monat('2026-08').werbungGoogle).toBe(300);
+    expect(monat('2026-08').werbungEingekauft).toBe(50);
+    expect(monat('2026-09').werbungGoogle).toBe(1800);   // (50 + 70) / 2 Tage × 30, der heutige Tag zählt nicht
+    expect(monat('2026-09').werbungEingekauft).toBe(37); // Pflegehilfe 37 + Pflegena 0, Test zählt nicht
+  });
+
+  it('übernimmt Gemeinkosten aus dem letzten früheren Monat, davor gibt es keine', () => {
+    expect(monat('2026-08')).toMatchObject({ quelle: 'eigen', gemeinkosten: 1200, ergebnis: -722 });
+    expect(monat('2026-09')).toMatchObject({ quelle: 'uebernommen', uebernommenAus: '2026-08', gemeinkosten: 1200, provisionJeKunde: 600 });
+    expect(monat('2026-07')).toMatchObject({ quelle: 'keine', gemeinkosten: null, provisionJeKunde: 550, variabelJeKunde: 50, kostenGedecktAb: null });
+  });
+
+  it('nennt die Kundenzahl, ab der Werbung und Gemeinkosten gedeckt sind', () => {
+    expect(monat('2026-08').kostenGedecktAb).toBe(2.8); // 1.550 € / (540 € × 31/30)
+    expect(monat('2026-09').kostenGedecktAb).toBe(5.6); // 3.037 € / 540 €
+  });
+});
+
+describe('Eingabe der Monatskosten', () => {
+  it('nimmt Zahlen und Texte mit Komma, lässt Zeilen ohne Betrag weg', () => {
+    const r = pruefeMonatsEingabe({
+      monat: '2026-09', provision_je_kunde: '550', variabel_je_kunde: 50,
+      gemeinkosten: [{ posten: ' Personal ', betrag: '1200,50' }, { posten: '', betrag: '' }, { posten: 'Versicherungen', betrag: '' }, { posten: 'Steuerberater', betrag: 300 }],
+    });
+    expect(r).toEqual({ ok: true, wert: { monat: '2026-09-01', provision_je_kunde: 550, variabel_je_kunde: 50,
+      gemeinkosten: [{ posten: 'Personal', betrag: 1200.5 }, { posten: 'Steuerberater', betrag: 300 }] } });
+  });
+  it('lehnt mehrdeutige und ungültige Angaben ab', () => {
+    const basis = { monat: '2026-09', provision_je_kunde: 550, variabel_je_kunde: 50, gemeinkosten: [] as unknown[] };
+    expect(pruefeMonatsEingabe({ ...basis, gemeinkosten: [{ posten: 'Miete', betrag: '1.200' }] }).ok).toBe(false); // Tausenderpunkt?
+    expect(pruefeMonatsEingabe({ ...basis, gemeinkosten: [{ posten: '', betrag: 500 }] }).ok).toBe(false);
+    expect(pruefeMonatsEingabe({ ...basis, gemeinkosten: [{ posten: 'Miete', betrag: -5 }] }).ok).toBe(false);
+    expect(pruefeMonatsEingabe({ ...basis, monat: '2026-13' }).ok).toBe(false);
+    expect(pruefeMonatsEingabe({ ...basis, provision_je_kunde: 'viel' }).ok).toBe(false);
+    expect(pruefeMonatsEingabe({ ...basis, gemeinkosten: Array.from({ length: 31 }, (_, i) => ({ posten: `P${i}`, betrag: 1 })) }).ok).toBe(false);
   });
 });
