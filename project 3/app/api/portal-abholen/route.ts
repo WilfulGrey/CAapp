@@ -53,7 +53,7 @@ import { parsePflegehilfe, telefoneAusHtml, waehleTelefone } from '@/lib/portal-
 import { parseCsv, csvZuLeadZeile, csvZeileBrauchbar } from '@/lib/portal-csv';
 import { PORTALE, vermittlerFuer, postfachPraefix } from '@/lib/portal-lead';
 import { zuVerarbeiten, SEED_SENTINEL_UID, versucheFuer, MAX_VERSUCHE, type LogZeile } from '@/lib/portal-mail-log';
-import { modellBloecke, pruefeAnfrage, waehleDokumente, SYSTEM as PFLEGENA_SYSTEM, WERKZEUG as PFLEGENA_WERKZEUG, type Dokument, type MailKopf } from '@/lib/pflegena';
+import { modellBloecke, modellFehlerArt, pruefeAnfrage, waehleDokumente, SYSTEM as PFLEGENA_SYSTEM, WERKZEUG as PFLEGENA_WERKZEUG, type Dokument, type MailKopf } from '@/lib/pflegena';
 import { flagGiltFuer } from '@/lib/portal-schutz';
 import { sendEmail } from '@/lib/email';
 import { apiZeilen, helfer24ZuLeadBody, heuteBerlin, HELFER24_EXPORT_URL, type Helfer24Ergebnis } from '@/lib/portal-helfer24';
@@ -276,7 +276,7 @@ const trockenGesehen = new Set<string>();
 
 type ModellErgebnis =
   | { ok: true; roh: any }
-  | { ok: false; dauerhaft: boolean; grund: string };
+  | { ok: false; dauerhaft: boolean; guthaben?: boolean; grund: string };
 
 async function frageModell(
   betreff: string,
@@ -323,9 +323,15 @@ async function frageModell(
     const rumpf = (await res.text().catch(() => '')).slice(0, 300);
     /* Nur 400 ist ein Urteil ueber DIESE Mail (z.B. zu lang). Alles andere
        — 401/403 Schluessel, 429 Limit, 5xx/529 Ueberlast — ist die Lage,
-       nicht der Inhalt. */
-    const dauerhaft = res.status === 400;
-    return { ok: false, dauerhaft, grund: `Modell HTTP ${res.status}: ${rumpf}` };
+       nicht der Inhalt. Leeres Guthaben kommt zwar als 400, ist aber die
+       Lage und kostet nichts — siehe modellFehlerArt. */
+    const art = modellFehlerArt(res.status, rumpf);
+    return {
+      ok: false,
+      dauerhaft: art === 'dauerhaft',
+      guthaben: art === 'guthaben',
+      grund: `Modell HTTP ${res.status}: ${rumpf}`,
+    };
   }
 
   const daten: any = await res.json().catch(() => null);
@@ -428,12 +434,12 @@ async function verarbeiteVermittler(
      zu gross, zu viele Seiten, kaputtes base64 —, nicht ueber die Anfrage.
      Also genau einmal ohne. Damit gilt: ein Dokument macht eine Mail nie
      schlechter als sie heute ohne waere. */
-  if (!antwort.ok && dokumente.length) {
+  if (!antwort.ok && !antwort.guthaben && dokumente.length) {
     log(`  ⚠ ${portal}: Modellaufruf mit Anhang gescheitert (${antwort.grund}) — zweiter Versuch ohne`);
     anhangHinweise.push(`Anhang vom Modell nicht verarbeitet (${antwort.grund.slice(0, 120)}) — ohne Anhang gelesen`);
     antwort = await frageModell(mail.subject ?? '', roh, []);
   }
-  if (!antwort.ok) return { ok: false, dauerhaft: antwort.dauerhaft, grund: antwort.grund, email: absender };
+  if (!antwort.ok) return { ok: false, dauerhaft: antwort.dauerhaft, guthaben: antwort.guthaben, grund: antwort.grund, email: absender };
 
   const kopf: MailKopf = {
     von: absender,
@@ -530,6 +536,10 @@ interface PostErgebnis {
   ok: boolean;
   /** Fehler: true = deterministisch (kein Retry), false = transient. */
   dauerhaft?: boolean;
+  /** Transient UND kostenlos (Modell ohne Guthaben) — zaehlt darum nicht
+   *  gegen MAX_VERSUCHE, sonst waere eine Stoerung von mehr als fuenf
+   *  Minuten wieder eine dauerhaft verlorene Anfrage. */
+  guthaben?: boolean;
   grund?: string;
   email?: string;
   name?: string;
@@ -796,6 +806,9 @@ async function arbeiteAb(cfg: Konfig, portal: string, client: ImapFlow, db: Supa
       }
 
       let ausgang: Ausgang;
+      /* Ein Fehlschlag, der uns nichts kostet, darf die Mail nicht
+         verbrauchen — siehe MAX_VERSUCHE weiter unten. */
+      let ohneZaehler = false;
       try {
         const ergebnis = vermittler
           ? await verarbeiteVermittler(cfg, portal, vermittler.provisionProTag, mail, roh, db)
@@ -812,6 +825,7 @@ async function arbeiteAb(cfg: Konfig, portal: string, client: ImapFlow, db: Supa
             if (vermittler) await weiterleitenAnTeam(portal, uid, mail, roh, ergebnis.grund);
           } else {
             ausgang = { status: 'offen', grund: ergebnis.grund };
+            ohneZaehler = ergebnis.guthaben === true;
           }
         } else if (ergebnis.uebersprungen) {
           const leadId = await registriereFehlmail(db, portal, uid, mail, roh, 'uebersprungen', ergebnis.grund, ergebnis.email, ergebnis.name);
@@ -839,7 +853,7 @@ async function arbeiteAb(cfg: Konfig, portal: string, client: ImapFlow, db: Supa
       /* Nur beim Vermittler mitzaehlen: bei den bezahlten Portalen wuerde
          ein gemeinsamer Deckel eine fuenfminuetige Stoerung von
          /api/portal-lead in einen dauerhaft abgelehnten Lead verwandeln. */
-      if (vermittler && ausgang.status === 'offen') {
+      if (vermittler && ausgang.status === 'offen' && !ohneZaehler) {
         ausgang.versuche = versucheFuer(uid, zeilen) + 1;
       }
 
