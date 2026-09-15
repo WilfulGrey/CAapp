@@ -1,14 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import {
-  wachstum, potenzial, berlinTag, wochenStart, tagPlus,
+  wachstum, potenzial, ergebnisJeMonat, berlinTag, wochenStart, tagPlus,
   PROFIL_EREIGNISSE, EINSATZ_STATUS, WACHSTUM_START,
-  type WLead, type WEreignis, type WEinsatz,
+  type WLead, type WEreignis, type WEinsatz, type AdsKostenTag, type MonatsEinstellung,
 } from '@/lib/wachstum';
+import { PORTAL_PREISE } from '@/lib/lead-kosten';
 
 /**
  * Wachstum auf einen Blick: Potenzialentwicklung im laufenden Monat, Kunden im
- * Einsatz je Tag, Anfragen und fertige Profile je Woche (Martin, 14.09.2026).
+ * Einsatz je Tag, Anfragen und fertige Profile je Woche (Martin, 14.09.2026),
+ * dazu das Ergebnis je Monat aus Provision, Werbung und Gemeinkosten (15.09.).
  *
  * Server-seitig mit dem Service-Key; an den Browser gehen nur Summen, keine
  * Namen oder Adressen.
@@ -58,9 +60,24 @@ export async function GET(request: NextRequest) {
         .in('status', [...EINSATZ_STATUS, 'geplant']) // geplant = offene Suche, fürs Potenzial
         .order('id').range(a, b)),
     ]);
+    const [adsKosten, kosten] = await Promise.all([
+      alle<AdsKostenTag>((a, b) => supabase.from('ads_kosten_tag')
+        .select('tag, kosten_netto')
+        .gte('tag', WACHSTUM_START)
+        .order('tag').range(a, b)),
+      supabase.from('wachstum_monat').select('monat, provision_je_kunde, variabel_je_kunde, gemeinkosten').order('monat'),
+    ]);
+    /* Fehlt die Tabelle (Migration noch nicht eingespielt), rechnet die Seite mit
+       den Standardwerten weiter und sagt das deutlich dazu — Speichern geht dann nicht. */
+    const tabelleFehlt = !!kosten.error && ['42P01', 'PGRST205'].includes(String(kosten.error.code));
+    if (kosten.error && !tabelleFehlt) throw new Error(kosten.error.message);
+    const einstellungen = (kosten.data ?? []) as MonatsEinstellung[];
+
     return NextResponse.json({
       ...wachstum({ leads, ereignisse, einsaetze, von, heute }),
       potenzial: potenzial({ leads, ereignisse, einsaetze, heute }),
+      ergebnis: ergebnisJeMonat({ leads, einsaetze, adsKosten, einstellungen, portalPreise: PORTAL_PREISE, heute }),
+      kostenTabelleFehlt: tabelleFehlt,
     }, {
       headers: { 'Cache-Control': 'no-store' },
     });
