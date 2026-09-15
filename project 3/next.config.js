@@ -14,7 +14,7 @@ const NOINDEX_PATHS = [
   '/result',
   '/step-2',
   '/abmelden',
-  '/kein-interesse',
+  '/rueckmeldung',
   '/feedback',
 ];
 

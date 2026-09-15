@@ -27,14 +27,35 @@ export const GESTRICHENE_MAILS: ReadonlySet<string> = new Set(["profil_nudge_3"]
 /** Satz am Ende der Abschiedsmail. Ehrlich, weil die Wechsel-Mail nach 7 Wochen noch kommt. */
 export const ABSCHIED_SATZ = "Falls wir nichts hören, melden wir uns erst in einigen Wochen noch einmal.";
 
-/** Gründe der zwei Stopp-Knöpfe der Abschiedsmail — Spiegel von
- *  project 3/lib/kein-interesse.ts (Edge Fn kann nicht aus lib/ importieren). */
-export type KeinInteresseGrund = "aktuell-nicht" | "nicht-relevant";
+/** Die drei Knöpfe der Abschiedsmail — Spiegel von project 3/lib/rueckmeldung.ts
+ *  (Edge Fn kann nicht aus lib/ importieren; ein Test prüft den Gleichlauf). */
+export type RueckmeldungKnopf = "interesse" | "aktuell-nicht" | "nicht-relevant";
 
-/** Ziel der Knöpfe „Aktuell nicht" und „Doch nicht relevant" (Registry #72):
- *  eine Seite im Kostenrechner, auf der der Kunde den Stopp bestätigt. Vorher
- *  öffneten die Knöpfe nur eine Mail an info@, und bis jemand den Status setzte,
- *  liefen die Mails weiter. */
-export function keinInteresseLink(siteUrl: string, token: string, grund: KeinInteresseGrund): string {
-  return `${siteUrl.replace(/\/$/, "")}/kein-interesse?token=${encodeURIComponent(token)}&grund=${grund}`;
+/** Ziel der Knöpfe der Abschiedsmail (Registry #72): /rueckmeldung im
+ *  Kostenrechner. „Später" wählt dort einen Termin, „nicht relevant" nennt einen
+ *  Grund, „Interesse" fordert einen Rückruf an. Vorher öffneten die Knöpfe nur
+ *  eine Mail an info@, und bis jemand den Status setzte, liefen die Mails weiter. */
+export function rueckmeldungLink(siteUrl: string, token: string, knopf: RueckmeldungKnopf): string {
+  return `${siteUrl.replace(/\/$/, "")}/rueckmeldung?token=${encodeURIComponent(token)}&knopf=${knopf}`;
 }
+
+/** Kunden-Aktivität nach Beginn einer Pause: dann gilt die Pause als beendet und
+ *  die Wiedervorlage entfällt (der Kunde hat sich schon selbst gemeldet).
+ *  Bewusst OHNE portal_reopened — das Team öffnet das Portal per Token auch. */
+export const AKTIVITAET_NACH_PAUSE = [
+  "angebot_requested_duplicate",
+  "patient_data_saved",
+  "caregiver_invited",
+  "application_accepted_internal",
+  "rueckruf_erbeten_mail",
+] as const;
+
+/** Pause aktiv: Termin liegt in der Zukunft und der Kunde war seitdem nicht aktiv. */
+export function pauseAktiv(bis: string | null | undefined, jetzt: Date, aktivSeitPause: boolean): boolean {
+  if (aktivSeitPause || !bis) return false;
+  const t = Date.parse(bis);
+  return Number.isFinite(t) && t > jetzt.getTime();
+}
+
+/** Status, bei denen die Wiedervorlage noch Sinn ergibt (offene Anfrage). */
+export const OFFENE_STATUS: ReadonlySet<string> = new Set(["angebot_requested", "info_requested", "manuell_pruefen"]);
