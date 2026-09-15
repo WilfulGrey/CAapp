@@ -13,7 +13,24 @@ import { appendJobParam, reminderBookedCancel } from "./followupJobs.ts";
 // Kunden-Meilenstein: Bewerbung eingegangen = Profil fertig (Registry #69).
 import { type LeadMilestone, MEILENSTEIN_EREIGNISSE, meilensteinAus } from "./meilenstein.ts";
 // Nachfass-Kette und Abschiedssatz (Registry #70).
-import { ABSCHIED_SATZ, GESTRICHENE_MAILS, KETTE_NACH_MAIL1 } from "./kette.ts";
+import {
+  ABSCHIED_SATZ,
+  AKTIVITAET_NACH_PAUSE,
+  GESTRICHENE_MAILS,
+  KETTE_NACH_MAIL1,
+  OFFENE_STATUS,
+  pauseAktiv,
+  rueckmeldungLink,
+} from "./kette.ts";
+// Persönliche Nachfrage zum Wunschtermin (Registry #72).
+import {
+  WIEDERVORLAGE_BETREFF,
+  WIEDERVORLAGE_KERN,
+  WIEDERVORLAGE_KNOPF,
+  WIEDERVORLAGE_SPAETER,
+  WIEDERVORLAGE_SPAETER_LINK,
+  wiedervorlageEinstieg,
+} from "./wiedervorlage.ts";
 // Anrede-Namen sauber schreiben (Versalien → „Ruppert") — Kopie aus lib/email.ts,
 // weil Edge Functions nicht aus lib/ importieren können. Siehe names.ts.
 import { buildLeadRef, capitalizeName as capitalize, cleanNamePart } from "./names.ts";
@@ -410,6 +427,31 @@ function buildPortalUrl(portalBase: string, token: string, goto?: string): strin
   // direkt bei der Bewerbung statt oben auf der Portal-Startansicht.
   const base = `${portalBase.replace(/\/$/, "")}/?token=${encodeURIComponent(token)}`;
   return goto ? `${base}&goto=${encodeURIComponent(goto)}` : base;
+}
+
+// Pause aus /rueckmeldung (Registry #72): letzte kunde_pausiert-Zeile + ob der
+// Kunde seitdem selbst aktiv war (dann ist die Pause vorbei).
+async function pauseStand(supabase: any, leadId: string): Promise<{ bis: string | null; aktivSeitPause: boolean } | null> {
+  const { data: pausen } = await supabase
+    .from("lead_events")
+    .select("created_at, metadata")
+    .eq("lead_id", leadId)
+    .eq("event_type", "kunde_pausiert")
+    .order("created_at", { ascending: false })
+    .limit(1);
+  const pause = Array.isArray(pausen) ? pausen[0] : null;
+  if (!pause) return null;
+  const { data: aktiv } = await supabase
+    .from("lead_events")
+    .select("id")
+    .eq("lead_id", leadId)
+    .in("event_type", [...AKTIVITAET_NACH_PAUSE])
+    .gt("created_at", pause.created_at)
+    .limit(1);
+  return {
+    bis: (pause.metadata as { bis?: string } | null)?.bis ?? null,
+    aktivSeitPause: Array.isArray(aktiv) && aktiv.length > 0,
+  };
 }
 
 async function getLeadMilestone(supabase: any, leadId: string): Promise<LeadMilestone> {
@@ -826,6 +868,45 @@ Primundus Deutschland | +49 89 200 000 830 | www.primundus.de`;
 }
 
 // Tag-49: Wechsel-Fenster (nach 6–8 Wochen erster Pflegekraft-Wechsel) — Info-Ton.
+// Nachfrage zum Wunschtermin (Registry #72) — Wortlaut in wiedervorlage.ts.
+export function buildWiedervorlageHtml(lead: Lead, siteUrl: string, portalBase: string, seit: string | null): string {
+  const portalUrl = (portalBase && lead.token) ? buildPortalUrl(portalBase, lead.token) : siteUrl;
+  const spaeterUrl = lead.token ? rueckmeldungLink(siteUrl, lead.token, "aktuell-nicht") : "tel:+4989200000830";
+  const halloAnrede = buildHalloAnrede(lead.anrede_text || null, lead.nachname || "", lead.vorname || "");
+  const content = `
+    <p style="font-size:15px;line-height:1.75;color:#444;margin-bottom:14px;">${halloAnrede},</p>
+    <p style="font-size:15px;line-height:1.75;color:#444;margin-bottom:14px;">${wiedervorlageEinstieg(seit)}</p>
+    <p style="font-size:15px;line-height:1.75;color:#444;margin-bottom:14px;">${WIEDERVORLAGE_KERN}</p>
+    ${bulletproofButton(portalUrl, `${WIEDERVORLAGE_KNOPF}&nbsp;&nbsp;&rarr;`, "#2A9D5C")}
+    <p style="font-size:14px;line-height:1.65;color:#666;margin:18px 0 0;">${WIEDERVORLAGE_SPAETER} <a href="${spaeterUrl}" style="color:#8B7355;">${WIEDERVORLAGE_SPAETER_LINK}</a></p>
+    <p style="font-size:13px;line-height:1.6;color:#888;margin:18px 0 0;">PS: Klappt im Portal etwas nicht, oder möchten Sie das lieber persönlich klären? Sie erreichen mich unter <a href="tel:+4989200000830" style="color:#8B7355;text-decoration:none;">089&nbsp;200&nbsp;000&nbsp;830</a> oder per <a href="https://wa.me/4989200000830" style="color:#8B7355;text-decoration:none;">WhatsApp</a>.</p>
+    ${buildMartaSig(siteUrl)}`;
+  return buildEmailWrapper(lead, siteUrl, content);
+}
+
+export function buildWiedervorlageText(lead: Lead, siteUrl: string, portalBase: string, seit: string | null): string {
+  const portalUrl = (portalBase && lead.token) ? buildPortalUrl(portalBase, lead.token) : siteUrl;
+  const spaeterUrl = lead.token ? rueckmeldungLink(siteUrl, lead.token, "aktuell-nicht") : "089 200 000 830";
+  const halloAnrede = buildHalloAnrede(lead.anrede_text || null, lead.nachname || "", lead.vorname || "");
+  return `${halloAnrede},
+
+${wiedervorlageEinstieg(seit)}
+
+${WIEDERVORLAGE_KERN}
+
+${WIEDERVORLAGE_KNOPF}: ${portalUrl}
+
+${WIEDERVORLAGE_SPAETER} ${spaeterUrl}
+
+PS: Klappt im Portal etwas nicht, oder möchten Sie das lieber persönlich klären? Sie erreichen mich unter 089 200 000 830 oder per WhatsApp (https://wa.me/4989200000830).
+
+Mit freundlichen Grüßen
+Marta Kapcio
+
+---
+Primundus Deutschland | +49 89 200 000 830 | www.primundus.de`;
+}
+
 function buildReaktivierungWechselHtml(lead: Lead, siteUrl: string, portalBase: string): string {
   const portalUrl = (portalBase && lead.token) ? buildPortalUrl(portalBase, lead.token) : siteUrl;
   const halloAnrede = buildHalloAnrede(lead.anrede_text || null, lead.nachname || "", lead.vorname || "");
@@ -938,16 +1019,24 @@ Marta Kapcio
 Primundus Deutschland | +49 89 200 000 830 | www.primundus.de`;
 }
 
-// Nachfass-3: "letzter Versuch" — Quick-Reaktion mit drei mailto-Buttons.
-// Antworten kommen als normale Mail an info@primundus.de mit
-// vordefiniertem Subject (inkl. Lead-ID damit das Team direkt zuordnen
-// kann). Bewusst SEHR kurz — nicht überreden, nur Status abklopfen.
+// Nachfass-3: "letzter Versuch" — Quick-Reaktion mit drei Knöpfen. Alle drei
+// führen auf /rueckmeldung im Kostenrechner (Registry #72): „Ja, habe Interesse"
+// → Portal oder Rückruf, „Aktuell nicht" → Wunschtermin für die nächste Meldung,
+// „Doch nicht relevant" → Grund + passendes Angebot, Abmelden nur als kleiner
+// Link. Ohne Token bleibt es beim mailto an info@ (Subject mit Lead-Ref).
+// Bewusst SEHR kurz — nicht überreden, nur Status abklopfen.
 function buildNachfass3Html(lead: Lead, siteUrl: string): string {
   const halloAnrede = buildHalloAnrede(lead.anrede_text || null, lead.nachname || "", lead.vorname || "");
   const leadRef = buildLeadRef(lead);
-  const mailtoYes = `mailto:info@primundus.de?subject=${encodeURIComponent(`Habe noch Interesse — ${leadRef}`)}&body=${encodeURIComponent(`Hallo Marta,\n\nich habe noch Interesse, bitte melden Sie sich bei mir.\n\n${halloAnrede.replace(/^Hallo /, '')}`)}`;
-  const mailtoLater = `mailto:info@primundus.de?subject=${encodeURIComponent(`Aktuell nicht — vielleicht später — ${leadRef}`)}&body=${encodeURIComponent(`Hallo Marta,\n\naktuell brauche ich noch keine Pflegekraft, vielleicht später.\n\n${halloAnrede.replace(/^Hallo /, '')}`)}`;
-  const mailtoNo = `mailto:info@primundus.de?subject=${encodeURIComponent(`Doch nicht relevant — ${leadRef}`)}&body=${encodeURIComponent(`Hallo Marta,\n\nes hat sich erledigt, das Thema ist für mich nicht mehr relevant.\n\n${halloAnrede.replace(/^Hallo /, '')}`)}`;
+  const mailtoYes = lead.token
+    ? rueckmeldungLink(siteUrl, lead.token, "interesse")
+    : `mailto:info@primundus.de?subject=${encodeURIComponent(`Habe noch Interesse — ${leadRef}`)}&body=${encodeURIComponent(`Hallo Marta,\n\nich habe noch Interesse, bitte melden Sie sich bei mir.\n\n${halloAnrede.replace(/^Hallo /, '')}`)}`;
+  const mailtoLater = lead.token
+    ? rueckmeldungLink(siteUrl, lead.token, "aktuell-nicht")
+    : `mailto:info@primundus.de?subject=${encodeURIComponent(`Aktuell nicht — vielleicht später — ${leadRef}`)}&body=${encodeURIComponent(`Hallo Marta,\n\naktuell brauche ich noch keine Pflegekraft, vielleicht später.\n\n${halloAnrede.replace(/^Hallo /, '')}`)}`;
+  const mailtoNo = lead.token
+    ? rueckmeldungLink(siteUrl, lead.token, "nicht-relevant")
+    : `mailto:info@primundus.de?subject=${encodeURIComponent(`Doch nicht relevant — ${leadRef}`)}&body=${encodeURIComponent(`Hallo Marta,\n\nes hat sich erledigt, das Thema ist für mich nicht mehr relevant.\n\n${halloAnrede.replace(/^Hallo /, '')}`)}`;
 
   const content = `
     <p style="font-size:15px;line-height:1.75;color:#444;margin-bottom:14px;">${halloAnrede},</p>
@@ -968,9 +1057,18 @@ function buildNachfass3Html(lead: Lead, siteUrl: string): string {
   return buildEmailWrapper(lead, siteUrl, content);
 }
 
-function buildNachfass3Text(lead: Lead, _siteUrl: string): string {
+function buildNachfass3Text(lead: Lead, siteUrl: string): string {
   const halloAnrede = buildHalloAnrede(lead.anrede_text || null, lead.nachname || "", lead.vorname || "");
   const leadRef = buildLeadRef(lead);
+  const linkYes = lead.token
+    ? rueckmeldungLink(siteUrl, lead.token, "interesse")
+    : `mailto:info@primundus.de?subject=Habe noch Interesse — ${leadRef}`;
+  const linkLater = lead.token
+    ? rueckmeldungLink(siteUrl, lead.token, "aktuell-nicht")
+    : `mailto:info@primundus.de?subject=Aktuell nicht — ${leadRef}`;
+  const linkNo = lead.token
+    ? rueckmeldungLink(siteUrl, lead.token, "nicht-relevant")
+    : `mailto:info@primundus.de?subject=Doch nicht relevant — ${leadRef}`;
   return `${halloAnrede},
 
 ein letzter Versuch von meiner Seite — wie schaut's bei Ihnen aus?
@@ -978,13 +1076,13 @@ ein letzter Versuch von meiner Seite — wie schaut's bei Ihnen aus?
 Antworten Sie kurz mit einer der drei Optionen:
 
 Ja, habe Interesse — bitte melden:
-mailto:info@primundus.de?subject=Habe noch Interesse — ${leadRef}
+${linkYes}
 
 Aktuell nicht — vielleicht später:
-mailto:info@primundus.de?subject=Aktuell nicht — ${leadRef}
+${linkLater}
 
 Doch nicht relevant:
-mailto:info@primundus.de?subject=Doch nicht relevant — ${leadRef}
+${linkNo}
 
 Schreiben Sie kurz per WhatsApp: https://wa.me/4989200000830
 Oder rufen Sie an: +49 89 200 000 830
@@ -2523,6 +2621,27 @@ Deno.serve(async (req: Request) => {
           continue;
         }
 
+        // Pause (Kunde hat auf /rueckmeldung einen Wunschtermin gewählt, Registry #72):
+        // bis dahin keine Mails aus der Warteschlange, außer der Nachfrage selbst
+        // und Mails, die der Kunde durch eine neue Anfrage selbst auslöst.
+        // Meldet sich der Kunde vorher selbst (AKTIVITAET_NACH_PAUSE), ist die Pause vorbei.
+        if (!["wiedervorlage", "eingangsbestaetigung", "angebot"].includes(scheduledEmail.email_type)) {
+          const pause = await pauseStand(supabase, scheduledEmail.lead_id);
+          if (pause && pauseAktiv(pause.bis, new Date(), pause.aktivSeitPause)) {
+            await supabase
+              .from("scheduled_emails")
+              .update({ status: "cancelled", updated_at: new Date().toISOString() })
+              .eq("id", scheduledEmail.id);
+            await supabase.from("lead_events").insert({
+              lead_id: scheduledEmail.lead_id,
+              event_type: `email_${scheduledEmail.email_type}_cancelled`,
+              metadata: { reason: "pausiert", bis: pause.bis },
+            });
+            results.push({ id: scheduledEmail.id, success: true });
+            continue;
+          }
+        }
+
         // Empfänger IMMER frisch aus dem Lead. scheduled_emails.recipient_email
         // ist nur eine Kopie vom Zeitpunkt der Einplanung — korrigiert jemand die
         // Adresse (Admin-Kontaktformular), würde die geplante Mail sonst weiter
@@ -2916,6 +3035,45 @@ Deno.serve(async (req: Request) => {
           text = buildProfilNudge3Text(lead as Lead, smtpConfig.siteUrl, portalBase);
           eventTypeSent = "email_profil_nudge_3_sent";
           eventTypeFailed = "email_profil_nudge_3_failed";
+        } else if (scheduledEmail.email_type === "wiedervorlage") {
+          // Nachfrage zum Wunschtermin (Registry #72). Entfällt, wenn der Lead
+          // nicht mehr offen ist (gebucht, abgemeldet, vom Team geschlossen),
+          // wenn der Kunde neu angefragt hat oder sich seit der Pause selbst
+          // gemeldet hat.
+          let entfaellt: string | null = OFFENE_STATUS.has(String(lead.status ?? "")) ? null : "status";
+          if (!entfaellt && lead.email) {
+            const { data: neuere } = await supabase
+              .from("leads")
+              .select("id")
+              .eq("email", lead.email)
+              .gt("created_at", lead.created_at)
+              .neq("id", lead.id)
+              .limit(1);
+            if (Array.isArray(neuere) && neuere.length > 0) entfaellt = "neue_anfrage";
+          }
+          if (!entfaellt) {
+            const pause = await pauseStand(supabase, scheduledEmail.lead_id);
+            if (pause?.aktivSeitPause) entfaellt = "kunde_aktiv";
+          }
+          if (entfaellt) {
+            await supabase
+              .from("scheduled_emails")
+              .update({ status: "cancelled", updated_at: new Date().toISOString() })
+              .eq("id", scheduledEmail.id);
+            await supabase.from("lead_events").insert({
+              lead_id: scheduledEmail.lead_id,
+              event_type: "email_wiedervorlage_cancelled",
+              metadata: { reason: entfaellt },
+            });
+            results.push({ id: scheduledEmail.id, success: true });
+            continue;
+          }
+          const seit = ((scheduledEmail.metadata ?? {}) as { seit?: string }).seit ?? null;
+          subject = WIEDERVORLAGE_BETREFF;
+          html = buildWiedervorlageHtml(lead as Lead, smtpConfig.siteUrl, portalBase, seit);
+          text = buildWiedervorlageText(lead as Lead, smtpConfig.siteUrl, portalBase, seit);
+          eventTypeSent = "email_wiedervorlage_sent";
+          eventTypeFailed = "email_wiedervorlage_failed";
         } else if (scheduledEmail.email_type === "reaktivierung_wechsel") {
           subject = "Steht bei Ihnen ein Pflegekraft-Wechsel an?";
           html = buildReaktivierungWechselHtml(lead as Lead, smtpConfig.siteUrl, portalBase);
