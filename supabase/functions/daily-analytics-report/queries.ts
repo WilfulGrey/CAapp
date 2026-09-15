@@ -235,9 +235,17 @@ export async function fetchDailyStats(
   // Test-Leads (m.kepinski+test*@mamamia.app, *example.com, etc.)
   // werden über isRealLead() rausgefiltert, damit interne QA die
   // echten Conversion-Zahlen nicht verfälscht.
+  /* Nur Leads MIT Kalkulation zaehlen (Martin, 12.09.2026: „ich habe nur 3
+     leads", die Mail sagte 5). Scheitert der Import einer Vermittler-Mail
+     (Pflegena am 11.09.: Anthropic-Guthaben leer), legt der Mail-Leser trotzdem
+     einen leeren Datensatz an — nur Absenderadresse, kein Name, keine
+     Kalkulation. Das ist kein Lead. Nachgemessen: von 210 Nicht-Test-Leads
+     seit 01.08. hatten genau diese zwei keine Kalkulation, jeder echte Lead —
+     Rechner, Website, Portal, Chat — hat eine. */
   const { data: leadsInPeriod, error: lErr } = await supabase
     .from("leads")
     .select("id, email, vorname, nachname, source, ist_test")
+    .not("kalkulation", "is", null)
     .gte("created_at", start)
     .lt("created_at", end);
   if (lErr) throw new Error(`leads: ${lErr.message}`);
@@ -507,9 +515,10 @@ export async function fetchPeriodStats(
 export async function fetchTotalLeads(supabase: SupabaseClient): Promise<number> {
   const { data, error } = await supabase
     .from("leads")
-    .select("email, vorname, nachname");
+    .select("email, vorname, nachname, ist_test")
+    .not("kalkulation", "is", null);   // leere Import-Reste zaehlen nicht (s. oben)
   if (error) throw new Error(`leads (total): ${error.message}`);
-  return (data ?? []).filter(isRealLead).length;
+  return (data ?? []).filter((l) => !(l as { ist_test?: boolean }).ist_test && isRealLead(l)).length;
 }
 
 /**
@@ -792,6 +801,7 @@ export async function fetchLeadCohorts(
   const { data: leads, error: lErr } = await supabase
     .from("leads")
     .select("id, email, vorname, nachname, created_at")
+    .not("kalkulation", "is", null)   // leere Import-Reste zaehlen nicht (s. fetchPeriod)
     .gte("created_at", aeltester.start)
     .lt("created_at", juengster.end);
   if (lErr) throw new Error(`leads (Kohorten): ${lErr.message}`);
