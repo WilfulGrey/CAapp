@@ -19,10 +19,18 @@ export const ZAEHLER_EREIGNISSE = [
   'cta_geklickt', 'abgeschickt',
   'garantie_geoeffnet', // Pop-up der Bestpreisgarantie geöffnet (12.09.2026)
   'garantie_weiter', // aus dem Pop-up in den Rechner (Knopf statt Verstanden, 13.09.2026)
+  // Kontakt in drei Schritten (Registry #76, 16.09.2026): Teilschritte und
+  // Ausgang. `abgeschickt` = Lead gespeichert (in `stufen` schon nach der
+  // E-Mail), `absenden_geklickt`/`absenden_fehler` trennen „nie geklickt"
+  // von „geklickt, Server-Fehler", `telefon_angegeben`/`ohne_telefon` den
+  // Anteil mit Rückrufnummer.
+  'kontakt_email', 'kontakt_telefon', 'absenden_geklickt', 'absenden_fehler', 'telefon_angegeben', 'ohne_telefon',
 ] as const;
 export type ZaehlerEreignis = (typeof ZAEHLER_EREIGNISSE)[number];
 
-export const ZAEHLER_VARIANTEN = ['vorschau', 'alt'] as const;
+// `stufen` = Kontakt in drei Schritten, `alt` = das Formular davor (50/50 seit
+// Registry #76), `vorschau` = Karten-Seite (?kraefte=1).
+export const ZAEHLER_VARIANTEN = ['vorschau', 'alt', 'stufen'] as const;
 export type ZaehlerVariante = (typeof ZAEHLER_VARIANTEN)[number];
 
 /**

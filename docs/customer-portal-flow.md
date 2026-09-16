@@ -228,6 +228,23 @@ Content-Type: application/json
    przyszło zapytanie.
 5. Build `portalUrl = ${NEXT_PUBLIC_PORTAL_URL}/?token=<lead.token>`
 
+### Kontakt in drei Schritten (Registry #76, 2026-09-16)
+
+Variante `stufen` (50/50 je Sitzung, `?kontakt=stufen|alt` erzwingt, `project 3/lib/kontakt-stufen.ts`):
+Schritt 9 fragt Name → E-Mail → Telefon einzeln. Nach der E-Mail ruft der Rechner
+`POST /api/angebot-anfordern` mit `telefonSpaeter: true` und OHNE `telefon` — die Route
+legt den Lead an (Spalte `telefon` NULL), plant Mail 1 wie sonst (delay 0 + flush), schickt
+die Team-Mail mit Telefon „noch nicht angegeben …" und loggt `kontakt_variante`
+(`{variante, telefon_spaeter, telefon_dabei}`; auch Variante `alt` loggt das). Conversion
+(dataLayer `angebot_erfolgreich`), Beacon und OpenAI-Pixel feuern genau einmal, an dieser
+Stelle, ohne Redirect. Der Telefon-Schritt ruft `POST /api/lead-telefon {token, telefon}`
+(nur `leads.telefon`, Event `telefon_nachgetragen`, Team-Mail-Nachtrag wenn vorher leer) und
+leitet dann ins Portal; „Ohne Rückrufnummer weiter" leitet ohne Nummer. Fehlt die Nummer,
+zeigt das Patientenprofil im Portal ein Pflichtfeld (Schritt „Zur Person") — von dort geht
+sie den bestehenden Weg (`patientFormMapper` → `Customer.phone` + `customer_contract.phone`;
+`lead-event` `metadata.phone` → `leads.telefon`). mamamia bekommt die Nummer aus dem
+Telefon-Schritt NICHT (kein Resync-Feld); das Panel liest ohnehin `customer_contract.phone`.
+
 ### Response
 
 ```json

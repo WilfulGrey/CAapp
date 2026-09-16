@@ -112,6 +112,10 @@ export const AngebotCard: FC<{
   // Mamamia returns null until patient form save → reverse mapper outputs
   // '' for gender so dropdown stays empty. No more patientGenderKnown opt.
   const mmPrefill = mapMamamiaCustomerToPatientForm(mmCustomer ?? null);
+  // Rückrufnummer fehlt (Kontakt in drei Schritten, Registry #76: der Rechner
+  // legt den Lead schon mit E-Mail an) — dann fragt Schritt „Zur Person" sie
+  // ab. Weder aus dem Rechner noch aus mamamia bekannt = fehlt.
+  const telefonFehlt = !((prefill as { phone?: string }).phone || (mmPrefill as { phone?: string }).phone);
   const savedData: Partial<PatientForm> & { _isDraft?: boolean } = storageKey
     ? (() => { try { return JSON.parse(localStorage.getItem(storageKey) || '{}'); } catch { return {}; } })()
     : {};
@@ -439,6 +443,7 @@ export const AngebotCard: FC<{
     plz: 'Einsatzort', wohnungstyp: 'Wohnungstyp', urbanisierung: 'Lage',
     wunschGeschlecht: 'Gewünschtes Geschlecht', fuehrerschein: 'Führerschein',
     startDate: 'Voraussichtliches Startdatum',
+    phone: 'Telefonnummer für Rückfragen',
   };
 
   // Der angezeigte Feldtext — eine Quelle für `value`, `onFocus` und den
@@ -469,6 +474,9 @@ export const AngebotCard: FC<{
       // blockieren — Geburtsjahr/Pflegegrad sind wie im SA-Wizard optional.
       if (patient.geschlecht === '') m.push('geschlecht');
       if (zwei && patient.p2_geschlecht === '') m.push('p2_geschlecht');
+      // Pflicht nur, wenn der Rechner keine Nummer mitgebracht hat: ohne sie
+      // kann das Team nicht nachfassen (Registry #76).
+      if (telefonFehlt && !isPlausibleGermanPhone(patient.phone)) m.push('phone');
     }
     if (s === 1) {
       (['mobilitaet','heben','demenz','nacht'] as const).forEach(k => { if (patient[k] === '') m.push(k); });
@@ -1000,6 +1008,26 @@ export const AngebotCard: FC<{
                       {patient.anzahl === '2' ? '2 Personen' : '1 Person'}
                     </div>
                   </div>
+
+                  {/* Rückrufnummer, wenn der Rechner sie nicht mitgebracht hat
+                      (Kontakt in drei Schritten, Registry #76). Geht mit dem
+                      Speichern nach mamamia (patientFormMapper: Customer.phone +
+                      customer_contract.phone) und über lead-event zurück in
+                      leads.telefon — beide Wege gab es schon. */}
+                  {telefonFehlt && (
+                    <div>
+                      <label className={labelCls}>Telefonnummer für Rückfragen&nbsp;<span className="text-red-400">*</span></label>
+                      <input
+                        type="tel"
+                        inputMode="tel"
+                        autoComplete="tel"
+                        value={patient.phone}
+                        onChange={e => updatePatient(p => ({ ...p, phone: e.target.value }))}
+                        placeholder="z. B. 0170 1234567"
+                        className={`w-full border rounded-xl px-3 py-2.5 text-sm bg-white focus:outline-none focus:ring-1 focus:ring-[#8B7355]/40 ${showErrors && !isPlausibleGermanPhone(patient.phone) ? 'border-red-400' : 'border-gray-200'}`}
+                      />
+                    </div>
+                  )}
 
                   {/* Patient 1 */}
                   {patient.anzahl !== '' && (
