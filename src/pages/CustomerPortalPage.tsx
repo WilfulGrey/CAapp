@@ -3647,11 +3647,30 @@ const CustomerPortalPage: FC = () => {
               // Kontaktperson (Osoba Kontaktowa) aus dem Lead → customer_contract
               // (salutation/first_name/last_name), damit das Mamamia-Panel die
               // Kontaktdaten zeigt statt nur Customer.first_name top-level.
-              contact: {
-                anrede: lead?.anrede_text ?? lead?.anrede ?? null,
-                vorname: lead?.vorname ?? null,
-                nachname: lead?.nachname ?? null,
-              },
+              //
+              // Vermittler-Lead (Registry #67): die Kontaktspalten tragen dort
+              // den Ansprechpartner der Agentur — er gehoert NICHT unter die
+              // Adresse des Patienten. Das MM-Team fuellt diesen Bogen ueber den
+              // gespiegelten Token aus (gotcha #10), also ist das hier der
+              // einzige Weg, auf dem das Formular bei solchen Leads ueberhaupt
+              // laeuft; ohne die Fallunterscheidung wuerde es den Server-Fix
+              // wieder ueberschreiben.
+              ...(lead?.vermittler
+                ? {
+                    vermittler: true,
+                    contact: {
+                      anrede: lead?.patient_anrede ?? null,
+                      vorname: lead?.patient_vorname ?? null,
+                      nachname: lead?.patient_nachname ?? null,
+                    },
+                  }
+                : {
+                    contact: {
+                      anrede: lead?.anrede_text ?? lead?.anrede ?? null,
+                      vorname: lead?.vorname ?? null,
+                      nachname: lead?.nachname ?? null,
+                    },
+                  }),
             });
 
             // ── Gating write: full mechanical patch. Awaited so the caller

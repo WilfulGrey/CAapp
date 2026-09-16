@@ -764,6 +764,7 @@ Deno.test("onboardLead (#54): StoreCustomer error → claim released (mamamia_on
 // [→ read → UpdateCustomer beim 1→2]. requests[] fängt die variables.
 
 import { resyncCustomerFromLead, ResyncConflictError } from "../onboard.ts";
+import { panelIdentitaet } from "../mappers.ts";
 
 const LOGIN = { data: { LoginAgency: { id: 8190, name: "Primundus", email: "x", token: "agency-jwt" } } };
 const UPDATED = { data: { UpdateCustomer: { id: 10670, customer_id: "pr-10670" } } };
@@ -914,4 +915,181 @@ Deno.test("resync (#55): mobilitaet + weitere_personen — tool_ids frisch aus m
   const v = mm.requests[2].variables;
   assertEquals(v.patients, [{ id: 75420, tool_ids: [4, 6], mobility_id: 5, lift_id: 1 }]);
   assertEquals(v.other_people_in_house, "yes");
+});
+
+/* ─── Identitaet eines Vermittler-Falls (Registry #67) ────────────────────── */
+
+const IDREAD = (over: Record<string, unknown> = {}) => ({
+  data: {
+    Customer: {
+      id: 10670,
+      first_name: "Bernd",
+      last_name: "Walde",
+      status: "draft",
+      location_id: 14380,
+      patients: [{ id: 75420, tools: [{ id: 2 }] }],
+      equipments: [{ id: 1 }, { id: 2 }],
+      customer_contract: null,
+      customer_contacts: [],
+      ...over,
+    },
+  },
+});
+
+/* Prod 16.09.: `vorname/nachname` tragen den Ansprechpartner der Agentur
+   (fest im Registry, Pflegena sendet ohne Anzeigenamen), der Haushalt steht
+   nur in patient_*. */
+const vermittlerLead = (over: Record<string, unknown> = {}) =>
+  makeLead({
+    id: "lead-rothmund",
+    mamamia_customer_id: 10670,
+    mamamia_job_offer_id: 36297,
+    vorname: "Bernd",
+    nachname: "Walde",
+    anrede: "Herr",
+    vermittler: "pflegena.com",
+    patient_anrede: "Frau",
+    patient_vorname: "Agnes",
+    patient_nachname: "Rothmund",
+    patient_street: "Im Winkel 2",
+    kalkulation: { bruttopreis: 3350, eigenanteil: 3016, formularDaten: { plz: "79771", ort: "Klettgau-Bühl" } },
+    ...over,
+  });
+
+Deno.test("resync (#67): Vermittler + details — Identitaet als LETZTE Mutation, mit Contract-Zeile und Kontaktperson", async () => {
+  _resetAgencyTokenCache();
+  const mm = fakeMamamia([LOGIN, readOf([P1]), UPDATED, IDREAD(), UPDATED, IDREAD({ first_name: "Agnes", last_name: "Rothmund" })]);
+  const r = await resyncCustomerFromLead({
+    lead: vermittlerLead(), felder: [], details: true, secrets: SECRETS, fetchFn: mm.fetch,
+  });
+  const v = mm.requests[4].variables;
+  assertEquals(v.first_name, "Agnes");
+  assertEquals(v.last_name, "Rothmund");
+  // equipments + non-leere patients-Stubs reisen mit: ausgelassene
+  // Association-Inputs waeren ein Wipe (gotcha #3), leere patients lehnt beta ab.
+  assertEquals(v.patients, [{ id: 75420, tool_ids: [2] }]);
+  assertEquals(v.equipment_ids, [1, 2]);
+  assertEquals(v.patient_contracts, [{
+    contact_type: "patient_contact",
+    is_same_as_first_patient: false,
+    is_same_as_contact: false,
+    salutation: "Mrs.",
+    first_name: "Agnes",
+    last_name: "Rothmund",
+    street_number: "Im Winkel 2",
+    zip_code: "79771",
+    city: "Klettgau-Bühl",
+    location_id: 14380,
+  }]);
+  assertEquals(v.customer_contacts, [{
+    is_same_as_first_patient: false, salutation: "Mr.", first_name: "Bernd", last_name: "Walde",
+  }]);
+  // Keine email in beiden Zeilen (Registry #52: ein Reject killt die ganze Mutation).
+  assertEquals("email" in (v.patient_contracts as Array<Record<string, unknown>>)[0], false);
+  assertEquals((r.identity as { after: unknown }).after !== undefined, true);
+  assertEquals(r.identity_error, undefined);
+});
+
+Deno.test("resync (#67): Ehepaar 1→2 — die Identitaets-Stubs tragen die id des in Pass 2 angelegten Patienten", async () => {
+  _resetAgencyTokenCache();
+  const P_NEU = { id: 75999, care_level: 1, mobility_id: 3, lift_id: 2, night_operations: "up_to_1_time", tools: [] as Array<{ id: number }> };
+  const mm = fakeMamamia([
+    LOGIN, readOf([P1]), UPDATED,          // Detail-Mutation legt den Klon an
+    readOf([P1, P_NEU]), UPDATED,          // Pass 2 gibt ihm seine Scalars
+    IDREAD({ patients: [{ id: 75420, tools: [{ id: 2 }] }, { id: 75999, tools: [] }] }),
+    UPDATED, IDREAD(),
+  ]);
+  await resyncCustomerFromLead({
+    lead: vermittlerLead({ kalkulation: { bruttopreis: 3350, eigenanteil: 3016, formularDaten: { betreuung_fuer: "ehepaar", plz: "79771" } } }),
+    felder: ["betreuung_fuer"], details: true, secrets: SECRETS, fetchFn: mm.fetch,
+  });
+  /* Der springende Punkt: patients[] ist REPLACE per id. Kaemen die Stubs aus
+     der Variablen von vor der ersten Mutation, stuende dort der Klon OHNE id —
+     Mamamia loeschte den in Pass 2 angelegten Patienten und legte ihn neu an,
+     ohne Delete-Weg zurueck. */
+  assertEquals(mm.requests[6].variables.patients, [
+    { id: 75420, tool_ids: [2] }, { id: 75999, tool_ids: [] },
+  ]);
+});
+
+Deno.test("resync (#67): von Hand gepflegte Zeilen werden nicht ersetzt — eigene Altzeilen schon", async () => {
+  _resetAgencyTokenCache();
+  const mm = fakeMamamia([
+    LOGIN, readOf([P1]), UPDATED,
+    IDREAD({
+      // "Walde" ist unser eigenes Altartefakt (alter Patientenbogen oder ein
+      // Spiegel) — das MUSS ueberschrieben werden, sonst friert der Fix ein.
+      customer_contract: { first_name: "Bernd", last_name: "Walde", location_id: 14380 },
+      customer_contacts: [{ first_name: "Sabine", last_name: "Tochter" }],
+    }),
+    UPDATED, IDREAD(),
+  ]);
+  const r = await resyncCustomerFromLead({
+    lead: vermittlerLead(), felder: [], details: true, secrets: SECRETS, fetchFn: mm.fetch,
+  });
+  const v = mm.requests[4].variables;
+  assertEquals(Array.isArray(v.patient_contracts), true);
+  assertEquals("customer_contacts" in v, false);
+  assertEquals((r.identity as { hinweis?: string }).hinweis, "customer_contacts von Hand gepflegt — nicht ersetzt");
+});
+
+Deno.test("resync (#67): ohne details (Admin-Preiskorrektur) passiert nichts — kein identity-Schluessel", async () => {
+  _resetAgencyTokenCache();
+  const mm = fakeMamamia([LOGIN, readOf([P1]), UPDATED]);
+  const r = await resyncCustomerFromLead({
+    lead: vermittlerLead({ kalkulation: { bruttopreis: 3350, eigenanteil: 3016, formularDaten: { pflegegrad: 3, plz: "79771" } } }),
+    felder: ["pflegegrad"], secrets: SECRETS, fetchFn: mm.fetch,
+  });
+  assertEquals(mm.requests.length, 3);
+  // Nicht `undefined`, sondern ABWESEND — assertEquals unterscheidet das.
+  assertEquals("identity" in r, false);
+  assertEquals("identity_error" in r, false);
+});
+
+Deno.test("resync (#67): Rechner-Lead — auch mit details keine Identitaets-Mutation", async () => {
+  _resetAgencyTokenCache();
+  const mm = fakeMamamia([LOGIN, readOf([P1]), UPDATED]);
+  const r = await resyncCustomerFromLead({
+    lead: resyncLead({ plz: "79771" }), felder: [], details: true, secrets: SECRETS, fetchFn: mm.fetch,
+  });
+  assertEquals(mm.requests.length, 3);
+  assertEquals("identity" in r, false);
+});
+
+Deno.test("resync (#67): Vermittler ohne Nachnamen des Haushalts — keine Identitaets-Mutation", async () => {
+  _resetAgencyTokenCache();
+  const mm = fakeMamamia([LOGIN, readOf([P1]), UPDATED]);
+  const r = await resyncCustomerFromLead({
+    lead: vermittlerLead({ patient_vorname: null, patient_nachname: null }),
+    felder: [], details: true, secrets: SECRETS, fetchFn: mm.fetch,
+  });
+  assertEquals(mm.requests.length, 3);
+  assertEquals("identity" in r, false);
+});
+
+Deno.test("resync (#67): Fehler der Identitaets-Mutation reisst den Detail-Sync nicht mit", async () => {
+  _resetAgencyTokenCache();
+  const mm = fakeMamamia([
+    LOGIN, readOf([P1]), UPDATED, IDREAD(),
+    { errors: [{ message: "Das Feld customer_contacts ist ungültig." }] },
+  ]);
+  const r = await resyncCustomerFromLead({
+    lead: vermittlerLead(), felder: [], details: true, secrets: SECRETS, fetchFn: mm.fetch,
+  });
+  // Detail-Mutation ist raus (Request 2), die Identitaet meldet ihren Fehler —
+  // und es gibt KEINEN zweiten Read danach (Mutationen sind atomar).
+  assertEquals(mm.requests.length, 5);
+  assertEquals(r.identity_error?.includes("customer_contacts"), true);
+  assertEquals((r.identity as { after?: unknown }).after, undefined);
+  assertEquals(r.patients_after, 1);
+});
+
+Deno.test("resync (#67): Haushalt ohne Vornamen — first_name: null loescht den Ansprechpartner-Vornamen", () => {
+  /* "Familie Maier": stuende first_name nicht drin, bliebe "Bernd" vor
+     "Maier" stehen. Ob Mamamia null als Leeren akzeptiert, klaert die
+     Staging-Sonde — gesendet wird es bewusst. */
+  assertEquals(
+    panelIdentitaet(vermittlerLead({ patient_vorname: null, patient_nachname: "Maier" })),
+    { first_name: null, last_name: "Maier", istPatient: true },
+  );
 });

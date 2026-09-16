@@ -591,10 +591,26 @@ Schlägt der Nachlauf fehl, steht der Kunde trotzdem und die Mails gehen raus
 
 ### Bekannte Kanten
 
-- Der mamamia-Kunde trägt die Kontaktdaten des **Vermittlers** (`Customer` =
-  Kontaktperson, nicht Patient). Unterschieden werden die Anfragen über
-  `leads.patient_*` und die erste Zeile des Kontextblocks
-  (`fd.portal_details` → JobOffer-Beschreibung): „Familie Schmidt, Kassel".
+- Der mamamia-Kunde heisst seit Registry #67 wie der **Haushalt**, nicht wie
+  der Vermittler: `Customer.first_name/last_name` und der JobOffer-Titel
+  kommen aus `leads.patient_*` (Anker: `patient_nachname`; fehlt er, bleibt
+  es beim Ansprechpartner). Der Vermittler steht als **Kontaktperson**
+  (`customer_contacts`) daneben — sein E-Mail-Feld dort bleibt leer, die
+  Adresse trägt der Kunde. Name, Anrede, Strasse und Einsatzort des
+  Haushalts stehen in der Patienten-Contract-Zeile; `Patient` selbst hat in
+  Mamamia **kein** Namensfeld.
+  Vorher hiessen alle acht Pflegena-Kunden „Bernd Walde" — der
+  Ansprechpartner der Agentur, bei jeder Anfrage derselbe.
+  Geschrieben wird das in einer zweiten Mutation des Resyncs
+  (`{felder: [], details: true}`, direkt nach dem Onboard); ihr Fehler steht
+  als `resync.identity_error` im 200er-Body und als Event
+  `mamamia_identity_sync_failed` in der Timeline, Retry ist derselbe Aufruf.
+- **Die Kontaktspalten des Leads bleiben der Vermittler** (`vorname/nachname/
+  anrede`) — aus ihnen baut die Eingangsbestätigung die Anrede der Mail AN
+  DEN VERMITTLER. Im Admin zeigt die Liste deshalb den Haushalt und darunter
+  klein „über Herr Bernd Walde · 79771 Klettgau-Bühl" (`kontaktAnzeige`).
+- Der Kontextblock (`fd.portal_details` → JobOffer-Beschreibung) führt die
+  Anfrage weiterhin mit „Familie Schmidt, Kassel".
 - Kommt dieselbe Familie zusätzlich über unseren Kostenrechner, entstehen
   zwei Leads mit zwei Preisen (einer mit, einer ohne Provision). Über die
   E-Mail nicht erkennbar — im Admin nach `patient_nachname` suchen.

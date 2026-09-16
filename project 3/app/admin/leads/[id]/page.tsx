@@ -8,6 +8,7 @@ import { createClient } from '@supabase/supabase-js';
 import { Loader as Loader2, ArrowLeft, Mail, Phone, Calendar, MapPin, FileText, Clock, Download, CreditCard as Edit, Save, X, RefreshCw, User, BellOff, CircleCheck as CheckCircle, MessageSquare, Copy, Check } from 'lucide-react';
 import { PORTAL_BASIS } from '@/lib/portal-url';
 import { LABELS, FD_LABEL_KEYS } from '@/lib/angaben-labels';
+import { kontaktAnzeige } from '@/lib/portal-lead';
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -483,7 +484,7 @@ export default function LeadDetailPage() {
           </Button>
           <div>
             <h1 className="text-3xl font-bold text-gray-900">
-              {[lead.anrede_text, lead.vorname, lead.nachname].filter(Boolean).join(' ') || 'Lead'} #{lead.id.slice(0, 8)}
+              {kontaktAnzeige(lead).name} #{lead.id.slice(0, 8)}
             </h1>
             <p className="text-gray-600 mt-1">Lead-Details und Timeline</p>
           </div>
@@ -674,6 +675,26 @@ export default function LeadDetailPage() {
               </div>
             ) : (
               <div className="space-y-3">
+                {/* Bei einem Vermittler-Lead adressieren die Felder oben die
+                    Agentur; der Haushalt steht in patient_* und war hier bisher
+                    nirgends zu sehen (der Block weiter unten haengt an
+                    order_confirmed_at, das ein Vermittler-Lead nie hat). */}
+                {lead.vermittler && lead.patient_nachname && (
+                  <div className="flex items-start gap-3 rounded-md bg-amber-50 border border-amber-200 p-3">
+                    <User className="w-5 h-5 text-amber-700 mt-0.5" />
+                    <div>
+                      <p className="text-sm text-amber-800">Kunde (über Vermittler)</p>
+                      <p className="font-medium">
+                        {[lead.patient_anrede, lead.patient_vorname, lead.patient_nachname].filter(Boolean).join(' ')}
+                      </p>
+                      {(lead.patient_street || lead.kalkulation?.formularDaten?.plz) && (
+                        <p className="text-sm text-gray-600">
+                          {[lead.patient_street, [lead.kalkulation?.formularDaten?.plz, lead.kalkulation?.formularDaten?.ort].filter(Boolean).join(' ')].filter(Boolean).join(', ')}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                )}
                 {lead.anrede && (
                   <div className="flex items-center gap-3">
                     <User className="w-5 h-5 text-gray-400" />

@@ -57,6 +57,9 @@ export interface Lead {
   // ─── Stage-B fields (populated by /api/betreuung-beauftragen) ─────────
   // The customer types these in manually after clicking through the
   // calculator email. Until stage B runs they're null.
+  /** Gesetzt, wenn der Lead ueber einen Vermittler kam (Registry #59) —
+   *  dann ist der Besteller die Agentur, nicht der Haushalt. */
+  vermittler?: string | null;
   patient_anrede?: string | null;
   patient_vorname?: string | null;
   patient_nachname?: string | null;

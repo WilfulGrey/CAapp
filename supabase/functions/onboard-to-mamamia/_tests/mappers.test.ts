@@ -3,6 +3,7 @@ import {
   buildCaregiverWish,
   buildCustomerInput,
   buildJobOfferTitle,
+  panelIdentitaet,
   buildPatients,
   computeArrivalDate,
   extractPlzFromLead,
@@ -322,6 +323,47 @@ Deno.test("computeArrivalDate: unknown timing falls back to 'sofort'", () => {
   assertEquals(computeArrivalDate("nieznane", NOW_2026_04_23), "2026-04-30");
 });
 
+// ─── panelIdentitaet (Registry #67) ─────────────────────────────────────────
+
+const VERMITTLER = {
+  vermittler: "pflegena.com",
+  vorname: "Bernd",
+  nachname: "Walde",
+  patient_anrede: "Frau",
+  patient_vorname: "Agnes",
+  patient_nachname: "Rothmund",
+};
+
+Deno.test("panelIdentitaet: Rechner-Lead — der Besteller ist der Kunde (unveraendert)", () => {
+  assertEquals(panelIdentitaet(makeLead({ patient_vorname: "Agnes", patient_nachname: "Rothmund" })), {
+    first_name: "hildegard", last_name: "von norman", istPatient: false,
+  });
+});
+
+Deno.test("panelIdentitaet: Rechner-Lead ohne Kontaktnamen faellt weiter auf patient_* zurueck", () => {
+  // Bitgleich mit dem Verhalten vor dieser Funktion (`?? lead.patient_*`).
+  assertEquals(
+    panelIdentitaet(makeLead({ vorname: null, nachname: null, patient_vorname: "Agnes", patient_nachname: "Rothmund" })),
+    { first_name: "Agnes", last_name: "Rothmund", istPatient: false },
+  );
+});
+
+Deno.test("panelIdentitaet: Vermittler-Lead — der Haushalt ist die Identitaet", () => {
+  /* Prod 16.09.: acht Pflegena-Kunden hiessen in Mamamia "Bernd Walde" —
+     der Ansprechpartner der Agentur, bei jeder Anfrage derselbe. */
+  assertEquals(panelIdentitaet(makeLead(VERMITTLER)), {
+    first_name: "Agnes", last_name: "Rothmund", istPatient: true,
+  });
+});
+
+Deno.test("panelIdentitaet: Vermittler ohne Nachnamen des Haushalts bleibt beim Ansprechpartner", () => {
+  // Lieber der immer gleiche Name als gar keiner.
+  assertEquals(
+    panelIdentitaet(makeLead({ ...VERMITTLER, patient_vorname: null, patient_nachname: null })),
+    { first_name: "Bernd", last_name: "Walde", istPatient: false },
+  );
+});
+
 // ─── buildJobOfferTitle ──────────────────────────────────────────────────────
 
 Deno.test("buildJobOfferTitle: nachname only (no city yet)", () => {
@@ -331,6 +373,12 @@ Deno.test("buildJobOfferTitle: nachname only (no city yet)", () => {
 Deno.test("buildJobOfferTitle: missing nachname falls back to 'Primundus' + lead id prefix", () => {
   const l = makeLead({ nachname: null });
   assertEquals(buildJobOfferTitle(l), "Primundus — aaaaaaaa");
+});
+
+Deno.test("buildJobOfferTitle: Vermittler-Lead traegt den Haushalt, nicht die Agentur", () => {
+  // Sonst heissen alle Jobs eines Vermittlers gleich, waehrend die Kunden
+  // unterscheidbar sind — dieselbe Verwechslung eine Ebene tiefer.
+  assertEquals(buildJobOfferTitle(makeLead(VERMITTLER)), "Primundus — Rothmund");
 });
 
 // ─── buildPatients (post-Bug-#13 minimal payload) ───────────────────────────

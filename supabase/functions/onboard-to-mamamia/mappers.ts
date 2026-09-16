@@ -140,12 +140,46 @@ export function computeArrivalDate(
   return d.toISOString().slice(0, 10);
 }
 
+// ─── Panel-Identitaet ───────────────────────────────────────────────────────
+// Unter welchem Namen Mamamia den Fall fuehrt. Normalfall: der Besteller —
+// wer den Kostenrechner ausgefuellt hat, ist auch der Kunde.
+//
+// Bei einem VERMITTLER-Lead (Registry #59) ist der Besteller die Agentur:
+// `lead.vorname/nachname` tragen deren Ansprechpartner, bei Pflegena bei
+// JEDER Anfrage denselben. Acht Kunden "Bernd Walde" sind fuer die Agentur
+// nicht unterscheidbar — die Identitaet, unter der jemand den Fall sucht,
+// ist der Haushalt.
+//
+// Anker ist der NACHNAME: einen Fall ohne Nachnamen gibt es nicht, ein
+// fehlender Vorname ist normal ("Familie Maier"). Fehlt der Nachname,
+// bleibt es beim Ansprechpartner — lieber der immer gleiche Name als keiner.
+//
+// Der Rechner-Zweig ist bitgleich mit dem Verhalten vor dieser Funktion.
+export function panelIdentitaet(lead: Lead): {
+  first_name: string | null;
+  last_name: string | null;
+  istPatient: boolean;
+} {
+  const nach = lead.patient_nachname?.trim();
+  if (lead.vermittler && nach) {
+    return { first_name: lead.patient_vorname?.trim() || null, last_name: nach, istPatient: true };
+  }
+  return {
+    first_name: lead.vorname ?? lead.patient_vorname ?? null,
+    last_name: lead.nachname ?? lead.patient_nachname ?? null,
+    istPatient: false,
+  };
+}
+
 // ─── JobOffer title generator ───────────────────────────────────────────────
 // Mamamia requires non-empty title. Use "Primundus — {nachname}" when available,
 // fall back to "Primundus — {first-8-chars-of-lead-id}" if nachname is null.
 export function buildJobOfferTitle(lead: Lead): string {
-  if (lead.nachname && lead.nachname.trim().length > 0) {
-    return `Primundus — ${lead.nachname}`;
+  // Derselbe Name wie der Kunde (panelIdentitaet) — sonst heissen die Jobs
+  // eines Vermittlers alle gleich, waehrend die Kunden unterscheidbar sind.
+  const nachname = panelIdentitaet(lead).last_name;
+  if (nachname && nachname.trim().length > 0) {
+    return `Primundus — ${nachname}`;
   }
   return `Primundus — ${lead.id.slice(0, 8)}`;
 }
@@ -432,17 +466,20 @@ export function buildCustomerInput(
   const fd = lead.kalkulation?.formularDaten ?? {};
   const careBudget = lead.kalkulation?.bruttopreis ?? null;
   const arrivalAt = computeArrivalDate(lead.care_start_timing, nowISO);
+  const ident = panelIdentitaet(lead);
 
   return {
-    // Identity — Customer.first_name/last_name = die KONTAKTPERSON / Osoba
-    // Kontaktowa (der Besteller, der den Kostenrechner ausgefüllt hat). Verified
-    // im Mamamia-Panel: dorthin, wo "John Smith" steht, gehört der Lead-Kontakt.
-    // Also lead.vorname/nachname (der Orderer); patient_* ist die GEPFLEGTE
-    // PERSON und gehört in die Patienten-/Vertrags-Records, NICHT in den
-    // Kontakt-Slot. (War invertiert: resolvePatient* bevorzugte patient_*, was
-    // bei gelaufenem Stage-B den Patienten in den Kontakt-Slot schrieb.)
-    first_name: lead.vorname ?? lead.patient_vorname ?? null,
-    last_name: lead.nachname ?? lead.patient_nachname ?? null,
+    // Identity — siehe panelIdentitaet(): normalerweise die KONTAKTPERSON /
+    // Osoba Kontaktowa (der Besteller, der den Kostenrechner ausgefüllt hat).
+    // Verified im Mamamia-Panel: dorthin, wo "John Smith" steht, gehört der
+    // Lead-Kontakt, nicht die gepflegte Person — die gehört in die Patienten-/
+    // Vertrags-Records. (War einmal invertiert: resolvePatient* bevorzugte
+    // patient_*, was bei gelaufenem Stage-B den Patienten in den Kontakt-Slot
+    // schrieb.) AUSNAHME Vermittler-Leads: dort IST der Besteller die Agentur,
+    // und ihr Ansprechpartner ist bei jeder Anfrage derselbe — dann traegt der
+    // Slot den Haushalt.
+    first_name: ident.first_name,
+    last_name: ident.last_name,
     email: lead.email,
     phone: lead.telefon,
     // Location — best-effort. Null when PLZ unknown; patient form fills

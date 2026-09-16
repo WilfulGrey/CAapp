@@ -5,7 +5,7 @@ import { describe, it, expect } from 'vitest';
 // root-vitest, weil project 3 keinen Testrunner hat und die früheren
 // Deno-Prüfskripte in scripts/ den `next build` gebrochen haben
 // (Registry #38): CI-required statt nie-laufender Standalone-Skripte.
-import { ergaenzeAngaben, reiterFuer, vermittlerFuer, postfachPraefix, PORTALE } from '../../project 3/lib/portal-lead';
+import { ergaenzeAngaben, reiterFuer, vermittlerFuer, postfachPraefix, kontaktAnzeige, PORTALE } from '../../project 3/lib/portal-lead';
 
 /* pricing_config — ECHTE Zeilen von prod (Abzug 08.09.2026), nicht erfunden.
  *
@@ -245,5 +245,58 @@ describe('postfachPraefix (wo die Mails liegen)', () => {
        Host — eine zweite Kopie hier koennte davon abweichen, und die
        Abweichung faellt niemandem auf. */
     expect(vermittlerFuer('pflegena.com')).not.toHaveProperty('antwortVon');
+  });
+});
+
+describe('kontaktAnzeige — wer in der Admin-Liste als Kontakt steht', () => {
+  const vermittlerLead = {
+    anrede_text: 'Herr', vorname: 'Bernd', nachname: 'Walde',
+    patient_anrede: 'Frau', patient_vorname: 'Agnes', patient_nachname: 'Rothmund',
+    vermittler: 'pflegena.com',
+    kalkulation: { formularDaten: { plz: '79771', ort: 'Klettgau-Bühl' } },
+  };
+
+  it('Vermittler-Lead: der Haushalt steht vorn, der Vermittler in der Unterzeile', () => {
+    /* Prod 16.09.: acht Pflegena-Leads, alle als "Herr Bernd Walde" —
+       das ist der Ansprechpartner der Agentur, bei jeder Anfrage derselbe. */
+    const a = kontaktAnzeige(vermittlerLead);
+    expect(a.name).toBe('Frau Agnes Rothmund');
+    expect(a.via).toBe('über Herr Bernd Walde · 79771 Klettgau-Bühl');
+  });
+
+  it('PLZ und Ort stehen dabei, weil zwei Anfragen zum selben Haushalt sonst gleich aussehen', () => {
+    /* Die beiden Maier-Leads vom 13.09. tragen denselben Namen; ohne Ort
+       unterscheidet sie in der Liste nur die Uhrzeit. */
+    const ohneOrt = kontaktAnzeige({ ...vermittlerLead, kalkulation: null });
+    expect(ohneOrt.via).toBe('über Herr Bernd Walde');
+  });
+
+  it('Vermittler ohne Nachnamen des Haushalts: Fallback auf den Ansprechpartner', () => {
+    /* Lieber der immer gleiche Name als gar keiner — und der Vorname allein
+       (ohne Nachnamen) identifiziert keinen Fall. */
+    const a = kontaktAnzeige({ ...vermittlerLead, patient_vorname: null, patient_nachname: null });
+    expect(a.name).toBe('Herr Bernd Walde');
+    expect(a.via).toBeNull();
+  });
+
+  it('nur Vorname fehlt ("Familie Maier") — der Haushalt gewinnt trotzdem', () => {
+    const a = kontaktAnzeige({ ...vermittlerLead, patient_vorname: null });
+    expect(a.name).toBe('Frau Rothmund');
+  });
+
+  it('gekaufter Portal-Lead ohne Vermittler: unverändert die Kontaktspalten', () => {
+    /* Bei Pflegehilfe/Helfer24 steht in vorname/nachname der echte
+       Ansprechpartner des Haushalts — dort war die Anzeige nie falsch. */
+    const a = kontaktAnzeige({
+      anrede_text: 'Frau', vorname: 'Maria', nachname: 'Schmidt',
+      patient_anrede: 'Herr', patient_vorname: 'Hans', patient_nachname: 'Schmidt',
+      vermittler: null,
+    });
+    expect(a.name).toBe('Frau Maria Schmidt');
+    expect(a.via).toBeNull();
+  });
+
+  it('gar keine Namen: "Unbekannt" statt leerer Zelle', () => {
+    expect(kontaktAnzeige({}).name).toBe('Unbekannt');
   });
 });

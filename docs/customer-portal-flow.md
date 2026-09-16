@@ -658,7 +658,7 @@ z prawdziwymi danymi. Verified live: Customer 7651 (`/tmp/test-minimal-storecust
 
 | Pole | Źródło | Komentarz |
 |---|---|---|
-| `first_name`, `last_name` | `lead.patient_*` (stage B) lub fallback `lead.vorname/nachname` | identity |
+| `first_name`, `last_name` | `panelIdentitaet(lead)`: normalnie `lead.vorname/nachname` (fallback `lead.patient_*`); przy **vermittlerze** z `patient_nachname` — `lead.patient_*` | identity; patrz niżej |
 | `email`, `phone` | `lead.email`, `lead.telefon` | identity |
 | `location_id` | wynik `Locations(plz)` lub `null` | tylko gdy stage-B podała PLZ |
 | `language_id` | **stała `1`** (German) | business default |
@@ -666,6 +666,20 @@ z prawdziwymi danymi. Verified live: Customer 7651 (`/tmp/test-minimal-storecust
 | `commission_agent_salary` | **stała `300`** | Primundus baseline (panel rejects 0) |
 | `care_budget`, `monthly_salary` | `lead.kalkulation.bruttopreis` | real |
 | `arrival_at` | derived z `care_start_timing` przez `OFFSET_DAYS` (sofort=+7d, 2-4-wochen=+21d, 1-2-monate=+45d, unklar=+30d) | derivation z real |
+
+> **Vermittler-Leads (Registry #67).** Normalnie `Customer.first_name/last_name` to
+> KONTAKTPERSONA (zamawiający z kalkulatora) — tak było zweryfikowane w panelu MM.
+> Ale przy leadzie od pośrednika zamawiającym jest agencja: `lead.vorname/nachname`
+> trzymają jej Ansprechpartnera, u Pflegeny przy KAŻDEJ anfradze tego samego
+> („Herr Bernd Walde" ×8 — prod, 16.09.2026). Wtedy slot niesie **haushalt**
+> (`lead.patient_anrede/_vorname/_nachname`), bo pod tym nazwiskiem agencja szuka
+> sprawy. Kotwicą jest NAZWISKO: brak `patient_nachname` ⇒ zostaje Ansprechpartner.
+> Ta sama funkcja `panelIdentitaet` daje tytuł joba (`buildJobOfferTitle`).
+> Kolumny kontaktowe leada zostają nietknięte — z nich powstaje anreda maili DO
+> pośrednika.
+>
+> `Patient` w MM **nie ma pola z nazwiskiem** (introspekcja 16.09.2026) —
+> imię/nazwisko/adres pacjenta żyją wyłącznie w `CustomerContract`.
 | `other_people_in_house` | `formularDaten.weitere_personen === "ja" ? "yes" : "no"` | real |
 | `gender` (caregiver wish mirror) | `formularDaten.geschlecht` (`weiblich`→`female`, `maennlich`→`male`, `egal`→`not_important`) | real |
 | `patients[]` | patrz tabela niżej | real care attrs |
@@ -825,6 +839,27 @@ Authorization: Bearer <SUPABASE_SERVICE_ROLE_KEY>          # Pflicht — sonst 4
 - Live belegt (beta 2026-09-07): 2→1 und 1→2 auf Customer 9989; Mutation ohne
   Contract-Args auf dem gebuchten 8394 lässt `customer_contract` und Confirmation
   unangetastet, 2→1 dort akzeptiert.
+- **Zweite Mutation: Identität (Registry #67)** — nur wenn der Lead ein Vermittler-Lead
+  MIT `patient_nachname` ist UND `details: true` gesetzt wurde (also beim Vermittler-
+  Eingang und beim Backfill, NICHT bei der Admin-Preiskorrektur: die darf von Hand
+  gepflegte Namen nicht überschreiben). Sie ist die **letzte** Mutation der Funktion —
+  nach Pass 2 — und ihre `patients`-Stubs kommen aus einem **frischen** Read
+  (`RESYNC_IDENTITY_READ`): die Variable `patients` trägt nach einem Ehepaar-Klon einen
+  Eintrag OHNE id, und `patients[]` ist REPLACE per id — dieselbe Liste erneut gesendet
+  würde den in Pass 2 angelegten Patienten löschen. Inhalt: `first_name`/`last_name`
+  (= Haushalt), `patient_contracts[{contact_type:"patient_contact",
+  is_same_as_*: false, salutation, first_name, last_name, street_number, zip_code,
+  city, location_id}]` und `customer_contacts[{is_same_as_first_patient:false, +
+  Ansprechpartner des Vermittlers}]`. **Kein `email`** in beiden Zeilen (#52).
+  Eigener try/catch: Fehler ⇒ `resync.identity_error` im 200er-Body, der Detail-Sync
+  bleibt unberührt. Der Read liegt in der Antwort (`resync.identity.before/after`) —
+  damit ist der `curl` zugleich Pre-flight und Beweis; der Proxy liest keine
+  Kontaktpersonen und das Agentur-Passwort liest niemand aus.
+  Bestehende Zeilen werden nur ersetzt, wenn sie **uns gehören** (Name leer oder aus
+  `{patient_*, lead.*}`) — sonst `identity.hinweis` und die Zeile bleibt stehen.
+  Das Read-Query selektiert bewusst den **singularen** `customer_contract` (den liest
+  prod täglich über den Proxy); `customer_contracts` (Plural) ist als Objektfeld auf
+  prod unbewiesen — Bug #16 zeigt genau diese Ablehnung.
 
 #### ⑧ Sign session JWT + Set-Cookie
 
