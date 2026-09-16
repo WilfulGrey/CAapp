@@ -38,6 +38,8 @@ export interface LeadKalkulation {
 
 export interface Lead {
   id: string;
+  /** Gesetzt, wenn der Lead ueber einen Vermittler kam (Registry #59). */
+  vermittler?: string | null;
   email: string;
   /** Zweite Empfängeradresse (CC) — gepflegt im SA-Portal/Admin, nie Teil der Identität. */
   email_cc?: string | null;

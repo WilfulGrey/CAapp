@@ -15,6 +15,7 @@ import {
   mapOtherPeopleInHouse,
   mapToolIds,
   detailFelderNachMamamia,
+  panelIdentitaet,
 } from "./mappers.ts";
 import { getOrRefreshAgencyToken, mamamiaRequest } from "../_shared/mamamiaClient.ts";
 import { loginAsAgency, panelMutateAsCustomer } from "../_shared/mamamiaPanelClient.ts";
@@ -593,6 +594,13 @@ export interface ResyncResult {
   patients_after: number;
   removed_ids: number[];
   felder: string[];
+  /* Nur im Identitaets-Zweig (Vermittler + details). Traegt den Zustand des
+     Kunden VOR und NACH dem Schreiben — die Antwort des Aufrufs ist damit
+     zugleich der Beweis: der Proxy liest keine Kontaktpersonen, das Agentur-
+     Passwort liest niemand aus. Beide Schluessel sind BEDINGT gesetzt, nie
+     `undefined` — assertEquals unterscheidet das. */
+  identity?: { before: unknown; after?: unknown; hinweis?: string };
+  identity_error?: string;
 }
 
 interface ResyncPatientRow {
@@ -608,6 +616,8 @@ interface ResyncReadData {
   Customer: {
     id: number;
     equipments: Array<{ id: number }> | null;
+    location_id: number | null;
+    customer_contract: { location_id: number | null } | null;
     patients: ResyncPatientRow[] | null;
     customer_caregiver_wish: Record<string, unknown> | null;
   } | null;
@@ -620,6 +630,8 @@ const RESYNC_READ = /* GraphQL */ `
     Customer(id: $id) {
       id
       equipments { id }
+      location_id
+      customer_contract { location_id }
       patients { id care_level mobility_id lift_id night_operations tools { id } }
       customer_caregiver_wish {
         is_open_for_all gender germany_skill alternative_germany_skill
@@ -673,6 +685,120 @@ const RESYNC_CUSTOMER = /* GraphQL */ `
     ) { id customer_id }
   }
 `;
+
+/* ─── Identitaet eines Vermittler-Falls (Registry #67) ────────────────────
+   Beim Vermittler traegt der Mamamia-Kunde bisher den Ansprechpartner der
+   Agentur — bei Pflegena acht Mal "Bernd Walde". Diese Mutation setzt den
+   Haushalt: Customer-Name, die Patienten-Contract-Zeile (Anrede, Name,
+   Strasse, PLZ/Ort, Einsatzort) und den Vermittler als Kontaktperson.
+
+   Form 1:1 aus _shared/acceptanceSync.ts (UPDATE_CUSTOMER_CONTRACT +
+   Variablenbau) — dort seit 07/2026 auf beiden Tenants produktiv.
+
+   ZWEITE Mutation, nicht in die Detail-Mutation gemischt: Kontaktzeilen
+   sind Kosmetik, und eine von Mamamia abgelehnte Adresse darf den
+   funktionierenden Detail-Sync nicht mitreissen (Registry #52). */
+const RESYNC_IDENTITAET = /* GraphQL */ `
+  mutation ResyncIdentitaet(
+    $id: Int
+    $patients: [PatientInputType]
+    $equipment_ids: [Int]
+    $first_name: String
+    $last_name: String
+    $patient_contracts: [CustomerContractInputType]
+    $customer_contacts: [CustomerContactInputType]
+  ) {
+    UpdateCustomer(
+      id: $id
+      patients: $patients
+      equipment_ids: $equipment_ids
+      first_name: $first_name
+      last_name: $last_name
+      patient_contracts: $patient_contracts
+      customer_contacts: $customer_contacts
+    ) { id customer_id }
+  }
+`;
+
+/* Eigenes Read-Query, NUR im Identitaets-Zweig. Bewusst NICHT in
+   RESYNC_READ: das laeuft bei JEDEM Resync, auch bei den Admin-
+   Preiskorrekturen (Registry #55) — ein Feld, das prod nicht kennt, legte
+   dort alles lahm.
+
+   Selektiert wird deshalb nur, was prod heute schon taeglich liest (Proxy
+   GET_CUSTOMER bei jedem Portalbesuch, mamamia-proxy/operations.ts):
+   der SINGULARE customer_contract. `customer_contracts` (Plural) ist auf
+   prod als OBJEKTFELD unbewiesen — Bug #16 zeigt genau diese Ablehnung;
+   Registry #19 hat die Plural-ARGUMENTE der Mutation bewiesen, nicht das
+   Feld. Die Flags (contact_type/is_same_as_*) werden geschrieben, aber
+   nicht gelesen: als Feld hat sie auf prod noch nie jemand selektiert. */
+const RESYNC_IDENTITY_READ = /* GraphQL */ `
+  query ResyncIdentity($id: Int!) {
+    Customer(id: $id) {
+      id first_name last_name status location_id
+      patients { id tools { id } }
+      equipments { id }
+      customer_contract {
+        salutation first_name last_name phone email
+        street_number zip_code city location_id
+      }
+      customer_contacts { salutation first_name last_name email }
+    }
+  }
+`;
+
+interface IdentityContactRow {
+  salutation?: string | null;
+  first_name?: string | null;
+  last_name?: string | null;
+  [k: string]: unknown;
+}
+interface IdentityReadData {
+  Customer: {
+    id: number;
+    first_name: string | null;
+    last_name: string | null;
+    status: string | null;
+    location_id: number | null;
+    patients: Array<{ id: number; tools: Array<{ id: number }> | null }> | null;
+    equipments: Array<{ id: number }> | null;
+    customer_contract: IdentityContactRow | null;
+    customer_contacts: IdentityContactRow[] | null;
+  } | null;
+}
+
+/* Mamamia kennt nur "Mr."/"Mrs.", der Parser liefert "Herr"/"Frau".
+   Unbekannt ⇒ weglassen — mapSalutation() defaultet still auf "Mr." und
+   waere hier eine erfundene Angabe (Święta zasada nr 1). */
+function anredeNachMamamia(anrede: string | null | undefined): "Mr." | "Mrs." | undefined {
+  const v = (anrede ?? "").trim().toLowerCase();
+  if (v === "herr") return "Mr.";
+  if (v === "frau") return "Mrs.";
+  return undefined;
+}
+
+/* Gehoert eine bestehende Zeile UNS? patient_contracts und
+   customer_contacts sind REPLACE — was ein Mensch im Panel eingetragen
+   hat, darf ein Automat nicht ueberschreiben.
+
+   Das Praedikat ist bewusst "gehoert uns", nicht "ist gleich unserem
+   Wert": eine von uns verursachte "Walde"-Zeile (alter Patientenbogen
+   oder ein Spiegel) hat einen anderen Namen als der Patient und waere
+   sonst fuer immer eingefroren. Vorname ZUSAETZLICH, damit eine von Hand
+   korrigierte Zeile (Nachname gelassen, Vorname berichtigt) fremd bleibt. */
+function zeileGehoertUns(
+  row: IdentityContactRow | null | undefined,
+  lead: Lead,
+): boolean {
+  if (!row) return true;
+  const norm = (v: unknown) => (typeof v === "string" ? v.trim().toLowerCase() : "");
+  const passt = (wert: unknown, unsere: Array<string | null | undefined>) => {
+    const w = norm(wert);
+    return w === "" || unsere.some((u) => norm(u) === w);
+  };
+  return passt(row.last_name, [lead.patient_nachname, lead.nachname])
+    && passt(row.first_name, [lead.patient_vorname, lead.vorname]);
+}
 
 type PatientStub = Record<string, unknown> & { id?: number; tool_ids: number[] };
 
@@ -839,8 +965,127 @@ export async function resyncCustomerFromLead(args: {
     }
   }
 
+  const ergebnis: ResyncResult = {
+    patients_before: existing.length,
+    patients_after: after,
+    removed_ids: removed,
+    felder: [...felder],
+  };
+
+  /* ─── Identitaet (Registry #67) ──────────────────────────────────────────
+     Nur fuer Vermittler-Leads MIT Patientennamen und nur wenn `details`
+     gesetzt ist. `details` kommt ausschliesslich vom Vermittler-Eingang
+     (und vom Backfill) — die Admin-Preiskorrektur ruft Resync mit `felder`
+     und darf von Hand gepflegte Namen/Adressen nicht ueberschreiben.
+
+     LETZTE Mutation der Funktion, nach Pass 2: `patients[]` ist REPLACE per
+     id, und die Variable `patients` traegt nach einem Ehepaar-Klon einen
+     Eintrag OHNE id — dieselbe Liste erneut gesendet wuerde den in Pass 2
+     angelegten Patienten loeschen (Mamamia hat kein Delete). Deshalb Stubs
+     aus einem FRISCHEN Read. Dass die Contract-Zeile in der letzten Mutation
+     entsteht, schuetzt sie ausserdem vor dem Spiegel aus gotcha #12, der
+     beim NAECHSTEN UpdateCustomer zuschlaegt. */
+  const ident = panelIdentitaet(lead);
+  if (ident.istPatient && details) {
+    try {
+      const vorher = (await mamamiaRequest<IdentityReadData>({
+        endpoint: secrets.mamamiaEndpoint,
+        token: agencyToken,
+        query: RESYNC_IDENTITY_READ,
+        variables: { id: customerId },
+        fetchFn,
+      })).Customer;
+      // Sofort festhalten: schlaegt die Mutation fehl, ist `before` der
+      // einzige Beleg, in welchem Zustand der Kunde steht.
+      ergebnis.identity = { before: vorher };
+
+      const stubs = (vorher?.patients ?? []).map((pt) => ({
+        id: pt.id,
+        tool_ids: (pt.tools ?? []).map((t) => t.id),
+      }));
+      const iVars: Record<string, unknown> = {
+        id: customerId,
+        // equipments MUESSEN zurueckgereicht werden (omitted ⇒ Wipe, gotcha #3);
+        // patients non-empty, sonst lehnt beta ab (gotcha #12).
+        patients: stubs,
+        equipment_ids: (vorher?.equipments ?? []).map((e) => e.id),
+        // `first_name: null` ist ABSICHT, wenn der Haushalt keinen Vornamen
+        // hat — sonst bliebe "Bernd" vor "Maier" stehen.
+        first_name: ident.first_name,
+        last_name: ident.last_name,
+      };
+
+      const hinweise: string[] = [];
+      const anrede = anredeNachMamamia(lead.patient_anrede);
+      if (zeileGehoertUns(vorher?.customer_contract, lead)) {
+        const locationId = vorher?.customer_contract?.location_id ?? vorher?.location_id ?? null;
+        iVars.patient_contracts = [{
+          contact_type: "patient_contact",
+          // Flags IMMER explizit: ohne sie defaultet Mamamia auf true und
+          // spiegelt beim naechsten UpdateCustomer die Daten der ersten
+          // Kontaktperson (= ab hier der Vermittler) in diese Zeile.
+          is_same_as_first_patient: false,
+          is_same_as_contact: false,
+          ...(anrede ? { salutation: anrede } : {}),
+          ...(ident.first_name ? { first_name: ident.first_name } : {}),
+          ...(ident.last_name ? { last_name: ident.last_name } : {}),
+          ...(lead.patient_street ? { street_number: lead.patient_street } : {}),
+          ...(typeof fd.plz === "string" && fd.plz.trim() ? { zip_code: fd.plz.trim() } : {}),
+          ...(typeof fd.ort === "string" && fd.ort.trim() ? { city: fd.ort.trim() } : {}),
+          ...(locationId != null ? { location_id: locationId } : {}),
+          // KEIN email: Mamamia validiert die im Contract streng, ein Reject
+          // killt die ganze Mutation (Registry #52).
+        }];
+      } else {
+        hinweise.push("customer_contract von Hand gepflegt — nicht ersetzt");
+      }
+
+      const kpAnrede = anredeNachMamamia(lead.anrede ?? lead.anrede_text);
+      const kpVor = lead.vorname?.trim();
+      const kpNach = lead.nachname?.trim();
+      if ((vorher?.customer_contacts ?? []).every((row) => zeileGehoertUns(row, lead))) {
+        if (kpVor || kpNach) {
+          // Der Vermittler bleibt sichtbar — sonst stuende in Mamamia nur noch
+          // der Haushalt und niemand wuesste, wer die Anfrage geschickt hat.
+          iVars.customer_contacts = [{
+            is_same_as_first_patient: false,
+            ...(kpAnrede ? { salutation: kpAnrede } : {}),
+            ...(kpVor ? { first_name: kpVor } : {}),
+            ...(kpNach ? { last_name: kpNach } : {}),
+          }];
+        }
+      } else {
+        hinweise.push("customer_contacts von Hand gepflegt — nicht ersetzt");
+      }
+
+      await mamamiaRequest<{ UpdateCustomer: { id: number } }>({
+        endpoint: secrets.mamamiaEndpoint,
+        token: agencyToken,
+        query: RESYNC_IDENTITAET,
+        variables: iVars,
+        fetchFn,
+      });
+
+      const nachher = (await mamamiaRequest<IdentityReadData>({
+        endpoint: secrets.mamamiaEndpoint,
+        token: agencyToken,
+        query: RESYNC_IDENTITY_READ,
+        variables: { id: customerId },
+        fetchFn,
+      })).Customer;
+
+      ergebnis.identity.after = nachher;
+      if (hinweise.length) ergebnis.identity.hinweis = hinweise.join("; ");
+    } catch (e) {
+      // Kosmetik darf den Detail-Sync nicht mitreissen (Registry #52) — aber
+      // still ist sie auch nicht: der Aufrufer protokolliert identity_error.
+      ergebnis.identity_error = e instanceof Error ? e.message : String(e);
+      console.error(`[onboard] resync identity customer=${customerId} failed: ${ergebnis.identity_error}`);
+    }
+  }
+
   console.log(
-    `[onboard] resync customer=${customerId} felder=${felder.join(",")} patients ${existing.length}→${after} removed=${removed.join(",") || "-"} budget=${budget ?? "-"}`,
+    `[onboard] resync customer=${customerId} felder=${felder.join(",")} patients ${existing.length}→${after} removed=${removed.join(",") || "-"} budget=${budget ?? "-"} identity=${ergebnis.identity_error ? "error" : ergebnis.identity ? "ok" : "-"}`,
   );
-  return { patients_before: existing.length, patients_after: after, removed_ids: removed, felder: [...felder] };
+  return ergebnis;
 }

@@ -248,6 +248,33 @@ describe('mapPatientFormToUpdateCustomerInput', () => {
     });
   });
 
+  it('vermittler: Spiegel-Flags explizit, damit der Vermittler nicht in die Patientenzeile rutscht', () => {
+    /* Registry #67: Das MM-Team fuellt diesen Bogen bei Vermittler-Faellen
+       ueber den gespiegelten Token aus. Ohne die Flags defaultet Mamamia auf
+       true und zieht beim naechsten UpdateCustomer die Daten der ersten
+       Kontaktperson (= der Vermittler) in die Zeile des Patienten — der
+       Server-Fix wuerde sich selbst zurueckdrehen. */
+    const r = mapPatientFormToUpdateCustomerInput(makeForm(), {
+      locationId: 1148,
+      vermittler: true,
+      contact: { anrede: 'Frau', vorname: 'Agnes', nachname: 'Rothmund' },
+    });
+    expect(r.customer_contract).toEqual({
+      location_id: 1148, zip_code: '10115', city: 'Berlin',
+      salutation: 'Mrs.', first_name: 'Agnes', last_name: 'Rothmund',
+      is_same_as_first_patient: false, is_same_as_contact: false,
+    });
+  });
+
+  it('ohne vermittler bleibt der Patch bitgleich — keine Flags fuer die uebrigen Kunden', () => {
+    const r = mapPatientFormToUpdateCustomerInput(makeForm(), {
+      locationId: 1148,
+      contact: { anrede: 'Frau', vorname: 'Anna', nachname: 'Schmidt' },
+    });
+    expect('is_same_as_first_patient' in (r.customer_contract ?? {})).toBe(false);
+    expect('is_same_as_contact' in (r.customer_contract ?? {})).toBe(false);
+  });
+
   it('maps familieNahe + internet yes/no (live-verified working enums)', () => {
     const r = mapPatientFormToUpdateCustomerInput(makeForm({
       familieNahe: 'Nein', internet: 'Ja',
