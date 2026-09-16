@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import {
-  wachstum, potenzial, ergebnisJeMonat, pruefeMonatsEingabe, istEchterLead, berlinTag, wochenStart,
+  wachstum, potenzial, ergebnisJeMonat, ergebnisVergleich, pruefeMonatsEingabe, istEchterLead, berlinTag, wochenStart,
   type WLead, type WEreignis, type WEinsatz, type MonatsEinstellung,
 } from '../../project 3/lib/wachstum';
 
@@ -221,6 +221,22 @@ describe('Ergebnis je Monat', () => {
     expect(monat('2026-08')).toMatchObject({ quelle: 'eigen', gemeinkosten: 1200, ergebnis: -722 });
     expect(monat('2026-09')).toMatchObject({ quelle: 'uebernommen', uebernommenAus: '2026-08', gemeinkosten: 1200, provisionJeKunde: 600 });
     expect(monat('2026-07')).toMatchObject({ quelle: 'keine', gemeinkosten: null, provisionJeKunde: 550, variabelJeKunde: 50, kostenGedecktAb: null });
+  });
+
+  it('vergleicht mit dem Vormonat: mehr Deckungsbeitrag, mehr Werbung, Ergebnis', () => {
+    expect(ergebnisVergleich(monat('2026-08'), monat('2026-09'))).toEqual({
+      kundenMehr: 0.4,              // 56/30 − 46/31
+      deckungsbeitragMehr: 180,     // 1.008 − 828
+      googleMehr: 1500, eingekauftMehr: -13, werbungMehr: 1487,
+      gemeinkostenMehr: 0,
+      ergebnisMehr: -1307,          // −2.029 − (−722)
+      vorGemeinkosten: false,
+    });
+    // Juli ohne Gemeinkosten: verglichen wird das Ergebnis vor Gemeinkosten
+    const v = ergebnisVergleich(monat('2026-07'), monat('2026-08'));
+    expect(v.vorGemeinkosten).toBe(true);
+    expect(v.gemeinkostenMehr).toBeNull();
+    expect(v.ergebnisMehr).toBe(478);   // (828 − 350) − (0 − 0)
   });
 
   it('nennt die Kundenzahl, ab der Werbung und Gemeinkosten gedeckt sind', () => {

@@ -501,3 +501,40 @@ export function pruefeMonatsEingabe(body: unknown): { ok: true; wert: MonatsEins
   }
   return { ok: true, wert: { monat: `${monat}-01`, provision_je_kunde: runden(provision), variabel_je_kunde: runden(variabel), gemeinkosten: posten } };
 }
+
+/* ─── Vergleich mit dem Vormonat ────────────────────────────────────────────
+ *
+ * Martin, 15.09.2026: „Ich kann doch nicht in den beiden Monaten ähnliche
+ * Zahlen haben, obwohl hier sechs Kunden mehr sind." — Mehr Kunden bringen mehr
+ * Deckungsbeitrag, aber mehr Werbung (z. B. eingekaufte Anfragen, die sofort
+ * kosten und erst ab der Anreise Provision bringen) frisst ihn auf. Der
+ * Vergleich zeigt beides nebeneinander. Fehlen in einem der Monate die
+ * Gemeinkosten, wird das Ergebnis VOR Gemeinkosten verglichen, sonst stünde
+ * ein Monat mit und einer ohne Gemeinkosten gegeneinander.
+ */
+export type ErgebnisVergleich = {
+  kundenMehr: number;
+  deckungsbeitragMehr: number;
+  googleMehr: number;
+  eingekauftMehr: number;
+  werbungMehr: number;
+  /** null, wenn in einem der beiden Monate keine Gemeinkosten eingetragen sind. */
+  gemeinkostenMehr: number | null;
+  ergebnisMehr: number;
+  vorGemeinkosten: boolean;
+};
+
+export function ergebnisVergleich(vorher: ErgebnisMonat, jetzt: ErgebnisMonat): ErgebnisVergleich {
+  const beide = vorher.gemeinkosten !== null && jetzt.gemeinkosten !== null;
+  const vorGk = (m: ErgebnisMonat) => m.deckungsbeitrag - m.werbung;
+  return {
+    kundenMehr: Math.round((jetzt.einsatztage / jetzt.tageImMonat - vorher.einsatztage / vorher.tageImMonat) * 10) / 10,
+    deckungsbeitragMehr: runden(jetzt.deckungsbeitrag - vorher.deckungsbeitrag),
+    googleMehr: runden(jetzt.werbungGoogle - vorher.werbungGoogle),
+    eingekauftMehr: runden(jetzt.werbungEingekauft - vorher.werbungEingekauft),
+    werbungMehr: runden(jetzt.werbung - vorher.werbung),
+    gemeinkostenMehr: beide ? runden((jetzt.gemeinkosten ?? 0) - (vorher.gemeinkosten ?? 0)) : null,
+    ergebnisMehr: runden(beide ? jetzt.ergebnis - vorher.ergebnis : vorGk(jetzt) - vorGk(vorher)),
+    vorGemeinkosten: !beide,
+  };
+}

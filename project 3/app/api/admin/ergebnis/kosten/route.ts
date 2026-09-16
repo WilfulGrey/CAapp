@@ -4,7 +4,7 @@ import { pruefeMonatsEingabe } from '@/lib/wachstum';
 
 /**
  * Speichert Provision, variable Kosten und Gemeinkosten eines Monats für die
- * Ergebnisrechnung auf /admin/wachstum (Martin, 15.09.2026: „manuelle Eingabe
+ * Ergebnisrechnung auf /admin/ergebnis (Martin, 15.09.2026: „manuelle Eingabe
  * von Gemeinkosten pro Monat … damit wir dann sehen, wo wir stehen").
  *
  * Eine Zeile je Monat in `wachstum_monat`; Monate ohne Zeile übernehmen den
