@@ -1714,9 +1714,15 @@ export function MultiStepForm({ mode = 'inline' }: MultiStepFormProps = {}) {
                       <div className="pt-1">
                         {stufenAktiv ? (
                           <>
+                            {stufe === 'telefon' && (
+                              /* Schließt den E-Mail-Schritt ab: die Mail ist ausgelöst (Runde 2, Martin 16.09.). */
+                              <p className="text-[14px] leading-snug text-[#2F5A38] mb-2">
+                                {STUFEN.telefon.bestaetigung} <span className="font-semibold break-all">{formData.email.trim()}</span>
+                              </p>
+                            )}
                             <p className="text-[12px] text-[#8B8B8B] mb-1">{stufenZaehler(stufe)}</p>
                             <p className="text-[19px] font-bold leading-snug text-[#1a1a1a]">{STUFEN[stufe].frage}</p>
-                            <p className="text-[15px] leading-snug text-[#555] mt-1">{STUFEN[stufe].text}</p>
+                            {STUFEN[stufe].text && <p className="text-[15px] leading-snug text-[#555] mt-1">{STUFEN[stufe].text}</p>}
                           </>
                         ) : (
                           <>

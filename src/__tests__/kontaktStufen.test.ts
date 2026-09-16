@@ -7,6 +7,7 @@ import {
   STUFEN_FUSS,
   stufenZaehler,
 } from '../../project 3/lib/kontakt-stufen';
+import { SCHRANKE } from '../../project 3/lib/kraefte-vorschau';
 
 // Registry #76 (Martin 16.09.2026): Kontakt in drei Schritten als 50/50 gegen
 // das heutige Formular; Lead schon mit E-Mail, Nummer danach.
@@ -41,10 +42,18 @@ describe('kontaktVariante', () => {
 });
 
 describe('Texte der drei Schritte', () => {
-  it('letzter Knopf = derselbe wie im heutigen Formular, passt in eine Zeile', () => {
-    expect(STUFEN.telefon.knopf).toBe(KNOPF_KONTAKT);
+  it('Kontrolle behält den Knopf des Trunks; letzter Knopf der Stufen = Kräfte-Vorschau („alle 5“), eine Zeile', () => {
     expect(KNOPF_KONTAKT).toBe('Preis & Pflegekräfte ansehen →');
-    expect(KNOPF_KONTAKT.length).toBeLessThanOrEqual(38);
+    expect(STUFEN.telefon.knopf).toBe(SCHRANKE.knopf);
+    expect(STUFEN.telefon.knopf).toContain('alle 5 Pflegekräfte');
+    expect(STUFEN.telefon.knopf.length).toBeLessThanOrEqual(38);
+  });
+  it('Runde 2 (Martin 16.09.): kein zweiter Drei-Schritte-Hinweis, keine falsche „nächste Seite“, Mail-Kopie bestätigt', () => {
+    expect(STUFEN.name.text).toBe('');
+    expect(STUFEN.email.text).not.toMatch(/nächsten Seite/);
+    expect(STUFEN.email.text).toBe('So haben Sie den Preis auch schriftlich.');
+    expect(STUFEN.telefon.bestaetigung).toMatch(/Kopie .* per E-Mail unterwegs an$/);
+    expect(STUFEN.telefon.bestaetigung).not.toMatch(/erhalten/);
   });
   it('kein Werbeanruf, kein Sofortangebot, kein „brauchen wir"', () => {
     const alles = JSON.stringify({ STUFEN, STUFEN_FUSS });
@@ -55,7 +64,6 @@ describe('Texte der drei Schritte', () => {
   it('Zähler und Reihenfolge', () => {
     expect(stufenZaehler('name')).toBe('Angabe 1 von 3');
     expect(stufenZaehler('telefon')).toBe('Angabe 3 von 3');
-    expect(STUFEN.name.text).toContain('noch 3 kurze Angaben');
     expect(STUFEN.telefon.ohne).toBe('Ohne Rückrufnummer weiter');
   });
 });

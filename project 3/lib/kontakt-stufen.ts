@@ -15,6 +15,8 @@
  * importiert es direkt.
  */
 
+import { SCHRANKE } from './kraefte-vorschau';
+
 export const KONTAKT_KEY = 'prim_kontakt_variante';
 
 export const KONTAKT_VARIANTEN = ['stufen', 'alt'] as const;
@@ -48,7 +50,7 @@ export function kontaktVariante(
   }
 }
 
-/** Derselbe Knopf wie im heutigen Formular — der Kunde hat das Versprechen geklickt, der letzte Knopf löst es ein. */
+/** Der Knopf des heutigen Formulars (Variante `alt`) — wortgleich mit dem Trunk, damit die Kontrolle unverändert bleibt. */
 export const KNOPF_KONTAKT = 'Preis & Pflegekräfte ansehen →';
 
 /**
@@ -59,23 +61,35 @@ export const KNOPF_KONTAKT = 'Preis & Pflegekräfte ansehen →';
 export const STUFEN = {
   name: {
     frage: 'Wie dürfen wir Sie ansprechen?',
-    text: 'Ihr Preis wartet – noch 3 kurze Angaben.',
+    // Runde 2 (Martin, 16.09. abends): kein zweiter Hinweis auf die drei
+    // Schritte — der kleine Zähler „Angabe 1 von 3" über der Frage reicht.
+    text: '',
     platzhalter: 'Ihr Name',
     knopf: 'Weiter →',
     fehler: 'Bitte geben Sie Ihren Namen ein',
   },
   email: {
     frage: 'Wohin dürfen wir Ihre Preisberechnung schicken?',
-    text: 'Den Preis sehen Sie gleich auf der nächsten Seite, die Berechnung kommt zusätzlich per E-Mail.',
+    // Runde 2 (Martin): „auf der nächsten Seite kommt der Preis" stimmte
+    // nicht — als Nächstes kommt die Rückrufnummer. Die Zeile sagt nur noch,
+    // was die Adresse dem Kunden bringt.
+    text: 'So haben Sie den Preis auch schriftlich.',
     platzhalter: 'E-Mail-Adresse',
     knopf: 'Weiter →',
     fehler: 'Bitte geben Sie eine gültige E-Mail-Adresse ein',
   },
   telefon: {
+    // Runde 2 (Martin): „Per Mail haben Sie eine Kopie erhalten" — hier ist
+    // der Satz wahr, der Lead ist nach dem E-Mail-Schritt gespeichert und die
+    // Mail ausgelöst. „Unterwegs" statt „erhalten", weil die Zustellung
+    // Sekunden bis Minuten dauert; die eingegebene Adresse steht dahinter.
+    bestaetigung: 'Eine Kopie Ihrer Preisberechnung ist per E-Mail unterwegs an',
     frage: 'Unter welcher Nummer erreichen wir Sie bei Rückfragen?',
     text: 'Nur bei Rückfragen zu Ihrer Betreuung.',
     platzhalter: 'Telefonnummer',
-    knopf: KNOPF_KONTAKT,
+    // Martin: „Jetzt alle Pflegekräfte … sehen" — derselbe Knopf wie auf der
+    // Kräfte-Vorschau (Strecke v2, mit „alle 5"), passt bei 375 px in eine Zeile.
+    knopf: SCHRANKE.knopf,
     // Klein und grau unter dem Hauptknopf (wie „Abmelden" auf der
     // Rückmeldeseite): der Hauptweg bleibt die Nummer, der Lead ist da.
     ohne: 'Ohne Rückrufnummer weiter',
