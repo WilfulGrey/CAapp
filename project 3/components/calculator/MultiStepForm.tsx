@@ -225,8 +225,6 @@ export function MultiStepForm({ mode = 'inline' }: MultiStepFormProps = {}) {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const preisDatenRef = useRef<any>(null);
   const preisLadenRef = useRef<Promise<void> | null>(null);
-  // Abnahme-Schalter ?sterne=a|b (Martin 17.09., „zeig mal") — fliegt nach seiner Wahl wieder raus.
-  const [sterneVar, setSterneVar] = useState<'a' | 'b' | null>(null);
   // Kontaktseite hinter dem Preis: Fehler je Feld (erst beim Klick geprüft) + Server-Fehler am Knopf.
   const [kontaktFehler, setKontaktFehler] = useState<Record<KontaktFeld, string>>({ name: '', email: '', phone: '' });
   const [kontaktServerFehler, setKontaktServerFehler] = useState('');
@@ -313,8 +311,6 @@ export function MultiStepForm({ mode = 'inline' }: MultiStepFormProps = {}) {
       const ab: Ablauf = an ? 'alt' : ablaufVariante(window.location.search, window.sessionStorage);
       ablaufRef.current = ab;
       setAblauf(ab);
-      const st = new URLSearchParams(window.location.search).get('sterne');
-      setSterneVar(st === 'a' || st === 'b' ? st : null);
       // Kontakt = eine Seite; die drei Schritte nur mit ?kontakt=stufen (ihr Test kommt danach).
       const kv = kontaktVariante(window.location.search, window.sessionStorage, 'alt');
       kontaktVarRef.current = kv;
@@ -1786,7 +1782,7 @@ export function MultiStepForm({ mode = 'inline' }: MultiStepFormProps = {}) {
                   ) : preisModus && !kontaktOffen && preisDaten ? (
                     /* Preis zuerst (Registry #77): Preis, Zuschüsse, Garantie,
                        Konditionen, Kräfte — dann der Knopf zur Kontaktabfrage. */
-                    <PreisSeite daten={preisDaten} onWeiter={oeffneKontaktNachPreis} onGarantie={oeffneGarantie} sterne={sterneVar} />
+                    <PreisSeite daten={preisDaten} onWeiter={oeffneKontaktNachPreis} onGarantie={oeffneGarantie} />
                   ) : preisModus && kontaktOffen && !stufenAktiv ? (
                     /* Kontaktseite hinter dem Preis: eine Seite, drei Felder, ein Knopf. */
                     <KontaktSeite

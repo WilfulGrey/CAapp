@@ -99,8 +99,11 @@ export const PREIS_SEITE = {
   // Eine Zeile neben den Fotos — „ab sofort verfügbar" sagte schon die Warteseite.
   unterKnopf: 'Passend zu Ihren Angaben',
   garantieMehr: 'Mehr Infos',
-  // Dieselbe Angabe wie über den Kundenstimmen der Startseite (TestimonialCard) — keine neue Zahl.
-  bewertung: { quelle: 'Google Bewertungen', wert: '4,8 von 5' },
+  // Bewertungszeile UNTER den Punkten, wie im Hero von primundus.de (Martin 17.09.:
+  // „aus 126 Bewertungen, wie es überall steht" — nicht „Google Bewertungen", nicht bunt).
+  // Schnitt und Anzahl kommen live aus /api/bewertungen-stand; ohne echte Zahl keine Zeile.
+  bewertungVon: 'von 5 aus',
+  bewertungAnzahl: (n: number) => (n === 1 ? '1 Bewertung' : `${n} Bewertungen`),
   haken: ['Täglich kündbar', 'Tagesgenaue Abrechnung', 'Erst auswählen, dann buchen', 'Keine Vermittlungsgebühr', 'Kosten erst, wenn die Pflegekraft da ist'],
   /** Nur wenn zuhause günstiger ist als das Heim — sonst kein Satz (kein Schönrechnen). */
   heim: (eigen: number): string | null => {

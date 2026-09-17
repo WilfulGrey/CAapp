@@ -99,6 +99,11 @@ describe('Texte', () => {
     expect(JSON.stringify(KONTAKT_SEITE)).not.toMatch(/Portal|Fast geschafft|Nur noch/);
     expect(Object.keys(KONTAKT_SEITE.label)).toEqual(['name', 'email', 'phone']);
   });
+  it('Bewertungszeile: Wortlaut wie überall („4,9 von 5 aus 126 Bewertungen"), Zahlen kommen live — keine im Code', () => {
+    expect(`4,9 ${PREIS_SEITE.bewertungVon} ${PREIS_SEITE.bewertungAnzahl(126)}`).toBe('4,9 von 5 aus 126 Bewertungen');
+    expect(PREIS_SEITE.bewertungAnzahl(1)).toBe('1 Bewertung');
+    expect(JSON.stringify(PREIS_SEITE)).not.toMatch(/Google|4[.,]8|126/);
+  });
   it('Warteseite im Ablauf Preis: ca. 3 s statt 10,7 s', () => {
     const gesamt = WARTE_KURZ_MS.reduce((a, b) => a + b, 0) + 300 + WARTE_KURZ_ENDE_MS;
     expect(gesamt).toBeGreaterThanOrEqual(2500);
