@@ -1467,7 +1467,8 @@ export const AngebotCard: FC<{
                       data-invalid={showErrors && !isPlausibleGermanPhone(patient.phone) ? '1' : undefined}
                       className={inputCls + (showErrors && !isPlausibleGermanPhone(patient.phone) ? ' border-red-300 bg-red-50/40' : '')}
                     />
-                    <p className="text-[13px] text-gray-500 mt-2">Unter dieser Nummer erreichen wir Sie – bitte prüfen.</p>
+                    {/* Martin 17.09.: nicht „bitte prüfen" — sagen, WANN wir anrufen. */}
+                    <p className="text-[13px] text-gray-500 mt-2">Nur bei Rückfragen oder wenn etwas dringend geklärt werden muss.</p>
                   </div>
                 </div>
               )}
