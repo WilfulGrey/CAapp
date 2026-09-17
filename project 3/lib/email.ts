@@ -4,6 +4,11 @@ import { getEmailLayout } from './email-template';
 import { PORTAL_BASIS } from './portal-url';
 import { quelleBetreff, websiteHerkunftLabel } from './lead-quelle';
 import { LABELS } from './angaben-labels';
+// Bewertungszeile unter Martas Karte (Martin, 17.09.2026). Den Stand holt der
+// Aufrufer per holeBewertungsStand() und reicht ihn herein — die Vorlagen
+// bleiben synchron und ohne Netzaufruf.
+import { type BewertungsStand, holeBewertungsStand } from './bewertungen-stand';
+import { MARTA_KARTE_MOBIL_CSS, martaKarteHtml } from './marta-karte';
 
 // Eigennamen sauber großschreiben: jedes Wort + jeden Bindestrich-Teil
 // kapitalisieren. Namens-Partikel (von, van, de, zu, …) bleiben klein —
@@ -275,7 +280,8 @@ www.primundus.de
 
 export function getEingangsbestaetigungEmailTemplate(
   lead: Lead,
-  kalkulation: Kalkulation
+  kalkulation: Kalkulation,
+  bewertung: BewertungsStand,
 ): EmailTemplate {
   const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://primundus.de';
 
@@ -315,90 +321,7 @@ export function getEingangsbestaetigungEmailTemplate(
 
   const martaSignatur = `
     <!-- Marta Signatur-Block -->
-    <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="margin: 0 0 32px 0; border: 1px solid #e8ddd0; border-radius: 12px; overflow: hidden;">
-      <tr>
-        <td style="padding: 18px 20px 16px; background: #ffffff;">
-          <table width="100%" cellpadding="0" cellspacing="0" role="presentation">
-            <tr>
-              <td style="vertical-align: top;">
-                <table cellpadding="0" cellspacing="0" role="presentation">
-                  <tr>
-                    <td style="padding-right: 12px; vertical-align: top;">
-                      <img src="${baseUrl}/images/marta-kapcio.jpg" alt="Marta Kapcio" width="60" style="display: block; width: 60px; height: auto; border-radius: 8px;" />
-                    </td>
-                    <td style="vertical-align: middle;">
-                      <p style="margin: 0 0 2px 0; font-size: 15px; font-weight: 700; color: #3D2B1F; white-space: nowrap; text-align: left;">Marta Kapcio</p>
-                      <p style="margin: 0 0 2px 0; font-size: 13px; color: #555; white-space: nowrap; text-align: left;">Pflegeberaterin</p>
-                      <p style="margin: 0; font-size: 12px; color: #9a8a73; white-space: nowrap; text-align: left;">Mo – So, 8 – 20 Uhr</p>
-                    </td>
-                  </tr>
-                </table>
-                <table cellpadding="0" cellspacing="0" role="presentation" style="margin-top: 12px;">
-                  <tr>
-                    <td style="padding-bottom: 6px;">
-                      <a href="tel:+4989200000830" style="display: inline-block; background-color: #f0ebe4; border-radius: 20px; padding: 8px 16px; text-decoration: none; font-size: 13px; font-weight: 500; color: #3D2B1F; white-space: nowrap;">&#9990; 089 200 000 830</a>
-                    </td>
-                  </tr>
-                  <tr>
-                    <td>
-                      <a href="https://wa.me/4989200000830" style="display: inline-block; background-color: #25D366; border-radius: 20px; padding: 8px 16px; text-decoration: none; font-size: 13px; font-weight: 600; color: #ffffff; white-space: nowrap;">WhatsApp schreiben</a>
-                    </td>
-                  </tr>
-                </table>
-              </td>
-              <td style="vertical-align: top; text-align: right;">
-                <table cellpadding="0" cellspacing="0" role="presentation" style="border: 1px solid #e8ddd0; border-radius: 8px; overflow: hidden; margin-left: auto;">
-                  <tr>
-                    <td style="padding: 8px 10px; background: #ffffff; text-align: center; vertical-align: top;">
-                      <img src="${baseUrl}/images/primundus_testsieger-2021.webp" alt="Testsieger DIE WELT" width="64" style="display: block; width: 64px; height: auto; margin: 0 auto 5px auto;" />
-                      <!-- Siegel bewusst KOMPAKT: "6× Testsieger" statt "Testsieger" +
-                           eigener Zeile "6× in Folge". Der Block sitzt neben dem Logo in
-                           der Kopfzeile und hat wenig Platz — vier Zeilen wirkten
-                           gedraengt und liessen "Testsieger" ohne die Zahl stehen
-                           (Martin 28.08.2026). Im FLIESSTEXT, wo eine ganze Zeile zur
-                           Verfuegung steht, bleibt "6× in Folge" erwuenscht. -->
-                      <p style="margin: 0 0 1px 0; font-size: 11px; font-weight: 700; color: #3D2B1F; white-space: nowrap; text-align: center;">6× Testsieger <span style="color: #B5A184;">DIE WELT</span></p>
-                      <p style="margin: 0; font-size: 10px; color: #888; line-height: 1.4; text-align: center;">Preis, Qualität &amp;<br>Kundenservice</p>
-                    </td>
-                  </tr>
-                </table>
-              </td>
-            </tr>
-          </table>
-        </td>
-      </tr>
-      <tr>
-        <td style="background: #f9f6f2; border-top: 1px solid #e8ddd0;">
-          <table width="100%" cellpadding="0" cellspacing="0" role="presentation">
-            <tr>
-              <td style="padding: 12px 0; text-align: center; width: 33%; border-right: 1px solid #e8ddd0;">
-                <p style="margin: 0; font-size: 12px; color: #555; line-height: 1.4; text-align: center;">Über 20 Jahre<br>Erfahrung</p>
-              </td>
-              <td style="padding: 12px 0; text-align: center; width: 33%; border-right: 1px solid #e8ddd0;">
-                <p style="margin: 0; font-size: 12px; color: #555; line-height: 1.4; text-align: center;">60.000+<br>betreute Einsätze</p>
-              </td>
-              <td style="padding: 12px 0; text-align: center; width: 33%;">
-                <p style="margin: 0; font-size: 12px; color: #555; line-height: 1.4; text-align: center;">Persönlicher<br>Ansprechpartner,<br>7&nbsp;Tage/Woche</p>
-              </td>
-            </tr>
-          </table>
-        </td>
-      </tr>
-      <tr>
-        <td style="background: #ffffff; border-top: 1px solid #e8ddd0; padding: 14px 16px;">
-          <table width="100%" cellpadding="0" cellspacing="0" role="presentation">
-            <tr>
-              <td style="text-align: center; vertical-align: middle; padding: 0 4px;"><img src="${baseUrl}/images/media/die-welt.webp" alt="DIE WELT" height="14" style="display: inline-block; height: 14px; width: auto; opacity: 0.4; filter: grayscale(100%);" /></td>
-              <td style="text-align: center; vertical-align: middle; padding: 0 4px;"><img src="${baseUrl}/images/media/frankfurter-allgemeine.webp" alt="Frankfurter Allgemeine" height="14" style="display: inline-block; height: 14px; width: auto; opacity: 0.4; filter: grayscale(100%);" /></td>
-              <td style="text-align: center; vertical-align: middle; padding: 0 4px;"><img src="${baseUrl}/images/media/ard.webp" alt="ARD" height="14" style="display: inline-block; height: 14px; width: auto; opacity: 0.4; filter: grayscale(100%);" /></td>
-              <td style="text-align: center; vertical-align: middle; padding: 0 4px;"><img src="${baseUrl}/images/media/ndr.webp" alt="NDR" height="14" style="display: inline-block; height: 14px; width: auto; opacity: 0.4; filter: grayscale(100%);" /></td>
-              <td style="text-align: center; vertical-align: middle; padding: 0 4px;"><img src="${baseUrl}/images/media/sat1.webp" alt="SAT.1" height="14" style="display: inline-block; height: 14px; width: auto; opacity: 0.4; filter: grayscale(100%);" /></td>
-              <td style="text-align: center; vertical-align: middle; padding: 0 4px;"><img src="${baseUrl}/images/media/bild-der-frau.webp" alt="Bild der Frau" height="14" style="display: inline-block; height: 14px; width: auto; opacity: 0.4; filter: grayscale(100%);" /></td>
-            </tr>
-          </table>
-        </td>
-      </tr>
-    </table>
+    ${martaKarteHtml({ fuer: 'kunde', bewertung, siteUrl: baseUrl, presseLogos: true, abstandUnten: 32 })}
   `;
 
   const content = `
@@ -540,6 +463,7 @@ www.primundus.de
 export function getAngebotsEmailTemplate(
   lead: Lead,
   kalkulation: Kalkulation,
+  bewertung: BewertungsStand,
   options?: { isResend?: boolean }
 ): EmailTemplate {
   const isResend = options?.isResend === true;
@@ -641,104 +565,7 @@ export function getAngebotsEmailTemplate(
     <p style="font-size: 16px; line-height: 1.7; color: #555; margin-top: 30px; margin-bottom: 20px;">Mit freundlichen Grüßen<br><strong style="color: #3D2B1F;">Marta Kapcio</strong></p>
 
     <!-- Marta Signatur-Block -->
-    <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="margin: 0 0 32px 0; border: 1px solid #e8ddd0; border-radius: 12px; overflow: hidden;">
-      <!-- Marta + Testsieger -->
-      <tr>
-        <td style="padding: 18px 20px 16px; background: #ffffff;">
-          <table width="100%" cellpadding="0" cellspacing="0" role="presentation">
-            <tr>
-              <!-- Photo + Info + Buttons below -->
-              <td style="vertical-align: top;">
-                <!-- Photo + Name row -->
-                <table cellpadding="0" cellspacing="0" role="presentation">
-                  <tr>
-                    <td style="padding-right: 12px; vertical-align: top;">
-                      <img src="${baseUrl}/images/marta-kapcio.jpg" alt="Marta Kapcio" width="60"
-                        style="display: block; width: 60px; height: auto; border-radius: 8px;" />
-                    </td>
-                    <td style="vertical-align: middle;">
-                      <p style="margin: 0 0 2px 0; font-size: 15px; font-weight: 700; color: #3D2B1F; text-align: left; white-space: nowrap;">Marta Kapcio</p>
-                      <p style="margin: 0 0 2px 0; font-size: 13px; color: #555; text-align: left; white-space: nowrap;">Pflegeberaterin</p>
-                      <p style="margin: 0; font-size: 12px; color: #9a8a73; text-align: left; white-space: nowrap;">Mo – So, 8 – 20 Uhr</p>
-                    </td>
-                  </tr>
-                </table>
-                <!-- Buttons below photo/name -->
-                <table cellpadding="0" cellspacing="0" role="presentation" style="margin-top: 12px;">
-                  <tr>
-                    <td style="padding-bottom: 6px;">
-                      <a href="tel:+4989200000830" style="display: inline-block; background-color: #f0ebe4; border-radius: 20px; padding: 8px 16px; text-decoration: none; font-size: 13px; font-weight: 500; color: #3D2B1F; white-space: nowrap;">&#9990; 089 200 000 830</a>
-                    </td>
-                  </tr>
-                  <tr>
-                    <td>
-                      <a href="https://wa.me/4989200000830" style="display: inline-block; background-color: #25D366; border-radius: 20px; padding: 8px 16px; text-decoration: none; font-size: 13px; font-weight: 600; color: #ffffff; white-space: nowrap;">WhatsApp schreiben</a>
-                    </td>
-                  </tr>
-                </table>
-              </td>
-              <!-- Testsieger badge – rechts, kleiner -->
-              <td style="vertical-align: top; text-align: right;">
-                <table cellpadding="0" cellspacing="0" role="presentation" style="border: 1px solid #e8ddd0; border-radius: 8px; overflow: hidden; margin-left: auto;">
-                  <tr>
-                    <td style="padding: 8px 10px; background: #ffffff; text-align: center; vertical-align: top;">
-                      <img src="${baseUrl}/images/primundus_testsieger-2021.webp" alt="Testsieger DIE WELT" width="64" style="display: block; width: 64px; height: auto; margin: 0 auto 5px auto;" />
-                      <p style="margin: 0 0 1px 0; font-size: 11px; font-weight: 700; color: #3D2B1F; white-space: nowrap; text-align: center;">6× Testsieger <span style="color: #B5A184;">DIE WELT</span></p>
-                      <p style="margin: 0; font-size: 10px; color: #888; line-height: 1.4; text-align: center;">Preis, Qualität &amp;<br>Kundenservice</p>
-                    </td>
-                  </tr>
-                </table>
-              </td>
-            </tr>
-          </table>
-        </td>
-      </tr>
-      <!-- Stats row -->
-      <tr>
-        <td style="background: #f9f6f2; border-top: 1px solid #e8ddd0;">
-          <table width="100%" cellpadding="0" cellspacing="0" role="presentation">
-            <tr>
-              <td style="padding: 12px 0; text-align: center; width: 33%; border-right: 1px solid #e8ddd0;">
-                <p style="margin: 0; font-size: 12px; color: #555; line-height: 1.4; text-align: center;">Über 20 Jahre<br>Erfahrung</p>
-              </td>
-              <td style="padding: 12px 0; text-align: center; width: 33%; border-right: 1px solid #e8ddd0;">
-                <p style="margin: 0; font-size: 12px; color: #555; line-height: 1.4; text-align: center;">60.000+<br>betreute Einsätze</p>
-              </td>
-              <td style="padding: 12px 0; text-align: center; width: 33%;">
-                <p style="margin: 0; font-size: 12px; color: #555; line-height: 1.4; text-align: center;">Persönlicher<br>Ansprechpartner,<br>7&nbsp;Tage/Woche</p>
-              </td>
-            </tr>
-          </table>
-        </td>
-      </tr>
-      <!-- Media logos – kleiner -->
-      <tr>
-        <td style="background: #ffffff; border-top: 1px solid #e8ddd0; padding: 14px 16px;">
-          <table width="100%" cellpadding="0" cellspacing="0" role="presentation">
-            <tr>
-              <td style="text-align: center; vertical-align: middle; padding: 0 4px;">
-                <img src="${baseUrl}/images/media/die-welt.webp" alt="DIE WELT" height="14" style="display: inline-block; height: 14px; width: auto; opacity: 0.4; filter: grayscale(100%);" />
-              </td>
-              <td style="text-align: center; vertical-align: middle; padding: 0 4px;">
-                <img src="${baseUrl}/images/media/frankfurter-allgemeine.webp" alt="Frankfurter Allgemeine" height="14" style="display: inline-block; height: 14px; width: auto; opacity: 0.4; filter: grayscale(100%);" />
-              </td>
-              <td style="text-align: center; vertical-align: middle; padding: 0 4px;">
-                <img src="${baseUrl}/images/media/ard.webp" alt="ARD" height="14" style="display: inline-block; height: 14px; width: auto; opacity: 0.4; filter: grayscale(100%);" />
-              </td>
-              <td style="text-align: center; vertical-align: middle; padding: 0 4px;">
-                <img src="${baseUrl}/images/media/ndr.webp" alt="NDR" height="14" style="display: inline-block; height: 14px; width: auto; opacity: 0.4; filter: grayscale(100%);" />
-              </td>
-              <td style="text-align: center; vertical-align: middle; padding: 0 4px;">
-                <img src="${baseUrl}/images/media/sat1.webp" alt="SAT.1" height="14" style="display: inline-block; height: 14px; width: auto; opacity: 0.4; filter: grayscale(100%);" />
-              </td>
-              <td style="text-align: center; vertical-align: middle; padding: 0 4px;">
-                <img src="${baseUrl}/images/media/bild-der-frau.webp" alt="Bild der Frau" height="14" style="display: inline-block; height: 14px; width: auto; opacity: 0.4; filter: grayscale(100%);" />
-              </td>
-            </tr>
-          </table>
-        </td>
-      </tr>
-    </table>
+    ${martaKarteHtml({ fuer: 'kunde', bewertung, siteUrl: baseUrl, presseLogos: true, abstandUnten: 32 })}
 
     ${resendNotice}
   `;
@@ -1273,6 +1100,7 @@ Lead im Admin-Panel: ${process.env.NEXT_PUBLIC_SITE_URL}/admin/leads/${lead.id}
 
 export function getVertragEmailTemplate(
   lead: Lead,
+  bewertung: BewertungsStand,
   options: {
     subject?: string;
     anschreiben?: string;
@@ -1309,84 +1137,7 @@ export function getVertragEmailTemplate(
 
   const martaSignatur = `
     <!-- Marta Signatur-Block -->
-    <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="margin: 0 0 32px 0; border: 1px solid #e8ddd0; border-radius: 12px; overflow: hidden;">
-      <tr>
-        <td style="padding: 18px 20px 16px; background: #ffffff;">
-          <table width="100%" cellpadding="0" cellspacing="0" role="presentation">
-            <tr>
-              <td style="vertical-align: top;">
-                <table cellpadding="0" cellspacing="0" role="presentation">
-                  <tr>
-                    <td style="padding-right: 12px; vertical-align: top;">
-                      <img src="${baseUrl}/images/marta-kapcio.jpg" alt="Marta Kapcio" width="60" style="display: block; width: 60px; height: auto; border-radius: 8px;" />
-                    </td>
-                    <td style="vertical-align: middle;">
-                      <p style="margin: 0 0 2px 0; font-size: 15px; font-weight: 700; color: #3D2B1F; white-space: nowrap; text-align: left;">Marta Kapcio</p>
-                      <p style="margin: 0 0 2px 0; font-size: 13px; color: #555; white-space: nowrap; text-align: left;">Pflegeberaterin</p>
-                      <p style="margin: 0; font-size: 12px; color: #9a8a73; white-space: nowrap; text-align: left;">Mo – So, 8 – 20 Uhr</p>
-                    </td>
-                  </tr>
-                </table>
-                <table cellpadding="0" cellspacing="0" role="presentation" style="margin-top: 12px;">
-                  <tr>
-                    <td style="padding-bottom: 6px;">
-                      <a href="tel:+4989200000830" style="display: inline-block; background-color: #f0ebe4; border-radius: 20px; padding: 8px 16px; text-decoration: none; font-size: 13px; font-weight: 500; color: #3D2B1F; white-space: nowrap;">&#9990; 089 200 000 830</a>
-                    </td>
-                  </tr>
-                  <tr>
-                    <td>
-                      <a href="https://wa.me/4989200000830" style="display: inline-block; background-color: #25D366; border-radius: 20px; padding: 8px 16px; text-decoration: none; font-size: 13px; font-weight: 600; color: #ffffff; white-space: nowrap;">WhatsApp schreiben</a>
-                    </td>
-                  </tr>
-                </table>
-              </td>
-              <td style="vertical-align: top; text-align: right;">
-                <table cellpadding="0" cellspacing="0" role="presentation" style="border: 1px solid #e8ddd0; border-radius: 8px; overflow: hidden; margin-left: auto;">
-                  <tr>
-                    <td style="padding: 8px 10px; background: #ffffff; text-align: center; vertical-align: top;">
-                      <img src="${baseUrl}/images/primundus_testsieger-2021.webp" alt="Testsieger DIE WELT" width="64" style="display: block; width: 64px; height: auto; margin: 0 auto 5px auto;" />
-                      <p style="margin: 0 0 1px 0; font-size: 11px; font-weight: 700; color: #3D2B1F; white-space: nowrap; text-align: center;">6× Testsieger <span style="color: #B5A184;">DIE WELT</span></p>
-                      <p style="margin: 0; font-size: 10px; color: #888; line-height: 1.4; text-align: center;">Preis, Qualität &amp;<br>Kundenservice</p>
-                    </td>
-                  </tr>
-                </table>
-              </td>
-            </tr>
-          </table>
-        </td>
-      </tr>
-      <tr>
-        <td style="background: #f9f6f2; border-top: 1px solid #e8ddd0;">
-          <table width="100%" cellpadding="0" cellspacing="0" role="presentation">
-            <tr>
-              <td style="padding: 12px 0; text-align: center; width: 33%; border-right: 1px solid #e8ddd0;">
-                <p style="margin: 0; font-size: 12px; color: #555; line-height: 1.4; text-align: center;">Über 20 Jahre<br>Erfahrung</p>
-              </td>
-              <td style="padding: 12px 0; text-align: center; width: 33%; border-right: 1px solid #e8ddd0;">
-                <p style="margin: 0; font-size: 12px; color: #555; line-height: 1.4; text-align: center;">60.000+<br>betreute Einsätze</p>
-              </td>
-              <td style="padding: 12px 0; text-align: center; width: 33%;">
-                <p style="margin: 0; font-size: 12px; color: #555; line-height: 1.4; text-align: center;">Persönlicher<br>Ansprechpartner,<br>7&nbsp;Tage/Woche</p>
-              </td>
-            </tr>
-          </table>
-        </td>
-      </tr>
-      <tr>
-        <td style="background: #ffffff; border-top: 1px solid #e8ddd0; padding: 14px 16px;">
-          <table width="100%" cellpadding="0" cellspacing="0" role="presentation">
-            <tr>
-              <td style="text-align: center; vertical-align: middle; padding: 0 4px;"><img src="${baseUrl}/images/media/die-welt.webp" alt="DIE WELT" height="14" style="display: inline-block; height: 14px; width: auto; opacity: 0.4; filter: grayscale(100%);" /></td>
-              <td style="text-align: center; vertical-align: middle; padding: 0 4px;"><img src="${baseUrl}/images/media/frankfurter-allgemeine.webp" alt="Frankfurter Allgemeine" height="14" style="display: inline-block; height: 14px; width: auto; opacity: 0.4; filter: grayscale(100%);" /></td>
-              <td style="text-align: center; vertical-align: middle; padding: 0 4px;"><img src="${baseUrl}/images/media/ard.webp" alt="ARD" height="14" style="display: inline-block; height: 14px; width: auto; opacity: 0.4; filter: grayscale(100%);" /></td>
-              <td style="text-align: center; vertical-align: middle; padding: 0 4px;"><img src="${baseUrl}/images/media/ndr.webp" alt="NDR" height="14" style="display: inline-block; height: 14px; width: auto; opacity: 0.4; filter: grayscale(100%);" /></td>
-              <td style="text-align: center; vertical-align: middle; padding: 0 4px;"><img src="${baseUrl}/images/media/sat1.webp" alt="SAT.1" height="14" style="display: inline-block; height: 14px; width: auto; opacity: 0.4; filter: grayscale(100%);" /></td>
-              <td style="text-align: center; vertical-align: middle; padding: 0 4px;"><img src="${baseUrl}/images/media/bild-der-frau.webp" alt="Bild der Frau" height="14" style="display: inline-block; height: 14px; width: auto; opacity: 0.4; filter: grayscale(100%);" /></td>
-            </tr>
-          </table>
-        </td>
-      </tr>
-    </table>
+    ${martaKarteHtml({ fuer: 'kunde', bewertung, siteUrl: baseUrl, presseLogos: true, abstandUnten: 32 })}
   `;
 
   const detailRows = [
@@ -1430,8 +1181,11 @@ export function getVertragEmailTemplate(
           <table width="100%" cellpadding="0" cellspacing="0">
             ${conditionsRows.map((row, i, arr) => {
               const isLast = i === arr.length - 1;
+              // Kein nowrap am Label (11.09.2026): "Sommermonate Juli & August"
+              // am Stück machte die Mail auf 360 px 30 px zu breit. Am Desktop
+              // hat die 44-%-Spalte Platz, dort bricht nichts um.
               return `<tr>
-                <td style="padding: 9px 12px 9px 0; ${isLast ? '' : 'border-bottom: 1px solid #f0ebe4;'} color: #888; font-size: 13px; width: 44%; white-space: nowrap;">${row.label}</td>
+                <td style="padding: 9px 12px 9px 0; ${isLast ? '' : 'border-bottom: 1px solid #f0ebe4;'} color: #888; font-size: 13px; width: 44%;">${row.label}</td>
                 <td style="padding: 9px 0; ${isLast ? '' : 'border-bottom: 1px solid #f0ebe4;'} color: #333; font-size: 13px; font-weight: 600;">${row.value}</td>
               </tr>`;
             }).join('')}
@@ -1643,60 +1397,13 @@ function customerGreeting(lead: Lead): string {
   return 'Guten Tag';
 }
 
-// Marta-Signatur-Karte — zentral für alle Caregiver-Event-Mails (A/B/C) und
-// das neue Mail-11-Layout. Identisch zur Eingangsbestätigung, damit die
-// gesamte Mail-Reihe optisch zusammenpasst.
-function caregiverMartaSig(baseUrl: string): string {
+// Grußformel + Marta-Signatur-Karte für alle Caregiver-Event-Mails (A/B/C)
+// und die Angebots-Anpassung. Die Karte selbst kommt aus lib/marta-karte.ts
+// (eine Vorlage für alle Mails, Handy-Regeln dort: MARTA_KARTE_MOBIL_CSS).
+function caregiverMartaSig(baseUrl: string, bewertung: BewertungsStand): string {
   return `
     <p style="font-size:16px;line-height:1.7;color:#555;margin-top:24px;margin-bottom:16px;">Mit freundlichen Grüßen<br><strong style="color:#3D2B1F;">Marta Kapcio</strong></p>
-    <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="margin:0 0 24px 0;border:1px solid #e8ddd0;border-radius:12px;overflow:hidden;">
-      <tr>
-        <td style="padding:18px 20px 16px;background:#ffffff;">
-          <table width="100%" cellpadding="0" cellspacing="0" role="presentation">
-            <tr>
-              <td style="vertical-align:top;">
-                <table cellpadding="0" cellspacing="0" role="presentation">
-                  <tr>
-                    <td style="padding-right:12px;vertical-align:top;">
-                      <img src="${baseUrl}/images/marta-kapcio.jpg" alt="Marta Kapcio" width="60" style="display:block;width:60px;height:auto;border-radius:8px;" />
-                    </td>
-                    <td style="vertical-align:middle;">
-                      <p style="margin:0 0 2px;font-size:15px;font-weight:700;color:#3D2B1F;white-space:nowrap;">Marta Kapcio</p>
-                      <p style="margin:0 0 2px;font-size:13px;color:#555;white-space:nowrap;">Pflegeberaterin</p>
-                      <p style="margin:0;font-size:12px;color:#9a8a73;white-space:nowrap;">Mo – So, 8 – 20 Uhr</p>
-                    </td>
-                  </tr>
-                </table>
-                <table cellpadding="0" cellspacing="0" role="presentation" style="margin-top:12px;">
-                  <tr><td style="padding-bottom:6px;">
-                    <a href="tel:+4989200000830" style="display:inline-block;background-color:#f0ebe4;border-radius:20px;padding:8px 16px;text-decoration:none;font-size:13px;font-weight:500;color:#3D2B1F;white-space:nowrap;">&#9990; 089 200 000 830</a>
-                  </td></tr>
-                  <tr><td>
-                    <a href="https://wa.me/4989200000830" style="display:inline-block;background-color:#25D366;border-radius:20px;padding:8px 16px;text-decoration:none;font-size:13px;font-weight:600;color:#ffffff;white-space:nowrap;">WhatsApp schreiben</a>
-                  </td></tr>
-                </table>
-              </td>
-              <td style="vertical-align:top;text-align:right;">
-                <table cellpadding="0" cellspacing="0" role="presentation" style="border:1px solid #e8ddd0;border-radius:8px;overflow:hidden;margin-left:auto;">
-                  <tr><td style="padding:8px 10px;background:#ffffff;text-align:center;vertical-align:top;">
-                    <img src="${baseUrl}/images/primundus_testsieger-2021.webp" alt="Testsieger DIE WELT" width="64" style="display:block;width:64px;height:auto;margin:0 auto 5px;" />
-                    <p style="margin:0 0 1px;font-size:11px;font-weight:700;color:#3D2B1F;white-space:nowrap;">6× Testsieger <span style="color:#B5A184;">DIE WELT</span></p>
-                    <p style="margin:0;font-size:10px;color:#888;line-height:1.4;">Preis, Qualität &amp;<br>Kundenservice</p>
-                  </td></tr>
-                </table>
-              </td>
-            </tr>
-          </table>
-        </td>
-      </tr>
-      <tr><td style="background:#f9f6f2;border-top:1px solid #e8ddd0;">
-        <table width="100%" cellpadding="0" cellspacing="0" role="presentation"><tr>
-          <td style="padding:12px 0;text-align:center;width:33%;border-right:1px solid #e8ddd0;"><p style="margin:0;font-size:12px;color:#555;line-height:1.4;">Über 20 Jahre<br>Erfahrung</p></td>
-          <td style="padding:12px 0;text-align:center;width:33%;border-right:1px solid #e8ddd0;"><p style="margin:0;font-size:12px;color:#555;line-height:1.4;">60.000+<br>betreute Einsätze</p></td>
-          <td style="padding:12px 0;text-align:center;width:33%;"><p style="margin:0;font-size:12px;color:#555;line-height:1.4;">Persönlicher<br>Ansprechpartner,<br>7&nbsp;Tage/Woche</p></td>
-        </tr></table>
-      </td></tr>
-    </table>`;
+    ${martaKarteHtml({ fuer: 'kunde', bewertung, siteUrl: baseUrl, presseLogos: false })}`;
 }
 
 // Gemeinsame HTML-Shell (Header + Content + Footer) für alle Caregiver-
@@ -1729,13 +1436,20 @@ function caregiverMailShell(baseUrl: string, leadEmail: string, content: string,
       .cond-top-cell { display: block !important; width: 100% !important; padding: 18px 22px 16px !important; border-right: none !important; border-bottom: 1px solid #ebe2d2 !important; }
       .cond-top-cell:last-child { border-bottom: none !important; }
     }
+    /* Handy (11.09.2026): Kopfzeile mit 20 statt 40 px Rand (Logo + Siegel
+       brauchten sonst 363 px) und schmalere Siegel-Spalte in der Marta-Karte —
+       wie getEmailLayout / send-scheduled-emails. Grenze 480 px, damit ein
+       600 px breites Fenster exakt die Desktop-Optik behaelt. */
+    @media only screen and (max-width: 480px) {
+      .email-header { padding: 20px 20px 16px 20px !important; }${MARTA_KARTE_MOBIL_CSS}
+    }
   </style>
 </head>
 <body>
   <div style="width:100%;background-color:#f4f4f4;padding:20px 0;">
     <table width="100%" cellpadding="0" cellspacing="0" role="presentation"><tr><td align="center">
       <div style="max-width:600px;margin:0 auto;background-color:#ffffff;border-radius:8px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.1);">
-        <div style="background:#ffffff;padding:24px 40px 20px 40px;border-bottom:1px solid #f0ebe4;">
+        <div class="email-header" style="background:#ffffff;padding:24px 40px 20px 40px;border-bottom:1px solid #f0ebe4;">
           <table width="100%" cellpadding="0" cellspacing="0" role="presentation"><tr>
             <td style="vertical-align:middle;">
               <img src="${baseUrl}/images/Primundus-Logo_V6.png" alt="Primundus Logo" width="160" style="display:block;width:160px;max-width:160px;height:auto;" />
@@ -1841,6 +1555,7 @@ function buildCaregiverEventEmail(opts: {
   plainSummary: string;    // Plaintext-Fallback (intro + middle, ohne HTML)
   psHtml?: string;         // optionales P.S. (z.B. Gebührenfreiheit) — vor der Sig
   psText?: string;         // Plaintext-Pendant des P.S.
+  bewertung: BewertungsStand; // Bewertungszeile unter der Marta-Karte
 }): EmailTemplate {
   const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://primundus.de';
   const greeting = customerGreeting(opts.lead);
@@ -1880,7 +1595,7 @@ function buildCaregiverEventEmail(opts: {
       </td></tr>
     </table>`;
 
-  const martaSig = caregiverMartaSig(baseUrl);
+  const martaSig = caregiverMartaSig(baseUrl, opts.bewertung);
 
   const content = `
     <p style="font-size:15px;line-height:1.75;color:#444;margin-bottom:14px;">${greeting},</p>
@@ -1938,6 +1653,7 @@ www.primundus.de
 export function getPatientDataSavedEmailTemplate(
   lead: Lead,
   portalUrl: string,
+  bewertung: BewertungsStand,
 ): EmailTemplate {
   const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://primundus.de';
   const greeting = customerGreeting(lead);
@@ -1955,54 +1671,7 @@ export function getPatientDataSavedEmailTemplate(
   // optisch konsistent bleibt.
   const martaSig = `
     <p style="font-size:16px;line-height:1.7;color:#555;margin-top:24px;margin-bottom:16px;">Mit freundlichen Grüßen<br><strong style="color:#3D2B1F;">Marta Kapcio</strong></p>
-    <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="margin:0 0 24px 0;border:1px solid #e8ddd0;border-radius:12px;overflow:hidden;">
-      <tr>
-        <td style="padding:18px 20px 16px;background:#ffffff;">
-          <table width="100%" cellpadding="0" cellspacing="0" role="presentation">
-            <tr>
-              <td style="vertical-align:top;">
-                <table cellpadding="0" cellspacing="0" role="presentation">
-                  <tr>
-                    <td style="padding-right:12px;vertical-align:top;">
-                      <img src="${baseUrl}/images/marta-kapcio.jpg" alt="Marta Kapcio" width="60" style="display:block;width:60px;height:auto;border-radius:8px;" />
-                    </td>
-                    <td style="vertical-align:middle;">
-                      <p style="margin:0 0 2px;font-size:15px;font-weight:700;color:#3D2B1F;white-space:nowrap;">Marta Kapcio</p>
-                      <p style="margin:0 0 2px;font-size:13px;color:#555;white-space:nowrap;">Pflegeberaterin</p>
-                      <p style="margin:0;font-size:12px;color:#9a8a73;white-space:nowrap;">Mo – So, 8 – 20 Uhr</p>
-                    </td>
-                  </tr>
-                </table>
-                <table cellpadding="0" cellspacing="0" role="presentation" style="margin-top:12px;">
-                  <tr><td style="padding-bottom:6px;">
-                    <a href="tel:+4989200000830" style="display:inline-block;background-color:#f0ebe4;border-radius:20px;padding:8px 16px;text-decoration:none;font-size:13px;font-weight:500;color:#3D2B1F;white-space:nowrap;">&#9990; 089 200 000 830</a>
-                  </td></tr>
-                  <tr><td>
-                    <a href="https://wa.me/4989200000830" style="display:inline-block;background-color:#25D366;border-radius:20px;padding:8px 16px;text-decoration:none;font-size:13px;font-weight:600;color:#ffffff;white-space:nowrap;">WhatsApp schreiben</a>
-                  </td></tr>
-                </table>
-              </td>
-              <td style="vertical-align:top;text-align:right;">
-                <table cellpadding="0" cellspacing="0" role="presentation" style="border:1px solid #e8ddd0;border-radius:8px;overflow:hidden;margin-left:auto;">
-                  <tr><td style="padding:8px 10px;background:#ffffff;text-align:center;vertical-align:top;">
-                    <img src="${baseUrl}/images/primundus_testsieger-2021.webp" alt="Testsieger DIE WELT" width="64" style="display:block;width:64px;height:auto;margin:0 auto 5px;" />
-                    <p style="margin:0 0 1px;font-size:11px;font-weight:700;color:#3D2B1F;white-space:nowrap;">6× Testsieger <span style="color:#B5A184;">DIE WELT</span></p>
-                    <p style="margin:0;font-size:10px;color:#888;line-height:1.4;">Preis, Qualität &amp;<br>Kundenservice</p>
-                  </td></tr>
-                </table>
-              </td>
-            </tr>
-          </table>
-        </td>
-      </tr>
-      <tr><td style="background:#f9f6f2;border-top:1px solid #e8ddd0;">
-        <table width="100%" cellpadding="0" cellspacing="0" role="presentation"><tr>
-          <td style="padding:12px 0;text-align:center;width:33%;border-right:1px solid #e8ddd0;"><p style="margin:0;font-size:12px;color:#555;line-height:1.4;">Über 20 Jahre<br>Erfahrung</p></td>
-          <td style="padding:12px 0;text-align:center;width:33%;border-right:1px solid #e8ddd0;"><p style="margin:0;font-size:12px;color:#555;line-height:1.4;">60.000+<br>betreute Einsätze</p></td>
-          <td style="padding:12px 0;text-align:center;width:33%;"><p style="margin:0;font-size:12px;color:#555;line-height:1.4;">Persönlicher<br>Ansprechpartner,<br>7&nbsp;Tage/Woche</p></td>
-        </tr></table>
-      </td></tr>
-    </table>`;
+    ${martaKarteHtml({ fuer: 'kunde', bewertung, siteUrl: baseUrl, presseLogos: false })}`;
 
   const content = `
     <p style="font-size:15px;line-height:1.75;color:#444;margin-bottom:14px;">${greeting},</p>
@@ -2031,13 +1700,20 @@ export function getPatientDataSavedEmailTemplate(
       .cond-top-cell { display: block !important; width: 100% !important; padding: 18px 22px 16px !important; border-right: none !important; border-bottom: 1px solid #ebe2d2 !important; }
       .cond-top-cell:last-child { border-bottom: none !important; }
     }
+    /* Handy (11.09.2026): Kopfzeile mit 20 statt 40 px Rand (Logo + Siegel
+       brauchten sonst 363 px) und schmalere Siegel-Spalte in der Marta-Karte —
+       wie getEmailLayout / send-scheduled-emails. Grenze 480 px, damit ein
+       600 px breites Fenster exakt die Desktop-Optik behaelt. */
+    @media only screen and (max-width: 480px) {
+      .email-header { padding: 20px 20px 16px 20px !important; }${MARTA_KARTE_MOBIL_CSS}
+    }
   </style>
 </head>
 <body>
   <div style="width:100%;background-color:#f4f4f4;padding:20px 0;">
     <table width="100%" cellpadding="0" cellspacing="0" role="presentation"><tr><td align="center">
       <div style="max-width:600px;margin:0 auto;background-color:#ffffff;border-radius:8px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.1);">
-        <div style="background:#ffffff;padding:24px 40px 20px 40px;border-bottom:1px solid #f0ebe4;">
+        <div class="email-header" style="background:#ffffff;padding:24px 40px 20px 40px;border-bottom:1px solid #f0ebe4;">
           <table width="100%" cellpadding="0" cellspacing="0" role="presentation"><tr>
             <td style="vertical-align:middle;">
               <img src="${baseUrl}/images/Primundus-Logo_V6.png" alt="Primundus Logo" width="160" style="display:block;width:160px;max-width:160px;height:auto;" />
@@ -2130,6 +1806,7 @@ export function getOfferUpdatedEmailTemplate(
   lead: Lead,
   info: OfferUpdatedInfo,
   portalUrl: string,
+  bewertung: BewertungsStand,
 ): EmailTemplate {
   const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://primundus.de';
   const greeting = customerGreeting(lead);
@@ -2180,7 +1857,7 @@ export function getOfferUpdatedEmailTemplate(
     ${eigenanteilHtml}
     ${bulletproofButton(portalUrl, 'Aktualisiertes Angebot ansehen →')}
     <p style="font-size:14px;line-height:1.65;color:#555;margin:18px 0 0;">Bei Fragen zur Anpassung erreichen Sie uns telefonisch unter <a href="tel:+4989200000830" style="color:#0066CC;text-decoration:none;">+49 89 200 000 830</a> oder per E-Mail an <a href="mailto:info@primundus.de" style="color:#0066CC;text-decoration:none;">info@primundus.de</a>.</p>
-    ${caregiverMartaSig(baseUrl)}`;
+    ${caregiverMartaSig(baseUrl, bewertung)}`;
 
   const html = caregiverMailShell(baseUrl, lead.email, content, customerUnsubscribeUrl(lead) || undefined);
 
@@ -2220,6 +1897,7 @@ export function getCaregiverInterestEmailTemplate(
   lead: Lead,
   caregiver: CaregiverDisplay,
   portalUrl: string,
+  bewertung: BewertungsStand,
 ): EmailTemplate {
   const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://primundus.de';
   const greeting = customerGreeting(lead);
@@ -2271,7 +1949,7 @@ export function getCaregiverInterestEmailTemplate(
     ${stepsTable}
     ${bestpreisBox}
     <p style="font-size:15px;line-height:1.75;color:#444;margin:30px 0 18px;">Wenn Sie Fragen zu ${firstName}s Profil haben oder Unterstützung bei der Einschätzung möchten — rufen Sie mich an, schreiben Sie mir per WhatsApp oder antworten Sie einfach auf diese E-Mail. Ich bin gerne für Sie da.</p>
-    ${caregiverMartaSig(baseUrl)}`;
+    ${caregiverMartaSig(baseUrl, bewertung)}`;
 
   const html = caregiverMailShell(baseUrl, lead.email, content, customerUnsubscribeUrl(lead));
 
@@ -2335,7 +2013,8 @@ export function getApplicationReceivedEmailTemplate(
   lead: Lead,
   caregiver: CaregiverDisplay,
   portalUrl: string,
-  offer?: OfferInfo,
+  offer: OfferInfo | undefined,
+  bewertung: BewertungsStand,
 ): EmailTemplate {
   const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://primundus.de';
   const greeting = customerGreeting(lead);
@@ -2451,7 +2130,7 @@ export function getApplicationReceivedEmailTemplate(
     ${stepsTable}
     ${bestpreisBox}
     <p style="font-size:15px;line-height:1.75;color:#444;margin:28px 0 18px;">Wenn Sie Fragen zu ${firstName}s Bewerbung haben oder Unterstützung bei der Entscheidung möchten — rufen Sie mich an, schreiben Sie mir per WhatsApp oder antworten Sie einfach auf diese E-Mail. Ich bin gerne für Sie da.</p>
-    ${caregiverMartaSig(baseUrl)}`;
+    ${caregiverMartaSig(baseUrl, bewertung)}`;
 
   const html = caregiverMailShell(baseUrl, lead.email, content, customerUnsubscribeUrl(lead));
 
@@ -2497,6 +2176,7 @@ export function getBookingConfirmedEmailTemplate(
   lead: Lead,
   caregiver: CaregiverDisplay,
   portalUrl: string,
+  bewertung: BewertungsStand,
 ): EmailTemplate {
   const firstName = caregiver.name.split(' ')[0];
   const introHtml = `<p style="font-size:15px;line-height:1.75;color:#444;margin-bottom:18px;">schön, dass Sie sich für <strong style="color:#2D1F0F;">${caregiver.name}</strong> entschieden haben. <strong style="color:#2D1F0F;">Ihre Buchung ist bei uns eingegangen</strong> — wir kümmern uns jetzt um alle weiteren Schritte.</p>`;
@@ -2509,6 +2189,7 @@ export function getBookingConfirmedEmailTemplate(
     middleHtml,
     ctaText: 'Status im Portal ansehen →',
     portalUrl,
+    bewertung,
     plainSummary: `schön, dass Sie sich für ${caregiver.name} entschieden haben. Ihre Buchung ist bei uns eingegangen — wir kümmern uns jetzt um alle weiteren Schritte. Wir stoßen die Vertragsunterlagen an und stimmen den Anreisetermin mit ${firstName} ab. Innerhalb der nächsten Werktage meldet sich Ihr persönlicher Ansprechpartner bei Ihnen, um die letzten Details zu klären — zum Beispiel den genauen Tag der Anreise, Zimmer und Schlüsselübergabe.`,
   });
 }
@@ -2522,47 +2203,13 @@ export function getBookingConfirmedEmailTemplate(
 export function getTokenRegenerationEmailTemplate(
   lead: Lead,
   portalUrl: string,
+  bewertung: BewertungsStand,
 ): EmailTemplate {
   const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://primundus.de';
   const greeting = customerGreeting(lead);
 
   const martaSignatur = `
-    <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="margin: 0 0 32px 0; border: 1px solid #e8ddd0; border-radius: 12px; overflow: hidden;">
-      <tr>
-        <td style="padding: 18px 20px 16px; background: #ffffff;">
-          <table width="100%" cellpadding="0" cellspacing="0" role="presentation">
-            <tr>
-              <td style="vertical-align: top;">
-                <table cellpadding="0" cellspacing="0" role="presentation">
-                  <tr>
-                    <td style="padding-right: 12px; vertical-align: top;">
-                      <img src="${baseUrl}/images/marta-kapcio.jpg" alt="Marta Kapcio" width="60" style="display: block; width: 60px; height: auto; border-radius: 8px;" />
-                    </td>
-                    <td style="vertical-align: middle;">
-                      <p style="margin: 0 0 2px 0; font-size: 15px; font-weight: 700; color: #3D2B1F; white-space: nowrap; text-align: left;">Marta Kapcio</p>
-                      <p style="margin: 0 0 2px 0; font-size: 13px; color: #555; white-space: nowrap; text-align: left;">Pflegeberaterin</p>
-                      <p style="margin: 0; font-size: 12px; color: #9a8a73; white-space: nowrap; text-align: left;">Mo – So, 8 – 20 Uhr</p>
-                    </td>
-                  </tr>
-                </table>
-                <table cellpadding="0" cellspacing="0" role="presentation" style="margin-top: 12px;">
-                  <tr>
-                    <td style="padding-bottom: 6px;">
-                      <a href="tel:+4989200000830" style="display: inline-block; background-color: #f0ebe4; border-radius: 20px; padding: 8px 16px; text-decoration: none; font-size: 13px; font-weight: 500; color: #3D2B1F; white-space: nowrap;">&#9990; 089 200 000 830</a>
-                    </td>
-                  </tr>
-                  <tr>
-                    <td>
-                      <a href="https://wa.me/4989200000830" style="display: inline-block; background-color: #25D366; border-radius: 20px; padding: 8px 16px; text-decoration: none; font-size: 13px; font-weight: 600; color: #ffffff; white-space: nowrap;">WhatsApp schreiben</a>
-                    </td>
-                  </tr>
-                </table>
-              </td>
-            </tr>
-          </table>
-        </td>
-      </tr>
-    </table>`;
+    ${martaKarteHtml({ fuer: 'kunde', bewertung, siteUrl: baseUrl, presseLogos: false, abstandUnten: 32 })}`;
 
   const content = `
     <p style="font-size: 17px; font-weight: 700; color: #3D2B1F; margin: 0 0 16px 0; line-height: 1.5;">${greeting},</p>
@@ -2780,16 +2427,19 @@ export async function buildCustomerCaregiverMailWithInlinePhoto(
   portalUrl: string,
   offer?: OfferInfo,
 ): Promise<{ template: EmailTemplate; attachments?: any[] }> {
-  const inline = await fetchInlineCaregiverPhoto(caregiver.photoUrl);
+  const [inline, bewertung] = await Promise.all([
+    fetchInlineCaregiverPhoto(caregiver.photoUrl),
+    holeBewertungsStand(),
+  ]);
 
   const caregiverForTemplate: CaregiverDisplay = inline
     ? { ...caregiver, photoUrl: `cid:${inline.cid}` }
     : caregiver;
 
   const template =
-    event === 'caregiver_interest_shown'      ? getCaregiverInterestEmailTemplate(lead, caregiverForTemplate, portalUrl)
-  : event === 'application_accepted_internal' ? getBookingConfirmedEmailTemplate(lead, caregiverForTemplate, portalUrl)
-  :                                             getApplicationReceivedEmailTemplate(lead, caregiverForTemplate, portalUrl, offer);
+    event === 'caregiver_interest_shown'      ? getCaregiverInterestEmailTemplate(lead, caregiverForTemplate, portalUrl, bewertung)
+  : event === 'application_accepted_internal' ? getBookingConfirmedEmailTemplate(lead, caregiverForTemplate, portalUrl, bewertung)
+  :                                             getApplicationReceivedEmailTemplate(lead, caregiverForTemplate, portalUrl, offer, bewertung);
 
   return inline
     ? { template, attachments: [inline] }
@@ -2837,6 +2487,7 @@ export function getBewertungsanfrageTemplate(
   .email-content { padding:36px 40px 32px; text-align:left; }
   .email-footer { background-color:#f8f9fa; padding:30px; text-align:center; border-top:1px solid #e0e0e0; }
   @media only screen and (max-width:600px) { .email-content { padding:28px 20px; } .email-header { padding:20px; } }
+  @media only screen and (max-width:480px) { .sig-pille { display:inline-block !important; padding:0 6px 6px 0 !important; } }
 </style></head>
 <body>
 <div class="email-wrapper">
@@ -2937,20 +2588,22 @@ export function getBewertungsanfrageTemplate(
               <p style="margin:0;font-size:12px;color:#9a8a73;white-space:nowrap;">Mo &ndash; So, 8 &ndash; 20 Uhr</p>
             </td>
           </tr></table>
+          <!-- Drei Pillen nebeneinander brauchen ~340 px; auf dem Handy (.sig-pille,
+               Media-Query oben) laufen sie in eine zweite Zeile statt aus der Mail. -->
           <table cellpadding="0" cellspacing="0" role="presentation" style="margin-top:12px;"><tr>
-            <td style="padding-right:6px;">
+            <td class="sig-pille" style="padding-right:6px;">
               <a href="tel:+4989200000830"
                  style="display:inline-block;background-color:#ffffff;border:1px solid #dcdcdc;
                         border-radius:16px;padding:6px 13px;text-decoration:none;font-size:12px;
-                        font-weight:500;color:#777777;white-space:nowrap;font-family:${SANS};">&#9990; 089 200 000 830</a>
+                        font-weight:500;color:#777777;white-space:nowrap;font-family:${SANS};" aria-label="Marta anrufen: 089 200 000 830"><img src="${cdn}/mail-icon-telefon-grau.png" alt="" width="14" height="14" style="display:inline-block;width:14px;height:14px;border:0;vertical-align:middle;margin-right:5px;" /><span style="vertical-align:middle;">089 200 000 830</span></a>
             </td>
-            <td style="padding-right:6px;">
+            <td class="sig-pille" style="padding-right:6px;">
               <a href="https://wa.me/4989200000830"
                  style="display:inline-block;background-color:#ffffff;border:1px solid #dcdcdc;
                         border-radius:16px;padding:6px 13px;text-decoration:none;font-size:12px;
                         font-weight:500;color:#777777;white-space:nowrap;font-family:${SANS};">WhatsApp</a>
             </td>
-            <td>
+            <td class="sig-pille">
               <a href="mailto:info@primundus.de"
                  style="display:inline-block;background-color:#ffffff;border:1px solid #dcdcdc;
                         border-radius:16px;padding:6px 13px;text-decoration:none;font-size:12px;

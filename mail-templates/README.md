@@ -125,7 +125,20 @@ durch (sie betreffen alle Mails):
   WhatsApp, Testsieger-Kasten (unten in jeder Mail)
 - **Footer** — Adresse / Kontakt / Abmelde-Hinweis (ganz unten)
 
+> Seit 17.09.2026 baut **eine** Funktion die Signaturkarte im Code: `project 3/lib/marta-karte.ts`
+> (Anrufen + WhatsApp, Bewertungssterne, Faktenzeile mit Bestpreisgarantie). Die Kundenvorlagen
+> hier zeigen noch die alte Ilka-Karte; 15/19 (Vermittler) sind die gerenderte Vermittler-Karte.
+
 Den **Bereich dazwischen** (Body) kannst du frei umbauen.
+
+**Handy-Breite (seit 11.09.2026):** Jede Mail muss bei 360 px ohne seitliches
+Scrollen passen. Die Signatur schafft das nur mit drei Dingen, die beim
+Umbauen nicht verloren gehen dürfen: Name/Rolle/Zeiten ohne `white-space:nowrap`
+(Zeiten als zwei nowrap-Teile „Mo – So," / „8 – 20 Uhr"), die Klassen
+`sig-siegel-*` am Testsieger-Kasten samt Media-Query `max-width: 480px` im
+`<style>` und die Presselogos mit fester Breite + `max-width:100%`. Prüfen:
+Mail in einem 360 px breiten Rahmen öffnen, `document.documentElement.scrollWidth`
+muss 360 sein.
 
 ## Dynamische Stellen je Mail
 

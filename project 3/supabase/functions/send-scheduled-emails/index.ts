@@ -67,6 +67,15 @@ import {
   type BewertungsLead,
 } from "./bewertung.ts";
 import { kundenEmpfaenger, ccListe } from "./empfaenger.ts";
+// Bewertungsstand für die Sterne in Martas Karte (Martin, 17.09.2026) — Kopie von
+// lib/bewertungen-stand.ts, Stand wird einmal pro Aufruf geladen (siehe unten).
+import {
+  type BewertungsStand,
+  BEWERTUNGS_STAND_ERSATZ,
+  ladeBewertungsStand,
+} from "./bewertungenStand.ts";
+// Martas Signaturkarte — eine Vorlage für alle Mails (Kopie von lib/marta-karte.ts).
+import { MARTA_KARTE_MOBIL_CSS, martaKarteHtml } from "./martaKarte.ts";
 import {
   portalHerkunft,
   portalIntroHtml,
@@ -270,6 +279,21 @@ function buildEmailWrapper(
          Die Faktenzeile laeuft ohnehin ueber die volle Kartenbreite. */
       .empf-foto { padding-left: 0 !important; }
     }
+    /* Handy (11.09.2026): Signatur-Karte (buildMartaSig) — "DIE WELT" in eine
+       eigene Zeile, Siegelbild kleiner, sonst passt die Siegel-Spalte nicht
+       neben Foto + Name; Anrufen/WhatsApp duerfen umbrechen (17.09.2026,
+       Regeln aus martaKarte.ts). Kopfzeile mit 20 statt 40 px Rand wie in
+       lib/email-template.ts (Logo 160 + Siegel-Block brauchten mit 40 px
+       Rand 363 px). Eigene Grenze 480 statt 600 px: ein 600 px breites
+       Fenster behaelt exakt die Desktop-Optik. */
+    @media only screen and (max-width: 480px) {
+      .email-header { padding: 20px 20px 16px 20px !important; }${MARTA_KARTE_MOBIL_CSS}
+      /* Bestpreisgarantie-Zeile der Eingangsbestaetigung (Siegel 190 px +
+         Linktext) war auf 360–390 px breiter als der Bildschirm: Siegel
+         ueber den Link statt daneben (17.09.2026). */
+      .bpg-bild { display: block !important; width: auto !important; padding: 0 0 10px 0 !important; }
+      .bpg-text { display: block !important; }
+    }
   </style>
 </head>
 <body>
@@ -331,92 +355,27 @@ function buildEmailWrapper(
 </html>`;
 }
  
-function buildMartaSig(siteUrl: string): string {
-  // Martas Foto kommt aus primundus.de statt vom Kostenrechner (20.08.):
-  // Beide Dienste deployen unabhaengig voneinander. Nach dem Foto-Wechsel
-  // (#481) war die neue Datei auf primundus.de sofort da, der
-  // Kostenrechner-Build haing >45 Min in Renders Warteschlange — in dieser
-  // Zeit verlinkte JEDE Mail ein 404 (eine Kundenmail um 07:50 war
-  // betroffen). Die Mail-Funktion deployt manuell und ist damit IMMER
-  // schneller als der Kostenrechner; Bilder gehoeren deshalb an die
-  // Adresse, die unabhaengig davon steht.
-  const martaUrl = "https://primundus.de/images/marta-kapcio.jpg";
-  const testUrl = `${siteUrl}/images/primundus_testsieger-2021.webp`;
-  const mediaBase = `${siteUrl}/images/media`;
+/* Bewertungsstand fuer die Sterne in der Karte. Der Handler setzt ihn
+   einmal pro Aufruf (Demo-Vorschau und Versand), bevor Mails gebaut werden —
+   die ~15 Mail-Bauer bleiben so unveraendert synchron. Bis dahin (und wenn
+   primundus.de nicht antwortet) gilt der Ersatzwert. */
+let bewertungsStand: BewertungsStand = BEWERTUNGS_STAND_ERSATZ;
+
+/* Grussformel + Martas Karte. Die Karte kommt aus martaKarte.ts (eine Vorlage
+   fuer alle Mails, Handy-Regeln MARTA_KARTE_MOBIL_CSS in buildEmailWrapper).
+   Martas Foto liegt auf primundus.de statt auf dem Kostenrechner (20.08.):
+   nach dem Foto-Wechsel (#481) hing der Kostenrechner-Build >45 Min in
+   Renders Warteschlange und JEDE Mail verlinkte ein 404 — primundus.de steht
+   unabhaengig davon.
+   Vermittler-Mails ("vermittler"): Karte ohne Sterne und ohne
+   Kunden-Konditionen in der Faktenzeile (vermittler.ts). */
+function buildMartaSig(siteUrl: string, fuer: "kunde" | "vermittler" = "kunde"): string {
+  const karte = fuer === "kunde"
+    ? martaKarteHtml({ fuer: "kunde", bewertung: bewertungsStand, siteUrl, presseLogos: true })
+    : martaKarteHtml({ fuer: "vermittler", siteUrl, presseLogos: true });
   return `
     <p style="font-size:16px;line-height:1.7;color:#555;margin-top:24px;margin-bottom:16px;">Mit freundlichen Grüßen<br><strong style="color:#3D2B1F;">Marta Kapcio</strong></p>
-    <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="margin:0 0 24px 0;border:1px solid #e8ddd0;border-radius:12px;overflow:hidden;">
-      <tr>
-        <td style="padding:18px 20px 16px;background:#ffffff;">
-          <table width="100%" cellpadding="0" cellspacing="0" role="presentation">
-            <tr>
-              <td style="vertical-align:top;">
-                <table cellpadding="0" cellspacing="0" role="presentation">
-                  <tr>
-                    <td style="padding-right:12px;vertical-align:top;">
-                      <img src="${martaUrl}" alt="Marta Kapcio" width="60" style="display:block;width:60px;height:auto;border-radius:8px;" />
-                    </td>
-                    <td style="vertical-align:middle;">
-                      <p style="margin:0 0 2px;font-size:15px;font-weight:700;color:#3D2B1F;white-space:nowrap;">Marta Kapcio</p>
-                      <p style="margin:0 0 2px;font-size:13px;color:#555;white-space:nowrap;">Pflegeberaterin</p>
-                      <p style="margin:0;font-size:12px;color:#9a8a73;white-space:nowrap;">Mo – So, 8 – 20 Uhr</p>
-                    </td>
-                  </tr>
-                </table>
-                <table cellpadding="0" cellspacing="0" role="presentation" style="margin-top:12px;">
-                  <tr><td style="padding-bottom:6px;">
-                    <a href="tel:+4989200000830" style="display:inline-block;background-color:#f0ebe4;border-radius:20px;padding:8px 16px;text-decoration:none;font-size:13px;font-weight:500;color:#3D2B1F;white-space:nowrap;">&#9990; 089 200 000 830</a>
-                  </td></tr>
-                  <tr><td>
-                    <a href="https://wa.me/4989200000830" style="display:inline-block;background-color:#25D366;border-radius:20px;padding:8px 16px;text-decoration:none;font-size:13px;font-weight:600;color:#ffffff;white-space:nowrap;">WhatsApp schreiben</a>
-                  </td></tr>
-                </table>
-              </td>
-              <td style="vertical-align:top;text-align:right;">
-                <table cellpadding="0" cellspacing="0" role="presentation" style="border:1px solid #e8ddd0;border-radius:8px;overflow:hidden;margin-left:auto;">
-                  <tr>
-                    <td style="padding:8px 10px;background:#ffffff;text-align:center;vertical-align:top;">
-                      <img src="${testUrl}" alt="Testsieger DIE WELT" width="64" style="display:block;width:64px;height:auto;margin:0 auto 5px;" />
-                      <p style="margin:0 0 1px;font-size:11px;font-weight:700;color:#3D2B1F;white-space:nowrap;">6× Testsieger <span style="color:#B5A184;">DIE WELT</span></p>
-                      <p style="margin:0;font-size:10px;color:#888;line-height:1.4;">Preis, Qualität &amp;<br>Kundenservice</p>
-                    </td>
-                  </tr>
-                </table>
-              </td>
-            </tr>
-          </table>
-        </td>
-      </tr>
-      <tr>
-        <td style="background:#f9f6f2;border-top:1px solid #e8ddd0;">
-          <table width="100%" cellpadding="0" cellspacing="0" role="presentation">
-            <tr>
-              <td style="padding:12px 0;text-align:center;width:33%;border-right:1px solid #e8ddd0;">
-                <p style="margin:0;font-size:12px;color:#555;line-height:1.4;">Über 20 Jahre<br>Erfahrung</p>
-              </td>
-              <td style="padding:12px 0;text-align:center;width:33%;border-right:1px solid #e8ddd0;">
-                <p style="margin:0;font-size:12px;color:#555;line-height:1.4;">60.000+<br>betreute Einsätze</p>
-              </td>
-              <td style="padding:12px 0;text-align:center;width:33%;">
-                <p style="margin:0;font-size:12px;color:#555;line-height:1.4;">Persönlicher<br>Ansprechpartner,<br>7&nbsp;Tage/Woche</p>
-              </td>
-            </tr>
-          </table>
-        </td>
-      </tr>
-      <tr>
-        <td style="background:#ffffff;border-top:1px solid #e8ddd0;padding:12px 16px;">
-          <table width="100%" cellpadding="0" cellspacing="0" role="presentation"><tr>
-            <td style="text-align:center;vertical-align:middle;padding:0 4px;"><img src="${mediaBase}/die-welt.webp" alt="DIE WELT" height="14" style="display:inline-block;height:14px;width:auto;opacity:0.4;filter:grayscale(100%);" /></td>
-            <td style="text-align:center;vertical-align:middle;padding:0 4px;"><img src="${mediaBase}/frankfurter-allgemeine.webp" alt="FAZ" height="14" style="display:inline-block;height:14px;width:auto;opacity:0.4;filter:grayscale(100%);" /></td>
-            <td style="text-align:center;vertical-align:middle;padding:0 4px;"><img src="${mediaBase}/ard.webp" alt="ARD" height="14" style="display:inline-block;height:14px;width:auto;opacity:0.4;filter:grayscale(100%);" /></td>
-            <td style="text-align:center;vertical-align:middle;padding:0 4px;"><img src="${mediaBase}/ndr.webp" alt="NDR" height="14" style="display:inline-block;height:14px;width:auto;opacity:0.4;filter:grayscale(100%);" /></td>
-            <td style="text-align:center;vertical-align:middle;padding:0 4px;"><img src="${mediaBase}/sat1.webp" alt="SAT.1" height="14" style="display:inline-block;height:14px;width:auto;opacity:0.4;filter:grayscale(100%);" /></td>
-            <td style="text-align:center;vertical-align:middle;padding:0 4px;"><img src="${mediaBase}/bild-der-frau.webp" alt="Bild der Frau" height="14" style="display:inline-block;height:14px;width:auto;opacity:0.4;filter:grayscale(100%);" /></td>
-          </tr></table>
-        </td>
-      </tr>
-    </table>`;
+    ${karte}`;
 }
  
 // ── Portal-Link + Lead-Meilenstein ────────────────────────────────────────
@@ -1222,8 +1181,8 @@ export function buildEingangsbestaetigungHtml(
       <tr>
         <td colspan="2" style="padding:14px 24px 16px;border-top:1px solid #ebe2d2;background:#F4F8F5;">
           <table width="100%" cellpadding="0" cellspacing="0" role="presentation"><tr>
-            <td style="width:200px;padding-right:16px;vertical-align:middle;"><a href="${siteUrl}/bestpreisgarantie" style="text-decoration:none;"><img src="${siteUrl}/images/bestpreisgarantie-siegel.png" width="190" alt="Primundus Bestpreisgarantie – 6× Preis-Leistungssieger" style="display:block;width:190px;height:auto;border:0;"></a></td>
-            <td style="vertical-align:middle;"><p style="margin:0;font-size:14px;line-height:1.6;"><a href="${siteUrl}/bestpreisgarantie" style="color:#1E5C3A;font-weight:600;">Mehr Infos zur Bestpreisgarantie →</a></p></td>
+            <td class="bpg-bild" style="width:200px;padding-right:16px;vertical-align:middle;"><a href="${siteUrl}/bestpreisgarantie" style="text-decoration:none;"><img src="${siteUrl}/images/bestpreisgarantie-siegel.png" width="190" alt="Primundus Bestpreisgarantie – 6× Preis-Leistungssieger" style="display:block;width:190px;height:auto;border:0;"></a></td>
+            <td class="bpg-text" style="vertical-align:middle;"><p style="margin:0;font-size:14px;line-height:1.6;"><a href="${siteUrl}/bestpreisgarantie" style="color:#1E5C3A;font-weight:600;">Mehr Infos zur Bestpreisgarantie →</a></p></td>
           </tr></table>
         </td>
       </tr>` : "";
@@ -2396,6 +2355,8 @@ Deno.serve(async (req: Request) => {
       const portalBase = Deno.env.get("PORTAL_URL") || "https://kundenportal.primundus.de";
       const site = smtpConfig.siteUrl;
       const to = demoBody.recipient;
+      // Die Vorschau zeigt dieselbe Bewertungszeile wie der Versand.
+      bewertungsStand = await ladeBewertungsStand(fetch);
       const ms = (demoBody.milestone || "none") as LeadMilestone;
       const pu = (portalBase && (lead as Lead).token) ? buildPortalUrl(portalBase, (lead as Lead).token) : site;
 
@@ -2476,7 +2437,7 @@ Deno.serve(async (req: Request) => {
           case "vermittler_angebot": {
             const d = {
               anrede: demoAnrede, kundeLabel: demoMeta.kunde_label,
-              signatur: buildMartaSig(site),
+              signatur: buildMartaSig(site, "vermittler"),
               bruttopreis: Number((lead as any).kalkulation?.bruttopreis ?? 0),
               provisionProTag: demoMeta.provision_pro_tag,
               empfehlung: demoVermittlerEmpf?.empfehlung ?? null,
@@ -2488,7 +2449,7 @@ Deno.serve(async (req: Request) => {
           case "vermittler_kraefte": {
             const d = {
               anrede: demoAnrede, kundeLabel: demoMeta.kunde_label,
-              signatur: buildMartaSig(site),
+              signatur: buildMartaSig(site, "vermittler"),
               fuenf: demoVermittlerFuenf?.fuenf ?? [], cids: demoVermittlerFuenf?.cids ?? [],
             };
             return { subject: demoMeta.betreff_antwort, html: buildEmailWrapper(lead as Lead, site, vermittlerKraefteHtml(d), VERMITTLER_FUSSNOTE, VERMITTLER_ABSENDER), text: vermittlerKraefteText(d) };
@@ -2558,6 +2519,10 @@ Deno.serve(async (req: Request) => {
       );
     }
  
+    // Bewertungszeile unter Martas Karte: einmal pro Aufruf laden (≤ 2 s,
+    // sonst Ersatzwert) — erst hier, damit leere Takte primundus.de nicht fragen.
+    bewertungsStand = await ladeBewertungsStand(fetch);
+
     const results: { id: string; success: boolean; error?: string; flagged?: boolean }[] = [];
     // Echte Versand-Fehlschläge dieses Laufs sammeln → EINE Sammel-Alarm-Mail
     // ans Team am Ende (siehe notifyOpsOfFailures). Geflaggte Domains zählen
@@ -2947,7 +2912,7 @@ Deno.serve(async (req: Request) => {
             /* Dieselbe Grussformel, Beraterinnen-Karte und Vertrauensleiste wie
                in jeder Kundenmail — ohne sie stand die Vermittler-Mail ohne
                Absenderin, ohne Telefonnummer und ohne Siegel da. */
-            signatur: buildMartaSig(smtpConfig.siteUrl),
+            signatur: buildMartaSig(smtpConfig.siteUrl, "vermittler"),
             kundeLabel: (meta.kunde_label as string) || null,
             bruttopreis: Number(kalk.bruttopreis ?? 0),
             provisionProTag: Number(meta.provision_pro_tag ?? 0),
@@ -2992,7 +2957,7 @@ Deno.serve(async (req: Request) => {
             /* Dieselbe Grussformel, Beraterinnen-Karte und Vertrauensleiste wie
                in jeder Kundenmail — ohne sie stand die Vermittler-Mail ohne
                Absenderin, ohne Telefonnummer und ohne Siegel da. */
-            signatur: buildMartaSig(smtpConfig.siteUrl),
+            signatur: buildMartaSig(smtpConfig.siteUrl, "vermittler"),
             kundeLabel: (meta.kunde_label as string) || null,
             fuenf: teile.fuenf, cids: teile.cids,
           };

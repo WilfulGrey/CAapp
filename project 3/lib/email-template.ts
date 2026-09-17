@@ -1,3 +1,6 @@
+// Handy-Regeln der Marta-Signaturkarte (Media-Query ≤480 px unten).
+import { MARTA_KARTE_MOBIL_CSS } from './marta-karte';
+
 export interface EmailLayoutProps {
   content: string;
   preheader?: string;
@@ -256,6 +259,15 @@ export function getEmailLayout({ content, preheader, siteUrl, grund }: EmailLayo
         width: 100%;
         padding: 14px 20px;
       }
+    }
+
+    /* Marta-Signaturkarte auf dem Handy (11.09.2026): Siegel-Spalte schmaler
+       ("DIE WELT" eigene Zeile, Bild 48 px), sonst passt sie nicht neben Foto
+       + Name und die Mail wird breiter als der Bildschirm; Anrufen/WhatsApp
+       duerfen umbrechen (17.09.2026). Eigene Grenze 480 px: ein 600 px
+       breites Fenster behaelt exakt die Desktop-Karte. Regeln aus
+       lib/marta-karte.ts, gleiche Einbindung in allen Mail-Shells. */
+    @media only screen and (max-width: 480px) {${MARTA_KARTE_MOBIL_CSS}
     }
   </style>
 </head>

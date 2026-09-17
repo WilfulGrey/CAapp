@@ -17,6 +17,7 @@ import { sendezeitIso } from '@/lib/quiet-hours';
 import { testphaseUmleitung } from '@/lib/portal-schutz';
 import { createHash } from 'crypto';
 import { kundenEmpfaenger } from '@/lib/empfaenger';
+import { holeBewertungsStand } from '@/lib/bewertungen-stand';
 
 // Bridge endpoint: the CA-App portal reports customer milestones back to the
 // kostenrechner lead so the Nachfass emails can branch. Token-authenticated —
@@ -1222,13 +1223,19 @@ async function handlePost(request: NextRequest) {
           console.log(`lead-event patient_data_saved: Einsatzort unresolved — Mail D unterdrückt (lead ${lead.id})`);
         } else {
           const portalUrl = buildPortalUrl(lead as any);
-          const template = getPatientDataSavedEmailTemplate(lead as any, portalUrl);
           // Testphase: Portal-Leads ans Team (Umleitung nur beim Versand).
           const umlD = testphaseUmleitung(lead as any, process.env.PORTAL_TESTPHASE, process.env.PORTAL_TESTPHASE_EMPFAENGER);
-          sendEmail(umlD?.empfaenger ?? (lead as any).email, umlD ? { ...template, subject: umlD.betreffPraefix + template.subject } : template, undefined,
-            umlD ? undefined : { cc: kundenEmpfaenger(lead as any).cc }).catch((e) =>
-            console.error('customer mail send threw:', e instanceof Error ? e.message : String(e)),
-          );
+          // Bewertungsstand in der Kette, nicht davor: die Antwort an das
+          // Portal wartet nicht auf primundus.de (holeBewertungsStand wirft nie).
+          holeBewertungsStand()
+            .then((bewertung) => {
+              const template = getPatientDataSavedEmailTemplate(lead as any, portalUrl, bewertung);
+              return sendEmail(umlD?.empfaenger ?? (lead as any).email, umlD ? { ...template, subject: umlD.betreffPraefix + template.subject } : template, undefined,
+                umlD ? undefined : { cc: kundenEmpfaenger(lead as any).cc });
+            })
+            .catch((e) =>
+              console.error('customer mail send threw:', e instanceof Error ? e.message : String(e)),
+            );
         }
       } else if (event === 'offer_updated') {
         // Aktualisiertes Angebot — alter/neuer Preis + geänderte Angaben aus
@@ -1243,25 +1250,30 @@ async function handlePost(request: NextRequest) {
         } else {
           const rawChanged = Array.isArray(m.changed) ? (m.changed as Array<Record<string, unknown>>) : [];
           const portalUrl = buildPortalUrl(lead as any);
-          const template = getOfferUpdatedEmailTemplate(
-            lead as any,
-            {
-              oldBruttopreis: oldB,
-              newBruttopreis: newB,
-              newEigenanteil: Number.isFinite(Number(m.new_eigenanteil)) ? Number(m.new_eigenanteil) : null,
-              changed: rawChanged.map((c) => ({
-                name: typeof c?.name === 'string' ? c.name : undefined,
-                alt: typeof c?.alt === 'string' ? c.alt : undefined,
-                neu: typeof c?.neu === 'string' ? c.neu : undefined,
-              })),
-            },
-            portalUrl,
-          );
           const umlO = testphaseUmleitung(lead as any, process.env.PORTAL_TESTPHASE, process.env.PORTAL_TESTPHASE_EMPFAENGER);
-          sendEmail(umlO?.empfaenger ?? (lead as any).email, umlO ? { ...template, subject: umlO.betreffPraefix + template.subject } : template, undefined,
-            umlO ? undefined : { cc: kundenEmpfaenger(lead as any).cc }).catch((e) =>
-            console.error('customer mail send threw:', e instanceof Error ? e.message : String(e)),
-          );
+          holeBewertungsStand()
+            .then((bewertung) => {
+              const template = getOfferUpdatedEmailTemplate(
+                lead as any,
+                {
+                  oldBruttopreis: oldB,
+                  newBruttopreis: newB,
+                  newEigenanteil: Number.isFinite(Number(m.new_eigenanteil)) ? Number(m.new_eigenanteil) : null,
+                  changed: rawChanged.map((c) => ({
+                    name: typeof c?.name === 'string' ? c.name : undefined,
+                    alt: typeof c?.alt === 'string' ? c.alt : undefined,
+                    neu: typeof c?.neu === 'string' ? c.neu : undefined,
+                  })),
+                },
+                portalUrl,
+                bewertung,
+              );
+              return sendEmail(umlO?.empfaenger ?? (lead as any).email, umlO ? { ...template, subject: umlO.betreffPraefix + template.subject } : template, undefined,
+                umlO ? undefined : { cc: kundenEmpfaenger(lead as any).cc });
+            })
+            .catch((e) =>
+              console.error('customer mail send threw:', e instanceof Error ? e.message : String(e)),
+            );
         }
       } else {
         // Caregiver-Event-Mails (A/B/C) — Foto inline einbetten (CID) —

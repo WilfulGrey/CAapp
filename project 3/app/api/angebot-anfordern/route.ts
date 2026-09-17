@@ -7,6 +7,7 @@ import {
   getTeamNotificationTemplate,
   getAngebotsEmailTemplate,
 } from '@/lib/email';
+import { holeBewertungsStand } from '@/lib/bewertungen-stand';
 import { testphaseUmleitung } from '@/lib/portal-schutz';
 import { parseCustomerName } from '@/lib/calculation';
 import { scheduleEmail, flushScheduledEmails } from '@/lib/lead-mails';
@@ -354,7 +355,7 @@ async function handleSendAngebotsEmailOnly(leadId: string) {
       );
     }
 
-    const angebotsEmail = getAngebotsEmailTemplate(lead, lead.kalkulation);
+    const angebotsEmail = getAngebotsEmailTemplate(lead, lead.kalkulation, await holeBewertungsStand());
     // Testphase: Portal-Leads ans Team (Umleitung nur beim Versand).
     const umlA = testphaseUmleitung(lead, process.env.PORTAL_TESTPHASE, process.env.PORTAL_TESTPHASE_EMPFAENGER);
     const emailResult = await sendEmail(
