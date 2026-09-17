@@ -93,6 +93,13 @@ const IS_PREVIEW_CHAT = PREVIEW_PARAM === 'chat';
 // die Karte sobald entweder Bewerbungen offen sind oder das Profil als
 // gespeichert gilt.
 const IS_PREVIEW_PATIENT = PREVIEW_PARAM === 'patient';
+// Dev-only: ?preview=patient&telefon=0 zeigt den Patientenbogen für einen Lead
+// OHNE Rückrufnummer (Kontakt in drei Schritten, Registry #76) — dann fragt
+// Schritt „Zur Person" die Nummer als Pflichtfeld ab.
+const PREVIEW_OHNE_TELEFON =
+  typeof window !== 'undefined'
+    ? new URLSearchParams(window.location.search).get('telefon') === '0'
+    : false;
 // Dev-only preview: Profil erfasst, 0 Bewerbungen, 0 Interest → der
 // "ready"-State ("Profil vollständig. Bewerbungen werden für Sie
 // vorbereitet. ✨"). Wird vom Multi-Job-Vorschau (?preview=jobs) als
@@ -189,7 +196,7 @@ const PREVIEW_LEAD: Lead = {
   nachname: 'Müller',
   anrede: 'Frau',
   anrede_text: 'Frau',
-  telefon: '+49 89 1234567',
+  telefon: PREVIEW_OHNE_TELEFON ? null : '+49 89 1234567',
   status: 'angebot_angefordert',
   token: 'preview-token',
   token_expires_at: null,
