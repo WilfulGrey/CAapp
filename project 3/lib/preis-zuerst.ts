@@ -101,7 +101,8 @@ export const PREIS_SEITE = {
  * hier nichts mehr den Preis — der Lohn sind die Pflegekräfte und das Portal.
  */
 export const KONTAKT_NACH_PREIS = {
-  kopf: (brutto: number) => `Ihr Preis: ${euro(brutto)} im Monat`,
+  // Kurz, damit der grüne Kopf auf dem Handy einzeilig bleibt („im Monat" stand auf der Preisseite).
+  kopf: (brutto: number) => `Ihr Preis: ${euro(brutto)}`,
   emailText: 'Ihre Berechnung und den Zugang zu Ihren Pflegekräften erhalten Sie per E-Mail.',
   knopf: `Alle ${PORTAL_ANZAHL} Pflegekräfte ansehen →`,
   // Nur für `?kontakt=alt` (heutiges Drei-Felder-Formular hinter dem Preis):
