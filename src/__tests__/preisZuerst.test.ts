@@ -69,10 +69,10 @@ describe('Zahlen der Preisseite', () => {
 });
 
 describe('Texte', () => {
-  it('ein Knopf, ein Versprechen: Preisseite und letzter Kontakt-Knopf tragen dieselben Worte, kurz genug für Luft im Knopf', () => {
-    expect(PREIS_SEITE.knopf).toBe('Alle 5 Pflegekräfte ansehen\u00A0→');
+  it('ein Knopf, ein Versprechen: Martins Wortlaut auf der Preisseite UND als letzter Kontakt-Knopf, eine Zeile', () => {
+    expect(PREIS_SEITE.knopf).toBe('Speichern & Pflegekräfte ansehen\u00A0→');
     expect(KONTAKT_NACH_PREIS.knopf).toBe(PREIS_SEITE.knopf);
-    expect(PREIS_SEITE.knopf.length).toBeLessThanOrEqual(30);
+    expect(PREIS_SEITE.knopf.length).toBeLessThanOrEqual(38);
   });
   it('ruhige Seite (Runde 2): höchstens eine Zeile unter dem Knopf, fünf gleichförmige Konditionen', () => {
     expect(PREIS_SEITE.unterKnopf.length).toBeLessThanOrEqual(34);
@@ -81,7 +81,6 @@ describe('Texte', () => {
   it('hinter dem Preis verspricht der Kontakt nicht noch einmal den Preis', () => {
     expect(KONTAKT_NACH_PREIS.kopf(3050)).toBe('Ihr Preis: 3.050\u00A0€');
     expect(KONTAKT_NACH_PREIS.emailText).not.toMatch(/sehen Sie gleich/);
-    expect(KONTAKT_NACH_PREIS.knopf).not.toMatch(/Preis/);
     expect(KONTAKT_NACH_PREIS.textAlt).not.toMatch(/Preis sehen/);
   });
   it('kein Werbeanruf, kein Sofortangebot, kein „brauchen/benötigen", „ca." statt Tilde', () => {

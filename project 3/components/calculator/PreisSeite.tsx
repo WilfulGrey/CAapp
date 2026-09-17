@@ -49,7 +49,7 @@ export function PreisSeite({ daten, onWeiter, onGarantie }: { daten: PreisDaten;
       <button
         type="button"
         onClick={onWeiter}
-        className="mt-6 w-full py-4 font-bold text-base rounded-xl bg-[#E76F63] hover:bg-[#D65E52] text-white shadow-lg hover:shadow-xl transition-all duration-200 cursor-pointer"
+        className="mt-6 w-full py-4 px-2 font-bold text-[15px] min-[400px]:text-base whitespace-nowrap rounded-xl bg-[#E76F63] hover:bg-[#D65E52] text-white shadow-lg hover:shadow-xl transition-all duration-200 cursor-pointer"
       >
         {PREIS_SEITE.knopf}
       </button>

@@ -52,6 +52,9 @@ export function euro(betrag: number): string {
   return `${Math.round(betrag).toLocaleString('de-DE')}\u00A0€`;
 }
 
+/** Der eine Knopf des Ablaufs `preis` — auf der Preisseite UND als letzter Knopf der Kontaktabfrage. */
+export const KNOPF_PREIS = 'Speichern & Pflegekräfte ansehen\u00A0→';
+
 /** vdek-Auswertung zum 01.07.2026, Bundesdurchschnitt im ersten Jahr — derselbe Wert wie im Portal (HEIM_EIGENANTEIL). */
 export const HEIM_EIGENANTEIL = 3364;
 
@@ -89,10 +92,10 @@ export const PREIS_SEITE = {
   zuschussLabel: 'Nach Zuschüssen',
   zuschussWert: (eigen: number) => `ca. ${euro(eigen)}`,
   eingerechnet: (namen: string) => (namen ? `${namen} eingerechnet` : ''),
-  // Derselbe Knopf wie am Ende der Kontaktabfrage (Martins Linie 11.09.: der
-  // Kunde klickt ein Versprechen, der letzte Knopf löst es ein). Kurz, damit
-  // er im Knopf Luft hat.
-  knopf: `Alle ${PORTAL_ANZAHL} Pflegekräfte ansehen\u00A0→`,
+  // Martins Wortlaut (17.09.): „Speichern & Pflegekräfte ansehen". Derselbe Knopf
+  // steht am Ende der Kontaktabfrage (Martins Linie 11.09.: der Kunde klickt ein
+  // Versprechen, der letzte Knopf löst es ein).
+  knopf: KNOPF_PREIS,
   // Eine Zeile neben den Fotos — „ab sofort verfügbar" sagte schon die Warteseite.
   unterKnopf: 'Passend zu Ihren Angaben',
   garantieMehr: 'Mehr Infos',
@@ -114,7 +117,7 @@ export const KONTAKT_NACH_PREIS = {
   // Kurz, damit der grüne Kopf auf dem Handy einzeilig bleibt („im Monat" stand auf der Preisseite).
   kopf: (brutto: number) => `Ihr Preis: ${euro(brutto)}`,
   emailText: 'Ihre Berechnung und den Zugang zu Ihren Pflegekräften erhalten Sie per E-Mail.',
-  knopf: `Alle ${PORTAL_ANZAHL} Pflegekräfte ansehen\u00A0→`,
+  knopf: KNOPF_PREIS,
   // Nur für `?kontakt=alt` (heutiges Drei-Felder-Formular hinter dem Preis):
   frageAlt: 'Für wen dürfen wir Ihr Kundenportal einrichten?',
   textAlt: `Dort sehen Sie alle ${PORTAL_ANZAHL} Pflegekräfte und Ihre Berechnung.`,
