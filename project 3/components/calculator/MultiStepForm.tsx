@@ -11,6 +11,8 @@ import { useFormTracking } from "@/hooks/use-form-tracking";
 import { deutschBalken, GANZ_SICHTBAR, GARANTIE, kopfzeile, kraefteVorschauAktiv, kraftFakten, parseVorschau, PORTAL_ANZAHL, SCHRANKE, VERLAUF, WARTE, wuenscheAusAntworten, type VorschauKraft } from "@/lib/kraefte-vorschau";
 import { BestpreisDialog } from "@/components/calculator/BestpreisDialog";
 import { PreisSeite, type PreisDaten } from "@/components/calculator/PreisSeite";
+import { HERO_PUNKTE } from "@/lib/hero-punkte";
+import type { SterneStand } from "@/lib/sterne-zeile";
 import { KontaktSeite, KONTAKT_FELD_ID, type KontaktFeld } from "@/components/calculator/KontaktSeite";
 import { ablaufVariante, KONTAKT_NACH_PREIS, KONTAKT_SEITE, WARTE_KURZ_ENDE_MS, WARTE_KURZ_MS, type Ablauf } from "@/lib/preis-zuerst";
 import { GARANTIE_OEFFNEN_EVENT } from "@/components/calculator/BestpreisSiegelLink";
@@ -187,9 +189,11 @@ interface MultiStepFormProps {
    * geliefert hat.
    */
   mode?: 'inline' | 'cta';
+  /** Bewertungsstand der Startseite (server-seitig geladen) — die Preisseite zeigt dieselbe Sterne-Zeile. */
+  bewertung?: SterneStand | null;
 }
 
-export function MultiStepForm({ mode = 'inline' }: MultiStepFormProps = {}) {
+export function MultiStepForm({ mode = 'inline', bewertung = null }: MultiStepFormProps = {}) {
   const { state, updateState, calculate } = useCalculator();
   const [currentStep, setCurrentStep] = useState(1);
   const [fullscreen, setFullscreen] = useState(false);
@@ -1293,11 +1297,7 @@ export function MultiStepForm({ mode = 'inline' }: MultiStepFormProps = {}) {
         {/* Einrueckung erst ab lg: auf 375px schob sie "Taeglich kuendbar,
             taggenau abgerechnet" in eine zweite Zeile. */}
         <ul className="mt-5 flex flex-col gap-3 lg:pl-1.5">
-          {[
-            'Keine Vermittlungsgebühr',
-            'Kein Vertrag vor Ihrer Auswahl',
-            'Täglich kündbar, taggenau abgerechnet',
-          ].map((punkt) => (
+          {HERO_PUNKTE.map((punkt) => (
             <li key={punkt} className="flex items-center gap-2.5">
               <svg className="h-[18px] w-[18px] flex-shrink-0 text-[#E76F63]" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24" aria-hidden="true">
                 <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
@@ -1784,7 +1784,7 @@ export function MultiStepForm({ mode = 'inline' }: MultiStepFormProps = {}) {
                   ) : preisModus && !kontaktOffen && preisDaten ? (
                     /* Preis zuerst (Registry #77): Preis, Zuschüsse, Garantie,
                        Konditionen, Kräfte — dann der Knopf zur Kontaktabfrage. */
-                    <PreisSeite daten={preisDaten} onWeiter={oeffneKontaktNachPreis} onGarantie={oeffneGarantie} />
+                    <PreisSeite daten={preisDaten} bewertung={bewertung} onWeiter={oeffneKontaktNachPreis} onGarantie={oeffneGarantie} />
                   ) : preisModus && kontaktOffen && !stufenAktiv ? (
                     /* Kontaktseite hinter dem Preis: eine Seite, drei Felder, ein Knopf. */
                     <KontaktSeite

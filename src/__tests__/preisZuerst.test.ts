@@ -11,6 +11,7 @@ import {
   WARTE_KURZ_MS,
   zuschussNamen,
 } from '../../project 3/lib/preis-zuerst';
+import { HERO_PUNKTE } from '../../project 3/lib/hero-punkte';
 
 // Registry #77 (Martin 17.09.2026): Preis vor den Kontaktdaten, 50/50 gegen den heutigen Weg.
 
@@ -76,9 +77,8 @@ describe('Texte', () => {
     expect(KONTAKT_NACH_PREIS.knopf).toBe(PREIS_SEITE.knopf);
     expect(PREIS_SEITE.knopf.length).toBeLessThanOrEqual(38);
   });
-  it('ruhige Seite (Runde 2): höchstens eine Zeile unter dem Knopf, fünf gleichförmige Konditionen', () => {
+  it('ruhige Seite (Runde 2): höchstens eine kurze Zeile unter dem Knopf', () => {
     expect(PREIS_SEITE.unterKnopf.length).toBeLessThanOrEqual(34);
-    expect(PREIS_SEITE.haken).toHaveLength(5);
   });
   it('hinter dem Preis verspricht der Kontakt nicht noch einmal den Preis', () => {
     expect(KONTAKT_NACH_PREIS.kopf(3050)).toBe('Ihr Preis: 3.050\u00A0€');
@@ -99,10 +99,10 @@ describe('Texte', () => {
     expect(JSON.stringify(KONTAKT_SEITE)).not.toMatch(/Portal|Fast geschafft|Nur noch/);
     expect(Object.keys(KONTAKT_SEITE.label)).toEqual(['name', 'email', 'phone']);
   });
-  it('Bewertungszeile: Wortlaut wie überall („4,9 von 5 aus 126 Bewertungen"), Zahlen kommen live — keine im Code', () => {
-    expect(`4,9 ${PREIS_SEITE.bewertungVon} ${PREIS_SEITE.bewertungAnzahl(126)}`).toBe('4,9 von 5 aus 126 Bewertungen');
-    expect(PREIS_SEITE.bewertungAnzahl(1)).toBe('1 Bewertung');
-    expect(JSON.stringify(PREIS_SEITE)).not.toMatch(/Google|4[.,]8|126/);
+  it('unter dem Knopf wie auf der Startseite: dieselben drei Punkte aus EINER Quelle, keine Bewertungszahl im Code', () => {
+    expect([...HERO_PUNKTE]).toEqual(['Keine Vermittlungsgebühr', 'Kein Vertrag vor Ihrer Auswahl', 'Täglich kündbar, taggenau abgerechnet']);
+    expect(JSON.stringify(PREIS_SEITE)).not.toMatch(/Google|4[.,]\d von 5|126/);
+    expect(PREIS_SEITE.marta.frage).toBe('Fragen zu Ihrem Preis?');
   });
   it('Warteseite im Ablauf Preis: ca. 3 s statt 10,7 s', () => {
     const gesamt = WARTE_KURZ_MS.reduce((a, b) => a + b, 0) + 300 + WARTE_KURZ_ENDE_MS;

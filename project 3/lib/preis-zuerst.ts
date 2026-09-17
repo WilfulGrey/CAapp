@@ -85,9 +85,9 @@ export const PREIS_SEITE = {
   // Satz der Portal-Kostenkarte; die Garantie hängt als Wort mit Link an
   // („mit Bestpreisgarantie" = GARANTIE.vorsatz + GARANTIE.wort, wie im Kopf des Kontakt-Schritts).
   proMonat: 'im Monat',
+  // Satz der Portal-Kostenkarte. Die Garantie steht EINMAL auf der Seite: als vierter
+  // Punkt unter dem Knopf, wie auf der Startseite (Martin: nicht doppelt).
   inklusive: 'Inkl. Steuern, Gebühren und Sozialabgaben.',
-  // „Mit Bestpreisgarantie." steht dazwischen — das Wort ist der Link zum Pop-up (GARANTIE.wort).
-  mitGarantie: 'Mit',
   zuzueglich: 'Zzgl. Kost und Logis sowie Reisekosten (125\u00A0€ pro Fahrt).',
   zuschussLabel: 'Nach Zuschüssen',
   zuschussWert: (eigen: number) => `ca. ${euro(eigen)}`,
@@ -99,12 +99,10 @@ export const PREIS_SEITE = {
   // Eine Zeile neben den Fotos — „ab sofort verfügbar" sagte schon die Warteseite.
   unterKnopf: 'Passend zu Ihren Angaben',
   garantieMehr: 'Mehr Infos',
-  // Bewertungszeile UNTER den Punkten, wie im Hero von primundus.de (Martin 17.09.:
-  // „aus 126 Bewertungen, wie es überall steht" — nicht „Google Bewertungen", nicht bunt).
-  // Schnitt und Anzahl kommen live aus /api/bewertungen-stand; ohne echte Zahl keine Zeile.
-  bewertungVon: 'von 5 aus',
-  bewertungAnzahl: (n: number) => (n === 1 ? '1 Bewertung' : `${n} Bewertungen`),
-  haken: ['Täglich kündbar', 'Tagesgenaue Abrechnung', 'Erst auswählen, dann buchen', 'Keine Vermittlungsgebühr', 'Kosten erst, wenn die Pflegekraft da ist'],
+  // Unter dem Knopf wie auf der Startseite (Martin 17.09.): die Hero-Punkte
+  // (lib/hero-punkte.ts) mit „Bestpreisgarantie · Mehr Infos" als viertem, die
+  // Sterne-Zeile (lib/sterne-zeile.ts, live von primundus.de), darunter Marta.
+  marta: { frage: 'Fragen zu Ihrem Preis?', text: 'Ich erkläre Ihnen gern, wie sich Ihr Preis zusammensetzt – schnell und unverbindlich.' },
   /** Nur wenn zuhause günstiger ist als das Heim — sonst kein Satz (kein Schönrechnen). */
   heim: (eigen: number): string | null => {
     const weniger = HEIM_EIGENANTEIL - eigen;
