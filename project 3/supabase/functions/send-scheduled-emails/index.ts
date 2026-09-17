@@ -67,6 +67,14 @@ import {
   type BewertungsLead,
 } from "./bewertung.ts";
 import { kundenEmpfaenger, ccListe } from "./empfaenger.ts";
+// Bewertungszeile unter Martas Karte (Martin, 17.09.2026) — Kopie von
+// lib/bewertungen-stand.ts, Stand wird einmal pro Aufruf geladen (siehe unten).
+import {
+  type BewertungsStand,
+  BEWERTUNGS_STAND_ERSATZ,
+  bewertungsZeileHtml,
+  ladeBewertungsStand,
+} from "./bewertungenStand.ts";
 import {
   portalHerkunft,
   portalIntroHtml,
@@ -331,7 +339,16 @@ function buildEmailWrapper(
 </html>`;
 }
  
-function buildMartaSig(siteUrl: string): string {
+/* Bewertungsstand fuer die Zeile unter der Karte. Der Handler setzt ihn
+   einmal pro Aufruf (Demo-Vorschau und Versand), bevor Mails gebaut werden —
+   die ~15 Mail-Bauer bleiben so unveraendert synchron. Bis dahin (und wenn
+   primundus.de nicht antwortet) gilt der Ersatzwert. */
+let bewertungsStand: BewertungsStand = BEWERTUNGS_STAND_ERSATZ;
+
+function buildMartaSig(siteUrl: string, opts: { mitBewertung?: boolean } = {}): string {
+  /* Vermittler-Mails (Geschaeftspartner, kein Endkunde) bekommen die Karte
+     OHNE Bewertungszeile: { mitBewertung: false }. */
+  const bewertungsZeile = opts.mitBewertung === false ? "" : bewertungsZeileHtml(bewertungsStand);
   // Martas Foto kommt aus primundus.de statt vom Kostenrechner (20.08.):
   // Beide Dienste deployen unabhaengig voneinander. Nach dem Foto-Wechsel
   // (#481) war die neue Datei auf primundus.de sofort da, der
@@ -345,7 +362,7 @@ function buildMartaSig(siteUrl: string): string {
   const mediaBase = `${siteUrl}/images/media`;
   return `
     <p style="font-size:16px;line-height:1.7;color:#555;margin-top:24px;margin-bottom:16px;">Mit freundlichen Grüßen<br><strong style="color:#3D2B1F;">Marta Kapcio</strong></p>
-    <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="margin:0 0 24px 0;border:1px solid #e8ddd0;border-radius:12px;overflow:hidden;">
+    <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="margin:${bewertungsZeile ? "0" : "0 0 24px 0"};border:1px solid #e8ddd0;border-radius:12px;overflow:hidden;">
       <tr>
         <td style="padding:18px 20px 16px;background:#ffffff;">
           <table width="100%" cellpadding="0" cellspacing="0" role="presentation">
@@ -416,7 +433,7 @@ function buildMartaSig(siteUrl: string): string {
           </tr></table>
         </td>
       </tr>
-    </table>`;
+    </table>${bewertungsZeile}`;
 }
  
 // ── Portal-Link + Lead-Meilenstein ────────────────────────────────────────
@@ -2396,6 +2413,8 @@ Deno.serve(async (req: Request) => {
       const portalBase = Deno.env.get("PORTAL_URL") || "https://kundenportal.primundus.de";
       const site = smtpConfig.siteUrl;
       const to = demoBody.recipient;
+      // Die Vorschau zeigt dieselbe Bewertungszeile wie der Versand.
+      bewertungsStand = await ladeBewertungsStand(fetch);
       const ms = (demoBody.milestone || "none") as LeadMilestone;
       const pu = (portalBase && (lead as Lead).token) ? buildPortalUrl(portalBase, (lead as Lead).token) : site;
 
@@ -2476,7 +2495,7 @@ Deno.serve(async (req: Request) => {
           case "vermittler_angebot": {
             const d = {
               anrede: demoAnrede, kundeLabel: demoMeta.kunde_label,
-              signatur: buildMartaSig(site),
+              signatur: buildMartaSig(site, { mitBewertung: false }),
               bruttopreis: Number((lead as any).kalkulation?.bruttopreis ?? 0),
               provisionProTag: demoMeta.provision_pro_tag,
               empfehlung: demoVermittlerEmpf?.empfehlung ?? null,
@@ -2488,7 +2507,7 @@ Deno.serve(async (req: Request) => {
           case "vermittler_kraefte": {
             const d = {
               anrede: demoAnrede, kundeLabel: demoMeta.kunde_label,
-              signatur: buildMartaSig(site),
+              signatur: buildMartaSig(site, { mitBewertung: false }),
               fuenf: demoVermittlerFuenf?.fuenf ?? [], cids: demoVermittlerFuenf?.cids ?? [],
             };
             return { subject: demoMeta.betreff_antwort, html: buildEmailWrapper(lead as Lead, site, vermittlerKraefteHtml(d), VERMITTLER_FUSSNOTE, VERMITTLER_ABSENDER), text: vermittlerKraefteText(d) };
@@ -2558,6 +2577,10 @@ Deno.serve(async (req: Request) => {
       );
     }
  
+    // Bewertungszeile unter Martas Karte: einmal pro Aufruf laden (≤ 2 s,
+    // sonst Ersatzwert) — erst hier, damit leere Takte primundus.de nicht fragen.
+    bewertungsStand = await ladeBewertungsStand(fetch);
+
     const results: { id: string; success: boolean; error?: string; flagged?: boolean }[] = [];
     // Echte Versand-Fehlschläge dieses Laufs sammeln → EINE Sammel-Alarm-Mail
     // ans Team am Ende (siehe notifyOpsOfFailures). Geflaggte Domains zählen
@@ -2947,7 +2970,7 @@ Deno.serve(async (req: Request) => {
             /* Dieselbe Grussformel, Beraterinnen-Karte und Vertrauensleiste wie
                in jeder Kundenmail — ohne sie stand die Vermittler-Mail ohne
                Absenderin, ohne Telefonnummer und ohne Siegel da. */
-            signatur: buildMartaSig(smtpConfig.siteUrl),
+            signatur: buildMartaSig(smtpConfig.siteUrl, { mitBewertung: false }),
             kundeLabel: (meta.kunde_label as string) || null,
             bruttopreis: Number(kalk.bruttopreis ?? 0),
             provisionProTag: Number(meta.provision_pro_tag ?? 0),
@@ -2992,7 +3015,7 @@ Deno.serve(async (req: Request) => {
             /* Dieselbe Grussformel, Beraterinnen-Karte und Vertrauensleiste wie
                in jeder Kundenmail — ohne sie stand die Vermittler-Mail ohne
                Absenderin, ohne Telefonnummer und ohne Siegel da. */
-            signatur: buildMartaSig(smtpConfig.siteUrl),
+            signatur: buildMartaSig(smtpConfig.siteUrl, { mitBewertung: false }),
             kundeLabel: (meta.kunde_label as string) || null,
             fuenf: teile.fuenf, cids: teile.cids,
           };

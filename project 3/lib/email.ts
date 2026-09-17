@@ -4,6 +4,10 @@ import { getEmailLayout } from './email-template';
 import { PORTAL_BASIS } from './portal-url';
 import { quelleBetreff, websiteHerkunftLabel } from './lead-quelle';
 import { LABELS } from './angaben-labels';
+// Bewertungszeile unter Martas Karte (Martin, 17.09.2026). Den Stand holt der
+// Aufrufer per holeBewertungsStand() und reicht ihn herein — die Vorlagen
+// bleiben synchron und ohne Netzaufruf.
+import { type BewertungsStand, bewertungsZeileHtml, holeBewertungsStand } from './bewertungen-stand';
 
 // Eigennamen sauber großschreiben: jedes Wort + jeden Bindestrich-Teil
 // kapitalisieren. Namens-Partikel (von, van, de, zu, …) bleiben klein —
@@ -275,7 +279,8 @@ www.primundus.de
 
 export function getEingangsbestaetigungEmailTemplate(
   lead: Lead,
-  kalkulation: Kalkulation
+  kalkulation: Kalkulation,
+  bewertung: BewertungsStand,
 ): EmailTemplate {
   const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://primundus.de';
 
@@ -315,7 +320,7 @@ export function getEingangsbestaetigungEmailTemplate(
 
   const martaSignatur = `
     <!-- Marta Signatur-Block -->
-    <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="margin: 0 0 32px 0; border: 1px solid #e8ddd0; border-radius: 12px; overflow: hidden;">
+    <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="margin: 0; border: 1px solid #e8ddd0; border-radius: 12px; overflow: hidden;">
       <tr>
         <td style="padding: 18px 20px 16px; background: #ffffff;">
           <table width="100%" cellpadding="0" cellspacing="0" role="presentation">
@@ -398,7 +403,7 @@ export function getEingangsbestaetigungEmailTemplate(
           </table>
         </td>
       </tr>
-    </table>
+    </table>${bewertungsZeileHtml(bewertung, 32)}
   `;
 
   const content = `
@@ -540,6 +545,7 @@ www.primundus.de
 export function getAngebotsEmailTemplate(
   lead: Lead,
   kalkulation: Kalkulation,
+  bewertung: BewertungsStand,
   options?: { isResend?: boolean }
 ): EmailTemplate {
   const isResend = options?.isResend === true;
@@ -641,7 +647,7 @@ export function getAngebotsEmailTemplate(
     <p style="font-size: 16px; line-height: 1.7; color: #555; margin-top: 30px; margin-bottom: 20px;">Mit freundlichen Grüßen<br><strong style="color: #3D2B1F;">Marta Kapcio</strong></p>
 
     <!-- Marta Signatur-Block -->
-    <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="margin: 0 0 32px 0; border: 1px solid #e8ddd0; border-radius: 12px; overflow: hidden;">
+    <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="margin: 0; border: 1px solid #e8ddd0; border-radius: 12px; overflow: hidden;">
       <!-- Marta + Testsieger -->
       <tr>
         <td style="padding: 18px 20px 16px; background: #ffffff;">
@@ -738,7 +744,7 @@ export function getAngebotsEmailTemplate(
           </table>
         </td>
       </tr>
-    </table>
+    </table>${bewertungsZeileHtml(bewertung, 32)}
 
     ${resendNotice}
   `;
@@ -1273,6 +1279,7 @@ Lead im Admin-Panel: ${process.env.NEXT_PUBLIC_SITE_URL}/admin/leads/${lead.id}
 
 export function getVertragEmailTemplate(
   lead: Lead,
+  bewertung: BewertungsStand,
   options: {
     subject?: string;
     anschreiben?: string;
@@ -1309,7 +1316,7 @@ export function getVertragEmailTemplate(
 
   const martaSignatur = `
     <!-- Marta Signatur-Block -->
-    <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="margin: 0 0 32px 0; border: 1px solid #e8ddd0; border-radius: 12px; overflow: hidden;">
+    <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="margin: 0; border: 1px solid #e8ddd0; border-radius: 12px; overflow: hidden;">
       <tr>
         <td style="padding: 18px 20px 16px; background: #ffffff;">
           <table width="100%" cellpadding="0" cellspacing="0" role="presentation">
@@ -1386,7 +1393,7 @@ export function getVertragEmailTemplate(
           </table>
         </td>
       </tr>
-    </table>
+    </table>${bewertungsZeileHtml(bewertung, 32)}
   `;
 
   const detailRows = [
@@ -1646,10 +1653,10 @@ function customerGreeting(lead: Lead): string {
 // Marta-Signatur-Karte — zentral für alle Caregiver-Event-Mails (A/B/C) und
 // das neue Mail-11-Layout. Identisch zur Eingangsbestätigung, damit die
 // gesamte Mail-Reihe optisch zusammenpasst.
-function caregiverMartaSig(baseUrl: string): string {
+function caregiverMartaSig(baseUrl: string, bewertung: BewertungsStand): string {
   return `
     <p style="font-size:16px;line-height:1.7;color:#555;margin-top:24px;margin-bottom:16px;">Mit freundlichen Grüßen<br><strong style="color:#3D2B1F;">Marta Kapcio</strong></p>
-    <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="margin:0 0 24px 0;border:1px solid #e8ddd0;border-radius:12px;overflow:hidden;">
+    <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="margin:0;border:1px solid #e8ddd0;border-radius:12px;overflow:hidden;">
       <tr>
         <td style="padding:18px 20px 16px;background:#ffffff;">
           <table width="100%" cellpadding="0" cellspacing="0" role="presentation">
@@ -1696,7 +1703,7 @@ function caregiverMartaSig(baseUrl: string): string {
           <td style="padding:12px 0;text-align:center;width:33%;"><p style="margin:0;font-size:12px;color:#555;line-height:1.4;">Persönlicher<br>Ansprechpartner,<br>7&nbsp;Tage/Woche</p></td>
         </tr></table>
       </td></tr>
-    </table>`;
+    </table>${bewertungsZeileHtml(bewertung)}`;
 }
 
 // Gemeinsame HTML-Shell (Header + Content + Footer) für alle Caregiver-
@@ -1841,6 +1848,7 @@ function buildCaregiverEventEmail(opts: {
   plainSummary: string;    // Plaintext-Fallback (intro + middle, ohne HTML)
   psHtml?: string;         // optionales P.S. (z.B. Gebührenfreiheit) — vor der Sig
   psText?: string;         // Plaintext-Pendant des P.S.
+  bewertung: BewertungsStand; // Bewertungszeile unter der Marta-Karte
 }): EmailTemplate {
   const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://primundus.de';
   const greeting = customerGreeting(opts.lead);
@@ -1880,7 +1888,7 @@ function buildCaregiverEventEmail(opts: {
       </td></tr>
     </table>`;
 
-  const martaSig = caregiverMartaSig(baseUrl);
+  const martaSig = caregiverMartaSig(baseUrl, opts.bewertung);
 
   const content = `
     <p style="font-size:15px;line-height:1.75;color:#444;margin-bottom:14px;">${greeting},</p>
@@ -1938,6 +1946,7 @@ www.primundus.de
 export function getPatientDataSavedEmailTemplate(
   lead: Lead,
   portalUrl: string,
+  bewertung: BewertungsStand,
 ): EmailTemplate {
   const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://primundus.de';
   const greeting = customerGreeting(lead);
@@ -1955,7 +1964,7 @@ export function getPatientDataSavedEmailTemplate(
   // optisch konsistent bleibt.
   const martaSig = `
     <p style="font-size:16px;line-height:1.7;color:#555;margin-top:24px;margin-bottom:16px;">Mit freundlichen Grüßen<br><strong style="color:#3D2B1F;">Marta Kapcio</strong></p>
-    <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="margin:0 0 24px 0;border:1px solid #e8ddd0;border-radius:12px;overflow:hidden;">
+    <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="margin:0;border:1px solid #e8ddd0;border-radius:12px;overflow:hidden;">
       <tr>
         <td style="padding:18px 20px 16px;background:#ffffff;">
           <table width="100%" cellpadding="0" cellspacing="0" role="presentation">
@@ -2002,7 +2011,7 @@ export function getPatientDataSavedEmailTemplate(
           <td style="padding:12px 0;text-align:center;width:33%;"><p style="margin:0;font-size:12px;color:#555;line-height:1.4;">Persönlicher<br>Ansprechpartner,<br>7&nbsp;Tage/Woche</p></td>
         </tr></table>
       </td></tr>
-    </table>`;
+    </table>${bewertungsZeileHtml(bewertung)}`;
 
   const content = `
     <p style="font-size:15px;line-height:1.75;color:#444;margin-bottom:14px;">${greeting},</p>
@@ -2130,6 +2139,7 @@ export function getOfferUpdatedEmailTemplate(
   lead: Lead,
   info: OfferUpdatedInfo,
   portalUrl: string,
+  bewertung: BewertungsStand,
 ): EmailTemplate {
   const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://primundus.de';
   const greeting = customerGreeting(lead);
@@ -2180,7 +2190,7 @@ export function getOfferUpdatedEmailTemplate(
     ${eigenanteilHtml}
     ${bulletproofButton(portalUrl, 'Aktualisiertes Angebot ansehen →')}
     <p style="font-size:14px;line-height:1.65;color:#555;margin:18px 0 0;">Bei Fragen zur Anpassung erreichen Sie uns telefonisch unter <a href="tel:+4989200000830" style="color:#0066CC;text-decoration:none;">+49 89 200 000 830</a> oder per E-Mail an <a href="mailto:info@primundus.de" style="color:#0066CC;text-decoration:none;">info@primundus.de</a>.</p>
-    ${caregiverMartaSig(baseUrl)}`;
+    ${caregiverMartaSig(baseUrl, bewertung)}`;
 
   const html = caregiverMailShell(baseUrl, lead.email, content, customerUnsubscribeUrl(lead) || undefined);
 
@@ -2220,6 +2230,7 @@ export function getCaregiverInterestEmailTemplate(
   lead: Lead,
   caregiver: CaregiverDisplay,
   portalUrl: string,
+  bewertung: BewertungsStand,
 ): EmailTemplate {
   const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://primundus.de';
   const greeting = customerGreeting(lead);
@@ -2271,7 +2282,7 @@ export function getCaregiverInterestEmailTemplate(
     ${stepsTable}
     ${bestpreisBox}
     <p style="font-size:15px;line-height:1.75;color:#444;margin:30px 0 18px;">Wenn Sie Fragen zu ${firstName}s Profil haben oder Unterstützung bei der Einschätzung möchten — rufen Sie mich an, schreiben Sie mir per WhatsApp oder antworten Sie einfach auf diese E-Mail. Ich bin gerne für Sie da.</p>
-    ${caregiverMartaSig(baseUrl)}`;
+    ${caregiverMartaSig(baseUrl, bewertung)}`;
 
   const html = caregiverMailShell(baseUrl, lead.email, content, customerUnsubscribeUrl(lead));
 
@@ -2335,7 +2346,8 @@ export function getApplicationReceivedEmailTemplate(
   lead: Lead,
   caregiver: CaregiverDisplay,
   portalUrl: string,
-  offer?: OfferInfo,
+  offer: OfferInfo | undefined,
+  bewertung: BewertungsStand,
 ): EmailTemplate {
   const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://primundus.de';
   const greeting = customerGreeting(lead);
@@ -2451,7 +2463,7 @@ export function getApplicationReceivedEmailTemplate(
     ${stepsTable}
     ${bestpreisBox}
     <p style="font-size:15px;line-height:1.75;color:#444;margin:28px 0 18px;">Wenn Sie Fragen zu ${firstName}s Bewerbung haben oder Unterstützung bei der Entscheidung möchten — rufen Sie mich an, schreiben Sie mir per WhatsApp oder antworten Sie einfach auf diese E-Mail. Ich bin gerne für Sie da.</p>
-    ${caregiverMartaSig(baseUrl)}`;
+    ${caregiverMartaSig(baseUrl, bewertung)}`;
 
   const html = caregiverMailShell(baseUrl, lead.email, content, customerUnsubscribeUrl(lead));
 
@@ -2497,6 +2509,7 @@ export function getBookingConfirmedEmailTemplate(
   lead: Lead,
   caregiver: CaregiverDisplay,
   portalUrl: string,
+  bewertung: BewertungsStand,
 ): EmailTemplate {
   const firstName = caregiver.name.split(' ')[0];
   const introHtml = `<p style="font-size:15px;line-height:1.75;color:#444;margin-bottom:18px;">schön, dass Sie sich für <strong style="color:#2D1F0F;">${caregiver.name}</strong> entschieden haben. <strong style="color:#2D1F0F;">Ihre Buchung ist bei uns eingegangen</strong> — wir kümmern uns jetzt um alle weiteren Schritte.</p>`;
@@ -2509,6 +2522,7 @@ export function getBookingConfirmedEmailTemplate(
     middleHtml,
     ctaText: 'Status im Portal ansehen →',
     portalUrl,
+    bewertung,
     plainSummary: `schön, dass Sie sich für ${caregiver.name} entschieden haben. Ihre Buchung ist bei uns eingegangen — wir kümmern uns jetzt um alle weiteren Schritte. Wir stoßen die Vertragsunterlagen an und stimmen den Anreisetermin mit ${firstName} ab. Innerhalb der nächsten Werktage meldet sich Ihr persönlicher Ansprechpartner bei Ihnen, um die letzten Details zu klären — zum Beispiel den genauen Tag der Anreise, Zimmer und Schlüsselübergabe.`,
   });
 }
@@ -2522,12 +2536,13 @@ export function getBookingConfirmedEmailTemplate(
 export function getTokenRegenerationEmailTemplate(
   lead: Lead,
   portalUrl: string,
+  bewertung: BewertungsStand,
 ): EmailTemplate {
   const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://primundus.de';
   const greeting = customerGreeting(lead);
 
   const martaSignatur = `
-    <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="margin: 0 0 32px 0; border: 1px solid #e8ddd0; border-radius: 12px; overflow: hidden;">
+    <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="margin: 0; border: 1px solid #e8ddd0; border-radius: 12px; overflow: hidden;">
       <tr>
         <td style="padding: 18px 20px 16px; background: #ffffff;">
           <table width="100%" cellpadding="0" cellspacing="0" role="presentation">
@@ -2562,7 +2577,7 @@ export function getTokenRegenerationEmailTemplate(
           </table>
         </td>
       </tr>
-    </table>`;
+    </table>${bewertungsZeileHtml(bewertung, 32)}`;
 
   const content = `
     <p style="font-size: 17px; font-weight: 700; color: #3D2B1F; margin: 0 0 16px 0; line-height: 1.5;">${greeting},</p>
@@ -2780,16 +2795,19 @@ export async function buildCustomerCaregiverMailWithInlinePhoto(
   portalUrl: string,
   offer?: OfferInfo,
 ): Promise<{ template: EmailTemplate; attachments?: any[] }> {
-  const inline = await fetchInlineCaregiverPhoto(caregiver.photoUrl);
+  const [inline, bewertung] = await Promise.all([
+    fetchInlineCaregiverPhoto(caregiver.photoUrl),
+    holeBewertungsStand(),
+  ]);
 
   const caregiverForTemplate: CaregiverDisplay = inline
     ? { ...caregiver, photoUrl: `cid:${inline.cid}` }
     : caregiver;
 
   const template =
-    event === 'caregiver_interest_shown'      ? getCaregiverInterestEmailTemplate(lead, caregiverForTemplate, portalUrl)
-  : event === 'application_accepted_internal' ? getBookingConfirmedEmailTemplate(lead, caregiverForTemplate, portalUrl)
-  :                                             getApplicationReceivedEmailTemplate(lead, caregiverForTemplate, portalUrl, offer);
+    event === 'caregiver_interest_shown'      ? getCaregiverInterestEmailTemplate(lead, caregiverForTemplate, portalUrl, bewertung)
+  : event === 'application_accepted_internal' ? getBookingConfirmedEmailTemplate(lead, caregiverForTemplate, portalUrl, bewertung)
+  :                                             getApplicationReceivedEmailTemplate(lead, caregiverForTemplate, portalUrl, offer, bewertung);
 
   return inline
     ? { template, attachments: [inline] }
