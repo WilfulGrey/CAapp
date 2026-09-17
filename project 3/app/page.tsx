@@ -202,7 +202,7 @@ export default async function HomePage() {
                   Scrollbereich) und funktioniert in jeder Breite.
                   Die Punkte unter dem Button stecken in MultiStepForm. */}
               <div className="mb-7 max-w-md">
-                <MultiStepForm mode="cta" />
+                <MultiStepForm mode="cta" bewertung={bewertung} />
                 {/* Bewertungssterne zentriert unter dem letzten Punkt, vor den
                     Logos (Martin 17.09.2026). */}
                 <BewertungsZeile stand={bewertung} />

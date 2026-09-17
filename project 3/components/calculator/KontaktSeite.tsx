@@ -1,6 +1,7 @@
 'use client';
 
-import { KONTAKT_SEITE } from '@/lib/preis-zuerst';
+import { KONTAKT_SEITE, MARTA_KARTE } from '@/lib/preis-zuerst';
+import { PersonalContact } from '@/components/calculator/PersonalContact';
 
 /**
  * Kontaktseite HINTER dem Preis (Registry #77, Martin 17.09.2026: „Diese Seite
@@ -31,6 +32,7 @@ export function KontaktSeite({ werte, fehler, serverFehler, sendet, onAendern, o
   const fehlerZeile = (f: KontaktFeld) =>
     fehler[f] ? <p id={`${KONTAKT_FELD_ID[f]}-fehler`} role="alert" className="mt-1.5 text-[13px] text-red-600">{fehler[f]}</p> : null;
   return (
+    <div>
     <form id="kontakt-seite" noValidate onSubmit={(e) => { e.preventDefault(); onAbsenden(); }} className="pt-2">
       <p className="text-[21px] leading-tight font-bold text-[#1a1a1a] [text-wrap:balance]">{KONTAKT_SEITE.frage}</p>
       <div className="mt-3 flex items-center gap-3">
@@ -120,5 +122,10 @@ export function KontaktSeite({ werte, fehler, serverFehler, sendet, onAendern, o
         {KONTAKT_SEITE.datenschutzNach}
       </p>
     </form>
+    {/* Ganz unten, außerhalb des Formulars: Marta wie auf der Preisseite (Martin 17.09.). */}
+    <div className="mt-7 border-t border-[#EEE9E0] pt-5">
+      <PersonalContact headline={MARTA_KARTE.frage} body={MARTA_KARTE.text} />
+    </div>
+    </div>
   );
 }

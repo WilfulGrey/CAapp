@@ -1663,8 +1663,10 @@ const CustomerPortalPage: FC = () => {
       refetchAcceptedApplications();
       // PDF-Upload zu Mamamia übernimmt jetzt die Server-Sequenz
       // (sync-acceptance, von der Bridge getriggert): der Guard adoptiert die
-      // längst existierende final_confirmation (Caregiver-Match) und hängt den
-      // Vertrag dort an — wichtig für PK-Wechsel-Fälle (Schiffer/Dachs 15.07.).
+      // längst existierende final_confirmation (Match über die Bewerbung, die
+      // fc-Kotwica oder Job+Pflegekraft — NIE nur über die Pflegekraft, Registry
+      // #78) und hängt den Vertrag dort an — wichtig für PK-Wechsel-Fälle
+      // (Schiffer/Dachs 15.07.).
       // Team-Mail-Resend, best-effort: Fehler nur loggen — die kritische
       // Persistenz (Upsert oben) ist bereits erfolgreich gelaufen.
       fetch(`${KOSTENRECHNER_URL}/api/lead-event`, {

@@ -119,8 +119,17 @@ Stałe: `RETRY_DELAYS_MS = [15s, 30s, 60s]` (`sync-acceptance/index.ts`);
 ## Guardy idempotencji (nigdy podwójny akcept)
 
 - **Adopcja:** przed StoreConfirmation moduł czyta `Customer.job_offers[].final_confirmation`
-  — jeśli istnieje confirmation dla **tej opiekunki** (caregiver-match: stare bundle,
-  SA-Portal, wcześniejszy retry po zgubionej odpowiedzi) → przejmuje jej id, NIE strzela.
+  — jeśli istnieje confirmation, która **należy do tego wiersza** (`gehoertZurRow`, Registry #78):
+  ta sama Bewerbung (`fc.application_id === row.application_id` — stare bundle, retry po
+  zgubionej odpowiedzi, panel zabookował tę samą Bewerbung), kotwica adopcyjna
+  (`fc.id === row.application_id`, Vertrag nachträglich) LUB ten sam job + ta sama PK
+  (job z `lead_events.application_accepted_internal.mamamia_job_offer_id`; panel zabookował
+  inną Bewerbung tej samej PK na tym jobie) → przejmuje jej id, NIE strzela. **Nigdy po samym
+  `caregiver_id`** — ta sama opiekunka wraca na kolejne turnusy (Fall Berg 9753: stary akcept
+  4296 przejęty dla nowej Bewerbung i przepięty uploadem). Faza PDF ma ten sam mur PRZED
+  StoreFile (obcy stempel ⇒ defer „Stempel prüfen"), a `UpdateConfirmation` dostaje zawsze
+  `application_id` z samej confirmation, nigdy z wiersza (MM od 17.09 odrzuca każdą inną
+  wartość: „The selected application id is invalid"; pole nadal wymagane).
 - **skip_confirm:** stare zakeszowane bundle wciąż wołają storeConfirmation same i wysyłają
   `metadata.mamamia_accepted=true` → bridge przekazuje `skip_confirm` → moduł nie dubluje
   (czeka aż final_confirmation będzie widoczne — wtedy adopcja).

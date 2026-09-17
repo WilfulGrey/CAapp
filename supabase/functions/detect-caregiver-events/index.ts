@@ -155,6 +155,8 @@ export interface DetectSupabase {
   stampAcceptanceConfirmed?(leadId: string, applicationId: number, confirmationId: number | null): Promise<void>;
   stampAcceptancePdfUploaded?(leadId: string, applicationId: number, sha256: string | null): Promise<void>;
   stampAcceptanceSyncAlerted?(leadId: string, applicationId: number): Promise<void>;
+  /** Job der Bewerbung aus dem Akzept-Event (Guard-Weg 3, Registry #78). Optional wie die vier oben. */
+  fetchAcceptanceJobOfferId?(leadId: string, applicationId: number): Promise<number | null>;
   // Follow-up Discovery (Bug #25): Leads außerhalb des Active-Sets, deren
   // Mamamia-Customer einen NEU eröffneten geplanten Job haben könnte.
   // Selbst-taktend via leads.mamamia_jobs_checked_at. Alle drei optional —
@@ -539,6 +541,7 @@ export async function retryAcceptanceSyncs(
         supabase: {
           stampConfirmed: supa.stampAcceptanceConfirmed.bind(supa),
           stampPdfUploaded: supa.stampAcceptancePdfUploaded.bind(supa),
+          fetchAcceptanceJobOfferId: (l, a) => supa.fetchAcceptanceJobOfferId?.(l, a) ?? Promise.resolve(null),
         },
         getAgencyToken: () =>
           getOrRefreshAgencyToken({
@@ -1548,6 +1551,23 @@ function makeRealSupabase(url: string, serviceKey: string): DetectSupabase {
         .eq("lead_id", leadId)
         .eq("application_id", applicationId);
       if (error) throw new Error(`supabase stampAcceptancePdfUploaded: ${error.message}`);
+    },
+    // Kopie von sync-acceptance/acceptanceJobOfferIdFromEvents (Edge Fns
+    // teilen keine Store-Module) — Änderungen synchron halten.
+    async fetchAcceptanceJobOfferId(leadId: string, applicationId: number) {
+      const { data, error } = await client
+        .from("lead_events")
+        .select("mamamia_job_offer_id")
+        .eq("lead_id", leadId)
+        .eq("event_type", "application_accepted_internal")
+        .eq("metadata->>application_id", String(applicationId))
+        .not("mamamia_job_offer_id", "is", null)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (error) throw new Error(`supabase fetchAcceptanceJobOfferId: ${error.message}`);
+      const id = (data as { mamamia_job_offer_id?: unknown } | null)?.mamamia_job_offer_id;
+      return typeof id === "number" ? id : null;
     },
     async stampAcceptanceSyncAlerted(leadId: string, applicationId: number) {
       const { error } = await client

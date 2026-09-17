@@ -20,9 +20,11 @@
 // Idempotenz-Anker:
 //   - mamamia_confirmed_at / mamamia_confirmation_id  (Phase 1+2 erledigt)
 //   - mamamia_pdf_uploaded_at                          (Phase 3+4 erledigt)
-//   - final_confirmation-Guard: hat der Kunde für DIESE Pflegekraft schon
-//     eine Confirmation (z.B. vom alten Client-Bundle oder SA-Portal), wird
-//     sie übernommen — StoreConfirmation feuert NIE doppelt.
+//   - final_confirmation-Guard: gibt es schon eine Confirmation, die zu DIESER
+//     Row gehört (dieselbe Bewerbung / Row ankert auf ihr / derselbe Job mit
+//     derselben Pflegekraft — `gehoertZurRow`, Registry #78), wird sie
+//     übernommen — StoreConfirmation feuert NIE doppelt. NIE nur über die
+//     Pflegekraft: dieselbe Kraft kommt zum nächsten Turnus wieder.
 //   - skipConfirm: Alt-Bundle-Kompat (metadata.mamamia_accepted === true ⇒
 //     der Client hat den Akzept bereits selbst gemacht).
 
@@ -65,6 +67,14 @@ export interface AcceptanceSyncSupabase {
     applicationId: number,
     sha256: string | null,
   ): Promise<void>;
+  /**
+   * Mamamia-Job der Bewerbung dieser Row — aus dem Akzept-Event
+   * (lead_events.application_accepted_internal.mamamia_job_offer_id, Spalte
+   * der Bridge seit #25; das Portal schickt den Session-Job mit). Optional
+   * für alte Test-Fakes; fehlt der Job, matcht der Guard nur noch über die
+   * Bewerbung (Registry #78).
+   */
+  fetchAcceptanceJobOfferId?(leadId: string, applicationId: number): Promise<number | null>;
 }
 
 export interface AcceptanceSyncSecrets {
@@ -159,9 +169,17 @@ interface SyncCustomerData {
     customer_contract: { location_id: number | null } | null;
     job_offers: Array<{
       id: number;
-      final_confirmation: { id: number; application_id?: number | null; caregiver: { id: number } | null } | null;
+      final_confirmation: { id: number; application_id: number | null; caregiver: { id: number } | null } | null;
     }> | null;
   } | null;
+}
+
+// final_confirmation eines Jobs, um den Job ergänzt (ein Job hat genau eine).
+interface FinalConfirmation {
+  id: number;
+  application_id: number | null;
+  caregiver: { id: number } | null;
+  job_offer_id: number;
 }
 
 // Schmaler UpdateCustomer — die DREI Personen aus dem Konfirmationsformular
@@ -584,9 +602,30 @@ async function runSequence(opts: AcceptanceSyncOpts, result: AcceptanceSyncResul
     id: p.id,
     tool_ids: (p.tools ?? []).map((t) => t.id),
   }));
-  const finalConfirmations = (cust.Customer?.job_offers ?? [])
-    .map((j) => j?.final_confirmation)
-    .filter((fc): fc is { id: number; application_id?: number | null; caregiver: { id: number } | null } => !!fc);
+  const finalConfirmations: FinalConfirmation[] = (cust.Customer?.job_offers ?? [])
+    .flatMap((j) => j?.final_confirmation ? [{ ...j.final_confirmation, job_offer_id: j.id }] : []);
+  const rowJobOfferId = (await supabase.fetchAcceptanceJobOfferId?.(row.lead_id, row.application_id)) ?? null;
+  // Gehört eine Confirmation zu DIESER Row? (Registry #78 — Fall Berg, Customer
+  // 9753: dieselbe Pflegekraft kam zum dritten Turnus wieder; ein Match nur
+  // über caregiver_id nahm ihre ALTE Confirmation für die neue Bewerbung, und
+  // der Upload hängte sie per UpdateConfirmation(application_id) an die neue
+  // Bewerbung um.) Drei legitime Wege:
+  //   1. dieselbe Bewerbung — Retry nach verlorener Response, Alt-Client
+  //      (skipConfirm), Panel buchte genau die Bewerbung, die der Kunde signierte;
+  //   2. die Row ankert auf der Confirmation — Vertrag nachträglich nach
+  //      Panel-Buchung (Portal: 'fc-<id>' → acceptanceApplicationId);
+  //   3. derselbe JOB mit derselben Pflegekraft — Panel buchte eine ANDERE
+  //      Bewerbung derselben Kraft, das Portal patchte die noch gelistete als
+  //      accepted (mappers.ts, Pfad 3). Ein Job hat genau eine
+  //      final_confirmation, also eindeutig. Ohne Job-Kenntnis (Event ohne
+  //      Spalte, vor #25) entfällt dieser Weg — dann lieber ein lauter
+  //      Doppel-Store (Validation ⇒ permanent ⇒ Alarm) als eine stille
+  //      Fremd-Adoption.
+  const gehoertZurRow = (fc: FinalConfirmation): boolean =>
+    fc.application_id === row.application_id
+    || fc.id === row.application_id
+    || (rowJobOfferId != null && fc.job_offer_id === rowJobOfferId
+      && row.caregiver_id != null && fc.caregiver?.id === row.caregiver_id);
 
   // ── 1. UpdateCustomer: die DREI Personen aus dem Konfirmationsformular ──
   // LE → patient_contracts[patient_contact] (+ location_id-Übernahme aus dem
@@ -681,11 +720,10 @@ async function runSequence(opts: AcceptanceSyncOpts, result: AcceptanceSyncResul
 
   // ── 2. StoreConfirmation (Akzept) — mit Guards ──
   if (!result.confirmed) {
-    // Guard A: existiert bereits eine final_confirmation für DIESE Pflegekraft
-    // (alter Client / SA-Portal / früherer Retry nach verlorener Response)?
-    const adopted = row.caregiver_id != null
-      ? finalConfirmations.find((fc) => fc.caregiver?.id === row.caregiver_id)
-      : undefined;
+    // Guard A: existiert bereits eine final_confirmation, die zu DIESER Row
+    // gehört (alter Client / SA-Portal / früherer Retry nach verlorener
+    // Response)? Siehe gehoertZurRow — nie nur über die Pflegekraft.
+    const adopted = finalConfirmations.find(gehoertZurRow);
     if (adopted) {
       result.confirmed = true;
       result.confirmation_id = adopted.id;
@@ -754,14 +792,35 @@ async function runSequence(opts: AcceptanceSyncOpts, result: AcceptanceSyncResul
   // hat — d.h. final_confirmation ist am Job sichtbar. Direkt nach
   // StoreConfirmation ist sie das oft noch nicht → dann übernimmt der Cron.
   if (result.confirmed && !result.pdf_uploaded) {
-    const confirmationId = result.confirmation_id
-      ?? (row.caregiver_id != null
-        ? finalConfirmations.find((fc) => fc.caregiver?.id === row.caregiver_id)?.id ?? null
-        : null);
-    const processed = confirmationId != null
-      && finalConfirmations.some((fc) => fc.id === confirmationId);
-    if (!processed) {
+    const confirmationId = result.confirmation_id ?? finalConfirmations.find(gehoertZurRow)?.id ?? null;
+    const fc = confirmationId != null ? finalConfirmations.find((f) => f.id === confirmationId) : undefined;
+    if (!fc) {
       result.deferred.push("pdf: confirmation not processed yet (final_confirmation missing)");
+      return;
+    }
+    // Stempel-Mur (Registry #78): der Upload hängt die Datei an EINE
+    // Confirmation und schickt deren application_id mit — wäre der Stempel
+    // fremd (Confirmation einer anderen Bewerbung / eines anderen Jobs), würde
+    // UpdateConfirmation sie UMHÄNGEN. Nicht unsere ⇒ kein Upload, Stempel von
+    // Hand prüfen. VOR StoreFile, sonst legt jeder Cron-Lauf eine verwaiste
+    // Datei in Mamamia ab.
+    if (!gehoertZurRow(fc)) {
+      result.deferred.push(
+        `pdf: confirmation ${fc.id} gehört zu Bewerbung ${fc.application_id} auf Job ${fc.job_offer_id}, nicht zu Bewerbung ${row.application_id} — kein Upload, Stempel prüfen`,
+      );
+      return;
+    }
+    // application_id: mamamias Validator VERLANGT das Feld („erforderlich")
+    // UND validiert es gegen Applications („ungültig" für IDs, die nie eine
+    // Application waren) — beides live gelernt, staging 2026-08-06, app=667.
+    // Immer der Wert, den die Confirmation SELBST trägt (soft-deleted IDs
+    // akzeptiert mamamia, nie-existente nicht) — so ist der Aufruf nie ein
+    // Umhängen. Seit 2026-09-17 (Mamamia-Team, nach Fall Berg) lehnt
+    // UpdateConfirmation jede ANDERE application_id ab („The selected
+    // application id is invalid") — Umhängen ist API-seitig unmöglich, das
+    // Feld bleibt Pflicht. Fehlt es (Confirmation ohne Bewerbung) ⇒ defer.
+    if (fc.application_id == null) {
+      result.deferred.push("pdf: confirmation without original application_id — cannot attach file");
       return;
     }
 
@@ -822,28 +881,13 @@ async function runSequence(opts: AcceptanceSyncOpts, result: AcceptanceSyncResul
       "Dienstleistungsvertrag-signiert.pdf",
       fetchFn,
     );
-    // application_id: mamamias Validator VERLANGT das Feld („erforderlich")
-    // UND validiert es gegen Applications („ungültig" für IDs, die nie eine
-    // Application waren) — beides live gelernt, staging 2026-08-06, app=667.
-    // Adoptions-Rows (Vertrag nachträglich nach Panel-Buchung) ankern auf der
-    // Confirmation-ID ⇒ die ORIGINAL-Bewerbung der Confirmation mitschicken
-    // (final_confirmation.application_id; soft-deleted IDs akzeptiert mamamia,
-    // nie-existente nicht). Echte Rows: weiterhin row.application_id.
-    const isAdoptionAnchor = row.application_id === confirmationId;
-    const uploadApplicationId = isAdoptionAnchor
-      ? finalConfirmations.find((fc) => fc.id === confirmationId)?.application_id ?? null
-      : row.application_id;
-    if (uploadApplicationId == null) {
-      result.deferred.push("pdf: adoption row without original application_id on confirmation — cannot attach file");
-      return;
-    }
     await mamamiaRequest({
       endpoint: secrets.mamamiaEndpoint,
       token: agencyToken,
       query: UPDATE_CONFIRMATION_FILES,
       variables: {
-        id: confirmationId,
-        application_id: uploadApplicationId,
+        id: fc.id,
+        application_id: fc.application_id,
         is_confirm_binding: true,
         file_tokens: [fileToken],
       },
