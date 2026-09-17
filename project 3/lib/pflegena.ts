@@ -331,6 +331,29 @@ export function modellBloecke(
   return bloecke;
 }
 
+/* Urteil ueber einen HTTP-Fehler des Modells — drei Lager statt zwei:
+ *
+ *   'dauerhaft'  Urteil ueber DIESE Mail (400, z. B. ein unbekanntes Feld im
+ *                document-Block). Erneut zu fragen endet gleich.
+ *   'transient'  unsere Lage, nicht der Inhalt (401/403 Schluessel, 429, 5xx).
+ *   'guthaben'   das Konto hat kein Guthaben mehr. Transient — UND der Aufruf
+ *                kostet nichts, weil er vor der Inferenz abgelehnt wird.
+ *                Darum zaehlt er in der Route nicht gegen MAX_VERSUCHE:
+ *                sonst waere eine Stoerung von mehr als fuenf Minuten wieder
+ *                eine dauerhaft verlorene Anfrage (Registry #61).
+ *
+ * Das Guthaben ist der EINZIGE Fall, in dem wir den Fehlertext lesen statt
+ * die Struktur: Anthropic meldet ihn als 400 invalid_request_error mit genau
+ * diesem Satz (prod 11.09.2026, zwei Anfragen von Pflegena dauerhaft
+ * abgelehnt). 'billing_error' ist derselbe Sachverhalt strukturiert (403) —
+ * beide Formen hier, damit ein spaeterer Wechsel der API uns nicht trifft. */
+export type ModellFehlerArt = 'dauerhaft' | 'transient' | 'guthaben';
+
+export function modellFehlerArt(status: number, rumpf: string): ModellFehlerArt {
+  if (/credit balance is too low|"type"\s*:\s*"billing_error"/i.test(rumpf)) return 'guthaben';
+  return status === 400 ? 'dauerhaft' : 'transient';
+}
+
 /* Die zwei Mails, die eine Vermittler-Anfrage ausloest. Bewusst HIER und
  * nicht in der Route: so kann der Test festhalten, was die Liste enthaelt —
  * und vor allem, was nicht. Stuende 'eingangsbestaetigung' darin, bekaeme
