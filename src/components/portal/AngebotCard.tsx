@@ -24,20 +24,18 @@ import { STEP_LABELS, einsatzortHinweis } from './shared';
 import type { MamamiaCustomer } from '../../lib/mamamia/types';
 import { mapMamamiaCustomerToPatientForm, germanySkillLabel } from '../../lib/mamamia/mappers';
 
-// Plausibilitäts-Check für deutsche Telefonnummern — bewusst lax: erlaubt
-// +49, 0049 oder führende 0, mit/ohne Leerzeichen/Bindestrich/Klammer.
-// Prüft nur, dass die Ziffern-Länge im realistischen Bereich liegt
-// (Festnetz + Mobil). Soll Tippfehler / Unsinn abfangen, NICHT als strenge
-// Format-Pflicht wirken (sonst frustrierte Kunden mit gültigen aber
-// ungewohnt formatierten Nummern).
+// Plausibilitäts-Check für Telefonnummern — bewusst lax, dieselbe Regel wie
+// im Kostenrechner (project 3/lib/telefon.ts): 8–15 Ziffern, führendes „+"
+// oder „00" erlaubt, Leerzeichen/Bindestrich/Klammer egal. Seit das Feld im
+// Profil immer steht und aus dem Rechner vorbelegt ist (Registry #76), darf
+// es nicht strenger sein als der Rechner — sonst sperrte eine dort gültige
+// +41-/+43-Nummer den Schritt. Soll Tippfehler / Unsinn abfangen, NICHT als
+// Format-Pflicht wirken.
 function isPlausibleGermanPhone(raw: string): boolean {
   if (!raw) return false;
   const cleaned = raw.replace(/[\s\-/().]/g, '');
-  // +49…, 0049… oder 0… — nach dem Prefix muss eine Ziffer 1-9 folgen
-  // (keine 0 als Vorwahl-Start), dann nur Ziffern. Plausible Rest-Länge
-  // 6–13 deckt deutsche Festnetz- und Mobilnummern ab.
-  const m = /^(?:\+49|0049|0)([1-9]\d{5,12})$/.exec(cleaned);
-  return m !== null;
+  const ziffern = cleaned.replace(/^\+/, '').replace(/^00/, '');
+  return /^\d{8,15}$/.test(ziffern);
 }
 
 export const AngebotCard: FC<{
@@ -112,10 +110,6 @@ export const AngebotCard: FC<{
   // Mamamia returns null until patient form save → reverse mapper outputs
   // '' for gender so dropdown stays empty. No more patientGenderKnown opt.
   const mmPrefill = mapMamamiaCustomerToPatientForm(mmCustomer ?? null);
-  // Rückrufnummer fehlt (Kontakt in drei Schritten, Registry #76: der Rechner
-  // legt den Lead schon mit E-Mail an) — dann fragt Schritt „Zur Person" sie
-  // ab. Weder aus dem Rechner noch aus mamamia bekannt = fehlt.
-  const telefonFehlt = !((prefill as { phone?: string }).phone || (mmPrefill as { phone?: string }).phone);
   const savedData: Partial<PatientForm> & { _isDraft?: boolean } = storageKey
     ? (() => { try { return JSON.parse(localStorage.getItem(storageKey) || '{}'); } catch { return {}; } })()
     : {};
@@ -474,9 +468,6 @@ export const AngebotCard: FC<{
       // blockieren — Geburtsjahr/Pflegegrad sind wie im SA-Wizard optional.
       if (patient.geschlecht === '') m.push('geschlecht');
       if (zwei && patient.p2_geschlecht === '') m.push('p2_geschlecht');
-      // Pflicht nur, wenn der Rechner keine Nummer mitgebracht hat: ohne sie
-      // kann das Team nicht nachfassen (Registry #76).
-      if (telefonFehlt && !isPlausibleGermanPhone(patient.phone)) m.push('phone');
     }
     if (s === 1) {
       (['mobilitaet','heben','demenz','nacht'] as const).forEach(k => { if (patient[k] === '') m.push(k); });
@@ -492,6 +483,10 @@ export const AngebotCard: FC<{
       // jedem Speichern erneut prüft.
       if (einsatzortHinweis({ ...einsatzortStand, lookupFehler: false }) !== null) m.push('plz');
       (['wohnungstyp','urbanisierung','startDate'] as const).forEach(k => { if (patient[k] === '') m.push(k); });
+      // Rückrufnummer immer Pflicht (Martin, 17.09.: „muss auf jeden Fall
+      // vorhanden sein") — vorbelegt aus Rechner oder mamamia, hier zu prüfen
+      // oder zu ergänzen; ohne sie kann das Team nicht nachfassen (Registry #76).
+      if (!isPlausibleGermanPhone(patient.phone)) m.push('phone');
     }
     if (s === 3) {
       (['wunschGeschlecht','fuehrerschein'] as const).forEach(k => { if (patient[k] === '') m.push(k); });
@@ -1009,25 +1004,6 @@ export const AngebotCard: FC<{
                     </div>
                   </div>
 
-                  {/* Rückrufnummer, wenn der Rechner sie nicht mitgebracht hat
-                      (Kontakt in drei Schritten, Registry #76). Geht mit dem
-                      Speichern nach mamamia (patientFormMapper: Customer.phone +
-                      customer_contract.phone) und über lead-event zurück in
-                      leads.telefon — beide Wege gab es schon. */}
-                  {telefonFehlt && (
-                    <div>
-                      <label className={labelCls}>Telefonnummer für Rückfragen&nbsp;<span className="text-red-400">*</span></label>
-                      <input
-                        type="tel"
-                        inputMode="tel"
-                        autoComplete="tel"
-                        value={patient.phone}
-                        onChange={e => updatePatient(p => ({ ...p, phone: e.target.value }))}
-                        placeholder="z. B. 0170 1234567"
-                        className={`w-full border rounded-xl px-3 py-2.5 text-sm bg-white focus:outline-none focus:ring-1 focus:ring-[#8B7355]/40 ${showErrors && !isPlausibleGermanPhone(patient.phone) ? 'border-red-400' : 'border-gray-200'}`}
-                      />
-                    </div>
-                  )}
 
                   {/* Patient 1 */}
                   {patient.anzahl !== '' && (
@@ -1468,6 +1444,31 @@ export const AngebotCard: FC<{
                     onChange={iso => updatePatient(p => ({ ...p, startDate: iso }))}
                   />
                   <p className="text-[13px] text-gray-500 mt-2">Wenn noch unklar — eine grobe Schätzung reicht.</p>
+                  {/* Rückrufnummer IMMER hier, neben dem Termin (Martin, 17.09.:
+                      „dass die Telefonnummer immer dort steht, man kann sie
+                      überprüfen, anpassen oder ergänzen — muss auf jeden Fall
+                      vorhanden sein"). Vorbelegt aus dem Rechner (leads.telefon)
+                      oder aus mamamia; Kontakt in drei Schritten (Registry #76)
+                      liefert Leads ohne Nummer, dann steht sie leer und ist
+                      Pflicht. Geht mit dem Speichern nach mamamia
+                      (patientFormMapper: Customer.phone + customer_contract.phone)
+                      und über lead-event zurück in leads.telefon — beide Wege
+                      gab es schon. Nicht wieder nach Step 5 auslagern: 06.–14.06.
+                      halbierte das die Tel-Quote (67 % → 34 %). */}
+                  <div className="mt-5">
+                    <label className={labelCls}>Telefonnummer für Rückfragen&nbsp;<span className="text-red-400">*</span></label>
+                    <input
+                      type="tel"
+                      inputMode="tel"
+                      autoComplete="tel"
+                      value={patient.phone}
+                      onChange={e => updatePatient(p => ({ ...p, phone: e.target.value }))}
+                      placeholder="z. B. 0170 1234567"
+                      data-invalid={showErrors && !isPlausibleGermanPhone(patient.phone) ? '1' : undefined}
+                      className={inputCls + (showErrors && !isPlausibleGermanPhone(patient.phone) ? ' border-red-300 bg-red-50/40' : '')}
+                    />
+                    <p className="text-[13px] text-gray-500 mt-2">Unter dieser Nummer erreichen wir Sie – bitte prüfen.</p>
+                  </div>
                 </div>
               )}
 

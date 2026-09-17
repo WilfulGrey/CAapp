@@ -239,8 +239,9 @@ die Team-Mail mit Telefon „noch nicht angegeben …" und loggt `kontakt_varian
 (dataLayer `angebot_erfolgreich`), Beacon und OpenAI-Pixel feuern genau einmal, an dieser
 Stelle, ohne Redirect. Der Telefon-Schritt ruft `POST /api/lead-telefon {token, telefon}`
 (nur `leads.telefon`, Event `telefon_nachgetragen`, Team-Mail-Nachtrag wenn vorher leer) und
-leitet dann ins Portal; „Ohne Rückrufnummer weiter" leitet ohne Nummer. Fehlt die Nummer,
-zeigt das Patientenprofil im Portal ein Pflichtfeld (Schritt „Zur Person") — von dort geht
+leitet dann ins Portal; „Ohne Rückrufnummer weiter" leitet ohne Nummer. Das Patientenprofil
+zeigt die Nummer IMMER (Schritt „Einsatzort & Start", unter dem Startdatum; vorbelegt aus
+`leads.telefon` bzw. mamamia, zu prüfen oder zu ergänzen, Pflicht — Martin 17.09.) — von dort geht
 sie den bestehenden Weg (`patientFormMapper` → `Customer.phone` + `customer_contract.phone`;
 `lead-event` `metadata.phone` → `leads.telefon`). mamamia bekommt die Nummer aus dem
 Telefon-Schritt NICHT (kein Resync-Feld); das Panel liest ohnehin `customer_contract.phone`.

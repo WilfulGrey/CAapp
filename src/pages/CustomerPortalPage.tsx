@@ -94,8 +94,8 @@ const IS_PREVIEW_CHAT = PREVIEW_PARAM === 'chat';
 // gespeichert gilt.
 const IS_PREVIEW_PATIENT = PREVIEW_PARAM === 'patient';
 // Dev-only: ?preview=patient&telefon=0 zeigt den Patientenbogen für einen Lead
-// OHNE Rückrufnummer (Kontakt in drei Schritten, Registry #76) — dann fragt
-// Schritt „Zur Person" die Nummer als Pflichtfeld ab.
+// OHNE Rückrufnummer (Kontakt in drei Schritten, Registry #76) — dann steht das
+// Pflichtfeld „Telefonnummer für Rückfragen" in „Einsatzort & Start" leer.
 const PREVIEW_OHNE_TELEFON =
   typeof window !== 'undefined'
     ? new URLSearchParams(window.location.search).get('telefon') === '0'
