@@ -286,7 +286,7 @@ export default function HomePage() {
                   </p>
 
                   <p className="text-[15px] text-[#5A5A5A] leading-relaxed">
-                    Als bester Vermittler von 24-Stunden-Pflegekräften ausgezeichnet: Primundus steht für die beste Kombination aus Preis, Qualität und Kundenservice.
+                    DIE WELT hat Primundus sechsmal in Folge ausgezeichnet: Primundus steht für die beste Kombination aus Preis, Qualität und Kundenservice.
                   </p>
                 </div>
               </div>

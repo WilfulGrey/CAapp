@@ -2107,7 +2107,7 @@ export function MultiStepForm({ mode = 'inline' }: MultiStepFormProps = {}) {
               <span className="text-[14px] font-semibold text-[#8B7355]">Anrufen</span>
             </a>
             <a
-              href={`https://wa.me/4989200000830?text=${encodeURIComponent("Hallo Frau Wysocki, ich habe eine Rückfrage:")}`}
+              href={`https://wa.me/4989200000830?text=${encodeURIComponent("Hallo Frau Kapcio, ich habe eine Rückfrage:")}`}
               target="_blank"
               rel="noopener noreferrer"
               className="flex-1 flex items-center justify-center gap-1.5 py-2 px-2 rounded-xl bg-[#25D366] hover:bg-[#20C05A] transition-colors"
