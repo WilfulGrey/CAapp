@@ -1792,6 +1792,7 @@ export function MultiStepForm({ mode = 'inline', bewertung = null }: MultiStepFo
                       fehler={kontaktFehler}
                       serverFehler={kontaktServerFehler}
                       sendet={isSubmitting}
+                      bewertung={bewertung}
                       onAendern={(feld, wert) => {
                         setFormData({ ...formData, [feld]: feld === 'phone' ? telefonBereinigen(wert) : wert });
                         if (kontaktFehler[feld]) setKontaktFehler({ ...kontaktFehler, [feld]: '' });
