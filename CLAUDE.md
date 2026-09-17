@@ -429,6 +429,8 @@ CA app → Mamamia:
 | `project 3/app/admin/wachstum/page.tsx` + `app/api/admin/wachstum/route.ts` + `lib/wachstum.ts` | Admin-Seite „Wachstum“ unter „Mehr“ (Registry #71): Potenzialentwicklung im laufenden Monat (fest gebucht + Suchende mit fertigem Profil), Kunden im Einsatz je Tag, Anfragen und fertige Profile je Tag im Wochenschnitt (eigen/eingekauft). Rechnen pure in `lib/wachstum.ts` (Test `src/__tests__/wachstum.test.ts`), Route mit Service-Key hinter dem Admin-Cookie, an den Browser nur Summen. Das Dashboard `/admin` bleibt unverändert |
 | `project 3/app/admin/ergebnis/page.tsx` + `app/api/admin/ergebnis/route.ts` + `app/api/admin/ergebnis/kosten/route.ts` | Admin-Seite „Ergebnis“ unter „Mehr“ (Registry #73/#74): Provision je Kunde minus variable Kosten, Werbung (automatisch: `ads_kosten_tag` + eingekaufte Anfragen × `PORTAL_PREISE`) und Gemeinkosten je Monat, Vergleich mit dem Vormonat; Eingabe per `PUT /api/admin/ergebnis/kosten` in Tabelle `wachstum_monat` (RLS ohne Policies, nur service_role). Rechnen: `ergebnisJeMonat`, `ergebnisVergleich`, `pruefeMonatsEingabe` in `lib/wachstum.ts` |
 | `project 3/lib/angaben-labels.ts` | Pure: `LABELS` (aus email.ts herausgezogen), `FELD_NAMEN`, `angabenLabel` (pflegegrad 0 ⇒ „Kein Pflegegrad") — Mails, Admin-Route und -Seite teilen die Wörter |
+| `project 3/app/api/bewertungen/route.ts` (+ `bestaetigen/`, `moderation/`) | Kundenbewertungen für primundus.de/erfahrungen (Seite in anderem Repo). `GET` = veröffentlichte Bewertungen (CORS primundus.de, `s-maxage=300`), `POST` = neue Bewertung `unbestaetigt` + Bestätigungsmail (Honeypot/Zeitfalle still 202, IP- und E-Mail-Limit 429, optional Turnstile). `bestaetigen` = Mail-Link → `bestaetigt` + Team-Mail mit frischem Moderations-Token + 303 zurück. `moderation` = GET zeigt EINEN Knopf (ändert nie etwas), POST wendet an. Tabelle `bewertungen` (Migration `project 3/supabase/migrations/20260917090000_bewertungen.sql`, RLS ohne Policy). Env: `BEWERTUNG_TEAM_AN`, `BEWERTUNG_API_BASIS`, `BEWERTUNG_CORS_EXTRA`, `BEWERTUNG_HASH_SALT`, `TURNSTILE_SECRET_KEY` |
+| `project 3/lib/bewertungen.ts` / `bewertungen-mails.ts` | Pure: Vertrag (Meldungen, Grenzen, Antwortform), Validierung, Link-Erkennung, Tokens (nur sha256 in der DB), IP-Hash, Limits, CORS, Moderations-Plan; Mails + kleine HTML-Seiten. Env-Doku im Kopf von `bewertungen.ts`. Tests: `src/__tests__/bewertungen.test.ts`, `bewertungenMails.test.ts`. Server-Teil (Supabase-Client, HTML-Antwort): `bewertungen-server.ts` |
 
 ### Edge Functions (`supabase/functions/`)
 
@@ -1146,7 +1148,7 @@ Suites:
 Cross-app importy z `project 3/` w root-vitest są dozwolone WYŁĄCZNIE dla
 pure modułów (zero importów Next/supabase; type-importy OK). Aktualna
 lista: `portal-url.ts`, `portal-lead.ts`, `portal-parser.ts`, `portal-csv.ts`, `angaben-diff.ts`,
-`angaben-labels.ts` (Registry #55), `oaiq.ts`, `pflegena.ts` (Registry #59), `zaehler.ts` (Registry #63), `wachstum.ts` (Registry #71, #73, #74), `telefon.ts` (Telefon im Kontakt-Schritt: nur Ziffern/+/Trennzeichen, 8–15 Ziffern; Server bleibt bei ≥6), `rueckmeldung.ts` (Registry #72).
+`angaben-labels.ts` (Registry #55), `oaiq.ts`, `pflegena.ts` (Registry #59), `zaehler.ts` (Registry #63), `wachstum.ts` (Registry #71, #73, #74), `telefon.ts` (Telefon im Kontakt-Schritt: nur Ziffern/+/Trennzeichen, 8–15 Ziffern; Server bleibt bei ≥6), `rueckmeldung.ts` (Registry #72), `bewertungen.ts` + `bewertungen-mails.ts` (Kundenbewertungen primundus.de/erfahrungen; zieht `email-template.ts` mit).
 
 ### Edge Functions (Deno)
 
