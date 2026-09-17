@@ -68,6 +68,20 @@ describe('Martas Karte kommt aus einer Vorlage', () => {
     }
   });
 
+  it('kein ✆-Zeichen mehr in Kundenmails, Hörer-Symbol als Bild (Martin 17.09.2026)', () => {
+    for (const datei of [EMAIL, EDGE, 'project 3/lib/marta-karte.ts',
+      'project 3/supabase/functions/send-scheduled-emails/martaKarte.ts',
+      'project 3/supabase/functions/send-scheduled-emails/bewertung.ts']) {
+      const quelle = lies(datei);
+      expect(quelle, datei).not.toContain('&#9990;');
+      expect(quelle.replace(/\/\*[^]*?\*\/|\/\/[^\n]*/g, ''), datei).not.toContain('✆');
+    }
+    // Bewertungsanfrage (beide Kopien): graues Hörer-Symbol vor der Nummer
+    for (const datei of [EMAIL, 'project 3/supabase/functions/send-scheduled-emails/bewertung.ts']) {
+      expect(lies(datei), datei).toContain('mail-icon-telefon-grau.png');
+    }
+  });
+
   it('statische Vermittler-Vorlagen enthalten genau die gerenderte Vermittler-Karte', () => {
     const karte = martaKarteHtml({ fuer: 'vermittler', siteUrl: 'https://kostenrechner.primundus.de', presseLogos: true }).trim();
     for (const datei of ['mail-templates/15-vermittler-angebot.html', 'mail-templates/19-vermittler-kraefte.html']) {

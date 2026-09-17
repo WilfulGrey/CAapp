@@ -238,7 +238,7 @@ export function getBewertungsanfrageTemplate(
               <a href="tel:+4989200000830"
                  style="display:inline-block;background-color:#ffffff;border:1px solid #dcdcdc;
                         border-radius:16px;padding:6px 13px;text-decoration:none;font-size:12px;
-                        font-weight:500;color:#777777;white-space:nowrap;font-family:${SANS};">&#9990; 089 200 000 830</a>
+                        font-weight:500;color:#777777;white-space:nowrap;font-family:${SANS};" aria-label="Marta anrufen: 089 200 000 830"><img src="${cdn}/mail-icon-telefon-grau.png" alt="" width="14" height="14" style="display:inline-block;width:14px;height:14px;border:0;vertical-align:middle;margin-right:5px;" /><span style="vertical-align:middle;">089 200 000 830</span></a>
             </td>
             <td class="sig-pille" style="padding-right:6px;">
               <a href="https://wa.me/4989200000830"

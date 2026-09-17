@@ -23,7 +23,7 @@ import * as edge from '../../project 3/supabase/functions/send-scheduled-emails/
 const SITE = 'https://kostenrechner.primundus.de';
 const STAND = { schnitt: '4,9', anzahl: 126 };
 const text = (html: string) => html.replace(/<[^>]+>/g, '').replace(/&nbsp;/g, ' ').replace(/&middot;/g, '·')
-  .replace(/&rarr;/g, '→').replace(/&#9733;/g, '★').replace(/&#9990;/g, '✆').replace(/\s+/g, ' ');
+  .replace(/&rarr;/g, '→').replace(/&#9733;/g, '★').replace(/\s+/g, ' ');
 
 describe('martaKarteHtml — Kundenmail', () => {
   const html = martaKarteHtml({ fuer: 'kunde', bewertung: STAND, siteUrl: SITE, presseLogos: true });
@@ -33,12 +33,13 @@ describe('martaKarteHtml — Kundenmail', () => {
     expect(zeile).toContain('href="tel:+4989200000830"');
     expect(zeile).toContain('href="https://wa.me/4989200000830"');
     expect((zeile.match(/class="sig-pille"/g) ?? []).length).toBe(2);
-    expect(text(zeile)).toContain('✆ Anrufen');
-    expect(text(zeile)).toMatch(/WhatsApp\s*$/);
+    expect(text(zeile)).toMatch(/^\s*Anrufen\s+WhatsApp\s*$/);
   });
 
-  it('alte Beschriftungen sind weg', () => {
+  it('alte Beschriftungen sind weg, kein ✆-Zeichen mehr (sah aus wie ein kaputtes ©)', () => {
     expect(html).not.toContain('WhatsApp schreiben');
+    expect(html).not.toContain('&#9990;');
+    expect(html).not.toContain('✆');
     // Nummer nur noch in aria-label/title, nicht als sichtbarer Text
     expect(text(html)).not.toContain('089 200 000 830');
   });
@@ -100,18 +101,11 @@ describe('martaKarteHtml — Kundenmail', () => {
 describe('martaKarteHtml — Handy (Martin 17.09.2026, nur Media-Query ≤480 px)', () => {
   const html = martaKarteHtml({ fuer: 'kunde', bewertung: STAND, siteUrl: SITE, presseLogos: true });
 
-  it('Knöpfe: Text in .sig-pille-text, Symbolbild .sig-pille-bild am Desktop versteckt (auch Outlook)', () => {
-    expect(html).toContain('<span class="sig-pille-text">&#9990; Anrufen</span>');
-    expect(html).toContain('<span class="sig-pille-text">WhatsApp</span>');
-    const bilder = html.match(/<img class="sig-pille-bild"[^>]*>/g) ?? [];
-    expect(bilder).toHaveLength(2);
-    for (const b of bilder) {
-      expect(b).toMatch(/width="20" height="20"/);
-      expect(b).toMatch(/style="display:none;mso-hide:all;/);
-      expect(b).toMatch(/alt="[^"]+"/);
-    }
-    expect(bilder[0]).toContain(`src="${SITE}/images/mail-icon-telefon.png"`);
-    expect(bilder[1]).toContain(`src="${SITE}/images/mail-icon-whatsapp.png"`);
+  it('Knöpfe: Symbol (16×16) vor der Beschriftung, auch am Desktop und in Outlook', () => {
+    const BILD = 'style="display:inline-block;width:16px;height:16px;border:0;vertical-align:middle;margin-right:6px;"';
+    expect(html).toContain(`<img class="sig-pille-bild" src="${SITE}/images/mail-icon-telefon.png" alt="" width="16" height="16" ${BILD} /><span class="sig-pille-text" style="vertical-align:middle;">Anrufen</span>`);
+    expect(html).toContain(`<img class="sig-pille-bild" src="${SITE}/images/mail-icon-whatsapp.png" alt="" width="16" height="16" ${BILD} /><span class="sig-pille-text" style="vertical-align:middle;">WhatsApp</span>`);
+    expect(html).not.toMatch(/sig-pille-bild[^>]*display:none/);
   });
 
   it('Links behalten zugänglichen Text (aria-label + title)', () => {
@@ -135,14 +129,14 @@ describe('martaKarteHtml — Handy (Martin 17.09.2026, nur Media-Query ≤480 px
 
   it('Media-Query-Regeln: Symbole statt Text, 44-px-Knöpfe, Sterne-Zeile tauschen', () => {
     expect(MARTA_KARTE_MOBIL_CSS).toContain('.sig-pille-text { display: none !important; }');
-    expect(MARTA_KARTE_MOBIL_CSS).toContain('.sig-pille-bild { display: inline-block !important;');
+    expect(MARTA_KARTE_MOBIL_CSS).toContain('.sig-pille-bild { width: 20px !important; height: 20px !important; margin: 0 !important; }');
     expect(MARTA_KARTE_MOBIL_CSS).toMatch(/\.sig-pille-link \{[^}]*width: 44px !important;[^}]*height: 44px !important;/);
     expect(MARTA_KARTE_MOBIL_CSS).toContain('.sig-sterne-desktop { display: none !important; }');
     expect(MARTA_KARTE_MOBIL_CSS).toMatch(/\.sig-sterne-mobil \{ display: block !important; max-height: none !important; overflow: visible !important; \}/);
   });
 
   it('Symbolbilder liegen als PNG 40×40 (2×) in project 3/public/images', () => {
-    for (const datei of ['mail-icon-whatsapp.png', 'mail-icon-telefon.png']) {
+    for (const datei of ['mail-icon-whatsapp.png', 'mail-icon-telefon.png', 'mail-icon-telefon-grau.png']) {
       const png = readFileSync(join(__dirname, '..', '..', 'project 3', 'public', 'images', datei));
       expect(png.subarray(1, 4).toString('ascii')).toBe('PNG');
       expect(png.readUInt32BE(16)).toBe(40);
@@ -168,7 +162,8 @@ describe('martaKarteHtml — Vermittler', () => {
   });
 
   it('dieselben Knöpfe wie in der Kundenmail', () => {
-    expect(text(html)).toContain('✆ Anrufen');
+    expect(text(html)).toContain('Anrufen');
+    expect(html).toContain('mail-icon-telefon.png');
     expect((html.match(/class="sig-pille"/g) ?? []).length).toBe(2);
   });
 });

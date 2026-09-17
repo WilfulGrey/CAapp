@@ -10,8 +10,10 @@ const STAND = { schnitt: "4,9", anzahl: 126 };
 Deno.test("Kundenkarte: Anrufen + WhatsApp nebeneinander, Sterne in der Karte, Bestpreisgarantie", () => {
   const html = martaKarteHtml({ fuer: "kunde", bewertung: STAND, siteUrl: SITE, presseLogos: true });
   assertEquals(html.match(/class="sig-pille"/g)?.length, 2);
-  assertStringIncludes(html, "&#9990; Anrufen</span>");
+  assertStringIncludes(html, 'alt="" width="16" height="16"');
+  assertStringIncludes(html, ">Anrufen</span>");
   assertStringIncludes(html, ">WhatsApp</span>");
+  assert(!html.includes("&#9990;"));
   assert(!html.includes("WhatsApp schreiben"));
   const knopf = html.indexOf("wa.me/4989200000830");
   const sterne = html.indexOf("&#9733;");

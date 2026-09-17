@@ -29,7 +29,7 @@ export const MARTA_KARTE_MOBIL_CSS = `
       .sig-pille { padding: 0 8px 0 0 !important; }
       .sig-pille-link { display: inline-block !important; width: 44px !important; height: 44px !important; padding: 0 !important; border-radius: 22px !important; line-height: 44px !important; text-align: center !important; }
       .sig-pille-text { display: none !important; }
-      .sig-pille-bild { display: inline-block !important; vertical-align: middle !important; }
+      .sig-pille-bild { width: 20px !important; height: 20px !important; margin: 0 !important; }
       .sig-sterne-desktop { display: none !important; }
       .sig-sterne-mobil { display: block !important; max-height: none !important; overflow: visible !important; }`;
 
@@ -50,8 +50,9 @@ export function bewertungsSterneHtml(stand: BewertungsStand, groessePx = 12.5, a
 
 const PILLE = 'display:inline-block;border-radius:20px;padding:8px 16px;text-decoration:none;font-size:13px;white-space:nowrap;';
 const FAKT = 'margin:0;font-size:12px;color:#555;line-height:1.4;';
-// Symbolbilder der Knöpfe (40×40-PNG, 2× für scharfe Darstellung): nur auf dem Handy.
-const SYMBOL = 'display:none;mso-hide:all;width:20px;height:20px;border:0;vertical-align:middle;';
+// Symbolbilder der Knöpfe (40×40-PNG, 2× für scharfe Darstellung): Desktop 16 px
+// vor der Beschriftung, Handy 20 px ohne Beschriftung (MARTA_KARTE_MOBIL_CSS).
+const SYMBOL = 'display:inline-block;width:16px;height:16px;border:0;vertical-align:middle;margin-right:6px;';
 
 const LOGOS: [datei: string, alt: string, breite: number][] = [
   ['die-welt.webp', 'DIE WELT', 68],
@@ -106,8 +107,8 @@ export function martaKarteHtml(o: MartaKarteOptionen): string {
             </table>
             <table cellpadding="0" cellspacing="0" role="presentation" style="margin-top:12px;">
               <tr>
-                <td class="sig-pille" style="padding-right:6px;"><a class="sig-pille-link" href="tel:+4989200000830" aria-label="Marta anrufen: 089 200 000 830" title="Marta anrufen: 089 200 000 830" style="${PILLE}background-color:#f0ebe4;font-weight:500;color:#3D2B1F;"><span class="sig-pille-text">&#9990; Anrufen</span><img class="sig-pille-bild" src="${site}/images/mail-icon-telefon.png" alt="Anrufen" width="20" height="20" style="${SYMBOL}" /></a></td>
-                <td class="sig-pille"><a class="sig-pille-link" href="https://wa.me/4989200000830" aria-label="WhatsApp an Marta: 089 200 000 830" title="WhatsApp an Marta: 089 200 000 830" style="${PILLE}background-color:#25D366;font-weight:600;color:#ffffff;"><span class="sig-pille-text">WhatsApp</span><img class="sig-pille-bild" src="${site}/images/mail-icon-whatsapp.png" alt="WhatsApp" width="20" height="20" style="${SYMBOL}" /></a></td>
+                <td class="sig-pille" style="padding-right:6px;"><a class="sig-pille-link" href="tel:+4989200000830" aria-label="Marta anrufen: 089 200 000 830" title="Marta anrufen: 089 200 000 830" style="${PILLE}background-color:#f0ebe4;font-weight:500;color:#3D2B1F;"><img class="sig-pille-bild" src="${site}/images/mail-icon-telefon.png" alt="" width="16" height="16" style="${SYMBOL}" /><span class="sig-pille-text" style="vertical-align:middle;">Anrufen</span></a></td>
+                <td class="sig-pille"><a class="sig-pille-link" href="https://wa.me/4989200000830" aria-label="WhatsApp an Marta: 089 200 000 830" title="WhatsApp an Marta: 089 200 000 830" style="${PILLE}background-color:#25D366;font-weight:600;color:#ffffff;"><img class="sig-pille-bild" src="${site}/images/mail-icon-whatsapp.png" alt="" width="16" height="16" style="${SYMBOL}" /><span class="sig-pille-text" style="vertical-align:middle;">WhatsApp</span></a></td>
               </tr>
             </table>${sterne}
           </td>
