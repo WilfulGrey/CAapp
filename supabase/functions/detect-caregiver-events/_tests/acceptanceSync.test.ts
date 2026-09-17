@@ -71,7 +71,8 @@ interface FakeNet {
   fetch: typeof fetch;
   ops: Array<{ op: string; variables: Record<string, unknown> }>;
   pdfBody?: Uint8Array | string;
-  finalConfirmations?: Array<{ id: number; application_id?: number | null; caregiver: { id: number } | null }>;
+  // final_confirmations, je eine auf einem eigenen Job (job_offer_id, default 100+i).
+  finalConfirmations?: Array<{ id: number; application_id: number | null; caregiver: { id: number } | null; job_offer_id?: number }>;
   // Fehler-Injektion für StoreConfirmation (Alarm-Policy-Tests):
   //   "graphql" = GraphQL-Fehler (⇒ permanent), "http500" = HTTP 500 (⇒ transient).
   // confirmFailTimes = wie viele Versuche fehlschlagen (undefined ⇒ alle).
@@ -161,9 +162,9 @@ function makeNet(opts: Partial<FakeNet> = {}): FakeNet {
               equipments: [{ id: 1 }, { id: 2 }],
               patients: [{ id: 42, tools: [{ id: 3 }] }],
               customer_contract: net.noExistingContract ? null : { location_id: 13035 },
-              job_offers: [
-                { id: 100, final_confirmation: net.finalConfirmations!.length ? net.finalConfirmations![0] : null },
-              ],
+              job_offers: net.finalConfirmations!.length
+                ? net.finalConfirmations!.map((fc, i) => ({ id: fc.job_offer_id ?? 100 + i, final_confirmation: fc }))
+                : [{ id: 100, final_confirmation: null }],
             },
           },
         }), { status: 200 });
@@ -201,6 +202,17 @@ function makeNet(opts: Partial<FakeNet> = {}): FakeNet {
       }
       if (q.includes("UpdateConfirmation")) {
         net.ops.push({ op: "UpdateConfirmation", variables: v });
+        // Mamamia seit 2026-09-17 (Fall Berg, #78): application_id MUSS die
+        // Bewerbung der Confirmation selbst sein — sonst Validation-Fehler.
+        const fc = net.finalConfirmations!.find((f) => f.id === v.id);
+        if (fc?.application_id != null && v.application_id !== fc.application_id) {
+          return new Response(JSON.stringify({
+            errors: [{
+              message: "The selected application id is invalid.",
+              extensions: { validation: { application_id: ["The selected application id is invalid."] } },
+            }],
+          }), { status: 200 });
+        }
         return new Response(JSON.stringify({ data: { UpdateConfirmation: { id: v.id, signed_contract: { id: 9, original_name: "x.pdf" } } } }), { status: 200 });
       }
       throw new Error(`fake fetch: unrouted call ${url} ${q.slice(0, 60)}`);
@@ -210,11 +222,13 @@ function makeNet(opts: Partial<FakeNet> = {}): FakeNet {
   return net;
 }
 
-function makeStamps() {
+// jobOfferId = Job der Row laut Akzept-Event (Guard-Weg 3); null = altes Event ohne Spalte.
+function makeStamps(jobOfferId: number | null = 100) {
   const calls: Array<{ kind: string; confirmationId?: number | null; sha?: string | null }> = [];
   return {
     calls,
     supabase: {
+      fetchAcceptanceJobOfferId: () => Promise.resolve(jobOfferId),
       stampConfirmed(_l: string, _a: number, confirmationId: number | null) {
         calls.push({ kind: "confirmed", confirmationId });
         return Promise.resolve();
@@ -367,7 +381,7 @@ Deno.test("sync: frischer Akzept — Reihenfolge UpdateCustomer→StoreConfirmat
 });
 
 Deno.test("sync: Retry — final_confirmation verarbeitet ⇒ PDF wird hochgeladen + SHA gestempelt", async () => {
-  const net = makeNet({ finalConfirmations: [{ id: 555, caregiver: { id: 501 } }] });
+  const net = makeNet({ finalConfirmations: [{ id: 555, application_id: 9001, caregiver: { id: 501 } }] });
   const stamps = makeStamps();
   const r = await syncAcceptance({
     lead: LEAD,
@@ -409,7 +423,7 @@ Deno.test("sync: Adoptions-Row (application_id == confirmation_id) ⇒ Upload mi
 });
 
 Deno.test("sync: Adoptions-Row und Confirmation OHNE application_id ⇒ defer (kein blinder Upload)", async () => {
-  const net = makeNet({ finalConfirmations: [{ id: 667, caregiver: { id: 501 } }] });
+  const net = makeNet({ finalConfirmations: [{ id: 667, application_id: null, caregiver: { id: 501 } }] });
   const stamps = makeStamps();
   const r = await syncAcceptance({
     lead: LEAD,
@@ -421,9 +435,11 @@ Deno.test("sync: Adoptions-Row und Confirmation OHNE application_id ⇒ defer (k
   assertStringIncludes(r.deferred.join("|"), "original application_id");
 });
 
-Deno.test("sync: Adoption — final_confirmation existiert (SA-Portal/Alt-Client) ⇒ KEIN doppelter Accept", async () => {
-  const net = makeNet({ finalConfirmations: [{ id: 777, caregiver: { id: 501 } }] });
-  const stamps = makeStamps();
+Deno.test("sync: Adoption Weg 3 — SA-Portal buchte eine ANDERE Bewerbung derselben Kraft auf DEMSELBEN Job ⇒ KEIN doppelter Accept, Upload mit application_id der Confirmation", async () => {
+  // Pfad 3 des Portals (mappers.ts): die noch gelistete Bewerbung 9001 wird als
+  // accepted gepatcht, die Confirmation 777 hängt an Bewerbung 9002 (Panel).
+  const net = makeNet({ finalConfirmations: [{ id: 777, application_id: 9002, caregiver: { id: 501 }, job_offer_id: 100 }] });
+  const stamps = makeStamps(100);
   const r = await syncAcceptance({
     lead: LEAD, row: makeRow(), secrets: SECRETS,
     supabase: stamps.supabase, getAgencyToken: agencyToken, fetchFn: net.fetch,
@@ -432,6 +448,53 @@ Deno.test("sync: Adoption — final_confirmation existiert (SA-Portal/Alt-Client
   assertEquals(r.confirmation_id, 777);
   assertEquals(stamps.calls[0], { kind: "confirmed", confirmationId: 777 });
   assertEquals(r.pdf_uploaded, true); // verarbeitet ⇒ Upload läuft direkt durch
+  const upd = net.ops.find((o) => o.op === "UpdateConfirmation")!.variables;
+  assertEquals(upd.application_id, 9002); // NIE 9001 — sonst hängt UpdateConfirmation die Confirmation um
+});
+
+Deno.test("sync (#78): Pflegekraft kommt zum nächsten Turnus wieder ⇒ alte Confirmation wird NICHT adoptiert, StoreConfirmation für die NEUE Bewerbung", async () => {
+  // Fall Berg 9753: Confirmation 4296 (Job 32952, Bewerbung 11198) — die Row
+  // ist die neue Bewerbung 13074 derselben Kraft auf Job 36300.
+  const net = makeNet({ finalConfirmations: [{ id: 4296, application_id: 11198, caregiver: { id: 501 }, job_offer_id: 32952 }] });
+  const stamps = makeStamps(36300);
+  const r = await syncAcceptance({
+    lead: LEAD, row: makeRow({ application_id: 13074 }), secrets: SECRETS,
+    supabase: stamps.supabase, getAgencyToken: agencyToken, fetchFn: net.fetch,
+  });
+  const store = net.ops.find((o) => o.op === "StoreConfirmation")!;
+  assertEquals(store.variables.application_id, 13074);
+  assertEquals(r.confirmation_id, 555); // die NEUE Confirmation, nicht 4296
+  assertEquals(stamps.calls[0], { kind: "confirmed", confirmationId: 555 });
+  assertEquals(net.ops.some((o) => o.op === "UpdateConfirmation"), false); // 4296 wird nie angefasst
+  assertStringIncludes(r.deferred.join("|"), "not processed"); // neue Confirmation noch nicht sichtbar ⇒ Cron
+});
+
+Deno.test("sync (#78): fremder Stempel (Confirmation einer anderen Bewerbung) ⇒ kein StoreFile, kein UpdateConfirmation, defer mit Grund", async () => {
+  const net = makeNet({
+    finalConfirmations: [{ id: 4296, application_id: 11198, caregiver: { id: 501 }, job_offer_id: 32952 }],
+    storageBody: new TextEncoder().encode("%PDF-1.7 canon"),
+  });
+  const stamps = makeStamps(36300);
+  const r = await syncAcceptance({
+    lead: LEAD,
+    row: makeRow({ application_id: 13074, mamamia_confirmed_at: "2026-09-15T13:05:08Z", mamamia_confirmation_id: 4296 }),
+    secrets: SECRETS, supabase: stamps.supabase, getAgencyToken: agencyToken, fetchFn: net.fetch,
+  });
+  assertEquals(r.pdf_uploaded, false);
+  assertEquals(net.ops.some((o) => o.op === "StoreFile"), false);
+  assertEquals(net.ops.some((o) => o.op === "UpdateConfirmation"), false);
+  assertStringIncludes(r.deferred.join("|"), "gehört zu Bewerbung 11198 auf Job 32952");
+});
+
+Deno.test("sync (#78): ohne Job-Kenntnis (altes Event) zählt nur die Bewerbung — andere Bewerbung derselben Kraft wird NICHT adoptiert", async () => {
+  const net = makeNet({ finalConfirmations: [{ id: 777, application_id: 9002, caregiver: { id: 501 }, job_offer_id: 100 }] });
+  const stamps = makeStamps(null);
+  const r = await syncAcceptance({
+    lead: LEAD, row: makeRow(), secrets: SECRETS,
+    supabase: stamps.supabase, getAgencyToken: agencyToken, fetchFn: net.fetch,
+  });
+  assertEquals(net.ops.some((o) => o.op === "StoreConfirmation"), true); // lieber laut doppelt als still fremd
+  assertEquals(r.confirmation_id, 555);
 });
 
 Deno.test("sync: skipConfirm (Alt-Bundle hat akzeptiert, noch unverarbeitet) ⇒ weder Store noch Stempel", async () => {
@@ -455,7 +518,7 @@ async function shaHex(bytes: Uint8Array): Promise<string> {
 Deno.test("sync: KANON aus dem Storage ⇒ genau diese Bytes zu Mamamia, KEIN Re-Render", async () => {
   const canon = new TextEncoder().encode("%PDF-1.7 canonical");
   const net = makeNet({
-    finalConfirmations: [{ id: 555, caregiver: { id: 501 } }],
+    finalConfirmations: [{ id: 555, application_id: 9001, caregiver: { id: 501 } }],
     storageBody: canon,
   });
   const stamps = makeStamps();
@@ -475,7 +538,7 @@ Deno.test("sync: KANON aus dem Storage ⇒ genau diese Bytes zu Mamamia, KEIN Re
 
 Deno.test("sync: Kanon-Bytes ≠ pdf_sha256 ⇒ Integritäts-Gate blockt Upload (deferred)", async () => {
   const net = makeNet({
-    finalConfirmations: [{ id: 555, caregiver: { id: 501 } }],
+    finalConfirmations: [{ id: 555, application_id: 9001, caregiver: { id: 501 } }],
     storageBody: new TextEncoder().encode("%PDF-1.7 tampered"),
   });
   const stamps = makeStamps();
@@ -490,7 +553,7 @@ Deno.test("sync: Kanon-Bytes ≠ pdf_sha256 ⇒ Integritäts-Gate blockt Upload 
 });
 
 Deno.test("sync: kein Kanon im Storage (404) ⇒ Fallback-Render via Kostenrechner (Alt-Rows)", async () => {
-  const net = makeNet({ finalConfirmations: [{ id: 555, caregiver: { id: 501 } }] }); // storageBody undefined ⇒ 404
+  const net = makeNet({ finalConfirmations: [{ id: 555, application_id: 9001, caregiver: { id: 501 } }] }); // storageBody undefined ⇒ 404
   const stamps = makeStamps();
   const r = await syncAcceptance({
     lead: LEAD,
@@ -505,7 +568,7 @@ Deno.test("sync: kein Kanon im Storage (404) ⇒ Fallback-Render via Kostenrechn
 
 Deno.test("sync: HTML-Fallback vom Renderer ⇒ Magic-Byte-Gate blockt Upload (deferred)", async () => {
   const net = makeNet({
-    finalConfirmations: [{ id: 555, caregiver: { id: 501 } }],
+    finalConfirmations: [{ id: 555, application_id: 9001, caregiver: { id: 501 } }],
     pdfBody: "<!DOCTYPE html><html>fallback</html>",
   });
   const stamps = makeStamps();
@@ -870,7 +933,7 @@ function makeCronDeps(net: FakeNet, pending: PendingAcceptanceSync[], alerted: s
 }
 
 Deno.test("retryAcceptanceSyncs: Retry repariert den Row ⇒ completed, KEIN Alarm (auch wenn alt)", async () => {
-  const net = makeNet({ finalConfirmations: [{ id: 555, caregiver: { id: 501 } }] });
+  const net = makeNet({ finalConfirmations: [{ id: 555, application_id: 9001, caregiver: { id: 501 } }] });
   const alerted: string[] = [];
   const pending = makePending({
     mamamia_confirmed_at: "2026-07-20T10:00:00Z",
@@ -1122,7 +1185,7 @@ Deno.test("sync-acceptance handler (Registry #52): customer_update_error ändert
 Deno.test("retry-chain: PDF dopięty w pierwszej stufie ⇒ stop, bez alarmu", async () => {
   // Zwischen Erstversuch und +15s hat Mamamia die Confirmation verarbeitet.
   const net = makeNet({
-    finalConfirmations: [{ id: 555, caregiver: { id: 501 } }],
+    finalConfirmations: [{ id: 555, application_id: 9001, caregiver: { id: 501 } }],
     storageBody: new TextEncoder().encode("%PDF-1.7 canon"),
   });
   const row = makeRow({ mamamia_confirmed_at: "2026-07-21T20:00:00Z", mamamia_confirmation_id: 555 });
