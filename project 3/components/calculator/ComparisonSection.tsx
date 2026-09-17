@@ -91,7 +91,7 @@ export function ComparisonSection() {
                 <svg className="w-5 h-5 text-[#708A95] flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                 </svg>
-                <span className="text-[16px] text-[#3D3D3D]">1:1 Betreuung rund um die Uhr</span>
+                <span className="text-[16px] text-[#3D3D3D]">1:1-Betreuung, bei Bedarf auch nachts</span>
               </div>
               <div className="flex items-start gap-3">
                 <svg className="w-5 h-5 text-[#708A95] flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -109,12 +109,13 @@ export function ComparisonSection() {
 
             <div className="border-t-2 border-[#708A95] pt-6">
               <div className="text-center">
-                <p className="text-[15px] text-[#3D3D3D] mb-2">Durchschnittlicher Eigenanteil pro Monat:</p>
-                <p className="text-4xl font-bold text-[#708A95]">1.500 €</p>
-                {/* 3.364 − 1.500 = 1.864 → "rund 1.860", nicht "bis zu 2.000"
-                    (rechnerisch falscher Claim wäre §5-UWG-Angriffsfläche). */}
+                <p className="text-[15px] text-[#3D3D3D] mb-2">Selbst zu tragen bei Pflegegrad 3:</p>
+                <p className="text-4xl font-bold text-[#708A95]">ab ca. 923 €</p>
+                {/* Wie primundus.de (17.09.2026): 2.150 € − 599 € Pflegegeld − 295 € Entlastungsbudget
+                    − 333 € Steuer = 923 €. 3.364 − 923 = 2.441 → "rund 2.440" beim Grundpreis, kein
+                    "bis zu" (rechnerisch kein Höchstwert, §5-UWG-Angriffsfläche). */}
                 <p className="text-[16px] font-semibold text-[#708A95] mt-2">
-                  Rund 1.860 € günstiger!
+                  Beim Grundpreis rund 2.440 € weniger im Monat
                 </p>
               </div>
             </div>
@@ -123,7 +124,8 @@ export function ComparisonSection() {
 
         <div className="mt-8 text-center">
           <p className="text-sm text-[#5A5A5A] max-w-2xl mx-auto mb-6">
-            <strong className="font-semibold text-[#3D3D3D]">Hinweis:</strong> Die Kosten können je nach Pflegegrad und Region variieren.
+            <strong className="font-semibold text-[#3D3D3D]">Hinweis:</strong> Pflegeheim: bundesweiter Durchschnitt (vdek, Stand 1. Juli 2026).
+            24-Stunden-Pflege: eine Person, nach Pflegegeld, Entlastungsbudget und Steuerermäßigung, zzgl. An- und Abreise.
             Mit unserem Kostenrechner erhalten Sie eine individuelle Berechnung für Ihre Situation.
           </p>
 
