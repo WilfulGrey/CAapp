@@ -52,6 +52,16 @@ export function euro(betrag: number): string {
   return `${Math.round(betrag).toLocaleString('de-DE')}\u00A0€`;
 }
 
+/**
+ * Martas Karte ganz unten auf der Preisseite UND auf der Kontaktseite (Martin 17.09.: „perfekt — würde ich
+ * vielleicht auch auf der nächsten Seite ganz unten machen"). Nicht auf den Preis beschränkt: allgemein
+ * helfen, auch bei Zuschüssen und Förderung. Wer beim Formular zögert, hat so einen Menschen statt nur den Ausgang.
+ */
+export const MARTA_KARTE = {
+  frage: 'Kann ich Ihnen weiterhelfen?',
+  text: 'Ich berate Sie gerne – auch zu Zuschüssen und Förderung. Schnell und unverbindlich.',
+} as const;
+
 /** Der eine Knopf des Ablaufs `preis` — auf der Preisseite UND als letzter Knopf der Kontaktabfrage. */
 export const KNOPF_PREIS = 'Speichern & Pflegekräfte ansehen\u00A0→';
 
@@ -102,8 +112,7 @@ export const PREIS_SEITE = {
   // Unter dem Knopf wie auf der Startseite (Martin 17.09.): die Hero-Punkte
   // (lib/hero-punkte.ts) mit „Bestpreisgarantie · Mehr Infos" als viertem, die
   // Sterne-Zeile (lib/sterne-zeile.ts, live von primundus.de), darunter Marta.
-  // Martin 17.09.: nicht auf den Preis beschränkt — allgemein helfen, auch bei Zuschüssen und Förderung.
-  marta: { frage: 'Kann ich Ihnen weiterhelfen?', text: 'Ich berate Sie gerne – auch zu Zuschüssen und Förderung. Schnell und unverbindlich.' },
+  marta: MARTA_KARTE,
   /** Nur wenn zuhause günstiger ist als das Heim — sonst kein Satz (kein Schönrechnen). */
   heim: (eigen: number): string | null => {
     const weniger = HEIM_EIGENANTEIL - eigen;
