@@ -17,16 +17,16 @@ import { KeyBenefitsBar } from "@/components/calculator/KeyBenefitsBar";
 import { PersonalContact } from "@/components/calculator/PersonalContact";
 import { homePageGraph, jsonLdString } from "@/lib/seo-schema";
 import { BewertungsZeile } from "@/components/calculator/BewertungsZeile";
-import { ladeBewertungsStand } from "@/lib/bewertungs-stand";
+import { ladeSterneStand } from "@/lib/sterne-zeile-laden";
 
 // Server-Komponente (seit 17.09.2026, vorher "use client"), damit die
 // Bewertungszahl im ersten HTML steht statt nachzuspringen. Alle Bausteine mit
 // Zustand oder Klicks tragen ihr eigenes "use client". Die Zahl kommt höchstens
-// eine Stunde alt von primundus.de/erfahrungen.
+// eine Stunde alt von primundus.de/api/bewertungen-stand (lib/sterne-zeile.ts).
 export const revalidate = 3600;
 
 export default async function HomePage() {
-  const bewertung = await ladeBewertungsStand();
+  const bewertung = await ladeSterneStand();
   return (
     <div className="min-h-screen bg-[#F8F7F5]">
       {/* Service + FAQPage-JSON-LD: landet über den SSR-Prerender im
@@ -335,7 +335,7 @@ export default async function HomePage() {
         </div>
 
         <div className="max-w-3xl mx-auto">
-          <TestimonialCard />
+          <TestimonialCard bewertung={bewertung} />
         </div>
       </main>
 
