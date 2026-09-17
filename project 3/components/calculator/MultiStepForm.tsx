@@ -10,10 +10,14 @@ import { scrollToCalculator, isCalculatorAligned, OPEN_CALCULATOR_EVENT } from "
 import { useFormTracking } from "@/hooks/use-form-tracking";
 import { deutschBalken, GANZ_SICHTBAR, GARANTIE, kopfzeile, kraefteVorschauAktiv, kraftFakten, parseVorschau, PORTAL_ANZAHL, SCHRANKE, VERLAUF, WARTE, wuenscheAusAntworten, type VorschauKraft } from "@/lib/kraefte-vorschau";
 import { BestpreisDialog } from "@/components/calculator/BestpreisDialog";
+import { PreisSeite, type PreisDaten } from "@/components/calculator/PreisSeite";
+import { KontaktSeite, KONTAKT_FELD_ID, type KontaktFeld } from "@/components/calculator/KontaktSeite";
+import { ablaufVariante, KONTAKT_NACH_PREIS, KONTAKT_SEITE, WARTE_KURZ_ENDE_MS, WARTE_KURZ_MS, type Ablauf } from "@/lib/preis-zuerst";
 import { GARANTIE_OEFFNEN_EVENT } from "@/components/calculator/BestpreisSiegelLink";
 import { zaehle } from "@/lib/zaehler";
 import { meldeAnfrage } from "@/lib/oaiq";
 import { telefonBereinigen, telefonFehler, telefonGueltig } from "@/lib/telefon";
+import { kontaktVariante, KNOPF_KONTAKT, STUFEN, STUFEN_FEHLER, type KontaktStufe, type KontaktVariante } from "@/lib/kontakt-stufen";
 
 const EMAIL_MUSTER = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -37,7 +41,7 @@ function AntwortZeichen() {
   );
 }
 
-function MatchingAnimation({ onComplete, initialCount, vorschau }: { onComplete: (finalCount: number) => void; initialCount: number; vorschau?: boolean }) {
+function MatchingAnimation({ onComplete, initialCount, vorschau, kurz }: { onComplete: (finalCount: number) => void; initialCount: number; vorschau?: boolean; kurz?: boolean }) {
   const [activeStep, setActiveStep] = useState(0);
   const [completedSteps, setCompletedSteps] = useState<number[]>([]);
   const [nurseCount, setNurseCount] = useState(initialCount);
@@ -50,9 +54,11 @@ function MatchingAnimation({ onComplete, initialCount, vorschau }: { onComplete:
   // Sonst die drei Schritte des normalen Rechners.
   const ANIM_STEPS = vorschau
     ? [
-        { label: WARTE.schritt1, sub: '', icon: '📋', duration: 3200 },
-        { label: WARTE.schritt2Laeuft, sub: '', icon: '👩‍⚕️', duration: 4500 },
-        { label: WARTE.schritt3, sub: '', icon: '✓', duration: 1800 },
+        // Ablauf „Preis zuerst" (Registry #77): ca. 3 s statt 10,7 s — der Lohn
+        // (der Preis) folgt direkt, die Berechnung braucht ca. 1 s.
+        { label: WARTE.schritt1, sub: '', icon: '📋', duration: kurz ? WARTE_KURZ_MS[0] : 3200 },
+        { label: WARTE.schritt2Laeuft, sub: '', icon: '👩‍⚕️', duration: kurz ? WARTE_KURZ_MS[1] : 4500 },
+        { label: WARTE.schritt3, sub: '', icon: '✓', duration: kurz ? WARTE_KURZ_MS[2] : 1800 },
       ]
     : [
         { label: 'Ihr persönliches Angebot wird erstellt', sub: 'Angebot & Pflegekräfte werden zusammengestellt', icon: '📋', duration: 3200 },
@@ -64,7 +70,7 @@ function MatchingAnimation({ onComplete, initialCount, vorschau }: { onComplete:
     let t: ReturnType<typeof setTimeout>;
     const run = (i: number) => {
       if (i >= ANIM_STEPS.length) {
-        setTimeout(() => { setDone(true); setTimeout(() => onCompleteRef.current(nurseCount), 900); }, 300);
+        setTimeout(() => { setDone(true); setTimeout(() => onCompleteRef.current(nurseCount), kurz ? WARTE_KURZ_ENDE_MS : 900); }, 300);
         return;
       }
       setActiveStep(i);
@@ -198,6 +204,31 @@ export function MultiStepForm({ mode = 'inline' }: MultiStepFormProps = {}) {
   // auslöst.
   const [vorschauAktiv, setVorschauAktiv] = useState(false);
   const vorschauAktivRef = useRef(false);
+  // Kontakt in drei Schritten (Registry #76, Martin 16.09.): 50/50 gegen das
+  // heutige Formular, klebrig je Sitzung, `?kontakt=stufen|alt` erzwingt.
+  // Nur im useEffect bestimmen — nie beim Rendern (Hydration, s. Tagesformel).
+  // Ref daneben, damit die Zähler-Effekte lesen können, ohne neu zu feuern.
+  const [kontaktVar, setKontaktVar] = useState<KontaktVariante>('alt');
+  const kontaktVarRef = useRef<KontaktVariante>('alt');
+  const [stufe, setStufe] = useState<KontaktStufe>('name');
+  const [stufenFehler, setStufenFehler] = useState('');
+  // Nach dem E-Mail-Schritt existiert der Lead; Token und Portal-Link für
+  // den Telefon-Schritt und den Redirect. Ref, weil die Handler async sind.
+  const leadDatenRef = useRef<{ leadId: string; portalUrl: string; token: string | null } | null>(null);
+  const [leadGespeichert, setLeadGespeichert] = useState(false);
+  // Preis zuerst (Registry #77, Martin 17.09.): EIN Test — der Ablauf würfelt
+  // (`preis` gegen `alt`), die Kontaktform folgt ihm. Die Kalkulation lädt
+  // während der Warteseite; scheitert sie, läuft der Besucher den heutigen Weg.
+  const [ablauf, setAblauf] = useState<Ablauf>('alt');
+  const ablaufRef = useRef<Ablauf>('alt');
+  const [preisDaten, setPreisDaten] = useState<PreisDaten | null>(null);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const preisDatenRef = useRef<any>(null);
+  const preisLadenRef = useRef<Promise<void> | null>(null);
+  // Kontaktseite hinter dem Preis: Fehler je Feld (erst beim Klick geprüft) + Server-Fehler am Knopf.
+  const [kontaktFehler, setKontaktFehler] = useState<Record<KontaktFeld, string>>({ name: '', email: '', phone: '' });
+  const [kontaktServerFehler, setKontaktServerFehler] = useState('');
+  const zaehlVariante = () => (vorschauAktivRef.current ? 'vorschau' : ablaufRef.current === 'preis' ? 'preis' : kontaktVarRef.current);
   const [kraefteVorschau, setKraefteVorschau] = useState<VorschauKraft[] | null>(null);
   // Schritt 9 im Vorschau-Modus: die Kontaktfelder öffnen sich erst nach dem
   // Knopf „Preis & Profile freischalten" (Martin, 10.09.). Ref für Payload/Redirect.
@@ -207,14 +238,14 @@ export function MultiStepForm({ mode = 'inline' }: MultiStepFormProps = {}) {
   const [garantieOffen, setGarantieOffen] = useState(false);
   const oeffneGarantie = () => {
     setGarantieOffen(true);
-    zaehle('garantie_geoeffnet', vorschauAktivRef.current ? 'vorschau' : 'alt');
+    zaehle('garantie_geoeffnet', zaehlVariante());
   };
   // Knopf im Pop-up (Martin 13.09.: statt Verstanden in den Rechner): wie der
   // Hero-Knopf, Wizard auf, Einstieg ohne Warm-up. Ist der Wizard schon offen,
   // schließt er nur das Pop-up. Zählt anonym als garantie_weiter.
   const weiterAusGarantie = () => {
     setGarantieOffen(false);
-    zaehle('garantie_weiter', vorschauAktivRef.current ? 'vorschau' : 'alt');
+    zaehle('garantie_weiter', zaehlVariante());
     if (!fullscreen) {
       analytics.trackEvent('wizard', 'wizard_opened', { source: 'garantie_popup' });
       setWarmupAudience('direct');
@@ -243,12 +274,47 @@ export function MultiStepForm({ mode = 'inline' }: MultiStepFormProps = {}) {
       document.getElementById('kontakt-name')?.focus({ preventScroll: true });
     }, 60);
   };
+  const oeffneKontaktNachPreis = () => {
+    kontaktOffenRef.current = true;
+    setKontaktOffen(true);
+    analytics.trackEvent('wizard', 'preis_weiter', {});
+    zaehle('kontakt_geoeffnet', 'preis');
+    setTimeout(() => {
+      document.querySelector('[data-calculator-card]')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      document.getElementById('kontakt-name')?.focus({ preventScroll: true });
+    }, 60);
+  };
   const vorschauModus = vorschauAktiv && !!kraefteVorschau && kraefteVorschau.length > 0;
+  // Preisseite vor der Kontaktabfrage — nur wenn die Kalkulation da ist.
+  const preisModus = ablauf === 'preis' && !!preisDaten && !vorschauModus;
+  const ergebnisModus = vorschauModus || preisModus;
+  // Die Karten-Seite (?kraefte=1) behält das alte Formular — keine Kreuzung der Tests.
+  const stufenAktiv = kontaktVar === 'stufen' && !vorschauModus;
+  // Hinter dem Preis verspricht der Kontakt nicht mehr den Preis, sondern die Kräfte (Registry #77).
+  const stufenText = preisModus && stufe === 'email' ? KONTAKT_NACH_PREIS.emailText : STUFEN[stufe].text;
+  const stufenKnopf = preisModus && stufe === 'telefon' ? KONTAKT_NACH_PREIS.knopf : STUFEN[stufe].knopf;
+  // Nach jedem Teilschritt-Wechsel das Feld fokussieren (der Wechsel folgt
+  // auf einen Klick, darum öffnet sich auch auf dem Handy die Tastatur).
+  useEffect(() => {
+    if (currentStep !== totalSteps || !stufenAktiv) return;
+    const id = stufe === 'name' ? 'kontakt-name' : stufe === 'email' ? 'kontakt-email' : 'kontakt-telefon';
+    const t = setTimeout(() => document.getElementById(id)?.focus({ preventScroll: true }), 60);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [stufe, currentStep, stufenAktiv]);
   useEffect(() => {
     try {
       const an = kraefteVorschauAktiv(window.location.search, window.sessionStorage);
       vorschauAktivRef.current = an;
       setVorschauAktiv(an);
+      // Die Karten-Seite (?kraefte=1) bleibt beim heutigen Weg — keine Kreuzung der Tests.
+      const ab: Ablauf = an ? 'alt' : ablaufVariante(window.location.search, window.sessionStorage);
+      ablaufRef.current = ab;
+      setAblauf(ab);
+      // Kontakt = eine Seite; die drei Schritte nur mit ?kontakt=stufen (ihr Test kommt danach).
+      const kv = kontaktVariante(window.location.search, window.sessionStorage, 'alt');
+      kontaktVarRef.current = kv;
+      setKontaktVar(kv);
     } catch { /* sessionStorage gesperrt — Vorschau bleibt aus */ }
   }, []);
   const setzeVorschau = (liste: VorschauKraft[]) => { kraefteVorschauRef.current = liste; setKraefteVorschau(liste); };
@@ -379,7 +445,7 @@ export function MultiStepForm({ mode = 'inline' }: MultiStepFormProps = {}) {
       kraefte_vorschau: vorschauAktivRef.current,
     });
     // Anonymer Zähler ohne Einwilligung (Registry #63): nur Schritt + Variante.
-    if (currentStep >= 1 && currentStep <= 9) zaehle(`schritt_${currentStep}` as `schritt_${1|2|3|4|5|6|7|8|9}`, vorschauAktivRef.current ? 'vorschau' : 'alt');
+    if (currentStep >= 1 && currentStep <= 9) zaehle(`schritt_${currentStep}` as `schritt_${1|2|3|4|5|6|7|8|9}`, zaehlVariante());
     stepStartRef.current = Date.now();
   }, [currentStep, wizardSichtbar]);
 
@@ -638,168 +704,301 @@ export function MultiStepForm({ mode = 'inline' }: MultiStepFormProps = {}) {
     return !newErrors.name && !newErrors.email && !newErrors.phone;
   };
 
+  // Lead anlegen: Preis serverseitig rechnen, dann /api/angebot-anfordern.
+  // Beide Varianten gehen diesen Weg; `stufen` schickt kein Telefon und
+  // meldet `telefonSpaeter` — die Route lässt die Nummer dann aus und der
+  // Telefon-Schritt trägt sie über /api/lead-telefon nach (Registry #76).
+  // Antworten → formularDaten der Preisberechnung (Preisseite UND Lead nutzen dieselben).
+  const formularDatenAusAntworten = () => ({
+    betreuung_fuer: state.patientCount || '',
+    pflegegrad: parseInt(state.pflegegrad || '0'),
+    weitere_personen: state.householdOthers || '',
+    mobilitaet: state.mobility || '',
+    nachteinsaetze: state.nightCare || '',
+    deutschkenntnisse: state.germanLevel || '',
+    fuehrerschein: state.driving || '',
+    // Getriebe (gearbox) lives on the CA-app patient form, not here —
+    // user picks Automatik / Schaltung / Egal in the in-portal step 3
+    // (Wünsche zur PK), and patientFormMapper writes it to
+    // customer_caregiver_wish.driving_license_gearbox via UpdateCustomer.
+    // Onboard sets a permissive 'automatic' default so Mamamia matching
+    // works before the patient form is saved.
+    geschlecht: state.gender || '',
+  });
+  // Preis zuerst: Kalkulation laden, sobald die Warteseite läuft (frischer State,
+  // darum im Effekt und nicht im Klick-Handler der letzten Frage).
+  useEffect(() => {
+    if (!showMatching || ablaufRef.current !== 'preis' || preisDatenRef.current) return;
+    preisLadenRef.current = fetch('/api/kalkulation-berechnen', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ formularDaten: formularDatenAusAntworten() }),
+    })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((k) => { if (k && typeof k.bruttopreis === 'number' && k.zuschüsse) { preisDatenRef.current = k; setPreisDaten(k); } })
+      .catch(() => { /* Preisseite entfällt — der Besucher läuft den heutigen Weg */ });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [showMatching]);
+  // Preisseite gesehen: anonym zählen (einmal je Seitenaufruf) + Ereignis mit Einwilligung.
+  useEffect(() => {
+    if (currentStep !== totalSteps || !preisModus || kontaktOffen) return;
+    zaehle('preis_gesehen', 'preis');
+    analytics.trackEvent('wizard', 'preis_gesehen', {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentStep, preisModus, kontaktOffen]);
+  const erzeugeLead = async (opts: { telefon: string | null; telefonSpaeter: boolean }) => {
+    const formularDaten = formularDatenAusAntworten();
+
+    // Preis zuerst (Registry #77): die Kalkulation der Preisseite wiederverwenden —
+    // der Kunde bekommt genau den Preis, den er gesehen hat. Sonst wie bisher
+    // server-seitig berechnen (damit die echten Preise aus der DB verwendet werden).
+    let kalkulation = preisDatenRef.current;
+    if (!kalkulation) {
+      const kalkulationResponse = await fetch('/api/kalkulation-berechnen', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ formularDaten }),
+      });
+      if (!kalkulationResponse.ok) {
+        throw new Error('Fehler bei der Kalkulation');
+      }
+      kalkulation = await kalkulationResponse.json();
+    }
+
+    // Sende an angebot-anfordern API (erstellt Lead + versendet Angebots-E-Mails)
+    // adParams: Google-Klick-IDs (gclid/wbraid/gbraid) aus der Landing-URL
+    // dieser Session — die Route sanitisiert und hängt sie an den Lead,
+    // damit qualifizierte Leads später als Offline-Conversions zu Google
+    // importiert werden können (docs/google-ads-tracking.md).
+    const response = await fetch('/api/angebot-anfordern', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        vorname: formData.name,
+        email: formData.email,
+        ...(opts.telefon ? { telefon: opts.telefon } : {}),
+        telefonSpaeter: opts.telefonSpaeter,
+        kontaktVariante: kontaktVarRef.current,
+        ablauf: ablaufRef.current,
+        careStartTiming: state.careStartTiming,
+        adParams: analytics.getAdParams(),
+        // Von welcher Seite kam die Anfrage (Martin, 27.08.). Die
+        // Varianten-Weiche liefert alle drei unter „/" aus, deshalb zählt
+        // die Variante aus dem Cookie — nicht der Pfad (analytics.ts).
+        quelle: (() => {
+          // Von primundus.de gekommen? Dann zählt die Website als Quelle
+          // (Martin, 04.09.: Betreff „Primundus.de", Unterseite in der Mail).
+          const web = websiteHerkunft();
+          if (web) return `website:${web.src}`;
+          const seite = variantenSeite();
+          return seite === '/' ? 'rechner' : `rechner:${seite.replace(/^\//, '')}`;
+        })(),
+        websitePfad: websiteHerkunft()?.pfad ?? null,
+        kalkulation: {
+          ...kalkulation,
+          formularDaten,
+        },
+      }),
+    });
+    if (!response.ok) {
+      throw new Error('Fehler beim Senden');
+    }
+    const data = await response.json();
+    if (!(data.success && data.leadId)) {
+      throw new Error('Fehler beim Anfordern des Angebots');
+    }
+    // No portalUrl from server is a deploy/config bug — surface it so
+    // the issue is visible instead of hidden behind a fallback UI.
+    if (typeof data.portalUrl !== 'string' || data.portalUrl.length === 0) {
+      throw new Error('Portal-URL fehlt in Server-Antwort. Bitte Support kontaktieren.');
+    }
+    return { data: data as { leadId: string; portalUrl: string; token: string | null }, kalkulation };
+  };
+
+  // Erfolgsmeldungen, die es je Lead genau EINMAL gibt: Beacon (Bug #33),
+  // OpenAI-Pixel, Google-Ads-Conversion über den dataLayer. `onDone` hängt
+  // den Redirect an das GTM-Ereignis (Variante alt); in `stufen` bleibt die
+  // Seite offen, GTM hat Zeit, der Redirect kommt nach dem Telefon-Schritt.
+  const meldeErfolg = (data: { leadId: string; portalUrl: string }, kalkulation: { bruttopreis?: number }, onDone?: () => void) => {
+    trackFormSubmit();
+    zaehle('abgeschickt', zaehlVariante());
+    // step_complete(contact_form) + Conversion in EINEM Beacon — überlebt
+    // den Redirect garantiert (Bug #33). Ersetzt die früheren racy
+    // supabase-js-Inserts (analytics.trackConversion + step_complete aus
+    // handleNext), von denen ~die Hälfte beim window.location.assign starb.
+    analytics.trackCriticalSubmit({
+      step: totalSteps,
+      stepName: getStepId(totalSteps),
+      timeOnStepSeconds: Math.round((Date.now() - stepStartRef.current) / 1000),
+      extra: {
+        kraefte_vorschau: vorschauAktivRef.current,
+        kraefte_aktion: kontaktOffenRef.current ? 'button' : null,
+        kontakt_variante: kontaktVarRef.current,
+        ablauf: ablaufRef.current,
+      },
+      conversion: {
+        leadId: data.leadId,
+        conversionType: 'angebot_angefordert',
+        conversionValue: kalkulation.bruttopreis,
+        formData: {
+          pflegegrad: state.pflegegrad,
+          care_start_timing: state.careStartTiming,
+          patient_count: state.patientCount,
+        },
+      },
+    });
+    // OpenAI Ads (ChatGPT-Werbung): lead_created an den Pixel. Bis zum
+    // 10.09. stand dieser Aufruf nur auf der alten /result-Seite, die der
+    // Wizard seit dem Direkt-Redirect nie erreicht — der Pixel hatte in
+    // einer Woche Kampagne kein einziges Ereignis gesehen. Ohne
+    // Marketing-Einwilligung existiert window.oaiq nicht, dann passiert
+    // nichts. Das SDK sendet mit keepalive/sendBeacon, der Redirect
+    // gleich darunter reisst den Request nicht ab.
+    meldeAnfrage(window.oaiq, data.leadId);
+    // GTM-Tags (Google-Ads-Conversion auf `angebot_erfolgreich`, siehe
+    // docs/google-ads-tracking.md) brauchen einen Moment zum Feuern,
+    // bevor die Navigation alle offenen Requests killt: eventCallback
+    // meldet „alle Tags fertig", eventTimeout/setTimeout sichern den
+    // Redirect ab, falls GTM geblockt ist (Adblocker) oder hängt.
+    (window as any).dataLayer = (window as any).dataLayer || [];
+    (window as any).dataLayer.push({
+      event: 'angebot_erfolgreich',
+      lead_id: data.leadId,
+      pflegegrad: state.pflegegrad,
+      care_start_timing: state.careStartTiming,
+      conversion_value: kalkulation.bruttopreis,
+      // Enhanced Conversions (Martin 25.08.): GTM-Variable „Nutzerdaten"
+      // normalisiert + SHA256-hasht die E-Mail, bevor sie an Google geht —
+      // Klartext verlässt den Browser nicht (docs/google-ads-tracking.md).
+      user_email: formData.email,
+      ...(onDone ? { eventCallback: onDone, eventTimeout: 700 } : {}),
+    });
+  };
+
+  // Variante alt: ein Formular, ein Absenden, direkt ins Portal.
+  // Kontaktseite hinter dem Preis (Registry #77): Knopf nie grau — geprüft wird
+  // beim Klick, Fehler stehen am Feld, das erste fehlerhafte Feld bekommt den Fokus.
+  const kontaktSeiteAbsenden = async () => {
+    if (isSubmitting) return;
+    const f: Record<KontaktFeld, string> = {
+      name: formData.name.trim() ? '' : KONTAKT_SEITE.fehler.name,
+      email: !formData.email.trim() ? KONTAKT_SEITE.fehler.emailLeer : EMAIL_MUSTER.test(formData.email.trim()) ? '' : KONTAKT_SEITE.fehler.email,
+      phone: telefonFehler(formData.phone ?? ''),
+    };
+    setKontaktFehler(f);
+    setKontaktServerFehler('');
+    const erstes = (['name', 'email', 'phone'] as const).find((k) => f[k]);
+    if (erstes) { document.getElementById(KONTAKT_FELD_ID[erstes])?.focus(); return; }
+    zaehle('absenden_geklickt', zaehlVariante());
+    setIsSubmitting(true);
+    try {
+      const { data, kalkulation } = await erzeugeLead({ telefon: formData.phone, telefonSpaeter: false });
+      let weg = false;
+      const insPortal = () => { if (weg) return; weg = true; window.location.assign(data.portalUrl); };
+      meldeErfolg(data, kalkulation, insPortal);
+      setTimeout(insPortal, 900);
+      // Knopf bleibt bis zum Redirect gesperrt — kein zweiter Lead durch Doppelklick.
+    } catch (error) {
+      console.error('Error:', error);
+      zaehle('absenden_fehler', zaehlVariante());
+      setKontaktServerFehler(KONTAKT_SEITE.fehler.speichern);
+      setIsSubmitting(false);
+    }
+  };
+
   const handleSubmit = async () => {
     if (!validateForm()) {
       return;
     }
-
+    zaehle('absenden_geklickt', zaehlVariante());
     setIsSubmitting(true);
 
     try {
-      // Erstelle formularDaten für die Berechnung
-      const formularDaten = {
-        betreuung_fuer: state.patientCount || '',
-        pflegegrad: parseInt(state.pflegegrad || '0'),
-        weitere_personen: state.householdOthers || '',
-        mobilitaet: state.mobility || '',
-        nachteinsaetze: state.nightCare || '',
-        deutschkenntnisse: state.germanLevel || '',
-        fuehrerschein: state.driving || '',
-        // Getriebe (gearbox) lives on the CA-app patient form, not here —
-        // user picks Automatik / Schaltung / Egal in the in-portal step 3
-        // (Wünsche zur PK), and patientFormMapper writes it to
-        // customer_caregiver_wish.driving_license_gearbox via UpdateCustomer.
-        // Onboard sets a permissive 'automatic' default so Mamamia matching
-        // works before the patient form is saved.
-        geschlecht: state.gender || '',
+      const { data, kalkulation } = await erzeugeLead({ telefon: formData.phone, telefonSpaeter: false });
+      // Direct redirect into the CA app — no thank-you interstitial, no
+      // countdown, no MatchingAnimation. User already filled name/email/
+      // phone on step 9 and clicked submit. Anything between submit and
+      // CA app is friction. Kostet im Normalfall ~100-300 ms, im Worst
+      // Case 900 ms (GTM-Callback, s. meldeErfolg).
+      let redirected = false;
+      const goToPortal = () => {
+        if (redirected) return;
+        redirected = true;
+        window.location.assign(data.portalUrl);
       };
-
-      // Berechne Kalkulation server-seitig (damit die echten Preise aus der DB verwendet werden)
-      const kalkulationResponse = await fetch('/api/kalkulation-berechnen', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          formularDaten,
-        }),
-      });
-
-      if (!kalkulationResponse.ok) {
-        throw new Error('Fehler bei der Kalkulation');
-      }
-
-      const kalkulation = await kalkulationResponse.json();
-
-      // Sende an angebot-anfordern API (erstellt Lead + versendet Angebots-E-Mails)
-      // adParams: Google-Klick-IDs (gclid/wbraid/gbraid) aus der Landing-URL
-      // dieser Session — die Route sanitisiert und hängt sie an den Lead,
-      // damit qualifizierte Leads später als Offline-Conversions zu Google
-      // importiert werden können (docs/google-ads-tracking.md).
-      const response = await fetch('/api/angebot-anfordern', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          vorname: formData.name,
-          email: formData.email,
-          telefon: formData.phone,
-          careStartTiming: state.careStartTiming,
-          adParams: analytics.getAdParams(),
-          // Von welcher Seite kam die Anfrage (Martin, 27.08.). Die
-          // Varianten-Weiche liefert alle drei unter „/" aus, deshalb zählt
-          // die Variante aus dem Cookie — nicht der Pfad (analytics.ts).
-          quelle: (() => {
-            // Von primundus.de gekommen? Dann zählt die Website als Quelle
-            // (Martin, 04.09.: Betreff „Primundus.de", Unterseite in der Mail).
-            const web = websiteHerkunft();
-            if (web) return `website:${web.src}`;
-            const seite = variantenSeite();
-            return seite === '/' ? 'rechner' : `rechner:${seite.replace(/^\//, '')}`;
-          })(),
-          websitePfad: websiteHerkunft()?.pfad ?? null,
-          kalkulation: {
-            ...kalkulation,
-            formularDaten,
-          },
-        }),
-      });
-
-      if (!response.ok) {
-        throw new Error('Fehler beim Senden');
-      }
-
-      const data = await response.json();
-
-      if (data.success && data.leadId) {
-        trackFormSubmit();
-        zaehle('abgeschickt', vorschauAktivRef.current ? 'vorschau' : 'alt');
-        // step_complete(contact_form) + Conversion in EINEM Beacon — überlebt
-        // den Redirect garantiert (Bug #33). Ersetzt die früheren racy
-        // supabase-js-Inserts (analytics.trackConversion + step_complete aus
-        // handleNext), von denen ~die Hälfte beim window.location.assign starb.
-        analytics.trackCriticalSubmit({
-          step: totalSteps,
-          stepName: getStepId(totalSteps),
-          timeOnStepSeconds: Math.round((Date.now() - stepStartRef.current) / 1000),
-          extra: {
-            kraefte_vorschau: vorschauAktivRef.current,
-            kraefte_aktion: kontaktOffenRef.current ? 'button' : null,
-          },
-          conversion: {
-            leadId: data.leadId,
-            conversionType: 'angebot_angefordert',
-            conversionValue: kalkulation.bruttopreis,
-            formData: {
-              pflegegrad: state.pflegegrad,
-              care_start_timing: state.careStartTiming,
-              patient_count: state.patientCount,
-            },
-          },
-        });
-        // Direct redirect into the CA app — no thank-you interstitial, no
-        // countdown, no MatchingAnimation. User already filled name/email/
-        // phone on step 10 and clicked submit. Anything between submit and
-        // CA app is friction.
-        if (typeof data.portalUrl === 'string' && data.portalUrl.length > 0) {
-          // GTM-Tags (Google-Ads-Conversion auf `angebot_erfolgreich`, siehe
-          // docs/google-ads-tracking.md) brauchen einen Moment zum Feuern,
-          // bevor die Navigation alle offenen Requests killt: eventCallback
-          // meldet „alle Tags fertig", eventTimeout/setTimeout sichern den
-          // Redirect ab, falls GTM geblockt ist (Adblocker) oder hängt.
-          // Kostet im Normalfall ~100-300 ms, im Worst Case 900 ms.
-          let redirected = false;
-          const goToPortal = () => {
-            if (redirected) return;
-            redirected = true;
-            window.location.assign(data.portalUrl);
-          };
-          // OpenAI Ads (ChatGPT-Werbung): lead_created an den Pixel. Bis zum
-          // 10.09. stand dieser Aufruf nur auf der alten /result-Seite, die der
-          // Wizard seit dem Direkt-Redirect nie erreicht — der Pixel hatte in
-          // einer Woche Kampagne kein einziges Ereignis gesehen. Ohne
-          // Marketing-Einwilligung existiert window.oaiq nicht, dann passiert
-          // nichts. Das SDK sendet mit keepalive/sendBeacon, der Redirect
-          // gleich darunter reisst den Request nicht ab.
-          meldeAnfrage(window.oaiq, data.leadId);
-          (window as any).dataLayer = (window as any).dataLayer || [];
-          (window as any).dataLayer.push({
-            event: 'angebot_erfolgreich',
-            lead_id: data.leadId,
-            pflegegrad: state.pflegegrad,
-            care_start_timing: state.careStartTiming,
-            conversion_value: kalkulation.bruttopreis,
-            // Enhanced Conversions (Martin 25.08.): GTM-Variable „Nutzerdaten"
-            // normalisiert + SHA256-hasht die E-Mail, bevor sie an Google geht —
-            // Klartext verlässt den Browser nicht (docs/google-ads-tracking.md).
-            user_email: formData.email,
-            eventCallback: goToPortal,
-            eventTimeout: 700,
-          });
-          setTimeout(goToPortal, 900);
-          return;
-        }
-        // No portalUrl from server is a deploy/config bug — surface it so
-        // the issue is visible instead of hidden behind a fallback UI.
-        throw new Error('Portal-URL fehlt in Server-Antwort. Bitte Support kontaktieren.');
-      } else {
-        throw new Error('Fehler beim Anfordern des Angebots');
-      }
+      meldeErfolg(data, kalkulation, goToPortal);
+      setTimeout(goToPortal, 900);
     } catch (error) {
       console.error('Error:', error);
+      zaehle('absenden_fehler', zaehlVariante());
       alert('Es ist ein Fehler aufgetreten. Bitte versuchen Sie es erneut.');
     } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  // Variante stufen: Name → E-Mail (Lead gespeichert, Mail raus, Conversion)
+  // → Telefon (nachgetragen oder übersprungen) → Portal.
+  const zumPortal = () => {
+    const ld = leadDatenRef.current;
+    if (ld?.portalUrl) window.location.assign(ld.portalUrl);
+  };
+  const ohneTelefon = () => {
+    if (isSubmitting) return;
+    zaehle('ohne_telefon', zaehlVariante());
+    zumPortal();
+  };
+  const stufeWeiter = async () => {
+    if (isSubmitting) return;
+    if (stufe === 'name') {
+      if (!formData.name.trim()) { setStufenFehler(STUFEN.name.fehler); return; }
+      setStufenFehler('');
+      setStufe('email');
+      zaehle('kontakt_email', zaehlVariante());
+      return;
+    }
+    if (stufe === 'email') {
+      if (!EMAIL_MUSTER.test(formData.email.trim())) { setStufenFehler(STUFEN.email.fehler); return; }
+      setStufenFehler('');
+      if (leadGespeichert) { setStufe('telefon'); return; }
+      zaehle('absenden_geklickt', zaehlVariante());
+      setIsSubmitting(true);
+      try {
+        const { data, kalkulation } = await erzeugeLead({ telefon: null, telefonSpaeter: true });
+        leadDatenRef.current = { leadId: data.leadId, portalUrl: data.portalUrl, token: data.token ?? null };
+        setLeadGespeichert(true);
+        meldeErfolg(data, kalkulation);
+        setStufe('telefon');
+        zaehle('kontakt_telefon', zaehlVariante());
+      } catch (error) {
+        console.error('Error:', error);
+        zaehle('absenden_fehler', zaehlVariante());
+        setStufenFehler(STUFEN_FEHLER.speichern);
+      } finally {
+        setIsSubmitting(false);
+      }
+      return;
+    }
+    // Telefon
+    const fehler = telefonFehler(formData.phone);
+    if (fehler) { setStufenFehler(fehler); return; }
+    setStufenFehler('');
+    setIsSubmitting(true);
+    try {
+      const ld = leadDatenRef.current;
+      if (ld?.token) {
+        const r = await fetch('/api/lead-telefon', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ token: ld.token, telefon: formData.phone }),
+        });
+        if (!r.ok) throw new Error('Telefon speichern fehlgeschlagen');
+      }
+      zaehle('telefon_angegeben', zaehlVariante());
+      zumPortal();
+    } catch (error) {
+      console.error('Error:', error);
+      setStufenFehler(STUFEN_FEHLER.telefon);
       setIsSubmitting(false);
     }
   };
@@ -998,9 +1197,16 @@ export function MultiStepForm({ mode = 'inline' }: MultiStepFormProps = {}) {
           // Warte-Screen immer mit den drei Schritten aus WARTE („Preis
           // berechnet“ …) — auch ohne Karten-Seite (Martin 11.09.: Warten bleibt).
           vorschau
-          onComplete={() => {
+          kurz={ablauf === 'preis'}
+          onComplete={async () => {
+            // Preis zuerst: auf die Kalkulation warten (läuft seit Beginn der
+            // Warteseite, ca. 1 s). Ohne Preis → heutiger Weg, anonym gezählt.
+            if (ablaufRef.current === 'preis') {
+              if (preisLadenRef.current) await preisLadenRef.current;
+              if (!preisDatenRef.current) zaehle('preis_fehler', 'preis');
+            }
             setShowMatching(false);
-            setCurrentStep(totalSteps); // = Step 9 (Kontaktformular)
+            setCurrentStep(totalSteps); // = Step 9 (Preisseite bzw. Kontaktformular)
           }}
         />
       </div>
@@ -1165,7 +1371,7 @@ export function MultiStepForm({ mode = 'inline' }: MultiStepFormProps = {}) {
                       <span className="inline-flex w-[22px] h-[22px] items-center justify-center rounded-full bg-white flex-shrink-0" aria-hidden="true">
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#1F8F5F" strokeWidth={3.2} strokeLinecap="round" strokeLinejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5" /></svg>
                       </span>
-                      {SCHRANKE.kopf}
+                      {preisModus && kontaktOffen && preisDaten ? KONTAKT_NACH_PREIS.kopf(preisDaten.bruttopreis) : SCHRANKE.kopf}
                     </p>
                     <p className="text-[14px] font-medium text-white/95 leading-snug mt-1 pl-[30px]">{SCHRANKE.auszeichnung}</p>
                   </div>
@@ -1573,6 +1779,25 @@ export function MultiStepForm({ mode = 'inline' }: MultiStepFormProps = {}) {
                         );
                       })()}
                     </div>
+                  ) : preisModus && !kontaktOffen && preisDaten ? (
+                    /* Preis zuerst (Registry #77): Preis, Zuschüsse, Garantie,
+                       Konditionen, Kräfte — dann der Knopf zur Kontaktabfrage. */
+                    <PreisSeite daten={preisDaten} onWeiter={oeffneKontaktNachPreis} onGarantie={oeffneGarantie} />
+                  ) : preisModus && kontaktOffen && !stufenAktiv ? (
+                    /* Kontaktseite hinter dem Preis: eine Seite, drei Felder, ein Knopf. */
+                    <KontaktSeite
+                      werte={{ name: formData.name, email: formData.email, phone: formData.phone }}
+                      fehler={kontaktFehler}
+                      serverFehler={kontaktServerFehler}
+                      sendet={isSubmitting}
+                      onAendern={(feld, wert) => {
+                        setFormData({ ...formData, [feld]: feld === 'phone' ? telefonBereinigen(wert) : wert });
+                        if (kontaktFehler[feld]) setKontaktFehler({ ...kontaktFehler, [feld]: '' });
+                      }}
+                      onAbsenden={() => { void kontaktSeiteAbsenden(); }}
+                      onFokus={(feld) => trackFieldFocus(feld)}
+                      onBlur={(feld) => trackFieldBlur(feld)}
+                    />
                   ) : (
                     <>
                       {/* V7 (Martin, 2026-07-08): Der Preiskasten ist die 1:1-Kopie
@@ -1606,12 +1831,107 @@ export function MultiStepForm({ mode = 'inline' }: MultiStepFormProps = {}) {
                           ist fertig", eine generische Spanne daneben wirkte
                           widersprüchlich (Martins Einwand 15.08.). */}
                       <div className="pt-1">
-                        <p className="text-[19px] font-bold leading-snug text-[#1a1a1a]">{SCHRANKE.frage}</p>
-                              <p className="text-[15px] leading-snug text-[#555] mt-1">{SCHRANKE.text}</p>
+                        {stufenAktiv ? (
+                          <>
+                            {stufe === 'telefon' && (
+                              /* Schließt den E-Mail-Schritt ab: die Mail ist ausgelöst (Runde 2, Martin 16.09.). */
+                              <p className="text-[14px] leading-snug text-[#2F5A38] mb-2">
+                                {STUFEN.telefon.bestaetigung} <span className="font-semibold break-all">{formData.email.trim()}</span>
+                              </p>
+                            )}
+                            <p className="text-[19px] font-bold leading-snug text-[#1a1a1a]">{STUFEN[stufe].frage}</p>
+                            {stufenText && <p className="text-[15px] leading-snug text-[#555] mt-1">{stufenText}</p>}
+                          </>
+                        ) : (
+                          <>
+                            <p className="text-[19px] font-bold leading-snug text-[#1a1a1a]">{SCHRANKE.frage}</p>
+                            <p className="text-[15px] leading-snug text-[#555] mt-1">{SCHRANKE.text}</p>
+                          </>
+                        )}
                       </div>
                     </>
                   )}
-                  {(!vorschauModus || kontaktOffen) && (<>
+                  {preisModus && !(kontaktOffen && stufenAktiv) ? null : stufenAktiv ? (
+                    /* Kontakt in drei Schritten (Registry #76): ein Feld je
+                       Schritt, echtes <form>, damit Enter/„Weiter" der Tastatur
+                       absendet; Fehler inline am Feld, Knopf nie grau. */
+                    <form
+                      noValidate
+                      onSubmit={(e) => { e.preventDefault(); void stufeWeiter(); }}
+                      className="space-y-3"
+                    >
+                      {stufe === 'name' && (
+                        <input
+                          id="kontakt-name"
+                          type="text"
+                          value={formData.name}
+                          onChange={(e) => { setFormData({ ...formData, name: e.target.value }); setStufenFehler(''); }}
+                          onFocus={() => trackFieldFocus('name')}
+                          onBlur={() => trackFieldBlur('name')}
+                          className={`w-full px-4 py-3 text-base border-[1.5px] rounded-xl bg-white focus:outline-none focus:ring-1 focus:ring-[#8B7355]/40 focus:border-[#8B7355] ${stufenFehler ? 'border-red-500' : 'border-[#CFC6B8]'}`}
+                          placeholder={STUFEN.name.platzhalter}
+                          autoComplete="name"
+                        />
+                      )}
+                      {stufe === 'email' && (
+                        <input
+                          id="kontakt-email"
+                          type="email"
+                          inputMode="email"
+                          value={formData.email}
+                          onChange={(e) => { setFormData({ ...formData, email: e.target.value }); setStufenFehler(''); }}
+                          onFocus={() => trackFieldFocus('email')}
+                          onBlur={() => trackFieldBlur('email')}
+                          className={`w-full px-4 py-3 text-base border-[1.5px] rounded-xl bg-white focus:outline-none focus:ring-1 focus:ring-[#8B7355]/40 focus:border-[#8B7355] ${stufenFehler ? 'border-red-500' : 'border-[#CFC6B8]'}`}
+                          placeholder={STUFEN.email.platzhalter}
+                          autoComplete="email"
+                        />
+                      )}
+                      {stufe === 'telefon' && (
+                        <input
+                          id="kontakt-telefon"
+                          type="tel"
+                          inputMode="tel"
+                          value={formData.phone}
+                          onChange={(e) => { setFormData({ ...formData, phone: telefonBereinigen(e.target.value) }); setStufenFehler(''); }}
+                          onFocus={() => trackFieldFocus('phone')}
+                          onBlur={() => trackFieldBlur('phone')}
+                          className={`w-full px-4 py-3 text-base border-[1.5px] rounded-xl bg-white focus:outline-none focus:ring-1 focus:ring-[#8B7355]/40 focus:border-[#8B7355] ${stufenFehler ? 'border-red-500' : 'border-[#CFC6B8]'}`}
+                          placeholder={STUFEN.telefon.platzhalter}
+                          autoComplete="tel"
+                        />
+                      )}
+                      {stufenFehler && <p className="text-[12px] text-red-500 px-3" role="alert">{stufenFehler}</p>}
+                      <button
+                        type="submit"
+                        disabled={isSubmitting}
+                        className={`w-full py-4 font-bold text-base rounded-xl transition-all duration-200 text-white shadow-lg ${isSubmitting ? 'bg-[#F2B5AE] cursor-wait' : 'bg-[#E76F63] hover:bg-[#D65E52] hover:shadow-xl cursor-pointer'}`}
+                      >
+                        {isSubmitting ? (
+                          <div className="flex items-center justify-center gap-2">
+                            <span>Wird gesendet...</span>
+                            <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                          </div>
+                        ) : (
+                          stufenKnopf
+                        )}
+                      </button>
+                      {stufe === 'telefon' && (
+                        <button type="button" onClick={ohneTelefon} className="block w-full text-center text-[12px] text-[#8B8B8B] underline hover:text-[#3D3D3D] py-1">
+                          {STUFEN.telefon.ohne}
+                        </button>
+                      )}
+                      {/* Nur die Einwilligung, dort wo die Daten abgehen; keine Fußzeile, kein Zurück (Runde 3, Martin). */}
+                      {stufe === 'email' && (
+                        <p className="text-center text-xs text-[#8B8B8B] leading-snug">
+                          Mit dem Absenden stimmen Sie unserer{' '}
+                          <a href="/datenschutz" target="_blank" className="text-[#8B7355] underline hover:text-[#A68968]">
+                            Datenschutzerklärung
+                          </a>{' '}zu.
+                        </p>
+                      )}
+                    </form>
+                  ) : (!ergebnisModus || kontaktOffen) && (<>
                   <div>
                     <input
                       id="kontakt-name"
@@ -1622,7 +1942,7 @@ export function MultiStepForm({ mode = 'inline' }: MultiStepFormProps = {}) {
                         setErrors({ ...errors, name: '' });
                       }}
                       onFocus={() => trackFieldFocus('name')}
-                      onBlur={(e) => trackFieldBlur('name', e.target.value)}
+                      onBlur={() => trackFieldBlur('name')}
                       className={`w-full px-4 py-3 text-base border-[1.5px] rounded-xl bg-white focus:outline-none focus:ring-1 focus:ring-[#8B7355]/40 focus:border-[#8B7355] ${
                         errors.name ? 'border-red-500' : 'border-[#CFC6B8]'
                       }`}
@@ -1642,7 +1962,7 @@ export function MultiStepForm({ mode = 'inline' }: MultiStepFormProps = {}) {
                       }}
                       onFocus={() => trackFieldFocus('email')}
                       onBlur={(e) => {
-                        trackFieldBlur('email', e.target.value);
+                        trackFieldBlur('email');
                         if (e.target.value.trim() && !EMAIL_MUSTER.test(e.target.value.trim())) {
                           setErrors((alt) => ({ ...alt, email: 'Bitte geben Sie eine gültige E-Mail-Adresse ein' }));
                         }
@@ -1667,7 +1987,7 @@ export function MultiStepForm({ mode = 'inline' }: MultiStepFormProps = {}) {
                       }}
                       onFocus={() => trackFieldFocus('phone')}
                       onBlur={(e) => {
-                        trackFieldBlur('phone', e.target.value);
+                        trackFieldBlur('phone');
                         // Hinweis erst nach dem Tippen, nie auf ein leeres Feld.
                         if (e.target.value.trim()) setErrors((alt) => ({ ...alt, phone: telefonFehler(e.target.value) }));
                       }}
@@ -1691,11 +2011,11 @@ export function MultiStepForm({ mode = 'inline' }: MultiStepFormProps = {}) {
         {/* Bottom-Button-Block: auf Step 1 komplett ausgeblendet (kein
             Zurück, Auto-Advance kümmert sich um Weiter), Steps 2-9 zeigen
             nur Zurück, Step 10 zeigt den Submit-Button mit Hinweis. */}
-        {currentStep > 1 && !(currentStep === totalSteps && vorschauModus && !kontaktOffen) && (
+        {currentStep > 1 && !(currentStep === totalSteps && ergebnisModus && !kontaktOffen) && !(currentStep === totalSteps && stufenAktiv) && !(currentStep === totalSteps && preisModus) && (
           // Nur-Zurück-Zeile eng an die Antworten (Martin 11.09.: „zurück hat
           // zu viel Luft"); der Absendeblock behält seinen Abstand.
-          <div className={`px-3 sm:px-6 lg:px-8 bg-white ${currentStep === totalSteps && (!vorschauModus || kontaktOffen) ? 'pt-4 pb-5' : 'pt-0 pb-3'}`}>
-            {currentStep === totalSteps && (!vorschauModus || kontaktOffen) ? (
+          <div className={`px-3 sm:px-6 lg:px-8 bg-white ${currentStep === totalSteps && (!ergebnisModus || kontaktOffen) ? 'pt-4 pb-5' : 'pt-0 pb-3'}`}>
+            {currentStep === totalSteps && (!ergebnisModus || kontaktOffen) ? (
               <div className="flex flex-col gap-2.5">
                 <button
                   onClick={() => handleNext()}
@@ -1718,7 +2038,7 @@ export function MultiStepForm({ mode = 'inline' }: MultiStepFormProps = {}) {
                       <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
                     </div>
                   ) : (
-                    <span className={vorschauModus ? 'whitespace-nowrap text-[15px]' : undefined}>{vorschauModus ? SCHRANKE.knopf : 'Preis & Pflegekräfte ansehen →'}</span>
+                    <span className={vorschauModus ? 'whitespace-nowrap text-[15px]' : undefined}>{vorschauModus ? SCHRANKE.knopf : KNOPF_KONTAKT}</span>
                   )}
                 </button>
                 <p className="text-center text-xs text-[#8B8B8B] leading-snug">

@@ -209,3 +209,16 @@ wartet nie auf die Function.
 `supabase functions deploy kraefte-vorschau --project-ref ycdwtrklpoqprabtwahi`.
 Braucht dieselben Secrets wie onboard-to-mamamia (MAMAMIA_ENDPOINT,
 MAMAMIA_AUTH_ENDPOINT, MAMAMIA_AGENCY_EMAIL, MAMAMIA_AGENCY_PASSWORD).
+
+## Kontakt in drei Schritten (16.09.2026, Registry #76)
+
+Der Kontakt-Schritt läuft seit dem 16.09. als 50/50: `alt` = der Stand oben (drei Felder,
+Frage/Satz aus `SCHRANKE`), `stufen` = Name → E-Mail → Telefon einzeln, Lead schon nach der
+E-Mail, Nummer danach (Texte in `lib/kontakt-stufen.ts`, Ablauf in CLAUDE.md Registry #76 und
+docs/customer-portal-flow.md). Der Satz-Stand von `SCHRANKE` in diesem Dokument beschreibt
+nur noch die Variante `alt` (seit 12.09.: „Für wen dürfen wir Ihre persönliche
+Preisberechnung ausstellen?" + „Ihren Preis sehen Sie direkt im nächsten Schritt.").
+
+## Preis zuerst (Registry #77, 17.09.2026)
+
+Der Platz der früheren Karten-Seite (Ergebnis vor der Kontaktschranke) trägt im Ablauf `preis` die Preisseite (`PreisSeite.tsx`, Texte in `lib/preis-zuerst.ts`). `?kraefte=1` bleibt beim heutigen Weg — keine Kreuzung der Tests. Details: CLAUDE.md Registry #77, docs/customer-portal-flow.md §„Preis zuerst“.

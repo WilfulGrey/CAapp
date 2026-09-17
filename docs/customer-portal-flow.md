@@ -228,6 +228,37 @@ Content-Type: application/json
    przyszło zapytanie.
 5. Build `portalUrl = ${NEXT_PUBLIC_PORTAL_URL}/?token=<lead.token>`
 
+### Preis zuerst (Registry #77, 2026-09-17)
+
+Ablauf `preis` (für ALLE Besucher seit Martins Entscheidung vom 17.09.; `?ablauf=alt` zeigt den alten Weg, `project 3/lib/preis-zuerst.ts`):
+Nach der letzten Frage lädt der Rechner die Kalkulation (`POST /api/kalkulation-berechnen`, ohne
+`sessionId` — die Route schreibt dann nichts), die Warteseite dauert ca. 3 s, danach steht in
+Schritt 9 die **Preisseite** (`components/calculator/PreisSeite.tsx`): Preis, Bestpreisgarantie,
+„Nach Zuschüssen ca. …", Heimvergleich, Kräfte-Fotos, Knopf zur Kontaktabfrage, darunter die
+Konditionen. Erst der Knopf öffnet den Kontakt — EINE Seite (`components/calculator/KontaktSeite.tsx`:
+Name, E-Mail, Telefon; Knopf nie grau, Fehler am Feld), mit `?kontakt=stufen` die drei Schritte (unten; ihr Test kommt später). Der Lead trägt die Kalkulation der Preisseite (kein
+zweiter Rechenlauf); das Event `kontakt_variante` trägt zusätzlich `ablauf`. Scheitert die
+Berechnung, entfällt die Preisseite und der Besucher läuft den heutigen Weg. Anonyme Zähler:
+`schritt_9` = Preisseite gesehen, `kontakt_geoeffnet`, `preis_fehler`, Variante `preis`.
+
+### Kontakt in drei Schritten (Registry #76, 2026-09-16)
+
+Variante `stufen` (50/50 je Sitzung, `?kontakt=stufen|alt` erzwingt, `project 3/lib/kontakt-stufen.ts`):
+Schritt 9 fragt Name → E-Mail → Telefon einzeln. Nach der E-Mail ruft der Rechner
+`POST /api/angebot-anfordern` mit `telefonSpaeter: true` und OHNE `telefon` — die Route
+legt den Lead an (Spalte `telefon` NULL), plant Mail 1 wie sonst (delay 0 + flush), schickt
+die Team-Mail mit Telefon „noch nicht angegeben …" und loggt `kontakt_variante`
+(`{variante, telefon_spaeter, telefon_dabei}`; auch Variante `alt` loggt das). Conversion
+(dataLayer `angebot_erfolgreich`), Beacon und OpenAI-Pixel feuern genau einmal, an dieser
+Stelle, ohne Redirect. Der Telefon-Schritt ruft `POST /api/lead-telefon {token, telefon}`
+(nur `leads.telefon`, Event `telefon_nachgetragen`, Team-Mail-Nachtrag wenn vorher leer) und
+leitet dann ins Portal; „Ohne Rückrufnummer weiter" leitet ohne Nummer. Das Patientenprofil
+zeigt die Nummer IMMER (Schritt „Einsatzort & Start", unter dem Startdatum; vorbelegt aus
+`leads.telefon` bzw. mamamia, zu prüfen oder zu ergänzen, Pflicht — Martin 17.09.) — von dort geht
+sie den bestehenden Weg (`patientFormMapper` → `Customer.phone` + `customer_contract.phone`;
+`lead-event` `metadata.phone` → `leads.telefon`). mamamia bekommt die Nummer aus dem
+Telefon-Schritt NICHT (kein Resync-Feld); das Panel liest ohnehin `customer_contract.phone`.
+
 ### Response
 
 ```json

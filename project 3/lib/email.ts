@@ -1174,7 +1174,7 @@ export function getTeamNotificationTemplate(
             <tr><th>Feld</th><th>Wert</th></tr>
             <tr><td><strong>Name</strong></td><td>${[lead.anrede_text, capitalize(lead.vorname || ''), capitalize(lead.nachname || '')].filter(Boolean).join(' ') || 'N/A'}</td></tr>
             <tr><td><strong>E-Mail</strong></td><td>${lead.email}</td></tr>
-            <tr><td><strong>Telefon</strong></td><td>${lead.telefon || 'N/A'}</td></tr>
+            <tr><td><strong>Telefon</strong></td><td>${lead.telefon || additionalData?.telefonHinweis || 'N/A'}</td></tr>
             <tr><td><strong>Status</strong></td><td>${lead.status}</td></tr>
             <tr><td><strong>Kam über</strong></td><td>${herkunft}</td></tr>
           </table>
@@ -1236,7 +1236,7 @@ ${caregiverLabel}: ${caregiverName}${status === 'application_accepted_internal' 
 === KONTAKTDATEN ===
 Name: ${[lead.anrede_text, capitalize(lead.vorname || ''), capitalize(lead.nachname || '')].filter(Boolean).join(' ') || 'N/A'}
 E-Mail: ${lead.email}
-Telefon: ${lead.telefon || 'N/A'}
+Telefon: ${lead.telefon || additionalData?.telefonHinweis || 'N/A'}
 Status: ${lead.status}
 Kam über: ${herkunft}
 
@@ -3006,4 +3006,27 @@ www.primundus.de
   // Verworfen: „Kurze Frage zu Ihrer Anfrage“ (Serienbrief-Ton) und
   // „Hat Ihnen das geholfen?“ (zu vage).
   return { subject: 'Wie fanden Sie unser Angebot?', html, text };
+}
+
+/**
+ * Team-Mail, wenn ein Kunde seine Rückrufnummer nachträgt (Kontakt in drei
+ * Schritten, Registry #76): der Lead lief schon als „noch nicht angegeben"
+ * durch die erste Team-Mail, hier kommt die Nummer hinterher.
+ */
+export function getTelefonNachgetragenTemplate(
+  lead: Pick<Lead, 'id' | 'vorname' | 'nachname' | 'anrede_text' | 'email'>,
+  telefon: string,
+): EmailTemplate {
+  const name = [lead.anrede_text, capitalize(lead.vorname || ''), capitalize(lead.nachname || '')].filter(Boolean).join(' ') || lead.email;
+  const adminUrl = `${process.env.NEXT_PUBLIC_SITE_URL || 'https://kostenrechner.primundus.de'}/admin/leads/${lead.id}`;
+  const tel = telefon.replace(/[<>]/g, '');
+  return {
+    subject: `📞 Telefonnummer nachgetragen – ${name}`,
+    html: `<!DOCTYPE html><html><body style="font-family:Arial,sans-serif;color:#333;">
+      <p><strong>${name}</strong> (${lead.email}) hat die Rückrufnummer nachgetragen:</p>
+      <p style="font-size:20px;"><a href="tel:${tel.replace(/\s/g, '')}">${tel}</a></p>
+      <p><a href="${adminUrl}">Lead im Admin öffnen</a></p>
+    </body></html>`,
+    text: `${name} (${lead.email}) hat die Rückrufnummer nachgetragen: ${tel}\n\nLead im Admin: ${adminUrl}\n`,
+  };
 }

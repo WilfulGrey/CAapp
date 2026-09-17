@@ -53,10 +53,21 @@ async function handlePost(request: NextRequest) {
       adParams,
       quelle,
       websitePfad,
+      telefonSpaeter,
+      kontaktVariante,
+      ablauf,
     }: {
       vorname?: string;
       email: string;
       telefon?: string;
+      /* Kontakt in drei Schritten (Registry #76): der Lead entsteht schon
+         nach Name + E-Mail, die Nummer folgt über /api/lead-telefon oder
+         im Patientenprofil. Nur dieser Weg darf ohne Telefon anlegen. */
+      telefonSpaeter?: boolean;
+      /* Welche Kontakt-Variante der Kunde sah (stufen | alt) — als
+         lead_event, damit Leads und Profile je Variante vergleichbar sind. */
+      kontaktVariante?: string;
+      ablauf?: string;
       careStartTiming?: string;
       kalkulation: Kalkulation;
       acceptPrivacy?: boolean;
@@ -109,10 +120,21 @@ async function handlePost(request: NextRequest) {
       );
     }
     // Mild geprüft (≥6 Ziffern), siehe MultiStepForm.validateForm()-Kommentar.
+    // Ausnahme seit 16.09.2026 (Registry #76, Martin: „schon mit der
+    // E-Mail-Adresse den Lead speichern und auch ohne Nummer senden"): mit
+    // `telefonSpaeter` darf die Nummer fehlen; eine mitgeschickte muss
+    // trotzdem plausibel sein.
+    const ohneTelefon = telefonSpaeter === true;
     const phoneDigits = (telefon ?? '').replace(/\D/g, '');
-    if (!telefon || phoneDigits.length < 6) {
+    if (!ohneTelefon && (!telefon || phoneDigits.length < 6)) {
       return NextResponse.json(
         { error: 'Telefonnummer erforderlich' },
+        { status: 400 }
+      );
+    }
+    if (ohneTelefon && telefon && phoneDigits.length < 6) {
+      return NextResponse.json(
+        { error: 'Telefonnummer ungültig' },
         { status: 400 }
       );
     }
@@ -191,6 +213,15 @@ async function handlePost(request: NextRequest) {
       console.warn(`angebot-anfordern: Lead ${lead.id} ohne acceptPrivacy=true angelegt (sollte durch Formular-Pflichtfeld nicht vorkommen).`);
     }
 
+    // Kontakt-Variante am Lead festhalten (Registry #76): der 50/50-Test
+    // wird nicht nur im anonymen Zähler, sondern auch je Lead lesbar
+    // (Profile, Buchungen, Anteil mit Nummer je Variante).
+    if (kontaktVariante === 'stufen' || kontaktVariante === 'alt') {
+      // `ablauf` (Registry #77): `preis` = Preisseite vor der Kontaktabfrage, `alt` = heutiger Weg.
+      const ablaufWert = ablauf === 'preis' || ablauf === 'alt' ? ablauf : null;
+      await logEvent(lead.id, 'kontakt_variante', { variante: kontaktVariante, ablauf: ablaufWert, telefon_spaeter: ohneTelefon, telefon_dabei: Boolean(lead.telefon) });
+    }
+
     // Re-Submit-Dedupe: wenn der Kunde dasselbe Formular nochmal schickt UND
     // die letzte Eingangsbestätigung <24h alt ist, schlucken wir die zweite
     // Mail komplett (kein Customer-Mail, kein Team-Mail). Bei Änderungen am
@@ -246,7 +277,13 @@ async function handlePost(request: NextRequest) {
     // nach Versand der Eingangsbestätigung gestartet.
 
     if (shouldSendMails) {
-      const teamEmail = getTeamNotificationTemplate(lead, 'angebot_requested', { quelle: quelleSicher, websitePfad: websitePfadSicher });
+      const teamEmail = getTeamNotificationTemplate(lead, 'angebot_requested', {
+        quelle: quelleSicher,
+        websitePfad: websitePfadSicher,
+        // Ohne Nummer angelegt: das Team soll wissen, dass sie noch kommen
+        // kann (Telefon-Schritt, sonst Patientenprofil) — nicht „N/A".
+        telefonHinweis: ohneTelefon && !lead.telefon ? 'noch nicht angegeben – kommt per Nachtrag oder Patientenprofil' : undefined,
+      });
       sendEmail('info@primundus.de', teamEmail)
         .then(async (r) => {
           if (r.success) {

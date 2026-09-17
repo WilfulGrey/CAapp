@@ -9,6 +9,15 @@ describe('Anonyme Wizard-Zähler', () => {
     expect(pruefeZaehler({ ereignis: 'abgeschickt', variante: 'alt', quelle: 'chatgpt' })).toEqual({ ereignis: 'abgeschickt', variante: 'alt', quelle: 'chatgpt' });
     expect(pruefeZaehler({ ereignis: 'abgeschickt', variante: 'alt', quelle: 'bing' })).toBeNull();
     expect(pruefeZaehler({ ereignis: 'schritt_10', variante: 'vorschau' })).toBeNull();
+    // Kontakt in drei Schritten (Registry #76): Teilschritte, Ausgang, Variante `stufen`
+    expect(pruefeZaehler({ ereignis: 'kontakt_email', variante: 'stufen', quelle: 'google' })).toEqual({ ereignis: 'kontakt_email', variante: 'stufen', quelle: 'google' });
+    expect(pruefeZaehler({ ereignis: 'absenden_fehler', variante: 'alt' })).toEqual({ ereignis: 'absenden_fehler', variante: 'alt', quelle: 'sonst' });
+    expect(pruefeZaehler({ ereignis: 'ohne_telefon', variante: 'stufen' })).toEqual({ ereignis: 'ohne_telefon', variante: 'stufen', quelle: 'sonst' });
+    // Preis zuerst (Registry #77): Preisseite, Knopf zur Kontaktabfrage, Variante `preis`
+    expect(pruefeZaehler({ ereignis: 'preis_gesehen', variante: 'preis', quelle: 'google' })).toEqual({ ereignis: 'preis_gesehen', variante: 'preis', quelle: 'google' });
+    expect(pruefeZaehler({ ereignis: 'kontakt_geoeffnet', variante: 'preis' })).toEqual({ ereignis: 'kontakt_geoeffnet', variante: 'preis', quelle: 'sonst' });
+    expect(pruefeZaehler({ ereignis: 'preis_fehler', variante: 'preis' })).toEqual({ ereignis: 'preis_fehler', variante: 'preis', quelle: 'sonst' });
+    expect(pruefeZaehler({ ereignis: 'kontakt_email', variante: 'neu' })).toBeNull();
     expect(pruefeZaehler({ ereignis: 'garantie_geoeffnet', variante: 'vorschau', quelle: 'google' })).toEqual({ ereignis: 'garantie_geoeffnet', variante: 'vorschau', quelle: 'google' });
     expect(pruefeZaehler({ ereignis: 'garantie_weiter', variante: 'alt', quelle: 'sonst' })).toEqual({ ereignis: 'garantie_weiter', variante: 'alt', quelle: 'sonst' });
     expect(pruefeZaehler({ ereignis: 'schritt_9', variante: 'x', email: 'a@b.de' })).toBeNull();
