@@ -16,26 +16,27 @@ function speicher(vorbelegt: Record<string, string> = {}) {
 }
 
 describe('kontaktVariante', () => {
-  it('würfelt 50/50 und merkt sich das Ergebnis je Sitzung', () => {
+  it('würfelt nicht mehr selbst: ohne Parameter und ohne Gemerktes gilt der Standard des Ablaufs (Registry #77)', () => {
     const s = speicher();
-    expect(kontaktVariante('', s, () => 0.2)).toBe('stufen');
-    expect(s.m.get(KONTAKT_KEY)).toBe('stufen');
-    // zweiter Aufruf: gemerkt, der Würfel zählt nicht mehr
-    expect(kontaktVariante('', s, () => 0.9)).toBe('stufen');
-    expect(kontaktVariante('', speicher(), () => 0.7)).toBe('alt');
+    expect(kontaktVariante('', s)).toBe('alt');
+    expect(kontaktVariante('', s, 'stufen')).toBe('stufen');
+    // der Standard wird NICHT gemerkt — er folgt dem Ablauf
+    expect(s.m.has(KONTAKT_KEY)).toBe(false);
   });
-  it('?kontakt= erzwingt und überschreibt das Gemerkte', () => {
+  it('?kontakt= erzwingt, klebt je Sitzung und schlägt den Standard', () => {
     const s = speicher({ [KONTAKT_KEY]: 'alt' });
     expect(kontaktVariante('?kontakt=stufen&start=1', s)).toBe('stufen');
     expect(s.m.get(KONTAKT_KEY)).toBe('stufen');
-    expect(kontaktVariante('?kontakt=alt', s)).toBe('alt');
+    expect(kontaktVariante('', s, 'alt')).toBe('stufen');
+    expect(kontaktVariante('?kontakt=alt', s, 'stufen')).toBe('alt');
     expect(kontaktVariante('?kontakt=quatsch', speicher({ [KONTAKT_KEY]: 'stufen' }))).toBe('stufen');
   });
-  it('ohne Storage (Safari privat) zählt nur der Parameter, sonst alt', () => {
+  it('ohne Storage (Safari privat) zählt der Parameter, sonst der Standard', () => {
     const kaputt = { getItem: () => { throw new Error('gesperrt'); }, setItem: () => { throw new Error('gesperrt'); } };
     expect(kontaktVariante('?kontakt=stufen', kaputt)).toBe('stufen');
-    expect(kontaktVariante('', kaputt, () => 0.1)).toBe('alt');
-    expect(kontaktVariante('', null, () => 0.1)).toBe('stufen');
+    expect(kontaktVariante('', kaputt)).toBe('alt');
+    expect(kontaktVariante('', kaputt, 'stufen')).toBe('stufen');
+    expect(kontaktVariante('', null, 'stufen')).toBe('stufen');
   });
 });
 

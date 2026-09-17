@@ -228,6 +228,19 @@ Content-Type: application/json
    przyszło zapytanie.
 5. Build `portalUrl = ${NEXT_PUBLIC_PORTAL_URL}/?token=<lead.token>`
 
+### Preis zuerst (Registry #77, 2026-09-17)
+
+Ablauf `preis` (50/50 je Sitzung gegen `alt`, `?ablauf=preis|alt` erzwingt, `project 3/lib/preis-zuerst.ts`):
+Nach der letzten Frage lädt der Rechner die Kalkulation (`POST /api/kalkulation-berechnen`, ohne
+`sessionId` — die Route schreibt dann nichts), die Warteseite dauert ca. 3 s, danach steht in
+Schritt 9 die **Preisseite** (`components/calculator/PreisSeite.tsx`): Preis, Bestpreisgarantie,
+„Nach Zuschüssen ca. …", Heimvergleich, Kräfte-Fotos, Knopf zur Kontaktabfrage, darunter die
+Konditionen. Erst der Knopf öffnet den Kontakt — im Ablauf `preis` die drei Schritte (unten),
+mit `?kontakt=alt` das heutige Formular. Der Lead trägt die Kalkulation der Preisseite (kein
+zweiter Rechenlauf); das Event `kontakt_variante` trägt zusätzlich `ablauf`. Scheitert die
+Berechnung, entfällt die Preisseite und der Besucher läuft den heutigen Weg. Anonyme Zähler:
+`schritt_9` = Preisseite gesehen, `kontakt_geoeffnet`, `preis_fehler`, Variante `preis`.
+
 ### Kontakt in drei Schritten (Registry #76, 2026-09-16)
 
 Variante `stufen` (50/50 je Sitzung, `?kontakt=stufen|alt` erzwingt, `project 3/lib/kontakt-stufen.ts`):

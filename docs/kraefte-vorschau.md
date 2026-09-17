@@ -218,3 +218,7 @@ E-Mail, Nummer danach (Texte in `lib/kontakt-stufen.ts`, Ablauf in CLAUDE.md Reg
 docs/customer-portal-flow.md). Der Satz-Stand von `SCHRANKE` in diesem Dokument beschreibt
 nur noch die Variante `alt` (seit 12.09.: „Für wen dürfen wir Ihre persönliche
 Preisberechnung ausstellen?" + „Ihren Preis sehen Sie direkt im nächsten Schritt.").
+
+## Preis zuerst (Registry #77, 17.09.2026)
+
+Der Platz der früheren Karten-Seite (Ergebnis vor der Kontaktschranke) trägt im Ablauf `preis` die Preisseite (`PreisSeite.tsx`, Texte in `lib/preis-zuerst.ts`). `?kraefte=1` bleibt beim heutigen Weg — keine Kreuzung der Tests. Details: CLAUDE.md Registry #77, docs/customer-portal-flow.md §„Preis zuerst“.

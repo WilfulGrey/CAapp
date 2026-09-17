@@ -7,12 +7,12 @@
  * einfach macht" — und: den Lead schon mit Name + E-Mail speichern, die
  * Preis-Mail auch ohne Nummer schicken, die Nummer danach erfragen.
  *
- * Läuft als 50/50 gegen das heutige Formular (Variante `alt`), weil der
- * Traffic-Mix allein den Kontaktschritt zwischen 8 % und 31 % schwanken
- * lässt (16.09.) — ohne gleichzeitige Kontrolle wäre die Wirkung nicht
- * lesbar. Die Variante klebt je Sitzung (sessionStorage), `?kontakt=stufen`
- * bzw. `?kontakt=alt` erzwingt sie. Pur (kein React/Next) — Root-Vitest
- * importiert es direkt.
+ * Seit Registry #77 (17.09.) würfelt dieses Modul nicht mehr selbst: EIN
+ * Test, der Ablauf (`lib/preis-zuerst.ts`: `preis` gegen `alt`). Die drei
+ * Schritte sind das Kontaktformular HINTER dem Preis; im Ablauf `alt` bleibt
+ * das heutige Formular. `?kontakt=stufen` bzw. `?kontakt=alt` erzwingt die
+ * Form unabhängig vom Ablauf (Abnahme, Vergleich) und klebt je Sitzung.
+ * Pur (kein React/Next) — Root-Vitest importiert es direkt.
  */
 
 import { SCHRANKE } from './kraefte-vorschau';
@@ -26,14 +26,16 @@ export const KONTAKT_STUFEN = ['name', 'email', 'telefon'] as const;
 export type KontaktStufe = (typeof KONTAKT_STUFEN)[number];
 
 /**
- * Welche Variante der Besucher sieht. Nur im Browser nach dem Mount rufen
+ * Welche Kontaktform der Besucher sieht. Nur im Browser nach dem Mount rufen
  * (useEffect) — beim Rendern würde Server und Client auseinanderlaufen.
- * Bei gesperrtem Storage (Safari privat) zählt der Parameter, sonst `alt`.
+ * Erzwungen (`?kontakt=…`, klebt je Sitzung) schlägt gemerkt schlägt
+ * `standard` (den gibt der Ablauf vor: `preis` → `stufen`, `alt` → `alt`).
+ * Der Standard wird NICHT gemerkt — er soll dem Ablauf folgen.
  */
 export function kontaktVariante(
   search: string,
   storage: Pick<Storage, 'getItem' | 'setItem'> | null,
-  wuerfel: () => number = Math.random,
+  standard: KontaktVariante = 'alt',
 ): KontaktVariante {
   let q: string | null = null;
   try { q = new URLSearchParams(search).get('kontakt'); } catch { q = null; }
@@ -42,11 +44,9 @@ export function kontaktVariante(
     if (erzwungen) { storage?.setItem(KONTAKT_KEY, erzwungen); return erzwungen; }
     const gemerkt = storage?.getItem(KONTAKT_KEY);
     if (gemerkt === 'stufen' || gemerkt === 'alt') return gemerkt;
-    const neu: KontaktVariante = wuerfel() < 0.5 ? 'stufen' : 'alt';
-    storage?.setItem(KONTAKT_KEY, neu);
-    return neu;
+    return standard;
   } catch {
-    return erzwungen ?? 'alt';
+    return erzwungen ?? standard;
   }
 }
 

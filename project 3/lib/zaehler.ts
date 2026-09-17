@@ -25,12 +25,16 @@ export const ZAEHLER_EREIGNISSE = [
   // von „geklickt, Server-Fehler", `telefon_angegeben`/`ohne_telefon` den
   // Anteil mit Rückrufnummer.
   'kontakt_email', 'kontakt_telefon', 'absenden_geklickt', 'absenden_fehler', 'telefon_angegeben', 'ohne_telefon',
+  // Preis zuerst (Registry #77, 17.09.2026): Preisseite gesehen, Knopf zur
+  // Kontaktabfrage geklickt, Preisberechnung gescheitert (dann läuft der
+  // Besucher den heutigen Weg).
+  'preis_gesehen', 'kontakt_geoeffnet', 'preis_fehler',
 ] as const;
 export type ZaehlerEreignis = (typeof ZAEHLER_EREIGNISSE)[number];
 
 // `stufen` = Kontakt in drei Schritten, `alt` = das Formular davor (50/50 seit
 // Registry #76), `vorschau` = Karten-Seite (?kraefte=1).
-export const ZAEHLER_VARIANTEN = ['vorschau', 'alt', 'stufen'] as const;
+export const ZAEHLER_VARIANTEN = ['vorschau', 'alt', 'stufen', 'preis'] as const;
 export type ZaehlerVariante = (typeof ZAEHLER_VARIANTEN)[number];
 
 /**

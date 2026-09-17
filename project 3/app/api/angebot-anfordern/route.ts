@@ -55,6 +55,7 @@ async function handlePost(request: NextRequest) {
       websitePfad,
       telefonSpaeter,
       kontaktVariante,
+      ablauf,
     }: {
       vorname?: string;
       email: string;
@@ -66,6 +67,7 @@ async function handlePost(request: NextRequest) {
       /* Welche Kontakt-Variante der Kunde sah (stufen | alt) — als
          lead_event, damit Leads und Profile je Variante vergleichbar sind. */
       kontaktVariante?: string;
+      ablauf?: string;
       careStartTiming?: string;
       kalkulation: Kalkulation;
       acceptPrivacy?: boolean;
@@ -215,7 +217,9 @@ async function handlePost(request: NextRequest) {
     // wird nicht nur im anonymen Zähler, sondern auch je Lead lesbar
     // (Profile, Buchungen, Anteil mit Nummer je Variante).
     if (kontaktVariante === 'stufen' || kontaktVariante === 'alt') {
-      await logEvent(lead.id, 'kontakt_variante', { variante: kontaktVariante, telefon_spaeter: ohneTelefon, telefon_dabei: Boolean(lead.telefon) });
+      // `ablauf` (Registry #77): `preis` = Preisseite vor der Kontaktabfrage, `alt` = heutiger Weg.
+      const ablaufWert = ablauf === 'preis' || ablauf === 'alt' ? ablauf : null;
+      await logEvent(lead.id, 'kontakt_variante', { variante: kontaktVariante, ablauf: ablaufWert, telefon_spaeter: ohneTelefon, telefon_dabei: Boolean(lead.telefon) });
     }
 
     // Re-Submit-Dedupe: wenn der Kunde dasselbe Formular nochmal schickt UND

@@ -10,6 +10,8 @@ import { scrollToCalculator, isCalculatorAligned, OPEN_CALCULATOR_EVENT } from "
 import { useFormTracking } from "@/hooks/use-form-tracking";
 import { deutschBalken, GANZ_SICHTBAR, GARANTIE, kopfzeile, kraefteVorschauAktiv, kraftFakten, parseVorschau, PORTAL_ANZAHL, SCHRANKE, VERLAUF, WARTE, wuenscheAusAntworten, type VorschauKraft } from "@/lib/kraefte-vorschau";
 import { BestpreisDialog } from "@/components/calculator/BestpreisDialog";
+import { PreisSeite, type PreisDaten } from "@/components/calculator/PreisSeite";
+import { ablaufVariante, KONTAKT_NACH_PREIS, WARTE_KURZ_ENDE_MS, WARTE_KURZ_MS, type Ablauf } from "@/lib/preis-zuerst";
 import { GARANTIE_OEFFNEN_EVENT } from "@/components/calculator/BestpreisSiegelLink";
 import { zaehle } from "@/lib/zaehler";
 import { meldeAnfrage } from "@/lib/oaiq";
@@ -38,7 +40,7 @@ function AntwortZeichen() {
   );
 }
 
-function MatchingAnimation({ onComplete, initialCount, vorschau }: { onComplete: (finalCount: number) => void; initialCount: number; vorschau?: boolean }) {
+function MatchingAnimation({ onComplete, initialCount, vorschau, kurz }: { onComplete: (finalCount: number) => void; initialCount: number; vorschau?: boolean; kurz?: boolean }) {
   const [activeStep, setActiveStep] = useState(0);
   const [completedSteps, setCompletedSteps] = useState<number[]>([]);
   const [nurseCount, setNurseCount] = useState(initialCount);
@@ -51,9 +53,11 @@ function MatchingAnimation({ onComplete, initialCount, vorschau }: { onComplete:
   // Sonst die drei Schritte des normalen Rechners.
   const ANIM_STEPS = vorschau
     ? [
-        { label: WARTE.schritt1, sub: '', icon: '📋', duration: 3200 },
-        { label: WARTE.schritt2Laeuft, sub: '', icon: '👩‍⚕️', duration: 4500 },
-        { label: WARTE.schritt3, sub: '', icon: '✓', duration: 1800 },
+        // Ablauf „Preis zuerst" (Registry #77): ca. 3 s statt 10,7 s — der Lohn
+        // (der Preis) folgt direkt, die Berechnung braucht ca. 1 s.
+        { label: WARTE.schritt1, sub: '', icon: '📋', duration: kurz ? WARTE_KURZ_MS[0] : 3200 },
+        { label: WARTE.schritt2Laeuft, sub: '', icon: '👩‍⚕️', duration: kurz ? WARTE_KURZ_MS[1] : 4500 },
+        { label: WARTE.schritt3, sub: '', icon: '✓', duration: kurz ? WARTE_KURZ_MS[2] : 1800 },
       ]
     : [
         { label: 'Ihr persönliches Angebot wird erstellt', sub: 'Angebot & Pflegekräfte werden zusammengestellt', icon: '📋', duration: 3200 },
@@ -65,7 +69,7 @@ function MatchingAnimation({ onComplete, initialCount, vorschau }: { onComplete:
     let t: ReturnType<typeof setTimeout>;
     const run = (i: number) => {
       if (i >= ANIM_STEPS.length) {
-        setTimeout(() => { setDone(true); setTimeout(() => onCompleteRef.current(nurseCount), 900); }, 300);
+        setTimeout(() => { setDone(true); setTimeout(() => onCompleteRef.current(nurseCount), kurz ? WARTE_KURZ_ENDE_MS : 900); }, 300);
         return;
       }
       setActiveStep(i);
@@ -211,7 +215,16 @@ export function MultiStepForm({ mode = 'inline' }: MultiStepFormProps = {}) {
   // den Telefon-Schritt und den Redirect. Ref, weil die Handler async sind.
   const leadDatenRef = useRef<{ leadId: string; portalUrl: string; token: string | null } | null>(null);
   const [leadGespeichert, setLeadGespeichert] = useState(false);
-  const zaehlVariante = () => (vorschauAktivRef.current ? 'vorschau' : kontaktVarRef.current);
+  // Preis zuerst (Registry #77, Martin 17.09.): EIN Test — der Ablauf würfelt
+  // (`preis` gegen `alt`), die Kontaktform folgt ihm. Die Kalkulation lädt
+  // während der Warteseite; scheitert sie, läuft der Besucher den heutigen Weg.
+  const [ablauf, setAblauf] = useState<Ablauf>('alt');
+  const ablaufRef = useRef<Ablauf>('alt');
+  const [preisDaten, setPreisDaten] = useState<PreisDaten | null>(null);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const preisDatenRef = useRef<any>(null);
+  const preisLadenRef = useRef<Promise<void> | null>(null);
+  const zaehlVariante = () => (vorschauAktivRef.current ? 'vorschau' : ablaufRef.current === 'preis' ? 'preis' : kontaktVarRef.current);
   const [kraefteVorschau, setKraefteVorschau] = useState<VorschauKraft[] | null>(null);
   // Schritt 9 im Vorschau-Modus: die Kontaktfelder öffnen sich erst nach dem
   // Knopf „Preis & Profile freischalten" (Martin, 10.09.). Ref für Payload/Redirect.
@@ -257,9 +270,25 @@ export function MultiStepForm({ mode = 'inline' }: MultiStepFormProps = {}) {
       document.getElementById('kontakt-name')?.focus({ preventScroll: true });
     }, 60);
   };
+  const oeffneKontaktNachPreis = () => {
+    kontaktOffenRef.current = true;
+    setKontaktOffen(true);
+    analytics.trackEvent('wizard', 'preis_weiter', {});
+    zaehle('kontakt_geoeffnet', 'preis');
+    setTimeout(() => {
+      document.querySelector('[data-calculator-card]')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      document.getElementById('kontakt-name')?.focus({ preventScroll: true });
+    }, 60);
+  };
   const vorschauModus = vorschauAktiv && !!kraefteVorschau && kraefteVorschau.length > 0;
+  // Preisseite vor der Kontaktabfrage — nur wenn die Kalkulation da ist.
+  const preisModus = ablauf === 'preis' && !!preisDaten && !vorschauModus;
+  const ergebnisModus = vorschauModus || preisModus;
   // Die Karten-Seite (?kraefte=1) behält das alte Formular — keine Kreuzung der Tests.
   const stufenAktiv = kontaktVar === 'stufen' && !vorschauModus;
+  // Hinter dem Preis verspricht der Kontakt nicht mehr den Preis, sondern die Kräfte (Registry #77).
+  const stufenText = preisModus && stufe === 'email' ? KONTAKT_NACH_PREIS.emailText : STUFEN[stufe].text;
+  const stufenKnopf = preisModus && stufe === 'telefon' ? KONTAKT_NACH_PREIS.knopf : STUFEN[stufe].knopf;
   // Nach jedem Teilschritt-Wechsel das Feld fokussieren (der Wechsel folgt
   // auf einen Klick, darum öffnet sich auch auf dem Handy die Tastatur).
   useEffect(() => {
@@ -274,7 +303,11 @@ export function MultiStepForm({ mode = 'inline' }: MultiStepFormProps = {}) {
       const an = kraefteVorschauAktiv(window.location.search, window.sessionStorage);
       vorschauAktivRef.current = an;
       setVorschauAktiv(an);
-      const kv = kontaktVariante(window.location.search, window.sessionStorage);
+      // Die Karten-Seite (?kraefte=1) bleibt beim heutigen Weg — keine Kreuzung der Tests.
+      const ab: Ablauf = an ? 'alt' : ablaufVariante(window.location.search, window.sessionStorage);
+      ablaufRef.current = ab;
+      setAblauf(ab);
+      const kv = kontaktVariante(window.location.search, window.sessionStorage, ab === 'preis' ? 'stufen' : 'alt');
       kontaktVarRef.current = kv;
       setKontaktVar(kv);
     } catch { /* sessionStorage gesperrt — Vorschau bleibt aus */ }
@@ -670,35 +703,62 @@ export function MultiStepForm({ mode = 'inline' }: MultiStepFormProps = {}) {
   // Beide Varianten gehen diesen Weg; `stufen` schickt kein Telefon und
   // meldet `telefonSpaeter` — die Route lässt die Nummer dann aus und der
   // Telefon-Schritt trägt sie über /api/lead-telefon nach (Registry #76).
-  const erzeugeLead = async (opts: { telefon: string | null; telefonSpaeter: boolean }) => {
-    // Erstelle formularDaten für die Berechnung
-    const formularDaten = {
-      betreuung_fuer: state.patientCount || '',
-      pflegegrad: parseInt(state.pflegegrad || '0'),
-      weitere_personen: state.householdOthers || '',
-      mobilitaet: state.mobility || '',
-      nachteinsaetze: state.nightCare || '',
-      deutschkenntnisse: state.germanLevel || '',
-      fuehrerschein: state.driving || '',
-      // Getriebe (gearbox) lives on the CA-app patient form, not here —
-      // user picks Automatik / Schaltung / Egal in the in-portal step 3
-      // (Wünsche zur PK), and patientFormMapper writes it to
-      // customer_caregiver_wish.driving_license_gearbox via UpdateCustomer.
-      // Onboard sets a permissive 'automatic' default so Mamamia matching
-      // works before the patient form is saved.
-      geschlecht: state.gender || '',
-    };
-
-    // Berechne Kalkulation server-seitig (damit die echten Preise aus der DB verwendet werden)
-    const kalkulationResponse = await fetch('/api/kalkulation-berechnen', {
+  // Antworten → formularDaten der Preisberechnung (Preisseite UND Lead nutzen dieselben).
+  const formularDatenAusAntworten = () => ({
+    betreuung_fuer: state.patientCount || '',
+    pflegegrad: parseInt(state.pflegegrad || '0'),
+    weitere_personen: state.householdOthers || '',
+    mobilitaet: state.mobility || '',
+    nachteinsaetze: state.nightCare || '',
+    deutschkenntnisse: state.germanLevel || '',
+    fuehrerschein: state.driving || '',
+    // Getriebe (gearbox) lives on the CA-app patient form, not here —
+    // user picks Automatik / Schaltung / Egal in the in-portal step 3
+    // (Wünsche zur PK), and patientFormMapper writes it to
+    // customer_caregiver_wish.driving_license_gearbox via UpdateCustomer.
+    // Onboard sets a permissive 'automatic' default so Mamamia matching
+    // works before the patient form is saved.
+    geschlecht: state.gender || '',
+  });
+  // Preis zuerst: Kalkulation laden, sobald die Warteseite läuft (frischer State,
+  // darum im Effekt und nicht im Klick-Handler der letzten Frage).
+  useEffect(() => {
+    if (!showMatching || ablaufRef.current !== 'preis' || preisDatenRef.current) return;
+    preisLadenRef.current = fetch('/api/kalkulation-berechnen', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ formularDaten }),
-    });
-    if (!kalkulationResponse.ok) {
-      throw new Error('Fehler bei der Kalkulation');
+      body: JSON.stringify({ formularDaten: formularDatenAusAntworten() }),
+    })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((k) => { if (k && typeof k.bruttopreis === 'number' && k.zuschüsse) { preisDatenRef.current = k; setPreisDaten(k); } })
+      .catch(() => { /* Preisseite entfällt — der Besucher läuft den heutigen Weg */ });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [showMatching]);
+  // Preisseite gesehen: anonym zählen (einmal je Seitenaufruf) + Ereignis mit Einwilligung.
+  useEffect(() => {
+    if (currentStep !== totalSteps || !preisModus || kontaktOffen) return;
+    zaehle('preis_gesehen', 'preis');
+    analytics.trackEvent('wizard', 'preis_gesehen', {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentStep, preisModus, kontaktOffen]);
+  const erzeugeLead = async (opts: { telefon: string | null; telefonSpaeter: boolean }) => {
+    const formularDaten = formularDatenAusAntworten();
+
+    // Preis zuerst (Registry #77): die Kalkulation der Preisseite wiederverwenden —
+    // der Kunde bekommt genau den Preis, den er gesehen hat. Sonst wie bisher
+    // server-seitig berechnen (damit die echten Preise aus der DB verwendet werden).
+    let kalkulation = preisDatenRef.current;
+    if (!kalkulation) {
+      const kalkulationResponse = await fetch('/api/kalkulation-berechnen', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ formularDaten }),
+      });
+      if (!kalkulationResponse.ok) {
+        throw new Error('Fehler bei der Kalkulation');
+      }
+      kalkulation = await kalkulationResponse.json();
     }
-    const kalkulation = await kalkulationResponse.json();
 
     // Sende an angebot-anfordern API (erstellt Lead + versendet Angebots-E-Mails)
     // adParams: Google-Klick-IDs (gclid/wbraid/gbraid) aus der Landing-URL
@@ -714,6 +774,7 @@ export function MultiStepForm({ mode = 'inline' }: MultiStepFormProps = {}) {
         ...(opts.telefon ? { telefon: opts.telefon } : {}),
         telefonSpaeter: opts.telefonSpaeter,
         kontaktVariante: kontaktVarRef.current,
+        ablauf: ablaufRef.current,
         careStartTiming: state.careStartTiming,
         adParams: analytics.getAdParams(),
         // Von welcher Seite kam die Anfrage (Martin, 27.08.). Die
@@ -768,6 +829,7 @@ export function MultiStepForm({ mode = 'inline' }: MultiStepFormProps = {}) {
         kraefte_vorschau: vorschauAktivRef.current,
         kraefte_aktion: kontaktOffenRef.current ? 'button' : null,
         kontakt_variante: kontaktVarRef.current,
+        ablauf: ablaufRef.current,
       },
       conversion: {
         leadId: data.leadId,
@@ -1100,9 +1162,16 @@ export function MultiStepForm({ mode = 'inline' }: MultiStepFormProps = {}) {
           // Warte-Screen immer mit den drei Schritten aus WARTE („Preis
           // berechnet“ …) — auch ohne Karten-Seite (Martin 11.09.: Warten bleibt).
           vorschau
-          onComplete={() => {
+          kurz={ablauf === 'preis'}
+          onComplete={async () => {
+            // Preis zuerst: auf die Kalkulation warten (läuft seit Beginn der
+            // Warteseite, ca. 1 s). Ohne Preis → heutiger Weg, anonym gezählt.
+            if (ablaufRef.current === 'preis') {
+              if (preisLadenRef.current) await preisLadenRef.current;
+              if (!preisDatenRef.current) zaehle('preis_fehler', 'preis');
+            }
             setShowMatching(false);
-            setCurrentStep(totalSteps); // = Step 9 (Kontaktformular)
+            setCurrentStep(totalSteps); // = Step 9 (Preisseite bzw. Kontaktformular)
           }}
         />
       </div>
@@ -1267,7 +1336,7 @@ export function MultiStepForm({ mode = 'inline' }: MultiStepFormProps = {}) {
                       <span className="inline-flex w-[22px] h-[22px] items-center justify-center rounded-full bg-white flex-shrink-0" aria-hidden="true">
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#1F8F5F" strokeWidth={3.2} strokeLinecap="round" strokeLinejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5" /></svg>
                       </span>
-                      {SCHRANKE.kopf}
+                      {preisModus && kontaktOffen && preisDaten ? KONTAKT_NACH_PREIS.kopf(preisDaten.bruttopreis) : SCHRANKE.kopf}
                     </p>
                     <p className="text-[14px] font-medium text-white/95 leading-snug mt-1 pl-[30px]">{SCHRANKE.auszeichnung}</p>
                   </div>
@@ -1675,6 +1744,10 @@ export function MultiStepForm({ mode = 'inline' }: MultiStepFormProps = {}) {
                         );
                       })()}
                     </div>
+                  ) : preisModus && !kontaktOffen && preisDaten ? (
+                    /* Preis zuerst (Registry #77): Preis, Zuschüsse, Garantie,
+                       Konditionen, Kräfte — dann der Knopf zur Kontaktabfrage. */
+                    <PreisSeite daten={preisDaten} onWeiter={oeffneKontaktNachPreis} onGarantie={oeffneGarantie} />
                   ) : (
                     <>
                       {/* V7 (Martin, 2026-07-08): Der Preiskasten ist die 1:1-Kopie
@@ -1717,18 +1790,18 @@ export function MultiStepForm({ mode = 'inline' }: MultiStepFormProps = {}) {
                               </p>
                             )}
                             <p className="text-[19px] font-bold leading-snug text-[#1a1a1a]">{STUFEN[stufe].frage}</p>
-                            {STUFEN[stufe].text && <p className="text-[15px] leading-snug text-[#555] mt-1">{STUFEN[stufe].text}</p>}
+                            {stufenText && <p className="text-[15px] leading-snug text-[#555] mt-1">{stufenText}</p>}
                           </>
                         ) : (
                           <>
-                            <p className="text-[19px] font-bold leading-snug text-[#1a1a1a]">{SCHRANKE.frage}</p>
-                            <p className="text-[15px] leading-snug text-[#555] mt-1">{SCHRANKE.text}</p>
+                            <p className="text-[19px] font-bold leading-snug text-[#1a1a1a]">{preisModus ? KONTAKT_NACH_PREIS.frageAlt : SCHRANKE.frage}</p>
+                            <p className="text-[15px] leading-snug text-[#555] mt-1">{preisModus ? KONTAKT_NACH_PREIS.textAlt : SCHRANKE.text}</p>
                           </>
                         )}
                       </div>
                     </>
                   )}
-                  {stufenAktiv ? (
+                  {preisModus && !kontaktOffen ? null : stufenAktiv ? (
                     /* Kontakt in drei Schritten (Registry #76): ein Feld je
                        Schritt, echtes <form>, damit Enter/„Weiter" der Tastatur
                        absendet; Fehler inline am Feld, Knopf nie grau. */
@@ -1790,7 +1863,7 @@ export function MultiStepForm({ mode = 'inline' }: MultiStepFormProps = {}) {
                             <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
                           </div>
                         ) : (
-                          STUFEN[stufe].knopf
+                          stufenKnopf
                         )}
                       </button>
                       {stufe === 'telefon' && (
@@ -1808,7 +1881,7 @@ export function MultiStepForm({ mode = 'inline' }: MultiStepFormProps = {}) {
                         </p>
                       )}
                     </form>
-                  ) : (!vorschauModus || kontaktOffen) && (<>
+                  ) : (!ergebnisModus || kontaktOffen) && (<>
                   <div>
                     <input
                       id="kontakt-name"
@@ -1888,11 +1961,11 @@ export function MultiStepForm({ mode = 'inline' }: MultiStepFormProps = {}) {
         {/* Bottom-Button-Block: auf Step 1 komplett ausgeblendet (kein
             Zurück, Auto-Advance kümmert sich um Weiter), Steps 2-9 zeigen
             nur Zurück, Step 10 zeigt den Submit-Button mit Hinweis. */}
-        {currentStep > 1 && !(currentStep === totalSteps && vorschauModus && !kontaktOffen) && !(currentStep === totalSteps && stufenAktiv) && (
+        {currentStep > 1 && !(currentStep === totalSteps && ergebnisModus && !kontaktOffen) && !(currentStep === totalSteps && stufenAktiv) && (
           // Nur-Zurück-Zeile eng an die Antworten (Martin 11.09.: „zurück hat
           // zu viel Luft"); der Absendeblock behält seinen Abstand.
-          <div className={`px-3 sm:px-6 lg:px-8 bg-white ${currentStep === totalSteps && (!vorschauModus || kontaktOffen) ? 'pt-4 pb-5' : 'pt-0 pb-3'}`}>
-            {currentStep === totalSteps && (!vorschauModus || kontaktOffen) ? (
+          <div className={`px-3 sm:px-6 lg:px-8 bg-white ${currentStep === totalSteps && (!ergebnisModus || kontaktOffen) ? 'pt-4 pb-5' : 'pt-0 pb-3'}`}>
+            {currentStep === totalSteps && (!ergebnisModus || kontaktOffen) ? (
               <div className="flex flex-col gap-2.5">
                 <button
                   onClick={() => handleNext()}
@@ -1915,7 +1988,7 @@ export function MultiStepForm({ mode = 'inline' }: MultiStepFormProps = {}) {
                       <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
                     </div>
                   ) : (
-                    <span className={vorschauModus ? 'whitespace-nowrap text-[15px]' : undefined}>{vorschauModus ? SCHRANKE.knopf : KNOPF_KONTAKT}</span>
+                    <span className={vorschauModus ? 'whitespace-nowrap text-[15px]' : undefined}>{vorschauModus ? SCHRANKE.knopf : preisModus ? KONTAKT_NACH_PREIS.knopf : KNOPF_KONTAKT}</span>
                   )}
                 </button>
                 <p className="text-center text-xs text-[#8B8B8B] leading-snug">
