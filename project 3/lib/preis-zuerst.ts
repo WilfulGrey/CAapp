@@ -85,7 +85,7 @@ export const PREIS_SEITE = {
   inklusive: 'Inkl. Steuern, Gebühren und Sozialabgaben.',
   // „Mit Bestpreisgarantie." steht dazwischen — das Wort ist der Link zum Pop-up (GARANTIE.wort).
   mitGarantie: 'Mit',
-  zuzueglich: 'Zzgl. Kost und Logis sowie Reisekosten (125 € pro Fahrt).',
+  zuzueglich: 'Zzgl. Kost und Logis sowie Reisekosten (125\u00A0€ pro Fahrt).',
   zuschussLabel: 'Nach Zuschüssen',
   zuschussWert: (eigen: number) => `ca. ${euro(eigen)}`,
   eingerechnet: (namen: string) => (namen ? `${namen} eingerechnet` : ''),

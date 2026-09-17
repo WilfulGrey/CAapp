@@ -29,7 +29,9 @@ export function PreisSeite({ daten, onWeiter, onGarantie }: { daten: PreisDaten;
         <span className="text-[16px] text-[#6B6B6B]">{PREIS_SEITE.proMonat}</span>
       </p>
       <p className="mt-3 text-[14px] leading-relaxed text-[#6B6B6B] [text-wrap:pretty]">
-        {PREIS_SEITE.inklusive} {PREIS_SEITE.mitGarantie}&nbsp;<button type="button" onClick={onGarantie} className="font-medium text-[#3D3D3D] underline underline-offset-2 hover:text-[#1a1a1a]">{GARANTIE.wort}</button>. {PREIS_SEITE.zuzueglich}
+        {PREIS_SEITE.inklusive}{' '}
+        <span className="whitespace-nowrap">{PREIS_SEITE.mitGarantie}{' '}<button type="button" onClick={onGarantie} className="font-medium text-[#3D3D3D] underline underline-offset-2 hover:text-[#1a1a1a]">{GARANTIE.wort}</button>.</span>{' '}
+        {PREIS_SEITE.zuzueglich}
       </p>
 
       {/* 2 · Die eine Stütze */}
