@@ -2,6 +2,8 @@
 
 import { KONTAKT_SEITE, MARTA_KARTE } from '@/lib/preis-zuerst';
 import { PersonalContact } from '@/components/calculator/PersonalContact';
+import { SterneText } from '@/components/calculator/BewertungsZeile';
+import type { SterneStand } from '@/lib/sterne-zeile';
 
 /**
  * Kontaktseite HINTER dem Preis (Registry #77, Martin 17.09.2026: „Diese Seite
@@ -16,7 +18,9 @@ export type KontaktWerte = Record<KontaktFeld, string>;
 const FOTOS = ['pk-1', 'pk-2', 'pk-3', 'pk-4', 'pk-5'].map((n) => `/images/caregivers/${n}.jpg`);
 export const KONTAKT_FELD_ID: Record<KontaktFeld, string> = { name: 'kontakt-name', email: 'kontakt-email', phone: 'kontakt-telefon' };
 
-export function KontaktSeite({ werte, fehler, serverFehler, sendet, onAendern, onAbsenden, onFokus, onBlur }: {
+export function KontaktSeite({ werte, fehler, serverFehler, sendet, bewertung = null, onAendern, onAbsenden, onFokus, onBlur }: {
+  /** Bewertungsstand der Startseite — dieselbe Sterne-Zeile unter dem Datenschutz-Satz (Martin 17.09.). Ohne Stand keine Zeile. */
+  bewertung?: SterneStand | null;
   werte: KontaktWerte;
   fehler: KontaktWerte;
   serverFehler: string;
@@ -121,6 +125,12 @@ export function KontaktSeite({ werte, fehler, serverFehler, sendet, onAendern, o
         <a href="/datenschutz" target="_blank" className="text-[#8B7355] underline hover:text-[#A68968]">{KONTAKT_SEITE.datenschutzLink}</a>{' '}
         {KONTAKT_SEITE.datenschutzNach}
       </p>
+      {/* Sterne wie auf Startseite und Preisseite, hier ohne Sprungziel — niemand soll das Formular verlassen. */}
+      {bewertung && (
+        <div className="mt-4 flex justify-center">
+          <span aria-label={`${bewertung.schnitt} von 5 Sternen`}><SterneText stand={bewertung} /></span>
+        </div>
+      )}
     </form>
     {/* Ganz unten, außerhalb des Formulars: Marta wie auf der Preisseite (Martin 17.09.). */}
     <div className="mt-7 border-t border-[#EEE9E0] pt-5">
