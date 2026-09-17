@@ -2,9 +2,11 @@ export interface EmailLayoutProps {
   content: string;
   preheader?: string;
   siteUrl?: string;
+  /** Satz in der Fußzeile, warum die Mail kommt. Standard: die Kalkulation. */
+  grund?: string;
 }
 
-export function getEmailLayout({ content, preheader, siteUrl }: EmailLayoutProps): string {
+export function getEmailLayout({ content, preheader, siteUrl, grund }: EmailLayoutProps): string {
   const baseUrl = siteUrl || process.env.NEXT_PUBLIC_SITE_URL || 'https://primundus.de';
   return `
 <!DOCTYPE html>
@@ -314,7 +316,7 @@ export function getEmailLayout({ content, preheader, siteUrl }: EmailLayoutProps
                 Diese E-Mail wurde versendet an: {{EMAIL}}<br>
                 Primundus Deutschland<br>
                 <br>
-                Sie erhalten diese E-Mail, weil Sie eine Kalkulation auf primundus.de angefordert haben.
+                ${grund ?? 'Sie erhalten diese E-Mail, weil Sie eine Kalkulation auf primundus.de angefordert haben.'}
               </div>
             </div>
           </div>
