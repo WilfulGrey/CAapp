@@ -13,7 +13,7 @@
 //
 // Umgebungsvariablen (Render, Kostenrechner — jeweils staging UND prod setzen):
 //   BEWERTUNG_TEAM_AN     Empfänger der Freigabe-Mail, kommagetrennt.
-//                         Standard: martin@mamamia.app
+//                         Standard: info@primundus.de (Martin, 17.09.2026)
 //   BEWERTUNG_API_BASIS   Basis-URL für Links in den Mails (Bestätigen, Moderation).
 //                         Standard: NEXT_PUBLIC_SITE_URL, sonst
 //                         https://kostenrechner.primundus.de. (Der Umweg über
@@ -32,12 +32,29 @@
 //                         turnstile_ok bleibt null.
 
 import { createHash, randomBytes } from 'crypto';
+import { anzeigeDatum, berlinDatum, istObjekt, normText, normZeile, type BewertungStatus, type Herkunft, type ModerationsAktion } from './bewertungen-basis';
+
+// Gemeinsame, Node-freie Teile (auch für die Admin-Seite im Browser).
+export {
+  AKTIONEN,
+  aktionAus,
+  berlinDatum,
+  berlinDatumZeit,
+  berlinTagText,
+  HERKUNFT,
+  istObjekt,
+  moderationsPlan,
+  normText,
+  normZeile,
+  STATUS,
+} from './bewertungen-basis';
+export type { BewertungStatus, Herkunft, ModerationsAktion, ModerationsPlan } from './bewertungen-basis';
 
 // ─── Grenzen und feste Werte ─────────────────────────────────────────────
 
 export const ERFAHRUNGEN_URL = 'https://primundus.de/erfahrungen';
 export const STANDARD_API_BASIS = 'https://kostenrechner.primundus.de';
-export const STANDARD_TEAM_AN = 'martin@mamamia.app';
+export const STANDARD_TEAM_AN = 'info@primundus.de';
 export const STANDARD_ORIGINS = ['https://primundus.de', 'https://www.primundus.de'];
 export const QUELLE = 'primundus.de/erfahrungen';
 
@@ -65,8 +82,6 @@ export const NAME_MAX = 60;
 export const ORT_MAX = 60;
 export const EMAIL_MAX = 254;
 
-export const STATUS = ['unbestaetigt', 'bestaetigt', 'veroeffentlicht', 'abgelehnt'] as const;
-export type BewertungStatus = (typeof STATUS)[number];
 /** Diese Status zählen für die E-Mail-Sperre (abgelehnt nicht). */
 export const AKTIVE_STATUS: readonly BewertungStatus[] = ['unbestaetigt', 'bestaetigt', 'veroeffentlicht'];
 
@@ -139,26 +154,7 @@ export type PruefErgebnis =
   | { ok: true; daten: BewertungEingabe }
   | { ok: false; fehler: Record<string, string> };
 
-// Steuerzeichen außer Tab/Zeilenumbruch. NUL lehnt Postgres in text ab.
-// eslint-disable-next-line no-control-regex
-const STEUERZEICHEN = /[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g;
 const EMAIL_MUSTER = /^[^\s@]+@[^\s@.]+(\.[^\s@.]+)+$/;
-
-function normText(wert: string): string {
-  return wert
-    .replace(/\r\n?/g, '\n')
-    .replace(STEUERZEICHEN, '')
-    .replace(/\n{3,}/g, '\n\n')
-    .trim();
-}
-
-function normZeile(wert: string): string {
-  return wert.replace(STEUERZEICHEN, '').replace(/\s+/g, ' ').trim();
-}
-
-export function istObjekt(wert: unknown): wert is Record<string, unknown> {
-  return typeof wert === 'object' && wert !== null && !Array.isArray(wert);
-}
 
 export function pruefeEingabe(body: unknown): PruefErgebnis {
   if (!istObjekt(body)) return { ok: false, fehler: { _: FEHLER.anfrage } };
@@ -201,39 +197,6 @@ export function pruefeEingabe(body: unknown): PruefErgebnis {
 export function sterneText(sterne: number): string {
   const voll = Math.max(0, Math.min(5, Math.round(sterne)));
   return '★'.repeat(voll) + '☆'.repeat(5 - voll);
-}
-
-function berlinTeile(iso: string): Record<string, string> {
-  const teile = new Intl.DateTimeFormat('de-DE', {
-    timeZone: 'Europe/Berlin',
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-    hourCycle: 'h23',
-  }).formatToParts(new Date(iso));
-  const aus: Record<string, string> = {};
-  for (const t of teile) aus[t.type] = t.value;
-  return aus;
-}
-
-/** YYYY-MM-DD in Europe/Berlin. */
-export function berlinDatum(iso: string): string {
-  const t = berlinTeile(iso);
-  return `${t.year}-${t.month}-${t.day}`;
-}
-
-/** „17.09.2026, 09:15 Uhr“ in Europe/Berlin. */
-export function berlinDatumZeit(iso: string): string {
-  const t = berlinTeile(iso);
-  return `${t.day}.${t.month}.${t.year}, ${t.hour}:${t.minute} Uhr`;
-}
-
-/** „17.09.2026“ in Europe/Berlin. */
-export function berlinTagText(iso: string): string {
-  const t = berlinTeile(iso);
-  return `${t.day}.${t.month}.${t.year}`;
 }
 
 // ─── Tokens und IP ───────────────────────────────────────────────────────
@@ -288,10 +251,13 @@ export interface BewertungZeile {
   kunde_bestaetigt: boolean;
   antwort: string | null;
   antwort_am: string | null;
+  /** Datum der Bewertung, wie gezeigt (YYYY-MM-DD). Beim Freigeben bzw. Eintragen gesetzt. */
+  datum: string | null;
+  herkunft: Herkunft;
 }
 
 /** Spalten für die öffentliche Abfrage — nie email, ip_hash, Tokens. */
-export const LISTEN_SPALTEN = 'id, sterne, text, name, ort, erstellt_am, veroeffentlicht_am, kunde_bestaetigt, antwort, antwort_am';
+export const LISTEN_SPALTEN = 'id, sterne, text, name, ort, erstellt_am, veroeffentlicht_am, kunde_bestaetigt, antwort, antwort_am, datum, herkunft';
 
 export interface OeffentlicheBewertung {
   id: string;
@@ -303,6 +269,7 @@ export interface OeffentlicheBewertung {
   kunde_bestaetigt: boolean;
   antwort: string | null;
   antwort_datum: string | null;
+  herkunft: Herkunft;
 }
 
 export function oeffentlich(z: BewertungZeile): OeffentlicheBewertung {
@@ -313,17 +280,22 @@ export function oeffentlich(z: BewertungZeile): OeffentlicheBewertung {
     text: z.text,
     name: z.name,
     ort: z.ort ?? null,
-    // Ohne veroeffentlicht_am (z. B. von Hand gesetzter Status) zählt das echte Eingangsdatum.
-    datum: berlinDatum(z.veroeffentlicht_am ?? z.erstellt_am),
+    datum: anzeigeDatum(z),
     kunde_bestaetigt: z.kunde_bestaetigt === true,
     antwort,
     antwort_datum: antwort && z.antwort_am ? berlinDatum(z.antwort_am) : null,
+    herkunft: z.herkunft,
   };
 }
 
+/** Neueste zuerst nach angezeigtem Datum; bei gleichem Tag bleibt die Reihenfolge der Abfrage. */
 export function listenAntwort(zeilen: BewertungZeile[], jetzt: Date): { bewertungen: OeffentlicheBewertung[]; stand: string } {
+  const sortiert = zeilen
+    .map((z, i) => ({ b: oeffentlich(z), i }))
+    .sort((x, y) => (x.b.datum < y.b.datum ? 1 : x.b.datum > y.b.datum ? -1 : x.i - y.i))
+    .map((e) => e.b);
   return {
-    bewertungen: zeilen.slice(0, MAX_LISTE).map(oeffentlich),
+    bewertungen: sortiert.slice(0, MAX_LISTE),
     stand: jetzt.toISOString(),
   };
 }
@@ -366,7 +338,7 @@ export function teamEmpfaenger(wert: string | undefined): string[] {
 export type BestaetigungsErgebnis = 'bestaetigen' | 'bereits' | 'ungueltig';
 
 export function bestaetigungsErgebnis(
-  zeile: { status: BewertungStatus; erstellt_am: string } | null,
+  zeile: { status: BewertungStatus; erstellt_am: string; bestaetigt_am?: string | null } | null,
   jetzt: Date,
 ): BestaetigungsErgebnis {
   if (!zeile) return 'ungueltig';
@@ -374,7 +346,9 @@ export function bestaetigungsErgebnis(
     const alter = jetzt.getTime() - new Date(zeile.erstellt_am).getTime();
     return alter < LINK_GUELTIG_MS ? 'bestaetigen' : 'ungueltig';
   }
-  // bestaetigt, veroeffentlicht, abgelehnt: alle wurden schon per Link bestätigt.
+  // Im Admin vor der Bestätigung abgelehnt (Spam): der Link ist damit ungültig.
+  if (zeile.status === 'abgelehnt' && !zeile.bestaetigt_am) return 'ungueltig';
+  // bestaetigt, veroeffentlicht, abgelehnt nach Bestätigung: schon bestätigt.
   return 'bereits';
 }
 
@@ -384,69 +358,10 @@ export function zielUrl(ergebnis: 'bestaetigt' | 'ungueltig'): string {
 
 // ─── Moderation ──────────────────────────────────────────────────────────
 
-export const AKTIONEN = {
-  freigeben: { knopf: 'Jetzt freigeben', mailText: 'Freigeben' },
-  freigeben_kunde: { knopf: 'Freigeben als bestätigter Kunde', mailText: 'Freigeben, als bestätigter Kunde markieren' },
-  ablehnen: { knopf: 'Ablehnen', mailText: 'Ablehnen' },
-} as const;
-export type ModerationsAktion = keyof typeof AKTIONEN;
-
-export function aktionAus(wert: unknown): ModerationsAktion | null {
-  return typeof wert === 'string' && Object.prototype.hasOwnProperty.call(AKTIONEN, wert)
-    ? (wert as ModerationsAktion)
-    : null;
-}
-
 export function moderationsLinks(basis: string, token: string): Record<ModerationsAktion, string> {
   const link = (aktion: ModerationsAktion) =>
     `${ohneSchraegstrich(basis)}/api/bewertungen/moderation?t=${encodeURIComponent(token)}&aktion=${aktion}`;
   return { freigeben: link('freigeben'), freigeben_kunde: link('freigeben_kunde'), ablehnen: link('ablehnen') };
-}
-
-export type ModerationsPlan =
-  | { art: 'aendern'; vonStatus: BewertungStatus; update: Record<string, unknown> }
-  | { art: 'erledigt' }
-  | { art: 'nicht_moeglich'; grund: string };
-
-const GRUND = {
-  unbestaetigt: 'Die Bewertung ist noch nicht per E-Mail bestätigt. Erst danach kann sie freigegeben oder abgelehnt werden.',
-  abgelehnt: 'Die Bewertung wurde bereits abgelehnt.',
-  veroeffentlicht: 'Die Bewertung ist bereits veröffentlicht. Zurückziehen geht nur direkt in der Datenbank.',
-};
-
-/**
- * Was eine Aktion bei diesem Stand tut. Nur aus „bestaetigt“ heraus wird
- * geändert; steht die Bewertung schon im Zielzustand, ist nichts zu tun.
- * Ausnahme: veröffentlicht ohne Kunden-Haken + freigeben_kunde setzt nur den
- * Haken nach (Datum bleibt).
- */
-export function moderationsPlan(
-  zeile: { status: BewertungStatus; kunde_bestaetigt: boolean },
-  aktion: ModerationsAktion,
-  jetztIso: string,
-): ModerationsPlan {
-  const { status } = zeile;
-  if (status === 'unbestaetigt') return { art: 'nicht_moeglich', grund: GRUND.unbestaetigt };
-
-  if (aktion === 'ablehnen') {
-    if (status === 'bestaetigt') return { art: 'aendern', vonStatus: 'bestaetigt', update: { status: 'abgelehnt', abgelehnt_am: jetztIso } };
-    if (status === 'abgelehnt') return { art: 'erledigt' };
-    return { art: 'nicht_moeglich', grund: GRUND.veroeffentlicht };
-  }
-
-  if (status === 'abgelehnt') return { art: 'nicht_moeglich', grund: GRUND.abgelehnt };
-
-  if (aktion === 'freigeben') {
-    if (status === 'bestaetigt') return { art: 'aendern', vonStatus: 'bestaetigt', update: { status: 'veroeffentlicht', veroeffentlicht_am: jetztIso } };
-    return { art: 'erledigt' };
-  }
-
-  // freigeben_kunde
-  if (status === 'bestaetigt') {
-    return { art: 'aendern', vonStatus: 'bestaetigt', update: { status: 'veroeffentlicht', veroeffentlicht_am: jetztIso, kunde_bestaetigt: true } };
-  }
-  if (zeile.kunde_bestaetigt) return { art: 'erledigt' };
-  return { art: 'aendern', vonStatus: 'veroeffentlicht', update: { kunde_bestaetigt: true } };
 }
 
 // ─── Turnstile ───────────────────────────────────────────────────────────

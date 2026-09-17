@@ -147,6 +147,11 @@ describe('Moderationsseite (GET, ändert nichts)', () => {
     expect(html).toContain('&lt;b&gt;Ewa&lt;/b&gt;');
   });
 
+  it('ohne E-Mail (eingetragene Bewertung): kein "null" auf der Seite', () => {
+    const html = moderationsSeite({ ...basis, bewertung: { ...BEWERTUNG, email: null }, aktion: 'freigeben', plan: { art: 'aendern' } });
+    expect(html).not.toContain('null');
+  });
+
   it('schon erledigt oder nicht möglich: kein Knopf, sondern Hinweis', () => {
     const erledigt = moderationsSeite({ ...basis, status: 'veroeffentlicht', aktion: 'freigeben', plan: { art: 'erledigt' } });
     expect(erledigt).not.toContain('<form');

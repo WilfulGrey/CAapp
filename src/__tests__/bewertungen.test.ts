@@ -19,6 +19,7 @@ import {
   limitFehler,
   LINK_GUELTIG_MS,
   listenAntwort,
+  LISTEN_SPALTEN,
   MAX_LISTE,
   moderationsLinks,
   moderationsPlan,
@@ -299,6 +300,8 @@ describe('Öffentliche Liste', () => {
     kunde_bestaetigt: true,
     antwort: null,
     antwort_am: null,
+    datum: null,
+    herkunft: 'formular',
     ...o,
   });
 
@@ -323,6 +326,7 @@ describe('Öffentliche Liste', () => {
         kunde_bestaetigt: true,
         antwort: null,
         antwort_datum: null,
+        herkunft: 'formular',
       }],
       stand: '2026-09-17T10:00:00.000Z',
     });
@@ -336,6 +340,27 @@ describe('Öffentliche Liste', () => {
     expect(b.antwort_datum).toBe('2026-09-05');
     const [ohne] = listenAntwort([zeile({ antwort: null, antwort_am: '2026-09-05T10:00:00Z' })], new Date(JETZT)).bewertungen;
     expect(ohne.antwort_datum).toBeNull();
+  });
+
+  it('datum-Spalte hat Vorrang (coalesce(datum, veroeffentlicht_am))', () => {
+    const [b] = listenAntwort([zeile({ datum: '2024-05-06', herkunft: 'google' })], new Date(JETZT)).bewertungen;
+    expect(b.datum).toBe('2024-05-06');
+    expect(b.herkunft).toBe('google');
+  });
+
+  it('sortiert nach angezeigtem Datum, neueste zuerst (eingetragene alte Bewertungen rutschen nach unten)', () => {
+    const liste = listenAntwort([
+      zeile({ id: 'alt-eingetragen', datum: '2024-05-06', herkunft: 'team', veroeffentlicht_am: '2026-09-16T10:00:00Z' }),
+      zeile({ id: 'neu', datum: '2026-09-10' }),
+      zeile({ id: 'ohne-datum', datum: null, veroeffentlicht_am: '2026-09-12T10:00:00Z' }),
+    ], new Date(JETZT)).bewertungen.map((b) => b.id);
+    expect(liste).toEqual(['ohne-datum', 'neu', 'alt-eingetragen']);
+  });
+
+  it('Spalten der öffentlichen Abfrage', () => {
+    expect(LISTEN_SPALTEN.split(',').map((s) => s.trim()).sort()).toEqual(
+      ['antwort', 'antwort_am', 'datum', 'erstellt_am', 'herkunft', 'id', 'kunde_bestaetigt', 'name', 'ort', 'sterne', 'text', 'veroeffentlicht_am'],
+    );
   });
 
   it('höchstens 200', () => {
@@ -379,9 +404,9 @@ describe('Konfiguration aus der Umgebung', () => {
     expect(apiBasis({})).toBe('https://kostenrechner.primundus.de');
     expect(apiBasis({ BEWERTUNG_API_BASIS: '  ' })).toBe('https://kostenrechner.primundus.de');
   });
-  it('Team-Empfänger: Liste, Standard martin@mamamia.app', () => {
-    expect(teamEmpfaenger(undefined)).toEqual(['martin@mamamia.app']);
-    expect(teamEmpfaenger(' ')).toEqual(['martin@mamamia.app']);
+  it('Team-Empfänger: Liste, Standard info@primundus.de (Martin, 17.09.2026)', () => {
+    expect(teamEmpfaenger(undefined)).toEqual(['info@primundus.de']);
+    expect(teamEmpfaenger(' ')).toEqual(['info@primundus.de']);
     expect(teamEmpfaenger('a@x.de, b@y.de ,')).toEqual(['a@x.de', 'b@y.de']);
   });
 });
@@ -396,10 +421,13 @@ describe('Bestätigungslink', () => {
     const alt = new Date(JETZT - LINK_GUELTIG_MS).toISOString();
     expect(bestaetigungsErgebnis({ status: 'unbestaetigt', erstellt_am: alt }, new Date(JETZT))).toBe('ungueltig');
   });
-  it('schon bestätigt/veröffentlicht/abgelehnt ⇒ bereits (wurde ja bestätigt)', () => {
+  it('schon bestätigt/veröffentlicht/abgelehnt nach Bestätigung ⇒ bereits', () => {
     for (const status of ['bestaetigt', 'veroeffentlicht', 'abgelehnt'] as const) {
-      expect(bestaetigungsErgebnis({ status, erstellt_am: erstellt }, new Date(JETZT))).toBe('bereits');
+      expect(bestaetigungsErgebnis({ status, erstellt_am: erstellt, bestaetigt_am: erstellt }, new Date(JETZT))).toBe('bereits');
     }
+  });
+  it('im Admin vor der Bestätigung abgelehnt ⇒ ungültig', () => {
+    expect(bestaetigungsErgebnis({ status: 'abgelehnt', erstellt_am: erstellt, bestaetigt_am: null }, new Date(JETZT))).toBe('ungueltig');
   });
   it('unbekannt ⇒ ungültig', () => {
     expect(bestaetigungsErgebnis(null, new Date(JETZT))).toBe('ungueltig');
@@ -431,14 +459,14 @@ describe('Moderation', () => {
     expect(moderationsPlan({ status: 'bestaetigt', kunde_bestaetigt: false }, 'freigeben', ISO)).toEqual({
       art: 'aendern',
       vonStatus: 'bestaetigt',
-      update: { status: 'veroeffentlicht', veroeffentlicht_am: ISO },
+      update: { status: 'veroeffentlicht', veroeffentlicht_am: ISO, datum: '2026-09-17' },
     });
   });
   it('bestätigt → freigeben als Kunde', () => {
     expect(moderationsPlan({ status: 'bestaetigt', kunde_bestaetigt: false }, 'freigeben_kunde', ISO)).toEqual({
       art: 'aendern',
       vonStatus: 'bestaetigt',
-      update: { status: 'veroeffentlicht', veroeffentlicht_am: ISO, kunde_bestaetigt: true },
+      update: { status: 'veroeffentlicht', veroeffentlicht_am: ISO, datum: '2026-09-17', kunde_bestaetigt: true },
     });
   });
   it('bestätigt → ablehnen', () => {

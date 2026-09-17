@@ -53,8 +53,10 @@ async function handleGet(request: NextRequest) {
       .from('bewertungen')
       .select(LISTEN_SPALTEN)
       .eq('status', 'veroeffentlicht')
+      // Wie gezeigt: coalesce(datum, veroeffentlicht_am). datum wird beim Freigeben
+      // und Eintragen gesetzt; listenAntwort sortiert den Rest exakt nach.
+      .order('datum', { ascending: false, nullsFirst: false })
       .order('veroeffentlicht_am', { ascending: false, nullsFirst: false })
-      .order('erstellt_am', { ascending: false })
       .limit(MAX_LISTE);
     if (error) throw new Error(error.message);
     const antwort = listenAntwort((data ?? []) as unknown as BewertungZeile[], new Date());
@@ -163,6 +165,7 @@ async function handlePost(request: NextRequest) {
         bestaetigen_token_hash: tokenHash(bestaetigenToken),
         moderation_token_hash: tokenHash(neuerToken()),
         quelle: QUELLE,
+        herkunft: 'formular',
         turnstile_ok: turnstile,
       })
       .select('id')

@@ -31,7 +31,7 @@ interface Zeile {
   text: string;
   name: string;
   ort: string | null;
-  email: string;
+  email: string | null;
 }
 
 const UNGUELTIG = () =>

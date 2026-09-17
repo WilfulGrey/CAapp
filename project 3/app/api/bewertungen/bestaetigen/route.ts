@@ -67,14 +67,17 @@ async function handleGet(request: NextRequest) {
     const supabase = supabaseDienst();
     const { data: zeile, error } = await supabase
       .from('bewertungen')
-      .select('id, status, erstellt_am, sterne, text, name, ort, email')
+      .select('id, status, erstellt_am, bestaetigt_am, sterne, text, name, ort, email')
       .eq('bestaetigen_token_hash', tokenHash(t))
       .maybeSingle();
     if (error) throw new Error(error.message);
 
     const jetzt = new Date();
-    const ergebnis = bestaetigungsErgebnis(zeile ? { status: zeile.status as BewertungStatus, erstellt_am: String(zeile.erstellt_am) } : null, jetzt);
-    if (ergebnis === 'ungueltig' || !zeile) return weiter('ungueltig');
+    const ergebnis = bestaetigungsErgebnis(
+      zeile ? { status: zeile.status as BewertungStatus, erstellt_am: String(zeile.erstellt_am), bestaetigt_am: zeile.bestaetigt_am ? String(zeile.bestaetigt_am) : null } : null,
+      jetzt,
+    );
+    if (ergebnis === 'ungueltig' || !zeile || !zeile.email) return weiter('ungueltig');
     if (ergebnis === 'bereits') return weiter('bestaetigt');
 
     const lead = await findeLead(supabase, String(zeile.email));

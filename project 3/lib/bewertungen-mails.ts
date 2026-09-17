@@ -40,7 +40,8 @@ export interface BewertungAnzeige {
   text: string;
   name: string;
   ort: string | null;
-  email: string;
+  /** null bei im Admin eingetragenen Bewertungen. */
+  email: string | null;
   erstellt_am: string;
 }
 
@@ -148,7 +149,7 @@ export function teamMail(p: {
     ['Sterne', `${sterne} (${b.sterne} von 5)`],
     ['Name', b.name],
     ['Ort', b.ort || '(keine Angabe)'],
-    ['E-Mail', b.email],
+    ['E-Mail', b.email || '(keine)'],
     ['Eingang', berlinDatumZeit(b.erstellt_am)],
   ];
 
@@ -245,7 +246,7 @@ export function moderationsSeite(p: {
     <h1>Bewertung prüfen</h1>
     <p class="sterne">${sterneText(b.sterne)}</p>
     <p class="text">${absatz(b.text)}</p>
-    <p class="meta">${esc([b.name, b.ort].filter(Boolean).join(', '))} · ${esc(b.email)}<br>
+    <p class="meta">${esc([[b.name, b.ort].filter(Boolean).join(', '), b.email].filter(Boolean).join(' · '))}<br>
       Eingang ${esc(berlinDatumZeit(b.erstellt_am))} · Stand: ${esc(statusText[p.status])}</p>`;
 
   let aktion: string;
