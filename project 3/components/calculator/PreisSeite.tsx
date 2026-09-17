@@ -1,13 +1,20 @@
 'use client';
 
 import { GARANTIE } from '@/lib/kraefte-vorschau';
+import { HERO_PUNKTE } from '@/lib/hero-punkte';
 import { PREIS_SEITE, euro, zuschussNamen } from '@/lib/preis-zuerst';
+import type { SterneStand } from '@/lib/sterne-zeile';
+import { SterneText } from '@/components/calculator/BewertungsZeile';
+import { PersonalContact } from '@/components/calculator/PersonalContact';
 
 /**
  * Preisseite VOR der Kontaktabfrage (Registry #77, Martin 17.09.2026).
- * Runde 2 — ruhig: ein Blickfang (Preis), eine Stütze (nach Zuschüssen), ein
- * Knopf; alles Weitere einspaltig unter dem Knopf. Der grüne Kopf darüber
- * („Ihr Preis ist berechnet", Testsieger-Siegel) kommt aus MultiStepForm.
+ * Ruhig: ein Blickfang (Preis), eine Stütze (nach Zuschüssen), ein Knopf.
+ * Unter dem Knopf dasselbe Muster wie auf der Startseite (Martin: „lös das
+ * doch so wie auf der Startseite ohne das Bestpreisgarantie-Logo. Dann
+ * darunter Kontakt zu Marta"): die Hero-Punkte mit „Bestpreisgarantie · Mehr
+ * Infos", die Sterne-Zeile, Martas Karte, zuletzt der Heimvergleich als Fußnote.
+ * Der grüne Kopf darüber kommt aus MultiStepForm.
  */
 export interface PreisDaten {
   bruttopreis: number;
@@ -17,7 +24,15 @@ export interface PreisDaten {
 
 const FOTOS = ['pk-1', 'pk-2', 'pk-3', 'pk-4', 'pk-5'].map((n) => `/images/caregivers/${n}.jpg`);
 
-export function PreisSeite({ daten, onWeiter, onGarantie }: { daten: PreisDaten; onWeiter: () => void; onGarantie: () => void }) {
+function Haken() {
+  return (
+    <svg className="h-[18px] w-[18px] flex-shrink-0 text-[#E76F63]" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24" aria-hidden="true">
+      <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+    </svg>
+  );
+}
+
+export function PreisSeite({ daten, bewertung = null, onWeiter, onGarantie }: { daten: PreisDaten; bewertung?: SterneStand | null; onWeiter: () => void; onGarantie: () => void }) {
   const hatZuschuss = daten.zuschüsse.gesamt > 0 && daten.eigenanteil < daten.bruttopreis;
   const heim = PREIS_SEITE.heim(daten.eigenanteil);
   const namen = zuschussNamen(daten.zuschüsse.items);
@@ -28,11 +43,7 @@ export function PreisSeite({ daten, onWeiter, onGarantie }: { daten: PreisDaten;
         <span className="text-[46px] leading-none font-extrabold tracking-tight tabular-nums">{euro(daten.bruttopreis)}</span>
         <span className="text-[16px] text-[#6B6B6B]">{PREIS_SEITE.proMonat}</span>
       </p>
-      <p className="mt-3 text-[14px] leading-relaxed text-[#6B6B6B] [text-wrap:pretty]">
-        {PREIS_SEITE.inklusive}{' '}
-        <span className="whitespace-nowrap">{PREIS_SEITE.mitGarantie}{' '}<button type="button" onClick={onGarantie} className="font-medium text-[#3D3D3D] underline underline-offset-2 hover:text-[#1a1a1a]">{GARANTIE.wort}</button>.</span>{' '}
-        {PREIS_SEITE.zuzueglich}
-      </p>
+      <p className="mt-3 text-[14px] leading-relaxed text-[#6B6B6B] [text-wrap:pretty]">{PREIS_SEITE.inklusive} {PREIS_SEITE.zuzueglich}</p>
 
       {/* 2 · Die eine Stütze */}
       {hatZuschuss && (
@@ -65,26 +76,36 @@ export function PreisSeite({ daten, onWeiter, onGarantie }: { daten: PreisDaten;
         <p className="text-[13px] leading-snug text-[#6B6B6B]">{PREIS_SEITE.unterKnopf}</p>
       </div>
 
-      {/* Darunter, ruhig und einspaltig: Garantie, Konditionen, Heimvergleich */}
+      {/* Darunter wie auf der Startseite: Punkte, Sterne — dann Marta */}
       <div className="mt-7 border-t border-[#EEE9E0] pt-5">
-        <button type="button" onClick={onGarantie} aria-label={`${GARANTIE.titel} – ${PREIS_SEITE.garantieMehr}`} className="block cursor-pointer">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={GARANTIE.siegelSrc} alt={GARANTIE.siegelAlt} className="h-[40px] w-auto" />
-        </button>
-        <p className="mt-2.5 text-[15px] leading-snug text-[#1a1a1a]">
-          {GARANTIE.zusage}{' '}
-          <button type="button" onClick={onGarantie} className="text-[#6B6B6B] underline underline-offset-2 hover:text-[#1a1a1a]">{PREIS_SEITE.garantieMehr}</button>
-        </p>
-        <ul className="mt-4 space-y-2 text-[15px] text-[#1a1a1a]">
-          {PREIS_SEITE.haken.map((h) => (
-            <li key={h} className="flex items-start gap-2.5">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#1F8F5F" strokeWidth={3} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" className="flex-shrink-0 mt-[3px]"><path d="M5 12.5l4.5 4.5L19 7.5" /></svg>
-              <span>{h}</span>
+        <ul className="flex flex-col gap-3">
+          {HERO_PUNKTE.map((punkt) => (
+            <li key={punkt} className="flex items-center gap-2.5">
+              <Haken />
+              <span className="text-[16px] leading-snug text-[#3D3D3D]">{punkt}</span>
             </li>
           ))}
+          <li className="flex items-center gap-2.5">
+            <Haken />
+            <span className="text-[16px] leading-snug text-[#3D3D3D]">
+              {GARANTIE.wort}{' '}
+              <button type="button" onClick={onGarantie} className="font-semibold text-[#1E5C3A] underline underline-offset-[3px]" aria-haspopup="dialog">
+                {PREIS_SEITE.garantieMehr}
+              </button>
+            </span>
+          </li>
         </ul>
+        {/* Sterne wie im Hero, hier ohne Sprungziel — niemand soll die Preisseite verlassen. */}
+        {bewertung && (
+          <div className="mt-6 flex justify-center">
+            <span aria-label={`${bewertung.schnitt} von 5 Sternen`}><SterneText stand={bewertung} /></span>
+          </div>
+        )}
+        <div className="mt-6">
+          <PersonalContact headline={PREIS_SEITE.marta.frage} body={PREIS_SEITE.marta.text} />
+        </div>
         {heim && (
-          <p className="mt-4 text-[13px] leading-relaxed text-[#6B6B6B]">{heim} {PREIS_SEITE.heimQuelle}</p>
+          <p className="mt-5 text-[13px] leading-relaxed text-[#6B6B6B]">{heim} {PREIS_SEITE.heimQuelle}</p>
         )}
       </div>
     </div>

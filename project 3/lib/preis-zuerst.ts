@@ -52,6 +52,16 @@ export function euro(betrag: number): string {
   return `${Math.round(betrag).toLocaleString('de-DE')}\u00A0€`;
 }
 
+/**
+ * Martas Karte ganz unten auf der Preisseite UND auf der Kontaktseite (Martin 17.09.: „perfekt — würde ich
+ * vielleicht auch auf der nächsten Seite ganz unten machen"). Nicht auf den Preis beschränkt: allgemein
+ * helfen, auch bei Zuschüssen und Förderung. Wer beim Formular zögert, hat so einen Menschen statt nur den Ausgang.
+ */
+export const MARTA_KARTE = {
+  frage: 'Kann ich Ihnen weiterhelfen?',
+  text: 'Ich berate Sie gerne – auch zu Zuschüssen und Förderung. Schnell und unverbindlich.',
+} as const;
+
 /** Der eine Knopf des Ablaufs `preis` — auf der Preisseite UND als letzter Knopf der Kontaktabfrage. */
 export const KNOPF_PREIS = 'Speichern & Pflegekräfte ansehen\u00A0→';
 
@@ -85,9 +95,9 @@ export const PREIS_SEITE = {
   // Satz der Portal-Kostenkarte; die Garantie hängt als Wort mit Link an
   // („mit Bestpreisgarantie" = GARANTIE.vorsatz + GARANTIE.wort, wie im Kopf des Kontakt-Schritts).
   proMonat: 'im Monat',
+  // Satz der Portal-Kostenkarte. Die Garantie steht EINMAL auf der Seite: als vierter
+  // Punkt unter dem Knopf, wie auf der Startseite (Martin: nicht doppelt).
   inklusive: 'Inkl. Steuern, Gebühren und Sozialabgaben.',
-  // „Mit Bestpreisgarantie." steht dazwischen — das Wort ist der Link zum Pop-up (GARANTIE.wort).
-  mitGarantie: 'Mit',
   zuzueglich: 'Zzgl. Kost und Logis sowie Reisekosten (125\u00A0€ pro Fahrt).',
   zuschussLabel: 'Nach Zuschüssen',
   zuschussWert: (eigen: number) => `ca. ${euro(eigen)}`,
@@ -99,7 +109,10 @@ export const PREIS_SEITE = {
   // Eine Zeile neben den Fotos — „ab sofort verfügbar" sagte schon die Warteseite.
   unterKnopf: 'Passend zu Ihren Angaben',
   garantieMehr: 'Mehr Infos',
-  haken: ['Täglich kündbar', 'Tagesgenaue Abrechnung', 'Erst auswählen, dann buchen', 'Keine Vermittlungsgebühr', 'Kosten erst, wenn die Pflegekraft da ist'],
+  // Unter dem Knopf wie auf der Startseite (Martin 17.09.): die Hero-Punkte
+  // (lib/hero-punkte.ts) mit „Bestpreisgarantie · Mehr Infos" als viertem, die
+  // Sterne-Zeile (lib/sterne-zeile.ts, live von primundus.de), darunter Marta.
+  marta: MARTA_KARTE,
   /** Nur wenn zuhause günstiger ist als das Heim — sonst kein Satz (kein Schönrechnen). */
   heim: (eigen: number): string | null => {
     const weniger = HEIM_EIGENANTEIL - eigen;
