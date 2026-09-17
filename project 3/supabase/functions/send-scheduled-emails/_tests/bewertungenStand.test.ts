@@ -1,11 +1,10 @@
-/* Deno-Test der Bewertungszeile — Spiegel von src/__tests__/bewertungenStand.test.ts
- * (dort wird zusätzlich geprüft, dass diese Kopie dasselbe HTML liefert wie
+/* Deno-Test des Bewertungsstands — Spiegel von src/__tests__/bewertungenStand.test.ts
+ * (dort wird zusätzlich geprüft, dass diese Kopie genauso prüft wie
  * project 3/lib/bewertungen-stand.ts). */
-import { assert, assertEquals, assertMatch, assertStringIncludes } from "jsr:@std/assert";
+import { assert, assertEquals } from "jsr:@std/assert";
 import {
   BEWERTUNGS_STAND_ERSATZ,
   BEWERTUNGS_STAND_URL,
-  bewertungsZeileHtml,
   ladeBewertungsStand,
   pruefeBewertungsStand,
 } from "../bewertungenStand.ts";
@@ -35,17 +34,6 @@ Deno.test("pruefeBewertungsStand: verwirft kaputte Werte", () => {
   for (const p of [null, undefined, "kaputt", 42, [GUELTIG]]) {
     assertEquals(pruefeBewertungsStand(p), null);
   }
-});
-
-Deno.test("bewertungsZeileHtml: Sterne, Zahlen, Link", () => {
-  const html = bewertungsZeileHtml({ schnitt: "4,9", anzahl: 126 });
-  assertEquals(html.match(/&#9733;/g)?.length, 5);
-  assertStringIncludes(html, "color:#D4A843;");
-  assertStringIncludes(html, '<strong style="color:#3D2B1F;">4,9</strong>');
-  assertStringIncludes(html, '<strong style="color:#3D2B1F;">126</strong>');
-  assertMatch(html, /<a href="https:\/\/primundus\.de\/erfahrungen"[^>]*>Erfahrungen lesen&nbsp;&rarr;<\/a>/);
-  assertStringIncludes(html, "margin:0 0 24px 0;");
-  assert(!html.includes("<img"));
 });
 
 Deno.test("ladeBewertungsStand: Erfolg ruft den Endpunkt mit Signal", async () => {

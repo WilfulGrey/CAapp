@@ -18,6 +18,9 @@ const MAIL_DATEIEN = [
   'lib/email-template.ts',
   'supabase/functions/send-scheduled-emails/index.ts',
   'supabase/functions/send-scheduled-emails/bewertung.ts',
+  // Signaturkarte (seit 17.09.2026 eine Vorlage statt Kopien)
+  'lib/marta-karte.ts',
+  'supabase/functions/send-scheduled-emails/martaKarte.ts',
 ];
 
 // Eine Siegel-Zeile ist ein <p>, das NUR "6× in Folge" enthaelt.
@@ -32,7 +35,7 @@ describe('Siegel in Mails bleibt kompakt', () => {
 
     it(`${datei}: das Siegel traegt die Zahl`, () => {
       const quelle = readFileSync(join(WURZEL, datei), 'utf8');
-      expect(quelle).toMatch(/<p[^>]*>6× Testsieger/);
+      expect(quelle).toMatch(/<p[^>]*>(<span[^>]*>)?6× Testsieger/);
     });
   }
 

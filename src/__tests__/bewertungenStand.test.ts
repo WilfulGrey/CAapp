@@ -1,6 +1,6 @@
 /**
- * Bewertungszeile unter Martas Karte (Martin, 17.09.2026):
- *   ★★★★★ 4,9 von 5 aus 126 Bewertungen · Erfahrungen lesen →
+ * Bewertungsstand für die Sterne in Martas Karte (Martin, 17.09.2026;
+ * Darstellung: martaKarte.test.ts).
  *
  * Die Zahlen kommen live aus primundus.de/api/bewertungen-stand. Fällt der
  * Abruf aus oder ist die Antwort kaputt, steht der letzte bekannte Stand in
@@ -13,7 +13,6 @@ import {
   BEWERTUNGS_STAND_ERSATZ,
   BEWERTUNGS_STAND_URL,
   ERFAHRUNGEN_URL,
-  bewertungsZeileHtml,
   holeBewertungsStand,
   ladeBewertungsStand,
   leereBewertungsStandCache,
@@ -70,64 +69,6 @@ describe('pruefeBewertungsStand', () => {
   it('akzeptiert die Grenzen 1,0 und 5,0 und eine einzelne Bewertung', () => {
     expect(pruefeBewertungsStand({ schnitt: '1,0', anzahl: 1 })).toEqual({ schnitt: '1,0', anzahl: 1 });
     expect(pruefeBewertungsStand({ schnitt: '5,0', anzahl: 1 })).toEqual({ schnitt: '5,0', anzahl: 1 });
-  });
-});
-
-describe('bewertungsZeileHtml', () => {
-  const html = bewertungsZeileHtml({ schnitt: '4,9', anzahl: 126 });
-
-  it('zeigt fünf goldene Sterne als Textzeichen, kein Bild', () => {
-    expect(html).toContain('color:#D4A843;');
-    expect(html.match(/&#9733;/g)).toHaveLength(5);
-    expect(html).not.toContain('<img');
-  });
-
-  it('setzt Schnitt und Anzahl fett in #3D2B1F, den Rest in #555', () => {
-    expect(html).toContain('<strong style="color:#3D2B1F;">4,9</strong>');
-    expect(html).toContain('<strong style="color:#3D2B1F;">126</strong>');
-    expect(html).toMatch(/<td[^>]*color:#555;/);
-    expect(html.replace(/<[^>]+>/g, '').replace(/&nbsp;/g, ' '))
-      .toContain('4,9 von 5 aus 126 Bewertungen');
-  });
-
-  it('verlinkt „Erfahrungen lesen →" auf primundus.de/erfahrungen', () => {
-    expect(ERFAHRUNGEN_URL).toBe('https://primundus.de/erfahrungen');
-    expect(html).toMatch(/<a href="https:\/\/primundus\.de\/erfahrungen"[^>]*>Erfahrungen lesen&nbsp;&rarr;<\/a>/);
-  });
-
-  it('ist mailtauglich: Tabelle mit role=presentation, nur Inline-Styles', () => {
-    expect(html).toMatch(/^\s*<table [^>]*role="presentation"/);
-    expect(html).not.toMatch(/class=/);
-    expect(html).not.toMatch(/<style/);
-  });
-
-  it('Schriftgrößen passen zur Karte (13–14 px)', () => {
-    const groessen = [...html.matchAll(/font-size:(\d+)px/g)].map((m) => Number(m[1]));
-    expect(groessen.length).toBeGreaterThan(0);
-    for (const g of groessen) expect(g === 13 || g === 14).toBe(true);
-  });
-
-  it('bricht auf schmalen Bildschirmen nur vor dem Link um, nie innerhalb der Zahlen', () => {
-    expect(html).toMatch(/<span style="white-space:nowrap;">[^]*Bewertungen<\/span>/);
-    expect(html).toMatch(/<a [^>]*white-space:nowrap;/);
-  });
-
-  it('Abstand nach unten ist einstellbar (Standard 24 px), die Karte darüber rückt heran', () => {
-    expect(html).toContain('margin:0 0 24px 0;');
-    expect(bewertungsZeileHtml({ schnitt: '4,9', anzahl: 126 }, 32)).toContain('margin:0 0 32px 0;');
-    expect(html).toMatch(/padding:10px /);
-  });
-
-  it('rundet die Sterne: 4,4 zeigt vier goldene und einen hellen', () => {
-    const z = bewertungsZeileHtml({ schnitt: '4,4', anzahl: 30 });
-    expect(z).toMatch(/color:#D4A843;">(&#9733;){4}<\/span><span style="color:#E3D9CB;">&#9733;<\/span>/);
-  });
-
-  it('Einzahl bei einer Bewertung, Tausenderpunkt bei großen Zahlen', () => {
-    const eins = bewertungsZeileHtml({ schnitt: '5,0', anzahl: 1 }).replace(/<[^>]+>/g, '');
-    expect(eins).toContain('aus 1 Bewertung');
-    expect(eins).not.toContain('Bewertungen');
-    expect(bewertungsZeileHtml({ schnitt: '4,8', anzahl: 1234 })).toContain('>1.234</strong>');
   });
 });
 
@@ -215,25 +156,12 @@ describe('holeBewertungsStand (Kostenrechner: Prozess-Cache)', () => {
 });
 
 describe('Kopie in der Edge Function (send-scheduled-emails/bewertungenStand.ts)', () => {
-  const staende = [
-    { schnitt: '4,9', anzahl: 126 },
-    { schnitt: '4,4', anzahl: 30 },
-    { schnitt: '5,0', anzahl: 1 },
-    { schnitt: '4,8', anzahl: 1234 },
-  ];
-
-  it('rendert dieselbe Zeile', () => {
-    for (const s of staende) {
-      expect(edge.bewertungsZeileHtml(s)).toBe(bewertungsZeileHtml(s));
-      expect(edge.bewertungsZeileHtml(s, 32)).toBe(bewertungsZeileHtml(s, 32));
-    }
-  });
-
   it('prüft gleich und hat dieselben Konstanten', () => {
     const payloads: unknown[] = [GUELTIG, { ...GUELTIG, schnitt: '4.9' }, { ...GUELTIG, anzahl: 0 }, null, 'x'];
     for (const p of payloads) expect(edge.pruefeBewertungsStand(p)).toEqual(pruefeBewertungsStand(p));
     expect(edge.BEWERTUNGS_STAND_ERSATZ).toEqual(BEWERTUNGS_STAND_ERSATZ);
     expect(edge.BEWERTUNGS_STAND_URL).toBe(BEWERTUNGS_STAND_URL);
     expect(edge.ERFAHRUNGEN_URL).toBe(ERFAHRUNGEN_URL);
+    expect(ERFAHRUNGEN_URL).toBe('https://primundus.de/erfahrungen');
   });
 });

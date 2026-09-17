@@ -7,7 +7,8 @@ import { LABELS } from './angaben-labels';
 // Bewertungszeile unter Martas Karte (Martin, 17.09.2026). Den Stand holt der
 // Aufrufer per holeBewertungsStand() und reicht ihn herein — die Vorlagen
 // bleiben synchron und ohne Netzaufruf.
-import { type BewertungsStand, bewertungsZeileHtml, holeBewertungsStand } from './bewertungen-stand';
+import { type BewertungsStand, holeBewertungsStand } from './bewertungen-stand';
+import { MARTA_KARTE_MOBIL_CSS, martaKarteHtml } from './marta-karte';
 
 // Eigennamen sauber großschreiben: jedes Wort + jeden Bindestrich-Teil
 // kapitalisieren. Namens-Partikel (von, van, de, zu, …) bleiben klein —
@@ -320,90 +321,7 @@ export function getEingangsbestaetigungEmailTemplate(
 
   const martaSignatur = `
     <!-- Marta Signatur-Block -->
-    <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="margin: 0; border: 1px solid #e8ddd0; border-radius: 12px; overflow: hidden;">
-      <tr>
-        <td style="padding: 18px 20px 16px; background: #ffffff;">
-          <table width="100%" cellpadding="0" cellspacing="0" role="presentation">
-            <tr>
-              <td style="vertical-align: top;">
-                <table cellpadding="0" cellspacing="0" role="presentation">
-                  <tr>
-                    <td style="padding-right: 12px; vertical-align: top;">
-                      <img src="${baseUrl}/images/marta-kapcio.jpg" alt="Marta Kapcio" width="60" style="display: block; width: 60px; height: auto; border-radius: 8px;" />
-                    </td>
-                    <td style="vertical-align: middle;">
-                      <p style="margin: 0 0 2px 0; font-size: 15px; font-weight: 700; color: #3D2B1F; text-align: left;">Marta Kapcio</p>
-                      <p style="margin: 0 0 2px 0; font-size: 13px; color: #555; text-align: left;">Pflegeberaterin</p>
-                      <p style="margin: 0; font-size: 12px; color: #9a8a73; text-align: left;"><span style="white-space: nowrap;">Mo – So,</span> <span style="white-space: nowrap;">8 – 20 Uhr</span></p>
-                    </td>
-                  </tr>
-                </table>
-                <table cellpadding="0" cellspacing="0" role="presentation" style="margin-top: 12px;">
-                  <tr>
-                    <td style="padding-bottom: 6px;">
-                      <a href="tel:+4989200000830" style="display: inline-block; background-color: #f0ebe4; border-radius: 20px; padding: 8px 16px; text-decoration: none; font-size: 13px; font-weight: 500; color: #3D2B1F; white-space: nowrap;">&#9990; 089 200 000 830</a>
-                    </td>
-                  </tr>
-                  <tr>
-                    <td>
-                      <a href="https://wa.me/4989200000830" style="display: inline-block; background-color: #25D366; border-radius: 20px; padding: 8px 16px; text-decoration: none; font-size: 13px; font-weight: 600; color: #ffffff; white-space: nowrap;">WhatsApp schreiben</a>
-                    </td>
-                  </tr>
-                </table>
-              </td>
-              <td style="vertical-align: top; text-align: right; padding-left: 10px;">
-                <table cellpadding="0" cellspacing="0" role="presentation" style="border: 1px solid #e8ddd0; border-radius: 8px; overflow: hidden; margin-left: auto;">
-                  <tr>
-                    <td class="sig-siegel-innen" style="padding: 8px 10px; background: #ffffff; text-align: center; vertical-align: top;">
-                      <img class="sig-siegel-bild" src="${baseUrl}/images/primundus_testsieger-2021.webp" alt="Testsieger DIE WELT" width="64" style="display: block; width: 64px; height: auto; margin: 0 auto 5px auto;" />
-                      <!-- Siegel bewusst KOMPAKT: "6× Testsieger" statt "Testsieger" +
-                           eigener Zeile "6× in Folge". Der Block sitzt neben dem Logo in
-                           der Kopfzeile und hat wenig Platz — vier Zeilen wirkten
-                           gedraengt und liessen "Testsieger" ohne die Zahl stehen
-                           (Martin 28.08.2026). Im FLIESSTEXT, wo eine ganze Zeile zur
-                           Verfuegung steht, bleibt "6× in Folge" erwuenscht. -->
-                      <p style="margin: 0 0 1px 0; font-size: 11px; font-weight: 700; color: #3D2B1F; text-align: center;"><span style="white-space: nowrap;">6× Testsieger</span> <span class="sig-siegel-welt" style="color: #B5A184; white-space: nowrap;">DIE WELT</span></p>
-                      <p style="margin: 0; font-size: 10px; color: #888; line-height: 1.4; text-align: center;"><span style="white-space: nowrap;">Preis, Qualität &amp;</span><br>Kundenservice</p>
-                    </td>
-                  </tr>
-                </table>
-              </td>
-            </tr>
-          </table>
-        </td>
-      </tr>
-      <tr>
-        <td style="background: #f9f6f2; border-top: 1px solid #e8ddd0;">
-          <table width="100%" cellpadding="0" cellspacing="0" role="presentation">
-            <tr>
-              <td style="padding: 12px 0; text-align: center; width: 33%; border-right: 1px solid #e8ddd0;">
-                <p style="margin: 0; font-size: 12px; color: #555; line-height: 1.4; text-align: center;">Über 20 Jahre<br>Erfahrung</p>
-              </td>
-              <td style="padding: 12px 0; text-align: center; width: 33%; border-right: 1px solid #e8ddd0;">
-                <p style="margin: 0; font-size: 12px; color: #555; line-height: 1.4; text-align: center;">60.000+<br>betreute Einsätze</p>
-              </td>
-              <td style="padding: 12px 0; text-align: center; width: 33%;">
-                <p style="margin: 0; font-size: 12px; color: #555; line-height: 1.4; text-align: center;">Persönlicher<br>Ansprechpartner,<br>7&nbsp;Tage/Woche</p>
-              </td>
-            </tr>
-          </table>
-        </td>
-      </tr>
-      <tr>
-        <td style="background: #ffffff; border-top: 1px solid #e8ddd0; padding: 14px 16px;">
-          <table width="100%" cellpadding="0" cellspacing="0" role="presentation">
-            <tr>
-              <td style="text-align: center; vertical-align: middle; padding: 0 4px;"><img src="${baseUrl}/images/media/die-welt.webp" alt="DIE WELT" width="68" height="14" style="display: inline-block; width: 68px; max-width: 100%; height: auto; opacity: 0.4; filter: grayscale(100%);" /></td>
-              <td style="text-align: center; vertical-align: middle; padding: 0 4px;"><img src="${baseUrl}/images/media/frankfurter-allgemeine.webp" alt="Frankfurter Allgemeine" width="103" height="14" style="display: inline-block; width: 103px; max-width: 100%; height: auto; opacity: 0.4; filter: grayscale(100%);" /></td>
-              <td style="text-align: center; vertical-align: middle; padding: 0 4px;"><img src="${baseUrl}/images/media/ard.webp" alt="ARD" width="38" height="14" style="display: inline-block; width: 38px; max-width: 100%; height: auto; opacity: 0.4; filter: grayscale(100%);" /></td>
-              <td style="text-align: center; vertical-align: middle; padding: 0 4px;"><img src="${baseUrl}/images/media/ndr.webp" alt="NDR" width="21" height="14" style="display: inline-block; width: 21px; max-width: 100%; height: auto; opacity: 0.4; filter: grayscale(100%);" /></td>
-              <td style="text-align: center; vertical-align: middle; padding: 0 4px;"><img src="${baseUrl}/images/media/sat1.webp" alt="SAT.1" width="45" height="14" style="display: inline-block; width: 45px; max-width: 100%; height: auto; opacity: 0.4; filter: grayscale(100%);" /></td>
-              <td style="text-align: center; vertical-align: middle; padding: 0 4px;"><img src="${baseUrl}/images/media/bild-der-frau.webp" alt="Bild der Frau" width="12" height="14" style="display: inline-block; width: 12px; max-width: 100%; height: auto; opacity: 0.4; filter: grayscale(100%);" /></td>
-            </tr>
-          </table>
-        </td>
-      </tr>
-    </table>${bewertungsZeileHtml(bewertung, 32)}
+    ${martaKarteHtml({ fuer: 'kunde', bewertung, siteUrl: baseUrl, presseLogos: true, abstandUnten: 32 })}
   `;
 
   const content = `
@@ -647,104 +565,7 @@ export function getAngebotsEmailTemplate(
     <p style="font-size: 16px; line-height: 1.7; color: #555; margin-top: 30px; margin-bottom: 20px;">Mit freundlichen Grüßen<br><strong style="color: #3D2B1F;">Marta Kapcio</strong></p>
 
     <!-- Marta Signatur-Block -->
-    <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="margin: 0; border: 1px solid #e8ddd0; border-radius: 12px; overflow: hidden;">
-      <!-- Marta + Testsieger -->
-      <tr>
-        <td style="padding: 18px 20px 16px; background: #ffffff;">
-          <table width="100%" cellpadding="0" cellspacing="0" role="presentation">
-            <tr>
-              <!-- Photo + Info + Buttons below -->
-              <td style="vertical-align: top;">
-                <!-- Photo + Name row -->
-                <table cellpadding="0" cellspacing="0" role="presentation">
-                  <tr>
-                    <td style="padding-right: 12px; vertical-align: top;">
-                      <img src="${baseUrl}/images/marta-kapcio.jpg" alt="Marta Kapcio" width="60"
-                        style="display: block; width: 60px; height: auto; border-radius: 8px;" />
-                    </td>
-                    <td style="vertical-align: middle;">
-                      <p style="margin: 0 0 2px 0; font-size: 15px; font-weight: 700; color: #3D2B1F; text-align: left;">Marta Kapcio</p>
-                      <p style="margin: 0 0 2px 0; font-size: 13px; color: #555; text-align: left;">Pflegeberaterin</p>
-                      <p style="margin: 0; font-size: 12px; color: #9a8a73; text-align: left;"><span style="white-space: nowrap;">Mo – So,</span> <span style="white-space: nowrap;">8 – 20 Uhr</span></p>
-                    </td>
-                  </tr>
-                </table>
-                <!-- Buttons below photo/name -->
-                <table cellpadding="0" cellspacing="0" role="presentation" style="margin-top: 12px;">
-                  <tr>
-                    <td style="padding-bottom: 6px;">
-                      <a href="tel:+4989200000830" style="display: inline-block; background-color: #f0ebe4; border-radius: 20px; padding: 8px 16px; text-decoration: none; font-size: 13px; font-weight: 500; color: #3D2B1F; white-space: nowrap;">&#9990; 089 200 000 830</a>
-                    </td>
-                  </tr>
-                  <tr>
-                    <td>
-                      <a href="https://wa.me/4989200000830" style="display: inline-block; background-color: #25D366; border-radius: 20px; padding: 8px 16px; text-decoration: none; font-size: 13px; font-weight: 600; color: #ffffff; white-space: nowrap;">WhatsApp schreiben</a>
-                    </td>
-                  </tr>
-                </table>
-              </td>
-              <!-- Testsieger badge – rechts, kleiner -->
-              <td style="vertical-align: top; text-align: right; padding-left: 10px;">
-                <table cellpadding="0" cellspacing="0" role="presentation" style="border: 1px solid #e8ddd0; border-radius: 8px; overflow: hidden; margin-left: auto;">
-                  <tr>
-                    <td class="sig-siegel-innen" style="padding: 8px 10px; background: #ffffff; text-align: center; vertical-align: top;">
-                      <img class="sig-siegel-bild" src="${baseUrl}/images/primundus_testsieger-2021.webp" alt="Testsieger DIE WELT" width="64" style="display: block; width: 64px; height: auto; margin: 0 auto 5px auto;" />
-                      <p style="margin: 0 0 1px 0; font-size: 11px; font-weight: 700; color: #3D2B1F; text-align: center;"><span style="white-space: nowrap;">6× Testsieger</span> <span class="sig-siegel-welt" style="color: #B5A184; white-space: nowrap;">DIE WELT</span></p>
-                      <p style="margin: 0; font-size: 10px; color: #888; line-height: 1.4; text-align: center;"><span style="white-space: nowrap;">Preis, Qualität &amp;</span><br>Kundenservice</p>
-                    </td>
-                  </tr>
-                </table>
-              </td>
-            </tr>
-          </table>
-        </td>
-      </tr>
-      <!-- Stats row -->
-      <tr>
-        <td style="background: #f9f6f2; border-top: 1px solid #e8ddd0;">
-          <table width="100%" cellpadding="0" cellspacing="0" role="presentation">
-            <tr>
-              <td style="padding: 12px 0; text-align: center; width: 33%; border-right: 1px solid #e8ddd0;">
-                <p style="margin: 0; font-size: 12px; color: #555; line-height: 1.4; text-align: center;">Über 20 Jahre<br>Erfahrung</p>
-              </td>
-              <td style="padding: 12px 0; text-align: center; width: 33%; border-right: 1px solid #e8ddd0;">
-                <p style="margin: 0; font-size: 12px; color: #555; line-height: 1.4; text-align: center;">60.000+<br>betreute Einsätze</p>
-              </td>
-              <td style="padding: 12px 0; text-align: center; width: 33%;">
-                <p style="margin: 0; font-size: 12px; color: #555; line-height: 1.4; text-align: center;">Persönlicher<br>Ansprechpartner,<br>7&nbsp;Tage/Woche</p>
-              </td>
-            </tr>
-          </table>
-        </td>
-      </tr>
-      <!-- Media logos – kleiner -->
-      <tr>
-        <td style="background: #ffffff; border-top: 1px solid #e8ddd0; padding: 14px 16px;">
-          <table width="100%" cellpadding="0" cellspacing="0" role="presentation">
-            <tr>
-              <td style="text-align: center; vertical-align: middle; padding: 0 4px;">
-                <img src="${baseUrl}/images/media/die-welt.webp" alt="DIE WELT" width="68" height="14" style="display: inline-block; width: 68px; max-width: 100%; height: auto; opacity: 0.4; filter: grayscale(100%);" />
-              </td>
-              <td style="text-align: center; vertical-align: middle; padding: 0 4px;">
-                <img src="${baseUrl}/images/media/frankfurter-allgemeine.webp" alt="Frankfurter Allgemeine" width="103" height="14" style="display: inline-block; width: 103px; max-width: 100%; height: auto; opacity: 0.4; filter: grayscale(100%);" />
-              </td>
-              <td style="text-align: center; vertical-align: middle; padding: 0 4px;">
-                <img src="${baseUrl}/images/media/ard.webp" alt="ARD" width="38" height="14" style="display: inline-block; width: 38px; max-width: 100%; height: auto; opacity: 0.4; filter: grayscale(100%);" />
-              </td>
-              <td style="text-align: center; vertical-align: middle; padding: 0 4px;">
-                <img src="${baseUrl}/images/media/ndr.webp" alt="NDR" width="21" height="14" style="display: inline-block; width: 21px; max-width: 100%; height: auto; opacity: 0.4; filter: grayscale(100%);" />
-              </td>
-              <td style="text-align: center; vertical-align: middle; padding: 0 4px;">
-                <img src="${baseUrl}/images/media/sat1.webp" alt="SAT.1" width="45" height="14" style="display: inline-block; width: 45px; max-width: 100%; height: auto; opacity: 0.4; filter: grayscale(100%);" />
-              </td>
-              <td style="text-align: center; vertical-align: middle; padding: 0 4px;">
-                <img src="${baseUrl}/images/media/bild-der-frau.webp" alt="Bild der Frau" width="12" height="14" style="display: inline-block; width: 12px; max-width: 100%; height: auto; opacity: 0.4; filter: grayscale(100%);" />
-              </td>
-            </tr>
-          </table>
-        </td>
-      </tr>
-    </table>${bewertungsZeileHtml(bewertung, 32)}
+    ${martaKarteHtml({ fuer: 'kunde', bewertung, siteUrl: baseUrl, presseLogos: true, abstandUnten: 32 })}
 
     ${resendNotice}
   `;
@@ -1316,84 +1137,7 @@ export function getVertragEmailTemplate(
 
   const martaSignatur = `
     <!-- Marta Signatur-Block -->
-    <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="margin: 0; border: 1px solid #e8ddd0; border-radius: 12px; overflow: hidden;">
-      <tr>
-        <td style="padding: 18px 20px 16px; background: #ffffff;">
-          <table width="100%" cellpadding="0" cellspacing="0" role="presentation">
-            <tr>
-              <td style="vertical-align: top;">
-                <table cellpadding="0" cellspacing="0" role="presentation">
-                  <tr>
-                    <td style="padding-right: 12px; vertical-align: top;">
-                      <img src="${baseUrl}/images/marta-kapcio.jpg" alt="Marta Kapcio" width="60" style="display: block; width: 60px; height: auto; border-radius: 8px;" />
-                    </td>
-                    <td style="vertical-align: middle;">
-                      <p style="margin: 0 0 2px 0; font-size: 15px; font-weight: 700; color: #3D2B1F; text-align: left;">Marta Kapcio</p>
-                      <p style="margin: 0 0 2px 0; font-size: 13px; color: #555; text-align: left;">Pflegeberaterin</p>
-                      <p style="margin: 0; font-size: 12px; color: #9a8a73; text-align: left;"><span style="white-space: nowrap;">Mo – So,</span> <span style="white-space: nowrap;">8 – 20 Uhr</span></p>
-                    </td>
-                  </tr>
-                </table>
-                <table cellpadding="0" cellspacing="0" role="presentation" style="margin-top: 12px;">
-                  <tr>
-                    <td style="padding-bottom: 6px;">
-                      <a href="tel:+4989200000830" style="display: inline-block; background-color: #f0ebe4; border-radius: 20px; padding: 8px 16px; text-decoration: none; font-size: 13px; font-weight: 500; color: #3D2B1F; white-space: nowrap;">&#9990; 089 200 000 830</a>
-                    </td>
-                  </tr>
-                  <tr>
-                    <td>
-                      <a href="https://wa.me/4989200000830" style="display: inline-block; background-color: #25D366; border-radius: 20px; padding: 8px 16px; text-decoration: none; font-size: 13px; font-weight: 600; color: #ffffff; white-space: nowrap;">WhatsApp schreiben</a>
-                    </td>
-                  </tr>
-                </table>
-              </td>
-              <td style="vertical-align: top; text-align: right; padding-left: 10px;">
-                <table cellpadding="0" cellspacing="0" role="presentation" style="border: 1px solid #e8ddd0; border-radius: 8px; overflow: hidden; margin-left: auto;">
-                  <tr>
-                    <td class="sig-siegel-innen" style="padding: 8px 10px; background: #ffffff; text-align: center; vertical-align: top;">
-                      <img class="sig-siegel-bild" src="${baseUrl}/images/primundus_testsieger-2021.webp" alt="Testsieger DIE WELT" width="64" style="display: block; width: 64px; height: auto; margin: 0 auto 5px auto;" />
-                      <p style="margin: 0 0 1px 0; font-size: 11px; font-weight: 700; color: #3D2B1F; text-align: center;"><span style="white-space: nowrap;">6× Testsieger</span> <span class="sig-siegel-welt" style="color: #B5A184; white-space: nowrap;">DIE WELT</span></p>
-                      <p style="margin: 0; font-size: 10px; color: #888; line-height: 1.4; text-align: center;"><span style="white-space: nowrap;">Preis, Qualität &amp;</span><br>Kundenservice</p>
-                    </td>
-                  </tr>
-                </table>
-              </td>
-            </tr>
-          </table>
-        </td>
-      </tr>
-      <tr>
-        <td style="background: #f9f6f2; border-top: 1px solid #e8ddd0;">
-          <table width="100%" cellpadding="0" cellspacing="0" role="presentation">
-            <tr>
-              <td style="padding: 12px 0; text-align: center; width: 33%; border-right: 1px solid #e8ddd0;">
-                <p style="margin: 0; font-size: 12px; color: #555; line-height: 1.4; text-align: center;">Über 20 Jahre<br>Erfahrung</p>
-              </td>
-              <td style="padding: 12px 0; text-align: center; width: 33%; border-right: 1px solid #e8ddd0;">
-                <p style="margin: 0; font-size: 12px; color: #555; line-height: 1.4; text-align: center;">60.000+<br>betreute Einsätze</p>
-              </td>
-              <td style="padding: 12px 0; text-align: center; width: 33%;">
-                <p style="margin: 0; font-size: 12px; color: #555; line-height: 1.4; text-align: center;">Persönlicher<br>Ansprechpartner,<br>7&nbsp;Tage/Woche</p>
-              </td>
-            </tr>
-          </table>
-        </td>
-      </tr>
-      <tr>
-        <td style="background: #ffffff; border-top: 1px solid #e8ddd0; padding: 14px 16px;">
-          <table width="100%" cellpadding="0" cellspacing="0" role="presentation">
-            <tr>
-              <td style="text-align: center; vertical-align: middle; padding: 0 4px;"><img src="${baseUrl}/images/media/die-welt.webp" alt="DIE WELT" width="68" height="14" style="display: inline-block; width: 68px; max-width: 100%; height: auto; opacity: 0.4; filter: grayscale(100%);" /></td>
-              <td style="text-align: center; vertical-align: middle; padding: 0 4px;"><img src="${baseUrl}/images/media/frankfurter-allgemeine.webp" alt="Frankfurter Allgemeine" width="103" height="14" style="display: inline-block; width: 103px; max-width: 100%; height: auto; opacity: 0.4; filter: grayscale(100%);" /></td>
-              <td style="text-align: center; vertical-align: middle; padding: 0 4px;"><img src="${baseUrl}/images/media/ard.webp" alt="ARD" width="38" height="14" style="display: inline-block; width: 38px; max-width: 100%; height: auto; opacity: 0.4; filter: grayscale(100%);" /></td>
-              <td style="text-align: center; vertical-align: middle; padding: 0 4px;"><img src="${baseUrl}/images/media/ndr.webp" alt="NDR" width="21" height="14" style="display: inline-block; width: 21px; max-width: 100%; height: auto; opacity: 0.4; filter: grayscale(100%);" /></td>
-              <td style="text-align: center; vertical-align: middle; padding: 0 4px;"><img src="${baseUrl}/images/media/sat1.webp" alt="SAT.1" width="45" height="14" style="display: inline-block; width: 45px; max-width: 100%; height: auto; opacity: 0.4; filter: grayscale(100%);" /></td>
-              <td style="text-align: center; vertical-align: middle; padding: 0 4px;"><img src="${baseUrl}/images/media/bild-der-frau.webp" alt="Bild der Frau" width="12" height="14" style="display: inline-block; width: 12px; max-width: 100%; height: auto; opacity: 0.4; filter: grayscale(100%);" /></td>
-            </tr>
-          </table>
-        </td>
-      </tr>
-    </table>${bewertungsZeileHtml(bewertung, 32)}
+    ${martaKarteHtml({ fuer: 'kunde', bewertung, siteUrl: baseUrl, presseLogos: true, abstandUnten: 32 })}
   `;
 
   const detailRows = [
@@ -1653,65 +1397,13 @@ function customerGreeting(lead: Lead): string {
   return 'Guten Tag';
 }
 
-// Marta-Signatur-Karte — zentral für alle Caregiver-Event-Mails (A/B/C) und
-// das neue Mail-11-Layout. Identisch zur Eingangsbestätigung, damit die
-// gesamte Mail-Reihe optisch zusammenpasst.
-// Handy (11.09.2026): Name/Zeiten dürfen umbrechen, das Siegel hat 10 px
-// festen Abstand und wird über .sig-siegel-* (Media-Query ≤480 px in der
-// jeweiligen Mail-Shell) schmaler — sonst war jede Mail auf 360–390 px
-// breiter als der Bildschirm. Gleiche Karte: Eingangsbestätigung, Angebot,
-// Vertrag, Pflegedaten, buildMartaSig (Edge Function) — immer ALLE ändern.
+// Grußformel + Marta-Signatur-Karte für alle Caregiver-Event-Mails (A/B/C)
+// und die Angebots-Anpassung. Die Karte selbst kommt aus lib/marta-karte.ts
+// (eine Vorlage für alle Mails, Handy-Regeln dort: MARTA_KARTE_MOBIL_CSS).
 function caregiverMartaSig(baseUrl: string, bewertung: BewertungsStand): string {
   return `
     <p style="font-size:16px;line-height:1.7;color:#555;margin-top:24px;margin-bottom:16px;">Mit freundlichen Grüßen<br><strong style="color:#3D2B1F;">Marta Kapcio</strong></p>
-    <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="margin:0;border:1px solid #e8ddd0;border-radius:12px;overflow:hidden;">
-      <tr>
-        <td style="padding:18px 20px 16px;background:#ffffff;">
-          <table width="100%" cellpadding="0" cellspacing="0" role="presentation">
-            <tr>
-              <td style="vertical-align:top;">
-                <table cellpadding="0" cellspacing="0" role="presentation">
-                  <tr>
-                    <td style="padding-right:12px;vertical-align:top;">
-                      <img src="${baseUrl}/images/marta-kapcio.jpg" alt="Marta Kapcio" width="60" style="display:block;width:60px;height:auto;border-radius:8px;" />
-                    </td>
-                    <td style="vertical-align:middle;">
-                      <p style="margin:0 0 2px;font-size:15px;font-weight:700;color:#3D2B1F;">Marta Kapcio</p>
-                      <p style="margin:0 0 2px;font-size:13px;color:#555;">Pflegeberaterin</p>
-                      <p style="margin:0;font-size:12px;color:#9a8a73;"><span style="white-space:nowrap;">Mo – So,</span> <span style="white-space:nowrap;">8 – 20 Uhr</span></p>
-                    </td>
-                  </tr>
-                </table>
-                <table cellpadding="0" cellspacing="0" role="presentation" style="margin-top:12px;">
-                  <tr><td style="padding-bottom:6px;">
-                    <a href="tel:+4989200000830" style="display:inline-block;background-color:#f0ebe4;border-radius:20px;padding:8px 16px;text-decoration:none;font-size:13px;font-weight:500;color:#3D2B1F;white-space:nowrap;">&#9990; 089 200 000 830</a>
-                  </td></tr>
-                  <tr><td>
-                    <a href="https://wa.me/4989200000830" style="display:inline-block;background-color:#25D366;border-radius:20px;padding:8px 16px;text-decoration:none;font-size:13px;font-weight:600;color:#ffffff;white-space:nowrap;">WhatsApp schreiben</a>
-                  </td></tr>
-                </table>
-              </td>
-              <td style="vertical-align:top;text-align:right;padding-left:10px;">
-                <table cellpadding="0" cellspacing="0" role="presentation" style="border:1px solid #e8ddd0;border-radius:8px;overflow:hidden;margin-left:auto;">
-                  <tr><td class="sig-siegel-innen" style="padding:8px 10px;background:#ffffff;text-align:center;vertical-align:top;">
-                    <img class="sig-siegel-bild" src="${baseUrl}/images/primundus_testsieger-2021.webp" alt="Testsieger DIE WELT" width="64" style="display:block;width:64px;height:auto;margin:0 auto 5px;" />
-                    <p style="margin:0 0 1px;font-size:11px;font-weight:700;color:#3D2B1F;"><span style="white-space:nowrap;">6× Testsieger</span> <span class="sig-siegel-welt" style="color:#B5A184;white-space:nowrap;">DIE WELT</span></p>
-                    <p style="margin:0;font-size:10px;color:#888;line-height:1.4;"><span style="white-space:nowrap;">Preis, Qualität &amp;</span><br>Kundenservice</p>
-                  </td></tr>
-                </table>
-              </td>
-            </tr>
-          </table>
-        </td>
-      </tr>
-      <tr><td style="background:#f9f6f2;border-top:1px solid #e8ddd0;">
-        <table width="100%" cellpadding="0" cellspacing="0" role="presentation"><tr>
-          <td style="padding:12px 0;text-align:center;width:33%;border-right:1px solid #e8ddd0;"><p style="margin:0;font-size:12px;color:#555;line-height:1.4;">Über 20 Jahre<br>Erfahrung</p></td>
-          <td style="padding:12px 0;text-align:center;width:33%;border-right:1px solid #e8ddd0;"><p style="margin:0;font-size:12px;color:#555;line-height:1.4;">60.000+<br>betreute Einsätze</p></td>
-          <td style="padding:12px 0;text-align:center;width:33%;"><p style="margin:0;font-size:12px;color:#555;line-height:1.4;">Persönlicher<br>Ansprechpartner,<br>7&nbsp;Tage/Woche</p></td>
-        </tr></table>
-      </td></tr>
-    </table>${bewertungsZeileHtml(bewertung)}`;
+    ${martaKarteHtml({ fuer: 'kunde', bewertung, siteUrl: baseUrl, presseLogos: false })}`;
 }
 
 // Gemeinsame HTML-Shell (Header + Content + Footer) für alle Caregiver-
@@ -1749,10 +1441,7 @@ function caregiverMailShell(baseUrl: string, leadEmail: string, content: string,
        wie getEmailLayout / send-scheduled-emails. Grenze 480 px, damit ein
        600 px breites Fenster exakt die Desktop-Optik behaelt. */
     @media only screen and (max-width: 480px) {
-      .email-header { padding: 20px 20px 16px 20px !important; }
-      .sig-siegel-welt { display: block !important; }
-      .sig-siegel-bild { width: 48px !important; }
-      .sig-siegel-innen { padding: 6px 8px !important; }
+      .email-header { padding: 20px 20px 16px 20px !important; }${MARTA_KARTE_MOBIL_CSS}
     }
   </style>
 </head>
@@ -1982,54 +1671,7 @@ export function getPatientDataSavedEmailTemplate(
   // optisch konsistent bleibt.
   const martaSig = `
     <p style="font-size:16px;line-height:1.7;color:#555;margin-top:24px;margin-bottom:16px;">Mit freundlichen Grüßen<br><strong style="color:#3D2B1F;">Marta Kapcio</strong></p>
-    <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="margin:0;border:1px solid #e8ddd0;border-radius:12px;overflow:hidden;">
-      <tr>
-        <td style="padding:18px 20px 16px;background:#ffffff;">
-          <table width="100%" cellpadding="0" cellspacing="0" role="presentation">
-            <tr>
-              <td style="vertical-align:top;">
-                <table cellpadding="0" cellspacing="0" role="presentation">
-                  <tr>
-                    <td style="padding-right:12px;vertical-align:top;">
-                      <img src="${baseUrl}/images/marta-kapcio.jpg" alt="Marta Kapcio" width="60" style="display:block;width:60px;height:auto;border-radius:8px;" />
-                    </td>
-                    <td style="vertical-align:middle;">
-                      <p style="margin:0 0 2px;font-size:15px;font-weight:700;color:#3D2B1F;">Marta Kapcio</p>
-                      <p style="margin:0 0 2px;font-size:13px;color:#555;">Pflegeberaterin</p>
-                      <p style="margin:0;font-size:12px;color:#9a8a73;"><span style="white-space:nowrap;">Mo – So,</span> <span style="white-space:nowrap;">8 – 20 Uhr</span></p>
-                    </td>
-                  </tr>
-                </table>
-                <table cellpadding="0" cellspacing="0" role="presentation" style="margin-top:12px;">
-                  <tr><td style="padding-bottom:6px;">
-                    <a href="tel:+4989200000830" style="display:inline-block;background-color:#f0ebe4;border-radius:20px;padding:8px 16px;text-decoration:none;font-size:13px;font-weight:500;color:#3D2B1F;white-space:nowrap;">&#9990; 089 200 000 830</a>
-                  </td></tr>
-                  <tr><td>
-                    <a href="https://wa.me/4989200000830" style="display:inline-block;background-color:#25D366;border-radius:20px;padding:8px 16px;text-decoration:none;font-size:13px;font-weight:600;color:#ffffff;white-space:nowrap;">WhatsApp schreiben</a>
-                  </td></tr>
-                </table>
-              </td>
-              <td style="vertical-align:top;text-align:right;padding-left:10px;">
-                <table cellpadding="0" cellspacing="0" role="presentation" style="border:1px solid #e8ddd0;border-radius:8px;overflow:hidden;margin-left:auto;">
-                  <tr><td class="sig-siegel-innen" style="padding:8px 10px;background:#ffffff;text-align:center;vertical-align:top;">
-                    <img class="sig-siegel-bild" src="${baseUrl}/images/primundus_testsieger-2021.webp" alt="Testsieger DIE WELT" width="64" style="display:block;width:64px;height:auto;margin:0 auto 5px;" />
-                    <p style="margin:0 0 1px;font-size:11px;font-weight:700;color:#3D2B1F;"><span style="white-space:nowrap;">6× Testsieger</span> <span class="sig-siegel-welt" style="color:#B5A184;white-space:nowrap;">DIE WELT</span></p>
-                    <p style="margin:0;font-size:10px;color:#888;line-height:1.4;"><span style="white-space:nowrap;">Preis, Qualität &amp;</span><br>Kundenservice</p>
-                  </td></tr>
-                </table>
-              </td>
-            </tr>
-          </table>
-        </td>
-      </tr>
-      <tr><td style="background:#f9f6f2;border-top:1px solid #e8ddd0;">
-        <table width="100%" cellpadding="0" cellspacing="0" role="presentation"><tr>
-          <td style="padding:12px 0;text-align:center;width:33%;border-right:1px solid #e8ddd0;"><p style="margin:0;font-size:12px;color:#555;line-height:1.4;">Über 20 Jahre<br>Erfahrung</p></td>
-          <td style="padding:12px 0;text-align:center;width:33%;border-right:1px solid #e8ddd0;"><p style="margin:0;font-size:12px;color:#555;line-height:1.4;">60.000+<br>betreute Einsätze</p></td>
-          <td style="padding:12px 0;text-align:center;width:33%;"><p style="margin:0;font-size:12px;color:#555;line-height:1.4;">Persönlicher<br>Ansprechpartner,<br>7&nbsp;Tage/Woche</p></td>
-        </tr></table>
-      </td></tr>
-    </table>${bewertungsZeileHtml(bewertung)}`;
+    ${martaKarteHtml({ fuer: 'kunde', bewertung, siteUrl: baseUrl, presseLogos: false })}`;
 
   const content = `
     <p style="font-size:15px;line-height:1.75;color:#444;margin-bottom:14px;">${greeting},</p>
@@ -2063,10 +1705,7 @@ export function getPatientDataSavedEmailTemplate(
        wie getEmailLayout / send-scheduled-emails. Grenze 480 px, damit ein
        600 px breites Fenster exakt die Desktop-Optik behaelt. */
     @media only screen and (max-width: 480px) {
-      .email-header { padding: 20px 20px 16px 20px !important; }
-      .sig-siegel-welt { display: block !important; }
-      .sig-siegel-bild { width: 48px !important; }
-      .sig-siegel-innen { padding: 6px 8px !important; }
+      .email-header { padding: 20px 20px 16px 20px !important; }${MARTA_KARTE_MOBIL_CSS}
     }
   </style>
 </head>
@@ -2570,42 +2209,7 @@ export function getTokenRegenerationEmailTemplate(
   const greeting = customerGreeting(lead);
 
   const martaSignatur = `
-    <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="margin: 0; border: 1px solid #e8ddd0; border-radius: 12px; overflow: hidden;">
-      <tr>
-        <td style="padding: 18px 20px 16px; background: #ffffff;">
-          <table width="100%" cellpadding="0" cellspacing="0" role="presentation">
-            <tr>
-              <td style="vertical-align: top;">
-                <table cellpadding="0" cellspacing="0" role="presentation">
-                  <tr>
-                    <td style="padding-right: 12px; vertical-align: top;">
-                      <img src="${baseUrl}/images/marta-kapcio.jpg" alt="Marta Kapcio" width="60" style="display: block; width: 60px; height: auto; border-radius: 8px;" />
-                    </td>
-                    <td style="vertical-align: middle;">
-                      <p style="margin: 0 0 2px 0; font-size: 15px; font-weight: 700; color: #3D2B1F; text-align: left;">Marta Kapcio</p>
-                      <p style="margin: 0 0 2px 0; font-size: 13px; color: #555; text-align: left;">Pflegeberaterin</p>
-                      <p style="margin: 0; font-size: 12px; color: #9a8a73; text-align: left;"><span style="white-space: nowrap;">Mo – So,</span> <span style="white-space: nowrap;">8 – 20 Uhr</span></p>
-                    </td>
-                  </tr>
-                </table>
-                <table cellpadding="0" cellspacing="0" role="presentation" style="margin-top: 12px;">
-                  <tr>
-                    <td style="padding-bottom: 6px;">
-                      <a href="tel:+4989200000830" style="display: inline-block; background-color: #f0ebe4; border-radius: 20px; padding: 8px 16px; text-decoration: none; font-size: 13px; font-weight: 500; color: #3D2B1F; white-space: nowrap;">&#9990; 089 200 000 830</a>
-                    </td>
-                  </tr>
-                  <tr>
-                    <td>
-                      <a href="https://wa.me/4989200000830" style="display: inline-block; background-color: #25D366; border-radius: 20px; padding: 8px 16px; text-decoration: none; font-size: 13px; font-weight: 600; color: #ffffff; white-space: nowrap;">WhatsApp schreiben</a>
-                    </td>
-                  </tr>
-                </table>
-              </td>
-            </tr>
-          </table>
-        </td>
-      </tr>
-    </table>${bewertungsZeileHtml(bewertung, 32)}`;
+    ${martaKarteHtml({ fuer: 'kunde', bewertung, siteUrl: baseUrl, presseLogos: false, abstandUnten: 32 })}`;
 
   const content = `
     <p style="font-size: 17px; font-weight: 700; color: #3D2B1F; margin: 0 0 16px 0; line-height: 1.5;">${greeting},</p>
