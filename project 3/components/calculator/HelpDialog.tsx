@@ -5,7 +5,7 @@ import { Phone, Calculator, Check } from "lucide-react";
 import Image from "next/image";
 import { openCalculator } from '@/lib/scroll-to-calculator';
 
-const WA_URL = `https://wa.me/4989200000830?text=${encodeURIComponent("Hallo Frau Wysocki, ich habe eine Rückfrage:")}`;
+const WA_URL = `https://wa.me/4989200000830?text=${encodeURIComponent("Hallo Frau Kapcio, ich habe eine Rückfrage:")}`;
 
 function WhatsAppIcon() {
   return (

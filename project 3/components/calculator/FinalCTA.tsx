@@ -54,7 +54,7 @@ export function FinalCTA() {
               <span className="text-white font-semibold text-[16px]">089 200 000 830</span>
             </a>
             <a
-              href={`https://wa.me/4989200000830?text=${encodeURIComponent("Hallo Frau Wysocki, ich habe eine Rückfrage:")}`}
+              href={`https://wa.me/4989200000830?text=${encodeURIComponent("Hallo Frau Kapcio, ich habe eine Rückfrage:")}`}
               target="_blank"
               rel="noopener noreferrer"
               className="w-full flex items-center justify-center gap-3 px-5 py-3 rounded-xl bg-[#25D366] hover:bg-[#20C05A] transition-colors"

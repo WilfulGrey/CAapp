@@ -33,7 +33,9 @@ export function TestsiegerSection() {
                 "Nr. 1 der Pflegekräfte-Vermittler" ist der wörtliche
                 Siegel-Claim; das Preis/Qualität-Statement ist bewusst KEIN
                 Zitat (steht so nicht in der Veröffentlichung), sondern
-                eigene Aussage — deshalb ohne Anführungszeichen/Kursiv. */}
+                eigene Aussage — deshalb ohne Anführungszeichen/Kursiv.
+                17.09.2026 (Martin): „bester Vermittler" raus, stattdessen die Linie von
+                primundus.de „DIE WELT hat Primundus sechsmal in Folge ausgezeichnet". */}
             <div className="flex-1">
               <h3 className="text-[22px] font-bold text-[#3D3D3D] mb-2">
                 {/* Nur "6× Testsieger": die Pille ueber dem Kasten
@@ -50,7 +52,7 @@ export function TestsiegerSection() {
               </p>
 
               <p className="text-[16px] text-[#5A5A5A] leading-relaxed lg:px-0 px-2">
-                Als bester Vermittler von 24-Stunden-Pflegekräften ausgezeichnet: Primundus steht für die beste Kombination aus Preis, Qualität und Kundenservice.
+                DIE WELT hat Primundus sechsmal in Folge ausgezeichnet: Primundus steht für die beste Kombination aus Preis, Qualität und Kundenservice.
               </p>
 
               <a

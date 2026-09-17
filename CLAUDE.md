@@ -411,6 +411,7 @@ CA app → Mamamia:
 | Plik | Co robi |
 |---|---|
 | `project 3/components/calculator/MultiStepForm.tsx` | 10-step wizard. Submit → `/api/angebot-anfordern` → redirect to portalUrl |
+| `project 3/lib/sterne-zeile.ts` (+ `sterne-zeile-laden.ts`, `components/calculator/BewertungsZeile.tsx`) | Bewertungssterne auf der Startseite (Martin 17.09.2026): „★★★★★ 4,9 von 5 aus 126 Bewertungen" zentriert unter den Hero-Punkten (Tipp → `#kundenstimmen`) und als Kopf der Kundenstimmen. Quelle `GET https://primundus.de/api/bewertungen-stand` (Website-Repo, Rechnung wie /erfahrungen). `app/page.tsx` ist dafür Server-Komponente mit `revalidate = 3600`, Zahl steht im ersten HTML. KEIN Ersatzwert: Ausfall/ungültige Antwort → beide Zeilen fehlen (anders als die Mails in `lib/bewertungen-stand.ts`). Test: `src/__tests__/sterneZeile.test.ts` |
 | `project 3/lib/calculator-context.tsx` | `CalculatorState`, types (`Driving`, `Mobility`, `NightCare`, etc.), pricing fetch |
 | `project 3/app/api/angebot-anfordern/route.ts` | Tworzy/updates lead, generuje token, wysyła email, zwraca portalUrl |
 | `project 3/app/api/kalkulation-berechnen/route.ts` | Server-side pricing calculation z `pricing_config` |
