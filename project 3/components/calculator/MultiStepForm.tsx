@@ -1281,9 +1281,12 @@ export function MultiStepForm({ mode = 'inline' }: MultiStepFormProps = {}) {
             kuendbar ist bei uns vertraglich hinterlegt (vertrag-content.ts
             §3.3). Alle drei gehoeren zur selben Kategorie: nichts, worin man
             haengenbleibt — die Startzeit ist bewusst NICHT dabei, sie ist
-            eine andere Aussage und steht weiter unten (Martin 16.08.).
-            "Kostenlos & unverbindlich" ist entfallen, das sagt jetzt die
-            Hero-Unterzeile. */}
+            eine andere Aussage (Martin 16.08.). Am 14.09. kam sie trotzdem
+            als Punkt dazu; seit 17.09. steht „Anreise in 3 Tagen möglich"
+            in der Hero-Unterzeile (Martin: „aus den 5 Punkten rausnehmen und
+            im Hero machen statt kostenlos und unverbindlich").
+            "Kostenlos & unverbindlich" steht damit nicht mehr im Hero, nur
+            noch im Fuß des Kontaktschritts und im Schluss-Aufruf. */}
         {/* Schriftgroesse: NIE kleiner als die Hero-Unterzeile ueber dem
             Button (16px, app/page.tsx) — Martin 16.08. Diese drei Zeilen
             sind der Message-Match zu den Anzeigen, nicht Kleingedrucktes. */}
@@ -1294,7 +1297,6 @@ export function MultiStepForm({ mode = 'inline' }: MultiStepFormProps = {}) {
             'Keine Vermittlungsgebühr',
             'Kein Vertrag vor Ihrer Auswahl',
             'Täglich kündbar, taggenau abgerechnet',
-            'Anreise in 3 Tagen möglich',
           ].map((punkt) => (
             <li key={punkt} className="flex items-center gap-2.5">
               <svg className="h-[18px] w-[18px] flex-shrink-0 text-[#E76F63]" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24" aria-hidden="true">

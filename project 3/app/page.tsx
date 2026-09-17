@@ -1,5 +1,3 @@
-"use client";
-
 import Image from "next/image";
 import { Header } from "@/components/calculator/Header";
 import { TestimonialCard } from "@/components/calculator/TestimonialCard";
@@ -18,12 +16,21 @@ import { RequirementsSection } from "@/components/calculator/RequirementsSection
 import { KeyBenefitsBar } from "@/components/calculator/KeyBenefitsBar";
 import { PersonalContact } from "@/components/calculator/PersonalContact";
 import { homePageGraph, jsonLdString } from "@/lib/seo-schema";
+import { BewertungsZeile } from "@/components/calculator/BewertungsZeile";
+import { ladeBewertungsStand } from "@/lib/bewertungs-stand";
 
-export default function HomePage() {
+// Server-Komponente (seit 17.09.2026, vorher "use client"), damit die
+// Bewertungszahl im ersten HTML steht statt nachzuspringen. Alle Bausteine mit
+// Zustand oder Klicks tragen ihr eigenes "use client". Die Zahl kommt höchstens
+// eine Stunde alt von primundus.de/erfahrungen.
+export const revalidate = 3600;
+
+export default async function HomePage() {
+  const bewertung = await ladeBewertungsStand();
   return (
     <div className="min-h-screen bg-[#F8F7F5]">
       {/* Service + FAQPage-JSON-LD: landet über den SSR-Prerender im
-          initialen HTML, auch wenn diese Page "use client" ist. */}
+          initialen HTML. */}
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: jsonLdString(homePageGraph()) }}
@@ -166,19 +173,26 @@ export default function HomePage() {
                   Aufmerksamkeit erzeugen, damit es nicht ueberlesen wird, dass
                   wir Angebot und passende Pflegekraefte zeigen?"). Die Zeile war
                   durchgehend grau — beim Ueberfliegen verschwanden genau die
-                  beiden Dinge, die sie wertvoll machen. Bewusst NUR zwei:
-                  "100 % kostenfrei und unverbindlich" mitzubetonen wuerde die
-                  Hierarchie aufheben, und der Punkt steht ohnehin unter dem
-                  Button. Dunkelgrau + halbfett statt Koralle — Koralle wuerde
-                  mit dem Button direkt darunter konkurrieren. */}
+                  beiden Dinge, die sie wertvoll machen. Bewusst NUR zwei —
+                  eine dritte Hervorhebung wuerde die Hierarchie aufheben.
+                  Dunkelgrau + halbfett statt Koralle — Koralle wuerde mit dem
+                  Button direkt darunter konkurrieren. */}
+              {/* Satzende seit 17.09.2026 „Anreise in 3 Tagen möglich" statt
+                  „100 % kostenfrei und unverbindlich" (Martin: „aus den 5
+                  Punkten rausnehmen und im Hero machen statt kostenlos und
+                  unverbindlich"). Wortlaut wie in Anzeigen und Ablauf-Plakette
+                  (seit 14.09.). Unverbindlich sagen konkreter die Punkte
+                  darunter („Kein Vertrag vor Ihrer Auswahl"). */}
               <p className="mb-6 max-w-[520px] text-[16px] leading-relaxed text-[#5B5B5B] lg:text-[18px]">
                 Sehen Sie in 2 Minuten,{" "}
                 <span className="font-semibold text-[#3D3D3D]">was es kostet</span> und{" "}
-                <span className="font-semibold text-[#3D3D3D]">welche Pflegekräfte verfügbar sind</span>{" "}
-                {/* Geschuetztes Leerzeichen: durch die fetten Anker verschob
-                    sich der Umbruch, und bei 375 px stand "– 100" am Zeilenende
-                    und "% kostenfrei" in der naechsten Zeile. */}
-                – 100&nbsp;% kostenfrei und unverbindlich.
+                {/* Die Zusage bleibt als EINE Zeile zusammen, der Strich haengt
+                    am Wort davor. Ohne das brach es auf dem iPhone in
+                    „– Anreise" / „in 3 Tagen möglich." (gemessen 390 px). Nach
+                    einem Gedankenstrich darf der Browser trotz geschuetztem
+                    Leerzeichen umbrechen — deshalb nowrap statt &nbsp;. */}
+                <span className="font-semibold text-[#3D3D3D]">welche Pflegekräfte verfügbar sind</span>&nbsp;–{" "}
+                <span className="whitespace-nowrap">Anreise in 3 Tagen möglich.</span>
               </p>
 
               {/* CTA-Modus jetzt auf ALLEN Breiten. Vorher lief auf dem
@@ -186,9 +200,12 @@ export default function HomePage() {
                   Interaktionsmodelle auf einer Seite. Das Overlay ist seit
                   heute ein echtes Modal (fixed, oben im Bild, eigener
                   Scrollbereich) und funktioniert in jeder Breite.
-                  Die drei Punkte unter dem Button stecken in MultiStepForm. */}
+                  Die Punkte unter dem Button stecken in MultiStepForm. */}
               <div className="mb-7 max-w-md">
                 <MultiStepForm mode="cta" />
+                {/* Bewertungssterne zentriert unter dem letzten Punkt, vor den
+                    Logos (Martin 17.09.2026). */}
+                <BewertungsZeile stand={bewertung} />
               </div>
 
             </div>
@@ -307,7 +324,8 @@ export default function HomePage() {
       <CareServicesSection />
 
       <main className="w-full mx-auto px-5 max-w-[520px] md:max-w-[720px] lg:max-w-[900px] xl:max-w-[1000px]">
-        <div className="mt-12 mb-6 max-w-3xl mx-auto">
+        {/* Sprungziel der Sterne-Zeile im Hero (BewertungsZeile). */}
+        <div id="kundenstimmen" className="mt-12 mb-6 max-w-3xl mx-auto scroll-mt-24">
           <p className="text-xs md:text-sm font-bold uppercase tracking-wider text-[#A89279] mb-2">
             Kundenstimmen
           </p>
