@@ -167,6 +167,22 @@ jobs:
         working-directory: project 3/supabase/functions/send-scheduled-emails
         run: deno task test
 
+  # Partner-Akquise (eigener Versand an Vermittler): Versandplan, Sperren,
+  # Anrede und Vorlagen. Läuft auf jedem PR.
+  deno-partner-akquise:
+    name: deno tests (send-partner-akquise)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: "v2.x"
+
+      - name: Run send-partner-akquise tests
+        working-directory: project 3/supabase/functions/send-partner-akquise
+        run: deno task test
+
   # Smoke renderera PDF umowy (pdfkit, Registry #27): renderuje 3 syntetyczne
   # fixture'y i asertuje %PDF-, 8 stron, komplet stringów modelu, ń/▸/✓,
   # stopki. Jedyna trwała ochrona samego RENDERU (root-vitest pilnuje tylko
@@ -330,7 +346,7 @@ jobs:
           mkdir -p /tmp/kr-deploy/supabase
           cp -r "project 3/supabase/functions" /tmp/kr-deploy/supabase/
           cd /tmp/kr-deploy
-          for fn in chat-ai schedule-email send-scheduled-emails; do
+          for fn in chat-ai schedule-email send-scheduled-emails send-partner-akquise; do
             echo "::group::Deploying $fn → staging ($STAGING_REF)"
             supabase functions deploy "$fn" --project-ref "$STAGING_REF"
             echo "::endgroup::"
