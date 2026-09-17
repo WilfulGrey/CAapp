@@ -102,7 +102,8 @@ describe('Texte', () => {
   it('unter dem Knopf wie auf der Startseite: dieselben drei Punkte aus EINER Quelle, keine Bewertungszahl im Code', () => {
     expect([...HERO_PUNKTE]).toEqual(['Keine Vermittlungsgebühr', 'Kein Vertrag vor Ihrer Auswahl', 'Täglich kündbar, taggenau abgerechnet']);
     expect(JSON.stringify(PREIS_SEITE)).not.toMatch(/Google|4[.,]\d von 5|126/);
-    expect(PREIS_SEITE.marta.frage).toBe('Fragen zu Ihrem Preis?');
+    expect(PREIS_SEITE.marta.frage).toBe('Kann ich Ihnen weiterhelfen?');
+    expect(PREIS_SEITE.marta.text).toMatch(/Zuschüssen und Förderung/);
   });
   it('Warteseite im Ablauf Preis: ca. 3 s statt 10,7 s', () => {
     const gesamt = WARTE_KURZ_MS.reduce((a, b) => a + b, 0) + 300 + WARTE_KURZ_ENDE_MS;
