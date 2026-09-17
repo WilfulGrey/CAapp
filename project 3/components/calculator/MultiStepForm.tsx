@@ -14,7 +14,7 @@ import { GARANTIE_OEFFNEN_EVENT } from "@/components/calculator/BestpreisSiegelL
 import { zaehle } from "@/lib/zaehler";
 import { meldeAnfrage } from "@/lib/oaiq";
 import { telefonBereinigen, telefonFehler, telefonGueltig } from "@/lib/telefon";
-import { kontaktVariante, KNOPF_KONTAKT, STUFEN, STUFEN_FEHLER, STUFEN_FUSS, stufenZaehler, type KontaktStufe, type KontaktVariante } from "@/lib/kontakt-stufen";
+import { kontaktVariante, KNOPF_KONTAKT, STUFEN, STUFEN_FEHLER, type KontaktStufe, type KontaktVariante } from "@/lib/kontakt-stufen";
 
 const EMAIL_MUSTER = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -845,10 +845,6 @@ export function MultiStepForm({ mode = 'inline' }: MultiStepFormProps = {}) {
   const zumPortal = () => {
     const ld = leadDatenRef.current;
     if (ld?.portalUrl) window.location.assign(ld.portalUrl);
-  };
-  const stufeZurueck = () => {
-    setStufenFehler('');
-    if (stufe === 'email') setStufe('name');
   };
   const ohneTelefon = () => {
     if (isSubmitting) return;
@@ -1720,7 +1716,6 @@ export function MultiStepForm({ mode = 'inline' }: MultiStepFormProps = {}) {
                                 {STUFEN.telefon.bestaetigung} <span className="font-semibold break-all">{formData.email.trim()}</span>
                               </p>
                             )}
-                            <p className="text-[12px] text-[#8B8B8B] mb-1">{stufenZaehler(stufe)}</p>
                             <p className="text-[19px] font-bold leading-snug text-[#1a1a1a]">{STUFEN[stufe].frage}</p>
                             {STUFEN[stufe].text && <p className="text-[15px] leading-snug text-[#555] mt-1">{STUFEN[stufe].text}</p>}
                           </>
@@ -1803,22 +1798,14 @@ export function MultiStepForm({ mode = 'inline' }: MultiStepFormProps = {}) {
                           {STUFEN.telefon.ohne}
                         </button>
                       )}
-                      <p className="text-center text-xs text-[#8B8B8B] leading-snug">
-                        {STUFEN_FUSS[stufe]}
-                        {stufe === 'email' && (
-                          <>
-                            <br />Mit dem Absenden stimmen Sie unserer{' '}
-                            <a href="/datenschutz" target="_blank" className="text-[#8B7355] underline hover:text-[#A68968]">
-                              Datenschutzerklärung
-                            </a>{' '}zu.
-                          </>
-                        )}
-                      </p>
+                      {/* Nur die Einwilligung, dort wo die Daten abgehen; keine Fußzeile, kein Zurück (Runde 3, Martin). */}
                       {stufe === 'email' && (
-                        <button type="button" onClick={stufeZurueck} className="inline-flex items-center gap-1 text-sm font-semibold text-[#708A95] hover:text-[#3D3D3D] py-1 transition-colors">
-                          <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2.2} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" /></svg>
-                          Zurück
-                        </button>
+                        <p className="text-center text-xs text-[#8B8B8B] leading-snug">
+                          Mit dem Absenden stimmen Sie unserer{' '}
+                          <a href="/datenschutz" target="_blank" className="text-[#8B7355] underline hover:text-[#A68968]">
+                            Datenschutzerklärung
+                          </a>{' '}zu.
+                        </p>
                       )}
                     </form>
                   ) : (!vorschauModus || kontaktOffen) && (<>

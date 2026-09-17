@@ -4,8 +4,6 @@ import {
   KONTAKT_KEY,
   kontaktVariante,
   STUFEN,
-  STUFEN_FUSS,
-  stufenZaehler,
 } from '../../project 3/lib/kontakt-stufen';
 import { SCHRANKE } from '../../project 3/lib/kraefte-vorschau';
 
@@ -48,22 +46,24 @@ describe('Texte der drei Schritte', () => {
     expect(STUFEN.telefon.knopf).toContain('alle 5 Pflegekräfte');
     expect(STUFEN.telefon.knopf.length).toBeLessThanOrEqual(38);
   });
-  it('Runde 2 (Martin 16.09.): kein zweiter Drei-Schritte-Hinweis, keine falsche „nächste Seite“, Mail-Kopie bestätigt', () => {
+  it('Runde 2/3 (Martin 16.09.): kein Drei-Schritte-Hinweis, kein „schicken“ beim Sofortpreis, keine falsche „nächste Seite“, Mail-Kopie bestätigt', () => {
     expect(STUFEN.name.text).toBe('');
+    expect(STUFEN.email.frage).not.toMatch(/schick|send/i);
+    expect(STUFEN.email.text).toMatch(/^Ihren Preis sehen Sie gleich/);
+    expect(STUFEN.email.text).toMatch(/per E-Mail/);
     expect(STUFEN.email.text).not.toMatch(/nächsten Seite/);
-    expect(STUFEN.email.text).toBe('So haben Sie den Preis auch schriftlich.');
+    expect(STUFEN.telefon.frage).toMatch(/Rückfragen zu Ihrer Betreuung\?$/);
+    expect(STUFEN.telefon.text).toBe('');
     expect(STUFEN.telefon.bestaetigung).toMatch(/Kopie .* per E-Mail unterwegs an$/);
     expect(STUFEN.telefon.bestaetigung).not.toMatch(/erhalten/);
   });
   it('kein Werbeanruf, kein Sofortangebot, kein „brauchen wir"', () => {
-    const alles = JSON.stringify({ STUFEN, STUFEN_FUSS });
+    const alles = JSON.stringify(STUFEN);
     expect(alles).not.toMatch(/Werbeanruf/i);
     expect(alles).not.toMatch(/Sofortangebot/);
     expect(alles).not.toMatch(/brauchen/);
   });
-  it('Zähler und Reihenfolge', () => {
-    expect(stufenZaehler('name')).toBe('Angabe 1 von 3');
-    expect(stufenZaehler('telefon')).toBe('Angabe 3 von 3');
+  it('grauer Weg ohne Nummer', () => {
     expect(STUFEN.telefon.ohne).toBe('Ohne Rückrufnummer weiter');
   });
 });

@@ -57,23 +57,31 @@ export const KNOPF_KONTAKT = 'Preis & Pflegekräfte ansehen →';
  * Die drei Teilschritte. Jede Frage gibt dem Feld einen Grund; die Zeile
  * darunter sagt, was der Kunde bekommt — nicht, was wir brauchen (Martins
  * Linie vom 12.09.). Kein „Werbeanruf", kein „Sofortangebot".
+ *
+ * Runde 3 (Martin, 16.09. spät, zum E-Mail-Schritt): „Oben steht, Preis ist
+ * berechnet … jetzt fragen wir, wohin dürfen wir die Preisberechnung
+ * schicken — ich weiß nicht, ob ich das verstehen würde. So viel Text.
+ * Kein Zurück. Überladen." Also: kein „schicken" (widerspricht dem
+ * Sofortpreis — die Zeile sagt, dass er den Preis GLEICH SIEHT und die
+ * Kopie zusätzlich bekommt), kein Zähler, keine Fußzeile (die Leiste
+ * darunter sagt schon „kostenfrei & unverbindlich"), kein Zurück; der
+ * Telefon-Grund steht in der Frage statt in einer eigenen Zeile.
  */
 export const STUFEN = {
   name: {
     frage: 'Wie dürfen wir Sie ansprechen?',
-    // Runde 2 (Martin, 16.09. abends): kein zweiter Hinweis auf die drei
-    // Schritte — der kleine Zähler „Angabe 1 von 3" über der Frage reicht.
+    // Runde 2/3 (Martin): kein Hinweis auf drei Schritte, kein Zähler.
     text: '',
     platzhalter: 'Ihr Name',
     knopf: 'Weiter →',
     fehler: 'Bitte geben Sie Ihren Namen ein',
   },
   email: {
-    frage: 'Wohin dürfen wir Ihre Preisberechnung schicken?',
-    // Runde 2 (Martin): „auf der nächsten Seite kommt der Preis" stimmte
-    // nicht — als Nächstes kommt die Rückrufnummer. Die Zeile sagt nur noch,
-    // was die Adresse dem Kunden bringt.
-    text: 'So haben Sie den Preis auch schriftlich.',
+    frage: 'Wie lautet Ihre E-Mail-Adresse?',
+    // Der Kunde hat „Ihr Preis ist berechnet" gelesen — die Zeile löst den
+    // scheinbaren Widerspruch: sehen gleich hier, Kopie zusätzlich per Mail.
+    // Nicht „auf der nächsten Seite" (als Nächstes kommt die Nummer).
+    text: 'Ihren Preis sehen Sie gleich – eine Kopie der Berechnung erhalten Sie per E-Mail.',
     platzhalter: 'E-Mail-Adresse',
     knopf: 'Weiter →',
     fehler: 'Bitte geben Sie eine gültige E-Mail-Adresse ein',
@@ -84,8 +92,8 @@ export const STUFEN = {
     // Mail ausgelöst. „Unterwegs" statt „erhalten", weil die Zustellung
     // Sekunden bis Minuten dauert; die eingegebene Adresse steht dahinter.
     bestaetigung: 'Eine Kopie Ihrer Preisberechnung ist per E-Mail unterwegs an',
-    frage: 'Unter welcher Nummer erreichen wir Sie bei Rückfragen?',
-    text: 'Nur bei Rückfragen zu Ihrer Betreuung.',
+    frage: 'Unter welcher Nummer erreichen wir Sie bei Rückfragen zu Ihrer Betreuung?',
+    text: '',
     platzhalter: 'Telefonnummer',
     // Martin: „Jetzt alle Pflegekräfte … sehen" — derselbe Knopf wie auf der
     // Kräfte-Vorschau (Strecke v2, mit „alle 5"), passt bei 375 px in eine Zeile.
@@ -96,20 +104,8 @@ export const STUFEN = {
   },
 } as const;
 
-/** „Angabe 1 von 3" über dem Feld. */
-export function stufenZaehler(stufe: KontaktStufe): string {
-  return `Angabe ${KONTAKT_STUFEN.indexOf(stufe) + 1} von ${KONTAKT_STUFEN.length}`;
-}
-
 /** Fehlertext, wenn das Speichern des Leads scheitert — kein alert(), inline am Knopf. */
 export const STUFEN_FEHLER = {
   speichern: 'Das hat leider nicht geklappt. Bitte versuchen Sie es noch einmal.',
   telefon: 'Die Nummer konnte nicht gespeichert werden. Bitte noch einmal versuchen – oder ohne Nummer weiter.',
-} as const;
-
-/** Fußzeilen: die Einwilligung steht dort, wo die Daten abgeschickt werden (E-Mail-Schritt). */
-export const STUFEN_FUSS = {
-  name: 'Kostenlos · unverbindlich',
-  email: 'Sofort sichtbar · kostenlos · unverbindlich',
-  telefon: 'Sofort sichtbar · kostenlos · unverbindlich',
 } as const;
