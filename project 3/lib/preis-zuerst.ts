@@ -49,7 +49,7 @@ export function ablaufVariante(
 
 /** „3.050 €" — ganze Euro, deutsches Tausenderzeichen, geschütztes Leerzeichen vor dem €. */
 export function euro(betrag: number): string {
-  return `${Math.round(betrag).toLocaleString('de-DE')} €`;
+  return `${Math.round(betrag).toLocaleString('de-DE')}\u00A0€`;
 }
 
 /** vdek-Auswertung zum 01.07.2026, Bundesdurchschnitt im ersten Jahr — derselbe Wert wie im Portal (HEIM_EIGENANTEIL). */
@@ -91,7 +91,7 @@ export const PREIS_SEITE = {
   kraefte: `${PORTAL_ANZAHL} passende Pflegekräfte – ab sofort verfügbar`,
   // Martin: „wenn er speichern will und Pflegekräfte sehen, dann Button".
   // „sichern" statt „speichern", damit der Knopf bei 375 px in eine Zeile passt (≤ 38 Zeichen).
-  knopf: 'Pflegekräfte ansehen & Preis sichern →',
+  knopf: 'Pflegekräfte ansehen & Preis sichern\u00A0→',
   // Sagt ehrlich, was als Nächstes kommt — keine Überraschungs-Schranke.
   unterKnopf: 'Dafür fragen wir im nächsten Schritt Ihre Kontaktdaten ab.',
 } as const;
@@ -104,7 +104,7 @@ export const KONTAKT_NACH_PREIS = {
   // Kurz, damit der grüne Kopf auf dem Handy einzeilig bleibt („im Monat" stand auf der Preisseite).
   kopf: (brutto: number) => `Ihr Preis: ${euro(brutto)}`,
   emailText: 'Ihre Berechnung und den Zugang zu Ihren Pflegekräften erhalten Sie per E-Mail.',
-  knopf: `Alle ${PORTAL_ANZAHL} Pflegekräfte ansehen →`,
+  knopf: `Alle ${PORTAL_ANZAHL} Pflegekräfte ansehen\u00A0→`,
   // Nur für `?kontakt=alt` (heutiges Drei-Felder-Formular hinter dem Preis):
   frageAlt: 'Für wen dürfen wir Ihr Kundenportal einrichten?',
   textAlt: `Dort sehen Sie alle ${PORTAL_ANZAHL} Pflegekräfte und Ihre Berechnung.`,

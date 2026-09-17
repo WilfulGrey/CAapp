@@ -43,13 +43,13 @@ describe('ablaufVariante', () => {
 
 describe('Zahlen der Preisseite', () => {
   it('Euro ohne Nachkommastellen, deutsches Tausenderzeichen', () => {
-    expect(euro(3050)).toBe('3.050 €');
-    expect(euro(1621.75)).toBe('1.622 €');
-    expect(euro(950)).toBe('950 €');
+    expect(euro(3050)).toBe('3.050\u00A0€');
+    expect(euro(1621.75)).toBe('1.622\u00A0€');
+    expect(euro(950)).toBe('950\u00A0€');
   });
   it('Heimvergleich nur, wenn zuhause günstiger ist — mit dem vdek-Wert des Portals', () => {
     expect(HEIM_EIGENANTEIL).toBe(3364);
-    expect(PREIS_SEITE.heim(1621.75)).toBe('Im Pflegeheim zahlen Sie im ersten Jahr durchschnittlich 3.364 € im Monat selbst – zuhause rund 1.742 € weniger.');
+    expect(PREIS_SEITE.heim(1621.75)).toBe('Im Pflegeheim zahlen Sie im ersten Jahr durchschnittlich 3.364\u00A0€ im Monat selbst – zuhause rund 1.742\u00A0€ weniger.');
     expect(PREIS_SEITE.heim(3364)).toBeNull();
     expect(PREIS_SEITE.heim(3900)).toBeNull();
   });
@@ -63,19 +63,19 @@ describe('Zahlen der Preisseite', () => {
     expect(zuschussNamen(items)).toBe('Pflegegeld, Entlastungsbudget und Steuervorteil');
     expect(zuschussNamen([items[3]])).toBe('Steuervorteil');
     expect(zuschussNamen([])).toBe('');
-    expect(PREIS_SEITE.nachZuschuessen(1621.75)).toBe('Nach Zuschüssen ca. 1.622 € im Monat');
+    expect(PREIS_SEITE.nachZuschuessen(1621.75)).toBe('Nach Zuschüssen ca. 1.622\u00A0€ im Monat');
   });
 });
 
 describe('Texte', () => {
   it('Knöpfe passen in eine Zeile (≤ 38 Zeichen)', () => {
-    expect(PREIS_SEITE.knopf).toBe('Pflegekräfte ansehen & Preis sichern →');
+    expect(PREIS_SEITE.knopf).toBe('Pflegekräfte ansehen & Preis sichern\u00A0→');
     expect(PREIS_SEITE.knopf.length).toBeLessThanOrEqual(38);
-    expect(KONTAKT_NACH_PREIS.knopf).toBe('Alle 5 Pflegekräfte ansehen →');
+    expect(KONTAKT_NACH_PREIS.knopf).toBe('Alle 5 Pflegekräfte ansehen\u00A0→');
     expect(KONTAKT_NACH_PREIS.knopf.length).toBeLessThanOrEqual(38);
   });
   it('hinter dem Preis verspricht der Kontakt nicht noch einmal den Preis', () => {
-    expect(KONTAKT_NACH_PREIS.kopf(3050)).toBe('Ihr Preis: 3.050 € im Monat');
+    expect(KONTAKT_NACH_PREIS.kopf(3050)).toBe('Ihr Preis: 3.050\u00A0€');
     expect(KONTAKT_NACH_PREIS.emailText).not.toMatch(/sehen Sie gleich/);
     expect(KONTAKT_NACH_PREIS.knopf).not.toMatch(/Preis/);
     expect(KONTAKT_NACH_PREIS.textAlt).not.toMatch(/Preis sehen/);
