@@ -10,8 +10,8 @@ const STAND = { schnitt: "4,9", anzahl: 126 };
 Deno.test("Kundenkarte: Anrufen + WhatsApp nebeneinander, Sterne in der Karte, Bestpreisgarantie", () => {
   const html = martaKarteHtml({ fuer: "kunde", bewertung: STAND, siteUrl: SITE, presseLogos: true });
   assertEquals(html.match(/class="sig-pille"/g)?.length, 2);
-  assertStringIncludes(html, "&#9990; Anrufen</a>");
-  assertStringIncludes(html, ">WhatsApp</a>");
+  assertStringIncludes(html, "&#9990; Anrufen</span>");
+  assertStringIncludes(html, ">WhatsApp</span>");
   assert(!html.includes("WhatsApp schreiben"));
   const knopf = html.indexOf("wa.me/4989200000830");
   const sterne = html.indexOf("&#9733;");
@@ -36,6 +36,12 @@ Deno.test("bewertungsSterneHtml: Link auf die Erfahrungen-Seite", () => {
   assertStringIncludes(z, 'href="https://primundus.de/erfahrungen"');
 });
 
-Deno.test("MARTA_KARTE_MOBIL_CSS: Knöpfe dürfen auf dem Handy umbrechen", () => {
-  assertStringIncludes(MARTA_KARTE_MOBIL_CSS, ".sig-pille { display: inline-block !important;");
+Deno.test("Handy: Symbol-Knöpfe und Sterne-Zeile über die volle Breite", () => {
+  const html = martaKarteHtml({ fuer: "kunde", bewertung: STAND, siteUrl: SITE, presseLogos: true });
+  assertEquals(html.match(/<img class="sig-pille-bild"/g)?.length, 2);
+  assertStringIncludes(html, `src="${SITE}/images/mail-icon-whatsapp.png"`);
+  assertStringIncludes(html, '<div class="sig-sterne-desktop">');
+  assertStringIncludes(html, '<div class="sig-sterne-mobil" style="display:none;mso-hide:all;max-height:0;overflow:hidden;">');
+  assertStringIncludes(MARTA_KARTE_MOBIL_CSS, ".sig-pille-text { display: none !important; }");
+  assertStringIncludes(MARTA_KARTE_MOBIL_CSS, ".sig-sterne-desktop { display: none !important; }");
 });

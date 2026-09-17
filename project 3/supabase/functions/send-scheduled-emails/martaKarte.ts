@@ -18,29 +18,40 @@ export type MartaKarteOptionen = {
   abstandUnten?: number;
 } & ({ fuer: 'kunde'; bewertung: BewertungsStand } | { fuer: 'vermittler' });
 
-/** Regeln für die Media-Query ≤480 px jeder Mail-Shell mit Karte. */
+/** Regeln für die Media-Query ≤480 px jeder Mail-Shell mit Karte.
+ *  Handy (Martin 17.09.2026): Knöpfe nur als Symbol in runden 44-px-Flächen
+ *  (passen nebeneinander), Sterne als eigene Zeile über die volle Breite.
+ *  Clients ohne Media-Query (Outlook Desktop) zeigen die Desktop-Karte. */
 export const MARTA_KARTE_MOBIL_CSS = `
       .sig-siegel-welt { display: block !important; }
       .sig-siegel-bild { width: 48px !important; }
       .sig-siegel-innen { padding: 6px 8px !important; }
-      .sig-pille { display: inline-block !important; padding: 0 6px 6px 0 !important; }`;
+      .sig-pille { padding: 0 8px 0 0 !important; }
+      .sig-pille-link { display: inline-block !important; width: 44px !important; height: 44px !important; padding: 0 !important; border-radius: 22px !important; line-height: 44px !important; text-align: center !important; }
+      .sig-pille-text { display: none !important; }
+      .sig-pille-bild { display: inline-block !important; vertical-align: middle !important; }
+      .sig-sterne-desktop { display: none !important; }
+      .sig-sterne-mobil { display: block !important; max-height: none !important; overflow: visible !important; }`;
 
 function tausender(n: number): string {
   return String(n).replace(/\B(?=(\d{3})+(?!\d))/g, '.');
 }
 
-/** „★★★★★ 4,9 von 5 · 126 Bewertungen →" — Umbruch nur vor dem Link. */
-export function bewertungsSterneHtml(stand: BewertungsStand): string {
+/** „★★★★★ 4,9 von 5 · 126 Bewertungen →" — Umbruch nur vor dem Link.
+ *  Desktop 12,5 px unter den Knöpfen, Handy 12 px über die volle Breite. */
+export function bewertungsSterneHtml(stand: BewertungsStand, groessePx = 12.5, abstandObenPx = 10): string {
   const gold = Math.min(5, Math.max(0, Math.round(Number(stand.schnitt.replace(',', '.')))));
   const sterne =
     `<span style="color:#D4A843;letter-spacing:1px;">${'&#9733;'.repeat(gold)}</span>` +
     (gold < 5 ? `<span style="color:#E3D9CB;">${'&#9733;'.repeat(5 - gold)}</span>` : '');
   const wort = stand.anzahl === 1 ? 'Bewertung' : 'Bewertungen';
-  return `<p style="margin:10px 0 0;font-size:12.5px;line-height:1.5;color:#555;text-align:left;"><span style="white-space:nowrap;">${sterne}&nbsp;<strong style="color:#3D2B1F;">${stand.schnitt}</strong> von 5&nbsp;&middot;</span> <a href="${ERFAHRUNGEN_URL}" style="color:#8B7355;font-weight:600;text-decoration:none;white-space:nowrap;">${tausender(stand.anzahl)} ${wort}&nbsp;&rarr;</a></p>`;
+  return `<p style="margin:${abstandObenPx}px 0 0;font-size:${groessePx}px;line-height:1.5;color:#555;text-align:left;"><span style="white-space:nowrap;">${sterne}&nbsp;<strong style="color:#3D2B1F;">${stand.schnitt}</strong> von 5&nbsp;&middot;</span> <a href="${ERFAHRUNGEN_URL}" style="color:#8B7355;font-weight:600;text-decoration:none;white-space:nowrap;">${tausender(stand.anzahl)} ${wort}&nbsp;&rarr;</a></p>`;
 }
 
 const PILLE = 'display:inline-block;border-radius:20px;padding:8px 16px;text-decoration:none;font-size:13px;white-space:nowrap;';
 const FAKT = 'margin:0;font-size:12px;color:#555;line-height:1.4;';
+// Symbolbilder der Knöpfe (40×40-PNG, 2× für scharfe Darstellung): nur auf dem Handy.
+const SYMBOL = 'display:none;mso-hide:all;width:20px;height:20px;border:0;vertical-align:middle;';
 
 const LOGOS: [datei: string, alt: string, breite: number][] = [
   ['die-welt.webp', 'DIE WELT', 68],
@@ -54,7 +65,11 @@ const LOGOS: [datei: string, alt: string, breite: number][] = [
 export function martaKarteHtml(o: MartaKarteOptionen): string {
   const site = o.siteUrl.replace(/\/$/, '');
   const sterne = o.fuer === 'kunde' ? `
-            ${bewertungsSterneHtml(o.bewertung)}` : '';
+            <div class="sig-sterne-desktop">${bewertungsSterneHtml(o.bewertung)}</div>` : '';
+  // Handy-Kopie der Sterne: am Desktop versteckt (mso-hide für Outlook),
+  // die Media-Query blendet sie ein und die Desktop-Kopie aus.
+  const sterneHandy = o.fuer === 'kunde' ? `
+      <div class="sig-sterne-mobil" style="display:none;mso-hide:all;max-height:0;overflow:hidden;">${bewertungsSterneHtml(o.bewertung, 12, 12)}</div>` : '';
   const dritterFakt = o.fuer === 'kunde'
     // &shy;: auf 360–390 px ist die Faktenzelle ~110 px breit, das Wort nicht.
     ? 'Bestpreisgarantie,<br>keine Vermittlungs&shy;gebühr'
@@ -91,8 +106,8 @@ export function martaKarteHtml(o: MartaKarteOptionen): string {
             </table>
             <table cellpadding="0" cellspacing="0" role="presentation" style="margin-top:12px;">
               <tr>
-                <td class="sig-pille" style="padding-right:6px;"><a href="tel:+4989200000830" style="${PILLE}background-color:#f0ebe4;font-weight:500;color:#3D2B1F;">&#9990; Anrufen</a></td>
-                <td class="sig-pille"><a href="https://wa.me/4989200000830" style="${PILLE}background-color:#25D366;font-weight:600;color:#ffffff;">WhatsApp</a></td>
+                <td class="sig-pille" style="padding-right:6px;"><a class="sig-pille-link" href="tel:+4989200000830" aria-label="Marta anrufen: 089 200 000 830" title="Marta anrufen: 089 200 000 830" style="${PILLE}background-color:#f0ebe4;font-weight:500;color:#3D2B1F;"><span class="sig-pille-text">&#9990; Anrufen</span><img class="sig-pille-bild" src="${site}/images/mail-icon-telefon.png" alt="Anrufen" width="20" height="20" style="${SYMBOL}" /></a></td>
+                <td class="sig-pille"><a class="sig-pille-link" href="https://wa.me/4989200000830" aria-label="WhatsApp an Marta: 089 200 000 830" title="WhatsApp an Marta: 089 200 000 830" style="${PILLE}background-color:#25D366;font-weight:600;color:#ffffff;"><span class="sig-pille-text">WhatsApp</span><img class="sig-pille-bild" src="${site}/images/mail-icon-whatsapp.png" alt="WhatsApp" width="20" height="20" style="${SYMBOL}" /></a></td>
               </tr>
             </table>${sterne}
           </td>
@@ -108,7 +123,7 @@ export function martaKarteHtml(o: MartaKarteOptionen): string {
             </table>
           </td>
         </tr>
-      </table>
+      </table>${sterneHandy}
     </td>
   </tr>
   <tr>

@@ -5,10 +5,14 @@
  *       ★★★★★ 4,9 von 5 · 126 Bewertungen →
  *   - Faktenzeile rechts: „Bestpreisgarantie, keine Vermittlungsgebühr"
  *   - Vermittler-Mails: keine Sterne, keine Kunden-Konditionen (vermittler.ts)
+ *   - Handy (≤480 px): nur Symbole in runden 44-px-Knöpfen, Sterne als eigene
+ *     Zeile über die volle Kartenbreite; Desktop/Outlook unverändert
  * Die Edge Function hat eine Kopie (send-scheduled-emails/martaKarte.ts);
  * unten wird geprüft, dass beide Kopien dieselbe Karte liefern.
  */
 import { describe, expect, it } from 'vitest';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import {
   MARTA_KARTE_MOBIL_CSS,
   bewertungsSterneHtml,
@@ -35,12 +39,13 @@ describe('martaKarteHtml — Kundenmail', () => {
 
   it('alte Beschriftungen sind weg', () => {
     expect(html).not.toContain('WhatsApp schreiben');
-    expect(html).not.toContain('089 200 000 830');
+    // Nummer nur noch in aria-label/title, nicht als sichtbarer Text
+    expect(text(html)).not.toContain('089 200 000 830');
   });
 
   it('Pillen behalten ihre Farben (beige Anrufen, grün WhatsApp)', () => {
-    expect(html).toMatch(/<a href="tel:\+4989200000830" style="[^"]*background-color:#f0ebe4;/);
-    expect(html).toMatch(/<a href="https:\/\/wa\.me\/4989200000830" style="[^"]*background-color:#25D366;/);
+    expect(html).toMatch(/<a class="sig-pille-link" href="tel:\+4989200000830" [^>]*style="[^"]*background-color:#f0ebe4;/);
+    expect(html).toMatch(/<a class="sig-pille-link" href="https:\/\/wa\.me\/4989200000830" [^>]*style="[^"]*background-color:#25D366;/);
   });
 
   it('Bewertungszeile steht IN der Karte, unter den Knöpfen, vor der Siegel-Spalte', () => {
@@ -56,7 +61,7 @@ describe('martaKarteHtml — Kundenmail', () => {
   it('keine eigene Zeile mehr unter der Karte', () => {
     expect(html.trim().endsWith('</table>')).toBe(true);
     const nachKarte = html.slice(html.lastIndexOf('https://primundus.de/erfahrungen'));
-    expect(nachKarte).toContain('sig-siegel-innen');
+    expect(nachKarte).toContain('Über 20 Jahre');
   });
 
   it('Siegel-Spalte hält mindestens 12 px Abstand zu den Knöpfen', () => {
@@ -92,12 +97,68 @@ describe('martaKarteHtml — Kundenmail', () => {
   });
 });
 
+describe('martaKarteHtml — Handy (Martin 17.09.2026, nur Media-Query ≤480 px)', () => {
+  const html = martaKarteHtml({ fuer: 'kunde', bewertung: STAND, siteUrl: SITE, presseLogos: true });
+
+  it('Knöpfe: Text in .sig-pille-text, Symbolbild .sig-pille-bild am Desktop versteckt (auch Outlook)', () => {
+    expect(html).toContain('<span class="sig-pille-text">&#9990; Anrufen</span>');
+    expect(html).toContain('<span class="sig-pille-text">WhatsApp</span>');
+    const bilder = html.match(/<img class="sig-pille-bild"[^>]*>/g) ?? [];
+    expect(bilder).toHaveLength(2);
+    for (const b of bilder) {
+      expect(b).toMatch(/width="20" height="20"/);
+      expect(b).toMatch(/style="display:none;mso-hide:all;/);
+      expect(b).toMatch(/alt="[^"]+"/);
+    }
+    expect(bilder[0]).toContain(`src="${SITE}/images/mail-icon-telefon.png"`);
+    expect(bilder[1]).toContain(`src="${SITE}/images/mail-icon-whatsapp.png"`);
+  });
+
+  it('Links behalten zugänglichen Text (aria-label + title)', () => {
+    expect(html).toMatch(/<a class="sig-pille-link" href="tel:\+4989200000830" aria-label="[^"]*089 200 000 830[^"]*" title="[^"]*089 200 000 830[^"]*"/);
+    expect(html).toMatch(/<a class="sig-pille-link" href="https:\/\/wa\.me\/4989200000830" aria-label="[^"]*WhatsApp[^"]*" title="[^"]*WhatsApp[^"]*"/);
+  });
+
+  it('Sterne: Desktop-Kopie in der linken Spalte, Handy-Kopie als eigene Zeile über die volle Kartenbreite', () => {
+    const desktop = html.indexOf('<div class="sig-sterne-desktop">');
+    const siegel = html.indexOf('sig-siegel-innen');
+    const mobil = html.indexOf('<div class="sig-sterne-mobil" style="display:none;mso-hide:all;max-height:0;overflow:hidden;">');
+    const fakten = html.indexOf('Über 20 Jahre');
+    expect(desktop).toBeGreaterThan(0);
+    expect(siegel).toBeGreaterThan(desktop);
+    expect(mobil).toBeGreaterThan(siegel);
+    expect(fakten).toBeGreaterThan(mobil);
+    const mobilHtml = html.slice(mobil, html.indexOf('</div>', mobil));
+    expect(mobilHtml).toContain('font-size:12px;');
+    expect(text(mobilHtml)).toContain('★★★★★ 4,9 von 5 · 126 Bewertungen →');
+  });
+
+  it('Media-Query-Regeln: Symbole statt Text, 44-px-Knöpfe, Sterne-Zeile tauschen', () => {
+    expect(MARTA_KARTE_MOBIL_CSS).toContain('.sig-pille-text { display: none !important; }');
+    expect(MARTA_KARTE_MOBIL_CSS).toContain('.sig-pille-bild { display: inline-block !important;');
+    expect(MARTA_KARTE_MOBIL_CSS).toMatch(/\.sig-pille-link \{[^}]*width: 44px !important;[^}]*height: 44px !important;/);
+    expect(MARTA_KARTE_MOBIL_CSS).toContain('.sig-sterne-desktop { display: none !important; }');
+    expect(MARTA_KARTE_MOBIL_CSS).toMatch(/\.sig-sterne-mobil \{ display: block !important; max-height: none !important; overflow: visible !important; \}/);
+  });
+
+  it('Symbolbilder liegen als PNG 40×40 (2×) in project 3/public/images', () => {
+    for (const datei of ['mail-icon-whatsapp.png', 'mail-icon-telefon.png']) {
+      const png = readFileSync(join(__dirname, '..', '..', 'project 3', 'public', 'images', datei));
+      expect(png.subarray(1, 4).toString('ascii')).toBe('PNG');
+      expect(png.readUInt32BE(16)).toBe(40);
+      expect(png.readUInt32BE(20)).toBe(40);
+      expect(png[25]).toBe(6); // RGBA — transparenter Hintergrund
+    }
+  });
+});
+
 describe('martaKarteHtml — Vermittler', () => {
   const html = martaKarteHtml({ fuer: 'vermittler', siteUrl: SITE, presseLogos: true });
 
   it('keine Bewertungszeile', () => {
     expect(html).not.toContain('&#9733;');
     expect(html).not.toContain('erfahrungen');
+    expect(html).not.toContain('sig-sterne-');
   });
 
   it('keine Kunden-Konditionen in der Faktenzeile', () => {
@@ -137,11 +198,10 @@ describe('bewertungsSterneHtml', () => {
 });
 
 describe('MARTA_KARTE_MOBIL_CSS', () => {
-  it('enthält Siegel-Regeln aus #702 und den Umbruch der Knöpfe', () => {
+  it('enthält die Siegel-Regeln aus #702', () => {
     expect(MARTA_KARTE_MOBIL_CSS).toContain('.sig-siegel-welt { display: block !important; }');
     expect(MARTA_KARTE_MOBIL_CSS).toContain('.sig-siegel-bild { width: 48px !important; }');
     expect(MARTA_KARTE_MOBIL_CSS).toContain('.sig-siegel-innen { padding: 6px 8px !important; }');
-    expect(MARTA_KARTE_MOBIL_CSS).toContain('.sig-pille { display: inline-block !important; padding: 0 6px 6px 0 !important; }');
   });
 });
 
