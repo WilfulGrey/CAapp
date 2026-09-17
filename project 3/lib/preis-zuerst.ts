@@ -69,31 +69,41 @@ export function zuschussNamen(items: Array<{ name: string; label: string; in_kal
 
 /**
  * Die Preisseite. Wortlaut = Kostenkarte des Kundenportals (von Martin
- * freigegeben) — eine Wahrheit vor und hinter der Schranke. Testsieger steht
- * im grünen Kopf darüber, deshalb hier nicht noch einmal.
+ * freigegeben) — eine Wahrheit vor und hinter der Schranke.
+ *
+ * Runde 2 (Martin 17.09.: „selten so eine unruhige und schlechte Seite
+ * gesehen"): EIN Blickfang (der Preis), EINE Stütze (nach Zuschüssen), EIN
+ * Knopf — sonst nichts über der Falz. Keine Kästen im Kasten, keine zweite
+ * Siegel-Pille neben dem Siegel im Kopf, drei Schriftgrößen, Grün nur für die
+ * Ersparnis, Koralle nur für den Knopf. Garantie, Konditionen und
+ * Heimvergleich stehen ruhig und einspaltig UNTER dem Knopf.
  */
 export const PREIS_SEITE = {
-  label: 'Ihre Betreuungskosten',
+  // Satz der Portal-Kostenkarte; die Garantie hängt als Wort mit Link an
+  // („mit Bestpreisgarantie" = GARANTIE.vorsatz + GARANTIE.wort, wie im Kopf des Kontakt-Schritts).
   proMonat: 'im Monat',
-  inklusive: 'Inkl. Steuern, Gebühren und Sozialabgaben. Zzgl. Kost und Logis sowie Reisekosten (125 € pro Fahrt).',
-  nachZuschuessen: (eigen: number) => `Nach Zuschüssen ca. ${euro(eigen)} im Monat`,
-  eingerechnet: (namen: string) => (namen ? `${namen} eingerechnet.` : ''),
+  inklusive: 'Inkl. Steuern, Gebühren und Sozialabgaben.',
+  // „Mit Bestpreisgarantie." steht dazwischen — das Wort ist der Link zum Pop-up (GARANTIE.wort).
+  mitGarantie: 'Mit',
+  zuzueglich: 'Zzgl. Kost und Logis sowie Reisekosten (125 € pro Fahrt).',
+  zuschussLabel: 'Nach Zuschüssen',
+  zuschussWert: (eigen: number) => `ca. ${euro(eigen)}`,
+  eingerechnet: (namen: string) => (namen ? `${namen} eingerechnet` : ''),
+  // Derselbe Knopf wie am Ende der Kontaktabfrage (Martins Linie 11.09.: der
+  // Kunde klickt ein Versprechen, der letzte Knopf löst es ein). Kurz, damit
+  // er im Knopf Luft hat.
+  knopf: `Alle ${PORTAL_ANZAHL} Pflegekräfte ansehen\u00A0→`,
+  // Eine Zeile neben den Fotos — „ab sofort verfügbar" sagte schon die Warteseite.
+  unterKnopf: 'Passend zu Ihren Angaben',
+  garantieMehr: 'Mehr Infos',
+  haken: ['Täglich kündbar', 'Tagesgenaue Abrechnung', 'Erst auswählen, dann buchen', 'Keine Vermittlungsgebühr', 'Kosten erst, wenn die Pflegekraft da ist'],
   /** Nur wenn zuhause günstiger ist als das Heim — sonst kein Satz (kein Schönrechnen). */
   heim: (eigen: number): string | null => {
     const weniger = HEIM_EIGENANTEIL - eigen;
     if (weniger <= 0) return null;
-    return `Im Pflegeheim zahlen Sie im ersten Jahr durchschnittlich ${euro(HEIM_EIGENANTEIL)} im Monat selbst – zuhause rund ${euro(weniger)} weniger.`;
+    return `Zum Vergleich: Im Pflegeheim zahlen Sie im ersten Jahr durchschnittlich ${euro(HEIM_EIGENANTEIL)} im Monat selbst – zuhause rund ${euro(weniger)} weniger.`;
   },
   heimQuelle: 'Quelle: vdek-Auswertung, Stand 1. Juli 2026.',
-  garantieMehr: 'Mehr Infos',
-  haken: ['Täglich kündbar', 'Tagesgenaue Abrechnung', 'Erst auswählen, dann buchen', 'Keine Vermittlungsgebühr'],
-  kostenErst: 'Kosten erst, wenn die Pflegekraft da ist.',
-  kraefte: `${PORTAL_ANZAHL} passende Pflegekräfte – ab sofort verfügbar`,
-  // Martin: „wenn er speichern will und Pflegekräfte sehen, dann Button".
-  // „sichern" statt „speichern", damit der Knopf bei 375 px in eine Zeile passt (≤ 38 Zeichen).
-  knopf: 'Pflegekräfte ansehen & Preis sichern\u00A0→',
-  // Sagt ehrlich, was als Nächstes kommt — keine Überraschungs-Schranke.
-  unterKnopf: 'Dafür fragen wir im nächsten Schritt Ihre Kontaktdaten ab.',
 } as const;
 
 /**

@@ -49,7 +49,7 @@ describe('Zahlen der Preisseite', () => {
   });
   it('Heimvergleich nur, wenn zuhause günstiger ist — mit dem vdek-Wert des Portals', () => {
     expect(HEIM_EIGENANTEIL).toBe(3364);
-    expect(PREIS_SEITE.heim(1621.75)).toBe('Im Pflegeheim zahlen Sie im ersten Jahr durchschnittlich 3.364\u00A0€ im Monat selbst – zuhause rund 1.742\u00A0€ weniger.');
+    expect(PREIS_SEITE.heim(1621.75)).toBe('Zum Vergleich: Im Pflegeheim zahlen Sie im ersten Jahr durchschnittlich 3.364\u00A0€ im Monat selbst – zuhause rund 1.742\u00A0€ weniger.');
     expect(PREIS_SEITE.heim(3364)).toBeNull();
     expect(PREIS_SEITE.heim(3900)).toBeNull();
   });
@@ -63,16 +63,20 @@ describe('Zahlen der Preisseite', () => {
     expect(zuschussNamen(items)).toBe('Pflegegeld, Entlastungsbudget und Steuervorteil');
     expect(zuschussNamen([items[3]])).toBe('Steuervorteil');
     expect(zuschussNamen([])).toBe('');
-    expect(PREIS_SEITE.nachZuschuessen(1621.75)).toBe('Nach Zuschüssen ca. 1.622\u00A0€ im Monat');
+    expect(PREIS_SEITE.zuschussLabel).toBe('Nach Zuschüssen');
+    expect(PREIS_SEITE.zuschussWert(1621.75)).toBe('ca. 1.622\u00A0€');
   });
 });
 
 describe('Texte', () => {
-  it('Knöpfe passen in eine Zeile (≤ 38 Zeichen)', () => {
-    expect(PREIS_SEITE.knopf).toBe('Pflegekräfte ansehen & Preis sichern\u00A0→');
-    expect(PREIS_SEITE.knopf.length).toBeLessThanOrEqual(38);
-    expect(KONTAKT_NACH_PREIS.knopf).toBe('Alle 5 Pflegekräfte ansehen\u00A0→');
-    expect(KONTAKT_NACH_PREIS.knopf.length).toBeLessThanOrEqual(38);
+  it('ein Knopf, ein Versprechen: Preisseite und letzter Kontakt-Knopf tragen dieselben Worte, kurz genug für Luft im Knopf', () => {
+    expect(PREIS_SEITE.knopf).toBe('Alle 5 Pflegekräfte ansehen\u00A0→');
+    expect(KONTAKT_NACH_PREIS.knopf).toBe(PREIS_SEITE.knopf);
+    expect(PREIS_SEITE.knopf.length).toBeLessThanOrEqual(30);
+  });
+  it('ruhige Seite (Runde 2): höchstens eine Zeile unter dem Knopf, fünf gleichförmige Konditionen', () => {
+    expect(PREIS_SEITE.unterKnopf.length).toBeLessThanOrEqual(34);
+    expect(PREIS_SEITE.haken).toHaveLength(5);
   });
   it('hinter dem Preis verspricht der Kontakt nicht noch einmal den Preis', () => {
     expect(KONTAKT_NACH_PREIS.kopf(3050)).toBe('Ihr Preis: 3.050\u00A0€');
@@ -81,7 +85,7 @@ describe('Texte', () => {
     expect(KONTAKT_NACH_PREIS.textAlt).not.toMatch(/Preis sehen/);
   });
   it('kein Werbeanruf, kein Sofortangebot, kein „brauchen/benötigen", „ca." statt Tilde', () => {
-    const alles = JSON.stringify({ PREIS_SEITE, KONTAKT_NACH_PREIS }) + PREIS_SEITE.nachZuschuessen(1) + (PREIS_SEITE.heim(1) ?? '');
+    const alles = JSON.stringify({ PREIS_SEITE, KONTAKT_NACH_PREIS }) + PREIS_SEITE.zuschussWert(1) + (PREIS_SEITE.heim(1) ?? '');
     expect(alles).not.toMatch(/Werbeanruf/i);
     expect(alles).not.toMatch(/Sofortangebot/);
     expect(alles).not.toMatch(/brauchen|benötigen/);
