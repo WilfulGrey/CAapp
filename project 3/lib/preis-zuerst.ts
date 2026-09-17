@@ -99,6 +99,8 @@ export const PREIS_SEITE = {
   // Eine Zeile neben den Fotos — „ab sofort verfügbar" sagte schon die Warteseite.
   unterKnopf: 'Passend zu Ihren Angaben',
   garantieMehr: 'Mehr Infos',
+  // Dieselbe Angabe wie über den Kundenstimmen der Startseite (TestimonialCard) — keine neue Zahl.
+  bewertung: { quelle: 'Google Bewertungen', wert: '4,8 von 5' },
   haken: ['Täglich kündbar', 'Tagesgenaue Abrechnung', 'Erst auswählen, dann buchen', 'Keine Vermittlungsgebühr', 'Kosten erst, wenn die Pflegekraft da ist'],
   /** Nur wenn zuhause günstiger ist als das Heim — sonst kein Satz (kein Schönrechnen). */
   heim: (eigen: number): string | null => {
