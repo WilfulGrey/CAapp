@@ -11,7 +11,8 @@ import { useFormTracking } from "@/hooks/use-form-tracking";
 import { deutschBalken, GANZ_SICHTBAR, GARANTIE, kopfzeile, kraefteVorschauAktiv, kraftFakten, parseVorschau, PORTAL_ANZAHL, SCHRANKE, VERLAUF, WARTE, wuenscheAusAntworten, type VorschauKraft } from "@/lib/kraefte-vorschau";
 import { BestpreisDialog } from "@/components/calculator/BestpreisDialog";
 import { PreisSeite, type PreisDaten } from "@/components/calculator/PreisSeite";
-import { ablaufVariante, KONTAKT_NACH_PREIS, WARTE_KURZ_ENDE_MS, WARTE_KURZ_MS, type Ablauf } from "@/lib/preis-zuerst";
+import { KontaktSeite, KONTAKT_FELD_ID, type KontaktFeld } from "@/components/calculator/KontaktSeite";
+import { ablaufVariante, KONTAKT_NACH_PREIS, KONTAKT_SEITE, WARTE_KURZ_ENDE_MS, WARTE_KURZ_MS, type Ablauf } from "@/lib/preis-zuerst";
 import { GARANTIE_OEFFNEN_EVENT } from "@/components/calculator/BestpreisSiegelLink";
 import { zaehle } from "@/lib/zaehler";
 import { meldeAnfrage } from "@/lib/oaiq";
@@ -224,6 +225,9 @@ export function MultiStepForm({ mode = 'inline' }: MultiStepFormProps = {}) {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const preisDatenRef = useRef<any>(null);
   const preisLadenRef = useRef<Promise<void> | null>(null);
+  // Kontaktseite hinter dem Preis: Fehler je Feld (erst beim Klick geprüft) + Server-Fehler am Knopf.
+  const [kontaktFehler, setKontaktFehler] = useState<Record<KontaktFeld, string>>({ name: '', email: '', phone: '' });
+  const [kontaktServerFehler, setKontaktServerFehler] = useState('');
   const zaehlVariante = () => (vorschauAktivRef.current ? 'vorschau' : ablaufRef.current === 'preis' ? 'preis' : kontaktVarRef.current);
   const [kraefteVorschau, setKraefteVorschau] = useState<VorschauKraft[] | null>(null);
   // Schritt 9 im Vorschau-Modus: die Kontaktfelder öffnen sich erst nach dem
@@ -307,7 +311,8 @@ export function MultiStepForm({ mode = 'inline' }: MultiStepFormProps = {}) {
       const ab: Ablauf = an ? 'alt' : ablaufVariante(window.location.search, window.sessionStorage);
       ablaufRef.current = ab;
       setAblauf(ab);
-      const kv = kontaktVariante(window.location.search, window.sessionStorage, ab === 'preis' ? 'stufen' : 'alt');
+      // Kontakt = eine Seite; die drei Schritte nur mit ?kontakt=stufen (ihr Test kommt danach).
+      const kv = kontaktVariante(window.location.search, window.sessionStorage, 'alt');
       kontaktVarRef.current = kv;
       setKontaktVar(kv);
     } catch { /* sessionStorage gesperrt — Vorschau bleibt aus */ }
@@ -871,6 +876,36 @@ export function MultiStepForm({ mode = 'inline' }: MultiStepFormProps = {}) {
   };
 
   // Variante alt: ein Formular, ein Absenden, direkt ins Portal.
+  // Kontaktseite hinter dem Preis (Registry #77): Knopf nie grau — geprüft wird
+  // beim Klick, Fehler stehen am Feld, das erste fehlerhafte Feld bekommt den Fokus.
+  const kontaktSeiteAbsenden = async () => {
+    if (isSubmitting) return;
+    const f: Record<KontaktFeld, string> = {
+      name: formData.name.trim() ? '' : KONTAKT_SEITE.fehler.name,
+      email: !formData.email.trim() ? KONTAKT_SEITE.fehler.emailLeer : EMAIL_MUSTER.test(formData.email.trim()) ? '' : KONTAKT_SEITE.fehler.email,
+      phone: telefonFehler(formData.phone ?? ''),
+    };
+    setKontaktFehler(f);
+    setKontaktServerFehler('');
+    const erstes = (['name', 'email', 'phone'] as const).find((k) => f[k]);
+    if (erstes) { document.getElementById(KONTAKT_FELD_ID[erstes])?.focus(); return; }
+    zaehle('absenden_geklickt', zaehlVariante());
+    setIsSubmitting(true);
+    try {
+      const { data, kalkulation } = await erzeugeLead({ telefon: formData.phone, telefonSpaeter: false });
+      let weg = false;
+      const insPortal = () => { if (weg) return; weg = true; window.location.assign(data.portalUrl); };
+      meldeErfolg(data, kalkulation, insPortal);
+      setTimeout(insPortal, 900);
+      // Knopf bleibt bis zum Redirect gesperrt — kein zweiter Lead durch Doppelklick.
+    } catch (error) {
+      console.error('Error:', error);
+      zaehle('absenden_fehler', zaehlVariante());
+      setKontaktServerFehler(KONTAKT_SEITE.fehler.speichern);
+      setIsSubmitting(false);
+    }
+  };
+
   const handleSubmit = async () => {
     if (!validateForm()) {
       return;
@@ -1748,6 +1783,21 @@ export function MultiStepForm({ mode = 'inline' }: MultiStepFormProps = {}) {
                     /* Preis zuerst (Registry #77): Preis, Zuschüsse, Garantie,
                        Konditionen, Kräfte — dann der Knopf zur Kontaktabfrage. */
                     <PreisSeite daten={preisDaten} onWeiter={oeffneKontaktNachPreis} onGarantie={oeffneGarantie} />
+                  ) : preisModus && kontaktOffen && !stufenAktiv ? (
+                    /* Kontaktseite hinter dem Preis: eine Seite, drei Felder, ein Knopf. */
+                    <KontaktSeite
+                      werte={{ name: formData.name, email: formData.email, phone: formData.phone }}
+                      fehler={kontaktFehler}
+                      serverFehler={kontaktServerFehler}
+                      sendet={isSubmitting}
+                      onAendern={(feld, wert) => {
+                        setFormData({ ...formData, [feld]: feld === 'phone' ? telefonBereinigen(wert) : wert });
+                        if (kontaktFehler[feld]) setKontaktFehler({ ...kontaktFehler, [feld]: '' });
+                      }}
+                      onAbsenden={() => { void kontaktSeiteAbsenden(); }}
+                      onFokus={(feld) => trackFieldFocus(feld)}
+                      onBlur={(feld) => trackFieldBlur(feld)}
+                    />
                   ) : (
                     <>
                       {/* V7 (Martin, 2026-07-08): Der Preiskasten ist die 1:1-Kopie
@@ -1794,14 +1844,14 @@ export function MultiStepForm({ mode = 'inline' }: MultiStepFormProps = {}) {
                           </>
                         ) : (
                           <>
-                            <p className="text-[19px] font-bold leading-snug text-[#1a1a1a]">{preisModus ? KONTAKT_NACH_PREIS.frageAlt : SCHRANKE.frage}</p>
-                            <p className="text-[15px] leading-snug text-[#555] mt-1">{preisModus ? KONTAKT_NACH_PREIS.textAlt : SCHRANKE.text}</p>
+                            <p className="text-[19px] font-bold leading-snug text-[#1a1a1a]">{SCHRANKE.frage}</p>
+                            <p className="text-[15px] leading-snug text-[#555] mt-1">{SCHRANKE.text}</p>
                           </>
                         )}
                       </div>
                     </>
                   )}
-                  {preisModus && !kontaktOffen ? null : stufenAktiv ? (
+                  {preisModus && !(kontaktOffen && stufenAktiv) ? null : stufenAktiv ? (
                     /* Kontakt in drei Schritten (Registry #76): ein Feld je
                        Schritt, echtes <form>, damit Enter/„Weiter" der Tastatur
                        absendet; Fehler inline am Feld, Knopf nie grau. */
@@ -1961,7 +2011,7 @@ export function MultiStepForm({ mode = 'inline' }: MultiStepFormProps = {}) {
         {/* Bottom-Button-Block: auf Step 1 komplett ausgeblendet (kein
             Zurück, Auto-Advance kümmert sich um Weiter), Steps 2-9 zeigen
             nur Zurück, Step 10 zeigt den Submit-Button mit Hinweis. */}
-        {currentStep > 1 && !(currentStep === totalSteps && ergebnisModus && !kontaktOffen) && !(currentStep === totalSteps && stufenAktiv) && (
+        {currentStep > 1 && !(currentStep === totalSteps && ergebnisModus && !kontaktOffen) && !(currentStep === totalSteps && stufenAktiv) && !(currentStep === totalSteps && preisModus) && (
           // Nur-Zurück-Zeile eng an die Antworten (Martin 11.09.: „zurück hat
           // zu viel Luft"); der Absendeblock behält seinen Abstand.
           <div className={`px-3 sm:px-6 lg:px-8 bg-white ${currentStep === totalSteps && (!ergebnisModus || kontaktOffen) ? 'pt-4 pb-5' : 'pt-0 pb-3'}`}>
@@ -1988,7 +2038,7 @@ export function MultiStepForm({ mode = 'inline' }: MultiStepFormProps = {}) {
                       <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
                     </div>
                   ) : (
-                    <span className={vorschauModus ? 'whitespace-nowrap text-[15px]' : undefined}>{vorschauModus ? SCHRANKE.knopf : preisModus ? KONTAKT_NACH_PREIS.knopf : KNOPF_KONTAKT}</span>
+                    <span className={vorschauModus ? 'whitespace-nowrap text-[15px]' : undefined}>{vorschauModus ? SCHRANKE.knopf : KNOPF_KONTAKT}</span>
                   )}
                 </button>
                 <p className="text-center text-xs text-[#8B8B8B] leading-snug">

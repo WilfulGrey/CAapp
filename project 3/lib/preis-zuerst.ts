@@ -10,11 +10,14 @@
  * Versprechen „Preis", das Anzeige, Seite und Rechner geben.
  *
  * Ablauf `preis`: 8 Fragen → kurze Warteseite (ca. 3 s statt 11) → PREISSEITE
- * (Preis, Zuschüsse, Heimvergleich, Garantie, Konditionen, Kräfte) → Knopf →
- * Kontakt (drei Schritte aus Registry #76; `?kontakt=alt` = heutiges
- * Formular) → Portal. Ablauf `alt` = heute. 50/50 je Sitzung, klebrig,
- * `?ablauf=preis|alt` erzwingt. Pur (kein React/Next) — Root-Vitest
- * importiert es direkt.
+ * → Knopf → KONTAKTSEITE (eine Seite, alle drei Angaben) → Portal.
+ *
+ * Martin 17.09. mittags: „lass alle auf neu machen und erst dann auf
+ * 3-Step-Kontakt" / „Preis und erst dann alle Daten" — also KEIN 50/50:
+ * jeder Besucher läuft `preis`; `?ablauf=alt` zeigt den alten Weg (Vergleich,
+ * Notausgang). Die drei Kontaktschritte (Registry #76) bleiben im Code und
+ * sind mit `?kontakt=stufen` zu sehen — ihr Test kommt danach. Pur (kein
+ * React/Next) — Root-Vitest importiert es direkt.
  */
 import { PORTAL_ANZAHL } from './kraefte-vorschau';
 
@@ -23,14 +26,13 @@ export const ABLAUF_VARIANTEN = ['preis', 'alt'] as const;
 export type Ablauf = (typeof ABLAUF_VARIANTEN)[number];
 
 /**
- * Welchen Ablauf der Besucher sieht. Nur im Browser nach dem Mount rufen
- * (useEffect) — beim Rendern liefen Server und Client auseinander.
- * Bei gesperrtem Storage (Safari privat) zählt der Parameter, sonst `alt`.
+ * Welchen Ablauf der Besucher sieht: `preis` für alle; `?ablauf=alt|preis`
+ * erzwingt und klebt je Sitzung. Nur im Browser nach dem Mount rufen
+ * (useEffect). Bei gesperrtem Storage (Safari privat) zählt der Parameter.
  */
 export function ablaufVariante(
   search: string,
   storage: Pick<Storage, 'getItem' | 'setItem'> | null,
-  wuerfel: () => number = Math.random,
 ): Ablauf {
   let q: string | null = null;
   try { q = new URLSearchParams(search).get('ablauf'); } catch { q = null; }
@@ -39,11 +41,9 @@ export function ablaufVariante(
     if (erzwungen) { storage?.setItem(ABLAUF_KEY, erzwungen); return erzwungen; }
     const gemerkt = storage?.getItem(ABLAUF_KEY);
     if (gemerkt === 'preis' || gemerkt === 'alt') return gemerkt;
-    const neu: Ablauf = wuerfel() < 0.5 ? 'preis' : 'alt';
-    storage?.setItem(ABLAUF_KEY, neu);
-    return neu;
+    return 'preis';
   } catch {
-    return erzwungen ?? 'alt';
+    return erzwungen ?? 'preis';
   }
 }
 
@@ -111,16 +111,43 @@ export const PREIS_SEITE = {
 
 /**
  * Kontakt HINTER dem Preis: der Kunde kennt den Preis schon, also verspricht
- * hier nichts mehr den Preis — der Lohn sind die Pflegekräfte und das Portal.
+ * hier nichts mehr den Preis — der Lohn sind die Pflegekräfte.
  */
 export const KONTAKT_NACH_PREIS = {
   // Kurz, damit der grüne Kopf auf dem Handy einzeilig bleibt („im Monat" stand auf der Preisseite).
   kopf: (brutto: number) => `Ihr Preis: ${euro(brutto)}`,
+  // Nur für `?kontakt=stufen` (drei Schritte, Test kommt später):
   emailText: 'Ihre Berechnung und den Zugang zu Ihren Pflegekräften erhalten Sie per E-Mail.',
   knopf: KNOPF_PREIS,
-  // Nur für `?kontakt=alt` (heutiges Drei-Felder-Formular hinter dem Preis):
-  frageAlt: 'Für wen dürfen wir Ihr Kundenportal einrichten?',
-  textAlt: `Dort sehen Sie alle ${PORTAL_ANZAHL} Pflegekräfte und Ihre Berechnung.`,
+} as const;
+
+/**
+ * Die Kontaktseite hinter dem Preis (Martin 17.09.: „Diese Seite müssen wir
+ * schön machen, damit das auch gut konvertiert"). Dieselbe ruhige Sprache wie
+ * die Preisseite: eine Frage, eine Zeile Lohn (Fotos + Satz), drei Felder mit
+ * sichtbaren Beschriftungen, ein Knopf, darunter nur der Datenschutz-Satz.
+ * Die Frage nimmt den Knopf auf, den der Kunde gerade geklickt hat
+ * („Speichern …") und folgt Martins Muster vom 12.09. („Für wen dürfen wir …?").
+ * Kein „Portal", kein „Fast geschafft", kein „brauchen".
+ */
+export const KONTAKT_SEITE = {
+  frage: 'Für wen dürfen wir Ihre Preisberechnung speichern?',
+  lohn: `Danach sehen Sie sofort Ihre ${PORTAL_ANZAHL} Pflegekräfte.`,
+  label: { name: 'Ihr Name', email: 'E-Mail-Adresse', phone: 'Telefonnummer' },
+  platzhalterTelefon: 'z. B. 0170 1234567',
+  // Martins Wortlaut (17.09., Portal-Profil): sagen, WANN wir anrufen.
+  telefonHinweis: 'Nur bei Rückfragen oder wenn etwas dringend geklärt werden muss.',
+  knopf: KNOPF_PREIS,
+  sendet: 'Wird gespeichert …',
+  datenschutzVor: 'Mit dem Absenden stimmen Sie unserer',
+  datenschutzLink: 'Datenschutzerklärung',
+  datenschutzNach: 'zu.',
+  fehler: {
+    name: 'Bitte geben Sie Ihren Namen ein',
+    emailLeer: 'Bitte geben Sie Ihre E-Mail-Adresse ein',
+    email: 'Bitte geben Sie eine gültige E-Mail-Adresse ein',
+    speichern: 'Das hat leider nicht geklappt. Bitte versuchen Sie es noch einmal.',
+  },
 } as const;
 
 /** Warteseite im Ablauf `preis`: ca. 3 s statt 10,7 s — die Preisberechnung braucht ca. 1 s, der Moment lässt den Preis individuell wirken. */

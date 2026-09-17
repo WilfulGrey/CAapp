@@ -5,6 +5,7 @@ import {
   euro,
   HEIM_EIGENANTEIL,
   KONTAKT_NACH_PREIS,
+  KONTAKT_SEITE,
   PREIS_SEITE,
   WARTE_KURZ_ENDE_MS,
   WARTE_KURZ_MS,
@@ -19,25 +20,26 @@ function speicher(vorbelegt: Record<string, string> = {}) {
 }
 
 describe('ablaufVariante', () => {
-  it('würfelt 50/50 und merkt sich das Ergebnis je Sitzung', () => {
+  it('alle laufen den neuen Weg — kein Würfel (Martin 17.09.: „lass alle auf neu machen")', () => {
     const s = speicher();
-    expect(ablaufVariante('', s, () => 0.2)).toBe('preis');
-    expect(s.m.get(ABLAUF_KEY)).toBe('preis');
-    expect(ablaufVariante('', s, () => 0.9)).toBe('preis');
-    expect(ablaufVariante('', speicher(), () => 0.7)).toBe('alt');
+    expect(ablaufVariante('', s)).toBe('preis');
+    expect(ablaufVariante('?start=1', s)).toBe('preis');
+    // der Standard wird nicht gemerkt — nur Erzwungenes klebt
+    expect(s.m.has(ABLAUF_KEY)).toBe(false);
   });
-  it('?ablauf= erzwingt und überschreibt das Gemerkte', () => {
-    const s = speicher({ [ABLAUF_KEY]: 'alt' });
-    expect(ablaufVariante('?start=1&ablauf=preis', s)).toBe('preis');
-    expect(s.m.get(ABLAUF_KEY)).toBe('preis');
-    expect(ablaufVariante('?ablauf=alt', s)).toBe('alt');
-    expect(ablaufVariante('?ablauf=quatsch', speicher({ [ABLAUF_KEY]: 'preis' }))).toBe('preis');
+  it('?ablauf=alt zeigt den alten Weg und klebt je Sitzung; ?ablauf=preis holt zurück', () => {
+    const s = speicher();
+    expect(ablaufVariante('?start=1&ablauf=alt', s)).toBe('alt');
+    expect(s.m.get(ABLAUF_KEY)).toBe('alt');
+    expect(ablaufVariante('', s)).toBe('alt');
+    expect(ablaufVariante('?ablauf=preis', s)).toBe('preis');
+    expect(ablaufVariante('?ablauf=quatsch', speicher())).toBe('preis');
   });
-  it('ohne Storage (Safari privat) zählt nur der Parameter, sonst der heutige Weg', () => {
+  it('ohne Storage (Safari privat) zählt der Parameter, sonst der neue Weg', () => {
     const kaputt = { getItem: () => { throw new Error('gesperrt'); }, setItem: () => { throw new Error('gesperrt'); } };
-    expect(ablaufVariante('?ablauf=preis', kaputt)).toBe('preis');
-    expect(ablaufVariante('', kaputt, () => 0.1)).toBe('alt');
-    expect(ablaufVariante('', null, () => 0.1)).toBe('preis');
+    expect(ablaufVariante('?ablauf=alt', kaputt)).toBe('alt');
+    expect(ablaufVariante('', kaputt)).toBe('preis');
+    expect(ablaufVariante('', null)).toBe('preis');
   });
 });
 
@@ -81,14 +83,21 @@ describe('Texte', () => {
   it('hinter dem Preis verspricht der Kontakt nicht noch einmal den Preis', () => {
     expect(KONTAKT_NACH_PREIS.kopf(3050)).toBe('Ihr Preis: 3.050\u00A0€');
     expect(KONTAKT_NACH_PREIS.emailText).not.toMatch(/sehen Sie gleich/);
-    expect(KONTAKT_NACH_PREIS.textAlt).not.toMatch(/Preis sehen/);
   });
   it('kein Werbeanruf, kein Sofortangebot, kein „brauchen/benötigen", „ca." statt Tilde', () => {
-    const alles = JSON.stringify({ PREIS_SEITE, KONTAKT_NACH_PREIS }) + PREIS_SEITE.zuschussWert(1) + (PREIS_SEITE.heim(1) ?? '');
+    const alles = JSON.stringify({ PREIS_SEITE, KONTAKT_NACH_PREIS, KONTAKT_SEITE }) + PREIS_SEITE.zuschussWert(1) + (PREIS_SEITE.heim(1) ?? '');
     expect(alles).not.toMatch(/Werbeanruf/i);
     expect(alles).not.toMatch(/Sofortangebot/);
     expect(alles).not.toMatch(/brauchen|benötigen/);
     expect(alles).not.toMatch(/~/);
+  });
+  it('Kontaktseite: nimmt den geklickten Knopf auf, ein Knopf mit denselben Worten, kein „Portal", Martins Telefon-Satz', () => {
+    expect(KONTAKT_SEITE.frage).toBe('Für wen dürfen wir Ihre Preisberechnung speichern?');
+    expect(KONTAKT_SEITE.knopf).toBe(PREIS_SEITE.knopf);
+    expect(KONTAKT_SEITE.lohn).toMatch(/5 Pflegekräfte/);
+    expect(KONTAKT_SEITE.telefonHinweis).toBe('Nur bei Rückfragen oder wenn etwas dringend geklärt werden muss.');
+    expect(JSON.stringify(KONTAKT_SEITE)).not.toMatch(/Portal|Fast geschafft|Nur noch/);
+    expect(Object.keys(KONTAKT_SEITE.label)).toEqual(['name', 'email', 'phone']);
   });
   it('Warteseite im Ablauf Preis: ca. 3 s statt 10,7 s', () => {
     const gesamt = WARTE_KURZ_MS.reduce((a, b) => a + b, 0) + 300 + WARTE_KURZ_ENDE_MS;
