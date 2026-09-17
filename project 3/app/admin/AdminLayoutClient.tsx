@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
-import { LayoutDashboard, Users, Euro, Gift, LogOut, ChartBar as BarChart3, MessageSquare, Receipt, ExternalLink, ChevronDown, TrendingUp, Wallet } from 'lucide-react';
+import { LayoutDashboard, Users, Euro, Gift, LogOut, ChartBar as BarChart3, MessageSquare, Receipt, ExternalLink, ChevronDown, TrendingUp, Wallet, Star } from 'lucide-react';
 
 export default function AdminLayoutClient({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
@@ -20,6 +20,7 @@ export default function AdminLayoutClient({ children }: { children: React.ReactN
   ];
   const weitereItems = [
     { href: '/admin/wachstum', label: 'Wachstum', icon: TrendingUp },
+    { href: '/admin/bewertungen', label: 'Bewertungen', icon: Star },
     { href: '/admin/ergebnis', label: 'Ergebnis', icon: Wallet },
     { href: '/admin/analytics', label: 'Analytics', icon: BarChart3 },
     { href: '/admin/kosten', label: 'Kosten', icon: Receipt },
