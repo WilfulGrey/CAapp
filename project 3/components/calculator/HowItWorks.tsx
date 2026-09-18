@@ -27,10 +27,12 @@ export function HowItWorks() {
             </div>
             <div className="pt-0.5 md:pt-5 flex-1">
               <h3 className="font-bold text-[17px] md:text-[18px] lg:text-[20px] mb-1.5 md:mb-2.5 text-[#3D3D3D] leading-snug">
-                Sofort Angebot und Pflegekräfte einsehen
+                Preis sofort sehen
               </h3>
+              {/* Seit „Preis zuerst" (17.09.2026 13:05): erst der Preis ohne Kontaktdaten, dann Speichern + Pflegekräfte.
+                  Wortlaut wie auf primundus.de (Startseite, Martin 18.09.). */}
               <p className="text-[16px] leading-[1.55] text-[#5A5A5A] mb-2.5">
-                Sie machen wenige preisrelevante Angaben und hinterlassen für die Kopie des Angebots Ihre Kontaktdaten. Sofort danach sehen Sie Ihr Angebot samt Zuschüssen und Steuervorteilen sowie die passenden Pflegekräfte — die Kopie kommt zusätzlich per E-Mail.
+                Sie beantworten ein paar kurze Fragen zur Pflegesituation und sehen sofort Ihren Monatspreis, auch was nach Zuschüssen bleibt. Ihre Kontaktdaten brauchen wir dafür noch nicht.
               </p>
               <span className="inline-flex items-center gap-1.5 bg-[#E8F5E9] text-[#2E7D32] px-3 py-1.5 rounded-lg text-xs font-semibold">
                 <Clock className="w-3.5 h-3.5" strokeWidth={2} />
@@ -51,10 +53,10 @@ export function HowItWorks() {
             </div>
             <div className="pt-0.5 md:pt-5 flex-1">
               <h3 className="font-bold text-[17px] md:text-[18px] lg:text-[20px] mb-1.5 md:mb-2.5 text-[#3D3D3D] leading-snug">
-                Profil vervollständigen — Bewerbungen erhalten
+                Pflegekräfte ansehen — Bewerbungen erhalten
               </h3>
               <p className="text-[16px] leading-[1.55] text-[#5A5A5A] mb-2.5">
-                Passt das für Sie, ergänzen Sie die Angaben zu Ihrem Angehörigen. Dann bewerben sich Pflegekräfte bei Ihnen — mit Foto, Erfahrung und Verfügbarkeit.
+                Mit Ihren Kontaktdaten speichern Sie die Berechnung und sehen sofort passende Pflegekräfte. Ergänzen Sie danach die Angaben zu Ihrem Angehörigen, dann bewerben sich Pflegekräfte bei Ihnen — mit Foto, Erfahrung und Verfügbarkeit.
               </p>
               <span className="inline-flex items-center gap-1.5 bg-[#E8F5E9] text-[#2E7D32] px-3 py-1.5 rounded-lg text-xs font-semibold">
                 <Check className="w-3.5 h-3.5" strokeWidth={2.5} />
