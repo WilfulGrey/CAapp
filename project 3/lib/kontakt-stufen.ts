@@ -7,11 +7,15 @@
  * einfach macht" — und: den Lead schon mit Name + E-Mail speichern, die
  * Preis-Mail auch ohne Nummer schicken, die Nummer danach erfragen.
  *
- * Seit Registry #77 (17.09.) würfelt dieses Modul nicht mehr selbst: EIN
- * Test, der Ablauf (`lib/preis-zuerst.ts`: `preis` gegen `alt`). Die drei
- * Schritte sind das Kontaktformular HINTER dem Preis; im Ablauf `alt` bleibt
- * das heutige Formular. `?kontakt=stufen` bzw. `?kontakt=alt` erzwingt die
- * Form unabhängig vom Ablauf (Abnahme, Vergleich) und klebt je Sitzung.
+ * Der EINE Test seit dem 19.09.2026 (Registry #80, Martin: „die alte Seite mit
+ * angepasster Wartezeit und dann nur einen Test mit dem 3-Step-Kontakt"): im
+ * Ablauf `alt` (kein Preis vor dem Kontakt) sehen `anteilStufen` der Besucher
+ * die drei Schritte, der Rest das alte Formular. Das Los fällt einmal und klebt
+ * 30 Tage (localStorage `prim_kontakt_los`), damit ein Wiederkehrer denselben
+ * Arm sieht; es wird nur gelesen, solange der Test läuft. Hinter der Preisseite
+ * (`?ablauf=preis`) bleibt die eine Kontaktseite. `?kontakt=stufen` bzw.
+ * `?kontakt=seite` (auch `alt`) erzwingt die Form (sessionStorage, klebt je
+ * Sitzung) und schlägt das Los. `KONTAKT_TEST.aktiv = false` beendet den Test.
  * Pur (kein React/Next) — Root-Vitest importiert es direkt.
  */
 
@@ -25,29 +29,70 @@ export type KontaktVariante = (typeof KONTAKT_VARIANTEN)[number];
 export const KONTAKT_STUFEN = ['name', 'email', 'telefon'] as const;
 export type KontaktStufe = (typeof KONTAKT_STUFEN)[number];
 
+/** Der Kontakt-Test: `aktiv: false` = alle sehen das alte Formular (eine Zeile + Merge). */
+export const KONTAKT_TEST = { aktiv: true, anteilStufen: 0.5 } as const;
+export type KontaktTest = { readonly aktiv: boolean; readonly anteilStufen: number };
+/** Das Los (localStorage): `{ v: 'stufen'|'alt', t: <ms> }`, gültig 30 Tage. */
+export const LOS_KEY = 'prim_kontakt_los';
+export const LOS_TAGE = 30;
+type Speicher = Pick<Storage, 'getItem' | 'setItem'>;
+
+/**
+ * Was `kontaktVariante` ohne Zwang liefert: im Ablauf `alt` das Los (solange der
+ * Test läuft), hinter der Preisseite die eine Seite (`alt` = `KontaktSeite.tsx`).
+ */
+export function kontaktStandard(ablauf: 'preis' | 'alt', test: KontaktTest = KONTAKT_TEST): KontaktVariante | 'wuerfeln' {
+  return ablauf === 'alt' && test.aktiv ? 'wuerfeln' : 'alt';
+}
+
+/** Das gemerkte Los, wenn es gültig ist — sonst null. */
+function gemerktesLos(los: Speicher | null, jetzt: number): KontaktVariante | null {
+  try {
+    const roh = los?.getItem(LOS_KEY);
+    if (!roh) return null;
+    const { v, t } = JSON.parse(roh) as { v?: unknown; t?: unknown };
+    if ((v !== 'stufen' && v !== 'alt') || typeof t !== 'number') return null;
+    return jetzt - t <= LOS_TAGE * 24 * 60 * 60 * 1000 ? v : null;
+  } catch {
+    return null;
+  }
+}
+
 /**
  * Welche Kontaktform der Besucher sieht. Nur im Browser nach dem Mount rufen
  * (useEffect) — beim Rendern würde Server und Client auseinanderlaufen.
- * Erzwungen (`?kontakt=…`, klebt je Sitzung) schlägt gemerkt schlägt
- * `standard` (den gibt der Ablauf vor: `preis` → `stufen`, `alt` → `alt`).
- * Der Standard wird NICHT gemerkt — er soll dem Ablauf folgen.
+ * Reihenfolge: erzwungen (`?kontakt=…`, in `storage` gemerkt, klebt je Sitzung)
+ * → in dieser Sitzung erzwungen → gültiges Los (`los`, 30 Tage; nur wenn
+ * `standard === 'wuerfeln'`) → neues Los (wird gemerkt) → feste Vorgabe.
+ * Ohne Los-Speicher fällt das Los auf `alt` — ein Los, das nicht klebt, fiele
+ * bei jedem Aufruf neu. Eine feste Vorgabe wird nie gemerkt.
  */
 export function kontaktVariante(
   search: string,
-  storage: Pick<Storage, 'getItem' | 'setItem'> | null,
-  standard: KontaktVariante = 'alt',
+  storage: Speicher | null,
+  standard: KontaktVariante | 'wuerfeln' = 'alt',
+  zufall: () => number = Math.random,
+  los: Speicher | null = storage,
+  jetzt: number = Date.now(),
+  test: KontaktTest = KONTAKT_TEST,
 ): KontaktVariante {
   let q: string | null = null;
   try { q = new URLSearchParams(search).get('kontakt'); } catch { q = null; }
-  const erzwungen = q === 'stufen' || q === 'alt' ? q : null;
+  const erzwungen: KontaktVariante | null = q === 'stufen' ? 'stufen' : q === 'alt' || q === 'seite' ? 'alt' : null;
+  const fest: KontaktVariante = standard === 'wuerfeln' ? 'alt' : standard;
   try {
     if (erzwungen) { storage?.setItem(KONTAKT_KEY, erzwungen); return erzwungen; }
     const gemerkt = storage?.getItem(KONTAKT_KEY);
     if (gemerkt === 'stufen' || gemerkt === 'alt') return gemerkt;
-    return standard;
   } catch {
-    return erzwungen ?? standard;
+    return erzwungen ?? fest;
   }
+  if (standard !== 'wuerfeln' || !los) return fest;
+  const alt = gemerktesLos(los, jetzt);
+  if (alt) return alt;
+  const neu: KontaktVariante = zufall() < test.anteilStufen ? 'stufen' : 'alt';
+  try { los.setItem(LOS_KEY, JSON.stringify({ v: neu, t: jetzt })); } catch { return 'alt'; }
+  return neu;
 }
 
 /** Der Knopf des heutigen Formulars (Variante `alt`) — wortgleich mit dem Trunk, damit die Kontrolle unverändert bleibt. */

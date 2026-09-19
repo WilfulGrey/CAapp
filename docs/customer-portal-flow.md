@@ -230,20 +230,24 @@ Content-Type: application/json
 
 ### Preis zuerst (Registry #77, 2026-09-17)
 
-Ablauf `preis` (für ALLE Besucher seit Martins Entscheidung vom 17.09.; `?ablauf=alt` zeigt den alten Weg, `project 3/lib/preis-zuerst.ts`):
+Ablauf `preis` (für ALLE Besucher vom 17.09. 13:05 bis zum 19.09. — seitdem AUS (Registry #80): `ABLAUF_STANDARD = 'alt'`,
+die Preisseite ist nur noch per `?ablauf=preis` erreichbar (klebt je Sitzung); `project 3/lib/preis-zuerst.ts`):
 Nach der letzten Frage lädt der Rechner die Kalkulation (`POST /api/kalkulation-berechnen`, ohne
 `sessionId` — die Route schreibt dann nichts), die Warteseite dauert ca. 3 s, danach steht in
 Schritt 9 die **Preisseite** (`components/calculator/PreisSeite.tsx`): Preis, Bestpreisgarantie,
 „Nach Zuschüssen ca. …", Heimvergleich, Kräfte-Fotos, Knopf zur Kontaktabfrage, darunter die
 Konditionen. Erst der Knopf öffnet den Kontakt — EINE Seite (`components/calculator/KontaktSeite.tsx`:
-Name, E-Mail, Telefon; Knopf nie grau, Fehler am Feld), mit `?kontakt=stufen` die drei Schritte (unten; ihr Test kommt später). Der Lead trägt die Kalkulation der Preisseite (kein
-zweiter Rechenlauf); das Event `kontakt_variante` trägt zusätzlich `ablauf`. Scheitert die
-Berechnung, entfällt die Preisseite und der Besucher läuft den heutigen Weg. Anonyme Zähler:
+Name, E-Mail, Telefon; Knopf nie grau, Fehler am Feld); `?kontakt=stufen|seite` erzwingt die Form
+unabhängig vom Ablauf. Der Lead trägt die Kalkulation der Preisseite (kein zweiter Rechenlauf); das
+Event `kontakt_variante` trägt zusätzlich `ablauf` (so lassen sich Anfragen je Arm zählen). Scheitert
+die Berechnung, entfällt die Preisseite und der Besucher läuft den alten Weg. Anonyme Zähler:
 `schritt_9` = Preisseite gesehen, `kontakt_geoeffnet`, `preis_fehler`, Variante `preis`.
 
 ### Kontakt in drei Schritten (Registry #76, 2026-09-16)
 
-Variante `stufen` (50/50 je Sitzung, `?kontakt=stufen|alt` erzwingt, `project 3/lib/kontakt-stufen.ts`):
+Variante `stufen` (`project 3/lib/kontakt-stufen.ts`; seit dem 19.09. der EINE Test, Registry #80: im Ablauf `alt`
+50/50 je Besucher gegen das alte Formular, Los klebt 30 Tage in localStorage `prim_kontakt_los`, Warteseite in beiden
+Armen kurz; `?kontakt=stufen|alt|seite` erzwingt je Sitzung; `KONTAKT_TEST.aktiv = false` beendet den Test):
 Schritt 9 fragt Name → E-Mail → Telefon einzeln. Nach der E-Mail ruft der Rechner
 `POST /api/angebot-anfordern` mit `telefonSpaeter: true` und OHNE `telefon` — die Route
 legt den Lead an (Spalte `telefon` NULL), plant Mail 1 wie sonst (delay 0 + flush), schickt
