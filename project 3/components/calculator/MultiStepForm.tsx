@@ -191,9 +191,15 @@ interface MultiStepFormProps {
   mode?: 'inline' | 'cta';
   /** Bewertungsstand der Startseite (server-seitig geladen) — die Preisseite zeigt dieselbe Sterne-Zeile. */
   bewertung?: SterneStand | null;
+  /** Text des Knopfs im Modus 'cta' (Landingpage /wechsel, Registry #81). */
+  knopf?: string;
+  /** Fester Ablauf statt Los (Landingpage /wechsel: immer Preis zuerst) — nicht gemerkt, gilt nur auf dieser Seite. */
+  ablaufFest?: Ablauf;
+  /** Eigener Zähler-Name, damit eine Landingpage die Arme des Ablauf-Tests nicht verfälscht. */
+  zaehlerVariante?: 'wechsel';
 }
 
-export function MultiStepForm({ mode = 'inline', bewertung = null }: MultiStepFormProps = {}) {
+export function MultiStepForm({ mode = 'inline', bewertung = null, knopf, ablaufFest, zaehlerVariante }: MultiStepFormProps = {}) {
   const { state, updateState, calculate } = useCalculator();
   const [currentStep, setCurrentStep] = useState(1);
   const [fullscreen, setFullscreen] = useState(false);
@@ -233,7 +239,7 @@ export function MultiStepForm({ mode = 'inline', bewertung = null }: MultiStepFo
   const [kontaktFehler, setKontaktFehler] = useState<Record<KontaktFeld, string>>({ name: '', email: '', phone: '' });
   const [kontaktServerFehler, setKontaktServerFehler] = useState('');
   // Ablauf-Test (Registry #80): `preis` = Preisseite vor dem Kontakt, `stufen` = kein Preis, drei Kontaktschritte.
-  const zaehlVariante = () => (vorschauAktivRef.current ? 'vorschau' : ablaufRef.current === 'preis' ? 'preis' : kontaktVarRef.current);
+  const zaehlVariante = () => (zaehlerVariante ?? (vorschauAktivRef.current ? 'vorschau' : ablaufRef.current === 'preis' ? 'preis' : kontaktVarRef.current));
   const [kraefteVorschau, setKraefteVorschau] = useState<VorschauKraft[] | null>(null);
   // Schritt 9 im Vorschau-Modus: die Kontaktfelder öffnen sich erst nach dem
   // Knopf „Preis & Profile freischalten" (Martin, 10.09.). Ref für Payload/Redirect.
@@ -283,7 +289,7 @@ export function MultiStepForm({ mode = 'inline', bewertung = null }: MultiStepFo
     kontaktOffenRef.current = true;
     setKontaktOffen(true);
     analytics.trackEvent('wizard', 'preis_weiter', {});
-    zaehle('kontakt_geoeffnet', 'preis');
+    zaehle('kontakt_geoeffnet', zaehlerVariante ?? 'preis');
     setTimeout(() => {
       document.querySelector('[data-calculator-card]')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
       document.getElementById('kontakt-name')?.focus({ preventScroll: true });
@@ -314,7 +320,7 @@ export function MultiStepForm({ mode = 'inline', bewertung = null }: MultiStepFo
       setVorschauAktiv(an);
       // Die Karten-Seite (?kraefte=1) bleibt beim heutigen Weg — keine Kreuzung der Tests.
       // Sonst fällt hier das Los des Ablauf-Tests (Registry #80), einmal je Sitzung.
-      const ab: Ablauf = an ? 'alt' : ablaufVariante(window.location.search, window.sessionStorage);
+      const ab: Ablauf = an ? 'alt' : ablaufFest ?? ablaufVariante(window.location.search, window.sessionStorage);
       ablaufRef.current = ab;
       setAblauf(ab);
       // Der Ablauf gibt die Kontaktform vor: ohne Preis die drei Schritte, hinter der Preisseite
@@ -749,7 +755,7 @@ export function MultiStepForm({ mode = 'inline', bewertung = null }: MultiStepFo
   // Preisseite gesehen: anonym zählen (einmal je Seitenaufruf) + Ereignis mit Einwilligung.
   useEffect(() => {
     if (currentStep !== totalSteps || !preisModus || kontaktOffen) return;
-    zaehle('preis_gesehen', 'preis');
+    zaehle('preis_gesehen', zaehlerVariante ?? 'preis');
     analytics.trackEvent('wizard', 'preis_gesehen', {});
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentStep, preisModus, kontaktOffen]);
@@ -787,6 +793,9 @@ export function MultiStepForm({ mode = 'inline', bewertung = null }: MultiStepFo
         telefonSpaeter: opts.telefonSpaeter,
         kontaktVariante: kontaktVarRef.current,
         ablauf: ablaufRef.current,
+        // Von welcher Rechner-Seite die Anfrage kam (Registry #81): die Landingpage /wechsel
+        // zählt im Ablauf-Test nicht mit.
+        seite: window.location.pathname,
         careStartTiming: state.careStartTiming,
         adParams: analytics.getAdParams(),
         // Von welcher Seite kam die Anfrage (Martin, 27.08.). Die
@@ -1210,7 +1219,7 @@ export function MultiStepForm({ mode = 'inline', bewertung = null }: MultiStepFo
             // Warteseite, ca. 1 s). Ohne Preis → heutiger Weg, anonym gezählt.
             if (ablaufRef.current === 'preis') {
               if (preisLadenRef.current) await preisLadenRef.current;
-              if (!preisDatenRef.current) zaehle('preis_fehler', 'preis');
+              if (!preisDatenRef.current) zaehle('preis_fehler', zaehlerVariante ?? 'preis');
             }
             setShowMatching(false);
             setCurrentStep(totalSteps); // = Step 9 (Preisseite bzw. Kontaktformular)
@@ -1239,7 +1248,7 @@ export function MultiStepForm({ mode = 'inline', bewertung = null }: MultiStepFo
           }}
           className="w-full rounded-xl bg-[#E76F63] px-4 py-[18px] text-[17px] font-bold text-white shadow-[0_4px_14px_rgba(231,111,99,0.32)] transition-all duration-200 hover:bg-[#D65E52]"
         >
-          Preis &amp; Pflegekräfte ansehen →
+          {knopf ?? 'Preis & Pflegekräfte ansehen →'}
         </button>
         {/* Zaehler zentriert unter dem Button (Martin 16.08.) — er gehoert
             zum Button, nicht zur linksbuendigen Textspalte darueber. */}

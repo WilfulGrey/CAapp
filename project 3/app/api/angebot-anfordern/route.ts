@@ -57,6 +57,7 @@ async function handlePost(request: NextRequest) {
       telefonSpaeter,
       kontaktVariante,
       ablauf,
+      seite,
     }: {
       vorname?: string;
       email: string;
@@ -69,6 +70,8 @@ async function handlePost(request: NextRequest) {
          lead_event, damit Leads und Profile je Variante vergleichbar sind. */
       kontaktVariante?: string;
       ablauf?: string;
+      /* Rechner-Seite der Anfrage (Registry #81): `/` oder `/wechsel` — die Landingpage zählt im Ablauf-Test nicht mit. */
+      seite?: string;
       careStartTiming?: string;
       kalkulation: Kalkulation;
       acceptPrivacy?: boolean;
@@ -220,7 +223,8 @@ async function handlePost(request: NextRequest) {
     if (kontaktVariante === 'stufen' || kontaktVariante === 'alt') {
       // `ablauf` (Registry #77): `preis` = Preisseite vor der Kontaktabfrage, `alt` = heutiger Weg.
       const ablaufWert = ablauf === 'preis' || ablauf === 'alt' ? ablauf : null;
-      await logEvent(lead.id, 'kontakt_variante', { variante: kontaktVariante, ablauf: ablaufWert, telefon_spaeter: ohneTelefon, telefon_dabei: Boolean(lead.telefon) });
+      const seiteWert = typeof seite === 'string' && /^\/[a-z0-9\-\/]{0,40}$/i.test(seite) ? seite : null;
+      await logEvent(lead.id, 'kontakt_variante', { variante: kontaktVariante, ablauf: ablaufWert, seite: seiteWert, telefon_spaeter: ohneTelefon, telefon_dabei: Boolean(lead.telefon) });
     }
 
     // Re-Submit-Dedupe: wenn der Kunde dasselbe Formular nochmal schickt UND
