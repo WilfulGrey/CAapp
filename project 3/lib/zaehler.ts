@@ -32,8 +32,10 @@ export const ZAEHLER_EREIGNISSE = [
 ] as const;
 export type ZaehlerEreignis = (typeof ZAEHLER_EREIGNISSE)[number];
 
-// `stufen` = Kontakt in drei Schritten, `alt` = das Formular davor (50/50 seit
-// Registry #76), `vorschau` = Karten-Seite (?kraefte=1).
+// `preis` = Preisseite vor dem Kontakt (Registry #77), `stufen` = kein Preis,
+// Kontakt in drei Schritten — die beiden Arme des Ablauf-Tests (Registry #80,
+// das Los fällt beim Laden, die Fragen 1–8 laufen also schon unter dem Los);
+// `alt` = das alte Formular (nur noch erzwungen), `vorschau` = Karten-Seite (?kraefte=1).
 export const ZAEHLER_VARIANTEN = ['vorschau', 'alt', 'stufen', 'preis'] as const;
 export type ZaehlerVariante = (typeof ZAEHLER_VARIANTEN)[number];
 

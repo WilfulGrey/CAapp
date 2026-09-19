@@ -26,13 +26,28 @@ export const ABLAUF_VARIANTEN = ['preis', 'alt'] as const;
 export type Ablauf = (typeof ABLAUF_VARIANTEN)[number];
 
 /**
- * Welchen Ablauf der Besucher sieht: `preis` für alle; `?ablauf=alt|preis`
- * erzwingt und klebt je Sitzung. Nur im Browser nach dem Mount rufen
- * (useEffect). Bei gesperrtem Storage (Safari privat) zählt der Parameter.
+ * Preis zuerst ist seit dem 19.09.2026 AUS (Registry #80, Martin: „zurück zu den
+ * deutlich besseren Zahlen"): Schritt 9 → Anfrage 10 % statt 28 %, Google-Sitzung
+ * → Anfrage 3,5 % statt 6,4 %. Alle laufen wieder `alt`; `?ablauf=preis` zeigt
+ * die Preisseite weiter (Vergleich, späterer Test). Ein Würfel für den Ablauf
+ * bleibt vorbereitet (`aktiv: true` + Anteil), läuft aber nicht.
+ */
+export const ABLAUF_STANDARD: Ablauf = 'alt';
+export const ABLAUF_TEST = { aktiv: false, anteilPreis: 0.5 } as const;
+export type AblaufTest = { readonly aktiv: boolean; readonly anteilPreis: number };
+
+/**
+ * Welchen Ablauf der Besucher sieht: `?ablauf=alt|preis` erzwingt und klebt je
+ * Sitzung; sonst das gemerkte Los; sonst — nur solange ein Ablauf-Test läuft —
+ * fällt das Los einmal und wird gemerkt; sonst `ABLAUF_STANDARD`. Ohne Storage
+ * (Safari privat) gilt der Standard. Nur im Browser nach dem Mount rufen
+ * (useEffect), nie im Render.
  */
 export function ablaufVariante(
   search: string,
   storage: Pick<Storage, 'getItem' | 'setItem'> | null,
+  zufall: () => number = Math.random,
+  test: AblaufTest = ABLAUF_TEST,
 ): Ablauf {
   let q: string | null = null;
   try { q = new URLSearchParams(search).get('ablauf'); } catch { q = null; }
@@ -41,9 +56,12 @@ export function ablaufVariante(
     if (erzwungen) { storage?.setItem(ABLAUF_KEY, erzwungen); return erzwungen; }
     const gemerkt = storage?.getItem(ABLAUF_KEY);
     if (gemerkt === 'preis' || gemerkt === 'alt') return gemerkt;
-    return 'preis';
+    if (!test.aktiv || !storage) return ABLAUF_STANDARD;
+    const los: Ablauf = zufall() < test.anteilPreis ? 'preis' : 'alt';
+    storage.setItem(ABLAUF_KEY, los);
+    return los;
   } catch {
-    return erzwungen ?? 'preis';
+    return erzwungen ?? ABLAUF_STANDARD;
   }
 }
 

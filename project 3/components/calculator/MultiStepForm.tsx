@@ -19,7 +19,7 @@ import { GARANTIE_OEFFNEN_EVENT } from "@/components/calculator/BestpreisSiegelL
 import { zaehle } from "@/lib/zaehler";
 import { meldeAnfrage } from "@/lib/oaiq";
 import { telefonBereinigen, telefonFehler, telefonGueltig } from "@/lib/telefon";
-import { kontaktVariante, KNOPF_KONTAKT, STUFEN, STUFEN_FEHLER, type KontaktStufe, type KontaktVariante } from "@/lib/kontakt-stufen";
+import { kontaktStandard, kontaktVariante, KNOPF_KONTAKT, STUFEN, STUFEN_FEHLER, type KontaktStufe, type KontaktVariante } from "@/lib/kontakt-stufen";
 
 const EMAIL_MUSTER = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -232,6 +232,7 @@ export function MultiStepForm({ mode = 'inline', bewertung = null }: MultiStepFo
   // Kontaktseite hinter dem Preis: Fehler je Feld (erst beim Klick geprüft) + Server-Fehler am Knopf.
   const [kontaktFehler, setKontaktFehler] = useState<Record<KontaktFeld, string>>({ name: '', email: '', phone: '' });
   const [kontaktServerFehler, setKontaktServerFehler] = useState('');
+  // Ablauf-Test (Registry #80): `preis` = Preisseite vor dem Kontakt, `stufen` = kein Preis, drei Kontaktschritte.
   const zaehlVariante = () => (vorschauAktivRef.current ? 'vorschau' : ablaufRef.current === 'preis' ? 'preis' : kontaktVarRef.current);
   const [kraefteVorschau, setKraefteVorschau] = useState<VorschauKraft[] | null>(null);
   // Schritt 9 im Vorschau-Modus: die Kontaktfelder öffnen sich erst nach dem
@@ -311,12 +312,14 @@ export function MultiStepForm({ mode = 'inline', bewertung = null }: MultiStepFo
       const an = kraefteVorschauAktiv(window.location.search, window.sessionStorage);
       vorschauAktivRef.current = an;
       setVorschauAktiv(an);
-      // Die Karten-Seite (?kraefte=1) bleibt beim heutigen Weg — keine Kreuzung der Tests.
+      // Die Karten-Seite (?kraefte=1) bleibt beim alten Weg — keine Kreuzung der Tests.
+      // Ablauf: seit 19.09. für alle `alt` (Preis zuerst aus), `?ablauf=preis` klebt je Sitzung.
       const ab: Ablauf = an ? 'alt' : ablaufVariante(window.location.search, window.sessionStorage);
       ablaufRef.current = ab;
       setAblauf(ab);
-      // Kontakt = eine Seite; die drei Schritte nur mit ?kontakt=stufen (ihr Test kommt danach).
-      const kv = kontaktVariante(window.location.search, window.sessionStorage, 'alt');
+      // Der eine Test (Registry #80): im Ablauf `alt` fällt das Los einmal und klebt 30 Tage
+      // (localStorage); Zwang per `?kontakt=` klebt je Sitzung. Karten-Seite ohne Los.
+      const kv = kontaktVariante(window.location.search, window.sessionStorage, an ? 'alt' : kontaktStandard(ab), Math.random, window.localStorage);
       kontaktVarRef.current = kv;
       setKontaktVar(kv);
     } catch { /* sessionStorage gesperrt — Vorschau bleibt aus */ }
@@ -1201,7 +1204,7 @@ export function MultiStepForm({ mode = 'inline', bewertung = null }: MultiStepFo
           // Warte-Screen immer mit den drei Schritten aus WARTE („Preis
           // berechnet“ …) — auch ohne Karten-Seite (Martin 11.09.: Warten bleibt).
           vorschau
-          kurz={ablauf === 'preis'}
+          kurz
           onComplete={async () => {
             // Preis zuerst: auf die Kalkulation warten (läuft seit Beginn der
             // Warteseite, ca. 1 s). Ohne Preis → heutiger Weg, anonym gezählt.
