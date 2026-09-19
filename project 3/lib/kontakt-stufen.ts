@@ -7,11 +7,14 @@
  * einfach macht" — und: den Lead schon mit Name + E-Mail speichern, die
  * Preis-Mail auch ohne Nummer schicken, die Nummer danach erfragen.
  *
- * Seit Registry #77 (17.09.) würfelt dieses Modul nicht mehr selbst: EIN
- * Test, der Ablauf (`lib/preis-zuerst.ts`: `preis` gegen `alt`). Die drei
- * Schritte sind das Kontaktformular HINTER dem Preis; im Ablauf `alt` bleibt
- * das heutige Formular. `?kontakt=stufen` bzw. `?kontakt=alt` erzwingt die
- * Form unabhängig vom Ablauf (Abnahme, Vergleich) und klebt je Sitzung.
+ * Seit Registry #77 (17.09.) würfelt dieses Modul nicht mehr selbst. Der
+ * Test liegt beim Ablauf (`lib/preis-zuerst.ts`, Registry #80, Martin 18.09.:
+ * „Preis zeigen wir nicht an, den Kontakt dafür in drei Schritten — als A/B-Test
+ * mit der anderen Variante, wir zeigen den Preis vorher an"): Ablauf `alt` =
+ * kein Preis, Kontakt in DREI Schritten (`stufen`); Ablauf `preis` = Preisseite,
+ * dann EINE Kontaktseite (`alt`). `kontaktStandard(ablauf)` liefert genau das.
+ * `?kontakt=stufen` bzw. `?kontakt=seite` (auch `alt`) erzwingt die Form
+ * unabhängig vom Ablauf (Abnahme, Vergleich) und klebt je Sitzung.
  * Pur (kein React/Next) — Root-Vitest importiert es direkt.
  */
 
@@ -26,10 +29,18 @@ export const KONTAKT_STUFEN = ['name', 'email', 'telefon'] as const;
 export type KontaktStufe = (typeof KONTAKT_STUFEN)[number];
 
 /**
+ * Welche Kontaktform der Ablauf vorgibt (Registry #80): ohne Preis die drei
+ * Schritte, hinter der Preisseite die eine Seite (`alt` = `KontaktSeite.tsx`).
+ */
+export function kontaktStandard(ablauf: 'preis' | 'alt'): KontaktVariante {
+  return ablauf === 'alt' ? 'stufen' : 'alt';
+}
+
+/**
  * Welche Kontaktform der Besucher sieht. Nur im Browser nach dem Mount rufen
  * (useEffect) — beim Rendern würde Server und Client auseinanderlaufen.
  * Erzwungen (`?kontakt=…`, klebt je Sitzung) schlägt gemerkt schlägt
- * `standard` (den gibt der Ablauf vor: `preis` → `stufen`, `alt` → `alt`).
+ * `standard` (den gibt der Ablauf vor, siehe `kontaktStandard`).
  * Der Standard wird NICHT gemerkt — er soll dem Ablauf folgen.
  */
 export function kontaktVariante(
@@ -39,7 +50,7 @@ export function kontaktVariante(
 ): KontaktVariante {
   let q: string | null = null;
   try { q = new URLSearchParams(search).get('kontakt'); } catch { q = null; }
-  const erzwungen = q === 'stufen' || q === 'alt' ? q : null;
+  const erzwungen: KontaktVariante | null = q === 'stufen' ? 'stufen' : q === 'alt' || q === 'seite' ? 'alt' : null;
   try {
     if (erzwungen) { storage?.setItem(KONTAKT_KEY, erzwungen); return erzwungen; }
     const gemerkt = storage?.getItem(KONTAKT_KEY);

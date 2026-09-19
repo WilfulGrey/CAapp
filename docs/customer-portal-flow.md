@@ -230,20 +230,24 @@ Content-Type: application/json
 
 ### Preis zuerst (Registry #77, 2026-09-17)
 
-Ablauf `preis` (für ALLE Besucher seit Martins Entscheidung vom 17.09.; `?ablauf=alt` zeigt den alten Weg, `project 3/lib/preis-zuerst.ts`):
+Ablauf `preis` (für ALLE Besucher seit Martins Entscheidung vom 17.09.; seit dem Ablauf-Test (Registry #80) fällt das Los
+50/50 je Sitzung: `preis` oder `alt` mit den drei Kontaktschritten; `?ablauf=alt|preis` erzwingt, `ABLAUF_TEST.aktiv = false`
+beendet den Test; `project 3/lib/preis-zuerst.ts`):
 Nach der letzten Frage lädt der Rechner die Kalkulation (`POST /api/kalkulation-berechnen`, ohne
 `sessionId` — die Route schreibt dann nichts), die Warteseite dauert ca. 3 s, danach steht in
 Schritt 9 die **Preisseite** (`components/calculator/PreisSeite.tsx`): Preis, Bestpreisgarantie,
 „Nach Zuschüssen ca. …", Heimvergleich, Kräfte-Fotos, Knopf zur Kontaktabfrage, darunter die
 Konditionen. Erst der Knopf öffnet den Kontakt — EINE Seite (`components/calculator/KontaktSeite.tsx`:
-Name, E-Mail, Telefon; Knopf nie grau, Fehler am Feld), mit `?kontakt=stufen` die drei Schritte (unten; ihr Test kommt später). Der Lead trägt die Kalkulation der Preisseite (kein
-zweiter Rechenlauf); das Event `kontakt_variante` trägt zusätzlich `ablauf`. Scheitert die
-Berechnung, entfällt die Preisseite und der Besucher läuft den heutigen Weg. Anonyme Zähler:
+Name, E-Mail, Telefon; Knopf nie grau, Fehler am Feld); `?kontakt=stufen|seite` erzwingt die Form
+unabhängig vom Ablauf. Der Lead trägt die Kalkulation der Preisseite (kein zweiter Rechenlauf); das
+Event `kontakt_variante` trägt zusätzlich `ablauf` (so lassen sich Anfragen je Arm zählen). Scheitert
+die Berechnung, entfällt die Preisseite und der Besucher läuft den alten Weg. Anonyme Zähler:
 `schritt_9` = Preisseite gesehen, `kontakt_geoeffnet`, `preis_fehler`, Variante `preis`.
 
 ### Kontakt in drei Schritten (Registry #76, 2026-09-16)
 
-Variante `stufen` (50/50 je Sitzung, `?kontakt=stufen|alt` erzwingt, `project 3/lib/kontakt-stufen.ts`):
+Variante `stufen` (`project 3/lib/kontakt-stufen.ts`; seit dem Ablauf-Test (Registry #80) der Kontakt im
+Ablauf `alt`, also OHNE Preisseite — Arm A gegen Arm B „Preis zuerst“; `?kontakt=stufen|seite` erzwingt):
 Schritt 9 fragt Name → E-Mail → Telefon einzeln. Nach der E-Mail ruft der Rechner
 `POST /api/angebot-anfordern` mit `telefonSpaeter: true` und OHNE `telefon` — die Route
 legt den Lead an (Spalte `telefon` NULL), plant Mail 1 wie sonst (delay 0 + flush), schickt

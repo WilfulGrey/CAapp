@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   ABLAUF_KEY,
+  ABLAUF_TEST,
   ablaufVariante,
   euro,
   HEIM_EIGENANTEIL,
@@ -22,26 +23,36 @@ function speicher(vorbelegt: Record<string, string> = {}) {
 }
 
 describe('ablaufVariante', () => {
-  it('alle laufen den neuen Weg — kein Würfel (Martin 17.09.: „lass alle auf neu machen")', () => {
+  // Registry #80 (Martin 18.09.): „Preis zeigen wir nicht an, den Kontakt dafür in drei Schritten — als
+  // A/B-Test mit der anderen Variante, wir zeigen den Preis vorher an." Das Los fällt beim Ablauf.
+  it('würfelt einmal je Sitzung und merkt das Los', () => {
+    expect(ABLAUF_TEST.aktiv).toBe(true);
+    expect(ABLAUF_TEST.anteilPreis).toBe(0.5);
     const s = speicher();
-    expect(ablaufVariante('', s)).toBe('preis');
-    expect(ablaufVariante('?start=1', s)).toBe('preis');
-    // der Standard wird nicht gemerkt — nur Erzwungenes klebt
-    expect(s.m.has(ABLAUF_KEY)).toBe(false);
+    expect(ablaufVariante('?start=1', s, () => 0.2)).toBe('preis');
+    expect(s.m.get(ABLAUF_KEY)).toBe('preis');
+    // zweiter Aufruf in derselben Sitzung: kein neues Los
+    expect(ablaufVariante('', s, () => 0.9)).toBe('preis');
+    const t = speicher();
+    expect(ablaufVariante('', t, () => 0.7)).toBe('alt');
+    expect(t.m.get(ABLAUF_KEY)).toBe('alt');
+    // genau 0,5 fällt auf den Weg ohne Preis (< anteilPreis = Preis)
+    expect(ablaufVariante('', speicher(), () => 0.5)).toBe('alt');
   });
-  it('?ablauf=alt zeigt den alten Weg und klebt je Sitzung; ?ablauf=preis holt zurück', () => {
+  it('?ablauf=alt|preis erzwingt, schlägt das Los und klebt je Sitzung', () => {
     const s = speicher();
-    expect(ablaufVariante('?start=1&ablauf=alt', s)).toBe('alt');
+    expect(ablaufVariante('?start=1&ablauf=alt', s, () => 0.1)).toBe('alt');
     expect(s.m.get(ABLAUF_KEY)).toBe('alt');
-    expect(ablaufVariante('', s)).toBe('alt');
-    expect(ablaufVariante('?ablauf=preis', s)).toBe('preis');
-    expect(ablaufVariante('?ablauf=quatsch', speicher())).toBe('preis');
+    expect(ablaufVariante('', s, () => 0.1)).toBe('alt');
+    expect(ablaufVariante('?ablauf=preis', s, () => 0.9)).toBe('preis');
+    expect(ablaufVariante('?ablauf=quatsch', speicher(), () => 0.9)).toBe('alt');
+    expect(ablaufVariante('', speicher({ [ABLAUF_KEY]: 'preis' }), () => 0.9)).toBe('preis');
   });
-  it('ohne Storage (Safari privat) zählt der Parameter, sonst der neue Weg', () => {
+  it('ohne Storage (Safari privat) zählt der Parameter, sonst der Preis-Weg — ein Los, das nicht klebt, fiele jedes Mal neu', () => {
     const kaputt = { getItem: () => { throw new Error('gesperrt'); }, setItem: () => { throw new Error('gesperrt'); } };
-    expect(ablaufVariante('?ablauf=alt', kaputt)).toBe('alt');
-    expect(ablaufVariante('', kaputt)).toBe('preis');
-    expect(ablaufVariante('', null)).toBe('preis');
+    expect(ablaufVariante('?ablauf=alt', kaputt, () => 0.1)).toBe('alt');
+    expect(ablaufVariante('', kaputt, () => 0.9)).toBe('preis');
+    expect(ablaufVariante('', null, () => 0.9)).toBe('preis');
   });
 });
 

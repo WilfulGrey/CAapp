@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   KNOPF_KONTAKT,
   KONTAKT_KEY,
+  kontaktStandard,
   kontaktVariante,
   STUFEN,
 } from '../../project 3/lib/kontakt-stufen';
@@ -37,6 +38,22 @@ describe('kontaktVariante', () => {
     expect(kontaktVariante('', kaputt)).toBe('alt');
     expect(kontaktVariante('', kaputt, 'stufen')).toBe('stufen');
     expect(kontaktVariante('', null, 'stufen')).toBe('stufen');
+  });
+
+  // Registry #80 (Martin 18.09.2026): der Ablauf gibt die Kontaktform vor — ohne Preis drei Schritte,
+  // hinter der Preisseite die eine Seite. Gewürfelt wird beim Ablauf, nicht hier.
+  it('Standard folgt dem Ablauf: alt → drei Schritte, preis → eine Seite', () => {
+    expect(kontaktStandard('alt')).toBe('stufen');
+    expect(kontaktStandard('preis')).toBe('alt');
+    const s = speicher();
+    expect(kontaktVariante('', s, kontaktStandard('alt'))).toBe('stufen');
+    expect(s.m.has(KONTAKT_KEY)).toBe(false);
+  });
+  it('?kontakt=seite ist die eine Seite und klebt wie ?kontakt=alt', () => {
+    const s = speicher();
+    expect(kontaktVariante('?kontakt=seite', s, 'stufen')).toBe('alt');
+    expect(s.m.get(KONTAKT_KEY)).toBe('alt');
+    expect(kontaktVariante('', s, 'stufen')).toBe('alt');
   });
 });
 

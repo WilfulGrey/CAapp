@@ -19,7 +19,7 @@ import { GARANTIE_OEFFNEN_EVENT } from "@/components/calculator/BestpreisSiegelL
 import { zaehle } from "@/lib/zaehler";
 import { meldeAnfrage } from "@/lib/oaiq";
 import { telefonBereinigen, telefonFehler, telefonGueltig } from "@/lib/telefon";
-import { kontaktVariante, KNOPF_KONTAKT, STUFEN, STUFEN_FEHLER, type KontaktStufe, type KontaktVariante } from "@/lib/kontakt-stufen";
+import { kontaktStandard, kontaktVariante, KNOPF_KONTAKT, STUFEN, STUFEN_FEHLER, type KontaktStufe, type KontaktVariante } from "@/lib/kontakt-stufen";
 
 const EMAIL_MUSTER = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -232,6 +232,7 @@ export function MultiStepForm({ mode = 'inline', bewertung = null }: MultiStepFo
   // Kontaktseite hinter dem Preis: Fehler je Feld (erst beim Klick geprüft) + Server-Fehler am Knopf.
   const [kontaktFehler, setKontaktFehler] = useState<Record<KontaktFeld, string>>({ name: '', email: '', phone: '' });
   const [kontaktServerFehler, setKontaktServerFehler] = useState('');
+  // Ablauf-Test (Registry #80): `preis` = Preisseite vor dem Kontakt, `stufen` = kein Preis, drei Kontaktschritte.
   const zaehlVariante = () => (vorschauAktivRef.current ? 'vorschau' : ablaufRef.current === 'preis' ? 'preis' : kontaktVarRef.current);
   const [kraefteVorschau, setKraefteVorschau] = useState<VorschauKraft[] | null>(null);
   // Schritt 9 im Vorschau-Modus: die Kontaktfelder öffnen sich erst nach dem
@@ -312,11 +313,13 @@ export function MultiStepForm({ mode = 'inline', bewertung = null }: MultiStepFo
       vorschauAktivRef.current = an;
       setVorschauAktiv(an);
       // Die Karten-Seite (?kraefte=1) bleibt beim heutigen Weg — keine Kreuzung der Tests.
+      // Sonst fällt hier das Los des Ablauf-Tests (Registry #80), einmal je Sitzung.
       const ab: Ablauf = an ? 'alt' : ablaufVariante(window.location.search, window.sessionStorage);
       ablaufRef.current = ab;
       setAblauf(ab);
-      // Kontakt = eine Seite; die drei Schritte nur mit ?kontakt=stufen (ihr Test kommt danach).
-      const kv = kontaktVariante(window.location.search, window.sessionStorage, 'alt');
+      // Der Ablauf gibt die Kontaktform vor: ohne Preis die drei Schritte, hinter der Preisseite
+      // die eine Seite; die Karten-Seite behält das alte Formular.
+      const kv = kontaktVariante(window.location.search, window.sessionStorage, an ? 'alt' : kontaktStandard(ab));
       kontaktVarRef.current = kv;
       setKontaktVar(kv);
     } catch { /* sessionStorage gesperrt — Vorschau bleibt aus */ }

@@ -26,13 +26,24 @@ export const ABLAUF_VARIANTEN = ['preis', 'alt'] as const;
 export type Ablauf = (typeof ABLAUF_VARIANTEN)[number];
 
 /**
- * Welchen Ablauf der Besucher sieht: `preis` für alle; `?ablauf=alt|preis`
- * erzwingt und klebt je Sitzung. Nur im Browser nach dem Mount rufen
- * (useEffect). Bei gesperrtem Storage (Safari privat) zählt der Parameter.
+ * Der Ablauf-Test (Registry #80, Martin 18.09.): `anteilPreis` der Sitzungen
+ * sehen den Preis vor dem Kontakt (dann EINE Kontaktseite), der Rest den
+ * Weg ohne Preis mit dem Kontakt in DREI Schritten. `aktiv: false` = Test
+ * aus, alle sehen `preis` (eine Zeile + Merge).
+ */
+export const ABLAUF_TEST = { aktiv: true, anteilPreis: 0.5 } as const;
+
+/**
+ * Welchen Ablauf der Besucher sieht: `?ablauf=alt|preis` erzwingt und klebt je
+ * Sitzung; sonst das gemerkte Los; sonst fällt das Los einmal (solange der Test
+ * läuft) und wird gemerkt, damit es je Sitzung klebt. Ohne Storage (Safari
+ * privat) gilt `preis` — ein Los, das nicht klebt, fiele bei jedem Aufruf neu.
+ * Nur im Browser nach dem Mount rufen (useEffect), nie im Render.
  */
 export function ablaufVariante(
   search: string,
   storage: Pick<Storage, 'getItem' | 'setItem'> | null,
+  zufall: () => number = Math.random,
 ): Ablauf {
   let q: string | null = null;
   try { q = new URLSearchParams(search).get('ablauf'); } catch { q = null; }
@@ -41,7 +52,10 @@ export function ablaufVariante(
     if (erzwungen) { storage?.setItem(ABLAUF_KEY, erzwungen); return erzwungen; }
     const gemerkt = storage?.getItem(ABLAUF_KEY);
     if (gemerkt === 'preis' || gemerkt === 'alt') return gemerkt;
-    return 'preis';
+    if (!ABLAUF_TEST.aktiv || !storage) return 'preis';
+    const los: Ablauf = zufall() < ABLAUF_TEST.anteilPreis ? 'preis' : 'alt';
+    storage.setItem(ABLAUF_KEY, los);
+    return los;
   } catch {
     return erzwungen ?? 'preis';
   }
