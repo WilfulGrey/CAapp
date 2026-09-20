@@ -23,7 +23,18 @@ import { ladeSterneStand } from "@/lib/sterne-zeile-laden";
 // Bewertungszahl im ersten HTML steht statt nachzuspringen. Alle Bausteine mit
 // Zustand oder Klicks tragen ihr eigenes "use client". Die Zahl kommt höchstens
 // eine Stunde alt von primundus.de/api/bewertungen-stand (lib/sterne-zeile.ts).
-export const revalidate = 3600;
+//
+// Je Anfrage gerendert, KEIN ISR (Registry #81, 20.09.2026): Mit
+// `revalidate = 3600` lieferte Next 13.5.1 die Startseite am 20.09. früh an
+// jeden Besucher als HTTP 304 ohne Inhalt aus (`x-nextjs-cache: HIT`, auch
+// direkt am Render-Host) — weiße Seite für alle, die den Rechner nicht schon
+// im Browser-Cache hatten. Bekannter Fehler dieser Next-Version: nach der
+// Hintergrund-Neuberechnung bleibt ein 304 im ISR-Cache hängen. /kosten-berechnen
+// rendert seit jeher je Anfrage (`force-dynamic`) und war gesund. Die Sterne
+// bleiben trotzdem stündlich gecacht: der Abruf in lib/sterne-zeile-laden.ts
+// nutzt den Next-Datencache (`next: { revalidate: 3600 }`), der auch in
+// dynamischen Seiten gilt.
+export const dynamic = 'force-dynamic';
 
 export default async function HomePage() {
   const bewertung = await ladeSterneStand();
