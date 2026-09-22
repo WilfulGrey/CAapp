@@ -130,6 +130,24 @@ export interface AcceptanceSyncResult {
   contact_fields_dropped?: Array<"le.email" | "ag.email" | "kp.email">;
   /** Rohwerte zu contact_fields_dropped (fürs Team lesbar, ohne DB-Blick). */
   dropped_values?: Record<string, string>;
+  /**
+   * Die Upload-Bramka hat NACHGELESEN und Mamamia zeigt unsere Confirmation
+   * NICHT am Job dieser Row (Registry #82). Das ist ein BUCHUNGS-Problem, kein
+   * Archiv-Problem: der Kunde hat "Neue Buchung" bekommen, in Mamamia bestätigt
+   * das nichts. Deshalb eigener Alarm (Chain ~T+2 Min, Cron 15 Min) statt der
+   * 24-h-Schwelle von pdfOverdue.
+   *
+   * "not_processed"        — gar keine passende final_confirmation am Job.
+   *                          Direkt nach StoreConfirmation normal (Sekunden),
+   *                          nach der Retry-Chain ein Befund.
+   * "foreign_confirmation" — der Stempel zeigt auf eine Confirmation, die zu
+   *                          einer ANDEREN Bewerbung/einem anderen Job gehört
+   *                          (Mur aus #78, Fall Berg).
+   *
+   * Typisiert statt String-Matching auf `deferred` — Klassifikation NUR über
+   * die Struktur, nie über den Meldungstext (Święta zasada 1.5).
+   */
+  booking_not_visible?: "not_processed" | "foreign_confirmation";
 }
 
 // ─── GraphQL ────────────────────────────────────────────────────────────────
@@ -796,6 +814,7 @@ async function runSequence(opts: AcceptanceSyncOpts, result: AcceptanceSyncResul
     const fc = confirmationId != null ? finalConfirmations.find((f) => f.id === confirmationId) : undefined;
     if (!fc) {
       result.deferred.push("pdf: confirmation not processed yet (final_confirmation missing)");
+      result.booking_not_visible = "not_processed";
       return;
     }
     // Stempel-Mur (Registry #78): der Upload hängt die Datei an EINE
@@ -808,6 +827,7 @@ async function runSequence(opts: AcceptanceSyncOpts, result: AcceptanceSyncResul
       result.deferred.push(
         `pdf: confirmation ${fc.id} gehört zu Bewerbung ${fc.application_id} auf Job ${fc.job_offer_id}, nicht zu Bewerbung ${row.application_id} — kein Upload, Stempel prüfen`,
       );
+      result.booking_not_visible = "foreign_confirmation";
       return;
     }
     // application_id: mamamias Validator VERLANGT das Feld („erforderlich")

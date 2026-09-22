@@ -274,3 +274,44 @@ Deno.test("Profile-Kachel zeigt die Kosten je Profil statt des Tagesschnitts", (
   assert(kachel, "Profile-Kachel fehlt");
   assert(!kachel![2].includes("Ø"), "kein Tagesschnitt mehr in der Fusszeile");
 });
+
+/*
+ * Registry #82 — Buchungs-Check.
+ *
+ * Der Cron-Alarm feuert EINMAL je Zeile und nach 30 Tagen sieht der Cron die
+ * Zeile nicht mehr. Diese Zeile im Report ist der bleibende Kanal. Zwei
+ * Zusagen, die sich lautlos umkehren lassen:
+ *  1) "kein roter Block" heisst geprueft und in Ordnung — nicht "Abfrage tot".
+ *     Deshalb steht bei 0 offenen Faellen trotzdem eine Zeile da.
+ *  2) Ein Lesefehler ist sichtbar (Muster fetchAgentNotes), nicht `count ?? 0`
+ *     wie in fetchMailHealth — sonst sieht ein kaputtes Query aus wie Gesundheit.
+ */
+Deno.test("#82: offene Buchungen ⇒ roter Block, Kunde und Alter genannt, 🚨 im Betreff", () => {
+  const { html, subject } = bauen({
+    buchungHealth: {
+      offen: 1,
+      rows: [{ lead: "Ingolf Berg", leadId: "e94d428b", applicationId: 13074, ageHours: 168 }],
+    },
+  });
+  assertStringIncludes(html, "Buchung nicht in Mamamia sichtbar");
+  assertStringIncludes(html, "Ingolf Berg");
+  assertStringIncludes(html, "Bewerbung 13074");
+  assertStringIncludes(html, "seit 168 h");
+  assertStringIncludes(subject, "🚨");
+});
+
+Deno.test("#82: 0 offen ⇒ kein Alarm, aber die Zeile steht da (kein Block ≠ kaputte Abfrage)", () => {
+  const { html, subject } = bauen({ buchungHealth: { offen: 0, rows: [] } });
+  assertStringIncludes(html, "Buchungs-Check: 0 offen");
+  assertEquals(html.includes("Buchung nicht in Mamamia sichtbar"), false);
+  assertEquals(subject.includes("🚨"), false);
+});
+
+Deno.test("#82: Lesefehler der Abfrage ist sichtbar und alarmiert", () => {
+  const { html, subject } = bauen({
+    buchungHealth: { offen: 0, rows: [], error: "permission denied for table" },
+  });
+  assertStringIncludes(html, "Buchungs-Check nicht lesbar");
+  assertStringIncludes(html, "permission denied for table");
+  assertStringIncludes(subject, "🚨");
+});

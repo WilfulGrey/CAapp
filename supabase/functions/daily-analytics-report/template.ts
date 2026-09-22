@@ -56,6 +56,10 @@ export function buildReportEmail(opts: {
   totalBookings: number;     // Buchungs-Vorgänge insgesamt (lifetime)
   siteUrl: string;
   mailHealth?: { failed24h: number; overduePending: number; samples: Array<{ type: string; error: string }> };
+  /** Registry #82 — unterschrieben, aber Mamamia zeigt die Buchung nicht.
+   *  Steht IMMER als Zeile im Report (auch bei 0), damit "kein Block" Gesundheit
+   *  heisst und nicht "Abfrage kaputt". */
+  buchungHealth?: { offen: number; rows: Array<{ lead: string; leadId: string; applicationId: number; ageHours: number }>; error?: string };
   prevPeriod?: PeriodStats;   // die 7 Tage VOR der Vergleichsperiode (Trend)
   agentNotes?: { notes: Array<{ source: string; note: string }>; error?: string };
   /** Google-Ads-Kosten (SEA, 16.08.) — null/undefined = Block entfällt (fail-soft). */
@@ -67,7 +71,7 @@ export function buildReportEmail(opts: {
    *  entfällt das Diagramm (fail-soft wie die Lead-Kohorten). */
   besucherKohorten?: BesucherKohorte[];
 }): { subject: string; html: string; text: string } {
-  const { yesterday, period, yesterdayLabel, periodLabel, totalLeads, bookedCustomers, totalBookings, siteUrl, mailHealth, prevPeriod, agentNotes, adsSpend } = opts;
+  const { yesterday, period, yesterdayLabel, periodLabel, totalLeads, bookedCustomers, totalBookings, siteUrl, mailHealth, buchungHealth, prevPeriod, agentNotes, adsSpend } = opts;
   const leadKohorten = opts.leadKohorten ?? [];
   const besucherKohorten = opts.besucherKohorten ?? [];
 
@@ -78,6 +82,7 @@ export function buildReportEmail(opts: {
   const perPiece = (spend: number, count: number) => (count > 0 ? euro(spend / count) : "—");
 
   const mailAlarm = mailHealth && (mailHealth.failed24h > 0 || mailHealth.overduePending > 0);
+  const buchungAlarm = !!buchungHealth && (buchungHealth.offen > 0 || !!buchungHealth.error);
 
   // Tagesfazit (Martin, 15.08.): die Mail beantwortet selbst, ob es ein
   // guter Tag war und wohin der Trend zeigt — Klartext oben statt nur
@@ -133,7 +138,7 @@ export function buildReportEmail(opts: {
         </div>`;
   })();
 
-  const subject = `${mailAlarm ? '🚨 ' : ''}📊 Primundus Daily — ${yesterdayLabel} · ${yesterday.wizardCompleted} neue Leads · ${verdict.wort} ${trend.pfeil}`;
+  const subject = `${mailAlarm || buchungAlarm ? '🚨 ' : ''}📊 Primundus Daily — ${yesterdayLabel} · ${yesterday.wizardCompleted} neue Leads · ${verdict.wort} ${trend.pfeil}`;
 
   // Mail-Ausfall-Alarm ganz oben — der stille Reminder-Blackout (25.05.–25.06.,
   // 207 Fehlschläge) darf sich nicht wiederholen.
@@ -143,6 +148,22 @@ export function buildReportEmail(opts: {
         ${mailHealth!.samples.map((s) => `<p style=\"margin:2px 0;font-size:12px;color:#b91c1c;\">· ${s.type}: ${s.error}</p>`).join('')}
        </div>`
     : '';
+
+  // Buchungs-Check (Registry #82): unterschrieben, aber Mamamia zeigt die
+  // Confirmation nicht am Job. Der Cron-Alarm feuert nur EINMAL je Zeile —
+  // hier bleibt der Befund stehen, bis er weg ist.
+  const buchungHtml = !buchungHealth
+    ? ''
+    : buchungHealth.error
+      ? `<div style="background:#fef2f2;border:2px solid #fca5a5;border-radius:10px;padding:14px 16px;margin:0 0 16px;">
+        <p style="margin:0;font-size:15px;font-weight:bold;color:#b91c1c;">🚨 Buchungs-Check nicht lesbar: ${buchungHealth.error}</p>
+       </div>`
+      : buchungHealth.offen > 0
+        ? `<div style="background:#fef2f2;border:2px solid #fca5a5;border-radius:10px;padding:14px 16px;margin:0 0 16px;">
+        <p style="margin:0 0 6px;font-size:15px;font-weight:bold;color:#b91c1c;">🚨 Buchung nicht in Mamamia sichtbar: ${buchungHealth.offen} offen</p>
+        ${buchungHealth.rows.map((r) => `<p style=\"margin:2px 0;font-size:12px;color:#b91c1c;\">· ${r.lead} — Bewerbung ${r.applicationId}, seit ${r.ageHours} h</p>`).join('')}
+       </div>`
+        : `<p style="margin:0 0 12px;font-size:12px;color:#9a8a73;">Buchungs-Check: 0 offen.</p>`;
 
   // Absolutwerte-Tabelle: Gestern · 7-T-Ø · Top (Datum)
   /* Hier standen eine Kennzahlen-Tabelle (rows/rowsHtml) und darueber adsRows.
@@ -571,6 +592,7 @@ export function buildReportEmail(opts: {
         </td></tr>
         <tr><td>
           ${mailAlarmHtml}
+          ${buchungHtml}
           ${fazitHtml}
           ${kachelnHtml}
           ${gruppeEigene}

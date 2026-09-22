@@ -620,6 +620,60 @@ export async function fetchAgentNotes(supabase: SupabaseClient, sinceIso: string
   return { notes: (data ?? []).map((r: { source?: string; note?: string }) => ({ source: String(r.source || "?"), note: String(r.note || "") })) };
 }
 
+// ─── Buchungs-Check (Registry #82) ─────────────────────────────────────────
+// Der Alarm aus detect-caregiver-events feuert EINMAL je Zeile
+// (`!row.mamamia_sync_alerted_at`) und nach 30 Tagen sieht der Cron die Zeile
+// gar nicht mehr. Ein übersehener Alarm ist damit für immer weg. Diese Zeile
+// ist der bleibende Kanal: sie steht im Report, solange der Zustand besteht,
+// und verschwindet von selbst, sobald der Upload durchgeht.
+//
+// Kein Mamamia-Aufruf nötig: der Upload passiert erst, wenn die Bramka unsere
+// Confirmation am Job der Bewerbung GELESEN hat (acceptanceSync.ts). Ein Row
+// mit Confirm-Stempel und ohne PDF-Stempel heisst deshalb genau:
+// "Mamamia zeigt die Buchung (noch) nicht".
+//
+// NICHT geprüft wird, ob eine einmal sichtbare Confirmation später wieder
+// verschwindet — das ist ein STORNO in Mamamia und ein legitimer Vorgang,
+// keine Störung (Michał, 22.09.2026).
+export interface BuchungHealth {
+  offen: number;
+  rows: Array<{ lead: string; leadId: string; applicationId: number; ageHours: number }>;
+  error?: string;
+}
+
+/** Älter als das hier ⇒ die Bramka hat mehrfach vergeblich nachgelesen. */
+const BUCHUNG_OFFEN_AB_MS = 2 * 60 * 60 * 1000;
+
+export async function fetchBuchungHealth(supabase: SupabaseClient): Promise<BuchungHealth> {
+  const cutoff = new Date(Date.now() - BUCHUNG_OFFEN_AB_MS).toISOString();
+  const { data, error } = await supabase
+    .from("lead_application_acceptances")
+    .select("lead_id, application_id, signed_at, leads!inner(vorname, nachname, email)")
+    .not("signatur", "is", null)
+    .not("mamamia_confirmed_at", "is", null)
+    .is("mamamia_pdf_uploaded_at", null)
+    .lt("signed_at", cutoff)
+    .order("signed_at", { ascending: false })
+    .limit(50);
+  // Fehler sichtbar zurückgeben (Muster fetchAgentNotes) — NICHT `count ?? 0`
+  // wie fetchMailHealth, sonst sieht ein kaputtes Query aus wie Gesundheit.
+  if (error) return { offen: 0, rows: [], error: error.message };
+  const rows = (data ?? [])
+    .map((r: Record<string, unknown>) => {
+      const l = r.leads as { vorname?: string; nachname?: string; email?: string } | null;
+      return {
+        lead: [l?.vorname, l?.nachname].filter(Boolean).join(" ") || String(l?.email ?? "?"),
+        leadId: String(r.lead_id),
+        applicationId: Number(r.application_id),
+        ageHours: Math.round((Date.now() - Date.parse(String(r.signed_at))) / 3600000),
+        _real: isRealLead(l),
+      };
+    })
+    .filter((r) => r._real)
+    .map(({ _real: _drop, ...r }) => r);
+  return { offen: rows.length, rows };
+}
+
 // ─── Google-Ads-Kosten (SEA, 16.08.) ───────────────────────────────────────
 // Spend gestern + Perioden-Summe fürs Kosten-je-Stück im Report. Fail-soft:
 // jeder Fehler (fehlende Vault-Secrets auf Staging, API-Ausfall) → null,

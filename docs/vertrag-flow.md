@@ -107,14 +107,34 @@ audit-row w `lead_events`).
 | StoreConfirmation odrzucone **permanentnie** (GraphQL-level error — deterministyczna odmowa, klasyfikacja po `graphqlErrors` na errorze, bez zgadywania treści komunikatu) | **NATYCHMIAST (T+0)** | bridge, zaraz po odpowiedzi synchronicznego sync-acceptance (`result.confirm_error.permanent=true`); stempel `mamamia_sync_alerted_at` po udanym mailu |
 | StoreConfirmation pada **transient** (network/HTTP/5xx) | 3 próby w callu (2s+4s backoff) + **retry-chain +15/+30/+60 s** — po wyczerpaniu łańcucha wciąż brak confirm ⇒ **alarm ≈ T+2 min** | retry-chain (edge, w tle) → POST `acceptance_sync_alarm` (source `sync-retry`) do bridge'a → mail; stempel TYLKO gdy mail przeszedł |
 | j.w., ale proces edge zginął zanim chain skończył | próg **5 min** od akceptu (niezależny bezpiecznik) | cron → ten sam POST (source `cron`); błąd maila ⇒ 502 ⇒ re-alarm za 15 min |
-| Confirm OK, **tylko PDF-upload** niedomknięty | po **24h** (archiwum, zero ryzyka klienta — bramka final_confirmation potrzebuje z natury drugiego przebiegu; chain zwykle domyka go w ≤2 min) | cron, ten sam kanał |
+| **Confirm ostemplowany, ale MM nie pokazuje confirmation na jobie tej Bewerbung** (bramka uploadu nachlasa; `booking_not_visible` = `not_processed` \| `foreign_confirmation`, Registry #82) | **~T+2 min** z retry-chain, **15 min** z crona — to problem BOOKINGOWY: klient dostał „Neue Buchung", a w MM nic tego nie potwierdza | retry-chain → POST (source `sync-retry`), potem cron (source `cron`); mail bridge'a ma własny, CZERWONY wariant „Buchung nicht in Mamamia sichtbar" |
+| Confirm OK, **confirmation widoczna**, tylko PDF-upload niedomknięty | po **24h** (archiwum, zero ryzyka klienta — render/StoreFile pada, booking stoi) | cron, ten sam kanał |
 | Wiersz naprawiony w tym samym przebiegu crona / stufie chaina | **bez alarmu** (alarm ocenia stan PO retry, nie sprzed) | — |
 | Krok 1 (kontakt-rows) odrzucony przez walidację MM LUB e-mail z formularza wyrzucony (`contact_fields_dropped`) — booking NIE dotknięty (Registry #52) | po CAŁEJ sekwencji (`finally` w `syncAcceptance`, timeout 5 s), pomijany gdy confirm permanent (czerwony już niesie błąd) | edge → POST **`acceptance_contact_alarm`** (ŻÓŁTY team-mail „Kontaktdaten nicht in Mamamia übernommen" + rohwerte); bridge dedupuje po `lead_events`+`application_id`, mail PRZED insertem; **bez** stempla `mamamia_sync_alerted_at` |
 
 Stałe: `RETRY_DELAYS_MS = [15s, 30s, 60s]` (`sync-acceptance/index.ts`);
-`ACCEPTANCE_CONFIRM_ALERT_AFTER_MS = 5 min`, `ACCEPTANCE_PDF_ALERT_AFTER_MS = 24h`
+`ACCEPTANCE_CONFIRM_ALERT_AFTER_MS = 5 min`, `ACCEPTANCE_BOOKING_ALERT_AFTER_MS = 15 min`, `ACCEPTANCE_PDF_ALERT_AFTER_MS = 24h`
 (`detect-caregiver-events/index.ts`); retry wewnętrzny `CONFIRM_TRANSIENT_RETRIES = 2`
 (`_shared/acceptanceSync.ts`). Stempel `mamamia_sync_alerted_at` = jednorazowość alarmu.
+
+**Dwie granice tej polityki, obie świadome (Registry #82):**
+
+1. **Alarm oparty na naszym stemplu wykrywa tylko awarie, o których sami wiemy.**
+   Próg 5 min sprawdza BRAK `mamamia_confirmed_at`. W przypadku Berga stempel był —
+   guard zaadoptował cudzą confirmation i wiersz wyglądał na udany, więc nie zadzwonił
+   żaden dzwonek przez 7 dni. Dlatego właściwym sygnałem jest **odczyt z MM** (bramka
+   uploadu), a nie nasz zapis. Konsekwencja: mur `gehoertZurRow` jest pojedynczym punktem
+   zaufania — każda jego zmiana wymaga testu regresyjnego, bo gdy on skłamie, alarm zamilknie.
+2. **Anulowanie akceptu w Mamamii NIE jest awarią i nie alarmuje** (decyzja Michała,
+   22.09.2026). Confirmation, która była widoczna i zniknęła później, to storno — legalny
+   krok agencji. Monitoring pilnuje wyłącznie „akcept nigdy nie wylądował", nigdy
+   „zniknął po czasie"; inaczej każdy storno zapalałby czerwone światło.
+
+**Jak trafienie znika:** stan gaśnie sam, gdy upload przejdzie — a przejdzie dopiero,
+gdy MM pokaże naszą confirmation na właściwym jobie. Trwałym kanałem jest linia
+**„Buchungs-Check"** w porannym raporcie (`fetchBuchungHealth`, czyste SQL, zero wywołań MM):
+alarm z crona leci raz, a po 30 dniach (`ACCEPTANCE_SYNC_MAX_AGE_DAYS`) wiersz w ogóle znika
+cronowi z oczu — raport trzyma go widocznym, dopóki trwa przyczyna.
 
 ## Guardy idempotencji (nigdy podwójny akcept)
 

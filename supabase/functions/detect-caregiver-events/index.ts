@@ -446,6 +446,12 @@ export async function discoverFolgeEinsaetze(
 const ACCEPTANCE_SYNC_MAX_AGE_DAYS = 30;
 const ACCEPTANCE_CONFIRM_ALERT_AFTER_MS = 5 * 60 * 1000;
 const ACCEPTANCE_PDF_ALERT_AFTER_MS = 24 * 60 * 60 * 1000;
+// Registry #82: Mamamia zeigt unsere Confirmation NICHT am Job der Bewerbung
+// (Upload-Bramka hat nachgelesen). Buchungs-Problem, kein Archiv-Problem —
+// eigene, kurze Schwelle statt der 24 h von pdfOverdue. Länger als die
+// Retry-Chain (15/30/60 s) plus ein Cron-Intervall, damit der normale Fall
+// "Mamamia braucht ein paar Sekunden" nicht alarmiert.
+const ACCEPTANCE_BOOKING_ALERT_AFTER_MS = 15 * 60 * 1000;
 
 // Team-Alarm über die Bridge — sie besitzt den SMTP-Transport. Das Event
 // acceptance_sync_alarm ist in route.ts team-mail-only (nicht in
@@ -457,6 +463,7 @@ async function postAcceptanceAlarm(
     confirmed: boolean;
     pdf_uploaded: boolean;
     permanent: boolean;
+    booking_not_visible?: "not_processed" | "foreign_confirmation" | null;
     error: string | null;
     age_minutes: number | null;
   },
@@ -476,6 +483,7 @@ async function postAcceptanceAlarm(
           confirmed: info.confirmed,
           pdf_uploaded: info.pdf_uploaded,
           permanent: info.permanent,
+          booking_not_visible: info.booking_not_visible ?? undefined,
           error: info.error,
           age_minutes: info.age_minutes,
           source: "cron",
@@ -523,6 +531,7 @@ export async function retryAcceptanceSyncs(
     let confirmedNow = !!row.mamamia_confirmed_at;
     let pdfNow = !!row.mamamia_pdf_uploaded_at;
     let permanentConfirmError = false;
+    let bookingNotVisible: "not_processed" | "foreign_confirmation" | null = null;
     let lastError: string | null = null;
     try {
       const result = await syncAcceptance({
@@ -556,6 +565,7 @@ export async function retryAcceptanceSyncs(
       confirmedNow = result.confirmed;
       pdfNow = result.pdf_uploaded;
       permanentConfirmError = result.confirm_error?.permanent === true;
+      bookingNotVisible = result.booking_not_visible ?? null;
       lastError = result.confirm_error?.message ?? null;
       if (result.confirmed && result.pdf_uploaded) out.completed += 1;
     } catch (e) {
@@ -571,15 +581,29 @@ export async function retryAcceptanceSyncs(
     const confirmOverdue = !confirmedNow &&
       (permanentConfirmError ||
         (Number.isFinite(ageMs) && ageMs > ACCEPTANCE_CONFIRM_ALERT_AFTER_MS));
-    const pdfOverdue = confirmedNow && !pdfNow &&
+    // Buchung nicht sichtbar (Registry #82) VOR pdfOverdue prüfen: derselbe
+    // Row erfüllt beides (confirm ok, PDF offen), aber die Ursachen sind
+    // verschieden — hier hat Mamamia unsere Confirmation nicht am Job, das ist
+    // Kundenrisiko und darf nicht 24 h unter "PDF fehlt" warten.
+    const bookingOverdue = !!bookingNotVisible && !confirmOverdue &&
+      Number.isFinite(ageMs) && ageMs > ACCEPTANCE_BOOKING_ALERT_AFTER_MS;
+    const pdfOverdue = confirmedNow && !pdfNow && !bookingOverdue &&
       Number.isFinite(ageMs) && ageMs > ACCEPTANCE_PDF_ALERT_AFTER_MS;
-    if ((confirmOverdue || pdfOverdue) && !row.mamamia_sync_alerted_at && supa.stampAcceptanceSyncAlerted) {
+    if (
+      (confirmOverdue || bookingOverdue || pdfOverdue) && !row.mamamia_sync_alerted_at &&
+      supa.stampAcceptanceSyncAlerted
+    ) {
       const ageMin = Number.isFinite(ageMs) ? Math.round(ageMs / 60000) : null;
+      const bookingMsg = `Buchung NICHT in Mamamia sichtbar (${bookingNotVisible}, ` +
+        `confirmation=${row.mamamia_confirmation_id ?? "?"}, alter=${ageMin ?? "?"}min) — ` +
+        `Kunde hat "Neue Buchung" erhalten`;
       console.error(
         `🚨 ACCEPTANCE-SYNC ALARM: lead=${row.lead_id} app=${row.application_id} ` +
           (confirmOverdue
             ? `Buchung OHNE Mamamia-Bestätigung (permanent=${permanentConfirmError}, ` +
               `alter=${ageMin ?? "?"}min, error=${lastError ?? "—"})`
+            : bookingOverdue
+            ? bookingMsg
             : "Vertrags-PDF fehlt seit >24h") +
           " — Team-Mail via Bridge + SA-Portal prüfen.",
       );
@@ -587,7 +611,8 @@ export async function retryAcceptanceSyncs(
         confirmed: confirmedNow,
         pdf_uploaded: pdfNow,
         permanent: permanentConfirmError,
-        error: lastError,
+        booking_not_visible: bookingNotVisible,
+        error: bookingOverdue ? bookingMsg : lastError,
         age_minutes: ageMin,
       });
       // Ohne lead_token ist die Mail für immer unmöglich → trotzdem stempeln,

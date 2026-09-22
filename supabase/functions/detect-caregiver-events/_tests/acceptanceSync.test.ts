@@ -997,8 +997,15 @@ Deno.test("retryAcceptanceSyncs: Bridge-Mail schlägt fehl ⇒ KEIN Stempel (Re-
 });
 
 Deno.test("retryAcceptanceSyncs: Confirm ok, nur PDF offen ⇒ Alarm erst nach 24h (kein Kundenrisiko)", async () => {
-  // final_confirmation NICHT sichtbar ⇒ PDF-Upload bleibt deferred.
-  const net = makeNet();
+  // ECHTER PDF-Fall (Registry #82): die Confirmation IST am Job sichtbar und
+  // gehört zur Row — nur der Upload scheitert (Renderer liefert kein PDF).
+  // Kein Kundenrisiko ⇒ 24h. Früher stand hier ein leeres finalConfirmations,
+  // also "Mamamia zeigt die Buchung nicht" — das ist seit #79 ein eigener,
+  // roter Fall mit 15-Min-Schwelle und kein PDF-Thema.
+  const net = makeNet({
+    finalConfirmations: [{ id: 555, application_id: 9001, caregiver: { id: 501 } }],
+    pdfBody: "<html>kein PDF</html>",
+  });
   const alerted: string[] = [];
   const confirmedRow = {
     mamamia_confirmed_at: "2026-07-20T10:00:00Z" as string | null,
@@ -1017,6 +1024,72 @@ Deno.test("retryAcceptanceSyncs: Confirm ok, nur PDF offen ⇒ Alarm erst nach 2
   const post = net.bridgePosts[0] as { metadata: Record<string, unknown> };
   assertEquals(post.metadata.confirmed, true);
   assertEquals(post.metadata.pdf_uploaded, false);
+});
+
+// ─── Registry #82: Buchung nicht in Mamamia sichtbar ───────────────────────
+// Fall Berg: beide Stempel gesetzt, Mamamia hatte die Confirmation aber am
+// FALSCHEN Job. Der Alarm fragte nur "haben WIR gestempelt?" und schwieg
+// 7 Tage. Jetzt entscheidet der Nachlese-Befund der Upload-Bramka.
+
+Deno.test("#82: Confirmation nicht am Job ⇒ Buchungs-Alarm nach 15 Min (nicht erst nach 24h)", async () => {
+  const net = makeNet(); // finalConfirmations leer ⇒ Mamamia zeigt nichts
+  const alerted: string[] = [];
+  const row = makePending({
+    mamamia_confirmed_at: "2026-09-15T13:05:08Z",
+    mamamia_confirmation_id: 4296,
+    accepted_at: new Date(Date.now() - 30 * 60_000).toISOString(), // 30 Min
+  });
+  const r = await retryAcceptanceSyncs(makeCronDeps(net, [row], alerted));
+  assertEquals(r.alerts, 1);
+  const post = net.bridgePosts[0] as { metadata: Record<string, unknown> };
+  assertEquals(post.metadata.booking_not_visible, "not_processed");
+  // confirmed=true UND trotzdem Alarm — das ist der ganze Punkt von #79.
+  assertEquals(post.metadata.confirmed, true);
+});
+
+Deno.test("#82: unter 15 Min bleibt es still (Mamamia darf ein paar Sekunden brauchen)", async () => {
+  const net = makeNet();
+  const alerted: string[] = [];
+  const row = makePending({
+    mamamia_confirmed_at: "2026-09-15T13:05:08Z",
+    mamamia_confirmation_id: 4296,
+    accepted_at: new Date(Date.now() - 5 * 60_000).toISOString(), // 5 Min
+  });
+  const r = await retryAcceptanceSyncs(makeCronDeps(net, [row], alerted));
+  assertEquals(r.alerts, 0);
+  assertEquals(net.bridgePosts.length, 0);
+});
+
+Deno.test("#82: fremde Confirmation (Mur aus #78) ⇒ eigener Grund im Alarm", async () => {
+  // Stempel zeigt auf Confirmation 4296, die zu einer anderen Bewerbung auf
+  // einem anderen Job gehört — exakt die Lage des Falls Berg am 15.09.
+  const net = makeNet({
+    finalConfirmations: [{ id: 4296, application_id: 11198, caregiver: { id: 501 }, job_offer_id: 32952 }],
+  });
+  const alerted: string[] = [];
+  const row = makePending({
+    mamamia_confirmed_at: "2026-09-15T13:05:08Z",
+    mamamia_confirmation_id: 4296,
+    accepted_at: new Date(Date.now() - 30 * 60_000).toISOString(),
+  });
+  const r = await retryAcceptanceSyncs(makeCronDeps(net, [row], alerted));
+  assertEquals(r.alerts, 1);
+  const post = net.bridgePosts[0] as { metadata: Record<string, unknown> };
+  assertEquals(post.metadata.booking_not_visible, "foreign_confirmation");
+});
+
+Deno.test("#82: schon alarmiert ⇒ kein zweiter Alarm", async () => {
+  const net = makeNet();
+  const alerted: string[] = [];
+  const row = makePending({
+    mamamia_confirmed_at: "2026-09-15T13:05:08Z",
+    mamamia_confirmation_id: 4296,
+    accepted_at: new Date(Date.now() - 30 * 60_000).toISOString(),
+    mamamia_sync_alerted_at: "2026-09-15T13:30:00Z",
+  });
+  const r = await retryAcceptanceSyncs(makeCronDeps(net, [row], alerted));
+  assertEquals(r.alerts, 0);
+  assertEquals(net.bridgePosts.length, 0);
 });
 
 // ─── sync-acceptance Edge Fn: Auth ─────────────────────────────────────────
@@ -1160,7 +1233,15 @@ Deno.test("retry-chain (Registry #52): Erstversuch HTTP 500 in Schritt 1, Stufe 
   const posts = net.bridgePosts.filter((p) => p.event === "acceptance_contact_alarm");
   assertEquals(posts.length >= 1, true); // jede Stufe POSTet, die Bridge dedupet pro application_id
   assertEquals(net.ops.filter((o) => o.op === "StoreConfirmation").length, 1);
-  assertEquals(net.bridgePosts.filter((p) => p.event === "acceptance_sync_alarm").length, 0);
+  // In diesem Fake veröffentlicht Mamamia die Confirmation nie am Job, also
+  // meldet die Chain seit #79 zusätzlich "Buchung nicht sichtbar" — genau der
+  // Befund, der im Fall Berg 7 Tage lang fehlte.
+  const syncAlarms = net.bridgePosts.filter((p) => p.event === "acceptance_sync_alarm");
+  assertEquals(syncAlarms.length, 1);
+  assertEquals(
+    (syncAlarms[0] as { metadata: Record<string, unknown> }).metadata.booking_not_visible,
+    "not_processed",
+  );
 });
 
 Deno.test("sync-acceptance handler (Registry #52): customer_update_error ändert weder complete noch retries_scheduled", async () => {
@@ -1239,8 +1320,12 @@ Deno.test("retry-chain: wyczerpana bez confirm (transient) ⇒ NATYCHMIAST alarm
 });
 
 Deno.test("retry-chain: confirm OK, tylko PDF wisi ⇒ wyczerpana BEZ alarmu (cron-backstop, 24h-próg)", async () => {
-  // finalConfirmations leer ⇒ Verarbeitungs-Bramka defer't den Upload in jeder Stufe.
-  const net = makeNet();
+  // Confirmation IST sichtbar (gehört zur Row), nur der Upload scheitert —
+  // Archiv-Thema, 24h-Schwelle des Crons, kein Alarm aus der Chain.
+  const net = makeNet({
+    finalConfirmations: [{ id: 555, application_id: 9001, caregiver: { id: 501 } }],
+    pdfBody: "<html>kein PDF</html>",
+  });
   const row = makeRow({ mamamia_confirmed_at: "2026-07-21T20:00:00Z", mamamia_confirmation_id: 555 });
   await runRetryChain(
     {
