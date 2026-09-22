@@ -132,7 +132,9 @@ Stałe: `RETRY_DELAYS_MS = [15s, 30s, 60s]` (`sync-acceptance/index.ts`);
 
 **Jak trafienie znika:** stan gaśnie sam, gdy upload przejdzie — a przejdzie dopiero,
 gdy MM pokaże naszą confirmation na właściwym jobie. Trwałym kanałem jest linia
-**„Buchungs-Check"** w porannym raporcie (`fetchBuchungHealth`, czyste SQL, zero wywołań MM):
+**„Buchungs-Check"** w porannym raporcie (`fetchBuchungHealth`, czyste SQL, zero wywołań MM —
+pokazuje WYŁĄCZNIE wiersze, dla których alarm zaprotokołował `booking_not_visible`; sam brak
+stempla PDF-a niczego nie dowodzi, bo ma wiele innych przyczyn):
 alarm z crona leci raz, a po 30 dniach (`ACCEPTANCE_SYNC_MAX_AGE_DAYS`) wiersz w ogóle znika
 cronowi z oczu — raport trzyma go widocznym, dopóki trwa przyczyna.
 

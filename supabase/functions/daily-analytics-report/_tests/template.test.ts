@@ -315,3 +315,41 @@ Deno.test("#82: Lesefehler der Abfrage ist sichtbar und alarmiert", () => {
   assertStringIncludes(html, "permission denied for table");
   assertStringIncludes(subject, "🚨");
 });
+
+/*
+ * Registry #82, Runde 2 (Michał: „nie możemy mieć fałszywych alarmów").
+ *
+ * Der erste Wurf nahm „Confirm-Stempel da, PDF-Stempel fehlt" als Beweis für
+ * „Mamamia zeigt die Buchung nicht". Das ist falsch: der fehlende PDF-Stempel
+ * hat mehrere Ursachen (Renderer, StoreFile, sha, Token — oder der Cron hat
+ * nach 30 Tagen aufgehört zu schauen), und in allen kann die Buchung in
+ * Ordnung sein. Gezeigt wird deshalb nur, was ein Alarm PROTOKOLLIERT hat.
+ */
+import { offeneBuchungen } from "../queries.ts";
+
+const beleg = (app: number, grund = "not_processed") => ({ leadId: "l1", applicationId: app, grund });
+const zeile = (app: number, pdfHochgeladen: boolean) => ({
+  leadId: "l1", applicationId: app, signedAt: "2026-09-22T00:00:00Z", pdfHochgeladen,
+});
+const jetzt = Date.parse("2026-09-23T00:00:00Z");
+
+Deno.test("#82: ohne protokollierten Befund wird NICHTS behauptet (die drei Juli-Zeilen)", () => {
+  // Zeile offen, aber kein Alarm hat je 'booking_not_visible' festgestellt.
+  assertEquals(offeneBuchungen([], [zeile(9705, false)], jetzt).length, 0);
+});
+
+Deno.test("#82: protokollierter Befund + Upload noch offen ⇒ Treffer, mit Grund", () => {
+  const t = offeneBuchungen([beleg(13074, "foreign_confirmation")], [zeile(13074, false)], jetzt);
+  assertEquals(t.length, 1);
+  assertEquals(t[0].grund, "foreign_confirmation");
+  assertEquals(t[0].ageHours, 24);
+});
+
+Deno.test("#82: Upload durch ⇒ Befund erledigt sich selbst", () => {
+  assertEquals(offeneBuchungen([beleg(13074)], [zeile(13074, true)], jetzt).length, 0);
+});
+
+Deno.test("#82: Beleg zu EINER Bewerbung färbt die anderen Zeilen des Leads nicht ein", () => {
+  const t = offeneBuchungen([beleg(13074)], [zeile(13074, false), zeile(11198, false)], jetzt);
+  assertEquals(t.map((x) => x.applicationId), [13074]);
+});

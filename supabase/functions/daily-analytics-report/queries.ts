@@ -621,51 +621,97 @@ export async function fetchAgentNotes(supabase: SupabaseClient, sinceIso: string
 }
 
 // ─── Buchungs-Check (Registry #82) ─────────────────────────────────────────
-// Der Alarm aus detect-caregiver-events feuert EINMAL je Zeile
-// (`!row.mamamia_sync_alerted_at`) und nach 30 Tagen sieht der Cron die Zeile
-// gar nicht mehr. Ein übersehener Alarm ist damit für immer weg. Diese Zeile
-// ist der bleibende Kanal: sie steht im Report, solange der Zustand besteht,
-// und verschwindet von selbst, sobald der Upload durchgeht.
+// Der Cron-Alarm feuert EINMAL je Zeile (`!row.mamamia_sync_alerted_at`) und
+// nach 30 Tagen sieht der Cron die Zeile gar nicht mehr. Ein übersehener Alarm
+// wäre damit für immer weg — diese Zeile ist der bleibende Kanal.
 //
-// Kein Mamamia-Aufruf nötig: der Upload passiert erst, wenn die Bramka unsere
-// Confirmation am Job der Bewerbung GELESEN hat (acceptanceSync.ts). Ein Row
-// mit Confirm-Stempel und ohne PDF-Stempel heisst deshalb genau:
-// "Mamamia zeigt die Buchung (noch) nicht".
+// WAS HIER NICHT STEHEN DARF: "Confirm-Stempel da, PDF-Stempel fehlt" als
+// Beweis für "Mamamia zeigt die Buchung nicht". Das war der erste Versuch und
+// es ist falsch (Michał, 22.09.2026: „nie możemy mieć fałszywych alarmów").
+// Der fehlende PDF-Stempel hat MEHRERE Ursachen: Renderer liefert kein PDF,
+// StoreFile scheitert, sha passt nicht, Lead-Token fehlt — oder der Cron hat
+// nach 30 Tagen schlicht aufgehört zu schauen. In all diesen Fällen KANN die
+// Buchung in Mamamia völlig in Ordnung sein. Der Stempel beweist nur eine
+// Richtung: Upload passiert ⇒ Mamamia hat sie gezeigt. Umgekehrt gilt nichts.
+//
+// Deshalb zählt nur, was der Code WIRKLICH festgestellt hat: die Upload-Bramka
+// hat nachgelesen und `booking_not_visible` gesetzt, und der Alarm hat das als
+// `lead_events.acceptance_sync_alarm` mit genau diesem Feld protokolliert.
+// Ohne diesen Beleg behaupten wir nichts.
 //
 // NICHT geprüft wird, ob eine einmal sichtbare Confirmation später wieder
-// verschwindet — das ist ein STORNO in Mamamia und ein legitimer Vorgang,
-// keine Störung (Michał, 22.09.2026).
+// verschwindet — das ist ein STORNO in Mamamia, ein legitimer Vorgang.
 export interface BuchungHealth {
   offen: number;
-  rows: Array<{ lead: string; leadId: string; applicationId: number; ageHours: number }>;
+  rows: Array<{ lead: string; leadId: string; applicationId: number; ageHours: number; grund: string }>;
   error?: string;
 }
 
-/** Älter als das hier ⇒ die Bramka hat mehrfach vergeblich nachgelesen. */
-const BUCHUNG_OFFEN_AB_MS = 2 * 60 * 60 * 1000;
+/** Ein Befund gilt als offen, solange der Upload nicht durch ist. */
+export function offeneBuchungen(
+  belege: Array<{ leadId: string; applicationId: number; grund: string }>,
+  zeilen: Array<{ leadId: string; applicationId: number; signedAt: string; pdfHochgeladen: boolean }>,
+  jetzt: number,
+): Array<{ leadId: string; applicationId: number; ageHours: number; grund: string }> {
+  const belegt = new Map(belege.map((b) => [`${b.leadId}:${b.applicationId}`, b.grund]));
+  return zeilen
+    .filter((z) => !z.pdfHochgeladen && belegt.has(`${z.leadId}:${z.applicationId}`))
+    .map((z) => ({
+      leadId: z.leadId,
+      applicationId: z.applicationId,
+      grund: belegt.get(`${z.leadId}:${z.applicationId}`)!,
+      ageHours: Math.round((jetzt - Date.parse(z.signedAt)) / 3600000),
+    }));
+}
 
 export async function fetchBuchungHealth(supabase: SupabaseClient): Promise<BuchungHealth> {
-  const cutoff = new Date(Date.now() - BUCHUNG_OFFEN_AB_MS).toISOString();
+  // 1. Belege: Alarme, die "Buchung nicht sichtbar" festgestellt haben.
+  const { data: evs, error: evErr } = await supabase
+    .from("lead_events")
+    .select("lead_id, metadata")
+    .eq("event_type", "acceptance_sync_alarm")
+    .not("metadata->>booking_not_visible", "is", null)
+    .order("created_at", { ascending: false })
+    .limit(200);
+  // Fehler sichtbar (Muster fetchAgentNotes) — NICHT `count ?? 0` wie
+  // fetchMailHealth, sonst sieht ein kaputtes Query aus wie Gesundheit.
+  if (evErr) return { offen: 0, rows: [], error: evErr.message };
+  const belege = (evs ?? []).flatMap((e: Record<string, unknown>) => {
+    const m = (e.metadata ?? {}) as Record<string, unknown>;
+    const app = Number(m.application_id);
+    if (!Number.isFinite(app)) return [];
+    return [{ leadId: String(e.lead_id), applicationId: app, grund: String(m.booking_not_visible) }];
+  });
+  if (belege.length === 0) return { offen: 0, rows: [] };
+
+  // 2. Aktueller Stand der belegten Zeilen — der Upload beendet den Befund.
+  const leadIds = [...new Set(belege.map((b) => b.leadId))];
   const { data, error } = await supabase
     .from("lead_application_acceptances")
-    .select("lead_id, application_id, signed_at, leads!inner(vorname, nachname, email)")
-    .not("signatur", "is", null)
-    .not("mamamia_confirmed_at", "is", null)
-    .is("mamamia_pdf_uploaded_at", null)
-    .lt("signed_at", cutoff)
-    .order("signed_at", { ascending: false })
-    .limit(50);
-  // Fehler sichtbar zurückgeben (Muster fetchAgentNotes) — NICHT `count ?? 0`
-  // wie fetchMailHealth, sonst sieht ein kaputtes Query aus wie Gesundheit.
+    .select("lead_id, application_id, signed_at, mamamia_pdf_uploaded_at, leads!inner(vorname, nachname, email)")
+    .in("lead_id", leadIds);
   if (error) return { offen: 0, rows: [], error: error.message };
-  const rows = (data ?? [])
-    .map((r: Record<string, unknown>) => {
-      const l = r.leads as { vorname?: string; nachname?: string; email?: string } | null;
+
+  const namen = new Map<string, { l: Record<string, unknown> | null }>();
+  const zeilen = (data ?? []).map((r: Record<string, unknown>) => {
+    const l = r.leads as Record<string, unknown> | null;
+    namen.set(`${r.lead_id}:${r.application_id}`, { l });
+    return {
+      leadId: String(r.lead_id),
+      applicationId: Number(r.application_id),
+      signedAt: String(r.signed_at),
+      pdfHochgeladen: r.mamamia_pdf_uploaded_at != null,
+    };
+  });
+
+  const rows = offeneBuchungen(belege, zeilen, Date.now())
+    .map((t) => {
+      const l = namen.get(`${t.leadId}:${t.applicationId}`)?.l as
+        | { vorname?: string; nachname?: string; email?: string }
+        | null;
       return {
+        ...t,
         lead: [l?.vorname, l?.nachname].filter(Boolean).join(" ") || String(l?.email ?? "?"),
-        leadId: String(r.lead_id),
-        applicationId: Number(r.application_id),
-        ageHours: Math.round((Date.now() - Date.parse(String(r.signed_at))) / 3600000),
         _real: isRealLead(l),
       };
     })

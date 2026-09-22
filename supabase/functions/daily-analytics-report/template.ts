@@ -59,7 +59,7 @@ export function buildReportEmail(opts: {
   /** Registry #82 — unterschrieben, aber Mamamia zeigt die Buchung nicht.
    *  Steht IMMER als Zeile im Report (auch bei 0), damit "kein Block" Gesundheit
    *  heisst und nicht "Abfrage kaputt". */
-  buchungHealth?: { offen: number; rows: Array<{ lead: string; leadId: string; applicationId: number; ageHours: number }>; error?: string };
+  buchungHealth?: { offen: number; rows: Array<{ lead: string; leadId: string; applicationId: number; ageHours: number; grund?: string }>; error?: string };
   prevPeriod?: PeriodStats;   // die 7 Tage VOR der Vergleichsperiode (Trend)
   agentNotes?: { notes: Array<{ source: string; note: string }>; error?: string };
   /** Google-Ads-Kosten (SEA, 16.08.) — null/undefined = Block entfällt (fail-soft). */
@@ -161,7 +161,7 @@ export function buildReportEmail(opts: {
       : buchungHealth.offen > 0
         ? `<div style="background:#fef2f2;border:2px solid #fca5a5;border-radius:10px;padding:14px 16px;margin:0 0 16px;">
         <p style="margin:0 0 6px;font-size:15px;font-weight:bold;color:#b91c1c;">🚨 Buchung nicht in Mamamia sichtbar: ${buchungHealth.offen} offen</p>
-        ${buchungHealth.rows.map((r) => `<p style=\"margin:2px 0;font-size:12px;color:#b91c1c;\">· ${r.lead} — Bewerbung ${r.applicationId}, seit ${r.ageHours} h</p>`).join('')}
+        ${buchungHealth.rows.map((r) => `<p style=\"margin:2px 0;font-size:12px;color:#b91c1c;\">· ${r.lead} — Bewerbung ${r.applicationId}, seit ${r.ageHours} h${r.grund ? ` (${r.grund})` : ''}</p>`).join('')}
        </div>`
         : `<p style="margin:0 0 12px;font-size:12px;color:#9a8a73;">Buchungs-Check: 0 offen.</p>`;
 
