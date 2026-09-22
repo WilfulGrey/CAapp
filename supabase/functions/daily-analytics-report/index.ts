@@ -25,7 +25,7 @@ import {
   fetchBesucherKohorten,
   fetchAdsSpend,
   fetchPeriodStats,
-  fetchTotalLeads, fetchMailHealth } from "./queries.ts";
+  fetchTotalLeads, fetchMailHealth, fetchBuchungHealth } from "./queries.ts";
 import { buildReportEmail } from "./template.ts";
 
 // Vergleichs-Periode für den Daily Report. 7 Tage liefert einen stabilen
@@ -132,7 +132,7 @@ Deno.serve(async (req: Request) => {
     const yesterday = berlinDayRange(daysAgo);
 
     const CHART_DAYS_BACK = 14;
-    const [yesterdayStats, periodStats, prevPeriodStats, totalLeads, booked, mailHealth, agentNotes, adsSpend, leadKohorten, besucherKohorten] = await Promise.all([
+    const [yesterdayStats, periodStats, prevPeriodStats, totalLeads, booked, mailHealth, agentNotes, adsSpend, leadKohorten, besucherKohorten, buchungHealth] = await Promise.all([
       fetchDailyStats(supabase, yesterday.start, yesterday.end),
       fetchPeriodStats(supabase, PERIOD_DAYS_BACK),
       // Die 7 Tage VOR der Vergleichsperiode — Basis für den Trend-Pfeil.
@@ -154,6 +154,14 @@ Deno.serve(async (req: Request) => {
         console.error("Besucher-Kohorten nicht lesbar:", e instanceof Error ? e.message : String(e));
         return [];
       }),
+      /* Buchungs-Check (Registry #82). `.catch` ist Pflicht: eine werfende
+         Sektion darf den ganzen Morgenreport nicht kippen — pg_cron meldet
+         trotzdem "succeeded" und niemand merkt es (Registry #36). */
+      fetchBuchungHealth(supabase).catch((e) => ({
+        offen: 0,
+        rows: [],
+        error: e instanceof Error ? e.message : String(e),
+      })),
     ]);
 
     const smtp = await getSmtpConfig(supabase);
@@ -171,6 +179,7 @@ Deno.serve(async (req: Request) => {
       totalBookings: booked.totalBookings,
       siteUrl: smtp.siteUrl,
       mailHealth,
+      buchungHealth,
       prevPeriod: prevPeriodStats,
       agentNotes,
       adsSpend,

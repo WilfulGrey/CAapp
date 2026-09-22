@@ -190,6 +190,13 @@ interface AcceptanceAlarmInfo {
   confirmed: boolean;
   pdf_uploaded: boolean;
   permanent: boolean;
+  /**
+   * Registry #82: wir haben gestempelt, aber Mamamia zeigt die Confirmation
+   * NICHT am Job dieser Bewerbung (Upload-Bramka hat nachgelesen). Buchungs-
+   * Problem trotz confirmed=true — eigener roter Fall, nicht der bernsteinfarbene
+   * "PDF fehlt"-Fall, dessen Text ausdrücklich "kein Kundenrisiko" behauptet.
+   */
+  booking_not_visible?: 'not_processed' | 'foreign_confirmation' | null;
   error?: string | null;
   age_minutes?: number | null;
   source: 'bridge' | 'cron' | 'sync-retry' | string;
@@ -253,28 +260,47 @@ function buildAcceptanceContactAlarmTemplate(lead: any, info: ContactAlarmInfo):
 function buildAcceptanceSyncAlarmTemplate(lead: any, info: AcceptanceAlarmInfo): EmailTemplate {
   const kunde = [lead.vorname, lead.nachname].filter(Boolean).join(' ') || lead.email || lead.id;
   const confirmCase = !info.confirmed;
+  // Registry #82 (Fall Berg): confirmed=true heisst nur, dass WIR gestempelt
+  // haben. Sagt die Upload-Bramka, dass Mamamia die Confirmation nicht am Job
+  // zeigt, ist das Kundenrisiko wie im confirmCase — also rot, nicht bernstein.
+  const bookingCase = !confirmCase && !!info.booking_not_visible;
+  const rot = confirmCase || bookingCase;
   const subject = confirmCase
     ? `🚨 ALARM: Buchung OHNE Mamamia-Bestätigung — ${kunde} (Bewerbung ${info.application_id})`
-    : `⚠️ ALARM: Vertrags-PDF fehlt in Mamamia — ${kunde} (Bewerbung ${info.application_id})`;
+    : bookingCase
+      ? `🚨 ALARM: Buchung nicht in Mamamia sichtbar — ${kunde} (Bewerbung ${info.application_id})`
+      : `⚠️ ALARM: Vertrags-PDF fehlt in Mamamia — ${kunde} (Bewerbung ${info.application_id})`;
 
   const lage = confirmCase
     ? 'Der Kunde hat die Buchung im Portal abgeschlossen (Unterschrift + Bestätigungsseite), aber in Mamamia existiert KEINE verbindliche Confirmation für diese Bewerbung. Der Kunde glaubt an eine Buchung, die aktuell nicht besteht.'
-    : 'Die Buchung ist in Mamamia bestätigt, aber der signierte Vertrag (PDF) konnte seit über 24 Stunden nicht hochgeladen werden. Kein unmittelbares Kundenrisiko — das Vertragsarchiv in Mamamia ist aber unvollständig.';
+    : bookingCase
+      ? 'Der Akzept wurde an Mamamia gesendet und bei uns als erledigt gestempelt — beim Nachlesen zeigt Mamamia die Confirmation aber NICHT am Job dieser Bewerbung. Der Kunde hat die Buchungs-Mail bekommen; in Mamamia bestätigt sie nichts.'
+      : 'Die Buchung ist in Mamamia bestätigt, aber der signierte Vertrag (PDF) konnte seit über 24 Stunden nicht hochgeladen werden. Kein unmittelbares Kundenrisiko — das Vertragsarchiv in Mamamia ist aber unvollständig.';
   const ursache = confirmCase
     ? (info.permanent
         ? 'Mamamia hat den Akzept DAUERHAFT abgelehnt — wahrscheinlichste Ursache: die Bewerbung wurde von der Agentur zurückgezogen oder existiert nicht mehr. Automatische Wiederholungen ändern daran nichts.'
         : 'Der automatische Sync schlägt bisher fehl (transienter Fehler). Weitere automatische Versuche laufen alle 15 Minuten weiter — dieser Alarm kommt trotzdem, damit niemand auf den Automatismus wartet.')
-    : 'Der Upload-Schritt (StoreFile/UpdateConfirmation bzw. das PDF-Rendering) schlägt wiederholt fehl — Details in den Supabase-Logs (sync-acceptance / detect-caregiver-events).';
+    : bookingCase
+      ? (info.booking_not_visible === 'foreign_confirmation'
+          ? 'Der gespeicherte Confirmation-Stempel gehört zu einer ANDEREN Bewerbung bzw. einem anderen Job (Registry #78). Der Vertrag wurde deshalb NICHT hochgeladen — sonst würde die fremde Confirmation umgehängt.'
+          : 'Mamamia hat die Confirmation auch nach mehreren Versuchen nicht am Job veröffentlicht. Entweder verarbeitet Mamamia sie noch nicht, oder sie ist dort gar nicht angekommen.')
+      : 'Der Upload-Schritt (StoreFile/UpdateConfirmation bzw. das PDF-Rendering) schlägt wiederholt fehl — Details in den Supabase-Logs (sync-acceptance / detect-caregiver-events).';
   const schritte = confirmCase
     ? [
         'SA-Portal → Kunde → Bewerbung öffnen: existiert sie noch, welcher Status?',
         'Bewerbung zurückgezogen/weg: Kunden SOFORT kontaktieren — er wartet auf eine Pflegekraft, die nicht kommt.',
         'Bewerbung in Ordnung: Annahme manuell im SA-Portal durchführen.',
       ]
-    : [
-        'Supabase-Logs (sync-acceptance / detect-caregiver-events) prüfen.',
-        'Notfalls Vertrag aus der Buchungs-Team-Mail manuell in Mamamia hochladen.',
-      ];
+    : bookingCase
+      ? [
+          'SA-Portal → Kunde → Job der Bewerbung öffnen: ist dort eine verbindliche Buchung eingetragen?',
+          'Keine Buchung: Annahme manuell im SA-Portal durchführen — der Kunde wartet auf eine Pflegekraft.',
+          'Buchung vorhanden: Stempel (mamamia_confirmation_id) der Zeile prüfen — er zeigt auf die falsche Confirmation.',
+        ]
+      : [
+          'Supabase-Logs (sync-acceptance / detect-caregiver-events) prüfen.',
+          'Notfalls Vertrag aus der Buchungs-Team-Mail manuell in Mamamia hochladen.',
+        ];
 
   const daten: Array<[string, string]> = [
     ['Kunde', String(kunde)],
@@ -304,10 +330,10 @@ function buildAcceptanceSyncAlarmTemplate(lead: any, info: AcceptanceAlarmInfo):
 
   const html = `
     <div style="font-family: Arial, sans-serif; max-width: 640px; margin: 0 auto;">
-      <div style="background-color: ${confirmCase ? '#dc2626' : '#d97706'}; color: white; padding: 16px 20px; border-radius: 8px 8px 0 0;">
+      <div style="background-color: ${rot ? '#dc2626' : '#d97706'}; color: white; padding: 16px 20px; border-radius: 8px 8px 0 0;">
         <h2 style="margin: 0; font-size: 18px;">${subject}</h2>
       </div>
-      <div style="border: 2px solid ${confirmCase ? '#dc2626' : '#d97706'}; border-top: none; border-radius: 0 0 8px 8px; padding: 20px;">
+      <div style="border: 2px solid ${rot ? '#dc2626' : '#d97706'}; border-top: none; border-radius: 0 0 8px 8px; padding: 20px;">
         <p style="margin-top: 0;"><strong>${lage}</strong></p>
         <p>${ursache}</p>
         <table style="border-collapse: collapse; width: 100%; font-size: 14px;">
@@ -1045,6 +1071,10 @@ async function handlePost(request: NextRequest) {
         confirmed: m.confirmed === true,
         pdf_uploaded: m.pdf_uploaded === true,
         permanent: m.permanent === true,
+        booking_not_visible: m.booking_not_visible === 'not_processed' ||
+            m.booking_not_visible === 'foreign_confirmation'
+          ? m.booking_not_visible
+          : null,
         error: typeof m.error === 'string' ? m.error : null,
         age_minutes: typeof m.age_minutes === 'number' ? m.age_minutes : null,
         // 'cron' (15-Min-Backstop) oder 'sync-retry' (Chain 15/30/60 s).

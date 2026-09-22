@@ -244,7 +244,13 @@ export async function runRetryChain(
     const lead = await deps.store.fetchLead(leadId);
     const row = await deps.store.fetchAcceptance(leadId, applicationId);
     if (!lead || !row) return;
-    if (row.mamamia_confirmed_at) {
+    // Registry #82: "confirm OK" heißt nur, dass WIR einen Stempel gesetzt haben.
+    // Sagt die Upload-Bramka nach der ganzen Chain, dass Mamamia unsere
+    // Confirmation am Job NICHT zeigt, ist das ein Buchungs-Problem — der Kunde
+    // hat "Neue Buchung" bekommen, Mamamia bestätigt nichts. Alarm jetzt, nicht
+    // in 24 h unter der Etikette "PDF fehlt" (Fall Berg schwieg 7 Tage).
+    const bookingNotVisible = lastResult?.booking_not_visible;
+    if (row.mamamia_confirmed_at && !bookingNotVisible) {
       console.log(`[retry-chain] exhausted — confirm OK, PDF pending, Cron-Backstop übernimmt (lead=${leadId}, app=${applicationId})`);
       return;
     }
@@ -259,11 +265,14 @@ export async function runRetryChain(
         metadata: {
           application_id: applicationId,
           caregiver_id: row.caregiver_id,
-          confirmed: false,
+          confirmed: !!row.mamamia_confirmed_at,
           pdf_uploaded: !!row.mamamia_pdf_uploaded_at,
           permanent: lastResult?.confirm_error?.permanent === true,
-          error: lastResult?.confirm_error?.message
-            ?? "confirm still missing after 15/30/60s retry chain",
+          booking_not_visible: bookingNotVisible,
+          error: bookingNotVisible
+            ? `Buchung nicht in Mamamia sichtbar (${bookingNotVisible}) — Confirmation ${row.mamamia_confirmation_id ?? "?"} nach 15/30/60s nicht am Job der Bewerbung`
+            : lastResult?.confirm_error?.message
+              ?? "confirm still missing after 15/30/60s retry chain",
           age_minutes: 2,
           source: "sync-retry",
         },
