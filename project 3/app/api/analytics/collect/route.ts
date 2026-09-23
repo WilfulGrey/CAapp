@@ -50,6 +50,7 @@ const MAX_JSON = 4000;
    feste Liste, damit ueber diese Route nichts anderes gesetzt werden kann. */
 const AD_PARAM_SPALTEN = new Set([
   'gclid', 'wbraid', 'gbraid', 'utm_term', 'utm_content',
+  'src', // Seite + Knopfposition auf primundus.de (Migration 20260923120000)
 ]);
 
 const text = (v: unknown, max = MAX_TEXT): string | null =>
