@@ -29,8 +29,11 @@ export function HowItWorks() {
               <h3 className="font-bold text-[17px] md:text-[18px] lg:text-[20px] mb-1.5 md:mb-2.5 text-[#3D3D3D] leading-snug">
                 Sofort Angebot und Pflegekräfte einsehen
               </h3>
+              {/* 23.09.2026 (Martin „alles auf ja", Vorschlag aus der OpenAI-Prüfung): „für die Kopie des Angebots"
+                  klang vorgeschoben — die Kontaktdaten sind die Voraussetzung für Preis und Pflegekräfte, die Kopie per
+                  Mail ist ein Zusatz. Derselbe Satz steht auf primundus.de (Startseite, /24-stunden-pflege, /ablauf). */}
               <p className="text-[16px] leading-[1.55] text-[#5A5A5A] mb-2.5">
-                Sie machen wenige preisrelevante Angaben und hinterlassen für die Kopie des Angebots Ihre Kontaktdaten. Sofort danach sehen Sie Ihr Angebot samt Zuschüssen und Steuervorteilen sowie die passenden Pflegekräfte — die Kopie kommt zusätzlich per E-Mail.
+                Sie machen wenige preisrelevante Angaben und hinterlassen Ihre Kontaktdaten. Sofort danach sehen Sie Ihr Angebot samt Zuschüssen und Steuervorteilen sowie die passenden Pflegekräfte. Eine Kopie kommt zusätzlich per E-Mail.
               </p>
               <span className="inline-flex items-center gap-1.5 bg-[#E8F5E9] text-[#2E7D32] px-3 py-1.5 rounded-lg text-xs font-semibold">
                 <Clock className="w-3.5 h-3.5" strokeWidth={2} />
