@@ -451,8 +451,9 @@ export function resolvePatientSalutation(lead: Lead): "Mr." | "Mrs." {
 // Business defaults that DO ship in onboard (NOT pytania do klienta):
 //   - language_id = 1   → Primundus is German market
 //   - visibility = "public"
-//   - commission_agent_salary = 10  → Primundus baseline (panel rejects 0;
-//     było 300, obniżone 2026-05-11 wg decyzji biznesowej Michała)
+//   - commission_agent_salary = 0  → keine Provision (300 → 10 am 2026-05-11,
+//     10 → 0 am 2026-09-24, Entscheidung Michał). MM rechnet (beta belegt)
+//     care_budget = monthly_salary − commission_agent_salary, mit 0 sind beide gleich.
 //   - is_open_for_all = false (in wish) → matcher should respect filters
 //
 // caller passes locationId from Locations(plz) lookup; null when PLZ
@@ -488,7 +489,7 @@ export function buildCustomerInput(
     // Business defaults
     language_id: 1,
     visibility: "public",
-    commission_agent_salary: 10,
+    commission_agent_salary: 0,
     // Pricing (real, from kalkulation)
     care_budget: careBudget,
     monthly_salary: careBudget,

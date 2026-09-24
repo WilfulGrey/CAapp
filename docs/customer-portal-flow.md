@@ -698,7 +698,7 @@ z prawdziwymi danymi. Verified live: Customer 7651 (`/tmp/test-minimal-storecust
 | `location_id` | wynik `Locations(plz)` lub `null` | tylko gdy stage-B podała PLZ |
 | `language_id` | **stała `1`** (German) | business default |
 | `visibility` | **stała `"public"`** | business default |
-| `commission_agent_salary` | **stała `300`** | Primundus baseline (panel rejects 0) |
+| `commission_agent_salary` | **stała `0`** | brak prowizji (300 → 10 w 05/2026, 10 → 0 od 24.09.2026); MM liczy `care_budget = monthly_salary − commission_agent_salary` (sprawdzone na becie), więc przy 0 oba są równe |
 | `care_budget`, `monthly_salary` | `lead.kalkulation.bruttopreis` | real |
 | `arrival_at` | derived z `care_start_timing` przez `OFFSET_DAYS` (sofort=+7d, 2-4-wochen=+21d, 1-2-monate=+45d, unklar=+30d) | derivation z real |
 
@@ -773,7 +773,7 @@ Authorization: Bearer <agency-jwt>
     "title":               "Primundus — <lead.nachname>",
     "description":         "Auto-created from Primundus kostenrechner",
     "salary_offered":      <lead.kalkulation.bruttopreis>,
-    "salary_commission":   300,
+    "salary_commission":   0,
     "visibility":          "public",
     "arrival_at":          "<YYYY-MM-DD>"
   }
