@@ -132,7 +132,8 @@ export const AngebotsFeedback: FC<{
             type="button"
             onClick={schliessen}
             aria-label="Nicht jetzt"
-            className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 shadow-md"
+            // 44-px-Tippfläche um den 32-px-Kreis (Portal-Redesign, Messung 24.09.)
+            className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 shadow-md relative after:absolute after:-inset-1.5 after:content-['']"
             style={{ background: '#FFFFFF', border: '1px solid #D4D4D8' }}
           >
             <X className="w-4 h-4" style={{ color: '#71717A' }} />

@@ -116,7 +116,7 @@ export const AppCard: FC<{
       <div className="flex items-center justify-between px-5 pb-5 pt-1">
         <button
           onClick={() => onDecline(app.id)}
-          className="text-sm text-gray-400 hover:text-gray-600 font-medium transition-colors"
+          className="min-h-[44px] -ml-2 px-2 text-sm text-gray-500 hover:text-gray-700 font-medium transition-colors"
         >
           Ablehnen
         </button>
