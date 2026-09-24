@@ -488,7 +488,7 @@ async function createCustomerAndJob(args: {
         ? `Auto-created from Primundus kostenrechner\n\n${fd.portal_details}`
         : "Auto-created from Primundus kostenrechner",
       salary_offered: careBudget,
-      salary_commission: 10,    // Primundus default commission, panel rejects 0 (300 → 10 wg decyzji 2026-05-11)
+      salary_commission: 0,     // keine SA-Provision (300 → 10 am 2026-05-11, 10 → 0 am 2026-09-24)
       visibility: "public",
       arrival_at: arrivalAt,
     },

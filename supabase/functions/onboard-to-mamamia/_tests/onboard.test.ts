@@ -254,7 +254,7 @@ Deno.test("onboardLead: StoreCustomer payload (Bug #13: minimal — only real da
   // ── BUSINESS DEFAULTS — NOT pytania do klienta ──
   assertEquals(v.language_id, 1);                   // Primundus = German market
   assertEquals(v.visibility, "public");
-  assertEquals(v.commission_agent_salary, 10);      // Primundus baseline (panel rejects 0; 300 → 10 wg decyzji 2026-05-11)
+  assertEquals(v.commission_agent_salary, 0);       // keine Provision (300 → 10 am 11.05., 10 → 0 am 24.09.2026)
 
   // ── NESTED — real care attrs only ──
   const wish = v.customer_caregiver_wish as Record<string, unknown>;
@@ -305,7 +305,7 @@ Deno.test("onboardLead: StoreCustomer payload (Bug #13: minimal — only real da
 
   // ── StoreJobOffer (third request after LoginAgency + StoreCustomer) ──
   const sjoReq = mm.requests[2];
-  assertEquals(sjoReq.variables.salary_commission, 10);
+  assertEquals(sjoReq.variables.salary_commission, 0);
   assertEquals(sjoReq.variables.visibility, "public");
 });
 
