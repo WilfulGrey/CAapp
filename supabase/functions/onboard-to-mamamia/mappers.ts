@@ -452,7 +452,7 @@ export function resolvePatientSalutation(lead: Lead): "Mr." | "Mrs." {
 //   - language_id = 1   → Primundus is German market
 //   - visibility = "public"
 //   - commission_agent_salary = 0  → keine Provision (300 → 10 am 2026-05-11,
-//     10 → 0 am 2026-09-24, Entscheidung Michał). MM rechnet
+//     10 → 0 am 2026-09-24, Entscheidung Michał). MM rechnet (beta belegt)
 //     care_budget = monthly_salary − commission_agent_salary, mit 0 sind beide gleich.
 //   - is_open_for_all = false (in wish) → matcher should respect filters
 //
