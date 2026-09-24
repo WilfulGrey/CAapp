@@ -29,8 +29,17 @@ export type KontaktVariante = (typeof KONTAKT_VARIANTEN)[number];
 export const KONTAKT_STUFEN = ['name', 'email', 'telefon'] as const;
 export type KontaktStufe = (typeof KONTAKT_STUFEN)[number];
 
-/** Der Kontakt-Test: `aktiv: false` = alle sehen das alte Formular (eine Zeile + Merge). */
-export const KONTAKT_TEST = { aktiv: true, anteilStufen: 0.5 } as const;
+/**
+ * Der Kontakt-Test: `aktiv: false` = alle sehen das alte Formular (eine Zeile + Merge).
+ *
+ * BEENDET am 24.09.2026 (Registry #84, Martin: „mach alles inkl. Beenden vom Kontakttest"). Die vorab
+ * festgelegte Regel (Plan 19.09., Nachtrag 20.09.) war erreicht — je Arm über 60 Besucher am Kontaktschritt
+ * (alt 63, stufen 65), Kennzahl Anfragen MIT Nummer je Start: alt 18,6 % (18/97) gegen stufen 10,6 % (10/94),
+ * P(stufen besser) = 6 %. Fertige Profile je Start alt 7,2 % gegen 3,2 %. Die drei Schritte brachten mehr
+ * Anfragen nur mit E-Mail (28,7 % gegen 19,6 %), aber halb so viele Nummern und Profile. Das gemerkte Los
+ * (`prim_kontakt_los`) wird ab jetzt nicht mehr gelesen; `?kontakt=stufen` zeigt die drei Schritte weiter.
+ */
+export const KONTAKT_TEST = { aktiv: false, anteilStufen: 0.5 } as const;
 export type KontaktTest = { readonly aktiv: boolean; readonly anteilStufen: number };
 /** Das Los (localStorage): `{ v: 'stufen'|'alt', t: <ms> }`, gültig 30 Tage. */
 export const LOS_KEY = 'prim_kontakt_los';
