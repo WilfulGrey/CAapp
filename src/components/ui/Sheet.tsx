@@ -10,6 +10,10 @@ export function Sheet({
   const titelId = useId();
   const box = useRef<HTMLDivElement>(null);
   const zuvor = useRef<HTMLElement | null>(null);
+  // onClose über eine Ref: Aufrufer übergeben oft eine neue Funktion je Render —
+  // als Abhängigkeit würde der Effekt dann bei jedem Render den Fokus zurücksetzen.
+  const schliessen = useRef(onClose);
+  schliessen.current = onClose;
 
   useEffect(() => {
     if (!offen) return;
@@ -17,7 +21,7 @@ export function Sheet({
     const fokusierbar = () => [...(box.current?.querySelectorAll<HTMLElement>('button, a[href], input, select, textarea, [tabindex]:not([tabindex="-1"])') ?? [])];
     fokusierbar()[0]?.focus();
     const taste = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') { e.preventDefault(); onClose(); return; }
+      if (e.key === 'Escape') { e.preventDefault(); schliessen.current(); return; }
       if (e.key !== 'Tab') return;
       const el = fokusierbar();
       if (!el.length) return;
@@ -33,7 +37,7 @@ export function Sheet({
       document.body.style.overflow = ueberlauf;
       zuvor.current?.focus?.();
     };
-  }, [offen, onClose]);
+  }, [offen]);
 
   if (!offen) return null;
   return (

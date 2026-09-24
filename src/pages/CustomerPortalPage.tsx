@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useRef, FC } from 'react';
-import { Check, Bell, Phone, AlertCircle, AlertTriangle, ChevronDown, X, ArrowLeft, ArrowRight, Heart } from 'lucide-react';
+import { Check, Bell, Phone, ShieldCheck, AlertCircle, ChevronDown, X, ArrowLeft, ArrowRight, Heart } from 'lucide-react';
 import { Nurse } from '../types';
 import { displayName } from '../components/portal/shared';
 import {
@@ -66,7 +66,24 @@ import { AngebotPruefenModal, buildVertragsDaten } from '../components/portal/An
 import { CustomerNurseModal } from '../components/portal/CustomerNurseModal';
 import { zeigtSommerzuschlag } from '../components/portal/konditionen';
 import { PflegekraftChat } from '../components/portal/PflegekraftChat';
-import { TELEFON_HREF, WHATSAPP_HREF } from '../lib/kontakt';
+import { TELEFON_HREF } from '../lib/kontakt';
+import { useSterneStand } from '../lib/sterne';
+import { BestpreisSheet, WarumSheet } from '../components/portal/PortalSheets';
+import { SoGehtEsWeiter } from '../components/portal/SoGehtEsWeiter';
+import { FaqListe } from '../components/portal/FaqListe';
+import { MartaBox } from '../components/portal/MartaBox';
+import { Button } from '../components/ui/Button';
+import { Card } from '../components/ui/Card';
+import { SectionHeader, EYEBROW, H2 } from '../components/ui/SectionHeader';
+import { StatusBadge } from '../components/ui/StatusBadge';
+
+// vdek-Auswertung zum 01.07.2026: bundesweiter Durchschnitt des Eigenanteils im ERSTEN
+// Heimjahr. Bewusst das erste Jahr — später sinkt es durch den Leistungszuschlag, und wer
+// jetzt entscheidet, vergleicht mit dem, was er zuerst zahlt. Beim nächsten vdek-Update
+// (jeweils 01.01. und 01.07.) nachziehen. EINE Konstante für Kostenkarte und Aufklapper
+// (bis Teil 3 des Redesigns stand die Zahl zweimal, einmal als Literal).
+const HEIM_EIGENANTEIL = 3364;
+const HEIM_QUELLE = 'vdek-Auswertung, Stand 1. Juli 2026';
 
 // ─── Dev-Only Preview-Mode (NICHT für Production) ──────────────────────────
 // Aktiviert via ?preview=bewerbung oder ?preview=interesse. Skipped den
@@ -635,7 +652,10 @@ const CustomerPortalPage: FC = () => {
   // über der mitlaufenden Knopfleiste des Formulars (Portal-Redesign 24.09.).
   // AngebotCard meldet das selbst (onImBlick), weil sie neu gemountet werden kann.
   const [formularImBlick, setFormularImBlick] = useState(false);
-  const [openFaq, setOpenFaq] = useState<number | null>(null);
+  // Pop-ups der Angebotsseite (Portal-Redesign Teil 3).
+  const [bestpreisOffen, setBestpreisOffen] = useState(false);
+  const [warumOffen, setWarumOffen] = useState(false);
+  const sterne = useSterneStand();
   // Manual override for the "Ihr Angebot" expand/collapse. null = follow
   // the auto rule below (expanded only in initial state). Toggling sets
   // an explicit value that wins over the auto rule.
@@ -1749,9 +1769,11 @@ const CustomerPortalPage: FC = () => {
     // Without it, the caregiver can't prepare a meaningful application
     // and we get back-and-forth queries that frustrate both sides.
     if (!patientSaved) {
-      // Kein wegklickbarer Hinweis mehr (Clarity 07.09.: Kunden tippten den
-      // Hinweis weg und weiter auf Karten) — direkt zum Formular.
-      zurPflegesituation();
+      // Seit Teil 3 des Redesigns (Martin 24.09.): Einladen mit Schloss öffnet
+      // „Warum erst die Pflegesituation?" mit dem Knopf zum Formular. Vorher
+      // (Clarity 07.09.) sprang der Knopf direkt ins Formular — ohne zu sagen,
+      // warum; der Hauptweg sind Bewerbungen, Einladen ist die Zugabe.
+      setWarumOffen(true);
       return false;
     }
     // Serialize concurrent invite clicks. Backend gate is per-request
@@ -2419,132 +2441,111 @@ const CustomerPortalPage: FC = () => {
           { text: 'Erst auswählen, dann buchen' },
           { text: 'Keine Vermittlungsgebühr' },
         ];
+        // Heimvergleich EINMAL berechnet (Karte + Aufklapper): Eigenanteil aus dem
+        // ANGEZEIGTEN Brutto minus Posten mit `in_kalkulation` (wie `zuschüsse.gesamt`
+        // serverseitig). Nur zeigen, wenn wir wirklich günstiger sind.
+        const zuschussPosten = (lead?.kalkulation?.['zuschüsse']?.items ?? [])
+          .filter(z => z.in_kalkulation && z.betrag_monatlich > 0);
+        const eigenanteil = zuschussPosten.length > 0
+          ? Math.max(0, brutto - zuschussPosten.reduce((a, z) => a + z.betrag_monatlich, 0))
+          : null;
+        const heimErsparnis = eigenanteil !== null ? HEIM_EIGENANTEIL - eigenanteil : 0;
         return (
-        <div style={{background:'#FFFFFF', borderBottom:'1px solid #E9E9EB'}}>
-        <div className="max-w-3xl mx-auto">
-          {/* „Ihr persönliches Angebot" steht im Header unter dem Namen
-              (Martin, 11.08.) — der Abschnitt heißt deshalb nach seinem
-              Inhalt und wiederholt den Titel nicht. Der Chevron klappt den
-              ganzen Abschnitt zu, sobald er nur noch Referenz ist. */}
-          <button
-            onClick={() => setOfferExpandedManual(!offerExpanded)}
-            className={`w-full px-5 pt-6 flex items-center justify-between gap-3 text-left ${offerExpanded ? 'pb-3' : 'pb-6'}`}
-          >
-            <div>
-              <h2 className="text-[1.2rem] font-bold tracking-tight" style={{color:'#18181B'}}>{hasPending ? 'Ihr Angebot' : 'Ihre Betreuungskosten'}</h2>
-            </div>
-            <ChevronDown className={`w-5 h-5 flex-shrink-0 transition-transform duration-200 ${offerExpanded ? 'rotate-180' : ''}`} style={{color:'#71717A'}} />
-          </button>
+        <div className={`max-w-3xl mx-auto px-3.5 ${!patientSaved && !hasPending ? '-mt-6' : 'pt-5'}`}>
+          {/* Karte im Look des Rechners (Teil 3, Martin 24.09.). „Ihr persönliches
+              Angebot" steht im Kopf — der Abschnitt heißt nach seinem Inhalt. Der
+              Chevron klappt den ganzen Abschnitt zu, sobald er nur noch Referenz ist
+              (Martin: „muss einklappbar sein für spätere Zustände"). */}
+          <Card className="relative px-5 pt-3 pb-4 shadow-lift">
+            <button
+              type="button"
+              onClick={() => setOfferExpandedManual(!offerExpanded)}
+              aria-expanded={offerExpanded}
+              className="w-full min-h-[44px] flex items-center justify-between gap-3 text-left"
+            >
+              <span className={EYEBROW}>{hasPending ? 'Ihr Angebot' : 'Ihre Betreuungskosten'}</span>
+              <ChevronDown className={`w-5 h-5 flex-shrink-0 text-pm-taupe transition-transform duration-200 ${offerExpanded ? 'rotate-180' : ''}`} />
+            </button>
 
-          {/* Die Kosten stehen IMMER (Martin, 11.08.). Der Kunde kam für den
-              Preis; ihn hinter einen Toggle zu legen wäre die teuerste
-              Ersparnis an Bildschirmhöhe.
-
-              Der MONATSBETRAG führt, nicht der Tagessatz: Angehörige rechnen
-              in Monaten, und der Tagessatz allein (Brutto/30) lässt die
-              Zuschüsse unsichtbar — der Kunde überschätzt seine Belastung um
-              genau deren Summe. `eigenanteil` und `zuschüsse` liegen im Lead
-              und wurden bis 11.08. nirgends angezeigt; im Kostenrechner sieht
-              er sie auch nicht (der Ergebnis-Block dort ist seit dem
-              Direct-Redirect toter Code, setShowResults(true) existiert
-              nicht). Das Portal ist die EINZIGE Stelle. */}
+          {/* Die Kosten stehen IMMER (Martin, 11.08.), solange der Abschnitt offen
+              ist. Der MONATSBETRAG führt, nicht der Tagessatz: Angehörige rechnen
+              in Monaten. */}
           {offerExpanded && (
-          <div className="px-4 pb-4">
+          <>
                 {/* NUR unser Angebot (Martin, 11.08.). Pflegegeld,
-                    Steuerersparnis und der daraus gebildete Eigenanteil sind
-                    bewusst NICHT hier: Das sind fremde Leistungen mit eigenen
-                    Voraussetzungen — wir nennen unseren Preis, nicht eine
-                    Rechnung über das Geld anderer. `eigenanteil` und
-                    `zuschüsse` bleiben unangetastet im Lead. */}
-                <div className="rounded-2xl border px-5 py-5" style={{background:'#F4F4F6', borderColor:'#D4D4D8'}}>
-                  <p className="text-[2.5rem] font-bold leading-none tracking-tight tabular-nums" style={{color:'#18181B'}}>{formatEuro(brutto)}</p>
-                  <p className="text-[15px] mt-2.5 leading-relaxed" style={{color:'#71717A'}}>
+                    Steuerersparnis und der daraus gebildete Eigenanteil stehen
+                    nicht am Preis — das sind fremde Leistungen mit eigenen
+                    Voraussetzungen. */}
+                  <p className="mt-1 text-[46px] font-extrabold leading-none tracking-[-0.04em] tabular-nums text-pm-ink">{formatEuro(brutto)}</p>
+                  <p className="text-[14.5px] mt-2 leading-[1.5] text-pm-muted">
                     Monatlich inkl. Steuern, Gebühren und Sozialabgaben. Zzgl. Kost und Logis sowie Reisekosten (125 € pro Fahrt).
                   </p>
-                  {/* Bestpreisgarantie (Martin 12.09.): oben am Preis, nur das
-                      Siegel und ein Link — die Bedingungen stehen auf der
-                      Garantie-Seite des Rechners. */}
-                  <div className="mt-4 flex items-center gap-3">
-                    <a href="https://kostenrechner.primundus.de/bestpreisgarantie" target="_blank" rel="noopener noreferrer" aria-label="Primundus Bestpreisgarantie – mehr Infos" className="flex-shrink-0">
-                      <img src="/images/bestpreisgarantie-siegel.png" alt="Primundus Bestpreisgarantie – 6× Preis-Leistungssieger" width={900} height={256} className="h-12 w-auto" loading="lazy" />
-                    </a>
-                    <a href="https://kostenrechner.primundus.de/bestpreisgarantie" target="_blank" rel="noopener noreferrer" className="text-[14px] font-semibold underline underline-offset-2 whitespace-nowrap" style={{color:'#1E5C3A'}}>Mehr Infos</a>
-                  </div>
+                  {/* Bestpreisgarantie (Martin 12.09.; Teil 3, 24.09.: eigenes
+                      Pop-up statt Link auf die Garantie-Seite des Rechners). */}
+                  <button
+                    type="button"
+                    onClick={() => setBestpreisOffen(true)}
+                    className="mt-3.5 w-full min-h-[48px] flex items-center gap-2.5 rounded-[14px] bg-pm-mint px-3 py-2 text-left"
+                  >
+                    <span className="w-[30px] h-[30px] rounded-full bg-pm-green text-white flex items-center justify-center flex-none" aria-hidden="true">
+                      <ShieldCheck className="w-4 h-4" />
+                    </span>
+                    <span className="flex-1 text-[15px] font-bold text-pm-green-deep">Bestpreisgarantie</span>
+                    <span className="text-[14px] font-semibold text-pm-green-deep underline underline-offset-2">Mehr Infos</span>
+                  </button>
 
                   {/* Konditionen stehen OFFEN unter dem Preis (Martin, 11.08.):
-                      Sie sind das Verkaufsargument — hinter einem Toggle
-                      erreichen sie niemanden. Die Zahlen (Reisekosten, Kost &
-                      Logis, Sommerzuschlag) sind umgekehrt Nachschlagewerk und
-                      liegen im Aufklapper.
-
-                      Einspaltig, nicht im 2er-Raster: Auf 375 px bleiben pro
-                      Spalte ~18 Zeichen, „Tagesgenaue Abrechnung" und „Ohne
-                      Vermittlungsgebühr" brachen dort erneut um — vier
-                      umbrechende Halbzeilen sind unruhiger als vier ganze.
-                      Mit den gekürzten Texten passt jetzt jede Zeile. */}
-                  <div className="mt-5 pt-5 space-y-3" style={{borderTop:'1px solid #E9E9EB'}}>
+                      Sie sind das Verkaufsargument. Einspaltig — im 2er-Raster
+                      brachen die Zeilen auf 375 px um. */}
+                  <ul className="mt-3.5">
                     {items.map((item, i) => (
-                      <div key={i} className="flex items-center gap-2.5">
-                        <Check className="w-4 h-4 flex-shrink-0" strokeWidth={3} style={{color:'#2A9D5C'}} />
-                        <span className="text-[15px]" style={{color:'#18181B'}}>{item.text}</span>
-                      </div>
+                      <li key={i} className="flex items-center gap-2.5 py-[5px] text-[15.5px] text-pm-ink">
+                        <span className="w-[22px] h-[22px] rounded-[7px] bg-pm-shell text-pm-taupe flex items-center justify-center flex-none" aria-hidden="true">
+                          <Check className="w-3.5 h-3.5" strokeWidth={3} />
+                        </span>
+                        {item.text}
+                      </li>
                     ))}
-                    {/* Kein fünfter Haken (Martin, 09.09.): Die Häkchen sind
-                        Konditionen des Angebots. „Kosten erst, wenn die
-                        Pflegekraft da ist" beantwortet die Sorge, ob man
-                        schon zahlt — das ist eine Erklärung, kein Punkt der
-                        Liste, und steht deshalb als schlichte Zeile darunter. */}
-                    <p className="text-[15px] leading-relaxed" style={{color:'#71717A'}}>
-                      Kosten erst, wenn die Pflegekraft da ist.
-                    </p>
-                  </div>
+                  </ul>
+                  {/* Kein fünfter Haken (Martin, 09.09.): „Kosten erst, wenn die
+                      Pflegekraft da ist" ist eine Erklärung, kein Punkt der Liste. */}
+                  <p className="mt-1.5 text-[14.5px] leading-[1.5] text-pm-muted">
+                    Kosten erst, wenn die Pflegekraft da ist.
+                  </p>
 
-                  {/* Beweis-Zeile direkt am Preis (Martin, 13.08.): die vier
-                      Checks sind Konditionen, hier steht, WER das verspricht.
-                      Form nach zwei verworfenen Anläufen (graue Textzeile,
-                      Statistik-Spalten): echtes Welt-Siegel + EIN Fließsatz —
-                      Wortlaut von Martin. Die ausführlichen Kacheln bleiben
-                      unten im Kontakt-Block. */}
-                  <div className="mt-4 pt-4 flex items-center gap-3" style={{borderTop:'1px solid #E9E9EB'}}>
+                  {/* Pflegeheim-Vergleich am Preis (Martin, 07.09.) — ein Satz,
+                      Herkunft der Zahl direkt darunter. */}
+                  {eigenanteil !== null && heimErsparnis > 0 && (
+                    <div className="mt-3 pt-3 border-t border-pm-line-soft">
+                      <p className="text-[14.5px] leading-[1.5] text-pm-ink">
+                        Zuhause statt Pflegeheim: rund <b className="text-pm-green-deep">{formatEuro(heimErsparnis)} weniger</b> im Monat.
+                      </p>
+                      <p className="mt-1 text-[13px] leading-snug text-pm-muted">
+                        Heim-Eigenanteil im 1. Jahr {formatEuro(HEIM_EIGENANTEIL)}, bei Ihnen nach Zuschüssen etwa {formatEuro(eigenanteil)}. Quelle: {HEIM_QUELLE}.
+                      </p>
+                    </div>
+                  )}
+
+                  {/* Beweis-Zeile am Preis (Martin, 13.08.): Welt-Siegel + EIN
+                      Satz — Wortlaut von Martin. */}
+                  <div className="mt-3 pt-3 border-t border-pm-line-soft flex items-center gap-3">
                     <img src="/badge-testsieger.webp" alt="Testsieger Die Welt" className="h-11 w-auto flex-shrink-0 object-contain" />
-                    <p className="text-[15px] leading-snug" style={{color:'#52525B'}}>
-                      <span className="font-semibold" style={{color:'#18181B'}}>6× Testsieger DIE&nbsp;WELT</span><br/>20&nbsp;Jahre Erfahrung · 60.000+ Einsätze
+                    <p className="text-[13.5px] leading-snug text-pm-muted">
+                      <b className="text-[15px] text-pm-ink">6× Testsieger DIE&nbsp;WELT</b><br/>20&nbsp;Jahre Erfahrung · 60.000+ Einsätze
                     </p>
                   </div>
-                  {/* Pflegeheim-Vergleich sichtbar am Preis (Martin, 07.09.):
-                      dieselbe Rechnung wie im Aufklapper „Was bleibt für Sie
-                      übrig" (aus dem angezeigten Brutto, nur Posten mit
-                      in_kalkulation) — hier als ein Satz. Nur wenn wir
-                      wirklich günstiger sind. */}
-                  {(() => {
-                    const posten = (lead?.kalkulation?.['zuschüsse']?.items ?? [])
-                      .filter(z => z.in_kalkulation && z.betrag_monatlich > 0);
-                    if (posten.length === 0) return null;
-                    const eigen = Math.max(0, brutto - posten.reduce((a, z) => a + z.betrag_monatlich, 0));
-                    const guenstiger = 3364 - eigen;
-                    if (guenstiger <= 0) return null;
-                    return (
-                      <div className="mt-4 rounded-xl px-4 py-3" style={{background:'#EEF7F1', border:'1px solid #CFE8D8'}}>
-                        <p className="text-[14px] leading-relaxed" style={{color:'#1F6B41'}}>
-                          <span className="font-semibold">Zuhause statt Pflegeheim:</span> Im Pflegeheim zahlen Sie im ersten Jahr durchschnittlich 3.364 € im Monat selbst. Zuhause mit Primundus sind es nach Zuschüssen etwa {formatEuro(eigen)} — <span className="font-semibold">rund {formatEuro(guenstiger)} weniger im Monat.</span>
-                          <span className="block mt-1 text-[12px]" style={{color:'#4C7A5F'}}>Quelle: vdek-Auswertung, Stand 1. Juli 2026.</span>
-                        </p>
-                      </div>
-                    );
-                  })()}
 
                   {/* Der Toggle sitzt IM Kasten (Martin, 11.08.) — er gehört
                       zum Angebot, nicht daneben. */}
                   <button
                     type="button"
                     onClick={() => setCostsExpanded(!costsExpanded)}
-                    className="mt-5 -mb-1 w-full flex items-center justify-center gap-1.5 pt-4 pb-1 text-[15px] font-semibold"
-                    style={{color:'#8B7355', borderTop:'1px solid #E9E9EB'}}
+                    aria-expanded={costsExpanded}
+                    className="mt-3 w-full min-h-[48px] flex items-center justify-between gap-2 border-t border-pm-line-soft pt-2 text-[15px] font-semibold text-pm-taupe-ink"
                   >
                     {costsExpanded ? 'Weniger anzeigen' : 'Alle Kosten im Überblick'}
-                    <ChevronDown className={`w-4 h-4 transition-transform duration-200 ${costsExpanded ? 'rotate-180' : ''}`} />
+                    <ChevronDown className={`w-5 h-5 text-pm-taupe transition-transform duration-200 ${costsExpanded ? 'rotate-180' : ''}`} />
                   </button>
-                </div>
 
                 {costsExpanded && (<>
 
@@ -2600,11 +2601,10 @@ const CustomerPortalPage: FC = () => {
                   );
                 })()}
 
-                {/* „Alle Kosten im Überblick" — die Aufstellung, die vorher als
-                    Fließtext-Zeile unter dem Preis stand. Keine zweite
-                    Überschrift im Kasten: der Toggle darüber benennt ihn schon
-                    (Martin, 11.08.: „nicht doppeln"). */}
-                <div className="rounded-2xl border mt-3 px-5 py-4 space-y-3" style={{background:'#F4F4F6', borderColor:'#D4D4D8'}}>
+                {/* „Alle Kosten im Überblick" — die Aufstellung. Keine zweite
+                    Überschrift: der Toggle darüber benennt sie schon (Martin,
+                    11.08.: „nicht doppeln"). */}
+                <div className="mt-1 rounded-[16px] bg-pm-paper px-4 py-3.5 space-y-3">
                   {[
                     { label: 'Betreuung', value: `${formatEuro(brutto)} / Monat`, note: '' },
                     { label: 'Entspricht', value: `${formatEuro(tagessatz)} / Tag`, note: 'tagesgenau abgerechnet' },
@@ -2619,132 +2619,79 @@ const CustomerPortalPage: FC = () => {
                       : []),
                   ].map((row, i) => (
                     <div key={i} className="flex items-baseline justify-between gap-4">
-                      <span className="text-[15px] flex-shrink-0" style={{color:'#71717A'}}>{row.label}</span>
+                      <span className="text-[15px] flex-shrink-0 text-pm-muted">{row.label}</span>
                       <span className="text-right">
-                        <span className="block text-[15px] tabular-nums" style={{color:'#18181B'}}>{row.value}</span>
-                        {row.note && <span className="block text-[13px] mt-0.5" style={{color:'#71717A'}}>{row.note}</span>}
+                        <span className="block text-[15px] tabular-nums text-pm-ink">{row.value}</span>
+                        {row.note && <span className="block text-[13px] mt-0.5 text-pm-muted">{row.note}</span>}
                       </span>
                     </div>
                   ))}
                 </div>
 
-
-                {/* ── Was bleibt für Sie übrig ──────────────────────────────
-                    Martin, 12.08.: Eigenanteil doch zeigen — aber HIER, nicht
-                    am Hauptpreis. Die Regel vom 11.08. („wir nennen unseren
-                    Preis, nicht eine Rechnung über das Geld anderer") gilt für
-                    den Betrag oben; der Aufklapper ist ausdrücklich
-                    Nachschlagewerk, dort gehört die Rechnung hin.
-
-                    Der Eigenanteil wird AUS DEM ANGEZEIGTEN BRUTTO gerechnet,
-                    nicht aus `kalkulation.eigenanteil` gelesen: Der gespeicherte
-                    Wert stammt vom Kostenrechner-Zeitpunkt und driftet, sobald
-                    das Angebot nachträglich angepasst wird — dann stünden oben
-                    3.050 € und hier ein Eigenanteil zu einem anderen Brutto.
-                    Summiert werden nur Posten mit `in_kalkulation`, genau wie
-                    `zuschüsse.gesamt` es serverseitig tut. */}
-                {(() => {
-                  const posten = (lead?.kalkulation?.['zuschüsse']?.items ?? [])
-                    .filter(z => z.in_kalkulation && z.betrag_monatlich > 0);
-                  if (posten.length === 0) return null;
-                  const summe = posten.reduce((a, z) => a + z.betrag_monatlich, 0);
-                  const eigen = Math.max(0, brutto - summe);
-                  // vdek-Auswertung zum 01.07.2026: bundesweiter Durchschnitt
-                  // des Eigenanteils im ERSTEN Heimjahr. Bewusst das erste Jahr
-                  // — später sinkt es durch den Leistungszuschlag, und wer jetzt
-                  // entscheidet, vergleicht mit dem, was er zuerst zahlt.
-                  // Stand + Quelle stehen mit in der Zeile: Ohne sie wäre es
-                  // eine Behauptung. Beim nächsten vdek-Update (jeweils 01.01.
-                  // und 01.07.) nachziehen.
-                  const HEIM_EIGENANTEIL = 3364;
-                  const guenstiger = HEIM_EIGENANTEIL - eigen;
-                  return (
-                    <div className="rounded-2xl border mt-3 px-5 py-4" style={{background:'#F4F4F6', borderColor:'#D4D4D8'}}>
-                      <p className="text-[12px] font-semibold uppercase tracking-widest mb-3" style={{color:'#8B7355'}}>
-                        Was bleibt für Sie übrig
-                      </p>
+                {/* ── Was bleibt für Sie übrig (Martin, 12.08.): Eigenanteil HIER,
+                    nicht am Hauptpreis. Gerechnet aus dem ANGEZEIGTEN Brutto
+                    (siehe `eigenanteil` oben), nicht aus `kalkulation.eigenanteil`
+                    — der gespeicherte Wert driftet, sobald das Angebot angepasst
+                    wird. Der Heimvergleich steht seit Teil 3 nur noch an der Karte. */}
+                {eigenanteil !== null && (
+                    <div className="mt-2.5 rounded-[16px] bg-pm-paper px-4 py-3.5">
+                      <p className={`${EYEBROW} mb-3`}>Was bleibt für Sie übrig</p>
                       <div className="space-y-3">
                         <div className="flex items-baseline justify-between gap-4">
-                          <span className="text-[15px] flex-shrink-0" style={{color:'#71717A'}}>Betreuung</span>
-                          <span className="text-[15px] tabular-nums" style={{color:'#18181B'}}>{formatEuro(brutto)}</span>
+                          <span className="text-[15px] flex-shrink-0 text-pm-muted">Betreuung</span>
+                          <span className="text-[15px] tabular-nums text-pm-ink">{formatEuro(brutto)}</span>
                         </div>
-                        {posten.map((z, i) => (
+                        {zuschussPosten.map((z, i) => (
                           <div key={i} className="flex items-baseline justify-between gap-4">
-                            <span className="text-[15px] min-w-0" style={{color:'#71717A'}}>
+                            <span className="text-[15px] min-w-0 text-pm-muted">
                               {/* `label` kommt aus subsidies_config und ist für
-                                  die Admin-Oberfläche geschrieben — das
-                                  Entlastungsbudget heisst dort „Entlastungs-
-                                  budget (3.539 Euro/Jahr ab Pflegegrad 2)".
-                                  Neben „− 295 €" gelesen widerspricht sich das.
-                                  Die Klammer fliegt raus; die Jahreszahl steht
-                                  ohnehin im `hinweis` darunter. */}
+                                  die Admin-Oberfläche geschrieben — die Klammer
+                                  („(3.539 Euro/Jahr ab Pflegegrad 2)") fliegt
+                                  raus; die Jahreszahl steht im `hinweis`. */}
                               {z.label.replace(/\s*\([^)]*\)\s*$/, '')}
                               {/* Der Vorbehalt steht AM Posten, nicht im FAQ. */}
                               {(z.hinweis || z.name === 'steuervorteil') && (
                                 <span className="block text-[13px] mt-0.5 leading-snug">
                                   {/* Fallback nur, falls jemand den hinweis in
-                                      subsidies_config leert. NICHT „hängt vom
-                                      Steuersatz ab": §35a ist ein direkter
-                                      Abzug von der Steuerschuld, nicht vom zu
-                                      versteuernden Einkommen — die Voraussetzung
-                                      ist, dass überhaupt so viel Steuer anfällt. */}
+                                      subsidies_config leert. §35a ist ein direkter
+                                      Abzug von der Steuerschuld. */}
                                   {z.hinweis ?? 'Setzt voraus, dass entsprechend Steuern anfallen.'}
                                 </span>
                               )}
                             </span>
-                            <span className="text-[15px] tabular-nums whitespace-nowrap flex-shrink-0" style={{color:'#18181B'}}>
+                            <span className="text-[15px] tabular-nums whitespace-nowrap flex-shrink-0 text-pm-ink">
                               − {formatEuro(z.betrag_monatlich)}
                             </span>
                           </div>
                         ))}
-                        <div className="flex items-baseline justify-between gap-4 pt-3" style={{borderTop:'1px solid #E9E9EB'}}>
-                          <span className="text-[15px] font-semibold flex-shrink-0" style={{color:'#18181B'}}>Ihr Eigenanteil</span>
-                          <span className="text-[17px] font-bold tabular-nums" style={{color:'#18181B'}}>{formatEuro(eigen)}</span>
+                        <div className="flex items-baseline justify-between gap-4 pt-3 border-t border-pm-line">
+                          <span className="text-[15px] font-semibold flex-shrink-0 text-pm-ink">Ihr Eigenanteil</span>
+                          <span className="text-[17px] font-bold tabular-nums text-pm-ink">{formatEuro(eigenanteil)}</span>
                         </div>
                       </div>
-
-                      {/* Heim-Vergleich: die einzige Zeile, die „ist das viel?"
-                          beantwortet. Nur zeigen, wenn wir wirklich günstiger
-                          sind — sonst wäre es ein Argument gegen uns. */}
-                      {guenstiger > 0 && (
-                        <p className="text-[14px] leading-relaxed mt-4 pt-4" style={{color:'#71717A', borderTop:'1px solid #E9E9EB'}}>
-                          Im Pflegeheim liegt der Eigenanteil im ersten Jahr bundesweit bei
-                          durchschnittlich <span className="font-semibold" style={{color:'#18181B'}}>{formatEuro(HEIM_EIGENANTEIL)}</span> im Monat
-                          {/* Nur die Ersparnis grün (#22A06B, das Portal-Grün
-                              aus den Verfügbarkeits-Chips). Der Heim-Betrag
-                              bleibt schwarz — grün wäre er ein Gütesiegel für
-                              die Zahl, gegen die wir argumentieren. */}
-                          — bei Ihnen zu Hause sind es <span className="font-bold" style={{color:'#22A06B'}}>{formatEuro(guenstiger)} weniger</span>.
-                          <span className="block mt-1 text-[13px]">Quelle: vdek-Auswertung, Stand 1. Juli 2026.</span>
-                        </p>
-                      )}
-
-                      <p className="text-[13px] leading-snug mt-3" style={{color:'#71717A'}}>
+                      <p className="text-[13px] leading-snug mt-3 text-pm-muted">
                         Pflegegeld, Entlastungsbudget und Steuervorteil sind Leistungen
                         Dritter mit eigenen Voraussetzungen — die Beträge sind eine
                         Orientierung, keine Zusage. Jahresbeträge sind auf den Monat umgelegt.
                       </p>
                     </div>
-                  );
-                })()}
+                )}
 
-                <div className="mt-2 flex justify-center">
-                  <a
-                    href="/primundus-mustervertrag.pdf"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="flex items-center gap-1.5 transition-opacity hover:opacity-70"
-                  >
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" style={{width:14,height:14,color:'#18181B'}}>
-                      <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="12" x2="12" y2="18"/><polyline points="9 15 12 18 15 15"/>
-                    </svg>
-                    <span className="text-[13px] underline" style={{color:'#18181B'}}>Mustervertrag als PDF herunterladen</span>
-                  </a>
-                </div>
+                <a
+                  href="/primundus-mustervertrag.pdf"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="mt-2 flex min-h-[44px] items-center justify-center gap-1.5 text-[14px] text-pm-ink underline underline-offset-2"
+                >
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4" aria-hidden="true">
+                    <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="12" x2="12" y2="18"/><polyline points="9 15 12 18 15 15"/>
+                  </svg>
+                  Mustervertrag als PDF herunterladen
+                </a>
                 </>)}
-            </div>
+          </>
           )}
-        </div>
+          </Card>
         </div>
         );
       })();
@@ -2895,8 +2842,9 @@ const CustomerPortalPage: FC = () => {
           );
         })()
       ) : (
-      <>
-      {/* ── Hero (full-width gradient) — state-aware copy ── */}
+      // Angebotsseite auf „paper" wie primundus.de; Karten weiß (Teil 3 des Redesigns).
+      <div className="bg-pm-paper">
+      {/* ── Hero — state-aware copy ── */}
       {(() => {
         // Einheitliche formale Anrede (Herr/Frau Nachname), abgeleitet via
         // Geschlechts-Erkennung wenn das anrede-Feld leer ist; sonst neutral
@@ -2985,49 +2933,34 @@ const CustomerPortalPage: FC = () => {
         // der Reihenfolge der Abschnitte selbst:
         //   Angebot → Passende Pflegekräfte → Pflegesituation → Vorteile/FAQ
 
+        // Look wie primundus.de (Teil 3 des Redesigns): Fläche „shell", Begrüßung in
+        // Taupe, Titel in 800. Im Ausgangszustand liegt die Kostenkarte leicht über
+        // der Unterkante (pb-10 + -mt-6 an der Karte).
         return (
-          <div className="relative" style={{background:'#FFFFFF', borderBottom:'1px solid #E9E9EB'}}>
-            <div className="relative max-w-3xl mx-auto px-5 pt-8 pb-3">
-              <p className="text-[15px] font-medium mb-3" style={{color:'#71717A'}}>
+          <div className="bg-pm-shell">
+            <div className={`max-w-3xl mx-auto px-[18px] pt-6 ${!patientSaved && !hasPending ? 'pb-10' : 'pb-7'}`}>
+              <p className="text-[16px] text-pm-taupe-ink">
                 Guten Tag{heroNameLine ? `, ${heroNameLine}` : ''}.
               </p>
-              <h1 className="text-[1.75rem] font-bold leading-tight tracking-tight mb-2" style={{color:'#18181B'}}>
+              <h1 className="mt-1 text-[31px] font-extrabold leading-[1.08] tracking-[-0.035em] text-pm-ink">
                 {heroCopy.title}
               </h1>
               {/* Im Ausgangszustand steht hier NICHTS mehr außer der
                   Bestätigung — kein Erklärabsatz, keine Checkliste, kein
                   Button. Alle drei waren Kopien dessen, was die Abschnitte
-                  darunter ohnehin tragen (Abschnitt „Pflegesituation" hat
-                  einen eigenen Karten-Kopf mit genau diesem Aufruf). */}
+                  darunter ohnehin tragen. */}
               {heroCopy.subtitle && (
-                <p className="text-[16px] leading-relaxed mb-4" style={{color:'#71717A'}}>
+                <p className="mt-3 text-[16px] leading-[1.55] text-pm-muted">
                   {heroCopy.subtitle}
                 </p>
               )}
-
-              {/* Vertrauen steht seit 08.09. in der Kosten-Karte (Siegel-Zeile),
-                  nicht mehr im Kopf (Martin: zwei Anläufe im Kopf wirkten
-                  unruhig). Der Kopf trägt nur Begrüßung, Titel und den Satz
-                  mit den drei Schritten. */}
-              {/* Trust-Zeile: ohne Fläche und Rahmen im schlanken Hero — als
-                  Pill wirkte sie wie der Primärbutton und war ein
-                  Fehlklick-Magnet, der nichts tut. */}
               {heroCopy.pill && (
-              <div
-                className={`inline-flex items-center gap-2 ${heroCopy.steps ? '' : 'rounded-full px-4 py-2'}`}
-                style={heroCopy.steps ? undefined : {background:'#F5F5F6', border:'1px solid #E9E9EB'}}
-              >
-                <Check className="w-4 h-4 flex-shrink-0" strokeWidth={3} style={{color:'#8B7355'}} />
-                <span className="text-[15px]" style={{color:'#18181B'}}>{heroCopy.pill}</span>
-              </div>
+                <p className="mt-3 inline-flex items-center gap-2 text-[15px] text-pm-ink">
+                  <Check className="w-4 h-4 flex-shrink-0 text-pm-taupe" strokeWidth={3} />
+                  {heroCopy.pill}
+                </p>
               )}
             </div>
-            {/* Die geschwungene Welle als Übergang zum Body ist am 11.08.
-                entfallen (Martin: „diese Trennung zwischen Header und Rest ist
-                krass unpassend"). Sie war das einzige verspielte Element in
-                einem sonst sachlichen Layout und ließ den Hero wie einen
-                aufgeklebten Banner wirken. Jetzt: gerade Kante, der Header
-                sitzt als Block auf der Seite. */}
           </div>
         );
       })()}
@@ -3036,7 +2969,7 @@ const CustomerPortalPage: FC = () => {
       {!patientSaved && angebotSection}
 
 
-      <div className="max-w-3xl mx-auto px-4 pt-1 pb-6 space-y-4" style={{background:'#FFFFFF'}}>
+      <div className="max-w-3xl mx-auto px-3.5 pt-1 pb-6 space-y-4">
 
 
         {/* ── SECTION HEADER: Ihre Bewerbungen — NUR bei offenen
@@ -3048,7 +2981,7 @@ const CustomerPortalPage: FC = () => {
              eine neue Bewerbung" und das Erste im Bild war etwas anderes. */}
         {hasPending && (
           <div className="px-1 pt-2">
-            <h2 className="text-[1.2rem] font-bold tracking-tight" style={{color:'#18181B'}}>Ihre Bewerbungen</h2>
+            <h2 className={H2}>Ihre Bewerbungen</h2>
           </div>
         )}
 
@@ -3102,7 +3035,7 @@ const CustomerPortalPage: FC = () => {
               13.08.) — der Kasten hing vorher ohne Einordnung zwischen
               Kosten und Pflegekräften. */}
           <div className="px-1 pt-2">
-            <h2 className="text-[1.2rem] font-bold tracking-tight" style={{color:'#18181B'}}>
+            <h2 className={H2}>
               {visibleInterests.length === 1 ? 'Interessierte Pflegekraft' : 'Interessierte Pflegekräfte'}
             </h2>
           </div>
@@ -3184,18 +3117,31 @@ const CustomerPortalPage: FC = () => {
              weiter unten: doppelte ids sind ungueltig, und getElementById
              nimmt ohnehin den ersten. */}
         {!hasPending && (
-          <div className="px-1 pt-2" id="pflegekraefte" style={{scrollMarginTop:96}}>
-            <h2 className="text-[1.2rem] font-bold tracking-tight" style={{color:'#18181B'}}>Passende Pflegekräfte</h2>
-            {/* Strecke v2 (Martin, 11.09.: „bei den Pflegekräften steht ja
-                einladen — da muss man erklären, was das bedeutet"). Wortlaut
-                aus der FAQ „Was bedeutet Einladen?", gekürzt; in Clarity wurde
-                diese Frage öfter geklickt als der Knopf selbst. Keine feste
-                Zahl in der Überschrift: bereits eingeladene Kräfte zählen nicht
-                mit, es sind nicht immer fünf. */}
-            <p className="text-[15px] leading-relaxed mt-1" style={{color:'#52525B'}}>
-              Gefällt Ihnen eine Pflegekraft, laden Sie sie ein, sich bei Ihnen zu bewerben.
-              Das ist unverbindlich: Ein Vertrag entsteht erst, wenn Sie ein konkretes Angebot annehmen.
-            </p>
+          <div className="px-1 pt-6" id="pflegekraefte" style={{scrollMarginTop:96}}>
+            {/* Martins Wortlaut (24.09., Entwurf v3/v4): Der Kunde erwartet
+                Bewerbungen; Einladen ist die Zugabe für die Wartezeit, und beides
+                geht erst mit vollständiger Pflegesituation. „Warum? Mehr" erklärt
+                es im Pop-up. Die Vertrags-Erklärung („unverbindlich …") steht
+                weiter in der FAQ. Keine feste Zahl in der Überschrift: bereits
+                eingeladene Kräfte zählen nicht mit. */}
+            <SectionHeader
+              eyebrow="Für Sie ausgewählt"
+              titel="Passende Pflegekräfte"
+              zeile={patientSaved ? (
+                <>Bewerbungen kommen meist in den nächsten Tagen. Wer Ihnen gefällt, laden Sie in der Zwischenzeit selbst ein.</>
+              ) : (
+                <>
+                  Laden Sie ein, wer Ihnen gefällt. Wir bereiten die Bewerbungen vor. Das geht, sobald Ihre Pflegesituation vollständig ist.{' '}
+                  <button
+                    type="button"
+                    onClick={() => setWarumOffen(true)}
+                    className="inline-flex min-h-[44px] -my-3 items-center whitespace-nowrap font-bold text-pm-taupe-ink underline underline-offset-2"
+                  >
+                    Warum? Mehr
+                  </button>
+                </>
+              )}
+            />
           </div>
         )}
 
@@ -3208,7 +3154,7 @@ const CustomerPortalPage: FC = () => {
             ruhiger Lade-Zustand STATT einer leeren "keine Pflegekräfte"-Seite.
             Auto-Retry (useEffect oben) lädt im Hintergrund nach. */}
         {!hasPending && matchingsLoadingOrError && (
-          <div className="rounded-3xl px-5 py-8 border text-center" style={{ background: '#F5F5F6', borderColor: '#D4D4D8' }}>
+          <div className="rounded-card px-5 py-8 border border-[#EFEBE4] bg-white text-center">
             <div className="inline-block w-6 h-6 rounded-full border-2 animate-spin mb-3" style={{ borderColor: '#C4B49A', borderTopColor: 'transparent' }} />
             <p className="text-[15px] font-semibold mb-1" style={{ color: '#18181B' }}>Wir laden Ihre Pflegekräfte …</p>
             <p className="text-[14px] leading-relaxed" style={{ color: '#71717A' }}>Einen Moment bitte — gleich sehen Sie Ihre persönlichen Vorschläge.</p>
@@ -3280,28 +3226,25 @@ const CustomerPortalPage: FC = () => {
                     den Kosten. Kein „Kostenrechner", kein „erst danach" —
                     Erwartung statt Schranke. */}
                 {!patientSaved && (
-                <div className="rounded-2xl px-5 py-5 mb-4" style={{background:'#FAF8F4', border:'1px solid #EBE2D2'}}>
-                  <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0" style={{background:'#FDF1E2'}}>
-                      <AlertTriangle className="w-4 h-4" style={{color:'#D97706'}} />
-                    </div>
-                    <p className="text-[17px] font-bold leading-snug" style={{color:'#3D2B1F'}}>Noch 2 Minuten bis zum Einladen</p>
-                  </div>
-                  <p className="text-[15px] leading-relaxed mt-2.5" style={{color:'#3A3A3A'}}>Vervollständigen Sie kurz Ihre Pflegesituation — dann können Sie diese Pflegekräfte einladen und erhalten unverbindliche Bewerbungen mit Foto, Erfahrung und Anreisedatum. Vieles ist schon ausgefüllt.</p>
-                  <button
-                    type="button"
-                    onClick={zurPflegesituation}
-                    className="mt-4 w-full rounded-xl py-3.5 text-[16px] font-bold text-white active:scale-[0.99] transition-transform"
-                    style={{background:'#2A9D5C'}}
-                  >
-                    Jetzt vervollständigen →
-                  </button>
-                </div>
+                <Card ton="hinweis" className="p-5 mb-5">
+                  {/* Status im selben Wortlaut wie beim Formular (Martin 24.09.:
+                      „Pflegesituation unvollständig"), Bernstein wie dort. */}
+                  <p className="flex items-center gap-2 text-[13px] font-bold text-pm-amber-ink">
+                    <span className="w-2 h-2 rounded-full bg-pm-amber" aria-hidden="true" />
+                    Pflegesituation unvollständig
+                  </p>
+                  <p className="mt-2 text-[17.5px] font-extrabold leading-[1.25] text-pm-ink">Noch 2 Minuten bis zu Ihren Bewerbungen</p>
+                  <p className="mt-2 mb-4 text-[14.5px] leading-[1.5] text-pm-muted">Vieles ist schon aus Ihrem Kostenrechner übernommen.</p>
+                  {/* Einziger Hauptknopf der Pflegekräfte (Koralle); einzeilig bei
+                      360 px — deshalb schmale Innenabstände. */}
+                  <Button breit onClick={zurPflegesituation} className="px-2 whitespace-nowrap">
+                    Pflegesituation vervollständigen
+                  </Button>
+                </Card>
                 )}
-                <div
-                  className="rounded-3xl px-3 py-4 border"
-                  style={{ background: '#F5F5F6', borderColor: '#D4D4D8' }}
-                >
+                {/* Kein grauer Kasten mehr um die Karten (Teil 3): jede Karte
+                    bekommt so ~26 px mehr Breite. */}
+                <div>
                   <div className="space-y-3">
                     {/* Interest-Karten werden jetzt OBEN in einer eigenen
                         always-visible Section gerendert (siehe oben), nicht
@@ -3363,7 +3306,7 @@ const CustomerPortalPage: FC = () => {
                   auf + die "neue Pflegekräfte"-Mail geht raus. Nur zeigen, wenn
                   wirklich gehalten (heldInvites > 0), nicht wenn der Pool leer ist. */}
               {!hasAnyCard && heldInvites > 0 && (
-                <div className="rounded-3xl px-5 py-5 border text-center" style={{ background: '#F5F5F6', borderColor: '#D4D4D8' }}>
+                <div className="rounded-card px-5 py-5 border border-[#EFEBE4] bg-white text-center">
                   <p className="text-[15px] font-semibold mb-1" style={{color:'#18181B'}}>Ihre Auswahl ist eingeladen</p>
                   <p className="text-[14px] leading-relaxed" style={{color:'#71717A'}}>
                     Die Pflegekräfte melden sich meist innerhalb von 1&ndash;2 Tagen. Sobald Rückmeldungen da sind, sehen Sie sie hier &mdash; meldet sich niemand, schlagen wir Ihnen automatisch weitere Pflegekräfte vor.
@@ -3376,7 +3319,7 @@ const CustomerPortalPage: FC = () => {
                   Überschrift ohne Karten (wirkt wie ein Bug). Ruhiger Hinweis,
                   dass weitere folgen (Martin, 18.08.). */}
               {!hasAnyCard && heldInvites === 0 && allVisible.length > 0 && (
-                <div className="rounded-3xl px-5 py-5 border text-center" style={{ background: '#F5F5F6', borderColor: '#D4D4D8' }}>
+                <div className="rounded-card px-5 py-5 border border-[#EFEBE4] bg-white text-center">
                   <p className="text-[15px] font-semibold mb-1" style={{color:'#18181B'}}>Alle aktuellen Vorschläge bearbeitet</p>
                   <p className="text-[14px] leading-relaxed" style={{color:'#71717A'}}>
                     Sie haben alle passenden Pflegekräfte durchgesehen. Wir schlagen Ihnen in Kürze weitere vor &mdash; Sie hören von uns.
@@ -3440,7 +3383,7 @@ const CustomerPortalPage: FC = () => {
           const moreCount = allDone.length - shownDone.length;
           return (
             <div className="space-y-2">
-              <p className="text-xs font-semibold uppercase tracking-wider text-gray-400 px-1">Bereits bearbeitet</p>
+              <p className="text-[11.5px] font-bold uppercase tracking-[.15em] text-pm-mute px-1">Bereits bearbeitet</p>
               {doneApps.map((app) => (
                 <AppCardDone key={app.id} app={app} onNurseClick={(n, a) => { setNurseModalApp(a); setSelectedNurse(n); }} onUndo={undoApp} />
               ))}
@@ -3471,8 +3414,8 @@ const CustomerPortalPage: FC = () => {
       </div>
 
       {!hasPending && (
-      <div style={{background:'#FFFFFF'}}>
-      <div className="max-w-3xl mx-auto px-4 pt-1 pb-4 space-y-4">
+      <div>
+      <div className="max-w-3xl mx-auto px-3.5 pt-1 pb-4 space-y-4">
         {/* ── SECTION: 2 · Patientendaten — der Onboarding-Schritt steht VOR
              den Pflegekräften (vorher lag die Karte zwischen PK-Header und
              PK-Karten — genau die „zwei Kästen"-Verwirrung, Martin 2026-07-12). ── */}
@@ -3500,51 +3443,43 @@ const CustomerPortalPage: FC = () => {
           // offen — nach dem Speichern ist es Referenz und fällt auf den
           // ruhigen Rahmen zurück.
           return (
-          <div id="patientendaten" className="px-1 pt-2 scroll-mt-24">
-            {/* Strecke v2 (Martin, 11.09.). Ersetzt „Als Nächstes: …" im Kopf,
-                „Ohne diese Angaben keine Bewerbungen möglich" und den Absatz
-                „Sobald Sie die Pflegesituation vervollständigt haben …" — alle
-                drei sagten dasselbe. Kein eigener Knopf: das Formular beginnt
-                direkt darunter, ein Sprung um drei Zentimeter wäre ein toter Klick. */}
-            {!patientSaved && (
-              <div className="mb-5">
-                <h2 className="text-[1.2rem] font-bold tracking-tight" style={{color:'#18181B'}}>Jetzt konkrete Bewerbungen erhalten</h2>
-                <p className="text-[16px] leading-relaxed mt-1" style={{color:'#18181B'}}>
-                  Wenn das Angebot passt, vervollständigen Sie die Pflegesituation, damit Sie
-                  Pflegekräfte einladen und Bewerbungen erhalten können.
-                </p>
-              </div>
+          <div id="patientendaten" className="px-1 pt-6 scroll-mt-24">
+            {/* Ein Kopf statt vier Überschriften (Teil 3, Entwurf v4): Eyebrow,
+                Titel, Status, ein Satz. Ersetzt „Jetzt konkrete Bewerbungen
+                erhalten" (Strecke v2, 11.09.) — der Hauptweg steht jetzt im
+                Pflegekräfte-Abschnitt und im Kasten „Noch 2 Minuten". Kein
+                eigener Knopf: das Formular beginnt direkt darunter.
+                Farbe des Status: Bernstein wie im Kasten (Koralle nur für Knöpfe). */}
+            {!patientSaved ? (
+              <SectionHeader
+                eyebrow="Für Ihre Bewerbungen"
+                titel="Pflegesituation"
+                rechts={<StatusBadge ton="warnung">Unvollständig</StatusBadge>}
+                zeile="Damit sich Pflegekräfte bewerben können. Vieles ist schon ausgefüllt."
+              />
+            ) : (
+              <button
+                type="button"
+                aria-expanded={patientExpanded}
+                className="w-full min-h-[44px] flex items-end justify-between gap-3 text-left"
+                onClick={() => {
+                  const next = !patientExpanded;
+                  setPatientExpandedManual(next);
+                  // Nach dem Speichern direkt in den bearbeitbaren Stepper
+                  // springen — sonst braeuchte es einen zweiten Klick.
+                  if (next) setTriggerOpenPatient(true);
+                }}
+              >
+                <span className="min-w-0">
+                  <span className={`block ${EYEBROW}`}>Für Ihre Bewerbungen</span>
+                  <span className={`block mt-1.5 ${H2}`}>Pflegesituation</span>
+                </span>
+                <span className="flex items-center gap-2 flex-shrink-0 pb-1">
+                  <StatusBadge ton="fertig">✓ Vollständig</StatusBadge>
+                  <ChevronDown className={`w-5 h-5 text-pm-taupe transition-transform duration-200 ${patientExpanded ? 'rotate-180' : ''}`} />
+                </span>
+              </button>
             )}
-            <button
-              type="button"
-              className="w-full flex items-center justify-between text-left"
-              onClick={() => {
-                // Unvollständig ist nicht zuklappbar — der Klick täte sonst
-                // heimlich nichts bzw. würde einen manual-Zustand setzen,
-                // der nach dem Speichern falsch nachwirkt.
-                if (!patientSaved) return;
-                const next = !patientExpanded;
-                setPatientExpandedManual(next);
-                // Nach dem Speichern direkt in den bearbeitbaren Stepper
-                // springen — sonst braeuchte es einen zweiten Klick auf den
-                // Karten-Kopf.
-                if (next) setTriggerOpenPatient(true);
-              }}
-            >
-              <div className="min-w-0">
-                <h2 className="text-[1.2rem] font-bold tracking-tight" style={{color:'#18181B'}}>Pflegesituation</h2>
-              </div>
-              <div className="flex items-center gap-2 flex-shrink-0">
-                {patientSaved ? (
-                  <span className="text-[12px] font-semibold px-3 py-1 rounded-full" style={{background:'#E3F7EF', color:'#2a9a6f'}}>✓ Vollständig</span>
-                ) : (
-                  <span className="text-[12px] font-semibold px-3 py-1 rounded-full" style={{background:'#FDF1E2', color:'#B45309'}}>Unvollständig</span>
-                )}
-                {patientSaved && (
-                  <ChevronDown className={`w-5 h-5 text-[#8B7355] transition-transform duration-200 ${patientExpanded ? 'rotate-180' : ''}`} />
-                )}
-              </div>
-            </button>
 
           </div>
           );
@@ -3559,7 +3494,8 @@ const CustomerPortalPage: FC = () => {
           mmCustomer={mmCustomer}
           onPatientSaved={(saved) => {
             if (saved && !patientSaved) {
-              showToast('✓ Vielen Dank! Ihre Daten sind gespeichert. Sie können jetzt Pflegekräfte einladen und Bewerbungen erhalten.', 7000);
+              // Hauptweg zuerst (Martin 24.09.): Bewerbungen, Einladen ist die Zugabe.
+              showToast('✓ Vielen Dank! Ihre Pflegesituation ist gespeichert. Passende Pflegekräfte können sich jetzt bei Ihnen bewerben.', 7000);
               // Frisch gespeichert → Abschnitt klappt zu (Referenz-Zustand).
               // Ohne den Reset würde ein früher gesetzter manual-Wert den
               // Bogen offen halten, obwohl die Aufgabe erledigt ist.
@@ -3833,238 +3769,21 @@ const CustomerPortalPage: FC = () => {
           wartet. Als Referenz bleibt das Angebot vollständig erreichbar. */}
       {patientSaved && angebotSection}
 
-      <div className="max-w-3xl mx-auto px-4 pt-1 pb-6 space-y-4" style={{background:'#FFFFFF'}}>
-        {/* ── SECTION: So geht es weiter (Martin, 07.09.) — dieselben drei
-             Schritte und derselbe Wortlaut wie in der Angebotsmail; der
-             anstehende Schritt ist grün und trägt den Knopf, erledigte
-             Schritte tragen den Haken. ── */}
-        <div className="px-1 pt-3">
-          <h2 className="text-[1.2rem] font-bold tracking-tight" style={{color:'#18181B'}}>So geht es weiter</h2>
+      <div className="max-w-3xl mx-auto px-3.5 pt-1 pb-6 space-y-4">
+        {/* ── So geht es weiter · Häufige Fragen · Marta (Teil 3 des Redesigns).
+             Schritt 1 = Pflegesituation gespeichert, Schritt 2 = Bewerbung da. ── */}
+        <div className="pt-6">
+          <SoGehtEsWeiter erledigt={[patientSaved, hasPending, false]} />
         </div>
-        {(() => {
-          const schritte = [
-            { n: 1, title: 'Pflegesituation vervollständigen — 2 Minuten', desc: 'Vieles ist schon ausgefüllt. Danach laden Sie Ihre Wunsch-Pflegekräfte ein und erhalten Bewerbungen.', done: patientSaved },
-            { n: 2, title: 'Pflegekräfte einladen & Bewerbungen erhalten', desc: 'Sobald Ihre Pflegesituation vervollständigt ist, laden Sie Ihre Wunschkandidatinnen ein — passende Pflegekräfte bewerben sich dann mit Profil, Erfahrung und Anreisedatum.', done: hasPending },
-            { n: 3, title: 'Auswählen und starten', desc: 'Sie entscheiden, wir übernehmen den Rest. Ihre Wunsch-Pflegekraft kann die Betreuung bereits in 4–7 Werktagen übernehmen.', done: false },
-          ];
-          const aktiv = schritte.findIndex(st => !st.done);
-          return (
-          <div className="rounded-2xl overflow-hidden border" style={{background:'#F4F4F6', borderColor:'#D4D4D8'}}>
-            {schritte.map((st, i, arr) => {
-              const istAktiv = i === aktiv;
-              return (
-              <div key={st.n} className={`flex items-start gap-4 px-5 py-4 ${i < arr.length - 1 ? 'border-b' : ''}`} style={{borderColor:'#E9E9EB', background: istAktiv ? '#EEF7F1' : undefined}}>
-                {st.done ? (
-                  <div className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5" style={{background:'#E3F7EF'}}>
-                    <Check className="w-4 h-4" strokeWidth={3} style={{color:'#22A06B'}} />
-                  </div>
-                ) : (
-                  <div className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 font-bold text-white mt-0.5" style={{background: istAktiv ? '#2A9D5C' : '#8B7355', fontSize:'15px'}}>{st.n}</div>
-                )}
-                <div className="flex-1 min-w-0">
-                  <p className={istAktiv ? 'text-[16px] font-bold' : 'text-[15px] font-semibold'} style={{color: st.done ? '#9CA3AF' : istAktiv ? '#1F6B41' : '#18181B'}}>{st.title}</p>
-                  <p className="text-[15px] mt-0.5 leading-relaxed" style={{color: st.done ? '#B5B5B5' : istAktiv ? '#3A3A3A' : '#71717A'}}>{st.desc}</p>
-                  {istAktiv && st.n === 1 && (
-                    <button
-                      type="button"
-                      onClick={zurPflegesituation}
-                      className="mt-3 w-full rounded-xl py-3 text-[15px] font-bold text-white active:scale-[0.99] transition-transform"
-                      style={{background:'#2A9D5C'}}
-                    >
-                      Pflegesituation vervollständigen →
-                    </button>
-                  )}
-                </div>
-              </div>
-              );
-            })}
-          </div>
-          );
-        })()}
-
-        {/* ── SECTION HEADER: Häufige Fragen ── */}
-        <div className="px-1 pt-3">
-          <h2 className="text-[1.2rem] font-bold tracking-tight" style={{color:'#18181B'}}>Häufige Fragen</h2>
+        <div className="pt-6">
+          <FaqListe />
         </div>
-        <div className="rounded-2xl overflow-hidden border" style={{background:'#F4F4F6', borderColor:'#D4D4D8'}}>
-          {[
-            /* Reihenfolge (Martin, 13.08.): Sprach-Niveaus ZUERST — die
-               Stufen (Grund/Mittel/Gut) stehen auf jeder Pflegekraft-Karte,
-               also ist das die Frage, die der Kunde beim Lesen der Liste
-               zuerst hat. Der Rest folgt dem Weg: Einladen → Vertrag →
-               Kündigung → Abrechnung → … */
-            /* Sprach-Stufen-Antwort als JSX statt String, damit wir die
-               Bar-Indikatoren genauso rendern können wie im Profil/Liste
-               (statt der Unicode-Punkte ●). Konsistente Optik im ganzen
-               Portal. Quelltext der Sätze identisch zur Modal-FAQ
-               (LANGUAGE_LEVELS in CustomerNurseModal). */
-            {
-              q: 'Was bedeuten die Deutsch-Niveaus (Grund, Mittel, Gut)?',
-              a: (
-                <div className="text-[15px] leading-[1.75] text-gray-600 space-y-3">
-                  <p>Eine grobe Orientierung — kein Sprach-Zertifikat. Die genaue Kommunikation hängt immer auch vom Tempo, der Mundart und der Geduld beider Seiten ab.</p>
-                  {[
-                    { bars: 1, label: 'Grund', desc: 'einzelne Wörter und einfache Sätze. Für eine Verständigung im Alltag braucht es Geduld, Gesten und etwas Vorbereitung; differenzierte Gespräche sind in der Regel nicht möglich.' },
-                    { bars: 2, label: 'Mittel', desc: 'einfache Alltagsthemen lassen sich besprechen, gängige Anweisungen werden meist verstanden. Bei komplexeren Themen (Diagnosen, Behörden, Telefonate) kann es zu Rückfragen oder Missverständnissen kommen.' },
-                    { bars: 3, label: 'Gut', desc: 'die Verständigung im Alltag und in der Pflege funktioniert in der Regel zuverlässig. Auch ausführlichere Gespräche sind möglich; sehr seltene Fachbegriffe, schnelles Sprechen oder Dialekt können dennoch Nachfragen erfordern.' },
-                  ].map((lvl) => (
-                    <div key={lvl.label} className="flex items-start gap-3">
-                      <div className="flex gap-0.5 pt-2.5 flex-shrink-0">
-                        {Array.from({ length: 3 }, (_, i) => (
-                          <div key={i} className={`w-3 h-1.5 rounded-full ${i < lvl.bars ? 'bg-[#8B7355]' : 'bg-gray-200'}`} />
-                        ))}
-                      </div>
-                      <p><span className="font-semibold text-[#3D2B1F]">{lvl.label}</span> — {lvl.desc}</p>
-                    </div>
-                  ))}
-                  <p>Wenn Sprachsicherheit besonders wichtig ist (z. B. Demenz, schwerhörige oder spracheingeschränkte Patienten), sprechen Sie uns gerne an — wir helfen bei der Einordnung.</p>
-                </div>
-              ),
-            },
-            { q: 'Was bedeutet „Einladen"?', a: 'Wenn Ihnen eine Pflegekraft gefällt, laden Sie sie ein, sich bei Ihnen zu bewerben. Dafür müssen Sie nur kurz die Pflegesituation vervollständigen — damit wir Ihnen passende, verfügbare Pflegekräfte zeigen können. Alles unverbindlich; ein Vertrag entsteht erst, wenn Sie ein konkretes Angebot annehmen.' },
-            { q: 'Gehe ich mit dem Einladen einen Vertrag ein?', a: 'Nein — das Einladen und Anschauen von Profilen ist vollständig unverbindlich. Ein Vertrag kommt erst zustande, wenn Sie ein konkretes Angebot ausdrücklich annehmen.' },
-            { q: 'Kann ich jederzeit kündigen?', a: 'Ja, täglich kündbar — ohne Mindestlaufzeit und ohne Angabe von Gründen. Kosten entstehen ausschließlich für Tage, an denen die Pflegekraft tatsächlich vor Ort ist.' },
-            { q: 'Wie funktioniert die Abrechnung?', a: 'Tagesgenau: Sie zahlen nur für geleistete Betreuungstage. Die Rechnung für den laufenden Monat wird jeweils zur Monatsmitte erstellt — transparent, nachvollziehbar, ohne versteckte Posten.' },
-            { q: 'Wie lange bleibt die Pflegekraft — und wie läuft der Wechsel?', a: 'Pflegekräfte bleiben im Durchschnitt 6 bis 8 Wochen. Zur Mitte des Einsatzes beginnen wir bereits mit der Planung der Nachfolge, damit der Übergang nahtlos klappt. Sie müssen sich um nichts kümmern — Primundus organisiert den gesamten Wechsel.' },
-            { q: 'Was passiert, wenn die Pflegekraft ausfällt?', a: 'Primundus kümmert sich umgehend um eine qualifizierte Vertretung. Ihr persönlicher Ansprechpartner informiert Sie proaktiv und begleitet die Übergabe.' },
-            { q: 'Wie werden Reisekosten abgerechnet?', a: 'Die Reisekosten betragen pauschal 125 € pro Strecke — also je einmal bei der Anreise und bei der Abreise. Weitere versteckte Reisekosten gibt es nicht.' },
-            { q: 'Ist das legal?', a: 'Ja, vollständig. Die Pflegekräfte sind sozialversicherungspflichtig bei uns angestellt und werden von uns nach Deutschland entsandt. Für jeden Einsatz liegt eine offizielle A1-Bescheinigung vor — der Nachweis der Sozialversicherungspflicht im Herkunftsland.' },
-            { q: 'Mit wem wird der Vertrag geschlossen?', a: 'Der Betreuungsvertrag wird mit der PRIMUNDUS Sp. z o.o. geschlossen — der Gesellschaft hinter Primundus Deutschland und Ihrem Vertragspartner für die gesamte Betreuung. Die Pflegekräfte sind bei uns sozialversicherungspflichtig angestellt und werden offiziell nach Deutschland entsandt.' },
-            { q: 'Welche Kosten entstehen insgesamt?', a: 'Es gibt vier Kostenpunkte: Die monatlichen Betreuungskosten laut Ihrem Angebot. Anreise und Abreise pauschal je 125 €. Kost und Logis, die Sie der Pflegekraft frei zur Verfügung stellen. Fällt der Einsatz in einen Sommermonat (Juli oder August), kommen 200 €/Monat (bzw. 6,67 €/Tag) Sommerzuschlag hinzu. An folgenden Feiertagen wird der doppelte Tagessatz berechnet: Karfreitag, Ostersonntag, Ostermontag, 1. Mai, Heiligabend, 1. + 2. Weihnachtstag, Silvester und Neujahr. Darüber hinaus gibt es keinerlei versteckte Kosten.' },
-            /* Sachleistungs-Frage (Martin, 13.08.): kommt in Beratungen
-               regelmäßig. Fachlich: 24h-Betreuung im Entsendemodell ist
-               KEINE ambulante Pflegesachleistung (§ 36 SGB XI, zugelassenen
-               Pflegediensten vorbehalten) — der Kunde nutzt die
-               GELDleistungen (Pflegegeld u. a.). Bewusst ohne Beträge: die
-               stehen personalisiert im Angebot unter „Alle Kosten im
-               Überblick" (Block „Was bleibt für Sie übrig"). */
-            { q: 'Kann ich die Pflegesachleistungen der Pflegekasse dafür einsetzen?', a: 'Nein — die 24-Stunden-Betreuung zählt nicht als Pflegesachleistung; diese sind zugelassenen ambulanten Pflegediensten vorbehalten. Sie nutzen stattdessen die Geldleistungen Ihrer Pflegekasse, allen voran das Pflegegeld. Welche Leistungen in Ihrer Situation zusammenkommen, sehen Sie in Ihrem Angebot unter „Alle Kosten im Überblick".' },
-          ].map((item, i, arr) => (
-            <div key={i} className={i < arr.length - 1 ? 'border-b' : ''} style={{borderColor:'#E9E9EB'}}>
-              <button
-                onClick={() => setOpenFaq(openFaq === i ? null : i)}
-                className="w-full flex items-center justify-between px-5 py-5 text-left transition-colors duration-150"
-                style={{background: openFaq === i ? '#F5F5F6' : 'transparent'}}
-              >
-                <span className="text-[15px] font-semibold pr-4 leading-snug transition-colors duration-150"
-                  style={{color: openFaq === i ? '#6B5444' : '#18181B'}}>
-                  {item.q}
-                </span>
-                <div className={`w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0 transition-all duration-200 ${
-                  openFaq === i ? 'bg-[#8B7355]' : 'bg-[#F0EDE8]'
-                }`}>
-                  <ChevronDown className={`w-4 h-4 transition-transform duration-200 ${
-                    openFaq === i ? 'rotate-180 text-white' : 'text-[#8B7355]'
-                  }`} />
-                </div>
-              </button>
-              {openFaq === i && (
-                <div className="px-5 pb-6 pt-1" style={{background:'#F5F5F6'}}>
-                  {typeof item.a === 'string' ? (
-                    <p className="text-[15px] leading-[1.75] text-gray-600 whitespace-pre-line">{item.a}</p>
-                  ) : (
-                    item.a
-                  )}
-                </div>
-              )}
-            </div>
-          ))}
-        </div>
-
-        {/* ── Marta-Box (Beraterin / Trust / CTA) ── */}
-        <div className="rounded-2xl overflow-hidden border bg-white" style={{borderColor:'#E9E9EB'}}>
-          <div className="px-5 pt-5 pb-5 space-y-5">
-            <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Noch Fragen? Ihre Beraterin</p>
-            <div className="flex items-center gap-4">
-              <div className="relative flex-shrink-0">
-                <img
-                  src="/marta-kapcio.jpg"
-                  alt="Marta Kapcio"
-                  className="w-[72px] h-[72px] rounded-2xl object-cover object-top"
-                  style={{border:'1.5px solid #F0C4B4'}}
-                />
-                <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-[#22A06B] rounded-full border-2 border-white">
-                  <span className="relative flex h-full w-full items-center justify-center">
-                    <span className="animate-ping absolute inline-flex h-2 w-2 rounded-full bg-white opacity-60" />
-                    <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-white" />
-                  </span>
-                </div>
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="font-bold text-gray-900 text-[17px] leading-tight">Marta Kapcio</p>
-                <p className="text-[14px] text-gray-500 mb-2">Pflegeberaterin · Primundus</p>
-                <a href={TELEFON_HREF} className="inline-flex items-center gap-1.5 text-[#8B7355] font-bold text-[16px] hover:opacity-80 transition-opacity">
-                  <Phone className="w-4 h-4 flex-shrink-0" />
-                  089 200 000 830
-                </a>
-                <p className="text-[14px] text-gray-500 mt-0.5">Mo–So, 8–20 Uhr</p>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-3 gap-2">
-              <div className="text-center bg-gray-50 rounded-xl py-3 px-1 border border-gray-100">
-                <img src="/badge-testsieger.webp" alt="Testsieger" className="h-8 w-auto mx-auto mb-1.5 object-contain" />
-                <p className="text-xs font-semibold text-gray-500 leading-tight">Testsieger<br/>Die Welt</p>
-              </div>
-              <div className="text-center bg-gray-50 rounded-xl py-3 px-1 border border-gray-100">
-                <div className="flex justify-center mb-1.5">
-                  <svg className="w-6 h-6 text-[#8B7355]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                  </svg>
-                </div>
-                <p className="text-xs font-semibold text-gray-500 leading-tight">20+ Jahre<br/>Erfahrung</p>
-              </div>
-              <div className="text-center bg-gray-50 rounded-xl py-3 px-1 border border-gray-100">
-                <div className="flex justify-center mb-1.5">
-                  <svg className="w-6 h-6 text-[#8B7355]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
-                  </svg>
-                </div>
-                <p className="text-xs font-semibold text-gray-500 leading-tight">60.000+<br/>Einsätze</p>
-              </div>
-            </div>
-
-            <div>
-              <p className="text-xs font-semibold text-gray-300 uppercase tracking-wider text-center mb-2.5">Bekannt aus</p>
-              <div className="flex items-center justify-center gap-4 flex-wrap">
-                {[
-                  { src: '/media-welt.webp', alt: 'Die Welt' },
-                  { src: '/media-bildderfau.webp', alt: 'Bild der Frau' },
-                  { src: '/media-faz.webp', alt: 'FAZ' },
-                  { src: '/media-ard.webp', alt: 'ARD' },
-                  { src: '/media-ndr.webp', alt: 'NDR' },
-                  { src: '/media-sat1.webp', alt: 'SAT.1' },
-                ].map(logo => (
-                  <img key={logo.alt} src={logo.src} alt={logo.alt} className="h-4 w-auto object-contain opacity-50 grayscale" />
-                ))}
-              </div>
-            </div>
-
-            <div className="flex gap-3">
-              <a
-                href={TELEFON_HREF}
-                className="flex-1 flex items-center justify-center gap-2 bg-[#E76F63] hover:bg-[#D65E52] text-white rounded-xl py-3 text-sm font-bold transition-colors"
-              >
-                <Phone className="w-4 h-4" />
-                Anrufen
-              </a>
-              <a
-                href={WHATSAPP_HREF}
-                target="_blank"
-                rel="noreferrer"
-                className="flex-1 flex items-center justify-center gap-2 bg-[#25D366] hover:bg-[#20BA5A] text-white rounded-xl py-3 text-sm font-bold transition-colors"
-              >
-                <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
-                  <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/><path d="M12 0C5.373 0 0 5.373 0 12c0 2.123.555 4.116 1.529 5.845L.057 23.571l5.865-1.539A11.94 11.94 0 0012 24c6.627 0 12-5.373 12-12S18.627 0 12 0zm0 21.894a9.86 9.86 0 01-5.031-1.378l-.361-.214-3.741.981.999-3.648-.235-.374A9.86 9.86 0 012.106 12C2.106 6.58 6.58 2.106 12 2.106S21.894 6.58 21.894 12 17.42 21.894 12 21.894z"/>
-                </svg>
-                WhatsApp
-              </a>
-            </div>
-          </div>
+        <div className="pt-4">
+          <MartaBox sterne={sterne} />
         </div>
 
       </div>
-      </>
+      </div>
       )}
 
       {/* Unterschriebenen Vertrag ansehen (read-only) — vom gebucht-Screen */}
@@ -4106,6 +3825,10 @@ const CustomerPortalPage: FC = () => {
       {chatNurse && CHAT_ENABLED && (
         <PflegekraftChat nurse={chatNurse} onClose={() => setChatNurse(null)} />
       )}
+
+      {/* Pop-ups der Angebotsseite (Teil 3 des Redesigns). */}
+      <BestpreisSheet offen={bestpreisOffen} onClose={() => setBestpreisOffen(false)} />
+      <WarumSheet offen={warumOffen} onClose={() => setWarumOffen(false)} onVervollstaendigen={zurPflegesituation} />
 
       {/* ── Rückmeldung zum Angebot (schwebend, unten rechts) ────────────
            Als Kasten im Fluss saß sie ~3000 px weit unten und wurde kaum

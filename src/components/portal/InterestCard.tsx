@@ -153,7 +153,7 @@ export const InterestCard: FC<{
                 <button
                   onClick={(e) => { e.stopPropagation(); handleDismiss(); }}
                   disabled={dismissPhase === 'sending'}
-                  className="text-xs font-medium text-gray-500 hover:text-gray-700 px-3 py-1.5 rounded-full hover:bg-gray-50 transition-colors disabled:opacity-50"
+                  className="min-h-[44px] text-[14px] font-medium text-pm-muted hover:text-pm-ink px-3 rounded-full hover:bg-pm-paper transition-colors disabled:opacity-50"
                 >
                   {dismissPhase === 'sending' ? 'lehnt ab…' : 'Ablehnen'}
                 </button>
@@ -179,7 +179,7 @@ export const InterestCard: FC<{
               ) : (
                 <button
                   onClick={(e) => { e.stopPropagation(); handleInvite(); }}
-                  className="flex items-center gap-1.5 text-xs font-bold bg-[#E76F63] text-white px-4 py-1.5 rounded-full hover:bg-[#D65E52] transition-colors active:scale-95 shadow-sm"
+                  className="min-h-[44px] flex items-center gap-1.5 text-[15px] font-bold bg-pm-coral text-white px-[18px] rounded-full hover:bg-pm-coral-deep transition-colors active:scale-[0.98]"
                 >
                   <UserPlus className="w-3.5 h-3.5" />
                   {profilFehlt ? 'Profil vervollständigen & einladen' : 'Einladen'}
