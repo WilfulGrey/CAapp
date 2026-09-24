@@ -6,7 +6,7 @@ import { useEffect, useState, type ReactNode } from 'react';
 import { Button } from './Button';
 
 export function FormNav({
-  onZurueck, onWeiter, weiterText, laedt = false, ladeText, hinweis, notiz,
+  onZurueck, onWeiter, weiterText, laedt = false, ladeText, hinweis,
 }: {
   onZurueck?: () => void;
   onWeiter: () => void;
@@ -15,7 +15,6 @@ export function FormNav({
   ladeText?: string;
   /** z. B. „Pflegegrad fehlt" — Tippen darauf springt zum Feld (Aufrufer) */
   hinweis?: ReactNode;
-  notiz?: ReactNode;
 }) {
   const [tastatur, setTastatur] = useState(false);
   useEffect(() => {
@@ -41,7 +40,6 @@ export function FormNav({
           {weiterText}
         </Button>
       </div>
-      {notiz && <p className="mt-2.5 text-center text-[12.5px] text-pm-muted">{notiz}</p>}
     </div>
   );
 }

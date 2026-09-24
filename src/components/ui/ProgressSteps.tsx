@@ -22,12 +22,12 @@ export function ProgressSteps({
               type="button"
               onClick={() => onSchritt(i)}
               aria-label={`Zurück zu Schritt ${i + 1}: ${name}`}
-              className="py-3 -my-3 rounded focus-visible:outline focus-visible:outline-2 focus-visible:outline-pm-taupe"
+              className="py-[19px] -my-[19px] rounded focus-visible:outline focus-visible:outline-2 focus-visible:outline-pm-taupe"
             >
               {balken}
             </button>
           ) : (
-            <span key={name} className="py-3 -my-3">{balken}</span>
+            <span key={name} className="py-[19px] -my-[19px]">{balken}</span>
           );
         })}
       </div>

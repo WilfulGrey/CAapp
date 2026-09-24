@@ -630,6 +630,11 @@ const CustomerPortalPage: FC = () => {
   // Kopfzeile (Martin, 2026-07-12): offen solange nicht gespeichert,
   // danach eingeklappt mit Status-Pill; manueller Toggle gewinnt.
   const [patientExpandedManual, setPatientExpandedManual] = useState<boolean | null>(null);
+
+  // Formular im Blick → Feedback-Blase ausblenden: Sie saß unten rechts genau
+  // über der mitlaufenden Knopfleiste des Formulars (Portal-Redesign 24.09.).
+  // AngebotCard meldet das selbst (onImBlick), weil sie neu gemountet werden kann.
+  const [formularImBlick, setFormularImBlick] = useState(false);
   const [openFaq, setOpenFaq] = useState<number | null>(null);
   // Manual override for the "Ihr Angebot" expand/collapse. null = follow
   // the auto rule below (expanded only in initial state). Toggling sets
@@ -2746,7 +2751,7 @@ const CustomerPortalPage: FC = () => {
 
   return (
     <>
-    <div className="min-h-screen bg-gray-100 md:flex md:items-start md:justify-center md:py-10">
+    <div className="min-h-screen bg-gray-100 font-pm md:flex md:items-start md:justify-center md:py-10">
     <div className="min-h-screen md:min-h-0 bg-white w-full md:w-[390px] md:min-h-[844px] md:rounded-[48px] md:shadow-2xl md:overflow-hidden md:border-[8px] md:border-gray-800 md:ring-4 md:ring-gray-900/10 relative" style={{fontFamily: 'inherit'}}>
     <div id="portal-scroll-container" className="md:h-[844px] md:overflow-y-auto md:overflow-x-hidden">
       {/* Toast */}
@@ -3562,9 +3567,9 @@ const CustomerPortalPage: FC = () => {
             }
             setPatientSaved(saved);
           }}
-          forceSaved={patientSaved}
           triggerOpenPatient={triggerOpenPatient}
           onTriggerHandled={() => setTriggerOpenPatient(false)}
+          onImBlick={setFormularImBlick}
           mamamiaEnabled={mmReady}
           onSaveToMamamia={async (form) => {
             const existingPatientIds = mmCustomer?.patients?.map(p => p.id) ?? [];
@@ -4113,7 +4118,7 @@ const CustomerPortalPage: FC = () => {
            Frage „wie geht es weiter" beantwortet, und wer offene
            Bewerbungen hat, soll sich um die kümmern. Chat und Modale
            liegen auf z-[60]+ — die Blase auf z-40 verdeckt sie nicht. */}
-      {!hasPending && !patientSaved && !feedbackWeg && feedbackReif && feedbackVerweilt && !chatNurse && !selectedApp && !selectedNurse && (
+      {!hasPending && !patientSaved && !feedbackWeg && feedbackReif && feedbackVerweilt && !formularImBlick && !chatNurse && !selectedApp && !selectedNurse && (
         <AngebotsFeedback
           onDismiss={feedbackErledigt}
           onGoToForm={() => {

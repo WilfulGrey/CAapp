@@ -558,6 +558,22 @@ Content-Type: application/json
 
 (szczegóły poszczególnych akcji → §6)
 
+### B.4 Patientenbogen („Pflegesituation“) — UI i walidacja (Registry #86)
+
+`src/components/portal/AngebotCard.tsx`, 4 kroki (`STEP_LABELS` w `shared.ts`):
+
+| Krok | Pflicht (`missingFields`) |
+|---|---|
+| 1 Zur Person | `geschlecht` (+ `p2_geschlecht` przy 2 osobach); `geburtsjahr` opcjonalny, ale jeśli wpisany: 4 cyfry 1920–2010 |
+| 2 Pflegebedarf | `mobilitaet`, `heben`, `demenz`, `nacht` (+ wszystkie `p2_*`); `mobilitaet`/`nacht` osoby 1 są stałe z kalkulatora |
+| 3 Einsatzort & Start | `plz` rozwiązywalny (`einsatzortHinweis`), `wohnungstyp`, `urbanisierung`, `startDate`, `phone` (8–15 cyfr) |
+| 4 Wünsche & Aufgaben | `wunschGeschlecht`, `fuehrerschein` |
+
+- Błędy pokazują się dopiero po „Weiter →“/„Speichern“ — przy polu (`FormField`, `data-invalid`) i skrótem nad przyciskiem („Geschlecht fehlt“), który przewija do pola. Znikają na żywo po uzupełnieniu.
+- „Speichern“ jest zawsze aktywny: przy brakach skacze do pierwszego niepełnego kroku, inaczej `onSaveToMamamia` → `updateCustomer` → `patient_data_saved` (w `CustomerPortalPage`).
+- Chipy zapisują niezmienione wartości (`Pflegegrad 3`, `71-80 kg`); krótsze etykiety tylko w widoku (`ChipSelect labels`).
+- Szkic w `localStorage` pod `patient_<token>` (`_isDraft`), event `patient_form_step` raz na krok i sesję.
+
 ---
 
 ## Edge Function `onboard-to-mamamia`
