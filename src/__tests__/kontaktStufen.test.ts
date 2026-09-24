@@ -22,12 +22,18 @@ function speicher(vorbelegt: Record<string, string> = {}) {
 describe('kontaktVariante', () => {
   const TAG = 24 * 60 * 60 * 1000;
   // Der eine Test (Registry #80, Martin 19.09.): drei Schritte gegen das alte Formular, im Ablauf alt, Los klebt 30 Tage.
-  it('Standard folgt dem Ablauf: alt → Los (solange der Test läuft), preis → eine Seite', () => {
-    expect(KONTAKT_TEST.aktiv).toBe(true);
+  // Test beendet am 24.09.2026 (Registry #84): altes Formular für alle, das Los wird nicht mehr gelesen.
+  it('Standard folgt dem Ablauf: Test aus → altes Formular; läuft er, würfelt der Ablauf alt', () => {
+    expect(KONTAKT_TEST.aktiv).toBe(false);
     expect(KONTAKT_TEST.anteilStufen).toBe(0.5);
-    expect(kontaktStandard('alt')).toBe('wuerfeln');
+    expect(kontaktStandard('alt')).toBe('alt');
     expect(kontaktStandard('preis')).toBe('alt');
-    expect(kontaktStandard('alt', { aktiv: false, anteilStufen: 0.5 })).toBe('alt');
+    expect(kontaktStandard('alt', { aktiv: true, anteilStufen: 0.5 })).toBe('wuerfeln');
+  });
+  it('Test aus: ein altes Los auf „stufen" führt trotzdem zum alten Formular, Zwang per ?kontakt=stufen bleibt', () => {
+    const los = speicher({ [LOS_KEY]: JSON.stringify({ v: 'stufen', t: 1_800_000_000_000 }) });
+    expect(kontaktVariante('', speicher(), kontaktStandard('alt'), () => 0.1, los, 1_800_000_000_000)).toBe('alt');
+    expect(kontaktVariante('?kontakt=stufen', speicher(), kontaktStandard('alt'), () => 0.9, los, 1_800_000_000_000)).toBe('stufen');
   });
   it('würfelt einmal, merkt das Los 30 Tage und zieht danach kein neues', () => {
     const sitzung = speicher(); const los = speicher(); const t0 = 1_800_000_000_000;

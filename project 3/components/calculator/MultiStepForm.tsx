@@ -317,8 +317,8 @@ export function MultiStepForm({ mode = 'inline', bewertung = null }: MultiStepFo
       const ab: Ablauf = an ? 'alt' : ablaufVariante(window.location.search, window.sessionStorage);
       ablaufRef.current = ab;
       setAblauf(ab);
-      // Der eine Test (Registry #80): im Ablauf `alt` fällt das Los einmal und klebt 30 Tage
-      // (localStorage); Zwang per `?kontakt=` klebt je Sitzung. Karten-Seite ohne Los.
+      // Kontakt-Test (Registry #80) seit 24.09.2026 beendet (Registry #84): altes Formular für alle,
+      // das Los wird nicht mehr gelesen; Zwang per `?kontakt=stufen` klebt weiter je Sitzung.
       const kv = kontaktVariante(window.location.search, window.sessionStorage, an ? 'alt' : kontaktStandard(ab), Math.random, window.localStorage);
       kontaktVarRef.current = kv;
       setKontaktVar(kv);
