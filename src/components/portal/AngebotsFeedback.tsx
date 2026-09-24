@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import type { FC } from 'react';
 import { X } from 'lucide-react';
+import { TELEFON_HREF, WHATSAPP_HREF } from '../../lib/kontakt';
 
 // Rückmeldung zum Angebot — als schwebende Frage von Marta, unten rechts.
 //
@@ -29,8 +30,7 @@ export type FeedbackAnswer = 'passt_nicht' | 'spaeter' | 'loslegen';
 const GRUENDE = ['Zu teuer', 'Pflegekräfte passen nicht', 'Doch ein Heim', 'Anders gelöst'];
 const ZEITPUNKTE = ['In 2–4 Wochen', 'In 1–3 Monaten', 'Noch unklar'];
 
-const PHONE_HREF = 'tel:+4989200000830';
-const WHATSAPP_HREF = 'https://wa.me/4989200000830';
+const PHONE_HREF = TELEFON_HREF;
 
 const chip =
   'text-[15px] px-3.5 py-2 rounded-full border transition-colors text-left ' +

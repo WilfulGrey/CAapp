@@ -1,7 +1,7 @@
 import type { FC } from 'react';
+import { TELEFON_HREF, WHATSAPP_HREF } from '../../lib/kontakt';
 
-const PHONE_HREF = 'tel:+4989200000830';
-const WHATSAPP_HREF = 'https://wa.me/4989200000830';
+const PHONE_HREF = TELEFON_HREF;
 
 export const BeratungCTA: FC<{
   /** Kontextueller Untertitel — z.B. "Unsicher bei der Auswahl?" über der
