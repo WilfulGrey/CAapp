@@ -1,5 +1,6 @@
 import type { FC } from 'react';
 import { X, Phone } from 'lucide-react';
+import { TELEFON, TELEFON_HREF, WHATSAPP_HREF } from '../../lib/kontakt';
 
 const MEDIA_LOGOS = [
   { src: '/media-welt.webp',       alt: 'Die Welt' },
@@ -60,13 +61,13 @@ export const ContactPopup: FC<{ onClose: () => void }> = ({ onClose }) => (
               <p className="font-bold text-gray-900 text-base leading-tight">Marta Kapcio</p>
               <p className="text-xs text-gray-500 mb-2.5">Pflegeberaterin · Primundus</p>
               <a
-                href="tel:089200000830"
+                href={TELEFON_HREF}
                 className="inline-flex items-center gap-1.5 text-[#8B7355] font-bold text-sm hover:opacity-80 transition-opacity"
               >
                 <Phone className="w-3.5 h-3.5 flex-shrink-0" />
-                089 200 000 830
+                {TELEFON}
               </a>
-              <p className="text-xs text-gray-500 mt-0.5">Mo–So, 8:00–18:00 Uhr</p>
+              <p className="text-xs text-gray-500 mt-0.5">Mo–So, 8–20 Uhr</p>
             </div>
           </div>
 
@@ -110,14 +111,14 @@ export const ContactPopup: FC<{ onClose: () => void }> = ({ onClose }) => (
 
           <div className="flex gap-3">
             <a
-              href="tel:089200000830"
+              href={TELEFON_HREF}
               className="flex-1 flex items-center justify-center gap-2 bg-[#E76F63] hover:bg-[#D65E52] text-white rounded-xl py-3 text-sm font-bold transition-colors"
             >
               <Phone className="w-4 h-4" />
               Anrufen
             </a>
             <a
-              href={`https://wa.me/4989200000830?text=${encodeURIComponent('Hallo Frau Wysocki, ich habe folgendes Anliegen:')}`}
+              href={WHATSAPP_HREF}
               target="_blank"
               rel="noreferrer"
               className="flex-1 flex items-center justify-center gap-2 bg-[#25D366] hover:bg-[#20BA5A] text-white rounded-xl py-3 text-sm font-bold transition-colors"

@@ -66,6 +66,7 @@ import { AngebotPruefenModal, buildVertragsDaten } from '../components/portal/An
 import { CustomerNurseModal } from '../components/portal/CustomerNurseModal';
 import { zeigtSommerzuschlag } from '../components/portal/konditionen';
 import { PflegekraftChat } from '../components/portal/PflegekraftChat';
+import { TELEFON_HREF, WHATSAPP_HREF } from '../lib/kontakt';
 
 // ─── Dev-Only Preview-Mode (NICHT für Production) ──────────────────────────
 // Aktiviert via ?preview=bewerbung oder ?preview=interesse. Skipped den
@@ -629,6 +630,11 @@ const CustomerPortalPage: FC = () => {
   // Kopfzeile (Martin, 2026-07-12): offen solange nicht gespeichert,
   // danach eingeklappt mit Status-Pill; manueller Toggle gewinnt.
   const [patientExpandedManual, setPatientExpandedManual] = useState<boolean | null>(null);
+
+  // Formular im Blick → Feedback-Blase ausblenden: Sie saß unten rechts genau
+  // über der mitlaufenden Knopfleiste des Formulars (Portal-Redesign 24.09.).
+  // AngebotCard meldet das selbst (onImBlick), weil sie neu gemountet werden kann.
+  const [formularImBlick, setFormularImBlick] = useState(false);
   const [openFaq, setOpenFaq] = useState<number | null>(null);
   // Manual override for the "Ihr Angebot" expand/collapse. null = follow
   // the auto rule below (expanded only in initial state). Toggling sets
@@ -2289,7 +2295,7 @@ const CustomerPortalPage: FC = () => {
                     style={{color:'#8B7355', borderColor:'#C4B49A', background:'white'}}>
               Erneut versuchen
             </button>
-            <a href="tel:+4989200000830"
+            <a href={TELEFON_HREF}
                className="inline-flex items-center gap-2 text-sm font-bold text-white rounded-2xl px-5 py-3"
                style={{background:'#8B7355'}}>
               <Phone className="w-4 h-4" /> Kontakt
@@ -2745,7 +2751,7 @@ const CustomerPortalPage: FC = () => {
 
   return (
     <>
-    <div className="min-h-screen bg-gray-100 md:flex md:items-start md:justify-center md:py-10">
+    <div className="min-h-screen bg-gray-100 font-pm md:flex md:items-start md:justify-center md:py-10">
     <div className="min-h-screen md:min-h-0 bg-white w-full md:w-[390px] md:min-h-[844px] md:rounded-[48px] md:shadow-2xl md:overflow-hidden md:border-[8px] md:border-gray-800 md:ring-4 md:ring-gray-900/10 relative" style={{fontFamily: 'inherit'}}>
     <div id="portal-scroll-container" className="md:h-[844px] md:overflow-y-auto md:overflow-x-hidden">
       {/* Toast */}
@@ -3561,9 +3567,9 @@ const CustomerPortalPage: FC = () => {
             }
             setPatientSaved(saved);
           }}
-          forceSaved={patientSaved}
           triggerOpenPatient={triggerOpenPatient}
           onTriggerHandled={() => setTriggerOpenPatient(false)}
+          onImBlick={setFormularImBlick}
           mamamiaEnabled={mmReady}
           onSaveToMamamia={async (form) => {
             const existingPatientIds = mmCustomer?.patients?.map(p => p.id) ?? [];
@@ -3987,11 +3993,11 @@ const CustomerPortalPage: FC = () => {
               <div className="flex-1 min-w-0">
                 <p className="font-bold text-gray-900 text-[17px] leading-tight">Marta Kapcio</p>
                 <p className="text-[14px] text-gray-500 mb-2">Pflegeberaterin · Primundus</p>
-                <a href="tel:089200000830" className="inline-flex items-center gap-1.5 text-[#8B7355] font-bold text-[16px] hover:opacity-80 transition-opacity">
+                <a href={TELEFON_HREF} className="inline-flex items-center gap-1.5 text-[#8B7355] font-bold text-[16px] hover:opacity-80 transition-opacity">
                   <Phone className="w-4 h-4 flex-shrink-0" />
                   089 200 000 830
                 </a>
-                <p className="text-[14px] text-gray-500 mt-0.5">Mo–So, 8:00–18:00 Uhr</p>
+                <p className="text-[14px] text-gray-500 mt-0.5">Mo–So, 8–20 Uhr</p>
               </div>
             </div>
 
@@ -4036,14 +4042,14 @@ const CustomerPortalPage: FC = () => {
 
             <div className="flex gap-3">
               <a
-                href="tel:089200000830"
+                href={TELEFON_HREF}
                 className="flex-1 flex items-center justify-center gap-2 bg-[#E76F63] hover:bg-[#D65E52] text-white rounded-xl py-3 text-sm font-bold transition-colors"
               >
                 <Phone className="w-4 h-4" />
                 Anrufen
               </a>
               <a
-                href={`https://wa.me/4989200000830?text=${encodeURIComponent('Hallo Frau Wysocki, ich habe folgendes Anliegen:')}`}
+                href={WHATSAPP_HREF}
                 target="_blank"
                 rel="noreferrer"
                 className="flex-1 flex items-center justify-center gap-2 bg-[#25D366] hover:bg-[#20BA5A] text-white rounded-xl py-3 text-sm font-bold transition-colors"
@@ -4112,7 +4118,7 @@ const CustomerPortalPage: FC = () => {
            Frage „wie geht es weiter" beantwortet, und wer offene
            Bewerbungen hat, soll sich um die kümmern. Chat und Modale
            liegen auf z-[60]+ — die Blase auf z-40 verdeckt sie nicht. */}
-      {!hasPending && !patientSaved && !feedbackWeg && feedbackReif && feedbackVerweilt && !chatNurse && !selectedApp && !selectedNurse && (
+      {!hasPending && !patientSaved && !feedbackWeg && feedbackReif && feedbackVerweilt && !formularImBlick && !chatNurse && !selectedApp && !selectedNurse && (
         <AngebotsFeedback
           onDismiss={feedbackErledigt}
           onGoToForm={() => {
@@ -4279,7 +4285,7 @@ const CustomerPortalPage: FC = () => {
                   </div>
                 </div>
                 <a
-                  href="tel:089200000830"
+                  href={TELEFON_HREF}
                   className="flex items-center justify-center gap-2 w-full bg-[#9B1FA1] hover:bg-[#7B1A85] text-white rounded-xl py-3 text-sm font-bold transition-colors"
                 >
                   <Phone className="w-4 h-4" />

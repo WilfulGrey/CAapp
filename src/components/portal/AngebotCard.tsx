@@ -1,21 +1,16 @@
 import { useEffect, useRef, useState } from 'react';
-import type { FC } from 'react';
-import { Check, ChevronDown, FileText, AlertCircle } from 'lucide-react';
-import jsPDF from 'jspdf';
-import html2canvas from 'html2canvas';
+import type { FC, ReactNode } from 'react';
+import { Check, Lock } from 'lucide-react';
 import {
   Lead,
-  formatDate,
-  addDays,
-  leadDisplayName,
-  leadGreeting,
-  careStartLabel,
-  formatEuro,
-  cap,
   prefillPatientFromLead,
 } from '../../lib/supabase';
-import { CustomSelect } from './CustomSelect';
 import { ChipSelect } from './ChipSelect';
+import { Card } from '../ui/Card';
+import { FormField } from '../ui/FormField';
+import { FormNav } from '../ui/FormNav';
+import { ProgressSteps } from '../ui/ProgressSteps';
+import { EYEBROW } from '../ui/SectionHeader';
 import { DateField, localTodayIso } from './DateField';
 import { callMamamia } from '../../lib/mamamia/client';
 import { reportLeadEvent } from '../../lib/leadEvents';
@@ -38,6 +33,36 @@ function isPlausibleGermanPhone(raw: string): boolean {
   return /^\d{8,15}$/.test(ziffern);
 }
 
+// Geburtsjahr ist optional; wenn eingetragen, dann ein plausibles Jahr.
+// Bis 24.09. eine Liste 1931–2000, jetzt ein Zahlenfeld (Martin: „Zahlenfeld").
+function geburtsjahrGueltig(jahr: string): boolean {
+  if (jahr === '') return true;
+  if (!/^\d{4}$/.test(jahr)) return false;
+  const n = Number(jahr);
+  return n >= 1920 && n <= 2010;
+}
+
+// Auswahl-Werte bleiben, wie mamamia und der Mapper sie kennen; die Chips zeigen
+// kürzere Beschriftungen, damit drei in eine Zeile passen (Einheit steht im Label).
+const GEWICHT = ['Unter 50 kg','51-60 kg','61-70 kg','71-80 kg','81-90 kg','91-100 kg','Über 100 kg'];
+const GEWICHT_KURZ: Record<string, string> = {
+  'Unter 50 kg': 'bis 50', '51-60 kg': '51–60', '61-70 kg': '61–70', '71-80 kg': '71–80',
+  '81-90 kg': '81–90', '91-100 kg': '91–100', 'Über 100 kg': 'über 100',
+};
+const GROESSE = ['Unter 151 cm','151-160 cm','161-170 cm','171-180 cm','181-190 cm','Über 190 cm'];
+const GROESSE_KURZ: Record<string, string> = {
+  'Unter 151 cm': 'bis 150', '151-160 cm': '151–160', '161-170 cm': '161–170',
+  '171-180 cm': '171–180', '181-190 cm': '181–190', 'Über 190 cm': 'über 190',
+};
+const PFLEGEGRAD = ['Kein/e','Pflegegrad 1','Pflegegrad 2','Pflegegrad 3','Pflegegrad 4','Pflegegrad 5'];
+const PFLEGEGRAD_KURZ: Record<string, string> = {
+  'Kein/e': 'Keiner', 'Pflegegrad 1': '1', 'Pflegegrad 2': '2', 'Pflegegrad 3': '3', 'Pflegegrad 4': '4', 'Pflegegrad 5': '5',
+};
+const DEMENZ = ['Nein','Leichtgradig','Mittelgradig','Schwer'];
+// Felder, die es pro Person gibt (Person 2 mit Präfix p2_).
+const PERSON_FELDER = ['geschlecht', 'geburtsjahr', 'mobilitaet', 'heben', 'demenz', 'nacht'];
+const INKONTINENZ = ['Nein','Harninkontinenz','Stuhlinkontinenz','Beides'];
+
 export const AngebotCard: FC<{
   lead?: Lead | null;
   /** Snapshot of the customer's Mamamia state — used to seed the
@@ -49,41 +74,19 @@ export const AngebotCard: FC<{
   onTriggerHandled?: () => void;
   mamamiaEnabled?: boolean;
   onSaveToMamamia?: (form: PatientForm) => Promise<void>;
-  /** External "patient is saved" signal from the parent (e.g. demo
-   *  override or a future API-driven source of truth). Treated as an
-   *  upper bound: when true, the row reads as "Vollständig" even if the
-   *  AngebotCard's own `saved` state hasn't flipped from a draft. Avoids
-   *  the parent claiming patientSaved=true while this card still shows
-   *  "Unvollständig" — they should agree. */
-  forceSaved?: boolean;
-}> = ({ lead, mmCustomer, onPatientSaved, triggerOpenPatient, onTriggerHandled, mamamiaEnabled, onSaveToMamamia, forceSaved }) => {
-  // ─── Derive display values from lead (or fallback to demo data) ──────────────
-  // No demo-mode hardcodes (CLAUDE.md §1: real backend or visible failure).
-  // When lead is missing, fields render empty — parent decides whether to
-  // gate the card behind a loading/error state.
-  const kalk = lead?.kalkulation;
-  const bruttopreis = kalk ? formatEuro(kalk.bruttopreis) : '';
-  const eigenanteil = kalk ? formatEuro(kalk.eigenanteil) : '';
-  const nachname = cap(lead?.nachname) || '';
-  const displayAngebot = nachname ? `${nachname} · ${bruttopreis}/Mo.` : bruttopreis;
-  const careStart = careStartLabel(lead?.care_start_timing ?? null);
-  const angebotDatum = lead ? formatDate(lead.created_at) : '';
-  const gueltigBis = lead ? addDays(lead.created_at, 30) : '';
-  const kundenEmail = lead?.email ?? '';
-  const kundenName = lead ? leadDisplayName(lead) : '';
-  const greeting = lead ? leadGreeting(lead) : '';
-  const zuschüsse = kalk?.['zuschüsse']?.items?.filter(z => z.in_kalkulation) ?? [];
-  const [angebotOpen, setAngebotOpen] = useState(false);
+  /** Formular ist (nicht mehr) im Bildschirm — die Seite blendet solange die
+   *  Feedback-Blase aus, die sonst über der Knopfleiste läge. */
+  onImBlick?: (imBlick: boolean) => void;
+}> = ({ lead, mmCustomer, onPatientSaved, triggerOpenPatient, onTriggerHandled, mamamiaEnabled, onSaveToMamamia, onImBlick }) => {
   // Offen, sobald die Karte gerendert wird: Seit dem Wegfall des
   // Zwischenkopfs (11.08.) steuert allein der Abschnittskopf in
   // CustomerPortalPage, ob dieser Block überhaupt erscheint.
   const [patientOpen, setPatientOpen] = useState(true);
-  // Fehlermeldung des Weiter-/Speichern-Buttons. Leer, solange der Kunde
-  // nichts falsch gemacht hat — rote Rahmen erscheinen erst nach dem ersten
-  // Fehlversuch (vorher standen sie ab dem ersten Rendern und das Formular
-  // sah falsch aus, bevor jemand getippt hatte).
-  const [stepError, setStepError] = useState('');
-  const showErrors = stepError !== '';
+  // Fehler zeigen erst nach einem Fehlversuch mit „Weiter"/„Speichern" — vorher
+  // standen die roten Rahmen ab dem ersten Rendern und das Formular sah falsch
+  // aus, bevor jemand getippt hatte. Welche Felder rot sind, ergibt sich live
+  // aus `missingFields`.
+  const [fehlerZeigen, setFehlerZeigen] = useState(false);
   const [step, setStep] = useState(0);
   const [priceInfo, setPriceInfo] = useState<string|null>(null);
 
@@ -205,7 +208,7 @@ export const AngebotCard: FC<{
 
   const zwei = patient.anzahl === '2';
 
-  // userDirty — set ONLY by user-driven setPatient (set() / CustomSelect
+  // userDirty — set ONLY by user-driven setPatient (set() / ChipSelect
   // onChange wrappers below). Programmatic merges (mm-rehydrate) leave
   // this false, so they don't masquerade as "user is editing".
   //
@@ -430,14 +433,15 @@ export const AngebotCard: FC<{
   const FIELD_LABELS: Record<string, string> = {
     anzahl: 'Anzahl zu betreuender Personen',
     geschlecht: 'Geschlecht', p2_geschlecht: 'Geschlecht (Person 2)',
+    geburtsjahr: 'Geburtsjahr', p2_geburtsjahr: 'Geburtsjahr (Person 2)',
     mobilitaet: 'Mobilität', p2_mobilitaet: 'Mobilität (Person 2)',
     heben: 'Heben erforderlich', p2_heben: 'Heben erforderlich (Person 2)',
     demenz: 'Demenz', p2_demenz: 'Demenz (Person 2)',
     nacht: 'Nachteinsätze', p2_nacht: 'Nachteinsätze (Person 2)',
     plz: 'Einsatzort', wohnungstyp: 'Wohnungstyp', urbanisierung: 'Lage',
     wunschGeschlecht: 'Gewünschtes Geschlecht', fuehrerschein: 'Führerschein',
-    startDate: 'Voraussichtliches Startdatum',
-    phone: 'Telefonnummer für Rückfragen',
+    startDate: 'Startdatum',
+    phone: 'Telefonnummer',
   };
 
   // Der angezeigte Feldtext — eine Quelle für `value`, `onFocus` und den
@@ -455,11 +459,6 @@ export const AngebotCard: FC<{
   };
   const einsatzortFehler = einsatzortHinweis(einsatzortStand);
 
-  const fieldLabel = (k: string): string =>
-    // Der ganze Satz statt „Einsatzort", sonst überschreibt „Weiter" den
-    // Konkreten mit einem nichtssagenden „Bitte noch ausfüllen: Einsatzort".
-    k === 'plz' ? (einsatzortFehler ?? FIELD_LABELS[k] ?? k) : FIELD_LABELS[k] ?? k;
-
   const missingFields = (s: number): string[] => {
     const m: string[] = [];
     if (s === 0) {
@@ -467,7 +466,12 @@ export const AngebotCard: FC<{
       // SA-Linie (Martin, 2026-07-08): nur aktivierungsrelevante Felder
       // blockieren — Geburtsjahr/Pflegegrad sind wie im SA-Wizard optional.
       if (patient.geschlecht === '') m.push('geschlecht');
+      // Geburtsjahr bleibt optional. Seit es ein Zahlenfeld ist (24.09.), hält
+      // nur ein angefangenes oder unmögliches Jahr den Schritt auf — sonst
+      // ginge „19" oder „1492" an mamamia (dort still verworfen).
+      if (!geburtsjahrGueltig(patient.geburtsjahr)) m.push('geburtsjahr');
       if (zwei && patient.p2_geschlecht === '') m.push('p2_geschlecht');
+      if (zwei && !geburtsjahrGueltig(patient.p2_geburtsjahr)) m.push('p2_geburtsjahr');
     }
     if (s === 1) {
       (['mobilitaet','heben','demenz','nacht'] as const).forEach(k => { if (patient[k] === '') m.push(k); });
@@ -494,17 +498,46 @@ export const AngebotCard: FC<{
     return m;
   };
 
-  const stepComplete = (s: number): boolean => {
-    if (s <= 3) return missingFields(s).length === 0;
-    return false;
-  };
-  const allComplete = STEP_LABELS.every((_, i) => stepComplete(i));
+  // Offene Angaben des aktuellen Schritts — live, damit Rahmen und Hinweis
+  // verschwinden, sobald der Kunde das Feld ausfüllt (vorher blieb die
+  // Meldung stehen, bis er erneut „Weiter" drückte).
+  const offen = fehlerZeigen ? missingFields(step) : [];
 
-  // `effectiveSaved` lets the parent's patientSaved signal flip the row
-  // to "Vollständig" even when the AngebotCard's own `saved` state hasn't
-  // moved (e.g. demo override, hydration race). The parent has its own
-  // truth — if it says saved, we should agree.
-  const effectiveSaved = saved || !!forceSaved;
+  // Fehler direkt am Feld. Chips brauchen keinen Feldnamen — der steht
+  // darüber; Eingabefelder sagen, was genau nicht stimmt.
+  const fehlerFuer = (k: string): string | undefined => {
+    if (!fehlerZeigen) return undefined;
+    // Der Einsatzort zeigt auch den Suchfehler, der nicht sperrt (s. o.).
+    if (k === 'plz') return einsatzortFehler ?? undefined;
+    if (!offen.includes(k)) return undefined;
+    if (k === 'geburtsjahr' || k === 'p2_geburtsjahr') return 'Bitte ein Jahr zwischen 1920 und 2010 eintragen';
+    if (k === 'startDate') return 'Bitte ein Datum wählen. Eine Schätzung reicht.';
+    if (k === 'phone') {
+      return patient.phone.trim() ? 'Die Nummer ist zu kurz oder zu lang. Bitte prüfen.' : 'Bitte eine Telefonnummer eintragen';
+    }
+    return 'Bitte eine Antwort wählen';
+  };
+
+  // Kurzfassung über den Knöpfen: „Geschlecht fehlt" statt „1 Angabe fehlt"
+  // (GPT-5-Prüfung 24.09.). Tippen springt zum Feld.
+  const navHinweis = (() => {
+    if (!fehlerZeigen) return null;
+    // Suchfehler beim Einsatzort sperrt nicht, soll aber gesehen werden.
+    if (offen.length === 0) return einsatzortFehler;
+    if (offen.length === 1 && offen[0] === 'plz' && einsatzortFehler) return einsatzortFehler;
+    // Beim Ehepaar heißt Person 1 auch so — sonst stünde „Geschlecht,
+    // Geschlecht (Person 2)" im Hinweis.
+    const name = (k: string) =>
+      zwei && PERSON_FELDER.includes(k) ? `${FIELD_LABELS[k]} (Person 1)` : FIELD_LABELS[k] ?? k;
+    const kurz = (k: string) => {
+      if (k === 'geburtsjahr' || k === 'p2_geburtsjahr') return `${name(k)} prüfen`;
+      if (k === 'phone' && patient.phone.trim()) return `${name(k)} prüfen`;
+      return `${name(k)} fehlt`;
+    };
+    return offen.length === 1
+      ? kurz(offen[0])
+      : `${offen.length} Angaben offen: ${offen.map(name).join(', ')}`;
+  })();
 
   // Schritt-Tracking (einmal je Schritt/Sitzung): endlich sichtbar, WO im
   // Patientenbogen die Abbrüche passieren (lead_events → Dashboard/Report).
@@ -515,10 +548,10 @@ export const AngebotCard: FC<{
     reportLeadEvent(lead.token, 'patient_form_step', { step: s });
   };
 
-  // Pflichtfeld leer → dezenter roter Rahmen (wie im SA-Portal); gefüllt → normal.
-  const req = (v: string) => (v === '' ? ' border-red-300 bg-red-50/40' : '');
-  const inputCls = 'w-full border border-gray-300 rounded-xl px-3 py-2.5 text-base text-gray-800 placeholder-gray-400 focus:outline-none focus:border-[#8B7355] focus:ring-2 focus:ring-[#8B7355]/10 transition-all bg-white';
-  const labelCls = 'block text-[16px] font-semibold mb-2.5 text-[#18181B]';
+  const inputCls =
+    'w-full min-h-[48px] rounded-[14px] border-[1.5px] border-pm-chip bg-white px-3.5 py-3 text-[16px] text-pm-ink ' +
+    'placeholder:text-pm-mute focus:outline-none focus:border-pm-taupe focus:ring-2 focus:ring-pm-taupe/15 transition-colors';
+  const inputFehlerCls = ' !border-pm-error';
 
   // Desktop: the phone-frame div (#portal-scroll-container) is the scroller.
   // Mobile: that div has no overflow, so `window` is the actual scroller.
@@ -539,672 +572,294 @@ export const AngebotCard: FC<{
       patientFormRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }, 50);
   };
-  // 2-column grid rows: align label boxes so a wrapped label (e.g.
-  // "Heben erforderlich? *" vs single-line "Demenz *") doesn't shift its
-  // select down relative to the neighbour. Apply via grid items-end on
-  // the row and flex flex-col on each cell.
-  // Einspaltig (Martin, 11.08.): Auf 375 px blieben pro Spalte ~150 px, die
-  // Auswahlwerte wurden zu „Bitte wäh…" abgeschnitten. Ausnahme bleibt die
-  // PLZ/Ort-Zeile weiter unten — zwei kurze Felder, die zusammengehören.
-  const gridRow2 = 'grid grid-cols-1 gap-6';
+  // Zum ersten roten Feld — nach dem Render, damit die Rahmen schon stehen.
+  // setTimeout statt rAF: nach einem await oder einem Schrittwechsel sind wir
+  // in keinem diskreten Event, rAF kann dem Commit zuvorkommen.
+  const zumErstenFehler = () => {
+    setTimeout(() => {
+      patientFormRef.current
+        ?.querySelector('[data-invalid="1"]')
+        ?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }, 60);
+  };
 
-  const downloadPdf = async () => {
-    // Pre-load logo as base64 so html2canvas doesn't miss it
-    const logoB64 = await fetch('/LOGO-PRIMUNDUS.png')
-      .then(r => r.blob())
-      .then(b => new Promise<string>(res => { const fr = new FileReader(); fr.onload = () => res(fr.result as string); fr.readAsDataURL(b); }));
+  // Sichtbarkeit melden (s. Prop `onImBlick`).
+  useEffect(() => {
+    const el = patientFormRef.current;
+    if (!el || !onImBlick || typeof IntersectionObserver === 'undefined') return;
+    const io = new IntersectionObserver(entries => onImBlick(entries.some(e => e.isIntersecting)));
+    io.observe(el);
+    return () => { io.disconnect(); onImBlick(false); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [patientOpen]);
 
-    const html = `<div style="width:794px;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;color:#1a1a1a;background:#fff;">
+  const zurueck = () => { setFehlerZeigen(false); setStep(s => s - 1); scrollToFormTop(); };
 
-  <!-- HEADER -->
-  <div style="padding:32px 52px 24px;border-bottom:1px solid #e8e8e8;">
-    <table style="width:100%;border-collapse:collapse;"><tr>
-      <td style="vertical-align:middle;width:55%;">
-        <img src="${logoB64}" style="height:52px;display:block;" />
-      </td>
-      <td style="vertical-align:middle;text-align:right;">
-        <div style="font-size:13px;color:#444;line-height:1.5;">089 200 000 830</div>
-        <div style="font-size:12px;color:#888;line-height:1.5;">Marta Kapcio · Mo–Sa 8–18 Uhr</div>
-      </td>
-    </tr></table>
-  </div>
+  const weiter = () => {
+    if (missingFields(step).length === 0) {
+      setFehlerZeigen(false);
+      trackStep(step + 1); setStep(s => s + 1); scrollToFormTop();
+      return;
+    }
+    // Kein `disabled` und kein stummes Nichts: Felder rot, Kurzfassung über
+    // den Knöpfen, Sprung zum ersten offenen Feld.
+    setFehlerZeigen(true);
+    zumErstenFehler();
+  };
 
-  <!-- ADDRESS + META -->
-  <div style="padding:24px 52px 20px;border-bottom:1px solid #f0f0f0;">
-    <table style="width:100%;border-collapse:collapse;"><tr>
-      <td style="vertical-align:top;">
-        ${kundenName ? `<div style="font-size:13px;font-weight:600;color:#1a1a1a;">${kundenName}</div>` : ''}
-        <div style="font-size:12px;color:#888;${kundenName ? 'margin-top:2px;' : ''}">${kundenEmail}</div>
-      </td>
-      <td style="vertical-align:top;text-align:right;">
-        <div style="font-size:12px;color:#888;line-height:2.0;">
-          <div>Angebotsdatum: <span style="color:#333;">${angebotDatum}</span></div>
-          <div>Gültig bis: <span style="color:#333;">${gueltigBis}</span></div>
-        </div>
-      </td>
-    </tr></table>
-  </div>
-
-  <!-- TITLE + BRIEF -->
-  <div style="padding:32px 52px 28px;">
-    <div style="font-size:19px;font-weight:700;color:#1a1a1a;margin-bottom:20px;line-height:1.35;">Ihr persönliches Angebot –<br/>24-Stunden-Betreuung zu Hause</div>
-    <p style="font-size:13.5px;color:#333;margin:0 0 10px;">${greeting},</p>
-    <p style="font-size:13.5px;color:#555;line-height:1.7;margin:0 0 10px;">vielen Dank für Ihre Anfrage. Gerne können wir die Betreuung übernehmen. Da unsere Betreuungskräfte direkt angestellt sind, kann die Betreuung bereits <strong style="color:#1a1a1a;">innerhalb von 4–7 Werktagen</strong> beginnen.</p>
-    <p style="font-size:13.5px;color:#555;line-height:1.7;margin:0 0 18px;">Unser nachfolgendes Angebot ist auf Ihre individuelle Situation zugeschnitten.</p>
-    <div style="font-size:13px;color:#888;">Ihre Marta Kapcio</div>
-  </div>
-
-  <!-- TRUST BAR -->
-  <div style="padding:13px 52px;background:#f9f9f9;border-top:1px solid #f0f0f0;border-bottom:1px solid #f0f0f0;">
-    <table style="width:100%;border-collapse:collapse;"><tr>
-      <td style="font-size:11px;color:#bbb;vertical-align:middle;width:80px;">Bekannt aus</td>
-      <td style="font-size:12px;font-weight:700;color:#666;vertical-align:middle;letter-spacing:0.5px;padding:0 16px;">DIE WELT</td>
-      <td style="font-size:12px;font-weight:700;color:#666;vertical-align:middle;letter-spacing:0.5px;padding:0 16px;">FAZ</td>
-      <td style="font-size:12px;font-weight:700;color:#666;vertical-align:middle;letter-spacing:0.5px;padding:0 16px;">ARD</td>
-      <td style="font-size:12px;font-weight:700;color:#666;vertical-align:middle;letter-spacing:0.5px;padding:0 16px;">NDR</td>
-      <td style="font-size:12px;font-weight:700;color:#666;vertical-align:middle;letter-spacing:0.5px;padding:0 16px;">SAT.1</td>
-    </tr></table>
-  </div>
-
-  <!-- KOSTEN -->
-  <div style="padding:32px 52px 0;">
-    <div style="font-size:10px;font-weight:700;color:#aaa;letter-spacing:1.5px;text-transform:uppercase;margin-bottom:14px;">Kosten</div>
-    <div style="border:1px solid #e8e8e8;border-radius:6px;overflow:hidden;margin-bottom:10px;">
-      <div style="padding:10px 22px;background:#f5f5f5;border-bottom:1px solid #e8e8e8;">
-        <div style="font-size:10px;font-weight:700;color:#aaa;letter-spacing:1.2px;text-transform:uppercase;">Monatssatz für die 24h-Betreuung</div>
-      </div>
-      <div style="padding:20px 22px 16px;">
-        <div style="font-size:38px;font-weight:700;color:#1a1a1a;line-height:1;">${bruttopreis}</div>
-        <div style="font-size:12px;color:#aaa;margin-top:6px;">Inkl. aller Steuern, Gebühren und Sozialabgaben</div>
-      </div>
-      <div style="border-top:1px solid #f0f0f0;">
-        <table style="width:100%;border-collapse:collapse;"><tr>
-          <td style="padding:12px 22px;border-right:1px solid #f0f0f0;width:50%;vertical-align:top;">
-            <div style="font-size:10px;color:#bbb;letter-spacing:1px;text-transform:uppercase;margin-bottom:4px;">Zzgl. Anreisepauschale</div>
-            <div style="font-size:13px;color:#555;">125 € pro Strecke</div>
-          </td>
-          <td style="padding:12px 22px;width:50%;vertical-align:top;">
-            <div style="font-size:10px;color:#bbb;letter-spacing:1px;text-transform:uppercase;margin-bottom:4px;">Zzgl. Kost &amp; Logis</div>
-            <div style="font-size:13px;color:#555;">Eigenes Zimmer + Verpflegung</div>
-          </td>
-        </tr></table>
-      </div>
-    </div>
-    <div style="padding:6px 0 28px;">
-      <div style="font-size:12px;color:#888;border:1px solid #e0e0e0;border-radius:20px;padding:5px 14px;display:inline-block;">✓ Täglich kündbar &nbsp;·&nbsp; ✓ Tagesgenaue Abrechnung &nbsp;·&nbsp; ✓ Keine Kosten ohne Pflegekraft</div>
-    </div>
-  </div>
-
-  <!-- ZUSCHÜSSE -->
-  <div style="padding:0 52px 28px;">
-    <div style="font-size:10px;font-weight:700;color:#aaa;letter-spacing:1.5px;text-transform:uppercase;margin-bottom:14px;">Mögliche Zuschüsse der Pflegekasse</div>
-    <div style="border:1px solid #e8e8e8;border-radius:6px;overflow:hidden;">
-      <table style="width:100%;border-collapse:collapse;">
-        ${zuschüsse.map((z: any) => `<tr><td style="padding:11px 22px;font-size:13px;color:#555;border-bottom:1px solid #f0f0f0;background:#fafafa;">${z.label}</td><td style="padding:11px 22px;text-align:right;font-size:13px;color:#555;border-bottom:1px solid #f0f0f0;background:#fafafa;white-space:nowrap;">−${formatEuro(z.betrag_monatlich)}</td></tr>`).join('')}
-        <tr><td style="padding:14px 22px;font-size:14px;font-weight:700;color:#1a1a1a;background:#fff;">Möglicher Eigenanteil</td><td style="padding:14px 22px;text-align:right;font-size:16px;font-weight:700;color:#1a1a1a;background:#fff;white-space:nowrap;">ab ${eigenanteil}/Monat</td></tr>
-      </table>
-    </div>
-    <div style="font-size:11px;color:#ccc;margin-top:8px;font-style:italic;">Zuschüsse sind individuell und abhängig von Ihrer persönlichen Situation. Kein Vertragsbestandteil.</div>
-  </div>
-
-  <!-- NÄCHSTE SCHRITTE -->
-  <div style="padding:24px 52px 32px;border-top:1px solid #f0f0f0;">
-    <div style="font-size:10px;font-weight:700;color:#aaa;letter-spacing:1.5px;text-transform:uppercase;margin-bottom:20px;">Was passiert nach der Annahme?</div>
-    ${[
-      ['1','Vertragsbestätigung per E-Mail','Sie erhalten sofort eine Bestätigung mit allen Details des Einsatzes.'],
-      ['2','Anreise &amp; Betreuungsbeginn','Die Pflegekraft reist zum vereinbarten Datum an und beginnt die Betreuung.'],
-      ['3','Laufende Begleitung','Ihr persönlicher Ansprechpartner ist 7 Tage die Woche für Sie erreichbar.'],
-      ['4','Nächsten Einsatz planen','Zur Mitte des Einsatzes planen wir gemeinsam die Nachfolge — alles im Portal.'],
-    ].map(([n,title,desc]) => `
-    <table style="width:100%;border-collapse:collapse;margin-bottom:14px;"><tr>
-      <td style="vertical-align:top;width:36px;padding-top:2px;">
-        <div style="width:24px;height:24px;border:1.5px solid #ddd;border-radius:50%;text-align:center;line-height:22px;font-size:11px;font-weight:700;color:#aaa;">${n}</div>
-      </td>
-      <td style="vertical-align:top;padding-left:14px;">
-        <div style="font-size:13.5px;font-weight:700;color:#1a1a1a;">${title}</div>
-        <div style="font-size:12.5px;color:#777;margin-top:3px;line-height:1.55;">${desc}</div>
-      </td>
-    </tr></table>`).join('')}
-  </div>
-
-  <!-- FOOTER -->
-  <div style="padding:16px 52px;border-top:1px solid #f0f0f0;background:#f9f9f9;">
-    <table style="width:100%;border-collapse:collapse;"><tr>
-      <td style="font-size:11px;color:#bbb;">Primundus GmbH · primundus.de · info@primundus.de</td>
-      <td style="text-align:right;font-size:11px;color:#bbb;">Vertrauliches Angebot${kundenName ? ` · Nur für ${kundenName}` : ''}</td>
-    </tr></table>
-  </div>
-
-</div>`;
-
-    const el = document.createElement('div');
-    el.style.cssText = 'position:fixed;left:-10000px;top:0;width:794px;pointer-events:none;';
-    el.innerHTML = html;
-    document.body.appendChild(el);
-
-    await new Promise(r => setTimeout(r, 300));
-
-    try {
-      const canvas = await html2canvas(el, {
-        scale: 2,
-        useCORS: true,
-        allowTaint: false,
-        backgroundColor: '#ffffff',
-        width: 794,
-        windowWidth: 794,
-      });
-
-      const imgData = canvas.toDataURL('image/png');
-      const doc = new jsPDF({ unit: 'mm', format: 'a4', orientation: 'portrait' });
-      const pageW = doc.internal.pageSize.getWidth();
-      const pageH = doc.internal.pageSize.getHeight();
-      const canvasH = (canvas.height / canvas.width) * pageW;
-
-      if (canvasH <= pageH) {
-        doc.addImage(imgData, 'PNG', 0, 0, pageW, canvasH);
-      } else {
-        const pxPerPage = (pageH / pageW) * canvas.width;
-        let remainingH = canvas.height;
-        let srcY = 0;
-        let firstPage = true;
-        while (remainingH > 0) {
-          const sliceH = Math.min(pxPerPage, remainingH);
-          const sliceCanvas = document.createElement('canvas');
-          sliceCanvas.width = canvas.width;
-          sliceCanvas.height = sliceH;
-          sliceCanvas.getContext('2d')!.drawImage(canvas, 0, srcY, canvas.width, sliceH, 0, 0, canvas.width, sliceH);
-          if (!firstPage) doc.addPage();
-          doc.addImage(sliceCanvas.toDataURL('image/png'), 'PNG', 0, 0, pageW, (sliceH / canvas.width) * pageW);
-          srcY += sliceH;
-          remainingH -= sliceH;
-          firstPage = false;
+  const speichern = async () => {
+    if (isSaving) return;
+    // „Speichern" ist immer aktiv (Martin, 24.09.): Tippen zeigt, was fehlt,
+    // und springt zum ersten offenen Schritt und Feld. Vorher war der Knopf
+    // still ausgegraut, wenn auf einem früheren Schritt etwas fehlte.
+    const ersterOffener = STEP_LABELS.findIndex((_, i) => missingFields(i).length > 0);
+    if (ersterOffener !== -1) {
+      setFehlerZeigen(true);
+      setStep(ersterOffener);
+      zumErstenFehler();
+      return;
+    }
+    // Hier stand bis Registry #65 ein `_isDraft:false` VOR dem
+    // Speichern — nach einem abgelehnten Save las der Reload
+    // „Vollständig", obwohl in Mamamia nichts steht. Ersatzlos
+    // gestrichen: der Autosave-Effekt schreibt `_isDraft:!saved`
+    // ohnehin bei jeder Änderung von `saved`, also false erst
+    // nach Erfolg.
+    // ── Save flow ─────────────────────────────────────
+    // Previously we collapsed the form and flipped
+    // patientSaved BEFORE the Mamamia round-trip — the
+    // customer could then click "Einladen" while Mamamia
+    // still had a half-populated profile (job_description
+    // missing), which made StoreRequest reject the
+    // invite. Now: button stays disabled, form stays
+    // visible, gate stays closed until updateCustomer
+    // resolves. On error: form re-opens, gate stays
+    // closed, parent shows a toast.
+    if (mamamiaEnabled && onSaveToMamamia) {
+      setIsSaving(true);
+      try {
+        await onSaveToMamamia(patient);
+        setSaved(true);
+        setPatientOpen(false);
+        onPatientSaved?.(true);
+        scrollPortalToTop();
+      } catch (err) {
+        // Parent already toasted; keep form open so the
+        // customer can retry without re-entering data.
+        setPatientOpen(true);
+        const m = err instanceof Error ? err.message : '';
+        if (!m.startsWith('EINSATZORT')) {
+          console.error('UpdateCustomer failed:', err);
+        } else {
+          // Der Einsatzort steht auf Schritt 3, „Speichern"
+          // auf Schritt 4 — ohne Rücksprung sieht der Kunde
+          // gar nichts und klickt wieder (Registry #65).
+          // Die Meldung selbst entsteht im nächsten Render aus
+          // lookupFehler/abgelehntePlz (einsatzortFehler).
+          if (m === 'EINSATZORT_LOOKUP') setLookupFehler(true);
+          else if (m.startsWith('EINSATZORT:') && m.slice(11) === patient.plz) setAbgelehntePlz(m.slice(11));
+          setStep(2);
+          setFehlerZeigen(true);
+          zumErstenFehler();
         }
+      } finally {
+        setIsSaving(false);
       }
-
-      doc.save('Primundus-Angebot.pdf');
-    } finally {
-      document.body.removeChild(el);
+    } else {
+      // Mamamia disabled (e.g. local dev) — fall back to
+      // the old immediate-collapse path.
+      setSaved(true);
+      setPatientOpen(false);
+      onPatientSaved?.(true);
+      scrollPortalToTop();
     }
   };
 
+  // Werte aus dem Kostenrechner (bestimmen den Preis) — fest, mit Schloss.
+  // Tippen erklärt, warum; vorher war das ein 14-px-Info-Knopf neben dem Label.
+  const festWert = (key: string, wert: ReactNode) => (
+    <>
+      <button
+        type="button"
+        onClick={() => setPriceInfo(priceInfo === key ? null : key)}
+        aria-expanded={priceInfo === key}
+        className="w-full min-h-[48px] rounded-[14px] bg-pm-paper px-3.5 py-2.5 text-left text-[16px] text-pm-ink flex items-center justify-between gap-3"
+      >
+        <span>{wert}</span>
+        <Lock className="w-4 h-4 flex-none text-pm-mute" aria-hidden="true" />
+      </button>
+      <p className="mt-2 text-[13.5px] leading-snug text-pm-muted">
+        {priceInfo === key
+          ? 'Diese Angabe bestimmt den Preis. Ändern kann sie Ihre Beraterin, dann schicken wir Ihnen ein neues Angebot.'
+          : 'Aus Ihrem Kostenrechner übernommen'}
+      </p>
+    </>
+  );
+
+  // Zwischenkopf („Person 1"); das Feld direkt darunter braucht keine eigene Trennlinie.
+  const personKopf = (text: string) => (
+    <p className={`${EYEBROW} pt-6 [&+[data-field]]:border-t-0 [&+[data-field]]:pt-3`}>{text}</p>
+  );
+
+  const geburtsjahrFeld = (k: 'geburtsjahr' | 'p2_geburtsjahr') => (
+    <input
+      value={patient[k]}
+      onChange={e => {
+        const ziffern = e.target.value.replace(/\D/g, '').slice(0, 4);
+        updatePatient(p => ({ ...p, [k]: ziffern }));
+      }}
+      inputMode="numeric"
+      pattern="[0-9]*"
+      autoComplete="off"
+      maxLength={4}
+      placeholder="z. B. 1948"
+      aria-invalid={!!fehlerFuer(k)}
+      className={inputCls + ' max-w-[160px] tabular-nums' + (fehlerFuer(k) ? inputFehlerCls : '')}
+    />
+  );
+
+  const letzterSchritt = step === STEP_LABELS.length - 1;
+
   return (
-    <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden shadow-sm divide-y divide-gray-100">
+    <div ref={patientFormRef} id="pflegesituation-formular" className="scroll-mt-16">
+      {patientOpen && (
+        <Card className="px-5 pt-5">
+          <ProgressSteps
+            schritte={STEP_LABELS}
+            aktuell={step}
+            onSchritt={i => { setFehlerZeigen(false); setStep(i); scrollToFormTop(); }}
+          />
 
-      {/* ── Row 1: Ihr Angebot — hidden, offer is now shown inline above the AngebotCard ── */}
-      <div style={{display:'none'}}>
-        <button
-          onClick={() => setAngebotOpen(o => !o)}
-          className="w-full flex items-center gap-3 px-4 py-3.5 hover:bg-gray-50 transition-colors text-left"
-        >
-          <div className="w-9 h-9 rounded-xl bg-[#E3F7EF] flex items-center justify-center flex-shrink-0">
-            <Check className="w-4 h-4 text-[#22A06B]" strokeWidth={3} />
-          </div>
-          <div className="flex-1 min-w-0">
-            <p className="text-sm text-gray-500 mb-0.5">Ihr Angebot</p>
-            <p className="text-sm font-bold text-gray-900">{displayAngebot}</p>
-            <p className="text-sm text-gray-500 mt-0.5">{careStart}</p>
-          </div>
-          <div className="w-7 h-7 rounded-full bg-[#F5F5F6] flex items-center justify-center flex-shrink-0">
-            <ChevronDown className={`w-4 h-4 text-[#8B7355] transition-transform ${angebotOpen ? 'rotate-180' : ''}`} />
-          </div>
-        </button>
+          <div className="mt-2">
+            {/* ── Step 1: Zur Person ── */}
+            {step === 0 && (
+              <>
+                <FormField feld="anzahl" label="Anzahl zu betreuender Personen">
+                  {festWert('anzahl', patient.anzahl === '2' ? '2 Personen' : '1 Person')}
+                </FormField>
 
-        {angebotOpen && (
-          <div className="border-t border-gray-100 px-4 pt-5 pb-5 space-y-5">
+                {zwei && personKopf('Person 1')}
+                <FormField feld="geschlecht" label="Geschlecht" pflicht fehler={fehlerFuer('geschlecht')}>
+                  <ChipSelect invalid={!!fehlerFuer('geschlecht')} value={patient.geschlecht} onChange={v => updatePatient(p=>({...p,geschlecht:v}))}
+                    options={['Männlich','Weiblich']} />
+                </FormField>
+                <FormField feld="geburtsjahr" label="Geburtsjahr" fehler={fehlerFuer('geburtsjahr')}>
+                  {geburtsjahrFeld('geburtsjahr')}
+                </FormField>
+                <FormField feld="gewicht" label="Gewicht in kg">
+                  <ChipSelect value={patient.gewicht} onChange={v => updatePatient(p=>({...p,gewicht:v}))}
+                    options={GEWICHT} labels={GEWICHT_KURZ} />
+                </FormField>
+                <FormField feld="groesse" label="Größe in cm">
+                  <ChipSelect value={patient.groesse} onChange={v => updatePatient(p=>({...p,groesse:v}))}
+                    options={GROESSE} labels={GROESSE_KURZ} />
+                </FormField>
+                <FormField feld="pflegegrad" label="Pflegegrad">
+                  <ChipSelect value={patient.pflegegrad} onChange={v => updatePatient(p=>({...p,pflegegrad:v}))}
+                    options={PFLEGEGRAD} labels={PFLEGEGRAD_KURZ} />
+                </FormField>
 
-            {/* ── Angebotsbrief ── */}
-            <div className="space-y-3">
-              <div className="flex items-start justify-between gap-2">
-                <div>
-                  {kundenName && <p className="text-sm font-bold text-gray-800">{kundenName}</p>}
-                  <p className="text-sm text-gray-500">{kundenEmail}</p>
-                </div>
-                <div className="text-right flex-shrink-0">
-                  <p className="text-xs text-gray-500">Angebotsdatum: {angebotDatum}</p>
-                  <p className="text-xs text-gray-500">Gültig bis: {gueltigBis}</p>
-                </div>
-              </div>
-              <div>
-                <p className="text-sm font-bold text-gray-900 mb-2 mt-6">Ihr persönliches Angebot –<br />24-Stunden-Betreuung zu Hause</p>
-                <p className="text-sm text-gray-600 mb-2">{greeting},</p>
-                <p className="text-sm text-gray-600 leading-relaxed">vielen Dank für Ihre Anfrage. Gerne können wir die Betreuung übernehmen. Da unsere Betreuungskräfte direkt angestellt sind, kann die Betreuung bereits <span className="font-semibold">innerhalb von 4–7 Werktagen</span> beginnen.</p>
-                <p className="text-sm text-gray-600 leading-relaxed mt-2">Nachfolgend finden Sie die Konditionen sowie bereits vorausgewählte Pflegekräfte. Melden Sie sich jederzeit bei Fragen.</p>
-                <p className="text-sm text-gray-400 mt-3">Ihre Marta Kapcio</p>
-              </div>
-            </div>
+                {zwei && (
+                  <>
+                    {personKopf('Person 2')}
+                    <FormField feld="p2_geschlecht" label="Geschlecht" pflicht fehler={fehlerFuer('p2_geschlecht')}>
+                      <ChipSelect invalid={!!fehlerFuer('p2_geschlecht')} value={patient.p2_geschlecht} onChange={v => updatePatient(p=>({...p,p2_geschlecht:v}))}
+                        options={['Männlich','Weiblich']} />
+                    </FormField>
+                    <FormField feld="p2_geburtsjahr" label="Geburtsjahr" fehler={fehlerFuer('p2_geburtsjahr')}>
+                      {geburtsjahrFeld('p2_geburtsjahr')}
+                    </FormField>
+                    <FormField feld="p2_gewicht" label="Gewicht in kg">
+                      <ChipSelect value={patient.p2_gewicht} onChange={v => updatePatient(p=>({...p,p2_gewicht:v}))}
+                        options={GEWICHT} labels={GEWICHT_KURZ} />
+                    </FormField>
+                    <FormField feld="p2_groesse" label="Größe in cm">
+                      <ChipSelect value={patient.p2_groesse} onChange={v => updatePatient(p=>({...p,p2_groesse:v}))}
+                        options={GROESSE} labels={GROESSE_KURZ} />
+                    </FormField>
+                    <FormField feld="p2_pflegegrad" label="Pflegegrad">
+                      <ChipSelect value={patient.p2_pflegegrad} onChange={v => updatePatient(p=>({...p,p2_pflegegrad:v}))}
+                        options={PFLEGEGRAD} labels={PFLEGEGRAD_KURZ} />
+                    </FormField>
+                  </>
+                )}
+              </>
+            )}
 
-            {/* ── Konditionen & Kosten ── */}
-            <div className="space-y-4">
-              <div className="rounded-xl border border-gray-200 overflow-hidden divide-y divide-gray-100 shadow-sm">
-                {/* Header */}
-                <div className="flex items-center justify-between px-4 py-3 bg-[#F5F5F6]">
-                  <span className="text-sm font-bold text-[#8B7355]">Ihre Konditionen</span>
-                </div>
-                {/* Kosten */}
-                {[
-                  { label: 'Mtl. Betreuungskosten', value: bruttopreis, bold: true, sub: 'Inkl. Steuern, Gebühren & Sozialabgaben' },
-                  { label: 'Anreise', value: 'Zzgl. 125 € / Strecke', bold: false },
-                  { label: 'Unterkunft', value: 'Zzgl. Kost & Logis', bold: false },
-                ].map(r => (
-                  <div key={r.label} className="flex items-center justify-between px-4 py-2 bg-white gap-4">
-                    <div>
-                      <span className="text-sm text-gray-700">{r.label}</span>
-                      {r.sub && <p className="text-sm text-gray-500 mt-0.5">{r.sub}</p>}
-                    </div>
-                    <span className={`text-sm text-right flex-shrink-0 ${r.bold ? 'font-bold text-gray-900' : 'text-gray-600'}`}>{r.value}</span>
-                  </div>
-                ))}
-                {/* Vertragskonditionen */}
-                <div className="flex items-center justify-between px-4 py-2 bg-gray-50">
-                  <span className="text-sm font-semibold text-gray-500">Vertragskonditionen</span>
-                  <span className="text-xs font-semibold text-[#1a7a4f] bg-[#E3F7EF] border border-[#B8E8D4] px-2 py-0.5 rounded-full">100% Sorglos</span>
-                </div>
-                {[
-                  'Täglich kündbar',
-                  'Tagesgenaue Abrechnung',
-                  'Kosten entstehen nur wenn Pflegekraft vor Ort ist',
-                ].map(label => (
-                  <div key={label} className="flex items-center gap-2.5 px-4 py-2 bg-gray-50">
-                    <Check className="w-3 h-3 text-[#22A06B] flex-shrink-0" strokeWidth={3} />
-                    <span className="text-sm text-gray-700">{label}</span>
-                  </div>
-                ))}
-              </div>
+            {/* ── Step 2: Pflegebedarf ── */}
+            {step === 1 && (
+              <>
+                {zwei && personKopf('Person 1')}
+                <FormField feld="mobilitaet" label="Mobilität">
+                  {festWert('mobilitaet', patient.mobilitaet)}
+                </FormField>
+                <FormField feld="heben" label="Heben erforderlich?" pflicht fehler={fehlerFuer('heben')}>
+                  <ChipSelect invalid={!!fehlerFuer('heben')} value={patient.heben} onChange={v => updatePatient(p=>({...p,heben:v}))}
+                    options={['Ja','Nein']} />
+                </FormField>
+                <FormField feld="demenz" label="Demenz" pflicht fehler={fehlerFuer('demenz')}>
+                  <ChipSelect invalid={!!fehlerFuer('demenz')} value={patient.demenz} onChange={v => updatePatient(p=>({...p,demenz:v}))}
+                    options={DEMENZ} />
+                </FormField>
+                <FormField feld="nacht" label="Nachteinsätze">
+                  {festWert('nacht', patient.nacht)}
+                </FormField>
+                {patient.nacht !== '' && patient.nacht !== 'Nein' && (
+                  <FormField feld="nachtDetail" label="Was ist in der Nacht zu tun?">
+                    <input value={patient.nachtDetail} onChange={set('nachtDetail')}
+                      placeholder="z. B. Toilettengang, Umlagern" className={inputCls} />
+                  </FormField>
+                )}
+                <FormField feld="inkontinenz" label="Inkontinenz">
+                  <ChipSelect value={patient.inkontinenz} onChange={v => updatePatient(p=>({...p,inkontinenz:v}))}
+                    options={INKONTINENZ} />
+                </FormField>
 
-              {/* Warum Primundus */}
-              <div className="rounded-xl border border-gray-100 overflow-hidden divide-y divide-gray-100">
-                <div className="px-4 py-2.5 bg-white">
-                  <p className="text-sm font-bold text-gray-900">Warum Primundus…</p>
-                </div>
-                {[
-                  { icon: <svg className="w-4 h-4 text-[#8B7355]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z" /></svg>, label: 'Über 20 Jahre Erfahrung' },
-                  { icon: <svg className="w-4 h-4 text-[#8B7355]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" /></svg>, label: 'Über 60.000+ Einsätze' },
-                  { icon: <svg className="w-4 h-4 text-[#8B7355]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg>, label: 'Persönlicher Ansprechpartner 7 Tage die Woche' },
-                ].map((r, i) => (
-                  <div key={i} className="flex items-center gap-3 px-4 py-2 bg-white">
-                    <span className="flex-shrink-0">{r.icon}</span>
-                    <span className="text-sm text-gray-700">{r.label}</span>
-                  </div>
-                ))}
-                <div className="flex items-center gap-3 px-4 py-2.5 bg-white">
-                  <img src="/badge-testsieger.webp" alt="Testsieger" className="w-8 flex-shrink-0 rounded" />
-                  <div>
-                    <p className="text-sm font-semibold text-gray-800">Testsieger bei DIE WELT</p>
-                    <p className="text-sm text-gray-400 italic">„Beste Kombination aus Preis, Qualität und Kundenservice."</p>
-                  </div>
-                </div>
-                <div className="px-4 py-3 bg-white">
-                  <p className="text-xs text-gray-400 mb-2">Bekannt aus</p>
-                  <div className="flex items-center justify-center gap-x-5 gap-y-3 flex-wrap">
-                    {[
-                      { src: '/media-welt.webp', alt: 'Die Welt' },
-                      { src: '/media-faz.webp', alt: 'FAZ' },
-                      { src: '/media-ard.webp', alt: 'ARD' },
-                      { src: '/media-ndr.webp', alt: 'NDR' },
-                      { src: '/media-sat1.webp', alt: 'SAT.1' },
-                    ].map(l => (
-                      <img key={l.alt} src={l.src} alt={l.alt} className="h-3.5 object-contain" />
-                    ))}
-                  </div>
-                </div>
-              </div>
-
-              {/* Zuschüsse — grüner Hinweisblock */}
-              <div className="rounded-xl border border-[#B8E8D4] overflow-hidden divide-y divide-[#c8edd8]">
-                <div className="px-4 py-2.5 bg-[#E3F7EF]">
-                  <p className="text-xs font-bold text-[#1a7a4f]">Mögliche Zuschüsse der Pflegekasse</p>
-                  <p className="text-xs text-[#2a9a6f] mt-0.5">Hinweis – kein Vertragsbestandteil</p>
-                </div>
-                {zuschüsse.map((z: any) => (
-                  <div key={z.label || z.name} className="flex items-center justify-between px-4 py-2 bg-[#E3F7EF] gap-4">
-                    <span className="text-xs text-[#1a7a4f]">{z.label}</span>
-                    <span className="text-xs font-semibold text-[#1a7a4f] text-right">−{formatEuro(z.betrag_monatlich)}</span>
-                  </div>
-                ))}
-                <div className="flex items-center justify-between px-4 py-2.5 bg-[#d0f2e4] border-t border-[#a3d9c4] gap-4">
-                  <span className="text-sm font-bold text-[#1a7a4f]">Möglicher Eigenanteil</span>
-                  <span className="text-sm font-bold text-[#1a7a4f] text-right">ab {eigenanteil}/Monat</span>
-                </div>
-              </div>
-              <p className="text-xs text-gray-400 leading-relaxed">
-                Zuschüsse sind individuell nutzbar und abhängig von Ihrer persönlichen Situation.
-              </p>
-            </div>
-
-            {/* ── PDF Download ── */}
-            <button onClick={downloadPdf} className="flex items-center gap-2 text-xs font-semibold text-[#8B7355] border border-[#C5B49A] bg-[#F5F5F6] rounded-lg px-3 py-2 hover:bg-[#EBE2D5] transition-colors w-full justify-center">
-              <svg className="w-3.5 h-3.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
-              Angebot als PDF herunterladen
-            </button>
-
-            {/* ── Wie geht es weiter? ── */}
-            <div className="rounded-xl border border-gray-200 overflow-hidden">
-              <div className="px-4 py-3 bg-gray-50 border-b border-gray-200">
-                <p className="text-sm font-bold text-gray-900">Wie geht es weiter?</p>
-              </div>
-              <div className="divide-y divide-gray-100">
-                {/* Step 1 */}
-                <button
-                  onClick={() => { setAngebotOpen(false); setPatientOpen(true); scrollToFormTop(); }}
-                  className="w-full flex items-center gap-3 px-4 py-3 hover:bg-[#F5F5F6] transition-colors text-left group"
-                >
-                  <div className="w-6 h-6 rounded-full bg-[#8B7355] text-white text-xs font-bold flex items-center justify-center flex-shrink-0">1</div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-semibold text-[#8B7355]">Pflegesituation vervollständigen</p>
-                    <p className="text-xs text-gray-500">Angaben zur Person & zum Haushalt</p>
-                  </div>
-                  <ChevronDown className="w-4 h-4 text-[#8B7355] -rotate-90 flex-shrink-0" />
-                </button>
-                {/* Step 2 */}
-                <div className="flex items-center gap-3 px-4 py-3">
-                  <div className="w-6 h-6 rounded-full bg-gray-200 text-gray-500 text-xs font-bold flex items-center justify-center flex-shrink-0">2</div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-semibold text-gray-700">Auswahl Ihrer Pflegekraft</p>
-                    <p className="text-xs text-gray-500">Passende Betreuerin kennenlernen</p>
-                  </div>
-                </div>
-                {/* Step 3 */}
-                <div className="flex items-center gap-3 px-4 py-3">
-                  <div className="w-6 h-6 rounded-full bg-gray-200 text-gray-500 text-xs font-bold flex items-center justify-center flex-shrink-0">3</div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-semibold text-gray-700">Anreise & Betreuungsbeginn</p>
-                    <p className="text-xs text-gray-500">Pflegekraft kommt zu Ihnen nach Hause</p>
-                  </div>
-                </div>
-                {/* Step 4 */}
-                <div className="flex items-center gap-3 px-4 py-3">
-                  <div className="w-6 h-6 rounded-full bg-gray-200 text-gray-500 text-xs font-bold flex items-center justify-center flex-shrink-0">4</div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-semibold text-gray-700">Laufende Betreuung</p>
-                    <p className="text-xs text-gray-500">Ihr persönlicher Ansprechpartner begleitet Sie</p>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-          </div>
-        )}
-      </div>
-
-      {/* ── Row 2: Patientendaten ── */}
-      <div>
-
-        {patientOpen && (
-          /* Kein roter Banner mehr (Martin, 11.08.: „Formular-Header ist doch
-             Mist"): Er war die dritte Überschrift „Pflegesituation" in Folge,
-             und sein Rahmen samt Schein zog eine Warnfarbe über das ganze
-             Formular — als wäre etwas kaputt statt bloß unausgefüllt. Der
-             Abschnittskopf oben trägt Titel und Status; hier beginnt direkt
-             die Arbeit. */
-          <div ref={patientFormRef} className="scroll-mt-16">
-          {/* Der Formular-Kasten traegt die Hervorhebung selbst (Martin,
-              13.08.): brauner Rand + weicher warmer Schatten statt eines
-              Aussenrahmens um den ganzen Abschnitt. Fläche bleibt #F4F4F6 —
-              auf Weiss verloeren die weissen Auswahl-Chips ihre Kontur. */}
-          <div className="rounded-2xl border overflow-hidden" style={{ background: '#F4F4F6', borderColor: '#8B7355', boxShadow: '0 10px 30px rgba(139, 115, 85, 0.16)' }}>
-
-            {/* Progress bar */}
-            <div className="px-4 pt-3 pb-2 flex items-center gap-3">
-              <div className="flex gap-1 flex-1">
-                {STEP_LABELS.map((_, i) => {
-                  // Erreichte Steps (inkl. aktueller) sind braun ausgefüllt;
-                  // noch nicht erreichte bleiben grau. Klick nur RÜCKWÄRTS zu
-                  // schon erreichten Steps erlaubt — vorwärts muss man durch
-                  // "Weiter" (mit Validation). Verhindert das Springen auf
-                  // Step 5 mit unvollständigen vorderen Steps.
-                  const reached = i <= step;
-                  return (
-                    <button
-                      key={i}
-                      onClick={() => { if (reached) setStep(i); }}
-                      disabled={!reached}
-                      className={`h-1 flex-1 rounded-full transition-all ${
-                        reached ? 'bg-[#8B7355]' : 'bg-gray-200 cursor-not-allowed'
-                      }`}
-                    />
-                  );
-                })}
-              </div>
-              <span className="text-xs text-gray-600 flex-shrink-0 font-medium">
-                {STEP_LABELS[step]} ({step + 1}/{STEP_LABELS.length})
-              </span>
-            </div>
-
-            <div className="px-4 pb-5 space-y-6 bg-white">
-
-              {/* Step heading */}
-              <div className="pt-1 pb-1 border-b border-gray-100">
-                <p className="text-xs font-bold text-gray-500 uppercase tracking-wider">
-                  {step === 0 && 'Angaben zur betreuten Person'}
-                  {step === 1 && 'Pflegebedarf'}
-                  {step === 2 && 'Einsatzort & Start'}
-                  {step === 3 && 'Wünsche & Aufgaben'}
-                </p>
-              </div>
-
-              {/* ── Step 1: Zur Person ── */}
-              {step === 0 && (
-                <>
-                  {/* Anzahl Patienten toggle */}
-                  <div>
-                    <label className={`${labelCls} flex items-center gap-1.5`}>
-                      Anzahl zu betreuender Personen
-                      <button type="button" onClick={() => setPriceInfo(priceInfo === 'anzahl' ? null : 'anzahl')} className="flex-shrink-0 text-gray-400 hover:text-[#8B7355] transition-colors">
-                        <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><circle cx="12" cy="12" r="10"/><path strokeLinecap="round" strokeLinejoin="round" d="M12 16v-4m0-4h.01"/></svg>
-                      </button>
-                    </label>
-                    {priceInfo === 'anzahl' && (
-                      <div className="text-xs text-gray-500 bg-gray-50 border border-gray-200 rounded-xl px-3 py-2.5 leading-relaxed flex items-start gap-2 mb-1">
-                        <span>Dieser Wert basiert auf Ihrem Angebot und beeinflusst den Preis. Für Änderungen wenden Sie sich bitte an Ihren Berater.</span>
-                        <button type="button" onClick={() => setPriceInfo(null)} className="text-gray-400 flex-shrink-0 font-bold">✕</button>
-                      </div>
-                    )}
-                    <div className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm text-gray-700 bg-gray-50 cursor-not-allowed">
-                      {patient.anzahl === '2' ? '2 Personen' : '1 Person'}
-                    </div>
-                  </div>
-
-
-                  {/* Patient 1 */}
-                  {patient.anzahl !== '' && (
-                    <>
-                      {zwei && (
-                        <p className="text-xs font-bold text-gray-400 uppercase tracking-wider pt-1">Person 1</p>
-                      )}
-                      <div className={gridRow2}>
-                        <div>
-                          <label className={labelCls}>Geschlecht&nbsp;<span className="text-red-400">*</span></label>
-                          <ChipSelect invalid={showErrors && patient.geschlecht === ''} value={patient.geschlecht} onChange={v => updatePatient(p=>({...p,geschlecht:v}))}
-                            options={['Männlich','Weiblich']} />
-                        </div>
-                        <div>
-                          <label className={labelCls}>Geburtsjahr</label>
-                          <CustomSelect value={patient.geburtsjahr} onChange={v => updatePatient(p=>({...p,geburtsjahr:v}))}
-                            options={Array.from({length:70},(_,i)=>String(1931+i))} />
-                        </div>
-                      </div>
-                      <div className={gridRow2}>
-                        <div>
-                          <label className={labelCls}>Gewicht</label>
-                          <ChipSelect value={patient.gewicht} onChange={v => updatePatient(p=>({...p,gewicht:v}))}
-                            options={['Unter 50 kg','51-60 kg','61-70 kg','71-80 kg','81-90 kg','91-100 kg','Über 100 kg']} />
-                        </div>
-                        <div>
-                          <label className={labelCls}>Größe</label>
-                          <ChipSelect value={patient.groesse} onChange={v => updatePatient(p=>({...p,groesse:v}))}
-                            options={['Unter 151 cm','151-160 cm','161-170 cm','171-180 cm','181-190 cm','Über 190 cm']} />
-                        </div>
-                      </div>
-                      <div>
-                        <label className={labelCls}>Pflegegrad</label>
-                        <ChipSelect value={patient.pflegegrad} onChange={v => updatePatient(p=>({...p,pflegegrad:v}))}
-                          options={['Kein/e','Pflegegrad 1','Pflegegrad 2','Pflegegrad 3','Pflegegrad 4','Pflegegrad 5']} />
-                      </div>
-                    </>
-                  )}
-
-                  {/* Patient 2 */}
-                  {zwei && (
-                    <>
-                      <div className="border-t border-gray-100 pt-3">
-                        <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-3">Person 2</p>
-                        <div className={gridRow2}>
-                          <div>
-                            <label className={labelCls}>Geschlecht&nbsp;<span className="text-red-400">*</span></label>
-                            <ChipSelect invalid={showErrors && patient.p2_geschlecht === ''} value={patient.p2_geschlecht} onChange={v => updatePatient(p=>({...p,p2_geschlecht:v}))}
-                              options={['Männlich','Weiblich']} />
-                          </div>
-                          <div>
-                            <label className={labelCls}>Geburtsjahr</label>
-                            <CustomSelect value={patient.p2_geburtsjahr} onChange={v => updatePatient(p=>({...p,p2_geburtsjahr:v}))}
-                              options={Array.from({length:70},(_,i)=>String(1931+i))} />
-                          </div>
-                        </div>
-                        <div className="grid grid-cols-1 gap-3 mt-3">
-                          <div>
-                            <label className={labelCls}>Gewicht</label>
-                            <ChipSelect value={patient.p2_gewicht} onChange={v => updatePatient(p=>({...p,p2_gewicht:v}))}
-                              options={['Unter 50 kg','51-60 kg','61-70 kg','71-80 kg','81-90 kg','91-100 kg','Über 100 kg']} />
-                          </div>
-                          <div>
-                            <label className={labelCls}>Größe</label>
-                            <ChipSelect value={patient.p2_groesse} onChange={v => updatePatient(p=>({...p,p2_groesse:v}))}
-                              options={['Unter 151 cm','151-160 cm','161-170 cm','171-180 cm','181-190 cm','Über 190 cm']} />
-                          </div>
-                        </div>
-                        <div className="mt-2">
-                          <label className={labelCls}>Pflegegrad</label>
-                          <ChipSelect value={patient.p2_pflegegrad} onChange={v => updatePatient(p=>({...p,p2_pflegegrad:v}))}
-                            options={['Kein/e','Pflegegrad 1','Pflegegrad 2','Pflegegrad 3','Pflegegrad 4','Pflegegrad 5']} />
-                        </div>
-                      </div>
-                    </>
-                  )}
-                </>
-              )}
-
-              {/* ── Step 2: Pflegebedarf ── */}
-              {step === 1 && (
-                <>
-                  {zwei && (
-                    <p className="text-xs font-bold text-gray-400 uppercase tracking-wider">Person 1</p>
-                  )}
-                  <div>
-                    <label className={`${labelCls} flex items-center gap-1.5`}>
-                      Mobilität
-                      <button type="button" onClick={() => setPriceInfo(priceInfo === 'mobilitaet' ? null : 'mobilitaet')} className="flex-shrink-0 text-gray-400 hover:text-[#8B7355] transition-colors">
-                        <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><circle cx="12" cy="12" r="10"/><path strokeLinecap="round" strokeLinejoin="round" d="M12 16v-4m0-4h.01"/></svg>
-                      </button>
-                    </label>
-                    {priceInfo === 'mobilitaet' && (
-                      <div className="text-xs text-gray-500 bg-gray-50 border border-gray-200 rounded-xl px-3 py-2.5 leading-relaxed flex items-start gap-2 mb-1">
-                        <span>Dieser Wert basiert auf Ihrem Angebot und beeinflusst den Preis. Für Änderungen wenden Sie sich bitte an Ihren Berater.</span>
-                        <button type="button" onClick={() => setPriceInfo(null)} className="text-gray-400 flex-shrink-0 font-bold">✕</button>
-                      </div>
-                    )}
-                    <div className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm text-gray-700 bg-gray-50 cursor-not-allowed">{patient.mobilitaet}</div>
-                  </div>
-                  <div className={gridRow2}>
-                    <div>
-                      <label className={labelCls}>Heben erforderlich?&nbsp;<span className="text-red-400">*</span></label>
-                      <ChipSelect invalid={showErrors && patient.heben === ''} value={patient.heben} onChange={v => updatePatient(p=>({...p,heben:v}))}
+                {zwei && (
+                  <>
+                    {personKopf('Person 2')}
+                    <FormField feld="p2_mobilitaet" label="Mobilität" pflicht fehler={fehlerFuer('p2_mobilitaet')}>
+                      <ChipSelect invalid={!!fehlerFuer('p2_mobilitaet')} value={patient.p2_mobilitaet} onChange={v => updatePatient(p=>({...p,p2_mobilitaet:v}))}
+                        options={['Vollständig mobil','Am Gehstock','Rollatorfähig','Rollstuhlfähig','Bettlägerig']} />
+                    </FormField>
+                    <FormField feld="p2_heben" label="Heben erforderlich?" pflicht fehler={fehlerFuer('p2_heben')}>
+                      <ChipSelect invalid={!!fehlerFuer('p2_heben')} value={patient.p2_heben} onChange={v => updatePatient(p=>({...p,p2_heben:v}))}
                         options={['Ja','Nein']} />
-                    </div>
-                    <div>
-                      <label className={labelCls}>Demenz&nbsp;<span className="text-red-400">*</span></label>
-                      <ChipSelect invalid={showErrors && patient.demenz === ''} value={patient.demenz} onChange={v => updatePatient(p=>({...p,demenz:v}))}
-                        options={['Nein','Leichtgradig','Mittelgradig','Schwer']} />
-                    </div>
-                  </div>
-                  <div className={gridRow2}>
-                    <div>
-                      <label className={`${labelCls} flex items-center gap-1.5`}>
-                        Nachteinsätze
-                        <button type="button" onClick={() => setPriceInfo(priceInfo === 'nacht' ? null : 'nacht')} className="flex-shrink-0 text-gray-400 hover:text-[#8B7355] transition-colors">
-                          <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><circle cx="12" cy="12" r="10"/><path strokeLinecap="round" strokeLinejoin="round" d="M12 16v-4m0-4h.01"/></svg>
-                        </button>
-                      </label>
-                      {priceInfo === 'nacht' && (
-                        <div className="text-xs text-gray-500 bg-gray-50 border border-gray-200 rounded-xl px-3 py-2.5 leading-relaxed flex items-start gap-2 mb-1">
-                          <span>Dieser Wert basiert auf Ihrem Angebot und beeinflusst den Preis. Für Änderungen wenden Sie sich bitte an Ihren Berater.</span>
-                          <button type="button" onClick={() => setPriceInfo(null)} className="text-gray-400 flex-shrink-0 font-bold">✕</button>
-                        </div>
-                      )}
-                      <div className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-[16px] text-gray-700 bg-gray-50 cursor-not-allowed">{patient.nacht}</div>
-                      {patient.nacht !== '' && patient.nacht !== 'Nein' && (
-                        <div className="mt-5">
-                          <label className={labelCls}>Was ist in der Nacht zu machen?</label>
-                          <input value={patient.nachtDetail} onChange={set('nachtDetail')}
-                            placeholder="z. B. Toilettengang, Umlagern, Medikamente" className={inputCls} />
-                        </div>
-                      )}
-                    </div>
-                    <div>
-                      <label className={labelCls}>Inkontinenz</label>
-                      <ChipSelect value={patient.inkontinenz} onChange={v => updatePatient(p=>({...p,inkontinenz:v}))}
-                        options={['Nein','Harninkontinenz','Stuhlinkontinenz','Beides']} />
-                    </div>
-                  </div>
+                    </FormField>
+                    <FormField feld="p2_demenz" label="Demenz" pflicht fehler={fehlerFuer('p2_demenz')}>
+                      <ChipSelect invalid={!!fehlerFuer('p2_demenz')} value={patient.p2_demenz} onChange={v => updatePatient(p=>({...p,p2_demenz:v}))}
+                        options={DEMENZ} />
+                    </FormField>
+                    <FormField feld="p2_nacht" label="Nachteinsätze" pflicht fehler={fehlerFuer('p2_nacht')}>
+                      <ChipSelect invalid={!!fehlerFuer('p2_nacht')} value={patient.p2_nacht} onChange={v => updatePatient(p=>({...p,p2_nacht:v}))}
+                        options={['Nein','Bis zu 1 Mal','1–2 Mal','Mehr als 2']} />
+                    </FormField>
+                    {patient.p2_nacht !== '' && patient.p2_nacht !== 'Nein' && (
+                      <FormField feld="p2_nachtDetail" label="Was ist in der Nacht zu tun?">
+                        <input value={patient.p2_nachtDetail} onChange={set('p2_nachtDetail')}
+                          placeholder="z. B. Toilettengang, Umlagern" className={inputCls} />
+                      </FormField>
+                    )}
+                    <FormField feld="p2_inkontinenz" label="Inkontinenz">
+                      <ChipSelect value={patient.p2_inkontinenz} onChange={v => updatePatient(p=>({...p,p2_inkontinenz:v}))}
+                        options={INKONTINENZ} />
+                    </FormField>
+                  </>
+                )}
 
-                  {/* Patient 2 Pflegebedarf */}
-                  {zwei && (
-                    <div className="border-t border-gray-100 pt-3">
-                      <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-3">Person 2</p>
-                      <div className="space-y-3">
-                        <div>
-                          <label className={`${labelCls} flex items-center gap-1.5`}>Mobilität&nbsp;<span className="text-red-400">*</span><svg className="w-3.5 h-3.5 text-gray-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><circle cx="12" cy="12" r="10"/><path strokeLinecap="round" strokeLinejoin="round" d="M12 16v-4m0-4h.01"/></svg></label>
-                          <ChipSelect invalid={showErrors && patient.p2_mobilitaet === ''} value={patient.p2_mobilitaet} onChange={v => updatePatient(p=>({...p,p2_mobilitaet:v}))}
-                            options={['Vollständig mobil','Am Gehstock','Rollatorfähig','Rollstuhlfähig','Bettlägerig']} />
-                        </div>
-                        <div className={gridRow2}>
-                          <div>
-                            <label className={labelCls}>Heben erforderlich?&nbsp;<span className="text-red-400">*</span></label>
-                            <ChipSelect invalid={showErrors && patient.p2_heben === ''} value={patient.p2_heben} onChange={v => updatePatient(p=>({...p,p2_heben:v}))}
-                              options={['Ja','Nein']} />
-                          </div>
-                          <div>
-                            <label className={labelCls}>Demenz&nbsp;<span className="text-red-400">*</span></label>
-                            <ChipSelect invalid={showErrors && patient.p2_demenz === ''} value={patient.p2_demenz} onChange={v => updatePatient(p=>({...p,p2_demenz:v}))}
-                              options={['Nein','Leichtgradig','Mittelgradig','Schwer']} />
-                          </div>
-                        </div>
-                        <div className={gridRow2}>
-                          <div>
-                            <label className={`${labelCls} flex items-center gap-1.5`}>Nachteinsätze&nbsp;<span className="text-red-400">*</span><svg className="w-3.5 h-3.5 text-gray-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><circle cx="12" cy="12" r="10"/><path strokeLinecap="round" strokeLinejoin="round" d="M12 16v-4m0-4h.01"/></svg></label>
-                            <ChipSelect invalid={showErrors && patient.p2_nacht === ''} value={patient.p2_nacht} onChange={v => updatePatient(p=>({...p,p2_nacht:v}))}
-                              options={['Nein','Bis zu 1 Mal','1–2 Mal','Mehr als 2']} />
-                            {patient.p2_nacht !== '' && patient.p2_nacht !== 'Nein' && (
-                              <div className="mt-5">
-                                <label className={labelCls}>Was ist in der Nacht zu machen?</label>
-                                <input value={patient.p2_nachtDetail} onChange={set('p2_nachtDetail')}
-                                  placeholder="z. B. Toilettengang, Umlagern, Medikamente" className={inputCls} />
-                              </div>
-                            )}
-                          </div>
-                          <div>
-                            <label className={labelCls}>Inkontinenz</label>
-                            <ChipSelect value={patient.p2_inkontinenz} onChange={v => updatePatient(p=>({...p,p2_inkontinenz:v}))}
-                              options={['Nein','Harninkontinenz','Stuhlinkontinenz','Beides']} />
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  )}
+                <FormField feld="diagnosen" label="Weitere Diagnosen">
+                  <textarea value={patient.diagnosen} onChange={set('diagnosen')}
+                    placeholder="z. B. Parkinson, Herzinsuffizienz, Diabetes"
+                    rows={2} className={`${inputCls} resize-none`} />
+                </FormField>
+              </>
+            )}
 
-                  <div>
-                    <label className={labelCls}>Weitere Diagnosen</label>
-                    <textarea value={patient.diagnosen} onChange={set('diagnosen')}
-                      placeholder="z.B. Parkinson, Herzinsuffizienz, Diabetes…"
-                      rows={2} className={`${inputCls} resize-none`} />
-                  </div>
-                </>
-              )}
-
-              {/* ── Step 3: Wohnsituation ── */}
-              {step === 2 && (
-                <>
+            {/* ── Step 3: Einsatzort & Start ── */}
+            {step === 2 && (
+              <>
+                <FormField feld="plz" label="Einsatzort" pflicht fehler={fehlerFuer('plz')}>
                   <div className="relative">
-                    <label className={labelCls}>Einsatzort&nbsp;<span className="text-red-400">*</span></label>
                     <input
                       value={einsatzortFeldWert}
                       onChange={onOrtInput}
@@ -1215,21 +870,14 @@ export const AngebotCard: FC<{
                       onBlur={() => setTimeout(() => setPlzSuggestions([]), 150)}
                       autoComplete="off"
                       placeholder="PLZ oder Ort eingeben"
-                      // Ohne data-invalid ist das Scrollen zum ersten Fehler ein
-                      // No-op — das Attribut kam bisher nur von ChipSelect.
-                      data-invalid={showErrors && einsatzortFehler ? '1' : undefined}
-                      className={inputCls + (showErrors && einsatzortFehler ? ' border-red-300 bg-red-50/40' : '') + (plzVerified ? ' pr-9' : '')}
+                      aria-invalid={!!fehlerFuer('plz')}
+                      className={inputCls + (fehlerFuer('plz') ? inputFehlerCls : '') + (plzVerified ? ' pr-10' : '')}
                     />
                     {plzVerified && (
-                      <Check className="absolute right-3 top-[46px] w-4 h-4 text-[#22A06B] pointer-events-none" strokeWidth={3} />
-                    )}
-                    {showErrors && einsatzortFehler && (
-                      <p className="text-[13px] mt-1.5" style={{ color: '#B91C1C' }}>
-                        {einsatzortFehler}
-                      </p>
+                      <Check className="absolute right-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-pm-green pointer-events-none" strokeWidth={3} />
                     )}
                     {plzSuggestions.length > 0 && (
-                      <div className="absolute z-20 top-full mt-1 left-0 right-0 bg-white border border-zinc-300 rounded-xl shadow-lg overflow-hidden">
+                      <div className="absolute z-20 top-full mt-1.5 left-0 right-0 bg-white border-[1.5px] border-pm-line rounded-[14px] shadow-lift overflow-hidden">
                         {plzSuggestions.map(o => (
                           <button
                             key={`${o.zip} ${o.city}`}
@@ -1237,383 +885,193 @@ export const AngebotCard: FC<{
                             // onMouseDown statt onClick — feuert vor dem Blur
                             // des Inputs, das die Liste schließt.
                             onMouseDown={() => pickPlz(o)}
-                            className="flex w-full items-baseline gap-2 text-left px-4 py-3 text-[16px] border-b last:border-b-0 border-zinc-200 hover:bg-[#F4F4F6] transition-colors"
+                            className="flex w-full min-h-[48px] items-center gap-2 text-left px-4 py-2.5 text-[16px] border-b last:border-b-0 border-pm-line-soft hover:bg-pm-paper transition-colors"
                           >
-                            <span className="font-semibold tabular-nums" style={{ color: '#18181B' }}>{o.zip}</span>
-                            <span style={{ color: '#71717A' }}>{o.city}</span>
+                            <span className="font-semibold tabular-nums text-pm-ink">{o.zip}</span>
+                            <span className="text-pm-muted">{o.city}</span>
                           </button>
                         ))}
                       </div>
                     )}
                   </div>
-                  <div>
-                    <label className={`${labelCls} flex items-center gap-1.5`}>
-                      Weitere Personen im Haushalt
-                      <button type="button" onClick={() => setPriceInfo(priceInfo === 'haushalt' ? null : 'haushalt')} className="flex-shrink-0 text-gray-400 hover:text-[#8B7355] transition-colors">
-                        <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><circle cx="12" cy="12" r="10"/><path strokeLinecap="round" strokeLinejoin="round" d="M12 16v-4m0-4h.01"/></svg>
-                      </button>
-                    </label>
-                    {priceInfo === 'haushalt' && (
-                      <div className="text-xs text-gray-500 bg-gray-50 border border-gray-200 rounded-xl px-3 py-2.5 leading-relaxed flex items-start gap-2 mb-1">
-                        <span>Dieser Wert basiert auf Ihrem Angebot und beeinflusst den Preis. Für Änderungen wenden Sie sich bitte an Ihren Berater.</span>
-                        <button type="button" onClick={() => setPriceInfo(null)} className="text-gray-400 flex-shrink-0 font-bold">✕</button>
-                      </div>
-                    )}
-                    <div className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-base bg-gray-50 cursor-not-allowed">
-                      {patient.haushalt
-                        ? <span className="text-gray-700">{patient.haushalt}</span>
-                        : <span className="text-gray-400">Nicht angegeben</span>}
-                    </div>
-                  </div>
-                  <div>
-                    <label className={labelCls}>Familie in der Nähe (bis 20 km)</label>
-                    <ChipSelect value={patient.familieNahe} onChange={v => updatePatient(p=>({...p,familieNahe:v}))}
-                      options={['Ja','Nein']} />
-                  </div>
-                  <div className={gridRow2}>
-                    <div>
-                      <label className={labelCls}>Urbanisation&nbsp;<span className="text-red-400">*</span></label>
-                      <ChipSelect invalid={showErrors && patient.urbanisierung === ''} value={patient.urbanisierung} onChange={v => updatePatient(p=>({...p,urbanisierung:v}))}
-                        options={['Großstadt','Kleinstadt','Dorf/Land']} />
-                    </div>
-                    <div>
-                      <label className={labelCls}>Wohnungstyp&nbsp;<span className="text-red-400">*</span></label>
-                      <ChipSelect invalid={showErrors && patient.wohnungstyp === ''} value={patient.wohnungstyp} onChange={v => updatePatient(p=>({...p,wohnungstyp:v}))}
-                        options={['Einfamilienhaus','Wohnung in Mehrfamilienhaus','Andere']} />
-                    </div>
-                  </div>
-                  {/* SA-Gruppierung: Unterbringung → Haustiere → Badezimmer →
-                      Raucherhaushalt → Internet; „Pflegedienst kommt?" wohnt
-                      jetzt wie bei SA im Schritt „Wünsche & Aufgaben". */}
-                  <div className={gridRow2}>
-                    <div>
-                      <label className={labelCls}>Unterbringung der PK</label>
-                      <ChipSelect value={patient.unterbringung} onChange={v => updatePatient(p=>({...p,unterbringung:v}))}
-                        options={['Zimmer in den Räumlichkeiten','Gesamter Bereich','Zimmer extern','Bereich extern']} />
-                    </div>
-                    <div>
-                      <label className={labelCls}>Haustiere</label>
-                      <ChipSelect value={patient.tiere} onChange={v => updatePatient(p=>({...p,tiere:v}))}
-                        options={['Keine','Hund','Katze','Andere']} />
-                    </div>
-                  </div>
-                  <div className={gridRow2}>
-                    <div>
-                      <label className={labelCls}>Eigenes Badezimmer</label>
-                      <ChipSelect value={patient.badezimmer} onChange={v => updatePatient(p=>({...p,badezimmer:v}))}
-                        options={['Ja','Nein']} />
-                    </div>
-                  </div>
-                  <div>
-                    <label className={labelCls}>Internet vorhanden?</label>
-                    <ChipSelect value={patient.internet} onChange={v => updatePatient(p=>({...p,internet:v}))}
-                      options={['Ja','Nein']} />
-                  </div>
-                </>
-              )}
+                </FormField>
+                <FormField feld="haushalt" label="Weitere Personen im Haushalt">
+                  {festWert('haushalt', patient.haushalt || <span className="text-pm-mute">Nicht angegeben</span>)}
+                </FormField>
+                <FormField feld="familieNahe" label="Familie in der Nähe (bis 20 km)">
+                  <ChipSelect value={patient.familieNahe} onChange={v => updatePatient(p=>({...p,familieNahe:v}))}
+                    options={['Ja','Nein']} />
+                </FormField>
+                <FormField feld="urbanisierung" label="Lage" pflicht fehler={fehlerFuer('urbanisierung')}>
+                  <ChipSelect invalid={!!fehlerFuer('urbanisierung')} value={patient.urbanisierung} onChange={v => updatePatient(p=>({...p,urbanisierung:v}))}
+                    options={['Großstadt','Kleinstadt','Dorf/Land']} />
+                </FormField>
+                <FormField feld="wohnungstyp" label="Wohnungstyp" pflicht fehler={fehlerFuer('wohnungstyp')}>
+                  <ChipSelect invalid={!!fehlerFuer('wohnungstyp')} value={patient.wohnungstyp} onChange={v => updatePatient(p=>({...p,wohnungstyp:v}))}
+                    options={['Einfamilienhaus','Wohnung in Mehrfamilienhaus','Andere']} />
+                </FormField>
+                {/* SA-Gruppierung: Unterbringung → Haustiere → Badezimmer →
+                    Internet; „Pflegedienst kommt?" wohnt wie bei SA im
+                    Schritt „Wünsche & Aufgaben". */}
+                <FormField feld="unterbringung" label="Unterbringung der Pflegekraft">
+                  <ChipSelect value={patient.unterbringung} onChange={v => updatePatient(p=>({...p,unterbringung:v}))}
+                    options={['Zimmer in den Räumlichkeiten','Gesamter Bereich','Zimmer extern','Bereich extern']} />
+                </FormField>
+                <FormField feld="tiere" label="Haustiere">
+                  <ChipSelect value={patient.tiere} onChange={v => updatePatient(p=>({...p,tiere:v}))}
+                    options={['Keine','Hund','Katze','Andere']} />
+                </FormField>
+                <FormField feld="badezimmer" label="Eigenes Badezimmer">
+                  <ChipSelect value={patient.badezimmer} onChange={v => updatePatient(p=>({...p,badezimmer:v}))}
+                    options={['Ja','Nein']} />
+                </FormField>
+                <FormField feld="internet" label="Internet vorhanden?">
+                  <ChipSelect value={patient.internet} onChange={v => updatePatient(p=>({...p,internet:v}))}
+                    options={['Ja','Nein']} />
+                </FormField>
 
-              {/* ── Step 4: Wünsche zur PK ── */}
-              {step === 3 && (
-                <>
-                  <div>
-                    <label className={labelCls}>Gewünschtes Geschlecht der PK&nbsp;<span className="text-red-400">*</span></label>
-                    <ChipSelect invalid={showErrors && patient.wunschGeschlecht === ''} value={patient.wunschGeschlecht} onChange={v => updatePatient(p=>({...p,wunschGeschlecht:v}))}
-                      options={['Egal','Weiblich','Männlich']} />
-                  </div>
-
-                  {/* Sprachniveau (read-only, preisrelevant) — eigene volle Zeile.
-                      Höhe matched die anderen Felder (text-base + px-3 py-2.5)
-                      damit es nicht "verkleinert" wirkt. */}
-                  <div>
-                    <label className="block text-sm font-semibold text-gray-600 mb-1.5 flex items-center gap-1.5">
-                      Sprachniveau
-                      <button type="button" onClick={() => setPriceInfo(priceInfo === 'sprache' ? null : 'sprache')} className="flex-shrink-0 text-gray-400 hover:text-[#8B7355] transition-colors">
-                        <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><circle cx="12" cy="12" r="10"/><path strokeLinecap="round" strokeLinejoin="round" d="M12 16v-4m0-4h.01"/></svg>
-                      </button>
-                    </label>
-                    {priceInfo === 'sprache' && (
-                      <div className="text-xs text-gray-500 bg-gray-50 border border-gray-200 rounded-xl px-3 py-2.5 leading-relaxed flex items-start gap-2 mb-1">
-                        <span>Dieser Wert basiert auf Ihrem Angebot und beeinflusst den Preis. Für Änderungen wenden Sie sich bitte an Ihren Berater.</span>
-                        <button type="button" onClick={() => setPriceInfo(null)} className="text-gray-400 flex-shrink-0 font-bold">✕</button>
-                      </div>
-                    )}
-                    <div className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-base text-gray-700 bg-gray-50 cursor-not-allowed">
-                      {germanySkillLabel(mmCustomer?.customer_caregiver_wish?.germany_skill) || '—'}
-                    </div>
-                  </div>
-
-                  {/* Führerschein — eigene volle Zeile, damit das Label nicht wrappt */}
-                  <div>
-                    <label className={labelCls}>Führerschein erforderlich?&nbsp;<span className="text-red-400">*</span></label>
-                    <ChipSelect invalid={showErrors && patient.fuehrerschein === ''} value={patient.fuehrerschein}
-                      onChange={v => updatePatient(p => ({ ...p, fuehrerschein: v, wunschGetriebe: v === 'Nein' ? '' : p.wunschGetriebe }))}
-                      options={['Ja', 'Nein']} />
-                  </div>
-
-                  {/* Getriebe — eigene volle Zeile, nur wenn Führerschein='Ja' */}
-                  {patient.fuehrerschein === 'Ja' && (
-                    <div>
-                      <label className={labelCls}>Getriebe</label>
-                      <ChipSelect value={patient.wunschGetriebe}
-                        onChange={v => updatePatient(p => ({ ...p, wunschGetriebe: v }))}
-                        options={['Automatik', 'Schaltung', 'Egal']} />
-                    </div>
-                  )}
-
-                  <div>
-                    <label className={labelCls}>Darf die Betreuungsperson rauchen?</label>
-                    <ChipSelect value={patient.rauchen} onChange={v => updatePatient(p=>({...p,rauchen:v}))}
-                      options={['Ja (nur Draußen)','Nein']} />
-                  </div>
-                  <div>
-                    <label className={labelCls}>Sonstige Wünsche</label>
-                    <textarea value={patient.sonstigeWuensche} onChange={set('sonstigeWuensche')}
-                      placeholder="z.B. Erfahrung mit Demenz, ruhige Person, tierlieb…"
-                      rows={2} className={`${inputCls} resize-none`} />
-                  </div>
-
-                  {/* SA-Gruppierung „Aufgaben & Pflegedienst" — Pflegedienst ist
-                      aus der Wohnsituation hierher gezogen (wie im SA-Wizard). */}
-                  <p className="text-xs font-bold text-gray-400 uppercase tracking-wider pt-2">Aufgaben & Pflegedienst</p>
-                  <div>
-                    <label className={labelCls}>Pflegedienst kommt?</label>
-                    <ChipSelect value={patient.pflegedienst} onChange={v => updatePatient(p=>{
-                      // When user switches to 'Nein', clear the follow-ups so
-                      // a stale frequency/tasks selection doesn't sneak into
-                      // the Mamamia description string on save.
-                      const next = { ...p, pflegedienst: v };
-                      if (v === 'Nein') {
-                        next.pflegedienstHaeufigkeit = '';
-                        next.pflegedienstAufgaben = '';
-                      }
-                      return next;
-                    })}
-                      options={['Ja','Nein','Geplant']} />
-                  </div>
-                  {/* Pflegedienst-Zusatzfelder (Häufigkeit/Aufgaben) entfernt —
-                      unnötige Hürde (Martin, 2026-07-08); Standard-Text kommt vom Mapper. */}
-                  <div>
-                    <label className={labelCls}>Muss die Betreuungskraft Einkäufe erledigen?</label>
-                    <ChipSelect value={patient.einkaeufe} onChange={v => updatePatient(p => {
-                      // Beim Wechsel auf 'Nein' das Detailfeld leeren, damit kein
-                      // veralteter Text in die Job-Beschreibung rutscht.
-                      const next = { ...p, einkaeufe: v };
-                      if (v === 'Nein') next.einkaeufeWie = '';
-                      return next;
-                    })} options={['Ja','Gelegentlich','Nein']} />
-                  </div>
-                  {(patient.einkaeufe === 'Ja' || patient.einkaeufe === 'Gelegentlich') && (
-                    <div>
-                      <label className={labelCls}>Wie werden die Einkäufe erledigt?</label>
-                      <input value={patient.einkaeufeWie} onChange={set('einkaeufeWie')}
-                        placeholder="ÖPNV, zu Fuß, Fahrrad, Taxi, Auto …" className={inputCls} />
-                    </div>
-                  )}
-                  <div>
-                    <label className={labelCls}>Aufgaben der Pflegekraft</label>
-                    <textarea value={patient.aufgaben} onChange={set('aufgaben')}
-                      placeholder="z.B. Körperpflege, Mahlzeiten, Arztbegleitung, Einkäufe…"
-                      rows={3} className={`${inputCls} resize-none`} />
-                  </div>
-                </>
-              )}
-
-              {/* ── Step 5: Startdatum (Name + Tel kommen vom Kostenrechner) ──
-                  Rückrollung 14.06.2026: Name- und Telefon-Felder wurden hier
-                  entfernt, weil sie seit 06.06. aus dem Kostenrechner-Funnel
-                  ausgelagert waren — was die Tel-Quote von 67 % auf 34 %
-                  halbiert hat, ohne Conversion-Vorteil. Jetzt fragt Step 5
-                  nur noch das Startdatum ab. */}
-
-              {/* Startdatum am Ende von „Einsatzort" (Martin, 11.08.): Ort und
-                  Termin sind beides Rahmendaten des Einsatzes; die Wünsche an
-                  die Pflegekraft sind ein anderes Thema. Vorher war es ein
-                  eigener Schritt mit einem einzigen Feld direkt vor dem Ziel.
-                  Das Feld bleibt Pflicht und bleibt LEER — bewusst nicht aus
-                  `arrival_at` vorbelegt: Der Kostenrechner fragt den Termin
-                  nicht ab, der Onboard-Wert ist eine Schätzung, und ein
-                  vorbelegtes Datum würde arglos bestätigt und der Job mit
-                  falschem Termin angelegt. */}
-              {step === 2 && (
-                <div className="pt-5 mt-5" style={{ borderTop: '1px solid #E9E9EB' }}>
-                  <label className={labelCls}>Voraussichtliches Startdatum&nbsp;<span className="text-red-400">*</span></label>
+                {/* Startdatum am Ende von „Einsatzort" (Martin, 11.08.): Ort und
+                    Termin sind beides Rahmendaten des Einsatzes. Das Feld bleibt
+                    Pflicht und bleibt LEER — bewusst nicht aus `arrival_at`
+                    vorbelegt: Der Kostenrechner fragt den Termin nicht ab, der
+                    Onboard-Wert ist eine Schätzung, und ein vorbelegtes Datum
+                    würde arglos bestätigt und der Job mit falschem Termin
+                    angelegt. */}
+                <FormField feld="startDate" label="Voraussichtliches Startdatum" pflicht fehler={fehlerFuer('startDate')}
+                  hinweis="Noch unklar? Eine grobe Schätzung reicht.">
                   <DateField
                     value={patient.startDate}
                     min={localTodayIso()}
-                    invalid={showErrors && patient.startDate === ''}
+                    invalid={!!fehlerFuer('startDate')}
                     onChange={iso => updatePatient(p => ({ ...p, startDate: iso }))}
                   />
-                  <p className="text-[13px] text-gray-500 mt-2">Wenn noch unklar — eine grobe Schätzung reicht.</p>
-                  {/* Rückrufnummer IMMER hier, neben dem Termin (Martin, 17.09.:
-                      „dass die Telefonnummer immer dort steht, man kann sie
-                      überprüfen, anpassen oder ergänzen — muss auf jeden Fall
-                      vorhanden sein"). Vorbelegt aus dem Rechner (leads.telefon)
-                      oder aus mamamia; Kontakt in drei Schritten (Registry #76)
-                      liefert Leads ohne Nummer, dann steht sie leer und ist
-                      Pflicht. Geht mit dem Speichern nach mamamia
-                      (patientFormMapper: Customer.phone + customer_contract.phone)
-                      und über lead-event zurück in leads.telefon — beide Wege
-                      gab es schon. Nicht wieder nach Step 5 auslagern: 06.–14.06.
-                      halbierte das die Tel-Quote (67 % → 34 %). */}
-                  <div className="mt-5">
-                    <label className={labelCls}>Telefonnummer für Rückfragen&nbsp;<span className="text-red-400">*</span></label>
-                    <input
-                      type="tel"
-                      inputMode="tel"
-                      autoComplete="tel"
-                      value={patient.phone}
-                      onChange={e => updatePatient(p => ({ ...p, phone: e.target.value }))}
-                      placeholder="z. B. 0170 1234567"
-                      data-invalid={showErrors && !isPlausibleGermanPhone(patient.phone) ? '1' : undefined}
-                      className={inputCls + (showErrors && !isPlausibleGermanPhone(patient.phone) ? ' border-red-300 bg-red-50/40' : '')}
-                    />
-                    {/* Martin 17.09.: nicht „bitte prüfen" — sagen, WANN wir anrufen. */}
-                    <p className="text-[13px] text-gray-500 mt-2">Nur bei Rückfragen oder wenn etwas dringend geklärt werden muss.</p>
-                  </div>
-                </div>
-              )}
+                </FormField>
+                {/* Rückrufnummer IMMER hier, neben dem Termin (Martin, 17.09.:
+                    „dass die Telefonnummer immer dort steht, man kann sie
+                    überprüfen, anpassen oder ergänzen — muss auf jeden Fall
+                    vorhanden sein"). Vorbelegt aus dem Rechner (leads.telefon)
+                    oder aus mamamia; Kontakt in drei Schritten (Registry #76)
+                    liefert Leads ohne Nummer, dann steht sie leer und ist
+                    Pflicht. Geht mit dem Speichern nach mamamia
+                    (patientFormMapper: Customer.phone + customer_contract.phone)
+                    und über lead-event zurück in leads.telefon — beide Wege
+                    gab es schon. Nicht wieder nach Step 5 auslagern: 06.–14.06.
+                    halbierte das die Tel-Quote (67 % → 34 %). */}
+                <FormField feld="phone" label="Telefonnummer für Rückfragen" pflicht fehler={fehlerFuer('phone')}
+                  // Martin 17.09.: nicht „bitte prüfen" — sagen, WANN wir anrufen.
+                  hinweis="Nur bei Rückfragen oder wenn etwas dringend geklärt werden muss.">
+                  <input
+                    type="tel"
+                    inputMode="tel"
+                    autoComplete="tel"
+                    value={patient.phone}
+                    onChange={e => updatePatient(p => ({ ...p, phone: e.target.value }))}
+                    placeholder="z. B. 0170 1234567"
+                    aria-invalid={!!fehlerFuer('phone')}
+                    className={inputCls + (fehlerFuer('phone') ? inputFehlerCls : '')}
+                  />
+                </FormField>
+              </>
+            )}
 
-              {stepError && (
-                <div className="rounded-xl px-4 py-3 text-[15px] leading-snug" style={{ background: '#FEF2F2', border: '1px solid #FCA5A5', color: '#B91C1C' }}>
-                  {stepError}
-                </div>
-              )}
-
-              {/* Nav buttons */}
-              <div className={`flex gap-2 pt-1 ${step > 0 ? 'justify-between' : 'justify-end'}`}>
-                {step > 0 && (
-                  <button
-                    onClick={() => { setStep(s => s - 1); scrollToFormTop(); }}
-                    className="px-4 py-2.5 text-sm font-semibold text-gray-500 border border-gray-200 rounded-xl hover:bg-gray-50 transition-colors"
-                  >
-                    ← Zurück
-                  </button>
+            {/* ── Step 4: Wünsche & Aufgaben ── */}
+            {step === 3 && (
+              <>
+                <FormField feld="wunschGeschlecht" label="Gewünschtes Geschlecht der Pflegekraft" pflicht fehler={fehlerFuer('wunschGeschlecht')}>
+                  <ChipSelect invalid={!!fehlerFuer('wunschGeschlecht')} value={patient.wunschGeschlecht} onChange={v => updatePatient(p=>({...p,wunschGeschlecht:v}))}
+                    options={['Egal','Weiblich','Männlich']} />
+                </FormField>
+                <FormField feld="sprache" label="Sprachniveau">
+                  {festWert('sprache', germanySkillLabel(mmCustomer?.customer_caregiver_wish?.germany_skill) || '—')}
+                </FormField>
+                <FormField feld="fuehrerschein" label="Führerschein erforderlich?" pflicht fehler={fehlerFuer('fuehrerschein')}>
+                  <ChipSelect invalid={!!fehlerFuer('fuehrerschein')} value={patient.fuehrerschein}
+                    onChange={v => updatePatient(p => ({ ...p, fuehrerschein: v, wunschGetriebe: v === 'Nein' ? '' : p.wunschGetriebe }))}
+                    options={['Ja', 'Nein']} />
+                </FormField>
+                {patient.fuehrerschein === 'Ja' && (
+                  <FormField feld="wunschGetriebe" label="Getriebe">
+                    <ChipSelect value={patient.wunschGetriebe}
+                      onChange={v => updatePatient(p => ({ ...p, wunschGetriebe: v }))}
+                      options={['Automatik', 'Schaltung', 'Egal']} />
+                  </FormField>
                 )}
-                {step < STEP_LABELS.length - 1 ? (
-                  <button
-                    onClick={() => {
-                      const miss = missingFields(step);
-                      if (miss.length === 0) {
-                        setStepError('');
-                        trackStep(step + 1); setStep(s => s + 1); scrollToFormTop();
-                        return;
-                      }
-                      // Kein `disabled` und kein stummes Nichts: benennen, was
-                      // fehlt, und zum ersten dieser Felder springen.
-                      // Fehlt NUR der Einsatzort, steht sein Hinweis für sich —
-                      // „Bitte noch ausfüllen:" vor einem ganzen Satz liest sich
-                      // wie ein Versehen.
-                      setStepError(
-                        miss.length === 1 && miss[0] === 'plz' && einsatzortFehler
-                          ? einsatzortFehler
-                          : `Bitte noch ausfüllen: ${miss.map(fieldLabel).join(', ')}`,
-                      );
-                      // Zum ersten fehlenden Feld springen — es steht auf
-                      // einem langen Schritt sonst außerhalb des Bildschirms.
-                      // Nach dem Render, damit die roten Rahmen schon stehen.
-                      requestAnimationFrame(() => {
-                        const el = patientFormRef.current?.querySelector('[data-invalid="1"]');
-                        el?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                      });
-                    }}
-                    className="flex-1 py-3 text-[16px] font-bold rounded-xl transition-all bg-[#E76F63] hover:bg-[#D65E52] text-white shadow-sm"
-                  >
-                    Weiter →
-                  </button>
-                ) : (
-                  <button
-                    onClick={async () => {
-                      if (!allComplete || isSaving) return;
-                      // Hier stand bis Registry #65 ein `_isDraft:false` VOR dem
-                      // Speichern — nach einem abgelehnten Save las der Reload
-                      // „Vollständig", obwohl in Mamamia nichts steht. Ersatzlos
-                      // gestrichen: der Autosave-Effekt schreibt `_isDraft:!saved`
-                      // ohnehin bei jeder Änderung von `saved`, also false erst
-                      // nach Erfolg.
-                      // ── Save flow ─────────────────────────────────────
-                      // Previously we collapsed the form and flipped
-                      // patientSaved BEFORE the Mamamia round-trip — the
-                      // customer could then click "Einladen" while Mamamia
-                      // still had a half-populated profile (job_description
-                      // missing), which made StoreRequest reject the
-                      // invite. Now: button stays disabled, form stays
-                      // visible, gate stays closed until updateCustomer
-                      // resolves. On error: form re-opens, gate stays
-                      // closed, parent shows a toast.
-                      if (mamamiaEnabled && onSaveToMamamia) {
-                        setIsSaving(true);
-                        try {
-                          await onSaveToMamamia(patient);
-                          setSaved(true);
-                          setPatientOpen(false);
-                          onPatientSaved?.(true);
-                          scrollPortalToTop();
-                        } catch (err) {
-                          // Parent already toasted; keep form open so the
-                          // customer can retry without re-entering data.
-                          setPatientOpen(true);
-                          const m = err instanceof Error ? err.message : '';
-                          if (!m.startsWith('EINSATZORT')) {
-                            console.error('UpdateCustomer failed:', err);
-                          } else {
-                            // Der Einsatzort steht auf Schritt 3, „Speichern"
-                            // auf Schritt 4 — ohne Rücksprung sieht der Kunde
-                            // gar nichts und klickt wieder (Registry #65).
-                            const lookupFehlerJetzt = m === 'EINSATZORT_LOOKUP';
-                            const abgelehntJetzt = m.startsWith('EINSATZORT:') && m.slice(11) === patient.plz;
-                            if (lookupFehlerJetzt) setLookupFehler(true);
-                            else if (abgelehntJetzt) setAbgelehntePlz(m.slice(11));
-                            setStep(2);
-                            // `einsatzortStand` aus dem Render ist hier VERALTET
-                            // (die Closure hält Werte von vor dem await, und die
-                            // Zeilen darüber wirken erst im nächsten Render).
-                            // Ohne das Überschreiben käme für einen Entwurf mit
-                            // 5-stelliger PLZ und gefülltem Ort `null` heraus,
-                            // `stepError` bliebe leer und `showErrors` false.
-                            setStepError(einsatzortHinweis({
-                              ...einsatzortStand,
-                              lookupFehler: lookupFehlerJetzt,
-                              abgelehnt: abgelehntJetzt,
-                            }) ?? '');
-                            // setTimeout statt rAF: nach einem await sind wir in
-                            // keinem diskreten Event, rAF kann dem Commit von
-                            // Schritt 3 zuvorkommen.
-                            setTimeout(() => {
-                              patientFormRef.current
-                                ?.querySelector('[data-invalid="1"]')
-                                ?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                            }, 0);
-                          }
-                        } finally {
-                          setIsSaving(false);
-                        }
-                      } else {
-                        // Mamamia disabled (e.g. local dev) — fall back to
-                        // the old immediate-collapse path.
-                        setSaved(true);
-                        setPatientOpen(false);
-                        onPatientSaved?.(true);
-                        scrollPortalToTop();
-                      }
-                    }}
-                    disabled={!allComplete || isSaving}
-                    className={`flex-1 py-2.5 text-sm font-bold rounded-xl transition-all ${
-                      allComplete && !isSaving
-                        ? 'bg-[#E76F63] hover:bg-[#D65E52] text-white shadow-sm'
-                        : 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                    }`}
-                  >
-                    {isSaving ? 'Speichern…' : 'Speichern'}
-                  </button>
-                )}
-              </div>
-            </div>
-          </div>
-          </div>
-        )}
-      </div>
+                <FormField feld="rauchen" label="Darf die Pflegekraft rauchen?">
+                  <ChipSelect value={patient.rauchen} onChange={v => updatePatient(p=>({...p,rauchen:v}))}
+                    options={['Ja (nur Draußen)','Nein']} labels={{ 'Ja (nur Draußen)': 'Ja, nur draußen' }} />
+                </FormField>
+                <FormField feld="sonstigeWuensche" label="Sonstige Wünsche">
+                  <textarea value={patient.sonstigeWuensche} onChange={set('sonstigeWuensche')}
+                    placeholder="z. B. Erfahrung mit Demenz, ruhige Person, tierlieb"
+                    rows={2} className={`${inputCls} resize-none`} />
+                </FormField>
 
+                {/* SA-Gruppierung „Aufgaben & Pflegedienst" — Pflegedienst ist
+                    aus der Wohnsituation hierher gezogen (wie im SA-Wizard). */}
+                {personKopf('Aufgaben & Pflegedienst')}
+                <FormField feld="pflegedienst" label="Kommt ein Pflegedienst?">
+                  <ChipSelect value={patient.pflegedienst} onChange={v => updatePatient(p=>{
+                    // When user switches to 'Nein', clear the follow-ups so
+                    // a stale frequency/tasks selection doesn't sneak into
+                    // the Mamamia description string on save.
+                    const next = { ...p, pflegedienst: v };
+                    if (v === 'Nein') {
+                      next.pflegedienstHaeufigkeit = '';
+                      next.pflegedienstAufgaben = '';
+                    }
+                    return next;
+                  })}
+                    options={['Ja','Nein','Geplant']} />
+                </FormField>
+                {/* Pflegedienst-Zusatzfelder (Häufigkeit/Aufgaben) entfernt —
+                    unnötige Hürde (Martin, 2026-07-08); Standard-Text kommt vom Mapper. */}
+                <FormField feld="einkaeufe" label="Muss die Pflegekraft Einkäufe erledigen?">
+                  <ChipSelect value={patient.einkaeufe} onChange={v => updatePatient(p => {
+                    // Beim Wechsel auf 'Nein' das Detailfeld leeren, damit kein
+                    // veralteter Text in die Job-Beschreibung rutscht.
+                    const next = { ...p, einkaeufe: v };
+                    if (v === 'Nein') next.einkaeufeWie = '';
+                    return next;
+                  })} options={['Ja','Gelegentlich','Nein']} />
+                </FormField>
+                {(patient.einkaeufe === 'Ja' || patient.einkaeufe === 'Gelegentlich') && (
+                  <FormField feld="einkaeufeWie" label="Wie werden die Einkäufe erledigt?">
+                    <input value={patient.einkaeufeWie} onChange={set('einkaeufeWie')}
+                      placeholder="ÖPNV, zu Fuß, Fahrrad, Taxi, Auto" className={inputCls} />
+                  </FormField>
+                )}
+                <FormField feld="aufgaben" label="Aufgaben der Pflegekraft">
+                  <textarea value={patient.aufgaben} onChange={set('aufgaben')}
+                    placeholder="z. B. Körperpflege, Mahlzeiten, Arztbegleitung, Einkäufe"
+                    rows={3} className={`${inputCls} resize-none`} />
+                </FormField>
+              </>
+            )}
+          </div>
+
+          <FormNav
+            onZurueck={step > 0 ? zurueck : undefined}
+            onWeiter={letzterSchritt ? () => { void speichern(); } : weiter}
+            weiterText={letzterSchritt ? 'Speichern' : 'Weiter →'}
+            laedt={isSaving}
+            ladeText="Speichern…"
+            hinweis={navHinweis && (
+              <button
+                type="button"
+                onClick={zumErstenFehler}
+                className="inline-flex min-h-[44px] -my-2.5 items-center px-2 underline decoration-pm-error/40 underline-offset-4"
+              >
+                {navHinweis}
+              </button>
+            )}
+          />
+        </Card>
+      )}
+      {/* Unter der Karte statt in der mitlaufenden Leiste — dort kostete die
+          zweite Zeile auf dem Handy Platz über dem Formular. */}
+      {patientOpen && (
+        <p className="mt-3 text-center text-[13px] text-pm-muted">Ihre Eingaben bleiben auf diesem Gerät gespeichert.</p>
+      )}
     </div>
   );
 };
-

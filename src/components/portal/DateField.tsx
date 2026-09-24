@@ -79,10 +79,10 @@ export const DateField: FC<{
       <button
         type="button"
         onClick={toggle}
-        className={`w-full border border-gray-300 rounded-xl px-3 py-2.5 text-base text-left bg-white flex items-center justify-between gap-2 focus:outline-none focus:border-[#8B7355] focus:ring-2 focus:ring-[#8B7355]/10 transition-all${invalid ? ' border-red-300 bg-red-50/40' : ''}`}
+        className={`w-full min-h-[48px] rounded-[14px] border-[1.5px] px-3.5 py-2.5 text-[16px] text-left bg-white flex items-center justify-between gap-2 focus:outline-none focus:border-pm-taupe focus:ring-2 focus:ring-pm-taupe/15 transition-colors ${invalid ? 'border-pm-error' : 'border-pm-chip'}`}
       >
-        <span className={display ? 'text-gray-800' : 'text-gray-400'}>{display || placeholder}</span>
-        <svg aria-hidden="true" className="w-5 h-5 text-[#8B7355] flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <span className={display ? 'text-pm-ink' : 'text-pm-mute'}>{display || placeholder}</span>
+        <svg aria-hidden="true" className="w-5 h-5 text-pm-taupe flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
         </svg>
       </button>
@@ -91,19 +91,19 @@ export const DateField: FC<{
         // Bewusst KEIN absolute-Dropdown: die Angebots-Karte hat
         // overflow-hidden und würde den Kalender abschneiden (Martin,
         // Screenshot 08.07.). Im Fluss gerendert wächst die Karte mit.
-        <div className="mt-1.5 w-full max-w-[320px] bg-white border border-gray-200 rounded-2xl shadow-sm p-3">
+        <div className="mt-2 w-full max-w-[340px] bg-white border-[1.5px] border-pm-line rounded-[18px] p-3">
           <div className="flex items-center justify-between mb-2 px-1">
-            <button type="button" onClick={prevMonth} aria-label="Voriger Monat" className="w-8 h-8 rounded-lg hover:bg-[#F5F5F6] flex items-center justify-center text-gray-500">
+            <button type="button" onClick={prevMonth} aria-label="Voriger Monat" className="w-11 h-11 rounded-full hover:bg-pm-paper flex items-center justify-center text-pm-taupe-ink">
               <ChevronLeft className="w-4 h-4" />
             </button>
-            <span className="text-sm font-bold text-gray-800">{MONTHS[viewMonth]} {viewYear}</span>
-            <button type="button" onClick={nextMonth} aria-label="Nächster Monat" className="w-8 h-8 rounded-lg hover:bg-[#F5F5F6] flex items-center justify-center text-gray-500">
+            <span className="text-[15.5px] font-bold text-pm-ink">{MONTHS[viewMonth]} {viewYear}</span>
+            <button type="button" onClick={nextMonth} aria-label="Nächster Monat" className="w-11 h-11 rounded-full hover:bg-pm-paper flex items-center justify-center text-pm-taupe-ink">
               <ChevronRight className="w-4 h-4" />
             </button>
           </div>
           <div className="grid grid-cols-7 gap-0.5 mb-1">
             {WEEKDAYS.map(w => (
-              <span key={w} className="h-7 flex items-center justify-center text-xs font-semibold text-gray-400">{w}</span>
+              <span key={w} className="h-7 flex items-center justify-center text-[12.5px] font-semibold text-pm-muted">{w}</span>
             ))}
           </div>
           <div className="grid grid-cols-7 gap-0.5">
@@ -121,13 +121,13 @@ export const DateField: FC<{
                   type="button"
                   disabled={disabled}
                   onClick={() => { onChange(iso); setOpen(false); }}
-                  className={`h-9 rounded-lg text-sm flex items-center justify-center transition-colors ${
+                  className={`h-11 rounded-full text-[15px] flex items-center justify-center transition-colors ${
                     selected
-                      ? 'bg-[#8B7355] text-white font-bold'
+                      ? 'bg-pm-taupe text-white font-bold'
                       : disabled
-                        ? 'text-gray-300 cursor-default'
-                        : 'text-gray-700 hover:bg-[#F5F5F6]'
-                  }${isToday && !selected ? ' font-bold ring-1 ring-inset ring-[#8B7355]/40' : ''}`}
+                        ? 'text-[#C9C4BC] cursor-default'
+                        : 'text-pm-body hover:bg-pm-paper'
+                  }${isToday && !selected ? ' font-bold ring-1 ring-inset ring-pm-taupe/50' : ''}`}
                 >
                   {d}
                 </button>
