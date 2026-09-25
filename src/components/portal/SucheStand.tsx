@@ -7,34 +7,26 @@ import { EYEBROW } from '../ui/SectionHeader';
 import { RESERVIERUNG_STUNDEN } from '../../lib/reservierung';
 import { kalenderTag } from './DateField';
 
-/** „24.09." aus einem ISO-Zeitpunkt oder Datum, in Berliner Zeit. */
+/** „15.10." aus einem Kalendertag („2026-10-15"), sonst null. */
 export function kurzDatum(iso: string | null | undefined): string | null {
-  if (!iso) return null;
-  // Datum ohne Zeitzone (mamamia `arrival_at`): der Tag, wie er dort steht.
   const tag = kalenderTag(iso);
-  if (tag) return `${tag.slice(8, 10)}.${tag.slice(5, 7)}.`;
-  // Zeitpunkt mit Zone (`leads.patient_form_at`): deutsche Zeit. Leerzeichen
-  // → „T", damit Safari ihn liest.
-  const d = new Date(iso.trim().replace(' ', 'T'));
-  if (Number.isNaN(d.getTime())) return null;
-  return new Intl.DateTimeFormat('de-DE', { timeZone: 'Europe/Berlin', day: '2-digit', month: '2-digit' }).format(d);
+  return tag ? `${tag.slice(8, 10)}.${tag.slice(5, 7)}.` : null;
 }
 
-export function SucheStand({ angefragtAm, passende, wunschstart, onAngaben, bisherigeBewerbungen = 0 }: {
-  /** `leads.patient_form_at` */
-  angefragtAm: string | null | undefined;
+export function SucheStand({ passende, wunschstart, onAngaben, bisherigeBewerbungen = 0 }: {
   /** Sichtbare passende Pflegekräfte; null = noch unbekannt. */
   passende: number | null;
-  /** Anreise laut Job (`arrival_at`) */
+  /** Startdatum aus dem Formular des Kunden, nie aus mamamia (Martin 25.09.:
+   *  „Das einzige Datum, was zählt, ist das, was im Formular angegeben wird"). */
   wunschstart: string | null | undefined;
   onAngaben: () => void;
   /** Schon erhaltene (entschiedene) Bewerbungen — dann ist „Bewerbung erhalten" kein reines Zukunftsversprechen. */
   bisherigeBewerbungen?: number;
 }) {
-  const am = kurzDatum(angefragtAm);
   const start = kurzDatum(wunschstart);
   const schritte: { titel: string; text: string | null }[] = [
-    { titel: 'Bewerbungen angefragt', text: am ? `am ${am}` : null },
+    // Ohne Datum (Martin 25.09.: „wozu brauchen wir das Datum?").
+    { titel: 'Bewerbungen angefragt', text: null },
     {
       titel: 'Anfrage für Pflegekräfte sichtbar',
       text: passende == null ? null

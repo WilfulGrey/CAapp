@@ -123,10 +123,10 @@ describe('AngebotCard – Startdatum beim Ändern', () => {
   const OHNE_START = { ...VOLL, startDate: '' };
   const bisAbsenden = async () => { for (let i = 0; i < 3; i++) await weiter(); };
 
-  it('übernimmt das beim Absenden gewählte Datum (mamamia-Format mit Uhrzeit)', async () => {
+  it('übernimmt das Datum aus dem zuletzt abgesendeten Formular', async () => {
     entwurf(OHNE_START);
     const onSave = vi.fn(async () => {});
-    render(<AngebotCard lead={lead} mamamiaEnabled onSaveToMamamia={onSave} gewaehlterStart="2099-11-15 00:00:00" />);
+    render(<AngebotCard lead={lead} mamamiaEnabled onSaveToMamamia={onSave} gewaehlterStart="2099-11-15" />);
     await bisAbsenden();
     schritt(4);
     await userEvent.click(screen.getByRole('button', { name: 'Bewerbungen anfragen' }));
@@ -144,7 +144,7 @@ describe('AngebotCard – Startdatum beim Ändern', () => {
 
   it('ein vergangenes Datum wird nicht vorbelegt', async () => {
     entwurf(OHNE_START);
-    render(<AngebotCard lead={lead} gewaehlterStart="2020-01-15 00:00:00" />);
+    render(<AngebotCard lead={lead} gewaehlterStart="2020-01-15" />);
     await bisAbsenden();
     schritt(3);
     expect(screen.getByText('Bitte ein Datum wählen. Eine Schätzung reicht.')).toBeInTheDocument();
