@@ -78,7 +78,7 @@ describe('Portal integration: golden paths', () => {
     render(<CustomerPortalPage />);
 
     // Wait for the pending-applications card to render with "Angebot prüfen"
-    const reviewBtn = await screen.findByRole('button', { name: /Angebot prüfen/i }, { timeout: 5000 });
+    const reviewBtn = await screen.findByRole('button', { name: /^Angebot prüfen$/ }, { timeout: 5000 });
 
     // Rekruter-Hinweis (application.message) VERBATIM — schon auf der Karte
     // (Registry #22: kein LLM, kein Filter; Fixture-Text 1:1 durch den vollen
@@ -158,7 +158,7 @@ describe('Portal integration: golden paths', () => {
     render(<CustomerPortalPage />);
 
     // Wait for "Angebot prüfen" to confirm initial AppCards rendered
-    await screen.findByRole('button', { name: /Angebot prüfen/i }, { timeout: 5000 });
+    await screen.findByRole('button', { name: /^Angebot prüfen$/ }, { timeout: 5000 });
 
     // Click "Ablehnen" on the application card
     const declineBtns = screen.getAllByRole('button', { name: /^Ablehnen$/ });
@@ -278,6 +278,29 @@ describe('Portal integration: golden paths', () => {
     expect(screen.getByRole('button', { name: /Pflegesituation.*Vollständig/ })).toBeInTheDocument();
   }, 15_000);
 
+  // ─── Nach dem Absenden ohne sichtbare Pflegekraft (Martin 25.09.) ────────
+
+  it('gespeichert, keine Bewerbung, keine Pflegekraft: „Ihre Suche läuft“ und ein Leer-Zustand statt nackter Überschrift', async () => {
+    server.use(
+      ...defaultHandlers({
+        proxy: {
+          listApplications: () => ({ JobOfferApplicationsWithPagination: { total: 0, data: [] } }),
+          listMatchings: () => ({ JobOfferMatchingsWithPagination: { total: 0, data: [] } }),
+        },
+      }),
+    );
+    localStorage.setItem(`patient_${TEST_LEAD_TOKEN}`, JSON.stringify({ _isDraft: false }));
+    setLocation(`?token=${TEST_LEAD_TOKEN}`);
+    render(<CustomerPortalPage />);
+
+    expect(await screen.findByText('Ihre Suche läuft', {}, { timeout: 5000 })).toBeInTheDocument();
+    expect(screen.getByText('Stand heute')).toBeInTheDocument();
+    expect(await screen.findByText('Gerade keine weiteren Vorschläge', {}, { timeout: 5000 })).toBeInTheDocument();
+    expect(screen.getByText(/Bewerbungen bekommen Sie trotzdem per E-Mail/)).toBeInTheDocument();
+    // „So geht es weiter" ersetzt der Stand.
+    expect(screen.queryByText('So geht es weiter')).toBeNull();
+  }, 15_000);
+
   // ─── Path 3: Einsatzort-Wall (Registry #65) ─────────────────────────────
 
   it('einsatzort wall: unauflösbare PLZ → kein updateCustomer, zurück auf Schritt 3', async () => {
@@ -324,7 +347,7 @@ describe('Portal integration: golden paths', () => {
       const weiter = await screen.findByRole('button', { name: /^Weiter →$/ }, { timeout: 5000 });
       await user.click(weiter);
     }
-    const speichern = await screen.findByRole('button', { name: /^Speichern$/ }, { timeout: 5000 });
+    const speichern = await screen.findByRole('button', { name: /^Bewerbungen anfragen$/ }, { timeout: 5000 });
     await user.click(speichern);
 
     // Der Kunde bekommt den Satz zu sehen — und zwar auf Schritt 3, wo das Feld

@@ -152,13 +152,13 @@ describe('AngebotCard – Schritte und Speichern', () => {
     expect(schritte).toEqual([1, 2]);
   });
 
-  it('„Speichern" ist immer aktiv und zeigt, was fehlt, statt zu speichern', async () => {
+  it('„Bewerbungen anfragen" ist immer aktiv und zeigt, was fehlt, statt abzusenden', async () => {
     entwurf({ ...VOLL, wunschGeschlecht: '' });
     const onSave = vi.fn(async () => {});
     render(<AngebotCard lead={lead} mamamiaEnabled onSaveToMamamia={onSave} />);
     for (let i = 0; i < 3; i++) await weiter();
     schritt(4);
-    const speichern = screen.getByRole('button', { name: 'Speichern' });
+    const speichern = screen.getByRole('button', { name: 'Bewerbungen anfragen' });
     expect(speichern).toBeEnabled();
     await userEvent.click(speichern);
     expect(onSave).not.toHaveBeenCalled();
@@ -171,7 +171,7 @@ describe('AngebotCard – Schritte und Speichern', () => {
     const onPatientSaved = vi.fn();
     render(<AngebotCard lead={lead} mamamiaEnabled onSaveToMamamia={onSave} onPatientSaved={onPatientSaved} />);
     for (let i = 0; i < 3; i++) await weiter();
-    await userEvent.click(screen.getByRole('button', { name: 'Speichern' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Bewerbungen anfragen' }));
     await waitFor(() => expect(onSave).toHaveBeenCalledTimes(1));
     expect(onSave.mock.calls[0][0]).toMatchObject({ geschlecht: 'Weiblich', plz: '80331', phone: '0170 1234567' });
     expect(onPatientSaved).toHaveBeenLastCalledWith(true);
@@ -182,5 +182,30 @@ describe('AngebotCard – Schritte und Speichern', () => {
   it('zeigt den Hinweis zum lokalen Speichern', () => {
     render(<AngebotCard lead={lead} />);
     expect(screen.getByText('Ihre Eingaben bleiben auf diesem Gerät gespeichert.')).toBeInTheDocument();
+  });
+});
+
+describe('AngebotCard – letzter Schritt', () => {
+  it('sagt, was das Absenden bedeutet, und führt „Zurück" als Link', async () => {
+    entwurf(VOLL);
+    render(<AngebotCard lead={lead} />);
+    for (let i = 0; i < 3; i++) await weiter();
+    expect(screen.getByText(/Mit dem Absenden fragen Sie Bewerbungen an/)).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Zurück' })).toBeNull();
+    await userEvent.click(screen.getByRole('button', { name: 'Zurück zu Schritt 3' }));
+    schritt(3);
+  });
+});
+
+describe('AngebotCard – Angaben ändern nach dem Absenden', () => {
+  it('schon abgeschickt: „Änderungen speichern“ statt „Bewerbungen anfragen“, kein 72-h-Satz', async () => {
+    localStorage.setItem(`patient_${TOKEN}`, JSON.stringify({ ...VOLL, _isDraft: false }));
+    const onAbgesendet = vi.fn();
+    render(<AngebotCard lead={lead} onAbgesendet={onAbgesendet} />);
+    for (let i = 0; i < 3; i++) await weiter();
+    expect(screen.queryByRole('button', { name: 'Bewerbungen anfragen' })).toBeNull();
+    expect(screen.queryByText(/Mit dem Absenden fragen Sie Bewerbungen an/)).toBeNull();
+    await userEvent.click(screen.getByRole('button', { name: 'Änderungen speichern' }));
+    expect(onAbgesendet).toHaveBeenCalledWith(true);
   });
 });

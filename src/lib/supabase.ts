@@ -38,6 +38,11 @@ export interface LeadKalkulation {
 
 export interface Lead {
   id: string;
+  /** Zeitpunkt des ersten Speicherns der Pflegesituation (mamamia-proxy setzt ihn).
+   *  Kommt mit `select *`; Anzeige „Bewerbungen angefragt am …" (SucheStand). */
+  patient_form_at?: string | null;
+  /** Standard-Job des Leads (Onboard). Ereignisse ohne Job gehören wie im Server zu ihm. */
+  mamamia_job_offer_id?: number | null;
   /** Gesetzt, wenn der Lead ueber einen Vermittler kam (Registry #59). */
   vermittler?: string | null;
   email: string;

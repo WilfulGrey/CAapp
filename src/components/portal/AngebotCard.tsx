@@ -18,6 +18,7 @@ import type { PatientForm } from './shared';
 import { STEP_LABELS, einsatzortHinweis } from './shared';
 import type { MamamiaCustomer } from '../../lib/mamamia/types';
 import { mapMamamiaCustomerToPatientForm, germanySkillLabel } from '../../lib/mamamia/mappers';
+import { RESERVIERUNG_STUNDEN } from '../../lib/reservierung';
 
 // Plausibilitäts-Check für Telefonnummern — bewusst lax, dieselbe Regel wie
 // im Kostenrechner (project 3/lib/telefon.ts): 8–15 Ziffern, führendes „+"
@@ -74,10 +75,9 @@ export const AngebotCard: FC<{
   onTriggerHandled?: () => void;
   mamamiaEnabled?: boolean;
   onSaveToMamamia?: (form: PatientForm) => Promise<void>;
-  /** Formular ist (nicht mehr) im Bildschirm — die Seite blendet solange die
-   *  Feedback-Blase aus, die sonst über der Knopfleiste läge. */
-  onImBlick?: (imBlick: boolean) => void;
-}> = ({ lead, mmCustomer, onPatientSaved, triggerOpenPatient, onTriggerHandled, mamamiaEnabled, onSaveToMamamia, onImBlick }) => {
+  /** Nach jedem erfolgreichen Absenden; `nurAenderung` = Angaben wurden nur geändert. */
+  onAbgesendet?: (nurAenderung: boolean) => void;
+}> = ({ lead, mmCustomer, onPatientSaved, triggerOpenPatient, onTriggerHandled, mamamiaEnabled, onSaveToMamamia, onAbgesendet }) => {
   // Offen, sobald die Karte gerendert wird: Seit dem Wegfall des
   // Zwischenkopfs (11.08.) steuert allein der Abschnittskopf in
   // CustomerPortalPage, ob dieser Block überhaupt erscheint.
@@ -583,16 +583,6 @@ export const AngebotCard: FC<{
     }, 60);
   };
 
-  // Sichtbarkeit melden (s. Prop `onImBlick`).
-  useEffect(() => {
-    const el = patientFormRef.current;
-    if (!el || !onImBlick || typeof IntersectionObserver === 'undefined') return;
-    const io = new IntersectionObserver(entries => onImBlick(entries.some(e => e.isIntersecting)));
-    io.observe(el);
-    return () => { io.disconnect(); onImBlick(false); };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [patientOpen]);
-
   const zurueck = () => { setFehlerZeigen(false); setStep(s => s - 1); scrollToFormTop(); };
 
   const weiter = () => {
@@ -642,6 +632,7 @@ export const AngebotCard: FC<{
         setSaved(true);
         setPatientOpen(false);
         onPatientSaved?.(true);
+        onAbgesendet?.(nurAenderung);
         scrollPortalToTop();
       } catch (err) {
         // Parent already toasted; keep form open so the
@@ -671,6 +662,7 @@ export const AngebotCard: FC<{
       setSaved(true);
       setPatientOpen(false);
       onPatientSaved?.(true);
+      onAbgesendet?.(nurAenderung);
       scrollPortalToTop();
     }
   };
@@ -719,6 +711,9 @@ export const AngebotCard: FC<{
   );
 
   const letzterSchritt = step === STEP_LABELS.length - 1;
+  // Schon abgeschickt (lokal oder laut mamamia aktiv) → nur Angaben ändern: kein erneutes
+  // „Bewerbungen anfragen", kein neues 72-h-Versprechen (Review 25.09.).
+  const nurAenderung = hasFinalSave || (mmCustomer?.status != null && mmCustomer.status !== 'draft');
 
   return (
     <div ref={patientFormRef} id="pflegesituation-formular" className="scroll-mt-16">
@@ -1045,6 +1040,15 @@ export const AngebotCard: FC<{
                     placeholder="z. B. Körperpflege, Mahlzeiten, Arztbegleitung, Einkäufe"
                     rows={3} className={`${inputCls} resize-none`} />
                 </FormField>
+                {/* Was das Absenden bedeutet (Martin 25.09.): verbindlich anfragen,
+                    72 h Reservierung je Bewerbung (= Auto-Absage in
+                    detect-caregiver-events), Vertrag erst mit Zusage. */}
+                {!nurAenderung && (
+                  <p className="mt-2 pt-4 border-t border-pm-line-soft text-[14.5px] leading-[1.5] text-pm-body">
+                    Mit dem Absenden fragen Sie Bewerbungen an. Jede Bewerbung ist {RESERVIERUNG_STUNDEN} Stunden für Sie reserviert.
+                    Ein Vertrag entsteht erst, wenn Sie zusagen.
+                  </p>
+                )}
               </>
             )}
           </div>
@@ -1052,9 +1056,12 @@ export const AngebotCard: FC<{
           <FormNav
             onZurueck={step > 0 ? zurueck : undefined}
             onWeiter={letzterSchritt ? () => { void speichern(); } : weiter}
-            weiterText={letzterSchritt ? 'Speichern' : 'Weiter →'}
+            // Verbindlich anfragen statt „Speichern" (Martin 25.09.): Der Kunde hat
+            // unter der Kostenkarte „Ja" gesagt; hier schickt er die Anfrage ab.
+            weiterText={letzterSchritt ? (nurAenderung ? 'Änderungen speichern' : 'Bewerbungen anfragen') : 'Weiter →'}
+            zurueckAlsLink={letzterSchritt ? `Zurück zu Schritt ${step}` : undefined}
             laedt={isSaving}
-            ladeText="Speichern…"
+            ladeText={nurAenderung ? 'Speichern…' : 'Wird angefragt…'}
             hinweis={navHinweis && (
               <button
                 type="button"
