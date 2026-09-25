@@ -52,6 +52,9 @@ import { AppCard } from '../components/portal/AppCard';
 import { AppCardDone } from '../components/portal/AppCardDone';
 import { BeratungCTA } from '../components/portal/BeratungCTA';
 import { AngebotFrage } from '../components/portal/AngebotFrage';
+import { SucheStand } from '../components/portal/SucheStand';
+import { reserviertBis as berechneReservierung, RESERVIERUNG_STUNDEN } from '../lib/reservierung';
+import type { FetchedLeadEvent } from '../lib/leadEvents';
 import { MatchCard } from '../components/portal/MatchCard';
 import { MatchCardDone } from '../components/portal/MatchCardDone';
 import { InterestCard, type InterestActionStatus } from '../components/portal/InterestCard';
@@ -121,6 +124,9 @@ const PREVIEW_OHNE_TELEFON =
 // vorbereitet. ✨"). Wird vom Multi-Job-Vorschau (?preview=jobs) als
 // Detail-View für geplante Jobs ohne Bewerbungen genutzt.
 const IS_PREVIEW_WARTET = PREVIEW_PARAM === 'wartet';
+// ?preview=wartet&leer=1 — keine sichtbaren Pflegekräfte (Leer-Zustand prüfen, 25.09.).
+const IS_PREVIEW_LEER =
+  typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('leer') === '1';
 const IS_PREVIEW_ANY = IS_PREVIEW_BEWERBUNG || IS_PREVIEW_INTERESSE || IS_PREVIEW_GEBUCHT || IS_PREVIEW_CHAT || IS_PREVIEW_PATIENT || IS_PREVIEW_WARTET;
 
 // Sub-Nav-Zeile mit Job-Kontext (Status-Badge + Zeitraum links) +
@@ -614,24 +620,8 @@ const CustomerPortalPage: FC = () => {
   // Kostenaufstellung IM Kasten auf. Beim Umbau war das kurzzeitig derselbe
   // Schalter — dadurch fehlte das Einklappen des Abschnitts ganz.
   const [costsExpanded, setCostsExpanded] = useState(false);
-  // Erstbesuch pro Lead (localStorage): beim ERSTEN Reingehen ins Portal soll
-  // "Ihr Angebot" aufgeklappt sein — danach folgt es der Fortschritts-Regel
-  // (collapsed sobald Patientendaten erfasst sind). In Preview immer true,
-  // damit der Erstbesuch-Zustand sichtbar ist. iOS-WebKit-localStorage kann
-  // fehlschlagen → Fallback "kein Erstbesuch" (greift dann nur die Auto-Regel).
-  const [offerFirstVisit] = useState<boolean>(() => {
-    if (IS_PREVIEW_ANY) return true;
-    try {
-      const token = new URLSearchParams(window.location.search).get('token');
-      if (!token) return false;
-      const key = `pm_portal_offer_seen_${token}`;
-      const seen = localStorage.getItem(key) === '1';
-      if (!seen) localStorage.setItem(key, '1');
-      return !seen;
-    } catch {
-      return false;
-    }
-  });
+  // (Der Erstbesuch-Schalter `offerFirstVisit` ist seit 25.09. weg: vor dem Absenden ist das
+  // Angebot immer offen, danach eingeklappt mit Preis in der Zeile.)
 
   // ─── Mamamia session + queries (K2-K4 integration) ───────────────────────
   const { session, ready: mmReady, error: mmError, expired: mmExpired } = useMamamiaSession(lead?.token ?? null, JOB_ID_PARAM);
@@ -911,7 +901,7 @@ const CustomerPortalPage: FC = () => {
       const fromInterest = [...previewInvitedFromInterest.entries()].map(
         ([caregiverId, nurse]) => ({ caregiverId, nurse }),
       );
-      return [...PREVIEW_MATCHINGS, ...fromInterest];
+      return IS_PREVIEW_LEER ? fromInterest : [...PREVIEW_MATCHINGS, ...fromInterest];
     }
     if (!mmReady || !mmMatchings?.data) return [];
     const now = new Date();
@@ -1217,6 +1207,43 @@ const CustomerPortalPage: FC = () => {
   const acceptedApp = applications.find((a) => a.status === 'accepted') ?? null;
   const hasPending = pendingApps.length > 0;
   const matchesUnlocked = !hasPending;
+
+  // „Ihre Suche läuft" (Martin 25.09.): gespeichert, keine offene Bewerbung und
+  // die Bewerbungen sind geladen — sonst zeigt der Kopf „Einen Moment …" und
+  // die Stand-Karte würde kurz „noch keine Bewerbung" behaupten.
+  const sucheLaeuft =
+    patientSaved && !hasPending && (IS_PREVIEW_ANY || (mmReady && !mmApplicationsLoading && !!mmApplications));
+
+  // Bewerbungs-Ereignisse für „Für Sie reserviert bis …" (src/lib/reservierung.ts).
+  // Neu laden, sobald sich die Zahl der Bewerbungen ändert.
+  const [bewerbungsEvents, setBewerbungsEvents] = useState<FetchedLeadEvent[]>([]);
+  useEffect(() => {
+    if (!lead?.token || IS_PREVIEW_ANY || !hasPending) return;
+    let aktiv = true;
+    fetchLeadEvents(lead.token, ['application_received', 'application_accepted_internal', 'application_rejected'])
+      .then((ev) => { if (aktiv) setBewerbungsEvents(ev); });
+    return () => { aktiv = false; };
+  }, [lead?.token, hasPending, pendingApps.length]);
+  const reservierungFuer = (app: Application): Date | null => {
+    if (IS_PREVIEW_ANY) {
+      // Vorschau: so, als wäre die Bewerbung vor 20 Stunden gekommen.
+      const std = 60 * 60 * 1000;
+      return new Date(Math.floor((Date.now() + (RESERVIERUNG_STUNDEN - 20) * std) / std) * std);
+    }
+    return berechneReservierung(bewerbungsEvents, { caregiverId: app.nurse.caregiverId, jobOfferId: mmJobOffer?.id });
+  };
+
+  // Mail B verlinkt `&view=application`: bei genau einer offenen Bewerbung
+  // direkt „Angebot prüfen" öffnen, sonst zu den Bewerbungen springen. Einmal.
+  const viewApplicationErledigt = useRef(false);
+  useEffect(() => {
+    if (viewApplicationErledigt.current || !hasPending) return;
+    if (new URLSearchParams(window.location.search).get('view') !== 'application') return;
+    viewApplicationErledigt.current = true;
+    if (pendingApps.length === 1) setSelectedApp(pendingApps[0]);
+    else setTimeout(() => document.getElementById('bewerbungen')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 300);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hasPending, pendingApps.length]);
 
   // Mamamia-Matchings vorübergehend nicht erreichbar (Upstream-500/Netzwerk)
   // ODER noch am Laden — UND wir haben (noch) keine Daten. Dann zeigt das
@@ -2370,8 +2397,10 @@ const CustomerPortalPage: FC = () => {
         // fehlen; sobald eine Bewerbung da ist, hat die Vorrang. Manueller
         // Toggle gewinnt. (Wieder die Regel von vor dem 11.08.-Umbau —
         // Martin: „muss einklappbar sein für spätere Zustände".)
+        // Nach dem Absenden eingeklappt, mit dem Preis in der Zeile (Martin 25.09.:
+        // dann zählen Bewerbungen, das Angebot ist Nachschlagewerk).
         const offerExpanded =
-          offerExpandedManual ?? (!hasPending && (offerFirstVisit || !patientSaved));
+          offerExpandedManual ?? (!hasPending && !patientSaved);
         const brutto = lead?.kalkulation?.bruttopreis ?? 3050;
         const tagessatz = Math.round(brutto / 30);
         // Gekürzt (Martin, 11.08.: „die Punkte schöner darstellen"). Zwei der
@@ -2412,6 +2441,11 @@ const CustomerPortalPage: FC = () => {
               className="w-full min-h-[44px] flex items-center justify-between gap-3 text-left"
             >
               <span className={EYEBROW}>{hasPending ? 'Ihr Angebot' : 'Ihre Betreuungskosten'}</span>
+              {!offerExpanded && (
+                <span className="ml-auto text-[15px] font-bold tabular-nums text-pm-ink">
+                  {formatEuro(brutto)}<span className="font-normal text-pm-muted"> / Monat</span>
+                </span>
+              )}
               <ChevronDown className={`w-5 h-5 flex-shrink-0 text-pm-taupe transition-transform duration-200 ${offerExpanded ? 'rotate-180' : ''}`} />
             </button>
 
@@ -2808,14 +2842,17 @@ const CustomerPortalPage: FC = () => {
         //              → explain what the portal does next
         const n = pendingApps.length;
 
+        // Eine Bewerbung: der Name im Titel (Martin 25.09., Entwurf B). „In Ruhe"
+        // ist raus — jede Bewerbung ist 72 Stunden reserviert, das steht an der Karte.
+        const ersteVorname = n === 1 ? displayName(pendingApps[0].nurse.name).split(' ')[0] : '';
         const heroCopy = hasPending
           ? {
               title: n > 1
-                ? `Sie haben ${n} neue Bewerbungen. 📨`
-                : 'Sie haben eine neue Bewerbung. 📨',
+                ? `Sie haben ${n} Bewerbungen`
+                : `${ersteVorname} möchte Sie betreuen`,
               subtitle: n > 1
-                ? 'Schauen Sie sich die Pflegekräfte in Ruhe an und entscheiden Sie, welche am besten passt.'
-                : 'Schauen Sie sich die Bewerbung in Ruhe an und entscheiden Sie, ob die Pflegekraft passt.',
+                ? 'Sehen Sie sich die Angebote an und entscheiden Sie, welche Pflegekraft am besten passt.'
+                : 'Sehen Sie sich das Angebot an und entscheiden Sie, ob die Pflegekraft passt.',
               pill: n > 1 ? `${n} Bewerbungen aktiv` : '1 Bewerbung aktiv',
               steps: null as 'initial' | 'saved' | null,
             }
@@ -2840,9 +2877,10 @@ const CustomerPortalPage: FC = () => {
               // der Arbeitsplatz des Kunden (Martin, 13.08.: „Ihr
               // Betreuungsportal" — „Ihr persönliches Angebot" passte nicht
               // mehr, das Angebot rutscht in diesem Zustand auch nach unten).
-              title: 'Ihr Betreuungsportal',
-              subtitle:
-                'Hier sehen Sie eingehende Bewerbungen und können in der Zwischenzeit passende Pflegekräfte zur Bewerbung einladen — es bleibt alles unverbindlich.',
+              // Martin 25.09.: nach dem Absenden zählt, dass die Suche läuft und
+              // Bewerbungen kommen („Ihr Betreuungsportal" sagte nichts davon).
+              title: 'Ihre Suche läuft',
+              subtitle: 'Sobald sich eine Pflegekraft bewirbt, bekommen Sie eine E-Mail.',
               // Kein Pill (Martin, 13.08.): „unverbindlich" steht schon im
               // Satz darüber — die Zeile war eine Wiederholung.
               pill: '',
@@ -2886,7 +2924,7 @@ const CustomerPortalPage: FC = () => {
         // der Unterkante (pb-10 + -mt-6 an der Karte).
         return (
           <div className="bg-pm-shell">
-            <div className={`max-w-3xl mx-auto px-[18px] pt-6 ${!patientSaved && !hasPending ? 'pb-10' : 'pb-7'}`}>
+            <div className={`max-w-3xl mx-auto px-[18px] pt-6 ${(!patientSaved && !hasPending) || sucheLaeuft ? 'pb-10' : 'pb-7'}`}>
               <p className="text-[16px] text-pm-taupe-ink">
                 Guten Tag{heroNameLine ? `, ${heroNameLine}` : ''}.
               </p>
@@ -2912,6 +2950,19 @@ const CustomerPortalPage: FC = () => {
           </div>
         );
       })()}
+
+      {/* ── Stand heute (Martin 25.09.): nach dem Absenden liegt diese Karte über
+           der Kante des Kopfs, wie vorher die Kostenkarte. ── */}
+      {sucheLaeuft && (
+        <div className="max-w-3xl mx-auto px-3.5 -mt-6">
+          <SucheStand
+            angefragtAm={lead?.patient_form_at}
+            passende={IS_PREVIEW_ANY || !matchingsLoadingOrError ? effectiveMatched.length : null}
+            wunschstart={mmJobOffer?.arrival_at}
+            onAngaben={zurPflegesituation}
+          />
+        </div>
+      )}
 
       {/* ── SECTION: Ihr Angebot (collapsible) ── */}
       {!patientSaved && angebotSection}
@@ -2979,6 +3030,7 @@ const CustomerPortalPage: FC = () => {
                 onDecline={() => setDeclineConfirmApp(app)}
                 onNurseClick={(n) => openNurseFromApp(n, app)}
                 onChat={CHAT_ENABLED ? (n) => setChatNurse(n) : undefined}
+                reserviertBis={reservierungFuer(app)}
               />
             ))}
             {/* Beratungs-CTA direkt unter den Bewerbungen — Bewerbungen sind
@@ -3101,10 +3153,12 @@ const CustomerPortalPage: FC = () => {
                 weiter in der FAQ. Keine feste Zahl in der Überschrift: bereits
                 eingeladene Kräfte zählen nicht mit. */}
             <SectionHeader
-              eyebrow="Für Sie ausgewählt"
-              titel="Passende Pflegekräfte"
+              // Nach dem Absenden ist Einladen die Zugabe für die Wartezeit
+              // (Martin 24./25.09.) — der Stand oben trägt die Bewerbungen.
+              eyebrow={patientSaved ? 'In der Zwischenzeit' : 'Für Sie ausgewählt'}
+              titel={patientSaved ? 'Selbst einladen' : 'Passende Pflegekräfte'}
               zeile={patientSaved ? (
-                <>Bewerbungen kommen meist in den nächsten Tagen. Wer Ihnen gefällt, laden Sie in der Zwischenzeit selbst ein.</>
+                <>Laden Sie ein, wer Ihnen gefällt. Die Pflegekraft meldet sich meist innerhalb von 1–2 Tagen.</>
               ) : (
                 <>
                   Laden Sie ein, wer Ihnen gefällt. Wir bereiten die Bewerbungen vor. Das geht, sobald Ihre Pflegesituation vollständig ist.{' '}
@@ -3266,8 +3320,8 @@ const CustomerPortalPage: FC = () => {
                   wirklich gehalten (heldInvites > 0), nicht wenn der Pool leer ist. */}
               {!hasAnyCard && heldInvites > 0 && (
                 <div className="rounded-card px-5 py-5 border border-[#EFEBE4] bg-white text-center">
-                  <p className="text-[15px] font-semibold mb-1" style={{color:'#18181B'}}>Ihre Auswahl ist eingeladen</p>
-                  <p className="text-[14px] leading-relaxed" style={{color:'#71717A'}}>
+                  <p className="text-[15.5px] font-bold text-pm-ink">Ihre Auswahl ist eingeladen</p>
+                  <p className="mt-1 text-[14px] leading-relaxed text-pm-muted">
                     Die Pflegekräfte melden sich meist innerhalb von 1&ndash;2 Tagen. Sobald Rückmeldungen da sind, sehen Sie sie hier &mdash; meldet sich niemand, schlagen wir Ihnen automatisch weitere Pflegekräfte vor.
                   </p>
                 </div>
@@ -3279,10 +3333,28 @@ const CustomerPortalPage: FC = () => {
                   dass weitere folgen (Martin, 18.08.). */}
               {!hasAnyCard && heldInvites === 0 && allVisible.length > 0 && (
                 <div className="rounded-card px-5 py-5 border border-[#EFEBE4] bg-white text-center">
-                  <p className="text-[15px] font-semibold mb-1" style={{color:'#18181B'}}>Alle aktuellen Vorschläge bearbeitet</p>
-                  <p className="text-[14px] leading-relaxed" style={{color:'#71717A'}}>
+                  <p className="text-[15.5px] font-bold text-pm-ink">Alle aktuellen Vorschläge bearbeitet</p>
+                  <p className="mt-1 text-[14px] leading-relaxed text-pm-muted">
                     Sie haben alle passenden Pflegekräfte durchgesehen. Wir schlagen Ihnen in Kürze weitere vor &mdash; Sie hören von uns.
                   </p>
+                </div>
+              )}
+
+              {/* Keine sichtbare Pflegekraft und nichts eingeladen (z. B. strenger
+                  Deutsch-Filter, Martin 25.09.: Filter bleibt). Vorher stand dann
+                  nur die Überschrift da. */}
+              {!hasAnyCard && heldInvites === 0 && allVisible.length === 0 && (
+                <div className="rounded-card px-5 py-6 border border-[#EFEBE4] bg-white text-center">
+                  <p className="text-[15.5px] font-bold text-pm-ink">Gerade keine weiteren Vorschläge</p>
+                  <p className="mt-1 text-[14px] leading-relaxed text-pm-muted">
+                    Neue passende Pflegekräfte erscheinen hier.{patientSaved ? ' Bewerbungen bekommen Sie trotzdem per E-Mail.' : ''}
+                  </p>
+                  <a
+                    href={TELEFON_HREF}
+                    className="mt-4 inline-flex min-h-[44px] items-center justify-center rounded-full border-[1.5px] border-pm-chip px-5 text-[15px] font-bold text-pm-taupe-ink hover:border-pm-taupe"
+                  >
+                    Mit Marta sprechen
+                  </a>
                 </div>
               )}
 
@@ -3737,9 +3809,12 @@ const CustomerPortalPage: FC = () => {
       <div className="max-w-3xl mx-auto px-3.5 pt-1 pb-6 space-y-4">
         {/* ── So geht es weiter · Häufige Fragen · Marta (Teil 3 des Redesigns).
              Schritt 1 = Pflegesituation gespeichert, Schritt 2 = Bewerbung da. ── */}
-        <div className="pt-6">
-          <SoGehtEsWeiter erledigt={[patientSaved, hasPending, false]} />
-        </div>
+        {/* Nach dem Absenden ersetzt „Stand heute" diese Liste (Martin 25.09.). */}
+        {!patientSaved && (
+          <div className="pt-6">
+            <SoGehtEsWeiter erledigt={[patientSaved, hasPending, false]} />
+          </div>
+        )}
         <div className="pt-6">
           <FaqListe />
         </div>

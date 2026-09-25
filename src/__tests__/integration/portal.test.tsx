@@ -278,6 +278,29 @@ describe('Portal integration: golden paths', () => {
     expect(screen.getByRole('button', { name: /Pflegesituation.*Vollständig/ })).toBeInTheDocument();
   }, 15_000);
 
+  // ─── Nach dem Absenden ohne sichtbare Pflegekraft (Martin 25.09.) ────────
+
+  it('gespeichert, keine Bewerbung, keine Pflegekraft: „Ihre Suche läuft“ und ein Leer-Zustand statt nackter Überschrift', async () => {
+    server.use(
+      ...defaultHandlers({
+        proxy: {
+          listApplications: () => ({ JobOfferApplicationsWithPagination: { total: 0, data: [] } }),
+          listMatchings: () => ({ JobOfferMatchingsWithPagination: { total: 0, data: [] } }),
+        },
+      }),
+    );
+    localStorage.setItem(`patient_${TEST_LEAD_TOKEN}`, JSON.stringify({ _isDraft: false }));
+    setLocation(`?token=${TEST_LEAD_TOKEN}`);
+    render(<CustomerPortalPage />);
+
+    expect(await screen.findByText('Ihre Suche läuft', {}, { timeout: 5000 })).toBeInTheDocument();
+    expect(screen.getByText('Stand heute')).toBeInTheDocument();
+    expect(await screen.findByText('Gerade keine weiteren Vorschläge', {}, { timeout: 5000 })).toBeInTheDocument();
+    expect(screen.getByText(/Bewerbungen bekommen Sie trotzdem per E-Mail/)).toBeInTheDocument();
+    // „So geht es weiter" ersetzt der Stand.
+    expect(screen.queryByText('So geht es weiter')).toBeNull();
+  }, 15_000);
+
   // ─── Path 3: Einsatzort-Wall (Registry #65) ─────────────────────────────
 
   it('einsatzort wall: unauflösbare PLZ → kein updateCustomer, zurück auf Schritt 3', async () => {
