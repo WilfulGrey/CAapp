@@ -77,9 +77,8 @@ export const AngebotCard: FC<{
   onSaveToMamamia?: (form: PatientForm) => Promise<void>;
   /** Nach jedem erfolgreichen Absenden; `nurAenderung` = Angaben wurden nur geändert. */
   onAbgesendet?: (nurAenderung: boolean) => void;
-  /** Startdatum, das der Kunde beim Absenden gewählt hat (`JobOffer.arrival_at`).
-   *  Nur übergeben, wenn schon abgesendet wurde: Vorher steht dort die
-   *  Onboard-Schätzung, die das Feld bewusst NICHT vorbelegt. */
+  /** Startdatum aus dem zuletzt abgesendeten Formular (`leads.patient_form`),
+   *  nie aus mamamia. Vor dem ersten Absenden gibt es keins: Feld bleibt leer. */
   gewaehlterStart?: string | null;
   /** Schon abgesendet (laut mamamia oder in dieser Sitzung): nur noch „Änderungen speichern". */
   schonAbgesendet?: boolean;
@@ -212,11 +211,10 @@ export const AngebotCard: FC<{
     raucherhaushalt: pick('raucherhaushalt'),
   });
 
-  // Startdatum beim Ändern (Martin 25.09.): Wer schon abgesendet hat, sieht
-  // im „Stand" seinen Wunschstart. Auf einem anderen Gerät (kein lokaler
-  // Entwurf) war das Feld trotzdem leer und musste neu gewählt werden. Einmal
-  // vorbelegen, nur wenn leer und das Datum nicht schon vorbei ist, sonst
-  // wählt der Kunde neu.
+  // Startdatum beim Ändern (Martin 25.09.): Auf einem anderen Gerät (kein
+  // lokaler Entwurf) war das Feld leer und musste neu gewählt werden. Einmal
+  // aus dem zuletzt abgesendeten Formular vorbelegen, nur wenn leer und das
+  // Datum nicht schon vorbei ist, sonst wählt der Kunde neu.
   const startVorbelegt = useRef(false);
   useEffect(() => {
     if (startVorbelegt.current) return;

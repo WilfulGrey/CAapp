@@ -44,6 +44,7 @@ import { buildMonthlyBreakdown, formatDeDate } from '../lib/pricing/monthlyBreak
 import {
   type Application,
   type NurseStatus,
+  type PatientForm,
 } from '../components/portal/shared';
 import { BookedScreen } from '../components/portal/BookedScreen';
 import { VertragSignieren } from '../components/portal/VertragSignieren';
@@ -644,6 +645,12 @@ const CustomerPortalPage: FC = () => {
   // wiederkehrende Kunden auf einem neuen Gerät erst den Ausgangszustand mit
   // offenem Formular, bis mamamia antwortete (Review 25.09.).
   const schonAbgesendet = abgesendetInSitzung || !!lead?.patient_form_at || (!!mmCustomer?.status && mmCustomer.status !== 'draft');
+  // Startdatum NUR aus dem Formular des Kunden (Martin 25.09.: „Das einzige
+  // Datum, was zählt, ist das, was hier im Formular angegeben wird"), nie aus
+  // mamamia `arrival_at` (dort kann noch die Onboard-Schätzung stehen).
+  // In dieser Sitzung abgesendet → dieses Formular, sonst der gespeicherte Bogen.
+  const [abgesendetesFormular, setAbgesendetesFormular] = useState<PatientForm | null>(null);
+  const formularStart = kalenderTag(abgesendetesFormular?.startDate ?? (lead?.patient_form?.startDate as string | undefined));
   const { data: mmJobOffer, loading: mmJobOfferLoading, error: mmJobOfferError, refetch: refetchJobOffer } = useJobOffer(mmReady);
   const { data: mmApplications, loading: mmApplicationsLoading, error: mmApplicationsError, refetch: refetchApplications } = useApplications({ limit: 20 }, mmReady);
   // limit=20 is intentional — client-side ranking (see `effectiveMatched`)
@@ -3042,14 +3049,13 @@ const CustomerPortalPage: FC = () => {
       {sucheLaeuft && (
         <div className="max-w-3xl mx-auto px-3.5 -mt-6">
           <SucheStand
-            angefragtAm={lead?.patient_form_at}
             // Abgelehnte zählen nicht als „gefunden" — sonst widerspräche die Zahl
             // der Liste darunter (Review 25.09.).
             passende={IS_PREVIEW_ANY || (mmReady && !matchingsLoadingOrError)
               ? effectiveMatched.filter((m) => (nurseStatusById.get(m.caregiverId) ?? 'pending') !== 'declined').length
               : null}
             bisherigeBewerbungen={applications.length}
-            wunschstart={mmJobOffer?.arrival_at}
+            wunschstart={formularStart}
             onAngaben={zurPflegesituation}
           />
         </div>
@@ -3649,9 +3655,7 @@ const CustomerPortalPage: FC = () => {
             showToast('✓ Ihre Angaben sind gespeichert.', 5000);
             setPatientExpandedManual(null);
           }}
-          // Nach dem Absenden ist `arrival_at` das Datum des Kunden (unten beim
-          // Speichern nach mamamia geschrieben), vorher nur die Onboard-Schätzung.
-          gewaehlterStart={schonAbgesendet ? mmJobOffer?.arrival_at : null}
+          gewaehlterStart={formularStart}
           mamamiaEnabled={mmReady}
           onSaveToMamamia={async (form) => {
             const existingPatientIds = mmCustomer?.patients?.map(p => p.id) ?? [];
@@ -3781,6 +3785,7 @@ const CustomerPortalPage: FC = () => {
                 ...(patch as Record<string, unknown>),
                 portal_form_snapshot: form,
               });
+              setAbgesendetesFormular(form);
             } catch (err) {
               const raw = err instanceof Error ? err.message : String(err ?? '');
               // Token während des Ausfüllens abgelaufen → ehrlich sagen und in

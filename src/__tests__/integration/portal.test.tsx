@@ -28,7 +28,7 @@ vi.mock('../../lib/supabase', async () => {
       }
       // Schon abgesendet (Proxy hat `patient_form_at` gesetzt), neues Gerät.
       if (token === 'token-abgesendet') {
-        return { lead: { ...defaultLead, token, patient_form_at: '2026-09-24T10:00:00Z' } as unknown as import('../../lib/supabase').Lead, error: null };
+        return { lead: { ...defaultLead, token, patient_form_at: '2026-09-24T10:00:00Z', patient_form: { startDate: '2099-11-15' } } as unknown as import('../../lib/supabase').Lead, error: null };
       }
       return { lead: null, error: 'Token nicht gefunden' };
     }),
@@ -356,7 +356,8 @@ describe('Portal integration: golden paths', () => {
     const kopfAngebot = (t: string) => t.includes('Ihr persönliches Angebot') && !t.includes('Gleich sehen Sie');
     expect(titel.some(kopfAngebot)).toBe(false);
     expect(titel.some((t) => t.includes('Passt Ihnen das Angebot?'))).toBe(false);
-    expect(screen.getByText('am 24.09.')).toBeInTheDocument();
+    // Wunschstart aus dem gespeicherten Formular, nicht aus mamamia `arrival_at`.
+    expect(screen.getByText(/Wunschstart 15\.11\./)).toBeInTheDocument();
   }, 15_000);
 
   it('gebucht, Link aus Mail B (view=application), Annahmen kommen später: keine „aktive Bewerbung“, kein zweites „Angebot prüfen“', async () => {
