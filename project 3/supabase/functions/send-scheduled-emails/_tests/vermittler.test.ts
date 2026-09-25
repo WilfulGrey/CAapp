@@ -11,6 +11,7 @@ import {
   vermittlerAngebotHtml, vermittlerAngebotText,
   vermittlerKraefteHtml, vermittlerKraefteText,
   VERMITTLER_FUSSNOTE, ANREISE_HINWEIS, VERMITTLER_ABSENDER,
+  kraefteNochmalUm,
 } from "../vermittler.ts";
 import type { Empfehlung } from "../empfehlung.ts";
 
@@ -227,4 +228,12 @@ Deno.test("Vermittler-Absender traegt das polnische Impressum", () => {
   assertStringIncludes(VERMITTLER_ABSENDER.kurz, "Poznańska 21/48");
   // Keine Spur der deutschen Marke — sonst stuenden beide im Fuss.
   assert(!VERMITTLER_ABSENDER.name.includes("Deutschland"));
+});
+
+Deno.test("kraefteNochmalUm: dreimal neu im 10-Minuten-Takt, dann Absage; nachts erst morgens", () => {
+  const tag = new Date("2026-09-25T13:05:00Z"); // 15:05 Berlin
+  assertEquals(kraefteNochmalUm(1, tag), "2026-09-25T13:15:00.000Z");
+  assertEquals(kraefteNochmalUm(3, tag), "2026-09-25T13:15:00.000Z");
+  assertEquals(kraefteNochmalUm(4, tag), null);
+  assertEquals(kraefteNochmalUm(1, new Date("2026-09-25T18:55:00Z")), "2026-09-26T06:00:00.000Z"); // 21:05 Berlin → 8:00
 });

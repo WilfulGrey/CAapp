@@ -2,9 +2,9 @@
  * Pflegekräfte zeigen und Fokus darauf setzen, ob der Kunde sich schon alle
  * angeschaut hat". Der Unterbau ist derselbe wie bei der Empfehlung der
  * Angebotsmail (holeMatchings) — hier nur ohne getCaregiver je Zeile. */
-import { assert, assertEquals, assertStringIncludes } from "@std/assert";
+import { assert, assertEquals, assertRejects, assertStringIncludes } from "@std/assert";
 import {
-  holeFuenf, fuenfListeHtml, fuenfListeText, fotoBudget, zahlwort,
+  holeFuenf, holeFuenfStreng, fuenfListeHtml, fuenfListeText, fotoBudget, zahlwort,
   HAKEN_VERFUEGBAR, type Empfehlung,
   kundenFakten,
   kraefteWort,
@@ -181,4 +181,20 @@ Deno.test("fotoImg: Liste und Empfehlungs-Karte benutzen dieselbe Funktion", () 
   const liste = fuenfListeHtml([e()], ["cid-1"], ["https://p/1"], "https://p/alle");
   assertStringIncludes(liste, fotoImg("cid-1", "Anna K.", 56, 12));
   assertStringIncludes(fuenfListeHtml([e()], [null], ["https://p/1"], "x"), fotoErsatz("Anna", 56, 12, 22));
+});
+
+Deno.test("holeFuenfStreng: Ausfall wirft, leere Liste ist [] — ein Timeout ist kein „keine Kräfte“ (Lead Mielke)", async () => {
+  const deps = { supabaseUrl: "https://s", key: "k", token: "t", jobOfferId: 1, formularDaten: {} };
+  const onboardOk = () => Promise.resolve(Response.json({ session_token: "jwt" }));
+  await assertRejects(
+    () => holeFuenfStreng({ ...deps, fetchFn: (url) => String(url).includes("onboard") ? onboardOk() : Promise.resolve(new Response("x", { status: 502 })) }),
+    Error, "listMatchings HTTP 502",
+  );
+  await assertRejects(
+    () => holeFuenfStreng({ ...deps, fetchFn: (url) => String(url).includes("onboard") ? onboardOk() : Promise.reject(new DOMException("Signal timed out.", "TimeoutError")) }),
+    DOMException, "Signal timed out.",
+  );
+  await assertRejects(() => holeFuenfStreng({ ...deps, fetchFn: () => Promise.resolve(new Response("x", { status: 500 })) }), Error, "onboard HTTP 500");
+  assertEquals(await holeFuenfStreng({ ...deps, fetchFn: (url) => String(url).includes("onboard") ? onboardOk()
+    : Promise.resolve(Response.json({ data: { JobOfferMatchingsWithPagination: { data: [] } } })) }), []);
 });

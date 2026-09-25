@@ -447,6 +447,14 @@ Provision tragen sie), und der Satz „weitere sende ich in den nächsten
 Stunden" erscheint gar nicht erst. Mail 2 wird dann **nicht** verschickt:
 Zeile `cancelled`, Ereignis `vermittler_kraefte_entfallen`, Mail ans Team.
 
+**Antwortet mamamia nicht** (Timeout 12 s, HTTP-Fehler, Onboard-Fehler), ist
+das KEIN „keine Kräfte": die Zeile geht zurück auf `pending`, neuer Versuch in
+10 Minuten (`sendezeitIso`, Zähler `metadata.fehlschlaege`, Grund in
+`error_message`), höchstens dreimal. Erst danach Absage — mit dem echten Grund
+in Ereignis und Team-Mail; der Betreff nennt den Kunden („Vermittler: Liste
+für … nicht verschickt"). Anlass: Registry #89 — die Liste für einen Lead
+wurde nach einem Timeout gestrichen, obwohl mamamia 78 Kräfte hatte.
+
 ### Fünf Bremsen
 
 Der Lead sieht für alle Automatiken aus wie ein normaler Kunde — er hat

@@ -29,6 +29,7 @@ import {
   textAusblenden,
   zahlwort,
 } from "./empfehlung.ts";
+import { sendezeitIso } from "./quietHours.ts";
 
 const KORALLE = "#E76F63";
 const BRAUN = "#8B7355";
@@ -278,6 +279,16 @@ function kraftZeile(e: Empfehlung, cid: string | null, letzte: boolean): string 
         </td>
       </tr></table>
     </td></tr>`;
+}
+
+/** Liste nicht geladen (Timeout, HTTP-Fehler)? Neuer Versuch in zehn Minuten,
+ *  höchstens dreimal — danach entscheidet ein Mensch (`null` = absagen).
+ *  Ein Timeout ist kein „keine Kräfte" (Lead Mielke, 25.09.2026). */
+export const KRAEFTE_WIEDERHOLUNGEN = 3;
+export function kraefteNochmalUm(fehlschlaege: number, jetzt: Date): string | null {
+  return fehlschlaege <= KRAEFTE_WIEDERHOLUNGEN
+    ? sendezeitIso(new Date(jetzt.getTime() + 10 * 60_000))
+    : null;
 }
 
 export interface KraefteDaten {

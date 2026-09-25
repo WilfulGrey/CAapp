@@ -616,12 +616,11 @@ export interface HoleDeps {
 
 const TIMEOUT_MS = 12_000;
 
-/**
- * Holt die Empfehlung. Gibt `null` zurück, wenn irgendetwas nicht klappt —
- * der Aufrufer fällt dann auf den bisherigen Mailtext zurück.
- */
 /** Session + Matches + Trichter — der gemeinsame Unterbau von holeEmpfehlung
- *  (eine Kraft, Angebotsmail) und holeFuenf (alle fünf, Nudge-Mail). */
+ *  (eine Kraft, Angebotsmail) und holeFuenf (alle fünf, Nudge-Mail).
+ *  `null` = gar nicht erst versucht (kein Token / kein Job), Exception =
+ *  mamamia hat nicht (rechtzeitig) geantwortet, `fuenf: []` = mamamia hat
+ *  geantwortet und niemand passt. */
 async function holeMatchings(deps: HoleDeps): Promise<{
   proxy: (action: string, variables: Record<string, unknown>) => Promise<unknown>;
   fuenf: Matching[];
@@ -650,16 +649,10 @@ async function holeMatchings(deps: HoleDeps): Promise<{
     body: JSON.stringify({ token: deps.token }),
     signal: AbortSignal.timeout(TIMEOUT_MS),
   });
-  if (!onboardRes.ok) {
-    console.warn(`[empfehlung] onboard HTTP ${onboardRes.status}`);
-    return null;
-  }
+  if (!onboardRes.ok) throw new Error(`onboard HTTP ${onboardRes.status}`);
   const onboard = await onboardRes.json() as { session_token?: string; job_offer_id?: number };
   const sessionToken = onboard?.session_token;
-  if (!sessionToken) {
-    console.warn("[empfehlung] onboard ohne session_token");
-    return null;
-  }
+  if (!sessionToken) throw new Error("onboard ohne session_token");
 
   const proxy = async (action: string, variables: Record<string, unknown>) => {
     const res = await f(`${deps.supabaseUrl}/functions/v1/mamamia-proxy`, {
@@ -682,10 +675,7 @@ async function holeMatchings(deps: HoleDeps): Promise<{
     mRes?.data?.JobOfferMatchingsWithPagination?.data ??
     mRes?.JobOfferMatchingsWithPagination?.data ??
     [];
-  if (!Array.isArray(roh) || roh.length === 0) return null;
-
-  const fuenf = waehleFuenf(roh, deps.formularDaten.deutschkenntnisse, now);
-  if (fuenf.length === 0) return null;
+  const fuenf = Array.isArray(roh) ? waehleFuenf(roh, deps.formularDaten.deutschkenntnisse, now) : [];
   return { proxy, fuenf };
 }
 
@@ -698,7 +688,7 @@ export async function holeEmpfehlung(deps: HoleDeps): Promise<EmpfehlungErgebnis
   const now = deps.now ?? new Date();
   try {
     const basis = await holeMatchings(deps);
-    if (!basis) return null;
+    if (!basis || basis.fuenf.length === 0) return null;
     const { proxy, fuenf } = basis;
 
     // ③ Zusatzfelder nur für die EINE empfohlene Kraft (Raucherin,
@@ -736,19 +726,27 @@ export interface FuenfErgebnis {
  * sieht, wären reine Kosten (jeder mamamia-Aufruf 700–2500 ms).
  */
 export async function holeFuenf(deps: HoleDeps): Promise<FuenfErgebnis | null> {
-  const now = deps.now ?? new Date();
   try {
-    const basis = await holeMatchings(deps);
-    if (!basis) return null;
-    const { fuenf } = basis;
-    return {
-      fuenf: fuenf.map((m) => baueEmpfehlung(m, null, deps.formularDaten, fuenf.length, now).empfehlung),
-      sichtbarGesamt: fuenf.length,
-    };
+    const fuenf = await holeFuenfStreng(deps);
+    return fuenf.length ? { fuenf, sichtbarGesamt: fuenf.length } : null;
   } catch (e) {
     console.warn("[fuenf] nicht verfügbar:", e instanceof Error ? e.message : String(e));
     return null;
   }
+}
+
+/**
+ * Wie holeFuenf, aber ohne das Schlucken: wirft, wenn mamamia nicht
+ * (rechtzeitig) antwortet, `[]` heißt „mamamia hat niemanden Passenden".
+ * Für die Vermittler-Liste, wo aus `null` eine Absage wurde — Lead Mielke,
+ * 25.09.2026: 78 Kräfte da, Anfrage nach 12 s abgebrochen, Liste gestrichen.
+ */
+export async function holeFuenfStreng(deps: HoleDeps): Promise<Empfehlung[]> {
+  const now = deps.now ?? new Date();
+  const basis = await holeMatchings(deps);
+  if (!basis) throw new Error("kein Token oder kein Job");
+  const { fuenf } = basis;
+  return fuenf.map((m) => baueEmpfehlung(m, null, deps.formularDaten, fuenf.length, now).empfehlung);
 }
 
 /** „fünf" für Betreff und Einleitung — Ziffern wirken in einer Anrede kalt. */
