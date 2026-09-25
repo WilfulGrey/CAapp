@@ -1,5 +1,8 @@
 import type { FC } from 'react';
-import { ChevronDown, Clock, Mail } from 'lucide-react';
+import { Check, ChevronDown, Clock, Mail } from 'lucide-react';
+import { HERO_PUNKTE } from '../../lib/heroPunkte';
+import type { SterneStand } from '../../lib/sterne';
+import { BewertungsZeile } from './BewertungsZeile';
 import { Button } from '../ui/Button';
 import { nochReserviertText } from '../../lib/reservierung';
 import type { Nurse } from '../../types';
@@ -17,7 +20,10 @@ export const AppCard: FC<{
   onChat?: (n: Nurse) => void;
   /** Ende der 72-h-Reservierung (src/lib/reservierung.ts). null = unbekannt → kein Hinweis. */
   reserviertBis?: Date | null;
-}> = ({ app, exiting, onReview, onDecline, onNurseClick, onChat, reserviertBis }) => {
+  /** Vorteile der Kostenrechner-Startseite + Sterne UNTER „Angebot prüfen" (Martin 25.09.:
+   *  „erst die Bewerbung, dann Angebot prüfen und darunter die Punkte"). Nur an einer Karte. */
+  vorteile?: { onBestpreis: () => void; sterne: SterneStand | null };
+}> = ({ app, exiting, onReview, onDecline, onNurseClick, onChat, reserviertBis, vorteile }) => {
   const { nurse } = app;
   const inits = initials(nurse.name);
   const name = displayName(nurse.name);
@@ -35,7 +41,8 @@ export const AppCard: FC<{
             <Mail className="w-3.5 h-3.5 text-pm-green" />
           </div>
           <p className="text-[15px] font-bold leading-snug text-pm-green-deep">
-            Neue Bewerbung{app.isInvited ? ' Ihrer eingeladenen Pflegekraft' : ''}
+            {/* Immer nur „Neue Bewerbung" (Martin 25.09.: nicht „Ihrer eingeladenen Pflegekraft"). */}
+            Neue Bewerbung
           </p>
         </div>
         {/* 72-h-Frist offen als Reservierung (Martin 25.09.). Nur mit echtem
@@ -123,18 +130,42 @@ export const AppCard: FC<{
             Frage an {vorname} stellen
           </button>
         )}
+        {/* Hauptknopf über die volle Breite, darunter die Vorteile wie auf der
+            Kostenrechner-Startseite (Martin 25.09.). */}
+        <Button breit onClick={onReview} className={`px-3 whitespace-nowrap ${onChat ? 'mt-3' : ''}`}>
+          Angebot prüfen
+        </Button>
+        {vorteile && (
+          <>
+            <ul className="mt-4 flex flex-col gap-2.5">
+              {HERO_PUNKTE.map((punkt) => (
+                <li key={punkt} className="flex items-center gap-1.5 text-[14px] min-[375px]:text-[14.5px] min-[390px]:gap-2 min-[390px]:text-[15px] leading-snug text-pm-ink">
+                  <Check className="h-[17px] w-[17px] flex-shrink-0 text-pm-coral" strokeWidth={2.5} aria-hidden="true" />
+                  {punkt}
+                </li>
+              ))}
+              <li className="flex items-center gap-1.5 text-[14px] min-[375px]:text-[14.5px] min-[390px]:gap-2 min-[390px]:text-[15px] leading-snug text-pm-ink">
+                <Check className="h-[17px] w-[17px] flex-shrink-0 text-pm-coral" strokeWidth={2.5} aria-hidden="true" />
+                <span>
+                  Bestpreisgarantie{' '}
+                  <button type="button" onClick={vorteile.onBestpreis} className="inline-flex min-h-[44px] -my-3 items-center font-semibold text-pm-green-deep underline underline-offset-[3px]">
+                    Mehr Infos
+                  </button>
+                </span>
+              </li>
+            </ul>
+            <BewertungsZeile stand={vorteile.sterne} className="mt-2" />
+          </>
+        )}
       </div>
 
-      <div className="flex items-center justify-between px-5 pb-5 pt-1">
+      <div className="px-5 pb-4 text-center">
         <button
           onClick={() => onDecline(app.id)}
-          className="min-h-[44px] -ml-2 px-2 text-[15px] text-pm-muted hover:text-pm-ink font-semibold transition-colors"
+          className="min-h-[44px] px-3 text-[15px] text-pm-muted hover:text-pm-ink font-semibold underline underline-offset-4 decoration-pm-line transition-colors"
         >
           Ablehnen
         </button>
-        <Button groesse="sm" onClick={onReview} className="px-6">
-          Angebot prüfen →
-        </Button>
       </div>
 
       </div>

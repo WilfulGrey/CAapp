@@ -53,8 +53,6 @@ import { AppCardDone } from '../components/portal/AppCardDone';
 import { BeratungCTA } from '../components/portal/BeratungCTA';
 import { AngebotFrage } from '../components/portal/AngebotFrage';
 import { SucheStand } from '../components/portal/SucheStand';
-import { BewertungsZeile } from '../components/portal/BewertungsZeile';
-import { HERO_PUNKTE } from '../lib/heroPunkte';
 import { reserviertBis as berechneReservierung, RESERVIERUNG_STUNDEN, nochReserviertText } from '../lib/reservierung';
 import type { FetchedLeadEvent } from '../lib/leadEvents';
 import { MatchCard } from '../components/portal/MatchCard';
@@ -2947,49 +2945,18 @@ const CustomerPortalPage: FC = () => {
                   (Martin 25.09.: „überzeugender … wie beim Kostenrechner auf der
                   Startseite oben im Hero") — Satz mit zwei Ankern, Countdown,
                   Knopf, die vier Vorteile der Website und die Sterne. */}
+              {/* Offene Bewerbung (Martin 25.09.): Kopf nur Titel + Zeit, direkt
+                  danach die Bewerbung; „Angebot prüfen" und die Vorteile stehen
+                  IN der Karte, nicht davor. */}
               {hasPending && (() => {
-                const vorname = displayName(pendingApps[0].nurse.name).split(' ')[0];
                 return (
                   <>
-                    <p className="mt-3 text-[16px] leading-[1.55] text-pm-muted">
-                      Sehen Sie sich{' '}
-                      <span className="font-semibold text-pm-ink">{n > 1 ? 'die Profile' : `${vorname}s Profil`}</span> und{' '}
-                      <span className="font-semibold text-pm-ink">{n > 1 ? 'die Angebote' : 'das Angebot'}</span> an. Ein Vertrag entsteht erst mit Ihrer Zusage.
-                    </p>
                     {heroCopy.frist && (
                       <p className="mt-3 inline-flex items-center gap-2 rounded-full px-3.5 py-2 text-[14.5px] font-bold bg-pm-amber-tint text-pm-amber-ink">
                         <Clock className="w-4 h-4 flex-shrink-0" aria-hidden="true" />
                         {nochReserviertText(heroCopy.frist)}
                       </p>
                     )}
-                    <button
-                      type="button"
-                      onClick={() => {
-                        if (n === 1) setSelectedApp(pendingApps[0]);
-                        else document.getElementById('bewerbungen')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                      }}
-                      className="mt-5 w-full min-h-[52px] rounded-full bg-pm-coral px-3 text-[17px] font-bold text-white whitespace-nowrap hover:bg-pm-coral-deep transition-colors"
-                    >
-                      {n > 1 ? 'Bewerbungen ansehen' : 'Angebot prüfen'}
-                    </button>
-                    <ul className="mt-5 flex flex-col gap-3">
-                      {HERO_PUNKTE.map((punkt) => (
-                        <li key={punkt} className="flex items-center gap-2 text-[15.5px] min-[390px]:gap-2.5 min-[390px]:text-[16px] leading-snug text-pm-ink">
-                          <Check className="h-[18px] w-[18px] flex-shrink-0 text-pm-coral" strokeWidth={2.5} aria-hidden="true" />
-                          {punkt}
-                        </li>
-                      ))}
-                      <li className="flex items-center gap-2 text-[15.5px] min-[390px]:gap-2.5 min-[390px]:text-[16px] leading-snug text-pm-ink">
-                        <Check className="h-[18px] w-[18px] flex-shrink-0 text-pm-coral" strokeWidth={2.5} aria-hidden="true" />
-                        <span>
-                          Bestpreisgarantie{' '}
-                          <button type="button" onClick={() => setBestpreisOffen(true)} className="inline-flex min-h-[44px] -my-3 items-center font-semibold text-pm-green-deep underline underline-offset-[3px]">
-                            Mehr Infos
-                          </button>
-                        </span>
-                      </li>
-                    </ul>
-                    <BewertungsZeile stand={sterne} className="mt-3" />
                   </>
                 );
               })()}
@@ -3063,11 +3030,9 @@ const CustomerPortalPage: FC = () => {
              Interesse, dann die Matching-Liste. Vorher stand die
              Interesse-Karte VOR der Bewerbung — der Hero sagte „Sie haben
              eine neue Bewerbung" und das Erste im Bild war etwas anderes. */}
-        {hasPending && (
-          <div className="px-1 pt-2">
-            <h2 className={H2}>Ihre Bewerbungen</h2>
-          </div>
-        )}
+        {/* Keine zweite Überschrift „Ihre Bewerbungen" mehr (Martin 25.09.):
+            Der Kopf sagt „Sie haben eine aktive Bewerbung", danach kommt direkt
+            die Karte. */}
 
 
         {/* ── SECTION: Pending Applications ──
@@ -3075,9 +3040,6 @@ const CustomerPortalPage: FC = () => {
              vom Kunden — die kommen ZUERST, vor allem anderen. */}
         {hasPending && (
           <div id="bewerbungen" className="space-y-3 scroll-mt-4">
-            <p className="text-[16px] leading-relaxed px-1 text-pm-ink">
-              Sagen Sie zu, sagen Sie ab oder stellen Sie eine Frage. Jede Antwort hilft der Pflegekraft, ihren Einsatz zu planen.
-            </p>
             {pendingApps.map((app) => (
               <AppCard
                 key={app.id}
@@ -3088,6 +3050,7 @@ const CustomerPortalPage: FC = () => {
                 onNurseClick={(n) => openNurseFromApp(n, app)}
                 onChat={CHAT_ENABLED ? (n) => setChatNurse(n) : undefined}
                 reserviertBis={pendingApps.length > 1 ? reservierungFuer(app) : null}
+                vorteile={app.id === pendingApps[0].id ? { onBestpreis: () => setBestpreisOffen(true), sterne } : undefined}
               />
             ))}
             {/* Beratungs-CTA direkt unter den Bewerbungen — Bewerbungen sind

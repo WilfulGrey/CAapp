@@ -78,7 +78,7 @@ describe('Portal integration: golden paths', () => {
     render(<CustomerPortalPage />);
 
     // Wait for the pending-applications card to render with "Angebot prüfen"
-    const reviewBtn = await screen.findByRole('button', { name: /^Angebot prüfen →$/ }, { timeout: 5000 });
+    const reviewBtn = await screen.findByRole('button', { name: /^Angebot prüfen$/ }, { timeout: 5000 });
 
     // Rekruter-Hinweis (application.message) VERBATIM — schon auf der Karte
     // (Registry #22: kein LLM, kein Filter; Fixture-Text 1:1 durch den vollen
@@ -158,7 +158,7 @@ describe('Portal integration: golden paths', () => {
     render(<CustomerPortalPage />);
 
     // Wait for "Angebot prüfen" to confirm initial AppCards rendered
-    await screen.findByRole('button', { name: /^Angebot prüfen →$/ }, { timeout: 5000 });
+    await screen.findByRole('button', { name: /^Angebot prüfen$/ }, { timeout: 5000 });
 
     // Click "Ablehnen" on the application card
     const declineBtns = screen.getAllByRole('button', { name: /^Ablehnen$/ });
