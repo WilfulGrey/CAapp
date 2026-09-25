@@ -1,7 +1,7 @@
 import type { FC } from 'react';
-import { Check, ChevronDown, Clock, Mail, ShieldCheck } from 'lucide-react';
+import { ChevronDown, Clock, Mail } from 'lucide-react';
 import { Button } from '../ui/Button';
-import { reserviertBisText, RESERVIERUNG_STUNDEN } from '../../lib/reservierung';
+import { nochReserviertText } from '../../lib/reservierung';
 import type { Nurse } from '../../types';
 import type { Application } from './shared';
 import { nurseLevel, nurseFacts, displayName, initials } from './shared';
@@ -17,9 +17,7 @@ export const AppCard: FC<{
   onChat?: (n: Nurse) => void;
   /** Ende der 72-h-Reservierung (src/lib/reservierung.ts). null = unbekannt → kein Hinweis. */
   reserviertBis?: Date | null;
-  /** Öffnet das Bestpreisgarantie-Pop-up (Hemmnisnehmer an der Entscheidung, Martin 25.09.). */
-  onBestpreis?: () => void;
-}> = ({ app, exiting, onReview, onDecline, onNurseClick, onChat, reserviertBis, onBestpreis }) => {
+}> = ({ app, exiting, onReview, onDecline, onNurseClick, onChat, reserviertBis }) => {
   const { nurse } = app;
   const inits = initials(nurse.name);
   const name = displayName(nurse.name);
@@ -45,8 +43,8 @@ export const AppCard: FC<{
         {reserviertBis && (
           <p className="mx-5 mt-2 inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[13px] font-bold bg-pm-amber-tint text-pm-amber-ink">
             <Clock className="w-3.5 h-3.5 flex-none" aria-hidden="true" />
-            {/* Countdown steht groß im Kopf; hier nur das Datum, damit die Zeile bei 360 px einzeilig bleibt. */}
-            Reserviert bis {reserviertBisText(reserviertBis)}
+            {/* Nur bei mehreren Bewerbungen (jede hat ihre Zeit); bei einer steht der Countdown im Kopf. */}
+            {nochReserviertText(reserviertBis)}
           </p>
         )}
         <div className="px-5 pt-3 pb-5 cursor-pointer active:bg-pm-paper" onClick={() => onNurseClick(nurse)}>
@@ -100,26 +98,6 @@ export const AppCard: FC<{
             </div>
           </div>
         </div>
-        {/* Hemmnisnehmer direkt an der Entscheidung (Martin 25.09.: Bestpreisgarantie,
-            täglich kündbar). Gleiche Zusagen wie die Kostenkarte. */}
-        <ul className="mb-3 space-y-1">
-          <li>
-            {onBestpreis ? (
-              <button type="button" onClick={onBestpreis} className="min-h-[44px] -my-1.5 inline-flex items-center gap-2 text-[14.5px] font-bold text-pm-green-deep underline decoration-pm-green/40 underline-offset-4">
-                <ShieldCheck className="w-4 h-4 flex-none text-pm-green" aria-hidden="true" />Bestpreisgarantie
-              </button>
-            ) : (
-              <span className="inline-flex items-center gap-2 text-[14.5px] font-bold text-pm-green-deep">
-                <ShieldCheck className="w-4 h-4 flex-none text-pm-green" aria-hidden="true" />Bestpreisgarantie
-              </span>
-            )}
-          </li>
-          {['Täglich kündbar', 'Kosten erst ab Anreise'].map((t) => (
-            <li key={t} className="flex items-center gap-2 text-[14.5px] text-pm-ink">
-              <Check className="w-4 h-4 flex-none text-pm-taupe" strokeWidth={3} aria-hidden="true" />{t}
-            </li>
-          ))}
-        </ul>
         {/*
           „Hinweis der Agentur" = application.message VERBATIM (Entscheidung
           Michał 2026-07-22, Registry #22): Rekruter schreiben dort kunden-
@@ -158,12 +136,7 @@ export const AppCard: FC<{
           Angebot prüfen →
         </Button>
       </div>
-      {/* Warum es eine Frist gibt — positiv gesagt (Martin 25.09.: „Tick zu negativ"). */}
-      {reserviertBis && (
-        <p className="border-t border-pm-line-soft px-5 py-3.5 text-[13.5px] leading-[1.5] text-pm-muted">
-          {vorname} hält den Termin {RESERVIERUNG_STUNDEN} Stunden für Sie frei. Danach ist {vorname} wieder für andere Familien da.
-        </p>
-      )}
+
       </div>
     </div>
   );

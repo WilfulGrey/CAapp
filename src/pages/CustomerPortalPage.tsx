@@ -53,7 +53,9 @@ import { AppCardDone } from '../components/portal/AppCardDone';
 import { BeratungCTA } from '../components/portal/BeratungCTA';
 import { AngebotFrage } from '../components/portal/AngebotFrage';
 import { SucheStand } from '../components/portal/SucheStand';
-import { reserviertBis as berechneReservierung, RESERVIERUNG_STUNDEN, reserviertBisText, nochReserviertText } from '../lib/reservierung';
+import { BewertungsZeile } from '../components/portal/BewertungsZeile';
+import { HERO_PUNKTE } from '../lib/heroPunkte';
+import { reserviertBis as berechneReservierung, RESERVIERUNG_STUNDEN, nochReserviertText } from '../lib/reservierung';
 import type { FetchedLeadEvent } from '../lib/leadEvents';
 import { MatchCard } from '../components/portal/MatchCard';
 import { MatchCardDone } from '../components/portal/MatchCardDone';
@@ -2856,10 +2858,9 @@ const CustomerPortalPage: FC = () => {
               title: n > 1
                 ? `Sie haben ${n} aktive Bewerbungen`
                 : 'Sie haben eine aktive Bewerbung',
-              // Positiv gesagt (Martin 25.09.: „Tick zu negativ"), die Zeit bleibt.
-              subtitle: frist
-                ? `${n > 1 ? 'Die Pflegekräfte halten' : `${displayName(pendingApps[0].nurse.name).split(' ')[0]} hält`} sich bis ${reserviertBisText(frist)} für Sie frei. Sagen Sie zu, ab oder stellen Sie eine Frage.`
-                : 'Sagen Sie zu, ab oder stellen Sie eine Frage.',
+              // Menschlich, ohne Datum (Martin 25.09.: „hält sich frei … zu viele
+              // Daten, zu unmenschlich"); die Zeit steht nur im Countdown.
+              subtitle: '',
               pill: frist ? nochReserviertText(frist) : '',
               frist,
               steps: null as 'initial' | 'saved' | null,
@@ -2942,6 +2943,56 @@ const CustomerPortalPage: FC = () => {
               <h1 className="mt-1 text-[31px] font-extrabold leading-[1.08] tracking-[-0.035em] text-pm-ink">
                 {heroCopy.title}
               </h1>
+              {/* Offene Bewerbung: Aufbau wie der Kopf der Kostenrechner-Startseite
+                  (Martin 25.09.: „überzeugender … wie beim Kostenrechner auf der
+                  Startseite oben im Hero") — Satz mit zwei Ankern, Countdown,
+                  Knopf, die vier Vorteile der Website und die Sterne. */}
+              {hasPending && (() => {
+                const vorname = displayName(pendingApps[0].nurse.name).split(' ')[0];
+                return (
+                  <>
+                    <p className="mt-3 text-[16px] leading-[1.55] text-pm-muted">
+                      Sehen Sie sich{' '}
+                      <span className="font-semibold text-pm-ink">{n > 1 ? 'die Profile' : `${vorname}s Profil`}</span> und{' '}
+                      <span className="font-semibold text-pm-ink">{n > 1 ? 'die Angebote' : 'das Angebot'}</span> an. Ein Vertrag entsteht erst mit Ihrer Zusage.
+                    </p>
+                    {heroCopy.frist && (
+                      <p className="mt-3 inline-flex items-center gap-2 rounded-full px-3.5 py-2 text-[14.5px] font-bold bg-pm-amber-tint text-pm-amber-ink">
+                        <Clock className="w-4 h-4 flex-shrink-0" aria-hidden="true" />
+                        {nochReserviertText(heroCopy.frist)}
+                      </p>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (n === 1) setSelectedApp(pendingApps[0]);
+                        else document.getElementById('bewerbungen')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                      }}
+                      className="mt-5 w-full min-h-[52px] rounded-full bg-pm-coral px-3 text-[17px] font-bold text-white whitespace-nowrap hover:bg-pm-coral-deep transition-colors"
+                    >
+                      {n > 1 ? 'Bewerbungen ansehen' : 'Angebot prüfen'}
+                    </button>
+                    <ul className="mt-5 flex flex-col gap-3">
+                      {HERO_PUNKTE.map((punkt) => (
+                        <li key={punkt} className="flex items-center gap-2 text-[15.5px] min-[390px]:gap-2.5 min-[390px]:text-[16px] leading-snug text-pm-ink">
+                          <Check className="h-[18px] w-[18px] flex-shrink-0 text-pm-coral" strokeWidth={2.5} aria-hidden="true" />
+                          {punkt}
+                        </li>
+                      ))}
+                      <li className="flex items-center gap-2 text-[15.5px] min-[390px]:gap-2.5 min-[390px]:text-[16px] leading-snug text-pm-ink">
+                        <Check className="h-[18px] w-[18px] flex-shrink-0 text-pm-coral" strokeWidth={2.5} aria-hidden="true" />
+                        <span>
+                          Bestpreisgarantie{' '}
+                          <button type="button" onClick={() => setBestpreisOffen(true)} className="inline-flex min-h-[44px] -my-3 items-center font-semibold text-pm-green-deep underline underline-offset-[3px]">
+                            Mehr Infos
+                          </button>
+                        </span>
+                      </li>
+                    </ul>
+                    <BewertungsZeile stand={sterne} className="mt-3" />
+                  </>
+                );
+              })()}
               {/* Im Ausgangszustand steht hier NICHTS mehr außer der
                   Bestätigung — kein Erklärabsatz, keine Checkliste, kein
                   Button. Alle drei waren Kopien dessen, was die Abschnitte
@@ -2951,13 +3002,7 @@ const CustomerPortalPage: FC = () => {
                   {heroCopy.subtitle}
                 </p>
               )}
-              {heroCopy.pill && heroCopy.frist && (
-                // Countdown der Reservierung (unter 24 h „Nur noch …", ohne Rot).
-                <p className="mt-3 inline-flex items-center gap-2 rounded-full px-3.5 py-2 text-[14.5px] font-bold bg-pm-amber-tint text-pm-amber-ink">
-                  <Clock className="w-4 h-4 flex-shrink-0" aria-hidden="true" />
-                  {heroCopy.pill}
-                </p>
-              )}
+
             </div>
           </div>
         );
@@ -3042,8 +3087,7 @@ const CustomerPortalPage: FC = () => {
                 onDecline={() => setDeclineConfirmApp(app)}
                 onNurseClick={(n) => openNurseFromApp(n, app)}
                 onChat={CHAT_ENABLED ? (n) => setChatNurse(n) : undefined}
-                reserviertBis={reservierungFuer(app)}
-                onBestpreis={() => setBestpreisOffen(true)}
+                reserviertBis={pendingApps.length > 1 ? reservierungFuer(app) : null}
               />
             ))}
             {/* Beratungs-CTA direkt unter den Bewerbungen — Bewerbungen sind
