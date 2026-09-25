@@ -3493,6 +3493,13 @@ const CustomerPortalPage: FC = () => {
           lead={lead}
           mmCustomer={mmCustomer}
           onPatientSaved={(saved) => {
+            // Angaben ändern nach dem Absenden (Martin 25.09.: „sobald man
+            // irgendwas anklickt, lädt die ganze Seite neu"): Jede Eingabe
+            // meldete „nicht gespeichert", der Server-Abgleich unten
+            // (mmCustomer.status ≠ draft) setzte sofort zurück — die Seite
+            // kippte bei jedem Tipp in den Ausgangszustand und wieder zurück.
+            // Führt mamamia den Kunden als aktiv, bleibt die Seite „gespeichert".
+            if (!saved && mmCustomer?.status && mmCustomer.status !== 'draft') return;
             if (saved && !patientSaved) {
               // Hauptweg zuerst (Martin 24.09.): Bewerbungen, Einladen ist die Zugabe.
               showToast('✓ Vielen Dank! Ihre Pflegesituation ist gespeichert. Passende Pflegekräfte können sich jetzt bei Ihnen bewerben.', 7000);
