@@ -196,3 +196,16 @@ describe('AngebotCard – letzter Schritt', () => {
     schritt(3);
   });
 });
+
+describe('AngebotCard – Angaben ändern nach dem Absenden', () => {
+  it('schon abgeschickt: „Änderungen speichern“ statt „Bewerbungen anfragen“, kein 72-h-Satz', async () => {
+    localStorage.setItem(`patient_${TOKEN}`, JSON.stringify({ ...VOLL, _isDraft: false }));
+    const onAbgesendet = vi.fn();
+    render(<AngebotCard lead={lead} onAbgesendet={onAbgesendet} />);
+    for (let i = 0; i < 3; i++) await weiter();
+    expect(screen.queryByRole('button', { name: 'Bewerbungen anfragen' })).toBeNull();
+    expect(screen.queryByText(/Mit dem Absenden fragen Sie Bewerbungen an/)).toBeNull();
+    await userEvent.click(screen.getByRole('button', { name: 'Änderungen speichern' }));
+    expect(onAbgesendet).toHaveBeenCalledWith(true);
+  });
+});

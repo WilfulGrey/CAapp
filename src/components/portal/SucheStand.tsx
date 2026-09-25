@@ -14,7 +14,7 @@ export function kurzDatum(iso: string | null | undefined): string | null {
   return new Intl.DateTimeFormat('de-DE', { timeZone: 'Europe/Berlin', day: '2-digit', month: '2-digit' }).format(d);
 }
 
-export function SucheStand({ angefragtAm, passende, wunschstart, onAngaben }: {
+export function SucheStand({ angefragtAm, passende, wunschstart, onAngaben, bisherigeBewerbungen = 0 }: {
   /** `leads.patient_form_at` */
   angefragtAm: string | null | undefined;
   /** Sichtbare passende Pflegekräfte; null = noch unbekannt. */
@@ -22,6 +22,8 @@ export function SucheStand({ angefragtAm, passende, wunschstart, onAngaben }: {
   /** Anreise laut Job (`arrival_at`) */
   wunschstart: string | null | undefined;
   onAngaben: () => void;
+  /** Schon erhaltene (entschiedene) Bewerbungen — dann ist „Bewerbung erhalten" kein reines Zukunftsversprechen. */
+  bisherigeBewerbungen?: number;
 }) {
   const am = kurzDatum(angefragtAm);
   const start = kurzDatum(wunschstart);
@@ -33,7 +35,12 @@ export function SucheStand({ angefragtAm, passende, wunschstart, onAngaben }: {
         : passende === 0 ? 'Wir suchen passende Pflegekräfte'
         : `${passende} passende ${passende === 1 ? 'Pflegekraft' : 'Pflegekräfte'} gefunden`,
     },
-    { titel: 'Bewerbung erhalten', text: 'meist in den nächsten Tagen, per E-Mail' },
+    {
+      titel: 'Bewerbung erhalten',
+      text: bisherigeBewerbungen > 0
+        ? `bisher ${bisherigeBewerbungen} ${bisherigeBewerbungen === 1 ? 'Bewerbung' : 'Bewerbungen'}, weitere kommen per E-Mail`
+        : 'meist in den nächsten Tagen, per E-Mail',
+    },
     { titel: 'Sie entscheiden', text: `Jede Bewerbung ist ${RESERVIERUNG_STUNDEN} Stunden für Sie reserviert` },
     { titel: 'Anreise', text: `ab 3 Tagen nach Ihrer Zusage${start ? ` · Wunschstart ${start}` : ''}` },
   ];

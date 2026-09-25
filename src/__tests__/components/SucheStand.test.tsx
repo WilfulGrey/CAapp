@@ -23,6 +23,11 @@ describe('SucheStand', () => {
     expect(screen.getByText('ab 3 Tagen nach Ihrer Zusage')).toBeInTheDocument();
   });
 
+  it('nach entschiedenen Bewerbungen kein reines Zukunftsversprechen', () => {
+    render(<SucheStand angefragtAm={null} passende={2} wunschstart={null} onAngaben={() => {}} bisherigeBewerbungen={1} />);
+    expect(screen.getByText('bisher 1 Bewerbung, weitere kommen per E-Mail')).toBeInTheDocument();
+  });
+
   it('Einzahl bei einer Pflegekraft', () => {
     render(<SucheStand angefragtAm={null} passende={1} wunschstart={null} onAngaben={() => {}} />);
     expect(screen.getByText('1 passende Pflegekraft gefunden')).toBeInTheDocument();

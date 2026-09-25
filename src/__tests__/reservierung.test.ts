@@ -77,3 +77,20 @@ describe('Countdown', () => {
     expect(stundenBis(new Date(jetzt - 5000), jetzt)).toBe(0);
   });
 });
+
+describe('reserviertBis — Jobs wie im Server', () => {
+  it('Ereignisse ohne Job gehören zum Standard-Job des Leads, nicht zu jedem Job', () => {
+    const alt = ev('application_received', '2026-09-20T08:00:00Z', { caregiver_id: 7 });
+    const neu = ev('application_received', '2026-09-24T09:10:00Z', { caregiver_id: 7, mamamia_job_offer_id: 222 });
+    // Bewerbung auf Job 222, Standard-Job 111: das alte jobfreie Ereignis zählt nicht.
+    expect(reserviertBis([alt, neu], { caregiverId: 7, jobOfferId: 222, standardJobId: 111 }, JETZT)?.toISOString())
+      .toBe('2026-09-27T09:00:00.000Z');
+    // Bewerbung auf dem Standard-Job: das jobfreie Ereignis ist der Anker (hier schon abgelaufen).
+    expect(reserviertBis([alt], { caregiverId: 7, jobOfferId: 111, standardJobId: 111 }, JETZT)).toBeNull();
+  });
+
+  it('ohne bekannten Job der Bewerbung keine Frist', () => {
+    expect(reserviertBis([ev('application_received', '2026-09-24T14:37:00Z', { caregiver_id: 7, mamamia_job_offer_id: 1 })],
+      { caregiverId: 7, jobOfferId: null }, JETZT)).toBeNull();
+  });
+});

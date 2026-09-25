@@ -1223,14 +1223,25 @@ const CustomerPortalPage: FC = () => {
     fetchLeadEvents(lead.token, ['application_received', 'application_accepted_internal', 'application_rejected'])
       .then((ev) => { if (aktiv) setBewerbungsEvents(ev); });
     return () => { aktiv = false; };
-  }, [lead?.token, hasPending, pendingApps.length]);
+  }, [lead?.token, hasPending, pendingApps.map((a) => a.id).join(',')]);
+  // Countdown „Noch N Stunden" zählt ohne Neuladen weiter.
+  const [, setUhr] = useState(0);
+  useEffect(() => {
+    if (!hasPending) return;
+    const t = setInterval(() => setUhr((x) => x + 1), 60_000);
+    return () => clearInterval(t);
+  }, [hasPending]);
   const reservierungFuer = (app: Application): Date | null => {
     if (IS_PREVIEW_ANY) {
       // Vorschau: so, als wäre die Bewerbung vor 20 Stunden gekommen.
       const std = 60 * 60 * 1000;
       return new Date(Math.floor((Date.now() + (RESERVIERUNG_STUNDEN - 20) * std) / std) * std);
     }
-    return berechneReservierung(bewerbungsEvents, { caregiverId: app.nurse.caregiverId, jobOfferId: mmJobOffer?.id });
+    return berechneReservierung(bewerbungsEvents, {
+      caregiverId: app.nurse.caregiverId,
+      jobOfferId: mmJobOffer?.id,
+      standardJobId: lead?.mamamia_job_offer_id ?? null,
+    });
   };
 
   // Mail B verlinkt `&view=application`: bei genau einer offenen Bewerbung
@@ -2441,7 +2452,9 @@ const CustomerPortalPage: FC = () => {
               className="w-full min-h-[44px] flex items-center justify-between gap-3 text-left"
             >
               <span className={EYEBROW}>{hasPending ? 'Ihr Angebot' : 'Ihre Betreuungskosten'}</span>
-              {!offerExpanded && (
+              {/* Preis nur ohne offene Bewerbung: Die Bewerbung nennt ihren eigenen
+                  Tagessatz, zwei Preise nebeneinander widersprächen sich (Review 25.09.). */}
+              {!offerExpanded && !hasPending && (
                 <span className="ml-auto text-[15px] font-bold tabular-nums text-pm-ink">
                   {formatEuro(brutto)}<span className="font-normal text-pm-muted"> / Monat</span>
                 </span>
@@ -2503,7 +2516,7 @@ const CustomerPortalPage: FC = () => {
                         Zuhause statt Pflegeheim: rund <b className="text-pm-green-deep">{formatEuro(heimErsparnis)} weniger</b> im Monat.
                       </p>
                       <p className="mt-1 text-[13px] leading-snug text-pm-muted">
-                        Heim-Eigenanteil im 1. Jahr {formatEuro(HEIM_EIGENANTEIL)}, bei Ihnen nach Zuschüssen etwa {formatEuro(eigenanteil)}. Quelle: {HEIM_QUELLE}.
+                        Heim-Eigenanteil im 1. Jahr {formatEuro(HEIM_EIGENANTEIL)}, zuhause mit Primundus nach Zuschüssen etwa {formatEuro(eigenanteil)}. Quelle: {HEIM_QUELLE}.
                       </p>
                     </div>
                   )}
@@ -2859,7 +2872,7 @@ const CustomerPortalPage: FC = () => {
               // Menschlich, ohne Datum (Martin 25.09.: „hält sich frei … zu viele
               // Daten, zu unmenschlich"); die Zeit steht nur im Countdown.
               subtitle: '',
-              pill: frist ? nochReserviertText(frist) : '',
+              pill: '',
               frist,
               steps: null as 'initial' | 'saved' | null,
             }
@@ -2941,32 +2954,25 @@ const CustomerPortalPage: FC = () => {
               <h1 className="mt-1 text-[31px] font-extrabold leading-[1.08] tracking-[-0.035em] text-pm-ink">
                 {heroCopy.title}
               </h1>
-              {/* Offene Bewerbung: Aufbau wie der Kopf der Kostenrechner-Startseite
-                  (Martin 25.09.: „überzeugender … wie beim Kostenrechner auf der
-                  Startseite oben im Hero") — Satz mit zwei Ankern, Countdown,
-                  Knopf, die vier Vorteile der Website und die Sterne. */}
               {/* Offene Bewerbung (Martin 25.09.): Kopf nur Titel + Zeit, direkt
-                  danach die Bewerbung; „Angebot prüfen" und die Vorteile stehen
-                  IN der Karte, nicht davor. */}
-              {hasPending && (() => {
-                return (
-                  <>
-                    {heroCopy.frist && (
-                      <p className="mt-3 inline-flex items-center gap-2 rounded-full px-3.5 py-2 text-[14.5px] font-bold bg-pm-amber-tint text-pm-amber-ink">
-                        <Clock className="w-4 h-4 flex-shrink-0" aria-hidden="true" />
-                        {nochReserviertText(heroCopy.frist)}
-                      </p>
-                    )}
-                  </>
-                );
-              })()}
-              {/* Im Ausgangszustand steht hier NICHTS mehr außer der
-                  Bestätigung — kein Erklärabsatz, keine Checkliste, kein
-                  Button. Alle drei waren Kopien dessen, was die Abschnitte
-                  darunter ohnehin tragen. */}
+                  danach die Bewerbung; „Angebot prüfen" und die Vorteile der
+                  Kostenrechner-Startseite stehen IN der Karte (AppCard `vorteile`). */}
+              {hasPending && heroCopy.frist && (
+                <p className="mt-3 inline-flex items-center gap-2 rounded-full px-3.5 py-2 text-[14.5px] font-bold bg-pm-amber-tint text-pm-amber-ink">
+                  <Clock className="w-4 h-4 flex-shrink-0" aria-hidden="true" />
+                  {nochReserviertText(heroCopy.frist)}
+                </p>
+              )}
               {heroCopy.subtitle && (
                 <p className="mt-3 text-[16px] leading-[1.55] text-pm-muted">
                   {heroCopy.subtitle}
+                </p>
+              )}
+              {/* Status-Zeile ohne Fläche (z. B. „Portal wird geladen"). */}
+              {!hasPending && heroCopy.pill && (
+                <p className="mt-3 inline-flex items-center gap-2 text-[15px] text-pm-ink">
+                  <Check className="w-4 h-4 flex-shrink-0 text-pm-taupe" strokeWidth={3} />
+                  {heroCopy.pill}
                 </p>
               )}
 
@@ -2981,7 +2987,12 @@ const CustomerPortalPage: FC = () => {
         <div className="max-w-3xl mx-auto px-3.5 -mt-6">
           <SucheStand
             angefragtAm={lead?.patient_form_at}
-            passende={IS_PREVIEW_ANY || !matchingsLoadingOrError ? effectiveMatched.length : null}
+            // Abgelehnte zählen nicht als „gefunden" — sonst widerspräche die Zahl
+            // der Liste darunter (Review 25.09.).
+            passende={IS_PREVIEW_ANY || (mmReady && !matchingsLoadingOrError)
+              ? effectiveMatched.filter((m) => (nurseStatusById.get(m.caregiverId) ?? 'pending') !== 'declined').length
+              : null}
+            bisherigeBewerbungen={applications.length}
             wunschstart={mmJobOffer?.arrival_at}
             onAngaben={zurPflegesituation}
           />
@@ -2994,7 +3005,9 @@ const CustomerPortalPage: FC = () => {
       {/* ── „Passt Ihnen das Angebot?" direkt unter den Kosten (Martin 25.09.):
            Verbindlich wird es VOR dem Formular — mit „Ja" fragt der Kunde
            Bewerbungen an. Ersetzt die schwebende Blase und „Noch 2 Minuten". */}
-      {!patientSaved && !hasPending && (
+      {/* Erst zeigen, wenn mamamia den Stand kennt: Sonst sähen Kunden, die schon
+          abgeschickt haben, auf einem neuen Gerät kurz wieder die Frage (Review 25.09.). */}
+      {!patientSaved && !hasPending && (IS_PREVIEW_ANY || !!mmCustomer) && (
         <div className="max-w-3xl mx-auto px-3.5 pt-4">
           <AngebotFrage
             beantwortet={feedbackWeg}
@@ -3363,7 +3376,9 @@ const CustomerPortalPage: FC = () => {
               {/* Keine sichtbare Pflegekraft und nichts eingeladen (z. B. strenger
                   Deutsch-Filter, Martin 25.09.: Filter bleibt). Vorher stand dann
                   nur die Überschrift da. */}
-              {!hasAnyCard && heldInvites === 0 && allVisible.length === 0 && (
+              {/* Nur mit wirklich geladenen Matchings — nicht, solange die Sitzung
+                  lädt oder hakt (Święta zasada nr 1, Review 25.09.). */}
+              {!hasAnyCard && heldInvites === 0 && allVisible.length === 0 && (IS_PREVIEW_ANY || (mmReady && !!mmMatchings?.data)) && (
                 <div className="rounded-card px-5 py-6 border border-[#EFEBE4] bg-white text-center">
                   <p className="text-[15.5px] font-bold text-pm-ink">Gerade keine weiteren Vorschläge</p>
                   <p className="mt-1 text-[14px] leading-relaxed text-pm-muted">
@@ -3563,6 +3578,12 @@ const CustomerPortalPage: FC = () => {
           }}
           triggerOpenPatient={triggerOpenPatient}
           onTriggerHandled={() => setTriggerOpenPatient(false)}
+          onAbgesendet={(nurAenderung) => {
+            // Angaben geändert (nicht die erste Anfrage): bestätigen und zuklappen.
+            if (!nurAenderung) return;
+            showToast('✓ Ihre Angaben sind gespeichert.', 5000);
+            setPatientExpandedManual(null);
+          }}
           mamamiaEnabled={mmReady}
           onSaveToMamamia={async (form) => {
             const existingPatientIds = mmCustomer?.patients?.map(p => p.id) ?? [];

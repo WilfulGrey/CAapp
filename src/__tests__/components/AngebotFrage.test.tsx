@@ -44,14 +44,15 @@ describe('AngebotFrage', () => {
     expect(onBestpreis).toHaveBeenCalledTimes(1);
   });
 
-  it('„Vielleicht später" lässt sich überspringen und danach doch anfragen, ohne zweite Team-Mail', async () => {
+  it('„Vielleicht später" lässt sich überspringen und danach doch anfragen — das Umentscheiden wird gemeldet', async () => {
     const { onAnswer, onAnfragen } = aufbau();
     await userEvent.click(screen.getByRole('button', { name: 'Vielleicht später' }));
     await userEvent.click(screen.getByRole('button', { name: 'Überspringen' }));
     expect(onAnswer).toHaveBeenLastCalledWith('spaeter', undefined, true);
     await userEvent.click(screen.getByRole('button', { name: 'Doch Bewerbungen anfragen' }));
     expect(onAnfragen).toHaveBeenCalledTimes(1);
-    expect(onAnswer.mock.calls.filter(c => c[2] === true)).toHaveLength(1);
+    // Umentscheiden wird gemeldet: erst „spaeter", dann „loslegen" — je genau einmal.
+    expect(onAnswer.mock.calls.filter(c => c[2] === true).map(c => c[0])).toEqual(['spaeter', 'loslegen']);
   });
 
   it('wer schon geantwortet hat, sieht keine Frage mehr, nur den Weg zu den Bewerbungen', async () => {

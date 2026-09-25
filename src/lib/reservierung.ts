@@ -15,16 +15,22 @@ const STUNDE = 60 * 60 * 1000;
 
 export function reserviertBis(
   events: FetchedLeadEvent[],
-  { caregiverId, jobOfferId }: { caregiverId: number | undefined | null; jobOfferId: number | undefined | null },
+  { caregiverId, jobOfferId, standardJobId }: {
+    caregiverId: number | undefined | null;
+    /** Job der Bewerbung (Sitzungs-Job). Unbekannt → keine Frist. */
+    jobOfferId: number | undefined | null;
+    /** `leads.mamamia_job_offer_id`: Ereignisse ohne Job gehören wie im Server zu ihm. */
+    standardJobId?: number | null;
+  },
   jetzt: number = Date.now(),
 ): Date | null {
-  if (!caregiverId) return null;
+  if (!caregiverId || jobOfferId == null) return null;
   const zumPaar = events.filter((e) => {
     const m = e.metadata ?? {};
     if (Number(m.caregiver_id) !== caregiverId) return false;
-    // Ältere Ereignisse ohne Job gehören wie beim Server zum Standard-Job.
-    const job = m.mamamia_job_offer_id;
-    return job == null || jobOfferId == null || Number(job) === jobOfferId;
+    const job = m.mamamia_job_offer_id ?? standardJobId;
+    // Weder Ereignis noch Lead kennen einen Job (Altbestand, ein Job): zählt.
+    return job == null || Number(job) === jobOfferId;
   });
   if (zumPaar.some((e) => e.event_type === 'application_accepted_internal' || e.event_type === 'application_rejected')) {
     return null;

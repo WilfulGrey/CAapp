@@ -41,13 +41,16 @@ export function AngebotFrage({
 }) {
   const [answer, setAnswer] = useState<FeedbackAnswer | null>(null);
   const [fertig, setFertig] = useState<{ answer: FeedbackAnswer; detail?: string } | null>(null);
-  const abgeschlossen = useRef(false);
+  // Endgültig gemeldete Antwort. Dieselbe Antwort geht nur einmal raus (eine Team-Mail),
+  // ein Umentscheiden („Passt nicht" → „Doch Bewerbungen anfragen") wird gemeldet — eine
+  // Korrektur zu verschlucken wäre schlimmer als ein Eintrag zu viel (Martin, 12.08.).
+  const gemeldet = useRef<FeedbackAnswer | null>(null);
 
   const abschliessen = (a: FeedbackAnswer, d?: string) => {
-    if (!abgeschlossen.current) {
-      abgeschlossen.current = true;
+    if (gemeldet.current !== a) {
+      if (gemeldet.current === null) onErledigt();
+      gemeldet.current = a;
       onAnswer(a, d, true);
-      onErledigt();
     }
     setFertig({ answer: a, detail: d });
   };
