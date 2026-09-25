@@ -25,6 +25,15 @@ export function localTodayIso(): string {
   return toIso(t.getFullYear(), t.getMonth(), t.getDate());
 }
 
+// Kalenderdatum aus einem mamamia-Wert („2026-10-15 00:00:00" oder
+// „2026-10-15") als yyyy-mm-dd, sonst null. Bewusst ohne `new Date()`:
+// Safari liest die Form mit Leerzeichen nicht zuverlässig, und ein
+// Datum ohne Zeitzone soll der Tag bleiben, der dort steht.
+export function kalenderTag(wert: string | null | undefined): string | null {
+  const m = /^(\d{4})-(\d{2})-(\d{2})(?:[ T]\d{2}:\d{2}(?::\d{2}(?:\.\d+)?)?)?$/.exec((wert ?? '').trim());
+  return m ? `${m[1]}-${m[2]}-${m[3]}` : null;
+}
+
 export const DateField: FC<{
   value: string; // ISO yyyy-mm-dd oder ''
   onChange: (iso: string) => void;

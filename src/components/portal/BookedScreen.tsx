@@ -164,7 +164,7 @@ export const BookedScreen: FC<{
                     href={pdfUrl}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="inline-flex items-center gap-1.5 text-sm font-semibold text-[#1f7a45] hover:underline"
+                    className="-my-2.5 inline-flex min-h-[44px] items-center gap-1.5 text-sm font-semibold text-[#1f7a45] hover:underline"
                   >
                     📄 Vertrag
                   </a>

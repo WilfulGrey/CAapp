@@ -5,11 +5,17 @@ import { Check } from 'lucide-react';
 import { Card } from '../ui/Card';
 import { EYEBROW } from '../ui/SectionHeader';
 import { RESERVIERUNG_STUNDEN } from '../../lib/reservierung';
+import { kalenderTag } from './DateField';
 
 /** „24.09." aus einem ISO-Zeitpunkt oder Datum, in Berliner Zeit. */
 export function kurzDatum(iso: string | null | undefined): string | null {
   if (!iso) return null;
-  const d = new Date(iso);
+  // Datum ohne Zeitzone (mamamia `arrival_at`): der Tag, wie er dort steht.
+  const tag = kalenderTag(iso);
+  if (tag) return `${tag.slice(8, 10)}.${tag.slice(5, 7)}.`;
+  // Zeitpunkt mit Zone (`leads.patient_form_at`): deutsche Zeit. Leerzeichen
+  // → „T", damit Safari ihn liest.
+  const d = new Date(iso.trim().replace(' ', 'T'));
   if (Number.isNaN(d.getTime())) return null;
   return new Intl.DateTimeFormat('de-DE', { timeZone: 'Europe/Berlin', day: '2-digit', month: '2-digit' }).format(d);
 }
@@ -38,8 +44,8 @@ export function SucheStand({ angefragtAm, passende, wunschstart, onAngaben, bish
     {
       titel: 'Bewerbung erhalten',
       text: bisherigeBewerbungen > 0
-        ? `bisher ${bisherigeBewerbungen} ${bisherigeBewerbungen === 1 ? 'Bewerbung' : 'Bewerbungen'}, weitere kommen per E-Mail`
-        : 'meist in den nächsten Tagen, per E-Mail',
+        ? `bisher ${bisherigeBewerbungen} ${bisherigeBewerbungen === 1 ? 'Bewerbung' : 'Bewerbungen'}, weitere kommen per E\u2011Mail`
+        : 'meist in den nächsten Tagen, per E\u2011Mail',
     },
     { titel: 'Sie entscheiden', text: `Jede Bewerbung ist ${RESERVIERUNG_STUNDEN} Stunden für Sie reserviert` },
     { titel: 'Anreise', text: `ab 3 Tagen nach Ihrer Zusage${start ? ` · Wunschstart ${start}` : ''}` },

@@ -106,6 +106,8 @@ export async function setDeclinedCaregiver(
   caregiverId: number,
   declined: boolean,
 ): Promise<{ error: string | null }> {
+  // Vorschau (?preview=…): kein echter Lead, nichts schreiben.
+  if (token === 'preview-token') return { error: null };
   const { error } = await supabase.rpc('set_declined_caregiver', {
     p_token: token,
     p_caregiver_id: caregiverId,
