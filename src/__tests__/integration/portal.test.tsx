@@ -11,6 +11,7 @@ import {
   TEST_JOB_OFFER_ID,
   bridgeHandler,
   proxyHandler,
+  sampleCustomer,
 } from '../../../test/fixtures/mamamia-mocks';
 
 // Mock Supabase helpers — Supabase-js uses a fetch impl that doesn't route
@@ -234,6 +235,47 @@ describe('Portal integration: golden paths', () => {
     await waitFor(() => expect(inviteCaregiverId).toBe(sampleMatching.caregiver.id), {
       timeout: 5000,
     });
+  }, 15_000);
+
+  // ─── Angaben ändern nach dem Absenden (Martin 25.09.: „sobald man irgendwas
+  //     anklickt, lädt die ganze Seite neu") ─────────────────────────────────
+
+  it('gespeicherter, bei mamamia aktiver Kunde ändert eine Angabe: die Seite kippt nicht in „nicht gespeichert“', async () => {
+    server.use(
+      ...defaultHandlers({
+        proxy: {
+          getCustomer: () => ({ Customer: { ...sampleCustomer, status: 'active' } }),
+          listApplications: () => ({ JobOfferApplicationsWithPagination: { total: 0, data: [] } }),
+        },
+      }),
+    );
+    localStorage.setItem(`patient_${TEST_LEAD_TOKEN}`, JSON.stringify({ _isDraft: false, geschlecht: 'Weiblich' }));
+    setLocation(`?token=${TEST_LEAD_TOKEN}`);
+    const user = userEvent.setup();
+    render(<CustomerPortalPage />);
+
+    // Formular über den Kopf „Pflegesituation ✓ Vollständig" öffnen.
+    const kopf = await screen.findByRole('button', { name: /Pflegesituation.*Vollständig/ }, { timeout: 5000 });
+    await user.click(kopf);
+    const chip = await screen.findByRole('button', { name: 'Männlich' }, { timeout: 5000 });
+
+    // Jeden Text mitschreiben, den die Seite zeigt — auch kurz aufblitzende:
+    // beide Renders laufen im selben Durchlauf, deshalb die ALTEN Werte der
+    // Textknoten und die eingefügten Knoten aus den Mutation-Records lesen.
+    const titel: string[] = [];
+    const mo = new MutationObserver((records) => {
+      for (const r of records) {
+        if (r.type === 'characterData' && r.oldValue) titel.push(r.oldValue);
+        r.addedNodes.forEach((n) => titel.push(n.textContent ?? ''));
+      }
+    });
+    mo.observe(document.body, { subtree: true, childList: true, characterData: true, characterDataOldValue: true });
+    await user.click(chip);
+    await new Promise((r) => setTimeout(r, 50));
+    mo.disconnect();
+
+    expect(titel.some((t) => t.includes('Ihr persönliches Angebot'))).toBe(false);
+    expect(screen.getByRole('button', { name: /Pflegesituation.*Vollständig/ })).toBeInTheDocument();
   }, 15_000);
 
   // ─── Path 3: Einsatzort-Wall (Registry #65) ─────────────────────────────
