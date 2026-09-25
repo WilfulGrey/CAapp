@@ -9,6 +9,11 @@ const FEIERTAGE_LIST = 'Karfreitag, Ostersonntag, Ostermontag, 1. Mai, Heiligabe
 import type { Nurse } from '../../types';
 import type { Application } from './shared';
 import { displayName, initials, nurseLevel, nurseFacts, isEmail } from './shared';
+
+// Einzige Anreden, die Mamamia für den Leistungsempfänger annimmt (Registry #88).
+// Auftraggeber und Kontaktperson behalten „Divers": dort ist die Anrede optional
+// bzw. geht gar nicht nach Mamamia.
+const LE_ANREDEN = ['Frau', 'Herr'];
 import { VertragSignieren, type VertragsDaten } from './VertragSignieren';
 import {
   parseDeDate,
@@ -154,7 +159,13 @@ export const AngebotPruefenModal: FC<{
   // Deutsch-Punktebalken — identisch zur geteilten PK-Karte (AppCard),
   // damit die Sprach-Optik im Modal konsistent zum restlichen Portal ist.
 
-  const [anrede, setAnrede] = useState(prefill?.anrede ?? 'Frau');
+  // Anrede des Leistungsempfängers geht als contract_patient.salutation an
+  // StoreConfirmation — dort PFLICHT und nur 'Mr.'/'Mrs.' (Registry #88,
+  // Fall Hümmer: „Divers" für ein Ehepaar ⇒ Mamamia lehnte den Akzept ab).
+  // Ein Prefill außerhalb von Frau/Herr (es gibt z. B. patient_anrede
+  // „Familie") bleibt LEER statt still als „Frau" angezeigt und als „Familie"
+  // gesendet zu werden — der Kunde wählt dann selbst.
+  const [anrede, setAnrede] = useState(LE_ANREDEN.includes(prefill?.anrede ?? 'Frau') ? (prefill?.anrede ?? 'Frau') : '');
   const [vorname, setVorname] = useState(prefill?.vorname ?? '');
   const [nachname, setNachname] = useState(prefill?.nachname ?? '');
   const [strasse, setStrasse] = useState(prefill?.strasse ?? '');
@@ -190,7 +201,7 @@ export const AngebotPruefenModal: FC<{
   // E-Mails: leer ODER gültig (Registry #52 — „x@t-online.de@t-online.de" ging
   // durch, Mamamia lehnte den Vertrag-Sync ab). KP-Mail ist Pflicht.
   const emailOk = (v: string) => v.trim() === '' || isEmail(v);
-  const canProceed = vorname.trim() !== '' && nachname.trim() !== '' && strasse.trim() !== '' && einsatzort.trim() !== ''
+  const canProceed = anrede !== '' && vorname.trim() !== '' && nachname.trim() !== '' && strasse.trim() !== '' && einsatzort.trim() !== ''
     && agComplete
     && kpVorname.trim() !== '' && kpNachname.trim() !== '' && kpTelefon.trim() !== '' && isEmail(kpEmail)
     && emailOk(email) && (agGleich || emailOk(agEmail));
@@ -396,7 +407,8 @@ export const AngebotPruefenModal: FC<{
                       <div>
                         <label className={labelCls}>Anrede</label>
                         <select value={anrede} onChange={e => setAnrede(e.target.value)} className={inputCls}>
-                          <option>Frau</option><option>Herr</option><option>Divers</option>
+                          {anrede === '' && <option value="" disabled>Bitte wählen</option>}
+                          {LE_ANREDEN.map((a) => <option key={a}>{a}</option>)}
                         </select>
                       </div>
                       <div>

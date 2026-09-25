@@ -464,6 +464,7 @@ async function postAcceptanceAlarm(
     pdf_uploaded: boolean;
     permanent: boolean;
     booking_not_visible?: "not_processed" | "foreign_confirmation" | null;
+    ursache?: "vertragsdaten" | null;
     error: string | null;
     age_minutes: number | null;
   },
@@ -484,6 +485,7 @@ async function postAcceptanceAlarm(
           pdf_uploaded: info.pdf_uploaded,
           permanent: info.permanent,
           booking_not_visible: info.booking_not_visible ?? undefined,
+          ursache: info.ursache ?? undefined,
           error: info.error,
           age_minutes: info.age_minutes,
           source: "cron",
@@ -532,6 +534,7 @@ export async function retryAcceptanceSyncs(
     let pdfNow = !!row.mamamia_pdf_uploaded_at;
     let permanentConfirmError = false;
     let bookingNotVisible: "not_processed" | "foreign_confirmation" | null = null;
+    let ursache: "vertragsdaten" | null = null;
     let lastError: string | null = null;
     try {
       const result = await syncAcceptance({
@@ -566,6 +569,7 @@ export async function retryAcceptanceSyncs(
       pdfNow = result.pdf_uploaded;
       permanentConfirmError = result.confirm_error?.permanent === true;
       bookingNotVisible = result.booking_not_visible ?? null;
+      ursache = result.confirm_error?.ursache ?? null;
       lastError = result.confirm_error?.message ?? null;
       if (result.confirmed && result.pdf_uploaded) out.completed += 1;
     } catch (e) {
@@ -612,6 +616,7 @@ export async function retryAcceptanceSyncs(
         pdf_uploaded: pdfNow,
         permanent: permanentConfirmError,
         booking_not_visible: bookingNotVisible,
+        ursache,
         error: bookingOverdue ? bookingMsg : lastError,
         age_minutes: ageMin,
       });

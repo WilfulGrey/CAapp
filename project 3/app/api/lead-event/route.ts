@@ -197,6 +197,14 @@ interface AcceptanceAlarmInfo {
    * "PDF fehlt"-Fall, dessen Text ausdrücklich "kein Kundenrisiko" behauptet.
    */
   booking_not_visible?: 'not_processed' | 'foreign_confirmation' | null;
+  /**
+   * Registry #88: Mamamia hat UNSERE Vertragsdaten abgelehnt (alle
+   * Validation-Keys unter contract_patient.* / contract_contact.*, z. B. die
+   * Anrede). Die Bewerbung ist dann sehr wahrscheinlich in Ordnung — der Mail-
+   * Text darf nicht „von der Agentur zurückgezogen" behaupten. Die Edge Function
+   * klassifiziert nach Struktur; hier wird nur verzweigt.
+   */
+  ursache?: 'vertragsdaten' | null;
   error?: string | null;
   age_minutes?: number | null;
   source: 'bridge' | 'cron' | 'sync-retry' | string;
@@ -277,7 +285,9 @@ function buildAcceptanceSyncAlarmTemplate(lead: any, info: AcceptanceAlarmInfo):
       ? 'Der Akzept wurde an Mamamia gesendet und bei uns als erledigt gestempelt — beim Nachlesen zeigt Mamamia die Confirmation aber NICHT am Job dieser Bewerbung. Der Kunde hat die Buchungs-Mail bekommen; in Mamamia bestätigt sie nichts.'
       : 'Die Buchung ist in Mamamia bestätigt, aber der signierte Vertrag (PDF) konnte seit über 24 Stunden nicht hochgeladen werden. Kein unmittelbares Kundenrisiko — das Vertragsarchiv in Mamamia ist aber unvollständig.';
   const ursache = confirmCase
-    ? (info.permanent
+    ? (info.permanent && info.ursache === 'vertragsdaten'
+        ? 'Mamamia hat den Akzept abgelehnt, weil UNSERE Vertragsdaten nicht angenommen wurden (welches Feld: siehe „Mamamia-Fehler" unten). Die Bewerbung selbst ist davon nicht betroffen und sehr wahrscheinlich noch offen. Automatische Wiederholungen ändern nichts — die Daten bleiben dieselben.'
+        : info.permanent
         ? 'Mamamia hat den Akzept DAUERHAFT abgelehnt — wahrscheinlichste Ursache: die Bewerbung wurde von der Agentur zurückgezogen oder existiert nicht mehr. Automatische Wiederholungen ändern daran nichts.'
         : 'Der automatische Sync schlägt bisher fehl (transienter Fehler). Weitere automatische Versuche laufen alle 15 Minuten weiter — dieser Alarm kommt trotzdem, damit niemand auf den Automatismus wartet.')
     : bookingCase
@@ -285,7 +295,12 @@ function buildAcceptanceSyncAlarmTemplate(lead: any, info: AcceptanceAlarmInfo):
           ? 'Der gespeicherte Confirmation-Stempel gehört zu einer ANDEREN Bewerbung bzw. einem anderen Job (Registry #78). Der Vertrag wurde deshalb NICHT hochgeladen — sonst würde die fremde Confirmation umgehängt.'
           : 'Mamamia hat die Confirmation auch nach mehreren Versuchen nicht am Job veröffentlicht. Entweder verarbeitet Mamamia sie noch nicht, oder sie ist dort gar nicht angekommen.')
       : 'Der Upload-Schritt (StoreFile/UpdateConfirmation bzw. das PDF-Rendering) schlägt wiederholt fehl — Details in den Supabase-Logs (sync-acceptance / detect-caregiver-events).';
-  const schritte = confirmCase
+  const schritte = confirmCase && info.permanent && info.ursache === 'vertragsdaten'
+    ? [
+        'SA-Portal → Kunde → Bewerbung öffnen und die Annahme manuell durchführen; das abgelehnte Feld dort von Hand setzen.',
+        'Nur bei Unklarheit den Kunden anrufen (z. B. Anrede, wenn ein Ehepaar betreut wird).',
+      ]
+    : confirmCase
     ? [
         'SA-Portal → Kunde → Bewerbung öffnen: existiert sie noch, welcher Status?',
         'Bewerbung zurückgezogen/weg: Kunden SOFORT kontaktieren — er wartet auf eine Pflegekraft, die nicht kommt.',
@@ -945,6 +960,7 @@ async function handlePost(request: NextRequest) {
               confirmed: false,
               pdf_uploaded: false,
               permanent: true,
+              ursache: confErr.ursache === 'vertragsdaten' ? 'vertragsdaten' : null,
               error: typeof confErr.message === 'string' ? confErr.message : String(confErr.message ?? ''),
               age_minutes: 0,
               source: 'bridge',
@@ -1075,6 +1091,7 @@ async function handlePost(request: NextRequest) {
             m.booking_not_visible === 'foreign_confirmation'
           ? m.booking_not_visible
           : null,
+        ursache: m.ursache === 'vertragsdaten' ? 'vertragsdaten' : null,
         error: typeof m.error === 'string' ? m.error : null,
         age_minutes: typeof m.age_minutes === 'number' ? m.age_minutes : null,
         // 'cron' (15-Min-Backstop) oder 'sync-retry' (Chain 15/30/60 s).

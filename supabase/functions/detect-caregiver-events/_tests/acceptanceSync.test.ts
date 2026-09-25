@@ -14,6 +14,7 @@ import {
   isValidationError,
   mapContractPatient,
   splitEinsatzort,
+  nurVertragsdaten,
   syncAcceptance,
 } from "../../_shared/acceptanceSync.ts";
 import { handleRequest as syncHandler, runRetryChain, type SyncStore } from "../../sync-acceptance/index.ts";
@@ -77,6 +78,8 @@ interface FakeNet {
   //   "graphql" = GraphQL-Fehler (⇒ permanent), "http500" = HTTP 500 (⇒ transient).
   // confirmFailTimes = wie viele Versuche fehlschlagen (undefined ⇒ alle).
   confirmFailMode?: "graphql" | "http500";
+  /** Registry #88: eigenes validation-Objekt für den "graphql"-Fall (Standard: application_id). */
+  confirmValidation?: Record<string, string[]>;
   // UpdateCustomerContract (Schritt 1): "graphql" = Laravel-Validation (⇒ permanent,
   // Sequenz läuft weiter), "graphql-plain" = GraphQL-Fehler OHNE extensions.validation
   // (⇒ throw), "http500" (⇒ throw). ucFailSequence: pro Aufruf ein Modus (Chain-Tests).
@@ -194,7 +197,7 @@ function makeNet(opts: Partial<FakeNet> = {}): FakeNet {
           return new Response(JSON.stringify({
             errors: [{
               message: "Anwendungs-ID ungültig.",
-              extensions: { validation: { application_id: ["Anwendungs-ID ungültig."] } },
+              extensions: { validation: net.confirmValidation ?? { application_id: ["Anwendungs-ID ungültig."] } },
             }],
           }), { status: 200 });
         }
@@ -1090,6 +1093,42 @@ Deno.test("#82: schon alarmiert ⇒ kein zweiter Alarm", async () => {
   const r = await retryAcceptanceSyncs(makeCronDeps(net, [row], alerted));
   assertEquals(r.alerts, 0);
   assertEquals(net.bridgePosts.length, 0);
+});
+
+// ─── Registry #88: Vertragsdaten abgelehnt ≠ Bewerbung zurückgezogen ──────
+// Fall Hümmer: „Divers" ⇒ salutation null ⇒ Mamamia lehnt StoreConfirmation
+// mit contract_patient.salutation ab. Der Alarm vermutete „von der Agentur
+// zurückgezogen" — falsch; die Bewerbung war in Ordnung.
+
+Deno.test("#88: nurVertragsdaten — nur contract_patient/contract_contact zählen", () => {
+  assertEquals(nurVertragsdaten(["contract_patient.salutation"]), true);
+  assertEquals(nurVertragsdaten(["contract_patient.salutation", "contract_contact.email"]), true);
+  assertEquals(nurVertragsdaten(["application_id"]), false);
+  assertEquals(nurVertragsdaten(["contract_patient.salutation", "application_id"]), false);
+  assertEquals(nurVertragsdaten([]), false);
+});
+
+Deno.test("#88: salutation abgelehnt ⇒ confirm_error.ursache = vertragsdaten", async () => {
+  const net = makeNet({
+    confirmFailMode: "graphql",
+    confirmValidation: { "contract_patient.salutation": ["Das Feld contract patient.salutation ist erforderlich."] },
+  });
+  const r = await syncAcceptance({
+    lead: LEAD, row: makeRow(), secrets: SECRETS,
+    supabase: makeStamps().supabase, getAgencyToken: agencyToken, fetchFn: net.fetch,
+  });
+  assertEquals(r.confirm_error?.permanent, true);
+  assertEquals(r.confirm_error?.ursache, "vertragsdaten");
+});
+
+Deno.test("#88: application_id abgelehnt ⇒ keine Ursache (bisheriger Alarmtext)", async () => {
+  const net = makeNet({ confirmFailMode: "graphql" }); // Standard: application_id
+  const r = await syncAcceptance({
+    lead: LEAD, row: makeRow(), secrets: SECRETS,
+    supabase: makeStamps().supabase, getAgencyToken: agencyToken, fetchFn: net.fetch,
+  });
+  assertEquals(r.confirm_error?.permanent, true);
+  assertEquals(r.confirm_error?.ursache, undefined);
 });
 
 // ─── sync-acceptance Edge Fn: Auth ─────────────────────────────────────────
