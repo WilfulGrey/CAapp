@@ -84,6 +84,8 @@ export const CustomerNurseModal: FC<{
    *  parent surfaces the error (CLAUDE.md §1 — no fake animation). */
   onInvite?: () => Promise<void>;
   onDeclineMatch?: () => void;
+  /** Nur ansehen, keine Aktionen (gebuchte Pflegekraft, Vertrag offen). */
+  nurProfil?: boolean;
   /** Öffnet den (übersetzten) Chat mit der Pflegekraft. */
   onChat?: () => void;
   isInvited?: boolean;
@@ -92,7 +94,7 @@ export const CustomerNurseModal: FC<{
    *  Heart-Icon), der erklärt, dass eine Einladung ihre offizielle
    *  Bewerbung ermöglicht. */
   hasInterest?: boolean;
-}> = ({ nurse, profileLoading = false, aboutLoading = false, initialLevelInfo = false, onClose, app, onReview, onDecline, onUndo, onInvite, onDeclineMatch, onChat, isInvited = false, hasInterest = false }) => {
+}> = ({ nurse, profileLoading = false, aboutLoading = false, initialLevelInfo = false, onClose, app, onReview, onDecline, onUndo, onInvite, onDeclineMatch, onChat, isInvited = false, hasInterest = false, nurProfil = false }) => {
   const [invited, setInvited] = useState(isInvited);
   const [invitePhaseModal, setInvitePhaseModal] = useState<'idle' | 'sending' | 'done'>('idle');
   const [showLevelInfo, setShowLevelInfo] = useState(initialLevelInfo);
@@ -163,7 +165,14 @@ export const CustomerNurseModal: FC<{
     }
   };
 
+  // Aktionen nur, wenn es wirklich eine gibt (Review 25.09.): Aus dem
+  // Gebucht-Bildschirm, dem Vertrag und den erledigten Karten kommt das Profil
+  // ohne onInvite. Vorher stand dort trotzdem „Einladen" und meldete
+  // „Pflegekraft wurde eingeladen!", ohne dass etwas gesendet wurde.
+  const zeigeAktionen = !nurProfil && (!!app || !!onInvite || invited);
+
   const handleModalInvite = async () => {
+    if (!onInvite) return;
     setInvitePhaseModal('sending');
     try {
       await onInvite?.();
@@ -618,6 +627,7 @@ export const CustomerNurseModal: FC<{
             ))}
           </div>
 
+          {(onChat || zeigeAktionen) && (
           <div className="px-5 py-4 border-t border-gray-100 flex-shrink-0 space-y-3">
             {onChat && (
               <button
@@ -630,6 +640,7 @@ export const CustomerNurseModal: FC<{
                 Frage an {nurse.name.split(' ')[0]} stellen
               </button>
             )}
+            {zeigeAktionen && (
             <div className="flex gap-3">
             {app ? (
               app.status === 'declined' ? (
@@ -659,12 +670,14 @@ export const CustomerNurseModal: FC<{
               <>
                 {!invited ? (
                   <>
+                    {onDeclineMatch && (
                     <button
-                      onClick={() => { onDeclineMatch?.(); }}
+                      onClick={() => { onDeclineMatch(); }}
                       className="flex-1 border-2 border-gray-200 text-gray-500 rounded-xl py-3 font-semibold text-sm hover:bg-gray-50 transition-colors"
                     >
                       Nein danke
                     </button>
+                    )}
                     {invitePhaseModal === 'sending' ? (
                       <div className="flex-[2] bg-[#F5F5F6] text-[#8B7355] rounded-xl py-3 font-bold text-sm border border-[#E9E9EB] flex items-center justify-center gap-2">
                         <svg className="w-4 h-4 animate-spin flex-shrink-0" viewBox="0 0 24 24" fill="none">
@@ -694,7 +707,9 @@ export const CustomerNurseModal: FC<{
               </>
             )}
             </div>
+            )}
           </div>
+          )}
         </div>
       </div>
 

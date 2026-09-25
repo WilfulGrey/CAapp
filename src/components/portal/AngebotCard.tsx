@@ -11,7 +11,7 @@ import { FormField } from '../ui/FormField';
 import { FormNav } from '../ui/FormNav';
 import { ProgressSteps } from '../ui/ProgressSteps';
 import { EYEBROW } from '../ui/SectionHeader';
-import { DateField, localTodayIso } from './DateField';
+import { DateField, kalenderTag, localTodayIso } from './DateField';
 import { callMamamia } from '../../lib/mamamia/client';
 import { reportLeadEvent } from '../../lib/leadEvents';
 import type { PatientForm } from './shared';
@@ -77,7 +77,13 @@ export const AngebotCard: FC<{
   onSaveToMamamia?: (form: PatientForm) => Promise<void>;
   /** Nach jedem erfolgreichen Absenden; `nurAenderung` = Angaben wurden nur geändert. */
   onAbgesendet?: (nurAenderung: boolean) => void;
-}> = ({ lead, mmCustomer, onPatientSaved, triggerOpenPatient, onTriggerHandled, mamamiaEnabled, onSaveToMamamia, onAbgesendet }) => {
+  /** Startdatum, das der Kunde beim Absenden gewählt hat (`JobOffer.arrival_at`).
+   *  Nur übergeben, wenn schon abgesendet wurde: Vorher steht dort die
+   *  Onboard-Schätzung, die das Feld bewusst NICHT vorbelegt. */
+  gewaehlterStart?: string | null;
+  /** Schon abgesendet (laut mamamia oder in dieser Sitzung): nur noch „Änderungen speichern". */
+  schonAbgesendet?: boolean;
+}> = ({ lead, mmCustomer, onPatientSaved, triggerOpenPatient, onTriggerHandled, mamamiaEnabled, onSaveToMamamia, onAbgesendet, gewaehlterStart, schonAbgesendet }) => {
   // Offen, sobald die Karte gerendert wird: Seit dem Wegfall des
   // Zwischenkopfs (11.08.) steuert allein der Abschnittskopf in
   // CustomerPortalPage, ob dieser Block überhaupt erscheint.
@@ -205,6 +211,20 @@ export const AngebotCard: FC<{
     einkaeufe: pick('einkaeufe'), einkaeufeWie: pick('einkaeufeWie'),
     raucherhaushalt: pick('raucherhaushalt'),
   });
+
+  // Startdatum beim Ändern (Martin 25.09.): Wer schon abgesendet hat, sieht
+  // im „Stand" seinen Wunschstart. Auf einem anderen Gerät (kein lokaler
+  // Entwurf) war das Feld trotzdem leer und musste neu gewählt werden. Einmal
+  // vorbelegen, nur wenn leer und das Datum nicht schon vorbei ist, sonst
+  // wählt der Kunde neu.
+  const startVorbelegt = useRef(false);
+  useEffect(() => {
+    if (startVorbelegt.current) return;
+    const tag = kalenderTag(gewaehlterStart);
+    if (!tag || tag < localTodayIso()) return;
+    startVorbelegt.current = true;
+    setPatient(p => (p.startDate ? p : { ...p, startDate: tag }));
+  }, [gewaehlterStart]);
 
   const zwei = patient.anzahl === '2';
 
@@ -713,7 +733,9 @@ export const AngebotCard: FC<{
   const letzterSchritt = step === STEP_LABELS.length - 1;
   // Schon abgeschickt (lokal oder laut mamamia aktiv) → nur Angaben ändern: kein erneutes
   // „Bewerbungen anfragen", kein neues 72-h-Versprechen (Review 25.09.).
-  const nurAenderung = hasFinalSave || (mmCustomer?.status != null && mmCustomer.status !== 'draft');
+  // `hasFinalSave` allein reicht nicht: Die erste Änderung überschreibt den
+  // lokalen Vermerk mit `_isDraft: true` (Review 25.09.).
+  const nurAenderung = hasFinalSave || !!schonAbgesendet || (mmCustomer?.status != null && mmCustomer.status !== 'draft');
 
   return (
     <div ref={patientFormRef} id="pflegesituation-formular" className="scroll-mt-16">

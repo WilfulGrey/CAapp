@@ -53,6 +53,7 @@ import { AppCardDone } from '../components/portal/AppCardDone';
 import { BeratungCTA } from '../components/portal/BeratungCTA';
 import { AngebotFrage } from '../components/portal/AngebotFrage';
 import { SucheStand } from '../components/portal/SucheStand';
+import { kalenderTag } from '../components/portal/DateField';
 import { reserviertBis as berechneReservierung, RESERVIERUNG_STUNDEN, nochReserviertText } from '../lib/reservierung';
 import type { FetchedLeadEvent } from '../lib/leadEvents';
 import { MatchCard } from '../components/portal/MatchCard';
@@ -491,6 +492,9 @@ const CustomerPortalPage: FC = () => {
         setLeadError('Ihr Angebot konnte nicht geladen werden. Bitte öffnen Sie den Link aus Ihrer E-Mail erneut.');
       } else {
         setLead(l);
+        // Im selben Render wie der Lead: kein einziges Bild im Ausgangszustand
+        // für Kunden, die schon abgesendet haben (siehe `schonAbgesendet`).
+        if (l.patient_form_at) setPatientSaved(true);
         // Report back to the kostenrechner lead so the Nachfass emails know
         // the customer reached the portal. Fire-and-forget. `m` ist die
         // Quell-Markierung aus den Nachfass-Mail-Links (pn1/pn2/pn3/wp) —
@@ -571,6 +575,11 @@ const CustomerPortalPage: FC = () => {
   // Karte explizit — Profile-Card direkt geöffnet, damit man den Wizard
   // visuell testen kann.
   const [patientSaved, setPatientSaved] = useState(IS_PREVIEW_ANY && !IS_PREVIEW_PATIENT);
+  // In DIESER Sitzung erfolgreich abgesendet. `mmCustomer` wird nach dem
+  // Speichern nicht neu geladen, sein Status bleibt bis zum Neuladen „draft"
+  // (Review 25.09.): Ohne diesen Vermerk kippte die Seite beim Ändern direkt
+  // nach dem ersten Absenden zurück in den Ausgangszustand.
+  const [abgesendetInSitzung, setAbgesendetInSitzung] = useState(false);
   const [triggerOpenPatient, setTriggerOpenPatient] = useState(IS_PREVIEW_PATIENT);
 
   // Rückmeldung zum Angebot (seit 25.09. die Frage „Passt Ihnen das Angebot?"
@@ -629,6 +638,12 @@ const CustomerPortalPage: FC = () => {
   // gleiches Ziel wie mmExpired: Selbst-Service-Screen für neuen Link.
   const [saveTokenExpired, setSaveTokenExpired] = useState(false);
   const { data: mmCustomer, loading: mmCustomerLoading, error: mmCustomerError } = useCustomer(mmReady);
+  // Schon abgesendet: in dieser Sitzung, laut Lead oder laut mamamia.
+  // `leads.patient_form_at` setzt der Proxy erst nach erfolgreichem
+  // UpdateCustomer. Es kommt mit dem Lead, lange vor mamamia: Ohne das sahen
+  // wiederkehrende Kunden auf einem neuen Gerät erst den Ausgangszustand mit
+  // offenem Formular, bis mamamia antwortete (Review 25.09.).
+  const schonAbgesendet = abgesendetInSitzung || !!lead?.patient_form_at || (!!mmCustomer?.status && mmCustomer.status !== 'draft');
   const { data: mmJobOffer, loading: mmJobOfferLoading, error: mmJobOfferError, refetch: refetchJobOffer } = useJobOffer(mmReady);
   const { data: mmApplications, loading: mmApplicationsLoading, error: mmApplicationsError, refetch: refetchApplications } = useApplications({ limit: 20 }, mmReady);
   // limit=20 is intentional — client-side ranking (see `effectiveMatched`)
@@ -696,7 +711,12 @@ const CustomerPortalPage: FC = () => {
   // info@primundus.de team mail with contract data, no Mamamia call.
   // On portal load we flip the matching app's status to 'accepted' →
   // existing BookedScreen renders. Persists across reload.
-  const { data: acceptedApplications, refetch: refetchAcceptedApplications } = useAcceptedApplications(mmReady);
+  const { data: acceptedApplications, error: acceptedApplicationsError, refetch: refetchAcceptedApplications } = useAcceptedApplications(mmReady);
+  // Erst wenn die Annahmen da sind (oder ihr Abruf scheiterte, fail-soft), steht
+  // fest, dass eine „neue" Bewerbung nicht längst gebucht ist (Review 25.09.):
+  // Sonst sah ein gebuchter Kunde kurz „Sie haben eine aktive Bewerbung", und
+  // der Link aus Mail B öffnete „Angebot prüfen" über dem Gebucht-Bildschirm.
+  const annahmenBekannt = IS_PREVIEW_ANY || !!acceptedApplications || !!acceptedApplicationsError;
 
   // Multi-Job (Opcja B, Dachs 8899): die Jobs des Leads — speist den
   // "Alle meine Einsätze"-Link auch OHNE ?job=-Deeplink (vorher war die
@@ -748,7 +768,12 @@ const CustomerPortalPage: FC = () => {
   // (caregiver_invite_attempts). Read on portal load, refetched after
   // every successful invite. Backend hard-gate in mamamia-proxy.inviteCaregiver
   // is the security boundary; this hook drives UX (disable button + modal).
-  const { data: inviteRate, refetch: refetchInviteRate } = useInviteRateState(mmReady);
+  const { data: inviteRate, error: inviteRateError, refetch: refetchInviteRate } = useInviteRateState(mmReady);
+  // Einladungen, die der Server-Stand `inviteRate` noch nicht mitzählt:
+  // caregiverId → der `inviteRate`-Stand beim Einladen. Kommt ein neuer Stand,
+  // zählt der Server sie selbst (Review 25.09.: sonst rückte nach dem Einladen
+  // kurz eine 6. Karte nach und verschwand wieder).
+  const einladungStand = useRef(new Map<number, unknown>());
   const [inviteRateModalState, setInviteRateModalState] = useState<{
     retryAfterSeconds: number;
     limit: number;
@@ -1025,10 +1050,10 @@ const CustomerPortalPage: FC = () => {
   // the source of truth and only ever flip TO true, never back to false
   // (so an in-progress mid-edit doesn't accidentally clear the badge).
   useEffect(() => {
-    if (mmCustomer?.status && mmCustomer.status !== 'draft' && !patientSaved) {
+    if (schonAbgesendet && !patientSaved) {
       setPatientSaved(true);
     }
-  }, [mmCustomer?.status, patientSaved]);
+  }, [schonAbgesendet, patientSaved]);
 
   // Sync real applications from Mamamia → local state (keeps existing mutation flow).
   useEffect(() => {
@@ -1158,7 +1183,13 @@ const CustomerPortalPage: FC = () => {
     setSelectedNurse(nurse);
   };
 
-  const pendingApps = applications.filter((a) => a.status === 'new');
+  // Angenommene direkt über die IDs ausschließen: Die Überlagerung auf
+  // „accepted" läuft erst im Effekt NACH dem Render, in dem die Annahmen
+  // eintreffen. In genau diesem Render öffnete sonst `view=application`.
+  const angenommeneIds = new Set((acceptedApplications?.application_ids ?? []).map(Number));
+  const pendingApps = annahmenBekannt
+    ? applications.filter((a) => a.status === 'new' && !angenommeneIds.has(Number(a.id)))
+    : [];
 
   // Mail-Deeplink goto=bewerbungen: sobald die Bewerbungen geladen sind,
   // EINMAL zur Sektion scrollen (ref-Guard gegen Re-Scroll bei Refetches).
@@ -1212,7 +1243,7 @@ const CustomerPortalPage: FC = () => {
   // die Bewerbungen sind geladen — sonst zeigt der Kopf „Einen Moment …" und
   // die Stand-Karte würde kurz „noch keine Bewerbung" behaupten.
   const sucheLaeuft =
-    patientSaved && !hasPending && (IS_PREVIEW_ANY || (mmReady && !mmApplicationsLoading && !!mmApplications));
+    patientSaved && !hasPending && (IS_PREVIEW_ANY || (mmReady && !mmApplicationsLoading && !!mmApplications && annahmenBekannt));
 
   // Bewerbungs-Ereignisse für „Für Sie reserviert bis …" (src/lib/reservierung.ts).
   // Neu laden, sobald sich die Zahl der Bewerbungen ändert.
@@ -1225,24 +1256,49 @@ const CustomerPortalPage: FC = () => {
     return () => { aktiv = false; };
   }, [lead?.token, hasPending, pendingApps.map((a) => a.id).join(',')]);
   // Countdown „Noch N Stunden" zählt ohne Neuladen weiter.
-  const [, setUhr] = useState(0);
+  const [uhr, setUhr] = useState(0);
   useEffect(() => {
     if (!hasPending) return;
     const t = setInterval(() => setUhr((x) => x + 1), 60_000);
     return () => clearInterval(t);
   }, [hasPending]);
+  const reservierungsPaar = (app: Application) => ({
+    caregiverId: app.nurse.caregiverId,
+    jobOfferId: mmJobOffer?.id,
+    standardJobId: lead?.mamamia_job_offer_id ?? null,
+  });
   const reservierungFuer = (app: Application): Date | null => {
+    // Vermittler-Leads sagt der Server nie automatisch ab (detect-caregiver-events).
+    if (lead?.vermittler) return null;
     if (IS_PREVIEW_ANY) {
       // Vorschau: so, als wäre die Bewerbung vor 20 Stunden gekommen.
       const std = 60 * 60 * 1000;
       return new Date(Math.floor((Date.now() + (RESERVIERUNG_STUNDEN - 20) * std) / std) * std);
     }
-    return berechneReservierung(bewerbungsEvents, {
-      caregiverId: app.nurse.caregiverId,
-      jobOfferId: mmJobOffer?.id,
-      standardJobId: lead?.mamamia_job_offer_id ?? null,
-    });
+    return berechneReservierung(bewerbungsEvents, reservierungsPaar(app));
   };
+
+  // Nach Ablauf sagt der Server die Bewerbung ab (Cron, bis ~15 Min. später).
+  // Ein offener Tab hätte bis zum Neuladen weiter „Angebot prüfen" für eine
+  // vergebene Bewerbung gezeigt (Review 25.09.): Solange eine abgelaufene offen
+  // ist, alle 5 Minuten nachladen, und beim Zurückkehren in den Tab sofort.
+  useEffect(() => {
+    if (IS_PREVIEW_ANY || !hasPending || uhr === 0 || uhr % 5 !== 0) return;
+    const jetzt = Date.now();
+    // jetzt = 0 → das Ende auch dann, wenn es schon vorbei ist.
+    const abgelaufen = pendingApps.some((a) => {
+      const ende = berechneReservierung(bewerbungsEvents, reservierungsPaar(a), 0);
+      return ende !== null && ende.getTime() <= jetzt;
+    });
+    if (abgelaufen) refetchApplications();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [uhr]);
+  useEffect(() => {
+    if (IS_PREVIEW_ANY || !hasPending) return;
+    const sichtbar = () => { if (document.visibilityState === 'visible') refetchApplications(); };
+    document.addEventListener('visibilitychange', sichtbar);
+    return () => document.removeEventListener('visibilitychange', sichtbar);
+  }, [hasPending, refetchApplications]);
 
   // Mail B verlinkt `&view=application`: bei genau einer offenen Bewerbung
   // direkt „Angebot prüfen" öffnen, sonst zu den Bewerbungen springen. Einmal.
@@ -1262,6 +1318,9 @@ const CustomerPortalPage: FC = () => {
   // Seite (2026-06-26: Mamamia-Matchings 500'ten kurz → Kunden sahen 0 PKs).
   // Bei echtem "0 Treffer" ist mmMatchings.data = [] (truthy) → NICHT hier.
   const matchingsLoadingOrError = mmReady && !mmMatchings?.data && (!!mmMatchingsError || mmMatchingsLoading);
+  // Die Liste zeigt 5 − Einladungen der letzten 24 h. Bis dieser Stand da ist,
+  // lädt sie: sonst standen erst 5 Karten da und dann verschwanden welche.
+  const listeLaedt = matchingsLoadingOrError || (mmReady && !IS_PREVIEW_ANY && !inviteRate && !inviteRateError);
 
   // Auto-Retry, solange die Matchings-Abfrage fehlerhaft ist: alle 8s im
   // Hintergrund nachladen, bis Mamamia wieder antwortet — der Kunde muss
@@ -1271,6 +1330,16 @@ const CustomerPortalPage: FC = () => {
     const t = setInterval(() => { refetchMatchings(); }, 8000);
     return () => clearInterval(t);
   }, [mmReady, mmMatchingsError, refetchMatchings]);
+
+  // Dasselbe für die Bewerbungen (Review 25.09.): Ohne Nachladen blieb der Kopf
+  // nach einem kurzen mamamia-500 dauerhaft auf „Einen Moment — Ihre
+  // Bewerbungen werden geladen". Raten („Ihre Suche läuft") wäre falsch, der
+  // Kunde kann eine Bewerbung haben, also: ruhig laden, bis mamamia antwortet.
+  useEffect(() => {
+    if (!mmReady || !mmApplicationsError) return;
+    const t = setInterval(() => { refetchApplications(); }, 8000);
+    return () => clearInterval(t);
+  }, [mmReady, mmApplicationsError, refetchApplications]);
 
   // Prefill for AngebotPruefenModal step 2 — replaces the previous
   // hardcoded fixture (Hildegard/Müller/Rosenstraße/München) that bled
@@ -1485,9 +1554,13 @@ const CustomerPortalPage: FC = () => {
     return true;
   });
 
+  // Nur der Timer des LETZTEN Toasts blendet aus: Vorher schloss der Timer
+  // eines älteren Toasts einen neueren zu früh (z. B. 7-s-Dank nach 4 s).
+  const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const showToast = (msg: string, durationMs = 4000) => {
     setToast(msg);
-    setTimeout(() => setToast(null), durationMs);
+    if (toastTimer.current) clearTimeout(toastTimer.current);
+    toastTimer.current = setTimeout(() => setToast(null), durationMs);
   };
 
   // Annahme-Pfad (seit 2026-07-15 automatisch — vorher MVP mit manueller
@@ -1812,6 +1885,7 @@ const CustomerPortalPage: FC = () => {
     // 10s (3 attempts × 5s), only surface the toast if every retry fails.
     // 10s covers the worst-case warm-up (translator wipe + a just-opened job
     // needing 3-5s); longer just makes a genuine failure feel laggy.
+    einladungStand.current.set(id, inviteRate);
     setStatusOverrides((prev) => {
       const next = new Map(prev);
       next.set(id, 'invited');
@@ -1923,6 +1997,7 @@ const CustomerPortalPage: FC = () => {
             nowYear: new Date().getFullYear(),
           })
         : null;
+      einladungStand.current.set(caregiverId, inviteRate);
       setInterestStatusOverrides((prev) => {
         const next = new Map(prev);
         next.set(caregiverId, 'invited');
@@ -2089,30 +2164,6 @@ const CustomerPortalPage: FC = () => {
       showToast('Konnte nicht ablehnen. Bitte erneut versuchen.');
       throw err;
     }
-  };
-
-  // Undo der Interest-Ablehnung: feuert caregiver_declined_undone-Event
-  // (überschreibt die letzte Decline in der lead_events-Historie) +
-  // entfernt lokales Override damit die Interest-Karte wieder oben
-  // auftaucht. Wenn Mamamia eine "restoreCaregiver"-Mutation hätte
-  // würden wir die auch rufen — gibt's aber nicht, also kann die Karte
-  // erst nach dem nächsten mmInterests-Refetch wieder sichtbar sein
-  // (Mamamia muss sie zurückbringen). Best-effort.
-  const undoDismissInterest = (caregiverId: number): void => {
-    setDeclinedFromInterest((prev) => {
-      const next = new Map(prev);
-      next.delete(caregiverId);
-      return next;
-    });
-    setInterestStatusOverrides((prev) => {
-      const next = new Map(prev);
-      next.delete(caregiverId);
-      return next;
-    });
-    reportLeadEvent(lead?.token, 'caregiver_declined_undone', {
-      caregiver_id: caregiverId,
-    });
-    refetchInterests?.();
   };
 
   // Used by modal (calls after own animation). Modal doesn't await — it just
@@ -2451,14 +2502,18 @@ const CustomerPortalPage: FC = () => {
               aria-expanded={offerExpanded}
               className="w-full min-h-[44px] flex items-center justify-between gap-3 text-left"
             >
-              <span className={EYEBROW}>{hasPending ? 'Ihr Angebot' : 'Ihre Betreuungskosten'}</span>
-              {/* Preis nur ohne offene Bewerbung: Die Bewerbung nennt ihren eigenen
-                  Tagessatz, zwei Preise nebeneinander widersprächen sich (Review 25.09.). */}
-              {!offerExpanded && !hasPending && (
-                <span className="ml-auto text-[15px] font-bold tabular-nums text-pm-ink">
-                  {formatEuro(brutto)}<span className="font-normal text-pm-muted"> / Monat</span>
-                </span>
-              )}
+              {/* Preis UNTER dem Label: Nebeneinander brach bei 360 px beides um
+                  („Ihre Betreuungs-/kosten", „3.050 € /" „Monat"). */}
+              <span className="flex min-w-0 flex-col gap-0.5">
+                <span className={EYEBROW}>{hasPending ? 'Ihr Angebot' : 'Ihre Betreuungskosten'}</span>
+                {/* Preis nur ohne offene Bewerbung: Die Bewerbung nennt ihren eigenen
+                    Tagessatz, zwei Preise nebeneinander widersprächen sich (Review 25.09.). */}
+                {!offerExpanded && !hasPending && (
+                  <span className="whitespace-nowrap text-[17px] font-bold tabular-nums text-pm-ink">
+                    {formatEuro(brutto)}<span className="text-[15px] font-normal text-pm-muted"> / Monat</span>
+                  </span>
+                )}
+              </span>
               <ChevronDown className={`w-5 h-5 flex-shrink-0 text-pm-taupe transition-transform duration-200 ${offerExpanded ? 'rotate-180' : ''}`} />
             </button>
 
@@ -2718,7 +2773,8 @@ const CustomerPortalPage: FC = () => {
           <div className="flex items-center gap-2">
             <button
               onClick={() => setShowContactPopup(true)}
-              className="flex items-center gap-1.5 bg-white hover:bg-[#F5F5F6] text-[#8B7355] border border-[#E9E9EB] rounded-full px-3 py-1.5 text-xs font-semibold transition-colors"
+              // Tippfläche ≥ 44 px über ein unsichtbares ::before, die Pille bleibt 32 px hoch.
+              className="relative flex items-center gap-1.5 bg-white hover:bg-[#F5F5F6] text-[#8B7355] border border-[#E9E9EB] rounded-full px-3 py-1.5 text-xs font-semibold transition-colors before:absolute before:-inset-y-2 before:inset-x-0 before:content-['']"
             >
               <Phone className="w-3.5 h-3.5" />
               Hilfe
@@ -2876,7 +2932,7 @@ const CustomerPortalPage: FC = () => {
               frist,
               steps: null as 'initial' | 'saved' | null,
             }
-          : patientSaved && !IS_PREVIEW_ANY && (!mmReady || mmApplicationsLoading || !mmApplications)
+          : patientSaved && !IS_PREVIEW_ANY && (!mmReady || mmApplicationsLoading || !mmApplications || !annahmenBekannt)
           ? {
               // Mamamia-Daten laden noch (oder der Abruf hakt) — hier NICHT
               // "werden vorbereitet" behaupten: Wer aus der Bewerbungs-Mail
@@ -2902,7 +2958,7 @@ const CustomerPortalPage: FC = () => {
               // Bewerbungen kommen („Ihr Betreuungsportal" sagte nichts davon).
               frist: null as Date | null,
               title: 'Ihre Suche läuft',
-              subtitle: 'Sobald sich eine Pflegekraft bewirbt, bekommen Sie eine E-Mail.',
+              subtitle: 'Sobald sich eine Pflegekraft bewirbt, bekommen Sie eine E\u2011Mail.',
               // Kein Pill (Martin, 13.08.): „unverbindlich" steht schon im
               // Satz darüber — die Zeile war eine Wiederholung.
               pill: '',
@@ -3216,7 +3272,7 @@ const CustomerPortalPage: FC = () => {
         {/* Mamamia-Matchings vorübergehend nicht erreichbar / noch am Laden →
             ruhiger Lade-Zustand STATT einer leeren "keine Pflegekräfte"-Seite.
             Auto-Retry (useEffect oben) lädt im Hintergrund nach. */}
-        {!hasPending && matchingsLoadingOrError && (
+        {!hasPending && listeLaedt && (
           <div className="rounded-card px-5 py-8 border border-[#EFEBE4] bg-white text-center">
             <div className="inline-block w-6 h-6 rounded-full border-2 animate-spin mb-3" style={{ borderColor: '#C4B49A', borderTopColor: 'transparent' }} />
             <p className="text-[15px] font-semibold mb-1" style={{ color: '#18181B' }}>Wir laden Ihre Pflegekräfte …</p>
@@ -3224,7 +3280,7 @@ const CustomerPortalPage: FC = () => {
           </div>
         )}
 
-        {!hasPending && !matchingsLoadingOrError && (() => {
+        {!hasPending && !listeLaedt && (() => {
           // Interest-Pflegekräfte (sowohl invited als auch declined)
           // werden NICHT in der Matching-Liste gerendert sondern unten
           // in der "Bereits bearbeitet"-Sektion (User-Wunsch: gleiche
@@ -3259,7 +3315,10 @@ const CustomerPortalPage: FC = () => {
           // der Pool wieder auf 5 + die "neue Pflegekräfte"-Mail geht raus.
           // Ablehnen zählt NICHT mit (caregiver_invite_attempts erfasst nur
           // echte Einladungen) → rückt sofort nach. used_24h aus getInviteRateState.
-          const heldInvites = inviteRate?.used_24h ?? 0;
+          const unbestaetigt = [...einladungStand.current].filter(([id, stand]) =>
+            stand === inviteRate
+            && (statusOverrides.get(id) === 'invited' || interestStatusOverrides.get(id) === 'invited')).length;
+          const heldInvites = (inviteRate?.used_24h ?? 0) + unbestaetigt;
           const visibleCount = Math.max(0, 5 - heldInvites);
           const pendingNurses: VisibleNurse[] = allVisible.filter(({ status }) => status === 'pending').slice(0, visibleCount);
           // Die Empfehlung (höchste Badge-Bewertung, Score = Erfahrungsjahre +
@@ -3382,7 +3441,7 @@ const CustomerPortalPage: FC = () => {
                 <div className="rounded-card px-5 py-6 border border-[#EFEBE4] bg-white text-center">
                   <p className="text-[15.5px] font-bold text-pm-ink">Gerade keine weiteren Vorschläge</p>
                   <p className="mt-1 text-[14px] leading-relaxed text-pm-muted">
-                    Neue passende Pflegekräfte erscheinen hier.{patientSaved ? ' Bewerbungen bekommen Sie trotzdem per E-Mail.' : ''}
+                    Neue passende Pflegekräfte erscheinen hier.{patientSaved ? ' Bewerbungen bekommen Sie trotzdem per E\u2011Mail.' : ''}
                   </p>
                   <a
                     href={TELEFON_HREF}
@@ -3460,7 +3519,11 @@ const CustomerPortalPage: FC = () => {
                   status={status}
                   hasInterestOrigin={interest}
                   onNurseClick={() => (fromEvent || interest) ? setSelectedNurse(nurse) : openNurseFromMatch(nurse, matchIdx)}
-                  onUndo={(!fromEvent && status === 'declined') ? (interest ? () => undoDismissInterest(caregiverId) : () => undoDeclinedMatch(matchIdx)) : undefined}
+                  // Kein „Rückgängig" für abgelehnte Interessenten (Review 25.09.): Die
+                  // Ablehnung steht serverseitig in lead_dismissed_caregivers, und der
+                  // Proxy kennt kein Zurücknehmen. Das lokale Rückgängig ließ die Karte
+                  // verschwinden, statt sie zurückzubringen, auch nach dem Neuladen.
+                  onUndo={(!fromEvent && status === 'declined' && !interest) ? () => undoDeclinedMatch(matchIdx) : undefined}
                 />
               ))}
               {!showAllDone && moreCount > 0 && (
@@ -3565,7 +3628,7 @@ const CustomerPortalPage: FC = () => {
             // (mmCustomer.status ≠ draft) setzte sofort zurück — die Seite
             // kippte bei jedem Tipp in den Ausgangszustand und wieder zurück.
             // Führt mamamia den Kunden als aktiv, bleibt die Seite „gespeichert".
-            if (!saved && mmCustomer?.status && mmCustomer.status !== 'draft') return;
+            if (!saved && schonAbgesendet) return;
             if (saved && !patientSaved) {
               // Hauptweg zuerst (Martin 24.09.): Bewerbungen, Einladen ist die Zugabe.
               showToast('✓ Vielen Dank! Ihre Anfrage ist raus. Passende Pflegekräfte können sich jetzt bei Ihnen bewerben.', 7000);
@@ -3578,12 +3641,17 @@ const CustomerPortalPage: FC = () => {
           }}
           triggerOpenPatient={triggerOpenPatient}
           onTriggerHandled={() => setTriggerOpenPatient(false)}
+          schonAbgesendet={schonAbgesendet}
           onAbgesendet={(nurAenderung) => {
+            setAbgesendetInSitzung(true);
             // Angaben geändert (nicht die erste Anfrage): bestätigen und zuklappen.
             if (!nurAenderung) return;
             showToast('✓ Ihre Angaben sind gespeichert.', 5000);
             setPatientExpandedManual(null);
           }}
+          // Nach dem Absenden ist `arrival_at` das Datum des Kunden (unten beim
+          // Speichern nach mamamia geschrieben), vorher nur die Onboard-Schätzung.
+          gewaehlterStart={schonAbgesendet ? mmJobOffer?.arrival_at : null}
           mamamiaEnabled={mmReady}
           onSaveToMamamia={async (form) => {
             const existingPatientIds = mmCustomer?.patients?.map(p => p.id) ?? [];
@@ -3779,7 +3847,9 @@ const CustomerPortalPage: FC = () => {
             // Mamamia currently holds — avoid no-op writes that would log
             // noise + reload the JobOffer.
             const pickedStartDate = form.startDate?.trim();
-            const currentArrival = mmJobOffer?.arrival_at ?? null;
+            // mamamia liefert „2026-10-15 00:00:00", das Formular „2026-10-15":
+            // nur den Tag vergleichen, sonst schreibt jedes Speichern neu.
+            const currentArrival = kalenderTag(mmJobOffer?.arrival_at);
             if (pickedStartDate && pickedStartDate !== currentArrival) {
               void (async () => {
                 try {
@@ -3955,6 +4025,8 @@ const CustomerPortalPage: FC = () => {
           initialLevelInfo={nurseModalStufe}
           onClose={() => { setSelectedNurse(null); setNurseModalApp(null); setNurseMatchIdx(null); setSelectedFromInterestId(null); setNurseModalStufe(false); }}
           app={nurseModalApp ?? undefined}
+          // Gebucht oder Vertrag offen: nur das Profil, kein „Einladen" (Review 25.09.).
+          nurProfil={!!acceptedApp || !!contractApp}
           onReview={() => { setSelectedNurse(null); setSelectedApp(nurseModalApp); setNurseModalApp(null); setSelectedFromInterestId(null); }}
           onDecline={() => { setDeclineConfirmApp(nurseModalApp); setSelectedNurse(null); setNurseModalApp(null); setSelectedFromInterestId(null); }}
           onChat={CHAT_ENABLED && nurseModalApp ? () => { const n = enrichedSelectedNurse; setSelectedNurse(null); setNurseModalApp(null); setNurseMatchIdx(null); setSelectedFromInterestId(null); setChatNurse(n); } : undefined}

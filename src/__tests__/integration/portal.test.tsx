@@ -3,6 +3,7 @@ import { describe, it, expect, vi } from 'vitest';
 import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { server } from '../../../test/mocks/server';
+import { http, HttpResponse, delay } from 'msw';
 import {
   defaultHandlers,
   defaultLead,
@@ -25,6 +26,10 @@ vi.mock('../../lib/supabase', async () => {
       if (token === TEST_LEAD_TOKEN) {
         return { lead: defaultLead as unknown as import('../../lib/supabase').Lead, error: null };
       }
+      // Schon abgesendet (Proxy hat `patient_form_at` gesetzt), neues Gerät.
+      if (token === 'token-abgesendet') {
+        return { lead: { ...defaultLead, token, patient_form_at: '2026-09-24T10:00:00Z' } as unknown as import('../../lib/supabase').Lead, error: null };
+      }
       return { lead: null, error: 'Token nicht gefunden' };
     }),
   };
@@ -37,6 +42,8 @@ import CustomerPortalPage from '../../pages/CustomerPortalPage';
 beforeAll(() => {
   window.URL.createObjectURL = vi.fn(() => 'blob:mock');
   window.scrollTo = vi.fn();
+  // …und kein Element.scrollTo (das Portal scrollt nach dem Absenden nach oben).
+  Element.prototype.scrollTo = vi.fn() as unknown as typeof Element.prototype.scrollTo;
   // jsdom kennt scrollIntoView nicht — das Formular scrollt beim Schrittwechsel
   // und beim Sprung zum ersten fehlenden Feld dorthin.
   Element.prototype.scrollIntoView = vi.fn();
@@ -278,6 +285,107 @@ describe('Portal integration: golden paths', () => {
     expect(screen.getByRole('button', { name: /Pflegesituation.*Vollständig/ })).toBeInTheDocument();
   }, 15_000);
 
+  it('erstes Absenden, dann gleich eine Angabe ändern: die Seite bleibt „abgesendet“ (mmCustomer noch „draft“)', async () => {
+    // Review 25.09.: `useCustomer` lädt nach dem Speichern nicht neu, der Status
+    // bleibt in dieser Sitzung „draft". Vorher kippte die erste Änderung die Seite
+    // zurück in den Ausgangszustand, und der Knopf hieß wieder „Bewerbungen anfragen".
+    server.use(
+      ...defaultHandlers({
+        proxy: {
+          listApplications: () => ({ JobOfferApplicationsWithPagination: { total: 0, data: [] } }),
+          searchLocations: () => ({ LocationsWithPagination: { data: [{ id: 4711, location: 'München', zip_code: '80331', country_code: 'DE' }] } }),
+        },
+      }),
+    );
+    localStorage.setItem(
+      `patient_${TEST_LEAD_TOKEN}`,
+      JSON.stringify({
+        _isDraft: true,
+        anzahl: '1', geschlecht: 'Weiblich',
+        mobilitaet: 'Rollatorfähig', heben: 'Nein', demenz: 'Nein', nacht: 'Nein',
+        plz: '80331', ort: 'München',
+        wohnungstyp: 'Einfamilienhaus', urbanisierung: 'Großstadt', startDate: '2099-12-01',
+        wunschGeschlecht: 'Weiblich', fuehrerschein: 'Nein',
+      }),
+    );
+    setLocation(`?token=${TEST_LEAD_TOKEN}`);
+    const user = userEvent.setup();
+    render(<CustomerPortalPage />);
+
+    for (let i = 0; i < 3; i++) {
+      await user.click(await screen.findByRole('button', { name: /^Weiter →$/ }, { timeout: 5000 }));
+    }
+    await user.click(await screen.findByRole('button', { name: /^Bewerbungen anfragen$/ }, { timeout: 5000 }));
+    expect(await screen.findByText('Ihre Suche läuft', {}, { timeout: 5000 })).toBeInTheDocument();
+
+    // Angaben öffnen und eine Angabe ändern.
+    await user.click(screen.getByRole('button', { name: /Angaben ansehen oder ändern/ }));
+    await user.click(await screen.findByRole('button', { name: 'Männlich' }, { timeout: 5000 }));
+    expect(screen.getByText('Ihre Suche läuft')).toBeInTheDocument();
+    expect(screen.queryByText('Ihr persönliches Angebot')).toBeNull();
+
+    // Letzter Schritt: nur noch „Änderungen speichern", kein zweites Anfragen.
+    for (let i = 0; i < 3; i++) {
+      await user.click(await screen.findByRole('button', { name: /^Weiter →$/ }, { timeout: 5000 }));
+    }
+    expect(screen.queryByRole('button', { name: /^Bewerbungen anfragen$/ })).toBeNull();
+    expect(screen.getByRole('button', { name: /^Änderungen speichern$/ })).toBeInTheDocument();
+  }, 20_000);
+
+  it('schon abgesendet, neues Gerät, mamamia noch unbekannt: nie der Ausgangszustand', async () => {
+    // Review 25.09.: Bis mamamia antwortete, sahen wiederkehrende Kunden ohne
+    // lokalen Vermerk das Angebot mit offenem Formular („Unvollständig").
+    server.use(
+      ...defaultHandlers({
+        proxy: {
+          getCustomer: () => ({ Customer: { ...sampleCustomer, status: 'draft' } }),
+          listApplications: () => ({ JobOfferApplicationsWithPagination: { total: 0, data: [] } }),
+        },
+      }),
+    );
+    const titel: string[] = [];
+    const mo = new MutationObserver((records) => {
+      for (const r of records) r.addedNodes.forEach((n) => titel.push(n.textContent ?? ''));
+    });
+    mo.observe(document.body, { subtree: true, childList: true });
+    setLocation('?token=token-abgesendet');
+    render(<CustomerPortalPage />);
+    expect(await screen.findByText('Ihre Suche läuft', {}, { timeout: 5000 })).toBeInTheDocument();
+    mo.disconnect();
+    // Der Ladebildschirm davor sagt „Gleich sehen Sie Ihr persönliches Angebot" — der zählt nicht.
+    const kopfAngebot = (t: string) => t.includes('Ihr persönliches Angebot') && !t.includes('Gleich sehen Sie');
+    expect(titel.some(kopfAngebot)).toBe(false);
+    expect(titel.some((t) => t.includes('Passt Ihnen das Angebot?'))).toBe(false);
+    expect(screen.getByText('am 24.09.')).toBeInTheDocument();
+  }, 15_000);
+
+  it('gebucht, Link aus Mail B (view=application), Annahmen kommen später: keine „aktive Bewerbung“, kein zweites „Angebot prüfen“', async () => {
+    // Review 25.09.: mamamia führt die Bewerbung noch als „neu", die Annahme
+    // kommt aus listAcceptedApplications. Kam die später, zeigte die Seite erst
+    // „Sie haben eine aktive Bewerbung" und öffnete „Angebot prüfen".
+    server.use(
+      http.post('*/functions/v1/mamamia-proxy', async ({ request }) => {
+        const body = await request.clone().json() as { action: string };
+        if (body.action !== 'listAcceptedApplications') return undefined;
+        await delay(300);
+        return HttpResponse.json({ data: { application_ids: [333], rows: [{ application_id: 333, caregiver_id: 50001, accepted_at: '2026-09-20T10:00:00Z', contract_snapshot: null }] } });
+      }),
+      ...defaultHandlers({}),
+    );
+    const titel: string[] = [];
+    const mo = new MutationObserver((records) => {
+      for (const r of records) r.addedNodes.forEach((n) => titel.push(n.textContent ?? ''));
+    });
+    mo.observe(document.body, { subtree: true, childList: true });
+    setLocation(`?token=${TEST_LEAD_TOKEN}&view=application`);
+    render(<CustomerPortalPage />);
+    await screen.findByText(/Pflegekraft gebucht!/i, {}, { timeout: 5000 });
+    await new Promise((r) => setTimeout(r, 400));
+    mo.disconnect();
+    expect(titel.some((t) => t.includes('Sie haben eine aktive Bewerbung'))).toBe(false);
+    expect(screen.queryByRole('heading', { name: 'Angebot prüfen' })).toBeNull();
+  }, 15_000);
+
   // ─── Nach dem Absenden ohne sichtbare Pflegekraft (Martin 25.09.) ────────
 
   it('gespeichert, keine Bewerbung, keine Pflegekraft: „Ihre Suche läuft“ und ein Leer-Zustand statt nackter Überschrift', async () => {
@@ -296,7 +404,7 @@ describe('Portal integration: golden paths', () => {
     expect(await screen.findByText('Ihre Suche läuft', {}, { timeout: 5000 })).toBeInTheDocument();
     expect(screen.getByText('Stand heute')).toBeInTheDocument();
     expect(await screen.findByText('Gerade keine weiteren Vorschläge', {}, { timeout: 5000 })).toBeInTheDocument();
-    expect(screen.getByText(/Bewerbungen bekommen Sie trotzdem per E-Mail/)).toBeInTheDocument();
+    expect(screen.getByText(/Bewerbungen bekommen Sie trotzdem per E.Mail/)).toBeInTheDocument();
     // „So geht es weiter" ersetzt der Stand.
     expect(screen.queryByText('So geht es weiter')).toBeNull();
   }, 15_000);

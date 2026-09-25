@@ -25,7 +25,7 @@ describe('SucheStand', () => {
 
   it('nach entschiedenen Bewerbungen kein reines Zukunftsversprechen', () => {
     render(<SucheStand angefragtAm={null} passende={2} wunschstart={null} onAngaben={() => {}} bisherigeBewerbungen={1} />);
-    expect(screen.getByText('bisher 1 Bewerbung, weitere kommen per E-Mail')).toBeInTheDocument();
+    expect(screen.getByText('bisher 1 Bewerbung, weitere kommen per E\u2011Mail')).toBeInTheDocument();
   });
 
   it('Einzahl bei einer Pflegekraft', () => {
@@ -36,6 +36,11 @@ describe('SucheStand', () => {
   it('kurzDatum rechnet in Berliner Zeit und verwirft Unsinn', () => {
     expect(kurzDatum('2026-09-24T23:30:00Z')).toBe('25.09.');
     expect(kurzDatum('kaputt')).toBeNull();
+    // mamamia `arrival_at`: Tag wie geschrieben, ohne Umweg über new Date() (Safari).
+    expect(kurzDatum('2026-10-15 00:00:00')).toBe('15.10.');
+    expect(kurzDatum('2026-10-01')).toBe('01.10.');
+    // Zeitpunkt mit Leerzeichen und Zone (Postgres-Form) liest auch Safari.
+    expect(kurzDatum('2026-09-24 23:30:00+00:00')).toBe('25.09.');
     expect(kurzDatum(undefined)).toBeNull();
   });
 });

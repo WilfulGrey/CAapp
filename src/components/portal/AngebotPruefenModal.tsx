@@ -257,7 +257,7 @@ export const AngebotPruefenModal: FC<{
                   {step === 1 ? 'Angebot prüfen' : 'Daten & Vertrag'}
                 </h2>
               </div>
-              <button onClick={onClose} className="w-8 h-8 rounded-full hover:bg-gray-100 flex items-center justify-center transition-colors flex-shrink-0 mt-0.5">
+              <button onClick={onClose} aria-label="Schließen" className="relative w-8 h-8 rounded-full hover:bg-gray-100 flex items-center justify-center transition-colors flex-shrink-0 mt-0.5 before:absolute before:-inset-1.5 before:content-['']">
                 <X className="w-4 h-4 text-gray-500" />
               </button>
             </div>
@@ -267,16 +267,17 @@ export const AngebotPruefenModal: FC<{
               <div className="flex border-b border-gray-100 mt-1">
                 <button
                   onClick={() => setStep(1)}
-                  className={`flex items-center gap-1.5 px-1 pb-2.5 text-xs font-semibold mr-5 border-b-2 transition-colors ${step === 1 ? 'border-[#8B7355] text-[#8B7355]' : 'border-transparent text-gray-400'}`}
+                  className={`relative flex items-center gap-1.5 px-1 pb-2.5 text-xs font-semibold mr-5 border-b-2 transition-colors before:absolute before:inset-x-0 before:-top-3.5 before:bottom-0 before:content-[''] ${step === 1 ? 'border-[#8B7355] text-[#8B7355]' : 'border-transparent text-gray-400'}`}
                 >
                   {step === 2 && <Check className="w-3 h-3 text-[#22A06B]" />}
                   1 · Angebot
                 </button>
-                <button
+                {/* Nur Anzeige: Schritt 2 erreicht man über „Weiter" (war ein Knopf ohne Funktion). */}
+                <span
                   className={`flex items-center gap-1.5 px-1 pb-2.5 text-xs font-semibold border-b-2 transition-colors ${step === 2 ? 'border-[#8B7355] text-[#8B7355]' : 'border-transparent text-gray-400'}`}
                 >
                   2 · Daten & Vertrag
-                </button>
+                </span>
               </div>
             )}
           </div>
@@ -311,7 +312,7 @@ export const AngebotPruefenModal: FC<{
                       {nurseFacts(nurse)}
                     </p>
                   </div>
-                  <button onClick={() => onNurseClick(nurse)} className="text-sm font-semibold text-[#8B7355] hover:underline flex-shrink-0">
+                  <button onClick={() => onNurseClick(nurse)} className="-my-3 min-h-[44px] text-sm font-semibold text-[#8B7355] hover:underline flex-shrink-0">
                     Profil →
                   </button>
                 </div>
@@ -376,7 +377,7 @@ export const AngebotPruefenModal: FC<{
                                   type="button"
                                   onClick={() => setFeiertagInfoOpen(v => !v)}
                                   aria-label="Welche Feiertage?"
-                                  className="text-gray-400 hover:text-gray-700 transition-colors"
+                                  className="relative text-gray-400 hover:text-gray-700 transition-colors before:absolute before:-inset-4 before:content-['']"
                                 >
                                   <Info className="w-3.5 h-3.5" />
                                 </button>

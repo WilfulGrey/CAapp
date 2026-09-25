@@ -143,7 +143,8 @@ export function reportLeadEvent(
    *  die endgültige Antwort feststeht. */
   notify?: boolean,
 ): void {
-  if (!token) return;
+  // Vorschau (?preview=…, Token „preview-token"): nichts an den Server senden.
+  if (!token || token === 'preview-token') return;
   const key = dedupeKey(token, event, metadata);
   if (sent.has(key)) return;
   sent.add(key);
@@ -182,7 +183,7 @@ export async function fetchLeadEvents(
   token: string | null | undefined,
   eventTypes?: LeadEvent[] | string[],
 ): Promise<FetchedLeadEvent[]> {
-  if (!token) return [];
+  if (!token || token === 'preview-token') return [];
   const params = new URLSearchParams({ token });
   if (eventTypes && eventTypes.length > 0) params.set('types', eventTypes.join(','));
   try {

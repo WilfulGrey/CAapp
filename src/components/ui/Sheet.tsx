@@ -57,7 +57,8 @@ export function Sheet({
             type="button"
             onClick={onClose}
             aria-label="Schließen"
-            className="w-10 h-10 rounded-full bg-pm-shell text-pm-ink flex items-center justify-center flex-none hover:bg-[#EAE3D9] focus-visible:outline focus-visible:outline-2 focus-visible:outline-pm-taupe"
+            // Sichtbar 40 px wie auf primundus.de, getippt wird auf 48 px (::before).
+            className="relative w-10 h-10 rounded-full bg-pm-shell text-pm-ink flex items-center justify-center flex-none hover:bg-[#EAE3D9] focus-visible:outline focus-visible:outline-2 focus-visible:outline-pm-taupe before:absolute before:-inset-1 before:content-['']"
           >
             <X className="w-5 h-5" />
           </button>

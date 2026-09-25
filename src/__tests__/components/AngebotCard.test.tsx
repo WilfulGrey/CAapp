@@ -118,6 +118,49 @@ describe('AngebotCard – Pflichtfelder', () => {
   });
 });
 
+describe('AngebotCard – Startdatum beim Ändern', () => {
+  // Wie auf einem anderen Gerät: kein lokaler Startdatum-Wert.
+  const OHNE_START = { ...VOLL, startDate: '' };
+  const bisAbsenden = async () => { for (let i = 0; i < 3; i++) await weiter(); };
+
+  it('übernimmt das beim Absenden gewählte Datum (mamamia-Format mit Uhrzeit)', async () => {
+    entwurf(OHNE_START);
+    const onSave = vi.fn(async () => {});
+    render(<AngebotCard lead={lead} mamamiaEnabled onSaveToMamamia={onSave} gewaehlterStart="2099-11-15 00:00:00" />);
+    await bisAbsenden();
+    schritt(4);
+    await userEvent.click(screen.getByRole('button', { name: 'Bewerbungen anfragen' }));
+    await waitFor(() => expect(onSave).toHaveBeenCalledTimes(1));
+    expect(onSave.mock.calls[0][0]).toMatchObject({ startDate: '2099-11-15' });
+  });
+
+  it('ohne gewähltes Datum (noch nicht abgesendet) bleibt das Feld leer', async () => {
+    entwurf(OHNE_START);
+    render(<AngebotCard lead={lead} />);
+    await bisAbsenden();
+    schritt(3);
+    expect(screen.getByText('Bitte ein Datum wählen. Eine Schätzung reicht.')).toBeInTheDocument();
+  });
+
+  it('ein vergangenes Datum wird nicht vorbelegt', async () => {
+    entwurf(OHNE_START);
+    render(<AngebotCard lead={lead} gewaehlterStart="2020-01-15 00:00:00" />);
+    await bisAbsenden();
+    schritt(3);
+    expect(screen.getByText('Bitte ein Datum wählen. Eine Schätzung reicht.')).toBeInTheDocument();
+  });
+
+  it('ein Datum auf diesem Gerät hat Vorrang', async () => {
+    entwurf(VOLL);
+    const onSave = vi.fn(async () => {});
+    render(<AngebotCard lead={lead} mamamiaEnabled onSaveToMamamia={onSave} gewaehlterStart="2099-11-15" />);
+    await bisAbsenden();
+    await userEvent.click(screen.getByRole('button', { name: 'Bewerbungen anfragen' }));
+    await waitFor(() => expect(onSave).toHaveBeenCalledTimes(1));
+    expect(onSave.mock.calls[0][0]).toMatchObject({ startDate: '2099-12-01' });
+  });
+});
+
 describe('AngebotCard – Auswahl-Beschriftungen', () => {
   it('Pflegegrad-Chip „3" speichert „Pflegegrad 3", Gewicht „71–80" speichert „71-80 kg"', async () => {
     entwurf({ _isDraft: true, anzahl: '1', geschlecht: 'Weiblich' });
