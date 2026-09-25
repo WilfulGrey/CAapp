@@ -71,7 +71,7 @@ describe('Countdown', () => {
     expect(nochReserviertText(ende, jetzt)).toBe('Noch 52 Stunden für Sie reserviert');
     expect(istDringend(ende, jetzt)).toBe(false);
     const bald = new Date(jetzt + 90 * 60 * 1000);
-    expect(nochReserviertText(bald, jetzt)).toBe('Noch 1 Stunde für Sie reserviert');
+    expect(nochReserviertText(bald, jetzt)).toBe('Nur noch 1 Stunde für Sie reserviert');
     expect(istDringend(bald, jetzt)).toBe(true);
     expect(nochReserviertText(new Date(jetzt + 10 * 60 * 1000), jetzt)).toBe('Nur noch kurz für Sie reserviert');
     expect(stundenBis(new Date(jetzt - 5000), jetzt)).toBe(0);

@@ -53,7 +53,7 @@ import { AppCardDone } from '../components/portal/AppCardDone';
 import { BeratungCTA } from '../components/portal/BeratungCTA';
 import { AngebotFrage } from '../components/portal/AngebotFrage';
 import { SucheStand } from '../components/portal/SucheStand';
-import { reserviertBis as berechneReservierung, RESERVIERUNG_STUNDEN, reserviertBisText, nochReserviertText, istDringend } from '../lib/reservierung';
+import { reserviertBis as berechneReservierung, RESERVIERUNG_STUNDEN, reserviertBisText, nochReserviertText } from '../lib/reservierung';
 import type { FetchedLeadEvent } from '../lib/leadEvents';
 import { MatchCard } from '../components/portal/MatchCard';
 import { MatchCardDone } from '../components/portal/MatchCardDone';
@@ -2856,9 +2856,10 @@ const CustomerPortalPage: FC = () => {
               title: n > 1
                 ? `Sie haben ${n} aktive Bewerbungen`
                 : 'Sie haben eine aktive Bewerbung',
+              // Positiv gesagt (Martin 25.09.: „Tick zu negativ"), die Zeit bleibt.
               subtitle: frist
-                ? `Bitte reagieren Sie bis ${reserviertBisText(frist)}. Danach geben wir ${n > 1 ? 'die Pflegekräfte' : 'die Pflegekraft'} wieder frei.`
-                : 'Bitte reagieren Sie: zusagen, absagen oder eine Frage stellen.',
+                ? `${n > 1 ? 'Die Pflegekräfte halten' : `${displayName(pendingApps[0].nurse.name).split(' ')[0]} hält`} sich bis ${reserviertBisText(frist)} für Sie frei. Sagen Sie zu, ab oder stellen Sie eine Frage.`
+                : 'Sagen Sie zu, ab oder stellen Sie eine Frage.',
               pill: frist ? nochReserviertText(frist) : '',
               frist,
               steps: null as 'initial' | 'saved' | null,
@@ -2951,10 +2952,8 @@ const CustomerPortalPage: FC = () => {
                 </p>
               )}
               {heroCopy.pill && heroCopy.frist && (
-                // Countdown der Reservierung, unter 24 h in Rot.
-                <p className={`mt-3 inline-flex items-center gap-2 rounded-full px-3.5 py-2 text-[14.5px] font-bold ${
-                  istDringend(heroCopy.frist) ? 'bg-[#FCE8E6] text-pm-error-ink' : 'bg-pm-amber-tint text-pm-amber-ink'
-                }`}>
+                // Countdown der Reservierung (unter 24 h „Nur noch …", ohne Rot).
+                <p className="mt-3 inline-flex items-center gap-2 rounded-full px-3.5 py-2 text-[14.5px] font-bold bg-pm-amber-tint text-pm-amber-ink">
                   <Clock className="w-4 h-4 flex-shrink-0" aria-hidden="true" />
                   {heroCopy.pill}
                 </p>
@@ -3044,6 +3043,7 @@ const CustomerPortalPage: FC = () => {
                 onNurseClick={(n) => openNurseFromApp(n, app)}
                 onChat={CHAT_ENABLED ? (n) => setChatNurse(n) : undefined}
                 reserviertBis={reservierungFuer(app)}
+                onBestpreis={() => setBestpreisOffen(true)}
               />
             ))}
             {/* Beratungs-CTA direkt unter den Bewerbungen — Bewerbungen sind

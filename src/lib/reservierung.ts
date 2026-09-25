@@ -43,11 +43,13 @@ export function stundenBis(d: Date, jetzt: number = Date.now()): number {
   return Math.max(0, Math.floor((d.getTime() - jetzt) / STUNDE));
 }
 
-/** „Noch 52 Stunden für Sie reserviert" — der Countdown im Kopf und an der Karte. */
+/** „Noch 52 Stunden für Sie reserviert" — der Countdown im Kopf. Unter 24 h „Nur noch …"
+ *  (Martin 25.09.: Zeit ja, aber nicht zu negativ — deshalb Wortwahl statt Rot). */
 export function nochReserviertText(d: Date, jetzt: number = Date.now()): string {
   const h = stundenBis(d, jetzt);
   if (h < 1) return 'Nur noch kurz für Sie reserviert';
-  return `Noch ${h} ${h === 1 ? 'Stunde' : 'Stunden'} für Sie reserviert`;
+  const stunden = `${h} ${h === 1 ? 'Stunde' : 'Stunden'}`;
+  return h < 24 ? `Nur noch ${stunden} für Sie reserviert` : `Noch ${stunden} für Sie reserviert`;
 }
 
 /** Unter 24 Stunden: dringend (andere Farbe). */
