@@ -114,7 +114,19 @@ export interface AcceptanceSyncResult {
    * Alarm nach 5 Min. Feld fehlt, wenn Confirm gar nicht dran war
    * (schon bestätigt / skipConfirm / Adoption) oder gelungen ist.
    */
-  confirm_error?: { message: string; permanent: boolean };
+  confirm_error?: {
+    message: string;
+    permanent: boolean;
+    /**
+     * Registry #88: Mamamia hat UNSERE Vertragsdaten abgelehnt — alle
+     * Validation-Keys liegen unter contract_patient.* / contract_contact.*
+     * (Fall Hümmer: contract_patient.salutation bei „Divers"). Dann ist die
+     * Bewerbung selbst sehr wahrscheinlich in Ordnung, und der Alarm darf
+     * nicht „von der Agentur zurückgezogen" vermuten. Fehlt das Feld, gilt
+     * die bisherige Vermutung. Klassifiziert nach Struktur, nicht nach Text.
+     */
+    ursache?: "vertragsdaten";
+  };
   /**
    * Schritt 1 (UpdateCustomer mit den Kontakt-Rows) von Mamamia DETERMINISTISCH
    * abgelehnt (Validation). Die Buchung darf daran nicht hängen — Sequenz läuft
@@ -525,6 +537,24 @@ export function isValidationError(e: unknown): boolean {
   return Array.isArray(errs) && errs.some((x) => x?.extensions?.validation != null);
 }
 
+// Registry #88: Keys aus `extensions.validation` — „contract_patient.salutation"
+// usw. Strukturell (Laravel-Validation), nie aus dem Meldungstext.
+export function validationKeys(e: unknown): string[] {
+  const errs = (e as { graphqlErrors?: Array<{ extensions?: Record<string, unknown> }> } | null)?.graphqlErrors;
+  if (!Array.isArray(errs)) return [];
+  return errs.flatMap((x) => {
+    const v = x?.extensions?.validation;
+    return v && typeof v === "object" ? Object.keys(v as Record<string, unknown>) : [];
+  });
+}
+
+// Nur Felder aus unserem Vertragsformular ⇒ Ursache „vertragsdaten".
+// application_id oder ein fremdes Feld ⇒ keine Aussage (bisheriger Text).
+export function nurVertragsdaten(keys: string[]): boolean {
+  return keys.length > 0 &&
+    keys.every((k) => k.startsWith("contract_patient.") || k.startsWith("contract_contact."));
+}
+
 // Kurze interne Retries NUR für transiente Confirm-Fehler — "jakieś retry
 // przez 5 minut i potem od razu alarm" (Michał 2026-07-21). Muss ins
 // 25s-Timeout der Bridge passen: 3 Versuche, Pausen 2s + 4s.
@@ -757,7 +787,7 @@ async function runSequence(opts: AcceptanceSyncOpts, result: AcceptanceSyncResul
       // SOFORT (Kunde glaubt sonst an eine Buchung, die es nicht gibt,
       // z.B. weil die Agentur die Bewerbung zurückgezogen hat).
       let conf: { StoreConfirmation: { id: number; application_id: number } | null } | null = null;
-      let confErr: { message: string; permanent: boolean } | null = null;
+      let confErr: AcceptanceSyncResult["confirm_error"] | null = null;
       for (let attempt = 0; ; attempt++) {
         try {
           conf = await mamamiaRequest<{
@@ -779,6 +809,7 @@ async function runSequence(opts: AcceptanceSyncOpts, result: AcceptanceSyncResul
         } catch (e) {
           const permanent = isPermanentMamamiaError(e);
           confErr = { message: (e as Error).message.slice(0, 300), permanent };
+          if (permanent && nurVertragsdaten(validationKeys(e))) confErr.ursache = "vertragsdaten";
           if (permanent || attempt >= CONFIRM_TRANSIENT_RETRIES) break;
           await sleep(CONFIRM_RETRY_DELAYS_MS[attempt] ?? 4000);
         }

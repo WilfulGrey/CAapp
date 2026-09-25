@@ -269,6 +269,7 @@ export async function runRetryChain(
           pdf_uploaded: !!row.mamamia_pdf_uploaded_at,
           permanent: lastResult?.confirm_error?.permanent === true,
           booking_not_visible: bookingNotVisible,
+          ursache: lastResult?.confirm_error?.ursache,
           error: bookingNotVisible
             ? `Buchung nicht in Mamamia sichtbar (${bookingNotVisible}) — Confirmation ${row.mamamia_confirmation_id ?? "?"} nach 15/30/60s nicht am Job der Bewerbung`
             : lastResult?.confirm_error?.message
