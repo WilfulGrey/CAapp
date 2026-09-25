@@ -49,8 +49,10 @@ import {
   keineEmpfehlungHtml,
   keineEmpfehlungText,
   stufenWort,
-  type EmpfehlungErgebnis, holeFuenf, fuenfListeHtml, fuenfListeText, kraefteWort, fuenfBetreff, fotoBudget } from "./empfehlung.ts";
+  type EmpfehlungErgebnis, holeFuenf, fuenfListeHtml, fuenfListeText, kraefteWort, fuenfBetreff, fotoBudget,
+  holeFuenfStreng, esc } from "./empfehlung.ts";
 import {
+  kraefteNochmalUm,
   vermittlerAngebotHtml, vermittlerAngebotText,
   vermittlerKraefteHtml, vermittlerKraefteText,
   VERMITTLER_ABSENDER,
@@ -2300,22 +2302,23 @@ async function runBewertungsRunde(
 /* Die fuenf Kraefte fuer die Vermittler-Mail: dieselben Daten wie beim
  * Nudge, aber ohne Profil-Links (es gibt fuer den Partner kein Portal) und
  * ohne Mail-Marker. Das Laden der Fotos bleibt hier, weil vermittler.ts
- * keine Deno-Abhaengigkeit haben soll. */
+ * keine Deno-Abhaengigkeit haben soll. Wirft, wenn mamamia nicht
+ * (rechtzeitig) antwortet; `null` heisst: geantwortet, niemand passt. */
 async function kraefteFuerVermittler(lead: Lead, supabaseUrl: string, key: string) {
   const tok = lead.token;
-  if (!tok) return null;
-  const erg = await holeFuenf({
+  if (!tok) throw new Error("Lead ohne Token");
+  const fuenf = await holeFuenfStreng({
     supabaseUrl, key, token: tok,
     jobOfferId: (lead as any).mamamia_job_offer_id ?? null,
     formularDaten: (lead as any).kalkulation?.formularDaten ?? {},
     darfOnboarden: Deno.env.get("EMPFEHLUNG_ONBOARD") !== "0",
   });
-  if (!erg || erg.fuenf.length === 0) return null;
-  const roh = await Promise.all(erg.fuenf.map((e) => fetchInlinePhotoDeno(e.fotoUrl)));
+  if (fuenf.length === 0) return null;
+  const roh = await Promise.all(fuenf.map((e) => fetchInlinePhotoDeno(e.fotoUrl)));
   const erlaubt = fotoBudget(roh.map((r) => r?.content.byteLength ?? 0));
   const inlines = roh.map((r, i) => (r && erlaubt[i] ? r : null));
   return {
-    fuenf: erg.fuenf,
+    fuenf,
     cids: inlines.map((r) => r?.cid ?? null),
     anhaenge: inlines.filter(Boolean) as NonNullable<typeof inlines[number]>[],
   };
@@ -2420,7 +2423,7 @@ Deno.serve(async (req: Request) => {
         if (demoVermittlerEmpf) demoInline = await fetchInlinePhotoDeno(demoVermittlerEmpf.empfehlung.fotoUrl);
       }
       if (demoTypen.includes("vermittler_kraefte")) {
-        demoVermittlerFuenf = await kraefteFuerVermittler(lead as Lead, supabaseUrl, supabaseServiceKey);
+        demoVermittlerFuenf = await kraefteFuerVermittler(lead as Lead, supabaseUrl, supabaseServiceKey).catch(() => null);
       }
       const demoAnrede = `${buildEingangsGreeting(lead as Lead)},`;
 
@@ -2928,27 +2931,49 @@ Deno.serve(async (req: Request) => {
              nach Mail 1 kann eine Kraft gebucht sein. Ohne Kraefte gaebe es
              nur eine leere Rahmung: dann lieber nicht senden (unten). */
           const meta = (scheduledEmail.metadata ?? {}) as Record<string, any>;
-          const teile = await kraefteFuerVermittler(lead as Lead, supabaseUrl, supabaseServiceKey);
-          if (!teile) {
+          /* Sichtbar statt still: der Partner wartet auf die angekuendigte
+             Liste, also muss ein Mensch davon erfahren — mit dem ECHTEN Grund
+             und dem Namen, sonst sucht das Team erst den Lead. */
+          const absagen = async (grund: string) => {
             await supabase.from("scheduled_emails").update({
-              status: "cancelled", updated_at: new Date().toISOString(),
-              error_message: "keine verfuegbaren Betreuungskraefte",
+              status: "cancelled", updated_at: new Date().toISOString(), error_message: grund,
             }).eq("id", scheduledEmail.id);
             await supabase.from("lead_events").insert({
               lead_id: scheduledEmail.lead_id,
               event_type: "vermittler_kraefte_entfallen",
-              metadata: { grund: "listMatchings lieferte keine Kraefte" },
+              metadata: { grund },
             });
-            /* Sichtbar statt still: der Partner wartet auf die angekuendigte
-               Liste, also muss ein Mensch davon erfahren. */
+            const kunde = (meta.kunde_label as string) || scheduledEmail.lead_id;
+            const satz = `Die angekündigte Liste an ${scheduledEmail.recipient_email} (${meta.betreff_antwort ?? "Re: Ihre Anfrage"}) wurde nicht verschickt: ${grund}. Bitte die Liste von Hand schicken.`;
             await sendEmailSmtp(
               smtpConfig, Deno.env.get("OPS_ALERT_TO") ?? "info@primundus.de",
-              `Vermittler: keine Kraefte fuer Lead ${scheduledEmail.lead_id}`,
-              `<p>Die angekuendigte Liste konnte nicht verschickt werden — mamamia lieferte keine verfuegbaren Betreuungskraefte.</p>`,
-              "Die angekuendigte Liste konnte nicht verschickt werden — mamamia lieferte keine verfuegbaren Betreuungskraefte.",
+              `Vermittler: Liste für ${kunde} nicht verschickt`,
+              `<p>${esc(satz)}</p><p>Lead ${scheduledEmail.lead_id}</p>`,
+              `${satz}\n\nLead ${scheduledEmail.lead_id}`,
               undefined, true,
             ).catch(() => {});
-            console.warn(`[vermittler] Lead ${scheduledEmail.lead_id}: keine Kraefte, Mail 2 entfaellt`);
+            console.warn(`[vermittler] Lead ${scheduledEmail.lead_id}: Mail 2 entfaellt — ${grund}`);
+          };
+          let teile: Awaited<ReturnType<typeof kraefteFuerVermittler>>;
+          try {
+            teile = await kraefteFuerVermittler(lead as Lead, supabaseUrl, supabaseServiceKey);
+          } catch (e) {
+            const grund = e instanceof Error ? e.message : String(e);
+            const fehlschlaege = Number(meta.fehlschlaege ?? 0) + 1;
+            const nochmal = kraefteNochmalUm(fehlschlaege, new Date());
+            if (nochmal) {
+              await supabase.from("scheduled_emails").update({
+                status: "pending", scheduled_for: nochmal, updated_at: new Date().toISOString(),
+                metadata: { ...meta, fehlschlaege }, error_message: `Versuch ${fehlschlaege}: ${grund}`,
+              }).eq("id", scheduledEmail.id);
+              console.warn(`[vermittler] Lead ${scheduledEmail.lead_id}: Liste nicht geladen (${grund}), neuer Versuch ${nochmal}`);
+            } else {
+              await absagen(`mamamia hat nach ${fehlschlaege} Versuchen nicht geantwortet (zuletzt: ${grund})`);
+            }
+            continue;
+          }
+          if (!teile) {
+            await absagen("mamamia hat keine passenden Betreuungskräfte geliefert");
             continue;
           }
           if (teile.anhaenge.length) (scheduledEmail as any).__inlineAttachments = teile.anhaenge;
