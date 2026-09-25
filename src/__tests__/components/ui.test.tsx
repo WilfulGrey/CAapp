@@ -122,3 +122,14 @@ describe('SectionHeader + StatusBadge', () => {
     expect(screen.getByText('Unvollständig')).toBeInTheDocument();
   });
 });
+
+describe('FormNav – letzter Schritt', () => {
+  it('Hauptknopf allein, „Zurück" als Link darunter', async () => {
+    const onZurueck = vi.fn();
+    render(<FormNav onZurueck={onZurueck} onWeiter={() => {}} weiterText="Bewerbungen anfragen" zurueckAlsLink="Zurück zu Schritt 3" />);
+    expect(screen.queryByRole('button', { name: 'Zurück' })).toBeNull();
+    await userEvent.click(screen.getByRole('button', { name: 'Zurück zu Schritt 3' }));
+    expect(onZurueck).toHaveBeenCalledTimes(1);
+    expect(screen.getByRole('button', { name: 'Bewerbungen anfragen' }).className).toMatch(/w-full/);
+  });
+});

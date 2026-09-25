@@ -6,7 +6,8 @@ import { Check } from 'lucide-react';
 import { SectionHeader } from '../ui/SectionHeader';
 
 export const SCHRITTE = [
-  { titel: 'Pflegesituation vervollständigen', text: '2 Minuten. Vieles ist schon ausgefüllt.' },
+  // Seit 25.09. heißt die Handlung „Bewerbungen anfragen" (Knopf im Formular, Frage unter den Kosten).
+  { titel: 'Bewerbungen anfragen', text: 'Pflegesituation beschreiben, 2 Minuten. Vieles ist schon ausgefüllt.' },
   { titel: 'Bewerbungen erhalten', text: 'Passende Pflegekräfte bewerben sich bei Ihnen. Gerne können Sie Ihre Favoriten einladen, sich zu bewerben.' },
   { titel: 'Auswählen und starten', text: 'Wir übernehmen den Rest. Anreise schon ab 3 Tagen möglich.' },
 ] as const;

@@ -74,10 +74,7 @@ export const AngebotCard: FC<{
   onTriggerHandled?: () => void;
   mamamiaEnabled?: boolean;
   onSaveToMamamia?: (form: PatientForm) => Promise<void>;
-  /** Formular ist (nicht mehr) im Bildschirm — die Seite blendet solange die
-   *  Feedback-Blase aus, die sonst über der Knopfleiste läge. */
-  onImBlick?: (imBlick: boolean) => void;
-}> = ({ lead, mmCustomer, onPatientSaved, triggerOpenPatient, onTriggerHandled, mamamiaEnabled, onSaveToMamamia, onImBlick }) => {
+}> = ({ lead, mmCustomer, onPatientSaved, triggerOpenPatient, onTriggerHandled, mamamiaEnabled, onSaveToMamamia }) => {
   // Offen, sobald die Karte gerendert wird: Seit dem Wegfall des
   // Zwischenkopfs (11.08.) steuert allein der Abschnittskopf in
   // CustomerPortalPage, ob dieser Block überhaupt erscheint.
@@ -583,16 +580,6 @@ export const AngebotCard: FC<{
     }, 60);
   };
 
-  // Sichtbarkeit melden (s. Prop `onImBlick`).
-  useEffect(() => {
-    const el = patientFormRef.current;
-    if (!el || !onImBlick || typeof IntersectionObserver === 'undefined') return;
-    const io = new IntersectionObserver(entries => onImBlick(entries.some(e => e.isIntersecting)));
-    io.observe(el);
-    return () => { io.disconnect(); onImBlick(false); };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [patientOpen]);
-
   const zurueck = () => { setFehlerZeigen(false); setStep(s => s - 1); scrollToFormTop(); };
 
   const weiter = () => {
@@ -1045,6 +1032,13 @@ export const AngebotCard: FC<{
                     placeholder="z. B. Körperpflege, Mahlzeiten, Arztbegleitung, Einkäufe"
                     rows={3} className={`${inputCls} resize-none`} />
                 </FormField>
+                {/* Was das Absenden bedeutet (Martin 25.09.): verbindlich anfragen,
+                    72 h Reservierung je Bewerbung (= Auto-Absage in
+                    detect-caregiver-events), Vertrag erst mit Zusage. */}
+                <p className="mt-2 pt-4 border-t border-pm-line-soft text-[14.5px] leading-[1.5] text-pm-body">
+                  Mit dem Absenden fragen Sie Bewerbungen an. Jede Bewerbung ist 72 Stunden für Sie reserviert.
+                  Ein Vertrag entsteht erst, wenn Sie zusagen.
+                </p>
               </>
             )}
           </div>
@@ -1052,9 +1046,12 @@ export const AngebotCard: FC<{
           <FormNav
             onZurueck={step > 0 ? zurueck : undefined}
             onWeiter={letzterSchritt ? () => { void speichern(); } : weiter}
-            weiterText={letzterSchritt ? 'Speichern' : 'Weiter →'}
+            // Verbindlich anfragen statt „Speichern" (Martin 25.09.): Der Kunde hat
+            // unter der Kostenkarte „Ja" gesagt; hier schickt er die Anfrage ab.
+            weiterText={letzterSchritt ? 'Bewerbungen anfragen' : 'Weiter →'}
+            zurueckAlsLink={letzterSchritt ? `Zurück zu Schritt ${step}` : undefined}
             laedt={isSaving}
-            ladeText="Speichern…"
+            ladeText="Wird angefragt…"
             hinweis={navHinweis && (
               <button
                 type="button"

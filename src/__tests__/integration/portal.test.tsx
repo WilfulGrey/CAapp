@@ -324,7 +324,7 @@ describe('Portal integration: golden paths', () => {
       const weiter = await screen.findByRole('button', { name: /^Weiter →$/ }, { timeout: 5000 });
       await user.click(weiter);
     }
-    const speichern = await screen.findByRole('button', { name: /^Speichern$/ }, { timeout: 5000 });
+    const speichern = await screen.findByRole('button', { name: /^Bewerbungen anfragen$/ }, { timeout: 5000 });
     await user.click(speichern);
 
     // Der Kunde bekommt den Satz zu sehen — und zwar auf Schritt 3, wo das Feld

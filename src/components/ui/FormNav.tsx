@@ -6,9 +6,12 @@ import { useEffect, useState, type ReactNode } from 'react';
 import { Button } from './Button';
 
 export function FormNav({
-  onZurueck, onWeiter, weiterText, laedt = false, ladeText, hinweis,
+  onZurueck, onWeiter, weiterText, laedt = false, ladeText, hinweis, zurueckAlsLink,
 }: {
   onZurueck?: () => void;
+  /** Letzter Schritt: Hauptknopf allein über die volle Breite, „Zurück" als Textlink
+   *  darunter (Martin 25.09.: „Bewerbungen anfragen" passte neben „Zurück" nicht). */
+  zurueckAlsLink?: string;
   onWeiter: () => void;
   weiterText: string;
   laedt?: boolean;
@@ -30,16 +33,21 @@ export function FormNav({
   return (
     <div className={`${tastatur ? '' : 'sticky bottom-0'} z-10 -mx-5 px-5 pt-3.5 pb-[calc(16px+env(safe-area-inset-bottom))] bg-white border-t border-[#EFEBE4] rounded-b-card`}>
       {hinweis && <div className="mb-2.5 text-center text-[13.5px] text-pm-error-ink">{hinweis}</div>}
-      <div className={onZurueck ? 'grid grid-cols-[auto_1fr] gap-2.5' : ''}>
-        {onZurueck && (
+      <div className={onZurueck && !zurueckAlsLink ? 'grid grid-cols-[auto_1fr] gap-2.5' : ''}>
+        {onZurueck && !zurueckAlsLink && (
           <Button variante="sekundaer" onClick={onZurueck} className="px-5 font-semibold text-[16px]">
             Zurück
           </Button>
         )}
-        <Button onClick={onWeiter} laedt={laedt} ladeText={ladeText} breit>
+        <Button onClick={onWeiter} laedt={laedt} ladeText={ladeText} breit className="px-2 whitespace-nowrap">
           {weiterText}
         </Button>
       </div>
+      {onZurueck && zurueckAlsLink && (
+        <div className="mt-1 text-center">
+          <Button variante="link" onClick={onZurueck} className="text-[15px]">{zurueckAlsLink}</Button>
+        </div>
+      )}
     </div>
   );
 }
