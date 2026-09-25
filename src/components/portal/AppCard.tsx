@@ -1,7 +1,7 @@
 import type { FC } from 'react';
 import { ChevronDown, Clock, Mail } from 'lucide-react';
 import { Button } from '../ui/Button';
-import { reserviertBisText, RESERVIERUNG_STUNDEN } from '../../lib/reservierung';
+import { istDringend, reserviertBisText, RESERVIERUNG_STUNDEN } from '../../lib/reservierung';
 import type { Nurse } from '../../types';
 import type { Application } from './shared';
 import { nurseLevel, nurseFacts, displayName, initials } from './shared';
@@ -41,9 +41,12 @@ export const AppCard: FC<{
         {/* 72-h-Frist offen als Reservierung (Martin 25.09.). Nur mit echtem
             Anker aus den lead_events, sonst gar nicht (nicht raten). */}
         {reserviertBis && (
-          <p className="mx-5 mt-2 inline-flex items-center gap-1.5 rounded-full bg-pm-amber-tint px-3 py-1.5 text-[13px] font-bold text-pm-amber-ink">
+          <p className={`mx-5 mt-2 inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[13px] font-bold ${
+            istDringend(reserviertBis) ? 'bg-[#FCE8E6] text-pm-error-ink' : 'bg-pm-amber-tint text-pm-amber-ink'
+          }`}>
             <Clock className="w-3.5 h-3.5 flex-none" aria-hidden="true" />
-            Für Sie reserviert bis {reserviertBisText(reserviertBis)}
+            {/* Countdown steht groß im Kopf; hier nur das Datum, damit die Zeile bei 360 px einzeilig bleibt. */}
+            Reserviert bis {reserviertBisText(reserviertBis)}
           </p>
         )}
         <div className="px-5 pt-3 pb-5 cursor-pointer active:bg-pm-paper" onClick={() => onNurseClick(nurse)}>

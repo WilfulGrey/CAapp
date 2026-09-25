@@ -61,3 +61,19 @@ describe('Reservierung = Auto-Absage des Servers', () => {
     expect(m && Number(m[1])).toBe(RESERVIERUNG_STUNDEN);
   });
 });
+
+describe('Countdown', () => {
+  it('volle Stunden, abgerundet, nie negativ; unter 24 h dringend', async () => {
+    const { stundenBis, nochReserviertText, istDringend } = await import('../lib/reservierung');
+    const jetzt = Date.parse('2026-09-25T10:00:00Z');
+    const ende = new Date('2026-09-27T14:00:00Z'); // 52 h
+    expect(stundenBis(ende, jetzt)).toBe(52);
+    expect(nochReserviertText(ende, jetzt)).toBe('Noch 52 Stunden für Sie reserviert');
+    expect(istDringend(ende, jetzt)).toBe(false);
+    const bald = new Date(jetzt + 90 * 60 * 1000);
+    expect(nochReserviertText(bald, jetzt)).toBe('Noch 1 Stunde für Sie reserviert');
+    expect(istDringend(bald, jetzt)).toBe(true);
+    expect(nochReserviertText(new Date(jetzt + 10 * 60 * 1000), jetzt)).toBe('Nur noch kurz für Sie reserviert');
+    expect(stundenBis(new Date(jetzt - 5000), jetzt)).toBe(0);
+  });
+});

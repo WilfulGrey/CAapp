@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useRef, FC } from 'react';
-import { Check, Bell, Phone, ShieldCheck, AlertCircle, ChevronDown, X, ArrowLeft, ArrowRight, Heart } from 'lucide-react';
+import { Check, Bell, Clock, Phone, ShieldCheck, AlertCircle, ChevronDown, X, ArrowLeft, ArrowRight, Heart } from 'lucide-react';
 import { Nurse } from '../types';
 import { displayName } from '../components/portal/shared';
 import {
@@ -53,7 +53,7 @@ import { AppCardDone } from '../components/portal/AppCardDone';
 import { BeratungCTA } from '../components/portal/BeratungCTA';
 import { AngebotFrage } from '../components/portal/AngebotFrage';
 import { SucheStand } from '../components/portal/SucheStand';
-import { reserviertBis as berechneReservierung, RESERVIERUNG_STUNDEN } from '../lib/reservierung';
+import { reserviertBis as berechneReservierung, RESERVIERUNG_STUNDEN, reserviertBisText, nochReserviertText, istDringend } from '../lib/reservierung';
 import type { FetchedLeadEvent } from '../lib/leadEvents';
 import { MatchCard } from '../components/portal/MatchCard';
 import { MatchCardDone } from '../components/portal/MatchCardDone';
@@ -2842,18 +2842,25 @@ const CustomerPortalPage: FC = () => {
         //              → explain what the portal does next
         const n = pendingApps.length;
 
-        // Eine Bewerbung: der Name im Titel (Martin 25.09., Entwurf B). „In Ruhe"
-        // ist raus — jede Bewerbung ist 72 Stunden reserviert, das steht an der Karte.
-        const ersteVorname = n === 1 ? displayName(pendingApps[0].nurse.name).split(' ')[0] : '';
+        // Offene Bewerbung = Druck, damit der Kunde reagiert (Martin 25.09.:
+        // „Maria möchte Sie betreuen ist Schwachsinn … aktive Bewerbung,
+        // reagieren Sie … wir brauchen mehr Druck"). Frist aus der frühesten
+        // Reservierung (gleiche Regel wie die Auto-Absage); ohne Frist kein Datum.
+        const fristen = pendingApps
+          .map((a) => reservierungFuer(a))
+          .filter((d): d is Date => d !== null)
+          .sort((a, b) => a.getTime() - b.getTime());
+        const frist = fristen[0] ?? null;
         const heroCopy = hasPending
           ? {
               title: n > 1
-                ? `Sie haben ${n} Bewerbungen`
-                : `${ersteVorname} möchte Sie betreuen`,
-              subtitle: n > 1
-                ? 'Sehen Sie sich die Angebote an und entscheiden Sie, welche Pflegekraft am besten passt.'
-                : 'Sehen Sie sich das Angebot an und entscheiden Sie, ob die Pflegekraft passt.',
-              pill: n > 1 ? `${n} Bewerbungen aktiv` : '1 Bewerbung aktiv',
+                ? `Sie haben ${n} aktive Bewerbungen`
+                : 'Sie haben eine aktive Bewerbung',
+              subtitle: frist
+                ? `Bitte reagieren Sie bis ${reserviertBisText(frist)}. Danach geben wir ${n > 1 ? 'die Pflegekräfte' : 'die Pflegekraft'} wieder frei.`
+                : 'Bitte reagieren Sie: zusagen, absagen oder eine Frage stellen.',
+              pill: frist ? nochReserviertText(frist) : '',
+              frist,
               steps: null as 'initial' | 'saved' | null,
             }
           : patientSaved && !IS_PREVIEW_ANY && (!mmReady || mmApplicationsLoading || !mmApplications)
@@ -2866,6 +2873,7 @@ const CustomerPortalPage: FC = () => {
               // mamamia wird `mmReady` nie true, dadurch hing JEDER gespeicherte
               // Zustand lokal auf "Einen Moment" fest — auch ?preview=wartet,
               // das genau den Zweig darunter zeigen soll (Übergabe 11.08.).
+              frist: null as Date | null,
               title: 'Einen Moment — Ihre Bewerbungen werden geladen.',
               subtitle: 'Wir holen gerade den aktuellen Stand Ihrer Anfrage. Das dauert nur wenige Sekunden.',
               pill: 'Portal wird geladen',
@@ -2879,6 +2887,7 @@ const CustomerPortalPage: FC = () => {
               // mehr, das Angebot rutscht in diesem Zustand auch nach unten).
               // Martin 25.09.: nach dem Absenden zählt, dass die Suche läuft und
               // Bewerbungen kommen („Ihr Betreuungsportal" sagte nichts davon).
+              frist: null as Date | null,
               title: 'Ihre Suche läuft',
               subtitle: 'Sobald sich eine Pflegekraft bewirbt, bekommen Sie eine E-Mail.',
               // Kein Pill (Martin, 13.08.): „unverbindlich" steht schon im
@@ -2891,6 +2900,7 @@ const CustomerPortalPage: FC = () => {
               // keine Statusmeldung („fertig"), sondern die Sache selbst. Der
               // Abschnitt darunter heißt deshalb „Ihre Betreuungskosten" und
               // wiederholt den Titel nicht.
+              frist: null as Date | null,
               title: 'Ihr persönliches Angebot',
               // Wird im Ausgangszustand NICHT im Hero gerendert: Die Begründung
               // steht dort, wo gehandelt wird — als Einleitung über dem
@@ -2940,9 +2950,12 @@ const CustomerPortalPage: FC = () => {
                   {heroCopy.subtitle}
                 </p>
               )}
-              {heroCopy.pill && (
-                <p className="mt-3 inline-flex items-center gap-2 text-[15px] text-pm-ink">
-                  <Check className="w-4 h-4 flex-shrink-0 text-pm-taupe" strokeWidth={3} />
+              {heroCopy.pill && heroCopy.frist && (
+                // Countdown der Reservierung, unter 24 h in Rot.
+                <p className={`mt-3 inline-flex items-center gap-2 rounded-full px-3.5 py-2 text-[14.5px] font-bold ${
+                  istDringend(heroCopy.frist) ? 'bg-[#FCE8E6] text-pm-error-ink' : 'bg-pm-amber-tint text-pm-amber-ink'
+                }`}>
+                  <Clock className="w-4 h-4 flex-shrink-0" aria-hidden="true" />
                   {heroCopy.pill}
                 </p>
               )}
@@ -3018,8 +3031,8 @@ const CustomerPortalPage: FC = () => {
              vom Kunden — die kommen ZUERST, vor allem anderen. */}
         {hasPending && (
           <div id="bewerbungen" className="space-y-3 scroll-mt-4">
-            <p className="text-[16px] leading-relaxed px-1" style={{color:'#18181B'}}>
-              Tippen Sie auf <span className="font-semibold">"Angebot prüfen"</span>, um die Details der Pflegekraft zu sehen und über das Angebot zu entscheiden.
+            <p className="text-[16px] leading-relaxed px-1 text-pm-ink">
+              Sagen Sie zu, sagen Sie ab oder stellen Sie eine Frage. Jede Antwort hilft der Pflegekraft, ihren Einsatz zu planen.
             </p>
             {pendingApps.map((app) => (
               <AppCard

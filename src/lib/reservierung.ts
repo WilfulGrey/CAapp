@@ -38,6 +38,23 @@ export function reserviertBis(
   return ende > jetzt ? new Date(ende) : null;
 }
 
+/** Volle Stunden bis zum Ende der Reservierung (abgerundet, nie negativ). */
+export function stundenBis(d: Date, jetzt: number = Date.now()): number {
+  return Math.max(0, Math.floor((d.getTime() - jetzt) / STUNDE));
+}
+
+/** „Noch 52 Stunden für Sie reserviert" — der Countdown im Kopf und an der Karte. */
+export function nochReserviertText(d: Date, jetzt: number = Date.now()): string {
+  const h = stundenBis(d, jetzt);
+  if (h < 1) return 'Nur noch kurz für Sie reserviert';
+  return `Noch ${h} ${h === 1 ? 'Stunde' : 'Stunden'} für Sie reserviert`;
+}
+
+/** Unter 24 Stunden: dringend (andere Farbe). */
+export function istDringend(d: Date, jetzt: number = Date.now()): boolean {
+  return stundenBis(d, jetzt) < 24;
+}
+
 /** „Fr, 27.09., 14 Uhr" in Berliner Zeit. */
 export function reserviertBisText(d: Date): string {
   const teile = Object.fromEntries(
