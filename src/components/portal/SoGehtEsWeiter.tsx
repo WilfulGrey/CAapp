@@ -6,9 +6,9 @@ import { Check } from 'lucide-react';
 import { SectionHeader } from '../ui/SectionHeader';
 
 export const SCHRITTE = [
-  // Seit 25.09. heißt die Handlung „Bewerbungen anfragen" (Knopf im Formular, Frage unter den Kosten).
-  { titel: 'Bewerbungen anfragen', text: 'Pflegesituation beschreiben, 2 Minuten. Vieles ist schon ausgefüllt.' },
-  { titel: 'Bewerbungen erhalten', text: 'Passende Pflegekräfte bewerben sich bei Ihnen. Gerne können Sie Ihre Favoriten einladen, sich zu bewerben.' },
+  // Seit 26.09. heißt der Knopf „Bewerbungen erhalten"; Schritt 1 ist die Handlung, Schritt 2 der Nutzen.
+  { titel: 'Pflegesituation beschreiben', text: '2 Minuten, vieles ist schon ausgefüllt.' },
+  { titel: 'Bewerbungen erhalten', text: 'Passende Pflegekräfte bewerben sich bei Ihnen, per E-Mail. Jede Bewerbung ist 72 Stunden für Sie reserviert.' },
   { titel: 'Auswählen und starten', text: 'Wir übernehmen den Rest. Anreise schon ab 3 Tagen möglich.' },
 ] as const;
 

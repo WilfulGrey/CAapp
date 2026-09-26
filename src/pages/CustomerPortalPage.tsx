@@ -3256,7 +3256,7 @@ const CustomerPortalPage: FC = () => {
                 <>Laden Sie ein, wer Ihnen gefällt. Die Pflegekraft meldet sich meist innerhalb von 1–2 Tagen.</>
               ) : (
                 <>
-                  Laden Sie ein, wer Ihnen gefällt. Wir bereiten die Bewerbungen vor. Das geht, sobald Ihre Pflegesituation vollständig ist.{' '}
+                  Laden Sie ein, wer Ihnen gefällt. Das geht, sobald Ihre Pflegesituation vollständig ist.{' '}
                   <button
                     type="button"
                     onClick={() => setWarumOffen(true)}
@@ -3587,7 +3587,7 @@ const CustomerPortalPage: FC = () => {
                 Farbe des Status: Bernstein wie im Kasten (Koralle nur für Knöpfe). */}
             {!patientSaved ? (
               <SectionHeader
-                eyebrow="Bewerbungen anfragen"
+                eyebrow="Bewerbungen erhalten"
                 titel="Pflegesituation"
                 rechts={<StatusBadge ton="warnung">Unvollständig</StatusBadge>}
                 zeile="In 2 Minuten, vieles ist schon ausgefüllt. Danach bewerben sich passende Pflegekräfte bei Ihnen."
@@ -3637,7 +3637,7 @@ const CustomerPortalPage: FC = () => {
             if (!saved && schonAbgesendet) return;
             if (saved && !patientSaved) {
               // Hauptweg zuerst (Martin 24.09.): Bewerbungen, Einladen ist die Zugabe.
-              showToast('✓ Vielen Dank! Ihre Anfrage ist raus. Passende Pflegekräfte können sich jetzt bei Ihnen bewerben.', 7000);
+              showToast('✓ Vielen Dank! Passende Pflegekräfte können sich jetzt bei Ihnen bewerben.', 7000);
               // Frisch gespeichert → Abschnitt klappt zu (Referenz-Zustand).
               // Ohne den Reset würde ein früher gesetzter manual-Wert den
               // Bogen offen halten, obwohl die Aufgabe erledigt ist.

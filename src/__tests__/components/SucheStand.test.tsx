@@ -8,7 +8,7 @@ describe('SucheStand', () => {
     const onAngaben = vi.fn();
     render(<SucheStand passende={4} wunschstart="2026-10-15" onAngaben={onAngaben} />);
     expect(screen.getByText('Stand heute')).toBeInTheDocument();
-    expect(screen.getByText('Bewerbungen angefragt')).toBeInTheDocument();
+    expect(screen.getByText('Pflegesituation beschrieben')).toBeInTheDocument();
     expect(screen.queryByText(/^am /)).toBeNull();
     expect(screen.getByText('4 passende Pflegekräfte gefunden')).toBeInTheDocument();
     expect(screen.getByText('Jede Bewerbung ist 72 Stunden für Sie reserviert')).toBeInTheDocument();

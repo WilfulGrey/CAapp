@@ -32,7 +32,7 @@ export function AngebotFrage({
   beantwortet: boolean;
   /** `endgueltig=false`: nur aufzeichnen, keine Team-Mail. `true`: genau einmal am Ende. */
   onAnswer: (answer: FeedbackAnswer, detail: string | undefined, endgueltig: boolean) => void;
-  /** Springt ins Formular („Ja, Bewerbungen anfragen"). */
+  /** Springt ins Formular („Ja, Bewerbungen erhalten"). */
   onAnfragen: () => void;
   /** Antwort abgeschlossen → Stempel setzen. */
   onErledigt: () => void;
@@ -42,7 +42,7 @@ export function AngebotFrage({
   const [answer, setAnswer] = useState<FeedbackAnswer | null>(null);
   const [fertig, setFertig] = useState<{ answer: FeedbackAnswer; detail?: string } | null>(null);
   // Endgültig gemeldete Antwort. Dieselbe Antwort geht nur einmal raus (eine Team-Mail),
-  // ein Umentscheiden („Passt nicht" → „Doch Bewerbungen anfragen") wird gemeldet — eine
+  // ein Umentscheiden („Passt nicht" → „Doch Bewerbungen erhalten") wird gemeldet — eine
   // Korrektur zu verschlucken wäre schlimmer als ein Eintrag zu viel (Martin, 12.08.).
   const gemeldet = useRef<FeedbackAnswer | null>(null);
 
@@ -58,8 +58,10 @@ export function AngebotFrage({
   const ja = () => { abschliessen('loslegen'); onAnfragen(); };
   const waehle = (a: FeedbackAnswer) => { setAnswer(a); onAnswer(a, undefined, false); };
 
+  // „Bewerbungen erhalten" statt „anfragen" (Martin 26.09.): der Knopf nennt, was der Kunde
+  // bekommt. Kein „Suche starten": passende Pflegekräfte zeigen wir ja schon.
   const anfragenKnopf = (
-    <Button breit onClick={ja} className="px-2 whitespace-nowrap">Ja, Bewerbungen anfragen</Button>
+    <Button breit onClick={ja} className="px-2 whitespace-nowrap">Ja, Bewerbungen erhalten</Button>
   );
   const linkKlasse = 'inline-flex min-h-[44px] items-center font-semibold text-pm-taupe-ink underline underline-offset-4';
 
@@ -68,7 +70,7 @@ export function AngebotFrage({
     return (
       <Card className="p-5">
         <p className={EYEBROW}>Ihre Bewerbungen</p>
-        <p className="mt-1.5 text-[19px] font-extrabold leading-[1.25] text-pm-ink">Bewerbungen anfragen</p>
+        <p className="mt-1.5 text-[19px] font-extrabold leading-[1.25] text-pm-ink">Bewerbungen erhalten</p>
         <p className="mt-2 mb-4 text-[14.5px] leading-[1.5] text-pm-muted">
           Beschreiben Sie in 2 Minuten die Pflegesituation. Dann bewerben sich passende Pflegekräfte bei Ihnen.
         </p>
@@ -95,7 +97,7 @@ export function AngebotFrage({
           </p>
         )}
         <div className="mt-4">
-          <Button breit variante="sekundaer" onClick={ja} className="px-2 whitespace-nowrap">Doch Bewerbungen anfragen</Button>
+          <Button breit variante="sekundaer" onClick={ja} className="px-2 whitespace-nowrap">Doch Bewerbungen erhalten</Button>
         </div>
       </Card>
     );
@@ -127,8 +129,8 @@ export function AngebotFrage({
       <p className={EYEBROW}>Ihre Entscheidung</p>
       <p className="mt-1.5 text-[21px] font-extrabold leading-[1.2] tracking-[-0.02em] text-pm-ink">Passt Ihnen das Angebot?</p>
       <p className="mt-2 mb-4 text-[14.5px] leading-[1.5] text-pm-muted">
-        Dann fragen Sie jetzt Bewerbungen an. Dafür beschreiben Sie in 2 Minuten die Pflegesituation.
-        Passende Pflegekräfte bewerben sich mit Foto, Erfahrung und Anreisetermin.
+        Dann beschreiben Sie in 2 Minuten die Pflegesituation, vieles ist schon ausgefüllt. Danach
+        bewerben sich passende Pflegekräfte bei Ihnen, mit Foto, Erfahrung, Anreisetermin und Preis.
       </p>
       {anfragenKnopf}
       <div className="mt-2.5 grid grid-cols-2 gap-2.5">
