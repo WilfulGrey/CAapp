@@ -24,12 +24,21 @@ export const KETTE_NACH_MAIL1: ReadonlyArray<readonly [typ: string, minuten: num
 /** Nicht mehr versendete Mail-Typen. Schon eingeplante Zeilen verfallen beim Versand. */
 export const GESTRICHENE_MAILS: ReadonlySet<string> = new Set(["profil_nudge_3"]);
 
-/** Satz am Ende der Abschiedsmail. Ehrlich, weil die Wechsel-Mail nach 7 Wochen noch kommt. */
-export const ABSCHIED_SATZ = "Falls wir nichts hören, melden wir uns erst in einigen Wochen noch einmal.";
+/** Satz am Ende der Abschiedsmail. Ehrlich, weil die Wechsel-Mail nach 7 Wochen noch kommt.
+ *  Ich-Form wie die ganze Mail (Vorschau v2, Martin 26.09.2026). */
+export const ABSCHIED_SATZ = "Wenn ich nichts von Ihnen höre, melde ich mich erst in einigen Wochen wieder.";
 
 /** Die drei Knöpfe der Abschiedsmail — Spiegel von project 3/lib/rueckmeldung.ts
  *  (Edge Fn kann nicht aus lib/ importieren; ein Test prüft den Gleichlauf). */
 export type RueckmeldungKnopf = "interesse" | "aktuell-nicht" | "nicht-relevant";
+
+/** Beschriftung der drei Knöpfe (Vorschau v2, 26.09.2026: „die Knöpfe … nicht professionell").
+ *  Wortgleich zu KNOEPFE in lib/rueckmeldung.ts — die Seite zitiert sie in der Team-Mail. */
+export const RUECKMELDUNG_KNOEPFE: Record<RueckmeldungKnopf, string> = {
+  "interesse": "Ja, ich habe noch Interesse",
+  "aktuell-nicht": "Aktuell nicht, vielleicht später",
+  "nicht-relevant": "Nicht mehr relevant",
+};
 
 /** Ziel der Knöpfe der Abschiedsmail (Registry #72): /rueckmeldung im
  *  Kostenrechner. „Später" wählt dort einen Termin, „nicht relevant" nennt einen

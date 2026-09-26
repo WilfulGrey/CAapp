@@ -119,8 +119,9 @@ describe('Gleichlauf mit der Mail-Funktion', () => {
     readFileSync(resolve(__dirname, '../../project 3/supabase/functions/send-scheduled-emails', datei), 'utf8');
 
   it('die Knopf-Texte der Abschiedsmail sind genau die Labels der Seite', () => {
-    const index = mail('index.ts');
-    for (const label of Object.values(KNOEPFE)) expect(index).toContain(`"${label}"`);
+    const kette = mail('kette.ts');
+    for (const [knopf, label] of Object.entries(KNOEPFE)) expect(kette).toContain(`"${knopf}": "${label}"`);
+    expect(mail('kundenMails.ts')).toContain('RUECKMELDUNG_KNOEPFE');
   });
 
   it('die Edge-Funktion kennt dieselben drei Knöpfe und dieselben offenen Status', () => {

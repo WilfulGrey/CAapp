@@ -167,6 +167,12 @@ jobs:
         working-directory: project 3/supabase/functions/send-scheduled-emails
         run: deno task test
 
+      # index.ts importiert kein Test (startet beim Import einen Server). Ein Typfehler dort
+      # hielte die ganze Warteschlange an — deshalb vor dem Deploy prüfen (26.09.2026).
+      - name: Type-check send-scheduled-emails/index.ts
+        working-directory: project 3/supabase/functions/send-scheduled-emails
+        run: deno check index.ts
+
   # Smoke renderera PDF umowy (pdfkit, Registry #27): renderuje 3 syntetyczne
   # fixture'y i asertuje %PDF-, 8 stron, komplet stringów modelu, ń/▸/✓,
   # stopki. Jedyna trwała ochrona samego RENDERU (root-vitest pilnuje tylko

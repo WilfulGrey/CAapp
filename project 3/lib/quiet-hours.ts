@@ -71,3 +71,38 @@ export function ausDerNachtruhe(zeitpunkt: Date): Date {
 export function sendezeitIso(zeitpunkt: Date): string {
   return ausDerNachtruhe(zeitpunkt).toISOString();
 }
+
+/** Liegt der Zeitpunkt in der Berliner Nachtruhe (21:00–07:59)? */
+export function inNachtruhe(zeitpunkt: Date): boolean {
+  const { stunde } = berlinFelder(zeitpunkt);
+  return stunde >= RUHE_AB_STUNDE || stunde < RUHE_BIS_STUNDE;
+}
+
+/** Ab dieser Berliner Stunde (Vorabend) geht eine vorgezogene Mail raus. */
+export const VORABEND_STUNDE = 20;
+
+/** Der Zeitpunkt, an dem in Berlin an diesem Kalendertag `stunde`:00 ist (Sommer-/Winterzeit wie berlinMorgen). */
+function berlinUm(jahr: number, monat: number, tag: number, stunde: number): Date {
+  let ms = Date.UTC(jahr, monat - 1, tag, stunde, 0, 0);
+  for (let i = 0; i < 2; i++) {
+    const ist = berlinFelder(new Date(ms));
+    const diff = stunde - ist.stunde;
+    if (diff === 0) break;
+    ms += diff * 60 * 60 * 1000;
+  }
+  return new Date(ms);
+}
+
+/**
+ * Gegenstück zu ausDerNachtruhe für Mails, die VOR einer Frist ankommen müssen
+ * (letzte Erinnerung vor Ablauf der Reservierung, 26.09.2026): Was in die
+ * Ruhezeit fällt, rutscht auf 20:00 davor — 21–24 Uhr auf 20:00 desselben
+ * Tags, 0–8 Uhr auf 20:00 des Vortags. Außerhalb der Ruhezeit unverändert.
+ */
+export function vorDerNachtruhe(zeitpunkt: Date): Date {
+  const { jahr, monat, tag, stunde } = berlinFelder(zeitpunkt);
+  if (stunde >= RUHE_BIS_STUNDE && stunde < RUHE_AB_STUNDE) return zeitpunkt;
+  if (stunde >= RUHE_AB_STUNDE) return berlinUm(jahr, monat, tag, VORABEND_STUNDE);
+  const vortag = new Date(Date.UTC(jahr, monat - 1, tag) - 24 * 60 * 60 * 1000);
+  return berlinUm(vortag.getUTCFullYear(), vortag.getUTCMonth() + 1, vortag.getUTCDate(), VORABEND_STUNDE);
+}

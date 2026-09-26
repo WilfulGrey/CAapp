@@ -29,7 +29,7 @@ Deno.test('Kette bleibt sonst unverändert, zeitlich aufsteigend', () => {
 
 Deno.test('Abschiedssatz verspricht keine Funkstille mehr', () => {
   assert(!ABSCHIED_SATZ.includes('nicht mehr'));
-  assertEquals(ABSCHIED_SATZ, 'Falls wir nichts hören, melden wir uns erst in einigen Wochen noch einmal.');
+  assertEquals(ABSCHIED_SATZ, 'Wenn ich nichts von Ihnen höre, melde ich mich erst in einigen Wochen wieder.');
 });
 
 // Registry #72: alle drei Knöpfe der Abschiedsmail führen auf /rueckmeldung.
