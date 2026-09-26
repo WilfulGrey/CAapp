@@ -288,7 +288,7 @@ describe('Portal integration: golden paths', () => {
   it('erstes Absenden, dann gleich eine Angabe ändern: die Seite bleibt „abgesendet“ (mmCustomer noch „draft“)', async () => {
     // Review 25.09.: `useCustomer` lädt nach dem Speichern nicht neu, der Status
     // bleibt in dieser Sitzung „draft". Vorher kippte die erste Änderung die Seite
-    // zurück in den Ausgangszustand, und der Knopf hieß wieder „Bewerbungen anfragen".
+    // zurück in den Ausgangszustand, und der Knopf hieß wieder „Bewerbungen erhalten".
     server.use(
       ...defaultHandlers({
         proxy: {
@@ -315,7 +315,7 @@ describe('Portal integration: golden paths', () => {
     for (let i = 0; i < 3; i++) {
       await user.click(await screen.findByRole('button', { name: /^Weiter →$/ }, { timeout: 5000 }));
     }
-    await user.click(await screen.findByRole('button', { name: /^Bewerbungen anfragen$/ }, { timeout: 5000 }));
+    await user.click(await screen.findByRole('button', { name: /^Bewerbungen erhalten$/ }, { timeout: 5000 }));
     expect(await screen.findByText('Ihre Suche läuft', {}, { timeout: 5000 })).toBeInTheDocument();
 
     // Angaben öffnen und eine Angabe ändern.
@@ -328,7 +328,7 @@ describe('Portal integration: golden paths', () => {
     for (let i = 0; i < 3; i++) {
       await user.click(await screen.findByRole('button', { name: /^Weiter →$/ }, { timeout: 5000 }));
     }
-    expect(screen.queryByRole('button', { name: /^Bewerbungen anfragen$/ })).toBeNull();
+    expect(screen.queryByRole('button', { name: /^Bewerbungen erhalten$/ })).toBeNull();
     expect(screen.getByRole('button', { name: /^Änderungen speichern$/ })).toBeInTheDocument();
   }, 20_000);
 
@@ -456,7 +456,7 @@ describe('Portal integration: golden paths', () => {
       const weiter = await screen.findByRole('button', { name: /^Weiter →$/ }, { timeout: 5000 });
       await user.click(weiter);
     }
-    const speichern = await screen.findByRole('button', { name: /^Bewerbungen anfragen$/ }, { timeout: 5000 });
+    const speichern = await screen.findByRole('button', { name: /^Bewerbungen erhalten$/ }, { timeout: 5000 });
     await user.click(speichern);
 
     // Der Kunde bekommt den Satz zu sehen — und zwar auf Schritt 3, wo das Feld

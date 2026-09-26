@@ -16,7 +16,7 @@ describe('AngebotFrage', () => {
   it('„Ja" meldet loslegen genau einmal endgültig und springt ins Formular', async () => {
     const { onAnswer, onAnfragen, onErledigt } = aufbau();
     expect(screen.getByText('Passt Ihnen das Angebot?')).toBeInTheDocument();
-    await userEvent.click(screen.getByRole('button', { name: 'Ja, Bewerbungen anfragen' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Ja, Bewerbungen erhalten' }));
     expect(onAnswer).toHaveBeenCalledTimes(1);
     expect(onAnswer).toHaveBeenCalledWith('loslegen', undefined, true);
     expect(onAnfragen).toHaveBeenCalledTimes(1);
@@ -49,7 +49,7 @@ describe('AngebotFrage', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Vielleicht später' }));
     await userEvent.click(screen.getByRole('button', { name: 'Überspringen' }));
     expect(onAnswer).toHaveBeenLastCalledWith('spaeter', undefined, true);
-    await userEvent.click(screen.getByRole('button', { name: 'Doch Bewerbungen anfragen' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Doch Bewerbungen erhalten' }));
     expect(onAnfragen).toHaveBeenCalledTimes(1);
     // Umentscheiden wird gemeldet: erst „spaeter", dann „loslegen" — je genau einmal.
     expect(onAnswer.mock.calls.filter(c => c[2] === true).map(c => c[0])).toEqual(['spaeter', 'loslegen']);

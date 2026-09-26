@@ -89,7 +89,7 @@ export function WarumSheet({ offen, onClose, onVervollstaendigen }: {
       fuss={(
         <>
           <Button breit onClick={() => { onClose(); onVervollstaendigen(); }} className="px-2 whitespace-nowrap">
-            Bewerbungen anfragen
+            Bewerbungen erhalten
           </Button>
           <Button variante="link" breit onClick={onClose} className="mt-2">Schließen</Button>
         </>

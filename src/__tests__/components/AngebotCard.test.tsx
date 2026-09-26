@@ -129,7 +129,7 @@ describe('AngebotCard – Startdatum beim Ändern', () => {
     render(<AngebotCard lead={lead} mamamiaEnabled onSaveToMamamia={onSave} gewaehlterStart="2099-11-15" />);
     await bisAbsenden();
     schritt(4);
-    await userEvent.click(screen.getByRole('button', { name: 'Bewerbungen anfragen' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Bewerbungen erhalten' }));
     await waitFor(() => expect(onSave).toHaveBeenCalledTimes(1));
     expect(onSave.mock.calls[0][0]).toMatchObject({ startDate: '2099-11-15' });
   });
@@ -155,7 +155,7 @@ describe('AngebotCard – Startdatum beim Ändern', () => {
     const onSave = vi.fn(async () => {});
     render(<AngebotCard lead={lead} mamamiaEnabled onSaveToMamamia={onSave} gewaehlterStart="2099-11-15" />);
     await bisAbsenden();
-    await userEvent.click(screen.getByRole('button', { name: 'Bewerbungen anfragen' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Bewerbungen erhalten' }));
     await waitFor(() => expect(onSave).toHaveBeenCalledTimes(1));
     expect(onSave.mock.calls[0][0]).toMatchObject({ startDate: '2099-12-01' });
   });
@@ -195,13 +195,13 @@ describe('AngebotCard – Schritte und Speichern', () => {
     expect(schritte).toEqual([1, 2]);
   });
 
-  it('„Bewerbungen anfragen" ist immer aktiv und zeigt, was fehlt, statt abzusenden', async () => {
+  it('„Bewerbungen erhalten" ist immer aktiv und zeigt, was fehlt, statt abzusenden', async () => {
     entwurf({ ...VOLL, wunschGeschlecht: '' });
     const onSave = vi.fn(async () => {});
     render(<AngebotCard lead={lead} mamamiaEnabled onSaveToMamamia={onSave} />);
     for (let i = 0; i < 3; i++) await weiter();
     schritt(4);
-    const speichern = screen.getByRole('button', { name: 'Bewerbungen anfragen' });
+    const speichern = screen.getByRole('button', { name: 'Bewerbungen erhalten' });
     expect(speichern).toBeEnabled();
     await userEvent.click(speichern);
     expect(onSave).not.toHaveBeenCalled();
@@ -214,7 +214,7 @@ describe('AngebotCard – Schritte und Speichern', () => {
     const onPatientSaved = vi.fn();
     render(<AngebotCard lead={lead} mamamiaEnabled onSaveToMamamia={onSave} onPatientSaved={onPatientSaved} />);
     for (let i = 0; i < 3; i++) await weiter();
-    await userEvent.click(screen.getByRole('button', { name: 'Bewerbungen anfragen' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Bewerbungen erhalten' }));
     await waitFor(() => expect(onSave).toHaveBeenCalledTimes(1));
     expect(onSave.mock.calls[0][0]).toMatchObject({ geschlecht: 'Weiblich', plz: '80331', phone: '0170 1234567' });
     expect(onPatientSaved).toHaveBeenLastCalledWith(true);
@@ -233,7 +233,7 @@ describe('AngebotCard – letzter Schritt', () => {
     entwurf(VOLL);
     render(<AngebotCard lead={lead} />);
     for (let i = 0; i < 3; i++) await weiter();
-    expect(screen.getByText(/Mit dem Absenden fragen Sie Bewerbungen an/)).toBeInTheDocument();
+    expect(screen.getByText(/Nach dem Absenden bewerben sich passende Pflegekräfte/)).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Zurück' })).toBeNull();
     await userEvent.click(screen.getByRole('button', { name: 'Zurück zu Schritt 3' }));
     schritt(3);
@@ -241,13 +241,13 @@ describe('AngebotCard – letzter Schritt', () => {
 });
 
 describe('AngebotCard – Angaben ändern nach dem Absenden', () => {
-  it('schon abgeschickt: „Änderungen speichern“ statt „Bewerbungen anfragen“, kein 72-h-Satz', async () => {
+  it('schon abgeschickt: „Änderungen speichern“ statt „Bewerbungen erhalten“, kein 72-h-Satz', async () => {
     localStorage.setItem(`patient_${TOKEN}`, JSON.stringify({ ...VOLL, _isDraft: false }));
     const onAbgesendet = vi.fn();
     render(<AngebotCard lead={lead} onAbgesendet={onAbgesendet} />);
     for (let i = 0; i < 3; i++) await weiter();
-    expect(screen.queryByRole('button', { name: 'Bewerbungen anfragen' })).toBeNull();
-    expect(screen.queryByText(/Mit dem Absenden fragen Sie Bewerbungen an/)).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Bewerbungen erhalten' })).toBeNull();
+    expect(screen.queryByText(/Nach dem Absenden bewerben sich passende Pflegekräfte/)).toBeNull();
     await userEvent.click(screen.getByRole('button', { name: 'Änderungen speichern' }));
     expect(onAbgesendet).toHaveBeenCalledWith(true);
   });

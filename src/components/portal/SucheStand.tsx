@@ -26,7 +26,7 @@ export function SucheStand({ passende, wunschstart, onAngaben, bisherigeBewerbun
   const start = kurzDatum(wunschstart);
   const schritte: { titel: string; text: string | null }[] = [
     // Ohne Datum (Martin 25.09.: „wozu brauchen wir das Datum?").
-    { titel: 'Bewerbungen angefragt', text: null },
+    { titel: 'Pflegesituation beschrieben', text: null },
     {
       titel: 'Anfrage für Pflegekräfte sichtbar',
       text: passende == null ? null

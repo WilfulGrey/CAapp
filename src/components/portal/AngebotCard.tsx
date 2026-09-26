@@ -701,7 +701,7 @@ export const AngebotCard: FC<{
       <p className="mt-2 text-[13.5px] leading-snug text-pm-muted">
         {priceInfo === key
           ? 'Diese Angabe bestimmt den Preis. Ändern kann sie Ihre Beraterin, dann schicken wir Ihnen ein neues Angebot.'
-          : 'Aus Ihrem Kostenrechner übernommen'}
+          : 'Aus Ihrer Anfrage übernommen'}
       </p>
     </>
   );
@@ -1065,7 +1065,7 @@ export const AngebotCard: FC<{
                     detect-caregiver-events), Vertrag erst mit Zusage. */}
                 {!nurAenderung && (
                   <p className="mt-2 pt-4 border-t border-pm-line-soft text-[14.5px] leading-[1.5] text-pm-body">
-                    Mit dem Absenden fragen Sie Bewerbungen an. Jede Bewerbung ist {RESERVIERUNG_STUNDEN} Stunden für Sie reserviert.
+                    Nach dem Absenden bewerben sich passende Pflegekräfte bei Ihnen. Jede Bewerbung ist {RESERVIERUNG_STUNDEN} Stunden für Sie reserviert.
                     Ein Vertrag entsteht erst, wenn Sie zusagen.
                   </p>
                 )}
@@ -1076,12 +1076,12 @@ export const AngebotCard: FC<{
           <FormNav
             onZurueck={step > 0 ? zurueck : undefined}
             onWeiter={letzterSchritt ? () => { void speichern(); } : weiter}
-            // Verbindlich anfragen statt „Speichern" (Martin 25.09.): Der Kunde hat
-            // unter der Kostenkarte „Ja" gesagt; hier schickt er die Anfrage ab.
-            weiterText={letzterSchritt ? (nurAenderung ? 'Änderungen speichern' : 'Bewerbungen anfragen') : 'Weiter →'}
+            // „Bewerbungen erhalten" statt „Speichern" (Martin 25./26.09.): Der Kunde hat
+            // unter der Kostenkarte „Ja" gesagt; der Knopf nennt, was er jetzt bekommt.
+            weiterText={letzterSchritt ? (nurAenderung ? 'Änderungen speichern' : 'Bewerbungen erhalten') : 'Weiter →'}
             zurueckAlsLink={letzterSchritt ? `Zurück zu Schritt ${step}` : undefined}
             laedt={isSaving}
-            ladeText={nurAenderung ? 'Speichern…' : 'Wird angefragt…'}
+            ladeText={nurAenderung ? 'Speichern…' : 'Wird gesendet…'}
             hinweis={navHinweis && (
               <button
                 type="button"
