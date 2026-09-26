@@ -6,17 +6,22 @@ import { useEffect, useState } from 'react';
 // (/abmelden?token=...). Ruft /api/unsubscribe auf und zeigt das Ergebnis.
 export default function AbmeldenPage() {
   const [status, setStatus] = useState<'loading' | 'done' | 'error' | 'notoken'>('loading');
+  // ?p= kommt aus der Partner-Akquise (Rundmail an Vermittler), ?token= aus Kundenmails.
+  const [partner, setPartner] = useState(false);
 
   useEffect(() => {
-    const token = new URLSearchParams(window.location.search).get('token');
-    if (!token) {
+    const params = new URLSearchParams(window.location.search);
+    const p = params.get('p');
+    const token = params.get('token');
+    setPartner(!!p);
+    if (!p && !token) {
       setStatus('notoken');
       return;
     }
     fetch('/api/unsubscribe', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ token }),
+      body: JSON.stringify(p ? { p } : { token }),
     })
       .then((r) => (r.ok ? setStatus('done') : setStatus('error')))
       .catch(() => setStatus('error'));
@@ -31,7 +36,19 @@ export default function AbmeldenPage() {
           <p style={{ color: '#555', fontSize: 15 }}>Einen Moment, wir verarbeiten Ihre Abmeldung…</p>
         )}
 
-        {status === 'done' && (
+        {status === 'done' && partner && (
+          <>
+            <h1 style={{ fontSize: 22, fontWeight: 700, color: '#2D1F0F', marginBottom: 12 }}>Sie wurden abgemeldet</h1>
+            <p style={{ color: '#555', fontSize: 15, lineHeight: 1.6 }}>
+              Sie erhalten keine weiteren E-Mails zum Primundus Partnerprogramm.
+              Bei Fragen erreichen Sie uns unter{' '}
+              <a href="tel:+4989200000831" style={{ color: '#8B7355' }}>089&nbsp;200&nbsp;000&nbsp;831</a> oder{' '}
+              <a href="mailto:partner@primundus.de" style={{ color: '#8B7355' }}>partner@primundus.de</a>.
+            </p>
+          </>
+        )}
+
+        {status === 'done' && !partner && (
           <>
             <h1 style={{ fontSize: 22, fontWeight: 700, color: '#2D1F0F', marginBottom: 12 }}>Sie wurden abgemeldet</h1>
             <p style={{ color: '#555', fontSize: 15, lineHeight: 1.6 }}>
