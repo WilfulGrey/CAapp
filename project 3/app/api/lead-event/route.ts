@@ -14,6 +14,7 @@ import {
 import { buildVertragAttachmentPdf, formatSignedAtBerlin } from '@/lib/vertrag';
 import { appendJobParam, PORTAL_BASIS } from '@/lib/portal-url';
 import { sendezeitIso } from '@/lib/quiet-hours';
+import { erinnerungsplan, reservierungsEnde } from '@/lib/erinnerungsplan';
 import { testphaseUmleitung } from '@/lib/portal-schutz';
 import { createHash } from 'crypto';
 import { kundenEmpfaenger } from '@/lib/empfaenger';
@@ -578,25 +579,13 @@ async function resolveLeadJobUuid(
 // damit die Edge Function beim Versand die richtige Mail bauen kann.
 //
 // caregiver_interest_shown → 1 Reminder nach 1h (interest_reminder).
-// application_received → 4 Reminder im Crescendo (Ton: persönliche Nachfrage
-// von Marta, keine Drohkulisse — Martin, 2026-07-20):
-//   1h  (application_reminder)        "schon gesehen?"
-//   4h  (application_reminder_4h)     "kurze Frage"
-//   12h (application_reminder_12h)    "wie ist Ihr Eindruck?"
-//   70h (application_last_chance)     letzte Erinnerung vor dem 72h-Auto-Reject
-// Alle 3 tragen identische Cancel-Logik (siehe Edge Function): sobald der
-// Kunde reagiert hat (accept/reject) ODER der Lead beauftragt/nicht
-// interessiert ist, cancelt sich der jeweilige Reminder beim nächsten Tick.
+// application_received → drei Erinnerungen vom Ende der Reservierung aus gerechnet
+// (lib/erinnerungsplan.ts, Vorschau v2 26.09.2026): Ende − 52 h, − 24 h, − 8 h, nie
+// nachts, die letzte sicher vor der automatischen Absage. Jede Zeile trägt
+// `reserviert_bis`, damit die Mail den Countdown nennt. Abbruch beim Versand
+// (Edge Function): Reaktion auf die Bewerbung, beauftragt / nicht interessiert,
+// Reservierung abgelaufen (stopRegeln.ts).
 const REMINDER_DELAY_INTEREST_MIN = 60;
-const REMINDER_DELAYS_APPLICATION_MIN: { emailType: string; delay: number }[] = [
-  { emailType: 'application_reminder',     delay: 60 },
-  { emailType: 'application_reminder_4h',  delay: 4 * 60 },
-  { emailType: 'application_reminder_12h', delay: 12 * 60 },
-  // 70h — "letzte Chance"-Mail, ~2h vor dem 72h-Auto-Reject (separater
-  // Cron in detect-caregiver-events). Kündigt das automatische Freigeben
-  // an und bittet um Reaktion.
-  { emailType: 'application_last_chance',  delay: 70 * 60 },
-];
 
 async function scheduleReactionReminder(
   supabaseAdmin: any,
@@ -636,16 +625,31 @@ async function scheduleReactionReminder(
     mamamia_job_offer_id: jobOfferId,
   };
 
-  const tiers = triggerEvent === 'caregiver_interest_shown'
-    ? [{ emailType: 'interest_reminder', delay: REMINDER_DELAY_INTEREST_MIN }]
-    : REMINDER_DELAYS_APPLICATION_MIN;
+  let zeilen: { emailType: string; scheduledFor: string; extra?: Record<string, unknown> }[];
+  if (triggerEvent === 'caregiver_interest_shown') {
+    // Nachtruhe (Martin, 19.08.): zwischen 21:00 und 08:00 Berliner Zeit auf 8:00.
+    zeilen = [{ emailType: 'interest_reminder', scheduledFor: sendezeitIso(new Date(Date.now() + REMINDER_DELAY_INTEREST_MIN * 60 * 1000)) }];
+  } else {
+    // Ende der Reservierung wie Server und Portal: frühester echter Eingang des Paars.
+    const ende = await reservierungsEndeFuer(supabaseAdmin, leadId, caregiverId, jobOfferId);
+    // Schon geplant (dieselbe Bewerbung kam erneut an)? Dann nichts doppelt einplanen.
+    const { data: offen } = await supabaseAdmin
+      .from('scheduled_emails')
+      .select('id')
+      .eq('lead_id', leadId)
+      .eq('status', 'pending')
+      .like('email_type', 'application_erinnerung_%')
+      .filter('metadata->>caregiver_id', 'eq', String(caregiverId ?? ''))
+      .limit(1);
+    if (Array.isArray(offen) && offen.length > 0) return;
+    zeilen = erinnerungsplan(ende, new Date()).map((z) => ({
+      emailType: z.emailType,
+      scheduledFor: z.scheduledFor.toISOString(),
+      extra: { reserviert_bis: ende.toISOString() },
+    }));
+  }
 
-  for (const { emailType, delay } of tiers) {
-    // Nachtruhe (Martin, 19.08.): faellt die Erinnerung zwischen 21:00 und
-    // 08:00 Berliner Zeit, wird sie auf 8:00 morgens geschoben. Der
-    // 12-Stunden-Tier war der groesste Nacht-Sender (72 Mails in 30 Tagen),
-    // weil eine Bewerbung am fruehen Nachmittag zwangslaeufig nachts erinnert.
-    const scheduledFor = sendezeitIso(new Date(Date.now() + delay * 60 * 1000));
+  for (const { emailType, scheduledFor, extra } of zeilen) {
     try {
       await supabaseAdmin.from('scheduled_emails').insert({
         lead_id: leadId,
@@ -653,14 +657,84 @@ async function scheduleReactionReminder(
         recipient_email: recipientEmail,
         scheduled_for: scheduledFor,
         status: 'pending',
-        metadata,
+        metadata: { ...metadata, ...(extra ?? {}) },
       });
     } catch (e) {
       // Fire-and-forget — falls das Scheduling fehlschlägt, sollen weder
-      // die ursprüngliche Mail (A/B) noch die anderen Tiers blockiert sein.
+      // die ursprüngliche Mail (A/B) noch die anderen Erinnerungen blockiert sein.
       console.error(`scheduleReactionReminder ${emailType} failed:`, e instanceof Error ? e.message : String(e));
     }
   }
+}
+
+/** Ende der Reservierung einer Bewerbung: frühester echter (nicht `seeded`)
+ *  application_received desselben Paars (Pflegekraft, Job) + 72 h, abgerundet.
+ *  Jobfreie Ereignisse zählen mit (Altbestand, ein Job). Ohne Treffer: ab jetzt. */
+async function reservierungsEndeFuer(
+  supabaseAdmin: any, leadId: string, caregiverId: number | string | undefined, jobOfferId: number | null,
+): Promise<Date> {
+  try {
+    const { data } = await supabaseAdmin
+      .from('lead_events')
+      .select('created_at, metadata')
+      .eq('lead_id', leadId)
+      .eq('event_type', 'application_received')
+      .filter('metadata->>caregiver_id', 'eq', String(caregiverId ?? ''));
+    const anker = ((data ?? []) as { created_at: string; metadata?: Record<string, unknown> | null }[])
+      .filter((e) => {
+        const m = e.metadata ?? {};
+        if (m.seeded === true) return false;
+        const job = m.mamamia_job_offer_id;
+        return jobOfferId == null || job == null || Number(job) === jobOfferId;
+      })
+      .map((e) => Date.parse(e.created_at));
+    const ende = reservierungsEnde(anker);
+    if (ende) return ende;
+  } catch (e) {
+    console.warn('reservierungsEndeFuer failed:', e instanceof Error ? e.message : String(e));
+  }
+  return reservierungsEnde([Date.now()])!;
+}
+
+/** „Reservierung abgelaufen" nach der automatischen Absage (Vorschau v2, Mail 16). Der Name
+ *  kommt aus dem letzten Eingang dieser Bewerbung — detect-caregiver-events schickt ihn nicht
+ *  mit. Pro Lead, Pflegekraft und Job nur einmal. Mehrere am selben Tag fasst die Edge
+ *  Function beim Versand zu einer Mail zusammen. */
+async function planeReservierungBeendet(
+  supabaseAdmin: any, lead: { id: string; email?: string | null }, caregiverId: unknown, jobOfferId: number | null,
+): Promise<void> {
+  if (caregiverId == null || !lead.email) return;
+  const cg = String(caregiverId);
+  const { data: vorhanden } = await supabaseAdmin
+    .from('scheduled_emails')
+    .select('id, metadata')
+    .eq('lead_id', lead.id)
+    .eq('email_type', 'reservierung_beendet')
+    .filter('metadata->>caregiver_id', 'eq', cg);
+  const doppelt = ((vorhanden ?? []) as { metadata?: Record<string, unknown> | null }[])
+    .some((z) => (z.metadata?.mamamia_job_offer_id ?? null) == jobOfferId);
+  if (doppelt) return;
+  const { data: eingang } = await supabaseAdmin
+    .from('lead_events')
+    .select('metadata')
+    .eq('lead_id', lead.id)
+    .eq('event_type', 'application_received')
+    .filter('metadata->>caregiver_id', 'eq', cg)
+    .order('created_at', { ascending: false })
+    .limit(1);
+  const name = String(((eingang ?? [])[0]?.metadata as Record<string, unknown> | undefined)?.caregiver_name ?? '').trim();
+  if (!name) {
+    console.warn(`reservierung_beendet: kein Name für Pflegekraft ${cg} (lead ${lead.id}) — keine Mail`);
+    return;
+  }
+  await supabaseAdmin.from('scheduled_emails').insert({
+    lead_id: lead.id,
+    email_type: 'reservierung_beendet',
+    recipient_email: lead.email,
+    scheduled_for: sendezeitIso(new Date()),
+    status: 'pending',
+    metadata: { caregiver_id: caregiverId, caregiver_name: name, mamamia_job_offer_id: jobOfferId },
+  });
 }
 
 const corsHeaders = {
@@ -1224,6 +1298,18 @@ async function handlePost(request: NextRequest) {
        fuenf Reaktions-Reminder. Team-Mails laufen weiter — wir wollen jede
        Bewerbung sehen. */
     const istVermittlerLead = Boolean((lead as any)?.vermittler);
+    // Automatische Absage nach 72 h ohne Antwort (detect-caregiver-events): Kunde
+    // erfährt, dass die Reservierung abgelaufen ist und die Suche weiterläuft.
+    if (
+      event === 'application_rejected' && !istVermittlerLead && !teamOnlyResend && !silent &&
+      metadata && typeof metadata === 'object' && (metadata as Record<string, unknown>).reason === 'auto_timeout_72h'
+    ) {
+      try {
+        await planeReservierungBeendet(supabase, lead as any, (metadata as Record<string, unknown>).caregiver_id, mamamiaJobOfferId);
+      } catch (e) {
+        console.error('reservierung_beendet schedule failed:', e instanceof Error ? e.message : String(e));
+      }
+    }
     if (istVermittlerLead && CUSTOMER_MAIL_EVENTS.has(event)) {
       console.log(`[lead-event] ${event}: Vermittler-Lead ${lead.id} — keine Kundenmail, kein Reminder`);
     }
@@ -1283,6 +1369,18 @@ async function handlePost(request: NextRequest) {
             .catch((e) =>
               console.error('customer mail send threw:', e instanceof Error ? e.message : String(e)),
             );
+          // „Noch keine Bewerbung? So geht es schneller" nach 48 h (Vorschau v2, Mail 08).
+          // Entfällt beim Versand, wenn bis dahin eine Bewerbung oder ein Interesse kam.
+          supabase.from('scheduled_emails').insert({
+            lead_id: lead.id,
+            email_type: 'suche_stand_2tage',
+            recipient_email: (lead as any).email,
+            scheduled_for: sendezeitIso(new Date(Date.now() + 48 * 60 * 60 * 1000)),
+            status: 'pending',
+            metadata: {},
+          }).then(({ error }: { error: { message: string } | null }) => {
+            if (error) console.error('suche_stand_2tage schedule failed:', error.message);
+          });
         }
       } else if (event === 'offer_updated') {
         // Aktualisiertes Angebot — alter/neuer Preis + geänderte Angaben aus
@@ -1342,6 +1440,7 @@ async function handlePost(request: NextRequest) {
             caregiver,
             portalUrl,
             offer,
+            !!contractAttachment,
           )
             .then(({ template, attachments }) => {
               // Mail C (Buchungsbestätigung): Vertrag-HTML zusätzlich anhängen.
