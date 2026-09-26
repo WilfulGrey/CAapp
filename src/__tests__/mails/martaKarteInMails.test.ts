@@ -43,7 +43,12 @@ describe('Martas Karte kommt aus einer Vorlage', () => {
     expect(vermittler.length).toBeGreaterThanOrEqual(4);
     for (const a of vermittler) expect(a).toContain('"vermittler"');
     const kunden = (quelle.match(/buildMartaSig\([^)]*\)/g) ?? []).filter((a) => !a.includes('"vermittler"'));
-    expect(kunden.length).toBeGreaterThanOrEqual(14);
+    expect(kunden.length).toBeGreaterThanOrEqual(6);
+    // Die neuen Kundenmails (kundenMails.ts, 26.09.2026) bekommen die Karte über den Kontext.
+    expect(quelle.slice(quelle.indexOf('function kundenKontext('))).toMatch(/marta: buildMartaSig\(siteUrl\)/);
+    const neu = lies('project 3/supabase/functions/send-scheduled-emails/kundenMails.ts');
+    expect((neu.match(/\$\{k\.marta\}/g) ?? []).length).toBeGreaterThanOrEqual(10);
+    expect(neu).not.toContain('martaKarteHtml');
   });
 
   it('Edge Function lädt den Bewertungsstand pro Aufruf, bevor Mails gebaut werden', () => {

@@ -1186,6 +1186,9 @@ export function fuenfListeHtml(
   cids: (string | null)[],
   profilUrls: string[],
   alleUrl: string,
+  /* Kopfzeile der Liste. Die neue Nudge-Mail (26.09.2026) sagt „Passend zu Ihrer
+     Anfrage": „vorbereitet" klang nach Arbeit, die noch ansteht. */
+  kopf = "Für Sie vorbereitet",
 ): string {
   if (fuenf.length === 0) return "";
   const n = fuenf.length;
@@ -1197,7 +1200,7 @@ export function fuenfListeHtml(
           <tr>
             <td style="padding:12px 18px;background:#FAF8F4;border-bottom:1px solid #EBE2D2;border-radius:15px 15px 0 0;">
               <table width="100%" cellpadding="0" cellspacing="0" role="presentation"><tr>
-                <td style="font-size:12px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;color:${KORALLE};">Für Sie vorbereitet</td>
+                <td style="font-size:12px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;color:${KORALLE};">${esc(kopf)}</td>
                 <td align="right" style="font-size:12.5px;color:#71717A;text-align:right;">${n} ${n === 1 ? "Kraft" : "Kräfte"} verfügbar</td>
               </tr></table>
             </td>

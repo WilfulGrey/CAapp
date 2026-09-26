@@ -9,15 +9,16 @@
 // Pure Logik für die Route und die Seite — keine Next-/Supabase-Importe, damit
 // root-vitest sie testen kann.
 
-/** Die drei Knöpfe der Abschiedsmail — Texte 1:1 wie in send-scheduled-emails. */
+/** Die drei Knöpfe der Abschiedsmail — Texte 1:1 wie RUECKMELDUNG_KNOEPFE in
+ *  send-scheduled-emails/kette.ts (neu seit der Vorschau v2, 26.09.2026). */
 export const KNOEPFE = {
-  interesse: 'Ja, habe Interesse — bitte melden',
-  'aktuell-nicht': 'Aktuell nicht — vielleicht später',
-  'nicht-relevant': 'Doch nicht relevant',
+  interesse: 'Ja, ich habe noch Interesse',
+  'aktuell-nicht': 'Aktuell nicht, vielleicht später',
+  'nicht-relevant': 'Nicht mehr relevant',
 } as const;
 export type Knopf = keyof typeof KNOEPFE;
 
-/** Gründe bei „Doch nicht relevant". Reihenfolge = Reihenfolge auf der Seite. */
+/** Gründe bei „Nicht mehr relevant". Reihenfolge = Reihenfolge auf der Seite. */
 export const ANLAESSE = {
   'anderer-anbieter': 'Wir haben einen anderen Anbieter gewählt',
   'zu-teuer': 'Es ist uns zu teuer',
@@ -127,7 +128,7 @@ export function teamMail(i: TeamInfo): { subject: string; html: string; text: st
       break;
     case 'grund':
       subject = `Preis-Einwand: ${i.kunde} („${anlass}“)`;
-      saetze.push(`${i.kunde} hat „Doch nicht relevant“ geklickt und als Grund „${anlass}“ gewählt. Die Seite hat die Bestpreisgarantie gezeigt.`);
+      saetze.push(`${i.kunde} hat „Nicht mehr relevant“ geklickt und als Grund „${anlass}“ gewählt. Die Seite hat die Bestpreisgarantie gezeigt.`);
       saetze.push('Ein Anruf lohnt sich, solange noch nicht unterschrieben ist. Der Kunde ist noch NICHT abgemeldet.');
       break;
   }
