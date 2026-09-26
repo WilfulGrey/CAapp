@@ -5,6 +5,7 @@ import { useParams } from 'next/navigation';
 import { createClient } from '@supabase/supabase-js';
 import { format, addDays } from 'date-fns';
 import { Loader as Loader2 } from 'lucide-react';
+import { HERO_PUNKTE } from '@/lib/hero-punkte';
 import Image from 'next/image';
 import { usableNamePart } from '@/lib/calculation';
 
@@ -230,10 +231,10 @@ export default function KalkulationPrintPage() {
           <div style={s.secHd}><div style={s.secNum}>2</div><div style={s.secTitle}>Unsere Konditionen</div><div style={s.secBadge}>100% Sorgenfrei und ohne Risiko</div></div>
           <div style={s.body}>
             {[
-              ['M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z', 'Keine Vertragsbindung', 'Täglich kündbar – maximale Flexibilität'],
-              ['M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8zM14 2v6h6M16 13H8M16 17H8', 'Tagesgenaue Abrechnung', 'Kosten entstehen erst mit Anreise der Betreuungskraft'],
-              ['M12 22c0 0 8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z', 'Kosten erst bei Start – keine Vorauszahlung', 'Sie zahlen nur, wenn die Betreuungskraft vor Ort arbeitet'],
-              ['M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2M9 7a4 4 0 100 8 4 4 0 000-8z', 'Persönlicher Ansprechpartner', '7 Tage die Woche für Sie da'],
+              ['M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z', HERO_PUNKTE[0], 'Als Direktanbieter sparen wir die Vermittler-Provision'],
+              ['M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8zM14 2v6h6M16 13H8M16 17H8', HERO_PUNKTE[1], 'Sie sehen die Bewerbungen und entscheiden dann'],
+              ['M12 22c0 0 8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z', HERO_PUNKTE[2], 'Kosten entstehen erst ab Anreise der Pflegekraft'],
+              ['M20 6L9 17l-5-5', 'Bestpreisgarantie', 'Haben Sie ein günstigeres, vergleichbares Angebot? Dann gilt unsere Bestpreisgarantie.'],
             ].map(([path, title, sub], i) => (
               <div key={i} style={{ ...s.vtItem, marginBottom: i < 3 ? '7pt' : '0' }}>
                 <div style={s.vtIcon}>{icon(path)}</div>
@@ -268,7 +269,7 @@ export default function KalkulationPrintPage() {
             ))}
           </div>
           <div style={s.hemm}>
-            {[['M20 6L9 17l-5-5', '100% Sorgenfrei'], ['M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z', 'Täglich kündbar'], ['M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z', 'Tagesgenaue Abrechnung']].map(([path, label], i) => (
+            {[['M20 6L9 17l-5-5', HERO_PUNKTE[0]], ['M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z', HERO_PUNKTE[1]], ['M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z', HERO_PUNKTE[2]]].map(([path, label], i) => (
               <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '12pt' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '3pt', fontSize: '8pt', color: '#2D6A4F', fontWeight: 600 }}>
                   {iconGreen(path)}{label}
