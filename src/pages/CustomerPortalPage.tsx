@@ -1835,19 +1835,25 @@ const CustomerPortalPage: FC = () => {
   // noch nicht abgesendet → Formular öffnen; schon abgesendet → zum Stand; offene
   // Bewerbung → zu den Bewerbungen. Erst wenn feststeht, ob abgesendet wurde
   // (Lead geladen und `patient_form_at` oder mamamia bekannt), und nur einmal.
+  // Erst springen, wenn das Ziel wirklich gerendert ist (Staging 26.09.: direkt nach dem
+  // Laden des Leads stand weder #stand noch #patientendaten, der Sprung ging ins Leere und
+  // der Ref verhinderte jeden zweiten Versuch). Ohne Ziel: beim nächsten Render erneut.
   const anfragenErledigtRef = useRef(false);
   useEffect(() => {
     // Aus der aktuellen URL lesen (wie view=application), nicht aus der Modul-Konstante.
     if (anfragenErledigtRef.current || new URLSearchParams(window.location.search).get('goto') !== 'anfragen') return;
     if (!lead || !(IS_PREVIEW_ANY || lead.patient_form_at || mmCustomer)) return;
+    const ziel = hasPending ? document.getElementById('bewerbungen')
+      : !schonAbgesendet ? document.getElementById('patientendaten')
+      : document.getElementById('stand');
+    if (!ziel) return;
     anfragenErledigtRef.current = true;
     requestAnimationFrame(() => {
-      if (hasPending) document.getElementById('bewerbungen')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-      else if (!schonAbgesendet) zurPflegesituation();
-      else (document.getElementById('stand') ?? document.getElementById('patientendaten'))?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      if (!hasPending && !schonAbgesendet) zurPflegesituation();
+      else ziel.scrollIntoView({ behavior: 'smooth', block: 'start' });
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [lead, mmCustomer, hasPending, schonAbgesendet]);
+  }, [lead, mmCustomer, mmReady, hasPending, schonAbgesendet, sucheLaeuft, pendingApps.length]);
 
   const canInviteNurse = (_idx: number): boolean => {
     // Strict gate: no invitations until patient profile is complete.
