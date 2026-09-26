@@ -10,6 +10,7 @@ import Image from 'next/image';
 import { identifyClarity } from '@/lib/clarity';
 import { usableNamePart } from '@/lib/calculation';
 import { PORTAL_BASIS } from '@/lib/portal-url';
+import { HERO_PUNKTE } from '@/lib/hero-punkte';
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -251,11 +252,12 @@ export default function KalkulationPage() {
             <span className="ml-auto text-xs font-semibold text-[#2D6A4F] bg-[#E8F5E9] px-2 py-1 rounded-full whitespace-nowrap sm:hidden">100% Sorgenfrei</span>
           </div>
           <div className="px-6 py-4 space-y-4">
+            {/* Die vier Punkte der Startseite (Martin 26.09.: „überall gleich“). */}
             {[
-              [Shield, 'Keine Vertragsbindung', 'Täglich kündbar – maximale Flexibilität für Sie'],
-              [FileText, 'Tagesgenaue Abrechnung', 'Kosten entstehen erst mit Anreise der Betreuungskraft'],
-              [Clock, 'Kosten erst bei Start – keine Vorauszahlung', 'Sie zahlen nur, wenn die Betreuungskraft vor Ort arbeitet'],
-              [Users, 'Persönlicher Ansprechpartner', '7 Tage die Woche für Sie da'],
+              [Shield, HERO_PUNKTE[0], 'Als Direktanbieter sparen wir die Vermittler-Provision'],
+              [FileText, HERO_PUNKTE[1], 'Sie sehen die Bewerbungen und entscheiden dann'],
+              [Clock, HERO_PUNKTE[2], 'Kosten entstehen erst ab Anreise der Pflegekraft'],
+              [Award, 'Bestpreisgarantie', 'Haben Sie ein günstigeres, vergleichbares Angebot? Dann gilt unsere Bestpreisgarantie.'],
             ].map(([Icon, title, sub]: any) => (
               <div key={title} className="flex gap-3 items-start">
                 <div className="w-8 h-8 rounded-lg bg-gray-50 border border-gray-200 flex items-center justify-center flex-shrink-0">
@@ -307,9 +309,9 @@ export default function KalkulationPage() {
           </div>
           <div className="px-6 pb-4 flex items-center justify-center gap-2 flex-wrap">
             {[
-              [CheckCircle2, '100% Sorgenfrei'],
-              [Shield, 'Täglich kündbar'],
-              [FileText, 'Tagesgenaue Abrechnung'],
+              [CheckCircle2, HERO_PUNKTE[0]],
+              [Shield, HERO_PUNKTE[1]],
+              [FileText, HERO_PUNKTE[2]],
             ].map(([Icon, label]: any) => (
               <div key={label} className="flex items-center gap-1.5 text-xs text-[#2D6A4F] font-semibold">
                 <Icon className="w-3 h-3" />{label}
