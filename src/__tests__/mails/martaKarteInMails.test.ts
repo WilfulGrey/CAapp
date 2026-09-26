@@ -28,7 +28,8 @@ describe('Martas Karte kommt aus einer Vorlage', () => {
 
   it('lib/email.ts: alle Kundenkarten mit Bewertung, keine Vermittler-Karte', () => {
     const aufrufe = lies(EMAIL).match(/martaKarteHtml\(\{[^}]*\}\)/g) ?? [];
-    expect(aufrufe.length).toBeGreaterThanOrEqual(6);
+    // Mail D nutzt seit 26.09.2026 caregiverMartaSig statt einer eigenen Karte.
+    expect(aufrufe.length).toBeGreaterThanOrEqual(5);
     for (const a of aufrufe) {
       expect(a).toContain("fuer: 'kunde'");
       expect(a).toContain('bewertung');
@@ -58,8 +59,8 @@ describe('Martas Karte kommt aus einer Vorlage', () => {
   it('jede Mail-Shell mit Karte trägt die Handy-Regeln der Karte', () => {
     expect(lies('project 3/lib/email-template.ts')).toContain('${MARTA_KARTE_MOBIL_CSS}');
     expect(lies(EDGE)).toContain('${MARTA_KARTE_MOBIL_CSS}');
-    // caregiverMailShell + Shell der Pflegedaten-Mail
-    expect(lies(EMAIL).match(/\$\{MARTA_KARTE_MOBIL_CSS\}/g)).toHaveLength(2);
+    // caregiverMailShell (die Pflegedaten-Mail nutzt sie seit 26.09.2026 mit)
+    expect(lies(EMAIL).match(/\$\{MARTA_KARTE_MOBIL_CSS\}/g)).toHaveLength(1);
   });
 
   it('Bewertungsanfrage und Vermittler-Modul bleiben ohne Sterne', () => {
