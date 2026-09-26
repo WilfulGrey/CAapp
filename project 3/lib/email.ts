@@ -9,6 +9,13 @@ import { LABELS } from './angaben-labels';
 // bleiben synchron und ohne Netzaufruf.
 import { type BewertungsStand, holeBewertungsStand } from './bewertungen-stand';
 import { MARTA_KARTE_MOBIL_CSS, martaKarteHtml } from './marta-karte';
+// Bausteine der neuen Kundenmails (Vorschau v2, Martin 26.09.2026) — Kopie in
+// send-scheduled-emails/mailBausteine.ts, Gleichheit prüft mails/mailBausteine.test.ts.
+import {
+  MAIL_FARBEN as MF, mAbschnitt, mAbstand, mb, mBewerbungsKarte, mChip, mEyebrow, mKarte, mKlein,
+  mKnopf, mKontakt, mLink, mp, mPflegekraft, mSchritte, mTitel, mTrenner, mVorschau,
+  type PflegekraftDaten,
+} from './mail-bausteine';
 
 // Eigennamen sauber großschreiben: jedes Wort + jeden Bindestrich-Teil
 // kapitalisieren. Namens-Partikel (von, van, de, zu, …) bleiben klein —
@@ -1381,19 +1388,8 @@ function customerGreeting(lead: Lead): string {
   if (anrede === 'Frau' && n)     return `Guten Tag Frau ${n}`;
   if (anrede === 'Herr' && n)     return `Guten Tag Herr ${n}`;
   if (anrede === 'Familie' && n)  return `Guten Tag Familie ${n}`;
-  // Vorname als Anrede nur wenn wir ihn als echten Vornamen einschätzen:
-  //   (a) in der Namens-DB (detectGenderFromName liefert Geschlecht), ODER
-  //   (b) es gibt einen separaten Nachnamen → der Parser hatte 2+ Tokens,
-  //       also ist das erste Token sehr wahrscheinlich ein Vorname
-  //       ("Tomasz Kowalski" → "Guten Tag Tomasz", auch wenn Tomasz nicht
-  //       in der DB ist).
-  // Reiner Einzel-Token, nicht in DB → vermutlich Nachname. Seit der
-  // Kostenrechner nur ein freies "Name"-Feld hat (PR #298), tippen Kunden
-  // oft nur ihren Nachnamen ("Zielke"), der fälschlich als vorname geparst
-  // wird. Dann lieber neutral "Guten Tag" als "Guten Tag Zielke".
-  if (lead.vorname && (detectGenderFromName(lead.vorname) || n)) {
-    return `Guten Tag ${capitalize(lead.vorname)}`;
-  }
+  // NIE der Vorname (Martin, Anrede-Konsistenz; Vorschau v2 26.09.2026): wie
+  // alle Kundenmails der Warteschlange formal mit Nachnamen, sonst „Guten Tag".
   return 'Guten Tag';
 }
 
@@ -1490,158 +1486,7 @@ function caregiverMailShell(baseUrl: string, leadEmail: string, content: string,
 </html>`;
 }
 
-// Kompakte Pflegekraft-Kachel (Foto/Initialen · Name · Alter · Badge ·
-// Erfahrung·Einsätze · Deutsch + "Profil ansehen"-Link). Gemeinsam für
-// Mail 11 (Interesse) und Mail 12 (Bewerbung), damit beide identisch wirken.
-// Kein grüner Button, keine Bio. Badge bewusst als Emoji-Medaille (📅 SVG
-// rendert in Gmail/Outlook nicht).
-  // Abstand Foto→Text als EIGENE Spalte, nicht als padding-right an der
-  // Foto-Zelle: mehrere Mail-Renderer verwerfen padding an einer <td>, die
-  // zugleich eine feste width traegt — dann klebt der Name am Bild (Martin
-  // 18.08. mit Screenshot: "viel zu eng name und bild", gemessener Abstand
-  // ~1 px statt 16). In Chrome war das NICHT reproduzierbar, das Padding
-  // greift dort; die leere Spalte kommt ganz ohne padding-Unterstuetzung aus
-  // und ist damit unabhaengig vom Client. Text mittig statt oben, sonst
-  // haengen zwei kurze Zeilen an der Oberkante eines 76-px-Fotos.
-function caregiverKachelHtml(cg: CaregiverDisplay, portalUrl: string): string {
-  const firstName = cg.name.split(' ')[0];
-  // Abgerundetes Quadrat wie im Portal (MatchCard: `rounded-xl`), nicht mehr
-  // der runde Avatar — Mail und Portal zeigen dieselbe Karte.
-  const photoHtml = cg.photoUrl
-    ? `<img src="${cg.photoUrl}" alt="${cg.name}" width="76" style="display:block;width:76px;height:76px;border-radius:12px;object-fit:cover;" />`
-    : `<div style="width:76px;height:76px;border-radius:12px;background-color:#B5A184;color:#fff;font-size:26px;font-weight:700;line-height:76px;text-align:center;">${caregiverInitials(cg.name)}</div>`;
 
-  // Alter dezent hinter dem Namen ("Grazyna J., 70") — Portal-Stil.
-  const ageSuffix = cg.age ? `<span style="font-weight:400;color:#71717A;">, ${cg.age}</span>` : '';
-  const deutschLine = cg.germanLevel
-    ? `<p style="margin:0;font-size:15px;color:#71717A;">Deutsch ${cg.germanLevel}</p>`
-    : '';
-  // Stufe als fettes Wort vor der Faktenzeile (kein Medaillen-Badge mehr) —
-  // exakt wie die Portal-Karte: „Bewährt: 12 Jahre Erfahrung · 3 Einsätze".
-  const tier = caregiverTierLabel(cg.einsatzCount, cg.yearsExperience);
-  const factsHtml = `<p style="margin:16px 0 0;font-size:15px;line-height:1.6;color:#71717A;">${stufenBadge(tier)}<span style="vertical-align:middle;">&nbsp;&nbsp;${caregiverFactsLine(cg)}</span></p>`;
-
-  return `
-    <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="margin:0 0 26px;border:1px solid #ECE7DF;border-radius:14px;background:#ffffff;overflow:hidden;">
-      <tr><td style="padding:18px 20px;">
-        <table width="100%" cellpadding="0" cellspacing="0" role="presentation">
-          <tr>
-            <td width="76" style="vertical-align:middle;width:76px;">${photoHtml}</td>
-            <td width="18" style="width:18px;font-size:0;line-height:0;">&nbsp;</td>
-            <td style="vertical-align:middle;">
-              <p style="margin:0 0 3px;font-size:18px;font-weight:700;color:#18181B;line-height:1.3;">${cg.name}${ageSuffix}</p>
-              ${deutschLine}
-            </td>
-          </tr>
-        </table>
-        ${factsHtml}
-        <div style="border-top:1px solid #ECE7DF;margin:14px 0 0;padding-top:14px;">
-          <a href="${portalUrl}" style="color:#8B7355;text-decoration:none;font-weight:700;font-size:15px;">${firstName}s Profil ansehen &rarr;</a>
-        </div>
-      </td></tr>
-    </table>`;
-}
-
-// Gemeinsamer Frame für beide Caregiver-Event-Mails. Nur Subject, Intro-HTML,
-// "So geht es weiter"-HTML und CTA-Text sind je Mail unterschiedlich.
-function buildCaregiverEventEmail(opts: {
-  lead: Lead;
-  caregiver: CaregiverDisplay;
-  subject: string;
-  introHtml: string;       // erster Absatz nach Greeting
-  middleHtml: string;      // "So geht es weiter"-Absatz
-  ctaText: string;         // Button-Text
-  portalUrl: string;       // URL hinter dem Button
-  plainSummary: string;    // Plaintext-Fallback (intro + middle, ohne HTML)
-  psHtml?: string;         // optionales P.S. (z.B. Gebührenfreiheit) — vor der Sig
-  psText?: string;         // Plaintext-Pendant des P.S.
-  bewertung: BewertungsStand; // Bewertungszeile unter der Marta-Karte
-}): EmailTemplate {
-  const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://primundus.de';
-  const greeting = customerGreeting(opts.lead);
-  const cg = opts.caregiver;
-
-  // Stufe + Fakten wortgleich zum Portal (caregiverTierLabel/caregiverFactsLine).
-  const tier = caregiverTierLabel(cg.einsatzCount, cg.yearsExperience);
-  const factsHtml = `<p style="margin:16px 0 0;font-size:15px;line-height:1.6;color:#71717A;">${stufenBadge(tier)}<span style="vertical-align:middle;">&nbsp;&nbsp;${caregiverFactsLine(cg)}</span></p>`;
-  const ageSuffix = cg.age ? `<span style="font-weight:400;color:#71717A;">, ${cg.age}</span>` : '';
-  const deutschLine = cg.germanLevel
-    ? `<p style="margin:0;font-size:15px;color:#71717A;">Deutsch ${cg.germanLevel}</p>`
-    : '';
-
-  // Plaintext-Reflex der Kachel (nur für den Text-Teil unten).
-  const metaParts: string[] = [];
-  if (cg.yearsExperience && cg.yearsExperience > 0) metaParts.push(`${cg.yearsExperience} ${cg.yearsExperience === 1 ? 'Jahr' : 'Jahre'} Erfahrung`);
-  if (cg.einsatzCount && cg.einsatzCount > 0)       metaParts.push(`${cg.einsatzCount} ${cg.einsatzCount === 1 ? 'Einsatz' : 'Einsätze'}`);
-
-  const photoHtml = cg.photoUrl
-    ? `<img src="${cg.photoUrl}" alt="${cg.name}" width="76" style="display:block;width:76px;height:76px;border-radius:12px;object-fit:cover;" />`
-    : `<div style="width:76px;height:76px;border-radius:12px;background-color:#B5A184;color:#fff;font-size:26px;font-weight:700;line-height:76px;text-align:center;">${caregiverInitials(cg.name)}</div>`;
-
-  const kachel = `
-    <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="margin:0 0 22px 0;border:1px solid #ECE7DF;border-radius:14px;overflow:hidden;">
-      <tr><td style="padding:18px 20px;background:#ffffff;">
-        <table width="100%" cellpadding="0" cellspacing="0" role="presentation">
-          <tr>
-            <td width="76" style="vertical-align:middle;width:76px;">${photoHtml}</td>
-            <td width="18" style="width:18px;font-size:0;line-height:0;">&nbsp;</td>
-            <td style="vertical-align:middle;">
-              <p style="margin:0 0 3px;font-size:18px;font-weight:700;color:#18181B;line-height:1.3;">${cg.name}${ageSuffix}</p>
-              ${deutschLine}
-            </td>
-          </tr>
-        </table>
-        ${factsHtml}
-      </td></tr>
-    </table>`;
-
-  const martaSig = caregiverMartaSig(baseUrl, opts.bewertung);
-
-  const content = `
-    <p style="font-size:15px;line-height:1.75;color:#444;margin-bottom:14px;">${greeting},</p>
-    ${opts.introHtml}
-    ${kachel}
-    <p style="font-size:15px;line-height:1.75;color:#444;margin-bottom:12px;"><strong style="color:#2D1F0F;">So geht es weiter:</strong></p>
-    ${opts.middleHtml}
-    ${bulletproofButton(opts.portalUrl, opts.ctaText)}
-    <div style="font-size:12px;color:#888;line-height:1.8;margin:0 0 18px;text-align:center;">
-      <span style="color:#2D6A4F;font-weight:600;">✓ Keine Vertragsbindung</span>&ensp;&middot;&ensp;
-      <span style="color:#2D6A4F;font-weight:600;">✓ Tagesgenaue Abrechnung</span>&ensp;&middot;&ensp;
-      <span style="color:#2D6A4F;font-weight:600;">✓ Kosten erst bei Anreise</span>
-    </div>
-    <div style="background:#EEF6F0;border-left:3px solid #4CAF50;padding:12px 14px;border-radius:0 6px 6px 0;font-size:14px;color:#555;line-height:1.6;">
-      Für Sie bleibt alles <strong>unverbindlich</strong>, bis Sie sich für eine passende Betreuungskraft entscheiden und diese anreist.
-    </div>
-    ${opts.psHtml ?? ''}
-    ${martaSig}`;
-
-  const html = caregiverMailShell(baseUrl, opts.lead.email, content, customerUnsubscribeUrl(opts.lead));
-
-  // Plaintext-Fallback. Knapper als HTML — Mail-Clients ohne HTML-Rendering
-  // sehen einen lesbaren Reflex von Intro + Pflegekraft + nächster Schritt.
-  const text = `${greeting},
-
-${opts.plainSummary}
-
-PFLEGEKRAFT
-${cg.name}${cg.age ? `, ${cg.age}` : ''} · ${tier}
-${metaParts.length > 0 ? metaParts.join(' · ') + '\n' : ''}${opts.ctaText.replace(/\s*→\s*$/, '')}: ${opts.portalUrl}
-
-✓ Keine Vertragsbindung  ·  ✓ Tagesgenaue Abrechnung  ·  ✓ Kosten erst bei Anreise
-
-Für Sie bleibt alles unverbindlich, bis Sie sich für eine passende
-Betreuungskraft entscheiden und diese anreist.
-${opts.psText ? '\n' + opts.psText + '\n' : ''}
-Mit freundlichen Grüßen
-Marta Kapcio — Pflegeberaterin
-Tel: 089 200 000 830  ·  WhatsApp: https://wa.me/4989200000830
-
-Primundus Deutschland
-www.primundus.de
-`;
-
-  return { subject: opts.subject, html, text };
-}
 
 // Customer-Mail bei `patient_data_saved` (Mail D). Wird einmal pro Lead
 // ausgelöst (DB-Dedupe), sobald der Kunde im Portal die Pflegesituation
@@ -1650,130 +1495,82 @@ www.primundus.de
 // noch keine spezifische Pflegekraft im Spiel ist. Stattdessen schiebt die
 // Mail den Kunden in den nächsten Action-Schritt: selbst Pflegekräfte
 // anschauen + einladen, statt passiv zu warten.
+// ─── Neue Kundenmails (Vorschau v2, Martin 26.09.2026) ─────────────────────
+// Texte und Optik wörtlich aus der abgenommenen Vorschau: weiße Karten, Knopf in
+// Koralle, eine Pflegekraft-Box (mail-bausteine), Marta in Ich-Form. Die Mails
+// der Warteschlange bauen dieselben Bausteine (send-scheduled-emails/kundenMails.ts).
+
+function pkDaten(cg: CaregiverDisplay): PflegekraftDaten {
+  return { name: cg.name, alter: cg.age ?? null, deutsch: cg.germanLevel ?? null,
+    jahre: cg.yearsExperience ?? null, einsaetze: cg.einsatzCount ?? null, foto: cg.photoUrl ?? null };
+}
+
+/** Parameter an einen Portal-Link hängen; ohne Link die Website. */
+function mitParam(url: string, param: string): string {
+  if (!url) return 'https://primundus.de';
+  return url + (url.includes('?') ? '&' : '?') + param;
+}
+
+const MAIL_KONTAKT_TEXT = 'Lieber am Telefon? 089 200 000 830 · WhatsApp: https://wa.me/4989200000830';
+const MAIL_MARTA_TEXT = `Mit freundlichen Grüßen
+Marta Kapcio, Ihre Ansprechpartnerin bei Primundus
+Tel: 089 200 000 830 · WhatsApp: https://wa.me/4989200000830
+
+Primundus Deutschland | www.primundus.de`;
+
+/** „15.10.2026" aus ISO/mamamia-Datum. */
+function datumKurz(iso?: string | null): string | null {
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(iso ?? '');
+  return m ? `${m[3]}.${m[2]}.${m[1]}` : null;
+}
+
 export function getPatientDataSavedEmailTemplate(
   lead: Lead,
   portalUrl: string,
   bewertung: BewertungsStand,
 ): EmailTemplate {
+  // Mail D „Ihre Suche läuft" (Vorschau 07): Erwartung setzen — Bewerbungen kommen per
+  // E-Mail und sind 72 Stunden reserviert; Einladen nur als Zugabe.
   const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://primundus.de';
   const greeting = customerGreeting(lead);
-  const subject = 'Ihre Pflegedaten sind bei uns eingegangen';
-
-  const introHtml = `<p style="font-size:15px;line-height:1.75;color:#444;margin-bottom:18px;">vielen Dank — Ihre Pflegesituation ist nun vollständig erfasst. Passende Pflegekräfte können sich jetzt ein Bild machen und sich bei Ihnen bewerben oder ihr Interesse bekunden.</p>`;
-
-  const actionHtml = `<p style="font-size:15px;line-height:1.75;color:#444;margin-bottom:20px;">In der Zwischenzeit müssen Sie nicht warten: Im Kundenportal sehen Sie sofort <strong style="color:#2D1F0F;">verfügbare Pflegekräfte</strong>, die zu Ihrem Bedarf passen, und können sie persönlich einladen, sich bei Ihnen zu bewerben.</p>`;
-
-  const ctaText = 'Jetzt Pflegekräfte ansehen und einladen →';
-
-  const outroHtml = `<p style="font-size:14px;line-height:1.65;color:#555;margin:18px 0 0;">Bei Fragen erreichen Sie uns telefonisch unter <a href="tel:+4989200000830" style="color:#0066CC;text-decoration:none;">+49 89 200 000 830</a> oder per E-Mail an <a href="mailto:info@primundus.de" style="color:#0066CC;text-decoration:none;">info@primundus.de</a>.</p>`;
-
-  // Marta-Sig — identisch zu buildCaregiverEventEmail, damit die Mail-Reihe
-  // optisch konsistent bleibt.
-  const martaSig = `
-    <p style="font-size:16px;line-height:1.7;color:#555;margin-top:24px;margin-bottom:16px;">Mit freundlichen Grüßen<br><strong style="color:#3D2B1F;">Marta Kapcio</strong></p>
-    ${martaKarteHtml({ fuer: 'kunde', bewertung, siteUrl: baseUrl, presseLogos: false })}`;
-
-  const content = `
-    <p style="font-size:15px;line-height:1.75;color:#444;margin-bottom:14px;">${greeting},</p>
-    ${introHtml}
-    ${actionHtml}
-    ${bulletproofButton(portalUrl, ctaText)}
-    <div style="font-size:12px;color:#888;line-height:1.8;margin:0 0 18px;text-align:center;">
-      <span style="color:#2D6A4F;font-weight:600;">✓ Keine Vertragsbindung</span>&ensp;&middot;&ensp;
-      <span style="color:#2D6A4F;font-weight:600;">✓ Tagesgenaue Abrechnung</span>&ensp;&middot;&ensp;
-      <span style="color:#2D6A4F;font-weight:600;">✓ Kosten erst bei Anreise</span>
-    </div>
-    ${outroHtml}
-    ${martaSig}`;
-
-  const html = `<!DOCTYPE html>
-<html lang="de">
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Primundus 24h-Pflege</title>
-  <style>
-    * { margin: 0; padding: 0; box-sizing: border-box; }
-    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; line-height: 1.6; color: #333; background-color: #f4f4f4; }
-    @media only screen and (max-width: 600px) {
-      .email-content { padding: 30px 20px !important; }
-      .cond-top-cell { display: block !important; width: 100% !important; padding: 18px 22px 16px !important; border-right: none !important; border-bottom: 1px solid #ebe2d2 !important; }
-      .cond-top-cell:last-child { border-bottom: none !important; }
-    }
-    /* Handy (11.09.2026): Kopfzeile mit 20 statt 40 px Rand (Logo + Siegel
-       brauchten sonst 363 px) und schmalere Siegel-Spalte in der Marta-Karte —
-       wie getEmailLayout / send-scheduled-emails. Grenze 480 px, damit ein
-       600 px breites Fenster exakt die Desktop-Optik behaelt. */
-    @media only screen and (max-width: 480px) {
-      .email-header { padding: 20px 20px 16px 20px !important; }${MARTA_KARTE_MOBIL_CSS}
-    }
-  </style>
-</head>
-<body>
-  <div style="width:100%;background-color:#f4f4f4;padding:20px 0;">
-    <table width="100%" cellpadding="0" cellspacing="0" role="presentation"><tr><td align="center">
-      <div style="max-width:600px;margin:0 auto;background-color:#ffffff;border-radius:8px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.1);">
-        <div class="email-header" style="background:#ffffff;padding:24px 40px 20px 40px;border-bottom:1px solid #f0ebe4;">
-          <table width="100%" cellpadding="0" cellspacing="0" role="presentation"><tr>
-            <td style="vertical-align:middle;">
-              <img src="${baseUrl}/images/Primundus-Logo_V6.png" alt="Primundus Logo" width="160" style="display:block;width:160px;max-width:160px;height:auto;" />
-            </td>
-            <td style="vertical-align:middle;text-align:right;">
-              <table cellpadding="0" cellspacing="0" role="presentation" style="margin-left:auto;"><tr>
-                <td style="text-align:center;vertical-align:middle;padding-right:8px;border-right:1px solid #f0ebe4;">
-                  <img src="${baseUrl}/images/primundus_testsieger-2021.webp" alt="Testsieger DIE WELT" width="36" style="display:block;width:36px;height:auto;" />
-                </td>
-                <td style="text-align:left;padding-left:8px;">
-                  <p style="margin:0 0 1px;font-size:10px;font-weight:700;color:#3D2B1F;white-space:nowrap;">6× Testsieger</p>
-                  <p style="margin:0 0 1px;font-size:10px;color:#B5A184;white-space:nowrap;font-weight:600;">DIE WELT</p>
-                  <p style="margin:0;font-size:9px;color:#aaa;white-space:nowrap;">Preis &amp; Qualit&auml;t</p>
-                </td>
-              </tr></table>
-            </td>
-          </tr></table>
-        </div>
-        <div class="email-content" style="padding:40px 40px 32px;text-align:left;">${content}</div>
-        <div style="background-color:#f8f9fa;padding:30px;text-align:center;border-top:1px solid #e0e0e0;">
-          <div style="font-weight:600;font-size:15px;color:#3D2B1F;margin-bottom:6px;">Primundus Deutschland</div>
-          <div style="font-size:13px;color:#666;line-height:1.8;">
-            24h-Pflege und Betreuung zu Hause<br>
-            <a href="tel:+4989200000830" style="color:#0066CC;text-decoration:none;">+49 89 200 000 830</a> |
-            <a href="mailto:info@primundus.de" style="color:#0066CC;text-decoration:none;">info@primundus.de</a><br>
-            <a href="https://primundus.de" style="color:#0066CC;text-decoration:none;">www.primundus.de</a>
-          </div>
-          <div style="font-size:12px;color:#999;margin-top:16px;line-height:1.5;">
-            Diese E-Mail wurde versendet an: ${lead.email}<br>
-            Primundus Deutschland<br><br>
-            Sie erhalten diese E-Mail, weil Sie eine Kalkulation auf primundus.de angefordert haben.${customerUnsubscribeUrl(lead) ? `<br><a href="${customerUnsubscribeUrl(lead)}" style="color:#999;text-decoration:underline;">Keine E-Mails mehr erhalten</a>` : ''}
-          </div>
-        </div>
-      </div>
-    </td></tr></table>
-  </div>
-</body>
-</html>`;
-
+  const url = portalUrl || 'https://primundus.de';
+  const absender = process.env.SMTP_FROM || 'kostenrechner@primundus.de';
+  const vorschau = 'Jede Bewerbung kommt per E-Mail und ist 72 Stunden für Sie reserviert.';
+  const schritte = [
+    { titel: 'Pflegesituation beschrieben', zustand: 'fertig' as const },
+    { titel: 'Anfrage für Pflegekräfte sichtbar', text: 'Passende Pflegekräfte sehen jetzt Ihre Anfrage.', zustand: 'jetzt' as const },
+    { titel: 'Bewerbung erhalten', text: 'Jede Bewerbung schicke ich Ihnen sofort per E-Mail, mit Profil, Anreisetermin und Preis.' },
+    { titel: 'Sie entscheiden', text: 'Jede Bewerbung ist 72 Stunden für Sie reserviert.' },
+    { titel: 'Anreise', text: 'ab 3 Tagen nach Ihrer Zusage' },
+  ];
+  const tipp = `Speichern Sie ${absender} in Ihren Kontakten. Dann landet keine Bewerbung im Spam.`;
+  const einladen = 'Gefällt Ihnen im Portal schon jemand? Dann laden Sie die Pflegekraft selbst zur Bewerbung ein. Sie meldet sich meist innerhalb von 1–2 Tagen.';
+  const content = `${mVorschau(vorschau)}
+    ${mp(`${greeting},`, 14)}
+    ${mTitel('Ihre Suche läuft', 8, 24)}
+    ${mp('danke für Ihre Angaben. Ab jetzt können sich passende Pflegekräfte bei Ihnen bewerben.', 20)}
+    ${mKarte(`${mEyebrow('Stand heute', 14)}${mSchritte(schritte)}`)}
+    ${mp(`${mb('Mein Tipp:')} ${tipp}`, 22)}
+    ${mKnopf(url, 'Stand Ihrer Suche ansehen', 0, 14)}
+    ${mKlein(einladen, 24, true)}
+    ${caregiverMartaSig(baseUrl, bewertung)}`;
+  const html = caregiverMailShell(baseUrl, lead.email, content, customerUnsubscribeUrl(lead));
   const text = `${greeting},
 
-vielen Dank — Ihre Pflegesituation ist nun vollständig erfasst. Passende Pflegekräfte können sich jetzt ein Bild machen und sich bei Ihnen bewerben oder ihr Interesse bekunden.
+danke für Ihre Angaben. Ab jetzt können sich passende Pflegekräfte bei Ihnen bewerben.
 
-In der Zwischenzeit müssen Sie nicht warten: Im Kundenportal sehen Sie sofort verfügbare Pflegekräfte, die zu Ihrem Bedarf passen, und können sie persönlich einladen, sich bei Ihnen zu bewerben.
+STAND HEUTE
+${schritte.map((s, i) => `${s.zustand === 'fertig' ? '✓' : `${i + 1}.`} ${s.titel}${s.text ? `: ${s.text}` : ''}`).join('\n')}
 
-Jetzt Pflegekräfte ansehen und einladen: ${portalUrl}
+Mein Tipp: ${tipp}
 
-✓ Keine Vertragsbindung  ·  ✓ Tagesgenaue Abrechnung  ·  ✓ Kosten erst bei Anreise
+Stand Ihrer Suche ansehen: ${url}
 
-Bei Fragen erreichen Sie uns telefonisch unter +49 89 200 000 830 oder per E-Mail an info@primundus.de.
+${einladen}
 
-Mit freundlichen Grüßen
-Marta Kapcio — Pflegeberaterin
-Tel: 089 200 000 830  ·  WhatsApp: https://wa.me/4989200000830
-
-Primundus Deutschland
-www.primundus.de
+${MAIL_MARTA_TEXT}
 `;
-
-  return { subject, html, text };
+  return { subject: 'Ihre Suche läuft – das passiert jetzt', html, text };
 }
 
 // ─── „Aktualisiertes Angebot" (offer_updated) ────────────────────────────────
@@ -1886,100 +1683,69 @@ www.primundus.de
   return { subject, html, text };
 }
 
-// Mail 11 (Mail A — Interesse). Eigenständiges Layout (NICHT
-// buildCaregiverEventEmail), damit Mail B/C unberührt bleiben:
-// kompakte Pflegekraft-Kachel (Foto · Name·Alter · Badge · Erfahrung ·
-// Deutsch · „Profil ansehen"-Link, kein grüner Button, keine Bio),
-// „Was Sie als Nächstes tun können"-Schritte und Gebühren-Box mit der
-// abgestimmten Formulierung. Header/Footer/Signatur über die geteilten
-// Helper (caregiverMailShell / caregiverMartaSig).
+// Mail 11 (Mail A — Interesse). Header/Footer/Signatur über die geteilten
+// Helper (caregiverMailShell / caregiverMartaSig), Inhalt aus mail-bausteine.
 export function getCaregiverInterestEmailTemplate(
   lead: Lead,
   caregiver: CaregiverDisplay,
   portalUrl: string,
   bewertung: BewertungsStand,
 ): EmailTemplate {
+  // Mail A „interessiert sich" (Vorschau 10, Martin: „wenn ihm eine Maria zusagt, dann
+  // laden Sie sie zur Bewerbung ein. Sie können natürlich auch weitere einladen").
   const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://primundus.de';
   const greeting = customerGreeting(lead);
   const cg = caregiver;
-  const firstName = cg.name.split(' ')[0];
-  const psLabel = 'font-size:11px;font-weight:700;color:#9a8a73;letter-spacing:.08em;text-transform:uppercase;';
-
-  const kachel = caregiverKachelHtml(cg, portalUrl);
-
-  // Nur für den Plaintext-Reflex der Kachel.
-  const metaParts: string[] = [];
-  if (cg.yearsExperience && cg.yearsExperience > 0) metaParts.push(`${cg.yearsExperience} ${cg.yearsExperience === 1 ? 'Jahr' : 'Jahre'} Erfahrung`);
-  if (cg.einsatzCount && cg.einsatzCount > 0)       metaParts.push(`${cg.einsatzCount} ${cg.einsatzCount === 1 ? 'Einsatz' : 'Einsätze'}`);
-
-  const stepRow = (n: string, title: string, desc: string, last = false) => `
-      <tr>
-        <td style="vertical-align:top;width:38px;padding:0 12px ${last ? '0' : '14px'} 0;">
-          <table cellpadding="0" cellspacing="0" role="presentation"><tr>
-            <td width="26" height="26" align="center" valign="middle" bgcolor="#8B7355" style="background-color:#8B7355;width:26px;min-width:26px;max-width:26px;height:26px;border-radius:13px;padding:0;mso-line-height-rule:exactly;color:#ffffff;font-size:13px;font-weight:700;line-height:26px;text-align:center;">${n}</td>
-          </tr></table>
-        </td>
-        <td style="vertical-align:top;padding:0 0 ${last ? '0' : '14px'} 0;">
-          <p style="margin:0 0 2px;font-size:15px;font-weight:700;color:#2D1F0F;line-height:1.4;">${title}</p>
-          <p style="margin:0;font-size:14px;line-height:1.6;color:#555;">${desc}</p>
-        </td>
-      </tr>`;
-
-  const stepsTable = `
-    <p style="font-size:15px;line-height:1.75;color:#2D1F0F;margin:0 0 16px;"><strong>Was Sie als Nächstes tun können:</strong></p>
-    <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="margin:0 0 26px;">
-      ${stepRow('1', 'Profil in Ruhe ansehen', `Im Portal finden Sie ${firstName}s vollständige Erfahrung, bisherige Einsätze und Sprachkenntnisse.`)}
-      ${stepRow('2', 'Einladen, sich zu bewerben', `Wenn Sie ebenfalls den Eindruck haben, dass ${firstName} passt, laden Sie sie mit einem Klick ein, sich bei Ihnen formal zu bewerben.`)}
-      ${stepRow('3', 'Konkrete Bewerbung erhalten', `Die formale Bewerbung erhalten Sie per E-Mail und sehen sie auch im Portal — mit Anreisedatum, Reisekosten und allen Konditionen. Erst dann entscheiden Sie verbindlich.`, true)}
-    </table>`;
-
-  const bestpreisBox = `
-    <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="margin:0 0 8px;background:#FAF8F4;border-radius:10px;overflow:hidden;">
-      <tr><td style="padding:16px 24px 20px;">
-        <p style="margin:0 0 6px;${psLabel}color:#B8860B;">Keine Vermittlungsgebühr</p>
-        <p style="margin:0 0 6px;font-size:14px;line-height:1.65;color:#2D1F0F;">Als <strong>Direktanbieter ohne Vermittler</strong> sparen wir die Provision — und geben diesen Vorteil direkt an Sie weiter.</p>
-        <p style="margin:0;font-size:14px;line-height:1.65;color:#2D1F0F;">Keine Anzahlung, keine Aufnahmegebühr, keine Bearbeitungspauschale — <strong>der Monatspreis ist der Preis.</strong></p>
-      </td></tr>
-    </table>`;
-
-  const content = `
-    <p style="font-size:15px;line-height:1.75;color:#444;margin-bottom:14px;">${greeting},</p>
-    <p style="font-size:15px;line-height:1.75;color:#444;margin-bottom:24px;">eine Pflegekraft hat Interesse an Ihrer Betreuungsstelle. Schauen Sie sich ihr Profil in Ruhe an — und laden Sie sie ein, sich zu bewerben, oder lehnen Sie ab.</p>
-    ${kachel}
-    ${stepsTable}
-    ${bestpreisBox}
-    <p style="font-size:15px;line-height:1.75;color:#444;margin:30px 0 18px;">Wenn Sie Fragen zu ${firstName}s Profil haben oder Unterstützung bei der Einschätzung möchten — rufen Sie mich an, schreiben Sie mir per WhatsApp oder antworten Sie einfach auf diese E-Mail. Ich bin gerne für Sie da.</p>
+  const vorname = cg.name.split(' ')[0];
+  const url = portalUrl || 'https://primundus.de';
+  const weitere = mitParam(portalUrl, 'goto=matches');
+  const about = (cg.aboutText ?? '').trim();
+  const karte = mKarte(`
+    <p style="margin:0 0 14px;font-size:16px;font-weight:700;color:${MF.greenDeep};">&#9829;&nbsp; Interessiert sich für Ihre Anfrage</p>
+    ${mPflegekraft(pkDaten(cg), url, { ohneRahmen: true })}
+    ${about ? `${mTrenner(16, 14)}${mEyebrow(`Über ${vorname}`)}${mp(escBasic(about), 0)}` : ''}`, { rand: MF.green, unten: 22, breite: '2px' });
+  const vorschau = `Wenn ${vorname} Ihnen zusagt, laden Sie sie zur Bewerbung ein.`;
+  const satz = `Wenn Ihnen ${vorname} zusagt, laden Sie sie zur Bewerbung ein. Dann schickt sie Ihnen ihr Angebot mit Anreisetermin und Preis, und Sie entscheiden. Sie können natürlich auch weitere Pflegekräfte einladen.`;
+  const schritte = [
+    { titel: `${vorname} einladen`, text: 'Ein Klick im Portal genügt.' },
+    { titel: 'Bewerbung erhalten', text: `${vorname} schickt Ihnen ihr Angebot per E-Mail. Es ist 72 Stunden für Sie reserviert.` },
+    { titel: 'Zusagen und starten', text: 'Anreise ab 3 Tagen nach Ihrer Zusage.' },
+  ];
+  const content = `${mVorschau(vorschau)}
+    ${mp(`${greeting},`, 14)}
+    ${mp(`${mb(cg.name)} hat Ihre Anfrage gesehen und interessiert sich für die Betreuung.`, 20)}
+    ${karte}
+    ${mp(satz, 20)}
+    ${mKnopf(url, `${vorname} zur Bewerbung einladen`, 0, 12)}
+    ${mKlein(mLink(weitere, 'Weitere Pflegekräfte ansehen'), 26, true)}
+    ${mAbschnitt('So geht es weiter', 'Drei Schritte bis zur Betreuung')}
+    ${mSchritte(schritte, true)}
+    ${mAbstand(22)}
+    ${mKontakt()}
     ${caregiverMartaSig(baseUrl, bewertung)}`;
-
   const html = caregiverMailShell(baseUrl, lead.email, content, customerUnsubscribeUrl(lead));
-
-  const metaPlain = metaParts.length > 0 ? metaParts.join(' · ') : '';
+  const fakten = [cg.yearsExperience ? `${cg.yearsExperience} ${cg.yearsExperience === 1 ? 'Jahr' : 'Jahre'} Erfahrung` : '',
+    cg.einsatzCount ? `${cg.einsatzCount} ${cg.einsatzCount === 1 ? 'Einsatz' : 'Einsätze'}` : ''].filter(Boolean).join(' · ');
   const text = `${greeting},
 
-eine Pflegekraft hat Interesse an Ihrer Betreuungsstelle. Schauen Sie sich ihr Profil in Ruhe an — und laden Sie sie ein, sich zu bewerben, oder lehnen Sie ab.
+${cg.name} hat Ihre Anfrage gesehen und interessiert sich für die Betreuung.
 
-PFLEGEKRAFT
-${cg.name}${cg.age ? `, ${cg.age}` : ''} · ${caregiverTierLabel(cg.einsatzCount, cg.yearsExperience)}
-${metaPlain ? metaPlain + '\n' : ''}${cg.germanLevel ? `Deutsch ${cg.germanLevel}\n` : ''}${firstName}s Profil ansehen: ${portalUrl}
+${cg.name}${cg.age ? `, ${cg.age}` : ''}${cg.germanLevel ? ` · Deutsch ${cg.germanLevel}` : ''}
+${caregiverTierLabel(cg.einsatzCount, cg.yearsExperience)}${fakten ? ` · ${fakten}` : ''}
+${about ? `\nÜber ${vorname}: ${about}\n` : ''}
+${satz}
 
-WAS SIE ALS NÄCHSTES TUN KÖNNEN
-1. Profil in Ruhe ansehen — im Portal finden Sie ${firstName}s vollständige Erfahrung, bisherige Einsätze und Sprachkenntnisse.
-2. Einladen, sich zu bewerben — wenn Sie ebenfalls den Eindruck haben, dass ${firstName} passt, laden Sie sie mit einem Klick ein, sich bei Ihnen formal zu bewerben.
-3. Konkrete Bewerbung erhalten — die formale Bewerbung erhalten Sie per E-Mail und sehen sie auch im Portal, mit Anreisedatum, Reisekosten und allen Konditionen. Erst dann entscheiden Sie verbindlich.
+${vorname} zur Bewerbung einladen: ${url}
+Weitere Pflegekräfte ansehen: ${weitere}
 
-Keine Vermittlungsgebühr: Keine Anzahlung, keine Aufnahmegebühr, keine Bearbeitungspauschale — der Monatspreis, den Sie sehen, ist der Preis.
+SO GEHT ES WEITER
+${schritte.map((s, i) => `${i + 1}. ${s.titel}: ${s.text}`).join('\n')}
 
-Wenn Sie Fragen zu ${firstName}s Profil haben oder Unterstützung bei der Einschätzung möchten — rufen Sie mich an, schreiben Sie mir per WhatsApp oder antworten Sie einfach auf diese E-Mail. Ich bin gerne für Sie da.
+${MAIL_KONTAKT_TEXT}
 
-Mit freundlichen Grüßen
-Marta Kapcio — Pflegeberaterin
-Tel: 089 200 000 830  ·  WhatsApp: https://wa.me/4989200000830
-
-Primundus Deutschland
-www.primundus.de
+${MAIL_MARTA_TEXT}
 `;
-
-  return { subject: 'Eine Pflegekraft interessiert sich für Ihre Anfrage', html, text };
+  return { subject: `${vorname} interessiert sich für Ihre Anfrage`, html, text };
 }
 
 // Deutsche Datumsausgabe aus ISO (tz-sicher — nur der YYYY-MM-DD-Teil zählt).
@@ -2005,10 +1771,8 @@ function rangeTouchesSummer(arr?: string | null, dep?: string | null): boolean {
   return false;
 }
 
-// Mail 12 (Mail B — Bewerbung). Eigenständiges Layout mit Konditionen-Bühne
-// (Tagessatz/Monatssatz + Detail-Tabelle aus der konkreten Mamamia-Bewerbung).
-// Mail A/C bleiben unberührt. `offer` ist optional — fehlt es (Alt-Events,
-// fehlende Daten), wird die Konditionen-Bühne weggelassen.
+// Mail 12 (Mail B — Bewerbung). `offer` ist optional — fehlt es (Alt-Events,
+// fehlende Daten), fallen Tagessatz, Zeitraum und die Konditionen-Zeilen weg.
 export function getApplicationReceivedEmailTemplate(
   lead: Lead,
   caregiver: CaregiverDisplay,
@@ -2016,156 +1780,79 @@ export function getApplicationReceivedEmailTemplate(
   offer: OfferInfo | undefined,
   bewertung: BewertungsStand,
 ): EmailTemplate {
+  // Mail B „Neue Bewerbung" (Vorschau 11): wie die Portal-Karte (AppCard) — Karte mit
+  // Tagessatz, „Angebot prüfen" öffnet die Bewerbung (view=application), darunter die
+  // vier Punkte der Startseite und die Sterne. 72 h Reservierung als Chip (kein Datum).
   const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://primundus.de';
   const greeting = customerGreeting(lead);
   const cg = caregiver;
-  const firstName = cg.name.split(' ')[0];
-  const psLabel = 'font-size:11px;font-weight:700;color:#9a8a73;letter-spacing:.08em;text-transform:uppercase;';
+  const vorname = cg.name.split(' ')[0];
   const fmtEuro = (n: number) => n.toLocaleString('de-DE', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
+  const applicationViewUrl = mitParam(portalUrl, 'view=application');
 
-  const applicationViewUrl = portalUrl + (portalUrl.includes('?') ? '&' : '?') + 'view=application';
-
-  // ── Konditionen aus der Bewerbung ─────────────────────────────────────────
   const salary = offer?.salary && offer.salary > 0 ? offer.salary : 0;
-  const tagessatz = salary > 0 ? Math.round(salary / 30) : 0;
-  const zuschuesse = (lead as any).kalkulation?.zuschüsse?.gesamt ?? 0;
-  const eigenanteil = salary > 0 ? Math.max(0, salary - zuschuesse) : 0;
-  const anreiseDatum = formatGermanDate(offer?.arrivalAt);
-  const abreiseDatum = formatGermanDate(offer?.departureAt);
+  const an = datumKurz(offer?.arrivalAt);
+  const ab = datumKurz(offer?.departureAt);
+  const anLang = formatGermanDate(offer?.arrivalAt)?.replace(/ \d{4}$/, '') ?? null;
+  const reise = offer?.arrivalFee != null ? offer.arrivalFee : null;
   const showSummer = rangeTouchesSummer(offer?.arrivalAt, offer?.departureAt);
-  const hasConditions = salary > 0 || !!anreiseDatum || !!abreiseDatum;
 
-  // Detail-Zeilen (nur befüllte zeigen).
-  const detailRow = (label: string, sub: string, value: string) =>
-    `<tr>
-      <td style="padding:5px 0;color:#888;">${label}${sub ? `<br><span style="font-size:12px;color:#aaa;">${sub}</span>` : ''}</td>
-      <td style="padding:5px 0;color:#2D1F0F;font-weight:600;text-align:right;">${value}</td>
-    </tr>`;
-  const detailRows: string[] = [];
-  if (anreiseDatum) detailRows.push(detailRow('Anreisedatum', '', anreiseDatum));
-  if (abreiseDatum) detailRows.push(detailRow('Abreisedatum (voraussichtlich)', '', abreiseDatum));
-  if (offer?.arrivalFee != null) detailRows.push(detailRow('Anreisekosten', '', `${fmtEuro(offer.arrivalFee)}&nbsp;€`));
-  if (offer?.departureFee != null) detailRows.push(detailRow('Abreisekosten', '', `${fmtEuro(offer.departureFee)}&nbsp;€`));
-  if (showSummer) detailRows.push(detailRow('Sommerzuschlag', 'Juli &amp; August', '6,67&nbsp;€&nbsp;/&nbsp;Tag'));
-  detailRows.push(detailRow('Feiertagszuschlag', 'an ausgewählten Feiertagen', 'doppelter Tagessatz'));
-  detailRows.push(detailRow('Kündigungsfrist', '', 'täglich'));
+  const karte = mBewerbungsKarte(pkDaten(cg), {
+    tagessatz: salary > 0 ? Math.round(salary / 30) : null,
+    zeitraum: an && ab ? `${an} – ${ab}` : an ? `ab ${an}` : null,
+    reisekosten: reise,
+  }, applicationViewUrl, { bewertung: { schnitt: bewertung.schnitt, anzahl: bewertung.anzahl } });
 
-  const konditionen = hasConditions ? `
-    <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="margin:0 0 28px;background:#FAF8F4;border-radius:10px;overflow:hidden;">
-      ${salary > 0 ? `
-      <tr>
-        <td class="cond-top-cell" style="width:50%;padding:22px 24px 18px;border-right:1px solid #ebe2d2;vertical-align:top;">
-          <p style="margin:0 0 8px;${psLabel}">Tagessatz</p>
-          <p style="margin:0 0 4px;font-size:26px;font-weight:700;color:#2D1F0F;line-height:1.15;">${fmtEuro(tagessatz)}&nbsp;€<span style="font-size:14px;font-weight:500;color:#9a8a73;"> / Tag</span></p>
-          <p style="margin:0;font-size:12px;color:#9a8a73;line-height:1.5;">inkl. Steuern &amp; Sozialabgaben</p>
-        </td>
-        <td class="cond-top-cell" style="width:50%;padding:22px 24px 18px;vertical-align:top;">
-          <p style="margin:0 0 8px;${psLabel}">Monatssatz</p>
-          <p style="margin:0 0 4px;font-size:26px;font-weight:700;color:#2D1F0F;line-height:1.15;">${fmtEuro(salary)}&nbsp;€<span style="font-size:14px;font-weight:500;color:#9a8a73;"> / Monat</span></p>
-          <p style="margin:0;font-size:12px;color:#9a8a73;line-height:1.5;">${zuschuesse > 0 ? `rechn. Eigenanteil ca. ${fmtEuro(eigenanteil)}&nbsp;€` : 'inkl. Steuern &amp; Sozialabgaben'}</p>
-        </td>
-      </tr>` : ''}
-      <tr>
-        <td colspan="2" style="padding:16px 24px 16px;${salary > 0 ? 'border-top:1px solid #ebe2d2;' : ''}">
-          <p style="margin:0 0 12px;${psLabel}">Konditionen im Detail</p>
-          <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="font-size:14px;color:#555;line-height:1.7;">
-            ${detailRows.join('')}
-          </table>
-        </td>
-      </tr>
-      <tr>
-        <td colspan="2" style="padding:14px 24px 18px;border-top:1px solid #ebe2d2;">
-          <p style="margin:0;font-size:13px;line-height:1.6;color:#666;"><a href="https://kundenportal.primundus.de/primundus-mustervertrag.pdf" target="_blank" style="color:#8B7355;text-decoration:none;font-weight:600;">Mustervertrag vorab einsehen &rarr;</a></p>
-        </td>
-      </tr>
-    </table>` : '';
-
-  const cta = `
-    <!--[if mso]><table role="presentation" cellpadding="0" cellspacing="0" border="0" align="center"><tr><td><![endif]-->
-    <table role="presentation" cellpadding="0" cellspacing="0" border="0" align="center" style="margin:8px auto 30px;border-collapse:separate;">
-      <tr>
-        <td align="center" bgcolor="#2A9D5C" style="background-color:#2A9D5C;background-image:linear-gradient(180deg,#34B36C 0%,#2A9D5C 100%);border-radius:10px;padding:17px 44px;box-shadow:0 2px 6px rgba(42,157,92,0.25);">
-          <a href="${applicationViewUrl}" target="_blank" style="color:#ffffff;text-decoration:none;font-weight:600;font-size:16px;letter-spacing:0.01em;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;line-height:1.4;">Bewerbung prüfen&nbsp;&nbsp;&rarr;</a>
-        </td>
-      </tr>
+  const zeilen: [string, string][] = [];
+  if (salary > 0) zeilen.push(['Monatlich', `${fmtEuro(salary)}&nbsp;€`]);
+  if (an) zeilen.push(['Anreise', an]);
+  if (ab) zeilen.push(['Abreise, voraussichtlich', ab]);
+  if (reise != null) zeilen.push(['Reisekosten', `${fmtEuro(reise)}&nbsp;€ je Fahrt`]);
+  if (showSummer) zeilen.push(['Sommerzuschlag (Juli, August)', '6,67&nbsp;€ je Tag']);
+  zeilen.push(['Feiertage', 'doppelter Tagessatz'], ['Kündigung', 'täglich']);
+  const details = `
+    <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="margin:0 0 6px;font-size:15px;line-height:1.5;">
+      ${zeilen.map(([k, v], i) => `<tr><td style="padding:9px 0;color:${MF.muted};${i ? `border-top:1px solid ${MF.line};` : ''}">${k}</td><td style="padding:9px 0;text-align:right;color:${MF.ink};font-weight:600;${i ? `border-top:1px solid ${MF.line};` : ''}">${v}</td></tr>`).join('')}
     </table>
-    <!--[if mso]></td></tr></table><![endif]-->`;
+    ${mKlein(mLink('https://kundenportal.primundus.de/primundus-mustervertrag.pdf', 'Mustervertrag vorab ansehen'), 26)}`;
 
-  const stepRow = (n: string, title: string, desc: string, last = false) => `
-      <tr>
-        <td style="vertical-align:top;width:38px;padding:0 12px ${last ? '0' : '14px'} 0;">
-          <table cellpadding="0" cellspacing="0" role="presentation"><tr>
-            <td width="26" height="26" align="center" valign="middle" bgcolor="#8B7355" style="background-color:#8B7355;width:26px;min-width:26px;max-width:26px;height:26px;border-radius:13px;padding:0;mso-line-height-rule:exactly;color:#ffffff;font-size:13px;font-weight:700;line-height:26px;text-align:center;">${n}</td>
-          </tr></table>
-        </td>
-        <td style="vertical-align:top;padding:0 0 ${last ? '0' : '14px'} 0;">
-          <p style="margin:0 0 2px;font-size:15px;font-weight:700;color:#2D1F0F;line-height:1.4;">${title}</p>
-          <p style="margin:0;font-size:14px;line-height:1.6;color:#555;">${desc}</p>
-        </td>
-      </tr>`;
-
-  const stepsTable = `
-    <p style="font-size:15px;line-height:1.75;color:#2D1F0F;margin:8px 0 16px;"><strong>So geht es weiter:</strong></p>
-    <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="margin:0 0 28px;">
-      ${stepRow('1', `${firstName}s Profil in Ruhe ansehen`, `Im Portal finden Sie ${firstName}s vollständige Erfahrung, bisherige Einsätze und Sprachkenntnisse.`)}
-      ${stepRow('2', 'Konditionen prüfen', 'Tagessatz, Anreise- und Abreisedatum, Reisekosten und etwaige Zuschläge im Detail durchgehen.')}
-      ${stepRow('3', 'Annehmen oder ablehnen', `Wenn ${firstName} passt: Kontaktdaten ergänzen und Pflegekraft beauftragen. Andernfalls die Bewerbung mit einem Klick ablehnen.`, true)}
-    </table>`;
-
-  const bestpreisBox = `
-    <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="margin:0 0 8px;background:#FAF8F4;border-radius:10px;overflow:hidden;">
-      <tr><td style="padding:16px 24px 20px;">
-        <p style="margin:0 0 6px;${psLabel}color:#B8860B;">Keine Vermittlungsgebühr</p>
-        <p style="margin:0 0 6px;font-size:14px;line-height:1.65;color:#2D1F0F;">Als <strong>Direktanbieter ohne Vermittler</strong> sparen wir die Provision — und geben diesen Vorteil direkt an Sie weiter.</p>
-        <p style="margin:0;font-size:14px;line-height:1.65;color:#2D1F0F;">Keine Anzahlung, keine Aufnahmegebühr, keine Bearbeitungspauschale — <strong>der Monatspreis ist der Preis.</strong></p>
-      </td></tr>
-    </table>`;
-
-  const content = `
-    <p style="font-size:15px;line-height:1.75;color:#444;margin-bottom:14px;">${greeting},</p>
-    <p style="font-size:15px;line-height:1.75;color:#444;margin-bottom:14px;"><strong style="color:#2D1F0F;">${cg.name}</strong> hat sich auf Ihre Betreuungsstelle beworben. Hier sind die Konditionen ihrer Bewerbung im Überblick.</p>
-    ${caregiverKachelHtml(cg, portalUrl)}
-    ${konditionen}
-    ${cta}
-    ${stepsTable}
-    ${bestpreisBox}
-    <p style="font-size:15px;line-height:1.75;color:#444;margin:28px 0 18px;">Wenn Sie Fragen zu ${firstName}s Bewerbung haben oder Unterstützung bei der Entscheidung möchten — rufen Sie mich an, schreiben Sie mir per WhatsApp oder antworten Sie einfach auf diese E-Mail. Ich bin gerne für Sie da.</p>
+  const vorschau = [anLang ? `Anreise ab ${anLang}` : '', salary > 0 ? `${fmtEuro(salary)} € im Monat` : ''].filter(Boolean).join(', ')
+    + (anLang || salary > 0 ? '. ' : '') + 'Prüfen Sie das Angebot und sagen Sie zu oder ab.';
+  const nachfrage = `Passt etwas nicht, zum Beispiel der Anreisetermin? Antworten Sie kurz auf diese E-Mail, ich kläre das mit ${vorname}.`;
+  const content = `${mVorschau(vorschau)}
+    ${mp(`${greeting},`, 14)}
+    ${mTitel('Sie haben eine aktive Bewerbung', 10, 24)}
+    ${mChip('72 Stunden für Sie reserviert')}
+    ${mp(`${mb(cg.name)} hat sich bei Ihnen beworben. Prüfen Sie ihr Angebot im Portal und sagen Sie dort zu oder ab.`, 20)}
+    ${karte}
+    ${mAbschnitt('Das Angebot im Detail', 'Konditionen')}
+    ${details}
+    ${mp(nachfrage, 8)}
     ${caregiverMartaSig(baseUrl, bewertung)}`;
-
   const html = caregiverMailShell(baseUrl, lead.email, content, customerUnsubscribeUrl(lead));
-
-  // ── Plaintext ─────────────────────────────────────────────────────────────
-  const condPlain = hasConditions ? `KONDITIONEN
-${salary > 0 ? `Tagessatz: ${fmtEuro(tagessatz)} € / Tag (inkl. Steuern & Sozialabgaben)\nMonatssatz: ${fmtEuro(salary)} € / Monat${zuschuesse > 0 ? ` — rechn. Eigenanteil ca. ${fmtEuro(eigenanteil)} €` : ''}\n` : ''}${anreiseDatum ? `Anreisedatum: ${anreiseDatum}\n` : ''}${abreiseDatum ? `Abreisedatum (voraussichtlich): ${abreiseDatum}\n` : ''}${offer?.arrivalFee != null ? `Anreisekosten: ${fmtEuro(offer.arrivalFee)} €\n` : ''}${offer?.departureFee != null ? `Abreisekosten: ${fmtEuro(offer.departureFee)} €\n` : ''}${showSummer ? 'Sommerzuschlag (Juli & August): 6,67 € / Tag\n' : ''}Feiertagszuschlag (an ausgewählten Feiertagen): doppelter Tagessatz
-Kündigungsfrist: täglich
-Mustervertrag: https://kundenportal.primundus.de/primundus-mustervertrag.pdf
-
-` : '';
 
   const text = `${greeting},
 
-${cg.name} hat sich auf Ihre Betreuungsstelle beworben. Hier sind die Konditionen ihrer Bewerbung im Überblick.
+SIE HABEN EINE AKTIVE BEWERBUNG · 72 Stunden für Sie reserviert
 
-${condPlain}Bewerbung prüfen: ${applicationViewUrl}
+${cg.name} hat sich bei Ihnen beworben. Prüfen Sie ihr Angebot im Portal und sagen Sie dort zu oder ab.
 
-SO GEHT ES WEITER
-1. ${firstName}s Profil in Ruhe ansehen — im Portal finden Sie ${firstName}s vollständige Erfahrung, bisherige Einsätze und Sprachkenntnisse.
-2. Konditionen prüfen — Tagessatz, Anreise- und Abreisedatum, Reisekosten und etwaige Zuschläge im Detail durchgehen.
-3. Annehmen oder ablehnen — wenn ${firstName} passt: Kontaktdaten ergänzen und Pflegekraft beauftragen. Andernfalls die Bewerbung mit einem Klick ablehnen.
+Angebot prüfen: ${applicationViewUrl}
 
-Keine Vermittlungsgebühr: Keine Anzahlung, keine Aufnahmegebühr, keine Bearbeitungspauschale — der Monatspreis, den Sie sehen, ist der Preis.
+KONDITIONEN
+${zeilen.map(([k, v]) => `${k}: ${v.replace(/&nbsp;/g, ' ')}`).join('\n')}
+Mustervertrag: https://kundenportal.primundus.de/primundus-mustervertrag.pdf
 
-Wenn Sie Fragen zu ${firstName}s Bewerbung haben oder Unterstützung bei der Entscheidung möchten — rufen Sie mich an, schreiben Sie mir per WhatsApp oder antworten Sie einfach auf diese E-Mail. Ich bin gerne für Sie da.
+✓ Keine Vermittlungsgebühr
+✓ Kein Vertrag vor Ihrer Auswahl
+✓ Täglich kündbar, taggenau abgerechnet
+✓ Bestpreisgarantie: https://kostenrechner.primundus.de/bestpreisgarantie
 
-Mit freundlichen Grüßen
-Marta Kapcio — Pflegeberaterin
-Tel: 089 200 000 830  ·  WhatsApp: https://wa.me/4989200000830
+${nachfrage}
 
-Primundus Deutschland
-www.primundus.de
+${MAIL_MARTA_TEXT}
 `;
-
-  return { subject: 'Sie haben eine neue Bewerbung erhalten', html, text };
+  return { subject: `Neue Bewerbung von ${vorname} – 72 Stunden für Sie reserviert`, html, text };
 }
 
 // Customer-Mail bei Buchungsbestätigung (Mail C). Wird ausgelöst, wenn der
@@ -2177,21 +1864,49 @@ export function getBookingConfirmedEmailTemplate(
   caregiver: CaregiverDisplay,
   portalUrl: string,
   bewertung: BewertungsStand,
+  /** Hängt der Vertrag an dieser Mail? Nur dann sagt der Text „im Anhang". */
+  vertragImAnhang = false,
 ): EmailTemplate {
-  const firstName = caregiver.name.split(' ')[0];
-  const introHtml = `<p style="font-size:15px;line-height:1.75;color:#444;margin-bottom:18px;">schön, dass Sie sich für <strong style="color:#2D1F0F;">${caregiver.name}</strong> entschieden haben. <strong style="color:#2D1F0F;">Ihre Buchung ist bei uns eingegangen</strong> — wir kümmern uns jetzt um alle weiteren Schritte.</p>`;
-  const middleHtml = `<p style="font-size:15px;line-height:1.75;color:#444;margin-bottom:20px;">Wir stoßen die Vertragsunterlagen an und stimmen den Anreisetermin mit ${firstName} ab. Innerhalb der nächsten Werktage meldet sich Ihr persönlicher Ansprechpartner bei Ihnen, um die letzten Details zu klären — zum Beispiel den genauen Tag der Anreise, Zimmer und Schlüsselübergabe.</p>`;
-  return buildCaregiverEventEmail({
-    lead,
-    caregiver,
-    subject: 'Buchung bestätigt — wir kümmern uns um alle weiteren Schritte',
-    introHtml,
-    middleHtml,
-    ctaText: 'Status im Portal ansehen →',
-    portalUrl,
-    bewertung,
-    plainSummary: `schön, dass Sie sich für ${caregiver.name} entschieden haben. Ihre Buchung ist bei uns eingegangen — wir kümmern uns jetzt um alle weiteren Schritte. Wir stoßen die Vertragsunterlagen an und stimmen den Anreisetermin mit ${firstName} ab. Innerhalb der nächsten Werktage meldet sich Ihr persönlicher Ansprechpartner bei Ihnen, um die letzten Details zu klären — zum Beispiel den genauen Tag der Anreise, Zimmer und Schlüsselübergabe.`,
-  });
+  // Mail C „Buchung bestätigt" (Vorschau 15): Ich-Form, ohne „unverbindlich" und ohne
+  // „keine Vertragsbindung" (nach der Buchung falsch).
+  const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://primundus.de';
+  const greeting = customerGreeting(lead);
+  const vorname = caregiver.name.split(' ')[0];
+  const url = portalUrl || 'https://primundus.de';
+  const schritte = [
+    { titel: 'Zusage', text: 'Ihre Buchung ist bei mir eingegangen.', zustand: 'fertig' as const },
+    { titel: 'Anreise abstimmen', text: `Ich stimme den Termin mit ${vorname} ab und melde mich in den nächsten Werktagen bei Ihnen: Anreise, Zimmer, Schlüsselübergabe.`, zustand: 'jetzt' as const },
+    { titel: 'Anreise', text: 'ab 3 Tagen nach Ihrer Zusage' },
+  ];
+  const vertrag = vertragImAnhang ? ' Ihren Vertrag finden Sie im Anhang.' : '';
+  const vorschau = vertragImAnhang ? 'Ihren Vertrag finden Sie im Anhang. Ich melde mich wegen der Anreise.' : 'Ich melde mich in den nächsten Werktagen wegen der Anreise.';
+  const fuss = 'Täglich kündbar, taggenau abgerechnet. Kosten entstehen erst ab Anreise.';
+  const content = `${mVorschau(vorschau)}
+    ${mp(`${greeting},`, 14)}
+    ${mTitel('Buchung bestätigt', 8, 24)}
+    ${mp(`schön, dass Sie sich für ${mb(caregiver.name)} entschieden haben.${vertrag}`, 20)}
+    ${mPflegekraft(pkDaten(caregiver), url)}
+    ${mKarte(`${mEyebrow('So geht es weiter', 14)}${mSchritte(schritte)}`)}
+    ${mKnopf(url, 'Nächste Schritte ansehen', 0, 14)}
+    ${mKlein(fuss, 24, true)}
+    ${caregiverMartaSig(baseUrl, bewertung)}`;
+  const html = caregiverMailShell(baseUrl, lead.email, content, customerUnsubscribeUrl(lead));
+  const text = `${greeting},
+
+BUCHUNG BESTÄTIGT
+
+schön, dass Sie sich für ${caregiver.name} entschieden haben.${vertrag}
+
+SO GEHT ES WEITER
+${schritte.map((s, i) => `${s.zustand === 'fertig' ? '✓' : `${i + 1}.`} ${s.titel}: ${s.text}`).join('\n')}
+
+Nächste Schritte ansehen: ${url}
+
+${fuss}
+
+${MAIL_MARTA_TEXT}
+`;
+  return { subject: 'Buchung bestätigt – so geht es jetzt weiter', html, text };
 }
 
 // ─── Token regeneration — magic-link expired → send a new one ─────────────
@@ -2217,8 +1932,8 @@ export function getTokenRegenerationEmailTemplate(
 
     <div style="background: linear-gradient(135deg, #2D5C2F 0%, #1F4421 100%); border-radius: 10px; padding: 28px; margin: 0 0 28px 0; text-align: center; color: #ffffff;">
       <h3 style="color: #ffffff; font-size: 18px; font-weight: 700; margin: 0 0 8px 0;">Ihr neuer Portal-Link</h3>
-      <p style="color: #E8F5E9; font-size: 14px; line-height: 1.6; margin: 0 0 18px 0;">Im Portal sehen Sie passende Pflegekräfte, eingegangene Bewerbungen und können Ihre Patientenangaben jederzeit aktualisieren.</p>
-      <a href="${portalUrl}" style="display: inline-block; background: #ffffff; color: #2D5C2F; padding: 14px 28px; border-radius: 8px; text-decoration: none; font-weight: 700; font-size: 15px;">Zum Kundenportal →</a>
+      <p style="color: #E8F5E9; font-size: 14px; line-height: 1.6; margin: 0 0 18px 0;">Im Portal sehen Sie Ihr Angebot, den Stand Ihrer Suche und alle Bewerbungen. Die Pflegesituation können Sie dort jederzeit ändern.</p>
+      <a href="${portalUrl}" style="display: inline-block; background: #ffffff; color: #2D5C2F; padding: 14px 28px; border-radius: 8px; text-decoration: none; font-weight: 700; font-size: 15px;">Angebot &amp; Stand ansehen →</a>
     </div>
 
     <p style="font-size: 13px; color: #888; line-height: 1.7; margin: 0 0 24px 0;">Aus Sicherheitsgründen ist auch dieser Link 14 Tage gültig. Falls Sie diese E-Mail nicht angefordert haben, können Sie sie ignorieren — der alte Link bleibt deaktiviert.</p>
@@ -2426,6 +2141,8 @@ export async function buildCustomerCaregiverMailWithInlinePhoto(
   caregiver: CaregiverDisplay,
   portalUrl: string,
   offer?: OfferInfo,
+  /** Mail C: hängt der Vertrag an? Dann sagt der Text „im Anhang". */
+  vertragImAnhang = false,
 ): Promise<{ template: EmailTemplate; attachments?: any[] }> {
   const [inline, bewertung] = await Promise.all([
     fetchInlineCaregiverPhoto(caregiver.photoUrl),
@@ -2438,7 +2155,7 @@ export async function buildCustomerCaregiverMailWithInlinePhoto(
 
   const template =
     event === 'caregiver_interest_shown'      ? getCaregiverInterestEmailTemplate(lead, caregiverForTemplate, portalUrl, bewertung)
-  : event === 'application_accepted_internal' ? getBookingConfirmedEmailTemplate(lead, caregiverForTemplate, portalUrl, bewertung)
+  : event === 'application_accepted_internal' ? getBookingConfirmedEmailTemplate(lead, caregiverForTemplate, portalUrl, bewertung, vertragImAnhang)
   :                                             getApplicationReceivedEmailTemplate(lead, caregiverForTemplate, portalUrl, offer, bewertung);
 
   return inline

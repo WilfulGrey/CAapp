@@ -10,14 +10,14 @@ Build. Die echten Mails werden im Code generiert (siehe „Wo es im Code lebt").
 Diese Regeln gelten mailübergreifend. Beim Bauen/Zurückbauen jeder Mail prüfen.
 
 1. **CTA-Buttons benennen den konkreten Nutzen — niemals „Zum Portal".**
-   Ein generischer Portal-Link ist verboten. Der Button-Text sagt, was der Kunde
-   dort tut/sieht. Standard für Angebots-Mails:
-   **„Angebot & passende Pflegekräfte ansehen →"**.
-   Kontext-Varianten: Pflegekraft-Profil → „Profil von {VORNAME} ansehen →",
-   Bewerbung → „Bewerbung von {VORNAME} ansehen →", Buchung → „Vertrag & nächste
-   Schritte ansehen →". Faustregel: **Verb + konkretes Objekt**, kein Ort.
-2. **Anrede:** „Guten Tag {Anrede} {Nachname}," bei Haupt-Mails (01, 11, 12, 13,
-   14); „Hallo {Anrede} {Nachname}," bei Remindern (02–10, 15).
+   Ein Knopf je Mail, Koralle, über die volle Breite, Wortlaut wie der Portal-Knopf,
+   der dasselbe tut (Vorschau v2, 26.09.2026): „Bewerbungen erhalten" (öffnet die
+   Pflegesituation, `goto=anfragen`), „Angebot prüfen" (öffnet die Bewerbung,
+   `view=application`), „Stand Ihrer Suche ansehen", „{VORNAME} zur Bewerbung
+   einladen", „Pflegekräfte einladen" / „Neue Pflegekräfte ansehen" (`goto=matches`).
+   Faustregel: **Verb + konkretes Objekt**, kein Ort.
+2. **Anrede:** „Guten Tag {Anrede} {Nachname}," in **allen** Kundenmails, sonst
+   „Guten Tag," — nie der Vorname (seit 26.09.2026 auch nicht mehr „Hallo …").
 3. **Tonalität:** Ilka spricht in **Ich-Form**. Kein „wir", das eigentlich Ilka
    meint („Rufen Sie **uns** an" → „Rufen Sie **mich** an").
 4. **Schlusssatz** (Ich-Form): „Wenn Sie Fragen [zum X] haben — rufen Sie mich
@@ -33,46 +33,42 @@ Diese Regeln gelten mailübergreifend. Beim Bauen/Zurückbauen jeder Mail prüfe
 
 ## Flow — wann läuft welche Mail (und warum sie stoppt)
 
-Es gibt **zwei parallele Stränge**:
+Stand 26.09.2026 (Registry #96/#97, abgenommene Vorschau v2). Die Texte leben im
+Code: Warteschlange `project 3/supabase/functions/send-scheduled-emails/kundenMails.ts`,
+Sofort-Mails `project 3/lib/email.ts`, beide aus `mail-bausteine` (zwei Kopien). Die
+HTML-Dateien in diesem Ordner zeigen noch den alten Stand.
 
-### A) Zeit-getriggert — „Kunde tut nichts" (Nurture)
-Startet automatisch nach der Anfrage, **fixe Zeitabstände**:
-
-```
-0h     [01] Eingangsbestätigung + Angebot   (sofort bei Anfrage)
-+24h   [02] Nachfass 1
-+48h   [05] Warum Primundus                 ← VOR Nachfass 2
-+72h   [03] Nachfass 2
-+120h  [04] Nachfass 3   (Break-up, 3 mailto-Buttons)
-```
-
-**Abbruch der Kette:**
-- Nachfass 1–3 stoppen, sobald der Kunde **bucht**, **„nicht interessiert"** ist
-  **oder eine Pflegekraft einlädt**.
-- „Warum Primundus" stoppt nur bei **gebucht / nicht interessiert** (läuft also
-  weiter, auch wenn schon eingeladen — Preis-Argument hilft bis zur Buchung).
-- Nachfass-Texte passen sich dem Fortschritt an (Portal geöffnet / Daten
-  erfasst / eingeladen) — sind **nicht** fix „Patientendaten unvollständig".
-
-### B) Event-getriggert — vom System / Mamamia
-Laufen unabhängig vom Timer, sobald das Event passiert:
+### A) Vor dem Absenden der Pflegesituation (Nurture)
 
 ```
-patient_data_saved        → [14] Mail D — Profil erfasst
-caregiver_interest_shown  → [11] Mail A + [06] Interesse-Reminder (+1h)
-application_received       → [12] Mail B + [07/08/09/10] Reminder 1h/4h/12h/46h
-application_accepted        → [13] Mail C — Buchung
+0h     Angebot („Passt Ihnen das Angebot?" → Ja, Bewerbungen erhalten)
++4h    Nudge 1  (bis zu fünf passende Pflegekräfte)
++28h   Nudge 2  („Soll ich die Angaben mit Ihnen zusammen ausfüllen?")
++48h   Vier Dinge, die Primundus anders macht
++72h   Nachfass 2
++120h  Nachfass 3 (drei Antwortknöpfe → /rueckmeldung)
++49d   Wechsel-Mail
 ```
+Alles nachts (21–8 Uhr) auf 8 Uhr. **Stopp:** Nudges, Vier Dinge, Nachfass 2 und 3
+stoppen, sobald die Pflegesituation abgesendet ist (`patient_data_saved`, auch eine
+Bewerbung zählt) oder eingeladen, gebucht, nicht interessiert.
 
-**Abbruch / Konsequenz:**
-- [06] und [07–10] stoppen, sobald der Kunde für **diese** Pflegekraft reagiert
-  (annimmt ODER ablehnt).
-- Nach [10] (46h-Reminder): ~2h später lehnt das System die Bewerbung
-  **automatisch ab** (48h ohne Reaktion). Keine Mail, sondern die Konsequenz.
+### B) Nach dem Absenden / Ereignisse
 
-> A und B laufen gleichzeitig: Ein Kunde kann z.B. mitten in der Nurture-Kette
-> eine Bewerbung erhalten (B) — die Nurture-Kette bricht dann ab, sobald er
-> reagiert/einlädt/bucht.
+```
+patient_data_saved        → Mail D „Ihre Suche läuft" + nach 48 h „Noch keine Bewerbung?"
+caregiver_interest_shown  → Mail A „{VORNAME} interessiert sich" + Erinnerung +1 h
+caregiver_invited         → nach 24 h „Neue passende Pflegekräfte" (nicht nachts,
+                             nicht während einer Reservierung)
+application_received      → Mail B „Neue Bewerbung – 72 Stunden reserviert"
+                             + Erinnerungen Ende − 52 h / − 24 h / − 8 h
+auto_timeout_72h          → „Reservierung abgelaufen – Ihre Suche läuft weiter"
+application_accepted      → Mail C „Buchung bestätigt"
+```
+Ende der Reservierung = frühester echter Eingang + 72 h, abgerundet (wie Portal und
+Server). Erinnerungen nie nachts, die letzte sicher vor dem Ende; sie stoppen bei Zu-
+oder Absage, gebucht, weniger als 1 h Rest oder weniger als 6 h nach der letzten Mail
+zu derselben Bewerbung. „Noch keine Bewerbung?" entfällt mit Bewerbung oder Interesse.
 
 ## So arbeiten wir (kein Chaos)
 
@@ -91,29 +87,24 @@ einen dynamischen Wert **verschiebst**, bleibt er dynamisch; wenn du ihn
 
 ## Subject-Zeilen (stehen nicht im HTML)
 
-Die Betreff-Zeilen werden im Code gesetzt, nicht im HTML — hier zum Mitbearbeiten:
-
-| Datei | Subject |
-|-------|---------|
-| 01 Eingangsbestätigung | Ihr Angebot zur 24-Stunden-Betreuung – Primundus *(Resubmit: „Ihr aktualisiertes Angebot zur 24-Stunden-Betreuung – Primundus")* |
-| 02 Nachfass 1 | AW: Kurze Rückfrage zu Ihrem Angebot |
-| 03 Nachfass 2 | Brauchen Sie noch Hilfe? |
-| 04 Nachfass 3 | Eine letzte Frage — wie schaut's bei Ihnen aus? |
-| 05 Warum Primundus | Kennen Sie die Primundus-Bestpreis-Garantie? |
-| 06 Interesse-Reminder | `{VORNAME}` wartet auf Ihre Rückmeldung |
-| 07 Bewerbung 1h | `{VORNAME}` wartet auf Ihre Entscheidung |
-| 08 Bewerbung 4h | `{VORNAME}`: bitte kurz Bescheid geben |
-| 09 Bewerbung 12h | `{VORNAME}`: ist die Bewerbung noch aktuell? |
-| 10 Bewerbung 46h | `{VORNAME}`: letzte Erinnerung — wir schließen die Bewerbung bald |
-| 11 Mail A — Interesse | Eine Pflegekraft interessiert sich für Ihre Anfrage |
-| 12 Mail B — Bewerbung | Sie haben eine neue Bewerbung erhalten |
-| 13 Mail C — Buchung | Buchung bestätigt — wir kümmern uns um alle weiteren Schritte |
-| 14 Mail D — Profil | Ihre Pflegedaten sind bei uns eingegangen |
-
-> Hinweis: Die Reminder-Subjects 07–10 stammen noch aus der alten Tonalität
-> (v.a. 10 „… wir schließen die Bewerbung bald" ist negativer als der neue
-> Mailtext). Wenn du die Subjects mit anpassen willst, schreib die Wunsch-
-> Betreffs einfach in diese Tabelle — ich ziehe sie nach.
+| Mail | Betreff |
+|------|---------|
+| Angebot | Ihr Angebot zur 24-Stunden-Betreuung – Primundus *(Resubmit: „Ihr aktualisiertes Angebot …"; Portal-Lead: eigener Betreff)* |
+| Nudge 1 | Fünf passende Pflegekräfte – es fehlen nur 2 Minuten *(Zahl aus mamamia)* |
+| Nudge 2 | Soll ich die Angaben mit Ihnen zusammen ausfüllen? |
+| Vier Dinge | Vier Dinge, die Primundus anders macht |
+| Nachfass 2 | Ihre Betreuung – kann ich Ihnen etwas abnehmen? |
+| Nachfass 3 | Eine letzte Frage: Wie ist der Stand bei Ihnen? |
+| Mail D | Ihre Suche läuft – das passiert jetzt |
+| Stand nach 2 Tagen | Noch keine Bewerbung? So geht es schneller |
+| Neue Pflegekräfte | Neue passende Pflegekräfte für Sie |
+| Mail A | `{VORNAME}` interessiert sich für Ihre Anfrage |
+| Mail B | Neue Bewerbung von `{VORNAME}` – 72 Stunden für Sie reserviert |
+| Erinnerung 1 | `{VORNAME}`s Bewerbung: noch 2 Tage für Sie reserviert *(Countdown aus der Reservierung)* |
+| Erinnerung 2 | Noch 24 Stunden: `{VORNAME}`s Bewerbung |
+| Letzte Erinnerung | Nur noch 8 Stunden reserviert: `{VORNAME}`s Bewerbung |
+| Reservierung abgelaufen | `{VORNAME}`s Reservierung ist abgelaufen – Ihre Suche läuft weiter |
+| Mail C | Buchung bestätigt – so geht es jetzt weiter |
 
 ## Feste Bausteine (überall gleich, am besten nicht pro Mail einzeln ändern)
 
@@ -146,7 +137,7 @@ Beispielwert → Bedeutung (Token beim Zurückbauen):
 
 | Feld | Beispiel | Bedeutung |
 |------|----------|-----------|
-| `ANREDE` | Hallo Frau Wendt | Begrüßung aus Anrede + Nachname des Kunden |
+| `ANREDE` | Guten Tag Frau Wendt | Begrüßung aus Anrede + Nachname des Kunden |
 | `VORNAME` | Barbara | Vorname der Pflegekraft |
 | `NAME` | Barbara B. | Kurzname Pflegekraft (Vorname + Initial) |
 | `FOTO` | (Bild / „BB"-Initialen) | Pflegekraft-Foto, sonst Initialen-Avatar |
