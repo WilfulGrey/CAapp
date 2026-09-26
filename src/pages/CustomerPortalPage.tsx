@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useRef, FC } from 'react';
-import { Check, Bell, Clock, Phone, ShieldCheck, AlertCircle, ChevronDown, X, ArrowLeft, ArrowRight, Heart } from 'lucide-react';
+import { Check, Bell, Clock, Phone, AlertCircle, ChevronDown, X, ArrowLeft, ArrowRight, Heart } from 'lucide-react';
 import { Nurse } from '../types';
 import { displayName } from '../components/portal/shared';
 import {
@@ -54,6 +54,7 @@ import { AppCardDone } from '../components/portal/AppCardDone';
 import { BeratungCTA } from '../components/portal/BeratungCTA';
 import { AngebotFrage } from '../components/portal/AngebotFrage';
 import { SucheStand } from '../components/portal/SucheStand';
+import { HERO_PUNKTE } from '../lib/heroPunkte';
 import { kalenderTag } from '../components/portal/DateField';
 import { reserviertBis as berechneReservierung, RESERVIERUNG_STUNDEN, nochReserviertText } from '../lib/reservierung';
 import type { FetchedLeadEvent } from '../lib/leadEvents';
@@ -1830,6 +1831,24 @@ const CustomerPortalPage: FC = () => {
     document.getElementById('patientendaten')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   };
 
+  // Mail-Deeplink goto=anfragen (Knopf „Bewerbungen erhalten" in den Mails, 26.09.):
+  // noch nicht abgesendet → Formular öffnen; schon abgesendet → zum Stand; offene
+  // Bewerbung → zu den Bewerbungen. Erst wenn feststeht, ob abgesendet wurde
+  // (Lead geladen und `patient_form_at` oder mamamia bekannt), und nur einmal.
+  const anfragenErledigtRef = useRef(false);
+  useEffect(() => {
+    // Aus der aktuellen URL lesen (wie view=application), nicht aus der Modul-Konstante.
+    if (anfragenErledigtRef.current || new URLSearchParams(window.location.search).get('goto') !== 'anfragen') return;
+    if (!lead || !(IS_PREVIEW_ANY || lead.patient_form_at || mmCustomer)) return;
+    anfragenErledigtRef.current = true;
+    requestAnimationFrame(() => {
+      if (hasPending) document.getElementById('bewerbungen')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      else if (!schonAbgesendet) zurPflegesituation();
+      else (document.getElementById('stand') ?? document.getElementById('patientendaten'))?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [lead, mmCustomer, hasPending, schonAbgesendet]);
+
   const canInviteNurse = (_idx: number): boolean => {
     // Strict gate: no invitations until patient profile is complete.
     // Without it, the caregiver can't prepare a meaningful application
@@ -2472,21 +2491,6 @@ const CustomerPortalPage: FC = () => {
           offerExpandedManual ?? (!hasPending && !patientSaved);
         const brutto = lead?.kalkulation?.bruttopreis ?? 3050;
         const tagessatz = Math.round(brutto / 30);
-        // Gekürzt (Martin, 11.08.: „die Punkte schöner darstellen"). Zwei der
-        // vier Texte brachen auf 375 px um — eine Liste, in der die Hälfte der
-        // Zeilen zweizeilig ist, wirkt unruhig, egal wie sie gestylt ist.
-        // Inhalt unverändert, nur knapper gesagt; die Langfassung steht im
-        // Snapshot, falls eine Formulierung so nicht stimmt.
-        const items = [
-          { text: 'Täglich kündbar' },
-          { text: 'Tagesgenaue Abrechnung' },
-          // „Zahlung erst ab Anreise" → „Kein Vertrag vor Auswahl nötig"
-          // (Martin, 12.08.): Im Ausgangszustand steht der Kunde vor der
-          // Frage, ob er sich mit dem Weiterklicken schon bindet — nicht vor
-          // einer Zahlungsfrage.
-          { text: 'Erst auswählen, dann buchen' },
-          { text: 'Keine Vermittlungsgebühr' },
-        ];
         // Heimvergleich EINMAL berechnet (Karte + Aufklapper): Eigenanteil aus dem
         // ANGEZEIGTEN Brutto minus Posten mit `in_kalkulation` (wie `zuschüsse.gesamt`
         // serverseitig). Nur zeigen, wenn wir wirklich günstiger sind.
@@ -2537,36 +2541,30 @@ const CustomerPortalPage: FC = () => {
                   <p className="text-[14.5px] mt-2 leading-[1.5] text-pm-muted">
                     Monatlich inkl. Steuern, Gebühren und Sozialabgaben. Zzgl. Kost und Logis sowie Reisekosten (125 € pro Fahrt).
                   </p>
-                  {/* Bestpreisgarantie (Martin 12.09.; Teil 3, 24.09.: eigenes
-                      Pop-up statt Link auf die Garantie-Seite des Rechners). */}
-                  <button
-                    type="button"
-                    onClick={() => setBestpreisOffen(true)}
-                    className="mt-3.5 w-full min-h-[48px] flex items-center gap-2.5 rounded-[14px] bg-pm-mint px-3 py-2 text-left"
-                  >
-                    <span className="w-[30px] h-[30px] rounded-full bg-pm-green text-white flex items-center justify-center flex-none" aria-hidden="true">
-                      <ShieldCheck className="w-4 h-4" />
-                    </span>
-                    <span className="flex-1 text-[15px] font-bold text-pm-green-deep">Bestpreisgarantie</span>
-                    <span className="text-[14px] font-semibold text-pm-green-deep underline underline-offset-2">Mehr Infos</span>
-                  </button>
-
-                  {/* Konditionen stehen OFFEN unter dem Preis (Martin, 11.08.):
-                      Sie sind das Verkaufsargument. Einspaltig — im 2er-Raster
-                      brachen die Zeilen auf 375 px um. */}
-                  <ul className="mt-3.5">
-                    {items.map((item, i) => (
-                      <li key={i} className="flex items-center gap-2.5 py-[5px] text-[15.5px] text-pm-ink">
-                        <span className="w-[22px] h-[22px] rounded-[7px] bg-pm-shell text-pm-taupe flex items-center justify-center flex-none" aria-hidden="true">
-                          <Check className="w-3.5 h-3.5" strokeWidth={3} />
-                        </span>
-                        {item.text}
+                  {/* Die vier Punkte der Startseite (Martin 26.09.: „die müssen doch
+                      überall gleich sein"): dieselbe Liste wie unter „Angebot prüfen"
+                      (AppCard) und in den Mails. Bestpreisgarantie ist der vierte Punkt
+                      und öffnet das Pop-up. */}
+                  <ul className="mt-4 flex flex-col gap-2.5">
+                    {HERO_PUNKTE.map((punkt) => (
+                      <li key={punkt} className="flex items-center gap-1.5 text-[14px] min-[375px]:text-[14.5px] min-[390px]:gap-2 min-[390px]:text-[15px] leading-snug text-pm-ink">
+                        <Check className="h-[17px] w-[17px] flex-shrink-0 text-pm-coral" strokeWidth={2.5} aria-hidden="true" />
+                        {punkt}
                       </li>
                     ))}
+                    <li className="flex items-center gap-1.5 text-[14px] min-[375px]:text-[14.5px] min-[390px]:gap-2 min-[390px]:text-[15px] leading-snug text-pm-ink">
+                      <Check className="h-[17px] w-[17px] flex-shrink-0 text-pm-coral" strokeWidth={2.5} aria-hidden="true" />
+                      <span>
+                        Bestpreisgarantie{' '}
+                        <button type="button" onClick={() => setBestpreisOffen(true)} className="inline-flex min-h-[44px] -my-3 items-center font-semibold text-pm-green-deep underline underline-offset-[3px]">
+                          Mehr Infos
+                        </button>
+                      </span>
+                    </li>
                   </ul>
                   {/* Kein fünfter Haken (Martin, 09.09.): „Kosten erst, wenn die
                       Pflegekraft da ist" ist eine Erklärung, kein Punkt der Liste. */}
-                  <p className="mt-1.5 text-[14.5px] leading-[1.5] text-pm-muted">
+                  <p className="mt-3 text-[14.5px] leading-[1.5] text-pm-muted">
                     Kosten erst, wenn die Pflegekraft da ist.
                   </p>
 
@@ -3047,7 +3045,7 @@ const CustomerPortalPage: FC = () => {
       {/* ── Stand heute (Martin 25.09.): nach dem Absenden liegt diese Karte über
            der Kante des Kopfs, wie vorher die Kostenkarte. ── */}
       {sucheLaeuft && (
-        <div className="max-w-3xl mx-auto px-3.5 -mt-6">
+        <div id="stand" className="max-w-3xl mx-auto px-3.5 -mt-6 scroll-mt-24">
           <SucheStand
             // Abgelehnte zählen nicht als „gefunden" — sonst widerspräche die Zahl
             // der Liste darunter (Review 25.09.).

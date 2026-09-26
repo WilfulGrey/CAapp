@@ -387,6 +387,44 @@ describe('Portal integration: golden paths', () => {
     expect(screen.queryByRole('heading', { name: 'Angebot prüfen' })).toBeNull();
   }, 15_000);
 
+  // ─── Startseiten-Punkte + Sprunglink goto=anfragen (Martin 26.09.) ───────
+
+  it('Kostenblock zeigt die vier Punkte der Startseite, nicht mehr die alte Liste', async () => {
+    server.use(...defaultHandlers({ proxy: { listApplications: () => ({ JobOfferApplicationsWithPagination: { total: 0, data: [] } }) } }));
+    setLocation(`?token=${TEST_LEAD_TOKEN}`);
+    render(<CustomerPortalPage />);
+    expect(await screen.findByText('Kein Vertrag vor Ihrer Auswahl', {}, { timeout: 5000 })).toBeInTheDocument();
+    expect(screen.getByText('Keine Vermittlungsgebühr')).toBeInTheDocument();
+    expect(screen.getByText('Täglich kündbar, taggenau abgerechnet')).toBeInTheDocument();
+    expect(screen.queryByText('Erst auswählen, dann buchen')).toBeNull();
+    expect(screen.queryByText('Tagesgenaue Abrechnung')).toBeNull();
+  }, 15_000);
+
+  const gescrollt = () => (Element.prototype.scrollIntoView as unknown as { mock: { contexts: Element[] } }).mock.contexts.map((e) => e.id);
+
+  it('goto=anfragen, noch nicht abgesendet: öffnet die Pflegesituation', async () => {
+    (Element.prototype.scrollIntoView as unknown as { mockClear: () => void }).mockClear();
+    server.use(...defaultHandlers({ proxy: { listApplications: () => ({ JobOfferApplicationsWithPagination: { total: 0, data: [] } }) } }));
+    setLocation(`?token=${TEST_LEAD_TOKEN}&goto=anfragen`);
+    render(<CustomerPortalPage />);
+    await waitFor(() => expect(gescrollt()).toContain('patientendaten'), { timeout: 5000 });
+    expect(await screen.findByText(/Schritt 1 von 4/, {}, { timeout: 5000 })).toBeInTheDocument();
+  }, 15_000);
+
+  it('goto=anfragen, schon abgesendet: springt zum Stand, Formular bleibt zu', async () => {
+    (Element.prototype.scrollIntoView as unknown as { mockClear: () => void }).mockClear();
+    server.use(...defaultHandlers({
+      proxy: {
+        getCustomer: () => ({ Customer: { ...sampleCustomer, status: 'active' } }),
+        listApplications: () => ({ JobOfferApplicationsWithPagination: { total: 0, data: [] } }),
+      },
+    }));
+    setLocation('?token=token-abgesendet&goto=anfragen');
+    render(<CustomerPortalPage />);
+    await waitFor(() => expect(gescrollt().some((id) => id === 'stand' || id === 'patientendaten')).toBe(true), { timeout: 5000 });
+    expect(screen.queryByText(/Schritt 1 von 4/)).toBeNull();
+  }, 15_000);
+
   // ─── Nach dem Absenden ohne sichtbare Pflegekraft (Martin 25.09.) ────────
 
   it('gespeichert, keine Bewerbung, keine Pflegekraft: „Ihre Suche läuft“ und ein Leer-Zustand statt nackter Überschrift', async () => {
