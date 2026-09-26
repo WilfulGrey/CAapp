@@ -421,7 +421,7 @@ describe('Portal integration: golden paths', () => {
     }));
     setLocation('?token=token-abgesendet&goto=anfragen');
     render(<CustomerPortalPage />);
-    await waitFor(() => expect(gescrollt().some((id) => id === 'stand' || id === 'patientendaten')).toBe(true), { timeout: 5000 });
+    await waitFor(() => expect(gescrollt()).toContain('stand'), { timeout: 5000 });
     expect(screen.queryByText(/Schritt 1 von 4/)).toBeNull();
   }, 15_000);
 
