@@ -20,8 +20,8 @@ import {
 
 const PORTAL = 'https://kundenportal.primundus.de/?token=tok&job=u1';
 const lead = { id: 'l1', email: 'k@example.com', vorname: 'Anna', nachname: 'Müller', anrede_text: 'Frau', token: 'tok' } as any;
-// Vorname unbekannt (nicht in der Namensliste), keine Anrede → nur „Guten Tag", nie der Vorname.
-const ohneAnrede = { ...lead, anrede_text: null, vorname: 'Zorbex', nachname: 'Kowalski' };
+// Vorname bekannt, Nachname fehlt: früher „Guten Tag Anna", jetzt nur „Guten Tag" (nie der Vorname).
+const ohneAnrede = { ...lead, anrede_text: null, vorname: 'Anna', nachname: '' };
 const B = { schnitt: '4,9', anzahl: 126 };
 const cg = { name: 'Maria K.', age: 62, germanLevel: 'Gut', yearsExperience: 6, einsatzCount: 14, photoUrl: 'cid:x@p', aboutText: 'Maria ist ruhig & einfühlsam.' };
 const offer = { salary: 3050, arrivalAt: '2026-10-15', departureAt: '2026-12-10', arrivalFee: 125, departureFee: 125 };
@@ -97,6 +97,6 @@ describe('Sofort-Mails (Vorschau v2)', () => {
   it('Anrede nie mit Vornamen', () => {
     const t = getPatientDataSavedEmailTemplate(ohneAnrede, PORTAL, B);
     expect(t.html).toContain('Guten Tag,');
-    expect(t.html).not.toContain('Guten Tag Zorbex');
+    expect(t.html).not.toContain('Guten Tag Anna');
   });
 });
