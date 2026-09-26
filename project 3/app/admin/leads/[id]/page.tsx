@@ -955,7 +955,7 @@ export default function LeadDetailPage() {
                     <div>
                       <p className="text-sm text-gray-600 mb-1">Ab wann wird eine Betreuung benötigt?</p>
                       {isEditMode ? (
-                        angabenSelect('care_start_timing', [['sofort', 'Sofort (4–7 Werktage)'], ['2-4-wochen', 'In 2–4 Wochen'], ['1-2-monate', 'In 1–2 Monaten'], ['unklar', 'Ich informiere mich nur']], true)
+                        angabenSelect('care_start_timing', [['sofort', 'Sofort'], ['2-4-wochen', 'In 2–4 Wochen'], ['1-2-monate', 'In 1–2 Monaten'], ['unklar', 'Ich informiere mich nur']], true)
                       ) : (
                         <p className="font-medium">
                           {lead.care_start_timing
