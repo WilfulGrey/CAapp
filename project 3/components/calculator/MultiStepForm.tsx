@@ -8,7 +8,7 @@ import { analytics, variantenSeite, websiteHerkunft } from "@/lib/analytics";
 import { cookieConsent } from "@/lib/cookie-consent";
 import { scrollToCalculator, isCalculatorAligned, OPEN_CALCULATOR_EVENT } from "@/lib/scroll-to-calculator";
 import { useFormTracking } from "@/hooks/use-form-tracking";
-import { deutschBalken, GANZ_SICHTBAR, GARANTIE, kopfzeile, kraefteVorschauAktiv, kraftFakten, parseVorschau, PORTAL_ANZAHL, SCHRANKE, VERLAUF, WARTE, wuenscheAusAntworten, zaehlerStand, type VorschauKraft } from "@/lib/kraefte-vorschau";
+import { deutschBalken, GANZ_SICHTBAR, GARANTIE, kopfzeile, kraefteVorschauAktiv, kraftFakten, parseVorschau, PORTAL_ANZAHL, SCHRANKE, VERLAUF, WARTE, wuenscheAusAntworten, type VorschauKraft } from "@/lib/kraefte-vorschau";
 import { BestpreisDialog } from "@/components/calculator/BestpreisDialog";
 import { PreisSeite, type PreisDaten } from "@/components/calculator/PreisSeite";
 import { HERO_PUNKTE } from "@/lib/hero-punkte";
@@ -25,7 +25,7 @@ const EMAIL_MUSTER = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 // ─── Matching Animation Component ────────────────────────────────────────────
 // Läuft zwischen letzter Frage (Step 8) und Kontaktformular (Step 9). 3 Schritte
-// mit Pflegekraft-Match-Zähler — baut Wertaufbau auf, bevor der Nutzer Name/
+// (ohne ausgedachten Zähler seit 27.09.2026) — baut Wertaufbau auf, bevor der Nutzer Name/
 // E-Mail eingibt. Wurde im Mai 2026 versehentlich entfernt (Commit 281e4ef
 // argumentierte mit „Friction nach Submit", aber die Animation lief VOR dem
 // Submit) — hier 1:1 wiederbelebt.
@@ -43,10 +43,9 @@ function AntwortZeichen() {
   );
 }
 
-function MatchingAnimation({ onComplete, initialCount, vorschau, kurz }: { onComplete: (finalCount: number) => void; initialCount: number; vorschau?: boolean; kurz?: boolean }) {
+function MatchingAnimation({ onComplete, vorschau, kurz }: { onComplete: () => void; vorschau?: boolean; kurz?: boolean }) {
   const [activeStep, setActiveStep] = useState(0);
   const [completedSteps, setCompletedSteps] = useState<number[]>([]);
-  const [nurseCount, setNurseCount] = useState(initialCount);
   const [done, setDone] = useState(false);
   const onCompleteRef = useRef(onComplete);
   onCompleteRef.current = onComplete;
@@ -72,7 +71,7 @@ function MatchingAnimation({ onComplete, initialCount, vorschau, kurz }: { onCom
     let t: ReturnType<typeof setTimeout>;
     const run = (i: number) => {
       if (i >= ANIM_STEPS.length) {
-        setTimeout(() => { setDone(true); setTimeout(() => onCompleteRef.current(nurseCount), kurz ? WARTE_KURZ_ENDE_MS : 900); }, 300);
+        setTimeout(() => { setDone(true); setTimeout(() => onCompleteRef.current(), kurz ? WARTE_KURZ_ENDE_MS : 900); }, 300);
         return;
       }
       setActiveStep(i);
@@ -82,23 +81,6 @@ function MatchingAnimation({ onComplete, initialCount, vorschau, kurz }: { onCom
     return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-
-  // Pflegekraft-Zähler läuft während Step 1 (Index 1) auf die Portal-Zahl 5 herunter
-  // (waehleFuenf) und landet mit dem Ende des Schritts genau dort — egal wie lang der
-  // Schritt ist (zaehlerStand, Martin 27.09.2026). Die Fertig-Texte nehmen PORTAL_ANZAHL
-  // direkt, nicht den Zählerstand: auch ein gedrosselter Hintergrund-Tab zeigt dann 5.
-  useEffect(() => {
-    if (activeStep !== 1) return;
-    const start = Date.now();
-    const dauer = Math.max(300, ANIM_STEPS[1].duration - 150);
-    const iv = setInterval(() => {
-      const n = zaehlerStand(initialCount, Date.now() - start, dauer);
-      setNurseCount(n);
-      if (n === PORTAL_ANZAHL) clearInterval(iv);
-    }, 60);
-    return () => { clearInterval(iv); setNurseCount(PORTAL_ANZAHL); };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeStep]);
 
   return (
     <div className="bg-white rounded-2xl border-[1.5px] border-[#C0C0C0] overflow-hidden shadow-md">
@@ -123,9 +105,9 @@ function MatchingAnimation({ onComplete, initialCount, vorschau, kurz }: { onCom
             // zweite Zeile sitzt der Text mittig zum Icon (Martin, 10.09.:
             // „Text nicht mittig zum Icon, wenn fertig"); ein leerer Absatz mit
             // Abstand hatte ihn nach oben geschoben.
-            const subText: React.ReactNode = i === 1 && isActive
-              ? <><span className="font-bold text-[#22A06B] tabular-nums">{nurseCount}</span> Pflegekräfte werden geprüft…</>
-              : i === 1 && isDone && !vorschau
+            // Während der Suche KEINE Zahl (Martin 27.09.2026): nur „… werden gesucht", fertig
+            // dann die echte Portal-Zahl.
+            const subText: React.ReactNode = i === 1 && isDone && !vorschau
               ? <><span className="font-bold text-[#22A06B]">{PORTAL_ANZAHL}</span> passende Pflegekräfte gefunden</>
               : vorschau && i === 2 && isDone
               ? WARTE.schritt3Fertig(PORTAL_ANZAHL)
@@ -340,54 +322,9 @@ export function MultiStepForm({ mode = 'inline', bewertung = null }: MultiStepFo
   // contact form users engage / drop off.
   const { trackFieldFocus, trackFieldBlur, trackFormSubmit } = useFormTracking('kontaktformular');
 
-  /* Die Tagesformel darf NICHT beim Rendern laufen.
-
-     Bis 23.08.2026 stand hier `useMemo(() => 71 + (new Date().getDate() % 8))`.
-     useMemo laeuft WAEHREND des Renderns — auf dem Server wie im Browser. Die
-     Startseite wird statisch vorgerendert, ihr HTML traegt also den Tag des
-     letzten Deploys, waehrend der Browser mit heute rechnet. Ab dem Tag danach
-     standen an derselben Stelle zwei verschiedene Zahlen.
-
-     Die Folge war kein Schoenheitsfehler: React meldete #425 („Text content
-     does not match server-rendered HTML"), daraus wurden #418 und #423 — und
-     #423 heisst „the entire root will switch to client rendering". React warf
-     bei JEDEM Aufruf die fertig gelieferte Seite weg und baute sie im Browser
-     neu auf. Auf Prod in Safari UND Chrome nachgewiesen.
-
-     Beim Drift weiter unten war die Falle bekannt („ERST NACH MOUNT"), bei der
-     Basis darunter nicht. Also derselbe Weg: im Render ein fester Wert, den
-     Server und Browser gleich berechnen, das echte Datum erst im Effekt. Der
-     Nachzug faellt nicht auf.
-     Seit 11.09.2026 (Strecke v2) ist die Zahl NUR noch der Startwert der
-     Warte-Animation, die auf 5 herunterzaehlt. Der Zaehler im Formular, der
-     mit Zufallsschwankung sprang (76 → 75 → 69 → 70 …), ist raus: eine Zahl,
-     die nach eingrenzenden Antworten steigt, sah gefaelscht aus. */
-  const TAGESBASIS_SSR = 75;   // Mitte von 71..78
-  const [dailyBase, setDailyBase] = useState(TAGESBASIS_SSR);
-  useEffect(() => {
-    setDailyBase(71 + (new Date().getDate() % 8));
-  }, []);
-
-  function getMatchingCount(): number {
-    let count = dailyBase;
-    // Answer-specific reductions
-    if (state.patientCount === 'ehepaar') count -= 9;
-    if (state.householdOthers === 'ja') count -= 4;
-    const grad = parseInt(state.pflegegrad || '0');
-    count -= Math.max(0, grad - 1) * 2;
-    // rollator & gehfähig: no extra drop. rollstuhl/bettlägerig: deutlich
-    if (state.mobility === 'rollstuhl') count -= 9;
-    if (state.mobility === 'bettlaegerig') count -= 14;
-    if (state.nightCare === 'gelegentlich') count -= 2;
-    if (state.nightCare === 'taeglich') count -= 8;
-    if (state.nightCare === 'mehrmals') count -= 14;
-    if (state.germanLevel === 'kommunikativ') count -= 2;
-    if (state.germanLevel === 'sehr-gut') count -= 10;
-    if (state.driving === 'ja') count -= 8;
-    if (state.gender === 'maennlich') count -= 7;
-    if (state.gender === 'weiblich') count -= 1;
-    return Math.max(12, count);
-  }
+  /* Die ausgedachte Startzahl der Warte-Animation (71–78 je Kalendertag minus Abzüge je
+     Antwort, Zähler vor „gefunden") ist raus (Martin 27.09.2026: „ja mach"):
+     Wir nennen nur noch die echte Portal-Zahl 5. */
 
   const [formData, setFormData] = useState({
     name: '',
@@ -1196,7 +1133,6 @@ export function MultiStepForm({ mode = 'inline', bewertung = null }: MultiStepFo
       {fullscreen && <div className="fixed inset-0 bg-black/60 z-[80]" aria-hidden="true" />}
       <div ref={formRef} id="calculator-form" className={outerClass}>
         <MatchingAnimation
-          initialCount={getMatchingCount()}
           // Warte-Screen immer mit den drei Schritten aus WARTE („Preis
           // berechnet“ …) — auch ohne Karten-Seite (Martin 11.09.: Warten bleibt).
           vorschau

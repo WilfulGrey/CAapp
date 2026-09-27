@@ -86,19 +86,6 @@ export const WARTE = {
 };
 
 /**
- * Zählerstand „N Pflegekräfte werden geprüft…" auf der Warteseite: läuft in `dauerMs` von
- * `von` auf die Portal-Zahl und landet GENAU mit dem Ende des Schritts dort. Vorher zog der
- * Zähler je 120 ms ein Vierzehntel ab und brauchte bis zu 4 s — seit dem kurzen Ablauf
- * (Registry #77, Schritt 2 = 1,2 s) blieb er mittendrin stehen, die Seite meldete „12 passende
- * Pflegekräfte gefunden" und gleich danach „5" (Martin, 27.09.2026).
- */
-export function zaehlerStand(von: number, verstrichenMs: number, dauerMs: number): number {
-  if (dauerMs <= 0 || verstrichenMs >= dauerMs || von <= PORTAL_ANZAHL) return PORTAL_ANZAHL;
-  const rest = 1 - Math.max(0, verstrichenMs) / dauerMs;
-  return Math.max(PORTAL_ANZAHL, Math.round(PORTAL_ANZAHL + (von - PORTAL_ANZAHL) * rest * rest));
-}
-
-/**
  * Kopf des Ergebnis-Screens — eine Zeile Titel, „sofort verfügbar" als
  * Unterzeile (Martin, 10.09. vom iPhone: „zu lang, Button nicht sichtbar";
  * der zweizeilige Titel kostete eine ganze Zeile).

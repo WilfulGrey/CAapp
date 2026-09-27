@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { deutschBalken, GARANTIE, hakenAusAntworten, kopfzeile, kraefteVorschauAktiv, kraftFakten, kraftZeile, parseVorschau, PORTAL_ANZAHL, SCHRANKE, VERLAUF, WARTE, wuenscheAusAntworten, zaehlerStand } from '../../project 3/lib/kraefte-vorschau';
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
+import { deutschBalken, GARANTIE, hakenAusAntworten, kopfzeile, kraefteVorschauAktiv, kraftFakten, kraftZeile, parseVorschau, PORTAL_ANZAHL, SCHRANKE, VERLAUF, WARTE, wuenscheAusAntworten } from '../../project 3/lib/kraefte-vorschau';
 
 function speicher(): Pick<Storage, 'getItem' | 'setItem'> {
   const m = new Map<string, string>();
@@ -111,28 +113,18 @@ describe('Kräfte-Vorschau (Rechner)', () => {
   });
 });
 
-// Martin 27.09.2026: „warum zeigen wir auf der Warteseite 12 gefundene Pflegekräfte, wenn
-// anschließend 5 steht?" — der Zähler blieb im kurzen Ablauf (Schritt 2 = 1,2 s) stehen.
-describe('zaehlerStand (Warteseite)', () => {
-  const [, schritt2] = [1000, 1200];
-  it('landet bei jedem Startwert mit dem Ende des Schritts genau auf der Portal-Zahl', () => {
-    for (const von of [12, 20, 30, 45, 78]) {
-      expect(zaehlerStand(von, schritt2, schritt2), `von ${von}`).toBe(PORTAL_ANZAHL);
-      expect(zaehlerStand(von, schritt2 + 500, schritt2)).toBe(PORTAL_ANZAHL);
-    }
+// Martin 27.09.2026: Die Warteseite meldete „12 passende Pflegekräfte gefunden“ und gleich
+// danach „5“; die Startzahl des Zählers (71–78 je Kalendertag minus Abzüge) war ausgedacht.
+// Jetzt keine Zahl während der Suche, fertig die Portal-Zahl.
+describe('Warteseite ohne ausgedachte Zahl', () => {
+  const quelle = readFileSync(resolve(__dirname, '../../project 3/components/calculator/MultiStepForm.tsx'), 'utf8');
+  it('kein Zähler „N Pflegekräfte werden geprüft“, keine Tagesformel', () => {
+    expect(quelle).not.toContain('werden geprüft');
+    expect(quelle).not.toMatch(/getMatchingCount|dailyBase|getDate\(\) % 8/);
   });
-  it('startet beim Startwert und zählt nur abwärts, nie unter 5', () => {
-    expect(zaehlerStand(30, 0, schritt2)).toBe(30);
-    let vorher = 30;
-    for (let t = 0; t <= schritt2; t += 60) {
-      const n = zaehlerStand(30, t, schritt2);
-      expect(n).toBeLessThanOrEqual(vorher);
-      expect(n).toBeGreaterThanOrEqual(PORTAL_ANZAHL);
-      vorher = n;
-    }
-  });
-  it('ohne Dauer oder mit kleinem Startwert sofort die Portal-Zahl', () => {
-    expect(zaehlerStand(30, 0, 0)).toBe(PORTAL_ANZAHL);
-    expect(zaehlerStand(3, 100, 1200)).toBe(PORTAL_ANZAHL);
+  it('„gefunden“ und „verfügbar“ nennen die Portal-Zahl', () => {
+    expect(quelle).toContain('WARTE.schritt2Fertig(PORTAL_ANZAHL)');
+    expect(quelle).toContain('WARTE.schritt3Fertig(PORTAL_ANZAHL)');
+    expect(PORTAL_ANZAHL).toBe(5);
   });
 });
