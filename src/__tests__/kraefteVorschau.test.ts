@@ -1,4 +1,6 @@
 import { describe, expect, it } from 'vitest';
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { deutschBalken, GARANTIE, hakenAusAntworten, kopfzeile, kraefteVorschauAktiv, kraftFakten, kraftZeile, parseVorschau, PORTAL_ANZAHL, SCHRANKE, VERLAUF, WARTE, wuenscheAusAntworten } from '../../project 3/lib/kraefte-vorschau';
 
 function speicher(): Pick<Storage, 'getItem' | 'setItem'> {
@@ -108,5 +110,21 @@ describe('Kräfte-Vorschau (Rechner)', () => {
     expect(out.map((k) => k.id)).toEqual([1, 3, 4]);
     expect(parseVorschau(null)).toEqual([]);
     expect(parseVorschau({ kraefte: 'nein' })).toEqual([]);
+  });
+});
+
+// Martin 27.09.2026: Die Warteseite meldete „12 passende Pflegekräfte gefunden“ und gleich
+// danach „5“; die Startzahl des Zählers (71–78 je Kalendertag minus Abzüge) war ausgedacht.
+// Jetzt keine Zahl während der Suche, fertig die Portal-Zahl.
+describe('Warteseite ohne ausgedachte Zahl', () => {
+  const quelle = readFileSync(resolve(__dirname, '../../project 3/components/calculator/MultiStepForm.tsx'), 'utf8');
+  it('kein Zähler „N Pflegekräfte werden geprüft“, keine Tagesformel', () => {
+    expect(quelle).not.toContain('werden geprüft');
+    expect(quelle).not.toMatch(/getMatchingCount|dailyBase|getDate\(\) % 8/);
+  });
+  it('„gefunden“ und „verfügbar“ nennen die Portal-Zahl', () => {
+    expect(quelle).toContain('WARTE.schritt2Fertig(PORTAL_ANZAHL)');
+    expect(quelle).toContain('WARTE.schritt3Fertig(PORTAL_ANZAHL)');
+    expect(PORTAL_ANZAHL).toBe(5);
   });
 });
