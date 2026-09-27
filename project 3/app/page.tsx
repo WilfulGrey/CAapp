@@ -95,7 +95,9 @@ export default async function HomePage() {
             sonst klebt es bei grossen Breiten in der Ecke. */}
         {/* Der Abstand zum Menue sitzt am Wrapper darueber (lg:pt-12), nicht
             hier — sonst addieren sich zwei Paddings. */}
-        <div className="mx-auto grid w-full max-w-[1280px] items-center lg:grid-cols-[46fr_54fr] lg:gap-12 lg:px-8 xl:gap-16">
+        {/* Eine Seitenbreite mit primundus.de (Martin 27.09.2026): Inhalt 1216 px, Behälter 1256 px mit
+            px-5 — Logo im Kopf, Hero und Fußzeile schließen links und rechts gleich ab. */}
+        <div className="mx-auto grid w-full max-w-[1256px] items-center lg:grid-cols-[46fr_54fr] lg:gap-12 lg:px-5 xl:gap-16">
 
           <div className="relative aspect-[1100/941] w-full overflow-hidden bg-[#F8F7F5] lg:order-2 lg:rounded-2xl">
             <Image
@@ -232,7 +234,7 @@ export default async function HomePage() {
             mit dem Beleg-PDF folgt weiter unten auf der Seite. Sie dreimal
             zu zeigen war Wiederholung, kein Beweis. */}
         <div className="bg-white lg:bg-transparent">
-          <div className="mx-auto w-full max-w-[1280px] px-5 pb-2 lg:px-8 lg:pb-0 lg:pt-10">
+          <div className="mx-auto w-full max-w-[1256px] px-5 pb-2 lg:pb-0 lg:pt-10">
             {/* Linie OBEN und UNTEN (Martin 16.08.: "auch unter den Logos
                 einen Strich wie drueber") — die Reihe wird dadurch zu einem
                 eigenen Band statt zu einem offenen Anhaengsel. */}
@@ -276,7 +278,7 @@ export default async function HomePage() {
 
       {/* Desktop: Side-by-side */}
       <section className="hidden lg:block py-14 px-5 bg-white">
-        <div className="max-w-[1280px] mx-auto">
+        <div className="max-w-[1216px] mx-auto">
           <div className="grid grid-cols-2 gap-8">
             {/* Linke Karte = Bestpreisgarantie (Martin 12.09.2026), dieselbe
                 Karte wie im mobilen Block — eine Quelle, kein Zweittext. */}
