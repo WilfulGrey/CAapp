@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { deutschBalken, GARANTIE, hakenAusAntworten, kopfzeile, kraefteVorschauAktiv, kraftFakten, kraftZeile, parseVorschau, PORTAL_ANZAHL, SCHRANKE, VERLAUF, WARTE, wuenscheAusAntworten } from '../../project 3/lib/kraefte-vorschau';
+import { deutschBalken, GARANTIE, hakenAusAntworten, kopfzeile, kraefteVorschauAktiv, kraftFakten, kraftZeile, parseVorschau, PORTAL_ANZAHL, SCHRANKE, VERLAUF, WARTE, wuenscheAusAntworten, zaehlerStand } from '../../project 3/lib/kraefte-vorschau';
 
 function speicher(): Pick<Storage, 'getItem' | 'setItem'> {
   const m = new Map<string, string>();
@@ -108,5 +108,31 @@ describe('Kräfte-Vorschau (Rechner)', () => {
     expect(out.map((k) => k.id)).toEqual([1, 3, 4]);
     expect(parseVorschau(null)).toEqual([]);
     expect(parseVorschau({ kraefte: 'nein' })).toEqual([]);
+  });
+});
+
+// Martin 27.09.2026: „warum zeigen wir auf der Warteseite 12 gefundene Pflegekräfte, wenn
+// anschließend 5 steht?" — der Zähler blieb im kurzen Ablauf (Schritt 2 = 1,2 s) stehen.
+describe('zaehlerStand (Warteseite)', () => {
+  const [, schritt2] = [1000, 1200];
+  it('landet bei jedem Startwert mit dem Ende des Schritts genau auf der Portal-Zahl', () => {
+    for (const von of [12, 20, 30, 45, 78]) {
+      expect(zaehlerStand(von, schritt2, schritt2), `von ${von}`).toBe(PORTAL_ANZAHL);
+      expect(zaehlerStand(von, schritt2 + 500, schritt2)).toBe(PORTAL_ANZAHL);
+    }
+  });
+  it('startet beim Startwert und zählt nur abwärts, nie unter 5', () => {
+    expect(zaehlerStand(30, 0, schritt2)).toBe(30);
+    let vorher = 30;
+    for (let t = 0; t <= schritt2; t += 60) {
+      const n = zaehlerStand(30, t, schritt2);
+      expect(n).toBeLessThanOrEqual(vorher);
+      expect(n).toBeGreaterThanOrEqual(PORTAL_ANZAHL);
+      vorher = n;
+    }
+  });
+  it('ohne Dauer oder mit kleinem Startwert sofort die Portal-Zahl', () => {
+    expect(zaehlerStand(30, 0, 0)).toBe(PORTAL_ANZAHL);
+    expect(zaehlerStand(3, 100, 1200)).toBe(PORTAL_ANZAHL);
   });
 });

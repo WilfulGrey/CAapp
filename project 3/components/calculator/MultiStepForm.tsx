@@ -8,7 +8,7 @@ import { analytics, variantenSeite, websiteHerkunft } from "@/lib/analytics";
 import { cookieConsent } from "@/lib/cookie-consent";
 import { scrollToCalculator, isCalculatorAligned, OPEN_CALCULATOR_EVENT } from "@/lib/scroll-to-calculator";
 import { useFormTracking } from "@/hooks/use-form-tracking";
-import { deutschBalken, GANZ_SICHTBAR, GARANTIE, kopfzeile, kraefteVorschauAktiv, kraftFakten, parseVorschau, PORTAL_ANZAHL, SCHRANKE, VERLAUF, WARTE, wuenscheAusAntworten, type VorschauKraft } from "@/lib/kraefte-vorschau";
+import { deutschBalken, GANZ_SICHTBAR, GARANTIE, kopfzeile, kraefteVorschauAktiv, kraftFakten, parseVorschau, PORTAL_ANZAHL, SCHRANKE, VERLAUF, WARTE, wuenscheAusAntworten, zaehlerStand, type VorschauKraft } from "@/lib/kraefte-vorschau";
 import { BestpreisDialog } from "@/components/calculator/BestpreisDialog";
 import { PreisSeite, type PreisDaten } from "@/components/calculator/PreisSeite";
 import { HERO_PUNKTE } from "@/lib/hero-punkte";
@@ -83,25 +83,21 @@ function MatchingAnimation({ onComplete, initialCount, vorschau, kurz }: { onCom
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Pflegekraft-Zähler läuft während Step 1 (Index 1) auf eine personalisierte
-  // Endzahl (target=5) herunter — fühlt sich wie eine echte Filterung an.
-  // 2026-07-08 (Martin): 3 → 5, passend zur gesperrten Ergebnis-Karte im
-  // Kontakt-Schritt. Hinweis: Portal-Vorschau zeigt aktuell Top 3 — ggf.
-  // dort nachziehen.
+  // Pflegekraft-Zähler läuft während Step 1 (Index 1) auf die Portal-Zahl 5 herunter
+  // (waehleFuenf) und landet mit dem Ende des Schritts genau dort — egal wie lang der
+  // Schritt ist (zaehlerStand, Martin 27.09.2026). Die Fertig-Texte nehmen PORTAL_ANZAHL
+  // direkt, nicht den Zählerstand: auch ein gedrosselter Hintergrund-Tab zeigt dann 5.
   useEffect(() => {
     if (activeStep !== 1) return;
+    const start = Date.now();
+    const dauer = Math.max(300, ANIM_STEPS[1].duration - 150);
     const iv = setInterval(() => {
-      // Ziel 5 = die Zahl, die auch das Kundenportal zeigt (waehleFuenf).
-      // Auch im Vorschau-Modus: dort stehen 3 der 5 vorab auf Schritt 9
-      // (Martin, 10.09.: „im Kundenportal zeigen wir doch 5").
-      const target = 5;
-      setNurseCount(prev => {
-        const next = prev - Math.ceil((prev - target) / 14);
-        if (next <= target) { clearInterval(iv); return target; }
-        return next;
-      });
-    }, 120);
-    return () => clearInterval(iv);
+      const n = zaehlerStand(initialCount, Date.now() - start, dauer);
+      setNurseCount(n);
+      if (n === PORTAL_ANZAHL) clearInterval(iv);
+    }, 60);
+    return () => { clearInterval(iv); setNurseCount(PORTAL_ANZAHL); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeStep]);
 
   return (
@@ -130,9 +126,9 @@ function MatchingAnimation({ onComplete, initialCount, vorschau, kurz }: { onCom
             const subText: React.ReactNode = i === 1 && isActive
               ? <><span className="font-bold text-[#22A06B] tabular-nums">{nurseCount}</span> Pflegekräfte werden geprüft…</>
               : i === 1 && isDone && !vorschau
-              ? <><span className="font-bold text-[#22A06B]">{nurseCount}</span> passende Pflegekräfte gefunden</>
+              ? <><span className="font-bold text-[#22A06B]">{PORTAL_ANZAHL}</span> passende Pflegekräfte gefunden</>
               : vorschau && i === 2 && isDone
-              ? WARTE.schritt3Fertig(nurseCount)
+              ? WARTE.schritt3Fertig(PORTAL_ANZAHL)
               : (isActive || isDone) && s.sub ? s.sub : null;
             return (
               <div key={i} className={`flex ${subText ? 'items-start' : 'items-center'} gap-4 transition-all duration-500 ${isPending ? 'opacity-25' : 'opacity-100'}`}>
@@ -151,7 +147,7 @@ function MatchingAnimation({ onComplete, initialCount, vorschau, kurz }: { onCom
                 </div>
                 <div className="flex-1 min-w-0 text-left">
                   <p className={`text-[15px] font-semibold leading-snug transition-colors duration-300 ${isDone ? 'text-[#3D3D3D]' : isActive ? 'text-[#3D3D3D]' : 'text-[#AFAFAF]'}`}>
-                    {vorschau && i === 1 && isDone ? WARTE.schritt2Fertig(nurseCount) : s.label}
+                    {vorschau && i === 1 && isDone ? WARTE.schritt2Fertig(PORTAL_ANZAHL) : s.label}
                     {isDone && <span className="ml-2 text-xs font-normal text-[#22A06B] whitespace-nowrap">✓ Fertig</span>}
                   </p>
                   {subText ? <p className="text-sm text-[#8B8B8B] mt-1">{subText}</p> : null}
