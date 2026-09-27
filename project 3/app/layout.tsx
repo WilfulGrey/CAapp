@@ -128,6 +128,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
     gtag('config', 'G-W2QEQ18EE7');
   }
 
+  var wahl = null;
   try {
     // Bugfix CRO 15.08.: Der Consent-Manager speichert unter
     // 'primundus_cookie_consent' als {version, consent:{analytics,...}} —
@@ -135,11 +136,18 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
     var stored = localStorage.getItem('primundus_cookie_consent');
     if (stored) {
       var data = JSON.parse(stored);
-      if (data && data.consent && data.consent.analytics) {
-        loadGoogleAnalytics();
-      }
+      if (data && data.consent) wahl = data.consent;
     }
   } catch(e) {}
+  // Zweite Quelle (Registry #99): das Cookie pm_consent auf .primundus.de —
+  // die Wahl von primundus.de oder von hier (lib/cookie-consent.ts)
+  if (!wahl) {
+    try {
+      var m = document.cookie.match(/(?:^|; )pm_consent=([^;]*)/);
+      if (m) wahl = JSON.parse(decodeURIComponent(m[1]));
+    } catch(e) {}
+  }
+  if (wahl && wahl.analytics) loadGoogleAnalytics();
 
   window.addEventListener('cookie-consent-changed', function(e) {
     if (e.detail && e.detail.analytics) {
@@ -182,13 +190,22 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
     window.oaiq('consent', true);
   }
 
+  var auswahl = null;
   try {
     var gespeichert = localStorage.getItem('primundus_cookie_consent');
     if (gespeichert) {
       var daten = JSON.parse(gespeichert);
-      if (daten && daten.consent && daten.consent.marketing) ladeOaiq();
+      if (daten && daten.consent) auswahl = daten.consent;
     }
   } catch(e) {}
+  // Zweite Quelle wie oben (Registry #99): Cookie pm_consent auf .primundus.de
+  if (!auswahl) {
+    try {
+      var treffer = document.cookie.match(/(?:^|; )pm_consent=([^;]*)/);
+      if (treffer) auswahl = JSON.parse(decodeURIComponent(treffer[1]));
+    } catch(e) {}
+  }
+  if (auswahl && auswahl.marketing) ladeOaiq();
 
   window.addEventListener('cookie-consent-changed', function(e) {
     var erlaubt = !!(e.detail && e.detail.marketing);

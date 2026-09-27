@@ -10,6 +10,44 @@ export interface ConsentState {
 const CONSENT_STORAGE_KEY = 'primundus_cookie_consent';
 const CONSENT_VERSION = '1.0';
 
+// Eine Cookie-Leiste für primundus.de UND den Kostenrechner (Registry #99, 27.09.2026, Martin: „eins und zwei umsetzen“).
+// localStorage gilt je Domain: Wer auf primundus.de schon „Alle akzeptieren“ oder „Nur notwendige“ gewählt hatte, bekam im
+// Rechner dieselbe Leiste noch einmal — direkt vor Frage 1. Seit 25.09. beantworteten nur noch 3 von 10 Website-Besuchern
+// Frage 1 (Anzeigen-Besucher 94 %). primundus.de schreibt die Wahl seit 27.09. zusätzlich ins Cookie `pm_consent` auf
+// .primundus.de; der Rechner liest es als zweite Quelle (localStorage bleibt vorn) und schreibt jede eigene Wahl hinein.
+// Wert: URL-kodiertes JSON {necessary, analytics, marketing[, timestamp]} — dieselbe Form wie auf primundus.de.
+const COOKIE_NAME = 'pm_consent';
+const COOKIE_DOMAIN = '.primundus.de';
+const COOKIE_TAGE = 180;
+
+function cookieLesen(): ConsentState | null {
+  if (typeof document === 'undefined') return null;
+  try {
+    const teil = document.cookie.split('; ').find((c) => c.startsWith(COOKIE_NAME + '='));
+    if (!teil) return null;
+    const v = JSON.parse(decodeURIComponent(teil.slice(COOKIE_NAME.length + 1)));
+    return typeof v?.necessary === 'boolean'
+      ? { necessary: true, analytics: v.analytics === true, marketing: v.marketing === true }
+      : null;
+  } catch {
+    return null;
+  }
+}
+
+function cookieSchreiben(state: ConsentState | null): void {
+  if (typeof document === 'undefined') return;
+  // Auf *.onrender.com (Staging) und localhost ohne Domain: dort gilt das Cookie nur für den eigenen Host
+  const aufDomain = location.hostname.endsWith('primundus.de') ? `; Domain=${COOKIE_DOMAIN}` : '';
+  const sicher = location.protocol === 'https:' ? '; Secure' : '';
+  try {
+    document.cookie = state
+      ? `${COOKIE_NAME}=${encodeURIComponent(JSON.stringify(state))}; Max-Age=${COOKIE_TAGE * 86400}; Path=/; SameSite=Lax${aufDomain}${sicher}`
+      : `${COOKIE_NAME}=; Max-Age=0; Path=/${aufDomain}${sicher}`;
+  } catch (error) {
+    console.error('Error writing consent cookie:', error);
+  }
+}
+
 export class CookieConsentManager {
   private static instance: CookieConsentManager;
   private consentState: ConsentState | null = null;
@@ -40,6 +78,8 @@ export class CookieConsentManager {
     } catch (error) {
       console.error('Error loading consent:', error);
     }
+    // Zweite Quelle: die Wahl, die der Besucher schon auf primundus.de (oder hier) getroffen hat
+    if (!this.consentState) this.consentState = cookieLesen();
   }
 
   saveConsent(consent: ConsentState): void {
@@ -61,6 +101,7 @@ export class CookieConsentManager {
     } catch (error) {
       console.error('Error saving consent:', error);
     }
+    cookieSchreiben(consentWithTimestamp);
 
     this.notifyListeners(consentWithTimestamp);
   }
@@ -101,6 +142,8 @@ export class CookieConsentManager {
     } catch (error) {
       console.error('Error revoking consent:', error);
     }
+    // Widerruf gilt auch für primundus.de — dort erscheint die Leiste dann ebenfalls wieder
+    cookieSchreiben(null);
     this.notifyListeners({
       necessary: true,
       analytics: false,
