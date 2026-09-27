@@ -1,5 +1,5 @@
 import type { FC } from 'react';
-import { Check, ChevronDown, Clock, Mail } from 'lucide-react';
+import { Check, Clock, Mail } from 'lucide-react';
 import { HERO_PUNKTE } from '../../lib/heroPunkte';
 import type { SterneStand } from '../../lib/sterne';
 import { BewertungsZeile } from './BewertungsZeile';
@@ -7,8 +7,7 @@ import { Button } from '../ui/Button';
 import { nochReserviertText } from '../../lib/reservierung';
 import type { Nurse } from '../../types';
 import type { Application } from './shared';
-import { nurseLevel, nurseFacts, displayName, initials } from './shared';
-import { DeutschZeile } from './SprachBalken';
+import { PflegekraftProfil } from './PflegekraftProfil';
 
 export const AppCard: FC<{
   app: Application;
@@ -25,86 +24,41 @@ export const AppCard: FC<{
   vorteile?: { onBestpreis: () => void; sterne: SterneStand | null };
 }> = ({ app, exiting, onReview, onDecline, onNurseClick, onChat, reserviertBis, vorteile }) => {
   const { nurse } = app;
-  const inits = initials(nurse.name);
-  const name = displayName(nurse.name);
   const vorname = nurse.name.split(' ')[0];
   return (
     <div style={exiting ? { animation: 'exitCard 0.32s ease-in forwards' } : undefined}>
       {/* Grün umrandeter Kasten: eine echte Bewerbung ist das stärkste
           positive Signal → Grün statt Coral (Martin, 18.08.). */}
       <div className="bg-white rounded-card border-2 border-pm-green overflow-hidden shadow-lift">
-        {/* Status-Kopf IN der Box oben, mit Icon — gleiches Muster wie der
-            Interesse-/Empfehlung-Kopf (Icon im Kreis + farbige Fettzeile),
-            hier grün (Martin, 18.08.). */}
-        <div className="flex items-center gap-2.5 px-5 pt-4 pb-1">
-          <div className="flex-shrink-0 w-7 h-7 rounded-full flex items-center justify-center bg-pm-mint">
-            <Mail className="w-3.5 h-3.5 text-pm-green" />
-          </div>
-          <p className="text-[15px] font-bold leading-snug text-pm-green-deep">
-            {/* Immer nur „Neue Bewerbung" (Martin 25.09.: nicht „Ihrer eingeladenen Pflegekraft"). */}
-            Neue Bewerbung
-          </p>
+        {/* Kopfleiste der Bewerbung (Martin 27.09.2026, „V"): „Neue Bewerbung" gehört zur
+            Bewerbung, nicht ins Profil. Darunter das geschlossene Profil, dann das Angebot —
+            alles im grünen Rahmen, identisch mit der Mail. */}
+        <div className="flex items-center gap-2 bg-pm-mint px-5 py-3 text-[15.5px] font-extrabold text-pm-green-deep">
+          <Mail className="w-4 h-4 flex-none" aria-hidden="true" />
+          {/* Immer nur „Neue Bewerbung" (Martin 25.09.: nicht „Ihrer eingeladenen Pflegekraft"). */}
+          Neue Bewerbung
         </div>
-        {/* 72-h-Frist offen als Reservierung (Martin 25.09.). Nur mit echtem
-            Anker aus den lead_events, sonst gar nicht (nicht raten). */}
-        {reserviertBis && (
-          <p className="mx-5 mt-2 inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[13px] font-bold bg-pm-amber-tint text-pm-amber-ink">
-            <Clock className="w-3.5 h-3.5 flex-none" aria-hidden="true" />
-            {/* Nur bei mehreren Bewerbungen (jede hat ihre Zeit); bei einer steht der Countdown im Kopf. */}
-            {nochReserviertText(reserviertBis)}
-          </p>
-        )}
-        <div className="px-5 pt-3 pb-5 cursor-pointer active:bg-pm-paper" onClick={() => onNurseClick(nurse)}>
-          <div className="flex items-center gap-3.5">
-            <div className="flex-shrink-0">
-              {nurse.image ? (
-                <img src={nurse.image} alt={nurse.name} className="w-16 h-16 rounded-[16px] object-cover" />
-              ) : (
-                <div className="w-16 h-16 rounded-[16px] flex items-center justify-center text-xl font-bold text-white"
-                  style={{ backgroundColor: nurse.color }}>
-                  {inits}
-                </div>
-              )}
-            </div>
-
-            {/* CG-Box wortgleich zur normalen Portal-Karte (MatchCard):
-                „Name, Alter" · „Deutsch X" · „Stufe: Fakten" — kein Pillen-
-                Badge, keine Sprachbalken, kein „J." (Martin, 18.08.). */}
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center justify-between gap-2">
-                <p className="text-[17px] font-bold leading-snug text-pm-ink">
-                  {name}
-                  {nurse.age ? <span className="font-normal text-pm-mute">, {nurse.age}</span> : null}
-                </p>
-                <ChevronDown className="w-4 h-4 -rotate-90 flex-shrink-0 text-pm-mute" />
-              </div>
-              <p className="mt-1"><DeutschZeile nurse={nurse} /></p>
-            </div>
-          </div>
-          {/* Fakten über die VOLLE Kartenbreite (wie MatchCard) — in der
-              schmalen Spalte neben dem Foto brach die Zeile sonst mitten in
-              der Zahl um („Ø 12 / Wochen pro Einsatz"). */}
-          <p className="text-[15px] leading-[1.5] mt-3 text-pm-muted">
-            {(() => { const lvl = nurseLevel(nurse.experienceYears ?? 0, nurse.history?.assignments ?? 0); return lvl.label ? (
-              <span className="font-bold text-pm-ink">{lvl.label}: </span>
-            ) : null; })()}
-            {nurseFacts(nurse)}
-          </p>
+        <div className="px-4 pt-4">
+          {/* 72-h-Frist offen als Reservierung (Martin 25.09.). Nur mit echtem
+              Anker aus den lead_events, sonst gar nicht (nicht raten). */}
+          {reserviertBis && (
+            <p className="mb-3 inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[13px] font-bold bg-pm-amber-tint text-pm-amber-ink">
+              <Clock className="w-3.5 h-3.5 flex-none" aria-hidden="true" />
+              {/* Nur bei mehreren Bewerbungen (jede hat ihre Zeit); bei einer steht der Countdown im Kopf. */}
+              {nochReserviertText(reserviertBis)}
+            </p>
+          )}
+          <PflegekraftProfil nurse={nurse} onProfil={() => onNurseClick(nurse)} />
         </div>
 
-      <div className="border-t border-pm-line-soft px-5 py-4">
-        <div className="bg-pm-paper rounded-[14px] px-4 py-3 mb-3">
-          <div className="flex items-start justify-between gap-3">
-            <div className="min-w-0 text-[13.5px] leading-[1.5] text-pm-muted">
-              <p>{app.offer.anreisedatum} – {app.offer.abreisedatum}</p>
-              <p>Reisekosten à {app.offer.anreisekosten} €</p>
-            </div>
-            <div className="text-right flex-shrink-0">
-              <p className="text-[12.5px] text-pm-muted mb-0.5">Tagessatz</p>
-              <p className="text-xl font-extrabold text-pm-ink">{Math.round(app.offer.monatlicheKosten / 30)} €<span className="text-sm font-normal text-pm-muted">/Tag</span></p>
-            </div>
-          </div>
-        </div>
+      <div className="px-5 pt-4 pb-4">
+        <p className="text-[13.5px] text-pm-muted">Tagessatz</p>
+        <p className="text-[26px] font-extrabold leading-tight text-pm-ink">{Math.round(app.offer.monatlicheKosten / 30)}&nbsp;€<span className="text-[14.5px] font-medium text-pm-muted">&nbsp;/&nbsp;Tag</span></p>
+        <p className="mt-1.5 mb-4 text-[14.5px] leading-normal text-pm-body">
+          <span className="whitespace-nowrap">{app.offer.anreisedatum} – {app.offer.abreisedatum}</span>
+          {' · '}
+          <span className="whitespace-nowrap">Reisekosten à {app.offer.anreisekosten}&nbsp;€</span>
+        </p>
         {/*
           „Hinweis der Agentur" = application.message VERBATIM (Entscheidung
           Michał 2026-07-22, Registry #22): Rekruter schreiben dort kunden-

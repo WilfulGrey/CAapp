@@ -1,9 +1,8 @@
 import { useState } from 'react';
 import type { FC } from 'react';
-import { Check, ChevronDown, UserPlus } from 'lucide-react';
+import { Check, UserPlus } from 'lucide-react';
 import type { Nurse } from '../../types';
-import { nurseFacts, nurseLevel, displayName, initials } from './shared';
-import { DeutschZeile } from './SprachBalken';
+import { PflegekraftProfil } from './PflegekraftProfil';
 
 export type InterestActionStatus = 'idle' | 'invited' | 'dismissed';
 
@@ -37,8 +36,6 @@ export const InterestCard: FC<{
 }> = ({ nurse, status, onNurseClick, onInvite, onInviteConfirm, onDismiss, exiting, globalInviteLocked, profilFehlt, onStufeClick }) => {
   const [invitePhase, setInvitePhase] = useState<'idle' | 'sending' | 'done'>('idle');
   const [dismissPhase, setDismissPhase] = useState<'idle' | 'sending'>('idle');
-  const inits = initials(nurse.name);
-  const name = displayName(nurse.name);
 
   const handleInvite = async () => {
     const allowed = onInvite ? onInvite() : true;
@@ -82,58 +79,13 @@ export const InterestCard: FC<{
             : 'border-zinc-300 hover:border-zinc-500'
         }`}
       >
-      <div className="px-4 pt-4 pb-3 active:bg-gray-50">
-        <div className="flex items-center gap-3.5">
-          <div className="flex-shrink-0">
-            {nurse.image ? (
-              <img src={nurse.image} alt={nurse.name} className="w-16 h-16 rounded-xl object-cover" />
-            ) : (
-              <div className="w-16 h-16 rounded-xl flex items-center justify-center text-lg font-bold text-white"
-                style={{ backgroundColor: nurse.color }}>
-                {inits}
-              </div>
-            )}
-          </div>
-
-          <div className="flex-1 min-w-0">
-            {/* Umbau 11.08. (Martin: „CG-Kasten sieht immer noch scheisse aus —
-                Farben austauschen bringt nichts"). Es lag an der Struktur:
-                drei Kleinschrift-Zeilen neben einem 56px-Foto, die Faktenzeile
-                mit `truncate` (der Kunde las „Ø 1…" — eine abgeschnittene
-                Zahl), dazu ein Sprachbalken, der genau das wiederholte, was
-                daneben im Klartext stand.
-                Jetzt: größeres Foto, Name als Zeile, darunter EINE Meta-Zeile,
-                darunter die Fakten ausgeschrieben und umbrechend. */}
-            <div className="flex items-center justify-between gap-2">
-              <p className="text-[17px] font-semibold leading-snug" style={{ color: '#18181B' }}>
-                {name}
-                {nurse.age ? <span className="font-normal" style={{ color: '#71717A' }}>, {nurse.age}</span> : null}
-              </p>
-              {/* Öffnen-Hinweis statt „Details"-Link im Footer (11.08.) */}
-              <ChevronDown className="w-4 h-4 -rotate-90 flex-shrink-0 text-zinc-400 group-hover:text-zinc-700 transition-colors" />
-            </div>
-
-            <p className="mt-1"><DeutschZeile nurse={nurse} /></p>
-          </div>
-        </div>
-
-        {/* Fakten über die VOLLE Kartenbreite (11.08.), nicht in der schmalen
-            Spalte neben dem Foto — dort brach die Zeile mitten in der Zahl um
-            („· im / Schnitt 12 Wochen"). */}
-        <p className="text-[16px] mt-3" style={{ color: '#71717A' }}>
-          {(() => { const lvl = nurseLevel(nurse.experienceYears ?? 0, nurse.history?.assignments ?? 0); return lvl.label ? (
-            <span
-              role={onStufeClick ? 'button' : undefined}
-              onClick={onStufeClick ? (e) => { e.stopPropagation(); onStufeClick(); } : undefined}
-              className={`font-semibold ${onStufeClick ? 'underline decoration-dotted underline-offset-4 cursor-pointer' : ''}`}
-              style={{ color: '#18181B' }}
-            >{lvl.label}: </span>
-          ) : null; })()}
-          {nurseFacts(nurse)}
-        </p>
+      {/* Geschlossenes Profil wie Bewerbung und Mail A (Martin 27.09.2026, „V"). Die Überschrift
+          „… interessiert sich für die Betreuung" steht im Abschnitt darüber (CustomerPortalPage). */}
+      <div className="px-3.5 pt-3.5">
+        <PflegekraftProfil nurse={nurse} onProfil={onNurseClick} onStufeClick={onStufeClick} />
       </div>
 
-      <div className="border-t border-gray-100 px-4 py-2.5 flex items-center justify-end gap-3">
+      <div className="px-4 py-2.5 flex items-center justify-end gap-3">
         <div className="flex items-center gap-2">
           {status === 'invited' || invitePhase === 'done' ? (
             <span className="flex items-center gap-1.5 text-xs font-bold text-[#22A06B] bg-[#E3F7EF] border border-[#B8E8D4] px-4 py-1.5 rounded-full">

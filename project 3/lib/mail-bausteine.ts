@@ -173,37 +173,74 @@ export type PflegekraftDaten = {
   foto?: string | null;
 };
 
-/** EINE Pflegekraft-Box für alle Mails — Zeichen für Zeichen wie caregiverKachelHtml in
- *  lib/email.ts (Mail A/B/C), damit die ganze Reihe gleich aussieht (Registry: einheitliche
- *  Pflegekräfte-Box). Abstand Foto→Text als eigene Spalte: manche Clients verwerfen padding an
- *  einer <td> mit fester Breite. `ohneRahmen` für den Einsatz in einer Karte. */
-export function mPflegekraft(pk: PflegekraftDaten, profilUrl: string, o: { ohneRahmen?: boolean; linkText?: string } = {}): string {
-  const vorname = pk.name.split(' ')[0];
+// Pflegekraft-Profil „V" (Martin 27.09.2026): geschlossene beige Fläche, Foto links, Name + Alter,
+// Deutsch mit Punkten, Leiste „★ Stufe / N Einsätze bei uns | N Jahre / Berufserfahrung", unten
+// „Profil ansehen ›". Identisch mit dem Portal (src/components/portal/PflegekraftProfil.tsx).
+export const PROFIL_BEIGE = '#F6EFE4';
+export const PROFIL_LINIE = '#E4D8C6';
+const STERN = '#D39B2A';
+
+function deutschPunkte(wort: string): string {
+  const n = wort === 'Gut' ? 3 : wort === 'Mittel' ? 2 : wort === 'Grund' ? 1 : 0;
+  if (n === 0) return '';
+  return [1, 2, 3].map((i) => `<span style="display:inline-block;width:9px;height:9px;border-radius:5px;background:${i <= n ? F.taupe : PROFIL_LINIE};margin-right:3px;vertical-align:middle;"></span>`).join('') + '&nbsp;';
+}
+
+/** Das Profil einer Pflegekraft als geschlossene Einheit — in jeder Mail gleich. Alles verlinkt aufs Profil. */
+export function mProfil(pk: PflegekraftDaten, profilUrl: string, unten = 0): string {
+  const a = (inhalt: string, farbe = '#18181B') => `<a href="${profilUrl}" target="_blank" style="color:${farbe};text-decoration:none;">${inhalt}</a>`;
+  const e = pk.einsaetze ?? 0;
+  const j = pk.jahre ?? 0;
+  const stufe = mStufe(pk.einsaetze, pk.jahre);
+  const stern = stufe === 'Elite' || stufe === 'Stammkraft' ? `<span style="color:${STERN};">&#9733;</span>&nbsp;` : '';
+  const felder: [string, string][] = [e > 0
+    ? [`${stern}${stufe}`, `${e} ${e === 1 ? 'Einsatz' : 'Einsätze'} bei uns`]
+    : ['Neu bei uns', 'erster Einsatz bei uns']];
+  if (j > 0) felder.push([`${j} ${j === 1 ? 'Jahr' : 'Jahre'}`, 'Berufserfahrung']);
+  const zellen = felder.map(([w, l], i) => `${i ? `<td width="1" style="width:1px;background:${PROFIL_LINIE};font-size:0;">&nbsp;</td>` : ''}<td align="center" width="${Math.floor(100 / felder.length)}%" style="text-align:center;padding:12px 6px;">${a(`<span style="display:block;font-size:15.5px;font-weight:800;line-height:1.3;color:${F.ink};white-space:nowrap;">${w}</span><span style="display:block;font-size:13px;line-height:1.35;color:${F.muted};white-space:nowrap;">${l}</span>`)}</td>`).join('');
+  // Outlook Desktop kennt kein object-fit: dort das Bild proportional (ein Hochformat würde sonst
+  // gequetscht), alle anderen quadratisch beschnitten — dasselbe Muster wie fotoImg (empfehlung.ts).
+  const bild = `src="${pk.foto}" alt="${esc(pk.name)}" width="80"`;
   const foto = pk.foto
-    ? `<img src="${pk.foto}" alt="${esc(pk.name)}" width="76" style="display:block;width:76px;height:76px;border-radius:12px;object-fit:cover;" />`
-    : `<div style="width:76px;height:76px;border-radius:12px;background-color:#B5A184;color:#fff;font-size:26px;font-weight:700;line-height:76px;text-align:center;">${initialen(pk.name)}</div>`;
+    ? `<!--[if mso]><img ${bild} style="display:block;border:0;" /><![endif]--><!--[if !mso]><!--><img ${bild} height="80" style="display:block;width:80px;height:80px;border-radius:14px;border:3px solid #ffffff;object-fit:cover;-ms-interpolation-mode:bicubic;outline:none;" /><!--<![endif]-->`
+    : `<div style="width:80px;height:80px;border-radius:14px;border:3px solid #ffffff;background-color:#B5A184;color:#fff;font-size:26px;font-weight:700;line-height:80px;text-align:center;">${initialen(pk.name)}</div>`;
   const alter = pk.alter && pk.alter > 0 ? `<span style="font-weight:400;color:#71717A;">, ${pk.alter}</span>` : '';
-  const deutsch = pk.deutsch ? `<p style="margin:0;font-size:15px;color:#71717A;">Deutsch ${esc(pk.deutsch)}</p>` : '';
-  const stufe = `<span style="display:inline-block;font-size:12px;font-weight:700;letter-spacing:.03em;color:#ffffff;background:${F.taupe};border-radius:999px;padding:4px 12px;white-space:nowrap;vertical-align:middle;">${mStufe(pk.einsaetze, pk.jahre)}</span>`;
-  const inhalt = `
-        <table width="100%" cellpadding="0" cellspacing="0" role="presentation">
-          <tr>
-            <td width="76" style="vertical-align:middle;width:76px;">${foto}</td>
-            <td width="18" style="width:18px;font-size:0;line-height:0;">&nbsp;</td>
-            <td style="vertical-align:middle;">
-              <p style="margin:0 0 3px;font-size:18px;font-weight:700;color:#18181B;line-height:1.3;">${esc(pk.name)}${alter}</p>
-              ${deutsch}
-            </td>
-          </tr>
-        </table>
-        <p style="margin:16px 0 0;font-size:15px;line-height:1.6;color:#71717A;">${stufe}<span style="vertical-align:middle;">&nbsp;&nbsp;${mFakten(pk.jahre, pk.einsaetze)}</span></p>
-        <div style="border-top:1px solid #ECE7DF;margin:14px 0 0;padding-top:14px;">
-          <a href="${profilUrl}" target="_blank" style="color:${F.taupe};text-decoration:none;font-weight:700;font-size:15px;">${o.linkText ?? `${esc(vorname)}s Profil ansehen`} &rarr;</a>
-        </div>`;
-  if (o.ohneRahmen) return inhalt;
+  const deutsch = pk.deutsch ? `<p style="margin:6px 0 0;font-size:15px;color:${F.muted};">${deutschPunkte(pk.deutsch)}Deutsch ${esc(pk.deutsch.toLowerCase())}</p>` : '';
   return `
-    <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="margin:0 0 26px;border:1px solid #ECE7DF;border-radius:14px;background:#ffffff;overflow:hidden;">
-      <tr><td style="padding:18px 20px;">${inhalt}</td></tr>
+    <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="margin:0 0 ${unten}px;background:${PROFIL_BEIGE};border-radius:16px;border-collapse:separate;">
+      <tr><td style="padding:16px 16px 14px;">
+        <table width="100%" cellpadding="0" cellspacing="0" role="presentation"><tr>
+          <td width="80" style="width:80px;vertical-align:middle;">${a(foto)}</td>
+          <td width="14" style="width:14px;font-size:0;line-height:0;">&nbsp;</td>
+          <td style="vertical-align:middle;"><p style="margin:0;font-size:19px;font-weight:800;line-height:1.25;color:#18181B;">${a(esc(pk.name))}${alter}</p>${deutsch}</td>
+        </tr></table>
+      </td></tr>
+      <tr><td style="border-top:1px solid ${PROFIL_LINIE};padding:0;"><table width="100%" cellpadding="0" cellspacing="0" role="presentation"><tr>${zellen}</tr></table></td></tr>
+      <tr><td align="center" style="border-top:1px solid ${PROFIL_LINIE};padding:11px 16px;text-align:center;font-size:14.5px;font-weight:700;">${a('Profil ansehen&nbsp;&rsaquo;', F.taupeInk)}</td></tr>
+    </table>`;
+}
+
+/** Textfassung des Profils (Nur-Text-Mail), dieselben Angaben wie mProfil. */
+export function mProfilText(pk: PflegekraftDaten): string {
+  const kopf = [pk.name + (pk.alter && pk.alter > 0 ? `, ${pk.alter}` : ''), pk.deutsch ? `Deutsch ${pk.deutsch.toLowerCase()}` : ''].filter(Boolean).join(' · ');
+  const e = pk.einsaetze ?? 0;
+  const j = pk.jahre ?? 0;
+  const teile = [
+    e > 0 ? `${mStufe(pk.einsaetze, pk.jahre)}: ${e} ${e === 1 ? 'Einsatz' : 'Einsätze'} bei uns` : 'Neu bei uns',
+    j > 0 ? `${j} ${j === 1 ? 'Jahr' : 'Jahre'} Berufserfahrung` : '',
+  ].filter(Boolean);
+  return `${kopf}\n${teile.join(' · ')}`;
+}
+
+/** Karte mit Kopfleiste (Bewerbung grün, Interesse grün, Empfehlung neutral): Kopf gehört zur Karte,
+ *  das Profil steht darin als eigene Einheit. */
+export function mKopfKarte(kopf: string, art: 'gruen' | 'neutral', inhalt: string, unten = 22): string {
+  const rand = art === 'gruen' ? `2px solid ${F.green}` : `1.5px solid ${F.line}`;
+  const kopfStil = art === 'gruen' ? `background:${F.mint};color:${F.greenDeep};` : `background:${F.shell};color:${F.taupeInk};`;
+  return `
+    <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="margin:0 0 ${unten}px;border:${rand};border-radius:20px;background:#ffffff;border-collapse:separate;">
+      <tr><td style="${kopfStil}border-radius:18px 18px 0 0;padding:12px 18px;font-size:15.5px;font-weight:800;line-height:1.3;">${kopf}</td></tr>
+      <tr><td style="padding:16px 16px 18px;">${inhalt}</td></tr>
     </table>`;
 }
 
@@ -216,23 +253,20 @@ export type BewerbungsAngebot = {
   reisekosten: number | null;
 };
 
-/** Karte „Neue Bewerbung" wie AppCard im Portal: grüner Rand, Pflegekraft, Angebot, Knopf
- *  „Angebot prüfen" (öffnet die Bewerbung), optional die vier Punkte + Sterne. */
+/** Karte „Neue Bewerbung" wie AppCard im Portal („V"): Kopfleiste, Profil, darunter Tagessatz,
+ *  Zeitraum, Knopf „Angebot prüfen" (öffnet die Bewerbung), optional die vier Punkte + Sterne. */
 export function mBewerbungsKarte(pk: PflegekraftDaten, angebot: BewerbungsAngebot, url: string,
   punkte: { bewertung: { schnitt: string; anzahl: number } | null } | null): string {
-  const zeileUnten = [
+  const zeile = [
     angebot.zeitraum ? `<span style="white-space:nowrap;">${esc(angebot.zeitraum)}</span>` : '',
     angebot.reisekosten != null ? `<span style="white-space:nowrap;">Reisekosten à ${angebot.reisekosten}&nbsp;€</span>` : '',
   ].filter(Boolean).join(' &middot; ');
-  const kasten = (angebot.tagessatz || zeileUnten) ? `
-    <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="margin:16px 0 18px;background:${F.grau};border-radius:14px;border-collapse:separate;">
-      <tr><td style="padding:14px 16px;">
-        ${angebot.tagessatz ? `<p style="margin:0;font-size:13.5px;color:${F.muted};">Tagessatz</p>
-        <p style="margin:2px 0 ${zeileUnten ? 8 : 0}px;font-size:26px;font-weight:800;color:${F.ink};line-height:1.1;">${angebot.tagessatz}&nbsp;€<span style="font-size:14.5px;font-weight:500;color:${F.muted};">&nbsp;/&nbsp;Tag</span></p>` : ''}
-        ${zeileUnten ? `<p style="margin:0;font-size:14.5px;line-height:1.5;color:${F.text};">${zeileUnten}</p>` : ''}
-      </td></tr>
-    </table>` : mAbstand(16);
-  const kopf = `<p style="margin:0 0 14px;font-size:16px;font-weight:700;color:${F.greenDeep};">&#9993;&nbsp; Neue Bewerbung</p>`;
-  return mKarte(`${kopf}${mPflegekraft(pk, url, { ohneRahmen: true })}${kasten}${mKnopf(url, 'Angebot prüfen', 0, punkte ? 16 : 0)}${punkte ? mPunkte(punkte.bewertung) : ''}`,
-    { rand: F.green, unten: 22, breite: '2px' });
+  const preis = angebot.tagessatz
+    ? `<p style="margin:0;font-size:13.5px;color:${F.muted};">Tagessatz</p><p style="margin:2px 0 0;font-size:26px;font-weight:800;color:${F.ink};line-height:1.1;">${angebot.tagessatz}&nbsp;€<span style="font-size:14.5px;font-weight:500;color:${F.muted};">&nbsp;/&nbsp;Tag</span></p>`
+    : '';
+  const angebotHtml = (preis || zeile)
+    ? `<table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="margin:18px 0 16px;"><tr><td style="padding:0 2px;">${preis}${zeile ? `<p style="margin:${preis ? 6 : 0}px 0 0;font-size:14.5px;line-height:1.5;color:${F.text};">${zeile}</p>` : ''}</td></tr></table>`
+    : mAbstand(16);
+  return mKopfKarte('&#9993;&nbsp; Neue Bewerbung', 'gruen',
+    `${mProfil(pk, url)}${angebotHtml}${mKnopf(url, 'Angebot prüfen', 0, punkte ? 16 : 0)}${punkte ? mPunkte(punkte.bewertung) : ''}`);
 }

@@ -1,10 +1,9 @@
 import type { FC } from 'react';
 import type { Nurse } from '../../types';
 import type { Application } from './shared';
-import { nurseLevel, nurseFacts, displayName, initials } from './shared';
+import { PflegekraftProfil } from './PflegekraftProfil';
 import { MonatsAufstellung } from './MonatsAufstellung';
 import { KOSTENRECHNER_URL } from '../../lib/leadEvents';
-import { DeutschZeile } from './SprachBalken';
 
 export const BookedScreen: FC<{
   app: Application;
@@ -32,9 +31,6 @@ export const BookedScreen: FC<{
   einsatzBeendet?: boolean;
 }> = ({ app, onNurseClick, onSignContract, vertragSigned, leadId, leadToken, onShowContract, einsatzBeendet }) => {
   const { nurse, offer } = app;
-  const name = displayName(nurse.name);
-  const inits = initials(nurse.name);
-  const lvl = nurseLevel(nurse.experienceYears ?? 0, nurse.history?.assignments ?? 0);
 
   const milestones = einsatzBeendet
     ? [
@@ -86,34 +82,8 @@ export const BookedScreen: FC<{
         </p>
       </div>
 
-      <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
-        <div
-          className="flex items-center gap-3.5 px-4 py-4 cursor-pointer hover:bg-gray-50 transition-colors"
-          onClick={() => onNurseClick(nurse)}
-        >
-          <div className="relative flex-shrink-0">
-            {nurse.image ? (
-              <img src={nurse.image} alt={nurse.name} className="w-14 h-14 rounded-xl object-cover" />
-            ) : (
-              <div className="w-14 h-14 rounded-xl flex items-center justify-center text-lg font-bold text-white"
-                style={{ backgroundColor: nurse.color }}>{inits}</div>
-            )}
-          </div>
-          {/* CG-Box im einheitlichen Portal-Stil (wie MatchCard). */}
-          <div className="flex-1 min-w-0">
-            <p className="font-bold" style={{ color: '#18181B' }}>
-              {name}{nurse.age ? <span className="font-normal" style={{ color: '#71717A' }}>, {nurse.age}</span> : null}
-            </p>
-            <p><DeutschZeile nurse={nurse} klein /></p>
-            <p className="text-sm mt-0.5" style={{ color: '#71717A' }}>
-              {lvl.label && <span className="font-semibold" style={{ color: '#18181B' }}>{lvl.label}: </span>}
-              {nurseFacts(nurse)}
-            </p>
-          </div>
-          <span className="text-xs text-gray-500 flex-shrink-0">Profil →</span>
-        </div>
-
-      </div>
+      {/* Ihre Pflegekraft: dasselbe geschlossene Profil wie überall (Martin 27.09.2026, „V"). */}
+      <PflegekraftProfil nurse={nurse} onProfil={() => onNurseClick(nurse)} />
 
       {app.coverMessage && (
         <div className="rounded-2xl bg-[#F5F5F6] border border-[#E9E9EB] px-4 py-3">

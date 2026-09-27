@@ -10,7 +10,6 @@ import {
   kraefteWort,
   fuenfBetreff,
   fotoImg,
-  fotoErsatz,
 } from "../empfehlung.ts";
 
 const JETZT = new Date("2026-09-03T10:00:00Z");
@@ -65,32 +64,32 @@ Deno.test("holeFuenf: kein Token / keine Matches → null (Rückfall auf alten T
       : Promise.resolve(Response.json({ data: { JobOfferMatchingsWithPagination: { data: [] } } })) }), null);
 });
 
-Deno.test("fuenfListeHtml: eine Zeile je Kraft, Foto per CID oder Initialen, keine Ø-Dauer", () => {
+Deno.test("fuenfListeHtml: ein Profil (V) je Kraft, Foto per CID oder Initialen, keine Ø-Dauer", () => {
   const fuenf = [e({ caregiverId: 1, anzeigeName: "Anna K.", vorname: "Anna" }), e({ caregiverId: 2, anzeigeName: "Beata M.", vorname: "Beata", alter: null })];
   const html = fuenfListeHtml(fuenf, ["cid-1", null], ["https://p/1", "https://p/2"], "https://p/alle");
   assertStringIncludes(html, 'src="cid:cid-1"');
-  assertStringIncludes(html, ">B<");                     // Initialen-Kachel für die zweite
+  assertStringIncludes(html, ">BM<");                    // Initialen-Kachel für die zweite
   assertStringIncludes(html, "Anna K.");
   assertStringIncludes(html, "Beata M.");
-  assertStringIncludes(html, "2 Kräfte verfügbar");
+  assertStringIncludes(html, "Für Sie vorbereitet");
   assertStringIncludes(html, 'href="https://p/1"');
+  assertStringIncludes(html, 'href="https://p/2"');
   assertStringIncludes(html, "Alle 2 Profile im Portal ansehen");
+  assertEquals((html.match(/Profil ansehen&nbsp;&rsaquo;/g) ?? []).length, 2, "jedes Profil geschlossen mit eigenem Link");
   assert(!html.includes("Ø"), "keine Durchschnittsdauer");
   assert(!html.includes("https://s3/"), "nie die rohe S3-URL");
 });
-
 Deno.test("fuenfListeHtml/Text: leer bei null Kräften", () => {
   assertEquals(fuenfListeHtml([], [], [], "x"), "");
   assertEquals(fuenfListeText([], [], "x"), "");
 });
 
-Deno.test("fuenfListeText: nummeriert, mit Profil-Link je Kraft", () => {
-  const t = fuenfListeText([e(), e({ caregiverId: 2, anzeigeName: "Beata M." })], ["https://p/1", "https://p/2"], "https://p/alle");
-  assertStringIncludes(t, "1. Anna K., 51 J. · Bewährt · 5 Jahre Erfahrung");
-  assertStringIncludes(t, "2. Beata M.");
+Deno.test("fuenfListeText: nummeriert, dieselben Angaben wie das Profil, mit Profil-Link je Kraft", () => {
+  const t = fuenfListeText([e(), e({ caregiverId: 2, anzeigeName: "Beata M.", einsaetze: 0 })], ["https://p/1", "https://p/2"], "https://p/alle");
+  assertStringIncludes(t, "1. Anna K., 51 · Deutsch mittel\n     Bewährt: 3 Einsätze bei uns · 5 Jahre Berufserfahrung");
+  assertStringIncludes(t, "2. Beata M., 51 · Deutsch mittel\n     Neu bei uns · 5 Jahre Berufserfahrung");
   assertStringIncludes(t, "Profil: https://p/2");
 });
-
 Deno.test("fotoBudget: je Foto und in Summe, obere zuerst", () => {
   // Echte Avatar-Groessen (gemessen 03.09.2026): 45-180 KB als PNG. Alle
   // fuenf muessen passen — die erste Fassung liess nur 120 KB je Bild zu,
@@ -114,23 +113,22 @@ Deno.test("Fakten tragen das echte Mittelpunkt-Zeichen, nie eine HTML-Entitaet",
   const f = kundenFakten({ id: 1, care_experience: "4", hp_total_jobs: 9 } as never);
   assertEquals(f, "4 Jahre Erfahrung · 9 Primundus-Einsätze");
   const html = fuenfListeHtml([e({ fakten: f })], [null], ["https://p/1"], "https://p/alle");
-  assert(!html.includes("&middot;"), "Entität im HTML");
   assert(!html.includes("&amp;"), "doppelt escaped");
-  assertStringIncludes(html, "4 Jahre Erfahrung · 9 Primundus-Einsätze");
   assert(!fuenfListeText([e({ fakten: f })], ["https://p/1"], "x").includes("&middot;"), "Entität im Text");
 });
-
-// Reihenfolge wie die Portal-Karte: Name, darunter Deutsch, dann die Fakten.
-Deno.test("Zeile: Deutsch steht VOR den Fakten, Trennlinie über alle Spalten", () => {
+// Wie das Portal (PflegekraftProfil): Name, darunter Deutsch mit Punkten, dann die Leiste
+// „Stufe / N Einsätze bei uns | N Jahre / Berufserfahrung" — keine eigene Stufen-Pille mehr.
+Deno.test("Profil: Deutsch unter dem Namen, Stufe hängt an den Einsätzen bei uns", () => {
   const html = fuenfListeHtml([e(), e({ caregiverId: 2, anzeigeName: "Beata M." })],
     [null, null], ["https://p/1", "https://p/2"], "https://p/alle");
-  assert(html.indexOf("Deutsch Mittel") < html.indexOf("5 Jahre Erfahrung"), "Deutsch muss über den Fakten stehen");
-  assertStringIncludes(html, 'colspan="3" style="font-size:0;line-height:0;height:1px;background:#EFE9E0;"');
-  // Profil-Hinweis je Zeile, mit der Hover-Klasse des Wrappers.
-  assertEquals((html.match(/class="profil-link"/g) ?? []).length, 4, "je Zeile Name + Hinweis");
-  assertStringIncludes(html, "Profil&nbsp;&rsaquo;");
+  assert(html.indexOf("Deutsch mittel") < html.indexOf("3 Einsätze bei uns"), "Deutsch muss über der Leiste stehen");
+  assert(html.indexOf("Bewährt") < html.indexOf("3 Einsätze bei uns"));
+  assertStringIncludes(html, "Berufserfahrung");
+  assert(!html.includes("über Primundus"), "alte Faktenzeile");
+  assert(!html.includes("border-radius:999px"), "keine Stufen-Pille");
+  // drei Punkte je Kraft (zwei davon gefüllt bei „Mittel")
+  assertEquals((html.match(/width:9px;height:9px/g) ?? []).length, 6);
 });
-
 // Bei nur einer Kraft stand „Eine Pflegekraefte zur Auswahl" und „eine
 // Pflegekraefte haben wir vorbereitet" (aufgefallen 03.09.2026 in der
 // Vorschau). Zahl und Wort gehoeren zusammen.
@@ -142,20 +140,6 @@ Deno.test("Singular: eine Pflegekraft, nicht eine Pflegekraefte", () => {
   assertEquals(fuenfBetreff(5), "Fünf Pflegekräfte zur Auswahl – wer soll es sein?");
 });
 
-// Reihenfolge der Sprachzeile wie im SA-Portal, Verfuegbarkeit daneben
-// (Martin, 03.09.2026): „Deutsch ●●● Gut  ✓ Ab sofort verfuegbar",
-// darunter erst Erfahrung und Einsaetze.
-Deno.test("Sprachzeile: Label vor den Punkten, Wert dahinter, Verfuegbarkeit daneben", () => {
-  const html = fuenfListeHtml([e()], [null], ["https://p/1"], "https://p/alle");
-  const iLabel = html.indexOf(">Deutsch<");
-  const iBalken = html.indexOf("border-radius:3px;background:#8B7355");
-  const iWert = html.indexOf(">Mittel<");
-  const iTermin = html.indexOf(HAKEN_VERFUEGBAR);
-  const iFakten = html.indexOf("5 Jahre Erfahrung");
-  assert(iLabel > -1 && iBalken > iLabel, "Label muss VOR den Punkten stehen");
-  assert(iWert > iBalken, "Wert muss NACH den Punkten stehen");
-  assert(iTermin > iWert && iTermin < iFakten, "Verfuegbarkeit gehoert in die Sprachzeile, vor die Fakten");
-});
 
 // Outlook Desktop kennt kein object-fit: ein Hochformat wuerde dort auf ein
 // Quadrat gequetscht — und die Haelfte der Avatare IST Hochformat (gemessen
@@ -177,12 +161,16 @@ Deno.test("fotoImg: Outlook proportional, alle anderen quadratisch beschnitten",
   assertEquals((h.match(/cid:cid-1/g) ?? []).length, 2, "beide Fassungen zeigen dasselbe Bild");
 });
 
-Deno.test("fotoImg: Liste und Empfehlungs-Karte benutzen dieselbe Funktion", () => {
-  const liste = fuenfListeHtml([e()], ["cid-1"], ["https://p/1"], "https://p/alle");
-  assertStringIncludes(liste, fotoImg("cid-1", "Anna K.", 56, 12));
-  assertStringIncludes(fuenfListeHtml([e()], [null], ["https://p/1"], "x"), fotoErsatz("Anna", 56, 12, 22));
+Deno.test("Liste: Foto Outlook-sicher wie fotoImg — proportional in Outlook, sonst quadratisch", () => {
+  const h = fuenfListeHtml([e()], ["cid-1"], ["https://p/1"], "https://p/alle");
+  const mso = h.slice(h.indexOf("[if mso]"), h.indexOf("<![endif]"));
+  assertStringIncludes(mso, 'src="cid:cid-1"');
+  assert(!mso.includes('height="80"'), "Outlook darf KEINE feste Höhe bekommen");
+  const rest = h.slice(h.indexOf("[if !mso]"));
+  assertStringIncludes(rest, 'height="80"');
+  assertStringIncludes(rest, "object-fit:cover");
+  assertEquals((h.match(/cid:cid-1/g) ?? []).length, 2, "beide Fassungen zeigen dasselbe Bild");
 });
-
 Deno.test("holeFuenfStreng: Ausfall wirft, leere Liste ist [] — ein Timeout ist kein „keine Kräfte“ (Lead Mielke)", async () => {
   const deps = { supabaseUrl: "https://s", key: "k", token: "t", jobOfferId: 1, formularDaten: {} };
   const onboardOk = () => Promise.resolve(Response.json({ session_token: "jwt" }));

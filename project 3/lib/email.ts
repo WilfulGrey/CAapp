@@ -13,7 +13,7 @@ import { MARTA_KARTE_MOBIL_CSS, martaKarteHtml } from './marta-karte';
 // send-scheduled-emails/mailBausteine.ts, Gleichheit prüft mails/mailBausteine.test.ts.
 import {
   MAIL_FARBEN as MF, mAbschnitt, mAbstand, mb, mBewerbungsKarte, mChip, mEyebrow, mKarte, mKlein,
-  mKnopf, mKontakt, mLink, mp, mPflegekraft, mSchritte, mTitel, mTrenner, mVorschau,
+  mKnopf, mKontakt, mKopfKarte, mLink, mp, mProfil, mSchritte, mTitel, mTrenner, mVorschau,
   type PflegekraftDaten,
 } from './mail-bausteine';
 
@@ -1700,10 +1700,10 @@ export function getCaregiverInterestEmailTemplate(
   const url = portalUrl || 'https://primundus.de';
   const weitere = mitParam(portalUrl, 'goto=matches');
   const about = (cg.aboutText ?? '').trim();
-  const karte = mKarte(`
-    <p style="margin:0 0 14px;font-size:16px;font-weight:700;color:${MF.greenDeep};">&#9829;&nbsp; Interessiert sich für Ihre Anfrage</p>
-    ${mPflegekraft(pkDaten(cg), url, { ohneRahmen: true })}
-    ${about ? `${mTrenner(16, 14)}${mEyebrow(`Über ${vorname}`)}${mp(escBasic(about), 0)}` : ''}`, { rand: MF.green, unten: 22, breite: '2px' });
+  // „V" (Martin 27.09.2026): Kopfleiste, darin das geschlossene Profil, darunter „Über …".
+  const karte = mKopfKarte('&#9829;&nbsp; Interessiert sich für Ihre Anfrage', 'gruen', `
+    ${mProfil(pkDaten(cg), url)}
+    ${about ? `${mAbstand(18)}${mEyebrow(`Über ${vorname}`)}${mp(escBasic(about), 0)}` : ''}`);
   const vorschau = `Wenn ${vorname} Ihnen zusagt, laden Sie sie zur Bewerbung ein.`;
   const satz = `Wenn Ihnen ${vorname} zusagt, laden Sie sie zur Bewerbung ein. Dann schickt sie Ihnen ihr Angebot mit Anreisetermin und Preis, und Sie entscheiden. Sie können natürlich auch weitere Pflegekräfte einladen.`;
   const schritte = [
@@ -1885,7 +1885,7 @@ export function getBookingConfirmedEmailTemplate(
     ${mp(`${greeting},`, 14)}
     ${mTitel('Buchung bestätigt', 8, 24)}
     ${mp(`schön, dass Sie sich für ${mb(caregiver.name)} entschieden haben.${vertrag}`, 20)}
-    ${mPflegekraft(pkDaten(caregiver), url)}
+    ${mProfil(pkDaten(caregiver), url, 22)}
     ${mKarte(`${mEyebrow('So geht es weiter', 14)}${mSchritte(schritte)}`)}
     ${mKnopf(url, 'Nächste Schritte ansehen', 0, 14)}
     ${mKlein(fuss, 24, true)}
