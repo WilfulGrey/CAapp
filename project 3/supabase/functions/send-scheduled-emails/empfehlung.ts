@@ -40,6 +40,8 @@
  * Ändert sich dort die Reihenfolge, muss sie hier mit.
  */
 
+import { mAbstand, mKopfKarte, mProfil, mProfilText, type PflegekraftDaten } from "./mailBausteine.ts";
+
 // ─── Formen aus mamamia (nur was wir wirklich lesen) ─────────────────────
 
 export interface MatchCaregiver {
@@ -1116,68 +1118,21 @@ export function keineEmpfehlungText(): string {
 Wir prüfen gerade, welche Betreuungskräfte zu Ihrer Anfrage passen. Sobald Profile verfügbar sind, finden Sie diese in Ihrem Kundenportal – wir melden uns bei Ihnen.`;
 }
 
-// ─── Fünf-Liste (Nudge-Mail, +4 h) ───────────────────────────────────────
-// Eine Zeile je Kraft, nicht fünf große Karten: Foto 56 px, Name + Alter,
-// Stufen-Chip, Faktenzeile, Deutsch-Balken + Termin-Haken. Dieselben
-// Bausteine wie die Empfehlung, damit der Kunde die Kräfte im Portal
-// wiedererkennt. Tabellen + Inline-Styles — Outlook kennt kein Flex.
+// ─── Fünf-Liste (Nudge-Mail) ─────────────────────────────────────────────
+// Seit „V" (27.09.2026) dasselbe Profil wie überall (mailBausteine.ts mProfil).
 
-function fuenfZeileHtml(e: Empfehlung, cid: string | null, profilUrl: string, erste: boolean): string {
-  const name = esc(e.anzeigeName);
-  const foto = cid ? fotoImg(cid, name, 56, 12) : fotoErsatz(e.vorname, 56, 12, 22);
-  const alter = e.alter ? `<span style="font-size:13.5px;font-weight:400;color:#A1A1AA;">&nbsp;&nbsp;${e.alter} J.</span>` : "";
-  /* Gefuellte Pille wie in der grossen Empfehlung — eine Stufe sieht in der
-     ganzen Mail gleich aus (Martin, 08.09.2026). Etwas kleiner, weil sie hier
-     in der Zeile hinter dem Namen sitzt und fuenfmal untereinander steht. */
-  const chip = e.stufe
-    ? `&nbsp;&nbsp;<span style="display:inline-block;font-size:10.5px;font-weight:700;letter-spacing:.03em;color:#ffffff;background:#8B7355;border-radius:999px;padding:3px 10px;white-space:nowrap;vertical-align:middle;">${esc(e.stufe)}</span>`
-    : "";
-  const balken = [1, 2, 3]
-    .map((i) => `<td width="14" style="width:14px;padding-right:3px;"><div style="width:12px;height:6px;border-radius:3px;background:${i <= e.deutschBalken ? "#8B7355" : "#E4E4E7"};font-size:0;line-height:0;">&nbsp;</div></td>`)
-    .join("");
-  /* Deutsch steht DIREKT unter dem Namen — genau wie die Karte im Portal
-     (MatchCard: Name, darunter „Deutsch <Stufe>", dann die Fakten). Der Kunde
-     sieht Sekunden später dieselbe Anordnung im Portal (Martin, 03.09.2026). */
-  /* Reihenfolge wie im SA-Portal: Label, dann die Punkte, dann der
-     ausgeschriebene Wert — „Deutsch ●●● Gut" (Martin, 03.09.2026). Vorher
-     standen die Punkte vorn und „Deutsch Gut" dahinter. */
-  const deutsch = e.deutschWort
-    ? `<table cellpadding="0" cellspacing="0" role="presentation" style="display:inline-table;vertical-align:middle;"><tr><td style="padding-right:6px;font-size:13px;color:#71717A;">Deutsch</td>${balken}<td style="padding-left:6px;font-size:13px;color:#71717A;">${esc(e.deutschWort)}</td></tr></table>`
-    : "";
-  const termin = e.gruende.includes(HAKEN_VERFUEGBAR)
-    ? `<span style="font-size:12.5px;color:#71717A;">&nbsp;&nbsp;<span style="color:#22A06B;font-weight:700;">&#10003;</span>&nbsp;${esc(HAKEN_VERFUEGBAR)}</span>`
-    : "";
-  /* Trennlinie über die VOLLE Breite (Martin, 03.09.2026): sie lag vorher als
-     border-top nur auf der Textspalte und hörte neben dem Foto auf. Jetzt eine
-     eigene Zeile über alle drei Spalten. */
-  const linie = erste
-    ? ""
-    : `
-          <tr><td colspan="3" style="font-size:0;line-height:0;height:1px;background:#EFE9E0;">&nbsp;</td></tr>
-          <tr><td colspan="3" style="font-size:0;line-height:0;height:13px;">&nbsp;</td></tr>`;
-  /* Ein Ziel je Zeile, zwei Wege dorthin: der Name UND der Hinweis rechts.
-     Der Hinweis ist das Gegenstück zum Chevron der Portal-Karte — ein blosses
-     Symbol liest sich in einer Mail nicht als klickbar. Mouseover über
-     a.profil-link im Basis-Style des Wrappers (Apple Mail, iOS, Gmail-Web;
-     Outlook kennt kein :hover, dort bleibt es statisch). */
-  return `${linie}
-          <tr>
-            <td width="56" style="width:56px;vertical-align:top;">${foto}</td>
-            <td width="14" style="width:14px;font-size:0;line-height:0;">&nbsp;</td>
-            <td style="vertical-align:top;">
-              <table width="100%" cellpadding="0" cellspacing="0" role="presentation"><tr>
-                <td style="font-size:15.5px;line-height:1.35;color:#18181B;"><a class="profil-link" href="${profilUrl}" target="_blank" style="color:#18181B;text-decoration:none;font-weight:700;">${name}</a>${alter}${chip}</td>
-                <td align="right" style="text-align:right;vertical-align:top;white-space:nowrap;"><a class="profil-link" href="${profilUrl}" target="_blank" style="color:#8B7355;text-decoration:none;font-size:13px;font-weight:600;">Profil&nbsp;&rsaquo;</a></td>
-              </tr></table>
-              <p style="margin:3px 0 0;line-height:1.5;">${deutsch}${termin}</p>
-              <p style="margin:3px 0 0;font-size:13.5px;line-height:1.5;color:#52525B;">${esc(e.fakten)}</p>
-            </td>
-          </tr>
-          <tr><td colspan="3" style="font-size:0;line-height:0;height:13px;">&nbsp;</td></tr>`;
+/** Empfehlung → Profil-Daten für den gemeinsamen Baustein (mailBausteine.ts mProfil). */
+export function pkDatenAus(e: Empfehlung, cid: string | null): PflegekraftDaten {
+  return {
+    name: e.anzeigeName, alter: e.alter, deutsch: e.deutschWort,
+    jahre: e.erfahrungJahre, einsaetze: e.einsaetze, foto: cid ? `cid:${cid}` : null,
+  };
 }
 
-
 /**
+ * Fünf-Liste als „V" (Martin 27.09.2026): dasselbe geschlossene Profil wie im Portal (MatchCard)
+ * und in allen anderen Mails, untereinander in einer Karte mit Kopfleiste. Vorher eigene Zeilen
+ * mit Stufen-Pille und „Einsätze über Primundus" — die Pille warf Fragen auf.
  * @param cids  je Kraft die CID des eingebetteten Fotos oder null (Initialen).
  *              Nie die rohe S3-URL — die ist nach ~30 Min tot.
  */
@@ -1192,35 +1147,14 @@ export function fuenfListeHtml(
 ): string {
   if (fuenf.length === 0) return "";
   const n = fuenf.length;
-  const zeilen = fuenf.map((e, i) => fuenfZeileHtml(e, cids[i] ?? null, profilUrls[i] ?? alleUrl, i === 0)).join("");
-  return `
-    <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="margin:22px 0 24px;">
-      <tr><td>
-        <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="border:2px solid #8B7355;border-radius:16px;background:#ffffff;">
-          <tr>
-            <td style="padding:12px 18px;background:#FAF8F4;border-bottom:1px solid #EBE2D2;border-radius:15px 15px 0 0;">
-              <table width="100%" cellpadding="0" cellspacing="0" role="presentation"><tr>
-                <td style="font-size:12px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;color:${KORALLE};">${esc(kopf)}</td>
-                <td align="right" style="font-size:12.5px;color:#71717A;text-align:right;">${n} ${n === 1 ? "Kraft" : "Kräfte"} verfügbar</td>
-              </tr></table>
-            </td>
-          </tr>
-          <tr><td style="padding:18px 18px 6px;">
-            <table width="100%" cellpadding="0" cellspacing="0" role="presentation">${zeilen}
-            </table>
-          </td></tr>
-        </table>
-        <p style="margin:12px 0 0;text-align:center;"><a href="${alleUrl}" target="_blank" style="color:#8B7355;text-decoration:underline;font-size:14px;font-weight:600;">Alle ${n === 1 ? "Profile" : n + " Profile"} im Portal ansehen &rarr;</a></p>
-      </td></tr>
-    </table>`;
+  const profile = fuenf.map((e, i) => mProfil(pkDatenAus(e, cids[i] ?? null), profilUrls[i] ?? alleUrl, i < n - 1 ? 12 : 0)).join("");
+  return `${mAbstand(6)}${mKopfKarte(esc(kopf), "neutral", profile, 12)}
+    <p style="margin:0 0 24px;text-align:center;"><a href="${alleUrl}" target="_blank" style="color:#8B7355;text-decoration:underline;font-size:14.5px;font-weight:700;">Alle ${n === 1 ? "Profile" : n + " Profile"} im Portal ansehen &rarr;</a></p>`;
 }
 
 export function fuenfListeText(fuenf: Empfehlung[], profilUrls: string[], alleUrl: string): string {
   if (fuenf.length === 0) return "";
-  const zeilen = fuenf.map((e, i) => {
-    const teile = [e.anzeigeName + (e.alter ? `, ${e.alter} J.` : ""), e.stufe, e.fakten,
-      e.deutschWort ? `Deutsch ${e.deutschWort}` : ""].filter(Boolean).join(" · ");
-    return `  ${i + 1}. ${teile}\n     Profil: ${profilUrls[i] ?? alleUrl}`;
-  }).join("\n");
+  const zeilen = fuenf.map((e, i) =>
+    `  ${i + 1}. ${mProfilText(pkDatenAus(e, null)).replace("\n", "\n     ")}\n     Profil: ${profilUrls[i] ?? alleUrl}`).join("\n");
   return `FÜR SIE VORBEREITET (${fuenf.length})\n${zeilen}\n\nAlle Profile im Portal: ${alleUrl}`;
 }

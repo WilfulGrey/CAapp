@@ -36,6 +36,10 @@ export default {
           amber: { DEFAULT: '#D97706', ink: '#8B5A12', tint: '#FDF1E2' },
           error: { DEFAULT: '#D9534F', ink: '#B03A36' },
           gold: '#D4A843',
+          // Pflegekraft-Profil (Portal + Mails gleich, Martin 27.09.2026 „V"): beige Fläche,
+          // Trennlinien, Stern bei Elite/Stammkraft. Mail: mail-bausteine.ts PROFIL_*.
+          profil: { DEFAULT: '#F6EFE4', linie: '#E4D8C6' },
+          stern: '#D39B2A',
           whatsapp: '#25D366',
         },
       },

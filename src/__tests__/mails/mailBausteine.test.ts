@@ -38,7 +38,8 @@ describe('mail-bausteine', () => {
       ['Karte', (m) => m.mKarte('x', { rand: '#3D7A5C' })],
       ['Knopf', (m) => m.mKnopf('https://a', 'Bewerbungen erhalten')],
       ['Knopf hell', (m) => m.mKnopfHell('https://a', 'Nicht mehr relevant')],
-      ['Pflegekraft', (m) => m.mPflegekraft(PK, 'https://p')],
+      ['Profil', (m) => m.mProfil(PK, 'https://p') + m.mProfil({ name: 'Ewa N.' }, 'https://p', 22)],
+      ['Kopfkarte', (m) => m.mKopfKarte('Unsere Empfehlung', 'neutral', 'x', 12) + m.mKopfKarte('Neue Bewerbung', 'gruen', 'y')],
       ['Bewerbung', (m) => m.mBewerbungsKarte(PK, angebot, 'https://p', { bewertung: null })],
       ['Schritte', (m) => m.mSchritte([{ titel: 'A', zustand: 'fertig' }, { titel: 'B', text: 'b', zustand: 'jetzt' }], true)],
       ['Anrede', (m) => m.anredeZeile('Frau', 'Müller') + m.anredeZeile(null, 'Müller')],
@@ -53,13 +54,32 @@ describe('mail-bausteine', () => {
     expect(next.anredeZeile(null, 'Müller')).toBe('Guten Tag');
   });
 
-  it('Pflegekraft-Box: Stufe wortgleich zum Portal, ehrlicher Ersatz ohne Zahlen', () => {
-    expect(text(next.mPflegekraft(PK, 'https://p'))).toContain('Elite 6 Jahre Erfahrung · 14 Einsätze');
-    const neu = text(next.mPflegekraft({ name: 'Ewa N.' }, 'https://p'));
-    expect(neu).toContain('Neu bei Primundus bereit für den ersten Einsatz');
-    expect(neu).toContain('Ewas Profil ansehen');
-    // Ohne Foto: Initialen statt kaputtem Bild
-    expect(next.mPflegekraft({ name: 'Ewa Nowak' }, 'https://p')).toContain('>EN</div>');
+  it('Profil „V": Stufe hängt an den Einsätzen bei uns, wortgleich zum Portal (PflegekraftProfil)', () => {
+    const t = text(next.mProfil(PK, 'https://p'));
+    expect(t).toContain('Maria K. , 62');
+    expect(t).toContain('Deutsch gut');
+    expect(t).toMatch(/&#9733;\s*Elite 14 Einsätze bei uns/);
+    expect(t).toContain('6 Jahre Berufserfahrung');
+    expect(t).toContain('Profil ansehen');
+    // Deutsch als drei Punkte (wie im Portal), ohne Angabe keine
+    expect(next.mProfil(PK, 'https://p').match(/width:9px;height:9px/g)).toHaveLength(3);
+    expect(next.mProfil({ name: 'Ewa N.' }, 'https://p')).not.toContain('width:9px;height:9px');
+  });
+
+  it('Profil ohne Einsätze und Jahre: „Neu bei uns", keine erfundenen Zahlen, Initialen statt Foto', () => {
+    const h = next.mProfil({ name: 'Ewa Nowak' }, 'https://p');
+    const t = text(h);
+    expect(t).toContain('Neu bei uns erster Einsatz bei uns');
+    expect(t).not.toMatch(/Berufserfahrung|Einsätze|undefined|NaN|null/);
+    expect(h).toContain('>EN<');
+  });
+
+  it('Bewerbungskarte: Kopfleiste „Neue Bewerbung" außerhalb des Profils, Angebot darunter', () => {
+    const t = text(next.mBewerbungsKarte(PK, { tagessatz: 102, zeitraum: '15.10.2026 – 10.12.2026', reisekosten: 125 }, 'https://p', null));
+    expect(t.indexOf('Neue Bewerbung')).toBeLessThan(t.indexOf('Maria K.'));
+    expect(t.indexOf('Profil ansehen')).toBeLessThan(t.indexOf('Tagessatz'));
+    expect(t).toContain('102 € / Tag');
+    expect(t.indexOf('Tagessatz')).toBeLessThan(t.indexOf('Angebot prüfen'));
   });
 
   it('Bewerbungskarte lässt fehlende Konditionen weg statt „undefined"', () => {

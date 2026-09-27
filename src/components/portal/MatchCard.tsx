@@ -1,10 +1,9 @@
 import { useState } from 'react';
 import type { FC } from 'react';
-import { Check, ChevronDown, Heart, Lock, Sparkles, UserPlus, X } from 'lucide-react';
+import { Check, Heart, Lock, Sparkles, UserPlus, X } from 'lucide-react';
 import type { Nurse } from '../../types';
 import type { NurseStatus } from './shared';
-import { nurseFacts, nurseLevel, displayName, initials } from './shared';
-import { DeutschZeile } from './SprachBalken';
+import { PflegekraftProfil } from './PflegekraftProfil';
 
 export const MatchCard: FC<{
   nurse: Nurse;
@@ -46,8 +45,6 @@ export const MatchCard: FC<{
   onStufeClick?: () => void;
 }> = ({ nurse, status, onNurseClick, onInvite, onInviteConfirm, onUndoDecline, hasInterestOrigin, isRecommended, globalInviteLocked, profilFehlt, onStufeClick }) => {
   const [invitePhase, setInvitePhase] = useState<'idle' | 'sending' | 'done'>('idle');
-  const inits = initials(nurse.name);
-  const name = displayName(nurse.name);
 
   const handleInvite = async () => {
     const allowed = onInvite ? onInvite() : true;
@@ -80,14 +77,6 @@ export const MatchCard: FC<{
            isRecommended → Name rutscht vom Badge weg, sonstige Cards
            bleiben kompakt wie vorher. */
     <div className="relative">
-      {/* Empfehlung als Zeile ÜBER der Karte, die Karte selbst mit kräftigerem
-          Rand (Teil 3 des Redesigns) — vorher ein zweiter Rahmen um die Karte. */}
-      {isRecommended && status === 'pending' && (
-        <p className="flex items-center gap-2 mb-2 ml-1 text-[14px] font-bold text-pm-taupe">
-          <Sparkles className="w-4 h-4 flex-shrink-0" />
-          Unsere Empfehlung für Sie
-        </p>
-      )}
       {showInterestOriginBadge && (
         <div className="absolute -top-2.5 left-1/2 -translate-x-1/2 z-10 whitespace-nowrap">
           <span
@@ -115,58 +104,19 @@ export const MatchCard: FC<{
           : 'border border-[#EFEBE4] hover:border-pm-taupe-light'
       }`}
     >
-      <div className="px-4 pt-4 pb-3 active:bg-pm-paper">
-        <div className="flex items-center gap-3.5">
-          <div className="flex-shrink-0">
-            {nurse.image ? (
-              <img src={nurse.image} alt={nurse.name} className="w-16 h-16 rounded-[16px] object-cover" />
-            ) : (
-              <div className="w-16 h-16 rounded-[16px] flex items-center justify-center text-lg font-bold text-white"
-                style={{ backgroundColor: nurse.color }}>
-                {inits}
-              </div>
-            )}
-          </div>
-
-          <div className="flex-1 min-w-0">
-            {/* Umbau 11.08. (Martin: „CG-Kasten sieht immer noch scheisse aus —
-                Farben austauschen bringt nichts"). Es lag an der Struktur:
-                drei Kleinschrift-Zeilen neben einem 56px-Foto, die Faktenzeile
-                mit `truncate` (der Kunde las „Ø 1…" — eine abgeschnittene
-                Zahl), dazu ein Sprachbalken, der genau das wiederholte, was
-                daneben im Klartext stand.
-                Jetzt: größeres Foto, Name als Zeile, darunter EINE Meta-Zeile,
-                darunter die Fakten ausgeschrieben und umbrechend. */}
-            <div className="flex items-center justify-between gap-2">
-              <p className="text-[17px] font-bold leading-snug text-pm-ink">
-                {name}
-                {nurse.age ? <span className="font-normal text-pm-mute">, {nurse.age}</span> : null}
-              </p>
-              {/* Öffnen-Hinweis statt „Details"-Link im Footer (11.08.) */}
-              <ChevronDown className="w-4 h-4 -rotate-90 flex-shrink-0 text-pm-mute group-hover:text-pm-taupe transition-colors" />
-            </div>
-
-            <p className="mt-1"><DeutschZeile nurse={nurse} /></p>
-          </div>
+      {/* Empfehlung als Kopfleiste IN der Karte, wie „Unsere Empfehlung" in der Angebotsmail
+          (Martin 27.09.2026, „V"). */}
+      {isRecommended && status === 'pending' && (
+        <div className="flex items-center gap-2 bg-pm-shell px-5 py-3 text-[15px] font-extrabold text-pm-taupe-ink">
+          <Sparkles className="w-4 h-4 flex-none" aria-hidden="true" />
+          Unsere Empfehlung für Sie
         </div>
-
-        {/* Fakten über die VOLLE Kartenbreite (11.08.), nicht in der schmalen
-            Spalte neben dem Foto — dort brach die Zeile mitten in der Zahl um
-            („· im / Schnitt 12 Wochen"). */}
-        <p className="text-[15px] leading-[1.5] mt-3 text-pm-muted">
-          {(() => { const lvl = nurseLevel(nurse.experienceYears ?? 0, nurse.history?.assignments ?? 0); return lvl.label ? (
-            <span
-              role={onStufeClick ? 'button' : undefined}
-              onClick={onStufeClick ? (e) => { e.stopPropagation(); onStufeClick(); } : undefined}
-              // py/-my: 44-px-Tippfläche, ohne die Zeile höher zu machen.
-              className={`font-bold text-pm-ink ${onStufeClick ? 'inline-block py-3 -my-3 px-1 -mx-1 underline decoration-dotted underline-offset-4 cursor-pointer' : ''}`}
-            >{lvl.label}:</span>
-          ) : null; })()}
-          {' '}{nurseFacts(nurse)}
-        </p>
+      )}
+      <div className="px-3.5 pt-3.5">
+        <PflegekraftProfil nurse={nurse} onProfil={onNurseClick} onStufeClick={onStufeClick} />
       </div>
 
-      <div className="border-t border-pm-line-soft px-4 py-3 flex items-center justify-end gap-3">
+      <div className="px-4 py-3 flex items-center justify-end gap-3">
         {status === 'declined' ? (
           <div className="flex items-center gap-3">
             {onUndoDecline && (

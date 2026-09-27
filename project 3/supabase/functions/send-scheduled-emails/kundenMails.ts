@@ -31,7 +31,9 @@ import {
   mKontakt,
   mLink,
   mp,
-  mPflegekraft,
+  mKopfKarte,
+  mProfil,
+  mProfilText,
   mPunkte,
   mSchritte,
   mTitel,
@@ -110,13 +112,7 @@ export function pkAusEmpfehlung(e: Empfehlung, cid: string | null): PflegekraftD
   };
 }
 
-function pkText(pk: PflegekraftDaten): string {
-  const kopf = [pk.name + (pk.alter ? `, ${pk.alter}` : ""), pk.deutsch ? `Deutsch ${pk.deutsch}` : ""].filter(Boolean).join(" · ");
-  const fakten: string[] = [];
-  if (pk.jahre && pk.jahre > 0) fakten.push(`${pk.jahre} ${pk.jahre === 1 ? "Jahr" : "Jahre"} Erfahrung`);
-  if (pk.einsaetze && pk.einsaetze > 0) fakten.push(`${pk.einsaetze} ${pk.einsaetze === 1 ? "Einsatz" : "Einsätze"}`);
-  return fakten.length ? `${kopf}\n${fakten.join(" · ")}` : kopf;
-}
+const pkText = mProfilText;
 
 // ── 01 Angebot (eingangsbestaetigung) ─────────────────────────────────────
 
@@ -255,10 +251,11 @@ export function angebotMail(k: Kontext, a: AngebotEingabe): KundenMail {
     const pk = pkAusEmpfehlung(emp.e, emp.cid);
     const grund = (t: string) => `<tr><td style="width:24px;padding:0 0 7px;color:${F.green};font-weight:800;font-size:15px;line-height:1.45;vertical-align:top;">&#10003;</td><td style="padding:0 0 7px;font-size:15px;line-height:1.45;color:${F.ink};">${esc(t)}</td></tr>`;
     const gruende = emp.e.gruende.length
-      ? `${mTrenner(16, 14)}<table role="presentation" cellpadding="0" cellspacing="0">${emp.e.gruende.map(grund).join("")}</table>`
+      ? `<p style="margin:16px 0 8px;font-size:15px;font-weight:700;color:${F.ink};">Passt zu Ihrer Anfrage</p><table role="presentation" cellpadding="0" cellspacing="0">${emp.e.gruende.map(grund).join("")}</table>`
       : "";
+    // „V" (Martin 27.09.2026): Kopfleiste „Unsere Empfehlung", darin das geschlossene Profil.
     empfHtml = `${mAbschnitt("Für Sie ausgewählt", `${n} passende ${pflegekraefte(n)}`)}
-    ${mKarte(`${mEyebrow("Unsere Empfehlung", 14)}${mPflegekraft(pk, profil, { ohneRahmen: true })}${gruende}`, { unten: 12 })}
+    ${mKopfKarte("Unsere Empfehlung", "neutral", `${mProfil(pk, profil)}${gruende}`, 12)}
     ${mKlein(mLink(alle, n === 1 ? "Profil im Portal ansehen" : `Alle ${n} Pflegekräfte ansehen`), 12, true)}`;
     empfText = `FÜR SIE AUSGEWÄHLT: ${n} passende ${pflegekraefte(n)}
 Unsere Empfehlung: ${pkText(pk)}
