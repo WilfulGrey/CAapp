@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { pruefeZaehler } from '@/lib/zaehler';
+import { istPruefAnfrage } from '@/lib/pruefbrowser';
 
 // Anonyme Wizard-Zähler (Registry #63): nimmt {ereignis, variante, quelle}
 // entgegen und erhöht per RPC einen Zähler je Tag/Stunde/Ereignis/Variante/
@@ -11,6 +12,9 @@ import { pruefeZaehler } from '@/lib/zaehler';
 export const dynamic = 'force-dynamic';
 
 export async function POST(request: NextRequest) {
+  // Markierte Prüfläufe zählen nicht (Registry #104). Der User-Agent wird nur
+  // geprüft, nicht gespeichert oder geloggt.
+  if (istPruefAnfrage(request.headers.get('user-agent'))) return new NextResponse(null, { status: 204 });
   try {
     const body = await request.json().catch(() => null);
     const z = pruefeZaehler(body);

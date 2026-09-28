@@ -1,4 +1,5 @@
 import { cookieConsent } from './cookie-consent';
+import { istPruefbrowser } from './pruefbrowser';
 
 /*
  * Geschrieben wird ueber die EIGENE Domain, nicht direkt nach Supabase.
@@ -25,6 +26,8 @@ import { cookieConsent } from './cookie-consent';
  * instances detected"), denn dieses Modul braucht gar keinen mehr.
  */
 async function senden(nutzlast: Record<string, unknown>): Promise<any | null> {
+  // Automatische Prüfläufe senden nichts (Registry #104) — zweite Sicherung neben init().
+  if (istPruefbrowser()) return null;
   try {
     const res = await fetch('/api/analytics/collect', {
       method: 'POST',
@@ -176,6 +179,11 @@ class Analytics {
 
     this.sessionId = this.getOrCreateSessionId();
     this.rememberAdParams();
+
+    /* Automatische Prüfläufe (Playwright & Co., navigator.webdriver) zählen nicht
+       (Registry #104): keine Sitzung, keine Ereignisse, kein Seitenzeit-Beacon.
+       Die Herkunft für die Lead-Quelle ist oben schon gemerkt (nur sessionStorage). */
+    if (istPruefbrowser()) return;
 
     /* Der Fingerprint stand bis 23.08. VOR dem ersten Datenbank-Aufruf —
        ohne try/catch und mit `await`. Ein Beiwerk konnte damit die gesamte
