@@ -355,7 +355,8 @@ describe('Portal integration: golden paths', () => {
     // Der Ladebildschirm davor sagt „Gleich sehen Sie Ihr persönliches Angebot" — der zählt nicht.
     const kopfAngebot = (t: string) => t.includes('Ihr persönliches Angebot') && !t.includes('Gleich sehen Sie');
     expect(titel.some(kopfAngebot)).toBe(false);
-    expect(titel.some((t) => t.includes('Passt Ihnen das Angebot?'))).toBe(false);
+    // Auch der Kasten für Neukunden darf nicht kurz aufblitzen (Registry #102: `!schonAbgesendet`).
+    expect(titel.some((t) => t.includes('Noch 2 Minuten bis zu Ihren Bewerbungen'))).toBe(false);
     // Wunschstart aus dem gespeicherten Formular, nicht aus mamamia `arrival_at`.
     expect(screen.getByText(/Wunschstart 15\.11\./)).toBeInTheDocument();
   }, 15_000);
@@ -423,6 +424,25 @@ describe('Portal integration: golden paths', () => {
     render(<CustomerPortalPage />);
     await waitFor(() => expect(gescrollt()).toContain('stand'), { timeout: 5000 });
     expect(screen.queryByText(/Schritt 1 von 4/)).toBeNull();
+  }, 15_000);
+
+  // ─── Einstieg wie am 25.09. mittags (Registry #102, Martin 28.09.: „alle 3 machen und dabei 1a“) ────────
+
+  it('Neukunde: Kasten „Noch 2 Minuten“ mit „aus Ihrer Anfrage“ führt ins Formular, keine Frage „Passt Ihnen das Angebot?“', async () => {
+    (Element.prototype.scrollIntoView as unknown as { mockClear: () => void }).mockClear();
+    server.use(...defaultHandlers({ proxy: { listApplications: () => ({ JobOfferApplicationsWithPagination: { total: 0, data: [] } }) } }));
+    setLocation(`?token=${TEST_LEAD_TOKEN}`);
+    render(<CustomerPortalPage />);
+    const titel = await screen.findByText('Noch 2 Minuten bis zu Ihren Bewerbungen', {}, { timeout: 5000 });
+    const kasten = titel.parentElement as HTMLElement;
+    expect(within(kasten).getByText('Pflegesituation unvollständig')).toBeInTheDocument();
+    expect(within(kasten).getByText('Vieles ist schon aus Ihrer Anfrage übernommen.')).toBeInTheDocument();
+    expect(within(kasten).queryByText(/Kostenrechner/)).toBeNull();
+    expect(screen.queryByText('Passt Ihnen das Angebot?')).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Vielleicht später' })).toBeNull();
+    await userEvent.click(within(kasten).getByRole('button', { name: 'Pflegesituation vervollständigen' }));
+    await waitFor(() => expect(gescrollt()).toContain('patientendaten'));
+    expect(screen.getByText(/Schritt 1 von 4/)).toBeInTheDocument();
   }, 15_000);
 
   // ─── Nach dem Absenden ohne sichtbare Pflegekraft (Martin 25.09.) ────────

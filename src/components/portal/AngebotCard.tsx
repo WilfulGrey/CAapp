@@ -82,7 +82,9 @@ export const AngebotCard: FC<{
   gewaehlterStart?: string | null;
   /** Schon abgesendet (laut mamamia oder in dieser Sitzung): nur noch „Änderungen speichern". */
   schonAbgesendet?: boolean;
-}> = ({ lead, mmCustomer, onPatientSaved, triggerOpenPatient, onTriggerHandled, mamamiaEnabled, onSaveToMamamia, onAbgesendet, gewaehlterStart, schonAbgesendet }) => {
+  /** Formular im Bild ja/nein — die schwebende Rückmeldung blendet sich dann aus (zurück seit Registry #102). */
+  onImBlick?: (imBlick: boolean) => void;
+}> = ({ lead, mmCustomer, onPatientSaved, triggerOpenPatient, onTriggerHandled, mamamiaEnabled, onSaveToMamamia, onAbgesendet, gewaehlterStart, schonAbgesendet, onImBlick }) => {
   // Offen, sobald die Karte gerendert wird: Seit dem Wegfall des
   // Zwischenkopfs (11.08.) steuert allein der Abschnittskopf in
   // CustomerPortalPage, ob dieser Block überhaupt erscheint.
@@ -574,10 +576,17 @@ export const AngebotCard: FC<{
   // Desktop: the phone-frame div (#portal-scroll-container) is the scroller.
   // Mobile: that div has no overflow, so `window` is the actual scroller.
   // Scroll both — each is a harmless no-op where it doesn't apply.
-  // Used for the final save: jump to the very top of the page.
+  // Used for the final save: jump to the very top of the page („Ihre Suche läuft“).
+  // Erst NACH dem Umbau der Seite und ohne Animation (Registry #102, Martin 28.09.: „wenn ich das speichere, dann
+  // lande ich unten und nicht oben“): Nach dem Absenden klappt das Formular zu und die Seite wird kürzer als die
+  // Stelle, an der der Kunde steht. Safari/WebKit brach das weiche Scrollen dann ab und blieb am neuen Seitenende
+  // (gemessen: 3.180 von 3.180 px; Chrome kam oben an). setTimeout statt rAF wie bei `zumErstenFehler`: nach einem
+  // await sind wir in keinem diskreten Event, rAF kann dem Commit zuvorkommen.
   const scrollPortalToTop = () => {
-    document.getElementById('portal-scroll-container')?.scrollTo({ top: 0, behavior: 'smooth' });
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+    setTimeout(() => {
+      document.getElementById('portal-scroll-container')?.scrollTo({ top: 0 });
+      window.scrollTo({ top: 0 });
+    }, 60);
   };
 
   // Step changes (open form / Weiter / Zurück) scroll to the top of the
@@ -600,6 +609,16 @@ export const AngebotCard: FC<{
         ?.scrollIntoView({ behavior: 'smooth', block: 'center' });
     }, 60);
   };
+
+  // Sichtbarkeit melden (s. Prop `onImBlick`, zurück seit Registry #102).
+  useEffect(() => {
+    const el = patientFormRef.current;
+    if (!el || !onImBlick || typeof IntersectionObserver === 'undefined') return;
+    const io = new IntersectionObserver(entries => onImBlick(entries.some(e => e.isIntersecting)));
+    io.observe(el);
+    return () => { io.disconnect(); onImBlick(false); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [patientOpen]);
 
   const zurueck = () => { setFehlerZeigen(false); setStep(s => s - 1); scrollToFormTop(); };
 
