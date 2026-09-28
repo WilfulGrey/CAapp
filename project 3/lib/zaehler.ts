@@ -14,6 +14,8 @@
  * oder ein React-Rerender nicht als zweiter Besucher zählt.
  */
 
+import { istPruefbrowser } from './pruefbrowser';
+
 export const ZAEHLER_EREIGNISSE = [
   'schritt_1', 'schritt_2', 'schritt_3', 'schritt_4', 'schritt_5', 'schritt_6', 'schritt_7', 'schritt_8', 'schritt_9',
   'cta_geklickt', 'abgeschickt',
@@ -84,6 +86,7 @@ const gezaehlt = new Set<string>();
 
 /** Schickt einen Zähl-Beacon; überlebt Navigation (sendBeacon / keepalive). Einmal je Ereignis und Seitenaufruf. */
 export function zaehle(ereignis: ZaehlerEreignis, variante: ZaehlerVariante, sender: { sendBeacon?: (url: string, data: Blob) => boolean; fetch?: typeof fetch } = typeof navigator !== 'undefined' ? { sendBeacon: navigator.sendBeacon?.bind(navigator), fetch: typeof fetch === 'function' ? fetch.bind(globalThis) : undefined } : {}, quelle: ZaehlerQuelle = quelleImBrowser()): boolean {
+  if (istPruefbrowser()) return false; // automatische Prüfläufe zählen nicht (Registry #104)
   const key = `${ereignis}|${variante}`;
   if (gezaehlt.has(key)) return false;
   gezaehlt.add(key);
