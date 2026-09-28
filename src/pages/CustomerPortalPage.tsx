@@ -52,7 +52,8 @@ import { AngebotCard } from '../components/portal/AngebotCard';
 import { AppCard } from '../components/portal/AppCard';
 import { AppCardDone } from '../components/portal/AppCardDone';
 import { BeratungCTA } from '../components/portal/BeratungCTA';
-import { AngebotFrage } from '../components/portal/AngebotFrage';
+// Einstieg wie am 25.09. mittags (Registry #102): Kasten „Noch 2 Minuten“ + schwebende Rückmeldung statt `AngebotFrage`.
+import { AngebotsFeedback } from '../components/portal/AngebotsFeedback';
 import { SucheStand } from '../components/portal/SucheStand';
 import { HERO_PUNKTE } from '../lib/heroPunkte';
 import { kalenderTag } from '../components/portal/DateField';
@@ -77,6 +78,7 @@ import { BestpreisSheet, WarumSheet } from '../components/portal/PortalSheets';
 import { SoGehtEsWeiter } from '../components/portal/SoGehtEsWeiter';
 import { FaqListe } from '../components/portal/FaqListe';
 import { MartaBox } from '../components/portal/MartaBox';
+import { Button } from '../components/ui/Button';
 import { Card } from '../components/ui/Card';
 import { SectionHeader, EYEBROW, H2 } from '../components/ui/SectionHeader';
 import { StatusBadge } from '../components/ui/StatusBadge';
@@ -612,10 +614,42 @@ const CustomerPortalPage: FC = () => {
     if (IS_PREVIEW_ANY) return;
     try { if (feedbackKey) localStorage.setItem(feedbackKey, String(Date.now())); } catch { /* s.o. */ }
   };
+
+  // ── Schwebende Rückmeldung „Was sagen Sie zum Angebot?“ (zurück seit Registry #102, Stand 25.09. mittags) ──
+  // Sie erscheint erst, wenn der Kunde am Angebot und an den Pflegekräften vorbei ist (`feedbackReif`: der
+  // Abschnitt #patientendaten kommt ins Bild) UND mindestens 45 s auf der Seite war (`feedbackVerweilt`) —
+  // Scrollen allein beweist nicht, dass jemand gelesen hat (Martin, 12.08.). In der Vorschau sofort „reif“,
+  // die Vorschau-Umgebung meldet weder Scroll- noch Intersection-Ereignisse (12.08. geprüft).
+  const VERWEILDAUER_MS = 45_000;
+  const [feedbackVerweilt, setFeedbackVerweilt] = useState(IS_PREVIEW_ANY);
+  useEffect(() => {
+    if (feedbackVerweilt) return;
+    const t = setTimeout(() => setFeedbackVerweilt(true), VERWEILDAUER_MS);
+    return () => clearTimeout(t);
+  }, [feedbackVerweilt]);
+
+  const [feedbackReif, setFeedbackReif] = useState(IS_PREVIEW_ANY);
+  useEffect(() => {
+    if (feedbackReif) return;
+    const el = document.getElementById('patientendaten');
+    if (!el || typeof IntersectionObserver === 'undefined') return;
+    const io = new IntersectionObserver(
+      entries => { if (entries.some(e => e.isIntersecting)) setFeedbackReif(true); },
+      { rootMargin: '0px 0px -20% 0px' },
+    );
+    io.observe(el);
+    return () => io.disconnect();
+    // `patientSaved` in den Abhängigkeiten, weil der beobachtete Abschnitt erst existiert, wenn er gerendert ist.
+  }, [feedbackReif, patientSaved]);
+
   // Sektion „Pflegesituation" klappt wie „Ihr persönliches Angebot" ueber die
   // Kopfzeile (Martin, 2026-07-12): offen solange nicht gespeichert,
   // danach eingeklappt mit Status-Pill; manueller Toggle gewinnt.
   const [patientExpandedManual, setPatientExpandedManual] = useState<boolean | null>(null);
+
+  // Formular im Blick → Rückmeldung ausblenden: Sie säße unten rechts genau über der mitlaufenden Knopfleiste des
+  // Formulars. AngebotCard meldet das selbst (onImBlick), weil sie neu gemountet werden kann.
+  const [formularImBlick, setFormularImBlick] = useState(false);
 
   // Pop-ups der Angebotsseite (Portal-Redesign Teil 3).
   const [bestpreisOffen, setBestpreisOffen] = useState(false);
@@ -3068,35 +3102,11 @@ const CustomerPortalPage: FC = () => {
       {/* ── SECTION: Ihr Angebot (collapsible) ── */}
       {!patientSaved && angebotSection}
 
-      {/* ── „Passt Ihnen das Angebot?" direkt unter den Kosten (Martin 25.09.):
-           Verbindlich wird es VOR dem Formular — mit „Ja" fragt der Kunde
-           Bewerbungen an. Ersetzt die schwebende Blase und „Noch 2 Minuten". */}
-      {/* Erst zeigen, wenn mamamia den Stand kennt: Sonst sähen Kunden, die schon
-          abgeschickt haben, auf einem neuen Gerät kurz wieder die Frage (Review 25.09.). */}
-      {!patientSaved && !hasPending && (IS_PREVIEW_ANY || !!mmCustomer) && (
-        <div className="max-w-3xl mx-auto px-3.5 pt-4">
-          <AngebotFrage
-            beantwortet={feedbackWeg}
-            onAnfragen={zurPflegesituation}
-            onErledigt={feedbackErledigt}
-            onBestpreis={() => setBestpreisOffen(true)}
-            onAnswer={(answer, detail, endgueltig) => {
-              // Erster Tap STILL (notify:false), Team-Mail genau einmal beim
-              // endgültigen Aufruf (Martin, 12.08.: „eine, nicht zwei").
-              reportLeadEvent(
-                lead?.token,
-                'angebots_feedback',
-                {
-                  feedback_answer: answer,
-                  feedback_detail: detail,
-                  ...(endgueltig ? { feedback_final: '1' } : {}),
-                },
-                endgueltig ? undefined : false,
-              );
-            }}
-          />
-        </div>
-      )}
+      {/* Die Frage „Passt Ihnen das Angebot?“ (#748/#751, 25./26.09.) stand hier. Seit Registry #102 wieder raus
+          (Martin 28.09.: „alle 3 machen und dabei 1a“): Danach speicherte kein Neukunde mehr die Pflegesituation
+          (0 von 6, vorher 30 %; 80 % der Patientendaten entstehen beim ersten Besuch). Der Weg zum Formular ist
+          wieder der Kasten „Noch 2 Minuten“ über den Pflegekräften, die Rückmeldung wieder die schwebende Frage.
+          Die Komponente `AngebotFrage` bleibt für einen späteren, gemessenen Versuch liegen. */}
 
 
       <div className="max-w-3xl mx-auto px-3.5 pt-1 pb-6 space-y-4">
@@ -3356,7 +3366,28 @@ const CustomerPortalPage: FC = () => {
                 {/* Der eine Schritt, markant und positiv (Martin, 08.09.): steht
                     nur hier über den Pflegekräften, nicht mehr zusätzlich unter
                     den Kosten. Kein „Kostenrechner", kein „erst danach" —
-                    Erwartung statt Schranke. */}
+                    Erwartung statt Schranke. Seit Registry #102 wieder da (Stand
+                    25.09. mittags), mit „aus Ihrer Anfrage“ statt „aus Ihrem
+                    Kostenrechner“ (Martin 26.09.: Kunden kennen „Kostenrechner“
+                    nicht). Nie für Kunden, die schon abgeschickt haben — auch nicht
+                    kurz, bis mamamia antwortet (`schonAbgesendet`, Review 25.09.). */}
+                {!patientSaved && !schonAbgesendet && (
+                <Card ton="hinweis" className="p-5 mb-5">
+                  {/* Status im selben Wortlaut wie beim Formular (Martin 24.09.:
+                      „Pflegesituation unvollständig"), Bernstein wie dort. */}
+                  <p className="flex items-center gap-2 text-[13px] font-bold text-pm-amber-ink">
+                    <span className="w-2 h-2 rounded-full bg-pm-amber" aria-hidden="true" />
+                    Pflegesituation unvollständig
+                  </p>
+                  <p className="mt-2 text-[17.5px] font-extrabold leading-[1.25] text-pm-ink">Noch 2 Minuten bis zu Ihren Bewerbungen</p>
+                  <p className="mt-2 mb-4 text-[14.5px] leading-[1.5] text-pm-muted">Vieles ist schon aus Ihrer Anfrage übernommen.</p>
+                  {/* Einziger Hauptknopf der Pflegekräfte (Koralle); einzeilig bei
+                      360 px — deshalb schmale Innenabstände. */}
+                  <Button breit onClick={zurPflegesituation} className="px-2 whitespace-nowrap">
+                    Pflegesituation vervollständigen
+                  </Button>
+                </Card>
+                )}
                 {/* Kein grauer Kasten mehr um die Karten (Teil 3): jede Karte
                     bekommt so ~26 px mehr Breite. */}
                 <div>
@@ -3651,6 +3682,7 @@ const CustomerPortalPage: FC = () => {
           }}
           triggerOpenPatient={triggerOpenPatient}
           onTriggerHandled={() => setTriggerOpenPatient(false)}
+          onImBlick={setFormularImBlick}
           schonAbgesendet={schonAbgesendet}
           onAbgesendet={(nurAenderung) => {
             setAbgesendetInSitzung(true);
@@ -3989,6 +4021,34 @@ const CustomerPortalPage: FC = () => {
       {/* Pop-ups der Angebotsseite (Teil 3 des Redesigns). */}
       <BestpreisSheet offen={bestpreisOffen} onClose={() => setBestpreisOffen(false)} />
       <WarumSheet offen={warumOffen} onClose={() => setWarumOffen(false)} onVervollstaendigen={zurPflegesituation} />
+
+      {/* ── Rückmeldung zum Angebot (schwebend, unten rechts), zurück seit Registry #102 ────────────
+           Als Kasten im Fluss saß sie ~3000 px weit unten und wurde kaum gesehen (Martin, 12.08.).
+           Schwebend mit Martas Gesicht: erst zusammengeklappt als ein Satz, wegklickbar, und sie taucht erst
+           auf, wenn der Kunde am Angebot und an den Pflegekräften vorbei ist (`feedbackReif`) und 45 s da war.
+           Nur solange das Profil offen ist (nie nach dem Absenden, auch nicht kurz: `schonAbgesendet`), nicht
+           bei offenen Bewerbungen, nicht über dem Formular. Chat und Modale liegen auf z-[60]+. */}
+      {!hasPending && !patientSaved && !schonAbgesendet && !feedbackWeg && feedbackReif && feedbackVerweilt && !formularImBlick && !chatNurse && !selectedApp && !selectedNurse && (
+        <AngebotsFeedback
+          onDismiss={feedbackErledigt}
+          onGoToForm={zurPflegesituation}
+          onAnswer={(answer, detail, endgueltig) => {
+            // Der erste Tap geht STILL raus (notify:false) — er sichert die Antwort, falls der Kunde jetzt
+            // abbricht, löst aber keine Mail aus. Die Team-Mail hängt am endgültigen Aufruf, der genau einmal
+            // kommt (Martin, 12.08.: „ich will immer eine Antwort erhalten“ — eine, nicht zwei).
+            reportLeadEvent(
+              lead?.token,
+              'angebots_feedback',
+              {
+                feedback_answer: answer,
+                feedback_detail: detail,
+                ...(endgueltig ? { feedback_final: '1' } : {}),
+              },
+              endgueltig ? undefined : false,
+            );
+          }}
+        />
+      )}
 
       {/* Angebot prüfen Modal */}
       {selectedApp && (

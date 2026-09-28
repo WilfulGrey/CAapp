@@ -222,6 +222,21 @@ describe('AngebotCard – Schritte und Speichern', () => {
     await waitFor(() => expect(JSON.parse(localStorage.getItem(`patient_${TOKEN}`)!)._isDraft).toBe(false));
   });
 
+  it('springt nach dem Absenden ohne Animation nach oben (Safari blieb sonst unten stehen, Registry #102)', async () => {
+    entwurf(VOLL);
+    const onSave = vi.fn(async () => {});
+    const scrollTo = vi.mocked(window.scrollTo);
+    scrollTo.mockClear();
+    render(<AngebotCard lead={lead} mamamiaEnabled onSaveToMamamia={onSave} />);
+    for (let i = 0; i < 3; i++) await weiter();
+    await userEvent.click(screen.getByRole('button', { name: 'Bewerbungen erhalten' }));
+    await waitFor(() => expect(onSave).toHaveBeenCalledTimes(1));
+    // Martin 28.09.: „wenn ich das speichere, dann lande ich unten“ — weiches Scrollen brach in WebKit ab,
+    // sobald das Formular zuklappte. Jetzt nach dem Umbau (Timer) und ohne `behavior: 'smooth'`.
+    await waitFor(() => expect(scrollTo).toHaveBeenCalledWith({ top: 0 }));
+    expect(scrollTo.mock.calls.some(([arg]) => (arg as ScrollToOptions | undefined)?.behavior === 'smooth')).toBe(false);
+  });
+
   it('zeigt den Hinweis zum lokalen Speichern', () => {
     render(<AngebotCard lead={lead} />);
     expect(screen.getByText('Ihre Eingaben bleiben auf diesem Gerät gespeichert.')).toBeInTheDocument();

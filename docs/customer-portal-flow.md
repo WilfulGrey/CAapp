@@ -571,7 +571,7 @@ Content-Type: application/json
 
 - Błędy pokazują się dopiero po „Weiter →“/„Speichern“ — przy polu (`FormField`, `data-invalid`) i skrótem nad przyciskiem („Geschlecht fehlt“), który przewija do pola. Znikają na żywo po uzupełnieniu.
 - Ostatni przycisk („Bewerbungen anfragen“, po wcześniejszym zapisie „Änderungen speichern“, Registry #90) jest zawsze aktywny: przy brakach skacze do pierwszego niepełnego kroku, inaczej `onSaveToMamamia` → `updateCustomer` → `patient_data_saved` (w `CustomerPortalPage`).
-- Przed formularzem: `AngebotFrage` („Passt Ihnen das Angebot?“, event `angebots_feedback`). Po wysłaniu: `SucheStand`. Przy otwartej aplikacji: odliczanie 72 h (`src/lib/reservierung.ts`, ta sama reguła co auto-reject w `detect-caregiver-events`).
+- Przed formularzem (od Registry #102 znowu jak 25.09.): karta „Noch 2 Minuten bis zu Ihren Bewerbungen“ nad opiekunkami z przyciskiem „Pflegesituation vervollständigen“ (`zurPflegesituation`) oraz pływające `AngebotsFeedback` („Was sagen Sie zum Angebot?“, event `angebots_feedback`, po 45 s i gdy #patientendaten w widoku, nie nad formularzem). `AngebotFrage` nie jest renderowane. Po wysłaniu: `SucheStand`. Przy otwartej aplikacji: odliczanie 72 h (`src/lib/reservierung.ts`, ta sama reguła co auto-reject w `detect-caregiver-events`).
 - Chipy zapisują niezmienione wartości (`Pflegegrad 3`, `71-80 kg`); krótsze etykiety tylko w widoku (`ChipSelect labels`).
 - Szkic w `localStorage` pod `patient_<token>` (`_isDraft`), event `patient_form_step` raz na krok i sesję.
 
