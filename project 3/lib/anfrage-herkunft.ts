@@ -18,6 +18,22 @@ export function anfrageArt(ergebnis: { isNew: boolean; isUpgrade: boolean }): An
   return 'duplikat';
 }
 
+/* Sitzung und Gerät (Registry #106): Die Sitzungs-ID ist die zufällige Kennung,
+   die lib/analytics.ts je Tab anlegt (`sess_<Zeit>_<Zufall>`) — über sie findet
+   man die Zeile in `analytics_sessions` (Einstiegsseite, Verweis, Gerät) und,
+   bei Einwilligung, die Schritte. Das Gerät ist dieselbe Klasse wie dort. Beides
+   kommt vom Browser; alles, was nicht genau dieser Form entspricht, wird null. */
+const SITZUNG_RE = /^sess_\d{10,14}_[a-z0-9]{1,20}$/;
+const GERAETE = ['mobile', 'tablet', 'desktop'] as const;
+
+export function sitzungPruefen(wert: unknown): string | null {
+  return typeof wert === 'string' && SITZUNG_RE.test(wert) ? wert : null;
+}
+
+export function geraetPruefen(wert: unknown): (typeof GERAETE)[number] | null {
+  return GERAETE.find((g) => g === wert) ?? null;
+}
+
 export function anfrageHerkunft(eingabe: {
   isNew: boolean;
   isUpgrade: boolean;
@@ -25,6 +41,15 @@ export function anfrageHerkunft(eingabe: {
   quelle: string;
   /** schon geprüft, sonst null */
   websitePfad: string | null;
-}): { art: AnfrageArt; quelle: string; website_pfad: string | null } {
-  return { art: anfrageArt(eingabe), quelle: eingabe.quelle, website_pfad: eingabe.websitePfad };
+  /** roh vom Browser, wird hier geprüft */
+  sessionId?: unknown;
+  geraet?: unknown;
+}): { art: AnfrageArt; quelle: string; website_pfad: string | null; session_id: string | null; geraet: string | null } {
+  return {
+    art: anfrageArt(eingabe),
+    quelle: eingabe.quelle,
+    website_pfad: eingabe.websitePfad,
+    session_id: sitzungPruefen(eingabe.sessionId),
+    geraet: geraetPruefen(eingabe.geraet),
+  };
 }

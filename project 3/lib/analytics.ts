@@ -491,6 +491,12 @@ class Analytics {
     return this.sessionId;
   }
 
+  /** Geräteklasse wie in `analytics_sessions.device_type` (mobile | tablet | desktop) —
+   *  für die Herkunft einer Anfrage (Registry #106). Nur die Klasse, nie der User-Agent. */
+  getGeraeteTyp(): string {
+    return this.getDeviceType();
+  }
+
   getSessionDbId(): string | null {
     return this.sessionDbId;
   }
