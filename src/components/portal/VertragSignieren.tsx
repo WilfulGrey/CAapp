@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import type { FC, ReactNode } from 'react';
 
 // ─── Prototyp: Online-signierbarer Dienstleistungsvertrag (Stufe A) ──────────
@@ -320,8 +320,9 @@ export const VertragSignieren: FC<{
   // embedded = ohne eigenen Seiten-Rahmen (z.B. in einem Modal-Schritt);
   // die Unterschrift schließt dann direkt ab (kein Zwischen-„Weiter").
   embedded?: boolean;
-  // signDisabled = Unterschrift-Button sperren (z.B. solange übergeordnete
-  // Pflichtfelder im Modal noch nicht vollständig sind).
+  // signDisabled = übergeordnete Pflichtfelder (Modal) sind noch nicht
+  // vollständig. Der Knopf bleibt trotzdem antippbar und sagt, was fehlt
+  // (Martin 29.09.2026: ein stumm grauer Knopf ließ Kunden anrufen).
   signDisabled?: boolean;
   // Bereits unterschriebener Vertrag — read-only Präsentation im gebuchten
   // Portal. initialSignedName setzt die Unterschrift, readOnly blendet das
@@ -341,7 +342,43 @@ export const VertragSignieren: FC<{
   // der Kunde den unterschriebenen Vertrag komplett einsehen kann.
   const [vollOffen, setVollOffen] = useState(!!readOnly);
 
-  const canSign = name.trim().length >= 3 && bestaetigt && widerruf;
+  // Was fehlt noch zur Unterschrift? Knopf bleibt aktiv; ein Tipp mit offenen
+  // Punkten nennt sie über dem Knopf, markiert sie und springt zum ersten.
+  const [versucht, setVersucht] = useState(false);
+  const nameRef = useRef<HTMLInputElement>(null);
+  const bestaetigtRef = useRef<HTMLInputElement>(null);
+  const widerrufRef = useRef<HTMLInputElement>(null);
+  const nameFehlt = name.trim().length < 3;
+  const fehlt = [
+    ...(nameFehlt ? [nameRef] : []),
+    ...(!bestaetigt ? [bestaetigtRef] : []),
+    ...(!widerruf ? [widerrufRef] : []),
+  ];
+  const canSign = fehlt.length === 0;
+  // Ein Satz statt Liste: die offenen Stellen sind darüber rot markiert.
+  const offeneHaekchen = (bestaetigt ? 0 : 1) + (widerruf ? 0 : 1);
+  const haekchenText = offeneHaekchen === 2 ? 'beide Häkchen setzen' : 'das fehlende Häkchen setzen';
+  const fehltSatz = nameFehlt
+    ? (offeneHaekchen ? `Bitte Ihren Namen eintippen und ${haekchenText}.` : 'Bitte Ihren Namen eintippen.')
+    : `Bitte ${haekchenText}.`;
+  // Nur den Scrollbereich des Dialogs bewegen (data-scrollbox), nie das Fenster
+  // (scrollIntoView scrollt in Safari das Fenster mit, Memory 24.09.).
+  const zeige = (el: HTMLElement | null) => {
+    if (!el) return;
+    const box = el.closest('[data-scrollbox]') as HTMLElement | null;
+    const ziel = (el.closest('[data-feld]') as HTMLElement | null) ?? el;
+    if (box) {
+      box.scrollTop = Math.max(0, ziel.getBoundingClientRect().top - box.getBoundingClientRect().top + box.scrollTop - 24);
+      el.focus({ preventScroll: true });
+    } else {
+      el.focus();
+    }
+  };
+  const klickUnterschreiben = () => {
+    if (signDisabled) { setVersucht(true); return; }
+    if (!canSign) { setVersucht(true); zeige(fehlt[0].current); return; }
+    sign();
+  };
   const sign = () => {
     const now = new Date();
     const dd = String(now.getDate()).padStart(2, '0');
@@ -549,30 +586,53 @@ export const VertragSignieren: FC<{
               <p className="text-sm font-bold text-gray-800 mb-1">Jetzt online unterschreiben</p>
               <p className="text-[12px] text-gray-500 mb-4">Tippen Sie Ihren vollständigen Namen — das gilt als Ihre rechtsverbindliche elektronische Unterschrift.</p>
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-3">
-                <div className="sm:col-span-2">
-                  <label className="block text-[12px] font-semibold text-gray-700 mb-1">Vollständiger Name (Unterschrift)</label>
-                  <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Vor- und Nachname"
-                    className="w-full border border-gray-200 rounded-xl px-3.5 py-3 text-sm focus:outline-none focus:border-[#8B7355] focus:ring-2 focus:ring-[#8B7355]/10" />
+                <div className="sm:col-span-2" data-feld="unterschrift-name">
+                  <label htmlFor="vs-name" className="block text-[13px] font-semibold text-gray-700 mb-1">Vollständiger Name (Unterschrift)</label>
+                  <input id="vs-name" ref={nameRef} value={name} onChange={(e) => setName(e.target.value)} placeholder="Vor- und Nachname"
+                    autoComplete="name" autoCapitalize="words" autoCorrect="off" spellCheck={false}
+                    aria-invalid={(versucht && nameFehlt) || undefined}
+                    aria-describedby={versucht && nameFehlt ? 'vs-name-hinweis' : undefined}
+                    className={`w-full border rounded-xl px-3.5 py-3 text-[16px] focus:outline-none focus:ring-2 ${versucht && nameFehlt ? 'border-pm-error bg-pm-coral-tint/60 focus:ring-pm-error/15' : 'border-gray-200 focus:border-[#8B7355] focus:ring-[#8B7355]/10'}`} />
+                  {versucht && nameFehlt && (
+                    <p id="vs-name-hinweis" className="mt-1.5 text-[13.5px] text-pm-error-ink">Bitte Vor- und Nachnamen eintippen.</p>
+                  )}
                 </div>
                 <div>
-                  <label className="block text-[12px] font-semibold text-gray-700 mb-1">Ort</label>
-                  <input value={ort} onChange={(e) => setOrt(e.target.value)}
-                    className="w-full border border-gray-200 rounded-xl px-3.5 py-3 text-sm focus:outline-none focus:border-[#8B7355] focus:ring-2 focus:ring-[#8B7355]/10" />
+                  <label htmlFor="vs-ort" className="block text-[13px] font-semibold text-gray-700 mb-1">Ort der Unterschrift</label>
+                  <input id="vs-ort" value={ort} onChange={(e) => setOrt(e.target.value)} autoCapitalize="words"
+                    className="w-full border border-gray-200 rounded-xl px-3.5 py-3 text-[16px] focus:outline-none focus:border-[#8B7355] focus:ring-2 focus:ring-[#8B7355]/10" />
                 </div>
               </div>
-              <label className="flex items-start gap-2.5 mb-2.5 cursor-pointer">
-                <input type="checkbox" checked={bestaetigt} onChange={(e) => setBestaetigt(e.target.checked)} className="mt-0.5 accent-[#8B7355] w-4 h-4" />
-                <span className="text-[12px] text-gray-600 leading-relaxed">Ich habe den gesamten Vertragsinhalt gelesen und unterschreibe diesen Dienstleistungsvertrag hiermit rechtsverbindlich elektronisch.</span>
-              </label>
-              <label className="flex items-start gap-2.5 mb-4 cursor-pointer">
-                <input type="checkbox" checked={widerruf} onChange={(e) => setWiderruf(e.target.checked)} className="mt-0.5 accent-[#8B7355] w-4 h-4" />
-                <span className="text-[12px] text-gray-600 leading-relaxed">Ich verlange ausdrücklich, dass die Betreuung bereits vor Ablauf der 14-tägigen Widerrufsfrist beginnt (§ 8). Die Widerrufsbelehrung habe ich erhalten.</span>
-              </label>
-              {signDisabled && (
-                <p className="text-[12px] text-amber-600 mb-2 text-center">Bitte oben zuerst die Kundendaten vollständig ausfüllen.</p>
+              {([
+                { ref: bestaetigtRef, an: bestaetigt, set: setBestaetigt, feld: 'unterschrift-gelesen',
+                  text: 'Ich habe den gesamten Vertragsinhalt gelesen und unterschreibe diesen Dienstleistungsvertrag hiermit rechtsverbindlich elektronisch.' },
+                { ref: widerrufRef, an: widerruf, set: setWiderruf, feld: 'unterschrift-widerruf',
+                  text: 'Ich verlange ausdrücklich, dass die Betreuung bereits vor Ablauf der 14-tägigen Widerrufsfrist beginnt (§ 8). Die Widerrufsbelehrung habe ich erhalten.' },
+              ]).map((c) => {
+                const rot = versucht && !c.an;
+                return (
+                  <div key={c.feld} data-feld={c.feld} className="mb-2.5 last-of-type:mb-4">
+                    <label className={`flex items-start gap-3 cursor-pointer rounded-xl px-2.5 py-2 -mx-2.5 border ${rot ? 'border-pm-error bg-pm-coral-tint/60' : 'border-transparent'}`}>
+                      <input type="checkbox" ref={c.ref} checked={c.an} onChange={(e) => c.set(e.target.checked)}
+                        aria-invalid={rot || undefined}
+                        className="mt-0.5 accent-[#8B7355] w-5 h-5 flex-none" />
+                      <span className="text-[13.5px] text-gray-700 leading-relaxed">
+                        {c.text}
+                        {rot && <span className="block mt-1 font-semibold text-pm-error-ink">Bitte bestätigen</span>}
+                      </span>
+                    </label>
+                  </div>
+                );
+              })}
+              {versucht && (signDisabled || !canSign) && (
+                <p role="alert" className="text-[13.5px] leading-snug text-pm-error-ink mb-2.5 text-center">
+                  {signDisabled
+                    ? 'Bitte zuerst Ihre Angaben vervollständigen.'
+                    : fehltSatz}
+                </p>
               )}
-              <button onClick={sign} disabled={!canSign || signDisabled}
-                className={`w-full rounded-xl py-3.5 text-sm font-bold text-white transition-colors ${(canSign && !signDisabled) ? 'bg-[#2A9D5C] hover:bg-[#248a50]' : 'bg-gray-300 cursor-not-allowed'}`}>
+              <button onClick={klickUnterschreiben}
+                className="w-full rounded-xl py-3.5 text-[16px] font-bold text-white transition-colors bg-[#2A9D5C] hover:bg-[#248a50]">
                 Kostenpflichtig unterschreiben
               </button>
             </div>

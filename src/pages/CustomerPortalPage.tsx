@@ -37,7 +37,7 @@ import {
   pickFinalConfirmedJob,
 } from '../lib/mamamia/mappers';
 import { mapPatientFormToUpdateCustomerInput, splitCustomerName } from '../lib/mamamia/patientFormMapper';
-import { customerSalutation } from '../lib/names';
+import { capitalizeName, customerSalutation } from '../lib/names';
 import { caregiverBadgeScore, badgeScore as nurseBadgeScore, MIN_BADGE_SCORE } from '../lib/mamamia/badge';
 import { callMamamia, MamamiaError } from '../lib/mamamia/client';
 import { buildMonthlyBreakdown, formatDeDate } from '../lib/pricing/monthlyBreakdown';
@@ -1387,8 +1387,10 @@ const CustomerPortalPage: FC = () => {
   // hardcoded fixture (Hildegard/Müller/Rosenstraße/München) that bled
   // through to every customer regardless of their actual data.
   // Priority: stage-B patient_* fields → stage-A lead.* → mmCustomer →
-  // empty string. KP (Kontaktperson) fields stay fresh — first time we
-  // ask for them.
+  // empty string. Kontaktperson = wer angefragt hat (Martin 29.09.2026):
+  // Telefon und E-Mail standen schon hier, der Name fehlte — Kunden sahen
+  // zwei leere Pflichtfelder und fanden sie nicht. Anrede nur, wenn der Lead
+  // sie ausdrücklich trägt (nie aus dem Vornamen raten).
   const pruefenPrefill: Partial<ContractFormData> = (() => {
     const stageBStreet = lead?.patient_street ?? '';
     const stageBZip = lead?.patient_zip ?? mmCustomer?.customer_contract?.zip_code ?? '';
@@ -1404,9 +1406,9 @@ const CustomerPortalPage: FC = () => {
       // Kontaktdaten gehören i.d.R. der Kontaktperson, daher dort vorausfüllen.
       telefon: '',
       email: '',
-      kpAnrede: '',
-      kpVorname: '',
-      kpNachname: '',
+      kpAnrede: lead?.anrede_text === 'Frau' || lead?.anrede_text === 'Herr' ? lead.anrede_text : '',
+      kpVorname: capitalizeName(lead?.vorname),
+      kpNachname: capitalizeName(lead?.nachname),
       kpTelefon: lead?.telefon || mmCustomer?.phone || mmCustomer?.customer_contract?.phone || '',
       kpEmail: lead?.email || mmCustomer?.email || '',
     };

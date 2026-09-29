@@ -97,29 +97,30 @@ describe('Portal integration: golden paths', () => {
     // …und im Modal an der Entscheidungsstelle (dort amber hervorgehoben).
     await waitFor(() => expect(screen.getAllByText('Test application message').length).toBeGreaterThan(1));
 
-    // Seite 1 = Angebot/Konditionen → weiter zu Daten & Vertrag (Seite 2).
+    // Schritt 1 = Angebot/Konditionen → weiter zu „Ihre Angaben" (Schritt 2).
     await user.click(await screen.findByRole('button', { name: /Weiter →/ }));
 
-    // Seite 2 = Kundendaten + Vertrag. Kontaktperson-Pflichtfelder ausfüllen.
-    // Placeholders "Vorname" / "Nachname" appear ONLY in Kontaktperson
-    // (Hauptpatient fields are prefilled <input value={}>, no placeholder).
-    await user.type(await screen.findByPlaceholderText('Vorname'), 'Max');
-    await user.type(screen.getByPlaceholderText('Nachname'), 'Kontakt');
+    // Schritt 2 = Angaben. Kontaktperson ist aus dem Lead vorbelegt (Martin
+    // 29.09.2026: Name stand vorher leer, obwohl Telefon und E-Mail schon da
+    // waren) — Namen sauber geschrieben (Lead: „anna"/„testerin").
+    const kp = within(await screen.findByRole('region', { name: /Kontaktperson/ }));
+    expect(kp.getByLabelText(/^Vorname/)).toHaveValue('Anna');
+    expect(kp.getByLabelText(/^Nachname/)).toHaveValue('Testerin');
+    expect(screen.getByText('Alle Pflichtangaben vorhanden.')).toBeInTheDocument();
 
-    const kpSection = screen.getByText(/Kontaktperson/).closest('div')!;
-    const kpInputs = within(kpSection.parentElement!).getAllByPlaceholderText('Bitte eingeben');
-    const byLabel = (needle: string) => kpInputs.find(el => {
-      const label = el.closest('div')?.querySelector('label')?.textContent ?? '';
-      return label.includes(needle) && label.includes('*');
-    });
-    const kpTelefonInput = byLabel('Telefon');
-    const kpEmailInput = byLabel('E-Mail');
-    if (!kpTelefonInput || !kpEmailInput) throw new Error('KP Telefon/E-Mail input not found');
-    await user.type(kpTelefonInput, '+49 89 12345');
-    await user.clear(kpEmailInput);
-    await user.type(kpEmailInput, 'max@kontakt.de');
+    // Kunde ändert die Kontaktperson.
+    await user.clear(kp.getByLabelText(/^Vorname/));
+    await user.type(kp.getByLabelText(/^Vorname/), 'Max');
+    await user.clear(kp.getByLabelText(/^Nachname/));
+    await user.type(kp.getByLabelText(/^Nachname/), 'Kontakt');
+    await user.clear(kp.getByLabelText(/^Telefon/));
+    await user.type(kp.getByLabelText(/^Telefon/), '+49 89 12345');
+    await user.clear(kp.getByLabelText(/^E-Mail/));
+    await user.type(kp.getByLabelText(/^E-Mail/), 'max@kontakt.de');
 
-    // Vertrag-Unterschrift: Name tippen = Unterschrift,
+    await user.click(screen.getByRole('button', { name: 'Weiter zur Unterschrift' }));
+
+    // Schritt 3 = Vertrag: Name tippen = Unterschrift,
     // beide Pflicht-Häkchen, dann rechtsverbindlich unterschreiben.
     await user.type(await screen.findByPlaceholderText('Vor- und Nachname'), 'Max Kontakt');
     await user.click(screen.getByText(/Ich habe den gesamten Vertragsinhalt gelesen/));

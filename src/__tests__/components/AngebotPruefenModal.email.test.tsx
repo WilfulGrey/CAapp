@@ -2,7 +2,7 @@
 // Registry #52: Vertragsformular prüft das E-Mail-FORMAT (Pflicht bleibt wie
 // vorher: nur die Kontaktperson). „x@t-online.de@t-online.de" ging bis 05.09.
 // durch und legte den Mamamia-Sync der Buchung lahm.
-import { describe, it, expect, vi } from 'vitest';
+import { beforeEach, describe, it, expect, vi } from 'vitest';
 import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { AngebotPruefenModal } from '../../components/portal/AngebotPruefenModal';
@@ -33,31 +33,27 @@ const prefill = {
   kpVorname: 'Catarina', kpNachname: 'Stein', kpTelefon: '0176',
 };
 
-function kpEmailInput() {
-  const kpSection = screen.getByText(/Kontaktperson/).closest('div')!;
-  const inputs = within(kpSection.parentElement!).getAllByPlaceholderText('Bitte eingeben');
-  const el = inputs.find((i) => {
-    const label = i.closest('div')?.querySelector('label')?.textContent ?? '';
-    return label.includes('E-Mail') && label.includes('*');
-  });
-  if (!el) throw new Error('KP E-Mail input not found');
-  return el;
-}
+const kpEmailInput = () => within(screen.getByRole('region', { name: /Kontaktperson/ })).getByLabelText(/^E-Mail/);
+// Offene/ungültige Angaben stehen oben in der Zusammenfassung (Martin 29.09.2026);
+// mit ihnen führt „Weiter zur Unterschrift" nicht zur Unterschrift.
+const fehltZeile = (name: RegExp) => screen.queryByRole('button', { name }) !== null;
+const kommtZurUnterschrift = async (user: ReturnType<typeof userEvent.setup>) => {
+  await user.click(screen.getByRole('button', { name: 'Weiter zur Unterschrift' }));
+  return screen.queryByRole('button', { name: /Kostenpflichtig unterschreiben/ }) !== null;
+};
 
-const signButton = () => screen.getByRole('button', { name: /unterschreiben/i });
-// signDisabled (= !canProceed) rendert diesen Hinweis; der Button selbst hängt zusätzlich an Name + Häkchen.
-const gesperrt = () => screen.queryByText(/Kundendaten vollständig ausfüllen/) !== null;
+// Der Dialog merkt sich Eingaben im sessionStorage (je Bewerbung) — Tests sollen bei null anfangen.
+beforeEach(() => window.sessionStorage.clear());
 
 describe('AngebotPruefenModal — E-Mail-Format (Registry #52)', () => {
-  it('KP-Mail „x@t-online.de@t-online.de" ⇒ Unterschrift gesperrt + Hinweis erst nach Blur; gültig ⇒ frei', async () => {
+  it('KP-Mail „x@t-online.de@t-online.de" ⇒ als ungültig gelistet + Hinweis erst nach Blur; gültig ⇒ frei', async () => {
     const user = userEvent.setup();
     render(
       <AngebotPruefenModal app={makeApp()} prefill={{ ...prefill, kpEmail: 'catarina-stein@t-online.de@t-online.de' }} contractOnly
         onClose={vi.fn()} onAccept={vi.fn()} onNurseClick={vi.fn()} />,
     );
-    expect(signButton()).toBeDisabled();
-    expect(gesperrt()).toBe(true);
-    // Hinweis NICHT vor dem Verlassen des Feldes (kein Rot mitten im Tippen)
+    expect(fehltZeile(/Kontaktperson: E-Mail ungültig/)).toBe(true);
+    // Hinweis am Feld NICHT vor dem Verlassen des Feldes (kein Rot mitten im Tippen)
     expect(screen.queryByText(/gültige E-Mail-Adresse/)).toBeNull();
     const input = kpEmailInput();
     await user.click(input);
@@ -67,23 +63,26 @@ describe('AngebotPruefenModal — E-Mail-Format (Registry #52)', () => {
     await user.clear(input);
     await user.type(input, 'catarina-stein@t-online.de');
     expect(screen.queryByText(/gültige E-Mail-Adresse/)).toBeNull();
-    expect(gesperrt()).toBe(false);
+    expect(fehltZeile(/Kontaktperson/)).toBe(false);
+    expect(await kommtZurUnterschrift(user)).toBe(true);
   });
 
-  it('LE-Mail bleibt optional: leer ⇒ frei, unbrauchbar ⇒ gesperrt', async () => {
+  it('LE-Mail bleibt optional: leer ⇒ frei, unbrauchbar ⇒ gelistet und keine Unterschrift', async () => {
     const user = userEvent.setup();
     const { unmount } = render(
       <AngebotPruefenModal app={makeApp()} prefill={{ ...prefill, kpEmail: 'ok@example.de', email: '' }} contractOnly
         onClose={vi.fn()} onAccept={vi.fn()} onNurseClick={vi.fn()} />,
     );
-    expect(gesperrt()).toBe(false);
+    expect(screen.getByText('Alle Pflichtangaben vorhanden.')).toBeTruthy();
     unmount();
+    window.sessionStorage.clear(); // sonst gewinnt der Entwurf des ersten Dialogs
     render(
       <AngebotPruefenModal app={makeApp()} prefill={{ ...prefill, kpEmail: 'ok@example.de', email: 'Michael.kopka @ Freenet.de' }} contractOnly
         onClose={vi.fn()} onAccept={vi.fn()} onNurseClick={vi.fn()} />,
     );
-    expect(gesperrt()).toBe(true);
-    expect(signButton()).toBeDisabled();
-    await user.click(screen.getAllByPlaceholderText('Bitte eingeben')[0]);
+    expect(fehltZeile(/Betreute Person: E-Mail ungültig/)).toBe(true);
+    expect(await kommtZurUnterschrift(user)).toBe(false);
+    // Nach dem Versuch steht der Hinweis am Feld, auch ohne Blur.
+    expect(screen.getByText(/gültige E-Mail-Adresse/)).toBeTruthy();
   });
 });
