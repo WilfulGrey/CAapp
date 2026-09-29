@@ -109,39 +109,34 @@ describe('Vertrag nachträglich abschließen (agentur-seitige Annahme)', () => {
     expect(await screen.findByText(/Bitte schließen Sie noch Ihren Betreuungsvertrag ab\./)).toBeTruthy();
     await user.click(screen.getByRole('button', { name: /Vertrag jetzt abschließen/ }));
 
-    // Modal öffnet DIREKT auf dem Vertragsformular (Schritt 2) — kein
-    // Angebots-Schritt, keine Tab-Navigation zurück zu Schritt 1.
-    expect(await screen.findByText(/zu betreuende Person/)).toBeTruthy();
+    // Modal öffnet DIREKT auf den Angaben (Schritt 2) — kein Angebots-
+    // Schritt, kein Weg zurück zum Angebot.
+    expect(await screen.findByRole('region', { name: /Betreute Person/ })).toBeTruthy();
     expect(screen.queryByRole('button', { name: /Weiter →/ })).toBeNull();
     expect(screen.queryByText('1 · Angebot')).toBeNull();
-    expect(screen.queryByRole('button', { name: /Zurück zum Angebot/ })).toBeNull();
+    expect(screen.queryByRole('button', { name: /^Zurück$/ })).toBeNull();
 
     // Vorbefüllt aus lead.patient_* (Stufe B).
-    expect(screen.getByDisplayValue('Anna')).toBeTruthy();
+    const le = within(screen.getByRole('region', { name: /Betreute Person/ }));
+    expect(le.getByLabelText(/^Vorname/)).toHaveValue('Anna');
 
-    // Kontaktperson-Pflichtfelder ausfüllen (Platzhalter „Vorname"/„Nachname"
-    // existieren nur dort — LE-Felder sind vorbefüllt; gleiche Selektorik wie
-    // portal.test.tsx happy path).
-    await user.type(await screen.findByPlaceholderText('Vorname'), 'Max');
-    await user.type(screen.getByPlaceholderText('Nachname'), 'Kontakt');
-    const kpSection = screen.getByText(/Kontaktperson/).closest('div')!;
-    const kpInputs = within(kpSection.parentElement!).getAllByPlaceholderText('Bitte eingeben');
-    const byLabel = (needle: string) => kpInputs.find(el => {
-      const label = el.closest('div')?.querySelector('label')?.textContent ?? '';
-      return label.includes(needle) && label.includes('*');
-    });
-    const kpTelefonInput = byLabel('Telefon');
-    const kpEmailInput = byLabel('E-Mail');
-    if (!kpTelefonInput || !kpEmailInput) throw new Error('KP Telefon/E-Mail input not found');
-    await user.type(kpTelefonInput, '+49 89 12345');
-    await user.clear(kpEmailInput);
-    await user.type(kpEmailInput, 'max@kontakt.de');
+    // Kontaktperson ausfüllen (Telefon/E-Mail aus dem Lead vorbelegt, Name leer).
+    const kp = within(screen.getByRole('region', { name: /Kontaktperson/ }));
+    await user.clear(kp.getByLabelText(/^Vorname/));
+    await user.type(kp.getByLabelText(/^Vorname/), 'Max');
+    await user.clear(kp.getByLabelText(/^Nachname/));
+    await user.type(kp.getByLabelText(/^Nachname/), 'Kontakt');
+    await user.clear(kp.getByLabelText(/^Telefon/));
+    await user.type(kp.getByLabelText(/^Telefon/), '+49 89 12345');
+    await user.clear(kp.getByLabelText(/^E-Mail/));
+    await user.type(kp.getByLabelText(/^E-Mail/), 'max@kontakt.de');
+    await user.click(screen.getByRole('button', { name: 'Weiter zur Unterschrift' }));
 
     // Unterschrift (VertragSignieren embedded — identisch zum Annahme-Flow).
     await user.type(await screen.findByPlaceholderText('Vor- und Nachname'), 'Max Kontakt');
     await user.click(screen.getByText(/Ich habe den gesamten Vertragsinhalt gelesen/));
-    await user.click(screen.getByText(/Ich verlange ausdrücklich/));
-    await user.click(screen.getByRole('button', { name: /Kostenpflichtig unterschreiben/i }));
+    await user.click(screen.getByText(/Ich stimme ausdrücklich zu/));
+    await user.click(screen.getByRole('button', { name: /Vertrag jetzt unterschreiben/i }));
 
     // Bridge-Kette: 1. Upsert-Event (persistiert contract_snapshot serverseitig),
     // 2. Team-Mail-Resend. reportLeadEvent-Events (portal_opened, …) laufen über

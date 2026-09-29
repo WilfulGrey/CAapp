@@ -1126,7 +1126,7 @@ mutation StoreConfirmation(
 }
 ```
 
-Pola `contract_*` mapują 1:1 z step-2 `AngebotPruefenModal` w UI.
+Pola `contract_*` mapują 1:1 z step-2 `AngebotPruefenModal` w UI („Ihre Angaben“). Od Registry #103 podpis to osobny krok 3 („Vertrag & Unterschrift“); lista brakujących pól = `fehlendeAngaben()` (te same reguły co dawny `canProceed`).
 
 #### `inviteCaregiver` — innym kanałem (panel/Sanctum)
 

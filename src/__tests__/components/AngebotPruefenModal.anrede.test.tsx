@@ -5,7 +5,7 @@
 // ablehnen. Ein Prefill außerhalb von Frau/Herr (in der DB steht z. B.
 // patient_anrede „Familie") darf nicht still als „Frau" angezeigt und als
 // „Familie" gesendet werden.
-import { describe, it, expect, vi } from 'vitest';
+import { beforeEach, describe, it, expect, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { AngebotPruefenModal } from '../../components/portal/AngebotPruefenModal';
@@ -36,7 +36,9 @@ const prefill = {
 
 // Erste Auswahlliste = Anrede des Leistungsempfängers.
 const leAnrede = () => screen.getAllByRole('combobox')[0] as HTMLSelectElement;
-const gesperrt = () => screen.queryByText(/Kundendaten vollständig ausfüllen/) !== null;
+// Offene Pflichtangaben stehen oben in der Zusammenfassung (Martin 29.09.2026),
+// ohne sie geht es nicht weiter zur Unterschrift.
+const fehltAnrede = () => screen.queryByRole('button', { name: /Betreute Person: Anrede/ }) !== null;
 
 function renderModal(anrede?: string) {
   render(
@@ -45,6 +47,9 @@ function renderModal(anrede?: string) {
   );
 }
 
+// Der Dialog merkt sich Eingaben im sessionStorage (je Bewerbung) — Tests sollen bei null anfangen.
+beforeEach(() => window.sessionStorage.clear());
+
 describe('AngebotPruefenModal — Anrede Leistungsempfänger (Registry #88)', () => {
   it('bietet nur Frau und Herr an, kein „Divers"', () => {
     renderModal('Frau');
@@ -52,13 +57,15 @@ describe('AngebotPruefenModal — Anrede Leistungsempfänger (Registry #88)', ()
     expect(werte).toEqual(['Frau', 'Herr']);
   });
 
-  it('Prefill „Familie" ⇒ leer, Unterschrift gesperrt, bis der Kunde Frau oder Herr wählt', async () => {
+  it('Prefill „Familie" ⇒ leer und als fehlende Angabe gelistet, bis der Kunde Frau oder Herr wählt', async () => {
     const user = userEvent.setup();
     renderModal('Familie');
     expect(leAnrede().value).toBe('');
-    expect(gesperrt()).toBe(true);
+    expect(fehltAnrede()).toBe(true);
+    expect(screen.getByText('Es fehlt 1 Angabe')).toBeTruthy();
     await user.selectOptions(leAnrede(), 'Herr');
     expect(leAnrede().value).toBe('Herr');
-    expect(gesperrt()).toBe(false);
+    expect(fehltAnrede()).toBe(false);
+    expect(screen.getByText('Alle Pflichtangaben vorhanden.')).toBeTruthy();
   });
 });
