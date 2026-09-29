@@ -49,38 +49,20 @@ export function websiteHerkunft(): WebsiteHerkunft | null {
   return websiteAusUrlUndReferrer();
 }
 
-/* Einstieg ohne Verweis = direkter Besuch (Registry #103, 28.09.2026). Gemerkt
-   wird nur der ERSTE Seitenaufruf im Tab: Wer über /bestpreisgarantie kommt und
-   dann den Rechner öffnet, hat dort den Rechner selbst als Verweis — ohne das
-   Merken würde aus einem direkten Besuch „sonst". Gespeichert wird nur
-   `direkt` oder `verweis`, nie die Adresse. */
-const EINSTIEG_KEY = '_prim_einstieg';
+/* Einstieg ohne Verweis = direkter Besuch (Registry #103, 28.09.2026). Bewusst
+   OHNE Speicher auf dem Gerät (Martin 29.09.: an der bisherigen Messung nichts
+   versehentlich ändern, nichts Neues ablegen): gelesen wird nur der Verweis des
+   aktuellen Aufrufs. Klicks innerhalb von kostenrechner./kundenportal. sind
+   kein Einstieg — dann bleibt die Quelle `sonst` (seltener Fall: erst
+   /bestpreisgarantie, dann der Rechner). */
 export type Einstieg = 'direkt' | 'verweis';
 
-function einstiegAusReferrer(): Einstieg | null {
+export function einstieg(): Einstieg | null {
   if (typeof document === 'undefined') return null;
   if (!document.referrer) return 'direkt';
   try {
     const host = new URL(document.referrer).hostname;
-    // Eigene Seiten des Rechners/Portals sind kein Einstieg, sondern ein Klick innerhalb.
     if (/^(kostenrechner|kundenportal)\.primundus\.de$/.test(host) || host === window.location.hostname) return null;
   } catch { /* kaputter Referrer */ }
   return 'verweis';
-}
-
-export function einstiegMerken(): void {
-  try {
-    if (sessionStorage.getItem(EINSTIEG_KEY)) return;
-    const e = einstiegAusReferrer();
-    if (e) sessionStorage.setItem(EINSTIEG_KEY, e);
-  } catch { /* gesperrt */ }
-}
-
-/** Der gemerkte Einstieg des Tabs — oder, falls nichts gemerkt ist, der aktuelle Verweis. */
-export function einstieg(): Einstieg | null {
-  try {
-    const roh = sessionStorage.getItem(EINSTIEG_KEY);
-    if (roh === 'direkt' || roh === 'verweis') return roh;
-  } catch { /* gesperrt */ }
-  return einstiegAusReferrer();
 }

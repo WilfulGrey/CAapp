@@ -1,6 +1,6 @@
 import { cookieConsent } from './cookie-consent';
 import { istPruefbrowser } from './pruefbrowser';
-import { einstiegMerken, websiteHerkunftMerken } from './website-herkunft';
+import { websiteHerkunftMerken } from './website-herkunft';
 import { geraeteTyp } from './geraet';
 
 /*
@@ -511,7 +511,6 @@ class Analytics {
   // Klick gewinnt), organische Folge-Landings löschen nichts.
   private rememberAdParams() {
     websiteHerkunftMerken();
-    einstiegMerken();
     const fromUrl = this.collectAdParamsFromUrl();
     if (Object.keys(fromUrl).length === 0) return;
     try {
