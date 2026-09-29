@@ -159,24 +159,21 @@ describe('AngebotPruefenModal — was fehlt, steht da', () => {
     expect(screen.getByRole('button', { name: 'PLZ und Ort fehlt' })).toBeTruthy();
   });
 
-  it('Eingaben bleiben nach dem Schließen erhalten, nach der Unterschrift nicht mehr', async () => {
+  it('Eingaben bleiben nach dem Schließen erhalten (Name und Häkchen der Unterschrift nicht)', async () => {
     const user = userEvent.setup();
     const erst = render(
       <AngebotPruefenModal app={app} prefill={prefill} contractOnly onClose={vi.fn()} onAccept={vi.fn()} onNurseClick={vi.fn()} />,
     );
     await user.type(le().getByLabelText(/^Straße und Hausnummer/), 'Rosenweg 3');
-    erst.unmount();
-    const onAccept = vi.fn(async () => {});
-    render(<AngebotPruefenModal app={app} prefill={prefill} contractOnly onClose={vi.fn()} onAccept={onAccept} onNurseClick={vi.fn()} />);
-    expect(le().getByLabelText(/^Straße und Hausnummer/)).toHaveValue('Rosenweg 3');
     await user.type(le().getByLabelText(/^PLZ und Ort/), '96120 Bischberg');
     await user.click(screen.getByRole('button', { name: 'Weiter zur Unterschrift' }));
     await user.type(await screen.findByPlaceholderText('Vor- und Nachname'), 'Petra Muster');
-    await user.click(screen.getByText(/Ich habe den gesamten Vertragsinhalt gelesen/));
-    await user.click(screen.getByText(/Ich verlange ausdrücklich/));
-    await user.click(screen.getByRole('button', { name: /Kostenpflichtig unterschreiben/ }));
-    expect(onAccept).toHaveBeenCalledTimes(1);
-    await vi.waitFor(() => expect(window.sessionStorage.getItem('apm-entwurf-13721')).toBeNull());
+    erst.unmount();
+    render(<AngebotPruefenModal app={app} prefill={prefill} contractOnly onClose={vi.fn()} onAccept={vi.fn()} onNurseClick={vi.fn()} />);
+    expect(le().getByLabelText(/^Straße und Hausnummer/)).toHaveValue('Rosenweg 3');
+    expect(le().getByLabelText(/^PLZ und Ort/)).toHaveValue('96120 Bischberg');
+    await user.click(screen.getByRole('button', { name: 'Weiter zur Unterschrift' }));
+    expect(await screen.findByPlaceholderText('Vor- und Nachname')).toHaveValue('');
   });
 
   it('Tipp neben den Dialog schließt nur auf dem Angebot', async () => {

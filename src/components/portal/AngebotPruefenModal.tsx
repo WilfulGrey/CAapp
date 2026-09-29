@@ -344,9 +344,12 @@ export const AngebotPruefenModal: FC<{
   onAccept: (id: string, data: ContractFormData) => void | Promise<void>;
   onNurseClick: (n: Nurse) => void;
 }> = ({ app, prefill: prefillVonAussen, contractOnly, onClose, onAccept, onNurseClick }) => {
-  // Eingaben überleben ein versehentliches Schließen (X, Neuladen) bis der Tab
-  // zu ist — Kunden sagten am Telefon „alles weg". Nur sessionStorage dieses
-  // Tabs; nach der Unterschrift gelöscht.
+  // Eingaben überleben ein versehentliches Schließen (X, Neuladen) und eine
+  // gescheiterte Übertragung nach der Unterschrift, bis der Tab zu ist — Kunden
+  // sagten am Telefon „alles weg". Nur sessionStorage dieses Tabs. Nicht nach der
+  // Unterschrift löschen: acceptApp meldet Erfolg/Fehler nicht zurück, und ein
+  // Fehlschlag soll die Angaben nicht kosten. Name und Häkchen der Unterschrift
+  // stehen nicht im Entwurf, die setzt der Kunde jedes Mal neu.
   const entwurfKey = `apm-entwurf-${app.id}`;
   const [prefill] = useState<Partial<ContractFormData> | undefined>(() => {
     try {
@@ -404,7 +407,6 @@ export const AngebotPruefenModal: FC<{
   useEffect(() => {
     try { window.sessionStorage.setItem(entwurfKey, entwurfJson); } catch { /* privater Modus: ohne Entwurf */ }
   }, [entwurfKey, entwurfJson]);
-  const entwurfLoeschen = () => { try { window.sessionStorage.removeItem(entwurfKey); } catch { /* egal */ } };
 
   const fehlend = fehlendeAngaben(formData);
   const canProceed = fehlend.length === 0;
@@ -778,7 +780,7 @@ export const AngebotPruefenModal: FC<{
                   // Schritt 3 erreicht man nur mit vollständigen Angaben. Fehlt
                   // trotzdem etwas, sagt die Unterschrift das, statt zu senden.
                   signDisabled={!canProceed}
-                  onSigned={(sig) => { void Promise.resolve(onAccept(app.id, { ...formData, signatur: sig })).then(entwurfLoeschen, () => {}); }}
+                  onSigned={(sig) => onAccept(app.id, { ...formData, signatur: sig })}
                 />
               </div>
             )}
