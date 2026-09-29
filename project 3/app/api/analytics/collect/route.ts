@@ -37,6 +37,7 @@
  */
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
+import { istPruefAnfrage } from '@/lib/pruefbrowser';
 import { withMem } from '@/lib/memlog';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
@@ -75,6 +76,8 @@ function db() {
 }
 
 async function handlePost(request: NextRequest) {
+  // Markierte Prüfläufe (HeadlessChrome/PrimundusPruefung) schreiben nichts (Registry #104).
+  if (istPruefAnfrage(request.headers.get('user-agent'))) return NextResponse.json({ id: null, pruefung: true });
   let body: any;
   try {
     body = await request.json();

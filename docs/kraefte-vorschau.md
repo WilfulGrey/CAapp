@@ -189,6 +189,14 @@ Tag/Stunde/Variante die Schritt-Aufrufe 1–9, „cta_geklickt" und „abgeschic
 Variante, Abbruch je Schritt). Die Einwilligungs-Events bleiben daneben
 bestehen (dort gibt es Sitzungen und Leads).
 
+**Quelle und Gerät (Registry #103, 28.09.):** Seitdem trägt jede Zählung die
+Quelle `google` | `chatgpt` | `website` | `direkt` | `sonst` (vorher lagen
+Website und direkt in `sonst`) und die Geräteklasse `mobil` | `desktop`
+(`unbekannt` = Rechner-Stand vor dem 28.09.). Website = dieselbe Regel wie die
+Lead-Quelle `website:…` (`lib/website-herkunft.ts`), direkt = Aufruf ohne
+Verweis (nur gelesen, nichts gespeichert), Gerät = dieselbe Regel wie `analytics_sessions.device_type`
+(`lib/geraet.ts`, Tablet zählt als mobil). Weiterhin ohne Personenbezug.
+
 **Datenschutz:** Die Karten stehen VOR jedem Lead auf einer öffentlichen
 Seite. Es verlassen nur Vorname, Alter, Stufe, Erfahrungsjahre, Deutsch-Wort,
 Foto-URL und Verfügbarkeitsdatum die Function. Fotos bevorzugt aus
