@@ -37,7 +37,8 @@ import {
   pickFinalConfirmedJob,
 } from '../lib/mamamia/mappers';
 import { mapPatientFormToUpdateCustomerInput, splitCustomerName } from '../lib/mamamia/patientFormMapper';
-import { capitalizeName, customerSalutation } from '../lib/names';
+import { customerSalutation } from '../lib/names';
+import { vertragsVorbelegung } from '../lib/vertragsVorbelegung';
 import { caregiverBadgeScore, badgeScore as nurseBadgeScore, MIN_BADGE_SCORE } from '../lib/mamamia/badge';
 import { callMamamia, MamamiaError } from '../lib/mamamia/client';
 import { buildMonthlyBreakdown, formatDeDate } from '../lib/pricing/monthlyBreakdown';
@@ -1383,36 +1384,12 @@ const CustomerPortalPage: FC = () => {
     return () => clearInterval(t);
   }, [mmReady, mmApplicationsError, refetchApplications]);
 
-  // Prefill for AngebotPruefenModal step 2 — replaces the previous
-  // hardcoded fixture (Hildegard/Müller/Rosenstraße/München) that bled
-  // through to every customer regardless of their actual data.
-  // Priority: stage-B patient_* fields → stage-A lead.* → mmCustomer →
-  // empty string. Kontaktperson = wer angefragt hat (Martin 29.09.2026):
-  // Telefon und E-Mail standen schon hier, der Name fehlte — Kunden sahen
-  // zwei leere Pflichtfelder und fanden sie nicht. Anrede nur, wenn der Lead
-  // sie ausdrücklich trägt (nie aus dem Vornamen raten).
-  const pruefenPrefill: Partial<ContractFormData> = (() => {
-    const stageBStreet = lead?.patient_street ?? '';
-    const stageBZip = lead?.patient_zip ?? mmCustomer?.customer_contract?.zip_code ?? '';
-    const stageBCity = lead?.patient_city ?? mmCustomer?.customer_contract?.city ?? '';
-    const ortLine = [stageBZip, stageBCity].filter(Boolean).join(', ');
-    return {
-      anrede: lead?.patient_anrede || lead?.anrede_text || 'Frau',
-      vorname: lead?.patient_vorname || lead?.vorname || '',
-      nachname: lead?.patient_nachname || lead?.nachname || '',
-      strasse: stageBStreet || mmCustomer?.customer_contract?.street_number || '',
-      einsatzort: ortLine,
-      // Patient hat meist KEINE eigene Telefon/E-Mail — die vorhandenen
-      // Kontaktdaten gehören i.d.R. der Kontaktperson, daher dort vorausfüllen.
-      telefon: '',
-      email: '',
-      kpAnrede: lead?.anrede_text === 'Frau' || lead?.anrede_text === 'Herr' ? lead.anrede_text : '',
-      kpVorname: capitalizeName(lead?.vorname),
-      kpNachname: capitalizeName(lead?.nachname),
-      kpTelefon: lead?.telefon || mmCustomer?.phone || mmCustomer?.customer_contract?.phone || '',
-      kpEmail: lead?.email || mmCustomer?.email || '',
-    };
-  })();
+  // Vorbelegung für „Ihre Angaben" im Buchungsdialog — Regeln in
+  // src/lib/vertragsVorbelegung.ts (ersetzt die frühere feste Testperson
+  // Hildegard/Müller, die bei jedem Kunden durchschlug).
+  const pruefenPrefill: Partial<ContractFormData> = vertragsVorbelegung(
+    lead, mmCustomer, abgesendetesFormular ?? (lead?.patient_form as Parameters<typeof vertragsVorbelegung>[2]),
+  );
 
   // Compute visible interests — drop rejected-by-caregiver and locally-
   // dismissed-by-customer entries. Also drop interests whose caregiver

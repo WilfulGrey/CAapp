@@ -369,7 +369,8 @@ export const AngebotPruefenModal: FC<{
   // Ein Prefill außerhalb von Frau/Herr (es gibt z. B. patient_anrede
   // „Familie") bleibt LEER statt still als „Frau" angezeigt und als „Familie"
   // gesendet zu werden — der Kunde wählt dann selbst.
-  const [anrede, setAnrede] = useState(LE_ANREDEN.includes(prefill?.anrede ?? 'Frau') ? (prefill?.anrede ?? 'Frau') : '');
+  // Ohne Angabe bleibt das Feld leer („Bitte wählen") — kein „Frau" als Vorgabe (nie raten).
+  const [anrede, setAnrede] = useState(LE_ANREDEN.includes(prefill?.anrede ?? '') ? (prefill?.anrede ?? '') : '');
   const [vorname, setVorname] = useState(prefill?.vorname ?? '');
   const [nachname, setNachname] = useState(prefill?.nachname ?? '');
   const [strasse, setStrasse] = useState(prefill?.strasse ?? '');
