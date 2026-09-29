@@ -121,7 +121,7 @@ describe('Portal integration: golden paths', () => {
     // beide Pflicht-Häkchen, dann rechtsverbindlich unterschreiben.
     await user.type(await screen.findByPlaceholderText('Vor- und Nachname'), 'Max Kontakt');
     await user.click(screen.getByText(/Ich habe den gesamten Vertragsinhalt gelesen/));
-    await user.click(screen.getByText(/Ich verlange ausdrücklich/));
+    await user.click(screen.getByText(/Ich stimme ausdrücklich zu/));
     await user.click(screen.getByRole('button', { name: /Kostenpflichtig unterschreiben/i }));
 
     // BookedScreen rendered (copy includes "Pflegekraft gebucht!" substring)

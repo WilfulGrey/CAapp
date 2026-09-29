@@ -136,7 +136,7 @@ describe('AngebotPruefenModal — was fehlt, steht da', () => {
     await user.type(screen.getByPlaceholderText('Vor- und Nachname'), 'Petra Muster');
     await user.click(screen.getByText(/Ich habe den gesamten Vertragsinhalt gelesen/));
     expect(screen.getByRole('alert').textContent).toBe('Bitte das fehlende Häkchen setzen.');
-    await user.click(screen.getByText(/Ich verlange ausdrücklich/));
+    await user.click(screen.getByText(/Ich stimme ausdrücklich zu/));
     expect(screen.queryByRole('alert')).toBeNull();
     await user.click(screen.getByRole('button', { name: /Kostenpflichtig unterschreiben/ }));
     expect(onAccept).toHaveBeenCalledTimes(1);

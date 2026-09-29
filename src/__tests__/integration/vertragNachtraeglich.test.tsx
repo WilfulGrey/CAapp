@@ -135,7 +135,7 @@ describe('Vertrag nachträglich abschließen (agentur-seitige Annahme)', () => {
     // Unterschrift (VertragSignieren embedded — identisch zum Annahme-Flow).
     await user.type(await screen.findByPlaceholderText('Vor- und Nachname'), 'Max Kontakt');
     await user.click(screen.getByText(/Ich habe den gesamten Vertragsinhalt gelesen/));
-    await user.click(screen.getByText(/Ich verlange ausdrücklich/));
+    await user.click(screen.getByText(/Ich stimme ausdrücklich zu/));
     await user.click(screen.getByRole('button', { name: /Kostenpflichtig unterschreiben/i }));
 
     // Bridge-Kette: 1. Upsert-Event (persistiert contract_snapshot serverseitig),
