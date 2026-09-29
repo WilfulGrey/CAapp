@@ -38,7 +38,6 @@ import {
 } from '../lib/mamamia/mappers';
 import { mapPatientFormToUpdateCustomerInput, splitCustomerName } from '../lib/mamamia/patientFormMapper';
 import { customerSalutation } from '../lib/names';
-import { vertragsVorbelegung } from '../lib/vertragsVorbelegung';
 import { caregiverBadgeScore, badgeScore as nurseBadgeScore, MIN_BADGE_SCORE } from '../lib/mamamia/badge';
 import { callMamamia, MamamiaError } from '../lib/mamamia/client';
 import { buildMonthlyBreakdown, formatDeDate } from '../lib/pricing/monthlyBreakdown';
@@ -1384,12 +1383,34 @@ const CustomerPortalPage: FC = () => {
     return () => clearInterval(t);
   }, [mmReady, mmApplicationsError, refetchApplications]);
 
-  // Vorbelegung für „Ihre Angaben" im Buchungsdialog — Regeln in
-  // src/lib/vertragsVorbelegung.ts (ersetzt die frühere feste Testperson
-  // Hildegard/Müller, die bei jedem Kunden durchschlug).
-  const pruefenPrefill: Partial<ContractFormData> = vertragsVorbelegung(
-    lead, mmCustomer, abgesendetesFormular ?? (lead?.patient_form as Parameters<typeof vertragsVorbelegung>[2]),
-  );
+  // Prefill for AngebotPruefenModal step 2 — replaces the previous
+  // hardcoded fixture (Hildegard/Müller/Rosenstraße/München) that bled
+  // through to every customer regardless of their actual data.
+  // Priority: stage-B patient_* fields → stage-A lead.* → mmCustomer →
+  // empty string. KP (Kontaktperson) fields stay fresh — first time we
+  // ask for them.
+  const pruefenPrefill: Partial<ContractFormData> = (() => {
+    const stageBStreet = lead?.patient_street ?? '';
+    const stageBZip = lead?.patient_zip ?? mmCustomer?.customer_contract?.zip_code ?? '';
+    const stageBCity = lead?.patient_city ?? mmCustomer?.customer_contract?.city ?? '';
+    const ortLine = [stageBZip, stageBCity].filter(Boolean).join(', ');
+    return {
+      anrede: lead?.patient_anrede || lead?.anrede_text || 'Frau',
+      vorname: lead?.patient_vorname || lead?.vorname || '',
+      nachname: lead?.patient_nachname || lead?.nachname || '',
+      strasse: stageBStreet || mmCustomer?.customer_contract?.street_number || '',
+      einsatzort: ortLine,
+      // Patient hat meist KEINE eigene Telefon/E-Mail — die vorhandenen
+      // Kontaktdaten gehören i.d.R. der Kontaktperson, daher dort vorausfüllen.
+      telefon: '',
+      email: '',
+      kpAnrede: '',
+      kpVorname: '',
+      kpNachname: '',
+      kpTelefon: lead?.telefon || mmCustomer?.phone || mmCustomer?.customer_contract?.phone || '',
+      kpEmail: lead?.email || mmCustomer?.email || '',
+    };
+  })();
 
   // Compute visible interests — drop rejected-by-caregiver and locally-
   // dismissed-by-customer entries. Also drop interests whose caregiver

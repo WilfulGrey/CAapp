@@ -120,7 +120,7 @@ describe('Vertrag nachträglich abschließen (agentur-seitige Annahme)', () => {
     const le = within(screen.getByRole('region', { name: /Betreute Person/ }));
     expect(le.getByLabelText(/^Vorname/)).toHaveValue('Anna');
 
-    // Kontaktperson überschreiben (vorbelegt aus dem Lead).
+    // Kontaktperson ausfüllen (Telefon/E-Mail aus dem Lead vorbelegt, Name leer).
     const kp = within(screen.getByRole('region', { name: /Kontaktperson/ }));
     await user.clear(kp.getByLabelText(/^Vorname/));
     await user.type(kp.getByLabelText(/^Vorname/), 'Max');

@@ -607,7 +607,8 @@ export const VertragSignieren: FC<{
                 { ref: bestaetigtRef, an: bestaetigt, set: setBestaetigt, feld: 'unterschrift-gelesen',
                   text: 'Ich habe den gesamten Vertragsinhalt gelesen und unterschreibe diesen Dienstleistungsvertrag hiermit rechtsverbindlich elektronisch.' },
                 { ref: widerrufRef, an: widerruf, set: setWiderruf, feld: 'unterschrift-widerruf',
-                  text: 'Ich verlange ausdrücklich, dass die Betreuung bereits vor Ablauf der 14-tägigen Widerrufsfrist beginnt (§ 8). Die Widerrufsbelehrung habe ich erhalten.' },
+                  // Satz 2 = Kenntnis vom Erlöschen (§ 356 Abs. 4 Nr. 2 lit. c BGB), Martin 29.09.2026.
+                  text: 'Ich verlange ausdrücklich, dass die Betreuung bereits vor Ablauf der 14-tägigen Widerrufsfrist beginnt (§ 8). Mir ist bekannt, dass ich mein Widerrufsrecht bei vollständiger Vertragserfüllung durch Primundus verliere. Die Widerrufsbelehrung habe ich erhalten.' },
               ]).map((c) => {
                 const rot = versucht && !c.an;
                 return (

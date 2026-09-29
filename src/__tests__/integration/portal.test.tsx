@@ -100,19 +100,16 @@ describe('Portal integration: golden paths', () => {
     // Schritt 1 = Angebot/Konditionen → weiter zu „Ihre Angaben" (Schritt 2).
     await user.click(await screen.findByRole('button', { name: /Weiter →/ }));
 
-    // Schritt 2 = Angaben. Kontaktperson ist aus dem Lead vorbelegt (Martin
-    // 29.09.2026: Name stand vorher leer, obwohl Telefon und E-Mail schon da
-    // waren) — Namen sauber geschrieben (Lead: „anna"/„testerin").
+    // Schritt 2 = Angaben. Vorbelegung wie bisher (Martin 29.09.2026: nichts am
+    // Datenfluss ändern): Name der Kontaktperson leer — und genau das steht jetzt
+    // oben in der Liste „was fehlt".
     const kp = within(await screen.findByRole('region', { name: /Kontaktperson/ }));
-    expect(kp.getByLabelText(/^Vorname/)).toHaveValue('Anna');
-    expect(kp.getByLabelText(/^Nachname/)).toHaveValue('Testerin');
-    expect(screen.getByText('Alle Pflichtangaben vorhanden.')).toBeInTheDocument();
+    expect(kp.getByLabelText(/^Vorname/)).toHaveValue('');
+    expect(screen.getByRole('button', { name: 'Kontaktperson: Vorname · Nachname' })).toBeInTheDocument();
 
-    // Kunde ändert die Kontaktperson.
-    await user.clear(kp.getByLabelText(/^Vorname/));
     await user.type(kp.getByLabelText(/^Vorname/), 'Max');
-    await user.clear(kp.getByLabelText(/^Nachname/));
     await user.type(kp.getByLabelText(/^Nachname/), 'Kontakt');
+    expect(screen.getByText('Alle Pflichtangaben vorhanden.')).toBeInTheDocument();
     await user.clear(kp.getByLabelText(/^Telefon/));
     await user.type(kp.getByLabelText(/^Telefon/), '+49 89 12345');
     await user.clear(kp.getByLabelText(/^E-Mail/));
