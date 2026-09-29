@@ -300,7 +300,7 @@ const Auswahl: FC<{
         aria-required={pflicht || undefined}
         aria-invalid={z.ton === 'fehler' || undefined}
         aria-describedby={status === 'leer' ? hinweisId : undefined}
-        className={`${EINGABE} ${z.ton === 'fehler' ? EINGABE_FEHLER : z.ton === 'offen' ? EINGABE_OFFEN : EINGABE_OK}`}
+        className={`${EINGABE} max-w-[12rem] ${z.ton === 'fehler' ? EINGABE_FEHLER : z.ton === 'offen' ? EINGABE_OFFEN : EINGABE_OK}`}
       >
         {(leerWaehlbar || value === '') && <option value="" disabled={!leerWaehlbar}>Bitte wählen</option>}
         {optionen.map((o) => <option key={o}>{o}</option>)}
@@ -678,10 +678,8 @@ export const AngebotPruefenModal: FC<{
                 <section aria-labelledby="apm-le-titel" className={block}>
                   <BlockKopf id="apm-le-titel" titel={BLOCK_NAME.le} zusatz="im Vertrag: Leistungsempfänger" offen={offenIn('le')} />
                   <div className="space-y-4">
-                    <div className="max-w-[12rem]">
-                      <Auswahl id={feldId('anrede')} label="Anrede" pflicht status={statusVon('anrede')} versucht={versucht}
-                        value={anrede} onChange={setAnrede} optionen={LE_ANREDEN} />
-                    </div>
+                    <Auswahl id={feldId('anrede')} label="Anrede" pflicht status={statusVon('anrede')} versucht={versucht}
+                      value={anrede} onChange={setAnrede} optionen={LE_ANREDEN} />
                     <div className="grid grid-cols-2 gap-3">
                       <Eingabe id={feldId('vorname')} label="Vorname" pflicht status={statusVon('vorname')} versucht={versucht}
                         value={vorname} onChange={setVorname} autoCapitalize="words" />
@@ -722,10 +720,8 @@ export const AngebotPruefenModal: FC<{
 
                   {!agGleich && (
                     <div className="space-y-4 mt-4 pt-4 border-t border-pm-line-soft">
-                      <div className="max-w-[12rem]">
-                        <Auswahl id={feldId('agAnrede')} label="Anrede" versucht={versucht} leerWaehlbar
-                          value={agAnrede} onChange={setAgAnrede} optionen={['Frau', 'Herr', 'Divers']} />
-                      </div>
+                      <Auswahl id={feldId('agAnrede')} label="Anrede" versucht={versucht} leerWaehlbar
+                        value={agAnrede} onChange={setAgAnrede} optionen={['Frau', 'Herr', 'Divers']} />
                       <div className="grid grid-cols-2 gap-3">
                         <Eingabe id={feldId('agVorname')} label="Vorname" pflicht status={statusVon('agVorname')} versucht={versucht}
                           value={agVorname} onChange={setAgVorname} autoComplete="given-name" autoCapitalize="words" />
@@ -750,10 +746,8 @@ export const AngebotPruefenModal: FC<{
                 <section aria-labelledby="apm-kp-titel" className={block}>
                   <BlockKopf id="apm-kp-titel" titel={BLOCK_NAME.kp} zusatz="für Rückfragen" offen={offenIn('kp')} />
                   <div className="space-y-4">
-                    <div className="max-w-[12rem]">
-                      <Auswahl id={feldId('kpAnrede')} label="Anrede" versucht={versucht} leerWaehlbar
-                        value={kpAnrede} onChange={setKpAnrede} optionen={['Frau', 'Herr', 'Divers']} />
-                    </div>
+                    <Auswahl id={feldId('kpAnrede')} label="Anrede" versucht={versucht} leerWaehlbar
+                      value={kpAnrede} onChange={setKpAnrede} optionen={['Frau', 'Herr', 'Divers']} />
                     <div className="grid grid-cols-2 gap-3">
                       <Eingabe id={feldId('kpVorname')} label="Vorname" pflicht status={statusVon('kpVorname')} versucht={versucht}
                         value={kpVorname} onChange={setKpVorname} autoComplete="given-name" autoCapitalize="words" />
