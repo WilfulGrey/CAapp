@@ -1733,6 +1733,7 @@ export default function LeadDetailPage() {
                     kunde_kein_interesse: { label: '🛑 Kunde abgemeldet (Abschiedsmail)', color: 'bg-gray-600' },
                     kunde_pausiert: { label: '⏸ Kunde: später melden (Wiedervorlage)', color: 'bg-amber-500' },
                     kontakt_variante: { label: '🧪 Kontakt-Variante im Rechner', color: 'bg-gray-400' },
+                    anfrage_herkunft: { label: 'Herkunft dieser Absendung', color: 'bg-gray-400' },
                     telefon_nachgetragen: { label: '📞 Telefonnummer nachgetragen', color: 'bg-blue-500' },
                     kunde_rueckmeldung: { label: '💬 Kunde nennt Grund (Abschiedsmail)', color: 'bg-amber-600' },
                     rueckruf_erbeten_mail: { label: '📞 Rückruf erbeten (Abschiedsmail)', color: 'bg-amber-500' },

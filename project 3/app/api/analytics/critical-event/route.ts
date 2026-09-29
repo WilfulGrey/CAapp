@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
+import { istPruefAnfrage } from '@/lib/pruefbrowser';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
@@ -31,6 +32,8 @@ function cleanData(v: unknown): Record<string, unknown> {
 }
 
 async function handlePost(request: NextRequest) {
+  // Markierte Prüfläufe (HeadlessChrome/PrimundusPruefung) schreiben nichts (Registry #104).
+  if (istPruefAnfrage(request.headers.get('user-agent'))) return NextResponse.json({ success: true, pruefung: true });
   try {
     const body = await request.json();
     const { sessionId, pagePath, events, conversion } = body ?? {};
