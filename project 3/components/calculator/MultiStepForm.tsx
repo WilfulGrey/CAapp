@@ -722,6 +722,11 @@ export function MultiStepForm({ mode = 'inline', bewertung = null }: MultiStepFo
         ablauf: ablaufRef.current,
         careStartTiming: state.careStartTiming,
         adParams: analytics.getAdParams(),
+        // Herkunft dieser Absendung (Registry #106): die anonyme Sitzungs-ID der
+        // Messung (sess_…) und die Geräteklasse — damit Einstiegsseite, Gerät und
+        // Weg einer Anfrage nachvollziehbar sind. Der Server prüft beides.
+        sessionId: analytics.getSessionId(),
+        geraet: analytics.getGeraeteTyp(),
         // Von welcher Seite kam die Anfrage (Martin, 27.08.). Die
         // Varianten-Weiche liefert alle drei unter „/" aus, deshalb zählt
         // die Variante aus dem Cookie — nicht der Pfad (analytics.ts).

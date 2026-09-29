@@ -12,6 +12,7 @@ import { testphaseUmleitung } from '@/lib/portal-schutz';
 import { parseCustomerName } from '@/lib/calculation';
 import { scheduleEmail, flushScheduledEmails } from '@/lib/lead-mails';
 import { quelleBereinigen } from '@/lib/lead-quelle';
+import { anfrageHerkunft } from '@/lib/anfrage-herkunft';
 
 function getSupabaseClient() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -54,6 +55,8 @@ async function handlePost(request: NextRequest) {
       adParams,
       quelle,
       websitePfad,
+      sessionId,
+      geraet,
       telefonSpaeter,
       kontaktVariante,
       ablauf,
@@ -79,6 +82,10 @@ async function handlePost(request: NextRequest) {
       quelle?: string;
       /* Pfad der verweisenden Website-Seite (nur bei quelle website:…). */
       websitePfad?: string | null;
+      /* Anonyme Sitzungs-ID der Messung und Geräteklasse (Registry #106) — nur
+         für das Ereignis anfrage_herkunft, geprüft in lib/anfrage-herkunft.ts. */
+      sessionId?: unknown;
+      geraet?: unknown;
     } = body;
     /* Der Client schickt die Quelle, der Server entscheidet, was gültig ist —
        sonst landet beliebiger Text in leads.source (Martin, 04.09.2026). */
@@ -173,6 +180,14 @@ async function handlePost(request: NextRequest) {
         quelle: quelleSicher,
       }
     );
+
+    // Herkunft DIESER Absendung (Registry #105) — auch bei einem Duplikat, dessen
+    // Lead die erste Quelle behält. Best-effort: darf die Anfrage nie blockieren.
+    try {
+      await logEvent(lead.id, 'anfrage_herkunft', anfrageHerkunft({ isNew, isUpgrade, quelle: quelleSicher, websitePfad: websitePfadSicher, sessionId, geraet }));
+    } catch (e) {
+      console.error('anfrage_herkunft nicht gespeichert (Lead existiert trotzdem):', e instanceof Error ? e.message : String(e));
+    }
 
     // Klick-IDs + UTM als SEPARATES best-effort Update (nicht im Insert/Update
     // von findOrCreateLead): Lead-Erstellung darf NIE an fehlenden Spalten

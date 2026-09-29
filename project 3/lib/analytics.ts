@@ -1,4 +1,7 @@
 import { cookieConsent } from './cookie-consent';
+import { istPruefbrowser } from './pruefbrowser';
+import { websiteHerkunftMerken } from './website-herkunft';
+import { geraeteTyp } from './geraet';
 
 /*
  * Geschrieben wird ueber die EIGENE Domain, nicht direkt nach Supabase.
@@ -25,6 +28,8 @@ import { cookieConsent } from './cookie-consent';
  * instances detected"), denn dieses Modul braucht gar keinen mehr.
  */
 async function senden(nutzlast: Record<string, unknown>): Promise<any | null> {
+  // Automatische Prüfläufe senden nichts (Registry #104) — zweite Sicherung neben init().
+  if (istPruefbrowser()) return null;
   try {
     const res = await fetch('/api/analytics/collect', {
       method: 'POST',
@@ -81,49 +86,11 @@ const AD_PARAM_KEYS = [
 type AdParams = Partial<Record<(typeof AD_PARAM_KEYS)[number], string>>;
 const AD_PARAMS_KEY = '_prim_ad_params';
 
-/* Herkunft von der Website primundus.de (Martin, 04.09.2026). Die Knöpfe dort
-   verlinken mit `?start=1&src=apex-…`; drei Links tragen keine Markierung,
-   dafür reicht die verweisende Seite. Beides wird beim ersten Aufruf gemerkt,
-   damit der Absende-Schritt Minuten später noch weiß, woher der Besucher kam. */
-const WEBSITE_KEY = '_prim_website';
-export type WebsiteHerkunft = { src: string; pfad?: string };
-
-function websiteAusUrlUndReferrer(): WebsiteHerkunft | null {
-  if (typeof window === 'undefined') return null;
-  const src = new URLSearchParams(window.location.search).get('src') || '';
-  let pfad: string | undefined;
-  let vonWebsite = false;
-  try {
-    const ref = document.referrer ? new URL(document.referrer) : null;
-    if (ref && /(^|\.)primundus\.de$/.test(ref.hostname) && !/^kostenrechner\./.test(ref.hostname)) {
-      vonWebsite = true;
-      if (ref.pathname && ref.pathname !== '/') pfad = ref.pathname.slice(0, 80);
-    }
-  } catch { /* kaputter Referrer — dann eben ohne */ }
-  // Bis 23.09.2026 galt nur `apex-…` — `ort-worms` von den 207 Ortsseiten wurde still
-  // verworfen, deshalb gab es nie einen Lead mit Quelle website:ort-…. Jetzt gelten beide
-  // Familien, mit Positionssuffix (-kopf, -kosten, -leiste, -schluss).
-  // Länge 40 wie quelleBereinigen() auf dem Server (lib/lead-quelle.ts) — längere Werte würden dort
-  // still zu „rechner" werden.
-  if (/^(apex|ort)-[a-z0-9-]{1,36}$/.test(src)) return { src, pfad };
-  if (vonWebsite) return { src: 'apex-referrer', pfad };
-  return null;
-}
-
-export function websiteHerkunftMerken(): void {
-  const h = websiteAusUrlUndReferrer();
-  if (!h) return;
-  try { sessionStorage.setItem(WEBSITE_KEY, JSON.stringify(h)); } catch { /* gesperrt */ }
-}
-
-/** Was beim ersten Aufruf gemerkt wurde — oder, falls nichts, die aktuelle URL. */
-export function websiteHerkunft(): WebsiteHerkunft | null {
-  try {
-    const roh = sessionStorage.getItem(WEBSITE_KEY);
-    if (roh) return JSON.parse(roh) as WebsiteHerkunft;
-  } catch { /* gesperrt */ }
-  return websiteAusUrlUndReferrer();
-}
+/* Herkunft von der Website und Einstieg: seit 28.09.2026 in lib/website-herkunft.ts
+   (Registry #103), damit der anonyme Zähler dieselbe Regel nutzt, ohne dieses
+   Modul zu laden. Hier nur weitergereicht — bestehende Importe bleiben gültig. */
+export { websiteHerkunft, websiteHerkunftMerken } from './website-herkunft';
+export type { WebsiteHerkunft } from './website-herkunft';
 
 /** Pfad der ausgelieferten Test-Variante (siehe middleware.ts). */
 export function variantenSeite(): string {
@@ -176,6 +143,11 @@ class Analytics {
 
     this.sessionId = this.getOrCreateSessionId();
     this.rememberAdParams();
+
+    /* Automatische Prüfläufe (Playwright & Co., navigator.webdriver) zählen nicht
+       (Registry #104): keine Sitzung, keine Ereignisse, kein Seitenzeit-Beacon.
+       Die Herkunft für die Lead-Quelle ist oben schon gemerkt (nur sessionStorage). */
+    if (istPruefbrowser()) return;
 
     /* Der Fingerprint stand bis 23.08. VOR dem ersten Datenbank-Aufruf —
        ohne try/catch und mit `await`. Ein Beiwerk konnte damit die gesamte
@@ -282,14 +254,7 @@ class Analytics {
   }
 
   private getDeviceType(): string {
-    const ua = navigator.userAgent;
-    if (/(tablet|ipad|playbook|silk)|(android(?!.*mobi))/i.test(ua)) {
-      return 'tablet';
-    }
-    if (/Mobile|Android|iP(hone|od)|IEMobile|BlackBerry|Kindle|Silk-Accelerated|(hpw|web)OS|Opera M(obi|ini)/.test(ua)) {
-      return 'mobile';
-    }
-    return 'desktop';
+    return geraeteTyp(navigator.userAgent);
   }
 
   private getBrowser(ua: string): string {
@@ -524,6 +489,12 @@ class Analytics {
 
   getSessionId(): string | null {
     return this.sessionId;
+  }
+
+  /** Geräteklasse wie in `analytics_sessions.device_type` (mobile | tablet | desktop) —
+   *  für die Herkunft einer Anfrage (Registry #106). Nur die Klasse, nie der User-Agent. */
+  getGeraeteTyp(): string {
+    return this.getDeviceType();
   }
 
   getSessionDbId(): string | null {
