@@ -122,7 +122,7 @@ describe('Portal integration: golden paths', () => {
     await user.type(await screen.findByPlaceholderText('Vor- und Nachname'), 'Max Kontakt');
     await user.click(screen.getByText(/Ich habe den gesamten Vertragsinhalt gelesen/));
     await user.click(screen.getByText(/Ich stimme ausdrücklich zu/));
-    await user.click(screen.getByRole('button', { name: /Kostenpflichtig unterschreiben/i }));
+    await user.click(screen.getByRole('button', { name: /Vertrag jetzt unterschreiben/i }));
 
     // BookedScreen rendered (copy includes "Pflegekraft gebucht!" substring)
     await waitFor(

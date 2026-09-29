@@ -106,7 +106,7 @@ describe('AngebotPruefenModal — was fehlt, steht da', () => {
     const user = userEvent.setup();
     renderModal();
     await user.click(screen.getByRole('button', { name: 'Weiter zur Unterschrift' }));
-    expect(screen.queryByRole('button', { name: /Kostenpflichtig unterschreiben/ })).toBeNull();
+    expect(screen.queryByRole('button', { name: /Vertrag jetzt unterschreiben/ })).toBeNull();
     const strasse = le().getByLabelText(/^Straße und Hausnummer/);
     expect(strasse.getAttribute('aria-invalid')).toBe('true');
     expect(document.activeElement).toBe(strasse);
@@ -119,7 +119,7 @@ describe('AngebotPruefenModal — was fehlt, steht da', () => {
     await user.type(le().getByLabelText(/^PLZ und Ort/), '96120 Bischberg');
     expect(screen.getByText('Alle Pflichtangaben vorhanden.')).toBeTruthy();
     await user.click(screen.getByRole('button', { name: 'Weiter zur Unterschrift' }));
-    expect(await screen.findByRole('button', { name: /Kostenpflichtig unterschreiben/ })).toBeTruthy();
+    expect(await screen.findByRole('button', { name: /Vertrag jetzt unterschreiben/ })).toBeTruthy();
     expect(screen.getByRole('heading', { name: 'Vertrag & Unterschrift' })).toBeTruthy();
   });
 
@@ -127,7 +127,7 @@ describe('AngebotPruefenModal — was fehlt, steht da', () => {
     const user = userEvent.setup();
     const { onAccept } = renderModal({ strasse: 'Rosenweg 3', einsatzort: '96120 Bischberg' });
     await user.click(screen.getByRole('button', { name: 'Weiter zur Unterschrift' }));
-    await user.click(await screen.findByRole('button', { name: /Kostenpflichtig unterschreiben/ }));
+    await user.click(await screen.findByRole('button', { name: /Vertrag jetzt unterschreiben/ }));
     expect(onAccept).not.toHaveBeenCalled();
     expect(screen.getByRole('alert').textContent).toBe('Bitte Ihren Namen eintippen und beide Häkchen setzen.');
     expect(document.activeElement).toBe(screen.getByPlaceholderText('Vor- und Nachname'));
@@ -138,7 +138,7 @@ describe('AngebotPruefenModal — was fehlt, steht da', () => {
     expect(screen.getByRole('alert').textContent).toBe('Bitte das fehlende Häkchen setzen.');
     await user.click(screen.getByText(/Ich stimme ausdrücklich zu/));
     expect(screen.queryByRole('alert')).toBeNull();
-    await user.click(screen.getByRole('button', { name: /Kostenpflichtig unterschreiben/ }));
+    await user.click(screen.getByRole('button', { name: /Vertrag jetzt unterschreiben/ }));
     expect(onAccept).toHaveBeenCalledTimes(1);
     expect(onAccept.mock.calls[0][1]).toMatchObject({ signatur: 'Petra Muster', strasse: 'Rosenweg 3', kpVorname: 'Petra' });
   });

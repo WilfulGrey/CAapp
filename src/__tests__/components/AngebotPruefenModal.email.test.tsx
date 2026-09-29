@@ -39,7 +39,7 @@ const kpEmailInput = () => within(screen.getByRole('region', { name: /Kontaktper
 const fehltZeile = (name: RegExp) => screen.queryByRole('button', { name }) !== null;
 const kommtZurUnterschrift = async (user: ReturnType<typeof userEvent.setup>) => {
   await user.click(screen.getByRole('button', { name: 'Weiter zur Unterschrift' }));
-  return screen.queryByRole('button', { name: /Kostenpflichtig unterschreiben/ }) !== null;
+  return screen.queryByRole('button', { name: /Vertrag jetzt unterschreiben/ }) !== null;
 };
 
 // Der Dialog merkt sich Eingaben im sessionStorage (je Bewerbung) — Tests sollen bei null anfangen.

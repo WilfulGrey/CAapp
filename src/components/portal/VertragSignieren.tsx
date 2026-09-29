@@ -636,7 +636,9 @@ export const VertragSignieren: FC<{
               )}
               <button onClick={klickUnterschreiben}
                 className="w-full rounded-xl py-3.5 text-[16px] font-bold text-white transition-colors bg-[#2A9D5C] hover:bg-[#248a50]">
-                Kostenpflichtig unterschreiben
+                {/* Martin 29.09.2026: „Vertrag jetzt unterschreiben“ statt „Kostenpflichtig unterschreiben“ —
+                    bewusst entschieden trotz Hinweis auf § 312j Abs. 3/4 BGB (Zahlungspflicht im Knopf), Registry #103. */}
+                Vertrag jetzt unterschreiben
               </button>
             </div>
           )}
