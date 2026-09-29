@@ -305,7 +305,7 @@ const Auswahl: FC<{
         {(leerWaehlbar || value === '') && <option value="" disabled={!leerWaehlbar}>Bitte wählen</option>}
         {optionen.map((o) => <option key={o}>{o}</option>)}
       </select>
-      {status === 'leer' && <Hinweis id={hinweisId} ton={z.ton}>Bitte wählen</Hinweis>}
+      {status === 'leer' && <Hinweis id={hinweisId} ton={z.ton}>Bitte {optionen.join(' oder ')} wählen</Hinweis>}
     </div>
   );
 };
