@@ -32,15 +32,17 @@
  * Deshalb geht jetzt alles ueber /api/analytics/collect — gleiche Herkunft,
  * kein CORS, kein fremder Cookie, keine Bot-Pruefung dazwischen.
  *
- * Bewusst mit dem ANON-Key, nicht mit dem Service-Role-Key: es aendert sich
- * nur der Weg, nicht die Berechtigung. RLS gilt unveraendert weiter.
+ * Mit dem Service-Key (seit 10/2026): analytics_sessions ist fuer den
+ * Anon-Schluessel nicht mehr lesbar — landing_page traegt oft
+ * /kalkulation/<leadId>. Was gesetzt werden kann, begrenzt weiter diese Route
+ * (feste Spalten, Laengen, AD_PARAM_SPALTEN), nicht RLS.
  */
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { withMem } from '@/lib/memlog';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const MAX_TEXT = 512;
@@ -69,7 +71,7 @@ function objekt(v: unknown): Record<string, unknown> {
 }
 
 function db() {
-  return createClient(supabaseUrl, supabaseAnonKey, {
+  return createClient(supabaseUrl, supabaseServiceKey, {
     auth: { persistSession: false, autoRefreshToken: false },
   });
 }

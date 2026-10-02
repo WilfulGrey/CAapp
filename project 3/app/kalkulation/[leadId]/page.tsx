@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { createClient } from '@supabase/supabase-js';
 import { format, addDays } from 'date-fns';
 import { Download, Loader as Loader2, Phone, ArrowRight, Shield, Clock, FileText, CircleCheck as CheckCircle2, Bed, Utensils, Chrome as Home, Handshake, Users, Award } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -11,11 +10,6 @@ import { identifyClarity } from '@/lib/clarity';
 import { usableNamePart } from '@/lib/calculation';
 import { PORTAL_BASIS } from '@/lib/portal-url';
 import { HERO_PUNKTE } from '@/lib/hero-punkte';
-
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-);
 
 function formatEuro(amount: number): string {
   return amount.toLocaleString('de-DE', { minimumFractionDigits: 0, maximumFractionDigits: 0 }) + ' €';
@@ -29,8 +23,9 @@ export default function KalkulationPage() {
 
   useEffect(() => {
     async function loadData() {
-      const { data: leadData } = await supabase.from('leads').select('*').eq('id', params.leadId).maybeSingle();
-      if (leadData) setLead(leadData);
+      // leads ist für den Anon-Schlüssel zu — die Daten kommen über die eigene Route.
+      const res = await fetch(`/api/kalkulation/${params.leadId}`, { cache: 'no-store' });
+      if (res.ok) setLead(await res.json());
       setLoading(false);
     }
     loadData();

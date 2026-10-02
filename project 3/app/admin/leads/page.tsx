@@ -11,15 +11,10 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { createClient } from '@supabase/supabase-js';
+import { adminDb as supabase } from '@/lib/admin-db';
 import { Search, Loader as Loader2, Mail, Phone, Calendar, ExternalLink } from 'lucide-react';
 import Link from 'next/link';
 import { istEingekauft, quellenName, reiterFuer, kontaktAnzeige, PORTALE } from '@/lib/portal-lead';
-
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-);
 
 /* „Dzyń" für neue Leads/Portal-Mails (Registry #48): zwei kurze Sinus-Töne
    (A5 → E6) rein aus WebAudio — kein Asset. Browser-Autoplay: der

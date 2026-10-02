@@ -195,29 +195,11 @@ export function proxyHandler(overrides: ProxyActionHandlers = {}) {
 // ─── Supabase leads + onboard handlers ────────────────────────────────────
 
 export function leadHandler(lead = defaultLead) {
-  return http.get(`${SUPABASE_URL}/rest/v1/leads`, ({ request }) => {
-    const url = new URL(request.url);
-    const tokenParam = url.searchParams.get('token');
-    const accept = request.headers.get('accept') ?? '';
-
-    // Supabase .maybeSingle() sends Accept: application/vnd.pgrst.object+json
-    // and expects a single object (or empty object when not found).
-    const wantsSingle = accept.includes('application/vnd.pgrst.object+json');
-
-    // PostgREST filter format: token=eq.xxx
-    if (tokenParam && tokenParam.startsWith('eq.')) {
-      const tok = tokenParam.slice(3);
-      if (tok === lead.token) {
-        return wantsSingle ? HttpResponse.json(lead) : HttpResponse.json([lead]);
-      }
-      // Not found
-      if (wantsSingle) {
-        return HttpResponse.json(null, { status: 406 });
-      }
-      return HttpResponse.json([]);
-    }
-
-    return wantsSingle ? HttpResponse.json(lead) : HttpResponse.json([lead]);
+  // fetchLeadByToken ruft die Funktion lead_by_token (POST, Body { p_token }):
+  // eine skalare jsonb-Funktion — PostgREST antwortet mit dem Objekt oder null.
+  return http.post(`${SUPABASE_URL}/rest/v1/rpc/lead_by_token`, async ({ request }) => {
+    const body = (await request.json()) as { p_token?: string };
+    return HttpResponse.json(body.p_token === lead.token ? lead : null);
   });
 }
 

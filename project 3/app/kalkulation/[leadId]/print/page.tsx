@@ -2,17 +2,11 @@
 
 import { useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
-import { createClient } from '@supabase/supabase-js';
 import { format, addDays } from 'date-fns';
 import { Loader as Loader2 } from 'lucide-react';
 import { HERO_PUNKTE } from '@/lib/hero-punkte';
 import Image from 'next/image';
 import { usableNamePart } from '@/lib/calculation';
-
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-);
 
 function formatEuro(amount: number): string {
   return amount.toLocaleString('de-DE', { minimumFractionDigits: 0, maximumFractionDigits: 0 }) + ' €';
@@ -25,8 +19,9 @@ export default function KalkulationPrintPage() {
 
   useEffect(() => {
     async function loadData() {
-      const { data } = await supabase.from('leads').select('*').eq('id', params.leadId).maybeSingle();
-      if (data) setLead(data);
+      // leads ist für den Anon-Schlüssel zu — die Daten kommen über die eigene Route.
+      const res = await fetch(`/api/kalkulation/${params.leadId}`, { cache: 'no-store' });
+      if (res.ok) setLead(await res.json());
       setLoading(false);
     }
     loadData();

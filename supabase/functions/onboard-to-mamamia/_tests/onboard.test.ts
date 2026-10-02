@@ -206,7 +206,8 @@ Deno.test("onboardLead: happy path — registers customer + joboffer, caches IDs
   assertEquals(supa.updated[0].id, lead.id);
   assertEquals(supa.updated[0].patch.mamamia_customer_id, 7566);
   assertEquals(supa.updated[0].patch.mamamia_job_offer_id, 16225);
-  assertEquals(supa.updated[0].patch.mamamia_user_token, "agency-jwt-xyz");
+  // Der Agentur-Token darf nie in leads landen (war für den Anon-Schlüssel lesbar).
+  assertEquals("mamamia_user_token" in supa.updated[0].patch, false);
 });
 
 Deno.test("onboardLead: StoreCustomer payload (Bug #13: minimal — only real data + business defaults)", async () => {

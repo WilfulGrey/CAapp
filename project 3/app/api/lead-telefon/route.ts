@@ -8,7 +8,7 @@ import { getTelefonNachgetragenTemplate, sendEmail } from '@/lib/email';
 // nummer nach. Token-gebunden wie /api/lead-event (der Magic-Link-Token ist
 // die gemeinsame Kennung), kein Re-Submit von /api/angebot-anfordern — der
 // würde die Kalkulation neu schreiben und eine zweite Team-Mail auslösen.
-// Nie /api/leads/[leadId] (ohne Auth und Whitelist, CLAUDE.md-Befund).
+// (/api/leads/[leadId] — ohne Auth und Whitelist — ist seit 10/2026 gelöscht.)
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;

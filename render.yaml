@@ -34,7 +34,9 @@ services:
     buildCommand: npm install && npm run build
     staticPublishPath: ./dist
     autoDeploy: true
-    pullRequestPreviewsEnabled: true
+    # Aus (10/2026): Vorschauen erben die Prod-Umgebung (beim Kostenrechner samt
+    # Service-Key) und liefen mit fremdem PR-Code gegen die Prod-Datenbank.
+    pullRequestPreviewsEnabled: false
     envVars:
       - key: VITE_SUPABASE_URL
         value: https://ycdwtrklpoqprabtwahi.supabase.co
@@ -76,7 +78,9 @@ services:
     buildCommand: npm install && npm run build
     startCommand: npm run start
     autoDeploy: true
-    pullRequestPreviewsEnabled: true
+    # Aus (10/2026): Vorschauen erben die Prod-Umgebung (beim Kostenrechner samt
+    # Service-Key) und liefen mit fremdem PR-Code gegen die Prod-Datenbank.
+    pullRequestPreviewsEnabled: false
     envVars:
       # Public — baked into the client bundle; safe to commit-or-prompt.
       # NEXT_PUBLIC_SITE_URL: once the service has its assigned URL, swap

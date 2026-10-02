@@ -70,6 +70,12 @@ async function handlePost(request: NextRequest) {
     // even if sent — never trust portal callers to address arbitrary leads.
     if (!token) return jsonError(400, 'token_required');
   } else {
+    /* Admin-Pfade nur mit Admin-Cookie: diese Route liegt nicht unter
+       /api/admin, die middleware schützt sie also nicht — vorher reichte eine
+       Lead-UUID, um einen frischen Portal-Token zurückzubekommen. Aufrufer ist
+       nur die Admin-Detailseite (same-origin, das Cookie geht mit). */
+    const pw = process.env.ADMIN_PASSWORD;
+    if (!pw || request.cookies.get('admin_auth')?.value !== pw) return jsonError(401, 'unauthorized');
     // Admin paths use lead_id. Portal token there would be a misconfig.
     if (!leadId) return jsonError(400, 'lead_id_required');
   }
