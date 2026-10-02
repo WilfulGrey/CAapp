@@ -111,12 +111,18 @@ audit-row w `lead_events`).
 | **Confirm ostemplowany, ale MM nie pokazuje confirmation na jobie tej Bewerbung** (bramka uploadu nachlasa; `booking_not_visible` = `not_processed` \| `foreign_confirmation`, Registry #82) | **~T+2 min** z retry-chain, **15 min** z crona — to problem BOOKINGOWY: klient dostał „Neue Buchung", a w MM nic tego nie potwierdza | retry-chain → POST (source `sync-retry`), potem cron (source `cron`); mail bridge'a ma własny, CZERWONY wariant „Buchung nicht in Mamamia sichtbar" |
 | Confirm OK, **confirmation widoczna**, tylko PDF-upload niedomknięty | po **24h** (archiwum, zero ryzyka klienta — render/StoreFile pada, booking stoi) | cron, ten sam kanał |
 | Wiersz naprawiony w tym samym przebiegu crona / stufie chaina | **bez alarmu** (alarm ocenia stan PO retry, nie sprzed) | — |
+| **Bewerbung odrzucona PO bookingu, a booking NIE stornowany** (Registry #110, Fall Hunkirchen: agencja odrzuciła Bewerbung 26 s po confirmation, w MM 3 dni „gebucht", PK nie przyjechała). Reguła na protokole MM (`CustomerLogsWithPagination`): `confirmation_created(C)` ≥ akcept − 2 min (C = nasz booking, nie adoptowany), żadnego tytułu kończącego C (`confirmation_rejected` = świadome storno SA/CGA ⇒ cisza), `application_rejected(A)` > t_C + 5 s (siostry z tej samej transakcji odpadają) | po **60 min karencji**, cron (faza po pętli leadów, przed Discovery; budżet 20 s) — **Dry-Run domyślnie**, scharf dopiero `WITHDRAWN_ALARM_LIVE=1` | cron → POST **`acceptance_withdrawn_alarm`** z `Authorization: Bearer <service_role>` (bez niego 401 — token klienta NIE wystarcza); bridge dedupuje po `lead_events`+`application_id`, mail (CZERWONY „Bewerbung nach Unterschrift zurückgezogen") PRZED insertem |
 | Krok 1 (kontakt-rows) odrzucony przez walidację MM LUB e-mail z formularza wyrzucony (`contact_fields_dropped`) — booking NIE dotknięty (Registry #52) | po CAŁEJ sekwencji (`finally` w `syncAcceptance`, timeout 5 s), pomijany gdy confirm permanent (czerwony już niesie błąd) | edge → POST **`acceptance_contact_alarm`** (ŻÓŁTY team-mail „Kontaktdaten nicht in Mamamia übernommen" + rohwerte); bridge dedupuje po `lead_events`+`application_id`, mail PRZED insertem; **bez** stempla `mamamia_sync_alerted_at` |
 
 Stałe: `RETRY_DELAYS_MS = [15s, 30s, 60s]` (`sync-acceptance/index.ts`);
 `ACCEPTANCE_CONFIRM_ALERT_AFTER_MS = 5 min`, `ACCEPTANCE_BOOKING_ALERT_AFTER_MS = 15 min`, `ACCEPTANCE_PDF_ALERT_AFTER_MS = 24h`
 (`detect-caregiver-events/index.ts`); retry wewnętrzny `CONFIRM_TRANSIENT_RETRIES = 2`
 (`_shared/acceptanceSync.ts`). Stempel `mamamia_sync_alerted_at` = jednorazowość alarmu.
+Registry #110 (`detect-caregiver-events/stilleRuecknahme.ts` + `index.ts`): okno 30 dni
+(`ACCEPTANCE_SYNC_MAX_AGE_DAYS`), `BUCHUNG_TOLERANZ_MS = 2 min`, `GESCHWISTER_MARGE_MS = 5 s`,
+`KARENZ_MS = 60 min`, `WITHDRAWN_BUDGET_MS = 20 s`, timeout MM i bridge 5 s, protokół po 100
+wpisów do 5 stron (pokrycie do dnia przed najstarszym akceptem klienta; niepełne ⇒ NIE oceniamy,
+licznik `unvollstaendig`). Jednorazowość = dedupe w bridge'u (bez stempla, bez migracji).
 
 **Dwie granice tej polityki, obie świadome (Registry #82):**
 
@@ -126,10 +132,13 @@ Stałe: `RETRY_DELAYS_MS = [15s, 30s, 60s]` (`sync-acceptance/index.ts`);
    żaden dzwonek przez 7 dni. Dlatego właściwym sygnałem jest **odczyt z MM** (bramka
    uploadu), a nie nasz zapis. Konsekwencja: mur `gehoertZurRow` jest pojedynczym punktem
    zaufania — każda jego zmiana wymaga testu regresyjnego, bo gdy on skłamie, alarm zamilknie.
-2. **Anulowanie akceptu w Mamamii NIE jest awarią i nie alarmuje** (decyzja Michała,
-   22.09.2026). Confirmation, która była widoczna i zniknęła później, to storno — legalny
-   krok agencji. Monitoring pilnuje wyłącznie „akcept nigdy nie wylądował", nigdy
-   „zniknął po czasie"; inaczej każdy storno zapalałby czerwone światło.
+2. **Świadome storno w Mamamii NIE jest awarią i nie alarmuje** (decyzja Michała,
+   22.09.2026, doprecyzowana 02.10.2026). Storno SA lub CGA zostawia w protokole MM
+   `confirmation_rejected` — legalny krok, zero alarmu (6 z 7 zniknięć bookingów we wrześniu).
+   **Awarią jest natomiast Bewerbung, która znika po cichu** (Registry #110): agencja
+   odrzuca *Bewerbung* po bookingu, a booking zostaje — w MM wygląda na obstawione, PK nie
+   przyjedzie. Od 10/2026 MM blokuje odrzucenie Bewerbung z confirmation; alarm #110 to
+   siatka bezpieczeństwa za tym blokiem.
 
 **Jak trafienie znika:** stan gaśnie sam, gdy upload przejdzie — a przejdzie dopiero,
 gdy MM pokaże naszą confirmation na właściwym jobie. Trwałym kanałem jest linia
@@ -224,7 +233,12 @@ Next.js i wywalał kontener Render (512 MB) OOM-em. Kluczowe fakty:
 - **Cache tokena agencji** (`mamamiaClient.ts`) nie jest invalidowany po `Unauthenticated`.
 - Czerwony template alarmu nie rozróżnia „walidacja" od „Bewerbung zurückgezogen"
   (flaga `validation` w `confirm_error` — propagacja w 3 miejscach).
-- `acceptance_sync_alarm` jest NON_DEDUPED i autoryzowany tokenem klienta (spam-wektor).
+- `acceptance_sync_alarm` jest NON_DEDUPED, a `acceptance_sync_alarm` i `acceptance_contact_alarm`
+  są autoryzowane tokenem klienta (spam-wektor). Nowy `acceptance_withdrawn_alarm` (Registry #110)
+  wymaga już Service-Role — wzorzec do przeniesienia na dwa pozostałe.
+- **Cron detect trwa 2–2,5 min i dobija do limitu 150 s** (02.10.2026: przebiegi 13:00 i 14:00
+  skończyły się 504 PRZED fazą akceptu — backstop alarmów wtedy nie biegnie; dotyczy też #110).
+  Osobne zadanie; czasy faz loguje od #110 `[phase] <nazwa> start t=…` + `*_ms` w JSON-ie przebiegu.
 
 - Utrwalanie checkboxów zgód + Ort podpisu (kolumny `consent_read/consent_widerruf/signed_ort`
   czekają puste — przeglądarka je dziś wyrzuca).
@@ -240,5 +254,12 @@ Next.js i wywalał kontener Render (512 MB) OOM-em. Kluczowe fakty:
   brak sekretu = funkcja nie startuje. Wartość per env: prod `https://kostenrechner.primundus.de`,
   staging `https://kostenrechner-staging.onrender.com`. Auth wywołania: `Authorization: Bearer <SERVICE_ROLE_KEY>`
   (constant-time compare) — WYŁĄCZNIE server-to-server (bridge/cron), nigdy z przeglądarki.
+- `detect-caregiver-events`: **`WITHDRAWN_ALARM_LIVE`** (Registry #110) — `1`/`true` = alarm
+  „Bewerbung po cichu" wysyła maile; brak/inna wartość = Dry-Run (tylko log `[withdrawn DRY-RUN]`).
+  Czytany przy KAŻDYM wywołaniu (nie w bootstrapie, nie przez `requireEnv`) ⇒
+  `supabase secrets set WITHDRAWN_ALARM_LIVE=1 --project-ref …` działa bez redeployu, rollback =
+  `secrets unset`. Staging zostaje bez sekretu (Dry-Run). Bridge (Render) sprawdza
+  `Authorization` wobec własnego `SUPABASE_SERVICE_ROLE_KEY` — musi być identyczny z kluczem
+  wstrzykiwanym edge-runtime'owi (legacy service_role; sprawdzone 02.10. po sha256).
 - CI deployuje `sync-acceptance` na staging (pętla w `test.yml`); prod manualnie
   (`supabase functions deploy sync-acceptance --project-ref ycdwtrklpoqprabtwahi`).
