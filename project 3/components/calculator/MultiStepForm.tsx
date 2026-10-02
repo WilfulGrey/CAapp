@@ -1061,7 +1061,8 @@ export function MultiStepForm({ mode = 'inline', bewertung = null }: MultiStepFo
       const source = (e as CustomEvent<{ source?: string }>).detail?.source ?? 'cta';
       analytics.trackEvent('wizard', 'wizard_opened', { source });
       setWarmupAudience('direct');
-      setCurrentStep(1);
+      // Kein Zurücksetzen auf Frage 1 (Registry #108): Wer schon geantwortet
+      // und geschlossen hat, macht an seiner Frage weiter — wie beim Hero-Knopf.
       setFullscreen(true);
     };
     window.addEventListener(OPEN_CALCULATOR_EVENT, oeffnen);
@@ -1104,6 +1105,30 @@ export function MultiStepForm({ mode = 'inline', bewertung = null }: MultiStepFo
     document.body.style.overflow = 'hidden';
     return () => { document.body.style.overflow = vorher; };
   }, [fullscreen]);
+
+  // Schließen = Pause, kein Neustart (Registry #108, Martin 02.10.2026).
+  // Bis dahin setzten das X und ein Tipp auf den dunklen Hintergrund den
+  // Fragebogen auf Frage 1 zurück. Die Cookie-Leiste (z-50) liegt unter dem
+  // Hintergrund (z-80): Wer per ?start=1 kam und auf die Leiste tippte, traf
+  // den Hintergrund — Fragebogen zu, beim Wiederöffnen wieder Frage 1 (live 32
+  // von 32 Läufen). Jetzt schließt nur das X, und Schritt und Antworten
+  // bleiben: Die Antworten liegen im CalculatorProvider, der Schritt in diesem
+  // State, und die Komponente bleibt beim Schließen gemountet (CTA-Zweig
+  // unten). Hero-Knopf und alle CTAs öffnen an derselben Frage. Ein noch
+  // laufender Auto-Weiter (Antwort vor < 300 ms getippt) wird verworfen, damit
+  // der Fragebogen nicht geschlossen weiterläuft — die Antwort bleibt gewählt.
+  // Der Inline-Modus (derzeit nirgends eingebunden) setzt wie bisher zurück.
+  const schliessen = () => {
+    if (advanceTimer.current) {
+      clearTimeout(advanceTimer.current);
+      advanceTimer.current = null;
+    }
+    setFullscreen(false);
+    if (mode !== 'cta') {
+      setWarmupAudience(null);
+      setCurrentStep(1);
+    }
+  };
 
   // Offen = ECHTES Overlay (fixed), nicht mehr `relative` im Textfluss
   // (Martin 16.08.: "warum oeffnet sich das so weit unten und nicht wie bei
@@ -1268,7 +1293,10 @@ export function MultiStepForm({ mode = 'inline', bewertung = null }: MultiStepFo
 
   return (
     <>
-    {fullscreen && <div className="fixed inset-0 bg-black/60 z-[80]" aria-hidden="true" onClick={() => { setFullscreen(false); if (mode !== 'cta') setWarmupAudience(null); setCurrentStep(1); }} />}
+    {/* Der Hintergrund schließt NICHT (Registry #108): Ein Tipp daneben, etwa
+        auf die Cookie-Leiste darunter, kostete den ganzen Fortschritt.
+        Schließen nur über das X (`schliessen`). */}
+    {fullscreen && <div className="fixed inset-0 bg-black/60 z-[80]" aria-hidden="true" />}
     <div ref={formRef} id="calculator-form" className={outerClass}>
       <div className="relative">
       <div data-calculator-card className="bg-white rounded-2xl border-[1.5px] border-[#C0C0C0] overflow-hidden shadow-md">
@@ -1276,7 +1304,7 @@ export function MultiStepForm({ mode = 'inline', bewertung = null }: MultiStepFo
           {fullscreen && currentStep !== totalSteps && (
             <button
               type="button"
-              onClick={() => { setFullscreen(false); if (mode !== 'cta') setWarmupAudience(null); setCurrentStep(1); }}
+              onClick={schliessen}
               aria-label="Schließen"
               className="absolute right-2.5 top-1/2 -translate-y-1/2 w-8 h-8 flex items-center justify-center rounded-full text-white hover:bg-white/20"
             >
