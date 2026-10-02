@@ -10,7 +10,7 @@ import { createClient } from '@supabase/supabase-js';
    immer an beiden geändert. Die Sitzung (Token-Erneuerung, Realtime) hält
    supabase-js selbst; AdminLayoutClient leitet ohne Sitzung zum Login, weil der
    Client sonst still auf den Anon-Schlüssel zurückfällt und leere Listen zeigt. */
-export const ADMIN_EMAIL = 'admin-panel@primundus.de';
+export const ADMIN_EMAIL = 'info@primundus.de';
 
 export const adminDb = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
