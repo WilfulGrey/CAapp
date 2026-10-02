@@ -142,6 +142,13 @@ Wizard-Events:
   `eventCallback` + `eventTimeout: 700` + Safety-`setTimeout(900)` vor
   `window.location.assign` — der Google-Ads-Conversion-Tag (GTM) bekommt
   Zeit zu feuern, Adblocker blockieren nur den Tag, nie den Redirect.
+- **Schließen und Wiederöffnen (Registry #108):** Der dunkle Hintergrund des
+  Overlays schließt bei den Fragen nicht; dort schließt nur das X, ohne Schritt
+  oder Antworten zurückzusetzen. Im Kontaktschritt (kein X) schließt der Tipp
+  daneben wie bisher, ebenfalls ohne Zurücksetzen. Hero-Knopf und alle CTAs öffnen an derselben Frage. Für die
+  Messung: `step_view` feuert beim Wiederöffnen für die aktuelle Frage erneut
+  (der Trichter zählt Sitzungen), `wizard_opened` je Öffnen wie bisher, der
+  anonyme Zähler `schritt_N` bleibt bei einmal je Seitenaufruf.
 - **Ad-Parameter:** `gclid`/`wbraid`/`gbraid`/`utm_term`/`utm_content` aus
   der Landing-URL landen per best-effort Update auf `analytics_sessions`
   (utm_source/medium/campaign standen schon im Insert) + in sessionStorage
