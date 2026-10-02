@@ -36,16 +36,19 @@ function rumpf(kopf: string): string {
 }
 
 describe('Fragebogen-Overlay: Hintergrund-Tipp kostet keinen Fortschritt', () => {
-  it('der dunkle Hintergrund hat keinen Klick-Handler', () => {
+  it('der dunkle Hintergrund schließt nur im Kontaktschritt (dort gibt es kein X)', () => {
     const hintergruende = [...quelle.matchAll(/<div[^>]*bg-black\/60[^>]*>/g)].map((m) => m[0]);
     // Fragebogen und Warteseite haben je einen Hintergrund.
     expect(hintergruende.length).toBeGreaterThanOrEqual(2);
     for (const h of hintergruende) {
-      expect(h, 'Ein Tipp auf den Hintergrund (z. B. auf die Cookie-Leiste) schließt wieder den Fragebogen').not.toMatch(/onClick|onPointer|onMouse|onTouch/);
+      const ohneKontaktAusgang = h.replace('onClick={currentStep === totalSteps ? schliessen : undefined}', '');
+      expect(ohneKontaktAusgang, 'Ein Tipp auf den Hintergrund (z. B. auf die Cookie-Leiste) schließt wieder den Fragebogen').not.toMatch(/onClick|onPointer|onMouse|onTouch/);
     }
+    // Der eine erlaubte Ausgang: nur im Kontaktschritt und nur über `schliessen` (hält Schritt und Antworten).
+    expect(hintergruende.filter((h) => h.includes('onClick=')).length).toBeLessThanOrEqual(1);
   });
 
-  it('nur das X schließt — über die Funktion `schliessen`', () => {
+  it('bei den Fragen schließt nur das X — über die Funktion `schliessen`', () => {
     const xKnopf = quelle.slice(quelle.lastIndexOf('<button', quelle.indexOf('aria-label="Schließen"')), quelle.indexOf('aria-label="Schließen"'));
     expect(xKnopf).toMatch(/onClick=\{schliessen\}/);
     // Jeder weitere Ort, der den Fragebogen schließt, braucht eine eigene Entscheidung.

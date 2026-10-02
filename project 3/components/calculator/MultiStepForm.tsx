@@ -1293,10 +1293,13 @@ export function MultiStepForm({ mode = 'inline', bewertung = null }: MultiStepFo
 
   return (
     <>
-    {/* Der Hintergrund schließt NICHT (Registry #108): Ein Tipp daneben, etwa
-        auf die Cookie-Leiste darunter, kostete den ganzen Fortschritt.
-        Schließen nur über das X (`schliessen`). */}
-    {fullscreen && <div className="fixed inset-0 bg-black/60 z-[80]" aria-hidden="true" />}
+    {/* Der Hintergrund schließt bei den Fragen NICHT (Registry #108): Ein Tipp
+        daneben, etwa auf die Cookie-Leiste darunter, kostete den ganzen
+        Fortschritt. Dort schließt nur das X (`schliessen`). Ausnahme
+        Kontaktschritt (Schritt 9): Er hat kein X, der Tipp daneben bleibt dort
+        der Ausgang wie bisher — jetzt über `schliessen`, also ohne Neustart;
+        der Knopf öffnet wieder beim Kontaktschritt. */}
+    {fullscreen && <div className="fixed inset-0 bg-black/60 z-[80]" aria-hidden="true" onClick={currentStep === totalSteps ? schliessen : undefined} />}
     <div ref={formRef} id="calculator-form" className={outerClass}>
       <div className="relative">
       <div data-calculator-card className="bg-white rounded-2xl border-[1.5px] border-[#C0C0C0] overflow-hidden shadow-md">
