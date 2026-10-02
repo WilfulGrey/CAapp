@@ -248,7 +248,12 @@ describe('AngebotCard – letzter Schritt', () => {
     entwurf(VOLL);
     render(<AngebotCard lead={lead} />);
     for (let i = 0; i < 3; i++) await weiter();
-    expect(screen.getByText(/Nach dem Absenden bewerben sich passende Pflegekräfte/)).toBeInTheDocument();
+    // Wortlaut seit Registry #109 (Martin 02.10.), direkt über „Bewerbungen erhalten“.
+    expect(screen.getByText(
+      'Kostenlos und unverbindlich. Ein Vertrag entsteht erst, wenn Sie eine Bewerbung annehmen und im Portal unterschreiben.',
+    )).toBeInTheDocument();
+    expect(screen.queryByText(/72 Stunden/)).toBeNull();
+    expect(screen.getByRole('button', { name: 'Bewerbungen erhalten' })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Zurück' })).toBeNull();
     await userEvent.click(screen.getByRole('button', { name: 'Zurück zu Schritt 3' }));
     schritt(3);
@@ -256,13 +261,14 @@ describe('AngebotCard – letzter Schritt', () => {
 });
 
 describe('AngebotCard – Angaben ändern nach dem Absenden', () => {
-  it('schon abgeschickt: „Änderungen speichern“ statt „Bewerbungen erhalten“, kein 72-h-Satz', async () => {
+  it('schon abgeschickt: „Änderungen speichern“ statt „Bewerbungen erhalten“, kein Satz über dem Knopf', async () => {
     localStorage.setItem(`patient_${TOKEN}`, JSON.stringify({ ...VOLL, _isDraft: false }));
     const onAbgesendet = vi.fn();
     render(<AngebotCard lead={lead} onAbgesendet={onAbgesendet} />);
     for (let i = 0; i < 3; i++) await weiter();
     expect(screen.queryByRole('button', { name: 'Bewerbungen erhalten' })).toBeNull();
-    expect(screen.queryByText(/Nach dem Absenden bewerben sich passende Pflegekräfte/)).toBeNull();
+    expect(screen.queryByText(/Kostenlos und unverbindlich/)).toBeNull();
+    expect(screen.queryByText(/Vertrag entsteht/)).toBeNull();
     await userEvent.click(screen.getByRole('button', { name: 'Änderungen speichern' }));
     expect(onAbgesendet).toHaveBeenCalledWith(true);
   });

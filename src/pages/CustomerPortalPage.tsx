@@ -74,7 +74,7 @@ import { zeigtSommerzuschlag } from '../components/portal/konditionen';
 import { PflegekraftChat } from '../components/portal/PflegekraftChat';
 import { TELEFON_HREF } from '../lib/kontakt';
 import { useSterneStand } from '../lib/sterne';
-import { BestpreisSheet, WarumSheet } from '../components/portal/PortalSheets';
+import { BestpreisSheet } from '../components/portal/PortalSheets';
 import { SoGehtEsWeiter } from '../components/portal/SoGehtEsWeiter';
 import { FaqListe } from '../components/portal/FaqListe';
 import { MartaBox } from '../components/portal/MartaBox';
@@ -651,9 +651,9 @@ const CustomerPortalPage: FC = () => {
   // Formulars. AngebotCard meldet das selbst (onImBlick), weil sie neu gemountet werden kann.
   const [formularImBlick, setFormularImBlick] = useState(false);
 
-  // Pop-ups der Angebotsseite (Portal-Redesign Teil 3).
+  // Pop-up der Angebotsseite (Portal-Redesign Teil 3). Das zweite, „Warum erst die
+  // Pflegesituation?", ist seit Registry #109 weg: Jeder Knopf springt direkt ins Formular.
   const [bestpreisOffen, setBestpreisOffen] = useState(false);
-  const [warumOffen, setWarumOffen] = useState(false);
   const sterne = useSterneStand();
   // Manual override for the "Ihr Angebot" expand/collapse. null = follow
   // the auto rule below (expanded only in initial state). Toggling sets
@@ -1894,11 +1894,11 @@ const CustomerPortalPage: FC = () => {
     // Without it, the caregiver can't prepare a meaningful application
     // and we get back-and-forth queries that frustrate both sides.
     if (!patientSaved) {
-      // Seit Teil 3 des Redesigns (Martin 24.09.): Einladen mit Schloss öffnet
-      // „Warum erst die Pflegesituation?" mit dem Knopf zum Formular. Vorher
-      // (Clarity 07.09.) sprang der Knopf direkt ins Formular — ohne zu sagen,
-      // warum; der Hauptweg sind Bewerbungen, Einladen ist die Zugabe.
-      setWarumOffen(true);
+      // „Profil vervollständigen & einladen" springt direkt ins Formular, wie bis
+      // 24.09. (Registry #109, Martin 02.10.). Das Fenster „Warum erst die
+      // Pflegesituation?" aus Teil 3 (24.09.) ist weg: Seitdem speicherte nur noch
+      // jeder 20. Neukunde die Pflegesituation in der ersten Stunde, vorher 28 %.
+      zurPflegesituation();
       return false;
     }
     // Serialize concurrent invite clicks. Backend gate is per-request
@@ -3255,31 +3255,18 @@ const CustomerPortalPage: FC = () => {
              nimmt ohnehin den ersten. */}
         {!hasPending && (
           <div className="px-1 pt-6" id="pflegekraefte" style={{scrollMarginTop:96}}>
-            {/* Martins Wortlaut (24.09., Entwurf v3/v4): Der Kunde erwartet
-                Bewerbungen; Einladen ist die Zugabe für die Wartezeit, und beides
-                geht erst mit vollständiger Pflegesituation. „Warum? Mehr" erklärt
-                es im Pop-up. Die Vertrags-Erklärung („unverbindlich …") steht
-                weiter in der FAQ. Keine feste Zahl in der Überschrift: bereits
-                eingeladene Kräfte zählen nicht mit. */}
+            {/* Vor dem Absenden wieder der Wortlaut der guten Phase bis 24.09. (Registry #109,
+                Martin 02.10.: „4 ja“): Was „Einladen“ heißt und dass es nichts kostet und
+                nicht bindet. Der Link „Warum? Mehr“ und sein Pop-up sind weg. Keine feste
+                Zahl in der Überschrift: bereits eingeladene Kräfte zählen nicht mit. */}
             <SectionHeader
               // Nach dem Absenden ist Einladen die Zugabe für die Wartezeit
               // (Martin 24./25.09.) — der Stand oben trägt die Bewerbungen.
               eyebrow={patientSaved ? 'In der Zwischenzeit' : 'Für Sie ausgewählt'}
               titel={patientSaved ? 'Selbst einladen' : 'Passende Pflegekräfte'}
-              zeile={patientSaved ? (
-                <>Laden Sie ein, wer Ihnen gefällt. Die Pflegekraft meldet sich meist innerhalb von 1–2 Tagen.</>
-              ) : (
-                <>
-                  Laden Sie ein, wer Ihnen gefällt. Das geht, sobald Ihre Pflegesituation vollständig ist.{' '}
-                  <button
-                    type="button"
-                    onClick={() => setWarumOffen(true)}
-                    className="inline-flex min-h-[44px] -my-3 items-center whitespace-nowrap font-bold text-pm-taupe-ink underline underline-offset-2"
-                  >
-                    Warum? Mehr
-                  </button>
-                </>
-              )}
+              zeile={patientSaved
+                ? 'Laden Sie ein, wer Ihnen gefällt. Die Pflegekraft meldet sich meist innerhalb von 1–2 Tagen.'
+                : 'Gefällt Ihnen eine Pflegekraft, laden Sie sie ein, sich bei Ihnen zu bewerben. Das ist kostenlos und unverbindlich: Ein Vertrag entsteht erst, wenn Sie eine Bewerbung annehmen und im Portal unterschreiben.'}
             />
           </div>
         )}
@@ -3366,25 +3353,22 @@ const CustomerPortalPage: FC = () => {
                 {/* Der eine Schritt, markant und positiv (Martin, 08.09.): steht
                     nur hier über den Pflegekräften, nicht mehr zusätzlich unter
                     den Kosten. Kein „Kostenrechner", kein „erst danach" —
-                    Erwartung statt Schranke. Seit Registry #102 wieder da (Stand
-                    25.09. mittags), mit „aus Ihrer Anfrage“ statt „aus Ihrem
-                    Kostenrechner“ (Martin 26.09.: Kunden kennen „Kostenrechner“
-                    nicht). Nie für Kunden, die schon abgeschickt haben — auch nicht
-                    kurz, bis mamamia antwortet (`schonAbgesendet`, Review 25.09.). */}
+                    Erwartung statt Schranke. Wortlaut seit Registry #109 wieder wie
+                    bis 24.09. (Einladen + Bewerbungen, „Jetzt vervollständigen →“),
+                    ohne die Statuszeile „Pflegesituation unvollständig“; der Look
+                    (Hinweis-Karte, Koralle-Knopf) bleibt. Nie für Kunden, die schon
+                    abgeschickt haben — auch nicht kurz, bis mamamia antwortet
+                    (`schonAbgesendet`, Review 25.09.). */}
                 {!patientSaved && !schonAbgesendet && (
                 <Card ton="hinweis" className="p-5 mb-5">
-                  {/* Status im selben Wortlaut wie beim Formular (Martin 24.09.:
-                      „Pflegesituation unvollständig"), Bernstein wie dort. */}
-                  <p className="flex items-center gap-2 text-[13px] font-bold text-pm-amber-ink">
-                    <span className="w-2 h-2 rounded-full bg-pm-amber" aria-hidden="true" />
-                    Pflegesituation unvollständig
+                  <p className="text-[17.5px] font-extrabold leading-[1.25] text-pm-ink">Noch 2 Minuten bis zum Einladen</p>
+                  <p className="mt-2 mb-4 text-[14.5px] leading-[1.5] text-pm-muted">
+                    Vervollständigen Sie kurz Ihre Pflegesituation. Danach können Sie diese Pflegekräfte einladen und erhalten Bewerbungen mit Foto, Erfahrung, Anreisedatum und Preis. Vieles ist schon ausgefüllt.
                   </p>
-                  <p className="mt-2 text-[17.5px] font-extrabold leading-[1.25] text-pm-ink">Noch 2 Minuten bis zu Ihren Bewerbungen</p>
-                  <p className="mt-2 mb-4 text-[14.5px] leading-[1.5] text-pm-muted">Vieles ist schon aus Ihrer Anfrage übernommen.</p>
                   {/* Einziger Hauptknopf der Pflegekräfte (Koralle); einzeilig bei
                       360 px — deshalb schmale Innenabstände. */}
                   <Button breit onClick={zurPflegesituation} className="px-2 whitespace-nowrap">
-                    Pflegesituation vervollständigen
+                    Jetzt vervollständigen →
                   </Button>
                 </Card>
                 )}
@@ -3614,18 +3598,18 @@ const CustomerPortalPage: FC = () => {
           // ruhigen Rahmen zurück.
           return (
           <div id="patientendaten" className="px-1 pt-6 scroll-mt-24">
-            {/* Ein Kopf statt vier Überschriften (Teil 3, Entwurf v4): Eyebrow,
-                Titel, Status, ein Satz. Ersetzt „Jetzt konkrete Bewerbungen
-                erhalten" (Strecke v2, 11.09.) — der Hauptweg steht jetzt im
-                Pflegekräfte-Abschnitt und im Kasten „Noch 2 Minuten". Kein
-                eigener Knopf: das Formular beginnt direkt darunter.
-                Farbe des Status: Bernstein wie im Kasten (Koralle nur für Knöpfe). */}
+            {/* Ein Kopf (Teil 3, Entwurf v4): Eyebrow, Status, Titel, ein Satz. Titel
+                und Satz seit Registry #109 wieder wie bis 24.09. („Jetzt konkrete
+                Bewerbungen erhalten“, Strecke v2, 11.09.): der Nutzen in der
+                Überschrift, „Pflegesituation“ als Eyebrow. Kein eigener Knopf: das
+                Formular beginnt direkt darunter. Farbe des Status: Bernstein
+                (Koralle nur für Knöpfe). */}
             {!patientSaved ? (
               <SectionHeader
-                eyebrow="Bewerbungen erhalten"
-                titel="Pflegesituation"
+                eyebrow="Pflegesituation"
+                titel="Jetzt konkrete Bewerbungen erhalten"
                 rechts={<StatusBadge ton="warnung">Unvollständig</StatusBadge>}
-                zeile="In 2 Minuten, vieles ist schon ausgefüllt. Danach bewerben sich passende Pflegekräfte bei Ihnen."
+                zeile="Vervollständigen Sie die Pflegesituation, damit Sie Pflegekräfte einladen und Bewerbungen erhalten können. Dauert etwa 2 Minuten, vieles ist schon ausgefüllt."
               />
             ) : (
               <button
@@ -3961,10 +3945,11 @@ const CustomerPortalPage: FC = () => {
       <div className="max-w-3xl mx-auto px-3.5 pt-1 pb-6 space-y-4">
         {/* ── So geht es weiter · Häufige Fragen · Marta (Teil 3 des Redesigns).
              Schritt 1 = Pflegesituation gespeichert, Schritt 2 = Bewerbung da. ── */}
-        {/* Nach dem Absenden ersetzt „Stand heute" diese Liste (Martin 25.09.). */}
+        {/* Nach dem Absenden ersetzt „Stand heute" diese Liste (Martin 25.09.).
+            Schritt 1 trägt seit Registry #109 wieder den Knopf ins Formular. */}
         {!patientSaved && (
           <div className="pt-6">
-            <SoGehtEsWeiter erledigt={[patientSaved, hasPending, false]} />
+            <SoGehtEsWeiter erledigt={[patientSaved, hasPending, false]} onVervollstaendigen={zurPflegesituation} />
           </div>
         )}
         <div className="pt-6">
@@ -4018,9 +4003,8 @@ const CustomerPortalPage: FC = () => {
         <PflegekraftChat nurse={chatNurse} onClose={() => setChatNurse(null)} />
       )}
 
-      {/* Pop-ups der Angebotsseite (Teil 3 des Redesigns). */}
+      {/* Pop-up der Angebotsseite (Teil 3 des Redesigns). */}
       <BestpreisSheet offen={bestpreisOffen} onClose={() => setBestpreisOffen(false)} />
-      <WarumSheet offen={warumOffen} onClose={() => setWarumOffen(false)} onVervollstaendigen={zurPflegesituation} />
 
       {/* ── Rückmeldung zum Angebot (schwebend, unten rechts), zurück seit Registry #102 ────────────
            Als Kasten im Fluss saß sie ~3000 px weit unten und wurde kaum gesehen (Martin, 12.08.).

@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import type { FC } from 'react';
-import { Check, Heart, Lock, Sparkles, UserPlus, X } from 'lucide-react';
+import { Check, Heart, Sparkles, UserPlus, X } from 'lucide-react';
 import type { Nurse } from '../../types';
 import type { NurseStatus } from './shared';
 import { PflegekraftProfil } from './PflegekraftProfil';
@@ -36,9 +36,11 @@ export const MatchCard: FC<{
    *  all pass the gate. Local invitePhase='sending' on this card already
    *  hides the button — this prop covers the OTHER cards. */
   globalInviteLocked?: boolean;
-  /** Pflegesituation fehlt noch: „Einladen" als Umriss-Knopf mit Schloss; der Tipp
-   *  öffnet über `onInvite` das Pop-up „Warum erst die Pflegesituation?" (Teil 3 des
-   *  Redesigns, Martin 24.09. — vorher „Profil vervollständigen & einladen", brach um). */
+  /** Pflegesituation fehlt noch: Koralle-Knopf „Profil vervollständigen & einladen" über die
+   *  volle Breite, derselbe Text wie auf der Interesse-Karte (Registry #109, Martin 02.10.).
+   *  Der Tipp geht über `onInvite`; das Portal springt dort direkt ins Formular
+   *  (`zurPflegesituation`) und gibt `false` zurück. Vom 24.09. bis 02.10. stand hier
+   *  „Einladen" mit Schloss und ein Erklärfenster. */
   profilFehlt?: boolean;
   /** Tipp auf die Stufen-Plakette: Profil mit geöffneter Erklärung (07.09.,
    *  Clarity: Kunden tippten Stammkraft/Bewährt und nichts passierte). */
@@ -165,16 +167,24 @@ export const MatchCard: FC<{
             </svg>
             Bitte warten…
           </button>
+        ) : profilFehlt ? (
+          // Volle Breite (Registry #109): Bis 24.09. stand der lange Text rechtsbündig und
+          // brach um. Gemessen (WebKit, Inter): Inhalt 268 px, Knopf bei 360 px 297 px breit,
+          // also einzeilig ab 360 px; darunter bricht er im Knopf um, statt überzustehen.
+          <button
+            type="button"
+            onClick={e => { e.stopPropagation(); handleInvite(); }}
+            className="w-full min-h-[44px] inline-flex items-center justify-center gap-1.5 px-3 rounded-full bg-pm-coral text-white text-[15px] font-bold leading-tight text-center transition-colors hover:bg-pm-coral-deep active:scale-[0.98] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-pm-taupe"
+          >
+            <UserPlus className="w-4 h-4 flex-none" aria-hidden="true" />
+            Profil vervollständigen &amp; einladen
+          </button>
         ) : (
           <button
             onClick={e => { e.stopPropagation(); handleInvite(); }}
-            className={`min-h-[44px] inline-flex items-center gap-1.5 px-[18px] rounded-full text-[15px] font-bold whitespace-nowrap transition-colors active:scale-[0.98] ${
-              profilFehlt
-                ? 'bg-white border-[1.5px] border-[#CDBFA8] text-pm-taupe-ink hover:border-pm-taupe'
-                : 'bg-pm-coral text-white hover:bg-pm-coral-deep'
-            }`}
+            className="min-h-[44px] inline-flex items-center gap-1.5 px-[18px] rounded-full text-[15px] font-bold whitespace-nowrap transition-colors active:scale-[0.98] bg-pm-coral text-white hover:bg-pm-coral-deep"
           >
-            {profilFehlt ? <Lock className="w-4 h-4" aria-hidden="true" /> : <UserPlus className="w-4 h-4" aria-hidden="true" />}
+            <UserPlus className="w-4 h-4" aria-hidden="true" />
             Einladen
           </button>
         )}

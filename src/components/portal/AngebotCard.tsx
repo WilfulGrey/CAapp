@@ -18,7 +18,6 @@ import type { PatientForm } from './shared';
 import { STEP_LABELS, einsatzortHinweis } from './shared';
 import type { MamamiaCustomer } from '../../lib/mamamia/types';
 import { mapMamamiaCustomerToPatientForm, germanySkillLabel } from '../../lib/mamamia/mappers';
-import { RESERVIERUNG_STUNDEN } from '../../lib/reservierung';
 
 // Plausibilitäts-Check für Telefonnummern — bewusst lax, dieselbe Regel wie
 // im Kostenrechner (project 3/lib/telefon.ts): 8–15 Ziffern, führendes „+"
@@ -749,7 +748,7 @@ export const AngebotCard: FC<{
 
   const letzterSchritt = step === STEP_LABELS.length - 1;
   // Schon abgeschickt (lokal oder laut mamamia aktiv) → nur Angaben ändern: kein erneutes
-  // „Bewerbungen anfragen", kein neues 72-h-Versprechen (Review 25.09.).
+  // „Bewerbungen erhalten", kein Satz über dem Knopf (Review 25.09.).
   // `hasFinalSave` allein reicht nicht: Die erste Änderung überschreibt den
   // lokalen Vermerk mit `_isDraft: true` (Review 25.09.).
   const nurAenderung = hasFinalSave || !!schonAbgesendet || (mmCustomer?.status != null && mmCustomer.status !== 'draft');
@@ -1079,13 +1078,13 @@ export const AngebotCard: FC<{
                     placeholder="z. B. Körperpflege, Mahlzeiten, Arztbegleitung, Einkäufe"
                     rows={3} className={`${inputCls} resize-none`} />
                 </FormField>
-                {/* Was das Absenden bedeutet (Martin 25.09.): verbindlich anfragen,
-                    72 h Reservierung je Bewerbung (= Auto-Absage in
-                    detect-caregiver-events), Vertrag erst mit Zusage. */}
+                {/* Was das Absenden bedeutet, direkt über „Bewerbungen erhalten“: kostenlos,
+                    unverbindlich, Vertrag erst mit Annahme und Unterschrift (Registry #109,
+                    Martin 02.10.). Vorher stand hier die 72-h-Reservierung (Registry #90);
+                    die steht weiter in „Stand heute“ und an der Bewerbung. */}
                 {!nurAenderung && (
                   <p className="mt-2 pt-4 border-t border-pm-line-soft text-[14.5px] leading-[1.5] text-pm-body">
-                    Nach dem Absenden bewerben sich passende Pflegekräfte bei Ihnen. Jede Bewerbung ist {RESERVIERUNG_STUNDEN} Stunden für Sie reserviert.
-                    Ein Vertrag entsteht erst, wenn Sie zusagen.
+                    Kostenlos und unverbindlich. Ein Vertrag entsteht erst, wenn Sie eine Bewerbung annehmen und im Portal unterschreiben.
                   </p>
                 )}
               </>

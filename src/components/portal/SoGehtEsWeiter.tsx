@@ -1,20 +1,22 @@
-// „So geht es weiter" (Portal-Redesign Teil 3). Liste mit feinen Trennlinien, ohne Knopf —
-// das Formular steht direkt darüber. Texte: Martin 24.09.2026 (Entwurf v4). Der Hauptweg sind
-// Bewerbungen; Einladen ist nur ein Angebot für die Wartezeit. Anreise wie `VORLAUF` auf
-// primundus.de: „ab 3 Tagen" (vorher „4–7 Werktagen").
+// „So geht es weiter" (Portal-Redesign Teil 3). Liste mit feinen Trennlinien. Steht nur vor dem
+// Absenden (danach ersetzt „Stand heute" sie). Texte seit Registry #109 (Martin 02.10.) wieder wie
+// bis 24.09.: Schritt 1 ist die Handlung und trägt den Knopf ins Formular, Schritt 2 nennt Einladen
+// und Bewerbungen zusammen. Anreise wie `VORLAUF` auf primundus.de: „ab 3 Tagen".
 import { Check } from 'lucide-react';
 import { SectionHeader } from '../ui/SectionHeader';
+import { Button } from '../ui/Button';
 
 export const SCHRITTE = [
-  // Seit 26.09. heißt der Knopf „Bewerbungen erhalten"; Schritt 1 ist die Handlung, Schritt 2 der Nutzen.
-  { titel: 'Pflegesituation beschreiben', text: '2 Minuten, vieles ist schon ausgefüllt.' },
-  { titel: 'Bewerbungen erhalten', text: 'Passende Pflegekräfte bewerben sich bei Ihnen, per E-Mail. Jede Bewerbung ist 72 Stunden für Sie reserviert.' },
+  { titel: 'Pflegesituation vervollständigen', text: 'Dauert etwa 2 Minuten, vieles ist schon ausgefüllt.' },
+  { titel: 'Pflegekräfte einladen und Bewerbungen erhalten', text: 'Passende Pflegekräfte bewerben sich bei Ihnen mit Foto, Erfahrung, Anreisedatum und Preis.' },
   { titel: 'Auswählen und starten', text: 'Wir übernehmen den Rest. Anreise schon ab 3 Tagen möglich.' },
 ] as const;
 
-export function SoGehtEsWeiter({ erledigt }: {
+export function SoGehtEsWeiter({ erledigt, onVervollstaendigen }: {
   /** erledigt[i] = Schritt i ist abgeschlossen (Pflegesituation gespeichert, Bewerbung da). */
   erledigt: readonly boolean[];
+  /** Knopf „Jetzt vervollständigen →" unter Schritt 1, solange der offen ist: springt ins Formular. */
+  onVervollstaendigen?: () => void;
 }) {
   const aktiv = SCHRITTE.findIndex((_, i) => !erledigt[i]);
   return (
@@ -33,9 +35,14 @@ export function SoGehtEsWeiter({ erledigt }: {
               >
                 {fertig ? <Check className="w-4 h-4" strokeWidth={3} aria-label="erledigt" /> : i + 1}
               </span>
-              <div className="min-w-0">
+              <div className="min-w-0 flex-1">
                 <p className={`mt-[3px] text-[16px] font-bold ${fertig ? 'text-pm-mute' : 'text-pm-ink'}`}>{s.titel}</p>
                 <p className={`mt-1 text-[14.5px] leading-[1.5] ${fertig ? 'text-pm-mute' : 'text-pm-muted'}`}>{s.text}</p>
+                {i === 0 && jetzt && onVervollstaendigen && (
+                  <Button groesse="sm" breit onClick={onVervollstaendigen} className="mt-3 whitespace-nowrap">
+                    Jetzt vervollständigen →
+                  </Button>
+                )}
               </div>
             </li>
           );
