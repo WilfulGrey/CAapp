@@ -29,6 +29,14 @@ import {
 } from "../_shared/acceptanceSync.ts";
 import { requireEnv } from "../_shared/env.ts";
 import {
+  brauchtWeitereSeite,
+  type LogEintrag,
+  rotiere,
+  type Ruecknahme,
+  stilleRuecknahme,
+  withdrawnAlarmIsLive,
+} from "./stilleRuecknahme.ts";
+import {
   type ApplicationNode,
   type CaregiverNode,
   type InterestNode,
@@ -157,6 +165,8 @@ export interface DetectSupabase {
   stampAcceptanceSyncAlerted?(leadId: string, applicationId: number): Promise<void>;
   /** Job der Bewerbung aus dem Akzept-Event (Guard-Weg 3, Registry #78). Optional wie die vier oben. */
   fetchAcceptanceJobOfferId?(leadId: string, applicationId: number): Promise<number | null>;
+  /** Registry #110: gebuchte Zeilen, deren Bewerbung still zurückgezogen werden könnte. Optional ⇒ alte Fakes = No-op. */
+  selectWatchedAcceptances?(maxAgeDays: number): Promise<WatchedAcceptance[]>;
   // Follow-up Discovery (Bug #25): Leads außerhalb des Active-Sets, deren
   // Mamamia-Customer einen NEU eröffneten geplanten Job haben könnte.
   // Selbst-taktend via leads.mamamia_jobs_checked_at. Alle drei optional —
@@ -164,6 +174,17 @@ export interface DetectSupabase {
   fetchDiscoveryLeads?(recheckHours: number, batchSize: number): Promise<Array<LeadRow & { status?: string | null }>>;
   stampLeadJobsChecked?(leadId: string): Promise<void>;
   markLeadFolgeEinsatz?(leadId: string, mamamiaJobOfferId: number): Promise<void>;
+}
+
+// Gebuchte Zeile für die Prüfung auf still zurückgezogene Bewerbungen (Registry #110).
+export interface WatchedAcceptance {
+  lead_id: string;
+  application_id: number;
+  caregiver_id: number | null;
+  mamamia_confirmation_id: number | null;
+  accepted_at: string;
+  lead_token: string | null;
+  lead_mamamia_customer_id: number | null;
 }
 
 // Pending-Row inkl. Lead-Anker (Join) — alles, was syncAcceptance braucht.
@@ -218,6 +239,25 @@ export interface BatchResult {
   discovery_probed: number;
   discovery_folge_einsatz: number;
   discovery_errors: number;
+  // Registry #110: still zurückgezogene Bewerbungen (Zähler aus checkStilleRuecknahmen).
+  withdrawn: WithdrawnStats;
+  // Phasendauern — Messdaten für das 504-Problem des Crons (Läufe brauchen 2–2,5 min).
+  loop_ms: number;
+  acceptance_ms: number;
+  withdrawn_ms: number;
+  discovery_ms: number;
+}
+
+export interface WithdrawnStats {
+  rows_geladen: number;
+  rows_geprueft: number;
+  hits: number;
+  alerts: number;
+  errors: number;
+  unvollstaendig: number;
+  unbekannt: number;
+  skipped: number;
+  aufgeschoben: number;
 }
 
 export interface HandlerDeps {
@@ -226,6 +266,8 @@ export interface HandlerDeps {
   fetchFn?: typeof fetch;
   /** Injectable für Tests — Backoff-Pausen der Confirm-Retries in acceptanceSync. */
   sleepFn?: (ms: number) => Promise<void>;
+  /** Injectable für Tests — Uhr für Budget, Rotation, Karenz und Phasendauern (Registry #110). */
+  nowFn?: () => number;
 }
 
 // ─── Handler ───────────────────────────────────────────────────────────────
@@ -273,6 +315,15 @@ async function handleSingle(leadId: string, deps: HandlerDeps): Promise<Response
 }
 
 async function handleBatch(deps: HandlerDeps): Promise<Response> {
+  const now = deps.nowFn ?? Date.now;
+  const t0 = now();
+  // Eine Startzeile je Phase: stirbt ein Lauf am 150-s-Limit (504), zeigt das
+  // Log, in welcher Phase (Läufe brauchen heute 2–2,5 min, Registry #110).
+  const phase = (name: string) => {
+    console.log(`[phase] ${name} start t=${now() - t0}ms`);
+    return now();
+  };
+  let ts = phase("leads");
   const leads = await deps.supabase.fetchActiveLeads();
   const batch: BatchResult = {
     mode: "batch",
@@ -294,6 +345,11 @@ async function handleBatch(deps: HandlerDeps): Promise<Response> {
     discovery_probed: 0,
     discovery_folge_einsatz: 0,
     discovery_errors: 0,
+    withdrawn: leereWithdrawnStats(),
+    loop_ms: 0,
+    acceptance_ms: 0,
+    withdrawn_ms: 0,
+    discovery_ms: 0,
   };
 
   for (const lead of leads) {
@@ -318,18 +374,32 @@ async function handleBatch(deps: HandlerDeps): Promise<Response> {
     }
   }
 
+  batch.loop_ms = now() - ts;
+
   // ── Acceptance-Sync-Retry (Refactor 2026-07-22) ──
+  ts = phase("acceptance");
   const rr = await retryAcceptanceSyncs(deps);
   batch.acceptance_syncs_scanned = rr.scanned;
   batch.acceptance_syncs_completed = rr.completed;
   batch.acceptance_sync_errors = rr.errors;
   batch.acceptance_sync_alerts = rr.alerts;
+  batch.acceptance_ms = now() - ts;
+
+  // ── Still zurückgezogene Bewerbungen (Registry #110) ──
+  // Bewusst NACH der Lead-Schleife: vorgezogen könnte eine langsame
+  // Mamamia-Abfrage die Bewerbungsmails aushungern. Die Karenz von 60 min
+  // verkraftet einen Lauf, der vorher am Zeitlimit stirbt.
+  ts = phase("withdrawn");
+  batch.withdrawn = await checkStilleRuecknahmen(deps);
+  batch.withdrawn_ms = now() - ts;
 
   // ── Follow-up Discovery (Bug #25) ──
+  ts = phase("discovery");
   const disc = await discoverFolgeEinsaetze(deps);
   batch.discovery_probed = disc.probed;
   batch.discovery_folge_einsatz = disc.folgeEinsatz;
   batch.discovery_errors = disc.errors;
+  batch.discovery_ms = now() - ts;
 
   return new Response(JSON.stringify(batch), {
     status: 200,
@@ -633,6 +703,199 @@ export async function retryAcceptanceSyncs(
     }
   }
 
+  return out;
+}
+
+// ─── Still zurückgezogene Bewerbung (Registry #110) ───────────────────────
+// Fall Hunkirchen (28.09.2026): Kunde unterschreibt, Mamamia bucht, 26 s später
+// lehnt die Agentur die BEWERBUNG ab — die Buchung bleibt stehen, die Pflegekraft
+// kommt nicht, drei Tage merkt es niemand. Unsere Alarme oben prüfen nur bis zum
+// PDF-Upload, ob Mamamia den Akzept annahm; das hatte sie. Diese Phase liest je
+// Kunde das Mamamia-Änderungsprotokoll und meldet NUR den stillen Fall (Regel in
+// stilleRuecknahme.ts). Bewusste Stornos (SA/CGA, `confirmation_rejected`) bleiben
+// still. Dry-Run per Default — scharf erst mit WITHDRAWN_ALARM_LIVE=1.
+
+const WITHDRAWN_BUDGET_MS = 20_000;
+const WITHDRAWN_MM_TIMEOUT_MS = 5_000;
+const WITHDRAWN_BRIDGE_TIMEOUT_MS = 5_000;
+const WITHDRAWN_SEITE = 100;
+const WITHDRAWN_MAX_SEITEN = 5;
+// Protokoll muss bis einen Tag vor die älteste beobachtete Unterschrift reichen.
+const WITHDRAWN_ABDECKUNG_VORLAUF_MS = 24 * 3600_000;
+
+// Felder + `total` live auf Prod verifiziert (Sonde 02.10.2026, Cron-Konto).
+// KEINE weiteren Felder ohne Prod-Test (Lehre 11.07.: rejected_at brach eine Abfrage).
+const CUSTOMER_LOGS = /* GraphQL */ `
+  query CustomerLogs($id: Int!, $limit: Int, $page: Int) {
+    CustomerLogsWithPagination(customer_id: $id, limit: $limit, page: $page) {
+      total
+      data { title logable_type logable_id created_at custom_author_name data }
+    }
+  }
+`;
+
+function leereWithdrawnStats(): WithdrawnStats {
+  return {
+    rows_geladen: 0, rows_geprueft: 0, hits: 0, alerts: 0, errors: 0,
+    unvollstaendig: 0, unbekannt: 0, skipped: 0, aufgeschoben: 0,
+  };
+}
+
+// Team-Alarm über die Bridge. Service-Role im Header: das Event ist nur
+// server-to-server erlaubt (Kunden-Token allein reicht dafür nicht).
+async function postWithdrawnAlarm(
+  deps: HandlerDeps,
+  z: WatchedAcceptance,
+  r: Ruecknahme,
+): Promise<"gesendet" | "deduped" | "fehler"> {
+  const fetcher = deps.fetchFn ?? globalThis.fetch;
+  try {
+    const res = await fetcher(`${deps.secrets.kostenrechnerUrl.replace(/\/$/, "")}/api/lead-event`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "Authorization": `Bearer ${deps.secrets.supabaseServiceKey}` },
+      body: JSON.stringify({
+        token: z.lead_token,
+        event: "acceptance_withdrawn_alarm",
+        metadata: {
+          application_id: z.application_id,
+          caregiver_id: z.caregiver_id,
+          confirmation_id: z.mamamia_confirmation_id,
+          accepted_at: z.accepted_at,
+          ...r,
+          source: "cron",
+        },
+      }),
+      signal: AbortSignal.timeout(WITHDRAWN_BRIDGE_TIMEOUT_MS),
+    });
+    if (!res.ok) {
+      console.error(`[withdrawn] Bridge HTTP ${res.status} (lead=${z.lead_id}, app=${z.application_id})`);
+      return "fehler";
+    }
+    const body = await res.json().catch(() => ({})) as { deduped?: boolean };
+    return body.deduped === true ? "deduped" : "gesendet";
+  } catch (e) {
+    console.error(`[withdrawn] Bridge-POST fehlgeschlagen (lead=${z.lead_id}, app=${z.application_id}):`, (e as Error).message);
+    return "fehler";
+  }
+}
+
+export async function checkStilleRuecknahmen(deps: HandlerDeps): Promise<WithdrawnStats> {
+  const out = leereWithdrawnStats();
+  const supa = deps.supabase;
+  if (!supa.selectWatchedAcceptances) return out; // alter Adapter/Fake → No-op
+  const now = deps.nowFn ?? Date.now;
+  const start = now();
+
+  let zeilen: WatchedAcceptance[];
+  try {
+    zeilen = await supa.selectWatchedAcceptances(ACCEPTANCE_SYNC_MAX_AGE_DAYS);
+  } catch (e) {
+    console.error("[withdrawn] Zeilen laden fehlgeschlagen:", (e as Error).message);
+    out.errors += 1;
+    return out;
+  }
+  out.rows_geladen = zeilen.length;
+
+  const jeKunde = new Map<number, WatchedAcceptance[]>();
+  for (const z of zeilen) {
+    if (!z.lead_token || z.lead_mamamia_customer_id == null) {
+      console.warn(`[withdrawn] Zeile ohne Token/MM-Kunde übersprungen (lead=${z.lead_id}, app=${z.application_id})`);
+      out.skipped += 1;
+      continue;
+    }
+    const liste = jeKunde.get(z.lead_mamamia_customer_id) ?? [];
+    liste.push(z);
+    jeKunde.set(z.lead_mamamia_customer_id, liste);
+  }
+  const kunden = rotiere([...jeKunde.keys()], start);
+  if (kunden.length === 0) return out;
+
+  const fetcher = deps.fetchFn ?? globalThis.fetch;
+  const mmFetch = ((input: RequestInfo | URL, init?: RequestInit) =>
+    fetcher(input, { ...init, signal: AbortSignal.timeout(WITHDRAWN_MM_TIMEOUT_MS) })) as typeof fetch;
+  let token: string;
+  try {
+    token = await getOrRefreshAgencyToken({
+      authEndpoint: deps.secrets.mamamiaAuthEndpoint,
+      email: deps.secrets.mamamiaAgencyEmail,
+      password: deps.secrets.mamamiaAgencyPassword,
+      fetchFn: mmFetch,
+    });
+  } catch (e) {
+    console.error("[withdrawn] Mamamia-Login fehlgeschlagen:", (e as Error).message);
+    out.errors += 1;
+    return out;
+  }
+  const live = withdrawnAlarmIsLive();
+
+  for (let i = 0; i < kunden.length; i++) {
+    if (now() - start > WITHDRAWN_BUDGET_MS) {
+      out.aufgeschoben = kunden.length - i;
+      console.warn(`[withdrawn] Budget ${WITHDRAWN_BUDGET_MS} ms erschöpft — ${out.aufgeschoben} Kunden auf den nächsten Lauf verschoben`);
+      break;
+    }
+    const kunde = kunden[i];
+    const kundenZeilen = jeKunde.get(kunde)!;
+    const grenze = Math.min(...kundenZeilen.map((z) => Date.parse(z.accepted_at))) - WITHDRAWN_ABDECKUNG_VORLAUF_MS;
+
+    const eintraege: LogEintrag[] = [];
+    let abgedeckt = false;
+    try {
+      for (let seite = 1; seite <= WITHDRAWN_MAX_SEITEN; seite++) {
+        const r = await mamamiaRequest<{
+          CustomerLogsWithPagination?: { total?: number | null; data?: LogEintrag[] | null } | null;
+        }>({
+          endpoint: deps.secrets.mamamiaEndpoint,
+          token,
+          query: CUSTOMER_LOGS,
+          variables: { id: kunde, limit: WITHDRAWN_SEITE, page: seite },
+          fetchFn: mmFetch,
+        });
+        const daten = r.CustomerLogsWithPagination?.data ?? [];
+        eintraege.push(...daten);
+        if (!brauchtWeitereSeite(daten, eintraege.length, r.CustomerLogsWithPagination?.total ?? 0, grenze)) {
+          abgedeckt = true;
+          break;
+        }
+      }
+    } catch (e) {
+      console.error(`[withdrawn] Protokoll MM-Kunde ${kunde} nicht lesbar:`, (e as Error).message);
+      out.errors += 1;
+      continue;
+    }
+    if (!abgedeckt) {
+      // Ohne vollständiges Fenster nicht auswerten: am Seitenrand könnte eine
+      // frühe Absage fehlen, die Regel 4 braucht. Lieber verpassen als falsch alarmieren.
+      console.error(`[withdrawn] Protokoll MM-Kunde ${kunde} unvollständig (${eintraege.length} Einträge, ${WITHDRAWN_MAX_SEITEN} Seiten) — nicht ausgewertet`);
+      out.unvollstaendig += kundenZeilen.length;
+      continue;
+    }
+
+    for (const z of kundenZeilen) {
+      out.rows_geprueft += 1;
+      const p = stilleRuecknahme(eintraege, z, now());
+      if (p.unbekannt.length > 0) {
+        out.unbekannt += p.unbekannt.length;
+        console.warn(`[withdrawn] unbekannte Protokoll-Titel (lead=${z.lead_id}, app=${z.application_id}): ${p.unbekannt.join(", ")}`);
+      }
+      if (!p.treffer) continue;
+      out.hits += 1;
+      if (!live) {
+        console.log(
+          `[withdrawn DRY-RUN] would alarm lead=${z.lead_id} app=${z.application_id} ` +
+            `conf=${z.mamamia_confirmation_id} rejected_at=${p.treffer.rejected_at} type=${p.treffer.reject_type ?? "—"}`,
+        );
+        continue;
+      }
+      const ergebnis = await postWithdrawnAlarm(deps, z, p.treffer);
+      if (ergebnis === "gesendet") {
+        out.alerts += 1;
+        console.error(`🚨 [withdrawn] Alarm gesendet: lead=${z.lead_id} app=${z.application_id} conf=${z.mamamia_confirmation_id}`);
+      } else if (ergebnis === "fehler") {
+        out.errors += 1;
+      }
+    }
+  }
   return out;
 }
 
@@ -1564,6 +1827,30 @@ function makeRealSupabase(url: string, serviceKey: string): DetectSupabase {
           lead_token: lead?.token ?? null,
           lead_mamamia_customer_id: lead?.mamamia_customer_id ?? null,
         } as PendingAcceptanceSync;
+      });
+    },
+    // Registry #110: gebuchte Zeilen der letzten Tage, neueste zuerst.
+    async selectWatchedAcceptances(maxAgeDays: number) {
+      const cutoff = new Date(Date.now() - maxAgeDays * 24 * 60 * 60 * 1000).toISOString();
+      const { data, error } = await client
+        .from("lead_application_acceptances")
+        .select("lead_id, application_id, caregiver_id, mamamia_confirmation_id, accepted_at, leads!inner(token, mamamia_customer_id)")
+        .not("signatur", "is", null)
+        .not("mamamia_confirmation_id", "is", null)
+        .gt("accepted_at", cutoff)
+        .order("accepted_at", { ascending: false });
+      if (error) throw new Error(`supabase selectWatchedAcceptances: ${error.message}`);
+      return (data ?? []).map((r: Record<string, unknown>) => {
+        const lead = r.leads as { token?: string | null; mamamia_customer_id?: number | null } | null;
+        return {
+          lead_id: r.lead_id as string,
+          application_id: r.application_id as number,
+          caregiver_id: (r.caregiver_id as number | null) ?? null,
+          mamamia_confirmation_id: (r.mamamia_confirmation_id as number | null) ?? null,
+          accepted_at: r.accepted_at as string,
+          lead_token: lead?.token ?? null,
+          lead_mamamia_customer_id: lead?.mamamia_customer_id ?? null,
+        };
       });
     },
     async stampAcceptanceConfirmed(leadId: string, applicationId: number, confirmationId: number | null) {

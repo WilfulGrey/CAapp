@@ -19,6 +19,7 @@ import { testphaseUmleitung } from '@/lib/portal-schutz';
 import { createHash } from 'crypto';
 import { kundenEmpfaenger } from '@/lib/empfaenger';
 import { holeBewertungsStand } from '@/lib/bewertungen-stand';
+import { buildRuecknahmeAlarm, istServiceRoleAnfrage, ruecknahmeInfo } from '@/lib/ruecknahme-alarm';
 
 // Bridge endpoint: the CA-App portal reports customer milestones back to the
 // kostenrechner lead so the Nachfass emails can branch. Token-authenticated —
@@ -94,6 +95,11 @@ const ALLOWED_EVENTS = [
   // Alarm für immer). Kein Stempel mamamia_sync_alerted_at (gehört dem roten
   // Buchungs-Alarm). TEAM-MAIL-ONLY.
   'acceptance_contact_alarm',
+  // Registry #110: angenommene Bewerbung NACH der Buchung still abgelehnt, die
+  // Buchung blieb stehen (Fall Hunkirchen). Gesendet vom detect-Cron, NUR mit
+  // Service-Role (Prüfung vor der Lead-Suche). Dedupe pro application_id über
+  // lead_events, Mail VOR dem Insert (Muster #52). TEAM-MAIL-ONLY.
+  'acceptance_withdrawn_alarm',
 ];
 const TEAM_NOTIFY_EVENTS = [
   'patient_data_saved',
@@ -825,6 +831,11 @@ async function handlePost(request: NextRequest) {
     if (!ALLOWED_EVENTS.includes(event)) {
       return NextResponse.json({ error: 'invalid event' }, { status: 400, headers: corsHeaders });
     }
+    if (event === 'acceptance_withdrawn_alarm') {
+      const auth = istServiceRoleAnfrage(request.headers.get('authorization'), process.env.SUPABASE_SERVICE_ROLE_KEY);
+      if (auth === 'fehlt') return NextResponse.json({ error: 'nicht konfiguriert' }, { status: 503, headers: corsHeaders });
+      if (auth === 'nein') return NextResponse.json({ error: 'nicht berechtigt' }, { status: 401, headers: corsHeaders });
+    }
 
     // Multi-Job: detect-caregiver-events transports the concrete Mamamia job
     // in metadata.mamamia_job_offer_id; we promote it to a dedicated column.
@@ -1107,6 +1118,46 @@ async function handlePost(request: NextRequest) {
         event_type: event,
         metadata: { source: 'acceptance-sync', ...m, application_id: appId },
       });
+      return NextResponse.json({ ok: true }, { headers: corsHeaders });
+    }
+
+    // Registry #110: still zurückgezogene Bewerbung. Eigener Block VOR dem
+    // generischen Dedupe/Insert (der würde lead-weit deduplizieren und die
+    // Zeile vor der Mail schreiben). Der Cron postet bei bestehendem Zustand
+    // jeden Lauf erneut — die Antwort `deduped` beendet das.
+    if (event === 'acceptance_withdrawn_alarm') {
+      const m = (metadata ?? {}) as Record<string, unknown>;
+      const info = ruecknahmeInfo(m);
+      if (!info) {
+        return NextResponse.json({ error: 'application_id required' }, { status: 400, headers: corsHeaders });
+      }
+      const { data: existing } = await supabase
+        .from('lead_events')
+        .select('id')
+        .eq('lead_id', lead.id)
+        .eq('event_type', event)
+        .eq('metadata->>application_id', info.application_id)
+        .limit(1);
+      if (existing && existing.length > 0) {
+        return NextResponse.json({ ok: true, deduped: true }, { headers: corsHeaders });
+      }
+      const mail = await sendEmail(TEAM_NOTIFY_RECIPIENT, buildRuecknahmeAlarm(lead, info), undefined, {
+        extraBcc: ACCEPT_TEAM_NOTIFY_EXTRA_BCC,
+      });
+      if (!mail.success) {
+        console.error(`[withdrawn-alarm] mail failed (lead=${lead.id}, app=${info.application_id}):`, mail.error);
+        return NextResponse.json(
+          { error: `alarm mail failed: ${(mail.error ?? 'unknown').slice(0, 300)}` },
+          { status: 502, headers: corsHeaders },
+        );
+      }
+      const { error: insErr } = await supabase.from('lead_events').insert({
+        lead_id: lead.id,
+        event_type: event,
+        metadata: { source: 'detect-withdrawn', ...m, application_id: info.application_id },
+      });
+      // Bekannte Grenze: ohne Zeile mailt der nächste Cron-Lauf erneut.
+      if (insErr) console.error(`[withdrawn-alarm] insert failed (lead=${lead.id}, app=${info.application_id}):`, insErr.message);
       return NextResponse.json({ ok: true }, { headers: corsHeaders });
     }
 
