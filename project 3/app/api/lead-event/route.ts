@@ -154,6 +154,13 @@ const NON_DEDUPED_EVENTS = new Set([
   // falsch), wäre der zweite Versuch sonst stumm und das Team sähe für immer
   // nur den ersten.
   'patient_form_location_unresolved',
+  // Jeder erreichte Schritt des Patientenbogens (metadata.step, 0-basiert:
+  // 1 = „Pflegebedarf", 2 = „Einsatzort & Start", 3 = „Wünsche & Aufgaben").
+  // Der Dedupe prüft nur (Lead, Typ), also blieb bis Registry #109 nur der
+  // ERSTE Schritt je Lead stehen — wo im Bogen abgebrochen wird, war nicht
+  // messbar. Keine Mail: weder in TEAM_NOTIFY_EVENTS noch in
+  // CUSTOMER_MAIL_EVENTS. Das Portal meldet jeden Schritt einmal je Sitzung.
+  'patient_form_step',
 ]);
 // Customer-facing Mails (an die Lead-Email) je Event. Trigger sind die neuen
 // Caregiver-Lifecycle-Events; das eigentliche Hooking aus Mamamia kommt

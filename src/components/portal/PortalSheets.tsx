@@ -1,8 +1,8 @@
-// Die beiden Pop-ups der Angebotsseite (Portal-Redesign Teil 3, Martin 24.09.2026).
+// Pop-up der Angebotsseite (Portal-Redesign Teil 3, Martin 24.09.2026).
 //   BestpreisSheet: eigenes Pop-up statt Link auf kostenrechner.primundus.de/bestpreisgarantie,
 //                   Wortlaut aus src/lib/garantie.ts (freigegeben 12.09.).
-//   WarumSheet:     „Warum erst die Pflegesituation?" — hinter „Warum? Mehr" und hinter dem
-//                   Einladen-Knopf mit Schloss, solange die Pflegesituation fehlt.
+// Das zweite Pop-up „Warum erst die Pflegesituation?" (WarumSheet) ist seit Registry #109
+// gelöscht (Martin 02.10.): „Profil vervollständigen & einladen" springt direkt ins Formular.
 import { useState } from 'react';
 import { Check, ChevronDown, Phone, ShieldCheck } from 'lucide-react';
 import { Sheet } from '../ui/Sheet';
@@ -72,36 +72,6 @@ export function BestpreisSheet({ offen, onClose }: { offen: boolean; onClose: ()
           </ul>
         )}
       </div>
-    </Sheet>
-  );
-}
-
-export function WarumSheet({ offen, onClose, onVervollstaendigen }: {
-  offen: boolean;
-  onClose: () => void;
-  onVervollstaendigen: () => void;
-}) {
-  return (
-    <Sheet
-      offen={offen}
-      titel="Warum erst die Pflegesituation?"
-      onClose={onClose}
-      fuss={(
-        <>
-          <Button breit onClick={() => { onClose(); onVervollstaendigen(); }} className="px-2 whitespace-nowrap">
-            Bewerbungen erhalten
-          </Button>
-          <Button variante="link" breit onClick={onClose} className="mt-2">Schließen</Button>
-        </>
-      )}
-    >
-      <p>Die Pflegekräfte entscheiden anhand Ihrer Angaben, ob sie zu Ihnen passen und wann sie anreisen können. Zum Beispiel:</p>
-      <ul className="mt-1">
-        <Punkt>Pflegegrad, Mobilität und Demenz</Punkt>
-        <Punkt>Einsätze in der Nacht</Punkt>
-        <Punkt>Wohnort, Unterbringung und Startdatum</Punkt>
-      </ul>
-      <p className="mt-2">Ohne diese Angaben kann sich niemand bewerben. Das Ausfüllen dauert etwa 2 Minuten.</p>
     </Sheet>
   );
 }

@@ -18,7 +18,7 @@ export type LeadEvent =
   | 'caregiver_declined'           // customer hat eine Pflegekraft abgelehnt (matching ODER interest)
   | 'caregiver_declined_undone'    // customer hat die Ablehnung rückgängig gemacht (Undo)
   | 'application_rejected'        // customer Bewerbung abgelehnt
-  | 'patient_form_step'           // Patientenbogen: Schritt erreicht (metadata.step) — Abbruch-Analyse
+  | 'patient_form_step'           // Patientenbogen: Schritt erreicht (metadata.step) — Abbruch-Analyse; Server speichert jeden (nicht dedupliziert, Registry #109)
   | 'patient_form_save_failed'    // Patientenbogen: Server-Save gescheitert (metadata.error)
   | 'patient_form_location_unresolved' // Einsatzort nicht auf einen Mamamia-location_id auflösbar → Speichern abgelehnt (Registry #65); Team-Mail
   | 'angebots_feedback';          // Rückmeldung zum Angebot: ein Tap + optionales Detail
