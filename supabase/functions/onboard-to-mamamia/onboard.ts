@@ -501,7 +501,8 @@ async function createCustomerAndJob(args: {
   await supabase.updateLead(lead.id, {
     mamamia_customer_id: mamamiaCustomerId,
     mamamia_job_offer_id: mamamiaJobOfferId,
-    mamamia_user_token: agencyToken,
+    // Kein mamamia_user_token mehr: das war der Agentur-Token von Mamamia, nie
+    // gelesen — und über den offenen Anon-Zugriff auf leads für jeden lesbar.
     mamamia_onboarded_at: now().toISOString(),
   });
 

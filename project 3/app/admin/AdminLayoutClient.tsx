@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
+import { adminDb } from '@/lib/admin-db';
 import { LayoutDashboard, Users, Euro, Gift, LogOut, ChartBar as BarChart3, MessageSquare, Receipt, ExternalLink, ChevronDown, TrendingUp, Wallet, Star } from 'lucide-react';
 
 export default function AdminLayoutClient({ children }: { children: React.ReactNode }) {
@@ -43,7 +44,25 @@ export default function AdminLayoutClient({ children }: { children: React.ReactN
   // Nach einem Seitenwechsel wieder zu.
   useEffect(() => { setOffen(false); }, [pathname]);
 
+  /* Ohne Sitzung am Konto des Panels fällt supabase-js still auf den
+     Anon-Schlüssel zurück, und RLS liefert leere Listen statt eines Fehlers.
+     Deshalb: Seiten erst zeigen, wenn die Sitzung steht; ohne Sitzung zum Login. */
+  const [sitzungOk, setSitzungOk] = useState(false);
+  useEffect(() => {
+    adminDb.auth.getSession().then(({ data }) => {
+      if (data.session) setSitzungOk(true);
+      else window.location.href = '/admin-login';
+    });
+    const { data } = adminDb.auth.onAuthStateChange((event) => {
+      if (event === 'SIGNED_OUT') window.location.href = '/admin-login';
+    });
+    return () => data.subscription.unsubscribe();
+  }, []);
+
   async function handleLogout() {
+    /* scope 'local': alle Admins teilen ein Konto — ein globales Abmelden
+       würde die Sitzungen der anderen mitbeenden. */
+    await adminDb.auth.signOut({ scope: 'local' });
     await fetch('/api/admin/auth', { method: 'DELETE' });
     router.push('/admin-login');
     router.refresh();
@@ -139,7 +158,7 @@ export default function AdminLayoutClient({ children }: { children: React.ReactN
       </nav>
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {children}
+        {sitzungOk ? children : null}
       </main>
     </div>
   );

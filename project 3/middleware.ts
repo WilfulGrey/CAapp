@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 
-const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'primundus2026';
+/* Kein Ersatzwert: das Repo ist öffentlich, ein Default-Passwort im Code wäre
+   für jeden lesbar. Fehlt die Variable, ist das Panel zu (siehe istAngemeldet). */
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD;
 
 /* Admin-API-Routen mit EIGENEM Zugangsschutz — sie duerfen nicht am
    Browser-Cookie haengen:
@@ -17,7 +19,8 @@ const API_OHNE_ADMIN_COOKIE = [
 ];
 
 function istAngemeldet(request: NextRequest): boolean {
-  return request.cookies.get('admin_auth')?.value === ADMIN_PASSWORD;
+  // Ohne ADMIN_PASSWORD wäre undefined === undefined (kein Cookie) ein Login.
+  return !!ADMIN_PASSWORD && request.cookies.get('admin_auth')?.value === ADMIN_PASSWORD;
 }
 
 /* Der A/B-Test mit Pria (Float auf der B-Seite) ist seit 13.09.2026

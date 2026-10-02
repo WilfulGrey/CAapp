@@ -86,11 +86,11 @@ export async function fetchLeadByToken(token: string): Promise<{
   lead: Lead | null;
   error: string | null;
 }> {
-  const { data, error } = await supabase
-    .from('leads')
-    .select('*')
-    .eq('token', token)
-    .maybeSingle();
+  /* Über die Funktion lead_by_token, nicht direkt aus der Tabelle: leads ist für
+     den Anon-Schlüssel per RLS zu (vorher konnte jeder mit dem öffentlichen
+     Schlüssel alle Leads lesen). Liefert die eigene Zeile als Objekt — ohne
+     interne Spalten (admin_notes, notizen, mamamia_user_token) — oder null. */
+  const { data, error } = await supabase.rpc('lead_by_token', { p_token: token });
 
   if (error) return { lead: null, error: error.message };
   if (!data) return { lead: null, error: 'Token nicht gefunden' };

@@ -49,7 +49,7 @@ Stan kodu: `integration/mamamia-onboarding`, ostatnie sweepy K1–K7 (kwiecień�
 │  caapp-beta/?token=X        │
 │  (Vite/React, src/)         │
 └──┬──────────────────────────┘
-   │ 4. GET /rest/v1/leads?token=eq.X  ──►  Supabase.leads
+   │ 4. POST /rest/v1/rpc/lead_by_token { p_token: X }  ──►  Supabase (Registry #107)
    │ 5. POST /functions/v1/onboard-to-mamamia { token }
    ▼
 ┌──────────────────────────────────────────────────────────────────────────────┐
@@ -124,8 +124,11 @@ Next.js 13 SSR, deployowane na `kostenrechner-beta.onrender.com` z brancha
 
 ### Tracking Stage A (analytics_*, Bug #33)
 
-`lib/analytics.ts` pisze bezpośrednio (anon key) do `analytics_sessions` /
-`analytics_events` / `analytics_conversions`. Wizard-Events:
+`lib/analytics.ts` wysyła przez trasy kostenrechnera (`/api/analytics/collect`,
+`/critical-event`, `/page-time`) do `analytics_sessions` / `analytics_events` /
+`analytics_conversions`. `collect` pisze Service-Keyem: `analytics_sessions` jest dla
+anon zamknięte (Registry #107 — `landing_page` niesie często `/kalkulation/<leadId>`).
+Wizard-Events:
 `warmup_answered`, `step_view` / `step_complete` (step 1–9, step 9 =
 `contact_form`), `step_back`.
 
@@ -463,7 +466,9 @@ kalkulation           jsonb                   -- całe `kalkulation` z body API
 -- mamamia onboarding cache (wypełnione przez onboard-to-mamamia)
 mamamia_customer_id   integer  NULL
 mamamia_job_offer_id  integer  NULL
-mamamia_user_token    text     NULL
+mamamia_user_token    text     NULL        -- NIEUŻYWANE od Registry #107: był tu token agencji
+                                            --   MM (czytelny przez anon). Onboard już nie pisze,
+                                            --   wartości wyzerowane; kolumna zostaje (Święta zasada 3).
 mamamia_onboarded_at  timestamptz NULL
 
 -- follow-up discovery (Bug #25, cron detect-caregiver-events)
@@ -514,17 +519,24 @@ Kolumny `mamamia_*` dodane migracją
 
 Vite + React 18 + TS, `caapp-beta.onrender.com/?token=X`.
 
-### B.1 Pobranie leada (Supabase REST z anon key)
+### B.1 Pobranie leada (funkcja `lead_by_token`, Registry #107)
 
-`src/pages/CustomerPortalPage.tsx:49` → `src/lib/supabase.ts:62`:
+`src/pages/CustomerPortalPage.tsx` → `src/lib/supabase.ts` `fetchLeadByToken`:
 
 ```http
-GET https://ycdwtrklpoqprabtwahi.supabase.co/rest/v1/leads?select=*&token=eq.<token>
+POST https://ycdwtrklpoqprabtwahi.supabase.co/rest/v1/rpc/lead_by_token
 apikey: <anon>
 Authorization: Bearer <anon>
+
+{ "p_token": "<token>" }
 ```
 
-Zwraca cały wiersz `leads`. Tani (~150–300 ms).
+Zwraca własny wiersz `leads` jako obiekt jsonb **bez** `admin_notes`, `notizen`,
+`mamamia_user_token` — albo `null`. Bez filtra `token_expires_at` (wygasły token ładuje
+wiersz, 401 daje dopiero onboard → „Neuen Link senden”). Tabela `leads` jest dla anon
+zamknięta (RLS); do 10/2026 portal czytał `select=*` z tabeli, a ten sam publiczny klucz
+pozwalał czytać wszystkie leady. Nowa kolumna potrzebna portalowi przychodzi sama; nowa
+**wewnętrzna** kolumna musi trafić na listę wykluczeń w funkcji (migracja).
 
 ### B.2 Onboard do mamamii
 
@@ -813,8 +825,7 @@ Response:
 UPDATE leads SET
   mamamia_customer_id  = <StoreCustomer.id>,
   mamamia_job_offer_id = <StoreJobOffer.id>,
-  mamamia_user_token   = <agency-jwt>,
-  mamamia_onboarded_at = now()
+  mamamia_onboarded_at = now()      -- bez mamamia_user_token (Registry #107)
 WHERE id = <lead.id>
 ```
 
@@ -1200,6 +1211,12 @@ Edge Fn   ←─── Sanctum session cookie (agency login) ──────�
   żeby logi Mamamii rozróżniały akcje portalu od akcji ludzi.
 - `SUPABASE_SERVICE_ROLE_KEY` ZAWSZE server-side. Używany w
   `onboard-to-mamamia` do bypass RLS przy lookup leada po tokenie.
+- **Klucz anon nie widzi leads & co.** (Registry #107): leads, lead_events, vertraege,
+  scheduled_emails, lead_jobs, portal_*_log, chat_* i analytics_sessions są dla anon
+  zamknięte, ceny/zuschüsse tylko do odczytu (`aktiv`). Portal czyta przez
+  `lead_by_token` + `set_declined_caregiver`, panel admina przez konto Supabase Auth z
+  flagą `app_metadata.primundus_admin` (`public.ist_admin()`), serwer kostenrechnera
+  (lead-management, PDF, analytics/collect, `/api/kalkulation/[leadId]`) Service-Keyem.
 - **Privilegierte Onboard-Bodies nur hinter service_role** (`_shared/serviceRoleAuth.ts`,
   Registry #55): `mirror_token` (Token-Spiegel), `lead_id`/`resync` (Admin-Korrektur nach
   MM). Gate aus dem Header VOR dem Rate-Limit; Anon-Bearer ⇒ 401 vor jedem MM-Call.

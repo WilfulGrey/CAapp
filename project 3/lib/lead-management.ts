@@ -1,11 +1,19 @@
-import { createClient } from '@supabase/supabase-js';
+import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { Kalkulation, generateToken, getTokenExpiry } from './calculation';
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-  { auth: { persistSession: false, autoRefreshToken: false } }
-);
+/* Service-Key: leads und lead_events sind für den Anon-Schlüssel per RLS zu.
+   Bis 10/2026 lief die Lead-Anlage hier auf dem Anon-Schlüssel und brauchte
+   dafür offene Policies (USING true) — jeder mit dem öffentlichen Schlüssel
+   konnte alle Leads lesen und ändern. Lazy, damit ein fehlender Schlüssel nicht
+   schon `next build` sprengt, sondern erst der Aufruf laut scheitert. */
+let client: SupabaseClient | null = null;
+function db(): SupabaseClient {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!url || !key) throw new Error('lead-management: SUPABASE_SERVICE_ROLE_KEY fehlt');
+  client ??= createClient(url, key, { auth: { persistSession: false, autoRefreshToken: false } });
+  return client;
+}
 
 export interface Lead {
   id: string;
@@ -63,7 +71,7 @@ export async function findOrCreateLead(
     quelle?: string;
   }
 ): Promise<{ lead: Lead; isNew: boolean; isUpgrade: boolean; kalkulationChanged: boolean }> {
-  const { data: existingLeads } = await supabase
+  const { data: existingLeads } = await db()
     .from('leads')
     .select('*')
     .eq('email', email)
@@ -107,7 +115,7 @@ export async function findOrCreateLead(
       if (data?.telefon) updates.telefon = data.telefon;
       if (data?.care_start_timing) updates.care_start_timing = data.care_start_timing;
 
-      const { data: updatedLead } = await supabase
+      const { data: updatedLead } = await db()
         .from('leads')
         .update(updates)
         .eq('id', latestLead.id)
@@ -147,7 +155,7 @@ export async function findOrCreateLead(
         updates.token_used = false;
       }
 
-      const { data: updatedLead, error: updateError } = await supabase
+      const { data: updatedLead, error: updateError } = await db()
         .from('leads')
         .update(updates)
         .eq('id', latestLead.id)
@@ -192,7 +200,7 @@ export async function findOrCreateLead(
         newLeadData.token_used = false;
       }
 
-      const { data: newLead, error: insertError } = await supabase
+      const { data: newLead, error: insertError } = await db()
         .from('leads')
         .insert(newLeadData)
         .select()
@@ -235,7 +243,7 @@ export async function findOrCreateLead(
     newLeadData.token_used = false;
   }
 
-  const { data: newLead, error: insertError } = await supabase
+  const { data: newLead, error: insertError } = await db()
     .from('leads')
     .insert(newLeadData)
     .select()
@@ -261,7 +269,7 @@ export async function logEvent(
   eventType: string,
   metadata?: any
 ): Promise<void> {
-  await supabase.from('lead_events').insert({
+  await db().from('lead_events').insert({
     lead_id: leadId,
     event_type: eventType,
     metadata: metadata || {},
@@ -273,7 +281,7 @@ export async function validateToken(token: string): Promise<{
   lead?: Lead;
   error?: string;
 }> {
-  const { data: lead } = await supabase
+  const { data: lead } = await db()
     .from('leads')
     .select('*')
     .eq('token', token)

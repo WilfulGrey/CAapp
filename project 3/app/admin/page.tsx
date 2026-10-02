@@ -2,13 +2,8 @@
 
 import { useEffect, useState } from 'react';
 import { Card } from '@/components/ui/card';
-import { createClient } from '@supabase/supabase-js';
+import { adminDb as supabase } from '@/lib/admin-db';
 import { Users, FileText, CheckCircle2, TrendingUp, Loader2 } from 'lucide-react';
-
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-);
 
 export default function AdminDashboard() {
   const [stats, setStats] = useState({

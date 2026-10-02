@@ -4,16 +4,11 @@ import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { createClient } from '@supabase/supabase-js';
+import { adminDb as supabase } from '@/lib/admin-db';
 import { Loader as Loader2, ArrowLeft, Mail, Phone, Calendar, MapPin, FileText, Clock, Download, CreditCard as Edit, Save, X, RefreshCw, User, BellOff, CircleCheck as CheckCircle, MessageSquare, Copy, Check } from 'lucide-react';
 import { PORTAL_BASIS } from '@/lib/portal-url';
 import { LABELS, FD_LABEL_KEYS } from '@/lib/angaben-labels';
 import { kontaktAnzeige } from '@/lib/portal-lead';
-
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-);
 
 export default function LeadDetailPage() {
   const params = useParams();
