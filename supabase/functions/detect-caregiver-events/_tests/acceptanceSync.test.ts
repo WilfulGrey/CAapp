@@ -691,18 +691,18 @@ Deno.test("sync: StoreConfirmation GraphQL-Fehler ⇒ permanent, KEIN Retry, kei
 const contactPosts = (net: FakeNet) => net.bridgePosts.filter((p) => p.event === "acceptance_contact_alarm");
 
 Deno.test("cleanEmail: Doppel-Domain / Leerzeichen ⇒ null, sonst getrimmt; droppedEmailFields meldet nur nicht-leere Rohwerte", () => {
-  const p = mapContractPatient({ vorname: "Elsa", email: "catarina-stein@t-online.de@t-online.de", telefon: "0176" })!;
+  const p = mapContractPatient({ vorname: "Elsa", email: "kunde@example.com@example.com", telefon: "0176" })!;
   assertEquals(p.email, null);
   assertEquals(p.first_name, "Elsa");
   assertEquals(mapContractContact({ email: " ok@example.de " })!.email, "ok@example.de");
-  assertEquals(mapContractContact({ email: "Michael.kopka @ Freenet.de" })!.email, null);
+  assertEquals(mapContractContact({ email: "vorname.nachname @ example.de" })!.email, null);
   // leer ⇒ null, aber NICHT "dropped" (LE-Prefill ist bewusst leer)
   const none = droppedEmailFields(makeRow({ contract_patient: { ...makeRow().contract_patient, email: "" } }));
   assertEquals(none.fields, []);
   // KP unbrauchbar ⇒ kp.email + Rohwert
-  const kp = droppedEmailFields(makeRow({ contract_contact: { ...makeRow().contract_contact, email: "Michael.kopka @ Freenet.de" } }));
+  const kp = droppedEmailFields(makeRow({ contract_contact: { ...makeRow().contract_contact, email: "vorname.nachname @ example.de" } }));
   assertEquals(kp.fields, ["kp.email"]);
-  assertEquals(kp.values["kp.email"], "Michael.kopka @ Freenet.de");
+  assertEquals(kp.values["kp.email"], "vorname.nachname @ example.de");
   // agGleich (le=null): AG nimmt LE-Mail ⇒ EIN Formularfeld ⇒ nur le.email
   const row = makeRow({ contract_patient: { ...makeRow().contract_patient, email: "x@y.de@y.de" } });
   row.contract_snapshot = { ...row.contract_snapshot, le: null, ag: { ...(row.contract_snapshot!.ag as Record<string, unknown>), email: "x@y.de@y.de" } };
@@ -798,7 +798,7 @@ Deno.test("sync: Fall Kopka — UC Validation + final_confirmation der Pflegekra
 Deno.test("sync: unbrauchbare KP-Mail + UC OK ⇒ contact_fields_dropped=['kp.email'], Row ohne email, Contact-Alarm mit Rohwert", async () => {
   const net = makeNet();
   const r = await syncAcceptance({
-    lead: LEAD, row: makeRow({ contract_contact: { ...makeRow().contract_contact, email: "Michael.kopka @ Freenet.de" } }), secrets: SECRETS,
+    lead: LEAD, row: makeRow({ contract_contact: { ...makeRow().contract_contact, email: "vorname.nachname @ example.de" } }), secrets: SECRETS,
     supabase: makeStamps().supabase, getAgencyToken: agencyToken, fetchFn: net.fetch,
   });
   assertEquals(r.customer_updated, true);
@@ -809,7 +809,7 @@ Deno.test("sync: unbrauchbare KP-Mail + UC OK ⇒ contact_fields_dropped=['kp.em
   assertEquals(posts.length, 1);
   const meta = (posts[0] as { metadata: Record<string, unknown> }).metadata;
   assertEquals(meta.dropped, ["kp.email"]);
-  assertEquals((meta.dropped_values as Record<string, string>)["kp.email"], "Michael.kopka @ Freenet.de");
+  assertEquals((meta.dropped_values as Record<string, string>)["kp.email"], "vorname.nachname @ example.de");
   assertEquals(meta.error, null);
 });
 

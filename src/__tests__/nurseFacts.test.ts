@@ -52,7 +52,7 @@ describe('nurseFacts', () => {
 
 describe('isEmail (Registry #52)', () => {
   it('lehnt Doppel-Domain und Leerzeichen ab, nimmt normale Adressen', () => {
-    expect(isEmail('catarina-stein@t-online.de@t-online.de')).toBe(false);
+    expect(isEmail('kunde@example.com@example.com')).toBe(false);
     expect(isEmail('a b@x.de')).toBe(false);
     expect(isEmail('nur-text')).toBe(false);
     expect(isEmail(' ok@example.de ')).toBe(true);
