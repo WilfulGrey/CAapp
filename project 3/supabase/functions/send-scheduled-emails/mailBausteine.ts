@@ -244,7 +244,7 @@ export function mKoepfe(koepfe: { foto: string | null; name: string }[], text: s
 }
 
 /** Kompakte Zeile einer Pflegekraft (Vorschlag 03.10.2026, Martin: „viel kompakter"): Foto 56 px,
- *  Name + Alter, darunter Deutsch und Erfahrung, bei Elite/Stammkraft der Stern. Ganze Zeile verlinkt. */
+ *  Name + Alter, darunter Deutsch mit Punkten, dann Erfahrung und Einsätze. Ganze Zeile verlinkt. */
 export function mProfilZeile(pk: PflegekraftDaten, profilUrl: string, unten = 8): string {
   const a = (inhalt: string, farbe = '#18181B') => `<a href="${profilUrl}" target="_blank" style="color:${farbe};text-decoration:none;">${inhalt}</a>`;
   const bild = `src="${pk.foto}" alt="${esc(pk.name)}" width="56"`;
@@ -252,21 +252,22 @@ export function mProfilZeile(pk: PflegekraftDaten, profilUrl: string, unten = 8)
     ? `<!--[if mso]><img ${bild} style="display:block;border:0;" /><![endif]--><!--[if !mso]><!--><img ${bild} height="56" style="display:block;width:56px;height:56px;border-radius:12px;border:0;object-fit:cover;-ms-interpolation-mode:bicubic;outline:none;" /><!--<![endif]-->`
     : `<div style="width:56px;height:56px;border-radius:12px;background-color:#B5A184;color:#fff;font-size:19px;font-weight:700;line-height:56px;text-align:center;">${initialen(pk.name)}</div>`;
   const alter = pk.alter && pk.alter > 0 ? `<span style="font-weight:400;color:#71717A;">, ${pk.alter}</span>` : '';
+  // Wie die Zeilen im Portal (Martin 03.10.: keine Sterne, Bewertungen je Pflegekraft gibt es nicht):
+  // Deutsch mit den Punkten des Profils, darunter Erfahrung und Einsätze bei uns als Zahl.
   const j = pk.jahre ?? 0;
-  const details = [pk.deutsch ? `Deutsch ${esc(pk.deutsch.toLowerCase())}` : '', j > 0 ? `${j} ${j === 1 ? 'Jahr' : 'Jahre'} Erfahrung` : ''].filter(Boolean).join(' · ');
-  // Zahl statt Stufen-Wort (OpenAI 03.10.: „Elite" klingt nach Verkaufsranking); Stern wie im Profil „V".
   const e = pk.einsaetze ?? 0;
-  const stufe = mStufe(pk.einsaetze, pk.jahre);
-  const mitStern = stufe === 'Elite' || stufe === 'Stammkraft';
-  const stern = e > 0
-    ? `<p style="margin:2px 0 0;font-size:13.5px;line-height:1.35;font-weight:700;color:${F.taupeInk};">${a(`${mitStern ? `<span style="color:${STERN};">&#9733;</span>&nbsp;` : ''}${e} ${e === 1 ? 'Einsatz' : 'Einsätze'} bei uns`, F.taupeInk)}</p>` : '';
+  const deutsch = pk.deutsch ? `${deutschPunkte(pk.deutsch)}Deutsch ${esc(pk.deutsch.toLowerCase())}` : '';
+  // Jede Angabe bleibt zusammen; auf schmalen Handys bricht die Zeile nur am Punkt.
+  const fakten = [j > 0 ? `${j} ${j === 1 ? 'Jahr' : 'Jahre'} Erfahrung` : '', e > 0 ? `${e} ${e === 1 ? 'Einsatz' : 'Einsätze'} bei uns` : '']
+    .filter(Boolean).map((t) => `<span style="white-space:nowrap;">${t}</span>`).join(' · ');
   return `
     <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="margin:0 0 ${unten}px;background:${PROFIL_BEIGE};border-radius:14px;border-collapse:separate;">
       <tr>
         <td width="56" style="width:56px;padding:10px 0 10px 10px;vertical-align:middle;">${a(foto)}</td>
         <td style="padding:10px 12px 10px 12px;vertical-align:middle;">
           <p style="margin:0;font-size:17px;font-weight:800;line-height:1.25;color:#18181B;">${a(esc(pk.name))}${alter}</p>
-          ${details ? `<p style="margin:3px 0 0;font-size:14px;line-height:1.35;color:${F.muted};">${a(details, F.muted)}</p>` : ''}${stern}
+          ${deutsch ? `<p style="margin:4px 0 0;font-size:14px;line-height:1.35;color:${F.muted};">${a(deutsch, F.muted)}</p>` : ''}
+          ${fakten ? `<p style="margin:2px 0 0;font-size:13.5px;line-height:1.35;color:${F.muted};">${a(fakten, F.muted)}</p>` : ''}
         </td>
       </tr>
     </table>`;

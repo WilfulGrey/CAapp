@@ -91,6 +91,8 @@ Deno.test("fuenfListeKompaktHtml: eine Zeile je Kraft, Zahl der Einsätze statt 
   assertStringIncludes(html, "14 Einsätze bei uns");
   assertStringIncludes(html, "6 Jahre Erfahrung");
   assert(!/Elite|Stammkraft|Bewährt|Bekannt/.test(html), "keine Stufen-Wörter in der kompakten Zeile");
+  assert(!html.includes("&#9733;"), "keine Sterne bei Pflegekräften (keine Bewertungen je Kraft)");
+  assertStringIncludes(html.replace(/<[^>]+>/g, ""), "6 Jahre Erfahrung · 14 Einsätze bei uns");
   assertEquals((html.match(/Einsätze bei uns|Einsatz bei uns/g) ?? []).length, 1, "ohne Einsatz keine Einsatz-Zeile");
   assertStringIncludes(html, 'href="https://p/2"');
   assertStringIncludes(html, "Alle 2 Profile im Portal ansehen");
