@@ -1,5 +1,5 @@
 /** @vitest-environment jsdom */
-// Registry #88 (Fall Hümmer): die Anrede des Leistungsempfängers geht als
+// Registry #88: die Anrede des Leistungsempfängers geht als
 // contract_patient.salutation an StoreConfirmation — dort Pflicht und nur
 // 'Mr.'/'Mrs.'. „Divers" (gewählt für ein Ehepaar) ließ Mamamia den Akzept
 // ablehnen. Ein Prefill außerhalb von Frau/Herr (in der DB steht z. B.
@@ -15,7 +15,7 @@ import type { Nurse } from '../../types';
 const app: Application = {
   id: '13721',
   nurse: {
-    id: 1, caregiverId: 25407, name: 'Halina J.', age: 60, color: '#8B7355',
+    id: 1, caregiverId: 25407, name: 'Maria Muster', age: 60, color: '#8B7355',
     experience: '5 J. Erfahrung', experienceYears: 5, language: { level: 'B1', bars: 3 },
     history: { assignments: 7, avgDurationMonths: 2 }, availability: '', availableSoon: false,
     addedTime: '', isLive: false, gender: 'female',
@@ -29,9 +29,9 @@ const app: Application = {
 };
 
 const prefill = {
-  vorname: 'Margareta und Jakob', nachname: 'Zöcklein', strasse: 'Holnstein Weg 4', einsatzort: '96120 Bischberg',
+  vorname: 'Maria und Josef', nachname: 'Muster', strasse: 'Musterweg 4', einsatzort: '96120 Musterstadt',
   telefon: '0175', email: '', agGleich: true,
-  kpVorname: 'Theresia', kpNachname: 'Hümmer', kpTelefon: '0175', kpEmail: 'th@example.de',
+  kpVorname: 'Renate', kpNachname: 'König', kpTelefon: '0175', kpEmail: 'th@example.de',
 };
 
 // Erste Auswahlliste = Anrede des Leistungsempfängers.

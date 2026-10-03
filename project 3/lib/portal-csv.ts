@@ -1,7 +1,7 @@
 /* ─── CSV-Anhang der Portal-Mail lesen ───────────────────────────────────
  *
  * Verbund Pflegehilfe haengt an jede Lead-Mail eine CSV-Datei mit dem
- * VOLLEN Datensatz (Zauner 01.09.: Anrede, Name, Telefon, Pflegegrad 3,
+ * VOLLEN Datensatz (uid 14, 01.09.: Anrede, Name, Telefon, Pflegegrad 3,
  * "Mobil ohne Hilfsmittel", Gewicht, Krankheiten … — waehrend der
  * Mailtext, zumal weitergeleitet, nur Bruchstuecke hergab und die
  * Annahme-Regeln teuer rieten). Die CSV ist deshalb die ERSTE Quelle;
@@ -53,7 +53,7 @@ export function parseCsv(text: string): string[][] {
 }
 
 /** Sanity-Check vor der Nutzung einer CSV-Zeile: eine handverstuemmelte
- *  Datei (Zauner-Test 03.09., uid 28: die GANZE Datenzeile in EIN Paar
+ *  Datei (Test 03.09., uid 28: die GANZE Datenzeile in EIN Paar
  *  Anfuehrungszeichen gewickelt) parst RFC-4180-korrekt zu EINEM Riesenfeld
  *  — alle Spalten leer, keine Kundenadresse, ewige Ablehnung. Dabei stand
  *  ALLES im Mailtext. Zeile mit weniger als der Haelfte der Kopfspalten

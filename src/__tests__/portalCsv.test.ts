@@ -8,7 +8,7 @@ import { parsePflegehilfe } from '../../project 3/lib/portal-parser';
  * Anhang bewies, dass der Mailtext (zumal weitergeleitet) die schlechtere
  * Quelle ist: dort fehlten Name, Telefon, Pflegegrad und Mobilität.
  * Die echte Datei beginnt mit BOM U+FEFF (EF BB BF) — Registry #57. */
-const zaunerCsv = '\uFEFF' + `RequestNumber,Sex,AcademicDegree,FirstName,SurName,AddressLine1,ZipCode,City,CountryIso2,Email,PhoneType,Phone,Availability,SeniorSex,SeniorAcademicDegree,SeniorFirstName,SeniorSurName,SeniorRelationship,SeniorLiveSituation,SeniorCareLevel,SeniorMobility,SeniorAge,SeniorMedicalProcess,RequestZipCode,RequestRegion,RequestCountryIso2,RequestDetail,ProductName,EmployeeFirstName,EmployeeSurName,FinishedDateTime,CreateDateTime
+const pflegehilfeCsv = '\uFEFF' + `RequestNumber,Sex,AcademicDegree,FirstName,SurName,AddressLine1,ZipCode,City,CountryIso2,Email,PhoneType,Phone,Availability,SeniorSex,SeniorAcademicDegree,SeniorFirstName,SeniorSurName,SeniorRelationship,SeniorLiveSituation,SeniorCareLevel,SeniorMobility,SeniorAge,SeniorMedicalProcess,RequestZipCode,RequestRegion,RequestCountryIso2,RequestDetail,ProductName,EmployeeFirstName,EmployeeSurName,FinishedDateTime,CreateDateTime
 13535387,Herr,,Max,Mustermann,,,,DE,familie@example.com,Mobile,+49 1700000001,Ganztägig telefonisch gut erreichbar,,,,,Schwiegervater,Lebt alleine,Pflegegrad 3,Mobil ohne Hilfsmittel,,Demenz,95703,Plößberg,DE,"Auftraggeber/Kontaktperson: Angehörige/Betreuer
 Budgetrahmen: 2900€ bis 3500€
 Dauer: Unbefristet
@@ -31,7 +31,7 @@ Bedarf: In Wochen",24 Stunden Betreuung,Vorname,Nachname,01.09.2026 11:05:32,01.
 
 describe('parseCsv (RFC 4180)', () => {
   it('liest gequotete, mehrzeilige Felder als EINE Zeile', () => {
-    const zeilen = parseCsv(zaunerCsv);
+    const zeilen = parseCsv(pflegehilfeCsv);
     expect(zeilen).toHaveLength(2); // Kopf + eine Datenzeile
     expect(zeilen[1][0]).toBe('13535387');
     expect(zeilen[1][26]).toContain('Bedarf: In Wochen'); // RequestDetail komplett
@@ -47,7 +47,7 @@ describe('parseCsv (RFC 4180)', () => {
 });
 
 describe('CSV → parsePflegehilfe (anonymisiert end-to-end)', () => {
-  const zeilen = parseCsv(zaunerCsv);
+  const zeilen = parseCsv(pflegehilfeCsv);
   const { text, zusatz } = csvZuLeadZeile(zeilen[0], zeilen[1]);
   const r = parsePflegehilfe(text);
 

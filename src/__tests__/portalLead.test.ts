@@ -251,7 +251,7 @@ describe('postfachPraefix (wo die Mails liegen)', () => {
 describe('kontaktAnzeige — wer in der Admin-Liste als Kontakt steht', () => {
   const vermittlerLead = {
     anrede_text: 'Herr', vorname: 'Bernd', nachname: 'Walde',
-    patient_anrede: 'Frau', patient_vorname: 'Agnes', patient_nachname: 'Rothmund',
+    patient_anrede: 'Frau', patient_vorname: 'Berta', patient_nachname: 'Muster',
     vermittler: 'pflegena.com',
     kalkulation: { formularDaten: { plz: '79771', ort: 'Klettgau-Bühl' } },
   };
@@ -260,7 +260,7 @@ describe('kontaktAnzeige — wer in der Admin-Liste als Kontakt steht', () => {
     /* Prod 16.09.: acht Pflegena-Leads, alle als "Herr Bernd Walde" —
        das ist der Ansprechpartner der Agentur, bei jeder Anfrage derselbe. */
     const a = kontaktAnzeige(vermittlerLead);
-    expect(a.name).toBe('Frau Agnes Rothmund');
+    expect(a.name).toBe('Frau Berta Muster');
     expect(a.via).toBe('über Herr Bernd Walde · 79771 Klettgau-Bühl');
   });
 
@@ -281,7 +281,7 @@ describe('kontaktAnzeige — wer in der Admin-Liste als Kontakt steht', () => {
 
   it('nur Vorname fehlt ("Familie Maier") — der Haushalt gewinnt trotzdem', () => {
     const a = kontaktAnzeige({ ...vermittlerLead, patient_vorname: null });
-    expect(a.name).toBe('Frau Rothmund');
+    expect(a.name).toBe('Frau Muster');
   });
 
   it('gekaufter Portal-Lead ohne Vermittler: unverändert die Kontaktspalten', () => {

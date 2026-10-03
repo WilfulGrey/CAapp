@@ -770,7 +770,7 @@ const CustomerPortalPage: FC = () => {
   const { data: leadJobs } = useLeadJobs(mmReady);
   const hasMultipleJobs = (leadJobs?.length ?? 0) > 1;
 
-  // Gebucht-Ableitung aus dem Mamamia-Stand (Fix Hagedorn 2026-07-15):
+  // Gebucht-Ableitung aus dem Mamamia-Stand (Fix 2026-07-15):
   // akzeptiert die AGENTUR die Bewerbung im SA-Portal, gibt es keine
   // lead_application_acceptances-Zeile — der einzige Beleg ist
   // JobOffer.final_confirmation (via GET_CUSTOMER job_offers). Fail-soft:
@@ -1130,7 +1130,7 @@ const CustomerPortalPage: FC = () => {
   //      rendern (Bug Michael Dachs / lead 39def7b2, 11.06.2026).
   //   3) KEINE Portal-Annahme, aber ein Job hat eine Mamamia-
   //      final_confirmation (die Agentur hat im SA-Portal akzeptiert —
-  //      Bug Hagedorn, 15.07.2026) → synthetische accepted-App aus dem
+  //      Bug 15.07.2026) → synthetische accepted-App aus dem
   //      Job-Stand, damit acceptedApp + BookedScreen trotzdem greifen.
   //
   // mmApplications ist bewusst in den Deps: der Sync-Effect oben ersetzt

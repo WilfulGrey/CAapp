@@ -171,7 +171,7 @@ Deno.test("Liste: Foto Outlook-sicher wie fotoImg — proportional in Outlook, s
   assertStringIncludes(rest, "object-fit:cover");
   assertEquals((h.match(/cid:cid-1/g) ?? []).length, 2, "beide Fassungen zeigen dasselbe Bild");
 });
-Deno.test("holeFuenfStreng: Ausfall wirft, leere Liste ist [] — ein Timeout ist kein „keine Kräfte“ (Lead Mielke)", async () => {
+Deno.test("holeFuenfStreng: Ausfall wirft, leere Liste ist [] — ein Timeout ist kein „keine Kräfte“ (Vermittler-Lead)", async () => {
   const deps = { supabaseUrl: "https://s", key: "k", token: "t", jobOfferId: 1, formularDaten: {} };
   const onboardOk = () => Promise.resolve(Response.json({ session_token: "jwt" }));
   await assertRejects(

@@ -330,12 +330,12 @@ const VERMITTLER = {
   vorname: "Bernd",
   nachname: "Walde",
   patient_anrede: "Frau",
-  patient_vorname: "Agnes",
-  patient_nachname: "Rothmund",
+  patient_vorname: "Berta",
+  patient_nachname: "Muster",
 };
 
 Deno.test("panelIdentitaet: Rechner-Lead — der Besteller ist der Kunde (unveraendert)", () => {
-  assertEquals(panelIdentitaet(makeLead({ patient_vorname: "Agnes", patient_nachname: "Rothmund" })), {
+  assertEquals(panelIdentitaet(makeLead({ patient_vorname: "Berta", patient_nachname: "Muster" })), {
     first_name: "hildegard", last_name: "von norman", istPatient: false,
   });
 });
@@ -343,8 +343,8 @@ Deno.test("panelIdentitaet: Rechner-Lead — der Besteller ist der Kunde (unvera
 Deno.test("panelIdentitaet: Rechner-Lead ohne Kontaktnamen faellt weiter auf patient_* zurueck", () => {
   // Bitgleich mit dem Verhalten vor dieser Funktion (`?? lead.patient_*`).
   assertEquals(
-    panelIdentitaet(makeLead({ vorname: null, nachname: null, patient_vorname: "Agnes", patient_nachname: "Rothmund" })),
-    { first_name: "Agnes", last_name: "Rothmund", istPatient: false },
+    panelIdentitaet(makeLead({ vorname: null, nachname: null, patient_vorname: "Berta", patient_nachname: "Muster" })),
+    { first_name: "Berta", last_name: "Muster", istPatient: false },
   );
 });
 
@@ -352,7 +352,7 @@ Deno.test("panelIdentitaet: Vermittler-Lead — der Haushalt ist die Identitaet"
   /* Prod 16.09.: acht Pflegena-Kunden hiessen in Mamamia "Bernd Walde" —
      der Ansprechpartner der Agentur, bei jeder Anfrage derselbe. */
   assertEquals(panelIdentitaet(makeLead(VERMITTLER)), {
-    first_name: "Agnes", last_name: "Rothmund", istPatient: true,
+    first_name: "Berta", last_name: "Muster", istPatient: true,
   });
 });
 
@@ -378,7 +378,7 @@ Deno.test("buildJobOfferTitle: missing nachname falls back to 'Primundus' + lead
 Deno.test("buildJobOfferTitle: Vermittler-Lead traegt den Haushalt, nicht die Agentur", () => {
   // Sonst heissen alle Jobs eines Vermittlers gleich, waehrend die Kunden
   // unterscheidbar sind — dieselbe Verwechslung eine Ebene tiefer.
-  assertEquals(buildJobOfferTitle(makeLead(VERMITTLER)), "Primundus — Rothmund");
+  assertEquals(buildJobOfferTitle(makeLead(VERMITTLER)), "Primundus — Muster");
 });
 
 // ─── buildPatients (post-Bug-#13 minimal payload) ───────────────────────────

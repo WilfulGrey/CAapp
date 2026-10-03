@@ -57,7 +57,7 @@ function setLocation(search: string) {
 
 const FC_ID = 5511;
 
-// Kunde-Hagedorn-Szenario: bestätigter Job mit final_confirmation,
+// Gebucht-Szenario: bestätigter Job mit final_confirmation,
 // Bewerbungsliste leer, keine Portal-Annahme.
 const confirmedCustomer = {
   ...sampleCustomer,

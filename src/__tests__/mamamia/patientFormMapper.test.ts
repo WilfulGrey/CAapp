@@ -257,11 +257,11 @@ describe('mapPatientFormToUpdateCustomerInput', () => {
     const r = mapPatientFormToUpdateCustomerInput(makeForm(), {
       locationId: 1148,
       vermittler: true,
-      contact: { anrede: 'Frau', vorname: 'Agnes', nachname: 'Rothmund' },
+      contact: { anrede: 'Frau', vorname: 'Berta', nachname: 'Muster' },
     });
     expect(r.customer_contract).toEqual({
       location_id: 1148, zip_code: '10115', city: 'Berlin',
-      salutation: 'Mrs.', first_name: 'Agnes', last_name: 'Rothmund',
+      salutation: 'Mrs.', first_name: 'Berta', last_name: 'Muster',
       is_same_as_first_patient: false, is_same_as_contact: false,
     });
   });

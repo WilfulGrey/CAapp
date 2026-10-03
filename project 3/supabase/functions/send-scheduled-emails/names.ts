@@ -59,7 +59,7 @@ export function cleanNamePart(part?: string | null): string {
 // Zuordnungs-Schlüssel für die Nachfass-3-Antwortknöpfe („Habe noch Interesse",
 // „Doch nicht relevant" …). Diese Knöpfe öffnen eine mailto: an info@, und der
 // Betreff ist die EINZIGE Zuordnungshilfe, sobald die Antwort aus einem anderen
-// Postfach kommt als dem, an das wir geschrieben haben. Fall Oehlert/Stein
+// Postfach kommt als dem, an das wir geschrieben haben. Fall zweier Leads
 // (08.09.2026): die Antwort lief über ein zweites t-online-Konto — im Postfach
 // stand ein Kunde als Absender, im Betreff ein anderer. Beide waren echte offene
 // Leads, also echtes Risiko, den Falschen auf „nicht interessiert" zu setzen.
