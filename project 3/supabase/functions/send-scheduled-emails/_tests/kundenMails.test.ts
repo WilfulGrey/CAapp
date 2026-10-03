@@ -53,7 +53,8 @@ function pruefe(name: string, m: KundenMail, knopf: string, link: string) {
     assert(!/undefined|NaN|\[object Object\]/.test(f), `${name}: Platzhalter`);
   }
   const s = sichtbar(m.html);
-  for (const wort of ["Kostenrechner", "Betreuungskräfte", "4–7", "in Ruhe", "vorbereitet", "Hallo ", "—", "vervollständigen", "Bewerbungen anfragen"]) {
+  // „vervollständigen" ist seit dem Portal-Rückbau (02.10.2026) wieder Portal-Wortlaut („Pflegesituation vervollständigen").
+  for (const wort of ["Kostenrechner", "Betreuungskräfte", "4–7", "in Ruhe", "vorbereitet", "Hallo ", "—", "Bewerbungen anfragen"]) {
     assert(!s.includes(wort) && !m.text.includes(wort), `${name}: enthält „${wort}"`);
   }
   assert(m.html.length < 60_000, `${name}: ${m.html.length} Zeichen`);
@@ -66,22 +67,44 @@ Deno.test("Portal-Link: Token + Parameter, leere fallen weg, ohne Token die Webs
   assertEquals(portalLink(PORTAL, null, SITE, { goto: "anfragen" }), SITE);
 });
 
-Deno.test("01 Angebot: Preis, Punkte, Frage, Empfehlung, Schritte, Angaben", () => {
+Deno.test("01 Angebot: Preis, Knopf oben und unten, Empfehlung, Schritte, Angaben", () => {
   const m = angebotMail(k(), {
     kalkulation: kalk, careStartTiming: "sofort", herkunft: null, portalBetreff: "X", angabenHinweis: null,
     resubmit: false, empfehlung: { e: empf, cid: "c1@primundus.de", sichtbar: 5 },
   });
-  pruefe("01", m, "Ja, Bewerbungen erhalten", `${PORTAL}/?token=tok123&goto=anfragen&m=eb`);
+  // Martin 03.10.2026: Knopf unter dem Preis und unten, beide auf Angebot und Pflegekräfte (Portal oben, kein goto).
+  const start = `${PORTAL}/?token=tok123&m=eb`;
+  pruefe("01", m, "Angebot &amp; Pflegekräfte ansehen", start);
+  assertEquals(m.html.split(`href="${start}"`).length - 1, 2, "zwei Knöpfe aufs Portal");
+  assertEquals(m.text.split(`Angebot & Pflegekräfte ansehen: ${start}`).length - 1, 2, "zwei Links im Text");
   const s = sichtbar(m.html);
   for (const t of ["3.050 €", "Keine Vermittlungsgebühr", "Kein Vertrag vor Ihrer Auswahl", "Täglich kündbar, taggenau abgerechnet",
-    "Bestpreisgarantie", "Passt Ihnen das Angebot?", "5 passende Pflegekräfte", "Fünf Pflegekräfte passen", "Maria K.", "Erfahrung mit Demenz",
-    "Alle 5 Pflegekräfte ansehen", "So geht es weiter", "Anreise schon ab 3 Tagen", "72 Stunden", "1.742 € weniger", "Gewünschter Start Sofort"]) {
+    "Bestpreisgarantie", "5 passende Pflegekräfte", "Fünf Pflegekräfte passen", "Maria K.", "Erfahrung mit Demenz",
+    "Alle 5 Pflegekräfte ansehen", "So geht es weiter", "Pflegesituation vervollständigen", "Pflegekräfte einladen und Bewerbungen erhalten",
+    "Anreise schon ab 3 Tagen", "1.742 € weniger", "Gewünschter Start Sofort"]) {
     assertStringIncludes(s, t, t);
   }
+  for (const weg of ["Passt Ihnen das Angebot?", "Ja, Bewerbungen erhalten", "72 Stunden", "goto=anfragen"]) {
+    assert(!m.html.includes(weg) && !m.text.includes(weg), `enthält noch „${weg}"`);
+  }
+  assert(m.html.indexOf(start) < m.html.indexOf("Keine Vermittlungsgebühr"), "erster Knopf steht über den Punkten");
+  assert(!s.includes("von 5 aus"), "ohne Bewertungsstand keine Sterne");
   assertStringIncludes(m.html, "cid:c1@primundus.de");
   assertStringIncludes(m.html, `${PORTAL}/?token=tok123&cg=7&m=eb`);
   assertEquals(m.betreff, "Ihr Angebot zur 24-Stunden-Betreuung – Primundus");
-  assertEquals(m.vorschau, "3.050 € im Monat, fünf passende Pflegekräfte. Passt Ihnen das Angebot?");
+  assertEquals(m.vorschau, "3.050 € im Monat. Fünf passende Pflegekräfte sind für Sie ausgewählt.");
+});
+
+Deno.test("01 Angebot: Sterne unter dem oberen Knopf, wie auf primundus.de", () => {
+  const m = angebotMail({ ...k(), bewertung: { schnitt: "4,9", anzahl: 126 } }, {
+    kalkulation: kalk, careStartTiming: null, herkunft: null, portalBetreff: "X", angabenHinweis: null, resubmit: false, empfehlung: null,
+  });
+  const s = sichtbar(m.html);
+  assertStringIncludes(s, "4,9 von 5 aus 126 Bewertungen");
+  assertStringIncludes(m.html, 'href="https://primundus.de/erfahrungen"');
+  assert(m.html.indexOf("von 5 aus") < m.html.indexOf("Keine Vermittlungsgebühr"), "Sterne direkt unter dem Knopf");
+  assertStringIncludes(m.text, "★★★★★ 4,9 von 5 aus 126 Bewertungen: https://primundus.de/erfahrungen");
+  assertEquals(m.vorschau, "3.050 € im Monat. Ihr persönliches Angebot zur 24-Stunden-Betreuung.");
 });
 
 Deno.test("01 Angebot: ohne Empfehlung, Resubmit, eingekaufter Lead", () => {

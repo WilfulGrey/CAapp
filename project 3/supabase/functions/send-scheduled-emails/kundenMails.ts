@@ -41,6 +41,7 @@ import {
   mVorschau,
   type BewerbungsAngebot,
   type PflegekraftDaten,
+  mSterneZeile,
 } from "./mailBausteine.ts";
 import { type Empfehlung, esc, zahlwort } from "./empfehlung.ts";
 import { ABSCHIED_SATZ, RUECKMELDUNG_KNOEPFE, rueckmeldungLink } from "./kette.ts";
@@ -56,6 +57,8 @@ export type Kontext = {
   token: string | null;
   /** Grußformel + Martas Karte (HTML). */
   marta: string;
+  /** Bewertungsstand dieses Laufs (wie in Martas Karte); fehlt er, fällt die Sternezeile weg. */
+  bewertung?: { schnitt: string; anzahl: number } | null;
 };
 
 export type KundenMail = { betreff: string; vorschau: string; html: string; text: string };
@@ -198,8 +201,8 @@ ${zeilen2.map(([l, v]) => `${l}: ${v}`).join("\n")}`;
 }
 
 const SCHRITTE_ANGEBOT = [
-  { titel: "Pflegesituation beschreiben", text: "2 Minuten, vieles ist schon ausgefüllt." },
-  { titel: "Bewerbungen erhalten", text: "Passende Pflegekräfte bewerben sich bei Ihnen, per E-Mail. Jede Bewerbung ist 72 Stunden für Sie reserviert." },
+  { titel: "Pflegesituation vervollständigen", text: "Dauert etwa 2 Minuten, vieles ist schon ausgefüllt." },
+  { titel: "Pflegekräfte einladen und Bewerbungen erhalten", text: "Passende Pflegekräfte bewerben sich bei Ihnen mit Foto, Erfahrung, Anreisedatum und Preis." },
   { titel: "Auswählen und starten", text: "Wir übernehmen den Rest. Anreise schon ab 3 Tagen möglich." },
 ];
 
@@ -210,7 +213,8 @@ export function angebotMail(k: Kontext, a: AngebotEingabe): KundenMail {
   const heim = heimVergleich(kalk);
   const emp = a.empfehlung ?? null;
   const n = emp ? Math.max(1, Math.min(5, emp.sichtbar || 1)) : 0;
-  const anfragen = k.portal({ goto: "anfragen", m: "eb" });
+  // Martin 03.10.2026: wie vor dem 26.09. auf Angebot und Pflegekräfte (Portal oben), nicht direkt ins Formular.
+  const start = k.portal({ m: "eb" });
 
   const kraefteSatz = n === 0 ? ""
     : n === 1 ? " Eine Pflegekraft passt schon zu Ihren Angaben, Sie finden sie weiter unten."
@@ -231,17 +235,13 @@ export function angebotMail(k: Kontext, a: AngebotEingabe): KundenMail {
     ${mEyebrow(brutto ? "Ihre Betreuungskosten" : "Ihre Konditionen", 8)}
     ${brutto ? `<p style="margin:0 0 8px;font-size:44px;font-weight:800;line-height:1;letter-spacing:-.03em;color:${F.ink};">${euro(brutto)}&nbsp;€</p>
     ${mKlein("Monatlich inkl. Steuern, Gebühren und Sozialabgaben. Zzgl. Kost und Logis sowie Reisekosten (125&nbsp;€ pro Fahrt).", 14)}` : ""}
+    ${mKnopf(start, "Angebot &amp; Pflegekräfte ansehen", 2, k.bewertung ? 10 : 18, { schrift: 16, innen: 12 })}
+    ${k.bewertung ? mSterneZeile(k.bewertung, 18) : ""}
     ${mPunkte(null)}
     ${mKlein("Kosten entstehen erst, wenn die Pflegekraft bei Ihnen ist.", 0)}
     ${heim ? `${mTrenner()}${heimHtml(heim, 0)}` : ""}
     ${mTrenner()}
     ${siegelZeile}`);
-  const frage = mKarte(`
-    ${mEyebrow("Ihre Entscheidung")}
-    ${mTitel("Passt Ihnen das Angebot?", 10)}
-    ${mp("Dann beschreiben Sie in 2 Minuten die Pflegesituation, vieles ist schon ausgefüllt. Danach bewerben sich passende Pflegekräfte bei Ihnen, mit Foto, Erfahrung, Anreisetermin und Preis. Ein Vertrag entsteht erst, wenn Sie zusagen.")}
-    ${mKnopf(anfragen, "Ja, Bewerbungen erhalten", 4, 12)}
-    ${mKlein("Passt etwas nicht? Antworten Sie kurz auf diese E-Mail, ich melde mich.", 0, true)}`, { rand: "#D8CDBD" });
 
   let empfHtml = "";
   let empfText = "";
@@ -270,20 +270,20 @@ ${n === 1 ? "Im Portal" : `Alle ${n} Pflegekräfte`}: ${alle}
   const hinweisHtml = a.angabenHinweis ? a.angabenHinweis.html : "";
 
   const vorschau = brutto
-    ? `${euro(brutto)} € im Monat${n ? `, ${n === 1 ? "eine passende Pflegekraft" : `${zahlwort(n)} passende Pflegekräfte`}` : ""}. Passt Ihnen das Angebot?`
-    : "Ihr persönliches Angebot zur 24-Stunden-Betreuung. Passt es Ihnen?";
+    ? `${euro(brutto)} € im Monat.${n ? ` ${n === 1 ? "Eine passende Pflegekraft ist" : `${zahlwort(n, true)} passende Pflegekräfte sind`} für Sie ausgewählt.` : " Ihr persönliches Angebot zur 24-Stunden-Betreuung."}`
+    : "Ihr persönliches Angebot zur 24-Stunden-Betreuung.";
 
   const html = `${mVorschau(vorschau)}
     ${gruss(k)}
     ${mp(einstieg + kraefteSatz, 22)}
     ${kosten}
-    ${frage}
     ${empfHtml}
     ${mAbschnitt("In drei Schritten", "So geht es weiter")}
     ${mSchritte(SCHRITTE_ANGEBOT, true)}
     ${mAbstand(22)}
     ${hinweisHtml}
     ${angaben.html}
+    ${mKnopf(start, "Angebot &amp; Pflegekräfte ansehen", 18, 22, { schrift: 16, innen: 12 })}
     ${mp("Wenn Sie Fragen zum Angebot haben, rufen Sie mich an, schreiben Sie mir per WhatsApp oder antworten Sie auf diese E-Mail.", 8)}
     ${k.marta}`;
 
@@ -293,20 +293,20 @@ ${klartext(einstieg + kraefteSatz)}
 
 ${brutto ? `IHRE BETREUUNGSKOSTEN
 ${euro(brutto)} € im Monat, inkl. Steuern, Gebühren und Sozialabgaben. Zzgl. Kost und Logis sowie Reisekosten (125 € pro Fahrt).
-` : "IHRE KONDITIONEN\n"}${punkteText()}
+` : "IHRE KONDITIONEN\n"}
+Angebot & Pflegekräfte ansehen: ${start}
+${k.bewertung ? `★★★★★ ${k.bewertung.schnitt} von 5 aus ${k.bewertung.anzahl} Bewertungen: https://primundus.de/erfahrungen\n` : ""}
+${punkteText()}
 Kosten entstehen erst, wenn die Pflegekraft bei Ihnen ist.
 ${heim ? `\n${heimText(heim)}\n` : ""}
 6× Testsieger DIE WELT · 20 Jahre Erfahrung · 60.000+ Einsätze
-
-PASST IHNEN DAS ANGEBOT?
-Dann beschreiben Sie in 2 Minuten die Pflegesituation, vieles ist schon ausgefüllt. Danach bewerben sich passende Pflegekräfte bei Ihnen, mit Foto, Erfahrung, Anreisetermin und Preis. Ein Vertrag entsteht erst, wenn Sie zusagen.
-Ja, Bewerbungen erhalten: ${anfragen}
-Passt etwas nicht? Antworten Sie kurz auf diese E-Mail, ich melde mich.
 
 ${empfText}SO GEHT ES WEITER
 ${SCHRITTE_ANGEBOT.map((s, i) => `${i + 1}. ${s.titel}: ${s.text}`).join("\n")}
 
 ${a.angabenHinweis ? `${a.angabenHinweis.text}\n\n` : ""}${angaben.text}
+
+Angebot & Pflegekräfte ansehen: ${start}
 
 Wenn Sie Fragen zum Angebot haben, rufen Sie mich an, schreiben Sie mir per WhatsApp oder antworten Sie auf diese E-Mail.
 

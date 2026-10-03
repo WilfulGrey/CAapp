@@ -68,11 +68,11 @@ export function mKarte(inhalt: string, o: { rand?: string; unten?: number; breit
 }
 
 /** Hauptknopf über die volle Breite, Koralle. Innenabstand am <td>, damit Outlook ihn zeigt. */
-export function mKnopf(url: string, label: string, oben = 6, unten = 12): string {
+export function mKnopf(url: string, label: string, oben = 6, unten = 12, o: { schrift?: number; innen?: number } = {}): string {
   return `
     <table width="100%" role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:${oben}px 0 ${unten}px;border-collapse:separate;">
-      <tr><td align="center" bgcolor="${F.coral}" style="background-color:${F.coral};border-radius:999px;padding:15px 16px;">
-        <a href="${url}" target="_blank" style="display:block;color:#ffffff;text-decoration:none;font-weight:700;font-size:17px;line-height:1.3;font-family:${SCHRIFT};text-align:center;">${label}</a>
+      <tr><td align="center" bgcolor="${F.coral}" style="background-color:${F.coral};border-radius:999px;padding:15px ${o.innen ?? 16}px;">
+        <a href="${url}" target="_blank" style="display:block;color:#ffffff;text-decoration:none;font-weight:700;font-size:${o.schrift ?? 17}px;line-height:1.3;font-family:${SCHRIFT};text-align:center;">${label}</a>
       </td></tr>
     </table>`;
 }
@@ -103,6 +103,16 @@ export function mPunkte(bewertung: { schnitt: string; anzahl: number } | null, o
       ${MAIL_HERO_PUNKTE.map(zeile).join('')}
       ${zeile(`Bestpreisgarantie <a href="${BESTPREIS_URL}" style="color:${F.greenDeep};font-weight:700;text-decoration:underline;">Mehr Infos</a>`)}
     </table>${sterne}`;
+}
+
+/** Sterne wie im Kopf von primundus.de („4,9 von 5 aus 126 Bewertungen“), mittig unter einem Knopf.
+ *  Gold wie Website (pm-gold) und Martas Karte; wie dort ist nur „126 Bewertungen“ dezent unterstrichen. */
+export function mSterneZeile(bewertung: { schnitt: string; anzahl: number }, unten = 18): string {
+  const gold = Math.min(5, Math.max(0, Math.round(Number(bewertung.schnitt.replace(",", ".")))));
+  const sterne = `<span style="color:#D4A843;letter-spacing:1px;">${"&#9733;".repeat(gold)}</span>` +
+    (gold < 5 ? `<span style="color:#E3D9CB;letter-spacing:1px;">${"&#9733;".repeat(5 - gold)}</span>` : "");
+  const wort = bewertung.anzahl === 1 ? "Bewertung" : "Bewertungen";
+  return `<p style="margin:0 0 ${unten}px;text-align:center;font-size:13.5px;line-height:1.4;color:${F.muted};"><a href="https://primundus.de/erfahrungen" style="color:${F.muted};text-decoration:none;">${sterne}&nbsp; <strong style="color:${F.ink};">${bewertung.schnitt}</strong> von 5 aus <span style="white-space:nowrap;text-decoration:underline;text-decoration-color:#D1C7BB;text-underline-offset:3px;">${bewertung.anzahl} ${wort}</span></a></p>`;
 }
 
 /** Bernstein-Chip wie der Countdown im Portal (ohne Datum im Text). */
