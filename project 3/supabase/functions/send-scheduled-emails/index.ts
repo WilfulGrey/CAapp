@@ -421,6 +421,7 @@ function kundenKontext(lead: Lead, siteUrl: string, portalBase: string): Kontext
     portal: (param) => portalLink(portalBase, lead.token, siteUrl, param),
     token: lead.token || null,
     marta: buildMartaSig(siteUrl),
+    bewertung: bewertungsStand,
   };
 }
 
@@ -2204,7 +2205,7 @@ Deno.serve(async (req: Request) => {
           eventTypeSent = "email_angebot_sent";
           eventTypeFailed = "email_angebot_failed";
         } else if (scheduledEmail.email_type === "eingangsbestaetigung") {
-          // Mail 1: Angebot + „Passt Ihnen das Angebot?" (Vorschau v2, Martin 26.09.2026).
+          // Mail 1: Angebot, Knopf „Angebot & Pflegekräfte ansehen" unter dem Preis und unten (Registry #110, Martin 03.10.2026).
           // Re-Submit: angepasster Betreff und Einstieg (Kunde hat das Formular nochmal
           // abgeschickt). Eingekaufter Lead: eigener Betreff, Portalname im Einstieg, Hinweis
           // über den Angaben — Herkunft schlägt Resubmit.

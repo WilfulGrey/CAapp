@@ -41,7 +41,7 @@ HTML-Dateien in diesem Ordner zeigen noch den alten Stand.
 ### A) Vor dem Absenden der Pflegesituation (Nurture)
 
 ```
-0h     Angebot („Passt Ihnen das Angebot?" → Ja, Bewerbungen erhalten)
+0h     Angebot (Knopf „Angebot & Pflegekräfte ansehen" unter dem Preis + unten, Sterne darunter; Registry #110)
 +4h    Nudge 1  (bis zu fünf passende Pflegekräfte)
 +28h   Nudge 2  („Soll ich die Angaben mit Ihnen zusammen ausfüllen?")
 +48h   Vier Dinge, die Primundus anders macht
