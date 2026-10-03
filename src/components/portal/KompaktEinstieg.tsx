@@ -30,12 +30,14 @@ import { EYEBROW, H2 } from '../ui/SectionHeader';
 export function KompaktEinleitung() {
   return (
     <p className="mt-3 text-[16px] leading-[1.55] text-pm-muted">
-      Eine Betreuungskraft wohnt bei Ihnen und hilft im Alltag: bei der Körperpflege, beim Essen und im
-      Haushalt. Um alles Weitere kümmern wir uns: Anreise, Wechsel in der Regel alle{' '}
-      {/* Nach „–" darf der Browser umbrechen; „6–8 Wochen" bleibt zusammen, und das letzte Wort
-          steht nicht allein in der Zeile (360 px). */}
-      <span className="whitespace-nowrap">6–8 Wochen</span>, schnellstmöglich Ersatz bei Ausfall und die{' '}
-      <span className="whitespace-nowrap">taggenaue Abrechnung.</span>
+      {/* Zusammen bleiben: Zahl und Wort, „DIE WELT" und das letzte Wortpaar — sonst stand bei
+          390 px „Bei DIE" / „WELT" getrennt und „gewählt." allein in der letzten Zeile. */}
+      Eine bei uns angestellte Betreuungskraft wohnt bei Ihnen und hilft im Alltag: bei der
+      Körperpflege, beim Essen und im Haushalt. Wir machen das seit über{' '}
+      <span className="whitespace-nowrap">20 Jahren</span>, mit mehr als{' '}
+      <span className="whitespace-nowrap">60.000 Einsätzen</span>, rechtssicher, täglich kündbar und
+      mit Bestpreisgarantie. Bei <span className="whitespace-nowrap">DIE WELT</span> wurden wir 6× in
+      Folge zum <span className="whitespace-nowrap">Testsieger gewählt.</span>
     </p>
   );
 }

@@ -177,13 +177,15 @@ describe('SchritteKasten', () => {
 });
 
 describe('KompaktEinleitung', () => {
-  it('Einleitung unter dem Titel im Wortlaut, „6–8 Wochen" bricht nicht um', () => {
+  it('Einleitung unter dem Titel im Wortlaut; Zahl + Wort, „DIE WELT" und das Ende brechen nicht um', () => {
     const { container } = render(<KompaktEinleitung />);
     const absatz = container.querySelector('p')!;
     expect(absatz.textContent).toBe(
-      'Eine Betreuungskraft wohnt bei Ihnen und hilft im Alltag: bei der Körperpflege, beim Essen und im Haushalt. Um alles Weitere kümmern wir uns: Anreise, Wechsel in der Regel alle 6–8 Wochen, schnellstmöglich Ersatz bei Ausfall und die taggenaue Abrechnung.',
+      'Eine bei uns angestellte Betreuungskraft wohnt bei Ihnen und hilft im Alltag: bei der Körperpflege, beim Essen und im Haushalt. Wir machen das seit über 20 Jahren, mit mehr als 60.000 Einsätzen, rechtssicher, täglich kündbar und mit Bestpreisgarantie. Bei DIE WELT wurden wir 6× in Folge zum Testsieger gewählt.',
     );
-    expect(within(absatz).getByText('6–8 Wochen').className).toContain('whitespace-nowrap');
+    for (const teil of ['20 Jahren', '60.000 Einsätzen', 'DIE WELT', 'Testsieger gewählt.']) {
+      expect(within(absatz).getByText(teil).className).toContain('whitespace-nowrap');
+    }
   });
 });
 

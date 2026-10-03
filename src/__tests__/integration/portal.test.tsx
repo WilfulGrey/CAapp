@@ -362,7 +362,7 @@ describe('Portal integration: golden paths', () => {
     // Auch der Kasten für Neukunden darf nicht kurz aufblitzen (Registry #102: `!schonAbgesendet`).
     expect(titel.some((t) => t.includes('Noch 2 Minuten bis zum Einladen'))).toBe(false);
     // …und der Kompakt-Einstieg auch nicht (Schritt „Angebot erstellt", Hinweis „Vor dem Einladen").
-    expect(titel.some((t) => t.includes('Angebot erstellt') || t.includes('Vor dem Einladen') || t.includes('Eine Betreuungskraft wohnt bei Ihnen'))).toBe(false);
+    expect(titel.some((t) => t.includes('Angebot erstellt') || t.includes('Vor dem Einladen') || t.includes('Betreuungskraft wohnt bei Ihnen'))).toBe(false);
     // Wunschstart aus dem gespeicherten Formular, nicht aus mamamia `arrival_at`.
     expect(screen.getByText(/Wunschstart 15\.11\./)).toBeInTheDocument();
   }, 15_000);
@@ -459,7 +459,7 @@ describe('Portal integration: golden paths', () => {
     const einleitung = titel.nextElementSibling as HTMLElement;
     expect(einleitung.tagName).toBe('P');
     expect(einleitung.textContent).toBe(
-      'Eine Betreuungskraft wohnt bei Ihnen und hilft im Alltag: bei der Körperpflege, beim Essen und im Haushalt. Um alles Weitere kümmern wir uns: Anreise, Wechsel in der Regel alle 6–8 Wochen, schnellstmöglich Ersatz bei Ausfall und die taggenaue Abrechnung.',
+      'Eine bei uns angestellte Betreuungskraft wohnt bei Ihnen und hilft im Alltag: bei der Körperpflege, beim Essen und im Haushalt. Wir machen das seit über 20 Jahren, mit mehr als 60.000 Einsätzen, rechtssicher, täglich kündbar und mit Bestpreisgarantie. Bei DIE WELT wurden wir 6× in Folge zum Testsieger gewählt.',
     );
     // Direkt nach der Kostenkarte, vor den Pflegekräften.
     const karte = screen.getByText('Ihre Betreuungskosten').closest('.shadow-lift')!;
