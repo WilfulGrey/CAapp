@@ -131,7 +131,7 @@ export const GET_CUSTOMER = /* GraphQL */ `
         id
         equipment
       }
-      # Gebucht-Ableitung (Fix Hagedorn 2026-07-15): akzeptiert die AGENTUR
+      # Gebucht-Ableitung (Fix 2026-07-15): akzeptiert die AGENTUR
       # eine Bewerbung im SA-Portal, entsteht KEINE
       # lead_application_acceptances-Zeile und Mamamia entfernt die Bewerbung
       # aus listApplications — der einzige sichtbare Beleg ist

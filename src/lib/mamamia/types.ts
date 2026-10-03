@@ -96,7 +96,7 @@ export interface MamamiaCustomerContract {
 }
 
 // Job-Offer-Teilmenge aus GET_CUSTOMER (Customer.job_offers). Für die
-// Gebucht-Ableitung aus dem Mamamia-Stand (Fix Hagedorn 2026-07-15):
+// Gebucht-Ableitung aus dem Mamamia-Stand (Fix 2026-07-15):
 // akzeptiert die Agentur eine Bewerbung im SA-Portal, entsteht KEINE
 // lead_application_acceptances-Zeile — JobOffer.final_confirmation ist
 // dann der einzige Beleg. ALLE Felder optional (fail-soft): eine alte

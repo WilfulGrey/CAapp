@@ -283,7 +283,7 @@ function kraftZeile(e: Empfehlung, cid: string | null, letzte: boolean): string 
 
 /** Liste nicht geladen (Timeout, HTTP-Fehler)? Neuer Versuch in zehn Minuten,
  *  höchstens dreimal — danach entscheidet ein Mensch (`null` = absagen).
- *  Ein Timeout ist kein „keine Kräfte" (Lead Mielke, 25.09.2026). */
+ *  Ein Timeout ist kein „keine Kräfte" (Vermittler-Lead, 25.09.2026). */
 export const KRAEFTE_WIEDERHOLUNGEN = 3;
 export function kraefteNochmalUm(fehlschlaege: number, jetzt: Date): string | null {
   return fehlschlaege <= KRAEFTE_WIEDERHOLUNGEN

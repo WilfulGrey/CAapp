@@ -325,8 +325,8 @@ export function mapOtherPeopleInHouse(fd: FormularDaten): "yes" | "no" {
 // dopiero zapis formularza pacjenta nadpisywał to na level_3 — a robi to
 // tylko ~22 % klientów. Reszta zostawała na level_4 → SA-Portal liczył im
 // 600 €/Mo i rekomendował ~150 € ponad ich własną ofertą.
-// Dowód (prod, 16.08.): Hümmer/Bähr/Krohne/Glatz — bez formularza → level_4;
-// Felsch/Türschmann — z formularzem → level_3.
+// Dowód (prod, 16.08.): cztery konta bez formularza → level_4;
+// dwa z formularzem → level_3.
 // `level_4` NIE jest tu osiągalny — to świadome ograniczenie, nie luka.
 // Mamamia enum 0..4 + "not_important" verified prod sweep 2026-04-28.
 //

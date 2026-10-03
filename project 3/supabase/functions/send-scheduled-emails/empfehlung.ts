@@ -740,7 +740,7 @@ export async function holeFuenf(deps: HoleDeps): Promise<FuenfErgebnis | null> {
 /**
  * Wie holeFuenf, aber ohne das Schlucken: wirft, wenn mamamia nicht
  * (rechtzeitig) antwortet, `[]` heißt „mamamia hat niemanden Passenden".
- * Für die Vermittler-Liste, wo aus `null` eine Absage wurde — Lead Mielke,
+ * Für die Vermittler-Liste, wo aus `null` eine Absage wurde — Vermittler-Lead,
  * 25.09.2026: 78 Kräfte da, Anfrage nach 12 s abgebrochen, Liste gestrichen.
  */
 export async function holeFuenfStreng(deps: HoleDeps): Promise<Empfehlung[]> {

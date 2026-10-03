@@ -755,7 +755,7 @@ export function pickFinalConfirmedJob(
   return confirmed[0];
 }
 
-/** Gebucht-Ableitung aus dem Mamamia-Stand (Fix Hagedorn 2026-07-15).
+/** Gebucht-Ableitung aus dem Mamamia-Stand (Fix 2026-07-15).
  *  Akzeptiert die AGENTUR die Bewerbung im SA-Portal, entsteht keine
  *  lead_application_acceptances-Zeile und Mamamia entfernt die Bewerbung aus
  *  listApplications — das Portal wäre blind und zeigte weiter Onboarding.
@@ -824,7 +824,7 @@ export function synthesizeAcceptedApplicationFromFinalConfirmation(
  *    1) Portal-Annahme, Application noch in listApplications → patchen.
  *    2) Portal-Annahme, Application weg → Synthese aus contract_snapshot.
  *    3) KEINE Portal-Annahme, aber Mamamia-final_confirmation (die Annahme
- *       kam agentur-seitig — Fix Hagedorn) → Synthese aus dem Job-Stand.
+ *       kam agentur-seitig — Fix) → Synthese aus dem Job-Stand.
  *  lead_application_acceptances hat VORRANG: sobald Pfad 1/2 greifen, läuft
  *  Pfad 3 nicht (keine Doppel-Synthese). Synthetische Apps werden jeden Lauf
  *  verworfen + frisch abgeleitet, damit die Platzhalter-Karte aufs volle

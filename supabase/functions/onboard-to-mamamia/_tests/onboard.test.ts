@@ -942,7 +942,7 @@ const IDREAD = (over: Record<string, unknown> = {}) => ({
    nur in patient_*. */
 const vermittlerLead = (over: Record<string, unknown> = {}) =>
   makeLead({
-    id: "lead-rothmund",
+    id: "lead-muster",
     mamamia_customer_id: 10670,
     mamamia_job_offer_id: 36297,
     vorname: "Bernd",
@@ -950,8 +950,8 @@ const vermittlerLead = (over: Record<string, unknown> = {}) =>
     anrede: "Herr",
     vermittler: "pflegena.com",
     patient_anrede: "Frau",
-    patient_vorname: "Agnes",
-    patient_nachname: "Rothmund",
+    patient_vorname: "Berta",
+    patient_nachname: "Muster",
     patient_street: "Im Winkel 2",
     kalkulation: { bruttopreis: 3350, eigenanteil: 3016, formularDaten: { plz: "79771", ort: "Klettgau-Bühl" } },
     ...over,
@@ -959,13 +959,13 @@ const vermittlerLead = (over: Record<string, unknown> = {}) =>
 
 Deno.test("resync (#67): Vermittler + details — Identitaet als LETZTE Mutation, mit Contract-Zeile und Kontaktperson", async () => {
   _resetAgencyTokenCache();
-  const mm = fakeMamamia([LOGIN, readOf([P1]), UPDATED, IDREAD(), UPDATED, IDREAD({ first_name: "Agnes", last_name: "Rothmund" })]);
+  const mm = fakeMamamia([LOGIN, readOf([P1]), UPDATED, IDREAD(), UPDATED, IDREAD({ first_name: "Berta", last_name: "Muster" })]);
   const r = await resyncCustomerFromLead({
     lead: vermittlerLead(), felder: [], details: true, secrets: SECRETS, fetchFn: mm.fetch,
   });
   const v = mm.requests[4].variables;
-  assertEquals(v.first_name, "Agnes");
-  assertEquals(v.last_name, "Rothmund");
+  assertEquals(v.first_name, "Berta");
+  assertEquals(v.last_name, "Muster");
   // equipments + non-leere patients-Stubs reisen mit: ausgelassene
   // Association-Inputs waeren ein Wipe (gotcha #3), leere patients lehnt beta ab.
   assertEquals(v.patients, [{ id: 75420, tool_ids: [2] }]);
@@ -975,8 +975,8 @@ Deno.test("resync (#67): Vermittler + details — Identitaet als LETZTE Mutation
     is_same_as_first_patient: false,
     is_same_as_contact: false,
     salutation: "Mrs.",
-    first_name: "Agnes",
-    last_name: "Rothmund",
+    first_name: "Berta",
+    last_name: "Muster",
     street_number: "Im Winkel 2",
     zip_code: "79771",
     city: "Klettgau-Bühl",

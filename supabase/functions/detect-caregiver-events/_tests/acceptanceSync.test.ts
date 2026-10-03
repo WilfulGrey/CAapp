@@ -1096,7 +1096,7 @@ Deno.test("#82: schon alarmiert ⇒ kein zweiter Alarm", async () => {
 });
 
 // ─── Registry #88: Vertragsdaten abgelehnt ≠ Bewerbung zurückgezogen ──────
-// Fall Hümmer: „Divers" ⇒ salutation null ⇒ Mamamia lehnt StoreConfirmation
+// Fall #88: „Divers" ⇒ salutation null ⇒ Mamamia lehnt StoreConfirmation
 // mit contract_patient.salutation ab. Der Alarm vermutete „von der Agentur
 // zurückgezogen" — falsch; die Bewerbung war in Ordnung.
 

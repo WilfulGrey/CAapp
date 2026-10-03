@@ -120,7 +120,7 @@ export interface AcceptanceSyncResult {
     /**
      * Registry #88: Mamamia hat UNSERE Vertragsdaten abgelehnt — alle
      * Validation-Keys liegen unter contract_patient.* / contract_contact.*
-     * (Fall Hümmer: contract_patient.salutation bei „Divers"). Dann ist die
+     * (Fall #88: contract_patient.salutation bei „Divers"). Dann ist die
      * Bewerbung selbst sehr wahrscheinlich in Ordnung, und der Alarm darf
      * nicht „von der Agentur zurückgezogen" vermuten. Fehlt das Feld, gilt
      * die bisherige Vermutung. Klassifiziert nach Struktur, nicht nach Text.

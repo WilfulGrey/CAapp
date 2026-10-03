@@ -527,7 +527,7 @@ describe('Portal integration: golden paths', () => {
   // ─── Path 3: Einsatzort-Wall (Registry #65) ─────────────────────────────
 
   it('einsatzort wall: unauflösbare PLZ → kein updateCustomer, zurück auf Schritt 3', async () => {
-    // Der Fall Schwenke als Entwurf: PLZ 5-stellig UND Ort gefüllt, also kommt
+    // Der Entwurf-Fall: PLZ 5-stellig UND Ort gefüllt, also kommt
     // der Kunde durch das Formular bis „Speichern" — erst Mamamia sagt, dass es
     // die PLZ nicht gibt (Default-Mock: searchLocations → []). Ohne location_id
     // stempelt Mamamia einen Platzhalter und der Kunde sieht „Vollständig" für

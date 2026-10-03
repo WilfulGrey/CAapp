@@ -1220,7 +1220,7 @@ describe('synthesizeAcceptedApplicationFromSnapshot', () => {
   });
 });
 
-// ─── Gebucht-Ableitung aus dem Mamamia-Stand (Bug-Fix Hagedorn 15.07.2026) ──
+// ─── Gebucht-Ableitung aus dem Mamamia-Stand (Bug-Fix 15.07.2026) ──
 // Akzeptiert die AGENTUR die Bewerbung im SA-Portal, gibt es keine
 // lead_application_acceptances-Zeile UND Mamamia entfernt die Bewerbung aus
 // listApplications — das Portal zeigte weiter den Onboarding-Zustand statt

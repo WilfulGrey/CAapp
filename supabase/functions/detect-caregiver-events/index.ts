@@ -127,7 +127,7 @@ export interface DetectSupabase {
   // ist beim Versand also ≤15 Min alt und damit gültig. Liefert Anzahl
   // aktualisierter Rows.
   refreshReminderPhotos(leadId: string, photoByCaregiver: Map<number, string>): Promise<number>;
-  // Reminder-Stopp (Martin, 2026-07-11 — Kunde Hagedorn): Bewerbungen, die
+  // Reminder-Stopp (Martin, 2026-07-11): Bewerbungen, die
   // in mamamia nicht mehr aktiv sind (Panel-/SA-Ablehnung LOESCHT die
   // Application, Portal-Reject setzt rejected_at), duerfen keine weiteren
   // Reminder ausloesen. Cancelt pending Reminder-Rows, deren Pflegekraft
@@ -787,7 +787,7 @@ export async function detect(
         seenAppIds,
         pairsWithAppId,
         seenInterests,
-        // Notify-Regel (Bug #25, Fall 9239 „Elke Zwolan"):
+        // Notify-Regel (Bug #25, Fall 9239):
         //   - DEFAULT-Job: immer (heutiges Verhalten — erste Bewerbung mailt).
         //   - Job mit Event-Historie: immer (auch geseedete Events zählen).
         //   - Job LIVE 'geplant': IMMER — ein geplanter Folge-Einsatz ist

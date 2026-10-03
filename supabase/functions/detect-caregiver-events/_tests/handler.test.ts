@@ -897,7 +897,7 @@ const appOn = (id: number, cg: number) => ({ id, caregiver_id: cg, caregiver: ma
 
 Deno.test("multi-job: erste Bewerbung auf LIVE-geplantem Folge-Job → NOTIFY (Bug #25, Fall 9239)", async () => {
   resetCaches();
-  // Regression Fall 9239 (Elke Zwolan): Folge-Job seit Tagen 'geplant', erste
+  // Regression Fall 9239: Folge-Job seit Tagen 'geplant', erste
   // Bewerbung kam — und wurde still geseedet (Kundin erfuhr NICHTS). Neu:
   // Live-Status 'geplant' ⇒ notify, auch ohne jede Event-Historie des Jobs.
   const recorder: BridgeOptions["recorder"] = [];

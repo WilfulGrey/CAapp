@@ -368,7 +368,7 @@ export const AngebotPruefenModal: FC<{
 
   // Anrede des Leistungsempfängers geht als contract_patient.salutation an
   // StoreConfirmation — dort PFLICHT und nur 'Mr.'/'Mrs.' (Registry #88,
-  // Fall Hümmer: „Divers" für ein Ehepaar ⇒ Mamamia lehnte den Akzept ab).
+  // „Divers" für ein Ehepaar ⇒ Mamamia lehnte den Akzept ab).
   // Ein Prefill außerhalb von Frau/Herr (es gibt z. B. patient_anrede
   // „Familie") bleibt LEER statt still als „Frau" angezeigt und als „Familie"
   // gesendet zu werden — der Kunde wählt dann selbst.
