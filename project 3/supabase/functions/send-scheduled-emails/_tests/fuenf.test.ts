@@ -4,7 +4,7 @@
  * Angebotsmail (holeMatchings) — hier nur ohne getCaregiver je Zeile. */
 import { assert, assertEquals, assertRejects, assertStringIncludes } from "@std/assert";
 import {
-  holeFuenf, holeFuenfStreng, fuenfListeHtml, fuenfListeText, fotoBudget, zahlwort,
+  holeFuenf, holeFuenfStreng, fuenfListeHtml, fuenfListeKompaktHtml, fuenfListeText, fotoBudget, zahlwort,
   HAKEN_VERFUEGBAR, type Empfehlung,
   kundenFakten,
   kraefteWort,
@@ -79,6 +79,28 @@ Deno.test("fuenfListeHtml: ein Profil (V) je Kraft, Foto per CID oder Initialen,
   assert(!html.includes("Ø"), "keine Durchschnittsdauer");
   assert(!html.includes("https://s3/"), "nie die rohe S3-URL");
 });
+Deno.test("fuenfListeKompaktHtml: eine Zeile je Kraft, Zahl der Einsätze statt Stufen-Wort, Foto per CID oder Initialen", () => {
+  const fuenf = [
+    e({ caregiverId: 1, anzeigeName: "Anna K.", vorname: "Anna", einsaetze: 14, erfahrungJahre: 6 }),
+    e({ caregiverId: 2, anzeigeName: "Beata M.", vorname: "Beata", alter: null, einsaetze: 0 }),
+  ];
+  const html = fuenfListeKompaktHtml(fuenf, ["cid-1", null], ["https://p/1", "https://p/2"], "https://p/alle");
+  assertStringIncludes(html, 'src="cid:cid-1"');
+  assertStringIncludes(html, ">BM<");
+  assertStringIncludes(html, "Passend zu Ihrer Anfrage");
+  assertStringIncludes(html, "14 Einsätze bei uns");
+  assertStringIncludes(html, "6 Jahre Erfahrung");
+  assert(!/Elite|Stammkraft|Bewährt|Bekannt/.test(html), "keine Stufen-Wörter in der kompakten Zeile");
+  assert(!html.includes("&#9733;"), "keine Sterne bei Pflegekräften (keine Bewertungen je Kraft)");
+  assertStringIncludes(html.replace(/<[^>]+>/g, ""), "6 Jahre Erfahrung · 14 Einsätze bei uns");
+  assertEquals((html.match(/Einsätze bei uns|Einsatz bei uns/g) ?? []).length, 1, "ohne Einsatz keine Einsatz-Zeile");
+  assertStringIncludes(html, 'href="https://p/2"');
+  assertStringIncludes(html, "Alle 2 Profile im Portal ansehen");
+  assert(!html.includes("Profil ansehen&nbsp;&rsaquo;"), "keine großen Profile");
+  assert(!html.includes("https://s3/"), "nie die rohe S3-URL");
+  assertEquals(fuenfListeKompaktHtml([], [], [], "x"), "");
+});
+
 Deno.test("fuenfListeHtml/Text: leer bei null Kräften", () => {
   assertEquals(fuenfListeHtml([], [], [], "x"), "");
   assertEquals(fuenfListeText([], [], "x"), "");

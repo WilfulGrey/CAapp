@@ -42,6 +42,7 @@ import {
   type BewerbungsAngebot,
   type PflegekraftDaten,
   mSterneZeile,
+  mKoepfe,
 } from "./mailBausteine.ts";
 import { type Empfehlung, esc, zahlwort } from "./empfehlung.ts";
 import { ABSCHIED_SATZ, RUECKMELDUNG_KNOEPFE, rueckmeldungLink } from "./kette.ts";
@@ -166,7 +167,7 @@ export type AngebotEingabe = {
   angabenHinweis: { html: string; text: string } | null;
   resubmit: boolean;
   /** Empfehlung aus mamamia; null/undefined → Abschnitt fällt weg. */
-  empfehlung?: { e: Empfehlung; cid: string | null; sichtbar: number } | null;
+  empfehlung?: { e: Empfehlung; cid: string | null; sichtbar: number; koepfe?: { foto: string | null; name: string }[] } | null;
 };
 
 function angabenTabelle(fd: Record<string, any>, careStartTiming: string | null | undefined): { html: string; text: string } {
@@ -215,6 +216,8 @@ export function angebotMail(k: Kontext, a: AngebotEingabe): KundenMail {
   const n = emp ? Math.max(1, Math.min(5, emp.sichtbar || 1)) : 0;
   // Martin 03.10.2026: wie vor dem 26.09. auf Angebot und Pflegekräfte (Portal oben), nicht direkt ins Formular.
   const start = k.portal({ m: "eb" });
+  // Köpfe der passenden Kräfte unter dem Knopf (Vorschlag 03.10.2026); ohne Empfehlung keine.
+  const koepfe = emp?.koepfe?.slice(0, 5) ?? [];
 
   const kraefteSatz = n === 0 ? ""
     : n === 1 ? " Eine Pflegekraft passt schon zu Ihren Angaben, Sie finden sie weiter unten."
@@ -235,7 +238,8 @@ export function angebotMail(k: Kontext, a: AngebotEingabe): KundenMail {
     ${mEyebrow(brutto ? "Ihre Betreuungskosten" : "Ihre Konditionen", 8)}
     ${brutto ? `<p style="margin:0 0 8px;font-size:44px;font-weight:800;line-height:1;letter-spacing:-.03em;color:${F.ink};">${euro(brutto)}&nbsp;€</p>
     ${mKlein("Monatlich inkl. Steuern, Gebühren und Sozialabgaben. Zzgl. Kost und Logis sowie Reisekosten (125&nbsp;€ pro Fahrt).", 14)}` : ""}
-    ${mKnopf(start, "Angebot &amp; Pflegekräfte ansehen", 2, k.bewertung ? 10 : 18, { schrift: 16, innen: 12 })}
+    ${mKnopf(start, "Angebot &amp; Pflegekräfte ansehen", 2, 10, { schrift: 16, innen: 12 })}
+    ${koepfe.length ? mKoepfe(koepfe, `<strong style="color:${F.ink};">${n} passende ${pflegekraefte(n)}</strong> für Sie&nbsp;&rarr;`, start, k.bewertung ? 8 : 18) : ""}
     ${k.bewertung ? mSterneZeile(k.bewertung, 18) : ""}
     ${mPunkte(null)}
     ${mKlein("Kosten entstehen erst, wenn die Pflegekraft bei Ihnen ist.", 0)}
@@ -343,24 +347,31 @@ export function nudge1Mail(k: Kontext, liste: FuenfListe | null): KundenMail {
   const n = liste?.vornamen.length ?? 0;
   const url = k.portal({ goto: "anfragen", m: "pn1" });
   const vorschau = nudge1Vorschau(liste?.vornamen ?? []);
-  const einstieg = n === 0 ? ""
-    : n === 1 ? "diese Pflegekraft passt zu Ihren Angaben und ist zum gewünschten Start frei:"
-    : `diese ${zahlwort(n)} Pflegekräfte passen zu Ihren Angaben und sind zum gewünschten Start frei:`;
-  const kern = n === 0
-    ? "passende Pflegekräfte können sich bei Ihnen bewerben, sobald die Pflegesituation da ist. Das dauert 2 Minuten, vieles ist schon ausgefüllt. Jede Bewerbung bekommen Sie per E-Mail, mit Anreisetermin und Preis. Ein Vertrag entsteht erst, wenn Sie zusagen."
-    : `${n === 1 ? "Bewerben kann sich die Pflegekraft" : "Bewerben können sie sich"}, sobald die Pflegesituation da ist. Das dauert 2 Minuten, vieles ist schon ausgefüllt. Jede Bewerbung bekommen Sie per E-Mail, mit Anreisetermin und Preis. Ein Vertrag entsteht erst, wenn Sie zusagen.`;
+  // Vorschlag 03.10.2026 (Martin: „die nächste Mail … zeigt mir die auch nochmal“, „ganz kompakt“):
+  // Knopf im ersten Bildschirm, Sterne darunter, die Kräfte als kompakte Zeilen danach.
+  const wer = n === 0 ? "" : n === 1
+    ? "nach Ihren bisherigen Angaben kommt eine Pflegekraft infrage, die zum gewünschten Start frei ist. Bewerben kann sie sich"
+    : `nach Ihren bisherigen Angaben kommen ${zahlwort(n)} Pflegekräfte infrage, die zum gewünschten Start frei sind. Bewerben können sie sich`;
+  const einstieg = n === 0
+    ? "passende Pflegekräfte können sich bei Ihnen bewerben, sobald die Pflegesituation vollständig ist. Das dauert etwa 2 Minuten, vieles ist schon ausgefüllt."
+    : `${wer}, sobald die Pflegesituation vollständig ist. Das dauert etwa 2 Minuten, vieles ist schon ausgefüllt.`;
+  const sicher = "Jede Bewerbung erhalten Sie mit Foto, Erfahrung, Anreisedatum und Preis. Ein Vertrag entsteht erst, wenn Sie zusagen.";
   const html = `${mVorschau(vorschau)}
     ${gruss(k)}
-    ${n ? `${mp(einstieg, 4)}${liste!.html}` : ""}
-    ${mp(kern, 20)}
-    ${mKnopf(url, "Bewerbungen erhalten", 0, 14)}
+    ${mp(einstieg, 20)}
+    ${mKnopf(url, "Pflegesituation vervollständigen", 0, k.bewertung ? 10 : 22)}
+    ${k.bewertung ? mSterneZeile(k.bewertung, 26) : ""}
+    ${n ? liste!.html : ""}
+    ${mp(sicher, 16)}
     ${mKontakt()}
     ${k.marta}`;
   const text = `${k.anrede},
 
-${n ? `${einstieg}\n\n${liste!.text}\n\n` : ""}${kern}
+${einstieg}
 
-Bewerbungen erhalten: ${url}
+Pflegesituation vervollständigen: ${url}
+${k.bewertung ? `★★★★★ ${k.bewertung.schnitt} von 5 aus ${k.bewertung.anzahl} Bewertungen: https://primundus.de/erfahrungen\n` : ""}
+${n ? `${liste!.text}\n\n` : ""}${sicher}
 
 ${KONTAKT_TEXT}
 

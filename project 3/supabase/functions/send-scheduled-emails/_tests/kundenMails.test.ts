@@ -95,6 +95,23 @@ Deno.test("01 Angebot: Preis, Knopf oben und unten, Empfehlung, Schritte, Angabe
   assertEquals(m.vorschau, "3.050 € im Monat. Fünf passende Pflegekräfte sind für Sie ausgewählt.");
 });
 
+Deno.test("01 Angebot: Köpfe der passenden Kräfte unter dem Knopf, vor den Sternen", () => {
+  const koepfe = [{ foto: "cid:a@primundus.de", name: "Maria K." }, { foto: null, name: "Ewa S." }, { foto: "cid:c@primundus.de", name: "Jolanta W." }];
+  const m = angebotMail({ ...k(), bewertung: { schnitt: "4,9", anzahl: 126 } }, {
+    kalkulation: kalk, careStartTiming: null, herkunft: null, portalBetreff: "X", angabenHinweis: null, resubmit: false,
+    empfehlung: { e: empf, cid: "a@primundus.de", sichtbar: 3, koepfe },
+  });
+  const s = sichtbar(m.html);
+  assertStringIncludes(s, "3 passende Pflegekräfte für Sie");
+  assertStringIncludes(m.html, 'src="cid:c@primundus.de"');
+  assertStringIncludes(s, " ES ");
+  const knopf = m.html.indexOf(">Angebot &amp; Pflegekräfte ansehen</a>");
+  const zeile = m.html.indexOf("passende Pflegekräfte</strong> für Sie");
+  assert(knopf < zeile && zeile < m.html.indexOf("von 5 aus"), "Knopf → Köpfe → Sterne");
+  const ohne = angebotMail(k(), { kalkulation: kalk, careStartTiming: null, herkunft: null, portalBetreff: "X", angabenHinweis: null, resubmit: false, empfehlung: { e: empf, cid: null, sichtbar: 5 } });
+  assert(!ohne.html.includes("</strong> für Sie&nbsp;&rarr;"), "ohne Köpfe keine Zeile");
+});
+
 Deno.test("01 Angebot: Sterne unter dem oberen Knopf, wie auf primundus.de", () => {
   const m = angebotMail({ ...k(), bewertung: { schnitt: "4,9", anzahl: 126 } }, {
     kalkulation: kalk, careStartTiming: null, herkunft: null, portalBetreff: "X", angabenHinweis: null, resubmit: false, empfehlung: null,
@@ -138,12 +155,18 @@ Deno.test("02 Nudge 1: Betreff und Vorschau nach Anzahl", () => {
   assertEquals(nudge1Vorschau(["Maria", "Ewa", "Jolanta", "Beata", "Irena"]), "Maria, Ewa und drei weitere könnten sich bei Ihnen bewerben.");
   assertEquals(nudge1Vorschau(["Maria", "Ewa", "Jolanta"]), "Maria, Ewa und eine weitere könnten sich bei Ihnen bewerben.");
   assertEquals(nudge1Vorschau(["Maria"]), "Maria könnte sich bei Ihnen bewerben.");
-  const mit = nudge1Mail(k(), { html: "<table>LISTE</table>", text: "LISTE", vornamen: ["Maria", "Ewa"] });
-  pruefe("02", mit, "Bewerbungen erhalten", `${PORTAL}/?token=tok123&goto=anfragen&m=pn1`);
+  // Vorschlag 03.10.2026: Knopf „Pflegesituation vervollständigen“ vor der Liste, Sterne darunter.
+  const mit = nudge1Mail({ ...k(), bewertung: { schnitt: "4,9", anzahl: 126 } }, { html: "<table>LISTE</table>", text: "LISTE", vornamen: ["Maria", "Ewa"] });
+  pruefe("02", mit, "Pflegesituation vervollständigen", `${PORTAL}/?token=tok123&goto=anfragen&m=pn1`);
   assertStringIncludes(mit.html, "LISTE");
-  assertStringIncludes(sichtbar(mit.html), "diese zwei Pflegekräfte passen");
+  assertStringIncludes(sichtbar(mit.html), "nach Ihren bisherigen Angaben kommen zwei Pflegekräfte infrage");
+  assert(mit.html.indexOf(">Pflegesituation vervollständigen</a>") < mit.html.indexOf("LISTE"), "Knopf vor der Liste");
+  assert(mit.html.indexOf("von 5 aus") < mit.html.indexOf("LISTE"), "Sterne unter dem Knopf");
+  assertStringIncludes(sichtbar(mit.html), "Jede Bewerbung erhalten Sie mit Foto, Erfahrung, Anreisedatum und Preis.");
+  assert(!mit.html.includes("Bewerbungen erhalten</a>"), "alter Knopf");
   const ohne = nudge1Mail(k(), null);
-  pruefe("02 ohne Liste", ohne, "Bewerbungen erhalten", "goto=anfragen&m=pn1");
+  pruefe("02 ohne Liste", ohne, "Pflegesituation vervollständigen", "goto=anfragen&m=pn1");
+  assert(!sichtbar(ohne.html).includes("von 5 aus"), "ohne Bewertungsstand keine Sterne");
 });
 
 Deno.test("03–06, 08, 09: Knopf und Ziel", () => {
