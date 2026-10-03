@@ -27,6 +27,10 @@ vi.mock('../../lib/supabase', async () => {
         return { lead: defaultLead as unknown as import('../../lib/supabase').Lead, error: null };
       }
       // Schon abgesendet (Proxy hat `patient_form_at` gesetzt), neues Gerät.
+      // Kompakt-Einstieg Runde 4: Lead ohne Zuschüsse in der Kalkulation (keine Eigenanteil-Zeile).
+      if (token === 'token-ohne-zuschuesse') {
+        return { lead: { ...defaultLead, token, kalkulation: { ...defaultLead.kalkulation, 'zuschüsse': { gesamt: 0, items: [] } } } as unknown as import('../../lib/supabase').Lead, error: null };
+      }
       if (token === 'token-abgesendet') {
         return { lead: { ...defaultLead, token, patient_form_at: '2026-09-24T10:00:00Z', patient_form: { startDate: '2099-11-15' } } as unknown as import('../../lib/supabase').Lead, error: null };
       }
@@ -358,7 +362,7 @@ describe('Portal integration: golden paths', () => {
     // Auch der Kasten für Neukunden darf nicht kurz aufblitzen (Registry #102: `!schonAbgesendet`).
     expect(titel.some((t) => t.includes('Noch 2 Minuten bis zum Einladen'))).toBe(false);
     // …und der Kompakt-Einstieg auch nicht (Schritt „Angebot erstellt", Hinweis „Vor dem Einladen").
-    expect(titel.some((t) => t.includes('Angebot erstellt') || t.includes('Vor dem Einladen'))).toBe(false);
+    expect(titel.some((t) => t.includes('Angebot erstellt') || t.includes('Vor dem Einladen') || t.includes('Eine Betreuungskraft wohnt bei Ihnen'))).toBe(false);
     // Wunschstart aus dem gespeicherten Formular, nicht aus mamamia `arrival_at`.
     expect(screen.getByText(/Wunschstart 15\.11\./)).toBeInTheDocument();
   }, 15_000);
@@ -450,8 +454,16 @@ describe('Portal integration: golden paths', () => {
     render(<CustomerPortalPage />);
     const region = await screen.findByRole('region', { name: 'So geht es weiter' }, { timeout: 5000 });
     const kasten = within(region);
+    // Runde 4: Einleitung direkt unter dem Titel, über der Kostenkarte.
+    const titel = screen.getByRole('heading', { level: 1, name: 'Ihr persönliches Angebot' });
+    const einleitung = titel.nextElementSibling as HTMLElement;
+    expect(einleitung.tagName).toBe('P');
+    expect(einleitung.textContent).toBe(
+      'Eine Betreuungskraft wohnt bei Ihnen und hilft im Alltag: bei der Körperpflege, beim Essen und im Haushalt. Um alles Weitere kümmern wir uns: Anreise, Wechsel in der Regel alle 6–8 Wochen, schnellstmöglich Ersatz bei Ausfall und die taggenaue Abrechnung.',
+    );
     // Direkt nach der Kostenkarte, vor den Pflegekräften.
     const karte = screen.getByText('Ihre Betreuungskosten').closest('.shadow-lift')!;
+    expect(einleitung.compareDocumentPosition(karte) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(karte.compareDocumentPosition(region) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(region.compareDocumentPosition(screen.getByText('Für Sie ausgewählt')) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
 
@@ -460,7 +472,7 @@ describe('Portal integration: golden paths', () => {
     expect(schritte[0].textContent).toBe('Erledigt: Angebot erstellt');
     expect(schritte[1].getAttribute('aria-current')).toBe('step');
     expect(within(schritte[1]).getByText('Pflegesituation vervollständigen')).toBeInTheDocument();
-    expect(within(schritte[1]).getByText('Dauert etwa 2 Minuten, vieles ist schon ausgefüllt.')).toBeInTheDocument();
+    expect(within(schritte[1]).getByText('Dauert etwa 2 Minuten, vieles ist schon ausgefüllt. Unverbindlich: Ein Vertrag entsteht erst, wenn Sie sich für eine Pflegekraft entscheiden.')).toBeInTheDocument();
     expect(within(schritte[2]).getByText('Pflegekräfte einladen und Bewerbungen erhalten')).toBeInTheDocument();
     expect(within(schritte[2]).getByText('Passende Pflegekräfte bewerben sich bei Ihnen mit Foto, Erfahrung, Anreisedatum und Preis.')).toBeInTheDocument();
     expect(within(schritte[2]).queryByRole('button')).toBeNull();
@@ -494,19 +506,37 @@ describe('Portal integration: golden paths', () => {
     await screen.findByRole('region', { name: 'So geht es weiter' }, { timeout: 5000 });
     const karte = screen.getByText('Ihre Betreuungskosten').closest('.shadow-lift') as HTMLElement;
     const inKarte = within(karte);
-    expect(inKarte.getByText('im Monat')).toBeInTheDocument();
+    // Preis mit „im Monat" (das zweite „im Monat" steht in der Eigenanteil-Zeile).
+    expect(text(inKarte.getByText('2.800 €').parentElement!)).toBe('2.800 €im Monat');
     expect(inKarte.getByText(/inkl\. Steuern, Gebühren und Sozialabgaben/)).toBeInTheDocument();
     // Die vier Punkte wieder in der Karte.
     const punkt = inKarte.getByText('Kein Vertrag vor Ihrer Auswahl');
     expect(inKarte.getByText('Keine Vermittlungsgebühr')).toBeInTheDocument();
     expect(inKarte.getByText('Täglich kündbar, taggenau abgerechnet')).toBeInTheDocument();
     expect(inKarte.getByText(/Bestpreisgarantie/)).toBeInTheDocument();
-    // Darunter Testsieger (Block aus dem Marta-Kasten) und die Sterne — nicht neben dem Preis.
+    // Runde 4: Eigenanteil zwischen kleiner Zeile und den Punkten, aus derselben Rechnung wie die
+    // Aufstellung (defaultLead: 2.800 € − Pflegegeld 347 € = 2.453 €), nur mit dem Posten, der ihn senkt.
+    const kleineZeile = inKarte.getByText(/inkl\. Steuern, Gebühren und Sozialabgaben/);
+    const eigenanteil = inKarte.getByText(/^Ihr Eigenanteil:/);
+    expect(text(eigenanteil)).toBe('Ihr Eigenanteil: ca. 2.453 € im Monat');
+    expect(text(eigenanteil.nextElementSibling!)).toBe('nach Pflegegeld · So rechnen wir ›');
+    expect(kleineZeile.compareDocumentPosition(eigenanteil) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(eigenanteil.compareDocumentPosition(punkt) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    // Darunter Testsieger (Block aus dem Marta-Kasten), daneben bzw. darunter das Portal-Siegel der
+    // Bestpreisgarantie, dann die Sterne — nicht neben dem Preis.
     const siegel = inKarte.getByRole('img', { name: 'Testsieger DIE WELT' });
     expect(punkt.compareDocumentPosition(siegel) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(inKarte.getByText('6× Testsieger')).toBeInTheDocument();
+    const garantieSiegel = inKarte.getByRole('img', { name: 'Primundus Bestpreisgarantie – 6× Preis-Leistungssieger' });
+    expect(garantieSiegel.getAttribute('src')).toBe('/images/bestpreisgarantie-siegel.png');
+    expect(siegel.compareDocumentPosition(garantieSiegel) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     const sterne = await within(karte).findByRole('link', { name: /4,9 von 5 aus 126 Bewertungen/ }, { timeout: 5000 });
-    expect(siegel.compareDocumentPosition(sterne) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(garantieSiegel.compareDocumentPosition(sterne) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    // Das Siegel öffnet dasselbe Pop-up wie „Mehr Infos".
+    await userEvent.click(garantieSiegel);
+    const sheet = await screen.findByRole('dialog', { name: 'Bestpreisgarantie' });
+    await userEvent.click(within(sheet).getAllByRole('button', { name: 'Schließen' })[0]);
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Bestpreisgarantie' })).toBeNull());
 
     // Kosten-Satz und Heimvergleich nur im Aufklapper; dort kein zweiter Testsieger.
     expect(screen.queryByText('Kosten erst, wenn die Pflegekraft da ist.')).toBeNull();
@@ -518,6 +548,36 @@ describe('Portal integration: golden paths', () => {
     expect(inKarte.getByText(/Zuhause statt Pflegeheim/)).toBeInTheDocument();
     expect(inKarte.getAllByRole('img', { name: 'Testsieger DIE WELT' })).toHaveLength(1);
     expect(inKarte.queryByText(/6× Testsieger DIE/)).toBeNull();
+  }, 15_000);
+
+  it('Neukunde: „So rechnen wir ›" öffnet „Alle Kosten im Überblick" und springt zu „Was bleibt für Sie übrig" — dort dieselbe Zahl', async () => {
+    (Element.prototype.scrollIntoView as unknown as { mockClear: () => void }).mockClear();
+    server.use(...defaultHandlers({ proxy: { listApplications: () => ({ JobOfferApplicationsWithPagination: { total: 0, data: [] } }) } }));
+    setLocation(`?token=${TEST_LEAD_TOKEN}`);
+    render(<CustomerPortalPage />);
+    await screen.findByRole('region', { name: 'So geht es weiter' }, { timeout: 5000 });
+    expect(screen.queryByText('Was bleibt für Sie übrig')).toBeNull();
+    await userEvent.click(screen.getByRole('button', { name: 'So rechnen wir ›' }));
+    const rechnung = document.getElementById('eigenanteil-rechnung')!;
+    expect(within(rechnung).getByText('Was bleibt für Sie übrig')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Weniger anzeigen' })).toBeInTheDocument();
+    await waitFor(() => expect(gescrollt()).toContain('eigenanteil-rechnung'));
+    // Dieselbe Rechnung: „Ihr Eigenanteil" in der Aufstellung = Betrag in der Zeile am Preis.
+    const zeile = within(rechnung).getByText('Ihr Eigenanteil').parentElement!;
+    expect(text(zeile)).toBe('Ihr Eigenanteil2.453 €');
+    expect(text(screen.getByText(/^Ihr Eigenanteil:/))).toContain('ca. 2.453 €');
+  }, 15_000);
+
+  it('Neukunde ohne Zuschüsse in der Kalkulation: keine Eigenanteil-Zeile', async () => {
+    server.use(...defaultHandlers({ proxy: { listApplications: () => ({ JobOfferApplicationsWithPagination: { total: 0, data: [] } }) } }));
+    setLocation('?token=token-ohne-zuschuesse');
+    render(<CustomerPortalPage />);
+    await screen.findByRole('region', { name: 'So geht es weiter' }, { timeout: 5000 });
+    expect(screen.queryByText(/^Ihr Eigenanteil:/)).toBeNull();
+    expect(screen.queryByRole('button', { name: 'So rechnen wir ›' })).toBeNull();
+    // Der Rest der Karte steht unverändert.
+    expect(screen.getByText('Kein Vertrag vor Ihrer Auswahl')).toBeInTheDocument();
+    expect(screen.getByRole('img', { name: 'Primundus Bestpreisgarantie – 6× Preis-Leistungssieger' })).toBeInTheDocument();
   }, 15_000);
 
   it('Neukunde: Pflegekräfte als Zeilen ohne Knöpfe und ohne Sterne — Deutsch mit Punkten, Erfahrung · Einsätze bei uns', async () => {

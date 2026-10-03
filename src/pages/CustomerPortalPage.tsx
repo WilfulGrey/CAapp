@@ -79,7 +79,7 @@ import { SoGehtEsWeiter } from '../components/portal/SoGehtEsWeiter';
 import { FaqListe } from '../components/portal/FaqListe';
 import { MartaBox, TestsiegerZeile } from '../components/portal/MartaBox';
 import { BewertungsZeile } from '../components/portal/BewertungsZeile';
-import { KompaktePflegekraefte, SchritteKasten } from '../components/portal/KompaktEinstieg';
+import { EigenanteilZeile, KompaktEinleitung, KompaktePflegekraefte, SchritteKasten } from '../components/portal/KompaktEinstieg';
 import { Button } from '../components/ui/Button';
 import { Card } from '../components/ui/Card';
 import { SectionHeader, EYEBROW, H2 } from '../components/ui/SectionHeader';
@@ -1897,6 +1897,15 @@ const CustomerPortalPage: FC = () => {
     ziel?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   };
 
+  // Kompakt-Einstieg (Runde 4): „So rechnen wir ›" an der Eigenanteil-Zeile öffnet „Alle Kosten im
+  // Überblick" und springt zur Aufstellung „Was bleibt für Sie übrig". Die kommt UNTER der Zeile dazu,
+  // also ohne Verschiebung über dem Blick; gesprungen wird nach dem Aufklappen, ohne Animation
+  // (WebKit, Registry #102).
+  const zurEigenanteilRechnung = () => {
+    setCostsExpanded(true);
+    setTimeout(() => document.getElementById('eigenanteil-rechnung')?.scrollIntoView({ block: 'start' }), 60);
+  };
+
   // Mail-Deeplink goto=anfragen (Knopf „Bewerbungen erhalten" in den Mails, 26.09.):
   // noch nicht abgesendet → Formular öffnen; schon abgesendet → zum Stand; offene
   // Bewerbung → zu den Bewerbungen. Erst wenn feststeht, ob abgesendet wurde
@@ -2690,6 +2699,11 @@ const CustomerPortalPage: FC = () => {
                         inkl. Steuern, Gebühren und Sozialabgaben, zzgl. Kost und Logis und Reisekosten{' '}
                         <span className="whitespace-nowrap">(125 € pro Fahrt)</span>
                       </p>
+                      {/* Runde 4: Eigenanteil aus DERSELBEN Rechnung wie „Was bleibt für Sie übrig"
+                          (`eigenanteil`/`zuschussPosten` oben); ohne Zuschüsse keine Zeile. */}
+                      {eigenanteil !== null && (
+                        <EigenanteilZeile betrag={formatEuro(eigenanteil)} posten={zuschussPosten} onRechnung={zurEigenanteilRechnung} />
+                      )}
                     </>
                   ) : (
                   <>
@@ -2705,7 +2719,15 @@ const CustomerPortalPage: FC = () => {
                       nichts darunter springt, wenn der Stand später kommt; ohne Stand keine Zeile). */}
                   {kompakt && (
                     <div className="mt-3.5 border-t border-pm-line-soft pt-3.5">
-                      <TestsiegerZeile />
+                      {/* Runde 4: daneben das Portal-Siegel der Bestpreisgarantie (Registry #66), gleich
+                          hoch; passt es nicht nebeneinander (Handy), steht es darunter. Tipp öffnet
+                          dasselbe Pop-up wie „Mehr Infos". */}
+                      <div className="flex flex-wrap items-center gap-x-5 gap-y-3">
+                        <TestsiegerZeile />
+                        <button type="button" onClick={() => setBestpreisOffen(true)} className="flex-none">
+                          <img src="/images/bestpreisgarantie-siegel.png" alt="Primundus Bestpreisgarantie – 6× Preis-Leistungssieger" width={900} height={256} className="h-12 w-auto" />
+                        </button>
+                      </div>
                       <div className="mt-2 flex h-7 items-center">
                         <BewertungsZeile stand={sterne} klein className="-my-2" />
                       </div>
@@ -2815,7 +2837,8 @@ const CustomerPortalPage: FC = () => {
                     — der gespeicherte Wert driftet, sobald das Angebot angepasst
                     wird. Der Heimvergleich steht seit Teil 3 nur noch an der Karte. */}
                 {eigenanteil !== null && (
-                    <div className="mt-2.5 rounded-[16px] bg-pm-paper px-4 py-3.5">
+                    // id = Sprungziel von „So rechnen wir ›" (Kompakt-Einstieg).
+                    <div id="eigenanteil-rechnung" className="mt-2.5 scroll-mt-16 rounded-[16px] bg-pm-paper px-4 py-3.5">
                       <p className={`${EYEBROW} mb-3`}>Was bleibt für Sie übrig</p>
                       <div className="space-y-3">
                         <div className="flex items-baseline justify-between gap-4">
@@ -3276,8 +3299,9 @@ const CustomerPortalPage: FC = () => {
         // der Unterkante (pb-10 + -mt-6 an der Karte).
         return (
           <div className="bg-pm-shell">
-            {/* Kompakt-Einstieg: etwas weniger Luft, damit Preis, Punkte und Testsieger mehr vom ersten Bild haben. */}
-            <div className={`max-w-3xl mx-auto px-[18px] ${kompakt ? 'pt-4 pb-9' : `pt-6 ${(!patientSaved && !hasPending) || sucheLaeuft ? 'pb-10' : 'pb-7'}`}`}>
+            {/* Kompakt-Einstieg: oben etwas weniger Luft; unten wie im Ausgangszustand (pb-10), damit die
+                Einleitung nicht an der Kostenkarte klebt. */}
+            <div className={`max-w-3xl mx-auto px-[18px] ${kompakt ? 'pt-4 pb-10' : `pt-6 ${(!patientSaved && !hasPending) || sucheLaeuft ? 'pb-10' : 'pb-7'}`}`}>
               <p className="text-[16px] text-pm-taupe-ink">
                 Guten Tag{heroNameLine ? `, ${heroNameLine}` : ''}.
               </p>
@@ -3285,6 +3309,8 @@ const CustomerPortalPage: FC = () => {
               <h1 className={`mt-1 font-extrabold leading-[1.08] tracking-[-0.035em] text-pm-ink ${kompakt ? 'text-[26px] min-[390px]:text-[28px]' : 'text-[31px]'}`}>
                 {heroCopy.title}
               </h1>
+              {/* Kompakt-Einstieg (Runde 4): kurze Einleitung der Seite, Fließtext ohne Kasten. */}
+              {kompakt && <KompaktEinleitung />}
               {/* Offene Bewerbung (Martin 25.09.): Kopf nur Titel + Zeit, direkt
                   danach die Bewerbung; „Angebot prüfen" und die Vorteile der
                   Kostenrechner-Startseite stehen IN der Karte (AppCard `vorteile`). */}

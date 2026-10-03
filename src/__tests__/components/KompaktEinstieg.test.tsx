@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { KompaktePflegekraefte, PflegekraftZeile, SchritteKasten } from '../../components/portal/KompaktEinstieg';
+import { aufzaehlung, EigenanteilZeile, KompaktEinleitung, KompaktePflegekraefte, PflegekraftZeile, SchritteKasten, zuschussKurzname } from '../../components/portal/KompaktEinstieg';
 import type { Nurse } from '../../types';
 
 const basis: Nurse = {
@@ -150,7 +150,7 @@ describe('SchritteKasten', () => {
     expect(schritte[0].textContent).toBe('Erledigt: Angebot erstellt');
     expect(schritte[1].getAttribute('aria-current')).toBe('step');
     expect(within(schritte[1]).getByText('Pflegesituation vervollständigen')).toBeTruthy();
-    expect(within(schritte[1]).getByText('Dauert etwa 2 Minuten, vieles ist schon ausgefüllt.')).toBeTruthy();
+    expect(within(schritte[1]).getByText('Dauert etwa 2 Minuten, vieles ist schon ausgefüllt. Unverbindlich: Ein Vertrag entsteht erst, wenn Sie sich für eine Pflegekraft entscheiden.')).toBeTruthy();
     expect(schritte[2].getAttribute('aria-current')).toBeNull();
     expect(within(schritte[2]).getByText('Pflegekräfte einladen und Bewerbungen erhalten')).toBeTruthy();
     expect(within(schritte[2]).getByText('Passende Pflegekräfte bewerben sich bei Ihnen mit Foto, Erfahrung, Anreisedatum und Preis.')).toBeTruthy();
@@ -173,5 +173,51 @@ describe('SchritteKasten', () => {
     expect(screen.getByText('Formular')).toBeTruthy();
     expect(screen.queryByRole('region', { name: 'So geht es weiter' })).toBeNull();
     expect(screen.queryByText('Angebot erstellt')).toBeNull();
+  });
+});
+
+describe('KompaktEinleitung', () => {
+  it('Einleitung unter dem Titel im Wortlaut, „6–8 Wochen" bricht nicht um', () => {
+    const { container } = render(<KompaktEinleitung />);
+    const absatz = container.querySelector('p')!;
+    expect(absatz.textContent).toBe(
+      'Eine Betreuungskraft wohnt bei Ihnen und hilft im Alltag: bei der Körperpflege, beim Essen und im Haushalt. Um alles Weitere kümmern wir uns: Anreise, Wechsel in der Regel alle 6–8 Wochen, schnellstmöglich Ersatz bei Ausfall und die taggenaue Abrechnung.',
+    );
+    expect(within(absatz).getByText('6–8 Wochen').className).toContain('whitespace-nowrap');
+  });
+});
+
+describe('EigenanteilZeile', () => {
+  const posten = [
+    { name: 'pflegegeld', label: 'Pflegegeld' },
+    { name: 'entlastungsbudget_neu', label: 'Entlastungsbudget (3.539 Euro/Jahr ab Pflegegrad 2)' },
+    { name: 'steuervorteil', label: 'Steuerliche Absetzbarkeit' },
+  ];
+
+  it('Betrag wie übergeben, Posten in Kurzform, „So rechnen wir ›" öffnet die Aufstellung', async () => {
+    const onRechnung = vi.fn();
+    const { container } = render(<EigenanteilZeile betrag="1.622 €" posten={posten} onRechnung={onRechnung} />);
+    const [zeile1, zeile2] = [...container.querySelectorAll('p')].map((p) => (p.textContent ?? '').replace(/\u00A0/g, ' '));
+    expect(zeile1).toBe('Ihr Eigenanteil: ca. 1.622 € im Monat');
+    expect(zeile2).toBe('nach Pflegegeld, Entlastungsbudget und Steuerersparnis · So rechnen wir ›');
+    await userEvent.click(screen.getByRole('button', { name: 'So rechnen wir ›' }));
+    expect(onRechnung).toHaveBeenCalledTimes(1);
+  });
+
+  it('nur die Posten, die den Betrag senken (hier einer)', () => {
+    const { container } = render(<EigenanteilZeile betrag="2.453 €" posten={[posten[0]]} onRechnung={() => {}} />);
+    expect((container.querySelectorAll('p')[1].textContent ?? '').replace(/\u00A0/g, ' ')).toBe('nach Pflegegeld · So rechnen wir ›');
+  });
+
+  it('aufzaehlung: eins, zwei, drei', () => {
+    expect(aufzaehlung([])).toBe('');
+    expect(aufzaehlung(['A'])).toBe('A');
+    expect(aufzaehlung(['A', 'B'])).toBe('A und B');
+    expect(aufzaehlung(['A', 'B', 'C'])).toBe('A, B und C');
+  });
+
+  it('zuschussKurzname: bekannte Posten kurz, unbekannte wie im Aufklapper (Label ohne Klammer)', () => {
+    expect(posten.map(zuschussKurzname)).toEqual(['Pflegegeld', 'Entlastungsbudget', 'Steuerersparnis']);
+    expect(zuschussKurzname({ name: 'entlastungsbetrag', label: 'Entlastungsbetrag (125 Euro/Monat)' })).toBe('Entlastungsbetrag');
   });
 });

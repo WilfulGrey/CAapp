@@ -3,8 +3,9 @@
 // erledigt, das ist das Angebot, das ist der nächste Schritt, hier sind die Pflegekräfte").
 //
 // Reihenfolge auf der Seite (CustomerPortalPage, `kompakt`):
-//   Kopf: Begrüßung und „Ihr persönliches Angebot"
-//   → Kostenkarte: Preis, kleine Zeile, die vier Punkte, Testsieger und Sterne, Aufklapper
+//   Kopf: Begrüßung, „Ihr persönliches Angebot" und eine kurze Einleitung (KompaktEinleitung)
+//   → Kostenkarte: Preis, kleine Zeile, Eigenanteil (EigenanteilZeile), die vier Punkte,
+//     Testsieger + Bestpreisgarantie-Siegel und Sterne, Aufklapper
 //   → Kasten „So geht es weiter" mit drei Schritten; das bestehende 4-Schritte-Formular
 //     (AngebotCard) klappt unter Schritt 2 auf
 //   → Pflegekräfte als Zeilen ohne Knöpfe.
@@ -20,6 +21,74 @@ import { displayName, initials } from './shared';
 import { Button } from '../ui/Button';
 import { Card } from '../ui/Card';
 import { EYEBROW, H2 } from '../ui/SectionHeader';
+
+/**
+ * Einleitung der Seite direkt unter dem Titel (Runde 4): was die Betreuung ist und was Primundus
+ * übernimmt. Fließtext wie die Unterzeilen der anderen Zustände (16 px, gedämpft) — kein Kasten,
+ * kein Hinweis-Ton.
+ */
+export function KompaktEinleitung() {
+  return (
+    <p className="mt-3 text-[16px] leading-[1.55] text-pm-muted">
+      Eine Betreuungskraft wohnt bei Ihnen und hilft im Alltag: bei der Körperpflege, beim Essen und im
+      Haushalt. Um alles Weitere kümmern wir uns: Anreise, Wechsel in der Regel alle{' '}
+      {/* Nach „–" darf der Browser umbrechen; „6–8 Wochen" bleibt zusammen, und das letzte Wort
+          steht nicht allein in der Zeile (360 px). */}
+      <span className="whitespace-nowrap">6–8 Wochen</span>, schnellstmöglich Ersatz bei Ausfall und die{' '}
+      <span className="whitespace-nowrap">taggenaue Abrechnung.</span>
+    </p>
+  );
+}
+
+/** Kurzname eines Zuschusses für „nach …"; unbekannte Posten wie im Aufklapper (Label ohne Klammer). */
+const KURZNAME: Record<string, string> = {
+  pflegegeld: 'Pflegegeld',
+  entlastungsbudget_neu: 'Entlastungsbudget',
+  steuervorteil: 'Steuerersparnis',
+};
+export function zuschussKurzname(posten: { name: string; label: string }): string {
+  return KURZNAME[posten.name] ?? posten.label.replace(/\s*\([^)]*\)\s*$/, '');
+}
+
+/** „A", „A und B", „A, B und C". */
+export function aufzaehlung(teile: string[]): string {
+  if (teile.length <= 1) return teile[0] ?? '';
+  return `${teile.slice(0, -1).join(', ')} und ${teile[teile.length - 1]}`;
+}
+
+/**
+ * Eigenanteil direkt unter dem Preis (Runde 4), leicht grün hinterlegt. Gerechnet wird hier
+ * NICHTS: Betrag und Posten kommen aus derselben Rechnung wie „Alle Kosten im Überblick → Was
+ * bleibt für Sie übrig → Ihr Eigenanteil" (CustomerPortalPage `eigenanteil`/`zuschussPosten`).
+ * Genannt werden nur Posten, die den Betrag wirklich senken; „So rechnen wir ›" öffnet die
+ * Aufstellung.
+ */
+export function EigenanteilZeile({ betrag, posten, onRechnung }: {
+  /** Fertig formatiert wie in der Aufstellung, z. B. „1.622 €". */
+  betrag: string;
+  posten: { name: string; label: string }[];
+  onRechnung: () => void;
+}) {
+  return (
+    <div className="mt-3 rounded-[14px] bg-pm-mint px-3 py-2.5">
+      <p className="text-[16px] leading-snug text-pm-ink">
+        {/* Zu schmal (360 px): Umbruch nach „Ihr Eigenanteil:", der Betrag bleibt zusammen. */}
+        Ihr Eigenanteil:{' '}
+        <span className="whitespace-nowrap"><b className="font-bold tabular-nums">ca. {betrag}</b> im Monat</span>
+      </p>
+      <p className="mt-0.5 text-[14px] leading-snug text-pm-muted">
+        nach {aufzaehlung(posten.map(zuschussKurzname))}{'\u00A0'}·{' '}
+        <button
+          type="button"
+          onClick={onRechnung}
+          className="inline-flex min-h-[44px] -my-3 items-center whitespace-nowrap font-semibold text-pm-green-deep underline underline-offset-[3px]"
+        >
+          So rechnen wir ›
+        </button>
+      </p>
+    </div>
+  );
+}
 
 /**
  * Kasten „So geht es weiter": drei Schritte untereinander als leichte Zeitleiste —
@@ -81,7 +150,8 @@ export function SchritteKasten({ aktiv, offen, onOeffnen, onImBlick, children }:
               Pflegesituation vervollständigen
             </p>
             <p className="mt-0.5 text-[16px] leading-[1.45] text-pm-muted">
-              Dauert etwa 2 Minuten, vieles ist schon ausgefüllt.
+              Dauert etwa 2 Minuten, vieles ist schon ausgefüllt. Unverbindlich: Ein Vertrag entsteht erst,
+              wenn Sie sich für eine Pflegekraft entscheiden.
             </p>
             {offen ? (
               // Volle Kastenbreite: 26 px Kreis + 10 px Abstand zurück nach links.
