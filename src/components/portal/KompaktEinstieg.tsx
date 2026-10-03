@@ -3,83 +3,35 @@
 // erledigt, das ist das Angebot, das ist der nächste Schritt, hier sind die Pflegekräfte").
 //
 // Reihenfolge auf der Seite (CustomerPortalPage, `kompakt`):
-//   Kopf: Begrüßung, „Ihr persönliches Angebot", Sterne-Zeile, Fortschritt in EINER Zeile
-//   → Kostenkarte (nur Preis, kleine Zeile, Aufklapper) → Kasten „Ihr nächster Schritt" mit dem
-//   bestehenden 4-Schritte-Formular (AngebotCard) → die vier Punkte der Startseite (ohne Karte)
+//   Kopf: Begrüßung und „Ihr persönliches Angebot"
+//   → Kostenkarte: Preis, kleine Zeile, die vier Punkte, Testsieger und Sterne, Aufklapper
+//   → Kasten „So geht es weiter" mit drei Schritten; das bestehende 4-Schritte-Formular
+//     (AngebotCard) klappt unter Schritt 2 auf
 //   → Pflegekräfte als Zeilen ohne Knöpfe.
-// Ziel (Martin): der Knopf „Jetzt vervollständigen →" steht im ersten Bild (390×664).
 // Alle anderen Zustände (abgesendet, Bewerbung, gebucht …) bleiben unverändert.
 //
-// Schrift in diesem Zustand: Fließtext 16 px, kleine Schrift 14 px. Ausnahme ist die
-// Fortschrittszeile: Sie muss bei 360 px in eine Zeile passen, deshalb dort kleiner.
-import { useEffect, useRef, type ReactNode } from 'react';
-import { Check, ChevronRight, Sparkles } from 'lucide-react';
+// Schrift: Fließtext 16 px, kleine Schrift 14 px. Ausnahme 13 px für die dritte Zeile der
+// Pflegekräfte und den Hinweis unter ihrer Überschrift — so bleiben beide bei 390 px einzeilig.
+import { Fragment, useEffect, useRef, type ReactNode } from 'react';
+import { Check, ChevronRight, Lock, Sparkles } from 'lucide-react';
 import type { Nurse } from '../../types';
-import type { SterneStand } from '../../lib/sterne';
-import { BewertungsZeile } from './BewertungsZeile';
-import { displayName, initials, nurseLevel } from './shared';
+import { DeutschPunkte } from './PflegekraftProfil';
+import { displayName, initials } from './shared';
 import { Button } from '../ui/Button';
 import { Card } from '../ui/Card';
 import { EYEBROW, H2 } from '../ui/SectionHeader';
 
 /**
- * Sterne-Zeile unter der Überschrift und Fortschritt. Die Sterne kommen aus demselben Lader wie
- * im Marta-Kasten (`useSterneStand`); ohne Stand keine Zeile. Die Höhe ist reserviert, damit
- * nichts darunter springt, wenn der Stand erst nach dem ersten Bild eintrifft (Sprungziel
- * `goto=anfragen` liegt darunter).
+ * Kasten „So geht es weiter": drei Schritte untereinander als leichte Zeitleiste —
+ * 1 erledigt (Angebot erstellt), 2 jetzt (Pflegesituation, Knopf), 3 später und gesperrt.
+ * Der Knopf öffnet das bestehende Formular IM Kasten unter Schritt 2 (kein Sprung); `children`
+ * ist die eingebettete AngebotCard, über die volle Breite des Kastens (die mitlaufende
+ * Knopfleiste reicht von Rand zu Rand). `aktiv=false` (alle anderen Zustände): nur ein neutraler
+ * Rahmen wie bisher, damit Kopf und Formular dort unverändert bleiben.
+ * `onImBlick`: Kasten im Bild ja/nein — die schwebende Frage legt sich nicht über das Formular
+ * (Regel aus Registry #102), und im Kompakt-Einstieg ist dieser Kasten das Formular.
  */
-export function KompaktKopf({ sterne }: { sterne: SterneStand | null }) {
-  return (
-    <>
-      <div className="mt-0.5 h-7 flex items-center">
-        <BewertungsZeile stand={sterne} className="-my-2" />
-      </div>
-      <Fortschritt />
-    </>
-  );
-}
-
-/**
- * „✓ Angebot erstellt · 2 Pflegesituation · 3 Einladen": leicht, kein Bestell-Stepper. Mit der
- * Breite gestaffelt (12,5 / 13 / 13,5 px bei 360 / 375 / 390 px), Symbole und Abstände in em: Die
- * Zeile schrumpft als Ganzes und bricht nie um (gemessen in WebKit, scrollWidth = clientWidth).
- */
-export function Fortschritt() {
-  return (
-    <ol
-      aria-label="Ihr Fortschritt"
-      className="mt-2 flex items-center justify-between whitespace-nowrap leading-none text-[12.5px] min-[375px]:text-[13px] min-[390px]:text-[13.5px]"
-    >
-      <li className="flex items-center gap-[0.3em] font-semibold text-pm-green-deep">
-        <Check className="h-[1.05em] w-[1.05em] flex-none" strokeWidth={3} aria-hidden="true" />
-        Angebot erstellt
-      </li>
-      <Trenner />
-      <li aria-current="step" className="flex items-center gap-[0.3em] font-bold text-pm-ink">
-        <span className="flex h-[1.4em] w-[1.4em] flex-none items-center justify-center rounded-full bg-pm-coral text-[0.85em] text-white" aria-hidden="true">2</span>
-        Pflegesituation
-      </li>
-      <Trenner />
-      <li className="flex items-center gap-[0.25em] font-semibold text-pm-mute">
-        <span className="flex-none" aria-hidden="true">3</span>
-        Einladen
-      </li>
-    </ol>
-  );
-}
-
-function Trenner() {
-  return <li aria-hidden="true" className="h-[1.1em] w-px flex-none bg-pm-chip" />;
-}
-
-/**
- * Kasten „Ihr nächster Schritt". Der Knopf öffnet das bestehende Formular IM Kasten (kein
- * Sprung); `children` ist die eingebettete AngebotCard. `aktiv=false` (alle anderen Zustände):
- * nur ein neutraler Rahmen wie bisher, damit Kopf und Formular dort unverändert bleiben.
- * `onImBlick`: Kasten im Bild ja/nein — die schwebende Rückmeldung legt sich nicht über das
- * Formular (Regel aus Registry #102), und im Kompakt-Einstieg ist der Kasten das Formular.
- */
-export function NaechsterSchritt({ aktiv, offen, onOeffnen, onImBlick, children }: {
+export function SchritteKasten({ aktiv, offen, onOeffnen, onImBlick, children }: {
   aktiv: boolean;
   offen: boolean;
   onOeffnen: () => void;
@@ -101,35 +53,77 @@ export function NaechsterSchritt({ aktiv, offen, onOeffnen, onImBlick, children 
     <section
       ref={kasten}
       id="patientendaten"
-      aria-labelledby="naechster-schritt-titel"
-      className="scroll-mt-16 rounded-card border-2 border-pm-taupe bg-white px-5 pb-4 pt-4 shadow-lift"
+      aria-labelledby="so-geht-es-weiter-titel"
+      className="scroll-mt-16 rounded-card border-2 border-pm-taupe bg-white px-5 pb-5 pt-4 shadow-lift"
     >
-      <p className={EYEBROW}>Ihr nächster Schritt</p>
-      {/* 20 px passt erst ab 390 px in eine Zeile (gemessen: 311 px bei 318 px Platz). */}
-      <h2 id="naechster-schritt-titel" className="mt-0.5 text-[18px] font-extrabold leading-[1.2] tracking-[-0.02em] text-pm-ink min-[390px]:text-[20px]">
-        Pflegesituation vervollständigen
+      <h2 id="so-geht-es-weiter-titel" className="text-[20px] font-extrabold leading-[1.2] tracking-[-0.02em] text-pm-ink">
+        So geht es weiter
       </h2>
-      {/* Wortlaut der guten Phase bis 24.09. (Registry #109): der Nutzen steht im Satz. */}
-      <p className="mt-1 text-[16px] leading-[1.45] text-pm-muted">
-        Dauert etwa 2 Minuten, vieles ist schon ausgefüllt. Danach laden Sie Pflegekräfte ein und erhalten Bewerbungen mit Foto, Erfahrung, Anreisedatum und Preis.
-      </p>
-      {!offen && (
-        <Button breit onClick={onOeffnen} className="mt-3.5 whitespace-nowrap">
-          Jetzt vervollständigen →
-        </Button>
-      )}
-      {children}
+      <ol className="mt-4">
+        <li className="relative flex gap-2.5 pb-5">
+          <Verbindung />
+          <span className="flex h-[26px] w-[26px] flex-none items-center justify-center rounded-full bg-pm-mint text-pm-green-deep" aria-hidden="true">
+            <Check className="h-4 w-4" strokeWidth={3} />
+          </span>
+          <p className="pt-[2px] text-[16px] font-semibold leading-snug text-pm-mute">
+            <span className="sr-only">Erledigt: </span>Angebot erstellt
+          </p>
+        </li>
+        <li aria-current="step" className="relative flex gap-2.5 pb-5">
+          {/* Offen steht das Formular über die volle Breite, die Linie hört dann hier auf. */}
+          {!offen && <Verbindung />}
+          <span className="flex h-[26px] w-[26px] flex-none items-center justify-center rounded-full bg-pm-coral text-[14px] font-bold text-white" aria-hidden="true">
+            2
+          </span>
+          <div className="min-w-0 flex-1">
+            {/* Gestaffelt, damit der Titel neben dem Kreis einzeilig bleibt (bei 360 px 246 von 252 px). */}
+            <p className="pt-[2px] text-[15.5px] font-bold leading-snug text-pm-ink min-[375px]:text-[16px] min-[390px]:text-[17px]">
+              Pflegesituation vervollständigen
+            </p>
+            <p className="mt-0.5 text-[16px] leading-[1.45] text-pm-muted">
+              Dauert etwa 2 Minuten, vieles ist schon ausgefüllt.
+            </p>
+            {offen ? (
+              // Volle Kastenbreite: 26 px Kreis + 10 px Abstand zurück nach links.
+              <div className="-ml-9 w-[calc(100%+2.25rem)]">{children}</div>
+            ) : (
+              <Button breit onClick={onOeffnen} className="mt-3 px-2 whitespace-nowrap">
+                Jetzt vervollständigen →
+              </Button>
+            )}
+          </div>
+        </li>
+        <li className="flex gap-2.5">
+          {/* Später und noch gesperrt: grau, Schloss statt Zahl — darf nicht nach „geht schon" aussehen. */}
+          <span className="flex h-[26px] w-[26px] flex-none items-center justify-center rounded-full border border-pm-chip bg-white text-pm-mute" aria-hidden="true">
+            <Lock className="h-3.5 w-3.5" />
+          </span>
+          <div className="min-w-0 flex-1">
+            <p className="pt-[2px] text-[16px] font-semibold leading-snug text-pm-mute">
+              <span className="sr-only">Danach: </span>Pflegekräfte einladen und Bewerbungen erhalten
+            </p>
+            <p className="mt-0.5 text-[14px] leading-[1.45] text-pm-mute">
+              Passende Pflegekräfte bewerben sich bei Ihnen mit Foto, Erfahrung, Anreisedatum und Preis.
+            </p>
+          </div>
+        </li>
+      </ol>
     </section>
   );
 }
 
+/** Senkrechte Linie zum nächsten Schritt, mittig unter dem 26-px-Kreis. */
+function Verbindung() {
+  return <span aria-hidden="true" className="absolute bottom-1 left-3 top-[30px] w-0.5 rounded-full bg-pm-line" />;
+}
+
 /**
- * Passende Pflegekräfte als Zeilen: Foto, Name und Alter, Deutsch und Erfahrung, Einsätze bei uns.
- * Keine Knöpfe — die ganze Zeile öffnet das Profil (wie „Profil ansehen"). Einladen geht dort,
- * sobald die Pflegesituation vollständig ist; vorher führt „Einladen" im Profil ins Formular.
- * Kein Satz unter der Überschrift: Der Kasten „Ihr nächster Schritt" darüber erklärt das Einladen.
+ * Passende Pflegekräfte als Zeilen: Foto, Name und Alter, Deutsch mit Punkten, Erfahrung und
+ * Einsätze bei uns. Keine Knöpfe — die ganze Zeile öffnet das Profil (wie „Profil ansehen").
+ * Unter der Überschrift ein leiser Hinweis mit Schloss: Einladen geht erst mit vollständiger
+ * Pflegesituation; der Tipp öffnet das Formular im Kasten „So geht es weiter".
  */
-export function KompaktePflegekraefte({ eintraege, laedt, alleBearbeitet, keineVorschlaege, onProfil, telefonHref }: {
+export function KompaktePflegekraefte({ eintraege, laedt, alleBearbeitet, keineVorschlaege, onProfil, onVervollstaendigen, telefonHref }: {
   /** Sichtbare Vorschläge in Anzeige-Reihenfolge (Empfehlung zuerst); `i` = Index für `openNurseFromMatch`. */
   eintraege: { nurse: Nurse; i: number }[];
   laedt: boolean;
@@ -138,6 +132,8 @@ export function KompaktePflegekraefte({ eintraege, laedt, alleBearbeitet, keineV
   /** Matchings geladen, aber keine passende Pflegekraft (z. B. strenger Deutsch-Filter). */
   keineVorschlaege: boolean;
   onProfil: (nurse: Nurse, i: number) => void;
+  /** Hinweis „Vor dem Einladen: Pflegesituation vervollständigen →". */
+  onVervollstaendigen: () => void;
   telefonHref: string;
 }) {
   const n = laedt ? 0 : eintraege.length;
@@ -148,6 +144,20 @@ export function KompaktePflegekraefte({ eintraege, laedt, alleBearbeitet, keineV
       <div id="pflegekraefte" className="px-1" style={{ scrollMarginTop: 96 }}>
         <p className={EYEBROW}>Für Sie ausgewählt</p>
         <h2 id="pflegekraefte-titel" className={`mt-1.5 ${H2}`}>{titel}</h2>
+        {n > 0 && (
+          // Zu schmal für eine Zeile (unter 390 px): Umbruch nach „Vor dem Einladen:", nie mittendrin.
+          <button
+            type="button"
+            onClick={onVervollstaendigen}
+            className="-mb-2 mt-0.5 flex min-h-[44px] items-center gap-1.5 text-left text-[13px] font-medium leading-snug text-pm-taupe-ink"
+          >
+            <Lock className="h-3.5 w-3.5 flex-none" aria-hidden="true" />
+            <span>
+              <span className="whitespace-nowrap">Vor dem Einladen:</span>{' '}
+              <span className="whitespace-nowrap underline decoration-pm-taupe/40 underline-offset-[3px]">Pflegesituation vervollständigen →</span>
+            </span>
+          </button>
+        )}
       </div>
 
       {laedt ? (
@@ -185,24 +195,27 @@ export function KompaktePflegekraefte({ eintraege, laedt, alleBearbeitet, keineV
   );
 }
 
-/** Eine Zeile: dieselben Daten wie das Profil auf der Karte (PflegekraftProfil), fehlende Teile entfallen. */
+/**
+ * Eine Zeile: dieselben Daten wie das Profil (PflegekraftProfil), fehlende Teile entfallen.
+ * Keine Sterne: Wir haben keine Bewertungen je Pflegekraft.
+ */
 export function PflegekraftZeile({ nurse, empfohlen, onClick }: { nurse: Nurse; empfohlen: boolean; onClick: () => void }) {
   const name = displayName(nurse.name);
   const einsaetze = nurse.history?.assignments ?? 0;
   const jahre = nurse.experienceYears ?? 0;
-  // Stern nur bei den Stufen, die ihn heute im Profil tragen.
-  const stufe = nurseLevel(jahre, einsaetze).label;
-  const stern = stufe === 'Elite' || stufe === 'Stammkraft';
-  const deutsch = nurse.language?.level && nurse.language.level !== '—' ? `Deutsch ${nurse.language.level.toLowerCase()}` : null;
-  const erfahrung = jahre > 0 ? `${jahre} ${jahre === 1 ? 'Jahr' : 'Jahre'} Erfahrung` : null;
-  const zweiteZeile = [deutsch, erfahrung].filter(Boolean).join(' · ');
+  const deutsch = nurse.language?.level && nurse.language.level !== '—' ? nurse.language.level : null;
+  const punkte = nurse.language?.bars ?? 0;
+  const erfahrung = [
+    jahre > 0 ? `${jahre} ${jahre === 1 ? 'Jahr' : 'Jahre'} Erfahrung` : null,
+    einsaetze > 0 ? `${einsaetze} ${einsaetze === 1 ? 'Einsatz' : 'Einsätze'} bei uns` : null,
+  ].filter((t): t is string => t !== null);
 
   return (
     <button
       type="button"
       onClick={onClick}
       aria-label={`Profil von ${name} ansehen`}
-      className="flex w-full items-center gap-3 px-3 py-3 text-left transition-colors hover:bg-pm-paper active:bg-pm-paper focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-pm-taupe"
+      className="flex w-full items-center gap-2.5 px-3 py-3 text-left transition-colors hover:bg-pm-paper active:bg-pm-paper focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-pm-taupe"
     >
       {nurse.image ? (
         <img src={nurse.image} alt="" className="h-14 w-14 flex-none rounded-[12px] object-cover" />
@@ -222,19 +235,26 @@ export function PflegekraftZeile({ nurse, empfohlen, onClick }: { nurse: Nurse; 
           {name}
           {nurse.age ? <span className="font-normal text-pm-mute">, {nurse.age}</span> : null}
         </span>
-        {/* Kleine Schrift 14 px; bei 360 px 13 px, damit „Deutsch mittel · 12 Jahre Erfahrung"
-            (längste Kombination, 215 px) neben Foto und Pfeil noch in eine Zeile passt. */}
-        {zweiteZeile && (
-          <span className="mt-0.5 block text-[13px] leading-snug text-pm-muted min-[375px]:text-[14px]">{zweiteZeile}</span>
+        {deutsch && (
+          <span className="mt-0.5 flex items-center gap-1.5 text-[14px] leading-snug text-pm-muted">
+            {punkte > 0 && <DeutschPunkte punkte={punkte} />}
+            Deutsch {deutsch.toLowerCase()}
+          </span>
         )}
-        {einsaetze > 0 && (
-          <span className="mt-0.5 block text-[14px] leading-snug text-pm-muted">
-            {stern && <span className="text-pm-stern" aria-hidden="true">★&nbsp;</span>}
-            {einsaetze} {einsaetze === 1 ? 'Einsatz' : 'Einsätze'} bei uns
+        {erfahrung.length > 0 && (
+          // Bricht es um (unter 390 px), dann am „·", das beim ersten Teil bleibt.
+          <span className="mt-0.5 block text-[13px] leading-snug text-pm-muted">
+            {erfahrung.map((teil, k) => (
+              <Fragment key={teil}>
+                {k > 0 && ' · '}
+                <span className="whitespace-nowrap">{teil}</span>
+              </Fragment>
+            ))}
           </span>
         )}
       </span>
-      <ChevronRight className="-ml-1.5 h-[18px] w-[18px] flex-none text-pm-mute" aria-hidden="true" />
+      {/* Schmal gehalten (16 px, eng am Text): Zeile 3 braucht bei 390 px bis zu 246 von 252 px. */}
+      <ChevronRight className="-ml-2 h-4 w-4 flex-none text-pm-mute" aria-hidden="true" />
     </button>
   );
 }

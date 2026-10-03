@@ -83,7 +83,7 @@ export const AngebotCard: FC<{
   schonAbgesendet?: boolean;
   /** Formular im Bild ja/nein — die schwebende Rückmeldung blendet sich dann aus (zurück seit Registry #102). */
   onImBlick?: (imBlick: boolean) => void;
-  /** Im Kasten „Ihr nächster Schritt" (Kompakt-Einstieg): ohne eigene Karte, der Kasten ist der Rahmen. */
+  /** Im Kasten „So geht es weiter" (Kompakt-Einstieg): ohne eigene Karte, der Kasten ist der Rahmen. */
   eingebettet?: boolean;
 }> = ({ lead, mmCustomer, onPatientSaved, triggerOpenPatient, onTriggerHandled, mamamiaEnabled, onSaveToMamamia, onAbgesendet, gewaehlterStart, schonAbgesendet, onImBlick, eingebettet = false }) => {
   // Offen, sobald die Karte gerendert wird: Seit dem Wegfall des

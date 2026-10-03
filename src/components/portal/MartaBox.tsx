@@ -25,6 +25,20 @@ function Sterne({ wert }: { wert: number }) {
   );
 }
 
+/** Testsieger-Siegel mit Zeile, wie im Marta-Kasten; auch in der Kostenkarte des Kompakt-Einstiegs. */
+export function TestsiegerZeile({ className = '' }: { className?: string }) {
+  return (
+    <div className={`flex items-center gap-3 ${className}`}>
+      <img src="/badge-testsieger.webp" alt="Testsieger DIE WELT" className="h-12 w-auto flex-none object-contain" />
+      <p className="leading-[1.3]">
+        <b className="text-[15px] text-pm-ink">6× Testsieger</b><br />
+        <span className="text-[13px] font-bold text-pm-taupe">DIE WELT</span>
+        <span className="text-[13px] text-pm-muted"> · Preis &amp; Qualität</span>
+      </p>
+    </div>
+  );
+}
+
 export function MartaBox({ sterne }: { sterne: SterneStand | null }) {
   return (
     <div className="rounded-card bg-white border border-[#EFEBE4] p-[18px]">
@@ -52,14 +66,7 @@ export function MartaBox({ sterne }: { sterne: SterneStand | null }) {
           <WhatsAppIcon className="w-[22px] h-[22px]" />
         </a>
       </div>
-      <div className="mt-4 pt-3.5 border-t border-pm-line-soft flex items-center gap-3">
-        <img src="/badge-testsieger.webp" alt="Testsieger DIE WELT" className="h-12 w-auto flex-none object-contain" />
-        <p className="leading-[1.3]">
-          <b className="text-[15px] text-pm-ink">6× Testsieger</b><br />
-          <span className="text-[13px] font-bold text-pm-taupe">DIE WELT</span>
-          <span className="text-[13px] text-pm-muted"> · Preis &amp; Qualität</span>
-        </p>
-      </div>
+      <TestsiegerZeile className="mt-4 pt-3.5 border-t border-pm-line-soft" />
       {sterne && (
         <a
           href={ERFAHRUNGEN_URL}
