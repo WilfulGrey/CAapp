@@ -71,7 +71,7 @@ describe('fehlendeAngaben — dieselben Regeln wie das bisherige Tor', () => {
   it('E-Mails: leer oder gültig, Kontaktperson Pflicht (Registry #52)', () => {
     expect(fehlendeAngaben({ ...voll, email: 'x@t-online.de@t-online.de' })[0]).toMatchObject({ feld: 'email', grund: 'ungueltig' });
     expect(fehlendeAngaben({ ...voll, kpEmail: '' })[0]).toMatchObject({ feld: 'kpEmail', grund: 'leer' });
-    expect(fehlendeAngaben({ ...voll, kpEmail: 'Michael.kopka @ Freenet.de' })[0]).toMatchObject({ feld: 'kpEmail', grund: 'ungueltig' });
+    expect(fehlendeAngaben({ ...voll, kpEmail: 'vorname.nachname @ example.de' })[0]).toMatchObject({ feld: 'kpEmail', grund: 'ungueltig' });
   });
 
   it('Vertragspartner nur, wenn jemand anderes unterschreibt', () => {

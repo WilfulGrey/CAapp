@@ -49,7 +49,7 @@ describe('AngebotPruefenModal — E-Mail-Format (Registry #52)', () => {
   it('KP-Mail „x@t-online.de@t-online.de" ⇒ als ungültig gelistet + Hinweis erst nach Blur; gültig ⇒ frei', async () => {
     const user = userEvent.setup();
     render(
-      <AngebotPruefenModal app={makeApp()} prefill={{ ...prefill, kpEmail: 'catarina-stein@t-online.de@t-online.de' }} contractOnly
+      <AngebotPruefenModal app={makeApp()} prefill={{ ...prefill, kpEmail: 'kunde@example.com@example.com' }} contractOnly
         onClose={vi.fn()} onAccept={vi.fn()} onNurseClick={vi.fn()} />,
     );
     expect(fehltZeile(/Kontaktperson: E-Mail ungültig/)).toBe(true);
@@ -61,7 +61,7 @@ describe('AngebotPruefenModal — E-Mail-Format (Registry #52)', () => {
     expect(screen.getByText(/gültige E-Mail-Adresse/)).toBeTruthy();
 
     await user.clear(input);
-    await user.type(input, 'catarina-stein@t-online.de');
+    await user.type(input, 'kunde@example.com');
     expect(screen.queryByText(/gültige E-Mail-Adresse/)).toBeNull();
     expect(fehltZeile(/Kontaktperson/)).toBe(false);
     expect(await kommtZurUnterschrift(user)).toBe(true);
@@ -77,7 +77,7 @@ describe('AngebotPruefenModal — E-Mail-Format (Registry #52)', () => {
     unmount();
     window.sessionStorage.clear(); // sonst gewinnt der Entwurf des ersten Dialogs
     render(
-      <AngebotPruefenModal app={makeApp()} prefill={{ ...prefill, kpEmail: 'ok@example.de', email: 'Michael.kopka @ Freenet.de' }} contractOnly
+      <AngebotPruefenModal app={makeApp()} prefill={{ ...prefill, kpEmail: 'ok@example.de', email: 'vorname.nachname @ example.de' }} contractOnly
         onClose={vi.fn()} onAccept={vi.fn()} onNurseClick={vi.fn()} />,
     );
     expect(fehltZeile(/Betreute Person: E-Mail ungültig/)).toBe(true);

@@ -3,13 +3,13 @@ import { describe, it, expect } from 'vitest';
 import { parseCsv, csvZuLeadZeile, csvZeileBrauchbar } from '../../project 3/lib/portal-csv';
 import { parsePflegehilfe } from '../../project 3/lib/portal-parser';
 
-/* Die ECHTE CSV aus der ersten Portal-Mail (Zauner, prod uid 14) —
+/* Die ECHTE CSV aus der ersten Portal-Mail (anonymisiert, prod uid 14) —
  * verbatim, inkl. mehrzeiligem, gequotetem RequestDetail. Genau dieser
  * Anhang bewies, dass der Mailtext (zumal weitergeleitet) die schlechtere
  * Quelle ist: dort fehlten Name, Telefon, Pflegegrad und Mobilität.
  * Die echte Datei beginnt mit BOM U+FEFF (EF BB BF) — Registry #57. */
 const zaunerCsv = '\uFEFF' + `RequestNumber,Sex,AcademicDegree,FirstName,SurName,AddressLine1,ZipCode,City,CountryIso2,Email,PhoneType,Phone,Availability,SeniorSex,SeniorAcademicDegree,SeniorFirstName,SeniorSurName,SeniorRelationship,SeniorLiveSituation,SeniorCareLevel,SeniorMobility,SeniorAge,SeniorMedicalProcess,RequestZipCode,RequestRegion,RequestCountryIso2,RequestDetail,ProductName,EmployeeFirstName,EmployeeSurName,FinishedDateTime,CreateDateTime
-13535387,Herr,,Michael,Zauner,,,,DE,family.zauner@gmail.com,Mobile,+49 17641239037,Ganztägig telefonisch gut erreichbar,,,,,Schwiegervater,Lebt alleine,Pflegegrad 3,Mobil ohne Hilfsmittel,,Demenz,95703,Plößberg,DE,"Auftraggeber/Kontaktperson: Angehörige/Betreuer
+13535387,Herr,,Max,Mustermann,,,,DE,familie@example.com,Mobile,+49 1700000001,Ganztägig telefonisch gut erreichbar,,,,,Schwiegervater,Lebt alleine,Pflegegrad 3,Mobil ohne Hilfsmittel,,Demenz,95703,Plößberg,DE,"Auftraggeber/Kontaktperson: Angehörige/Betreuer
 Budgetrahmen: 2900€ bis 3500€
 Dauer: Unbefristet
 Kundenservice durch Agentur: Vor-Ort oder Per Telefon
@@ -26,7 +26,7 @@ Pflegegrad/-stufe: 3
 Mobilität: Mobil ohne Hilfsmittel
 Körpergewicht des Patienten: 70 kg
 Krankheiten: Demenz
-Bedarf: In Wochen",24 Stunden Betreuung,Robin,Ottermann,01.09.2026 11:05:32,01.09.2026 10:59:54
+Bedarf: In Wochen",24 Stunden Betreuung,Vorname,Nachname,01.09.2026 11:05:32,01.09.2026 10:59:54
 `;
 
 describe('parseCsv (RFC 4180)', () => {
@@ -46,15 +46,15 @@ describe('parseCsv (RFC 4180)', () => {
   });
 });
 
-describe('CSV → parsePflegehilfe (Zauner end-to-end)', () => {
+describe('CSV → parsePflegehilfe (anonymisiert end-to-end)', () => {
   const zeilen = parseCsv(zaunerCsv);
   const { text, zusatz } = csvZuLeadZeile(zeilen[0], zeilen[1]);
   const r = parsePflegehilfe(text);
 
   it('Kontakt vollständig — genau die Felder, die der Fwd-Text verlor', () => {
-    expect(r.kontakt.name).toBe('Herr Michael Zauner');
-    expect(r.kontakt.email).toBe('family.zauner@gmail.com');
-    expect(r.kontakt.telefon).toBe('+49 17641239037');
+    expect(r.kontakt.name).toBe('Herr Max Mustermann');
+    expect(r.kontakt.email).toBe('familie@example.com');
+    expect(r.kontakt.telefon).toBe('+49 1700000001');
     expect(r.kontakt.plz).toBe('95703');
     expect(r.kontakt.ort).toBe('Plößberg');
   });
