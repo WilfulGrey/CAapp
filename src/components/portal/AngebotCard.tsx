@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import type { FC, ReactNode } from 'react';
+import type { ElementType, FC, ReactNode } from 'react';
 import { Check, Lock } from 'lucide-react';
 import {
   Lead,
@@ -83,7 +83,9 @@ export const AngebotCard: FC<{
   schonAbgesendet?: boolean;
   /** Formular im Bild ja/nein — die schwebende Rückmeldung blendet sich dann aus (zurück seit Registry #102). */
   onImBlick?: (imBlick: boolean) => void;
-}> = ({ lead, mmCustomer, onPatientSaved, triggerOpenPatient, onTriggerHandled, mamamiaEnabled, onSaveToMamamia, onAbgesendet, gewaehlterStart, schonAbgesendet, onImBlick }) => {
+  /** Im Kasten „Ihr nächster Schritt" (Kompakt-Einstieg): ohne eigene Karte, der Kasten ist der Rahmen. */
+  eingebettet?: boolean;
+}> = ({ lead, mmCustomer, onPatientSaved, triggerOpenPatient, onTriggerHandled, mamamiaEnabled, onSaveToMamamia, onAbgesendet, gewaehlterStart, schonAbgesendet, onImBlick, eingebettet = false }) => {
   // Offen, sobald die Karte gerendert wird: Seit dem Wegfall des
   // Zwischenkopfs (11.08.) steuert allein der Abschnittskopf in
   // CustomerPortalPage, ob dieser Block überhaupt erscheint.
@@ -752,11 +754,13 @@ export const AngebotCard: FC<{
   // `hasFinalSave` allein reicht nicht: Die erste Änderung überschreibt den
   // lokalen Vermerk mit `_isDraft: true` (Review 25.09.).
   const nurAenderung = hasFinalSave || !!schonAbgesendet || (mmCustomer?.status != null && mmCustomer.status !== 'draft');
+  // Eingebettet trägt der Kasten Rand und Innenabstand (px-5, passend zur mitlaufenden Knopfleiste).
+  const Rahmen: ElementType = eingebettet ? 'div' : Card;
 
   return (
     <div ref={patientFormRef} id="pflegesituation-formular" className="scroll-mt-16">
       {patientOpen && (
-        <Card className="px-5 pt-5">
+        <Rahmen className={eingebettet ? 'mt-4 border-t border-pm-line-soft pt-4' : 'px-5 pt-5'}>
           <ProgressSteps
             schritte={STEP_LABELS}
             aktuell={step}
@@ -1110,7 +1114,7 @@ export const AngebotCard: FC<{
               </button>
             )}
           />
-        </Card>
+        </Rahmen>
       )}
       {/* Unter der Karte statt in der mitlaufenden Leiste — dort kostete die
           zweite Zeile auf dem Handy Platz über dem Formular. */}
