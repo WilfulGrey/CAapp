@@ -3,9 +3,9 @@
 // erledigt, das ist das Angebot, das ist der nächste Schritt, hier sind die Pflegekräfte").
 //
 // Reihenfolge auf der Seite (CustomerPortalPage, `kompakt`):
-//   Kopf: Begrüßung, „Ihr persönliches Angebot" und eine kurze Einleitung (KompaktEinleitung)
+//   Kopf: Begrüßung, „Ihr Angebot zur 24-Stunden-Betreuung" und eine kurze Einleitung (KompaktEinleitung)
 //   → Kostenkarte: Preis, kleine Zeile, Eigenanteil (EigenanteilZeile), die vier Punkte,
-//     Testsieger + Bestpreisgarantie-Siegel und Sterne, Aufklapper
+//     Testsieger (KompaktTestsieger) und Sterne, Aufklapper
 //   → Kasten „So geht es weiter" mit drei Schritten; das bestehende 4-Schritte-Formular
 //     (AngebotCard) klappt unter Schritt 2 auf
 //   → Pflegekräfte als Zeilen ohne Knöpfe.
@@ -23,22 +23,39 @@ import { Card } from '../ui/Card';
 import { EYEBROW, H2 } from '../ui/SectionHeader';
 
 /**
- * Einleitung der Seite direkt unter dem Titel (Runde 4): was die Betreuung ist und was Primundus
- * übernimmt. Fließtext wie die Unterzeilen der anderen Zustände (16 px, gedämpft) — kein Kasten,
- * kein Hinweis-Ton.
+ * Einleitung der Seite direkt unter dem Titel (Runde 5): Dank für die Anfrage und was die Seite zeigt.
+ * Fließtext wie die Unterzeilen der anderen Zustände (16 px, gedämpft) — kein Kasten, kein Hinweis-Ton.
  */
 export function KompaktEinleitung() {
   return (
     <p className="mt-3 text-[16px] leading-[1.55] text-pm-muted">
-      {/* Zusammen bleiben: Zahl und Wort, „DIE WELT" und das letzte Wortpaar — sonst stand bei
-          390 px „Bei DIE" / „WELT" getrennt und „gewählt." allein in der letzten Zeile. */}
-      Eine bei uns angestellte Betreuungskraft wohnt bei Ihnen und hilft im Alltag: bei der
-      Körperpflege, beim Essen und im Haushalt. Wir machen das seit über{' '}
-      <span className="whitespace-nowrap">20 Jahren</span>, mit mehr als{' '}
-      <span className="whitespace-nowrap">60.000 Einsätzen</span>, rechtssicher, täglich kündbar und
-      mit Bestpreisgarantie. Bei <span className="whitespace-nowrap">DIE WELT</span> wurden wir 6× in
-      Folge zum <span className="whitespace-nowrap">Testsieger gewählt.</span>
+      {/* „zu Hause" und das letzte Wortpaar bleiben zusammen — sonst stand bei 390 px „passen."
+          allein in der letzten Zeile. */}
+      Vielen Dank für Ihre Anfrage. Hier sehen Sie, was eine bei uns angestellte Betreuungskraft bei
+      Ihnen <span className="whitespace-nowrap">zu Hause</span> kostet, wie es weitergeht und welche
+      Pflegekräfte zu Ihren <span className="whitespace-nowrap">Angaben passen.</span>
     </p>
+  );
+}
+
+/**
+ * Testsieger in der Kostenkarte (Runde 5): Siegel, „6× Testsieger DIE WELT", darunter Erfahrung und
+ * Einsätze. Im Marta-Kasten weiter unten steht der Block unverändert („DIE WELT · Preis & Qualität").
+ */
+export function KompaktTestsieger() {
+  return (
+    <div className="flex items-center gap-3">
+      <img src="/badge-testsieger.webp" alt="Testsieger DIE WELT" className="h-12 w-auto flex-none object-contain" />
+      <p className="text-[14px] leading-snug text-pm-muted">
+        <b className="text-[16px] text-pm-ink">
+          6× Testsieger <span className="whitespace-nowrap">DIE WELT</span>
+        </b>
+        <br />
+        {/* Zu schmal für eine Zeile (Handy): Umbruch nach „·", beide Hälften bleiben ganz. */}
+        <span className="whitespace-nowrap">Über 20 Jahre Erfahrung</span>{'\u00A0'}·{' '}
+        <span className="whitespace-nowrap">über 60.000 Einsätze</span>
+      </p>
+    </div>
   );
 }
 

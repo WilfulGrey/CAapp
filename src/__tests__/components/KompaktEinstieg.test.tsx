@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { aufzaehlung, EigenanteilZeile, KompaktEinleitung, KompaktePflegekraefte, PflegekraftZeile, SchritteKasten, zuschussKurzname } from '../../components/portal/KompaktEinstieg';
+import { aufzaehlung, EigenanteilZeile, KompaktEinleitung, KompaktePflegekraefte, KompaktTestsieger, PflegekraftZeile, SchritteKasten, zuschussKurzname } from '../../components/portal/KompaktEinstieg';
 import type { Nurse } from '../../types';
 
 const basis: Nurse = {
@@ -177,13 +177,28 @@ describe('SchritteKasten', () => {
 });
 
 describe('KompaktEinleitung', () => {
-  it('Einleitung unter dem Titel im Wortlaut; Zahl + Wort, „DIE WELT" und das Ende brechen nicht um', () => {
+  it('Einleitung unter dem Titel im Wortlaut; „zu Hause" und das Ende brechen nicht um', () => {
     const { container } = render(<KompaktEinleitung />);
     const absatz = container.querySelector('p')!;
     expect(absatz.textContent).toBe(
-      'Eine bei uns angestellte Betreuungskraft wohnt bei Ihnen und hilft im Alltag: bei der Körperpflege, beim Essen und im Haushalt. Wir machen das seit über 20 Jahren, mit mehr als 60.000 Einsätzen, rechtssicher, täglich kündbar und mit Bestpreisgarantie. Bei DIE WELT wurden wir 6× in Folge zum Testsieger gewählt.',
+      'Vielen Dank für Ihre Anfrage. Hier sehen Sie, was eine bei uns angestellte Betreuungskraft bei Ihnen zu Hause kostet, wie es weitergeht und welche Pflegekräfte zu Ihren Angaben passen.',
     );
-    for (const teil of ['20 Jahren', '60.000 Einsätzen', 'DIE WELT', 'Testsieger gewählt.']) {
+    for (const teil of ['zu Hause', 'Angaben passen.']) {
+      expect(within(absatz).getByText(teil).className).toContain('whitespace-nowrap');
+    }
+  });
+});
+
+describe('KompaktTestsieger', () => {
+  it('Siegel, „6× Testsieger DIE WELT" fett, darunter Erfahrung und Einsätze', () => {
+    const { container } = render(<KompaktTestsieger />);
+    expect(screen.getByRole('img', { name: 'Testsieger DIE WELT' }).getAttribute('src')).toBe('/badge-testsieger.webp');
+    const titel = container.querySelector('b')!;
+    expect(titel.textContent).toBe('6× Testsieger DIE WELT');
+    const absatz = container.querySelector('p')!;
+    expect(absatz.textContent!.replace(/\u00A0/g, ' ')).toBe('6× Testsieger DIE WELTÜber 20 Jahre Erfahrung · über 60.000 Einsätze');
+    // Umbruch nur nach „·": beide Hälften als Ganzes.
+    for (const teil of ['Über 20 Jahre Erfahrung', 'über 60.000 Einsätze']) {
       expect(within(absatz).getByText(teil).className).toContain('whitespace-nowrap');
     }
   });

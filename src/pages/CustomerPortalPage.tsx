@@ -77,9 +77,9 @@ import { useSterneStand } from '../lib/sterne';
 import { BestpreisSheet } from '../components/portal/PortalSheets';
 import { SoGehtEsWeiter } from '../components/portal/SoGehtEsWeiter';
 import { FaqListe } from '../components/portal/FaqListe';
-import { MartaBox, TestsiegerZeile } from '../components/portal/MartaBox';
+import { MartaBox } from '../components/portal/MartaBox';
 import { BewertungsZeile } from '../components/portal/BewertungsZeile';
-import { EigenanteilZeile, KompaktEinleitung, KompaktePflegekraefte, SchritteKasten } from '../components/portal/KompaktEinstieg';
+import { EigenanteilZeile, KompaktEinleitung, KompaktePflegekraefte, KompaktTestsieger, SchritteKasten } from '../components/portal/KompaktEinstieg';
 import { Button } from '../components/ui/Button';
 import { Card } from '../components/ui/Card';
 import { SectionHeader, EYEBROW, H2 } from '../components/ui/SectionHeader';
@@ -2617,8 +2617,8 @@ const CustomerPortalPage: FC = () => {
           : null;
         const heimErsparnis = eigenanteil !== null ? HEIM_EIGENANTEIL - eigenanteil : 0;
         // Absätze, die im Kompakt-Einstieg nicht am Preis stehen: „Kosten erst …" und der
-        // Heimvergleich im Aufklapper „Alle Kosten im Überblick", der Testsieger als Siegel unter
-        // den vier Punkten (sonst alle drei unverändert an ihrer Stelle).
+        // Heimvergleich im Aufklapper „Alle Kosten im Überblick", der Testsieger als eigener Block
+        // unter den vier Punkten (KompaktTestsieger; sonst alle drei unverändert an ihrer Stelle).
         // Kein fünfter Haken (Martin, 09.09.): „Kosten erst, wenn die
         // Pflegekraft da ist" ist eine Erklärung, kein Punkt der Liste.
         const kostenErst = (
@@ -2643,8 +2643,8 @@ const CustomerPortalPage: FC = () => {
         const testsieger = (
           <div className="mt-3 pt-3 border-t border-pm-line-soft flex items-center gap-3">
             <img src="/badge-testsieger.webp" alt="Testsieger Die Welt" className="h-11 w-auto flex-shrink-0 object-contain" />
-            <p className={`${kompakt ? 'text-[14px]' : 'text-[13.5px]'} leading-snug text-pm-muted`}>
-              <b className={`${kompakt ? 'text-[16px]' : 'text-[15px]'} text-pm-ink`}>6× Testsieger DIE&nbsp;WELT</b><br/>20&nbsp;Jahre Erfahrung · 60.000+ Einsätze
+            <p className="text-[13.5px] leading-snug text-pm-muted">
+              <b className="text-[15px] text-pm-ink">6× Testsieger DIE&nbsp;WELT</b><br/>20&nbsp;Jahre Erfahrung · 60.000+ Einsätze
             </p>
           </div>
         );
@@ -2715,19 +2715,13 @@ const CustomerPortalPage: FC = () => {
                   )}
                   {vierPunkte(kompakt ? 'mt-3.5 flex flex-col gap-2' : 'mt-4 flex flex-col gap-2.5')}
                   {/* Kompakt-Einstieg: Vertrauen direkt unter den Punkten, nicht neben dem Preis —
-                      das Siegel wie im Marta-Kasten, darunter die Sterne (Höhe reserviert, damit
-                      nichts darunter springt, wenn der Stand später kommt; ohne Stand keine Zeile). */}
+                      Testsieger-Siegel mit Erfahrung und Einsätzen, darunter die Sterne (Höhe
+                      reserviert, damit nichts darunter springt, wenn der Stand später kommt; ohne
+                      Stand keine Zeile). Kein eigenes Bestpreisgarantie-Siegel (Runde 5): die
+                      Garantie steht als vierter Punkt mit „Mehr Infos". */}
                   {kompakt && (
                     <div className="mt-3.5 border-t border-pm-line-soft pt-3.5">
-                      {/* Runde 4: daneben das Portal-Siegel der Bestpreisgarantie (Registry #66), gleich
-                          hoch; passt es nicht nebeneinander (Handy), steht es darunter. Tipp öffnet
-                          dasselbe Pop-up wie „Mehr Infos". */}
-                      <div className="flex flex-wrap items-center gap-x-5 gap-y-3">
-                        <TestsiegerZeile />
-                        <button type="button" onClick={() => setBestpreisOffen(true)} className="flex-none">
-                          <img src="/images/bestpreisgarantie-siegel.png" alt="Primundus Bestpreisgarantie – 6× Preis-Leistungssieger" width={900} height={256} className="h-12 w-auto" />
-                        </button>
-                      </div>
+                      <KompaktTestsieger />
                       <div className="mt-2 flex h-7 items-center">
                         <BewertungsZeile stand={sterne} klein className="-my-2" />
                       </div>
@@ -3305,11 +3299,14 @@ const CustomerPortalPage: FC = () => {
               <p className="text-[16px] text-pm-taupe-ink">
                 Guten Tag{heroNameLine ? `, ${heroNameLine}` : ''}.
               </p>
-              {/* Kompakt-Einstieg: Titel in EINER Zeile (31 px brauchen 362 px, bei 390 px sind 354 frei). */}
+              {/* Kompakt-Einstieg (Runde 5): Titel wie der Betreff der Angebotsmail, in 26/28 px.
+                  „24-Stunden-Betreuung" bricht nicht um (sonst „24-" allein am Zeilenende). */}
               <h1 className={`mt-1 font-extrabold leading-[1.08] tracking-[-0.035em] text-pm-ink ${kompakt ? 'text-[26px] min-[390px]:text-[28px]' : 'text-[31px]'}`}>
-                {heroCopy.title}
+                {kompakt ? (
+                  <>Ihr Angebot zur <span className="whitespace-nowrap">24-Stunden-Betreuung</span></>
+                ) : heroCopy.title}
               </h1>
-              {/* Kompakt-Einstieg (Runde 4): kurze Einleitung der Seite, Fließtext ohne Kasten. */}
+              {/* Kompakt-Einstieg: kurze Einleitung der Seite, Fließtext ohne Kasten. */}
               {kompakt && <KompaktEinleitung />}
               {/* Offene Bewerbung (Martin 25.09.): Kopf nur Titel + Zeit, direkt
                   danach die Bewerbung; „Angebot prüfen" und die Vorteile der
