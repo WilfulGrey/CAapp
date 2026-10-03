@@ -4,8 +4,10 @@
 //
 // Reihenfolge auf der Seite (CustomerPortalPage, `kompakt`):
 //   Kopf: Begrüßung, „Ihr persönliches Angebot", Sterne-Zeile, Fortschritt in EINER Zeile
-//   → Kostenkarte (kompakt, Details im Aufklapper) → Kasten „Ihr nächster Schritt" mit dem
-//   bestehenden 4-Schritte-Formular (AngebotCard) → Pflegekräfte als Zeilen ohne Knöpfe.
+//   → Kostenkarte (nur Preis, kleine Zeile, Aufklapper) → Kasten „Ihr nächster Schritt" mit dem
+//   bestehenden 4-Schritte-Formular (AngebotCard) → die vier Punkte der Startseite (ohne Karte)
+//   → Pflegekräfte als Zeilen ohne Knöpfe.
+// Ziel (Martin): der Knopf „Jetzt vervollständigen →" steht im ersten Bild (390×664).
 // Alle anderen Zustände (abgesendet, Bewerbung, gebucht …) bleiben unverändert.
 //
 // Schrift in diesem Zustand: Fließtext 16 px, kleine Schrift 14 px. Ausnahme ist die
@@ -29,7 +31,7 @@ import { EYEBROW, H2 } from '../ui/SectionHeader';
 export function KompaktKopf({ sterne }: { sterne: SterneStand | null }) {
   return (
     <>
-      <div className="mt-1 h-7 flex items-center">
+      <div className="mt-0.5 h-7 flex items-center">
         <BewertungsZeile stand={sterne} className="-my-2" />
       </div>
       <Fortschritt />
@@ -38,17 +40,15 @@ export function KompaktKopf({ sterne }: { sterne: SterneStand | null }) {
 }
 
 /**
- * „✓ Angebot erstellt · 2 Pflegesituation · 3 Pflegekräfte einladen": leicht, kein Bestell-Stepper.
- * Die drei Wörter sind fest (Wortlaut freigegeben) und brauchen in Inter bei 12 px schon 306 px —
- * mehr, als bei 390 px neben den Symbolen Platz ist. Deshalb kleine Schrift, mit der Breite
- * gestaffelt (10,5 / 11 / 11,5 px), Symbole und Abstände in em: Die Zeile schrumpft als Ganzes und
- * bricht nie um. Gemessen in WebKit bei 360 und 390 px (scrollWidth = clientWidth).
+ * „✓ Angebot erstellt · 2 Pflegesituation · 3 Einladen": leicht, kein Bestell-Stepper. Mit der
+ * Breite gestaffelt (12,5 / 13 / 13,5 px bei 360 / 375 / 390 px), Symbole und Abstände in em: Die
+ * Zeile schrumpft als Ganzes und bricht nie um (gemessen in WebKit, scrollWidth = clientWidth).
  */
 export function Fortschritt() {
   return (
     <ol
       aria-label="Ihr Fortschritt"
-      className="mt-2.5 flex items-center justify-between whitespace-nowrap leading-none text-[10.5px] min-[375px]:text-[11px] min-[390px]:text-[11.5px]"
+      className="mt-2 flex items-center justify-between whitespace-nowrap leading-none text-[12.5px] min-[375px]:text-[13px] min-[390px]:text-[13.5px]"
     >
       <li className="flex items-center gap-[0.3em] font-semibold text-pm-green-deep">
         <Check className="h-[1.05em] w-[1.05em] flex-none" strokeWidth={3} aria-hidden="true" />
@@ -62,7 +62,7 @@ export function Fortschritt() {
       <Trenner />
       <li className="flex items-center gap-[0.25em] font-semibold text-pm-mute">
         <span className="flex-none" aria-hidden="true">3</span>
-        Pflegekräfte einladen
+        Einladen
       </li>
     </ol>
   );
@@ -102,18 +102,19 @@ export function NaechsterSchritt({ aktiv, offen, onOeffnen, onImBlick, children 
       ref={kasten}
       id="patientendaten"
       aria-labelledby="naechster-schritt-titel"
-      className="scroll-mt-16 rounded-card border-2 border-pm-taupe bg-white px-5 pb-4 pt-[18px] shadow-lift"
+      className="scroll-mt-16 rounded-card border-2 border-pm-taupe bg-white px-5 pb-4 pt-4 shadow-lift"
     >
       <p className={EYEBROW}>Ihr nächster Schritt</p>
       {/* 20 px passt erst ab 390 px in eine Zeile (gemessen: 311 px bei 318 px Platz). */}
-      <h2 id="naechster-schritt-titel" className="mt-1 text-[18px] font-extrabold leading-[1.2] tracking-[-0.02em] text-pm-ink min-[390px]:text-[20px]">
+      <h2 id="naechster-schritt-titel" className="mt-0.5 text-[18px] font-extrabold leading-[1.2] tracking-[-0.02em] text-pm-ink min-[390px]:text-[20px]">
         Pflegesituation vervollständigen
       </h2>
-      <p className="mt-1.5 text-[16px] leading-[1.5] text-pm-muted">
-        Dauert etwa 2 Minuten, vieles ist schon ausgefüllt. Danach laden Sie die Pflegekräfte ein, die Ihnen gefallen.
+      {/* Wortlaut der guten Phase bis 24.09. (Registry #109): der Nutzen steht im Satz. */}
+      <p className="mt-1 text-[16px] leading-[1.45] text-pm-muted">
+        Dauert etwa 2 Minuten, vieles ist schon ausgefüllt. Danach laden Sie Pflegekräfte ein und erhalten Bewerbungen mit Foto, Erfahrung, Anreisedatum und Preis.
       </p>
       {!offen && (
-        <Button breit onClick={onOeffnen} className="mt-4 whitespace-nowrap">
+        <Button breit onClick={onOeffnen} className="mt-3.5 whitespace-nowrap">
           Jetzt vervollständigen →
         </Button>
       )}
@@ -126,6 +127,7 @@ export function NaechsterSchritt({ aktiv, offen, onOeffnen, onImBlick, children 
  * Passende Pflegekräfte als Zeilen: Foto, Name und Alter, Deutsch und Erfahrung, Einsätze bei uns.
  * Keine Knöpfe — die ganze Zeile öffnet das Profil (wie „Profil ansehen"). Einladen geht dort,
  * sobald die Pflegesituation vollständig ist; vorher führt „Einladen" im Profil ins Formular.
+ * Kein Satz unter der Überschrift: Der Kasten „Ihr nächster Schritt" darüber erklärt das Einladen.
  */
 export function KompaktePflegekraefte({ eintraege, laedt, alleBearbeitet, keineVorschlaege, onProfil, telefonHref }: {
   /** Sichtbare Vorschläge in Anzeige-Reihenfolge (Empfehlung zuerst); `i` = Index für `openNurseFromMatch`. */
@@ -146,11 +148,6 @@ export function KompaktePflegekraefte({ eintraege, laedt, alleBearbeitet, keineV
       <div id="pflegekraefte" className="px-1" style={{ scrollMarginTop: 96 }}>
         <p className={EYEBROW}>Für Sie ausgewählt</p>
         <h2 id="pflegekraefte-titel" className={`mt-1.5 ${H2}`}>{titel}</h2>
-        {n > 0 && (
-          <p className="mt-2 text-[16px] leading-[1.5] text-pm-muted">
-            Einladen können Sie sie, sobald die Pflegesituation vollständig ist.
-          </p>
-        )}
       </div>
 
       {laedt ? (

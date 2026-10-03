@@ -2540,6 +2540,31 @@ const CustomerPortalPage: FC = () => {
   // Bewerbungen, und wenn nicht da, dann Pflegekräfte"). Dieselbe Sektion
   // an zwei möglichen Stellen — deshalb einmal gebaut und unten je nach
   // Zustand eingehängt, statt 300 Zeilen zu duplizieren.
+  // Die vier Punkte der Startseite (Martin 26.09.: „die müssen doch überall gleich sein"):
+  // dieselbe Liste wie unter „Angebot prüfen" (AppCard) und in den Mails. Bestpreisgarantie ist
+  // der vierte Punkt und öffnet das Pop-up. Sonst in der Kostenkarte; im Kompakt-Einstieg ohne
+  // eigene Karte unter dem Kasten „Ihr nächster Schritt", damit dessen Knopf ins erste Bild rückt.
+  const punktKlasse = 'flex items-center gap-1.5 text-[14px] min-[375px]:text-[14.5px] min-[390px]:gap-2 min-[390px]:text-[15px] leading-snug text-pm-ink';
+  const vierPunkte = (listenKlasse: string) => (
+    <ul className={listenKlasse}>
+      {HERO_PUNKTE.map((punkt) => (
+        <li key={punkt} className={punktKlasse}>
+          <Check className="h-[17px] w-[17px] flex-shrink-0 text-pm-coral" strokeWidth={2.5} aria-hidden="true" />
+          {punkt}
+        </li>
+      ))}
+      <li className={punktKlasse}>
+        <Check className="h-[17px] w-[17px] flex-shrink-0 text-pm-coral" strokeWidth={2.5} aria-hidden="true" />
+        <span>
+          Bestpreisgarantie{' '}
+          <button type="button" onClick={() => setBestpreisOffen(true)} className="inline-flex min-h-[44px] -my-3 items-center font-semibold text-pm-green-deep underline underline-offset-[3px]">
+            Mehr Infos
+          </button>
+        </span>
+      </li>
+    </ul>
+  );
+
       const angebotSection = (() => {
         // Seit 11.08. steuert dieser Toggle NUR noch die Konditionen und den
         // Mustervertrag — der Preis steht immer. Default zu: Der Kunde soll
@@ -2600,16 +2625,13 @@ const CustomerPortalPage: FC = () => {
             </p>
           </div>
         );
-        // Die vier Punkte wie bisher (bei 16 px bräche „Täglich kündbar, taggenau abgerechnet"
-        // um); im Kompakt-Einstieg nur enger gesetzt (gap der Liste).
-        const punktKlasse = 'flex items-center gap-1.5 text-[14px] min-[375px]:text-[14.5px] min-[390px]:gap-2 min-[390px]:text-[15px] leading-snug text-pm-ink';
         return (
         <div className={`max-w-3xl mx-auto px-3.5 ${!patientSaved && !hasPending ? '-mt-6' : 'pt-5'}`}>
           {/* Karte im Look des Rechners (Teil 3, Martin 24.09.). „Ihr persönliches
               Angebot" steht im Kopf — der Abschnitt heißt nach seinem Inhalt. Der
               Chevron klappt den ganzen Abschnitt zu, sobald er nur noch Referenz ist
               (Martin: „muss einklappbar sein für spätere Zustände"). */}
-          <Card className={`relative px-5 shadow-lift ${kompakt ? 'pt-4 pb-1' : 'pt-3 pb-4'}`}>
+          <Card className={`relative px-5 shadow-lift ${kompakt ? 'pt-3.5 pb-0.5' : 'pt-3 pb-4'}`}>
             {kompakt ? (
               <p className={EYEBROW}>Ihre Betreuungskosten</p>
             ) : (
@@ -2646,11 +2668,11 @@ const CustomerPortalPage: FC = () => {
                     Voraussetzungen. */}
                   {kompakt ? (
                     <>
-                      <p className="mt-2 flex items-baseline gap-2 whitespace-nowrap">
+                      <p className="mt-1 flex items-baseline gap-2 whitespace-nowrap">
                         <span className="text-[42px] font-extrabold leading-none tracking-[-0.04em] tabular-nums text-pm-ink">{formatEuro(brutto)}</span>
                         <span className="text-[16px] text-pm-muted">im Monat</span>
                       </p>
-                      <p className="mt-2 text-[14px] leading-[1.45] text-pm-muted">
+                      <p className="mt-1.5 text-[14px] leading-[1.4] text-pm-muted">
                         inkl. Steuern, Gebühren und Sozialabgaben, zzgl. Kost und Logis und Reisekosten{' '}
                         <span className="whitespace-nowrap">(125 € pro Fahrt)</span>
                       </p>
@@ -2663,27 +2685,8 @@ const CustomerPortalPage: FC = () => {
                   </p>
                   </>
                   )}
-                  {/* Die vier Punkte der Startseite (Martin 26.09.: „die müssen doch
-                      überall gleich sein"): dieselbe Liste wie unter „Angebot prüfen"
-                      (AppCard) und in den Mails. Bestpreisgarantie ist der vierte Punkt
-                      und öffnet das Pop-up. */}
-                  <ul className={kompakt ? 'mt-3.5 flex flex-col gap-1.5' : 'mt-4 flex flex-col gap-2.5'}>
-                    {HERO_PUNKTE.map((punkt) => (
-                      <li key={punkt} className={punktKlasse}>
-                        <Check className="h-[17px] w-[17px] flex-shrink-0 text-pm-coral" strokeWidth={2.5} aria-hidden="true" />
-                        {punkt}
-                      </li>
-                    ))}
-                    <li className={punktKlasse}>
-                      <Check className="h-[17px] w-[17px] flex-shrink-0 text-pm-coral" strokeWidth={2.5} aria-hidden="true" />
-                      <span>
-                        Bestpreisgarantie{' '}
-                        <button type="button" onClick={() => setBestpreisOffen(true)} className="inline-flex min-h-[44px] -my-3 items-center font-semibold text-pm-green-deep underline underline-offset-[3px]">
-                          Mehr Infos
-                        </button>
-                      </span>
-                    </li>
-                  </ul>
+                  {/* Im Kompakt-Einstieg stehen die vier Punkte unter dem Kasten „Ihr nächster Schritt". */}
+                  {!kompakt && vierPunkte('mt-4 flex flex-col gap-2.5')}
                   {!kompakt && kostenErst}
                   {!kompakt && heimVergleich}
                   {!kompakt && testsieger}
@@ -2694,7 +2697,7 @@ const CustomerPortalPage: FC = () => {
                     type="button"
                     onClick={() => setCostsExpanded(!costsExpanded)}
                     aria-expanded={costsExpanded}
-                    className={`mt-3 w-full min-h-[48px] flex items-center justify-between gap-2 border-t border-pm-line-soft pt-2 ${kompakt ? 'text-[16px]' : 'text-[15px]'} font-semibold text-pm-taupe-ink`}
+                    className={`w-full flex items-center justify-between gap-2 border-t border-pm-line-soft pt-2 ${kompakt ? 'mt-2.5 min-h-[44px] text-[16px]' : 'mt-3 min-h-[48px] text-[15px]'} font-semibold text-pm-taupe-ink`}
                   >
                     {costsExpanded ? 'Weniger anzeigen' : 'Alle Kosten im Überblick'}
                     <ChevronDown className={`w-5 h-5 text-pm-taupe transition-transform duration-200 ${costsExpanded ? 'rotate-180' : ''}`} />
@@ -3250,7 +3253,8 @@ const CustomerPortalPage: FC = () => {
         // der Unterkante (pb-10 + -mt-6 an der Karte).
         return (
           <div className="bg-pm-shell">
-            <div className={`max-w-3xl mx-auto px-[18px] pt-6 ${(!patientSaved && !hasPending) || sucheLaeuft ? 'pb-10' : 'pb-7'}`}>
+            {/* Kompakt-Einstieg: etwas weniger Luft, damit „Jetzt vervollständigen →" ins erste Bild passt. */}
+            <div className={`max-w-3xl mx-auto px-[18px] ${kompakt ? 'pt-4 pb-9' : `pt-6 ${(!patientSaved && !hasPending) || sucheLaeuft ? 'pb-10' : 'pb-7'}`}`}>
               <p className="text-[16px] text-pm-taupe-ink">
                 Guten Tag{heroNameLine ? `, ${heroNameLine}` : ''}.
               </p>
@@ -3646,7 +3650,7 @@ const CustomerPortalPage: FC = () => {
 
       {!hasPending && (
       <div>
-      <div className={`max-w-3xl mx-auto px-3.5 ${kompakt ? 'pt-4' : 'pt-1 pb-4 space-y-4'}`}>
+      <div className={`max-w-3xl mx-auto px-3.5 ${kompakt ? 'pt-3' : 'pt-1 pb-4 space-y-4'}`}>
         {/* ── SECTION: 2 · Patientendaten — der Onboarding-Schritt steht VOR
              den Pflegekräften (vorher lag die Karte zwischen PK-Header und
              PK-Karten — genau die „zwei Kästen"-Verwirrung, Martin 2026-07-12). ── */}
@@ -4016,10 +4020,12 @@ const CustomerPortalPage: FC = () => {
       </div>
       )}
 
-      {/* Kompakt-Einstieg: passende Pflegekräfte als Zeilen (dieselbe Auswahl wie die Karten),
-          darunter „Bereits bearbeitet" (z. B. im Profil mit „Nein danke" abgelehnt). */}
+      {/* Kompakt-Einstieg: die vier Punkte, passende Pflegekräfte als Zeilen (dieselbe Auswahl wie
+          die Karten), darunter „Bereits bearbeitet" (z. B. im Profil mit „Nein danke" abgelehnt). */}
       {kompakt && (
-        <div className="max-w-3xl mx-auto px-3.5 pt-9 space-y-4">
+        <div className="max-w-3xl mx-auto px-3.5 pt-5">
+          {vierPunkte('flex flex-col gap-2.5 px-1')}
+          <div className="pt-9 space-y-4">
           <KompaktePflegekraefte
             eintraege={pflegekraftAuswahl.visibleNurses}
             laedt={listeLaedt}
@@ -4029,6 +4035,7 @@ const CustomerPortalPage: FC = () => {
             telefonHref={TELEFON_HREF}
           />
           {bereitsBearbeitet}
+          </div>
         </div>
       )}
 

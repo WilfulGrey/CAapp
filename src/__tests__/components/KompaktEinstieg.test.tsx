@@ -75,10 +75,9 @@ describe('KompaktePflegekraefte', () => {
     expect(screen.getAllByText('Unsere Empfehlung')).toHaveLength(1);
   });
 
-  it('beim Laden keine Zahl und kein Einladen-Satz', () => {
+  it('beim Laden keine Zahl', () => {
     render(<KompaktePflegekraefte {...props} laedt eintraege={[{ nurse: basis, i: 0 }]} />);
     expect(screen.getByRole('heading', { name: 'Passende Pflegekräfte' })).toBeTruthy();
-    expect(screen.queryByText(/Einladen können Sie sie/)).toBeNull();
     expect(screen.getByText('Wir laden Ihre Pflegekräfte …')).toBeTruthy();
   });
 });

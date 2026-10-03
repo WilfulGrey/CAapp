@@ -439,8 +439,9 @@ describe('Portal integration: golden paths', () => {
     render(<CustomerPortalPage />);
     const kasten = within(await screen.findByRole('region', { name: 'Pflegesituation vervollständigen' }, { timeout: 5000 }));
     expect(kasten.getByText('Ihr nächster Schritt')).toBeInTheDocument();
+    // Wortlaut der guten Phase bis 24.09. (Registry #109): mit dem Nutzen im Satz.
     expect(kasten.getByText(
-      'Dauert etwa 2 Minuten, vieles ist schon ausgefüllt. Danach laden Sie die Pflegekräfte ein, die Ihnen gefallen.',
+      'Dauert etwa 2 Minuten, vieles ist schon ausgefüllt. Danach laden Sie Pflegekräfte ein und erhalten Bewerbungen mit Foto, Erfahrung, Anreisedatum und Preis.',
     )).toBeInTheDocument();
     expect(screen.queryByText('Noch 2 Minuten bis zum Einladen')).toBeNull();
     expect(screen.queryByText('Passt Ihnen das Angebot?')).toBeNull();
@@ -467,7 +468,8 @@ describe('Portal integration: golden paths', () => {
     render(<CustomerPortalPage />);
     // Zahl = tatsächlich gezeigte Pflegekräfte, Einzahl bei einer.
     expect(await screen.findByRole('heading', { name: '1 passende Pflegekraft' }, { timeout: 5000 })).toBeInTheDocument();
-    expect(screen.getByText('Einladen können Sie sie, sobald die Pflegesituation vollständig ist.')).toBeInTheDocument();
+    // Kein Satz unter der Überschrift: Der Kasten darüber erklärt das Einladen.
+    expect(screen.queryByText(/Einladen können Sie sie/)).toBeNull();
     const zeile = screen.getByRole('button', { name: 'Profil von Helena K. ansehen' });
     expect(within(zeile).getByText('Unsere Empfehlung')).toBeInTheDocument();
     expect(within(zeile).getByText(/15 Einsätze bei uns/)).toBeInTheDocument();
@@ -485,16 +487,23 @@ describe('Portal integration: golden paths', () => {
     expect(einladungen).toBe(0);
   }, 15_000);
 
-  it('Neukunde: Fortschritt in einer Zeile, Angebot mit Details im Aufklapper, kein Formularkopf, kein „So geht es weiter“', async () => {
+  it('Neukunde: Fortschritt in einer Zeile, Kostenkarte nur mit Preis und Aufklapper, vier Punkte unter dem Kasten, kein „So geht es weiter“', async () => {
     server.use(...defaultHandlers({ proxy: { listApplications: () => ({ JobOfferApplicationsWithPagination: { total: 0, data: [] } }) } }));
     setLocation(`?token=${TEST_LEAD_TOKEN}`);
     render(<CustomerPortalPage />);
     const fortschritt = within(await screen.findByRole('list', { name: 'Ihr Fortschritt' }, { timeout: 5000 }));
     expect(fortschritt.getByText('Angebot erstellt')).toBeInTheDocument();
     expect(fortschritt.getByText('Pflegesituation')).toBeInTheDocument();
-    expect(fortschritt.getByText('Pflegekräfte einladen')).toBeInTheDocument();
+    expect(fortschritt.getByText('Einladen')).toBeInTheDocument();
     expect(screen.queryByRole('heading', { name: 'Jetzt konkrete Bewerbungen erhalten' })).toBeNull();
     expect(screen.queryByText('So geht es weiter')).toBeNull();
+
+    // Die vier Punkte stehen unter dem Kasten „Ihr nächster Schritt", nicht mehr in der Kostenkarte.
+    const kasten = screen.getByRole('region', { name: 'Pflegesituation vervollständigen' });
+    const punkt = screen.getByText('Kein Vertrag vor Ihrer Auswahl');
+    expect(kasten.compareDocumentPosition(punkt) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(kasten.contains(punkt)).toBe(false);
+    expect(screen.getByText('Ihre Betreuungskosten').closest('.shadow-lift')?.contains(punkt)).toBe(false);
 
     // Am Preis nur noch eine Zeile; Kosten-Satz, Heimvergleich und Testsieger stehen im Aufklapper.
     expect(screen.getByText('im Monat')).toBeInTheDocument();
