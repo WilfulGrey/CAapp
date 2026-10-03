@@ -40,7 +40,8 @@ export function KompaktEinleitung() {
 
 /**
  * Testsieger in der Kostenkarte (Runde 5): Siegel, „6× Testsieger DIE WELT", darunter Erfahrung und
- * Einsätze. Im Marta-Kasten weiter unten steht der Block unverändert („DIE WELT · Preis & Qualität").
+ * Einsätze als zwei eigene Zeilen ohne „·" (sonst endete auf dem Handy eine Zeile mit dem Punkt).
+ * Im Marta-Kasten weiter unten steht der Block unverändert („DIE WELT · Preis & Qualität").
  */
 export function KompaktTestsieger() {
   return (
@@ -51,9 +52,9 @@ export function KompaktTestsieger() {
           6× Testsieger <span className="whitespace-nowrap">DIE WELT</span>
         </b>
         <br />
-        {/* Zu schmal für eine Zeile (Handy): Umbruch nach „·", beide Hälften bleiben ganz. */}
-        <span className="whitespace-nowrap">Über 20 Jahre Erfahrung</span>{'\u00A0'}·{' '}
-        <span className="whitespace-nowrap">über 60.000 Einsätze</span>
+        Über 20 Jahre Erfahrung
+        <br />
+        Über 60.000 Einsätze
       </p>
     </div>
   );

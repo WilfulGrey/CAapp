@@ -190,17 +190,15 @@ describe('KompaktEinleitung', () => {
 });
 
 describe('KompaktTestsieger', () => {
-  it('Siegel, „6× Testsieger DIE WELT" fett, darunter Erfahrung und Einsätze', () => {
+  it('Siegel, „6× Testsieger DIE WELT" fett, darunter Erfahrung und Einsätze als zwei Zeilen ohne „·"', () => {
     const { container } = render(<KompaktTestsieger />);
     expect(screen.getByRole('img', { name: 'Testsieger DIE WELT' }).getAttribute('src')).toBe('/badge-testsieger.webp');
     const titel = container.querySelector('b')!;
     expect(titel.textContent).toBe('6× Testsieger DIE WELT');
     const absatz = container.querySelector('p')!;
-    expect(absatz.textContent!.replace(/\u00A0/g, ' ')).toBe('6× Testsieger DIE WELTÜber 20 Jahre Erfahrung · über 60.000 Einsätze');
-    // Umbruch nur nach „·": beide Hälften als Ganzes.
-    for (const teil of ['Über 20 Jahre Erfahrung', 'über 60.000 Einsätze']) {
-      expect(within(absatz).getByText(teil).className).toContain('whitespace-nowrap');
-    }
+    expect(absatz.textContent).toBe('6× Testsieger DIE WELTÜber 20 Jahre ErfahrungÜber 60.000 Einsätze');
+    expect(absatz.querySelectorAll('br')).toHaveLength(2);
+    expect(absatz.textContent).not.toContain('·');
   });
 });
 

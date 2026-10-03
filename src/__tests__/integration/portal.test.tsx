@@ -532,7 +532,7 @@ describe('Portal integration: golden paths', () => {
     const testsieger = inKarte.getByText(/^6× Testsieger/);
     expect(testsieger.tagName).toBe('B');
     expect(text(testsieger)).toBe('6× Testsieger DIE WELT');
-    expect(text(testsieger.parentElement!)).toBe('6× Testsieger DIE WELTÜber 20 Jahre Erfahrung · über 60.000 Einsätze');
+    expect(text(testsieger.parentElement!)).toBe('6× Testsieger DIE WELTÜber 20 Jahre ErfahrungÜber 60.000 Einsätze');
     expect(inKarte.queryByText(/Preis & Qualität/)).toBeNull();
     expect(inKarte.queryByRole('img', { name: /Bestpreisgarantie/ })).toBeNull();
     const sterne = await within(karte).findByRole('link', { name: /4,9 von 5 aus 126 Bewertungen/ }, { timeout: 5000 });
