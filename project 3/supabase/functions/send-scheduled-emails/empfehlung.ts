@@ -40,7 +40,7 @@
  * Ändert sich dort die Reihenfolge, muss sie hier mit.
  */
 
-import { mAbstand, mKopfKarte, mProfil, mProfilText, type PflegekraftDaten } from "./mailBausteine.ts";
+import { mAbstand, mEyebrow, mKopfKarte, mProfil, mProfilText, mProfilZeile, type PflegekraftDaten } from "./mailBausteine.ts";
 
 // ─── Formen aus mamamia (nur was wir wirklich lesen) ─────────────────────
 
@@ -127,6 +127,9 @@ export interface EmpfehlungErgebnis {
   empfehlung: Empfehlung;
   /** Wie viele Kräfte der Kunde im Portal insgesamt sieht (inkl. Empfehlung), max. 5. */
   sichtbarGesamt: number;
+  /** Alle sichtbaren Kräfte in Portal-Reihenfolge, die Empfehlung zuerst — für die Köpfe
+   *  unter dem Knopf der Angebotsmail (Martin 03.10.2026). Ohne Zusatzaufruf an mamamia. */
+  alle?: Empfehlung[];
 }
 
 // ─── Badge / Stufe — Kopie aus src/lib/mamamia/badge.ts ──────────────────
@@ -707,7 +710,9 @@ export async function holeEmpfehlung(deps: HoleDeps): Promise<EmpfehlungErgebnis
       console.warn("[empfehlung] getCaregiver fehlgeschlagen:", e instanceof Error ? e.message : String(e));
     }
 
-    return baueEmpfehlung(fuenf[0], extra, deps.formularDaten, fuenf.length, now);
+    const erg = baueEmpfehlung(fuenf[0], extra, deps.formularDaten, fuenf.length, now);
+    const weitere = fuenf.slice(1).map((m) => baueEmpfehlung(m, null, deps.formularDaten, fuenf.length, now).empfehlung);
+    return { ...erg, alle: [erg.empfehlung, ...weitere] };
   } catch (e) {
     console.warn("[empfehlung] nicht verfügbar:", e instanceof Error ? e.message : String(e));
     return null;
@@ -1150,6 +1155,15 @@ export function fuenfListeHtml(
   const profile = fuenf.map((e, i) => mProfil(pkDatenAus(e, cids[i] ?? null), profilUrls[i] ?? alleUrl, i < n - 1 ? 12 : 0)).join("");
   return `${mAbstand(6)}${mKopfKarte(esc(kopf), "neutral", profile, 12)}
     <p style="margin:0 0 24px;text-align:center;"><a href="${alleUrl}" target="_blank" style="color:#8B7355;text-decoration:underline;font-size:14.5px;font-weight:700;">Alle ${n === 1 ? "Profile" : n + " Profile"} im Portal ansehen &rarr;</a></p>`;
+}
+
+/** Fünf-Liste kompakt (Vorschlag 03.10.2026): Zeilen statt großer Profile, ohne Rahmenkarte. */
+export function fuenfListeKompaktHtml(fuenf: Empfehlung[], cids: (string | null)[], profilUrls: string[], alleUrl: string, kopf = "Passend zu Ihrer Anfrage"): string {
+  if (fuenf.length === 0) return "";
+  const n = fuenf.length;
+  const zeilen = fuenf.map((e, i) => mProfilZeile(pkDatenAus(e, cids[i] ?? null), profilUrls[i] ?? alleUrl, i < n - 1 ? 8 : 0)).join("");
+  return `${mEyebrow(esc(kopf), 10)}${zeilen}
+    <p style="margin:12px 0 24px;text-align:center;"><a href="${alleUrl}" target="_blank" style="color:#8B7355;text-decoration:underline;font-size:14.5px;font-weight:700;">Alle ${n === 1 ? "Profile" : n + " Profile"} im Portal ansehen &rarr;</a></p>`;
 }
 
 export function fuenfListeText(fuenf: Empfehlung[], profilUrls: string[], alleUrl: string): string {

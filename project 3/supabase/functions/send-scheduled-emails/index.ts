@@ -74,7 +74,7 @@ import { testphaseUmleitung } from "./testphase.ts";
 import {
   holeEmpfehlung,
   stufenWort,
-  type EmpfehlungErgebnis, holeFuenf, fuenfListeHtml, fuenfListeText, fotoBudget,
+  type EmpfehlungErgebnis, holeFuenf, fuenfListeKompaktHtml, fuenfListeText, fotoBudget,
   holeFuenfStreng, esc } from "./empfehlung.ts";
 import {
   kraefteNochmalUm,
@@ -1071,7 +1071,8 @@ async function fuenfFuerNudge(
   const profilUrls = erg.fuenf.map((e) => withMailMark(`${basisUrl}&cg=${e.caregiverId}`, "pn1"));
   const alleUrl = withMailMark(buildPortalUrl(portalBase, tok, "matches"), "pn1");
   return {
-    html: fuenfListeHtml(erg.fuenf, inlines.map((r) => r?.cid ?? null), profilUrls, alleUrl, "Passend zu Ihrer Anfrage"),
+    // Kompakte Zeilen statt großer Profile (Vorschlag 03.10.2026, Martin: „ganz kompakt").
+    html: fuenfListeKompaktHtml(erg.fuenf, inlines.map((r) => r?.cid ?? null), profilUrls, alleUrl, "Passend zu Ihrer Anfrage"),
     text: fuenfListeText(erg.fuenf, profilUrls, alleUrl).replace("FÜR SIE VORBEREITET", "PASSEND ZU IHRER ANFRAGE"),
     anzahl: erg.fuenf.length,
     vornamen: erg.fuenf.map((e) => e.vorname),
@@ -1101,7 +1102,7 @@ type InlineFoto = { filename: string; content: Uint8Array; contentType: string; 
  *  fuenfFuerNudge). Schreibt nichts; der lead_events-Eintrag bleibt beim Versand. */
 async function empfehlungFuerAngebot(
   lead: Lead, supabaseUrl: string, key: string, darfOnboarden: boolean,
-): Promise<{ erg: EmpfehlungErgebnis; inline: InlineFoto | null } | null> {
+): Promise<{ erg: EmpfehlungErgebnis; inline: InlineFoto | null; weitere: (InlineFoto | null)[] } | null> {
   if (!lead.token) return null;
   const erg = await holeEmpfehlung({
     supabaseUrl, key, token: lead.token,
@@ -1110,12 +1111,16 @@ async function empfehlungFuerAngebot(
     darfOnboarden,
   });
   if (!erg) return null;
-  return { erg, inline: await fetchInlinePhotoDeno(erg.empfehlung.fotoUrl) };
+  // Köpfe unter dem Knopf (Martin 03.10.2026): die Fotos der übrigen Kräfte, im selben
+  // Budget wie die Fünf-Liste der Nudge-Mail; was nicht passt, wird zu Initialen.
+  const [inline, ...roh] = await Promise.all([erg.empfehlung, ...(erg.alle ?? []).slice(1)].map((e) => fetchInlinePhotoDeno(e.fotoUrl)));
+  const darf = fotoBudget(roh.map((r) => r?.content.length ?? null), 300_000, 1_200_000 - (inline?.content.length ?? 0));
+  return { erg, inline, weitere: roh.map((r, n) => (r && darf[n]) ? r : null) };
 }
 
 /** Eingaben der Angebotsmail aus dem Lead. */
 function angebotEingabe(
-  lead: Lead, resubmit: boolean, empf: { erg: EmpfehlungErgebnis; inline: InlineFoto | null } | null,
+  lead: Lead, resubmit: boolean, empf: { erg: EmpfehlungErgebnis; inline: InlineFoto | null; weitere: (InlineFoto | null)[] } | null,
 ): AngebotEingabe {
   const herkunft = portalHerkunft(lead.source);
   /* Welche Felder WIR gesetzt haben, legt api/portal-lead in der Kalkulation ab. Fehlt die
@@ -1131,7 +1136,13 @@ function angebotEingabe(
       ? { html: portalAngabenHinweisHtml(herkunft, angenommen), text: portalAngabenHinweisText(herkunft, angenommen) }
       : null,
     resubmit,
-    empfehlung: empf ? { e: empf.erg.empfehlung, cid: empf.inline?.cid ?? null, sichtbar: empf.erg.sichtbarGesamt } : null,
+    empfehlung: empf ? {
+      e: empf.erg.empfehlung, cid: empf.inline?.cid ?? null, sichtbar: empf.erg.sichtbarGesamt,
+      koepfe: (empf.erg.alle ?? [empf.erg.empfehlung]).map((e, n) => {
+        const foto = n === 0 ? empf.inline : empf.weitere[n - 1] ?? null;
+        return { foto: foto ? `cid:${foto.cid}` : null, name: e.anzeigeName };
+      }),
+    } : null,
   };
 }
 
@@ -2217,6 +2228,8 @@ Deno.serve(async (req: Request) => {
           );
           if (empf) {
             if (empf.inline) (scheduledEmail as any).__reminderInline = empf.inline;
+            const weitere = empf.weitere.filter((r): r is InlineFoto => r !== null);
+            if (weitere.length) (scheduledEmail as any).__inlineAttachments = weitere;
             await supabase.from("lead_events").insert({
               lead_id: scheduledEmail.lead_id,
               event_type: "empfehlung_in_angebotsmail",
@@ -2225,6 +2238,7 @@ Deno.serve(async (req: Request) => {
                 sichtbar_gesamt: empf.erg.sichtbarGesamt,
                 gruende: empf.erg.empfehlung.gruende,
                 foto: empf.inline ? "inline" : "initialen",
+                koepfe_fotos: (empf.inline ? 1 : 0) + weitere.length,
               },
             });
           }
