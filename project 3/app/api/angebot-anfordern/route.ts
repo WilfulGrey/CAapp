@@ -299,12 +299,13 @@ async function handlePost(request: NextRequest) {
     }
 
     // Social-Zuordnung (Registry #112): kam die NEUE Anfrage über einen Beitrag
-    // des Content-Loops, erfährt dieser „Anfrage zu Variante X“ — ohne
-    // Personendaten (lib/sozial-zuordnung-server.ts). Wiederholte Anfragen
-    // eines bestehenden Leads zählen nicht. Fire-and-forget wie die Mails;
-    // ohne SOZIAL_ZUORDNUNG_* (Staging, lokal) geht nichts raus.
+    // des Content-Loops, erfährt dieser „Anfrage zu Variante X“ — nur Variante,
+    // Beitrag, Plattform und Datum (lib/sozial-zuordnung-server.ts), nichts vom
+    // Lead. Wiederholte Anfragen eines bestehenden Leads zählen nicht. Im
+    // Hintergrund wie die Mails, ein Versuch, höchstens 3 s; Lead, Mails und
+    // Antwort hängen nicht davon ab. Ohne SOZIAL_ZUORDNUNG_* geht nichts raus.
     if (sozial && (isNew || isUpgrade)) {
-      anContentLoopMelden({ ereignis: 'anfrage', herkunft: sozial, leadId: lead.id })
+      anfrageAnContentLoop(sozial)
         .catch((e) => console.error('sozial-zuordnung threw:', e instanceof Error ? e.message : String(e)));
     }
 
@@ -409,7 +410,7 @@ import { withMem } from '@/lib/memlog';
 import { PORTAL_BASIS } from '@/lib/portal-url';
 import { kundenEmpfaenger } from '@/lib/empfaenger';
 import { sozialBereinigen } from '@/lib/sozial-zuordnung';
-import { anContentLoopMelden } from '@/lib/sozial-zuordnung-server';
+import { anfrageAnContentLoop } from '@/lib/sozial-zuordnung-server';
 
 /* Was vom Client-`adParams` (sessionStorage `_prim_ad_params`) den Lead
    erreichen darf: Google-Klick-IDs für den Offline-Import, die

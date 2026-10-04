@@ -1,25 +1,23 @@
 /**
- * Social-Zuordnung: Beitrag → Besuch → Anfrage (Registry #112, 04.10.2026).
+ * Social-Zuordnung: Beitrag → Anfrage (Registry #112, 04.10.2026, schlanke Fassung).
  *
  * Der Content-Loop (eigenes Supabase-Projekt, PM-SEO-repo docs/v1/ATTRIBUTION.md)
  * verlinkt Instagram- und Facebook-Beiträge über seine Klick-Weiterleitung hierher:
  *   /?utm_source=instagram|facebook&utm_medium=social&utm_campaign=…
  *     &utm_content=<variante>&content_id=<beitrag>&variant_id=<variante>&start=1
- * Für den Variantenvergleich braucht er je Variante zwei Zahlen aus dem Rechner:
- * Besuche (Seite geladen) und Anfragen (Lead neu angelegt).
+ * Er braucht aus dem Rechner nur eine Zahl je Variante: Anfragen (Lead neu angelegt).
+ * Besuche meldet der Rechner nicht — die Klicks der Weiterleitung sind die Näherung.
  *
  * Regeln wie beim anonymen Zähler (lib/zaehler.ts, Registry #63):
  *  - Die Werte beschreiben den Beitrag, nicht die Person: jeder Besucher derselben
  *    Variante bringt dieselben Werte mit.
  *  - Kein Browser-Speicher (kein Cookie, kein local-/sessionStorage). Gelesen wird
- *    nur die Adresse, gehalten im Arbeitsspeicher der Seite. Der Rechner ändert die
- *    Adresse nicht, nach einem Neuladen steht der Wert also wieder dort.
- *  - Der Browser schickt nur an die eigene Domain (SOZIAL_PFAD). Erst der Server
- *    meldet an den Content-Loop (lib/sozial-zuordnung-server.ts).
+ *    nur die Adresse, gehalten im Arbeitsspeicher der Seite.
+ *  - Der Browser schickt nichts zusätzlich: die Herkunft reist im Feld `sozial` mit
+ *    der ohnehin abgeschickten Anfrage. Erst der Server meldet an den Content-Loop
+ *    (lib/sozial-zuordnung-server.ts).
  * Dieses Modul darf nie um ein Feld erweitert werden, das eine Person erkennbar macht.
  */
-
-export const SOZIAL_PFAD = '/api/sozial-zuordnung';
 
 export const SOZIAL_PLATTFORMEN = ['instagram', 'facebook'] as const;
 export type SozialPlattform = (typeof SOZIAL_PLATTFORMEN)[number];
@@ -47,7 +45,7 @@ export function sozialAusSuche(search: string): SozialHerkunft | null {
   return { variante, beitrag: BEITRAG.test(beitrag) ? beitrag : null, plattform };
 }
 
-/** Prüft, was der Browser schickt (Besuchs-Route, Lead-Absenden). Nur die drei Felder, sonst null. */
+/** Prüft auf dem Server, was der Browser im Feld `sozial` schickt. Nur die drei Felder, sonst null. */
 export function sozialBereinigen(roh: unknown): SozialHerkunft | null {
   if (!roh || typeof roh !== 'object' || Array.isArray(roh)) return null;
   const o = roh as Record<string, unknown>;
@@ -59,7 +57,6 @@ export function sozialBereinigen(roh: unknown): SozialHerkunft | null {
 }
 
 let gemerkt: SozialHerkunft | null = null;
-let besuchGemeldet = false;
 
 /** Herkunft dieses Seitenaufrufs: beim ersten Treffer aus der Adresse, danach aus dem Arbeitsspeicher. */
 export function sozialHerkunft(search: string = typeof window !== 'undefined' ? window.location.search : ''): SozialHerkunft | null {
@@ -67,34 +64,7 @@ export function sozialHerkunft(search: string = typeof window !== 'undefined' ? 
   return gemerkt;
 }
 
-type Sender = { sendBeacon?: (url: string, data: Blob) => boolean; fetch?: typeof fetch };
-
-function browserSender(): Sender {
-  if (typeof navigator === 'undefined') return {};
-  return {
-    sendBeacon: navigator.sendBeacon?.bind(navigator),
-    fetch: typeof fetch === 'function' ? fetch.bind(globalThis) : undefined,
-  };
-}
-
-/** Meldet den Besuch einmal je Seitenaufruf, nur bei Social-Herkunft. Überlebt Navigation (sendBeacon / keepalive). */
-export function meldeSozialBesuch(sender: Sender = browserSender(), search?: string): boolean {
-  if (besuchGemeldet) return false;
-  const herkunft = sozialHerkunft(search);
-  if (!herkunft) return false;
-  besuchGemeldet = true;
-  const body = JSON.stringify({ ereignis: 'besuch', ...herkunft });
-  try {
-    if (sender.sendBeacon?.(SOZIAL_PFAD, new Blob([body], { type: 'application/json' }))) return true;
-    sender.fetch?.(SOZIAL_PFAD, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body, keepalive: true }).catch(() => {});
-    return true;
-  } catch {
-    return false;
-  }
-}
-
 /** Nur für Tests: Arbeitsspeicher zurücksetzen. */
 export function sozialZuruecksetzen(): void {
   gemerkt = null;
-  besuchGemeldet = false;
 }

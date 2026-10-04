@@ -172,11 +172,10 @@ a patient form w CAapp dopełnia później):
 Kommt der Besucher über einen Beitrag des Content-Loops (`utm_medium=social`,
 `utm_source=instagram|facebook`, `variant_id`, `content_id`), liest
 `lib/sozial-zuordnung.ts` daraus `{variante, beitrag, plattform}`, hält es nur im
-Arbeitsspeicher und meldet den Besuch einmal je Seitenaufruf an
-`POST /api/sozial-zuordnung` (eigene Domain, immer 204). Die Route meldet ihn an den
-Content-Loop weiter (`lib/sozial-zuordnung-server.ts`); die Anfrage meldet
+Arbeitsspeicher und schickt es beim Absenden im Feld `sozial` mit. Besuche werden
+nicht gemeldet, der Browser macht keine zusätzliche Anfrage; die Anfrage meldet
 `/api/angebot-anfordern` (Schritt 4a unten). Kein Browser-Speicher, keine Kennung der
-Person; ohne `SOZIAL_ZUORDNUNG_*` geht nichts raus.
+Person; ohne `SOZIAL_ZUORDNUNG_URL` + `SOZIAL_ZUORDNUNG_SCHLUESSEL` geht nichts raus.
 
 ### Submit kalkulatora
 
@@ -249,9 +248,11 @@ Content-Type: application/json
    przyszło zapytanie.
 4a. **Social-Zuordnung (Registry #112):** `body.sozial` (vom Fragebogen, siehe
    „Social-Zuordnung“ oben) prüft `sozialBereinigen`; nur bei neuem Lead (`isNew || isUpgrade`)
-   meldet die Route fire-and-forget „Anfrage“ an den Content-Loop: Variante, Beitrag,
-   Plattform, volle Stunde, `extern_ref` = HMAC-SHA256 der Lead-ID. Keine Lead-ID,
-   keine Kontaktdaten. Wiederholte Anfragen eines bestehenden Leads zählen nicht.
+   meldet die Route im Hintergrund (wie die Mails, ein Versuch, ≤ 3 s) „Anfrage“ an den
+   Content-Loop: `{ereignis:"anfrage", tracking_id, content_id, plattform, tag}` mit
+   `tag` = Datum Europe/Berlin. Keine Lead-ID oder Ableitung, keine Uhrzeit, keine
+   Kontaktdaten. Wiederholte Anfragen eines bestehenden Leads zählen nicht; Lead,
+   Mails und Antwort hängen nicht davon ab.
 5. Build `portalUrl = ${NEXT_PUBLIC_PORTAL_URL}/?token=<lead.token>`
 
 ### Preis zuerst (Registry #77, 2026-09-17)

@@ -5,7 +5,7 @@ import { useCalculator, formatEuro } from "@/lib/calculator-context";
 import { CircleCheck as CheckCircle2, Phone } from "lucide-react";
 import Image from "next/image";
 import { analytics, variantenSeite, websiteHerkunft } from "@/lib/analytics";
-import { meldeSozialBesuch, sozialHerkunft } from "@/lib/sozial-zuordnung";
+import { sozialHerkunft } from "@/lib/sozial-zuordnung";
 import { cookieConsent } from "@/lib/cookie-consent";
 import { scrollToCalculator, isCalculatorAligned, OPEN_CALCULATOR_EVENT } from "@/lib/scroll-to-calculator";
 import { useFormTracking } from "@/hooks/use-form-tracking";
@@ -1101,10 +1101,11 @@ export function MultiStepForm({ mode = 'inline', bewertung = null }: MultiStepFo
     setFullscreen(true);
   }, [mode]);
 
-  // Social-Beitrag (Registry #112): Besuch einmal je Seitenaufruf an die eigene
-  // Route melden — ohne Kennung der Person, ohne Browser-Speicher.
+  // Social-Beitrag (Registry #112): Herkunft beim Laden aus der Adresse lesen und im
+  // Arbeitsspeicher halten (übersteht einen Seitenwechsel im Rechner). Nur lesen —
+  // keine Anfrage, kein Browser-Speicher; gemeldet wird erst beim Absenden.
   useEffect(() => {
-    meldeSozialBesuch();
+    sozialHerkunft();
   }, []);
 
   // Solange das Overlay offen ist, darf die Seite dahinter nicht mitscrollen —
