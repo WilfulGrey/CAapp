@@ -2,31 +2,28 @@
 // (Vorschlag 03.10.2026 für Martin: „ganz kompakt auf Angebot und passende Pflegekräfte … das ist
 // erledigt, das ist das Angebot, das ist der nächste Schritt, hier sind die Pflegekräfte").
 //
-// Reihenfolge auf der Seite (CustomerPortalPage, `kompakt`), Runde 8 (Geschäftsführung: „Wir haben
-// doch echte Pflegekräfte, daher brauchen wir keine Fake-Box … kurze, schöne und sichere Einleitung
-// zum Angebot, dann Kosten und dann Pflegekräfte. Wenn die Pflegesituation unvollständig ist, dann
-// ein Hinweis."):
-//   Kopf: Begrüßung, „Ihr Angebot zur 24-Stunden-Betreuung", Einleitung (KompaktEinleitung) und eine
-//     Zeile Fakten (KompaktFakten)
-//   → Kostenkarte: Preis, kleine Zeile, Eigenanteil (EigenanteilZeile; „So rechnen wir ›" öffnet die
-//     Aufstellung), die vier Punkte der Startseite, unten Testsieger-Siegel und Sterne (KompaktVertrauen)
-//   → „Für Sie ausgewählt / Ihre passenden Pflegekräfte" (KompaktPflegekraefteBereich) mit dem
-//     Status-Hinweis „Ihre Pflegesituation ist noch nicht vollständig" (hebt sich ab: Koralle-Ton,
-//     Koralle-Rand; das 4-Schritte-Formular klappt darin auf einer weißen Fläche auf), darunter die
-//     echten Profile als Zeilen ohne Knöpfe (KompaktePflegekraefte).
-// Alle anderen Zustände (abgesendet, Bewerbung, gebucht …) bleiben unverändert.
+// Reihenfolge auf der Seite (CustomerPortalPage, `kompakt`), Runde 13 (Geschäftsführung: „überall
+// nur Tags, Überschrift, Tags …" — ruhig; betont sind nur Kostenkarte und Hinweis, sonst Text mit Luft):
+//   Kopf: Begrüßung, „Ihr Angebot zur 24-Stunden-Betreuung", Einleitung (KompaktEinleitung)
+//   → Kostenkarte: Preis, kleine Zeile, Eigenanteil als Text (EigenanteilZeile; „So rechnen wir ›" öffnet
+//     die Aufstellung), Linie, die vier Punkte der Startseite, Linie, Siegel mit Testsieger/Erfahrung
+//     und Sternen (KompaktVertrauen)
+//   → „Ihre passenden Pflegekräfte" (KompaktPflegekraefteBereich) mit dem Hinweis „Ihre Pflegesituation
+//     ist noch nicht vollständig" (dunkles Kopfband, weißer Körper; das 4-Schritte-Formular klappt
+//     darin auf), darunter die echten Profile als schlichte Zeilen (KompaktePflegekraefte).
+// Keine Versalien-Zeilen, keine weiteren Kästen oder Tönungen. Alle anderen Zustände (abgesendet,
+// Bewerbung, gebucht …) bleiben unverändert.
 //
 // Schrift: Fließtext 16 px, kleine Schrift 14 px. Ausnahme 13 px für die dritte Zeile der
 // Pflegekräfte — so bleibt sie bei 390 px einzeilig.
 import { Fragment, useEffect, useRef, type ReactNode } from 'react';
-import { ChevronRight, Info, Sparkles } from 'lucide-react';
+import { ChevronRight, Sparkles } from 'lucide-react';
 import type { Nurse } from '../../types';
 import type { SterneStand } from '../../lib/sterne';
 import { BewertungsZeile } from './BewertungsZeile';
 import { DeutschPunkte } from './PflegekraftProfil';
 import { displayName, initials } from './shared';
 import { Button } from '../ui/Button';
-import { Card } from '../ui/Card';
 import { SectionHeader } from '../ui/SectionHeader';
 
 /**
@@ -44,44 +41,36 @@ export function KompaktEinleitung() {
   );
 }
 
-/** Die Fakten unter der Einleitung (Runde 12, Wortlaut der Geschäftsführung). */
-export const FAKTEN = ['Über 20 Jahre Erfahrung', 'Täglich kündbar', '6× in Folge Testsieger DIE WELT'] as const;
+/** Die erste Zeile neben dem Siegel unten in der Kostenkarte (Runde 13, Wortlaut der Geschäftsführung). */
+export const VERTRAUEN = ['6× in Folge Testsieger DIE WELT', 'über 20 Jahre Erfahrung'] as const;
 
 /**
- * EINE Zeile Fakten unter der Einleitung (Runde 12): nicht klein (15 px, halbfett, Taupe), jeder
- * Punkt bleibt ganz, umbrochen wird nur zwischen den Punkten. Der Trenner „·" sitzt VOR jedem Punkt
- * im Abstand davor; am Zeilenanfang liegt er links außerhalb und wird abgeschnitten — so steht nie
- * ein „·" am Zeilenende oder -anfang. Bei 360–390 px: „Über 20 Jahre Erfahrung · Täglich kündbar" /
- * „6× in Folge Testsieger DIE WELT".
- */
-export function KompaktFakten() {
-  return (
-    <div className="mt-2.5 overflow-hidden">
-      <ul className="-ml-5 flex flex-wrap gap-y-0.5 text-[15px] font-semibold leading-snug text-pm-taupe-ink">
-        {FAKTEN.map((fakt) => (
-          <li
-            key={fakt}
-            className="relative whitespace-nowrap pl-5 before:absolute before:left-[7px] before:font-normal before:text-pm-taupe before:content-['·']"
-          >
-            {fakt}
-          </li>
-        ))}
-      </ul>
-    </div>
-  );
-}
-
-/**
- * Unten in der Kostenkarte (Runde 12): eine ruhige Zeile mit dem kleinen Testsieger-Siegel und den
- * Sternen wie auf der Startseite. Höhe reserviert, damit nichts springt, wenn der Stand später kommt;
- * ohne Stand bleibt nur das Siegel.
+ * Unten in der Kostenkarte (Runde 13): EINE ruhige Zeile — kleines Testsieger-Siegel, daneben
+ * „6× in Folge Testsieger DIE WELT · über 20 Jahre Erfahrung" und die Sterne wie auf der Startseite.
+ * Die Teile bleiben ganz, umbrochen wird nur zwischen ihnen; der Trenner „·" sitzt vor dem Teil und
+ * wird am Zeilenanfang abgeschnitten (nie ein Punkt am Zeilenende). In der schmalen Spalte stehen
+ * die beiden Teile untereinander. Höhe der Sterne reserviert (ohne Stand keine Sterne).
  */
 export function KompaktVertrauen({ sterne }: { sterne: SterneStand | null }) {
   return (
-    <div className="mt-3.5 border-t border-pm-line-soft pt-3">
-      <div className="flex h-7 items-center gap-2">
-        <img src="/badge-testsieger.webp" alt="" className="h-7 w-auto flex-none object-contain" />
-        <BewertungsZeile stand={sterne} klein className="-my-2" />
+    <div className="mt-4 flex items-center gap-2.5 border-t border-pm-line-soft pt-4">
+      <img src="/badge-testsieger.webp" alt="" className="h-11 w-auto flex-none object-contain" />
+      <div className="min-w-0">
+        <div className="overflow-hidden">
+          <ul className="-ml-4 flex flex-wrap text-[13.5px] leading-snug">
+            {VERTRAUEN.map((teil, k) => (
+              <li
+                key={teil}
+                className={`relative whitespace-nowrap pl-4 before:absolute before:left-[5px] before:font-normal before:text-pm-mute before:content-['·'] ${k === 0 ? 'font-semibold text-pm-ink' : 'text-pm-muted'}`}
+              >
+                {teil}
+              </li>
+            ))}
+          </ul>
+        </div>
+        <div className="flex h-6 items-center">
+          <BewertungsZeile stand={sterne} klein className="-my-2.5" />
+        </div>
       </div>
     </div>
   );
@@ -104,7 +93,7 @@ export function aufzaehlung(teile: string[]): string {
 }
 
 /**
- * Eigenanteil direkt unter dem Preis (Runde 4), leicht grün hinterlegt. Gerechnet wird hier
+ * Eigenanteil direkt unter dem Preis (Runde 4; seit Runde 13 schlichter Text, kein grüner Kasten). Gerechnet wird hier
  * NICHTS: Betrag und Posten kommen aus derselben Rechnung wie die Aufstellung „Was bleibt für Sie
  * übrig → Ihr Eigenanteil" (CustomerPortalPage `eigenanteil`/`zuschussPosten`). Genannt werden nur
  * Posten, die den Betrag wirklich senken; „So rechnen wir ›" öffnet die Aufstellung.
@@ -116,7 +105,7 @@ export function EigenanteilZeile({ betrag, posten, onRechnung }: {
   onRechnung: () => void;
 }) {
   return (
-    <div className="mt-3 rounded-[14px] bg-pm-mint px-3 py-2.5">
+    <div className="mt-3.5">
       <p className="text-[16px] leading-snug text-pm-ink">
         {/* Zu schmal (360 px): Umbruch nach „Ihr Eigenanteil:", der Betrag bleibt zusammen. */}
         Ihr Eigenanteil:{' '}
@@ -137,7 +126,7 @@ export function EigenanteilZeile({ betrag, posten, onRechnung }: {
 }
 
 /**
- * Pflegekräfte-Bereich (Runde 8): Kopf „Für Sie ausgewählt / Ihre passenden Pflegekräfte", darunter
+ * Pflegekräfte-Bereich (Runde 8; seit Runde 13 ohne Versalien-Zeile): Kopf „Ihre passenden Pflegekräfte", darunter
  * der Status-Hinweis „Ihre Pflegesituation ist noch nicht vollständig" (Runde 12; ruhig, kein
  * Fehler-Rot) — im Kompakt-Einstieg ist die Pflegesituation per Definition noch nicht abgeschickt,
  * also steht er hier immer — dann die echten Profile (`liste`).
@@ -171,48 +160,47 @@ export function KompaktPflegekraefteBereich({ aktiv, offen, onOeffnen, onImBlick
       <div id="pflegekraefte" className="px-1" style={{ scrollMarginTop: 72 }}>
         <SectionHeader
           id="pflegekraefte-titel"
-          eyebrow="Für Sie ausgewählt"
           titel="Ihre passenden Pflegekräfte"
           // Bei 360 px zweizeilig: „Ihren Angaben." bleibt zusammen.
           zeile={<>Echte Profile, ausgewählt nach <span className="whitespace-nowrap">Ihren Angaben.</span></>}
         />
       </div>
-      {/* Hülle trägt id und Ref. Look A (Runde 12, „Text und Formularkasten ist gleich"): hebt sich klar
-          vom Seitentext ab — Koralle-Ton, 2 px Koralle-Rand, Schatten; offen liegt das Formular auf einer
-          weißen Innenfläche (px-5, damit die mitlaufende Knopfleiste bündig bleibt). */}
-      <div ref={hinweis} id="patientendaten" className="mt-4 scroll-mt-16">
-      <div className="rounded-card border-2 border-pm-coral bg-pm-coral-tint px-5 pb-4 pt-4 shadow-lift">
-        <p className="flex items-center gap-1.5 text-[13px] font-semibold text-pm-taupe-ink">
-          <Info className="h-4 w-4 flex-none" aria-hidden="true" />
-          Hinweis
-        </p>
+      {/* Hülle trägt id und Ref. Look B (Runde 13, Wahl der Geschäftsführung): dunkles Kopfband mit dem
+          Titel in Weiß, weißer Körper, kräftiger Rand — hebt sich klar vom Seitentext ab, auch offen.
+          Der Kasten selbst ist dunkel, nur der Körper weiß: So entsteht an den runden Ecken keine helle
+          Haarlinie zwischen Rand und Band (Kantenglättung). */}
+      <div ref={hinweis} id="patientendaten" className="mt-5 scroll-mt-16">
+      <div className="rounded-card border-2 border-pm-taupe-ink bg-pm-taupe-ink shadow-lift">
         {/* Letzte Wortpaare bleiben zusammen (kein Wort allein in der letzten Zeile). */}
-        <p className="mt-1 text-[17.5px] font-extrabold leading-[1.25] text-pm-ink">
+        <p className="px-5 py-3.5 text-[17.5px] font-extrabold leading-[1.25] text-white">
           Ihre Pflegesituation ist noch <span className="whitespace-nowrap">nicht vollständig</span>
         </p>
-        <p className="mt-1.5 text-[14.5px] leading-[1.5] text-pm-muted">
-          Deshalb können Sie diese Pflegekräfte noch nicht einladen und noch keine{' '}
-          <span className="whitespace-nowrap">Bewerbungen erhalten.</span>
-        </p>
-        {offen ? (
-          <div className="-mx-3 mt-4 rounded-[16px] bg-white px-5">{children}</div>
-        ) : (
-          <>
-            {/* Gestaffelte Schrift: Der Knopftext braucht bei 17 px 291 px, bei 360 px sind 272 frei. */}
-            <Button breit onClick={onOeffnen} className="mt-3.5 !px-2">
-              <span className="whitespace-nowrap text-[15.5px] min-[375px]:text-[16px] min-[390px]:text-[17px]">
-                Pflegesituation vervollständigen →
-              </span>
-            </Button>
-            <p className="mt-2.5 text-[13px] leading-snug text-pm-muted">
-              Vieles ist schon ausgefüllt. Unverbindlich: Ein Vertrag entsteht erst, wenn Sie ein Angebot{' '}
-              <span className="whitespace-nowrap">ausdrücklich annehmen.</span>
-            </p>
-          </>
-        )}
+        <div className="rounded-b-[18px] bg-white px-5 pb-4 pt-3.5">
+          <p className="text-[14.5px] leading-[1.5] text-pm-muted">
+            Deshalb können Sie diese Pflegekräfte noch nicht einladen und noch keine{' '}
+            <span className="whitespace-nowrap">Bewerbungen erhalten.</span>
+          </p>
+          {offen ? (
+            // Das Formular im weißen Körper, durch eine Linie vom Text getrennt (px-5 → Knopfleiste bündig).
+            <div className="mt-4 border-t border-pm-line-soft">{children}</div>
+          ) : (
+            <>
+              {/* Gestaffelte Schrift: Der Knopftext braucht bei 17 px 291 px, bei 360 px sind 272 frei. */}
+              <Button breit onClick={onOeffnen} className="mt-3.5 !px-2">
+                <span className="whitespace-nowrap text-[15.5px] min-[375px]:text-[16px] min-[390px]:text-[17px]">
+                  Pflegesituation vervollständigen →
+                </span>
+              </Button>
+              <p className="mt-2.5 text-[13px] leading-snug text-pm-muted">
+                Vieles ist schon ausgefüllt. Unverbindlich: Ein Vertrag entsteht erst, wenn Sie ein Angebot{' '}
+                <span className="whitespace-nowrap">ausdrücklich annehmen.</span>
+              </p>
+            </>
+          )}
+        </div>
       </div>
       </div>
-      <div className="mt-4">{liste}</div>
+      <div className="mt-6">{liste}</div>
     </section>
   );
 }
@@ -220,7 +208,8 @@ export function KompaktPflegekraefteBereich({ aktiv, offen, onOeffnen, onImBlick
 /**
  * Die echten Profile als Zeilen: Foto, Name und Alter, Deutsch mit Punkten, Erfahrung und Einsätze
  * bei uns. Keine Knöpfe — die ganze Zeile öffnet das Profil (wie „Profil ansehen"). Ohne eigene
- * Überschrift: Der Kopf „Ihre passenden Pflegekräfte" steht im Bereich darüber (Runde 8).
+ * Überschrift: Der Kopf „Ihre passenden Pflegekräfte" steht im Bereich darüber (Runde 8). Seit
+ * Runde 13 ohne Karte: schlichte Zeilen mit dünnen Linien auf dem Seitengrund.
  */
 export function KompaktePflegekraefte({ eintraege, laedt, alleBearbeitet, keineVorschlaege, onProfil, telefonHref }: {
   /** Sichtbare Vorschläge in Anzeige-Reihenfolge (Empfehlung zuerst); `i` = Index für `openNurseFromMatch`. */
@@ -237,26 +226,26 @@ export function KompaktePflegekraefte({ eintraege, laedt, alleBearbeitet, keineV
   return (
     <>
       {laedt ? (
-        <Card className="px-5 py-8 text-center">
+        <div className="px-5 py-8 text-center">
           <div className="mb-3 inline-block h-6 w-6 animate-spin rounded-full border-2 border-pm-chip border-t-transparent" />
           <p className="text-[16px] font-semibold text-pm-ink">Wir laden Ihre Pflegekräfte …</p>
           <p className="mt-1 text-[14px] leading-relaxed text-pm-muted">Einen Moment bitte — gleich sehen Sie Ihre persönlichen Vorschläge.</p>
-        </Card>
+        </div>
       ) : n > 0 ? (
-        <Card className="divide-y divide-pm-line-soft overflow-hidden">
+        <div className="divide-y divide-pm-line">
           {eintraege.map(({ nurse, i }, pos) => (
             <PflegekraftZeile key={nurse.caregiverId ?? i} nurse={nurse} empfohlen={pos === 0} onClick={() => onProfil(nurse, i)} />
           ))}
-        </Card>
+        </div>
       ) : alleBearbeitet ? (
-        <Card className="px-5 py-5 text-center">
+        <div className="px-5 py-5 text-center">
           <p className="text-[16px] font-bold text-pm-ink">Alle aktuellen Vorschläge bearbeitet</p>
           <p className="mt-1 text-[14px] leading-relaxed text-pm-muted">
             Sie haben alle passenden Pflegekräfte durchgesehen. Wir schlagen Ihnen in Kürze weitere vor &mdash; Sie hören von uns.
           </p>
-        </Card>
+        </div>
       ) : keineVorschlaege ? (
-        <Card className="px-5 py-6 text-center">
+        <div className="px-5 py-6 text-center">
           <p className="text-[16px] font-bold text-pm-ink">Gerade keine weiteren Vorschläge</p>
           <p className="mt-1 text-[14px] leading-relaxed text-pm-muted">Neue passende Pflegekräfte erscheinen hier.</p>
           <a
@@ -265,7 +254,7 @@ export function KompaktePflegekraefte({ eintraege, laedt, alleBearbeitet, keineV
           >
             Mit Marta sprechen
           </a>
-        </Card>
+        </div>
       ) : null}
     </>
   );
@@ -291,7 +280,7 @@ export function PflegekraftZeile({ nurse, empfohlen, onClick }: { nurse: Nurse; 
       type="button"
       onClick={onClick}
       aria-label={`Profil von ${name} ansehen`}
-      className="flex w-full items-center gap-2.5 px-3 py-3 text-left transition-colors hover:bg-pm-paper active:bg-pm-paper focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-pm-taupe"
+      className="flex w-full items-center gap-2.5 px-1 py-3.5 text-left transition-colors hover:bg-white/60 active:bg-white/60 focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-pm-taupe"
     >
       {nurse.image ? (
         <img src={nurse.image} alt="" className="h-14 w-14 flex-none rounded-[12px] object-cover" />
@@ -301,8 +290,9 @@ export function PflegekraftZeile({ nurse, empfohlen, onClick }: { nurse: Nurse; 
         </span>
       )}
       <span className="min-w-0 flex-1">
+        {/* Runde 13: Empfehlung als leiser Text, keine Pille. */}
         {empfohlen && (
-          <span className="mb-1 inline-flex items-center gap-1 rounded-full bg-pm-shell px-2 py-[3px] text-[12.5px] font-bold leading-none text-pm-taupe-ink">
+          <span className="mb-1 flex items-center gap-1 text-[12.5px] font-semibold leading-none text-pm-taupe-ink">
             <Sparkles className="h-3 w-3 flex-none" aria-hidden="true" />
             Unsere Empfehlung
           </span>

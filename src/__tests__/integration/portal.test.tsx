@@ -444,10 +444,10 @@ describe('Portal integration: golden paths', () => {
   // ─── Kompakt-Einstieg vor dem ersten Absenden (Vorschlag 03.10.2026, KompaktEinstieg.tsx) ────────
   // Ersetzt den Kasten „Noch 2 Minuten“ (Registry #102), die Knöpfe je Karte, den Formularkopf
   // „Jetzt konkrete Bewerbungen erhalten“ und die Liste „So geht es weiter“ (Registry #109).
-  // Runde 8 (Geschäftsführer: „Wir haben doch echte Pflegekräfte … keine Fake-Box"): Einleitung mit
-  // Sternen und Testsieger im Kopf, Kostenkarte mit den vier Punkten, dann „Für Sie ausgewählt /
-  // Ihre passenden Pflegekräfte" mit dem Status-Hinweis „Ihre Pflegesituation ist noch nicht vollständig" (Formular darin)
-  // und den echten Profilen; keine Zusammenfassungskarte, kein „So geht es weiter".
+  // Runde 8 (Geschäftsführer: „Wir haben doch echte Pflegekräfte … keine Fake-Box") bis Runde 13
+  // („ruhig"): Einleitung im Kopf, Kostenkarte (Preis, Eigenanteil als Text, vier Punkte, Siegel mit
+  // Testsieger/Erfahrung und Sternen), dann „Ihre passenden Pflegekräfte" mit dem Status-Hinweis
+  // „Ihre Pflegesituation ist noch nicht vollständig" (Look B, Formular darin) und den echten Profilen.
 
   // Text ohne geschütztes Leerzeichen (vor dem „·“ der Zeile 3 steht eins).
   const text = (el: Element) => (el.textContent ?? '').replace(/ /g, ' ');
@@ -467,11 +467,9 @@ describe('Portal integration: golden paths', () => {
     expect(einleitung.textContent).toBe(
       'Ihr Angebot umfasst eine Rund-um-Betreuung zu Hause durch bei uns angestellte, sozialversicherte Betreuungskräfte. Um Anreise, Wechsel und Ersatz bei Ausfall kümmern wir uns.',
     );
-    // Runde 12: darunter EINE Zeile Fakten — kein Knopf, keine Haken, kein Siegel, keine Sterne im Kopf.
+    // Runde 13: im Kopf nur die Einleitung — keine Fakten-Zeile, kein Knopf, keine Haken, kein Siegel, keine Sterne.
     const kopf = titel.parentElement as HTMLElement;
-    expect(within(kopf).getAllByRole('listitem').map((li) => li.textContent)).toEqual([
-      'Über 20 Jahre Erfahrung', 'Täglich kündbar', '6× in Folge Testsieger DIE WELT',
-    ]);
+    expect(within(kopf).queryByRole('list')).toBeNull();
     expect(within(kopf).queryByRole('button')).toBeNull();
     expect(kopf.querySelector('img[src="/badge-testsieger.webp"]')).toBeNull();
     expect(within(kopf).queryByRole('link', { name: /Bewertungen/ })).toBeNull();
@@ -482,11 +480,13 @@ describe('Portal integration: golden paths', () => {
     expect(karte.contains(sterne)).toBe(true);
     expect(einleitung.compareDocumentPosition(karte) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(karte.compareDocumentPosition(bereich) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-    expect(within(bereich).getByText('Für Sie ausgewählt')).toBeInTheDocument();
+    // Runde 13: keine Versalien-Zeilen (weder „Für Sie ausgewählt" noch sichtbar „Ihre Betreuungskosten").
+    expect(screen.queryByText('Für Sie ausgewählt')).toBeNull();
+    expect(screen.getByText('Ihre Betreuungskosten').className).toContain('sr-only');
     expect(text(within(bereich).getByText(/^Echte Profile, ausgewählt nach/))).toBe('Echte Profile, ausgewählt nach Ihren Angaben.');
     const hinweis = document.getElementById('patientendaten')!;
     expect(bereich.contains(hinweis)).toBe(true);
-    expect(within(hinweis).getByText('Hinweis')).toBeInTheDocument();
+    expect(within(hinweis).queryByText('Hinweis')).toBeNull();
     expect(within(hinweis).getByText((_, el) => el?.tagName === 'P' && el.textContent === 'Ihre Pflegesituation ist noch nicht vollständig')).toBeInTheDocument();
     expect(within(hinweis).getByText((_, el) => el?.tagName === 'P' && el.textContent === 'Deshalb können Sie diese Pflegekräfte noch nicht einladen und noch keine Bewerbungen erhalten.')).toBeInTheDocument();
     expect(text(within(hinweis).getByText(/^Vieles ist schon ausgefüllt\./))).toBe('Vieles ist schon ausgefüllt. Unverbindlich: Ein Vertrag entsteht erst, wenn Sie ein Angebot ausdrücklich annehmen.');
@@ -537,10 +537,13 @@ describe('Portal integration: golden paths', () => {
     expect(eigenanteil.compareDocumentPosition(punkt) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(inKarte.getByText('Keine Vermittlungsgebühr')).toBeInTheDocument();
     expect(inKarte.getByText('Täglich kündbar, taggenau abgerechnet')).toBeInTheDocument();
-    // Unten in der Karte (Runde 12): eine Zeile mit Testsieger-Siegel und Sternen, nach den vier Punkten.
+    // Eigenanteil als schlichter Text (Runde 13), kein grüner Kasten.
+    expect(karte.querySelector('.bg-pm-mint')).toBeNull();
+    // Unten in der Karte (Runde 13): Siegel, daneben Testsieger/Erfahrung und die Sterne, nach den vier Punkten.
     const siegel = karte.querySelector('img[src="/badge-testsieger.webp"]')!;
     const sterne = await inKarte.findByRole('link', { name: /4,9 von 5 aus 126 Bewertungen/ }, { timeout: 5000 });
-    expect(siegel.parentElement).toBe(sterne.parentElement);
+    expect(siegel.parentElement!.contains(sterne)).toBe(true);
+    expect(within(siegel.parentElement!).getAllByRole('listitem').map((li) => li.textContent)).toEqual(['6× in Folge Testsieger DIE WELT', 'über 20 Jahre Erfahrung']);
     expect(punkt.compareDocumentPosition(siegel) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     // Weg aus der Karte: „Wir kümmern uns um alles", die Zeile „Alle Kosten im Überblick".
     expect(inKarte.queryByText('Wir kümmern uns um alles')).toBeNull();
@@ -599,9 +602,9 @@ describe('Portal integration: golden paths', () => {
     server.use(...defaultHandlers({ proxy: { listApplications: () => ({ JobOfferApplicationsWithPagination: { total: 0, data: [] } }) } }));
     setLocation(`?token=${TEST_LEAD_TOKEN}`);
     render(<CustomerPortalPage />);
-    // Kopf „Für Sie ausgewählt / Ihre passenden Pflegekräfte"; keine Zahl, keine eigene Überschrift über den Zeilen.
+    // Kopf „Ihre passenden Pflegekräfte" (Runde 13 ohne Versalien-Zeile); keine Zahl, keine eigene Überschrift über den Zeilen.
     const bereich = await screen.findByRole('region', { name: 'Ihre passenden Pflegekräfte' }, { timeout: 5000 });
-    expect(within(bereich).getByText('Für Sie ausgewählt')).toBeInTheDocument();
+    expect(within(bereich).queryByText('Für Sie ausgewählt')).toBeNull();
     expect(screen.queryByRole('heading', { name: 'Die Profile' })).toBeNull();
     // Der Kopf steht sofort, die Zeilen kommen mit den Vorschlägen.
     const zeile = await within(bereich).findByRole('button', { name: 'Profil von Helena K. ansehen' }, { timeout: 5000 });

@@ -79,7 +79,7 @@ import { SoGehtEsWeiter } from '../components/portal/SoGehtEsWeiter';
 import { FaqListe } from '../components/portal/FaqListe';
 import { MartaBox } from '../components/portal/MartaBox';
 import { BewertungsZeile } from '../components/portal/BewertungsZeile';
-import { EigenanteilZeile, KompaktEinleitung, KompaktFakten, KompaktePflegekraefte, KompaktPflegekraefteBereich, KompaktVertrauen } from '../components/portal/KompaktEinstieg';
+import { EigenanteilZeile, KompaktEinleitung, KompaktePflegekraefte, KompaktPflegekraefteBereich, KompaktVertrauen } from '../components/portal/KompaktEinstieg';
 import { Button } from '../components/ui/Button';
 import { Card } from '../components/ui/Card';
 import { SectionHeader, EYEBROW, H2 } from '../components/ui/SectionHeader';
@@ -2655,9 +2655,11 @@ const CustomerPortalPage: FC = () => {
               Angebot" steht im Kopf — der Abschnitt heißt nach seinem Inhalt. Der
               Chevron klappt den ganzen Abschnitt zu, sobald er nur noch Referenz ist
               (Martin: „muss einklappbar sein für spätere Zustände"). */}
-          <Card className={`relative px-5 shadow-lift ${kompakt ? `pt-3.5 ${costsExpanded ? 'pb-0.5' : 'pb-4'}` : 'pt-3 pb-4'}`}>
+          <Card className={`relative px-5 shadow-lift ${kompakt ? `pt-5 ${costsExpanded ? 'pb-0.5' : 'pb-5'}` : 'pt-3 pb-4'}`}>
             {kompakt ? (
-              <p className={EYEBROW}>Ihre Betreuungskosten</p>
+              // Runde 13: keine Versalien-Zeile mehr — die Karte beginnt mit dem Preis; der Name bleibt
+              // für Screenreader.
+              <h2 className="sr-only">Ihre Betreuungskosten</h2>
             ) : (
             <button
               type="button"
@@ -2692,7 +2694,7 @@ const CustomerPortalPage: FC = () => {
                     Voraussetzungen. */}
                   {kompakt ? (
                     <>
-                      <p className="mt-1 flex items-baseline gap-2 whitespace-nowrap">
+                      <p className="flex items-baseline gap-2 whitespace-nowrap">
                         <span className="text-[42px] font-extrabold leading-none tracking-[-0.04em] tabular-nums text-pm-ink">{formatEuro(brutto)}</span>
                         <span className="text-[16px] text-pm-muted">im Monat</span>
                       </p>
@@ -2717,9 +2719,9 @@ const CustomerPortalPage: FC = () => {
                   </p>
                   </>
                   )}
-                  {/* Kompakt-Einstieg: die vier Punkte der Startseite wie überall, darunter (Runde 12) eine
-                      ruhige Zeile mit Testsieger-Siegel und Sternen. */}
-                  {vierPunkte(kompakt ? 'mt-3.5 flex flex-col gap-2' : 'mt-4 flex flex-col gap-2.5')}
+                  {/* Kompakt-Einstieg: dünne Linie, die vier Punkte der Startseite wie überall, dünne Linie,
+                      eine ruhige Zeile mit Testsieger-Siegel, Testsieger/Erfahrung und Sternen (Runde 13). */}
+                  {vierPunkte(kompakt ? 'mt-4 flex flex-col gap-2 border-t border-pm-line-soft pt-4' : 'mt-4 flex flex-col gap-2.5')}
                   {kompakt && <KompaktVertrauen sterne={sterne} />}
                   {!kompakt && kostenErst}
                   {!kompakt && heimVergleich}
@@ -2831,7 +2833,7 @@ const CustomerPortalPage: FC = () => {
                 {eigenanteil !== null && (
                     // id = Sprungziel von „So rechnen wir ›" (Kompakt-Einstieg).
                     <div id="eigenanteil-rechnung" className="mt-2.5 scroll-mt-16 rounded-[16px] bg-pm-paper px-4 py-3.5">
-                      <p className={`${EYEBROW} mb-3`}>Was bleibt für Sie übrig</p>
+                      <p className={kompakt ? 'mb-3 text-[15px] font-semibold text-pm-ink' : `${EYEBROW} mb-3`}>Was bleibt für Sie übrig</p>
                       <div className="space-y-3">
                         <div className="flex items-baseline justify-between gap-4">
                           <span className={`${grund} flex-shrink-0 text-pm-muted`}>Betreuung</span>
@@ -3002,7 +3004,7 @@ const CustomerPortalPage: FC = () => {
     const moreCount = allDone.length - shownDone.length;
     return (
       <div className="space-y-2">
-        <p className="text-[11.5px] font-bold uppercase tracking-[.15em] text-pm-mute px-1">Bereits bearbeitet</p>
+        <p className={kompakt ? 'px-1 text-[15px] font-semibold text-pm-ink' : 'text-[11.5px] font-bold uppercase tracking-[.15em] text-pm-mute px-1'}>Bereits bearbeitet</p>
         {doneApps.map((app) => (
           <AppCardDone key={app.id} app={app} onNurseClick={(n, a) => { setNurseModalApp(a); setSelectedNurse(n); }} onUndo={undoApp} />
         ))}
@@ -3304,14 +3306,9 @@ const CustomerPortalPage: FC = () => {
                   <>Ihr Angebot zur <span className="whitespace-nowrap">24-Stunden-Betreuung</span></>
                 ) : heroCopy.title}
               </h1>
-              {/* Kompakt-Einstieg (Runde 12): Einleitung und EINE Zeile Fakten — kein Knopf, keine Haken
-                  (Geschäftsführung: „warum plötzlich Patientendaten?", „überladen"). */}
-              {kompakt && (
-                <>
-                  <KompaktEinleitung />
-                  <KompaktFakten />
-                </>
-              )}
+              {/* Kompakt-Einstieg (Runde 13, „ruhig"): nur die Einleitung — keine Fakten-Zeile, kein Knopf,
+                  keine Haken. Betont sind auf der Seite nur Kostenkarte und Hinweis. */}
+              {kompakt && <KompaktEinleitung />}
               {/* Offene Bewerbung (Martin 25.09.): Kopf nur Titel + Zeit, direkt
                   danach die Bewerbung; „Angebot prüfen" und die Vorteile der
                   Kostenrechner-Startseite stehen IN der Karte (AppCard `vorteile`). */}
@@ -3698,7 +3695,7 @@ const CustomerPortalPage: FC = () => {
 
       {!hasPending && (
       <div>
-      <div className={`max-w-3xl mx-auto px-3.5 ${kompakt ? 'pt-9' : 'pt-1 pb-4 space-y-4'}`}>
+      <div className={`max-w-3xl mx-auto px-3.5 ${kompakt ? 'pt-10' : 'pt-1 pb-4 space-y-4'}`}>
         {/* ── SECTION: 2 · Patientendaten — der Onboarding-Schritt steht VOR
              den Pflegekräften (vorher lag die Karte zwischen PK-Header und
              PK-Karten — genau die „zwei Kästen"-Verwirrung, Martin 2026-07-12). ── */}

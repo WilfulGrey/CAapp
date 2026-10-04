@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { aufzaehlung, EigenanteilZeile, FAKTEN, KompaktEinleitung, KompaktFakten, KompaktePflegekraefte, KompaktPflegekraefteBereich, KompaktVertrauen, PflegekraftZeile, zuschussKurzname } from '../../components/portal/KompaktEinstieg';
+import { aufzaehlung, EigenanteilZeile, KompaktEinleitung, KompaktePflegekraefte, KompaktPflegekraefteBereich, KompaktVertrauen, PflegekraftZeile, VERTRAUEN, zuschussKurzname } from '../../components/portal/KompaktEinstieg';
 import type { Nurse } from '../../types';
 
 const basis: Nurse = {
@@ -76,7 +76,10 @@ describe('PflegekraftZeile', () => {
       />,
     );
     const zeile = zeileVon('Helena K.');
-    expect(within(zeile).getByText('Unsere Empfehlung')).toBeTruthy();
+    const empfehlung = within(zeile).getByText('Unsere Empfehlung');
+    // Runde 13: leiser Text, keine Pille.
+    expect(empfehlung.className).not.toContain('rounded-full');
+    expect(empfehlung.className).not.toContain('bg-');
     expect(zeile.textContent).not.toMatch(/Deutsch|Erfahrung|Einsätze|, \d/);
     expect(gefuellt(zeile)).toBe(0);
   });
@@ -106,6 +109,10 @@ describe('KompaktePflegekraefte', () => {
     expect(screen.queryByRole('heading')).toBeNull();
     expect(screen.queryByText(/Vor dem Einladen/)).toBeNull();
     expect(screen.getAllByRole('button', { name: /^Profil von / })).toHaveLength(2);
+    // Runde 13: schlichte Zeilen mit Linien, keine Karte.
+    const liste = zeileVon('Helena K.').parentElement!;
+    expect(liste.className).toContain('divide-y');
+    expect(liste.className).not.toContain('rounded-card');
     expect(screen.getAllByText('Unsere Empfehlung')).toHaveLength(1);
     expect(within(zeileVon('Helena K.')).getByText('Unsere Empfehlung')).toBeTruthy();
   });
@@ -134,40 +141,32 @@ describe('KompaktEinleitung', () => {
   });
 });
 
-describe('KompaktFakten', () => {
-  it('eine Zeile Fakten im Wortlaut; jeder Punkt ganz, Trenner nur zwischen Punkten (am Zeilenanfang abgeschnitten)', () => {
-    const { container } = render(<KompaktFakten />);
-    const punkte = screen.getAllByRole('listitem');
-    expect(punkte.map((li) => li.textContent)).toEqual(['Über 20 Jahre Erfahrung', 'Täglich kündbar', '6× in Folge Testsieger DIE WELT']);
-    expect(FAKTEN).toHaveLength(3);
-    for (const li of punkte) {
-      expect(li.className).toContain('whitespace-nowrap');
-      expect(li.className).toContain("before:content-['·']");
-    }
-    // Der Trenner des ersten Punkts einer Zeile liegt links außerhalb und wird abgeschnitten.
-    expect(screen.getByRole('list').className).toContain('-ml-5');
-    expect(container.firstElementChild!.className).toContain('overflow-hidden');
-    // Nicht klein: 15 px, halbfett.
-    expect(screen.getByRole('list').className).toContain('text-[15px]');
-    expect(screen.getByRole('list').className).toContain('font-semibold');
-  });
-});
-
 describe('KompaktVertrauen', () => {
-  it('eine ruhige Zeile: kleines Testsieger-Siegel und die Sterne', () => {
+  it('eine ruhige Zeile: Siegel, daneben „6× in Folge Testsieger DIE WELT · über 20 Jahre Erfahrung" und die Sterne', () => {
     const { container } = render(<KompaktVertrauen sterne={{ schnitt: '4,9', wert: 4.9, anzahl: 126 }} />);
     const siegel = container.querySelector('img')!;
     expect(siegel.getAttribute('src')).toBe('/badge-testsieger.webp');
+    const teile = screen.getAllByRole('listitem');
+    expect(teile.map((li) => li.textContent)).toEqual(['6× in Folge Testsieger DIE WELT', 'über 20 Jahre Erfahrung']);
+    expect(VERTRAUEN).toHaveLength(2);
+    // Teile ganz, Umbruch nur zwischen ihnen; der Trenner sitzt vor dem Teil und wird am Zeilenanfang abgeschnitten.
+    for (const li of teile) {
+      expect(li.className).toContain('whitespace-nowrap');
+      expect(li.className).toContain("before:content-['·']");
+    }
+    expect(screen.getByRole('list').parentElement!.className).toContain('overflow-hidden');
     const sterne = screen.getByRole('link', { name: /4,9 von 5 aus 126 Bewertungen/ });
     expect(sterne.getAttribute('href')).toBe('https://primundus.de/erfahrungen');
-    expect(siegel.parentElement).toBe(sterne.parentElement);
-    expect(screen.queryByRole('list')).toBeNull();
+    expect(siegel.parentElement!.contains(sterne)).toBe(true);
+    // Mit einer dünnen Linie von den Punkten darüber getrennt.
+    expect((container.firstElementChild as HTMLElement).className).toContain('border-t');
   });
 
-  it('ohne Bewertungsstand nur das Siegel', () => {
+  it('ohne Bewertungsstand: Siegel und Testsieger-Zeile, keine Sterne', () => {
     const { container } = render(<KompaktVertrauen sterne={null} />);
     expect(screen.queryByRole('link')).toBeNull();
     expect(container.querySelector('img')).not.toBeNull();
+    expect(screen.getAllByRole('listitem')).toHaveLength(2);
   });
 });
 
@@ -178,18 +177,25 @@ describe('KompaktPflegekraefteBereich', () => {
     const onOeffnen = vi.fn();
     render(<KompaktPflegekraefteBereich {...props} onOeffnen={onOeffnen}><p>Formular</p></KompaktPflegekraefteBereich>);
     const bereich = screen.getByRole('region', { name: 'Ihre passenden Pflegekräfte' });
-    expect(within(bereich).getByText('Für Sie ausgewählt')).toBeTruthy();
+    // Runde 13: keine Versalien-Zeile über der Überschrift.
+    expect(within(bereich).queryByText('Für Sie ausgewählt')).toBeNull();
     expect(within(bereich).getByText(/^Echte Profile, ausgewählt nach/).textContent).toBe('Echte Profile, ausgewählt nach Ihren Angaben.');
     const hinweis = document.getElementById('patientendaten')!;
     // Runde 12: Status-Hinweis statt „Noch 2 Minuten bis zum Einladen".
-    expect(within(hinweis).getByText('Hinweis')).toBeTruthy();
+    expect(within(hinweis).queryByText('Hinweis')).toBeNull();
     expect(within(hinweis).getByText((_, el) => el?.tagName === 'P' && el.textContent === 'Ihre Pflegesituation ist noch nicht vollständig')).toBeTruthy();
     expect(within(hinweis).getByText((_, el) => el?.tagName === 'P' && el.textContent === 'Deshalb können Sie diese Pflegekräfte noch nicht einladen und noch keine Bewerbungen erhalten.')).toBeTruthy();
     expect(screen.queryByText('Noch 2 Minuten bis zum Einladen')).toBeNull();
-    // Look A: hebt sich ab — Koralle-Ton und 2 px Koralle-Rand.
+    // Look B: dunkles Kopfband mit dem Titel in Weiß, weißer Körper, kräftiger Rand.
+    // Der Kasten ist dunkel (Rand + Band ohne helle Naht an den Ecken), nur der Körper ist weiß.
     const rahmen = hinweis.firstElementChild as HTMLElement;
-    expect(rahmen.className).toContain('border-pm-coral');
-    expect(rahmen.className).toContain('bg-pm-coral-tint');
+    expect(rahmen.className).toContain('border-pm-taupe-ink');
+    expect(rahmen.className).toContain('bg-pm-taupe-ink');
+    const band = within(hinweis).getByText((_, el) => el?.tagName === 'P' && el.textContent === 'Ihre Pflegesituation ist noch nicht vollständig');
+    expect(band.parentElement).toBe(rahmen);
+    expect(band.className).toContain('text-white');
+    const koerper = within(hinweis).getByText((_, el) => el?.tagName === 'P' && el.textContent === 'Deshalb können Sie diese Pflegekräfte noch nicht einladen und noch keine Bewerbungen erhalten.').parentElement!;
+    expect(koerper.className).toContain('bg-white');
     const unverbindlich = within(hinweis).getByText(/^Vieles ist schon ausgefüllt\./);
     expect(unverbindlich.textContent).toBe('Vieles ist schon ausgefüllt. Unverbindlich: Ein Vertrag entsteht erst, wenn Sie ein Angebot ausdrücklich annehmen.');
     expect(within(unverbindlich).getByText('ausdrücklich annehmen.').className).toContain('whitespace-nowrap');
@@ -201,11 +207,11 @@ describe('KompaktPflegekraefteBereich', () => {
     expect(onOeffnen).toHaveBeenCalledTimes(1);
   });
 
-  it('offen: das Formular steht im Hinweis auf einer weißen Innenfläche, Knopf und kleine Zeile sind weg', () => {
+  it('offen: das Formular steht im weißen Körper des Hinweises, Knopf und kleine Zeile sind weg', () => {
     render(<KompaktPflegekraefteBereich {...props} offen><p>Formular</p></KompaktPflegekraefteBereich>);
     const hinweis = document.getElementById('patientendaten')!;
     expect(within(hinweis).getByText('Formular')).toBeTruthy();
-    expect(within(hinweis).getByText('Formular').parentElement!.className).toContain('bg-white');
+    expect(within(hinweis).getByText('Formular').parentElement!.className).toContain('border-t');
     expect(screen.queryByRole('button', { name: 'Pflegesituation vervollständigen →' })).toBeNull();
     expect(screen.queryByText(/^Vieles ist schon ausgefüllt\./)).toBeNull();
     // Der Status bleibt über dem Formular stehen.
@@ -227,6 +233,11 @@ describe('EigenanteilZeile', () => {
     { name: 'entlastungsbudget_neu', label: 'Entlastungsbudget (3.539 Euro/Jahr ab Pflegegrad 2)' },
     { name: 'steuervorteil', label: 'Steuerliche Absetzbarkeit' },
   ];
+
+  it('Runde 13: schlichter Text, kein grüner Kasten', () => {
+    const { container } = render(<EigenanteilZeile betrag="2.453 €" posten={[{ name: 'pflegegeld', label: 'Pflegegeld' }]} onRechnung={() => {}} />);
+    expect((container.firstElementChild as HTMLElement).className).not.toContain('bg-pm-mint');
+  });
 
   it('Betrag wie übergeben, Posten in Kurzform, „So rechnen wir ›" öffnet die Aufstellung', async () => {
     const onRechnung = vi.fn();
