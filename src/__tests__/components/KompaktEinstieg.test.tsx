@@ -124,34 +124,34 @@ describe('KompaktePflegekraefte', () => {
 });
 
 describe('KompaktEinleitung', () => {
-  it('Einleitung unter dem Titel im Wortlaut der Geschäftsführung', () => {
+  it('Einleitung unter dem Titel im Wortlaut der Geschäftsführung; Einheiten brechen nicht um', () => {
     const { container } = render(<KompaktEinleitung />);
-    expect(container.querySelector('p')!.textContent).toBe(
-      'Eine bei uns angestellte Betreuungskraft wohnt bei Ihnen und hilft im Alltag. Sie wählen in Ruhe aus, um alles Weitere kümmern wir uns: Anreise, Wechsel und Ersatz, wenn jemand ausfällt.',
+    const absatz = container.querySelector('p')!;
+    expect(absatz.textContent).toBe(
+      'Ihr Angebot umfasst eine Rund-um-Betreuung zu Hause durch bei uns angestellte, sozialversicherte Betreuungskräfte. Dazu kommen über 20 Jahre Erfahrung, tägliche Kündbarkeit und 6× Testsieger DIE WELT. Unten finden Sie die für Sie ausgewählten Pflegekräfte: einfach Pflegesituation vervollständigen und Favoriten einladen.',
     );
+    for (const teil of ['20 Jahre', '6× Testsieger DIE WELT', 'Favoriten einladen.']) {
+      expect(within(absatz).getByText(teil).className).toContain('whitespace-nowrap');
+    }
   });
 });
 
 describe('KompaktVertrauen', () => {
-  it('Sterne und darunter das kleine Testsieger-Siegel mit „6× Testsieger DIE WELT · über 20 Jahre Erfahrung"', () => {
+  it('eine Zeile: kleines Testsieger-Siegel links, daneben die Sterne — kein Text zum Testsieger', () => {
     const { container } = render(<KompaktVertrauen sterne={{ schnitt: '4,9', wert: 4.9, anzahl: 126 }} />);
-    const sterne = screen.getByRole('link', { name: /4,9 von 5 aus 126 Bewertungen/ });
-    expect(sterne.getAttribute('href')).toBe('https://primundus.de/erfahrungen');
     const siegel = container.querySelector('img')!;
     expect(siegel.getAttribute('src')).toBe('/badge-testsieger.webp');
-    const zeile = siegel.nextElementSibling as HTMLElement;
-    expect(zeile.textContent).toBe('6× Testsieger DIE WELT · über 20 Jahre Erfahrung');
-    expect(sterne.compareDocumentPosition(siegel) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-    // Unter 375 px zwei Zeilen ohne „·" (kein Punkt am Zeilenende), ab 375 px eine Zeile.
-    expect(within(zeile).getByText('·').className).toContain('hidden');
-    expect(within(zeile).getByText('·').className).toContain('min-[375px]:inline');
-    expect(zeile.querySelector('br')!.className).toContain('min-[375px]:hidden');
+    const sterne = screen.getByRole('link', { name: /4,9 von 5 aus 126 Bewertungen/ });
+    expect(sterne.getAttribute('href')).toBe('https://primundus.de/erfahrungen');
+    expect(siegel.parentElement).toBe(sterne.parentElement);
+    expect(siegel.compareDocumentPosition(sterne) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(container.textContent).not.toMatch(/Testsieger|Erfahrung/);
   });
 
-  it('ohne Bewertungsstand keine Sternezeile, die Testsieger-Zeile bleibt', () => {
-    render(<KompaktVertrauen sterne={null} />);
+  it('ohne Bewertungsstand nur das Siegel', () => {
+    const { container } = render(<KompaktVertrauen sterne={null} />);
     expect(screen.queryByRole('link')).toBeNull();
-    expect(screen.getByText('6× Testsieger DIE WELT')).toBeTruthy();
+    expect(container.querySelector('img')).not.toBeNull();
   });
 });
 

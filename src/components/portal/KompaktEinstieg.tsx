@@ -6,8 +6,8 @@
 // doch echte Pflegekräfte, daher brauchen wir keine Fake-Box … kurze, schöne und sichere Einleitung
 // zum Angebot, dann Kosten und dann Pflegekräfte. Wenn die Pflegesituation unvollständig ist, dann
 // ein Hinweis."):
-//   Kopf: Begrüßung, „Ihr Angebot zur 24-Stunden-Betreuung", Einleitung (KompaktEinleitung) und zwei
-//     ruhige Zeilen Vertrauen (KompaktVertrauen: Sterne, Testsieger)
+//   Kopf: Begrüßung, „Ihr Angebot zur 24-Stunden-Betreuung", Einleitung (KompaktEinleitung) und eine
+//     ruhige Zeile Vertrauen (KompaktVertrauen: kleines Testsieger-Siegel und Sterne)
 //   → Kostenkarte: Preis, kleine Zeile, Eigenanteil (EigenanteilZeile; „So rechnen wir ›" öffnet die
 //     Aufstellung), die vier Punkte der Startseite
 //   → „Für Sie ausgewählt / Ihre passenden Pflegekräfte" (KompaktPflegekraefteBereich) mit dem
@@ -15,8 +15,8 @@
 //     darunter die echten Profile als Zeilen ohne Knöpfe (KompaktePflegekraefte).
 // Alle anderen Zustände (abgesendet, Bewerbung, gebucht …) bleiben unverändert.
 //
-// Schrift: Fließtext 16 px, kleine Schrift 14 px. Ausnahmen 13 px: die dritte Zeile der
-// Pflegekräfte (bei 390 px einzeilig) und die Testsieger-Zeile im Kopf (ab 375 px einzeilig).
+// Schrift: Fließtext 16 px, kleine Schrift 14 px. Ausnahme 13 px für die dritte Zeile der
+// Pflegekräfte — so bleibt sie bei 390 px einzeilig.
 import { Fragment, useEffect, useRef, type ReactNode } from 'react';
 import { ChevronRight, Sparkles } from 'lucide-react';
 import type { Nurse } from '../../types';
@@ -29,44 +29,35 @@ import { Card } from '../ui/Card';
 import { SectionHeader } from '../ui/SectionHeader';
 
 /**
- * Einleitung unter dem Titel (Runde 8, Wortlaut der Geschäftsführung): was die Betreuung ist und dass
- * wir uns um alles kümmern. Fließtext wie die Unterzeilen der anderen Zustände — kein Kasten.
+ * Einleitung unter dem Titel (Runde 9, Wortlaut der Geschäftsführung): was das Angebot umfasst, warum
+ * Primundus, und was unten zu tun ist. Fließtext wie die Unterzeilen der anderen Zustände — kein Kasten.
+ * Zusammen bleiben „20 Jahre", „6× Testsieger DIE WELT" und das letzte Wortpaar.
  */
 export function KompaktEinleitung() {
   return (
     <p className="mt-3 text-[16px] leading-[1.55] text-pm-muted">
-      Eine bei uns angestellte Betreuungskraft wohnt bei Ihnen und hilft im Alltag. Sie wählen in Ruhe aus,
-      um alles Weitere kümmern wir uns: Anreise, Wechsel und Ersatz, wenn jemand ausfällt.
+      Ihr Angebot umfasst eine Rund-um-Betreuung zu Hause durch bei uns angestellte, sozialversicherte
+      Betreuungskräfte. Dazu kommen über <span className="whitespace-nowrap">20 Jahre</span> Erfahrung,
+      tägliche Kündbarkeit und <span className="whitespace-nowrap">6× Testsieger DIE WELT</span>. Unten
+      finden Sie die für Sie ausgewählten Pflegekräfte: einfach Pflegesituation vervollständigen und{' '}
+      <span className="whitespace-nowrap">Favoriten einladen.</span>
     </p>
   );
 }
 
 /**
- * Zwei ruhige Zeilen unter der Einleitung (Runde 8): die Sterne wie auf der Startseite (Höhe
- * reserviert, damit nichts springt, wenn der Stand später kommt; ohne Stand keine Zeile) und das
- * kleine Testsieger-Siegel mit „6× Testsieger DIE WELT · über 20 Jahre Erfahrung". Die Zeile braucht
- * bei 13 px 309 px — unter 375 px passt sie nicht, dort steht „über 20 Jahre Erfahrung" ohne „·"
- * in der zweiten Zeile (kein Punkt am Zeilenende).
+ * Eine ruhige Zeile unter der Einleitung (Runde 9): das kleine Testsieger-Siegel und die Sterne wie
+ * auf der Startseite. Höhe reserviert, damit nichts springt, wenn der Stand später kommt; ohne Stand
+ * bleibt nur das Siegel. „6× Testsieger DIE WELT" und die Erfahrung stehen in der Einleitung.
  */
 export function KompaktVertrauen({ sterne }: { sterne: SterneStand | null }) {
   return (
-    <>
-      <div className="mt-2.5 flex h-7 items-center">
-        <BewertungsZeile stand={sterne} klein className="-my-2" />
-      </div>
-      <div className="mt-1 flex items-center gap-2">
-        <img src="/badge-testsieger.webp" alt="" className="h-7 w-auto flex-none object-contain" />
-        <p className="text-[13px] leading-snug text-pm-muted">
-          <span className="font-semibold text-pm-ink">6× Testsieger DIE WELT</span>
-          <span className="hidden min-[375px]:inline"> · </span>
-          <br className="min-[375px]:hidden" />
-          über 20 Jahre Erfahrung
-        </p>
-      </div>
-    </>
+    <div className="mt-2.5 flex h-7 items-center gap-2">
+      <img src="/badge-testsieger.webp" alt="" className="h-7 w-auto flex-none object-contain" />
+      <BewertungsZeile stand={sterne} klein className="-my-2" />
+    </div>
   );
 }
-
 
 /** Kurzname eines Zuschusses für „nach …"; unbekannte Posten wie im Aufklapper (Label ohne Klammer). */
 const KURZNAME: Record<string, string> = {
