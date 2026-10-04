@@ -40,12 +40,13 @@ export type KompaktLook = 'ruhig' | 'angebot';
 const SUCHE = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : null;
 export const KOMPAKT_LOOK: KompaktLook = SUCHE?.get('look') === 'angebot' ? 'angebot' : 'ruhig';
 
-/** „4. Oktober 2026" (Berliner Kalendertag) aus dem Anlagezeitpunkt der Anfrage; ohne gültiges Datum nichts. */
+/** „4.10.2026" (Berliner Kalendertag) aus dem Anlagezeitpunkt der Anfrage; ohne gültiges Datum nichts. In der Karte
+ *  steht es als „Anfrage vom …" — es ist das Datum der Anfrage, kein eigenes Angebotsdatum (OpenAI 04.10.). */
 export function angebotDatum(iso: string | null | undefined): string | null {
   if (!iso) return null;
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return null;
-  return d.toLocaleDateString('de-DE', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'Europe/Berlin' });
+  return d.toLocaleDateString('de-DE', { day: 'numeric', month: 'numeric', year: 'numeric', timeZone: 'Europe/Berlin' });
 }
 
 /**
@@ -60,7 +61,7 @@ export function angebotGrundlage(fd: Record<string, unknown> | null | undefined,
   if (typeof pg === 'number' || (typeof pg === 'string' && /^\d$/.test(pg))) {
     teile.push(Number(pg) === 0 ? 'Kein Pflegegrad' : `Pflegegrad ${pg}`);
   }
-  if (start) teile.push(`Start ${careStartLabel(start)}`);
+  if (start) teile.push(`Beginn ${careStartLabel(start)}`);
   return teile;
 }
 
@@ -70,7 +71,7 @@ export function AngebotKopf({ datum, grundlage }: { datum: string | null; grundl
     <div>
       <div className="flex items-baseline justify-between gap-3 border-b border-pm-line pb-3">
         <p className="text-[15px] font-semibold text-pm-ink">Angebot</p>
-        {datum && <p className="text-[14px] tabular-nums text-pm-muted">{datum}</p>}
+        {datum && <p className="text-[14px] tabular-nums text-pm-muted">Anfrage vom {datum}</p>}
       </div>
       {grundlage.length > 0 && (
         // Teile bleiben ganz, umbrochen wird nur zwischen ihnen (Trenner vor dem Teil, am Zeilenanfang abgeschnitten).
@@ -98,7 +99,7 @@ export function AngebotZeilen() {
     <div className="mt-5 space-y-2 border-t border-pm-line pt-4 text-[15px] leading-[1.5] text-pm-body">
       <p><span className="font-semibold text-pm-ink">Enthalten:</span> Lohn, Steuern, Sozialabgaben und Gebühren</p>
       <p>
-        <span className="font-semibold text-pm-ink">Zusätzlich:</span> Kost und Logis,{' '}
+        <span className="font-semibold text-pm-ink">Zusätzlich:</span> Kost und Logis sowie{' '}
         <span className="whitespace-nowrap">125 € Reisekosten</span> pro Fahrt
       </p>
     </div>
@@ -204,7 +205,8 @@ export function KompaktPflegekraefteBereich({ aktiv, offen, onOeffnen, onImBlick
             <div className="flex items-start gap-3 rounded-t-card bg-pm-amber-tint px-5 py-4">
               <AlertCircle className="mt-[2px] h-5 w-5 flex-none text-pm-amber-ink" strokeWidth={2} aria-hidden="true" />
               <p className="text-[16px] font-semibold leading-[1.45] text-pm-ink">
-                Es fehlen noch Informationen, damit Pflegekräfte sich bewerben können.
+                {/* Martins Satz (04.10.), sprachlich geglättet (OpenAI): „Angaben" statt „Informationen", „sich" vorgezogen. */}
+                Es fehlen noch Angaben, damit sich passende Pflegekräfte bewerben können.
               </p>
             </div>
             <div className={`rounded-b-card px-5 ${offen ? 'pb-5' : 'pb-6 pt-5'}`}>
@@ -215,9 +217,11 @@ export function KompaktPflegekraefteBereich({ aktiv, offen, onOeffnen, onImBlick
                   <Button breit onClick={onOeffnen} className="!px-2 !font-semibold">
                     Jetzt vervollständigen →
                   </Button>
+                  {/* Nicht „wenn Sie ein Angebot annehmen" — die Karte oben heißt „Angebot" (OpenAI 04.10.). Wortlaut
+                      wie über dem Absende-Knopf des Formulars (Registry #109, freigegeben). */}
                   <p className="mt-3 text-[13.5px] leading-[1.45] text-pm-muted">
-                    Vieles ist schon ausgefüllt. Unverbindlich: Ein Vertrag entsteht erst, wenn Sie ein Angebot{' '}
-                    <span className="whitespace-nowrap">ausdrücklich annehmen.</span>
+                    Vieles ist schon ausgefüllt. Unverbindlich: Ein Vertrag entsteht erst, wenn Sie eine Bewerbung annehmen
+                    und im Portal <span className="whitespace-nowrap">unterschreiben.</span>
                   </p>
                 </>
               )}
