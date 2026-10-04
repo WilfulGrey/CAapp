@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { aufzaehlung, EigenanteilZeile, KompaktEinleitung, KompaktePflegekraefte, KompaktTestsieger, PflegekraftZeile, SchritteKasten, zuschussKurzname } from '../../components/portal/KompaktEinstieg';
+import { aufzaehlung, EigenanteilZeile, FotoStapel, KompaktePflegekraefte, KUEMMERN_PUNKTE, PflegekraefteKarte, PflegekraftZeile, WirKuemmernUns, zuschussKurzname } from '../../components/portal/KompaktEinstieg';
 import type { Nurse } from '../../types';
 
 const basis: Nurse = {
@@ -92,113 +92,143 @@ describe('PflegekraftZeile', () => {
 describe('KompaktePflegekraefte', () => {
   const props = {
     laedt: false, alleBearbeitet: false, keineVorschlaege: false,
-    onProfil: () => {}, onVervollstaendigen: () => {}, telefonHref: 'tel:0',
+    onProfil: () => {}, telefonHref: 'tel:0',
   };
 
-  it('Eyebrow, Überschrift mit der Zahl der Zeilen (Einzahl bei einer); Empfehlung nur in der ersten', () => {
-    const { rerender } = render(<KompaktePflegekraefte {...props} eintraege={[{ nurse: basis, i: 0 }]} />);
-    expect(screen.getByText('Für Sie ausgewählt')).toBeTruthy();
-    expect(screen.getByRole('heading', { name: '1 passende Pflegekraft' })).toBeTruthy();
-    rerender(
+  // Runde 6: Zahl und „was fehlt" sagt die Karte darüber — hier nur die kleine Überschrift „Die Profile".
+  it('kleine Überschrift „Die Profile", keine große Überschrift, kein Schloss-Hinweis; Empfehlung nur in der ersten Zeile', () => {
+    render(
       <KompaktePflegekraefte
         {...props}
         eintraege={[{ nurse: basis, i: 0 }, { nurse: { ...basis, caregiverId: 50003, name: 'Anna Nowak' }, i: 1 }]}
       />,
     );
-    expect(screen.getByRole('heading', { name: '2 passende Pflegekräfte' })).toBeTruthy();
+    expect(screen.getByRole('heading', { name: 'Die Profile' })).toBeTruthy();
+    expect(screen.queryByText('Für Sie ausgewählt')).toBeNull();
+    expect(screen.queryByText(/passende Pflegekr/)).toBeNull();
+    expect(screen.queryByText(/Vor dem Einladen/)).toBeNull();
+    expect(screen.getAllByRole('button', { name: /^Profil von / })).toHaveLength(2);
     expect(screen.getAllByText('Unsere Empfehlung')).toHaveLength(1);
     expect(within(zeileVon('Helena K.')).getByText('Unsere Empfehlung')).toBeTruthy();
   });
 
-  it('Hinweis unter der Überschrift: „Vor dem Einladen: Pflegesituation vervollständigen →" öffnet das Formular', async () => {
-    const onVervollstaendigen = vi.fn();
-    const onProfil = vi.fn();
-    render(<KompaktePflegekraefte {...props} onProfil={onProfil} onVervollstaendigen={onVervollstaendigen} eintraege={[{ nurse: basis, i: 0 }]} />);
-    const hinweis = screen.getByRole('button', { name: 'Vor dem Einladen: Pflegesituation vervollständigen →' });
-    // Steht direkt unter der Überschrift, vor der ersten Zeile.
-    const titel = screen.getByRole('heading', { name: '1 passende Pflegekraft' });
-    expect(titel.compareDocumentPosition(hinweis) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-    expect(hinweis.compareDocumentPosition(zeileVon('Helena K.')) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-    await userEvent.click(hinweis);
-    expect(onVervollstaendigen).toHaveBeenCalledTimes(1);
-    expect(onProfil).not.toHaveBeenCalled();
-  });
-
-  it('beim Laden keine Zahl und kein Hinweis', () => {
+  it('beim Laden: Hinweis statt Zeilen', () => {
     render(<KompaktePflegekraefte {...props} laedt eintraege={[{ nurse: basis, i: 0 }]} />);
-    expect(screen.getByRole('heading', { name: 'Passende Pflegekräfte' })).toBeTruthy();
     expect(screen.getByText('Wir laden Ihre Pflegekräfte …')).toBeTruthy();
-    expect(screen.queryByText(/Vor dem Einladen/)).toBeNull();
+    expect(screen.queryByRole('button', { name: /^Profil von / })).toBeNull();
   });
 
-  it('ohne Vorschläge: Leer-Zustand mit Marta, kein Hinweis', () => {
+  it('ohne Vorschläge: Leer-Zustand mit Marta', () => {
     render(<KompaktePflegekraefte {...props} keineVorschlaege eintraege={[]} />);
     expect(screen.getByText('Gerade keine weiteren Vorschläge')).toBeTruthy();
     expect(screen.getByRole('link', { name: 'Mit Marta sprechen' }).getAttribute('href')).toBe('tel:0');
-    expect(screen.queryByText(/Vor dem Einladen/)).toBeNull();
   });
 });
 
-describe('SchritteKasten', () => {
-  it('drei Schritte: 1 erledigt, 2 jetzt mit Knopf, 3 später und gesperrt', async () => {
-    const onOeffnen = vi.fn();
-    render(<SchritteKasten aktiv offen={false} onOeffnen={onOeffnen}><p>Formular</p></SchritteKasten>);
-    const kasten = screen.getByRole('region', { name: 'So geht es weiter' });
-    expect(kasten.id).toBe('patientendaten');
-    const schritte = within(kasten).getAllByRole('listitem');
-    expect(schritte).toHaveLength(3);
-    expect(schritte[0].textContent).toBe('Erledigt: Angebot erstellt');
-    expect(schritte[1].getAttribute('aria-current')).toBe('step');
-    expect(within(schritte[1]).getByText('Pflegesituation vervollständigen')).toBeTruthy();
-    expect(within(schritte[1]).getByText('Dauert etwa 2 Minuten, vieles ist schon ausgefüllt. Unverbindlich: Ein Vertrag entsteht erst, wenn Sie sich für eine Pflegekraft entscheiden.')).toBeTruthy();
-    expect(schritte[2].getAttribute('aria-current')).toBeNull();
-    expect(within(schritte[2]).getByText('Pflegekräfte einladen und Bewerbungen erhalten')).toBeTruthy();
-    expect(within(schritte[2]).getByText('Passende Pflegekräfte bewerben sich bei Ihnen mit Foto, Erfahrung, Anreisedatum und Preis.')).toBeTruthy();
-    // Schritt 3 hat keinen Knopf: Er darf nicht nach „geht schon" aussehen.
-    expect(within(schritte[2]).queryByRole('button')).toBeNull();
-    expect(screen.queryByText('Formular')).toBeNull();
-    await userEvent.click(within(schritte[1]).getByRole('button', { name: 'Jetzt vervollständigen →' }));
-    expect(onOeffnen).toHaveBeenCalledTimes(1);
+describe('WirKuemmernUns', () => {
+  it('kleine fette Überschrift mit Siegel daneben, darunter die sechs Häkchen im Wortlaut', () => {
+    const { container } = render(<WirKuemmernUns onBestpreis={() => {}} />);
+    const titel = screen.getByRole('heading', { name: 'Wir kümmern uns um alles' });
+    // Siegel rechts in derselben Zeile, nur als Bild (der Punkt sagt es in Worten).
+    const siegel = container.querySelector('img')!;
+    expect(siegel.getAttribute('src')).toBe('/badge-testsieger.webp');
+    expect(siegel.getAttribute('alt')).toBe('');
+    expect(siegel.parentElement).toBe(titel.parentElement);
+    const punkte = screen.getAllByRole('listitem').map((li) => li.textContent);
+    expect(punkte).toEqual([
+      'Anreise ab 3 Tagen möglich',
+      'Wechsel und Ersatz geregelt',
+      'Täglich kündbar',
+      'Bestpreisgarantie',
+      'Über 20 Jahre Erfahrung',
+      '6× Testsieger DIE WELT',
+    ]);
+    expect(KUEMMERN_PUNKTE).toHaveLength(6);
+    // Eine Spalte auf dem Handy, zwei erst ab 640 px.
+    expect(screen.getByRole('list').className).toContain('grid-cols-1');
+    expect(screen.getByRole('list').className).toContain('sm:grid-cols-2');
   });
 
-  it('offen: das Formular steht unter Schritt 2, der Knopf ist weg', () => {
-    render(<SchritteKasten aktiv offen onOeffnen={() => {}}><p>Formular</p></SchritteKasten>);
-    const schritte = within(screen.getByRole('region', { name: 'So geht es weiter' })).getAllByRole('listitem');
-    expect(within(schritte[1]).getByText('Formular')).toBeTruthy();
-    expect(screen.queryByRole('button', { name: 'Jetzt vervollständigen →' })).toBeNull();
-  });
-
-  it('nicht aktiv (alle anderen Zustände): nur der Inhalt, kein Kasten', () => {
-    render(<SchritteKasten aktiv={false} offen={false} onOeffnen={() => {}}><p>Formular</p></SchritteKasten>);
-    expect(screen.getByText('Formular')).toBeTruthy();
-    expect(screen.queryByRole('region', { name: 'So geht es weiter' })).toBeNull();
-    expect(screen.queryByText('Angebot erstellt')).toBeNull();
+  it('nur „Bestpreisgarantie" ist antippbar und öffnet das Pop-up', async () => {
+    const onBestpreis = vi.fn();
+    render(<WirKuemmernUns onBestpreis={onBestpreis} />);
+    expect(screen.getAllByRole('button')).toHaveLength(1);
+    await userEvent.click(screen.getByRole('button', { name: 'Bestpreisgarantie' }));
+    expect(onBestpreis).toHaveBeenCalledTimes(1);
   });
 });
 
-describe('KompaktEinleitung', () => {
-  it('Einleitung unter dem Titel im Wortlaut; „zu Hause" und das Ende brechen nicht um', () => {
-    const { container } = render(<KompaktEinleitung />);
-    const absatz = container.querySelector('p')!;
-    expect(absatz.textContent).toBe(
-      'Vielen Dank für Ihre Anfrage. Hier sehen Sie, was eine bei uns angestellte Betreuungskraft bei Ihnen zu Hause kostet, wie es weitergeht und welche Pflegekräfte zu Ihren Angaben passen.',
+describe('FotoStapel', () => {
+  it('runde Fotos übereinander (ab dem zweiten überlappend), ohne Foto die Initialen', () => {
+    const { container } = render(
+      <FotoStapel nurses={[{ ...basis, image: '/a.jpg' }, { ...basis, caregiverId: 50003, name: 'Anna Nowak', image: undefined }]} />,
     );
-    for (const teil of ['zu Hause', 'Angaben passen.']) {
-      expect(within(absatz).getByText(teil).className).toContain('whitespace-nowrap');
-    }
+    const kreise = container.querySelectorAll(':scope > div > span');
+    expect(kreise).toHaveLength(2);
+    expect(kreise[0].className).toContain('rounded-full');
+    expect(kreise[0].className).toContain('border-white');
+    expect(kreise[0].className).not.toContain('-ml-2.5');
+    expect(kreise[1].className).toContain('-ml-2.5');
+    expect(kreise[0].querySelector('img')!.getAttribute('src')).toBe('/a.jpg');
+    expect(kreise[1].textContent).toBe('AN');
   });
 });
 
-describe('KompaktTestsieger', () => {
-  it('Siegel, „6× Testsieger DIE WELT" fett, darunter Erfahrung und Einsätze als zwei Zeilen ohne „·"', () => {
-    const { container } = render(<KompaktTestsieger />);
-    expect(screen.getByRole('img', { name: 'Testsieger DIE WELT' }).getAttribute('src')).toBe('/badge-testsieger.webp');
-    const titel = container.querySelector('b')!;
-    expect(titel.textContent).toBe('6× Testsieger DIE WELT');
-    const absatz = container.querySelector('p')!;
-    expect(absatz.textContent).toBe('6× Testsieger DIE WELTÜber 20 Jahre ErfahrungÜber 60.000 Einsätze');
-    expect(absatz.querySelectorAll('br')).toHaveLength(2);
-    expect(absatz.textContent).not.toContain('·');
+describe('PflegekraefteKarte', () => {
+  const fuenf: Nurse[] = ['Ewa Lis', 'Anna Nowak', 'Helena Wolf', 'Pavel Kral', 'Irena Pawlak'].map((name, k) => ({
+    ...basis, caregiverId: 60000 + k, name, image: `/p${k}.jpg`,
+  }));
+  const props = { aktiv: true, laedt: false, offen: false, onOeffnen: () => {}, onProfile: () => {} };
+
+  it('Titel mit der Zahl, Fotos, was fehlt, Knopf, „Unverbindlich", Link zu den Profilen', async () => {
+    const onOeffnen = vi.fn();
+    const onProfile = vi.fn();
+    render(<PflegekraefteKarte {...props} nurses={fuenf} onOeffnen={onOeffnen} onProfile={onProfile}><p>Formular</p></PflegekraefteKarte>);
+    const karte = screen.getByRole('region', { name: '5 Pflegekräfte sind schon für Sie ausgewählt' });
+    expect(karte.id).toBe('patientendaten');
+    expect(within(karte).getByText('für Sie ausgewählt').className).toContain('whitespace-nowrap');
+    expect(karte.querySelectorAll('img')).toHaveLength(5);
+    expect(within(karte).getByText('Fotos, Namen und Profile liegen bereit.')).toBeTruthy();
+    expect(within(karte).getByText('Zum Einladen fehlt nur noch Ihre Pflegesituation: etwa 2 Minuten, vieles ist schon ausgefüllt.')).toBeTruthy();
+    const unverbindlich = within(karte).getByText(/^Unverbindlich:/);
+    expect(unverbindlich.textContent).toBe('Unverbindlich: Ein Vertrag entsteht erst, wenn Sie sich für eine Pflegekraft entscheiden.');
+    expect(within(unverbindlich).getByText('Pflegekraft entscheiden.').className).toContain('whitespace-nowrap');
+    expect(screen.queryByText('Formular')).toBeNull();
+    await userEvent.click(within(karte).getByRole('button', { name: 'Pflegesituation vervollständigen →' }));
+    expect(onOeffnen).toHaveBeenCalledTimes(1);
+    await userEvent.click(within(karte).getByRole('button', { name: 'Alle 5 Profile ansehen ↓' }));
+    expect(onProfile).toHaveBeenCalledTimes(1);
+  });
+
+  it('Einzahl: „1 Pflegekraft ist schon für Sie ausgewählt", Link „Profil ansehen ↓"', () => {
+    render(<PflegekraefteKarte {...props} nurses={[fuenf[0]]}><p>Formular</p></PflegekraefteKarte>);
+    expect(screen.getByRole('region', { name: '1 Pflegekraft ist schon für Sie ausgewählt' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Profil ansehen ↓' })).toBeTruthy();
+  });
+
+  it('offen: das Formular steht in der Karte; Knopf, „Unverbindlich" und Link sind weg', () => {
+    render(<PflegekraefteKarte {...props} nurses={fuenf} offen><p>Formular</p></PflegekraefteKarte>);
+    const karte = screen.getByRole('region', { name: '5 Pflegekräfte sind schon für Sie ausgewählt' });
+    expect(within(karte).getByText('Formular')).toBeTruthy();
+    expect(screen.queryByRole('button', { name: 'Pflegesituation vervollständigen →' })).toBeNull();
+    expect(screen.queryByText(/^Unverbindlich:/)).toBeNull();
+    expect(screen.queryByRole('button', { name: /Profile ansehen/ })).toBeNull();
+  });
+
+  it('beim Laden: keine Zahl, keine Fotos, kein Link — der Knopf bleibt', () => {
+    render(<PflegekraefteKarte {...props} laedt nurses={fuenf}><p>Formular</p></PflegekraefteKarte>);
+    const karte = screen.getByRole('region', { name: 'Passende Pflegekräfte' });
+    expect(karte.querySelectorAll('img')).toHaveLength(0);
+    expect(screen.queryByText('Fotos, Namen und Profile liegen bereit.')).toBeNull();
+    expect(screen.queryByRole('button', { name: /Profile ansehen/ })).toBeNull();
+    expect(screen.getByRole('button', { name: 'Pflegesituation vervollständigen →' })).toBeTruthy();
+  });
+
+  it('nicht aktiv (alle anderen Zustände): nur der Inhalt, keine Karte', () => {
+    render(<PflegekraefteKarte {...props} aktiv={false} nurses={fuenf}><p>Formular</p></PflegekraefteKarte>);
+    expect(screen.getByText('Formular')).toBeTruthy();
+    expect(screen.queryByRole('region')).toBeNull();
+    expect(screen.queryByText(/ausgewählt/)).toBeNull();
   });
 });
 
