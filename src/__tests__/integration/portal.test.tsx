@@ -470,6 +470,9 @@ describe('Portal integration: golden paths', () => {
     const kopf = titel.parentElement as HTMLElement;
     const sterne = await within(kopf).findByRole('link', { name: /4,9 von 5 aus 126 Bewertungen/ }, { timeout: 5000 });
     expect(einleitung.compareDocumentPosition(sterne) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    // Runde 11: direkt unter der Einleitung der Knopf ins Formular.
+    const knopfOben = within(kopf).getByRole('button', { name: 'Pflegesituation vervollständigen →' });
+    expect(einleitung.nextElementSibling).toBe(knopfOben);
     // Runde 10: unter der Einleitung vier kurze Haken, dann Siegel + Sterne.
     expect(within(kopf).getAllByRole('listitem').map((li) => li.textContent)).toEqual([
       'Bei uns angestellt', 'Täglich kündbar', 'Über 20 Jahre Erfahrung', '6× Testsieger DIE WELT',
@@ -505,6 +508,21 @@ describe('Portal integration: golden paths', () => {
     expect(within(hinweis).queryByRole('button', { name: 'Jetzt vervollständigen →' })).toBeNull();
     // Kein Sprung: Der Knopf steht im Hinweis, das Formular klappt darunter auf.
     expect(gescrollt()).not.toContain('patientendaten');
+  }, 15_000);
+
+  it('Neukunde: „Pflegesituation vervollständigen →“ unter der Einleitung springt zum Hinweis und öffnet das Formular dort', async () => {
+    (Element.prototype.scrollIntoView as unknown as { mockClear: () => void }).mockClear();
+    server.use(...defaultHandlers({ proxy: { listApplications: () => ({ JobOfferApplicationsWithPagination: { total: 0, data: [] } }) } }));
+    setLocation(`?token=${TEST_LEAD_TOKEN}`);
+    render(<CustomerPortalPage />);
+    await screen.findByRole('region', { name: 'Ihre passenden Pflegekräfte' }, { timeout: 5000 });
+    expect(screen.queryByText(/Schritt 1 von 4/)).toBeNull();
+    await userEvent.click(screen.getByRole('button', { name: 'Pflegesituation vervollständigen →' }));
+    // Sprung genau einmal zum Hinweis (ohne Animation, dann aufklappen — wie „Einladen" im Profil).
+    expect(gescrollt().filter((id) => id === 'patientendaten')).toHaveLength(1);
+    const hinweis = document.getElementById('patientendaten')!;
+    expect(await within(hinweis).findByText(/Schritt 1 von 4/)).toBeInTheDocument();
+    expect(within(hinweis).queryByRole('button', { name: 'Jetzt vervollständigen →' })).toBeNull();
   }, 15_000);
 
   it('Neukunde: Kostenkarte mit Preis, kleiner Zeile, Eigenanteil und den vier Punkten; Sterne und Testsieger stehen im Kopf; die Aufstellung nur über „So rechnen wir ›“', async () => {

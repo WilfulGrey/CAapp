@@ -3303,11 +3303,16 @@ const CustomerPortalPage: FC = () => {
                   <>Ihr Angebot zur <span className="whitespace-nowrap">24-Stunden-Betreuung</span></>
                 ) : heroCopy.title}
               </h1>
-              {/* Kompakt-Einstieg (Runde 8): kurze Einleitung, darunter Sterne und Testsieger als zwei
-                  ruhige Zeilen — keine Karte. */}
+              {/* Kompakt-Einstieg: kurze Einleitung, darunter (Runde 11) der Knopf ins Formular — er springt
+                  ohne Animation zum Hinweis „Noch 2 Minuten bis zum Einladen" und öffnet das Formular dort
+                  (`zurPflegesituation`, WebKit-sicher wie „So rechnen wir ›"), dann vier Haken, Siegel und
+                  Sterne. Nur vor dem ersten Absenden (`kompakt`), wie der Hinweis; keine feste Leiste. */}
               {kompakt && (
                 <>
                   <KompaktEinleitung />
+                  <Button breit onClick={zurPflegesituation} className="mt-3.5 !px-2 whitespace-nowrap">
+                    Pflegesituation vervollständigen →
+                  </Button>
                   <KompaktVertrauen sterne={sterne} />
                 </>
               )}
