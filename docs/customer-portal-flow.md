@@ -167,6 +167,17 @@ a patient form w CAapp dopełnia później):
 - haushalt, urbanisation, wohnungstyp, unterbringung, internet, Pflegedienst,
   Tiere — onboard wstrzykuje hardkodowane defaulty (patrz tabela §5)
 
+### Social-Zuordnung (Registry #112)
+
+Kommt der Besucher über einen Beitrag des Content-Loops (`utm_medium=social`,
+`utm_source=instagram|facebook`, `variant_id`, `content_id`), liest
+`lib/sozial-zuordnung.ts` daraus `{variante, beitrag, plattform}`, hält es nur im
+Arbeitsspeicher und meldet den Besuch einmal je Seitenaufruf an
+`POST /api/sozial-zuordnung` (eigene Domain, immer 204). Die Route meldet ihn an den
+Content-Loop weiter (`lib/sozial-zuordnung-server.ts`); die Anfrage meldet
+`/api/angebot-anfordern` (Schritt 4a unten). Kein Browser-Speicher, keine Kennung der
+Person; ohne `SOZIAL_ZUORDNUNG_*` geht nichts raus.
+
 ### Submit kalkulatora
 
 `project 3/app/result/page.tsx:140`:
@@ -236,6 +247,11 @@ Content-Type: application/json
    testu znika, gdy zadna ze stron czatu nie miala ruchu. To INNY wymiar niż `wizardOpenedBySource` w tym samym
    raporcie: tamto to PRZYCISK otwierający wizard, to jest STRONA, z której
    przyszło zapytanie.
+4a. **Social-Zuordnung (Registry #112):** `body.sozial` (vom Fragebogen, siehe
+   „Social-Zuordnung“ oben) prüft `sozialBereinigen`; nur bei neuem Lead (`isNew || isUpgrade`)
+   meldet die Route fire-and-forget „Anfrage“ an den Content-Loop: Variante, Beitrag,
+   Plattform, volle Stunde, `extern_ref` = HMAC-SHA256 der Lead-ID. Keine Lead-ID,
+   keine Kontaktdaten. Wiederholte Anfragen eines bestehenden Leads zählen nicht.
 5. Build `portalUrl = ${NEXT_PUBLIC_PORTAL_URL}/?token=<lead.token>`
 
 ### Preis zuerst (Registry #77, 2026-09-17)

@@ -83,6 +83,8 @@ Pliki `.env` dostaniesz **osobnym kanałem** od Michała (Signal / encrypted ema
 
 Template'y są w repo (`.env.example` w obu lokalizacjach) — pokazują które klucze są potrzebne, ale wartości są puste; podstawisz je z paczki Michała.
 
+Opcjonalne w kalkulatorze (Registry #112): `SOZIAL_ZUORDNUNG_URL`, `SOZIAL_ZUORDNUNG_SCHLUESSEL`, `SOZIAL_ZUORDNUNG_SALZ` — lokalnie zostaw puste, wtedy kalkulator nic nie wysyła do Content-Loopa.
+
 ---
 
 ## 3. Install i lokalny dev

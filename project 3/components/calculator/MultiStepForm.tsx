@@ -5,6 +5,7 @@ import { useCalculator, formatEuro } from "@/lib/calculator-context";
 import { CircleCheck as CheckCircle2, Phone } from "lucide-react";
 import Image from "next/image";
 import { analytics, variantenSeite, websiteHerkunft } from "@/lib/analytics";
+import { meldeSozialBesuch, sozialHerkunft } from "@/lib/sozial-zuordnung";
 import { cookieConsent } from "@/lib/cookie-consent";
 import { scrollToCalculator, isCalculatorAligned, OPEN_CALCULATOR_EVENT } from "@/lib/scroll-to-calculator";
 import { useFormTracking } from "@/hooks/use-form-tracking";
@@ -734,6 +735,9 @@ export function MultiStepForm({ mode = 'inline', bewertung = null }: MultiStepFo
           return seite === '/' ? 'rechner' : `rechner:${seite.replace(/^\//, '')}`;
         })(),
         websitePfad: websiteHerkunft()?.pfad ?? null,
+        // Social-Beitrag des Content-Loops (Registry #112): Variante, Beitrag,
+        // Plattform aus der Adresse, nur im Arbeitsspeicher — sonst null.
+        sozial: sozialHerkunft(),
         kalkulation: {
           ...kalkulation,
           formularDaten,
@@ -1096,6 +1100,12 @@ export function MultiStepForm({ mode = 'inline', bewertung = null }: MultiStepFo
     setCurrentStep(1);
     setFullscreen(true);
   }, [mode]);
+
+  // Social-Beitrag (Registry #112): Besuch einmal je Seitenaufruf an die eigene
+  // Route melden — ohne Kennung der Person, ohne Browser-Speicher.
+  useEffect(() => {
+    meldeSozialBesuch();
+  }, []);
 
   // Solange das Overlay offen ist, darf die Seite dahinter nicht mitscrollen —
   // sonst scrollt der Wisch im Wizard die Landingpage weg.
