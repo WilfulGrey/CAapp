@@ -2734,8 +2734,9 @@ const CustomerPortalPage: FC = () => {
                       {angebotLook ? (
                         // Runde 18: „Alles im Preis" steht oben bei den Vorteilen; am Preis nur, was dazukommt.
                         <p className="mt-3 text-[15px] leading-[1.5] text-pm-muted">
-                          Dazu kommen Kost und Logis sowie <span className="whitespace-nowrap">125 € Reisekosten</span>{' '}
-                          <span className="whitespace-nowrap">pro Fahrt.</span>
+                          {/* Feiertage am Preis, damit „Alles im Preis" oben ehrlich bleibt (Vertrag § 4 Nr. 8: neun Feiertage). */}
+                          Dazu kommen Kost und Logis, <span className="whitespace-nowrap">125 € Reisekosten</span> pro Fahrt
+                          und an neun Feiertagen im Jahr der doppelte <span className="whitespace-nowrap">Tagessatz.</span>
                         </p>
                       ) : (
                       <p className="mt-3 text-[14px] leading-[1.5] text-pm-muted">
@@ -2865,6 +2866,11 @@ const CustomerPortalPage: FC = () => {
                        verwirrt. Berechnet und im Vertrag steht er unveraendert. */
                     ...(zeigtSommerzuschlag()
                       ? [{ label: 'Sommerzuschlag', value: '6,67 € / Tag', note: 'Juli + August' }]
+                      : []),
+                    // Runde 18: Die Aufstellung nannte die Feiertage nicht (Vertrag § 4 Nr. 8). Vorerst nur im Look
+                    // „angebot"; mit der Freigabe für alle Zustände.
+                    ...(angebotLook
+                      ? [{ label: 'Feiertage', value: 'doppelter Tagessatz', note: 'an 9 Feiertagen im Jahr' }]
                       : []),
                   ].map((row, i) => (
                     <div key={i} className="flex items-baseline justify-between gap-4">

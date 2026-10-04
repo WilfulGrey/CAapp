@@ -80,7 +80,7 @@ export function AngebotEinleitung({ fuer }: { fuer: string | null }) {
   return (
     <p className="mt-4 text-[17px] leading-[1.55] text-pm-muted">
       Ihr Angebot umfasst eine Rund-um-Betreuung zu Hause{fuer ? ` ${fuer}` : ''}. Anreise, Wechsel und Vertretung
-      organisieren <span className="whitespace-nowrap">wir.</span>
+      der Betreuungskräfte organisieren <span className="whitespace-nowrap">wir.</span>
     </p>
   );
 }
@@ -88,7 +88,8 @@ export function AngebotEinleitung({ fuer }: { fuer: string | null }) {
 /**
  * Runde 18 (Martin: „wichtiger ist, oben die Vorteile zu sagen: es ist alles drin, bei uns angestellt und täglich
  * kündbar; der Preis kann weiter unten sein"). Vier Zeilen, ohne Kasten. „Alles im Preis" bezieht sich auf die
- * genannten Posten (Feiertags- und Sommerzuschlag stehen im Vertrag, Kost und Logis und Reisekosten am Preis).
+ * genannten Posten; was dazukommt (Kost und Logis, Reisekosten, Feiertage), steht direkt am Preis — sonst wäre
+ * „Alles" angreifbar (OpenAI 04.10.). Sommerzuschlag nur in der Saison in der Aufstellung (Martin 09.09.).
  */
 export function AngebotVorteile({ onBestpreis }: { onBestpreis: () => void }) {
   const zeile = 'flex items-start gap-3 text-[17px] leading-[1.45] text-pm-body';
