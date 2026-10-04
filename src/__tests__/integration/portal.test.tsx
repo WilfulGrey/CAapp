@@ -465,7 +465,7 @@ describe('Portal integration: golden paths', () => {
     const titel = screen.getByRole('heading', { level: 1, name: 'Ihr Angebot zur 24-Stunden-Betreuung' });
     const einleitung = titel.nextElementSibling as HTMLElement;
     expect(einleitung.textContent).toBe(
-      'Ihr Angebot umfasst eine Rund-um-Betreuung zu Hause durch bei uns angestellte, sozialversicherte Betreuungskräfte. Um Anreise, Wechsel und Ersatz bei Ausfall kümmern wir uns.',
+      'Ihr Angebot umfasst eine Rund-um-Betreuung zu Hause durch bei uns angestellte Betreuungskräfte. Anreise, Wechsel und Vertretung organisieren wir, und Ihre Ansprechpartnerin ist täglich von 8 bis 20 Uhr für Sie da.',
     );
     // Runde 13: im Kopf nur die Einleitung — keine Fakten-Zeile, kein Knopf, keine Haken, kein Siegel, keine Sterne.
     const kopf = titel.parentElement as HTMLElement;
@@ -513,7 +513,7 @@ describe('Portal integration: golden paths', () => {
     expect(gescrollt()).not.toContain('patientendaten');
   }, 15_000);
 
-  it('Neukunde: Kostenkarte mit Preis, kleiner Zeile, Eigenanteil, den vier Punkten und unten Siegel + Sterne; die Aufstellung nur über „So rechnen wir ›“', async () => {
+  it('Neukunde: Kostenkarte mit Preis, kleiner Schrift, dem Textlink „Alle Kosten im Überblick ›“, den vier Punkten und unten Siegel + Sterne; kein Eigenanteil an der Karte', async () => {
     server.use(
       ...defaultHandlers({ proxy: { listApplications: () => ({ JobOfferApplicationsWithPagination: { total: 0, data: [] } }) } }),
       http.get('https://primundus.de/api/bewertungen-stand', () => HttpResponse.json({ schnitt: '4,9', wert: 4.9, anzahl: 126 })),
@@ -523,21 +523,23 @@ describe('Portal integration: golden paths', () => {
     await screen.findByRole('region', { name: 'Ihre passenden Pflegekräfte' }, { timeout: 5000 });
     const karte = screen.getByText('Ihre Betreuungskosten').closest('.shadow-lift') as HTMLElement;
     const inKarte = within(karte);
-    // Preis mit „im Monat" (das zweite „im Monat" steht in der Eigenanteil-Zeile).
     expect(text(inKarte.getByText('2.800 €').parentElement!)).toBe('2.800 €im Monat');
-    const kleineZeile = inKarte.getByText(/^inkl\. Steuern/);
-    expect(text(kleineZeile)).toBe('inkl. Steuern, Gebühren und Sozialabgaben, zzgl. Kost und Logis und 125 € Reisekosten pro Fahrt');
-    // Eigenanteil aus derselben Rechnung wie die Aufstellung (defaultLead: 2.800 € − Pflegegeld 347 € = 2.453 €).
-    const eigenanteil = inKarte.getByText(/^Ihr Eigenanteil:/);
-    expect(text(eigenanteil)).toBe('Ihr Eigenanteil: ca. 2.453 € im Monat');
-    expect(text(eigenanteil.nextElementSibling!)).toBe('nach Pflegegeld · So rechnen wir ›');
-    expect(kleineZeile.compareDocumentPosition(eigenanteil) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    // Runde 14: EIN Absatz kleine Schrift im Wortlaut der Geschäftsführung.
+    const kleineZeile = inKarte.getByText(/^Inklusive Lohn/);
+    expect(text(kleineZeile)).toBe('Inklusive Lohn, Steuern, Sozialabgaben und Gebühren. Dazu kommen Kost und Logis und 125 € Reisekosten pro Fahrt.');
+    // Keine Eigenanteil-Zeilen mehr an der Karte; stattdessen direkt unter der kleinen Schrift ein leiser Textlink (kein Kasten).
+    expect(inKarte.queryByText(/^Ihr Eigenanteil/)).toBeNull();
+    expect(inKarte.queryByText(/^nach Pflegegeld/)).toBeNull();
+    expect(inKarte.queryByRole('button', { name: 'So rechnen wir ›' })).toBeNull();
+    const link = inKarte.getByRole('button', { name: 'Alle Kosten im Überblick ›' });
+    expect(link.parentElement!.previousElementSibling).toBe(kleineZeile);
+    expect(link.className).toContain('underline');
+    expect(link.className).not.toMatch(/\bbg-|\bborder\b|rounded/);
     // Dann die vier Punkte der Startseite.
     const punkt = inKarte.getByText('Kein Vertrag vor Ihrer Auswahl');
-    expect(eigenanteil.compareDocumentPosition(punkt) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(link.compareDocumentPosition(punkt) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(inKarte.getByText('Keine Vermittlungsgebühr')).toBeInTheDocument();
     expect(inKarte.getByText('Täglich kündbar, taggenau abgerechnet')).toBeInTheDocument();
-    // Eigenanteil als schlichter Text (Runde 13), kein grüner Kasten.
     expect(karte.querySelector('.bg-pm-mint')).toBeNull();
     // Unten in der Karte (Runde 13): Siegel, daneben Testsieger/Erfahrung und die Sterne, nach den vier Punkten.
     const siegel = karte.querySelector('img[src="/badge-testsieger.webp"]')!;
@@ -545,7 +547,7 @@ describe('Portal integration: golden paths', () => {
     expect(siegel.parentElement!.contains(sterne)).toBe(true);
     expect(within(siegel.parentElement!).getAllByRole('listitem').map((li) => li.textContent)).toEqual(['6× in Folge Testsieger DIE WELT', 'über 20 Jahre Erfahrung']);
     expect(punkt.compareDocumentPosition(siegel) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-    // Weg aus der Karte: „Wir kümmern uns um alles", die Zeile „Alle Kosten im Überblick".
+    // Weg aus der Karte: „Wir kümmern uns um alles", die Klappzeile „Alle Kosten im Überblick".
     expect(inKarte.queryByText('Wir kümmern uns um alles')).toBeNull();
     expect(inKarte.queryByRole('button', { name: 'Alle Kosten im Überblick' })).toBeNull();
     // „Mehr Infos" an der Bestpreisgarantie öffnet das Pop-up.
@@ -557,7 +559,7 @@ describe('Portal integration: golden paths', () => {
     // Kosten-Satz und Heimvergleich nur in der Aufstellung; zu geht sie mit „Weniger anzeigen".
     expect(screen.queryByText('Kosten erst, wenn die Pflegekraft da ist.')).toBeNull();
     expect(screen.queryByText(/Zuhause statt Pflegeheim/)).toBeNull();
-    await userEvent.click(inKarte.getByRole('button', { name: 'So rechnen wir ›' }));
+    await userEvent.click(link);
     expect(inKarte.getByText('Kosten erst, wenn die Pflegekraft da ist.')).toBeInTheDocument();
     expect(inKarte.getByText(/Zuhause statt Pflegeheim/)).toBeInTheDocument();
     expect(inKarte.queryByText(/6× Testsieger/)).toBeNull();
@@ -565,37 +567,41 @@ describe('Portal integration: golden paths', () => {
     expect(screen.queryByText('Kosten erst, wenn die Pflegekraft da ist.')).toBeNull();
     expect(inKarte.queryByRole('button', { name: 'Weniger anzeigen' })).toBeNull();
     expect(inKarte.queryByRole('button', { name: 'Alle Kosten im Überblick' })).toBeNull();
+    // Der Textlink bleibt stehen und öffnet wieder.
+    expect(inKarte.getByRole('button', { name: 'Alle Kosten im Überblick ›' })).toBeInTheDocument();
   }, 15_000);
 
-  it('Neukunde: „So rechnen wir ›" öffnet „Alle Kosten im Überblick" und springt zu „Was bleibt für Sie übrig" — dort dieselbe Zahl', async () => {
+  it('Neukunde: „Alle Kosten im Überblick ›“ öffnet die Aufstellung und springt an ihren Anfang — darin „Was bleibt für Sie übrig“ mit dem Eigenanteil', async () => {
     (Element.prototype.scrollIntoView as unknown as { mockClear: () => void }).mockClear();
     server.use(...defaultHandlers({ proxy: { listApplications: () => ({ JobOfferApplicationsWithPagination: { total: 0, data: [] } }) } }));
     setLocation(`?token=${TEST_LEAD_TOKEN}`);
     render(<CustomerPortalPage />);
     await screen.findByRole('region', { name: 'Ihre passenden Pflegekräfte' }, { timeout: 5000 });
+    expect(document.getElementById('kosten-ueberblick')).toBeNull();
     expect(screen.queryByText('Was bleibt für Sie übrig')).toBeNull();
-    await userEvent.click(screen.getByRole('button', { name: 'So rechnen wir ›' }));
-    const rechnung = document.getElementById('eigenanteil-rechnung')!;
-    expect(within(rechnung).getByText('Was bleibt für Sie übrig')).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Alle Kosten im Überblick ›' }));
+    const ueberblick = document.getElementById('kosten-ueberblick')!;
+    expect(text(within(ueberblick).getByText('Betreuung').parentElement!)).toBe('Betreuung2.800 € / Monat');
     expect(screen.getByRole('button', { name: 'Weniger anzeigen' })).toBeInTheDocument();
-    await waitFor(() => expect(gescrollt()).toContain('eigenanteil-rechnung'));
-    // Dieselbe Rechnung: „Ihr Eigenanteil" in der Aufstellung = Betrag in der Zeile am Preis.
-    const zeile = within(rechnung).getByText('Ihr Eigenanteil').parentElement!;
-    expect(text(zeile)).toBe('Ihr Eigenanteil2.453 €');
-    expect(text(screen.getByText(/^Ihr Eigenanteil:/))).toContain('ca. 2.453 €');
+    await waitFor(() => expect(gescrollt()).toContain('kosten-ueberblick'));
+    // Der Eigenanteil steht in der Aufstellung (defaultLead: 2.800 € − Pflegegeld 347 € = 2.453 €).
+    const rechnung = screen.getByText('Was bleibt für Sie übrig').parentElement!;
+    expect(ueberblick.compareDocumentPosition(rechnung) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(text(within(rechnung).getByText('Ihr Eigenanteil').parentElement!)).toBe('Ihr Eigenanteil2.453 €');
   }, 15_000);
 
-  it('Neukunde ohne Zuschüsse in der Kalkulation: keine Eigenanteil-Zeile', async () => {
+  it('Neukunde ohne Zuschüsse in der Kalkulation: Textlink da, die Aufstellung ohne „Was bleibt für Sie übrig“', async () => {
     server.use(...defaultHandlers({ proxy: { listApplications: () => ({ JobOfferApplicationsWithPagination: { total: 0, data: [] } }) } }));
     setLocation('?token=token-ohne-zuschuesse');
     render(<CustomerPortalPage />);
     await screen.findByRole('region', { name: 'Ihre passenden Pflegekräfte' }, { timeout: 5000 });
-    expect(screen.queryByText(/^Ihr Eigenanteil:/)).toBeNull();
-    expect(screen.queryByRole('button', { name: 'So rechnen wir ›' })).toBeNull();
-    // Der Rest der Karte steht unverändert.
     const karte = screen.getByText('Ihre Betreuungskosten').closest('.shadow-lift') as HTMLElement;
     expect(within(karte).getByText('Kein Vertrag vor Ihrer Auswahl')).toBeInTheDocument();
     expect(within(karte).getByRole('button', { name: 'Mehr Infos' })).toBeInTheDocument();
+    await userEvent.click(within(karte).getByRole('button', { name: 'Alle Kosten im Überblick ›' }));
+    expect(document.getElementById('kosten-ueberblick')).not.toBeNull();
+    expect(screen.queryByText('Was bleibt für Sie übrig')).toBeNull();
+    expect(screen.queryByText(/Ihr Eigenanteil/)).toBeNull();
   }, 15_000);
 
   it('Neukunde: die Profile als Zeilen ohne Knöpfe und ohne Sterne — Deutsch mit Punkten, Erfahrung · Einsätze bei uns', async () => {

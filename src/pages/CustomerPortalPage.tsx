@@ -79,7 +79,7 @@ import { SoGehtEsWeiter } from '../components/portal/SoGehtEsWeiter';
 import { FaqListe } from '../components/portal/FaqListe';
 import { MartaBox } from '../components/portal/MartaBox';
 import { BewertungsZeile } from '../components/portal/BewertungsZeile';
-import { EigenanteilZeile, KompaktEinleitung, KompaktePflegekraefte, KompaktPflegekraefteBereich, KompaktVertrauen } from '../components/portal/KompaktEinstieg';
+import { KompaktEinleitung, KompaktePflegekraefte, KompaktPflegekraefteBereich, KompaktVertrauen } from '../components/portal/KompaktEinstieg';
 import { Button } from '../components/ui/Button';
 import { Card } from '../components/ui/Card';
 import { SectionHeader, EYEBROW, H2 } from '../components/ui/SectionHeader';
@@ -1898,13 +1898,13 @@ const CustomerPortalPage: FC = () => {
     ziel?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   };
 
-  // Kompakt-Einstieg: „So rechnen wir ›" an der Eigenanteil-Zeile öffnet die Kostenaufstellung (seit
-  // Runde 6 ohne eigene Zeile „Alle Kosten im Überblick") und springt zu „Was bleibt für Sie übrig".
-  // Die kommt UNTER der Zeile dazu, also ohne Verschiebung über dem Blick; gesprungen wird nach dem
-  // Aufklappen, ohne Animation (WebKit, Registry #102).
-  const zurEigenanteilRechnung = () => {
+  // Kompakt-Einstieg (Runde 14): der Textlink „Alle Kosten im Überblick ›" unter der kleinen Schrift
+  // öffnet die Kostenaufstellung (samt „Was bleibt für Sie übrig" mit dem Eigenanteil) und springt an
+  // ihren Anfang. Sie kommt UNTER dem Link dazu, also ohne Verschiebung über dem Blick; gesprungen wird
+  // nach dem Aufklappen, ohne Animation (WebKit, Registry #102).
+  const zuAllenKosten = () => {
     setCostsExpanded(true);
-    setTimeout(() => document.getElementById('eigenanteil-rechnung')?.scrollIntoView({ block: 'start' }), 60);
+    setTimeout(() => document.getElementById('kosten-ueberblick')?.scrollIntoView({ block: 'start' }), 60);
   };
 
   // Mail-Deeplink goto=anfragen (Knopf „Bewerbungen erhalten" in den Mails, 26.09.):
@@ -2618,8 +2618,8 @@ const CustomerPortalPage: FC = () => {
           : null;
         const heimErsparnis = eigenanteil !== null ? HEIM_EIGENANTEIL - eigenanteil : 0;
         // Absätze, die im Kompakt-Einstieg nicht am Preis stehen: „Kosten erst …" und der
-        // Heimvergleich in der Aufstellung hinter „So rechnen wir ›", der Testsieger im Kopf unter der
-        // Einleitung (KompaktVertrauen; sonst alle drei unverändert an ihrer Stelle).
+        // Heimvergleich in der Aufstellung hinter „Alle Kosten im Überblick ›", der Testsieger unten in
+        // der Karte (KompaktVertrauen; sonst alle drei unverändert an ihrer Stelle).
         // Kein fünfter Haken (Martin, 09.09.): „Kosten erst, wenn die
         // Pflegekraft da ist" ist eine Erklärung, kein Punkt der Liste.
         const kostenErst = (
@@ -2699,17 +2699,24 @@ const CustomerPortalPage: FC = () => {
                         <span className="text-[16px] text-pm-muted">im Monat</span>
                       </p>
                       <p className="mt-1.5 text-[14px] leading-[1.4] text-pm-muted">
-                        {/* Betrag und Wort zusammen, „pro Fahrt" nie allein in der letzten Zeile. */}
-                        inkl. Steuern, Gebühren und Sozialabgaben, zzgl. Kost und Logis und{' '}
+                        {/* Wortlaut der Geschäftsführung (Runde 14). Betrag und Wort zusammen,
+                            „pro Fahrt." nie allein in der letzten Zeile. */}
+                        Inklusive Lohn, Steuern, Sozialabgaben und Gebühren. Dazu kommen Kost und Logis und{' '}
                         <span className="whitespace-nowrap">125 € Reisekosten</span>{' '}
-                        <span className="whitespace-nowrap">pro Fahrt</span>
+                        <span className="whitespace-nowrap">pro Fahrt.</span>
                       </p>
-                      {/* Eigenanteil aus DERSELBEN Rechnung wie „Was bleibt für Sie übrig"
-                          (`eigenanteil`/`zuschussPosten` oben); ohne Zuschüsse keine Zeile.
-                          „So rechnen wir ›" öffnet die Aufstellung (Runde 6: einziger Weg dorthin). */}
-                      {eigenanteil !== null && (
-                        <EigenanteilZeile betrag={formatEuro(eigenanteil)} posten={zuschussPosten} onRechnung={zurEigenanteilRechnung} />
-                      )}
+                      {/* Runde 14: statt der Eigenanteil-Zeilen EIN leiser Textlink, kein Kasten. Er öffnet
+                          die Aufstellung unten in der Karte (mit „Was bleibt für Sie übrig" und dem
+                          Eigenanteil) und springt an ihren Anfang — einziger Weg dorthin. */}
+                      <p className="mt-2.5 text-[14px] leading-[1.4]">
+                        <button
+                          type="button"
+                          onClick={zuAllenKosten}
+                          className="inline-flex min-h-[44px] -my-3 items-center font-semibold text-pm-green-deep underline underline-offset-[3px]"
+                        >
+                          Alle Kosten im Überblick ›
+                        </button>
+                      </p>
                     </>
                   ) : (
                   <>
@@ -2728,8 +2735,8 @@ const CustomerPortalPage: FC = () => {
                   {!kompakt && testsieger}
 
                   {/* Der Toggle sitzt IM Kasten (Martin, 11.08.) — er gehört
-                      zum Angebot, nicht daneben. Kompakt-Einstieg (Runde 6): keine eigene Zeile
-                      „Alle Kosten im Überblick" mehr — „So rechnen wir ›" öffnet die Aufstellung,
+                      zum Angebot, nicht daneben. Kompakt-Einstieg: keine eigene Zeile „Alle Kosten
+                      im Überblick" — der Textlink unter der kleinen Schrift öffnet die Aufstellung,
                       die Zeile erscheint nur offen als „Weniger anzeigen". */}
                   {(!kompakt || costsExpanded) && (
                   <button
@@ -2800,7 +2807,11 @@ const CustomerPortalPage: FC = () => {
                 {/* „Alle Kosten im Überblick" — die Aufstellung. Keine zweite
                     Überschrift: der Toggle darüber benennt sie schon (Martin,
                     11.08.: „nicht doppeln"). */}
-                <div className="mt-1 rounded-[16px] bg-pm-paper px-4 py-3.5 space-y-3">
+                {/* id = Sprungziel des Textlinks „Alle Kosten im Überblick ›" (nur Kompakt-Einstieg). */}
+                <div
+                  id={kompakt ? 'kosten-ueberblick' : undefined}
+                  className={`mt-1 rounded-[16px] bg-pm-paper px-4 py-3.5 space-y-3${kompakt ? ' scroll-mt-16' : ''}`}
+                >
                   {[
                     { label: 'Betreuung', value: `${formatEuro(brutto)} / Monat`, note: '' },
                     { label: 'Entspricht', value: `${formatEuro(tagessatz)} / Tag`, note: 'tagesgenau abgerechnet' },
@@ -2831,8 +2842,7 @@ const CustomerPortalPage: FC = () => {
                     — der gespeicherte Wert driftet, sobald das Angebot angepasst
                     wird. Der Heimvergleich steht seit Teil 3 nur noch an der Karte. */}
                 {eigenanteil !== null && (
-                    // id = Sprungziel von „So rechnen wir ›" (Kompakt-Einstieg).
-                    <div id="eigenanteil-rechnung" className="mt-2.5 scroll-mt-16 rounded-[16px] bg-pm-paper px-4 py-3.5">
+                    <div className="mt-2.5 rounded-[16px] bg-pm-paper px-4 py-3.5">
                       <p className={kompakt ? 'mb-3 text-[15px] font-semibold text-pm-ink' : `${EYEBROW} mb-3`}>Was bleibt für Sie übrig</p>
                       <div className="space-y-3">
                         <div className="flex items-baseline justify-between gap-4">

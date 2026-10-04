@@ -5,9 +5,9 @@
 // Reihenfolge auf der Seite (CustomerPortalPage, `kompakt`), Runde 13 (Geschäftsführung: „überall
 // nur Tags, Überschrift, Tags …" — ruhig; betont sind nur Kostenkarte und Hinweis, sonst Text mit Luft):
 //   Kopf: Begrüßung, „Ihr Angebot zur 24-Stunden-Betreuung", Einleitung (KompaktEinleitung)
-//   → Kostenkarte: Preis, kleine Zeile, Eigenanteil als Text (EigenanteilZeile; „So rechnen wir ›" öffnet
-//     die Aufstellung), Linie, die vier Punkte der Startseite, Linie, Siegel mit Testsieger/Erfahrung
-//     und Sternen (KompaktVertrauen)
+//   → Kostenkarte (Runde 14 schlanker): Preis, kleine Schrift, der Textlink „Alle Kosten im Überblick ›"
+//     (öffnet die Aufstellung samt Eigenanteil), Linie, die vier Punkte der Startseite, Linie, Siegel mit
+//     Testsieger/Erfahrung und Sternen (KompaktVertrauen)
 //   → „Ihre passenden Pflegekräfte" (KompaktPflegekraefteBereich) mit dem Hinweis „Ihre Pflegesituation
 //     ist noch nicht vollständig" (dunkles Kopfband, weißer Körper; das 4-Schritte-Formular klappt
 //     darin auf), darunter die echten Profile als schlichte Zeilen (KompaktePflegekraefte).
@@ -27,16 +27,17 @@ import { Button } from '../ui/Button';
 import { SectionHeader } from '../ui/SectionHeader';
 
 /**
- * Einleitung unter dem Titel (Runde 12, Wortlaut der Geschäftsführung): was das Angebot umfasst und
- * worum wir uns kümmern. Fließtext wie die Unterzeilen der anderen Zustände — kein Kasten.
+ * Einleitung unter dem Titel (Runde 14, Wortlaut der Geschäftsführung): was das Angebot umfasst, was wir
+ * organisieren und wann die Ansprechpartnerin erreichbar ist. Fließtext wie die Unterzeilen der anderen
+ * Zustände — kein Kasten.
  */
 export function KompaktEinleitung() {
   return (
     <p className="mt-3 text-[16px] leading-[1.55] text-pm-muted">
-      {/* „Um Anreise," und das Ende bleiben zusammen — kein „Um" allein am Zeilenende. */}
-      Ihr Angebot umfasst eine Rund-um-Betreuung zu Hause durch bei uns angestellte, sozialversicherte
-      Betreuungskräfte. <span className="whitespace-nowrap">Um Anreise,</span> Wechsel und Ersatz bei Ausfall{' '}
-      <span className="whitespace-nowrap">kümmern wir uns.</span>
+      {/* Die Uhrzeit und das Satzende bleiben zusammen — kein „da." allein in der letzten Zeile. */}
+      Ihr Angebot umfasst eine Rund-um-Betreuung zu Hause durch bei uns angestellte Betreuungskräfte.
+      Anreise, Wechsel und Vertretung organisieren wir, und Ihre Ansprechpartnerin ist täglich von{' '}
+      <span className="whitespace-nowrap">8 bis 20 Uhr</span> <span className="whitespace-nowrap">für Sie da.</span>
     </p>
   );
 }
@@ -72,55 +73,6 @@ export function KompaktVertrauen({ sterne }: { sterne: SterneStand | null }) {
           <BewertungsZeile stand={sterne} klein className="-my-2.5" />
         </div>
       </div>
-    </div>
-  );
-}
-
-/** Kurzname eines Zuschusses für „nach …"; unbekannte Posten wie im Aufklapper (Label ohne Klammer). */
-const KURZNAME: Record<string, string> = {
-  pflegegeld: 'Pflegegeld',
-  entlastungsbudget_neu: 'Entlastungsbudget',
-  steuervorteil: 'Steuerersparnis',
-};
-export function zuschussKurzname(posten: { name: string; label: string }): string {
-  return KURZNAME[posten.name] ?? posten.label.replace(/\s*\([^)]*\)\s*$/, '');
-}
-
-/** „A", „A und B", „A, B und C". */
-export function aufzaehlung(teile: string[]): string {
-  if (teile.length <= 1) return teile[0] ?? '';
-  return `${teile.slice(0, -1).join(', ')} und ${teile[teile.length - 1]}`;
-}
-
-/**
- * Eigenanteil direkt unter dem Preis (Runde 4; seit Runde 13 schlichter Text, kein grüner Kasten). Gerechnet wird hier
- * NICHTS: Betrag und Posten kommen aus derselben Rechnung wie die Aufstellung „Was bleibt für Sie
- * übrig → Ihr Eigenanteil" (CustomerPortalPage `eigenanteil`/`zuschussPosten`). Genannt werden nur
- * Posten, die den Betrag wirklich senken; „So rechnen wir ›" öffnet die Aufstellung.
- */
-export function EigenanteilZeile({ betrag, posten, onRechnung }: {
-  /** Fertig formatiert wie in der Aufstellung, z. B. „1.622 €". */
-  betrag: string;
-  posten: { name: string; label: string }[];
-  onRechnung: () => void;
-}) {
-  return (
-    <div className="mt-3.5">
-      <p className="text-[16px] leading-snug text-pm-ink">
-        {/* Zu schmal (360 px): Umbruch nach „Ihr Eigenanteil:", der Betrag bleibt zusammen. */}
-        Ihr Eigenanteil:{' '}
-        <span className="whitespace-nowrap"><b className="font-bold tabular-nums">ca. {betrag}</b> im Monat</span>
-      </p>
-      <p className="mt-0.5 text-[14px] leading-snug text-pm-muted">
-        nach {aufzaehlung(posten.map(zuschussKurzname))}{'\u00A0'}·{' '}
-        <button
-          type="button"
-          onClick={onRechnung}
-          className="inline-flex min-h-[44px] -my-3 items-center whitespace-nowrap font-semibold text-pm-green-deep underline underline-offset-[3px]"
-        >
-          So rechnen wir ›
-        </button>
-      </p>
     </div>
   );
 }
