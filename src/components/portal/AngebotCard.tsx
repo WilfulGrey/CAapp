@@ -760,7 +760,7 @@ export const AngebotCard: FC<{
   return (
     <div ref={patientFormRef} id="pflegesituation-formular" className="scroll-mt-16">
       {patientOpen && (
-        <Rahmen className={eingebettet ? 'mt-4 border-t border-pm-line-soft pt-4' : 'px-5 pt-5'}>
+        <Rahmen className={eingebettet ? 'pt-4' : 'px-5 pt-5'}>
           <ProgressSteps
             schritte={STEP_LABELS}
             aktuell={step}

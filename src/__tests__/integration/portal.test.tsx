@@ -364,7 +364,7 @@ describe('Portal integration: golden paths', () => {
     // Auch der Kasten für Neukunden darf nicht kurz aufblitzen (Registry #102: `!schonAbgesendet`).
     expect(titel.some((t) => t.includes('Noch 2 Minuten bis zum Einladen'))).toBe(false);
     // …und der Kompakt-Einstieg auch nicht (Einleitung, Pflegekräfte-Bereich).
-    expect(titel.some((t) => t.includes('Wir haben passende Pflegekräfte') || t.includes('Ihre passenden Pflegekräfte') || t.includes('Echte Profile, ausgewählt'))).toBe(false);
+    expect(titel.some((t) => t.includes('Rund-um-Betreuung zu Hause') || t.includes('Ihre passenden Pflegekräfte') || t.includes('Echte Profile, ausgewählt'))).toBe(false);
     // Wunschstart aus dem gespeicherten Formular, nicht aus mamamia `arrival_at`.
     expect(screen.getByText(/Wunschstart 15\.11\./)).toBeInTheDocument();
   }, 15_000);
@@ -465,22 +465,22 @@ describe('Portal integration: golden paths', () => {
     const titel = screen.getByRole('heading', { level: 1, name: 'Ihr Angebot zur 24-Stunden-Betreuung' });
     const einleitung = titel.nextElementSibling as HTMLElement;
     expect(einleitung.textContent).toBe(
-      'Wir haben passende Pflegekräfte für Sie gefunden. Vervollständigen Sie kurz Ihre Pflegesituation, dann laden Sie unverbindlich Ihre Favoriten ein.',
+      'Ihr Angebot umfasst eine Rund-um-Betreuung zu Hause durch bei uns angestellte Betreuungskräfte.',
     );
+    // Runde 12: darunter EINE Zeile Fakten — kein Knopf, keine Haken, kein Siegel, keine Sterne im Kopf.
     const kopf = titel.parentElement as HTMLElement;
-    const sterne = await within(kopf).findByRole('link', { name: /4,9 von 5 aus 126 Bewertungen/ }, { timeout: 5000 });
-    expect(einleitung.compareDocumentPosition(sterne) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-    // Runde 11: direkt unter der Einleitung der Knopf ins Formular.
-    const knopfOben = within(kopf).getByRole('button', { name: 'Pflegesituation vervollständigen →' });
-    expect(einleitung.nextElementSibling).toBe(knopfOben);
-    // Runde 10: unter der Einleitung vier kurze Haken, dann Siegel + Sterne.
     expect(within(kopf).getAllByRole('listitem').map((li) => li.textContent)).toEqual([
-      'Bei uns angestellt', 'Täglich kündbar', 'Über 20 Jahre Erfahrung', '6× Testsieger DIE WELT',
+      'Über 20 Jahre Erfahrung', 'Täglich kündbar', '6× in Folge Testsieger DIE WELT',
     ]);
-    expect(kopf.querySelector('img[src="/badge-testsieger.webp"]')).not.toBeNull();
+    expect(within(kopf).queryByRole('button')).toBeNull();
+    expect(kopf.querySelector('img[src="/badge-testsieger.webp"]')).toBeNull();
+    expect(within(kopf).queryByRole('link', { name: /Bewertungen/ })).toBeNull();
+    // Siegel + Sterne unten in der Kostenkarte.
+    const sterne = await screen.findByRole('link', { name: /4,9 von 5 aus 126 Bewertungen/ }, { timeout: 5000 });
     // Reihenfolge: Kopf → Kostenkarte → Pflegekräfte-Bereich (Kopf, Hinweis, Zeilen).
     const karte = screen.getByText('Ihre Betreuungskosten').closest('.shadow-lift')!;
-    expect(sterne.compareDocumentPosition(karte) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(karte.contains(sterne)).toBe(true);
+    expect(einleitung.compareDocumentPosition(karte) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(karte.compareDocumentPosition(bereich) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(within(bereich).getByText('Für Sie ausgewählt')).toBeInTheDocument();
     expect(text(within(bereich).getByText(/^Echte Profile, ausgewählt nach/))).toBe('Echte Profile, ausgewählt nach Ihren Angaben.');
@@ -510,22 +510,7 @@ describe('Portal integration: golden paths', () => {
     expect(gescrollt()).not.toContain('patientendaten');
   }, 15_000);
 
-  it('Neukunde: „Pflegesituation vervollständigen →“ unter der Einleitung springt zum Hinweis und öffnet das Formular dort', async () => {
-    (Element.prototype.scrollIntoView as unknown as { mockClear: () => void }).mockClear();
-    server.use(...defaultHandlers({ proxy: { listApplications: () => ({ JobOfferApplicationsWithPagination: { total: 0, data: [] } }) } }));
-    setLocation(`?token=${TEST_LEAD_TOKEN}`);
-    render(<CustomerPortalPage />);
-    await screen.findByRole('region', { name: 'Ihre passenden Pflegekräfte' }, { timeout: 5000 });
-    expect(screen.queryByText(/Schritt 1 von 4/)).toBeNull();
-    await userEvent.click(screen.getByRole('button', { name: 'Pflegesituation vervollständigen →' }));
-    // Sprung genau einmal zum Hinweis (ohne Animation, dann aufklappen — wie „Einladen" im Profil).
-    expect(gescrollt().filter((id) => id === 'patientendaten')).toHaveLength(1);
-    const hinweis = document.getElementById('patientendaten')!;
-    expect(await within(hinweis).findByText(/Schritt 1 von 4/)).toBeInTheDocument();
-    expect(within(hinweis).queryByRole('button', { name: 'Jetzt vervollständigen →' })).toBeNull();
-  }, 15_000);
-
-  it('Neukunde: Kostenkarte mit Preis, kleiner Zeile, Eigenanteil und den vier Punkten; Sterne und Testsieger stehen im Kopf; die Aufstellung nur über „So rechnen wir ›“', async () => {
+  it('Neukunde: Kostenkarte mit Preis, kleiner Zeile, Eigenanteil, den vier Punkten und unten Siegel + Sterne; die Aufstellung nur über „So rechnen wir ›“', async () => {
     server.use(
       ...defaultHandlers({ proxy: { listApplications: () => ({ JobOfferApplicationsWithPagination: { total: 0, data: [] } }) } }),
       http.get('https://primundus.de/api/bewertungen-stand', () => HttpResponse.json({ schnitt: '4,9', wert: 4.9, anzahl: 126 })),
@@ -549,10 +534,13 @@ describe('Portal integration: golden paths', () => {
     expect(eigenanteil.compareDocumentPosition(punkt) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(inKarte.getByText('Keine Vermittlungsgebühr')).toBeInTheDocument();
     expect(inKarte.getByText('Täglich kündbar, taggenau abgerechnet')).toBeInTheDocument();
-    // Weg aus der Karte: „Wir kümmern uns um alles", Siegel, Sterne, die Zeile „Alle Kosten im Überblick".
+    // Unten in der Karte (Runde 12): eine Zeile mit Testsieger-Siegel und Sternen, nach den vier Punkten.
+    const siegel = karte.querySelector('img[src="/badge-testsieger.webp"]')!;
+    const sterne = await inKarte.findByRole('link', { name: /4,9 von 5 aus 126 Bewertungen/ }, { timeout: 5000 });
+    expect(siegel.parentElement).toBe(sterne.parentElement);
+    expect(punkt.compareDocumentPosition(siegel) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    // Weg aus der Karte: „Wir kümmern uns um alles", die Zeile „Alle Kosten im Überblick".
     expect(inKarte.queryByText('Wir kümmern uns um alles')).toBeNull();
-    expect(karte.querySelector('img[src="/badge-testsieger.webp"]')).toBeNull();
-    expect(inKarte.queryByRole('link', { name: /Bewertungen/ })).toBeNull();
     expect(inKarte.queryByRole('button', { name: 'Alle Kosten im Überblick' })).toBeNull();
     // „Mehr Infos" an der Bestpreisgarantie öffnet das Pop-up.
     await userEvent.click(inKarte.getByRole('button', { name: 'Mehr Infos' }));

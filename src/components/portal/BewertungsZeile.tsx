@@ -4,16 +4,17 @@ import { anzahlText, ERFAHRUNGEN_URL, sternFuellung, type SterneStand } from '..
 
 const STERN = 'M10 1.6l2.47 5.2 5.7.72-4.2 3.93 1.08 5.64L10 14.3l-5.05 2.79 1.08-5.64-4.2-3.93 5.7-.72z';
 
-// `klein`: 14-px-Sterne und 13/14 px Text, damit die Zeile in der Kostenkarte auch bei 360 px passt.
+// `klein` (nur Kompakt-Einstieg): 12-px-Sterne und 12,5/13,5 px Text — so passen Testsieger-Siegel und
+// Sterne in EINE Zeile der Kostenkarte, auch bei 360 px.
 export function BewertungsZeile({ stand, className = '', klein = false }: { stand: SterneStand | null; className?: string; klein?: boolean }) {
   if (!stand) return null;
-  const stern = klein ? 14 : 16;
+  const stern = klein ? 12 : 16;
   return (
     <a
       href={ERFAHRUNGEN_URL}
       target="_blank"
       rel="noreferrer"
-      className={`inline-flex min-h-[44px] items-center ${klein ? 'gap-1.5' : 'gap-2'} whitespace-nowrap ${className}`}
+      className={`inline-flex min-h-[44px] items-center ${klein ? 'gap-1' : 'gap-2'} whitespace-nowrap ${className}`}
     >
       <span className="inline-flex items-center gap-[2px]" aria-hidden="true">
         {[0, 1, 2, 3, 4].map((i) => {
@@ -28,7 +29,7 @@ export function BewertungsZeile({ stand, className = '', klein = false }: { stan
           );
         })}
       </span>
-      <span className={`${klein ? 'text-[13px] min-[375px]:text-[14px]' : 'text-[15px]'} leading-snug text-pm-muted`}>
+      <span className={`${klein ? 'text-[12.5px] min-[375px]:text-[13.5px]' : 'text-[15px]'} leading-snug text-pm-muted`}>
         <strong className="font-semibold text-pm-ink">{stand.schnitt}</strong> von 5 aus{' '}
         <span className="underline decoration-[#C9C4BC] underline-offset-[3px]">{anzahlText(stand.anzahl)}</span>
       </span>

@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { aufzaehlung, EigenanteilZeile, KompaktEinleitung, KompaktePflegekraefte, KompaktPflegekraefteBereich, KompaktVertrauen, PflegekraftZeile, VERTRAUEN_PUNKTE, zuschussKurzname } from '../../components/portal/KompaktEinstieg';
+import { aufzaehlung, EigenanteilZeile, FAKTEN, KompaktEinleitung, KompaktFakten, KompaktePflegekraefte, KompaktPflegekraefteBereich, KompaktVertrauen, PflegekraftZeile, zuschussKurzname } from '../../components/portal/KompaktEinstieg';
 import type { Nurse } from '../../types';
 
 const basis: Nurse = {
@@ -124,40 +124,47 @@ describe('KompaktePflegekraefte', () => {
 });
 
 describe('KompaktEinleitung', () => {
-  it('kurze Einleitung im Wortlaut der Geschäftsführung; das Ende bricht nicht um', () => {
+  it('Einleitung unter dem Titel im Wortlaut der Geschäftsführung', () => {
     const { container } = render(<KompaktEinleitung />);
-    const absatz = container.querySelector('p')!;
-    expect(absatz.textContent).toBe(
-      'Wir haben passende Pflegekräfte für Sie gefunden. Vervollständigen Sie kurz Ihre Pflegesituation, dann laden Sie unverbindlich Ihre Favoriten ein.',
+    expect(container.querySelector('p')!.textContent).toBe(
+      'Ihr Angebot umfasst eine Rund-um-Betreuung zu Hause durch bei uns angestellte Betreuungskräfte.',
     );
-    expect(within(absatz).getByText('Favoriten ein.').className).toContain('whitespace-nowrap');
+  });
+});
+
+describe('KompaktFakten', () => {
+  it('eine Zeile Fakten im Wortlaut; jeder Punkt ganz, Trenner nur zwischen Punkten (am Zeilenanfang abgeschnitten)', () => {
+    const { container } = render(<KompaktFakten />);
+    const punkte = screen.getAllByRole('listitem');
+    expect(punkte.map((li) => li.textContent)).toEqual(['Über 20 Jahre Erfahrung', 'Täglich kündbar', '6× in Folge Testsieger DIE WELT']);
+    expect(FAKTEN).toHaveLength(3);
+    for (const li of punkte) {
+      expect(li.className).toContain('whitespace-nowrap');
+      expect(li.className).toContain("before:content-['·']");
+    }
+    // Der Trenner des ersten Punkts einer Zeile liegt links außerhalb und wird abgeschnitten.
+    expect(screen.getByRole('list').className).toContain('-ml-5');
+    expect(container.firstElementChild!.className).toContain('overflow-hidden');
+    // Nicht klein: 15 px, halbfett.
+    expect(screen.getByRole('list').className).toContain('text-[15px]');
+    expect(screen.getByRole('list').className).toContain('font-semibold');
   });
 });
 
 describe('KompaktVertrauen', () => {
-  it('vier kurze Haken im Wortlaut, dann Siegel und Sterne', () => {
+  it('eine ruhige Zeile: kleines Testsieger-Siegel und die Sterne', () => {
     const { container } = render(<KompaktVertrauen sterne={{ schnitt: '4,9', wert: 4.9, anzahl: 126 }} />);
-    const liste = screen.getByRole('list');
-    expect(within(liste).getAllByRole('listitem').map((li) => li.textContent)).toEqual([
-      'Bei uns angestellt', 'Täglich kündbar', 'Über 20 Jahre Erfahrung', '6× Testsieger DIE WELT',
-    ]);
-    expect(VERTRAUEN_PUNKTE).toHaveLength(4);
-    // 2×2, spaltenweise (keine Trenner, kein Umbruch im Punkt).
-    expect(liste.className).toContain('grid-rows-2');
-    expect(liste.className).toContain('grid-flow-col');
-    for (const li of within(liste).getAllByRole('listitem')) expect(li.className).toContain('whitespace-nowrap');
     const siegel = container.querySelector('img')!;
     expect(siegel.getAttribute('src')).toBe('/badge-testsieger.webp');
     const sterne = screen.getByRole('link', { name: /4,9 von 5 aus 126 Bewertungen/ });
     expect(sterne.getAttribute('href')).toBe('https://primundus.de/erfahrungen');
     expect(siegel.parentElement).toBe(sterne.parentElement);
-    expect(liste.compareDocumentPosition(siegel) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(screen.queryByRole('list')).toBeNull();
   });
 
-  it('ohne Bewertungsstand: Haken und Siegel, keine Sterne', () => {
+  it('ohne Bewertungsstand nur das Siegel', () => {
     const { container } = render(<KompaktVertrauen sterne={null} />);
     expect(screen.queryByRole('link')).toBeNull();
-    expect(screen.getAllByRole('listitem')).toHaveLength(4);
     expect(container.querySelector('img')).not.toBeNull();
   });
 });
@@ -174,8 +181,12 @@ describe('KompaktPflegekraefteBereich', () => {
     const hinweis = document.getElementById('patientendaten')!;
     expect(within(hinweis).getByText('Noch 2 Minuten bis zum Einladen')).toBeTruthy();
     expect(within(hinweis).getByText(/^Vervollständigen Sie kurz/).textContent).toBe(
-      'Vervollständigen Sie kurz Ihre Pflegesituation, vieles ist schon ausgefüllt. Danach laden Sie Pflegekräfte ein und erhalten Bewerbungen mit Foto, Erfahrung, Anreisedatum und Preis.',
+      'Vervollständigen Sie kurz Ihre Pflegesituation, vieles ist schon ausgefüllt. Danach laden Sie Ihre Favoriten ein und erhalten Bewerbungen mit Foto, Erfahrung, Anreisedatum und Preis.',
     );
+    // Look A: hebt sich ab — Koralle-Ton und 2 px Koralle-Rand.
+    const rahmen = hinweis.firstElementChild as HTMLElement;
+    expect(rahmen.className).toContain('border-pm-coral');
+    expect(rahmen.className).toContain('bg-pm-coral-tint');
     const unverbindlich = within(hinweis).getByText(/^Unverbindlich:/);
     expect(unverbindlich.textContent).toBe('Unverbindlich: Ein Vertrag entsteht erst, wenn Sie ein Angebot ausdrücklich annehmen.');
     expect(within(unverbindlich).getByText('ausdrücklich annehmen.').className).toContain('whitespace-nowrap');
@@ -187,10 +198,11 @@ describe('KompaktPflegekraefteBereich', () => {
     expect(onOeffnen).toHaveBeenCalledTimes(1);
   });
 
-  it('offen: das Formular steht im Hinweis, Knopf und „Unverbindlich" sind weg', () => {
+  it('offen: das Formular steht im Hinweis auf einer weißen Innenfläche, Knopf und „Unverbindlich" sind weg', () => {
     render(<KompaktPflegekraefteBereich {...props} offen><p>Formular</p></KompaktPflegekraefteBereich>);
     const hinweis = document.getElementById('patientendaten')!;
     expect(within(hinweis).getByText('Formular')).toBeTruthy();
+    expect(within(hinweis).getByText('Formular').parentElement!.className).toContain('bg-white');
     expect(screen.queryByRole('button', { name: 'Jetzt vervollständigen →' })).toBeNull();
     expect(screen.queryByText(/^Unverbindlich:/)).toBeNull();
   });

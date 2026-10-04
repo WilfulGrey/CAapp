@@ -6,19 +6,20 @@
 // doch echte Pflegekräfte, daher brauchen wir keine Fake-Box … kurze, schöne und sichere Einleitung
 // zum Angebot, dann Kosten und dann Pflegekräfte. Wenn die Pflegesituation unvollständig ist, dann
 // ein Hinweis."):
-//   Kopf: Begrüßung, „Ihr Angebot zur 24-Stunden-Betreuung", kurze Einleitung (KompaktEinleitung),
-//     vier kurze Haken und das kleine Testsieger-Siegel mit den Sternen (KompaktVertrauen)
+//   Kopf: Begrüßung, „Ihr Angebot zur 24-Stunden-Betreuung", Einleitung (KompaktEinleitung) und eine
+//     Zeile Fakten (KompaktFakten)
 //   → Kostenkarte: Preis, kleine Zeile, Eigenanteil (EigenanteilZeile; „So rechnen wir ›" öffnet die
-//     Aufstellung), die vier Punkte der Startseite
+//     Aufstellung), die vier Punkte der Startseite, unten Testsieger-Siegel und Sterne (KompaktVertrauen)
 //   → „Für Sie ausgewählt / Ihre passenden Pflegekräfte" (KompaktPflegekraefteBereich) mit dem
-//     schmalen Hinweis „Noch 2 Minuten bis zum Einladen" (das 4-Schritte-Formular klappt darin auf),
-//     darunter die echten Profile als Zeilen ohne Knöpfe (KompaktePflegekraefte).
+//     Hinweis „Noch 2 Minuten bis zum Einladen" (hebt sich ab: Koralle-Ton, Koralle-Rand; das
+//     4-Schritte-Formular klappt darin auf einer weißen Fläche auf), darunter die echten Profile als
+//     Zeilen ohne Knöpfe (KompaktePflegekraefte).
 // Alle anderen Zustände (abgesendet, Bewerbung, gebucht …) bleiben unverändert.
 //
 // Schrift: Fließtext 16 px, kleine Schrift 14 px. Ausnahme 13 px für die dritte Zeile der
 // Pflegekräfte — so bleibt sie bei 390 px einzeilig.
 import { Fragment, useEffect, useRef, type ReactNode } from 'react';
-import { Check, ChevronRight, Sparkles } from 'lucide-react';
+import { ChevronRight, Sparkles } from 'lucide-react';
 import type { Nurse } from '../../types';
 import type { SterneStand } from '../../lib/sterne';
 import { BewertungsZeile } from './BewertungsZeile';
@@ -29,46 +30,57 @@ import { Card } from '../ui/Card';
 import { SectionHeader } from '../ui/SectionHeader';
 
 /**
- * Einleitung unter dem Titel (Runde 10; Geschäftsführung: „viel zu lang, nicht überzeugend"): sofort
- * sagen, dass passende Pflegekräfte da sind, was jetzt zu tun ist und dass es unverbindlich ist.
+ * Einleitung unter dem Titel (Runde 12, Wortlaut der Geschäftsführung): was das Angebot umfasst.
  * Fließtext wie die Unterzeilen der anderen Zustände — kein Kasten.
  */
 export function KompaktEinleitung() {
   return (
     <p className="mt-3 text-[16px] leading-[1.55] text-pm-muted">
-      Wir haben passende Pflegekräfte für Sie gefunden. Vervollständigen Sie kurz Ihre Pflegesituation,
-      dann laden Sie unverbindlich Ihre <span className="whitespace-nowrap">Favoriten ein.</span>
+      Ihr Angebot umfasst eine Rund-um-Betreuung zu Hause durch bei uns angestellte Betreuungskräfte.
     </p>
   );
 }
 
-/** Vier kurze Haken unter der Einleitung (Runde 10, Wortlaut der Geschäftsführung). */
-export const VERTRAUEN_PUNKTE = ['Bei uns angestellt', 'Täglich kündbar', 'Über 20 Jahre Erfahrung', '6× Testsieger DIE WELT'] as const;
+/** Die Fakten unter der Einleitung (Runde 12, Wortlaut der Geschäftsführung). */
+export const FAKTEN = ['Über 20 Jahre Erfahrung', 'Täglich kündbar', '6× in Folge Testsieger DIE WELT'] as const;
 
 /**
- * Vertrauen unter der Einleitung (Runde 10): vier kurze Haken, darunter das kleine Testsieger-Siegel
- * mit den Sternen wie auf der Startseite (Höhe reserviert, damit nichts springt, wenn der Stand später
- * kommt; ohne Stand bleibt nur das Siegel). Die Haken stehen als 2×2, spaltenweise gefüllt — links
- * die kurzen, rechts die langen: So passen zwei Zeilen auch bei 360 px (312 von 324 px), ohne Trenner
- * am Zeilenende und ohne Umbruch im Punkt. Auch breiter bleibt es bei 2×2 (die Spalte des Kopfs ist
- * auf dem Tablet nur ca. 340 px breit, eine Zeile bräuchte 470 px).
+ * EINE Zeile Fakten unter der Einleitung (Runde 12): nicht klein (15 px, halbfett, Taupe), jeder
+ * Punkt bleibt ganz, umbrochen wird nur zwischen den Punkten. Der Trenner „·" sitzt VOR jedem Punkt
+ * im Abstand davor; am Zeilenanfang liegt er links außerhalb und wird abgeschnitten — so steht nie
+ * ein „·" am Zeilenende oder -anfang. Bei 360–390 px: „Über 20 Jahre Erfahrung · Täglich kündbar" /
+ * „6× in Folge Testsieger DIE WELT".
  */
-export function KompaktVertrauen({ sterne }: { sterne: SterneStand | null }) {
+export function KompaktFakten() {
   return (
-    <>
-      <ul className="mt-3 grid grid-flow-col grid-rows-2 justify-start gap-x-3 gap-y-1">
-        {VERTRAUEN_PUNKTE.map((punkt) => (
-          <li key={punkt} className="flex items-center gap-1 whitespace-nowrap text-[13px] font-medium leading-snug text-pm-ink">
-            <Check className="h-3.5 w-3.5 flex-none text-pm-coral" strokeWidth={3} aria-hidden="true" />
-            {punkt}
+    <div className="mt-2.5 overflow-hidden">
+      <ul className="-ml-5 flex flex-wrap gap-y-0.5 text-[15px] font-semibold leading-snug text-pm-taupe-ink">
+        {FAKTEN.map((fakt) => (
+          <li
+            key={fakt}
+            className="relative whitespace-nowrap pl-5 before:absolute before:left-[7px] before:font-normal before:text-pm-taupe before:content-['·']"
+          >
+            {fakt}
           </li>
         ))}
       </ul>
-      <div className="mt-2 flex h-7 items-center gap-2">
+    </div>
+  );
+}
+
+/**
+ * Unten in der Kostenkarte (Runde 12): eine ruhige Zeile mit dem kleinen Testsieger-Siegel und den
+ * Sternen wie auf der Startseite. Höhe reserviert, damit nichts springt, wenn der Stand später kommt;
+ * ohne Stand bleibt nur das Siegel.
+ */
+export function KompaktVertrauen({ sterne }: { sterne: SterneStand | null }) {
+  return (
+    <div className="mt-3.5 border-t border-pm-line-soft pt-3">
+      <div className="flex h-7 items-center gap-2">
         <img src="/badge-testsieger.webp" alt="" className="h-7 w-auto flex-none object-contain" />
         <BewertungsZeile stand={sterne} klein className="-my-2" />
       </div>
-    </>
+    </div>
   );
 }
 
@@ -161,16 +173,18 @@ export function KompaktPflegekraefteBereich({ aktiv, offen, onOeffnen, onImBlick
           zeile={<>Echte Profile, ausgewählt nach <span className="whitespace-nowrap">Ihren Angaben.</span></>}
         />
       </div>
-      {/* Hülle trägt id und Ref (Card reicht keinen Ref durch); Look = Hinweis-Karte des Portals. */}
+      {/* Hülle trägt id und Ref. Look A (Runde 12, „Text und Formularkasten ist gleich"): hebt sich klar
+          vom Seitentext ab — Koralle-Ton, 2 px Koralle-Rand, Schatten; offen liegt das Formular auf einer
+          weißen Innenfläche (px-5, damit die mitlaufende Knopfleiste bündig bleibt). */}
       <div ref={hinweis} id="patientendaten" className="mt-4 scroll-mt-16">
-      <Card ton="hinweis" className="px-5 pb-4 pt-4">
+      <div className="rounded-card border-2 border-pm-coral bg-pm-coral-tint px-5 pb-4 pt-4 shadow-lift">
         <p className="text-[17.5px] font-extrabold leading-[1.25] text-pm-ink">Noch 2 Minuten bis zum Einladen</p>
         <p className="mt-1.5 text-[14.5px] leading-[1.5] text-pm-muted">
-          Vervollständigen Sie kurz Ihre Pflegesituation, vieles ist schon ausgefüllt. Danach laden Sie
-          Pflegekräfte ein und erhalten Bewerbungen mit Foto, Erfahrung, Anreisedatum und Preis.
+          Vervollständigen Sie kurz Ihre Pflegesituation, vieles ist schon ausgefüllt. Danach laden Sie Ihre
+          Favoriten ein und erhalten Bewerbungen mit Foto, Erfahrung, Anreisedatum und Preis.
         </p>
         {offen ? (
-          children
+          <div className="-mx-3 mt-4 rounded-[16px] bg-white px-5">{children}</div>
         ) : (
           <>
             <Button breit onClick={onOeffnen} className="mt-3.5 !px-2 whitespace-nowrap">
@@ -182,7 +196,7 @@ export function KompaktPflegekraefteBereich({ aktiv, offen, onOeffnen, onImBlick
             </p>
           </>
         )}
-      </Card>
+      </div>
       </div>
       <div className="mt-4">{liste}</div>
     </section>

@@ -79,7 +79,7 @@ import { SoGehtEsWeiter } from '../components/portal/SoGehtEsWeiter';
 import { FaqListe } from '../components/portal/FaqListe';
 import { MartaBox } from '../components/portal/MartaBox';
 import { BewertungsZeile } from '../components/portal/BewertungsZeile';
-import { EigenanteilZeile, KompaktEinleitung, KompaktePflegekraefte, KompaktPflegekraefteBereich, KompaktVertrauen } from '../components/portal/KompaktEinstieg';
+import { EigenanteilZeile, KompaktEinleitung, KompaktFakten, KompaktePflegekraefte, KompaktPflegekraefteBereich, KompaktVertrauen } from '../components/portal/KompaktEinstieg';
 import { Button } from '../components/ui/Button';
 import { Card } from '../components/ui/Card';
 import { SectionHeader, EYEBROW, H2 } from '../components/ui/SectionHeader';
@@ -2717,9 +2717,10 @@ const CustomerPortalPage: FC = () => {
                   </p>
                   </>
                   )}
-                  {/* Kompakt-Einstieg (Runde 8): die vier Punkte der Startseite wie überall; Sterne und
-                      Testsieger stehen im Kopf unter der Einleitung. */}
+                  {/* Kompakt-Einstieg: die vier Punkte der Startseite wie überall, darunter (Runde 12) eine
+                      ruhige Zeile mit Testsieger-Siegel und Sternen. */}
                   {vierPunkte(kompakt ? 'mt-3.5 flex flex-col gap-2' : 'mt-4 flex flex-col gap-2.5')}
+                  {kompakt && <KompaktVertrauen sterne={sterne} />}
                   {!kompakt && kostenErst}
                   {!kompakt && heimVergleich}
                   {!kompakt && testsieger}
@@ -3303,17 +3304,12 @@ const CustomerPortalPage: FC = () => {
                   <>Ihr Angebot zur <span className="whitespace-nowrap">24-Stunden-Betreuung</span></>
                 ) : heroCopy.title}
               </h1>
-              {/* Kompakt-Einstieg: kurze Einleitung, darunter (Runde 11) der Knopf ins Formular — er springt
-                  ohne Animation zum Hinweis „Noch 2 Minuten bis zum Einladen" und öffnet das Formular dort
-                  (`zurPflegesituation`, WebKit-sicher wie „So rechnen wir ›"), dann vier Haken, Siegel und
-                  Sterne. Nur vor dem ersten Absenden (`kompakt`), wie der Hinweis; keine feste Leiste. */}
+              {/* Kompakt-Einstieg (Runde 12): Einleitung und EINE Zeile Fakten — kein Knopf, keine Haken
+                  (Geschäftsführung: „warum plötzlich Patientendaten?", „überladen"). */}
               {kompakt && (
                 <>
                   <KompaktEinleitung />
-                  <Button breit onClick={zurPflegesituation} className="mt-3.5 !px-2 whitespace-nowrap">
-                    Pflegesituation vervollständigen →
-                  </Button>
-                  <KompaktVertrauen sterne={sterne} />
+                  <KompaktFakten />
                 </>
               )}
               {/* Offene Bewerbung (Martin 25.09.): Kopf nur Titel + Zeit, direkt
