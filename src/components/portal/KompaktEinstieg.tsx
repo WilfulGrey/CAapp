@@ -17,81 +17,91 @@
 // Schrift: Fließtext 16 px, kleine Schrift 14 px. Ausnahme 13 px für die dritte Zeile der
 // Pflegekräfte — so bleibt sie bei 390 px einzeilig.
 import { useEffect, useRef, type ReactNode } from 'react';
-import { Check, ChevronRight, Sparkles } from 'lucide-react';
+import { AlertCircle, ChevronRight, Sparkles } from 'lucide-react';
 import type { Nurse } from '../../types';
 import type { SterneStand } from '../../lib/sterne';
 import { BewertungsZeile } from './BewertungsZeile';
 import { DeutschPunkte } from './PflegekraftProfil';
 import { displayName, initials } from './shared';
+import { careStartLabel } from '../../lib/supabase';
 import { Button } from '../ui/Button';
 import { SectionHeader } from '../ui/SectionHeader';
 
 /**
- * Runde 16 (Vorschlag 04.10., Martin: „Findest du das geil? Wollen wir nicht was Besseres wagen?"): der Einstieg als
- * Weg. Eine feine Linie verbindet vier Stationen: ✓ Angebot erstellt (Preiskarte) → ● Pflegesituation vervollständigen
- * (Hinweis mit Knopf, das Formular klappt darin auf) → ○ Ihre passenden Pflegekräfte → ○ Bewerbungen erhalten.
- * Bis zur Entscheidung nur per Adresse: `?look=weg`, dazu `&kopf=dunkel` für den Kopf im dunklen Band der
- * Partnerseite (#191715). Ohne Parameter bleibt Fassung 11 (`ruhig`).
+ * Runde 17 (Vorschlag 04.10. abends). Martin zu „Ihr Weg" (Runde 16): „sieht nicht aus wie ein echtes Angebot …
+ * professioneller … Inklusive passt nicht … als Nächstes muss stehen: passende Pflegekräfte einladen und Bewerbungen
+ * erhalten … da das Patientenprofil nicht da ist, eine Achtung: Es fehlen noch Informationen, damit Pflegekräfte sich
+ * bewerben können. Jetzt vervollständigen." Deshalb: die Preiskarte als Angebot (Datum, Grundlage aus der Anfrage,
+ * Preis, Zeilen „Enthalten"/„Zusätzlich" wie im Angebots-PDF), danach „Passende Pflegekräfte einladen und Bewerbungen
+ * erhalten" mit dem Achtung-Hinweis über den Profilen. Bis zur Entscheidung nur per Adresse `?look=angebot`;
+ * ohne Parameter bleibt Fassung 11 (`ruhig`).
  */
-export type KompaktLook = 'ruhig' | 'weg';
+export type KompaktLook = 'ruhig' | 'angebot';
 const SUCHE = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : null;
-export const KOMPAKT_LOOK: KompaktLook = SUCHE?.get('look') === 'weg' ? 'weg' : 'ruhig';
-export const KOMPAKT_KOPF_DUNKEL = KOMPAKT_LOOK === 'weg' && SUCHE?.get('kopf') === 'dunkel';
-/** Runde 16, Hinweis in Station 2: Standard = Status + positiver Nachsatz (OpenAI-Gegencheck), `&hinweis=lang` =
- *  Wortlaut der Geschäftsführung vom 04.10. (zur Abnahme nebeneinander). */
-const HINWEIS_LANG = KOMPAKT_LOOK === 'weg' && SUCHE?.get('hinweis') === 'lang';
+export const KOMPAKT_LOOK: KompaktLook = SUCHE?.get('look') === 'angebot' ? 'angebot' : 'ruhig';
 
-type WegZustand = 'erledigt' | 'jetzt' | 'offen';
-
-/** Punkt einer Station: erledigt = grün mit Haken, jetzt = Koralle-Ring mit Kern, offen = leerer Ring. */
-function WegPunkt({ zustand }: { zustand: WegZustand }) {
-  if (zustand === 'erledigt') {
-    return (
-      <span className="absolute left-0 top-[3px] flex h-[22px] w-[22px] items-center justify-center rounded-full bg-pm-green" aria-hidden="true">
-        <Check className="h-[13px] w-[13px] text-white" strokeWidth={3} />
-      </span>
-    );
-  }
-  if (zustand === 'jetzt') {
-    return (
-      <span className="absolute left-0 top-[3px] flex h-[22px] w-[22px] items-center justify-center rounded-full border-2 border-pm-coral bg-white ring-4 ring-pm-coral/15" aria-hidden="true">
-        <span className="h-[8px] w-[8px] rounded-full bg-pm-coral" />
-      </span>
-    );
-  }
-  return <span className="absolute left-0 top-[3px] h-[22px] w-[22px] rounded-full border-[1.5px] border-pm-chip bg-pm-paper" aria-hidden="true" />;
+/** „4. Oktober 2026" (Berliner Kalendertag) aus dem Anlagezeitpunkt der Anfrage; ohne gültiges Datum nichts. */
+export function angebotDatum(iso: string | null | undefined): string | null {
+  if (!iso) return null;
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return null;
+  return d.toLocaleDateString('de-DE', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'Europe/Berlin' });
 }
 
 /**
- * Eine Station des Wegs. Die Linie läuft vom Punkt bis zum Punkt der nächsten Station (3 px in deren Kopf hinein),
- * deshalb darf zwischen zwei Stationen kein Außenabstand stehen — der Abstand ist das `pb-10` der Station.
- * `linie`: grün = Strecke schon gegangen, grau = noch offen, keine = letzte Station.
+ * Grundlage des Angebots aus der Anfrage, wie im Angebots-PDF („Ihre Angaben"), auf das Nötigste gekürzt:
+ * für wen, Pflegegrad, Start. Fehlende Angaben entfallen (kein Ersatzwert).
  */
-export function WegStation({ zustand, titel, zeile, linie, children, titelId }: {
-  zustand: WegZustand;
-  titel: ReactNode;
-  zeile?: ReactNode;
-  linie?: 'gruen' | 'grau';
-  children?: ReactNode;
-  titelId?: string;
-}) {
+export function angebotGrundlage(fd: Record<string, unknown> | null | undefined, start: string | null | undefined): string[] {
+  const teile: string[] = [];
+  if (fd?.betreuung_fuer === '1-person') teile.push('Für 1 Person');
+  if (fd?.betreuung_fuer === 'ehepaar') teile.push('Für 2 Personen');
+  const pg = fd?.pflegegrad;
+  if (typeof pg === 'number' || (typeof pg === 'string' && /^\d$/.test(pg))) {
+    teile.push(Number(pg) === 0 ? 'Kein Pflegegrad' : `Pflegegrad ${pg}`);
+  }
+  if (start) teile.push(`Start ${careStartLabel(start)}`);
+  return teile;
+}
+
+/** Kopf der Angebotskarte: links „Angebot", rechts das Datum, darunter die Grundlage. */
+export function AngebotKopf({ datum, grundlage }: { datum: string | null; grundlage: string[] }) {
   return (
-    <section aria-labelledby={titelId} className={`relative pl-9 ${linie ? 'pb-9' : ''}`}>
-      {linie && (
-        <span
-          aria-hidden="true"
-          className={`absolute left-[10.25px] top-[29px] bottom-[-3px] w-[1.5px] ${linie === 'gruen' ? 'bg-pm-green/55' : 'bg-pm-line'}`}
-        />
+    <div>
+      <div className="flex items-baseline justify-between gap-3 border-b border-pm-line pb-3">
+        <p className="text-[15px] font-semibold text-pm-ink">Angebot</p>
+        {datum && <p className="text-[14px] tabular-nums text-pm-muted">{datum}</p>}
+      </div>
+      {grundlage.length > 0 && (
+        // Teile bleiben ganz, umbrochen wird nur zwischen ihnen (Trenner vor dem Teil, am Zeilenanfang abgeschnitten).
+        <div className="mt-3 overflow-hidden">
+          <p className="-ml-4 flex flex-wrap text-[15px] leading-[1.5] text-pm-body">
+            {grundlage.map((teil) => (
+              <span key={teil} className="relative whitespace-nowrap pl-4 before:absolute before:left-[5px] before:text-pm-mute before:content-['·']">
+                {teil}
+              </span>
+            ))}
+          </p>
+        </div>
       )}
-      <WegPunkt zustand={zustand} />
-      <h2 id={titelId} className="text-[18px] font-semibold leading-[28px] tracking-[-0.01em] text-pm-ink">
-        {zustand === 'erledigt' && <span className="sr-only">Erledigt: </span>}
-        {zustand === 'jetzt' && <span className="sr-only">Jetzt: </span>}
-        {titel}
-      </h2>
-      {zeile && <p className="mt-1 text-[15px] leading-[1.5] text-pm-muted">{zeile}</p>}
-      {children && <div className="mt-4">{children}</div>}
-    </section>
+    </div>
+  );
+}
+
+/**
+ * Was im Preis steckt, als Zeilen wie im Angebots-PDF statt des Satzes „Inklusive …" (Martin 04.10.: „Inklusive passt
+ * nicht"). Kein „alle Kosten", kein „nur": Feiertags- und Sommerzuschlag stehen in „Kosten im Überblick".
+ */
+export function AngebotZeilen() {
+  // Bezeichnung vorn im Satz statt als Spalte: Bei 390 px brach die Spalte „Lohn, Steuern, …" in drei Zeilen.
+  return (
+    <div className="mt-5 space-y-2 border-t border-pm-line pt-4 text-[15px] leading-[1.5] text-pm-body">
+      <p><span className="font-semibold text-pm-ink">Enthalten:</span> Lohn, Steuern, Sozialabgaben und Gebühren</p>
+      <p>
+        <span className="font-semibold text-pm-ink">Zusätzlich:</span> Kost und Logis,{' '}
+        <span className="whitespace-nowrap">125 € Reisekosten</span> pro Fahrt
+      </p>
+    </div>
   );
 }
 
@@ -100,9 +110,9 @@ export function WegStation({ zustand, titel, zeile, linie, children, titelId }: 
  * organisieren und wann die Ansprechpartnerin erreichbar ist. Fließtext, kein Kasten; seit Runde 15
  * (Designdurchgang) 17 px mit Zeilenhöhe 1,55.
  */
-export function KompaktEinleitung({ dunkel = false }: { dunkel?: boolean }) {
+export function KompaktEinleitung() {
   return (
-    <p className={`mt-4 text-[17px] leading-[1.55] ${dunkel ? 'text-white/80' : 'text-pm-muted'}`}>
+    <p className="mt-4 text-[17px] leading-[1.55] text-pm-muted">
       {/* Die Uhrzeit und das Satzende bleiben zusammen — kein „da." allein in der letzten Zeile. */}
       Ihr Angebot umfasst eine Rund-um-Betreuung zu Hause durch bei uns angestellte Betreuungskräfte.
       Anreise, Wechsel und Vertretung organisieren wir, und Ihre Ansprechpartnerin ist täglich von{' '}
@@ -122,13 +132,13 @@ export const VERTRAUEN = ['6× in Folge Testsieger DIE WELT', 'über 20 Jahre Er
  * bei 24 px Innenabstand nur 250 px (390 px), die Sternzeile braucht rund 280. Ihre Höhe ist reserviert,
  * damit nichts springt, wenn der Stand nachlädt (ohne Stand keine Sterne).
  */
-export function KompaktVertrauen({ sterne, eng = false }: { sterne: SterneStand | null; eng?: boolean }) {
+export function KompaktVertrauen({ sterne }: { sterne: SterneStand | null }) {
   return (
     <div className="mt-5 border-t border-pm-line pt-5">
       <div className="flex items-center gap-3">
         <img src="/badge-testsieger.webp" alt="" className="h-10 w-auto flex-none object-contain" />
         <div className="min-w-0 overflow-hidden">
-          <ul className={`-ml-4 flex flex-wrap ${eng ? 'text-[13px] min-[390px]:text-[14px]' : 'text-[14px]'} leading-5`}>
+          <ul className="-ml-4 flex flex-wrap text-[14px] leading-5">
             {VERTRAUEN.map((teil, k) => (
               <li
                 key={teil}
@@ -141,7 +151,7 @@ export function KompaktVertrauen({ sterne, eng = false }: { sterne: SterneStand 
         </div>
       </div>
       <div className="mt-3 flex h-6 items-center">
-        <BewertungsZeile stand={sterne} klein eng={eng} className="-my-2.5" />
+        <BewertungsZeile stand={sterne} klein className="-my-2.5" />
       </div>
     </div>
   );
@@ -177,68 +187,48 @@ export function KompaktPflegekraefteBereich({ aktiv, offen, onOeffnen, onImBlick
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [aktiv]);
   if (!aktiv) return <div>{children}</div>;
-  if (look === 'weg') {
-    // Runde 16: Stationen 2–4 des Wegs (Station 1 „Angebot erstellt" trägt die Preiskarte, CustomerPortalPage).
-    // Der Hinweis ist hier heller gestaltet: weiße Karte statt dunklem Kopfbalken, der Wortlaut bleibt. Offen
-    // greift die Karte über die Linie hinweg auf volle Breite — das Formular braucht den Platz, und wer
-    // ausfüllt, braucht die Linie nicht.
+  if (look === 'angebot') {
+    // Runde 17: Überschrift = was der Kunde will (Martin: „als Nächstes muss stehen: passende Pflegekräfte einladen und
+    // Bewerbungen erhalten"), darunter der Achtung-Hinweis in seinem Wortlaut (bernsteinfarbener Kopf mit Zeichen,
+    // weißer Körper mit Knopf; das Formular klappt im Körper auf), dann die Profile.
     return (
-      <>
-        <WegStation zustand="jetzt" titel="Pflegesituation vervollständigen" linie="grau" titelId="patientendaten-titel">
-          <div
-            ref={hinweis}
-            id="patientendaten"
-            // relative: Die Karte liegt über der Linie der Station (offen greift sie über die Linie).
-            className={`relative scroll-mt-16 rounded-card bg-white shadow-lift ${offen ? '-ml-9 px-6 pb-5 pt-5' : 'px-[22px] pb-6 pt-5'}`}
-          >
-            {/* Erster Satz = Status im Wortlaut der Geschäftsführung (Runde 12). Zweiter Satz positiv statt „noch nicht
-                … noch keine" (OpenAI 04.10.); `hinweis=lang` zeigt den Wortlaut vom 04.10. („diese" → „die passenden",
-                die Profile stehen erst in der nächsten Station). */}
-            <p className="text-[16px] leading-[1.5] text-pm-body">
-              {HINWEIS_LANG ? (
-                <>Ihre Pflegesituation ist noch nicht vollständig. Deshalb können Sie die passenden Pflegekräfte noch
-                nicht einladen und noch keine <span className="whitespace-nowrap">Bewerbungen erhalten.</span></>
-              ) : (
-                <>Ihre Pflegesituation ist noch nicht vollständig. Sobald Sie die Angaben ergänzen, können Sie passende
-                Pflegekräfte einladen und <span className="whitespace-nowrap">Bewerbungen erhalten.</span></>
-              )}
-            </p>
-            {offen ? (
-              <div className="mt-5 border-t border-pm-line">{children}</div>
-            ) : (
-              <>
-                <Button breit onClick={onOeffnen} className="mt-5 !px-2 !font-semibold">
-                  Jetzt vervollständigen →
-                </Button>
-                <p className="mt-3 text-[13.5px] leading-[1.45] text-pm-muted">
-                  Vieles ist schon ausgefüllt. Unverbindlich: Ein Vertrag entsteht erst, wenn Sie ein Angebot{' '}
-                  <span className="whitespace-nowrap">ausdrücklich annehmen.</span>
-                </p>
-              </>
-            )}
-          </div>
-        </WegStation>
-        {/* id = Sprungziel des Mail-Links `goto=matches` (wie in Fassung 11). */}
+      <section aria-labelledby="pflegekraefte-titel">
+        {/* 22 px statt 24: so bleibt die Überschrift bei 390 px zweizeilig. */}
         <div id="pflegekraefte" style={{ scrollMarginTop: 72 }}>
-          <WegStation
-            zustand="offen"
-            titel="Ihre passenden Pflegekräfte"
-            titelId="pflegekraefte-titel"
-            zeile={<>Echte Profile, ausgewählt nach <span className="whitespace-nowrap">Ihren Angaben.</span></>}
-            linie="grau"
-          >
-            {liste}
-          </WegStation>
+          <h2 id="pflegekraefte-titel" className="text-[22px] font-bold leading-[1.25] tracking-[-0.02em] text-pm-ink">
+            Passende Pflegekräfte einladen und <span className="whitespace-nowrap">Bewerbungen erhalten</span>
+          </h2>
         </div>
-        <WegStation
-          zustand="offen"
-          titel="Bewerbungen erhalten"
-          zeile={<>
-            Sie erhalten Bewerbungen mit Foto, Erfahrung, möglichem Anreisedatum und Preis. Eine Anreise ist schon ab
-            3 Tagen <span className="whitespace-nowrap">möglich.</span>
-          </>}
-        />
-      </>
+        <div ref={hinweis} id="patientendaten" className="mt-5 scroll-mt-16">
+          <div className="rounded-card border border-pm-amber/30 bg-white shadow-[0_1px_2px_rgba(28,28,28,.04)]">
+            <div className="flex items-start gap-3 rounded-t-card bg-pm-amber-tint px-5 py-4">
+              <AlertCircle className="mt-[2px] h-5 w-5 flex-none text-pm-amber-ink" strokeWidth={2} aria-hidden="true" />
+              <p className="text-[16px] font-semibold leading-[1.45] text-pm-ink">
+                Es fehlen noch Informationen, damit Pflegekräfte sich bewerben können.
+              </p>
+            </div>
+            <div className={`rounded-b-card px-5 ${offen ? 'pb-5' : 'pb-6 pt-5'}`}>
+              {offen ? (
+                children
+              ) : (
+                <>
+                  <Button breit onClick={onOeffnen} className="!px-2 !font-semibold">
+                    Jetzt vervollständigen →
+                  </Button>
+                  <p className="mt-3 text-[13.5px] leading-[1.45] text-pm-muted">
+                    Vieles ist schon ausgefüllt. Unverbindlich: Ein Vertrag entsteht erst, wenn Sie ein Angebot{' '}
+                    <span className="whitespace-nowrap">ausdrücklich annehmen.</span>
+                  </p>
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+        {/* Dann „Ihre passenden Pflegekräfte" (Martin: „dann kämen die, Ihre passenden Pflegekräfte"). */}
+        <h3 className="mt-8 text-[18px] font-semibold leading-[1.3] text-pm-ink">Ihre passenden Pflegekräfte</h3>
+        <p className="mt-1 text-[15px] leading-[1.5] text-pm-muted">Echte Profile, ausgewählt nach Ihren Angaben.</p>
+        <div className="mt-4">{liste}</div>
+      </section>
     );
   }
   return (
@@ -312,7 +302,7 @@ export function KompaktePflegekraefte({ eintraege, laedt, alleBearbeitet, keineV
   keineVorschlaege: boolean;
   onProfil: (nurse: Nurse, i: number) => void;
   telefonHref: string;
-  /** Runde 16 (Weg): größere Fotos und Schrift, mehr Luft — die Profile sollen wie Menschen wirken, nicht wie Zeilen. */
+  /** Runde 16/17: größere Fotos und Schrift ab 390 px — die Profile sollen wie Menschen wirken, nicht wie Zeilen. */
   gross?: boolean;
 }) {
   const n = laedt ? 0 : eintraege.length;

@@ -6,8 +6,7 @@ const STERN = 'M10 1.6l2.47 5.2 5.7.72-4.2 3.93 1.08 5.64L10 14.3l-5.05 2.79 1.0
 
 // `klein` (nur Kompakt-Einstieg, Sternzeile unter dem Testsieger-Siegel der Kostenkarte): 12-px-Sterne,
 // Text 12,5 / 13,5 / 14 px (360 / 375 / ab 390 px) — so bleibt die Zeile bei 24 px Innenabstand einzeilig.
-// `eng` (Runde 16, Preiskarte im Weg, 270 px Platz): Text 13 px auf allen Breiten.
-export function BewertungsZeile({ stand, className = '', klein = false, eng = false }: { stand: SterneStand | null; className?: string; klein?: boolean; eng?: boolean }) {
+export function BewertungsZeile({ stand, className = '', klein = false }: { stand: SterneStand | null; className?: string; klein?: boolean }) {
   if (!stand) return null;
   const stern = klein ? 12 : 16;
   return (
@@ -21,7 +20,7 @@ export function BewertungsZeile({ stand, className = '', klein = false, eng = fa
         {[0, 1, 2, 3, 4].map((i) => {
           const fuellung = sternFuellung(stand.wert, i);
           return (
-            <svg key={i} viewBox="0 0 20 20" width={eng ? undefined : stern} height={eng ? undefined : stern} className={eng ? 'h-[11px] w-[11px] flex-none min-[390px]:h-3 min-[390px]:w-3' : 'flex-none'}>
+            <svg key={i} viewBox="0 0 20 20" width={stern} height={stern} className="flex-none">
               <path d={STERN} fill="#E5E3DF" />
               {fuellung > 0 && (
                 <path d={STERN} fill="#D4A843" style={fuellung < 1 ? { clipPath: `inset(0 ${Math.round((1 - fuellung) * 100)}% 0 0)` } : undefined} />
@@ -30,7 +29,7 @@ export function BewertungsZeile({ stand, className = '', klein = false, eng = fa
           );
         })}
       </span>
-      <span className={`${eng ? 'text-[12px] min-[375px]:text-[12.5px] min-[390px]:text-[13px]' : klein ? 'text-[12.5px] min-[375px]:text-[13.5px] min-[390px]:text-[14px]' : 'text-[15px]'} leading-snug text-pm-muted`}>
+      <span className={`${klein ? 'text-[12.5px] min-[375px]:text-[13.5px] min-[390px]:text-[14px]' : 'text-[15px]'} leading-snug text-pm-muted`}>
         <strong className="font-semibold text-pm-ink">{stand.schnitt}</strong> von 5 aus{' '}
         <span className="underline decoration-[#C9C4BC] underline-offset-[3px]">{anzahlText(stand.anzahl)}</span>
       </span>

@@ -79,7 +79,7 @@ import { SoGehtEsWeiter } from '../components/portal/SoGehtEsWeiter';
 import { FaqListe } from '../components/portal/FaqListe';
 import { MartaBox } from '../components/portal/MartaBox';
 import { BewertungsZeile } from '../components/portal/BewertungsZeile';
-import { KOMPAKT_KOPF_DUNKEL, KOMPAKT_LOOK, KompaktEinleitung, KompaktePflegekraefte, KompaktPflegekraefteBereich, KompaktVertrauen, WegStation } from '../components/portal/KompaktEinstieg';
+import { AngebotKopf, AngebotZeilen, KOMPAKT_LOOK, KompaktEinleitung, KompaktePflegekraefte, KompaktPflegekraefteBereich, KompaktVertrauen, angebotDatum, angebotGrundlage } from '../components/portal/KompaktEinstieg';
 import { Button } from '../components/ui/Button';
 import { Card } from '../components/ui/Card';
 import { SectionHeader, EYEBROW, H2 } from '../components/ui/SectionHeader';
@@ -2676,17 +2676,17 @@ const CustomerPortalPage: FC = () => {
             </p>
           </div>
         );
-        // Runde 16 (Weg): Station 1 „Angebot erstellt" trägt die Preiskarte; die Linie läuft ohne Abstand in
-        // die Station 2 darunter weiter (Abschnitt Pflegekräfte ohne pt).
-        const wegStation1 = kompakt && KOMPAKT_LOOK === 'weg';
-        const karte = (
-          <>
+        // Runde 17 (`?look=angebot`): die Karte als Angebot — Kopf mit Datum und Grundlage, Zeilen statt „Inklusive …".
+        const angebotLook = kompakt && KOMPAKT_LOOK === 'angebot';
+        const fdAngebot = (lead?.kalkulation as Record<string, unknown> | null | undefined)?.formularDaten as Record<string, unknown> | undefined;
+        return (
+        <div className={`max-w-3xl mx-auto ${kompakt ? 'px-5 pt-10' : `px-3.5 ${!patientSaved && !hasPending ? '-mt-6' : 'pt-5'}`}`}>
           {/* Karte im Look des Rechners (Teil 3, Martin 24.09.). „Ihr persönliches
               Angebot" steht im Kopf — der Abschnitt heißt nach seinem Inhalt. Der
               Chevron klappt den ganzen Abschnitt zu, sobald er nur noch Referenz ist
               (Martin: „muss einklappbar sein für spätere Zustände"). */}
           {/* Kompakt-Einstieg (Runde 15): weiß, 20 px Radius, ohne Rand, weicher zweilagiger Schatten, 24 px Innenabstand. */}
-          <Card className={`relative shadow-lift ${kompakt ? `!border-0 ${wegStation1 ? 'px-[18px] pt-5 min-[390px]:px-[22px] min-[390px]:pt-[22px]' : 'px-6 pt-6'} ${costsExpanded ? 'pb-2' : 'pb-6'}` : 'px-5 pt-3 pb-4'}`}>
+          <Card className={`relative shadow-lift ${kompakt ? `!border-0 px-6 ${angebotLook ? 'pt-5' : 'pt-6'} ${costsExpanded ? 'pb-2' : 'pb-6'}` : 'px-5 pt-3 pb-4'}`}>
             {kompakt ? (
               // Runde 13: keine Versalien-Zeile mehr — die Karte beginnt mit dem Preis; der Name bleibt
               // für Screenreader.
@@ -2725,10 +2725,14 @@ const CustomerPortalPage: FC = () => {
                     Voraussetzungen. */}
                   {kompakt ? (
                     <>
-                      <p className="flex items-baseline gap-2 whitespace-nowrap">
+                      {angebotLook && (
+                        <AngebotKopf datum={angebotDatum(lead?.created_at)} grundlage={angebotGrundlage(fdAngebot, lead?.care_start_timing)} />
+                      )}
+                      <p className={`${angebotLook ? 'mt-4 ' : ''}flex items-baseline gap-2 whitespace-nowrap`}>
                         <span className="text-[44px] font-bold leading-none tracking-[-0.03em] tabular-nums text-pm-ink">{formatEuro(brutto)}</span>
                         <span className="text-[16px] text-pm-muted">im Monat</span>
                       </p>
+                      {angebotLook ? <AngebotZeilen /> : (
                       <p className="mt-3 text-[14px] leading-[1.5] text-pm-muted">
                         {/* Wortlaut der Geschäftsführung (Runde 14). Betrag und Wort zusammen,
                             „pro Fahrt." nie allein in der letzten Zeile. */}
@@ -2736,6 +2740,7 @@ const CustomerPortalPage: FC = () => {
                         <span className="whitespace-nowrap">125 € Reisekosten</span>{' '}
                         <span className="whitespace-nowrap">pro Fahrt.</span>
                       </p>
+                      )}
                       {/* Runde 14: statt der Eigenanteil-Zeilen EIN leiser Textlink, kein Kasten. Er öffnet
                           die Aufstellung unten in der Karte (mit „Was bleibt für Sie übrig" und dem
                           Eigenanteil) und springt an ihren Anfang — einziger Weg dorthin. */}
@@ -2745,9 +2750,8 @@ const CustomerPortalPage: FC = () => {
                           onClick={zuAllenKosten}
                           className={`inline-flex min-h-[44px] -my-3 items-center ${LINK_RUHIG}`}
                         >
-                          {/* Runde 16 (Weg): ohne „Alle" — die Aufstellung nennt den Feiertagszuschlag nicht, und „alle
-                              Kosten" sagen wir nie (OpenAI 04.10.). Fassung 11 unverändert. */}
-                          {wegStation1 ? 'Kosten im Überblick ›' : 'Alle Kosten im Überblick ›'}
+                          {/* Runde 17: ohne „Alle" — die Aufstellung nennt den Feiertagszuschlag nicht. */}
+                          {angebotLook ? 'Kosten im Überblick ›' : 'Alle Kosten im Überblick ›'}
                         </button>
                       </p>
                     </>
@@ -2762,7 +2766,7 @@ const CustomerPortalPage: FC = () => {
                   {/* Kompakt-Einstieg: Haarlinie, die vier Punkte der Startseite (Runde 15: feiner grüner Haken,
                       16 px), Haarlinie, Testsieger-Siegel mit Testsieger/Erfahrung und darunter die Sterne. */}
                   {kompakt ? vierPunkteRuhig : vierPunkte('mt-4 flex flex-col gap-2.5')}
-                  {kompakt && <KompaktVertrauen sterne={sterne} eng={wegStation1} />}
+                  {kompakt && <KompaktVertrauen sterne={sterne} />}
                   {!kompakt && kostenErst}
                   {!kompakt && heimVergleich}
                   {!kompakt && testsieger}
@@ -2934,11 +2938,6 @@ const CustomerPortalPage: FC = () => {
           </>
           )}
           </Card>
-          </>
-        );
-        return (
-        <div className={`max-w-3xl mx-auto ${kompakt ? (wegStation1 ? 'px-5 pt-8' : 'px-5 pt-10') : `px-3.5 ${!patientSaved && !hasPending ? '-mt-6' : 'pt-5'}`}`}>
-          {wegStation1 ? <WegStation zustand="erledigt" titel="Ihr Angebot liegt vor" linie="gruen" titelId="angebot-titel">{karte}</WegStation> : karte}
         </div>
         );
       })();
@@ -3343,16 +3342,15 @@ const CustomerPortalPage: FC = () => {
         // (paper), 20 px Rand wie alle Abschnitte; Begrüßung 16 px muted, Titel 30 px (bis 375 px: 28) in 700,
         // die Kostenkarte folgt mit 40 px Abstand (statt über der Kante zu liegen).
         return (
-          // Runde 16 (Weg, `kopf=dunkel`): der Kopf im dunklen Band der Partnerseite (#191715), Text weiß.
-          <div className={kompakt ? (KOMPAKT_KOPF_DUNKEL ? 'bg-[#191715]' : '') : 'bg-pm-shell'}>
-            <div className={`max-w-3xl mx-auto ${kompakt ? (KOMPAKT_KOPF_DUNKEL ? 'px-5 pt-8 pb-10' : 'px-5 pt-6') : `px-[18px] pt-6 ${(!patientSaved && !hasPending) || sucheLaeuft ? 'pb-10' : 'pb-7'}`}`}>
-              <p className={`text-[16px] ${kompakt ? (KOMPAKT_KOPF_DUNKEL ? 'text-white/65' : 'text-pm-muted') : 'text-pm-taupe-ink'}`}>
+          <div className={kompakt ? '' : 'bg-pm-shell'}>
+            <div className={`max-w-3xl mx-auto ${kompakt ? 'px-5 pt-6' : `px-[18px] pt-6 ${(!patientSaved && !hasPending) || sucheLaeuft ? 'pb-10' : 'pb-7'}`}`}>
+              <p className={`text-[16px] ${kompakt ? 'text-pm-muted' : 'text-pm-taupe-ink'}`}>
                 Guten Tag{heroNameLine ? `, ${heroNameLine}` : ''}.
               </p>
               {/* Kompakt-Einstieg (Runde 5): Titel wie der Betreff der Angebotsmail; höchstens zwei Zeilen —
                   „24-Stunden-Betreuung" bricht nicht um (sonst „24-" allein am Zeilenende). */}
               <h1 className={kompakt
-                ? `mt-2 text-[28px] min-[376px]:text-[30px] font-bold leading-[1.15] tracking-[-0.025em] ${KOMPAKT_KOPF_DUNKEL ? 'text-white' : 'text-pm-ink'}`
+                ? 'mt-2 text-[28px] min-[376px]:text-[30px] font-bold leading-[1.15] tracking-[-0.025em] text-pm-ink'
                 : 'mt-1 font-extrabold leading-[1.08] tracking-[-0.035em] text-pm-ink text-[31px]'}>
                 {kompakt ? (
                   <>Ihr Angebot zur <span className="whitespace-nowrap">24-Stunden-Betreuung</span></>
@@ -3360,7 +3358,7 @@ const CustomerPortalPage: FC = () => {
               </h1>
               {/* Kompakt-Einstieg (Runde 13, „ruhig"): nur die Einleitung — keine Fakten-Zeile, kein Knopf,
                   keine Haken. Betont sind auf der Seite nur Kostenkarte und Hinweis. */}
-              {kompakt && <KompaktEinleitung dunkel={KOMPAKT_KOPF_DUNKEL} />}
+              {kompakt && <KompaktEinleitung />}
               {/* Offene Bewerbung (Martin 25.09.): Kopf nur Titel + Zeit, direkt
                   danach die Bewerbung; „Angebot prüfen" und die Vorteile der
                   Kostenrechner-Startseite stehen IN der Karte (AppCard `vorteile`). */}
@@ -3747,7 +3745,7 @@ const CustomerPortalPage: FC = () => {
 
       {!hasPending && (
       <div>
-      <div className={`max-w-3xl mx-auto ${kompakt ? (KOMPAKT_LOOK === 'weg' ? 'px-5' : 'px-5 pt-10') : 'px-3.5 pt-1 pb-4 space-y-4'}`}>
+      <div className={`max-w-3xl mx-auto ${kompakt ? 'px-5 pt-10' : 'px-3.5 pt-1 pb-4 space-y-4'}`}>
         {/* ── SECTION: 2 · Patientendaten — der Onboarding-Schritt steht VOR
              den Pflegekräften (vorher lag die Karte zwischen PK-Header und
              PK-Karten — genau die „zwei Kästen"-Verwirrung, Martin 2026-07-12). ── */}
@@ -3774,7 +3772,7 @@ const CustomerPortalPage: FC = () => {
               keineVorschlaege={pflegekraftAuswahl.allVisible.length === 0 && (IS_PREVIEW_ANY || (mmReady && !!mmMatchings?.data))}
               onProfil={openNurseFromMatch}
               telefonHref={TELEFON_HREF}
-              gross={KOMPAKT_LOOK === 'weg'}
+              gross={KOMPAKT_LOOK === 'angebot'}
             />
           }
         >
