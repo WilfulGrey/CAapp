@@ -79,7 +79,7 @@ import { SoGehtEsWeiter } from '../components/portal/SoGehtEsWeiter';
 import { FaqListe } from '../components/portal/FaqListe';
 import { MartaBox } from '../components/portal/MartaBox';
 import { BewertungsZeile } from '../components/portal/BewertungsZeile';
-import { KompaktEinleitung, KompaktePflegekraefte, KompaktPflegekraefteBereich, KompaktVertrauen } from '../components/portal/KompaktEinstieg';
+import { KOMPAKT_KOPF_DUNKEL, KOMPAKT_LOOK, KompaktEinleitung, KompaktePflegekraefte, KompaktPflegekraefteBereich, KompaktVertrauen, WegStation } from '../components/portal/KompaktEinstieg';
 import { Button } from '../components/ui/Button';
 import { Card } from '../components/ui/Card';
 import { SectionHeader, EYEBROW, H2 } from '../components/ui/SectionHeader';
@@ -2676,14 +2676,17 @@ const CustomerPortalPage: FC = () => {
             </p>
           </div>
         );
-        return (
-        <div className={`max-w-3xl mx-auto ${kompakt ? 'px-5 pt-10' : `px-3.5 ${!patientSaved && !hasPending ? '-mt-6' : 'pt-5'}`}`}>
+        // Runde 16 (Weg): Station 1 „Angebot erstellt" trägt die Preiskarte; die Linie läuft ohne Abstand in
+        // die Station 2 darunter weiter (Abschnitt Pflegekräfte ohne pt).
+        const wegStation1 = kompakt && KOMPAKT_LOOK === 'weg';
+        const karte = (
+          <>
           {/* Karte im Look des Rechners (Teil 3, Martin 24.09.). „Ihr persönliches
               Angebot" steht im Kopf — der Abschnitt heißt nach seinem Inhalt. Der
               Chevron klappt den ganzen Abschnitt zu, sobald er nur noch Referenz ist
               (Martin: „muss einklappbar sein für spätere Zustände"). */}
           {/* Kompakt-Einstieg (Runde 15): weiß, 20 px Radius, ohne Rand, weicher zweilagiger Schatten, 24 px Innenabstand. */}
-          <Card className={`relative shadow-lift ${kompakt ? `!border-0 px-6 pt-6 ${costsExpanded ? 'pb-2' : 'pb-6'}` : 'px-5 pt-3 pb-4'}`}>
+          <Card className={`relative shadow-lift ${kompakt ? `!border-0 ${wegStation1 ? 'px-[18px] pt-5 min-[390px]:px-[22px] min-[390px]:pt-[22px]' : 'px-6 pt-6'} ${costsExpanded ? 'pb-2' : 'pb-6'}` : 'px-5 pt-3 pb-4'}`}>
             {kompakt ? (
               // Runde 13: keine Versalien-Zeile mehr — die Karte beginnt mit dem Preis; der Name bleibt
               // für Screenreader.
@@ -2742,7 +2745,9 @@ const CustomerPortalPage: FC = () => {
                           onClick={zuAllenKosten}
                           className={`inline-flex min-h-[44px] -my-3 items-center ${LINK_RUHIG}`}
                         >
-                          Alle Kosten im Überblick ›
+                          {/* Runde 16 (Weg): ohne „Alle" — die Aufstellung nennt den Feiertagszuschlag nicht, und „alle
+                              Kosten" sagen wir nie (OpenAI 04.10.). Fassung 11 unverändert. */}
+                          {wegStation1 ? 'Kosten im Überblick ›' : 'Alle Kosten im Überblick ›'}
                         </button>
                       </p>
                     </>
@@ -2757,7 +2762,7 @@ const CustomerPortalPage: FC = () => {
                   {/* Kompakt-Einstieg: Haarlinie, die vier Punkte der Startseite (Runde 15: feiner grüner Haken,
                       16 px), Haarlinie, Testsieger-Siegel mit Testsieger/Erfahrung und darunter die Sterne. */}
                   {kompakt ? vierPunkteRuhig : vierPunkte('mt-4 flex flex-col gap-2.5')}
-                  {kompakt && <KompaktVertrauen sterne={sterne} />}
+                  {kompakt && <KompaktVertrauen sterne={sterne} eng={wegStation1} />}
                   {!kompakt && kostenErst}
                   {!kompakt && heimVergleich}
                   {!kompakt && testsieger}
@@ -2929,6 +2934,11 @@ const CustomerPortalPage: FC = () => {
           </>
           )}
           </Card>
+          </>
+        );
+        return (
+        <div className={`max-w-3xl mx-auto ${kompakt ? (wegStation1 ? 'px-5 pt-8' : 'px-5 pt-10') : `px-3.5 ${!patientSaved && !hasPending ? '-mt-6' : 'pt-5'}`}`}>
+          {wegStation1 ? <WegStation zustand="erledigt" titel="Ihr Angebot liegt vor" linie="gruen" titelId="angebot-titel">{karte}</WegStation> : karte}
         </div>
         );
       })();
@@ -3333,15 +3343,16 @@ const CustomerPortalPage: FC = () => {
         // (paper), 20 px Rand wie alle Abschnitte; Begrüßung 16 px muted, Titel 30 px (bis 375 px: 28) in 700,
         // die Kostenkarte folgt mit 40 px Abstand (statt über der Kante zu liegen).
         return (
-          <div className={kompakt ? '' : 'bg-pm-shell'}>
-            <div className={`max-w-3xl mx-auto ${kompakt ? 'px-5 pt-6' : `px-[18px] pt-6 ${(!patientSaved && !hasPending) || sucheLaeuft ? 'pb-10' : 'pb-7'}`}`}>
-              <p className={`text-[16px] ${kompakt ? 'text-pm-muted' : 'text-pm-taupe-ink'}`}>
+          // Runde 16 (Weg, `kopf=dunkel`): der Kopf im dunklen Band der Partnerseite (#191715), Text weiß.
+          <div className={kompakt ? (KOMPAKT_KOPF_DUNKEL ? 'bg-[#191715]' : '') : 'bg-pm-shell'}>
+            <div className={`max-w-3xl mx-auto ${kompakt ? (KOMPAKT_KOPF_DUNKEL ? 'px-5 pt-8 pb-10' : 'px-5 pt-6') : `px-[18px] pt-6 ${(!patientSaved && !hasPending) || sucheLaeuft ? 'pb-10' : 'pb-7'}`}`}>
+              <p className={`text-[16px] ${kompakt ? (KOMPAKT_KOPF_DUNKEL ? 'text-white/65' : 'text-pm-muted') : 'text-pm-taupe-ink'}`}>
                 Guten Tag{heroNameLine ? `, ${heroNameLine}` : ''}.
               </p>
               {/* Kompakt-Einstieg (Runde 5): Titel wie der Betreff der Angebotsmail; höchstens zwei Zeilen —
                   „24-Stunden-Betreuung" bricht nicht um (sonst „24-" allein am Zeilenende). */}
               <h1 className={kompakt
-                ? 'mt-2 text-[28px] min-[376px]:text-[30px] font-bold leading-[1.15] tracking-[-0.025em] text-pm-ink'
+                ? `mt-2 text-[28px] min-[376px]:text-[30px] font-bold leading-[1.15] tracking-[-0.025em] ${KOMPAKT_KOPF_DUNKEL ? 'text-white' : 'text-pm-ink'}`
                 : 'mt-1 font-extrabold leading-[1.08] tracking-[-0.035em] text-pm-ink text-[31px]'}>
                 {kompakt ? (
                   <>Ihr Angebot zur <span className="whitespace-nowrap">24-Stunden-Betreuung</span></>
@@ -3349,7 +3360,7 @@ const CustomerPortalPage: FC = () => {
               </h1>
               {/* Kompakt-Einstieg (Runde 13, „ruhig"): nur die Einleitung — keine Fakten-Zeile, kein Knopf,
                   keine Haken. Betont sind auf der Seite nur Kostenkarte und Hinweis. */}
-              {kompakt && <KompaktEinleitung />}
+              {kompakt && <KompaktEinleitung dunkel={KOMPAKT_KOPF_DUNKEL} />}
               {/* Offene Bewerbung (Martin 25.09.): Kopf nur Titel + Zeit, direkt
                   danach die Bewerbung; „Angebot prüfen" und die Vorteile der
                   Kostenrechner-Startseite stehen IN der Karte (AppCard `vorteile`). */}
@@ -3736,7 +3747,7 @@ const CustomerPortalPage: FC = () => {
 
       {!hasPending && (
       <div>
-      <div className={`max-w-3xl mx-auto ${kompakt ? 'px-5 pt-10' : 'px-3.5 pt-1 pb-4 space-y-4'}`}>
+      <div className={`max-w-3xl mx-auto ${kompakt ? (KOMPAKT_LOOK === 'weg' ? 'px-5' : 'px-5 pt-10') : 'px-3.5 pt-1 pb-4 space-y-4'}`}>
         {/* ── SECTION: 2 · Patientendaten — der Onboarding-Schritt steht VOR
              den Pflegekräften (vorher lag die Karte zwischen PK-Header und
              PK-Karten — genau die „zwei Kästen"-Verwirrung, Martin 2026-07-12). ── */}
@@ -3751,6 +3762,7 @@ const CustomerPortalPage: FC = () => {
              Profilen darunter (sonst bleibt `KompaktPflegekraefteBereich` dieses neutrale div). */}
         <KompaktPflegekraefteBereich
           aktiv={kompakt}
+          look={KOMPAKT_LOOK}
           offen={formImKasten}
           onOeffnen={() => setFormImKasten(true)}
           onImBlick={setFormularImBlick}
@@ -3762,6 +3774,7 @@ const CustomerPortalPage: FC = () => {
               keineVorschlaege={pflegekraftAuswahl.allVisible.length === 0 && (IS_PREVIEW_ANY || (mmReady && !!mmMatchings?.data))}
               onProfil={openNurseFromMatch}
               telefonHref={TELEFON_HREF}
+              gross={KOMPAKT_LOOK === 'weg'}
             />
           }
         >
