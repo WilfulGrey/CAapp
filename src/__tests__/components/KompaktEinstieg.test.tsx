@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { aufzaehlung, EigenanteilZeile, KompaktEinleitung, KompaktePflegekraefte, KompaktPflegekraefteBereich, KompaktVertrauen, PflegekraftZeile, zuschussKurzname } from '../../components/portal/KompaktEinstieg';
+import { aufzaehlung, EigenanteilZeile, KompaktEinleitung, KompaktePflegekraefte, KompaktPflegekraefteBereich, KompaktVertrauen, PflegekraftZeile, VERTRAUEN_PUNKTE, zuschussKurzname } from '../../components/portal/KompaktEinstieg';
 import type { Nurse } from '../../types';
 
 const basis: Nurse = {
@@ -124,33 +124,40 @@ describe('KompaktePflegekraefte', () => {
 });
 
 describe('KompaktEinleitung', () => {
-  it('Einleitung unter dem Titel im Wortlaut der Geschäftsführung; Einheiten brechen nicht um', () => {
+  it('kurze Einleitung im Wortlaut der Geschäftsführung; das Ende bricht nicht um', () => {
     const { container } = render(<KompaktEinleitung />);
     const absatz = container.querySelector('p')!;
     expect(absatz.textContent).toBe(
-      'Ihr Angebot umfasst eine Rund-um-Betreuung zu Hause durch bei uns angestellte, sozialversicherte Betreuungskräfte. Dazu kommen über 20 Jahre Erfahrung, tägliche Kündbarkeit und 6× Testsieger DIE WELT. Unten finden Sie die für Sie ausgewählten Pflegekräfte: einfach Pflegesituation vervollständigen und Favoriten einladen.',
+      'Wir haben passende Pflegekräfte für Sie gefunden. Vervollständigen Sie kurz Ihre Pflegesituation, dann laden Sie unverbindlich Ihre Favoriten ein.',
     );
-    for (const teil of ['20 Jahre', '6× Testsieger DIE WELT', 'Favoriten einladen.']) {
-      expect(within(absatz).getByText(teil).className).toContain('whitespace-nowrap');
-    }
+    expect(within(absatz).getByText('Favoriten ein.').className).toContain('whitespace-nowrap');
   });
 });
 
 describe('KompaktVertrauen', () => {
-  it('eine Zeile: kleines Testsieger-Siegel links, daneben die Sterne — kein Text zum Testsieger', () => {
+  it('vier kurze Haken im Wortlaut, dann Siegel und Sterne', () => {
     const { container } = render(<KompaktVertrauen sterne={{ schnitt: '4,9', wert: 4.9, anzahl: 126 }} />);
+    const liste = screen.getByRole('list');
+    expect(within(liste).getAllByRole('listitem').map((li) => li.textContent)).toEqual([
+      'Bei uns angestellt', 'Täglich kündbar', 'Über 20 Jahre Erfahrung', '6× Testsieger DIE WELT',
+    ]);
+    expect(VERTRAUEN_PUNKTE).toHaveLength(4);
+    // 2×2, spaltenweise (keine Trenner, kein Umbruch im Punkt).
+    expect(liste.className).toContain('grid-rows-2');
+    expect(liste.className).toContain('grid-flow-col');
+    for (const li of within(liste).getAllByRole('listitem')) expect(li.className).toContain('whitespace-nowrap');
     const siegel = container.querySelector('img')!;
     expect(siegel.getAttribute('src')).toBe('/badge-testsieger.webp');
     const sterne = screen.getByRole('link', { name: /4,9 von 5 aus 126 Bewertungen/ });
     expect(sterne.getAttribute('href')).toBe('https://primundus.de/erfahrungen');
     expect(siegel.parentElement).toBe(sterne.parentElement);
-    expect(siegel.compareDocumentPosition(sterne) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-    expect(container.textContent).not.toMatch(/Testsieger|Erfahrung/);
+    expect(liste.compareDocumentPosition(siegel) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 
-  it('ohne Bewertungsstand nur das Siegel', () => {
+  it('ohne Bewertungsstand: Haken und Siegel, keine Sterne', () => {
     const { container } = render(<KompaktVertrauen sterne={null} />);
     expect(screen.queryByRole('link')).toBeNull();
+    expect(screen.getAllByRole('listitem')).toHaveLength(4);
     expect(container.querySelector('img')).not.toBeNull();
   });
 });

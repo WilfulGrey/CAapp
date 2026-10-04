@@ -6,8 +6,8 @@
 // doch echte Pflegekräfte, daher brauchen wir keine Fake-Box … kurze, schöne und sichere Einleitung
 // zum Angebot, dann Kosten und dann Pflegekräfte. Wenn die Pflegesituation unvollständig ist, dann
 // ein Hinweis."):
-//   Kopf: Begrüßung, „Ihr Angebot zur 24-Stunden-Betreuung", Einleitung (KompaktEinleitung) und eine
-//     ruhige Zeile Vertrauen (KompaktVertrauen: kleines Testsieger-Siegel und Sterne)
+//   Kopf: Begrüßung, „Ihr Angebot zur 24-Stunden-Betreuung", kurze Einleitung (KompaktEinleitung),
+//     vier kurze Haken und das kleine Testsieger-Siegel mit den Sternen (KompaktVertrauen)
 //   → Kostenkarte: Preis, kleine Zeile, Eigenanteil (EigenanteilZeile; „So rechnen wir ›" öffnet die
 //     Aufstellung), die vier Punkte der Startseite
 //   → „Für Sie ausgewählt / Ihre passenden Pflegekräfte" (KompaktPflegekraefteBereich) mit dem
@@ -18,7 +18,7 @@
 // Schrift: Fließtext 16 px, kleine Schrift 14 px. Ausnahme 13 px für die dritte Zeile der
 // Pflegekräfte — so bleibt sie bei 390 px einzeilig.
 import { Fragment, useEffect, useRef, type ReactNode } from 'react';
-import { ChevronRight, Sparkles } from 'lucide-react';
+import { Check, ChevronRight, Sparkles } from 'lucide-react';
 import type { Nurse } from '../../types';
 import type { SterneStand } from '../../lib/sterne';
 import { BewertungsZeile } from './BewertungsZeile';
@@ -29,33 +29,46 @@ import { Card } from '../ui/Card';
 import { SectionHeader } from '../ui/SectionHeader';
 
 /**
- * Einleitung unter dem Titel (Runde 9, Wortlaut der Geschäftsführung): was das Angebot umfasst, warum
- * Primundus, und was unten zu tun ist. Fließtext wie die Unterzeilen der anderen Zustände — kein Kasten.
- * Zusammen bleiben „20 Jahre", „6× Testsieger DIE WELT" und das letzte Wortpaar.
+ * Einleitung unter dem Titel (Runde 10; Geschäftsführung: „viel zu lang, nicht überzeugend"): sofort
+ * sagen, dass passende Pflegekräfte da sind, was jetzt zu tun ist und dass es unverbindlich ist.
+ * Fließtext wie die Unterzeilen der anderen Zustände — kein Kasten.
  */
 export function KompaktEinleitung() {
   return (
     <p className="mt-3 text-[16px] leading-[1.55] text-pm-muted">
-      Ihr Angebot umfasst eine Rund-um-Betreuung zu Hause durch bei uns angestellte, sozialversicherte
-      Betreuungskräfte. Dazu kommen über <span className="whitespace-nowrap">20 Jahre</span> Erfahrung,
-      tägliche Kündbarkeit und <span className="whitespace-nowrap">6× Testsieger DIE WELT</span>. Unten
-      finden Sie die für Sie ausgewählten Pflegekräfte: einfach Pflegesituation vervollständigen und{' '}
-      <span className="whitespace-nowrap">Favoriten einladen.</span>
+      Wir haben passende Pflegekräfte für Sie gefunden. Vervollständigen Sie kurz Ihre Pflegesituation,
+      dann laden Sie unverbindlich Ihre <span className="whitespace-nowrap">Favoriten ein.</span>
     </p>
   );
 }
 
+/** Vier kurze Haken unter der Einleitung (Runde 10, Wortlaut der Geschäftsführung). */
+export const VERTRAUEN_PUNKTE = ['Bei uns angestellt', 'Täglich kündbar', 'Über 20 Jahre Erfahrung', '6× Testsieger DIE WELT'] as const;
+
 /**
- * Eine ruhige Zeile unter der Einleitung (Runde 9): das kleine Testsieger-Siegel und die Sterne wie
- * auf der Startseite. Höhe reserviert, damit nichts springt, wenn der Stand später kommt; ohne Stand
- * bleibt nur das Siegel. „6× Testsieger DIE WELT" und die Erfahrung stehen in der Einleitung.
+ * Vertrauen unter der Einleitung (Runde 10): vier kurze Haken, darunter das kleine Testsieger-Siegel
+ * mit den Sternen wie auf der Startseite (Höhe reserviert, damit nichts springt, wenn der Stand später
+ * kommt; ohne Stand bleibt nur das Siegel). Die Haken stehen als 2×2, spaltenweise gefüllt — links
+ * die kurzen, rechts die langen: So passen zwei Zeilen auch bei 360 px (312 von 324 px), ohne Trenner
+ * am Zeilenende und ohne Umbruch im Punkt. Auch breiter bleibt es bei 2×2 (die Spalte des Kopfs ist
+ * auf dem Tablet nur ca. 340 px breit, eine Zeile bräuchte 470 px).
  */
 export function KompaktVertrauen({ sterne }: { sterne: SterneStand | null }) {
   return (
-    <div className="mt-2.5 flex h-7 items-center gap-2">
-      <img src="/badge-testsieger.webp" alt="" className="h-7 w-auto flex-none object-contain" />
-      <BewertungsZeile stand={sterne} klein className="-my-2" />
-    </div>
+    <>
+      <ul className="mt-3 grid grid-flow-col grid-rows-2 justify-start gap-x-3 gap-y-1">
+        {VERTRAUEN_PUNKTE.map((punkt) => (
+          <li key={punkt} className="flex items-center gap-1 whitespace-nowrap text-[13px] font-medium leading-snug text-pm-ink">
+            <Check className="h-3.5 w-3.5 flex-none text-pm-coral" strokeWidth={3} aria-hidden="true" />
+            {punkt}
+          </li>
+        ))}
+      </ul>
+      <div className="mt-2 flex h-7 items-center gap-2">
+        <img src="/badge-testsieger.webp" alt="" className="h-7 w-auto flex-none object-contain" />
+        <BewertungsZeile stand={sterne} klein className="-my-2" />
+      </div>
+    </>
   );
 }
 

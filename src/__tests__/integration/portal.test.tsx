@@ -364,7 +364,7 @@ describe('Portal integration: golden paths', () => {
     // Auch der Kasten für Neukunden darf nicht kurz aufblitzen (Registry #102: `!schonAbgesendet`).
     expect(titel.some((t) => t.includes('Noch 2 Minuten bis zum Einladen'))).toBe(false);
     // …und der Kompakt-Einstieg auch nicht (Einleitung, Pflegekräfte-Bereich).
-    expect(titel.some((t) => t.includes('Rund-um-Betreuung zu Hause') || t.includes('Ihre passenden Pflegekräfte') || t.includes('Echte Profile, ausgewählt'))).toBe(false);
+    expect(titel.some((t) => t.includes('Wir haben passende Pflegekräfte') || t.includes('Ihre passenden Pflegekräfte') || t.includes('Echte Profile, ausgewählt'))).toBe(false);
     // Wunschstart aus dem gespeicherten Formular, nicht aus mamamia `arrival_at`.
     expect(screen.getByText(/Wunschstart 15\.11\./)).toBeInTheDocument();
   }, 15_000);
@@ -465,14 +465,16 @@ describe('Portal integration: golden paths', () => {
     const titel = screen.getByRole('heading', { level: 1, name: 'Ihr Angebot zur 24-Stunden-Betreuung' });
     const einleitung = titel.nextElementSibling as HTMLElement;
     expect(einleitung.textContent).toBe(
-      'Ihr Angebot umfasst eine Rund-um-Betreuung zu Hause durch bei uns angestellte, sozialversicherte Betreuungskräfte. Dazu kommen über 20 Jahre Erfahrung, tägliche Kündbarkeit und 6× Testsieger DIE WELT. Unten finden Sie die für Sie ausgewählten Pflegekräfte: einfach Pflegesituation vervollständigen und Favoriten einladen.',
+      'Wir haben passende Pflegekräfte für Sie gefunden. Vervollständigen Sie kurz Ihre Pflegesituation, dann laden Sie unverbindlich Ihre Favoriten ein.',
     );
     const kopf = titel.parentElement as HTMLElement;
     const sterne = await within(kopf).findByRole('link', { name: /4,9 von 5 aus 126 Bewertungen/ }, { timeout: 5000 });
     expect(einleitung.compareDocumentPosition(sterne) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-    // Runde 9: unter der Einleitung nur Siegel + Sterne, der Testsieger-Text steht in der Einleitung.
+    // Runde 10: unter der Einleitung vier kurze Haken, dann Siegel + Sterne.
+    expect(within(kopf).getAllByRole('listitem').map((li) => li.textContent)).toEqual([
+      'Bei uns angestellt', 'Täglich kündbar', 'Über 20 Jahre Erfahrung', '6× Testsieger DIE WELT',
+    ]);
     expect(kopf.querySelector('img[src="/badge-testsieger.webp"]')).not.toBeNull();
-    expect(within(kopf).queryByText(/über 20 Jahre Erfahrung$/)).toBeNull();
     // Reihenfolge: Kopf → Kostenkarte → Pflegekräfte-Bereich (Kopf, Hinweis, Zeilen).
     const karte = screen.getByText('Ihre Betreuungskosten').closest('.shadow-lift')!;
     expect(sterne.compareDocumentPosition(karte) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
