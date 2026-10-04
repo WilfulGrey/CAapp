@@ -129,6 +129,17 @@ describe('Social-Zuordnung: Meldung „Anfrage“ an den Content-Loop', () => {
     expect(ZUORDNUNG_ZEITLIMIT_MS).toBeLessThanOrEqual(3000);
   });
 
+  it('sendet nur an eine https-Adresse', async () => {
+    const fehler = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const { fn, aufrufe } = fetchMit(201);
+    for (const url of ['http://loop.example/functions/v1/zuordnung', 'loop.example/zuordnung', 'keine adresse']) {
+      expect(await anfrageAnContentLoop(HERKUNFT, { ...ENV, SOZIAL_ZUORDNUNG_URL: url }, fn, JETZT), url).toBe('aus');
+    }
+    expect(aufrufe).toHaveLength(0);
+    for (const [zeile] of fehler.mock.calls) expect(String(zeile)).not.toMatch(/loop\.example|geheim/);
+    fehler.mockRestore();
+  });
+
   it('genau ein Versuch: kein zweiter bei 5xx, Netzfehler oder 4xx', async () => {
     const fehler = vi.spyOn(console, 'error').mockImplementation(() => {});
     for (const antwort of [503, 'netzfehler', 422, 401] as const) {

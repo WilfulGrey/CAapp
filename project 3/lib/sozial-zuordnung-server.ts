@@ -36,6 +36,16 @@ export function anfrageNutzlast(herkunft: SozialHerkunft, jetzt: Date = new Date
 
 type Umgebung = Record<string, string | undefined>;
 
+/** Nur https: eine vertippte Adresse soll das Geheimnis nicht im Klartext verschicken (OpenAI-Prüfung S3). */
+function httpsAdresse(roh: string): string | null {
+  try {
+    const u = new URL(roh);
+    return u.protocol === 'https:' ? u.toString() : null;
+  } catch {
+    return null;
+  }
+}
+
 export async function anfrageAnContentLoop(
   herkunft: SozialHerkunft,
   env: Umgebung = process.env,
@@ -45,8 +55,13 @@ export async function anfrageAnContentLoop(
   const url = (env.SOZIAL_ZUORDNUNG_URL ?? '').trim();
   const schluessel = (env.SOZIAL_ZUORDNUNG_SCHLUESSEL ?? '').trim();
   if (!url || !schluessel) return 'aus';
+  const ziel = httpsAdresse(url);
+  if (!ziel) {
+    console.error('[sozial-zuordnung] SOZIAL_ZUORDNUNG_URL ist keine https-Adresse, nichts gesendet');
+    return 'aus';
+  }
   try {
-    const res = await fetchFn(url, {
+    const res = await fetchFn(ziel, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'x-zuordnung-schluessel': schluessel },
       body: JSON.stringify(anfrageNutzlast(herkunft, jetzt)),
