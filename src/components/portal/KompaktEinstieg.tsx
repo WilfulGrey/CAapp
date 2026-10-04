@@ -5,7 +5,7 @@
 // Reihenfolge auf der Seite (CustomerPortalPage, `kompakt`), Runde 6:
 //   Kopf: Begrüßung und „Ihr Angebot zur 24-Stunden-Betreuung"
 //   → Angebotskarte: Preis, kleine Zeile, Eigenanteil (EigenanteilZeile; „So rechnen wir ›" öffnet
-//     die Aufstellung), „Wir kümmern uns um alles" mit sechs Häkchen (WirKuemmernUns), Sterne
+//     die Aufstellung), „Wir kümmern uns um alles" mit sieben Häkchen (WirKuemmernUns), Sterne
 //   → Karte „N Pflegekräfte sind schon für Sie ausgewählt" (PflegekraefteKarte): Fotos, was zum
 //     Einladen fehlt, Knopf ins Formular; das bestehende 4-Schritte-Formular (AngebotCard) klappt
 //     darin auf
@@ -72,11 +72,15 @@ export function EigenanteilZeile({ betrag, posten, onRechnung }: {
   );
 }
 
-/** Die sechs Häkchen unter „Wir kümmern uns um alles" (Runde 6, Wortlaut der Geschäftsführung). */
+/**
+ * Die sieben Häkchen unter „Wir kümmern uns um alles" (Wortlaut der Geschäftsführung; Runde 7:
+ * „Keine Vermittlungsgebühr" gehört zu den USPs, die immer zu sehen sein müssen).
+ */
 export const KUEMMERN_PUNKTE = [
   'Anreise ab 3 Tagen möglich',
   'Wechsel und Ersatz geregelt',
   'Täglich kündbar',
+  'Keine Vermittlungsgebühr',
   'Bestpreisgarantie',
   'Über 20 Jahre Erfahrung',
   '6× Testsieger DIE WELT',
@@ -84,7 +88,7 @@ export const KUEMMERN_PUNKTE = [
 
 /**
  * Vertrauen in der Angebotskarte (Runde 6): dünne Linie, kleine fette Überschrift mit dem
- * Testsieger-Siegel rechts, darunter sechs kurze Häkchen in der Schrift der früheren vier Punkte.
+ * Testsieger-Siegel rechts, darunter sieben kurze Häkchen in der Schrift der früheren vier Punkte.
  * Eine Spalte auf dem Handy: Die längsten Punkte brauchen mit Haken je 212 px, zwei Spalten
  * bräuchten 437 px (bei 360 px sind 290 frei) — zwei Spalten erst ab 640 px.
  * „Bestpreisgarantie" öffnet das bestehende Pop-up, leise unterstrichen.

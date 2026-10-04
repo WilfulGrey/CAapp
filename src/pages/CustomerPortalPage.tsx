@@ -2725,7 +2725,7 @@ const CustomerPortalPage: FC = () => {
                   )}
                   {!kompakt && vierPunkte('mt-4 flex flex-col gap-2.5')}
                   {/* Kompakt-Einstieg (Runde 6): statt der vier Punkte „Wir kümmern uns um alles" mit
-                      sechs Häkchen, darunter die Sterne (Höhe reserviert, damit nichts darunter springt,
+                      sieben Häkchen, darunter die Sterne (Höhe reserviert, damit nichts darunter springt,
                       wenn der Stand später kommt; ohne Stand keine Zeile). */}
                   {kompakt && (
                     <>

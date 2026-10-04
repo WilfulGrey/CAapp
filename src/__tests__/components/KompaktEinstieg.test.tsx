@@ -126,7 +126,7 @@ describe('KompaktePflegekraefte', () => {
 });
 
 describe('WirKuemmernUns', () => {
-  it('kleine fette Überschrift mit Siegel daneben, darunter die sechs Häkchen im Wortlaut', () => {
+  it('kleine fette Überschrift mit Siegel daneben, darunter die sieben Häkchen im Wortlaut', () => {
     const { container } = render(<WirKuemmernUns onBestpreis={() => {}} />);
     const titel = screen.getByRole('heading', { name: 'Wir kümmern uns um alles' });
     // Siegel rechts in derselben Zeile, nur als Bild (der Punkt sagt es in Worten).
@@ -139,11 +139,12 @@ describe('WirKuemmernUns', () => {
       'Anreise ab 3 Tagen möglich',
       'Wechsel und Ersatz geregelt',
       'Täglich kündbar',
+      'Keine Vermittlungsgebühr',
       'Bestpreisgarantie',
       'Über 20 Jahre Erfahrung',
       '6× Testsieger DIE WELT',
     ]);
-    expect(KUEMMERN_PUNKTE).toHaveLength(6);
+    expect(KUEMMERN_PUNKTE).toHaveLength(7);
     // Eine Spalte auf dem Handy, zwei erst ab 640 px.
     expect(screen.getByRole('list').className).toContain('grid-cols-1');
     expect(screen.getByRole('list').className).toContain('sm:grid-cols-2');

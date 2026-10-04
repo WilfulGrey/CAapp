@@ -398,14 +398,15 @@ describe('Portal integration: golden paths', () => {
 
   // ─── Startseiten-Punkte + Sprunglink goto=anfragen (Martin 26.09.) ───────
 
-  it('Kompakt-Einstieg: statt der vier Startseiten-Punkte „Wir kümmern uns um alles" mit sechs Häkchen; die alte Liste bleibt weg', async () => {
+  it('Kompakt-Einstieg: statt der vier Startseiten-Punkte „Wir kümmern uns um alles" mit sieben Häkchen; die alte Liste bleibt weg', async () => {
     server.use(...defaultHandlers({ proxy: { listApplications: () => ({ JobOfferApplicationsWithPagination: { total: 0, data: [] } }) } }));
     setLocation(`?token=${TEST_LEAD_TOKEN}`);
     render(<CustomerPortalPage />);
     expect(await screen.findByRole('heading', { name: 'Wir kümmern uns um alles' }, { timeout: 5000 })).toBeInTheDocument();
     expect(screen.getByText('Täglich kündbar')).toBeInTheDocument();
+    // „Keine Vermittlungsgebühr" bleibt als Häkchen (USP, Runde 7); die übrigen Startseiten-Punkte nicht.
+    expect(screen.getByText('Keine Vermittlungsgebühr')).toBeInTheDocument();
     expect(screen.queryByText('Kein Vertrag vor Ihrer Auswahl')).toBeNull();
-    expect(screen.queryByText('Keine Vermittlungsgebühr')).toBeNull();
     expect(screen.queryByText('Täglich kündbar, taggenau abgerechnet')).toBeNull();
     expect(screen.queryByText('Erst auswählen, dann buchen')).toBeNull();
     expect(screen.queryByText('Tagesgenaue Abrechnung')).toBeNull();
@@ -516,19 +517,19 @@ describe('Portal integration: golden paths', () => {
     expect(text(eigenanteil)).toBe('Ihr Eigenanteil: ca. 2.453 € im Monat');
     expect(text(eigenanteil.nextElementSibling!)).toBe('nach Pflegegeld · So rechnen wir ›');
     expect(kleineZeile.compareDocumentPosition(eigenanteil) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-    // Dann „Wir kümmern uns um alles" mit dem Siegel und den sechs Häkchen, dann die Sterne.
+    // Dann „Wir kümmern uns um alles" mit dem Siegel und den sieben Häkchen, dann die Sterne.
     const kuemmern = inKarte.getByRole('heading', { name: 'Wir kümmern uns um alles' });
     expect(eigenanteil.compareDocumentPosition(kuemmern) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(karte.querySelectorAll('img[src="/badge-testsieger.webp"]')).toHaveLength(1);
     const liste = kuemmern.parentElement!.nextElementSibling as HTMLElement;
     expect(within(liste).getAllByRole('listitem').map((li) => li.textContent)).toEqual([
       'Anreise ab 3 Tagen möglich', 'Wechsel und Ersatz geregelt', 'Täglich kündbar',
-      'Bestpreisgarantie', 'Über 20 Jahre Erfahrung', '6× Testsieger DIE WELT',
+      'Keine Vermittlungsgebühr', 'Bestpreisgarantie', 'Über 20 Jahre Erfahrung', '6× Testsieger DIE WELT',
     ]);
     const sterne = await within(karte).findByRole('link', { name: /4,9 von 5 aus 126 Bewertungen/ }, { timeout: 5000 });
     expect(liste.compareDocumentPosition(sterne) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     // Weg: die vier Punkte, der Testsieger-Block, das Garantie-Siegel, die Zeile „Alle Kosten im Überblick".
-    expect(inKarte.queryByText('Keine Vermittlungsgebühr')).toBeNull();
+    expect(inKarte.queryByText('Kein Vertrag vor Ihrer Auswahl')).toBeNull();
     expect(inKarte.queryByRole('button', { name: 'Mehr Infos' })).toBeNull();
     expect(inKarte.queryByText(/60\.000 Einsätze/)).toBeNull();
     expect(inKarte.queryByRole('img', { name: /Bestpreisgarantie/ })).toBeNull();
