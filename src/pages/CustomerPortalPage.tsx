@@ -79,7 +79,7 @@ import { SoGehtEsWeiter } from '../components/portal/SoGehtEsWeiter';
 import { FaqListe } from '../components/portal/FaqListe';
 import { MartaBox } from '../components/portal/MartaBox';
 import { BewertungsZeile } from '../components/portal/BewertungsZeile';
-import { AngebotEinleitung, AngebotKopf, AngebotVorteile, KOMPAKT_LOOK, KompaktEinleitung, KompaktePflegekraefte, KompaktPflegekraefteBereich, KompaktVertrauen, angebotDatum, angebotFuer } from '../components/portal/KompaktEinstieg';
+import { AngebotKopf, AngebotLeistung, AngebotVertrauen, AngebotVorteile, KOMPAKT_LOOK, KompaktEinleitung, KompaktePflegekraefte, KompaktPflegekraefteBereich, KompaktVertrauen, angebotDatum, angebotFuer } from '../components/portal/KompaktEinstieg';
 import { Button } from '../components/ui/Button';
 import { Card } from '../components/ui/Card';
 import { SectionHeader, EYEBROW, H2 } from '../components/ui/SectionHeader';
@@ -2725,7 +2725,10 @@ const CustomerPortalPage: FC = () => {
                   {kompakt ? (
                     <>
                       {angebotLook && (
-                        <AngebotKopf datum={angebotDatum(lead?.created_at)} />
+                        <>
+                          <AngebotKopf datum={angebotDatum(lead?.created_at)} />
+                          <AngebotLeistung fuer={angebotFuer((lead?.kalkulation as Record<string, unknown> | null | undefined)?.formularDaten as Record<string, unknown> | undefined)} />
+                        </>
                       )}
                       <p className={`${angebotLook ? 'mt-4 ' : ''}flex items-baseline gap-2 whitespace-nowrap`}>
                         <span className="text-[44px] font-bold leading-none tracking-[-0.03em] tabular-nums text-pm-ink">{formatEuro(brutto)}</span>
@@ -2772,7 +2775,8 @@ const CustomerPortalPage: FC = () => {
                   {/* Kompakt-Einstieg: Haarlinie, die vier Punkte der Startseite (Runde 15: feiner grüner Haken,
                       16 px), Haarlinie, Testsieger-Siegel mit Testsieger/Erfahrung und darunter die Sterne. */}
                   {kompakt ? (angebotLook ? null : vierPunkteRuhig) : vierPunkte('mt-4 flex flex-col gap-2.5')}
-                  {kompakt && <KompaktVertrauen sterne={sterne} />}
+                  {/* Runde 19: Im Look „angebot" stehen Siegel und Sterne oben unter dem Titel. */}
+                  {kompakt && !angebotLook && <KompaktVertrauen sterne={sterne} />}
                   {!kompakt && kostenErst}
                   {!kompakt && heimVergleich}
                   {!kompakt && testsieger}
@@ -3369,10 +3373,11 @@ const CustomerPortalPage: FC = () => {
               </h1>
               {/* Kompakt-Einstieg (Runde 13, „ruhig"): nur die Einleitung — keine Fakten-Zeile, kein Knopf,
                   keine Haken. Betont sind auf der Seite nur Kostenkarte und Hinweis. */}
-              {/* Runde 18 (`?look=angebot`): kurze Einleitung mit Grundlage, dann die Vorteile — der Preis folgt darunter. */}
+              {/* Runde 19 (`?look=angebot`): oben nur unsere Vorteile — Siegel, Testsieger, Erfahrung, Sterne und vier
+                  Punkte. Die Situation (Personen, Pflegegrad) steht unten in der Preiskarte. */}
               {kompakt && KOMPAKT_LOOK === 'angebot' ? (
                 <>
-                  <AngebotEinleitung fuer={angebotFuer((lead?.kalkulation as Record<string, unknown> | null | undefined)?.formularDaten as Record<string, unknown> | undefined)} />
+                  <AngebotVertrauen sterne={sterne} />
                   <AngebotVorteile onBestpreis={() => setBestpreisOffen(true)} />
                 </>
               ) : kompakt && <KompaktEinleitung />}

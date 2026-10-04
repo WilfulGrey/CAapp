@@ -74,14 +74,37 @@ export function AngebotKopf({ datum }: { datum: string | null }) {
 }
 
 /**
- * Runde 18: Einleitung zum Angebot, kurz — Leistung und Grundlage in einem Satz, dann „wir kümmern uns".
+ * Runde 19 (Martin: „die Situation nicht oben, das kann man unten machen"): was das Angebot umfasst, steht in der
+ * Preiskarte über dem Preis — mit der Grundlage aus der Anfrage, falls vorhanden.
  */
-export function AngebotEinleitung({ fuer }: { fuer: string | null }) {
+export function AngebotLeistung({ fuer }: { fuer: string | null }) {
   return (
-    <p className="mt-4 text-[17px] leading-[1.55] text-pm-muted">
-      Ihr Angebot umfasst eine Rund-um-Betreuung zu Hause{fuer ? ` ${fuer}` : ''}. Anreise, Wechsel und Vertretung
-      der Betreuungskräfte organisieren <span className="whitespace-nowrap">wir.</span>
+    <p className="mt-4 text-[15px] leading-[1.5] text-pm-body">
+      Rund-um-Betreuung zu Hause{fuer ? ` ${fuer}` : ''}. Anreise, Wechsel und Vertretung organisieren{' '}
+      <span className="whitespace-nowrap">wir.</span>
     </p>
+  );
+}
+
+/**
+ * Runde 19 (Martin: „eher unsere Vorteile rein, Testsieger, sechsfach und sowas … das Siegel und die Sterne sind noch
+ * nicht sichtbar … vorne mit reinbekommen"): Siegel mit Testsieger, Erfahrung und Sternen direkt unter dem Titel, ohne
+ * Kasten. Die Sterne stehen ohne Stand nicht da (kein Ersatzwert), die Höhe bleibt reserviert.
+ */
+export function AngebotVertrauen({ sterne }: { sterne: SterneStand | null }) {
+  return (
+    <div className="mt-5 flex items-center gap-3.5">
+      <img src="/badge-testsieger.webp" alt="Testsieger DIE WELT" className="h-[66px] w-auto flex-none object-contain" />
+      <div className="min-w-0">
+        <p className="text-[15px] font-semibold leading-[1.35] text-pm-ink min-[390px]:text-[16px]">
+          6× in Folge Testsieger <span className="whitespace-nowrap">DIE WELT</span>
+        </p>
+        <p className="text-[14px] leading-[1.4] text-pm-muted min-[390px]:text-[15px]">über 20 Jahre Erfahrung</p>
+        <div className="flex h-6 items-center">
+          <BewertungsZeile stand={sterne} klein className="-my-2.5" />
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -95,7 +118,7 @@ export function AngebotVorteile({ onBestpreis }: { onBestpreis: () => void }) {
   const zeile = 'flex items-start gap-3 text-[17px] leading-[1.45] text-pm-body';
   const haken = <Check className="mt-[3px] h-5 w-5 flex-none text-pm-green" strokeWidth={2.25} aria-hidden="true" />;
   return (
-    <ul className="mt-6 flex flex-col gap-3.5">
+    <ul className="mt-5 flex flex-col gap-3.5">
       <li className={zeile}>{haken}<span><b className="font-semibold text-pm-ink">Alles im Preis:</b> Lohn, Steuern, Sozialabgaben und Gebühren</span></li>
       <li className={zeile}>{haken}<span><b className="font-semibold text-pm-ink">Bei uns angestellt</b> und sozialversichert</span></li>
       <li className={zeile}>{haken}<span><b className="font-semibold text-pm-ink">Täglich kündbar,</b> taggenau abgerechnet</span></li>
