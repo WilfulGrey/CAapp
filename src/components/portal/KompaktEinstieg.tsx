@@ -2,26 +2,71 @@
 // (Vorschlag 03.10.2026 für Martin: „ganz kompakt auf Angebot und passende Pflegekräfte … das ist
 // erledigt, das ist das Angebot, das ist der nächste Schritt, hier sind die Pflegekräfte").
 //
-// Reihenfolge auf der Seite (CustomerPortalPage, `kompakt`), Runde 6:
-//   Kopf: Begrüßung und „Ihr Angebot zur 24-Stunden-Betreuung"
-//   → Angebotskarte: Preis, kleine Zeile, Eigenanteil (EigenanteilZeile; „So rechnen wir ›" öffnet
-//     die Aufstellung), „Wir kümmern uns um alles" mit sieben Häkchen (WirKuemmernUns), Sterne
-//   → Karte „N Pflegekräfte sind schon für Sie ausgewählt" (PflegekraefteKarte): Fotos, was zum
-//     Einladen fehlt, Knopf ins Formular; das bestehende 4-Schritte-Formular (AngebotCard) klappt
-//     darin auf
-//   → die Profile als Zeilen ohne Knöpfe (KompaktePflegekraefte).
+// Reihenfolge auf der Seite (CustomerPortalPage, `kompakt`), Runde 8 (Geschäftsführung: „Wir haben
+// doch echte Pflegekräfte, daher brauchen wir keine Fake-Box … kurze, schöne und sichere Einleitung
+// zum Angebot, dann Kosten und dann Pflegekräfte. Wenn die Pflegesituation unvollständig ist, dann
+// ein Hinweis."):
+//   Kopf: Begrüßung, „Ihr Angebot zur 24-Stunden-Betreuung", Einleitung (KompaktEinleitung) und zwei
+//     ruhige Zeilen Vertrauen (KompaktVertrauen: Sterne, Testsieger)
+//   → Kostenkarte: Preis, kleine Zeile, Eigenanteil (EigenanteilZeile; „So rechnen wir ›" öffnet die
+//     Aufstellung), die vier Punkte der Startseite
+//   → „Für Sie ausgewählt / Ihre passenden Pflegekräfte" (KompaktPflegekraefteBereich) mit dem
+//     schmalen Hinweis „Noch 2 Minuten bis zum Einladen" (das 4-Schritte-Formular klappt darin auf),
+//     darunter die echten Profile als Zeilen ohne Knöpfe (KompaktePflegekraefte).
 // Alle anderen Zustände (abgesendet, Bewerbung, gebucht …) bleiben unverändert.
 //
-// Schrift: Fließtext 16 px, kleine Schrift 14 px. Ausnahme 13 px für die dritte Zeile der
-// Pflegekräfte — so bleibt sie bei 390 px einzeilig.
+// Schrift: Fließtext 16 px, kleine Schrift 14 px. Ausnahmen 13 px: die dritte Zeile der
+// Pflegekräfte (bei 390 px einzeilig) und die Testsieger-Zeile im Kopf (ab 375 px einzeilig).
 import { Fragment, useEffect, useRef, type ReactNode } from 'react';
-import { Check, ChevronRight, Sparkles } from 'lucide-react';
+import { ChevronRight, Sparkles } from 'lucide-react';
 import type { Nurse } from '../../types';
+import type { SterneStand } from '../../lib/sterne';
+import { BewertungsZeile } from './BewertungsZeile';
 import { DeutschPunkte } from './PflegekraftProfil';
 import { displayName, initials } from './shared';
 import { Button } from '../ui/Button';
 import { Card } from '../ui/Card';
-import { EYEBROW } from '../ui/SectionHeader';
+import { SectionHeader } from '../ui/SectionHeader';
+
+/**
+ * Einleitung unter dem Titel (Runde 8, Wortlaut der Geschäftsführung): was die Betreuung ist und dass
+ * wir uns um alles kümmern. Fließtext wie die Unterzeilen der anderen Zustände — kein Kasten.
+ */
+export function KompaktEinleitung() {
+  return (
+    <p className="mt-3 text-[16px] leading-[1.55] text-pm-muted">
+      Eine bei uns angestellte Betreuungskraft wohnt bei Ihnen und hilft im Alltag. Sie wählen in Ruhe aus,
+      um alles Weitere kümmern wir uns: Anreise, Wechsel und Ersatz, wenn jemand ausfällt.
+    </p>
+  );
+}
+
+/**
+ * Zwei ruhige Zeilen unter der Einleitung (Runde 8): die Sterne wie auf der Startseite (Höhe
+ * reserviert, damit nichts springt, wenn der Stand später kommt; ohne Stand keine Zeile) und das
+ * kleine Testsieger-Siegel mit „6× Testsieger DIE WELT · über 20 Jahre Erfahrung". Die Zeile braucht
+ * bei 13 px 309 px — unter 375 px passt sie nicht, dort steht „über 20 Jahre Erfahrung" ohne „·"
+ * in der zweiten Zeile (kein Punkt am Zeilenende).
+ */
+export function KompaktVertrauen({ sterne }: { sterne: SterneStand | null }) {
+  return (
+    <>
+      <div className="mt-2.5 flex h-7 items-center">
+        <BewertungsZeile stand={sterne} klein className="-my-2" />
+      </div>
+      <div className="mt-1 flex items-center gap-2">
+        <img src="/badge-testsieger.webp" alt="" className="h-7 w-auto flex-none object-contain" />
+        <p className="text-[13px] leading-snug text-pm-muted">
+          <span className="font-semibold text-pm-ink">6× Testsieger DIE WELT</span>
+          <span className="hidden min-[375px]:inline"> · </span>
+          <br className="min-[375px]:hidden" />
+          über 20 Jahre Erfahrung
+        </p>
+      </div>
+    </>
+  );
+}
+
 
 /** Kurzname eines Zuschusses für „nach …"; unbekannte Posten wie im Aufklapper (Label ohne Klammer). */
 const KURZNAME: Record<string, string> = {
@@ -73,109 +118,26 @@ export function EigenanteilZeile({ betrag, posten, onRechnung }: {
 }
 
 /**
- * Die sieben Häkchen unter „Wir kümmern uns um alles" (Wortlaut der Geschäftsführung; Runde 7:
- * „Keine Vermittlungsgebühr" gehört zu den USPs, die immer zu sehen sein müssen).
+ * Pflegekräfte-Bereich (Runde 8): Kopf „Für Sie ausgewählt / Ihre passenden Pflegekräfte", darunter
+ * der schmale Hinweis „Noch 2 Minuten bis zum Einladen" — im Kompakt-Einstieg ist die Pflegesituation
+ * per Definition noch nicht abgeschickt, also steht er hier immer — dann die echten Profile (`liste`).
+ * Der Knopf öffnet das bestehende 4-Schritte-Formular IM Hinweis (`children` = eingebettete
+ * AngebotCard; px-5, weil die mitlaufende Knopfleiste von Rand zu Rand reicht). id des Hinweises =
+ * Sprungziel aller Wege ins Formular (`zurPflegesituation`, Mail-Link `goto=anfragen`, „Einladen" im
+ * Profil). `aktiv=false` (alle anderen Zustände): nur ein neutraler Rahmen um das Formular wie bisher.
+ * `onImBlick`: Hinweis im Bild ja/nein — die schwebende Frage legt sich nicht über das Formular.
  */
-export const KUEMMERN_PUNKTE = [
-  'Anreise ab 3 Tagen möglich',
-  'Wechsel und Ersatz geregelt',
-  'Täglich kündbar',
-  'Keine Vermittlungsgebühr',
-  'Bestpreisgarantie',
-  'Über 20 Jahre Erfahrung',
-  '6× Testsieger DIE WELT',
-] as const;
-
-/**
- * Vertrauen in der Angebotskarte (Runde 6): dünne Linie, kleine fette Überschrift mit dem
- * Testsieger-Siegel rechts, darunter sieben kurze Häkchen in der Schrift der früheren vier Punkte.
- * Eine Spalte auf dem Handy: Die längsten Punkte brauchen mit Haken je 212 px, zwei Spalten
- * bräuchten 437 px (bei 360 px sind 290 frei) — zwei Spalten erst ab 640 px.
- * „Bestpreisgarantie" öffnet das bestehende Pop-up, leise unterstrichen.
- */
-export function WirKuemmernUns({ onBestpreis }: { onBestpreis: () => void }) {
-  return (
-    <div className="mt-3.5 border-t border-pm-line-soft pt-3">
-      <div className="flex items-center justify-between gap-3">
-        <h2 className="text-[16px] font-bold leading-snug text-pm-ink">Wir kümmern uns um alles</h2>
-        {/* Nur das Bild: „6× Testsieger DIE WELT" steht als Punkt darunter in Worten. */}
-        <img src="/badge-testsieger.webp" alt="" className="h-9 w-auto flex-none object-contain" />
-      </div>
-      <ul className="mt-1.5 grid grid-cols-1 gap-y-1 sm:grid-cols-2 sm:gap-x-4">
-        {KUEMMERN_PUNKTE.map((punkt) => (
-          <li
-            key={punkt}
-            className="flex items-center gap-1.5 text-[14px] leading-snug text-pm-ink min-[375px]:text-[14.5px] min-[390px]:gap-2 min-[390px]:text-[15px]"
-          >
-            <Check className="h-[17px] w-[17px] flex-none text-pm-coral" strokeWidth={2.5} aria-hidden="true" />
-            {punkt === 'Bestpreisgarantie' ? (
-              <button
-                type="button"
-                onClick={onBestpreis}
-                className="-my-3 inline-flex min-h-[44px] items-center text-left underline decoration-pm-taupe/40 underline-offset-[3px]"
-              >
-                {punkt}
-              </button>
-            ) : (
-              punkt
-            )}
-          </li>
-        ))}
-      </ul>
-    </div>
-  );
-}
-
-/**
- * Fotos der Vorschläge übereinander wie im Kostenrechner (Kontakt-Schritt und Preisseite:
- * runde Fotos mit weißem Rand, je 10 px überlappend), hier 40 px groß. Ohne Foto: Initialen.
- */
-export function FotoStapel({ nurses }: { nurses: Nurse[] }) {
-  return (
-    <div className="flex flex-none" aria-hidden="true">
-      {nurses.map((nurse, i) => (
-        <span
-          key={nurse.caregiverId ?? i}
-          className={`relative h-10 w-10 flex-none overflow-hidden rounded-full border-2 border-white ${i > 0 ? '-ml-2.5' : ''}`}
-        >
-          {nurse.image ? (
-            <img src={nurse.image} alt="" className="absolute inset-0 h-full w-full object-cover" />
-          ) : (
-            <span className="absolute inset-0 flex items-center justify-center text-[13px] font-bold text-white" style={{ backgroundColor: nurse.color }}>
-              {initials(nurse.name)}
-            </span>
-          )}
-        </span>
-      ))}
-    </div>
-  );
-}
-
-/**
- * Karte „N Pflegekräfte sind schon für Sie ausgewählt" (Runde 6) direkt nach der Angebotskarte —
- * die Hauptaktion der Seite: Fotos der Vorschläge, was zum Einladen fehlt, Knopf ins Formular.
- * Der Knopf öffnet das bestehende Formular IN der Karte (`children` = eingebettete AngebotCard;
- * die mitlaufende Knopfleiste reicht wie bisher von Rand zu Rand, darum px-5). id = Sprungziel
- * aller Wege ins Formular (`zurPflegesituation`, Mail-Link `goto=anfragen`).
- * `aktiv=false` (alle anderen Zustände): nur ein neutraler Rahmen um das Formular wie bisher.
- * `onImBlick`: Karte im Bild ja/nein — die schwebende Frage legt sich nicht über das Formular
- * (Regel aus Registry #102).
- */
-export function PflegekraefteKarte({ aktiv, nurses, laedt, offen, onOeffnen, onProfile, onImBlick, children }: {
+export function KompaktPflegekraefteBereich({ aktiv, offen, onOeffnen, onImBlick, liste, children }: {
   aktiv: boolean;
-  /** Sichtbare Vorschläge in Anzeige-Reihenfolge (dieselben wie die Zeilen darunter). */
-  nurses: Nurse[];
-  laedt: boolean;
   offen: boolean;
   onOeffnen: () => void;
-  /** „Alle N Profile ansehen ↓": zu den Zeilen. */
-  onProfile: () => void;
   onImBlick?: (imBlick: boolean) => void;
+  liste: ReactNode;
   children: ReactNode;
 }) {
-  const karte = useRef<HTMLElement>(null);
+  const hinweis = useRef<HTMLDivElement>(null);
   useEffect(() => {
-    const el = karte.current;
+    const el = hinweis.current;
     if (!aktiv || !el || !onImBlick || typeof IntersectionObserver === 'undefined') return;
     const io = new IntersectionObserver((e) => onImBlick(e.some((x) => x.isIntersecting)));
     io.observe(el);
@@ -183,69 +145,50 @@ export function PflegekraefteKarte({ aktiv, nurses, laedt, offen, onOeffnen, onP
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [aktiv]);
   if (!aktiv) return <div>{children}</div>;
-  const n = laedt ? 0 : nurses.length;
-  // Ohne geladene Vorschläge keine Zahl und keine Fotos — nie eine Auswahl behaupten, die nicht da ist.
-  // „für Sie ausgewählt" bleibt zusammen, sonst stand bei 390 px „ausgewählt" allein in Zeile 2.
-  const titel: ReactNode = n === 0 ? 'Passende Pflegekräfte' : (
-    <>
-      {n === 1 ? '1 Pflegekraft ist schon' : `${n} Pflegekräfte sind schon`}{' '}
-      <span className="whitespace-nowrap">für Sie ausgewählt</span>
-    </>
-  );
   return (
-    <section
-      ref={karte}
-      id="patientendaten"
-      aria-labelledby="pflegekraefte-karte-titel"
-      className="scroll-mt-16 rounded-card border-2 border-pm-taupe bg-white px-5 pb-5 pt-4 shadow-lift"
-    >
-      <h2 id="pflegekraefte-karte-titel" className="text-[20px] font-extrabold leading-[1.2] tracking-[-0.02em] text-pm-ink">
-        {titel}
-      </h2>
-      {n > 0 && (
-        // Text neben den Fotos, solange daneben 140 px frei sind (390 px); schmaler darunter.
-        <div className="mt-3 flex flex-wrap items-center gap-x-2.5 gap-y-1.5">
-          <FotoStapel nurses={nurses} />
-          <p className="min-w-[140px] flex-1 text-[14px] leading-snug text-pm-muted">Fotos, Namen und Profile liegen bereit.</p>
-        </div>
-      )}
-      <p className="mt-3 text-[16px] leading-[1.45] text-pm-muted">
-        Zum Einladen fehlt nur noch Ihre Pflegesituation: etwa 2 Minuten, vieles ist schon ausgefüllt.
-      </p>
-      {offen ? (
-        children
-      ) : (
-        <>
-          {/* Gestaffelte Schrift: Der Knopftext braucht bei 17 px 291 px, bei 360 px sind 272 frei. */}
-          <Button breit onClick={onOeffnen} className="mt-3.5 !px-2">
-            <span className="whitespace-nowrap text-[15.5px] min-[375px]:text-[16px] min-[390px]:text-[17px]">
-              Pflegesituation vervollständigen →
-            </span>
-          </Button>
-          <p className="mt-3 text-[14px] leading-snug text-pm-muted">
-            {/* Das letzte Wortpaar bleibt zusammen (bei 360 px stand sonst „entscheiden." allein). */}
-            Unverbindlich: Ein Vertrag entsteht erst, wenn Sie sich für eine{' '}
-            <span className="whitespace-nowrap">Pflegekraft entscheiden.</span>
-          </p>
-          {n > 0 && (
-            <button
-              type="button"
-              onClick={onProfile}
-              className="mt-1 inline-flex min-h-[44px] items-center text-[15px] font-semibold text-pm-taupe-ink underline decoration-pm-taupe/40 underline-offset-[3px]"
-            >
-              {n === 1 ? 'Profil ansehen ↓' : `Alle ${n} Profile ansehen ↓`}
-            </button>
-          )}
-        </>
-      )}
+    <section aria-labelledby="pflegekraefte-titel">
+      {/* id = Sprungziel des Mail-Links `goto=matches` (scrollt, sobald die Liste steht). */}
+      <div id="pflegekraefte" className="px-1" style={{ scrollMarginTop: 72 }}>
+        <SectionHeader
+          id="pflegekraefte-titel"
+          eyebrow="Für Sie ausgewählt"
+          titel="Ihre passenden Pflegekräfte"
+          // Bei 360 px zweizeilig: „Ihren Angaben." bleibt zusammen.
+          zeile={<>Echte Profile, ausgewählt nach <span className="whitespace-nowrap">Ihren Angaben.</span></>}
+        />
+      </div>
+      {/* Hülle trägt id und Ref (Card reicht keinen Ref durch); Look = Hinweis-Karte des Portals. */}
+      <div ref={hinweis} id="patientendaten" className="mt-4 scroll-mt-16">
+      <Card ton="hinweis" className="px-5 pb-4 pt-4">
+        <p className="text-[17.5px] font-extrabold leading-[1.25] text-pm-ink">Noch 2 Minuten bis zum Einladen</p>
+        <p className="mt-1.5 text-[14.5px] leading-[1.5] text-pm-muted">
+          Vervollständigen Sie kurz Ihre Pflegesituation, vieles ist schon ausgefüllt. Danach laden Sie
+          Pflegekräfte ein und erhalten Bewerbungen mit Foto, Erfahrung, Anreisedatum und Preis.
+        </p>
+        {offen ? (
+          children
+        ) : (
+          <>
+            <Button breit onClick={onOeffnen} className="mt-3.5 !px-2 whitespace-nowrap">
+              Jetzt vervollständigen →
+            </Button>
+            <p className="mt-2.5 text-[13px] leading-snug text-pm-muted">
+              Unverbindlich: Ein Vertrag entsteht erst, wenn Sie ein Angebot{' '}
+              <span className="whitespace-nowrap">ausdrücklich annehmen.</span>
+            </p>
+          </>
+        )}
+      </Card>
+      </div>
+      <div className="mt-4">{liste}</div>
     </section>
   );
 }
 
 /**
- * Die Profile als Zeilen: Foto, Name und Alter, Deutsch mit Punkten, Erfahrung und Einsätze bei uns.
- * Keine Knöpfe — die ganze Zeile öffnet das Profil (wie „Profil ansehen"). Nur eine kleine
- * Überschrift („Die Profile"): Anzahl und was zum Einladen fehlt, sagt die Karte darüber (Runde 6).
+ * Die echten Profile als Zeilen: Foto, Name und Alter, Deutsch mit Punkten, Erfahrung und Einsätze
+ * bei uns. Keine Knöpfe — die ganze Zeile öffnet das Profil (wie „Profil ansehen"). Ohne eigene
+ * Überschrift: Der Kopf „Ihre passenden Pflegekräfte" steht im Bereich darüber (Runde 8).
  */
 export function KompaktePflegekraefte({ eintraege, laedt, alleBearbeitet, keineVorschlaege, onProfil, telefonHref }: {
   /** Sichtbare Vorschläge in Anzeige-Reihenfolge (Empfehlung zuerst); `i` = Index für `openNurseFromMatch`. */
@@ -260,33 +203,28 @@ export function KompaktePflegekraefte({ eintraege, laedt, alleBearbeitet, keineV
 }) {
   const n = laedt ? 0 : eintraege.length;
   return (
-    <section aria-labelledby="pflegekraefte-titel">
-      {/* id = Sprungziel von „Alle N Profile ansehen ↓" und des Mail-Links `goto=matches`. */}
-      <div id="pflegekraefte" className="px-1" style={{ scrollMarginTop: 96 }}>
-        <h2 id="pflegekraefte-titel" className={EYEBROW}>Die Profile</h2>
-      </div>
-
+    <>
       {laedt ? (
-        <Card className="mt-3 px-5 py-8 text-center">
+        <Card className="px-5 py-8 text-center">
           <div className="mb-3 inline-block h-6 w-6 animate-spin rounded-full border-2 border-pm-chip border-t-transparent" />
           <p className="text-[16px] font-semibold text-pm-ink">Wir laden Ihre Pflegekräfte …</p>
           <p className="mt-1 text-[14px] leading-relaxed text-pm-muted">Einen Moment bitte — gleich sehen Sie Ihre persönlichen Vorschläge.</p>
         </Card>
       ) : n > 0 ? (
-        <Card className="mt-3 divide-y divide-pm-line-soft overflow-hidden">
+        <Card className="divide-y divide-pm-line-soft overflow-hidden">
           {eintraege.map(({ nurse, i }, pos) => (
             <PflegekraftZeile key={nurse.caregiverId ?? i} nurse={nurse} empfohlen={pos === 0} onClick={() => onProfil(nurse, i)} />
           ))}
         </Card>
       ) : alleBearbeitet ? (
-        <Card className="mt-3 px-5 py-5 text-center">
+        <Card className="px-5 py-5 text-center">
           <p className="text-[16px] font-bold text-pm-ink">Alle aktuellen Vorschläge bearbeitet</p>
           <p className="mt-1 text-[14px] leading-relaxed text-pm-muted">
             Sie haben alle passenden Pflegekräfte durchgesehen. Wir schlagen Ihnen in Kürze weitere vor &mdash; Sie hören von uns.
           </p>
         </Card>
       ) : keineVorschlaege ? (
-        <Card className="mt-3 px-5 py-6 text-center">
+        <Card className="px-5 py-6 text-center">
           <p className="text-[16px] font-bold text-pm-ink">Gerade keine weiteren Vorschläge</p>
           <p className="mt-1 text-[14px] leading-relaxed text-pm-muted">Neue passende Pflegekräfte erscheinen hier.</p>
           <a
@@ -297,7 +235,7 @@ export function KompaktePflegekraefte({ eintraege, laedt, alleBearbeitet, keineV
           </a>
         </Card>
       ) : null}
-    </section>
+    </>
   );
 }
 

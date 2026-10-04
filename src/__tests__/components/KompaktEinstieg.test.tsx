@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { aufzaehlung, EigenanteilZeile, FotoStapel, KompaktePflegekraefte, KUEMMERN_PUNKTE, PflegekraefteKarte, PflegekraftZeile, WirKuemmernUns, zuschussKurzname } from '../../components/portal/KompaktEinstieg';
+import { aufzaehlung, EigenanteilZeile, KompaktEinleitung, KompaktePflegekraefte, KompaktPflegekraefteBereich, KompaktVertrauen, PflegekraftZeile, zuschussKurzname } from '../../components/portal/KompaktEinstieg';
 import type { Nurse } from '../../types';
 
 const basis: Nurse = {
@@ -95,17 +95,15 @@ describe('KompaktePflegekraefte', () => {
     onProfil: () => {}, telefonHref: 'tel:0',
   };
 
-  // Runde 6: Zahl und „was fehlt" sagt die Karte darüber — hier nur die kleine Überschrift „Die Profile".
-  it('kleine Überschrift „Die Profile", keine große Überschrift, kein Schloss-Hinweis; Empfehlung nur in der ersten Zeile', () => {
+  // Runde 8: nur noch die Zeilen — der Kopf „Ihre passenden Pflegekräfte" steht im Bereich darüber.
+  it('nur die Zeilen, ohne eigene Überschrift; Empfehlung nur in der ersten', () => {
     render(
       <KompaktePflegekraefte
         {...props}
         eintraege={[{ nurse: basis, i: 0 }, { nurse: { ...basis, caregiverId: 50003, name: 'Anna Nowak' }, i: 1 }]}
       />,
     );
-    expect(screen.getByRole('heading', { name: 'Die Profile' })).toBeTruthy();
-    expect(screen.queryByText('Für Sie ausgewählt')).toBeNull();
-    expect(screen.queryByText(/passende Pflegekr/)).toBeNull();
+    expect(screen.queryByRole('heading')).toBeNull();
     expect(screen.queryByText(/Vor dem Einladen/)).toBeNull();
     expect(screen.getAllByRole('button', { name: /^Profil von / })).toHaveLength(2);
     expect(screen.getAllByText('Unsere Empfehlung')).toHaveLength(1);
@@ -125,111 +123,77 @@ describe('KompaktePflegekraefte', () => {
   });
 });
 
-describe('WirKuemmernUns', () => {
-  it('kleine fette Überschrift mit Siegel daneben, darunter die sieben Häkchen im Wortlaut', () => {
-    const { container } = render(<WirKuemmernUns onBestpreis={() => {}} />);
-    const titel = screen.getByRole('heading', { name: 'Wir kümmern uns um alles' });
-    // Siegel rechts in derselben Zeile, nur als Bild (der Punkt sagt es in Worten).
+describe('KompaktEinleitung', () => {
+  it('Einleitung unter dem Titel im Wortlaut der Geschäftsführung', () => {
+    const { container } = render(<KompaktEinleitung />);
+    expect(container.querySelector('p')!.textContent).toBe(
+      'Eine bei uns angestellte Betreuungskraft wohnt bei Ihnen und hilft im Alltag. Sie wählen in Ruhe aus, um alles Weitere kümmern wir uns: Anreise, Wechsel und Ersatz, wenn jemand ausfällt.',
+    );
+  });
+});
+
+describe('KompaktVertrauen', () => {
+  it('Sterne und darunter das kleine Testsieger-Siegel mit „6× Testsieger DIE WELT · über 20 Jahre Erfahrung"', () => {
+    const { container } = render(<KompaktVertrauen sterne={{ schnitt: '4,9', wert: 4.9, anzahl: 126 }} />);
+    const sterne = screen.getByRole('link', { name: /4,9 von 5 aus 126 Bewertungen/ });
+    expect(sterne.getAttribute('href')).toBe('https://primundus.de/erfahrungen');
     const siegel = container.querySelector('img')!;
     expect(siegel.getAttribute('src')).toBe('/badge-testsieger.webp');
-    expect(siegel.getAttribute('alt')).toBe('');
-    expect(siegel.parentElement).toBe(titel.parentElement);
-    const punkte = screen.getAllByRole('listitem').map((li) => li.textContent);
-    expect(punkte).toEqual([
-      'Anreise ab 3 Tagen möglich',
-      'Wechsel und Ersatz geregelt',
-      'Täglich kündbar',
-      'Keine Vermittlungsgebühr',
-      'Bestpreisgarantie',
-      'Über 20 Jahre Erfahrung',
-      '6× Testsieger DIE WELT',
-    ]);
-    expect(KUEMMERN_PUNKTE).toHaveLength(7);
-    // Eine Spalte auf dem Handy, zwei erst ab 640 px.
-    expect(screen.getByRole('list').className).toContain('grid-cols-1');
-    expect(screen.getByRole('list').className).toContain('sm:grid-cols-2');
+    const zeile = siegel.nextElementSibling as HTMLElement;
+    expect(zeile.textContent).toBe('6× Testsieger DIE WELT · über 20 Jahre Erfahrung');
+    expect(sterne.compareDocumentPosition(siegel) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    // Unter 375 px zwei Zeilen ohne „·" (kein Punkt am Zeilenende), ab 375 px eine Zeile.
+    expect(within(zeile).getByText('·').className).toContain('hidden');
+    expect(within(zeile).getByText('·').className).toContain('min-[375px]:inline');
+    expect(zeile.querySelector('br')!.className).toContain('min-[375px]:hidden');
   });
 
-  it('nur „Bestpreisgarantie" ist antippbar und öffnet das Pop-up', async () => {
-    const onBestpreis = vi.fn();
-    render(<WirKuemmernUns onBestpreis={onBestpreis} />);
-    expect(screen.getAllByRole('button')).toHaveLength(1);
-    await userEvent.click(screen.getByRole('button', { name: 'Bestpreisgarantie' }));
-    expect(onBestpreis).toHaveBeenCalledTimes(1);
+  it('ohne Bewertungsstand keine Sternezeile, die Testsieger-Zeile bleibt', () => {
+    render(<KompaktVertrauen sterne={null} />);
+    expect(screen.queryByRole('link')).toBeNull();
+    expect(screen.getByText('6× Testsieger DIE WELT')).toBeTruthy();
   });
 });
 
-describe('FotoStapel', () => {
-  it('runde Fotos übereinander (ab dem zweiten überlappend), ohne Foto die Initialen', () => {
-    const { container } = render(
-      <FotoStapel nurses={[{ ...basis, image: '/a.jpg' }, { ...basis, caregiverId: 50003, name: 'Anna Nowak', image: undefined }]} />,
-    );
-    const kreise = container.querySelectorAll(':scope > div > span');
-    expect(kreise).toHaveLength(2);
-    expect(kreise[0].className).toContain('rounded-full');
-    expect(kreise[0].className).toContain('border-white');
-    expect(kreise[0].className).not.toContain('-ml-2.5');
-    expect(kreise[1].className).toContain('-ml-2.5');
-    expect(kreise[0].querySelector('img')!.getAttribute('src')).toBe('/a.jpg');
-    expect(kreise[1].textContent).toBe('AN');
-  });
-});
+describe('KompaktPflegekraefteBereich', () => {
+  const props = { aktiv: true, offen: false, onOeffnen: () => {}, liste: <p>Zeilen</p> };
 
-describe('PflegekraefteKarte', () => {
-  const fuenf: Nurse[] = ['Ewa Lis', 'Anna Nowak', 'Helena Wolf', 'Pavel Kral', 'Irena Pawlak'].map((name, k) => ({
-    ...basis, caregiverId: 60000 + k, name, image: `/p${k}.jpg`,
-  }));
-  const props = { aktiv: true, laedt: false, offen: false, onOeffnen: () => {}, onProfile: () => {} };
-
-  it('Titel mit der Zahl, Fotos, was fehlt, Knopf, „Unverbindlich", Link zu den Profilen', async () => {
+  it('Kopf, Hinweis mit Knopf und „Unverbindlich", darunter die Zeilen', async () => {
     const onOeffnen = vi.fn();
-    const onProfile = vi.fn();
-    render(<PflegekraefteKarte {...props} nurses={fuenf} onOeffnen={onOeffnen} onProfile={onProfile}><p>Formular</p></PflegekraefteKarte>);
-    const karte = screen.getByRole('region', { name: '5 Pflegekräfte sind schon für Sie ausgewählt' });
-    expect(karte.id).toBe('patientendaten');
-    expect(within(karte).getByText('für Sie ausgewählt').className).toContain('whitespace-nowrap');
-    expect(karte.querySelectorAll('img')).toHaveLength(5);
-    expect(within(karte).getByText('Fotos, Namen und Profile liegen bereit.')).toBeTruthy();
-    expect(within(karte).getByText('Zum Einladen fehlt nur noch Ihre Pflegesituation: etwa 2 Minuten, vieles ist schon ausgefüllt.')).toBeTruthy();
-    const unverbindlich = within(karte).getByText(/^Unverbindlich:/);
-    expect(unverbindlich.textContent).toBe('Unverbindlich: Ein Vertrag entsteht erst, wenn Sie sich für eine Pflegekraft entscheiden.');
-    expect(within(unverbindlich).getByText('Pflegekraft entscheiden.').className).toContain('whitespace-nowrap');
+    render(<KompaktPflegekraefteBereich {...props} onOeffnen={onOeffnen}><p>Formular</p></KompaktPflegekraefteBereich>);
+    const bereich = screen.getByRole('region', { name: 'Ihre passenden Pflegekräfte' });
+    expect(within(bereich).getByText('Für Sie ausgewählt')).toBeTruthy();
+    expect(within(bereich).getByText(/^Echte Profile, ausgewählt nach/).textContent).toBe('Echte Profile, ausgewählt nach Ihren Angaben.');
+    const hinweis = document.getElementById('patientendaten')!;
+    expect(within(hinweis).getByText('Noch 2 Minuten bis zum Einladen')).toBeTruthy();
+    expect(within(hinweis).getByText(/^Vervollständigen Sie kurz/).textContent).toBe(
+      'Vervollständigen Sie kurz Ihre Pflegesituation, vieles ist schon ausgefüllt. Danach laden Sie Pflegekräfte ein und erhalten Bewerbungen mit Foto, Erfahrung, Anreisedatum und Preis.',
+    );
+    const unverbindlich = within(hinweis).getByText(/^Unverbindlich:/);
+    expect(unverbindlich.textContent).toBe('Unverbindlich: Ein Vertrag entsteht erst, wenn Sie ein Angebot ausdrücklich annehmen.');
+    expect(within(unverbindlich).getByText('ausdrücklich annehmen.').className).toContain('whitespace-nowrap');
+    // Reihenfolge: Kopf → Hinweis → Zeilen.
+    const zeilen = screen.getByText('Zeilen');
+    expect(hinweis.compareDocumentPosition(zeilen) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(screen.queryByText('Formular')).toBeNull();
-    await userEvent.click(within(karte).getByRole('button', { name: 'Pflegesituation vervollständigen →' }));
+    await userEvent.click(within(hinweis).getByRole('button', { name: 'Jetzt vervollständigen →' }));
     expect(onOeffnen).toHaveBeenCalledTimes(1);
-    await userEvent.click(within(karte).getByRole('button', { name: 'Alle 5 Profile ansehen ↓' }));
-    expect(onProfile).toHaveBeenCalledTimes(1);
   });
 
-  it('Einzahl: „1 Pflegekraft ist schon für Sie ausgewählt", Link „Profil ansehen ↓"', () => {
-    render(<PflegekraefteKarte {...props} nurses={[fuenf[0]]}><p>Formular</p></PflegekraefteKarte>);
-    expect(screen.getByRole('region', { name: '1 Pflegekraft ist schon für Sie ausgewählt' })).toBeTruthy();
-    expect(screen.getByRole('button', { name: 'Profil ansehen ↓' })).toBeTruthy();
-  });
-
-  it('offen: das Formular steht in der Karte; Knopf, „Unverbindlich" und Link sind weg', () => {
-    render(<PflegekraefteKarte {...props} nurses={fuenf} offen><p>Formular</p></PflegekraefteKarte>);
-    const karte = screen.getByRole('region', { name: '5 Pflegekräfte sind schon für Sie ausgewählt' });
-    expect(within(karte).getByText('Formular')).toBeTruthy();
-    expect(screen.queryByRole('button', { name: 'Pflegesituation vervollständigen →' })).toBeNull();
+  it('offen: das Formular steht im Hinweis, Knopf und „Unverbindlich" sind weg', () => {
+    render(<KompaktPflegekraefteBereich {...props} offen><p>Formular</p></KompaktPflegekraefteBereich>);
+    const hinweis = document.getElementById('patientendaten')!;
+    expect(within(hinweis).getByText('Formular')).toBeTruthy();
+    expect(screen.queryByRole('button', { name: 'Jetzt vervollständigen →' })).toBeNull();
     expect(screen.queryByText(/^Unverbindlich:/)).toBeNull();
-    expect(screen.queryByRole('button', { name: /Profile ansehen/ })).toBeNull();
   });
 
-  it('beim Laden: keine Zahl, keine Fotos, kein Link — der Knopf bleibt', () => {
-    render(<PflegekraefteKarte {...props} laedt nurses={fuenf}><p>Formular</p></PflegekraefteKarte>);
-    const karte = screen.getByRole('region', { name: 'Passende Pflegekräfte' });
-    expect(karte.querySelectorAll('img')).toHaveLength(0);
-    expect(screen.queryByText('Fotos, Namen und Profile liegen bereit.')).toBeNull();
-    expect(screen.queryByRole('button', { name: /Profile ansehen/ })).toBeNull();
-    expect(screen.getByRole('button', { name: 'Pflegesituation vervollständigen →' })).toBeTruthy();
-  });
-
-  it('nicht aktiv (alle anderen Zustände): nur der Inhalt, keine Karte', () => {
-    render(<PflegekraefteKarte {...props} aktiv={false} nurses={fuenf}><p>Formular</p></PflegekraefteKarte>);
+  it('nicht aktiv (alle anderen Zustände): nur der Inhalt, kein Kopf, kein Hinweis, keine Zeilen', () => {
+    render(<KompaktPflegekraefteBereich {...props} aktiv={false}><p>Formular</p></KompaktPflegekraefteBereich>);
     expect(screen.getByText('Formular')).toBeTruthy();
     expect(screen.queryByRole('region')).toBeNull();
-    expect(screen.queryByText(/ausgewählt/)).toBeNull();
+    expect(screen.queryByText('Noch 2 Minuten bis zum Einladen')).toBeNull();
+    expect(screen.queryByText('Zeilen')).toBeNull();
   });
 });
 

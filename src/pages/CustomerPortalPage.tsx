@@ -79,7 +79,7 @@ import { SoGehtEsWeiter } from '../components/portal/SoGehtEsWeiter';
 import { FaqListe } from '../components/portal/FaqListe';
 import { MartaBox } from '../components/portal/MartaBox';
 import { BewertungsZeile } from '../components/portal/BewertungsZeile';
-import { EigenanteilZeile, KompaktePflegekraefte, PflegekraefteKarte, WirKuemmernUns } from '../components/portal/KompaktEinstieg';
+import { EigenanteilZeile, KompaktEinleitung, KompaktePflegekraefte, KompaktPflegekraefteBereich, KompaktVertrauen } from '../components/portal/KompaktEinstieg';
 import { Button } from '../components/ui/Button';
 import { Card } from '../components/ui/Card';
 import { SectionHeader, EYEBROW, H2 } from '../components/ui/SectionHeader';
@@ -697,7 +697,7 @@ const CustomerPortalPage: FC = () => {
       return !!roh && (JSON.parse(roh) as { _isDraft?: boolean })._isDraft !== true;
     } catch { return false; }
   }, [lead?.token]);
-  // Formular in der Pflegekräfte-Karte aufgeklappt (Kompakt-Einstieg).
+  // Formular im Hinweis „Noch 2 Minuten bis zum Einladen" aufgeklappt (Kompakt-Einstieg).
   const [formImKasten, setFormImKasten] = useState(false);
   // Startdatum NUR aus dem Formular des Kunden (Martin 25.09.: „Das einzige
   // Datum, was zählt, ist das, was hier im Formular angegeben wird"), nie aus
@@ -1885,8 +1885,8 @@ const CustomerPortalPage: FC = () => {
     setPatientExpandedManual(true);
     setTriggerOpenPatient(true);
     const ziel = document.getElementById('patientendaten');
-    // Kompakt-Einstieg: Das Formular steht in der Karte „N Pflegekräfte sind schon für Sie ausgewählt"
-    // (id patientendaten) und klappt erst jetzt auf. Darum ZUERST ohne Animation zur Karte, DANN
+    // Kompakt-Einstieg: Das Formular steht im Hinweis „Noch 2 Minuten bis zum Einladen" (id
+    // patientendaten) und klappt erst jetzt auf. Darum ZUERST ohne Animation zum Hinweis, DANN
     // aufklappen — das Formular kommt so unter dem oberen Bildrand dazu. Weich gescrollt bricht WebKit
     // ab, sobald oberhalb Inhalt dazukommt (wie Registry #102): Vom Hinweis bei den Pflegekräften aus
     // landete die Seite einmal 2.326 px unter dem Ziel.
@@ -1907,12 +1907,6 @@ const CustomerPortalPage: FC = () => {
     setTimeout(() => document.getElementById('eigenanteil-rechnung')?.scrollIntoView({ block: 'start' }), 60);
   };
 
-  // Kompakt-Einstieg (Runde 6): „Alle N Profile ansehen ↓" in der Pflegekräfte-Karte — zu den Zeilen.
-  // Weich gescrollt: Darüber kommt dabei kein Inhalt dazu (anders als beim Formular, Registry #102).
-  const zuDenProfilen = () => {
-    document.getElementById('pflegekraefte')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-  };
-
   // Mail-Deeplink goto=anfragen (Knopf „Bewerbungen erhalten" in den Mails, 26.09.):
   // noch nicht abgesendet → Formular öffnen; schon abgesendet → zum Stand; offene
   // Bewerbung → zu den Bewerbungen. Erst wenn feststeht, ob abgesendet wurde
@@ -1930,8 +1924,8 @@ const CustomerPortalPage: FC = () => {
       : document.getElementById('stand');
     if (!ziel) return;
     anfragenErledigtRef.current = true;
-    // Kompakt-Einstieg: Formular in der Pflegekräfte-Karte öffnen und EINMAL ohne Animation zur Karte.
-    // Sie steht über den Zeilen, spät geladene Zeilen schieben sie also nicht mehr weg.
+    // Kompakt-Einstieg: Formular im Hinweis öffnen und EINMAL ohne Animation zum Hinweis. Er steht über
+    // den Zeilen, spät geladene Zeilen schieben ihn also nicht mehr weg.
     if (kompakt) {
       setFormImKasten(true);
       setTimeout(() => ziel.scrollIntoView({ block: 'start' }), 60);
@@ -2624,8 +2618,8 @@ const CustomerPortalPage: FC = () => {
           : null;
         const heimErsparnis = eigenanteil !== null ? HEIM_EIGENANTEIL - eigenanteil : 0;
         // Absätze, die im Kompakt-Einstieg nicht am Preis stehen: „Kosten erst …" und der
-        // Heimvergleich in der Aufstellung hinter „So rechnen wir ›", der Testsieger als Punkt unter
-        // „Wir kümmern uns um alles" (WirKuemmernUns; sonst alle drei unverändert an ihrer Stelle).
+        // Heimvergleich in der Aufstellung hinter „So rechnen wir ›", der Testsieger im Kopf unter der
+        // Einleitung (KompaktVertrauen; sonst alle drei unverändert an ihrer Stelle).
         // Kein fünfter Haken (Martin, 09.09.): „Kosten erst, wenn die
         // Pflegekraft da ist" ist eine Erklärung, kein Punkt der Liste.
         const kostenErst = (
@@ -2723,18 +2717,9 @@ const CustomerPortalPage: FC = () => {
                   </p>
                   </>
                   )}
-                  {!kompakt && vierPunkte('mt-4 flex flex-col gap-2.5')}
-                  {/* Kompakt-Einstieg (Runde 6): statt der vier Punkte „Wir kümmern uns um alles" mit
-                      sieben Häkchen, darunter die Sterne (Höhe reserviert, damit nichts darunter springt,
-                      wenn der Stand später kommt; ohne Stand keine Zeile). */}
-                  {kompakt && (
-                    <>
-                      <WirKuemmernUns onBestpreis={() => setBestpreisOffen(true)} />
-                      <div className="mt-2 flex h-7 items-center">
-                        <BewertungsZeile stand={sterne} klein className="-my-2" />
-                      </div>
-                    </>
-                  )}
+                  {/* Kompakt-Einstieg (Runde 8): die vier Punkte der Startseite wie überall; Sterne und
+                      Testsieger stehen im Kopf unter der Einleitung. */}
+                  {vierPunkte(kompakt ? 'mt-3.5 flex flex-col gap-2' : 'mt-4 flex flex-col gap-2.5')}
                   {!kompakt && kostenErst}
                   {!kompakt && heimVergleich}
                   {!kompakt && testsieger}
@@ -3305,7 +3290,8 @@ const CustomerPortalPage: FC = () => {
         // der Unterkante (pb-10 + -mt-6 an der Karte).
         return (
           <div className="bg-pm-shell">
-            {/* Kompakt-Einstieg: oben etwas weniger Luft; unten wie im Ausgangszustand (pb-10). */}
+            {/* Kompakt-Einstieg: oben etwas weniger Luft; unten wie im Ausgangszustand (pb-10), damit die
+                Vertrauenszeilen nicht an der Kostenkarte kleben. */}
             <div className={`max-w-3xl mx-auto px-[18px] ${kompakt ? 'pt-4 pb-10' : `pt-6 ${(!patientSaved && !hasPending) || sucheLaeuft ? 'pb-10' : 'pb-7'}`}`}>
               <p className="text-[16px] text-pm-taupe-ink">
                 Guten Tag{heroNameLine ? `, ${heroNameLine}` : ''}.
@@ -3317,6 +3303,14 @@ const CustomerPortalPage: FC = () => {
                   <>Ihr Angebot zur <span className="whitespace-nowrap">24-Stunden-Betreuung</span></>
                 ) : heroCopy.title}
               </h1>
+              {/* Kompakt-Einstieg (Runde 8): kurze Einleitung, darunter Sterne und Testsieger als zwei
+                  ruhige Zeilen — keine Karte. */}
+              {kompakt && (
+                <>
+                  <KompaktEinleitung />
+                  <KompaktVertrauen sterne={sterne} />
+                </>
+              )}
               {/* Offene Bewerbung (Martin 25.09.): Kopf nur Titel + Zeit, direkt
                   danach die Bewerbung; „Angebot prüfen" und die Vorteile der
                   Kostenrechner-Startseite stehen IN der Karte (AppCard `vorteile`). */}
@@ -3703,7 +3697,7 @@ const CustomerPortalPage: FC = () => {
 
       {!hasPending && (
       <div>
-      <div className={`max-w-3xl mx-auto px-3.5 ${kompakt ? 'pt-3' : 'pt-1 pb-4 space-y-4'}`}>
+      <div className={`max-w-3xl mx-auto px-3.5 ${kompakt ? 'pt-9' : 'pt-1 pb-4 space-y-4'}`}>
         {/* ── SECTION: 2 · Patientendaten — der Onboarding-Schritt steht VOR
              den Pflegekräften (vorher lag die Karte zwischen PK-Header und
              PK-Karten — genau die „zwei Kästen"-Verwirrung, Martin 2026-07-12). ── */}
@@ -3713,17 +3707,24 @@ const CustomerPortalPage: FC = () => {
              und Formular aneinander (Martin: „zu eng"). Die Dringlichkeit
              traegt seit 11.09. der Block „Jetzt konkrete Bewerbungen
              erhalten" darueber. Das div bleibt als neutraler Anker.
-             Kompakt-Einstieg (Runde 6): die Karte „N Pflegekräfte sind schon für Sie ausgewählt" mit
-             Fotos und Knopf, das Formular klappt darin auf (sonst bleibt `PflegekraefteKarte` dieses
-             neutrale div). */}
-        <PflegekraefteKarte
+             Kompakt-Einstieg (Runde 8): „Für Sie ausgewählt / Ihre passenden Pflegekräfte" mit dem
+             Hinweis „Noch 2 Minuten bis zum Einladen" (das Formular klappt darin auf) und den echten
+             Profilen darunter (sonst bleibt `KompaktPflegekraefteBereich` dieses neutrale div). */}
+        <KompaktPflegekraefteBereich
           aktiv={kompakt}
-          nurses={pflegekraftAuswahl.visibleNurses.map((v) => v.nurse)}
-          laedt={listeLaedt}
           offen={formImKasten}
           onOeffnen={() => setFormImKasten(true)}
-          onProfile={zuDenProfilen}
           onImBlick={setFormularImBlick}
+          liste={
+            <KompaktePflegekraefte
+              eintraege={pflegekraftAuswahl.visibleNurses}
+              laedt={listeLaedt}
+              alleBearbeitet={pflegekraftAuswahl.visibleNurses.length === 0 && pflegekraftAuswahl.allVisible.length > 0}
+              keineVorschlaege={pflegekraftAuswahl.allVisible.length === 0 && (IS_PREVIEW_ANY || (mmReady && !!mmMatchings?.data))}
+              onProfil={openNurseFromMatch}
+              telefonHref={TELEFON_HREF}
+            />
+          }
         >
         {!hasPending && !kompakt && (() => {
           // Unvollständig = IMMER offen (Martin, 13.08.): Solange die
@@ -4076,27 +4077,17 @@ const CustomerPortalPage: FC = () => {
         />
         </div>
         )}
-        </PflegekraefteKarte>{/* Ende Hervorhebung Pflegesituation (Kopf + Formular) */}
+        </KompaktPflegekraefteBereich>{/* Ende Hervorhebung Pflegesituation (Kopf + Formular) */}
 
       </div>
       </div>
       )}
 
-      {/* Kompakt-Einstieg: die Profile als Zeilen (dieselbe Auswahl wie die Karten und die Fotos der
-          Karte darüber), darunter „Bereits bearbeitet" (z. B. im Profil mit „Nein danke" abgelehnt). */}
-      {kompakt && (
-        <div className="max-w-3xl mx-auto px-3.5 pt-6">
-          <div className="space-y-4">
-          <KompaktePflegekraefte
-            eintraege={pflegekraftAuswahl.visibleNurses}
-            laedt={listeLaedt}
-            alleBearbeitet={pflegekraftAuswahl.visibleNurses.length === 0 && pflegekraftAuswahl.allVisible.length > 0}
-            keineVorschlaege={pflegekraftAuswahl.allVisible.length === 0 && (IS_PREVIEW_ANY || (mmReady && !!mmMatchings?.data))}
-            onProfil={openNurseFromMatch}
-            telefonHref={TELEFON_HREF}
-          />
+      {/* Kompakt-Einstieg: unter den Profilen „Bereits bearbeitet" (z. B. im Profil mit „Nein danke"
+          abgelehnt); die Profile selbst stehen im Pflegekräfte-Bereich darüber. */}
+      {kompakt && bereitsBearbeitet && (
+        <div className="max-w-3xl mx-auto px-3.5 pt-4">
           {bereitsBearbeitet}
-          </div>
         </div>
       )}
 
