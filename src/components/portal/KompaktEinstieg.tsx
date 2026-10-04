@@ -17,13 +17,12 @@
 // Schrift: Fließtext 16 px, kleine Schrift 14 px. Ausnahme 13 px für die dritte Zeile der
 // Pflegekräfte — so bleibt sie bei 390 px einzeilig.
 import { useEffect, useRef, type ReactNode } from 'react';
-import { AlertCircle, ChevronRight, Sparkles } from 'lucide-react';
+import { AlertCircle, Check, ChevronRight, Sparkles } from 'lucide-react';
 import type { Nurse } from '../../types';
 import type { SterneStand } from '../../lib/sterne';
 import { BewertungsZeile } from './BewertungsZeile';
 import { DeutschPunkte } from './PflegekraftProfil';
 import { displayName, initials } from './shared';
-import { careStartLabel } from '../../lib/supabase';
 import { Button } from '../ui/Button';
 import { SectionHeader } from '../ui/SectionHeader';
 
@@ -50,59 +49,66 @@ export function angebotDatum(iso: string | null | undefined): string | null {
 }
 
 /**
- * Grundlage des Angebots aus der Anfrage, wie im Angebots-PDF („Ihre Angaben"), auf das Nötigste gekürzt:
- * für wen, Pflegegrad, Start. Fehlende Angaben entfallen (kein Ersatzwert).
+ * Runde 18 (Martin 04.10. spät): „wir fragen keinen Start ab" — der Rechner sendet care_start_timing seit dem Umbau als
+ * null; nie aus diesem Feld etwas anzeigen. Grundlage im Satz der Einleitung: „für zwei Personen mit Pflegegrad 4".
+ * Fehlende Angaben entfallen (kein Ersatzwert).
  */
-export function angebotGrundlage(fd: Record<string, unknown> | null | undefined, start: string | null | undefined): string[] {
-  const teile: string[] = [];
-  if (fd?.betreuung_fuer === '1-person') teile.push('Für 1 Person');
-  if (fd?.betreuung_fuer === 'ehepaar') teile.push('Für 2 Personen');
+export function angebotFuer(fd: Record<string, unknown> | null | undefined): string | null {
+  const wer = fd?.betreuung_fuer === '1-person' ? 'eine Person' : fd?.betreuung_fuer === 'ehepaar' ? 'zwei Personen' : null;
   const pg = fd?.pflegegrad;
-  if (typeof pg === 'number' || (typeof pg === 'string' && /^\d$/.test(pg))) {
-    teile.push(Number(pg) === 0 ? 'Kein Pflegegrad' : `Pflegegrad ${pg}`);
-  }
-  if (start) teile.push(`Beginn ${careStartLabel(start)}`);
-  return teile;
+  const grad = typeof pg === 'number' || (typeof pg === 'string' && /^\d$/.test(pg))
+    ? (Number(pg) === 0 ? 'ohne Pflegegrad' : `mit Pflegegrad ${pg}`)
+    : null;
+  if (!wer) return null;
+  return grad ? `für ${wer} ${grad}` : `für ${wer}`;
 }
 
-/** Kopf der Angebotskarte: links „Angebot", rechts das Datum, darunter die Grundlage. */
-export function AngebotKopf({ datum, grundlage }: { datum: string | null; grundlage: string[] }) {
+/** Kopf der Preiskarte: links „Ihr Preis", rechts das Datum der Anfrage. */
+export function AngebotKopf({ datum }: { datum: string | null }) {
   return (
-    <div>
-      <div className="flex items-baseline justify-between gap-3 border-b border-pm-line pb-3">
-        <p className="text-[15px] font-semibold text-pm-ink">Angebot</p>
-        {datum && <p className="text-[14px] tabular-nums text-pm-muted">Anfrage vom {datum}</p>}
-      </div>
-      {grundlage.length > 0 && (
-        // Teile bleiben ganz, umbrochen wird nur zwischen ihnen (Trenner vor dem Teil, am Zeilenanfang abgeschnitten).
-        <div className="mt-3 overflow-hidden">
-          <p className="-ml-4 flex flex-wrap text-[15px] leading-[1.5] text-pm-body">
-            {grundlage.map((teil) => (
-              <span key={teil} className="relative whitespace-nowrap pl-4 before:absolute before:left-[5px] before:text-pm-mute before:content-['·']">
-                {teil}
-              </span>
-            ))}
-          </p>
-        </div>
-      )}
+    <div className="flex items-baseline justify-between gap-3 border-b border-pm-line pb-3">
+      <p className="text-[15px] font-semibold text-pm-ink">Ihr Preis</p>
+      {datum && <p className="text-[14px] tabular-nums text-pm-muted">Anfrage vom {datum}</p>}
     </div>
   );
 }
 
 /**
- * Was im Preis steckt, als Zeilen wie im Angebots-PDF statt des Satzes „Inklusive …" (Martin 04.10.: „Inklusive passt
- * nicht"). Kein „alle Kosten", kein „nur": Feiertags- und Sommerzuschlag stehen in „Kosten im Überblick".
+ * Runde 18: Einleitung zum Angebot, kurz — Leistung und Grundlage in einem Satz, dann „wir kümmern uns".
  */
-export function AngebotZeilen() {
-  // Bezeichnung vorn im Satz statt als Spalte: Bei 390 px brach die Spalte „Lohn, Steuern, …" in drei Zeilen.
+export function AngebotEinleitung({ fuer }: { fuer: string | null }) {
   return (
-    <div className="mt-5 space-y-2 border-t border-pm-line pt-4 text-[15px] leading-[1.5] text-pm-body">
-      <p><span className="font-semibold text-pm-ink">Enthalten:</span> Lohn, Steuern, Sozialabgaben und Gebühren</p>
-      <p>
-        <span className="font-semibold text-pm-ink">Zusätzlich:</span> Kost und Logis sowie{' '}
-        <span className="whitespace-nowrap">125 € Reisekosten</span> pro Fahrt
-      </p>
-    </div>
+    <p className="mt-4 text-[17px] leading-[1.55] text-pm-muted">
+      Ihr Angebot umfasst eine Rund-um-Betreuung zu Hause{fuer ? ` ${fuer}` : ''}. Anreise, Wechsel und Vertretung
+      organisieren <span className="whitespace-nowrap">wir.</span>
+    </p>
+  );
+}
+
+/**
+ * Runde 18 (Martin: „wichtiger ist, oben die Vorteile zu sagen: es ist alles drin, bei uns angestellt und täglich
+ * kündbar; der Preis kann weiter unten sein"). Vier Zeilen, ohne Kasten. „Alles im Preis" bezieht sich auf die
+ * genannten Posten (Feiertags- und Sommerzuschlag stehen im Vertrag, Kost und Logis und Reisekosten am Preis).
+ */
+export function AngebotVorteile({ onBestpreis }: { onBestpreis: () => void }) {
+  const zeile = 'flex items-start gap-3 text-[17px] leading-[1.45] text-pm-body';
+  const haken = <Check className="mt-[3px] h-5 w-5 flex-none text-pm-green" strokeWidth={2.25} aria-hidden="true" />;
+  return (
+    <ul className="mt-6 flex flex-col gap-3.5">
+      <li className={zeile}>{haken}<span><b className="font-semibold text-pm-ink">Alles im Preis:</b> Lohn, Steuern, Sozialabgaben und Gebühren</span></li>
+      <li className={zeile}>{haken}<span><b className="font-semibold text-pm-ink">Bei uns angestellt</b> und sozialversichert</span></li>
+      <li className={zeile}>{haken}<span><b className="font-semibold text-pm-ink">Täglich kündbar,</b> taggenau abgerechnet</span></li>
+      <li className={zeile}>{haken}<span>
+        <b className="font-semibold text-pm-ink">Bestpreisgarantie</b>{' '}
+        <button
+          type="button"
+          onClick={onBestpreis}
+          className="inline-flex min-h-[44px] -my-3 items-center font-semibold text-pm-taupe-ink underline underline-offset-4 decoration-pm-taupe/40 hover:decoration-pm-taupe-ink"
+        >
+          Mehr Infos
+        </button>
+      </span></li>
+    </ul>
   );
 }
 

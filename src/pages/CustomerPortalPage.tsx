@@ -79,7 +79,7 @@ import { SoGehtEsWeiter } from '../components/portal/SoGehtEsWeiter';
 import { FaqListe } from '../components/portal/FaqListe';
 import { MartaBox } from '../components/portal/MartaBox';
 import { BewertungsZeile } from '../components/portal/BewertungsZeile';
-import { AngebotKopf, AngebotZeilen, KOMPAKT_LOOK, KompaktEinleitung, KompaktePflegekraefte, KompaktPflegekraefteBereich, KompaktVertrauen, angebotDatum, angebotGrundlage } from '../components/portal/KompaktEinstieg';
+import { AngebotEinleitung, AngebotKopf, AngebotVorteile, KOMPAKT_LOOK, KompaktEinleitung, KompaktePflegekraefte, KompaktPflegekraefteBereich, KompaktVertrauen, angebotDatum, angebotFuer } from '../components/portal/KompaktEinstieg';
 import { Button } from '../components/ui/Button';
 import { Card } from '../components/ui/Card';
 import { SectionHeader, EYEBROW, H2 } from '../components/ui/SectionHeader';
@@ -2678,7 +2678,6 @@ const CustomerPortalPage: FC = () => {
         );
         // Runde 17 (`?look=angebot`): die Karte als Angebot — Kopf mit Datum und Grundlage, Zeilen statt „Inklusive …".
         const angebotLook = kompakt && KOMPAKT_LOOK === 'angebot';
-        const fdAngebot = (lead?.kalkulation as Record<string, unknown> | null | undefined)?.formularDaten as Record<string, unknown> | undefined;
         return (
         <div className={`max-w-3xl mx-auto ${kompakt ? 'px-5 pt-10' : `px-3.5 ${!patientSaved && !hasPending ? '-mt-6' : 'pt-5'}`}`}>
           {/* Karte im Look des Rechners (Teil 3, Martin 24.09.). „Ihr persönliches
@@ -2726,13 +2725,19 @@ const CustomerPortalPage: FC = () => {
                   {kompakt ? (
                     <>
                       {angebotLook && (
-                        <AngebotKopf datum={angebotDatum(lead?.created_at)} grundlage={angebotGrundlage(fdAngebot, lead?.care_start_timing)} />
+                        <AngebotKopf datum={angebotDatum(lead?.created_at)} />
                       )}
                       <p className={`${angebotLook ? 'mt-4 ' : ''}flex items-baseline gap-2 whitespace-nowrap`}>
                         <span className="text-[44px] font-bold leading-none tracking-[-0.03em] tabular-nums text-pm-ink">{formatEuro(brutto)}</span>
                         <span className="text-[16px] text-pm-muted">im Monat</span>
                       </p>
-                      {angebotLook ? <AngebotZeilen /> : (
+                      {angebotLook ? (
+                        // Runde 18: „Alles im Preis" steht oben bei den Vorteilen; am Preis nur, was dazukommt.
+                        <p className="mt-3 text-[15px] leading-[1.5] text-pm-muted">
+                          Dazu kommen Kost und Logis sowie <span className="whitespace-nowrap">125 € Reisekosten</span>{' '}
+                          <span className="whitespace-nowrap">pro Fahrt.</span>
+                        </p>
+                      ) : (
                       <p className="mt-3 text-[14px] leading-[1.5] text-pm-muted">
                         {/* Wortlaut der Geschäftsführung (Runde 14). Betrag und Wort zusammen,
                             „pro Fahrt." nie allein in der letzten Zeile. */}
@@ -2765,7 +2770,7 @@ const CustomerPortalPage: FC = () => {
                   )}
                   {/* Kompakt-Einstieg: Haarlinie, die vier Punkte der Startseite (Runde 15: feiner grüner Haken,
                       16 px), Haarlinie, Testsieger-Siegel mit Testsieger/Erfahrung und darunter die Sterne. */}
-                  {kompakt ? vierPunkteRuhig : vierPunkte('mt-4 flex flex-col gap-2.5')}
+                  {kompakt ? (angebotLook ? null : vierPunkteRuhig) : vierPunkte('mt-4 flex flex-col gap-2.5')}
                   {kompakt && <KompaktVertrauen sterne={sterne} />}
                   {!kompakt && kostenErst}
                   {!kompakt && heimVergleich}
@@ -3358,7 +3363,13 @@ const CustomerPortalPage: FC = () => {
               </h1>
               {/* Kompakt-Einstieg (Runde 13, „ruhig"): nur die Einleitung — keine Fakten-Zeile, kein Knopf,
                   keine Haken. Betont sind auf der Seite nur Kostenkarte und Hinweis. */}
-              {kompakt && <KompaktEinleitung />}
+              {/* Runde 18 (`?look=angebot`): kurze Einleitung mit Grundlage, dann die Vorteile — der Preis folgt darunter. */}
+              {kompakt && KOMPAKT_LOOK === 'angebot' ? (
+                <>
+                  <AngebotEinleitung fuer={angebotFuer((lead?.kalkulation as Record<string, unknown> | null | undefined)?.formularDaten as Record<string, unknown> | undefined)} />
+                  <AngebotVorteile onBestpreis={() => setBestpreisOffen(true)} />
+                </>
+              ) : kompakt && <KompaktEinleitung />}
               {/* Offene Bewerbung (Martin 25.09.): Kopf nur Titel + Zeit, direkt
                   danach die Bewerbung; „Angebot prüfen" und die Vorteile der
                   Kostenrechner-Startseite stehen IN der Karte (AppCard `vorteile`). */}
