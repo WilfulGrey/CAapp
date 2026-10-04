@@ -11,15 +11,15 @@
 //   → Kostenkarte: Preis, kleine Zeile, Eigenanteil (EigenanteilZeile; „So rechnen wir ›" öffnet die
 //     Aufstellung), die vier Punkte der Startseite, unten Testsieger-Siegel und Sterne (KompaktVertrauen)
 //   → „Für Sie ausgewählt / Ihre passenden Pflegekräfte" (KompaktPflegekraefteBereich) mit dem
-//     Hinweis „Noch 2 Minuten bis zum Einladen" (hebt sich ab: Koralle-Ton, Koralle-Rand; das
-//     4-Schritte-Formular klappt darin auf einer weißen Fläche auf), darunter die echten Profile als
-//     Zeilen ohne Knöpfe (KompaktePflegekraefte).
+//     Status-Hinweis „Ihre Pflegesituation ist noch nicht vollständig" (hebt sich ab: Koralle-Ton,
+//     Koralle-Rand; das 4-Schritte-Formular klappt darin auf einer weißen Fläche auf), darunter die
+//     echten Profile als Zeilen ohne Knöpfe (KompaktePflegekraefte).
 // Alle anderen Zustände (abgesendet, Bewerbung, gebucht …) bleiben unverändert.
 //
 // Schrift: Fließtext 16 px, kleine Schrift 14 px. Ausnahme 13 px für die dritte Zeile der
 // Pflegekräfte — so bleibt sie bei 390 px einzeilig.
 import { Fragment, useEffect, useRef, type ReactNode } from 'react';
-import { ChevronRight, Sparkles } from 'lucide-react';
+import { ChevronRight, Info, Sparkles } from 'lucide-react';
 import type { Nurse } from '../../types';
 import type { SterneStand } from '../../lib/sterne';
 import { BewertungsZeile } from './BewertungsZeile';
@@ -30,13 +30,16 @@ import { Card } from '../ui/Card';
 import { SectionHeader } from '../ui/SectionHeader';
 
 /**
- * Einleitung unter dem Titel (Runde 12, Wortlaut der Geschäftsführung): was das Angebot umfasst.
- * Fließtext wie die Unterzeilen der anderen Zustände — kein Kasten.
+ * Einleitung unter dem Titel (Runde 12, Wortlaut der Geschäftsführung): was das Angebot umfasst und
+ * worum wir uns kümmern. Fließtext wie die Unterzeilen der anderen Zustände — kein Kasten.
  */
 export function KompaktEinleitung() {
   return (
     <p className="mt-3 text-[16px] leading-[1.55] text-pm-muted">
-      Ihr Angebot umfasst eine Rund-um-Betreuung zu Hause durch bei uns angestellte Betreuungskräfte.
+      {/* „Um Anreise," und das Ende bleiben zusammen — kein „Um" allein am Zeilenende. */}
+      Ihr Angebot umfasst eine Rund-um-Betreuung zu Hause durch bei uns angestellte, sozialversicherte
+      Betreuungskräfte. <span className="whitespace-nowrap">Um Anreise,</span> Wechsel und Ersatz bei Ausfall{' '}
+      <span className="whitespace-nowrap">kümmern wir uns.</span>
     </p>
   );
 }
@@ -135,8 +138,9 @@ export function EigenanteilZeile({ betrag, posten, onRechnung }: {
 
 /**
  * Pflegekräfte-Bereich (Runde 8): Kopf „Für Sie ausgewählt / Ihre passenden Pflegekräfte", darunter
- * der schmale Hinweis „Noch 2 Minuten bis zum Einladen" — im Kompakt-Einstieg ist die Pflegesituation
- * per Definition noch nicht abgeschickt, also steht er hier immer — dann die echten Profile (`liste`).
+ * der Status-Hinweis „Ihre Pflegesituation ist noch nicht vollständig" (Runde 12; ruhig, kein
+ * Fehler-Rot) — im Kompakt-Einstieg ist die Pflegesituation per Definition noch nicht abgeschickt,
+ * also steht er hier immer — dann die echten Profile (`liste`).
  * Der Knopf öffnet das bestehende 4-Schritte-Formular IM Hinweis (`children` = eingebettete
  * AngebotCard; px-5, weil die mitlaufende Knopfleiste von Rand zu Rand reicht). id des Hinweises =
  * Sprungziel aller Wege ins Formular (`zurPflegesituation`, Mail-Link `goto=anfragen`, „Einladen" im
@@ -178,20 +182,30 @@ export function KompaktPflegekraefteBereich({ aktiv, offen, onOeffnen, onImBlick
           weißen Innenfläche (px-5, damit die mitlaufende Knopfleiste bündig bleibt). */}
       <div ref={hinweis} id="patientendaten" className="mt-4 scroll-mt-16">
       <div className="rounded-card border-2 border-pm-coral bg-pm-coral-tint px-5 pb-4 pt-4 shadow-lift">
-        <p className="text-[17.5px] font-extrabold leading-[1.25] text-pm-ink">Noch 2 Minuten bis zum Einladen</p>
+        <p className="flex items-center gap-1.5 text-[13px] font-semibold text-pm-taupe-ink">
+          <Info className="h-4 w-4 flex-none" aria-hidden="true" />
+          Hinweis
+        </p>
+        {/* Letzte Wortpaare bleiben zusammen (kein Wort allein in der letzten Zeile). */}
+        <p className="mt-1 text-[17.5px] font-extrabold leading-[1.25] text-pm-ink">
+          Ihre Pflegesituation ist noch <span className="whitespace-nowrap">nicht vollständig</span>
+        </p>
         <p className="mt-1.5 text-[14.5px] leading-[1.5] text-pm-muted">
-          Vervollständigen Sie kurz Ihre Pflegesituation, vieles ist schon ausgefüllt. Danach laden Sie Ihre
-          Favoriten ein und erhalten Bewerbungen mit Foto, Erfahrung, Anreisedatum und Preis.
+          Deshalb können Sie diese Pflegekräfte noch nicht einladen und noch keine{' '}
+          <span className="whitespace-nowrap">Bewerbungen erhalten.</span>
         </p>
         {offen ? (
           <div className="-mx-3 mt-4 rounded-[16px] bg-white px-5">{children}</div>
         ) : (
           <>
-            <Button breit onClick={onOeffnen} className="mt-3.5 !px-2 whitespace-nowrap">
-              Jetzt vervollständigen →
+            {/* Gestaffelte Schrift: Der Knopftext braucht bei 17 px 291 px, bei 360 px sind 272 frei. */}
+            <Button breit onClick={onOeffnen} className="mt-3.5 !px-2">
+              <span className="whitespace-nowrap text-[15.5px] min-[375px]:text-[16px] min-[390px]:text-[17px]">
+                Pflegesituation vervollständigen →
+              </span>
             </Button>
             <p className="mt-2.5 text-[13px] leading-snug text-pm-muted">
-              Unverbindlich: Ein Vertrag entsteht erst, wenn Sie ein Angebot{' '}
+              Vieles ist schon ausgefüllt. Unverbindlich: Ein Vertrag entsteht erst, wenn Sie ein Angebot{' '}
               <span className="whitespace-nowrap">ausdrücklich annehmen.</span>
             </p>
           </>

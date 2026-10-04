@@ -124,11 +124,13 @@ describe('KompaktePflegekraefte', () => {
 });
 
 describe('KompaktEinleitung', () => {
-  it('Einleitung unter dem Titel im Wortlaut der Geschäftsführung', () => {
+  it('Einleitung unter dem Titel im Wortlaut der Geschäftsführung (zwei Sätze)', () => {
     const { container } = render(<KompaktEinleitung />);
-    expect(container.querySelector('p')!.textContent).toBe(
-      'Ihr Angebot umfasst eine Rund-um-Betreuung zu Hause durch bei uns angestellte Betreuungskräfte.',
+    const absatz = container.querySelector('p')!;
+    expect(absatz.textContent).toBe(
+      'Ihr Angebot umfasst eine Rund-um-Betreuung zu Hause durch bei uns angestellte, sozialversicherte Betreuungskräfte. Um Anreise, Wechsel und Ersatz bei Ausfall kümmern wir uns.',
     );
+    expect(within(absatz).getByText('kümmern wir uns.').className).toContain('whitespace-nowrap');
   });
 });
 
@@ -172,46 +174,49 @@ describe('KompaktVertrauen', () => {
 describe('KompaktPflegekraefteBereich', () => {
   const props = { aktiv: true, offen: false, onOeffnen: () => {}, liste: <p>Zeilen</p> };
 
-  it('Kopf, Hinweis mit Knopf und „Unverbindlich", darunter die Zeilen', async () => {
+  it('Kopf, Status-Hinweis mit Knopf und kleiner Zeile, darunter die Zeilen', async () => {
     const onOeffnen = vi.fn();
     render(<KompaktPflegekraefteBereich {...props} onOeffnen={onOeffnen}><p>Formular</p></KompaktPflegekraefteBereich>);
     const bereich = screen.getByRole('region', { name: 'Ihre passenden Pflegekräfte' });
     expect(within(bereich).getByText('Für Sie ausgewählt')).toBeTruthy();
     expect(within(bereich).getByText(/^Echte Profile, ausgewählt nach/).textContent).toBe('Echte Profile, ausgewählt nach Ihren Angaben.');
     const hinweis = document.getElementById('patientendaten')!;
-    expect(within(hinweis).getByText('Noch 2 Minuten bis zum Einladen')).toBeTruthy();
-    expect(within(hinweis).getByText(/^Vervollständigen Sie kurz/).textContent).toBe(
-      'Vervollständigen Sie kurz Ihre Pflegesituation, vieles ist schon ausgefüllt. Danach laden Sie Ihre Favoriten ein und erhalten Bewerbungen mit Foto, Erfahrung, Anreisedatum und Preis.',
-    );
+    // Runde 12: Status-Hinweis statt „Noch 2 Minuten bis zum Einladen".
+    expect(within(hinweis).getByText('Hinweis')).toBeTruthy();
+    expect(within(hinweis).getByText((_, el) => el?.tagName === 'P' && el.textContent === 'Ihre Pflegesituation ist noch nicht vollständig')).toBeTruthy();
+    expect(within(hinweis).getByText((_, el) => el?.tagName === 'P' && el.textContent === 'Deshalb können Sie diese Pflegekräfte noch nicht einladen und noch keine Bewerbungen erhalten.')).toBeTruthy();
+    expect(screen.queryByText('Noch 2 Minuten bis zum Einladen')).toBeNull();
     // Look A: hebt sich ab — Koralle-Ton und 2 px Koralle-Rand.
     const rahmen = hinweis.firstElementChild as HTMLElement;
     expect(rahmen.className).toContain('border-pm-coral');
     expect(rahmen.className).toContain('bg-pm-coral-tint');
-    const unverbindlich = within(hinweis).getByText(/^Unverbindlich:/);
-    expect(unverbindlich.textContent).toBe('Unverbindlich: Ein Vertrag entsteht erst, wenn Sie ein Angebot ausdrücklich annehmen.');
+    const unverbindlich = within(hinweis).getByText(/^Vieles ist schon ausgefüllt\./);
+    expect(unverbindlich.textContent).toBe('Vieles ist schon ausgefüllt. Unverbindlich: Ein Vertrag entsteht erst, wenn Sie ein Angebot ausdrücklich annehmen.');
     expect(within(unverbindlich).getByText('ausdrücklich annehmen.').className).toContain('whitespace-nowrap');
     // Reihenfolge: Kopf → Hinweis → Zeilen.
     const zeilen = screen.getByText('Zeilen');
     expect(hinweis.compareDocumentPosition(zeilen) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(screen.queryByText('Formular')).toBeNull();
-    await userEvent.click(within(hinweis).getByRole('button', { name: 'Jetzt vervollständigen →' }));
+    await userEvent.click(within(hinweis).getByRole('button', { name: 'Pflegesituation vervollständigen →' }));
     expect(onOeffnen).toHaveBeenCalledTimes(1);
   });
 
-  it('offen: das Formular steht im Hinweis auf einer weißen Innenfläche, Knopf und „Unverbindlich" sind weg', () => {
+  it('offen: das Formular steht im Hinweis auf einer weißen Innenfläche, Knopf und kleine Zeile sind weg', () => {
     render(<KompaktPflegekraefteBereich {...props} offen><p>Formular</p></KompaktPflegekraefteBereich>);
     const hinweis = document.getElementById('patientendaten')!;
     expect(within(hinweis).getByText('Formular')).toBeTruthy();
     expect(within(hinweis).getByText('Formular').parentElement!.className).toContain('bg-white');
-    expect(screen.queryByRole('button', { name: 'Jetzt vervollständigen →' })).toBeNull();
-    expect(screen.queryByText(/^Unverbindlich:/)).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Pflegesituation vervollständigen →' })).toBeNull();
+    expect(screen.queryByText(/^Vieles ist schon ausgefüllt\./)).toBeNull();
+    // Der Status bleibt über dem Formular stehen.
+    expect(within(hinweis).getByText((_, el) => el?.tagName === 'P' && el.textContent === 'Ihre Pflegesituation ist noch nicht vollständig')).toBeTruthy();
   });
 
   it('nicht aktiv (alle anderen Zustände): nur der Inhalt, kein Kopf, kein Hinweis, keine Zeilen', () => {
     render(<KompaktPflegekraefteBereich {...props} aktiv={false}><p>Formular</p></KompaktPflegekraefteBereich>);
     expect(screen.getByText('Formular')).toBeTruthy();
     expect(screen.queryByRole('region')).toBeNull();
-    expect(screen.queryByText('Noch 2 Minuten bis zum Einladen')).toBeNull();
+    expect(screen.queryByText((_, el) => el?.tagName === 'P' && el.textContent === 'Ihre Pflegesituation ist noch nicht vollständig')).toBeNull();
     expect(screen.queryByText('Zeilen')).toBeNull();
   });
 });

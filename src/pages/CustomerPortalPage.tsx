@@ -697,7 +697,7 @@ const CustomerPortalPage: FC = () => {
       return !!roh && (JSON.parse(roh) as { _isDraft?: boolean })._isDraft !== true;
     } catch { return false; }
   }, [lead?.token]);
-  // Formular im Hinweis „Noch 2 Minuten bis zum Einladen" aufgeklappt (Kompakt-Einstieg).
+  // Formular im Hinweis „Ihre Pflegesituation ist noch nicht vollständig" aufgeklappt (Kompakt-Einstieg).
   const [formImKasten, setFormImKasten] = useState(false);
   // Startdatum NUR aus dem Formular des Kunden (Martin 25.09.: „Das einzige
   // Datum, was zählt, ist das, was hier im Formular angegeben wird"), nie aus
@@ -1885,8 +1885,8 @@ const CustomerPortalPage: FC = () => {
     setPatientExpandedManual(true);
     setTriggerOpenPatient(true);
     const ziel = document.getElementById('patientendaten');
-    // Kompakt-Einstieg: Das Formular steht im Hinweis „Noch 2 Minuten bis zum Einladen" (id
-    // patientendaten) und klappt erst jetzt auf. Darum ZUERST ohne Animation zum Hinweis, DANN
+    // Kompakt-Einstieg: Das Formular steht im Hinweis „Ihre Pflegesituation ist noch nicht vollständig"
+    // (id patientendaten) und klappt erst jetzt auf. Darum ZUERST ohne Animation zum Hinweis, DANN
     // aufklappen — das Formular kommt so unter dem oberen Bildrand dazu. Weich gescrollt bricht WebKit
     // ab, sobald oberhalb Inhalt dazukommt (wie Registry #102): Vom Hinweis bei den Pflegekräften aus
     // landete die Seite einmal 2.326 px unter dem Ziel.
@@ -3709,7 +3709,7 @@ const CustomerPortalPage: FC = () => {
              traegt seit 11.09. der Block „Jetzt konkrete Bewerbungen
              erhalten" darueber. Das div bleibt als neutraler Anker.
              Kompakt-Einstieg (Runde 8): „Für Sie ausgewählt / Ihre passenden Pflegekräfte" mit dem
-             Hinweis „Noch 2 Minuten bis zum Einladen" (das Formular klappt darin auf) und den echten
+             Hinweis „Ihre Pflegesituation ist noch nicht vollständig" (das Formular klappt darin auf) und den echten
              Profilen darunter (sonst bleibt `KompaktPflegekraefteBereich` dieses neutrale div). */}
         <KompaktPflegekraefteBereich
           aktiv={kompakt}
