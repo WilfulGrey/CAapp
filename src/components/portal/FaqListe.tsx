@@ -61,14 +61,15 @@ export const FAQ: { q: string; a: ReactNode }[] = [
 
 const SICHTBAR = 4;
 
-export function FaqListe() {
+/** `ruhig` (Kompakt-Einstieg, Runde 15): Kopf ohne Eyebrow im ruhigen H2-Stil; sonst unverändert. */
+export function FaqListe({ ruhig = false }: { ruhig?: boolean } = {}) {
   const [offen, setOffen] = useState<number | null>(null);
   const [alle, setAlle] = useState(false);
   const liste = alle ? FAQ : FAQ.slice(0, SICHTBAR);
   return (
     <section>
-      <SectionHeader eyebrow="Gut zu wissen" titel="Häufige Fragen" />
-      <div className="mt-3.5 border-b border-pm-line">
+      <SectionHeader eyebrow={ruhig ? undefined : 'Gut zu wissen'} titel="Häufige Fragen" ruhig={ruhig} />
+      <div className={`${ruhig ? 'mt-5' : 'mt-3.5'} border-b border-pm-line`}>
         {liste.map((item, i) => {
           const auf = offen === i;
           return (

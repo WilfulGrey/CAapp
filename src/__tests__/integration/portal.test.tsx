@@ -541,12 +541,16 @@ describe('Portal integration: golden paths', () => {
     expect(inKarte.getByText('Keine Vermittlungsgebühr')).toBeInTheDocument();
     expect(inKarte.getByText('Täglich kündbar, taggenau abgerechnet')).toBeInTheDocument();
     expect(karte.querySelector('.bg-pm-mint')).toBeNull();
-    // Unten in der Karte (Runde 13): Siegel, daneben Testsieger/Erfahrung und die Sterne, nach den vier Punkten.
+    // Unten in der Karte: Siegel, daneben Testsieger/Erfahrung, darunter die Sterne (Runde 15), nach den vier Punkten.
     const siegel = karte.querySelector('img[src="/badge-testsieger.webp"]')!;
     const sterne = await inKarte.findByRole('link', { name: /4,9 von 5 aus 126 Bewertungen/ }, { timeout: 5000 });
-    expect(siegel.parentElement!.contains(sterne)).toBe(true);
     expect(within(siegel.parentElement!).getAllByRole('listitem').map((li) => li.textContent)).toEqual(['6× in Folge Testsieger DIE WELT', 'über 20 Jahre Erfahrung']);
+    expect(siegel.compareDocumentPosition(sterne) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(punkt.compareDocumentPosition(siegel) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    // Runde 15: Karte ohne Rand, Haken im Marken-Grün statt Koralle.
+    expect(karte.className).toContain('!border-0');
+    expect(punkt.closest('li')!.querySelector('svg')!.getAttribute('class')).toContain('text-pm-green');
+    expect(karte.querySelector('.text-pm-coral')).toBeNull();
     // Weg aus der Karte: „Wir kümmern uns um alles", die Klappzeile „Alle Kosten im Überblick".
     expect(inKarte.queryByText('Wir kümmern uns um alles')).toBeNull();
     expect(inKarte.queryByRole('button', { name: 'Alle Kosten im Überblick' })).toBeNull();
@@ -604,7 +608,7 @@ describe('Portal integration: golden paths', () => {
     expect(screen.queryByText(/Ihr Eigenanteil/)).toBeNull();
   }, 15_000);
 
-  it('Neukunde: die Profile als Zeilen ohne Knöpfe und ohne Sterne — Deutsch mit Punkten, Erfahrung · Einsätze bei uns', async () => {
+  it('Neukunde: die Profile als Zeilen in EINER weißen Karte, ohne Knöpfe und ohne Sterne — Deutsch mit Punkten, Erfahrung und Einsätze bei uns', async () => {
     server.use(...defaultHandlers({ proxy: { listApplications: () => ({ JobOfferApplicationsWithPagination: { total: 0, data: [] } }) } }));
     setLocation(`?token=${TEST_LEAD_TOKEN}`);
     render(<CustomerPortalPage />);
@@ -617,8 +621,12 @@ describe('Portal integration: golden paths', () => {
     expect(within(zeile).getByText('Unsere Empfehlung')).toBeInTheDocument();
     expect(within(zeile).getByText('Deutsch gut')).toBeInTheDocument();
     expect(zeile.querySelectorAll('span.bg-pm-taupe')).toHaveLength(3);
-    expect(text(zeile)).toContain('5 Jahre Erfahrung · 15 Einsätze bei uns');
+    // Ganze Teile; der Trenner „·" kommt per CSS (am Zeilenanfang abgeschnitten).
+    expect([...zeile.querySelectorAll('.whitespace-nowrap')].map((t) => t.textContent)).toEqual(['5 Jahre Erfahrung', '15 Einsätze bei uns']);
     expect(zeile.textContent).not.toContain('★');
+    // Runde 15: eine weiße Karte mit Haarlinien.
+    expect(zeile.parentElement!.className).toContain('rounded-card');
+    expect(zeile.parentElement!.className).toContain('divide-y');
     // Keine Knöpfe je Pflegekraft mehr.
     expect(screen.queryByRole('button', { name: 'Profil vervollständigen & einladen' })).toBeNull();
     expect(screen.queryByRole('button', { name: 'Einladen' })).toBeNull();

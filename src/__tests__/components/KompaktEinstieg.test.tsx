@@ -21,8 +21,9 @@ const basis: Nurse = {
 };
 
 const zeileVon = (name: string) => screen.getByRole('button', { name: `Profil von ${name} ansehen` });
-// Text der Zeile; das geschützte Leerzeichen vor dem „·" (Umbruch erst danach) als normales.
-const text = (el: HTMLElement) => (el.textContent ?? '').replace(/\u00A0/g, ' ');
+// Runde 15: Erfahrung und Einsätze als ganze Teile; der Trenner „·" kommt per CSS vor den Teil und wird am
+// Zeilenanfang abgeschnitten (Hülle overflow-hidden) — im Text steht er deshalb nicht.
+const teileVon = (el: HTMLElement) => [...el.querySelectorAll('.whitespace-nowrap')].map((t) => t.textContent);
 // Gefüllte Punkte der Deutsch-Anzeige (DeutschPunkte aus dem Profil „V").
 const gefuellt = (el: HTMLElement) => el.querySelectorAll('span.bg-pm-taupe').length;
 
@@ -35,7 +36,14 @@ describe('PflegekraftZeile', () => {
     expect(within(zeile).getByText(', 41')).toBeTruthy();
     expect(within(zeile).getByText('Deutsch gut')).toBeTruthy();
     expect(gefuellt(zeile)).toBe(3);
-    expect(text(zeile)).toContain('6 Jahre Erfahrung · 14 Einsätze bei uns');
+    expect(teileVon(zeile)).toEqual(['6 Jahre Erfahrung', '14 Einsätze bei uns']);
+    for (const teil of zeile.querySelectorAll('.whitespace-nowrap')) expect(teil.className).toContain("before:content-['·']");
+    expect(zeile.querySelector('.whitespace-nowrap')!.parentElement!.parentElement!.className).toContain('overflow-hidden');
+    // Runde 15: Name 17 px in 600, Alter in muted (AA), Foto 56 px mit runden Ecken.
+    expect(within(zeile).getByText(', 41').className).toContain('text-pm-muted');
+    const foto = zeile.firstElementChild as HTMLElement; // ohne Bild: Initialen in derselben Fläche
+    expect(foto.className).toContain('h-14');
+    expect(foto.className).toContain('rounded-xl');
     // Keine Bewertung je Pflegekraft: kein Stern, auch nicht für Elite/Stammkraft.
     expect(zeile.textContent).not.toContain('★');
     expect(within(zeile).queryByText('Unsere Empfehlung')).toBeNull();
@@ -48,9 +56,9 @@ describe('PflegekraftZeile', () => {
     expect(gefuellt(zeile)).toBe(2);
   });
 
-  it('Einzahl: „1 Jahr Erfahrung · 1 Einsatz bei uns"', () => {
+  it('Einzahl: „1 Jahr Erfahrung", „1 Einsatz bei uns"', () => {
     render(<PflegekraftZeile nurse={{ ...basis, experienceYears: 1, history: { assignments: 1, avgDurationMonths: 2 } }} empfohlen={false} onClick={() => {}} />);
-    expect(text(zeileVon('Helena K.'))).toContain('1 Jahr Erfahrung · 1 Einsatz bei uns');
+    expect(teileVon(zeileVon('Helena K.'))).toEqual(['1 Jahr Erfahrung', '1 Einsatz bei uns']);
   });
 
   it('fehlende oder null Teile entfallen samt Trenner', () => {
@@ -109,10 +117,11 @@ describe('KompaktePflegekraefte', () => {
     expect(screen.queryByRole('heading')).toBeNull();
     expect(screen.queryByText(/Vor dem Einladen/)).toBeNull();
     expect(screen.getAllByRole('button', { name: /^Profil von / })).toHaveLength(2);
-    // Runde 13: schlichte Zeilen mit Linien, keine Karte.
+    // Runde 15: EINE weiße Karte, Haarlinien zwischen den Zeilen.
     const liste = zeileVon('Helena K.').parentElement!;
     expect(liste.className).toContain('divide-y');
-    expect(liste.className).not.toContain('rounded-card');
+    expect(liste.className).toContain('rounded-card');
+    expect(liste.className).toContain('bg-white');
     expect(screen.getAllByText('Unsere Empfehlung')).toHaveLength(1);
     expect(within(zeileVon('Helena K.')).getByText('Unsere Empfehlung')).toBeTruthy();
   });
@@ -126,7 +135,10 @@ describe('KompaktePflegekraefte', () => {
   it('ohne Vorschläge: Leer-Zustand mit Marta', () => {
     render(<KompaktePflegekraefte {...props} keineVorschlaege eintraege={[]} />);
     expect(screen.getByText('Gerade keine weiteren Vorschläge')).toBeTruthy();
-    expect(screen.getByRole('link', { name: 'Mit Marta sprechen' }).getAttribute('href')).toBe('tel:0');
+    const marta = screen.getByRole('link', { name: 'Mit Marta sprechen' });
+    expect(marta.getAttribute('href')).toBe('tel:0');
+    // Knöpfe einheitlich (Runde 15): 52 px hoch.
+    expect(marta.className).toContain('min-h-[52px]');
   });
 });
 
@@ -145,7 +157,7 @@ describe('KompaktEinleitung', () => {
 });
 
 describe('KompaktVertrauen', () => {
-  it('eine ruhige Zeile: Siegel, daneben „6× in Folge Testsieger DIE WELT · über 20 Jahre Erfahrung" und die Sterne', () => {
+  it('Siegel, daneben „6× in Folge Testsieger DIE WELT · über 20 Jahre Erfahrung", darunter die Sterne', () => {
     const { container } = render(<KompaktVertrauen sterne={{ schnitt: '4,9', wert: 4.9, anzahl: 126 }} />);
     const siegel = container.querySelector('img')!;
     expect(siegel.getAttribute('src')).toBe('/badge-testsieger.webp');
@@ -160,9 +172,15 @@ describe('KompaktVertrauen', () => {
     expect(screen.getByRole('list').parentElement!.className).toContain('overflow-hidden');
     const sterne = screen.getByRole('link', { name: /4,9 von 5 aus 126 Bewertungen/ });
     expect(sterne.getAttribute('href')).toBe('https://primundus.de/erfahrungen');
-    expect(siegel.parentElement!.contains(sterne)).toBe(true);
-    // Mit einer dünnen Linie von den Punkten darüber getrennt.
-    expect((container.firstElementChild as HTMLElement).className).toContain('border-t');
+    // Runde 15: Die Sterne stehen unter Siegel und Text (neben dem Siegel ist die Spalte bei 24 px Innenabstand zu schmal).
+    expect(siegel.parentElement!.contains(sterne)).toBe(false);
+    expect(siegel.parentElement!.contains(teile[0])).toBe(true);
+    expect(siegel.compareDocumentPosition(sterne) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(siegel.className).toContain('h-10');
+    // Mit einer Haarlinie von den Punkten darüber getrennt; beides im selben Block.
+    const block = container.firstElementChild as HTMLElement;
+    expect(block.className).toContain('border-t');
+    expect(block.contains(sterne)).toBe(true);
   });
 
   it('ohne Bewertungsstand: Siegel und Testsieger-Zeile, keine Sterne', () => {
@@ -189,15 +207,20 @@ describe('KompaktPflegekraefteBereich', () => {
     expect(within(hinweis).getByText((_, el) => el?.tagName === 'P' && el.textContent === 'Ihre Pflegesituation ist noch nicht vollständig')).toBeTruthy();
     expect(within(hinweis).getByText((_, el) => el?.tagName === 'P' && el.textContent === 'Deshalb können Sie diese Pflegekräfte noch nicht einladen und noch keine Bewerbungen erhalten.')).toBeTruthy();
     expect(screen.queryByText('Noch 2 Minuten bis zum Einladen')).toBeNull();
-    // Look B: dunkles Kopfband mit dem Titel in Weiß, weißer Körper, kräftiger Rand.
-    // Der Kasten ist dunkel (Rand + Band ohne helle Naht an den Ecken), nur der Körper ist weiß.
+    // Look B, Runde 15 verfeinert: dunkles Kopfband (taupe-ink) mit dem Titel in Weiß (18 px, 600), weißer
+    // Körper mit 16 px Text, weicher Schatten statt Rand.
     const rahmen = hinweis.firstElementChild as HTMLElement;
-    expect(rahmen.className).toContain('border-pm-taupe-ink');
-    expect(rahmen.className).toContain('bg-pm-taupe-ink');
+    expect(rahmen.className).toContain('shadow-lift');
+    expect(rahmen.className).toContain('rounded-card');
+    expect(rahmen.className).not.toMatch(/\bborder/);
     const band = within(hinweis).getByText((_, el) => el?.tagName === 'P' && el.textContent === 'Ihre Pflegesituation ist noch nicht vollständig');
     expect(band.parentElement).toBe(rahmen);
+    expect(band.className).toContain('bg-pm-taupe-ink');
     expect(band.className).toContain('text-white');
-    const koerper = within(hinweis).getByText((_, el) => el?.tagName === 'P' && el.textContent === 'Deshalb können Sie diese Pflegekräfte noch nicht einladen und noch keine Bewerbungen erhalten.').parentElement!;
+    expect(band.className).toContain('text-[18px]');
+    const text16 = within(hinweis).getByText((_, el) => el?.tagName === 'P' && el.textContent === 'Deshalb können Sie diese Pflegekräfte noch nicht einladen und noch keine Bewerbungen erhalten.');
+    expect(text16.className).toContain('text-[16px]');
+    const koerper = text16.parentElement!;
     expect(koerper.className).toContain('bg-white');
     const unverbindlich = within(hinweis).getByText(/^Vieles ist schon ausgefüllt\./);
     expect(unverbindlich.textContent).toBe('Vieles ist schon ausgefüllt. Unverbindlich: Ein Vertrag entsteht erst, wenn Sie ein Angebot ausdrücklich annehmen.');

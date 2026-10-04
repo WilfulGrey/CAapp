@@ -16,7 +16,7 @@
 //
 // Schrift: Fließtext 16 px, kleine Schrift 14 px. Ausnahme 13 px für die dritte Zeile der
 // Pflegekräfte — so bleibt sie bei 390 px einzeilig.
-import { Fragment, useEffect, useRef, type ReactNode } from 'react';
+import { useEffect, useRef, type ReactNode } from 'react';
 import { ChevronRight, Sparkles } from 'lucide-react';
 import type { Nurse } from '../../types';
 import type { SterneStand } from '../../lib/sterne';
@@ -28,12 +28,12 @@ import { SectionHeader } from '../ui/SectionHeader';
 
 /**
  * Einleitung unter dem Titel (Runde 14, Wortlaut der Geschäftsführung): was das Angebot umfasst, was wir
- * organisieren und wann die Ansprechpartnerin erreichbar ist. Fließtext wie die Unterzeilen der anderen
- * Zustände — kein Kasten.
+ * organisieren und wann die Ansprechpartnerin erreichbar ist. Fließtext, kein Kasten; seit Runde 15
+ * (Designdurchgang) 17 px mit Zeilenhöhe 1,55.
  */
 export function KompaktEinleitung() {
   return (
-    <p className="mt-3 text-[16px] leading-[1.55] text-pm-muted">
+    <p className="mt-4 text-[17px] leading-[1.55] text-pm-muted">
       {/* Die Uhrzeit und das Satzende bleiben zusammen — kein „da." allein in der letzten Zeile. */}
       Ihr Angebot umfasst eine Rund-um-Betreuung zu Hause durch bei uns angestellte Betreuungskräfte.
       Anreise, Wechsel und Vertretung organisieren wir, und Ihre Ansprechpartnerin ist täglich von{' '}
@@ -46,32 +46,33 @@ export function KompaktEinleitung() {
 export const VERTRAUEN = ['6× in Folge Testsieger DIE WELT', 'über 20 Jahre Erfahrung'] as const;
 
 /**
- * Unten in der Kostenkarte (Runde 13): EINE ruhige Zeile — kleines Testsieger-Siegel, daneben
- * „6× in Folge Testsieger DIE WELT · über 20 Jahre Erfahrung" und die Sterne wie auf der Startseite.
- * Die Teile bleiben ganz, umbrochen wird nur zwischen ihnen; der Trenner „·" sitzt vor dem Teil und
- * wird am Zeilenanfang abgeschnitten (nie ein Punkt am Zeilenende). In der schmalen Spalte stehen
- * die beiden Teile untereinander. Höhe der Sterne reserviert (ohne Stand keine Sterne).
+ * Unten in der Kostenkarte (Runde 13; Runde 15 neu gesetzt): Testsieger-Siegel (40 px), daneben
+ * „6× in Folge Testsieger DIE WELT · über 20 Jahre Erfahrung" in 14 px. Die Teile bleiben ganz, umbrochen
+ * wird nur zwischen ihnen; der Trenner „·" sitzt vor dem Teil und wird am Zeilenanfang abgeschnitten (nie
+ * ein Punkt am Zeilenende). Die Sterne stehen darunter über die volle Breite: Neben dem Siegel bleiben
+ * bei 24 px Innenabstand nur 250 px (390 px), die Sternzeile braucht rund 280. Ihre Höhe ist reserviert,
+ * damit nichts springt, wenn der Stand nachlädt (ohne Stand keine Sterne).
  */
 export function KompaktVertrauen({ sterne }: { sterne: SterneStand | null }) {
   return (
-    <div className="mt-4 flex items-center gap-2.5 border-t border-pm-line-soft pt-4">
-      <img src="/badge-testsieger.webp" alt="" className="h-11 w-auto flex-none object-contain" />
-      <div className="min-w-0">
-        <div className="overflow-hidden">
-          <ul className="-ml-4 flex flex-wrap text-[13.5px] leading-snug">
+    <div className="mt-5 border-t border-pm-line pt-5">
+      <div className="flex items-center gap-3">
+        <img src="/badge-testsieger.webp" alt="" className="h-10 w-auto flex-none object-contain" />
+        <div className="min-w-0 overflow-hidden">
+          <ul className="-ml-4 flex flex-wrap text-[14px] leading-5">
             {VERTRAUEN.map((teil, k) => (
               <li
                 key={teil}
-                className={`relative whitespace-nowrap pl-4 before:absolute before:left-[5px] before:font-normal before:text-pm-mute before:content-['·'] ${k === 0 ? 'font-semibold text-pm-ink' : 'text-pm-muted'}`}
+                className={`relative whitespace-nowrap pl-4 before:absolute before:left-[5px] before:font-normal before:text-pm-mute before:content-['·'] ${k === 0 ? 'font-medium text-pm-ink' : 'text-pm-muted'}`}
               >
                 {teil}
               </li>
             ))}
           </ul>
         </div>
-        <div className="flex h-6 items-center">
-          <BewertungsZeile stand={sterne} klein className="-my-2.5" />
-        </div>
+      </div>
+      <div className="mt-3 flex h-6 items-center">
+        <BewertungsZeile stand={sterne} klein className="-my-2.5" />
       </div>
     </div>
   );
@@ -83,7 +84,7 @@ export function KompaktVertrauen({ sterne }: { sterne: SterneStand | null }) {
  * Fehler-Rot) — im Kompakt-Einstieg ist die Pflegesituation per Definition noch nicht abgeschickt,
  * also steht er hier immer — dann die echten Profile (`liste`).
  * Der Knopf öffnet das bestehende 4-Schritte-Formular IM Hinweis (`children` = eingebettete
- * AngebotCard; px-5, weil die mitlaufende Knopfleiste von Rand zu Rand reicht). id des Hinweises =
+ * AngebotCard; px-6, die mitlaufende Knopfleiste reicht mit `ruhig` von Rand zu Rand). id des Hinweises =
  * Sprungziel aller Wege ins Formular (`zurPflegesituation`, Mail-Link `goto=anfragen`, „Einladen" im
  * Profil). `aktiv=false` (alle anderen Zustände): nur ein neutraler Rahmen um das Formular wie bisher.
  * `onImBlick`: Hinweis im Bild ja/nein — die schwebende Frage legt sich nicht über das Formular.
@@ -109,48 +110,49 @@ export function KompaktPflegekraefteBereich({ aktiv, offen, onOeffnen, onImBlick
   return (
     <section aria-labelledby="pflegekraefte-titel">
       {/* id = Sprungziel des Mail-Links `goto=matches` (scrollt, sobald die Liste steht). */}
-      <div id="pflegekraefte" className="px-1" style={{ scrollMarginTop: 72 }}>
+      <div id="pflegekraefte" style={{ scrollMarginTop: 72 }}>
         <SectionHeader
           id="pflegekraefte-titel"
+          ruhig
           titel="Ihre passenden Pflegekräfte"
           // Bei 360 px zweizeilig: „Ihren Angaben." bleibt zusammen.
           zeile={<>Echte Profile, ausgewählt nach <span className="whitespace-nowrap">Ihren Angaben.</span></>}
         />
       </div>
-      {/* Hülle trägt id und Ref. Look B (Runde 13, Wahl der Geschäftsführung): dunkles Kopfband mit dem
-          Titel in Weiß, weißer Körper, kräftiger Rand — hebt sich klar vom Seitentext ab, auch offen.
-          Der Kasten selbst ist dunkel, nur der Körper weiß: So entsteht an den runden Ecken keine helle
-          Haarlinie zwischen Rand und Band (Kantenglättung). */}
-      <div ref={hinweis} id="patientendaten" className="mt-5 scroll-mt-16">
-      <div className="rounded-card border-2 border-pm-taupe-ink bg-pm-taupe-ink shadow-lift">
-        {/* Letzte Wortpaare bleiben zusammen (kein Wort allein in der letzten Zeile). */}
-        <p className="px-5 py-3.5 text-[17.5px] font-extrabold leading-[1.25] text-white">
-          Ihre Pflegesituation ist noch <span className="whitespace-nowrap">nicht vollständig</span>
-        </p>
-        <div className="rounded-b-[18px] bg-white px-5 pb-4 pt-3.5">
-          <p className="text-[14.5px] leading-[1.5] text-pm-muted">
-            Deshalb können Sie diese Pflegekräfte noch nicht einladen und noch keine{' '}
-            <span className="whitespace-nowrap">Bewerbungen erhalten.</span>
+      {/* Hülle trägt id und Ref. Look B (Runde 13), Runde 15 verfeinert: dunkles Kopfband (taupe-ink) mit dem
+          Titel in Weiß, weißer Körper, weicher Schatten statt Rand. Band und Körper runden ihre Ecken selbst —
+          kein overflow-hidden, das eingebettete Formular soll nichts abgeschnitten bekommen. */}
+      <div ref={hinweis} id="patientendaten" className="mt-6 scroll-mt-16">
+        <div className="rounded-card shadow-lift">
+          {/* Letzte Wortpaare bleiben zusammen (kein Wort allein in der letzten Zeile). */}
+          <p className="rounded-t-card bg-pm-taupe-ink px-6 py-4 text-[18px] font-semibold leading-[1.35] text-white">
+            Ihre Pflegesituation ist noch <span className="whitespace-nowrap">nicht vollständig</span>
           </p>
-          {offen ? (
-            // Das Formular im weißen Körper, durch eine Linie vom Text getrennt (px-5 → Knopfleiste bündig).
-            <div className="mt-4 border-t border-pm-line-soft">{children}</div>
-          ) : (
-            <>
-              {/* Gestaffelte Schrift: Der Knopftext braucht bei 17 px 291 px, bei 360 px sind 272 frei. */}
-              <Button breit onClick={onOeffnen} className="mt-3.5 !px-2">
-                <span className="whitespace-nowrap text-[15.5px] min-[375px]:text-[16px] min-[390px]:text-[17px]">
-                  Pflegesituation vervollständigen →
-                </span>
-              </Button>
-              <p className="mt-2.5 text-[13px] leading-snug text-pm-muted">
-                Vieles ist schon ausgefüllt. Unverbindlich: Ein Vertrag entsteht erst, wenn Sie ein Angebot{' '}
-                <span className="whitespace-nowrap">ausdrücklich annehmen.</span>
-              </p>
-            </>
-          )}
+          <div className={`rounded-b-card bg-white px-6 pt-4 ${offen ? 'pb-5' : 'pb-6'}`}>
+            <p className="text-[16px] leading-[1.5] text-pm-body">
+              Deshalb können Sie diese Pflegekräfte noch nicht einladen und noch keine{' '}
+              <span className="whitespace-nowrap">Bewerbungen erhalten.</span>
+            </p>
+            {offen ? (
+              // Das Formular im weißen Körper, durch eine Haarlinie vom Text getrennt.
+              <div className="mt-5 border-t border-pm-line">{children}</div>
+            ) : (
+              <>
+                {/* Gestaffelte Schrift (600), gemessen in WebKit: 17 px → 285 px Text bei 286 frei (390 px),
+                    16 px → 269 bei 271 (375 px), 15 px → 252 bei 256 (360 px); 24 px Innenabstand, 8 px im Knopf. */}
+                <Button breit onClick={onOeffnen} className="mt-5 !px-2 !font-semibold">
+                  <span className="whitespace-nowrap text-[15px] min-[375px]:text-[16px] min-[390px]:text-[17px]">
+                    Pflegesituation vervollständigen →
+                  </span>
+                </Button>
+                <p className="mt-3 text-[13.5px] leading-[1.45] text-pm-muted">
+                  Vieles ist schon ausgefüllt. Unverbindlich: Ein Vertrag entsteht erst, wenn Sie ein Angebot{' '}
+                  <span className="whitespace-nowrap">ausdrücklich annehmen.</span>
+                </p>
+              </>
+            )}
+          </div>
         </div>
-      </div>
       </div>
       <div className="mt-6">{liste}</div>
     </section>
@@ -161,8 +163,11 @@ export function KompaktPflegekraefteBereich({ aktiv, offen, onOeffnen, onImBlick
  * Die echten Profile als Zeilen: Foto, Name und Alter, Deutsch mit Punkten, Erfahrung und Einsätze
  * bei uns. Keine Knöpfe — die ganze Zeile öffnet das Profil (wie „Profil ansehen"). Ohne eigene
  * Überschrift: Der Kopf „Ihre passenden Pflegekräfte" steht im Bereich darüber (Runde 8). Seit
- * Runde 13 ohne Karte: schlichte Zeilen mit dünnen Linien auf dem Seitengrund.
+ * Runde 15 (Designdurchgang) EINE weiße Karte mit Haarlinien zwischen den Zeilen; Laden und leere
+ * Zustände in derselben Karte, linksbündig.
  */
+const LISTEN_KARTE = 'rounded-card bg-white shadow-lift';
+
 export function KompaktePflegekraefte({ eintraege, laedt, alleBearbeitet, keineVorschlaege, onProfil, telefonHref }: {
   /** Sichtbare Vorschläge in Anzeige-Reihenfolge (Empfehlung zuerst); `i` = Index für `openNurseFromMatch`. */
   eintraege: { nurse: Nurse; i: number }[];
@@ -178,34 +183,32 @@ export function KompaktePflegekraefte({ eintraege, laedt, alleBearbeitet, keineV
   return (
     <>
       {laedt ? (
-        <div className="px-5 py-8 text-center">
-          <div className="mb-3 inline-block h-6 w-6 animate-spin rounded-full border-2 border-pm-chip border-t-transparent" />
+        <div className={`${LISTEN_KARTE} px-6 py-6`}>
+          <div className="mb-3 h-6 w-6 animate-spin rounded-full border-2 border-pm-chip border-t-transparent" />
           <p className="text-[16px] font-semibold text-pm-ink">Wir laden Ihre Pflegekräfte …</p>
           <p className="mt-1 text-[14px] leading-relaxed text-pm-muted">Einen Moment bitte — gleich sehen Sie Ihre persönlichen Vorschläge.</p>
         </div>
       ) : n > 0 ? (
-        <div className="divide-y divide-pm-line">
+        <div className={`${LISTEN_KARTE} divide-y divide-pm-line overflow-hidden`}>
           {eintraege.map(({ nurse, i }, pos) => (
             <PflegekraftZeile key={nurse.caregiverId ?? i} nurse={nurse} empfohlen={pos === 0} onClick={() => onProfil(nurse, i)} />
           ))}
         </div>
       ) : alleBearbeitet ? (
-        <div className="px-5 py-5 text-center">
-          <p className="text-[16px] font-bold text-pm-ink">Alle aktuellen Vorschläge bearbeitet</p>
+        <div className={`${LISTEN_KARTE} px-6 py-6`}>
+          <p className="text-[16px] font-semibold text-pm-ink">Alle aktuellen Vorschläge bearbeitet</p>
           <p className="mt-1 text-[14px] leading-relaxed text-pm-muted">
             Sie haben alle passenden Pflegekräfte durchgesehen. Wir schlagen Ihnen in Kürze weitere vor &mdash; Sie hören von uns.
           </p>
         </div>
       ) : keineVorschlaege ? (
-        <div className="px-5 py-6 text-center">
-          <p className="text-[16px] font-bold text-pm-ink">Gerade keine weiteren Vorschläge</p>
+        <div className={`${LISTEN_KARTE} px-6 py-6`}>
+          <p className="text-[16px] font-semibold text-pm-ink">Gerade keine weiteren Vorschläge</p>
           <p className="mt-1 text-[14px] leading-relaxed text-pm-muted">Neue passende Pflegekräfte erscheinen hier.</p>
-          <a
-            href={telefonHref}
-            className="mt-4 inline-flex min-h-[44px] items-center justify-center rounded-full border-[1.5px] border-pm-chip px-5 text-[15px] font-bold text-pm-taupe-ink hover:border-pm-taupe"
-          >
+          {/* Knöpfe im Kompakt-Einstieg einheitlich: 52 px, rund, 16 px in 600 (Runde 15). */}
+          <Button variante="sekundaer" href={telefonHref} className="mt-4 !text-[16px] !font-semibold">
             Mit Marta sprechen
-          </a>
+          </Button>
         </div>
       ) : null}
     </>
@@ -232,47 +235,49 @@ export function PflegekraftZeile({ nurse, empfohlen, onClick }: { nurse: Nurse; 
       type="button"
       onClick={onClick}
       aria-label={`Profil von ${name} ansehen`}
-      className="flex w-full items-center gap-2.5 px-1 py-3.5 text-left transition-colors hover:bg-white/60 active:bg-white/60 focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-pm-taupe"
+      className="flex w-full items-center gap-4 px-5 py-4 text-left transition-colors hover:bg-pm-paper active:bg-pm-paper focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-pm-taupe"
     >
       {nurse.image ? (
-        <img src={nurse.image} alt="" className="h-14 w-14 flex-none rounded-[12px] object-cover" />
+        <img src={nurse.image} alt="" className="h-14 w-14 flex-none rounded-xl object-cover" />
       ) : (
-        <span className="flex h-14 w-14 flex-none items-center justify-center rounded-[12px] text-[18px] font-bold text-white" style={{ backgroundColor: nurse.color }} aria-hidden="true">
+        <span className="flex h-14 w-14 flex-none items-center justify-center rounded-xl text-[18px] font-semibold text-white" style={{ backgroundColor: nurse.color }} aria-hidden="true">
           {initials(nurse.name)}
         </span>
       )}
       <span className="min-w-0 flex-1">
         {/* Runde 13: Empfehlung als leiser Text, keine Pille. */}
         {empfohlen && (
-          <span className="mb-1 flex items-center gap-1 text-[12.5px] font-semibold leading-none text-pm-taupe-ink">
-            <Sparkles className="h-3 w-3 flex-none" aria-hidden="true" />
+          <span className="mb-1.5 flex items-center gap-1 text-[13px] font-medium leading-none text-pm-taupe-ink">
+            <Sparkles className="h-3.5 w-3.5 flex-none" strokeWidth={1.75} aria-hidden="true" />
             Unsere Empfehlung
           </span>
         )}
-        <span className="block text-[17px] font-bold leading-snug text-pm-ink">
+        <span className="block text-[17px] font-semibold leading-snug text-pm-ink">
           {name}
-          {nurse.age ? <span className="font-normal text-pm-mute">, {nurse.age}</span> : null}
+          {/* Alter in muted (5,3:1) statt mute (3,5:1) — AA. */}
+          {nurse.age ? <span className="font-normal text-pm-muted">, {nurse.age}</span> : null}
         </span>
         {deutsch && (
-          <span className="mt-0.5 flex items-center gap-1.5 text-[14px] leading-snug text-pm-muted">
+          <span className="mt-1 flex items-center gap-1.5 text-[14.5px] leading-snug text-pm-muted">
             {punkte > 0 && <DeutschPunkte punkte={punkte} />}
             Deutsch {deutsch.toLowerCase()}
           </span>
         )}
         {erfahrung.length > 0 && (
-          // Bricht es um (unter 390 px), dann am „·", das beim ersten Teil bleibt.
-          <span className="mt-0.5 block text-[13px] leading-snug text-pm-muted">
-            {erfahrung.map((teil, k) => (
-              <Fragment key={teil}>
-                {k > 0 && ' · '}
-                <span className="whitespace-nowrap">{teil}</span>
-              </Fragment>
-            ))}
+          // Teile bleiben ganz, umbrochen wird nur zwischen ihnen; der Trenner „·" sitzt vor dem Teil und
+          // wird am Zeilenanfang abgeschnitten (bei 14,5 px stehen die beiden Teile untereinander).
+          <span className="mt-0.5 block overflow-hidden">
+            <span className="-ml-4 flex flex-wrap text-[14.5px] leading-snug text-pm-muted">
+              {erfahrung.map((teil) => (
+                <span key={teil} className="relative whitespace-nowrap pl-4 before:absolute before:left-[5px] before:content-['·']">
+                  {teil}
+                </span>
+              ))}
+            </span>
           </span>
         )}
       </span>
-      {/* Schmal gehalten (16 px, eng am Text): Zeile 3 braucht bei 390 px bis zu 246 von 252 px. */}
-      <ChevronRight className="-ml-2 h-4 w-4 flex-none text-pm-mute" aria-hidden="true" />
+      <ChevronRight className="h-5 w-5 flex-none text-pm-mute" strokeWidth={1.75} aria-hidden="true" />
     </button>
   );
 }

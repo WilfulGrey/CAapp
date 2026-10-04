@@ -2588,6 +2588,33 @@ const CustomerPortalPage: FC = () => {
     </ul>
   );
 
+  // Kompakt-Einstieg (Runde 15, Designdurchgang): dieselben vier Punkte, aber ruhig gesetzt — feiner
+  // Haken im Marken-Grün statt Koralle (Koralle bleibt dem Hauptknopf), 16 px, 12 px Abstand; ein
+  // umbrechender Punkt hängt sauber unter seinem Text. „Mehr Infos" als leiser Textlink wie überall im
+  // Einstieg (Stil des Link-Knopfs).
+  const LINK_RUHIG = 'font-semibold text-pm-taupe-ink underline underline-offset-4 decoration-pm-taupe/40 hover:decoration-pm-taupe-ink';
+  const punktKlasseRuhig = 'flex items-start gap-3 text-[16px] leading-[1.45] text-pm-ink';
+  const hakenRuhig = <Check className="mt-[3px] h-[18px] w-[18px] flex-none text-pm-green" strokeWidth={2} aria-hidden="true" />;
+  const vierPunkteRuhig = (
+    <ul className="mt-5 flex flex-col gap-3 border-t border-pm-line pt-5">
+      {HERO_PUNKTE.map((punkt) => (
+        <li key={punkt} className={punktKlasseRuhig}>
+          {hakenRuhig}
+          {punkt}
+        </li>
+      ))}
+      <li className={punktKlasseRuhig}>
+        {hakenRuhig}
+        <span>
+          Bestpreisgarantie{' '}
+          <button type="button" onClick={() => setBestpreisOffen(true)} className={`inline-flex min-h-[44px] -my-3 items-center ${LINK_RUHIG}`}>
+            Mehr Infos
+          </button>
+        </span>
+      </li>
+    </ul>
+  );
+
       const angebotSection = (() => {
         // Seit 11.08. steuert dieser Toggle NUR noch die Konditionen und den
         // Mustervertrag — der Preis steht immer. Default zu: Der Kunde soll
@@ -2650,12 +2677,13 @@ const CustomerPortalPage: FC = () => {
           </div>
         );
         return (
-        <div className={`max-w-3xl mx-auto px-3.5 ${!patientSaved && !hasPending ? '-mt-6' : 'pt-5'}`}>
+        <div className={`max-w-3xl mx-auto ${kompakt ? 'px-5 pt-10' : `px-3.5 ${!patientSaved && !hasPending ? '-mt-6' : 'pt-5'}`}`}>
           {/* Karte im Look des Rechners (Teil 3, Martin 24.09.). „Ihr persönliches
               Angebot" steht im Kopf — der Abschnitt heißt nach seinem Inhalt. Der
               Chevron klappt den ganzen Abschnitt zu, sobald er nur noch Referenz ist
               (Martin: „muss einklappbar sein für spätere Zustände"). */}
-          <Card className={`relative px-5 shadow-lift ${kompakt ? `pt-5 ${costsExpanded ? 'pb-0.5' : 'pb-5'}` : 'pt-3 pb-4'}`}>
+          {/* Kompakt-Einstieg (Runde 15): weiß, 20 px Radius, ohne Rand, weicher zweilagiger Schatten, 24 px Innenabstand. */}
+          <Card className={`relative shadow-lift ${kompakt ? `!border-0 px-6 pt-6 ${costsExpanded ? 'pb-2' : 'pb-6'}` : 'px-5 pt-3 pb-4'}`}>
             {kompakt ? (
               // Runde 13: keine Versalien-Zeile mehr — die Karte beginnt mit dem Preis; der Name bleibt
               // für Screenreader.
@@ -2695,10 +2723,10 @@ const CustomerPortalPage: FC = () => {
                   {kompakt ? (
                     <>
                       <p className="flex items-baseline gap-2 whitespace-nowrap">
-                        <span className="text-[42px] font-extrabold leading-none tracking-[-0.04em] tabular-nums text-pm-ink">{formatEuro(brutto)}</span>
+                        <span className="text-[44px] font-bold leading-none tracking-[-0.03em] tabular-nums text-pm-ink">{formatEuro(brutto)}</span>
                         <span className="text-[16px] text-pm-muted">im Monat</span>
                       </p>
-                      <p className="mt-1.5 text-[14px] leading-[1.4] text-pm-muted">
+                      <p className="mt-3 text-[14px] leading-[1.5] text-pm-muted">
                         {/* Wortlaut der Geschäftsführung (Runde 14). Betrag und Wort zusammen,
                             „pro Fahrt." nie allein in der letzten Zeile. */}
                         Inklusive Lohn, Steuern, Sozialabgaben und Gebühren. Dazu kommen Kost und Logis und{' '}
@@ -2708,11 +2736,11 @@ const CustomerPortalPage: FC = () => {
                       {/* Runde 14: statt der Eigenanteil-Zeilen EIN leiser Textlink, kein Kasten. Er öffnet
                           die Aufstellung unten in der Karte (mit „Was bleibt für Sie übrig" und dem
                           Eigenanteil) und springt an ihren Anfang — einziger Weg dorthin. */}
-                      <p className="mt-2.5 text-[14px] leading-[1.4]">
+                      <p className="mt-3 text-[15px] leading-[1.4]">
                         <button
                           type="button"
                           onClick={zuAllenKosten}
-                          className="inline-flex min-h-[44px] -my-3 items-center font-semibold text-pm-green-deep underline underline-offset-[3px]"
+                          className={`inline-flex min-h-[44px] -my-3 items-center ${LINK_RUHIG}`}
                         >
                           Alle Kosten im Überblick ›
                         </button>
@@ -2726,9 +2754,9 @@ const CustomerPortalPage: FC = () => {
                   </p>
                   </>
                   )}
-                  {/* Kompakt-Einstieg: dünne Linie, die vier Punkte der Startseite wie überall, dünne Linie,
-                      eine ruhige Zeile mit Testsieger-Siegel, Testsieger/Erfahrung und Sternen (Runde 13). */}
-                  {vierPunkte(kompakt ? 'mt-4 flex flex-col gap-2 border-t border-pm-line-soft pt-4' : 'mt-4 flex flex-col gap-2.5')}
+                  {/* Kompakt-Einstieg: Haarlinie, die vier Punkte der Startseite (Runde 15: feiner grüner Haken,
+                      16 px), Haarlinie, Testsieger-Siegel mit Testsieger/Erfahrung und darunter die Sterne. */}
+                  {kompakt ? vierPunkteRuhig : vierPunkte('mt-4 flex flex-col gap-2.5')}
                   {kompakt && <KompaktVertrauen sterne={sterne} />}
                   {!kompakt && kostenErst}
                   {!kompakt && heimVergleich}
@@ -2743,7 +2771,7 @@ const CustomerPortalPage: FC = () => {
                     type="button"
                     onClick={() => setCostsExpanded(!costsExpanded)}
                     aria-expanded={costsExpanded}
-                    className={`w-full flex items-center justify-between gap-2 border-t border-pm-line-soft pt-2 ${kompakt ? 'mt-2.5 min-h-[44px] text-[16px]' : 'mt-3 min-h-[48px] text-[15px]'} font-semibold text-pm-taupe-ink`}
+                    className={`w-full flex items-center justify-between gap-2 border-t pt-2 ${kompakt ? 'mt-5 border-pm-line min-h-[48px] text-[16px]' : 'border-pm-line-soft mt-3 min-h-[48px] text-[15px]'} font-semibold text-pm-taupe-ink`}
                   >
                     {costsExpanded ? 'Weniger anzeigen' : 'Alle Kosten im Überblick'}
                     <ChevronDown className={`w-5 h-5 text-pm-taupe transition-transform duration-200 ${costsExpanded ? 'rotate-180' : ''}`} />
@@ -3301,17 +3329,20 @@ const CustomerPortalPage: FC = () => {
         // Look wie primundus.de (Teil 3 des Redesigns): Fläche „shell", Begrüßung in
         // Taupe, Titel in 800. Im Ausgangszustand liegt die Kostenkarte leicht über
         // der Unterkante (pb-10 + -mt-6 an der Karte).
+        // Kompakt-Einstieg (Runde 15, Designdurchgang): KEINE Fläche — der Kopf steht auf dem Seitengrund
+        // (paper), 20 px Rand wie alle Abschnitte; Begrüßung 16 px muted, Titel 30 px (bis 375 px: 28) in 700,
+        // die Kostenkarte folgt mit 40 px Abstand (statt über der Kante zu liegen).
         return (
-          <div className="bg-pm-shell">
-            {/* Kompakt-Einstieg: oben etwas weniger Luft; unten wie im Ausgangszustand (pb-10), damit die
-                Vertrauenszeilen nicht an der Kostenkarte kleben. */}
-            <div className={`max-w-3xl mx-auto px-[18px] ${kompakt ? 'pt-4 pb-10' : `pt-6 ${(!patientSaved && !hasPending) || sucheLaeuft ? 'pb-10' : 'pb-7'}`}`}>
-              <p className="text-[16px] text-pm-taupe-ink">
+          <div className={kompakt ? '' : 'bg-pm-shell'}>
+            <div className={`max-w-3xl mx-auto ${kompakt ? 'px-5 pt-6' : `px-[18px] pt-6 ${(!patientSaved && !hasPending) || sucheLaeuft ? 'pb-10' : 'pb-7'}`}`}>
+              <p className={`text-[16px] ${kompakt ? 'text-pm-muted' : 'text-pm-taupe-ink'}`}>
                 Guten Tag{heroNameLine ? `, ${heroNameLine}` : ''}.
               </p>
-              {/* Kompakt-Einstieg (Runde 5): Titel wie der Betreff der Angebotsmail, in 26/28 px.
+              {/* Kompakt-Einstieg (Runde 5): Titel wie der Betreff der Angebotsmail; höchstens zwei Zeilen —
                   „24-Stunden-Betreuung" bricht nicht um (sonst „24-" allein am Zeilenende). */}
-              <h1 className={`mt-1 font-extrabold leading-[1.08] tracking-[-0.035em] text-pm-ink ${kompakt ? 'text-[26px] min-[390px]:text-[28px]' : 'text-[31px]'}`}>
+              <h1 className={kompakt
+                ? 'mt-2 text-[28px] min-[376px]:text-[30px] font-bold leading-[1.15] tracking-[-0.025em] text-pm-ink'
+                : 'mt-1 font-extrabold leading-[1.08] tracking-[-0.035em] text-pm-ink text-[31px]'}>
                 {kompakt ? (
                   <>Ihr Angebot zur <span className="whitespace-nowrap">24-Stunden-Betreuung</span></>
                 ) : heroCopy.title}
@@ -3705,7 +3736,7 @@ const CustomerPortalPage: FC = () => {
 
       {!hasPending && (
       <div>
-      <div className={`max-w-3xl mx-auto px-3.5 ${kompakt ? 'pt-10' : 'pt-1 pb-4 space-y-4'}`}>
+      <div className={`max-w-3xl mx-auto ${kompakt ? 'px-5 pt-10' : 'px-3.5 pt-1 pb-4 space-y-4'}`}>
         {/* ── SECTION: 2 · Patientendaten — der Onboarding-Schritt steht VOR
              den Pflegekräften (vorher lag die Karte zwischen PK-Header und
              PK-Karten — genau die „zwei Kästen"-Verwirrung, Martin 2026-07-12). ── */}
@@ -4094,7 +4125,7 @@ const CustomerPortalPage: FC = () => {
       {/* Kompakt-Einstieg: unter den Profilen „Bereits bearbeitet" (z. B. im Profil mit „Nein danke"
           abgelehnt); die Profile selbst stehen im Pflegekräfte-Bereich darüber. */}
       {kompakt && bereitsBearbeitet && (
-        <div className="max-w-3xl mx-auto px-3.5 pt-4">
+        <div className="max-w-3xl mx-auto px-5 pt-6">
           {bereitsBearbeitet}
         </div>
       )}
@@ -4106,7 +4137,8 @@ const CustomerPortalPage: FC = () => {
           wartet. Als Referenz bleibt das Angebot vollständig erreichbar. */}
       {patientSaved && angebotSection}
 
-      <div className="max-w-3xl mx-auto px-3.5 pt-1 pb-6 space-y-4">
+      {/* Kompakt-Einstieg (Runde 15): 20 px Rand, 40 px Abstand zum Abschnitt darüber, FAQ-Kopf ohne Eyebrow. */}
+      <div className={`max-w-3xl mx-auto ${kompakt ? 'px-5 pt-10' : 'px-3.5 pt-1'} pb-6 space-y-4`}>
         {/* ── So geht es weiter · Häufige Fragen · Marta (Teil 3 des Redesigns).
              Schritt 1 = Pflegesituation gespeichert, Schritt 2 = Bewerbung da. ── */}
         {/* Nach dem Absenden ersetzt „Stand heute" diese Liste (Martin 25.09.).
@@ -4116,8 +4148,8 @@ const CustomerPortalPage: FC = () => {
             <SoGehtEsWeiter erledigt={[patientSaved, hasPending, false]} onVervollstaendigen={zurPflegesituation} />
           </div>
         )}
-        <div className="pt-6">
-          <FaqListe />
+        <div className={kompakt ? '' : 'pt-6'}>
+          <FaqListe ruhig={kompakt} />
         </div>
         <div className="pt-4">
           <MartaBox sterne={sterne} />

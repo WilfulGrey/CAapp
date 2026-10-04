@@ -754,7 +754,7 @@ export const AngebotCard: FC<{
   // `hasFinalSave` allein reicht nicht: Die erste Änderung überschreibt den
   // lokalen Vermerk mit `_isDraft: true` (Review 25.09.).
   const nurAenderung = hasFinalSave || !!schonAbgesendet || (mmCustomer?.status != null && mmCustomer.status !== 'draft');
-  // Eingebettet trägt der Kasten Rand und Innenabstand (px-5, passend zur mitlaufenden Knopfleiste).
+  // Eingebettet trägt der Kasten Rand und Innenabstand (px-6, passend zur mitlaufenden Knopfleiste mit `ruhig`).
   const Rahmen: ElementType = eingebettet ? 'div' : Card;
 
   return (
@@ -1096,6 +1096,7 @@ export const AngebotCard: FC<{
           </div>
 
           <FormNav
+            ruhig={eingebettet}
             onZurueck={step > 0 ? zurueck : undefined}
             onWeiter={letzterSchritt ? () => { void speichern(); } : weiter}
             // „Bewerbungen erhalten" statt „Speichern" (Martin 25./26.09.): Der Kunde hat
