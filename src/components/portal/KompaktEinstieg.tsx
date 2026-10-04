@@ -80,8 +80,8 @@ export function AngebotKopf({ datum }: { datum: string | null }) {
 export function AngebotLeistung({ fuer }: { fuer: string | null }) {
   return (
     <p className="mt-4 text-[15px] leading-[1.5] text-pm-body">
-      Rund-um-Betreuung zu Hause{fuer ? ` ${fuer}` : ''}. Anreise, Wechsel und Vertretung organisieren{' '}
-      <span className="whitespace-nowrap">wir.</span>
+      Rund-um-Betreuung zu Hause{fuer ? ` ${fuer}` : ''}. Wir organisieren Anreise, Wechsel und{' '}
+      <span className="whitespace-nowrap">Vertretung.</span>
     </p>
   );
 }
@@ -94,7 +94,10 @@ export function AngebotLeistung({ fuer }: { fuer: string | null }) {
 export function AngebotVertrauen({ sterne }: { sterne: SterneStand | null }) {
   return (
     <div className="mt-5 flex items-center gap-3.5">
-      <img src="/badge-testsieger.webp" alt="Testsieger DIE WELT" className="h-[66px] w-auto flex-none object-contain" />
+      {/* Siegel antippbar: Quelle und Einordnung stehen auf der Testsieger-Seite (OpenAI 04.10.: Claim belegbar machen). */}
+      <a href="https://primundus.de/testsieger-24-stunden-pflege" target="_blank" rel="noreferrer" className="flex-none" aria-label="Testsieger DIE WELT: Quelle ansehen">
+        <img src="/badge-testsieger.webp" alt="" className="h-[66px] w-auto object-contain" />
+      </a>
       <div className="min-w-0">
         <p className="text-[15px] font-semibold leading-[1.35] text-pm-ink min-[390px]:text-[16px]">
           6× in Folge Testsieger <span className="whitespace-nowrap">DIE WELT</span>
