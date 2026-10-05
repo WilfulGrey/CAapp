@@ -3400,7 +3400,7 @@ const CustomerPortalPage: FC = () => {
                   <AngebotSterne sterne={sterne} />
                   <AngebotEinleitung teil="anfang" />
                   {/* Kurzfassung nur, wenn die echte Liste geladen und leer ist — sonst springt der Satz beim Laden um. */}
-                  <AngebotEinleitung teil="ende" ohneKraefte={mmReady && !!mmMatchings?.data && pflegekraftAuswahl.visibleNurses.length === 0} />
+                  <AngebotEinleitung teil="ende" ohneKraefte={!listeLaedt && mmReady && !!mmMatchings?.data && pflegekraftAuswahl.allVisible.length === 0} />
                 </>
               ) : kompakt && <KompaktEinleitung />}
               {/* Offene Bewerbung (Martin 25.09.): Kopf nur Titel + Zeit, direkt
