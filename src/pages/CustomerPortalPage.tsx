@@ -79,7 +79,7 @@ import { SoGehtEsWeiter } from '../components/portal/SoGehtEsWeiter';
 import { FaqListe } from '../components/portal/FaqListe';
 import { MartaBox } from '../components/portal/MartaBox';
 import { BewertungsZeile } from '../components/portal/BewertungsZeile';
-import { AngebotEinleitung, AngebotKonditionen, AngebotKopf, AngebotLeistung, AngebotPerson, AngebotVertrauen, KOMPAKT_LOOK, KompaktEinleitung, KompaktePflegekraefte, KompaktPflegekraefteBereich, KompaktVertrauen, angebotDatum, angebotFuer } from '../components/portal/KompaktEinstieg';
+import { AngebotEinleitung, AngebotKonditionen, AngebotKopf, AngebotLeistung, AngebotPerson, AngebotSterne, KOMPAKT_LOOK, KompaktEinleitung, KompaktePflegekraefte, KompaktPflegekraefteBereich, KompaktVertrauen, angebotDatum, angebotFuer } from '../components/portal/KompaktEinstieg';
 import { Button } from '../components/ui/Button';
 import { Card } from '../components/ui/Card';
 import { SectionHeader, EYEBROW, H2 } from '../components/ui/SectionHeader';
@@ -3396,9 +3396,9 @@ const CustomerPortalPage: FC = () => {
                   {/* Runde 25 (Martin zu Fassung 19: „ein Angebot inkl. Einleitung und Beschreibung dessen, was der Kunde
                       bekommt"): Siegel und Sterne am Titel, dann seine Einleitung; direkt darunter die Kosten. Der Weg in
                       vier Schritten steht erst unter dem Angebot (KompaktPflegekraefteBereich). */}
-                  <AngebotEinleitung teil="anfang">
-                    <AngebotVertrauen sterne={sterne} eng />
-                  </AngebotEinleitung>
+                  {/* Runde 26: Sterne unter dem Titel, das Siegel steht neben dem Testsieger-Satz der Einleitung. */}
+                  <AngebotSterne sterne={sterne} />
+                  <AngebotEinleitung teil="anfang" />
                   {/* Kurzfassung nur, wenn die echte Liste geladen und leer ist — sonst springt der Satz beim Laden um. */}
                   <AngebotEinleitung teil="ende" ohneKraefte={mmReady && !!mmMatchings?.data && pflegekraftAuswahl.visibleNurses.length === 0} />
                 </>

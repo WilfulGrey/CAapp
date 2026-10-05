@@ -40,6 +40,9 @@ import { SectionHeader } from '../ui/SectionHeader';
 export type KompaktLook = 'ruhig' | 'angebot';
 const SUCHE = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : null;
 export const KOMPAKT_LOOK: KompaktLook = SUCHE?.get('look') === 'angebot' ? 'angebot' : 'ruhig';
+/** Runde 26: neben dem Siegel die fette Zeile „6× in Folge Testsieger DIE WELT" (Martin: „daneben machen mit dieser
+ *  Überschrift"; OpenAI 05.10.: trifft seine Worte und wirkt professioneller). Nur zur Abnahme `&siegel=ohne`: ohne die Zeile. */
+const SIEGEL_MIT_KOPF = SUCHE?.get('siegel') !== 'ohne';
 
 /** „05.10.2026" (Berliner Kalendertag) aus dem Anlagezeitpunkt der Anfrage; ohne gültiges Datum nichts. Der Preis wird
  *  in derselben Sekunde berechnet und als „Ihr Angebot" verschickt, darum „Ihr Angebot vom …" (OpenAI 05.10.). */
@@ -227,18 +230,44 @@ function ohneTrennung(text: string) {
 }
 
 /**
- * `teil="anfang"`: Absatz zur Leistung, dann der Testsieger-Satz mit dem Siegel als Beleg (`children`); `teil="ende"`:
+ * `teil="anfang"`: Absatz zur Leistung, dann der Testsieger-Satz mit dem Siegel daneben (Runde 26, Martin zu Fassung 20:
+ * „das Siegel passt natürlich zu ‚für unseren Service hat uns DIE WELT' … kannst du daneben machen"). `teil="ende"`:
  * „Unten finden Sie …" direkt über den Kosten.
  */
-export function AngebotEinleitung({ teil, ohneKraefte = false, children }: { teil: 'anfang' | 'ende'; ohneKraefte?: boolean; children?: ReactNode }) {
+export function AngebotEinleitung({ teil, ohneKraefte = false }: { teil: 'anfang' | 'ende'; ohneKraefte?: boolean }) {
   const absatz = 'text-pretty text-[17px] leading-[1.55] text-pm-body';
   if (teil === 'ende') return <p className={`mt-6 ${absatz}`}>{ohneKraefte ? EINLEITUNG_ENDE_OHNE_KRAEFTE : EINLEITUNG_ENDE}</p>;
   return (
     <>
       <p className={`mt-5 ${absatz}`}>{ohneTrennung(EINLEITUNG_ABSATZ)}</p>
-      <p className={`mt-4 ${absatz}`}>{EINLEITUNG_TESTSIEGER}</p>
-      {children}
+      <div className="mt-5 flex items-center gap-4">
+        {/* Siegel antippbar: Quelle und Einordnung stehen auf der Testsieger-Seite. */}
+        <a href="https://primundus.de/testsieger-24-stunden-pflege" target="_blank" rel="noreferrer" className="flex-none" aria-label="Testsieger DIE WELT: Quelle ansehen">
+          <img src="/badge-testsieger.webp" alt="" className={`${SIEGEL_MIT_KOPF ? 'h-[76px]' : 'h-[60px]'} w-auto object-contain`} />
+        </a>
+        <div className="min-w-0">
+          {SIEGEL_MIT_KOPF && (
+            <p className="text-[15.5px] font-semibold leading-[1.35] text-pm-ink">
+              6× in Folge Testsieger <span className="whitespace-nowrap">DIE WELT</span>
+            </p>
+          )}
+          <p className={SIEGEL_MIT_KOPF ? 'mt-1 text-pretty text-[15px] leading-[1.5] text-pm-muted' : absatz}>{EINLEITUNG_TESTSIEGER}</p>
+        </div>
+      </div>
     </>
+  );
+}
+
+/**
+ * Runde 26 (Martin zu Fassung 20: „die Sterne passen da nicht dazu … als würde das zusammengehören. Das macht gar keinen
+ * Sinn."): die Bewertungen unserer Kunden als eigene Zeile direkt unter dem Titel, getrennt vom Siegel der Auszeichnung.
+ * Ohne Stand keine Sterne (kein Ersatzwert); die Höhe bleibt reserviert, damit nichts springt.
+ */
+export function AngebotSterne({ sterne }: { sterne: SterneStand | null }) {
+  return (
+    <div className="mt-2 flex h-7 items-center">
+      <BewertungsZeile stand={sterne} className="-my-2" />
+    </div>
   );
 }
 
