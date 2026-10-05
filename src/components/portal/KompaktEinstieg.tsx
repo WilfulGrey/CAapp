@@ -17,7 +17,7 @@
 // Schrift: Fließtext 16 px, kleine Schrift 14 px. Ausnahme 13 px für die dritte Zeile der
 // Pflegekräfte — so bleibt sie bei 390 px einzeilig.
 import { useEffect, useRef, type ReactNode } from 'react';
-import { AlertCircle, Check, ChevronRight, Sparkles } from 'lucide-react';
+import { AlertCircle, ChevronRight, Sparkles } from 'lucide-react';
 import type { Nurse } from '../../types';
 import type { SterneStand } from '../../lib/sterne';
 import { BewertungsZeile } from './BewertungsZeile';
@@ -78,10 +78,10 @@ export function AngebotKopf({ datum }: { datum: string | null }) {
  * Preiskarte über dem Preis — mit der Grundlage aus der Anfrage, falls vorhanden.
  */
 export function AngebotLeistung({ fuer }: { fuer: string | null }) {
+  // Runde 20: nur die Grundlage, eine Zeile über dem Preis („Für zwei Personen mit Pflegegrad 4"); ohne Angaben „Ihr Preis".
   return (
-    <p className="mt-4 text-[15px] leading-[1.5] text-pm-body">
-      Rund-um-Betreuung zu Hause{fuer ? ` ${fuer}` : ''}. Wir organisieren Anreise, Wechsel und{' '}
-      <span className="whitespace-nowrap">Vertretung.</span>
+    <p className="text-[15px] leading-[1.4] text-pm-muted">
+      {fuer ? fuer.charAt(0).toUpperCase() + fuer.slice(1) : 'Ihr Preis'}
     </p>
   );
 }
@@ -92,17 +92,17 @@ export function AngebotLeistung({ fuer }: { fuer: string | null }) {
  * Kasten. Die Sterne stehen ohne Stand nicht da (kein Ersatzwert), die Höhe bleibt reserviert.
  */
 export function AngebotVertrauen({ sterne }: { sterne: SterneStand | null }) {
+  // Runde 20 (Martin: „überladen, nicht clean, unprofessionell"): zwei Zeilen statt drei, Siegel 48 px.
   return (
-    <div className="mt-5 flex items-center gap-3.5">
-      {/* Siegel antippbar: Quelle und Einordnung stehen auf der Testsieger-Seite (OpenAI 04.10.: Claim belegbar machen). */}
+    <div className="mt-5 flex items-center gap-3">
+      {/* Siegel antippbar: Quelle und Einordnung stehen auf der Testsieger-Seite. */}
       <a href="https://primundus.de/testsieger-24-stunden-pflege" target="_blank" rel="noreferrer" className="flex-none" aria-label="Testsieger DIE WELT: Quelle ansehen">
-        <img src="/badge-testsieger.webp" alt="" className="h-[66px] w-auto object-contain" />
+        <img src="/badge-testsieger.webp" alt="" className="h-12 w-auto object-contain" />
       </a>
       <div className="min-w-0">
-        <p className="text-[15px] font-semibold leading-[1.35] text-pm-ink min-[390px]:text-[16px]">
+        <p className="text-[15px] font-semibold leading-[1.35] text-pm-ink">
           6× in Folge Testsieger <span className="whitespace-nowrap">DIE WELT</span>
         </p>
-        <p className="text-[14px] leading-[1.4] text-pm-muted min-[390px]:text-[15px]">über 20 Jahre Erfahrung</p>
         <div className="flex h-6 items-center">
           <BewertungsZeile stand={sterne} klein className="-my-2.5" />
         </div>
@@ -118,19 +118,27 @@ export function AngebotVertrauen({ sterne }: { sterne: SterneStand | null }) {
  * „Alles" angreifbar (OpenAI 04.10.). Sommerzuschlag nur in der Saison in der Aufstellung (Martin 09.09.).
  */
 export function AngebotVorteile({ onBestpreis }: { onBestpreis: () => void }) {
-  const zeile = 'flex items-start gap-3 text-[17px] leading-[1.45] text-pm-body';
-  const haken = <Check className="mt-[3px] h-5 w-5 flex-none text-pm-green" strokeWidth={2.25} aria-hidden="true" />;
+  // Runde 20: Maße 1:1 wie `Punkte` auf primundus.de (components/vertrauen/Vertrauen.tsx): Kachel 22 px, Schrift
+  // 15–17 px nach Breite, mittleres Gewicht. Ab 375 px steht so jeder Punkt in einer Zeile (gemessen in WebKit).
+  const zeile = 'flex items-center gap-2.5 text-[15px] font-medium leading-[1.4] text-pm-ink min-[375px]:text-[15.5px] min-[390px]:gap-3 min-[390px]:text-[16.5px] min-[430px]:text-[17px]';
+  const kachel = (
+    <span className="flex h-[22px] w-[22px] flex-none items-center justify-center rounded-[7px] bg-pm-coral-tint text-pm-coral" aria-hidden="true">
+      <svg viewBox="0 0 12 12" className="h-3 w-3" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M2.5 6.3l2.3 2.2 4.7-5" />
+      </svg>
+    </span>
+  );
   return (
-    <ul className="mt-5 flex flex-col gap-3.5">
-      <li className={zeile}>{haken}<span><b className="font-semibold text-pm-ink">Alles im Preis:</b> Lohn, Steuern, Sozialabgaben und Gebühren</span></li>
-      <li className={zeile}>{haken}<span><b className="font-semibold text-pm-ink">Bei uns angestellt</b> und sozialversichert</span></li>
-      <li className={zeile}>{haken}<span><b className="font-semibold text-pm-ink">Täglich kündbar,</b> taggenau abgerechnet</span></li>
-      <li className={zeile}>{haken}<span>
-        <b className="font-semibold text-pm-ink">Bestpreisgarantie</b>{' '}
+    <ul className="mt-6 grid gap-3">
+      <li className={zeile}>{kachel}<span>Alles im Preis: Lohn, Steuern, Gebühren</span></li>
+      <li className={zeile}>{kachel}<span>Bei uns angestellt und sozialversichert</span></li>
+      <li className={zeile}>{kachel}<span>Täglich kündbar, taggenau abgerechnet</span></li>
+      <li className={zeile}>{kachel}<span>
+        Bestpreisgarantie{' '}
         <button
           type="button"
           onClick={onBestpreis}
-          className="inline-flex min-h-[44px] -my-3 items-center font-semibold text-pm-taupe-ink underline underline-offset-4 decoration-pm-taupe/40 hover:decoration-pm-taupe-ink"
+          className="inline-flex min-h-[44px] -my-3 items-center font-medium text-pm-taupe-ink underline underline-offset-4 decoration-pm-taupe/40 hover:decoration-pm-taupe-ink"
         >
           Mehr Infos
         </button>
@@ -229,42 +237,38 @@ export function KompaktPflegekraefteBereich({ aktiv, offen, onOeffnen, onImBlick
       <section aria-labelledby="pflegekraefte-titel">
         {/* 22 px statt 24: so bleibt die Überschrift bei 390 px zweizeilig. */}
         <div id="pflegekraefte" style={{ scrollMarginTop: 72 }}>
-          <h2 id="pflegekraefte-titel" className="text-[22px] font-bold leading-[1.25] tracking-[-0.02em] text-pm-ink">
+          <h2 id="pflegekraefte-titel" className="text-[23px] font-extrabold leading-[1.2] tracking-[-0.03em] text-pm-ink">
             Passende Pflegekräfte einladen und <span className="whitespace-nowrap">Bewerbungen erhalten</span>
           </h2>
         </div>
         <div ref={hinweis} id="patientendaten" className="mt-5 scroll-mt-16">
-          <div className="rounded-card border border-pm-amber/30 bg-white shadow-[0_1px_2px_rgba(28,28,28,.04)]">
-            <div className="flex items-start gap-3 rounded-t-card bg-pm-amber-tint px-5 py-4">
-              <AlertCircle className="mt-[2px] h-5 w-5 flex-none text-pm-amber-ink" strokeWidth={2} aria-hidden="true" />
-              <p className="text-[16px] font-semibold leading-[1.45] text-pm-ink">
-                {/* Martins Satz (04.10.), sprachlich geglättet (OpenAI): „Angaben" statt „Informationen", „sich" vorgezogen. */}
-                Es fehlen noch Angaben, damit sich passende Pflegekräfte bewerben können.
+          {/* Runde 20: ruhige weiße Karte wie die Preiskarte; das Zeichen in Bernstein trägt das „Achtung". */}
+          <div className="rounded-card bg-white px-5 pb-6 pt-5 shadow-lift">
+            <div className="flex items-start gap-3">
+              <AlertCircle className="mt-[2px] h-5 w-5 flex-none text-pm-amber" strokeWidth={2.25} aria-hidden="true" />
+              {/* „passende" steht schon darüber und darunter (H2, H3); ohne es zwei Zeilen statt drei. */}
+              <p className="text-[16px] font-medium leading-[1.45] text-pm-ink">
+                Es fehlen noch Angaben, damit sich Pflegekräfte <span className="whitespace-nowrap">bewerben können.</span>
               </p>
             </div>
-            <div className={`rounded-b-card px-5 ${offen ? 'pb-5' : 'pb-6 pt-5'}`}>
-              {offen ? (
-                children
-              ) : (
-                <>
-                  <Button breit onClick={onOeffnen} className="!px-2 !font-semibold">
-                    Jetzt vervollständigen →
-                  </Button>
-                  {/* Nicht „wenn Sie ein Angebot annehmen" — die Karte oben heißt „Angebot" (OpenAI 04.10.). Wortlaut
-                      wie über dem Absende-Knopf des Formulars (Registry #109, freigegeben). */}
-                  <p className="mt-3 text-[13.5px] leading-[1.45] text-pm-muted">
-                    Vieles ist schon ausgefüllt. Unverbindlich: Ein Vertrag entsteht erst, wenn Sie eine Bewerbung annehmen
-                    und im Portal <span className="whitespace-nowrap">unterschreiben.</span>
-                  </p>
-                </>
-              )}
-            </div>
+            {offen ? (
+              <div className="mt-4 border-t border-pm-line">{children}</div>
+            ) : (
+              <>
+                <Button breit onClick={onOeffnen} className="mt-5 !px-2 !font-semibold">
+                  Jetzt vervollständigen →
+                </Button>
+                {/* Wortlaut aus Registry #109 (freigegeben), gekürzt. */}
+                <p className="mt-3 text-balance text-center text-[14px] leading-[1.45] text-pm-muted">
+                  Kostenlos und unverbindlich. Vieles ist schon ausgefüllt.
+                </p>
+              </>
+            )}
           </div>
         </div>
         {/* Dann „Ihre passenden Pflegekräfte" (Martin: „dann kämen die, Ihre passenden Pflegekräfte"). */}
-        <h3 className="mt-8 text-[18px] font-semibold leading-[1.3] text-pm-ink">Ihre passenden Pflegekräfte</h3>
-        <p className="mt-1 text-[15px] leading-[1.5] text-pm-muted">Echte Profile, ausgewählt nach Ihren Angaben.</p>
-        <div className="mt-4">{liste}</div>
+        <h3 className="mt-9 text-[18px] font-bold leading-[1.3] tracking-[-0.01em] text-pm-ink">Ihre passenden Pflegekräfte</h3>
+        <div className="mt-3">{liste}</div>
       </section>
     );
   }

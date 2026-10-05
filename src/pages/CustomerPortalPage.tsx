@@ -79,7 +79,7 @@ import { SoGehtEsWeiter } from '../components/portal/SoGehtEsWeiter';
 import { FaqListe } from '../components/portal/FaqListe';
 import { MartaBox } from '../components/portal/MartaBox';
 import { BewertungsZeile } from '../components/portal/BewertungsZeile';
-import { AngebotKopf, AngebotLeistung, AngebotVertrauen, AngebotVorteile, KOMPAKT_LOOK, KompaktEinleitung, KompaktePflegekraefte, KompaktPflegekraefteBereich, KompaktVertrauen, angebotDatum, angebotFuer } from '../components/portal/KompaktEinstieg';
+import { AngebotLeistung, AngebotVertrauen, AngebotVorteile, KOMPAKT_LOOK, KompaktEinleitung, KompaktePflegekraefte, KompaktPflegekraefteBereich, KompaktVertrauen, angebotFuer } from '../components/portal/KompaktEinstieg';
 import { Button } from '../components/ui/Button';
 import { Card } from '../components/ui/Card';
 import { SectionHeader, EYEBROW, H2 } from '../components/ui/SectionHeader';
@@ -2685,7 +2685,7 @@ const CustomerPortalPage: FC = () => {
               Chevron klappt den ganzen Abschnitt zu, sobald er nur noch Referenz ist
               (Martin: „muss einklappbar sein für spätere Zustände"). */}
           {/* Kompakt-Einstieg (Runde 15): weiß, 20 px Radius, ohne Rand, weicher zweilagiger Schatten, 24 px Innenabstand. */}
-          <Card className={`relative shadow-lift ${kompakt ? `!border-0 px-6 ${angebotLook ? 'pt-5' : 'pt-6'} ${costsExpanded ? 'pb-2' : 'pb-6'}` : 'px-5 pt-3 pb-4'}`}>
+          <Card className={`relative shadow-lift ${kompakt ? `!border-0 px-6 pt-6 ${costsExpanded ? 'pb-2' : 'pb-6'}` : 'px-5 pt-3 pb-4'}`}>
             {kompakt ? (
               // Runde 13: keine Versalien-Zeile mehr — die Karte beginnt mit dem Preis; der Name bleibt
               // für Screenreader.
@@ -2725,13 +2725,11 @@ const CustomerPortalPage: FC = () => {
                   {kompakt ? (
                     <>
                       {angebotLook && (
-                        <>
-                          <AngebotKopf datum={angebotDatum(lead?.created_at)} />
-                          <AngebotLeistung fuer={angebotFuer((lead?.kalkulation as Record<string, unknown> | null | undefined)?.formularDaten as Record<string, unknown> | undefined)} />
-                        </>
+                        // Runde 20: kein Kopf mit Datum mehr — nur die Grundlage als kurze Zeile über dem Preis.
+                        <AngebotLeistung fuer={angebotFuer((lead?.kalkulation as Record<string, unknown> | null | undefined)?.formularDaten as Record<string, unknown> | undefined)} />
                       )}
-                      <p className={`${angebotLook ? 'mt-4 ' : ''}flex items-baseline gap-2 whitespace-nowrap`}>
-                        <span className="text-[44px] font-bold leading-none tracking-[-0.03em] tabular-nums text-pm-ink">{formatEuro(brutto)}</span>
+                      <p className={`${angebotLook ? 'mt-2 ' : ''}flex items-baseline gap-2 whitespace-nowrap`}>
+                        <span className={`text-[44px] ${angebotLook ? 'font-extrabold tracking-[-0.04em]' : 'font-bold tracking-[-0.03em]'} leading-none tabular-nums text-pm-ink`}>{formatEuro(brutto)}</span>
                         <span className="text-[16px] text-pm-muted">im Monat</span>
                       </p>
                       {angebotLook ? (
@@ -2739,7 +2737,7 @@ const CustomerPortalPage: FC = () => {
                         <p className="mt-3 text-[15px] leading-[1.5] text-pm-muted">
                           {/* Feiertage am Preis, damit „Alles im Preis" oben ehrlich bleibt (Vertrag § 4 Nr. 8: neun Feiertage). */}
                           Dazu kommen Kost und Logis, <span className="whitespace-nowrap">125 € Reisekosten</span> pro Fahrt
-                          und an neun Feiertagen im Jahr der doppelte <span className="whitespace-nowrap">Tagessatz.</span>
+                          und <span className="whitespace-nowrap">Feiertagszuschläge.</span>
                         </p>
                       ) : (
                       <p className="mt-3 text-[14px] leading-[1.5] text-pm-muted">
@@ -3365,7 +3363,7 @@ const CustomerPortalPage: FC = () => {
               {/* Kompakt-Einstieg (Runde 5): Titel wie der Betreff der Angebotsmail; höchstens zwei Zeilen —
                   „24-Stunden-Betreuung" bricht nicht um (sonst „24-" allein am Zeilenende). */}
               <h1 className={kompakt
-                ? 'mt-2 text-[28px] min-[376px]:text-[30px] font-bold leading-[1.15] tracking-[-0.025em] text-pm-ink'
+                ? `mt-2 text-[28px] min-[376px]:text-[30px] ${KOMPAKT_LOOK === 'angebot' ? 'font-extrabold leading-[1.1] tracking-[-0.035em]' : 'font-bold leading-[1.15] tracking-[-0.025em]'} text-pm-ink`
                 : 'mt-1 font-extrabold leading-[1.08] tracking-[-0.035em] text-pm-ink text-[31px]'}>
                 {kompakt ? (
                   <>Ihr Angebot zur <span className="whitespace-nowrap">24-Stunden-Betreuung</span></>
