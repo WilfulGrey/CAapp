@@ -79,7 +79,7 @@ import { SoGehtEsWeiter } from '../components/portal/SoGehtEsWeiter';
 import { FaqListe } from '../components/portal/FaqListe';
 import { MartaBox } from '../components/portal/MartaBox';
 import { BewertungsZeile } from '../components/portal/BewertungsZeile';
-import { ANGEBOT_REIHE, AngebotEinleitung, AngebotKopf, AngebotLeistung, AngebotPerson, AngebotWeg, AngebotVertrauen, AngebotVorteile, KOMPAKT_LOOK, KompaktEinleitung, KompaktePflegekraefte, KompaktPflegekraefteBereich, KompaktVertrauen, angebotDatum, angebotFuer } from '../components/portal/KompaktEinstieg';
+import { AngebotEinleitung, AngebotKonditionen, AngebotKopf, AngebotLeistung, AngebotPerson, AngebotVertrauen, KOMPAKT_LOOK, KompaktEinleitung, KompaktePflegekraefte, KompaktPflegekraefteBereich, KompaktVertrauen, angebotDatum, angebotFuer } from '../components/portal/KompaktEinstieg';
 import { Button } from '../components/ui/Button';
 import { Card } from '../components/ui/Card';
 import { SectionHeader, EYEBROW, H2 } from '../components/ui/SectionHeader';
@@ -2680,14 +2680,12 @@ const CustomerPortalPage: FC = () => {
         const angebotLook = kompakt && KOMPAKT_LOOK === 'angebot';
         return (
         <div id={angebotLook ? 'angebot' : undefined} className={`max-w-3xl mx-auto ${kompakt ? `px-5 ${KOMPAKT_LOOK === 'angebot' ? 'scroll-mt-20 pt-7' : 'pt-10'}` : `px-3.5 ${!patientSaved && !hasPending ? '-mt-6' : 'pt-5'}`}`}>
-          {/* Runde 24, Variante B zur Abnahme (`&reihe=vorteile`): die Vorteile über der Karte. */}
-          {angebotLook && ANGEBOT_REIHE === 'vorteile' && <div className="mb-6"><AngebotVorteile onBestpreis={() => setBestpreisOffen(true)} /></div>}
           {/* Karte im Look des Rechners (Teil 3, Martin 24.09.). „Ihr persönliches
               Angebot" steht im Kopf — der Abschnitt heißt nach seinem Inhalt. Der
               Chevron klappt den ganzen Abschnitt zu, sobald er nur noch Referenz ist
               (Martin: „muss einklappbar sein für spätere Zustände"). */}
           {/* Kompakt-Einstieg (Runde 15): weiß, 20 px Radius, ohne Rand, weicher zweilagiger Schatten, 24 px Innenabstand. */}
-          <Card className={`relative ${angebotLook ? `px-6 pt-6 ${costsExpanded ? 'pb-2' : 'pb-6'}` : kompakt ? `shadow-lift !border-0 px-6 pt-6 ${costsExpanded ? 'pb-2' : 'pb-6'}` : 'shadow-lift px-5 pt-3 pb-4'}`}>
+          <Card className={`relative ${angebotLook ? `px-5 pt-6 ${costsExpanded ? 'pb-2' : 'pb-6'}` : kompakt ? `shadow-lift !border-0 px-6 pt-6 ${costsExpanded ? 'pb-2' : 'pb-6'}` : 'shadow-lift px-5 pt-3 pb-4'}`}>
             {kompakt ? (
               // Runde 13: keine Versalien-Zeile mehr — die Karte beginnt mit dem Preis; der Name bleibt
               // für Screenreader.
@@ -2743,8 +2741,10 @@ const CustomerPortalPage: FC = () => {
                         // Runde 18: „Alles im Preis" steht oben bei den Vorteilen; am Preis nur, was dazukommt.
                         <p className="mt-3 text-[15px] leading-[1.5] text-pm-muted">
                           {/* Feiertage am Preis, damit „Alles im Preis" oben ehrlich bleibt (Vertrag § 4 Nr. 8: neun Feiertage). */}
-                          Dazu kommen Kost und Logis, <span className="whitespace-nowrap">125 € Reisekosten</span> pro Fahrt
-                          und <span className="whitespace-nowrap">Feiertagszuschläge.</span>
+                          {/* Runde 25: „alles drin" (Martins Wort) als Satz am Preis. */}
+                          Lohn, Steuern, Gebühren: alles drin. Dazu kommen Kost und Logis,{' '}
+                          <span className="whitespace-nowrap">125 € Reisekosten</span> pro Fahrt und{' '}
+                          <span className="whitespace-nowrap">Feiertagszuschläge.</span>
                         </p>
                       ) : (
                       <p className="mt-3 text-[14px] leading-[1.5] text-pm-muted">
@@ -2779,7 +2779,8 @@ const CustomerPortalPage: FC = () => {
                   )}
                   {/* Kompakt-Einstieg: Haarlinie, die vier Punkte der Startseite (Runde 15: feiner grüner Haken,
                       16 px), Haarlinie, Testsieger-Siegel mit Testsieger/Erfahrung und darunter die Sterne. */}
-                  {kompakt ? (angebotLook ? null : vierPunkteRuhig) : vierPunkte('mt-4 flex flex-col gap-2.5')}
+                  {/* Runde 25: im Look „angebot" die Konditionen (kündbar, Bestpreisgarantie) als Teil des Angebots. */}
+                  {kompakt ? (angebotLook ? <AngebotKonditionen onBestpreis={() => setBestpreisOffen(true)} /> : vierPunkteRuhig) : vierPunkte('mt-4 flex flex-col gap-2.5')}
                   {/* Runde 19: Im Look „angebot" stehen Siegel und Sterne oben unter dem Titel. */}
                   {kompakt && !angebotLook && <KompaktVertrauen sterne={sterne} />}
                   {!kompakt && kostenErst}
@@ -2958,13 +2959,6 @@ const CustomerPortalPage: FC = () => {
           </>
           )}
           </Card>
-          {/* Runde 24 (Vorschlag): die vier Vorteile direkt unter der Angebotskarte, je eine Zeile (in der Karte
-              brachen sie bei 302 px Breite um). Variante B (`&reihe=vorteile`) setzt sie über die Karte. */}
-          {angebotLook && ANGEBOT_REIHE === 'angebot' && (
-            <div className="mt-6">
-              <AngebotVorteile onBestpreis={() => setBestpreisOffen(true)} />
-            </div>
-          )}
         </div>
         );
       })();
@@ -3399,12 +3393,14 @@ const CustomerPortalPage: FC = () => {
                   Punkte. Die Situation (Personen, Pflegegrad) steht unten in der Preiskarte. */}
               {kompakt && KOMPAKT_LOOK === 'angebot' ? (
                 <>
-                  {/* Runde 24 (Martin zu Fassung 18): Siegel und Sterne gehören zum Kopf wie in Fassung 16/17, dann die
-                      Einleitung, die den Weg erklärt, dann der Weg. Kein eigener Kopf für Schritt 1 — direkt unter dem
-                      Weg steht die Angebotskarte („Und wo ist das Angebot?"). */}
-                  <AngebotVertrauen sterne={sterne} />
-                  <AngebotEinleitung />
-                  <AngebotWeg onSprung={(ziel) => document.getElementById(ziel)?.scrollIntoView({ behavior: 'smooth', block: 'start' })} />
+                  {/* Runde 25 (Martin zu Fassung 19: „ein Angebot inkl. Einleitung und Beschreibung dessen, was der Kunde
+                      bekommt"): Siegel und Sterne am Titel, dann seine Einleitung; direkt darunter die Kosten. Der Weg in
+                      vier Schritten steht erst unter dem Angebot (KompaktPflegekraefteBereich). */}
+                  <AngebotEinleitung teil="anfang">
+                    <AngebotVertrauen sterne={sterne} eng />
+                  </AngebotEinleitung>
+                  {/* Kurzfassung nur, wenn die echte Liste geladen und leer ist — sonst springt der Satz beim Laden um. */}
+                  <AngebotEinleitung teil="ende" ohneKraefte={mmReady && !!mmMatchings?.data && pflegekraftAuswahl.visibleNurses.length === 0} />
                 </>
               ) : kompakt && <KompaktEinleitung />}
               {/* Offene Bewerbung (Martin 25.09.): Kopf nur Titel + Zeit, direkt

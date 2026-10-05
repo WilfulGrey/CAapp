@@ -40,12 +40,6 @@ import { SectionHeader } from '../ui/SectionHeader';
 export type KompaktLook = 'ruhig' | 'angebot';
 const SUCHE = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : null;
 export const KOMPAKT_LOOK: KompaktLook = SUCHE?.get('look') === 'angebot' ? 'angebot' : 'ruhig';
-/**
- * Runde 24, nur zur Abnahme: wo die vier Vorteile stehen. `angebot` (Vorschlag): in der Angebotskarte unter dem Preis —
- * Martin zu Fassung 18: „Ihr Angebot liegt vor. Und wo ist das Angebot? … dann kommt erst der Preis". `vorteile`
- * (`&reihe=vorteile`): über der Karte wie bisher (Martin 04.10.: „oben die Vorteile … der Preis kann weiter unten sein").
- */
-export const ANGEBOT_REIHE: 'angebot' | 'vorteile' = SUCHE?.get('reihe') === 'vorteile' ? 'vorteile' : 'angebot';
 
 /** „05.10.2026" (Berliner Kalendertag) aus dem Anlagezeitpunkt der Anfrage; ohne gültiges Datum nichts. Der Preis wird
  *  in derselben Sekunde berechnet und als „Ihr Angebot" verschickt, darum „Ihr Angebot vom …" (OpenAI 05.10.). */
@@ -130,7 +124,7 @@ function Punkt({ nummer, stand, gross = false }: { nummer: number; stand: 'ferti
 
 export function AngebotWeg({ onSprung }: { onSprung: (ziel: string) => void }) {
   return (
-    <nav aria-label="Ihr Weg zur Pflegekraft" className="mt-6">
+    <nav aria-label="Ihr Weg zur Pflegekraft" className="mt-4">
       <ol className="relative grid grid-cols-4">
         {/* Linie von der Mitte der ersten bis zur Mitte der letzten Spalte; das erledigte Stück in Taupe (Runde 24:
             oben nur eine Akzentfarbe, Koralle für den aktuellen Schritt — Martin: „nicht so bunt"). */}
@@ -190,10 +184,11 @@ export function AngebotPerson({ name, kuerzel }: { name: string | null; kuerzel:
  * nicht sichtbar … vorne mit reinbekommen"): Siegel mit Testsieger, Erfahrung und Sternen direkt unter dem Titel, ohne
  * Kasten. Die Sterne stehen ohne Stand nicht da (kein Ersatzwert), die Höhe bleibt reserviert.
  */
-export function AngebotVertrauen({ sterne }: { sterne: SterneStand | null }) {
+export function AngebotVertrauen({ sterne, eng = false }: { sterne: SterneStand | null; eng?: boolean }) {
   // Runde 20 (Martin: „überladen, nicht clean, unprofessionell"): zwei Zeilen statt drei, Siegel 48 px.
+  // Runde 25: `eng` = direkt unter dem Testsieger-Satz der Einleitung (Beleg), darum weniger Abstand.
   return (
-    <div className="mt-5 flex items-center gap-3">
+    <div className={`${eng ? 'mt-3' : 'mt-5'} flex items-center gap-3`}>
       {/* Siegel antippbar: Quelle und Einordnung stehen auf der Testsieger-Seite. */}
       <a href="https://primundus.de/testsieger-24-stunden-pflege" target="_blank" rel="noreferrer" className="flex-none" aria-label="Testsieger DIE WELT: Quelle ansehen">
         <img src="/badge-testsieger.webp" alt="" className="h-12 w-auto object-contain" />
@@ -211,57 +206,70 @@ export function AngebotVertrauen({ sterne }: { sterne: SterneStand | null }) {
 }
 
 /**
- * Runde 24 (Martin 05.10. zu Fassung 18: „oben komme ich rein, habe Angebot, einladen, Bewerbung, auswählen. Aber ich
- * sehe keine Einleitung. Da fehlt mir so ein bisschen was."): ein Absatz zwischen Siegel und Weg, der den Weg erklärt.
- * Er sagt nicht noch einmal „Angebot" (Martin: „Ihr Angebot zur 24-Stunden-Betreuung, Angebot …, Ihr Angebot liegt vor.
- * Und wo ist das Angebot?"). Keine Aussage über gefundene Pflegekräfte — die Liste kann leer sein.
+ * Runde 25 (Martin 05.10. zu Fassung 19: „Wir brauchen doch ein Angebot inkl. Einleitung und Beschreibung dessen, was der
+ * Kunde bekommt", dazu sein Entwurf „Gerne übernehmen wir die Rund-um-Betreuung. Unsere Pflegekräfte sind bei uns
+ * angestellt …"): die Einleitung als Absatz unter Titel und Siegel. Fakten: „bei uns angestellt" (Martin 30.09.),
+ * Testsieger für den Kundenservice, sechs Jahre in Folge, zuletzt 2026 (testsieger-formulierungslinie). Ist die Liste
+ * geladen und leer, entfällt der Hinweis auf die Pflegekräfte (keine Aussage über Kräfte, die nicht da sind).
  */
-// OpenAI 05.10. (mutig10): kürzer, ohne „Vielen Dank …“ (Floskel), höchstens drei Zeilen.
-export const EINLEITUNG = 'Bis zum Start Ihrer Betreuung sind es vier Schritte. Sie entscheiden, wer zu Ihnen kommt.';
+// OpenAI 05.10. (mutig11): „kümmern uns um" statt des zweiten „übernehmen", „direkt bei uns angestellt, ohne Vermittler"
+// (Martins Punkt vom 05.10.), Quelle der Auszeichnung im Satz, „aktuell verfügbar" statt „für Sie verfügbar" (klingt
+// sonst nach Reservierung). Nicht übernommen: „Rundum-Betreuung" (Martins Wort ist „Rund-um-Betreuung").
+export const EINLEITUNG_ABSATZ = 'Gerne übernehmen wir die Rund-um-Betreuung. Unsere Pflegekräfte sind direkt bei uns angestellt, ohne Vermittler, und wir kümmern uns um die komplette Abwicklung von Anfang bis Ende.';
+export const EINLEITUNG_TESTSIEGER = 'Für unseren Service hat uns DIE WELT nun zum sechsten Mal in Folge als Testsieger ausgezeichnet.';
+export const EINLEITUNG_ENDE = 'Unten finden Sie Ihre Kosten mit unserer Bestpreisgarantie und passende Pflegekräfte, die aktuell verfügbar sind.';
+export const EINLEITUNG_ENDE_OHNE_KRAEFTE = 'Unten finden Sie Ihre Kosten mit unserer Bestpreisgarantie.';
 
-export function AngebotEinleitung() {
-  return <p className="mt-5 text-pretty text-[17px] leading-[1.5] text-pm-muted">{EINLEITUNG}</p>;
+/** „Rund-um-Betreuung" bricht nie am Bindestrich um. */
+function ohneTrennung(text: string) {
+  const [vor, nach] = text.split('Rund-um-Betreuung');
+  return nach === undefined ? text : <>{vor}<span className="whitespace-nowrap">Rund-um-Betreuung</span>{nach}</>;
 }
 
 /**
- * Die vier Vorteile (Martin 04.10.: „es ist alles drin, bei uns angestellt und täglich kündbar"; 05.10. zu Fassung 18:
- * „alles drin, bei uns angestellt, täglich kündbar — das fand ich vorher besser"). Runde 24 wieder wie Fassung 16 (Martin
- * dazu: „die Punkte finde ich schon ganz gut"): je Punkt eine Zeile, Maße wie `Punkte` auf primundus.de (Kachel 22 px,
- * eigener Haken, mittleres Gewicht) — ruhiger als die Zeilen mit Zeichen, Titel und Satz aus Fassung 17/18 („so bunt
- * oben … zerstreut"). „Bei uns angestellt" heißt für Martin legal, sozialversicherungspflichtig, ohne Vermittler.
- * Fakten: Vertrag § 3 (kündbar ohne Frist, anteilige Abrechnung); Garantie über das Pop-up mit dem Wortlaut der Quelle.
- * `imAngebot`: als Teil der Angebotskarte unter dem Preis, mit Haarlinie davor.
+ * `teil="anfang"`: Absatz zur Leistung, dann der Testsieger-Satz mit dem Siegel als Beleg (`children`); `teil="ende"`:
+ * „Unten finden Sie …" direkt über den Kosten.
  */
-export const VORTEILE = [
-  'Lohn, Steuern, Gebühren: alles drin',
-  'Legal bei uns angestellt, ohne Vermittler',
-  'Täglich kündbar, taggenau abgerechnet',
-] as const;
+export function AngebotEinleitung({ teil, ohneKraefte = false, children }: { teil: 'anfang' | 'ende'; ohneKraefte?: boolean; children?: ReactNode }) {
+  const absatz = 'text-pretty text-[17px] leading-[1.55] text-pm-body';
+  if (teil === 'ende') return <p className={`mt-6 ${absatz}`}>{ohneKraefte ? EINLEITUNG_ENDE_OHNE_KRAEFTE : EINLEITUNG_ENDE}</p>;
+  return (
+    <>
+      <p className={`mt-5 ${absatz}`}>{ohneTrennung(EINLEITUNG_ABSATZ)}</p>
+      <p className={`mt-4 ${absatz}`}>{EINLEITUNG_TESTSIEGER}</p>
+      {children}
+    </>
+  );
+}
 
-export function AngebotVorteile({ onBestpreis, imAngebot = false }: { onBestpreis: () => void; imAngebot?: boolean }) {
-  const zeile = 'flex items-center gap-2.5 text-[15px] font-medium leading-[1.4] text-pm-ink min-[375px]:text-[15.5px] min-[390px]:gap-3 min-[390px]:text-[16px]';
+/**
+ * Konditionen in der Angebotskarte unter dem Preis (Runde 25): „Täglich kündbar, taggenau abgerechnet" (Vertrag § 3) und
+ * die Bestpreisgarantie (Pop-up mit dem Wortlaut der Quelle). Haken wie `Punkte` auf primundus.de (Fassung 16, Martin:
+ * „die Punkte finde ich schon ganz gut"). „Alles drin" steht als Satz am Preis, „bei uns angestellt" in der Einleitung.
+ */
+export function AngebotKonditionen({ onBestpreis }: { onBestpreis: () => void }) {
+  // In der Karte sind 308 px frei (390 px): Kachel 20 px, Abstand 8 px, Schrift 14,5 px, dann bleibt „Täglich kündbar,
+  // taggenau abgerechnet" einzeilig (gemessen in WebKit: Text 286 px bei 15 px).
+  const zeile = 'flex items-start gap-2 text-[14.5px] font-medium leading-[1.4] text-pm-ink';
   const kachel = (
-    <span className="flex h-[22px] w-[22px] flex-none items-center justify-center rounded-[7px] bg-pm-coral-tint text-pm-coral" aria-hidden="true">
+    <span className="mt-px flex h-5 w-5 flex-none items-center justify-center rounded-[6px] bg-pm-coral-tint text-pm-coral" aria-hidden="true">
       <svg viewBox="0 0 12 12" className="h-3 w-3" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
         <path d="M2.5 6.3l2.3 2.2 4.7-5" />
       </svg>
     </span>
   );
   return (
-    <ul className={imAngebot ? 'mt-5 grid gap-3 border-t border-pm-line pt-5' : 'grid gap-3'}>
-      {VORTEILE.map((punkt) => (
-        <li key={punkt} className={zeile}>{kachel}<span>{punkt}</span></li>
-      ))}
-      <li className={zeile}>{kachel}<span>
-        {GARANTIE_PORTAL.titel}{' '}
+    <ul className="mt-5 grid gap-3 border-t border-pm-line pt-5">
+      <li className={zeile}>{kachel}<span>Täglich kündbar, taggenau abgerechnet</span></li>
+      <li className={zeile}>{kachel}<span className="flex-1">{GARANTIE_PORTAL.titel}</span>
         <button
           type="button"
           onClick={onBestpreis}
-          className="inline-flex min-h-[44px] -my-3 items-center font-semibold text-pm-taupe-ink hover:text-pm-ink"
+          className="inline-flex min-h-[44px] -my-3 flex-none items-center font-semibold text-pm-taupe-ink hover:text-pm-ink"
         >
           Mehr Infos&nbsp;›
         </button>
-      </span></li>
+      </li>
     </ul>
   );
 }
@@ -354,6 +362,10 @@ export function KompaktPflegekraefteBereich({ aktiv, offen, onOeffnen, onImBlick
     // Schritte 3 und 4 als je ein Satz. Hinweis-Karte = Sprungziel `goto=anfragen`, das Formular klappt darin auf.
     return (
       <section aria-labelledby="pflegekraefte">
+        {/* Runde 25: Oben steht das Angebot (Einleitung, Kosten); der Weg leitet von dort zu den Schritten 2–4 über. */}
+        <h2 className="text-[20px] font-extrabold leading-[1.25] tracking-[-0.02em] text-pm-ink">So geht es weiter</h2>
+        <AngebotWeg onSprung={(ziel) => document.getElementById(ziel)?.scrollIntoView({ behavior: 'smooth', block: 'start' })} />
+        <div className="mt-10" />
         <SchrittKopf id="pflegekraefte" nummer={2} titel="Pflegekräfte einladen" stand="jetzt" />
         <p className="mt-3 text-[16px] leading-[1.5] text-pm-muted">
           Gefällt Ihnen eine Pflegekraft, laden Sie sie ein, sich bei Ihnen zu bewerben. Das ist kostenlos und unverbindlich.
