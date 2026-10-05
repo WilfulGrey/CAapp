@@ -79,7 +79,7 @@ import { SoGehtEsWeiter } from '../components/portal/SoGehtEsWeiter';
 import { FaqListe } from '../components/portal/FaqListe';
 import { MartaBox } from '../components/portal/MartaBox';
 import { BewertungsZeile } from '../components/portal/BewertungsZeile';
-import { AngebotKopf, AngebotLeistung, AngebotPerson, AngebotWeg, SchrittKopf, AngebotVertrauen, AngebotVorteile, KOMPAKT_LOOK, KompaktEinleitung, KompaktePflegekraefte, KompaktPflegekraefteBereich, KompaktVertrauen, angebotDatum, angebotFuer } from '../components/portal/KompaktEinstieg';
+import { ANGEBOT_REIHE, AngebotEinleitung, AngebotKopf, AngebotLeistung, AngebotPerson, AngebotWeg, AngebotVertrauen, AngebotVorteile, KOMPAKT_LOOK, KompaktEinleitung, KompaktePflegekraefte, KompaktPflegekraefteBereich, KompaktVertrauen, angebotDatum, angebotFuer } from '../components/portal/KompaktEinstieg';
 import { Button } from '../components/ui/Button';
 import { Card } from '../components/ui/Card';
 import { SectionHeader, EYEBROW, H2 } from '../components/ui/SectionHeader';
@@ -2679,7 +2679,9 @@ const CustomerPortalPage: FC = () => {
         // Runde 17 (`?look=angebot`): die Karte als Angebot — Kopf mit Datum und Grundlage, Zeilen statt „Inklusive …".
         const angebotLook = kompakt && KOMPAKT_LOOK === 'angebot';
         return (
-        <div className={`max-w-3xl mx-auto ${kompakt ? `px-5 ${KOMPAKT_LOOK === 'angebot' ? 'pt-12' : 'pt-10'}` : `px-3.5 ${!patientSaved && !hasPending ? '-mt-6' : 'pt-5'}`}`}>
+        <div id={angebotLook ? 'angebot' : undefined} className={`max-w-3xl mx-auto ${kompakt ? `px-5 ${KOMPAKT_LOOK === 'angebot' ? 'scroll-mt-20 pt-7' : 'pt-10'}` : `px-3.5 ${!patientSaved && !hasPending ? '-mt-6' : 'pt-5'}`}`}>
+          {/* Runde 24, Variante B zur Abnahme (`&reihe=vorteile`): die Vorteile über der Karte. */}
+          {angebotLook && ANGEBOT_REIHE === 'vorteile' && <div className="mb-6"><AngebotVorteile onBestpreis={() => setBestpreisOffen(true)} /></div>}
           {/* Karte im Look des Rechners (Teil 3, Martin 24.09.). „Ihr persönliches
               Angebot" steht im Kopf — der Abschnitt heißt nach seinem Inhalt. Der
               Chevron klappt den ganzen Abschnitt zu, sobald er nur noch Referenz ist
@@ -2956,6 +2958,13 @@ const CustomerPortalPage: FC = () => {
           </>
           )}
           </Card>
+          {/* Runde 24 (Vorschlag): die vier Vorteile direkt unter der Angebotskarte, je eine Zeile (in der Karte
+              brachen sie bei 302 px Breite um). Variante B (`&reihe=vorteile`) setzt sie über die Karte. */}
+          {angebotLook && ANGEBOT_REIHE === 'angebot' && (
+            <div className="mt-6">
+              <AngebotVorteile onBestpreis={() => setBestpreisOffen(true)} />
+            </div>
+          )}
         </div>
         );
       })();
@@ -3378,7 +3387,7 @@ const CustomerPortalPage: FC = () => {
               {/* Kompakt-Einstieg (Runde 5): Titel wie der Betreff der Angebotsmail; höchstens zwei Zeilen —
                   „24-Stunden-Betreuung" bricht nicht um (sonst „24-" allein am Zeilenende). */}
               <h1 className={kompakt
-                ? `${KOMPAKT_LOOK === 'angebot' ? 'mt-7 text-[28px] min-[376px]:text-[31px] font-extrabold leading-[1.1] tracking-[-0.035em]' : 'mt-2 text-[28px] min-[376px]:text-[30px] font-bold leading-[1.15] tracking-[-0.025em]'} text-pm-ink`
+                ? `${KOMPAKT_LOOK === 'angebot' ? 'mt-6 text-[28px] min-[376px]:text-[31px] font-extrabold leading-[1.1] tracking-[-0.035em]' : 'mt-2 text-[28px] min-[376px]:text-[30px] font-bold leading-[1.15] tracking-[-0.025em]'} text-pm-ink`
                 : 'mt-1 font-extrabold leading-[1.08] tracking-[-0.035em] text-pm-ink text-[31px]'}>
                 {kompakt ? (
                   <>Ihr Angebot zur <span className="whitespace-nowrap">24-Stunden-Betreuung</span></>
@@ -3390,14 +3399,12 @@ const CustomerPortalPage: FC = () => {
                   Punkte. Die Situation (Personen, Pflegegrad) steht unten in der Preiskarte. */}
               {kompakt && KOMPAKT_LOOK === 'angebot' ? (
                 <>
-                  {/* Runde 23: der Weg in vier Schritten als Stand unter dem Titel; jeder Punkt springt hin. */}
+                  {/* Runde 24 (Martin zu Fassung 18): Siegel und Sterne gehören zum Kopf wie in Fassung 16/17, dann die
+                      Einleitung, die den Weg erklärt, dann der Weg. Kein eigener Kopf für Schritt 1 — direkt unter dem
+                      Weg steht die Angebotskarte („Und wo ist das Angebot?"). */}
+                  <AngebotVertrauen sterne={sterne} />
+                  <AngebotEinleitung />
                   <AngebotWeg onSprung={(ziel) => document.getElementById(ziel)?.scrollIntoView({ behavior: 'smooth', block: 'start' })} />
-                  <div id="angebot" className="mt-10 scroll-mt-20">
-                    {/* Schritt 1 hat denselben Kopf wie die Schritte 2–4 (OpenAI 05.10.: „semantische Klammer"). */}
-                    <SchrittKopf id="schritt-angebot" nummer={1} titel="Ihr Angebot liegt vor" stand="fertig" />
-                    <AngebotVertrauen sterne={sterne} />
-                    <AngebotVorteile onBestpreis={() => setBestpreisOffen(true)} />
-                  </div>
                 </>
               ) : kompakt && <KompaktEinleitung />}
               {/* Offene Bewerbung (Martin 25.09.): Kopf nur Titel + Zeit, direkt

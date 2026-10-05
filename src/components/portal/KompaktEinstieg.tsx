@@ -17,7 +17,7 @@
 // Schrift: Fließtext 16 px, kleine Schrift 14 px. Ausnahme 13 px für die dritte Zeile der
 // Pflegekräfte — so bleibt sie bei 390 px einzeilig.
 import { useEffect, useRef, type ReactNode } from 'react';
-import { BadgeEuro, CalendarCheck, Check, ChevronRight, ClipboardList, ShieldCheck, Sparkles, UserCheck, UserRound } from 'lucide-react';
+import { AlertTriangle, Check, ChevronRight, Sparkles, UserRound } from 'lucide-react';
 import { GARANTIE_PORTAL } from '../../lib/garantie';
 import type { Nurse } from '../../types';
 import type { SterneStand } from '../../lib/sterne';
@@ -40,6 +40,12 @@ import { SectionHeader } from '../ui/SectionHeader';
 export type KompaktLook = 'ruhig' | 'angebot';
 const SUCHE = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : null;
 export const KOMPAKT_LOOK: KompaktLook = SUCHE?.get('look') === 'angebot' ? 'angebot' : 'ruhig';
+/**
+ * Runde 24, nur zur Abnahme: wo die vier Vorteile stehen. `angebot` (Vorschlag): in der Angebotskarte unter dem Preis —
+ * Martin zu Fassung 18: „Ihr Angebot liegt vor. Und wo ist das Angebot? … dann kommt erst der Preis". `vorteile`
+ * (`&reihe=vorteile`): über der Karte wie bisher (Martin 04.10.: „oben die Vorteile … der Preis kann weiter unten sein").
+ */
+export const ANGEBOT_REIHE: 'angebot' | 'vorteile' = SUCHE?.get('reihe') === 'vorteile' ? 'vorteile' : 'angebot';
 
 /** „05.10.2026" (Berliner Kalendertag) aus dem Anlagezeitpunkt der Anfrage; ohne gültiges Datum nichts. Der Preis wird
  *  in derselben Sekunde berechnet und als „Ihr Angebot" verschickt, darum „Ihr Angebot vom …" (OpenAI 05.10.). */
@@ -98,6 +104,8 @@ export function AngebotLeistung({ fuer }: { fuer: string | null }) {
  * Daten nicht da sind, dann kennen die Pflegekräfte den Job nicht" — das Vervollständigen ist KEIN eigener Schritt,
  * sondern der Hinweis in Schritt 2). Der Weg steht unter dem Titel wie der Stand einer Bestellung; jeder Punkt springt
  * zu seinem Abschnitt. Schritt 1 ist erledigt (das Angebot steht darunter), Schritt 2 ist der aktuelle.
+ * Runde 24: Schritt 1 hat keinen eigenen Kopf mehr (Martin: „darunter wieder Ihr Angebot liegt vor"), „Angebot" springt
+ * zur Angebotskarte (id `angebot`).
  */
 export const WEG = [
   { label: 'Angebot', ziel: 'angebot' },
@@ -112,7 +120,7 @@ function Punkt({ nummer, stand, gross = false }: { nummer: number; stand: 'ferti
     <span
       aria-hidden="true"
       className={`relative flex flex-none items-center justify-center rounded-full font-semibold tabular-nums ${groesse} ${
-        stand === 'fertig' ? 'bg-pm-green text-white' : stand === 'jetzt' ? 'bg-pm-coral text-white' : 'border-2 border-pm-line bg-pm-paper text-pm-muted'
+        stand === 'fertig' ? 'bg-pm-taupe text-white' : stand === 'jetzt' ? 'bg-pm-coral text-white' : 'border-2 border-pm-line bg-pm-paper text-pm-muted'
       }`}
     >
       {stand === 'fertig' ? <Check className="h-4 w-4" strokeWidth={3} /> : nummer}
@@ -124,9 +132,10 @@ export function AngebotWeg({ onSprung }: { onSprung: (ziel: string) => void }) {
   return (
     <nav aria-label="Ihr Weg zur Pflegekraft" className="mt-6">
       <ol className="relative grid grid-cols-4">
-        {/* Linie von der Mitte der ersten bis zur Mitte der letzten Spalte; das erledigte Stück grün. */}
+        {/* Linie von der Mitte der ersten bis zur Mitte der letzten Spalte; das erledigte Stück in Taupe (Runde 24:
+            oben nur eine Akzentfarbe, Koralle für den aktuellen Schritt — Martin: „nicht so bunt"). */}
         <span aria-hidden="true" className="absolute left-[12.5%] right-[12.5%] top-[21px] h-[2px] rounded-full bg-pm-line" />
-        <span aria-hidden="true" className="absolute left-[12.5%] top-[21px] h-[2px] w-[25%] rounded-full bg-pm-green" />
+        <span aria-hidden="true" className="absolute left-[12.5%] top-[21px] h-[2px] w-[25%] rounded-full bg-pm-taupe" />
         {WEG.map((w, i) => {
           const stand = i === 0 ? 'fertig' : i === 1 ? 'jetzt' : 'spaeter';
           return (
@@ -202,49 +211,57 @@ export function AngebotVertrauen({ sterne }: { sterne: SterneStand | null }) {
 }
 
 /**
- * Runde 18 (Martin: „wichtiger ist, oben die Vorteile zu sagen: es ist alles drin, bei uns angestellt und täglich
- * kündbar; der Preis kann weiter unten sein"). Vier Zeilen, ohne Kasten. Erster Punkt seit Runde 21 „Lohn, Steuern,
- * Gebühren: alles drin" (Martins Worte; OpenAI 05.10.: „alles" gilt so nur für diese drei Posten und stößt sich nicht
- * mit „Dazu kommen …" am Preis). Sommerzuschlag nur in der Saison in der Aufstellung (Martin 09.09.).
+ * Runde 24 (Martin 05.10. zu Fassung 18: „oben komme ich rein, habe Angebot, einladen, Bewerbung, auswählen. Aber ich
+ * sehe keine Einleitung. Da fehlt mir so ein bisschen was."): ein Absatz zwischen Siegel und Weg, der den Weg erklärt.
+ * Er sagt nicht noch einmal „Angebot" (Martin: „Ihr Angebot zur 24-Stunden-Betreuung, Angebot …, Ihr Angebot liegt vor.
+ * Und wo ist das Angebot?"). Keine Aussage über gefundene Pflegekräfte — die Liste kann leer sein.
  */
-export function AngebotVorteile({ onBestpreis }: { onBestpreis: () => void }) {
-  // Runde 22 (Martin 05.10. mit dem Bild „Willkommen bei Erinnerungen": „das wirkt übersichtlich, ich will das mehr
-  // apple-like"): je Vorteil ein Zeichen, ein kurzer Titel und ein erklärender Satz. Fakten: Vertrag § 3 (kündbar ohne
-  // Kündigungsfrist, anteilige Abrechnung), Garantie-Wortlaut aus GARANTIE_PORTAL, „Keine Vermittlungsgebühr" wie auf
-  // der Startseite. „Alles drin" gilt für die genannten Posten; was dazukommt, steht am Preis.
-  const zeilen = [
-    { Zeichen: BadgeEuro, titel: 'Alles drin', text: 'Lohn, Steuern und Gebühren sind im Preis.' },
-    { Zeichen: UserCheck, titel: 'Bei uns angestellt', text: 'Legal, sozialversicherungspflichtig und ohne Vermittler.' },
-    { Zeichen: CalendarCheck, titel: 'Täglich kündbar', text: 'Ohne Kündigungsfrist. Abgerechnet wird taggenau.' },
-  ];
-  const kachel = 'flex h-10 w-10 flex-none items-center justify-center rounded-[11px] bg-pm-coral-tint text-pm-coral';
+// OpenAI 05.10. (mutig10): kürzer, ohne „Vielen Dank …“ (Floskel), höchstens drei Zeilen.
+export const EINLEITUNG = 'Bis zum Start Ihrer Betreuung sind es vier Schritte. Sie entscheiden, wer zu Ihnen kommt.';
+
+export function AngebotEinleitung() {
+  return <p className="mt-5 text-pretty text-[17px] leading-[1.5] text-pm-muted">{EINLEITUNG}</p>;
+}
+
+/**
+ * Die vier Vorteile (Martin 04.10.: „es ist alles drin, bei uns angestellt und täglich kündbar"; 05.10. zu Fassung 18:
+ * „alles drin, bei uns angestellt, täglich kündbar — das fand ich vorher besser"). Runde 24 wieder wie Fassung 16 (Martin
+ * dazu: „die Punkte finde ich schon ganz gut"): je Punkt eine Zeile, Maße wie `Punkte` auf primundus.de (Kachel 22 px,
+ * eigener Haken, mittleres Gewicht) — ruhiger als die Zeilen mit Zeichen, Titel und Satz aus Fassung 17/18 („so bunt
+ * oben … zerstreut"). „Bei uns angestellt" heißt für Martin legal, sozialversicherungspflichtig, ohne Vermittler.
+ * Fakten: Vertrag § 3 (kündbar ohne Frist, anteilige Abrechnung); Garantie über das Pop-up mit dem Wortlaut der Quelle.
+ * `imAngebot`: als Teil der Angebotskarte unter dem Preis, mit Haarlinie davor.
+ */
+export const VORTEILE = [
+  'Lohn, Steuern, Gebühren: alles drin',
+  'Legal bei uns angestellt, ohne Vermittler',
+  'Täglich kündbar, taggenau abgerechnet',
+] as const;
+
+export function AngebotVorteile({ onBestpreis, imAngebot = false }: { onBestpreis: () => void; imAngebot?: boolean }) {
+  const zeile = 'flex items-center gap-2.5 text-[15px] font-medium leading-[1.4] text-pm-ink min-[375px]:text-[15.5px] min-[390px]:gap-3 min-[390px]:text-[16px]';
+  const kachel = (
+    <span className="flex h-[22px] w-[22px] flex-none items-center justify-center rounded-[7px] bg-pm-coral-tint text-pm-coral" aria-hidden="true">
+      <svg viewBox="0 0 12 12" className="h-3 w-3" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M2.5 6.3l2.3 2.2 4.7-5" />
+      </svg>
+    </span>
+  );
   return (
-    <ul className="mt-8 grid gap-6">
-      {zeilen.map(({ Zeichen, titel, text }) => (
-        <li key={titel} className="flex gap-4">
-          <span className={kachel} aria-hidden="true"><Zeichen className="h-[22px] w-[22px]" strokeWidth={2} /></span>
-          <div className="min-w-0">
-            <p className="text-[17px] font-semibold leading-[1.3] tracking-[-0.01em] text-pm-ink">{titel}</p>
-            <p className="mt-0.5 text-balance text-[15.5px] leading-[1.45] text-pm-muted">{text}</p>
-          </div>
-        </li>
+    <ul className={imAngebot ? 'mt-5 grid gap-3 border-t border-pm-line pt-5' : 'grid gap-3'}>
+      {VORTEILE.map((punkt) => (
+        <li key={punkt} className={zeile}>{kachel}<span>{punkt}</span></li>
       ))}
-      <li className="flex gap-4">
-        <span className={kachel} aria-hidden="true"><ShieldCheck className="h-[22px] w-[22px]" strokeWidth={2} /></span>
-        <div className="min-w-0">
-          <p className="text-[17px] font-semibold leading-[1.3] tracking-[-0.01em] text-pm-ink">{GARANTIE_PORTAL.titel}</p>
-          <p className="mt-0.5 text-[15.5px] leading-[1.45] text-pm-muted">
-            {GARANTIE_PORTAL.zusage}{' '}
-            <button
-              type="button"
-              onClick={onBestpreis}
-              className="inline-flex min-h-[44px] -my-3 items-center font-semibold text-pm-taupe-ink hover:text-pm-ink"
-            >
-              Mehr Infos&nbsp;›
-            </button>
-          </p>
-        </div>
-      </li>
+      <li className={zeile}>{kachel}<span>
+        {GARANTIE_PORTAL.titel}{' '}
+        <button
+          type="button"
+          onClick={onBestpreis}
+          className="inline-flex min-h-[44px] -my-3 items-center font-semibold text-pm-taupe-ink hover:text-pm-ink"
+        >
+          Mehr Infos&nbsp;›
+        </button>
+      </span></li>
     </ul>
   );
 }
@@ -332,7 +349,7 @@ export function KompaktPflegekraefteBereich({ aktiv, offen, onOeffnen, onImBlick
   }, [aktiv]);
   if (!aktiv) return <div>{children}</div>;
   if (look === 'angebot') {
-    // Runde 23: Schritt 2 „Pflegekräfte einladen" mit Martins Hinweis (fehlen Angaben, kennen die Pflegekräfte den
+    // Runde 23/24: Schritt 2 „Pflegekräfte einladen" mit Martins Achtung-Hinweis (fehlen Angaben, kennen die Pflegekräfte den
     // Einsatz nicht) und den Pflegekräften in der Karte des Portals (MatchCard „V", wie nach dem Absenden), danach die
     // Schritte 3 und 4 als je ein Satz. Hinweis-Karte = Sprungziel `goto=anfragen`, das Formular klappt darin auf.
     return (
@@ -342,13 +359,15 @@ export function KompaktPflegekraefteBereich({ aktiv, offen, onOeffnen, onImBlick
           Gefällt Ihnen eine Pflegekraft, laden Sie sie ein, sich bei Ihnen zu bewerben. Das ist kostenlos und unverbindlich.
         </p>
         <div ref={hinweis} id="patientendaten" className="mt-5 scroll-mt-20">
+          {/* Runde 24 (Martin zu Fassung 18: „dann kommt dieser Achtung, würde ich das nennen … also Achtung, auch Symbol"):
+              Warnzeichen in Bernstein und das Wort „Achtung" vorn im Titel. */}
           <Card className="px-5 pb-5 pt-5">
             <div className="flex gap-4">
-              <span aria-hidden="true" className="flex h-10 w-10 flex-none items-center justify-center rounded-[11px] bg-pm-coral-tint text-pm-coral">
-                <ClipboardList className="h-[22px] w-[22px]" strokeWidth={2} />
+              <span aria-hidden="true" className="flex h-10 w-10 flex-none items-center justify-center rounded-[11px] bg-pm-amber-tint text-pm-amber">
+                <AlertTriangle className="h-[22px] w-[22px]" strokeWidth={2} />
               </span>
               <div className="min-w-0">
-                <p className="text-[17px] font-semibold leading-[1.3] tracking-[-0.01em] text-pm-ink">Zum Einladen fehlen noch Angaben zur Pflegesituation</p>
+                <p className="text-[17px] font-semibold leading-[1.3] tracking-[-0.01em] text-pm-ink">Achtung: Es fehlen noch Angaben zur Pflegesituation</p>
                 <p className="mt-1 text-[15px] leading-[1.45] text-pm-muted">
                   Erst damit kennen die Pflegekräfte Ihren Einsatz und können sich bewerben. Dauert etwa 2&nbsp;Minuten, vieles ist schon ausgefüllt.
                 </p>
@@ -363,12 +382,9 @@ export function KompaktPflegekraefteBereich({ aktiv, offen, onOeffnen, onImBlick
             )}
           </Card>
         </div>
-        {/* Über den Karten (Martin 04.10.: „dann kämen die, Ihre passenden Pflegekräfte"): was die Karten sind —
-            Vorschläge zu den Angaben; eingeladen wird nach dem Vervollständigen (OpenAI 05.10.: sonst wirken die
-            Knöpfe der Karten wie ein Widerspruch zum Hinweis). */}
-        <h3 className="mt-9 text-[18px] font-bold leading-[1.3] tracking-[-0.01em] text-pm-ink">Ihre passenden Pflegekräfte</h3>
-        <p className="mt-1 text-[15px] leading-[1.45] text-pm-muted">Echte Profile, ausgewählt nach Ihren Angaben.</p>
-        <div className="mt-4">{liste}</div>
+        {/* Runde 24 (Martin zu Fassung 18: „darunter wieder Ihre passenden Pflegekräfte. Also eine Überschrift reicht"):
+            die Karten direkt unter dem Hinweis, ohne eigene Überschrift. */}
+        <div className="mt-6">{liste}</div>
         <div className="mt-14">
           <SchrittKopf id="schritt-bewerbungen" nummer={3} titel="Bewerbungen erhalten" stand="spaeter" />
           <p className="mt-3 text-[16px] leading-[1.5] text-pm-muted">
