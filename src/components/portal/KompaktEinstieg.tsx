@@ -87,7 +87,7 @@ export function AngebotLeistung({ fuer }: { fuer: string | null }) {
   return (
     <div>
       <p className="text-[17px] font-semibold leading-[1.3] tracking-[-0.01em] text-pm-ink">Rund-um-Betreuung zu Hause</p>
-      {fuer && <p className="mt-0.5 text-[15px] leading-[1.4] text-pm-muted">{fuer}</p>}
+      {fuer && <p className="mt-0.5 text-[15px] leading-[1.4] text-pm-muted">{fuer.charAt(0).toUpperCase() + fuer.slice(1)}</p>}
     </div>
   );
 }
@@ -148,8 +148,8 @@ export function AngebotVorteile({ onBestpreis }: { onBestpreis: () => void }) {
   // der Startseite. „Alles drin" gilt für die genannten Posten; was dazukommt, steht am Preis.
   const zeilen = [
     { Zeichen: BadgeEuro, titel: 'Alles drin', text: 'Lohn, Steuern und Gebühren sind im Preis. Keine Vermittlungsgebühr.' },
-    { Zeichen: UserCheck, titel: 'Bei uns angestellt', text: 'Ihre Betreuungskraft ist sozialversichert. Wir organisieren Anreise, Wechsel und Vertretung.' },
-    { Zeichen: CalendarCheck, titel: 'Täglich kündbar', text: 'Ohne Kündigungsfrist und taggenau abgerechnet.' },
+    { Zeichen: UserCheck, titel: 'Bei uns angestellt', text: 'Sozialversichert. Wir organisieren Anreise, Wechsel und Vertretung.' },
+    { Zeichen: CalendarCheck, titel: 'Täglich kündbar', text: 'Ohne Kündigungsfrist. Abgerechnet wird taggenau.' },
   ];
   const kachel = 'flex h-10 w-10 flex-none items-center justify-center rounded-[11px] bg-pm-coral-tint text-pm-coral';
   return (
@@ -172,9 +172,9 @@ export function AngebotVorteile({ onBestpreis }: { onBestpreis: () => void }) {
             <button
               type="button"
               onClick={onBestpreis}
-              className="inline-flex min-h-[44px] -my-3 items-center font-medium text-pm-taupe-ink underline underline-offset-4 decoration-pm-taupe/40 hover:decoration-pm-taupe-ink"
+              className="inline-flex min-h-[44px] -my-3 items-center font-semibold text-pm-taupe-ink hover:text-pm-ink"
             >
-              Mehr Infos
+              Mehr Infos&nbsp;›
             </button>
           </p>
         </div>
@@ -295,7 +295,7 @@ export function KompaktPflegekraefteBereich({ aktiv, offen, onOeffnen, onImBlick
                   )}
                   <span
                     className={`relative flex h-7 w-7 flex-none items-center justify-center rounded-full text-[14px] font-semibold tabular-nums ${
-                      fertig ? 'bg-pm-green text-white' : jetzt ? 'bg-pm-coral text-white' : 'border-2 border-pm-line bg-white text-pm-muted'
+                      fertig ? 'bg-pm-green text-white' : jetzt ? 'bg-pm-coral-tint text-pm-coral' : 'border-2 border-pm-line bg-white text-pm-muted'
                     }`}
                   >
                     {fertig ? <Check className="h-4 w-4" strokeWidth={3} aria-label="erledigt" /> : i + 1}
@@ -304,7 +304,7 @@ export function KompaktPflegekraefteBereich({ aktiv, offen, onOeffnen, onImBlick
                     <p className={`text-[17px] font-semibold leading-[1.3] tracking-[-0.01em] ${fertig ? 'text-pm-muted' : 'text-pm-ink'}`}>{s.titel}</p>
                     <p className="mt-1 text-[15px] leading-[1.45] text-pm-muted">{s.text}</p>
                     {jetzt && !offen && (
-                      <Button breit onClick={onOeffnen} className="mt-4 !font-semibold">
+                      <Button breit onClick={onOeffnen} className="mt-5 mb-1 !font-semibold">
                         Jetzt vervollständigen
                       </Button>
                     )}
@@ -315,7 +315,7 @@ export function KompaktPflegekraefteBereich({ aktiv, offen, onOeffnen, onImBlick
           </ol>
           {offen && <div className="mt-5 border-t border-pm-line">{children}</div>}
         </div>
-        <div id="pflegekraefte" style={{ scrollMarginTop: 72 }} className="mt-12">
+        <div id="pflegekraefte" style={{ scrollMarginTop: 72 }} className="mt-14">
           <h2 id="pflegekraefte-titel" className="text-[24px] font-extrabold leading-[1.15] tracking-[-0.03em] text-pm-ink">Ihre passenden Pflegekräfte</h2>
           <p className="mt-1.5 text-pretty text-[16px] leading-[1.45] text-pm-muted">Echte Profile, ausgewählt nach Ihren Angaben.</p>
         </div>

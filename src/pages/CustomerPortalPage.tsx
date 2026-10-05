@@ -2679,7 +2679,7 @@ const CustomerPortalPage: FC = () => {
         // Runde 17 (`?look=angebot`): die Karte als Angebot — Kopf mit Datum und Grundlage, Zeilen statt „Inklusive …".
         const angebotLook = kompakt && KOMPAKT_LOOK === 'angebot';
         return (
-        <div className={`max-w-3xl mx-auto ${kompakt ? 'px-5 pt-10' : `px-3.5 ${!patientSaved && !hasPending ? '-mt-6' : 'pt-5'}`}`}>
+        <div className={`max-w-3xl mx-auto ${kompakt ? `px-5 ${KOMPAKT_LOOK === 'angebot' ? 'pt-12' : 'pt-10'}` : `px-3.5 ${!patientSaved && !hasPending ? '-mt-6' : 'pt-5'}`}`}>
           {/* Karte im Look des Rechners (Teil 3, Martin 24.09.). „Ihr persönliches
               Angebot" steht im Kopf — der Abschnitt heißt nach seinem Inhalt. Der
               Chevron klappt den ganzen Abschnitt zu, sobald er nur noch Referenz ist
@@ -2760,7 +2760,7 @@ const CustomerPortalPage: FC = () => {
                         <button
                           type="button"
                           onClick={zuAllenKosten}
-                          className={`inline-flex min-h-[44px] -my-3 items-center ${LINK_RUHIG}`}
+                          className={`inline-flex min-h-[44px] -my-3 items-center ${angebotLook ? 'font-semibold text-pm-taupe-ink hover:text-pm-ink' : LINK_RUHIG}`}
                         >
                           {/* Runde 17: ohne „Alle" — die Aufstellung nennt den Feiertagszuschlag nicht. */}
                           {angebotLook ? 'Kosten im Überblick ›' : 'Alle Kosten im Überblick ›'}
@@ -3780,7 +3780,7 @@ const CustomerPortalPage: FC = () => {
 
       {!hasPending && (
       <div>
-      <div className={`max-w-3xl mx-auto ${kompakt ? 'px-5 pt-10' : 'px-3.5 pt-1 pb-4 space-y-4'}`}>
+      <div className={`max-w-3xl mx-auto ${kompakt ? `px-5 ${KOMPAKT_LOOK === 'angebot' ? 'pt-14' : 'pt-10'}` : 'px-3.5 pt-1 pb-4 space-y-4'}`}>
         {/* ── SECTION: 2 · Patientendaten — der Onboarding-Schritt steht VOR
              den Pflegekräften (vorher lag die Karte zwischen PK-Header und
              PK-Karten — genau die „zwei Kästen"-Verwirrung, Martin 2026-07-12). ── */}
