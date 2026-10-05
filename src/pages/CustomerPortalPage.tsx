@@ -79,7 +79,7 @@ import { SoGehtEsWeiter } from '../components/portal/SoGehtEsWeiter';
 import { FaqListe } from '../components/portal/FaqListe';
 import { MartaBox } from '../components/portal/MartaBox';
 import { BewertungsZeile } from '../components/portal/BewertungsZeile';
-import { AngebotKopf, AngebotLeistung, AngebotPerson, AngebotWeg, AngebotVertrauen, AngebotVorteile, KOMPAKT_LOOK, KompaktEinleitung, KompaktePflegekraefte, KompaktPflegekraefteBereich, KompaktVertrauen, angebotDatum, angebotFuer } from '../components/portal/KompaktEinstieg';
+import { AngebotKopf, AngebotLeistung, AngebotPerson, AngebotWeg, SchrittKopf, AngebotVertrauen, AngebotVorteile, KOMPAKT_LOOK, KompaktEinleitung, KompaktePflegekraefte, KompaktPflegekraefteBereich, KompaktVertrauen, angebotDatum, angebotFuer } from '../components/portal/KompaktEinstieg';
 import { Button } from '../components/ui/Button';
 import { Card } from '../components/ui/Card';
 import { SectionHeader, EYEBROW, H2 } from '../components/ui/SectionHeader';
@@ -3392,7 +3392,9 @@ const CustomerPortalPage: FC = () => {
                 <>
                   {/* Runde 23: der Weg in vier Schritten als Stand unter dem Titel; jeder Punkt springt hin. */}
                   <AngebotWeg onSprung={(ziel) => document.getElementById(ziel)?.scrollIntoView({ behavior: 'smooth', block: 'start' })} />
-                  <div id="angebot" className="mt-8 scroll-mt-20">
+                  <div id="angebot" className="mt-10 scroll-mt-20">
+                    {/* Schritt 1 hat denselben Kopf wie die Schritte 2–4 (OpenAI 05.10.: „semantische Klammer"). */}
+                    <SchrittKopf id="schritt-angebot" nummer={1} titel="Ihr Angebot liegt vor" stand="fertig" />
                     <AngebotVertrauen sterne={sterne} />
                     <AngebotVorteile onBestpreis={() => setBestpreisOffen(true)} />
                   </div>

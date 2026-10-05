@@ -214,7 +214,7 @@ export function AngebotVorteile({ onBestpreis }: { onBestpreis: () => void }) {
   // der Startseite. „Alles drin" gilt für die genannten Posten; was dazukommt, steht am Preis.
   const zeilen = [
     { Zeichen: BadgeEuro, titel: 'Alles drin', text: 'Lohn, Steuern und Gebühren sind im Preis.' },
-    { Zeichen: UserCheck, titel: 'Bei uns angestellt', text: 'Legal und sozialversicherungspflichtig angestellt, ohne Vermittler.' },
+    { Zeichen: UserCheck, titel: 'Bei uns angestellt', text: 'Legal, sozialversicherungspflichtig und ohne Vermittler.' },
     { Zeichen: CalendarCheck, titel: 'Täglich kündbar', text: 'Ohne Kündigungsfrist. Abgerechnet wird taggenau.' },
   ];
   const kachel = 'flex h-10 w-10 flex-none items-center justify-center rounded-[11px] bg-pm-coral-tint text-pm-coral';
@@ -348,7 +348,7 @@ export function KompaktPflegekraefteBereich({ aktiv, offen, onOeffnen, onImBlick
                 <ClipboardList className="h-[22px] w-[22px]" strokeWidth={2} />
               </span>
               <div className="min-w-0">
-                <p className="text-[17px] font-semibold leading-[1.3] tracking-[-0.01em] text-pm-ink">Es fehlen noch Angaben zur Pflegesituation</p>
+                <p className="text-[17px] font-semibold leading-[1.3] tracking-[-0.01em] text-pm-ink">Zum Einladen fehlen noch Angaben zur Pflegesituation</p>
                 <p className="mt-1 text-[15px] leading-[1.45] text-pm-muted">
                   Erst damit kennen die Pflegekräfte Ihren Einsatz und können sich bewerben. Dauert etwa 2&nbsp;Minuten, vieles ist schon ausgefüllt.
                 </p>
@@ -363,6 +363,11 @@ export function KompaktPflegekraefteBereich({ aktiv, offen, onOeffnen, onImBlick
             )}
           </Card>
         </div>
+        {/* Über den Karten (Martin 04.10.: „dann kämen die, Ihre passenden Pflegekräfte"): was die Karten sind —
+            Vorschläge zu den Angaben; eingeladen wird nach dem Vervollständigen (OpenAI 05.10.: sonst wirken die
+            Knöpfe der Karten wie ein Widerspruch zum Hinweis). */}
+        <h3 className="mt-9 text-[18px] font-bold leading-[1.3] tracking-[-0.01em] text-pm-ink">Ihre passenden Pflegekräfte</h3>
+        <p className="mt-1 text-[15px] leading-[1.45] text-pm-muted">Echte Profile, ausgewählt nach Ihren Angaben.</p>
         <div className="mt-4">{liste}</div>
         <div className="mt-14">
           <SchrittKopf id="schritt-bewerbungen" nummer={3} titel="Bewerbungen erhalten" stand="spaeter" />
