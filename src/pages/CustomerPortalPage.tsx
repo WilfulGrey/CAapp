@@ -79,7 +79,7 @@ import { SoGehtEsWeiter } from '../components/portal/SoGehtEsWeiter';
 import { FaqListe } from '../components/portal/FaqListe';
 import { MartaBox } from '../components/portal/MartaBox';
 import { BewertungsZeile } from '../components/portal/BewertungsZeile';
-import { AngebotLeistung, AngebotVertrauen, AngebotVorteile, KOMPAKT_LOOK, KompaktEinleitung, KompaktePflegekraefte, KompaktPflegekraefteBereich, KompaktVertrauen, angebotFuer } from '../components/portal/KompaktEinstieg';
+import { AngebotKopf, AngebotLeistung, AngebotVertrauen, AngebotVorteile, KOMPAKT_LOOK, KompaktEinleitung, KompaktePflegekraefte, KompaktPflegekraefteBereich, KompaktVertrauen, angebotDatum, angebotFuer } from '../components/portal/KompaktEinstieg';
 import { Button } from '../components/ui/Button';
 import { Card } from '../components/ui/Card';
 import { SectionHeader, EYEBROW, H2 } from '../components/ui/SectionHeader';
@@ -2725,8 +2725,13 @@ const CustomerPortalPage: FC = () => {
                   {kompakt ? (
                     <>
                       {angebotLook && (
-                        // Runde 20: kein Kopf mit Datum mehr — nur die Grundlage als kurze Zeile über dem Preis.
-                        <AngebotLeistung fuer={angebotFuer((lead?.kalkulation as Record<string, unknown> | null | undefined)?.formularDaten as Record<string, unknown> | undefined)} />
+                        // Runde 21: „IHR ANGEBOT VOM …" als kleine Zeile, darunter die Grundlage über dem Preis.
+                        <>
+                          <AngebotKopf datum={angebotDatum(lead?.created_at)} />
+                          <div className="mt-1.5">
+                            <AngebotLeistung fuer={angebotFuer((lead?.kalkulation as Record<string, unknown> | null | undefined)?.formularDaten as Record<string, unknown> | undefined)} />
+                          </div>
+                        </>
                       )}
                       <p className={`${angebotLook ? 'mt-2 ' : ''}flex items-baseline gap-2 whitespace-nowrap`}>
                         <span className={`text-[44px] ${angebotLook ? 'font-extrabold tracking-[-0.04em]' : 'font-bold tracking-[-0.03em]'} leading-none tabular-nums text-pm-ink`}>{formatEuro(brutto)}</span>

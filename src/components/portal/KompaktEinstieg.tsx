@@ -39,13 +39,13 @@ export type KompaktLook = 'ruhig' | 'angebot';
 const SUCHE = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : null;
 export const KOMPAKT_LOOK: KompaktLook = SUCHE?.get('look') === 'angebot' ? 'angebot' : 'ruhig';
 
-/** „4.10.2026" (Berliner Kalendertag) aus dem Anlagezeitpunkt der Anfrage; ohne gültiges Datum nichts. In der Karte
- *  steht es als „Anfrage vom …" — es ist das Datum der Anfrage, kein eigenes Angebotsdatum (OpenAI 04.10.). */
+/** „05.10.2026" (Berliner Kalendertag) aus dem Anlagezeitpunkt der Anfrage; ohne gültiges Datum nichts. Der Preis wird
+ *  in derselben Sekunde berechnet und als „Ihr Angebot" verschickt, darum „Ihr Angebot vom …" (OpenAI 05.10.). */
 export function angebotDatum(iso: string | null | undefined): string | null {
   if (!iso) return null;
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return null;
-  return d.toLocaleDateString('de-DE', { day: 'numeric', month: 'numeric', year: 'numeric', timeZone: 'Europe/Berlin' });
+  return d.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric', timeZone: 'Europe/Berlin' });
 }
 
 /**
@@ -63,13 +63,16 @@ export function angebotFuer(fd: Record<string, unknown> | null | undefined): str
   return grad ? `für ${wer} ${grad}` : `für ${wer}`;
 }
 
-/** Kopf der Preiskarte: links „Ihr Preis", rechts das Datum der Anfrage. */
+/**
+ * Kopf der Preiskarte (Runde 21): eine kleine Zeile im Stil der Website-Etiketten, „IHR ANGEBOT VOM 05.10.2026".
+ * Ohne Linie und ohne zweite Spalte (Martin zu Fassung 15: „überladen"); sie hält, dass die Karte ein Angebot ist
+ * und kein Rechenergebnis (Martin zur Weg-Fassung: „sieht nicht aus wie ein echtes Angebot"; OpenAI 05.10.).
+ */
 export function AngebotKopf({ datum }: { datum: string | null }) {
   return (
-    <div className="flex items-baseline justify-between gap-3 border-b border-pm-line pb-3">
-      <p className="text-[15px] font-semibold text-pm-ink">Ihr Preis</p>
-      {datum && <p className="text-[14px] tabular-nums text-pm-muted">Anfrage vom {datum}</p>}
-    </div>
+    <p className="text-[12.5px] font-semibold uppercase tabular-nums tracking-[0.08em] text-pm-taupe-ink">
+      {datum ? `Ihr Angebot vom ${datum}` : 'Ihr Angebot'}
+    </p>
   );
 }
 
@@ -113,9 +116,9 @@ export function AngebotVertrauen({ sterne }: { sterne: SterneStand | null }) {
 
 /**
  * Runde 18 (Martin: „wichtiger ist, oben die Vorteile zu sagen: es ist alles drin, bei uns angestellt und täglich
- * kündbar; der Preis kann weiter unten sein"). Vier Zeilen, ohne Kasten. „Alles im Preis" bezieht sich auf die
- * genannten Posten; was dazukommt (Kost und Logis, Reisekosten, Feiertage), steht direkt am Preis — sonst wäre
- * „Alles" angreifbar (OpenAI 04.10.). Sommerzuschlag nur in der Saison in der Aufstellung (Martin 09.09.).
+ * kündbar; der Preis kann weiter unten sein"). Vier Zeilen, ohne Kasten. Erster Punkt seit Runde 21 „Lohn, Steuern,
+ * Gebühren: alles drin" (Martins Worte; OpenAI 05.10.: „alles" gilt so nur für diese drei Posten und stößt sich nicht
+ * mit „Dazu kommen …" am Preis). Sommerzuschlag nur in der Saison in der Aufstellung (Martin 09.09.).
  */
 export function AngebotVorteile({ onBestpreis }: { onBestpreis: () => void }) {
   // Runde 20: Maße 1:1 wie `Punkte` auf primundus.de (components/vertrauen/Vertrauen.tsx): Kachel 22 px, Schrift
@@ -130,7 +133,7 @@ export function AngebotVorteile({ onBestpreis }: { onBestpreis: () => void }) {
   );
   return (
     <ul className="mt-6 grid gap-3">
-      <li className={zeile}>{kachel}<span>Alles im Preis: Lohn, Steuern, Gebühren</span></li>
+      <li className={zeile}>{kachel}<span>Lohn, Steuern, Gebühren: alles drin</span></li>
       <li className={zeile}>{kachel}<span>Bei uns angestellt und sozialversichert</span></li>
       <li className={zeile}>{kachel}<span>Täglich kündbar, taggenau abgerechnet</span></li>
       <li className={zeile}>{kachel}<span>
